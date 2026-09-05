@@ -16,6 +16,9 @@ import {
 import { getCombo } from "@/lib/combos/service";
 import { esModalidadServicio, resolverRecargoServicioPct } from "@/lib/pos-ventas/servicios";
 import { orCodigoBarraProductoLocal, codigosDeProductoLocal } from "@/lib/productos/busquedaCodigoBarra";
+import { ofertasVigentesPorProductoLocal } from "@/lib/ofertas/servidor";
+import { descuentoPctDesdePrecios } from "@/lib/ofertas/precio";
+import { CONDICION_PAGO_LABEL } from "@/lib/ofertas/vigencia";
 
 const FUZZY_CANDIDATE_LIMIT = 10000;
 const FUZZY_TOP_RESULTS = 10;
@@ -535,6 +538,35 @@ async function construirItems(lista, { esDeposito, allowNegativeStock, listaApli
       // Combo inválido para este contexto (otro local, etc.) → se omite del listado.
       console.warn("[pos-ventas/buscar-producto] combo omitido:", e.message);
     }
+  }
+
+  // ── OFERTA VIGENTE, PARA QUE EL CAJERO LA VEA ANTES DE COBRAR ─────────────
+  //
+  // Es informativo: acá NO se cambia `precioVenta`. El precio que se cobra lo
+  // resuelve `pos-ventas/crear` contra la misma fila de la oferta, y tiene que
+  // seguir siendo el único lugar donde eso se decide — si esta ruta también
+  // bajara el precio, habría dos motores calculando lo mismo y el día que uno
+  // cambie se cobra distinto de lo que se muestra.
+  //
+  // `condicionPago` viaja siempre: una oferta de solo efectivo que se muestre
+  // sin decirlo es peor que no mostrarla, porque el cajero promete un precio que
+  // no va a poder hacer si el cliente saca la tarjeta.
+  const ofertas = await ofertasVigentesPorProductoLocal(prisma, {
+    localId,
+    productoLocalIds: lista.map((pl) => pl.id),
+  });
+
+  for (const [productoLocalId, oferta] of Object.entries(ofertas)) {
+    const item = byId.get(Number(productoLocalId));
+    if (!item) continue;
+    item.oferta = {
+      ofertaId: oferta.ofertaId,
+      ofertaNombre: oferta.ofertaNombre,
+      precioOferta: oferta.precioOferta,
+      condicionPago: oferta.condicionPago,
+      condicionPagoLabel: CONDICION_PAGO_LABEL[oferta.condicionPago] || oferta.condicionPago,
+      descuentoPct: descuentoPctDesdePrecios(item.precioVenta, oferta.precioOferta),
+    };
   }
 
   return lista.map((pl) => byId.get(pl.id)).filter(Boolean);

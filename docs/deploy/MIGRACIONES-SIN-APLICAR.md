@@ -16,7 +16,39 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna.
+### `20260904120000_ofertas_y_recargos_pago`
+
+Rama `feat/ofertas-y-recargos-por-medio-de-pago`. **Sin mergear y sin desplegar.**
+Producción está en 105; con ésta el árbol pasa a **106**.
+
+**Es aditiva pura.** Crea un enum (`CondicionPagoOferta`), cuatro tablas
+(`Oferta`, `OfertaLinea`, `OfertaEvento`, `RecargoPagoLocal`) y agrega nueve
+columnas **nullable** a `Venta` y `VentaDetalle`. No borra, no renombra y no
+transforma ninguna columna existente. **No toca**
+`ConfiguracionGrupo.comisionDebito/comisionCredito/comisionMercadopago`: ésas
+siguen siendo la comisión bancaria y esta tanda no las lee.
+
+**No hay backfill, y es una decisión.** Las ~8.000 ventas existentes quedan con
+las nueve columnas en `null`. Ese `null` dice la verdad —se cobraron en un mundo
+sin ofertas ni recargos— y escribir `0` convertiría una ausencia en una
+afirmación que después no se podría distinguir de "hubo una oferta de cero
+pesos".
+
+**No siembra ninguna fila de `RecargoPagoLocal`**, así que el día del despliegue
+ningún local le cobra un peso de más a nadie. Sin fila, el recargo es 0. Hay que
+configurarlo local por local, a mano, y recién ahí empieza a aplicarse.
+
+**Qué comprobar después de aplicarla**, contra `information_schema`: que las
+cuatro tablas existan donde antes daban cero filas; que `Venta.recargoPagoImporte`
+exista, sea `numeric` y `is_nullable = YES`; y que
+`SELECT COUNT(*) FROM "RecargoPagoLocal"` dé **0**. Si diera más de cero, alguien
+sembró recargos y hay clientes pagando de más.
+
+⚠️ **ESTA MIGRACIÓN NO SE EJERCIÓ CONTRA NINGÚN POSTGRES.** Está escrita a mano y
+revisada, pero no se corrió `prisma migrate dev`, ni `prisma validate`, ni
+`prisma generate`. El motivo está en el informe de la rama: la única base
+disponible en la máquina donde se trabajó es la de producción. **No desplegar sin
+aplicarla antes contra una base de prueba.**
 
 ---
 

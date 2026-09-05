@@ -16,7 +16,9 @@ import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
 import { SOLO_TRANSITO } from "@/lib/transferencias/politicasStock";
 import { requireOperadorSegunConfig, verificarVoucherOperador } from "@/lib/operador";
 import { WHERE_TURNO_OPERATIVO, ERROR_TURNO_EN_PREPARACION } from "@/lib/caja/cierreRelevo";
-import { normalizarYConsolidarPagos, aplicarComisiones, derivarCamposVenta } from "@/lib/pos-ventas/pagos";
+import { normalizarYConsolidarPagos, aplicarComisiones, derivarCamposVenta, normalizarMedio } from "@/lib/pos-ventas/pagos";
+import { calcularVentaComercial } from "@/lib/ofertas/motorVenta";
+import { ofertasVigentesPorProductoLocal, recargosDelLocal } from "@/lib/ofertas/servidor";
 import { verificarDescuentoPuntos, textoDescuentoPuntosInvalido } from "@/lib/pos-ventas/puntos";
 import {
   esModalidadServicio,
@@ -31,7 +33,10 @@ import {
   pesoDesdeImporte,
   validarSubtotalFijado,
   subtotalLinea,
-  sumarSubtotales,
+  // `sumarSubtotales` salió de acá: el subtotal ahora lo devuelve el motor
+  // comercial, que suma lo MISMO pero después de aplicar las ofertas. Dejarlo
+  // importado invitaría a volver a sumar por su cuenta y a que el total y las
+  // líneas dejaran de contar la misma historia.
 } from "@/lib/pos-ventas/lineaPorImporte";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
@@ -470,16 +475,7 @@ export async function POST(req) {
       }
     }
 
-    // Calcular totales. Suma en centavos enteros y respeta el importe fijado de
-    // las líneas de peso cargadas por importe: esas NO se re-derivan del peso
-    // redondeado (daría $1.997,50 donde el cajero cobró $2.000).
-    const subtotal = sumarSubtotales(items);
-    // Base ELEGIBLE para descuentos/puntos = mercadería (subtotal SIN servicios).
-    // Los servicios de importe variable no reciben descuentos/promos/puntos y su
-    // importe no puede reducirse indirectamente por un descuento global.
-    const baseElegibleDescuento = Math.round((subtotal - subtotalServicios + Number.EPSILON) * 100) / 100;
     const descuentoManual = Number(descuento) || 0;
-    const descuentoAutomatico = baseElegibleDescuento * (descuentoAplicadoPct / 100);
 
     // El descuento por puntos LO CALCULA EL SERVIDOR. Era el único importe del
     // cobro que entraba crudo del body: se validaba cuántos puntos se gastaban
@@ -509,11 +505,108 @@ export async function POST(req) {
       // de la tolerancia: el que vale es el calculado acá.
       descuentoPorPuntosVal = chequeo.esperado;
     }
-    const descuentoTotal = descuentoAutomatico + descuentoManual + descuentoPorPuntosVal;
+
+    // === OFERTAS Y RECARGO COMERCIAL — SERVER-AUTHORITATIVE ==================
+    //
+    // El POS puede MOSTRAR un precio de oferta, pero no puede imponerlo: el que
+    // vale es el que sale de la fila de la oferta leída acá. Si el navegador
+    // manda $900 y no hay oferta vigente, se cobra el precio normal.
+    //
+    // El `productoLocalId` de cada línea se resuelve ACÁ contra la base, por
+    // (localId, baseId), y no se toma del body. Un id de otra ubicación colado
+    // en el payload aplicaría la oferta de otro local.
+    const idsBaseCarrito = [...new Set(items.map((i) => i.productoBaseId).filter(Boolean))];
+    const filasLocales = await prisma.productoLocal.findMany({
+      where: { localId, baseId: { in: idsBaseCarrito } },
+      select: { id: true, baseId: true },
+    });
+    const productoLocalPorBase = new Map(filasLocales.map((pl) => [pl.baseId, pl.id]));
+
+    // Los MEDIOS de la venta (no los importes) deciden si una oferta aplica y
+    // cuánto recargo se cobra. Salen del body antes de conocer el total, porque
+    // el total DEPENDE de ellos: con débito puede no haber oferta y sí recargo.
+    const mediosDeclarados =
+      Array.isArray(body.pagos) && body.pagos.length > 0
+        ? body.pagos.map((p) => normalizarMedio(p?.medio))
+        : [normalizarMedio(formaPago)];
+    const mediosUsados = [...new Set(mediosDeclarados.filter(Boolean))];
+
+    // ── LA VENTA OFFLINE NO APLICA OFERTAS NI RECARGOS, Y ES A PROPÓSITO ─────
+    //
+    // Una venta encolada se cobró hace rato y se está registrando ahora. Si acá
+    // se resolviera la oferta contra el reloj de HOY podría aplicarse una que ya
+    // venció, o dejar de aplicarse una que regía cuando el cajero cobró: las dos
+    // formas dan una venta que no coincide con la plata que entró al cajón.
+    //
+    // Y con el recargo es peor que un número mal: la cola manda los pagos con el
+    // total que se cobró, así que sumarle un recargo acá haría que la suma no dé
+    // y la venta encolada se RECHACE. Eso rompería el modo offline, que es
+    // justamente lo que no se puede tocar.
+    //
+    // Por eso la política de la v1 es explícita en los dos lados: el POS avisa
+    // que sin conexión no hay ofertas ni recargos, y acá se registra la venta
+    // exactamente como se cobró.
+    const esReplayOffline = origenOffline === true;
+    const ofertasPorProductoLocal = esReplayOffline
+      ? {}
+      : await ofertasVigentesPorProductoLocal(prisma, {
+          localId,
+          productoLocalIds: [...productoLocalPorBase.values()],
+        });
+    const recargosPorMedio = esReplayOffline ? {} : await recargosDelLocal(prisma, localId);
+
+    // Motor comercial canónico: ofertas, descuentos existentes y recargo, en ese
+    // orden. Ver lib/ofertas/motorVenta.js — es puro y está cubierto por
+    // candados; acá solo se le da de comer y se guarda lo que devuelve.
+    const comercial = calcularVentaComercial({
+      lineas: items.map((item) => ({
+        productoBaseId: item.productoBaseId,
+        productoLocalId: productoLocalPorBase.get(item.productoBaseId) ?? null,
+        nombre: item.nombre,
+        cantidad: item.cantidad,
+        precioNormal: item.precio,
+        esServicio: item.esServicio === true,
+        subtotalFijado: item.subtotalFijado ?? null,
+      })),
+      ofertasPorProductoLocal,
+      mediosUsados,
+      recargosPorMedio,
+      descuentos: {
+        automaticoPct: descuentoAplicadoPct,
+        manual: descuentoManual,
+        porPuntos: descuentoPorPuntosVal,
+      },
+      subtotalServicios,
+    });
+
+    // El precio de la línea pasa a ser el que se cobra de verdad. Todo lo que
+    // viene después —subtotales, costo, ganancia, consumo de stock, puntos— usa
+    // el mismo número, así que la oferta no puede quedar aplicada en el total y
+    // olvidada en una línea.
+    comercial.lineas.forEach((linea, i) => {
+      items[i].precio = linea.precioAplicado;
+      items[i].__oferta = linea.ofertaAplicada
+        ? {
+            ofertaId: linea.ofertaId,
+            ofertaNombre: linea.ofertaNombre,
+            precioNormal: linea.precioNormal,
+            descuentoPromocional: linea.descuentoPromocional,
+          }
+        : { ofertaId: null, ofertaNombre: null, precioNormal: linea.precioNormal, descuentoPromocional: 0 };
+    });
+
+    // Base ELEGIBLE para descuentos/puntos = mercadería (subtotal SIN servicios).
+    // Los servicios de importe variable no reciben descuentos/promos/puntos y su
+    // importe no puede reducirse indirectamente por un descuento global.
+    const subtotal = comercial.subtotal;
+    const descuentoAutomatico = comercial.descuentoAutomatico;
+    const descuentoTotal = comercial.descuentoTotal;
+    const descuentoPromocional = comercial.descuentoPromocional;
+    const totalAntesRecargo = comercial.totalAntesRecargo;
 
     // Ningún descuento (manual/automático/puntos) puede exceder la mercadería elegible:
     // eso equivaldría a descontar sobre servicios. Se rechaza explícitamente.
-    if (Math.round(descuentoTotal * 100) > Math.round(baseElegibleDescuento * 100) + 1) {
+    if (comercial.excedeDescuento) {
       return NextResponse.json(
         {
           ok: false,
@@ -523,13 +616,67 @@ export async function POST(req) {
       );
     }
 
-    const total = subtotal - descuentoTotal; // Lo que paga el cliente (SIN comision)
+    // Lo que paga el cliente: YA incluye el recargo comercial y todavía NO la
+    // comisión bancaria, que no la paga él.
+    const total = comercial.total;
 
     if (total <= 0) {
       return NextResponse.json(
         { ok: false, error: "El total debe ser mayor a 0" },
         { status: 400 }
       );
+    }
+
+    // ── LA PANTALLA DIJO UN NÚMERO Y ACÁ SALIÓ OTRO ─────────────────────────
+    //
+    // El POS manda `totalPantalla`: el importe que el cajero acaba de ver en el
+    // botón que apretó, y que probablemente ya le dijo en voz alta al cliente.
+    // Si la cuenta de acá no coincide, la venta NO se registra.
+    //
+    // Sin esto el desenlace es silencioso y es el peor de los dos posibles: con
+    // un solo medio el backend arma el tender con SU total, así que la venta
+    // entra por $8.300, la pantalla pidió $8.100, y nadie se entera hasta el
+    // arqueo — donde aparece una diferencia sin explicación y sin forma de saber
+    // de qué venta salió. Con pago dividido el error al menos se ve, porque los
+    // importes no suman.
+    //
+    // Se responde con el total bueno y su desglose para que el POS pueda
+    // refrescar y volver a confirmar CON EL NÚMERO NUEVO A LA VISTA, en vez de
+    // reintentar solo y cobrar algo que nadie miró.
+    //
+    // La cola offline queda afuera a propósito: una venta encolada se cobró hace
+    // rato, no aplica ofertas ni recargos (ver arriba) y su total es el que
+    // efectivamente entró al cajón. Compararlo contra el de hoy la rechazaría
+    // por estar bien.
+    const totalPantalla = Number(body?.totalPantalla);
+    if (!esReplayOffline && Number.isFinite(totalPantalla) && totalPantalla > 0) {
+      const difiere = Math.round(totalPantalla * 100) !== Math.round(total * 100);
+      if (difiere) {
+        return NextResponse.json(
+          {
+            ok: false,
+            code: "TOTAL_DESACTUALIZADO",
+            error:
+              `El total cambió: la pantalla mostraba $${totalPantalla} y ahora son $${total}. ` +
+              `Puede haber empezado o terminado una oferta, o haber cambiado un recargo. ` +
+              `Revisá el importe antes de cobrar.`,
+            totalEsperado: total,
+            totalPantalla,
+            breakdown: {
+              subtotal,
+              subtotalSinOferta: comercial.subtotalNormal,
+              descuentoPromocional,
+              descuentoTotal,
+              totalAntesRecargo,
+              recargoPagoPct: comercial.recargoPagoPct,
+              recargoPagoImporte: comercial.recargoPagoImporte,
+              recargoPagoMedio: comercial.recargoPagoMedio,
+              total,
+            },
+          },
+          { status: 409 }
+        );
+      }
     }
 
     // === PAGOS (pago dividido) ==========================================
@@ -546,7 +693,32 @@ export async function POST(req) {
 
     const consolidado = normalizarYConsolidarPagos(pagosRaw, total);
     if (consolidado.error) {
-      return NextResponse.json({ ok: false, error: consolidado.error }, { status: 400 });
+      // Cuando hay recargo o descuento promocional, "la suma de los pagos no da"
+      // casi siempre significa que el POS calculó con otro total, no que el
+      // cajero se equivocó tipeando. Un mensaje genérico ahí manda a la persona
+      // a contar billetes cuando el problema es que la pantalla está vieja.
+      const hayCondicionComercial =
+        comercial.recargoPagoImporte > 0 || comercial.descuentoPromocional > 0;
+      return NextResponse.json(
+        {
+          ok: false,
+          error: hayCondicionComercial
+            ? `${consolidado.error} El total incluye la condición comercial vigente` +
+              (comercial.recargoPagoImporte > 0
+                ? ` (recargo ${comercial.recargoPagoPct} % por ${comercial.recargoPagoMedio}: $${comercial.recargoPagoImporte})`
+                : "") +
+              (comercial.descuentoPromocional > 0
+                ? ` (descuento por ofertas: $${comercial.descuentoPromocional})`
+                : "") +
+              ". Refrescá el POS y volvé a cobrar."
+            : consolidado.error,
+          totalEsperado: total,
+          recargoPagoPct: comercial.recargoPagoPct || undefined,
+          recargoPagoImporte: comercial.recargoPagoImporte || undefined,
+          descuentoPromocional: comercial.descuentoPromocional || undefined,
+        },
+        { status: 400 }
+      );
     }
 
     // % de comisión por medio digital, resueltos de la config del grupo (no hardcode).
@@ -815,7 +987,23 @@ export async function POST(req) {
       let costoTotal = 0;
       for (const l of lineasComerciales) costoTotal += l.costoLinea;
       costoTotal = Math.round((costoTotal + Number.EPSILON) * 100) / 100;
-      const gananciaBruta = total - costoTotal;
+      // ── LA GANANCIA DE MERCADERÍA SE MIDE ANTES DEL RECARGO ────────────────
+      //
+      // El recargo por medio de pago NO es venta de mercadería: es un cargo
+      // financiero que el comercio le traslada al cliente. Sumarlo acá haría que
+      // vender lo mismo con débito "diera más ganancia de mercadería" que con
+      // efectivo, y el reporte de rentabilidad de productos pasaría a depender
+      // de cómo pagó cada cliente.
+      //
+      // En una venta SIN recargo `totalAntesRecargo` es idéntico a `total`, así
+      // que las ventas de hoy siguen dando exactamente el mismo número: esto no
+      // cambia ni un peso de lo que ya está guardado ni de lo que se calcula
+      // cuando no hay recargo configurado.
+      //
+      // `gananciaNeta` SÍ se sigue midiendo contra el neto recibido —recargo
+      // cobrado menos comisión pagada—, porque esa es la pregunta financiera:
+      // cuánto entró de verdad. Son dos ganancias distintas a propósito.
+      const gananciaBruta = totalAntesRecargo - costoTotal;
       const gananciaNeta = netoRecibido - costoTotal;
 
       // Bloqueo determinístico (FOR UPDATE por productoLocalId asc) + validación +
@@ -852,6 +1040,15 @@ export async function POST(req) {
           gananciaNeta,
           formaPago: formaPagoVenta, // derivado: medio único o "mixto"
           esFiado: esFiadoVenta,
+          // Snapshot comercial. Se guarda SIEMPRE, incluso en cero, para que una
+          // venta nueva sin oferta se distinga de una venta vieja anterior a
+          // esta tanda —esas quedan en null— cuando alguien reconstruya el
+          // histórico dentro de unos años.
+          descuentoPromocional,
+          totalAntesRecargo,
+          recargoPagoPct: comercial.recargoPagoPct,
+          recargoPagoImporte: comercial.recargoPagoImporte,
+          recargoPagoMedio: comercial.recargoPagoMedio,
         },
       });
 
@@ -908,6 +1105,13 @@ export async function POST(req) {
             // consumo vive en VentaDetalleComponente); SERVICIO → null (sin stock).
             productoLocalId: l.consumoFisico?.productoLocalId ?? null,
             cantidadStock: l.consumoFisico?.cantidadStock ?? null,
+            // Snapshot de la oferta. `precio` (arriba) ya es lo COBRADO; esto es
+            // lo que habría costado sin oferta y cuál era. `ofertaNombre` se
+            // congela para que la línea se pueda leer aunque la oferta se borre.
+            precioNormal: l.oferta?.precioNormal ?? l.precio,
+            ofertaId: l.oferta?.ofertaId ?? null,
+            ofertaNombre: l.oferta?.ofertaNombre ?? null,
+            descuentoPromocional: l.oferta?.descuentoPromocional ?? 0,
           },
         });
 
@@ -1044,7 +1248,11 @@ export async function POST(req) {
         });
       }
 
-      return { venta: nuevaVenta, allowNegativeStockUsed, transferenciaVenta };
+      // `lineasComerciales` sale de la transacción porque el TICKET se arma con
+      // ellas. Son exactamente las filas que se acaban de escribir en
+      // VentaDetalle: mismo precio, misma cantidad, mismo subtotal. Es la única
+      // forma de que el papel no pueda decir otra cosa que la base.
+      return { venta: nuevaVenta, allowNegativeStockUsed, transferenciaVenta, lineasComerciales };
     }, {
       maxWait: 10_000,
       timeout: 30_000,
@@ -1143,6 +1351,49 @@ export async function POST(req) {
         descuentoPorPuntos: descuentoPorPuntosVal,
         descuentoTotal,
         total,
+        // Condición comercial aplicada, para el ticket y para que el POS pueda
+        // mostrar lo mismo que se guardó en vez de recalcularlo por su cuenta.
+        subtotalSinOferta: comercial.subtotalNormal,
+        descuentoPromocional,
+        totalAntesRecargo,
+        recargoPagoPct: comercial.recargoPagoPct,
+        recargoPagoImporte: comercial.recargoPagoImporte,
+        recargoPagoMedio: comercial.recargoPagoMedio,
+        // ── LAS LÍNEAS AUTORITATIVAS, PARA EL TICKET ────────────────────────
+        //
+        // El POS armaba el ticket con `state.carrito`, que tiene el precio
+        // NORMAL. Con una oferta eso imprime "9 × $1.000" arriba de un total de
+        // $8.100: un papel que no cierra, que el cliente mira y que no hay forma
+        // de defender en el mostrador.
+        //
+        // Estas son las líneas que se acaban de escribir en VentaDetalle.
+        // `precio` es lo COBRADO, así que cantidad × precio suma el subtotal, y
+        // `precioNormal` viaja al lado para poder decir cuánto se ahorró sin
+        // tener que restar nada en el navegador.
+        lineas: (txResult.lineasComerciales || []).map((l) => ({
+          nombre: l.nombre,
+          cantidad: l.cantidad,
+          precio: l.precio,
+          subtotal: l.subtotal,
+          precioNormal: l.oferta?.precioNormal ?? l.precio,
+          ofertaNombre: l.oferta?.ofertaNombre ?? null,
+          descuentoPromocional: l.oferta?.descuentoPromocional ?? 0,
+          // Snapshot del servicio de importe variable, para que el ticket pueda
+          // desglosar la carga y su recargo igual que en la reimpresión.
+          esServicio: l.tipo === "SERVICIO",
+          importeBaseServicio: l.servicio?.importeBaseServicio ?? null,
+          recargoServicioPct: l.servicio?.recargoServicioPct ?? null,
+          recargoServicioImporte: l.servicio?.recargoServicioImporte ?? null,
+        })),
+        ofertasAplicadas: comercial.lineas
+          .filter((l) => l.ofertaAplicada)
+          .map((l) => ({
+            nombre: l.nombre,
+            ofertaNombre: l.ofertaNombre,
+            precioNormal: l.precioNormal,
+            precioOferta: l.precioAplicado,
+            descuento: l.descuentoPromocional,
+          })),
       },
     });
   } catch (err) {

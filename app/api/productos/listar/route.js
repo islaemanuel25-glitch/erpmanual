@@ -18,6 +18,7 @@ import {
   esPresentacionDeCompra,
 } from "@/lib/productos/presentaciones";
 import { traerFilasParaControles } from "@/lib/productos/sqlControles";
+import { sellosDeOfertaVigente } from "@/lib/ofertas/servidor";
 
 const PAGE_SIZES_VALIDOS = [25, 50, 100];
 
@@ -467,6 +468,36 @@ export async function GET(req) {
           }
         })
       );
+    }
+
+    // ── SELLO "OFERTA" ────────────────────────────────────────────────────
+    //
+    // El producto avisa DISCRETAMENTE que participa de una oferta vigente y
+    // lleva el link para ir a verla. Lo que NO hace es administrar la promoción
+    // desde acá: el precio de oferta se carga y se cambia en el módulo Ofertas,
+    // y en un solo lugar. Duplicar esa edición en la ficha del producto dejaría
+    // dos pantallas capaces de cambiar el mismo número.
+    //
+    // Y el `precio_venta` del producto NO se toca ni se pisa: una oferta es una
+    // excepción temporal, no un precio nuevo. Lo que se agrega es un campo al
+    // lado.
+    //
+    // Solo se resuelve para los productos de LA PÁGINA, y si falla no rompe el
+    // listado: un sello que no se pudo pintar es peor que nada, pero mucho mejor
+    // que un catálogo que no carga.
+    try {
+      const idsPagina = items.map((it) => it.localProductoId).filter(Boolean);
+      if (idsPagina.length > 0) {
+        const sellos = await sellosDeOfertaVigente(prisma, {
+          localId,
+          productoLocalIds: idsPagina,
+        });
+        for (const it of items) {
+          it.oferta = sellos[it.localProductoId] || null;
+        }
+      }
+    } catch (e) {
+      console.warn("[productos/listar] no se pudieron resolver las ofertas vigentes:", e.message);
     }
 
     return NextResponse.json({

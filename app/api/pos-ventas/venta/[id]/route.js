@@ -49,6 +49,17 @@ export async function GET(req, { params }) {
         subtotal: venta.subtotal,
         descuento: venta.descuento,
         total: venta.total,
+        // ── CONDICIÓN COMERCIAL CONGELADA ────────────────────────────────────
+        //
+        // Sale de las columnas de ESTA venta, no de las ofertas de hoy. Una
+        // reimpresión de hace tres meses tiene que decir lo que se cobró aquel
+        // día: recalcular la oferta vigente ahora daría otro papel para la misma
+        // operación, y el que quedó en la mano del cliente sería el falso.
+        descuentoPromocional: venta.descuentoPromocional,
+        totalAntesRecargo: venta.totalAntesRecargo,
+        recargoPagoPct: venta.recargoPagoPct,
+        recargoPagoImporte: venta.recargoPagoImporte,
+        recargoPagoMedio: venta.recargoPagoMedio,
         formaPago: venta.formaPago,
         comisionBancaria: venta.comisionBancaria,
         netoRecibido: venta.netoRecibido,
@@ -80,13 +91,25 @@ export async function GET(req, { params }) {
           importeBaseServicio: d.importeBaseServicio,
           recargoServicioPct: d.recargoServicioPct,
           recargoServicioImporte: d.recargoServicioImporte,
+          // Snapshot de la oferta. `precio` (arriba) YA es lo cobrado; esto es lo
+          // que habría costado sin ella y cómo se llamaba. El nombre está
+          // congelado en la fila, así que sigue leyéndose aunque la oferta se
+          // haya finalizado o borrado.
+          precioNormal: d.precioNormal,
+          ofertaNombre: d.ofertaNombre,
+          descuentoPromocional: d.descuentoPromocional,
         })),
       },
     });
   } catch (err) {
     console.error("Error en GET /api/pos-ventas/venta/[id]:", err);
+    // "Error interno" no le dice nada a nadie. Es la deuda que CLAUDE.md tiene
+    // anotada —206 rutas contestan eso, y el día que producción se cayó fue lo
+    // único que se vio—. Esta es la ruta de la que cuelga la reimpresión: si un
+    // ticket no se puede recuperar, quien lo está buscando necesita saber por
+    // qué, no que "hubo un error".
     return NextResponse.json(
-      { ok: false, error: "Error interno" },
+      { ok: false, error: `No se pudo leer la venta: ${err.message}` },
       { status: 500 }
     );
   }

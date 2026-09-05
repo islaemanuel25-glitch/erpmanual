@@ -34,6 +34,7 @@ model Grupo {
   listasPrecio    ListaPrecio[]
   codigosProveedor ProductoCodigoProveedor[]
   importacionesLista ImportacionListaProveedor[]
+  ofertas            Oferta[]
 }
 
 model GrupoDeposito {
@@ -118,6 +119,8 @@ model Local {
   cierresPreparacion   CierrePreparacion[]
   retirosPreparacion   RetiroPreparacion[]
   cambiosPendientes    CambioPendiente[]
+  ofertas              Oferta[]
+  recargosPago         RecargoPagoLocal[]
 }
 
 // Configuración de comportamiento POR LOCAL. Reemplaza (con herencia) a los
@@ -575,6 +578,7 @@ model ProductoLocal {
   combosComoCombo         ComboComponente[]        @relation("ComboComponente_comboPL")
   combosComoComponente    ComboComponente[]        @relation("ComboComponente_componentePL")
   ventaDetalleComponentes VentaDetalleComponente[]
+  ofertaLineas            OfertaLinea[]
 
   @@unique([localId, baseId])
   @@unique([id, localId]) // destino de las FK compuestas de ComboComponente
@@ -1091,6 +1095,32 @@ model Venta {
   formaPago        String
   esFiado          Boolean  @default(false)
 
+  // ── OFERTA Y RECARGO COMERCIAL — SNAPSHOT DE LA VENTA ──────────────────────
+  //
+  // Todo nullable y todo aditivo: las ventas anteriores a esta tanda quedan en
+  // null y significan exactamente lo que significaban —no hubo oferta ni
+  // recargo—, sin backfill y sin reinterpretar una sola columna vieja.
+  //
+  // `recargoPagoImporte` NO ES `comisionBancaria` Y NO SE PUEDE DEDUCIR DE ELLA.
+  // El recargo se lo cobra el comercio AL CLIENTE y SUBE el total; la comisión
+  // se la cobra el procesador AL COMERCIO y baja el neto. Un débito con 5 % de
+  // recargo y 7 % de comisión sobre $10.000 da tres números distintos: el
+  // cliente paga 10.500, el banco se queda 735, el comercio recibe 9.765.
+  //
+  // Por qué `totalAntesRecargo` es su propia columna y no `total menos
+  // recargoPagoImporte`: la resta da lo mismo hoy, pero deja la ganancia de
+  // mercadería dependiendo de que nadie toque nunca la fórmula. Guardado, el
+  // reporte de "venta de mercadería" no necesita saber cómo se compone el total.
+  //
+  // `recargoPagoMedio` es el medio que IMPUSO la condición (el de mayor
+  // recargo), no "el medio de la venta": en un pago mixto son cosas distintas y
+  // esa diferencia es justamente lo que hay que poder auditar después.
+  descuentoPromocional Decimal?   @db.Decimal(12, 2)
+  totalAntesRecargo    Decimal?   @db.Decimal(12, 2)
+  recargoPagoPct       Decimal?   @db.Decimal(5, 2)
+  recargoPagoImporte   Decimal?   @db.Decimal(12, 2)
+  recargoPagoMedio     MedioPago?
+
   // Corrección de ventas (in-place versionada; ver model VentaCorreccion).
   // version = token de bloqueo optimista (se incrementa en cada corrección).
   version            Int      @default(0)
@@ -1237,16 +1267,34 @@ model VentaDetalle {
   productoLocalId    Int?
   cantidadStock      Decimal? @db.Decimal(12, 3)
 
+  // ── OFERTA APLICADA A ESTA LÍNEA — SNAPSHOT ────────────────────────────────
+  //
+  // `precio` (arriba) ya es el precio REALMENTE COBRADO, y `ganancia` ya se
+  // calcula contra él: no se duplican. Lo que faltaba para poder reconstruir la
+  // línea dentro de diez años es el precio que HABRÍA tenido sin la oferta, y
+  // cuál era esa oferta.
+  //
+  // `ofertaNombre` es un snapshot y no un join: sobrevive a que la oferta se
+  // borre. `ofertaId` va con SetNull para que se pueda borrar una oferta que
+  // nunca se usó sin arrastrar historial, y para que una oferta borrada deje el
+  // id en null en vez de apuntar a una fila que no existe. El nombre queda.
+  precioNormal         Decimal? @db.Decimal(12, 2)
+  ofertaId             Int?
+  ofertaNombre         String?
+  descuentoPromocional Decimal? @db.Decimal(12, 2)
+
   createdAt          DateTime           @default(now())
 
   venta        Venta        @relation(fields: [ventaId], references: [id], onDelete: Cascade)
   productoBase ProductoBase @relation(fields: [productoBaseId], references: [id])
   listaPrecio  ListaPrecio? @relation(fields: [listaPrecioId], references: [id], onDelete: SetNull)
   componentes  VentaDetalleComponente[]
+  oferta       Oferta?      @relation(fields: [ofertaId], references: [id], onDelete: SetNull)
 
   @@index([ventaId])
   @@index([productoBaseId])
   @@index([listaPrecioId])
+  @@index([ofertaId])
 }
 
 // COMPONENTES CONSUMIDOS POR UNA LÍNEA DE VENTA DE COMBO (E1)
@@ -3256,4 +3304,209 @@ model LlamadaLector {
 
   /// Se consulta siempre igual: las de las últimas horas, por modelo.
   @@index([creadoEn, modelo])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// OFERTAS COMERCIALES
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Una oferta es una EXCEPCIÓN TEMPORAL de precio sobre productos concretos de
+// un local. No toca `ProductoLocal.precio_venta` ni `ProductoBase.precio_venta`
+// jamás: el precio normal sigue siendo el precio normal, y cuando la oferta
+// termina no hay nada que restaurar. Esa es toda la razón por la que esto es
+// una tabla aparte y no un par de columnas en el producto.
+//
+// NO HAY COLUMNA `estado`, y es a propósito. El estado funcional que ve la
+// gente —BORRADOR, PROGRAMADA, ACTIVA, REVISAR, VENCIDA, FINALIZADA— se DERIVA
+// en `lib/ofertas/estados.js` a partir de `publicadaEn`, `finalizadaEn`, la
+// ventana y las líneas marcadas. Es el mismo criterio que hace que `Venta` no
+// tenga un booleano `anulada` al lado de `anuladaEn`: dos fuentes de verdad que
+// dicen lo mismo se contradicen el día que una se actualiza sola, y ahí no hay
+// forma de saber cuál manda. Además, derivado no necesita un proceso que
+// despierte a medianoche a mover ofertas de PROGRAMADA a ACTIVA.
+
+enum CondicionPagoOferta {
+  /// Exige que el ÚNICO medio de la venta sea efectivo. Un pago mixto no la
+  /// cumple, aunque el efectivo cubra casi todo.
+  SOLO_EFECTIVO
+  CUALQUIER_MEDIO
+}
+
+model Oferta {
+  id      Int    @id @default(autoincrement())
+  grupoId Int
+  /// La oferta es de UN local. Un producto vale distinto en cada ubicación, así
+  /// que una oferta "del grupo" no tendría un precio que aplicar.
+  localId Int
+  nombre  String
+
+  condicionPago CondicionPagoOferta @default(CUALQUIER_MEDIO)
+
+  /// Ventana SEMIABIERTA [inicioEn, finEn): en el instante `finEn` la oferta ya
+  /// no rige. Con el extremo cerrado, dos ofertas consecutivas que se tocan
+  /// estarían las dos vigentes durante ese instante.
+  inicioEn DateTime
+  finEn    DateTime
+
+  observaciones String?
+
+  /// Momento en que dejó de ser borrador y salió a la calle. null = BORRADOR.
+  /// Un borrador no rige aunque sus fechas ya estén corriendo.
+  publicadaEn   DateTime?
+  publicadaPorId Int?
+
+  /// Decisión humana de darla por terminada. Gana sobre cualquier fecha.
+  /// Los tres van juntos, como la anulación de venta: una finalización sin
+  /// autor es indistinguible de un error de datos dentro de un mes.
+  finalizadaEn   DateTime?
+  finalizadaPorId Int?
+  motivoFinalizacion String?
+
+  /// De qué oferta se duplicó, cuando se renovó creando una nueva. Int suelto y
+  /// no relación: es trazabilidad, y una FK obligaría a decidir qué pasa al
+  /// borrar la original.
+  renovadaDesdeId Int?
+
+  creadoPorId Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  grupo   Grupo  @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  local   Local  @relation(fields: [localId], references: [id])
+  lineas  OfertaLinea[]
+  eventos OfertaEvento[]
+  /// Líneas de venta que la aplicaron. La relación existe para poder contestar
+  /// "¿esta oferta se usó alguna vez?" sin adivinar, que es lo que decide si se
+  /// puede borrar. Del lado de VentaDetalle es SetNull: borrar una oferta nunca
+  /// borra historial de ventas.
+  ventaDetalles VentaDetalle[]
+
+  @@index([grupoId])
+  @@index([localId])
+  /// La consulta caliente del POS es "ofertas de este local vigentes ahora".
+  @@index([localId, inicioEn, finEn])
+  @@index([finEn])
+}
+
+model OfertaLinea {
+  id       Int @id @default(autoincrement())
+  ofertaId Int
+  /// El producto EN ESE LOCAL. Es la fila que tiene el precio y el costo, así
+  /// que es la única identidad con la que un precio de oferta significa algo.
+  productoLocalId Int
+  /// Identidad comercial/histórica, congelada. Int suelto: sirve para reportes
+  /// que cruzan locales y no justifica tocar ProductoBase con un campo inverso.
+  productoBaseId  Int
+
+  /// FUENTE CANÓNICA del precio promocional. El descuento en % NO se guarda: se
+  /// deriva contra `precioNormalReferencia` en `lib/ofertas/precio.js`. Guardar
+  /// los dos sería tener dos números que dicen lo mismo y se pueden contradecir.
+  precioOferta Decimal @db.Decimal(12, 2)
+
+  /// Fotos del momento en que se cargó o se revisó la línea. No se actualizan
+  /// solas: si el producto cambia de precio o de costo, estas NO se mueven — de
+  /// esa diferencia sale justamente el aviso de revisar.
+  precioNormalReferencia Decimal @db.Decimal(12, 2)
+  costoReferencia        Decimal @db.Decimal(12, 2)
+
+  /// Momento en que se detectó que el costo cambió respecto de `costoReferencia`.
+  /// null = nada que mirar. De acá sale el estado REVISAR de toda la oferta.
+  /// La oferta marcada SIGUE APLICÁNDOSE: el aviso no cambia el precio.
+  revisionPendienteDesde DateTime?
+  /// Costo que se leyó al marcar. Se guarda para poder mostrar el "de → a" aunque
+  /// el costo vuelva a moverse antes de que alguien mire el aviso.
+  costoAlDetectar        Decimal? @db.Decimal(12, 2)
+
+  /// Última vez que una persona miró esta línea y dijo "está bien así".
+  revisadaEn   DateTime?
+  revisadaPorId Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  oferta        Oferta        @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
+  productoLocal ProductoLocal @relation(fields: [productoLocalId], references: [id], onDelete: Cascade)
+
+  /// Un producto no puede estar dos veces en la misma oferta: sería dos precios
+  /// para lo mismo dentro de una sola fila de configuración.
+  @@unique([ofertaId, productoLocalId])
+  @@index([ofertaId])
+  @@index([productoLocalId])
+  @@index([revisionPendienteDesde])
+}
+
+/// LIBRO DE CAMBIOS DE UNA OFERTA — inmutable, sin FK a Usuario (mismo patrón
+/// que AuditoriaBitacora y VentaCorreccion).
+///
+/// Contesta las preguntas que se pidieron: cuándo se creó, cuándo cambió, quién
+/// lo cambió, qué valor tenía y cuál quedó, y cuándo se finalizó. No se muestra
+/// en la pantalla principal: se consulta cuando alguien pregunta por qué.
+model OfertaEvento {
+  id       Int @id @default(autoincrement())
+  ofertaId Int
+  /// Línea afectada, cuando el evento es de una línea y no de la oferta entera.
+  ofertaLineaId Int?
+
+  /// "CREADA" | "PUBLICADA" | "PRECIO_CAMBIADO" | "LINEA_AGREGADA" |
+  /// "LINEA_QUITADA" | "VENTANA_CAMBIADA" | "CONDICION_CAMBIADA" |
+  /// "REVISION_MARCADA" | "REVISION_CONFIRMADA" | "FINALIZADA" | "RENOVADA"
+  /// Es String y no enum a propósito: agregar un motivo de auditoría no debería
+  /// costar una migración. Este comentario es lo único que enumera los valores.
+  tipo String
+
+  usuarioId Int?
+  /// Qué había antes y qué quedó. JSON legible, no columnas por cada campo: los
+  /// eventos no son todos del mismo tipo y media tabla quedaría en null.
+  valorAnterior Json?
+  valorNuevo    Json?
+  nota          String?
+
+  createdAt DateTime @default(now())
+
+  oferta Oferta @relation(fields: [ofertaId], references: [id], onDelete: Cascade)
+
+  @@index([ofertaId])
+  @@index([createdAt])
+  @@index([tipo])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RECARGO COMERCIAL POR MEDIO DE PAGO
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ESTO NO ES `ConfiguracionGrupo.comisionDebito` NI SUS HERMANAS, y no se puede
+// derivar de ellas. Son dos hechos distintos que se parecen porque los dos son
+// un porcentaje sobre el mismo medio de pago:
+//
+//   RecargoPagoLocal (esto)      lo cobra el comercio AL CLIENTE. SUBE el total
+//                                de la venta. Es POR LOCAL, porque es una
+//                                decisión comercial de cada boca.
+//   ConfiguracionGrupo.comision* se la cobra el procesador AL COMERCIO. NO toca
+//                                el total: baja el neto. Es POR GRUPO, porque
+//                                el contrato con el banco es uno solo.
+//
+// Se crearon columnas nuevas en vez de reusar las de comisión justamente para
+// que nadie pueda confundirlas después: los nombres dicen "recargo", viven en
+// otra tabla, se configuran en otra pantalla y se congelan en otras columnas de
+// Venta.
+model RecargoPagoLocal {
+  id      Int       @id @default(autoincrement())
+  localId Int
+  /// Solo EFECTIVO, DEBITO, CREDITO y MERCADOPAGO admiten recargo. FIADO no:
+  /// no es una forma de cobrar sino una promesa de pago, y el recargo se define
+  /// cuando se cobra de verdad. La ruta rechaza cualquier otro valor.
+  medio   MedioPago
+  /// Porcentaje que se le suma al cliente. 0 = no se le cobra nada de más.
+  /// La AUSENCIA de fila significa exactamente lo mismo que 0: nunca se inventa
+  /// un porcentaje "razonable" por defecto.
+  porcentaje Decimal @default(0) @db.Decimal(5, 2)
+
+  actualizadoPorId Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  local Local @relation(fields: [localId], references: [id], onDelete: Cascade)
+
+  @@unique([localId, medio])
+  @@index([localId])
 }

@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-09-04] - Actualización: pos-ventas, productos, configuracion
+
+### Modificado
+- **pos-ventas**: fix(pos): el ticket imprime lo que se cobro, y una venta desfasada se rechaza SIN VERIFICAR
+- **pos-ventas**: feat(pos): el cajero ve el total de cada medio antes de elegir SIN VERIFICAR
+- **pos-ventas**: feat(pos): la venta resuelve la oferta y el recargo en el servidor SIN VERIFICAR
+- **productos**: feat(productos): el listado informa si un producto está en una oferta vigente SIN VERIFICAR
+- **configuracion**: feat(ofertas): módulo de Ofertas y pantalla de recargos por medio de pago SIN VERIFICAR
+
+
 ## [2026-09-02] - Actualización: productos
 
 ### Modificado

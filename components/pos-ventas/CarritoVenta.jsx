@@ -6,12 +6,35 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import { fromUnidades } from "@/lib/conversiones/stock";
 import { subtotalLinea } from "@/lib/pos-ventas/lineaPorImporte";
+import { textoOfertaDeLinea } from "@/lib/ofertas/previewPos";
 
 function formatPrecio(n) {
   return Number(n).toLocaleString("es-AR", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+// ── LA OFERTA EN LA LÍNEA DEL CARRITO ──────────────────────────────────────
+//
+// "$1.000 · Oferta efectivo $900". El precio normal NO se reemplaza por el
+// promocional, y no es una omisión: hasta que no se elija cómo se paga, el
+// precio de oferta es una posibilidad. Mostrar $900 a secas sería prometer un
+// precio que se cae si el cliente saca la tarjeta.
+//
+// Lo que tiene que quedar claro son las cuatro cosas: el precio normal, que hay
+// una oferta, cuál es su condición, y cuánto es el precio promocional. Por eso
+// la condición viaja en la etiqueta ("Oferta efectivo" vs "Oferta") en vez de en
+// un ícono o un color, que no se leen.
+function EtiquetaOferta({ item }) {
+  const oferta = textoOfertaDeLinea(item);
+  if (!oferta) return null;
+  return (
+    <span className="pos-text-success-soft whitespace-nowrap">
+      {" · "}
+      {oferta.etiqueta} ${formatPrecio(oferta.precio)}
+    </span>
+  );
 }
 
 // ── EL STOCK DEL CARRITO SE DIBUJA SOLO SI EL LOCAL LO PIDIÓ ───────────────
@@ -386,6 +409,7 @@ function CarritoVenta({
                 <div className="flex items-center justify-between gap-2 mt-1">
                   <span className="text-[11px] pos-text-muted whitespace-nowrap">
                     $ {formatPrecio(item.precio)} c/u
+                    <EtiquetaOferta item={item} />
                   </span>
                   <CantidadStepper
                     item={item}
@@ -430,6 +454,12 @@ function CarritoVenta({
                   </span>
                 ) : (
                   <>
+                    {textoOfertaDeLinea(item) && (
+                      <span className="block text-[10px] pos-text-muted truncate">
+                        $ {formatPrecio(item.precio)}
+                        <EtiquetaOferta item={item} />
+                      </span>
+                    )}
                     {item.listaPrecioNombre && item.tipoPrecioAplicado && item.tipoPrecioAplicado !== "PRECIO_VENTA" && (
                       <span className="block text-[10px] sunmi-text-muted truncate">
                         {item.listaPrecioNombre}

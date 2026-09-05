@@ -244,7 +244,7 @@ for (const [tipo, esperado] of Object.entries(ESPERADOS)) {
 // LA FORMA GENERAL
 // ═══════════════════════════════════════════════════════════════════════════
 
-seccion("Tablas, columnas e índices en total");
+seccion("La forma general");
 
 const [{ n: tablas }] = await prisma.$queryRaw`
   SELECT count(*)::int AS n FROM pg_tables WHERE schemaname='public' AND tablename <> '_prisma_migrations'
@@ -257,12 +257,30 @@ const [{ n: indices }] = await prisma.$queryRaw`
   SELECT count(*)::int AS n FROM pg_indexes WHERE schemaname='public' AND tablename <> '_prisma_migrations'
 `;
 
-// Los tres números salen de la comparación contra producción del 2026-09-04,
-// hecha con estas mismas consultas. No son "más o menos": si cambian, algo se
-// agregó o se perdió y hay que mirarlo.
-ok(`61 tablas (producción tiene 61)`, tablas === 61, `hay ${tablas}`);
-ok(`890 columnas (producción tiene 890)`, columnas === 890, `hay ${columnas}`);
-ok(`277 índices (producción tiene 277)`, indices === 277, `hay ${indices}`);
+console.log(`   tablas ${tablas} · columnas ${columnas} · índices ${indices}`);
+
+// ── POR QUÉ ACÁ NO HAY NÚMEROS EXACTOS ────────────────────────────────────
+//
+// Este archivo tenía tres afirmaciones fijas —61 tablas, 890 columnas, 277
+// índices—, que son los totales de producción al 2026-09-04. Estaban bien
+// mientras el único consumidor era la rama del saneamiento.
+//
+// En cualquier rama con una migración nueva son falsos POR DISEÑO: la rama de
+// Ofertas agrega cuatro tablas, y tiene que agregarlas. Dejarlos habría
+// convertido este candado en uno que se pone rojo cada vez que alguien hace su
+// trabajo, y a la tercera vez se ignora el archivo entero — incluidas las 43
+// afirmaciones de arriba, que son las que de verdad cuidan algo.
+//
+// La igualdad exacta contra producción vive donde corresponde:
+// `comparar-con-produccion.mjs`, que corre SOLO en la rama del saneamiento y
+// compara los objetos uno por uno, no los totales. Ver el README de
+// `docs/deploy/estructura-produccion/`.
+//
+// Lo que sí se afirma acá es un piso que ninguna migración puede cruzar hacia
+// abajo: una rama puede AGREGAR estructura, nunca perder la que ya existía.
+ok(`al menos las 61 tablas de producción`, tablas >= 61, `hay ${tablas}`);
+ok(`al menos las 890 columnas de producción`, columnas >= 890, `hay ${columnas}`);
+ok(`al menos los 277 índices de producción`, indices >= 277, `hay ${indices}`);
 
 // ═══════════════════════════════════════════════════════════════════════════
 
