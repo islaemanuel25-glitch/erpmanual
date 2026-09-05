@@ -50,15 +50,37 @@
 name: Visual — Configuración POS
 
 on:
-  # A MANO Y NADA MÁS. Esto construye la app entera y levanta un navegador: son
-  # varios minutos de runner. Colgarlo de cada push gastaría eso en cada commit
-  # de un comentario, y lo que se mira son cuatro pantallas que cambian poco.
+  # A MANO. Esto construye la app entera y levanta un navegador: son varios
+  # minutos de runner, y lo que se mira son cuatro pantallas que cambian poco.
   workflow_dispatch:
     inputs:
       ancho:
         description: "Anchos a capturar, separados por coma"
         required: false
         default: "360,390,412"
+
+  # ── Y POR PUSH, ACOTADO, MIENTRAS ESTO NO ESTÉ EN LA RAMA POR DEFECTO ──────
+  #
+  # `workflow_dispatch` NO se puede disparar sobre una rama si el archivo no
+  # existe todavía en la rama por defecto: la API contesta 404 buscándolo en
+  # `main`. Es una regla de GitHub, no una preferencia, y deja al workflow sin
+  # forma de correr justamente mientras se lo está escribiendo.
+  #
+  # El `paths` es lo que impide que esto se vuelva caro: solo corre cuando cambia
+  # la UI que se está mirando, el arnés que la mira o el sembrado del escenario.
+  # Un commit de documentación no lo dispara.
+  #
+  # Cuando esto llegue a `main`, el disparador de arriba alcanza y este bloque se
+  # puede sacar.
+  push:
+    branches: ["feat/configuracion-pos-**"]
+    paths:
+      - ".github/workflows/visual-configuracion-pos.yml"
+      - "scripts/generar-huellas.mjs"
+      - "scripts/visual/**"
+      - "scripts/pruebas-db/sembrar-visual-medios-cobro.mjs"
+      - "app/modulos/configuracion/**"
+      - "components/configuracion-pos/**"
 
 concurrency:
   group: visual-configuracion-pos-${{ github.ref }}
@@ -100,6 +122,10 @@ jobs:
       USUARIO_PRUEBA: admin@admin.com
       CLAVE_PRUEBA: "123456"
       PUERTO: "3111"
+      # En una corrida por `push` no hay `inputs`, así que sin este respaldo el
+      # bucle no iteraría sobre nada y el workflow terminaría en verde sin haber
+      # sacado una sola foto. Un verde vacío es peor que un rojo.
+      ANCHOS: ${{ inputs.ancho || '360,390,412' }}
 
     steps:
       - name: Traer el código de ESTA rama
@@ -162,7 +188,7 @@ jobs:
       - name: Capturar el estado por defecto
         run: |
           set -e
-          for ancho in $(echo "${{ inputs.ancho }}" | tr ',' ' '); do
+          for ancho in $(echo "$ANCHOS" | tr ',' ' '); do
             echo "── $ancho px — sin configurar ──"
             node scripts/generar-huellas.mjs \
               --salida "/tmp/capturas/$ancho" \
@@ -192,7 +218,7 @@ jobs:
       - name: Capturar los estados configurados
         run: |
           set -e
-          for ancho in $(echo "${{ inputs.ancho }}" | tr ',' ' '); do
+          for ancho in $(echo "$ANCHOS" | tr ',' ' '); do
             echo "── $ancho px — configurado ──"
             node scripts/generar-huellas.mjs \
               --salida "/tmp/capturas/$ancho" \
@@ -208,7 +234,7 @@ jobs:
       - name: Ordenar el artefacto con nombres legibles
         run: |
           mkdir -p /tmp/artefacto
-          for ancho in $(echo "${{ inputs.ancho }}" | tr ',' ' '); do
+          for ancho in $(echo "$ANCHOS" | tr ',' ' '); do
             for img in /tmp/capturas/$ancho/*.png; do
               [ -e "$img" ] || continue
               cp "$img" "/tmp/artefacto/$ancho-$(basename "$img")"
