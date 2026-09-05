@@ -16,7 +16,76 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-### `20260904120000_ofertas_y_recargos_pago`
+Ninguna. Producción está al día en **4 migraciones**, que son las que hay en el
+árbol después del squash de la baseline. Comprobado con `prisma migrate status`
+el 2026-09-05 después de desplegar
+`4dcbceefa0ea52a7481d1a9f3dae3e84430f0ae9`: *"4 migrations found in
+prisma/migrations. Database schema is up to date!"*.
+
+---
+
+## 2026-09-05 — `4dcbceef`, Configuración POS: dos migraciones aplicadas
+
+Las dos se aplicaron **de verdad**, y eso es lo que distingue "se aplicó" de "la
+imagen no la conocía", que salen iguales en el código de salida: la salida
+imprimió `Applying migration` para las dos, y el contenedor descartable contó
+**4**, el mismo número que el árbol.
+
+### `20260905010000_medios_cobro_configurables` — aditiva
+
+Crea el enum `ProcesadorCobro` y la tabla `MedioCobroLocal`. **No siembra ni una
+fila**, y eso se comprobó después de aplicarla: la tabla existe y tiene **0
+filas**, así que ningún local cambió sus botones de cobro ese día. La
+compatibilidad no vive en un backfill sino en la capa de dominio —un local sin
+filas usa los cuatro medios de siempre—, y por eso vale también para los locales
+que se creen después.
+
+Los cuatro índices quedaron, incluido el parcial que Prisma no sabe expresar:
+`MedioCobroLocal_tipo_activo_key`, verificado contra `pg_indexes`.
+
+**El clasificador la marcó** por un `DROP CONSTRAINT IF EXISTS` en la línea 93.
+Es un falso positivo y se confirmó con la base: esa tabla no existía en
+producción —cero filas en `information_schema.tables`— porque la crea esta misma
+migración veinte líneas más arriba. El `DROP ... IF EXISTS` seguido del `ADD` es
+el patrón idempotente, no le saca una clave a nadie.
+
+### `20260905150000_permiso_medios_cobro_dueno_local` — de DATOS
+
+Le agrega `config_local.medios_cobro` al rol DUEÑO_LOCAL. **Otorga, no
+reemplaza**: concatena con `||`, así que ningún permiso ajustado a mano se
+pierde.
+
+**Verificada cruzando las filas, no los totales**, en la ventana entre migrar y
+recrear: DUEÑO_LOCAL pasó de 44 permisos a 45 y es el único con el permiso
+nuevo; Admin, Deposito, Mini, CAJERO y ENCARGADO quedaron exactamente con los
+mismos conteos que antes del despliegue —1, 31, 10, 6 y 31—. Los dos lados: la
+fila que tenía que cambiar cambió, y ninguna que no debía.
+
+**El clasificador también la marcó**, por el `UPDATE`, y ahí el motivo es real:
+la versión vieja lee esa tabla en cada sesión. Lo que la hace segura es qué
+escribe. La imagen que estaba atendiendo **no nombra ese permiso en ningún
+lado** —comprobado con `git show` contra el commit desplegado, cero
+apariciones—, así que durante la ventana fue un string inerte en un array.
+
+**Su reposición, si alguna vez hay que volver atrás:** sacarle el permiso al rol
+desde la pantalla de Roles, o el `UPDATE` inverso quitando ese elemento del
+array. No hace falta el dump: la migración no borró nada.
+
+### Lo que NO se pudo verificar
+
+La sonda de cascada no corrió. La sesión que desplegó corre **en** el VPS, donde
+no hay `node_modules`, Node es 18 y no hay ningún navegador. Se dice acá en vez
+de darla por buena.
+
+---
+
+### `20260904120000_ofertas_y_recargos_pago` — APLICADA el 2026-09-05
+
+Se aplicó en el despliegue de `caa3a6dc`, antes que las dos de arriba. La entrada
+original de esta lista quedó sin borrar en ese despliegue y decía "sin mergear y
+sin desplegar", que ya era falso. **Se conserva abajo como registro**, con esta
+aclaración adelante, porque el archivo tiene que decir qué falta y esa entrada
+decía lo contrario de lo que pasaba.
 
 Rama `feat/ofertas-y-recargos-por-medio-de-pago`. **Sin mergear y sin desplegar.**
 Producción está en 105; con ésta el árbol pasa a **106**.
