@@ -345,6 +345,46 @@ const CONTEO = `(() => {
  * relleno incluido, a propósito: cambiar eso movería el número de las pantallas
  * de la línea de base y aparecerían diferencias que no son de estilo.
  */
+/**
+ * PARA LAS PANTALLAS QUE NO TIENEN NINGUNA TABLA.
+ *
+ * `esperarTablaEstable` no sirve ahí: sin `tbody` entra en la rama de "todavía
+ * no es la tabla final" y da vueltas las ochenta veces —veinticuatro segundos—
+ * para terminar devolviendo 0. Y peor: la huella queda vacía y `huellaUtilizable`
+ * la rechaza, así que la pantalla nunca se captura.
+ *
+ * Acá la señal es el TEXTO de la página quieto dos lecturas seguidas, más que no
+ * haya ningún indicador de carga. Es la misma idea que la de la tabla —esperar a
+ * que la pantalla se asiente, no a que pase un tiempo— con lo único que hay para
+ * mirar cuando no hay filas que contar.
+ *
+ * Sin esto se fotografía el `SunmiLoader`. Y no se notaría revisando la huella,
+ * porque la huella de una pantalla sin tablas es casi solo la URL: sale idéntica
+ * cargando y cargada.
+ */
+async function esperarTextoEstable(intentos = 40, intervalo = 300) {
+  let previo = null, estables = 0;
+  for (let i = 0; i < intentos; i++) {
+    await sleep(intervalo);
+    const cargando = await evaluar(
+      `!!document.querySelector("[aria-busy='true'], .animate-pulse, [data-cargando='true']")`
+    );
+    if (cargando) {
+      estables = 0;
+      previo = null;
+      continue;
+    }
+    const texto = await evaluar(`document.body.innerText`);
+    if (texto && texto === previo) {
+      if (++estables >= 2) return texto.length;
+    } else {
+      estables = 0;
+    }
+    previo = texto;
+  }
+  return 0;
+}
+
 async function esperarTablaEstable(intentos = 80, intervalo = 300) {
   let previo = -1, estables = 0, ultimo = 0;
   for (let i = 0; i < intentos; i++) {
@@ -473,13 +513,29 @@ try {
   const soloArg = arg("solo");
   const solo = soloArg ? soloArg.split(",").map((s) => s.trim()) : null;
 
+  // ── `--pantallas archivo.json`: OTRA LISTA, EL MISMO ARNÉS ────────────────
+  //
+  // La lista de arriba es la línea de base del ERP y no se toca: agregarle
+  // pantallas movería la comparación de las dieciséis. Pero el arnés —el cliente
+  // CDP, el login real, la selección de contexto, la captura que resuelve el
+  // contenedor con scroll propio— sirve para cualquier pantalla, y reimplementar
+  // todo eso al lado para sacar cuatro capturas sería exactamente lo que este
+  // proyecto ya pagó una vez con el resolutor de alias duplicado.
+  //
+  // Cada entrada acepta lo mismo que las de acá, más `sinTabla: true` para las
+  // pantallas que no tienen ninguna. Ver `esperarTextoEstable`.
+  const archivoPantallas = arg("pantallas");
+  const LISTA = archivoPantallas
+    ? JSON.parse(fs.readFileSync(archivoPantallas, "utf8"))
+    : PANTALLAS;
+
   const seleccion = solo
-    ? PANTALLAS.filter((p) => solo.includes(p.nombre))
+    ? LISTA.filter((p) => solo.includes(p.nombre))
     : TANDA
-      ? PANTALLAS.slice((TANDA - 1) * TAM_TANDA, TANDA * TAM_TANDA)
-      : PANTALLAS;
+      ? LISTA.slice((TANDA - 1) * TAM_TANDA, TANDA * TAM_TANDA)
+      : LISTA;
   if (!seleccion.length) {
-    console.error(`La tanda ${TANDA} está vacía (hay ${PANTALLAS.length} pantallas).`);
+    console.error(`La tanda ${TANDA} está vacía (hay ${LISTA.length} pantallas).`);
     process.exit(1);
   }
 
@@ -572,7 +628,7 @@ try {
       await sleep(1500);
     }
 
-    const filas = await esperarTablaEstable();
+    const filas = p.sinTabla ? await esperarTextoEstable() : await esperarTablaEstable();
 
     if (p.clicPrimeraFila) {
       await evaluar(`(() => {
@@ -584,8 +640,14 @@ try {
     }
 
     // ── EL CORTE: NI VACÍA NI INESTABLE ──────────────────────────────────────
-    const tablasAhora = JSON.parse(await evaluar(FILAS_POR_TABLA));
-    const util = huellaUtilizable(tablasAhora);
+    //
+    // Una pantalla declarada `sinTabla` no pasa por acá, y no es una excepción
+    // cómoda: este corte existe para que una tabla vacía no se selle como
+    // referencia, y una pantalla que no tiene tablas lo reprobaría siempre por
+    // el motivo equivocado. Su corte es que el texto se haya quedado quieto, y
+    // ése ya corrió arriba.
+    const tablasAhora = p.sinTabla ? [] : JSON.parse(await evaluar(FILAS_POR_TABLA));
+    const util = p.sinTabla ? { ok: filas > 0, motivo: "la pantalla quedó sin texto" } : huellaUtilizable(tablasAhora);
     if (!util.ok) {
       log(`  ROJO ${p.nombre}: ${util.motivo}`);
       log(`       NO se guarda la huella. Una huella vacía sella el estado vacío como referencia.`);

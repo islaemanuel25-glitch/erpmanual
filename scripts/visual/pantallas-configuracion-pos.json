@@ -1,0 +1,17 @@
+[
+  {
+    "nombre": "configuracion-pos",
+    "url": "/modulos/configuracion/pos-ventas",
+    "sinTabla": true
+  },
+  {
+    "nombre": "cobros-defaults",
+    "url": "/modulos/configuracion/pos-ventas/cobros",
+    "sinTabla": true
+  },
+  {
+    "nombre": "agregar-medio",
+    "url": "/modulos/configuracion/pos-ventas/cobros/nuevo",
+    "sinTabla": true
+  }
+]

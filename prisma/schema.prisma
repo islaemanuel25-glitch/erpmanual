@@ -121,6 +121,7 @@ model Local {
   cambiosPendientes    CambioPendiente[]
   ofertas              Oferta[]
   recargosPago         RecargoPagoLocal[]
+  mediosCobro          MedioCobroLocal[]
 }
 
 // Configuración de comportamiento POR LOCAL. Reemplaza (con herencia) a los
@@ -3509,4 +3510,115 @@ model RecargoPagoLocal {
 
   @@unique([localId, medio])
   @@index([localId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MEDIOS DE COBRO CONFIGURABLES DEL POS
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Hasta acá el POS mostraba cuatro botones fijos escritos en `FormaPago.jsx`.
+// Esto los hace configurables POR LOCAL: qué se ve, cómo se llama, en qué orden,
+// y con qué condición comercial.
+//
+// ── TIPO CONTABLE Y PROCESADOR SON DOS COSAS DISTINTAS ─────────────────────
+//
+// Y esa separación es todo el punto del modelo. El TIPO CONTABLE es qué es el
+// movimiento para la contabilidad —`MedioPago`, el mismo enum de siempre—. El
+// PROCESADOR es por dónde pasa la plata.
+//
+//   "MP Débito"  → tipoContable DEBITO      · procesador MERCADOPAGO
+//   "MP Crédito" → tipoContable CREDITO     · procesador MERCADOPAGO
+//   "MP QR"      → tipoContable MERCADOPAGO · procesador MERCADOPAGO
+//
+// Los tres son botones distintos en la pantalla y tres cosas distintas en el
+// libro, pero los tres se concilian contra Mercado Pago. Con un solo campo eso
+// no se puede decir: o se pierde la conciliación o se pierde la contabilidad.
+//
+// ── EL NOMBRE VISIBLE NO ES LA IDENTIDAD ───────────────────────────────────
+//
+// `nombre` es lo que lee el cajero y puede cambiar mañana. Lo que se congela en
+// la venta es `VentaPago.medio`, que es el tipo contable. Una venta de 2026 que
+// dice DEBITO va a seguir diciendo DEBITO aunque el botón pase a llamarse otra
+// cosa: la configuración no reescribe historia.
+//
+// ── UN SOLO MEDIO ACTIVO POR TIPO CONTABLE, Y POR QUÉ ──────────────────────
+//
+// `VentaPago` tiene `@@unique([ventaId, medio])`: como máximo un tender por medio
+// canónico por venta. Si un local tuviera "Débito Banco" y "MP Débito" los dos
+// activos —los dos con tipoContable DEBITO— y un cajero partiera el pago entre
+// los dos, el segundo tender violaría esa restricción y la venta se caería EN LA
+// CAJA, con gente esperando.
+//
+// La alternativa era cambiar la clave de `VentaPago`, que es la verdad de 14.226
+// ventas. No se toca. Se prohíbe la combinación que la rompería, con un índice
+// PARCIAL —solo entre los activos, porque los inactivos pueden convivir sin
+// riesgo— que vive en el SQL de la migración: Prisma no sabe expresar un WHERE
+// en un índice único, igual que los otros ocho parciales del esquema.
+//
+// La validación además se hace ANTES, en la capa de dominio, con un mensaje que
+// se entiende. Esperar al error de Postgres para explicárselo a alguien es
+// hacerle leer un mensaje escrito para otra persona.
+//
+// ── FIADO NO ESTÁ ACÁ, A PROPÓSITO ─────────────────────────────────────────
+//
+// No es una forma de cobrar sino una promesa de pago: no entra plata, es tender
+// único por regla del sistema, no admite recargo ni comisión de procesador, y el
+// POS ya lo dibuja aparte con sus propias condiciones —fuera de las ventas con
+// servicios y exigiendo cliente—. Meterlo acá para que "todos los medios sean
+// iguales" sería uniformidad de formulario a cambio de romper reglas reales.
+//
+// ── LA COMISIÓN ES NULLABLE, Y EL NULL SIGNIFICA ALGO ──────────────────────
+//
+// `null` = hereda la del grupo (`ConfiguracionGrupo.comision*`). Un número =
+// override explícito de este local. Son dos estados distintos y por eso no se
+// backfillea: poner el valor del grupo en cada local convertiría "hereda" en
+// "alguien lo decidió así", y el día que cambie la comisión del grupo los locales
+// no la seguirían sin que nadie sepa por qué.
+//
+// El RECARGO no está acá: sigue viviendo en `RecargoPagoLocal`, que ya existe,
+// está probado y tiene su propia unicidad. Dos columnas para el mismo recargo
+// serían dos fuentes que se contradicen el día que una se actualiza sola. La
+// capa de dominio las compone y la pantalla edita una sola cosa.
+
+/// Por dónde pasa la plata. NO es el tipo contable: ver el comentario de arriba.
+enum ProcesadorCobro {
+  MERCADOPAGO
+  /// Débito o crédito por posnet bancario.
+  BANCO
+  /// Cualquier otro, para no tener que migrar el enum por cada caso nuevo.
+  OTRO
+}
+
+model MedioCobroLocal {
+  id      Int @id @default(autoincrement())
+  localId Int
+
+  /// Lo que lee el cajero en el botón. Cambiarlo NO cambia nada contable.
+  nombre String
+  /// Oculto en el POS sin perder su configuración ni su historial.
+  activo Boolean @default(true)
+  /// Orden de los botones. No es único: dos medios pueden empatar y se desempata
+  /// por nombre, que es preferible a rechazar una edición por un número repetido.
+  orden  Int     @default(0)
+
+  /// QUÉ ES el movimiento. El mismo enum que congela `VentaPago.medio`.
+  tipoContable MedioPago
+  /// POR DÓNDE pasa. Nullable: el efectivo no tiene procesador.
+  procesador   ProcesadorCobro?
+
+  /// NULL = hereda `ConfiguracionGrupo`. Un número = override de este local.
+  comisionPct Decimal? @db.Decimal(5, 2)
+
+  /// Preparado para la integración futura (conciliación, credenciales por
+  /// referencia, estado). Hoy nadie lo escribe: existe para no tener que migrar
+  /// la tabla el día que se conecte un procesador de verdad.
+  integracionJson Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  local Local @relation(fields: [localId], references: [id], onDelete: Cascade)
+
+  @@index([localId])
+  @@index([localId, activo, orden])
 }

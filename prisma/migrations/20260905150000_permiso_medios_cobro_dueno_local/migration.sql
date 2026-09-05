@@ -1,0 +1,85 @@
+-- `config_local.medios_cobro` para el DUEÑO_LOCAL que YA EXISTE.
+--
+-- ── POR QUÉ HACE FALTA, Y NO ALCANZA CON `systemRoles.js` ──────────────────
+--
+-- `prisma/seed.js` NO repisa los permisos de un rol que ya existe: respeta lo
+-- que el administrador haya ajustado a mano. Es la decisión correcta, y tiene
+-- una consecuencia: agregar el permiso a la matriz de `lib/rbac/systemRoles.js`
+-- solo alcanza a las instalaciones NUEVAS. En la que ya está corriendo,
+-- DUEÑO_LOCAL se quedaría sin él para siempre y nadie se enteraría hasta que
+-- alguien no pueda entrar a Configuración POS → Cobros.
+--
+-- Medido contra producción en solo lectura antes de escribir esto: hoy ningún
+-- rol tiene `config_local.medios_cobro`, así que el único que llega a Cobros es
+-- Admin por su comodín. DUEÑO_LOCAL —4 usuarios activos— entra a Configuración
+-- POS por `config_local.pos` y no ve la sección de Cobros.
+--
+-- ── POR QUÉ ES UNA MIGRACIÓN Y NO UN SCRIPT ───────────────────────────────
+--
+-- Es la regla del proyecto: un paso de datos que corre en producción va como
+-- migración. Se aplica UNA sola vez, queda registrada en `_prisma_migrations` y
+-- viaja con el despliegue. Un script suelto no tiene ninguna de las tres cosas.
+--
+-- Y es el patrón que este repo ya usó tres veces para exactamente esto:
+-- `20260807220000_otorgar_reportes_ver_roles_locales`,
+-- `20260811180000_permisos_revisar_y_comprobantes` y
+-- `20260903040000_permisos_proveedores_y_compras_roles_existentes`. No se
+-- inventa un mecanismo nuevo; se sigue el que está. (Los tres archivos ya no
+-- están en el árbol: se los llevó el squash de la baseline. Su efecto está
+-- adentro de ella y el patrón está acá.)
+--
+-- ── QUÉ SE OTORGA, Y A QUIÉN ──────────────────────────────────────────────
+--
+-- `config_local.medios_cobro`, SOLO a DUEÑO_LOCAL.
+--
+-- ENCARGADO NO entra: la decisión de producto fue que por ahora no lo tenga.
+-- CAJERO tampoco: configurar los botones de cobro no es una tarea de caja.
+-- Admin no hace falta: tiene el comodín, y el `WHERE` lo excluye igual.
+--
+-- Ningún otro rol se toca. Los personalizados de esta instalación —"Deposito",
+-- "Mini"— quedan exactamente como estaban: el `WHERE` los excluye por nombre.
+--
+-- ── ESTO NO ES UNA REGLA PERMANENTE, Y ES IMPORTANTE QUE SE ENTIENDA ──────
+--
+-- Es una asignación INICIAL de rollout, no un vínculo fijo entre el rol y el
+-- permiso. En la aplicación no hay ni va a haber ningún `if rol === DUEÑO_LOCAL`:
+-- el código pregunta por el PERMISO, nunca por el nombre del rol.
+--
+-- Después manda el administrador, en los dos sentidos:
+--
+--   · si le SACA `config_local.medios_cobro` a DUEÑO_LOCAL desde la pantalla de
+--     Roles, se lo saca de verdad y nada se lo devuelve. No hay ningún proceso
+--     que vuelva a aplicar esto: el seed no repisa roles existentes —por eso
+--     hizo falta esta migración— y `_prisma_migrations` impide que se ejecute
+--     dos veces.
+--
+--   · si se lo quiere DAR a ENCARGADO, o a "Deposito", o a un rol nuevo, se hace
+--     desde esa misma pantalla y funciona igual. No hace falta tocar código ni
+--     escribir otra migración.
+--
+-- ── POR QUÉ NO PISA NINGUNA PERSONALIZACIÓN ───────────────────────────────
+--
+-- Porque NO reemplaza el array: lo CONCATENA con `||`. Un DUEÑO_LOCAL que hoy
+-- tenga permisos agregados a mano los conserva todos, en su orden. Reemplazarlo
+-- por los defaults de `systemRoles.js` habría sido el camino corto y habría
+-- borrado en silencio cada ajuste que un administrador hizo. Es la diferencia
+-- entre otorgar y reinicializar.
+--
+-- ── LAS DOS DEFENSAS DEL `WHERE`, QUE NO SON ADORNO ───────────────────────
+--
+-- `jsonb_typeof = 'array'` — si alguna fila guardara un objeto en vez de un
+-- array, `||` no falla: fusiona, y dejaría el permiso mal guardado.
+--
+-- `NOT (permisos @> '["*"]')` — a un rol con el comodín agregarle un permiso
+-- concreto es ruido: ya puede todo.
+--
+-- Y el `NOT (@> ...)` del propio permiso la hace idempotente: si alguien ya se
+-- lo dio a mano antes del despliegue, esto no duplica la entrada.
+
+UPDATE "Rol"
+   SET "permisos" = "permisos" || '["config_local.medios_cobro"]'::jsonb,
+       "updatedAt" = NOW()
+ WHERE "nombre" IN ('DUEÑO_LOCAL')
+   AND jsonb_typeof("permisos") = 'array'
+   AND NOT ("permisos" @> '["config_local.medios_cobro"]'::jsonb)
+   AND NOT ("permisos" @> '["*"]'::jsonb);

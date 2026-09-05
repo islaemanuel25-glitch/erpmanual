@@ -7,11 +7,23 @@ export default function SunmiToggle({
   value = false,
   onChange = () => {},
   label = "",
+  disabled = false,
 }) {
   const { theme } = useSunmiTheme();
   const [checked, setChecked] = useState(value);
 
+  // UN INTERRUPTOR APAGADO QUE IGUAL SE MUEVE MIENTE.
+  //
+  // Sin esto, la única forma de dibujar algo "todavía no disponible" era ponerle
+  // un `onChange` vacío: el interruptor se corría igual, la persona veía que se
+  // encendió y nada había pasado. Peor que no dejarlo tocar es dejar que parezca
+  // que sí.
+  //
+  // Se agrega acá y no en la pantalla porque hay más de una que lo va a
+  // necesitar, y dos interruptores apagados dibujados distinto es exactamente
+  // cómo empiezan las diferencias entre pantallas.
   const toggle = () => {
+    if (disabled) return;
     const newVal = !checked;
     setChecked(newVal);
     onChange(newVal);
@@ -45,7 +57,9 @@ export default function SunmiToggle({
 
   return (
     <div
-      className="flex items-center gap-2 cursor-pointer select-none"
+      className={`flex items-center gap-2 select-none ${
+        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+      }`}
       onClick={toggle}
     >
       {/* TRACK — acá había un comentario adentro de la cadena. Ver abajo. */}

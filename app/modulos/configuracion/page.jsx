@@ -5,11 +5,14 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
-import { puedeVerConfigLocal } from "@/lib/config/acceso";
+import { puedeVerConfigLocal, puedeVerSeccion, PERMISOS_CONFIG_POS } from "@/lib/config/acceso";
 import { Palette, PackageOpen, Receipt, Wrench, Tags, ShoppingCart, BellRing } from "lucide-react";
 
 // Cada tarjeta declara su gating igual que el menú (lib/menu/registry.js):
 //  - `permiso`: el config_local.* (o listas_precios.ver) que la habilita.
+//  - `permisos`: varios, y alcanza con tener CUALQUIERA. Es el equivalente de
+//    `requiredAnyPerms` del menú, para las secciones que adentro tienen cosas
+//    con permisos distintos.
 //  - `adminOnly`: exclusiva de admin (no la ve DUEÑO_LOCAL/ENCARGADO).
 // El backend revalida cada escritura; esto solo decide qué tarjetas se muestran.
 const SECCIONES = [
@@ -28,11 +31,13 @@ const SECCIONES = [
     permiso: "config_local.stock",
   },
   {
-    label: "POS Ventas",
+    label: "Configuración POS",
     href: "/modulos/configuracion/pos-ventas",
     icon: ShoppingCart,
-    descripcion: "Reglas de cierre de venta del POS (cliente y operario obligatorio).",
-    permiso: "config_local.pos",
+    descripcion: "Cobros, reglas de venta, integraciones y apariencia del POS.",
+    // Dos permisos, y alcanza con uno: adentro conviven las reglas de venta
+    // (`config_local.pos`) y los medios de cobro (`config_local.medios_cobro`).
+    permisos: PERMISOS_CONFIG_POS,
   },
   {
     label: "Editor de Ticket",
@@ -69,18 +74,13 @@ export default function ConfiguracionPage() {
 
   if (cargando) return null;
 
-  const permisos = perfil?.permisos || [];
-  const esAdmin = Array.isArray(permisos) && permisos.includes("*");
   // DUEÑO_LOCAL/ENCARGADO entran si tienen alguna config_local.* (o admin).
   if (!puedeVerConfigLocal(perfil)) return <SinPermisos />;
 
   // Filtrado por tarjeta: admin ve todo; el resto solo las tarjetas cuyo permiso
   // posee, y nunca las adminOnly (p. ej. Mantenimiento / reset destructivo).
-  const secciones = SECCIONES.filter((s) => {
-    if (esAdmin) return true;
-    if (s.adminOnly) return false;
-    return !s.permiso || permisos.includes(s.permiso);
-  });
+  // La decisión vive en `puedeVerSeccion` para que tenga candados propios.
+  const secciones = SECCIONES.filter((s) => puedeVerSeccion(perfil, s));
 
   return (
     <div className="max-w-2xl mx-auto">

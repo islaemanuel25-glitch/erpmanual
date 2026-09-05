@@ -41,7 +41,18 @@ const BUSCADOR = leer("components/pos-ventas/BuscadorProductos.jsx");
 const CARRITO = leer("components/pos-ventas/CarritoVenta.jsx");
 const PANTALLA = leer("app/modulos/pos-ventas/page.jsx");
 const EDITOR_COMBO = leer("components/productos/EditorComponentesCombo.jsx");
-const CONFIG_PANTALLA = leer("app/modulos/configuracion/pos-ventas/page.jsx");
+// LA PANTALLA DE REGLAS SE MUDÓ, Y ESTE CANDADO SE MUDÓ CON ELLA.
+//
+// Vivía en `configuracion/pos-ventas/page.jsx`. Esa ruta pasó a ser la PORTADA
+// de Configuración POS y los tres toggles se fueron a `/pos-ventas/reglas`.
+//
+// Dos de las afirmaciones de acá se pusieron en rojo y avisaron solas. La
+// tercera —POS8, que exige que la preferencia no se guarde en `localStorage`—
+// se quedó en VERDE leyendo la portada, que no tiene ningún toggle: seguía
+// pasando sin afirmar nada. Es el caso exacto que CLAUDE.md describe, y por eso
+// después de mudar un archivo hay que releer los candados que lo nombraban,
+// SOBRE TODO los que no se quejaron.
+const CONFIG_PANTALLA = leer("app/modulos/configuracion/pos-ventas/reglas/page.jsx");
 const CONFIG_RUTA = leer("app/api/config/pos-ventas-cliente/route.js");
 const CONFIG_LIB = leer("lib/config/local.js");
 const ESQUEMA = fs.readFileSync(path.join(RAIZ, "prisma/schema.prisma"), "utf8");
@@ -251,7 +262,7 @@ test("POS8. LA PREFERENCIA NO VIVE EN EL NAVEGADOR", () => {
 // LA PANTALLA DE CONFIGURACIÓN
 // ══════════════════════════════════════════════════════════════════════════
 
-test("POS9. LA OPCIÓN ESTÁ EN CONFIGURACIÓN → POS VENTAS, CON SU NOMBRE EXACTO", () => {
+test("POS9. LA OPCIÓN ESTÁ EN CONFIGURACIÓN POS → REGLAS DE VENTA, CON SU NOMBRE EXACTO", () => {
   assert.match(CONFIG_PANTALLA, /"Mostrar stock en POS Ventas"/);
   assert.match(CONFIG_PANTALLA, /key: "mostrarStockPos"/);
   // Con las piezas del kit, no con un input nativo.
