@@ -27,6 +27,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 const PANTALLAS = [
   ["Configuración POS (portada)", "@/app/modulos/configuracion/pos-ventas/page.jsx"],
@@ -52,4 +53,52 @@ test("el formulario compartido y el hook de datos también", async () => {
 
   const hook = await import("@/hooks/useMediosCobro.js");
   assert.equal(typeof hook.default, "function");
+});
+
+// CANDADOS DEL REDISEÑO MOBILE APROBADO EN FIGMA.
+//
+// La portada tiene permiso para cambiar su composición, pero NO para crear una
+// paleta paralela ni medidas arbitrarias. Los valores visuales tienen que salir
+// del kit/tokens Sunmi y de la escala Tailwind ya existente.
+test("la portada mobile usa tokens del sistema y no hardcodea colores ni px arbitrarios", () => {
+  const portada = readFileSync(new URL("./page.jsx", import.meta.url), "utf8");
+
+  assert.doesNotMatch(
+    portada,
+    /#[0-9a-fA-F]{3,8}\b/,
+    "la portada introdujo un color hexadecimal literal"
+  );
+  assert.doesNotMatch(
+    portada,
+    /\[[0-9.]+px\]/,
+    "la portada introdujo una medida arbitraria en px"
+  );
+
+  assert.match(portada, /useSunmiTheme/);
+  assert.match(portada, /sunmi-badge-accent/);
+  assert.match(portada, /sunmi-btn-accent-soft/);
+  assert.match(portada, /var\(--success-fg\)/);
+});
+
+test("el chrome inmersivo queda limitado a la portada mobile de Configuración POS", () => {
+  const layout = readFileSync(
+    new URL("../../../../components/LayoutBase.jsx", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(
+    layout,
+    /pathname === "\/modulos\/configuracion\/pos-ventas"/,
+    "la excepción debe depender de la ruta exacta, no de un startsWith que afecte subpantallas"
+  );
+  assert.match(
+    layout,
+    /configuracionPosMobile \? "hidden md:block" : ""/,
+    "el Header debe ocultarse solo en mobile y seguir presente en desktop"
+  );
+  assert.match(
+    layout,
+    /!configuracionPosMobile/,
+    "el título mobile global debe omitirse en la portada que ya trae título propio"
+  );
 });
