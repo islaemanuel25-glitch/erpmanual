@@ -87,9 +87,13 @@ test("la portada mobile usa tokens del sistema y no hardcodea colores ni px arbi
   // Exigirla ahora dejaría el candado pidiendo que vuelva algo que decidimos
   // sacar. Lo que sí se sigue exigiendo —arriba— es que no aparezca un color
   // literal ni una medida arbitraria, que es lo que el candado cuida de verdad.
+  // Se prohíben los INGREDIENTES de los chips, no la palabra "Local:". La
+  // primera versión de esta línea también prohibía esa cadena y se puso en rojo
+  // sola: el bloque DESKTOP la usa legítimamente, en el subtítulo de
+  // `SunmiHeader`. Pedía algo que la pantalla nunca prometió.
   assert.doesNotMatch(
     portada,
-    /Local: |rolNombre|UserRound/,
+    /rolNombre|UserRound/,
     "los chips de local y rol volvieron: eso ya lo muestra el Header global"
   );
 });

@@ -33,7 +33,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 // paralela acá.
 
 export default function SunmiNavCard({
-  icon: Icono,
+  icon,
   label,
   descripcion,
   estado = null,
@@ -41,6 +41,12 @@ export default function SunmiNavCard({
   atenuado = false,
   className = "",
 }) {
+  // JSX trata un identificador en minúscula como etiqueta HTML, así que un
+  // componente recibido por prop hay que renombrarlo con mayúscula. Se hace ACÁ
+  // y no en la firma a propósito: renombrándolo en el destructuring, el nombre
+  // `icon` no vuelve a aparecer en el cuerpo, y el candado del kit que busca
+  // props declarados y nunca usados lo cuenta como muerto. Lo encontró él, no yo.
+  const Icono = icon;
   const navega = Boolean(href);
 
   const tarjeta = (
