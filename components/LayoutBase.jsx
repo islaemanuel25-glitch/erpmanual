@@ -28,6 +28,12 @@ export default function LayoutBase({ children }) {
   const isLauncher = menuMode === "launcher";
   const menu = isTopbar && perfil ? fullMenu : null;
 
+  // La portada mobile de Configuración POS tiene header propio (el diseño
+  // aprobado en Figma). Solo ESA ruta se vuelve inmersiva en angosto:
+  // las subpantallas siguen usando el chrome normal, y desktop queda igual.
+  const configuracionPosMobile =
+    pathname === "/modulos/configuracion/pos-ventas";
+
   // El launcher solo aparece en Inicio/Dashboard. En otras rutas (POS, Stock,
   // etc.) no se renderiza arriba del contenido.
   const showLauncher = isLauncher && pathname.startsWith("/modulos/dashboard");
@@ -37,6 +43,10 @@ export default function LayoutBase({ children }) {
   const headerMobileHandler = isTopbar
     ? () => setMobileDrawerOpen(true)
     : undefined;
+
+  const mainPadding = configuracionPosMobile
+    ? `px-0 pt-0 ${isTopbar ? "pb-20" : "pb-0"} md:p-4`
+    : `p-4 ${isTopbar ? "pb-20 md:pb-4" : "pb-4"}`;
 
   return (
     <div className={`${isSidebar ? "flex" : "flex flex-col"} h-dvh w-full overflow-x-hidden`}>
@@ -57,19 +67,24 @@ export default function LayoutBase({ children }) {
       {/* CONTENT AREA */}
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
 
-        <Header onOpenMobileMenu={headerMobileHandler} />
+        {/* La portada de Configuración POS reemplaza este header SOLO en mobile. */}
+        <div className={configuracionPosMobile ? "hidden md:block" : ""}>
+          <Header onOpenMobileMenu={headerMobileHandler} />
+        </div>
 
         {/* TOPBAR desktop (solo en modo topbar) */}
         {isTopbar && <TopbarNav onOpenMenu={() => setDrawerOpen(true)} />}
 
-        {/* TITULO MOBILE */}
-        <div className="md:hidden px-4 py-3 text-xl font-semibold">
-          {tituloMobile}
-        </div>
+        {/* TITULO MOBILE — la portada de Configuración POS ya trae el suyo. */}
+        {!configuracionPosMobile && (
+          <div className="md:hidden px-4 py-3 text-xl font-semibold">
+            {tituloMobile}
+          </div>
+        )}
 
         {/* MAIN CONTENT: pb en mobile para no tapar con BottomNav (solo topbar) */}
         <main
-          className={`flex-1 min-h-0 p-4 ${isTopbar ? "pb-20 md:pb-4" : "pb-4"} overflow-auto transition-colors duration-200 ${isSidebar ? "md:border-l md:border-[var(--chrome-border)]" : ""}`}
+          className={`flex-1 min-h-0 ${mainPadding} overflow-auto transition-colors duration-200 ${isSidebar ? "md:border-l md:border-[var(--chrome-border)]" : ""}`}
         >
           {/* En modo launcher el menú aparece sólo en Inicio/Dashboard */}
           {showLauncher && <AppLauncher />}
