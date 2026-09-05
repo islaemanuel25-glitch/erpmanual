@@ -1,0 +1,237 @@
+# CAPTURAS REALES DE CONFIGURACIÓN POS, EN UN RUNNER QUE SE MUERE AL TERMINAR.
+#
+# ── POR QUÉ EXISTE ESTE WORKFLOW ─────────────────────────────────────────────
+#
+# Emanuel no puede mirar localhost, y la sesión que escribe el código corre en el
+# VPS de producción, donde no hay `node_modules`, Node es 18 y no hay ningún
+# navegador. O sea: la UI se estaba entregando sin que nadie la hubiera visto.
+# "Los candados están en verde" no dice nada sobre si la pantalla se ve bien;
+# CLAUDE.md tiene cinco casos anotados de defectos que ningún candado encontró y
+# que aparecieron al abrir la pantalla.
+#
+# ── LO QUE NO SE REIMPLEMENTÓ ────────────────────────────────────────────────
+#
+# El arnés. `scripts/generar-huellas.mjs` ya sabe manejar un navegador por CDP,
+# hacer login REAL contra `/api/login`, fijar grupo y ubicación como lo haría una
+# persona con el selector, esperar a que la pantalla se asiente en vez de dormir
+# un rato, y capturar. Escribir otro al lado habría sido repetir el error del
+# resolutor de alias duplicado, que está anotado en CLAUDE.md.
+#
+# Lo único que se le agregó son dos cosas chicas: `--pantallas archivo.json`, para
+# darle otra lista sin tocar la de las dieciséis de la línea de base, y
+# `sinTabla: true`, porque su corte de calidad es "la tabla tiene filas" y estas
+# pantallas no tienen ninguna tabla.
+#
+# ── POR QUÉ EL TEMA ES `sunmiSand` ───────────────────────────────────────────
+#
+# Porque es el que el diseño usó: `bg-[#f6f1e7]` de fondo y `bg-[#fffaf0]` en las
+# tarjetas son exactamente los cremas de los PNG aprobados. Capturar en
+# `sunmiDark` daría fotos oscuras contra un mockup claro, y cada diferencia de
+# color habría que descontarla a ojo antes de poder juzgar la composición.
+#
+# No es elegir un tema "que quede bien": es el tema real del producto sobre el
+# que se dibujó. La estructura no depende de cuál se use; la comparación sí.
+#
+# ── Y EL ALTO ES 1600, NO 800 ────────────────────────────────────────────────
+#
+# Para que entre la pantalla entera. Lo que se está mirando es el ancho —360, 390
+# y 412— porque ahí es donde se ve el desborde, el texto cortado y los controles
+# que se van de la pantalla. Con un alto de teléfono, la mitad del formulario de
+# editar quedaría abajo del pliegue y no saldría en ninguna imagen, que es
+# exactamente el defecto que ya pasó una vez con la pantalla de recetas.
+#
+# ── AISLAMIENTO ──────────────────────────────────────────────────────────────
+#
+# Todo vive y muere acá. PostgreSQL es un service container del runner; la base
+# se crea vacía y se migra desde cero; el usuario de prueba lo crea `prisma/seed.js`
+# con una clave que no protege nada; y no se publica ninguna URL. No se toca el
+# VPS, ni `erpazul`, ni `erpazul_revision`, ni ninguna credencial de producción.
+
+name: Visual — Configuración POS
+
+on:
+  # A MANO Y NADA MÁS. Esto construye la app entera y levanta un navegador: son
+  # varios minutos de runner. Colgarlo de cada push gastaría eso en cada commit
+  # de un comentario, y lo que se mira son cuatro pantallas que cambian poco.
+  workflow_dispatch:
+    inputs:
+      ancho:
+        description: "Anchos a capturar, separados por coma"
+        required: false
+        default: "360,390,412"
+
+concurrency:
+  group: visual-configuracion-pos-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  capturar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: erpazul
+          POSTGRES_PASSWORD: erpazul_ci
+          POSTGRES_DB: erpazul_visual
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U erpazul -d erpazul_visual"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://erpazul:erpazul_ci@127.0.0.1:5432/erpazul_visual
+      # NO es production: el nivel ESCRITURA de `scripts/lib/clientePrisma.mjs`
+      # aborta con NODE_ENV=production, y el sembrado lo necesita.
+      NODE_ENV: test
+      # Firma cookies de una base que dura minutos. Ponerlo en `secrets` daría la
+      # falsa impresión de que protege algo real.
+      AUTH_SECRET: secreto-visual-sin-valor-fuera-del-runner
+      # Credenciales del usuario que crea `prisma/seed.js`. Son de la base
+      # efímera y de ningún otro lado.
+      USUARIO_PRUEBA: admin@admin.com
+      CLAVE_PRUEBA: "123456"
+      PUERTO: "3111"
+
+    steps:
+      - name: Traer el código de ESTA rama
+        uses: actions/checkout@v4
+
+      - name: Node 20 (el mismo del Dockerfile)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: prisma generate
+        run: npx prisma generate
+
+      # Las MISMAS migraciones que corren en producción, desde una base vacía. No
+      # se usa `db push`: la foto tiene que salir de la estructura que el
+      # despliegue produce, no de una parecida.
+      - name: Migrar desde cero
+        run: npx prisma migrate deploy
+
+      - name: Sembrar los datos base
+        run: node prisma/seed.js
+
+      - name: Construir la aplicación
+        run: npm run build
+
+      - name: Levantar la aplicación y esperar a que conteste
+        run: |
+          npx next start -p "$PUERTO" > /tmp/app.log 2>&1 &
+          for i in $(seq 1 60); do
+            codigo=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$PUERTO/login" || true)
+            if [ "$codigo" = "200" ]; then echo "la app contesta 200 en /login"; exit 0; fi
+            sleep 2
+          done
+          echo "La aplicación no contestó en 120 s. Últimas líneas del log:"
+          tail -40 /tmp/app.log
+          exit 1
+
+      - name: Ubicar el navegador del runner
+        id: navegador
+        run: |
+          # ubuntu-latest trae Chrome preinstalado. El arnés llama `--edge` a esta
+          # opción por su origen, pero es la ruta de un binario Chromium
+          # cualquiera: las banderas de CDP son las mismas.
+          for b in google-chrome chromium-browser chromium; do
+            ruta=$(command -v "$b" || true)
+            if [ -n "$ruta" ]; then echo "ruta=$ruta" >> "$GITHUB_OUTPUT"; echo "navegador: $ruta"; exit 0; fi
+          done
+          echo "No hay ningún navegador Chromium en el runner."
+          exit 1
+
+      # ── PASADA 1: EL LOCAL SIN CONFIGURAR ────────────────────────────────
+      #
+      # Va PRIMERO y no es un detalle de orden: "defaults" es la AUSENCIA de
+      # configuración, así que es el único estado que no se puede sembrar. Se
+      # fotografía antes de tocar nada.
+      - name: Capturar el estado por defecto
+        run: |
+          set -e
+          for ancho in $(echo "${{ inputs.ancho }}" | tr ',' ' '); do
+            echo "── $ancho px — sin configurar ──"
+            node scripts/generar-huellas.mjs \
+              --salida "/tmp/capturas/$ancho" \
+              --pantallas scripts/visual/pantallas-configuracion-pos.json \
+              --usuario "$USUARIO_PRUEBA" --clave "$CLAVE_PRUEBA" \
+              --tema sunmiSand \
+              --base "http://localhost:$PUERTO" \
+              --edge "${{ steps.navegador.outputs.ruta }}" \
+              --puerto-cdp 9223 \
+              --ancho "$ancho" --alto 1600
+          done
+
+      # ── SEMBRAR LAS OTRAS TRES CONDICIONES ───────────────────────────────
+      - name: Sembrar medio oculto, comisión heredada y comisión local
+        run: |
+          node --import ./scripts/alias-loader.mjs \
+            scripts/pruebas-db/sembrar-visual-medios-cobro.mjs \
+            --pantallas /tmp/pantallas-configuradas.json
+          cat /tmp/pantallas-configuradas.json
+
+      # ── PASADA 2: CON CONFIGURACIÓN ──────────────────────────────────────
+      #
+      # La lista la ESCRIBIÓ el sembrado, porque las dos pantallas de editar se
+      # direccionan por la clave de edición del medio y esa clave no existe hasta
+      # que existen las filas. Adivinarla acá sería asumir el formato que la UI
+      # tiene prohibido asumir.
+      - name: Capturar los estados configurados
+        run: |
+          set -e
+          for ancho in $(echo "${{ inputs.ancho }}" | tr ',' ' '); do
+            echo "── $ancho px — configurado ──"
+            node scripts/generar-huellas.mjs \
+              --salida "/tmp/capturas/$ancho" \
+              --pantallas /tmp/pantallas-configuradas.json \
+              --usuario "$USUARIO_PRUEBA" --clave "$CLAVE_PRUEBA" \
+              --tema sunmiSand \
+              --base "http://localhost:$PUERTO" \
+              --edge "${{ steps.navegador.outputs.ruta }}" \
+              --puerto-cdp 9223 \
+              --ancho "$ancho" --alto 1600
+          done
+
+      - name: Ordenar el artefacto con nombres legibles
+        run: |
+          mkdir -p /tmp/artefacto
+          for ancho in $(echo "${{ inputs.ancho }}" | tr ',' ' '); do
+            for img in /tmp/capturas/$ancho/*.png; do
+              [ -e "$img" ] || continue
+              cp "$img" "/tmp/artefacto/$ancho-$(basename "$img")"
+            done
+            # La huella que el arnés produce al lado: no es el entregable, pero
+            # dice con qué tamaño y tema se sacó cada foto.
+            [ -f "/tmp/capturas/$ancho/meta.json" ] && cp "/tmp/capturas/$ancho/meta.json" "/tmp/artefacto/$ancho-meta.json" || true
+          done
+          # Las referencias aprobadas viajan en el mismo artefacto: comparar es
+          # abrir dos imágenes, y buscarlas en el repo es un paso donde alguien se
+          # equivoca de versión.
+          mkdir -p /tmp/artefacto/figma-aprobado
+          cp docs/diseno/configuracion-pos/*.png /tmp/artefacto/figma-aprobado/
+          ls -la /tmp/artefacto
+
+      - name: Subir las capturas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: configuracion-pos-visual
+          path: /tmp/artefacto
+          if-no-files-found: error
+
+      - name: Log de la aplicación si algo falló
+        if: failure()
+        run: tail -80 /tmp/app.log || true
