@@ -31,10 +31,10 @@ const SECCIONES = [
     permiso: "config_local.stock",
   },
   {
-    label: "POS Ventas",
+    label: "Configuración POS",
     href: "/modulos/configuracion/pos-ventas",
     icon: ShoppingCart,
-    descripcion: "Reglas de cierre de venta del POS (cliente y operario obligatorio).",
+    descripcion: "Cobros, reglas de venta, integraciones y apariencia del POS.",
     // Dos permisos, y alcanza con uno: adentro conviven las reglas de venta
     // (`config_local.pos`) y los medios de cobro (`config_local.medios_cobro`).
     permisos: PERMISOS_CONFIG_POS,

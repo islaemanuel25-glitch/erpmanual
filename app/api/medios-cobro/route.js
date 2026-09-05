@@ -4,7 +4,13 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { MEDIO_LABEL } from "@/lib/pos-ventas/pagos";
 import { normalizarRecargos } from "@/lib/recargos-pago/recargoPago";
-import { PROCESADORES, TIPOS_COBRABLES, claveEdicionDe, normalizarEntrada } from "@/lib/pos-ventas/mediosCobro";
+import {
+  PROCESADORES,
+  PROCESADOR_LABEL,
+  TIPOS_COBRABLES,
+  claveEdicionDe,
+  normalizarEntrada,
+} from "@/lib/pos-ventas/mediosCobro";
 import {
   guardarRecargoDeTipo,
   materializarDefaults,
@@ -63,7 +69,10 @@ export async function GET(req) {
       // Las opciones salen del servidor y no de una lista en el navegador, para
       // que la pantalla no pueda ofrecer un tipo que la base no acepta.
       tiposContables: TIPOS_COBRABLES.map((t) => ({ valor: t, label: MEDIO_LABEL[t] || t })),
-      procesadores: PROCESADORES,
+      // Con etiqueta, igual que los tipos: si la pantalla tuviera que traducir
+      // MERCADOPAGO a "Mercado Pago" por su cuenta, la segunda pantalla que lo
+      // haga lo va a escribir distinto.
+      procesadores: PROCESADORES.map((p) => ({ valor: p, label: PROCESADOR_LABEL[p] || p })),
     });
   } catch (err) {
     console.error("Error leyendo medios de cobro:", err);
