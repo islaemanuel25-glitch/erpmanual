@@ -16,72 +16,90 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-### `20260906190000_comision_sin_configurar` — SIN APLICAR en producción
-
-**El árbol pasa de 4 a 5 migraciones.** Producción sigue en **4**: esta todavía
-no se aplicó. Lo último comprobado con `prisma migrate status` fue el 2026-09-06
-al desplegar `65761f3697f75d8b5cc1ed327d8bb44c84d1a2ea`: *"4 migrations found in
+Ninguna. Producción está al día en **5 migraciones**, que son las que hay en el
+árbol. Comprobado con `prisma migrate status` el 2026-09-06 después de desplegar
+`cc5f2ed1773359dbae832e4b0d5a12f4c8cf3018`: *"5 migrations found in
 prisma/migrations. Database schema is up to date!"*.
 
-**Qué hace.** Le saca a las tres comisiones del grupo su `DEFAULT 7` y su
-`NOT NULL`, y agrega una columna a `Venta`:
+---
 
-- `ConfiguracionGrupo.comisionDebito` → nullable, sin default
-- `ConfiguracionGrupo.comisionCredito` → nullable, sin default
-- `ConfiguracionGrupo.comisionMercadopago` → nullable, sin default
-- `Venta.comisionPendiente` → `BOOLEAN NOT NULL DEFAULT false`
+## 2026-09-06 — `cc5f2ed1`, comisión sin configurar: una migración aplicada
 
-**Qué NO hace, y es la mitad que importa.** No tiene un solo `UPDATE`. No hace
-backfill. **No modifica los 7 ya almacenados**: el grupo que hoy existe conserva
-sus tres valores y va a seguir heredando 7, pero porque los tiene guardados y no
-porque el código los invente. De acá en adelante un grupo nuevo puede quedar con
-la comisión en `null`, que significa **sin configurar** — y `null` no es `0`: el
-0 es una comisión que alguien decidió y el `null` es un dato que falta.
+### `20260906190000_comision_sin_configurar` — APLICADA
 
-**Por qué existía ese 7.** Venía del `@default(7)` del esquema y de un `?? 7`
-copiado en el dominio y en dos rutas. No era una regla de negocio de nadie y
-decidía cuánto se le descontaba al comercio en cada venta.
+Se aplicó **de verdad**, y eso es lo que distingue "se aplicó" de "la imagen no
+la conocía", que salen iguales en el código de salida: `migrate deploy` imprimió
+`Applying migration 20260906190000_comision_sin_configurar` y después
+`All migrations have been successfully applied`.
 
-#### El clasificador la marca NO ADITIVA, y está bien que lo haga
+**El conteo pasó de 4 a 5**, que es el control que vale: el árbol tiene 5, el
+contenedor descartable de la imagen nueva informó 5, y el `migrate status`
+posterior dice *"5 migrations found in prisma/migrations. Database schema is up
+to date!"*.
 
-`node scripts/clasificar-migraciones.mjs` la marca por los `DROP DEFAULT`, con
-este motivo: *"la versión vieja contaba con ese default para no mandar el
-campo"*. **El clasificador no se tocó y no se lo va a tocar**: hace análisis de
-texto y frenar de más es la dirección correcta.
+#### La frenada del clasificador, y cómo se resolvió
 
-**Por qué la ventana igual es compatible.** En la ventana entre migrar y recrear,
-la app vieja sigue atendiendo:
+`node scripts/clasificar-migraciones.mjs` la marcó **NO ADITIVA** por el
+`DROP DEFAULT`, con este motivo: *"la versión vieja contaba con ese default para
+no mandar el campo"*. El despliegue **frenó en el paso 0, antes del backup**, así
+que en ese momento no se había tocado nada de producción.
 
-- al mismo tiempo que se quita el `DEFAULT` se quita el `NOT NULL`, así que un
-  `INSERT` que omita las tres columnas **sigue funcionando**;
-- esas filas quedan en `NULL`;
-- la versión vieja resuelve ese `NULL` con su fallback histórico `?? 7`, o sea
-  exactamente lo que obtenía antes cuando el default se lo escribía la base;
-- `Venta.comisionPendiente` tiene `DEFAULT false` y el código viejo la ignora.
+Se le informó a Emanuel qué migración era, qué sentencia la marcó y por qué la
+ventana igual era compatible —el `DROP NOT NULL` va en la misma migración, así
+que el código viejo puede seguir insertando sin nombrar esas columnas y su
+fallback histórico resuelve los `NULL` en 7—, y **se esperó su confirmación
+explícita**. La autorización fue **puntual y solo para este despliegue**: no se
+tocó el clasificador, no se agregó ninguna variable permanente y no se modificó
+la migración para esquivarlo.
 
-**La autorización para desplegarla se pide sobre el SHA final, y es puntual.** No
-hay ninguna autorización permanente ni una variable de escape: cuando el
-clasificador frene, se informa y decide Emanuel, una vez.
+#### ⚠️ EL CONTROL DE AUTORIZACIÓN NO DEJÓ SU RASTRO — DEFECTO CONOCIDO
 
-#### Evidencia, medida contra Postgres en el runner efímero
+Se ejecutó `DEPLOY_MIGRACION_AUTORIZADA=1` en el paso de migrar, pero
+**`.claude/migraciones-autorizadas.log` NO fue creado**: la guardia `PreToolUse`
+no interceptó el comando en este entorno.
 
-Las cinco afirmaciones están en `scripts/pruebas-db/mediosCobro.mjs`, sección
-"Compatibilidad de la migración que sacó el DEFAULT 7", y corren en cada CI:
+O sea que la autorización de este despliegue quedó respaldada por la decisión
+explícita previa, por la ejecución informada y por este cierre documental —pero
+**no** por el archivo automático de bitácora, que es el único control que no
+depende de que alguien se acuerde.
 
-- las tres columnas **aceptan `NULL`** — comprobado escribiendo, no leyendo el
-  esquema: una columna que dice ser nulable y rechaza el `NULL` no sirve;
-- un `INSERT` de `ConfiguracionGrupo` **omitiendo las tres comisiones funciona**,
-  que es literalmente lo que hace el código viejo;
-- los valores existentes del fixture —**7 / 10 / 5**— quedan intactos;
-- una `Venta` creada **sin nombrar** `comisionPendiente` nace en `false`;
-- el código viejo sobre ese `NULL` resuelve **7**, y el código nuevo sobre la
-  misma fila resuelve `pct: null` con origen `"sin-configurar"`.
+**Es un defecto conocido del mecanismo de deploy y se resuelve en una tanda
+aparte.** No se arregló acá a propósito: este cierre es documental. Mientras el
+hook no funcione, toda autorización manual de migración depende de que quede
+escrita a mano en un documento como este.
 
-#### Al aplicarla
+#### Efecto medido en producción, después de aplicar
 
-Se borra esta sección en el mismo commit que confirme el despliegue, y se anota
-abajo con lo que haya informado `migrate deploy` — el CONTEO, que tiene que pasar
-de 4 a **5**, no el código de salida.
+Leído contra `information_schema` en un contenedor descartable, no deducido del
+archivo de migración:
+
+| columna | nullable | default |
+|---|---|---|
+| `ConfiguracionGrupo.comisionDebito` | `YES` | `null` |
+| `ConfiguracionGrupo.comisionCredito` | `YES` | `null` |
+| `ConfiguracionGrupo.comisionMercadopago` | `YES` | `null` |
+| `Venta.comisionPendiente` | `NO` | `false` |
+
+**Y el histórico NO se reinterpretó**, que es la mitad que importa:
+
+- los valores guardados de `ConfiguracionGrupo` siguen siendo **`[7, 7, 7]`**: la
+  migración no modificó ninguna fila;
+- de las **14.981** ventas existentes, **0** quedaron con `comisionPendiente` en
+  `true` — son ventas que se cobraron con una comisión conocida, y así quedan.
+
+#### Backup y corte
+
+`pre-cc5f2ed1_20260906_212334.sql.gz`, **3.840.112 bytes**, validado ANTES de
+migrar con los cuatro chequeos. El quinto no aplica: la migración es de esquema y
+no borra ni un dato.
+
+**El corte fue de 5 segundos**, contra un tope de 30.
+
+#### Estado final
+
+Producción en `cc5f2ed1773359dbae832e4b0d5a12f4c8cf3018`, con los cinco valores
+coincidiendo, PostgreSQL healthy, cero reinicios, logs sin errores ni fatales,
+`/login` en 200 y el árbol del VPS limpio.
 
 ---
 
