@@ -221,6 +221,21 @@ test("Cobros tiene el botón de volver del kit, con destino explícito", () => {
     /router\.back\(\)/,
     "router.back() llevaría a donde sea que se venga, no a la portada"
   );
+
+  // ── Y VA DONDE VA EN EL RESTO DEL ERP: ARRIBA A LA DERECHA ──────────────
+  //
+  // No es una preferencia de esta pantalla. `SunmiBackButton` se usa en 34
+  // lugares; medidos los otros 33, hay 26 que lo dejan a la derecha —último de
+  // una fila `justify-between`, `justify-end`, `items-end` o `ml-auto`— y 7 a
+  // la izquierda. La colocación de acá es la misma de `configuracion/ticket`.
+  //
+  // Este candado existe porque el botón ya se movió dos veces. Sin él, la
+  // tercera no la ve nadie hasta abrir la pantalla.
+  assert.match(
+    cobros,
+    /<div className="flex justify-end mb-2">\s*<SunmiBackButton/,
+    "el botón de volver dejó de estar arriba a la derecha"
+  );
 });
 
 test("'Cobros' se escribe una sola vez: el título lo pone el shell", () => {
