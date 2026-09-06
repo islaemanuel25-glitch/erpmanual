@@ -58,7 +58,8 @@ export async function GET(req) {
         v."costoTotal",
         v."gananciaNeta",
         -- Sin esto, el estado del ticket se calcularía sobre una ganancia que
-        -- puede ser un placeholder. Ver `lib/pos-ventas/comisionPendiente.js`.
+        -- puede ser un placeholder. El porqué está en lib/pos-ventas/comisionPendiente.js
+        -- (sin comillas invertidas: adentro de una plantilla SQL cierran el literal).
         v."comisionPendiente",
         v."turnoId",
         u.nombre AS "vendedorNombre",
