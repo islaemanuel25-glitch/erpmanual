@@ -212,6 +212,21 @@ jobs:
               --ancho "$ancho" --alto 1600
           done
 
+      # ── EL VIAJE DE LA CLAVE POR LA URL ──────────────────────────────────
+      #
+      # Va DESPUÉS de las capturas de defaults porque escribe —materializa y
+      # borra medios— y antes del sembrado, que de todas formas deja el escenario
+      # en un estado conocido.
+      #
+      # Mide lo que las pruebas de base no pueden ver: ellas llaman a los
+      # handlers directo, con `params` armado a mano, así que prueban el handler
+      # y no el transporte. El defecto de los cuatro defaults inabribles vivía
+      # justo en ese tramo.
+      - name: Medir el viaje de la clave de edición por la URL
+        run: |
+          node --import ./scripts/alias-loader.mjs \
+            scripts/sonda-clave-de-medio.mjs --base "http://localhost:$PUERTO"
+
       # ── SEMBRAR LAS OTRAS TRES CONDICIONES ───────────────────────────────
       - name: Sembrar medio oculto, comisión heredada y comisión local
         run: |

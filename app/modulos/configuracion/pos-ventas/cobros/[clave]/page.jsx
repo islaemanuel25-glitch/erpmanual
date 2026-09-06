@@ -11,6 +11,7 @@ import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import useMediosCobro from "@/hooks/useMediosCobro";
 import { puedeVerSeccion } from "@/lib/config/acceso";
+import { decodificarSegmentoDeRuta } from "@/lib/rutas/segmentoDeRuta";
 
 // EDITAR UN MEDIO DE COBRO.
 //
@@ -21,6 +22,18 @@ import { puedeVerSeccion } from "@/lib/config/acceso";
 // parsea la clave y no arma ninguna: si algún día el backend cambia cómo se
 // direcciona un medio que todavía no existe, acá no hay que tocar nada.
 //
+// ── PERO SÍ HAY QUE DESHACER EL TRANSPORTE ─────────────────────────────────
+//
+// La lista arma el enlace con `encodeURIComponent`, así que `defecto:EFECTIVO`
+// viaja como `defecto%3AEFECTIVO`, y `use(params)` entrega el segmento TAL CUAL
+// viaja. La comparación quedaba `"defecto:EFECTIVO" !== "defecto%3AEFECTIVO"` y
+// los cuatro medios por defecto se veían como inexistentes: es el defecto que
+// llegó a producción.
+//
+// Decodificar el segmento NO es interpretar la clave. Acá se deshace el
+// transporte y se compara el texto; qué significa adentro lo sigue sabiendo solo
+// el backend. Ver `lib/rutas/segmentoDeRuta.js`.
+//
 // ── EL FORMULARIO SE MONTA RECIÉN CON LOS DATOS ────────────────────────────
 //
 // No antes. `FormularioMedio` toma su estado inicial de lo que recibe, y
@@ -30,7 +43,8 @@ import { puedeVerSeccion } from "@/lib/config/acceso";
 const RUTA_COBROS = "/modulos/configuracion/pos-ventas/cobros";
 
 export default function EditarMedioPage({ params }) {
-  const { clave } = use(params);
+  const { clave: segmento } = use(params);
+  const clave = decodificarSegmentoDeRuta(segmento);
   const router = useRouter();
   const { perfil, cargando: cargandoUser } = useUser();
   const { contexto } = useContextoActivo();
