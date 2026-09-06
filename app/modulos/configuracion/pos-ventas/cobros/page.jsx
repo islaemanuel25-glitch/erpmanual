@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Info } from "lucide-react";
 
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiNavCard from "@/components/sunmi/SunmiNavCard";
@@ -53,13 +54,30 @@ export default function CobrosPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
+      {/* El destino va explícito y no `router.back()`: desde Cobros se vuelve
+          SIEMPRE a la portada de Configuración POS, se haya llegado desde donde
+          se haya llegado. Es la misma colocación que usa `configuracion/ticket`. */}
+      {/* A la IZQUIERDA, debajo del título que pone el shell: "Volver" es
+          navegación hacia atrás y ahí es donde se la busca. La primera versión
+          lo alineaba a la derecha copiando la colocación de
+          `configuracion/ticket`, y en la captura de 390 quedaba flotando lejos
+          del texto al que pertenece.
+
+          El contenedor solo deja de empujar: el botón ya es `inline-flex`, así
+          que sin `justify-end` se apoya solo en el margen izquierdo. No se le
+          tocó ni un estilo al componente. */}
+      <div className="mb-2">
+        <SunmiBackButton href="/modulos/configuracion/pos-ventas" />
+      </div>
+
       <div className="space-y-5">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold sunmi-text-strong">Cobros</h1>
-          <p className="text-sm sunmi-text-muted">
-            Configurá los medios de cobro de este local.
-          </p>
-        </div>
+        {/* Acá había un <h1>Cobros</h1>. Se fue porque el título de la pantalla
+            ya lo pone el shell —el bloque mobile de LayoutBase y el <h1> del
+            Header en escritorio—, y desde que la ruta resuelve su propio título
+            los dos dicen "Cobros". Dejarlo era leerlo dos veces seguidas. */}
+        <p className="text-sm sunmi-text-muted">
+          Configurá los medios de cobro de este local.
+        </p>
 
         {cargando ? (
           <SunmiLoader />
