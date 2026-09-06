@@ -208,6 +208,31 @@ test("el aviso de configuración predeterminada aparece SOLO con usandoDefaults"
   assert.doesNotMatch(cobros, /Un mismo procesador puede tener varios botones/);
 });
 
+test("Cobros tiene el botón de volver del kit, con destino explícito", () => {
+  const cobros = cobrosSinComentarios();
+  assert.match(cobros, /SunmiBackButton/, "el botón sale del kit, no se dibuja otra flecha");
+  assert.match(
+    cobros,
+    /href="\/modulos\/configuracion\/pos-ventas"/,
+    "desde Cobros se vuelve SIEMPRE a la portada, no a lo último que se visitó"
+  );
+  assert.doesNotMatch(
+    cobros,
+    /router\.back\(\)/,
+    "router.back() llevaría a donde sea que se venga, no a la portada"
+  );
+});
+
+test("'Cobros' se escribe una sola vez: el título lo pone el shell", () => {
+  // El título de la pantalla lo dibujan el bloque mobile de LayoutBase y el
+  // <h1> del Header, los dos desde `usePageTitle`. Si la página además pusiera
+  // el suyo, se leería dos veces seguidas.
+  const cobros = cobrosSinComentarios();
+  assert.doesNotMatch(cobros, /<h1[^>]*>[\s\S]*?Cobros[\s\S]*?<\/h1>/);
+  // Y la bajada sí se queda: es de la pantalla, no del shell.
+  assert.match(cobros, /Configurá los medios de cobro de este local/);
+});
+
 test("Cobros no repite el contexto que ya muestra el shell", () => {
   const cobros = cobrosSinComentarios();
   assert.doesNotMatch(
