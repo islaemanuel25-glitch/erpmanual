@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-09-04 18:32
+**Última actualización:** 2026-09-06 20:39
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,17 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-09-06: test: los fixtures traen comisionPendiente, que es lo que trae una venta real
+- 2026-09-06: fix(pos): comisionEsExacta falla cerrado y todos los consumidores quedan cubiertos
+- 2026-09-06: fix(auditoria): un backtick adentro de la plantilla SQL la cerraba
+- 2026-09-06: feat(pos): la comision sin configurar deja de ser un 7 inventado
+- 2026-09-05: fix(configuracion-pos): distinguir "sin procesador" de "todavia no elegi"
+- 2026-09-05: fix(candados): repuntar el de reglas del POS y corregir uno mio que afirmaba mal
+- 2026-09-05: feat(configuracion-pos): las cuatro pantallas del diseno aprobado
+- 2026-09-05: fix(medios): una sola regla para no quedarse sin medios, y contrato explicito para editar un default
+- 2026-09-05: feat(pos): los botones de cobro salen de la configuracion del local
+- 2026-09-05: feat(pos): API de medios de cobro y permiso config_local.medios_cobro
+- 2026-09-05: feat(pos): medios de cobro configurables por local — schema y dominio
 - 2026-09-04: fix(pos): el ticket imprime lo que se cobro, y una venta desfasada se rechaza SIN VERIFICAR
 - 2026-09-04: feat(pos): el cajero ve el total de cada medio antes de elegir SIN VERIFICAR
 - 2026-09-04: feat(pos): la venta resuelve la oferta y el recargo en el servidor SIN VERIFICAR

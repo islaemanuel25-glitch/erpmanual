@@ -1,5 +1,44 @@
 # Changelog
 
+## [2026-09-06] - Actualización: pos-ventas, dashboard, reportes-ventas, configuracion, productos
+
+### Modificado
+- **pos-ventas**: test: los fixtures traen comisionPendiente, que es lo que trae una venta real
+- **pos-ventas**: fix(pos): comisionEsExacta falla cerrado y todos los consumidores quedan cubiertos
+- **pos-ventas**: fix(auditoria): un backtick adentro de la plantilla SQL la cerraba
+- **pos-ventas**: feat(pos): la comision sin configurar deja de ser un 7 inventado
+- **pos-ventas**: fix(configuracion-pos): distinguir "sin procesador" de "todavia no elegi"
+- **pos-ventas**: fix(candados): repuntar el de reglas del POS y corregir uno mio que afirmaba mal
+- **pos-ventas**: feat(configuracion-pos): las cuatro pantallas del diseno aprobado
+- **pos-ventas**: fix(medios): una sola regla para no quedarse sin medios, y contrato explicito para editar un default
+- **pos-ventas**: feat(pos): los botones de cobro salen de la configuracion del local
+- **pos-ventas**: feat(pos): API de medios de cobro y permiso config_local.medios_cobro
+- **pos-ventas**: feat(pos): medios de cobro configurables por local — schema y dominio
+- **dashboard**: fix(pos): comisionEsExacta falla cerrado y todos los consumidores quedan cubiertos
+- **reportes-ventas**: fix(pos): comisionEsExacta falla cerrado y todos los consumidores quedan cubiertos
+- **reportes-ventas**: feat(pos): la comision sin configurar deja de ser un 7 inventado
+- **configuracion**: fix(cobros): los cuatro medios por defecto vuelven a abrirse desde la lista
+- **configuracion**: feat(shell): la pantalla activa puede registrar una accion al lado del titulo
+- **configuracion**: fix(cobros): el boton de volver va arriba a la derecha, como en el resto del ERP
+- **configuracion**: fix(cobros): Volver va a la izquierda
+- **configuracion**: fix(cobros): el titulo dice Cobros, y aparece el boton de volver
+- **configuracion**: feat(cobros): la lista usa el mismo patron que Configuracion POS
+- **configuracion**: fix(sunmi): dos rojos que encontraron los candados, y los dos tenian razon
+- **configuracion**: feat(sunmi): SunmiNavCard, y sacar de la portada lo que el Header ya muestra
+- **configuracion**: test(config-pos): exigir shell mobile global
+- **configuracion**: fix(config-pos): integrar diseño dentro del shell del ERP
+- **configuracion**: fix(config-pos): restaurar header global en mobile
+- **configuracion**: test(config-pos): blindar portada mobile y tokens de theme
+- **configuracion**: feat(layout): dar chrome mobile propio a configuración POS
+- **configuracion**: feat(config-pos): aplicar portada mobile aprobada en Figma
+- **configuracion**: fix(configuracion-pos): Apariencia se muestra apagada y no lleva a ningun lado
+- **configuracion**: test(configuracion-pos): candar quien ve que adentro de Configuracion POS
+- **configuracion**: fix(configuracion-pos): distinguir "sin procesador" de "todavia no elegi"
+- **configuracion**: feat(configuracion-pos): las cuatro pantallas del diseno aprobado
+- **configuracion**: fix(menu): un permiso sin camino es un permiso que no existe
+- **productos**: test(alertas): mandar la ficha entera, y que la ruta diga que salio mal
+
+
 ## [2026-09-04] - Actualización: pos-ventas, productos, configuracion
 
 ### Modificado
