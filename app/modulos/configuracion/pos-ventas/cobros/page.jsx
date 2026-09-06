@@ -57,16 +57,16 @@ export default function CobrosPage() {
       {/* El destino va explícito y no `router.back()`: desde Cobros se vuelve
           SIEMPRE a la portada de Configuración POS, se haya llegado desde donde
           se haya llegado. Es la misma colocación que usa `configuracion/ticket`. */}
-      {/* A la IZQUIERDA, debajo del título que pone el shell: "Volver" es
-          navegación hacia atrás y ahí es donde se la busca. La primera versión
-          lo alineaba a la derecha copiando la colocación de
-          `configuracion/ticket`, y en la captura de 390 quedaba flotando lejos
-          del texto al que pertenece.
+      {/* ARRIBA A LA DERECHA, que es la convención del ERP y no una preferencia
+          de esta pantalla. `SunmiBackButton` se usa en 34 lugares; medidos los
+          otros 33, hay 26 que lo dejan a la derecha —último de una fila
+          `justify-between`, `justify-end`, `items-end` o `ml-auto`— y 7 a la
+          izquierda. La colocación de acá es la de `configuracion/ticket`.
 
-          El contenedor solo deja de empujar: el botón ya es `inline-flex`, así
-          que sin `justify-end` se apoya solo en el margen izquierdo. No se le
-          tocó ni un estilo al componente. */}
-      <div className="mb-2">
+          Hubo una versión intermedia que lo puso a la izquierda; se revirtió al
+          confirmar que el patrón existente manda. Lo único que hace este div es
+          empujar el botón: al componente no se le tocó ni un estilo. */}
+      <div className="flex justify-end mb-2">
         <SunmiBackButton href="/modulos/configuracion/pos-ventas" />
       </div>
 
