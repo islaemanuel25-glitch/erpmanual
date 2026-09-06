@@ -208,12 +208,22 @@ test("el aviso de configuración predeterminada aparece SOLO con usandoDefaults"
   assert.doesNotMatch(cobros, /Un mismo procesador puede tener varios botones/);
 });
 
-test("Cobros tiene el botón de volver del kit, con destino explícito", () => {
+test("COBROS REGISTRA UNA ACCIÓN, Y ESA ACCIÓN ES EL SunmiBackButton DEL KIT", () => {
   const cobros = cobrosSinComentarios();
+  assert.match(cobros, /useAccionDePagina\(/, "Cobros no registra ninguna acción de página");
   assert.match(cobros, /SunmiBackButton/, "el botón sale del kit, no se dibuja otra flecha");
   assert.match(
     cobros,
-    /href="\/modulos\/configuracion\/pos-ventas"/,
+    /useAccionDePagina\(\s*\(\) => \([\s\S]*?<SunmiBackButton href=\{RUTA_PORTADA\}/,
+    "lo registrado tiene que ser el botón del kit, no otra cosa"
+  );
+});
+
+test("el destino de la acción es explícito: la portada de Configuración POS", () => {
+  const cobros = cobrosSinComentarios();
+  assert.match(
+    cobros,
+    /const RUTA_PORTADA = "\/modulos\/configuracion\/pos-ventas"/,
     "desde Cobros se vuelve SIEMPRE a la portada, no a lo último que se visitó"
   );
   assert.doesNotMatch(
@@ -221,21 +231,28 @@ test("Cobros tiene el botón de volver del kit, con destino explícito", () => {
     /router\.back\(\)/,
     "router.back() llevaría a donde sea que se venga, no a la portada"
   );
+});
 
-  // ── Y VA DONDE VA EN EL RESTO DEL ERP: ARRIBA A LA DERECHA ──────────────
-  //
-  // No es una preferencia de esta pantalla. `SunmiBackButton` se usa en 34
-  // lugares; medidos los otros 33, hay 26 que lo dejan a la derecha —último de
-  // una fila `justify-between`, `justify-end`, `items-end` o `ml-auto`— y 7 a
-  // la izquierda. La colocación de acá es la misma de `configuracion/ticket`.
-  //
-  // Este candado existe porque el botón ya se movió dos veces. Sin él, la
-  // tercera no la ve nadie hasta abrir la pantalla.
+test("EL BOTÓN NO VUELVE A OCUPAR UNA FILA PROPIA EN MOBILE", () => {
+  // Era el defecto: el botón quedaba en una fila aparte debajo del título y
+  // regalaba una franja de alto. Ahora en mobile lo dibuja el shell, en la misma
+  // fila que "Cobros"; lo que queda en la pantalla es SOLO la colocación de
+  // escritorio, donde el shell no tiene fila de título propia.
+  const cobros = cobrosSinComentarios();
   assert.match(
     cobros,
-    /<div className="flex justify-end mb-2">\s*<SunmiBackButton/,
-    "el botón de volver dejó de estar arriba a la derecha"
+    /<div className="hidden md:flex justify-end mb-2">\{volver\}<\/div>/,
+    "la colocación de escritorio cambió, o el botón volvió a ocupar alto en mobile"
   );
+  assert.doesNotMatch(
+    cobros,
+    /<div className="flex justify-end mb-2">/,
+    "el botón volvió a tener su propia fila en mobile"
+  );
+  // Un solo lugar donde se declara: la pantalla dibuja el mismo nodo que
+  // registró. Si apareciera un segundo `<SunmiBackButton .../>` habría dos
+  // botones que se pueden ir separando con el tiempo.
+  assert.equal((cobros.match(/<SunmiBackButton/g) || []).length, 1);
 });
 
 test("'Cobros' se escribe una sola vez: el título lo pone el shell", () => {

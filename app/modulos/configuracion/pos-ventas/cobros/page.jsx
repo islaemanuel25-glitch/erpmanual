@@ -9,6 +9,7 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiNavCard from "@/components/sunmi/SunmiNavCard";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SinPermisos from "@/components/auth/SinPermisos";
+import { useAccionDePagina } from "@/app/context/AccionDePaginaContext";
 import { useUser } from "@/app/context/UserContext";
 import useMediosCobro from "@/hooks/useMediosCobro";
 import { puedeVerSeccion } from "@/lib/config/acceso";
@@ -43,32 +44,52 @@ import { etiquetaVisibilidad, inicialesDeMedio, resumenComercial } from "@/lib/p
 // Se dibuja `medios.map` sobre lo que devuelve `/api/medios-cobro`, en su orden,
 // con la cantidad y los nombres que haya. Acá no hay ningún medio escrito.
 
-const RUTA_COBROS = "/modulos/configuracion/pos-ventas/cobros";
+const RUTA_PORTADA = "/modulos/configuracion/pos-ventas";
+const RUTA_COBROS = `${RUTA_PORTADA}/cobros`;
 
 export default function CobrosPage() {
   const { perfil, cargando: cargandoUser } = useUser();
   const { cargando, error, medios, usandoDefaults } = useMediosCobro();
 
+  const puedeVer = puedeVerSeccion(perfil, { permiso: "config_local.medios_cobro" });
+
+  // ── LA ACCIÓN VA AL SLOT DEL SHELL, QUE ES DONDE ESTÁ EL TÍTULO ──────────
+  //
+  // En mobile el título "Cobros" lo dibuja `LayoutBase` en una fila que está
+  // ARRIBA de `<main>`, así que nada escrito acá adentro puede quedar a su
+  // altura. Registrando la acción, el shell la pone en esa misma fila y la
+  // composición queda "Cobros ......... ← Volver", sin duplicar el título ni
+  // esconder el global ni empujar nada con márgenes.
+  //
+  // El destino va explícito y no `router.back()`: desde Cobros se vuelve SIEMPRE
+  // a la portada de Configuración POS, se haya llegado desde donde se haya
+  // llegado.
+  //
+  // La fábrica devuelve `null` cuando el usuario no tiene el permiso, para no
+  // ofrecer la acción en una pantalla que muestra `SinPermisos`. El hook se
+  // llama siempre —nunca condicionalmente—; lo que cambia es lo que devuelve.
+  const volver = useAccionDePagina(
+    () => (puedeVer ? <SunmiBackButton href={RUTA_PORTADA} /> : null),
+    [puedeVer]
+  );
+
   if (cargandoUser) return null;
-  if (!puedeVerSeccion(perfil, { permiso: "config_local.medios_cobro" })) return <SinPermisos />;
+  if (!puedeVer) return <SinPermisos />;
 
   return (
     <div className="max-w-2xl mx-auto">
-      {/* El destino va explícito y no `router.back()`: desde Cobros se vuelve
-          SIEMPRE a la portada de Configuración POS, se haya llegado desde donde
-          se haya llegado. Es la misma colocación que usa `configuracion/ticket`. */}
-      {/* ARRIBA A LA DERECHA, que es la convención del ERP y no una preferencia
-          de esta pantalla. `SunmiBackButton` se usa en 34 lugares; medidos los
-          otros 33, hay 26 que lo dejan a la derecha —último de una fila
-          `justify-between`, `justify-end`, `items-end` o `ml-auto`— y 7 a la
-          izquierda. La colocación de acá es la de `configuracion/ticket`.
+      {/* SOLO ESCRITORIO, y es el MISMO nodo que se registró arriba: se declara
+          una vez y aparece en un lugar por ancho.
 
-          Hubo una versión intermedia que lo puso a la izquierda; se revirtió al
-          confirmar que el patrón existente manda. Lo único que hace este div es
-          empujar el botón: al componente no se le tocó ni un estilo. */}
-      <div className="flex justify-end mb-2">
-        <SunmiBackButton href="/modulos/configuracion/pos-ventas" />
-      </div>
+          En escritorio el shell no tiene fila de título propia —el `<h1>` vive
+          en la barra superior del `Header`—, así que ahí no hay ninguna fila
+          donde poner la acción y la colocación sigue siendo la de siempre:
+          arriba a la derecha del contenido, dentro de la misma columna, igual
+          que `configuracion/ticket` y que otros 25 usos del botón.
+
+          En mobile este div es `hidden`, así que no ocupa alto: la acción ya
+          está arriba, en la fila del título. */}
+      <div className="hidden md:flex justify-end mb-2">{volver}</div>
 
       <div className="space-y-5">
         {/* Acá había un <h1>Cobros</h1>. Se fue porque el título de la pantalla

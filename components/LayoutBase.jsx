@@ -11,6 +11,7 @@ import { useLayoutSettings } from "@/app/context/LayoutSettingsContext";
 import { useUser } from "@/app/context/UserContext";
 import { useMenu } from "@/hooks/useMenu";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useAccionDelShell } from "@/app/context/AccionDePaginaContext";
 import { LEGACY_LAYOUTBASE_TITLES } from "@/lib/menu/legacyTitles";
 
 export default function LayoutBase({ children }) {
@@ -22,6 +23,7 @@ export default function LayoutBase({ children }) {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   const tituloMobile = usePageTitle({ overrides: LEGACY_LAYOUTBASE_TITLES });
+  const accionDePagina = useAccionDelShell();
 
   const isSidebar = menuMode === "sidebarLeft";
   const isTopbar = menuMode === "topbar";
@@ -62,9 +64,27 @@ export default function LayoutBase({ children }) {
         {/* TOPBAR desktop (solo en modo topbar) */}
         {isTopbar && <TopbarNav onOpenMenu={() => setDrawerOpen(true)} />}
 
-        {/* TITULO MOBILE */}
+        {/* TITULO MOBILE — con el slot de acción de la pantalla activa.
+            El shell NO sabe qué pantalla es ni qué nodo le pasaron: acá solo se
+            pregunta si hay una acción o no. Cualquier comparación de ruta en
+            este archivo sería la excepción que este mecanismo vino a evitar.
+
+            Sin acción se dibuja exactamente lo que se dibujaba antes —el texto
+            suelto adentro del mismo div— para que las pantallas que no usan el
+            slot, que son casi todas, queden idénticas al píxel.
+
+            Con acción, la fila se reparte: el título a la izquierda, la acción
+            a la derecha. `min-w-0 truncate` es lo que hace que un título largo
+            se recorte en vez de empujar la acción fuera de la pantalla. */}
         <div className="md:hidden px-4 py-3 text-xl font-semibold">
-          {tituloMobile}
+          {accionDePagina ? (
+            <div className="flex items-center justify-between gap-3">
+              <span className="min-w-0 truncate">{tituloMobile}</span>
+              {accionDePagina}
+            </div>
+          ) : (
+            tituloMobile
+          )}
         </div>
 
         {/* MAIN CONTENT: pb en mobile para no tapar con BottomNav (solo topbar) */}
