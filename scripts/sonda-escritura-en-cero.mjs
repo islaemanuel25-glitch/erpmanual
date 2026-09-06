@@ -405,9 +405,14 @@ seccion("E · entrar al campo y ver qué queda seleccionado");
 
 campo = await preparar("Recargo al cliente");
 await clic(campo.caja, "derecha");
+
+// La FOTO va primero, con el campo todavía enfocado. Leer el portapapeles mueve
+// el foco al textarea, así que retratar después mostraba el campo apagado: una
+// foto perfectamente nítida del momento equivocado.
+await retratar(campo.caja, "foco-en-el-cero");
+
 const seleccionAlEntrar = await loSeleccionado();
 console.log(`    al entrar, lo seleccionado es: ${JSON.stringify(seleccionAlEntrar)}`);
-await retratar(campo.caja, "foco-en-el-cero");
 
 // Y la pregunta del navegador, aparte de lo que haga la pantalla: ¿se puede
 // seleccionar un `type="number"` sin que lance? `selectionStart` sí lanza.
