@@ -41,6 +41,7 @@
 // cargue o que no aparezcan los campos salen con 1 diciendo cuál.
 
 import { spawn } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
 
@@ -58,6 +59,8 @@ const EDGE = arg("edge", "/usr/bin/google-chrome");
 const PUERTO = Number(arg("puerto-cdp", "9224"));
 const PERFIL = path.join(tmpdir(), "sonda-escritura-en-cero");
 const RUTA = arg("ruta", "/modulos/configuracion/pos-ventas/cobros/defecto%3AEFECTIVO");
+/** Dónde dejar las fotos del campo enfocado. Sin esto, la sonda solo mide. */
+const CAPTURAS = arg("capturas", null);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -289,6 +292,61 @@ async function pegar() {
 
 const medidas = () => evaluar(`JSON.stringify({ eventos: window.__medidas, valor: window.__campo.value })`);
 
+/**
+ * QUÉ HAY SELECCIONADO ADENTRO DEL CAMPO, medido copiando.
+ *
+ * No se puede preguntar de frente: en un `<input type="number">` Chrome lanza
+ * `InvalidStateError` al leer `selectionStart`. Lo que sí se puede es ejercer el
+ * comando de copiar del navegador y ver qué quedó en el portapapeles.
+ *
+ * El centinela es lo que hace que la medición signifique algo: si no hay nada
+ * seleccionado, el comando de copiar no pisa el portapapeles y lo que se lee es
+ * el centinela. Sin él, "no se copió nada" y "se copió lo de antes" darían lo
+ * mismo.
+ */
+async function loSeleccionado() {
+  const CENTINELA = "SIN-SELECCION";
+  await copiarAlPortapapeles(CENTINELA);
+
+  // Volver al campo SIN tocar su contenido: el clic ya lo dejó enfocado antes de
+  // llamar acá, pero copiar desde el textarea movió el foco.
+  await evaluar(`window.__campo.focus()`);
+  await send("Input.dispatchKeyEvent", {
+    type: "keyDown", key: "c", code: "KeyC", modifiers: 2,
+    windowsVirtualKeyCode: 67, commands: ["copy"],
+  });
+  await send("Input.dispatchKeyEvent", { type: "keyUp", key: "c", code: "KeyC", modifiers: 2, windowsVirtualKeyCode: 67 });
+  await sleep(120);
+
+  const leido = await evaluar(`(() => {
+    const t = document.getElementById("__copiador");
+    t.value = "";
+    t.focus();
+    return "listo";
+  })()`);
+  if (leido !== "listo") frenar("no se pudo preparar la lectura del portapapeles");
+
+  await pegar();
+  return evaluar(`document.getElementById("__copiador").value`);
+}
+
+/** Una foto del campo enfocado, para mirar con los ojos lo que se midió. */
+async function retratar(caja, nombre) {
+  if (!CAPTURAS) return null;
+  const { data } = await send("Page.captureScreenshot", {
+    format: "png",
+    clip: {
+      x: Math.max(0, caja.x - 12), y: Math.max(0, caja.y - 34),
+      width: Math.min(390, caja.w + 24), height: caja.h + 48, scale: 3,
+    },
+  });
+  fs.mkdirSync(CAPTURAS, { recursive: true });
+  const destino = path.join(CAPTURAS, `${nombre}.png`);
+  fs.writeFileSync(destino, Buffer.from(data, "base64"));
+  console.log(`    foto: ${destino}`);
+  return destino;
+}
+
 function informar(nombre, crudo) {
   const { eventos, valor } = JSON.parse(crudo);
   console.log(`\n  ── ${nombre} ──`);
@@ -336,6 +394,59 @@ await evaluar(`window.__medidas = []`);
 await pegar();
 const D = informar('D · valor 0, PEGAR "12"', await medidas());
 
+// ── E. ENTRAR AL CAMPO: ¿QUEDA EL CERO SELECCIONADO? ───────────────────────
+//
+// Es lo que la persona VE antes de escribir. La lógica ya reemplaza el cero,
+// pero con el cursor al costado del `0` parece que va a quedar `10`, y eso hace
+// dudar a quien está cargando un recargo.
+
+seccion("E · entrar al campo y ver qué queda seleccionado");
+
+campo = await preparar("Recargo al cliente");
+await clic(campo.caja, "derecha");
+const seleccionAlEntrar = await loSeleccionado();
+console.log(`    al entrar, lo seleccionado es: ${JSON.stringify(seleccionAlEntrar)}`);
+await retratar(campo.caja, "foco-en-el-cero");
+
+// Y la pregunta del navegador, aparte de lo que haga la pantalla: ¿se puede
+// seleccionar un `type="number"` sin que lance? `selectionStart` sí lanza.
+campo = await preparar("Recargo al cliente");
+await clic(campo.caja, "derecha");
+const conSelect = await evaluar(`(() => {
+  try { window.__campo.select(); return { ok: true, error: null }; }
+  catch (e) { return { ok: false, error: String(e) }; }
+})()`);
+const seleccionForzada = conSelect.ok ? await loSeleccionado() : null;
+console.log(`    select() sin excepción: ${conSelect.ok}${conSelect.error ? ` — ${conSelect.error}` : ""}`);
+console.log(`    tras select(), lo seleccionado es: ${JSON.stringify(seleccionForzada)}`);
+
+// Y que después de seleccionar se pueda seguir escribiendo normal.
+await teclear("1");
+const trasSeleccionar = JSON.parse(await medidas()).valor;
+console.log(`    y al teclear 1 con el cero seleccionado queda: ${JSON.stringify(trasSeleccionar)}`);
+
+// ── F. UN VALOR QUE NO ES CERO NO SE SELECCIONA ────────────────────────────
+
+seccion("F · un valor distinto de 0 no se reemplaza al entrar");
+
+campo = await preparar("Recargo al cliente");
+await clic(campo.caja, "derecha");
+await teclear("1");
+await teclear("2");
+const doceEnElCampo = JSON.parse(await medidas()).valor;
+
+// Salir del campo y volver a entrar: es el gesto que dispara el enfoque.
+await evaluar(`window.__campo.blur()`);
+await sleep(80);
+await clic(campo.caja, "derecha");
+const seleccionCon12 = await loSeleccionado();
+console.log(`    con ${JSON.stringify(doceEnElCampo)} en el campo, lo seleccionado es: ${JSON.stringify(seleccionCon12)}`);
+
+await evaluar(`window.__campo.focus()`);
+await teclear("3");
+const trasEscribirEn12 = JSON.parse(await medidas()).valor;
+console.log(`    y al teclear 3 queda: ${JSON.stringify(trasEscribirEn12)}`);
+
 // ══════════════════════════════════════════════════════════════════════════
 // LO QUE SE AFIRMA
 // ══════════════════════════════════════════════════════════════════════════
@@ -351,6 +462,30 @@ ok(
   `informó ${tipos(C) || "nada"} — sin esta diferencia no se pueden separar los dos casos`
 );
 ok("y ese algo es `insertFromPaste`", tipos(C).includes("insertFromPaste"), `informó ${tipos(C) || "nada"}`);
+
+console.log("\n── entrar al campo ──");
+ok(
+  "el navegador PUEDE seleccionar un type=number: `select()` no lanza",
+  conSelect.ok,
+  conSelect.error || ""
+);
+ok(
+  "y esa selección cubre el cero",
+  seleccionForzada === "0",
+  `se copió ${JSON.stringify(seleccionForzada)}`
+);
+ok(
+  "AL ENTRAR AL CAMPO, EL CERO QUEDA SELECCIONADO",
+  seleccionAlEntrar === "0",
+  `se copió ${JSON.stringify(seleccionAlEntrar)} — con el cero sin seleccionar, parece que el dígito se va a sumar al lado`
+);
+ok(
+  "y escribir con el cero seleccionado sigue dejando el dígito solo",
+  trasSeleccionar === "1",
+  `quedó ${JSON.stringify(trasSeleccionar)}`
+);
+ok("un valor de dos dígitos NO se selecciona al entrar", seleccionCon12 !== "12", `se copió ${JSON.stringify(seleccionCon12)}`);
+ok("y escribir sobre él lo sigue completando", trasEscribirEn12 === "123", `quedó ${JSON.stringify(trasEscribirEn12)}`);
 
 console.log("\n── lo que tiene que quedar en el campo ──");
 ok("A · 0 + tecla 1 → 1", A.valor === "1", `quedó ${JSON.stringify(A.valor)}`);
