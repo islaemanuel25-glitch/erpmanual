@@ -44,6 +44,10 @@ export async function GET(req, { params }) {
         descuento: true,
         total: true,
         comisionBancaria: true,
+        // Sin esto, el detalle imprimiría "Comisión $0" y un neto igual al total
+        // para una venta a la que le falta el dato. Ver
+        // `lib/pos-ventas/comisionPendiente.js`.
+        comisionPendiente: true,
         netoRecibido: true,
         costoTotal: true,
         gananciaBruta: true,

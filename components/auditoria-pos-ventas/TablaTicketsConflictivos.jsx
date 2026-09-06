@@ -97,9 +97,16 @@ export default function TablaTicketsConflictivos({
                     </td>
                     <td className={`${TD} capitalize`}>{row.formaPago}</td>
                     <td className={TD_MONO}>${formatPrecio(row.total)}</td>
-                    <td className={TD_MONO}>${formatPrecio(row.comision)}</td>
+                    {/* Con la comisión pendiente, estos tres números son
+                        placeholders. Se dice, en vez de imprimir "$0" y una
+                        ganancia que descontó nada. */}
+                    <td className={TD_MONO}>
+                      {row.comisionPendiente ? "Pendiente" : `$${formatPrecio(row.comision)}`}
+                    </td>
                     <td className={`${TD_MONO} sunmi-text-muted`}>${formatPrecio(row.costo)}</td>
-                    <td className={`${TD_MONO} font-semibold`}>${formatPrecio(row.gananciaNeta)}</td>
+                    <td className={`${TD_MONO} font-semibold`}>
+                      {row.comisionPendiente ? "Pendiente" : `$${formatPrecio(row.gananciaNeta)}`}
+                    </td>
                     <td className={TD_MONO}>
                       {row.margenPct == null ? "—" : `${formatPrecio(row.margenPct)} %`}
                     </td>

@@ -20,7 +20,9 @@ import { validarMotivo, estadoVentanaCorreccion, esVentaFiada } from "@/lib/pos-
 import { evaluarCorreccion } from "@/lib/pos-ventas/motorCorreccion";
 import { planConsumoVenta } from "@/lib/combos/planConsumoVenta";
 import { preservarSubtotalOriginal } from "@/lib/pos-ventas/lineaPorImporte";
-import { normalizarYConsolidarPagos, aplicarComisiones, derivarCamposVenta, round2 } from "@/lib/pos-ventas/pagos";
+import { normalizarYConsolidarPagos, aplicarComisiones, derivarCamposVenta, round2, MEDIOS_CON_COMISION } from "@/lib/pos-ventas/pagos";
+import { mediosDelLocal } from "@/lib/pos-ventas/mediosCobroServidor";
+import { comisionesDeMedios } from "@/lib/pos-ventas/mediosCobro";
 import { enBetaCorreccionCompleta, COD_FLAG_OFF, MSG_FLAG_OFF } from "@/lib/pos-ventas/correccionBeta";
 import { bloqueoCorreccion } from "@/lib/ventas-internas/integracionVenta";
 import {
@@ -132,10 +134,23 @@ export async function POST(req, { params }) {
       const consol = normalizarYConsolidarPagos(body.pagos, totalNuevo);
       if (consol.error) { const e = new Error(consol.error); e.status = 400; e.code = "pagos_invalidos"; throw e; }
 
+      // LA MISMA RESOLUCIÓN QUE USA CREAR, Y NO UNA COPIA.
+      //
+      // Acá había una segunda implementación: leía `ConfiguracionGrupo` directo
+      // y aplicaba su propio `?? 7`. O sea que corregir IGNORABA la comisión
+      // propia del medio del local y podía darle a una venta corregida un
+      // porcentaje distinto del que le había dado el POS al cobrarla. Era un
+      // defecto preexistente, no de esta tanda, pero es exactamente la misma
+      // regla y por eso se unifica acá.
+      //
+      // `mediosDelLocal` compone las tres fuentes —override del local, herencia
+      // del grupo, sin configurar— y `comisionesDeMedios` deja fuera del mapa lo
+      // que no está configurado, para que `aplicarComisiones` lo marque como
+      // pendiente en vez de cobrarlo como 0.
       let comisionPctPorMedio = {};
-      if (consol.pagos.some((p) => ["MERCADOPAGO", "DEBITO", "CREDITO"].includes(p.medio))) {
-        const comCfg = await tx.configuracionGrupo.findUnique({ where: { grupoId }, select: { comisionDebito: true, comisionCredito: true, comisionMercadopago: true } });
-        comisionPctPorMedio = { DEBITO: Number(comCfg?.comisionDebito ?? 7), CREDITO: Number(comCfg?.comisionCredito ?? 7), MERCADOPAGO: Number(comCfg?.comisionMercadopago ?? 7) };
+      if (consol.pagos.some((p) => MEDIOS_CON_COMISION.includes(p.medio))) {
+        const mediosDelPos = await mediosDelLocal(tx, { localId, grupoId });
+        comisionPctPorMedio = comisionesDeMedios(mediosDelPos);
       }
       const pagosConComision = aplicarComisiones(consol.pagos, comisionPctPorMedio);
       const derivado = derivarCamposVenta(pagosConComision);
@@ -208,7 +223,10 @@ export async function POST(req, { params }) {
       for (const l of lineasComerciales) {
         const esCombo = l.tipo === "COMBO"; const esServicio = l.tipo === "SERVICIO";
         const share = totalNuevo > 0 ? Number(l.subtotal) / totalNuevo : 0;
-        const comisionLinea = esServicio ? 0 : round2(comisionBancaria * share);
+        // Igual que en crear: con la comisión pendiente no se prorratea un cero
+        // estructural por línea. Ver `lib/pos-ventas/comisionPendiente.js`.
+        const comisionLinea =
+          esServicio || derivado.comisionPendiente ? 0 : round2(comisionBancaria * share);
         const svc = esServicio ? l.servicio : null;
         const detalle = await tx.ventaDetalle.create({
           data: {
@@ -231,6 +249,9 @@ export async function POST(req, { params }) {
         data: {
           clienteId: clienteDespues, subtotal: subtotalNuevo, descuento, total: totalNuevo,
           comisionBancaria, comisionPct: derivado.comisionPct, netoRecibido: derivado.netoRecibido,
+          // Se recalcula con la corrección: si la comisión sigue sin
+          // configurarse, la venta corregida también queda pendiente.
+          comisionPendiente: derivado.comisionPendiente,
           costoTotal, gananciaBruta, gananciaNeta, formaPago: derivado.formaPago, esFiado: esFiadoDespues,
           version: { increment: 1 }, corregida: true, ultimaCorreccionId: correccionId,
         },

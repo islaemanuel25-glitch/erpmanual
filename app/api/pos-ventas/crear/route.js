@@ -1045,6 +1045,10 @@ export async function POST(req) {
           total,
           comisionBancaria,
           comisionPct: comisionPctVenta,
+          // Snapshot: al menos un tender que cobra comisión se cobró sin tenerla
+          // configurada, así que `comisionBancaria`, `netoRecibido` y
+          // `gananciaNeta` de esta fila son placeholders y no mediciones.
+          comisionPendiente: derivado.comisionPendiente,
           netoRecibido,
           costoTotal,
           gananciaBruta,
@@ -1084,7 +1088,12 @@ export async function POST(req) {
         // Servicios: cobrados en efectivo → sin comisión bancaria. Normales/combos:
         // se prorratea la comisión por participación en el total.
         const shareLinea = total > 0 ? lineaSubtotal / total : 0;
-        const comisionLinea = esServicioLinea ? 0 : comisionBancaria * shareLinea;
+        // Con la comisión pendiente NO se prorratea: repartir un cero
+        // estructural por línea convertiría un dato faltante en "esta línea no
+        // pagó comisión", que es una afirmación que nadie puede hacer todavía.
+        // `comisionLinea` ya es nulable y `null` es su forma de decirlo.
+        const comisionLinea =
+          esServicioLinea || derivado.comisionPendiente ? 0 : comisionBancaria * shareLinea;
         // Servicios y combos: sin lista de precios. Normales: la lista resuelta por el server.
         const itemListaValida = esComboLinea || esServicioLinea ? null : listaResuelta;
         const svc = esServicioLinea ? l.servicio : null;

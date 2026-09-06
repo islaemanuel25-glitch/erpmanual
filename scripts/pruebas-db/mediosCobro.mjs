@@ -21,7 +21,7 @@ const jwt = (await import("jsonwebtoken")).default;
 
 const { mediosDelLocal, materializarDefaults, aplicarCambioDeMedio } =
   await import("../../lib/pos-ventas/mediosCobroServidor.js");
-const { MEDIOS_POR_DEFECTO, COMISION_PCT_DEFAULT, comisionesDeMedios, recargosDeMedios } =
+const { MEDIOS_POR_DEFECTO, comisionesDeMedios, recargosDeMedios } =
   await import("../../lib/pos-ventas/mediosCobro.js");
 const { aplicarComisiones } = await import("../../lib/pos-ventas/pagos.js");
 
