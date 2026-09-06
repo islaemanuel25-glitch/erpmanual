@@ -74,8 +74,18 @@ test("la portada mobile usa tokens del sistema y no hardcodea colores ni px arbi
     "la portada introdujo una medida arbitraria en px"
   );
 
-  assert.match(portada, /sunmi-badge-accent/);
-  assert.match(portada, /sunmi-btn-accent-soft/);
+  // ── LA AFIRMACIÓN DE `sunmi-btn-accent-soft` SE FUE, TAMBIÉN A PROPÓSITO ─
+  //
+  // Esa clase la ponía el bloque del "Tip" escrito adentro de esta página. El
+  // bloque se fue al kit —`SunmiAviso`— porque Cobros necesita el mismo aviso,
+  // así que ahora la clase vive en la pieza. Exigirla acá sería pedir que el
+  // token vuelva a estar suelto en la pantalla, que es justo lo contrario de lo
+  // que queremos.
+  //
+  // Lo que se exige en su lugar es que la portada CONSUMA las piezas del kit:
+  // si alguien vuelve a dibujar la tarjeta o el aviso a mano, esto se pone rojo.
+  assert.match(portada, /SunmiNavCard/);
+  assert.match(portada, /SunmiAviso/);
 
   // ── LA AFIRMACIÓN DE `var(--success-fg)` SE FUE, Y SE FUE A PROPÓSITO ────
   //
@@ -142,5 +152,67 @@ test("Configuración POS conserva el header y el título mobile globales del ERP
     portada,
     /ArrowLeft|theme\.header|<h1[^>]*>Configuración POS<\/h1>|<h2[^>]*>[\s\S]*Configuración POS[\s\S]*<\/h2>/,
     "la portada no debe inventar un header o un título paralelo"
+  );
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// COBROS COMPARTE EL PATRÓN, Y LA LISTA SIGUE SIENDO DEL SERVIDOR
+// ══════════════════════════════════════════════════════════════════════════
+
+/** El archivo sin comentarios: acá se mira lo que la pantalla HACE. */
+function cobrosSinComentarios() {
+  return readFileSync(new URL("./cobros/page.jsx", import.meta.url), "utf8")
+    .replace(/\/\/[^\n]*/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+}
+
+test("Cobros usa las MISMAS piezas que la portada, no una tarjeta propia", () => {
+  const cobros = cobrosSinComentarios();
+  assert.match(cobros, /SunmiNavCard/);
+  assert.match(cobros, /SunmiAviso/);
+  assert.doesNotMatch(
+    cobros,
+    /size-12 shrink-0 items-center/,
+    "el redondel volvió a la página: su geometría vive en la pieza"
+  );
+});
+
+test("los medios se dibujan desde el servidor, no escritos en la pantalla", () => {
+  // Es lo que hace que la pantalla funcione con cualquier cantidad y cualquier
+  // nombre. Si alguien escribiera los cuatro de hoy, esto se pone rojo.
+  const cobros = cobrosSinComentarios();
+  assert.match(cobros, /medios\.map\(/);
+  assert.doesNotMatch(
+    cobros,
+    /"Efectivo"|"Débito"|"Crédito"|"Mercado Pago"/,
+    "hay un medio escrito a mano en la pantalla"
+  );
+});
+
+test("el resumen de la tarjeta es el comercial, no el orden ni el procesador", () => {
+  // Recargo y comisión son lo que cambia plata. El orden y el procesador siguen
+  // existiendo y siguen siendo editables adentro del medio; simplemente no son
+  // lo primero que alguien necesita leer en una lista.
+  const cobros = cobrosSinComentarios();
+  assert.match(cobros, /resumenComercial/);
+  assert.doesNotMatch(cobros, /resumenClasificacion/);
+});
+
+test("el aviso de configuración predeterminada aparece SOLO con usandoDefaults", () => {
+  const cobros = cobrosSinComentarios();
+  assert.match(cobros, /usandoDefaults && \(/);
+  assert.match(cobros, /Configuración predeterminada/);
+  // Y el párrafo permanente sobre procesadores no vuelve: se leía una vez y
+  // después estorbaba todos los días.
+  assert.doesNotMatch(cobros, /Un mismo procesador puede tener varios botones/);
+});
+
+test("Cobros no repite el contexto que ya muestra el shell", () => {
+  const cobros = cobrosSinComentarios();
+  assert.doesNotMatch(
+    cobros,
+    /useContextoActivo|Local: |SunmiHeader/,
+    "el local y la cinta del módulo ya los pone el shell del ERP"
   );
 });

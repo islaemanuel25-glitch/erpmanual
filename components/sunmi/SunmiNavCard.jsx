@@ -34,6 +34,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 
 export default function SunmiNavCard({
   icon,
+  insignia = null,
   label,
   descripcion,
   estado = null,
@@ -51,13 +52,20 @@ export default function SunmiNavCard({
 
   const tarjeta = (
     <SunmiCard className={`flex items-center gap-3 p-4 ${atenuado ? "opacity-60" : ""} ${className}`}>
-      {Icono && (
+      {/* ── EL REDONDEL ES UNO SOLO, LLEVE UN ICONO O DOS LETRAS ─────────────
+          Configuración POS pone un icono; Cobros pone las iniciales del medio,
+          porque el nombre lo escribe cada local y no hay icono que le
+          corresponda. Es el ÚNICO punto donde las dos pantallas difieren, así
+          que se resuelve adentro de la pieza y no duplicando la tarjeta: el
+          tamaño, el radio y el color del redondel siguen decidiéndose en un
+          solo lugar. */}
+      {(insignia || Icono) && (
         <span
-          className={`flex size-12 shrink-0 items-center justify-center rounded-xl ${
+          className={`flex size-12 shrink-0 items-center justify-center rounded-xl text-sm font-semibold ${
             atenuado ? "sunmi-badge-muted" : "sunmi-badge-accent"
           }`}
         >
-          <Icono className="size-6" aria-hidden="true" />
+          {insignia ?? <Icono className="size-6" aria-hidden="true" />}
         </span>
       )}
 

@@ -77,3 +77,31 @@ test("sin icono no se rompe: dibuja la tarjeta igual", () => {
   const html = dibujar({ icon: null, href: "/x" });
   assert.ok(html.includes("Cobros"));
 });
+
+// ══════════════════════════════════════════════════════════════════════════
+// EL REDONDEL ADMITE UNA SIGLA, PORQUE NO TODO TIENE ICONO
+// ══════════════════════════════════════════════════════════════════════════
+//
+// Cobros muestra las iniciales del medio: el nombre lo escribe cada local, así
+// que no hay icono que le corresponda. Lo que NO puede pasar es que eso derive
+// en una segunda tarjeta con su propia geometría.
+
+test("una insignia se dibuja adentro del mismo redondel que el icono", () => {
+  const html = dibujar({ icon: null, insignia: "MP", href: "/x" });
+  assert.ok(html.includes("MP"));
+  assert.match(html, /size-12[^"]*rounded-xl/, "el redondel tiene que ser el mismo");
+});
+
+test("la insignia gana sobre el icono, y entonces no se dibujan los dos", () => {
+  const html = dibujar({ insignia: "EF", href: "/x" });
+  assert.ok(html.includes("EF"));
+  // Con destino hay dos <svg> —icono y flecha—; con insignia queda solo la
+  // flecha, porque el icono lo reemplazó la sigla.
+  assert.equal((html.match(/<svg/g) || []).length, 1);
+});
+
+test("la insignia respeta el estado atenuado igual que el icono", () => {
+  const apagada = dibujar({ insignia: "CR", href: null, atenuado: true });
+  assert.match(apagada, /sunmi-badge-muted/);
+  assert.equal(apagada.includes("sunmi-badge-accent"), false);
+});
