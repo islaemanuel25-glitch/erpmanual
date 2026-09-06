@@ -128,6 +128,32 @@ console.log(`    usandoDefaults ................ ${listado.json?.usandoDefaults}
 ok("la clave del default no es un id, es una clave de tipo", CLAVE === "defecto:EFECTIVO", CLAVE);
 ok("y al codificarla para la URL deja de ser igual a sí misma", SEGMENTO !== CLAVE, SEGMENTO);
 
+// ── 1.bis QUÉ LE LLEGA A LA PANTALLA ───────────────────────────────────────
+//
+// La pantalla de edición es un componente de cliente y lee el segmento con
+// `use(params)`. El valor viaja serializado dentro de la respuesta de la ruta,
+// así que se puede leer de ahí sin abrir un navegador: es la medición directa
+// de qué recibe `params.clave`, y no una deducción a partir de lo que se ve.
+
+seccion("qué valor de segmento le llega a la pantalla de edición");
+
+const pagina = await fetch(`${BASE}/modulos/configuracion/pos-ventas/cobros/${SEGMENTO}`, {
+  headers: { cookie: `erpazul_sesion=${sesion}` },
+});
+const cuerpoPagina = await pagina.text();
+
+const llegaCodificado = cuerpoPagina.includes(SEGMENTO);
+const llegaDecodificado = cuerpoPagina.includes(CLAVE);
+console.log(`    la respuesta contiene ${JSON.stringify(SEGMENTO)} .... ${llegaCodificado}`);
+console.log(`    la respuesta contiene ${JSON.stringify(CLAVE)} ...... ${llegaDecodificado}`);
+
+ok("la pantalla contesta 200", pagina.status === 200, `contestó ${pagina.status}`);
+ok(
+  "el segmento le llega a la pantalla TAL CUAL viaja en la URL, sin decodificar",
+  llegaCodificado,
+  "no se encontró el segmento codificado en la respuesta"
+);
+
 // ── 2. PATCH CON LA CLAVE CODIFICADA ───────────────────────────────────────
 //
 // Éste es el caso real: es lo que manda el formulario, porque arma la URL con
