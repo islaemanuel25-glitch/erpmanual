@@ -66,8 +66,16 @@ if (!SECRETO) frenar("falta AUTH_SECRET en el entorno");
 
 // ── El escenario ───────────────────────────────────────────────────────────
 
-const local = await prisma.local.findFirst({ select: { id: true, grupoId: true, nombre: true } });
-if (!local) frenar("no hay ningún local en la base");
+// El grupo NO es una columna de `Local`: cuelga de `GrupoLocal`, igual que lo
+// resuelve `getGrupoIdDeLocal`. Se elige un local que esté en un grupo, porque
+// sin grupo el alcance no se puede resolver y la ruta contesta 400.
+const vinculo = await prisma.grupoLocal.findFirst({
+  select: { grupoId: true, localId: true },
+  orderBy: { localId: "asc" },
+});
+if (!vinculo) frenar("no hay ningún local dentro de un grupo en la base");
+
+const local = { id: vinculo.localId, grupoId: vinculo.grupoId };
 
 const usuario = await prisma.usuario.findFirst({ select: { id: true } });
 if (!usuario) frenar("no hay ningún usuario en la base");
