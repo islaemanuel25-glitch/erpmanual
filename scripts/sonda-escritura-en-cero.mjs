@@ -135,7 +135,24 @@ const navegador = spawn(
   ],
   { stdio: "ignore" }
 );
-const cerrar = () => { try { navegador.kill(); } catch {} };
+/**
+ * Suelta los dos recursos que esta sonda abre: el socket de CDP y el navegador
+ * que levantó.
+ *
+ * Los DOS, y no solo el navegador. Node no termina mientras quede un handle
+ * abierto, y el socket es uno: con él vivo el proceso se quedaba corriendo
+ * después de imprimir su resultado, el paso del workflow no avanzaba nunca y el
+ * job se cortaba por `timeout-minutes`. Lo peor de ese defecto es que solo
+ * ocurría en el camino EXITOSO —el de error salía por `process.exit`—, así que
+ * la sonda terminaba bien cuando fallaba y se colgaba cuando pasaba.
+ *
+ * `process.on("exit")` no alcanzaba para eso: ese evento no se emite mientras
+ * haya handles abiertos, que es exactamente lo que impedía terminar.
+ */
+const cerrar = () => {
+  try { ws?.close(); } catch {}
+  try { navegador.kill(); } catch {}
+};
 process.on("exit", cerrar);
 process.on("SIGINT", () => { cerrar(); process.exit(130); });
 
@@ -342,6 +359,12 @@ ok('C · 0 + pegar "10" → 10', C.valor === "10", `quedó ${JSON.stringify(C.va
 ok('D · 0 + pegar "12" → 12', D.valor === "12", `quedó ${JSON.stringify(D.valor)}`);
 
 console.log(`\n${pasadas} afirmaciones en verde, ${fallas.length} en rojo.`);
+
+// Se cierra acá, en los dos caminos. Después de esto no queda ningún handle
+// abierto, así que el proceso termina solo y con código 0: no hace falta un
+// `process.exit(0)`, que taparía un cierre incompleto en vez de hacerlo.
+cerrar();
+
 if (fallas.length) {
   console.log("\nEN ROJO:");
   for (const f of fallas) console.log(`  · ${f}`);
