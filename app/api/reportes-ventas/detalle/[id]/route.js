@@ -44,6 +44,10 @@ export async function GET(req, { params }) {
         descuento: true,
         total: true,
         comisionBancaria: true,
+        // Sin esto, el detalle imprimiría "Comisión $0" y un neto igual al total
+        // para una venta a la que le falta el dato. Ver
+        // `lib/pos-ventas/comisionPendiente.js`.
+        comisionPendiente: true,
         netoRecibido: true,
         costoTotal: true,
         gananciaBruta: true,
@@ -133,6 +137,10 @@ export async function GET(req, { params }) {
       total: num(venta.total).toFixed(2),
       comisionBancaria: num(venta.comisionBancaria).toFixed(2),
       netoRecibido: num(venta.netoRecibido).toFixed(2),
+      // Los dos de arriba —y la ganancia neta de abajo— son placeholders cuando
+      // esto es `true`. Viaja adentro de `totales` porque es lo que consumen
+      // tanto el detalle del admin como la reimpresión del ticket.
+      comisionPendiente: venta.comisionPendiente === true,
     };
     if (verCostos) {
       totales.costoTotal = num(venta.costoTotal).toFixed(2);

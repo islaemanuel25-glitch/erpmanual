@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuditoriaScope, parseRangoFechas } from "@/lib/auditoria-pos-ventas/scope";
 import { estadoTicket } from "@/lib/auditoria-pos-ventas/agregaciones";
+import { comisionEsExacta } from "@/lib/pos-ventas/comisionPendiente";
 
 export async function GET(req) {
   try {
@@ -56,6 +57,10 @@ export async function GET(req) {
         v."netoRecibido",
         v."costoTotal",
         v."gananciaNeta",
+        -- Sin esto, el estado del ticket se calcularía sobre una ganancia que
+        -- puede ser un placeholder. El porqué está en lib/pos-ventas/comisionPendiente.js
+        -- (sin comillas invertidas: adentro de una plantilla SQL cierran el literal).
+        v."comisionPendiente",
         v."turnoId",
         u.nombre AS "vendedorNombre",
         u.email AS "vendedorEmail",
@@ -82,10 +87,13 @@ export async function GET(req) {
     const items = rows.map((r) => {
       const gn = Number(r.gananciaNeta);
       const nr = Number(r.netoRecibido);
-      const estado = estadoTicket(gn, nr);
+      const estado = estadoTicket(gn, nr, r);
       const nrSafe = Number(r.netoRecibido);
+      // El margen de un ticket con comisión pendiente sale inflado, porque su
+      // ganancia neta no descontó nada. No se muestra un número: se dice que
+      // está pendiente.
       const margenPct =
-        nrSafe > 0 ? (Number(r.gananciaNeta) / nrSafe) * 100 : null;
+        !comisionEsExacta(r) ? null : nrSafe > 0 ? (Number(r.gananciaNeta) / nrSafe) * 100 : null;
       const tid = r.turnoId != null ? Number(r.turnoId) : null;
       return {
         id: r.id,
@@ -101,6 +109,9 @@ export async function GET(req) {
         gananciaNeta: Number(r.gananciaNeta),
         margenPct: margenPct === null ? null : Number(margenPct.toFixed(4)),
         estado,
+        // La comisión, el neto y la ganancia de arriba son placeholders cuando
+        // esto es `true`. La tabla los tiene que rotular, no imprimirlos.
+        comisionPendiente: r.comisionPendiente === true,
         turno:
           tid != null
             ? {

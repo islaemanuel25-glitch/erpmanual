@@ -155,7 +155,7 @@ export default function AuditoriaBalancesPage() {
   const [fechaDesde2, setFechaDesde2] = useState("");
   const [fechaHasta2, setFechaHasta2] = useState("");
 
-  const { loading, error, resumen, medios, comparacion, cargar } = useAuditoriaBalances();
+  const { loading, error, resumen, medios, estadoMedios, comparacion, cargar } = useAuditoriaBalances();
 
   useEffect(() => {
     const hoy = hoyArgentinaISO();
@@ -259,7 +259,7 @@ export default function AuditoriaBalancesPage() {
               </span>
             </div>
             <div className="p-3">
-              <TablaMediosPago items={medios} />
+              <TablaMediosPago items={medios} estadoFinanciero={estadoMedios} />
             </div>
           </SunmiCard>
         </>

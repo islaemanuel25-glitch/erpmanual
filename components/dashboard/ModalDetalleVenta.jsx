@@ -6,6 +6,7 @@ import { fechaHoraAR, horaAR } from "@/lib/fechas/formatearFechaHora";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import { X } from "lucide-react";
+import { comisionEsExacta, TEXTO_PENDIENTE } from "@/lib/pos-ventas/comisionPendiente";
 
 function fmt(n) {
   if (n == null) return "—";
@@ -181,7 +182,16 @@ export default function ModalDetalleVenta({ open, ventaId, onClose }) {
                     ${fmt(venta.total)}
                   </span>
                 </div>
-                {Number(venta.comisionBancaria) > 0 && (
+                {/* Con la comisión pendiente ese importe es un cero estructural:
+                    se dice, en vez de mostrar una comisión de $0 que nadie
+                    cobró. */}
+                {!comisionEsExacta(venta) && (
+                  <div className="flex justify-between">
+                    <span>Comisión bancaria</span>
+                    <span>{TEXTO_PENDIENTE}</span>
+                  </div>
+                )}
+                {comisionEsExacta(venta) && Number(venta.comisionBancaria) > 0 && (
                   <div className="flex justify-between text-xs sunmi-text-muted">
                     <span>Comisión</span>
                     <span className="tabular-nums">-${fmt(venta.comisionBancaria)}</span>

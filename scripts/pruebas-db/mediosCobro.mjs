@@ -21,7 +21,7 @@ const jwt = (await import("jsonwebtoken")).default;
 
 const { mediosDelLocal, materializarDefaults, aplicarCambioDeMedio } =
   await import("../../lib/pos-ventas/mediosCobroServidor.js");
-const { MEDIOS_POR_DEFECTO, COMISION_PCT_DEFAULT, comisionesDeMedios, recargosDeMedios } =
+const { MEDIOS_POR_DEFECTO, comisionesDeMedios, recargosDeMedios, resolverComision } =
   await import("../../lib/pos-ventas/mediosCobro.js");
 const { aplicarComisiones } = await import("../../lib/pos-ventas/pagos.js");
 
@@ -55,7 +55,7 @@ const leer = async (r) => ({ status: r.status, ...(await r.json().catch(() => ({
 const params = (id) => ({ params: Promise.resolve({ id: String(id) }) });
 
 const marca = `ci-medios-${Date.now()}`;
-const creado = { grupoId: null, localAId: null, localBId: null, localNuevoId: null, usuarioId: null, cajeroId: null, rolId: null, rolCajeroId: null };
+const creado = { grupoId: null, localAId: null, localBId: null, localNuevoId: null, usuarioId: null, cajeroId: null, rolId: null, rolCajeroId: null, grupoSinComisionId: null, ventaHistoricaId: null };
 
 async function montar() {
   const rol = await prisma.rol.create({ data: { nombre: `${marca}-rol`, permisos: ["*"] } });
@@ -95,13 +95,23 @@ async function montar() {
 async function desmontar() {
   if (!creado.grupoId) return;
   const locales = [creado.localAId, creado.localBId, creado.localNuevoId].filter(Boolean);
+  // PRIMERO la venta de la prueba de compatibilidad: apunta al usuario y al
+  // local, así que borrarla después hacía fallar el `deleteMany` de usuarios por
+  // clave foránea y dejaba la limpieza a medias.
+  if (creado.ventaHistoricaId) {
+    await prisma.venta.deleteMany({ where: { id: creado.ventaHistoricaId } });
+  }
   await prisma.medioCobroLocal.deleteMany({ where: { localId: { in: locales } } });
   await prisma.recargoPagoLocal.deleteMany({ where: { localId: { in: locales } } });
   await prisma.usuario.deleteMany({ where: { id: { in: [creado.usuarioId, creado.cajeroId].filter(Boolean) } } });
   await prisma.grupoLocal.deleteMany({ where: { grupoId: creado.grupoId } });
-  await prisma.configuracionGrupo.deleteMany({ where: { grupoId: creado.grupoId } });
+  await prisma.configuracionGrupo.deleteMany({
+    where: { grupoId: { in: [creado.grupoId, creado.grupoSinComisionId].filter(Boolean) } },
+  });
   await prisma.local.deleteMany({ where: { id: { in: locales } } });
-  await prisma.grupo.deleteMany({ where: { id: creado.grupoId } });
+  await prisma.grupo.deleteMany({
+    where: { id: { in: [creado.grupoId, creado.grupoSinComisionId].filter(Boolean) } },
+  });
   await prisma.rol.deleteMany({ where: { id: { in: [creado.rolId, creado.rolCajeroId].filter(Boolean) } } });
 }
 
@@ -617,6 +627,74 @@ async function correr(f) {
   const bIntacto = await prisma.medioCobroLocal.findUnique({ where: { id: debB.id }, select: { nombre: true } });
   igual("el medio ajeno quedó intacto", bIntacto.nombre, "MP Débito");
 
+  // ─────────────────────────────────────────────────────────────────────────
+  seccion("Compatibilidad de la migración que sacó el DEFAULT 7");
+
+  // 1. LAS TRES COLUMNAS ADMITEN NULL.
+  //
+  // Es lo que hace posible el estado "sin configurar". Se ejerce escribiendo,
+  // no leyendo el esquema: una columna que dice ser nulable y rechaza el NULL
+  // no sirve de nada.
+  const grupoSinComision = await prisma.grupo.create({
+    data: { nombre: `${marca}-grupo-sin-comision` },
+    select: { id: true },
+  });
+  creado.grupoSinComisionId = grupoSinComision.id;
+
+  // 2. INSERTAR OMITIENDO LAS TRES COMISIONES FUNCIONA.
+  //
+  // Es exactamente lo que hace el código VIEJO durante la ventana del
+  // despliegue: no las nombra porque contaba con el DEFAULT. Sin el `DROP NOT
+  // NULL` de la misma migración, este INSERT fallaría y el despliegue sería
+  // incompatible hacia atrás.
+  const cfgNueva = await prisma.configuracionGrupo.create({
+    data: { grupoId: grupoSinComision.id, allowNegativeStock: false },
+    select: { comisionDebito: true, comisionCredito: true, comisionMercadopago: true },
+  });
+  igual("un grupo nuevo puede quedar con las tres comisiones sin configurar",
+    [cfgNueva.comisionDebito, cfgNueva.comisionCredito, cfgNueva.comisionMercadopago],
+    [null, null, null]);
+
+  // 3. LOS 7 EXISTENTES NO CAMBIAN.
+  const cfgVieja = await prisma.configuracionGrupo.findUnique({
+    where: { grupoId: grupo.id },
+    select: { comisionDebito: true, comisionCredito: true, comisionMercadopago: true },
+  });
+  igual("el grupo que ya tenía sus comisiones las conserva",
+    [Number(cfgVieja.comisionDebito), Number(cfgVieja.comisionCredito), Number(cfgVieja.comisionMercadopago)],
+    [7, 10, 5]);
+
+  // 4. UNA VENTA HISTÓRICA QUEDA `comisionPendiente: false`.
+  //
+  // La columna es aditiva y con default, así que todo lo que ya estaba nace
+  // marcado como exacto: es lo que era, se cobró con una comisión conocida.
+  const ventaHistorica = await prisma.venta.create({
+    data: {
+      // `numero` es Int y único por local: un número alto no choca con los
+      // fixtures de esta corrida, que arrancan de abajo.
+      localId: localA.id, vendedorId: creado.usuarioId, numero: 999001,
+      subtotal: 1000, total: 1000, formaPago: "efectivo",
+    },
+    select: { id: true, comisionPendiente: true },
+  });
+  creado.ventaHistoricaId = ventaHistorica.id;
+  igual("una venta creada sin nombrar el campo queda marcada como exacta",
+    ventaHistorica.comisionPendiente, false);
+
+  // 5. EL CÓDIGO VIEJO NO DEPENDE DEL DEFAULT PARA RESOLVER.
+  //
+  // Durante la ventana, la versión anterior lee estas columnas y aplica su
+  // `?? 7`. Con la fila en NULL obtiene 7, que es EXACTAMENTE lo que obtenía
+  // antes cuando el DEFAULT se lo escribía la base. Por eso la migración es
+  // compatible hacia atrás aunque el clasificador la marque por el DROP DEFAULT.
+  const comoLoLeeElCodigoViejo = Number(cfgNueva.comisionDebito ?? 7);
+  igual("el fallback histórico del código viejo sigue dando 7 sobre un NULL",
+    comoLoLeeElCodigoViejo, 7);
+
+  // Y el código NUEVO, sobre esa misma fila, dice la verdad: no está configurada.
+  const resuelto = resolverComision({ tipoContable: "DEBITO", comisionPct: null }, cfgNueva);
+  igual("y el código nuevo lo llama por su nombre", [resuelto.pct, resuelto.origen],
+    [null, "sin-configurar"]);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

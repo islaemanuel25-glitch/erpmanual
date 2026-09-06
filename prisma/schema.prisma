@@ -1089,6 +1089,16 @@ model Venta {
   total            Decimal  @db.Decimal(12, 2)
   comisionBancaria Decimal  @default(0) @db.Decimal(12, 2)
   comisionPct      Decimal? @db.Decimal(5, 2)
+  // LOS IMPORTES DE ARRIBA Y DE ABAJO SON EXACTOS SOLO SI ESTO ES `false`.
+  //
+  // `true` significa que al menos un tender que cobra comisión se cobró SIN la
+  // comisión configurada. `comisionBancaria`, `netoRecibido` y `gananciaNeta`
+  // quedan con un cero estructural que NO es una medición.
+  //
+  // Es un snapshot de lo que se sabía al vender: configurar la comisión mañana
+  // no lo cambia, porque la venta de hoy se cobró sin ese dato. Ver
+  // `lib/pos-ventas/comisionPendiente.js`.
+  comisionPendiente Boolean @default(false)
   netoRecibido     Decimal  @default(0) @db.Decimal(12, 2)
   costoTotal       Decimal  @default(0) @db.Decimal(12, 2)
   gananciaBruta    Decimal  @default(0) @db.Decimal(12, 2)
@@ -2248,9 +2258,13 @@ model ConfiguracionGrupo {
   requireMotivoLimitesStock     Boolean  @default(false)
   exigirClienteVentasDeposito   Boolean  @default(false)
   exigirClienteVentasLocal      Boolean  @default(false)
-  comisionDebito                Decimal  @default(7) @db.Decimal(5, 2)
-  comisionCredito               Decimal  @default(7) @db.Decimal(5, 2)
-  comisionMercadopago           Decimal  @default(7) @db.Decimal(5, 2)
+  // NULABLES Y SIN DEFAULT: `null` es "todavía no se configuró", que no es lo
+  // mismo que 0 %. Tenían `@default(7)`, así que todo grupo nacía con una
+  // comisión que nadie había decidido. Las filas existentes conservan su valor:
+  // la migración no las toca.
+  comisionDebito                Decimal? @db.Decimal(5, 2)
+  comisionCredito               Decimal? @db.Decimal(5, 2)
+  comisionMercadopago           Decimal? @db.Decimal(5, 2)
   createdAt                     DateTime @default(now())
   updatedAt                     DateTime @updatedAt
 

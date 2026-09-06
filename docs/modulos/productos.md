@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-09-04 18:32
+**Última actualización:** 2026-09-06 20:39
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,7 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-09-05: test(alertas): mandar la ficha entera, y que la ruta diga que salio mal
 - 2026-09-04: feat(productos): el listado informa si un producto está en una oferta vigente SIN VERIFICAR
 - 2026-09-02: fix(productos): el combo de escritorio vuelve a donde volvía, y el celular no
 - 2026-09-02: fix(productos): escritorio recupera su retorno, que el hotfix anterior le sacó

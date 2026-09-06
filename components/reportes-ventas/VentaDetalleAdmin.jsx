@@ -11,6 +11,7 @@
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
+import { comisionEsExacta, TEXTO_PENDIENTE } from "@/lib/pos-ventas/comisionPendiente";
 
 
 const FORMA_PAGO_LABEL = {
@@ -393,21 +394,34 @@ export default function VentaDetalleAdmin({ venta, permisos }) {
               <TotalTile label="Descuento" value={`- ${fmtMoneda(t.descuento)}`} tone="accent" />
             )}
             <TotalTile label="Total" value={fmtMoneda(t.total)} tone="accent" />
-            {Number(t.comisionBancaria) > 0 && (
-              <TotalTile
-                label="Comisión bancaria"
-                value={`- ${fmtMoneda(t.comisionBancaria)}`}
-                tone="accent"
-              />
+            {/* Tres de estos números son placeholders cuando la venta se cobró
+                sin la comisión configurada. Se rotulan en vez de imprimirse:
+                un "$0" de comisión y un neto igual al total se leen como que el
+                procesador no se llevó nada. */}
+            {!comisionEsExacta(t) ? (
+              <TotalTile label="Comisión bancaria" value={TEXTO_PENDIENTE} tone="accent" />
+            ) : (
+              Number(t.comisionBancaria) > 0 && (
+                <TotalTile
+                  label="Comisión bancaria"
+                  value={`- ${fmtMoneda(t.comisionBancaria)}`}
+                  tone="accent"
+                />
+              )
             )}
-            <TotalTile label="Neto recibido" value={fmtMoneda(t.netoRecibido)} tone="success" highlight />
+            <TotalTile
+              label="Neto recibido"
+              value={comisionEsExacta(t) ? fmtMoneda(t.netoRecibido) : TEXTO_PENDIENTE}
+              tone="success"
+              highlight
+            />
             {verCostos && t.costoTotal != null && (
               <>
                 <TotalTile label="Costo total" value={fmtMoneda(t.costoTotal)} tone="muted" />
                 <TotalTile label="Ganancia bruta" value={fmtMoneda(t.gananciaBruta)} tone="success" />
                 <TotalTile
                   label="Ganancia neta"
-                  value={fmtMoneda(t.gananciaNeta)}
+                  value={comisionEsExacta(t) ? fmtMoneda(t.gananciaNeta) : TEXTO_PENDIENTE}
                   tone="success"
                   highlight
                 />

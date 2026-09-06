@@ -4,6 +4,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 import { estadoDelTurno } from "@/lib/caja/cierreRelevo";
+import { resumirExactitud } from "@/lib/pos-ventas/comisionPendiente";
 
 export async function GET(req) {
   try {
@@ -109,6 +110,7 @@ export async function GET(req) {
         comisionBancaria: true,
         costoTotal: true,
         gananciaNeta: true,
+        comisionPendiente: true,
       },
     });
 
@@ -158,7 +160,11 @@ export async function GET(req) {
         comisionBancaria: Number(v.comisionBancaria),
         costoTotal: Number(v.costoTotal),
         gananciaNeta: Number(v.gananciaNeta),
+        // La comisión y la ganancia de esta fila son placeholders cuando esto
+        // es `true`. La pantalla del turno lo tiene que decir.
+        comisionPendiente: v.comisionPendiente === true,
       })),
+      estadoFinanciero: resumirExactitud(ventas),
     });
   } catch (error) {
     console.error("Error ventas por turno:", error);

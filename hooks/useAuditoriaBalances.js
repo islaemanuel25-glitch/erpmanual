@@ -19,6 +19,7 @@ export function useAuditoriaBalances() {
   const [error, setError] = useState("");
   const [resumen, setResumen] = useState(null);
   const [medios, setMedios] = useState(null);
+  const [estadoMedios, setEstadoMedios] = useState(null);
   const [comparacion, setComparacion] = useState(null);
 
   const cargar = useCallback(async (fechaDesde, fechaHasta, fechaDesde2 = null, fechaHasta2 = null) => {
@@ -53,6 +54,9 @@ export function useAuditoriaBalances() {
 
       setResumen(dRes.resumen);
       setMedios(dMedios.items);
+      // El estado de exactitud viaja al lado de los items: la tabla de medios lo
+      // necesita para rotular sus columnas de comisión, neto y ganancia.
+      setEstadoMedios(dMedios.estadoFinanciero ?? null);
 
       if (responses[2]) {
         const dBal = await responses[2].json();
@@ -73,6 +77,7 @@ export function useAuditoriaBalances() {
     error,
     resumen,
     medios,
+    estadoMedios,
     comparacion,
     cargar,
   };

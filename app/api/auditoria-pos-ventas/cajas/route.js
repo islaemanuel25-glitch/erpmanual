@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuditoriaScope, parseRangoFechas } from "@/lib/auditoria-pos-ventas/scope";
+import { comisionEsExacta, estadoFinanciero } from "@/lib/pos-ventas/comisionPendiente";
 
 /**
  * GET /api/auditoria-pos-ventas/cajas?fechaDesde=YYYY-MM-DD&fechaHasta=YYYY-MM-DD
@@ -87,6 +88,10 @@ export async function GET(req) {
           costoTotal: true,
           gananciaNeta: true,
           descuento: true,
+          // La caja NO se bloquea por esto y el efectivo esperado no cambia:
+          // solo se marcan como incompletos la comisión, el neto y la ganancia
+          // del turno, que son información derivada.
+          comisionPendiente: true,
         },
       });
 
@@ -105,11 +110,13 @@ export async function GET(req) {
             costo: 0,
             ganancia: 0,
             descuento: 0,
+            pendientes: 0,
           });
         }
         const a = ventasAggMap.get(tid);
         const total = Number(v.total) || 0;
         a.count++;
+        if (!comisionEsExacta(v)) a.pendientes++;
         a.totalBruto += total;
         a.comision += Number(v.comisionBancaria) || 0;
         a.neto += Number(v.netoRecibido) || 0;
@@ -132,6 +139,7 @@ export async function GET(req) {
       const vAgg = ventasAggMap.get(t.id) || {
         count: 0, totalBruto: 0, totalEfectivo: 0, totalDigital: 0,
         totalFiado: 0, comision: 0, neto: 0, costo: 0, ganancia: 0, descuento: 0,
+        pendientes: 0,
       };
 
       // Movimientos de caja
@@ -192,6 +200,13 @@ export async function GET(req) {
           costo: Number(vAgg.costo.toFixed(2)),
           ganancia: Number(vAgg.ganancia.toFixed(2)),
           descuento: Number(vAgg.descuento.toFixed(2)),
+          // Los tres de arriba son parciales si el turno tiene ventas cobradas
+          // sin la comisión configurada. El bruto, el efectivo y el fiado no:
+          // esos son montos y no dependen de la comisión.
+          estadoFinanciero: estadoFinanciero({
+            pendientes: vAgg.pendientes,
+            total: vAgg.count,
+          }),
         },
         esperado,
         real,

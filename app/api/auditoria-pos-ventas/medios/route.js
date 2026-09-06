@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuditoriaScope, parseRangoFechas } from "@/lib/auditoria-pos-ventas/scope";
 import { MEDIOS_CONOCIDOS } from "@/lib/auditoria-pos-ventas/constantes";
 import { tendersParaAgregar } from "@/lib/pos-ventas/pagos";
+import { resumirExactitud } from "@/lib/pos-ventas/comisionPendiente";
 
 const ORDEN_FILAS = [...MEDIOS_CONOCIDOS, "otros"];
 
@@ -34,6 +35,10 @@ export async function GET(req) {
         gananciaNeta: true,
         formaPago: true,
         esFiado: true,
+        // Obligatorio en toda consulta financiera: `comisionEsExacta` falla
+        // cerrado, así que omitirlo haría que estas ventas cuenten como
+        // pendientes en vez de presentarse como cerradas sin serlo.
+        comisionPendiente: true,
         pagos: { select: { medio: true, monto: true, comision: true, neto: true } },
       },
     });
@@ -69,6 +74,9 @@ export async function GET(req) {
       items,
       nota:
         "Montos por TENDER (VentaPago): cada pago suma al bucket de su medio. Costo y ganancia se prorratean por participación del pago en el total.",
+      // Las columnas de comisión, neto y ganancia de cada medio arrastran los
+      // ceros estructurales de las ventas cobradas sin la comisión configurada.
+      estadoFinanciero: resumirExactitud(ventas),
     });
   } catch (e) {
     console.error("auditoria-pos-ventas/medios:", e);

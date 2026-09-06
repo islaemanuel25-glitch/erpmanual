@@ -31,12 +31,18 @@ export async function GET(req) {
       },
     });
 
+    // `null` cuando no hay comisión configurada, y no un 7 inventado. Acá había
+    // `?? 7` en las tres: una segunda copia del respaldo que el dominio ya no
+    // tiene. Quien consuma esto tiene que poder distinguir "no configurada" de
+    // "0 %", que es toda la diferencia.
+    const pct = (v) => (v == null ? null : Number(v));
+
     return NextResponse.json({
       ok: true,
       comisiones: {
-        debito: Number(config?.comisionDebito ?? 7),
-        credito: Number(config?.comisionCredito ?? 7),
-        mercadopago: Number(config?.comisionMercadopago ?? 7),
+        debito: pct(config?.comisionDebito),
+        credito: pct(config?.comisionCredito),
+        mercadopago: pct(config?.comisionMercadopago),
       },
     });
   } catch (error) {
