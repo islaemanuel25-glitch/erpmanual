@@ -13,5 +13,10 @@
     "nombre": "agregar-medio",
     "url": "/modulos/configuracion/pos-ventas/cobros/nuevo",
     "sinTabla": true
+  },
+  {
+    "nombre": "editar-medio-defecto",
+    "url": "/modulos/configuracion/pos-ventas/cobros/defecto%3AEFECTIVO",
+    "sinTabla": true
   }
 ]
