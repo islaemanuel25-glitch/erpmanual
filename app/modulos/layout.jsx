@@ -6,6 +6,7 @@ import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import { LayoutSettingsProvider } from "@/app/context/LayoutSettingsContext";
 import { OperadorProvider } from "@/app/context/OperadorContext";
+import { AccionDePaginaProvider } from "@/app/context/AccionDePaginaContext";
 import LayoutBase from "@/components/LayoutBase";
 
 export default function ModulosLayout({ children }) {
@@ -40,7 +41,12 @@ export default function ModulosLayout({ children }) {
   return (
     <LayoutSettingsProvider>
       <OperadorProvider>
-        <LayoutBase>{children}</LayoutBase>
+        {/* El proveedor envuelve al shell Y a las pantallas: el shell lee la
+            acción registrada y la pantalla activa la registra. Si envolviera
+            solo a una de las dos partes, no habría slot. */}
+        <AccionDePaginaProvider>
+          <LayoutBase>{children}</LayoutBase>
+        </AccionDePaginaProvider>
       </OperadorProvider>
     </LayoutSettingsProvider>
   );
