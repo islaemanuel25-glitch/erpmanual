@@ -18,7 +18,7 @@ import {
   textoOrigenComision,
   SIN_PROCESADOR,
 } from "@/lib/pos-ventas/mediosCobroPantalla";
-import { alEscribirNumero } from "@/lib/formularios/escrituraNumerica";
+import { alEnfocarNumero, alEscribirNumero } from "@/lib/formularios/escrituraNumerica";
 
 // EDITAR O CREAR UN MEDIO DE COBRO. Un solo formulario para las dos cosas.
 //
@@ -175,6 +175,10 @@ export default function FormularioMedio({
                 // pueden dejar el mismo texto y tienen que terminar distinto.
                 // La medición del navegador está en `escrituraNumerica.js`.
                 onChange={(e) => set("recargoPct", alEscribirNumero(form.recargoPct, e))}
+                // Al entrar, un 0 queda resaltado: así se ve de antemano que lo
+                // que se escriba lo reemplaza. Con cualquier otro valor no hace
+                // nada, para no borrarle los dígitos a quien entra a corregir.
+                onFocus={alEnfocarNumero}
               />
               <span className="text-xs sunmi-text-muted">%</span>
             </>
@@ -204,6 +208,10 @@ export default function FormularioMedio({
                 // no toca el campo VACÍO, que acá significa "heredá la del
                 // grupo" y no es lo mismo que un cero.
                 onChange={(e) => set("comisionPct", alEscribirNumero(form.comisionPct, e))}
+                // Mismo trato, y con el mismo cuidado: un campo vacío —el que
+                // hereda la comisión del grupo— no es un "0", así que no se
+                // selecciona nada y no aparece ningún cero inventado.
+                onFocus={alEnfocarNumero}
               />
               <span className="text-xs sunmi-text-muted">%</span>
             </>

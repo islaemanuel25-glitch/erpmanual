@@ -228,7 +228,8 @@ jobs:
             --base "http://localhost:$PUERTO" \
             --usuario "$USUARIO_PRUEBA" --clave "$CLAVE_PRUEBA" \
             --edge "${{ steps.navegador.outputs.ruta }}" \
-            --puerto-cdp 9224
+            --puerto-cdp 9224 \
+            --capturas "/tmp/capturas/390"
 
       # ── EL VIAJE DE LA CLAVE POR LA URL ──────────────────────────────────
       #
