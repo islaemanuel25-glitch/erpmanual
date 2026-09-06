@@ -421,7 +421,12 @@ const seleccionForzada = conSelect.ok ? await loSeleccionado() : null;
 console.log(`    select() sin excepción: ${conSelect.ok}${conSelect.error ? ` — ${conSelect.error}` : ""}`);
 console.log(`    tras select(), lo seleccionado es: ${JSON.stringify(seleccionForzada)}`);
 
-// Y que después de seleccionar se pueda seguir escribiendo normal.
+// Escribir con el cero seleccionado va en su PROPIA preparación, y no después de
+// leer el portapapeles: esa lectura deja el foco en el textarea, así que la tecla
+// caía ahí y la medición hablaba de la sonda en vez de la pantalla.
+campo = await preparar("Recargo al cliente");
+await clic(campo.caja, "derecha");
+await evaluar(`window.__campo.select()`);
 await teclear("1");
 const trasSeleccionar = JSON.parse(await medidas()).valor;
 console.log(`    y al teclear 1 con el cero seleccionado queda: ${JSON.stringify(trasSeleccionar)}`);
