@@ -212,6 +212,24 @@ jobs:
               --ancho "$ancho" --alto 1600
           done
 
+      # ── QUÉ INFORMA EL NAVEGADOR AL ESCRIBIR Y AL PEGAR ──────────────────
+      #
+      # Va antes de todo lo que escribe en la base: esta sonda solo teclea y
+      # pega en el formulario, no guarda nada, así que necesita los defaults
+      # intactos.
+      #
+      # Mide algo que ninguna función pura puede contestar: si el navegador
+      # distingue una tecla de un pegado en un `type="number"` controlado por
+      # React. De esa distinción depende que pegar "10" sobre un campo en 0 no
+      # se convierta en "1".
+      - name: Medir la escritura y el pegado sobre un campo en 0
+        run: |
+          node scripts/sonda-escritura-en-cero.mjs \
+            --base "http://localhost:$PUERTO" \
+            --usuario "$USUARIO_PRUEBA" --clave "$CLAVE_PRUEBA" \
+            --edge "${{ steps.navegador.outputs.ruta }}" \
+            --puerto-cdp 9224
+
       # ── EL VIAJE DE LA CLAVE POR LA URL ──────────────────────────────────
       #
       # Va DESPUÉS de las capturas de defaults porque escribe —materializa y
