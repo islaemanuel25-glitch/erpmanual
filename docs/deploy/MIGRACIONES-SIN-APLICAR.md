@@ -23,6 +23,88 @@ prisma/migrations. Database schema is up to date!"*.
 
 ---
 
+## 2026-09-06 — `8b1c7ed0`, formularios de cobros: solo código
+
+Producción pasó de `cc5f2ed1773359dbae832e4b0d5a12f4c8cf3018` a
+`8b1c7ed0aae86d5d7d94e52a6eaa095f2e76c02f` —el merge del PR #39, el rediseño de
+editar y agregar medio de cobro—. **Cero migraciones**: este archivo ya decía
+que no había pendientes y el despliegue no agregó ninguna.
+
+#### Sin migraciones, comprobado por tres caminos
+
+`node scripts/clasificar-migraciones.mjs` informó **"Archivos a mirar: 0"** y
+salió con 0; `git diff cc5f2ed1..8b1c7ed0 -- prisma/migrations` no devuelve
+ningún archivo; y no había ninguna migración sin commitear, que es el único
+punto ciego que el clasificador no puede cubrir.
+
+**`--vps` no se pudo usar, y no se esquivó.** La sesión que desplegó corre
+**dentro** del propio VPS, así que el alias `ssh vps-erp` no resuelve y el script
+salió con **2 — INDETERMINADO**, fallando cerrado como corresponde. Se le pasó la
+base a mano con `--desde cc5f2ed1773359dbae832e4b0d5a12f4c8cf3018`, que es el SHA
+de la imagen que estaba atendiendo producción —leído con
+`docker inspect erpazul_app`— o sea exactamente el dato que `--vps` iba a buscar.
+No se tocó el clasificador ni se agregó ninguna variable.
+
+El contenedor descartable **de la imagen nueva** informó **5 migrations found in
+prisma/migrations** —el mismo número que el árbol local y que el del VPS, así que
+el conteo no quedó atrasado— y el `migrate status` posterior cierra con
+*"Database schema is up to date!"*.
+
+**No se usó `DEPLOY_MIGRACION_AUTORIZADA`**: no había ninguna migración que
+autorizar.
+
+#### Backup y corte
+
+`pre-8b1c7ed0_20260906_233948.sql.gz`, **3.850.121 bytes**, validado ANTES del
+corte con los cuatro chequeos: `pg_dump` con `pipefail` en 0, `gzip -t` limpio,
+marca de cierre en las últimas 20 líneas y **67 tablas**. El quinto no aplica: no
+hay migración.
+
+**El corte fue de 2 segundos**, contra un tope de 30. El reloj arrancó pegado al
+`up -d` y ese número incluye la ida y vuelta del `curl`, así que el corte real es
+menor.
+
+#### Estado final
+
+Los cinco valores coinciden en `8b1c7ed0aae86d5d7d94e52a6eaa095f2e76c02f`:
+`origin/main`, el HEAD del repo del VPS, la etiqueta de la imagen del contenedor,
+`APP_BUILD_ID` adentro y `/api/version`.
+
+`erpazul_app` arriba con **cero reinicios**; `erpazul_db` **no se recreó** —todo
+con `--no-deps app`—; logs de los últimos 10 minutos sin un solo error ni fatal;
+`APP_IMAGE` sin filtrarse dentro del contenedor; `/login` en 200; las dos rutas
+de la tanda —`/cobros` y `/cobros/nuevo`— en 200; y el árbol del VPS limpio.
+**No hubo rollback.** La referencia quedó disponible en
+`ghcr.io/islaemanuel25-glitch/erpmanual:cc5f2ed1773359dbae832e4b0d5a12f4c8cf3018`
+(imagen `sha256:bd359d1c3529…`).
+
+El código viajó, con control: la bajada nueva *"Configurá cómo se muestra y se
+cobra con este medio."* —que no existe en ningún archivo de `cc5f2ed1`— aparece
+en tres chunks del build que sirve, y el control *"Conciliación automática"*
+—presente antes y ahora— también, así que la búsqueda mide. Se **descartó** un
+marcador de desaparición: "Agregar medio de cobro" iba a servir para probar que
+la cinta se fue, pero la lista de Cobros sigue escribiendo ese texto en su botón.
+
+#### LO QUE NO SE PUDO VERIFICAR
+
+**La sonda de cascada NO se ejecutó.** Necesita un navegador por CDP y en este
+VPS no hay ninguno, ni `node_modules`, ni Node 20. Es la misma limitación anotada
+en el despliegue del 2026-09-05.
+
+**Tampoco se abrieron las pantallas contra producción a mano**, por la misma
+ausencia de navegador.
+
+Lo que sí hay, y **no reemplaza a la sonda**: CI hizo la validación visual con un
+navegador real a 360, 390, 412 y 1280 px sobre un árbol **idéntico** al
+desplegado —`d54782d92d42…` en los dos—; el rango `cc5f2ed1..8b1c7ed0` **no toca
+un solo archivo CSS** ni la configuración de Tailwind; y
+`lib/sunmi/ordenDeCascada.test.mjs` —el hermano barato, que mira el orden en
+`app/globals.css`— viajó verde dentro de los 5014 candados. Eso acota el riesgo;
+no mide lo que la sonda mide, que es el resultado de la cascada en el navegador.
+La sonda queda **sin correr**, dicho acá en vez de darla por buena.
+
+---
+
 ## 2026-09-06 — `cc5f2ed1`, comisión sin configurar: una migración aplicada
 
 ### `20260906190000_comision_sin_configurar` — APLICADA
