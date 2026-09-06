@@ -18,6 +18,7 @@ import {
   textoOrigenComision,
   SIN_PROCESADOR,
 } from "@/lib/pos-ventas/mediosCobroPantalla";
+import { reemplazarCeroInicial } from "@/lib/formularios/escrituraNumerica";
 
 // EDITAR O CREAR UN MEDIO DE COBRO. Un solo formulario para las dos cosas.
 //
@@ -167,7 +168,10 @@ export default function FormularioMedio({
                 type="number"
                 inputMode="decimal"
                 value={form.recargoPct}
-                onChange={(e) => set("recargoPct", e.target.value)}
+                // Escribir sobre un campo que muestra 0 reemplaza ese cero en
+                // vez de sumarle el dígito al lado. El porqué y los casos que la
+                // regla NO toca están en `lib/formularios/escrituraNumerica.js`.
+                onChange={(e) => set("recargoPct", reemplazarCeroInicial(form.recargoPct, e.target.value))}
               />
               <span className="text-xs sunmi-text-muted">%</span>
             </>
@@ -193,7 +197,10 @@ export default function FormularioMedio({
                 inputMode="decimal"
                 value={form.comisionPct}
                 placeholder="Heredada"
-                onChange={(e) => set("comisionPct", e.target.value)}
+                // Mismo trato que el recargo, y con el mismo cuidado: la regla
+                // no toca el campo VACÍO, que acá significa "heredá la del
+                // grupo" y no es lo mismo que un cero.
+                onChange={(e) => set("comisionPct", reemplazarCeroInicial(form.comisionPct, e.target.value))}
               />
               <span className="text-xs sunmi-text-muted">%</span>
             </>
