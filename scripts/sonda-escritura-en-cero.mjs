@@ -182,24 +182,32 @@ async function preparar(rotulo) {
   }
 
   const info = await evaluar(`(() => {
-    const inputs = [...document.querySelectorAll('input[type="number"]')];
-    // El campo se identifica por el TEXTO de su fila, no por su posición: si
+    // El campo se identifica por el TEXTO de su fila y no por su posición: si
     // mañana se agrega otro número arriba, un índice mediría el equivocado.
-    const conRotulo = inputs.map((i) => {
-      let nodo = i, texto = "";
-      for (let n = 0; n < 5 && nodo; n++) { nodo = nodo.parentElement; texto = nodo ? nodo.textContent : texto; }
-      return { texto: (texto || "").slice(0, 60), valor: i.value };
-    });
-    const idx = conRotulo.findIndex((c) => c.texto.includes(${JSON.stringify(rotulo)}));
-    if (idx < 0) return { error: "no se encontró el campo", campos: conRotulo };
+    //
+    // La fila es el elemento MÁS CHICO que contiene el rótulo y un input. Subir
+    // una cantidad fija de niveles no sirve: se pasa de largo y termina midiendo
+    // el texto de la pantalla entera.
+    const filas = [...document.querySelectorAll("div")]
+      .filter((el) => el.querySelector('input[type="number"]') && el.textContent.includes(${JSON.stringify(rotulo)}))
+      .sort((a, b) => a.textContent.length - b.textContent.length);
 
-    window.__campo = inputs[idx];
+    if (!filas.length) {
+      const campos = [...document.querySelectorAll('input[type="number"]')].map((i) => i.value);
+      return { error: "no se encontró la fila del campo", campos };
+    }
+
+    window.__campo = filas[0].querySelector('input[type="number"]');
     window.__medidas = [];
     window.__campo.addEventListener("input", (e) => {
       window.__medidas.push({ inputType: e.inputType, data: e.data, valor: e.target.value });
     });
     const r = window.__campo.getBoundingClientRect();
-    return { valor: window.__campo.value, caja: { x: r.x, y: r.y, w: r.width, h: r.height }, rotulo: conRotulo[idx].texto };
+    return {
+      valor: window.__campo.value,
+      caja: { x: r.x, y: r.y, w: r.width, h: r.height },
+      rotulo: filas[0].textContent.slice(0, 60),
+    };
   })()`);
 
   if (!info || info.error) frenar(`${info?.error || "no se pudo preparar el campo"} — ${JSON.stringify(info?.campos || null)}`);
