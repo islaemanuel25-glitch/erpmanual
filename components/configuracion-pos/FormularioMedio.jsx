@@ -18,6 +18,7 @@ import {
   textoOrigenComision,
   SIN_PROCESADOR,
 } from "@/lib/pos-ventas/mediosCobroPantalla";
+import { alEscribirNumero } from "@/lib/formularios/escrituraNumerica";
 
 // EDITAR O CREAR UN MEDIO DE COBRO. Un solo formulario para las dos cosas.
 //
@@ -167,7 +168,13 @@ export default function FormularioMedio({
                 type="number"
                 inputMode="decimal"
                 value={form.recargoPct}
-                onChange={(e) => set("recargoPct", e.target.value)}
+                // Escribir o pegar sobre un campo que muestra 0 reemplaza ese
+                // cero en vez de sumarle el texto al lado. Se le pasa el EVENTO
+                // entero, no el valor: la decisión necesita saber qué operación
+                // ocurrió, porque teclear `1` sobre `0` y pegar `"10"` sobre `0`
+                // pueden dejar el mismo texto y tienen que terminar distinto.
+                // La medición del navegador está en `escrituraNumerica.js`.
+                onChange={(e) => set("recargoPct", alEscribirNumero(form.recargoPct, e))}
               />
               <span className="text-xs sunmi-text-muted">%</span>
             </>
@@ -193,7 +200,10 @@ export default function FormularioMedio({
                 inputMode="decimal"
                 value={form.comisionPct}
                 placeholder="Heredada"
-                onChange={(e) => set("comisionPct", e.target.value)}
+                // Mismo trato que el recargo, y con el mismo cuidado: la regla
+                // no toca el campo VACÍO, que acá significa "heredá la del
+                // grupo" y no es lo mismo que un cero.
+                onChange={(e) => set("comisionPct", alEscribirNumero(form.comisionPct, e))}
               />
               <span className="text-xs sunmi-text-muted">%</span>
             </>
