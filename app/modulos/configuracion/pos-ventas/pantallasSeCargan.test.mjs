@@ -159,13 +159,21 @@ test("Configuración POS conserva el header y el título mobile globales del ERP
 // COBROS COMPARTE EL PATRÓN, Y LA LISTA SIGUE SIENDO DEL SERVIDOR
 // ══════════════════════════════════════════════════════════════════════════
 
-/** El archivo sin comentarios: acá se mira lo que la pantalla HACE. */
-function cobrosSinComentarios() {
-  return readFileSync(new URL("./cobros/page.jsx", import.meta.url), "utf8")
+/** Un archivo de pantalla sin comentarios: acá se mira lo que HACE. */
+function sinComentarios(relativa) {
+  return readFileSync(new URL(relativa, import.meta.url), "utf8")
     .replace(/\/\/[^\n]*/g, "")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
 }
+
+const cobrosSinComentarios = () => sinComentarios("./cobros/page.jsx");
+
+/** Las dos pantallas de formulario, que comparten `FormularioMedio`. */
+const FORMULARIOS = [
+  ["Editar medio", "./cobros/[clave]/page.jsx"],
+  ["Agregar medio", "./cobros/nuevo/page.jsx"],
+];
 
 test("Cobros usa las MISMAS piezas que la portada, no una tarjeta propia", () => {
   const cobros = cobrosSinComentarios();
@@ -272,4 +280,56 @@ test("Cobros no repite el contexto que ya muestra el shell", () => {
     /useContextoActivo|Local: |SunmiHeader/,
     "el local y la cinta del módulo ya los pone el shell del ERP"
   );
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// EDITAR Y AGREGAR CUMPLEN EL MISMO CONTRATO QUE LA LISTA
+// ══════════════════════════════════════════════════════════════════════════
+//
+// Eran las dos que faltaban. Cada una abría con una cinta ámbar en mayúsculas
+// —"MERCADO PAGO"— y abajo "Cobros · Local: Depósito Central", mientras el shell
+// ya decía "Cobros" arriba de todo. Dos encabezados para una pantalla, y ninguno
+// de los dos nombraba dónde estaba parado quien miraba.
+
+for (const [nombre, ruta] of FORMULARIOS) {
+  test(`${nombre}: el título y el Volver los registra en el shell`, () => {
+    const pantalla = sinComentarios(ruta);
+    assert.match(pantalla, /useTituloDePagina\(/, "el título tiene que salir de la pantalla");
+    assert.match(pantalla, /useAccionDePagina\(/);
+    assert.match(pantalla, /<SunmiBackButton href=\{RUTA_COBROS\} \/>/);
+  });
+
+  test(`${nombre}: un solo Volver, y en mobile no ocupa una fila propia`, () => {
+    const pantalla = sinComentarios(ruta);
+    // Mismo criterio que en la lista: la colocación de escritorio es lo único
+    // que queda en la página, porque allá el shell no tiene fila de título.
+    assert.match(pantalla, /<div className="hidden md:flex justify-end mb-2">\{volver\}<\/div>/);
+    assert.doesNotMatch(pantalla, /<div className="flex justify-end mb-2">/);
+    assert.equal((pantalla.match(/<SunmiBackButton/g) || []).length, 1);
+  });
+
+  test(`${nombre}: no repite el contexto ni escribe un encabezado propio`, () => {
+    const pantalla = sinComentarios(ruta);
+    assert.doesNotMatch(
+      pantalla,
+      /useContextoActivo|Local: |SunmiHeader|subtitulo=/,
+      "el local y la cinta se sacaron del diseño: el shell ya pone el título"
+    );
+  });
+}
+
+test("y la pieza compartida tampoco dibuja un encabezado", () => {
+  const form = readFileSync(
+    new URL("../../../../components/configuracion-pos/FormularioMedio.jsx", import.meta.url),
+    "utf8"
+  )
+    .replace(/\/\/[^\n]*/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
+
+  assert.doesNotMatch(form, /SunmiHeader/, "la cinta del título no puede volver");
+  assert.doesNotMatch(form, /subtitulo/, "el subtítulo del local se sacó del diseño");
+  // Y lo que SÍ le quedó de arriba: la bajada de cada modo.
+  assert.match(form, /Configurá cómo se muestra y se cobra con este medio\./);
+  assert.match(form, /Creá un nuevo medio de cobro para este local\./);
 });

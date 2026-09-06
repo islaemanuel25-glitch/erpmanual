@@ -17,6 +17,8 @@
 - **dashboard**: fix(pos): comisionEsExacta falla cerrado y todos los consumidores quedan cubiertos
 - **reportes-ventas**: fix(pos): comisionEsExacta falla cerrado y todos los consumidores quedan cubiertos
 - **reportes-ventas**: feat(pos): la comision sin configurar deja de ser un 7 inventado
+- **configuracion**: feat(cobros): editar y agregar medio siguen el diseño aprobado
+- **configuracion**: feat(shell): la pantalla activa puede poner su propio título
 - **configuracion**: fix(cobros): los cuatro medios por defecto vuelven a abrirse desde la lista
 - **configuracion**: feat(shell): la pantalla activa puede registrar una accion al lado del titulo
 - **configuracion**: fix(cobros): el boton de volver va arriba a la derecha, como en el resto del ERP
@@ -37,6 +39,18 @@
 - **configuracion**: feat(configuracion-pos): las cuatro pantallas del diseno aprobado
 - **configuracion**: fix(menu): un permiso sin camino es un permiso que no existe
 - **productos**: test(alertas): mandar la ficha entera, y que la ruta diga que salio mal
+
+### Detalle — formularios de cobros (rama feat/cobros-formulario-figma)
+- Editar y agregar medio siguen los frames aprobados versionados en `docs/diseno/configuracion-pos/`.
+- El título del shell pasa a decir el nombre del medio —"Efectivo", "Mercado Pago", "Crédito"— y "Agregar medio" al crear.
+- La acción "← Volver" queda en la misma fila que el título.
+- Se sacan la cinta ámbar con el nombre del medio y el subtítulo "Cobros · Local: …".
+- Cada pantalla trae su bajada: "Configurá cómo se muestra y se cobra con este medio." al editar y "Creá un nuevo medio de cobro para este local." al crear.
+- Sin cambios de comportamiento: recargo, comisión, herencia por campo vacío y override con 0 quedan como estaban.
+- Numérico ya validado en navegador real: escribir "1" sobre "0" da "1", pegar "10" da "10" y el "0" inicial queda seleccionado al enfocar.
+- El título se registra y se limpia por identidad, así dos medios con el mismo nombre no se pisan la fila del shell.
+- Verificado a 360, 390, 412 y 1280 px. Suite final: 5014 candados, 0 rojos.
+- No se modificaron APIs, Prisma, migraciones, POS, `LayoutBase.jsx` ni `Header.jsx`.
 
 
 ## [2026-09-04] - Actualización: pos-ventas, productos, configuracion

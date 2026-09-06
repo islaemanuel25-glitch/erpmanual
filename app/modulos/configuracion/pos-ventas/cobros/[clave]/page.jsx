@@ -3,12 +3,13 @@
 import { use } from "react";
 import { useRouter } from "next/navigation";
 
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SinPermisos from "@/components/auth/SinPermisos";
 import FormularioMedio from "@/components/configuracion-pos/FormularioMedio";
+import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
 import { useUser } from "@/app/context/UserContext";
-import useContextoActivo from "@/hooks/useContextoActivo";
 import useMediosCobro from "@/hooks/useMediosCobro";
 import { puedeVerSeccion } from "@/lib/config/acceso";
 import { decodificarSegmentoDeRuta } from "@/lib/rutas/segmentoDeRuta";
@@ -42,21 +43,41 @@ import { decodificarSegmentoDeRuta } from "@/lib/rutas/segmentoDeRuta";
 
 const RUTA_COBROS = "/modulos/configuracion/pos-ventas/cobros";
 
+// Mientras el medio no llegó todavía no hay nombre que poner. Se dice qué
+// pantalla es, que es verdad y es más útil que "Cobros" —el título que la ruta
+// resuelve sola, y que nombra la sección de la que se vino, no dónde se está.
+const TITULO_MIENTRAS_CARGA = "Editar medio";
+
 export default function EditarMedioPage({ params }) {
   const { clave: segmento } = use(params);
   const clave = decodificarSegmentoDeRuta(segmento);
   const router = useRouter();
   const { perfil, cargando: cargandoUser } = useUser();
-  const { contexto } = useContextoActivo();
   const { cargando, error, medios, tiposContables, procesadores, recargosPorTipo } = useMediosCobro();
 
+  const puedeVer = !cargandoUser && puedeVerSeccion(perfil, { permiso: "config_local.medios_cobro" });
+  const medio = medios.find((m) => m.claveEdicion === clave) || null;
+
+  // ── EL TÍTULO Y EL VOLVER VAN AL SHELL, Y SE REGISTRAN ANTES DE LOS CORTES ─
+  //
+  // Los `return` de abajo son condicionales y los hooks no: tienen que llamarse
+  // siempre y en el mismo orden. Por eso la condición viaja adentro del valor
+  // registrado —`null` deja el slot vacío— en vez de saltear la llamada.
+  //
+  // El título es el NOMBRE del medio, que no sale de la ruta: es el dato que la
+  // pantalla acaba de leer. Es el mismo mecanismo que ya usa Cobros para su
+  // Volver, con el escalón de título que se agregó en esta tanda.
+  useTituloDePagina(puedeVer ? medio?.nombre || TITULO_MIENTRAS_CARGA : null);
+  const volver = useAccionDePagina(
+    () => (puedeVer ? <SunmiBackButton href={RUTA_COBROS} /> : null),
+    [puedeVer]
+  );
+
   if (cargandoUser) return null;
-  if (!puedeVerSeccion(perfil, { permiso: "config_local.medios_cobro" })) return <SinPermisos />;
+  if (!puedeVer) return <SinPermisos />;
 
   if (cargando) return <SunmiLoader />;
   if (error) return <SunmiCard className="p-3 text-xs sunmi-text-danger">{error}</SunmiCard>;
-
-  const medio = medios.find((m) => m.claveEdicion === clave);
 
   if (!medio) {
     return (
@@ -68,14 +89,21 @@ export default function EditarMedioPage({ params }) {
   }
 
   return (
-    <FormularioMedio
-      modo="editar"
-      medio={medio}
-      tiposContables={tiposContables}
-      procesadores={procesadores}
-      recargosPorTipo={recargosPorTipo}
-      subtitulo={`Cobros${contexto?.nombre ? ` · Local: ${contexto.nombre}` : ""}`}
-      alVolver={() => router.push(RUTA_COBROS)}
-    />
+    <div className="max-w-2xl mx-auto">
+      {/* En escritorio el shell no tiene fila de título propia —el `<h1>` vive
+          en el Header—, así que el MISMO nodo registrado se dibuja acá. Nunca
+          hay dos: en mobile lo pone la fila del shell y este div está oculto.
+          Es el patrón que ya usa la lista de Cobros. */}
+      <div className="hidden md:flex justify-end mb-2">{volver}</div>
+
+      <FormularioMedio
+        modo="editar"
+        medio={medio}
+        tiposContables={tiposContables}
+        procesadores={procesadores}
+        recargosPorTipo={recargosPorTipo}
+        alVolver={() => router.push(RUTA_COBROS)}
+      />
+    </div>
   );
 }
