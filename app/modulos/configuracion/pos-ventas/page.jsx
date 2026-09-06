@@ -7,6 +7,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiListItem from "@/components/sunmi/SunmiListItem";
 import SunmiNavCard from "@/components/sunmi/SunmiNavCard";
+import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SinPermisos from "@/components/auth/SinPermisos";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -63,17 +64,11 @@ export default function ConfiguracionPosPage() {
             ))}
           </div>
 
-          <div className="sunmi-btn-accent-soft flex items-start gap-3 rounded-2xl p-4">
-            <span className="sunmi-badge-accent flex size-10 shrink-0 items-center justify-center rounded-full">
-              <Lightbulb className="size-5" aria-hidden="true" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold sunmi-text-accent">Tip</p>
-              <p className="mt-1 text-sm leading-snug sunmi-text-muted">
-                Cada sección personaliza el POS según las necesidades del local.
-              </p>
-            </div>
-          </div>
+          {/* El bloque estaba escrito acá; se fue al kit sin cambiarle nada,
+              porque Cobros necesita el mismo aviso. Ver `SunmiAviso`. */}
+          <SunmiAviso icon={Lightbulb} titulo="Tip">
+            Cada sección personaliza el POS según las necesidades del local.
+          </SunmiAviso>
         </div>
       </section>
 
