@@ -95,14 +95,15 @@ async function montar() {
 async function desmontar() {
   if (!creado.grupoId) return;
   const locales = [creado.localAId, creado.localBId, creado.localNuevoId].filter(Boolean);
-  await prisma.medioCobroLocal.deleteMany({ where: { localId: { in: locales } } });
-  await prisma.recargoPagoLocal.deleteMany({ where: { localId: { in: locales } } });
-  await prisma.usuario.deleteMany({ where: { id: { in: [creado.usuarioId, creado.cajeroId].filter(Boolean) } } });
-  // La venta de la prueba de compatibilidad se borra ANTES que su local, y sus
-  // detalles/pagos caen por cascada.
+  // PRIMERO la venta de la prueba de compatibilidad: apunta al usuario y al
+  // local, así que borrarla después hacía fallar el `deleteMany` de usuarios por
+  // clave foránea y dejaba la limpieza a medias.
   if (creado.ventaHistoricaId) {
     await prisma.venta.deleteMany({ where: { id: creado.ventaHistoricaId } });
   }
+  await prisma.medioCobroLocal.deleteMany({ where: { localId: { in: locales } } });
+  await prisma.recargoPagoLocal.deleteMany({ where: { localId: { in: locales } } });
+  await prisma.usuario.deleteMany({ where: { id: { in: [creado.usuarioId, creado.cajeroId].filter(Boolean) } } });
   await prisma.grupoLocal.deleteMany({ where: { grupoId: creado.grupoId } });
   await prisma.configuracionGrupo.deleteMany({
     where: { grupoId: { in: [creado.grupoId, creado.grupoSinComisionId].filter(Boolean) } },
