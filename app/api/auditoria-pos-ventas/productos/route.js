@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getAuditoriaScope, parseRangoFechas } from "@/lib/auditoria-pos-ventas/scope";
 import { estadoProducto } from "@/lib/auditoria-pos-ventas/agregaciones";
 import { UMBRAL_MARGEN_BAJO_PCT } from "@/lib/auditoria-pos-ventas/constantes";
+import { comisionEsExacta, estadoFinanciero } from "@/lib/pos-ventas/comisionPendiente";
 
 export async function GET(req) {
   try {
@@ -44,6 +45,10 @@ export async function GET(req) {
             id: true,
             total: true,
             comisionBancaria: true,
+            // Sin esto, una línea de una venta pendiente entra al prorrateo con
+            // una comisión de 0 y el resultado del producto sale INFLADO. Es el
+            // mismo error que el margen del ticket, una capa más abajo.
+            comisionPendiente: true,
           },
         },
       },
@@ -57,6 +62,13 @@ export async function GET(req) {
       const cant = Number(d.cantidad) || 0;
       const costoLinea = (Number(d.precioCosto) || 0) * cant;
       // Usar comisionLinea persistida (E1) si existe, fallback a prorrateo runtime
+      // Una venta con la comisión sin configurar aporta `comisionLinea: null`
+      // Y `comisionBancaria: 0`, así que por los dos caminos la línea entraría
+      // con comisión cero y el resultado del producto quedaría sobreestimado.
+      // El número se sigue calculando —es lo mejor disponible— pero la fila
+      // queda contada como pendiente.
+      const lineaPendiente = !comisionEsExacta(d.venta);
+
       let comisionProrrateada;
       if (d.comisionLinea != null) {
         comisionProrrateada = Number(d.comisionLinea);
@@ -79,6 +91,8 @@ export async function GET(req) {
           costo: 0,
           comisionProrrateada: 0,
           resultadoReal: 0,
+          lineas: 0,
+          lineasPendientes: 0,
         });
       }
       const row = map.get(pid);
@@ -87,13 +101,25 @@ export async function GET(req) {
       row.costo += costoLinea;
       row.comisionProrrateada += comisionProrrateada;
       row.resultadoReal += resultadoLinea;
+      row.lineas += 1;
+      if (lineaPendiente) row.lineasPendientes += 1;
     }
 
     const items = Array.from(map.values())
       .map((row) => {
-        const estado = estadoProducto(row.resultadoReal, row.venta);
+        const financiero = estadoFinanciero({
+          pendientes: row.lineasPendientes,
+          total: row.lineas,
+        });
+        // Con líneas pendientes el resultado está sobreestimado, así que ni el
+        // estado ni el margen se pueden afirmar: se dicen pendientes.
+        const estado = financiero.parcial
+          ? "pendiente"
+          : estadoProducto(row.resultadoReal, row.venta);
         const margenPct =
-          row.venta > 0 ? (row.resultadoReal / row.venta) * 100 : null;
+          financiero.parcial || row.venta <= 0
+            ? null
+            : (row.resultadoReal / row.venta) * 100;
         return {
           ...row,
           cantidad: Number(row.cantidad.toFixed(3)),
@@ -103,6 +129,7 @@ export async function GET(req) {
           resultadoReal: Number(row.resultadoReal.toFixed(2)),
           margenPct: margenPct === null ? null : Number(margenPct.toFixed(4)),
           estado,
+          estadoFinanciero: financiero,
         };
       })
       .sort((a, b) => a.resultadoReal - b.resultadoReal);

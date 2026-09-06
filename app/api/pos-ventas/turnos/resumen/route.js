@@ -5,6 +5,7 @@ import { checkPerm } from "@/lib/authorize";
 import { tendersParaAgregar } from "@/lib/pos-ventas/pagos";
 import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 import { calcularEfectivoEsperado, desglosarMovimientos, desdeCentavos } from "@/lib/caja/efectivoEsperado";
+import { resumirExactitud } from "@/lib/pos-ventas/comisionPendiente";
 import { estadoDelTurno } from "@/lib/caja/cierreRelevo";
 
 export async function GET(req) {
@@ -68,6 +69,10 @@ export async function GET(req) {
         where: whereVentaComercial({ turnoId }),
         select: {
           total: true, formaPago: true, esFiado: true, comisionBancaria: true, netoRecibido: true,
+          // El efectivo esperado NO depende de esto y no cambia. Lo que se marca
+          // son los dos renglones informativos —comisión y neto digital—, que sí
+          // arrastran ceros estructurales.
+          comisionPendiente: true,
           pagos: { select: { medio: true, monto: true, comision: true, neto: true } },
         },
       }),
@@ -228,6 +233,13 @@ export async function GET(req) {
       totalFiado: calculo.ventasFiado,
       totalComision: calculo.comisionDigital,
       netoDigital: calculo.netoDigital,
+      // ESTOS DOS RENGLONES SON INFORMATIVOS Y PUEDEN ESTAR INCOMPLETOS.
+      //
+      // El efectivo esperado de más abajo NO: su fórmula es
+      // `inicial + efectivo + ingresos − retiros` y la comisión no participa, así
+      // que un dato de comisión que falta no descuadra el arqueo ni le hace
+      // faltar plata a nadie. Está medido y tiene su candado.
+      estadoFinanciero: resumirExactitud(ventas),
       totalIngresosCaja: calculo.ingresos,
       // Solo lo de Caja +/-: los retiros de recaudacion van aparte.
       movimientosManuales: {

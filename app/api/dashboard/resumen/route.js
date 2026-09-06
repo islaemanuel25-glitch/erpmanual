@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 import { getUsuarioSession } from "@/lib/auth";
 import { getContextoActivo } from "@/lib/contexto";
+import { estadoFinanciero } from "@/lib/pos-ventas/comisionPendiente";
 
 export async function GET(req) {
   try {
@@ -54,6 +55,13 @@ export async function GET(req) {
     const gananciaNetaHoy = Number(aggVentas._sum.gananciaNeta) || 0;
     const itemsVendidos = Number(aggItems._sum.cantidad) || 0;
 
+    // La ganancia neta del día es el único número de acá que depende de la
+    // comisión: si hay ventas cobradas sin configurarla, descontó de menos y
+    // está sobreestimada. El total facturado y los items no se ven afectados.
+    const pendientesHoy = await prisma.venta.count({
+      where: whereVentaComercial({ localId, fecha: { gte: hoy }, comisionPendiente: true }),
+    });
+
     return NextResponse.json({
       ok: true,
       resumen: {
@@ -62,6 +70,7 @@ export async function GET(req) {
         ticketPromedio,
         gananciaNetaHoy,
         itemsVendidos,
+        estadoFinanciero: estadoFinanciero({ pendientes: pendientesHoy, total: cantidadVentas }),
       },
     });
   } catch (error) {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuditoriaScope } from "@/lib/auditoria-pos-ventas/scope";
 import { margenPctFromSums } from "@/lib/auditoria-pos-ventas/agregaciones";
+import { resumirExactitud } from "@/lib/pos-ventas/comisionPendiente";
 import { MEDIOS_CONOCIDOS } from "@/lib/auditoria-pos-ventas/constantes";
 import { tendersParaAgregar } from "@/lib/pos-ventas/pagos";
 
@@ -28,6 +29,10 @@ async function calcularRango(localId, fechaInicio, fechaFin) {
       gananciaNeta: true,
       formaPago: true,
       esFiado: true,
+      // La bandera viaja SIEMPRE en las consultas financieras. `comisionEsExacta`
+      // falla cerrado a propósito: sin este campo, la venta cuenta como pendiente
+      // y el total sale rotulado, en vez de presentarse como cerrado por omisión.
+      comisionPendiente: true,
       pagos: { select: { medio: true, monto: true, comision: true, neto: true } },
     },
   });
@@ -72,7 +77,8 @@ async function calcularRango(localId, fechaInicio, fechaFin) {
     }
   }
 
-  const margenPct = margenPctFromSums(ganancia, neto);
+  const estado = resumirExactitud(ventas);
+  const margenPct = margenPctFromSums(ganancia, neto, { parcial: estado.parcial });
   const ticketPromedio = totalTickets > 0 ? ventaBruta / totalTickets : null;
 
   const medios = ORDEN_MEDIOS.map((k) => ({
@@ -94,6 +100,10 @@ async function calcularRango(localId, fechaInicio, fechaFin) {
     margenPct: margenPct === null ? null : Number(margenPct.toFixed(4)),
     ticketPromedio: ticketPromedio === null ? null : Number(ticketPromedio.toFixed(2)),
     medios,
+    // La comisión de arriba son las CONOCIDAS —el total real es mayor— y el neto
+    // y la ganancia están sobreestimados, porque descontaron de menos. La forma
+    // la define el dominio y las superficies solo la renderizan.
+    estadoFinanciero: estado,
   };
 }
 

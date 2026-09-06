@@ -137,6 +137,10 @@ export async function GET(req, { params }) {
       total: num(venta.total).toFixed(2),
       comisionBancaria: num(venta.comisionBancaria).toFixed(2),
       netoRecibido: num(venta.netoRecibido).toFixed(2),
+      // Los dos de arriba —y la ganancia neta de abajo— son placeholders cuando
+      // esto es `true`. Viaja adentro de `totales` porque es lo que consumen
+      // tanto el detalle del admin como la reimpresión del ticket.
+      comisionPendiente: venta.comisionPendiente === true,
     };
     if (verCostos) {
       totales.costoTotal = num(venta.costoTotal).toFixed(2);

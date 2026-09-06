@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuditoriaScope, parseRangoFechas } from "@/lib/auditoria-pos-ventas/scope";
+import { estadoFinanciero } from "@/lib/pos-ventas/comisionPendiente";
 
 export async function GET(req) {
   try {
@@ -77,6 +78,26 @@ export async function GET(req) {
           },
         })
       : [];
+
+    // Cuántas ventas de cada turno se cobraron sin la comisión configurada. Va
+    // por `groupBy` porque un conteo filtrado cuesta mucho menos que traer las
+    // filas solo para mirar un booleano.
+    const pendientesPorTurno = new Map(
+      turnoIds.length > 0
+        ? (
+            await prisma.venta.groupBy({
+              by: ["turnoId"],
+              where: {
+                localId,
+                turnoId: { in: turnoIds },
+                fecha: { gte: fechaInicio, lte: fechaFin },
+                comisionPendiente: true,
+              },
+              _count: { id: true },
+            })
+          ).map((p) => [p.turnoId, p._count?.id ?? 0])
+        : []
+    );
 
     const aggMap = new Map();
     for (const a of aggs) {
@@ -157,6 +178,13 @@ export async function GET(req) {
         neto: Number(agg?._sum?.netoRecibido ?? 0),
         costo: Number(agg?._sum?.costoTotal ?? 0),
         gananciaTurno: Number(agg?._sum?.gananciaNeta ?? 0),
+        // La comisión, el neto y la ganancia del turno son parciales si alguna
+        // de sus ventas se cobró sin la comisión configurada. El efectivo
+        // esperado y la diferencia de caja NO cambian: no dependen de esto.
+        estadoFinanciero: estadoFinanciero({
+          pendientes: pendientesPorTurno.get(t.id) ?? 0,
+          total: agg?._count?.id ?? 0,
+        }),
         vendedor: t.vendedor,
         operador: t.operador || null,
         // Campos nuevos

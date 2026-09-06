@@ -7,6 +7,7 @@ import { getRangoArgentina } from "@/lib/fechas/rangoArgentina";
 import { resolveVistaOperativa, getGrupoIdDeLocal } from "@/lib/grupos";
 import { getContextoActivo } from "@/lib/contexto";
 import { tendersParaAgregar, normalizarMedio } from "@/lib/pos-ventas/pagos";
+import { resumirExactitud } from "@/lib/pos-ventas/comisionPendiente";
 
 export async function GET(req) {
   try {
@@ -107,6 +108,9 @@ export async function GET(req) {
         descuento: true,
         comisionBancaria: true,
         netoRecibido: true,
+        // Obligatorio: `comisionEsExacta` falla cerrado, así que sin este campo
+        // el reporte contaría todas sus ventas como pendientes.
+        comisionPendiente: true,
         costoTotal: true,
         gananciaBruta: true,
         gananciaNeta: true,
@@ -198,6 +202,10 @@ export async function GET(req) {
         totalNeto: totalNeto.toFixed(2),
         totalCostos: totalCostos.toFixed(2),
         gananciaNeta: gananciaNeta.toFixed(2),
+        // `totalComisiones` son las CONOCIDAS —el total real es mayor— y el neto
+        // y la ganancia están sobreestimados. El desglose por medio arrastra lo
+        // mismo, porque sus tenders traen el cero estructural.
+        estadoFinanciero: resumirExactitud(ventas),
       },
       desglosePago: Object.values(desglosePagoMap),
       topProductos,

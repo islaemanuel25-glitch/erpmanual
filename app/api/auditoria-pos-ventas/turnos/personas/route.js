@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuditoriaScope, parseRangoFechas } from "@/lib/auditoria-pos-ventas/scope";
+import { estadoFinanciero } from "@/lib/pos-ventas/comisionPendiente";
 
 /**
  * GET /api/auditoria-pos-ventas/turnos/personas?fechaDesde=...&fechaHasta=...&turnoId=N
@@ -57,6 +58,17 @@ export async function GET(req) {
       return NextResponse.json({ ok: true, items: [] });
     }
 
+    // Las ventas de cada persona que se cobraron sin la comisión configurada.
+    const pendientesPorVendedor = new Map(
+      (
+        await prisma.venta.groupBy({
+          by: ["vendedorId"],
+          where: { ...where, comisionPendiente: true },
+          _count: { id: true },
+        })
+      ).map((p) => [p.vendedorId, p._count?.id ?? 0])
+    );
+
     // Traer nombres de usuarios
     const vendedorIds = aggs.map((a) => a.vendedorId);
     const usuarios = await prisma.usuario.findMany({
@@ -82,6 +94,10 @@ export async function GET(req) {
           costo: Number(a._sum.costoTotal ?? 0),
           ganancia: Number(a._sum.gananciaNeta ?? 0),
           descuento: Number(a._sum.descuento ?? 0),
+          estadoFinanciero: estadoFinanciero({
+            pendientes: pendientesPorVendedor.get(a.vendedorId) ?? 0,
+            total: a._count.id,
+          }),
         };
       })
       .sort((a, b) => b.totalBruto - a.totalBruto);

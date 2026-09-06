@@ -63,6 +63,11 @@ export async function GET(req, { params }) {
         formaPago: venta.formaPago,
         comisionBancaria: venta.comisionBancaria,
         netoRecibido: venta.netoRecibido,
+        // Viaja con la venta porque de acá salen la reimpresión del ticket y el
+        // detalle: los dos tienen que poder decir "pendiente" en vez de "$0".
+        // El `include` sin `select` ya trae la columna; se nombra igual para que
+        // se vea que es parte del contrato de esta respuesta.
+        comisionPendiente: venta.comisionPendiente === true,
         // Tenders congelados (pago dividido). Para venta de 1 medio, un solo pago.
         pagos: venta.pagos.map((p) => ({
           medio: p.medio,

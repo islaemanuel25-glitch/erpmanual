@@ -60,6 +60,10 @@ function construirTicket(venta) {
     total: num(venta.totales?.total),
     comisionBancaria: num(venta.totales?.comisionBancaria),
     netoRecibido: num(venta.totales?.netoRecibido),
+    // El ticket necesita saberlo para no imprimir una comisión de $0 que nadie
+    // cobró. `comisionEsExacta` falla cerrado, así que si esto no viajara toda
+    // reimpresión diría "pendiente".
+    comisionPendiente: venta.totales?.comisionPendiente === true,
     formaPago: venta.formaPago,
     esFiado: venta.esFiado,
     // Snapshot de tenders para el desglose de pagos del ticket.

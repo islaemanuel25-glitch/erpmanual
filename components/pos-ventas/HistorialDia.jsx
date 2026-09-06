@@ -7,6 +7,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import { lineasPagoTicket, esPagoDividido } from "@/lib/pos-ventas/pagos";
+import { comisionEsExacta, TEXTO_PENDIENTE } from "@/lib/pos-ventas/comisionPendiente";
 import { snapshotServicioTicket } from "@/lib/pos-ventas/servicios";
 
 function fmt(n) {
@@ -326,11 +327,20 @@ export default function HistorialDia({
                       <span className="tabular-nums">${fmt(l.monto)}</span>
                     </div>
                   ))}
-                  {Number(detalle.comisionBancaria) > 0 && (
-                    <>
-                      <div className="flex justify-between"><span>Comisión bancaria</span><span className="tabular-nums">-${fmt(detalle.comisionBancaria)}</span></div>
-                      <div className="flex justify-between"><span>Neto recibido</span><span className="tabular-nums">${fmt(detalle.netoRecibido)}</span></div>
-                    </>
+                  {/* Ni "$0" de comisión ni un neto igual al total: los dos se
+                      leerían como que el procesador no cobró nada. */}
+                  {!comisionEsExacta(detalle) ? (
+                    <div className="flex justify-between">
+                      <span>Comisión bancaria</span>
+                      <span>{TEXTO_PENDIENTE}</span>
+                    </div>
+                  ) : (
+                    Number(detalle.comisionBancaria) > 0 && (
+                      <>
+                        <div className="flex justify-between"><span>Comisión bancaria</span><span className="tabular-nums">-${fmt(detalle.comisionBancaria)}</span></div>
+                        <div className="flex justify-between"><span>Neto recibido</span><span className="tabular-nums">${fmt(detalle.netoRecibido)}</span></div>
+                      </>
+                    )
                   )}
                 </div>
               ) : (
@@ -380,6 +390,11 @@ export default function HistorialDia({
                       pagos: Array.isArray(detalle.pagos) ? detalle.pagos : null,
                       comisionBancaria: detalle.comisionBancaria ?? 0,
                       netoRecibido: detalle.netoRecibido ?? Number(detalle.total),
+                      // Viaja al ticket: sin esto la reimpresión volvería a
+                      // imprimir una comisión de $0 que nadie cobró. Y como
+                      // `comisionEsExacta` falla cerrado, omitirlo haría que
+                      // TODA reimpresión dijera "pendiente".
+                      comisionPendiente: detalle.comisionPendiente === true,
                       cliente: detalle.cliente?.nombre
                         ? { nombre: detalle.cliente.nombre }
                         : null,

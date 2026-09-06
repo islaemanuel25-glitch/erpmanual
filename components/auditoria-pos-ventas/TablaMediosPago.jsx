@@ -1,6 +1,7 @@
 "use client";
 
 import SunmiTable from "@/components/sunmi/SunmiTable";
+import { ROTULO_AGREGADO } from "@/lib/pos-ventas/comisionPendiente";
 
 function formatPrecio(n) {
   return Number(n ?? 0).toLocaleString("es-AR", {
@@ -21,7 +22,7 @@ const LABELS = {
 const TD = "px-1.5 sm:px-2 py-1.5 whitespace-nowrap text-[11px] sm:text-xs";
 const TD_MONO = `${TD} text-right font-mono`;
 
-export default function TablaMediosPago({ items }) {
+export default function TablaMediosPago({ items, estadoFinanciero = null }) {
   if (!items || items.length === 0) return null;
 
   const conMovimiento = items.filter(
@@ -46,6 +47,18 @@ export default function TablaMediosPago({ items }) {
       <p className="text-[10px] sunmi-text-muted mb-1.5">
         Fiado prioriza <code className="text-[9px]">esFiado</code>. Valores desde Venta persistida.
       </p>
+      {/* Las columnas de comisión, neto y ganancia arrastran los ceros
+          estructurales de las ventas cobradas sin la comisión configurada. La
+          de bruto no: es un monto y no depende de esto. */}
+      {estadoFinanciero?.parcial && (
+        <p className="text-[10px] sunmi-text-muted mb-1.5">
+          {estadoFinanciero.pendientes === 1
+            ? "1 venta sin comisión configurada: "
+            : `${estadoFinanciero.pendientes} ventas sin comisión configurada: `}
+          {ROTULO_AGREGADO.comision.toLowerCase()}, {ROTULO_AGREGADO.neto.toLowerCase()},{" "}
+          {ROTULO_AGREGADO.ganancia.toLowerCase()}.
+        </p>
+      )}
       <div className="overflow-x-auto sunmi-scroll-hint sunmi-scroll-area">
         <div className="min-w-[520px] md:min-w-[540px]">
           <SunmiTable
