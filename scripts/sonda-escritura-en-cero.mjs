@@ -70,6 +70,7 @@ const ok = (t, c, d = "") => {
   if (c) { pasadas += 1; console.log(`  ✓ ${t}`); }
   else { fallas.push(`${t}${d ? ` — ${d}` : ""}`); console.log(`  ✗ ${t}${d ? ` — ${d}` : ""}`); }
 };
+const seccion = (t) => console.log(`\n  ── ${t} ${"─".repeat(Math.max(0, 58 - t.length))}`);
 
 function frenar(motivo) {
   console.error(`\nNO SE PUDO MEDIR: ${motivo}`);
