@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiListItem from "@/components/sunmi/SunmiListItem";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
@@ -40,6 +39,18 @@ import { alEnfocarNumero, alEscribirNumero } from "@/lib/formularios/escrituraNu
 // débito a crédito y aprieta Guardar le escribiría al crédito el porcentaje que
 // tenía cargado el débito, sin haberlo pedido nunca.
 //
+// ── EL TÍTULO NO SE DIBUJA ACÁ ─────────────────────────────────────────────
+//
+// Esta pieza empezaba con una cinta ámbar en mayúsculas —"MERCADO PAGO"— y
+// abajo "Cobros · Local: Depósito Central", mientras el shell decía "Cobros"
+// arriba de todo. Eran dos encabezados para una sola pantalla, y el de arriba
+// nombraba la sección de la que se venía en vez de dónde se estaba parado.
+//
+// Ahora el título lo pone el shell, que es el único que tiene una fila para él
+// y donde ya vive el botón de Volver. La pantalla lo registra con
+// `useTituloDePagina`; acá adentro queda solamente la BAJADA, que dice qué se
+// hace en esta pantalla y no repite el nombre.
+//
 // ── null NO ES 0 ───────────────────────────────────────────────────────────
 //
 // El campo de comisión vacío significa "heredá la del grupo" y se manda como
@@ -48,6 +59,16 @@ import { alEnfocarNumero, alEscribirNumero } from "@/lib/formularios/escrituraNu
 // el otro haría que el local deje de seguir la comisión contratada sin que nadie
 // lo haya decidido.
 
+/**
+ * La bajada de cada pantalla. Es lo único que cambia arriba entre las dos, así
+ * que se elige por `modo` y no se pide por prop: pedirla dejaría que las dos
+ * pantallas se contradigan sin que nada avise.
+ */
+const BAJADA = {
+  editar: "Configurá cómo se muestra y se cobra con este medio.",
+  alta: "Creá un nuevo medio de cobro para este local.",
+};
+
 export default function FormularioMedio({
   modo = "editar",
   medio = null,
@@ -55,7 +76,6 @@ export default function FormularioMedio({
   procesadores = [],
   recargosPorTipo = {},
   ordenSugerido = 1,
-  subtitulo = "",
   alVolver = () => {},
 }) {
   const esAlta = modo === "alta";
@@ -116,10 +136,7 @@ export default function FormularioMedio({
 
   return (
     <div className="max-w-2xl mx-auto">
-      <SunmiHeader
-        title={esAlta ? "Agregar medio de cobro" : medio?.nombre || "Medio de cobro"}
-        subtitle={subtitulo}
-      />
+      <p className="text-xs sunmi-text-muted mb-4 px-1">{BAJADA[modo] ?? BAJADA.editar}</p>
 
       <Seccion titulo="GENERAL">
         <SunmiListItem

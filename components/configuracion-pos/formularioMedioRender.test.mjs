@@ -61,7 +61,6 @@ const dibujar = (props) =>
       tiposContables: TIPOS,
       procesadores: PROCESADORES,
       recargosPorTipo: RECARGOS,
-      subtitulo: "Cobros · Local: depo",
       ...props,
     })
   );
@@ -104,18 +103,61 @@ test("el pie recuerda que el recargo y la comisión son cosas distintas", () => 
 // EDITAR CONTRA CREAR: LA MISMA PIEZA
 // ══════════════════════════════════════════════════════════════════════════
 
-test("editar muestra el nombre del medio y Guardar cambios", () => {
+test("editar cierra con Cancelar y Guardar cambios", () => {
   const html = dibujar({ modo: "editar", medio: MEDIO_HEREDADO });
-  assert.ok(html.includes("Mercado Pago"));
   assert.ok(html.includes("Guardar cambios"));
   assert.ok(html.includes("Cancelar"));
+  assert.equal(html.includes("Crear medio"), false);
 });
 
-test("crear muestra su título, el orden sugerido y Crear medio", () => {
+test("crear trae el orden sugerido y cierra con Crear medio", () => {
   const html = dibujar({ modo: "alta", ordenSugerido: 5 });
-  assert.ok(html.includes("Agregar medio de cobro"));
   assert.ok(html.includes("Crear medio"));
+  assert.ok(html.includes("Cancelar"));
+  assert.equal(html.includes("Guardar cambios"), false);
   assert.ok(html.includes('value="5"'), "el orden sugerido tiene que estar cargado");
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// EL TÍTULO NO SE DIBUJA ACÁ, Y LA BAJADA SÍ
+// ══════════════════════════════════════════════════════════════════════════
+//
+// Antes esta pieza abría con una cinta ámbar en mayúsculas y abajo
+// "Cobros · Local: Depósito Central", mientras el shell ya decía "Cobros" en su
+// propia fila. Eran dos encabezados para una pantalla sola, y ninguno de los dos
+// decía dónde estaba parado quien miraba.
+//
+// Ahora el título lo registra la PANTALLA y lo dibuja el shell. Lo que este
+// candado puede afirmar de la pieza es lo que quedó de este lado: que no vuelva
+// a escribir un encabezado propio, y que la bajada diga qué se hace acá.
+
+test("la pieza NO dibuja ningún encabezado propio", () => {
+  const editar = dibujar({ modo: "editar", medio: MEDIO_HEREDADO });
+  const alta = dibujar({ modo: "alta", ordenSugerido: 1 });
+
+  for (const [pantalla, html] of [["editar", editar], ["alta", alta]]) {
+    assert.equal(
+      html.includes("Agregar medio de cobro"),
+      false,
+      `${pantalla}: el título viejo de la cinta no puede volver`
+    );
+    assert.equal(
+      /Cobros\s*·\s*Local/.test(html),
+      false,
+      `${pantalla}: el subtítulo del local se sacó del diseño`
+    );
+    assert.equal(html.includes("Medio de cobro</"), false, `${pantalla}: ni su relleno`);
+  }
+});
+
+test("cada modo trae su bajada, y no la del otro", () => {
+  const editar = dibujar({ modo: "editar", medio: MEDIO_HEREDADO });
+  assert.match(editar, /Configurá cómo se muestra y se cobra con este medio\./);
+  assert.equal(editar.includes("Creá un nuevo medio de cobro"), false);
+
+  const alta = dibujar({ modo: "alta", ordenSugerido: 1 });
+  assert.match(alta, /Creá un nuevo medio de cobro para este local\./);
+  assert.equal(alta.includes("Configurá cómo se muestra"), false);
 });
 
 test("los dos selectores se dibujan, y sin elegir nada dicen 'Elegir'", () => {
