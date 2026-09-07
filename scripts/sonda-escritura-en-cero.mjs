@@ -555,6 +555,11 @@ for (const rotulo of CAMPOS) {
   const valorInicial = info.valor;
   await clic(info.caja, "izquierda");
   const selAl0 = await loSeleccionado();
+  // El foco vuelve al campo: `loSeleccionado` termina pegando en el textarea
+  // auxiliar y se lo lleva. Sin esto la tecla no llega y el campo no informa
+  // NINGÚN evento — que es exactamente el falso rojo que dio la primera corrida.
+  // La entrada sigue siendo el click de arriba; esto solo repara al instrumento.
+  await evaluar(`window.__campo.focus()`);
   await teclear("1");
   let m = JSON.parse(await medidas());
   console.log(`    antes=${JSON.stringify(valorInicial)} seleccion=${JSON.stringify(selAl0)} ${detalle(m)}`);
@@ -576,6 +581,7 @@ for (const rotulo of CAMPOS) {
   info = await conValorInicial(rotulo, "12");
   await clic(info.caja, "derecha");
   const selEn12 = await loSeleccionado();
+  await evaluar(`window.__campo.focus()`);
   await teclear("3");
   m = JSON.parse(await medidas());
   console.log(`    antes="12" seleccion=${JSON.stringify(selEn12)} ${detalle(m)}`);
@@ -587,6 +593,9 @@ for (const rotulo of CAMPOS) {
   ok(`${rotulo} · Tab llega al campo`, t.llego, `no llegó en ${t.tabs} tabulaciones`);
   if (t.llego) {
     const selTab = await loSeleccionado();
+    // La ENTRADA fue con Tab; este focus() solo repone lo que se llevó la
+    // medición de la selección. No reemplaza a la forma de entrada.
+    await evaluar(`window.__campo.focus()`);
     await teclear("1");
     m = JSON.parse(await medidas());
     console.log(`    TAB antes=${JSON.stringify(t.info.valor)} (${t.tabs} tabs) seleccion=${JSON.stringify(selTab)} ${detalle(m)}`);
@@ -611,6 +620,7 @@ for (const rotulo of CAMPOS) {
   }
   if (llegoTab12) {
     const sel12Tab = await loSeleccionado();
+    await evaluar(`window.__campo.focus()`);
     await teclear("3");
     m = JSON.parse(await medidas());
     console.log(`    TAB sobre 12: seleccion=${JSON.stringify(sel12Tab)} ${detalle(m)}`);
