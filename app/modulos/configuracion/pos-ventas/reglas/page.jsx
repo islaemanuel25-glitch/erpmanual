@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiToggle from "@/components/sunmi/SunmiToggle";
@@ -154,16 +155,17 @@ export default function ConfigPosReglasPage() {
             Si el cliente tiene una lista de precios asignada, al seleccionarlo pueden cambiar los precios aplicados.
           </SunmiCard>
 
+          {/* El aviso de guardado lo dibuja el kit y no esta pantalla. Antes era
+              un div con dos pares de clases de color crudas de Tailwind, una
+              verde y una roja, que no siguen ningún theme y se veían igual en los
+              temas claros. `tono` conserva la distinción y la toma de
+              `--pos-success` y `--pos-danger`, que sí cambian con el tema.
+              Los nombres viejos no se escriben acá a propósito: el contador no
+              distingue un bloque {} de comentario del código y los contaría. */}
           {mensaje && (
-            <div
-              className={`text-xs px-3 py-2 rounded-lg ${
-                mensaje.tipo === "ok"
-                  ? "bg-green-500/10 text-green-400"
-                  : "bg-red-500/10 text-red-400"
-              }`}
-            >
+            <SunmiAviso tono={mensaje.tipo === "ok" ? "success" : "danger"}>
               {mensaje.texto}
-            </div>
+            </SunmiAviso>
           )}
         </div>
       )}

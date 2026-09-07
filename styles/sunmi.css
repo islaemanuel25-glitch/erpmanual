@@ -566,6 +566,37 @@
   background: color-mix(in srgb, var(--pos-link) 30%, transparent);
 }
 
+/* Los tres tonos que le faltaban a la familia, con la MISMA fórmula que
+   `accent` y `link`: 20 % de relleno, 40 % de borde y el color pleno para el
+   texto. No hay ningún valor nuevo — `--pos-success`, `--pos-danger` y
+   `--pos-warning` ya están definidos en los catorce scopes de tema, igual que
+   `--pos-accent`. Los usa `SunmiAviso` para su prop `tono`, y existen porque un
+   aviso de éxito y uno de error no se pueden distinguir con el tono de acento. */
+.sunmi-btn-success-soft {
+  background: color-mix(in srgb, var(--pos-success) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pos-success) 40%, transparent);
+  color: var(--pos-success);
+}
+.sunmi-btn-success-soft:hover {
+  border-color: color-mix(in srgb, var(--pos-success) 60%, transparent);
+}
+.sunmi-btn-danger-soft {
+  background: color-mix(in srgb, var(--pos-danger) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pos-danger) 40%, transparent);
+  color: var(--pos-danger);
+}
+.sunmi-btn-danger-soft:hover {
+  border-color: color-mix(in srgb, var(--pos-danger) 60%, transparent);
+}
+.sunmi-btn-warning-soft {
+  background: color-mix(in srgb, var(--pos-warning) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pos-warning) 40%, transparent);
+  color: var(--pos-warning);
+}
+.sunmi-btn-warning-soft:hover {
+  border-color: color-mix(in srgb, var(--pos-warning) 60%, transparent);
+}
+
 /* --- Pill link (solid bg) --- */
 .sunmi-pill-link { background: var(--pos-link); color: var(--app-bg); }
 
@@ -573,6 +604,10 @@
 .sunmi-badge-muted   { background: var(--pos-control-bg); color: var(--pos-muted-strong); }
 .sunmi-badge-success { background: var(--pos-success); color: #fff; }
 .sunmi-badge-danger  { background: var(--pos-danger); color: #fff; }
+/* El que le faltaba a la familia. Toma el color de texto de `--app-bg`, como
+   `.sunmi-badge-accent`, y NO el `#fff` de sus dos vecinos de arriba: ese literal
+   es hardcodeo que ya estaba y que esta tanda no toca, pero tampoco se copia. */
+.sunmi-badge-warning { background: var(--pos-warning); color: var(--app-bg); }
 
 /* --- Utilidades --- */
 .sunmi-row-hover:hover { background: var(--table-row-hover); }
