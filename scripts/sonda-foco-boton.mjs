@@ -361,13 +361,17 @@ for (const ancho of ANCHOS) {
     }
 
     if (CAPTURAS) {
-      await evaluar(`(() => { document.getElementById("ancla").focus(); return true; })()`);
-      await send("Input.dispatchKeyEvent", { type: "rawKeyDown", windowsVirtualKeyCode: 9, key: "Tab", code: "Tab" });
-      await send("Input.dispatchKeyEvent", { type: "keyUp", windowsVirtualKeyCode: 9, key: "Tab", code: "Tab" });
-      await sleep(60);
-      const { data } = await send("Page.captureScreenshot", { format: "png", clip: { x: 0, y: 0, width: ancho, height: 330, scale: 2 } });
+      // Una foto POR CONTROL. La versión anterior mandaba un solo Tab, así que
+      // retrataba siempre el primero y los ocho restantes no aparecían enfocados
+      // en ninguna imagen — justo los que hay que mirar para decidir si el
+      // contorno del navegador se percibe.
       fs.mkdirSync(CAPTURAS, { recursive: true });
-      fs.writeFileSync(path.join(CAPTURAS, `${ancho}-${tema}-foco.png`), Buffer.from(data, "base64"));
+      for (let i = 0; i < CASOS.length; i++) {
+        await porTeclado(CASOS[i].id, i);
+        const { data } = await send("Page.captureScreenshot", { format: "png", clip: { x: 0, y: 0, width: ancho, height: 330, scale: 2 } });
+        const nombre = CASOS[i].id.replace(/^c-/, "");
+        fs.writeFileSync(path.join(CAPTURAS, `${ancho}-${tema}-${i + 1}-${nombre}.png`), Buffer.from(data, "base64"));
+      }
     }
   }
 }
