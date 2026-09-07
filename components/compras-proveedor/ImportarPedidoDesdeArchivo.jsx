@@ -18,6 +18,7 @@ import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiSelect from "@/components/sunmi/SunmiSelect";
@@ -1677,15 +1678,14 @@ export default function ImportarPedidoDesdeArchivo() {
                     ))}
                   </ul>
                   {descartadasPorLaReceta.length > 8 && (
-                    <button
-                      type="button"
+                    <SunmiLinkButton
                       onClick={() => setVerTodasLasDescartadas((v) => !v)}
-                      className="text-xs sunmi-text-accent mt-1 underline"
+                      className="mt-1"
                     >
                       {verTodasLasDescartadas
                         ? "Ver menos"
                         : `Ver los ${descartadasPorLaReceta.length} renglones que quedaron afuera`}
-                    </button>
+                    </SunmiLinkButton>
                   )}
                 </div>
               )}
