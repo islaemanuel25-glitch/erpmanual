@@ -1132,6 +1132,25 @@ model Venta {
   recargoPagoImporte   Decimal?   @db.Decimal(12, 2)
   recargoPagoMedio     MedioPago?
 
+  // ── QUIÉN IMPUSO EL RECARGO, CUANDO FUE UNA MODALIDAD ────────────────────
+  //
+  // `recargoPagoMedio` congela el TIPO CONTABLE del que ganó, y en un pago mixto
+  // eso ya era ambiguo: `CREDITO` no dice si fue "Mercado Pago · Crédito" o
+  // "Banco X · Crédito". Con modalidades se vuelve indistinguible del todo.
+  //
+  // NO se duplica el porcentaje: `recargoPagoPct` ya congela el ganador. Lo que
+  // se agrega es solo la IDENTIDAD, y en pares referencia + texto por el mismo
+  // motivo que en `VentaPago`: la referencia opera, el texto explica, y el texto
+  // sobrevive a que se renombre, se desactive o se borre la configuración.
+  //
+  // Todo nullable: una venta legacy los deja en null y no significa nada nuevo.
+  recargoPagoMedioCobroLocalId Int?
+  /// Nombre del medio visible que impuso la condición, congelado.
+  recargoPagoMedioNombre       String?
+  recargoPagoModalidadId       Int?
+  /// Nombre de la modalidad que impuso la condición, congelado.
+  recargoPagoModalidadNombre   String?
+
   // Corrección de ventas (in-place versionada; ver model VentaCorreccion).
   // version = token de bloqueo optimista (se incrementa en cada corrección).
   version            Int      @default(0)
@@ -1173,6 +1192,10 @@ model Venta {
   cliente           Cliente?                 @relation(fields: [clienteId], references: [id])
   listaPrecio       ListaPrecio?             @relation(fields: [listaPrecioId], references: [id], onDelete: SetNull)
   turno             Turno?                   @relation(fields: [turnoId], references: [id])
+  // `SetNull` por la misma razón que en `VentaPago`: borrar una modalidad de la
+  // configuración no puede borrar ventas ni dejarlas sin explicación. El texto
+  // congelado sigue ahí aunque la referencia se pierda.
+  recargoPagoModalidad MedioCobroModalidadLocal? @relation(fields: [recargoPagoModalidadId], references: [id], onDelete: SetNull)
   detalles          VentaDetalle[]
   pagos             VentaPago[]
   movimientoCC      MovimientoCuenta[]
@@ -1363,14 +1386,61 @@ model VentaPago {
   neto        Decimal   @default(0) @db.Decimal(12, 2) // monto - comision
   createdAt   DateTime  @default(now())
 
+  // ── CON QUÉ SE COBRÓ ESTE TENDER, Y CÓMO SOBREVIVE A LA CONFIGURACIÓN ─────
+  //
+  // `medio` sigue congelando el TIPO CONTABLE realmente utilizado, y
+  // `comisionPct`, `comision` y `neto` siguen siendo el snapshot autoritativo de
+  // la comisión. Lo que faltaba era la IDENTIDAD: dos tenders con
+  // `medio = CREDITO` pueden ser "Mercado Pago · Crédito" y "Banco X · Crédito",
+  // y hoy son indistinguibles para siempre.
+  //
+  // Van EN PARES, y no es redundancia. La referencia sirve para operar —agrupar,
+  // conciliar, filtrar— y el texto para explicar. Si mañana se renombra el medio,
+  // se renombra la modalidad, o se borra la configuración, la venta vieja tiene
+  // que seguir diciendo lo que decía. Por eso las FK son `SetNull`: perder la
+  // referencia no puede borrar el pago ni dejarlo mudo.
+  //
+  // Todo nullable: una venta legacy —medio sin modalidades— deja los cinco en
+  // null y significa exactamente lo que significaba.
+  medioCobroLocalId Int?
+  /// Nombre del medio visible tal como se leía al cobrar.
+  medioNombre       String?
+  /// POR DÓNDE pasó. Congelado: cambiar el procesador del medio no reescribe ventas.
+  procesador        ProcesadorCobro?
+  modalidadId       Int?
+  /// Nombre de la modalidad tal como se leía al cobrar.
+  modalidadNombre   String?
+
   // Cascade: la eliminación física de una venta arrastra sus pagos (hoy las ventas
   // no se anulan/eliminan; queda coherente para el futuro y para recuperación).
   venta Venta @relation(fields: [ventaId], references: [id], onDelete: Cascade)
 
-  // Un tender por medio como máximo (el backend consolida medios repetidos).
-  @@unique([ventaId, medio])
+  medioCobro MedioCobroLocal?          @relation(fields: [medioCobroLocalId], references: [id], onDelete: SetNull)
+  modalidad  MedioCobroModalidadLocal? @relation(fields: [modalidadId], references: [id], onDelete: SetNull)
+
+  // ── UN TENDER POR MEDIO, Y UNO POR MODALIDAD ─────────────────────────────
+  //
+  // El `@@unique([ventaId, medio])` que había acá NO alcanza desde que un medio
+  // puede tener modalidades: Mercado Pago/Débito y Mercado Pago/Crédito son dos
+  // tenders del mismo enum y la restricción rechazaba el segundo. Medido.
+  //
+  // Y NO se reemplaza por `@@unique([ventaId, medio, modalidadId])`, que sería lo
+  // obvio y estaría MAL: en PostgreSQL dos `NULL` nunca son iguales en un índice
+  // único, así que dos tenders legacy —los dos con `modalidadId` en null— dejarían
+  // de chocar. Eso aflojaría en silencio la protección que hoy funciona.
+  //
+  // Se reemplaza por DOS índices únicos PARCIALES, escritos a mano en la
+  // migración porque Prisma no los expresa:
+  //
+  //   UNIQUE (ventaId, medio)      WHERE modalidadId IS NULL      ← contrato legacy, idéntico
+  //   UNIQUE (ventaId, modalidadId) WHERE modalidadId IS NOT NULL ← una vez cada modalidad
+  //
+  // Nada que hoy se rechaza pasa a aceptarse. El candado estructural y las dos
+  // contrapruebas están en `scripts/pruebas-db/mediosCobro.mjs`.
   @@index([ventaId])
   @@index([medio])
+  @@index([medioCobroLocalId])
+  @@index([modalidadId])
 }
 
 // TURNOS DE CAJA
@@ -3633,6 +3703,84 @@ model MedioCobroLocal {
 
   local Local @relation(fields: [localId], references: [id], onDelete: Cascade)
 
+  modalidades MedioCobroModalidadLocal[]
+
   @@index([localId])
   @@index([localId, activo, orden])
+}
+
+/// MODALIDADES DE UN MEDIO: UN SOLO BOTÓN, VARIAS CONDICIONES.
+///
+/// ── LOS TRES NIVELES, QUE NO SE VUELVEN A MEZCLAR ──────────────────────────
+///
+/// Mercado Pago se cobra de tres formas distintas y cada una tiene su condición
+/// comercial. Antes eso obligaba a tres botones en el POS. Ahora:
+///
+///     MEDIO VISIBLE   Mercado Pago      ← un `MedioCobroLocal`
+///     MODALIDAD       Crédito           ← una fila de esta tabla
+///     TIPO CONTABLE   CREDITO           ← el enum, que clasifica el movimiento
+///
+/// Los tres son cosas distintas. Que la modalidad tenga `tipoContable` NO
+/// recrea la arquitectura vieja: aquella tenía TRES `MedioCobroLocal` visibles
+/// —MP Débito, MP Crédito, MP QR— y eso sigue prohibido. Acá hay UNO visible con
+/// N modalidades adentro, y el `tipoContable` de la modalidad es únicamente su
+/// clasificación contable, no su identidad de botón.
+///
+/// ── EL RECARGO VIVE ACÁ, Y ES LA FUENTE ────────────────────────────────────
+///
+/// `recargoPct` es autoritativo para esta modalidad. NO se consulta
+/// `RecargoPagoLocal` cuando hay una modalidad elegida: esa tabla está indexada
+/// por `(localId, MedioPago)` y colapsaría Débito y Crédito del mismo padre en
+/// una sola fila. Medido: el segundo insert lo rechaza la base.
+///
+/// `0` significa "sin recargo", igual que la ausencia de fila en la tabla vieja.
+/// Nunca se inventa un porcentaje por defecto.
+///
+/// ── LA COMISIÓN ES NULLABLE, Y ESO SIGNIFICA ALGO ──────────────────────────
+///
+/// `null` NO es `0`. El sistema ya distingue "comisión configurada en cero" de
+/// "comisión sin configurar", y de esa diferencia depende `comisionPendiente`,
+/// que marca las ventas cuyos importes de neto y ganancia tienen un cero
+/// estructural que no es una medición. Convertir el `null` en `0` acá apagaría
+/// esa marca en silencio. Mismo criterio que `MedioCobroLocal.comisionPct`.
+///
+/// ── AISLAMIENTO ────────────────────────────────────────────────────────────
+///
+/// Una modalidad pertenece a UN medio, y el medio a UN local: el aislamiento por
+/// local se hereda por la relación y no se duplica como columna. El servidor
+/// igual valida la cadena completa —modalidad → medio → local de la venta— antes
+/// de aceptar una selección.
+model MedioCobroModalidadLocal {
+  id                Int @id @default(autoincrement())
+  medioCobroLocalId Int
+
+  /// Lo que lee el cajero adentro del selector. Cambiarlo no cambia nada
+  /// contable ni reescribe ninguna venta: las ventas congelan su propio texto.
+  nombre String
+  /// Oculta en el POS sin perder su configuración ni su historial. Una modalidad
+  /// inactiva no puede usarse para crear una venta nueva, aunque el cliente
+  /// mande su id.
+  activo Boolean @default(true)
+  /// Orden dentro del selector. No es único: se desempata por nombre, igual que
+  /// en el medio padre.
+  orden  Int     @default(0)
+
+  /// QUÉ ES el movimiento de ESTA modalidad. Es lo que termina en `VentaPago.medio`.
+  tipoContable MedioPago
+
+  /// Porcentaje que se le suma al cliente. Fuente autoritativa de la modalidad.
+  recargoPct Decimal @default(0) @db.Decimal(5, 2)
+  /// NULL = sin configurar, y NO es lo mismo que 0. Ver arriba.
+  comisionPct Decimal? @db.Decimal(5, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  medio MedioCobroLocal @relation(fields: [medioCobroLocalId], references: [id], onDelete: Cascade)
+
+  pagos VentaPago[]
+  ventasQueImpuso Venta[]
+
+  @@index([medioCobroLocalId])
+  @@index([medioCobroLocalId, activo, orden])
 }
