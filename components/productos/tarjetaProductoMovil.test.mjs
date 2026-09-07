@@ -324,9 +324,15 @@ test("G5d. LA FOTO NO EMPUJA: es cuadrada, acotada y no se recorta", () => {
   // mirar la fila del precio.
   const html = render({ caras: SUELTO, imagenUrl: "/uploads/prod-9.webp" });
   assert.match(html, /sunmi-product-thumbnail/, "cambió el lado de la miniatura");
+  // ACOTADO A LA MINIATURA, no al HTML entero. La primera versión buscaba
+  // `h-[…px]` en toda la tarjeta y se llevaba puesto el `min-h-[30px]` de la
+  // fila del precio, que no tiene nada que ver: la afirmación era más ancha que
+  // lo que dice.
+  const img = html.match(/<img[^>]*>/);
+  assert.ok(img, "no se encontró la miniatura");
   assert.doesNotMatch(
-    html,
-    /w-\[[0-9]+px\]|h-\[[0-9]+px\]/,
+    img[0],
+    /[wh]-\[[0-9.]+px\]/,
     "volvió a escribirse una medida suelta en la miniatura"
   );
   assert.match(html, /object-contain/, "la foto pasó a recortarse en vez de entrar entera");
