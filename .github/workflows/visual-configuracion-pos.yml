@@ -294,6 +294,23 @@ jobs:
             --anchos "390,1280" \
             --capturas "/tmp/capturas/muted-carrito"
 
+      # ── ¿SE VE DÓNDE ESTÁ EL FOCO? ───────────────────────────────────────
+      #
+      # `app/globals.css` apaga con `!important` el outline y la sombra de TODO
+      # `button:focus`, y el anillo del kit —`.sunmi-btn:focus-visible`— no lleva
+      # `!important`. Leyendo, el primero le gana. Eso es un razonamiento de
+      # especificidad con `!important` y `:focus-visible` de por medio, que es
+      # donde uno se equivoca, así que se mide.
+      #
+      # Esta sonda INFORMA y no falla: retrata el estado actual, que ya se sabe
+      # que puede ser malo, y su arreglo no es de esta tanda.
+      - name: Medir si el foco de teclado se ve
+        run: |
+          node scripts/sonda-foco-boton.mjs \
+            --base "http://localhost:$PUERTO" \
+            --edge "${{ steps.navegador.outputs.ruta }}" \
+            --puerto-cdp 9229
+
       # ── EL VIAJE DE LA CLAVE POR LA URL ──────────────────────────────────
       #
       # Va DESPUÉS de las capturas de defaults porque escribe —materializa y
