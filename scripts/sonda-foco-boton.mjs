@@ -82,8 +82,12 @@ async function urlDepurador() {
   frenar("el navegador no respondió al puerto de depuración");
 }
 
-async function evaluar(expresion) {
-  const r = await send("Runtime.evaluate", { expression: expresion, returnByValue: true });
+async function evaluar(expresion, esperarPromesa = false) {
+  const r = await send("Runtime.evaluate", {
+    expression: expresion,
+    returnByValue: true,
+    awaitPromise: esperarPromesa,
+  });
   if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
   return r.result.value;
 }
@@ -167,8 +171,26 @@ await evaluar(`(() => {
   return true;
 })()`);
 
-const LEER = (elId) => `(() => {
+/**
+ * Lee el estado ESTABLE, no el que hay en el instante de preguntar.
+ *
+ * Esta espera no es prudencia: es el cuarto defecto que tuvo esta sonda, y el
+ * más engañoso, porque daba verde. `.sunmi-btn` lleva `@apply … transition`, y
+ * esa utilidad de Tailwind transiciona `box-shadow` durante 150 ms. Las lecturas
+ * caían a los 25 ms del Tab, así que retrataban la sombra ambiental EN CAMINO
+ * hacia `none` —medido: 0,082 de alfa a los 50 ms, 0,0000 a los 150, `none` a
+ * los 300— y esa sombra moribunda se informaba como anillo de foco. El botón no
+ * mostraba ninguna señal: la sonda estaba mirando demasiado temprano.
+ *
+ * Por eso el corte no es un número elegido a ojo sino una pregunta al navegador:
+ * se espera a que no queden transiciones corriendo sobre el elemento.
+ */
+const LEER = (elId) => `(async () => {
   const el = document.getElementById(${JSON.stringify(elId)});
+  for (let i = 0; i < 60 && el.getAnimations().length > 0; i++) {
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  await new Promise((r) => setTimeout(r, 60));
   const s = getComputedStyle(el);
   return JSON.stringify({
     enfocado: document.activeElement === el,
@@ -184,7 +206,7 @@ const LEER = (elId) => `(() => {
 async function reposo(elId) {
   await evaluar(`(() => { document.activeElement && document.activeElement.blur(); return true; })()`);
   await sleep(40);
-  return JSON.parse(await evaluar(LEER(elId)));
+  return JSON.parse(await evaluar(LEER(elId), true));
 }
 
 async function porTeclado(elId, indice) {
@@ -197,7 +219,7 @@ async function porTeclado(elId, indice) {
     await send("Input.dispatchKeyEvent", { type: "keyUp", windowsVirtualKeyCode: 9, key: "Tab", code: "Tab" });
     await sleep(25);
   }
-  return JSON.parse(await evaluar(LEER(elId)));
+  return JSON.parse(await evaluar(LEER(elId), true));
 }
 
 async function porMouse(elId) {
@@ -216,7 +238,7 @@ async function porMouse(elId) {
     await send("Input.dispatchMouseEvent", { type, x: caja.x, y: caja.y, button: "left", clickCount: 1 });
   }
   await sleep(40);
-  return JSON.parse(await evaluar(LEER(elId)));
+  return JSON.parse(await evaluar(LEER(elId), true));
 }
 
 /**
