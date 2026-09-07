@@ -1,33 +1,37 @@
-// SONDA: ¿SE VE DÓNDE ESTÁ EL FOCO CUANDO SE NAVEGA CON TECLADO?
+// SONDA: ¿SE VE DÓNDE ESTÁ EL FOCO, Y SOLO CUANDO CORRESPONDE?
 //
 //   node scripts/sonda-foco-boton.mjs --base http://localhost:3111
 //
 // ── QUÉ PREGUNTA CONTESTA ──────────────────────────────────────────────────
 //
-// `app/globals.css` tiene esto, para TODO botón de la aplicación:
+// Son dos preguntas y hay que contestar las dos, porque arreglar una rompiendo
+// la otra es el error clásico de este tema:
 //
-//   button:focus { outline: none !important; box-shadow: none !important; }
+//   1. Con TAB, ¿el control muestra una señal visible?
+//   2. Con CLICK, ¿NO la muestra? Un anillo de teclado que queda pegado después
+//      de cada click es la razón por la que alguien lo apagó en primer lugar.
 //
-// Y `styles/sunmi.css` tiene el anillo de foco del kit, SIN `!important`:
+// ── POR QUÉ SE USA TECLADO Y MOUSE DE VERDAD ───────────────────────────────
 //
-//   .sunmi-btn:focus-visible { box-shadow: 0 0 0 2px …; }
+// La primera versión de esta sonda enfocaba con `el.focus()` desde el script y
+// leía `:focus-visible`. Daba `true` SIEMPRE —Chrome trata el foco por script
+// como si fuera de teclado— así que no distinguía los dos casos, que es
+// justamente lo único que hay que distinguir. Ahora el Tab y el click se
+// mandan como eventos de entrada reales por CDP.
 //
-// Leyendo, el primero le gana al segundo y ningún botón mostraría dónde está el
-// foco. Pero eso es un razonamiento de especificidad con `!important` y
-// `:focus-visible` de por medio, que es exactamente donde uno se equivoca. Se
-// mide.
+// ── Y POR QUÉ SE MIDE SIN FOCO Y CON FOCO ──────────────────────────────────
 //
-// Se prueban tres: un `<button>` pelado, uno del kit —`sunmi-btn`—, y la tarjeta
-// entera como botón, que es el patrón de `TarjetaOferta`. El foco se pone con
-// `.focus()`, y además se comprueba `:focus-visible` con `matches`, porque un
-// foco puesto por código no siempre lo activa.
+// Porque el botón del kit tiene una sombra ambiental que está siempre. Leer solo
+// el estado enfocado la contaba como anillo de foco: falso positivo, ya visto.
+// Hay señal solo si algo CAMBIA al enfocar.
 //
 // ── EL CRITERIO ───────────────────────────────────────────────────────────
 //
-// Esta sonda INFORMA, no falla: lo que mide es el estado actual del repo, que ya
-// se sabe que puede ser malo. Sale con 0 salvo que no pueda medir.
+// Si no puede medir, es ROJO. El veredicto se activa con `--exigir`, para que la
+// misma sonda sirva de retrato del estado roto y de candado del arreglado.
 
 import { spawn } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
 
@@ -35,11 +39,16 @@ const arg = (n, d = null) => {
   const i = process.argv.indexOf(`--${n}`);
   return i > -1 && process.argv[i + 1] && !process.argv[i + 1].startsWith("--") ? process.argv[i + 1] : d;
 };
+const bandera = (n) => process.argv.includes(`--${n}`);
 
 const BASE = (arg("base", "http://localhost:3111") || "").replace(/\/$/, "");
 const EDGE = arg("edge", "/usr/bin/google-chrome");
 const PUERTO = Number(arg("puerto-cdp", "9229"));
 const PERFIL = path.join(tmpdir(), "sonda-foco-boton");
+const CAPTURAS = arg("capturas", null);
+const EXIGIR = bandera("exigir");
+const ANCHOS = (arg("anchos", "390,1280") || "").split(",").map((n) => Number(n.trim()));
+const TEMAS = (arg("temas", "sunmiDark,sunmiLight,sunmiSand,sunmiBlueClassic") || "").split(",");
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -109,83 +118,144 @@ await send("Page.navigate", { url: `${BASE}/login` });
 let lista = false;
 for (let i = 0; i < 80; i++) {
   await sleep(250);
-  try {
-    lista = await evaluar(`document.readyState === "complete" && !!document.querySelector("button")`);
-  } catch {}
+  try { lista = await evaluar('document.readyState === "complete" && !!document.querySelector("button")'); } catch {}
   if (lista) break;
 }
 if (!lista) frenar("la página no llegó a tener un botón");
 
+// Los cinco controles del contrato. Se dibujan en una barra propia, con un ancla
+// antes para poder llegar al primero con un solo Tab.
 const CASOS = [
-  { nombre: "<button> pelado", clases: "" },
-  { nombre: "botón del kit (sunmi-btn)", clases: "sunmi-btn sunmi-btn-cyan" },
-  { nombre: "tarjeta entera como botón (TarjetaOferta)", clases: "w-full text-left sunmi-panel rounded-lg p-3 flex flex-col gap-1.5" },
+  { id: "c-kit", nombre: "A · SunmiButton", etiqueta: "button", clases: "sunmi-btn sunmi-btn-cyan" },
+  { id: "c-nativo", nombre: "B · button nativo", etiqueta: "button", clases: "" },
+  { id: "c-tarjeta", nombre: "C · TarjetaOferta (tarjeta como botón)", etiqueta: "button", clases: "w-full text-left sunmi-panel rounded-lg p-3" },
+  { id: "c-enlace", nombre: "D · botón con apariencia de enlace", etiqueta: "button", clases: "text-xs sunmi-text-accent mt-1 underline" },
+  { id: "c-input", nombre: "E · SunmiInput", etiqueta: "input", clases: "sunmi-input" },
 ];
 
-const medido = await evaluar(`(() => {
+await evaluar(`(() => {
   const casos = ${JSON.stringify(CASOS)};
-  const salida = [];
+  const barra = document.createElement("div");
+  barra.id = "barra-foco";
+  barra.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:99999;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--app-bg)";
+  const titulo = document.createElement("div");
+  titulo.id = "barra-titulo";
+  titulo.style.cssText = "font:600 12px system-ui;color:var(--app-fg)";
+  barra.append(titulo);
+  const ancla = document.createElement("a");
+  ancla.id = "ancla";
+  ancla.href = "#";
+  ancla.textContent = "ancla";
+  ancla.style.cssText = "font:12px system-ui;color:var(--app-fg)";
+  barra.append(ancla);
   for (const c of casos) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = c.clases;
-    b.textContent = "foco";
-    document.body.append(b);
-
-    // ── EL CONTROL: SE MIDE SIN FOCO Y CON FOCO ──────────────────────────
-    //
-    // Sin esto, la sonda daba un falso positivo. El botón del kit tiene una
-    // sombra ambiental de 0 1px 3px que está SIEMPRE, y leer solo el estado
-    // enfocado la contaba como si fuera el anillo de foco. Lo que prueba que hay
-    // señal de foco no es que haya sombra: es que algo CAMBIE al enfocar.
-    //
-    // Sin backticks en este comentario a propósito: vive adentro de un template
-    // literal, y uno solo cerraría la cadena. Es la trampa que CLAUDE.md tiene
-    // anotada.
-    const sinFoco = getComputedStyle(b);
-    const antes = { outline: sinFoco.outlineStyle, boxShadow: sinFoco.boxShadow };
-
-    b.focus();
-    const s = getComputedStyle(b);
-    salida.push({
-      nombre: c.nombre,
-      enfocado: document.activeElement === b,
-      focusVisible: (() => { try { return b.matches(":focus-visible"); } catch { return null; } })(),
-      outline: s.outlineStyle + " " + s.outlineWidth + " " + s.outlineColor,
-      boxShadow: s.boxShadow,
-      outlineSinFoco: antes.outline,
-      boxShadowSinFoco: antes.boxShadow,
-    });
-    b.blur();
-    b.remove();
+    const el = document.createElement(c.etiqueta);
+    el.id = c.id;
+    if (c.etiqueta === "button") { el.type = "button"; el.textContent = c.nombre; }
+    else { el.value = "texto"; }
+    el.className = c.clases;
+    barra.append(el);
   }
-  return JSON.stringify(salida);
+  document.body.append(barra);
+  return true;
 })()`);
 
-console.log("\n  ══ foco visible ═══════════════════════════════════════════");
-let sinSenal = 0;
-for (const r of JSON.parse(medido)) {
-  // Hay señal de foco solo si algo CAMBIA al enfocar. Una sombra que ya estaba
-  // no señala nada: está igual en los cien botones que no tienen el foco.
-  const cambia = r.boxShadow !== r.boxShadowSinFoco || r.outline.split(" ")[0] !== r.outlineSinFoco;
-  if (!cambia) sinSenal += 1;
-  console.log(`  ${r.nombre}`);
-  console.log(`     enfocado ${r.enfocado} · :focus-visible ${r.focusVisible}`);
-  console.log(`     outline     sin foco ${r.outlineSinFoco}  ·  con foco ${r.outline}`);
-  console.log(`     box-shadow  sin foco ${r.boxShadowSinFoco}`);
-  console.log(`                 con foco ${r.boxShadow}`);
-  console.log(`     ${cambia ? "→ SE VE: algo cambia al enfocar" : "→ NO se ve: nada cambia al enfocar"}`);
+const LEER = (elId) => `(() => {
+  const el = document.getElementById(${JSON.stringify(elId)});
+  const s = getComputedStyle(el);
+  return JSON.stringify({
+    enfocado: document.activeElement === el,
+    focusVisible: (() => { try { return el.matches(":focus-visible"); } catch { return null; } })(),
+    outline: s.outlineStyle + " " + s.outlineWidth,
+    boxShadow: s.boxShadow,
+  });
+})()`;
+
+async function reposo(elId) {
+  await evaluar(`(() => { document.activeElement && document.activeElement.blur(); return true; })()`);
+  await sleep(40);
+  return JSON.parse(await evaluar(LEER(elId)));
+}
+
+async function porTeclado(elId, indice) {
+  // Se ancla el foco en el enlace de arriba y se manda TAB de verdad tantas
+  // veces como haga falta. Un `focus()` por script no sirve: Chrome lo trata
+  // como teclado siempre y no distinguiría del click.
+  await evaluar(`(() => { document.getElementById("ancla").focus(); return true; })()`);
+  for (let i = 0; i <= indice; i++) {
+    await send("Input.dispatchKeyEvent", { type: "rawKeyDown", windowsVirtualKeyCode: 9, key: "Tab", code: "Tab" });
+    await send("Input.dispatchKeyEvent", { type: "keyUp", windowsVirtualKeyCode: 9, key: "Tab", code: "Tab" });
+    await sleep(25);
+  }
+  return JSON.parse(await evaluar(LEER(elId)));
+}
+
+async function porMouse(elId) {
+  const caja = JSON.parse(await evaluar(`(() => {
+    const r = document.getElementById(${JSON.stringify(elId)}).getBoundingClientRect();
+    return JSON.stringify({ x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) });
+  })()`));
+  for (const type of ["mousePressed", "mouseReleased"]) {
+    await send("Input.dispatchMouseEvent", { type, x: caja.x, y: caja.y, button: "left", clickCount: 1 });
+  }
+  await sleep(40);
+  return JSON.parse(await evaluar(LEER(elId)));
+}
+
+const hayCambio = (base, otro) =>
+  base.outline !== otro.outline || base.boxShadow !== otro.boxShadow;
+
+let fallas = 0;
+const ok = (t, c, d = "") => { if (c) console.log(`  ✓ ${t}`); else { fallas++; console.log(`  ✗ ${t}${d ? "  " + d : ""}`); } };
+
+for (const ancho of ANCHOS) {
+  await send("Emulation.setDeviceMetricsOverride", { width: ancho, height: 700, deviceScaleFactor: 1, mobile: ancho < 1024 });
+  for (const tema of TEMAS) {
+    await evaluar(`(() => {
+      document.documentElement.dataset.theme = ${JSON.stringify(tema)};
+      document.getElementById("barra-titulo").textContent = ${JSON.stringify(`${tema} · ${ancho}px`)};
+      return true;
+    })()`);
+    await sleep(60);
+    console.log(`\n  ══ ${tema} · ${ancho} px ═══════════════════════════════`);
+
+    for (let i = 0; i < CASOS.length; i++) {
+      const c = CASOS[i];
+      const base = await reposo(c.id);
+      const tec = await porTeclado(c.id, i);
+      const mou = await porMouse(c.id);
+
+      const senalTeclado = tec.enfocado && hayCambio(base, tec);
+      const senalMouse = mou.enfocado && hayCambio(base, mou);
+
+      console.log(`  ${c.nombre}`);
+      console.log(`     reposo   outline ${base.outline}  shadow ${base.boxShadow === "none" ? "none" : "sí"}`);
+      console.log(`     TAB      enfocado ${tec.enfocado} fv ${tec.focusVisible} outline ${tec.outline}  ${senalTeclado ? "→ SE VE" : "→ NO se ve"}`);
+      console.log(`     CLICK    enfocado ${mou.enfocado} fv ${mou.focusVisible} outline ${mou.outline}  ${senalMouse ? "→ deja anillo" : "→ limpio"}`);
+
+      if (EXIGIR) {
+        ok(`${tema}/${ancho} · ${c.nombre}: con TAB se ve`, senalTeclado);
+        ok(`${tema}/${ancho} · ${c.nombre}: con CLICK no queda anillo de teclado`, !senalMouse);
+      }
+    }
+
+    if (CAPTURAS) {
+      await evaluar(`(() => { document.getElementById("ancla").focus(); return true; })()`);
+      await send("Input.dispatchKeyEvent", { type: "rawKeyDown", windowsVirtualKeyCode: 9, key: "Tab", code: "Tab" });
+      await send("Input.dispatchKeyEvent", { type: "keyUp", windowsVirtualKeyCode: 9, key: "Tab", code: "Tab" });
+      await sleep(60);
+      const { data } = await send("Page.captureScreenshot", { format: "png", clip: { x: 0, y: 0, width: ancho, height: 330, scale: 2 } });
+      fs.mkdirSync(CAPTURAS, { recursive: true });
+      fs.writeFileSync(path.join(CAPTURAS, `${ancho}-${tema}-foco.png`), Buffer.from(data, "base64"));
+    }
+  }
 }
 
 console.log("");
-if (sinSenal) {
-  console.log(`  ${sinSenal} de 3 no muestran señal de foco.`);
-  console.log("  Causa leída en la hoja: app/globals.css declara");
-  console.log("    button:focus { outline: none !important; box-shadow: none !important }");
-  console.log("  y el anillo del kit —.sunmi-btn:focus-visible— no lleva !important, así que pierde.");
+if (EXIGIR) {
+  console.log(`  ${fallas} afirmaciones en rojo.`);
 } else {
-  console.log("  Los tres muestran señal de foco.");
+  console.log("  (retrato del estado actual: sin --exigir esta sonda no falla)");
 }
-
 cerrar();
-process.exit(0);
+process.exit(EXIGIR && fallas ? 1 : 0);

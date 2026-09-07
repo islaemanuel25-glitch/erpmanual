@@ -309,7 +309,10 @@ jobs:
           node scripts/sonda-foco-boton.mjs \
             --base "http://localhost:$PUERTO" \
             --edge "${{ steps.navegador.outputs.ruta }}" \
-            --puerto-cdp 9229
+            --puerto-cdp 9229 \
+            --anchos "390,1280" \
+            --temas "sunmiDark,sunmiLight,sunmiSand,sunmiBlueClassic" \
+            --capturas "/tmp/capturas/foco"
 
       # ── EL VIAJE DE LA CLAVE POR LA URL ──────────────────────────────────
       #
