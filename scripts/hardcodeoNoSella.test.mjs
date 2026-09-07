@@ -93,19 +93,38 @@ function repoLimpioDeJuguete() {
 }
 
 /**
- * Una copia de la línea de base real con TODOS los contadores bajados.
+ * Una copia de la línea de base real con TODOS los contadores bajados Y con
+ * parte del inventario quitado.
  *
  * Bajarlos es lo que hace que el escaneo de hoy dé "subió", que es el estado en
  * el que un sellado accidental hace daño. Con la copia intacta el candado
  * probaría el caso inofensivo.
+ *
+ * ── POR QUÉ TAMBIÉN SE RECORTA EL INVENTARIO ──────────────────────────────
+ *
+ * Deflactar `total` no alcanza desde que el trinquete decide por ALTAS y no por
+ * totales. Este fixture bajaba solo los totales, y el candado del veredicto
+ * —"el trinquete tiene que salir con 1"— pasaba igual… porque el repo tenía 9
+ * ocurrencias pendientes de verdad. O sea que **pasaba por un motivo que no
+ * declaraba**: no por el escenario que construye, sino por el estado del árbol.
+ *
+ * Quedó al descubierto el día que esas 9 se resolvieron y el trinquete llegó a
+ * cero: el candado se puso rojo sin que nadie hubiera tocado lo que él protege.
+ *
+ * Sacarle al inventario la primera ocurrencia lo vuelve autosuficiente: la
+ * "subida" la produce el fixture, no la deuda que ande dando vueltas. Ahora el
+ * candado afirma lo mismo tenga el repo cero altas o mil.
  */
 function baseDeflactada() {
   const carpeta = fs.mkdtempSync(path.join(os.tmpdir(), "hardcodeo-candado-"));
   const archivo = path.join(carpeta, "linea-base.json");
   const doc = JSON.parse(fs.readFileSync(REAL, "utf8"));
   for (const k of Object.keys(doc.total)) doc.total[k] = Math.max(0, doc.total[k] - 5);
+  const primerArchivo = Object.keys(doc.inventario ?? {})[0];
+  if (!primerArchivo) throw new Error("la línea de base no tiene inventario: el fixture no puede construir un alta");
+  delete doc.inventario[primerArchivo];
   fs.writeFileSync(archivo, JSON.stringify(doc, null, 2) + "\n");
-  return { carpeta, archivo };
+  return { carpeta, archivo, archivoQuitado: primerArchivo };
 }
 
 const limpiar = (carpeta) => fs.rmSync(carpeta, { recursive: true, force: true });

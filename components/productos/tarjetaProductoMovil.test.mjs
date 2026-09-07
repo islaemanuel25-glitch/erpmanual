@@ -87,9 +87,14 @@ test("G2. conserva el bloque de precio de la card definida", () => {
   const html = render({ caras: PACK_EN_DEPOSITO });
   assert.match(html, /data-cara-precio/);
   assert.match(html, /background:var\(--hover-bg\)/);
-  assert.match(html, /text-\[9px\]/);
-  assert.match(html, /text-\[25px\]/);
-  assert.match(html, /w-\[202px\]/);
+  // Las tres medidas dejaron de escribirse en el JSX: son contratos con nombre
+  // —`--sunmi-product-value-label-font-size`, `…-number-font-size` y
+  // `…-value-width`— y el valor lo guarda `lib/sunmi/metricasDeProducto.test.mjs`.
+  // Acá se sigue afirmando lo mismo que antes: que la tarjeta USA ese bloque.
+  // Lo que cambió es que el número vive en un lugar y no repetido en la cadena.
+  assert.match(html, /sunmi-product-value-label/);
+  assert.match(html, /sunmi-product-value-number/);
+  assert.match(html, /sunmi-product-value-block/);
   // El atributo dice qué ESCALA se muestra, no qué cara: la tarjeta es una sola
   // y ya no hay frente ni dorso. "venta" es la escala configurada, la que cobra
   // el POS, y es con la que toda tarjeta abre.
@@ -310,8 +315,20 @@ test("G5d. LA FOTO NO EMPUJA: es cuadrada, acotada y no se recorta", () => {
   // con `auto-rows-fr` eso estira TODAS las filas de la grilla, no solo la de la
   // tarjeta que tiene foto. El número no es decorativo, es lo que hace que el
   // cambio sea invisible para el resto de la card.
+  //
+  // EL NÚMERO SE MUDÓ, EL MOTIVO NO. El lado ya no se escribe acá: es
+  // `--sunmi-product-thumbnail-size`, y que valga 44 lo afirma
+  // `lib/sunmi/metricasDeProducto.test.mjs`. Este candado sigue afirmando lo
+  // que le toca —que la miniatura consume ese contrato y no un tamaño suelto—,
+  // y el razonamiento de arriba es la razón por la que ese token no se toca sin
+  // mirar la fila del precio.
   const html = render({ caras: SUELTO, imagenUrl: "/uploads/prod-9.webp" });
-  assert.match(html, /w-\[44px\] h-\[44px\]/, "cambió el lado de la miniatura");
+  assert.match(html, /sunmi-product-thumbnail/, "cambió el lado de la miniatura");
+  assert.doesNotMatch(
+    html,
+    /w-\[[0-9]+px\]|h-\[[0-9]+px\]/,
+    "volvió a escribirse una medida suelta en la miniatura"
+  );
   assert.match(html, /object-contain/, "la foto pasó a recortarse en vez de entrar entera");
   assert.match(html, /shrink-0/, "la miniatura puede achicarse y deformar la fila");
 

@@ -77,33 +77,55 @@ for (let i = 0; i < 80; i++) { await sleep(250); try { lista = await evaluar('do
 if (!lista) frenar("la página no llegó a cargar");
 
 /**
- * Los pares. `viejo` es exactamente lo que decía el JSX antes de la tanda;
- * `nuevo` lo que dice ahora. `props` son las propiedades computadas que el
- * contrato promete iguales.
+ * Los pares. `nuevo` es lo que dice el JSX hoy. El lado VIEJO se expresa en dos
+ * partes: `viejo` para las clases que siguen existiendo, y `viejoEstilo` para
+ * los valores que antes venían de una clase arbitraria de Tailwind.
+ *
+ * ── POR QUÉ EL VIEJO NO PUEDE SER "LA CLASE DE ANTES" ─────────────────────
+ *
+ * Tailwind genera una clase arbitraria solo si ALGUIEN LA NOMBRA en los
+ * archivos que escanea. Esta tanda las sacó del JSX, así que `w-[202px]`,
+ * `min-h-[51.5px]`, `text-[25px]` y `w-[44px]` ya no están en la hoja: un
+ * elemento con esa clase se dibuja sin ancho y sin alto.
+ *
+ * La primera versión de esta sonda las usaba igual y dio 24 diferencias que NO
+ * eran del cambio: comparaba lo nuevo contra un elemento sin estilo. Es la misma
+ * trampa que el procedimiento de despliegue documenta al revés —una clase no
+ * desaparece del build porque la saques del código, desaparece cuando nadie la
+ * nombra— y acá se pagó en la dirección contraria.
+ *
+ * El estilo en línea es la referencia correcta: `w-[202px]` producía
+ * exactamente `width: 202px`, y eso no depende de que Tailwind lo genere.
  */
 const PARES = [
   { nombre: "lista de tarjetas · gap", etiqueta: "div",
-    viejo: "grid grid-cols-1 auto-rows-fr gap-[9px]",
+    viejo: "grid grid-cols-1 auto-rows-fr",
+    viejoEstilo: "gap:9px",
     nuevo: "grid grid-cols-1 auto-rows-fr sunmi-product-list",
     props: ["rowGap", "columnGap"] },
   { nombre: "bloque de valor · caja", etiqueta: "div",
-    viejo: "flex w-[202px] max-w-full rounded-xl px-2.5 py-2 min-h-[51.5px]",
+    viejo: "flex max-w-full rounded-xl px-2.5 py-2",
+    viejoEstilo: "width:202px;min-height:51.5px",
     nuevo: "flex max-w-full rounded-xl px-2.5 py-2 sunmi-product-value-block",
     props: ["width", "minHeight", "paddingLeft", "paddingTop", "borderRadius"] },
   { nombre: "rótulo del valor", etiqueta: "span",
-    viejo: "mb-1 text-[9px] font-bold whitespace-nowrap",
+    viejo: "mb-1 font-bold whitespace-nowrap",
+    viejoEstilo: "font-size:9px",
     nuevo: "mb-1 sunmi-product-value-label font-bold whitespace-nowrap",
     props: ["fontSize", "fontWeight", "marginBottom"] },
   { nombre: "número del valor", etiqueta: "span",
-    viejo: "text-[25px] font-semibold whitespace-nowrap",
+    viejo: "font-semibold whitespace-nowrap",
+    viejoEstilo: "font-size:25px",
     nuevo: "sunmi-product-value-number font-semibold whitespace-nowrap",
     props: ["fontSize", "fontWeight"] },
   { nombre: "miniatura del producto", etiqueta: "div",
-    viejo: "w-[44px] h-[44px]",
+    viejo: "",
+    viejoEstilo: "width:44px;height:44px",
     nuevo: "sunmi-product-thumbnail",
     props: ["width", "height"] },
   { nombre: "acción de la tarjeta", etiqueta: "button",
-    viejo: "flex items-center justify-center gap-1.5 py-2.5 h-[44px] text-xs font-medium sunmi-text-strong sunmi-row-hover",
+    viejo: "flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium sunmi-text-strong sunmi-row-hover",
+    viejoEstilo: "height:44px",
     nuevo: "flex items-center justify-center gap-1.5 py-2.5 sunmi-product-card-action text-xs font-medium sunmi-text-strong sunmi-row-hover",
     props: ["height", "paddingTop", "fontSize"] },
   { nombre: "botón-enlace (importador)", etiqueta: "button",
@@ -130,6 +152,7 @@ await evaluar(`(() => {
       const el = document.createElement(p.etiqueta);
       el.id = "par-" + i + "-" + lado;
       el.className = p[lado];
+      if (lado === "viejo" && p.viejoEstilo) el.style.cssText = p.viejoEstilo;
       el.textContent = "x";
       cont.append(el);
       caja.append(cont);
