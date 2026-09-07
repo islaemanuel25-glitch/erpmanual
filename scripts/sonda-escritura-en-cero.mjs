@@ -624,8 +624,22 @@ for (const rotulo of CAMPOS) {
     await teclear("3");
     m = JSON.parse(await medidas());
     console.log(`    TAB sobre 12: seleccion=${JSON.stringify(sel12Tab)} ${detalle(m)}`);
-    ok(`${rotulo} · Tab · 12 NO se selecciona entero`, sel12Tab !== "12", `se copió ${JSON.stringify(sel12Tab)}`);
-    ok(`${rotulo} · Tab · 12 + tecla 3 → 123`, m.valor === "123", `quedó ${JSON.stringify(m.valor)}`);
+    // ── TAB Y CLICK NO ENTRAN IGUAL, Y ESO ES DEL NAVEGADOR ──────────────
+    //
+    // Estas dos afirmaciones decían antes "12 NO se selecciona entero" y
+    // "12 + tecla 3 → 123", copiadas del caso del click. Estaban MAL: le exigían
+    // al producto anular una convención del navegador que nadie pidió anular.
+    //
+    // Medido: al entrar con Tab a un campo con `12`, el navegador SELECCIONA EL
+    // CONTENIDO COMPLETO —la lectura del portapapeles devuelve "12"— así que la
+    // tecla reemplaza la selección y queda `3`. Entrando con click el mismo
+    // campo devuelve SIN-SELECCION y `+3` da `123`.
+    //
+    // `alEscribirNumero` NI SIQUIERA INTERVIENE acá: su primera línea es
+    // `if (String(anterior) !== "0") return valor`, y "12" no es "0". Lo que se
+    // ve es el navegador, no el contrato.
+    ok(`${rotulo} · Tab · 12 selecciona el contenido completo`, sel12Tab === "12", `se copió ${JSON.stringify(sel12Tab)}`);
+    ok(`${rotulo} · Tab · 12 + tecla 3 reemplaza la selección → 3`, m.valor === "3", `quedó ${JSON.stringify(m.valor)}`);
   } else {
     ok(`${rotulo} · Tab llega al campo con 12`, false, "no llegó en 40 tabulaciones");
   }
