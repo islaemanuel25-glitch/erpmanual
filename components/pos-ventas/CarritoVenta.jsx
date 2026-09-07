@@ -455,7 +455,7 @@ function CarritoVenta({
                 ) : (
                   <>
                     {textoOfertaDeLinea(item) && (
-                      <span className="block text-xs2 pos-text-muted truncate">
+                      <span className="block text-xs2 sunmi-text-muted truncate">
                         $ {formatPrecio(item.precio)}
                         <EtiquetaOferta item={item} />
                       </span>
