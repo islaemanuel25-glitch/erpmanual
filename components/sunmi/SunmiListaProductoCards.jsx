@@ -7,7 +7,7 @@
 // grilla parecida al lado.
 export default function SunmiListaProductoCards({ children }) {
   return (
-    <div className="grid grid-cols-1 auto-rows-fr gap-[9px]">
+    <div className="grid grid-cols-1 auto-rows-fr sunmi-product-list">
       {children}
     </div>
   );

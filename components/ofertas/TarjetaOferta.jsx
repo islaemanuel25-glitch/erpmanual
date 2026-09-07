@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, Clock } from "lucide-react";
+import SunmiActionCard from "@/components/sunmi/SunmiActionCard";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import EstadoOfertaPill from "./EstadoOfertaPill";
 import { formatearRangoOferta } from "@/lib/ofertas/formato";
@@ -17,11 +18,7 @@ export default function TarjetaOferta({ oferta, onAbrir }) {
   if (!oferta) return null;
 
   return (
-    <button
-      type="button"
-      onClick={() => onAbrir?.(oferta)}
-      className="w-full text-left sunmi-panel rounded-lg p-3 flex flex-col gap-1.5"
-    >
+    <SunmiActionCard onClick={() => onAbrir?.(oferta)}>
       <div className="flex items-start justify-between gap-2">
         <span className="font-semibold sunmi-text-strong leading-tight">{oferta.nombre}</span>
         <EstadoOfertaPill estado={oferta.estado} />
@@ -56,6 +53,6 @@ export default function TarjetaOferta({ oferta, onAbrir }) {
           <span>Vence pronto</span>
         </div>
       )}
-    </button>
+    </SunmiActionCard>
   );
 }
