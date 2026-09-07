@@ -41,6 +41,8 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { MARCA_VEREDICTO } from "../lib/hardcodeo/contador.mjs";
+
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(AQUI, "..");
 // El contador real. La variable de entorno existe SOLO para que el candado
@@ -131,7 +133,10 @@ process.stdin.on("end", () => {
   // Lo que los separa es la MARCA que el contador imprime cuando de verdad
   // comparó. Sin esa marca no hubo veredicto, haya salido con el código que haya
   // salido.
-  const MARCA_VEREDICTO = "TRINQUETE: subió el hardcodeo.";
+  // La marca la define el CONTADOR y la importan los tres que la necesitan: el
+  // que la imprime, este hook que la busca, y el candado. Estaba escrita a mano
+  // en dos lados, y cambiar el texto del trinquete habría dejado a este hook
+  // informando "no pudo correr" sobre un contador que contestó bien.
   const salidaCompleta = `${r.stdout || ""}\n${r.stderr || ""}`;
   const huboVeredicto = salidaCompleta.includes(MARCA_VEREDICTO);
 

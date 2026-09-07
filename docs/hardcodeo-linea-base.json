@@ -1,7 +1,8 @@
 {
   "_lea_esto": "Línea de base del hardcodeo. La sella scripts/hardcodeo.mjs --linea-base --sellar; sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
-  "generada": "2026-08-23 02:34",
-  "commit": "ed6583fa66d83f75dd0226c632410e8fafd32d7d",
+  "_inventario": "El trinquete compara el INVENTARIO, no los totales: una ocurrencia es archivo + categoría + texto, con cantidad. Sin número de línea, para que mover código no invente violaciones. Un alta en cualquier clave pone rojo aunque el total baje.",
+  "generada": "2026-09-07 01:07",
+  "commit": "32757049cafa4f7dbf39fe931a19d9b773bee5cc",
   "total": {
     "color": 288,
     "medida": 1916,
@@ -9,7 +10,7 @@
     "crudo": 318,
     "celda": 461,
     "kit-pisado": 0,
-    "tema-paralelo": 129
+    "tema-paralelo": 87
   },
   "porPantalla": {
     "(kit)": {
@@ -37,7 +38,7 @@
       "crudo": 0,
       "celda": 8,
       "kit-pisado": 0,
-      "tema-paralelo": 1
+      "tema-paralelo": 0
     },
     "auditoria-pos-ventas": {
       "color": 43,
@@ -127,7 +128,7 @@
       "crudo": 5,
       "celda": 4,
       "kit-pisado": 0,
-      "tema-paralelo": 2
+      "tema-paralelo": 0
     },
     "fidelidad": {
       "color": 0,
@@ -217,7 +218,7 @@
       "crudo": 16,
       "celda": 0,
       "kit-pisado": 0,
-      "tema-paralelo": 1
+      "tema-paralelo": 0
     },
     "pos-transferencias": {
       "color": 4,
@@ -226,7 +227,7 @@
       "crudo": 29,
       "celda": 15,
       "kit-pisado": 0,
-      "tema-paralelo": 1
+      "tema-paralelo": 0
     },
     "pos-ventas": {
       "color": 37,
@@ -235,7 +236,7 @@
       "crudo": 62,
       "celda": 16,
       "kit-pisado": 0,
-      "tema-paralelo": 118
+      "tema-paralelo": 86
     },
     "productos": {
       "color": 38,
@@ -244,7 +245,7 @@
       "crudo": 32,
       "celda": 91,
       "kit-pisado": 0,
-      "tema-paralelo": 5
+      "tema-paralelo": 0
     },
     "proveedores": {
       "color": 1,
@@ -344,6 +345,2657 @@
       "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
+    }
+  },
+  "inventario": {
+    "app/andamio-producto-card/page.jsx": {
+      "medida": {
+        "w-[360px]": 1,
+        "gap-[9px]": 1,
+        "text-[22px]": 1,
+        "text-[11.5px]": 1
+      }
+    },
+    "app/andamio-velo/page.jsx": {
+      "modal": {
+        "fixed inset-0": 1
+      }
+    },
+    "app/bloqueo-operador/page.jsx": {
+      "medida": {
+        "text-[11px]": 4,
+        "text-[10px]": 1
+      },
+      "color": {
+        "bg-red-": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "app/inicio/page.jsx": {
+      "medida": {
+        "text-[11px]": 1,
+        "text-[13px]": 1,
+        "text-[10px]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "app/login/page.jsx": {
+      "color": {
+        "text-slate-": 3,
+        "bg-red-": 1
+      },
+      "medida": {
+        "text-[11px]": 2
+      }
+    },
+    "app/modulos/auditoria-pos-ventas/balances/page.jsx": {
+      "medida": {
+        "text-[10px]": 3,
+        "text-[11px]": 7,
+        "text-[9px]": 4
+      },
+      "celda": {
+        "<td>": 11
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "app/modulos/auditoria-pos-ventas/cajas/page.jsx": {
+      "medida": {
+        "text-[10px]": 18,
+        "text-[9px]": 8,
+        "text-[11px]": 2
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "app/modulos/auditoria-pos-ventas/page.jsx": {
+      "color": {
+        "#60a5fa": 1,
+        "rgba(96,165,250,0.12)": 1,
+        "#fbbf24": 1,
+        "rgba(251,191,36,0.12)": 1,
+        "#a78bfa": 1,
+        "rgba(167,139,250,0.12)": 1,
+        "rgba(0,0,0,0.35)": 1,
+        "rgba(255,255,255,0.06)": 1,
+        "#0c2d4a": 1,
+        "#143d5e": 1,
+        "#1a4971": 1,
+        "rgba(96,165,250,0.25)": 1
+      },
+      "crudo": {
+        "<button>": 1
+      },
+      "medida": {
+        "w-[72px]": 1,
+        "h-[72px]": 1,
+        "w-[88px]": 1,
+        "h-[88px]": 1,
+        "rounded-[22px]": 1,
+        "w-[44px]": 1,
+        "h-[44px]": 1,
+        "text-[11px]": 1,
+        "max-w-[200px]": 1
+      }
+    },
+    "app/modulos/auditoria-pos-ventas/productos/page.jsx": {
+      "medida": {
+        "text-[11px]": 7,
+        "text-[9px]": 3,
+        "h-[2px]": 1
+      },
+      "crudo": {
+        "<button>": 4
+      }
+    },
+    "app/modulos/auditoria-pos-ventas/turnos/[id]/page.jsx": {
+      "medida": {
+        "max-w-[1280px]": 1,
+        "text-[12px]": 4,
+        "text-[10px]": 11,
+        "text-[16px]": 3,
+        "text-[18px]": 3,
+        "text-[13px]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      },
+      "color": {
+        "bg-red-": 2,
+        "text-green-": 5,
+        "bg-green-": 1,
+        "text-red-": 6,
+        "bg-amber-": 2,
+        "text-amber-": 7
+      },
+      "celda": {
+        "<td>": 14
+      }
+    },
+    "app/modulos/auditoria-pos-ventas/turnos/page.jsx": {
+      "color": {
+        "bg-amber-": 3,
+        "text-orange-": 2,
+        "text-amber-": 3
+      },
+      "crudo": {
+        "<button>": 5
+      },
+      "medida": {
+        "text-[13px]": 17,
+        "text-[10px]": 34,
+        "text-[11px]": 7,
+        "text-[12px]": 11,
+        "text-[14px]": 3,
+        "text-[15px]": 6,
+        "border-l-[4px]": 1,
+        "text-[16px]": 1,
+        "max-w-[1280px]": 1,
+        "text-[28px]": 1,
+        "min-w-[180px]": 1
+      },
+      "celda": {
+        "<td>": 5
+      }
+    },
+    "app/modulos/categorias/page.jsx": {
+      "celda": {
+        "<td>": 3
+      }
+    },
+    "app/modulos/clientes/[id]/page.jsx": {
+      "crudo": {
+        "<button>": 4,
+        "<select>": 1
+      },
+      "medida": {
+        "text-[11px]": 16,
+        "text-[10px]": 1
+      },
+      "celda": {
+        "<td>": 13
+      }
+    },
+    "app/modulos/clientes/analytics/page.jsx": {
+      "medida": {
+        "text-[11px]": 4,
+        "min-w-[200px]": 1,
+        "text-[10px]": 7
+      },
+      "crudo": {
+        "<button>": 6,
+        "<input>": 2
+      },
+      "celda": {
+        "<td>": 12
+      }
+    },
+    "app/modulos/clientes/page.jsx": {
+      "crudo": {
+        "<select>": 5,
+        "<input>": 1,
+        "<button>": 6
+      },
+      "medida": {
+        "text-[11px]": 24,
+        "max-h-[50vh]": 1,
+        "max-w-[150px]": 1,
+        "max-w-[140px]": 1,
+        "max-w-[180px]": 1,
+        "text-[10px]": 6,
+        "max-h-[90vh]": 3
+      },
+      "celda": {
+        "<td>": 23
+      }
+    },
+    "app/modulos/compras-proveedor/[id]/page.jsx": {
+      "color": {
+        "#f59e0b": 2
+      },
+      "medida": {
+        "text-[13px]": 4,
+        "text-[12px]": 1,
+        "text-[10px]": 1
+      },
+      "celda": {
+        "<td>": 6
+      }
+    },
+    "app/modulos/compras-proveedor/ganancia/page.jsx": {
+      "medida": {
+        "min-w-[180px]": 1,
+        "text-[13px]": 2
+      },
+      "celda": {
+        "<td>": 13
+      }
+    },
+    "app/modulos/compras-proveedor/nueva/page.jsx": {
+      "crudo": {
+        "<button>": 12
+      },
+      "medida": {
+        "text-[11px]": 20,
+        "text-[12px]": 15,
+        "w-[148px]": 1,
+        "text-[8.5px]": 2,
+        "text-[10px]": 5,
+        "w-[80px]": 1,
+        "text-[16px]": 1,
+        "text-[14px]": 3,
+        "w-[30px]": 1,
+        "h-[30px]": 1,
+        "w-[22px]": 1,
+        "h-[22px]": 1,
+        "text-[13px]": 9,
+        "w-[54px]": 1,
+        "w-[50px]": 1,
+        "text-[12.5px]": 6,
+        "text-[15px]": 2,
+        "max-w-[380px]": 1,
+        "max-w-[400px]": 1,
+        "text-[9.5px]": 4,
+        "w-[26px]": 1,
+        "h-[26px]": 1,
+        "min-w-[200px]": 2,
+        "text-[10.5px]": 4,
+        "w-[112px]": 4,
+        "w-[96px]": 2,
+        "w-[104px]": 5,
+        "w-[48px]": 2,
+        "w-[64px]": 2,
+        "w-[100px]": 2,
+        "w-[34px]": 2,
+        "w-[260px]": 1,
+        "max-h-[62dvh]": 1,
+        "min-w-[860px]": 2,
+        "pb-[96px]": 1
+      },
+      "color": {
+        "#f59e0b": 9,
+        "bg-amber-": 1,
+        "rgba(0,0,0,0.25)": 1,
+        "rgba(0,0,0,0.18)": 1,
+        "bg-black/": 2,
+        "bg-red-": 1
+      },
+      "modal": {
+        "fixed inset-0": 2
+      }
+    },
+    "app/modulos/compras/page.jsx": {
+      "medida": {
+        "text-[12px]": 1,
+        "text-[11px]": 1
+      }
+    },
+    "app/modulos/configuracion/apariencia/page.jsx": {
+      "medida": {
+        "text-[10px]": 2
+      },
+      "color": {
+        "bg-red-": 1
+      }
+    },
+    "app/modulos/configuracion/arqueo-caja/page.jsx": {
+      "medida": {
+        "text-[12px]": 4,
+        "text-[11px]": 1
+      }
+    },
+    "app/modulos/configuracion/listas-precios/page.jsx": {
+      "celda": {
+        "<td>": 6
+      }
+    },
+    "app/modulos/configuracion/mantenimiento/page.jsx": {
+      "color": {
+        "border-red-": 1,
+        "bg-black/": 1
+      },
+      "medida": {
+        "text-[12px]": 4,
+        "text-[11px]": 1
+      },
+      "modal": {
+        "fixed inset-0": 1
+      },
+      "crudo": {
+        "<input>": 1
+      }
+    },
+    "app/modulos/configuracion/pos-ventas/page.jsx": {
+      "color": {
+        "bg-green-": 1,
+        "bg-red-": 1
+      }
+    },
+    "app/modulos/configuracion/stock/page.jsx": {
+      "color": {
+        "bg-green-": 1,
+        "bg-red-": 1
+      }
+    },
+    "app/modulos/configuracion/ticket/page.jsx": {
+      "medida": {
+        "min-w-[180px]": 1,
+        "max-w-[240px]": 1,
+        "text-[10px]": 1,
+        "text-[12px]": 3,
+        "max-h-[80vh]": 1
+      },
+      "color": {
+        "text-red-": 1,
+        "#f5f5f5": 1
+      }
+    },
+    "app/modulos/fidelidad/page.jsx": {
+      "medida": {
+        "text-[11px]": 8,
+        "text-[10px]": 6
+      },
+      "crudo": {
+        "<button>": 3
+      }
+    },
+    "app/modulos/grupos/page.jsx": {
+      "medida": {
+        "min-w-[160px]": 1,
+        "text-[11px]": 2
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "app/modulos/locales/page.jsx": {
+      "celda": {
+        "<td>": 5
+      }
+    },
+    "app/modulos/notificaciones/page.jsx": {
+      "medida": {
+        "text-[13px]": 2,
+        "text-[11px]": 6,
+        "text-[10px]": 1
+      },
+      "crudo": {
+        "<button>": 2
+      }
+    },
+    "app/modulos/operadores/page.jsx": {
+      "celda": {
+        "<td>": 4
+      },
+      "medida": {
+        "text-[10px]": 2
+      }
+    },
+    "app/modulos/pedidos/historial/page.jsx": {
+      "medida": {
+        "text-[11px]": 6,
+        "text-[12px]": 3,
+        "text-[13px]": 1,
+        "text-[10px]": 5
+      },
+      "crudo": {
+        "<button>": 2
+      }
+    },
+    "app/modulos/pedidos/page.jsx": {
+      "crudo": {
+        "<button>": 14
+      },
+      "medida": {
+        "text-[11px]": 11,
+        "text-[12px]": 9,
+        "text-[13px]": 6,
+        "text-[18px]": 1,
+        "text-[10px]": 9,
+        "h-[32px]": 7,
+        "text-[16px]": 4,
+        "w-[32px]": 4,
+        "min-w-[36px]": 2
+      },
+      "color": {
+        "bg-red-": 1,
+        "text-red-": 1
+      }
+    },
+    "app/modulos/pos-transferencias/nueva/page.jsx": {
+      "crudo": {
+        "<button>": 2
+      },
+      "medida": {
+        "text-[11px]": 1
+      }
+    },
+    "app/modulos/pos-transferencias/page.jsx": {
+      "crudo": {
+        "<button>": 1
+      },
+      "medida": {
+        "text-[11px]": 13,
+        "text-[13px]": 4,
+        "text-[14px]": 3,
+        "text-[12px]": 1,
+        "text-[9px]": 1
+      }
+    },
+    "app/modulos/pos-ventas/aperturas/[cambioId]/page.jsx": {
+      "medida": {
+        "text-[12px]": 1,
+        "text-[11px]": 5,
+        "text-[10px]": 1,
+        "max-w-[1400px]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "app/modulos/pos-ventas/aperturas/page.jsx": {
+      "medida": {
+        "max-w-[720px]": 1,
+        "text-[11px]": 5,
+        "text-[12px]": 2
+      },
+      "crudo": {
+        "<button>": 2
+      }
+    },
+    "app/modulos/pos-ventas/aperturas/sin-cambio/page.jsx": {
+      "medida": {
+        "text-[12px]": 1,
+        "text-[11px]": 4,
+        "max-w-[1000px]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "app/modulos/pos-ventas/cierres/[token]/page.jsx": {
+      "medida": {
+        "text-[12px]": 1,
+        "text-[11px]": 3,
+        "max-w-[1400px]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "app/modulos/pos-ventas/cierres/iniciar/page.jsx": {
+      "medida": {
+        "text-[11px]": 2,
+        "max-w-[560px]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "app/modulos/pos-ventas/cierres/page.jsx": {
+      "medida": {
+        "max-w-[720px]": 1,
+        "text-[11px]": 3
+      },
+      "crudo": {
+        "<button>": 2
+      }
+    },
+    "app/modulos/pos-ventas/page.jsx": {
+      "medida": {
+        "text-[10px]": 6,
+        "text-[11px]": 9,
+        "min-w-[360px]": 1,
+        "max-w-[520px]": 1
+      },
+      "crudo": {
+        "<button>": 11,
+        "<input>": 1
+      },
+      "color": {
+        "bg-red-": 1
+      }
+    },
+    "app/modulos/pos-ventas/retiros/[token]/page.jsx": {
+      "medida": {
+        "text-[12px]": 1,
+        "text-[11px]": 4,
+        "max-w-[1400px]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "app/modulos/pos-ventas/retiros/nuevo/page.jsx": {
+      "medida": {
+        "text-[11px]": 2,
+        "max-w-[560px]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "app/modulos/productos/[id]/page.jsx": {
+      "medida": {
+        "text-[13px]": 1
+      }
+    },
+    "app/modulos/productos/editar-combo/[productoLocalId]/page.jsx": {
+      "color": {
+        "text-red-": 1
+      },
+      "medida": {
+        "text-[12px]": 1
+      }
+    },
+    "app/modulos/productos/page.jsx": {
+      "crudo": {
+        "<button>": 3,
+        "<input>": 1
+      },
+      "medida": {
+        "text-[13px]": 3,
+        "text-[10px]": 2,
+        "min-h-[24px]": 1,
+        "text-[11px]": 19,
+        "gap-[9px]": 1,
+        "text-[12px]": 14
+      },
+      "celda": {
+        "<td>": 48
+      }
+    },
+    "app/modulos/proveedores/listas/[id]/page.jsx": {
+      "medida": {
+        "text-[13px]": 1,
+        "text-[11px]": 9,
+        "text-[11.5px]": 3,
+        "text-[12.5px]": 2,
+        "text-[12px]": 3
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "app/modulos/proveedores/listas/nueva/page.jsx": {
+      "medida": {
+        "text-[11px]": 2,
+        "text-[12px]": 4,
+        "text-[11.5px]": 6,
+        "text-[10.5px]": 2,
+        "max-w-[720px]": 1
+      },
+      "crudo": {
+        "<button>": 2,
+        "<input>": 1
+      }
+    },
+    "app/modulos/proveedores/listas/page.jsx": {
+      "medida": {
+        "text-[11px]": 17,
+        "text-[12.5px]": 1,
+        "text-[11.5px]": 3,
+        "text-[12px]": 12,
+        "max-w-[24ch]": 1,
+        "text-[10px]": 1,
+        "text-[13px]": 1,
+        "max-w-[1600px]": 1
+      },
+      "crudo": {
+        "<input>": 1,
+        "<button>": 1
+      },
+      "celda": {
+        "<td>": 14
+      }
+    },
+    "app/modulos/proveedores/page.jsx": {
+      "crudo": {
+        "<input>": 1,
+        "<button>": 3
+      },
+      "celda": {
+        "<td>": 8
+      },
+      "medida": {
+        "text-[10.5px]": 1,
+        "py-[1px]": 1,
+        "text-[15px]": 1
+      }
+    },
+    "app/modulos/proveedores/recetas/page.jsx": {
+      "medida": {
+        "max-w-[1600px]": 1,
+        "text-[11px]": 1,
+        "w-[14px]": 1,
+        "min-w-[8rem]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "app/modulos/reportes-stock/page.jsx": {
+      "medida": {
+        "text-[12px]": 1,
+        "text-[13px]": 1,
+        "text-[11px]": 2
+      },
+      "celda": {
+        "<td>": 12
+      }
+    },
+    "app/modulos/reportes-ventas/[ventaId]/page.jsx": {
+      "medida": {
+        "text-[11px]": 4
+      }
+    },
+    "app/modulos/reportes-ventas/page.jsx": {
+      "medida": {
+        "text-[11px]": 11,
+        "text-[15px]": 1,
+        "text-[17px]": 1,
+        "text-[12px]": 2,
+        "max-w-[200px]": 1,
+        "text-[13px]": 1,
+        "max-w-[150px]": 1,
+        "text-[14px]": 1,
+        "max-w-[220px]": 1,
+        "text-[10px]": 1
+      },
+      "celda": {
+        "<td>": 19
+      },
+      "crudo": {
+        "<button>": 2
+      }
+    },
+    "app/modulos/roles/page.jsx": {
+      "celda": {
+        "<td>": 3
+      }
+    },
+    "app/modulos/transferencias/[id]/page.jsx": {
+      "medida": {
+        "text-[11px]": 2
+      }
+    },
+    "app/modulos/transferencias/page.jsx": {
+      "medida": {
+        "text-[11px]": 8,
+        "text-[12px]": 2,
+        "text-[14px]": 1,
+        "text-[15px]": 1,
+        "text-[10px]": 3,
+        "max-w-[260px]": 1
+      },
+      "crudo": {
+        "<button>": 4
+      },
+      "celda": {
+        "<td>": 9
+      }
+    },
+    "app/modulos/turnos/[id]/page.jsx": {
+      "color": {
+        "#000": 1
+      },
+      "medida": {
+        "text-[11px]": 6,
+        "text-[12px]": 2
+      },
+      "celda": {
+        "<td>": 5
+      },
+      "modal": {
+        "fixed inset-0": 1
+      }
+    },
+    "app/modulos/turnos/cambios-pendientes/page.jsx": {
+      "medida": {
+        "max-w-[1100px]": 1,
+        "text-[11px]": 11,
+        "text-[13px]": 1,
+        "text-[10px]": 1
+      },
+      "crudo": {
+        "<button>": 2
+      }
+    },
+    "app/modulos/turnos/page.jsx": {
+      "medida": {
+        "text-[11px]": 6,
+        "text-[12px]": 1
+      },
+      "crudo": {
+        "<button>": 2
+      },
+      "celda": {
+        "<td>": 14
+      }
+    },
+    "app/modulos/usuarios/page.jsx": {
+      "celda": {
+        "<td>": 5
+      }
+    },
+    "components/auditoria-pos-ventas/ResumenKpis.jsx": {
+      "medida": {
+        "text-[9px]": 1
+      }
+    },
+    "components/auditoria-pos-ventas/TablaMediosPago.jsx": {
+      "medida": {
+        "text-[11px]": 1,
+        "text-[10px]": 1,
+        "text-[9px]": 2,
+        "min-w-[520px]": 1,
+        "min-w-[540px]": 1
+      },
+      "celda": {
+        "<td>": 12
+      }
+    },
+    "components/auditoria-pos-ventas/TablaRentabilidadProductos.jsx": {
+      "medida": {
+        "text-[10px]": 2,
+        "text-[11px]": 1,
+        "text-[9px]": 1,
+        "min-w-[700px]": 1,
+        "min-w-[780px]": 1,
+        "max-w-[260px]": 1
+      },
+      "celda": {
+        "<td>": 8
+      }
+    },
+    "components/auditoria-pos-ventas/TablaTicketsConflictivos.jsx": {
+      "medida": {
+        "text-[10px]": 3,
+        "text-[11px]": 1,
+        "min-w-[820px]": 1,
+        "min-w-[960px]": 1,
+        "max-w-[100px]": 1
+      },
+      "celda": {
+        "<td>": 11
+      }
+    },
+    "components/auditoria/BitacoraAuditoria.jsx": {
+      "medida": {
+        "text-[13px]": 1,
+        "text-[11px]": 2
+      },
+      "celda": {
+        "<td>": 8
+      },
+      "color": {
+        "rgba(127,127,127,0.12)": 1
+      }
+    },
+    "components/auth/SinPermisos.jsx": {
+      "medida": {
+        "min-h-[60vh]": 1
+      },
+      "color": {
+        "text-red-": 1,
+        "text-slate-": 1
+      }
+    },
+    "components/caja/CifrasRetiro.jsx": {
+      "medida": {
+        "text-[11px]": 1,
+        "text-[10px]": 1,
+        "text-[12px]": 1,
+        "text-[13px]": 1
+      }
+    },
+    "components/caja/GrillaCambio.jsx": {
+      "medida": {
+        "text-[10px]": 1,
+        "text-[12px]": 1,
+        "text-[11px]": 1
+      },
+      "crudo": {
+        "<button>": 3
+      }
+    },
+    "components/caja/ModalCambioPrevio.jsx": {
+      "medida": {
+        "max-h-[92vh]": 1,
+        "max-h-[88vh]": 1,
+        "text-[12px]": 2,
+        "text-[10px]": 1
+      }
+    },
+    "components/caja/ModalProcesoPendiente.jsx": {
+      "modal": {
+        "fixed inset-0": 1
+      },
+      "medida": {
+        "max-h-[92vh]": 1,
+        "max-h-[88vh]": 1,
+        "text-[12px]": 2
+      }
+    },
+    "components/caja/PanelesApertura.jsx": {
+      "medida": {
+        "text-[11px]": 12,
+        "text-[12px]": 6,
+        "text-[13px]": 1,
+        "text-[10px]": 2
+      },
+      "crudo": {
+        "<input>": 1
+      }
+    },
+    "components/caja/PanelesCierre.jsx": {
+      "medida": {
+        "text-[11px]": 5,
+        "text-[12px]": 1,
+        "text-[13px]": 1
+      }
+    },
+    "components/caja/PanelesRetiro.jsx": {
+      "medida": {
+        "text-[11px]": 7,
+        "text-[12px]": 9,
+        "text-[10px]": 1
+      },
+      "crudo": {
+        "<button>": 2
+      }
+    },
+    "components/caja/TablaDenominaciones.jsx": {
+      "medida": {
+        "text-[10px]": 2
+      },
+      "crudo": {
+        "<button>": 3
+      }
+    },
+    "components/categorias/ModalCategoria.jsx": {
+      "medida": {
+        "text-[11px]": 2
+      }
+    },
+    "components/clientes/ModalMergeClientes.jsx": {
+      "medida": {
+        "max-h-[90vh]": 1,
+        "text-[11px]": 1,
+        "text-[10px]": 1
+      },
+      "color": {
+        "bg-emerald-": 1,
+        "text-emerald-": 1,
+        "text-slate-": 16,
+        "bg-slate-": 4,
+        "border-slate-": 1,
+        "bg-red-": 3
+      },
+      "crudo": {
+        "<button>": 3,
+        "<input>": 1
+      },
+      "celda": {
+        "<td>": 6
+      }
+    },
+    "components/compras-proveedor/CarritoPedido.jsx": {
+      "medida": {
+        "max-h-[46dvh]": 1,
+        "max-h-[42dvh]": 1,
+        "text-[12.5px]": 2,
+        "w-[24px]": 4,
+        "h-[24px]": 4,
+        "text-[15px]": 2,
+        "text-[12px]": 5,
+        "w-[50px]": 1,
+        "text-[10px]": 4,
+        "w-[74px]": 1,
+        "text-[13px]": 1,
+        "text-[11px]": 3,
+        "text-[10.5px]": 1,
+        "w-[26px]": 1,
+        "h-[26px]": 1,
+        "text-[16px]": 1,
+        "max-w-[420px]": 1
+      },
+      "crudo": {
+        "<button>": 7
+      },
+      "modal": {
+        "fixed inset-0": 2
+      },
+      "color": {
+        "bg-black/": 2,
+        "rgba(0,0,0,0.35)": 2
+      }
+    },
+    "components/compras-proveedor/FiltrosPedidosProveedor.jsx": {
+      "medida": {
+        "text-[11px]": 5,
+        "text-[13px]": 1
+      }
+    },
+    "components/compras-proveedor/ListadoPedidosProveedor.jsx": {
+      "celda": {
+        "<td>": 7
+      },
+      "medida": {
+        "text-[10px]": 2,
+        "text-[11px]": 1,
+        "text-[12px]": 1
+      }
+    },
+    "components/compras-proveedor/ModalEnviarPedido.jsx": {
+      "medida": {
+        "text-[11px]": 2
+      }
+    },
+    "components/compras-proveedor/ModalVincularCodigo.jsx": {
+      "medida": {
+        "text-[12px]": 3,
+        "text-[13px]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/compras-proveedor/ProveedoresPedidoHoy.jsx": {
+      "medida": {
+        "text-[12px]": 2,
+        "text-[11px]": 1
+      }
+    },
+    "components/comprobantes/PanelComprobantes.jsx": {
+      "celda": {
+        "<td>": 7
+      },
+      "medida": {
+        "max-w-[22rem]": 1
+      }
+    },
+    "components/dashboard/AccesosRapidos.jsx": {
+      "medida": {
+        "text-[13px]": 2,
+        "min-h-[84px]": 1,
+        "min-h-[80px]": 1
+      },
+      "color": {
+        "rgb(var(--module-${item.color})": 2
+      }
+    },
+    "components/dashboard/ActividadReciente.jsx": {
+      "medida": {
+        "max-h-[280px]": 1,
+        "text-[11px]": 1,
+        "text-[13px]": 2
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/dashboard/DashboardDesktop.jsx": {
+      "color": {
+        "text-amber-": 1,
+        "text-red-": 1
+      },
+      "crudo": {
+        "<button>": 1
+      },
+      "medida": {
+        "h-[300px]": 1,
+        "text-[11px]": 1,
+        "min-h-[280px]": 1
+      }
+    },
+    "components/dashboard/DashboardMobile.jsx": {
+      "color": {
+        "text-amber-": 1,
+        "text-red-": 1
+      },
+      "crudo": {
+        "<button>": 1
+      },
+      "medida": {
+        "text-[11px]": 1
+      }
+    },
+    "components/dashboard/KpiCard.jsx": {
+      "color": {
+        "bg-emerald-": 1,
+        "bg-amber-": 1
+      },
+      "medida": {
+        "text-[11px]": 1,
+        "text-[10px]": 2
+      }
+    },
+    "components/dashboard/ModalDetalleVenta.jsx": {
+      "modal": {
+        "fixed inset-0": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/dashboard/UltimasVentas.jsx": {
+      "medida": {
+        "min-h-[280px]": 1,
+        "max-w-[200px]": 1,
+        "max-h-[320px]": 1,
+        "text-[11px]": 2,
+        "text-[13px]": 1,
+        "text-[10px]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/dashboard/VentaDetalleContent.jsx": {
+      "medida": {
+        "max-w-[180px]": 1
+      },
+      "celda": {
+        "<td>": 4
+      }
+    },
+    "components/grupos/EditorGrupo.jsx": {
+      "medida": {
+        "text-[11px]": 2,
+        "max-w-[260px]": 1,
+        "min-w-[200px]": 1,
+        "text-[12px]": 2
+      }
+    },
+    "components/grupos/GrupoAvatar.jsx": {
+      "color": {
+        "bg-amber-": 1,
+        "bg-cyan-": 1,
+        "bg-emerald-": 1
+      }
+    },
+    "components/grupos/GrupoHeader.jsx": {
+      "medida": {
+        "min-w-[180px]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/grupos/GrupoItemRow.jsx": {
+      "color": {
+        "text-amber-": 1,
+        "text-cyan-": 1,
+        "bg-emerald-": 1
+      },
+      "medida": {
+        "text-[10px]": 1,
+        "py-[1px]": 1,
+        "text-[11px]": 1,
+        "pl-[23px]": 1
+      }
+    },
+    "components/grupos/GrupoListRow.jsx": {
+      "medida": {
+        "text-[11px]": 1
+      }
+    },
+    "components/grupos/ModalGrupo.jsx": {
+      "medida": {
+        "text-[11px]": 6
+      }
+    },
+    "components/grupos/TablaDepositos.jsx": {
+      "color": {
+        "text-gray-": 3,
+        "bg-red-": 1
+      },
+      "celda": {
+        "<td>": 3
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/grupos/TablaLocales.jsx": {
+      "color": {
+        "text-gray-": 3,
+        "bg-green-": 1,
+        "bg-red-": 1
+      },
+      "celda": {
+        "<td>": 3
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/inicio/ProveedoresDeHoyAlert.jsx": {
+      "medida": {
+        "text-[14px]": 1,
+        "text-[12px]": 1,
+        "text-[11px]": 1
+      }
+    },
+    "components/layout/AppLauncherTile.jsx": {
+      "color": {
+        "rgb(var(--module-${color})": 3,
+        "#ffffff": 2
+      },
+      "medida": {
+        "min-w-[22px]": 1,
+        "h-[22px]": 1,
+        "text-[11px]": 1,
+        "text-[13px]": 1,
+        "max-w-[112px]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/layout/InicioGreeting.jsx": {
+      "medida": {
+        "text-[22px]": 1,
+        "text-[13px]": 1,
+        "text-[28px]": 1
+      }
+    },
+    "components/layout/MobileNav.jsx": {
+      "medida": {
+        "min-h-[44px]": 4,
+        "min-w-[44px]": 2,
+        "text-[11px]": 1,
+        "min-h-[56px]": 1,
+        "text-[14px]": 1
+      },
+      "crudo": {
+        "<button>": 2
+      },
+      "color": {
+        "bg-black/": 1
+      },
+      "modal": {
+        "fixed inset-0": 1
+      }
+    },
+    "components/layout/SubmenuPanel.jsx": {
+      "medida": {
+        "w-[52px]": 1,
+        "h-[52px]": 1,
+        "text-[13px]": 1,
+        "text-[15px]": 1,
+        "text-[12px]": 1,
+        "max-h-[60vh]": 1
+      },
+      "color": {
+        "rgb(var(--module-${color})": 4
+      },
+      "modal": {
+        "fixed inset-0": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/layout/TopbarNav.jsx": {
+      "medida": {
+        "h-[44px]": 1,
+        "text-[12px]": 1,
+        "min-w-[220px]": 1,
+        "text-[10px]": 1,
+        "text-[13px]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/listas-precios/CardDefaultDeposito.jsx": {
+      "medida": {
+        "text-[12px]": 1,
+        "text-[11px]": 5
+      },
+      "color": {
+        "text-slate-": 3,
+        "bg-amber-": 1,
+        "text-amber-": 1
+      }
+    },
+    "components/listas-precios/ModalListaPrecio.jsx": {
+      "medida": {
+        "text-[11px]": 5
+      }
+    },
+    "components/listas-precios/ModalPreviewPrecio.jsx": {
+      "medida": {
+        "text-[11px]": 3,
+        "text-[12px]": 4,
+        "text-[13px]": 1,
+        "text-[20px]": 1
+      }
+    },
+    "components/locales/ModalLocal.jsx": {
+      "medida": {
+        "max-h-[65vh]": 1
+      }
+    },
+    "components/locales/SunmiTableLocales.jsx": {
+      "color": {
+        "bg-slate-": 2,
+        "text-slate-": 1
+      },
+      "medida": {
+        "text-[12px]": 2,
+        "text-[13px]": 1
+      },
+      "celda": {
+        "<td>": 2
+      }
+    },
+    "components/notificaciones/CampanaNotificaciones.jsx": {
+      "crudo": {
+        "<button>": 7
+      },
+      "medida": {
+        "text-[13px]": 1,
+        "text-[11px]": 4,
+        "text-[10px]": 2,
+        "min-w-[16px]": 1,
+        "h-[16px]": 1,
+        "leading-[16px]": 1,
+        "max-h-[80vh]": 1
+      },
+      "color": {
+        "bg-black/": 1
+      },
+      "modal": {
+        "fixed inset-0": 1
+      }
+    },
+    "components/notificaciones/PushControls.jsx": {
+      "medida": {
+        "text-[13px]": 1,
+        "text-[11px]": 2
+      }
+    },
+    "components/operador/ModalPedirOperador.jsx": {
+      "modal": {
+        "fixed inset-0": 1
+      }
+    },
+    "components/operador/OperadorSelector.jsx": {
+      "medida": {
+        "text-[10px]": 4,
+        "text-[11px]": 2,
+        "min-w-[240px]": 1,
+        "text-[9px]": 2
+      },
+      "crudo": {
+        "<button>": 2,
+        "<select>": 1
+      }
+    },
+    "components/operador/RequiereOperador.jsx": {
+      "medida": {
+        "text-[11px]": 1
+      }
+    },
+    "components/operadores/ModalOperador.jsx": {
+      "medida": {
+        "max-h-[65vh]": 1,
+        "text-[13px]": 1,
+        "text-[10px]": 1
+      },
+      "color": {
+        "border-emerald-": 1,
+        "border-slate-": 1
+      },
+      "crudo": {
+        "<input>": 1
+      }
+    },
+    "components/pos-transferencias/nueva/BuscadorManual.jsx": {
+      "crudo": {
+        "<button>": 3
+      },
+      "medida": {
+        "text-[10px]": 2,
+        "text-[11px]": 1
+      },
+      "color": {
+        "bg-red-": 1,
+        "text-red-": 1
+      }
+    },
+    "components/pos-transferencias/nueva/Encabezado.jsx": {
+      "medida": {
+        "text-[12px]": 1,
+        "text-[13px]": 6,
+        "text-[11px]": 4,
+        "text-[15px]": 1,
+        "text-[10px]": 1,
+        "h-[2px]": 1,
+        "text-[16px]": 1
+      }
+    },
+    "components/pos-transferencias/nueva/FiltrosDeposito.jsx": {
+      "medida": {
+        "text-[15px]": 1,
+        "h-[32px]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      },
+      "color": {
+        "bg-gray-": 1
+      }
+    },
+    "components/pos-transferencias/nueva/PreparadosTable.jsx": {
+      "medida": {
+        "text-[12px]": 3,
+        "text-[11px]": 8,
+        "w-[70px]": 2,
+        "w-[80px]": 2,
+        "w-[220px]": 1,
+        "w-[76px]": 1,
+        "text-[10px]": 11,
+        "text-[13px]": 6
+      },
+      "crudo": {
+        "<button>": 11
+      },
+      "celda": {
+        "<td>": 7
+      }
+    },
+    "components/pos-transferencias/nueva/ResumenPreparados.jsx": {
+      "color": {
+        "text-gray-": 1
+      }
+    },
+    "components/pos-transferencias/nueva/Separador.jsx": {
+      "medida": {
+        "text-[10px]": 1,
+        "text-[11px]": 1,
+        "h-[3px]": 1,
+        "top-[1px]": 1,
+        "h-[1px]": 1
+      }
+    },
+    "components/pos-transferencias/nueva/TablaSugeridos.jsx": {
+      "medida": {
+        "text-[12px]": 2,
+        "text-[11px]": 11,
+        "w-[85px]": 1,
+        "w-[140px]": 2,
+        "min-w-[140px]": 2,
+        "min-w-[200px]": 2,
+        "w-[72px]": 2,
+        "text-[10px]": 6,
+        "text-[13px]": 6,
+        "w-[76px]": 3,
+        "min-h-[14px]": 1
+      },
+      "crudo": {
+        "<button>": 10,
+        "<input>": 1
+      },
+      "celda": {
+        "<td>": 8
+      }
+    },
+    "components/pos-ventas/AvisoArqueo.jsx": {
+      "medida": {
+        "text-[12px]": 2,
+        "text-[11px]": 1
+      }
+    },
+    "components/pos-ventas/AvisoVentaInterna.jsx": {
+      "medida": {
+        "mt-[1px]": 1
+      }
+    },
+    "components/pos-ventas/BuscadorProductos.jsx": {
+      "tema-paralelo": {
+        "pos-text-muted": 4,
+        "pos-text-danger": 1,
+        "pos-bg-surface-interactive": 1,
+        "pos-text-accent": 1
+      },
+      "medida": {
+        "text-[11px]": 2
+      }
+    },
+    "components/pos-ventas/CarritoVenta.jsx": {
+      "medida": {
+        "text-[10px]": 8,
+        "w-[56px]": 1,
+        "text-[11px]": 2,
+        "max-w-[160px]": 1
+      },
+      "tema-paralelo": {
+        "pos-text-muted": 12,
+        "pos-text-muted-strong": 2,
+        "pos-text-link": 2,
+        "pos-text-success": 1,
+        "pos-text-accent": 2,
+        "pos-text-danger": 5,
+        "pos-bg-surface": 1,
+        "pos-bg-row": 1,
+        "pos-bg-row-hover": 1
+      },
+      "crudo": {
+        "<button>": 14
+      },
+      "celda": {
+        "<td>": 5
+      }
+    },
+    "components/pos-ventas/ClientePickerFullscreen.jsx": {
+      "modal": {
+        "fixed inset-0": 1
+      },
+      "medida": {
+        "text-[11px]": 2
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/pos-ventas/FormaPago.jsx": {
+      "crudo": {
+        "<button>": 10,
+        "<select>": 1
+      },
+      "tema-paralelo": {
+        "pos-text-link": 2,
+        "pos-text-muted": 8,
+        "pos-text-accent": 4,
+        "pos-text-danger": 3,
+        "pos-text-success-soft": 2,
+        "pos-bg-panel": 1,
+        "pos-text-muted-strong": 1,
+        "pos-text-points": 1
+      },
+      "medida": {
+        "text-[11px]": 2,
+        "text-[10px]": 2
+      }
+    },
+    "components/pos-ventas/HistorialArqueos.jsx": {
+      "medida": {
+        "text-[11px]": 5,
+        "text-[14px]": 1,
+        "text-[12px]": 5,
+        "text-[13px]": 1,
+        "max-w-[200px]": 1,
+        "text-[10px]": 1
+      },
+      "celda": {
+        "<td>": 11
+      }
+    },
+    "components/pos-ventas/HistorialDia.jsx": {
+      "modal": {
+        "fixed inset-0": 2
+      },
+      "medida": {
+        "text-[11px]": 3,
+        "text-[10px]": 3
+      },
+      "crudo": {
+        "<button>": 1,
+        "<input>": 1
+      }
+    },
+    "components/pos-ventas/IconosMedios.jsx": {
+      "color": {
+        "#27ae60": 1,
+        "#a7f3d0": 1,
+        "#ffffff": 3,
+        "#1e874b": 1,
+        "#fcd34d": 1,
+        "#2f80ed": 1,
+        "#1b4fa8": 1,
+        "#8b5cf6": 1,
+        "#5b21b6": 1
+      }
+    },
+    "components/pos-ventas/ModalAperturaTurno.jsx": {
+      "modal": {
+        "fixed inset-0": 1
+      },
+      "medida": {
+        "text-[12px]": 3,
+        "text-[11px]": 1
+      },
+      "color": {
+        "#f59e0b": 2
+      }
+    },
+    "components/pos-ventas/ModalArqueoCaja.jsx": {
+      "color": {
+        "bg-black/": 1
+      },
+      "modal": {
+        "fixed inset-0": 1
+      },
+      "medida": {
+        "max-h-[92vh]": 1,
+        "text-[12px]": 5,
+        "text-[11px]": 2
+      }
+    },
+    "components/pos-ventas/ModalCajaMovimiento.jsx": {
+      "color": {
+        "bg-black/": 1,
+        "bg-green-": 1,
+        "bg-red-": 1,
+        "text-red-": 2
+      },
+      "modal": {
+        "fixed inset-0": 1
+      },
+      "medida": {
+        "text-[12px]": 1,
+        "text-[11px]": 1
+      },
+      "crudo": {
+        "<button>": 2
+      }
+    },
+    "components/pos-ventas/ModalCanjePuntos.jsx": {
+      "modal": {
+        "fixed inset-0": 1
+      },
+      "medida": {
+        "text-[10px]": 1,
+        "text-[11px]": 1
+      }
+    },
+    "components/pos-ventas/ModalCierreTurno.jsx": {
+      "modal": {
+        "fixed inset-0": 2
+      },
+      "medida": {
+        "text-[12px]": 4
+      }
+    },
+    "components/pos-ventas/ModalConfirmacion.jsx": {
+      "modal": {
+        "fixed inset-0": 1
+      }
+    },
+    "components/pos-ventas/ModalDescuento.jsx": {
+      "modal": {
+        "fixed inset-0": 1
+      },
+      "tema-paralelo": {
+        "pos-bg-panel": 1,
+        "pos-text-muted": 1,
+        "pos-text-success-soft": 1,
+        "pos-text-success": 1
+      },
+      "crudo": {
+        "<button>": 2
+      }
+    },
+    "components/pos-ventas/ModalImporteServicio.jsx": {
+      "modal": {
+        "fixed inset-0": 1
+      },
+      "medida": {
+        "max-h-[90vh]": 1
+      },
+      "tema-paralelo": {
+        "pos-text-muted": 4,
+        "pos-bg-panel": 1,
+        "pos-text-accent": 1,
+        "pos-text-danger": 1
+      }
+    },
+    "components/pos-ventas/ModalPagoEfectivo.jsx": {
+      "modal": {
+        "fixed inset-0": 1
+      },
+      "medida": {
+        "max-h-[90vh]": 1
+      },
+      "tema-paralelo": {
+        "pos-bg-panel": 1,
+        "pos-text-muted": 2,
+        "pos-text-accent": 1,
+        "pos-text-success-soft": 1,
+        "pos-text-success": 1,
+        "pos-text-danger": 1
+      }
+    },
+    "components/pos-ventas/ModalPendientesOffline.jsx": {
+      "modal": {
+        "fixed inset-0": 1
+      },
+      "medida": {
+        "max-h-[85vh]": 1,
+        "text-[11px]": 3
+      },
+      "crudo": {
+        "<button>": 3
+      }
+    },
+    "components/pos-ventas/ModalPesoKg.jsx": {
+      "modal": {
+        "fixed inset-0": 1
+      },
+      "tema-paralelo": {
+        "pos-text-muted": 4,
+        "pos-bg-panel": 1,
+        "pos-text-accent": 1
+      },
+      "crudo": {
+        "<button>": 2
+      },
+      "medida": {
+        "text-[11px]": 1
+      }
+    },
+    "components/pos-ventas/ModalTicket.jsx": {
+      "modal": {
+        "fixed inset-0": 1
+      }
+    },
+    "components/pos-ventas/ModalTicketOffline.jsx": {
+      "color": {
+        "#000": 5,
+        "#dc2626": 1,
+        "#333": 1
+      },
+      "modal": {
+        "fixed inset-0": 1
+      }
+    },
+    "components/pos-ventas/StatsDelDia.jsx": {
+      "medida": {
+        "text-[11px]": 1
+      },
+      "tema-paralelo": {
+        "pos-text-muted": 3,
+        "pos-text-link": 1,
+        "pos-text-accent": 1,
+        "pos-text-success": 1
+      }
+    },
+    "components/pos-ventas/TicketEditor.jsx": {
+      "medida": {
+        "text-[10px]": 6,
+        "text-[11px]": 1,
+        "text-[12px]": 1
+      },
+      "crudo": {
+        "<input>": 3
+      }
+    },
+    "components/pos-ventas/TicketPreview.jsx": {
+      "color": {
+        "#fff": 1,
+        "#000": 8,
+        "rgba(0,0,0,0.15)": 1
+      }
+    },
+    "components/productos/AvisoCambioDeEscala.jsx": {
+      "medida": {
+        "text-[12px]": 2
+      }
+    },
+    "components/productos/CargarFotoProducto.jsx": {
+      "medida": {
+        "w-[96px]": 2,
+        "h-[96px]": 2,
+        "text-[10px]": 2,
+        "w-[64px]": 1,
+        "h-[64px]": 1
+      },
+      "crudo": {
+        "<input>": 1
+      }
+    },
+    "components/productos/CarruselControles.jsx": {
+      "crudo": {
+        "<button>": 2
+      },
+      "medida": {
+        "min-h-[44px]": 1,
+        "text-[11.5px]": 1,
+        "text-[10.5px]": 2,
+        "text-[12px]": 1
+      }
+    },
+    "components/productos/ColumnManager.jsx": {
+      "medida": {
+        "text-[12px]": 1
+      },
+      "crudo": {
+        "<input>": 1
+      }
+    },
+    "components/productos/EditorComponentesCombo.jsx": {
+      "medida": {
+        "text-[11px]": 3,
+        "text-[12px]": 2,
+        "text-[10px]": 1
+      },
+      "celda": {
+        "<td>": 7
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/productos/FiltrosProductos.jsx": {
+      "crudo": {
+        "<button>": 1
+      },
+      "color": {
+        "bg-red-": 1,
+        "text-red-": 1
+      }
+    },
+    "components/productos/FormCombo.jsx": {
+      "medida": {
+        "text-[13px]": 5,
+        "text-[11px]": 16,
+        "text-[10px]": 3,
+        "text-[12px]": 3
+      }
+    },
+    "components/productos/FormProducto.jsx": {
+      "medida": {
+        "text-[12px]": 6,
+        "text-[9px]": 1,
+        "text-[13px]": 1
+      },
+      "color": {
+        "text-slate-": 15,
+        "bg-red-": 1,
+        "text-amber-": 1,
+        "border-slate-": 1
+      }
+    },
+    "components/productos/HojaMasAcciones.jsx": {
+      "crudo": {
+        "<button>": 1
+      },
+      "medida": {
+        "min-h-[44px]": 1,
+        "text-[13px]": 1,
+        "text-[10.5px]": 1
+      }
+    },
+    "components/productos/HojaPersonalizarTarjeta.jsx": {
+      "medida": {
+        "text-[10.5px]": 2,
+        "text-[13px]": 2,
+        "min-h-[44px]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/productos/ModalProductoFinal.jsx": {
+      "medida": {
+        "max-h-[70vh]": 1
+      }
+    },
+    "components/productos/ModalVerComposicion.jsx": {
+      "medida": {
+        "text-[12px]": 5,
+        "text-[14px]": 1,
+        "text-[10.5px]": 3,
+        "py-[1px]": 3,
+        "text-[11px]": 3,
+        "text-[13px]": 1,
+        "text-[10px]": 2
+      },
+      "celda": {
+        "<td>": 6
+      }
+    },
+    "components/productos/SeccionCodigosProveedor.jsx": {
+      "medida": {
+        "text-[13px]": 3,
+        "text-[12px]": 6
+      },
+      "crudo": {
+        "<button>": 3
+      }
+    },
+    "components/productos/SunmiTablaProductos.jsx": {
+      "medida": {
+        "w-[56px]": 4,
+        "w-[140px]": 1,
+        "w-[120px]": 1,
+        "w-[90px]": 4,
+        "min-w-[220px]": 1,
+        "text-[9px]": 2,
+        "py-[2px]": 1,
+        "w-[100px]": 4,
+        "w-[80px]": 4,
+        "w-[70px]": 2,
+        "text-[10.5px]": 1,
+        "py-[1px]": 1,
+        "text-[12px]": 1,
+        "w-[26px]": 6,
+        "h-[26px]": 6
+      },
+      "color": {
+        "bg-red-": 1
+      },
+      "celda": {
+        "<td>": 2
+      },
+      "crudo": {
+        "<button>": 6
+      }
+    },
+    "components/productos/TablaProductos.jsx": {
+      "color": {
+        "border-slate-": 2,
+        "bg-slate-": 2,
+        "text-amber-": 1,
+        "text-red-": 1
+      },
+      "medida": {
+        "text-[13px]": 1,
+        "text-[15px]": 2
+      },
+      "celda": {
+        "<td>": 2
+      },
+      "crudo": {
+        "<button>": 2
+      }
+    },
+    "components/productos/TarjetaProductoMovil.jsx": {
+      "medida": {
+        "min-h-[51.5px]": 1,
+        "w-[202px]": 1,
+        "text-[9px]": 1,
+        "text-[25px]": 1,
+        "w-[44px]": 1,
+        "h-[44px]": 1,
+        "text-[10px]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/productos/VoiceFieldButton.jsx": {
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/productos/VoiceProductWizard.jsx": {
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/productos/actualizacion-precios/ActualizacionPreciosPage.jsx": {
+      "medida": {
+        "max-w-[510px]": 1,
+        "text-[11px]": 17,
+        "max-w-[200px]": 3,
+        "text-[12px]": 3
+      },
+      "celda": {
+        "<td>": 18
+      },
+      "color": {
+        "text-amber-": 2,
+        "border-amber-": 1,
+        "border-cyan-": 1,
+        "bg-amber-": 2,
+        "bg-black/": 1,
+        "bg-red-": 1,
+        "bg-emerald-": 1
+      },
+      "crudo": {
+        "<button>": 1,
+        "<input>": 3
+      },
+      "modal": {
+        "fixed inset-0": 1
+      }
+    },
+    "components/productos/actualizacion-precios/PreviewPreciosTable.jsx": {
+      "crudo": {
+        "<input>": 2
+      },
+      "celda": {
+        "<td>": 8
+      },
+      "color": {
+        "text-amber-": 1
+      }
+    },
+    "components/proveedores/ModalCodigosProveedor.jsx": {
+      "medida": {
+        "max-h-[65vh]": 1,
+        "text-[13px]": 1,
+        "text-[12px]": 1
+      },
+      "color": {
+        "text-red-": 1
+      }
+    },
+    "components/proveedores/ModalProveedor.jsx": {
+      "medida": {
+        "text-[11px]": 1
+      }
+    },
+    "components/proveedores/listas/BotonReporte.jsx": {
+      "medida": {
+        "text-[11.5px]": 2,
+        "max-w-[26rem]": 1,
+        "text-[10px]": 1,
+        "text-[9.5px]": 1,
+        "text-[10.5px]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/proveedores/listas/CabeceraCatalogo.jsx": {
+      "crudo": {
+        "<button>": 2
+      },
+      "medida": {
+        "text-[22px]": 1,
+        "text-[11px]": 2,
+        "text-[9.5px]": 2,
+        "text-[13.5px]": 1,
+        "text-[10px]": 1
+      }
+    },
+    "components/proveedores/listas/DiagnosticoArchivo.jsx": {
+      "medida": {
+        "text-[15px]": 1,
+        "text-[10px]": 3,
+        "text-[9px]": 1,
+        "text-[11.5px]": 1,
+        "text-[10.5px]": 3,
+        "text-[11px]": 1,
+        "text-[9.5px]": 1
+      },
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/proveedores/listas/InterpretacionesFila.jsx": {
+      "crudo": {
+        "<button>": 1,
+        "<input>": 1
+      },
+      "medida": {
+        "min-w-[13.5rem]": 1,
+        "text-[11.5px]": 1,
+        "text-[9px]": 2,
+        "text-[13px]": 1,
+        "text-[10.5px]": 1,
+        "text-[9.5px]": 1,
+        "text-[10px]": 3,
+        "text-[11px]": 2
+      }
+    },
+    "components/proveedores/listas/ModalRevertir.jsx": {
+      "medida": {
+        "text-[22px]": 1,
+        "text-[11px]": 1,
+        "text-[12px]": 2,
+        "text-[11.5px]": 2,
+        "text-[10.5px]": 7,
+        "text-[10px]": 1
+      }
+    },
+    "components/proveedores/listas/ModalTerminar.jsx": {
+      "medida": {
+        "text-[22px]": 1,
+        "text-[11.5px]": 3,
+        "text-[10.5px]": 1
+      }
+    },
+    "components/proveedores/listas/PanelAplicar.jsx": {
+      "medida": {
+        "text-[12.5px]": 4,
+        "text-[11.5px]": 11,
+        "text-[10.5px]": 1,
+        "text-[11px]": 2,
+        "text-[12px]": 8,
+        "max-h-[320px]": 1
+      },
+      "crudo": {
+        "<input>": 1,
+        "<button>": 1
+      }
+    },
+    "components/proveedores/listas/PanelDecision.jsx": {
+      "medida": {
+        "text-[9px]": 2,
+        "text-[11.5px]": 2,
+        "text-[9.5px]": 4,
+        "text-[10px]": 3,
+        "text-[11px]": 4,
+        "text-[12px]": 3,
+        "text-[10.5px]": 12,
+        "text-[16px]": 1,
+        "text-[20px]": 1
+      },
+      "crudo": {
+        "<input>": 1,
+        "<button>": 2
+      }
+    },
+    "components/proveedores/listas/PanelMacheo.jsx": {
+      "crudo": {
+        "<button>": 1
+      },
+      "medida": {
+        "text-[19px]": 3,
+        "text-[11.5px]": 4,
+        "text-[10.5px]": 4,
+        "text-[13.5px]": 1,
+        "text-[11px]": 2
+      }
+    },
+    "components/proveedores/listas/PanelProducto.jsx": {
+      "medida": {
+        "text-[9.5px]": 4,
+        "text-[11.5px]": 1,
+        "text-[10px]": 1,
+        "text-[12px]": 2,
+        "text-[10.5px]": 6,
+        "text-[11px]": 1
+      },
+      "crudo": {
+        "<input>": 1
+      }
+    },
+    "components/proveedores/listas/PanelVincular.jsx": {
+      "medida": {
+        "text-[13px]": 2,
+        "text-[11px]": 12,
+        "text-[12.5px]": 2,
+        "max-h-[280px]": 1,
+        "text-[10.5px]": 1,
+        "text-[12px]": 2
+      },
+      "crudo": {
+        "<button>": 2
+      }
+    },
+    "components/proveedores/listas/PiezasListas.jsx": {
+      "medida": {
+        "text-[10.5px]": 9,
+        "py-[2px]": 1,
+        "text-[11px]": 7,
+        "text-[12.5px]": 1,
+        "text-[12px]": 9,
+        "text-[10px]": 4,
+        "max-w-[22ch]": 1,
+        "max-w-[24ch]": 1,
+        "text-[13px]": 1,
+        "text-[11.5px]": 2
+      },
+      "crudo": {
+        "<button>": 4,
+        "<input>": 1
+      },
+      "celda": {
+        "<td>": 10
+      }
+    },
+    "components/proveedores/listas/ResumenConciliacion.jsx": {
+      "crudo": {
+        "<button>": 4
+      },
+      "medida": {
+        "text-[20px]": 1,
+        "text-[17px]": 1,
+        "text-[10.5px]": 7,
+        "text-[9.5px]": 2,
+        "text-[13px]": 1,
+        "text-[10px]": 2,
+        "text-[11.5px]": 1
+      }
+    },
+    "components/proveedores/listas/TablaCatalogo.jsx": {
+      "medida": {
+        "max-w-[9rem]": 2,
+        "max-w-[22rem]": 2,
+        "text-[9.5px]": 4,
+        "text-[10px]": 1
+      }
+    },
+    "components/proveedores/listas/VistaProductosSistema.jsx": {
+      "medida": {
+        "text-[11px]": 6,
+        "text-[10.5px]": 2,
+        "text-[14px]": 1,
+        "text-[11.5px]": 1,
+        "text-[12px]": 4,
+        "max-w-[20rem]": 1,
+        "text-[10px]": 2,
+        "max-w-[12rem]": 1,
+        "max-w-[18rem]": 1
+      },
+      "celda": {
+        "<td>": 7
+      }
+    },
+    "components/reportes-ventas/AccionesTicket.jsx": {
+      "medida": {
+        "text-[12px]": 8,
+        "text-[11px]": 7,
+        "text-[13px]": 2
+      },
+      "crudo": {
+        "<button>": 2
+      }
+    },
+    "components/reportes-ventas/CintaVentaAnulada.jsx": {
+      "medida": {
+        "text-[12px]": 1
+      }
+    },
+    "components/reportes-ventas/EditorVentaCorreccion.jsx": {
+      "medida": {
+        "text-[10px]": 8,
+        "text-[11px]": 15,
+        "max-w-[240px]": 1,
+        "w-[56px]": 1,
+        "w-[90px]": 1,
+        "text-[13px]": 11,
+        "w-[110px]": 1,
+        "text-[12px]": 12
+      },
+      "crudo": {
+        "<button>": 4
+      },
+      "celda": {
+        "<td>": 8
+      }
+    },
+    "components/reportes-ventas/LineaEditableCard.jsx": {
+      "medida": {
+        "text-[10px]": 7,
+        "text-[11px]": 6,
+        "text-[12px]": 2,
+        "w-[64px]": 1,
+        "w-[90px]": 1
+      },
+      "crudo": {
+        "<button>": 2
+      }
+    },
+    "components/reportes-ventas/ReporteVentasPorCliente.jsx": {
+      "medida": {
+        "text-[11px]": 9,
+        "text-[12px]": 2,
+        "text-[15px]": 1,
+        "text-[10px]": 2,
+        "text-[13px]": 1
+      },
+      "crudo": {
+        "<button>": 2
+      }
+    },
+    "components/reportes-ventas/VentaDetalleAdmin.jsx": {
+      "medida": {
+        "text-[10px]": 4,
+        "text-[11px]": 9,
+        "text-[12px]": 2,
+        "text-[14px]": 1,
+        "text-[15px]": 1,
+        "text-[13px]": 1
+      },
+      "celda": {
+        "<td>": 7
+      }
+    },
+    "components/roles/ModalRol.jsx": {
+      "medida": {
+        "max-h-[65vh]": 1
+      }
+    },
+    "components/sidebar/SidebarGroup.jsx": {
+      "crudo": {
+        "<button>": 1
+      }
+    },
+    "components/sidebar/SidebarMobile.jsx": {
+      "crudo": {
+        "<button>": 2
+      },
+      "color": {
+        "text-slate-": 5,
+        "bg-black/": 1
+      },
+      "modal": {
+        "fixed inset-0": 1
+      },
+      "medida": {
+        "min-h-[44px]": 1
+      }
+    },
+    "components/sidebar/SidebarPro.jsx": {
+      "color": {
+        "text-slate-": 3,
+        "bg-black/": 1,
+        "rgba(0,0,0,0.45)": 1
+      },
+      "medida": {
+        "text-[8px]": 2
+      },
+      "modal": {
+        "fixed inset-0": 1
+      }
+    },
+    "components/stock_locales/ColumnPicker.jsx": {
+      "crudo": {
+        "<button>": 1,
+        "<input>": 1
+      },
+      "medida": {
+        "text-[11px]": 2,
+        "min-w-[180px]": 1,
+        "text-[12px]": 1
+      }
+    },
+    "components/stock_locales/FiltrosStock.jsx": {
+      "crudo": {
+        "<button>": 1
+      },
+      "color": {
+        "text-red-": 1
+      }
+    },
+    "components/stock_locales/ModalAjuste.jsx": {
+      "color": {
+        "bg-black/": 1,
+        "text-slate-": 2
+      },
+      "modal": {
+        "fixed inset-0": 1
+      },
+      "crudo": {
+        "<button>": 2,
+        "<input>": 3
+      },
+      "medida": {
+        "text-[14px]": 1,
+        "text-[12px]": 1,
+        "text-[13px]": 6,
+        "text-[11px]": 6
+      }
+    },
+    "components/stock_locales/ModalLimites.jsx": {
+      "color": {
+        "bg-black/": 1
+      },
+      "modal": {
+        "fixed inset-0": 1
+      },
+      "crudo": {
+        "<button>": 2
+      },
+      "medida": {
+        "text-[14px]": 1,
+        "text-[12px]": 1,
+        "text-[11px]": 2,
+        "text-[13px]": 1
+      }
+    },
+    "components/stock_locales/TablaStock.jsx": {
+      "medida": {
+        "text-[10px]": 4,
+        "text-[13px]": 2,
+        "text-[12px]": 2,
+        "text-[11px]": 2
+      },
+      "celda": {
+        "<td>": 10
+      },
+      "crudo": {
+        "<button>": 4
+      }
+    },
+    "components/sunmi/SunmiBadge.jsx": {
+      "medida": {
+        "text-[11px]": 1
+      }
+    },
+    "components/sunmi/SunmiBadgeEstado.jsx": {
+      "medida": {
+        "py-[1px]": 1,
+        "text-[10.5px]": 1
+      }
+    },
+    "components/sunmi/SunmiButtonIcon.jsx": {
+      "color": {
+        "text-amber-": 1,
+        "text-red-": 1,
+        "text-slate-": 1
+      }
+    },
+    "components/sunmi/SunmiCampoBusquedaVoz.jsx": {
+      "tema-paralelo": {
+        "pos-text-danger": 1
+      }
+    },
+    "components/sunmi/SunmiCardHeader.jsx": {
+      "color": {
+        "text-slate-": 1
+      },
+      "medida": {
+        "text-[15px]": 1,
+        "text-[11px]": 1
+      }
+    },
+    "components/sunmi/SunmiDateRangePicker.jsx": {
+      "color": {
+        "#e0e0e0": 1,
+        "rgba(0,0,0,0.12)": 1,
+        "#666": 1
+      }
+    },
+    "components/sunmi/SunmiEntityCard.jsx": {
+      "medida": {
+        "mt-[2px]": 1
+      }
+    },
+    "components/sunmi/SunmiHeader.jsx": {
+      "medida": {
+        "text-[13px]": 1,
+        "text-[11px]": 1
+      }
+    },
+    "components/sunmi/SunmiListCardItem.jsx": {
+      "medida": {
+        "h-[1px]": 1
+      }
+    },
+    "components/sunmi/SunmiListCardRemove.jsx": {
+      "color": {
+        "bg-slate-": 1
+      }
+    },
+    "components/sunmi/SunmiListItem.jsx": {
+      "color": {
+        "text-slate-": 2,
+        "bg-slate-": 1
+      },
+      "medida": {
+        "mt-[2px]": 1,
+        "text-[13px]": 1,
+        "text-[11px]": 1
+      }
+    },
+    "components/sunmi/SunmiLoader.jsx": {
+      "color": {
+        "border-slate-": 1
+      }
+    },
+    "components/sunmi/SunmiModalLayout.jsx": {
+      "medida": {
+        "max-h-[90vh]": 1
+      }
+    },
+    "components/sunmi/SunmiPageSizer.jsx": {
+      "medida": {
+        "text-[11px]": 2
+      }
+    },
+    "components/sunmi/SunmiPaginador.jsx": {
+      "medida": {
+        "min-w-[44px]": 2,
+        "min-h-[44px]": 4,
+        "text-[13px]": 1,
+        "text-[11px]": 2,
+        "text-[12px]": 1
+      }
+    },
+    "components/sunmi/SunmiPill.jsx": {
+      "medida": {
+        "py-[1px]": 1,
+        "text-[10.5px]": 1
+      }
+    },
+    "components/sunmi/SunmiProductoCard.jsx": {
+      "medida": {
+        "px-[13px]": 1,
+        "h-[44px]": 1,
+        "pt-[9px]": 1,
+        "text-[10.5px]": 1,
+        "text-[15px]": 1,
+        "text-[11.5px]": 1,
+        "min-h-[30px]": 1
+      }
+    },
+    "components/sunmi/SunmiSection.jsx": {
+      "medida": {
+        "text-[13px]": 1,
+        "text-[11px]": 1
+      }
+    },
+    "components/sunmi/SunmiSelect.jsx": {
+      "medida": {
+        "text-[13px]": 1
+      }
+    },
+    "components/sunmi/SunmiSelectAdv.jsx": {
+      "medida": {
+        "text-[13px]": 2,
+        "text-[12px]": 2
+      }
+    },
+    "components/sunmi/SunmiSelectConCrearRapido.jsx": {
+      "medida": {
+        "text-[11px]": 2
+      },
+      "color": {
+        "bg-black/": 1,
+        "bg-red-": 1
+      },
+      "modal": {
+        "fixed inset-0": 1
+      }
+    },
+    "components/sunmi/SunmiSelectorUnidad.jsx": {
+      "medida": {
+        "pt-[9px]": 1,
+        "text-[11.5px]": 1,
+        "rounded-[10px]": 1,
+        "text-[10.5px]": 1
+      }
+    },
+    "components/sunmi/SunmiSeparator.jsx": {
+      "color": {
+        "bg-slate-": 1,
+        "text-slate-": 1
+      },
+      "medida": {
+        "text-[12px]": 1
+      }
+    },
+    "components/sunmi/SunmiTable.jsx": {
+      "medida": {
+        "max-h-[70dvh]": 1,
+        "text-[12px]": 1
+      }
+    },
+    "components/sunmi/SunmiTableEmpty.jsx": {
+      "medida": {
+        "text-[12px]": 1
+      }
+    },
+    "components/sunmi/SunmiToast.jsx": {
+      "color": {
+        "#1e293b": 1,
+        "#f1f5f9": 1,
+        "#334155": 1,
+        "#10b981": 1,
+        "#fff": 2,
+        "#ef4444": 1
+      }
+    },
+    "components/sunmi/SunmiToggle.jsx": {
+      "color": {
+        "text-slate-": 1,
+        "bg-slate-": 1
+      },
+      "medida": {
+        "text-[12px]": 1
+      }
+    },
+    "components/sunmi/SunmiToggleEstado.jsx": {
+      "color": {
+        "bg-green-": 1,
+        "text-slate-": 1,
+        "bg-slate-": 1
+      },
+      "medida": {
+        "text-[12px]": 1
+      }
+    },
+    "components/sunmi/SunmiUserCell.jsx": {
+      "color": {
+        "bg-amber-": 1,
+        "text-slate-": 3
+      }
+    },
+    "components/transferencias/CardTransferencia.jsx": {
+      "medida": {
+        "text-[15px]": 1,
+        "text-[10px]": 1,
+        "text-[17px]": 1,
+        "text-[11px]": 2,
+        "text-[12px]": 1
+      }
+    },
+    "components/transferencias/ColumnSettingsPanel.jsx": {
+      "medida": {
+        "text-[11px]": 1,
+        "text-[12px]": 1
+      },
+      "crudo": {
+        "<input>": 1
+      }
+    },
+    "components/transferencias/EstadoTransferenciaBadge.jsx": {
+      "medida": {
+        "text-[11px]": 1,
+        "text-[10px]": 1
+      }
+    },
+    "components/transferencias/FilaTransferencia.jsx": {
+      "medida": {
+        "text-[11px]": 4,
+        "max-w-[110px]": 1,
+        "max-w-[180px]": 1,
+        "text-[13px]": 1,
+        "max-w-[130px]": 1,
+        "max-w-[200px]": 1,
+        "text-[10px]": 1,
+        "text-[14px]": 1
+      },
+      "celda": {
+        "<td>": 9
+      }
+    },
+    "components/transferencias/ReporteTransferenciasPorDestino.jsx": {
+      "medida": {
+        "text-[11px]": 7,
+        "text-[12px]": 3,
+        "text-[15px]": 1,
+        "text-[10px]": 2,
+        "text-[13px]": 1
+      },
+      "crudo": {
+        "<button>": 2
+      }
+    },
+    "components/transferencias/TablaDetalleTransferencia.jsx": {
+      "medida": {
+        "text-[14px]": 1,
+        "text-[15px]": 1,
+        "text-[11px]": 4,
+        "text-[12px]": 3,
+        "text-[13px]": 1
+      },
+      "celda": {
+        "<td>": 11
+      }
+    },
+    "components/transferencias/TransferenciaHeader.jsx": {
+      "medida": {
+        "text-[11px]": 1
+      }
+    },
+    "components/transferencias/detallePresentacion.jsx": {
+      "medida": {
+        "text-[10px]": 1,
+        "text-[11px]": 3
+      }
+    },
+    "components/turnos/ArqueosDelTurno.jsx": {
+      "medida": {
+        "text-[11px]": 10,
+        "text-[12px]": 1
+      }
+    },
+    "components/turnos/CircuitoDelDinero.jsx": {
+      "medida": {
+        "text-[12px]": 8,
+        "text-[11px]": 6
+      }
+    },
+    "components/turnos/ResumenCierre.jsx": {
+      "medida": {
+        "text-[11px]": 2,
+        "text-[12px]": 4
+      }
+    },
+    "components/usuarios/CeldaUsuario.jsx": {
+      "color": {
+        "text-slate-": 2
+      }
+    },
+    "components/usuarios/ModalUsuario.jsx": {
+      "medida": {
+        "max-h-[65vh]": 1
+      }
+    },
+    "components/usuarios/SunmiTableUsuarios.jsx": {
+      "color": {
+        "bg-slate-": 3,
+        "text-slate-": 1
+      },
+      "medida": {
+        "text-[12px]": 5
+      },
+      "celda": {
+        "<td>": 2
+      }
+    },
+    "components/version/AvisoVersionNueva.jsx": {
+      "medida": {
+        "text-[12px]": 1
+      }
     }
   }
 }

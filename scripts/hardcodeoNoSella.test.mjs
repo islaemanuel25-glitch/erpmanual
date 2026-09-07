@@ -50,13 +50,46 @@ const SCRIPT = path.join(RAIZ, "scripts", "hardcodeo.mjs");
 const REAL = path.join(RAIZ, "docs", "hardcodeo-linea-base.json");
 
 /** Corre el script con la línea de base apuntada a `archivo`. */
-function correr(args, archivo) {
+function correr(args, archivo, raizEscaneo) {
   return spawnSync(process.execPath, [SCRIPT, ...args], {
     cwd: RAIZ,
     encoding: "utf8",
-    env: { ...process.env, HARDCODEO_LINEA_BASE: archivo },
+    env: {
+      ...process.env,
+      HARDCODEO_LINEA_BASE: archivo,
+      ...(raizEscaneo ? { HARDCODEO_RAIZ: raizEscaneo } : {}),
+    },
     maxBuffer: 64 * 1024 * 1024,
   });
+}
+
+/**
+ * UN REPO DE JUGUETE, LIMPIO, PARA PODER EJERCER EL SELLADO.
+ *
+ * Desde el 2026-09-07 el sellado se NIEGA si el árbol escaneado tiene cambios
+ * sin commitear: así fue como la base del 2026-08-22 quedó anotando un commit
+ * que no describe sus números. Y el repo de verdad está sucio justo cuando se
+ * corren los candados —hay una tanda en curso—, así que el caso "sí escribe" no
+ * se puede ejercer contra él sin aflojar la guardia.
+ *
+ * Se ejerce contra un repo propio, con un commit y un `.jsx` adentro. Es la
+ * situación real que el sellado exige, no una excepción para el test.
+ */
+function repoLimpioDeJuguete() {
+  const raiz = fs.mkdtempSync(path.join(os.tmpdir(), "hardcodeo-repo-"));
+  fs.mkdirSync(path.join(raiz, "app", "modulos", "demo"), { recursive: true });
+  fs.writeFileSync(
+    path.join(raiz, "app", "modulos", "demo", "page.jsx"),
+    'export default function P() {\n  return <div className="text-[13px] pos-text-muted">hola</div>;\n}\n'
+  );
+  const git = (...args) =>
+    spawnSync("git", args, { cwd: raiz, encoding: "utf8", env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null" } });
+  git("init", "-q");
+  git("config", "user.email", "candado@local");
+  git("config", "user.name", "candado");
+  git("add", "-A");
+  git("commit", "-q", "-m", "arbol de juguete");
+  return raiz;
 }
 
 /**
@@ -109,9 +142,10 @@ test("Y EL OTRO SENTIDO: con --sellar sí escribe", () => {
   // segunda mitad de siempre: un vacío solo significa algo si la misma prueba
   // encuentra algo cuando tiene que encontrarlo.
   const { carpeta, archivo } = baseDeflactada();
+  const raizLimpia = repoLimpioDeJuguete();
   try {
     const antes = fs.readFileSync(archivo);
-    const r = correr(["--linea-base", "--sellar"], archivo);
+    const r = correr(["--linea-base", "--sellar"], archivo, raizLimpia);
     const despues = fs.readFileSync(archivo);
 
     assert.equal(r.status, 0, `el sellado salió con ${r.status}:\n${r.stderr}`);
@@ -122,8 +156,42 @@ test("Y EL OTRO SENTIDO: con --sellar sí escribe", () => {
     );
     const doc = JSON.parse(fs.readFileSync(archivo, "utf8"));
     assert.ok(doc.total && Object.keys(doc.total).length > 0, "el sellado dejó un archivo sin totales");
+
+    // Y lo que hace que la base sea reproducible: el commit anotado es el del
+    // árbol que se escaneó, y el inventario viene con él. Sin esto se podría
+    // sellar un archivo bien formado que describe otro árbol, que es el defecto
+    // que esta tanda vino a cerrar.
+    assert.match(doc.commit, /^[0-9a-f]{40}$/, "el sellado no anotó un commit completo");
+    assert.ok(doc.inventario, "el sellado dejó la base sin inventario");
+    assert.ok(
+      doc.inventario["app/modulos/demo/page.jsx"],
+      "el inventario no menciona el único archivo del árbol escaneado"
+    );
   } finally {
     limpiar(carpeta);
+    fs.rmSync(raizLimpia, { recursive: true, force: true });
+  }
+});
+
+test("Y SE NIEGA A SELLAR DESDE UN ÁRBOL SUCIO", () => {
+  // El caso que rompió la base del 2026-08-22: se escanea el árbol de trabajo y
+  // se anota el commit de HEAD, que describe otra cosa. Ahora es un rechazo.
+  const { carpeta, archivo } = baseDeflactada();
+  const raizSucia = repoLimpioDeJuguete();
+  try {
+    fs.writeFileSync(
+      path.join(raizSucia, "app", "modulos", "demo", "page.jsx"),
+      'export default function P() {\n  return <div className="text-[9px]">otra cosa</div>;\n}\n'
+    );
+    const antes = fs.readFileSync(archivo);
+    const r = correr(["--linea-base", "--sellar"], archivo, raizSucia);
+
+    assert.equal(r.status, 2, "sellar desde un árbol sucio tiene que fallar");
+    assert.match(r.stderr, /sin commitear/);
+    assert.ok(fs.readFileSync(archivo).equals(antes), "no tenía que escribir nada");
+  } finally {
+    limpiar(carpeta);
+    fs.rmSync(raizSucia, { recursive: true, force: true });
   }
 });
 
