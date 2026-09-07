@@ -253,6 +253,27 @@ jobs:
             --anchos "390,1280" \
             --capturas "/tmp/capturas/aviso-reglas"
 
+      # ── QUÉ TAMAÑO CALCULA LA HOJA PARA LOS IMPORTES DEL COBRO ───────────
+      #
+      # `styles/sunmi.css` agranda el total un 50 % con una regla compuesta
+      # —`.pos-text-accent.font-black`— cuyo comentario dice que apunta a UN
+      # elemento. Hoy hay cuatro que combinan esas dos clases, así que la regla
+      # los agranda a todos. Esto no se ve en una captura de la pantalla de
+      # cobro: tres de los cuatro solo aparecen con una venta armada y ciertos
+      # medios configurados.
+      #
+      # La sonda mide la cascada sobre nodos con la cadena de clases exacta del
+      # JSX, que es fiel para tamaño y color porque los valores de esta hoja son
+      # `rem` y variables de tema. No necesita sesión: la hoja la sirve el layout
+      # raíz.
+      - name: Medir los importes del cobro, antes y después de migrar
+        run: |
+          node scripts/sonda-importe-pos.mjs \
+            --base "http://localhost:$PUERTO" \
+            --edge "${{ steps.navegador.outputs.ruta }}" \
+            --puerto-cdp 9227 \
+            --anchos "390,1280"
+
       # ── EL VIAJE DE LA CLAVE POR LA URL ──────────────────────────────────
       #
       # Va DESPUÉS de las capturas de defaults porque escribe —materializa y
