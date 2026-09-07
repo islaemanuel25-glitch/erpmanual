@@ -188,7 +188,10 @@ if (QUITAR_RESETS) {
         const s = r.selectorText.replace(/\\s+/g, " ").trim();
         const suprime = r.style.outline === "none" || r.style.boxShadow === "none" || r.style.outlineStyle === "none";
         if (!suprime) continue;
-        const universal = s === "*:focus";
+        // El CSSOM normaliza el selector: '*:focus' escrito en la hoja vuelve
+        // como ':focus'. Comparar contra el texto con asterisco encontraba cero,
+        // y por eso la primera corrida borró una sola de las dos y frenó.
+        const universal = s === "*:focus" || s === ":focus";
         const bloque = /button:focus/.test(s) && /select:focus/.test(s) && /input/.test(s);
         if (universal || bloque) {
           fuera.push(s + " { " + r.style.cssText + " }");
