@@ -314,6 +314,18 @@ jobs:
             --temas "sunmiDark,sunmiLight,sunmiSand,sunmiBlueClassic" \
             --capturas "/tmp/capturas/foco"
 
+      # Diagnóstico crudo. No resume a sí/no: imprime la serie temporal y las
+      # reglas que el navegador dice que emparejan. Está para cerrar por qué el
+      # SunmiButton medía sombra al enfocarse si la regla global la borra.
+      - name: Foco — valores crudos del SunmiButton
+        run: |
+          node scripts/sonda-foco-crudo.mjs \
+            --base "http://localhost:$PUERTO" \
+            --edge "${{ steps.navegador.outputs.ruta }}" \
+            --puerto-cdp 9231 \
+            --tema sunmiDark \
+            --ancho 390
+
       # ── EL VIAJE DE LA CLAVE POR LA URL ──────────────────────────────────
       #
       # Va DESPUÉS de las capturas de defaults porque escribe —materializa y
