@@ -278,7 +278,7 @@ function FormaPago({
               después: con dos medios puede haberse perdido una oferta de solo
               efectivo y haberse sumado el recargo más alto. */}
           {avisoCombinado && (
-            <div className="px-2 py-1.5 rounded-lg text-xs text-center font-medium pos-text-accent"
+            <div className="px-2 py-1.5 rounded-lg text-xs text-center font-medium sunmi-text-accent"
               style={{ background: "color-mix(in srgb, var(--pos-accent) 12%, transparent)" }}>
               {avisoCombinado.split("\n").map((linea, i) => (
                 <div key={i}>{linea}</div>
@@ -371,7 +371,7 @@ function FormaPago({
               {totalPorMedioDifiere ? "Total según el medio" : "Total a cobrar"}
             </div>
             {totalPorMedioDifiere ? (
-              <div className="text-2xl lg:text-3xl font-black pos-text-accent mt-1 tabular-nums tracking-tight">
+              <div className="text-2xl lg:text-3xl font-black sunmi-text-accent mt-1 tabular-nums tracking-tight">
                 ${formatPrecio(Math.min(...MEDIOS_COBRO.map((m) => totalDe([m.key]))))}
                 {" – "}
                 ${formatPrecio(Math.max(...MEDIOS_COBRO.map((m) => totalDe([m.key]))))}
@@ -442,7 +442,7 @@ function FormaPago({
                         </span>
                         {/* EL NÚMERO QUE EL CAJERO NECESITA ANTES DE TOCAR NADA.
                             Sale del mismo motor que va a cobrar el servidor. */}
-                        <span className="text-base font-black pos-text-accent tabular-nums leading-tight">
+                        <span className="text-base font-black sunmi-text-accent tabular-nums leading-tight">
                           ${formatPrecio(totalDe([m.key]))}
                         </span>
                       </>

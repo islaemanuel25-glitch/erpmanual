@@ -1237,7 +1237,11 @@ export default function ImportarPedidoDesdeArchivo() {
           color="cyan"
           subtitle="Foto, PDF o Excel. Primero revisás productos y precios; recién después se guarda."
         />
-        <input
+        {/* La entrada de archivo va por la pieza del kit y no por un `<input>`
+            pelado. `SunmiInput` reenvía el `ref` y hace spread de los props, así
+            que `type`, `accept` y `onChange` llegan igual, y `componerClaseInput`
+            conserva `hidden`. Es lo mismo que ya hace `PanelComprobantes`. */}
+        <SunmiInput
           ref={inputRef}
           type="file"
           className="hidden"

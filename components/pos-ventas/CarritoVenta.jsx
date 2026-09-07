@@ -30,7 +30,7 @@ function EtiquetaOferta({ item }) {
   const oferta = textoOfertaDeLinea(item);
   if (!oferta) return null;
   return (
-    <span className="pos-text-success-soft whitespace-nowrap">
+    <span className="sunmi-text-success-soft whitespace-nowrap">
       {" · "}
       {oferta.etiqueta} ${formatPrecio(oferta.precio)}
     </span>
@@ -455,7 +455,7 @@ function CarritoVenta({
                 ) : (
                   <>
                     {textoOfertaDeLinea(item) && (
-                      <span className="block text-xs2 pos-text-muted truncate">
+                      <span className="block text-xs2 sunmi-text-muted truncate">
                         $ {formatPrecio(item.precio)}
                         <EtiquetaOferta item={item} />
                       </span>
