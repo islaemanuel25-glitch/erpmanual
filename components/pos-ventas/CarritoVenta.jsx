@@ -30,7 +30,7 @@ function EtiquetaOferta({ item }) {
   const oferta = textoOfertaDeLinea(item);
   if (!oferta) return null;
   return (
-    <span className="pos-text-success-soft whitespace-nowrap">
+    <span className="sunmi-text-success-soft whitespace-nowrap">
       {" · "}
       {oferta.etiqueta} ${formatPrecio(oferta.precio)}
     </span>

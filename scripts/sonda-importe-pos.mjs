@@ -97,7 +97,10 @@ const CASOS = [
   {
     nombre: "CarritoVenta:458  precio tachado",
     antes: "block text-xs2 pos-text-muted truncate",
-    despues: "block text-xs2 sunmi-text-muted truncate",
+    despues: "block text-xs2 pos-text-muted truncate",
+    nota:
+      "NO se migra: medido, sunmi-text-muted da OTRO color —60 % del primer plano " +
+      "contra el gris propio del POS—, y eso es alterar el POS por aproximación",
   },
   {
     nombre: "CarritoVenta:464  nombre de lista (ya migrado)",
