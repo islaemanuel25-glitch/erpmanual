@@ -1443,16 +1443,43 @@ input[type="date"]::-moz-focus-inner {
   border: 0;
 }
 
-*:focus {
-  outline: none;
-}
+/* ==================================================
+   ⭐ FOCO — ACÁ NO VA NINGUNA SUPRESIÓN GLOBAL
+   ==================================================
 
-input:not([type="date"]):focus,
-select:focus,
-button:focus {
-  outline: none !important;
-  box-shadow: none !important;
-}
+   Hasta el 2026-09-07 vivían acá dos reglas, del commit inicial y sin motivo
+   documentado:
+
+       *:focus { outline: none; }
+
+       input:not([type="date"]):focus, select:focus, button:focus {
+         outline: none !important;
+         box-shadow: none !important;
+       }
+
+   Entre las dos dejaban la aplicación sin foco de teclado. Medido sobre nueve
+   familias en cuatro temas y dos anchos: SIETE DE NUEVE no mostraban ninguna
+   señal al llegar con Tab. Sobrevivían el textarea —porque `textarea` no está
+   en el selector— y el input de fecha —porque está excluido, y por el
+   calendario, no por el foco—.
+
+   La segunda destruía los contratos del kit: las siete reglas de foco de
+   `styles/sunmi.css` son de especificidad de clase y ninguna lleva `!important`,
+   así que perdían contra ésta aun estando DESPUÉS en la cascada. La primera
+   borraba el anillo que el navegador dibuja solo en las piezas que no tienen
+   contrato propio.
+
+   No se reemplazaron por nada, y eso es el arreglo entero. Medido con las dos
+   fuera: los nueve controles señalan con Tab, ninguno deja anillo de teclado al
+   clickear con `:focus-visible` en falso, y no hay doble indicador en ninguna de
+   las ocho combinaciones — porque cada contrato del kit ya declara su propio
+   `outline: none` al lado de su anillo, y las piezas sin contrato recuperan el
+   anillo del navegador, que se pinta en dos tonos y se ve tanto sobre los temas
+   claros como sobre los oscuros.
+
+   Si alguna vez hace falta apagar un contorno, va en el contrato de ESA pieza y
+   solo si la pieza ya provee otra señal visible. Nunca acá, y nunca con un
+   selector universal. Lo protegen los candados de `lib/sunmi/focoVisible.test.mjs`. */
 
 /* ==================================================
    ⭐ MINIINFO (fila desplegable)
