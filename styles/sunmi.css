@@ -800,3 +800,60 @@
     font-size: 1.5rem !important;
   }
 }
+
+/* ==================================================
+   ⭐ MÉTRICAS DE LA TARJETA DE PRODUCTO
+   ==================================================
+
+   Los siete valores de abajo NO son números elegidos para callar al contador:
+   son EXACTAMENTE los que la tarjeta ya mostraba, formalizados en Figma como
+   contrato —nodo 12:2 del archivo fYqIEZxHRb6yx6pIUrUG2h—. Por eso ninguno se
+   ajustó al escalón más cercano de la escala de espaciado: hacerlo habría
+   cambiado píxeles, que es justo lo contrario de lo que esta tanda hace.
+
+   Ninguno cae en la escala del sistema, y esa es la razón de que existan. La
+   escala es de 3,5 px por unidad —raíz de 14 px— y ofrece equivalencia solo si
+   el número cae exacto en un escalón: 9 px son 2,571 unidades, 51,5 son 14,714,
+   44 son 12,571 y 202 no tiene ningún escalón cerca. La escala tipográfica tiene
+   tres tokens —10, 11 y 14 px— y ni 9 ni 25 están.
+
+   Estaban escritos a mano en el JSX, repetidos y sin nombre. Acá el número vive
+   UNA vez y el JSX pasa a nombrar la intención.
+
+   EL TAMAÑO DE LA MINIATURA GOBIERNA LOS DOS EJES. Es un cuadrado por contrato,
+   no por casualidad de que ancho y alto coincidan hoy.
+
+   Y `--sunmi-product-action-height` vale lo mismo que la miniatura POR AHORA.
+   Son tokens distintos a propósito: uno es el tamaño de una imagen y el otro el
+   alto de un área táctil. Unirlos por coincidencia numérica ataría dos
+   decisiones de diseño que no tienen por qué moverse juntas. */
+:root {
+  --sunmi-product-list-gap: 9px;
+  --sunmi-product-value-min-height: 51.5px;
+  --sunmi-product-value-width: 202px;
+  --sunmi-product-value-label-font-size: 9px;
+  --sunmi-product-value-number-font-size: 25px;
+  --sunmi-product-thumbnail-size: 44px;
+  --sunmi-product-action-height: 44px;
+}
+
+.sunmi-product-list {
+  gap: var(--sunmi-product-list-gap);
+}
+.sunmi-product-value-block {
+  width: var(--sunmi-product-value-width);
+  min-height: var(--sunmi-product-value-min-height);
+}
+.sunmi-product-value-label {
+  font-size: var(--sunmi-product-value-label-font-size);
+}
+.sunmi-product-value-number {
+  font-size: var(--sunmi-product-value-number-font-size);
+}
+.sunmi-product-thumbnail {
+  width: var(--sunmi-product-thumbnail-size);
+  height: var(--sunmi-product-thumbnail-size);
+}
+.sunmi-product-card-action {
+  height: var(--sunmi-product-action-height);
+}

@@ -90,7 +90,11 @@ const PADDING = "px-[13px] pt-3.5 pb-3";
 // misma caja para la existencia: si cada pantalla copiara ancho, alto, fondo y
 // área táctil, las dos tarjetas serían iguales solo hasta el próximo cambio.
 // Se extrajo sin cambiar una clase ni un nodo del consumidor original.
-const ALTO_BLOQUE_VALOR = "min-h-[51.5px]";
+// El ancho y el alto mínimo del bloque son un contrato de Figma —nodo 12:2— y
+// viven juntos en `.sunmi-product-value-block`. Antes estaban partidos en dos
+// lugares de este archivo: el alto en esta constante y el ancho suelto en la
+// cadena de clases de abajo.
+const CAJA_BLOQUE_VALOR = "sunmi-product-value-block";
 
 export function BloqueValorTarjeta({
   className = "",
@@ -101,7 +105,7 @@ export function BloqueValorTarjeta({
   activo = false,
   ...resto
 }) {
-  const clases = `flex w-[202px] max-w-full rounded-xl px-2.5 py-2 [background:var(--hover-bg)] ${ALTO_BLOQUE_VALOR} ${className}`;
+  const clases = `flex max-w-full rounded-xl px-2.5 py-2 [background:var(--hover-bg)] ${CAJA_BLOQUE_VALOR} ${className}`;
   if (!esControl) {
     return (
       <span data-cara-precio className={clases} {...resto}>
@@ -131,7 +135,7 @@ export function RotuloBloqueValor({ children, className = "", style = undefined,
   return (
     <span
       data-cara-presentacion
-      className={`mb-1 text-[9px] font-bold whitespace-nowrap ${className}`}
+      className={`mb-1 sunmi-product-value-label font-bold whitespace-nowrap ${className}`}
       style={style}
       {...resto}
     >
@@ -144,7 +148,7 @@ export function NumeroBloqueValor({ children, atenuado = false, className = "", 
   return (
     <span
       data-cara-importe
-      className={`text-[25px] font-semibold whitespace-nowrap [font-variant-numeric:tabular-nums] tracking-[-.01em] ${
+      className={`sunmi-product-value-number font-semibold whitespace-nowrap [font-variant-numeric:tabular-nums] tracking-[-.01em] ${
         atenuado ? "sunmi-text-muted" : "sunmi-text-strong"
       } ${className}`}
       {...resto}
@@ -159,7 +163,9 @@ export function NumeroBloqueValor({ children, atenuado = false, className = "", 
 // Stock recibe la misma `imagenUrl`, así que la miniatura vive junto a la card.
 // La implementación es exactamente la que ya funcionaba en Productos: si la URL
 // está rota se retira, y `contain` evita recortar la etiqueta del envase.
-const LADO_MINIATURA = "w-[44px] h-[44px]";
+// El tamaño gobierna LOS DOS EJES: la miniatura es cuadrada por contrato, no
+// porque hoy ancho y alto coincidan.
+const LADO_MINIATURA = "sunmi-product-thumbnail";
 
 export function MiniaturaProductoTarjeta({ url }) {
   const [fallo, setFallo] = useState(false);
@@ -258,7 +264,7 @@ export function AccionTarjeta({ icono: Icono, onClick, children, ...resto }) {
       //
       // Medido después de ponerlo: la tarjeta pasa de 203,4 a 215,9 px y a
       // 390 px SIGUEN ENTRANDO TRES. No costó la tercera tarjeta.
-      className="flex items-center justify-center gap-1.5 py-2.5 h-[44px] text-xs font-medium sunmi-text-strong sunmi-row-hover"
+      className="flex items-center justify-center gap-1.5 py-2.5 sunmi-product-card-action text-xs font-medium sunmi-text-strong sunmi-row-hover"
       {...resto}
     >
       {Icono && <Icono className="w-4 h-4 shrink-0" aria-hidden="true" />}
