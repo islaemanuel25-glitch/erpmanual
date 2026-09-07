@@ -9,11 +9,16 @@
 // un contador que reventaba antes de contar nada producía el aviso "este cambio
 // hizo subir el conteo por encima de la línea de base".
 //
-// No es teórico: se vio el 2026-09-04. `lib/hardcodeo/contador.js` es ESM en un
+// No es teórico: se vio el 2026-09-04. `lib/hardcodeo/contador` era ESM en un
 // archivo `.js` y el `package.json` no declara `"type": "module"`, así que en
-// Node 18 el import explota con `Named export 'ETIQUETAS' not found`. Cada
+// Node 18 el import explotaba con `Named export 'ETIQUETAS' not found`. Cada
 // edición de un `.jsx` disparaba una falsa alarma, y —lo que importa— durante
 // toda esa sesión el trinquete no midió nada mientras parecía estar midiendo.
+//
+// Esa causa se arregló el 2026-09-07 renombrando el módulo a `.mjs`, y la cuida
+// `scripts/hardcodeoArranca.test.mjs`. Este candado sigue igual: lo que afirma
+// no es que el contador cargue, sino que el hook DISTINGA un veredicto de un
+// choque — y un choque puede venir de cualquier lado.
 //
 // Un aviso que no separa "conté y subió" de "no pude contar" no se puede creer
 // en ninguna de las dos direcciones: la falsa alarma hace que se lo empiece a

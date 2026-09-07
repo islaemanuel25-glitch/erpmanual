@@ -19,7 +19,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { esComentario } from "@/lib/hardcodeo/contador.js";
+import { esComentario } from "@/lib/hardcodeo/contador.mjs";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
