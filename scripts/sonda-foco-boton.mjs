@@ -237,6 +237,10 @@ const LEER = (elId) => `(async () => {
     outlineColor: s.outlineColor,
     outlineOffset: s.outlineOffset,
     boxShadow: s.boxShadow,
+    // El contorno se dibuja POR FUERA del elemento, así que lo que decide si se
+    // percibe es el fondo de atrás, no el del propio control.
+    fondo: getComputedStyle(el.parentElement || document.body).backgroundColor,
+    esquema: getComputedStyle(document.documentElement).colorScheme,
   });
 })()`;
 
@@ -333,8 +337,17 @@ for (const ancho of ANCHOS) {
           `CLICK[fv:${String(mou.focusVisible).padEnd(5)} ${senalMouse ? "anillo" : "limpio"}]` +
           `${doble ? "  ⚠ DOBLE" : ""}`
       );
-      // Los valores crudos solo en el primer tema: alcanzan para saber qué
-      // dibuja la señal, y repetirlos en los cuatro serían cientos de líneas.
+      // El color del contorno nativo va SIEMPRE, en los cuatro temas. Es lo
+      // único que decide si el fallback del navegador se percibe, y depende del
+      // esquema de color que Chrome resuelva para la página: medido, el mismo
+      // control da naranja en una combinación y casi negro en otra. Un contorno
+      // casi negro sobre fondo oscuro no es una señal.
+      if (hayContorno(tec)) {
+        console.log(`  ${"".padEnd(38)}  contorno nativo ${tec.outline} ${tec.outlineColor} off=${tec.outlineOffset}  fondo=${tec.fondo}  color-scheme=${tec.esquema}`);
+      }
+      // El resto de los valores crudos solo en el primer tema: alcanzan para
+      // saber qué dibuja la señal, y repetirlos en los cuatro serían cientos de
+      // líneas.
       if (tema === TEMAS[0]) {
         console.log(`  ${"".padEnd(38)}  reposo sh=${base.boxShadow}`);
         console.log(`  ${"".padEnd(38)}  TAB    out=${tec.outline} ${tec.outlineColor} off=${tec.outlineOffset}  sh=${tec.boxShadow}`);
