@@ -274,6 +274,26 @@ jobs:
             --puerto-cdp 9227 \
             --anchos "390,1280"
 
+      # ── LOS DOS GRISES DEL CARRITO, TEMA POR TEMA ────────────────────────
+      #
+      # Debajo del nombre del producto conviven dos renglones secundarios del
+      # mismo rango —el precio con su oferta, y el nombre de la lista— dibujados
+      # con dos contratos de gris distintos. La sonda mide el color efectivo y el
+      # contraste contra el fondo en los catorce temas, con la clase de hoy y con
+      # la migrada, para decidir con números si esa diferencia dice algo.
+      #
+      # Retrata una RECONSTRUCCIÓN de los dos renglones, no la celda: llegar a
+      # ella pide una venta con un producto en oferta Y una lista aplicada, y el
+      # sembrado del runner no crea productos.
+      - name: Comparar los dos grises secundarios del carrito
+        run: |
+          node scripts/sonda-muted-carrito.mjs \
+            --base "http://localhost:$PUERTO" \
+            --edge "${{ steps.navegador.outputs.ruta }}" \
+            --puerto-cdp 9228 \
+            --anchos "390,1280" \
+            --capturas "/tmp/capturas/muted-carrito"
+
       # ── EL VIAJE DE LA CLAVE POR LA URL ──────────────────────────────────
       #
       # Va DESPUÉS de las capturas de defaults porque escribe —materializa y
@@ -337,6 +357,12 @@ jobs:
             [ -e "$img" ] || continue
             cp "$img" "/tmp/artefacto/$(basename "$img")"
           done
+          # Ídem las tiras de los dos grises del carrito, que van en su propia
+          # carpeta porque son catorce temas por dos anchos por dos estados.
+          if [ -d /tmp/capturas/muted-carrito ]; then
+            mkdir -p /tmp/artefacto/muted-carrito
+            cp /tmp/capturas/muted-carrito/*.png /tmp/artefacto/muted-carrito/ || true
+          fi
           # Las referencias aprobadas viajan en el mismo artefacto: comparar es
           # abrir dos imágenes, y buscarlas en el repo es un paso donde alguien se
           # equivoca de versión.
