@@ -409,6 +409,16 @@ jobs:
             mkdir -p /tmp/artefacto/muted-carrito
             cp /tmp/capturas/muted-carrito/*.png /tmp/artefacto/muted-carrito/ || true
           fi
+          # Las tiras de foco, con y sin los resets históricos. Van al artefacto
+          # porque el valor computado del contorno no dice qué se pinta: Chrome
+          # dibuja el anillo de 'outline: auto' en dos tonos y getComputedStyle
+          # informa uno solo. Si hay que decidir si se percibe, se miran píxeles.
+          for carpeta in foco foco-sin-resets; do
+            if [ -d "/tmp/capturas/$carpeta" ]; then
+              mkdir -p "/tmp/artefacto/$carpeta"
+              cp /tmp/capturas/$carpeta/*.png "/tmp/artefacto/$carpeta/" || true
+            fi
+          done
           # Las referencias aprobadas viajan en el mismo artefacto: comparar es
           # abrir dos imágenes, y buscarlas en el repo es un paso donde alguien se
           # equivoca de versión.
