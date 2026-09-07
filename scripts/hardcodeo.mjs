@@ -386,6 +386,10 @@ function sellarLineaBase() {
       "sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número " +
       "sube, se arregla el código o se decide subir la base a propósito y se dice por qué " +
       "en el commit.",
+    _commit:
+      "`commit` es el árbol que se ESCANEÓ, no la fecha en que se selló: pueden diferir. " +
+      "Cuando se corrige un falso positivo del contador, la base se REEXPRESA desde el " +
+      "árbol histórico —no desde main— para no perdonar la deuda que entró después.",
     _inventario:
       "El trinquete compara el INVENTARIO, no los totales: una ocurrencia es " +
       "archivo + categoría + texto, con cantidad. Sin número de línea, para que mover " +
@@ -404,6 +408,31 @@ function sellarLineaBase() {
   return 0;
 }
 
+/**
+ * Altas de UN archivo contra su propia versión en `HEAD`.
+ *
+ * Contesta la única pregunta que el hook puede hacer con honestidad: ¿los
+ * cambios sin commitear de este archivo trajeron hardcodeo que antes no estaba?
+ *
+ * Un archivo que no existe en `HEAD` es nuevo, y entonces TODO lo suyo es nuevo:
+ * se compara contra vacío, no se saltea. Saltearlo sería la puerta de entrada
+ * más obvia —crear el archivo con la deuda adentro y que nadie lo mire—.
+ */
+function altasContraHead(rel) {
+  const abs = path.join(RAIZ_ESCANEO, rel);
+  const ahora = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
+  let previo = "";
+  try {
+    previo = git("show", `HEAD:${rel}`);
+  } catch {
+    // No está en HEAD: archivo nuevo. Se compara contra vacío.
+    previo = "";
+  }
+  const invAhora = inventarioDeHallazgos(contarArchivo(rel, ahora, OPCIONES).hallazgos);
+  const invPrevio = inventarioDeHallazgos(contarArchivo(rel, previo, OPCIONES).hallazgos);
+  return altasContraBase(invPrevio, invAhora);
+}
+
 function trinquete() {
   const base = leerLineaBase();
   if (!base) {
@@ -419,7 +448,38 @@ function trinquete() {
   // clave, así que una sola ocurrencia nueva pone rojo aunque el total baje.
   //
   // Las dos decisiones son puras y tienen candados; acá solo se imprime.
-  const altas = base.inventario ? altasContraBase(base.inventario, inventario) : [];
+  // ── `--archivo` ACOTA EL INFORME A UN SOLO ARCHIVO ──────────────────────
+  //
+  // Lo usa el hook que corre después de cada edición. Sin esto, el hook
+  // contestaba con la deuda ENTERA del repo —treinta líneas— cada vez que
+  // alguien tocaba un `.jsx`, y encima encabezaba con "este cambio hizo subir el
+  // conteo" aunque la edición lo hubiera BAJADO. Un aviso que dice lo mismo
+  // pase lo que pase, y que además puede estar diciendo lo contrario de lo que
+  // pasó, se lee salteado a los dos días.
+  //
+  // El veredicto NO se afloja: sigue siendo rojo si hay altas. Lo que cambia es
+  // de quién se habla. Sin la bandera, el comportamiento es exactamente el de
+  // antes.
+  //
+  // ── Y CON `--archivo` LA REFERENCIA NO ES LA LÍNEA BASE, ES `HEAD` ──────
+  //
+  // Filtrar las altas contra la línea base por archivo NO demuestra que la
+  // edición actual haya introducido nada. Reproducido: una ocurrencia que entró
+  // en un commit anterior y sigue pendiente vuelve a aparecer cada vez que
+  // alguien toca CUALQUIER otra línea del mismo archivo, y el hook la atribuía a
+  // esa edición. Con 15 altas pendientes en 13 lugares no es un caso teórico:
+  // es lo que iba a pasar en cuanto alguien editara uno de esos trece archivos.
+  //
+  // La referencia honesta para "¿esto lo trajo el trabajo actual?" es el mismo
+  // archivo en `HEAD`. Lo que está en `HEAD` ya está commiteado: será deuda, y
+  // el trinquete global la sigue informando, pero no la trajo quien está
+  // editando ahora.
+  //
+  // El modo GLOBAL no cambia: sin `--archivo` se compara contra la línea base
+  // histórica exactamente como antes.
+  const soloArchivo = valor("--archivo");
+  const todasLasAltas = base.inventario ? altasContraBase(base.inventario, inventario) : [];
+  const altas = soloArchivo ? altasContraHead(soloArchivo) : todasLasAltas;
   const { estado, subieron, bajaron } = compararConLineaBase(base.total, total);
 
   // Una base vieja no tiene inventario. Se dice, en vez de contestar que está
@@ -444,14 +504,23 @@ function trinquete() {
       console.error(`     ${a.que}${cuantas}  —  ${a.archivo}${desde}`);
     }
     console.error(`\n  ${totalDeAltas(altas)} ocurrencias nuevas en ${altas.length} lugares.`);
-    // El total se sigue informando porque es lo que se lee de un vistazo, pero
-    // NO es lo que decide: acá se ve por qué mirarlo solo a él no alcanzaba.
-    const resumenTotal = subieron.length
-      ? subieron.map((s) => `${ETIQUETAS[s.categoria]} +${s.delta}`).join(", ")
-      : bajaron.length
-        ? "el total incluso BAJÓ: la compensación cruzada es exactamente esto"
-        : "el total no se movió: la compensación cruzada es exactamente esto";
-    console.error(`  Contra los totales: ${resumenTotal}.`);
+    if (soloArchivo) {
+      // Acotado a un archivo, el resumen de totales del repo entero no viene al
+      // caso y era justamente el ruido: se dice cuánto queda pendiente y nada más.
+      // Ese pendiente sale de la línea base histórica —que es lo que mide la
+      // deuda del repo— y no de la comparación contra HEAD.
+      const resto = totalDeAltas(todasLasAltas);
+      if (resto > 0) console.error(`  (en el repo quedan ${resto} pendientes de antes, que no son de este cambio)`);
+    } else {
+      // El total se sigue informando porque es lo que se lee de un vistazo, pero
+      // NO es lo que decide: acá se ve por qué mirarlo solo a él no alcanzaba.
+      const resumenTotal = subieron.length
+        ? subieron.map((s) => `${ETIQUETAS[s.categoria]} +${s.delta}`).join(", ")
+        : bajaron.length
+          ? "el total incluso BAJÓ: la compensación cruzada es exactamente esto"
+          : "el total no se movió: la compensación cruzada es exactamente esto";
+      console.error(`  Contra los totales: ${resumenTotal}.`);
+    }
     console.error("\nQué hacer: usar lo que ya existe en vez del valor escrito a mano.");
     console.error("Para ver qué hay en una pantalla: node scripts/hardcodeo.mjs --ficha <pantalla>");
     console.error("Si el aumento es a propósito, se sube la base a mano y se dice por qué:");
@@ -466,6 +535,14 @@ function trinquete() {
     return 0;
   }
 
+  // En verde también hay que decir contra QUÉ se comparó, o el mensaje afirma
+  // algo que no se midió: con `--archivo` la referencia es HEAD, no la base.
+  if (soloArchivo) {
+    console.log(`TRINQUETE: los cambios sin commitear de ${soloArchivo} no traen hardcodeo nuevo.`);
+    const resto = totalDeAltas(todasLasAltas);
+    if (resto > 0) console.log(`  (en el repo quedan ${resto} pendientes de antes, que no son de este cambio)`);
+    return 0;
+  }
   console.log("TRINQUETE: sin cambios respecto de la línea de base.");
   return 0;
 }

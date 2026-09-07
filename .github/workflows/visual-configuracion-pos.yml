@@ -231,6 +231,28 @@ jobs:
             --puerto-cdp 9224 \
             --capturas "/tmp/capturas/390"
 
+      # ── EL AVISO DE REGLAS, QUE NINGUNA CAPTURA ESTÁTICA PUEDE MOSTRAR ───
+      #
+      # Ese aviso aparece SOLO después de guardar, así que las pantallas de la
+      # lista de arriba lo fotografían siempre vacío. La sonda lo hace aparecer
+      # por el camino real —toca el interruptor, que en esa pantalla ES el
+      # guardado— y para el estado de error le pide al NAVEGADOR que bloquee la
+      # ruta de la API, de modo que el `fetch` caiga en el `catch` de la
+      # pantalla. No hay bandera ni parámetro de prueba en el código productivo.
+      #
+      # Va DESPUÉS de las capturas de defaults porque toca interruptores y deja
+      # la configuración cambiada, y antes del sembrado, que de todas formas fija
+      # el escenario.
+      - name: Retratar el aviso de Reglas en sus dos tonos
+        run: |
+          node scripts/sonda-aviso-de-reglas.mjs \
+            --base "http://localhost:$PUERTO" \
+            --usuario "$USUARIO_PRUEBA" --clave "$CLAVE_PRUEBA" \
+            --edge "${{ steps.navegador.outputs.ruta }}" \
+            --puerto-cdp 9225 \
+            --anchos "390,1280" \
+            --capturas "/tmp/capturas/aviso-reglas"
+
       # ── EL VIAJE DE LA CLAVE POR LA URL ──────────────────────────────────
       #
       # Va DESPUÉS de las capturas de defaults porque escribe —materializa y
@@ -287,6 +309,12 @@ jobs:
             # La huella que el arnés produce al lado: no es el entregable, pero
             # dice con qué tamaño y tema se sacó cada foto.
             [ -f "/tmp/capturas/$ancho/meta.json" ] && cp "/tmp/capturas/$ancho/meta.json" "/tmp/artefacto/$ancho-meta.json" || true
+          done
+          # Las fotos del aviso de Reglas no salen de una tanda por ancho: las
+          # saca la sonda, que ya las nombra con su ancho adelante.
+          for img in /tmp/capturas/aviso-reglas/*.png; do
+            [ -e "$img" ] || continue
+            cp "$img" "/tmp/artefacto/$(basename "$img")"
           done
           # Las referencias aprobadas viajan en el mismo artefacto: comparar es
           # abrir dos imágenes, y buscarlas en el repo es un paso donde alguien se

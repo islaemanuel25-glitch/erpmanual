@@ -1,11 +1,12 @@
 {
   "_lea_esto": "Línea de base del hardcodeo. La sella scripts/hardcodeo.mjs --linea-base --sellar; sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
+  "_commit": "`commit` es el árbol que se ESCANEÓ, no la fecha en que se selló: pueden diferir. Cuando se corrige un falso positivo del contador, la base se REEXPRESA desde el árbol histórico —no desde main— para no perdonar la deuda que entró después.",
   "_inventario": "El trinquete compara el INVENTARIO, no los totales: una ocurrencia es archivo + categoría + texto, con cantidad. Sin número de línea, para que mover código no invente violaciones. Un alta en cualquier clave pone rojo aunque el total baje.",
-  "generada": "2026-09-07 01:07",
+  "generada": "2026-09-07 02:55",
   "commit": "32757049cafa4f7dbf39fe931a19d9b773bee5cc",
   "total": {
     "color": 288,
-    "medida": 1916,
+    "medida": 1912,
     "modal": 36,
     "crudo": 318,
     "celda": 461,
@@ -177,7 +178,7 @@
     },
     "locales": {
       "color": 3,
-      "medida": 4,
+      "medida": 3,
       "modal": 0,
       "crudo": 0,
       "celda": 7,
@@ -204,7 +205,7 @@
     },
     "operadores": {
       "color": 2,
-      "medida": 5,
+      "medida": 4,
       "modal": 0,
       "crudo": 1,
       "celda": 4,
@@ -276,7 +277,7 @@
     },
     "roles": {
       "color": 0,
-      "medida": 1,
+      "medida": 0,
       "modal": 0,
       "crudo": 0,
       "celda": 3,
@@ -321,7 +322,7 @@
     },
     "usuarios": {
       "color": 6,
-      "medida": 6,
+      "medida": 5,
       "modal": 0,
       "crudo": 0,
       "celda": 7,
@@ -1581,11 +1582,6 @@
         "text-[20px]": 1
       }
     },
-    "components/locales/ModalLocal.jsx": {
-      "medida": {
-        "max-h-[65vh]": 1
-      }
-    },
     "components/locales/SunmiTableLocales.jsx": {
       "color": {
         "bg-slate-": 2,
@@ -1649,7 +1645,6 @@
     },
     "components/operadores/ModalOperador.jsx": {
       "medida": {
-        "max-h-[65vh]": 1,
         "text-[13px]": 1,
         "text-[10px]": 1
       },
@@ -2567,11 +2562,6 @@
         "<td>": 7
       }
     },
-    "components/roles/ModalRol.jsx": {
-      "medida": {
-        "max-h-[65vh]": 1
-      }
-    },
     "components/sidebar/SidebarGroup.jsx": {
       "crudo": {
         "<button>": 1
@@ -2973,11 +2963,6 @@
     "components/usuarios/CeldaUsuario.jsx": {
       "color": {
         "text-slate-": 2
-      }
-    },
-    "components/usuarios/ModalUsuario.jsx": {
-      "medida": {
-        "max-h-[65vh]": 1
       }
     },
     "components/usuarios/SunmiTableUsuarios.jsx": {

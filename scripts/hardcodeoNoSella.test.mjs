@@ -173,6 +173,92 @@ test("Y EL OTRO SENTIDO: con --sellar sí escribe", () => {
   }
 });
 
+// ══════════════════════════════════════════════════════════════════════════
+// SELLAR DESDE OTRO ÁRBOL SELLA ESE ÁRBOL, NO EL DE TRABAJO
+// ══════════════════════════════════════════════════════════════════════════
+//
+// Es lo que hace posible REEXPRESAR la base histórica cuando se corrige un falso
+// positivo del contador: se escanea el árbol de entonces, no `main`. Si el
+// escaneo se contaminara con el árbol actual, la reexpresión perdonaría toda la
+// deuda que entró después —que es exactamente lo que no se puede hacer— y el
+// archivo quedaría igual de bien formado, sin ninguna señal de que pasó.
+
+test("A · LO SELLADO ES EL ÁRBOL ESCANEADO, y no se cuela el de trabajo", () => {
+  const { carpeta, archivo } = baseDeflactada();
+  const raizLimpia = repoLimpioDeJuguete();
+  try {
+    correr(["--linea-base", "--sellar"], archivo, raizLimpia);
+    const doc = JSON.parse(fs.readFileSync(archivo, "utf8"));
+    const archivos = Object.keys(doc.inventario);
+
+    // El árbol de juguete tiene UN archivo. Si aparece cualquier otro, lo que se
+    // selló no es lo que se pidió escanear.
+    assert.deepEqual(archivos, ["app/modulos/demo/page.jsx"]);
+
+    // Y dicho por el otro lado, que es el que atraparía una contaminación
+    // parcial: ninguna ruta del repo real puede estar acá.
+    assert.equal(
+      archivos.some((a) => a.startsWith("components/sunmi/") || a.startsWith("components/pos-ventas/")),
+      false,
+      "el sellado arrastró archivos del árbol de trabajo"
+    );
+  } finally {
+    limpiar(carpeta);
+    fs.rmSync(raizLimpia, { recursive: true, force: true });
+  }
+});
+
+test("C · EL COMMIT ANOTADO ES EL HEAD DEL ÁRBOL ESCANEADO", () => {
+  // No el del repo desde el que se corre el comando. Es la diferencia entre una
+  // base reproducible y un archivo que dice una cosa y describe otra: así se
+  // rompió la del 2026-08-22, anotando el HEAD mientras escaneaba otra cosa.
+  const { carpeta, archivo } = baseDeflactada();
+  const raizLimpia = repoLimpioDeJuguete();
+  try {
+    const suyo = spawnSync("git", ["rev-parse", "HEAD"], { cwd: raizLimpia, encoding: "utf8" }).stdout.trim();
+    const nuestro = spawnSync("git", ["rev-parse", "HEAD"], { cwd: RAIZ, encoding: "utf8" }).stdout.trim();
+
+    correr(["--linea-base", "--sellar"], archivo, raizLimpia);
+    const doc = JSON.parse(fs.readFileSync(archivo, "utf8"));
+
+    assert.equal(doc.commit, suyo, "anotó un commit que no es el del árbol escaneado");
+    assert.notEqual(doc.commit, nuestro, "anotó el HEAD de este repo en vez del escaneado");
+  } finally {
+    limpiar(carpeta);
+    fs.rmSync(raizLimpia, { recursive: true, force: true });
+  }
+});
+
+test("E · CONTRAPRUEBA: sellar SIN la costura no da lo mismo", () => {
+  // La mitad que hace que A signifique algo. Si sellar desde acá y desde el
+  // árbol de juguete dieran lo mismo, la costura no estaría separando nada y A
+  // pasaría por casualidad.
+  const a = baseDeflactada();
+  const b = baseDeflactada();
+  const raizLimpia = repoLimpioDeJuguete();
+  try {
+    correr(["--linea-base", "--sellar"], a.archivo, raizLimpia);
+    // Sin `HARDCODEO_RAIZ` se escanea ESTE repo. Durante los candados suele
+    // estar sucio, y entonces el sellado tiene que rechazarlo —que es la otra
+    // forma de no contaminar—. Si estuviera limpio, el contenido igual sería
+    // distinto. Se comprueban las dos salidas posibles porque las dos son
+    // correctas y cuál ocurre depende del estado del árbol, no de la regla.
+    const r = correr(["--linea-base", "--sellar"], b.archivo);
+    if (r.status === 0) {
+      const desdeJuguete = JSON.parse(fs.readFileSync(a.archivo, "utf8"));
+      const desdeAca = JSON.parse(fs.readFileSync(b.archivo, "utf8"));
+      assert.notDeepEqual(desdeJuguete.inventario, desdeAca.inventario);
+    } else {
+      assert.equal(r.status, 2, "sellar desde un árbol sucio tiene que ser un rechazo");
+      assert.match(r.stderr, /sin commitear/);
+    }
+  } finally {
+    limpiar(a.carpeta);
+    limpiar(b.carpeta);
+    fs.rmSync(raizLimpia, { recursive: true, force: true });
+  }
+});
+
 test("Y SE NIEGA A SELLAR DESDE UN ÁRBOL SUCIO", () => {
   // El caso que rompió la base del 2026-08-22: se escanea el árbol de trabajo y
   // se anota el commit de HEAD, que describe otra cosa. Ahora es un rechazo.

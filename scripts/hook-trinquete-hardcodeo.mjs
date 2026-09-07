@@ -103,7 +103,21 @@ process.stdin.on("end", () => {
   const rel = rutaRelativa(String(datos?.tool_input?.file_path ?? ""));
   if (!rel || !ME_IMPORTA.test(rel)) responder(null);
 
-  const r = spawnSync(process.execPath, [CONTADOR, "--trinquete"], {
+  // ── SE PREGUNTA POR EL ARCHIVO EDITADO, NO POR EL REPO ENTERO ───────────
+  //
+  // Antes esto pedía el veredicto global y contestaba con la deuda completa
+  // —treinta líneas— después de CADA edición de un `.jsx`, aunque la edición no
+  // hubiera agregado nada. Peor: el encabezado decía "este cambio hizo subir el
+  // conteo" incluso cuando lo había bajado, porque el aviso no distinguía lo que
+  // la edición introdujo de lo que ya estaba.
+  //
+  // Un aviso que aparece siempre y que además puede estar diciendo lo contrario
+  // de lo que pasó se lee salteado a los dos días, y ahí deja de avisar.
+  //
+  // Con `--archivo` el contador informa solo las altas de ESE archivo y sale con
+  // 0 si no hay ninguna, así que el hook se calla cuando no hay nada que decir.
+  // El veredicto no se aflojó: sigue siendo rojo si la edición introdujo algo.
+  const r = spawnSync(process.execPath, [CONTADOR, "--trinquete", "--archivo", rel], {
     cwd: ROOT,
     encoding: "utf8",
     timeout: 60_000,
@@ -159,9 +173,17 @@ process.stdin.on("end", () => {
     .trim();
 
   responder(
-    `TRINQUETE DE HARDCODEO: este cambio hizo subir el conteo por encima de la línea de base.\n\n` +
+    // LA FRASE DICE LO QUE SE MIDIÓ, NI MÁS NI MENOS. La versión anterior
+    // afirmaba "esta edición introdujo hardcodeo que no estaba en la línea de
+    // base", y eso NO se seguía de la medición: el trinquete filtraba por
+    // archivo las altas contra la línea base histórica, así que una ocurrencia
+    // de un commit anterior volvía a acusar a cualquiera que tocara otra línea
+    // del mismo archivo. Ahora se compara contra `HEAD`, y por eso se habla de
+    // los cambios sin commitear —que es lo que de verdad se comparó— y no de la
+    // última pulsación, que el hook no puede ver.
+    `TRINQUETE DE HARDCODEO: los cambios sin commitear de ${rel} traen hardcodeo ` +
+      `que no está en la versión commiteada de ese archivo.\n\n` +
       `${limpio}\n\n` +
-      `Archivo tocado: ${rel}\n` +
       `Para ver qué hay en esa pantalla: node scripts/hardcodeo.mjs --ficha <pantalla>\n\n` +
       `Esto NO revierte nada. Hay dos salidas honestas: usar lo que ya existe —el token, ` +
       `el componente del kit— o, si el aumento es a propósito, subir la línea de base con ` +
