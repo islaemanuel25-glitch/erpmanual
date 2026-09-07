@@ -115,9 +115,52 @@ test("el contador cuenta y el hardcodeo subió: el hook lo dice", () => {
   });
 
   assert.ok(aviso);
-  assert.match(aviso, /hizo subir el conteo/);
+  assert.match(aviso, /introdujo hardcodeo que no estaba en la línea de base/);
   assert.match(aviso, /Colores fijos: 10 → 12/, "el detalle del aumento tiene que llegar");
   assert.match(aviso, /FormaPago\.jsx/, "y qué archivo se tocó");
+
+  // ── LO QUE EL AVISO YA NO PUEDE DECIR ────────────────────────────────────
+  //
+  // Decía "este cambio hizo subir el conteo" en TODOS los casos, porque miraba
+  // el veredicto global del repo. O sea que lo afirmaba también cuando la
+  // edición había BAJADO el conteo —se vio el 2026-09-07, informándolo mientras
+  // el total iba de 31 a 28—. Era una afirmación sobre el cambio hecha con un
+  // dato que no era del cambio.
+  assert.doesNotMatch(
+    aviso,
+    /hizo subir el conteo/,
+    "el aviso volvió a afirmar algo sobre el total que no midió"
+  );
+});
+
+test("EL HOOK PREGUNTA POR EL ARCHIVO EDITADO, no por el repo entero", () => {
+  // Es lo que hace que el aviso deje de aparecer en cada edición con la deuda
+  // completa. Se comprueba mirando los argumentos con los que llamó al contador:
+  // si algún día se vuelve a preguntar en global, el aviso vuelve a ser ruido y
+  // acá se ve antes de que nadie lo sufra.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trinquete-argv-"));
+  const registro = path.join(dir, "argv.json");
+  const falso = path.join(dir, "contador-falso.mjs");
+  fs.writeFileSync(
+    falso,
+    // El falso es `.mjs`, así que `require` no existe: se importa.
+    `import fs from "node:fs";\n` +
+      `fs.writeFileSync(${JSON.stringify(registro)}, JSON.stringify(process.argv.slice(2)));\n` +
+      `process.exit(0);\n`
+  );
+
+  try {
+    spawnSync(process.execPath, [HOOK], {
+      input: JSON.stringify({ tool_input: { file_path: ARCHIVO } }),
+      encoding: "utf8",
+      env: { ...process.env, ERPAZUL_CONTADOR_HARDCODEO: falso },
+    });
+
+    const argv = JSON.parse(fs.readFileSync(registro, "utf8"));
+    assert.deepEqual(argv, ["--trinquete", "--archivo", "components/pos-ventas/FormaPago.jsx"]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("el hardcodeo no subió: el hook se queda callado", () => {

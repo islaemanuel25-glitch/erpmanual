@@ -423,7 +423,21 @@ function trinquete() {
   // clave, así que una sola ocurrencia nueva pone rojo aunque el total baje.
   //
   // Las dos decisiones son puras y tienen candados; acá solo se imprime.
-  const altas = base.inventario ? altasContraBase(base.inventario, inventario) : [];
+  // ── `--archivo` ACOTA EL INFORME A UN SOLO ARCHIVO ──────────────────────
+  //
+  // Lo usa el hook que corre después de cada edición. Sin esto, el hook
+  // contestaba con la deuda ENTERA del repo —treinta líneas— cada vez que
+  // alguien tocaba un `.jsx`, y encima encabezaba con "este cambio hizo subir el
+  // conteo" aunque la edición lo hubiera BAJADO. Un aviso que dice lo mismo
+  // pase lo que pase, y que además puede estar diciendo lo contrario de lo que
+  // pasó, se lee salteado a los dos días.
+  //
+  // El veredicto NO se afloja: sigue siendo rojo si hay altas. Lo que cambia es
+  // de quién se habla. Sin la bandera, el comportamiento es exactamente el de
+  // antes.
+  const soloArchivo = valor("--archivo");
+  const todasLasAltas = base.inventario ? altasContraBase(base.inventario, inventario) : [];
+  const altas = soloArchivo ? todasLasAltas.filter((a) => a.archivo === soloArchivo) : todasLasAltas;
   const { estado, subieron, bajaron } = compararConLineaBase(base.total, total);
 
   // Una base vieja no tiene inventario. Se dice, en vez de contestar que está
@@ -448,14 +462,21 @@ function trinquete() {
       console.error(`     ${a.que}${cuantas}  —  ${a.archivo}${desde}`);
     }
     console.error(`\n  ${totalDeAltas(altas)} ocurrencias nuevas en ${altas.length} lugares.`);
-    // El total se sigue informando porque es lo que se lee de un vistazo, pero
-    // NO es lo que decide: acá se ve por qué mirarlo solo a él no alcanzaba.
-    const resumenTotal = subieron.length
-      ? subieron.map((s) => `${ETIQUETAS[s.categoria]} +${s.delta}`).join(", ")
-      : bajaron.length
-        ? "el total incluso BAJÓ: la compensación cruzada es exactamente esto"
-        : "el total no se movió: la compensación cruzada es exactamente esto";
-    console.error(`  Contra los totales: ${resumenTotal}.`);
+    if (soloArchivo) {
+      // Acotado a un archivo, el resumen de totales del repo entero no viene al
+      // caso y era justamente el ruido: se dice cuánto queda pendiente y nada más.
+      const resto = totalDeAltas(todasLasAltas) - totalDeAltas(altas);
+      if (resto > 0) console.error(`  (en el resto del repo quedan ${resto}, de antes de esta edición)`);
+    } else {
+      // El total se sigue informando porque es lo que se lee de un vistazo, pero
+      // NO es lo que decide: acá se ve por qué mirarlo solo a él no alcanzaba.
+      const resumenTotal = subieron.length
+        ? subieron.map((s) => `${ETIQUETAS[s.categoria]} +${s.delta}`).join(", ")
+        : bajaron.length
+          ? "el total incluso BAJÓ: la compensación cruzada es exactamente esto"
+          : "el total no se movió: la compensación cruzada es exactamente esto";
+      console.error(`  Contra los totales: ${resumenTotal}.`);
+    }
     console.error("\nQué hacer: usar lo que ya existe en vez del valor escrito a mano.");
     console.error("Para ver qué hay en una pantalla: node scripts/hardcodeo.mjs --ficha <pantalla>");
     console.error("Si el aumento es a propósito, se sube la base a mano y se dice por qué:");
