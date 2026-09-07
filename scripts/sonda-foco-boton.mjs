@@ -135,9 +135,13 @@ const medido = await evaluar(`(() => {
     // ── EL CONTROL: SE MIDE SIN FOCO Y CON FOCO ──────────────────────────
     //
     // Sin esto, la sonda daba un falso positivo. El botón del kit tiene una
-    // sombra ambiental —`0 1px 3px`— que está SIEMPRE, y leer solo el estado
+    // sombra ambiental de 0 1px 3px que está SIEMPRE, y leer solo el estado
     // enfocado la contaba como si fuera el anillo de foco. Lo que prueba que hay
     // señal de foco no es que haya sombra: es que algo CAMBIE al enfocar.
+    //
+    // Sin backticks en este comentario a propósito: vive adentro de un template
+    // literal, y uno solo cerraría la cadena. Es la trampa que CLAUDE.md tiene
+    // anotada.
     const sinFoco = getComputedStyle(b);
     const antes = { outline: sinFoco.outlineStyle, boxShadow: sinFoco.boxShadow };
 
