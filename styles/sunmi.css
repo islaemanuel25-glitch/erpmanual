@@ -428,6 +428,17 @@
 .sunmi-text-success { color: var(--pos-success, #22c55e); }
 .sunmi-text-danger  { color: var(--pos-danger, #ef4444); }
 .sunmi-text-warning { color: var(--pos-warning, #f59e0b); }
+/* UN POSITIVO DICHO EN TONO INFORMATIVO, que no es lo mismo que un estado de
+   éxito. Es el importe de un descuento, el vuelto, la etiqueta de una oferta:
+   datos que están bien y que no hay que celebrar. `success` los diría más
+   fuerte de lo que son.
+   No alcanzaba con `.sunmi-text-success`: usa `--pos-success`, que en los
+   catorce temas vale otra cosa —#34d399 contra #6ee7b7 en los oscuros,
+   #059669 contra #047857 en los claros—, así que migrar ahí cambiaría el color.
+   La variable ya existe y está definida en los catorce; lo que faltaba era el
+   miembro de la familia general que la lee, como ya lo hacen accent, success y
+   danger acá arriba. */
+.sunmi-text-success-soft { color: var(--pos-success-soft); }
 
 /* --- Overlays --- */
 .sunmi-overlay        { background: color-mix(in srgb, black 50%, transparent); }
