@@ -356,7 +356,22 @@ for (const ancho of ANCHOS) {
 
       if (EXIGIR) {
         ok(`${tema}/${ancho} · ${c.nombre}: con TAB se ve`, senalTeclado);
-        ok(`${tema}/${ancho} · ${c.nombre}: con CLICK no queda anillo de teclado`, !senalMouse);
+        // La fuente de verdad es `:focus-visible` del navegador, no el
+        // dispositivo. Chrome lo pone en `true` al clickear un campo que espera
+        // texto —input, select, textarea, date— porque ahí el foco SÍ importa:
+        // el que escribe necesita saber dónde va a caer lo que teclee. Un anillo
+        // ahí es correcto, no un defecto.
+        //
+        // Lo que no puede pasar es un anillo de teclado con `:focus-visible` en
+        // falso: eso es el mouse dejando una marca de navegación que nadie pidió.
+        // La primera versión de esta afirmación exigía 'con el mouse nunca se ve'
+        // y se puso roja sobre los cuatro campos de texto, que es justo el caso
+        // legítimo.
+        ok(
+          `${tema}/${ancho} · ${c.nombre}: con CLICK no queda anillo de teclado indebido`,
+          !(senalMouse && mou.focusVisible === false),
+          `focus-visible=${mou.focusVisible} shadow=${mou.boxShadow}`
+        );
       }
     }
 
