@@ -115,7 +115,10 @@ test("el contador cuenta y el hardcodeo subió: el hook lo dice", () => {
   });
 
   assert.ok(aviso);
-  assert.match(aviso, /introdujo hardcodeo que no estaba en la línea de base/);
+  // La frase habla de LOS CAMBIOS SIN COMMITEAR contra la versión commiteada,
+  // que es contra lo que el trinquete compara con `--archivo`. Ver abajo.
+  assert.match(aviso, /cambios sin commitear de .* traen hardcodeo/);
+  assert.match(aviso, /no está en la versión commiteada de ese archivo/);
   assert.match(aviso, /Colores fijos: 10 → 12/, "el detalle del aumento tiene que llegar");
   assert.match(aviso, /FormaPago\.jsx/, "y qué archivo se tocó");
 
@@ -130,6 +133,27 @@ test("el contador cuenta y el hardcodeo subió: el hook lo dice", () => {
     aviso,
     /hizo subir el conteo/,
     "el aviso volvió a afirmar algo sobre el total que no midió"
+  );
+
+  // ── Y TAMPOCO PUEDE DECIR "ESTA EDICIÓN INTRODUJO" ───────────────────────
+  //
+  // Es la segunda frase que hubo que sacar, del mismo tipo que la de arriba y
+  // por el mismo motivo: afirmaba algo que la medición no sostenía.
+  //
+  // Decía "esta edición de X introdujo hardcodeo que no estaba en la línea de
+  // base". Pero el trinquete filtraba por archivo las altas contra la línea base
+  // HISTÓRICA, así que una ocurrencia que entró en un commit anterior y sigue
+  // pendiente reaparecía cada vez que alguien tocaba cualquier otra línea de ese
+  // archivo. Reproducido: `HEAD` con el `text-[13px]` adentro, una edición que
+  // solo cambia una palabra, y el hook acusando a esa edición.
+  //
+  // Ahora la referencia es el mismo archivo en `HEAD`, y la frase dice eso. Lo
+  // que se puede afirmar es "los cambios sin commitear traen algo que la versión
+  // commiteada no tenía" — no cuál pulsación lo trajo, que el hook no puede ver.
+  assert.doesNotMatch(
+    aviso,
+    /esta edición de .* introdujo/,
+    "volvió la frase que le atribuía a la edición lo que solo se comparó contra la línea de base"
   );
 });
 

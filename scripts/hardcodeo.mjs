@@ -408,6 +408,31 @@ function sellarLineaBase() {
   return 0;
 }
 
+/**
+ * Altas de UN archivo contra su propia versión en `HEAD`.
+ *
+ * Contesta la única pregunta que el hook puede hacer con honestidad: ¿los
+ * cambios sin commitear de este archivo trajeron hardcodeo que antes no estaba?
+ *
+ * Un archivo que no existe en `HEAD` es nuevo, y entonces TODO lo suyo es nuevo:
+ * se compara contra vacío, no se saltea. Saltearlo sería la puerta de entrada
+ * más obvia —crear el archivo con la deuda adentro y que nadie lo mire—.
+ */
+function altasContraHead(rel) {
+  const abs = path.join(RAIZ_ESCANEO, rel);
+  const ahora = fs.existsSync(abs) ? fs.readFileSync(abs, "utf8") : "";
+  let previo = "";
+  try {
+    previo = git("show", `HEAD:${rel}`);
+  } catch {
+    // No está en HEAD: archivo nuevo. Se compara contra vacío.
+    previo = "";
+  }
+  const invAhora = inventarioDeHallazgos(contarArchivo(rel, ahora, OPCIONES).hallazgos);
+  const invPrevio = inventarioDeHallazgos(contarArchivo(rel, previo, OPCIONES).hallazgos);
+  return altasContraBase(invPrevio, invAhora);
+}
+
 function trinquete() {
   const base = leerLineaBase();
   if (!base) {
@@ -435,9 +460,26 @@ function trinquete() {
   // El veredicto NO se afloja: sigue siendo rojo si hay altas. Lo que cambia es
   // de quién se habla. Sin la bandera, el comportamiento es exactamente el de
   // antes.
+  //
+  // ── Y CON `--archivo` LA REFERENCIA NO ES LA LÍNEA BASE, ES `HEAD` ──────
+  //
+  // Filtrar las altas contra la línea base por archivo NO demuestra que la
+  // edición actual haya introducido nada. Reproducido: una ocurrencia que entró
+  // en un commit anterior y sigue pendiente vuelve a aparecer cada vez que
+  // alguien toca CUALQUIER otra línea del mismo archivo, y el hook la atribuía a
+  // esa edición. Con 15 altas pendientes en 13 lugares no es un caso teórico:
+  // es lo que iba a pasar en cuanto alguien editara uno de esos trece archivos.
+  //
+  // La referencia honesta para "¿esto lo trajo el trabajo actual?" es el mismo
+  // archivo en `HEAD`. Lo que está en `HEAD` ya está commiteado: será deuda, y
+  // el trinquete global la sigue informando, pero no la trajo quien está
+  // editando ahora.
+  //
+  // El modo GLOBAL no cambia: sin `--archivo` se compara contra la línea base
+  // histórica exactamente como antes.
   const soloArchivo = valor("--archivo");
   const todasLasAltas = base.inventario ? altasContraBase(base.inventario, inventario) : [];
-  const altas = soloArchivo ? todasLasAltas.filter((a) => a.archivo === soloArchivo) : todasLasAltas;
+  const altas = soloArchivo ? altasContraHead(soloArchivo) : todasLasAltas;
   const { estado, subieron, bajaron } = compararConLineaBase(base.total, total);
 
   // Una base vieja no tiene inventario. Se dice, en vez de contestar que está
@@ -465,8 +507,10 @@ function trinquete() {
     if (soloArchivo) {
       // Acotado a un archivo, el resumen de totales del repo entero no viene al
       // caso y era justamente el ruido: se dice cuánto queda pendiente y nada más.
-      const resto = totalDeAltas(todasLasAltas) - totalDeAltas(altas);
-      if (resto > 0) console.error(`  (en el resto del repo quedan ${resto}, de antes de esta edición)`);
+      // Ese pendiente sale de la línea base histórica —que es lo que mide la
+      // deuda del repo— y no de la comparación contra HEAD.
+      const resto = totalDeAltas(todasLasAltas);
+      if (resto > 0) console.error(`  (en el repo quedan ${resto} pendientes de antes, que no son de este cambio)`);
     } else {
       // El total se sigue informando porque es lo que se lee de un vistazo, pero
       // NO es lo que decide: acá se ve por qué mirarlo solo a él no alcanzaba.
@@ -491,6 +535,14 @@ function trinquete() {
     return 0;
   }
 
+  // En verde también hay que decir contra QUÉ se comparó, o el mensaje afirma
+  // algo que no se midió: con `--archivo` la referencia es HEAD, no la base.
+  if (soloArchivo) {
+    console.log(`TRINQUETE: los cambios sin commitear de ${soloArchivo} no traen hardcodeo nuevo.`);
+    const resto = totalDeAltas(todasLasAltas);
+    if (resto > 0) console.log(`  (en el repo quedan ${resto} pendientes de antes, que no son de este cambio)`);
+    return 0;
+  }
   console.log("TRINQUETE: sin cambios respecto de la línea de base.");
   return 0;
 }

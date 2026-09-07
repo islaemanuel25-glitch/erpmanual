@@ -173,8 +173,16 @@ process.stdin.on("end", () => {
     .trim();
 
   responder(
-    `TRINQUETE DE HARDCODEO: esta edición de ${rel} introdujo hardcodeo que no ` +
-      `estaba en la línea de base.\n\n` +
+    // LA FRASE DICE LO QUE SE MIDIÓ, NI MÁS NI MENOS. La versión anterior
+    // afirmaba "esta edición introdujo hardcodeo que no estaba en la línea de
+    // base", y eso NO se seguía de la medición: el trinquete filtraba por
+    // archivo las altas contra la línea base histórica, así que una ocurrencia
+    // de un commit anterior volvía a acusar a cualquiera que tocara otra línea
+    // del mismo archivo. Ahora se compara contra `HEAD`, y por eso se habla de
+    // los cambios sin commitear —que es lo que de verdad se comparó— y no de la
+    // última pulsación, que el hook no puede ver.
+    `TRINQUETE DE HARDCODEO: los cambios sin commitear de ${rel} traen hardcodeo ` +
+      `que no está en la versión commiteada de ese archivo.\n\n` +
       `${limpio}\n\n` +
       `Para ver qué hay en esa pantalla: node scripts/hardcodeo.mjs --ficha <pantalla>\n\n` +
       `Esto NO revierte nada. Hay dos salidas honestas: usar lo que ya existe —el token, ` +
