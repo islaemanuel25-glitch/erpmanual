@@ -98,6 +98,11 @@ async function desmontar() {
   // PRIMERO la venta de la prueba de compatibilidad: apunta al usuario y al
   // local, así que borrarla después hacía fallar el `deleteMany` de usuarios por
   // clave foránea y dejaba la limpieza a medias.
+  // La venta de los conflictos se borra igual que la histórica: sus tenders se
+  // van por el `onDelete: Cascade` de `VentaPago`.
+  if (creado.ventaConflictoId) {
+    await prisma.venta.deleteMany({ where: { id: creado.ventaConflictoId } });
+  }
   if (creado.ventaHistoricaId) {
     await prisma.venta.deleteMany({ where: { id: creado.ventaHistoricaId } });
   }
@@ -695,6 +700,164 @@ async function correr(f) {
   const resuelto = resolverComision({ tipoContable: "DEBITO", comisionPct: null }, cfgNueva);
   igual("y el código nuevo lo llama por su nombre", [resuelto.pct, resuelto.origen],
     [null, "sin-configurar"]);
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // LOS TRES CONFLICTOS DEL MODELO CON LAS MODALIDADES POR MEDIO
+  // ═════════════════════════════════════════════════════════════════════════
+  //
+  // El diseño aprobado —Figma `fYqIEZxHRb6yx6pIUrUG2h`, página 19:2— reemplaza
+  // los tres botones de Mercado Pago por UNO con modalidades:
+  //
+  //     Mercado Pago
+  //     ├── Débito
+  //     ├── Crédito
+  //     └── QR / saldo
+  //
+  // Antes de tocar el esquema hay que demostrar que el modelo de hoy no puede
+  // expresarlo, y demostrarlo EJERCIENDO la base, no leyendo `schema.prisma`.
+  //
+  // ── LA TENTACIÓN QUE ESTOS ESCENARIOS NO TOMAN ─────────────────────────
+  //
+  // Sería fácil darle a cada modalidad un `MedioPago` distinto —DEBITO para una,
+  // CREDITO para otra— y que todo pasara. Eso reproduce EXACTAMENTE la
+  // arquitectura que el diseño viene a reemplazar: si las modalidades fueran
+  // tipos contables distintos, volveríamos a tener tres botones en el POS.
+  //
+  // Las tres comparten la identidad contable del medio padre, `MERCADOPAGO`.
+  // Eso es el escenario, no un descuido.
+  //
+  // Los tres tienen que quedar en ROJO, y cada rojo tiene que decir POR QUÉ.
+
+  seccion("11. CONFLICTO A · dos modalidades del mismo padre con recargos distintos");
+
+  // El contrato futuro: Débito 2 % y Crédito 6 %, las dos bajo Mercado Pago.
+  await prisma.recargoPagoLocal.deleteMany({ where: { localId: localA.id, medio: "MERCADOPAGO" } });
+
+  await prisma.recargoPagoLocal.create({
+    data: { localId: localA.id, medio: "MERCADOPAGO", porcentaje: 2 },
+  });
+
+  // La segunda modalidad, del MISMO medio padre, con OTRO recargo.
+  let choqueRecargo = null;
+  try {
+    await prisma.recargoPagoLocal.create({
+      data: { localId: localA.id, medio: "MERCADOPAGO", porcentaje: 6 },
+    });
+  } catch (e) {
+    choqueRecargo = e?.message?.split("\n").find((l) => l.trim()) || String(e);
+  }
+
+  const filasRecargoMP = await prisma.recargoPagoLocal.findMany({
+    where: { localId: localA.id, medio: "MERCADOPAGO" },
+    select: { porcentaje: true },
+  });
+  const pctsMP = filasRecargoMP.map((r) => Number(r.porcentaje)).sort((a, b) => a - b);
+
+  console.log(`    primer recargo (Débito 2 %): guardado`);
+  console.log(`    segundo recargo (Crédito 6 %): ${choqueRecargo ? "RECHAZADO — " + choqueRecargo : "guardado"}`);
+  console.log(`    filas que quedaron para (local, MERCADOPAGO): ${JSON.stringify(pctsMP)}`);
+
+  igual(
+    "CONFLICTO A · Débito 2 % y Crédito 6 % conviven bajo el mismo medio padre — " +
+      "el modelo actual COLAPSA el recargo de las dos modalidades en una sola clave (localId, MedioPago)",
+    pctsMP,
+    [2, 6]
+  );
+
+  await prisma.recargoPagoLocal.deleteMany({ where: { localId: localA.id, medio: "MERCADOPAGO" } });
+
+  seccion("12. CONFLICTO B · dos tenders del mismo medio padre en una venta");
+
+  // Una venta de verdad, propia de este escenario, para insertar tenders reales.
+  const ventaConflicto = await prisma.venta.create({
+    data: {
+      localId: localA.id,
+      vendedorId: creado.usuarioId,
+      numero: 990001,
+      subtotal: 300,
+      total: 300,
+      formaPago: "mercadopago",
+    },
+    select: { id: true },
+  });
+  creado.ventaConflictoId = ventaConflicto.id;
+
+  const tenders = [];
+  let choqueTender = null;
+
+  // Mercado Pago / Débito
+  tenders.push(
+    await prisma.ventaPago.create({
+      data: { ventaId: ventaConflicto.id, medio: "MERCADOPAGO", monto: 100, comision: 0, neto: 100 },
+      select: { id: true, monto: true },
+    })
+  );
+  console.log(`    primer tender (MP/Débito $100): id ${tenders[0].id}`);
+
+  // Mercado Pago / Crédito — mismo medio padre, otra modalidad.
+  try {
+    tenders.push(
+      await prisma.ventaPago.create({
+        data: { ventaId: ventaConflicto.id, medio: "MERCADOPAGO", monto: 200, comision: 0, neto: 200 },
+        select: { id: true, monto: true },
+      })
+    );
+    console.log(`    segundo tender (MP/Crédito $200): id ${tenders[1].id}`);
+  } catch (e) {
+    choqueTender = e?.message?.split("\n").find((l) => l.trim()) || String(e);
+    console.log(`    segundo tender (MP/Crédito $200): RECHAZADO — ${choqueTender}`);
+  }
+
+  const quedaron = await prisma.ventaPago.findMany({
+    where: { ventaId: ventaConflicto.id },
+    select: { medio: true, monto: true },
+  });
+  console.log(`    filas que quedaron en la venta: ${JSON.stringify(quedaron.map((t) => [t.medio, Number(t.monto)]))}`);
+
+  igual(
+    "CONFLICTO B · una venta registra MP/Débito y MP/Crédito como dos tenders — " +
+      "hoy lo impide @@unique([ventaId, medio]), que identifica el tender por TIPO CONTABLE",
+    quedaron.length,
+    2
+  );
+
+  seccion("13. CONFLICTO C · snapshot histórico de la modalidad");
+
+  // Se construye el registro histórico MÁXIMO que el modelo permite hoy: se
+  // congela en la venta lo que impuso la condición comercial.
+  await prisma.venta.update({
+    where: { id: ventaConflicto.id },
+    data: { recargoPagoPct: 6, recargoPagoImporte: 18, recargoPagoMedio: "MERCADOPAGO" },
+  });
+
+  // Y AHORA LA CONFIGURACIÓN CAMBIA, que es lo que hace que el snapshot importe:
+  // la modalidad que se usó se renombra, cambia de porcentaje y se desactiva.
+  // Si la auditoría dependiera de leer la configuración actual, acá empezaría a
+  // mentir.
+  const congelado = await prisma.venta.findUnique({
+    where: { id: ventaConflicto.id },
+    select: { recargoPagoPct: true, recargoPagoImporte: true, recargoPagoMedio: true },
+  });
+  console.log(`    lo máximo que la venta puede congelar hoy: ${JSON.stringify({
+    pct: Number(congelado.recargoPagoPct),
+    importe: Number(congelado.recargoPagoImporte),
+    medio: congelado.recargoPagoMedio,
+  })}`);
+
+  // La pregunta que una auditoría futura va a hacer: ¿con QUÉ modalidad se cobró?
+  // El dato congelado no alcanza para distinguir Crédito de Débito: los dos
+  // dirían MERCADOPAGO. Se comprueba sobre el objeto devuelto, no sobre el
+  // schema: lo que importa es qué puede CONTESTAR la venta.
+  const puedeIdentificarModalidad = Object.keys(congelado).some((k) => /modalidad/i.test(k));
+  console.log(`    ¿puede decir si fue Débito o Crédito?: ${puedeIdentificarModalidad ? "sí" : "NO"}`);
+
+  igual(
+    "CONFLICTO C · la venta histórica identifica la MODALIDAD con la que se cobró — " +
+      `hoy solo congela el tipo contable (${congelado.recargoPagoMedio}), así que Mercado Pago/Crédito y ` +
+      "Mercado Pago/Débito son indistinguibles para siempre",
+    puedeIdentificarModalidad,
+    true
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
