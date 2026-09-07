@@ -107,7 +107,7 @@ export default function CobrosPage() {
         ) : (
           <>
             <div className="space-y-3">
-              <h2 className="text-[11px] sunmi-section-title">MEDIOS DE COBRO</h2>
+              <h2 className="text-sm2 sunmi-section-title">MEDIOS DE COBRO</h2>
 
               <div className="flex flex-col gap-3">
                 {medios.map((m) => (

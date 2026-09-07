@@ -68,7 +68,7 @@ export default function ResumenKpis({ resumen }) {
       {/* Dicho con palabras y con el número de ventas, porque "(parcial)" en un
           rótulo explica QUE falta algo pero no QUÉ. */}
       {parcial && (
-        <p className="text-[11px] sunmi-text-muted px-1">
+        <p className="text-sm2 sunmi-text-muted px-1">
           {ventasPendientes === 1
             ? "1 venta se cobró sin la comisión configurada: comisión, neto y ganancia son parciales."
             : `${ventasPendientes} ventas se cobraron sin la comisión configurada: comisión, neto y ganancia son parciales.`}

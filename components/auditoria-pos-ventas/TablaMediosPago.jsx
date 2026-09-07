@@ -44,14 +44,14 @@ export default function TablaMediosPago({ items, estadoFinanciero = null }) {
 
   return (
     <div>
-      <p className="text-[10px] sunmi-text-muted mb-1.5">
+      <p className="text-xs2 sunmi-text-muted mb-1.5">
         Fiado prioriza <code className="text-[9px]">esFiado</code>. Valores desde Venta persistida.
       </p>
       {/* Las columnas de comisión, neto y ganancia arrastran los ceros
           estructurales de las ventas cobradas sin la comisión configurada. La
           de bruto no: es un monto y no depende de esto. */}
       {estadoFinanciero?.parcial && (
-        <p className="text-[10px] sunmi-text-muted mb-1.5">
+        <p className="text-xs2 sunmi-text-muted mb-1.5">
           {estadoFinanciero.pendientes === 1
             ? "1 venta sin comisión configurada: "
             : `${estadoFinanciero.pendientes} ventas sin comisión configurada: `}
