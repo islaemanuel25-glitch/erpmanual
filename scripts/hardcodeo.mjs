@@ -386,6 +386,10 @@ function sellarLineaBase() {
       "sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número " +
       "sube, se arregla el código o se decide subir la base a propósito y se dice por qué " +
       "en el commit.",
+    _commit:
+      "`commit` es el árbol que se ESCANEÓ, no la fecha en que se selló: pueden diferir. " +
+      "Cuando se corrige un falso positivo del contador, la base se REEXPRESA desde el " +
+      "árbol histórico —no desde main— para no perdonar la deuda que entró después.",
     _inventario:
       "El trinquete compara el INVENTARIO, no los totales: una ocurrencia es " +
       "archivo + categoría + texto, con cantidad. Sin número de línea, para que mover " +
