@@ -126,11 +126,15 @@ if (!lista) frenar("la página no llegó a tener un botón");
 // Los cinco controles del contrato. Se dibujan en una barra propia, con un ancla
 // antes para poder llegar al primero con un solo Tab.
 const CASOS = [
-  { id: "c-kit", nombre: "A · SunmiButton", etiqueta: "button", clases: "sunmi-btn sunmi-btn-cyan" },
-  { id: "c-nativo", nombre: "B · button nativo", etiqueta: "button", clases: "" },
-  { id: "c-tarjeta", nombre: "C · TarjetaOferta (tarjeta como botón)", etiqueta: "button", clases: "w-full text-left sunmi-panel rounded-lg p-3" },
-  { id: "c-enlace", nombre: "D · botón con apariencia de enlace", etiqueta: "button", clases: "text-xs sunmi-text-accent mt-1 underline" },
-  { id: "c-input", nombre: "E · SunmiInput", etiqueta: "input", clases: "sunmi-input" },
+  { id: "c-kit", nombre: "1 SunmiButton", etiqueta: "button", clases: "sunmi-btn sunmi-btn-cyan" },
+  { id: "c-input", nombre: "2 SunmiInput", etiqueta: "input", clases: "sunmi-input" },
+  { id: "c-select", nombre: "3 select del kit", etiqueta: "select", clases: "sunmi-select-native" },
+  { id: "c-textarea", nombre: "4 SunmiTextarea", etiqueta: "textarea", clases: "sunmi-textarea" },
+  { id: "c-nativo", nombre: "5 button nativo", etiqueta: "button", clases: "" },
+  { id: "c-a", nombre: "6 enlace <a>", etiqueta: "a", clases: "" },
+  { id: "c-tarjeta", nombre: "7 TarjetaOferta", etiqueta: "button", clases: "w-full text-left sunmi-panel rounded-lg p-3" },
+  { id: "c-link", nombre: "8 botón-enlace crudo", etiqueta: "button", clases: "text-xs sunmi-text-accent underline" },
+  { id: "c-fecha", nombre: "9 input date (la excepción histórica)", etiqueta: "input", tipo: "date", clases: "sunmi-input" },
 ];
 
 await evaluar(`(() => {
@@ -152,7 +156,10 @@ await evaluar(`(() => {
     const el = document.createElement(c.etiqueta);
     el.id = c.id;
     if (c.etiqueta === "button") { el.type = "button"; el.textContent = c.nombre; }
-    else { el.value = "texto"; }
+    else if (c.etiqueta === "a") { el.href = "#"; el.textContent = c.nombre; el.style.color = "var(--app-fg)"; }
+    else if (c.etiqueta === "select") { const o = document.createElement("option"); o.textContent = "opción"; el.append(o); }
+    else if (c.etiqueta === "textarea") { el.value = "texto"; el.rows = 1; }
+    else { el.type = c.tipo || "text"; el.value = c.tipo === "date" ? "2026-09-07" : "texto"; }
     el.className = c.clases;
     barra.append(el);
   }
@@ -165,8 +172,11 @@ const LEER = (elId) => `(() => {
   const s = getComputedStyle(el);
   return JSON.stringify({
     enfocado: document.activeElement === el,
+    focus: (() => { try { return el.matches(":focus"); } catch { return null; } })(),
     focusVisible: (() => { try { return el.matches(":focus-visible"); } catch { return null; } })(),
     outline: s.outlineStyle + " " + s.outlineWidth,
+    outlineColor: s.outlineColor,
+    outlineOffset: s.outlineOffset,
     boxShadow: s.boxShadow,
   });
 })()`;
@@ -191,6 +201,13 @@ async function porTeclado(elId, indice) {
 }
 
 async function porMouse(elId) {
+  // Se suelta el foco ANTES de clickear. Sin esto el click caía sobre un
+  // elemento que el Tab acababa de enfocar, y Chrome conserva `:focus-visible`:
+  // la columna del mouse informaba `true` siempre y no distinguía nada, que es
+  // lo único que esta sonda tiene que distinguir.
+  await evaluar(`(() => { document.activeElement && document.activeElement.blur(); return true; })()`);
+  await sleep(40);
+
   const caja = JSON.parse(await evaluar(`(() => {
     const r = document.getElementById(${JSON.stringify(elId)}).getBoundingClientRect();
     return JSON.stringify({ x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) });
@@ -202,8 +219,22 @@ async function porMouse(elId) {
   return JSON.parse(await evaluar(LEER(elId)));
 }
 
-const hayCambio = (base, otro) =>
-  base.outline !== otro.outline || base.boxShadow !== otro.boxShadow;
+/**
+ * ¿Hay señal de foco? Solo si algo se AGREGA, no si algo cambia.
+ *
+ * La versión anterior tomaba cualquier diferencia contra el reposo, y eso daba
+ * un falso positivo al revés: el botón del kit tiene una sombra ambiental que la
+ * regla global BORRA al enfocarlo, y esa desaparición contaba como "se ve". Un
+ * control que pierde su sombra al recibir el foco no está señalando dónde está
+ * el foco: está perdiendo decoración.
+ *
+ * Señal = aparece un contorno, o la sombra pasa a ser algo distinto Y no vacío.
+ */
+const haySenal = (base, otro) => {
+  const contorno = otro.outline.split(" ")[0] !== "none";
+  const sombraNueva = otro.boxShadow !== "none" && otro.boxShadow !== base.boxShadow;
+  return contorno || sombraNueva;
+};
 
 let fallas = 0;
 const ok = (t, c, d = "") => { if (c) console.log(`  ✓ ${t}`); else { fallas++; console.log(`  ✗ ${t}${d ? "  " + d : ""}`); } };
@@ -225,13 +256,18 @@ for (const ancho of ANCHOS) {
       const tec = await porTeclado(c.id, i);
       const mou = await porMouse(c.id);
 
-      const senalTeclado = tec.enfocado && hayCambio(base, tec);
-      const senalMouse = mou.enfocado && hayCambio(base, mou);
+      const senalTeclado = tec.enfocado && haySenal(base, tec);
+      const senalMouse = mou.enfocado && haySenal(base, mou);
 
-      console.log(`  ${c.nombre}`);
-      console.log(`     reposo   outline ${base.outline}  shadow ${base.boxShadow === "none" ? "none" : "sí"}`);
-      console.log(`     TAB      enfocado ${tec.enfocado} fv ${tec.focusVisible} outline ${tec.outline}  ${senalTeclado ? "→ SE VE" : "→ NO se ve"}`);
-      console.log(`     CLICK    enfocado ${mou.enfocado} fv ${mou.focusVisible} outline ${mou.outline}  ${senalMouse ? "→ deja anillo" : "→ limpio"}`);
+      // Una fila por control: TAB y CLICK con lo que decide cada uno.
+      console.log(
+        `  ${c.nombre.padEnd(38)}` +
+          `TAB[fv:${String(tec.focusVisible).padEnd(5)} out:${tec.outline.padEnd(12)} sh:${tec.boxShadow === "none" ? "no " : "sí "}${senalTeclado ? "SE VE " : "NO ve "}]  ` +
+          `CLICK[fv:${String(mou.focusVisible).padEnd(5)} ${senalMouse ? "anillo" : "limpio"}]`
+      );
+      if (senalTeclado && tec.outline.split(" ")[0] !== "none") {
+        console.log(`  ${"".padEnd(38)}      contorno ${tec.outline} ${tec.outlineColor} offset ${tec.outlineOffset}`);
+      }
 
       if (EXIGIR) {
         ok(`${tema}/${ancho} · ${c.nombre}: con TAB se ve`, senalTeclado);
