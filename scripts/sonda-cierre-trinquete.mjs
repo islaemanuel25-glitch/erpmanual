@@ -55,8 +55,11 @@ async function urlDepurador() {
   }
   frenar("el navegador no abrió el puerto de depuración");
 }
-async function evaluar(e) {
-  const r = await send("Runtime.evaluate", { expression: e, returnByValue: true });
+async function evaluar(e, esperarPromesa = false) {
+  // `awaitPromise` no es opcional cuando la expresión es una IIFE asíncrona: sin
+  // él, CDP devuelve el objeto Promise sin resolver y `result.value` viene
+  // vacío. Es el mismo defecto que ya se había corregido en la sonda de foco.
+  const r = await send("Runtime.evaluate", { expression: e, returnByValue: true, awaitPromise: esperarPromesa });
   if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);
   return r.result.value;
 }
