@@ -55,7 +55,11 @@ CREATE TABLE IF NOT EXISTS "MedioCobroModalidadLocal" (
   -- `Venta.comisionPendiente`.
   "comisionPct"       DECIMAL(5,2),
   "createdAt"         TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updatedAt"         TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  -- SIN DEFAULT, a propósito. `@updatedAt` de Prisma lo escribe el cliente en
+  -- cada UPDATE, no la base: ponerle un DEFAULT acá crea deriva contra el schema
+  -- —el chequeo lo detectó— y además haría creer que la base lo mantiene, cuando
+  -- un UPDATE por SQL directo lo dejaría viejo.
+  "updatedAt"         TIMESTAMP(3) NOT NULL
 );
 
 DO $$
@@ -157,7 +161,22 @@ CREATE INDEX IF NOT EXISTS "Venta_recargoPagoModalidadId_idx"
 --   legacy   · misma venta + mismo medio + modalidad NULL      → RECHAZADO
 --   modalidad· misma venta + misma modalidad                   → RECHAZADO
 --   dos mods · misma venta + MP/Débito + MP/Crédito            → PERMITIDO
+-- ES UN ÍNDICE, NO UNA CONSTRAINT, Y LA DIFERENCIA SE PAGÓ.
+--
+-- La baseline lo crea con `CREATE UNIQUE INDEX "VentaPago_ventaId_medio_key"`.
+-- La primera versión de esta migración escribía `DROP CONSTRAINT IF EXISTS`, que
+-- sobre un índice NO BORRA NADA — y el `IF EXISTS` se lo tragó en silencio: la
+-- migración aplicaba sin error y la restricción vieja seguía viva, así que el
+-- segundo tender habría seguido siendo rechazado.
+--
+-- Lo detectó el chequeo de deriva, que comparó el schema contra el resultado de
+-- las migraciones y propuso exactamente este DROP INDEX. Sin ese chequeo, la
+-- migración habría pasado por verde sin hacer su trabajo.
+--
+-- Se dejan las dos formas porque la constraint podría existir en una base creada
+-- por otro camino, y `IF EXISTS` en ambas las vuelve idempotentes.
 ALTER TABLE "VentaPago" DROP CONSTRAINT IF EXISTS "VentaPago_ventaId_medio_key";
+DROP INDEX IF EXISTS "VentaPago_ventaId_medio_key";
 
 -- Legacy: replica EXACTAMENTE lo que hacía la constraint, acotado a las filas
 -- sin modalidad. Nada que antes se rechazara pasa a aceptarse.
