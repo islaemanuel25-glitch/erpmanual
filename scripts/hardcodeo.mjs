@@ -70,6 +70,10 @@ import { fileURLToPath } from "node:url";
 import {
   contarArchivo,
   compararConLineaBase,
+  inventarioDeHallazgos,
+  altasContraBase,
+  totalDeAltas,
+  MARCA_VEREDICTO,
   sumar,
   contadorVacio,
   PRIORIDAD,
@@ -101,8 +105,24 @@ const { FORBIDDEN, WHITELIST, estaExento } = require_(path.join(AQUI, "check-the
 // en los 300 archivos de interfaz en vez de en la pantalla declarada.
 const OPCIONES = { patronesColor: FORBIDDEN, excepcionesColor: WHITELIST, exentaColor: estaExento };
 
+// QUÉ ÁRBOL SE ESCANEA, QUE NO SIEMPRE ES ESTE.
+//
+// Normalmente es el repo donde vive el script. La excepción tiene un motivo
+// concreto: la línea de base sellada el 2026-08-22 quedó describiendo un árbol
+// que ya no se puede reproducir desde acá, y para REEXPRESARLA con una regla
+// corregida hay que escanear ese árbol histórico —un `git worktree` en detached—
+// y no el de hoy. Sin esta costura, la única forma sería sellar sobre `main`, que
+// es exactamente lo que no se puede hacer: perdonaría toda la deuda que entró
+// después.
+//
+// La línea de base se sigue leyendo y escribiendo en RAIZ: se escanea allá y se
+// escribe acá, que es lo que hace falta.
+const RAIZ_ESCANEO = process.env.HARDCODEO_RAIZ
+  ? path.resolve(process.env.HARDCODEO_RAIZ)
+  : RAIZ;
+
 const git = (...args) =>
-  execFileSync("git", args, { cwd: RAIZ, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  execFileSync("git", args, { cwd: RAIZ_ESCANEO, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 
 /**
  * Todos los archivos de interfaz del repo, enumerados con git.
@@ -157,7 +177,7 @@ export function pantallaDe(ruta) {
 function escanear() {
   const porArchivo = [];
   for (const ruta of archivosDeInterfaz()) {
-    const contenido = fs.readFileSync(path.join(RAIZ, ruta), "utf8");
+    const contenido = fs.readFileSync(path.join(RAIZ_ESCANEO, ruta), "utf8");
     const { hallazgos, conteo } = contarArchivo(ruta, contenido, OPCIONES);
     porArchivo.push({ ruta, pantalla: pantallaDe(ruta), hallazgos, conteo });
   }
@@ -280,7 +300,11 @@ function totalesActuales() {
   const grupos = agruparPorPantalla(porArchivo);
   const porPantalla = {};
   for (const [k, v] of [...grupos].sort()) porPantalla[k] = v.conteo;
-  return { total: sumar(porArchivo.map((a) => a.conteo)), porPantalla };
+  // El inventario es lo que permite ver un alta tapada por una baja ajena. Los
+  // totales se siguen calculando porque son lo que se lee de un vistazo, pero ya
+  // no son los que deciden el veredicto.
+  const inventario = inventarioDeHallazgos(porArchivo.flatMap((a) => a.hallazgos));
+  return { total: sumar(porArchivo.map((a) => a.conteo)), porPantalla, inventario };
 }
 
 /**
@@ -332,7 +356,29 @@ function mostrarLineaBase() {
 
 /** SELLAR: el único lugar de este script que escribe la línea de base. */
 function sellarLineaBase() {
-  const { total, porPantalla } = totalesActuales();
+  // ── EL COMMIT TIENE QUE DESCRIBIR LO QUE SE ESCANEÓ ──────────────────────
+  //
+  // Hasta el 2026-09-07 esto anotaba `HEAD` y escaneaba el ÁRBOL DE TRABAJO, que
+  // no son lo mismo cuando hay cambios sin commitear. La base sellada el
+  // 2026-08-22 quedó diciendo `ed6583fa` con números que en realidad son los del
+  // árbol de `32757049` — un archivo que se declara reproducible y no lo es.
+  //
+  // Se ataja antes de escribir: si el árbol escaneado está sucio, no hay ningún
+  // commit que describa esos números y sellar sería fabricar una referencia
+  // falsa. Es un rechazo, no un aviso, porque el aviso ya existía —la fecha— y
+  // no alcanzó.
+  const sucio = git("status", "--porcelain").trim();
+  if (sucio) {
+    console.error("NO se selló: el árbol que se escaneó tiene cambios sin commitear.");
+    console.error("");
+    console.error("Los números saldrían del árbol de trabajo y el `commit` anotado sería el de");
+    console.error("HEAD, que describe otra cosa. Así se rompió la base del 2026-08-22.");
+    console.error("");
+    console.error("Commiteá primero, o sellá desde un árbol limpio.");
+    return 2;
+  }
+
+  const { total, porPantalla, inventario } = totalesActuales();
   const commit = git("rev-parse", "HEAD").trim();
   const doc = {
     _lea_esto:
@@ -340,10 +386,16 @@ function sellarLineaBase() {
       "sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número " +
       "sube, se arregla el código o se decide subir la base a propósito y se dice por qué " +
       "en el commit.",
+    _inventario:
+      "El trinquete compara el INVENTARIO, no los totales: una ocurrencia es " +
+      "archivo + categoría + texto, con cantidad. Sin número de línea, para que mover " +
+      "código no invente violaciones. Un alta en cualquier clave pone rojo aunque el " +
+      "total baje.",
     generada: new Date().toISOString().slice(0, 16).replace("T", " "),
     commit,
     total,
     porPantalla,
+    inventario,
   };
   fs.mkdirSync(path.dirname(LINEA_BASE), { recursive: true });
   fs.writeFileSync(LINEA_BASE, JSON.stringify(doc, null, 2) + "\n");
@@ -358,17 +410,48 @@ function trinquete() {
     console.error("No hay línea de base. Generala con: node scripts/hardcodeo.mjs --linea-base");
     return 2;
   }
-  const { total } = totalesActuales();
-  // El veredicto lo decide `compararConLineaBase`, que es puro y tiene candados.
-  // Acá solo se imprime: si la decisión viviera en este script, no se podría
-  // ejercer sin ensuciar el repo para que un número suba.
+  const { total, inventario } = totalesActuales();
+
+  // ── EL VEREDICTO LO DECIDEN LAS ALTAS, NO EL TOTAL ──────────────────────
+  //
+  // Comparar totales deja pasar la compensación cruzada: 17 medidas nuevas y 15
+  // viejas limpiadas se informaban como "+2". `altasContraBase` mira clave por
+  // clave, así que una sola ocurrencia nueva pone rojo aunque el total baje.
+  //
+  // Las dos decisiones son puras y tienen candados; acá solo se imprime.
+  const altas = base.inventario ? altasContraBase(base.inventario, inventario) : [];
   const { estado, subieron, bajaron } = compararConLineaBase(base.total, total);
 
-  if (estado === "subio") {
-    console.error("TRINQUETE: subió el hardcodeo.\n");
-    for (const s of subieron) {
-      console.error(`  ${ETIQUETAS[s.categoria]}: ${s.antes} → ${s.ahora}  (+${s.delta})`);
+  // Una base vieja no tiene inventario. Se dice, en vez de contestar que está
+  // todo bien: sin inventario esto vuelve a ser el guardia que ya falló.
+  if (!base.inventario) {
+    console.error("TRINQUETE: la línea de base no tiene inventario, así que NO se puede");
+    console.error("distinguir un alta de una compensación. Volvé a sellarla desde el árbol");
+    console.error("histórico que corresponda antes de confiar en este control.");
+    return 2;
+  }
+
+  if (altas.length) {
+    console.error(`${MARCA_VEREDICTO}\n`);
+    let cat = null;
+    for (const a of altas) {
+      if (a.categoria !== cat) {
+        cat = a.categoria;
+        console.error(`  ${ETIQUETAS[cat]}:`);
+      }
+      const cuantas = a.delta === 1 ? "" : ` ×${a.delta}`;
+      const desde = a.antes ? ` (era ${a.antes}, ahora ${a.ahora})` : "";
+      console.error(`     ${a.que}${cuantas}  —  ${a.archivo}${desde}`);
     }
+    console.error(`\n  ${totalDeAltas(altas)} ocurrencias nuevas en ${altas.length} lugares.`);
+    // El total se sigue informando porque es lo que se lee de un vistazo, pero
+    // NO es lo que decide: acá se ve por qué mirarlo solo a él no alcanzaba.
+    const resumenTotal = subieron.length
+      ? subieron.map((s) => `${ETIQUETAS[s.categoria]} +${s.delta}`).join(", ")
+      : bajaron.length
+        ? "el total incluso BAJÓ: la compensación cruzada es exactamente esto"
+        : "el total no se movió: la compensación cruzada es exactamente esto";
+    console.error(`  Contra los totales: ${resumenTotal}.`);
     console.error("\nQué hacer: usar lo que ya existe en vez del valor escrito a mano.");
     console.error("Para ver qué hay en una pantalla: node scripts/hardcodeo.mjs --ficha <pantalla>");
     console.error("Si el aumento es a propósito, se sube la base a mano y se dice por qué:");

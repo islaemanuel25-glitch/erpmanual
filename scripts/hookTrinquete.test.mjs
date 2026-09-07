@@ -39,6 +39,10 @@ import fs from "node:fs";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 
+// La marca se IMPORTA, no se copia: era la tercera escritura a mano de la misma
+// cadena, y por eso cambiar el texto del trinquete rompía el hook en silencio.
+import { MARCA_VEREDICTO as MARCA } from "@/lib/hardcodeo/contador.mjs";
+
 // `fileURLToPath(import.meta.url)` y no `import.meta.dirname`: el segundo existe
 // desde Node 20.11 y este candado tiene que poder correr también en el intérprete
 // viejo, porque el defecto que fija aparece justamente ahí.
@@ -79,8 +83,6 @@ function correrHook({ stdout = "", stderr = "", codigo = 0 }) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 }
-
-const MARCA = "TRINQUETE: subió el hardcodeo.";
 
 // ══════════════════════════════════════════════════════════════════════════
 
