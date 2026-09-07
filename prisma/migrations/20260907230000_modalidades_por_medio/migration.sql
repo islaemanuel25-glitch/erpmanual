@@ -120,8 +120,18 @@ ALTER TABLE "Venta" ADD COLUMN IF NOT EXISTS "recargoPagoMedioNombre"       TEXT
 ALTER TABLE "Venta" ADD COLUMN IF NOT EXISTS "recargoPagoModalidadId"       INTEGER;
 ALTER TABLE "Venta" ADD COLUMN IF NOT EXISTS "recargoPagoModalidadNombre"   TEXT;
 
+-- Las DOS son referencias operativas de verdad, no números sueltos: el contrato
+-- es referencia + texto, y una referencia sin FK no es una referencia. Las dos
+-- con SET NULL: borrar un medio o una modalidad de la configuración NO borra la
+-- venta, deja el id en null, y el nombre congelado sigue explicándola.
 DO $$
 BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Venta_recargoPagoMedioCobroLocalId_fkey') THEN
+    ALTER TABLE "Venta"
+      ADD CONSTRAINT "Venta_recargoPagoMedioCobroLocalId_fkey"
+      FOREIGN KEY ("recargoPagoMedioCobroLocalId") REFERENCES "MedioCobroLocal"("id")
+      ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Venta_recargoPagoModalidadId_fkey') THEN
     ALTER TABLE "Venta"
       ADD CONSTRAINT "Venta_recargoPagoModalidadId_fkey"
@@ -130,6 +140,11 @@ BEGIN
   END IF;
 END
 $$;
+
+CREATE INDEX IF NOT EXISTS "Venta_recargoPagoMedioCobroLocalId_idx"
+  ON "Venta"("recargoPagoMedioCobroLocalId");
+CREATE INDEX IF NOT EXISTS "Venta_recargoPagoModalidadId_idx"
+  ON "Venta"("recargoPagoModalidadId");
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- 4. La restricción de tenders: una unique por dos índices parciales

@@ -1143,7 +1143,13 @@ model Venta {
   // motivo que en `VentaPago`: la referencia opera, el texto explica, y el texto
   // sobrevive a que se renombre, se desactive o se borre la configuración.
   //
-  // Todo nullable: una venta legacy los deja en null y no significa nada nuevo.
+  // Misma distinción que en `VentaPago`, y por el mismo motivo:
+  //
+  //   · venta HISTÓRICA anterior a esto → los cuatro en null;
+  //   · venta nueva cuyo recargo ganó un medio SIN modalidad → congela
+  //     `recargoPagoMedioCobroLocalId` y `recargoPagoMedioNombre`, y deja los dos
+  //     de modalidad en null;
+  //   · venta nueva cuyo recargo ganó una modalidad → congela los cuatro.
   recargoPagoMedioCobroLocalId Int?
   /// Nombre del medio visible que impuso la condición, congelado.
   recargoPagoMedioNombre       String?
@@ -1195,7 +1201,8 @@ model Venta {
   // `SetNull` por la misma razón que en `VentaPago`: borrar una modalidad de la
   // configuración no puede borrar ventas ni dejarlas sin explicación. El texto
   // congelado sigue ahí aunque la referencia se pierda.
-  recargoPagoModalidad MedioCobroModalidadLocal? @relation(fields: [recargoPagoModalidadId], references: [id], onDelete: SetNull)
+  recargoPagoMedioCobro MedioCobroLocal?         @relation("RecargoImpuestoPorMedio", fields: [recargoPagoMedioCobroLocalId], references: [id], onDelete: SetNull)
+  recargoPagoModalidad MedioCobroModalidadLocal? @relation("RecargoImpuestoPorModalidad", fields: [recargoPagoModalidadId], references: [id], onDelete: SetNull)
   detalles          VentaDetalle[]
   pagos             VentaPago[]
   movimientoCC      MovimientoCuenta[]
@@ -1218,6 +1225,10 @@ model Venta {
   // arqueo, reportes y estadísticas. Sin índice, cada una de ésas hace un scan
   // más por una columna que en el 99,9 % de las filas vale null.
   @@index([anuladaEn])
+  // Índices de las dos FK del snapshot de recargo, por la convención del repo:
+  // toda FK lleva su índice.
+  @@index([recargoPagoMedioCobroLocalId])
+  @@index([recargoPagoModalidadId])
 }
 
 // LIBRO DE CORRECCIONES DE VENTA (antes/después) — inmutable, sin FKs duras
@@ -1400,8 +1411,27 @@ model VentaPago {
   // que seguir diciendo lo que decía. Por eso las FK son `SetNull`: perder la
   // referencia no puede borrar el pago ni dejarlo mudo.
   //
-  // Todo nullable: una venta legacy —medio sin modalidades— deja los cinco en
-  // null y significa exactamente lo que significaba.
+  // ── "LEGACY" ES UNA FILA VIEJA, NO UN MEDIO SIN MODALIDADES ──────────────
+  //
+  // La distinción importa y es fácil de confundir. Hay TRES situaciones:
+  //
+  //   1. VENTA HISTÓRICA, anterior a esta funcionalidad.
+  //      Los cinco en null. Es compatibilidad hacia atrás y nada más: nadie va a
+  //      reescribirlas.
+  //
+  //   2. VENTA NUEVA con un medio configurable SIN modalidades.
+  //      Congela `medioCobroLocalId`, `medioNombre` y `procesador`. Solo
+  //      `modalidadId` y `modalidadNombre` quedan en null.
+  //
+  //      NO puede quedar identificada solo como `CREDITO`: dos medios distintos
+  //      —"Banco X" y "Mercado Pago"— comparten ese enum, y agregar identidad
+  //      operativa e histórica es justamente el punto de esta tanda. Un medio sin
+  //      modalidades igual tiene nombre y procesador que congelar.
+  //
+  //   3. VENTA NUEVA con modalidad.
+  //      Congela los cinco, y `medio` toma el `tipoContable` DE LA MODALIDAD.
+  //
+  // Nullable para que 1 siga siendo posible, no para que 2 se quede vacía.
   medioCobroLocalId Int?
   /// Nombre del medio visible tal como se leía al cobrar.
   medioNombre       String?
@@ -1415,8 +1445,8 @@ model VentaPago {
   // no se anulan/eliminan; queda coherente para el futuro y para recuperación).
   venta Venta @relation(fields: [ventaId], references: [id], onDelete: Cascade)
 
-  medioCobro MedioCobroLocal?          @relation(fields: [medioCobroLocalId], references: [id], onDelete: SetNull)
-  modalidad  MedioCobroModalidadLocal? @relation(fields: [modalidadId], references: [id], onDelete: SetNull)
+  medioCobro MedioCobroLocal?          @relation("PagoConMedioCobro", fields: [medioCobroLocalId], references: [id], onDelete: SetNull)
+  modalidad  MedioCobroModalidadLocal? @relation("PagoConModalidad", fields: [modalidadId], references: [id], onDelete: SetNull)
 
   // ── UN TENDER POR MEDIO, Y UNO POR MODALIDAD ─────────────────────────────
   //
@@ -3705,6 +3735,15 @@ model MedioCobroLocal {
 
   modalidades MedioCobroModalidadLocal[]
 
+  /// Los tenders que se cobraron con ESTE medio. Nombrada porque `Venta` también
+  /// apunta acá por otro motivo —quién impuso el recargo— y sin nombre Prisma no
+  /// puede distinguir las dos relaciones.
+  pagos               VentaPago[] @relation("PagoConMedioCobro")
+  /// Las ventas donde ESTE medio impuso la condición comercial. En un pago mixto
+  /// el que impone no es "el medio de la venta": son cosas distintas y por eso
+  /// son dos relaciones y no una.
+  ventasCuyoRecargoImpuso Venta[]  @relation("RecargoImpuestoPorMedio")
+
   @@index([localId])
   @@index([localId, activo, orden])
 }
@@ -3736,13 +3775,29 @@ model MedioCobroLocal {
 /// `0` significa "sin recargo", igual que la ausencia de fila en la tabla vieja.
 /// Nunca se inventa un porcentaje por defecto.
 ///
-/// ── LA COMISIÓN ES NULLABLE, Y ESO SIGNIFICA ALGO ──────────────────────────
+/// ── LA COMISIÓN ES NULLABLE, Y ESO SIGNIFICA "SEGUIR RESOLVIENDO" ──────────
 ///
 /// `null` NO es `0`. El sistema ya distingue "comisión configurada en cero" de
 /// "comisión sin configurar", y de esa diferencia depende `comisionPendiente`,
 /// que marca las ventas cuyos importes de neto y ganancia tienen un cero
 /// estructural que no es una medición. Convertir el `null` en `0` acá apagaría
 /// esa marca en silencio. Mismo criterio que `MedioCobroLocal.comisionPct`.
+///
+/// LA CADENA DE RESOLUCIÓN, CERRADA Y EN ESTE ORDEN:
+///
+///   1. `MedioCobroModalidadLocal.comisionPct`  ← override de la modalidad
+///   2. `MedioCobroLocal.comisionPct`           ← override del medio padre
+///   3. `ConfiguracionGrupo`, por el `tipoContable` DE LA MODALIDAD
+///   4. sin configurar → `comisionPendiente`
+///
+/// **UN `0` EXPLÍCITO GANA Y CORTA LA CADENA.** Significa "este medio no cobra
+/// comisión", que es una decisión, no una ausencia. Por eso la resolución NO
+/// puede escribirse con `||` ni con `a ?? b` sobre un valor ya convertido a
+/// número: `0 || x` devuelve `x` y transformaría una decisión en herencia.
+/// Solo se baja al escalón siguiente cuando el valor es `null`.
+///
+/// `null` significa "heredá, seguí resolviendo", y solo termina en "sin
+/// configurar" cuando la cadena se agota entera.
 ///
 /// ── AISLAMIENTO ────────────────────────────────────────────────────────────
 ///
@@ -3778,8 +3833,10 @@ model MedioCobroModalidadLocal {
 
   medio MedioCobroLocal @relation(fields: [medioCobroLocalId], references: [id], onDelete: Cascade)
 
-  pagos VentaPago[]
-  ventasQueImpuso Venta[]
+  /// Los tenders cobrados con ESTA modalidad.
+  pagos VentaPago[] @relation("PagoConModalidad")
+  /// Las ventas donde ESTA modalidad impuso la condición comercial.
+  ventasCuyoRecargoImpuso Venta[] @relation("RecargoImpuestoPorModalidad")
 
   @@index([medioCobroLocalId])
   @@index([medioCobroLocalId, activo, orden])
