@@ -504,6 +504,187 @@ ok("B · 0 + tecla 1 (cursor a la derecha) → 1", B.valor === "1", `quedó ${JS
 ok('C · 0 + pegar "10" → 10', C.valor === "10", `quedó ${JSON.stringify(C.valor)}`);
 ok('D · 0 + pegar "12" → 12', D.valor === "12", `quedó ${JSON.stringify(D.valor)}`);
 
+
+// ══ LA MATRIZ: LOS DOS CAMPOS, LOS MISMOS CASOS ═══════════════════════════
+//
+// Hasta acá la sonda medía SOLO "Recargo al cliente". El arreglo del 2026-09-06
+// se aplicó a los dos campos por simetría, pero uno solo se ejerció en un
+// navegador, y "se hizo igual en los dos" no es una medición.
+//
+// Los helpers de arriba ya eran genéricos —`preparar` recibe el rótulo— así que
+// esto no duplica nada: recorre la misma maquinaria con los dos campos.
+//
+// SOBRE `selectionStart`: NO SE PUEDE LEER. En un `<input type="number">` Chrome
+// lanza `InvalidStateError`. Por eso la selección se mide ejerciendo el comando
+// de copiar y viendo qué quedó en el portapapeles, con un centinela para que
+// "no se copió nada" y "se copió lo de antes" no den lo mismo. Es la evidencia
+// alternativa que la sonda ya usaba, documentada arriba en `loSeleccionado`.
+
+const CAMPOS = ["Recargo al cliente", "Comisión"];
+
+/** Deja el campo con un valor de partida, tecleándolo como lo haría una persona. */
+async function conValorInicial(rotulo, texto) {
+  const info = await preparar(rotulo);
+  await clic(info.caja, "derecha");
+  for (const d of String(texto)) await teclear(d);
+  await evaluar(`window.__medidas = []`);
+  return info;
+}
+
+/** Llega al campo con TAB desde el primer input de la pantalla. */
+async function entrarConTab(rotulo) {
+  const info = await preparar(rotulo);
+  await evaluar(`(() => { document.querySelector("input")?.focus(); return true; })()`);
+  for (let i = 0; i < 40; i++) {
+    await send("Input.dispatchKeyEvent", { type: "rawKeyDown", windowsVirtualKeyCode: 9, key: "Tab", code: "Tab" });
+    await send("Input.dispatchKeyEvent", { type: "keyUp", windowsVirtualKeyCode: 9, key: "Tab", code: "Tab" });
+    await sleep(40);
+    if (await evaluar(`document.activeElement === window.__campo`)) return { info, llego: true, tabs: i + 1 };
+  }
+  return { info, llego: false, tabs: 40 };
+}
+
+const detalle = (m) =>
+  (m.eventos || []).map((e) => `inputType=${e.inputType} data=${JSON.stringify(e.data)} valor=${JSON.stringify(e.valor)}`).join(" | ") || "(sin eventos)";
+
+for (const rotulo of CAMPOS) {
+  seccion(`MATRIZ · ${rotulo}`);
+
+  // ── CLICK, partiendo de 0 ────────────────────────────────────────────────
+  let info = await preparar(rotulo);
+  const valorInicial = info.valor;
+  await clic(info.caja, "izquierda");
+  const selAl0 = await loSeleccionado();
+  await teclear("1");
+  let m = JSON.parse(await medidas());
+  console.log(`    antes=${JSON.stringify(valorInicial)} seleccion=${JSON.stringify(selAl0)} ${detalle(m)}`);
+  ok(`${rotulo} · click · 0 + tecla 1 → 1`, m.valor === "1", `quedó ${JSON.stringify(m.valor)}`);
+
+  info = await preparar(rotulo);
+  await clic(info.caja, "izquierda");
+  await teclear("7");
+  m = JSON.parse(await medidas());
+  console.log(`    antes=${JSON.stringify(info.valor)} ${detalle(m)}`);
+  ok(`${rotulo} · click · 0 + tecla 7 → 7`, m.valor === "7", `quedó ${JSON.stringify(m.valor)}`);
+
+  await teclear("5");
+  m = JSON.parse(await medidas());
+  console.log(`    y despues tecla 5 → ${detalle(m)}`);
+  ok(`${rotulo} · click · 7 + tecla 5 → 75`, m.valor === "75", `quedó ${JSON.stringify(m.valor)}`);
+
+  // ── CLICK, partiendo de 12 ───────────────────────────────────────────────
+  info = await conValorInicial(rotulo, "12");
+  await clic(info.caja, "derecha");
+  const selEn12 = await loSeleccionado();
+  await teclear("3");
+  m = JSON.parse(await medidas());
+  console.log(`    antes="12" seleccion=${JSON.stringify(selEn12)} ${detalle(m)}`);
+  ok(`${rotulo} · click · 12 NO se selecciona entero`, selEn12 !== "12", `se copió ${JSON.stringify(selEn12)}`);
+  ok(`${rotulo} · click · 12 + tecla 3 → 123`, m.valor === "123", `quedó ${JSON.stringify(m.valor)}`);
+
+  // ── TAB, partiendo de 0 ──────────────────────────────────────────────────
+  let t = await entrarConTab(rotulo);
+  ok(`${rotulo} · Tab llega al campo`, t.llego, `no llegó en ${t.tabs} tabulaciones`);
+  if (t.llego) {
+    const selTab = await loSeleccionado();
+    await teclear("1");
+    m = JSON.parse(await medidas());
+    console.log(`    TAB antes=${JSON.stringify(t.info.valor)} (${t.tabs} tabs) seleccion=${JSON.stringify(selTab)} ${detalle(m)}`);
+    ok(`${rotulo} · Tab · 0 + tecla 1 → 1`, m.valor === "1", `quedó ${JSON.stringify(m.valor)}`);
+
+    t = await entrarConTab(rotulo);
+    await teclear("7");
+    m = JSON.parse(await medidas());
+    console.log(`    TAB ${detalle(m)}`);
+    ok(`${rotulo} · Tab · 0 + tecla 7 → 7`, m.valor === "7", `quedó ${JSON.stringify(m.valor)}`);
+  }
+
+  // ── TAB, partiendo de 12 ─────────────────────────────────────────────────
+  info = await conValorInicial(rotulo, "12");
+  await evaluar(`(() => { document.querySelector("input")?.focus(); return true; })()`);
+  let llegoTab12 = false;
+  for (let i = 0; i < 40 && !llegoTab12; i++) {
+    await send("Input.dispatchKeyEvent", { type: "rawKeyDown", windowsVirtualKeyCode: 9, key: "Tab", code: "Tab" });
+    await send("Input.dispatchKeyEvent", { type: "keyUp", windowsVirtualKeyCode: 9, key: "Tab", code: "Tab" });
+    await sleep(40);
+    llegoTab12 = await evaluar(`document.activeElement === window.__campo`);
+  }
+  if (llegoTab12) {
+    const sel12Tab = await loSeleccionado();
+    await teclear("3");
+    m = JSON.parse(await medidas());
+    console.log(`    TAB sobre 12: seleccion=${JSON.stringify(sel12Tab)} ${detalle(m)}`);
+    ok(`${rotulo} · Tab · 12 NO se selecciona entero`, sel12Tab !== "12", `se copió ${JSON.stringify(sel12Tab)}`);
+    ok(`${rotulo} · Tab · 12 + tecla 3 → 123`, m.valor === "123", `quedó ${JSON.stringify(m.valor)}`);
+  } else {
+    ok(`${rotulo} · Tab llega al campo con 12`, false, "no llegó en 40 tabulaciones");
+  }
+
+  // ── PEGADO ───────────────────────────────────────────────────────────────
+  for (const texto of ["10", "12"]) {
+    info = await preparar(rotulo);
+    await clic(info.caja, "izquierda");
+    await copiarAlPortapapeles(texto);
+    await evaluar(`window.__campo.focus()`);
+    await evaluar(`window.__medidas = []`);
+    await pegar();
+    m = JSON.parse(await medidas());
+    console.log(`    pegar ${JSON.stringify(texto)} sobre 0 → ${detalle(m)}`);
+    ok(`${rotulo} · pegar "${texto}" sobre 0 → ${texto}`, m.valor === texto, `quedó ${JSON.stringify(m.valor)}`);
+    ok(`${rotulo} · el pegado se distingue: insertFromPaste`,
+      (m.eventos || []).some((e) => e.inputType === "insertFromPaste"),
+      `informó ${(m.eventos || []).map((e) => e.inputType).join(",") || "nada"}`);
+  }
+
+  // ── BORRADO Y REESCRITURA ────────────────────────────────────────────────
+  //
+  // No se afirma un valor esperado para el estado vacío: se MIDE lo que el
+  // producto hace hoy. Lo único que se exige es lo que sí es contrato — que
+  // después de vaciar, escribir un dígito deje ese dígito solo.
+  info = await conValorInicial(rotulo, "45");
+  await clic(info.caja, "derecha");
+  for (let i = 0; i < 6; i++) {
+    await send("Input.dispatchKeyEvent", { type: "keyDown", key: "Backspace", code: "Backspace", windowsVirtualKeyCode: 8 });
+    await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Backspace", code: "Backspace", windowsVirtualKeyCode: 8 });
+    await sleep(60);
+  }
+  const trasBorrar = await evaluar(`window.__campo.value`);
+  console.log(`    tras borrar todo, el campo muestra ${JSON.stringify(trasBorrar)}`);
+  await evaluar(`window.__medidas = []`);
+  await teclear("4");
+  m = JSON.parse(await medidas());
+  console.log(`    y escribir 4 → ${detalle(m)}`);
+  ok(`${rotulo} · borrar todo y escribir 4 → 4`, m.valor === "4", `quedó ${JSON.stringify(m.valor)}`);
+
+  // ── DECIMALES ────────────────────────────────────────────────────────────
+  //
+  // Primero se comprueba si el campo los admite. `step` y `inputMode` lo
+  // declaran; si no los admitiera, esto lo dice en vez de exigir un
+  // comportamiento que el producto no promete.
+  info = await preparar(rotulo);
+  const config = JSON.parse(await evaluar(`JSON.stringify({
+    step: window.__campo.getAttribute("step"),
+    inputMode: window.__campo.getAttribute("inputmode"),
+    min: window.__campo.getAttribute("min"),
+    max: window.__campo.getAttribute("max"),
+  })`));
+  console.log(`    configuración: step=${config.step} inputMode=${config.inputMode} min=${config.min} max=${config.max}`);
+  const admiteDecimal = config.inputMode === "decimal" || (config.step && config.step !== "1");
+  if (!admiteDecimal) {
+    console.log(`    el campo NO declara decimales: no se exige "1.5"`);
+  } else {
+    await clic(info.caja, "izquierda");
+    await teclear("1");
+    await send("Input.dispatchKeyEvent", { type: "keyDown", key: ".", code: "Period", text: ".", unmodifiedText: ".", windowsVirtualKeyCode: 190 });
+    await send("Input.dispatchKeyEvent", { type: "keyUp", key: ".", code: "Period", windowsVirtualKeyCode: 190 });
+    await sleep(120);
+    await teclear("5");
+    m = JSON.parse(await medidas());
+    console.log(`    decimal: ${detalle(m)}  → valor final ${JSON.stringify(m.valor)}`);
+    ok(`${rotulo} · decimal 1.5`, m.valor === "1.5", `quedó ${JSON.stringify(m.valor)}`);
+  }
+}
+
 console.log(`\n${pasadas} afirmaciones en verde, ${fallas.length} en rojo.`);
 
 // Se cierra acá, en los dos caminos. Después de esto no queda ningún handle
