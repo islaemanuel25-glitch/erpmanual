@@ -98,7 +98,7 @@ export default function TarjetaStockMovil({
       // `false`, no `null`: ver el comentario de arriba.
       codigoInterno={false}
       marca={
-        <span className="text-[10.5px] sunmi-text-muted whitespace-nowrap">
+        <span className="text-xs sunmi-text-muted whitespace-nowrap">
           mín {textoLimite(item?.stockMin, configurados, item, localEsDeposito)}
           {" · "}
           máx {textoLimite(item?.stockMax, configurados, item, localEsDeposito)}

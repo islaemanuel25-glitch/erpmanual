@@ -1362,7 +1362,7 @@ export default function NuevaCompraProveedorPage() {
       <SunmiButton
         color="primary"
         type="button"
-        className={compact ? "w-full py-1.5 text-[12px]" : "px-3 py-1.5 text-[12px]"}
+        className={compact ? "w-full py-1.5 text-sm" : "px-3 py-1.5 text-sm"}
         disabled={!proveedorId || loadingProds}
         onClick={() => {
           if (borradorExistente) {
@@ -1971,7 +1971,7 @@ export default function NuevaCompraProveedorPage() {
         {proveedorId && botonImportar()}
 
         {avisoImportacion && (
-          <div className="rounded-lg border px-3 py-2 mb-3 text-[12px] sunmi-text-accent sunmi-divider">
+          <div className="rounded-lg border px-3 py-2 mb-3 text-sm sunmi-text-accent sunmi-divider">
             {avisoImportacion}
           </div>
         )}

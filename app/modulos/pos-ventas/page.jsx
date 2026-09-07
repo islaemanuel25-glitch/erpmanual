@@ -2102,7 +2102,7 @@ export default function PosVentasPage() {
                 vuelve a apretar el medio: no hay reintento automático, porque
                 cobrar un importe que nadie miró es justo lo que esto evita. */}
             {refrescoDeTotal && (
-              <div className="mb-2 px-3 py-2 rounded-lg text-xs text-center pos-text-danger"
+              <div className="mb-2 px-3 py-2 rounded-lg text-xs text-center sunmi-pos-text-danger"
                 style={{ background: "color-mix(in srgb, var(--pos-danger) 12%, transparent)" }}>
                 <div className="font-bold">La venta NO se registró: el total cambió.</div>
                 <div className="mt-1">

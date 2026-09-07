@@ -236,7 +236,7 @@ export default function FormularioMedio({
         />
         {/* Cómo se vuelve a heredar, dicho con palabras. Vaciar el campo es la
             acción, y sin esta línea sería un truco que hay que adivinar. */}
-        <p className="text-[11px] sunmi-text-muted px-1">
+        <p className="text-sm2 sunmi-text-muted px-1">
           {comisionHeredada
             ? `Sin valor propio: este medio usa la comisión del grupo${
                 pctHeredado != null ? ` (${formatearPct(pctHeredado)})` : ""
@@ -305,7 +305,7 @@ export default function FormularioMedio({
         />
       </Seccion>
 
-      <p className="text-[11px] sunmi-text-muted mt-3 px-1">
+      <p className="text-sm2 sunmi-text-muted mt-3 px-1">
         El recargo y la comisión siguen siendo datos distintos aunque pertenezcan al mismo medio: el
         recargo lo paga el cliente y sube el total; la comisión la paga el comercio y baja el neto.
       </p>
@@ -330,7 +330,7 @@ export default function FormularioMedio({
 function Seccion({ titulo, children }) {
   return (
     <div className="mb-4">
-      <h2 className="text-[11px] sunmi-section-title mb-2 px-1">{titulo}</h2>
+      <h2 className="text-sm2 sunmi-section-title mb-2 px-1">{titulo}</h2>
       <SunmiCard className="p-3 flex flex-col">{children}</SunmiCard>
     </div>
   );
