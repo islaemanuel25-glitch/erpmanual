@@ -302,14 +302,17 @@ jobs:
       # especificidad con `!important` y `:focus-visible` de por medio, que es
       # donde uno se equivoca, así que se mide.
       #
-      # Esta sonda INFORMA y no falla: retrata el estado actual, que ya se sabe
-      # que puede ser malo, y su arreglo no es de esta tanda.
+      # Ahora EXIGE. Desde que se quitaron las dos supresiones globales de
+      # app/globals.css, el contrato es que los nueve controles señalen con Tab
+      # y que ninguno deje anillo de teclado al clickear. Si se rompe, es rojo:
+      # el foco de teclado es la única forma de usar la aplicación sin mouse.
       - name: Medir si el foco de teclado se ve
         run: |
           node scripts/sonda-foco-boton.mjs \
             --base "http://localhost:$PUERTO" \
             --edge "${{ steps.navegador.outputs.ruta }}" \
             --puerto-cdp 9229 \
+            --exigir \
             --anchos "390,1280" \
             --temas "sunmiDark,sunmiLight,sunmiSand,sunmiBlueClassic" \
             --capturas "/tmp/capturas/foco"
@@ -326,19 +329,21 @@ jobs:
             --tema sunmiDark \
             --ancho 390
 
-      # La VARIANTE: las dos supresiones históricas borradas del CSSOM en vivo.
-      # Contesta qué pasa naturalmente al dejar de sabotear, sin tocar el
-      # archivo y sin commitear nada. Informa doble indicador si lo hay.
-      - name: Foco — variante sin los resets históricos
+      # La variante que se usó para DECIDIR el arreglo: borra del CSSOM las dos
+      # supresiones. Ahora que ya no están en la hoja no puede encontrarlas, y
+      # frena a propósito — por eso corre con '|| true' y sin --exigir. Se
+      # conserva porque es lo que contesta si alguien las repone: si un día vuelve
+      # a encontrar dos para borrar, es que volvieron.
+      - name: Foco — la variante ya no encuentra qué quitar
+        continue-on-error: true
         run: |
           node scripts/sonda-foco-boton.mjs \
             --base "http://localhost:$PUERTO" \
             --edge "${{ steps.navegador.outputs.ruta }}" \
             --puerto-cdp 9232 \
             --quitar-resets \
-            --anchos "390,1280" \
-            --temas "sunmiDark,sunmiLight,sunmiSand,sunmiBlueClassic" \
-            --capturas "/tmp/capturas/foco-sin-resets"
+            --anchos "390" \
+            --temas "sunmiDark" || true
 
       # ── EL VIAJE DE LA CLAVE POR LA URL ──────────────────────────────────
       #
