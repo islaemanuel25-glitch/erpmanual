@@ -326,6 +326,20 @@ jobs:
             --tema sunmiDark \
             --ancho 390
 
+      # La VARIANTE: las dos supresiones históricas borradas del CSSOM en vivo.
+      # Contesta qué pasa naturalmente al dejar de sabotear, sin tocar el
+      # archivo y sin commitear nada. Informa doble indicador si lo hay.
+      - name: Foco — variante sin los resets históricos
+        run: |
+          node scripts/sonda-foco-boton.mjs \
+            --base "http://localhost:$PUERTO" \
+            --edge "${{ steps.navegador.outputs.ruta }}" \
+            --puerto-cdp 9232 \
+            --quitar-resets \
+            --anchos "390,1280" \
+            --temas "sunmiDark,sunmiLight,sunmiSand,sunmiBlueClassic" \
+            --capturas "/tmp/capturas/foco-sin-resets"
+
       # ── EL VIAJE DE LA CLAVE POR LA URL ──────────────────────────────────
       #
       # Va DESPUÉS de las capturas de defaults porque escribe —materializa y

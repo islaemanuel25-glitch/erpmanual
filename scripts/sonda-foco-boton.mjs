@@ -47,6 +47,11 @@ const PUERTO = Number(arg("puerto-cdp", "9229"));
 const PERFIL = path.join(tmpdir(), "sonda-foco-boton");
 const CAPTURAS = arg("capturas", null);
 const EXIGIR = bandera("exigir");
+// Prueba la remoción de las dos supresiones históricas SIN tocar el archivo:
+// las borra del CSSOM en vivo. Es la remoción de verdad, no una imitación con
+// reglas nuevas encima — que además no podría reproducirla, porque lo que hay
+// que sacar lleva `!important` y no se le puede ganar agregando.
+const QUITAR_RESETS = bandera("quitar-resets");
 const ANCHOS = (arg("anchos", "390,1280") || "").split(",").map((n) => Number(n.trim()));
 const TEMAS = (arg("temas", "sunmiDark,sunmiLight,sunmiSand,sunmiBlueClassic") || "").split(",");
 
@@ -171,6 +176,35 @@ await evaluar(`(() => {
   return true;
 })()`);
 
+if (QUITAR_RESETS) {
+  const quitadas = JSON.parse(await evaluar(`(() => {
+    const fuera = [];
+    for (const hoja of document.styleSheets) {
+      let reglas;
+      try { reglas = hoja.cssRules; } catch { continue; }
+      for (let i = reglas.length - 1; i >= 0; i--) {
+        const r = reglas[i];
+        if (!r.selectorText) continue;
+        const s = r.selectorText.replace(/\\s+/g, " ").trim();
+        const suprime = r.style.outline === "none" || r.style.boxShadow === "none" || r.style.outlineStyle === "none";
+        if (!suprime) continue;
+        const universal = s === "*:focus";
+        const bloque = /button:focus/.test(s) && /select:focus/.test(s) && /input/.test(s);
+        if (universal || bloque) {
+          fuera.push(s + " { " + r.style.cssText + " }");
+          hoja.deleteRule(i);
+        }
+      }
+    }
+    return JSON.stringify(fuera);
+  })()`));
+  console.log("\n  ── variante: las dos supresiones históricas, BORRADAS del CSSOM ──");
+  for (const q of quitadas) console.log(`     fuera: ${q}`);
+  // Si no las encontró, no está midiendo la variante: está midiendo el estado
+  // de siempre y lo llamaría "después". Eso es peor que un rojo.
+  if (quitadas.length < 2) frenar(`esperaba borrar las dos supresiones y borró ${quitadas.length}`);
+}
+
 /**
  * Lee el estado ESTABLE, no el que hay en el instante de preguntar.
  *
@@ -252,13 +286,19 @@ async function porMouse(elId) {
  *
  * Señal = aparece un contorno, o la sombra pasa a ser algo distinto Y no vacío.
  */
-const haySenal = (base, otro) => {
-  const contorno = otro.outline.split(" ")[0] !== "none";
-  const sombraNueva = otro.boxShadow !== "none" && otro.boxShadow !== base.boxShadow;
-  return contorno || sombraNueva;
-};
+const hayContorno = (otro) => otro.outline.split(" ")[0] !== "none";
+const hayAnillo = (base, otro) => otro.boxShadow !== "none" && otro.boxShadow !== base.boxShadow;
+const haySenal = (base, otro) => hayContorno(otro) || hayAnillo(base, otro);
+
+// Doble indicador: el contorno del navegador Y el anillo propio del kit a la
+// vez. No es un defecto que se pueda deducir leyendo la hoja —depende de si la
+// pieza tiene contrato propio—, así que se mide. Y solo se corrige donde la
+// medición lo muestre: apagarle el contorno a una pieza que NO tiene anillo
+// propio la dejaría sin ninguna señal.
+const hayDobleFoco = (base, otro) => hayContorno(otro) && hayAnillo(base, otro);
 
 let fallas = 0;
+const dobles = [];
 const ok = (t, c, d = "") => { if (c) console.log(`  ✓ ${t}`); else { fallas++; console.log(`  ✗ ${t}${d ? "  " + d : ""}`); } };
 
 for (const ancho of ANCHOS) {
@@ -280,15 +320,22 @@ for (const ancho of ANCHOS) {
 
       const senalTeclado = tec.enfocado && haySenal(base, tec);
       const senalMouse = mou.enfocado && haySenal(base, mou);
+      const doble = tec.enfocado && hayDobleFoco(base, tec);
+      if (doble) dobles.push(`${tema}/${ancho} · ${c.nombre}`);
 
       // Una fila por control: TAB y CLICK con lo que decide cada uno.
       console.log(
         `  ${c.nombre.padEnd(38)}` +
           `TAB[fv:${String(tec.focusVisible).padEnd(5)} out:${tec.outline.padEnd(12)} sh:${tec.boxShadow === "none" ? "no " : "sí "}${senalTeclado ? "SE VE " : "NO ve "}]  ` +
-          `CLICK[fv:${String(mou.focusVisible).padEnd(5)} ${senalMouse ? "anillo" : "limpio"}]`
+          `CLICK[fv:${String(mou.focusVisible).padEnd(5)} ${senalMouse ? "anillo" : "limpio"}]` +
+          `${doble ? "  ⚠ DOBLE" : ""}`
       );
-      if (senalTeclado && tec.outline.split(" ")[0] !== "none") {
-        console.log(`  ${"".padEnd(38)}      contorno ${tec.outline} ${tec.outlineColor} offset ${tec.outlineOffset}`);
+      // Los valores crudos solo en el primer tema: alcanzan para saber qué
+      // dibuja la señal, y repetirlos en los cuatro serían cientos de líneas.
+      if (tema === TEMAS[0]) {
+        console.log(`  ${"".padEnd(38)}  reposo sh=${base.boxShadow}`);
+        console.log(`  ${"".padEnd(38)}  TAB    out=${tec.outline} ${tec.outlineColor} off=${tec.outlineOffset}  sh=${tec.boxShadow}`);
+        console.log(`  ${"".padEnd(38)}  CLICK  out=${mou.outline} ${mou.outlineColor} off=${mou.outlineOffset}  sh=${mou.boxShadow}`);
       }
 
       if (EXIGIR) {
@@ -307,6 +354,14 @@ for (const ancho of ANCHOS) {
       fs.writeFileSync(path.join(CAPTURAS, `${ancho}-${tema}-foco.png`), Buffer.from(data, "base64"));
     }
   }
+}
+
+console.log("");
+if (dobles.length) {
+  console.log(`  ⚠ DOBLE INDICADOR en ${dobles.length} combinaciones — contorno del navegador Y anillo del kit a la vez:`);
+  for (const d of dobles) console.log(`     ${d}`);
+} else {
+  console.log("  Sin doble indicador: ningún control muestra contorno y anillo propio a la vez.");
 }
 
 console.log("");
