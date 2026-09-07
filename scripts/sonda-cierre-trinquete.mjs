@@ -149,9 +149,12 @@ const PARES = [
     props: ["fontSize", "color", "textDecorationLine", "backgroundColor", "borderTopWidth",
             "borderRadius", "paddingTop", "paddingLeft", "marginTop"] },
   { nombre: "tarjeta de acción (TarjetaOferta)", etiqueta: "button", interactivo: true,
+    // `viejo` y `main` conservan `sunmi-panel` a propósito: es lo que la pantalla
+    // escribía, y esa clase no existe, así que retratan la tarjeta transparente
+    // y sin borde que había. `nuevo` usa la superficie real.
     viejo: "w-full text-left sunmi-panel rounded-lg p-3 flex flex-col gap-1.5",
     main: "w-full text-left sunmi-panel rounded-lg p-3 flex flex-col gap-1.5",
-    nuevo: "w-full text-left sunmi-panel rounded-lg p-3 flex flex-col gap-1.5",
+    nuevo: "w-full text-left sunmi-card-surface rounded-lg p-3 flex flex-col gap-1.5",
     // Las tres propiedades de SUPERFICIE —fondo, ancho y color de borde— salen
     // de esta lista a propósito: Figma (nodo 14:2) autoriza que cambien respecto
     // de main, así que exigir equivalencia ahí sería exigir conservar el defecto.
