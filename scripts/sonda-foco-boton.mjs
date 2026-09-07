@@ -131,6 +131,16 @@ const medido = await evaluar(`(() => {
     b.className = c.clases;
     b.textContent = "foco";
     document.body.append(b);
+
+    // ── EL CONTROL: SE MIDE SIN FOCO Y CON FOCO ──────────────────────────
+    //
+    // Sin esto, la sonda daba un falso positivo. El botón del kit tiene una
+    // sombra ambiental —`0 1px 3px`— que está SIEMPRE, y leer solo el estado
+    // enfocado la contaba como si fuera el anillo de foco. Lo que prueba que hay
+    // señal de foco no es que haya sombra: es que algo CAMBIE al enfocar.
+    const sinFoco = getComputedStyle(b);
+    const antes = { outline: sinFoco.outlineStyle, boxShadow: sinFoco.boxShadow };
+
     b.focus();
     const s = getComputedStyle(b);
     salida.push({
@@ -139,6 +149,8 @@ const medido = await evaluar(`(() => {
       focusVisible: (() => { try { return b.matches(":focus-visible"); } catch { return null; } })(),
       outline: s.outlineStyle + " " + s.outlineWidth + " " + s.outlineColor,
       boxShadow: s.boxShadow,
+      outlineSinFoco: antes.outline,
+      boxShadowSinFoco: antes.boxShadow,
     });
     b.blur();
     b.remove();
@@ -149,13 +161,16 @@ const medido = await evaluar(`(() => {
 console.log("\n  ══ foco visible ═══════════════════════════════════════════");
 let sinSenal = 0;
 for (const r of JSON.parse(medido)) {
-  const hayAnillo = r.boxShadow !== "none" || !/none/.test(r.outline);
-  if (!hayAnillo) sinSenal += 1;
+  // Hay señal de foco solo si algo CAMBIA al enfocar. Una sombra que ya estaba
+  // no señala nada: está igual en los cien botones que no tienen el foco.
+  const cambia = r.boxShadow !== r.boxShadowSinFoco || r.outline.split(" ")[0] !== r.outlineSinFoco;
+  if (!cambia) sinSenal += 1;
   console.log(`  ${r.nombre}`);
   console.log(`     enfocado ${r.enfocado} · :focus-visible ${r.focusVisible}`);
-  console.log(`     outline    ${r.outline}`);
-  console.log(`     box-shadow ${r.boxShadow}`);
-  console.log(`     ${hayAnillo ? "→ SE VE dónde está el foco" : "→ NO se ve dónde está el foco"}`);
+  console.log(`     outline     sin foco ${r.outlineSinFoco}  ·  con foco ${r.outline}`);
+  console.log(`     box-shadow  sin foco ${r.boxShadowSinFoco}`);
+  console.log(`                 con foco ${r.boxShadow}`);
+  console.log(`     ${cambia ? "→ SE VE: algo cambia al enfocar" : "→ NO se ve: nada cambia al enfocar"}`);
 }
 
 console.log("");
