@@ -30,6 +30,11 @@ const PUERTO = Number(arg("puerto-cdp", "9240"));
 const PERFIL = path.join(tmpdir(), "sonda-cierre-trinquete");
 const ANCHOS = (arg("anchos", "390,1280") || "").split(",").map((n) => Number(n.trim()));
 const TEMAS = (arg("temas", "sunmiDark,sunmiLight,sunmiSand,sunmiBlueClassic") || "").split(",");
+// `--volcar <lado>` imprime los valores medidos de UN lado, en formato
+// comparable entre corridas, y no compara nada. Es lo que permite medir `main`
+// en una corrida y la rama en otra: la comparación se hace afuera, entre dos
+// volcados, en vez de adentro de un solo build.
+const VOLCAR = arg("volcar", null);
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let ws, sessionId, sig = 0;
@@ -101,40 +106,48 @@ const PARES = [
   { nombre: "lista de tarjetas · gap", etiqueta: "div",
     viejo: "grid grid-cols-1 auto-rows-fr",
     viejoEstilo: "gap:9px",
+    main: "grid grid-cols-1 auto-rows-fr gap-[9px]",
     nuevo: "grid grid-cols-1 auto-rows-fr sunmi-product-list",
     props: ["rowGap", "columnGap"] },
   { nombre: "bloque de valor · caja", etiqueta: "div",
     viejo: "flex max-w-full rounded-xl px-2.5 py-2",
     viejoEstilo: "width:202px;min-height:51.5px",
+    main: "flex w-[202px] max-w-full rounded-xl px-2.5 py-2 min-h-[51.5px]",
     nuevo: "flex max-w-full rounded-xl px-2.5 py-2 sunmi-product-value-block",
     props: ["width", "minHeight", "paddingLeft", "paddingTop", "borderRadius"] },
   { nombre: "rótulo del valor", etiqueta: "span",
     viejo: "mb-1 font-bold whitespace-nowrap",
     viejoEstilo: "font-size:9px",
+    main: "mb-1 text-[9px] font-bold whitespace-nowrap",
     nuevo: "mb-1 sunmi-product-value-label font-bold whitespace-nowrap",
     props: ["fontSize", "fontWeight", "marginBottom"] },
   { nombre: "número del valor", etiqueta: "span",
     viejo: "font-semibold whitespace-nowrap",
     viejoEstilo: "font-size:25px",
+    main: "text-[25px] font-semibold whitespace-nowrap",
     nuevo: "sunmi-product-value-number font-semibold whitespace-nowrap",
     props: ["fontSize", "fontWeight"] },
   { nombre: "miniatura del producto", etiqueta: "div",
     viejo: "",
     viejoEstilo: "width:44px;height:44px",
+    main: "w-[44px] h-[44px]",
     nuevo: "sunmi-product-thumbnail",
     props: ["width", "height"] },
   { nombre: "acción de la tarjeta", etiqueta: "button",
     viejo: "flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium sunmi-text-strong sunmi-row-hover",
     viejoEstilo: "height:44px",
+    main: "flex items-center justify-center gap-1.5 py-2.5 h-[44px] text-xs font-medium sunmi-text-strong sunmi-row-hover",
     nuevo: "flex items-center justify-center gap-1.5 py-2.5 sunmi-product-card-action text-xs font-medium sunmi-text-strong sunmi-row-hover",
     props: ["height", "paddingTop", "fontSize"] },
-  { nombre: "botón-enlace (importador)", etiqueta: "button",
+  { nombre: "botón-enlace (importador)", etiqueta: "button", interactivo: true,
     viejo: "text-xs sunmi-text-accent mt-1 underline",
+    main: "text-xs sunmi-text-accent mt-1 underline",
     nuevo: "text-xs sunmi-text-accent underline mt-1",
     props: ["fontSize", "color", "textDecorationLine", "backgroundColor", "borderTopWidth",
             "borderRadius", "paddingTop", "paddingLeft", "marginTop"] },
-  { nombre: "tarjeta de acción (TarjetaOferta)", etiqueta: "button",
+  { nombre: "tarjeta de acción (TarjetaOferta)", etiqueta: "button", interactivo: true,
     viejo: "w-full text-left sunmi-panel rounded-lg p-3 flex flex-col gap-1.5",
+    main: "w-full text-left sunmi-panel rounded-lg p-3 flex flex-col gap-1.5",
     nuevo: "w-full text-left sunmi-panel rounded-lg p-3 flex flex-col gap-1.5",
     props: ["width", "textAlign", "backgroundColor", "borderTopWidth", "borderTopColor",
             "borderRadius", "paddingTop", "paddingLeft", "rowGap", "display", "flexDirection"] },
@@ -146,13 +159,14 @@ await evaluar(`(() => {
   caja.id = "caja-cierre";
   caja.style.cssText = "position:fixed;top:0;left:0;width:100%;z-index:99999;background:var(--app-bg)";
   for (const [i, p] of pares.entries()) {
-    for (const lado of ["viejo", "nuevo"]) {
+    for (const lado of ["viejo", "nuevo", "main"]) {
       const cont = document.createElement("div");
       cont.style.cssText = "width:320px";
       const el = document.createElement(p.etiqueta);
       el.id = "par-" + i + "-" + lado;
       el.className = p[lado];
       if (lado === "viejo" && p.viejoEstilo) el.style.cssText = p.viejoEstilo;
+      if (lado === "main" && !p.main) continue;
       el.textContent = "x";
       cont.append(el);
       caja.append(cont);
@@ -171,8 +185,45 @@ const LEER = (id, props) => `(() => {
   return JSON.stringify(o);
 })()`;
 
+/**
+ * Lo que se puede medir de una pieza interactiva: que el click llega, que Tab la
+ * enfoca, y qué señal de foco recibe. Es lo que distingue "se ve igual" de
+ * "se comporta igual", y en las dos piezas nuevas es justamente el punto: el
+ * foco tiene que seguir siendo el NATIVO del navegador.
+ */
+const INTERACCION = (id) => `(async () => {
+  const el = document.getElementById(${JSON.stringify(id)});
+  if (!el) return null;
+  el.dataset.clicks = "0";
+  if (!el.dataset.enganchado) {
+    el.addEventListener("click", () => { el.dataset.clicks = String(Number(el.dataset.clicks) + 1); });
+    el.dataset.enganchado = "1";
+  }
+  document.activeElement && document.activeElement.blur();
+  await new Promise((r) => setTimeout(r, 30));
+
+  el.focus();
+  await new Promise((r) => setTimeout(r, 30));
+  const s = getComputedStyle(el);
+  const porTeclado = {
+    tag: el.tagName,
+    type: el.getAttribute("type"),
+    enfocado: document.activeElement === el,
+    focusVisible: (() => { try { return el.matches(":focus-visible"); } catch { return null; } })(),
+    outline: s.outlineStyle + " " + s.outlineWidth,
+    boxShadow: s.boxShadow,
+  };
+
+  el.click();
+  await new Promise((r) => setTimeout(r, 20));
+  return JSON.stringify({ ...porTeclado, clicks: Number(el.dataset.clicks) });
+})()`;
+
 let fallas = 0;
-console.log("\n  ══ equivalencia medida: viejo vs nuevo, en la misma página ══\n");
+const volcado = [];
+console.log(VOLCAR
+  ? `\n  ══ VOLCADO del lado "${VOLCAR}" — para comparar entre corridas ══\n`
+  : "\n  ══ equivalencia medida: viejo vs nuevo, en la misma página ══\n");
 
 for (const ancho of ANCHOS) {
   await send("Emulation.setDeviceMetricsOverride", { width: ancho, height: 900, deviceScaleFactor: 1, mobile: ancho < 1024 });
@@ -180,22 +231,45 @@ for (const ancho of ANCHOS) {
     await evaluar(`(() => { document.documentElement.dataset.theme = ${JSON.stringify(tema)}; return true; })()`);
     await sleep(60);
     for (const [i, p] of PARES.entries()) {
-      const v = await evaluar(LEER(`par-${i}-viejo`, p.props));
-      const n = await evaluar(LEER(`par-${i}-nuevo`, p.props));
-      if (!v || !n) frenar(`no se dibujó el par "${p.nombre}"`);
-      const V = JSON.parse(v), N = JSON.parse(n);
-      const distintas = p.props.filter((k) => V[k] !== N[k]);
+      const lados = VOLCAR ? [VOLCAR] : ["viejo", "nuevo"];
+      const leido = {};
+      for (const lado of lados) {
+        const bruto = await evaluar(LEER(`par-${i}-${lado}`, p.props));
+        if (!bruto) frenar(`no se dibujó el par "${p.nombre}" (${lado})`);
+        leido[lado] = JSON.parse(bruto);
+        if (p.interactivo) {
+          const inter = await evaluar(INTERACCION(`par-${i}-${lado}`), true);
+          if (!inter) frenar(`no se pudo ejercer "${p.nombre}" (${lado})`);
+          Object.assign(leido[lado], JSON.parse(inter));
+        }
+      }
+
+      const claves = Object.keys(leido[lados[0]]).sort();
+
+      if (VOLCAR) {
+        // Una línea por combinación, ordenada y estable: se compara con diff.
+        volcado.push(`${tema}|${ancho}|${p.nombre}|` + claves.map((k) => `${k}=${leido[VOLCAR][k]}`).join(";"));
+        continue;
+      }
+
+      const V = leido.viejo, N = leido.nuevo;
+      const distintas = claves.filter((k) => V[k] !== N[k]);
       if (distintas.length) {
         fallas += 1;
         console.log(`  ✗ ${tema}/${ancho} · ${p.nombre}`);
         for (const k of distintas) console.log(`      ${k}: viejo=${V[k]}  nuevo=${N[k]}`);
       } else if (tema === TEMAS[0]) {
-        console.log(`  ✓ ${ancho}px · ${p.nombre.padEnd(36)} ${p.props.map((k) => `${k}=${N[k]}`).join(" · ")}`);
+        console.log(`  ✓ ${ancho}px · ${p.nombre.padEnd(36)} ${claves.map((k) => `${k}=${N[k]}`).join(" · ")}`);
       }
     }
   }
 }
 
-console.log(`\n  ${fallas} diferencias.  (${PARES.length} contratos × ${TEMAS.length} temas × ${ANCHOS.length} anchos)`);
+if (VOLCAR) {
+  for (const l of volcado.sort()) console.log("  VOLCADO " + l);
+  console.log(`\n  ${volcado.length} líneas volcadas.`);
+} else {
+  console.log(`\n  ${fallas} diferencias.  (${PARES.length} contratos × ${TEMAS.length} temas × ${ANCHOS.length} anchos)`);
+}
 cerrar();
-process.exit(fallas ? 1 : 0);
+process.exit(!VOLCAR && fallas ? 1 : 0);
