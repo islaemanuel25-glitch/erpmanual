@@ -152,8 +152,12 @@ const PARES = [
     viejo: "w-full text-left sunmi-panel rounded-lg p-3 flex flex-col gap-1.5",
     main: "w-full text-left sunmi-panel rounded-lg p-3 flex flex-col gap-1.5",
     nuevo: "w-full text-left sunmi-panel rounded-lg p-3 flex flex-col gap-1.5",
-    props: ["width", "textAlign", "backgroundColor", "borderTopWidth", "borderTopColor",
-            "borderRadius", "paddingTop", "paddingLeft", "rowGap", "display", "flexDirection"] },
+    // Las tres propiedades de SUPERFICIE —fondo, ancho y color de borde— salen
+    // de esta lista a propósito: Figma (nodo 14:2) autoriza que cambien respecto
+    // de main, así que exigir equivalencia ahí sería exigir conservar el defecto.
+    // Se comprueban aparte, contra los tokens del tema, más abajo.
+    props: ["width", "textAlign", "borderRadius", "paddingTop", "paddingLeft",
+            "rowGap", "display", "flexDirection"] },
 ];
 
 await evaluar(`(() => {
@@ -175,6 +179,14 @@ await evaluar(`(() => {
       caja.append(cont);
     }
   }
+  // Referencia de superficie: los tokens del tema, sin ninguna clase. Contra
+  // esto se compara el fondo y el borde de la tarjeta, para no escribir ningún
+  // RGB en la sonda y que valga en los catorce temas.
+  const ref = document.createElement("div");
+  ref.id = "ref-superficie";
+  ref.style.cssText = "background:var(--card-bg);border:1px solid var(--card-border)";
+  caja.append(ref);
+
   document.body.append(caja);
   return true;
 })()`);
@@ -268,11 +280,51 @@ for (const ancho of ANCHOS) {
   }
 }
 
+// ── EL CAMBIO QUE SÍ ESTÁ AUTORIZADO ──────────────────────────────────────
+//
+// La superficie de `SunmiActionCard` DEBE diferir de main: en main la tarjeta
+// sale transparente y sin borde porque escribía `sunmi-panel`, que no existe
+// como regla. Figma (nodo 14:2) aprobó fondo y borde desde los tokens del tema.
+//
+// Por eso no se compara contra main sino contra una REFERENCIA construida con
+// los propios tokens: así no hay ningún RGB escrito en esta sonda y la
+// afirmación vale en los catorce temas, no en los cuatro que se recorren.
+let superficieMal = 0;
+const filasSuperficie = [];
+for (const ancho of ANCHOS) {
+  await send("Emulation.setDeviceMetricsOverride", { width: ancho, height: 900, deviceScaleFactor: 1, mobile: ancho < 1024 });
+  for (const tema of TEMAS) {
+    await evaluar(`(() => { document.documentElement.dataset.theme = ${JSON.stringify(tema)}; return true; })()`);
+    await sleep(60);
+    const iTarjeta = PARES.findIndex((p) => p.nombre.startsWith("tarjeta de acción"));
+    const lado = VOLCAR || "nuevo";
+    const props = ["backgroundColor", "borderTopWidth", "borderTopColor"];
+    const t = JSON.parse((await evaluar(LEER(`par-${iTarjeta}-${lado}`, props))) || "null");
+    const r = JSON.parse((await evaluar(LEER("ref-superficie", props))) || "null");
+    if (!t || !r) frenar("no se pudo medir la superficie");
+    const ok =
+      t.backgroundColor === r.backgroundColor &&
+      t.borderTopColor === r.borderTopColor &&
+      t.borderTopWidth === "1px";
+    if (!ok) superficieMal += 1;
+    filasSuperficie.push(
+      `  ${ok ? "✓" : "✗"} ${tema}/${ancho}  bg=${t.backgroundColor}  borde=${t.borderTopWidth} ${t.borderTopColor}` +
+        (ok ? "" : `   ESPERADO bg=${r.backgroundColor} borde=1px ${r.borderTopColor}`)
+    );
+  }
+}
+
 if (VOLCAR) {
   for (const l of volcado.sort()) console.log("  VOLCADO " + l);
   console.log(`\n  ${volcado.length} líneas volcadas.`);
 } else {
-  console.log(`\n  ${fallas} diferencias.  (${PARES.length} contratos × ${TEMAS.length} temas × ${ANCHOS.length} anchos)`);
+  console.log(`\n  CONTRATOS PRESERVADOS: ${fallas} diferencias NO autorizadas.`);
+  console.log(`  (${PARES.length} contratos × ${TEMAS.length} temas × ${ANCHOS.length} anchos; la superficie de la tarjeta se mide aparte)`);
+  console.log("\n  CAMBIO APROBADO POR FIGMA — superficie de SunmiActionCard:");
+  console.log("    main    → transparente / 0px");
+  console.log("    rama    → var(--card-bg) / 1px var(--card-border)");
+  for (const f of filasSuperficie) console.log("  " + f);
+  console.log(`    Figma   → ${superficieMal ? "NO COINCIDE" : "coincide"}`);
 }
 cerrar();
-process.exit(!VOLCAR && fallas ? 1 : 0);
+process.exit(!VOLCAR && (fallas || superficieMal) ? 1 : 0);

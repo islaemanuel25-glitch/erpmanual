@@ -802,6 +802,39 @@
 }
 
 /* ==================================================
+   ⭐ SUPERFICIE DE TARJETA — SOLO FONDO Y BORDE
+   ==================================================
+
+   El fondo y el borde de una tarjeta, y nada más. Sin radio, sin relleno, sin
+   sombra, sin margen y sin difuminado: esas decisiones son de cada pieza, y
+   meterlas acá obligaría a pelearlas desde afuera.
+
+   ── POR QUÉ EXISTE, Y NO ES UNA CLASE MÁS ──────────────────────────────────
+
+   `.sunmi-panel` NO EXISTE. Nunca existió como regla: no está en esta hoja, ni
+   en `app/globals.css`, ni la genera ningún plugin, y no aparece en el CSS que
+   sirve producción —comprobado contra las dos hojas del build, con `.sunmi-card`
+   como control—. Es una clase muerta que catorce archivos escriben creyendo que
+   les da fondo de tarjeta.
+
+   `SunmiActionCard` la escribía, así que la tarjeta salía TRANSPARENTE y SIN
+   BORDE. Medido: `background-color: rgba(0,0,0,0)` y `border-top-width: 0px`.
+   Y como el componente de dominio que la consume hacía exactamente lo mismo
+   antes de la extracción, la comparación contra `main` daba cero diferencias:
+   los dos lados estaban igual de mal, y una sonda que mide equivalencia no
+   puede ver eso.
+
+   Tampoco sirve `.sunmi-card`: además del fondo y el borde trae `rounded-2xl`,
+   `shadow-md`, `p-4`, `mb-3` y `backdrop-blur-md`, que cambiarían la pieza.
+
+   Los dos tokens son los que ya usan `.sunmi-card` y los catorce temas: acá no
+   hay ningún color nuevo. Contrato de Figma, nodo 14:2. */
+.sunmi-card-surface {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+}
+
+/* ==================================================
    ⭐ MÉTRICAS DE LA TARJETA DE PRODUCTO
    ==================================================
 

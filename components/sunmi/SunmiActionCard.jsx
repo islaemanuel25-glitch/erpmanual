@@ -20,9 +20,20 @@
 //
 // ── DE DÓNDE SALEN EL FONDO Y EL BORDE ────────────────────────────────────
 //
-// De `sunmi-panel`, que los lee de `--card-bg` y `--card-border` del tema. No
+// De `.sunmi-card-surface`, que los lee de `--card-bg` y `--card-border`. No
 // hay ningún color nuevo acá: la tarjeta se ve distinta en los catorce temas
 // porque los tokens cambian, no porque la pieza sepa de colores.
+//
+// LA PRIMERA VERSIÓN DE ESTA PIEZA ESCRIBÍA `sunmi-panel`, Y ESA CLASE NO
+// EXISTE. No está en ninguna hoja, no la genera ningún plugin y no aparece en el
+// CSS que sirve producción. La tarjeta salía transparente y sin borde —medido:
+// `rgba(0,0,0,0)` y `0px`— y nadie lo veía porque el consumidor de dominio hacía
+// exactamente lo mismo antes de la extracción: la comparación contra `main` daba
+// cero diferencias con los dos lados igual de mal.
+//
+// Lo tapaba además un candado que se llamaba "el fondo y el borde salen del
+// tema" y solo comprobaba que no hubiera colores escritos a mano. Un archivo sin
+// fondo ninguno pasaba igual.
 //
 // ── EL FOCO ES EL DEL NAVEGADOR ───────────────────────────────────────────
 //
@@ -42,7 +53,7 @@ export default function SunmiActionCard({ children, className = "", type = "butt
     <button
       type={type}
       {...props}
-      className={`w-full text-left sunmi-panel rounded-lg p-3 flex flex-col gap-1.5 ${className}`}
+      className={`w-full text-left sunmi-card-surface rounded-lg p-3 flex flex-col gap-1.5 ${className}`}
     >
       {children}
     </button>
