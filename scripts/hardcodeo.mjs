@@ -75,7 +75,7 @@ import {
   PRIORIDAD,
   ETIQUETAS,
   FUERA_DE_ALCANCE,
-} from "../lib/hardcodeo/contador.js";
+} from "../lib/hardcodeo/contador.mjs";
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const RAIZ = path.resolve(AQUI, "..");
