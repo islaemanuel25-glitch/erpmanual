@@ -116,11 +116,17 @@ process.stdin.on("end", () => {
   // contar nada. Un aviso que no distingue un veredicto de un choque es un aviso
   // que no se puede creer en ninguna de las dos direcciones.
   //
-  // Se ve todos los días en cuanto el intérprete no es el que la herramienta
-  // necesita: `lib/hardcodeo/contador.js` es ESM en un archivo `.js` y el
+  // Se vio todos los días en cuanto el intérprete no era el que la herramienta
+  // necesita: `lib/hardcodeo/contador` era ESM en un archivo `.js` y el
   // `package.json` no declara `"type": "module"`, así que en Node 18 el import
-  // explota con `Named export 'ETIQUETAS' not found` — código 1, cero bytes de
+  // explotaba con `Named export 'ETIQUETAS' not found` — código 1, cero bytes de
   // salida, y el hook lo contaba como un aumento.
+  //
+  // **Esa causa ya está arreglada**: el contador es `.mjs` y lo cuida
+  // `scripts/hardcodeoArranca.test.mjs`. Esta defensa NO se saca, porque no era
+  // de ese defecto: separa un veredicto de un choque, y choques hay muchos —un
+  // timeout, un git que no responde, una excepción nueva—. Se sacaría recién si
+  // el contador dejara de poder chocar, que no va a pasar.
   //
   // Lo que los separa es la MARCA que el contador imprime cuando de verdad
   // comparó. Sin esa marca no hubo veredicto, haya salido con el código que haya

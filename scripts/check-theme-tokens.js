@@ -144,7 +144,7 @@ const WHITELIST = [
  * ¿Esta línea de este archivo está exenta?
  *
  * Vive acá y no copiada en cada consumidor. Hay DOS que preguntan lo mismo —el
- * chequeo de este archivo y el contador de `lib/hardcodeo/contador.js`, que se
+ * chequeo de este archivo y el contador de `lib/hardcodeo/contador.mjs`, que se
  * invoca desde `scripts/hardcodeo.mjs`— y antes cada uno hacía su propio
  * `w.test(linea)`. Dos implementaciones de la misma regla se separan el día que
  * una aprende algo que la otra no: con las excepciones scopeadas por archivo, la

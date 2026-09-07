@@ -44,7 +44,7 @@
 // acá" y el otro "¿esto empeoró?". Si fueran dos scripts, cada uno con su
 // contador, el día que uno cambie de criterio empiezan a decir números distintos
 // sobre el mismo archivo y no hay forma de saber cuál miente. Acá los dos llaman
-// a `lib/hardcodeo/contador.js`, que es donde vive el criterio.
+// a `lib/hardcodeo/contador.mjs`, que es donde vive el criterio.
 //
 // Los patrones de color salen de `check-theme-tokens.js` por la misma razón.
 //
@@ -233,7 +233,7 @@ function ficha(nombre, json) {
   }
   console.log("Lo que esta ficha NO cuenta:");
   for (const f of FUERA_DE_ALCANCE) console.log(`   · ${f.que}`);
-  console.log("   (el motivo de cada uno está en lib/hardcodeo/contador.js)");
+  console.log("   (el motivo de cada uno está en lib/hardcodeo/contador.mjs)");
   return 0;
 }
 
