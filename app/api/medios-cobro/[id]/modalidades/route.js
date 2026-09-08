@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { MEDIO_LABEL } from "@/lib/pos-ventas/pagos";
-import { TIPOS_COBRABLES } from "@/lib/pos-ventas/mediosCobro";
+import { TIPOS_COBRABLES, parsearClaveEdicion } from "@/lib/pos-ventas/mediosCobro";
 import {
   componerModalidades,
   normalizarEntradaModalidad,
@@ -66,10 +66,19 @@ export async function GET(req, { params }) {
     // consulta convierte abrir una pantalla en configurar un local. Se busca el
     // medio tal como está y, si todavía es un default, no tiene modalidades —que
     // es la verdad—.
-    const medio = await prisma.medioCobroLocal.findFirst({
-      where: { id: Number(id), localId },
-      select: { id: true, nombre: true, tipoContable: true },
-    });
+    //
+    // La clave se PARSEA con la misma función que el resto: un `defecto:EFECTIVO`
+    // no direcciona ninguna fila, y pasarlo por `Number()` daba `NaN`, que Prisma
+    // rechaza con un 500. Un medio que todavía no existe no tiene modalidades, y
+    // eso se contesta como lo que es: no encontrado.
+    const ref = parsearClaveEdicion(id);
+    const medio =
+      ref?.clase === "id"
+        ? await prisma.medioCobroLocal.findFirst({
+            where: { id: ref.id, localId },
+            select: { id: true, nombre: true, tipoContable: true },
+          })
+        : null;
     if (!medio) {
       return NextResponse.json(
         { ok: false, error: "Ese medio de cobro no existe en este local." },
