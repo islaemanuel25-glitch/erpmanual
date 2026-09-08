@@ -19,7 +19,7 @@ import FormaPago from "@/components/pos-ventas/FormaPago";
 import ModalPagoEfectivo from "@/components/pos-ventas/ModalPagoEfectivo";
 import ModalImporteServicio from "@/components/pos-ventas/ModalImporteServicio";
 import { sumarTotalServicios, componerCobroSimple } from "@/lib/pos-ventas/servicios";
-import { totalesPorMedio, hayOfertaSoloEfectivoEnCarrito } from "@/lib/ofertas/previewPos";
+import { totalesPorMedio, totalesPorOpcionDeCobro, hayOfertaSoloEfectivoEnCarrito } from "@/lib/ofertas/previewPos";
 import { normalizarRecargos } from "@/lib/recargos-pago/recargoPago";
 import { itemsCrearPayload } from "@/lib/pos-ventas/payloadVenta";
 import { sumarSubtotales } from "@/lib/pos-ventas/lineaPorImporte";
@@ -852,6 +852,39 @@ export default function PosVentasPage() {
           : undefined,
       }),
     [state.carrito, state.descuento, state.descuentoPorPuntos, recargosPorMedio, minEfectivoServicios, mediosCobro]
+  );
+
+  // ── UN TOTAL POR OPCIÓN COBRABLE, NO POR TIPO CONTABLE ──────────────────
+  //
+  // El de arriba indexa por `MedioPago`, y eso alcanza mientras un tipo contable
+  // sea una condición. Con modalidades deja de alcanzar: "Crédito 1 pago" al 4 %
+  // y "Crédito cuotas" al 8 % son las dos CREDITO, así que la segunda pisaría a
+  // la primera y el cajero vería un solo número —el equivocado para una de las
+  // dos— sin ningún síntoma.
+  //
+  // Éste indexa por la identidad de cada opción: la modalidad si hay, el medio si
+  // no. Es la MISMA clave que usa el panel para pedir el total de lo que está
+  // dibujando, así que el número que se muestra no puede ser el de otra opción.
+  //
+  // Sale del MISMO motor: `totalesPorOpcionDeCobro` llama a
+  // `calcularVentaComercial` una vez por opción. Acá no se calcula ningún importe.
+  //
+  // Sin configuración —modo offline, o antes de que llegue el GET— queda en
+  // `null` y el panel se comporta exactamente como antes.
+  const previewPorOpcion = useMemo(
+    () =>
+      mediosCobro
+        ? totalesPorOpcionDeCobro({
+            carrito: state.carrito,
+            medios: mediosCobro,
+            descuentos: {
+              manual: state.descuento,
+              porPuntos: state.descuentoPorPuntos,
+            },
+            subtotalServicios: minEfectivoServicios,
+          })
+        : null,
+    [state.carrito, state.descuento, state.descuentoPorPuntos, minEfectivoServicios, mediosCobro]
   );
 
   const hayOfertaSoloEfectivo = hayOfertaSoloEfectivoEnCarrito(state.carrito);
@@ -2131,6 +2164,7 @@ export default function PosVentasPage() {
               clienteSeleccionado={state.clienteSeleccionado}
               minEfectivoServicios={minEfectivoServicios}
               previewPorMedio={previewPorMedio}
+              previewPorOpcion={previewPorOpcion}
               recargosPorMedio={recargosPorMedio}
               hayOfertaSoloEfectivo={hayOfertaSoloEfectivo}
               mediosCobro={mediosCobro}
