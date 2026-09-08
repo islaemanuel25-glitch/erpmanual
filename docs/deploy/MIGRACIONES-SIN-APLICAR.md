@@ -16,15 +16,33 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-### `20260908130000_recepcion_diferencias_positivas` — SIN APLICAR en producción
-
-**El árbol pasa de 6 a 7 migraciones.** Producción sigue en **6**: ésta todavía
-no se aplicó. Lo último comprobado con `prisma migrate status` fue el 2026-09-08
-al desplegar `63e0f790a430b555bbd3fd0dc976993d49eaa121`: *"6 migrations found in
+Ninguna. Producción está al día en **7 migraciones**, que son las que hay en el
+árbol. Comprobado con `prisma migrate status` el 2026-09-08 después de desplegar
+`392c06dad382844afa8bec892893512cc2deae86`: *"7 migrations found in
 prisma/migrations. Database schema is up to date!"*.
 
-Entró con el merge del PR #49 —`6b93ee493d86fc040b8cb257cbe7508326c78079`—, que
-permite recibir más de lo enviado y recibir productos que el remito no menciona.
+---
+
+## 2026-09-08 — `392c06da`, recepción con excedentes: una migración aplicada
+
+Producción pasó de `63e0f790a430b555bbd3fd0dc976993d49eaa121` a
+`392c06dad382844afa8bec892893512cc2deae86`: el merge del PR #49
+—`6b93ee493d86fc040b8cb257cbe7508326c78079`— más el commit documental que
+registró esta misma migración como pendiente. El código funcional es idéntico al
+HEAD que aprobó la CI #202.
+
+### `20260908130000_recepcion_diferencias_positivas` — APLICADA
+
+Se aplicó **de verdad**: `migrate deploy` imprimió
+`Applying migration 20260908130000_recepcion_diferencias_positivas` y después
+`All migrations have been successfully applied`. La fila quedó en
+`_prisma_migrations` con `finished_at = 2026-09-08 12:54:36.591679+00`,
+`applied_steps_count = 1` y sin rollback.
+
+**El conteo pasó de 6 a 7**, que es el control que vale: el árbol tiene 7, la
+imagen nueva las conoce —se listó su `/app/prisma/migrations` antes de usarla, y
+la nueva estaba— y el `migrate status` posterior dice *"7 migrations found in
+prisma/migrations. Database schema is up to date!"*.
 
 **Qué hace.** Tres columnas nuevas en `TransferenciaDetalle` y dos en
 `AuditoriaStock`, con sus dos claves foráneas y tres índices:
@@ -65,7 +83,7 @@ obligatoria: la única `NOT NULL` trae su `DEFAULT false`, así que un `INSERT` 
 la omita sigue funcionando. Las otras cuatro son nulables. No se quita nada que
 la versión vieja esté leyendo.
 
-#### Evidencia
+#### Evidencia previa
 
 - `scripts/pruebas-db/recepcionTransferencias.mjs` ejerce las cuatro rutas de
   recepción contra Postgres y cuenta las filas de `StockLocal` después: **138
@@ -75,6 +93,108 @@ la versión vieja esté leyendo.
   archivo más la baseline— y comprueba que Prisma aplique **solo** la migración
   nueva. Ése decide el veredicto de la CI, sin `|| true`.
 - CI #202 (`34226908387`) en verde sobre `48772178`, el HEAD que se mergeó.
+
+#### El backup
+
+`/srv/produccion/backups/pre-392c06da_20260908_124939.sql.gz`, **3.976.894
+bytes**, SHA-256
+`280b945f3aa291c66ab5c03bbf8ab48dc6c61dd49635304de62e2242dd0a26e3`. Nuevo, no se
+reusó el anterior. Los cuatro chequeos: `pg_dump` con 0 bajo `set -o pipefail`,
+`gzip -t` sin salida, la marca `PostgreSQL database dump complete` en las últimas
+20 líneas —la última es el token `\unrestrict`— y **68** `CREATE TABLE`.
+
+**El quinto chequeo NO aplica y conviene que quede dicho por qué**: existe para
+migraciones de DATOS, y sirve para comprobar que el dump contenga los valores que
+se van a borrar. Ésta no borra ni modifica ninguno, así que no hay un valor
+concreto que buscar. No se saltea por descuido.
+
+#### La contraprueba, antes de tocar producción
+
+El backup nuevo se restauró en un PostgreSQL descartable —`postgres:16`, el mismo
+que produccción— y la migración se aplicó ahí con la **imagen nueva** y
+`prisma migrate deploy`, no pegando SQL a mano. Los once controles:
+
+1. restauró con código 0 y **cero** líneas `ERROR`/`FATAL`;
+2. 68 tablas legibles en `public`;
+3. `migrate deploy` informó **7 migrations found**;
+4. imprimió `Applying migration 20260908130000_recepcion_diferencias_positivas`,
+   una sola;
+5. terminó con `All migrations have been successfully applied`;
+6. `migrate status` → `Database schema is up to date!`;
+7. 7 migraciones reconocidas;
+8. las 5 columnas existen, con los tipos y la nulabilidad esperados;
+9. las 2 FK existen, las dos con `ON DELETE SET NULL ON UPDATE CASCADE`, y
+   `AuditoriaStock.transferenciaId` **sin** FK, que es a propósito;
+10. los 3 índices existen;
+11. **los conteos históricos no se movieron ni en una fila**: Transferencia 182,
+    TransferenciaDetalle 6083, AuditoriaStock 8690, Venta 15529, VentaPago 15532,
+    ProductoBase 2703, ProductoLocal 11977, StockLocal 11809, Usuario 6, Local 5
+    —idénticos antes y después de migrar—.
+
+La copia descartable y su contenedor se eliminaron al terminar.
+
+#### El despliegue
+
+**Corte: 13,47 segundos**, medidos desde inmediatamente antes del `up -d` hasta
+el primer 200 de `/api/version`, con el `docker compose` adentro. El tope es 30.
+
+Los **seis** valores de identidad coinciden en
+`392c06dad382844afa8bec892893512cc2deae86`: `origin/main`, HEAD del repo del VPS,
+imagen del contenedor, `APP_BUILD_ID`, `/api/version` y el label OCI
+`org.opencontainers.image.revision`. Imagen
+`ghcr.io/islaemanuel25-glitch/erpmanual@sha256:76556a77b7e614a961ee949b2c1f7a0a8df3414b3adecdf0da2525e963bb606f`,
+`linux/amd64`.
+
+App `running`, 0 reinicios, logs sin `error`/`fatal`/`panic`. **PostgreSQL no se
+recreó ni se reinició**: sigue siendo el contenedor `3bd85a35bb0f`, `healthy`, 0
+reinicios, arrancado el 2026-08-17. `/login` responde 200 con la pantalla de
+login y `/api/version` devuelve el SHA.
+
+Esquema comprobado **contra PostgreSQL, no deducido del schema**: las 5 columnas,
+las 2 FK con su comportamiento, los 3 índices, `agregadoEnRecepcion` con
+`DEFAULT false`, y **0 filas** con `agregadoEnRecepcion = true` — las 6083
+históricas quedaron en `false`, que es la verdad.
+
+Smoke de rutas sin sesión y sin mutar nada: `buscar-productos-origen`,
+`linea-recepcion` (POST y DELETE), `guardar-recepcion` y `confirmar-recepcion`
+contestan **401**, y dos rutas inventadas contestan **404**. El control negativo
+es lo que hace que el 401 signifique algo.
+
+**Referencia de rollback**:
+`ghcr.io/islaemanuel25-glitch/erpmanual:63e0f790a430b555bbd3fd0dc976993d49eaa121`,
+image ID
+`sha256:1bf76978ff31b8bab07998c654a2438b89db9c3d984d249914ea1778684a2692`. Si
+hiciera falta volver, se vuelve a esa imagen y **las columnas nuevas se dejan**:
+el código anterior no las nombra. No se revierte una migración con `DROP`.
+
+#### Lo que no salió liso
+
+**El clasificador en modo `--vps` salió con 2**, no con 0: hace
+`ssh vps-erp docker inspect` y el despliegue se corrió **desde el propio VPS**,
+donde ese alias no resuelve. Falló cerrado, como está escrito que debe. Se usó la
+salida documentada —`--desde <SHA_QUE_CORRÍA_ANTES>`— con el SHA leído de la
+**misma fuente** que consulta el modo `--vps`
+(`docker inspect erpazul_app --format '{{.Config.Image}}'`), localmente. Resultado
+`aditiva`, salida 0. **El clasificador no se tocó.**
+
+Y su verde no se tomó como autorización, porque el propio script avisa que **no
+lee adentro de un bloque `DO $$`** y esta migración tiene dos. Se releyó el SQL
+exacto —SHA-256 `bce236a6…`, idéntico al que aprobó la CI— y las 38 líneas
+ejecutables son 5 `ADD COLUMN`, 2 bloques `DO $$` con un solo `ADD CONSTRAINT`
+cada uno guardado por `IF NOT EXISTS`, y 3 `CREATE INDEX`. Los `DELETE`/`UPDATE`
+que aparecen en un grep crudo son las cláusulas `ON DELETE SET NULL ON UPDATE
+CASCADE` de esas FK.
+
+**`Venta` y `VentaPago` subieron en 1 durante el despliegue** —15529→15530 y
+15532→15533—. **No es la migración**, que no nombra ninguna de las dos: es una
+venta real, la 15582 del local 4, creada a las 12:54:07, cuarenta y dos segundos
+antes de recrear la app. Las tres tablas que la migración sí toca —Transferencia,
+TransferenciaDetalle, AuditoriaStock— quedaron en 182, 6083 y 8690, iguales antes
+y después.
+
+**La interfaz para agregar el producto extra NO viaja en esta tanda**, y es
+deliberado: se desplegó primero el backend y el modelo. La UI se diseña en Figma
+en la tanda siguiente.
 
 ---
 
