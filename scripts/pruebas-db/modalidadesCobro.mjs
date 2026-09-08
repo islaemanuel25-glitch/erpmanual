@@ -179,9 +179,9 @@ async function correr(f) {
     importeBaseServicio: null,
     subtotalFijado: null,
   };
-  const cobrar = (cuerpo, sesion = sesionA) =>
+  const cobrar = async (cuerpo, sesion = sesionA) =>
     leer(
-      rutaCrearVenta.POST(
+      await rutaCrearVenta.POST(
         pedido("http://ci/api/pos-ventas/crear", {
           metodo: "POST",
           sesion,
