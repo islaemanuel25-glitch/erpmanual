@@ -67,7 +67,22 @@ const pedido = (url, { metodo = "GET", cuerpo, sesion } = {}) =>
     headers: { cookie: `erpazul_sesion=${sesion}`, "content-type": "application/json" },
     body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
   });
-const leer = async (r) => ({ status: r.status, ...(await r.json().catch(() => ({}))) });
+/**
+ * Lee la respuesta de un handler. ACEPTA LA PROMESA, y eso no es comodidad.
+ *
+ * Sin el `await` de adentro, `leer(ruta.POST(...))` recibe la Promesa y llama
+ * `.json()` sobre ella: el script muere con "r.json is not a function" en la
+ * primera afirmación, y el rojo no dice nada del producto. Ya pasó una vez en
+ * `modalidadesCobro.mjs` y volvió a pasar acá, que es la señal de que el
+ * problema no era el olvido sino que la función permitía olvidarse.
+ *
+ * Resolviendo la promesa ACÁ, las dos formas —`leer(await x)` y `leer(x)`—
+ * quedan bien, y el que escriba la próxima llamada no tiene que acordarse.
+ */
+const leer = async (respuesta) => {
+  const r = await respuesta;
+  return { status: r.status, ...(await r.json().catch(() => ({}))) };
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // FIXTURES
