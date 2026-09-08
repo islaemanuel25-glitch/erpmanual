@@ -54,7 +54,19 @@ const igualStock = (t, o, e) => {
 };
 
 const SECRETO = process.env.AUTH_SECRET;
-const token = (usuarioId, localId, grupoId, permisos = ["*"]) =>
+
+/**
+ * EL TOKEN DE ESTAS PRUEBAS NO ES ADMIN, Y ESO ES EL PUNTO.
+ *
+ * `esAdminPorPermisos` es `permisos.includes("*")`, y un admin SALTEA la
+ * comprobación de destino a propósito —la regla existente lo permite—. Con un
+ * token de `["*"]`, las afirmaciones de que el ORIGEN no puede tocar la
+ * recepción daban 200 y parecían un agujero del producto: eran del fixture.
+ *
+ * Por eso el default es el permiso mínimo del flujo. Un admin se pide
+ * explícitamente cuando se lo quiera medir.
+ */
+const token = (usuarioId, localId, grupoId, permisos = ["transferencias.recibir", "transferencias.ver"]) =>
   jwt.sign(
     { id: usuarioId, nombre: "CI", email: `ci${usuarioId}@l`, localId, grupoId, permisos },
     SECRETO,
@@ -488,7 +500,10 @@ async function correr(f) {
 
   igual("no se creó ninguna Venta", await prisma.venta.count({ where: { localId: { in: [origen.id, destino.id] } } }), 0);
   igual("ni ningún VentaPago", await prisma.ventaPago.count({ where: { venta: { localId: { in: [origen.id, destino.id] } } } }), 0);
-  igual("ni movimientos de caja", await prisma.cajaMovimiento.count({ where: { localId: { in: [origen.id, destino.id] } } }), 0);
+  // `CajaMovimiento` no tiene `localId`: cuelga del TURNO. Se pregunta por ahí,
+  // que es donde vive la relación, en vez de inventarle una columna.
+  igual("ni movimientos de caja",
+    await prisma.cajaMovimiento.count({ where: { turno: { localId: { in: [origen.id, destino.id] } } } }), 0);
   igual("ni turnos", await prisma.turno.count({ where: { localId: { in: [origen.id, destino.id] } } }), 0);
 }
 
