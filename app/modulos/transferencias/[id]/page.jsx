@@ -533,7 +533,18 @@ export default function TransferenciaDetallePage() {
               me={me}
               puedeRecibir={puedeRecibir}
               guardando={guardando}
-              guardarCambios={guardarCambios}
+              // ── SIN GUARDADO POR LOTES CUANDO SE ESTÁ RECIBIENDO ────────
+              //
+              // El puesto de trabajo persiste cada producto al marcarlo
+              // revisado, de a uno. Ofrecer además un "Guardar cambios" sería
+              // peligroso: la ficha PROPONE lo enviado para el caso feliz de un
+              // toque, así que un guardado masivo escribiría esos 150 valores
+              // propuestos como cantidades reales de productos que nadie contó.
+              //
+              // La ruta `guardar-recepcion` sigue existiendo y sigue siendo el
+              // borrador por lotes —no marca revisado—; lo que deja de existir
+              // es el botón que la dispararía con defaults visuales.
+              guardarCambios={puedeRecibir ? null : guardarCambios}
               confirmando={confirmando}
               confirmarRecepcion={confirmarRecepcion}
               dirty={dirty}

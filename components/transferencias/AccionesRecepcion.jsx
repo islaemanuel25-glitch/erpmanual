@@ -81,14 +81,27 @@ export default function AccionesRecepcion({
 
         {puedeRecibir && (
           <>
-            <SunmiButton
-              color="slate"
-              disabled={guardando}
-              onClick={guardarCambios}
-              className="text-sm"
-            >
-              {guardando ? "Guardando..." : "Guardar cambios"}
-            </SunmiButton>
+            {/* ── POR QUÉ "GUARDAR CAMBIOS" PUEDE NO ESTAR ──────────────────
+
+                En el puesto de trabajo del control físico NO hay guardado por
+                lotes: cada producto se persiste cuando se lo marca revisado, de
+                a uno. Y dejar el botón ahí sería peligroso, no redundante — la
+                pantalla PROPONE lo enviado en cada producto para el caso feliz
+                de un toque, así que un "Guardar" mandaría esos 150 valores
+                propuestos como cantidades reales de productos que nadie contó.
+
+                Sin `guardarCambios`, el botón no se dibuja. La regla vive en un
+                solo lugar: quien no entrega el handler no ofrece la acción. */}
+            {guardarCambios && (
+              <SunmiButton
+                color="slate"
+                disabled={guardando}
+                onClick={guardarCambios}
+                className="text-sm"
+              >
+                {guardando ? "Guardando..." : "Guardar cambios"}
+              </SunmiButton>
+            )}
 
             <SunmiButton
               color="amber"
@@ -113,7 +126,9 @@ export default function AccionesRecepcion({
         )}
       </div>
 
-      {puedeRecibir && dirty && (
+      {/* El aviso solo tiene sentido si hay algo que guardar. Sin guardado por
+          lotes no hay borrador pendiente: cada producto se persiste al marcarlo. */}
+      {puedeRecibir && guardarCambios && dirty && (
         <div className="mt-2">
           <SunmiAviso tono="warning">{AVISO_SIN_GUARDAR}</SunmiAviso>
         </div>

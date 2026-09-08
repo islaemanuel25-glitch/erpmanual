@@ -17,6 +17,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import ResumenControlFisico from "./ResumenControlFisico.jsx";
+import AccionesRecepcion, { AVISO_SIN_GUARDAR } from "./AccionesRecepcion.jsx";
 import FichaProductoRecepcion, { ROTULO_SUELTAS, TEXTO_ESTADO } from "./FichaProductoRecepcion.jsx";
 import { ESTADO_PRODUCTO, FILTRO, resumenDeRecepcion } from "@/lib/transferencias/controlFisico";
 
@@ -181,6 +182,41 @@ test("una línea agregada NO pide motivo y ofrece quitarse", () => {
 test("una línea DEL REMITO no ofrece quitarse", () => {
   const html = pintarFicha({ producto: linea(), onQuitar: () => {} });
   assert.ok(!html.includes("Quitar producto agregado"), "una línea del remito no se borra");
+});
+
+test("recibiendo NO hay 'Guardar cambios': escribiría 150 defaults que nadie contó", () => {
+  // El peligro concreto: la ficha PROPONE lo enviado en cada producto para el
+  // caso feliz de un toque. Un guardado masivo tomaría esas 150 propuestas como
+  // cantidades reales. Sin el handler, el botón no se dibuja.
+  const base = {
+    id: 97,
+    item: { id: 97, estado: "Recibiendo", items: [], origen: {}, destino: {}, resumen: {} },
+    me: { id: 1, permisos: ["*"] },
+    guardando: false,
+    confirmando: false,
+    confirmarRecepcion: () => {},
+    puedeCancelar: false,
+    puedeRecibir: true,
+  };
+
+  const recibiendo = renderToStaticMarkup(
+    React.createElement(AccionesRecepcion, { ...base, guardarCambios: null, dirty: true })
+  );
+  assert.ok(!recibiendo.includes("Guardar cambios"), "el guardado masivo sigue ofreciéndose");
+  assert.ok(!recibiendo.includes(AVISO_SIN_GUARDAR), "avisa de un borrador que no existe");
+  // Pero confirmar sigue estando: es el acto que mueve stock.
+  assert.ok(recibiendo.includes("Confirmar recepción"));
+  // Y las acciones de siempre no se perdieron.
+  for (const t of ["PDF Envío", "PDF Recepción", "Imprimir ticket POS"]) {
+    assert.ok(recibiendo.includes(t), `desapareció "${t}"`);
+  }
+
+  // Con el handler —el detalle histórico de quien no recibe— sí se dibuja.
+  const conGuardar = renderToStaticMarkup(
+    React.createElement(AccionesRecepcion, { ...base, guardarCambios: () => {}, dirty: true })
+  );
+  assert.ok(conGuardar.includes("Guardar cambios"));
+  assert.ok(conGuardar.includes(AVISO_SIN_GUARDAR));
 });
 
 test("sin permiso de recibir no hay editor ni botón de revisar", () => {
