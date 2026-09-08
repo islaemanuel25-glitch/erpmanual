@@ -474,9 +474,26 @@ try {
     textoCobros.includes("Comisión sin configurar"),
     "una comisión sin cargar se dice SIN CONFIGURAR"
   );
+  // ── EL "HEREDADA" SE MIDE SOBRE LAS FILAS DE MODALIDAD, NO SOBRE LA PÁGINA ─
+  //
+  // La primera versión partía el texto de la página en "MODALIDADES" y miraba
+  // todo lo que venía después. Abajo de la lista está el formulario del MEDIO, y
+  // ahí "Heredada del grupo · editable" es CORRECTO: un medio sí hereda. O sea
+  // que la sonda estaba dando rojo por un texto que tiene que estar, sobre una
+  // pantalla que no es la que la afirmación nombra.
+  //
+  // Lo que se afirma es lo que dice el pedido: que ninguna MODALIDAD se presente
+  // como heredada. Se leen sus filas.
+  const filasModalidad = await evaluar(
+    `[...document.querySelectorAll("a")]
+       .map((a) => a.innerText || "")
+       .filter((t) => t.includes(${JSON.stringify(NOMBRE_MODALIDAD_A)}) || t.includes(${JSON.stringify(NOMBRE_MODALIDAD_B)}))`
+  );
+  afirmar(filasModalidad.length === 2, "las dos modalidades son filas propias", JSON.stringify(filasModalidad));
   afirmar(
-    !/hered/i.test(textoCobros.split("MODALIDADES")[1] ?? ""),
-    "y NUNCA heredada: una modalidad no hereda del grupo"
+    !/hered/i.test(filasModalidad.join(" ")),
+    "y NINGUNA dice heredada: una modalidad no hereda del grupo",
+    JSON.stringify(filasModalidad)
   );
   afirmar(
     /cobra por modalidad/i.test(textoCobros),
@@ -600,8 +617,26 @@ try {
   // `prisma/seed.js` no crea ninguno. Si el buscador no lo encuentra es un
   // problema de FIXTURE y no de la UI, así que se muere diciéndolo: contar ese
   // rojo como evidencia de la pantalla sería mentir sobre qué se midió.
+  // ── EL localId VA EXPLÍCITO, COMO LO MANDA EL POS ───────────────────────
+  //
+  // `buscar-producto` NO usa el contexto activo: toma `localId` del query, y si
+  // no viene cae al `localId` de la SESIÓN. El usuario de prueba tiene asignado
+  // el depósito, así que una consulta sin ese parámetro busca en otro local y
+  // devuelve cero — que es lo que pasó en la corrida 34180152496 y se leyó como
+  // "falta el fixture" cuando el fixture estaba puesto.
+  //
+  // La pantalla sí lo manda, porque usa su `localActual`. Esta comprobación
+  // previa tiene que preguntar igual que ella.
+  const localId = await evaluar(
+    `fetch("/api/locales/opciones", { credentials: "same-origin" })
+       .then((r) => r.json())
+       .then((j) => ((j.items || []).find((l) => String(l.nombre).toLowerCase() === ${JSON.stringify(LOCAL_NOMBRE.toLowerCase())}) || {}).id ?? null)`,
+    true
+  );
+  if (!localId) morir(`no pude resolver el id del local "${LOCAL_NOMBRE}"`);
+
   const enCatalogo = await evaluar(
-    `fetch("/api/pos-ventas/buscar-producto?q=" + encodeURIComponent(${JSON.stringify(PRODUCTO)}),
+    `fetch("/api/pos-ventas/buscar-producto?localId=" + ${Number(localId)} + "&q=" + encodeURIComponent(${JSON.stringify(PRODUCTO)}),
        { credentials: "same-origin" }).then((x) => x.json()).then((r) => (r.items || []).length)`,
     true
   );
