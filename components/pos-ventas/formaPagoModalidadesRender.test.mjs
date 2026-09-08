@@ -67,7 +67,22 @@ const dibujarPanel = (props = {}) =>
     })
   );
 
-const contar = (html, texto) => html.split(texto).length - 1;
+/**
+ * CUÁNTOS BOTONES DEL PANEL LLEVAN ESTE TEXTO.
+ *
+ * Contar el texto crudo NO sirve, y lo probó este mismo candado en su primera
+ * corrida: el ícono de Mercado Pago es un `<img alt="Mercado Pago">` adentro del
+ * botón, así que el nombre aparecía dos veces y el candado daba rojo con UN solo
+ * botón. Estaba midiendo el alt del ícono, no la cantidad de botones.
+ *
+ * Se cuentan elementos. Los botones no se anidan en este panel, así que cortar
+ * por la etiqueta de apertura y quedarse con lo que va hasta su cierre alcanza.
+ */
+const contarBotonesCon = (html, texto) =>
+  html
+    .split("<button")
+    .slice(1)
+    .filter((seg) => seg.split("</button>")[0].includes(texto)).length;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // UN MEDIO CON MODALIDADES ES UN SOLO BOTÓN
@@ -76,7 +91,7 @@ const contar = (html, texto) => html.split(texto).length - 1;
 test("Mercado Pago aparece UNA vez, y sus modalidades no son medios", () => {
   const html = dibujarPanel();
 
-  assert.equal(contar(html, "Mercado Pago"), 1, "un solo botón padre");
+  assert.equal(contarBotonesCon(html, "Mercado Pago"), 1, "un solo botón padre");
   assert.equal(html.includes("Crédito 1 pago"), false, "la modalidad no es un botón del panel");
   assert.equal(html.includes("Crédito cuotas"), false);
 });
