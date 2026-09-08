@@ -16,10 +16,65 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está al día en **6 migraciones**, que son las que hay en el
-árbol. Comprobado con `prisma migrate status` el 2026-09-08 después de desplegar
-`63e0f790a430b555bbd3fd0dc976993d49eaa121`: *"6 migrations found in
+### `20260908130000_recepcion_diferencias_positivas` — SIN APLICAR en producción
+
+**El árbol pasa de 6 a 7 migraciones.** Producción sigue en **6**: ésta todavía
+no se aplicó. Lo último comprobado con `prisma migrate status` fue el 2026-09-08
+al desplegar `63e0f790a430b555bbd3fd0dc976993d49eaa121`: *"6 migrations found in
 prisma/migrations. Database schema is up to date!"*.
+
+Entró con el merge del PR #49 —`6b93ee493d86fc040b8cb257cbe7508326c78079`—, que
+permite recibir más de lo enviado y recibir productos que el remito no menciona.
+
+**Qué hace.** Tres columnas nuevas en `TransferenciaDetalle` y dos en
+`AuditoriaStock`, con sus dos claves foráneas y tres índices:
+
+- `TransferenciaDetalle.agregadoEnRecepcion` → `BOOLEAN NOT NULL DEFAULT false`
+- `TransferenciaDetalle.agregadoEnRecepcionPorId` → nullable, FK a `Usuario`
+  con `ON DELETE SET NULL`
+- `TransferenciaDetalle.agregadoEnRecepcionAt` → `TIMESTAMP(3)` nullable
+- `AuditoriaStock.transferenciaId` → `INTEGER` nullable, **sin FK a propósito**
+- `AuditoriaStock.transferenciaDetalleId` → nullable, FK a
+  `TransferenciaDetalle` con `ON DELETE SET NULL`
+
+**Qué NO hace.** No tiene un solo `DROP`, ni un `UPDATE`, ni un `DELETE`, ni un
+`INSERT`, ni backfill. Ninguna transferencia histórica se toca ni se reinterpreta:
+quedan con `agregadoEnRecepcion = false`, que es la verdad —ninguna línea vieja
+se pudo agregar en recepción porque la función no existía—.
+
+Tampoco toca `AccionStock`: `AuditoriaStock.accion` es un `String`, así que los
+dos valores nuevos —`EXCEDENTE_RECEPCION_TRANSFERENCIA` y
+`AGREGADO_RECEPCION_TRANSFERENCIA`— no necesitan migración, y
+`DIFERENCIA_RECEPCION_TRANSFERENCIA` conserva el significado que siempre tuvo.
+
+#### El clasificador la marca ADITIVA
+
+`node scripts/clasificar-migraciones.mjs --desde 63e0f790… --hasta 48772178…`
+sale con **0** y la lista como `aditiva`, sin coincidencias.
+
+**Y eso no alcanza, porque el propio script lo dice: no lee adentro de un bloque
+`DO $$`.** Esta migración tiene DOS. Se leyeron a mano y los dos contienen
+únicamente un `ADD CONSTRAINT` de clave foránea sobre una columna nueva, guardado
+por un `IF NOT EXISTS` contra `pg_constraint`. Los únicos `DELETE` y `UPDATE` del
+archivo son las cláusulas `ON DELETE SET NULL ON UPDATE CASCADE` de esas dos FK
+—acciones referenciales, no sentencias—.
+
+**Por qué la ventana entre migrar y recrear es compatible.** El código viejo que
+sigue atendiendo no nombra ninguna de las cinco columnas, y ninguna es
+obligatoria: la única `NOT NULL` trae su `DEFAULT false`, así que un `INSERT` que
+la omita sigue funcionando. Las otras cuatro son nulables. No se quita nada que
+la versión vieja esté leyendo.
+
+#### Evidencia
+
+- `scripts/pruebas-db/recepcionTransferencias.mjs` ejerce las cuatro rutas de
+  recepción contra Postgres y cuenta las filas de `StockLocal` después: **138
+  afirmaciones**, y corre en cada CI desde este PR.
+- `scripts/pruebas-db/contraprueba-migracion-nueva.mjs`, que ya viajaba en la
+  suite, reproduce el escenario real de producción —105 filas históricas sin
+  archivo más la baseline— y comprueba que Prisma aplique **solo** la migración
+  nueva. Ése decide el veredicto de la CI, sin `|| true`.
+- CI #202 (`34226908387`) en verde sobre `48772178`, el HEAD que se mergeó.
 
 ---
 
