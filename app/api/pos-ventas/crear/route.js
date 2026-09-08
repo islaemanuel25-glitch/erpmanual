@@ -16,9 +16,10 @@ import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
 import { SOLO_TRANSITO } from "@/lib/transferencias/politicasStock";
 import { requireOperadorSegunConfig, verificarVoucherOperador } from "@/lib/operador";
 import { WHERE_TURNO_OPERATIVO, ERROR_TURNO_EN_PREPARACION } from "@/lib/caja/cierreRelevo";
-import { normalizarYConsolidarPagos, aplicarComisiones, derivarCamposVenta, normalizarMedio, MEDIOS_CON_COMISION } from "@/lib/pos-ventas/pagos";
+import { consolidarTenders, aplicarComisionesResueltas, derivarCamposVenta, normalizarMedio, MEDIOS_CON_COMISION } from "@/lib/pos-ventas/pagos";
 import { mediosDelLocal } from "@/lib/pos-ventas/mediosCobroServidor";
 import { comisionesDeMedios } from "@/lib/pos-ventas/mediosCobro";
+import { CONFLICTO_COBRO, condicionLegacy, resolverTenders } from "@/lib/pos-ventas/modalidadesDeMedio";
 import { calcularVentaComercial } from "@/lib/ofertas/motorVenta";
 import { ofertasVigentesPorProductoLocal, recargosDelLocal } from "@/lib/ofertas/servidor";
 import { verificarDescuentoPuntos, textoDescuentoPuntosInvalido } from "@/lib/pos-ventas/puntos";
@@ -524,14 +525,21 @@ export async function POST(req) {
     });
     const productoLocalPorBase = new Map(filasLocales.map((pl) => [pl.baseId, pl.id]));
 
-    // Los MEDIOS de la venta (no los importes) deciden si una oferta aplica y
-    // cuánto recargo se cobra. Salen del body antes de conocer el total, porque
-    // el total DEPENDE de ellos: con débito puede no haber oferta y sí recargo.
-    const mediosDeclarados =
-      Array.isArray(body.pagos) && body.pagos.length > 0
-        ? body.pagos.map((p) => normalizarMedio(p?.medio))
-        : [normalizarMedio(formaPago)];
-    const mediosUsados = [...new Set(mediosDeclarados.filter(Boolean))];
+    // ── LO QUE EL CLIENTE ELIGE, ANTES DE CONOCER EL TOTAL ──────────────────
+    //
+    // La CONDICIÓN de la venta —qué oferta aplica, cuánto recargo se cobra— sale
+    // de con qué se paga, así que hay que resolverla antes del total: el total
+    // DEPENDE de ella. Con débito puede no haber oferta y sí recargo.
+    //
+    // Lo que el navegador manda es IDENTIDAD y monto, en dos formas que conviven:
+    //
+    //   nuevo    { medioCobroLocalId, modalidadId, monto }
+    //   legacy   { medio, monto }   ·   o `formaPago` y nada más
+    //
+    // Ninguna de las dos trae condición. El tipo contable, el recargo, la
+    // comisión, el procesador y los nombres se releen del servidor más abajo.
+    const hayPagosExplicitos = Array.isArray(body.pagos) && body.pagos.length > 0;
+    const selecciones = hayPagosExplicitos ? body.pagos : formaPago ? [{ medio: formaPago }] : [];
 
     // ── LA VENTA OFFLINE NO APLICA OFERTAS NI RECARGOS, Y ES A PROPÓSITO ─────
     //
@@ -557,6 +565,73 @@ export async function POST(req) {
         });
     const recargosPorMedio = esReplayOffline ? {} : await recargosDelLocal(prisma, localId);
 
+    // ── LA CONDICIÓN DE CADA TENDER, RESUELTA CONTRA LA CONFIGURACIÓN ───────
+    //
+    // Acá el servidor deja de creerle al cliente. De lo que llegó se usa
+    // únicamente `medioCobroLocalId`, `modalidadId` y `monto`; todo lo demás se
+    // relee. Un `recargoPct`, un `comisionPct`, un `procesador` o un `medio`
+    // mandados por el navegador junto a los ids no se miran: no entran a
+    // `resolverTenders`.
+    //
+    // ── POR QUÉ LA CONFIGURACIÓN SE LEE ACÁ Y NO MÁS ABAJO ─────────────────
+    //
+    // Antes se leía después del total, solo para la comisión y solo si algún
+    // tender la cobraba. Ahora hace falta antes, porque de la configuración sale
+    // el RECARGO de la modalidad, y el recargo cambia el total. Es una consulta
+    // indexada por local y ya se hacía en casi todas las ventas.
+    //
+    // ── LA OFERTA OFFLINE QUEDA EXACTAMENTE COMO ESTABA ────────────────────
+    //
+    // Una venta encolada se cobró hace rato: no se le releen condiciones, no se
+    // le resuelven modalidades y NO se la rechaza porque hoy una modalidad esté
+    // inactiva o porque el medio con el que se cobró ahora tenga modalidades. Se
+    // registra como se cobró. Ver el bloque de arriba.
+    //
+    // La configuración se lee SIEMPRE online. Offline se lee solo cuando algún
+    // tender cobra comisión, que es exactamente cuándo se leía antes de esta
+    // tanda: una cola de ventas en efectivo no paga una consulta de más.
+    const necesitaConfiguracion =
+      !esReplayOffline ||
+      selecciones.some((p) => MEDIOS_CON_COMISION.includes(normalizarMedio(p?.medio)));
+    const mediosDelPos = necesitaConfiguracion
+      ? await mediosDelLocal(prisma, { localId, grupoId })
+      : [];
+    const comisionPctPorMedio = comisionesDeMedios(mediosDelPos);
+
+    const resolucion = esReplayOffline
+      ? {
+          ok: true,
+          tenders: selecciones.map((p) => ({
+            // El medio crudo sobrevive cuando no se reconoce, para que el mensaje
+            // de "medio desconocido" siga nombrando lo que mandó el cliente y no
+            // un `null` que no ayuda a nadie.
+            ...condicionLegacy(normalizarMedio(p?.medio) ?? p?.medio, { comisionPctPorMedio }),
+            monto: p?.monto,
+          })),
+        }
+      : resolverTenders({
+          medios: mediosDelPos,
+          pagos: selecciones,
+          recargosPorMedio,
+          comisionPctPorMedio,
+        });
+
+    if (!resolucion.ok) {
+      // Es un conflicto de CONFIGURACIÓN, no un error del cajero: la
+      // configuración cambió entre que abrió el POS y apretó cobrar. Se contesta
+      // 409 con el motivo, igual que `TOTAL_DESACTUALIZADO`, para que la pantalla
+      // pueda refrescar y volver a confirmar en vez de reintentar a ciegas.
+      //
+      // El caso que este 409 existe para tapar: un POS viejo mandando
+      // `medio: MERCADOPAGO` cuando el local ya configuró modalidades adentro de
+      // Mercado Pago. Cobrarlo contra `RecargoPagoLocal` saltearía el recargo de
+      // Crédito, en silencio y a favor de quien manda el pedido.
+      return NextResponse.json(
+        { ok: false, code: resolucion.motivo, error: resolucion.error },
+        { status: resolucion.motivo === CONFLICTO_COBRO.MEDIO_INEXISTENTE ? 404 : 409 }
+      );
+    }
+
     // Motor comercial canónico: ofertas, descuentos existentes y recargo, en ese
     // orden. Ver lib/ofertas/motorVenta.js — es puro y está cubierto por
     // candados; acá solo se le da de comer y se guarda lo que devuelve.
@@ -571,7 +646,12 @@ export async function POST(req) {
         subtotalFijado: item.subtotalFijado ?? null,
       })),
       ofertasPorProductoLocal,
-      mediosUsados,
+      // Las condiciones ya resueltas por el servidor. `mediosUsados` sale de
+      // adentro de ellas —del `tipoContable` efectivo de cada una, que con
+      // modalidad es el de la modalidad— y por eso no se pasa: lo que decide si
+      // una oferta SOLO_EFECTIVO aplica tiene que ser lo mismo que se congela en
+      // el tender, no lo que declaró el navegador.
+      condicionesDeCobro: resolucion.tenders,
       recargosPorMedio,
       descuentos: {
         automaticoPct: descuentoAplicadoPct,
@@ -673,6 +753,11 @@ export async function POST(req) {
               recargoPagoPct: comercial.recargoPagoPct,
               recargoPagoImporte: comercial.recargoPagoImporte,
               recargoPagoMedio: comercial.recargoPagoMedio,
+              // Aditivo: quién impuso la condición, para que la pantalla pueda
+              // decir "el recargo lo pone Mercado Pago · Crédito" y no solo un
+              // porcentaje. Los consumidores viejos leen lo de arriba igual.
+              recargoPagoMedioNombre: comercial.recargoPagoMedioNombre,
+              recargoPagoModalidadNombre: comercial.recargoPagoModalidadNombre,
               total,
             },
           },
@@ -682,18 +767,25 @@ export async function POST(req) {
     }
 
     // === PAGOS (pago dividido) ==========================================
-    // Fuente: body.pagos[] (clientes nuevos) o compat legacy formaPago → 1 tender
-    // por el total. Se recalcula TODO server-side: se valida Σ==total (exacto),
-    // medios válidos, montos>0, FIADO único; y se derivan comisión/neto y los
-    // campos legacy de Venta. NO se confía en comisión/neto/pct del cliente.
-    const pagosRaw =
-      Array.isArray(body.pagos) && body.pagos.length > 0
-        ? body.pagos
-        : formaPago
-        ? [{ medio: formaPago, monto: total }]
-        : [];
+    // Las condiciones ya están resueltas; acá se cierran las reglas de PLATA:
+    // Σ == total (exacto, en centavos), montos > 0, FIADO único, y la
+    // consolidación de tenders repetidos. NO se confía en comisión/neto/pct del
+    // cliente: ninguno de esos tres llegó hasta acá.
+    //
+    // La consolidación ahora es POR IDENTIDAD y no por tipo contable: dos
+    // modalidades distintas que comparten CREDITO son dos tenders. Ver
+    // `claveDeTender`, donde está escrito por qué un medio sin modalidad se
+    // sigue consolidando por su enum y no por su id.
+    //
+    // Sin `body.pagos` hay un solo tender y su monto es el total: es la compat
+    // de `formaPago`, y por eso el monto se completa recién acá, cuando el total
+    // ya está calculado.
+    const tendersConMonto = resolucion.tenders.map((t) => ({
+      ...t,
+      monto: hayPagosExplicitos ? t.monto : total,
+    }));
 
-    const consolidado = normalizarYConsolidarPagos(pagosRaw, total);
+    const consolidado = consolidarTenders(tendersConMonto, total);
     if (consolidado.error) {
       // Cuando hay recargo o descuento promocional, "la suma de los pagos no da"
       // casi siempre significa que el POS calculó con otro total, no que el
@@ -723,30 +815,25 @@ export async function POST(req) {
       );
     }
 
-    // ── % DE COMISIÓN POR MEDIO ──────────────────────────────────────────────
+    // ── % DE COMISIÓN: CADA TENDER TRAE EL SUYO ─────────────────────────────
     //
-    // Sale de la configuración de medios del local, que compone dos fuentes: la
-    // comisión propia del medio si alguien la definió, y la del GRUPO
-    // (`ConfiguracionGrupo`) cuando no. Ver `lib/pos-ventas/mediosCobro.js`.
+    // Ya viene adentro de la condición resuelta más arriba, y por eso acá no hay
+    // ninguna búsqueda. El mapa `{TIPO: pct}` que había antes no alcanzaba desde
+    // que existen las modalidades: "Crédito 1 pago" al 3 % y "Crédito cuotas" al
+    // 7 % son las dos CREDITO, y un mapa no puede tener las dos.
+    //
+    // La CUENTA no cambió: `aplicarComisionesResueltas` y `aplicarComisiones`
+    // llaman las dos a `comisionDeTender`, que es la única fórmula. Lo único que
+    // cambió es de dónde sale el porcentaje.
     //
     // Un local que nunca configuró nada da EXACTAMENTE los mismos números que
-    // antes de esta tanda: los medios por defecto tienen `comisionPct` en null y
-    // heredan del grupo, con el mismo 7 de respaldo. Ese es el requisito de no
-    // regresión y por eso la fuente se cambió acá y no el cálculo, que sigue
-    // siendo `aplicarComisiones` sin tocar.
+    // antes: sus medios por defecto tienen `comisionPct` en null y heredan del
+    // grupo, igual que siempre.
     //
-    // NO se rechaza un tender cuyo medio no esté configurado o esté apagado, y es
-    // deliberado: la configuración puede cambiar entre que el cajero abrió el POS
-    // y apretó cobrar, y una venta offline llega con el medio con el que se cobró
-    // hace rato. Rechazarla sería perder una venta que ya ocurrió. Lo que protege
-    // el dato es la validación contra el enum canónico, que sigue intacta.
-    let comisionPctPorMedio = {};
-    if (consolidado.pagos.some((p) => MEDIOS_CON_COMISION.includes(p.medio))) {
-      const mediosDelPos = await mediosDelLocal(prisma, { localId, grupoId });
-      comisionPctPorMedio = comisionesDeMedios(mediosDelPos);
-    }
-
-    const pagosConComision = aplicarComisiones(consolidado.pagos, comisionPctPorMedio);
+    // NO se rechaza un tender por su comisión, y es deliberado: `null` significa
+    // sin configurar, se guarda como null y la venta queda con
+    // `comisionPendiente`. Perder la venta por un dato que falta sería peor.
+    const pagosConComision = aplicarComisionesResueltas(consolidado.tenders);
     const derivado = derivarCamposVenta(pagosConComision);
     const esFiadoVenta = derivado.esFiado; // server-authoritative (deriva de los tenders)
 
@@ -761,7 +848,7 @@ export async function POST(req) {
         );
       }
       // El total de los servicios debe quedar cubierto ÍNTEGRAMENTE en efectivo.
-      const cobertura = validarCoberturaEfectivo(subtotalServicios, consolidado.pagos);
+      const cobertura = validarCoberturaEfectivo(subtotalServicios, consolidado.tenders);
       if (!cobertura.valido) {
         return NextResponse.json(
           {
@@ -1064,6 +1151,16 @@ export async function POST(req) {
           recargoPagoPct: comercial.recargoPagoPct,
           recargoPagoImporte: comercial.recargoPagoImporte,
           recargoPagoMedio: comercial.recargoPagoMedio,
+          // QUIÉN impuso el recargo, además de cuánto. Sale del MISMO cálculo
+          // que decidió el porcentaje —no de una segunda búsqueda—, así que la
+          // venta no puede quedar con un ganador que no produjo su número.
+          //
+          // `recargoPagoMedio` sigue congelando el tipo contable del ganador y
+          // no se toca: es lo que leen los reportes de hoy. Esto se le suma.
+          recargoPagoMedioCobroLocalId: comercial.recargoPagoMedioCobroLocalId,
+          recargoPagoMedioNombre: comercial.recargoPagoMedioNombre,
+          recargoPagoModalidadId: comercial.recargoPagoModalidadId,
+          recargoPagoModalidadNombre: comercial.recargoPagoModalidadNombre,
         },
       });
 
@@ -1076,6 +1173,19 @@ export async function POST(req) {
           comisionPct: t.comisionPct,
           comision: t.comision,
           neto: t.neto,
+          // CON QUÉ SE COBRÓ ESTE TENDER. Van en pares referencia + texto: la
+          // referencia para operar, el texto para que la venta siga
+          // explicándose cuando alguien renombre o borre la configuración.
+          //
+          // Los cinco en null es un cobro sin identidad configurable —una venta
+          // offline, un cliente viejo— y sigue siendo válido. Un medio SIN
+          // modalidades sí congela los tres del padre: "Banco X · CREDITO" y
+          // "Mercado Pago · CREDITO" no pueden quedar indistinguibles.
+          medioCobroLocalId: t.medioCobroLocalId ?? null,
+          medioNombre: t.medioNombre ?? null,
+          procesador: t.procesador ?? null,
+          modalidadId: t.modalidadId ?? null,
+          modalidadNombre: t.modalidadNombre ?? null,
         })),
       });
 
@@ -1361,8 +1471,19 @@ export async function POST(req) {
       formaPago: formaPagoVenta,
       comisionBancaria,
       netoRecibido,
+      // Los cinco campos de siempre, más la identidad congelada CUANDO EXISTE.
+      // Es aditivo a propósito: los consumidores actuales leen `medio` y `monto`
+      // y no se enteran. Lo que habilita es que el ticket pueda decir "Mercado
+      // Pago · Crédito" sin ir a buscar la configuración de hoy —que para
+      // entonces puede ser otra—. El ticket no se rediseña en esta tanda: el
+      // dato queda disponible.
       pagos: pagosConComision.map((t) => ({
         medio: t.medio, monto: t.monto, comisionPct: t.comisionPct, comision: t.comision, neto: t.neto,
+        medioCobroLocalId: t.medioCobroLocalId ?? null,
+        medioNombre: t.medioNombre ?? null,
+        procesador: t.procesador ?? null,
+        modalidadId: t.modalidadId ?? null,
+        modalidadNombre: t.modalidadNombre ?? null,
       })),
       breakdown: {
         subtotal,
@@ -1379,6 +1500,9 @@ export async function POST(req) {
         recargoPagoPct: comercial.recargoPagoPct,
         recargoPagoImporte: comercial.recargoPagoImporte,
         recargoPagoMedio: comercial.recargoPagoMedio,
+        // Y quién lo impuso, con las mismas palabras que quedaron en la venta.
+        recargoPagoMedioNombre: comercial.recargoPagoMedioNombre,
+        recargoPagoModalidadNombre: comercial.recargoPagoModalidadNombre,
         // ── LAS LÍNEAS AUTORITATIVAS, PARA EL TICKET ────────────────────────
         //
         // El POS armaba el ticket con `state.carrito`, que tiene el precio
