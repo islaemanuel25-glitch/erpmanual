@@ -29,27 +29,48 @@ import SunmiPageSizer from "@/components/sunmi/SunmiPageSizer";
 import {
   SectionHead,
   BadgePresentacion,
+  BadgeAgregado,
   fmtCantidad,
+  fmtDiferencia,
   fmtMoneda,
   cantidadOGuion,
 } from "./detallePresentacion";
+import {
+  ESTADO_LINEA,
+  estadoDeLinea,
+  motivoSigueSiendoValido,
+  motivosParaDiferencia,
+  previsualizarIngresoFisico,
+  sePuedeQuitarLinea,
+} from "@/lib/transferencias/recepcionUI";
 
 function num(v) {
   const n = Number(v);
   return Number.isNaN(n) ? 0 : n;
 }
 
-const MOTIVOS = [
-  { value: "Faltante", label: "Faltante" },
-  { value: "Producto dañado", label: "Producto dañado" },
-  { value: "Otro", label: "Otro (especificar)" },
-];
+// ── LOS MOTIVOS YA NO SON UNA LISTA FIJA ───────────────────────────────────
+//
+// Estaban acá, con tres opciones —Faltante, Producto dañado, Otro— porque
+// recibir de más no se podía. Ahora se piden por línea a `motivosParaDiferencia`,
+// que los elige según el SIGNO de la diferencia: ofrecer "Faltante" para
+// explicar que llegaron 5 de más es pedirle a alguien que clasifique un sobrante
+// como una falta, y ese dato después se lee en un reporte.
+//
+// La lista vive en `lib/transferencias/recepcionUI.js` y no acá porque la card
+// del teléfono y la fila del escritorio tienen que ofrecer lo mismo.
 
 export default function TablaDetalleTransferencia({
   item,
   editItems,
   setEditItems,
   inputsHabilitados,
+  /** Abre el selector de producto. Sin handler, el botón no se dibuja. */
+  onAgregarProducto = null,
+  /** Quita una línea agregada en recepción. Recibe el detalleId. */
+  onQuitarLinea = null,
+  /** Qué línea se está borrando ahora mismo, para deshabilitar su botón. */
+  quitandoId = null,
 }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(() => {
@@ -99,12 +120,25 @@ export default function TablaDetalleTransferencia({
       : d.cantidadRecibida;
     const recibido = recibidoCrudo == null ? null : num(recibidoCrudo);
     const diff = recibido == null ? null : recibido - enviada;
+    // `estadoLinea` y no `estado`: el `estado` de arriba es el de la
+    // TRANSFERENCIA. Con el mismo nombre uno sombrea al otro adentro de este
+    // callback.
+    const estadoLinea = estadoDeLinea({ enviada, recibida: recibidoCrudo });
+    // El tono de la FILA. El excedente no usa el rojo del faltante: llegar de más
+    // no es un error de validación, es una diferencia real que hay que explicar.
     let tono = "";
-    if (diff === null) tono = "";
-    else if (diff === 0) tono = "sunmi-state-success";
-    else if (diff < 0) tono = "sunmi-state-danger-soft";
-    else tono = "sunmi-state-warning-soft";
-    return { d, idx, edit, enviada, recibido, diff, tono };
+    if (estadoLinea === ESTADO_LINEA.EXACTO) tono = "sunmi-state-success";
+    else if (estadoLinea === ESTADO_LINEA.FALTANTE) tono = "sunmi-state-danger-soft";
+    else if (estadoLinea === ESTADO_LINEA.EXCEDENTE) tono = "sunmi-state-warning-soft";
+    // Cuántas unidades físicas representa lo recibido, cuando la línea va en
+    // BULTO y el factor lo hace distinto del número escrito. Informativo.
+    const fisico = previsualizarIngresoFisico({
+      cantidad: recibido,
+      unidad: d.unidadEnviada,
+      factorPack: d.factorPack,
+    });
+    const sePuedeQuitar = sePuedeQuitarLinea({ linea: d, puedeRecibir: inputsHabilitados });
+    return { d, idx, edit, enviada, recibido, diff, estadoLinea, tono, fisico, sePuedeQuitar };
   });
 
   const cambiar = (idx, campo, valor, extra) => {
@@ -113,9 +147,27 @@ export default function TablaDetalleTransferencia({
     setEditItems(copia);
   };
 
+  // ── LO QUE ESCRIBE EL OPERADOR NO SE TOCA ─────────────────────────────────
+  //
+  // `valor` entra y sale igual. NO se topea contra lo enviado, no se redondea y
+  // no se convierte: recibir más de lo que dice el remito es un caso real y el
+  // backend lo acepta desde el 2026-09-08. Recortarlo acá borraría justamente la
+  // evidencia del desvío.
   const onRecibidoChange = (idx, enviada, valor) => {
-    // Igualar lo enviado limpia el motivo: deja de haber diferencia que explicar.
-    const limpiar = num(valor) === enviada ? { motivoPrincipal: "", motivoDetalle: "" } : null;
+    // Dos limpiezas del MOTIVO, y la segunda es nueva:
+    //
+    //   · igualar lo enviado lo limpia, porque deja de haber diferencia que
+    //     explicar (esto ya estaba);
+    //   · cambiar el SIGNO también. Alguien que cargó 8 sobre 10 y eligió
+    //     "Faltante" y después corrige a 15 quedaría con un motivo que dice lo
+    //     contrario de lo que pasó, y el desplegable ya ni siquiera lo ofrece.
+    const motivoActual = editItems[idx]?.motivoPrincipal || "";
+    const sigueValido = motivoSigueSiendoValido({
+      enviada,
+      recibida: valor,
+      motivoPrincipal: motivoActual,
+    });
+    const limpiar = sigueValido ? null : { motivoPrincipal: "", motivoDetalle: "" };
     cambiar(idx, "recibido", valor, limpiar);
   };
 
@@ -123,8 +175,13 @@ export default function TablaDetalleTransferencia({
     cambiar(idx, "motivoPrincipal", valor, valor !== "Otro" ? { motivoDetalle: "" } : null);
   };
 
-  const claseDiff = (diff) =>
-    diff === null ? "sunmi-text-muted" : diff === 0 ? "sunmi-text-success" : "sunmi-text-warning";
+  // El color del NÚMERO, con la misma separación que el tono de la fila.
+  const claseDiff = (estadoLinea) => {
+    if (estadoLinea === ESTADO_LINEA.EXACTO) return "sunmi-text-success";
+    if (estadoLinea === ESTADO_LINEA.FALTANTE) return "sunmi-text-danger";
+    if (estadoLinea === ESTADO_LINEA.EXCEDENTE) return "sunmi-text-warning";
+    return "sunmi-text-muted";
+  };
 
   const headers = [
     "Producto",
@@ -142,10 +199,25 @@ export default function TablaDetalleTransferencia({
 
   return (
     <section className="space-y-2">
-      <SectionHead
-        title="Productos transferidos"
-        subtitle={`${allItems.length} línea${allItems.length === 1 ? "" : "s"}`}
-      />
+      {/* El botón vive en la cabecera de la sección OPERATIVA de productos, que
+          es donde el operador está mirando cuando abre los bultos y encuentra
+          algo que el remito no menciona.
+
+          Sin `onAgregarProducto` no se dibuja, y la página solo lo pasa cuando
+          `puedeRecibir` es verdadero. O sea que en "Recibida", en "Cancelada" y
+          para quien no es el destino no aparece — y no porque acá se repita la
+          regla, sino porque la pantalla no entrega el handler. */}
+      <div className="flex items-end justify-between gap-3 flex-wrap">
+        <SectionHead
+          title="Productos transferidos"
+          subtitle={`${allItems.length} línea${allItems.length === 1 ? "" : "s"}`}
+        />
+        {onAgregarProducto && (
+          <SunmiButton color="amber" onClick={onAgregarProducto} className="shrink-0">
+            + Agregar producto recibido
+          </SunmiButton>
+        )}
+      </div>
       <SunmiCard>
         {allItems.length === 0 && (
           <div className="text-center py-8 sunmi-text-muted text-sm">Sin productos</div>
@@ -154,7 +226,7 @@ export default function TablaDetalleTransferencia({
         {/* ══════════ Móvil: una card por línea ══════════ */}
         {allItems.length > 0 && (
           <div className="md:hidden space-y-2">
-            {filasVisibles.map(({ d, idx, edit, enviada, recibido, diff }) => (
+            {filasVisibles.map(({ d, idx, edit, enviada, recibido, diff, estadoLinea, fisico, sePuedeQuitar }) => (
               <div key={d.id} className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1.5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 font-semibold sunmi-text-strong text-[14px] leading-tight break-words">
@@ -167,6 +239,7 @@ export default function TablaDetalleTransferencia({
 
                 <div className="flex flex-wrap items-center gap-1.5">
                   <BadgePresentacion d={d} />
+                  <BadgeAgregado d={d} />
                   <span className="text-[11px] sunmi-text-muted">
                     {d.codigoBarra || "Sin código"}
                   </span>
@@ -188,8 +261,8 @@ export default function TablaDetalleTransferencia({
                   {verDiferencia && (
                     <span>
                       Diferencia{" "}
-                      <span className={`tabular-nums font-semibold ${claseDiff(diff)}`}>
-                        {diff === null ? "—" : fmtCantidad(diff)}
+                      <span className={`tabular-nums font-semibold ${claseDiff(estadoLinea)}`}>
+                        {fmtDiferencia(diff)}
                       </span>
                     </span>
                   )}
@@ -218,6 +291,15 @@ export default function TablaDetalleTransferencia({
                   </div>
                 )}
 
+                {/* Cuántas unidades entran de verdad. En una línea en BULTO el
+                    número escrito no es el que mueve stock, y esa distancia es
+                    justo la que hay que ver antes de confirmar. */}
+                {fisico != null && (
+                  <div className="text-sm2 sunmi-text-muted">
+                    Ingreso físico: {fmtCantidad(fisico)} unidades
+                  </div>
+                )}
+
                 {inputsHabilitados && num(edit?.recibido) !== enviada && (
                   <div className="space-y-2">
                     <div>
@@ -227,7 +309,7 @@ export default function TablaDetalleTransferencia({
                         onChange={(val) => onMotivoChange(idx, val)}
                       >
                         <option value="">Seleccionar…</option>
-                        {MOTIVOS.map((m) => (
+                        {motivosParaDiferencia({ enviada, recibida: edit?.recibido }).map((m) => (
                           <option key={m.value} value={m.value}>{m.label}</option>
                         ))}
                       </SunmiSelectAdv>
@@ -249,6 +331,19 @@ export default function TablaDetalleTransferencia({
                     {d.motivoDetalle ? ` · ${d.motivoDetalle}` : ""}
                   </div>
                 )}
+
+                {/* Quitar. SOLO en una línea agregada durante la recepción: una
+                    del remito no se borra nunca desde acá, y por eso el botón ni
+                    siquiera se dibuja en vez de aparecer y fallar. */}
+                {sePuedeQuitar && onQuitarLinea && (
+                  <SunmiButton
+                    color="red"
+                    onClick={() => onQuitarLinea(d.id)}
+                    disabled={quitandoId === d.id}
+                  >
+                    {quitandoId === d.id ? "Quitando…" : "Quitar producto agregado"}
+                  </SunmiButton>
+                )}
               </div>
             ))}
           </div>
@@ -258,7 +353,7 @@ export default function TablaDetalleTransferencia({
         {allItems.length > 0 && (
           <div className="hidden md:block overflow-x-auto">
             <SunmiTable headers={headers}>
-              {filasVisibles.map(({ d, idx, edit, enviada, recibido, diff, tono }) => (
+              {filasVisibles.map(({ d, idx, edit, enviada, recibido, diff, estadoLinea, tono, fisico, sePuedeQuitar }) => (
                 <tr
                   key={d.id}
                   className={`align-middle sunmi-row-hover transition-colors ${tono}`}
@@ -267,6 +362,23 @@ export default function TablaDetalleTransferencia({
                     <div className="font-semibold sunmi-text-strong text-[13px] leading-snug">
                       {d.nombre}
                     </div>
+                    <BadgeAgregado d={d} />
+                    {/* Quitar va ACÁ, en la celda del producto, y no en una
+                        columna propia. Dos motivos: una columna que aparece y
+                        desaparece según haya líneas agregadas mueve la tabla
+                        entera, y la acción queda al lado de lo que borra.
+                        SOLO en una línea agregada: una del remito no se borra
+                        nunca desde acá, y por eso el botón no existe en vez de
+                        aparecer apagado. */}
+                    {sePuedeQuitar && onQuitarLinea && (
+                      <SunmiButton
+                        color="red"
+                        onClick={() => onQuitarLinea(d.id)}
+                        disabled={quitandoId === d.id}
+                      >
+                        {quitandoId === d.id ? "Quitando…" : "Quitar"}
+                      </SunmiButton>
+                    )}
                   </td>
                   <td className="px-2.5 py-3 font-mono text-[12px] sunmi-text-muted whitespace-nowrap">
                     {d.codigoBarra || "—"}
@@ -290,14 +402,21 @@ export default function TablaDetalleTransferencia({
                       ) : (
                         <span className="font-mono tabular-nums">{cantidadOGuion(recibido)}</span>
                       )}
+                      {/* Mismo dato que en la card del teléfono: el número escrito
+                          no es el que mueve stock cuando la línea va en BULTO. */}
+                      {fisico != null && (
+                        <div className="text-xs2 sunmi-text-muted leading-tight">
+                          {fmtCantidad(fisico)} unidades
+                        </div>
+                      )}
                     </td>
                   )}
 
                   {verDiferencia && (
                     <td
-                      className={`px-2.5 py-3 text-right font-mono tabular-nums font-semibold whitespace-nowrap ${claseDiff(diff)}`}
+                      className={`px-2.5 py-3 text-right font-mono tabular-nums font-semibold whitespace-nowrap ${claseDiff(estadoLinea)}`}
                     >
-                      {diff === null ? "—" : fmtCantidad(diff)}
+                      {fmtDiferencia(diff)}
                     </td>
                   )}
 
@@ -316,7 +435,7 @@ export default function TablaDetalleTransferencia({
                             onChange={(val) => onMotivoChange(idx, val)}
                           >
                             <option value="">Seleccionar…</option>
-                            {MOTIVOS.map((m) => (
+                            {motivosParaDiferencia({ enviada, recibida: edit?.recibido }).map((m) => (
                               <option key={m.value} value={m.value}>{m.label}</option>
                             ))}
                           </SunmiSelectAdv>
@@ -353,6 +472,7 @@ export default function TablaDetalleTransferencia({
                   <td className="px-2.5 py-3 text-right font-mono font-bold tabular-nums sunmi-text-strong whitespace-nowrap">
                     {fmtMoneda(d.subtotal)}
                   </td>
+
                 </tr>
               ))}
             </SunmiTable>

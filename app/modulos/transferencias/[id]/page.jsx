@@ -31,8 +31,10 @@ import EstadoTransferenciaBadge, { DiferenciasBadge } from "@/components/transfe
 import TransferenciaHeader from "@/components/transferencias/TransferenciaHeader";
 import TablaDetalleTransferencia from "@/components/transferencias/TablaDetalleTransferencia";
 import AccionesRecepcion from "@/components/transferencias/AccionesRecepcion";
+import AgregarProductoRecibido from "@/components/transferencias/AgregarProductoRecibido";
 import PanelCancelarTransferencia from "@/components/transferencias/PanelCancelarTransferencia";
 import { SectionHead, TotalTile, fmtCantidad, fmtMoneda } from "@/components/transferencias/detallePresentacion";
+import { cuerpoQuitarLinea } from "@/lib/transferencias/recepcionUI";
 
 const LISTADO = "/modulos/transferencias";
 const TZ_AR = "America/Argentina/Cordoba";
@@ -80,6 +82,13 @@ export default function TransferenciaDetallePage() {
   //
   // Todo hook de este componente va acá arriba, antes de cualquier return.
   const [panelCancelar, setPanelCancelar] = useState(false);
+
+  // Selector de "producto que llegó y no estaba en el remito", y qué línea se
+  // está quitando. Los dos hooks van acá arriba, antes de cualquier return, por
+  // el mismo motivo que el de arriba: cambiar la cantidad de hooks entre renders
+  // rompe la pantalla entera.
+  const [agregarAbierto, setAgregarAbierto] = useState(false);
+  const [quitandoId, setQuitandoId] = useState(null);
 
   const [me, setMe] = useState(null);
 
@@ -262,6 +271,53 @@ export default function TransferenciaDetallePage() {
   };
 
   // ===============================
+  // Agregar y quitar una línea de recepción
+  //
+  // ── EL SERVIDOR ES EL AUTORITATIVO, Y POR ESO SE RECARGA ──────────────────
+  //
+  // Después de agregar o de quitar NO se toca `editItems` a mano: se vuelve a
+  // pedir `/api/transferencias/detalle` y se reconstruye todo desde la respuesta
+  // real, con el mismo `cargar()` de siempre.
+  //
+  // Inventar la línea en el estado local y confiar en que coincida con lo que
+  // quedó guardado es exactamente la clase de suposición que después aparece
+  // como una diferencia que nadie sabe explicar: el servidor le pone el id, la
+  // marca de agregada, el autor, la fecha y el costo, y cualquiera de esos cinco
+  // puede salir distinto de lo que la pantalla imaginó.
+  //
+  // Y `cargar()` deja `dirty` en false, que también es correcto: lo que había sin
+  // guardar se pierde al recargar, y el aviso de la card lo dice antes.
+  // ===============================
+  const agregarLinea = async (cuerpo) => {
+    const res = await fetch("/api/transferencias/linea-recepcion", {
+      method: "POST",
+      body: JSON.stringify(cuerpo),
+    });
+    const json = await res.json();
+    // `yaExistia` NO recarga ni cierra: el modal muestra el mensaje y el
+    // operador corrige la cantidad en la línea que ya está.
+    if (json?.ok && !json.yaExistia) await cargar();
+    return json;
+  };
+
+  const quitarLinea = async (detalleId) => {
+    try {
+      setQuitandoId(detalleId);
+      const res = await fetch("/api/transferencias/linea-recepcion", {
+        method: "DELETE",
+        body: JSON.stringify(cuerpoQuitarLinea({ transferenciaId: item.id, detalleId })),
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error);
+      await cargar();
+    } catch (err) {
+      alert("No se pudo quitar la línea: " + err.message);
+    } finally {
+      setQuitandoId(null);
+    }
+  };
+
+  // ===============================
   // Confirmar recepción
   // ===============================
   const confirmarRecepcion = async () => {
@@ -387,6 +443,7 @@ export default function TransferenciaDetallePage() {
               guardarCambios={guardarCambios}
               confirmando={confirmando}
               confirmarRecepcion={confirmarRecepcion}
+              dirty={dirty}
               puedeCancelar={puedeCancelar}
               panelCancelarAbierto={panelCancelar}
               abrirPanelCancelar={() => setPanelCancelar((v) => !v)}
@@ -408,12 +465,30 @@ export default function TransferenciaDetallePage() {
             <TransferenciaHeader item={item} />
 
             {/* 2 · Productos transferidos */}
+            {/* El botón "+ Agregar producto recibido" y la acción de quitar solo
+                existen si esta persona puede recibir. No se le pasa un booleano
+                a la tabla para que ella decida: se le pasa —o no— el handler.
+                Sin handler no hay nada que dibujar, y así la regla vive en un
+                solo lugar. En "Recibida" y en "Cancelada", `puedeRecibir` ya es
+                falso. */}
             <TablaDetalleTransferencia
               item={item}
               editItems={editItems}
               setEditItems={setEditItemsDirty}
               inputsHabilitados={inputsHabilitados}
+              onAgregarProducto={puedeRecibir ? () => setAgregarAbierto(true) : null}
+              onQuitarLinea={puedeRecibir ? quitarLinea : null}
+              quitandoId={quitandoId}
             />
+
+            {puedeRecibir && (
+              <AgregarProductoRecibido
+                abierto={agregarAbierto}
+                transferenciaId={item.id}
+                onCerrar={() => setAgregarAbierto(false)}
+                onAgregar={agregarLinea}
+              />
+            )}
 
             {/* 3 · Totales — métricas por LÍNEA (ver comentario arriba) */}
             <section className="space-y-2">
