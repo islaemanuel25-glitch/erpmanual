@@ -354,11 +354,29 @@ try {
   }
   const rutaMedio = `${BASE}/modulos/configuracion/pos-ventas/cobros/${encodeURIComponent(String(medioId))}`;
 
-  /** Una tecla de verdad, con su texto: es lo que hace que React vea un `insertText`. */
+  /**
+   * UNA TECLA DE VERDAD, Y UNA SOLA VEZ.
+   *
+   * `keyDown` CON `text` ya inserta el carácter: Chrome sintetiza el `char` solo.
+   * Mandar además un evento `char` lo inserta DOS VECES, y eso fue exactamente
+   * lo que midió la primera corrida —teclear un "4" sobre un 0 seleccionado dejó
+   * "44"— y lo que hizo que el nombre de la modalidad se guardara con cada letra
+   * duplicada.
+   *
+   * Era un defecto de la MEDICIÓN y no del producto, y hay prueba en la misma
+   * corrida: `sonda-escritura-en-cero.mjs` —que teclea así, sin `char`— informó
+   * un solo `insertText` y dejó "1" sobre el cero seleccionado. Esta es su misma
+   * forma.
+   */
   const teclear = async (ch) => {
-    await send("Input.dispatchKeyEvent", { type: "keyDown", key: ch, text: ch, unmodifiedText: ch });
-    await send("Input.dispatchKeyEvent", { type: "char", text: ch });
-    await send("Input.dispatchKeyEvent", { type: "keyUp", key: ch });
+    // El espacio va con su `code` y su código virtual: sin ellos hay navegadores
+    // que lo tratan como activación del control enfocado en vez de como texto, y
+    // un nombre de modalidad lleva espacios.
+    const extra = ch === " " ? { code: "Space", windowsVirtualKeyCode: 32 } : {};
+    await send("Input.dispatchKeyEvent", {
+      type: "keyDown", key: ch, text: ch, unmodifiedText: ch, ...extra,
+    });
+    await send("Input.dispatchKeyEvent", { type: "keyUp", key: ch, ...extra });
     await sleep(60);
   };
   const escribirEn = async (selectorJs, texto, { seleccionarTodo = false } = {}) => {
@@ -547,13 +565,7 @@ try {
   // se quiere medir.
   const cargarProducto = async () => {
     const campo = `document.querySelector('input[placeholder*="odigo"], input[type=search]')`;
-    await clickEn(campo);
-    await evaluar(`(() => { const i = ${campo}; if (i) { i.focus(); i.select(); } return true; })()`);
-    for (const ch of "Sonda Modalidades") {
-      await send("Input.dispatchKeyEvent", { type: "keyDown", text: ch });
-      await send("Input.dispatchKeyEvent", { type: "char", text: ch });
-      await send("Input.dispatchKeyEvent", { type: "keyUp", text: ch });
-    }
+    await escribirEn(campo, "Sonda Modalidades", { seleccionarTodo: true });
     await esperar(
       `document.body.innerText.includes(${JSON.stringify(PRODUCTO)})`,
       "el producto en los resultados de la búsqueda"
