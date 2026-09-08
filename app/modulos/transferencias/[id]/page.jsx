@@ -31,7 +31,7 @@ import EstadoTransferenciaBadge, { DiferenciasBadge } from "@/components/transfe
 import TransferenciaHeader from "@/components/transferencias/TransferenciaHeader";
 import TablaDetalleTransferencia from "@/components/transferencias/TablaDetalleTransferencia";
 import AccionesRecepcion from "@/components/transferencias/AccionesRecepcion";
-import AgregarProductoRecibido from "@/components/transferencias/AgregarProductoRecibido";
+import WorkspaceRecepcion from "@/components/transferencias/WorkspaceRecepcion";
 import PanelCancelarTransferencia from "@/components/transferencias/PanelCancelarTransferencia";
 import { SectionHead, TotalTile, fmtCantidad, fmtMoneda } from "@/components/transferencias/detallePresentacion";
 import { exigeMotivo } from "@/lib/transferencias/recepcion";
@@ -93,8 +93,8 @@ export default function TransferenciaDetallePage() {
   // está quitando. Los dos hooks van acá arriba, antes de cualquier return, por
   // el mismo motivo que el de arriba: cambiar la cantidad de hooks entre renders
   // rompe la pantalla entera.
-  const [agregarAbierto, setAgregarAbierto] = useState(false);
   const [quitandoId, setQuitandoId] = useState(null);
+  const [revisando, setRevisando] = useState(false);
 
   const [me, setMe] = useState(null);
 
@@ -364,6 +364,33 @@ export default function TransferenciaDetallePage() {
     return json;
   };
 
+  /**
+   * CERRAR EL CONTROL FÍSICO DE UN PRODUCTO.
+   *
+   * Se persiste al toque, de a un producto: con 150, esperar a tener todos
+   * revisados para guardar el checklist es perder el trabajo de una tarde si se
+   * cierra el navegador.
+   *
+   * Y se recarga preservando la edición pendiente, por lo mismo que agregar y
+   * quitar: el operador puede tener otro producto a medio escribir.
+   */
+  const revisarProducto = async (cuerpo) => {
+    try {
+      setRevisando(true);
+      const res = await fetch("/api/transferencias/revisar-producto", {
+        method: "POST",
+        body: JSON.stringify({ transferenciaId: item.id, ...cuerpo }),
+      });
+      const json = await res.json();
+      if (json?.ok) await cargar({ preservarEdicion: true });
+      return json;
+    } catch (err) {
+      return { ok: false, error: err?.message || "No se pudo guardar la revisión." };
+    } finally {
+      setRevisando(false);
+    }
+  };
+
   const quitarLinea = async (detalleId) => {
     try {
       setQuitandoId(detalleId);
@@ -530,29 +557,35 @@ export default function TransferenciaDetallePage() {
             {/* 1 · Información general */}
             <TransferenciaHeader item={item} />
 
-            {/* 2 · Productos transferidos */}
-            {/* El botón "+ Agregar producto recibido" y la acción de quitar solo
-                existen si esta persona puede recibir. No se le pasa un booleano
-                a la tabla para que ella decida: se le pasa —o no— el handler.
-                Sin handler no hay nada que dibujar, y así la regla vive en un
-                solo lugar. En "Recibida" y en "Cancelada", `puedeRecibir` ya es
-                falso. */}
-            <TablaDetalleTransferencia
-              item={item}
-              editItems={editItems}
-              setEditItems={setEditItemsDirty}
-              inputsHabilitados={inputsHabilitados}
-              onAgregarProducto={puedeRecibir ? () => setAgregarAbierto(true) : null}
-              onQuitarLinea={puedeRecibir ? quitarLinea : null}
-              quitandoId={quitandoId}
-            />
+            {/* ── 2 · PRODUCTOS: DOS PANTALLAS, Y LA QUE SE VE DEPENDE DE SI
+                   ESTA PERSONA ESTÁ RECIBIENDO ─────────────────────────────
 
-            {puedeRecibir && (
-              <AgregarProductoRecibido
-                abierto={agregarAbierto}
-                transferenciaId={item.id}
-                onCerrar={() => setAgregarAbierto(false)}
+                Quien RECIBE ve el puesto de trabajo: buscador, escáner, cards
+                que filtran y una ficha por producto. Con 150 productos, recorrer
+                la lista en el orden del remito no es una forma de trabajar.
+
+                Todos los demás —el origen, un admin mirando, una transferencia
+                Recibida o Cancelada— siguen viendo el detalle de siempre. Esa
+                pantalla es el registro histórico del documento y no se convierte
+                en un editor: se lee, se imprime y se compara. Cambiarla por el
+                workspace le sacaría a la mitad de los usuarios la vista que
+                usan. */}
+            {puedeRecibir ? (
+              <WorkspaceRecepcion
+                item={item}
+                puedeRecibir={puedeRecibir}
+                onRevisar={revisarProducto}
                 onAgregar={agregarLinea}
+                onQuitarLinea={quitarLinea}
+                guardando={revisando}
+                quitandoId={quitandoId}
+              />
+            ) : (
+              <TablaDetalleTransferencia
+                item={item}
+                editItems={editItems}
+                setEditItems={setEditItemsDirty}
+                inputsHabilitados={inputsHabilitados}
               />
             )}
 

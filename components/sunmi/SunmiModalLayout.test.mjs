@@ -627,6 +627,11 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // Además es el caso donde el toque al costado pasa solo: en el teléfono este
     // modal es una hoja pegada al borde de abajo, con el pulgar justo ahí.
     "components/transferencias/AgregarProductoRecibido.jsx": true,
+    // El ESCÁNER contesta que NO, y por el mismo criterio: cerrarlo no pierde
+    // nada. No hay nada escrito adentro —es un visor de cámara— y volver a
+    // abrirlo cuesta un toque. Lo que sí tiene que pasar al cerrar es que la
+    // cámara se apague, y eso lo garantizan sus propios candados, no el velo.
+    "components/sunmi/SunmiEscanerCodigoBarra.jsx": false,
     // Stock: los dos son formularios cortos pero se pierde lo escrito —la
     // cantidad y su motivo en uno, los dos límites en el otro—. Y hay un motivo
     // extra que no es de criterio sino de CONSERVAR: los dos estaban armados a
