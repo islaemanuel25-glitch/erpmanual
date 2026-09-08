@@ -414,7 +414,48 @@ jobs:
               --ancho "$ancho" --alto 1600
           done
 
+      # ── EL CAMINO DE COBRO CON MODALIDADES, EN UN NAVEGADOR DE VERDAD ────
+      #
+      # Va ÚLTIMA, y no es orden estético. La sonda crea modalidades sobre el
+      # medio de Mercado Pago, y crear una modalidad sobre un medio que todavía
+      # es un DEFAULT materializa los cuatro medios del local. Aunque borra sus
+      # modalidades al terminar, esa materialización cambia el estado que las
+      # mediciones anteriores fotografían. Corriendo última, todas ya terminaron
+      # y el runner se destruye después.
+      #
+      # ── PRIMERO EL FIXTURE, PORQUE EL SEED NO CREA PRODUCTOS ─────────────
+      #
+      # `prisma/seed.js` crea el grupo, los locales y el usuario, y ni un solo
+      # producto. Sin producto la sonda no puede cargar el carrito y sin carrito
+      # el panel de cobro no muestra importes: ese rojo sería del FIXTURE y se
+      # leería como un defecto de la UI. Sin turno abierto es peor todavía — el
+      # POS redirige a la pantalla de apertura y la sonda mediría otra pantalla.
+      #
+      # El armado sale de `scripts/pruebas-db/lib/fixturePos.mjs`, la misma pieza
+      # que usa la prueba de base: dos armados del mismo escenario se rompen el
+      # día que uno cambia.
+      - name: Sembrar el producto y el turno que el POS necesita
+        run: |
+          node --import ./scripts/alias-loader.mjs \
+            scripts/pruebas-db/sembrar-visual-pos.mjs --local "Local 1"
+
+      - name: Medir el cobro con modalidades en el navegador
+        run: |
+          node scripts/sonda-modalidades-cobro.mjs \
+            --base "http://localhost:$PUERTO" \
+            --usuario "$USUARIO_PRUEBA" --clave "$CLAVE_PRUEBA" \
+            --edge "${{ steps.navegador.outputs.ruta }}" \
+            --puerto-cdp 9243 \
+            --local-nombre "Local 1" \
+            --temas "sunmiDark,sunmiLight,sunmiSand,sunmiBlueClassic" \
+            --capturas "/tmp/capturas/modalidades"
+
+      # `always()` porque la sonda de arriba es un GATE: si se pone roja, las
+      # capturas son justo lo que hay que mirar para entender por qué. Sin esto,
+      # un rojo se lleva puesta la evidencia y deja el artefacto vacío, que
+      # además hace fallar la subida por `if-no-files-found: error`.
       - name: Ordenar el artefacto con nombres legibles
+        if: always()
         run: |
           mkdir -p /tmp/artefacto
           for ancho in $(echo "$ANCHOS" | tr ',' ' '); do
@@ -442,7 +483,7 @@ jobs:
           # porque el valor computado del contorno no dice qué se pinta: Chrome
           # dibuja el anillo de 'outline: auto' en dos tonos y getComputedStyle
           # informa uno solo. Si hay que decidir si se percibe, se miran píxeles.
-          for carpeta in foco foco-sin-resets; do
+          for carpeta in foco foco-sin-resets modalidades; do
             if [ -d "/tmp/capturas/$carpeta" ]; then
               mkdir -p "/tmp/artefacto/$carpeta"
               cp /tmp/capturas/$carpeta/*.png "/tmp/artefacto/$carpeta/" || true

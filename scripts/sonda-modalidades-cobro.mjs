@@ -54,10 +54,18 @@ const arg = (n, d = null) => {
 const BASE = arg("base", "http://localhost:3111");
 const USUARIO = arg("usuario");
 const CLAVE = arg("clave");
-const LOCAL = arg("local");
+// DÓNDE SE PARA. Un LOCAL y no el depósito: el POS de un depósito se comporta
+// distinto, y lo que hay que medir es la pantalla del que vende. Es el mismo
+// local donde `sembrar-visual-pos.mjs` deja el producto y el turno abierto.
+const LOCAL_NOMBRE = arg("local-nombre", "Local 1");
+// El producto que siembra ese script. Se busca por él porque tiene que ser
+// inequívoco: si el buscador devolviera dos cosas, la sonda tocaría la
+// equivocada y estaría midiendo sobre otro producto.
+const PRODUCTO = arg("producto", "Sonda Modalidades Producto");
 const PUERTO = Number(arg("puerto-cdp", "9243"));
 const PERFIL = arg("perfil", path.join(os.tmpdir(), "sonda-modalidades-cobro"));
 const EDGE = arg("edge", "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe");
+const CAPTURAS = arg("capturas", null);
 
 // Los dos anchos que el pedido exige medir. El primero es la Sunmi.
 const ANCHO_MOBILE = Number(arg("ancho-mobile", "390"));
@@ -68,7 +76,17 @@ const ALTO_DESKTOP = Number(arg("alto-desktop", "900"));
 // Los cuatro temas que hay que ver. No se adapta la UI con condicionales: la
 // misma pantalla tiene que responder a los tokens, y eso se comprueba leyendo el
 // color COMPUTADO en cada uno.
-const TEMAS = (arg("temas", "dark,light,sand,blueClassic") || "").split(",").map((t) => t.trim()).filter(Boolean);
+//
+// ── LOS IDS SON LOS DEL REPO, NO NOMBRES CORTOS ─────────────────────────────
+//
+// El default decía `dark,light,sand,blueClassic`, que no existen: los scopes de
+// `styles/sunmi.css` y el resto de las sondas usan `sunmiDark`, `sunmiLight`,
+// `sunmiSand` y `sunmiBlueClassic`. Con los cortos, `data-theme` queda en un
+// valor que ningún selector empareja, así que los cuatro "temas" daban el MISMO
+// color y la afirmación de que cambian habría sido un falso rojo — o peor, un
+// verde si alguien la aflojaba. No se crean alias: se usan los de verdad.
+const TEMAS = (arg("temas", "sunmiDark,sunmiLight,sunmiSand,sunmiBlueClassic") || "")
+  .split(",").map((t) => t.trim()).filter(Boolean);
 
 // Los nombres con los que la sonda configura su caso. Llevan marca de tiempo
 // para no chocar con lo que el local ya tenga, y se borran al final.
@@ -181,6 +199,39 @@ async function clickEn(selectorJs) {
 const botonConTexto = (texto) =>
   `[...document.querySelectorAll("button")].find((b) => (b.textContent || "").includes(${JSON.stringify(texto)}))`;
 
+/**
+ * CUÁNTOS BOTONES DE VERDAD, VISIBLES, LLEVAN ESTE TEXTO.
+ *
+ * Ésta es la medición que reemplazó a un `veces >= 1` sobre `document.body
+ * .innerText`, que probaba "existe" y no "es UNO".
+ *
+ * Tres decisiones, y las tres son por lo que NO tiene que contar:
+ *
+ *   · `button` — nodos interactivos. Un título, un `<div>` o una fila de tabla
+ *     con el mismo texto no son un botón de cobro.
+ *   · `innerText` y no `textContent` ni el HTML — el ícono de Mercado Pago es un
+ *     `<img alt="Mercado Pago">`, y el alt es un ATRIBUTO: no entra en el texto
+ *     renderizado. Un `aria-label` tampoco. Contando el HTML crudo, un solo
+ *     botón daba dos.
+ *   · `getClientRects().length > 0` — lo oculto no cuenta. Un panel escondido
+ *     con los mismos botones haría dar dos donde el cajero ve uno.
+ */
+const contarBotonesCon = (texto) =>
+  evaluar(
+    `[...document.querySelectorAll("button")]
+       .filter((b) => b.getClientRects().length > 0)
+       .filter((b) => (b.innerText || "").includes(${JSON.stringify(texto)}))
+       .length`
+  );
+
+/** Una captura de la pantalla entera, si se pidió carpeta. Acompaña, no reemplaza. */
+async function retratar(nombre) {
+  if (!CAPTURAS) return;
+  fs.mkdirSync(CAPTURAS, { recursive: true });
+  const { data } = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true });
+  fs.writeFileSync(path.join(CAPTURAS, `${nombre}.png`), Buffer.from(data, "base64"));
+}
+
 const morir = (motivo) => {
   console.error("");
   console.error(`ROJO · la sonda no pudo medir: ${motivo}`);
@@ -253,20 +304,14 @@ try {
     `,
   });
 
+  // La ubicación va POR NOMBRE y el arnés falla si no existe, en vez de caer al
+  // depósito en silencio: medir parado en otro lado daría un verde sobre una
+  // pantalla que no es la pedida.
   await prepararSesion({
     navegar, evaluar, base: BASE, usuario: USUARIO, clave: CLAVE,
+    ubicacion: LOCAL_NOMBRE,
     log: (m) => console.log(m),
   });
-
-  if (LOCAL) {
-    const r = await evaluar(
-      `fetch("/api/contexto-activo/set",{method:"POST",headers:{"Content-Type":"application/json"},` +
-        `body:JSON.stringify({localId:${Number(LOCAL)}})}).then(r=>r.json()).catch(e=>({ok:false,error:String(e)}))`,
-      true
-    );
-    if (!r || r.ok !== true) morir(`no pude pararme en el local ${LOCAL}: ${r?.error ?? "sin respuesta"}`);
-    console.log(`ubicación pedida: ${r.nombre} (id ${r.localId})`);
-  }
 
   // ═════════════════════════════════════════════════════════════════════════
   console.log("\n── 1. COBROS: la lista de modalidades de un medio ─────────────");
@@ -303,9 +348,84 @@ try {
   console.log("\n── 2. COBROS: crear dos modalidades del MISMO tipo contable ───");
   // ═════════════════════════════════════════════════════════════════════════
 
+  medioId = padre.id;
+  if (medioId == null) {
+    morir("el medio de Mercado Pago todavía es un default: falta correr sembrar-visual-medios-cobro.mjs");
+  }
+  const rutaMedio = `${BASE}/modulos/configuracion/pos-ventas/cobros/${encodeURIComponent(String(medioId))}`;
+
+  /** Una tecla de verdad, con su texto: es lo que hace que React vea un `insertText`. */
+  const teclear = async (ch) => {
+    await send("Input.dispatchKeyEvent", { type: "keyDown", key: ch, text: ch, unmodifiedText: ch });
+    await send("Input.dispatchKeyEvent", { type: "char", text: ch });
+    await send("Input.dispatchKeyEvent", { type: "keyUp", key: ch });
+    await sleep(60);
+  };
+  const escribirEn = async (selectorJs, texto, { seleccionarTodo = false } = {}) => {
+    if (!(await clickEn(selectorJs))) morir(`no encontré el campo: ${selectorJs}`);
+    if (seleccionarTodo) {
+      await evaluar(`(() => { const i = ${selectorJs}; if (i) i.select(); return true; })()`);
+    }
+    for (const ch of texto) await teclear(ch);
+  };
+
+  // ── LA MODALIDAD SE CREA POR EL FORMULARIO, NO POR LA API ────────────────
+  //
+  // Es el único camino que prueba que la pantalla de alta funciona: un
+  // `SunmiInput` sin importar, o un select que no abre, compilan y pasan los
+  // candados. La segunda modalidad sí se crea por la API —es preparación del
+  // escenario y el formulario ya quedó ejercido—.
+  await navegar(`${rutaMedio}/modalidades/nueva`);
+  await esperar(`document.body.innerText.includes("CONDICIÓN COMERCIAL")`, "el formulario de alta");
+  await retratar("390-cobros-modalidad-alta");
+
+  const campoNombre = `document.querySelector('input[placeholder^="Ej. Cr"]')`;
+  afirmar(await evaluar(`!!${campoNombre}`), "el alta pide un nombre");
+  await escribirEn(campoNombre, NOMBRE_MODALIDAD_A);
+
+  // El tipo contable arranca en el del PADRE —MERCADOPAGO— y hay que ponerlo en
+  // CREDITO: que las dos modalidades compartan tipo contable es todo el caso.
+  // El disparador del kit se busca por SU clase y no por su texto: el texto es el
+  // valor elegido y cambia, así que un selector por texto mediría otra cosa el
+  // día que cambie el default.
+  const disparadorTipo = `document.querySelector("button.sunmi-select-trigger")`;
+  afirmar(await evaluar(`!!${disparadorTipo}`), "el alta ofrece elegir el tipo contable");
+  await clickEn(disparadorTipo);
+  await esperar(`!!document.querySelector(".sunmi-select-dropdown")`, "el desplegable del tipo contable");
+  const eligioTipo = await clickEn(
+    `[...document.querySelectorAll(".sunmi-select-dropdown div")].find((d) => (d.innerText || "").trim() === "Crédito")`
+  );
+  afirmar(eligioTipo, "se puede elegir el tipo contable en el desplegable del kit");
+
+  // ── LA ESCRITURA NUMÉRICA, EJERCIDA DE VERDAD ───────────────────────────
+  //
+  // El campo de recargo de un alta muestra 0. El contrato cerrado dice que al
+  // entrar ese 0 queda seleccionado y que teclear un dígito lo REEMPLAZA: 0 + 6
+  // da 6, no 06 ni 60. Es el defecto que ya se midió una vez y no puede volver.
+  const campoRecargo = `[...document.querySelectorAll('input[type=number]')][1]`;
+  const valorInicialRecargo = await evaluar(`(${campoRecargo} || {}).value ?? null`);
+  afirmar(valorInicialRecargo === "0", "el recargo de un alta arranca en 0", `arrancó en ${valorInicialRecargo}`);
+  await escribirEn(campoRecargo, String(RECARGO_A));
+  const trasTeclear = await evaluar(`(${campoRecargo} || {}).value ?? null`);
+  afirmar(
+    trasTeclear === String(RECARGO_A),
+    `con el 0 seleccionado, teclear ${RECARGO_A} deja ${RECARGO_A} y no 0${RECARGO_A} ni ${RECARGO_A}0`,
+    `quedó ${JSON.stringify(trasTeclear)}`
+  );
+
+  afirmar(await clickEn(botonConTexto("Crear modalidad")), "se puede tocar Crear modalidad");
+  await esperar(`document.body.innerText.includes("MODALIDADES")`, "la vuelta al medio después de crear");
+  afirmar(
+    await evaluar(
+      `[...document.querySelectorAll("a")].some((a) => (a.innerText || "").includes(${JSON.stringify(NOMBRE_MODALIDAD_A)}))`
+    ),
+    "la modalidad creada desde el formulario aparece en la LISTA, como fila que se puede abrir"
+  );
+
+  // La segunda, por API: preparación del escenario.
   const crear = async (nombre, recargo) => {
     const r = await evaluar(
-      `fetch("/api/medios-cobro/" + encodeURIComponent(${JSON.stringify(padre.claveEdicion)}) + "/modalidades",` +
+      `fetch("/api/medios-cobro/" + ${Number(medioId)} + "/modalidades",` +
         `{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},` +
         `body:JSON.stringify({nombre:${JSON.stringify(nombre)},tipoContable:"CREDITO",recargoPct:${recargo},comisionPct:null})})` +
         `.then(r=>r.json())`,
@@ -314,23 +434,24 @@ try {
     if (!r?.ok) morir(`no pude crear la modalidad "${nombre}": ${r?.error ?? "sin respuesta"}`);
     return r.modalidadId;
   };
-  // La creación se hace por la API a propósito: lo que esta sonda tiene que
-  // medir es la PANTALLA DE COBRO, y tipear dos formularios enteros para llegar
-  // ahí la haría frágil por motivos que no son el objeto de la medición. El
-  // formulario se ejerce igual, más abajo, editando.
-  modalidades = [await crear(NOMBRE_MODALIDAD_A, RECARGO_A), await crear(NOMBRE_MODALIDAD_B, RECARGO_B)];
-  medioId = (await evaluar(
-    `fetch("/api/medios-cobro",{credentials:"same-origin"}).then(r=>r.json())`, true
-  )).medios.find((m) => m.tipoContable === "MERCADOPAGO")?.id;
+  const idB = await crear(NOMBRE_MODALIDAD_B, RECARGO_B);
 
-  await navegar(`${BASE}/modulos/configuracion/pos-ventas/cobros/${encodeURIComponent(String(medioId))}`);
+  await navegar(rutaMedio);
   await esperar(`document.body.innerText.includes("MODALIDADES")`, "la sección MODALIDADES");
+  const idsDelMedio = await evaluar(
+    `fetch("/api/medios-cobro/" + ${Number(medioId)} + "/modalidades",{credentials:"same-origin"})` +
+      `.then(r=>r.json()).then(r=>(r.modalidades||[]).map(m=>[m.nombre,m.id]))`,
+    true
+  );
+  const idA = (idsDelMedio.find(([n]) => n === NOMBRE_MODALIDAD_A) || [])[1];
+  if (idA == null) morir("la modalidad creada por el formulario no quedó guardada");
+  modalidades = [idA, idB];
 
   const textoCobros = await evaluar(`document.body.innerText`);
   afirmar(textoCobros.includes(NOMBRE_MODALIDAD_A), "la primera modalidad se ve en la lista");
   afirmar(textoCobros.includes(NOMBRE_MODALIDAD_B), "la segunda también, aunque comparta el tipo contable");
-  afirmar(textoCobros.includes("Recargo 4 %"), "con su recargo", textoCobros.slice(0, 400));
-  afirmar(textoCobros.includes("Recargo 8 %"), "y el de la otra");
+  afirmar(textoCobros.includes(`Recargo ${RECARGO_A} %`), "con su recargo", textoCobros.slice(0, 500));
+  afirmar(textoCobros.includes(`Recargo ${RECARGO_B} %`), "y el de la otra");
   afirmar(
     textoCobros.includes("Comisión sin configurar"),
     "una comisión sin cargar se dice SIN CONFIGURAR"
@@ -340,48 +461,44 @@ try {
     "y NUNCA heredada: una modalidad no hereda del grupo"
   );
   afirmar(
-    /la condición.*modalidad/i.test(textoCobros) || textoCobros.includes("cobra por modalidad"),
-    "y se avisa que la condición del medio ya no manda"
+    /cobra por modalidad/i.test(textoCobros),
+    "y se avisa que la condición del medio ya no manda",
+    textoCobros.slice(0, 500)
   );
+  await retratar("390-cobros-medio-con-modalidades");
 
   // ═════════════════════════════════════════════════════════════════════════
   console.log("\n── 3. COBROS: editar una modalidad, con el teclado ────────────");
   // ═════════════════════════════════════════════════════════════════════════
 
-  await navegar(
-    `${BASE}/modulos/configuracion/pos-ventas/cobros/${encodeURIComponent(String(medioId))}/modalidades/${modalidades[0]}`
-  );
+  await navegar(`${rutaMedio}/modalidades/${modalidades[0]}`);
   await esperar(`document.body.innerText.includes("CONDICIÓN COMERCIAL")`, "el formulario de la modalidad");
+  await retratar("390-cobros-modalidad-editar");
 
   const formulario = await evaluar(`document.body.innerText`);
   afirmar(formulario.includes("Sin configurar"), "el campo de comisión dice Sin configurar");
   afirmar(!/hered/i.test(formulario), "y en ningún lado dice Heredada");
-  afirmar(!formulario.includes("Procesador\nElegir"), "no se pide procesador: lo aporta el padre");
+  afirmar(formulario.includes("Lo aporta el medio"), "no se pide procesador: lo aporta el padre");
 
-  // ── LA ESCRITURA NUMÉRICA, EJERCIDA DE VERDAD ───────────────────────────
+  // ── SE EDITA DE VERDAD: LA COMISIÓN PASA DE null A UN NÚMERO ────────────
   //
-  // El contrato ya cerrado: con un 0 seleccionado, teclear 1 deja 1 y no 10. Se
-  // ejerce con el TECLADO del navegador, que es el único que reproduce el caso.
-  const inputRecargo = `[...document.querySelectorAll('input[type=number]')].find((i) => i.value === "4" || i.value === "0")`;
-  await clickEn(inputRecargo);
-  await evaluar(`(() => { const i = ${inputRecargo}; if (i) { i.focus(); i.select(); } return true; })()`);
-  for (const texto of ["1"]) {
-    await send("Input.dispatchKeyEvent", { type: "keyDown", text: texto });
-    await send("Input.dispatchKeyEvent", { type: "char", text: texto });
-    await send("Input.dispatchKeyEvent", { type: "keyUp", text: texto });
-  }
-  await sleep(200);
-  const valorTrasTeclear = await evaluar(`(${inputRecargo} || {}).value ?? null`);
+  // El campo arranca VACÍO —sin configurar, que no es 0— así que escribir acá
+  // ejerce el otro lado del contrato: lo que se guarda es 3, y el renglón de la
+  // lista tiene que dejar de decir "sin configurar".
+  const campoComision = `[...document.querySelectorAll('input[type=number]')][2]`;
+  const comisionInicial = await evaluar(`(${campoComision} || {}).value ?? null`);
+  afirmar(comisionInicial === "", "la comisión arranca vacía: sin configurar no es 0",
+    `arrancó en ${JSON.stringify(comisionInicial)}`);
+  await escribirEn(campoComision, "3");
   afirmar(
-    valorTrasTeclear === "1",
-    "con el valor seleccionado, teclear 1 deja 1 y no 10",
-    `quedó ${JSON.stringify(valorTrasTeclear)}`
+    (await evaluar(`(${campoComision} || {}).value ?? null`)) === "3",
+    "y se puede escribir un porcentaje"
   );
 
-  // ── FOCO VISIBLE CON TAB, Y SIN INDICADOR POR CLICK ─────────────────────
+  // ── FOCO VISIBLE CON TAB ────────────────────────────────────────────────
   await send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
   await send("Input.dispatchKeyEvent", { type: "keyUp", key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 });
-  await sleep(200);
+  await sleep(250);
   const foco = await evaluar(
     `(() => {
        const el = document.activeElement;
@@ -406,82 +523,150 @@ try {
     "con una señal dibujada: contorno o sombra",
     JSON.stringify(foco)
   );
+  await retratar("390-cobros-modalidad-foco");
+
+  afirmar(await clickEn(botonConTexto("Guardar cambios")), "se puede tocar Guardar cambios");
+  await esperar(`document.body.innerText.includes("MODALIDADES")`, "la vuelta al medio después de guardar");
+  const trasGuardar = await evaluar(`document.body.innerText`);
+  afirmar(
+    trasGuardar.includes("Comisión 3 %"),
+    "el cambio quedó guardado y la lista lo muestra",
+    trasGuardar.slice(0, 500)
+  );
 
   // ═════════════════════════════════════════════════════════════════════════
   console.log("\n── 4. POS: un solo botón padre, y el selector ─────────────────");
   // ═════════════════════════════════════════════════════════════════════════
 
+  // ── ABRIR EL POS CON EL CARRITO CARGADO, SIEMPRE IGUAL ──────────────────
+  //
+  // Se hace en una función porque hacen falta CUATRO veces: después de cobrar,
+  // el POS limpia el carrito —es lo que tiene que hacer—, así que cada bloque
+  // que sigue necesita volver a cargarlo. Con el carrito vacío el panel no
+  // muestra importes y las afirmaciones medirían una pantalla que no es la que
+  // se quiere medir.
+  const cargarProducto = async () => {
+    const campo = `document.querySelector('input[placeholder*="odigo"], input[type=search]')`;
+    await clickEn(campo);
+    await evaluar(`(() => { const i = ${campo}; if (i) { i.focus(); i.select(); } return true; })()`);
+    for (const ch of "Sonda Modalidades") {
+      await send("Input.dispatchKeyEvent", { type: "keyDown", text: ch });
+      await send("Input.dispatchKeyEvent", { type: "char", text: ch });
+      await send("Input.dispatchKeyEvent", { type: "keyUp", text: ch });
+    }
+    await esperar(
+      `document.body.innerText.includes(${JSON.stringify(PRODUCTO)})`,
+      "el producto en los resultados de la búsqueda"
+    );
+    // La fila de resultado es un `div` con onClick, no un botón: se la toca con
+    // el mouse, que es lo que hace un dedo.
+    return clickEn(
+      `[...document.querySelectorAll("div")].find((d) => d.onclick && (d.innerText || "").includes(${JSON.stringify(PRODUCTO)}))`
+    );
+  };
+
   const abrirPos = async () => {
     await navegar(`${BASE}/modulos/pos-ventas`);
+    await esperar(
+      `!!document.querySelector('input[placeholder*="odigo"], input[type=search]')`,
+      "el buscador de productos del POS"
+    );
+    await cargarProducto();
     await esperar(`document.body.innerText.includes("Elegí cómo cobrar") ||
-      document.body.innerText.includes("Total a cobrar") ||
-      document.body.innerText.includes("Total según el medio")`, "el panel de cobro del POS");
+      document.body.innerText.includes("Total según el medio")`, "el panel de cobro con el carrito cargado");
   };
-  await abrirPos();
 
-  // Hace falta algo en el carrito para que los importes existan. Se busca un
-  // producto REAL del local con el buscador de la pantalla.
-  const cargoCarrito = await evaluar(
-    `(async () => {
-       const r = await fetch("/api/pos-ventas/buscar-producto?q=a", { credentials: "same-origin" }).then((x) => x.json());
-       return (r.items || []).length;
-     })()`,
+  await navegar(`${BASE}/modulos/pos-ventas`);
+  await esperar(
+    `!!document.querySelector('input[placeholder*="odigo"], input[type=search]')`,
+    "el buscador de productos del POS"
+  );
+
+  // ── EL CARRITO SE CARGA POR LA PANTALLA, TOCANDO EL PRODUCTO ────────────
+  //
+  // El producto lo siembra `scripts/pruebas-db/sembrar-visual-pos.mjs`, porque
+  // `prisma/seed.js` no crea ninguno. Si el buscador no lo encuentra es un
+  // problema de FIXTURE y no de la UI, así que se muere diciéndolo: contar ese
+  // rojo como evidencia de la pantalla sería mentir sobre qué se midió.
+  const enCatalogo = await evaluar(
+    `fetch("/api/pos-ventas/buscar-producto?q=" + encodeURIComponent(${JSON.stringify(PRODUCTO)}),
+       { credentials: "same-origin" }).then((x) => x.json()).then((r) => (r.items || []).length)`,
     true
   );
-  if (!cargoCarrito) morir("el local no tiene productos para cargar el carrito");
-
-  const input = `document.querySelector('input[type=search], input[placeholder*="uscar"]')`;
-  await clickEn(input);
-  await evaluar(`(() => { const i = ${input}; if (i) i.focus(); return true; })()`);
-  for (const ch of "a") {
-    await send("Input.dispatchKeyEvent", { type: "keyDown", text: ch });
-    await send("Input.dispatchKeyEvent", { type: "char", text: ch });
-    await send("Input.dispatchKeyEvent", { type: "keyUp", text: ch });
+  if (!enCatalogo) {
+    morir(
+      `el buscador no encuentra "${PRODUCTO}": falta el fixture. ` +
+        `Corré scripts/pruebas-db/sembrar-visual-pos.mjs antes de esta sonda.`
+    );
   }
-  await sleep(900);
-  await evaluar(`(() => {
-    const b = [...document.querySelectorAll("button,li,div[role=option]")].find((n) => n.dataset && n.dataset.resultado);
-    if (b) b.click();
-    return true;
-  })()`);
-  await sleep(600);
 
+  const toco = await cargarProducto();
+  afirmar(toco, "se toca el producto y entra al carrito");
+  await esperar(
+    `document.body.innerText.includes("Elegí cómo cobrar") ||
+     document.body.innerText.includes("Total según el medio")`,
+    "el panel de cobro habilitado con el carrito cargado"
+  );
+  await retratar("390-pos-panel");
+
+  // ── UN SOLO BOTÓN PADRE. NODOS, NO TEXTO ────────────────────────────────
   const nombrePadre = padre.nombre;
-  const textoPos = await evaluar(`document.body.innerText`);
-  const vecesPadre = textoPos.split(nombrePadre).length - 1;
-  afirmar(vecesPadre >= 1, `el botón "${nombrePadre}" está en el panel`);
+  const botonesPadre = await contarBotonesCon(nombrePadre);
   afirmar(
-    !textoPos.includes(NOMBRE_MODALIDAD_A) && !textoPos.includes(NOMBRE_MODALIDAD_B),
-    "y sus modalidades NO son botones del panel: es UN solo botón"
+    botonesPadre === 1,
+    `"${nombrePadre}" es UN solo botón de cobro`,
+    `botones visibles con ese texto: ${botonesPadre}`
+  );
+
+  const comoBotonA = await contarBotonesCon(NOMBRE_MODALIDAD_A);
+  const comoBotonB = await contarBotonesCon(NOMBRE_MODALIDAD_B);
+  afirmar(
+    comoBotonA === 0 && comoBotonB === 0,
+    "y sus modalidades NO son botones del panel",
+    `"${NOMBRE_MODALIDAD_A}": ${comoBotonA} · "${NOMBRE_MODALIDAD_B}": ${comoBotonB}`
   );
 
   // Tocarlo NO cobra: abre el selector.
-  const toco = await clickEn(botonConTexto(nombrePadre));
-  afirmar(toco, "se puede tocar el botón padre");
+  const abrio = await clickEn(botonConTexto(nombrePadre));
+  afirmar(abrio, "se puede tocar el botón padre");
   await sleep(400);
-  const trasTocar = await evaluar(`document.body.innerText`);
   afirmar(
-    trasTocar.includes("Elegí la modalidad"),
+    await evaluar(`document.body.innerText.includes("Elegí la modalidad")`),
     "tocarlo abre el selector en vez de cobrar",
-    trasTocar.slice(0, 300)
+    (await evaluar(`document.body.innerText`)).slice(0, 300)
   );
-  afirmar(trasTocar.includes(NOMBRE_MODALIDAD_A), "el selector muestra la primera modalidad");
-  afirmar(trasTocar.includes(NOMBRE_MODALIDAD_B), "y la segunda, con el mismo tipo contable");
+  afirmar(
+    (await contarBotonesCon(NOMBRE_MODALIDAD_A)) === 1,
+    "recién ACÁ la primera modalidad es un botón"
+  );
+  afirmar(
+    (await contarBotonesCon(NOMBRE_MODALIDAD_B)) === 1,
+    "y la segunda también, con el mismo tipo contable"
+  );
   afirmar(
     await evaluar(`window.__cobros.length === 0`),
     "y no se mandó ningún cobro al abrir el selector"
   );
+  await retratar("390-selector-modalidad");
 
-  // Los dos importes tienen que ser DISTINTOS: 4 % contra 8 %.
-  const importes = await evaluar(
-    `[...document.querySelectorAll("button")]
-       .map((b) => (b.textContent || "").match(/\\$[\\d.,]+/g) || [])
-       .flat()`
-  );
+  // Los dos importes tienen que ser DISTINTOS: 4 % contra 8 %. Se leen de LOS
+  // BOTONES de cada modalidad y no de la página entera, para que el total grande
+  // de arriba no pueda hacer pasar la afirmación por su cuenta.
+  const importeDe = (texto) =>
+    evaluar(
+      `(() => {
+         const b = ${botonConTexto(texto)};
+         const m = (b?.innerText || "").match(/\\$([\\d.]+,\\d{2})/);
+         return m ? m[1] : null;
+       })()`
+    );
+  const importeA = await importeDe(NOMBRE_MODALIDAD_A);
+  const importeB = await importeDe(NOMBRE_MODALIDAD_B);
+  afirmar(importeA != null && importeB != null, "cada modalidad muestra su importe", `${importeA} · ${importeB}`);
   afirmar(
-    new Set(importes).size >= 2,
-    "las dos modalidades muestran importes DISTINTOS",
-    JSON.stringify(importes)
+    importeA !== importeB,
+    "y los dos importes son DISTINTOS: 4 % contra 8 %",
+    `${importeA} contra ${importeB}`
   );
 
   // ── SIN DESBORDE HORIZONTAL A 390 px ────────────────────────────────────
@@ -494,15 +679,6 @@ try {
   console.log("\n── 5. POS: elegir la modalidad manda IDENTIDAD, no porcentajes ─");
   // ═════════════════════════════════════════════════════════════════════════
 
-  const totalEnPantalla = await evaluar(
-    `(() => {
-       const b = ${botonConTexto(NOMBRE_MODALIDAD_B)};
-       const m = (b?.textContent || "").match(/\\$([\\d.]+,\\d{2})/);
-       return m ? m[1] : null;
-     })()`
-  );
-  afirmar(totalEnPantalla != null, "la opción muestra su importe");
-
   await evaluar(`window.__respuestaCobro = { status: 200, cuerpo: { ok: true, ventaId: 0, numero: 0, breakdown: {} } }; true`);
   await clickEn(botonConTexto(NOMBRE_MODALIDAD_B));
   await sleep(700);
@@ -513,25 +689,32 @@ try {
   afirmar(tender != null, "el cuerpo lleva un tender", JSON.stringify(cobro));
   afirmar(
     tender?.medioCobroLocalId === medioId,
-    "con el id del medio padre",
+    "el cuerpo manda medioCobroLocalId, con el id del medio padre",
     JSON.stringify(tender)
   );
   afirmar(
     tender?.modalidadId === modalidades[1],
-    "y el id de la modalidad elegida",
+    "y modalidadId, con el de la modalidad elegida",
     JSON.stringify(tender)
   );
-  afirmar(
-    tender != null && !("recargoPct" in tender) && !("comisionPct" in tender) &&
-      !("tipoContable" in tender) && !("procesador" in tender),
-    "y NINGÚN porcentaje, comisión, tipo ni procesador: eso lo resuelve el servidor",
-    JSON.stringify(tender)
-  );
+  // Uno por uno y no en una sola afirmación: si mañana se filtra el procesador,
+  // el rojo tiene que decir CUÁL se filtró.
+  for (const campo of ["recargoPct", "comisionPct", "tipoContable", "procesador"]) {
+    afirmar(
+      tender != null && !(campo in tender),
+      `y NO manda ${campo}: eso lo resuelve el servidor`,
+      JSON.stringify(tender)
+    );
+  }
+
+  // El importe que se vio está en es-AR: se convierte a número para comparar en
+  // centavos, que es como se compara plata en este repo.
+  const aNumero = (t) => Number(String(t ?? "").replace(/\./g, "").replace(",", "."));
   afirmar(
     cobro?.totalPantalla != null &&
-      String(cobro.totalPantalla).replace(".", ",") === String(totalEnPantalla).replace(/\./g, ""),
-    "y el total que viaja es EL QUE SE VIO",
-    `pantalla ${totalEnPantalla} · cuerpo ${cobro?.totalPantalla}`
+      Math.round(Number(cobro.totalPantalla) * 100) === Math.round(aNumero(importeB) * 100),
+    "y el total que viaja es EL QUE SE VIO en el botón",
+    `pantalla ${importeB} · cuerpo ${cobro?.totalPantalla}`
   );
 
   // ═════════════════════════════════════════════════════════════════════════
@@ -612,28 +795,45 @@ try {
   console.log("\n── 8. LOS CUATRO TEMAS, sobre la misma pantalla ───────────────");
   // ═════════════════════════════════════════════════════════════════════════
 
-  await abrirPos();
-  await clickEn(botonConTexto(nombrePadre));
-  await sleep(400);
+  // ── EL TEMA SE PONE COMO LO PONE LA APLICACIÓN ──────────────────────────
+  //
+  // Escribiendo `localStorage` y recargando, que es el camino que usa el propio
+  // `SunmiThemeProvider` y el que ya usa `generar-huellas.mjs`. Pisar
+  // `data-theme` a mano sería más rápido y mediría otra cosa: el proveedor lo
+  // reescribe en su sincronización, así que una lectura tomada en el medio
+  // podría ser del tema viejo sin que nada avise.
+  const ponerTema = async (tema) => {
+    await evaluar(
+      `(() => { try { localStorage.setItem("erp-sunmi-theme", ${JSON.stringify(tema)}); } catch (e) {} return true; })()`
+    );
+    await abrirPos();
+    const aplicado = await evaluar(`document.documentElement.dataset.theme || null`);
+    if (aplicado !== tema) {
+      morir(`pedí el tema ${tema} y la página quedó en ${JSON.stringify(aplicado)}`);
+    }
+  };
 
   const lecturas = {};
   for (const tema of TEMAS) {
-    await evaluar(`document.documentElement.setAttribute("data-theme", ${JSON.stringify(tema)}); true`);
-    await sleep(300);
+    await ponerTema(tema);
+    await clickEn(botonConTexto(nombrePadre));
+    await sleep(400);
     lecturas[tema] = await evaluar(
       `(() => {
          const b = ${botonConTexto(NOMBRE_MODALIDAD_A)};
          if (!b) return null;
          const cs = getComputedStyle(b);
-         return { fondo: cs.backgroundColor, texto: cs.color, borde: cs.borderColor };
+         const fondo = getComputedStyle(document.body).backgroundColor;
+         return { fondo: cs.backgroundColor, texto: cs.color, borde: cs.borderColor, pagina: fondo };
        })()`
     );
-    afirmar(lecturas[tema] != null, `el selector se dibuja en el tema ${tema}`);
+    afirmar(lecturas[tema] != null, `el selector se dibuja en el tema ${tema}`, "no apareció el botón de la modalidad");
+    await retratar(`390-tema-${tema}`);
   }
-  const distintos = new Set(Object.values(lecturas).filter(Boolean).map((l) => l.fondo + l.texto));
+  const firmas = Object.values(lecturas).filter(Boolean).map((l) => `${l.fondo}|${l.texto}|${l.pagina}`);
   afirmar(
-    distintos.size > 1,
-    "los temas cambian el color de verdad: la UI responde a los tokens",
+    new Set(firmas).size === firmas.length && firmas.length === TEMAS.length,
+    "los CUATRO temas dan valores computados distintos: la UI responde a los tokens",
     JSON.stringify(lecturas)
   );
 
@@ -641,26 +841,35 @@ try {
   console.log("\n── 9. ESCRITORIO: el mismo contrato, otra composición ─────────");
   // ═════════════════════════════════════════════════════════════════════════
 
-  await evaluar(`document.documentElement.setAttribute("data-theme", ${JSON.stringify(TEMAS[0] ?? "dark")}); true`);
   await medirEn(ANCHO_DESKTOP, ALTO_DESKTOP, false);
-  await abrirPos();
+  await ponerTema(TEMAS[0]);
 
-  const textoDesktop = await evaluar(`document.body.innerText`);
-  afirmar(textoDesktop.includes(nombrePadre), "el botón padre está en escritorio");
+  const botonesPadreDesktop = await contarBotonesCon(nombrePadre);
+  afirmar(botonesPadreDesktop === 1, "en escritorio también es UN solo botón padre",
+    `botones: ${botonesPadreDesktop}`);
   afirmar(
-    !textoDesktop.includes(NOMBRE_MODALIDAD_A),
-    "y sigue siendo UN botón: las modalidades no se despliegan solas"
+    (await contarBotonesCon(NOMBRE_MODALIDAD_A)) === 0 &&
+      (await contarBotonesCon(NOMBRE_MODALIDAD_B)) === 0,
+    "y las modalidades no se despliegan solas"
   );
+  await retratar(`${ANCHO_DESKTOP}-pos-panel`);
+
   await clickEn(botonConTexto(nombrePadre));
   await sleep(400);
   afirmar(
     await evaluar(`document.body.innerText.includes("Elegí la modalidad")`),
     "el selector abre igual en escritorio"
   );
+  afirmar(
+    (await contarBotonesCon(NOMBRE_MODALIDAD_A)) === 1 &&
+      (await contarBotonesCon(NOMBRE_MODALIDAD_B)) === 1,
+    "con las dos modalidades, igual que en mobile: mismo contrato"
+  );
   const desbordeDesktop = await evaluar(
     `document.documentElement.scrollWidth - document.documentElement.clientWidth`
   );
   afirmar(desbordeDesktop <= 0, "sin desborde horizontal en escritorio", `sobran ${desbordeDesktop} px`);
+  await retratar(`${ANCHO_DESKTOP}-selector-modalidad`);
 
   await navegar(`${BASE}/modulos/configuracion/pos-ventas/cobros/${encodeURIComponent(String(medioId))}`);
   await esperar(`document.body.innerText.includes("MODALIDADES")`, "Cobros en escritorio");

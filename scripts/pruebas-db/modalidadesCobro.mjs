@@ -29,6 +29,7 @@ const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 
 const jwt = (await import("jsonwebtoken")).default;
 
+const { crearProductoVendible, abrirTurnoDePrueba } = await import("./fixturePos.mjs");
 const { mediosDelLocal } = await import("../../lib/pos-ventas/mediosCobroServidor.js");
 const { totalesPorOpcionDeCobro } = await import("../../lib/ofertas/previewPos.js");
 
@@ -117,24 +118,23 @@ async function montar() {
   // Un producto de $1.000 que cuesta $600. Los porcentajes de esta corrida están
   // elegidos para que los totales sean enteros exactos y un error de redondeo se
   // vea a simple vista.
-  const base = await prisma.productoBase.create({
-    data: {
-      grupoId: grupo.id, nombre: `${marca}-producto`, unidad_medida: "unidad",
-      precio_costo: 600, precio_venta: 1000, redondeo_100: false,
-    },
+  //
+  // El armado sale de `fixturePos.mjs` y no está escrito acá: el runner
+  // visual necesita EXACTAMENTE lo mismo, y dos armados del mismo escenario se
+  // rompen el día que uno cambia.
+  const producto = await crearProductoVendible(prisma, {
+    grupoId: grupo.id,
+    localId: localA.id,
+    nombre: `${marca}-producto`,
+    precioVenta: 1000,
+    precioCosto: 600,
   });
-  const pl = await prisma.productoLocal.create({
-    data: { localId: localA.id, baseId: base.id, nombre: "Producto de prueba" },
-  });
-  await prisma.stockLocal.create({ data: { localId: localA.id, productoId: pl.id, cantidad: 1000 } });
 
-  const turno = await prisma.turno.create({
-    data: { localId: localA.id, vendedorId: usuario.id, montoInicial: 0 },
-  });
+  const turno = await abrirTurnoDePrueba(prisma, { localId: localA.id, vendedorId: usuario.id });
 
   return {
     grupo, localA, localB, usuario, turno,
-    producto: { baseId: base.id, productoLocalId: pl.id },
+    producto,
     sesionA: token(usuario.id, localA.id, grupo.id),
     sesionB: token(usuario.id, localB.id, grupo.id),
   };
