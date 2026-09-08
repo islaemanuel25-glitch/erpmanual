@@ -8,7 +8,7 @@ import { valorizarDetalle, origenEsDepositoDe } from "@/lib/transferencias/costo
 // EL MISMO helper que usa la recepción para devolver el faltante al origen. Se
 // importa en vez de replicar la fórmula: si la regla cambia, la pantalla no
 // puede quedar mostrando otro número que el que el stock realmente movió.
-import { calcularDevolucionUnidades, aMilesimas, desdeMilesimas } from "@/lib/transferencias/recepcion";
+import { calcularAjusteOrigenUnidades, aMilesimas, desdeMilesimas } from "@/lib/transferencias/recepcion";
 
 function toNumber(v) {
   const n = Number(v);
@@ -56,6 +56,9 @@ export async function GET(req) {
             // Relación YA existente en el schema (TransferenciaDetalle.confirmadoPor).
             // Viaja en la misma consulta: no agrega una query por línea.
             confirmadoPor: { select: { id: true, nombre: true } },
+            // Quién agregó la línea al abrir los bultos. Viaja en la misma
+            // consulta, igual que el confirmador: no agrega una query por línea.
+            agregadoEnRecepcionPor: { select: { id: true, nombre: true } },
           },
         },
       },
@@ -99,9 +102,10 @@ export async function GET(req) {
     let itemsEnviados = 0;
     let itemsRecibidos = 0;
     let costoTotal = 0;
-    // Devolución al origen, acumulada en milésimas enteras (misma escala que el
-    // stock). Solo suma las líneas que YA tienen recepción cargada.
-    let devolucionTotalM = 0;
+    // Ajuste del origen, acumulado en milésimas enteras (misma escala que el
+    // stock) y CON SIGNO. Solo suma las líneas que YA tienen recepción cargada.
+    // Un total negativo significa que, en neto, al origen se le descuenta.
+    let ajusteTotalM = 0;
 
     const items = transferencia.detalle.map((d) => {
       const cantidadEnviada = toNumber(d.cantidad);
@@ -152,26 +156,26 @@ export async function GET(req) {
       itemsRecibidos += cantidadRecibida ?? 0;
       costoTotal += subtotal;
 
-      // Devolución al origen en UNIDADES FÍSICAS de StockLocal:
+      // Ajuste del origen en UNIDADES FÍSICAS de StockLocal, CON SIGNO:
       //   (enviadaMilésimas - recibidaMilésimas) × factorFisico
-      // Es exactamente lo que confirmar-recepcion acredita al origen. Sin
-      // recepción cargada todavía no hay devolución que informar → null (no 0:
-      // 0 significa "llegó todo").
+      // Es exactamente lo que confirmar-recepcion le aplica al origen. Positivo
+      // vuelve, negativo se descuenta. Sin recepción cargada todavía no hay nada
+      // que informar → null (no 0: 0 significa "llegó justo").
       //
       // INFORMATIVO Y DE SOLA LECTURA: este endpoint no mueve stock.
-      const devolucionOrigen =
+      const ajusteOrigen =
         cantidadRecibida == null
           ? null
-          : calcularDevolucionUnidades({
+          : calcularAjusteOrigenUnidades({
               enviada: d.cantidad,
               recibida: d.recibido,
               unidad: d.unidadEnviada,
               factorPack: d.producto?.base?.factor_pack,
             });
 
-      if (devolucionOrigen != null) {
-        const devM = aMilesimas(devolucionOrigen);
-        if (devM !== null) devolucionTotalM += devM;
+      if (ajusteOrigen != null) {
+        const ajM = aMilesimas(ajusteOrigen);
+        if (ajM !== null) ajusteTotalM += ajM;
       }
 
       return {
@@ -189,7 +193,19 @@ export async function GET(req) {
         precioCosto: costoNormalizado,
         subtotal,
 
-        devolucionOrigen,
+        ajusteOrigen,
+        // Lo que la línea significa para el inventario, ya separado, para que la
+        // pantalla no tenga que decidir el signo: una es lo que VUELVE al origen
+        // y la otra lo que se le DESCUENTA. Las dos derivan de `ajusteOrigen`.
+        devolucionOrigen: ajusteOrigen == null ? null : Math.max(0, ajusteOrigen),
+        excedenteOrigen: ajusteOrigen == null ? null : Math.max(0, -ajusteOrigen),
+        // Una línea que no estaba en el remito. Con su autor y su fecha: sin eso,
+        // dentro de un mes es indistinguible de un error de datos.
+        agregadoEnRecepcion: d.agregadoEnRecepcion === true,
+        agregadoEnRecepcionPor: d.agregadoEnRecepcionPor
+          ? { id: d.agregadoEnRecepcionPor.id, nombre: d.agregadoEnRecepcionPor.nombre }
+          : null,
+        agregadoEnRecepcionAt: d.agregadoEnRecepcionAt,
         confirmadoPor: d.confirmadoPor
           ? { id: d.confirmadoPor.id, nombre: d.confirmadoPor.nombre }
           : null,
@@ -308,8 +324,13 @@ export async function GET(req) {
         itemsRecibidos,
         diferenciaTotal,
         costoTotal,
-        // Unidades físicas devueltas al stock del origen por el faltante.
-        devolucionOrigenTotal: desdeMilesimas(devolucionTotalM),
+        // Unidades físicas de ajuste al stock del origen, en NETO y con signo:
+        // positivo vuelve, negativo se descuenta. Se informa el neto y no dos
+        // sumas separadas porque es lo que el inventario del origen realmente
+        // hace, y porque dos totales que hay que restar mentalmente es como se
+        // llega a leer el número al revés.
+        ajusteOrigenTotal: desdeMilesimas(ajusteTotalM),
+        devolucionOrigenTotal: Math.max(0, desdeMilesimas(ajusteTotalM)),
       },
       items,
     };

@@ -8,6 +8,12 @@ import {
   mensajeRecepcion,
   statusRecepcion,
 } from "@/lib/transferencias/recepcion";
+import {
+  ErrorRecepcion,
+  estadoAdmiteRecepcion,
+  puedeRecibir,
+  reclamarOFallar,
+} from "@/lib/transferencias/recepcionServidor";
 
 export async function POST(req) {
   try {
@@ -46,103 +52,122 @@ export async function POST(req) {
       );
     }
 
-    if (transferencia.estado === "Recibida") {
-      return NextResponse.json(
-        { ok: false, error: "Esta transferencia ya fue confirmada. No se pueden guardar cambios." },
-        { status: 400 }
-      );
+    // Prechequeos BARATOS y no autoritativos: sirven para contestar rápido y con
+    // un mensaje bueno. El estado se vuelve a exigir adentro de la transacción,
+    // donde sí es una garantía; acá todavía puede cambiar entre esta lectura y
+    // la escritura.
+    const estado = estadoAdmiteRecepcion(transferencia.estado, { accion: "guardar cambios" });
+    if (!estado.ok) {
+      return NextResponse.json({ ok: false, error: estado.error }, { status: estado.status });
     }
 
-    if (transferencia.estado !== "Enviada" && transferencia.estado !== "Recibiendo") {
-      return NextResponse.json(
-        { ok: false, error: `No se puede editar una transferencia en estado "${transferencia.estado}"` },
-        { status: 400 }
-      );
-    }
-
-    if (!session.esAdmin) {
-      const localId = Number(session.localId || 0);
-      if (!localId || localId !== transferencia.destinoId) {
-        return NextResponse.json(
-          { ok: false, error: "Sin permiso para esta transferencia" },
-          { status: 403 }
-        );
-      }
+    // El alcance sí es definitivo: el destino de una transferencia no cambia, y
+    // los permisos de la sesión tampoco durante el pedido.
+    const alcance = puedeRecibir(session, transferencia);
+    if (!alcance.ok) {
+      return NextResponse.json({ ok: false, error: alcance.error }, { status: alcance.status });
     }
 
     // ============================================================
-    // 🟦 VALIDACIÓN — contra la BASE, no contra lo que manda el cliente
+    // 🟦 TODO ADENTRO DE UNA TRANSACCIÓN, Y EL LOCK PRIMERO
     //
-    // La cantidad enviada sale ahora del detalle persistido. Antes se leía de
-    // `it.enviado`, es decir del propio request: bastaba mandar un `enviado`
-    // inflado para guardar un `recibido` mayor al real y, al confirmar,
-    // acreditarle al destino stock que nunca salió del origen.
+    // Antes esto validaba con una lectura suelta y después escribía con N
+    // updates sueltos. Dos agujeros:
     //
-    // Se valida TODO antes de escribir nada: si un item falla, no se guarda
-    // ninguno (evita dejar la recepción a medio registrar).
+    //   1. Entre la validación y la escritura, confirmar podía cerrar la
+    //      transferencia. Los updates se aplicaban igual, sobre una recepción ya
+    //      confirmada, y ese `recibido` nuevo no movía ningún stock — quedaba una
+    //      transferencia "Recibida" cuyo detalle dice otra cosa que su stock.
+    //   2. Sin transacción, un fallo a mitad de la lista dejaba la recepción a
+    //      medio guardar, que es justo lo que el comentario viejo decía evitar.
+    //
+    // `reclamarOFallar` es la primera escritura: toma el lock de la fila de la
+    // transferencia y, de paso, exige que el estado siga admitiendo edición. Si
+    // confirmar llegó antes, empareja cero y esto aborta sin escribir nada.
     // ============================================================
-    const detalles = await prisma.transferenciaDetalle.findMany({
-      where: { transferenciaId, id: { in: items.map((it) => Number(it.id)) } },
-      include: { producto: { include: { base: true } } },
-    });
-    const porId = new Map(detalles.map((d) => [d.id, d]));
+    await prisma.$transaction(async (tx) => {
+      await reclamarOFallar(tx, transferenciaId, "Recibiendo");
 
-    const planes = [];
-    for (const it of items) {
-      const d = porId.get(Number(it.id));
-      if (!d) {
-        return NextResponse.json(
-          { ok: false, error: "Detalle inexistente o de otra transferencia" },
-          { status: 400 }
-        );
+      // ── VALIDACIÓN — contra la BASE, no contra lo que manda el cliente ──
+      //
+      // La cantidad enviada sale del detalle persistido. Antes se leía de
+      // `it.enviado`, es decir del propio request: bastaba mandar un `enviado`
+      // inflado para guardar un `recibido` mayor al real y, al confirmar,
+      // acreditarle al destino stock que nunca salió del origen.
+      //
+      // Y se relee ACÁ, después del lock, no antes: una línea agregada o
+      // borrada entre medio cambiaría qué se está validando.
+      const detalles = await tx.transferenciaDetalle.findMany({
+        where: { transferenciaId, id: { in: items.map((it) => Number(it.id)) } },
+        include: { producto: { include: { base: true } } },
+      });
+      const porId = new Map(detalles.map((d) => [d.id, d]));
+
+      const planes = [];
+      for (const it of items) {
+        const d = porId.get(Number(it.id));
+        if (!d) {
+          throw new ErrorRecepcion(
+            "DETALLE_INEXISTENTE",
+            "Detalle inexistente o de otra transferencia",
+            400
+          );
+        }
+
+        const plan = validarDetalleRecepcion({
+          detalle: {
+            cantidad: d.cantidad, // ← fuente de verdad: la base
+            unidadEnviada: d.unidadEnviada,
+            motivoPrincipal: it.motivoPrincipal,
+            motivoDetalle: it.motivoDetalle,
+            // También de la base: si viniera del request, cualquiera podría marcar
+            // una línea del remito como agregada y dejar su tránsito sin limpiar.
+            agregadoEnRecepcion: d.agregadoEnRecepcion,
+          },
+          factorPack: Number(d.producto?.base?.factor_pack || 1),
+          recibidoPropuesto: it.recibido,
+        });
+
+        if (!plan.ok) {
+          const nombre = d.producto?.base?.nombre || null;
+          throw new ErrorRecepcion(
+            plan.error,
+            mensajeRecepcion(plan.error, { nombre }),
+            statusRecepcion(plan.error)
+          );
+        }
+
+        planes.push({ id: d.id, plan, it });
       }
 
-      const plan = validarDetalleRecepcion({
-        detalle: {
-          cantidad: d.cantidad, // ← fuente de verdad: la base
-          unidadEnviada: d.unidadEnviada,
-          motivoPrincipal: it.motivoPrincipal,
-          motivoDetalle: it.motivoDetalle,
-        },
-        factorPack: Number(d.producto?.base?.factor_pack || 1),
-        recibidoPropuesto: it.recibido,
-      });
+      // Se valida TODO antes de escribir nada: si un item falla, no se guarda
+      // ninguno. Ahora además lo garantiza la transacción y no el orden.
+      for (const { id, plan, it } of planes) {
+        await tx.transferenciaDetalle.update({
+          where: { id },
+          data: {
+            recibido: plan.recibida,
 
-      if (!plan.ok) {
-        const nombre = d.producto?.base?.nombre || null;
-        return NextResponse.json(
-          { ok: false, codigo: plan.error, error: mensajeRecepcion(plan.error, { nombre }) },
-          { status: statusRecepcion(plan.error) }
-        );
+            motivoPrincipal: plan.hayDiferencia ? it.motivoPrincipal || null : null,
+
+            motivoDetalle:
+              plan.hayDiferencia && it.motivoPrincipal === "Otro"
+                ? it.motivoDetalle || null
+                : null,
+          },
+        });
       }
-
-      planes.push({ id: d.id, plan, it });
-    }
-
-    // Guardar cada item
-    for (const { id, plan, it } of planes) {
-      await prisma.transferenciaDetalle.update({
-        where: { id },
-        data: {
-          recibido: plan.recibida,
-
-          motivoPrincipal: plan.hayDiferencia ? it.motivoPrincipal || null : null,
-
-          motivoDetalle:
-            plan.hayDiferencia && it.motivoPrincipal === "Otro"
-              ? it.motivoDetalle || null
-              : null,
-        },
-      });
-    }
-
-    await prisma.transferencia.update({
-      where: { id: transferenciaId },
-      data: { estado: "Recibiendo" },
     });
 
     return NextResponse.json({ ok: true });
   } catch (err) {
+    // Abortos deliberados desde adentro de la transacción: nada quedó escrito.
+    if (err.name === "ErrorRecepcion") {
+      return NextResponse.json(
+        { ok: false, codigo: err.code, error: err.message },
+        { status: err.status || 409 }
+      );
+    }
     console.error("ERROR guardar-recepcion:", err);
     return NextResponse.json(
       { ok: false, error: "Error interno" },

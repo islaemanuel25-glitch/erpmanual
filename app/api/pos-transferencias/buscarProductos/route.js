@@ -3,36 +3,21 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { productoVisibleWhere } from "@/lib/visibilidad";
-import {
-  rankearLiteral,
-  resolverContraCatalogo,
-} from "@/lib/productos/busquedaFuzzyProducto";
-import { codigosDeProductoLocal } from "@/lib/productos/busquedaCodigoBarra";
+import { buscarCatalogoLocal } from "@/lib/productos/buscarCatalogoLocal";
 
-const FUZZY_CANDIDATE_LIMIT = 10000;
-const FUZZY_TOP_RESULTS = 10;
-
-function mapItem(productoLocal) {
-  const base = productoLocal.base;
-  const stockActual = Number(productoLocal.stock?.[0]?.cantidad || 0);
-  return {
-    productoLocalId: productoLocal.id,
-    baseId: productoLocal.baseId,
-    nombre: productoLocal.nombre || base?.nombre || "",
-    codigoBarra: base?.codigo_barra || "",
-    codigoBarraSecundario: base?.codigo_barra_secundario || "",
-    codigoBarraPropio: productoLocal?.codigo_barra_propio || "",
-    stockActual,
-    precioCosto: Number(
-      productoLocal.precio_costo || base?.precio_costo || 0
-    ),
-    unidadMedida: base?.unidad_medida || "unidad",
-    factorPack: Number(base?.factor_pack || 1),
-    categoriaNombre: base?.categoria?.nombre ?? null,
-    areaFisicaNombre: base?.area_fisica?.nombre ?? null,
-  };
-}
+// BUSCAR PRODUCTOS PARA ARMAR UNA TRANSFERENCIA.
+//
+// ── LA BÚSQUEDA SE MUDÓ AL KIT, LA AUTORIZACIÓN SE QUEDÓ ──────────────────
+//
+// El universo, el ranking y el mapeo viven ahora en
+// `lib/productos/buscarCatalogoLocal.js`, porque la recepción de transferencias
+// necesita EXACTAMENTE la misma búsqueda con otra autorización. Copiarla habría
+// dejado dos buscadores que se separan el día que uno aprende a excluir algo.
+//
+// Lo que se queda acá es lo único propio de esta pantalla y lo que NO se puede
+// compartir: quién puede buscar y en qué local. Acá el que busca es el ORIGEN y
+// tiene que ser su propio local; en recepción es el DESTINO y el catálogo es el
+// del origen de esa transferencia.
 
 export async function GET(req) {
   try {
@@ -71,92 +56,17 @@ export async function GET(req) {
       );
     }
 
-    // Sin query: comportamiento previo — lista corta de todos los productos del local.
-    if (!q) {
-      const productos = await prisma.productoLocal.findMany({
-        // Regla A: no se ofrecen productos creados por otro local (relevante
-        // cuando el origen es el depósito).
-        where: {
-          localId: origenId,
-          base: { AND: [productoVisibleWhere(origenId), { es_combo: false }] },
-        },
-        include: {
-          base: { include: { categoria: true, area_fisica: true } },
-          stock: { where: { localId: origenId }, select: { cantidad: true } },
-        },
-        take: 50,
-      });
-      const items = productos.map(mapItem);
-      return NextResponse.json({
-        ok: true,
-        items,
-        total: items.length,
-        error: null,
-      });
-    }
-
-    // Manual y voz comparten universo: el catálogo real del local. Se rankea
-    // en memoria sobre todo el catálogo para no perder matches válidos por
-    // efecto de un take fijo (ej. "leche" no encontraba "Leche Cotar").
-    const candidatos = await prisma.productoLocal.findMany({
-      // Regla A: mismo filtro que arriba.
-      where: {
-        localId: origenId,
-        base: { AND: [productoVisibleWhere(origenId), { es_combo: false }] },
-      },
-      select: {
-        id: true,
-        nombre: true,
-        codigo_barra_propio: true,
-        base: { select: { nombre: true, codigo_barra: true, codigo_barra_secundario: true } },
-      },
-      take: FUZZY_CANDIDATE_LIMIT,
+    const { items, total, queryInterpretada } = await buscarCatalogoLocal(prisma, {
+      localId: origenId,
+      q,
+      fromVoice,
     });
 
-    const getNombre = (p) => p.nombre || p.base?.nombre || "";
-    const getCodigo = (p) => codigosDeProductoLocal(p);
-
-    let rankings;
-    let queryInterpretada = null;
-    if (fromVoice) {
-      const resuelto = resolverContraCatalogo(candidatos, q, {
-        getNombre,
-        getCodigo,
-        maxDistance: 3,
-      });
-      rankings = resuelto.rankings;
-      queryInterpretada = resuelto.queryInterpretada;
-    } else {
-      rankings = rankearLiteral(candidatos, q, { getNombre, getCodigo });
-    }
-
-    const topIds = rankings.slice(0, FUZZY_TOP_RESULTS).map((r) => r.item.id);
-    if (topIds.length === 0) {
-      return NextResponse.json({
-        ok: true,
-        items: [],
-        total: 0,
-        ...(fromVoice ? { queryInterpretada: null } : {}),
-        error: null,
-      });
-    }
-
-    const productosFull = await prisma.productoLocal.findMany({
-      where: { id: { in: topIds } },
-      include: {
-        base: { include: { categoria: true, area_fisica: true } },
-        stock: { where: { localId: origenId }, select: { cantidad: true } },
-      },
-    });
-    const orderMap = new Map(topIds.map((id, idx) => [id, idx]));
-    productosFull.sort((a, b) => orderMap.get(a.id) - orderMap.get(b.id));
-
-    const items = productosFull.map(mapItem);
     return NextResponse.json({
       ok: true,
       items,
-      total: items.length,
-      ...(fromVoice ? { queryInterpretada } : {}),
+      total,
+      ...(fromVoice && q ? { queryInterpretada } : {}),
       error: null,
     });
   } catch (err) {
