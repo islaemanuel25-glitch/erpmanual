@@ -3,10 +3,26 @@
 import { memo, useState } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import { IconoMedio } from "@/components/pos-ventas/IconosMedios";
+import SelectorModalidad from "@/components/pos-ventas/SelectorModalidad";
 import { showError } from "@/components/sunmi/SunmiToast";
-import { aCentavos, MEDIO_LABEL } from "@/lib/pos-ventas/pagos";
-import { MEDIOS_POR_DEFECTO } from "@/lib/pos-ventas/mediosCobro";
+import { aCentavos } from "@/lib/pos-ventas/pagos";
+import {
+  CONDICION_FIADO,
+  botonesDisponiblesParaFila,
+  botonesDeCobro,
+  claveDeOpcion,
+  condicionesDeFilas,
+  filaDeBoton,
+  filasIniciales,
+  formaPagoDeSeleccion,
+  identidadDeSeleccion,
+  modalidadesDisponiblesParaFila,
+  opcionesDeModalidad,
+  primeraFilaLibre,
+  totalDeBoton,
+} from "@/lib/pos-ventas/cobroPantalla";
 import { componerCobroSimple, evaluarDivisionPago } from "@/lib/pos-ventas/servicios";
 import { avisoPagoCombinado, recargoDeVenta } from "@/lib/recargos-pago/recargoPago";
 import { aMedioEnum } from "@/lib/ofertas/previewPos";
@@ -15,59 +31,28 @@ import { aMedioEnum } from "@/lib/ofertas/previewPos";
 //
 // Antes había acá una lista fija de cuatro. Ahora los medios se configuran por
 // local —cuáles, cómo se llaman y en qué orden— y llegan por props desde
-// `/api/medios-cobro`.
+// `/api/medios-cobro`. Quien los arma es `botonesDeCobro`, que además decide el
+// respaldo cuando no llega configuración: sale de `MEDIOS_POR_DEFECTO`, la MISMA
+// constante que usa el servidor.
 //
-// El respaldo NO es otra lista escrita al lado: sale de `MEDIOS_POR_DEFECTO`,
-// que es la MISMA constante que usa el servidor cuando un local no configuró
-// nada. Una segunda lista acá se separaría de aquélla el día que una cambie, y
-// el POS mostraría botones distintos de los que el backend cobra.
+// ── LA IDENTIDAD DE UN BOTÓN DEJÓ DE SER SU TIPO CONTABLE ──────────────────
 //
-// Se usa cuando no llega configuración: modo offline, o una pantalla que todavía
-// no la pasa.
-function mediosDesdeDefaults() {
-  return MEDIOS_POR_DEFECTO.map((d) => ({
-    key: d.tipoContable.toLowerCase(),
-    label: MEDIO_LABEL[d.tipoContable] || d.tipoContable,
-    tipoContable: d.tipoContable,
-  }));
-}
-
-/**
- * De la configuración a lo que dibuja el botón.
- *
- * `key` en minúscula porque es lo que espera `IconoMedio` y lo que viaja como
- * `formaPago` en el payload —que es el contrato de hoy y no se toca—. `label` es
- * el nombre configurado, que puede ser "MP Débito". `tipoContable` es lo que
- * decide todo lo comercial y lo que la venta congela.
- */
-function aBotones(mediosCobro) {
-  if (!Array.isArray(mediosCobro) || mediosCobro.length === 0) return mediosDesdeDefaults();
-  return mediosCobro
-    .filter((m) => m.activo !== false)
-    .map((m) => ({
-      key: String(m.tipoContable).toLowerCase(),
-      label: m.nombre,
-      tipoContable: m.tipoContable,
-    }));
-}
+// Este componente derivaba la `key` de `tipoContable.toLowerCase()`. Desde que
+// un medio puede tener modalidades, dos botones distintos pueden compartir ese
+// enum —"Banco X" y una modalidad de crédito de Mercado Pago son los dos
+// CREDITO— y con la misma key React reusaría el nodo y el panel dividido no
+// podría distinguirlos. Ahora la clave es la del medio, y la de una opción
+// cobrable es la de la modalidad: la MISMA que indexa el preview.
+//
+// ── UN MEDIO CON MODALIDADES ES UN SOLO BOTÓN ──────────────────────────────
+//
+// Tocarlo NO cobra: abre el selector. Es la regla visual central del diseño y no
+// tiene excepciones —tampoco cuando hay una sola modalidad activa—, porque un
+// botón que unas veces cobra al toque y otras abre una pantalla es un botón en
+// el que no se puede confiar. Ver `abreSelector` en `cobroPantalla.js`.
 
 function formatPrecio(n) {
   return Number(n).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-/**
- * Filas iniciales del "Dividir pago": los DOS PRIMEROS medios del local, con los
- * importes vacíos.
- *
- * Antes eran efectivo y débito fijos. Con medios configurables eso se rompe solo:
- * un local que no cobra con débito abriría el panel con una fila de un medio que
- * no tiene, y al confirmar el backend rechazaría la venta.
- *
- * Si el local tiene un solo medio, se abre con una fila: dividir entre uno no
- * tiene sentido, pero tampoco lo tiene inventar un segundo medio.
- */
-function filasIniciales(medios) {
-  return medios.slice(0, 2).map((m) => ({ medio: m.key, monto: "" }));
 }
 
 function FormaPago({
@@ -89,64 +74,83 @@ function FormaPago({
   // ── CONDICIÓN COMERCIAL: EL TOTAL DEJÓ DE SER UN NÚMERO ───────────────────
   //
   // `previewPorMedio` es la salida de `totalesPorMedio` (lib/ofertas/previewPos):
-  // un total por cada medio, más `__paraMedios(medios[])` para el panel dividido,
-  // donde el conjunto lo arma la persona. Todos esos números los produjo el MISMO
-  // motor que corre en el servidor al cobrar; acá no se calcula ninguno.
+  // un total por cada TIPO CONTABLE. Sirve mientras un tipo contable sea una
+  // condición, y deja de servir con modalidades: dos condiciones distintas
+  // comparten CREDITO y la segunda pisaría a la primera.
   //
-  // Cuando llega `null` —modo offline, o una pantalla que todavía no lo pasa—
-  // este componente se comporta EXACTAMENTE como antes, usando `subtotal` y los
-  // descuentos. Esa rama no se tocó a propósito: es el camino por donde entra la
-  // plata todos los días.
+  // `previewPorOpcion` es `totalesPorOpcionDeCobro`, indexado por la identidad de
+  // cada opción cobrable. Cuando está, manda. Todos esos números los produjo el
+  // MISMO motor que corre en el servidor al cobrar; acá no se calcula ninguno.
+  //
+  // Cuando los dos llegan en `null` —modo offline, o una pantalla que todavía no
+  // los pasa— este componente se comporta EXACTAMENTE como antes, usando
+  // `subtotal` y los descuentos. Esa rama no se tocó a propósito: es el camino
+  // por donde entra la plata todos los días.
   previewPorMedio = null,
+  previewPorOpcion = null,
   recargosPorMedio = null,
   hayOfertaSoloEfectivo = false,
-  // Los medios configurados del local, de `/api/medios-cobro`. Sin esto —modo
-  // offline, o una pantalla que todavía no los pasa— se usan los defaults, que
-  // son la MISMA constante que usa el servidor.
+  // Los medios configurados del local, de `/api/medios-cobro`, ya con sus
+  // modalidades. Sin esto se usan los defaults, que son la MISMA constante que
+  // usa el servidor.
   mediosCobro = null,
 }) {
   // Los botones del cobro simple y del pago dividido salen de la configuración.
   // Fiado no está: es tender único y se dibuja aparte, con sus propias
   // condiciones.
-  const MEDIOS_COBRO = aBotones(mediosCobro);
-  const MEDIOS_DIVIDIR = MEDIOS_COBRO;
+  const BOTONES = botonesDeCobro(mediosCobro);
   const base = subtotal - descuento - descuentoPorPuntos;
+  const hayPreviewOpcion = Boolean(previewPorOpcion);
 
-  // El total de un conjunto de medios. Sin preview, el de siempre.
-  const totalDe = (medios) => {
-    if (!previewPorMedio) return base;
-    if (medios.length === 1) {
-      const p = previewPorMedio[aMedioEnum(medios[0])];
-      if (p) return p.total;
-    }
-    return previewPorMedio.__paraMedios ? previewPorMedio.__paraMedios(medios).total : base;
+  // ── EL TOTAL DE UNA OPCIÓN, SIEMPRE PEDIDO, NUNCA CALCULADO ──────────────
+  const totalDeClave = (clave) => {
+    const p = hayPreviewOpcion ? previewPorOpcion[clave] : null;
+    return p ? Number(p.total) : null;
   };
+  const totalDeOpcion = (boton, modalidad = null) => {
+    const porOpcion = totalDeClave(claveDeOpcion(boton, modalidad));
+    if (porOpcion != null) return porOpcion;
+    // Camino de siempre: un total por tipo contable.
+    const tipo = aMedioEnum(modalidad?.tipoContable ?? boton?.tipoContable);
+    const p = previewPorMedio ? previewPorMedio[tipo] : null;
+    return p ? Number(p.total) : base;
+  };
+  const resumenDe = (boton) =>
+    hayPreviewOpcion
+      ? totalDeBoton(boton, previewPorOpcion, base)
+      : { total: totalDeOpcion(boton), min: 0, max: 0, difiere: false };
 
   // ── ¿HACE FALTA MOSTRAR UN NÚMERO POR BOTÓN? ─────────────────────────────
   //
-  // Solo cuando los cuatro NO dan lo mismo. Sin ofertas y sin recargos —que es
-  // casi todo el día en casi todos los locales— los cuatro coinciden y el panel
-  // queda idéntico a como estaba: un total grande arriba y cuatro botones. Poner
-  // el mismo número cuatro veces no informa, ocupa lugar y desplaza los botones.
-  const totalesMedios = previewPorMedio
-    ? MEDIOS_COBRO.map((m) => aCentavos(previewPorMedio[aMedioEnum(m.key)]?.total ?? base))
-    : [];
-  const totalPorMedioDifiere =
-    totalesMedios.length > 0 && new Set(totalesMedios).size > 1;
-
-  // El total "sin elegir medio". Con los cuatro iguales es ese valor común (que
-  // ya puede incluir una oferta de cualquier medio); si difieren, no existe un
-  // único total honesto y el número grande se reemplaza por los de cada botón.
+  // Solo cuando NO dan todos lo mismo. Sin ofertas y sin recargos —que es casi
+  // todo el día en casi todos los locales— coinciden y el panel queda idéntico a
+  // como estaba: un total grande arriba y los botones. Poner el mismo número
+  // cuatro veces no informa, ocupa lugar y desplaza los botones.
   //
-  // Se pregunta por el PRIMER medio del local y no por "efectivo": desde que los
-  // medios se configuran, un local puede no tener efectivo, y pedir el total de
-  // un medio que no cobra devolvería un número que no corresponde a ningún botón.
-  // En esta rama los totales son todos iguales, así que cuál se pregunte no
-  // cambia el número — cambia que el número exista.
+  // Con modalidades un botón puede no tener UN total: se cuenta su rango.
+  const resumenes = BOTONES.map(resumenDe);
+  const importesVisibles = resumenes.flatMap((r) =>
+    r.difiere ? [aCentavos(r.min), aCentavos(r.max)] : [aCentavos(r.total)]
+  );
+  const totalPorMedioDifiere = importesVisibles.length > 0 && new Set(importesVisibles).size > 1;
+
+  // El total "sin elegir medio". Con todos iguales es ese valor común; si
+  // difieren, no existe un único total honesto y el número grande se reemplaza
+  // por los de cada botón.
   const total =
-    previewPorMedio && !totalPorMedioDifiere && MEDIOS_COBRO.length > 0
-      ? totalDe([MEDIOS_COBRO[0].key])
+    (hayPreviewOpcion || previewPorMedio) && !totalPorMedioDifiere && BOTONES.length > 0
+      ? resumenes[0].total
       : base;
+
+  // El total de FIADO sale del motor igual que todo lo demás: no tiene recargo,
+  // así que da el total antes del recargo, pero eso lo decide el motor y no una
+  // resta escrita acá.
+  const totalFiado =
+    hayPreviewOpcion && previewPorOpcion.__paraCondiciones
+      ? previewPorOpcion.__paraCondiciones([CONDICION_FIADO]).total
+      : previewPorMedio?.__paraMedios
+        ? previewPorMedio.__paraMedios(["FIADO"]).total
+        : base;
 
   // ── Servicios de importe variable: mínimo a cubrir en EFECTIVO ────────────
   const minEf = Math.max(0, Number(minEfectivoServicios) || 0);
@@ -158,9 +162,20 @@ function FormaPago({
   const resto = restoCent / 100;
   const puedeVender = !disabled && !cobrando && subtotal > 0;
 
-  // ── Modo: simple (por defecto) o avanzado (Dividir pago) ──────────────────
+  // El botón de efectivo del local: el que cobra una venta 100 % de servicios.
+  // Si tiene modalidades, tocarlo abre el selector igual que cualquier otro.
+  const botonEfectivo = BOTONES.find((b) => b.tipoContable === "EFECTIVO") || null;
+  // Su identidad para el REPARTO de servicios, y solo si no exige elegir: un
+  // reparto automático no puede elegir una modalidad por el cajero. Ver
+  // `componerCobroSimple`.
+  const identidadEfectivo = botonEfectivo && !botonEfectivo.abreSelector
+    ? identidadDeSeleccion(botonEfectivo)
+    : null;
+
+  // ── Modo: simple, selector de modalidad, o avanzado (Dividir pago) ────────
   const [modo, setModo] = useState("simple");
-  const [filas, setFilas] = useState(() => filasIniciales(MEDIOS_COBRO)); // [{ medio, monto:string }]
+  const [botonAbierto, setBotonAbierto] = useState(null);
+  const [filas, setFilas] = useState(() => filasIniciales(BOTONES));
 
   // Recalcular ante cambios del carrito: si cambió el total o el mínimo de servicios,
   // resetear las filas del "Dividir pago" para no arrastrar importes obsoletos.
@@ -169,82 +184,153 @@ function FormaPago({
   const [prevCarritoKey, setPrevCarritoKey] = useState(carritoKey);
   if (carritoKey !== prevCarritoKey) {
     setPrevCarritoKey(carritoKey);
-    setFilas(filasIniciales(MEDIOS_COBRO));
+    setFilas(filasIniciales(BOTONES));
   }
 
-  // ── Cobro SIMPLE: un medio → componer payload server-authoritative ─────────
+  // ── Cobro SIMPLE: una opción → payload server-authoritative ───────────────
   //
-  // El total que se manda es el DE ESE MEDIO, no el de la pantalla: es el mismo
-  // número que el cajero acaba de ver en el botón que apretó. Viaja además como
-  // `totalPantalla` para que el servidor pueda rechazar la venta si su cuenta da
-  // otra cosa, en vez de registrar un total distinto del que se le pidió al
-  // cliente.
-  const cobrarSimple = (medio) => {
+  // Lo que viaja es IDENTIDAD y monto. El tipo contable, el recargo, la comisión
+  // y el procesador los relee el servidor de la configuración: mandarlos desde
+  // acá sería mandar datos que se ignoran y sugerir que el navegador decide algo.
+  //
+  // El total que se manda es EL DE ESA OPCIÓN, el mismo número que el cajero
+  // acaba de ver. Viaja además como `totalPantalla` para que el servidor pueda
+  // rechazar la venta si su cuenta da otra cosa.
+  const cobrarOpcion = (boton, modalidad = null) => {
     if (!puedeVender) return;
-    if (medio === "fiado" && hayServicios) {
-      return showError("No se puede fiar una venta que contiene servicios");
-    }
-    const totalMedio = totalDe([medio]);
+    const totalOpcion = totalDeOpcion(boton, modalidad);
     onCobrar({
-      ...componerCobroSimple({ medio, total: totalMedio, minEfectivoServicios: minEf }),
-      totalPantalla: totalMedio,
+      ...componerCobroSimple({
+        medio: formaPagoDeSeleccion(boton, modalidad),
+        total: totalOpcion,
+        minEfectivoServicios: minEf,
+        identidad: identidadDeSeleccion(boton, modalidad),
+        identidadEfectivo,
+      }),
+      totalPantalla: totalOpcion,
     });
   };
 
-  // ── Modo AVANZADO: editor de filas (medio + importe). Lógica en helper puro. ──
+  // Tocar un botón: cobra, o abre el selector si el medio tiene modalidades.
+  const tocarBoton = (boton) => {
+    if (!puedeVender) return;
+    if (boton.abreSelector) {
+      setBotonAbierto(boton);
+      setModo("modalidad");
+      return;
+    }
+    cobrarOpcion(boton);
+  };
+
+  const cobrarFiado = () => {
+    if (!puedeVender) return;
+    if (hayServicios) return showError("No se puede fiar una venta que contiene servicios");
+    onCobrar({
+      ...componerCobroSimple({ medio: "fiado", total: totalFiado, minEfectivoServicios: minEf }),
+      totalPantalla: totalFiado,
+    });
+  };
+
+  // ── Modo AVANZADO: editor de filas (medio + modalidad + importe) ──────────
   //
-  // El total del panel dividido SE RECALCULA con el conjunto de medios elegido:
-  // agregar débito a un pago en efectivo puede perder una oferta de solo efectivo
-  // Y sumar un recargo, y las dos cosas mueven el número que el cajero tiene que
-  // cobrar. Los importes que se tipean abajo tienen que sumar ESE total.
-  const mediosUsados = filas.map((f) => f.medio);
-  const totalDividido = totalDe(mediosUsados);
+  // El total del panel dividido SE RECALCULA con el conjunto elegido: agregar
+  // débito a un pago en efectivo puede perder una oferta de solo efectivo Y sumar
+  // un recargo, y las dos cosas mueven el número que el cajero tiene que cobrar.
+  const resultadoDividido =
+    hayPreviewOpcion && previewPorOpcion.__paraCondiciones
+      ? previewPorOpcion.__paraCondiciones(condicionesDeFilas(filas, BOTONES))
+      : previewPorMedio?.__paraMedios
+        ? previewPorMedio.__paraMedios(filas.map((f) => aMedioEnum(f.tipoContable ?? f.medio)))
+        : null;
+  const totalDividido = resultadoDividido ? resultadoDividido.total : base;
   const div = evaluarDivisionPago({ filas, total: totalDividido, minEfectivoServicios: minEf });
   const puedeCobrarDividido = puedeVender && div.puedeCobrar;
 
   // Aviso del pago combinado. El texto lo arma `recargoPago.js` para que el POS y
-  // el backend digan exactamente lo mismo; acá solo se lo muestra.
-  const avisoCombinado = recargosPorMedio
+  // el backend digan exactamente lo mismo; acá solo se lo muestra. El GANADOR
+  // sale del resultado del motor —no se reconstruye acá— y por eso puede nombrar
+  // la modalidad, que es lo único que distingue dos condiciones del mismo tipo.
+  const mediosUsados = filas.map((f) => aMedioEnum(f.tipoContable ?? f.medio));
+  const avisoCombinado = resultadoDividido
     ? avisoPagoCombinado({
-        mediosUsados: mediosUsados.map(aMedioEnum),
-        recargo: recargoDeVenta(mediosUsados.map(aMedioEnum), recargosPorMedio),
+        mediosUsados,
+        recargo: { pct: resultadoDividido.recargoPagoPct, medio: resultadoDividido.recargoPagoMedio },
+        etiquetaGanador: resultadoDividido.recargoPagoModalidadNombre
+          ? `${resultadoDividido.recargoPagoMedioNombre} · ${resultadoDividido.recargoPagoModalidadNombre}`
+          : resultadoDividido.recargoPagoMedioNombre,
         hayOfertaSoloEfectivoEnCarrito: hayOfertaSoloEfectivo,
       })
-    : null;
+    : recargosPorMedio
+      ? avisoPagoCombinado({
+          mediosUsados,
+          recargo: recargoDeVenta(mediosUsados, recargosPorMedio),
+          hayOfertaSoloEfectivoEnCarrito: hayOfertaSoloEfectivo,
+        })
+      : null;
 
-  // Opciones de medio para una fila: su propio medio + los aún no usados (evita duplicados).
-  const opcionesPara = (idx) =>
-    MEDIOS_DIVIDIR.filter((m) => m.key === filas[idx].medio || !mediosUsados.includes(m.key));
+  const botonDe = (clave) => BOTONES.find((b) => b.clave === clave) || null;
 
-  const cambiarMedio = (idx, medio) => {
-    if (filas.some((f, i) => i !== idx && f.medio === medio)) {
-      return showError("Ese medio ya está en la lista");
-    }
-    setFilas((prev) => prev.map((f, i) => (i === idx ? { ...f, medio } : f)));
+  const cambiarMedio = (idx, botonClave) => {
+    const boton = botonDe(botonClave);
+    if (!boton) return;
+    setFilas((prev) => {
+      const libres = modalidadesDisponiblesParaFila(boton, prev.filter((_, i) => i !== idx), -1);
+      const modalidad = boton.abreSelector ? libres[0] ?? opcionesDeModalidad(boton)[0] : null;
+      return prev.map((f, i) => (i === idx ? filaDeBoton(boton, modalidad, f.monto) : f));
+    });
+  };
+  const cambiarModalidad = (idx, modalidadId) => {
+    setFilas((prev) =>
+      prev.map((f, i) => {
+        if (i !== idx) return f;
+        const boton = botonDe(f.botonClave);
+        const modalidad = opcionesDeModalidad(boton).find((o) => String(o.modalidadId) === String(modalidadId));
+        return modalidad ? filaDeBoton(boton, modalidad, f.monto) : f;
+      })
+    );
   };
   const cambiarMonto = (idx, monto) =>
     setFilas((prev) => prev.map((f, i) => (i === idx ? { ...f, monto } : f)));
   const agregarFila = () => {
-    const libre = MEDIOS_DIVIDIR.find((m) => !mediosUsados.includes(m.key));
-    if (!libre) return showError("No hay más medios para agregar");
-    setFilas((prev) => [...prev, { medio: libre.key, monto: "" }]);
+    const fila = primeraFilaLibre(BOTONES, filas);
+    if (!fila) return showError("No hay más medios para agregar");
+    setFilas((prev) => [...prev, fila]);
   };
   const quitarFila = (idx) =>
     setFilas((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
   const abrirDividir = () => {
-    setFilas(filasIniciales(MEDIOS_COBRO));
+    setFilas(filasIniciales(BOTONES));
     setModo("avanzado");
   };
   const volverSimple = () => {
     setModo("simple");
-    setFilas(filasIniciales(MEDIOS_COBRO));
+    setBotonAbierto(null);
+    setFilas(filasIniciales(BOTONES));
   };
   const cobrarDividido = () => {
     if (!puedeCobrarDividido) return;
     const pagos = div.pagos;
-    const fp = pagos.length === 1 ? pagos[0].medio : "mixto";
+    // `formaPago` sigue siendo el contrato de hoy: el tipo contable si hay uno
+    // solo, "mixto" si hay varios. Con identidad el servidor igual lo deriva de
+    // los tenders; esto es lo que la ruta exige recibir.
+    const tipos = [...new Set(filas.map((f) => String(f.tipoContable ?? f.medio).toLowerCase()))];
+    const fp = tipos.length === 1 ? tipos[0] : "mixto";
     onCobrar({ formaPago: fp, total: totalDividido, pagos, totalPantalla: totalDividido });
   };
+
+  // ── UN SOLO ENCABEZADO PARA LAS DOS PANTALLAS DE ADENTRO ────────────────
+  //
+  // El selector de modalidad y el panel de dividir tienen la misma fila arriba:
+  // volver, título, y un hueco para que el título quede centrado. Escribirla dos
+  // veces es como empiezan a separarse —una gana un margen, la otra cambia el
+  // tamaño— y además duplicaría un `<button>` crudo que el trinquete cuenta.
+  const encabezado = (titulo) => (
+    <div className="flex items-center justify-between">
+      <button type="button" onClick={volverSimple} className="text-sm pos-text-link">← Volver</button>
+      <span className="text-sm font-bold uppercase tracking-wide">{titulo}</span>
+      <span className="w-12" />
+    </div>
+  );
 
   const BTN_PRIMARIO = "sunmi-btn sunmi-pos-btn-primary w-full min-h-14 lg:min-h-16 text-lg lg:text-xl font-bold rounded-md";
   const BTN_MEDIO = "sunmi-btn sunmi-pos-btn-secondary min-h-14 text-sm font-semibold rounded-md";
@@ -259,15 +345,22 @@ function FormaPago({
 
   return (
     <SunmiCard className="p-3 lg:p-4 flex flex-col gap-3">
-      {modo === "avanzado" ? (
+      {modo === "modalidad" && botonAbierto ? (
+        /* ═══════════════ ELEGIR MODALIDAD ═══════════════ */
+        <>
+          {encabezado(botonAbierto.nombre)}
+          <SelectorModalidad
+            opciones={opcionesDeModalidad(botonAbierto)}
+            totalDe={(clave) => totalDeClave(clave) ?? base}
+            onElegir={(opcion) => cobrarOpcion(botonAbierto, opcion)}
+            deshabilitado={!puedeVender}
+            formatearImporte={formatPrecio}
+          />
+        </>
+      ) : modo === "avanzado" ? (
         /* ═══════════════ DIVIDIR PAGO (editor de filas) ═══════════════ */
         <>
-          <div className="flex items-center justify-between">
-            <button type="button" onClick={volverSimple}
-              className="text-sm pos-text-link">← Volver</button>
-            <span className="text-sm font-bold uppercase tracking-wide">Dividir pago</span>
-            <span className="w-12" />
-          </div>
+          {encabezado("Dividir pago")}
 
           <div className="text-center">
             <span className="text-xs pos-text-muted">Total: </span>
@@ -292,42 +385,71 @@ function FormaPago({
             </div>
           )}
 
-          {/* Filas: [ medio ▼ ] [ importe ] [ × ] */}
+          {/* Filas: [ medio ▼ / modalidad ▼ ] [ importe ] [ × ] */}
           <div className="flex flex-col gap-2">
-            {filas.map((f, idx) => (
-              <div key={idx} className="flex items-center gap-2">
-                <div className="flex-1 min-w-0 flex items-center gap-2">
-                  {/* Ícono real del medio (mismo set que el cobro simple); cambia al cambiar el medio. */}
-                  <IconoMedio medio={f.medio} size={20} />
-                  {/* Select NATIVO (picker del SO en móvil): robusto en todo dispositivo,
-                      sin portal ni posicionamiento fijo. Estilizado con la clase sunmi-control. */}
-                  <select
-                    value={f.medio}
-                    onChange={(e) => cambiarMedio(idx, e.target.value)}
-                    aria-label="Medio de pago"
-                    className="sunmi-control w-full min-w-0 min-h-11 rounded-md px-3 text-base cursor-pointer"
-                  >
-                    {opcionesPara(idx).map((m) => (
-                      <option key={m.key} value={m.key}>{m.label}</option>
-                    ))}
-                  </select>
+            {filas.map((f, idx) => {
+              const boton = botonDe(f.botonClave);
+              const modalidades = boton ? modalidadesDisponiblesParaFila(boton, filas, idx) : [];
+              return (
+                <div key={f.clave} className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0 flex items-center gap-2">
+                    {/* Ícono real del medio (mismo set que el cobro simple); cambia al cambiar el medio. */}
+                    <IconoMedio tipoContable={boton?.tipoContable} procesador={boton?.procesador} size={20} />
+                    {/* Select NATIVO (picker del SO en móvil): robusto en todo dispositivo,
+                        sin portal ni posicionamiento fijo. Estilizado con la clase sunmi-control. */}
+                    <div className="flex-1 min-w-0 flex flex-col gap-1">
+                      <select
+                        value={f.botonClave ?? ""}
+                        onChange={(e) => cambiarMedio(idx, e.target.value)}
+                        aria-label="Medio de pago"
+                        className="sunmi-control w-full min-w-0 min-h-11 rounded-md px-3 text-base cursor-pointer"
+                      >
+                        {botonesDisponiblesParaFila(BOTONES, filas, idx).map((b) => (
+                          <option key={b.clave} value={b.clave}>{b.nombre}</option>
+                        ))}
+                      </select>
+                      {/* LA MODALIDAD SE ELIGE ADENTRO DE LA FILA DEL MEDIO, y no
+                          como otra opción de medio: "Mercado Pago · Crédito" es
+                          una condición de Mercado Pago, no un medio aparte.
+
+                          Éste sí es el selector del kit y no uno nativo: el de
+                          arriba viene de antes y no se toca en esta tanda, pero
+                          lo que se agrega sigue la convención del proyecto. */}
+                      {boton?.abreSelector && (
+                        <SunmiSelectAdv
+                          className="w-full min-w-0"
+                          value={String(f.modalidadId ?? "")}
+                          onChange={(v) => cambiarModalidad(idx, v)}
+                          placeholder="Modalidad"
+                          aria-label={`Modalidad de ${boton.nombre}`}
+                          data-modalidad-de={boton.nombre}
+                        >
+                          {modalidades.map((o) => (
+                            <SunmiSelectOption key={o.clave} value={String(o.modalidadId)}>
+                              {o.nombre}
+                            </SunmiSelectOption>
+                          ))}
+                        </SunmiSelectAdv>
+                      )}
+                    </div>
+                  </div>
+                  <div className="w-28 shrink-0">
+                    <SunmiInput type="number" inputMode="decimal" value={f.monto} placeholder="$0"
+                      onChange={(e) => cambiarMonto(idx, e.target.value)}
+                      className="!text-right text-base min-h-11" />
+                  </div>
+                  <button type="button" onClick={() => quitarFila(idx)} disabled={filas.length <= 1}
+                    aria-label="Eliminar medio"
+                    className="shrink-0 w-9 h-9 flex items-center justify-center rounded-md pos-text-danger disabled:opacity-30 disabled:cursor-not-allowed text-lg leading-none">
+                    ×
+                  </button>
                 </div>
-                <div className="w-28 shrink-0">
-                  <SunmiInput type="number" inputMode="decimal" value={f.monto} placeholder="$0"
-                    onChange={(e) => cambiarMonto(idx, e.target.value)}
-                    className="!text-right text-base min-h-11" />
-                </div>
-                <button type="button" onClick={() => quitarFila(idx)} disabled={filas.length <= 1}
-                  aria-label="Eliminar medio"
-                  className="shrink-0 w-9 h-9 flex items-center justify-center rounded-md pos-text-danger disabled:opacity-30 disabled:cursor-not-allowed text-lg leading-none">
-                  ×
-                </button>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <button type="button" onClick={agregarFila}
-            disabled={filas.length >= MEDIOS_DIVIDIR.length}
+            disabled={primeraFilaLibre(BOTONES, filas) == null}
             className="sunmi-btn sunmi-pos-btn-secondary min-h-11 text-sm rounded-md disabled:opacity-40">
             + Agregar medio
           </button>
@@ -361,20 +483,20 @@ function FormaPago({
         /* ═══════════════ COBRO SIMPLE ═══════════════ */
         <>
           {/* 1) TOTAL
-              Cuando los cuatro medios NO dan lo mismo, no hay un total único que
-              sea verdad, y un número grande arriba sería falso en tres de los
-              cuatro casos. En vez de inventar uno se dice el rango y el importe
-              real vive en cada botón. Con los cuatro iguales —que es casi todo el
-              día— esto queda exactamente como estaba. */}
+              Cuando los medios NO dan lo mismo, no hay un total único que sea
+              verdad, y un número grande arriba sería falso en casi todos los
+              casos. En vez de inventar uno se dice el rango y el importe real
+              vive en cada botón. Con todos iguales —que es casi todo el día—
+              esto queda exactamente como estaba. */}
           <div className="text-center py-1">
             <div className="text-[11px] pos-text-muted uppercase tracking-widest font-medium">
               {totalPorMedioDifiere ? "Total según el medio" : "Total a cobrar"}
             </div>
             {totalPorMedioDifiere ? (
               <div className="text-2xl lg:text-3xl font-black sunmi-text-accent mt-1 tabular-nums tracking-tight">
-                ${formatPrecio(Math.min(...MEDIOS_COBRO.map((m) => totalDe([m.key]))))}
+                ${formatPrecio(Math.min(...importesVisibles) / 100)}
                 {" – "}
-                ${formatPrecio(Math.max(...MEDIOS_COBRO.map((m) => totalDe([m.key]))))}
+                ${formatPrecio(Math.max(...importesVisibles) / 100)}
               </div>
             ) : (
               <div className="text-4xl lg:text-5xl font-black pos-text-accent mt-1 tabular-nums tracking-tight">
@@ -395,7 +517,9 @@ function FormaPago({
               <div className="text-sm text-center pos-text-muted">
                 Este servicio debe abonarse en efectivo
               </div>
-              <button type="button" onClick={() => cobrarSimple("efectivo")} disabled={!puedeVender}
+              <button type="button"
+                onClick={() => (botonEfectivo ? tocarBoton(botonEfectivo) : null)}
+                disabled={!puedeVender || !botonEfectivo}
                 className={BTN_PRIMARIO}>
                 {cobrando ? "Procesando..." : "COBRAR EN EFECTIVO"}
               </button>
@@ -426,33 +550,42 @@ function FormaPago({
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                {MEDIOS_COBRO.map((m) => (
-                  <button key={m.key} type="button" onClick={() => cobrarSimple(m.key)} disabled={!puedeVender}
-                    className={`${BTN_MEDIO} ${
-                      totalPorMedioDifiere
-                        ? "flex flex-col items-center justify-center gap-0 py-1"
-                        : "flex items-center justify-center gap-2 whitespace-nowrap"
-                    }`}>
-                    {/* El logo de MP es un óvalo (más ancho): se achica lo mínimo para que
-                        "Mercado Pago" entre en una sola línea, sin deformarlo. */}
-                    {totalPorMedioDifiere ? (
-                      <>
-                        <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
-                          <IconoMedio medio={m.key} size={m.key === "mercadopago" ? 16 : 18} /> {m.label}
-                        </span>
-                        {/* EL NÚMERO QUE EL CAJERO NECESITA ANTES DE TOCAR NADA.
-                            Sale del mismo motor que va a cobrar el servidor. */}
-                        <span className="text-base font-black sunmi-text-accent tabular-nums leading-tight">
-                          ${formatPrecio(totalDe([m.key]))}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <IconoMedio medio={m.key} size={m.key === "mercadopago" ? 19 : 22} /> {m.label}
-                      </>
-                    )}
-                  </button>
-                ))}
+                {BOTONES.map((m, i) => {
+                  const r = resumenes[i];
+                  return (
+                    <button key={m.clave} type="button" onClick={() => tocarBoton(m)} disabled={!puedeVender}
+                      className={`${BTN_MEDIO} ${
+                        totalPorMedioDifiere
+                          ? "flex flex-col items-center justify-center gap-0 py-1"
+                          : "flex items-center justify-center gap-2 whitespace-nowrap"
+                      }`}>
+                      {/* El logo de MP es un óvalo (más ancho): se achica lo mínimo para que
+                          "Mercado Pago" entre en una sola línea, sin deformarlo. */}
+                      {totalPorMedioDifiere ? (
+                        <>
+                          <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
+                            <IconoMedio tipoContable={m.tipoContable} procesador={m.procesador}
+                              size={m.tipoContable === "MERCADOPAGO" ? 16 : 18} /> {m.nombre}
+                          </span>
+                          {/* EL NÚMERO QUE EL CAJERO NECESITA ANTES DE TOCAR NADA.
+                              Sale del mismo motor que va a cobrar el servidor. Con
+                              modalidades de distinto recargo no hay UN número: se
+                              muestra el rango y el importe exacto está adentro. */}
+                          <span className="text-base font-black sunmi-text-accent tabular-nums leading-tight">
+                            {r.difiere
+                              ? `$${formatPrecio(r.min)} – $${formatPrecio(r.max)}`
+                              : `$${formatPrecio(r.total)}`}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <IconoMedio tipoContable={m.tipoContable} procesador={m.procesador}
+                            size={m.tipoContable === "MERCADOPAGO" ? 19 : 22} /> {m.nombre}
+                        </>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Fiado: solo en venta sin servicios */}
@@ -464,7 +597,7 @@ function FormaPago({
                       Seleccioná un cliente para vender fiado
                     </div>
                   )}
-                  <button type="button" onClick={() => cobrarSimple("fiado")} disabled={!puedeVender}
+                  <button type="button" onClick={cobrarFiado} disabled={!puedeVender}
                     className="sunmi-btn sunmi-pos-btn-secondary w-full min-h-11 text-sm rounded-md">
                     Fiado
                   </button>

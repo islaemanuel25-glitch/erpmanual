@@ -65,8 +65,35 @@ export const ICONO_POR_MEDIO = {
   mercadopago: IconoMercadoPago,
 };
 
-export function IconoMedio({ medio, size = 22, className = "" }) {
-  const Comp = ICONO_POR_MEDIO[medio];
+// Procesador → ícono, como RESPALDO. Ver `IconoMedio`.
+const ICONO_POR_PROCESADOR = {
+  MERCADOPAGO: IconoMercadoPago,
+};
+
+/**
+ * EL ÍCONO DE UN MEDIO, SIN MIRAR NUNCA EL NOMBRE.
+ *
+ * Desde que los medios se configuran, el nombre lo escribe cada local: puede ser
+ * "MP Débito", "Posnet Norte" o "Caja chica". Un `nombre.includes("Mercado
+ * Pago")` acá adentro haría que un componente genérico decidiera dominio por
+ * texto, y bastaría que alguien renombre su botón para que el ícono cambie solo.
+ *
+ * Las tres fuentes, en este orden y todas de datos y no de texto libre:
+ *
+ *   1. `medio` — la clave legacy en minúscula. Es como llamaban a esto las
+ *      pantallas de antes y se conserva para no tocarlas.
+ *   2. `tipoContable` — QUÉ ES el movimiento. Es la fuente principal y la que
+ *      mantiene el dibujo exactamente igual que hasta hoy.
+ *   3. `procesador` — POR DÓNDE pasa. Solo como respaldo, para un tipo contable
+ *      que el set no conozca.
+ *
+ * Sin ninguna coincidencia devuelve `null`, que es el respaldo visual que este
+ * componente ya tenía: la fila se dibuja sin ícono y con su nombre, que es
+ * información suficiente. Es mejor que inventarle un ícono ajeno.
+ */
+export function IconoMedio({ medio, tipoContable = null, procesador = null, size = 22, className = "" }) {
+  const clave = medio ?? (tipoContable ? String(tipoContable).toLowerCase() : null);
+  const Comp = ICONO_POR_MEDIO[clave] || (procesador ? ICONO_POR_PROCESADOR[procesador] : null);
   if (!Comp) return null;
   return <Comp size={size} className={`shrink-0 ${className}`} />;
 }

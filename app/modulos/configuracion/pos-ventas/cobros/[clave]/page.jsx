@@ -3,11 +3,16 @@
 import { use } from "react";
 import { useRouter } from "next/navigation";
 
+import { Info } from "lucide-react";
+
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
+import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SinPermisos from "@/components/auth/SinPermisos";
 import FormularioMedio from "@/components/configuracion-pos/FormularioMedio";
+import ListaModalidades from "@/components/configuracion-pos/ListaModalidades";
+import { avisoCondicionDelPadre } from "@/lib/pos-ventas/modalidadesPantalla";
 import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
 import { useUser } from "@/app/context/UserContext";
 import useMediosCobro from "@/hooks/useMediosCobro";
@@ -88,6 +93,12 @@ export default function EditarMedioPage({ params }) {
     );
   }
 
+  // La clave viaja igual que en la lista: opaca, codificada, y el backend la
+  // interpreta. Un medio que todavía es un DEFAULT se direcciona igual, y crear
+  // su primera modalidad materializa los cuatro medios del local.
+  const rutaModalidades = `${RUTA_COBROS}/${encodeURIComponent(clave)}/modalidades`;
+  const aviso = avisoCondicionDelPadre(medio);
+
   return (
     <div className="max-w-2xl mx-auto">
       {/* En escritorio el shell no tiene fila de título propia —el `<h1>` vive
@@ -95,6 +106,31 @@ export default function EditarMedioPage({ params }) {
           hay dos: en mobile lo pone la fila del shell y este div está oculto.
           Es el patrón que ya usa la lista de Cobros. */}
       <div className="hidden md:flex justify-end mb-2">{volver}</div>
+
+      {/* ── LAS MODALIDADES VAN ARRIBA, Y NO ES ORNAMENTO ────────────────────
+          Cuando un medio tiene modalidades activas, la condición que el POS
+          aplica sale de ELLAS. Ponerlas debajo del recargo y la comisión del
+          medio dejaría lo que ya no manda arriba y lo que manda abajo. */}
+      <div className="mb-5">
+        <ListaModalidades
+          modalidades={medio.modalidades ?? []}
+          hrefDe={(m) => `${rutaModalidades}/${m.id}`}
+          hrefNueva={`${rutaModalidades}/nueva`}
+          mensajeVacio={
+            "Este medio cobra con su propio recargo y su propia comisión. " +
+            "Agregá una modalidad si el mismo botón tiene que poder cobrar con condiciones distintas " +
+            "—por ejemplo débito y crédito adentro de Mercado Pago—."
+          }
+        />
+      </div>
+
+      {aviso && (
+        <div className="mb-4">
+          <SunmiAviso icon={Info} titulo="La condición sale de la modalidad">
+            {aviso}
+          </SunmiAviso>
+        </div>
+      )}
 
       <FormularioMedio
         modo="editar"
