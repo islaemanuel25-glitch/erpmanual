@@ -9,6 +9,7 @@
 // presentación pura: mismas clases, mismos tamaños, mismos tonos.
 
 import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
+import { signoDeDiferencia } from "@/lib/transferencias/recepcionUI";
 
 export function fmtMoneda(n) {
   if (n == null) return "—";
@@ -32,6 +33,38 @@ export function fmtCantidad(n) {
 export function cantidadOGuion(n) {
   if (n === null || n === undefined) return "—";
   return fmtCantidad(n);
+}
+
+// ── LA DIFERENCIA SE LEE CON SIGNO ──────────────────────────────────────────
+//
+// Enviado 10, recibido 15: la pantalla dice "+5". Sin el más, un 5 en la columna
+// Diferencia se lee igual que un faltante de 5, que es exactamente lo contrario.
+//
+// El menos ya lo trae el número formateado; el más hay que ponerlo. Por eso el
+// signo sale de `signoDeDiferencia` —una sola función para las dos
+// presentaciones— y el número sigue saliendo de `fmtCantidad`, sin una segunda
+// copia del formateo de cantidades.
+export function fmtDiferencia(diff) {
+  if (diff === null || diff === undefined) return "—";
+  return `${signoDeDiferencia(diff)}${fmtCantidad(diff)}`;
+}
+
+// Badge de una línea que no estaba en el remito.
+//
+// No es decoración: una línea con "Enviado 0" y "Recibido 2" es indistinguible a
+// simple vista de un renglón mal cargado. El badge dice que ese 0 es correcto y
+// que alguien la agregó a propósito.
+//
+// Usa `BasePildora`, la misma forma que `BadgePresentacion`: si tuviera su propio
+// tamaño y su propio redondeo, los dos badges que van uno al lado del otro se
+// verían distintos el día que alguien toque uno solo.
+export function BadgeAgregado({ d }) {
+  if (!d?.agregadoEnRecepcion) return null;
+  return (
+    <BasePildora tono="sunmi-state-warning-soft sunmi-text-warning">
+      Agregado en recepción
+    </BasePildora>
+  );
 }
 
 export function fmtFechaHoraAR(iso) {
@@ -65,19 +98,34 @@ export function presentacionDeLinea(d = {}) {
   return "—";
 }
 
+// La forma de las píldoras de esta pantalla, en un solo lugar.
+//
+// Se extrajo de `BadgePresentacion` sin cambiarle una clase —mismo tamaño, mismo
+// redondeo, mismo peso— cuando apareció el segundo badge. Con dos copias, el día
+// que alguien ajuste una los dos que van pegados dejan de emparejar, y eso se ve.
+//
+// El tamaño es `text-xs2`, el token de 10px de `tailwind.config.js`: vale
+// exactamente lo mismo que el `text-[10px]` que había y no le suma una medida
+// mágica al trinquete.
+function BasePildora({ tono, children }) {
+  return (
+    <span className={`px-1.5 py-0.5 rounded-full text-xs2 font-medium whitespace-nowrap ${tono}`}>
+      {children}
+    </span>
+  );
+}
+
 // Badge de presentación, con el mismo tamaño y forma que BadgeModo en Ventas.
 export function BadgePresentacion({ d }) {
   const label = presentacionDeLinea(d);
   if (label === "—") return null;
   const destacado = label === "Bulto";
   return (
-    <span
-      className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap ${
-        destacado ? "sunmi-state-success sunmi-text-success" : "sunmi-surface-soft sunmi-text-link"
-      }`}
+    <BasePildora
+      tono={destacado ? "sunmi-state-success sunmi-text-success" : "sunmi-surface-soft sunmi-text-link"}
     >
       {label}
-    </span>
+    </BasePildora>
   );
 }
 
