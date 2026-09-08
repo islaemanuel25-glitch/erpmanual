@@ -16,10 +16,207 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está al día en **5 migraciones**, que son las que hay en el
-árbol. Comprobado con `prisma migrate status` el 2026-09-06 después de desplegar
-`cc5f2ed1773359dbae832e4b0d5a12f4c8cf3018`: *"5 migrations found in
+Ninguna. Producción está al día en **6 migraciones**, que son las que hay en el
+árbol. Comprobado con `prisma migrate status` el 2026-09-08 después de desplegar
+`63e0f790a430b555bbd3fd0dc976993d49eaa121`: *"6 migrations found in
 prisma/migrations. Database schema is up to date!"*.
+
+---
+
+## 2026-09-08 — `63e0f790`, modalidades por medio de cobro: una migración aplicada
+
+Producción pasó de `13ff4034e0b170c29edd00cea49e115e607c9d17` a
+`63e0f790a430b555bbd3fd0dc976993d49eaa121`, el merge del PR #48.
+
+### `20260907230000_modalidades_por_medio` — APLICADA
+
+Se aplicó **de verdad**, y eso es lo que distingue "se aplicó" de "la imagen no
+la conocía", que salen iguales en el código de salida: `migrate deploy` imprimió
+`Applying migration 20260907230000_modalidades_por_medio` y después
+`All migrations have been successfully applied`.
+
+**El conteo pasó de 5 a 6**, que es el control que vale: el árbol tiene 6, la
+imagen nueva las conoce —se listó su `/app/prisma/migrations` antes de usarla—, y
+el `migrate status` posterior dice *"6 migrations found in prisma/migrations.
+Database schema is up to date!"*.
+
+#### La frenada del clasificador, y cómo se resolvió
+
+`node scripts/clasificar-migraciones.mjs --desde 13ff4034…` la marcó
+**NO ADITIVA**, con salida 1, señalando exactamente dos sentencias:
+
+- `DROP CONSTRAINT (línea 178)` — `ALTER TABLE "VentaPago" DROP CONSTRAINT IF
+  EXISTS "VentaPago_ventaId_medio_key";`, *"puede sacar una foreign key o un
+  unique del que la versión vieja depende"*;
+- `DROP INDEX (línea 179)` — `DROP INDEX IF EXISTS
+  "VentaPago_ventaId_medio_key";`, *"degrada consultas de la versión vieja, y si
+  era único deja entrar duplicados"*.
+
+Ninguna otra sentencia y ninguna otra migración: **1 archivo a mirar**.
+
+**`--vps` no se pudo usar, y no se esquivó.** La sesión que desplegó corre DENTRO
+del VPS, así que el alias `vps-erp` no resuelve. Se usó `--desde` **después** de
+demostrar que `13ff4034` era efectivamente lo que atendía: es el `Config.Image`
+del contenedor, su `APP_BUILD_ID` y lo que devolvía `/api/version`. Los tres
+coincidían antes de tocar nada.
+
+Emanuel autorizó **explícitamente y por adelantado** esta migración y esta
+clasificación, sabiendo cuál era el `DROP`. La autorización fue **puntual y solo
+para este despliegue**: no se tocó el clasificador, no se modificó el hook, no se
+exportó ninguna variable y no se cambió la migración para esquivarlo.
+
+#### Qué hace, y qué NO hace
+
+La migración crea la tabla `MedioCobroModalidadLocal`, agrega cinco columnas
+nulables a `VentaPago` y cuatro a `Venta`, y **reemplaza** la protección vieja por
+dos índices únicos parciales:
+
+- `VentaPago_ventaId_medio_sin_modalidad_key`, con `WHERE ("modalidadId" IS
+  NULL)` — replica EXACTAMENTE lo que hacía la unique vieja para las filas sin
+  modalidad, así que nada que antes se rechazara pasa a aceptarse;
+- `VentaPago_ventaId_modalidad_key`, con `WHERE ("modalidadId" IS NOT NULL)` —
+  una vez cada modalidad por venta.
+
+Y NO se usó `UNIQUE (ventaId, medio, modalidadId)`, que sería lo obvio y sería un
+error: en PostgreSQL dos `NULL` nunca son iguales dentro de un índice único, así
+que dos tenders legacy del mismo medio dejarían de chocar. Eso aflojaría en
+silencio la protección que hoy funciona.
+
+**Cero datos borrados. Cero backfill. Cero modalidades sembradas. Cero ventas
+reescritas.**
+
+#### Efecto medido en producción, después de aplicar
+
+Leído contra PostgreSQL, no deducido del archivo de migración:
+
+| qué | resultado |
+|---|---|
+| `MedioCobroModalidadLocal` existe | sí, con **0 filas** |
+| `VentaPago_ventaId_medio_sin_modalidad_key` | presente, `WHERE ("modalidadId" IS NULL)` |
+| `VentaPago_ventaId_modalidad_key` | presente, `WHERE ("modalidadId" IS NOT NULL)` |
+| `VentaPago_ventaId_medio_key` (la vieja) | **ausente** |
+| columnas nuevas de `VentaPago` | 5 de 5 |
+| columnas nuevas de `Venta` | 4 de 4 |
+| las cuatro FK nuevas | `confdeltype = n`, o sea **SET NULL** |
+| `Venta` | **15.487 → 15.487** |
+| `VentaPago` | **15.490 → 15.490** |
+| filas con las columnas nuevas escritas | 0 |
+
+La precondición se comprobó **justo antes** de migrar, para que el `IF EXISTS` no
+pudiera esconder una deriva: `VentaPago_ventaId_medio_key` estaba, y su
+definición era `CREATE UNIQUE INDEX … ON "VentaPago" ("ventaId", medio)` — un
+**índice**, no una constraint, que es exactamente por qué la migración lleva las
+dos formas del `DROP`. Los dos índices nuevos no existían y la tabla tampoco.
+
+#### La contraprueba: se ejerció sobre una COPIA antes de tocar producción
+
+Es lo que separa "la migración se lee bien" de "la migración corre bien sobre
+estos datos", y se hizo entera antes de aplicar nada en producción:
+
+1. el backup se restauró en un **PostgreSQL 16 descartable**, en su propio
+   contenedor y su propia red, nunca sobre producción;
+2. las seis tablas abrieron y se leyeron: `Venta` 15.487, `VentaPago` 15.490,
+   `MedioCobroLocal` 4, `RecargoPagoLocal` 4, `Usuario` 6, `Turno` 353 — y
+   `VentaPago_ventaId_medio_key` estaba presente, así que la copia era espejo
+   fiel de producción;
+3. se aplicó `prisma migrate deploy` **con la imagen nueva**, no el SQL a mano:
+   informó `6 migrations found` y `Applying migration
+   20260907230000_modalidades_por_medio`;
+4. después: tabla nueva con 0 filas, los dos índices parciales con sus `WHERE`
+   exactos, el índice viejo ausente, las cuatro FK en SET NULL, y **los mismos
+   conteos antes y después** —15.487 y 15.490— con cero filas reescritas;
+5. la copia y su red se eliminaron.
+
+Recién con eso se tocó producción.
+
+#### Backup y corte
+
+`/srv/produccion/backups/pre-63e0f790_20260908_084447.sql.gz`, **3.953.964
+bytes**, SHA-256 `91d1aa9bc6de01bcf892b261f3d18a3c1a5a7bf92ff88516e853fbea7b585610`.
+
+Validado ANTES de migrar: `pg_dump` con `pipefail` salió **0**, `gzip -t` sin
+salida, encabezado `PostgreSQL database dump`, la marca `PostgreSQL database dump
+complete` dentro de las últimas 20 líneas, y **67** `CREATE TABLE` (mínimo 40).
+
+**El quinto chequeo no aplicaba, y el motivo es el que prescribe el
+procedimiento:** existe para comprobar que un valor de los que se van a borrar
+esté dentro del dump, y esta migración no elimina ni reescribe ninguna fila. No
+hay valor a perder que buscar. En su lugar se hizo la restauración descartable
+completa de arriba, que es una comprobación más fuerte: no pregunta si el dump
+contiene un valor, sino si el dump entero abre y si la migración corre sobre él.
+
+**El corte fue de 3 segundos**, contra un tope de 30.
+
+#### Estado final
+
+Producción en `63e0f790a430b555bbd3fd0dc976993d49eaa121`, con los **cinco valores
+coincidiendo** —`origin/main`, HEAD del repo del VPS, imagen del contenedor,
+`APP_BUILD_ID` y `/api/version`— más el label OCI
+`org.opencontainers.image.revision`, que da el mismo SHA. Digest de la imagen:
+`sha256:69bc5c1763ab81c30cf2d24cc383d744da2ac4dc0396d04f5a9f6b3f4d1979db`,
+`linux/amd64`.
+
+`APP_IMAGE` dentro del contenedor: **0** — está en el `.env` de Compose y no en
+`.env.prod`. App running con **0 reinicios**; PostgreSQL healthy y **no
+recreado** —lleva tres semanas arriba, siempre `--no-deps app`—; logs sin
+`error`, `fatal` ni `panic`; `/login` 200, `/api/version` 200 con el SHA nuevo,
+Cobros 200 y POS 200; las rutas nuevas presentes —`/api/medios-cobro/:id/
+modalidades` contesta 401 sin sesión, y `…/modalidades/:id` contesta 405 porque
+solo expone PATCH y DELETE—; y el árbol del VPS limpio.
+
+Referencia de rollback conservada y todavía local: image ID
+`sha256:4ae36baae7d8f2a4f1a63a615a103d0aea454e06ad6240e6bf62be31b862acca`,
+RepoTag fijo
+`ghcr.io/islaemanuel25-glitch/erpmanual:13ff4034e0b170c29edd00cea49e115e607c9d17`.
+
+**La ventana de rollback quedó limpia a propósito:** no se configuró ninguna
+modalidad y no se cobró ninguna venta durante el despliegue, así que
+`MedioCobroModalidadLocal` tiene 0 filas y ningún `VentaPago` tiene `modalidadId`.
+Mientras eso siga así, volver a la imagen anterior es seguro: las columnas y la
+tabla nuevas son aditivas, y el índice parcial legacy conserva exactamente el
+comportamiento viejo.
+
+#### Y el cambio VIAJÓ a la imagen, comprobado con su control
+
+Los cinco valores prueban que el despliegue es consistente, no que la imagen
+tenga lo que se quería desplegar. El marcador fue la cadena `"Elegí la
+modalidad"` —texto de interfaz, no un identificador, porque el build minifica los
+identificadores—: aparece en tres chunks de `/app/.next`, y `git show
+13ff4034:components/pos-ventas/FormaPago.jsx` da **0** apariciones, así que es
+genuinamente nueva. El control fue `"Elegí cómo cobrar"`, que ya existía antes y
+también aparece: sin él, un vacío no habría significado nada.
+
+#### ⚠️ CUATRO ANOMALÍAS CONOCIDAS, NINGUNA DEL DESPLIEGUE
+
+**1. `.claude/migraciones-autorizadas.log` NO fue creado.** Se ejecutó
+`DEPLOY_MIGRACION_AUTORIZADA=1` dos veces —una sobre la copia descartable y una
+sobre producción, las dos puntuales y nunca exportada— y la guardia `PreToolUse`
+no interceptó el comando en este entorno. Es **el mismo defecto conocido que ya
+quedó anotado el 2026-09-06**, no uno nuevo: la autorización queda respaldada por
+la decisión explícita previa de Emanuel, por la ejecución informada y por este
+cierre documental, pero **no** por el archivo automático. Se resuelve en una tanda
+aparte.
+
+**2. `scripts/sonda-cascada.mjs` no se pudo ejecutar.** El procedimiento la pide
+al mismo nivel que el build, y en el VPS no hay ningún navegador instalado. Lo
+que sí se midió: el rango `13ff4034..63e0f790` **no toca** `app/globals.css`,
+`styles/`, `tailwind.config.js`, `SunmiButton`, `SunmiInput` ni `lib/sunmi/` —o
+sea ninguna de las entradas de las que esa medición depende— y su hermano barato,
+`lib/sunmi/ordenDeCascada.test.mjs`, viajó verde en la suite. Además, la
+validación visual real de esta tanda ya había corrido en Chrome efímero sobre el
+árbol probado: corrida `34180485033` de "Visual — Configuración POS", **66
+afirmaciones en verde**. No es lo mismo que haber corrido la sonda de cascada, y
+por eso queda dicho.
+
+**3. `_prisma_migrations` conserva una fila histórica revertida.**
+`20241202000000_add_venta_campos` figura con `rolled_back_at` del 2026-04-27 y, al
+lado, otra fila de la misma migración terminada bien. Es **anterior a esta
+tanda** y `migrate status` la considera resuelta. Se anota porque apareció al
+contar las filas aplicadas.
+
+**4. Sigue el warning de interpolación de `POSTGRES_PASSWORD`.** Es el pendiente
+conocido. Por eso no se ejecutó nada que creara o recreara el servicio `db`, y
+todos los comandos fueron con `--no-deps app`.
 
 ---
 
