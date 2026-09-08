@@ -245,7 +245,10 @@ model Usuario {
   local Local? @relation(fields: [localId], references: [id])
   rol   Rol    @relation(fields: [rolId], references: [id])
 
-  confirmaciones TransferenciaDetalle[]
+  confirmaciones TransferenciaDetalle[] @relation("TransferenciaDetalleConfirmadoPor")
+  /// Líneas que esta persona agregó durante una recepción. Es la otra relación
+  /// hacia `TransferenciaDetalle`, y por eso las dos van nombradas.
+  lineasAgregadasEnRecepcion TransferenciaDetalle[] @relation("TransferenciaDetalleAgregadoPor")
 
   posTransferencias            PosTransferencia[] @relation("pos_usuario")
   posTransferenciasSolicitadas PosTransferencia[] @relation("pos_solicitado_por")
@@ -792,15 +795,51 @@ model TransferenciaDetalle {
   confirmadoPorId Int?
   fechaRecepcion  DateTime?
 
+  // ── UNA LÍNEA QUE NO ESTABA EN EL REMITO ──────────────────────────────────
+  //
+  // Al abrir los bultos puede aparecer mercadería que el envío no registró. Esa
+  // línea se agrega DURANTE la recepción, y para el inventario significa algo
+  // distinto de una línea original: su `cantidad` es 0 —nunca se envió— así que
+  // no tiene tránsito que limpiar, y su recibido es un descuento adicional al
+  // origen.
+  //
+  // ── POR QUÉ UN BOOLEANO Y NO `cantidad === 0` ────────────────────────────
+  //
+  // Porque `cantidad === 0` es una coincidencia aritmética, no un hecho
+  // registrado: una línea original enviada en 0 —que hoy el sistema no impide—
+  // se leería igual, y sobre todo no contesta QUIÉN la agregó ni CUÁNDO. Ese
+  // dato no se puede reconstruir después, y es exactamente lo que una auditoría
+  // pregunta cuando aparece stock que nadie mandó.
+  //
+  // Los tres van juntos por el mismo motivo que `canceladaEn` / `canceladaPorId`
+  // / `motivoCancelacion` unas líneas más arriba: una línea agregada sin autor y
+  // sin fecha es indistinguible dentro de un mes de un error de datos.
+  //
+  // Default `false` y las otras dos nulables: las transferencias históricas
+  // quedan exactamente como estaban, que es la verdad —ninguna línea vieja se
+  // agregó en recepción, porque no se podía—.
+  agregadoEnRecepcion     Boolean   @default(false)
+  agregadoEnRecepcionPorId Int?
+  agregadoEnRecepcionAt   DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   producto      ProductoLocal @relation(fields: [productoId], references: [id])
   transferencia Transferencia @relation(fields: [transferenciaId], references: [id], onDelete: Cascade)
-  confirmadoPor Usuario?      @relation(fields: [confirmadoPorId], references: [id])
+  confirmadoPor Usuario?      @relation("TransferenciaDetalleConfirmadoPor", fields: [confirmadoPorId], references: [id])
+  /// Quién agregó esta línea durante la recepción. Nombrada porque `Usuario` ya
+  /// recibe otra relación desde esta misma tabla —el confirmador— y sin nombre
+  /// Prisma no puede distinguirlas.
+  agregadoEnRecepcionPor Usuario? @relation("TransferenciaDetalleAgregadoPor", fields: [agregadoEnRecepcionPorId], references: [id])
+
+  /// Los movimientos de stock que esta línea produjo al recibirse. La relación
+  /// existe para que la auditoría no dependa del texto libre de `motivo`.
+  auditoriasStock AuditoriaStock[]
 
   @@index([transferenciaId])
   @@index([productoId])
+  @@index([agregadoEnRecepcionPorId])
 }
 
 enum DiaPedido {
@@ -2418,14 +2457,33 @@ model AuditoriaStock {
   stockMaxAnterior Decimal? @db.Decimal(12, 2)
   stockMaxNuevo    Decimal? @db.Decimal(12, 2)
   motivo           String?
+
+  // ── DE QUÉ RECEPCIÓN SALIÓ ESTE MOVIMIENTO ────────────────────────────────
+  //
+  // Hasta acá el único rastro de que un ajuste venía de una recepción era el
+  // texto de `motivo`, que arma la ruta con los números adentro de una frase.
+  // Sirve para leerlo, no para preguntarle nada a la base: no se puede pedir
+  // "todos los movimientos de la transferencia 97" sin parsear castellano.
+  //
+  // Estas dos referencias lo vuelven estructural. Nulables porque la enorme
+  // mayoría de los movimientos de stock no vienen de una transferencia —un
+  // ajuste manual, una venta— y esas filas quedan como estaban. `SetNull` en las
+  // dos: borrar una transferencia no puede borrar la historia de que su stock se
+  // movió, igual que en las FK de identidad de `VentaPago`.
+  transferenciaId        Int?
+  transferenciaDetalleId Int?
+
   createdAt        DateTime @default(now())
 
   local   Local   @relation(fields: [localId], references: [id])
   usuario Usuario @relation(fields: [userId], references: [id])
+  transferenciaDetalle TransferenciaDetalle? @relation(fields: [transferenciaDetalleId], references: [id], onDelete: SetNull)
 
   @@index([grupoId, localId])
   @@index([productoLocalId])
   @@index([createdAt])
+  @@index([transferenciaId])
+  @@index([transferenciaDetalleId])
 }
 
 // BITÁCORA DE AUDITORÍA CENTRAL
