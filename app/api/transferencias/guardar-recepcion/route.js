@@ -8,6 +8,7 @@ import {
   mensajeRecepcion,
   statusRecepcion,
 } from "@/lib/transferencias/recepcion";
+import { estadoAdmiteRecepcion, puedeRecibir } from "@/lib/transferencias/recepcionServidor";
 
 export async function POST(req) {
   try {
@@ -46,28 +47,14 @@ export async function POST(req) {
       );
     }
 
-    if (transferencia.estado === "Recibida") {
-      return NextResponse.json(
-        { ok: false, error: "Esta transferencia ya fue confirmada. No se pueden guardar cambios." },
-        { status: 400 }
-      );
+    const estado = estadoAdmiteRecepcion(transferencia.estado, { accion: "guardar cambios" });
+    if (!estado.ok) {
+      return NextResponse.json({ ok: false, error: estado.error }, { status: estado.status });
     }
 
-    if (transferencia.estado !== "Enviada" && transferencia.estado !== "Recibiendo") {
-      return NextResponse.json(
-        { ok: false, error: `No se puede editar una transferencia en estado "${transferencia.estado}"` },
-        { status: 400 }
-      );
-    }
-
-    if (!session.esAdmin) {
-      const localId = Number(session.localId || 0);
-      if (!localId || localId !== transferencia.destinoId) {
-        return NextResponse.json(
-          { ok: false, error: "Sin permiso para esta transferencia" },
-          { status: 403 }
-        );
-      }
+    const alcance = puedeRecibir(session, transferencia);
+    if (!alcance.ok) {
+      return NextResponse.json({ ok: false, error: alcance.error }, { status: alcance.status });
     }
 
     // ============================================================
@@ -103,6 +90,9 @@ export async function POST(req) {
           unidadEnviada: d.unidadEnviada,
           motivoPrincipal: it.motivoPrincipal,
           motivoDetalle: it.motivoDetalle,
+          // También de la base: si viniera del request, cualquiera podría marcar
+          // una línea del remito como agregada y dejar su tránsito sin limpiar.
+          agregadoEnRecepcion: d.agregadoEnRecepcion,
         },
         factorPack: Number(d.producto?.base?.factor_pack || 1),
         recibidoPropuesto: it.recibido,

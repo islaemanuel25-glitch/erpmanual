@@ -10,10 +10,11 @@ import {
   validarDetalleRecepcion,
   mensajeRecepcion,
   statusRecepcion,
+  accionAuditoriaDe,
+  ACCIONES_RECEPCION,
 } from "@/lib/transferencias/recepcion";
-
-/** Acción de AuditoriaStock para la devolución del faltante al origen. */
-const ACCION_DEVOLUCION = "DIFERENCIA_RECEPCION_TRANSFERENCIA";
+import { estadoAdmiteRecepcion, puedeRecibir } from "@/lib/transferencias/recepcionServidor";
+import { getConfigLocalEfectiva } from "@/lib/config/local";
 
 /** Cantidades siempre con la escala física de StockLocal (3 decimales). */
 const fmt = (n) => Number(n || 0).toFixed(3);
@@ -93,34 +94,14 @@ export async function POST(req) {
     }
 
     // Validar estado antes de procesar
-    if (transferencia.estado === "Recibida") {
-      return NextResponse.json(
-        { ok: false, error: "Esta transferencia ya fue confirmada. No se puede volver a confirmar." },
-        { status: 400 }
-      );
+    const estadoOk = estadoAdmiteRecepcion(transferencia.estado, { accion: "volver a confirmar" });
+    if (!estadoOk.ok) {
+      return NextResponse.json({ ok: false, error: estadoOk.error }, { status: estadoOk.status });
     }
 
-    if (transferencia.estado !== "Enviada" && transferencia.estado !== "Recibiendo") {
-      return NextResponse.json(
-        { ok: false, error: `No se puede confirmar una transferencia en estado "${transferencia.estado}"` },
-        { status: 400 }
-      );
-    }
-
-    if (!esAdmin) {
-      const localId = Number(session.localId || 0);
-      if (!localId) {
-        return NextResponse.json(
-          { ok: false, error: "Usuario sin local asignado" },
-          { status: 400 }
-        );
-      }
-      if (localId !== transferencia.destinoId) {
-        return NextResponse.json(
-          { ok: false, error: "No podés confirmar esta transferencia" },
-          { status: 403 }
-        );
-      }
+    const alcance = puedeRecibir(session, transferencia);
+    if (!alcance.ok) {
+      return NextResponse.json({ ok: false, error: alcance.error }, { status: alcance.status });
     }
 
     // ============================================================
@@ -145,6 +126,7 @@ export async function POST(req) {
           unidadEnviada: d.unidadEnviada,
           motivoPrincipal: d.motivoPrincipal,
           motivoDetalle: d.motivoDetalle,
+          agregadoEnRecepcion: d.agregadoEnRecepcion,
         },
         factorPack: Number(d.producto.base.factor_pack || 1),
       });
@@ -163,15 +145,20 @@ export async function POST(req) {
     // ============================================================
     // 🟦 GRUPO DEL ORIGEN — también antes de la transacción
     //
-    // Solo hace falta si hay algo que devolver: la auditoría de la devolución
-    // lo exige (AuditoriaStock.grupoId es obligatorio). Si no se puede resolver,
-    // la recepción se detiene: devolver stock sin dejar rastro sería exactamente
-    // la "corrección silenciosa" que este cambio viene a eliminar.
+    // Hace falta si hay CUALQUIER ajuste de stock del origen, en los dos
+    // sentidos: la auditoría lo exige (AuditoriaStock.grupoId es obligatorio). Si
+    // no se puede resolver, la recepción se detiene: mover stock sin dejar rastro
+    // sería exactamente la "corrección silenciosa" que este flujo viene a
+    // eliminar.
+    //
+    // Antes esto solo miraba las devoluciones, porque eran el único ajuste
+    // posible. Con diferencias positivas y líneas agregadas, el origen también
+    // PIERDE stock y ese movimiento necesita el mismo rastro.
     // ============================================================
-    const hayDevolucion = [...planes.values()].some((p) => p.devolucionUnidades > 0);
+    const hayAjusteOrigen = [...planes.values()].some((p) => p.ajusteOrigenUnidades !== 0);
     let grupoOrigenId = null;
 
-    if (hayDevolucion) {
+    if (hayAjusteOrigen) {
       grupoOrigenId = await getGrupoIdDeLocal(transferencia.origenId);
       if (!grupoOrigenId) {
         return NextResponse.json(
@@ -179,10 +166,87 @@ export async function POST(req) {
             ok: false,
             codigo: "GRUPO_ORIGEN_NO_RESUELTO",
             error:
-              "No se pudo determinar el grupo del local de origen. Hay diferencias para devolver y no se puede auditar la devolución.",
+              "No se pudo determinar el grupo del local de origen. Hay diferencias que ajustar y no se puede auditar el movimiento.",
           },
           { status: 409 }
         );
+      }
+    }
+
+    // ============================================================
+    // 🟦 STOCK NEGATIVO — LA POLÍTICA VIGENTE, NO UNA NUEVA
+    //
+    // Cuando llega MÁS de lo enviado, el origen pierde la diferencia además de
+    // lo que ya había perdido al mandar. Eso puede dejarlo en negativo, y ERP
+    // Azul ya tiene una regla para eso: `allowNegativeStock`, el mismo flag que
+    // decide si un envío con stock insuficiente se rechaza o se registra
+    // (`pos-transferencias/enviar`). Acá se respeta esa política y no se inventa
+    // otra.
+    //
+    // Se lee con `getConfigLocalEfectiva` del local ORIGEN, que es la fuente
+    // canónica —override del local con fallback al grupo—. El envío lee solo el
+    // grupo; esa asimetría es previa y no se toca en esta tanda.
+    //
+    // Y se comprueba ANTES de la transacción, con el stock actual: si no alcanza
+    // y el grupo no permite negativos, la recepción no empieza. Rechazar acá deja
+    // el inventario intacto y le dice al operador exactamente qué producto y
+    // cuánto falta.
+    // ============================================================
+    const excedentes = [...planes.entries()].filter(([, p]) => p.excedenteUnidades > 0);
+    let permiteNegativo = false;
+
+    if (excedentes.length > 0) {
+      const grupoParaPolitica = grupoOrigenId || (await getGrupoIdDeLocal(transferencia.origenId));
+      const cfg = await getConfigLocalEfectiva(transferencia.origenId, grupoParaPolitica);
+      permiteNegativo = cfg.allowNegativeStock === true;
+
+      if (!permiteNegativo) {
+        const porDetalle = new Map(transferencia.detalle.map((d) => [d.id, d]));
+        const faltantes = [];
+
+        for (const [detalleId, plan] of excedentes) {
+          const d = porDetalle.get(detalleId);
+          const productoOrigen = await prisma.productoLocal.findUnique({
+            where: {
+              localId_baseId: { localId: transferencia.origenId, baseId: d.producto.base.id },
+            },
+            select: { id: true },
+          });
+          const stock = productoOrigen
+            ? await prisma.stockLocal.findUnique({
+                where: {
+                  localId_productoId: {
+                    localId: transferencia.origenId,
+                    productoId: productoOrigen.id,
+                  },
+                },
+                select: { cantidad: true },
+              })
+            : null;
+
+          const disponible = Number(stock?.cantidad || 0);
+          if (plan.excedenteUnidades > disponible) {
+            faltantes.push({
+              productoNombre: d.producto.base.nombre || d.producto.nombre || "N/A",
+              necesario: plan.excedenteUnidades,
+              disponible,
+            });
+          }
+        }
+
+        if (faltantes.length > 0) {
+          return NextResponse.json(
+            {
+              ok: false,
+              codigo: "STOCK_INSUFICIENTE",
+              error:
+                "Llegó más mercadería de la enviada y el local de origen no tiene stock para cubrir la diferencia. " +
+                "Este grupo no permite stock negativo.",
+              faltantes,
+            },
+            { status: 400 }
+          );
+        }
       }
     }
 
@@ -286,26 +350,35 @@ export async function POST(req) {
         });
 
         // ============================================================
-        // 🟥 ORIGEN — limpiar tránsito y DEVOLVER la diferencia
+        // 🟥 ORIGEN — limpiar tránsito y AJUSTAR por la diferencia
         //
         // El origen ya perdió la cantidad enviada antes de llegar acá: en
         // DESCONTAR_Y_TRANSITO la descontó la transferencia al enviarse, en
         // SOLO_TRANSITO la descontó la Venta al crearse. Por eso la recepción NO
         // distingue política: en los dos casos el neto correcto es que el origen
-        // pierda solo lo que el destino efectivamente recibió.
+        // pierda exactamente lo que el destino recibió.
         //
         //   enTransito -= enviado     (la mercadería salió: el tránsito queda en 0)
-        //   cantidad   += enviado - recibido   (lo que no llegó vuelve al stock)
+        //   cantidad   += enviado - recibido
+        //
+        // El segundo término tiene SIGNO. Positivo devuelve lo que no llegó;
+        // negativo descuenta lo que llegó de más, que el origen todavía no había
+        // perdido. La fórmula es la misma para los tres casos, y esa es la razón
+        // por la que no hay ramas acá: 10/8 → +2, 10/10 → 0, 10/15 → −5.
+        //
+        // Y para una línea AGREGADA en recepción el tránsito NO se toca: nunca
+        // formó parte del envío, así que no hay reserva que liberar. Restarle su
+        // cantidad inventaría un tránsito que nadie creó.
         //
         // Las dos van en UNA sola escritura atómica sobre la fila: partirlas en
         // dos updates abre una ventana donde el stock del origen está a medio
         // corregir.
         //
-        // La devolución es de INVENTARIO, no comercial: si la transferencia nació
-        // de una venta interna, esa venta sigue facturando lo enviado. Resolver
-        // el desfase (nota de crédito, merma, imputación) es una etapa aparte.
+        // El ajuste es de INVENTARIO, no comercial: si la transferencia nació de
+        // una venta interna, esa venta sigue facturando lo enviado. Resolver el
+        // desfase (nota de crédito, merma, imputación) es una etapa aparte.
         // ============================================================
-        const { enviadaUnidades, devolucionUnidades } = plan;
+        const { enviadaUnidades, ajusteOrigenUnidades } = plan;
 
         const productoOrigen = await tx.productoLocal.findUnique({
           where: {
@@ -342,6 +415,15 @@ export async function POST(req) {
           );
         }
 
+        // `increment` con un número negativo descuenta: es la misma operación
+        // atómica de Postgres y no hace falta una segunda rama para el signo.
+        // Se arma como UNA expresión y no mutando un objeto: las dos claves
+        // quedan juntas en el mismo literal, que es lo que hace evidente —y
+        // comprobable— que van en la misma escritura.
+        const datosOrigen = plan.tocaTransito
+          ? { cantidad: { increment: ajusteOrigenUnidades }, enTransito: { decrement: enviadaUnidades } }
+          : { cantidad: { increment: ajusteOrigenUnidades } };
+
         const origenActualizado = await tx.stockLocal.update({
           where: {
             localId_productoId: {
@@ -349,38 +431,60 @@ export async function POST(req) {
               productoId: productoOrigen.id,
             },
           },
-          data: {
-            cantidad: { increment: devolucionUnidades },
-            enTransito: { decrement: enviadaUnidades },
-          },
+          data: datosOrigen,
         });
 
         // ============================================================
-        // 🟪 AUDITORÍA DE LA DEVOLUCIÓN — dentro de la transacción
+        // 🟪 AUDITORÍA DEL AJUSTE — dentro de la transacción
         //
         // Sin `.catch()` a propósito, al revés que las auditorías de
         // stock_locales/ajustar: acá la auditoría no es un extra, es el único
-        // rastro de que ese stock volvió solo. Si no se puede escribir, la
+        // rastro de que ese stock se movió solo. Si no se puede escribir, la
         // recepción entera se revierte.
+        //
+        // TRES ACCIONES Y NO UNA. Hasta acá todo se guardaba como
+        // `DIFERENCIA_RECEPCION_TRANSFERENCIA`, que significaba "faltó
+        // mercadería" porque era el único caso posible. Con diferencias
+        // positivas eso dejaría de ser cierto y un reporte que agrupe por acción
+        // sumaría faltantes con sobrantes. Ver `accionAuditoriaDe`.
+        //
+        // Y el vínculo con la transferencia ahora es ESTRUCTURAL —dos columnas—
+        // y no solo el texto del motivo: "todos los movimientos de la
+        // transferencia 97" no se puede contestar parseando castellano.
         // ============================================================
-        if (devolucionUnidades > 0) {
+        const accion = accionAuditoriaDe(plan);
+        if (accion) {
+          const esAgregada = accion === ACCIONES_RECEPCION.AGREGADO;
+          const esFaltante = accion === ACCIONES_RECEPCION.FALTANTE;
+          const magnitud = esFaltante ? plan.devolucionUnidades : plan.excedenteUnidades;
+
           await tx.auditoriaStock.create({
             data: {
               grupoId: grupoOrigenId,
               localId: transferencia.origenId,
               productoLocalId: productoOrigen.id,
               userId: usuarioId,
-              accion: ACCION_DEVOLUCION,
+              accion,
+              transferenciaId,
+              transferenciaDetalleId: d.id,
               cantidadAnterior: Number(stockOrigen.cantidad),
               cantidadNueva: Number(origenActualizado.cantidad),
               // Enviado y recibido van en la unidad del REMITO (puede ser BULTO);
-              // lo devuelto, en unidades de stock. Se explicita para que la
+              // el movimiento, en unidades de stock. Se explicita para que la
               // auditoría no se lea como "2 bultos" cuando son 2 unidades.
-              motivo:
-                `Devolución por diferencia de recepción — transferencia #${transferenciaId}, ` +
-                `detalle #${d.id}, enviado ${fmt(plan.enviada)} ${plan.unidad}, ` +
-                `recibido ${fmt(plan.recibida)} ${plan.unidad}, ` +
-                `devuelto ${fmt(devolucionUnidades)} (unidades de stock)`,
+              motivo: esAgregada
+                ? `Producto agregado durante la recepción — transferencia #${transferenciaId}, ` +
+                  `detalle #${d.id}, enviado 0.000, recibido ${fmt(plan.recibida)} ${plan.unidad}, ` +
+                  `descontado del origen ${fmt(magnitud)} (unidades de stock)`
+                : esFaltante
+                ? `Devolución por diferencia de recepción — transferencia #${transferenciaId}, ` +
+                  `detalle #${d.id}, enviado ${fmt(plan.enviada)} ${plan.unidad}, ` +
+                  `recibido ${fmt(plan.recibida)} ${plan.unidad}, ` +
+                  `devuelto ${fmt(magnitud)} (unidades de stock)`
+                : `Excedente de recepción — transferencia #${transferenciaId}, ` +
+                  `detalle #${d.id}, enviado ${fmt(plan.enviada)} ${plan.unidad}, ` +
+                  `recibido ${fmt(plan.recibida)} ${plan.unidad}, ` +
+                  `descontado del origen ${fmt(magnitud)} (unidades de stock)`,
             },
           });
         }
