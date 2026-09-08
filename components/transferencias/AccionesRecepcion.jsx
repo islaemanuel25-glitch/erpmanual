@@ -15,6 +15,10 @@
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiAviso from "@/components/sunmi/SunmiAviso";
+
+/** El aviso de que hay cambios sin guardar. Exportado para que lo mida un candado. */
+export const AVISO_SIN_GUARDAR = "Guardá los cambios antes de confirmar.";
 
 export default function AccionesRecepcion({
   id,
@@ -25,6 +29,23 @@ export default function AccionesRecepcion({
   confirmarRecepcion,
   confirmando,
   guardarCambios,
+  /**
+   * Hay cambios sin guardar.
+   *
+   * ── QUÉ CAMBIA Y QUÉ NO ────────────────────────────────────────────────
+   *
+   * NO cambia el comportamiento: confirmar con cambios pendientes sigue estando
+   * bloqueado y sigue avisando. Lo que cambia es CUÁNDO se entera el operador.
+   *
+   * Hasta acá la regla existía solo adentro del handler, así que la única forma
+   * de descubrirla era tocar "Confirmar recepción" y recibir un cartel. El
+   * aviso la pone a la vista antes, al lado de los dos botones que la resuelven.
+   *
+   * Y no se agrega un auto-guardado como efecto lateral de confirmar: ese
+   * contrato hoy no existe y escribir cantidades sin que nadie lo pidiera es
+   * peor que un cartel.
+   */
+  dirty = false,
   puedeCancelar,
   // La cancelación dejó de ser un `confirm()` y pasó a ser un panel: pide el
   // preview al servidor, dice qué va a pasar con ESTE remito —que no es lo mismo
@@ -91,6 +112,12 @@ export default function AccionesRecepcion({
           </SunmiButton>
         )}
       </div>
+
+      {puedeRecibir && dirty && (
+        <div className="mt-2">
+          <SunmiAviso tono="warning">{AVISO_SIN_GUARDAR}</SunmiAviso>
+        </div>
+      )}
 
       {panelCancelar}
     </SunmiCard>

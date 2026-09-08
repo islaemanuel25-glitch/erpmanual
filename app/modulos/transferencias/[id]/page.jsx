@@ -17,7 +17,7 @@
 // confirmación, cancelación y permisos no se tocó.
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -31,8 +31,16 @@ import EstadoTransferenciaBadge, { DiferenciasBadge } from "@/components/transfe
 import TransferenciaHeader from "@/components/transferencias/TransferenciaHeader";
 import TablaDetalleTransferencia from "@/components/transferencias/TablaDetalleTransferencia";
 import AccionesRecepcion from "@/components/transferencias/AccionesRecepcion";
+import AgregarProductoRecibido from "@/components/transferencias/AgregarProductoRecibido";
 import PanelCancelarTransferencia from "@/components/transferencias/PanelCancelarTransferencia";
 import { SectionHead, TotalTile, fmtCantidad, fmtMoneda } from "@/components/transferencias/detallePresentacion";
+import { exigeMotivo } from "@/lib/transferencias/recepcion";
+import {
+  construirEditItems,
+  cuerpoQuitarLinea,
+  hayEdicionPendiente,
+  reconciliarEditItems,
+} from "@/lib/transferencias/recepcionUI";
 
 const LISTADO = "/modulos/transferencias";
 const TZ_AR = "America/Argentina/Cordoba";
@@ -81,15 +89,39 @@ export default function TransferenciaDetallePage() {
   // Todo hook de este componente va acá arriba, antes de cualquier return.
   const [panelCancelar, setPanelCancelar] = useState(false);
 
+  // Selector de "producto que llegó y no estaba en el remito", y qué línea se
+  // está quitando. Los dos hooks van acá arriba, antes de cualquier return, por
+  // el mismo motivo que el de arriba: cambiar la cantidad de hooks entre renders
+  // rompe la pantalla entera.
+  const [agregarAbierto, setAgregarAbierto] = useState(false);
+  const [quitandoId, setQuitandoId] = useState(null);
+
   const [me, setMe] = useState(null);
 
   // Detecta cambios sin guardar
   const [dirty, setDirty] = useState(false);
 
+  // ── UN ESPEJO DE `editItems`, Y NO ES UNA COMODIDAD ───────────────────────
+  //
+  // Agregar una línea recarga del servidor y tiene que RECONCILIAR lo fresco con
+  // lo que el operador tenía escrito. Ese "lo que tenía escrito" hay que leerlo
+  // en el momento de recargar, y leerlo del estado significaría leer la clausura
+  // del render en el que se creó el handler: si entre medio hubo otro
+  // `setEditItems`, el valor sería viejo y la edición que se pretende conservar
+  // se perdería igual — el mismo defecto con otra causa.
+  //
+  // El ref se escribe en el MISMO lugar donde se escribe el estado, así que los
+  // dos dicen siempre lo mismo.
+  const editItemsRef = useRef([]);
+  const aplicarEditItems = (valor) => {
+    editItemsRef.current = valor;
+    setEditItems(valor);
+  };
+
   // Wrapper para marcar cambios como dirty
-  const setEditItemsDirty = (fn) => {
+  const setEditItemsDirty = (valor) => {
     setDirty(true);
-    setEditItems(fn);
+    aplicarEditItems(valor);
   };
 
   // ===============================
@@ -104,7 +136,24 @@ export default function TransferenciaDetallePage() {
   // ===============================
   // Cargar transferencia
   // ===============================
-  const cargar = async () => {
+  /**
+   * ── LOS DOS MODOS DE RECARGAR, Y CUÁNDO VA CADA UNO ─────────────────────
+   *
+   * Por defecto `cargar()` REEMPLAZA todo y deja `dirty` en false. Es lo que
+   * corresponde después de la carga inicial, de Guardar y de Confirmar: en esos
+   * tres momentos lo que hay en el servidor ES lo último que quiso el operador,
+   * así que no hay nada pendiente que conservar.
+   *
+   * `cargar({ preservarEdicion: true })` es solo para las recargas que provoca
+   * AGREGAR o QUITAR una línea. Ahí el operador no guardó nada: pidió otra cosa,
+   * y pisarle lo escrito sería cobrarle esa otra cosa con su trabajo.
+   *
+   * En ese modo `dirty` no se fuerza: se RECALCULA comparando lo reconciliado
+   * contra lo que el servidor propone. Si ya no queda ninguna edición —por
+   * ejemplo porque la única que había estaba en la línea que se acaba de
+   * quitar— vuelve a false solo, sin dejar el aviso encendido de gusto.
+   */
+  const cargar = async ({ preservarEdicion = false } = {}) => {
     try {
       setLoading(true);
       setError("");
@@ -126,23 +175,24 @@ export default function TransferenciaDetallePage() {
 
       setItem(json.item);
 
-      setEditItems(
-        json.item.items.map((d) => ({
-          id: d.id,
-          enviado: d.cantidadEnviada,
-          // null = todavía no se cargó recepción → se propone lo enviado.
-          // 0 = no llegó ninguna unidad → se muestra 0. Son cosas distintas, y
-          // usar truthiness acá hacía que un 0 guardado reapareciera como el
-          // total enviado y se pudiera sobrescribir sin querer.
-          recibido:
-            d.cantidadRecibida == null ? d.cantidadEnviada : d.cantidadRecibida,
-          motivoPrincipal: d.motivoPrincipal || "",
-          motivoDetalle: d.motivoDetalle || "",
-        }))
-      );
+      // La construcción de `editItems` se mudó a `recepcionUI`: la hacen dos
+      // caminos —reemplazar y reconciliar— y con dos copias, el día que una
+      // cambie la otra queda atrás. El distingo entre `null` y `0` sigue vivo
+      // allá, en `filaDeServidor`, con su motivo escrito.
+      const frescos = json.item.items;
+      const reconciliados = preservarEdicion
+        ? reconciliarEditItems({ items: frescos, previos: editItemsRef.current })
+        : construirEditItems(frescos);
 
-      // Al cargar, no hay cambios pendientes
-      setDirty(false);
+      aplicarEditItems(reconciliados);
+
+      // Reemplazar no deja nada pendiente. Preservar sí puede, y se pregunta en
+      // vez de suponerse.
+      setDirty(
+        preservarEdicion
+          ? hayEdicionPendiente({ items: frescos, editItems: reconciliados })
+          : false
+      );
 
     } catch (e) {
       console.error("Error cargando transferencia:", e);
@@ -216,11 +266,28 @@ export default function TransferenciaDetallePage() {
     try {
       setGuardando(true);
 
+      // ── LA MISMA REGLA QUE EL SERVIDOR, NO UNA PARECIDA ──────────────────
+      //
+      // Esto miraba solo `recibido !== enviado`, y con eso le pedía motivo a una
+      // línea AGREGADA en recepción —que por definición tiene 0 enviado y algo
+      // recibido—. El servidor dejó de exigirlo el 2026-09-08 porque su
+      // procedencia ya está registrada con autor y fecha; si la pantalla siguiera
+      // pidiéndolo, habría dos reglas contradictorias y la que frena sería la de
+      // acá, sobre una línea que el propio sistema creó bien.
+      //
+      // `exigeMotivo` es la función que usa `validarDetalleRecepcion`. Una sola.
       for (const it of editItems) {
         const enviado = num(it.enviado);
         const recibido = num(it.recibido);
 
-        if (recibido !== enviado) {
+        const pideMotivo = exigeMotivo({
+          hayDiferencia: recibido !== enviado,
+          // Estructural y del servidor: la reconciliación nunca conserva una
+          // versión vieja de este flag.
+          agregadoEnRecepcion: it.agregadoEnRecepcion,
+        });
+
+        if (pideMotivo) {
           if (!it.motivoPrincipal) {
             alert("Falta motivo.");
             setGuardando(false);
@@ -258,6 +325,61 @@ export default function TransferenciaDetallePage() {
       alert("Error guardando: " + err.message);
     } finally {
       setGuardando(false);
+    }
+  };
+
+  // ===============================
+  // Agregar y quitar una línea de recepción
+  //
+  // ── EL SERVIDOR ES EL AUTORITATIVO, Y POR ESO SE RECARGA ──────────────────
+  //
+  // Después de agregar o de quitar NO se toca `editItems` a mano: se vuelve a
+  // pedir `/api/transferencias/detalle` y se reconstruye todo desde la respuesta
+  // real, con el mismo `cargar()` de siempre.
+  //
+  // Inventar la línea en el estado local y confiar en que coincida con lo que
+  // quedó guardado es exactamente la clase de suposición que después aparece
+  // como una diferencia que nadie sabe explicar: el servidor le pone el id, la
+  // marca de agregada, el autor, la fecha y el costo, y cualquiera de esos cinco
+  // puede salir distinto de lo que la pantalla imaginó.
+  //
+  // Y `cargar()` deja `dirty` en false, que también es correcto: lo que había sin
+  // guardar se pierde al recargar, y el aviso de la card lo dice antes.
+  // ===============================
+  const agregarLinea = async (cuerpo) => {
+    const res = await fetch("/api/transferencias/linea-recepcion", {
+      method: "POST",
+      body: JSON.stringify(cuerpo),
+    });
+    const json = await res.json();
+    // `yaExistia` NO recarga ni cierra: el modal muestra el mensaje y el
+    // operador corrige la cantidad en la línea que ya está.
+    //
+    // Y la recarga PRESERVA la edición pendiente. El caso que esto arregla es el
+    // más común de todos: alguien escribió 15 sobre 10, no guardó, y agrega el
+    // producto que apareció al abrir los bultos. Sin preservar, el 15 volvía a 10
+    // y el operador perdía su trabajo por haber usado otra función de la misma
+    // pantalla.
+    if (json?.ok && !json.yaExistia) await cargar({ preservarEdicion: true });
+    return json;
+  };
+
+  const quitarLinea = async (detalleId) => {
+    try {
+      setQuitandoId(detalleId);
+      const res = await fetch("/api/transferencias/linea-recepcion", {
+        method: "DELETE",
+        body: JSON.stringify(cuerpoQuitarLinea({ transferenciaId: item.id, detalleId })),
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error);
+      // Mismo motivo que al agregar. La línea borrada desaparece sola —no viene
+      // en la respuesta— y las ediciones pendientes de las OTRAS sobreviven.
+      await cargar({ preservarEdicion: true });
+    } catch (err) {
+      alert("No se pudo quitar la línea: " + err.message);
+    } finally {
+      setQuitandoId(null);
     }
   };
 
@@ -387,6 +509,7 @@ export default function TransferenciaDetallePage() {
               guardarCambios={guardarCambios}
               confirmando={confirmando}
               confirmarRecepcion={confirmarRecepcion}
+              dirty={dirty}
               puedeCancelar={puedeCancelar}
               panelCancelarAbierto={panelCancelar}
               abrirPanelCancelar={() => setPanelCancelar((v) => !v)}
@@ -408,12 +531,30 @@ export default function TransferenciaDetallePage() {
             <TransferenciaHeader item={item} />
 
             {/* 2 · Productos transferidos */}
+            {/* El botón "+ Agregar producto recibido" y la acción de quitar solo
+                existen si esta persona puede recibir. No se le pasa un booleano
+                a la tabla para que ella decida: se le pasa —o no— el handler.
+                Sin handler no hay nada que dibujar, y así la regla vive en un
+                solo lugar. En "Recibida" y en "Cancelada", `puedeRecibir` ya es
+                falso. */}
             <TablaDetalleTransferencia
               item={item}
               editItems={editItems}
               setEditItems={setEditItemsDirty}
               inputsHabilitados={inputsHabilitados}
+              onAgregarProducto={puedeRecibir ? () => setAgregarAbierto(true) : null}
+              onQuitarLinea={puedeRecibir ? quitarLinea : null}
+              quitandoId={quitandoId}
             />
+
+            {puedeRecibir && (
+              <AgregarProductoRecibido
+                abierto={agregarAbierto}
+                transferenciaId={item.id}
+                onCerrar={() => setAgregarAbierto(false)}
+                onAgregar={agregarLinea}
+              />
+            )}
 
             {/* 3 · Totales — métricas por LÍNEA (ver comentario arriba) */}
             <section className="space-y-2">

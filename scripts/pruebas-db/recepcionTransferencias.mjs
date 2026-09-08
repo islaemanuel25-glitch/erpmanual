@@ -387,6 +387,82 @@ async function correr(f) {
   igualStock("Coca: la línea original se recibió completa", (await stockDestinoDe(pCoca.baseId)).cantidad, 10);
 
   // ═════════════════════════════════════════════════════════════════════════
+  seccion("EL FLUJO DEL PEDIDO: 10/15 con Sobrante + Fanta agregada SIN motivo");
+  // ═════════════════════════════════════════════════════════════════════════
+  //
+  // ── POR QUÉ ESTA SECCIÓN EXISTE ─────────────────────────────────────────
+  //
+  // La de arriba guarda un "Sobrante" a mano en la línea agregada, así que pasa
+  // por el camino en el que el motivo SÍ está. El defecto vivía justo al lado:
+  // `linea-recepcion` crea la línea sin motivo —no hay ninguno que sea un dato
+  // real— y confirmar la rechazaba con FALTA_MOTIVO_DIFERENCIA. O sea que el
+  // sistema creaba una línea que él mismo no podía confirmar.
+  //
+  // Acá se ejerce el flujo tal cual ocurre: se agrega, NO se le guarda motivo, y
+  // se confirma. Contra las rutas de verdad y contra Postgres, que es lo único
+  // que contesta si el inventario quedó bien.
+
+  const pA = await armarProducto({ nombre: `prodA-${n++}` });
+  const pFantaB = await armarProducto({ nombre: `fantaB-${n++}`, factorPack: 6, stockOrigen: 100 });
+  const tFlujo = await armarTransferencia([{ producto: pA, cantidad: 10 }]);
+  const detRemito = await prisma.transferenciaDetalle.findFirst({ where: { transferenciaId: tFlujo.id } });
+
+  // 1 · la línea del remito: 10 enviadas, 15 recibidas, con su Sobrante.
+  const guardadoA = await guardar(tFlujo.id, [
+    { id: detRemito.id, recibido: 15, motivoPrincipal: "Sobrante" },
+  ]);
+  ok("la línea del remito guarda 15 con Sobrante", guardadoA.ok === true, guardadoA.error);
+
+  // 2 · Fanta, agregada, 2 BULTO de 6. La ruta NO le escribe motivo.
+  const altaFanta = await agregarLinea({
+    transferenciaId: tFlujo.id, productoLocalId: pFantaB.productoLocalId,
+    recibido: 2, unidadEnviada: "BULTO",
+  });
+  ok("se agrega Fanta en BULTO", altaFanta.ok === true, altaFanta.error);
+  const detFantaB = await prisma.transferenciaDetalle.findUnique({ where: { id: altaFanta.detalleId } });
+  igual("y nace SIN motivo, que es como la crea la ruta", detFantaB.motivoPrincipal, null);
+  igual("marcada como agregada", detFantaB.agregadoEnRecepcion, true);
+
+  const origenAntesA = await stockDe(origen.id, pA.productoLocalId);
+  const origenAntesFanta = await stockDe(origen.id, pFantaB.productoLocalId);
+  const transitoFantaB = origenAntesFanta.enTransito;
+
+  // 3 · CONFIRMAR, sin haberle puesto ningún motivo a Fanta.
+  const conf = await confirmar(tFlujo.id);
+  ok("CONFIRMA sin pedirle motivo a la línea agregada", conf.ok === true, JSON.stringify(conf));
+  ok("y no falla por falta de motivo", conf.codigo !== "FALTA_MOTIVO_DIFERENCIA", conf.codigo || "");
+
+  // 4 · el inventario, que es lo que importa.
+  const trasA = await stockDe(origen.id, pA.productoLocalId);
+  igualStock("Producto A: el origen pierde los 5 de más", trasA.cantidad, origenAntesA.cantidad - 5);
+  igualStock("y su tránsito queda en 0", trasA.enTransito, 0);
+  igualStock("el destino recibe 15", (await stockDestinoDe(pA.baseId)).cantidad, 15);
+
+  const trasFanta = await stockDe(origen.id, pFantaB.productoLocalId);
+  igualStock("Fanta: el origen pierde 12 unidades (2 bultos de 6)",
+    trasFanta.cantidad, origenAntesFanta.cantidad - 12);
+  igualStock("Fanta: el tránsito NO se tocó: nunca se envió", trasFanta.enTransito, transitoFantaB);
+  igualStock("Fanta: el destino recibe 12, no 2", (await stockDestinoDe(pFantaB.baseId)).cantidad, 12);
+
+  // 5 · la auditoría distingue las dos.
+  const audA = await prisma.auditoriaStock.findFirst({ where: { transferenciaDetalleId: detRemito.id } });
+  igual("Producto A se audita como EXCEDENTE", audA?.accion, ACCIONES_RECEPCION.EXCEDENTE);
+  const audFanta = await prisma.auditoriaStock.findFirst({ where: { transferenciaDetalleId: detFantaB.id } });
+  igual("Fanta se audita como AGREGADO", audFanta?.accion, ACCIONES_RECEPCION.AGREGADO);
+
+  // 6 · y el motivo sigue sin inventarse en la base.
+  const detFantaFinal = await prisma.transferenciaDetalle.findUnique({ where: { id: detFantaB.id } });
+  igual("no se le escribió un motivo falso", detFantaFinal.motivoPrincipal, null);
+
+  // 7 · EL CONTRASTE: una línea DEL REMITO con diferencia y sin motivo NO pasa.
+  const tSinMotivo = await armarTransferencia([{ producto: pA, cantidad: 4 }]);
+  const detSinMotivo = await prisma.transferenciaDetalle.findFirst({ where: { transferenciaId: tSinMotivo.id } });
+  const guardarSinMotivo = await guardar(tSinMotivo.id, [{ id: detSinMotivo.id, recibido: 9 }]);
+  ok("una línea del REMITO sin motivo sigue rechazándose", guardarSinMotivo.ok !== true,
+    JSON.stringify(guardarSinMotivo));
+  igual("con el código de siempre", guardarSinMotivo.codigo, "FALTA_MOTIVO_DIFERENCIA");
+
+  // ═════════════════════════════════════════════════════════════════════════
   seccion("Auditoría: las tres acciones quedan distinguidas");
   // ═════════════════════════════════════════════════════════════════════════
 

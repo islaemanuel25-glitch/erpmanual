@@ -618,6 +618,15 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     "components/compras-proveedor/ModalVincularCodigo.jsx": true,
     "components/listas-precios/ModalListaPrecio.jsx": true,
     "components/caja/ModalCambioPrevio.jsx": true,
+    // Agregar un producto que llegó y el remito no menciona. Se pierde lo
+    // ARMADO, que es el criterio: el producto buscado y elegido, la unidad en la
+    // que se contó y la cantidad. Y las tres cuestan distinto de rehacer — la
+    // unidad en particular es una decisión que la pantalla NO puede recuperar
+    // sola, porque a propósito no tiene default.
+    //
+    // Además es el caso donde el toque al costado pasa solo: en el teléfono este
+    // modal es una hoja pegada al borde de abajo, con el pulgar justo ahí.
+    "components/transferencias/AgregarProductoRecibido.jsx": true,
     // Stock: los dos son formularios cortos pero se pierde lo escrito —la
     // cantidad y su motivo en uno, los dos límites en el otro—. Y hay un motivo
     // extra que no es de criterio sino de CONSERVAR: los dos estaban armados a

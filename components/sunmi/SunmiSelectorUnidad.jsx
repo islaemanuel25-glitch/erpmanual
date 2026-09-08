@@ -24,18 +24,37 @@ import { componerClaseTexto } from "@/lib/sunmi/claseNegociada";
 
 export const UNIDAD = Object.freeze({ PACK: "pack", UN: "un" });
 
+/** Las dos de siempre. Sigue siendo el default, así que nadie tuvo que cambiar. */
+export const OPCIONES_PRECIO = Object.freeze([
+  { clave: UNIDAD.PACK, texto: "Pack" },
+  { clave: UNIDAD.UN, texto: "Un" },
+]);
+
+// ── POR QUÉ ESTE CONTROL AHORA ACEPTA OPCIONES Y `null` ───────────────────
+//
+// La recepción de transferencias necesita el MISMO control —dos botones pegados
+// para elegir una unidad— con otras dos etiquetas: "UNIDAD" y "BULTO · x6". La
+// alternativa era escribir uno parecido al lado, y dos controles que hacen lo
+// mismo no se rompen el día que se escriben: se rompen el día que uno aprende
+// algo y el otro no.
+//
+// Y una diferencia que NO es cosmética: acá el valor puede empezar en `null`.
+// Para los precios siempre hay una unidad elegida —se está mirando una lista y
+// tiene que estar en alguna escala—; para una línea agregada en recepción, elegir
+// por el operador es inventar un dato. Con `valor = null` no hay ningún botón
+// presionado y el `aria-pressed` de los dos es `false`, que es la verdad.
+//
+// Los defaults quedaron como estaban, así que el consumidor que ya existía no
+// cambió ni una línea.
+
 export default function SunmiSelectorUnidad({
   valor = UNIDAD.PACK,
   onCambiar,
   rotulo = "Ver precios por",
   nota = null,
+  opciones = OPCIONES_PRECIO,
   className = "",
 }) {
-  const opciones = [
-    { clave: UNIDAD.PACK, texto: "Pack" },
-    { clave: UNIDAD.UN, texto: "Un" },
-  ];
-
   return (
     <div className={["sunmi-surface-soft border-b sunmi-divider px-3 pb-2 pt-[9px]", className].filter(Boolean).join(" ")}>
       <div className="flex items-center justify-between gap-3">
