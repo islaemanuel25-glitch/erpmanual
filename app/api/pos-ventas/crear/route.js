@@ -626,9 +626,18 @@ export async function POST(req) {
       // `medio: MERCADOPAGO` cuando el local ya configuró modalidades adentro de
       // Mercado Pago. Cobrarlo contra `RecargoPagoLocal` saltearía el recargo de
       // Crédito, en silencio y a favor de quien manda el pedido.
+      //
+      // DOS CÓDIGOS, Y LA DIFERENCIA IMPORTA. "No existe" es 404 y cubre
+      // también lo que no es de este local o cuelga de otro padre: los tres se
+      // contestan igual para que un id ajeno no sirva para averiguar qué
+      // configuró otra boca. "Existe pero cambió" —se desactivó, ahora exige
+      // modalidad— es 409, que es lo que la pantalla sabe leer como "refrescá".
+      const noExiste =
+        resolucion.motivo === CONFLICTO_COBRO.MEDIO_INEXISTENTE ||
+        resolucion.motivo === CONFLICTO_COBRO.MODALIDAD_INEXISTENTE;
       return NextResponse.json(
         { ok: false, code: resolucion.motivo, error: resolucion.error },
-        { status: resolucion.motivo === CONFLICTO_COBRO.MEDIO_INEXISTENTE ? 404 : 409 }
+        { status: noExiste ? 404 : 409 }
       );
     }
 
