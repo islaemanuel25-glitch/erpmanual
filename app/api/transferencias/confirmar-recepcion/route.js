@@ -7,30 +7,116 @@ import { esFiambreFijo, piezasToKg } from "@/lib/conversiones/stock";
 import { esComboBase } from "@/lib/combos/guards";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import {
-  validarDetalleRecepcion,
   mensajeRecepcion,
   statusRecepcion,
   accionAuditoriaDe,
   ACCIONES_RECEPCION,
 } from "@/lib/transferencias/recepcion";
-import { estadoAdmiteRecepcion, puedeRecibir } from "@/lib/transferencias/recepcionServidor";
+import {
+  cargarDetallesDeRecepcion,
+  ErrorRecepcion,
+  estadoAdmiteRecepcion,
+  planificarRecepcion,
+  puedeRecibir,
+  reclamarOFallar,
+} from "@/lib/transferencias/recepcionServidor";
 import { getConfigLocalEfectiva } from "@/lib/config/local";
 
 /** Cantidades siempre con la escala física de StockLocal (3 decimales). */
 const fmt = (n) => Number(n || 0).toFixed(3);
 
+const MENSAJE_STOCK_INSUFICIENTE =
+  "Llegó más mercadería de la enviada y el local de origen no tiene stock para cubrir la diferencia. " +
+  "Este grupo no permite stock negativo.";
+
 /**
- * Error tipado que se lanza DENTRO de la transacción para abortarla entera. El
- * catch exterior lo traduce a HTTP: nunca se devuelve un NextResponse desde
- * adentro de `$transaction`.
+ * QUÉ PRODUCTOS NO ALCANZAN — SOLO PARA EL MENSAJE.
+ *
+ * Lectura sin lock, antes de la transacción, para poder decir qué producto y
+ * cuánto falta. **No es la garantía**: ver `descontarConGuardia`.
  */
-class ErrorRecepcion extends Error {
-  constructor(code, message, status = 409) {
-    super(message);
-    this.name = "ErrorRecepcion";
-    this.code = code;
-    this.status = status;
+async function faltantesDeExcedente(db, { origenId, detalles, planes }) {
+  const faltantes = [];
+
+  for (const d of detalles) {
+    const plan = planes.get(d.id);
+    if (!plan || plan.excedenteUnidades <= 0) continue;
+
+    const productoOrigen = await db.productoLocal.findUnique({
+      where: { localId_baseId: { localId: origenId, baseId: d.producto.base.id } },
+      select: { id: true },
+    });
+    const stock = productoOrigen
+      ? await db.stockLocal.findUnique({
+          where: { localId_productoId: { localId: origenId, productoId: productoOrigen.id } },
+          select: { cantidad: true },
+        })
+      : null;
+
+    const disponible = Number(stock?.cantidad || 0);
+    if (plan.excedenteUnidades > disponible) {
+      faltantes.push({
+        productoNombre: d.producto.base.nombre || d.producto.nombre || "N/A",
+        necesario: plan.excedenteUnidades,
+        disponible,
+      });
+    }
   }
+
+  return faltantes;
+}
+
+/**
+ * EL DESCUENTO DEL ORIGEN, CON LA GUARDIA DE STOCK NEGATIVO ADENTRO DE LA
+ * TRANSACCIÓN.
+ *
+ * ── POR QUÉ NO ALCANZABA CON MIRAR ANTES ──────────────────────────────────
+ *
+ * Leer el stock, ver que alcanza y descontar después deja una carrera entre DOS
+ * TRANSFERENCIAS DISTINTAS sobre el mismo producto. El lock de `Transferencia`
+ * no la cubre: A y B no comparten esa fila.
+ *
+ *     stock 10, las dos necesitan 8
+ *     A lee 10 → pasa · B lee 10 → pasa · A descuenta → 2 · B descuenta → -6
+ *
+ * ── CÓMO SE CIERRA ────────────────────────────────────────────────────────
+ *
+ * El UPDATE lleva la condición adentro: `cantidad >= minimoRequerido`. En READ
+ * COMMITTED, la segunda transacción se BLOQUEA en el lock de esa fila y, cuando
+ * la primera termina, vuelve a evaluar el WHERE contra la versión NUEVA. Ve
+ * `cantidad = 2`, `2 >= 8` es falso, empareja cero filas y se entera. No hay
+ * ventana entre comprobar y escribir porque son la misma sentencia.
+ *
+ * Y funciona con varios detalles del MISMO producto en la misma recepción: cada
+ * uno descuenta en secuencia dentro de la misma transacción, así que el segundo
+ * ve lo que dejó el primero. Validar los dos contra el stock inicial dejaría que
+ * la suma lo atravesara.
+ *
+ * `updateMany` no devuelve la fila, así que el valor nuevo se relee para la
+ * auditoría. Con `minimoRequerido = 0` no hay nada que guardar y se usa el
+ * `update` de siempre, que ya la devuelve.
+ */
+async function descontarConGuardia(tx, { localId, productoId, datos, minimoRequerido, nombre }) {
+  const donde = { localId_productoId: { localId, productoId } };
+
+  if (!(minimoRequerido > 0)) {
+    return tx.stockLocal.update({ where: donde, data: datos });
+  }
+
+  const r = await tx.stockLocal.updateMany({
+    where: { localId, productoId, cantidad: { gte: minimoRequerido } },
+    data: datos,
+  });
+
+  if (r.count === 0) {
+    throw new ErrorRecepcion(
+      "STOCK_INSUFICIENTE",
+      `${MENSAJE_STOCK_INSUFICIENTE} (${nombre}: hacen falta ${fmt(minimoRequerido)} unidades)`,
+      400
+    );
+  }
+
+  return tx.stockLocal.findUnique({ where: donde });
 }
 
 export async function POST(req) {
@@ -105,42 +191,25 @@ export async function POST(req) {
     }
 
     // ============================================================
-    // 🟦 VALIDACIÓN PREVIA — antes de tocar una sola fila
+    // 🟦 PREVALIDACIÓN — RÁPIDA Y NO AUTORITATIVA
     //
-    // Se validan TODOS los detalles primero: si uno solo es inválido, la
-    // recepción no empieza y el stock queda intacto. Antes la aritmética se
-    // resolvía dentro del loop de mutación, así que un detalle malo podía
-    // encontrarse con detalles anteriores ya aplicados (la transacción los
-    // revertía, pero el estado quedaba en "Confirmando" hasta el rollback).
+    // Corre antes de la transacción para poder contestar con un mensaje bueno
+    // —qué producto, qué le falta— sin haber tomado ningún lock.
+    //
+    // NO ES LA GARANTÍA. Entre esta lectura y la transacción, otra persona puede
+    // agregar una línea, borrarla o cambiar una cantidad. La versión que manda es
+    // la que corre DESPUÉS del lock, sobre los detalles releídos ahí. Las dos
+    // llaman a la MISMA función: si fueran dos copias, la de adentro se quedaría
+    // atrás y este rechazo amable dejaría pasar lo que aquélla tendría que frenar.
     // ============================================================
-    const planes = new Map(); // detalleId → resultado validado
-
-    for (const d of transferencia.detalle) {
-      // Los combos no tienen stock físico: no se reciben (igual que antes).
-      if (esComboBase(d.producto.base)) continue;
-
-      const plan = validarDetalleRecepcion({
-        detalle: {
-          cantidad: d.cantidad,
-          recibido: d.recibido,
-          unidadEnviada: d.unidadEnviada,
-          motivoPrincipal: d.motivoPrincipal,
-          motivoDetalle: d.motivoDetalle,
-          agregadoEnRecepcion: d.agregadoEnRecepcion,
-        },
-        factorPack: Number(d.producto.base.factor_pack || 1),
-      });
-
-      if (!plan.ok) {
-        const nombre = d.producto.base.nombre || d.producto.nombre || null;
-        return NextResponse.json(
-          { ok: false, codigo: plan.error, error: mensajeRecepcion(plan.error, { nombre }) },
-          { status: statusRecepcion(plan.error) }
-        );
-      }
-
-      planes.set(d.id, plan);
+    const previo = planificarRecepcion(transferencia.detalle);
+    if (!previo.ok) {
+      return NextResponse.json(
+        { ok: false, codigo: previo.error, error: mensajeRecepcion(previo.error, { nombre: previo.nombre }) },
+        { status: statusRecepcion(previo.error) }
+      );
     }
+    const planes = previo.planes;
 
     // ============================================================
     // 🟦 GRUPO DEL ORIGEN — también antes de la transacción
@@ -155,22 +224,30 @@ export async function POST(req) {
     // posible. Con diferencias positivas y líneas agregadas, el origen también
     // PIERDE stock y ese movimiento necesita el mismo rastro.
     // ============================================================
-    const hayAjusteOrigen = [...planes.values()].some((p) => p.ajusteOrigenUnidades !== 0);
-    let grupoOrigenId = null;
+    // Se resuelve SIEMPRE, no solo si el snapshot de afuera ve ajustes: entre
+    // esta lectura y el lock puede aparecer una línea agregada que sí los tenga,
+    // y quedarse sin grupo ahí adentro voltearía una recepción ya empezada. Es
+    // una consulta indexada y no depende de los detalles.
+    const grupoOrigenId = await getGrupoIdDeLocal(transferencia.origenId);
 
-    if (hayAjusteOrigen) {
-      grupoOrigenId = await getGrupoIdDeLocal(transferencia.origenId);
-      if (!grupoOrigenId) {
-        return NextResponse.json(
-          {
-            ok: false,
-            codigo: "GRUPO_ORIGEN_NO_RESUELTO",
-            error:
-              "No se pudo determinar el grupo del local de origen. Hay diferencias que ajustar y no se puede auditar el movimiento.",
-          },
-          { status: 409 }
-        );
-      }
+    // Pero la EXIGENCIA sigue siendo condicional, y es la de antes: una recepción
+    // sin ningún ajuste de origen no escribe auditoría, así que no necesita
+    // grupo, y pedírselo rechazaría recepciones que hoy funcionan.
+    //
+    // Éste es el rechazo amable, sobre el snapshot de afuera. El que manda está
+    // adentro de la transacción, justo antes de escribir la auditoría: es ahí
+    // donde se sabe de verdad si hay algo que auditar.
+    const hayAjusteOrigen = [...previo.planes.values()].some((p) => p.ajusteOrigenUnidades !== 0);
+    if (hayAjusteOrigen && !grupoOrigenId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          codigo: "GRUPO_ORIGEN_NO_RESUELTO",
+          error:
+            "No se pudo determinar el grupo del local de origen. Hay diferencias que ajustar y no se puede auditar el movimiento.",
+        },
+        { status: 409 }
+      );
     }
 
     // ============================================================
@@ -187,66 +264,38 @@ export async function POST(req) {
     // canónica —override del local con fallback al grupo—. El envío lee solo el
     // grupo; esa asimetría es previa y no se toca en esta tanda.
     //
-    // Y se comprueba ANTES de la transacción, con el stock actual: si no alcanza
-    // y el grupo no permite negativos, la recepción no empieza. Rechazar acá deja
-    // el inventario intacto y le dice al operador exactamente qué producto y
-    // cuánto falta.
+    // ── DÓNDE ESTÁ LA GARANTÍA, Y DÓNDE NO ────────────────────────────────
+    //
+    // El chequeo de abajo es SOLO para el mensaje: dice qué producto y cuánto
+    // falta sin haber tomado ningún lock. NO es la garantía, y creer que lo era
+    // dejaba abierta una carrera entre DOS TRANSFERENCIAS DISTINTAS sobre el
+    // mismo producto:
+    //
+    //     stock 10, las dos necesitan descontar 8
+    //     A consulta → hay 10 → pasa
+    //     B consulta → hay 10 → pasa
+    //     A descuenta → quedan 2
+    //     B descuenta → quedan -6      ← con allowNegativeStock = false
+    //
+    // El lock de `Transferencia` no lo arregla porque A y B son transferencias
+    // distintas: no comparten esa fila. La garantía real está adentro de la
+    // transacción, en un UPDATE condicionado al stock disponible. Ver
+    // `descontarConGuardia`.
     // ============================================================
-    const excedentes = [...planes.entries()].filter(([, p]) => p.excedenteUnidades > 0);
-    let permiteNegativo = false;
+    const cfgOrigen = await getConfigLocalEfectiva(transferencia.origenId, grupoOrigenId);
+    const permiteNegativo = cfgOrigen.allowNegativeStock === true;
 
-    if (excedentes.length > 0) {
-      const grupoParaPolitica = grupoOrigenId || (await getGrupoIdDeLocal(transferencia.origenId));
-      const cfg = await getConfigLocalEfectiva(transferencia.origenId, grupoParaPolitica);
-      permiteNegativo = cfg.allowNegativeStock === true;
-
-      if (!permiteNegativo) {
-        const porDetalle = new Map(transferencia.detalle.map((d) => [d.id, d]));
-        const faltantes = [];
-
-        for (const [detalleId, plan] of excedentes) {
-          const d = porDetalle.get(detalleId);
-          const productoOrigen = await prisma.productoLocal.findUnique({
-            where: {
-              localId_baseId: { localId: transferencia.origenId, baseId: d.producto.base.id },
-            },
-            select: { id: true },
-          });
-          const stock = productoOrigen
-            ? await prisma.stockLocal.findUnique({
-                where: {
-                  localId_productoId: {
-                    localId: transferencia.origenId,
-                    productoId: productoOrigen.id,
-                  },
-                },
-                select: { cantidad: true },
-              })
-            : null;
-
-          const disponible = Number(stock?.cantidad || 0);
-          if (plan.excedenteUnidades > disponible) {
-            faltantes.push({
-              productoNombre: d.producto.base.nombre || d.producto.nombre || "N/A",
-              necesario: plan.excedenteUnidades,
-              disponible,
-            });
-          }
-        }
-
-        if (faltantes.length > 0) {
-          return NextResponse.json(
-            {
-              ok: false,
-              codigo: "STOCK_INSUFICIENTE",
-              error:
-                "Llegó más mercadería de la enviada y el local de origen no tiene stock para cubrir la diferencia. " +
-                "Este grupo no permite stock negativo.",
-              faltantes,
-            },
-            { status: 400 }
-          );
-        }
+    if (!permiteNegativo) {
+      const faltantes = await faltantesDeExcedente(prisma, {
+        origenId: transferencia.origenId,
+        detalles: transferencia.detalle,
+        planes,
+      });
+      if (faltantes.length > 0) {
+        return NextResponse.json(
+          { ok: false, codigo: "STOCK_INSUFICIENTE", error: MENSAJE_STOCK_INSUFICIENTE, faltantes },
+          { status: 400 }
+        );
       }
     }
 
@@ -254,30 +303,47 @@ export async function POST(req) {
     // TODO en transacción para consistencia de stock
     // ============================================================
     await prisma.$transaction(async (tx) => {
-      // Barrera atómica: tomar exclusividad con updateMany condicional.
-      // Solo pasa si estado es Enviada o Recibiendo.
-      // Si otro proceso ya cambió el estado, count = 0 → abortar.
-      const lock = await tx.transferencia.updateMany({
-        where: {
-          id: transferenciaId,
-          estado: { in: ["Enviada", "Recibiendo"] },
-        },
-        data: { estado: "Confirmando" },
-      });
+      // ── 1. EL LOCK, Y ES LO PRIMERO QUE PASA ────────────────────────────
+      //
+      // `updateMany` condicional sobre la fila de la transferencia. En READ
+      // COMMITTED, cualquier otra escritura de recepción sobre esa fila se
+      // bloquea acá y después vuelve a evaluar su WHERE contra lo que dejamos:
+      // ve "Confirmando" y empareja cero.
+      await reclamarOFallar(tx, transferenciaId, "Confirmando");
 
-      if (lock.count === 0) {
-        throw new Error("ALREADY_CONFIRMED");
+      // ── 2. RECIÉN AHORA SE LEE QUÉ HAY QUE PROCESAR ─────────────────────
+      //
+      // Éste es el arreglo. Antes los detalles se leían ANTES del lock, así que
+      // una línea agregada entre la lectura y la barrera quedaba fuera del
+      // snapshot: la transferencia terminaba "Recibida" con una línea cuyo stock
+      // nunca se movió. Ahora el conjunto que mueve stock es POSTERIOR al lock,
+      // y a partir de acá nadie más puede tocarlo.
+      const detalles = await cargarDetallesDeRecepcion(tx, transferenciaId);
+
+      // ── 3. Y SE VUELVE A VALIDAR SOBRE ESA LECTURA ──────────────────────
+      //
+      // Con la MISMA función que la prevalidación de afuera. Si algo no valida,
+      // se lanza y la transacción entera se revierte — incluido el "Confirmando",
+      // que vuelve al estado anterior.
+      const autoritativo = planificarRecepcion(detalles);
+      if (!autoritativo.ok) {
+        throw new ErrorRecepcion(
+          autoritativo.error,
+          mensajeRecepcion(autoritativo.error, { nombre: autoritativo.nombre }),
+          statusRecepcion(autoritativo.error)
+        );
       }
+      const planesFirmes = autoritativo.planes;
 
       let tieneDiferencias = false;
 
-      for (const d of transferencia.detalle) {
+      for (const d of detalles) {
         // Defensa: los combos no tienen stock físico, no se procesan aquí.
         if (esComboBase(d.producto.base)) continue;
 
-        // Plan ya validado arriba: cantidades dentro de rango, unidad conocida y
-        // motivo presente si hay diferencia. Acá solo se aplica.
-        const plan = planes.get(d.id);
+        // Plan ya validado sobre la lectura de ADENTRO del lock: cantidades
+        // válidas, unidad conocida y motivo presente si hay diferencia.
+        const plan = planesFirmes.get(d.id);
         const { recibida, recibidaUnidades } = plan;
 
         if (plan.hayDiferencia) tieneDiferencias = true;
@@ -424,14 +490,14 @@ export async function POST(req) {
           ? { cantidad: { increment: ajusteOrigenUnidades }, enTransito: { decrement: enviadaUnidades } }
           : { cantidad: { increment: ajusteOrigenUnidades } };
 
-        const origenActualizado = await tx.stockLocal.update({
-          where: {
-            localId_productoId: {
-              localId: transferencia.origenId,
-              productoId: productoOrigen.id,
-            },
-          },
-          data: datosOrigen,
+        const origenActualizado = await descontarConGuardia(tx, {
+          localId: transferencia.origenId,
+          productoId: productoOrigen.id,
+          datos: datosOrigen,
+          // La guardia solo hace falta cuando el origen PIERDE stock y el grupo
+          // no admite negativos. Una devolución nunca puede dejarlo negativo.
+          minimoRequerido: !permiteNegativo ? plan.excedenteUnidades : 0,
+          nombre: d.producto.base.nombre || d.producto.nombre || String(productoOrigen.id),
         });
 
         // ============================================================
@@ -454,6 +520,18 @@ export async function POST(req) {
         // ============================================================
         const accion = accionAuditoriaDe(plan);
         if (accion) {
+          // La versión que manda del chequeo de grupo. El de afuera mira el
+          // snapshot previo al lock; acá ya se sabe, sobre la lectura firme, que
+          // esta línea mueve stock y necesita rastro. Sin grupo se aborta todo:
+          // `AuditoriaStock.grupoId` es obligatorio y dejarlo llegar a Prisma
+          // devolvería "Error interno" en lugar de decir qué falta.
+          if (!grupoOrigenId) {
+            throw new ErrorRecepcion(
+              "GRUPO_ORIGEN_NO_RESUELTO",
+              "No se pudo determinar el grupo del local de origen. Hay diferencias que ajustar y no se puede auditar el movimiento."
+            );
+          }
+
           const esAgregada = accion === ACCIONES_RECEPCION.AGREGADO;
           const esFaltante = accion === ACCIONES_RECEPCION.FALTANTE;
           const magnitud = esFaltante ? plan.devolucionUnidades : plan.excedenteUnidades;
@@ -517,13 +595,8 @@ export async function POST(req) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    if (err.message === "ALREADY_CONFIRMED") {
-      return NextResponse.json(
-        { ok: false, error: "Esta transferencia ya fue confirmada." },
-        { status: 400 }
-      );
-    }
     // Abortos deliberados desde adentro de la transacción: nada quedó escrito.
+    // Incluye RECEPCION_TOMADA, que es haber perdido la carrera por el lock.
     if (err.name === "ErrorRecepcion") {
       return NextResponse.json(
         { ok: false, codigo: err.code, error: err.message },

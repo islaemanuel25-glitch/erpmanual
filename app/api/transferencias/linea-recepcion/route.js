@@ -5,7 +5,13 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { esComboBase } from "@/lib/combos/guards";
 import { productoDelCatalogoLocal } from "@/lib/productos/buscarCatalogoLocal";
-import { estadoAdmiteRecepcion, puedeRecibir } from "@/lib/transferencias/recepcionServidor";
+import { ERRORES_RECEPCION, resolverUnidadEnviada } from "@/lib/transferencias/recepcion";
+import {
+  ErrorRecepcion,
+  estadoAdmiteRecepcion,
+  puedeRecibir,
+  reclamarOFallar,
+} from "@/lib/transferencias/recepcionServidor";
 
 // AGREGAR O QUITAR UNA LÍNEA QUE APARECIÓ AL ABRIR LOS BULTOS.
 //
@@ -85,11 +91,13 @@ async function resolverPedido(req) {
 /**
  * POST — agregar una línea de recepción.
  *
- * Cuerpo: { transferenciaId, productoLocalId, unidadEnviada?, recibido? }
+ * Cuerpo: { transferenciaId, productoLocalId, unidadEnviada, recibido? }
  *
  * `productoLocalId` es del catálogo del ORIGEN, y se comprueba contra ese
  * catálogo con el MISMO filtro que usa el buscador: lo que no se puede encontrar
  * tampoco se puede agregar.
+ *
+ * `unidadEnviada` es OBLIGATORIA. Ver el comentario en el cuerpo.
  */
 export async function POST(req) {
   try {
@@ -128,63 +136,110 @@ export async function POST(req) {
       );
     }
 
-    // ── SI YA ESTÁ EN EL REMITO, NO SE DUPLICA ──────────────────────────────
-    const existente = await prisma.transferenciaDetalle.findFirst({
-      where: { transferenciaId: transferencia.id, productoId: producto.id },
-      select: { id: true, cantidad: true, recibido: true, agregadoEnRecepcion: true },
-    });
-
-    if (existente) {
-      return NextResponse.json({
-        ok: true,
-        yaExistia: true,
-        detalleId: existente.id,
-        agregadoEnRecepcion: existente.agregadoEnRecepcion,
-        mensaje:
-          "Ese producto ya figura en esta transferencia. Aumentá la cantidad recibida en su línea en vez de agregarlo de nuevo.",
-      });
-    }
-
-    // La unidad de una línea agregada NO se hereda de nada: el operador cuenta
-    // en bultos o en unidades y esa elección cambia el stock por el factor de
-    // pack. Sin dato explícito se asume UNIDAD, que es la escala física de
-    // StockLocal y la única que no multiplica. Asumir BULTO inventaría stock, que
-    // es el mismo motivo por el que la recepción ya no tiene el viejo fallback
-    // silencioso `unidadEnviada || "BULTO"`.
-    const unidad = String(body?.unidadEnviada || "UNIDAD").toUpperCase();
-    if (unidad !== "UNIDAD" && unidad !== "BULTO") {
+    // ── LA UNIDAD ES OBLIGATORIA, Y NO SE ADIVINA ───────────────────────────
+    //
+    // Acá había `body?.unidadEnviada || "UNIDAD"`. Ese default es la misma
+    // familia de defecto que el viejo `unidadEnviada || "BULTO"` que la
+    // aritmética de recepción ya eliminó: **el mismo número significa cosas
+    // distintas según la unidad**, y elegirla por el servidor convierte un dato
+    // que faltó en un dato inventado.
+    //
+    // No es simétrico con aquél, es peor. Asumir UNIDAD parece "conservador"
+    // porque no multiplica por el factor de pack, pero una línea agregada
+    // DESCUENTA del origen: un cliente que mande 3 pensando en bultos de 20 le
+    // acredita al destino 3 unidades y le descuenta al origen 3, cuando la
+    // realidad son 60 y 60. La diferencia de 57 unidades no aparece en ningún
+    // lado —no hay envío contra el cual contrastar— y no vuelve a haber ninguna
+    // oportunidad de detectarla.
+    //
+    // Se resuelve con `resolverUnidadEnviada`, la MISMA función que valida la
+    // unidad de las líneas del remito, para que las dos puertas por las que
+    // entra una unidad contesten igual.
+    const uni = resolverUnidadEnviada(body?.unidadEnviada);
+    if (!uni.ok) {
+      // El CÓDIGO es el compartido, para que el cliente distinga los dos casos
+      // igual que en el resto de la recepción. El TEXTO no: el de
+      // `mensajeRecepcion` dice "corregí la transferencia antes de recibirla",
+      // que es el consejo correcto para una línea del remito guardada sin unidad
+      // y el equivocado acá, donde lo que faltó lo mandó este mismo pedido.
+      //
+      // Y el status tampoco: allá es 409 porque el dato guardado está mal, acá es
+      // 400 porque el pedido vino incompleto.
+      const falta = uni.error === ERRORES_RECEPCION.UNIDAD_AUSENTE;
       return NextResponse.json(
-        { ok: false, codigo: "UNIDAD_ENVIADA_DESCONOCIDA", error: "Unidad desconocida: se esperaba BULTO o UNIDAD." },
+        {
+          ok: false,
+          codigo: uni.error,
+          error: falta
+            ? "Falta la unidad de la línea agregada. Indicá si contaste en BULTO o en UNIDAD: " +
+              "la misma cantidad significa distinto según cuál sea."
+            : "Unidad desconocida: se esperaba BULTO o UNIDAD.",
+        },
         { status: 400 }
       );
     }
 
-    const creado = await prisma.transferenciaDetalle.create({
-      data: {
-        transferenciaId: transferencia.id,
-        productoId: producto.id,
-        // CERO, y es el dato honesto: esta línea no se envió. De acá sale que su
-        // tránsito no se toque y que su diferencia sea todo lo recibido.
-        cantidad: 0,
-        recibido: body?.recibido == null ? null : body.recibido,
-        unidadEnviada: unidad,
-        precioCosto: producto.precio_costo ?? producto.base?.precio_costo ?? null,
-        agregadoEnRecepcion: true,
-        agregadoEnRecepcionPorId: usuarioId,
-        agregadoEnRecepcionAt: new Date(),
-      },
-      select: { id: true },
+    // ── LA ESCRITURA, DETRÁS DEL LOCK ───────────────────────────────────────
+    //
+    // Antes esto creaba la línea y después movía el estado, las dos sueltas.
+    // Confirmar podía cerrar la transferencia justo en el medio, y la línea
+    // nacía dentro de una recepción ya confirmada: su stock no se iba a mover
+    // nunca, y el `estado: "Recibiendo"` de después reabría una transferencia
+    // que ya estaba "Recibida".
+    //
+    // `reclamarOFallar` deja las dos cosas resueltas de una: toma el lock de la
+    // fila y pone "Recibiendo", que es el estado que esta ruta quería dejar de
+    // todos modos. Y la comprobación de duplicado se mudó ADENTRO porque dos
+    // POST simultáneos del mismo producto la pasaban los dos.
+    const resultado = await prisma.$transaction(async (tx) => {
+      await reclamarOFallar(tx, transferencia.id, "Recibiendo");
+
+      // ── SI YA ESTÁ EN EL REMITO, NO SE DUPLICA ────────────────────────────
+      const existente = await tx.transferenciaDetalle.findFirst({
+        where: { transferenciaId: transferencia.id, productoId: producto.id },
+        select: { id: true, cantidad: true, recibido: true, agregadoEnRecepcion: true },
+      });
+
+      if (existente) {
+        return {
+          ok: true,
+          yaExistia: true,
+          detalleId: existente.id,
+          agregadoEnRecepcion: existente.agregadoEnRecepcion,
+          mensaje:
+            "Ese producto ya figura en esta transferencia. Aumentá la cantidad recibida en su línea en vez de agregarlo de nuevo.",
+        };
+      }
+
+      const creado = await tx.transferenciaDetalle.create({
+        data: {
+          transferenciaId: transferencia.id,
+          productoId: producto.id,
+          // CERO, y es el dato honesto: esta línea no se envió. De acá sale que su
+          // tránsito no se toque y que su diferencia sea todo lo recibido.
+          cantidad: 0,
+          recibido: body?.recibido == null ? null : body.recibido,
+          unidadEnviada: uni.unidad,
+          precioCosto: producto.precio_costo ?? producto.base?.precio_costo ?? null,
+          agregadoEnRecepcion: true,
+          agregadoEnRecepcionPorId: usuarioId,
+          agregadoEnRecepcionAt: new Date(),
+        },
+        select: { id: true },
+      });
+
+      return { ok: true, yaExistia: false, detalleId: creado.id };
     });
 
-    // La transferencia pasa a "Recibiendo" igual que al guardar cantidades: hay
-    // trabajo de recepción en curso.
-    await prisma.transferencia.update({
-      where: { id: transferencia.id },
-      data: { estado: "Recibiendo" },
-    });
-
-    return NextResponse.json({ ok: true, yaExistia: false, detalleId: creado.id });
+    return NextResponse.json(resultado);
   } catch (err) {
+    // Abortos deliberados desde adentro de la transacción: nada quedó escrito.
+    if (err.name === "ErrorRecepcion") {
+      return NextResponse.json(
+        { ok: false, codigo: err.code, error: err.message },
+        { status: err.status || 409 }
+      );
+    }
     console.error("ERROR agregar linea de recepcion:", err);
     return NextResponse.json(
       { ok: false, error: "No se pudo agregar la línea de recepción." },
@@ -209,37 +264,57 @@ export async function DELETE(req) {
     const { transferencia, body } = pedido;
     const detalleId = Number(body?.detalleId || 0);
 
-    // El detalle se busca DENTRO de la transferencia: un id de otra transferencia
-    // no aparece, así que no se puede borrar una línea ajena pasando su número.
-    const detalle = await prisma.transferenciaDetalle.findFirst({
-      where: { id: detalleId, transferenciaId: transferencia.id },
-      select: { id: true, agregadoEnRecepcion: true },
-    });
+    // ── EL LOCK PRIMERO, Y RECIÉN DESPUÉS SE MIRA LA LÍNEA ──────────────────
+    //
+    // Ésta era la peor de las tres carreras, porque borra. Validar afuera y
+    // borrar después dejaba esta secuencia: el DELETE comprueba que el estado
+    // admite edición, confirmar toma la transferencia y le mueve el stock a esa
+    // línea, y el borrado se ejecuta encima. El stock ya se movió y la línea que
+    // lo explica desaparece: queda un ajuste de inventario sin origen, y la
+    // auditoría apunta a un `transferenciaDetalleId` que ya no existe.
+    //
+    // Con el lock adelante eso no puede pasar en ningún orden: o el DELETE llega
+    // primero y confirmar ve una transferencia sin esa línea, o confirmar llega
+    // primero y el DELETE empareja cero y aborta.
+    await prisma.$transaction(async (tx) => {
+      await reclamarOFallar(tx, transferencia.id, "Recibiendo");
 
-    if (!detalle) {
-      return NextResponse.json(
-        { ok: false, error: "Esa línea no pertenece a esta transferencia." },
-        { status: 404 }
-      );
-    }
+      // El detalle se busca DENTRO de la transferencia: un id de otra transferencia
+      // no aparece, así que no se puede borrar una línea ajena pasando su número.
+      const detalle = await tx.transferenciaDetalle.findFirst({
+        where: { id: detalleId, transferenciaId: transferencia.id },
+        select: { id: true, agregadoEnRecepcion: true },
+      });
 
-    if (!detalle.agregadoEnRecepcion) {
-      return NextResponse.json(
-        {
-          ok: false,
-          codigo: "LINEA_DEL_REMITO_NO_SE_BORRA",
-          error:
-            "Esa línea es parte del envío original y no se puede eliminar desde la recepción. " +
+      if (!detalle) {
+        throw new ErrorRecepcion(
+          "LINEA_AJENA",
+          "Esa línea no pertenece a esta transferencia.",
+          404
+        );
+      }
+
+      if (!detalle.agregadoEnRecepcion) {
+        throw new ErrorRecepcion(
+          "LINEA_DEL_REMITO_NO_SE_BORRA",
+          "Esa línea es parte del envío original y no se puede eliminar desde la recepción. " +
             "Si no llegó nada de ese producto, cargá 0 como cantidad recibida.",
-        },
-        { status: 409 }
-      );
-    }
+          409
+        );
+      }
 
-    await prisma.transferenciaDetalle.delete({ where: { id: detalle.id } });
+      await tx.transferenciaDetalle.delete({ where: { id: detalle.id } });
+    });
 
     return NextResponse.json({ ok: true, eliminada: true });
   } catch (err) {
+    // Abortos deliberados desde adentro de la transacción: nada quedó escrito.
+    if (err.name === "ErrorRecepcion") {
+      return NextResponse.json(
+        { ok: false, codigo: err.code, error: err.message },
+        { status: err.status || 409 }
+      );
+    }
     console.error("ERROR eliminar linea de recepcion:", err);
     return NextResponse.json(
       { ok: false, error: "No se pudo eliminar la línea de recepción." },

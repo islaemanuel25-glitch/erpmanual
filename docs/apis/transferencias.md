@@ -123,9 +123,13 @@ Confirma recepcion y actualiza stock. Opera en transaccion.
 ```
 
 **Logica:**
-1. Valida TODOS los detalles antes de abrir la transaccion (cantidad, unidad,
+1. Prevalida TODOS los detalles antes de abrir la transaccion (cantidad, unidad,
    motivo, usuario de sesion y grupo del origen). Si algo falla, no se toca stock.
-2. Toma la barrera de estado (`updateMany` condicional) como primera escritura.
+   Esta pasada **no es autoritativa**: lee sin lock, y sirve para contestar
+   rapido con un mensaje que diga que producto y que le pasa.
+2. Toma la barrera de estado (`reclamarOFallar`) como primera escritura, **relee
+   los detalles adentro del lock** y vuelve a planificar con la misma funcion.
+   Ese segundo plan es el que manda.
 3. Suma al destino **solo la cantidad recibida** (convirtiendo bultos a unidades, o
    piezas a kg en fiambre fijo si corresponde).
 4. Crea ProductoLocal/StockLocal si no existen en destino.
@@ -192,6 +196,40 @@ rechaza— y no se define una regla nueva. Si el grupo no permite negativos y el
 origen no tiene stock para cubrir la diferencia, la confirmacion responde
 `STOCK_INSUFICIENTE` con la lista de faltantes y **no toca nada**.
 
+Ese chequeo previo es **solo para el mensaje**: lee sin lock, para poder decir
+que producto y cuanto falta. La garantia esta adentro de la transaccion, en
+`descontarConGuardia`: el descuento del origen es un `updateMany` con la
+condicion `cantidad >= excedenteNecesario` **dentro de la misma sentencia**, y si
+empareja cero filas se aborta toda la recepcion con `STOCK_INSUFICIENTE`.
+
+Hace falta porque el candado de la recepcion no cubre este caso: dos
+transferencias distintas sobre el mismo producto no comparten la fila de
+`Transferencia`. Con stock 10 y dos excedentes de 8, ambas leerian 10 y el origen
+terminaria en -6. Con la condicion adentro del UPDATE, la segunda se bloquea en
+el lock de la fila de stock, reevalua su `WHERE` contra la version nueva, ve 2 y
+no empareja. La respuesta de ese camino **no trae la lista `faltantes`**: es la
+forma de distinguir cual de los dos controles actuo.
+
+#### El candado de la recepcion
+
+Las cuatro escrituras de recepcion —guardar, agregar linea, borrar linea y
+confirmar— usan **la fila de `Transferencia` como mutex**. Cada una abre una
+transaccion y su **primera escritura** es `reclamarOFallar`, un `updateMany`
+condicionado a `estado IN ('Enviada','Recibiendo')` que deja `Recibiendo` para
+las tres primeras y `Confirmando` para la ultima.
+
+En READ COMMITTED, la segunda que llega se **bloquea** en esa fila y, cuando la
+primera termina, vuelve a evaluar su `WHERE` contra la version nueva: ve
+`Confirmando`, empareja cero filas y responde `RECEPCION_TOMADA` (409) sin haber
+escrito nada.
+
+Y lo que se procesa se lee **despues** del reclamo, no antes. Sin eso el candado
+no serviria: una linea agregada entre la lectura y el lock quedaria fuera del
+conjunto que mueve stock, y la transferencia terminaria `Recibida` con una linea
+cuyo inventario nunca se movio. El caso peor era el borrado: validado en
+`Recibiendo` y ejecutado despues de que la confirmacion movio el stock de esa
+linea, dejaba un ajuste de inventario sin la linea que lo explica.
+
 #### Auditoria
 
 `AuditoriaStock` distingue los tres casos, y ademas queda vinculada
@@ -216,6 +254,7 @@ rastro era el texto de `motivo`—:
 | `LINEA_AGREGADA_CON_CANTIDAD_ENVIADA` | 409 | Una linea marcada como agregada tiene cantidad enviada |
 | `UNIDAD_ENVIADA_AUSENTE` / `_DESCONOCIDA` | 409 | El detalle no dice si se envio en BULTO o UNIDAD |
 | `AJUSTE_ORIGEN_INVALIDO` | 409 | No se pudo calcular el ajuste de stock del origen |
+| `RECEPCION_TOMADA` | 409 | Otra persona la esta confirmando o ya la confirmo |
 
 Todos abortan la transaccion completa: no quedan mutaciones parciales.
 
@@ -225,7 +264,7 @@ Agrega una linea por un producto que llego y no estaba en el remito.
 Permiso `transferencias.recibir`; **solo el DESTINO** de esa transferencia, salvo
 admin; solo en estado `Enviada` o `Recibiendo`.
 
-**Body:** `{ transferenciaId, productoLocalId, unidadEnviada?, recibido? }`
+**Body:** `{ transferenciaId, productoLocalId, unidadEnviada, recibido? }`
 
 - `productoLocalId` es del catalogo del **ORIGEN**, y se comprueba contra ese
   catalogo con el mismo filtro que usa el buscador. El origen sale de la
@@ -233,14 +272,20 @@ admin; solo en estado `Enviada` o `Recibiendo`.
 - Si el producto **ya es una linea** de la transferencia, no se duplica: responde
   `{ ok: true, yaExistia: true, detalleId }` para que se aumente el `recibido` de
   esa linea.
-- `unidadEnviada` sin valor asume `UNIDAD`, que es la escala fisica de
-  `StockLocal`. Asumir `BULTO` inventaria stock.
+- **`unidadEnviada` es obligatoria y no tiene valor por defecto.** Se valida con
+  `resolverUnidadEnviada`, la misma funcion que valida las lineas del remito. Una
+  linea agregada DESCUENTA del origen y no hay ningun envio contra el cual
+  contrastar la diferencia: con `factor_pack` 20, suponer `UNIDAD` donde el
+  operador conto bultos son 57 unidades que no aparecen en ningun lado.
 - **No mueve stock.** El inventario se toca recien al confirmar.
 
 | Codigo | Status | Cuando |
 |---|---|---|
 | `PRODUCTO_FUERA_DEL_ORIGEN` | 404 | El producto no esta en el catalogo del origen (o no existe, o no es visible: se contestan igual) |
 | `COMBO_NO_TRANSFERIBLE` | 400 | Un combo no tiene stock fisico propio |
+| `UNIDAD_ENVIADA_AUSENTE` | 400 | No se indico si se conto en BULTO o en UNIDAD |
+| `UNIDAD_ENVIADA_DESCONOCIDA` | 400 | Se indico algo que no es BULTO ni UNIDAD |
+| `RECEPCION_TOMADA` | 409 | Otra persona esta confirmando la transferencia (ver "El candado de la recepcion") |
 
 ### DELETE /api/transferencias/linea-recepcion
 
@@ -252,6 +297,8 @@ porque esa linea nunca lo movio.
 | Codigo | Status | Cuando |
 |---|---|---|
 | `LINEA_DEL_REMITO_NO_SE_BORRA` | 409 | Es una linea del envio original: si no llego nada, se carga `recibido = 0` |
+| `LINEA_AJENA` | 404 | Ese detalle no pertenece a esta transferencia |
+| `RECEPCION_TOMADA` | 409 | Otra persona esta confirmando la transferencia |
 
 ### GET /api/transferencias/buscar-productos-origen
 

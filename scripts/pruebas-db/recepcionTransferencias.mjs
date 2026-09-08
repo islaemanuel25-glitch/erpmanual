@@ -97,6 +97,79 @@ const leer = async (respuesta) => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
+// CÓMO SE PRUEBA UNA CARRERA SIN SORTEARLA
+//
+// Un `Promise.all` de dos pedidos no prueba nada: el sistema operativo decide el
+// orden, y una versión ROTA pasa cada vez que las dos operaciones no llegan a
+// solaparse. Una prueba que a veces pasa es peor que no tenerla, porque el verde
+// se lee igual.
+//
+// Acá el orden lo fija PostgreSQL y no el azar. Una transacción interactiva toma
+// la fila y NO la suelta; recién entonces se dispara el pedido que va a chocar.
+// Ese pedido se queda esperando el lock —eso se COMPRUEBA, no se supone— y solo
+// después se libera la barrera. El resultado es el mismo en todas las corridas.
+//
+// `esperarBloqueo` es lo que convierte esto en determinista: si el pedido NUNCA
+// llega a bloquearse, la prueba FALLA. No se degrada a "bueno, igual dio bien":
+// una prueba que no pudo montar su condición no probó nada.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Cuántas conexiones de esta base están esperando un lock ahora mismo. */
+const bloqueadas = async () => {
+  const filas = await prisma.$queryRaw`
+    SELECT count(*)::int AS n
+      FROM pg_stat_activity
+     WHERE datname = current_database()
+       AND state = 'active'
+       AND wait_event_type = 'Lock'`;
+  return Number(filas?.[0]?.n || 0);
+};
+
+/** Espera a que ALGUIEN quede esperando un lock. Devuelve false si nunca pasa. */
+async function esperarBloqueo(msMax = 10000) {
+  const hasta = Date.now() + msMax;
+  while (Date.now() < hasta) {
+    if ((await bloqueadas()) > 0) return true;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  return false;
+}
+
+/**
+ * Abre una transacción que toma algo y se queda quieta hasta que se la suelta.
+ *
+ * Devuelve `{ tomado, soltar, fin }`: `tomado` ya está resuelto cuando la fila
+ * quedó tomada —así el pedido que va a chocar se dispara DESPUÉS, sin sleeps—,
+ * `soltar()` confirma la transacción y `fin` es su resultado.
+ */
+function barrera(tomar) {
+  let soltar;
+  const puerta = new Promise((r) => { soltar = r; });
+  let avisar;
+  const tomado = new Promise((r) => { avisar = r; });
+
+  const fin = prisma.$transaction(
+    async (tx) => {
+      let r;
+      try {
+        r = await tomar(tx);
+      } catch (e) {
+        // Sin esto, un fallo al tomar dejaría `tomado` sin resolver y la prueba
+        // colgada para siempre en vez de fallar.
+        avisar({ error: e });
+        throw e;
+      }
+      avisar(r);
+      await puerta;
+      return r;
+    },
+    { timeout: 60000, maxWait: 60000 }
+  );
+
+  return { tomado, soltar, fin: fin.catch((e) => ({ error: e })) };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // FIXTURES
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -288,6 +361,7 @@ async function correr(f) {
 
   const alta = await agregarLinea({
     transferenciaId: tf.id, productoLocalId: pFanta.productoLocalId, recibido: 6,
+    unidadEnviada: "UNIDAD",
   });
   ok("se puede agregar un producto que no estaba en el remito", alta.ok === true, alta.error);
   igual("y no venía de antes", alta.yaExistia, false);
@@ -348,13 +422,14 @@ async function correr(f) {
   const tSeg = await armarTransferencia([{ producto: pOtro, cantidad: 5 }]);
 
   const conAjeno = await agregarLinea({
-    transferenciaId: tSeg.id, productoLocalId: pAjeno.productoLocalId,
+    transferenciaId: tSeg.id, productoLocalId: pAjeno.productoLocalId, unidadEnviada: "UNIDAD",
   });
   igual("un producto de otro origen se rechaza", conAjeno.status, 404);
   igual("y se dice por qué", conAjeno.codigo, "PRODUCTO_FUERA_DEL_ORIGEN");
 
   const desdeOrigen = await agregarLinea(
-    { transferenciaId: tSeg.id, productoLocalId: pOtro.productoLocalId }, sesionOrigen
+    { transferenciaId: tSeg.id, productoLocalId: pOtro.productoLocalId, unidadEnviada: "UNIDAD" },
+    sesionOrigen
   );
   igual("el local ORIGEN no puede tocar la recepción", desdeOrigen.status, 403);
 
@@ -381,7 +456,7 @@ async function correr(f) {
   // ═════════════════════════════════════════════════════════════════════════
 
   const yaEsta = await agregarLinea({
-    transferenciaId: tSeg.id, productoLocalId: pOtro.productoLocalId,
+    transferenciaId: tSeg.id, productoLocalId: pOtro.productoLocalId, unidadEnviada: "UNIDAD",
   });
   ok("agregar un producto que YA está en el remito no falla", yaEsta.ok === true, yaEsta.error);
   igual("avisa que ya existía", yaEsta.yaExistia, true);
@@ -389,7 +464,9 @@ async function correr(f) {
     await prisma.transferenciaDetalle.count({ where: { transferenciaId: tSeg.id, productoId: pOtro.productoLocalId } }), 1);
 
   const pBorrar = await armarProducto({ nombre: `borrar-${n++}` });
-  const extra = await agregarLinea({ transferenciaId: tSeg.id, productoLocalId: pBorrar.productoLocalId });
+  const extra = await agregarLinea({
+    transferenciaId: tSeg.id, productoLocalId: pBorrar.productoLocalId, unidadEnviada: "UNIDAD",
+  });
   ok("se agrega una línea extra", extra.ok === true, extra.error);
 
   const stockAntesDeBorrar = await stockDe(origen.id, pBorrar.productoLocalId);
@@ -421,13 +498,17 @@ async function correr(f) {
 
   igual("una transferencia Recibida no admite guardar", (await guardar(tSeg.id, [])).status, 400);
   igual("ni agregar líneas",
-    (await agregarLinea({ transferenciaId: tSeg.id, productoLocalId: pBorrar.productoLocalId })).status, 400);
+    (await agregarLinea({
+      transferenciaId: tSeg.id, productoLocalId: pBorrar.productoLocalId, unidadEnviada: "UNIDAD",
+    })).status, 400);
 
   const tCancel = await armarTransferencia([{ producto: pOtro, cantidad: 1 }]);
   await prisma.transferencia.update({ where: { id: tCancel.id }, data: { estado: "Cancelada" } });
   igual("una Cancelada no admite guardar", (await guardar(tCancel.id, [])).status, 400);
   igual("ni agregar líneas",
-    (await agregarLinea({ transferenciaId: tCancel.id, productoLocalId: pBorrar.productoLocalId })).status, 400);
+    (await agregarLinea({
+      transferenciaId: tCancel.id, productoLocalId: pBorrar.productoLocalId, unidadEnviada: "UNIDAD",
+    })).status, 400);
   igual("ni confirmar", (await confirmar(tCancel.id)).status, 400);
 
   // ═════════════════════════════════════════════════════════════════════════
@@ -493,6 +574,226 @@ async function correr(f) {
   ok("con la política que SÍ los permite, la misma recepción entra", permitido.ok === true, permitido.error);
   igualStock("y el origen queda en -5", (await stockDe(origen.id, pSinStock.productoLocalId)).cantidad, -5);
   igualStock("con el destino en 15", (await stockDestinoDe(pSinStock.baseId)).cantidad, 15);
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("Unidad obligatoria en una línea agregada (nada de adivinar)");
+  // ═════════════════════════════════════════════════════════════════════════
+
+  const pPack = await armarProducto({ nombre: `pack-${n++}`, factorPack: 20, stockOrigen: 200 });
+  const tUni = await armarTransferencia([{ producto: pOtro, cantidad: 1 }]);
+
+  const sinUnidad = await agregarLinea({
+    transferenciaId: tUni.id, productoLocalId: pPack.productoLocalId, recibido: 3,
+  });
+  igual("agregar sin unidad se rechaza", sinUnidad.status, 400);
+  igual("con el código de unidad ausente", sinUnidad.codigo, "UNIDAD_ENVIADA_AUSENTE");
+  igual("y NO se creó ninguna línea",
+    await prisma.transferenciaDetalle.count({
+      where: { transferenciaId: tUni.id, productoId: pPack.productoLocalId },
+    }), 0);
+
+  const unidadRara = await agregarLinea({
+    transferenciaId: tUni.id, productoLocalId: pPack.productoLocalId,
+    recibido: 3, unidadEnviada: "CAJON",
+  });
+  igual("una unidad desconocida también", unidadRara.status, 400);
+  igual("con su propio código", unidadRara.codigo, "UNIDAD_ENVIADA_DESCONOCIDA");
+
+  // Y el número que explica por qué esto no es un detalle de forma: con factor 20,
+  // haber supuesto UNIDAD en vez de BULTO son 57 unidades de diferencia sobre el
+  // stock del ORIGEN, que es de donde sale una línea agregada.
+  const enBultos = await agregarLinea({
+    transferenciaId: tUni.id, productoLocalId: pPack.productoLocalId,
+    recibido: 3, unidadEnviada: "BULTO",
+  });
+  ok("con la unidad explícita sí entra", enBultos.ok === true, enBultos.error);
+
+  const origenPackAntes = await stockDe(origen.id, pPack.productoLocalId);
+  const detUni = await prisma.transferenciaDetalle.findFirst({
+    where: { transferenciaId: tUni.id, agregadoEnRecepcion: false },
+  });
+  await guardar(tUni.id, [
+    { id: detUni.id, recibido: 1 },
+    { id: enBultos.detalleId, recibido: 3, motivoPrincipal: "Sobrante" },
+  ]);
+  const confUni = await confirmar(tUni.id);
+  ok("y la recepción confirma", confUni.ok === true, JSON.stringify(confUni));
+
+  const origenPackDespues = await stockDe(origen.id, pPack.productoLocalId);
+  igualStock("el origen perdió 60 unidades, no 3",
+    origenPackAntes.cantidad - origenPackDespues.cantidad, 60);
+  igualStock("y el destino recibió 60", (await stockDestinoDe(pPack.baseId)).cantidad, 60);
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("Carrera: la fila de Transferencia es el mutex (sin sorteo)");
+  // ═════════════════════════════════════════════════════════════════════════
+
+  const pMutex = await armarProducto({ nombre: `mutex-${n++}`, stockOrigen: 100 });
+  const tMutex = await armarTransferencia([{ producto: pMutex, cantidad: 10 }]);
+  const detMutex = await prisma.transferenciaDetalle.findFirst({ where: { transferenciaId: tMutex.id } });
+  await guardar(tMutex.id, [{ id: detMutex.id, recibido: 10 }]);
+
+  const mutexAntes = await stockDe(origen.id, pMutex.productoLocalId);
+  const mutexDestinoAntes = await stockDestinoDe(pMutex.baseId);
+
+  // Una transacción toma la fila con el MISMO updateMany condicional que usa la
+  // ruta. Es la confirmación "que llegó primero".
+  const bMutex = barrera((tx) =>
+    tx.transferencia.updateMany({
+      where: { id: tMutex.id, estado: { in: ["Enviada", "Recibiendo"] } },
+      data: { estado: "Confirmando" },
+    })
+  );
+  const tomadaMutex = await bMutex.tomado;
+  igual("la primera confirmación toma la fila", tomadaMutex?.count, 1);
+
+  // Recién ahora se dispara la segunda. La fila ya está tomada: su updateMany
+  // BLOQUEA. Eso se comprueba antes de seguir.
+  const segundaConfirmacion = confirmar(tMutex.id);
+  ok("la segunda confirmación queda esperando el lock", await esperarBloqueo(),
+    "nunca se bloqueó: la prueba no llegó a montar la carrera");
+
+  bMutex.soltar();
+  await bMutex.fin;
+
+  const perdio = await segundaConfirmacion;
+  ok("y pierde la carrera", perdio.ok !== true, JSON.stringify(perdio));
+  igual("con el código del conflicto", perdio.codigo, "RECEPCION_TOMADA");
+  igual("y su status", perdio.status, 409);
+
+  const mutexDespues = await stockDe(origen.id, pMutex.productoLocalId);
+  igualStock("la perdedora no movió el origen", mutexDespues.cantidad, mutexAntes.cantidad);
+  igualStock("ni su tránsito", mutexDespues.enTransito, mutexAntes.enTransito);
+  igualStock("ni acreditó al destino",
+    (await stockDestinoDe(pMutex.baseId)).cantidad, mutexDestinoAntes.cantidad);
+  igual("y el detalle no quedó marcado como confirmado",
+    (await prisma.transferenciaDetalle.findUnique({ where: { id: detMutex.id } })).confirmadoPorId, null);
+
+  // ── Y BORRAR TAMPOCO SE CUELA: ES EL CASO QUE DESTRUÍA DATOS ──────────────
+  //
+  // Sin el lock, un DELETE validado en "Recibiendo" podía ejecutarse después de
+  // que la confirmación ya hubiera movido el stock de esa línea: quedaba un
+  // ajuste de inventario sin la línea que lo explica.
+  await prisma.transferencia.update({ where: { id: tMutex.id }, data: { estado: "Recibiendo" } });
+  const extraMutex = await agregarLinea({
+    transferenciaId: tMutex.id, productoLocalId: pMutex.productoLocalId, unidadEnviada: "UNIDAD",
+  });
+  // El producto ya está en el remito, así que se usa otro para poder borrar.
+  const pBorrable = await armarProducto({ nombre: `borrable-${n++}` });
+  const extraBorrable = await agregarLinea({
+    transferenciaId: tMutex.id, productoLocalId: pBorrable.productoLocalId,
+    recibido: 2, unidadEnviada: "UNIDAD",
+  });
+  ok("hay una línea agregada para borrar", extraBorrable.ok === true, extraBorrable.error);
+  igual("y el producto del remito no se duplicó", extraMutex.yaExistia, true);
+
+  const bBorrado = barrera((tx) =>
+    tx.transferencia.updateMany({
+      where: { id: tMutex.id, estado: { in: ["Enviada", "Recibiendo"] } },
+      data: { estado: "Confirmando" },
+    })
+  );
+  igual("la confirmación toma la fila otra vez", (await bBorrado.tomado)?.count, 1);
+
+  const borradoTardio = borrarLinea({ transferenciaId: tMutex.id, detalleId: extraBorrable.detalleId });
+  ok("el borrado queda esperando el lock", await esperarBloqueo(),
+    "nunca se bloqueó: la prueba no llegó a montar la carrera");
+
+  bBorrado.soltar();
+  await bBorrado.fin;
+
+  const borradoPerdido = await borradoTardio;
+  ok("el borrado pierde", borradoPerdido.ok !== true, JSON.stringify(borradoPerdido));
+  igual("con el mismo código de conflicto", borradoPerdido.codigo, "RECEPCION_TOMADA");
+  igual("y la línea sigue existiendo",
+    await prisma.transferenciaDetalle.count({ where: { id: extraBorrable.detalleId } }), 1);
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("Carrera entre DOS transferencias por el mismo stock de origen");
+  // ═════════════════════════════════════════════════════════════════════════
+  //
+  // Acá el lock de `Transferencia` NO sirve: A y B no comparten esa fila. Lo que
+  // tiene que sostener el invariante es el update condicional del origen.
+
+  await prisma.configuracionGrupo.update({
+    where: { grupoId: grupo.id }, data: { allowNegativeStock: false },
+  });
+
+  // Stock 12, dos transferencias que envían 1 cada una → quedan 10 disponibles y
+  // 2 en tránsito. Cada una recibe 9: excedente 8. Las dos juntas necesitan 16.
+  const pDisputado = await armarProducto({ nombre: `disputado-${n++}`, stockOrigen: 12 });
+  const tA = await armarTransferencia([{ producto: pDisputado, cantidad: 1 }]);
+  const tB = await armarTransferencia([{ producto: pDisputado, cantidad: 1 }]);
+  const detA = await prisma.transferenciaDetalle.findFirst({ where: { transferenciaId: tA.id } });
+  const detB = await prisma.transferenciaDetalle.findFirst({ where: { transferenciaId: tB.id } });
+  await guardar(tA.id, [{ id: detA.id, recibido: 9, motivoPrincipal: "Sobrante" }]);
+  await guardar(tB.id, [{ id: detB.id, recibido: 9, motivoPrincipal: "Sobrante" }]);
+
+  igualStock("el origen arranca con 10 disponibles",
+    (await stockDe(origen.id, pDisputado.productoLocalId)).cantidad, 10);
+
+  // ── EL ORDEN, FIJADO A MANO ──────────────────────────────────────────────
+  //
+  // 1. Una transacción toma la FILA DE STOCK sin cambiar el número: sigue en 10.
+  //    Los SELECT no se bloquean, así que el chequeo previo de B va a leer 10 y
+  //    pasar — que es exactamente lo que hacía falta reproducir.
+  // 2. Se dispara B, que se queda esperando en su update condicional.
+  // 3. Ahí recién la barrera descuenta los 8 de A y confirma.
+  // 4. B despierta, reevalúa su WHERE contra la fila NUEVA y ve 2. No alcanza.
+  //
+  // Sin la guardia, el paso 4 no existiría: B escribiría sobre el valor viejo y
+  // el origen terminaría en -6.
+  let descontarA;
+  const bStock = barrera(async (tx) => {
+    const tomado = await tx.stockLocal.updateMany({
+      where: { localId: origen.id, productoId: pDisputado.productoLocalId },
+      data: { cantidad: { increment: 0 } },
+    });
+    // La segunda escritura se hace cuando la prueba lo pide, ya con B esperando.
+    descontarA = () =>
+      tx.stockLocal.updateMany({
+        where: { localId: origen.id, productoId: pDisputado.productoLocalId, cantidad: { gte: 8 } },
+        data: { cantidad: { decrement: 8 }, enTransito: { decrement: 1 } },
+      });
+    return tomado;
+  });
+  igual("la barrera toma la fila de stock", (await bStock.tomado)?.count, 1);
+
+  const confirmarB = confirmar(tB.id);
+  ok("B queda esperando el lock del stock", await esperarBloqueo(),
+    "nunca se bloqueó: la prueba no llegó a montar la carrera");
+
+  const aDescontó = await descontarA();
+  igual("A descuenta sus 8 (10 → 2)", aDescontó.count, 1);
+  bStock.soltar();
+  await bStock.fin;
+
+  const bPerdio = await confirmarB;
+  ok("B se rechaza", bPerdio.ok !== true, JSON.stringify(bPerdio));
+  igual("con el código de la política vigente", bPerdio.codigo, "STOCK_INSUFICIENTE");
+  // Y ésta es LA afirmación que separa el arreglo del bug: el chequeo previo de B
+  // leyó 10 y lo dejó pasar —por eso no trae la lista `faltantes`, que solo arma
+  // ese camino—. Lo frenó la guardia de adentro de la transacción.
+  ok("y lo frenó la guardia de ADENTRO, no el chequeo previo",
+    bPerdio.faltantes === undefined, JSON.stringify(bPerdio.faltantes));
+
+  const trasDisputa = await stockDe(origen.id, pDisputado.productoLocalId);
+  igualStock("el origen quedó en 2, no en -6", trasDisputa.cantidad, 2);
+  ok("y nunca fue negativo", trasDisputa.cantidad >= 0, String(trasDisputa.cantidad));
+  igualStock("B no acreditó nada al destino", (await stockDestinoDe(pDisputado.baseId)).cantidad, 0);
+  ok("y B sigue siendo recibible",
+    (await prisma.transferencia.findUnique({ where: { id: tB.id } })).estado === "Recibiendo");
+
+  // El caso secuencial, que es el que ya cubría el chequeo previo: con el stock
+  // en 2, el rechazo llega antes de abrir la transacción y SÍ trae los faltantes.
+  const bSecuencial = await confirmar(tB.id);
+  igual("en secuencia el rechazo es el mismo", bSecuencial.codigo, "STOCK_INSUFICIENTE");
+  ok("pero ahí sí se dice qué falta", Array.isArray(bSecuencial.faltantes) && bSecuencial.faltantes.length === 1,
+    JSON.stringify(bSecuencial.faltantes));
+
+  await prisma.configuracionGrupo.update({
+    where: { grupoId: grupo.id }, data: { allowNegativeStock: true },
+  });
 
   // ═════════════════════════════════════════════════════════════════════════
   seccion("20. La recepción sigue siendo solo de inventario");
