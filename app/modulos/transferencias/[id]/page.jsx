@@ -17,7 +17,7 @@
 // confirmación, cancelación y permisos no se tocó.
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -34,7 +34,12 @@ import AccionesRecepcion from "@/components/transferencias/AccionesRecepcion";
 import AgregarProductoRecibido from "@/components/transferencias/AgregarProductoRecibido";
 import PanelCancelarTransferencia from "@/components/transferencias/PanelCancelarTransferencia";
 import { SectionHead, TotalTile, fmtCantidad, fmtMoneda } from "@/components/transferencias/detallePresentacion";
-import { cuerpoQuitarLinea } from "@/lib/transferencias/recepcionUI";
+import {
+  construirEditItems,
+  cuerpoQuitarLinea,
+  hayEdicionPendiente,
+  reconciliarEditItems,
+} from "@/lib/transferencias/recepcionUI";
 
 const LISTADO = "/modulos/transferencias";
 const TZ_AR = "America/Argentina/Cordoba";
@@ -95,10 +100,27 @@ export default function TransferenciaDetallePage() {
   // Detecta cambios sin guardar
   const [dirty, setDirty] = useState(false);
 
+  // ── UN ESPEJO DE `editItems`, Y NO ES UNA COMODIDAD ───────────────────────
+  //
+  // Agregar una línea recarga del servidor y tiene que RECONCILIAR lo fresco con
+  // lo que el operador tenía escrito. Ese "lo que tenía escrito" hay que leerlo
+  // en el momento de recargar, y leerlo del estado significaría leer la clausura
+  // del render en el que se creó el handler: si entre medio hubo otro
+  // `setEditItems`, el valor sería viejo y la edición que se pretende conservar
+  // se perdería igual — el mismo defecto con otra causa.
+  //
+  // El ref se escribe en el MISMO lugar donde se escribe el estado, así que los
+  // dos dicen siempre lo mismo.
+  const editItemsRef = useRef([]);
+  const aplicarEditItems = (valor) => {
+    editItemsRef.current = valor;
+    setEditItems(valor);
+  };
+
   // Wrapper para marcar cambios como dirty
-  const setEditItemsDirty = (fn) => {
+  const setEditItemsDirty = (valor) => {
     setDirty(true);
-    setEditItems(fn);
+    aplicarEditItems(valor);
   };
 
   // ===============================
@@ -113,7 +135,24 @@ export default function TransferenciaDetallePage() {
   // ===============================
   // Cargar transferencia
   // ===============================
-  const cargar = async () => {
+  /**
+   * ── LOS DOS MODOS DE RECARGAR, Y CUÁNDO VA CADA UNO ─────────────────────
+   *
+   * Por defecto `cargar()` REEMPLAZA todo y deja `dirty` en false. Es lo que
+   * corresponde después de la carga inicial, de Guardar y de Confirmar: en esos
+   * tres momentos lo que hay en el servidor ES lo último que quiso el operador,
+   * así que no hay nada pendiente que conservar.
+   *
+   * `cargar({ preservarEdicion: true })` es solo para las recargas que provoca
+   * AGREGAR o QUITAR una línea. Ahí el operador no guardó nada: pidió otra cosa,
+   * y pisarle lo escrito sería cobrarle esa otra cosa con su trabajo.
+   *
+   * En ese modo `dirty` no se fuerza: se RECALCULA comparando lo reconciliado
+   * contra lo que el servidor propone. Si ya no queda ninguna edición —por
+   * ejemplo porque la única que había estaba en la línea que se acaba de
+   * quitar— vuelve a false solo, sin dejar el aviso encendido de gusto.
+   */
+  const cargar = async ({ preservarEdicion = false } = {}) => {
     try {
       setLoading(true);
       setError("");
@@ -135,23 +174,24 @@ export default function TransferenciaDetallePage() {
 
       setItem(json.item);
 
-      setEditItems(
-        json.item.items.map((d) => ({
-          id: d.id,
-          enviado: d.cantidadEnviada,
-          // null = todavía no se cargó recepción → se propone lo enviado.
-          // 0 = no llegó ninguna unidad → se muestra 0. Son cosas distintas, y
-          // usar truthiness acá hacía que un 0 guardado reapareciera como el
-          // total enviado y se pudiera sobrescribir sin querer.
-          recibido:
-            d.cantidadRecibida == null ? d.cantidadEnviada : d.cantidadRecibida,
-          motivoPrincipal: d.motivoPrincipal || "",
-          motivoDetalle: d.motivoDetalle || "",
-        }))
-      );
+      // La construcción de `editItems` se mudó a `recepcionUI`: la hacen dos
+      // caminos —reemplazar y reconciliar— y con dos copias, el día que una
+      // cambie la otra queda atrás. El distingo entre `null` y `0` sigue vivo
+      // allá, en `filaDeServidor`, con su motivo escrito.
+      const frescos = json.item.items;
+      const reconciliados = preservarEdicion
+        ? reconciliarEditItems({ items: frescos, previos: editItemsRef.current })
+        : construirEditItems(frescos);
 
-      // Al cargar, no hay cambios pendientes
-      setDirty(false);
+      aplicarEditItems(reconciliados);
+
+      // Reemplazar no deja nada pendiente. Preservar sí puede, y se pregunta en
+      // vez de suponerse.
+      setDirty(
+        preservarEdicion
+          ? hayEdicionPendiente({ items: frescos, editItems: reconciliados })
+          : false
+      );
 
     } catch (e) {
       console.error("Error cargando transferencia:", e);
@@ -296,7 +336,13 @@ export default function TransferenciaDetallePage() {
     const json = await res.json();
     // `yaExistia` NO recarga ni cierra: el modal muestra el mensaje y el
     // operador corrige la cantidad en la línea que ya está.
-    if (json?.ok && !json.yaExistia) await cargar();
+    //
+    // Y la recarga PRESERVA la edición pendiente. El caso que esto arregla es el
+    // más común de todos: alguien escribió 15 sobre 10, no guardó, y agrega el
+    // producto que apareció al abrir los bultos. Sin preservar, el 15 volvía a 10
+    // y el operador perdía su trabajo por haber usado otra función de la misma
+    // pantalla.
+    if (json?.ok && !json.yaExistia) await cargar({ preservarEdicion: true });
     return json;
   };
 
@@ -309,7 +355,9 @@ export default function TransferenciaDetallePage() {
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error);
-      await cargar();
+      // Mismo motivo que al agregar. La línea borrada desaparece sola —no viene
+      // en la respuesta— y las ediciones pendientes de las OTRAS sobreviven.
+      await cargar({ preservarEdicion: true });
     } catch (err) {
       alert("No se pudo quitar la línea: " + err.message);
     } finally {

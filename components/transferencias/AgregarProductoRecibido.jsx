@@ -146,7 +146,12 @@ export default function AgregarProductoRecibido({
         const url = new URL("/api/transferencias/buscar-productos-origen", window.location.origin);
         url.searchParams.set("transferenciaId", String(transferenciaId));
         url.searchParams.set("q", q);
-        if (fueVoz) url.searchParams.set("fromVoice", "1");
+        // "true" y no "1": el endpoint compara `=== "true"` literal, igual que
+        // los otros tres buscadores por voz del repo. Con "1" el ranking de voz
+        // no se activaba nunca y nada avisaba — la búsqueda contestaba, solo que
+        // ordenada como si se hubiera tecleado. Se corrige el llamador, no el
+        // servidor: cuatro rutas ya usan ese contrato.
+        if (fueVoz) url.searchParams.set("fromVoice", "true");
         const res = await fetch(url.toString(), { cache: "no-store" });
         const json = await res.json();
         setResultados(json.ok ? json.items || [] : []);
@@ -172,10 +177,17 @@ export default function AgregarProductoRecibido({
 
   const elegir = (p) => {
     setProducto(p);
-    // Cambiar de producto reinicia la unidad: el factor puede ser otro, y
-    // arrastrar "BULTO" de un producto x6 a uno x24 es justamente el error que
-    // esta pantalla existe para no cometer.
+    // Cambiar de producto reinicia la unidad Y la cantidad. Las dos son
+    // decisiones que se tomaron mirando OTRO producto: "2" contado en bultos de
+    // 6 no significa lo mismo que "2" en bultos de 24, y dejar el número puesto
+    // invita a confirmar sin volver a pensarlo. Es el mismo motivo por el que la
+    // unidad no tiene default — arrastrarla del producto anterior sería
+    // exactamente eso, un default con otro nombre.
+    //
+    // El texto buscado SÍ se conserva: sirve para elegir otro resultado de la
+    // misma búsqueda, y no es una decisión sobre el producto.
     setUnidad(null);
+    setCantidad("");
     setMensaje("");
   };
 
