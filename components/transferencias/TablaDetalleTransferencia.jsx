@@ -104,10 +104,18 @@ export default function TablaDetalleTransferencia({
   const verDevuelto = allItems.some((d) => d.devolucionOrigen != null);
   // Motivo y detalle: editables mientras se recibe; si no, solo si hay algo
   // cargado que mostrar. Una columna entera de guiones no aporta.
+  //
+  // Y desde el 2026-09-08 la columna tampoco aparece si NINGUNA línea puede pedir
+  // motivo. Pasa de verdad: una transferencia cuyas líneas son todas agregadas en
+  // recepción no tiene a quién pedirle uno —su procedencia ya está registrada— y
+  // la columna quedaría entera de guiones.
+  const hayLineasDelRemito = allItems.some((d) => !d.agregadoEnRecepcion);
   const verMotivo =
-    !esCancelada && (inputsHabilitados || allItems.some((d) => d.motivoPrincipal));
+    !esCancelada &&
+    ((inputsHabilitados && hayLineasDelRemito) || allItems.some((d) => d.motivoPrincipal));
   const verDetalle =
-    !esCancelada && (inputsHabilitados || allItems.some((d) => d.motivoDetalle));
+    !esCancelada &&
+    ((inputsHabilitados && hayLineasDelRemito) || allItems.some((d) => d.motivoDetalle));
 
   const filasVisibles = pagedItems.map((d, localIdx) => {
     const idx = offset + localIdx;
@@ -138,7 +146,18 @@ export default function TablaDetalleTransferencia({
       factorPack: d.factorPack,
     });
     const sePuedeQuitar = sePuedeQuitarLinea({ linea: d, puedeRecibir: inputsHabilitados });
-    return { d, idx, edit, enviada, recibido, diff, estadoLinea, tono, fisico, sePuedeQuitar };
+    // Qué motivos ofrece ESTA línea. Lista vacía = no se le pide ninguno, y hay
+    // dos razones: no hay diferencia, o la línea se agregó en recepción y su
+    // procedencia ya está registrada con autor y fecha. La decisión no se toma
+    // acá: sale de `exigeMotivo`, la misma que aplica el servidor.
+    const motivos = motivosParaDiferencia({
+      enviada,
+      recibida: edit?.recibido,
+      agregadoEnRecepcion: d.agregadoEnRecepcion,
+    });
+    return {
+      d, idx, edit, enviada, recibido, diff, estadoLinea, tono, fisico, sePuedeQuitar, motivos,
+    };
   });
 
   const cambiar = (idx, campo, valor, extra) => {
@@ -166,6 +185,7 @@ export default function TablaDetalleTransferencia({
       enviada,
       recibida: valor,
       motivoPrincipal: motivoActual,
+      agregadoEnRecepcion: editItems[idx]?.agregadoEnRecepcion,
     });
     const limpiar = sigueValido ? null : { motivoPrincipal: "", motivoDetalle: "" };
     cambiar(idx, "recibido", valor, limpiar);
@@ -226,7 +246,7 @@ export default function TablaDetalleTransferencia({
         {/* ══════════ Móvil: una card por línea ══════════ */}
         {allItems.length > 0 && (
           <div className="md:hidden space-y-2">
-            {filasVisibles.map(({ d, idx, edit, enviada, recibido, diff, estadoLinea, fisico, sePuedeQuitar }) => (
+            {filasVisibles.map(({ d, idx, edit, enviada, recibido, diff, estadoLinea, fisico, sePuedeQuitar, motivos }) => (
               <div key={d.id} className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1.5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 font-semibold sunmi-text-strong text-[14px] leading-tight break-words">
@@ -300,7 +320,11 @@ export default function TablaDetalleTransferencia({
                   </div>
                 )}
 
-                {inputsHabilitados && num(edit?.recibido) !== enviada && (
+                {/* El selector aparece si esta línea DEBE explicar su diferencia.
+                    Una agregada en recepción no: el badge de arriba ya dice de
+                    dónde salió, con autor y fecha detrás. Pedirle además un
+                    motivo sería pedir dos veces la misma explicación. */}
+                {inputsHabilitados && motivos.length > 0 && (
                   <div className="space-y-2">
                     <div>
                       <div className="text-[11px] sunmi-text-muted mb-1">Motivo</div>
@@ -309,7 +333,7 @@ export default function TablaDetalleTransferencia({
                         onChange={(val) => onMotivoChange(idx, val)}
                       >
                         <option value="">Seleccionar…</option>
-                        {motivosParaDiferencia({ enviada, recibida: edit?.recibido }).map((m) => (
+                        {motivos.map((m) => (
                           <option key={m.value} value={m.value}>{m.label}</option>
                         ))}
                       </SunmiSelectAdv>
@@ -353,7 +377,7 @@ export default function TablaDetalleTransferencia({
         {allItems.length > 0 && (
           <div className="hidden md:block overflow-x-auto">
             <SunmiTable headers={headers}>
-              {filasVisibles.map(({ d, idx, edit, enviada, recibido, diff, estadoLinea, tono, fisico, sePuedeQuitar }) => (
+              {filasVisibles.map(({ d, idx, edit, enviada, recibido, diff, estadoLinea, tono, fisico, sePuedeQuitar, motivos }) => (
                 <tr
                   key={d.id}
                   className={`align-middle sunmi-row-hover transition-colors ${tono}`}
@@ -428,14 +452,16 @@ export default function TablaDetalleTransferencia({
 
                   {verMotivo && (
                     <td className="px-2.5 py-3">
+                      {/* Misma condición que en la card del teléfono, y por el
+                          mismo motivo: una línea agregada no explica dos veces. */}
                       {inputsHabilitados ? (
-                        num(edit?.recibido) !== enviada ? (
+                        motivos.length > 0 ? (
                           <SunmiSelectAdv
                             value={edit?.motivoPrincipal || ""}
                             onChange={(val) => onMotivoChange(idx, val)}
                           >
                             <option value="">Seleccionar…</option>
-                            {motivosParaDiferencia({ enviada, recibida: edit?.recibido }).map((m) => (
+                            {motivos.map((m) => (
                               <option key={m.value} value={m.value}>{m.label}</option>
                             ))}
                           </SunmiSelectAdv>
@@ -452,7 +478,7 @@ export default function TablaDetalleTransferencia({
                     <td className="px-2.5 py-3">
                       {inputsHabilitados &&
                       edit?.motivoPrincipal === "Otro" &&
-                      num(edit?.recibido) !== enviada ? (
+                      motivos.length > 0 ? (
                         <SunmiInput
                           type="text"
                           value={edit?.motivoDetalle || ""}

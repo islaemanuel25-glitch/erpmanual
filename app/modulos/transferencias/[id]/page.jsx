@@ -34,6 +34,7 @@ import AccionesRecepcion from "@/components/transferencias/AccionesRecepcion";
 import AgregarProductoRecibido from "@/components/transferencias/AgregarProductoRecibido";
 import PanelCancelarTransferencia from "@/components/transferencias/PanelCancelarTransferencia";
 import { SectionHead, TotalTile, fmtCantidad, fmtMoneda } from "@/components/transferencias/detallePresentacion";
+import { exigeMotivo } from "@/lib/transferencias/recepcion";
 import {
   construirEditItems,
   cuerpoQuitarLinea,
@@ -265,11 +266,28 @@ export default function TransferenciaDetallePage() {
     try {
       setGuardando(true);
 
+      // ── LA MISMA REGLA QUE EL SERVIDOR, NO UNA PARECIDA ──────────────────
+      //
+      // Esto miraba solo `recibido !== enviado`, y con eso le pedía motivo a una
+      // línea AGREGADA en recepción —que por definición tiene 0 enviado y algo
+      // recibido—. El servidor dejó de exigirlo el 2026-09-08 porque su
+      // procedencia ya está registrada con autor y fecha; si la pantalla siguiera
+      // pidiéndolo, habría dos reglas contradictorias y la que frena sería la de
+      // acá, sobre una línea que el propio sistema creó bien.
+      //
+      // `exigeMotivo` es la función que usa `validarDetalleRecepcion`. Una sola.
       for (const it of editItems) {
         const enviado = num(it.enviado);
         const recibido = num(it.recibido);
 
-        if (recibido !== enviado) {
+        const pideMotivo = exigeMotivo({
+          hayDiferencia: recibido !== enviado,
+          // Estructural y del servidor: la reconciliación nunca conserva una
+          // versión vieja de este flag.
+          agregadoEnRecepcion: it.agregadoEnRecepcion,
+        });
+
+        if (pideMotivo) {
           if (!it.motivoPrincipal) {
             alert("Falta motivo.");
             setGuardando(false);

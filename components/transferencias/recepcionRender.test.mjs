@@ -237,6 +237,76 @@ test("14 · el aviso de cambios sin guardar se ve, y solo cuando corresponde", (
   }
 });
 
+test("una línea AGREGADA no dibuja el selector de motivo, en móvil Y en escritorio", () => {
+  // El caso del flujo: Producto A con 10→15 y su Sobrante, más Fanta agregada.
+  const items = [
+    linea({ id: 1, nombre: "Producto A", cantidadEnviada: 10, cantidadRecibida: null }),
+    linea({
+      id: 2,
+      nombre: "Fanta 2,25 L",
+      cantidadEnviada: 0,
+      cantidadRecibida: 2,
+      unidadEnviada: "BULTO",
+      factorPack: 6,
+      agregadoEnRecepcion: true,
+      // SIN motivo, que es como la crea `linea-recepcion`.
+      motivoPrincipal: "",
+    }),
+  ];
+  const editItems = editar(items).map((e) =>
+    e.id === 1 ? { ...e, recibido: 15, motivoPrincipal: "Sobrante" } : e
+  );
+  const html = pintar({ items, editItems });
+
+  // La agregada se identifica sola.
+  assert.ok(html.includes("Agregado en recepción"), "falta el badge de la línea agregada");
+  assert.ok(html.includes("12 unidades"), "falta el ingreso físico de la agregada");
+
+  // Y la original conserva su motivo, que el control cerrado rotula.
+  assert.ok(html.includes("Sobrante"), "la línea original perdió su motivo");
+  assert.ok(html.includes("+5"), "la línea original perdió su diferencia");
+
+  // EL CONTRASTE QUE IMPORTA: hay UN solo selector de motivo por presentación
+  // —el de la línea original—, no dos. Si la agregada también lo dibujara, el
+  // "Seleccionar…" del suyo aparecería, porque no tiene motivo elegido.
+  assert.ok(
+    !html.includes("Seleccionar"),
+    "la línea agregada está dibujando su propio selector de motivo, vacío"
+  );
+
+  // El rótulo "Motivo" aparece DOS veces y está bien: uno es el de la card del
+  // teléfono y el otro el encabezado de la columna del escritorio. Uno por
+  // presentación, no uno por línea — que es lo que pasaría si la agregada
+  // también dibujara el suyo.
+  const rotulos = (html.match(/>Motivo</g) || []).length;
+  assert.equal(rotulos, 2, `hay ${rotulos} rótulos "Motivo": uno por presentación`);
+});
+
+test("y una línea agregada SIN motivo no rompe nada al dibujarse sola", () => {
+  const items = [
+    linea({
+      id: 2,
+      nombre: "Fanta 2,25 L",
+      cantidadEnviada: 0,
+      cantidadRecibida: 2,
+      unidadEnviada: "BULTO",
+      factorPack: 6,
+      agregadoEnRecepcion: true,
+      motivoPrincipal: "",
+    }),
+  ];
+  const html = pintar({ items });
+  assert.ok(html.includes("Fanta 2,25 L"));
+  assert.ok(html.includes("Agregado en recepción"));
+  assert.ok(!html.includes("Seleccionar"), "se le pide motivo a una línea agregada");
+  // Y si NINGUNA línea puede pedir motivo, la columna entera desaparece: quedaría
+  // llena de guiones. Esto lo encontró este mismo candado.
+  assert.ok(
+    !html.includes(">Motivo<"),
+    "queda la columna Motivo sin ninguna línea que pueda tener uno"
+  );
+});
+
 test("17 · un 0 recibido se dibuja como 0 y no como lo enviado", () => {
   const items = [linea()];
   const editItems = editar(items).map((e) => ({ ...e, recibido: 0 }));
