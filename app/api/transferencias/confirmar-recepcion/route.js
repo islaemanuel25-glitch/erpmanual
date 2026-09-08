@@ -16,6 +16,7 @@ import {
   cargarDetallesDeRecepcion,
   ErrorRecepcion,
   estadoAdmiteRecepcion,
+  originalesSinRevisar,
   planificarRecepcion,
   puedeRecibir,
   reclamarOFallar,
@@ -325,6 +326,31 @@ export async function POST(req) {
       // Con la MISMA función que la prevalidación de afuera. Si algo no valida,
       // se lanza y la transacción entera se revierte — incluido el "Confirmando",
       // que vuelve al estado anterior.
+      // ── 2.bis · ¿SE TERMINÓ DE CONTAR? ──────────────────────────────────
+      //
+      // La recepción es un control físico: confirmar con productos del remito
+      // sin revisar sería cerrar un conteo que nadie terminó, y el stock se
+      // mueve acá. La guarda va en el SERVIDOR y no solo en el botón, porque una
+      // pestaña vieja o un pedido a mano lo saltean.
+      //
+      // Y va DESPUÉS del lock, sobre la lectura firme: entre el snapshot de
+      // afuera y este punto alguien pudo desmarcar o agregar una línea.
+      //
+      // Las agregadas no cuentan: no pertenecen al remito, y meterlas en el
+      // denominador haría que agregar un producto bloqueara la confirmación.
+      const pendientes = originalesSinRevisar(detalles);
+      if (pendientes.length > 0) {
+        const nombres = pendientes.slice(0, 5).map((p) => p.nombre).filter(Boolean);
+        throw new ErrorRecepcion(
+          "PRODUCTOS_SIN_REVISAR",
+          `Faltan revisar ${pendientes.length} producto${pendientes.length === 1 ? "" : "s"} del remito` +
+            (nombres.length ? `: ${nombres.join(", ")}${pendientes.length > nombres.length ? "…" : ""}` : "") +
+            ". Terminá el control físico antes de confirmar.",
+          409,
+          { pendientes: pendientes.length, ejemplos: nombres }
+        );
+      }
+
       const autoritativo = planificarRecepcion(detalles);
       if (!autoritativo.ok) {
         throw new ErrorRecepcion(
@@ -599,7 +625,7 @@ export async function POST(req) {
     // Incluye RECEPCION_TOMADA, que es haber perdido la carrera por el lock.
     if (err.name === "ErrorRecepcion") {
       return NextResponse.json(
-        { ok: false, codigo: err.code, error: err.message },
+        { ok: false, codigo: err.code, error: err.message, ...(err.datos || {}) },
         { status: err.status || 409 }
       );
     }

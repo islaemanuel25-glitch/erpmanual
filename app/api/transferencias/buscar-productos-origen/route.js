@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { buscarCatalogoLocal } from "@/lib/productos/buscarCatalogoLocal";
+import { buscarCatalogoLocal, mapProductoParaRecepcion } from "@/lib/productos/buscarCatalogoLocal";
 import { estadoAdmiteRecepcion, puedeRecibir } from "@/lib/transferencias/recepcionServidor";
 
 // BUSCAR EN EL CATÁLOGO DEL ORIGEN, PARA AGREGAR UN PRODUCTO QUE LLEGÓ DE MÁS.
@@ -94,10 +94,21 @@ export async function GET(req) {
       fromVoice,
     });
 
+    // ── EL JSON DE RECEPCIÓN NO LLEVA STOCK NI COSTO ────────────────────────
+    //
+    // `buscarCatalogoLocal` los trae porque el POS los necesita. Quien recibe
+    // mercadería, no: lo que tiene que hacer es identificar el producto que
+    // tiene en la mano y decir en qué presentación llegó.
+    //
+    // No alcanza con no dibujarlos. Mientras viajen en la respuesta están a un
+    // `fetch` de cualquiera con `transferencias.recibir`, y ese permiso no es el
+    // de ver costos. Por eso hay una proyección explícita y no un `delete`
+    // suelto: lo que se agregue mañana al mapper compartido NO sale por acá
+    // hasta que alguien lo ponga a propósito.
     return NextResponse.json({
       ok: true,
       origenId: transferencia.origenId,
-      items,
+      items: items.map(mapProductoParaRecepcion),
       total,
       ...(fromVoice && q ? { queryInterpretada } : {}),
       error: null,

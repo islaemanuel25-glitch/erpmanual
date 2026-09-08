@@ -249,6 +249,9 @@ model Usuario {
   /// Líneas que esta persona agregó durante una recepción. Es la otra relación
   /// hacia `TransferenciaDetalle`, y por eso las dos van nombradas.
   lineasAgregadasEnRecepcion TransferenciaDetalle[] @relation("TransferenciaDetalleAgregadoPor")
+  /// Los productos cuyo control físico esta persona dio por terminado. Tercera
+  /// relación hacia `TransferenciaDetalle`, nombrada como las otras dos.
+  lineasRevisadasEnRecepcion TransferenciaDetalle[] @relation("TransferenciaDetalleRevisadoPor")
 
   posTransferencias            PosTransferencia[] @relation("pos_usuario")
   posTransferenciasSolicitadas PosTransferencia[] @relation("pos_solicitado_por")
@@ -822,6 +825,49 @@ model TransferenciaDetalle {
   agregadoEnRecepcionPorId Int?
   agregadoEnRecepcionAt   DateTime?
 
+  // ── EL PACK INCOMPLETO ────────────────────────────────────────────────────
+  //
+  // Salieron 6 PACK de 6 y llegaron 5 packs enteros más 5 unidades. Son 35
+  // unidades físicas, y guardarlas como `recibido = 5.833` sería un error de
+  // exactitud, no de redondeo: 5.833 × 6 = 34.998, y eso es lo que quedaría
+  // escrito en el `Decimal(12,3)` del stock, en cada pack incompleto, para
+  // siempre.
+  //
+  // Por eso son DOS datos explícitos y la intención queda en la estructura:
+  //
+  //   recibido                = 5   ← packs enteros, en la unidad del envío
+  //   recibidoUnidadesSueltas = 5   ← unidades físicas fuera de los packs
+  //
+  // El total sale de multiplicar UNA vez y sumar —`milesimasFisicas`—, así que
+  // no hay doble conversión ni decimal periódico.
+  //
+  // Nulable: la enorme mayoría de las líneas no tiene pack incompleto, y en una
+  // línea enviada en UNIDAD el desglose no existe —se rechaza con
+  // UNIDADES_SUELTAS_SIN_BULTO—.
+  recibidoUnidadesSueltas Decimal? @db.Decimal(12, 3)
+
+  // ── EL CONTROL FÍSICO TERMINADO ───────────────────────────────────────────
+  //
+  // "Revisado" NO es `recibido != null`. Son dos hechos distintos: alguien puede
+  // haber empezado a escribir una cantidad y no haber terminado de contar. Esto
+  // dice que esta persona TERMINÓ de verificar físicamente este producto.
+  //
+  // Y no puede ser estado de React: con 150 productos, cerrar el navegador y
+  // volver tiene que conservar el avance. Por eso se persiste, y con autor y
+  // fecha — sin ellos, dentro de un mes un checklist a medias es indistinguible
+  // de un error de datos.
+  //
+  // `revisadoEnRecepcionAt` además ORDENA: los productos revisados se muestran
+  // en el orden real en que aparecieron físicamente, que es como el operador
+  // recorrió la mercadería.
+  //
+  // Default `false` y las otras dos nulables: las transferencias históricas
+  // quedan exactamente como estaban. Ninguna se revisó con este mecanismo porque
+  // no existía, y no se inventa quién ni cuándo.
+  revisadoEnRecepcion      Boolean   @default(false)
+  revisadoEnRecepcionPorId Int?
+  revisadoEnRecepcionAt    DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -832,6 +878,9 @@ model TransferenciaDetalle {
   /// recibe otra relación desde esta misma tabla —el confirmador— y sin nombre
   /// Prisma no puede distinguirlas.
   agregadoEnRecepcionPor Usuario? @relation("TransferenciaDetalleAgregadoPor", fields: [agregadoEnRecepcionPorId], references: [id])
+  /// Quién dio por terminado el control físico de esta línea. Nombrada por el
+  /// mismo motivo: `Usuario` ya recibe otras dos relaciones desde esta tabla.
+  revisadoEnRecepcionPor Usuario? @relation("TransferenciaDetalleRevisadoPor", fields: [revisadoEnRecepcionPorId], references: [id])
 
   /// Los movimientos de stock que esta línea produjo al recibirse. La relación
   /// existe para que la auditoría no dependa del texto libre de `motivo`.
@@ -840,6 +889,11 @@ model TransferenciaDetalle {
   @@index([transferenciaId])
   @@index([productoId])
   @@index([agregadoEnRecepcionPorId])
+  /// Sostiene la guarda de confirmación —"¿queda algún original sin revisar?"—,
+  /// que corre en cada intento de confirmar filtrando por transferencia + flag.
+  /// NO se indexa `revisadoEnRecepcionPorId`: nadie consulta "qué revisó tal
+  /// persona", y un índice que nadie usa solo cuesta escrituras.
+  @@index([transferenciaId, revisadoEnRecepcion])
 }
 
 enum DiaPedido {

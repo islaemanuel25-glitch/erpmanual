@@ -51,7 +51,12 @@ export async function GET(req) {
         detalle: {
           include: {
             producto: {
-              include: { base: true },
+              // La CATEGORÍA viaja acá adentro, en la misma consulta. Es la que
+              // ya tiene asignada el `ProductoBase`: la recepción no crea
+              // categorías propias ni las duplica, y el filtro de la pantalla se
+              // arma con las que aparecen en ESTE remito —no con el catálogo
+              // entero, que serían cientos para 150 productos.
+              include: { base: { include: { categoria: { select: { id: true, nombre: true } } } } },
             },
             // Relación YA existente en el schema (TransferenciaDetalle.confirmadoPor).
             // Viaja en la misma consulta: no agrega una query por línea.
@@ -59,6 +64,8 @@ export async function GET(req) {
             // Quién agregó la línea al abrir los bultos. Viaja en la misma
             // consulta, igual que el confirmador: no agrega una query por línea.
             agregadoEnRecepcionPor: { select: { id: true, nombre: true } },
+            // Y quién cerró su control físico. Mismo criterio: una consulta.
+            revisadoEnRecepcionPor: { select: { id: true, nombre: true } },
           },
         },
       },
@@ -206,6 +213,35 @@ export async function GET(req) {
           ? { id: d.agregadoEnRecepcionPor.id, nombre: d.agregadoEnRecepcionPor.nombre }
           : null,
         agregadoEnRecepcionAt: d.agregadoEnRecepcionAt,
+        // ── EL CONTROL FÍSICO ────────────────────────────────────────────
+        //
+        // "Revisado" no se deduce de `cantidadRecibida != null`: son dos hechos
+        // distintos y colapsarlos daría por controlado un producto donde alguien
+        // apenas empezó a escribir. La fecha además ORDENA los revisados en el
+        // orden real en que apareció la mercadería.
+        revisadoEnRecepcion: d.revisadoEnRecepcion === true,
+        revisadoEnRecepcionPor: d.revisadoEnRecepcionPor
+          ? { id: d.revisadoEnRecepcionPor.id, nombre: d.revisadoEnRecepcionPor.nombre }
+          : null,
+        revisadoEnRecepcionAt: d.revisadoEnRecepcionAt,
+        // El pack incompleto. `null` y `0` significan lo mismo y se normaliza a
+        // número para que la pantalla no tenga que distinguirlos.
+        recibidoUnidadesSueltas:
+          d.recibidoUnidadesSueltas == null ? 0 : toNumber(d.recibidoUnidadesSueltas),
+        // ── LOS TRES CÓDIGOS ESCANEABLES ─────────────────────────────────
+        //
+        // El scanner busca PRIMERO adentro de esta transferencia, así que la
+        // pantalla necesita poder comparar el código leído contra los mismos
+        // tres que reconoce el resto del ERP. Salen con los nombres que espera
+        // `codigosDeItem`, para no inventar una cuarta definición de "qué código
+        // se puede escanear".
+        codigoBarraSecundario: d.producto?.base?.codigo_barra_secundario || null,
+        codigoBarraPropio: d.producto?.codigo_barra_propio || null,
+        // La categoría real del ProductoBase. Solo id y nombre: el filtro no
+        // necesita más y el resto no tiene por qué salir del servidor.
+        categoria: d.producto?.base?.categoria
+          ? { id: d.producto.base.categoria.id, nombre: d.producto.base.categoria.nombre }
+          : null,
         confirmadoPor: d.confirmadoPor
           ? { id: d.confirmadoPor.id, nombre: d.confirmadoPor.nombre }
           : null,
