@@ -214,6 +214,16 @@ export async function GET(req) {
         motivoPrincipal: d.motivoPrincipal || "",
         motivoDetalle: d.motivoDetalle || "",
         unidadEnviada: d.unidadEnviada || null,
+        // El factor de pack viaja SOLO para que la pantalla pueda decir "2
+        // bultos = 12 unidades" al lado de una línea agregada en BULTO. Sin él,
+        // el único camino sería que la pantalla lo dedujera de otra cosa o que se
+        // lo inventara, y con un factor inventado la aclaración mentiría en el
+        // renglón donde más importa.
+        //
+        // Es un dato de LECTURA y nada más: la conversión que mueve stock la
+        // sigue haciendo el servidor, una sola vez, en `aUnidadesFisicas`. La
+        // pantalla no manda cantidades convertidas.
+        factorPack: Number(d.producto?.base?.factor_pack || 1),
         unidadMedida: d.producto?.base?.unidad_medida || null,
         esFiambreFijo: esFiambreFijo(d.producto?.base),
         pesoReferenciaKg: esFiambreFijo(d.producto?.base) ? toNumber(d.producto?.base?.pesoReferenciaKg) : null,
