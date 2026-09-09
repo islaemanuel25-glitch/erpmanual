@@ -1,5 +1,29 @@
 # Changelog
 
+## [2026-09-09] - Actualización: transferencias, pos-transferencias, pos-ventas, configuracion
+
+### Modificado
+- **transferencias**: fix(transferencias): los siete defectos de la revisión arquitectónica
+- **transferencias**: fix(transferencias): recibiendo no hay guardado por lotes, y es por seguridad
+- **transferencias**: feat(transferencias): el puesto de trabajo del control fisico
+- **transferencias**: feat(transferencias): el modelo del control fisico y la aritmetica del pack incompleto
+- **transferencias**: fix(transferencias): una linea agregada no explica dos veces de donde salio
+- **transferencias**: fix(transferencias): agregar o quitar una linea ya no pisa lo que no se guardo
+- **transferencias**: feat(transferencias): la recepcion representa el excedente y el producto extra
+- **transferencias**: feat(transferencias): las decisiones de la recepcion, fuera de la pantalla
+- **transferencias**: feat(transferencias): el detalle expone el factor de pack de cada linea
+- **transferencias**: fix(transferencias): los tres defectos de la revisión de recepción
+- **transferencias**: feat(transferencias): la recepcion representa lo que llego
+- **pos-transferencias**: refactor(productos): un solo buscador de catalogo por local
+- **pos-ventas**: fix(pos): el candado contaba el alt del icono, no los botones
+- **pos-ventas**: feat(pos): un boton padre, un selector de modalidad, identidad en el cobro
+- **pos-ventas**: feat(cobros): configurar modalidades desde la pantalla del medio
+- **pos-ventas**: fix(pos): una modalidad de otro padre tiene que contestar 404, no 409
+- **pos-ventas**: feat(pos): cobrar por identidad, con la condicion resuelta en el servidor
+- **pos-ventas**: feat(cobros): resolver modalidades en servidor
+- **configuracion**: feat(cobros): configurar modalidades desde la pantalla del medio
+
+
 ## [2026-09-06] - Actualización: pos-ventas, dashboard, reportes-ventas, configuracion, productos
 
 ### Modificado

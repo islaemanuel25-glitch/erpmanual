@@ -1,47 +1,46 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-06 20:39
+**Fecha:** 2026-09-09 00:50
 
 ## Módulos modificados recientemente
 
-### pos-ventas
-- test: los fixtures traen comisionPendiente, que es lo que trae una venta real, fix(pos): comisionEsExacta falla cerrado y todos los consumidores quedan cubiertos, fix(auditoria): un backtick adentro de la plantilla SQL la cerraba
-- Archivos: 10 nuevos, 28 modificados (38 total)
+### transferencias
+- fix(transferencias): los siete defectos de la revisión arquitectónica, fix(transferencias): recibiendo no hay guardado por lotes, y es por seguridad, feat(transferencias): el puesto de trabajo del control fisico
+- Archivos: 9 nuevos, 7 modificados (16 total)
 
-### dashboard
-- fix(pos): comisionEsExacta falla cerrado y todos los consumidores quedan cubiertos
+### pos-transferencias
+- refactor(productos): un solo buscador de catalogo por local
 - Archivos: 1 modificados (1 total)
 
-### reportes-ventas
-- fix(pos): comisionEsExacta falla cerrado y todos los consumidores quedan cubiertos, feat(pos): la comision sin configurar deja de ser un 7 inventado
-- Archivos: 4 modificados (4 total)
+### pos-ventas
+- fix(pos): el candado contaba el alt del icono, no los botones, feat(pos): un boton padre, un selector de modalidad, identidad en el cobro, feat(cobros): configurar modalidades desde la pantalla del medio
+- Archivos: 8 nuevos, 7 modificados (15 total)
 
 ### configuracion
-- fix(cobros): los cuatro medios por defecto vuelven a abrirse desde la lista, feat(shell): la pantalla activa puede registrar una accion al lado del titulo, fix(cobros): el boton de volver va arriba a la derecha, como en el resto del ERP
-- Archivos: 6 nuevos, 4 modificados (10 total)
-
-### productos
-- test(alertas): mandar la ficha entera, y que la ruta diga que salio mal
-- Archivos: 1 modificados (1 total)
+- feat(cobros): configurar modalidades desde la pantalla del medio
+- Archivos: 2 nuevos, 1 modificados (3 total)
 
 
 ## Archivos nuevos desde última sincronización
-- lib/pos-ventas/comisionPendiente.test.mjs
-- lib/pos-ventas/comisionPendiente.js
-- lib/pos-ventas/mediosCobroPantalla.test.mjs
-- lib/auditoria-pos-ventas/margenConComisionPendiente.test.mjs
-- lib/pos-ventas/mediosCobro.js
-- lib/pos-ventas/mediosCobro.test.mjs
-- lib/pos-ventas/mediosCobroPantalla.js
-- lib/pos-ventas/sinRespaldoDeComision.test.mjs
-- lib/pos-ventas/ventaConComisionPendiente.test.mjs
-- lib/pos-ventas/mediosCobroServidor.js
-- app/modulos/configuracion/pos-ventas/cobros/[clave]/page.jsx
-- app/modulos/configuracion/pos-ventas/cobros/page.jsx
-- app/modulos/configuracion/pos-ventas/pantallasSeCargan.test.mjs
-- app/modulos/configuracion/pos-ventas/integraciones/page.jsx
-- app/modulos/configuracion/pos-ventas/cobros/nuevo/page.jsx
-- app/modulos/configuracion/pos-ventas/reglas/page.jsx
+- app/api/transferencias/revisar-producto/route.js
+- components/transferencias/AgregarProductoRecibido.jsx
+- components/transferencias/WorkspaceRecepcion.jsx
+- components/transferencias/controlFisicoRender.test.mjs
+- components/transferencias/FichaProductoRecepcion.jsx
+- components/transferencias/ResumenControlFisico.jsx
+- app/api/transferencias/buscar-productos-origen/route.js
+- components/transferencias/recepcionRender.test.mjs
+- app/api/transferencias/linea-recepcion/route.js
+- components/pos-ventas/formaPagoModalidadesRender.test.mjs
+- components/pos-ventas/SelectorModalidad.jsx
+- lib/pos-ventas/cobroPantalla.js
+- lib/pos-ventas/cobroPantalla.test.mjs
+- lib/pos-ventas/modalidadesPantalla.js
+- lib/pos-ventas/modalidadesPantalla.test.mjs
+- lib/pos-ventas/modalidadesDeMedio.js
+- lib/pos-ventas/modalidadesDeMedio.test.mjs
+- app/modulos/configuracion/pos-ventas/cobros/[clave]/modalidades/[modalidadId]/page.jsx
+- app/modulos/configuracion/pos-ventas/cobros/[clave]/modalidades/nueva/page.jsx
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai
