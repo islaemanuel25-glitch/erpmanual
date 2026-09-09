@@ -188,6 +188,38 @@ async function tocar(fragmento, { etiqueta = null } = {}) {
 }
 
 /**
+ * Toca una OPCIÓN de `SunmiSelectAdv`, que no es un botón.
+ *
+ * Sus opciones son `div` con `onClick` y sin `role`, así que `tocar` —que
+ * consulta `button, a, [role="button"]`— no las ve nunca. El síntoma es
+ * "no se encontró nada tocable con «Faltante»", que suena a que el motivo no
+ * está en la lista y en realidad es que se está mirando otra clase de elemento.
+ *
+ * Y hay que abrir la lista primero: cerrada, ninguna opción existe en el DOM.
+ */
+async function tocarOpcion(texto, { etiqueta } = {}) {
+  const ok = await evaluar(`(() => {
+    const objetivo = ${JSON.stringify(texto)};
+    const nodos = [...document.querySelectorAll('div[class*="cursor-pointer"]')]
+      .filter((n) => n.offsetParent !== null);
+    const el = nodos.find((n) => (n.textContent || "").trim() === objetivo)
+      || nodos.find((n) => (n.textContent || "").includes(objetivo));
+    if (!el) return false;
+    el.scrollIntoView({ block: 'center' });
+    el.click();
+    return true;
+  })()`);
+  if (!ok) {
+    const inventario = await evaluar(`(() => {
+      const n = [...document.querySelectorAll('div[class*="cursor-pointer"]')].filter((e) => e.offsetParent !== null);
+      return n.length + " opciones · " + n.map((e) => JSON.stringify((e.textContent || "").trim().slice(0, 30))).join(", ");
+    })()`);
+    throw new Error(`no se encontró la opción «${etiqueta || texto}».\n  ${inventario}`);
+  }
+  await esperar(700);
+}
+
+/**
  * Escribe en el enésimo `input[type=number]` como lo haría una persona.
  *
  * Enfoca, selecciona lo que hay y lo reemplaza con `Input.insertText`, que entra
@@ -317,6 +349,8 @@ await send("Network.setCookie", {
 
 const RUTA = `${BASE}/modulos/transferencias/${TRANSFERENCIA}`;
 const MODO = arg("modo", "principal");
+/** Qué producto buscar en el catálogo del origen. Lo usa `nodeclarado-pack`. */
+const BUSQUEDA = arg("buscar", "COCA COLA ZERO");
 let desbordes = 0;
 
 /**
@@ -509,6 +543,168 @@ for (const ancho of ANCHOS) {
     );
     if (!abierto) throw new Error("el modal del catálogo del origen no abrió");
     desbordes += await foto("D-no-declarado-catalogo-origen", ancho);
+  }
+
+  // ── LAS TRES ESCENAS DE LA TANDA CORRECTIVA ────────────────────────────
+  //
+  // Las tres retratan el MISMO defecto por sus tres caras: la escala en la que
+  // se recibe una línea con snapshot. La transferencia de estas escenas se
+  // arma con `scripts/fixture-captura-cajon.mjs`, que llama a las funciones de
+  // producción —el mapper de venta interna y `crearTransferencia`— sobre la
+  // copia descartable. El respaldo no sirve: la migración es aditiva y no
+  // rellena históricos, así que ahí ninguna línea tiene snapshot todavía.
+
+  if (MODO === "cajon-inicial") {
+    // E · el CAJÓN x8 recién abierto. Lo que se fotografía es el VALOR
+    // PROPUESTO: la línea está persistida como 48 con `unidadEnviada = UNIDAD`,
+    // y el campo tiene que arrancar en 6, que es la escala en la que el remito
+    // habla. Antes arrancaba en 48, así que el caso feliz de un toque guardaba
+    // 48 cajones: 384 unidades.
+    await tocar("Pendiente de revisar", { etiqueta: "la línea en CAJÓN" });
+    await esperarTexto("CAJÓN x8");
+
+    const estado = await evaluar(`(() => {
+      const campos = [...document.querySelectorAll('input[type="number"]')].filter((e) => e.offsetParent !== null);
+      const t = document.body.innerText;
+      const linea = t.split(String.fromCharCode(10)).find((l) => l.indexOf("Enviado") === 0);
+      return JSON.stringify({ campos: campos.map((e) => e.value), enviado: linea || null });
+    })()`);
+    const { campos, enviado } = JSON.parse(estado);
+    if (campos[0] !== "6") {
+      throw new Error(
+        `el campo propone ${JSON.stringify(campos[0])} y tiene que proponer "6": la foto no probaría el caso`
+      );
+    }
+    if (!enviado || !enviado.includes("6 CAJÓN x8")) {
+      throw new Error(`el rótulo del envío no dice 6 CAJÓN x8; dice: ${enviado}`);
+    }
+    console.log(`  · ${enviado} · campo inicial = ${campos[0]}`);
+    desbordes += await foto("E-cajon-inicial", ancho);
+  }
+
+  if (MODO === "cajon-guardado") {
+    // F · el mismo CAJÓN, DESPUÉS de ejercer el servidor.
+    //
+    // No alcanza con escribir los números y fotografiar: eso retrata el estado
+    // local de React y no prueba que el servidor los haya aceptado. Antes de
+    // esta corrección, 5 + 7 sobre una línea con `unidadEnviada = UNIDAD` se
+    // rechazaba con SUELTAS_SIN_BULTO, y la recarga informaba cero recibido.
+    //
+    // Así que la escena escribe, MARCA REVISADO —que persiste—, RECARGA la
+    // página desde cero, y recién ahí saca la foto. Lo que se ve viene de la
+    // base, no del navegador.
+    await tocar("Pendiente de revisar", { etiqueta: "la línea en CAJÓN" });
+    await esperarTexto("CAJÓN x8");
+    await tocar("Hay unidades sueltas", { etiqueta: "el desglose del cajón" });
+    const hay = await evaluar(
+      `[...document.querySelectorAll('input[type="number"]')].filter((e) => e.offsetParent !== null).length >= 2`
+    );
+    if (!hay) throw new Error("el desglose no se abrió: la foto no probaría el caso");
+
+    await escribirEnCampo(0, "5");
+    await escribirEnCampo(1, "7");
+    await esperar(800);
+
+    // Falta 1, así que el botón pide un motivo antes de dejar marcar.
+    //
+    // Son DOS toques y no uno: `SunmiSelectAdv` dibuja su lista solo cuando
+    // está abierto, así que "Faltante" no existe en el DOM hasta que alguien
+    // toca el control. Buscarlo de entrada da "no se encontró nada tocable",
+    // que suena a que el motivo no está y en realidad es que la lista está
+    // cerrada — el mismo malentendido que ya costó dos candados en este repo.
+    await tocar("Seleccionar", { etiqueta: "el selector de motivo" });
+    await esperar(600);
+    await tocarOpcion("Faltante", { etiqueta: "el motivo de la diferencia" });
+    await tocar("y seguir", { etiqueta: "el botón de marcar revisado" });
+    await esperar(2500);
+
+    // ── LA RECARGA, QUE ES LO QUE HACE QUE ESTA FOTO PRUEBE ALGO ─────────
+    await abrir();
+    await tocar("Todos", { etiqueta: "el filtro Todos" });
+    await esperar(900);
+
+    const persistido = await evaluar(`(() => {
+      const t = document.body.innerText;
+      return JSON.stringify({
+        revisado: t.includes("Revisado"),
+        faltante: t.includes("Faltante"),
+        texto: t.split(String.fromCharCode(10)).filter((l) => l.indexOf("Recibido") === 0 || l.indexOf("Enviado") === 0),
+      });
+    })()`);
+    const leido = JSON.parse(persistido);
+    if (!leido.revisado) throw new Error("la línea no quedó revisada en la base");
+    if (!leido.faltante) throw new Error("la línea no quedó como Faltante: el 5+7 no llegó al servidor");
+    console.log(`  · tras recargar: ${JSON.stringify(leido.texto)}`);
+
+    // Y se abre la ficha, que es donde se ven los dos números y el 47 de 48.
+    await tocar("Faltante", { etiqueta: "la línea ya revisada" });
+    await esperarTexto("CAJÓN x8");
+    const detalle = await evaluar(`(() => {
+      const campos = [...document.querySelectorAll('input[type="number"]')].filter((e) => e.offsetParent !== null);
+      const t = document.body.innerText.split(String.fromCharCode(10));
+      return JSON.stringify({
+        campos: campos.map((e) => e.value),
+        fisico: t.find((l) => l.indexOf("Ingreso f") === 0) || null,
+      });
+    })()`);
+    const { campos, fisico } = JSON.parse(detalle);
+    if (campos[0] !== "5" || campos[1] !== "7") {
+      throw new Error(`la recarga no conservó 5 + 7; los campos dicen ${JSON.stringify(campos)}`);
+    }
+    if (!fisico || !fisico.includes("47")) {
+      throw new Error(`la pantalla no dice 47 físicas; dice: ${fisico}`);
+    }
+    console.log(`  · ${fisico}`);
+    desbordes += await foto("F-cajon-guardado", ancho);
+  }
+
+  if (MODO === "nodeclarado-pack") {
+    // G · el producto no declarado con un producto AGRUPADO ya elegido.
+    //
+    // Es la escena que la tanda anterior no pudo sacar: quedó el modal abierto
+    // sobre el buscador vacío. Lo que hay que ver es lo de después de elegir —la
+    // presentación que declara el catálogo del origen, y los dos campos del
+    // bulto incompleto— y sobre todo lo que YA NO está: la pregunta
+    // "¿Cómo lo contaste? UNIDAD / BULTO".
+    // El camino de excepción es el mismo que la escena D: el botón aparece
+    // recién cuando un escaneo no encuentra nada en el remito, que es cuando el
+    // operador de verdad se entera de que tiene algo no declarado en la mano.
+    await escribirEnBuscador("zzz-no-existe");
+    await apretarEnter();
+    await esperarTexto("no figura");
+    await tocar("Informar producto no declarado", { etiqueta: "el botón de no declarado" });
+    await esperar(1800);
+    const abierto = await evaluar(
+      `[...document.querySelectorAll('input[type="text"], input:not([type])')].filter((e) => e.offsetParent !== null).length >= 2`
+    );
+    if (!abierto) throw new Error("el modal del catálogo del origen no abrió");
+
+    await escribirEnBuscador(BUSQUEDA, { enModal: true });
+    await esperar(2500);
+    await tocar(BUSQUEDA, { etiqueta: "un resultado del catálogo del origen" });
+    await esperar(1200);
+
+    const escena = await evaluar(`(() => {
+      const t = document.body.innerText;
+      const campos = [...document.querySelectorAll('input[type="number"]')].filter((e) => e.offsetParent !== null);
+      return JSON.stringify({
+        presentacion: t.includes("Presentación de origen"),
+        completos: t.includes("Completos"),
+        sueltas: t.includes("Unidades sueltas"),
+        pregunta: t.includes("Cómo lo contaste"),
+        campos: campos.length,
+        rotulo: t.split(String.fromCharCode(10)).find((l) => l.indexOf("PACK x") === 0 || l.indexOf("CAJÓN x") === 0) || null,
+      });
+    })()`);
+    const e = JSON.parse(escena);
+    if (e.pregunta) throw new Error("el selector UNIDAD/BULTO sigue en pantalla");
+    if (!e.presentacion) throw new Error("no se muestra la presentación de origen");
+    if (!e.completos || !e.sueltas) {
+      throw new Error(`faltan los dos campos del bulto: ${JSON.stringify(e)}`);
+    }
+    if (e.campos < 2) throw new Error(`hay ${e.campos} campos numéricos y tienen que ser 2`);
+    console.log(`  · presentación ${e.rotulo} · ${e.campos} campos · sin selector`);
+    desbordes += await foto("G-no-declarado-pack", ancho);
   }
 
   if (MODO === "completo") {
