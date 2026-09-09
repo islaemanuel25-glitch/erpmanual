@@ -299,6 +299,23 @@ export async function GET(req) {
         unidadMedida: d.producto?.base?.unidad_medida || null,
         esFiambreFijo: esFiambreFijo(d.producto?.base),
         pesoReferenciaKg: esFiambreFijo(d.producto?.base) ? toNumber(d.producto?.base?.pesoReferenciaKg) : null,
+        // ── EL SNAPSHOT DE CÓMO SALIÓ, TAL CUAL SE GUARDÓ ──────────────────
+        //
+        // Va crudo y sin interpretar: quien lo lee arma el descriptor con
+        // `descriptorDeEnvio`, que es el único lugar donde se decide si esta
+        // línea contesta con lo REGISTRADO o con una reconstrucción del catálogo
+        // de hoy. Interpretarlo acá obligaría a repetir esa decisión en cada
+        // consumidor.
+        //
+        // En una línea anterior a la migración los cinco vienen en null, y eso es
+        // el dato: no se registró.
+        presentacionEnvio: d.presentacionEnvio || null,
+        cantidadPresentada: toNumber(d.cantidadPresentada),
+        sueltasEnviadas: toNumber(d.sueltasEnviadas),
+        factorPresentacion: d.factorPresentacion == null ? null : Number(d.factorPresentacion),
+        pesoPiezaKg: toNumber(d.pesoPiezaKg),
+        // Lo necesita la reconstrucción para distinguir una PIEZA de un kilo.
+        modoVentaDeposito: d.producto?.base?.modoVentaDeposito || null,
       };
     });
 

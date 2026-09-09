@@ -14,6 +14,7 @@ import {
 } from "@/lib/transferencias/recepcion";
 import {
   cargarDetallesDeRecepcion,
+  pesoPiezaParaRecepcion,
   ErrorRecepcion,
   estadoAdmiteRecepcion,
   originalesSinRevisar,
@@ -380,8 +381,15 @@ export async function POST(req) {
         const esFijo = esFiambreFijo(d.producto.base);
 
         // Unidades para sumar al local (KG para fiambre fijo, unidades normal)
+        // ── EL PESO CONGELADO LE GANA AL DEL CATÁLOGO ────────────────────
+        //
+        // De este número sale cuántos KILOS se le acreditan al destino. Leerlo
+        // vivo significaba que editar `pesoReferenciaKg` después de despachar
+        // cambiaba el stock que entraba por un remito que ya había salido.
+        // `pesoPiezaParaRecepcion` usa el snapshot si la línea lo tiene, y el
+        // catálogo si es anterior a la migración — o sea, lo de siempre.
         const incrementoLocal = esFijo
-          ? piezasToKg(recibida, Number(d.producto.base.pesoReferenciaKg))
+          ? piezasToKg(recibida, pesoPiezaParaRecepcion(d))
           : recibidaUnidades;
 
         // ============================================================

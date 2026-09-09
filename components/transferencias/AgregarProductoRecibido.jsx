@@ -45,6 +45,8 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import SunmiSelectorUnidad from "@/components/sunmi/SunmiSelectorUnidad";
+import { presentacionDeProducto } from "@/lib/productos/presentacionDeProducto";
+import { nombreDePresentacion, unidadDeDiferencia } from "@/lib/transferencias/presentacionEnvio";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 
@@ -192,6 +194,25 @@ export default function AgregarProductoRecibido({
 
   const opciones = useMemo(() => (producto ? opcionesDeUnidad(producto) : []), [producto]);
 
+  // ── QUÉ ES ESTE PRODUCTO, SEGÚN EL CATÁLOGO DEL ORIGEN ──────────────────
+  //
+  // La misma decisión que usa la recepción de una línea del remito, tomada acá
+  // sobre lo que devolvió el buscador del ORIGEN — que es el único catálogo que
+  // esta pantalla consulta, y sigue siéndolo.
+  const presentacionDelCatalogo = useMemo(
+    () =>
+      producto
+        ? presentacionDeProducto({
+            unidadMedida: producto.unidadMedida,
+            factorPack: producto.factorPack,
+            modoVentaDeposito: producto.modoVentaDeposito,
+            pesoReferenciaKg: producto.pesoReferenciaKg,
+            contadoEn: unidad,
+          })
+        : { presentacion: "UNIDAD", factor: null, pesoPiezaKg: null },
+    [producto, unidad]
+  );
+
   // Cuántas unidades físicas entran. INFORMATIVO: este número no viaja.
   const ingresoFisico = previsualizarIngresoFisico({
     cantidad,
@@ -335,22 +356,32 @@ export default function AgregarProductoRecibido({
             </SunmiButton>
           </div>
 
-          {/* SIN PRESELECCIÓN. `valor` arranca en null y los dos botones salen
-              sin presionar: el kit ya sabe representar "todavía nada elegido". */}
-          <SunmiSelectorUnidad
-            rotulo={ROTULO_UNIDAD}
-            valor={unidad}
-            opciones={opciones}
-            onCambiar={(v) => {
-              setUnidad(v);
-              setMensaje("");
-            }}
-            nota={
-              opciones.length === 1
-                ? "Este producto no se maneja por bulto."
-                : "Elegí en qué contaste lo que llegó."
-            }
-          />
+          {/* ── LA PRESENTACIÓN LA SABE EL CATÁLOGO DEL ORIGEN ──────────────
+              Preguntar "¿UNIDAD o BULTO?" cuando el producto ya dice que es un
+              CAJÓN x8 es pedirle al operador que traduzca algo que el dominio ya
+              sabe. Se muestra qué es, y la pregunta queda solo donde de verdad
+              hay dos respuestas posibles. */}
+          <Campo label="Presentación de origen">
+            <span className="font-semibold sunmi-text-strong">
+              {nombreDePresentacion(presentacionDelCatalogo)}
+            </span>
+          </Campo>
+
+          {/* Solo cuando el producto ADMITE las dos formas: un pack se puede
+              recibir por bultos o suelto. En KG, en PIEZA y en UNIDAD no hay
+              nada que elegir y el selector no aparece. */}
+          {opciones.length > 1 && (
+            <SunmiSelectorUnidad
+              rotulo={ROTULO_UNIDAD}
+              valor={unidad}
+              opciones={opciones}
+              onCambiar={(v) => {
+                setUnidad(v);
+                setMensaje("");
+              }}
+              nota="Elegí en qué contaste lo que llegó."
+            />
+          )}
 
           {/* 3 · CUÁNTOS */}
           <div>
@@ -365,7 +396,7 @@ export default function AgregarProductoRecibido({
                 una sola vez. Ver `previsualizarIngresoFisico`. */}
             {ingresoFisico != null && (
               <div className="text-sm2 sunmi-text-muted mt-1">
-                Ingreso físico: {fmtCantidad(ingresoFisico)} unidades
+                Ingreso físico: {fmtCantidad(ingresoFisico)} {unidadDeDiferencia(presentacionDelCatalogo)}
               </div>
             )}
           </div>

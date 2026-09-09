@@ -156,6 +156,28 @@ export async function POST(req) {
     // unidad de las líneas del remito, para que las dos puertas por las que
     // entra una unidad contesten igual.
     const uni = resolverUnidadEnviada(body?.unidadEnviada);
+
+    // ── LAS SUELTAS SE VALIDAN CON LA MISMA REGLA QUE LA RECEPCIÓN NORMAL ──
+    //
+    // Solo tienen sentido cuando la presentación AGRUPA: en UNIDAD, en KG y en
+    // PIEZA no hay bultos que completar, y un valor ahí sería un dato sobre una
+    // escala que no existe. Es la misma condición que `validarDetalleRecepcion`
+    // aplica del otro lado con `UNIDADES_SUELTAS_SIN_BULTO`.
+    const sueltasPedidas = Number(body?.recibidoUnidadesSueltas);
+    const traeSueltas = Number.isFinite(sueltasPedidas) && sueltasPedidas > 0;
+    if (traeSueltas && uni.ok && uni.unidad !== "BULTO") {
+      return NextResponse.json(
+        {
+          ok: false,
+          codigo: ERRORES_RECEPCION.SUELTAS_SIN_BULTO,
+          error:
+            "Las unidades sueltas solo tienen sentido cuando la mercadería viene en bultos. " +
+            "En UNIDAD, KG o PIEZA no hay bulto que completar.",
+        },
+        { status: 400 }
+      );
+    }
+    const sueltas = traeSueltas ? sueltasPedidas : null;
     if (!uni.ok) {
       // El CÓDIGO es el compartido, para que el cliente distinga los dos casos
       // igual que en el resto de la recepción. El TEXTO no: el de
@@ -220,6 +242,20 @@ export async function POST(req) {
           cantidad: 0,
           recibido: body?.recibido == null ? null : body.recibido,
           unidadEnviada: uni.unidad,
+          // ── EL PACK INCOMPLETO TAMBIÉN EN UNA LÍNEA NO DECLARADA ─────────
+          //
+          // Un producto que llegó sin estar en el remito puede llegar igual de
+          // incompleto que uno declarado: 2 packs de 6 más 1 suelta. Sin esto
+          // había que elegir entre escribir 2,166 packs —el error de exactitud
+          // que todo este modelo evita— o perder la suelta.
+          //
+          // La columna YA existía: es la misma `recibidoUnidadesSueltas` que usa
+          // la recepción normal. Lo único que faltaba era que el contrato la
+          // aceptara. No hay columna nueva ni migración por esto.
+          //
+          // Se valida con la MISMA regla: sueltas solo si la presentación
+          // agrupa. Ver `sueltasParaLineaNueva`.
+          recibidoUnidadesSueltas: sueltas,
           precioCosto: producto.precio_costo ?? producto.base?.precio_costo ?? null,
           agregadoEnRecepcion: true,
           agregadoEnRecepcionPorId: usuarioId,
