@@ -46,7 +46,7 @@ import SunmiEscanerCodigoBarra, {
 
 import ResumenControlFisico from "./ResumenControlFisico";
 import FichaProductoRecepcion, { TEXTO_ESTADO, presentacionDelEnvio } from "./FichaProductoRecepcion";
-import AgregarProductoRecibido from "./AgregarProductoRecibido";
+import AgregarProductoRecibido, { ACCION_AGREGAR } from "./AgregarProductoRecibido";
 import { SectionHead, fmtCantidad } from "./detallePresentacion";
 import {
   ESTADO_PRODUCTO,
@@ -231,24 +231,33 @@ export default function WorkspaceRecepcion({
               Escanear código
             </SunmiButton>
           )}
-          {puedeRecibir && (
-            <SunmiButton color="slate" onClick={() => setAgregarAbierto(true)}>
-              Buscar en catálogo del origen
-            </SunmiButton>
-          )}
         </div>
 
+        {/* ── EL CATÁLOGO DEL ORIGEN ES UN CAMINO DE EXCEPCIÓN ─────────────
+            Antes este botón estaba SIEMPRE, y eso contradice el flujo: lo normal
+            es que el producto esté en el remito, y ofrecer permanentemente el
+            atajo para "informar algo que no figura" invita a usarlo antes de
+            haber buscado — con el resultado de una línea agregada al lado de la
+            del remito, para el mismo producto.
+
+            Aparece solo cuando la búsqueda YA falló, que es cuando significa
+            algo. Y aparece pegado al mensaje que explica por qué. */}
         {aviso && (
           <SunmiAviso tono="warning">
             {aviso}
             {aviso === MENSAJE_NO_FIGURA && puedeRecibir && (
               <>
                 {" "}
-                Si igual llegó, buscalo en el catálogo del origen y agregalo como producto no
-                declarado.
+                Si igual llegó, informalo como producto no declarado.
               </>
             )}
           </SunmiAviso>
+        )}
+
+        {aviso === MENSAJE_NO_FIGURA && puedeRecibir && (
+          <SunmiButton color="slate" onClick={() => setAgregarAbierto(true)}>
+            {ACCION_AGREGAR}
+          </SunmiButton>
         )}
       </SunmiCard>
 

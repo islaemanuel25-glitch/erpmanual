@@ -56,7 +56,18 @@ import {
   validarLineaNueva,
 } from "@/lib/transferencias/recepcionUI";
 
-export const TITULO_AGREGAR = "Agregar producto recibido";
+// ── EL LENGUAJE: SE INFORMA UNA INCONSISTENCIA, NO SE PIDE MERCADERÍA ─────
+//
+// Antes decía "Agregar producto recibido" y "Agregar a recepción". Suena a que
+// el operador se suma algo, y no es lo que está pasando: llegó mercadería que el
+// remito no menciona y él lo está INFORMANDO. La diferencia importa porque de
+// esto sale un descuento en el stock del origen y una auditoría con su nombre.
+//
+// Los nombres internos —el componente, la ruta `linea-recepcion`, el campo
+// `agregadoEnRecepcion`— no se tocan: renombrarlos sería mover media base y un
+// endpoint desplegado por una cuestión de redacción.
+export const TITULO_AGREGAR = "Producto no declarado";
+export const ACCION_AGREGAR = "Informar producto no declarado";
 export const ROTULO_UNIDAD = "¿Cómo lo contaste?";
 export const ROTULO_CANTIDAD = "Cantidad recibida";
 
@@ -81,12 +92,25 @@ function FilaResultado({ p, onElegir }) {
     >
       <span className="block min-w-0">
         <span className="block font-semibold sunmi-text-strong break-words">{p.nombre}</span>
+        {/* ── NI STOCK NI COSTO ────────────────────────────────────────────
+            Acá decía "Stock origen N". Se sacó por dos motivos y el segundo es
+            peor que el primero.
+
+            El de fondo: quien informa mercadería que llegó de más no necesita
+            saber cuánto hay en el origen, y `transferencias.recibir` no es el
+            permiso de ver stock ni costos. El endpoint ya dejó de mandarlos.
+
+            El inmediato: como el endpoint dejó de mandarlos, esto venía
+            dibujando "Stock origen 0" para TODOS los productos — un dato falso,
+            que es peor que un dato que no está.
+
+            Lo que sí hace falta para identificar lo que se tiene en la mano: el
+            nombre, el código y en qué presentación viene. */}
         <span className="block text-sm2 sunmi-text-muted">
           <span className="font-mono">{p.codigoBarra || "Sin código"}</span>
           {" · "}
-          {factor > 1 ? `Bulto · x${factor}` : "Unidad"}
-          {" · Stock origen "}
-          <span className="tabular-nums sunmi-text-link">{fmtCantidad(p.stockActual)}</span>
+          {factor > 1 ? `PACK x${factor}` : "Unidad"}
+          {p.categoriaNombre ? ` · ${p.categoriaNombre}` : ""}
         </span>
       </span>
     </SunmiButton>
@@ -226,7 +250,7 @@ export default function AgregarProductoRecibido({
     <SunmiModalLayout
       open={abierto}
       title={TITULO_AGREGAR}
-      subtitle="Se busca en el catálogo del local de origen"
+      subtitle="Llegó algo que el remito no menciona. Buscalo en el catálogo del origen."
       onClose={onCerrar}
       z={9999}
       // Es carga: la cantidad y la unidad ya elegidas se perderían con un toque
@@ -244,7 +268,7 @@ export default function AgregarProductoRecibido({
             Cancelar
           </SunmiButton>
           <SunmiButton color="amber" onClick={agregar} disabled={enviando}>
-            {enviando ? "Agregando…" : "Agregar a recepción"}
+            {enviando ? "Informando…" : ACCION_AGREGAR}
           </SunmiButton>
         </div>
       }

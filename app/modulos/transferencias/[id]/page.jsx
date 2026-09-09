@@ -35,6 +35,7 @@ import WorkspaceRecepcion from "@/components/transferencias/WorkspaceRecepcion";
 import PanelCancelarTransferencia from "@/components/transferencias/PanelCancelarTransferencia";
 import { SectionHead, TotalTile, fmtCantidad, fmtMoneda } from "@/components/transferencias/detallePresentacion";
 import { exigeMotivo } from "@/lib/transferencias/recepcion";
+import { ESTADO_PRODUCTO, estadoDeProducto } from "@/lib/transferencias/controlFisico";
 import {
   construirEditItems,
   cuerpoQuitarLinea,
@@ -453,9 +454,21 @@ export default function TransferenciaDetallePage() {
   // ===============================
   const lineas = item?.items || [];
   const lineasRecibidas = lineas.filter((d) => d.cantidadRecibida != null).length;
-  const lineasConDiferencia = lineas.filter(
-    (d) => d.cantidadRecibida != null && num(d.cantidadRecibida) !== num(d.cantidadEnviada)
-  ).length;
+  // ── LA DIFERENCIA SE CUENTA EN FÍSICO ──────────────────────────────────
+  //
+  // Comparaba `cantidadRecibida !== cantidadEnviada`, o sea las cantidades en la
+  // PRESENTACIÓN. Desde que existe el pack incompleto eso miente en los dos
+  // sentidos: "6 packs + 1 suelta" contra 6 enviados daba 6 !== 6 = false, o sea
+  // "sin diferencia", con 37 unidades contra 36; y "5 packs + 6 sueltas" daba
+  // diferencia con 36 contra 36.
+  //
+  // Se usa `estadoDeProducto`, el mismo que alimenta las cards del puesto de
+  // trabajo, así que el tile de acá y el resumen de allá no pueden discrepar.
+  const lineasConDiferencia = lineas.filter((d) => {
+    const e = estadoDeProducto({ ...d, revisadoEnRecepcion: true });
+    return d.cantidadRecibida != null &&
+      (e === ESTADO_PRODUCTO.FALTANTE || e === ESTADO_PRODUCTO.SOBRANTE);
+  }).length;
   const lineasDevueltas = lineas.filter((d) => d.devolucionOrigen != null && num(d.devolucionOrigen) > 0).length;
   const importeTotal = item ? num(item.resumen?.costoTotal) : 0;
 

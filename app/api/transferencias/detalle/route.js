@@ -8,7 +8,12 @@ import { valorizarDetalle, origenEsDepositoDe } from "@/lib/transferencias/costo
 // EL MISMO helper que usa la recepción para devolver el faltante al origen. Se
 // importa en vez de replicar la fórmula: si la regla cambia, la pantalla no
 // puede quedar mostrando otro número que el que el stock realmente movió.
-import { calcularAjusteOrigenUnidades, aMilesimas, desdeMilesimas } from "@/lib/transferencias/recepcion";
+import {
+  calcularAjusteOrigenUnidades,
+  aMilesimas,
+  desdeMilesimas,
+  milesimasFisicas,
+} from "@/lib/transferencias/recepcion";
 
 function toNumber(v) {
   const n = Number(v);
@@ -159,8 +164,33 @@ export async function GET(req) {
         { origenEsDeposito: origenEsDepositoDe(transferencia, "detalle") }
       );
 
-      itemsEnviados += cantidadEnviada;
-      itemsRecibidos += cantidadRecibida ?? 0;
+      // ── ESTOS DOS SE CUENTAN EN FÍSICO, Y ANTES NO ───────────────────────
+      //
+      // Sumaban la cantidad en la PRESENTACIÓN de cada línea, y de ahí salía
+      // `diferenciaTotal`, que decide la marca "tiene diferencias" del documento.
+      // Con packs incompletos eso mentía en los dos sentidos:
+      //
+      //   6 packs enviados, 6 packs + 1 suelta recibidos → 6 − 6 = 0, "sin
+      //   diferencia", cuando físicamente son 37 contra 36;
+      //   6 enviados, 5 packs + 6 sueltas → 5 − 6 = −1, "falta", cuando son 36
+      //   contra 36 y no falta nada.
+      //
+      // Sumar milésimas físicas no arregla que la suma cruce unidades con kilos
+      // —eso ya era así y por eso los totales de pantalla se cuentan por LÍNEA—,
+      // pero sí hace que la marca de diferencia diga la verdad línea por línea.
+      const envFisM = milesimasFisicas({
+        cantidad: d.cantidad, sueltas: 0,
+        unidad: d.unidadEnviada, factorPack: d.producto?.base?.factor_pack,
+      });
+      const recFisM =
+        cantidadRecibida == null
+          ? null
+          : milesimasFisicas({
+              cantidad: d.recibido, sueltas: d.recibidoUnidadesSueltas,
+              unidad: d.unidadEnviada, factorPack: d.producto?.base?.factor_pack,
+            });
+      itemsEnviados += envFisM == null ? 0 : desdeMilesimas(envFisM);
+      itemsRecibidos += recFisM == null ? 0 : desdeMilesimas(recFisM);
       costoTotal += subtotal;
 
       // Ajuste del origen en UNIDADES FÍSICAS de StockLocal, CON SIGNO:
@@ -176,6 +206,12 @@ export async function GET(req) {
           : calcularAjusteOrigenUnidades({
               enviada: d.cantidad,
               recibida: d.recibido,
+              // El pack incompleto. Sin esto, una línea de 5 packs + 5 sueltas se
+              // leía como 5 packs pelados: el detalle histórico decía que
+              // faltaban 6 unidades cuando faltaba 1, mientras el stock —que sí
+              // pasa las sueltas— quedaba bien. Stock correcto y documento
+              // incorrecto es peor que los dos mal: nadie sospecha del papel.
+              recibidaSueltas: d.recibidoUnidadesSueltas,
               unidad: d.unidadEnviada,
               factorPack: d.producto?.base?.factor_pack,
             });

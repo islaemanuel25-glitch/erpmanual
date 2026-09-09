@@ -30,6 +30,7 @@ const rutaConfirmar = await import("../../app/api/transferencias/confirmar-recep
 const rutaLinea = await import("../../app/api/transferencias/linea-recepcion/route.js");
 const rutaBuscar = await import("../../app/api/transferencias/buscar-productos-origen/route.js");
 const rutaRevisar = await import("../../app/api/transferencias/revisar-producto/route.js");
+const rutaDetalle = await import("../../app/api/transferencias/detalle/route.js");
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ARNÉS
@@ -1113,6 +1114,151 @@ async function correr(f) {
   ok("G · NO existe la clave precioCosto", !claves.has("precioCosto"), [...claves].join(", "));
   ok("G · sí lo necesario para identificar", claves.has("productoLocalId") && claves.has("nombre") &&
     claves.has("codigoBarra") && claves.has("factorPack"), [...claves].join(", "));
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("H. Desmarcar NO puede reescribir el conteo");
+  // ═════════════════════════════════════════════════════════════════════════
+  //
+  // El defecto que más caro salía de los siete, y el único que ninguna pieza
+  // podía ver por separado: desmarcar pasaba por el MISMO validador que marcar,
+  // con un cuerpo que no traía cantidades. El validador hace lo correcto en su
+  // lugar —sin recepción cargada, proponer lo enviado— y ahí hacía un desastre:
+  // un conteo terminado de 5 bultos y 5 sueltas volvía a 6 bultos y 0 sueltas.
+  //
+  // O sea: 35 unidades contadas a mano se convertían en 36 por tocar un botón
+  // que dice "desmarcar", y la pantalla mostraba la línea sin diferencia.
+  //
+  // Se lee la BASE, no la respuesta del endpoint. Un endpoint puede contestar
+  // bien y haber escrito mal.
+
+  const pH = await armarProducto({ nombre: "desmarcar", factorPack: 6, stockOrigen: 100 });
+  const tH = await armarTransferencia([{ producto: pH, cantidad: 6, unidad: "BULTO", factorPack: 6 }]);
+  const detH = await prisma.transferenciaDetalle.findFirst({ where: { transferenciaId: tH.id } });
+
+  const marcarH = await revisar({
+    transferenciaId: tH.id, detalleId: detH.id,
+    recibido: 5, recibidoUnidadesSueltas: 5, motivoPrincipal: "Faltante", revisado: true,
+  });
+  ok("H · se cierra el control con 5 bultos y 5 sueltas", marcarH.ok === true, marcarH.error);
+
+  const trasMarcar = await prisma.transferenciaDetalle.findUnique({ where: { id: detH.id } });
+  igual("H · queda recibido 5", Number(trasMarcar.recibido), 5);
+  igual("H · queda 5 sueltas", Number(trasMarcar.recibidoUnidadesSueltas), 5);
+  igual("H · queda revisado", trasMarcar.revisadoEnRecepcion, true);
+  ok("H · con autor", Number(trasMarcar.revisadoEnRecepcionPorId) === usuario.id,
+    String(trasMarcar.revisadoEnRecepcionPorId));
+  ok("H · y con fecha", trasMarcar.revisadoEnRecepcionAt instanceof Date,
+    String(trasMarcar.revisadoEnRecepcionAt));
+
+  const desmarcarH = await revisar({ transferenciaId: tH.id, detalleId: detH.id, revisado: false });
+  ok("H · se desmarca", desmarcarH.ok === true, desmarcarH.error);
+
+  const trasDesmarcar = await prisma.transferenciaDetalle.findUnique({ where: { id: detH.id } });
+  igual("H · el recibido SIGUE en 5", Number(trasDesmarcar.recibido), 5);
+  igual("H · las sueltas SIGUEN en 5", Number(trasDesmarcar.recibidoUnidadesSueltas), 5);
+  igual("H · el motivo SIGUE siendo Faltante", trasDesmarcar.motivoPrincipal, "Faltante");
+  igual("H · la marca queda en false", trasDesmarcar.revisadoEnRecepcion, false);
+  igual("H · el autor se borra", trasDesmarcar.revisadoEnRecepcionPorId, null);
+  igual("H · la fecha se borra", trasDesmarcar.revisadoEnRecepcionAt, null);
+
+  // Y volver a marcar SIN mandar cantidades tampoco puede inventarlas: es el
+  // mismo defecto por la otra puerta, la del cuerpo parcial.
+  const reMarcarH = await revisar({ transferenciaId: tH.id, detalleId: detH.id, revisado: true });
+  ok("H · se vuelve a marcar sin mandar cantidades", reMarcarH.ok === true, reMarcarH.error);
+  const trasReMarcar = await prisma.transferenciaDetalle.findUnique({ where: { id: detH.id } });
+  igual("H · y el recibido sigue en 5, no en 6", Number(trasReMarcar.recibido), 5);
+  igual("H · y las sueltas siguen en 5, no en 0", Number(trasReMarcar.recibidoUnidadesSueltas), 5);
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("I. El detalle recargado entiende el pack incompleto");
+  // ═════════════════════════════════════════════════════════════════════════
+  //
+  // El stock ya se movía bien —lo prueban las secciones de arriba—, pero la
+  // pantalla del histórico restaba CANTIDADES DE PRESENTACIÓN: 6 bultos contra
+  // 6 bultos daba "sin diferencia" aunque hubiera llegado una unidad de más, y
+  // 5 contra 6 daba "faltan 6" cuando faltaba 1. El documento contradecía al
+  // stock que él mismo había movido.
+  //
+  // Se confirma de verdad y se recarga el detalle por su endpoint, que es el
+  // camino que recorre la pantalla.
+
+  // La ruta contesta `{ ok, item }` y todo lo interesante vive adentro de
+  // `item`. Se desenvuelve acá, una vez, para que las afirmaciones digan qué
+  // miden y no cómo viaja.
+  const detalleDe = async (transferenciaId) => {
+    const r = await leer(rutaDetalle.GET(pedido(
+      `http://ci/api/transferencias/detalle?id=${transferenciaId}`, { sesion }
+    )));
+    return { ok: r.ok, error: r.error, ...(r.item || {}) };
+  };
+
+  // I.1 — 6 bultos de 6 más 1 suelta: 37 físicas contra 36. Sobra 1.
+  const pI1 = await armarProducto({ nombre: "sobra-una", factorPack: 6, stockOrigen: 100 });
+  const tI1 = await armarTransferencia([{ producto: pI1, cantidad: 6, unidad: "BULTO", factorPack: 6 }]);
+  const detI1 = await prisma.transferenciaDetalle.findFirst({ where: { transferenciaId: tI1.id } });
+  const rI1 = await revisar({
+    transferenciaId: tI1.id, detalleId: detI1.id,
+    recibido: 6, recibidoUnidadesSueltas: 1, motivoPrincipal: "Sobrante", revisado: true,
+  });
+  ok("I.1 · se cierra el control con 6 bultos y 1 suelta", rI1.ok === true, rI1.error);
+  const cI1 = await confirmar(tI1.id);
+  ok("I.1 · se confirma", cI1.ok === true, cI1.error);
+
+  const dI1 = await detalleDe(tI1.id);
+  ok("I.1 · el detalle contesta", dI1.ok === true, dI1.error);
+  igual("I.1 · enviadas 36 unidades físicas", dI1.resumen?.itemsEnviados, 36);
+  igual("I.1 · recibidas 37 unidades físicas", dI1.resumen?.itemsRecibidos, 37);
+  igual("I.1 · la diferencia del documento es +1", dI1.resumen?.diferenciaTotal, 1);
+  ok("I.1 · y el documento queda marcado con diferencias", dI1.tieneDiferencias === true,
+    String(dI1.tieneDiferencias));
+  // El ajuste informativo del origen también: entró una unidad de más, así que
+  // al origen se le descuenta 1, no 0.
+  igual("I.1 · al origen se le descuenta 1", dI1.items?.[0]?.excedenteOrigen, 1);
+  igual("I.1 · y no se le devuelve nada", dI1.items?.[0]?.devolucionOrigen, 0);
+
+  // I.2 — 5 bultos de 6 más 5 sueltas: 35 físicas contra 36. Falta 1, NO 6.
+  const pI2 = await armarProducto({ nombre: "falta-una", factorPack: 6, stockOrigen: 100 });
+  const tI2 = await armarTransferencia([{ producto: pI2, cantidad: 6, unidad: "BULTO", factorPack: 6 }]);
+  const detI2 = await prisma.transferenciaDetalle.findFirst({ where: { transferenciaId: tI2.id } });
+  const rI2 = await revisar({
+    transferenciaId: tI2.id, detalleId: detI2.id,
+    recibido: 5, recibidoUnidadesSueltas: 5, motivoPrincipal: "Faltante", revisado: true,
+  });
+  ok("I.2 · se cierra el control con 5 bultos y 5 sueltas", rI2.ok === true, rI2.error);
+  const cI2 = await confirmar(tI2.id);
+  ok("I.2 · se confirma", cI2.ok === true, cI2.error);
+
+  const dI2 = await detalleDe(tI2.id);
+  ok("I.2 · el detalle contesta", dI2.ok === true, dI2.error);
+  igual("I.2 · enviadas 36 unidades físicas", dI2.resumen?.itemsEnviados, 36);
+  igual("I.2 · recibidas 35 unidades físicas", dI2.resumen?.itemsRecibidos, 35);
+  igual("I.2 · falta 1, no 6", dI2.resumen?.diferenciaTotal, -1);
+  igual("I.2 · al origen se le devuelve 1, no 6", dI2.items?.[0]?.devolucionOrigen, 1);
+  igual("I.2 · y no se le descuenta nada", dI2.items?.[0]?.excedenteOrigen, 0);
+
+  // Y el stock confirma que el documento por fin dice lo mismo que él: el
+  // destino recibió 35 y al origen volvió 1 de las 36 que había mandado.
+  const sI2o = await stockDe(origen.id, pI2.productoLocalId);
+  const sI2d = await stockDestinoDe(pI2.baseId);
+  igualStock("I.2 · el destino queda con 35", sI2d.cantidad, 35);
+  igualStock("I.2 · el origen recupera 1", sI2o.cantidad, 100 - 36 + 1);
+  igualStock("I.2 · sin tránsito colgado", sI2o.enTransito, 0);
+
+  // I.3 — 5 bultos de 6 más 6 sueltas: 36 contra 36. NO hay diferencia, aunque
+  // las cantidades de presentación difieran (5 contra 6).
+  const pI3 = await armarProducto({ nombre: "igual-distinto", factorPack: 6, stockOrigen: 100 });
+  const tI3 = await armarTransferencia([{ producto: pI3, cantidad: 6, unidad: "BULTO", factorPack: 6 }]);
+  const detI3 = await prisma.transferenciaDetalle.findFirst({ where: { transferenciaId: tI3.id } });
+  const rI3 = await revisar({
+    transferenciaId: tI3.id, detalleId: detI3.id,
+    recibido: 5, recibidoUnidadesSueltas: 6, revisado: true,
+  });
+  ok("I.3 · se cierra sin exigir motivo, porque no hay diferencia física", rI3.ok === true, rI3.error);
+  const cI3 = await confirmar(tI3.id);
+  ok("I.3 · se confirma", cI3.ok === true, cI3.error);
+  const dI3 = await detalleDe(tI3.id);
+  igual("I.3 · 36 contra 36: diferencia 0", dI3.resumen?.diferenciaTotal, 0);
+  igual("I.3 · y no hay ajuste al origen", dI3.items?.[0]?.ajusteOrigen, 0);
 
   // ═════════════════════════════════════════════════════════════════════════
   seccion("20. La recepción sigue siendo solo de inventario");

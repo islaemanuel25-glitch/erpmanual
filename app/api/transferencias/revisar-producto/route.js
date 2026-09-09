@@ -125,21 +125,81 @@ export async function POST(req) {
         );
       }
 
+      const seleccion = {
+        id: true,
+        recibido: true,
+        recibidoUnidadesSueltas: true,
+        motivoPrincipal: true,
+        motivoDetalle: true,
+        revisadoEnRecepcion: true,
+        revisadoEnRecepcionAt: true,
+      };
+
+      // ── DESMARCAR NO ES UNA CAPTURA: NO TOCA LAS CANTIDADES ───────────
+      //
+      // Tiene su propio camino, y es un arreglo de un defecto real.
+      //
+      // Antes desmarcar pasaba por la validación como cualquier guardado, con un
+      // cuerpo que solo traía `{ detalleId, revisado: false }`. Sin `recibido` en
+      // el request Y sin `recibido` en el objeto que se le pasaba al validador,
+      // `resolverRecibido` caía a su fallback —"sin recepción cargada, se propone
+      // lo enviado"— y la fila terminaba reescrita:
+      //
+      //     persistido: 5 packs + 5 sueltas = 35 físicas, motivo Faltante
+      //     desmarcar  → 6 packs + 0 sueltas = 36 físicas, sin motivo
+      //
+      // Eso no es desmarcar: es borrar el conteo de alguien y dejar el remito
+      // como si hubiera llegado completo. Y era silencioso.
+      //
+      // Desmarcar toca EXACTAMENTE los tres campos de la revisión. La cantidad,
+      // las sueltas y el motivo quedan como estaban, porque nadie los volvió a
+      // contar. Sigue adentro del mismo lock: quitar la marca mientras otro
+      // confirma es la misma carrera que cualquier otra escritura.
+      if (!revisado) {
+        const desmarcado = await tx.transferenciaDetalle.update({
+          where: { id: d.id },
+          data: {
+            revisadoEnRecepcion: false,
+            revisadoEnRecepcionPorId: null,
+            revisadoEnRecepcionAt: null,
+          },
+          select: seleccion,
+        });
+        const pendientesTrasDesmarcar = await tx.transferenciaDetalle.count({
+          where: { transferenciaId, agregadoEnRecepcion: false, revisadoEnRecepcion: false },
+        });
+        return { detalle: desmarcado, pendientes: pendientesTrasDesmarcar };
+      }
+
+      // ── MARCAR SÍ ES UNA CAPTURA, Y VALIDA ────────────────────────────
+      //
       // La MISMA validación que guardar y confirmar. La cantidad enviada, la
       // unidad y la procedencia salen de la BASE: si vinieran del request,
       // cualquiera podría marcar una línea del remito como agregada, o inflar lo
       // enviado para acreditarse stock que nunca salió.
+      //
+      // Y lo que el pedido NO trae sale de lo PERSISTIDO, no del fallback de "lo
+      // enviado". Un cuerpo parcial —marcar sin volver a escribir la cantidad—
+      // tiene que conservar lo que ya estaba contado, que es el mismo defecto que
+      // el de desmarcar con otra puerta de entrada.
+      const trae = (clave) => Object.prototype.hasOwnProperty.call(body || {}, clave);
+
       const plan = validarDetalleRecepcion({
         detalle: {
           cantidad: d.cantidad,
           unidadEnviada: d.unidadEnviada,
-          motivoPrincipal: body?.motivoPrincipal,
-          motivoDetalle: body?.motivoDetalle,
+          // Lo persistido como base; el request lo pisa solo si lo manda.
+          recibido: d.recibido,
+          recibidoUnidadesSueltas: d.recibidoUnidadesSueltas,
+          motivoPrincipal: trae("motivoPrincipal") ? body.motivoPrincipal : d.motivoPrincipal,
+          motivoDetalle: trae("motivoDetalle") ? body.motivoDetalle : d.motivoDetalle,
           agregadoEnRecepcion: d.agregadoEnRecepcion,
         },
         factorPack: Number(d.producto?.base?.factor_pack || 1),
-        recibidoPropuesto: body?.recibido,
-        sueltasPropuestas: body?.recibidoUnidadesSueltas,
+        recibidoPropuesto: trae("recibido") ? body.recibido : undefined,
+        sueltasPropuestas: trae("recibidoUnidadesSueltas")
+          ? body.recibidoUnidadesSueltas
+          : undefined,
       });
 
       if (!plan.ok) {
@@ -151,32 +211,24 @@ export async function POST(req) {
         );
       }
 
+      const motivoElegido = trae("motivoPrincipal") ? body.motivoPrincipal : d.motivoPrincipal;
+      const detalleElegido = trae("motivoDetalle") ? body.motivoDetalle : d.motivoDetalle;
+
       const actualizado = await tx.transferenciaDetalle.update({
         where: { id: d.id },
         data: {
           recibido: plan.recibida,
           // Normalizado por el validador: 0 cuando no hay pack incompleto.
           recibidoUnidadesSueltas: plan.recibidaSueltas,
-          motivoPrincipal: plan.hayDiferencia ? body?.motivoPrincipal || null : null,
+          motivoPrincipal: plan.hayDiferencia ? motivoElegido || null : null,
           motivoDetalle:
-            plan.hayDiferencia && body?.motivoPrincipal === "Otro"
-              ? body?.motivoDetalle || null
-              : null,
-          revisadoEnRecepcion: revisado,
-          // Autoría y hora del SERVIDOR. Desmarcar las limpia: un registro que
-          // dice quién revisó algo que ya no está revisado no es un registro.
-          revisadoEnRecepcionPorId: revisado ? usuarioId : null,
-          revisadoEnRecepcionAt: revisado ? new Date() : null,
-        },
-        select: {
-          id: true,
-          recibido: true,
-          recibidoUnidadesSueltas: true,
-          motivoPrincipal: true,
-          motivoDetalle: true,
+            plan.hayDiferencia && motivoElegido === "Otro" ? detalleElegido || null : null,
           revisadoEnRecepcion: true,
-          revisadoEnRecepcionAt: true,
+          // Autoría y hora del SERVIDOR.
+          revisadoEnRecepcionPorId: usuarioId,
+          revisadoEnRecepcionAt: new Date(),
         },
+        select: seleccion,
       });
 
       // Cuánto falta, para que la pantalla no tenga que recargar la
