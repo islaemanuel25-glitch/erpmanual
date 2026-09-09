@@ -189,6 +189,47 @@ const CASOS = [
     candado: "3e. la CÁMARA no cae por nombre: un código que no está es 'no figura'",
     suite: "lib/transferencias/integracionRecepcion.test.mjs",
   },
+  // ── LOS CUATRO DE LA LIMPIEZA DE HARDCODEO (2026-09-09) ────────────────
+  //
+  // El trinquete global quedó verde con estos adentro, así que el candado de
+  // cero hardcodeo es lo único que los cubre. Que se ponga rojo con cada uno es
+  // lo que separa ese candado de un archivo que acompaña.
+  {
+    n: "H-1",
+    defecto: "vuelve la grilla de valor arbitrario al puesto de trabajo",
+    archivo: "components/transferencias/WorkspaceRecepcion.jsx",
+    de: '<div className="hidden lg:grid lg:grid-cols-2 gap-3 items-start">',
+    a: '<div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 items-start">',
+    candado: "las piezas del control físico no tienen NINGÚN valor visual arbitrario",
+    suite: "components/transferencias/ceroHardcodeoControlFisico.test.mjs",
+  },
+  {
+    n: "H-2",
+    defecto: "el escáner del kit vuelve a conocer el número del apilado",
+    archivo: "components/sunmi/SunmiEscanerCodigoBarra.jsx",
+    de: "      z={NIVEL_MODAL_GLOBAL}",
+    a: "      z={9999}",
+    candado: "las piezas del control físico no tienen NINGÚN valor visual arbitrario",
+    suite: "components/transferencias/ceroHardcodeoControlFisico.test.mjs",
+  },
+  {
+    n: "H-3",
+    defecto: "el escáner vuelve a elegir su propia medida responsive",
+    archivo: "components/sunmi/SunmiEscanerCodigoBarra.jsx",
+    de: '      forma="hoja-o-centrado"',
+    a: '      forma="hoja-o-centrado"\n      maxWidth="sm:max-w-lg"',
+    candado: "las piezas del control físico no tienen NINGÚN valor visual arbitrario",
+    suite: "components/transferencias/ceroHardcodeoControlFisico.test.mjs",
+  },
+  {
+    n: "H-4",
+    defecto: "vuelve la grilla arbitraria del pie de producto no declarado",
+    archivo: "components/transferencias/AgregarProductoRecibido.jsx",
+    de: '<div className="flex flex-col sm:flex-row gap-2 w-full">',
+    a: '<div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2 w-full">',
+    candado: "las piezas del control físico no tienen NINGÚN valor visual arbitrario",
+    suite: "components/transferencias/ceroHardcodeoControlFisico.test.mjs",
+  },
   {
     n: "24-25",
     defecto: "marcar deja de escribir la autoría",

@@ -40,7 +40,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
+import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
@@ -252,7 +252,9 @@ export default function AgregarProductoRecibido({
       title={TITULO_AGREGAR}
       subtitle="Llegó algo que el remito no menciona. Buscalo en el catálogo del origen."
       onClose={onCerrar}
-      z={9999}
+      // El mismo nivel que el escáner, y por la misma puerta: los dos conviven
+      // en este flujo y el número vive una sola vez, en el dueño de la capa.
+      z={NIVEL_MODAL_GLOBAL}
       // Es carga: la cantidad y la unidad ya elegidas se perderían con un toque
       // al costado, y en el teléfono ese toque pasa solo.
       destructivo
@@ -260,14 +262,23 @@ export default function AgregarProductoRecibido({
       // El alto lo pone el kit. No se elige un `vh` a ojo para imitar una
       // maqueta: la lista de resultados crece contra el cuerpo con `flex-1
       // min-h-0`, que es lo que hace aparecer el scroll donde corresponde.
-      maxWidth="sm:max-w-lg"
+      // Sin `maxWidth`, por lo mismo que el escáner: el default del kit alcanza
+      // y `sm:max-w-lg` era una medida responsive elegida en la pantalla.
       espacioCuerpo="px-4 space-y-3"
       footer={
-        <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2 w-full">
+        // Apilados en el teléfono y en fila de `sm` para arriba, con Cancelar en
+        // su ancho natural y la acción ocupando lo que sobra.
+        //
+        // Decía `grid grid-cols-1 sm:grid-cols-[auto_1fr]`, que es un valor
+        // arbitrario. Con flex sale con primitivas y da lo mismo: en columna los
+        // hijos se estiran solos, y en fila `sm:flex-1` es el `1fr`. `SunmiButton`
+        // negocia alto, display, padding, radio y letra — no el ancho ni el flex—
+        // así que la clase llega tal cual.
+        <div className="flex flex-col sm:flex-row gap-2 w-full">
           <SunmiButton color="slate" onClick={onCerrar} disabled={enviando}>
             Cancelar
           </SunmiButton>
-          <SunmiButton color="amber" onClick={agregar} disabled={enviando}>
+          <SunmiButton color="amber" onClick={agregar} disabled={enviando} className="sm:flex-1">
             {enviando ? "Informando…" : ACCION_AGREGAR}
           </SunmiButton>
         </div>

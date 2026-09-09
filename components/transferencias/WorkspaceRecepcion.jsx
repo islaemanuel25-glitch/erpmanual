@@ -315,7 +315,15 @@ export default function WorkspaceRecepcion({
         )}
       </div>
 
-      <div className="hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 items-start">
+      {/* `lg:grid-cols-2`, no un valor arbitrario. Decía
+          `lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]` para que las dos columnas
+          pudieran ENCOGERSE —sin el `minmax(0,…)` una columna con contenido
+          largo desborda la grilla—, sin saber que la primitiva de Tailwind ya
+          hace exactamente eso: `grid-cols-2` genera
+          `repeat(2, minmax(0, 1fr))`, comprobado contra la escala del proyecto,
+          que no la redefine. Misma CSS, cero píxeles de diferencia, y un valor
+          arbitrario menos. */}
+      <div className="hidden lg:grid lg:grid-cols-2 gap-3 items-start">
         <div>{listado}</div>
         <div className="lg:sticky lg:top-3">{ficha}</div>
       </div>

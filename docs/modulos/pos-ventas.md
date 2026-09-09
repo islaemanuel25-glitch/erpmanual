@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-09-09 00:50
+**Última actualización:** 2026-09-06 20:39
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,12 +55,6 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
-- 2026-09-08: fix(pos): el candado contaba el alt del icono, no los botones
-- 2026-09-08: feat(pos): un boton padre, un selector de modalidad, identidad en el cobro
-- 2026-09-08: feat(cobros): configurar modalidades desde la pantalla del medio
-- 2026-09-08: fix(pos): una modalidad de otro padre tiene que contestar 404, no 409
-- 2026-09-08: feat(pos): cobrar por identidad, con la condicion resuelta en el servidor
-- 2026-09-08: feat(cobros): resolver modalidades en servidor
 - 2026-09-06: test: los fixtures traen comisionPendiente, que es lo que trae una venta real
 - 2026-09-06: fix(pos): comisionEsExacta falla cerrado y todos los consumidores quedan cubiertos
 - 2026-09-06: fix(auditoria): un backtick adentro de la plantilla SQL la cerraba

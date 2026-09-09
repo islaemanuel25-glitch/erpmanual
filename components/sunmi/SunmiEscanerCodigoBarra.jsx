@@ -39,7 +39,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
+import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 
@@ -220,9 +220,16 @@ export default function SunmiEscanerCodigoBarra({
       title={titulo}
       subtitle={ayuda}
       onClose={onCerrar}
-      z={9999}
+      // El escáner es kit: no puede conocer el número del apilado. Declara la
+      // INTENCIÓN —va arriba de todo— y cuánto mide eso lo sabe el dueño de la
+      // capa.
+      z={NIVEL_MODAL_GLOBAL}
       forma="hoja-o-centrado"
-      maxWidth="sm:max-w-lg"
+      // Sin `maxWidth`: el default del kit alcanza. Declaraba `sm:max-w-lg`, que
+      // es una medida responsive elegida acá para una pieza genérica — el visor
+      // toma el ancho que le den y no necesita uno propio. Cambia 64 px en
+      // pantallas de 640 para arriba (32rem → 36rem) y nada por debajo, donde el
+      // `w-full` ya mandaba.
       espacioCuerpo="px-4 space-y-3"
       footer={
         <SunmiButton color="slate" onClick={onCerrar} className="w-full">
