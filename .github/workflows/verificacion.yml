@@ -135,6 +135,22 @@ jobs:
       - name: Suite de candados
         run: npm test
 
+      # Un candado que nunca se vio en rojo se lee igual que uno que funciona.
+      # Esto rompe a propósito, uno por uno, los doce defectos que la revisión
+      # arquitectónica del 2026-09-08 encontró con la suite en verde, y exige
+      # que el candado que cubre cada uno se ponga rojo POR SU NOMBRE.
+      #
+      # Corre sobre copias descartables: no toca el árbol. Y verifica que la
+      # inyección aplicó y que el módulo siguió cargando, porque un ancla que no
+      # engancha y un archivo que no parsea son las dos formas de que una
+      # contraprueba mienta.
+      #
+      # La hermana que necesita Postgres —desmarcar y el ajuste al origen— vive
+      # en scripts/pruebas-db/contrapruebasRevision.mjs y se corre a mano: cada
+      # caso corre la suite de recepción entera, y son minutos.
+      - name: Contrapruebas de la revisión
+        run: node scripts/contrapruebas-revision.mjs
+
       - name: Aplicar las migraciones DESDE CERO
         # El mismo comando que corre el despliegue, sobre una base vacía. Desde
         # el saneamiento del historial hay UNA sola migración —la baseline— y
