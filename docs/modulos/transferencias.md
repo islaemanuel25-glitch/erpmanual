@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-07-31 07:40
+**Última actualización:** 2026-09-09 02:17
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -194,6 +194,18 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-09-09: fix(transferencias): tres defectos de integración del control físico
+- 2026-09-09: fix(transferencias): los siete defectos de la revisión arquitectónica
+- 2026-09-08: fix(transferencias): recibiendo no hay guardado por lotes, y es por seguridad
+- 2026-09-08: feat(transferencias): el puesto de trabajo del control fisico
+- 2026-09-08: feat(transferencias): el modelo del control fisico y la aritmetica del pack incompleto
+- 2026-09-08: fix(transferencias): una linea agregada no explica dos veces de donde salio
+- 2026-09-08: fix(transferencias): agregar o quitar una linea ya no pisa lo que no se guardo
+- 2026-09-08: feat(transferencias): la recepcion representa el excedente y el producto extra
+- 2026-09-08: feat(transferencias): las decisiones de la recepcion, fuera de la pantalla
+- 2026-09-08: feat(transferencias): el detalle expone el factor de pack de cada linea
+- 2026-09-08: fix(transferencias): los tres defectos de la revisión de recepción
+- 2026-09-08: feat(transferencias): la recepcion representa lo que llego
 - 2026-07-30: fix(transferencias): respetar fecha local argentina
 - 2026-07-30: fix(transferencias): normalizar costo según unidad enviada
 - 2026-07-30: fix(transferencias): validar cantidades recibidas

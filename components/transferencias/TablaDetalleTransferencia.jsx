@@ -40,13 +40,27 @@ import {
   estadoDeLinea,
   motivoSigueSiendoValido,
   motivosParaDiferencia,
-  previsualizarIngresoFisico,
   sePuedeQuitarLinea,
 } from "@/lib/transferencias/recepcionUI";
+import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
 
 function num(v) {
   const n = Number(v);
   return Number.isNaN(n) ? 0 : n;
+}
+
+/**
+ * "5 PACK x6 + 5 sueltas". El desglose, no el total.
+ *
+ * El total solo dice 35; el desglose dice de dónde sale, que es lo que el
+ * operador contó y lo que permite verificarlo sin rehacer la cuenta.
+ */
+function desgloseFisico(d, recibido) {
+  const factor = Number(d.factorPack || 1);
+  const sueltas = num(d.recibidoUnidadesSueltas);
+  const packs = `${fmtCantidad(recibido)} PACK x${factor}`;
+  if (!sueltas) return packs;
+  return `${packs} + ${fmtCantidad(sueltas)} ${sueltas === 1 ? "suelta" : "sueltas"}`;
 }
 
 // ── LOS MOTIVOS YA NO SON UNA LISTA FIJA ───────────────────────────────────
@@ -127,11 +141,45 @@ export default function TablaDetalleTransferencia({
       ? (edit?.recibido ?? enviada)
       : d.cantidadRecibida;
     const recibido = recibidoCrudo == null ? null : num(recibidoCrudo);
-    const diff = recibido == null ? null : recibido - enviada;
+
+    // ── LA DIFERENCIA SE MIDE EN FÍSICO, TAMBIÉN EN EL HISTÓRICO ──────────
+    //
+    // Restar las cantidades en la PRESENTACIÓN mentía desde que existe el pack
+    // incompleto: 6 packs enviados contra "6 packs + 1 suelta" recibidos daba
+    // `6 − 6 = 0`, o sea "exacto", cuando físicamente son 37 contra 36. Y al
+    // revés: 5 packs + 6 sueltas daba "falta 1" cuando son 36 contra 36.
+    //
+    // El stock ya se movía bien —confirmar sí pasa las sueltas—, así que lo que
+    // quedaba mal era SOLO el documento. Es el peor de los dos casos: nadie
+    // sospecha del papel cuando el inventario cuadra.
+    //
+    // Se mide con `milesimasFisicas`, la misma del servidor. No hay una fórmula
+    // acá.
+    const envFis = unidadesFisicasDe({
+      cantidad: enviada, sueltas: 0, unidad: d.unidadEnviada, factorPack: d.factorPack,
+    });
+    const recFis =
+      recibido == null
+        ? null
+        : unidadesFisicasDe({
+            cantidad: recibido,
+            // Mientras se edita, las sueltas persistidas son las que hay: esta
+            // tabla ya no es el editor de la recepción.
+            sueltas: d.recibidoUnidadesSueltas,
+            unidad: d.unidadEnviada,
+            factorPack: d.factorPack,
+          });
+    const diff = envFis == null || recFis == null ? null : recFis - envFis;
     // `estadoLinea` y no `estado`: el `estado` de arriba es el de la
     // TRANSFERENCIA. Con el mismo nombre uno sombrea al otro adentro de este
     // callback.
-    const estadoLinea = estadoDeLinea({ enviada, recibida: recibidoCrudo });
+    //
+    // Y compara las FÍSICAS por el mismo motivo que `diff`: en la presentación,
+    // "6 packs + 1 suelta" contra 6 enviados se leería como exacto.
+    const estadoLinea = estadoDeLinea({
+      enviada: envFis,
+      recibida: recibidoCrudo == null ? null : recFis,
+    });
     // El tono de la FILA. El excedente no usa el rojo del faltante: llegar de más
     // no es un error de validación, es una diferencia real que hay que explicar.
     let tono = "";
@@ -140,11 +188,12 @@ export default function TablaDetalleTransferencia({
     else if (estadoLinea === ESTADO_LINEA.EXCEDENTE) tono = "sunmi-state-warning-soft";
     // Cuántas unidades físicas representa lo recibido, cuando la línea va en
     // BULTO y el factor lo hace distinto del número escrito. Informativo.
-    const fisico = previsualizarIngresoFisico({
-      cantidad: recibido,
-      unidad: d.unidadEnviada,
-      factorPack: d.factorPack,
-    });
+    // Sale del mismo número físico que ya se calculó, con las sueltas adentro:
+    // `previsualizarIngresoFisico` no las conocía y por eso mostraba 30 donde
+    // había 35. Se muestra solo cuando aporta —en BULTO con factor > 1—, que es
+    // el criterio que tenía.
+    const agrupa = d.unidadEnviada === "BULTO" && Number(d.factorPack || 1) > 1;
+    const fisico = agrupa && recFis != null && recFis > 0 ? recFis : null;
     const sePuedeQuitar = sePuedeQuitarLinea({ linea: d, puedeRecibir: inputsHabilitados });
     // Qué motivos ofrece ESTA línea. Lista vacía = no se le pide ninguno, y hay
     // dos razones: no hay diferencia, o la línea se agregó en recepción y su
@@ -314,9 +363,12 @@ export default function TablaDetalleTransferencia({
                 {/* Cuántas unidades entran de verdad. En una línea en BULTO el
                     número escrito no es el que mueve stock, y esa distancia es
                     justo la que hay que ver antes de confirmar. */}
+                {/* El DESGLOSE, no solo el total. "35 unidades" a secas pierde
+                    de dónde salieron; "5 PACK x6 + 5 sueltas" es lo que el
+                    operador contó y lo que hace verificable el 35. */}
                 {fisico != null && (
                   <div className="text-sm2 sunmi-text-muted">
-                    Ingreso físico: {fmtCantidad(fisico)} unidades
+                    Ingreso físico: {desgloseFisico(d, recibido)} = {fmtCantidad(fisico)} unidades
                   </div>
                 )}
 

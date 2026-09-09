@@ -31,15 +31,16 @@ import EstadoTransferenciaBadge, { DiferenciasBadge } from "@/components/transfe
 import TransferenciaHeader from "@/components/transferencias/TransferenciaHeader";
 import TablaDetalleTransferencia from "@/components/transferencias/TablaDetalleTransferencia";
 import AccionesRecepcion from "@/components/transferencias/AccionesRecepcion";
-import AgregarProductoRecibido from "@/components/transferencias/AgregarProductoRecibido";
+import WorkspaceRecepcion from "@/components/transferencias/WorkspaceRecepcion";
 import PanelCancelarTransferencia from "@/components/transferencias/PanelCancelarTransferencia";
 import { SectionHead, TotalTile, fmtCantidad, fmtMoneda } from "@/components/transferencias/detallePresentacion";
 import { exigeMotivo } from "@/lib/transferencias/recepcion";
+import { ESTADO_PRODUCTO, estadoDeProducto } from "@/lib/transferencias/controlFisico";
 import {
-  construirEditItems,
+  MODO_RECEPCION,
   cuerpoQuitarLinea,
-  hayEdicionPendiente,
-  reconciliarEditItems,
+  modoDeRecepcion,
+  siguienteEdicion,
 } from "@/lib/transferencias/recepcionUI";
 
 const LISTADO = "/modulos/transferencias";
@@ -93,8 +94,8 @@ export default function TransferenciaDetallePage() {
   // está quitando. Los dos hooks van acá arriba, antes de cualquier return, por
   // el mismo motivo que el de arriba: cambiar la cantidad de hooks entre renders
   // rompe la pantalla entera.
-  const [agregarAbierto, setAgregarAbierto] = useState(false);
   const [quitandoId, setQuitandoId] = useState(null);
+  const [revisando, setRevisando] = useState(false);
 
   const [me, setMe] = useState(null);
 
@@ -118,11 +119,40 @@ export default function TransferenciaDetallePage() {
     setEditItems(valor);
   };
 
-  // Wrapper para marcar cambios como dirty
+  // Wrapper para marcar cambios como dirty. Solo lo llama la tabla histórica,
+  // que es el único consumidor del editor por lotes.
   const setEditItemsDirty = (valor) => {
     setDirty(true);
     aplicarEditItems(valor);
   };
+
+  // ── EL MODO, DECIDIDO UNA VEZ Y ANTES QUE LOS HANDLERS ────────────────────
+  //
+  // Se calcula acá arriba, y no junto al resto de los permisos, porque `cargar()`
+  // lo necesita: es lo que decide si una recarga preserva la edición del editor
+  // por lotes o parte de cero. Dejarlo abajo obligaría a que `cargar` lo leyera
+  // de una variable declarada después, o a repetir la condición — y una condición
+  // repetida es una que un día va a decir dos cosas distintas.
+  //
+  // Es derivación pura de `item` y del local activo: no necesita al usuario
+  // cargado, así que puede vivir antes del `if (!me) return`.
+  const localIdActivo = contexto?.localId || me?.localId || null;
+  const puedeRecibir =
+    !!item &&
+    !!localIdActivo &&
+    (item.estado === "Enviada" || item.estado === "Recibiendo") &&
+    item.destino?.id === localIdActivo;
+
+  const modo = modoDeRecepcion({ puedeRecibir });
+
+  // ── Y ACÁ SE CORTA LA ÚLTIMA VÍA POR LA QUE EL LEGACY PODRÍA GOBERNAR ─────
+  //
+  // `siguienteEdicion` ya garantiza que en control físico `dirty` nace en false.
+  // Esto lo vuelve a decir del lado de la LECTURA, así que ni siquiera un
+  // `setDirty(true)` escrito mañana en otro handler podría bloquear el puesto de
+  // trabajo. Es una sola expresión y está al lado de su motivo, no un
+  // `setDirty(false)` suelto después de cada fetch.
+  const dirtyEfectivo = modo === MODO_RECEPCION.EDITOR_LOTES && dirty;
 
   // ===============================
   // Usuario
@@ -148,10 +178,10 @@ export default function TransferenciaDetallePage() {
    * AGREGAR o QUITAR una línea. Ahí el operador no guardó nada: pidió otra cosa,
    * y pisarle lo escrito sería cobrarle esa otra cosa con su trabajo.
    *
-   * En ese modo `dirty` no se fuerza: se RECALCULA comparando lo reconciliado
-   * contra lo que el servidor propone. Si ya no queda ninguna edición —por
-   * ejemplo porque la única que había estaba en la línea que se acaba de
-   * quitar— vuelve a false solo, sin dejar el aviso encendido de gusto.
+   * QUÉ SIGNIFICA ESE PEDIDO LO DECIDE `siguienteEdicion`, NO ESTE ARCHIVO. En
+   * control físico no hay edición pendiente que preservar —cada producto se
+   * persiste al marcarlo revisado— así que el pedido no hace nada y `dirty` no
+   * puede quedar encendido. Ver el bloque del dirty fantasma en `recepcionUI`.
    */
   const cargar = async ({ preservarEdicion = false } = {}) => {
     try {
@@ -175,24 +205,18 @@ export default function TransferenciaDetallePage() {
 
       setItem(json.item);
 
-      // La construcción de `editItems` se mudó a `recepcionUI`: la hacen dos
-      // caminos —reemplazar y reconciliar— y con dos copias, el día que una
-      // cambie la otra queda atrás. El distingo entre `null` y `0` sigue vivo
-      // allá, en `filaDeServidor`, con su motivo escrito.
+      // Reemplazar, reconciliar y decidir el `dirty` es UNA decisión y vive en
+      // `recepcionUI`. Acá no se elige nada: se pasa el modo y lo que se pidió.
       const frescos = json.item.items;
-      const reconciliados = preservarEdicion
-        ? reconciliarEditItems({ items: frescos, previos: editItemsRef.current })
-        : construirEditItems(frescos);
+      const siguiente = siguienteEdicion({
+        modo,
+        preservar: preservarEdicion,
+        items: frescos,
+        previos: editItemsRef.current,
+      });
 
-      aplicarEditItems(reconciliados);
-
-      // Reemplazar no deja nada pendiente. Preservar sí puede, y se pregunta en
-      // vez de suponerse.
-      setDirty(
-        preservarEdicion
-          ? hayEdicionPendiente({ items: frescos, editItems: reconciliados })
-          : false
-      );
+      aplicarEditItems(siguiente.editItems);
+      setDirty(siguiente.dirty);
 
     } catch (e) {
       console.error("Error cargando transferencia:", e);
@@ -223,20 +247,8 @@ export default function TransferenciaDetallePage() {
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
   if (!esAdmin && !permisos.includes("transferencias.ver")) return <SinPermisos />;
 
-  // ===============================
-  // Permisos — solo el local destino puede editar/recibir
-  // ===============================
-  const localIdActivo = contexto?.localId || me.localId || null;
-
-  let puedeRecibir = false;
-
-  if (item && localIdActivo) {
-    const esDestino = item.destino?.id === localIdActivo;
-    const estadoValido =
-      item.estado === "Enviada" || item.estado === "Recibiendo";
-    puedeRecibir = estadoValido && esDestino;
-  }
-
+  // Permisos de recepción: `puedeRecibir` se calcula arriba, junto al modo,
+  // porque `cargar()` lo necesita. Acá solo se le pone el nombre que usa el JSX.
   const inputsHabilitados = puedeRecibir;
 
   // ── QUIÉN VE EL BOTÓN DE CANCELAR ──────────────────────────────────────────
@@ -316,10 +328,12 @@ export default function TransferenciaDetallePage() {
       const json = await res.json();
       if (!json.ok) throw new Error(json.error);
 
+      // `cargar()` sin preservar ya deja `dirty` en false: lo decide
+      // `siguienteEdicion`, que es el único lugar donde se decide. Acá había
+      // además un `setDirty(false)` suelto, redundante y engañoso — hacía
+      // parecer que el estado se apaga a mano después de cada fetch, que es
+      // exactamente la forma de "arreglo" que deja la causa intacta.
       await cargar();
-
-      // Cambios guardados → dirty false
-      setDirty(false);
 
     } catch (err) {
       alert("Error guardando: " + err.message);
@@ -364,6 +378,42 @@ export default function TransferenciaDetallePage() {
     return json;
   };
 
+  /**
+   * CERRAR EL CONTROL FÍSICO DE UN PRODUCTO.
+   *
+   * Se persiste al toque, de a un producto: con 150, esperar a tener todos
+   * revisados para guardar el checklist es perder el trabajo de una tarde si se
+   * cierra el navegador.
+   *
+   * ── Y SE RECARGA FRESCO, QUE ES LO CONTRARIO DE LO QUE HACÍA ─────────────
+   *
+   * Pedía `preservarEdicion: true` "por lo mismo que agregar y quitar". No era lo
+   * mismo: esta acción SOLO existe en el control físico, donde no hay edición
+   * pendiente que preservar porque lo que el operador escribe se acaba de
+   * persistir. Preservar ahí resucitaba la propuesta vieja de `filaDeServidor` y
+   * la comparaba contra lo recién guardado — el dirty fantasma.
+   *
+   * `siguienteEdicion` ya lo haría imposible aunque acá dijera lo contrario. Se
+   * escribe igual como carga fresca porque es lo que esta acción significa, y un
+   * pedido que el sistema tiene que anular es un pedido mal escrito.
+   */
+  const revisarProducto = async (cuerpo) => {
+    try {
+      setRevisando(true);
+      const res = await fetch("/api/transferencias/revisar-producto", {
+        method: "POST",
+        body: JSON.stringify({ transferenciaId: item.id, ...cuerpo }),
+      });
+      const json = await res.json();
+      if (json?.ok) await cargar();
+      return json;
+    } catch (err) {
+      return { ok: false, error: err?.message || "No se pudo guardar la revisión." };
+    } finally {
+      setRevisando(false);
+    }
+  };
+
   const quitarLinea = async (detalleId) => {
     try {
       setQuitandoId(detalleId);
@@ -388,8 +438,13 @@ export default function TransferenciaDetallePage() {
   // ===============================
   const confirmarRecepcion = async () => {
 
-    // BLOQUEAR si hay cambios sin guardar
-    if (dirty) {
+    // BLOQUEAR si hay cambios sin guardar EN EL EDITOR POR LOTES.
+    //
+    // Se lee `dirtyEfectivo` y no `dirty` a propósito: en el puesto de control
+    // físico no hay editor por lotes montado ni botón de guardar, así que este
+    // aviso mandaría al operador a apretar algo que no existe. Ver el bloque del
+    // dirty fantasma en `recepcionUI`.
+    if (dirtyEfectivo) {
       alert("Tenés cambios sin guardar. Guardalos antes de confirmar.");
       return;
     }
@@ -426,9 +481,21 @@ export default function TransferenciaDetallePage() {
   // ===============================
   const lineas = item?.items || [];
   const lineasRecibidas = lineas.filter((d) => d.cantidadRecibida != null).length;
-  const lineasConDiferencia = lineas.filter(
-    (d) => d.cantidadRecibida != null && num(d.cantidadRecibida) !== num(d.cantidadEnviada)
-  ).length;
+  // ── LA DIFERENCIA SE CUENTA EN FÍSICO ──────────────────────────────────
+  //
+  // Comparaba `cantidadRecibida !== cantidadEnviada`, o sea las cantidades en la
+  // PRESENTACIÓN. Desde que existe el pack incompleto eso miente en los dos
+  // sentidos: "6 packs + 1 suelta" contra 6 enviados daba 6 !== 6 = false, o sea
+  // "sin diferencia", con 37 unidades contra 36; y "5 packs + 6 sueltas" daba
+  // diferencia con 36 contra 36.
+  //
+  // Se usa `estadoDeProducto`, el mismo que alimenta las cards del puesto de
+  // trabajo, así que el tile de acá y el resumen de allá no pueden discrepar.
+  const lineasConDiferencia = lineas.filter((d) => {
+    const e = estadoDeProducto({ ...d, revisadoEnRecepcion: true });
+    return d.cantidadRecibida != null &&
+      (e === ESTADO_PRODUCTO.FALTANTE || e === ESTADO_PRODUCTO.SOBRANTE);
+  }).length;
   const lineasDevueltas = lineas.filter((d) => d.devolucionOrigen != null && num(d.devolucionOrigen) > 0).length;
   const importeTotal = item ? num(item.resumen?.costoTotal) : 0;
 
@@ -506,10 +573,21 @@ export default function TransferenciaDetallePage() {
               me={me}
               puedeRecibir={puedeRecibir}
               guardando={guardando}
-              guardarCambios={guardarCambios}
+              // ── SIN GUARDADO POR LOTES CUANDO SE ESTÁ RECIBIENDO ────────
+              //
+              // El puesto de trabajo persiste cada producto al marcarlo
+              // revisado, de a uno. Ofrecer además un "Guardar cambios" sería
+              // peligroso: la ficha PROPONE lo enviado para el caso feliz de un
+              // toque, así que un guardado masivo escribiría esos 150 valores
+              // propuestos como cantidades reales de productos que nadie contó.
+              //
+              // La ruta `guardar-recepcion` sigue existiendo y sigue siendo el
+              // borrador por lotes —no marca revisado—; lo que deja de existir
+              // es el botón que la dispararía con defaults visuales.
+              guardarCambios={puedeRecibir ? null : guardarCambios}
               confirmando={confirmando}
               confirmarRecepcion={confirmarRecepcion}
-              dirty={dirty}
+              dirty={dirtyEfectivo}
               puedeCancelar={puedeCancelar}
               panelCancelarAbierto={panelCancelar}
               abrirPanelCancelar={() => setPanelCancelar((v) => !v)}
@@ -530,29 +608,35 @@ export default function TransferenciaDetallePage() {
             {/* 1 · Información general */}
             <TransferenciaHeader item={item} />
 
-            {/* 2 · Productos transferidos */}
-            {/* El botón "+ Agregar producto recibido" y la acción de quitar solo
-                existen si esta persona puede recibir. No se le pasa un booleano
-                a la tabla para que ella decida: se le pasa —o no— el handler.
-                Sin handler no hay nada que dibujar, y así la regla vive en un
-                solo lugar. En "Recibida" y en "Cancelada", `puedeRecibir` ya es
-                falso. */}
-            <TablaDetalleTransferencia
-              item={item}
-              editItems={editItems}
-              setEditItems={setEditItemsDirty}
-              inputsHabilitados={inputsHabilitados}
-              onAgregarProducto={puedeRecibir ? () => setAgregarAbierto(true) : null}
-              onQuitarLinea={puedeRecibir ? quitarLinea : null}
-              quitandoId={quitandoId}
-            />
+            {/* ── 2 · PRODUCTOS: DOS PANTALLAS, Y LA QUE SE VE DEPENDE DE SI
+                   ESTA PERSONA ESTÁ RECIBIENDO ─────────────────────────────
 
-            {puedeRecibir && (
-              <AgregarProductoRecibido
-                abierto={agregarAbierto}
-                transferenciaId={item.id}
-                onCerrar={() => setAgregarAbierto(false)}
+                Quien RECIBE ve el puesto de trabajo: buscador, escáner, cards
+                que filtran y una ficha por producto. Con 150 productos, recorrer
+                la lista en el orden del remito no es una forma de trabajar.
+
+                Todos los demás —el origen, un admin mirando, una transferencia
+                Recibida o Cancelada— siguen viendo el detalle de siempre. Esa
+                pantalla es el registro histórico del documento y no se convierte
+                en un editor: se lee, se imprime y se compara. Cambiarla por el
+                workspace le sacaría a la mitad de los usuarios la vista que
+                usan. */}
+            {puedeRecibir ? (
+              <WorkspaceRecepcion
+                item={item}
+                puedeRecibir={puedeRecibir}
+                onRevisar={revisarProducto}
                 onAgregar={agregarLinea}
+                onQuitarLinea={quitarLinea}
+                guardando={revisando}
+                quitandoId={quitandoId}
+              />
+            ) : (
+              <TablaDetalleTransferencia
+                item={item}
+                editItems={editItems}
+                setEditItems={setEditItemsDirty}
+                inputsHabilitados={inputsHabilitados}
               />
             )}
 

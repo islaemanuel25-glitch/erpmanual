@@ -1,5 +1,41 @@
 # Changelog
 
+## [2026-09-09] - Actualización: transferencias
+
+<!-- ESTA ENTRADA SE EDITÓ A MANO Y NO SE VUELVE A GENERAR.
+
+     `scripts/update-docs.js` arma la lista leyendo el log de git, así que
+     arrastró siete líneas de pos-ventas, una de pos-transferencias y una de
+     configuracion: commits que ya estaban en `main` de otras tandas y que
+     todavía no se habían documentado. No son de esta rama, que es la recepción
+     física de transferencias, y mezclarlos hace que el diff de la PR toque
+     módulos que no se abrieron.
+
+     Se sacaron esas nueve líneas y el encabezado quedó solo con transferencias.
+     `docs/modulos/pos-ventas.md` y `docs/modulos/pos-transferencias.md`
+     volvieron a estar idénticos a `origin/main` por el mismo motivo.
+
+     NO volver a correr `update-docs.js` sobre esta rama: los reintroduce, porque
+     esos commits siguen sin documentar en `main` y el generador los sigue viendo.
+     Se documentan solos la próxima vez que alguien lo corra en `main`, que es
+     donde corresponde. -->
+
+### Modificado
+- **transferencias**: fix(transferencias): la limpieza de hardcodeo visual del control físico
+- **transferencias**: fix(transferencias): tres defectos de integración del control físico
+- **transferencias**: fix(transferencias): los siete defectos de la revisión arquitectónica
+- **transferencias**: fix(transferencias): recibiendo no hay guardado por lotes, y es por seguridad
+- **transferencias**: feat(transferencias): el puesto de trabajo del control fisico
+- **transferencias**: feat(transferencias): el modelo del control fisico y la aritmetica del pack incompleto
+- **transferencias**: fix(transferencias): una linea agregada no explica dos veces de donde salio
+- **transferencias**: fix(transferencias): agregar o quitar una linea ya no pisa lo que no se guardo
+- **transferencias**: feat(transferencias): la recepcion representa el excedente y el producto extra
+- **transferencias**: feat(transferencias): las decisiones de la recepcion, fuera de la pantalla
+- **transferencias**: feat(transferencias): el detalle expone el factor de pack de cada linea
+- **transferencias**: fix(transferencias): los tres defectos de la revisión de recepción
+- **transferencias**: feat(transferencias): la recepcion representa lo que llego
+
+
 ## [2026-09-06] - Actualización: pos-ventas, dashboard, reportes-ventas, configuracion, productos
 
 ### Modificado

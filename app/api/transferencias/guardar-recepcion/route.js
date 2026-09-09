@@ -126,6 +126,7 @@ export async function POST(req) {
           },
           factorPack: Number(d.producto?.base?.factor_pack || 1),
           recibidoPropuesto: it.recibido,
+          sueltasPropuestas: it.recibidoUnidadesSueltas,
         });
 
         if (!plan.ok) {
@@ -147,6 +148,8 @@ export async function POST(req) {
           where: { id },
           data: {
             recibido: plan.recibida,
+            // El pack incompleto, normalizado por el validador: 0 si no hay.
+            recibidoUnidadesSueltas: plan.recibidaSueltas,
 
             motivoPrincipal: plan.hayDiferencia ? it.motivoPrincipal || null : null,
 
@@ -154,6 +157,16 @@ export async function POST(req) {
               plan.hayDiferencia && it.motivoPrincipal === "Otro"
                 ? it.motivoDetalle || null
                 : null,
+
+            // ── ESTA RUTA NO MARCA REVISADO, Y ES DELIBERADO ──────────────
+            //
+            // Guardar es un BORRADOR: "empecé a contar esto". Cerrar el control
+            // físico es otro acto, tiene autor y hora, y habilita confirmar la
+            // transferencia — vive en `revisar-producto`.
+            //
+            // Si guardar marcara revisado, un "Guardar" sobre una línea daría
+            // por controlado un producto que nadie terminó de contar, y la
+            // guarda de confirmación dejaría de significar algo.
           },
         });
       }

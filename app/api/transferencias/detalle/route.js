@@ -8,7 +8,12 @@ import { valorizarDetalle, origenEsDepositoDe } from "@/lib/transferencias/costo
 // EL MISMO helper que usa la recepción para devolver el faltante al origen. Se
 // importa en vez de replicar la fórmula: si la regla cambia, la pantalla no
 // puede quedar mostrando otro número que el que el stock realmente movió.
-import { calcularAjusteOrigenUnidades, aMilesimas, desdeMilesimas } from "@/lib/transferencias/recepcion";
+import {
+  calcularAjusteOrigenUnidades,
+  aMilesimas,
+  desdeMilesimas,
+  milesimasFisicas,
+} from "@/lib/transferencias/recepcion";
 
 function toNumber(v) {
   const n = Number(v);
@@ -51,7 +56,12 @@ export async function GET(req) {
         detalle: {
           include: {
             producto: {
-              include: { base: true },
+              // La CATEGORÍA viaja acá adentro, en la misma consulta. Es la que
+              // ya tiene asignada el `ProductoBase`: la recepción no crea
+              // categorías propias ni las duplica, y el filtro de la pantalla se
+              // arma con las que aparecen en ESTE remito —no con el catálogo
+              // entero, que serían cientos para 150 productos.
+              include: { base: { include: { categoria: { select: { id: true, nombre: true } } } } },
             },
             // Relación YA existente en el schema (TransferenciaDetalle.confirmadoPor).
             // Viaja en la misma consulta: no agrega una query por línea.
@@ -59,6 +69,8 @@ export async function GET(req) {
             // Quién agregó la línea al abrir los bultos. Viaja en la misma
             // consulta, igual que el confirmador: no agrega una query por línea.
             agregadoEnRecepcionPor: { select: { id: true, nombre: true } },
+            // Y quién cerró su control físico. Mismo criterio: una consulta.
+            revisadoEnRecepcionPor: { select: { id: true, nombre: true } },
           },
         },
       },
@@ -152,8 +164,33 @@ export async function GET(req) {
         { origenEsDeposito: origenEsDepositoDe(transferencia, "detalle") }
       );
 
-      itemsEnviados += cantidadEnviada;
-      itemsRecibidos += cantidadRecibida ?? 0;
+      // ── ESTOS DOS SE CUENTAN EN FÍSICO, Y ANTES NO ───────────────────────
+      //
+      // Sumaban la cantidad en la PRESENTACIÓN de cada línea, y de ahí salía
+      // `diferenciaTotal`, que decide la marca "tiene diferencias" del documento.
+      // Con packs incompletos eso mentía en los dos sentidos:
+      //
+      //   6 packs enviados, 6 packs + 1 suelta recibidos → 6 − 6 = 0, "sin
+      //   diferencia", cuando físicamente son 37 contra 36;
+      //   6 enviados, 5 packs + 6 sueltas → 5 − 6 = −1, "falta", cuando son 36
+      //   contra 36 y no falta nada.
+      //
+      // Sumar milésimas físicas no arregla que la suma cruce unidades con kilos
+      // —eso ya era así y por eso los totales de pantalla se cuentan por LÍNEA—,
+      // pero sí hace que la marca de diferencia diga la verdad línea por línea.
+      const envFisM = milesimasFisicas({
+        cantidad: d.cantidad, sueltas: 0,
+        unidad: d.unidadEnviada, factorPack: d.producto?.base?.factor_pack,
+      });
+      const recFisM =
+        cantidadRecibida == null
+          ? null
+          : milesimasFisicas({
+              cantidad: d.recibido, sueltas: d.recibidoUnidadesSueltas,
+              unidad: d.unidadEnviada, factorPack: d.producto?.base?.factor_pack,
+            });
+      itemsEnviados += envFisM == null ? 0 : desdeMilesimas(envFisM);
+      itemsRecibidos += recFisM == null ? 0 : desdeMilesimas(recFisM);
       costoTotal += subtotal;
 
       // Ajuste del origen en UNIDADES FÍSICAS de StockLocal, CON SIGNO:
@@ -169,6 +206,12 @@ export async function GET(req) {
           : calcularAjusteOrigenUnidades({
               enviada: d.cantidad,
               recibida: d.recibido,
+              // El pack incompleto. Sin esto, una línea de 5 packs + 5 sueltas se
+              // leía como 5 packs pelados: el detalle histórico decía que
+              // faltaban 6 unidades cuando faltaba 1, mientras el stock —que sí
+              // pasa las sueltas— quedaba bien. Stock correcto y documento
+              // incorrecto es peor que los dos mal: nadie sospecha del papel.
+              recibidaSueltas: d.recibidoUnidadesSueltas,
               unidad: d.unidadEnviada,
               factorPack: d.producto?.base?.factor_pack,
             });
@@ -206,6 +249,35 @@ export async function GET(req) {
           ? { id: d.agregadoEnRecepcionPor.id, nombre: d.agregadoEnRecepcionPor.nombre }
           : null,
         agregadoEnRecepcionAt: d.agregadoEnRecepcionAt,
+        // ── EL CONTROL FÍSICO ────────────────────────────────────────────
+        //
+        // "Revisado" no se deduce de `cantidadRecibida != null`: son dos hechos
+        // distintos y colapsarlos daría por controlado un producto donde alguien
+        // apenas empezó a escribir. La fecha además ORDENA los revisados en el
+        // orden real en que apareció la mercadería.
+        revisadoEnRecepcion: d.revisadoEnRecepcion === true,
+        revisadoEnRecepcionPor: d.revisadoEnRecepcionPor
+          ? { id: d.revisadoEnRecepcionPor.id, nombre: d.revisadoEnRecepcionPor.nombre }
+          : null,
+        revisadoEnRecepcionAt: d.revisadoEnRecepcionAt,
+        // El pack incompleto. `null` y `0` significan lo mismo y se normaliza a
+        // número para que la pantalla no tenga que distinguirlos.
+        recibidoUnidadesSueltas:
+          d.recibidoUnidadesSueltas == null ? 0 : toNumber(d.recibidoUnidadesSueltas),
+        // ── LOS TRES CÓDIGOS ESCANEABLES ─────────────────────────────────
+        //
+        // El scanner busca PRIMERO adentro de esta transferencia, así que la
+        // pantalla necesita poder comparar el código leído contra los mismos
+        // tres que reconoce el resto del ERP. Salen con los nombres que espera
+        // `codigosDeItem`, para no inventar una cuarta definición de "qué código
+        // se puede escanear".
+        codigoBarraSecundario: d.producto?.base?.codigo_barra_secundario || null,
+        codigoBarraPropio: d.producto?.codigo_barra_propio || null,
+        // La categoría real del ProductoBase. Solo id y nombre: el filtro no
+        // necesita más y el resto no tiene por qué salir del servidor.
+        categoria: d.producto?.base?.categoria
+          ? { id: d.producto.base.categoria.id, nombre: d.producto.base.categoria.nombre }
+          : null,
         confirmadoPor: d.confirmadoPor
           ? { id: d.confirmadoPor.id, nombre: d.confirmadoPor.nombre }
           : null,

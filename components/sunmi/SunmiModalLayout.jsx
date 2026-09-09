@@ -58,6 +58,34 @@ export const COLOR_VELO = "color-mix(in srgb, black 70%, var(--app-bg))";
 export const OPACIDAD_VELO = 0.92;
 
 /**
+ * LA ALTURA A LA QUE SE APILA UN MODAL QUE TIENE QUE TAPAR TODO.
+ *
+ * ── POR QUÉ EL NÚMERO VIVE ACÁ Y NO EN CADA PANTALLA ──────────────────────
+ *
+ * `z` no tiene default a propósito —ver el comentario del parámetro—: el número
+ * no es cosmético y no se puede mirar en una captura. Hay cosas por encima de 50
+ * que viven FUERA del modal —la campana de notificaciones a 9998 y 9999, el
+ * gestor de columnas de productos a 9999— así que el contexto de apilado de la
+ * capa no las tapa, y un modal que quede debajo solo se descubre el día que las
+ * dos cosas están abiertas.
+ *
+ * Que no haya default no significa que cada pantalla tenga que ELEGIR el número.
+ * Significa que tiene que elegir la INTENCIÓN: "este modal va arriba de todo".
+ * El 9999 es cuánto mide esa intención hoy, y eso lo sabe el dueño de la capa,
+ * que es esta pieza — la misma que ya es dueña del color y la opacidad del velo,
+ * y por el mismo motivo.
+ *
+ * ── LO QUE ESTO NO ES ─────────────────────────────────────────────────────
+ *
+ * No es una reforma del apilado del repo. Hay veintitantos consumidores con el
+ * `9999` escrito a mano y tres en 50 —los de clientes, que tienen un escalonado
+ * propio con intención—, y unificarlos es una tanda con su propio relevamiento y
+ * sus propias capturas. Acá se estrena con los dos consumidores del control
+ * físico de recepción, que es el flujo que estaba en revisión.
+ */
+export const NIVEL_MODAL_GLOBAL = 9999;
+
+/**
  * LA PILA DE MODALES ABIERTOS. Existe para una sola pregunta: con dos modales a
  * la vez, **`Escape` tiene que cerrar el de arriba y no los dos**.
  *

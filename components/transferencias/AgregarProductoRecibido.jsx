@@ -40,7 +40,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
+import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
@@ -56,7 +56,18 @@ import {
   validarLineaNueva,
 } from "@/lib/transferencias/recepcionUI";
 
-export const TITULO_AGREGAR = "Agregar producto recibido";
+// ── EL LENGUAJE: SE INFORMA UNA INCONSISTENCIA, NO SE PIDE MERCADERÍA ─────
+//
+// Antes decía "Agregar producto recibido" y "Agregar a recepción". Suena a que
+// el operador se suma algo, y no es lo que está pasando: llegó mercadería que el
+// remito no menciona y él lo está INFORMANDO. La diferencia importa porque de
+// esto sale un descuento en el stock del origen y una auditoría con su nombre.
+//
+// Los nombres internos —el componente, la ruta `linea-recepcion`, el campo
+// `agregadoEnRecepcion`— no se tocan: renombrarlos sería mover media base y un
+// endpoint desplegado por una cuestión de redacción.
+export const TITULO_AGREGAR = "Producto no declarado";
+export const ACCION_AGREGAR = "Informar producto no declarado";
 export const ROTULO_UNIDAD = "¿Cómo lo contaste?";
 export const ROTULO_CANTIDAD = "Cantidad recibida";
 
@@ -81,12 +92,25 @@ function FilaResultado({ p, onElegir }) {
     >
       <span className="block min-w-0">
         <span className="block font-semibold sunmi-text-strong break-words">{p.nombre}</span>
+        {/* ── NI STOCK NI COSTO ────────────────────────────────────────────
+            Acá decía "Stock origen N". Se sacó por dos motivos y el segundo es
+            peor que el primero.
+
+            El de fondo: quien informa mercadería que llegó de más no necesita
+            saber cuánto hay en el origen, y `transferencias.recibir` no es el
+            permiso de ver stock ni costos. El endpoint ya dejó de mandarlos.
+
+            El inmediato: como el endpoint dejó de mandarlos, esto venía
+            dibujando "Stock origen 0" para TODOS los productos — un dato falso,
+            que es peor que un dato que no está.
+
+            Lo que sí hace falta para identificar lo que se tiene en la mano: el
+            nombre, el código y en qué presentación viene. */}
         <span className="block text-sm2 sunmi-text-muted">
           <span className="font-mono">{p.codigoBarra || "Sin código"}</span>
           {" · "}
-          {factor > 1 ? `Bulto · x${factor}` : "Unidad"}
-          {" · Stock origen "}
-          <span className="tabular-nums sunmi-text-link">{fmtCantidad(p.stockActual)}</span>
+          {factor > 1 ? `PACK x${factor}` : "Unidad"}
+          {p.categoriaNombre ? ` · ${p.categoriaNombre}` : ""}
         </span>
       </span>
     </SunmiButton>
@@ -226,9 +250,11 @@ export default function AgregarProductoRecibido({
     <SunmiModalLayout
       open={abierto}
       title={TITULO_AGREGAR}
-      subtitle="Se busca en el catálogo del local de origen"
+      subtitle="Llegó algo que el remito no menciona. Buscalo en el catálogo del origen."
       onClose={onCerrar}
-      z={9999}
+      // El mismo nivel que el escáner, y por la misma puerta: los dos conviven
+      // en este flujo y el número vive una sola vez, en el dueño de la capa.
+      z={NIVEL_MODAL_GLOBAL}
       // Es carga: la cantidad y la unidad ya elegidas se perderían con un toque
       // al costado, y en el teléfono ese toque pasa solo.
       destructivo
@@ -236,15 +262,24 @@ export default function AgregarProductoRecibido({
       // El alto lo pone el kit. No se elige un `vh` a ojo para imitar una
       // maqueta: la lista de resultados crece contra el cuerpo con `flex-1
       // min-h-0`, que es lo que hace aparecer el scroll donde corresponde.
-      maxWidth="sm:max-w-lg"
+      // Sin `maxWidth`, por lo mismo que el escáner: el default del kit alcanza
+      // y `sm:max-w-lg` era una medida responsive elegida en la pantalla.
       espacioCuerpo="px-4 space-y-3"
       footer={
-        <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2 w-full">
+        // Apilados en el teléfono y en fila de `sm` para arriba, con Cancelar en
+        // su ancho natural y la acción ocupando lo que sobra.
+        //
+        // Decía `grid grid-cols-1 sm:grid-cols-[auto_1fr]`, que es un valor
+        // arbitrario. Con flex sale con primitivas y da lo mismo: en columna los
+        // hijos se estiran solos, y en fila `sm:flex-1` es el `1fr`. `SunmiButton`
+        // negocia alto, display, padding, radio y letra — no el ancho ni el flex—
+        // así que la clase llega tal cual.
+        <div className="flex flex-col sm:flex-row gap-2 w-full">
           <SunmiButton color="slate" onClick={onCerrar} disabled={enviando}>
             Cancelar
           </SunmiButton>
-          <SunmiButton color="amber" onClick={agregar} disabled={enviando}>
-            {enviando ? "Agregando…" : "Agregar a recepción"}
+          <SunmiButton color="amber" onClick={agregar} disabled={enviando} className="sm:flex-1">
+            {enviando ? "Informando…" : ACCION_AGREGAR}
           </SunmiButton>
         </div>
       }
