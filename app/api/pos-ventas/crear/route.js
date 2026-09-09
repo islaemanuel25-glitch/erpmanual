@@ -1292,6 +1292,10 @@ export async function POST(req) {
           consumoFisicoConsolidado,
           lineasComerciales,
           snapshots: construirSnapshots(productosOrigen),
+          // Fuera de un depósito no hay modos de venta por bulto ni piezas: la
+          // presentación es la del producto y nada más. Es el mismo dato que ya
+          // gobierna `cantidadParaStockNormal`.
+          esDeposito,
         });
 
         // Venta 100% de servicios: se completa normalmente y no genera

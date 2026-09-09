@@ -846,6 +846,53 @@ model TransferenciaDetalle {
   // UNIDADES_SUELTAS_SIN_BULTO—.
   recibidoUnidadesSueltas Decimal? @db.Decimal(12, 3)
 
+  // ── EL SNAPSHOT DE CÓMO SALIÓ DEL ORIGEN ──────────────────────────────────
+  //
+  // ── EL PROBLEMA, MEDIDO ───────────────────────────────────────────────────
+  //
+  // `unidadEnviada` es `ModoPedido`: BULTO o UNIDAD y nada más. Y el camino que
+  // crea casi todas estas transferencias —la venta interna del POS— convierte
+  // los packs a unidades ANTES de guardar, así que escribe UNIDAD siempre. Está
+  // dicho en `mapearVentaATransferencia`: *"unidadEnviada='UNIDAD' y factorPack=1
+  // SIEMPRE"*.
+  //
+  // Contado sobre producción el 2026-09-09: de 4631 líneas de productos `pack`,
+  // solo 5 tenían BULTO. De 234 de cajón, 1. De 411 de kg, ninguna.
+  //
+  // Así que "6 CAJÓN x8" no era un problema de presentación: el dato no existía.
+  //
+  // ── Y NO ALCANZA CON CONGELAR UNA ETIQUETA ────────────────────────────────
+  //
+  // Hoy la aritmética lee el catálogo VIVO. `confirmar-recepcion` convierte
+  // piezas a kilos con `base.pesoReferenciaKg` en el momento de confirmar, y la
+  // recepción multiplica por `base.factor_pack`. Editar cualquiera de los dos
+  // después de despachar cambia cuánto stock entra al destino de una
+  // transferencia que ya salió. Por eso se congelan los NÚMEROS, no el rótulo.
+  //
+  // ── LOS CINCO HECHOS, Y POR QUÉ SON CINCO ─────────────────────────────────
+  //
+  // Se guarda lo mínimo que hace a esta fila autosuficiente. Nada que se pueda
+  // derivar de lo que ya está.
+  //
+  // `cantidad` (física) NO se toca: es la que mantiene paridad con el descuento
+  // de stock del origen. El snapshot agrega la otra mitad — cómo se contó.
+  presentacionEnvio  PresentacionEnvio?
+  /// Cuánto se despachó EN esa presentación: 6 cajones, 3,250 kg, 2 piezas.
+  /// No se deriva de `cantidad` porque con un envío mixto no da entero: 4 packs
+  /// de 6 más 5 sueltas son 29 unidades, y 29/6 no es 4.
+  cantidadPresentada Decimal?           @db.Decimal(12, 3)
+  /// Las unidades que viajaron FUERA de los bultos completos. Es lo que permite
+  /// representar "4 PACK x6 + 5" sin escribir 4,833 packs, que es el mismo error
+  /// de exactitud que `recibidoUnidadesSueltas` evita del lado de la recepción.
+  sueltasEnviadas    Decimal?           @db.Decimal(12, 3)
+  /// El factor CONGELADO. Sin esto, cambiar `factor_pack` de 8 a 12 reescribe
+  /// cuántas unidades físicas dice haber movido una transferencia vieja.
+  factorPresentacion Int?
+  /// El peso de referencia CONGELADO, solo para PIEZA. Sin esto, editar
+  /// `pesoReferenciaKg` después de despachar cambia cuántos kilos acredita
+  /// `confirmar-recepcion` al destino.
+  pesoPiezaKg        Decimal?           @db.Decimal(12, 3)
+
   // ── EL CONTROL FÍSICO TERMINADO ───────────────────────────────────────────
   //
   // "Revisado" NO es `recibido != null`. Son dos hechos distintos: alguien puede
@@ -932,6 +979,24 @@ enum ModoStock {
 enum ModoVentaDeposito {
   PIEZA
   PESO
+}
+
+/// ── EN QUÉ PRESENTACIÓN SALIÓ LA MERCADERÍA DEL ORIGEN ──────────────────────
+///
+/// `ModoPedido` solo sabe decir BULTO o UNIDAD, y con eso no se puede distinguir
+/// un pack de un cajón, ni un kilo de una pieza. Un remito de 6 cajones de 8
+/// quedaba escrito como 48 UNIDAD, y la pantalla no mentía: mostraba lo que el
+/// dato decía.
+///
+/// Estos cinco valores son los que el dominio ya usa —`UnidadMedida` tiene
+/// unidad, pack, cajon y kg, y `ModoVentaDeposito` agrega PIEZA— reunidos en una
+/// sola pregunta: cómo se contó lo que salió.
+enum PresentacionEnvio {
+  UNIDAD
+  PACK
+  CAJON
+  KG
+  PIEZA
 }
 
 // Modalidad del producto. NORMAL = producto de precio/stock habitual.
