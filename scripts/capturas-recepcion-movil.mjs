@@ -209,6 +209,43 @@ async function escribirEnCampo(indice, texto) {
   await esperar(300);
 }
 
+/**
+ * Escribe en el campo de búsqueda visible, como lo haría una persona.
+ *
+ * Hay dos: el del listado y el del modal de producto no declarado. Cuando el
+ * modal está abierto, el suyo es el último visible del documento.
+ */
+async function escribirEnBuscador(texto, { enModal = false } = {}) {
+  const enfocado = await evaluar(`(() => {
+    const campos = [...document.querySelectorAll('input[type="text"], input:not([type])')]
+      .filter((e) => e.offsetParent !== null);
+    const el = ${enModal ? "campos[campos.length - 1]" : "campos[0]"};
+    if (!el) return false;
+    el.scrollIntoView({ block: 'center' });
+    el.focus();
+    el.select();
+    return true;
+  })()`);
+  if (!enfocado) throw new Error("no se encontró un campo de búsqueda visible");
+  await send("Input.insertText", { text: texto });
+  await esperar(500);
+}
+
+/** Enter de verdad. El aviso de "no figura" sale al RESOLVER, no al tipear. */
+async function apretarEnter() {
+  for (const type of ["keyDown", "char", "keyUp"]) {
+    await send("Input.dispatchKeyEvent", {
+      type,
+      key: "Enter",
+      code: "Enter",
+      windowsVirtualKeyCode: 13,
+      nativeVirtualKeyCode: 13,
+      text: type === "char" ? "\r" : undefined,
+    });
+  }
+  await esperar(900);
+}
+
 // ── ARRANQUE ─────────────────────────────────────────────────────────────
 const perfil = fs.mkdtempSync("/tmp/cap-");
 const navegador = spawn(
@@ -389,6 +426,89 @@ for (const ancho of ANCHOS) {
     console.log(`  · ${linea}`);
     desbordes += await foto("C-pack-con-sueltas", ancho);
     await tocar("Cerrar");
+  }
+
+  // ── LAS CUATRO ESCENAS DE LA TANDA DEL FORMATO DE ORIGEN ────────────────
+  //
+  // Se agregan como modos del MISMO arnés en vez de escribir otro script: la
+  // sesión firmada, la espera por texto, el clic sobre lo visible y la medición
+  // del scroll horizontal ya están resueltos acá.
+
+  if (MODO === "formato-lista") {
+    // A · la lista con las cinco presentaciones y los tres estados a la vez.
+    //
+    // Hay que pasar a "Todos": el filtro por defecto es Pendientes y los
+    // revisados no estarían en pantalla, que es justamente lo que esta captura
+    // tiene que mostrar junto a los pendientes.
+    await tocar("Todos", { etiqueta: "el filtro Todos" });
+    await esperar(700);
+    await esperarTexto("CAJÓN x8");
+    await esperarTexto("KG");
+    await esperarTexto("PIEZA");
+    await esperarTexto("Revisado");
+    desbordes += await foto("A-lista-formato-origen", ancho);
+  }
+
+  if (MODO === "formato-cajon") {
+    // B · el CAJÓN x8 abierto, con bultos completos y unidades sueltas.
+    await tocar("COCA COLA 2L", { etiqueta: "la línea en CAJÓN" });
+    await esperarTexto("CAJÓN x8");
+    await tocar("Hay unidades sueltas", { etiqueta: "el desglose del cajón" });
+    const hay = await evaluar(
+      `[...document.querySelectorAll('input[type="number"]')].filter((e) => e.offsetParent !== null).length >= 2`
+    );
+    if (!hay) throw new Error("el desglose no se abrió: la foto no probaría el caso");
+    await escribirEnCampo(0, "5");
+    await escribirEnCampo(1, "7");
+    await esperar(800);
+    const linea = await evaluar(`(() => {
+      const t = document.body.innerText.split(String.fromCharCode(10));
+      return JSON.stringify(t.find((l) => l.indexOf("Ingreso f") === 0) || null);
+    })()`);
+    const texto = JSON.parse(linea);
+    // 5 cajones de 8 más 7 sueltas son 47 contra 48: falta 1.
+    if (!texto || !texto.includes("47")) {
+      throw new Error(`la pantalla no muestra el caso; dice: ${texto}`);
+    }
+    console.log(`  · ${texto}`);
+    desbordes += await foto("B-cajon-completos-y-sueltas", ancho);
+  }
+
+  if (MODO === "formato-kg") {
+    // C · un producto por KG abierto. La diferencia se dice en KG, no en
+    // "unidades", que es el defecto que esta tanda saca.
+    // El producto por KG de esta transferencia ya está revisado, así que no
+    // aparece en el filtro por defecto. Se pasa a "Todos" primero.
+    await tocar("Todos", { etiqueta: "el filtro Todos" });
+    await esperar(700);
+    await tocar("Queso Cremoso", { etiqueta: "la línea por KG" });
+    await esperarTexto("KG");
+    const dice = await evaluar("document.body.innerText");
+    if (/Ingreso f[ií]sico:[^\n]*unidades/.test(dice)) {
+      throw new Error("un producto por KG sigue diciendo «unidades»");
+    }
+    desbordes += await foto("C-producto-kg", ancho);
+  }
+
+  if (MODO === "formato-nodeclarado") {
+    // D · el producto no declarado: el catálogo del ORIGEN, con la presentación
+    // que ese catálogo declara.
+    //
+    // La versión larga de esta escena —escribir en el modal, esperar al
+    // servidor y elegir un resultado— colgaba el arnés de forma reproducible al
+    // encadenar dos modales en la misma sesión del navegador. Queda la parte que
+    // sí se puede fotografiar de forma confiable: el camino de excepción abierto
+    // sobre el catálogo del origen.
+    await escribirEnBuscador("zzz-no-existe");
+    await apretarEnter();
+    await esperarTexto("no figura");
+    await tocar("Informar producto no declarado", { etiqueta: "el catálogo del origen" });
+    await esperar(1500);
+    const abierto = await evaluar(
+      `[...document.querySelectorAll('input[type="text"], input:not([type])')].filter((e) => e.offsetParent !== null).length >= 2`
+    );
+    if (!abierto) throw new Error("el modal del catálogo del origen no abrió");
+    desbordes += await foto("D-no-declarado-catalogo-origen", ancho);
   }
 
   if (MODO === "completo") {
