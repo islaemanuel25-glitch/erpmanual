@@ -16,13 +16,149 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-**Una.** Producción está en **7 migraciones** y el árbol tiene **8**: entró
-`20260908213000_recepcion_control_fisico` con el merge del PR #51
-—`e453b750aeedad2c8e8d6d8ded8d0f0eb22d567d`—.
+Ninguna. Producción está al día en **8 migraciones**, que son las que hay en el
+árbol. Comprobado con `prisma migrate status` el 2026-09-09 después de desplegar
+`262cc338ff475670a413e44e30fe51ae922c5f3f`: *"8 migrations found in
+prisma/migrations. Database schema is up to date!"*.
 
-### `20260908213000_recepcion_control_fisico` — PENDIENTE
+---
 
-Todo sobre `TransferenciaDetalle`. Es la mesa de trabajo de la recepción física:
+## 2026-09-09 — `262cc338`, control físico de recepción: una migración aplicada
+
+Producción pasó de `d1458e30ffa49422e71200f78100355e842493d3` a
+`262cc338ff475670a413e44e30fe51ae922c5f3f`: el merge del PR #51
+—`e453b750aeedad2c8e8d6d8ded8d0f0eb22d567d`— más el commit documental que
+registró esta misma migración como pendiente. **El código funcional es idéntico
+al HEAD que aprobó la CI #215**, `2a57bcf4d1af1b4dc9a5a4eca24d38cdc57b10ba`:
+`git diff` entre el merge y el SHA desplegado, excluyendo este archivo, quedó
+vacío.
+
+### `20260908213000_recepcion_control_fisico` — APLICADA
+
+Se aplicó **de verdad**: `migrate deploy` imprimió
+`Applying migration 20260908213000_recepcion_control_fisico` y después
+`All migrations have been successfully applied`. El conteo pasó de **7 a 8**, que
+es la comprobación que el código de salida no da — ver la regla 7 de `/deploy`.
+
+**Qué agregó**, todo sobre `TransferenciaDetalle` y todo verificado contra el
+PostgreSQL de producción después de aplicar, no deducido del `.sql`:
+
+- `revisadoEnRecepcion` — `boolean`, `NOT NULL`, `DEFAULT false`.
+- `revisadoEnRecepcionPorId` — `integer`, nulable.
+- `revisadoEnRecepcionAt` — `timestamp(3)`, nulable (`datetime_precision = 3`).
+- `recibidoUnidadesSueltas` — `numeric(12,3)`, nulable.
+- FK `TransferenciaDetalle_revisadoEnRecepcionPorId_fkey` → `Usuario(id)`,
+  `ON UPDATE CASCADE ON DELETE SET NULL`.
+- Índice `TransferenciaDetalle_transferenciaId_revisadoEnRecepcion_idx` sobre
+  `("transferenciaId", "revisadoEnRecepcion")`.
+
+**Los históricos no se reinterpretaron.** Sobre las 6197 filas de
+`TransferenciaDetalle` en producción: **0** con `revisadoEnRecepcion = true`,
+**0** con `recibidoUnidadesSueltas` no nula, **0** con autor no nulo. Es la
+verdad y no una omisión: ninguna transferencia vieja se revisó con este
+mecanismo porque el mecanismo no existía.
+
+### La contraprueba, antes de tocar producción
+
+El backup **nuevo** se restauró en un PostgreSQL 16 descartable y la migración se
+aplicó ahí primero, con un contenedor de **la imagen nueva** y sin pegar el SQL a
+mano:
+
+- restauración con 0 errores y 68 tablas;
+- `8 migrations found`, `Applying migration …`, `All migrations have been
+  successfully applied`;
+- `migrate status` → `8 migrations found` · `Database schema is up to date!`;
+- las cuatro columnas, la FK y el índice, con tipo, precisión, nulabilidad y
+  default correctos;
+- **conteos idénticos antes y después** en las diez tablas que se midieron:
+  Transferencia 184, TransferenciaDetalle 6197, AuditoriaStock 8759, Venta 15888,
+  VentaPago 15891, ProductoBase 2746, ProductoLocal 12020, StockLocal 11836,
+  Usuario 6, Local 5;
+- 0 filas con `revisadoEnRecepcion = true` después de migrar.
+
+El descartable se eliminó al terminar.
+
+### El clasificador, y por qué no alcanzaba
+
+`node scripts/clasificar-migraciones.mjs --desde d1458e30… --hasta 262cc338…`:
+**1 archivo a mirar**, clasificado **aditiva**, sin coincidencias, salida **0**.
+
+Y no se tomó como autorización, porque el propio script avisa que **no lee
+adentro de un bloque `DO $$`**. Este `.sql` tiene uno. Se leyó a mano, línea por
+línea: contiene **únicamente** el `ADD CONSTRAINT` de la FK nueva, protegido por
+un `IF NOT EXISTS` sobre `pg_constraint`. No hay ninguna sentencia destructiva
+oculta ahí adentro ni en el resto del archivo — son cuatro
+`ADD COLUMN IF NOT EXISTS`, ese `ADD CONSTRAINT`, y un `CREATE INDEX IF NOT
+EXISTS`.
+
+### El backup
+
+- `/srv/produccion/backups/pre-262cc338_20260909_100356.sql.gz`
+- 4.047.620 bytes
+- SHA-256 `ae5046b92ec053fcf72c76e30761cc4a593fb17a701029a8c66e6ee0bc7e3893`
+- los cuatro controles: `pg_dump` con `pipefail` salió 0, `gzip -t` sin salida,
+  la marca `PostgreSQL database dump complete` dentro de las últimas 20 líneas, y
+  68 `CREATE TABLE` (el piso son 40).
+
+**El quinto chequeo NO aplica, y el motivo importa.** Ese control existe para
+comprobar que un valor que la migración va a BORRAR o TRANSFORMAR esté dentro del
+dump. Esta migración no borra, no actualiza y no transforma ningún dato: es
+puramente aditiva. No hay un valor que vaya a desaparecer que se pueda buscar
+adentro del archivo, así que el chequeo no tendría qué afirmar.
+
+### El despliegue
+
+- Corte medido desde inmediatamente después del `up -d`: **5 segundos** hasta el
+  primer HTTP 200 de `/api/version`. El tope es 30.
+- Las seis identidades coincidieron en `262cc338…`: `origin/main`, HEAD del repo
+  del VPS, tag de la imagen del contenedor, `APP_BUILD_ID`, `/api/version` y el
+  label `org.opencontainers.image.revision`.
+- Imagen validada contra el registry antes de empezar: `linux/amd64`, digest
+  `sha256:223423f035d5536577cda17e93d46ca63da486c5160cce5d9e587f31b95a0e39`, y
+  las 8 migraciones adentro.
+- Referencia de rollback registrada antes de tocar `APP_IMAGE`: RepoTag
+  `ghcr.io/islaemanuel25-glitch/erpmanual:d1458e30ffa49422e71200f78100355e842493d3`,
+  image ID `sha256:0411c3774d3f4001c047a9563c9fbbd996f9b464339a6a6aa96836a55e12ad58`.
+  No hizo falta usarla.
+- **PostgreSQL NO fue recreado**: mismo container ID
+  `3bd85a35bb0f…`, arrancado el 2026-08-17, `healthy`, 0 reinicios. Todo con
+  `--no-deps app`.
+- `erpazul_app`: `running`, 0 reinicios, `Ready in 719ms`, sin `error`, `fatal`
+  ni `panic` en los logs posteriores.
+- Smokes sin mutar: las cinco rutas reales de recepción contestaron **401** sin
+  sesión, y tres rutas inventadas contestaron **404** — el control negativo que
+  demuestra que el 401 viene de rutas que existen. No se ejecutó ninguna
+  recepción falsa en producción.
+- Sonda de cascada **verde antes y después** contra `https://operix.cloud`, con
+  las cuatro mediciones en su valor esperado.
+
+### Una nota sobre la sonda, para el próximo despliegue
+
+`scripts/sonda-cascada.mjs` trae como binario por defecto la ruta de Edge en
+Windows, y **desde el VPS no hay ningún navegador**: ni en el host, ni dentro de
+la imagen de producción. Correrla desde acá da un `ReferenceError: WebSocket is
+not defined` en el Node 18 del host, y con Node 22 el navegador no levanta.
+
+Se resolvió sin instalar nada en el VPS: un contenedor descartable
+`node:22-alpine` con `chromium` de los repositorios de Alpine, y un envoltorio de
+dos líneas que le agrega `--no-sandbox` —en un contenedor, Chromium no puede
+crear los namespaces de su sandbox, y el error real es
+`Failed to move to new namespace`—. La sonda midió de verdad: 1622 reglas en la
+hoja servida y las cuatro comprobaciones en su valor.
+
+Queda anotado porque el próximo despliegue desde el VPS se va a encontrar con lo
+mismo, y porque el criterio de la skill es que una sonda que no puede medir es
+ROJO y frena, no "pendiente".
+
+---
+
+### El análisis PREVIO, conservado tal como se escribió
+
+Lo que sigue es la ficha que se redactó **antes** de aplicar la migración, cuando
+todavía figuraba como pendiente. Se conserva a propósito: dice qué se prometió y
+con qué criterio, y así se puede contrastar contra lo que efectivamente pasó, que
+está arriba. Todo sobre `TransferenciaDetalle`, que es la mesa de trabajo de la
+recepción física:
 qué producto se terminó de revisar, quién lo revisó y cuándo, y cuántas unidades
 sueltas llegaron fuera de un pack entero.
 
