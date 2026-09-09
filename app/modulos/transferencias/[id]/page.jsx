@@ -21,10 +21,12 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import useContextoActivo from "@/hooks/useContextoActivo";
+import { useAccionDePagina } from "@/app/context/AccionDePaginaContext";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 
 import SinPermisos from "@/components/auth/SinPermisos";
 import EstadoTransferenciaBadge, { DiferenciasBadge } from "@/components/transferencias/EstadoTransferenciaBadge";
@@ -153,6 +155,44 @@ export default function TransferenciaDetallePage() {
   // trabajo. Es una sola expresión y está al lado de su motivo, no un
   // `setDirty(false)` suelto después de cada fetch.
   const dirtyEfectivo = modo === MODO_RECEPCION.EDITOR_LOTES && dirty;
+
+  // ── EL "VOLVER" VIVE EN EL SHELL, NO ADENTRO DEL CONTENIDO ───────────────
+  //
+  // En el teléfono había DOS encabezados: la fila del shell diciendo
+  // "Transferencias", y abajo otra franja con "← Volver a transferencias" y el
+  // número. Dos barras para lo mismo, y la de abajo empujaba el trabajo real
+  // —el buscador— más lejos todavía.
+  //
+  // El mecanismo genérico ya existe y lo estrenó Cobros: la pantalla registra su
+  // acción y `LayoutBase` la dibuja a la derecha de su propio título. Acá no se
+  // agrega nada al shell ni se compara ninguna ruta.
+  //
+  // El slot del shell es `md:hidden`, así que de 768 px para arriba no dibuja
+  // nada y el escritorio conserva su franja con el botón de siempre. Por eso el
+  // registro es incondicional y lo que se esconde es la franja, no la acción.
+  //
+  // El hook va acá arriba, con los demás: `if (!me) return` está más abajo y un
+  // hook detrás de un retorno temprano cambia la cantidad de hooks entre
+  // renders. Es el defecto que ya rompió esta pantalla una vez.
+  useAccionDePagina(() => <SunmiBackButton href={LISTADO} />, []);
+
+  /**
+   * Imprimir el ticket en la impresora del POS.
+   *
+   * Vivía SOLO adentro de `AccionesRecepcion`. La composición móvil lo ofrece
+   * desde "Más acciones", así que sube a la página —que es de donde cuelgan las
+   * dos— en vez de escribirse una segunda vez allá abajo. `AccionesRecepcion`
+   * conserva el suyo y no se toca: cambiarlo movería el escritorio.
+   *
+   * El import es dinámico por lo mismo que allá: el módulo de impresión no tiene
+   * por qué viajar en el bundle de una pantalla que casi siempre solo se lee.
+   */
+  const imprimirTicket = async () => {
+    const { default: imprimir } = await import(
+      "@/lib/transferencias/imprimirTicketTransferencia"
+    );
+    imprimir(item, me);
+  };
 
   // ===============================
   // Usuario
@@ -513,7 +553,12 @@ export default function TransferenciaDetallePage() {
       <div className="w-full space-y-3">
         {/* Franja de encabezado: Volver + título + badges a la izquierda, fecha
             a la derecha. Una sola fila en desktop, con wrap en pantallas chicas. */}
-        <div className="flex items-start justify-between gap-3 flex-wrap">
+        {/* La franja del encabezado es de ESCRITORIO. En el teléfono el shell
+            ya dibuja "Transferencias" con el Volver a la derecha —ver
+            `useAccionDePagina` arriba—, y repetirla acá era el segundo
+            encabezado que la V2 viene a sacar. El corte es `md`, el mismo
+            que usa `LayoutBase` para su fila: o manda uno o manda el otro. */}
+        <div className="hidden md:flex items-start justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
             <SunmiButton color="slate" onClick={volver} className="text-sm shrink-0">
               ← Volver a transferencias
@@ -567,6 +612,12 @@ export default function TransferenciaDetallePage() {
           <>
             {/* Acciones ARRIBA, en su propia card — mismo lugar y misma
                 composición que AccionesTicket en "Ver venta". */}
+            {/* ── LAS ACCIONES, SOLO EN ESCRITORIO ────────────────────────
+                En el teléfono esta card no va arriba del flujo físico: PDF,
+                ticket y cancelación se llegan por "⋯", y confirmar es el CTA
+                del pie. Las funciones son LAS MISMAS —se le pasan también a
+                `WorkspaceRecepcion`—, no hay una segunda versión. */}
+            <div className="hidden md:block">
             <AccionesRecepcion
               id={id}
               item={item}
@@ -604,9 +655,15 @@ export default function TransferenciaDetallePage() {
                 ) : null
               }
             />
+            </div>
 
-            {/* 1 · Información general */}
-            <TransferenciaHeader item={item} />
+            {/* ── 1 · INFORMACIÓN GENERAL, SOLO EN ESCRITORIO ─────────────
+                No se borra: en el teléfono se llega por "⋯" → "Información
+                general", y lo que se abre es ESTE MISMO componente. Lo que
+                deja de pasar es que ocupe media pantalla durante el conteo. */}
+            <div className="hidden md:block">
+              <TransferenciaHeader item={item} />
+            </div>
 
             {/* ── 2 · PRODUCTOS: DOS PANTALLAS, Y LA QUE SE VE DEPENDE DE SI
                    ESTA PERSONA ESTÁ RECIBIENDO ─────────────────────────────
@@ -630,6 +687,26 @@ export default function TransferenciaDetallePage() {
                 onQuitarLinea={quitarLinea}
                 guardando={revisando}
                 quitandoId={quitandoId}
+                // Lo administrativo, para que la composición móvil pueda
+                // acomodarlo. Son las MISMAS funciones que recibe
+                // `AccionesRecepcion`: una sola definición de cada acción.
+                confirmarRecepcion={confirmarRecepcion}
+                confirmando={confirmando}
+                puedeCancelar={puedeCancelar}
+                abrirPanelCancelar={() => setPanelCancelar((v) => !v)}
+                panelCancelar={
+                  panelCancelar ? (
+                    <PanelCancelarTransferencia
+                      id={id}
+                      onCerrar={() => setPanelCancelar(false)}
+                      onCancelada={async () => {
+                        setPanelCancelar(false);
+                        await cargar();
+                      }}
+                    />
+                  ) : null
+                }
+                imprimirTicket={imprimirTicket}
               />
             ) : (
               <TablaDetalleTransferencia
@@ -640,8 +717,12 @@ export default function TransferenciaDetallePage() {
               />
             )}
 
-            {/* 3 · Totales — métricas por LÍNEA (ver comentario arriba) */}
-            <section className="space-y-2">
+            {/* ── 3 · TOTALES, SOLO EN ESCRITORIO ─────────────────────────
+                Métricas por LÍNEA (ver el comentario de arriba). En el
+                teléfono el avance vive en el bloque compacto —"0 / 15
+                revisados"— y las cinco cifras aparecen recién al llegar a
+                15/15, que es cuando dejan de ser ruido. */}
+            <section className="hidden md:block space-y-2">
               <SectionHead title="Totales" />
               <SunmiCard>
                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-3">

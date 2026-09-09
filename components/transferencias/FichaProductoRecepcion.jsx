@@ -74,6 +74,21 @@ export default function FichaProductoRecepcion({
   onRevisar,
   onQuitar,
   quitando = false,
+  /**
+   * La ficha se está dibujando DENTRO de una hoja inferior.
+   *
+   * ── ES PRESENTACIÓN Y NADA MÁS ─────────────────────────────────────────
+   *
+   * Cambia dos cosas y ninguna es de negocio: no pone su propia `SunmiCard`
+   * —adentro de la hoja ya hay una tarjeta y anidarlas dibuja dos bordes y dos
+   * fondos—, y el botón principal dice "y seguir", porque en el teléfono
+   * guardar CIERRA la hoja y devuelve al buscador para el producto siguiente.
+   *
+   * El default es `false`, así que el escritorio queda exactamente como estaba.
+   */
+  enHoja = false,
+  /** Se llama después de guardar BIEN. La hoja lo usa para cerrarse sola. */
+  onGuardado = null,
 }) {
   const d = producto;
 
@@ -168,14 +183,30 @@ export default function FichaProductoRecepcion({
       motivoPrincipal: motivos.length > 0 ? motivo : null,
       motivoDetalle: motivos.length > 0 && motivo === "Otro" ? detalleMotivo : null,
     });
-    if (r && r.ok === false) setError(r.error || "No se pudo guardar la revisión.");
+    if (r && r.ok === false) {
+      setError(r.error || "No se pudo guardar la revisión.");
+      return;
+    }
+    // Solo cuando salió bien. Si la hoja se cerrara igual ante un error, el
+    // operador vería desaparecer el producto creyendo que quedó guardado.
+    onGuardado?.();
   };
 
+  // Adentro de una hoja la tarjeta la pone el modal. Ver `enHoja`.
+  const Envoltorio = enHoja ? "div" : SunmiCard;
+  const claseEnvoltorio = enHoja ? "space-y-2" : "p-3 space-y-2";
+
   return (
-    <SunmiCard className="p-3 space-y-2">
+    <Envoltorio className={claseEnvoltorio}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
-          <h3 className="font-semibold sunmi-text-strong leading-tight break-words">{d.nombre}</h3>
+          {/* Adentro de la hoja el nombre YA está en el encabezado del modal, y
+              repetirlo dos veces seguidas se lee como un error de la pantalla.
+              En escritorio la ficha no tiene encabezado arriba, así que ahí el
+              título sigue siendo suyo. Se vio en la captura de 390 px. */}
+          {!enHoja && (
+            <h3 className="font-semibold sunmi-text-strong leading-tight break-words">{d.nombre}</h3>
+          )}
           <p className="text-sm2 sunmi-text-muted">
             {d.categoria?.nombre || "Sin categoría"}
             {d.codigoBarra ? ` · ${d.codigoBarra}` : ""}
@@ -297,6 +328,14 @@ export default function FichaProductoRecepcion({
           >
             {guardando
               ? "Guardando…"
+              : enHoja
+              ? // En el teléfono el botón dice qué pasa DESPUÉS: guardar cierra
+                // la hoja y deja el buscador listo para el producto siguiente.
+                // Y nombra lo que se está guardando, que con una diferencia en
+                // pantalla no es lo mismo que "revisado".
+                diferenciaFisica
+                ? "✓ Guardar diferencia y seguir"
+                : "✓ Marcar revisado y seguir"
               : d.revisadoEnRecepcion
               ? "✓ Revisado — guardar de nuevo"
               : "✓ Marcar como revisado"}
@@ -327,6 +366,6 @@ export default function FichaProductoRecepcion({
           Revisado por {d.revisadoEnRecepcionPor.nombre}
         </p>
       )}
-    </SunmiCard>
+    </Envoltorio>
   );
 }

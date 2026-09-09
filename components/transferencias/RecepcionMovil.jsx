@@ -1,0 +1,466 @@
+"use client";
+
+// LA COMPOSICIÓN MÓVIL DEL CONTROL FÍSICO — V2.
+//
+// ── QUÉ ES ESTO Y QUÉ NO ES ──────────────────────────────────────────────
+//
+// Es PRESENTACIÓN. No tiene estado de negocio, no llama a ningún endpoint y no
+// decide nada: recibe de `WorkspaceRecepcion` el mismo estado y los mismos
+// handlers que usa el escritorio, y los acomoda distinto. Un solo cerebro, dos
+// composiciones — si esta pieza tuviera su propio filtro o su propio "revisar",
+// el día que una regla cambie el teléfono y la computadora dirían cosas
+// distintas, y el que se entera es el que está contando cajas.
+//
+// Lo único suyo son tres booleanos de "qué hoja está abierta", que no son
+// negocio: son qué se ve.
+//
+// ── EL PROBLEMA QUE RESUELVE ─────────────────────────────────────────────
+//
+// La pantalla anterior era una página administrativa: encabezado del shell,
+// otro encabezado adentro con su propio "Volver", cinco tarjetas de métricas,
+// la información general completa, cinco botones de PDF y cancelación, y recién
+// después el buscador. Con 150 productos en la mano eso es scrollear un
+// documento antes de poder trabajar.
+//
+// Acá el orden es el del trabajo: dónde estoy → buscar → contar → marcar →
+// siguiente. Todo lo administrativo sigue existiendo y se llega por "⋯".
+//
+// ── POR QUÉ EL PRODUCTO ES UNA HOJA Y NO UN REEMPLAZO ────────────────────
+//
+// Antes el producto REEMPLAZABA al listado y aparecía un segundo "Volver".
+// Con una hoja inferior la lista queda atrás, visible, y cerrar es un gesto —
+// no una decisión de navegación. Y el modal es el del kit: la capa, el velo, el
+// `Escape`, la pila de modales y el portal ya están resueltos ahí.
+
+import { useState } from "react";
+import { ArrowRight, MoreHorizontal } from "lucide-react";
+
+import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiAviso from "@/components/sunmi/SunmiAviso";
+import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
+import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
+import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
+import SunmiFiltroEstado from "@/components/sunmi/SunmiFiltroEstado";
+import { hayEscanerDisponible } from "@/components/sunmi/SunmiEscanerCodigoBarra";
+
+import EstadoTransferenciaBadge from "./EstadoTransferenciaBadge";
+import TransferenciaHeader from "./TransferenciaHeader";
+import FichaProductoRecepcion from "./FichaProductoRecepcion";
+import { fmtCantidad } from "./detallePresentacion";
+import { FILTRO, pasaFiltro } from "@/lib/transferencias/controlFisico";
+import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
+
+/** El texto del buscador, el mismo patrón que Productos y el POS. */
+export const PLACEHOLDER_BUSCADOR = "Buscar producto, código o categoría...";
+
+export const TITULO_MAS_ACCIONES = "Más acciones";
+export const TITULO_INFO_GENERAL = "Información general";
+
+/** Los cuatro estados del trabajo. Fijos, y todos a la vista. */
+const TABS = [
+  { clave: FILTRO.PENDIENTES, texto: "Pendientes" },
+  { clave: FILTRO.DIFERENCIAS, texto: "Diferencias" },
+  { clave: FILTRO.REVISADOS, texto: "Revisados" },
+  { clave: FILTRO.TODOS, texto: "Todos" },
+];
+
+/** De dónde sale el número de cada tab. Del MISMO resumen que las cards. */
+const CONTEO = {
+  [FILTRO.PENDIENTES]: (r) => r.pendientes,
+  [FILTRO.DIFERENCIAS]: (r) => r.diferencias,
+  [FILTRO.REVISADOS]: (r) => r.revisados,
+  [FILTRO.TODOS]: (r) => r.totalRemito,
+};
+
+export default function RecepcionMovil({
+  item,
+  resumen,
+  categorias,
+  visibles,
+  seleccionado,
+  filtro,
+  categoriaId,
+  texto,
+  aviso,
+  puedeRecibir,
+  guardando,
+  quitandoId,
+  onFiltrar,
+  onCategoria,
+  onTexto,
+  onTeclear,
+  onVoz,
+  onElegir,
+  onCerrarProducto,
+  onRevisar,
+  onQuitarLinea,
+  onAbrirEscaner,
+  onAbrirAgregar,
+  accionAgregar,
+  mensajeNoFigura,
+  FilaProducto,
+  // Lo administrativo, que ya vive en la página y acá solo se acomoda.
+  confirmarRecepcion,
+  confirmando = false,
+  puedeCancelar = false,
+  abrirPanelCancelar,
+  panelCancelar = null,
+  imprimirTicket,
+}) {
+  const [masAcciones, setMasAcciones] = useState(false);
+  const [infoGeneral, setInfoGeneral] = useState(false);
+
+  const pendientes = resumen?.pendientes ?? 0;
+  const todoRevisado = pendientes === 0 && (resumen?.totalRemito ?? 0) > 0;
+
+  const opcionesEstado = TABS.map((t) => ({ ...t, cantidad: CONTEO[t.clave](resumen || {}) }));
+
+  // ── QUIÉN TIENE DIFERENCIA LO DECIDE EL MISMO PREDICADO QUE EL FILTRO ───
+  //
+  // `pasaFiltro(d, DIFERENCIAS)` es lo que alimenta el tab y las cards. Si acá
+  // se preguntara de otra forma, esta lista y el número del tab podrían decir
+  // cosas distintas sobre los mismos productos. El DTO además NO trae un campo
+  // `diferencia`: derivarlo a mano habría dado `0` para todos, en silencio.
+  const diferencias = (item?.items || []).filter((d) => pasaFiltro(d, FILTRO.DIFERENCIAS));
+
+  /** "35 de 36 unidades · faltó 1". En FÍSICO, que es lo que mueve stock. */
+  const detalleDiferencia = (d) => {
+    const args = { unidad: d.unidadEnviada, factorPack: d.factorPack };
+    const env = unidadesFisicasDe({ cantidad: d.cantidadEnviada, sueltas: 0, ...args });
+    const rec = unidadesFisicasDe({
+      cantidad: d.cantidadRecibida, sueltas: d.recibidoUnidadesSueltas, ...args,
+    });
+    if (env == null || rec == null) return null;
+    const delta = rec - env;
+    const cuantas = Math.abs(delta);
+    return `${fmtCantidad(rec)} de ${fmtCantidad(env)} unidades · ${
+      delta < 0 ? "faltó" : "sobró"
+    } ${fmtCantidad(cuantas)}`;
+  };
+
+  return (
+    <section className="space-y-3">
+      {/* ── 1 · DÓNDE ESTOY ───────────────────────────────────────────────
+          Compacto a propósito. El título "Transferencias" y el "Volver" los
+          dibuja el shell —ver `useAccionDePagina` en la página—, así que acá no
+          se repiten. Lo que falta para saber dónde estamos es el número, el
+          estado, las dos puntas y el avance. Nada más. */}
+      <SunmiCard className="p-3 space-y-1">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-semibold sunmi-text-strong truncate">
+              Transferencia #{item?.id}
+            </span>
+            <EstadoTransferenciaBadge estado={item?.estado} />
+          </div>
+          <SunmiButton
+            color="slate"
+            onClick={() => setMasAcciones(true)}
+            aria-label={TITULO_MAS_ACCIONES}
+            aria-haspopup="dialog"
+            className="shrink-0"
+          >
+            {/* ── ICONO Y NO EL CARÁCTER "⋯" ────────────────────────────
+                El carácter salió como un cuadrito vacío en la captura de 390 px:
+                el botón quedaba gris y sin nada adentro. No es un problema del
+                arnés —el "←" de Volver sí se ve, porque es un icono— sino de
+                depender de un glifo que la fuente puede no tener. `lucide-react`
+                ya es del kit y lo usa `SunmiBackButton`. */}
+            <MoreHorizontal size={18} aria-hidden="true" />
+          </SunmiButton>
+        </div>
+
+        {/* La flecha también era un carácter y también salió como un cuadrito.
+            Mismo arreglo: un icono, que además se anuncia solo. */}
+        <p className="text-sm2 sunmi-text-muted truncate flex items-center gap-1">
+          <span className="truncate">{item?.origen?.nombre}</span>
+          <ArrowRight size={14} aria-label="hacia" className="shrink-0" />
+          <span className="truncate">{item?.destino?.nombre}</span>
+        </p>
+
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="text-sm2 sunmi-text-muted">
+            <span className="tabular-nums sunmi-text-strong font-semibold">
+              {resumen?.revisados ?? 0} / {resumen?.totalRemito ?? 0}
+            </span>{" "}
+            revisados
+          </span>
+          <span className={`text-sm2 ${pendientes > 0 ? "sunmi-text-accent" : "sunmi-text-success"}`}>
+            {pendientes > 0
+              ? `${pendientes} ${pendientes === 1 ? "pendiente" : "pendientes"}`
+              : "Sin pendientes"}
+          </span>
+        </div>
+      </SunmiCard>
+
+      {/* ── 2 · BUSCAR ────────────────────────────────────────────────────
+          El MISMO componente que Productos y el POS: lupa, campo y micrófono.
+          No hay un botón de "Escanear" al lado — un lector físico escribe el
+          código y manda Enter, que entra por `onKeyDown` igual que un nombre
+          tecleado, y la cámara vive en "⋯" mientras no haya una composición
+          aprobada para ella. */}
+      <SunmiCampoBusquedaVoz
+        value={texto}
+        onChange={onTexto}
+        onVoz={onVoz}
+        onKeyDown={onTeclear}
+        placeholder={PLACEHOLDER_BUSCADOR}
+        ariaLabel="Buscar producto de esta transferencia"
+      />
+
+      {aviso && (
+        <SunmiAviso tono="warning">
+          {aviso}
+          {aviso === mensajeNoFigura && puedeRecibir && (
+            <> Si igual llegó, informalo como producto no declarado.</>
+          )}
+        </SunmiAviso>
+      )}
+
+      {aviso === mensajeNoFigura && puedeRecibir && (
+        <SunmiButton color="slate" onClick={onAbrirAgregar} className="w-full justify-center">
+          {accionAgregar}
+        </SunmiButton>
+      )}
+
+      {/* ── 3 · FILTROS ───────────────────────────────────────────────────
+          El estado del trabajo primero, en grilla para que entren los cuatro
+          con su número. La categoría abajo y en un desplegable: es un filtro
+          secundario y no tiene que competir con el principal. */}
+      <SunmiFiltroEstado
+        opciones={opcionesEstado}
+        valor={filtro}
+        onCambiar={onFiltrar}
+        ariaLabel="Filtrar productos por estado"
+      />
+
+      <div>
+        <label className="text-sm2 sunmi-text-muted mb-1 block" htmlFor="categoria-recepcion">
+          Categoría
+        </label>
+        <SunmiSelectAdv
+          id="categoria-recepcion"
+          value={categoriaId == null ? "" : String(categoriaId)}
+          onChange={(v) => onCategoria(v === "" ? null : v)}
+        >
+          <option value="">Todas · {resumen?.totalRemito ?? 0}</option>
+          {categorias.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nombre} · {c.cantidad}
+            </option>
+          ))}
+        </SunmiSelectAdv>
+      </div>
+
+      {/* ── 4 · CUANDO YA ESTÁ TODO ───────────────────────────────────────
+          Recién acá aparece el resumen, y compacto. Durante el conteo esas
+          cinco cifras son ruido; al terminar son lo único que importa. */}
+      {todoRevisado && (
+        <SunmiCard className="p-3 space-y-2">
+          <p className="font-semibold sunmi-text-success">✓ Todo revisado</p>
+          <p className="text-sm2 sunmi-text-muted">
+            Revisá las diferencias y confirmá para mover el stock.
+          </p>
+          <div className="grid grid-cols-2 gap-1 text-sm2">
+            <span className="sunmi-text-muted">
+              <span className="tabular-nums sunmi-text-strong">{resumen.correctos}</span> correctos
+            </span>
+            <span className="sunmi-text-muted">
+              <span className="tabular-nums sunmi-text-strong">{resumen.faltantes}</span>{" "}
+              {resumen.faltantes === 1 ? "faltante" : "faltantes"}
+            </span>
+            <span className="sunmi-text-muted">
+              <span className="tabular-nums sunmi-text-strong">{resumen.sobrantes}</span>{" "}
+              {resumen.sobrantes === 1 ? "sobrante" : "sobrantes"}
+            </span>
+            <span className="sunmi-text-muted">
+              <span className="tabular-nums sunmi-text-strong">{resumen.noDeclarados}</span> no
+              {" "}declarados
+            </span>
+          </div>
+
+          {diferencias.length > 0 && (
+            <div className="space-y-1 pt-1">
+              <p className="text-sm2 sunmi-text-muted">Diferencias</p>
+              {diferencias.map((d) => (
+                <div key={d.id} className="flex items-center justify-between gap-2">
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm2 sunmi-text-strong">{d.nombre}</span>
+                    <span className="block text-sm2 sunmi-text-muted">{detalleDiferencia(d)}</span>
+                  </span>
+                  <SunmiButton color="slate" onClick={() => onElegir(d)} className="shrink-0">
+                    Revisar
+                  </SunmiButton>
+                </div>
+              ))}
+            </div>
+          )}
+        </SunmiCard>
+      )}
+
+      {/* ── 5 · LOS PRODUCTOS ─────────────────────────────────────────────
+          La misma fila que el escritorio: se toca la tarjeta entera y no hay
+          botones adentro. */}
+      <div className="space-y-1.5">
+        {visibles.length === 0 && (
+          <p className="text-center py-6 sunmi-text-muted text-sm2">
+            No hay productos que coincidan con este filtro.
+          </p>
+        )}
+        {visibles.map((d) => (
+          <FilaProducto key={d.id} d={d} activa={false} onElegir={onElegir} />
+        ))}
+      </div>
+
+      {/* ── 6 · CONFIRMAR ─────────────────────────────────────────────────
+          El estado del botón NO se decide acá: sale de `pendientes`, que sale
+          del mismo resumen que las cards. Y el servidor lo vuelve a comprobar
+          —`PRODUCTOS_SIN_REVISAR`—: esto evita el viaje, no reemplaza la regla. */}
+      {puedeRecibir && (
+        <SunmiCard className="p-3 space-y-2">
+          <p className={`text-sm2 ${todoRevisado ? "sunmi-text-success" : "sunmi-text-muted"}`}>
+            {todoRevisado
+              ? "Todo revisado · listo para confirmar"
+              : `Falta revisar ${pendientes} ${pendientes === 1 ? "producto" : "productos"}`}
+          </p>
+          <SunmiButton
+            color="amber"
+            onClick={confirmarRecepcion}
+            disabled={!todoRevisado || confirmando}
+            className="w-full justify-center"
+          >
+            {confirmando ? "Confirmando..." : "✓ Confirmar recepción"}
+          </SunmiButton>
+        </SunmiCard>
+      )}
+
+      {/* ── LA HOJA DEL PRODUCTO ──────────────────────────────────────────
+          `forma="hoja"` del kit: pegada abajo, con su velo y su `Escape`. La
+          ficha va sin su tarjeta —`enHoja`— porque el modal ya pone una. */}
+      <SunmiModalLayout
+        open={!!seleccionado}
+        title={seleccionado?.nombre || ""}
+        onClose={onCerrarProducto}
+        z={NIVEL_MODAL_GLOBAL}
+        forma="hoja"
+        // Es carga: hay una cantidad escrita que un toque al costado tiraría.
+        destructivo
+        espacioCuerpo="gap-2"
+      >
+        {seleccionado && (
+          <FichaProductoRecepcion
+            key={seleccionado.id}
+            producto={seleccionado}
+            puedeRecibir={puedeRecibir}
+            guardando={guardando}
+            onRevisar={onRevisar}
+            onQuitar={onQuitarLinea}
+            quitando={quitandoId === seleccionado.id}
+            enHoja
+            onGuardado={onCerrarProducto}
+          />
+        )}
+      </SunmiModalLayout>
+
+      {/* ── LA HOJA DE "MÁS ACCIONES" ─────────────────────────────────────
+          Todo lo administrativo, fuera del flujo físico pero a un toque. */}
+      <SunmiModalLayout
+        open={masAcciones}
+        title={TITULO_MAS_ACCIONES}
+        subtitle={`Transferencia #${item?.id} · ${item?.origen?.nombre} a ${item?.destino?.nombre}`}
+        onClose={() => setMasAcciones(false)}
+        z={NIVEL_MODAL_GLOBAL}
+        forma="hoja"
+        espacioCuerpo="gap-2"
+      >
+        <SunmiButton
+          color="slate"
+          className="w-full justify-center"
+          onClick={() => {
+            setMasAcciones(false);
+            setInfoGeneral(true);
+          }}
+        >
+          {TITULO_INFO_GENERAL}
+        </SunmiButton>
+
+        <a href={`/api/transferencias/pdf?id=${item?.id}`} target="_blank" rel="noreferrer">
+          <SunmiButton color="slate" className="w-full justify-center">
+            📄 PDF de envío
+          </SunmiButton>
+        </a>
+        <a href={`/api/transferencias/pdf-recepcion?id=${item?.id}`} target="_blank" rel="noreferrer">
+          <SunmiButton color="slate" className="w-full justify-center">
+            📄 PDF de recepción
+          </SunmiButton>
+        </a>
+        <SunmiButton color="slate" className="w-full justify-center" onClick={imprimirTicket}>
+          🖨 Imprimir ticket POS
+        </SunmiButton>
+
+        {/* ── LA CÁMARA, MIENTRAS NO HAYA UNA COMPOSICIÓN APROBADA ────────
+            El V2 no dibuja un botón de escanear al lado del buscador: eso se
+            descartó. Pero la cámara sigue existiendo y sacarla sería perder una
+            función. Queda acá, que es la superficie aprobada menos invasiva, y
+            no se inventa un lugar nuevo en el flujo principal. Solo aparece si
+            el navegador sabe leer códigos. */}
+        {puedeRecibir && hayEscanerDisponible() && (
+          <SunmiButton
+            color="slate"
+            className="w-full justify-center"
+            onClick={() => {
+              setMasAcciones(false);
+              onAbrirEscaner();
+            }}
+          >
+            📷 Escanear con la cámara
+          </SunmiButton>
+        )}
+
+        {puedeCancelar && (
+          <>
+            {/* Separado, porque no es una acción más de la lista.
+
+                Con `sunmi-border border-t` se dibujaba una CAJA VACÍA: esa
+                clase del kit pone los cuatro bordes, así que `border-t` solo le
+                agregaba grosor arriba y el resto ya estaba puesto. En la captura
+                de 390 px se veía un rectángulo blanco entre los botones.
+                `SunmiSeparator` es la pieza del kit para esto y no hay que
+                adivinarle el color. */}
+            <SunmiSeparator />
+            <SunmiButton
+              color="red"
+              className="w-full justify-center"
+              onClick={() => {
+                setMasAcciones(false);
+                abrirPanelCancelar?.();
+              }}
+            >
+              ⛔ Cancelar transferencia
+            </SunmiButton>
+          </>
+        )}
+      </SunmiModalLayout>
+
+      {/* ── LA HOJA DE INFORMACIÓN GENERAL ────────────────────────────────
+          El MISMO bloque del escritorio, sin una segunda versión. Deja de estar
+          desplegado durante el conteo; no deja de existir. */}
+      <SunmiModalLayout
+        open={infoGeneral}
+        title={TITULO_INFO_GENERAL}
+        onClose={() => setInfoGeneral(false)}
+        z={NIVEL_MODAL_GLOBAL}
+        forma="hoja"
+        espacioCuerpo="gap-2"
+      >
+        <TransferenciaHeader item={item} />
+      </SunmiModalLayout>
+
+      {/* El panel de cancelación lo dibuja la página, con su preview y su
+          motivo. Acá solo se lo deja aparecer cuando está abierto. */}
+      {panelCancelar}
+    </section>
+  );
+}

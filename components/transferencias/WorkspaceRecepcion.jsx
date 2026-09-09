@@ -45,6 +45,7 @@ import SunmiEscanerCodigoBarra, {
 } from "@/components/sunmi/SunmiEscanerCodigoBarra";
 
 import ResumenControlFisico from "./ResumenControlFisico";
+import RecepcionMovil from "./RecepcionMovil";
 import FichaProductoRecepcion, { TEXTO_ESTADO, presentacionDelEnvio } from "./FichaProductoRecepcion";
 import AgregarProductoRecibido, { ACCION_AGREGAR } from "./AgregarProductoRecibido";
 import { SectionHead, fmtCantidad } from "./detallePresentacion";
@@ -70,7 +71,7 @@ const TABS = [
 export const MENSAJE_NO_FIGURA = "Este producto no figura en esta transferencia.";
 
 /** Una fila del listado. Se toca entera para abrir la ficha. */
-function FilaProducto({ d, activa, onElegir }) {
+export function FilaProducto({ d, activa, onElegir }) {
   const estado = estadoDeProducto(d);
   return (
     <SunmiActionCard
@@ -101,6 +102,23 @@ export default function WorkspaceRecepcion({
   onQuitarLinea,
   guardando = false,
   quitandoId = null,
+  // ── LO ADMINISTRATIVO, QUE EN EL TELÉFONO VIVE ADENTRO DE ESTA PANTALLA ──
+  //
+  // En escritorio, confirmar, los PDF y la cancelación los dibuja
+  // `AccionesRecepcion` arriba de todo y esta pieza ni se entera. En el teléfono
+  // esa card desaparece del flujo físico —ver `RecepcionMovil`— así que las
+  // acciones tienen que llegar hasta acá para poder acomodarse: confirmar como
+  // CTA al pie, el resto detrás de "⋯".
+  //
+  // Son las MISMAS funciones que recibe `AccionesRecepcion`, pasadas por la
+  // página. No hay una segunda versión de ninguna: si las hubiera, el botón del
+  // teléfono y el de la computadora podrían dejar de hacer lo mismo.
+  confirmarRecepcion = null,
+  confirmando = false,
+  puedeCancelar = false,
+  abrirPanelCancelar = null,
+  panelCancelar = null,
+  imprimirTicket = null,
 }) {
   const items = item?.items || [];
 
@@ -220,6 +238,60 @@ export default function WorkspaceRecepcion({
 
   return (
     <section className="space-y-3">
+      {/* ══ TELÉFONO ═══════════════════════════════════════════════════════
+          La composición V2. Recibe el estado y los handlers de acá: no tiene
+          filtro propio, ni búsqueda propia, ni "revisar" propio. El corte es
+          `md`, el MISMO que usa el shell para su fila de título con acción —ver
+          `LayoutBase`—, así que o manda el encabezado del shell o manda el de la
+          página, nunca los dos ni ninguno. */}
+      <div className="md:hidden">
+        <RecepcionMovil
+          item={item}
+          resumen={resumen}
+          categorias={categorias}
+          visibles={visibles}
+          seleccionado={seleccionado}
+          filtro={filtro}
+          categoriaId={categoriaId}
+          texto={texto}
+          aviso={aviso}
+          puedeRecibir={puedeRecibir}
+          guardando={guardando}
+          quitandoId={quitandoId}
+          onFiltrar={setFiltro}
+          onCategoria={setCategoriaId}
+          onTexto={(v) => {
+            setTexto(v);
+            setAviso("");
+          }}
+          onTeclear={alTeclear}
+          onVoz={(t) => {
+            dictado.current = true;
+            setTexto(t);
+          }}
+          onElegir={elegir}
+          onCerrarProducto={() => setSeleccionadoId(null)}
+          onRevisar={onRevisar}
+          onQuitarLinea={onQuitarLinea}
+          onAbrirEscaner={() => setEscaneando(true)}
+          onAbrirAgregar={() => setAgregarAbierto(true)}
+          accionAgregar={ACCION_AGREGAR}
+          mensajeNoFigura={MENSAJE_NO_FIGURA}
+          FilaProducto={FilaProducto}
+          confirmarRecepcion={confirmarRecepcion}
+          confirmando={confirmando}
+          puedeCancelar={puedeCancelar}
+          abrirPanelCancelar={abrirPanelCancelar}
+          panelCancelar={panelCancelar}
+          imprimirTicket={imprimirTicket}
+        />
+      </div>
+
+      {/* ══ ESCRITORIO ═════════════════════════════════════════════════════
+          Lo que había, sin tocar. El corte `md` deja todo lo de 768 px para
+          arriba exactamente como estaba, incluido su propio corte interno en
+          `lg` entre la lista apilada y las dos columnas. */}
+      <div className="hidden md:block space-y-3">
       <SectionHead
         title="Control de recepción"
         subtitle={`${resumen.revisados} de ${resumen.totalRemito} productos revisados`}
@@ -327,7 +399,13 @@ export default function WorkspaceRecepcion({
         <div>{listado}</div>
         <div className="lg:sticky lg:top-3">{ficha}</div>
       </div>
+      </div>
+      {/* ══ FIN DEL ESCRITORIO ═════════════════════════════════════════════ */}
 
+      {/* Los dos modales son COMPARTIDOS: el escáner y el alta de un producto no
+          declarado se abren desde cualquiera de las dos composiciones y no hay
+          motivo para tener dos. Se montan por portal, así que dónde estén
+          escritos no cambia dónde se dibujan. */}
       <SunmiEscanerCodigoBarra
         abierto={escaneando}
         onCerrar={() => setEscaneando(false)}

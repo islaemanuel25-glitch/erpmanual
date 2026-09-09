@@ -42,6 +42,11 @@ const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const PIEZAS = [
   "components/sunmi/SunmiChipsFiltro.jsx",
   "components/sunmi/SunmiEscanerCodigoBarra.jsx",
+  // Las dos que trajo la V2 móvil del 2026-09-09. Se suman acá el mismo día que
+  // nacen: el encabezado de este archivo advierte que la lista es explícita, y
+  // una pieza nueva que no se agrega queda sin cubrir sin que nada avise.
+  "components/sunmi/SunmiFiltroEstado.jsx",
+  "components/transferencias/RecepcionMovil.jsx",
   "components/transferencias/WorkspaceRecepcion.jsx",
   "components/transferencias/ResumenControlFisico.jsx",
   "components/transferencias/FichaProductoRecepcion.jsx",
@@ -128,7 +133,7 @@ test("las piezas del control físico no tienen NINGÚN valor visual arbitrario",
   assert.deepEqual(hallazgos, [], `\n  ${hallazgos.join("\n  ")}\n`);
 });
 
-test("EL CANDADO ENUMERA DE VERDAD: los seis archivos existen y se leen", () => {
+test("EL CANDADO ENUMERA DE VERDAD: los ocho archivos existen y se leen", () => {
   // Sin esto, un archivo renombrado dejaría el candado en verde sin mirar nada,
   // que es el patrón que este repo ya se comió tres veces.
   for (const rel of PIEZAS) {
@@ -136,7 +141,7 @@ test("EL CANDADO ENUMERA DE VERDAD: los seis archivos existen y se leen", () => 
     assert.ok(fs.existsSync(abs), `${rel} no existe: el candado dejó de cubrirlo`);
     assert.ok(codigoDe(rel).length > 200, `${rel} quedó vacío o ilegible`);
   }
-  assert.equal(PIEZAS.length, 6);
+  assert.equal(PIEZAS.length, 8);
 });
 
 test("y los patrones ENCUENTRAN de verdad lo que dicen encontrar", () => {
