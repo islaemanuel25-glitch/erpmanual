@@ -32,6 +32,13 @@ const rutaBuscar = await import("../../app/api/transferencias/buscar-productos-o
 const rutaRevisar = await import("../../app/api/transferencias/revisar-producto/route.js");
 const rutaDetalle = await import("../../app/api/transferencias/detalle/route.js");
 
+// Las decisiones de la pantalla, ejercidas con lo que el endpoint devuelve de
+// verdad. Los tres defectos de integración del 2026-09-09 vivían justo ahí: en
+// el cable entre lo que el servidor manda y lo que la pantalla decide.
+const { MODO_RECEPCION, siguienteEdicion } = await import("../../lib/transferencias/recepcionUI.js");
+const { FILTRO, RESOLUCION, categoriasDelRemito, productosVisibles, resolverEntrada, resumenDeRecepcion } =
+  await import("../../lib/transferencias/controlFisico.js");
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ARNÉS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -227,6 +234,10 @@ async function desmontar() {
   await prisma.local.deleteMany({ where: { id: { in: locales } } });
   await prisma.grupo.deleteMany({ where: { id: { in: grupos } } });
   await prisma.rol.deleteMany({ where: { id: creado.rolId } });
+  // Las categorías de la sección K no cuelgan de un grupo —`Categoria` no tiene
+  // `grupoId`— así que se borran por la marca de la corrida. Va al final: los
+  // `ProductoBase` que las referencian ya se fueron.
+  await prisma.categoria.deleteMany({ where: { nombre: { startsWith: marca } } });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1259,6 +1270,191 @@ async function correr(f) {
   const dI3 = await detalleDe(tI3.id);
   igual("I.3 · 36 contra 36: diferencia 0", dI3.resumen?.diferenciaTotal, 0);
   igual("I.3 · y no hay ajuste al origen", dI3.items?.[0]?.ajusteOrigen, 0);
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("J. El dirty fantasma, con datos reales y llegando a Confirmar");
+  // ═════════════════════════════════════════════════════════════════════════
+  //
+  // El defecto no vivía en ninguna pieza: vivía en el cable. `filaDeServidor`
+  // PROPONE lo enviado cuando no hay recepción cargada —correcto—, y
+  // `reconciliarEditItems` conserva lo que el operador escribió —correcto—. La
+  // recarga posterior a una revisión las juntaba, comparaba la propuesta vieja
+  // (6) contra lo recién guardado (5), y encendía `dirty`.
+  //
+  // Con el botón "Guardar cambios" retirado del control físico a propósito, eso
+  // dejaba a Confirmar diciendo "Tenés cambios sin guardar. Guardalos antes de
+  // confirmar." sin ningún botón capaz de resolverlo. El remito quedaba trabado.
+  //
+  // Por eso esta prueba NO se conforma con llamar al helper con datos escritos a
+  // mano: usa lo que devuelve el endpoint de detalle DESPUÉS de una revisión
+  // real, y termina llamando a confirmar de verdad.
+
+  const pJ1 = await armarProducto({ nombre: "fantasma-pack", factorPack: 6, stockOrigen: 100 });
+  const pJ2 = await armarProducto({ nombre: "fantasma-simple", stockOrigen: 100 });
+  const tJ = await armarTransferencia([
+    { producto: pJ1, cantidad: 6, unidad: "BULTO", factorPack: 6 },
+    { producto: pJ2, cantidad: 4 },
+  ]);
+
+  // 1 — La pantalla abre. El editor por lotes propone lo enviado, que es 6.
+  const dJ0 = await detalleDe(tJ.id);
+  ok("J · el detalle abre", dJ0.ok === true, dJ0.error);
+  const alAbrirJ = siguienteEdicion({
+    modo: MODO_RECEPCION.CONTROL_FISICO,
+    preservar: false,
+    items: dJ0.items,
+  });
+  const propuestaJ = alAbrirJ.editItems.find((e) => e.enviado === 6);
+  igual("J · sin contar, la propuesta es lo enviado", Number(propuestaJ?.recibido), 6);
+  igual("J · y al abrir no hay nada pendiente", alAbrirJ.dirty, false);
+
+  // 2 — El operador cuenta 5 packs + 5 sueltas y marca revisado. De verdad.
+  const detJ1 = await prisma.transferenciaDetalle.findFirst({
+    where: { transferenciaId: tJ.id, productoId: pJ1.productoLocalId },
+  });
+  const revJ = await revisar({
+    transferenciaId: tJ.id, detalleId: detJ1.id,
+    recibido: 5, recibidoUnidadesSueltas: 5, motivoPrincipal: "Faltante", revisado: true,
+  });
+  ok("J · se cierra el control con 5 packs y 5 sueltas", revJ.ok === true, revJ.error);
+
+  // 3 — La pantalla recarga. Esta es la juntura exacta donde nacía el fantasma.
+  const dJ1 = await detalleDe(tJ.id);
+  ok("J · el detalle recarga", dJ1.ok === true, dJ1.error);
+  const trasRevisarJ = siguienteEdicion({
+    modo: MODO_RECEPCION.CONTROL_FISICO,
+    preservar: true,
+    items: dJ1.items,
+    previos: alAbrirJ.editItems,
+  });
+  igual("J · NO queda dirty fantasma", trasRevisarJ.dirty, false);
+  igual(
+    "J · y editItems refleja lo guardado, no la propuesta vieja",
+    Number(trasRevisarJ.editItems.find((e) => e.id === detJ1.id)?.recibido),
+    5
+  );
+
+  // 3.bis — LA CONTRAPRUEBA, EN LA MISMA CORRIDA. Si el escenario no generara
+  // ninguna diferencia, el `false` de arriba no probaría nada: probaría que no
+  // había nada que apagar. Genera una, de 6 contra 5, y lo que la apaga es el
+  // modo.
+  const enLotesJ = siguienteEdicion({
+    modo: MODO_RECEPCION.EDITOR_LOTES,
+    preservar: true,
+    items: dJ1.items,
+    previos: alAbrirJ.editItems,
+  });
+  igual("J · el escenario SÍ genera el fantasma en el editor por lotes", enLotesJ.dirty, true);
+
+  // 4 — Se completa el resto del checklist y Confirmar LLEGA AL ENDPOINT.
+  const detJ2 = await prisma.transferenciaDetalle.findFirst({
+    where: { transferenciaId: tJ.id, productoId: pJ2.productoLocalId },
+  });
+  const revJ2 = await revisar({
+    transferenciaId: tJ.id, detalleId: detJ2.id, recibido: 4, revisado: true,
+  });
+  ok("J · se revisa el segundo producto", revJ2.ok === true, revJ2.error);
+
+  const confJ = await confirmar(tJ.id);
+  ok("J · CONFIRMAR llega y responde ok", confJ.ok === true, confJ.error);
+
+  const trasConfirmarJ = await prisma.transferencia.findUnique({ where: { id: tJ.id } });
+  igual("J · la transferencia queda Recibida", trasConfirmarJ.estado, "Recibida");
+
+  // Y el stock quedó como corresponde: 35 físicas del pack incompleto.
+  const sJ1 = await stockDestinoDe(pJ1.baseId);
+  igualStock("J · el destino recibió 35, no 36", sJ1.cantidad, 35);
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("K. La card de no declarados y su filtro dicen lo mismo");
+  // ═════════════════════════════════════════════════════════════════════════
+  //
+  // Con datos reales del endpoint, porque el defecto dependía de que la
+  // categoría del extra NO estuviera entre las del remito — y de dónde sale la
+  // categoría de cada línea lo decide el DTO, no la pantalla.
+
+  const catGolosinas = await prisma.categoria.create({ data: { nombre: `${marca}-Golosinas` } });
+  const catLimpieza = await prisma.categoria.create({ data: { nombre: `${marca}-Limpieza` } });
+
+  const pK1 = await armarProducto({ nombre: "k-golosina", stockOrigen: 50 });
+  const pK2 = await armarProducto({ nombre: "k-limpieza", stockOrigen: 50 });
+  // La columna es `categoria_id` en `ProductoBase`. Se escribe con el nombre que
+  // tiene en el esquema y no con el que uno supone: `categoriaId` no existe y
+  // Prisma lo rechaza con un "Unknown argument" que apunta a otro lado.
+  // El código de barras se pone acá porque el fixture del POS no lo trae, y la
+  // sección L lo necesita: sin código, "escanear" no es un escenario, es un
+  // campo vacío. Con `null` la prueba habría pasado por el camino equivocado.
+  const CODIGO_K1 = "7790001234567";
+  await prisma.productoBase.update({
+    where: { id: pK1.baseId },
+    data: { categoria_id: catGolosinas.id, codigo_barra: CODIGO_K1 },
+  });
+  await prisma.productoBase.update({
+    where: { id: pK2.baseId }, data: { categoria_id: catLimpieza.id },
+  });
+
+  const tK = await armarTransferencia([{ producto: pK1, cantidad: 5 }]);
+  const agK = await agregarLinea({
+    transferenciaId: tK.id, productoLocalId: pK2.productoLocalId,
+    unidadEnviada: "UNIDAD", recibido: 2,
+  });
+  ok("K · se informa el producto no declarado", agK.ok === true, agK.error);
+
+  const dK = await detalleDe(tK.id);
+  ok("K · el detalle contesta", dK.ok === true, dK.error);
+
+  const catsK = categoriasDelRemito(dK.items);
+  ok(
+    "K · las categorías del remito NO incluyen la del extra",
+    !catsK.some((c) => c.nombre === catLimpieza.nombre),
+    catsK.map((c) => c.nombre).join(", ")
+  );
+  const idGolosinasK = catsK[0]?.id;
+  ok("K · y sí la del remito", catsK.length === 1, catsK.map((c) => c.nombre).join(", "));
+
+  const resumenK = resumenDeRecepcion(dK.items);
+  igual("K · la card dice 1 no declarado", resumenK.noDeclarados, 1);
+
+  const visiblesK = productosVisibles(dK.items, {
+    filtro: FILTRO.NO_DECLARADOS,
+    categoriaId: idGolosinasK,
+  });
+  igual("K · y con el chip del remito activo la lista muestra 1, no 0", visiblesK.length, 1);
+  ok(
+    "K · y es el extra de la otra categoría",
+    String(visiblesK[0]?.nombre || "").includes("k-limpieza") &&
+      visiblesK[0]?.categoria?.nombre === catLimpieza.nombre,
+    `${visiblesK[0]?.nombre} / ${visiblesK[0]?.categoria?.nombre}`
+  );
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("L. Enter con datos reales: código, un nombre, varios nombres, ninguno");
+  // ═════════════════════════════════════════════════════════════════════════
+
+  const dL = await detalleDe(tK.id);
+  const lineaK1 = dL.items.find((d) => !d.agregadoEnRecepcion);
+  igual("L · el DTO trae el código de barras", lineaK1.codigoBarra, CODIGO_K1);
+
+  const porCodigoL = resolverEntrada(dL.items, lineaK1.codigoBarra);
+  igual("L · un código exacto abre el producto", porCodigoL.tipo, RESOLUCION.ABRIR);
+  igual("L · y se marca como código, así el campo se limpia", porCodigoL.porCodigo, true);
+
+  // Un solo producto del remito coincide por nombre: se abre.
+  const unicoL = resolverEntrada(dL.items, "k-golosina");
+  igual("L · una sola coincidencia por nombre abre", unicoL.tipo, RESOLUCION.ABRIR);
+  igual("L · y NO se marca como código: el texto buscado no se borra", unicoL.porCodigo, false);
+
+  // Varios: el prefijo que comparten los dos productos del fixture.
+  const variosL = resolverEntrada(dL.items, marca);
+  igual("L · con varias coincidencias queda la lista", variosL.tipo, RESOLUCION.LISTA);
+  ok("L · y son las dos", variosL.resultados.length === 2, String(variosL.resultados.length));
+
+  const ningunoL = resolverEntrada(dL.items, "xyz-que-no-existe");
+  igual("L · sin coincidencias, recién ahí no figura", ningunoL.tipo, RESOLUCION.NO_FIGURA);
+
+  // Y la cámara no cae por nombre.
+  const camaraL = resolverEntrada(dL.items, "k-golosina", { soloCodigo: true });
+  igual("L · la cámara no resuelve por nombre", camaraL.tipo, RESOLUCION.NO_FIGURA);
 
   // ═════════════════════════════════════════════════════════════════════════
   seccion("20. La recepción sigue siendo solo de inventario");

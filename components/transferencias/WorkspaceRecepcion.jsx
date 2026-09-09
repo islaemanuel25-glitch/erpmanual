@@ -51,10 +51,11 @@ import { SectionHead, fmtCantidad } from "./detallePresentacion";
 import {
   ESTADO_PRODUCTO,
   FILTRO,
-  buscarPorCodigoExacto,
+  RESOLUCION,
   categoriasDelRemito,
   estadoDeProducto,
   productosVisibles,
+  resolverEntrada,
   resumenDeRecepcion,
 } from "@/lib/transferencias/controlFisico";
 
@@ -128,40 +129,58 @@ export default function WorkspaceRecepcion({
   };
 
   /**
-   * Lo que hace un código leído o tecleado con Enter.
+   * Lo que hace un código leído o un texto tecleado con Enter.
    *
-   * Primero adentro del remito, con coincidencia EXACTA: un código identifica un
-   * producto o no lo identifica, y una coincidencia parcial abriría la ficha del
-   * producto equivocado con la mercadería en la mano.
+   * Qué corresponde en cada caso lo decide `resolverEntrada`, que está en el
+   * módulo puro con su cascada escrita y sus candados. Acá solo se aplica:
    *
-   * Si el producto YA está —incluido uno agregado antes— se abre su ficha. No se
-   * vuelve a agregar.
+   *   ABRIR      → se abre la ficha. Si el producto YA estaba —incluido uno
+   *                agregado antes— se abre el suyo, no se agrega otro.
+   *   LISTA      → hay varios y **no se elige por el operador**. El texto queda
+   *                puesto, así que el listado ya los está mostrando filtrados.
+   *   NO_FIGURA  → recién acá el aviso, que es lo que habilita el catálogo.
    */
-  const resolverCodigo = (codigo) => {
-    const encontrado = buscarPorCodigoExacto(items, codigo);
-    if (encontrado) {
-      elegir(encontrado);
-      // Se limpia el campo para que el siguiente escaneo entre en un campo
-      // vacío: el operador va a escanear muchos seguidos.
-      setTexto("");
-      return true;
+  const resolver = (entrada, opciones) => {
+    const r = resolverEntrada(items, entrada, opciones);
+
+    if (r.tipo === RESOLUCION.ABRIR) {
+      elegir(r.producto);
+      // El campo se limpia solo cuando lo que entró era un CÓDIGO: el operador
+      // va a escanear muchos seguidos y el siguiente tiene que caer en un campo
+      // vacío. Si escribió "Fanta", el texto queda: es el contexto de lo que
+      // buscó, y borrárselo le devuelve la lista entera sin haberlo pedido.
+      if (r.porCodigo) setTexto("");
+      return r;
     }
-    setAviso(MENSAJE_NO_FIGURA);
-    setTexto(codigo);
-    return false;
+
+    if (r.tipo === RESOLUCION.NO_FIGURA) {
+      setAviso(MENSAJE_NO_FIGURA);
+      setTexto(String(entrada || "").trim());
+      return r;
+    }
+
+    // Varios resultados: el texto ya filtra el listado y no hay nada que avisar.
+    // Decir "no figura" acá sería falso y ofrecería informar como no declarado un
+    // producto que está en pantalla.
+    setAviso("");
+    return r;
   };
 
   const alEscanear = (codigo) => {
     setEscaneando(false);
-    resolverCodigo(codigo);
+    // La cámara devuelve un CÓDIGO. Sin fallback por nombre: un código que no
+    // está en el remito es "no figura", y buscarlo como texto abriría cualquier
+    // producto cuyo nombre contenga esos dígitos.
+    resolver(codigo, { soloCodigo: true });
   };
 
   const alTeclear = (e) => {
-    // Un lector físico escribe el código y manda Enter: mismo camino que la
-    // cámara, sin una segunda definición de qué es un escaneo.
+    // Un lector físico escribe el código y manda Enter, y una persona escribe un
+    // nombre y manda Enter. Los dos entran por acá: la cascada distingue cuál fue
+    // sin obligar a nadie a declararlo.
     if (e.key === "Enter" && texto.trim()) {
       e.preventDefault();
-      resolverCodigo(texto.trim());
+      resolver(texto.trim());
     }
   };
 
