@@ -972,6 +972,10 @@ export async function POST(req) {
       baseStockMap[p.id] = {
         modoVentaDeposito: p.modoVentaDeposito || "PESO",
         pesoReferenciaKg: Number(p.pesoReferenciaKg || 0),
+        // Lo exige `esProductoFiambre`, la puerta de `esFiambreFijo`: sin él una
+        // pieza fija se lee como producto a granel al congelar la presentación.
+        modoCompraProveedor: p.modoCompraProveedor || null,
+        pesoEsFijo: p.pesoEsFijo ?? null,
         factorPack,
         modo_envio: p.modo_envio || null,
         unidad_medida: p.unidad_medida || "unidad",

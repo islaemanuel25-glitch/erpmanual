@@ -34,6 +34,8 @@ function snapshotDeEnvioManual(item) {
     factorPack: base.factor_pack,
     modoVentaDeposito: base.modoVentaDeposito,
     pesoReferenciaKg: base.pesoReferenciaKg,
+    modoCompraProveedor: base.modoCompraProveedor,
+    pesoEsFijo: base.pesoEsFijo,
     contadoEn: item.unidadEnviada,
   });
 

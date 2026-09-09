@@ -316,6 +316,10 @@ export async function GET(req) {
         pesoPiezaKg: toNumber(d.pesoPiezaKg),
         // Lo necesita la reconstrucción para distinguir una PIEZA de un kilo.
         modoVentaDeposito: d.producto?.base?.modoVentaDeposito || null,
+        // Lo exige `esProductoFiambre`, la puerta del predicado único de pieza
+        // fija. Sin él la reconstrucción leería un fiambre como producto a granel.
+        modoCompraProveedor: d.producto?.base?.modoCompraProveedor || null,
+        pesoEsFijo: d.producto?.base?.pesoEsFijo ?? null,
       };
     });
 

@@ -207,6 +207,7 @@ export default function AgregarProductoRecibido({
             factorPack: producto.factorPack,
             modoVentaDeposito: producto.modoVentaDeposito,
             pesoReferenciaKg: producto.pesoReferenciaKg,
+            modoCompraProveedor: producto.modoCompraProveedor,
             contadoEn: unidad,
           })
         : { presentacion: "UNIDAD", factor: null, pesoPiezaKg: null },
