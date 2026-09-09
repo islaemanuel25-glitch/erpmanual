@@ -957,7 +957,25 @@ export async function POST(req) {
     const productoBaseIds = items.map((i) => i.productoBaseId);
     const productosBase = await prisma.productoBase.findMany({
       where: { id: { in: productoBaseIds } },
-      select: { id: true, precio_costo: true, factor_pack: true, categoria_id: true, modoVentaDeposito: true, pesoReferenciaKg: true, modo_envio: true, unidad_medida: true, es_combo: true },
+      select: {
+        id: true, precio_costo: true, factor_pack: true, categoria_id: true,
+        modoVentaDeposito: true, pesoReferenciaKg: true, modo_envio: true,
+        unidad_medida: true, es_combo: true,
+        // ── SIN ESTOS DOS, NINGUNA PIEZA SE CONGELA COMO PIEZA ───────────
+        //
+        // `baseStockMap` los lee más abajo para armar la entrada que decide la
+        // presentación, pero el select no los pedía: llegaban `undefined`, así
+        // que `modoCompraProveedor` quedaba en null y `esProductoFiambre` —la
+        // puerta de `esFiambreFijo`— daba false SIEMPRE. Un fiambre de pieza
+        // fija tiene `unidad_medida = "kg"`, o sea que caía en la rama del kilo
+        // y el snapshot lo congelaba como KG: "2 PIEZA" se guardaba como "2 KG",
+        // y de ahí sale cuántos kilos acredita `confirmar-recepcion`.
+        //
+        // El candado del helper pasaba igual porque lo llamaba con un objeto
+        // escrito a mano, donde los dos campos estaban. El camino real del POS
+        // no los tenía.
+        modoCompraProveedor: true, pesoEsFijo: true,
+      },
     });
     const costosMap = {};
     const pbMap = {};
