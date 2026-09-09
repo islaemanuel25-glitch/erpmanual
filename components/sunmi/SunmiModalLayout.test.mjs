@@ -627,6 +627,28 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // Además es el caso donde el toque al costado pasa solo: en el teléfono este
     // modal es una hoja pegada al borde de abajo, con el pulgar justo ahí.
     "components/transferencias/AgregarProductoRecibido.jsx": true,
+    // ── LAS TRES HOJAS DE LA RECEPCIÓN MÓVIL, Y CONTESTAN DISTINTO ─────────
+    //
+    // El archivo declara `true` porque una de sus tres hojas lo necesita, y
+    // conviene decir cuál y por qué, que es lo que este chequeo por archivo no
+    // puede afirmar solo:
+    //
+    // · la HOJA DEL PRODUCTO sí: adentro hay una cantidad contada a mano, el
+    //   desglose de unidades sueltas de un pack incompleto y el motivo de la
+    //   diferencia. Cerrar sin querer tira el conteo, y en el teléfono es una
+    //   hoja pegada al borde de abajo con el pulgar justo ahí — el mismo
+    //   argumento que `AgregarProductoRecibido`.
+    //
+    // · "MÁS ACCIONES" no: es un menú. Se toca una opción y se va a otro lado.
+    //
+    // · "INFORMACIÓN GENERAL" tampoco: es de solo lectura.
+    //
+    // Es el segundo archivo con más de un modal —el primero es la pantalla de
+    // clientes, anotada más abajo—, y le cabe la misma limitación: este chequeo
+    // mira el ARCHIVO, así que solo puede afirmar que alguno lo declara. Hoy no
+    // puede pasar inadvertido porque son tres y están a la vista en el mismo
+    // componente.
+    "components/transferencias/RecepcionMovil.jsx": true,
     // El ESCÁNER contesta que NO, y por el mismo criterio: cerrarlo no pierde
     // nada. No hay nada escrito adentro —es un visor de cámara— y volver a
     // abrirlo cuesta un toque. Lo que sí tiene que pasar al cerrar es que la
