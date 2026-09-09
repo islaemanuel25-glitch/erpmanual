@@ -62,6 +62,50 @@ const CASOS = [
       "I.2 · al origen se le devuelve 1, no 6",
     ],
   },
+  // ── LOS TRES DE LA SEGUNDA REVISIÓN (2026-09-09) ────────────────────────
+  //
+  // El del dirty fantasma NO se puede probar con un helper suelto: la sección J
+  // recorre el camino real —abrir, revisar contra el endpoint, recargar por el
+  // endpoint de detalle, reconciliar, confirmar— y es esa juntura la que lo
+  // producía. Acá se reintroduce la preservación legacy y esa sección tiene que
+  // gritar.
+  {
+    n: "I-1",
+    defecto: "vuelve la preservación legacy después de una revisión con diferencia",
+    archivo: "lib/transferencias/recepcionUI.js",
+    inyecciones: [
+      {
+        de: "  const conservar = modo === MODO_RECEPCION.EDITOR_LOTES && preservar === true;",
+        a: "  const conservar = preservar === true;",
+      },
+    ],
+    esperadas: [
+      "J · NO queda dirty fantasma",
+      "J · y editItems refleja lo guardado, no la propuesta vieja",
+    ],
+  },
+  {
+    n: "I-2",
+    defecto: "el chip de categoría del remito vuelve a filtrar los no declarados",
+    archivo: "lib/transferencias/controlFisico.js",
+    inyecciones: [
+      { de: "  if (categoriaId && !filtraNoDeclarados) {", a: "  if (categoriaId) {" },
+    ],
+    esperadas: [
+      "K · y con el chip del remito activo la lista muestra 1, no 0",
+    ],
+  },
+  {
+    n: "I-3",
+    defecto: "Enter vuelve a ser siempre un escaneo",
+    archivo: "lib/transferencias/controlFisico.js",
+    inyecciones: [
+      { de: "  if (porTexto.length === 1) {", a: "  if (false) {" },
+    ],
+    esperadas: [
+      "L · una sola coincidencia por nombre abre",
+    ],
+  },
 ];
 
 // `node_modules` se ENLAZA, no se copia. Copiarlo entero daba un árbol a medias
