@@ -1,8 +1,28 @@
 # Changelog
 
-## [2026-09-09] - Actualización: transferencias, pos-transferencias, pos-ventas, configuracion
+## [2026-09-09] - Actualización: transferencias
+
+<!-- ESTA ENTRADA SE EDITÓ A MANO Y NO SE VUELVE A GENERAR.
+
+     `scripts/update-docs.js` arma la lista leyendo el log de git, así que
+     arrastró siete líneas de pos-ventas, una de pos-transferencias y una de
+     configuracion: commits que ya estaban en `main` de otras tandas y que
+     todavía no se habían documentado. No son de esta rama, que es la recepción
+     física de transferencias, y mezclarlos hace que el diff de la PR toque
+     módulos que no se abrieron.
+
+     Se sacaron esas nueve líneas y el encabezado quedó solo con transferencias.
+     `docs/modulos/pos-ventas.md` y `docs/modulos/pos-transferencias.md`
+     volvieron a estar idénticos a `origin/main` por el mismo motivo.
+
+     NO volver a correr `update-docs.js` sobre esta rama: los reintroduce, porque
+     esos commits siguen sin documentar en `main` y el generador los sigue viendo.
+     Se documentan solos la próxima vez que alguien lo corra en `main`, que es
+     donde corresponde. -->
 
 ### Modificado
+- **transferencias**: fix(transferencias): la limpieza de hardcodeo visual del control físico
+- **transferencias**: fix(transferencias): tres defectos de integración del control físico
 - **transferencias**: fix(transferencias): los siete defectos de la revisión arquitectónica
 - **transferencias**: fix(transferencias): recibiendo no hay guardado por lotes, y es por seguridad
 - **transferencias**: feat(transferencias): el puesto de trabajo del control fisico
@@ -14,14 +34,6 @@
 - **transferencias**: feat(transferencias): el detalle expone el factor de pack de cada linea
 - **transferencias**: fix(transferencias): los tres defectos de la revisión de recepción
 - **transferencias**: feat(transferencias): la recepcion representa lo que llego
-- **pos-transferencias**: refactor(productos): un solo buscador de catalogo por local
-- **pos-ventas**: fix(pos): el candado contaba el alt del icono, no los botones
-- **pos-ventas**: feat(pos): un boton padre, un selector de modalidad, identidad en el cobro
-- **pos-ventas**: feat(cobros): configurar modalidades desde la pantalla del medio
-- **pos-ventas**: fix(pos): una modalidad de otro padre tiene que contestar 404, no 409
-- **pos-ventas**: feat(pos): cobrar por identidad, con la condicion resuelta en el servidor
-- **pos-ventas**: feat(cobros): resolver modalidades en servidor
-- **configuracion**: feat(cobros): configurar modalidades desde la pantalla del medio
 
 
 ## [2026-09-06] - Actualización: pos-ventas, dashboard, reportes-ventas, configuracion, productos
