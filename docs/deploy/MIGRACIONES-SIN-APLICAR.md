@@ -16,10 +16,90 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está al día en **7 migraciones**, que son las que hay en el
-árbol. Comprobado con `prisma migrate status` el 2026-09-08 después de desplegar
-`392c06dad382844afa8bec892893512cc2deae86`: *"7 migrations found in
-prisma/migrations. Database schema is up to date!"*.
+**Una.** Producción está en **7 migraciones** y el árbol tiene **8**: entró
+`20260908213000_recepcion_control_fisico` con el merge del PR #51
+—`e453b750aeedad2c8e8d6d8ded8d0f0eb22d567d`—.
+
+### `20260908213000_recepcion_control_fisico` — PENDIENTE
+
+Todo sobre `TransferenciaDetalle`. Es la mesa de trabajo de la recepción física:
+qué producto se terminó de revisar, quién lo revisó y cuándo, y cuántas unidades
+sueltas llegaron fuera de un pack entero.
+
+**Cuatro columnas:**
+
+- `revisadoEnRecepcion` — `BOOLEAN NOT NULL DEFAULT false`. La única `NOT NULL`, y
+  por eso la única que necesita default. Es el checklist: "esta persona terminó de
+  verificar físicamente este producto".
+- `revisadoEnRecepcionPorId` — `INTEGER` nulable. Quién lo revisó.
+- `revisadoEnRecepcionAt` — `TIMESTAMP(3)` nulable. Cuándo. Además ORDENA: los
+  revisados se muestran en el orden real en que apareció la mercadería.
+- `recibidoUnidadesSueltas` — `DECIMAL(12,3)` nulable. Las unidades que llegaron
+  fuera de un pack entero. Es una columna aparte y no un decimal en `recibido`
+  porque `5.833 × 6 = 34.998`, y eso en un `Decimal(12,3)` **no es 35**: cada pack
+  incompleto dejaría dos milésimas de menos en el destino y dos de más en el
+  origen, para siempre.
+
+**Una clave foránea:**
+
+- `TransferenciaDetalle_revisadoEnRecepcionPorId_fkey` → `Usuario(id)`,
+  `ON DELETE SET NULL ON UPDATE CASCADE`. Igual que las otras dos autorías de esta
+  tabla: borrar un usuario no puede borrar el hecho de que el control se hizo.
+- Se crea dentro de un bloque `DO $$` con `IF NOT EXISTS` sobre `pg_constraint`,
+  porque `ADD CONSTRAINT` no acepta `IF NOT EXISTS` en PostgreSQL 16. **Ese bloque
+  no contiene ninguna otra sentencia** — leído a mano, línea por línea.
+
+**Un índice:**
+
+- `TransferenciaDetalle_transferenciaId_revisadoEnRecepcion_idx` sobre
+  `("transferenciaId", "revisadoEnRecepcion")`. Lo sostiene la guarda de
+  confirmación, que en cada intento pregunta "¿queda algún producto original sin
+  revisar?". Es la única consulta nueva que corre siempre, y la única que se
+  indexa: `revisadoEnRecepcionPorId` NO se indexa porque nadie consulta "qué
+  revisó tal persona", y un índice que nadie usa solo cuesta escrituras.
+
+### QUÉ NO HACE, dicho para que no haya que deducirlo
+
+- **No hay un solo `DROP`.**
+- **No hay `UPDATE`** de datos existentes.
+- **No hay `DELETE`.**
+- **No hay `INSERT`.**
+- **No hay backfill** de ninguna clase.
+- No toca `cantidad`: el remito original es histórico y no se reescribe.
+- No toca `recibido` de ninguna fila existente.
+- **No inventa quién revisó las transferencias viejas** ni cuándo.
+- **No mueve stock.** Ninguna tabla de inventario aparece en el archivo.
+
+Los seis enunciados son verificables leyendo el `.sql`: son cuatro
+`ADD COLUMN IF NOT EXISTS`, un `ADD CONSTRAINT` dentro del `DO $$`, y un
+`CREATE INDEX IF NOT EXISTS`. Nada más.
+
+### Qué les pasa a los históricos
+
+Quedan con `revisadoEnRecepcion = false`, autor y fecha en `NULL`, y
+`recibidoUnidadesSueltas` en `NULL`.
+
+**Es deliberado y es la verdad**: ninguna transferencia vieja se revisó con este
+mecanismo, porque el mecanismo no existía. Fingir un checklist retroactivo sería
+inventar un dato de auditoría. Lo que la pantalla decida mostrar para una
+transferencia ya Recibida es asunto de la presentación, no de la migración.
+
+Corolario operativo: si al desplegar hay una recepción a medio hacer, sus
+productos quedan en `false` y el operador los va a tener que recorrer con la
+herramienta nueva. Se decide antes del despliegue, no en el `.sql`.
+
+### Compatibilidad hacia atrás durante la ventana
+
+Entre `migrate deploy` y recrear la app, el esquema es nuevo y el código es
+viejo. Acá eso es seguro y se puede afirmar por construcción:
+
+- el código viejo **no nombra ninguna de las cuatro columnas**, así que no puede
+  romperse por ellas;
+- la única `NOT NULL` trae `DEFAULT false`, así que un `INSERT` del código viejo
+  —que no la menciona— sigue siendo válido;
+- las otras tres son nulables, así que tampoco obligan a nada.
+
+La migración es **compatible hacia atrás** durante toda esa ventana.
 
 ---
 
