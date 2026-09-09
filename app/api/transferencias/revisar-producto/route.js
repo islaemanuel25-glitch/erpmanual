@@ -41,6 +41,7 @@ import {
 } from "@/lib/transferencias/recepcion";
 import {
   ErrorRecepcion,
+  detalleParaValidar,
   estadoAdmiteRecepcion,
   puedeRecibir,
   reclamarOFallar,
@@ -184,18 +185,24 @@ export async function POST(req) {
       // el de desmarcar con otra puerta de entrada.
       const trae = (clave) => Object.prototype.hasOwnProperty.call(body || {}, clave);
 
+      // ── LA ESCALA NO SE INTERPRETA ACÁ ──────────────────────────────
+      //
+      // Decía `cantidad: d.cantidad`, `unidadEnviada: d.unidadEnviada` y
+      // `factorPack` del catálogo vivo. Para una línea con snapshot eso es
+      // falso: un envío de 6 CAJÓN x8 queda persistido como 48 con unidad
+      // UNIDAD, así que esta ruta pedía contar 48 unidades y rechazaba
+      // —SUELTAS_SIN_BULTO— un conteo de 5 cajones y 7 sueltas.
+      //
+      // `detalleParaValidar` contesta las tres cosas por el mismo camino que la
+      // pantalla, y lo persistido sigue siendo la base: el request solo pisa lo
+      // que manda.
       const plan = validarDetalleRecepcion({
-        detalle: {
-          cantidad: d.cantidad,
-          unidadEnviada: d.unidadEnviada,
-          // Lo persistido como base; el request lo pisa solo si lo manda.
-          recibido: d.recibido,
-          recibidoUnidadesSueltas: d.recibidoUnidadesSueltas,
-          motivoPrincipal: trae("motivoPrincipal") ? body.motivoPrincipal : d.motivoPrincipal,
-          motivoDetalle: trae("motivoDetalle") ? body.motivoDetalle : d.motivoDetalle,
-          agregadoEnRecepcion: d.agregadoEnRecepcion,
-        },
-        factorPack: Number(d.producto?.base?.factor_pack || 1),
+        ...detalleParaValidar(d, {
+          detalle: {
+            motivoPrincipal: trae("motivoPrincipal") ? body.motivoPrincipal : d.motivoPrincipal,
+            motivoDetalle: trae("motivoDetalle") ? body.motivoDetalle : d.motivoDetalle,
+          },
+        }),
         recibidoPropuesto: trae("recibido") ? body.recibido : undefined,
         sueltasPropuestas: trae("recibidoUnidadesSueltas")
           ? body.recibidoUnidadesSueltas

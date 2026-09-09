@@ -41,9 +41,8 @@ import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
 import { motivosParaDiferencia } from "@/lib/transferencias/recepcionUI";
 import { ESTADO_PRODUCTO, estadoDeProducto } from "@/lib/transferencias/controlFisico";
 import {
-  PRESENTACION,
-  agrupa,
   descriptorDeEnvio,
+  escalaDeEnvio,
   nombreDePresentacion,
   rotuloDeEnvio,
   rotuloFisicoDeEnvio,
@@ -139,7 +138,15 @@ export default function FichaProductoRecepcion({
   // React para "resetear estado cuando cambia la identidad", y no necesita un
   // efecto que sincronice.
   const inicial = () => {
-    const propuesto = d?.cantidadRecibida == null ? d?.cantidadEnviada : d.cantidadRecibida;
+    // ── LO PROPUESTO VA EN LA PRESENTACIÓN, NO EN FÍSICO ────────────────
+    //
+    // Decía `d.cantidadEnviada`, que es la cantidad FÍSICA persistida. Para una
+    // línea con snapshot eso proponía 48 debajo de un rótulo que dice "6 CAJÓN
+    // x8": el caso feliz —llegó todo, un toque a "Marcar revisado"— guardaba 48
+    // cajones, o sea 384 unidades. El descriptor contesta en la misma escala en
+    // la que está escrito el campo.
+    const propuesto =
+      d?.cantidadRecibida == null ? descriptorDeEnvio(d || {}).cantidad : d.cantidadRecibida;
     const s = Number(d?.recibidoUnidadesSueltas || 0);
     return {
       recibido: String(propuesto ?? ""),
@@ -168,17 +175,23 @@ export default function FichaProductoRecepcion({
   // contaba como pack y un kilo como unidad. El descriptor contesta con lo que
   // se REGISTRÓ al despachar cuando la línea lo tiene, y reconstruye del
   // catálogo cuando es anterior a la migración.
-  const envio = descriptorDeEnvio(d);
-  const factor = envio.factor || 1;
+  //
+  // Y la escala —unidad y factor— sale de `escalaDeEnvio`, la MISMA que usan
+  // las cuatro rutas del servidor. Acá se calculaba al lado con las mismas tres
+  // líneas; dos copias de la misma decisión se separan el día que una cambia, y
+  // esta decide qué se le manda a `revisar-producto`.
+  const escala = escalaDeEnvio(d);
+  const envio = escala.envio;
+  const factor = escala.factorPack;
   // `agrupaEsta` y no `agrupa`: el import del módulo se llama así y sombrearlo
   // acá adentro dejaría inalcanzable la función del dominio.
-  const agrupaEsta = agrupa(envio.presentacion) && factor > 1;
+  const agrupaEsta = escala.unidad === "BULTO";
   const estado = estadoDeProducto(d);
 
   // Las físicas de lo que está escrito AHORA. Misma función que el servidor, y
   // con el factor CONGELADO: si el catálogo cambió después del envío, la cuenta
   // sigue siendo la del remito.
-  const unidadParaCuenta = agrupaEsta ? "BULTO" : "UNIDAD";
+  const unidadParaCuenta = escala.unidad;
   const fisicasEditadas = unidadesFisicasDe({
     cantidad: recibido === "" ? 0 : recibido,
     sueltas: agrupaEsta && conSueltas ? sueltas || 0 : 0,
@@ -186,8 +199,8 @@ export default function FichaProductoRecepcion({
     factorPack: factor,
   });
   const fisicasEnviadas = unidadesFisicasDe({
-    cantidad: envio.cantidad,
-    sueltas: envio.sueltas,
+    cantidad: escala.cantidad,
+    sueltas: escala.sueltas,
     unidad: unidadParaCuenta,
     factorPack: factor,
   });

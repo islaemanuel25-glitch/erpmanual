@@ -91,7 +91,11 @@ test("la lista muestra la presentación registrada, no las unidades físicas", (
 test("la ficha deja de decidir por `unidadEnviada` y usa el descriptor", () => {
   const src = codigoDe(FICHA);
 
-  assert.match(src, /const envio = descriptorDeEnvio\(d\)/);
+  // El descriptor sigue mandando; lo que cambió es que la ficha lo pide a través
+  // de `escalaDeEnvio`, la MISMA resolución que usan las cuatro rutas del
+  // servidor. Antes la calculaba al lado con tres líneas propias.
+  assert.match(src, /const escala = escalaDeEnvio\(d\)/);
+  assert.match(src, /const envio = escala\.envio/);
   assert.match(src, /rotuloDeEnvio\(envio\)/);
   assert.match(src, /nombreDePresentacion\(envio\)/);
 
@@ -121,7 +125,7 @@ test("18-19. KG no se dice en «unidades» y PIEZA no se degrada", () => {
 
 test("la ficha usa el factor CONGELADO para su aritmética", () => {
   const src = codigoDe(FICHA);
-  assert.match(src, /const factor = envio\.factor \|\| 1/);
+  assert.match(src, /const factor = escala\.factorPack/);
   // Ya no lee el factor del catálogo que viaja en el DTO.
   assert.ok(
     !/const factor = Number\(d\.factorPack \|\| 1\)/.test(src),
@@ -136,14 +140,27 @@ test("la ficha usa el factor CONGELADO para su aritmética", () => {
 test("13. el no declarado usa la presentación del catálogo del ORIGEN", () => {
   const src = codigoDe(AGREGAR);
 
-  assert.match(src, /presentacionDeProducto\(\{/);
-  assert.match(src, /unidadMedida: producto\.unidadMedida/);
-  assert.match(src, /modoVentaDeposito: producto\.modoVentaDeposito/);
-  assert.match(src, /pesoReferenciaKg: producto\.pesoReferenciaKg/);
-  // Se MUESTRA qué es, en vez de preguntarlo siempre.
+  // La resolución se mudó a `presentacionDeProductoNuevo`, en el dominio: los
+  // seis campos del catálogo se leen ahí y no en el JSX. El candado sigue al
+  // código y de paso afirma más — que ese helper NO recibe `contadoEn`, que era
+  // lo que dejaba a la elección manual pisar al catálogo.
+  assert.match(src, /presentacionDeProductoNuevo\(producto\)/);
+  const ui = codigoDe("lib/transferencias/recepcionUI.js");
+  assert.match(ui, /unidadMedida: producto\?\.unidadMedida/);
+  assert.match(ui, /modoVentaDeposito: producto\?\.modoVentaDeposito/);
+  assert.match(ui, /pesoReferenciaKg: producto\?\.pesoReferenciaKg/);
+  assert.match(ui, /modoCompraProveedor: producto\?\.modoCompraProveedor/);
+
+  // Se MUESTRA qué es, en vez de preguntarlo.
   assert.match(src, /Presentación de origen/);
-  // Y el selector genérico solo aparece cuando hay dos respuestas posibles.
-  assert.match(src, /\{opciones\.length > 1 && \(/);
+
+  // ── Y EL SELECTOR SE FUE DEL TODO ─────────────────────────────────────
+  //
+  // Acá decía `{opciones.length > 1 && (`: la pregunta seguía apareciendo en un
+  // pack, que es justo donde el catálogo tiene la respuesta. Lo que queda es la
+  // unidad DERIVADA y, en un agrupado, los dos campos del bulto incompleto.
+  assert.ok(!/opciones\.length > 1/.test(src), "volvió el selector condicional");
+  assert.match(src, /const esAgrupada = unidad === "BULTO"/);
 });
 
 test("12. y sigue buscando SOLO en el catálogo del origen", () => {
@@ -207,6 +224,20 @@ test("y confirmar usa el peso CONGELADO para acreditar kilos", () => {
 
   const servidor = codigoDe("lib/transferencias/recepcionServidor.js");
   assert.match(servidor, /export function pesoPiezaParaRecepcion/);
-  assert.match(servidor, /export function factorParaRecepcion/);
-  assert.match(servidor, /factorPack: factorParaRecepcion\(d\)/);
+
+  // ── EL FACTOR YA NO SE PREGUNTA SUELTO ────────────────────────────────
+  //
+  // `factorParaRecepcion` contestaba SOLO el factor, y eso resultó ser media
+  // respuesta: la cantidad y la unidad seguían saliendo de los campos crudos,
+  // así que un envío de 6 CAJÓN x8 se validaba en 48 UNIDAD con un factor 8 que
+  // la unidad hacía inaplicable. La pregunta correcta es la escala entera, y la
+  // contesta `escalaDeRecepcion`. Dejar las dos habría sido dejar dos respuestas
+  // para la misma pregunta, que es como empezó este defecto.
+  assert.match(servidor, /export function escalaDeRecepcion/);
+  assert.match(servidor, /export function detalleParaValidar/);
+  assert.match(servidor, /factorPack: escala\.factorPack/);
+  assert.ok(
+    !/factorParaRecepcion/.test(servidor),
+    "volvió la respuesta parcial al lado de la completa"
+  );
 });
