@@ -751,16 +751,27 @@ for (const ancho of ANCHOS) {
       const t = document.body.innerText;
       const botones = [...document.querySelectorAll('button')].filter((e) => e.offsetParent !== null);
       return JSON.stringify({
-        registrado: t.includes("Registrado originalmente"),
+        historica: t.includes("Transferencia histórica"),
+        registrado: t.includes("no registró cómo salió del depósito"),
+        remito: t.includes("Remito original"),
         actual: t.includes("Presentación actual del depósito"),
-        accion: botones.some((b) => (b.textContent || "").includes("Recibir con presentación actual")),
-        lineas: t.split(String.fromCharCode(10)).filter((l) => l.includes("UNIDAD") || l.includes("CAJÓN")).slice(0, 4),
+        equivale: t.includes("Equivale a"),
+        ayuda: t.includes("No cambia el remito original"),
+        // El CTA nombra la presentación de verdad: "Usar PACK x30 para esta
+        // recepción". Buscar el genérico dejaría pasar un botón que no dice qué
+        // va a hacer, que es justo lo que el diseño vino a corregir.
+        accion: botones.some((b) => /^Usar .+ para esta recepción$/.test((b.textContent || "").trim())),
+        lineas: t.split(String.fromCharCode(10)).filter((l) => l.includes("Remito original") || l.includes("Equivale a")).slice(0, 4),
       });
     })()`);
     const c = JSON.parse(escena);
-    if (!c.registrado) throw new Error("falta el hecho histórico rotulado");
+    if (!c.historica) throw new Error("falta el rótulo «Transferencia histórica»");
+    if (!c.registrado) throw new Error("falta decir que la línea no registró cómo salió");
+    if (!c.remito) throw new Error("falta el remito original");
     if (!c.actual) throw new Error("falta la presentación actual del depósito");
-    if (!c.accion) throw new Error("falta la acción explícita: sin ella la adopción sería automática");
+    if (!c.equivale) throw new Error("falta la equivalencia exacta: sin ella se adopta a ciegas");
+    if (!c.ayuda) throw new Error("falta la ayuda que aclara que el remito no cambia");
+    if (!c.accion) throw new Error("el CTA no nombra la presentación de verdad");
     console.log(`  · ${JSON.stringify(c.lineas)}`);
     desbordes += await foto("C-historica-adoptar-presentacion", ancho);
   }
