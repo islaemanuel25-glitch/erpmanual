@@ -16,10 +16,141 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está al día en **8 migraciones**, que son las que hay en el
-árbol. Comprobado con `prisma migrate status` el 2026-09-09 después de desplegar
-`262cc338ff475670a413e44e30fe51ae922c5f3f`: *"8 migrations found in
+Ninguna. Producción está al día en **9 migraciones**, que son las que hay en el
+árbol. Comprobado con `prisma migrate status` el 2026-09-10 después de desplegar
+`edad85fba53620555b6b74f7906fd3ff2eb9c449`: *"9 migrations found in
 prisma/migrations. Database schema is up to date!"*.
+
+---
+
+## 2026-09-10 — `edad85fb`, snapshot de presentación de salida: una migración aplicada
+
+Producción pasó de `b1b9b53da916e31f4bfe344ef14bea1e74081fc1` a
+`edad85fba53620555b6b74f7906fd3ff2eb9c449`, que es el **merge del PR #53**.
+
+El merge tiene dos padres, y son exactamente los esperados:
+
+- `b1b9b53da916e31f4bfe344ef14bea1e74081fc1` — el `main` de antes;
+- `8b51df5000f8e81759de55814958da859818d650` — el HEAD funcional aprobado del PR.
+
+**El árbol del merge es idéntico al del HEAD aprobado**: los dos dan el mismo
+hash de árbol, `05bfa442acfd375f3de716fc7760b4478f01560c`, y `git diff` entre
+ellos queda vacío. La base no se había movido, así que no hubo resolución de
+conflictos que pudiera haber cambiado un archivo en el camino.
+
+### `20260909170000_presentacion_envio_snapshot` — APLICADA
+
+Se aplicó **de verdad**: `migrate deploy` imprimió
+`Applying migration 20260909170000_presentacion_envio_snapshot` y después
+`All migrations have been successfully applied`. El conteo pasó de **8 a 9**, que
+es la comprobación que el código de salida no da — ver la regla 7 de `/deploy`.
+
+`migrate status` posterior: *"9 migrations found in prisma/migrations"* y
+*"Database schema is up to date!"*.
+
+**Qué agregó**, todo sobre `TransferenciaDetalle` y todo verificado contra el
+PostgreSQL de producción después de aplicar —leyendo `information_schema`, no
+deducido del `.sql`—:
+
+- `presentacionEnvio` — enum `PresentacionEnvio`, nulable.
+- `cantidadPresentada` — `numeric(12,3)`, nulable.
+- `sueltasEnviadas` — `numeric(12,3)`, nulable.
+- `factorPresentacion` — `integer`, nulable.
+- `pesoPiezaKg` — `numeric(12,3)`, nulable.
+
+**Las cinco son nulables.** El enum `PresentacionEnvio` quedó con sus cinco
+valores y en este orden: `UNIDAD`, `PACK`, `CAJON`, `KG`, `PIEZA`.
+
+### CERO BACKFILL — y es lo que más importa de esta entrada
+
+Sobre las **6388** filas de `TransferenciaDetalle` que ya existían:
+
+- **0** tienen `presentacionEnvio`;
+- **0** tienen `cantidadPresentada`;
+- las **6388** conservan su `cantidad` anterior.
+
+**La presentación histórica NO se inventó.** Rellenarla dividiendo la cantidad
+física por el factor actual —48 / 8 = 6 cajones— habría sido afirmar cómo se
+despachó algo que nadie registró, y con 47 unidades la cuenta ni siquiera da
+entera. Una fila sin snapshot dice "no se registró", que es la verdad; una
+rellenada diría "se registró así", que sería falso.
+
+El snapshot **empieza a existir para las transferencias nuevas**. Las anteriores
+siguen reconstruyéndose del catálogo, marcadas como no registradas.
+
+### Seguridad de la migración, y el límite del clasificador
+
+`scripts/clasificar-migraciones.mjs`, corrido **antes del backup** con la imagen
+que estaba atendiendo como base: **1 archivo**, clasificación **ADITIVA**,
+**0 coincidencias**, **exit 0**.
+
+**Pero el propio clasificador avisa que no inspecciona el interior de un bloque
+`DO $$`, y esta migración tiene uno.** Así que se leyó a mano: adentro hay
+únicamente el `CREATE TYPE` del enum, protegido por `IF NOT EXISTS` sobre
+`pg_type`. El resto del archivo son **cinco `ADD COLUMN IF NOT EXISTS`**.
+
+No hay `DROP`, ni `UPDATE`, ni `DELETE`, ni `INSERT`, ni `NOT NULL`.
+
+**No se necesitó autorización manual de migraciones.**
+`.claude/migraciones-autorizadas.log` no existe, o sea que el clasificador miró
+todo lo que entró y nadie abrió la puerta de `DEPLOY_MIGRACION_AUTORIZADA=1`.
+
+### Backup
+
+`/srv/produccion/backups/pre-edad85fb_20260910_100414.sql.gz`, **4,0 MB**.
+
+Los cuatro controles: `pg_dump` salió con **0** —con `set -o pipefail` adelante,
+para que el código leído no sea el del `gzip`—, `gzip -t` sin salida, la marca
+`PostgreSQL database dump complete` presente en las últimas 20 líneas, y **68
+tablas**.
+
+**El quinto chequeo no aplica**: es el que comprueba que un valor a punto de
+borrarse esté dentro del dump, y esta migración no borra ni transforma datos.
+
+**Rollback disponible y registrado antes de tocar nada:** la imagen anterior,
+`b1b9b53da916e31f4bfe344ef14bea1e74081fc1`, image ID
+`sha256:31239d6013c60680b37f00e14bf5676e51ec0478fef1cd714372e473aceb0787`.
+
+### El despliegue
+
+- **Corte: 5 segundos.** El límite de `/deploy` es 30. **No hubo rollback.**
+- Los cinco valores dieron el mismo SHA
+  `edad85fba53620555b6b74f7906fd3ff2eb9c449`: `origin/main`, el HEAD del VPS, la
+  imagen del contenedor, `APP_BUILD_ID` y `/api/version`.
+- `erpazul_app`: **0 reinicios**. `erpazul_db`: **healthy y no recreado**.
+- Logs sin ningún `error` ni `fatal`.
+- `/login` → **200**. `/api/version` → **200**.
+- Árbol del VPS **limpio**: la copia del `.env` fue a
+  `/srv/produccion/backups/env/`, fuera del repo, que es lo que mantiene vivo ese
+  control.
+- **Sonda de cascada VERDE antes y después**, contra producción.
+
+Apareció el **warning conocido de `POSTGRES_PASSWORD`** —*"variable is not set.
+Defaulting to a blank string"*— en cada comando de compose. Es el pendiente de
+interpolación ya anotado, y por eso todo se hizo con **`--no-deps app`**:
+**PostgreSQL no fue tocado en ningún momento.**
+
+### UN DEFECTO DEL PASO 0, ANOTADO PARA NO PERDERLO
+
+**Al empezar este despliegue, este archivo decía "Pendientes: ninguna" — y era
+falso.** Había una migración en `main` que todavía no estaba en producción:
+justamente la que esta entrada registra.
+
+Pasó porque el commit documental que la habría anotado como pendiente no se
+hizo: la tanda del merge se cerró con la instrucción explícita de no agregar
+commits documentales, y este archivo se actualiza recién ahora, con el despliegue
+ya terminado.
+
+**El despliegue no se apoyó únicamente en ese texto, y por eso no pasó nada.** El
+clasificador calcula el rango solo, contra la imagen que está atendiendo, y
+detectó correctamente la migración real: informó 1 archivo donde el archivo decía
+cero. El control redundante hizo su trabajo.
+
+Pero el archivo existe para que el que despliega **se entere antes de arrancar**,
+no para que el clasificador lo corrija a mitad de camino. Un archivo que dice
+"ninguna" cuando hay una es exactamente la clase de dato que se lee rápido y se
+cree. Queda registrado; **no se tocó el mecanismo ni ningún script en esta
+tanda.**
 
 ---
 
