@@ -13,6 +13,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -76,6 +77,47 @@ test("un SHA que no existe sale con 2", () => {
 test("un directorio que no existe sale con 2", () => {
   const r = correr("--dir", "tests/migraciones/no-existe-a-proposito");
   assert.equal(r.status, SALIDA.INDETERMINADO, r.stdout + r.stderr);
+});
+
+test("CERO MIGRACIONES SALE CON 0, Y LO DICE CON UN NÚMERO", () => {
+  // Es el caso del despliegue que sólo trae código, y el del commit documental
+  // solo. Tiene que verse distinto de "no pude mirar", que sale con 2: los dos
+  // se imprimían igual antes de que este script existiera.
+  const vacio = fs.mkdtempSync(path.join(os.tmpdir(), "sin-migraciones-"));
+  try {
+    const r = correr("--dir", vacio);
+    assert.equal(r.status, SALIDA.LIMPIO, r.stdout + r.stderr);
+    assert.match(r.stdout, /Archivos a mirar: 0/);
+  } finally {
+    fs.rmSync(vacio, { recursive: true, force: true });
+  }
+});
+
+test("MAIN IGUAL A PRODUCCIÓN SALE CON 2, NO CON 0", () => {
+  // Un rango degenerado no devuelve archivos, y eso se imprime igual que "este
+  // despliegue no trae migraciones". Son cosas opuestas.
+  const r = correr("--desde", "HEAD");
+  assert.equal(r.status, SALIDA.INDETERMINADO, r.stdout + r.stderr);
+  assert.match(r.stderr, /rango es degenerado/);
+});
+
+// ---------------------------------------------------------------------------
+// LOS MODOS, Y CUÁL ES EL DEL DESPLIEGUE
+// ---------------------------------------------------------------------------
+
+test("SIN MODO, EL ERROR NOMBRA EL CANÓNICO PRIMERO", () => {
+  // El que llega acá sin saber qué pasar tiene que encontrar el modo que
+  // resuelve solo, no el que lo obliga a saber si está adentro o afuera.
+  const r = correr();
+  assert.match(r.stderr, /--desplegado/);
+});
+
+test("--vps SIGUE EXISTIENDO Y SIGUE SIENDO LA VÍA REMOTA", () => {
+  // No se elimina: es explícito, es auditable y hay entornos que lo usan. Lo que
+  // dejó de ser es el único camino automático.
+  const src = fs.readFileSync(SCRIPT, "utf8");
+  assert.match(src, /flag\("vps"\)/, "se borró el modo remoto explícito");
+  assert.match(src, /forzarRemoto/, "--vps dejó de forzar la vía remota");
 });
 
 // ---------------------------------------------------------------------------
@@ -243,8 +285,21 @@ test("UNA ETIQUETA MÓVIL NO SIRVE COMO BASE", () => {
 test("EL CLASIFICADOR YA NO LE PREGUNTA EL HEAD DE GIT AL VPS", () => {
   // Si alguien lo revierte, el rango vuelve a salir degenerado en todos los
   // despliegues y la autorización manual vuelve a ser un paso más — que es
-  // exactamente lo que este cambio vino a cerrar.
-  const src = fs.readFileSync(path.join(AQUI, "clasificar-migraciones.mjs"), "utf8");
+  // exactamente lo que ese cambio vino a cerrar.
+  //
+  // LA SEGUNDA MITAD SE MUDÓ, y este candado sigue al código. La lectura de la
+  // imagen dejó de estar acá adentro: vive en lib/deploy/shaDesplegado.mjs, que
+  // es el único lugar que contesta "qué SHA está atendiendo". Dejarla apuntando
+  // a este archivo la habría dejado en verde afirmando nada, que es el caso de
+  // CLAUDE.md sobre releer los candados verdes después de una mudanza.
+  const src = fs.readFileSync(SCRIPT, "utf8");
   assert.doesNotMatch(src, /git rev-parse HEAD['"`]?\s*\]/, "volvió a preguntarle el HEAD al VPS");
-  assert.match(src, /docker inspect \$\{CONTENEDOR_APP\} --format/);
+
+  const resolutor = fs.readFileSync(
+    path.join(ROOT, "lib", "deploy", "shaDesplegado.mjs"),
+    "utf8"
+  );
+  assert.match(resolutor, /docker inspect/);
+  assert.match(resolutor, /\{\{\.Config\.Image\}\}/);
+  assert.doesNotMatch(resolutor, /git rev-parse HEAD/, "volvió a preguntarle el HEAD al VPS");
 });

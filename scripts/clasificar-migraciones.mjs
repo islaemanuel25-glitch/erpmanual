@@ -36,14 +36,23 @@
 //
 // ── USO ─────────────────────────────────────────────────────────────────────
 //
+//   node scripts/clasificar-migraciones.mjs --desplegado
+//       EL MODO DEL DESPLIEGUE. Averigua solo el SHA de la IMAGEN QUE ESTÁ
+//       ATENDIENDO —no el HEAD de git del VPS, que el paso 1 ya movió— y
+//       clasifica lo que este árbol introduce por encima.
+//
+//       El que llama NO tiene que saber si está adentro o afuera del servidor:
+//       de eso se ocupa `resolverShaDesplegado`, que mira si desde acá se ve el
+//       contenedor que atiende y recién si no, pregunta por ssh.
+//
 //   node scripts/clasificar-migraciones.mjs --vps
-//       Pide por ssh el SHA de la IMAGEN QUE ESTÁ ATENDIENDO —no el HEAD de git
-//       del VPS, que el paso 1 del despliegue ya movió— y clasifica lo que este
-//       árbol introduce por encima. Es el modo del despliegue.
+//       Lo mismo, pero FORZANDO la vía remota por ssh. Se conserva porque hay
+//       entornos que la usan y porque un modo explícito es auditable; dejó de
+//       ser el único camino automático, que es lo que lo volvía frágil.
 //
 //   node scripts/clasificar-migraciones.mjs --desde <SHA> [--hasta <SHA>]
 //       El mismo análisis con el rango dado a mano. `--hasta` es HEAD por
-//       default.
+//       default. Es la ruta explícita y auditable, y no se va a ninguna parte.
 //
 //   node scripts/clasificar-migraciones.mjs --dir <ruta>
 //       Clasifica todos los migration.sql que haya bajo esa ruta, sin git. Es
@@ -60,11 +69,25 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+// La resolución del SHA desplegado vive en un solo lugar y se importa. Escribir
+// una segunda acá sería el caso de la regla 1 de CLAUDE.md: dos funciones que
+// contestan lo mismo no se rompen el día que se escriben, sino el día que una
+// cambia. Y el módulo es .mjs a propósito — ver el candado de la cadena de la
+// guardia en scripts/hook-guardia-migraciones.test.mjs.
+import {
+  leerEtiquetaRemota,
+  resolverShaDesplegado,
+  shaDeLaEtiqueta,
+  ShaIndeterminado,
+} from "../lib/deploy/shaDesplegado.mjs";
+
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(AQUI, "..");
 const DIR_MIGRACIONES = path.join(ROOT, "prisma", "migrations");
-const ALIAS_VPS = "vps-erp";
-const CONTENEDOR_APP = "erpazul_app";
+
+// Se re-exporta con el nombre de siempre: los candados la importan de este
+// archivo desde antes de la mudanza y no tenían por qué enterarse.
+export { shaDeLaEtiqueta };
 
 export const SALIDA = { LIMPIO: 0, MARCADO: 1, INDETERMINADO: 2 };
 
@@ -218,39 +241,37 @@ function correr(programa, argumentos, comoFalla) {
  * Y es el mismo SHA que el procedimiento ya anota como referencia de rollback en
  * el paso 2, así que no hay un dato nuevo que mantener.
  *
- * Si el ssh falla, si el contenedor no está, o si la etiqueta no es un SHA de 40
- * —`latest`, una imagen construida a mano— no se adivina: INDETERMINADO.
- */
-function shaQueAtiende() {
-  const etiqueta = correr(
-    "ssh",
-    [
-      "-o", "ConnectTimeout=20", "-o", "BatchMode=yes", ALIAS_VPS,
-      `docker inspect ${CONTENEDOR_APP} --format '{{.Config.Image}}'`,
-    ],
-    `no se pudo leer la imagen del contenedor ${CONTENEDOR_APP} por ssh`
-  );
-  return shaDeLaEtiqueta(etiqueta);
-}
-
-/**
- * El SHA de 40 que lleva una etiqueta de imagen, o INDETERMINADO.
+ * Si no se puede leer, si el contenedor no está, o si la etiqueta no es un SHA
+ * de 40 —`latest`, una imagen construida a mano— no se adivina: INDETERMINADO.
  *
- * Aparte para poder ejercerlo sin ssh. Una etiqueta móvil —`latest`— no sirve
- * como base: apunta a lo último que se construyó y mañana señala otra cosa, que
- * es la misma razón por la que producción despliega solo por SHA completo.
+ * ── Y DE DÓNDE SE LEE, QUE ES LO QUE SE ARREGLÓ EL 2026-09-10 ─────────────
+ *
+ * Antes solo por ssh. Eso ataba el chequeo a estar AFUERA del servidor, y el día
+ * que el despliegue se corrió desde el propio VPS —donde el alias no resuelve—
+ * el modo automático salió con 2 sin poder mirar nada. Ahora la resolución es
+ * canónica y vive en lib/deploy/shaDesplegado.mjs: mira primero si desde acá se
+ * ve el contenedor que atiende, y solo sale a la red si no.
+ *
+ * `forzarRemoto` es lo que conserva `--vps` con su significado de siempre.
  */
-export function shaDeLaEtiqueta(etiqueta) {
-  const m = /:([0-9a-f]{40})\s*$/i.exec(String(etiqueta ?? "").trim());
-  if (!m) {
-    throw new Indeterminado(
-      `la imagen que atiende no está etiquetada con un SHA de 40: ${JSON.stringify(String(etiqueta ?? "").slice(0, 80))}.\n\n` +
-        "Sin saber qué código está sirviendo pedidos no se puede decir qué introduce\n" +
-        "este despliegue por encima. Si la imagen se etiquetó a mano o con `latest`,\n" +
-        "pasá el SHA previo con --desde <SHA>."
+function shaQueAtiende({ forzarRemoto = false } = {}) {
+  try {
+    return resolverShaDesplegado(
+      forzarRemoto
+        ? {
+            leerLocal: () => {
+              throw new Error("--vps fuerza la vía remota");
+            },
+            leerRemoto: leerEtiquetaRemota,
+          }
+        : {}
     );
+  } catch (e) {
+    // El resolutor falla cerrado con su propio tipo; acá se traduce al del
+    // script para que la salida siga siendo la misma que el despliegue conoce.
+    if (e instanceof ShaIndeterminado) throw new Indeterminado(e.message);
+    throw e;
   }
-  return m[1].toLowerCase();
 }
 
 /** Los migration.sql que `hasta` introduce por encima de `desde`. */
@@ -358,14 +379,22 @@ function principal() {
   if (dir) {
     archivos = migracionesDelDirectorio(dir);
     origen = `directorio ${dir}`;
-  } else if (flag("vps") || desde) {
+  } else if (flag("desplegado") || flag("vps") || desde) {
     // El directorio de migraciones tiene que estar donde se lo espera. Si
     // alguien lo movió, este script estaría clasificando el vacío y saliendo
     // con 0 — el peor final posible para un candado.
     if (!fs.existsSync(DIR_MIGRACIONES)) {
       throw new Indeterminado(`no existe ${path.relative(ROOT, DIR_MIGRACIONES)}: el repo no está donde el script cree`);
     }
-    const base = desde || shaQueAtiende();
+
+    let resuelto = null;
+    if (!desde) {
+      resuelto = shaQueAtiende({ forzarRemoto: flag("vps") && !flag("desplegado") });
+      console.log(`SHA desplegado: ${resuelto.sha} (origen ${resuelto.origen})`);
+      console.log(`  evidencia: ${resuelto.evidencia.como}`);
+      console.log(`  imagen: ${resuelto.evidencia.etiqueta}`);
+    }
+    const base = desde || resuelto.sha;
 
     // Antes de mirar nada: que el rango no sea el vacío disfrazado de "limpio".
     if (esRangoDegenerado(resolverSha(base), resolverSha(hasta))) {
@@ -382,9 +411,11 @@ function principal() {
     }
 
     archivos = migracionesDelRango(base, hasta);
-    origen = `${base.slice(0, 12)}..${hasta}${desde ? "" : " (la imagen que atiende)"}`;
+    origen = `${base.slice(0, 12)}..${hasta}${resuelto ? ` (la imagen que atiende, leída en ${resuelto.origen})` : ""}`;
   } else {
-    throw new Indeterminado("hace falta --vps, --desde <SHA> o --dir <ruta>. Sin rango no se clasifica nada");
+    throw new Indeterminado(
+      "hace falta --desplegado, --vps, --desde <SHA> o --dir <ruta>. Sin rango no se clasifica nada"
+    );
   }
 
   console.log(`Clasificando migraciones de: ${origen}`);
