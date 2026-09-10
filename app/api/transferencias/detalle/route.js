@@ -20,6 +20,9 @@ import {
 // quedaría bien y el papel mal, que es peor que los dos mal — nadie sospecha del
 // papel.
 import { escalaDeRecepcion } from "@/lib/transferencias/recepcionServidor";
+// La MISMA función con la que la ruta de adopción decide qué es el producto
+// hoy. La pantalla no la vuelve a deducir por su cuenta.
+import { presentacionDeProducto } from "@/lib/productos/presentacionDeProducto";
 
 function toNumber(v) {
   const n = Number(v);
@@ -77,6 +80,9 @@ export async function GET(req) {
             agregadoEnRecepcionPor: { select: { id: true, nombre: true } },
             // Y quién cerró su control físico. Mismo criterio: una consulta.
             revisadoEnRecepcionPor: { select: { id: true, nombre: true } },
+            // Y quién decidió recibir esta histórica en la presentación de hoy.
+            // Cuarta autoría de la misma tabla, en la misma consulta.
+            presentacionAdoptadaPor: { select: { id: true, nombre: true } },
           },
         },
       },
@@ -336,6 +342,36 @@ export async function GET(req) {
         // fija. Sin él la reconstrucción leería un fiambre como producto a granel.
         modoCompraProveedor: d.producto?.base?.modoCompraProveedor || null,
         pesoEsFijo: d.producto?.base?.pesoEsFijo ?? null,
+        // ── DE DÓNDE SALIÓ ESE SNAPSHOT ─────────────────────────────────
+        //
+        // Los cinco campos de arriba significan dos cosas distintas según de
+        // dónde vengan: "así SALIÓ del origen" o "alguien eligió contar así
+        // durante la recepción". Sin esta marca no hay forma de distinguirlas
+        // después, y una línea histórica adoptada afirmaría un despacho que
+        // nadie registró. Ver `origenDePresentacion`.
+        presentacionAdoptadaAt: d.presentacionAdoptadaAt || null,
+        presentacionAdoptadaPor: d.presentacionAdoptadaPor?.nombre || null,
+        // ── LA PRESENTACIÓN QUE EL DEPÓSITO USA HOY ─────────────────────
+        //
+        // Es lo que la pantalla necesita para poder OFRECER la adopción sobre
+        // una histórica: sin esto tendría que deducirla del catálogo por su
+        // cuenta, y ahí nacen las dos respuestas que después no coinciden con la
+        // del servidor. Se manda calculada, con la misma función que la ruta de
+        // adopción usa para decidir.
+        //
+        // Informativa: quien adopta es el servidor, releyendo. Esto solo sirve
+        // para decidir si se dibuja el ofrecimiento y qué texto mostrar.
+        presentacionActual: (() => {
+          const p = presentacionDeProducto({
+            unidadMedida: d.producto?.base?.unidad_medida,
+            factorPack: d.producto?.base?.factor_pack,
+            modoVentaDeposito: d.producto?.base?.modoVentaDeposito,
+            pesoReferenciaKg: d.producto?.base?.pesoReferenciaKg,
+            modoCompraProveedor: d.producto?.base?.modoCompraProveedor,
+            pesoEsFijo: d.producto?.base?.pesoEsFijo,
+          });
+          return { presentacion: p.presentacion, factor: p.factor, pesoPiezaKg: p.pesoPiezaKg };
+        })(),
       };
     });
 

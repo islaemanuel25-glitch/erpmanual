@@ -164,8 +164,30 @@ const CASOS = [
     n: "I-1c",
     defecto: "revisar vuelve a pedir la preservación legacy",
     archivo: "app/modulos/transferencias/[id]/page.jsx",
-    de: "      if (json?.ok) await cargar();",
-    a: "      if (json?.ok) await cargar({ preservarEdicion: true });",
+    // ── EL ANCLA TENÍA QUE CRECER: DEJÓ DE SER ÚNICA ─────────────────────
+    //
+    // `if (json?.ok) await cargar();` aparecía una sola vez. El 2026-09-10 se
+    // sumó `adoptarPresentacion`, que recarga fresco por el mismo motivo y con
+    // la misma línea — así que el ancla pasó a matchear dos lugares y el script
+    // lo dijo: "la inyección no aplica (2 coincidencias)".
+    //
+    // Se ancla desde el `fetch`, que sí identifica a cuál de los dos handlers
+    // pertenece. Inyectar en el equivocado habría puesto en rojo un candado que
+    // no es el que este caso defiende.
+    de:
+      '"/api/transferencias/revisar-producto", {\n' +
+      "        method: \"POST\",\n" +
+      "        body: JSON.stringify({ transferenciaId: item.id, ...cuerpo }),\n" +
+      "      });\n" +
+      "      const json = await res.json();\n" +
+      "      if (json?.ok) await cargar();",
+    a:
+      '"/api/transferencias/revisar-producto", {\n' +
+      "        method: \"POST\",\n" +
+      "        body: JSON.stringify({ transferenciaId: item.id, ...cuerpo }),\n" +
+      "      });\n" +
+      "      const json = await res.json();\n" +
+      "      if (json?.ok) await cargar({ preservarEdicion: true });",
     candado: "1e. LA CONEXIÓN REAL: la página no puede dejar que el legacy la gobierne",
     suite: "lib/transferencias/integracionRecepcion.test.mjs",
   },
@@ -282,6 +304,15 @@ const CASOS = [
     a: "    () => items.length > 0 && faltaEnLaTransferencia(visibles, texto),",
     candado: "2c. LA CONTRAPRUEBA: preguntarle a la lista filtrada daría lo contrario",
     suite: "lib/transferencias/busquedaYNoDeclarados.test.mjs",
+  },
+  {
+    n: "U-3",
+    defecto: "adoptar vuelve a poder pisar una presentación registrada al despachar",
+    archivo: "lib/transferencias/adopcionDePresentacion.js",
+    de: "  if (linea.presentacionEnvio) {\n    return { ok: false, motivo: MOTIVOS_ADOPCION.YA_TIENE_SNAPSHOT };",
+    a: "  if (false) {\n    return { ok: false, motivo: MOTIVOS_ADOPCION.YA_TIENE_SNAPSHOT };",
+    candado: "16. una línea CON snapshot de despacho no ofrece adoptar nada",
+    suite: "lib/transferencias/adopcionDePresentacion.test.mjs",
   },
 ];
 

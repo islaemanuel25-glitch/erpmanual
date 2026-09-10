@@ -41,6 +41,12 @@ import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
 import { motivosParaDiferencia } from "@/lib/transferencias/recepcionUI";
 import { ESTADO_PRODUCTO, estadoDeProducto } from "@/lib/transferencias/controlFisico";
 import {
+  ORIGEN_PRESENTACION,
+  admiteAdopcion,
+  hayPresentacionDistinta,
+  origenDePresentacion,
+} from "@/lib/transferencias/adopcionDePresentacion";
+import {
   descriptorDeEnvio,
   escalaDeEnvio,
   nombreDePresentacion,
@@ -50,6 +56,17 @@ import {
 } from "@/lib/transferencias/presentacionEnvio";
 
 export const ROTULO_SUELTAS = "Hay unidades sueltas";
+
+// ── LOS DOS HECHOS DE UNA HISTÓRICA, CON NOMBRE PROPIO ───────────────────
+//
+// "Registrado originalmente" y "Presentación actual del depósito" no son dos
+// formas de decir lo mismo: el primero es lo que quedó escrito el día que salió
+// la mercadería, el segundo es lo que el catálogo dice HOY. Mostrarlos juntos y
+// rotulados es lo que hace que adoptar sea una decisión y no una corrección.
+export const ROTULO_REGISTRADO_ORIGINAL = "Registrado originalmente";
+export const ROTULO_PRESENTACION_ACTUAL = "Presentación actual del depósito";
+export const ACCION_ADOPTAR = "Recibir con presentación actual";
+export const ROTULO_ADOPTADA = "Presentación adoptada en la recepción";
 
 /**
  * El nombre de la presentación, tal como el remito la nombra.
@@ -109,6 +126,13 @@ export default function FichaProductoRecepcion({
   enHoja = false,
   /** Se llama después de guardar BIEN. La hoja lo usa para cerrarse sola. */
   onGuardado = null,
+  /**
+   * Adoptar, para ESTA recepción, la presentación que el depósito usa hoy.
+   *
+   * Manda solo el id: la presentación, el factor y el peso los resuelve el
+   * servidor releyendo el catálogo. La pantalla no elige escalas.
+   */
+  onAdoptarPresentacion = null,
 }) {
   const d = producto;
 
@@ -163,6 +187,11 @@ export default function FichaProductoRecepcion({
   const [motivo, setMotivo] = useState(() => inicial().motivo);
   const [detalleMotivo, setDetalleMotivo] = useState(() => inicial().detalleMotivo);
   const [error, setError] = useState("");
+  // Con los otros hooks y NUNCA despues del guard `if (!d) return null`:
+  // React cuenta hooks por render, y un `useState` detras de un return
+  // temprano cambia la cantidad entre un render y el siguiente. Es el
+  // defecto que este archivo ya tiene anotado tres lineas mas abajo.
+  const [adoptando, setAdoptando] = useState(false);
 
   // El guard va DESPUÉS de los hooks: React cuenta hooks por render y retornar
   // antes cambiaría la cantidad entre un render y el siguiente. Es el mismo
@@ -187,6 +216,38 @@ export default function FichaProductoRecepcion({
   // acá adentro dejaría inalcanzable la función del dominio.
   const agrupaEsta = escala.unidad === "BULTO";
   const estado = estadoDeProducto(d);
+
+  // ── ¿ESTA LÍNEA ADMITE ADOPTAR LA PRESENTACIÓN DE HOY? ──────────────────
+  //
+  // Tres condiciones, y las tres tienen que darse:
+  //
+  //   · que se pueda recibir —si la transferencia está cerrada, no hay nada
+  //     que contar—;
+  //   · que la línea sea una HISTÓRICA de verdad: sin snapshot de despacho y no
+  //     agregada en recepción. Lo decide `admiteAdopcion`, la misma función que
+  //     el servidor vuelve a preguntar sobre su propia relectura;
+  //   · que el catálogo diga algo DISTINTO. Si coincide, el botón no cambiaría
+  //     nada y sería ruido.
+  //
+  // Esto solo decide si se DIBUJA el ofrecimiento. Quien adopta es el servidor:
+  // acá no se elige presentación, ni factor, ni peso — el POST manda dos ids.
+  const adoptada = origenDePresentacion(d) === ORIGEN_PRESENTACION.ADOPTADA;
+  const puedeAdoptar =
+    puedeRecibir &&
+    admiteAdopcion(d).ok &&
+    !!d.presentacionActual &&
+    hayPresentacionDistinta(d.presentacionActual, envio);
+
+  const adoptar = async () => {
+    setError("");
+    setAdoptando(true);
+    try {
+      const r = await onAdoptarPresentacion?.({ detalleId: d.id });
+      if (r && r.ok === false) setError(r.error || "No se pudo adoptar la presentación actual.");
+    } finally {
+      setAdoptando(false);
+    }
+  };
 
   // Las físicas de lo que está escrito AHORA. Misma función que el servidor, y
   // con el factor CONGELADO: si el catálogo cambió después del envío, la cuenta
@@ -309,6 +370,43 @@ export default function FichaProductoRecepcion({
           <div className="text-sm2 sunmi-text-muted">{nombreDePresentacion(envio)}</div>
         </div>
       </div>
+
+      {/* ── UNA HISTÓRICA ABIERTA, Y CÓMO SE LA PUEDE CONTAR ───────────────
+          La transferencia se creó antes de que el sistema congelara la
+          presentación, así que lo único que quedó escrito es la cantidad
+          física: "40 UNIDAD". Eso es la verdad de lo que se sabe — nadie anotó
+          cómo salió — y no se toca.
+
+          Pero el operador tiene cinco cajones en la mano. Se le muestran los DOS
+          hechos, separados y rotulados, y la decisión de contar en la
+          presentación de hoy es suya y explícita. Nunca automática: el sistema
+          no sabe cómo salió la mercadería y no lo va a adivinar. */}
+      {puedeAdoptar && (
+        <div className="sunmi-surface-soft sunmi-border rounded-lg p-2.5 space-y-2">
+          <div>
+            <div className="text-sm2 sunmi-text-muted">{ROTULO_REGISTRADO_ORIGINAL}</div>
+            <div className="font-mono tabular-nums sunmi-text-strong">{rotuloDeEnvio(envio)}</div>
+          </div>
+          <div>
+            <div className="text-sm2 sunmi-text-muted">{ROTULO_PRESENTACION_ACTUAL}</div>
+            <div className="font-mono tabular-nums sunmi-text-strong">
+              {nombreDePresentacion(d.presentacionActual)}
+            </div>
+          </div>
+          <SunmiButton color="amber" onClick={adoptar} disabled={adoptando}>
+            {adoptando ? "Adoptando…" : ACCION_ADOPTAR}
+          </SunmiButton>
+        </div>
+      )}
+
+      {/* Cuando ya se adoptó, la card dice de dónde salió la presentación. Sin
+          esto la línea se leería como si el origen la hubiera registrado así. */}
+      {adoptada && (
+        <div className="text-sm2 sunmi-text-muted">
+          {ROTULO_ADOPTADA}
+          {d.presentacionAdoptadaPor ? ` por ${d.presentacionAdoptadaPor}` : ""}
+        </div>
+      )}
 
       {/* ── EL PACK INCOMPLETO ────────────────────────────────────────────── */}
       {puedeRecibir && agrupaEsta && (
