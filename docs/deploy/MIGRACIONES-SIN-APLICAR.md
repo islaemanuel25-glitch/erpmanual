@@ -16,10 +16,51 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está al día en **9 migraciones**, que son las que hay en el
-árbol. Comprobado con `prisma migrate status` el 2026-09-10 después de desplegar
-`edad85fba53620555b6b74f7906fd3ff2eb9c449`: *"9 migrations found in
-prisma/migrations. Database schema is up to date!"*.
+### `20260910120000_presentacion_adoptada_en_recepcion` — PENDIENTE DE PRODUCCIÓN
+
+**Producción sigue en 9 migraciones.** Cuando el PR de
+`feat/recepcion-ux-historicas-y-no-declarados` entre a `main`, el árbol va a
+tener **10** y esta va a ser la que falte: hay que aplicarla en el próximo
+despliegue.
+
+Se registra ACÁ y no después justamente por lo que pasó el 2026-09-10. Ese día el
+paso 0 leyó "Pendientes: ninguna" siendo falso —la migración del snapshot ya
+estaba en `main` sin aplicar— porque el commit que la habría anotado no se hizo.
+El clasificador la detectó igual y no pasó nada, pero este archivo existe para
+que el que despliega **se entere antes de arrancar**, no para que un control
+redundante lo corrija a mitad de camino. Está contado en la entrada del
+2026-09-10, más abajo.
+
+**Qué agrega**, todo sobre `TransferenciaDetalle`:
+
+- `presentacionAdoptadaAt` — `TIMESTAMP(3)`, **nullable**.
+- `presentacionAdoptadaPorId` — `INTEGER`, **nullable**.
+- FK `TransferenciaDetalle_presentacionAdoptadaPorId_fkey` → `Usuario(id)`, con
+  `ON DELETE SET NULL` y `ON UPDATE CASCADE` — el mismo criterio que las otras
+  tres autorías de esa tabla.
+
+**Para qué.** Los cinco campos del snapshot significan "así SALIÓ del origen".
+Una transferencia histórica abierta puede recibirse adoptando la presentación que
+el depósito usa hoy, y eso llena esos mismos cinco campos. Sin una marca, la
+línea pasaría a afirmar que su presentación se registró al despachar — falso, y
+dentro de un mes indistinguible de una que sí se registró. Estas dos columnas son
+lo que separa "se despachó así" de "alguien lo adoptó durante la recepción". Ver
+`origenDePresentacion` en `lib/transferencias/adopcionDePresentacion.js`.
+
+**Lo que NO hace**, y se puede comprobar leyendo el `.sql`:
+
+- **cero backfill**: ninguna fila existente se toca;
+- no toca `cantidad` — la física histórica sigue siendo la autoridad;
+- no modifica ninguno de los cinco campos del snapshot que ya existían;
+- sin `DROP`, sin `UPDATE` de datos, sin `DELETE`, sin `INSERT`, sin `NOT NULL`.
+
+**Aditiva y compatible hacia atrás.** El código anterior no nombra ninguna de las
+dos columnas y ninguna es obligatoria, así que sigue funcionando durante toda la
+ventana entre migrar y recrear.
+
+Hay un candado que lee el SQL y lo verifica —`adopcionDePresentacion.test.mjs`,
+"la migración es ADITIVA"— con los patrones a nivel SENTENCIA, para que el
+`ON UPDATE CASCADE` de la clave foránea no se confunda con un `UPDATE` de datos.
 
 ---
 
