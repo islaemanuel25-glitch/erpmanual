@@ -287,7 +287,11 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   const migraciones = fs
     .readdirSync(path.join(RAIZ, "prisma/migrations"))
     .filter((d) => /^\d/.test(d));
-  assert.equal(migraciones.length, 9, "apareció una migración que nadie declaró acá");
+  // El 2026-09-10 entro la tercera: `20260910120000_presentacion_adoptada_en_recepcion`,
+  // que registra QUIEN y CUANDO adopto la presentacion actual sobre una linea
+  // historica. Dos columnas nulables y una FK, sin backfill.
+  assert.equal(migraciones.length, 10, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
+  assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));
 });

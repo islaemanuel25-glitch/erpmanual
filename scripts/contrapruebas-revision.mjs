@@ -67,8 +67,17 @@ const CASOS = [
     // fue lo que la primera corrida dejó pasar, y recortarla a la indentación
     // del botón no alcanzó: con ocho espacios el ancla vive DENTRO de la línea
     // de doce. Se ancla en la línea siguiente, que es la que la distingue.
-    de: "MENSAJE_NO_FIGURA && puedeRecibir && (\n          <SunmiButton color=\"slate\"",
-    a: "puedeRecibir && (\n          <SunmiButton color=\"slate\"",
+    // ── LA GUARDA CAMBIÓ DE FORMA ────────────────────────────────────────
+    //
+    // Era `aviso === MENSAJE_NO_FIGURA`, y ese aviso solo existía después de
+    // tocar Enter. Ahora la guarda es `noFigura`, un booleano derivado del texto
+    // contra la transferencia completa. El ancla sigue al código: lo que se
+    // inyecta —sacarle la condición al botón— es exactamente lo mismo.
+    // Y la sangria bajo de diez a ocho espacios cuando el bloque salio de
+    // adentro de la card de busqueda para irse debajo de los filtros. El ancla
+    // sigue al codigo: con la vieja no matcheaba nada y el script lo dijo.
+    de: "noFigura && puedeRecibir && (\n        <SunmiButton color=\"slate\"",
+    a: "puedeRecibir && (\n        <SunmiButton color=\"slate\"",
     candado: "3. la acción del catálogo del origen solo existe tras no encontrar",
     suite: "lib/transferencias/revisionSueltas.test.mjs",
   },
@@ -158,8 +167,30 @@ const CASOS = [
     n: "I-1c",
     defecto: "revisar vuelve a pedir la preservación legacy",
     archivo: "app/modulos/transferencias/[id]/page.jsx",
-    de: "      if (json?.ok) await cargar();",
-    a: "      if (json?.ok) await cargar({ preservarEdicion: true });",
+    // ── EL ANCLA TENÍA QUE CRECER: DEJÓ DE SER ÚNICA ─────────────────────
+    //
+    // `if (json?.ok) await cargar();` aparecía una sola vez. El 2026-09-10 se
+    // sumó `adoptarPresentacion`, que recarga fresco por el mismo motivo y con
+    // la misma línea — así que el ancla pasó a matchear dos lugares y el script
+    // lo dijo: "la inyección no aplica (2 coincidencias)".
+    //
+    // Se ancla desde el `fetch`, que sí identifica a cuál de los dos handlers
+    // pertenece. Inyectar en el equivocado habría puesto en rojo un candado que
+    // no es el que este caso defiende.
+    de:
+      '"/api/transferencias/revisar-producto", {\n' +
+      "        method: \"POST\",\n" +
+      "        body: JSON.stringify({ transferenciaId: item.id, ...cuerpo }),\n" +
+      "      });\n" +
+      "      const json = await res.json();\n" +
+      "      if (json?.ok) await cargar();",
+    a:
+      '"/api/transferencias/revisar-producto", {\n' +
+      "        method: \"POST\",\n" +
+      "        body: JSON.stringify({ transferenciaId: item.id, ...cuerpo }),\n" +
+      "      });\n" +
+      "      const json = await res.json();\n" +
+      "      if (json?.ok) await cargar({ preservarEdicion: true });",
     candado: "1e. LA CONEXIÓN REAL: la página no puede dejar que el legacy la gobierne",
     suite: "lib/transferencias/integracionRecepcion.test.mjs",
   },
@@ -248,6 +279,43 @@ const CASOS = [
     a: "          revisadoEnRecepcionPorId: Number(body?.usuarioId || 0),",
     candado: "24-25. guardar un borrador NO marca revisado; revisar SÍ lo persiste",
     suite: "lib/transferencias/controlFisico.test.mjs",
+  },
+
+  // ── LOS TRES DE LA TANDA DE UX, 2026-09-10 ─────────────────────────────
+  //
+  // Un candado que nunca se vio en rojo se lee igual que uno que funciona. Los
+  // tres defectos que esta tanda vino a cerrar tienen su inyección acá.
+  {
+    n: "U-1",
+    defecto: "«Todos» vuelve a esconder los productos no declarados",
+    archivo: "lib/transferencias/controlFisico.js",
+    // El ancla lleva la línea de arriba porque `return true;` solo, en un
+    // archivo con siete `case`, no identifica cuál se está rompiendo.
+    de: "      // 52. Los dos números son correctos porque cuentan cosas distintas.\n      return true;",
+    a: "      // 52. Los dos números son correctos porque cuentan cosas distintas.\n      return esDelRemito;",
+    candado: "4. un no declarado aparece en «Todos»",
+    suite: "lib/transferencias/busquedaYNoDeclarados.test.mjs",
+  },
+  {
+    n: "U-2",
+    defecto: "«no figura» vuelve a decidirse contra la lista FILTRADA",
+    archivo: "components/transferencias/WorkspaceRecepcion.jsx",
+    // Es el error exacto que el nombre del parámetro existe para evitar: con la
+    // lista filtrada, un producto tapado por un filtro se lee como ausente y la
+    // pantalla ofrece duplicarlo.
+    de: "    () => items.length > 0 && faltaEnLaTransferencia(items, texto),",
+    a: "    () => items.length > 0 && faltaEnLaTransferencia(visibles, texto),",
+    candado: "2c. LA CONTRAPRUEBA: preguntarle a la lista filtrada daría lo contrario",
+    suite: "lib/transferencias/busquedaYNoDeclarados.test.mjs",
+  },
+  {
+    n: "U-3",
+    defecto: "adoptar vuelve a poder pisar una presentación registrada al despachar",
+    archivo: "lib/transferencias/adopcionDePresentacion.js",
+    de: "  if (linea.presentacionEnvio) {\n    return { ok: false, motivo: MOTIVOS_ADOPCION.YA_TIENE_SNAPSHOT };",
+    a: "  if (false) {\n    return { ok: false, motivo: MOTIVOS_ADOPCION.YA_TIENE_SNAPSHOT };",
+    candado: "16. una línea CON snapshot de despacho no ofrece adoptar nada",
+    suite: "lib/transferencias/adopcionDePresentacion.test.mjs",
   },
 ];
 

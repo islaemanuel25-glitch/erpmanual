@@ -252,6 +252,9 @@ model Usuario {
   /// Los productos cuyo control físico esta persona dio por terminado. Tercera
   /// relación hacia `TransferenciaDetalle`, nombrada como las otras dos.
   lineasRevisadasEnRecepcion TransferenciaDetalle[] @relation("TransferenciaDetalleRevisadoPor")
+  /// Las líneas históricas que esta persona decidió recibir en la presentación
+  /// actual del depósito. Cuarta relación hacia `TransferenciaDetalle`.
+  lineasConPresentacionAdoptada TransferenciaDetalle[] @relation("TransferenciaDetallePresentacionAdoptadaPor")
 
   posTransferencias            PosTransferencia[] @relation("pos_usuario")
   posTransferenciasSolicitadas PosTransferencia[] @relation("pos_solicitado_por")
@@ -893,6 +896,35 @@ model TransferenciaDetalle {
   /// `confirmar-recepcion` al destino.
   pesoPiezaKg        Decimal?           @db.Decimal(12, 3)
 
+  // ── LOS CINCO DE ARRIBA PUEDEN VENIR DE DOS LADOS ─────────────────────────
+  //
+  // Nacieron como "así SALIÓ del origen". Pero una transferencia HISTÓRICA
+  // —creada antes de que el snapshot existiera— sigue pudiendo estar abierta, y
+  // el operador tiene cinco cajones en la mano mientras la pantalla le pide
+  // contar 40 unidades. La salida es que él ADOPTE explícitamente la
+  // presentación que el depósito usa hoy, para contar.
+  //
+  // Eso llena los mismos cinco campos, y ahí está el riesgo: sin una marca, esa
+  // línea pasaría a afirmar que su presentación se registró al despachar. Sería
+  // falso, y dentro de un mes indistinguible de una que sí se registró.
+  //
+  // ── POR QUÉ UNA FECHA Y UN AUTOR, Y NO UN ENUM DE PROCEDENCIA ────────────
+  //
+  // Porque las tres procedencias posibles ya se distinguen con lo que la fila
+  // tiene: sin `presentacionEnvio` es reconstruida, con `agregadoEnRecepcion` es
+  // un no declarado, y lo que falta es separar "se despachó así" de "alguien lo
+  // adoptó acá". Un enum que repitiera lo que estas columnas ya dicen podría
+  // contradecirlas. Ver `origenDePresentacion`.
+  //
+  // Y van los dos juntos por el mismo motivo que `agregadoEnRecepcionPorId` y su
+  // fecha: una decisión sin autor ni momento no se puede auditar.
+  //
+  // Nulables las dos, sin default y sin backfill: ninguna línea existente fue
+  // adoptada, porque no se podía. Y una fila con snapshot y sin esta marca se lee
+  // como despacho, que es exactamente lo que era.
+  presentacionAdoptadaAt   DateTime?
+  presentacionAdoptadaPorId Int?
+
   // ── EL CONTROL FÍSICO TERMINADO ───────────────────────────────────────────
   //
   // "Revisado" NO es `recibido != null`. Son dos hechos distintos: alguien puede
@@ -928,6 +960,9 @@ model TransferenciaDetalle {
   /// Quién dio por terminado el control físico de esta línea. Nombrada por el
   /// mismo motivo: `Usuario` ya recibe otras dos relaciones desde esta tabla.
   revisadoEnRecepcionPor Usuario? @relation("TransferenciaDetalleRevisadoPor", fields: [revisadoEnRecepcionPorId], references: [id])
+  /// Quién decidió recibir esta línea histórica en la presentación actual del
+  /// depósito. Nombrada por el mismo motivo que las tres de arriba.
+  presentacionAdoptadaPor Usuario? @relation("TransferenciaDetallePresentacionAdoptadaPor", fields: [presentacionAdoptadaPorId], references: [id])
 
   /// Los movimientos de stock que esta línea produjo al recibirse. La relación
   /// existe para que la auditoría no dependa del texto libre de `motivo`.

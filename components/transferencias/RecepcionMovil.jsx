@@ -50,6 +50,7 @@ import TransferenciaHeader from "./TransferenciaHeader";
 import FichaProductoRecepcion from "./FichaProductoRecepcion";
 import { fmtCantidad } from "./detallePresentacion";
 import { FILTRO, pasaFiltro } from "@/lib/transferencias/controlFisico";
+import { firmaDeEdicion } from "@/lib/transferencias/presentacionEnvio";
 import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
 
 /** El texto del buscador, el mismo patrón que Productos y el POS. */
@@ -71,7 +72,10 @@ const CONTEO = {
   [FILTRO.PENDIENTES]: (r) => r.pendientes,
   [FILTRO.DIFERENCIAS]: (r) => r.diferencias,
   [FILTRO.REVISADOS]: (r) => r.revisados,
-  [FILTRO.TODOS]: (r) => r.totalRemito,
+  // "Todos" cuenta la mercadería que hay sobre la mesa —agregados incluidos—,
+  // que es lo que ese tab muestra. Los otros tres cuentan el remito. Ver
+  // `resumenDeRecepcion`: son dos totales con dos nombres a propósito.
+  [FILTRO.TODOS]: (r) => r.totalFisico ?? r.totalRemito,
 };
 
 export default function RecepcionMovil({
@@ -84,6 +88,8 @@ export default function RecepcionMovil({
   categoriaId,
   texto,
   aviso,
+  /** Decidido arriba contra la transferencia COMPLETA. Ver `faltaEnLaTransferencia`. */
+  noFigura = false,
   puedeRecibir,
   guardando,
   quitandoId,
@@ -96,6 +102,7 @@ export default function RecepcionMovil({
   onCerrarProducto,
   onRevisar,
   onQuitarLinea,
+  onAdoptarPresentacion,
   onAbrirEscaner,
   onAbrirAgregar,
   accionAgregar,
@@ -116,6 +123,7 @@ export default function RecepcionMovil({
   const todoRevisado = pendientes === 0 && (resumen?.totalRemito ?? 0) > 0;
 
   const opcionesEstado = TABS.map((t) => ({ ...t, cantidad: CONTEO[t.clave](resumen || {}) }));
+
 
   // ── QUIÉN TIENE DIFERENCIA LO DECIDE EL MISMO PREDICADO QUE EL FILTRO ───
   //
@@ -210,21 +218,6 @@ export default function RecepcionMovil({
         ariaLabel="Buscar producto de esta transferencia"
       />
 
-      {aviso && (
-        <SunmiAviso tono="warning">
-          {aviso}
-          {aviso === mensajeNoFigura && puedeRecibir && (
-            <> Si igual llegó, informalo como producto no declarado.</>
-          )}
-        </SunmiAviso>
-      )}
-
-      {aviso === mensajeNoFigura && puedeRecibir && (
-        <SunmiButton color="slate" onClick={onAbrirAgregar} className="w-full justify-center">
-          {accionAgregar}
-        </SunmiButton>
-      )}
-
       {/* ── 3 · FILTROS ───────────────────────────────────────────────────
           El estado del trabajo primero, en grilla para que entren los cuatro
           con su número. La categoría abajo y en un desplegable: es un filtro
@@ -245,7 +238,16 @@ export default function RecepcionMovil({
           value={categoriaId == null ? "" : String(categoriaId)}
           onChange={(v) => onCategoria(v === "" ? null : v)}
         >
-          <option value="">Todas · {resumen?.totalRemito ?? 0}</option>
+          {/* ── "TODAS" ES EL UNIVERSO QUE ESTA VISTA PUEDE MOSTRAR ──────
+              Decía `totalRemito` mientras el tab de al lado ya decía
+              `totalFisico`: con 52 originales y 1 agregado la pantalla mostraba
+              "Todos 53" y "Todas · 52" a cinco píxeles de distancia. Dos
+              números para lo mismo, y ninguno explicaba al otro.
+
+              El avance del remito —3 / 52 revisados, 49 pendientes— sigue
+              contando el DOCUMENTO y no se toca. Son dos preguntas distintas y
+              cada una conserva la suya. */}
+          <option value="">Todas · {resumen?.totalFisico ?? resumen?.totalRemito ?? 0}</option>
           {categorias.map((c) => (
             <option key={c.id} value={c.id}>
               {c.nombre} · {c.cantidad}
@@ -253,6 +255,39 @@ export default function RecepcionMovil({
           ))}
         </SunmiSelectAdv>
       </div>
+
+      {/* ── 4 · EL CAMINO DE EXCEPCIÓN, DESPUÉS DE LOS FILTROS ─────────────
+          Acá se comparaba `aviso === mensajeNoFigura`, y ese aviso solo existía
+          después de tocar Enter. El operador escribía "9 de oro", no encontraba
+          nada, y la pantalla le contestaba "No hay productos que coincidan con
+          este filtro" mientras el botón para informarlo quedaba detrás de una
+          tecla que nadie sabía que había que apretar.
+
+          Ahora llega decidido de arriba, en `noFigura`, derivado del texto
+          contra la transferencia COMPLETA. Un booleano y no una comparación de
+          strings: dos textos que se parecen no pueden volver a decidir esto.
+
+          ── Y VA ACÁ ABAJO, NO PEGADO AL BUSCADOR ───────────────────────
+          Estaba entre el buscador y los filtros, y eso empujaba el trabajo
+          normal —elegir estado, elegir categoría— más abajo cada vez que una
+          búsqueda no encontraba algo. El orden del diseño aprobado pone primero
+          las herramientas de siempre y el camino de excepción al final, que es
+          donde corresponde a algo que pasa poco. */}
+      {(noFigura || aviso) && (
+        <SunmiAviso tono="warning">
+          {noFigura ? mensajeNoFigura : aviso}
+          {noFigura && puedeRecibir && (
+            <> Si igual llegó, informalo como producto no declarado.</>
+          )}
+        </SunmiAviso>
+      )}
+
+      {noFigura && puedeRecibir && (
+        <SunmiButton color="slate" onClick={onAbrirAgregar} className="w-full justify-center">
+          {accionAgregar}
+        </SunmiButton>
+      )}
+
 
       {/* ── 4 · CUANDO YA ESTÁ TODO ───────────────────────────────────────
           Recién acá aparece el resumen, y compacto. Durante el conteo esas
@@ -304,7 +339,13 @@ export default function RecepcionMovil({
           La misma fila que el escritorio: se toca la tarjeta entera y no hay
           botones adentro. */}
       <div className="space-y-1.5">
-        {visibles.length === 0 && (
+        {/* ── DOS VACÍOS QUE SIGNIFICAN COSAS DISTINTAS ─────────────────
+            Una lista vacía porque el FILTRO tapó lo que hay no es lo mismo que
+            una lista vacía porque el producto NO ESTÁ. Cuando `noFigura` ya lo
+            dijo arriba —y ofreció el camino de salida— repetir "no coincide con
+            este filtro" manda a mirar el filtro, que es justo la confusión que
+            esta tanda vino a sacar. */}
+        {visibles.length === 0 && !noFigura && (
           <p className="text-center py-6 sunmi-text-muted text-sm2">
             No hay productos que coincidan con este filtro.
           </p>
@@ -346,16 +387,29 @@ export default function RecepcionMovil({
         z={NIVEL_MODAL_GLOBAL}
         forma="hoja"
         // Es carga: hay una cantidad escrita que un toque al costado tiraría.
+        //
+        // Se probó condicionarlo —mientras la hoja es la vista de DECISIÓN de
+        // una histórica no hay ningún campo que perder— y NO va: el candado del
+        // kit acepta solo literales acá, a propósito, para que una expresión
+        // cualquiera no pase como decisión tomada. Hacerlo condicional es una
+        // decisión de criterio que se registra allá, y no era el pedido de esta
+        // tanda.
         destructivo
         espacioCuerpo="gap-2"
       >
         {seleccionado && (
           <FichaProductoRecepcion
-            key={seleccionado.id}
+            // ── LA IDENTIDAD INCLUYE LA ESCALA, NO SOLO EL ID ──────────────
+            // Adoptar la presentación actual cambia en qué se cuenta esta línea
+            // SIN cambiarle el id. Con `key={seleccionado.id}` React conservaba el
+            // estado: el rótulo pasaba a "5 CAJÓN x8" y el campo seguía diciendo
+            // 40. Ver `firmaDeEdicion`.
+            key={firmaDeEdicion(seleccionado)}
             producto={seleccionado}
             puedeRecibir={puedeRecibir}
             guardando={guardando}
             onRevisar={onRevisar}
+            onAdoptarPresentacion={onAdoptarPresentacion}
             onQuitar={onQuitarLinea}
             quitando={quitandoId === seleccionado.id}
             enHoja

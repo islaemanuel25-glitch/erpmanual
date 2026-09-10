@@ -53,8 +53,22 @@ test("2. un producto PENDIENTE no lleva el verde de revisado", () => {
   // El verde está detrás de la condición, no suelto.
   assert.match(src, /const revisado = d\.revisadoEnRecepcion === true && !d\.agregadoEnRecepcion/);
   assert.match(src, /\{revisado \?/);
-  // Y el pendiente cae en la otra rama, con el tono apagado de siempre.
-  assert.match(src, /<span className="text-sm2 sunmi-text-muted shrink-0">\{TEXTO_ESTADO\[estado\]\}<\/span>/);
+  // ── EL PENDIENTE SIGUE APAGADO, PERO YA NO TODOS ────────────────────
+  //
+  // Esta rama pintaba TODO lo no revisado con el mismo gris, asi que un
+  // producto NO DECLARADO se veia igual que uno que nadie conto. Ahora el tono
+  // sale del mismo mapa de tokens que el resultado, y el pendiente cae en el
+  // `muted` de siempre por el fallback.
+  //
+  // Se afirma sobre el COMPORTAMIENTO —que el pendiente quede muted y el no
+  // declarado no— y no sobre el marcado exacto, que es lo que hacia que este
+  // candado se pusiera rojo por una reescritura que no cambia lo que defiende.
+  assert.match(src, /TONO_ESTADO_FILA\[estado\] \|\| "sunmi-text-muted"/);
+  assert.match(src, /\{TEXTO_ESTADO\[estado\]\}/);
+  assert.ok(
+    !/TONO_ESTADO_FILA\[ESTADO_PRODUCTO\.PENDIENTE\]/.test(src),
+    "el pendiente dejo de caer en el muted del fallback"
+  );
 });
 
 test("3. «Revisado» y el RESULTADO son dos dimensiones y no se mezclan", () => {

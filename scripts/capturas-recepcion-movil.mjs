@@ -144,7 +144,16 @@ async function foto(nombre, ancho) {
 }
 
 /** Toca el primer elemento cuyo texto contenga el fragmento. */
-async function tocar(fragmento, { etiqueta = null } = {}) {
+/**
+ * @param {object} opciones
+ * @param {boolean} [opciones.ultimo] Tocar la ÚLTIMA coincidencia y no la
+ *   primera. Hace falta cuando un modal repite el texto de un botón que quedó
+ *   atrás: "Informar producto no declarado" es a la vez el CTA del listado y el
+ *   botón que confirma adentro de la hoja. El velo no los distingue —los dos
+ *   siguen renderizados— así que sin esto el clic se va al de atrás, el modal no
+ *   se cierra y la línea no se crea. Costó una corrida entenderlo.
+ */
+async function tocar(fragmento, { etiqueta = null, ultimo = false } = {}) {
   // `textContent` y NO `innerText`: el segundo depende del layout y devuelve
   // vacío en elementos que el navegador considera no renderizados, que es lo que
   // pasa justo después de una captura con `captureBeyondViewport`. Y se
@@ -164,9 +173,10 @@ async function tocar(fragmento, { etiqueta = null } = {}) {
     const objetivo = ${JSON.stringify(fragmento)};
     const nodos = [...document.querySelectorAll('button, a, [role="button"]')]
       .filter((n) => n.offsetParent !== null);
-    const el = nodos.find((n) =>
+    const coinciden = nodos.filter((n) =>
       ((n.getAttribute('aria-label') || '') + ' ' + (n.textContent || '')).includes(objetivo)
     );
+    const el = ${ultimo ? "coinciden[coinciden.length - 1]" : "coinciden[0]"};
     if (!el) return false;
     el.scrollIntoView({ block: 'center' });
     el.click();
@@ -656,6 +666,114 @@ for (const ancho of ANCHOS) {
     }
     console.log(`  · ${fisico}`);
     desbordes += await foto("F-cajon-guardado", ancho);
+  }
+
+  // ── LAS TRES ESCENAS DE LA TANDA DE UX ─────────────────────────────────
+  //
+  // Las tres se sacan sobre la transferencia #176 de la copia del respaldo, que
+  // es una HISTÓRICA abierta de verdad: 52 líneas, ninguna con snapshot de
+  // despacho, y varios productos que hoy el depósito trabaja agrupados. No hay
+  // fixture que fabricar — el caso existe.
+
+  if (MODO === "ux-no-figura") {
+    // A · se escribe algo que no está en la transferencia y el camino de salida
+    // aparece SOLO, sin Enter. Antes había que adivinar que existía esa tecla.
+    await escribirEnBuscador(BUSQUEDA);
+    await esperar(900);
+
+    const estado = await evaluar(`(() => {
+      const t = document.body.innerText;
+      const botones = [...document.querySelectorAll('button')].filter((e) => e.offsetParent !== null);
+      return JSON.stringify({
+        noFigura: t.includes("no figura en esta transferencia"),
+        cta: botones.some((b) => (b.textContent || "").includes("Informar producto no declarado")),
+        filtro: t.includes("coincidan con este filtro"),
+      });
+    })()`);
+    const e = JSON.parse(estado);
+    // Se comprueba ANTES de disparar: una pantalla que dice lo contrario se
+    // fotografía igual de bien que la buena.
+    if (!e.noFigura) throw new Error("no apareció el aviso de que el producto no figura");
+    if (!e.cta) throw new Error("el CTA no apareció sin Enter, que es todo el punto de esta captura");
+    console.log(`  · sin Enter: aviso ${e.noFigura} · CTA ${e.cta}`);
+    desbordes += await foto("A-no-figura-cta", ancho);
+  }
+
+  if (MODO === "ux-no-declarado") {
+    // B · informar el producto y verlo QUEDAR en el listado. Antes se agregaba y
+    // desaparecía: no estaba en ningún filtro, ni siquiera en "Todos".
+    await escribirEnBuscador(BUSQUEDA);
+    await esperar(900);
+    await tocar("Informar producto no declarado", { etiqueta: "el camino de salida" });
+    await esperar(1800);
+
+    await escribirEnBuscador(BUSQUEDA, { enModal: true });
+    await esperar(2500);
+    await tocar(BUSQUEDA, { etiqueta: "un resultado del catálogo del origen" });
+    await esperar(1200);
+
+    // 2 completos y 1 suelta: el caso que prueba que el desglose sobrevive.
+    await escribirEnCampo(0, "2");
+    await escribirEnCampo(1, "1");
+    await esperar(600);
+    await tocar("Informar producto no declarado", {
+      etiqueta: "el botón de confirmar",
+      ultimo: true,
+    });
+    await esperar(3000);
+
+    const escena = await evaluar(`(() => {
+      const t = document.body.innerText;
+      const filas = [...document.querySelectorAll('[data-detalle-id]')].filter((e) => e.offsetParent !== null);
+      const card = filas.find((f) => (f.textContent || "").includes("9 DE ORO"));
+      return JSON.stringify({
+        visibleEnLista: !!card,
+        texto: card ? (card.textContent || "").trim().slice(0, 120) : null,
+        cuantasFilas: filas.length,
+      });
+    })()`);
+    const b = JSON.parse(escena);
+    if (!b.visibleEnLista) {
+      throw new Error("el producto agregado NO quedó visible en el listado: es el defecto que la tanda cierra");
+    }
+    console.log(`  · en el listado (${b.cuantasFilas} filas): ${b.texto}`);
+    desbordes += await foto("B-no-declarado-integrado", ancho);
+  }
+
+  if (MODO === "ux-historica") {
+    // C · la histórica abierta: los dos hechos, separados, y la acción explícita.
+    await escribirEnBuscador(BUSQUEDA);
+    await esperar(900);
+    await tocar(BUSQUEDA, { etiqueta: "la línea histórica" });
+    await esperar(1200);
+
+    const escena = await evaluar(`(() => {
+      const t = document.body.innerText;
+      const botones = [...document.querySelectorAll('button')].filter((e) => e.offsetParent !== null);
+      return JSON.stringify({
+        historica: t.includes("Transferencia histórica"),
+        registrado: t.includes("no registró cómo salió del depósito"),
+        remito: t.includes("Remito original"),
+        actual: t.includes("Presentación actual del depósito"),
+        equivale: t.includes("Equivale a"),
+        ayuda: t.includes("No cambia el remito original"),
+        // El CTA nombra la presentación de verdad: "Usar PACK x30 para esta
+        // recepción". Buscar el genérico dejaría pasar un botón que no dice qué
+        // va a hacer, que es justo lo que el diseño vino a corregir.
+        accion: botones.some((b) => /^Usar .+ para esta recepción$/.test((b.textContent || "").trim())),
+        lineas: t.split(String.fromCharCode(10)).filter((l) => l.includes("Remito original") || l.includes("Equivale a")).slice(0, 4),
+      });
+    })()`);
+    const c = JSON.parse(escena);
+    if (!c.historica) throw new Error("falta el rótulo «Transferencia histórica»");
+    if (!c.registrado) throw new Error("falta decir que la línea no registró cómo salió");
+    if (!c.remito) throw new Error("falta el remito original");
+    if (!c.actual) throw new Error("falta la presentación actual del depósito");
+    if (!c.equivale) throw new Error("falta la equivalencia exacta: sin ella se adopta a ciegas");
+    if (!c.ayuda) throw new Error("falta la ayuda que aclara que el remito no cambia");
+    if (!c.accion) throw new Error("el CTA no nombra la presentación de verdad");
+    console.log(`  · ${JSON.stringify(c.lineas)}`);
+    desbordes += await foto("C-historica-adoptar-presentacion", ancho);
   }
 
   if (MODO === "nodeclarado-pack") {
