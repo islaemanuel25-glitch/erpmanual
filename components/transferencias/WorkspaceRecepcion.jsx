@@ -45,6 +45,9 @@ import SunmiEscanerCodigoBarra, {
   hayEscanerDisponible,
 } from "@/components/sunmi/SunmiEscanerCodigoBarra";
 
+// El MISMO formateador que el detalle de escritorio. Un segundo formateador de
+// moneda es cómo el mismo importe termina escrito de dos formas en la misma app.
+import { fmtMoneda } from "./detallePresentacion";
 import ResumenControlFisico from "./ResumenControlFisico";
 import RecepcionMovil from "./RecepcionMovil";
 import FichaProductoRecepcion, { TEXTO_ESTADO } from "./FichaProductoRecepcion";
@@ -146,6 +149,22 @@ export function FilaProducto({ d, activa, onElegir }) {
           : `Enviado ${rotuloDeEnvio(envio)}`}
         {d.categoria?.nombre ? ` · ${d.categoria.nombre}` : ""}
       </span>
+      {/* ── EL IMPORTE, EN SU PROPIO RENGLÓN Y DEBAJO DE LA CANTIDAD ──────
+          La recepción dejaba afuera información económica que la transferencia
+          ya tenía. El número NO se calcula acá: sale de `subtotal`, que el
+          endpoint de detalle ya resuelve con `valorizarDetalle` —la misma
+          autoridad que los dos PDF y el listado—. Multiplicar de nuevo cantidad
+          por costo en el navegador es cómo un documento termina mostrando dos
+          importes distintos de sí mismo.
+
+          Y va en un renglón propio, no al lado del estado: el estado es la
+          única cosa que vive en la columna derecha. Compartirla obligaría a
+          leer dos datos de naturaleza distinta en la misma línea de barrido. */}
+      {d.subtotal != null && (
+        <span className="text-sm2 sunmi-text-muted">
+          Importe <span className="tabular-nums sunmi-text-strong">{fmtMoneda(d.subtotal)}</span>
+        </span>
+      )}
       {/* El RESULTADO, en su propio renglón y solo cuando ya se revisó: es la
           otra dimensión, y mezclarla con "Revisado" borraría la diferencia. */}
       {revisado && (

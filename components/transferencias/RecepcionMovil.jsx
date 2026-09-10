@@ -48,7 +48,7 @@ import { hayEscanerDisponible } from "@/components/sunmi/SunmiEscanerCodigoBarra
 import EstadoTransferenciaBadge from "./EstadoTransferenciaBadge";
 import TransferenciaHeader from "./TransferenciaHeader";
 import FichaProductoRecepcion from "./FichaProductoRecepcion";
-import { fmtCantidad } from "./detallePresentacion";
+import { fmtCantidad, fmtMoneda } from "./detallePresentacion";
 import { FILTRO, pasaFiltro } from "@/lib/transferencias/controlFisico";
 import { firmaDeEdicion } from "@/lib/transferencias/presentacionEnvio";
 import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
@@ -201,6 +201,23 @@ export default function RecepcionMovil({
               : "Sin pendientes"}
           </span>
         </div>
+
+        {/* ── EL IMPORTE DEL DOCUMENTO, DEBAJO DEL PROGRESO ────────────────
+            Sale de `item.resumen.costoTotal`, que el endpoint de detalle
+            acumula sumando los `subtotal` que devuelve `valorizarDetalle`. No
+            se suman las cards acá: el mismo documento no puede mostrar dos
+            totales, y sumar en el navegador es exactamente cómo se llega a eso
+            —una card filtrada, un redondeo distinto, y el total deja de ser el
+            del remito—. Es el MISMO número que el tile de escritorio y que los
+            dos PDF. */}
+        {item?.resumen?.costoTotal != null && (
+          <p className="text-sm2 sunmi-text-muted">
+            Importe total ·{" "}
+            <span className="tabular-nums sunmi-text-strong font-semibold">
+              {fmtMoneda(item.resumen.costoTotal)}
+            </span>
+          </p>
+        )}
       </SunmiCard>
 
       {/* ── 2 · BUSCAR ────────────────────────────────────────────────────

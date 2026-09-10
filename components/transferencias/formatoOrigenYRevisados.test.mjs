@@ -158,12 +158,22 @@ test("13. el no declarado usa la presentación del catálogo del ORIGEN", () => 
   // seis campos del catálogo se leen ahí y no en el JSX. El candado sigue al
   // código y de paso afirma más — que ese helper NO recibe `contadoEn`, que era
   // lo que dejaba a la elección manual pisar al catálogo.
+  //
+  // Y LA PRESENTACIÓN ES LA DE SALIDA DEPÓSITO → LOCAL. `modoCompraProveedor`
+  // salió de la lista y entró `modoEnvio`: el primero describe cómo el depósito
+  // le COMPRA al proveedor y no tiene nada que decir sobre en qué escala este
+  // local recibe; el segundo es la política de salida, y sin él la pantalla
+  // ofrece "PACK x6" sobre un producto que el depósito solo despacha suelto.
   assert.match(src, /presentacionDeProductoNuevo\(producto\)/);
   const ui = codigoDe("lib/transferencias/recepcionUI.js");
   assert.match(ui, /unidadMedida: producto\?\.unidadMedida/);
   assert.match(ui, /modoVentaDeposito: producto\?\.modoVentaDeposito/);
   assert.match(ui, /pesoReferenciaKg: producto\?\.pesoReferenciaKg/);
-  assert.match(ui, /modoCompraProveedor: producto\?\.modoCompraProveedor/);
+  assert.match(ui, /modoEnvio: producto\?\.modoEnvio/);
+  assert.ok(
+    !/modoCompraProveedor/.test(ui),
+    "la relación proveedor→depósito volvió a decidir cómo se recibe en el local"
+  );
 
   // Se MUESTRA qué es, en vez de preguntarlo.
   assert.match(src, /Presentación de origen/);
