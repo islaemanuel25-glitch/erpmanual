@@ -44,7 +44,7 @@ dominio `https://operix.cloud`, backups en `/srv/produccion/backups/`.
    autorización posible**: `db push`, `migrate reset`, `db execute` y
    `migrate resolve`. No es un olvido ni una regla que se afloje cuando aprieta.
    La lista, el criterio por el que es esa y no otra, y lo que se miró y NO se
-   tapó están en `lib/deploy/guardiaMigraciones.js`. Ver "Los cuatro comandos
+   tapó están en `lib/deploy/guardiaMigraciones.mjs`. Ver "Los cuatro comandos
    bloqueados" en el paso 4 antes de tocarlos.
 
 ## EL TOPE DE CORTE: 30 SEGUNDOS
@@ -376,15 +376,20 @@ que corre las migraciones. El detalle de cómo se descubrió está abajo, en
 "La trampa del contenedor descartable".
 
 **El clasificador va ANTES del paso 1, no entre el tercero y el cuarto.** Se
-corre desde la máquina local, con el VPS todavía en el SHA viejo:
+corre con el VPS todavía en el SHA viejo:
 
 ```bash
-node scripts/clasificar-migraciones.mjs --vps
+node scripts/clasificar-migraciones.mjs --desplegado
 ```
 
 **Por qué antes:** para leerlo con tiempo y no con el despliegue a medio hacer.
 El orden ya no es lo que decide si el chequeo sirve — eso cambió el 2026-08-13 y
 está abajo.
+
+**`--desplegado` y no `--vps`, y no es un cambio de nombre.** El que despliega no
+tiene que saber si está adentro o afuera del servidor: eso lo resuelve el propio
+script. La sección siguiente cuenta cómo, y por qué depender de `--vps` dejó la
+guardia inservible en uno de los dos entornos.
 
 ### LA BASE SALE DE LA IMAGEN QUE ATIENDE, no del HEAD de git del VPS
 
@@ -405,7 +410,7 @@ sino el paso 5, cuando la ventana ya se cerró. Y es el dato correcto: durante l
 ventana lo que importa es qué CÓDIGO está sirviendo pedidos, no qué commit tiene
 checkouteado el repo del servidor.
 
-Sigue fallando cerrado: si el ssh no llega, si el contenedor no está, o si la
+Sigue fallando cerrado: si no se puede leer, si el contenedor no está, o si la
 etiqueta no es un SHA de 40 —`latest`, una imagen construida a mano— sale con 2.
 
 Comprobado en los dos sentidos, que es lo que hace que el arreglo valga: con un
@@ -414,8 +419,60 @@ verdad en el rango —una rama descartable con un `DROP COLUMN`— **la guardia
 denegó el comando**, nombrando el archivo, la línea y el motivo. Sin ese segundo
 sentido el arreglo habría cambiado un pedido molesto por un control muerto.
 
-Si por lo que sea la imagen no sirve como base, se le pasa el SHA a mano:
-`--desde <SHA_QUE_CORRÍA_ANTES>`.
+### DE DÓNDE SE LEE ESE SHA: ADENTRO DEL VPS Y DESDE AFUERA
+
+Hasta el 2026-09-10 se leía de una sola forma: `ssh vps-erp docker inspect …`.
+Eso ata el chequeo a estar **afuera** del servidor.
+
+El despliegue de `f63c0928` se corrió **desde el propio VPS**, donde el alias
+`vps-erp` no resuelve. En ese entorno `--vps` sale con 2 sin poder mirar nada, y
+si la guardia hubiera llegado a correr habría denegado **todos** los despliegues
+hechos desde ahí. Es la misma forma del defecto del 2026-08-13: un control que se
+dispara siempre no es un control, es un trámite que se termina salteando.
+
+**Ahora hay una sola resolución canónica**, en `lib/deploy/shaDesplegado.mjs`, y
+decide por CAPACIDAD y no por nombre de máquina:
+
+1. **¿Se ve desde acá el contenedor que atiende?** —`docker inspect erpazul_app
+   --format '{{.Config.Image}}'`—. Si sí, ese es el dato y no se sale a la red.
+2. Si no, se pregunta **por ssh** con el alias, que es lo de siempre.
+3. Si ninguna de las dos sirve, **no adivina**: sale con 2 diciendo qué intentó
+   con cada una y cuál es la salida explícita.
+
+No pregunta "¿estoy en el VPS?". Preguntar eso obliga a codificar un hostname, un
+usuario o una ruta, y los tres mienten el día que algo se muda. El sondeo de
+capacidad y el dato son **el mismo comando**, así que no puede pasar que el
+sondeo diga que sí y el dato salga de otro lado.
+
+Y la lectura local **exige que la imagen sea la de producción**
+—`ghcr.io/islaemanuel25-glitch/erpmanual`—. Sin eso, un contenedor llamado
+`erpazul_app` en una máquina de desarrollo contestaría que sí y su SHA se tomaría
+como base del rango.
+
+El script informa de dónde salió, y eso va en el reporte:
+
+```
+SHA desplegado: f63c0928… (origen local)
+  evidencia: docker inspect erpazul_app --format '{{.Config.Image}}'
+```
+
+**`--vps` sigue existiendo** y sigue forzando la vía remota. No se borró: es
+explícito y auditable, y hay entornos que lo usan. Lo que dejó de ser es el único
+camino automático.
+
+### SI LA RESOLUCIÓN AUTOMÁTICA FALLA
+
+No se desactiva la guardia y no se usa la autorización manual para tapar un
+problema de plomería. Se lee el SHA que está atendiendo y se pasa a mano:
+
+```bash
+docker inspect erpazul_app --format '{{.Config.Image}}'      # o por ssh, según dónde se esté
+node scripts/clasificar-migraciones.mjs --desde <SHA_QUE_CORRÍA_ANTES>
+```
+
+Es la ruta explícita y auditable, y no se va a ninguna parte. **Pero es una
+salida de emergencia, no el procedimiento**: si hace falta dos veces seguidas, lo
+que hay que arreglar es la resolución, no acostumbrarse al rodeo.
 
 No se saltea aunque el despliegue "no traiga migraciones": eso es justamente lo
 que el chequeo comprueba. Si igual se lo saltea, la guardia lo intercepta en el
@@ -614,13 +671,13 @@ Una regla que solo vive en un documento se viola en silencio la primera vez. Es
 un script versionado, con sus candados:
 
 ```bash
-node scripts/clasificar-migraciones.mjs --vps
+node scripts/clasificar-migraciones.mjs --desplegado
 ```
 
-Pide por ssh el SHA de la imagen que está atendiendo y clasifica exactamente lo
-que este árbol introduce por encima. El rango sale de ahí y no de
-`migrate status`: son las migraciones que este despliegue mete sobre el código
-que hoy sirve pedidos.
+Averigua el SHA de la imagen que está atendiendo —acá mismo si el contenedor se
+ve desde donde se corre, por ssh si no— y clasifica exactamente lo que este árbol
+introduce por encima. El rango sale de ahí y no de `migrate status`: son las
+migraciones que este despliegue mete sobre el código que hoy sirve pedidos.
 
 **«Archivos a mirar: 0» tiene TRES formas de mentir.** Las tres terminan en un
 cero tranquilizador sobre un despliegue que sí trae migraciones:
@@ -647,9 +704,15 @@ para `git diff`. Lo que la tapa es commitear antes, que es un hábito, no un
 candado.
 
 Códigos de salida: **0** no encontró nada, **1** marcó al menos una y el
-despliegue se frena, **2** no pudo determinar el rango. Falla cerrado: si el ssh
-no llega, si el SHA no existe o si el directorio de migraciones no está donde lo
-espera, sale con 2. **Nunca pasa por no haber podido mirar.**
+despliegue se frena, **2** no pudo determinar el rango. Falla cerrado: si no se
+puede leer el SHA que atiende, si el SHA no existe o si el directorio de
+migraciones no está donde lo espera, sale con 2. **Nunca pasa por no haber
+podido mirar.**
+
+**Los dos sabores del 2 no son el mismo problema, y la guardia los separa.** No
+poder resolver el SHA se arregla resolviéndolo; un rango degenerado quiere decir
+que lo que se iba a desplegar ya está desplegado. Mezclarlos manda a revisar ssh
+a alguien cuyo problema es que no hay nada que hacer.
 
 **Un 0 no es una autorización.** El propio script lo imprime al salir bien, para
 que no haya que venir a leer esto para enterarse. El análisis es textual: busca
@@ -671,9 +734,41 @@ con 0. Autorizar a mano es explícito y visible en la línea:
 `DEPLOY_MIGRACION_AUTORIZADA=1` adelante del comando, misma idea que
 `SEED_DESTRUCTIVO`.
 
-La decisión vive en `lib/deploy/guardiaMigraciones.js`, que es una función pura
+La decisión vive en `lib/deploy/guardiaMigraciones.mjs`, que es una función pura
 con sus candados al lado; el hook solo lee la entrada, corre el clasificador
 cuando hace falta y escribe la respuesta.
+
+#### ESTA GUARDIA YA ESTUVO APAGADA, Y NADIE LO VIO — 2026-09-10
+
+Vale la pena saber cómo se apaga una guardia, porque no fue por una regla mal
+escrita: **fue por una extensión de archivo.**
+
+El hook importaba su decisión desde `guardiaMigraciones.js`. Ese archivo tiene
+sintaxis ESM y el repo no declara `"type": "module"`, así que para Node es
+CommonJS salvo que el motor detecte la sintaxis solo — algo que hacen 20.19+ y
+22.7+, y **Node 18 no**. En el VPS de producción `node --version` es v18.19.1.
+
+Resultado: el hook moría con un `SyntaxError` **antes de ejecutar una sola
+línea**, escribía cero bytes, y sin decisión el comando pasaba. El
+`migrate deploy` de producción del 2026-09-10 corrió sin que nada lo mirara. Los
+candados de la decisión seguían todos en verde: probaban una función pura que
+nunca llegaba a ejecutarse.
+
+Lo que lo cierra, y las tres cosas hacen falta:
+
+1. **La cadena entera es `.mjs`** — ESM explícito, sin depender del motor. Hay un
+   candado que se pone rojo si vuelve a entrar un `.js` en el medio.
+2. **El hook no importa nada de forma estática salvo módulos de `node:`.** Lo que
+   necesita para decidir lo carga con `await import()` dentro de un try/catch, y
+   si eso falla contesta **deny**. Un control que no puede correr tiene que
+   frenar: dejar pasar es exactamente cómo se apagó solo.
+3. **Los candados del hook lo EJECUTAN como proceso**, con el payload textual del
+   despliegue de `f63c0928`, en vez de importarlo. Es la regla 2 de CLAUDE.md:
+   la pieza estaba probada y el camino no.
+
+Las tres tienen contraprueba —`G-1`, `G-2` y `G-3` en
+`scripts/contrapruebas-revision.mjs`—: reintroducir cada defecto pone rojo el
+candado que le toca.
 
 **Desde el 2026-08-10 esta guardia importa más que antes.** Ese día Emanuel sacó
 los pedidos de permiso —`defaultMode` en `dontAsk`— porque un cartel que siempre
@@ -744,7 +839,7 @@ decide Emanuel—, porque una guardia que estorba todos los días se termina
 apagando, y ahí deja de proteger de todo.
 
 **Lo que se miró y NO se tapó**, con el motivo, está en la constante
-`NO_TAPADOS` de `lib/deploy/guardiaMigraciones.js`: `migrate dev` (puede resetear
+`NO_TAPADOS` de `lib/deploy/guardiaMigraciones.mjs`: `migrate dev` (puede resetear
 la base, pero es el comando del trabajo diario), `studio` (edita cualquier fila,
 pero el daño lo hace una persona haciendo clic y eso no lo distingue un match de
 texto), `db seed` (ya está protegido mejor por `scripts/lib/clientePrisma.mjs`) y
@@ -1116,7 +1211,7 @@ hipótesis a comprobar mirando la base, no como un hecho.
 sentencia, qué quedó aplicado, si el local sigue operando, y cuáles son las
 opciones. **No decidir por criterio propio y no desbloquear nada.** Si la salida
 es marcar la migración, eso significa sacarla de la lista de rechazo de
-`lib/deploy/guardiaMigraciones.js` a propósito y con su confirmación — no
+`lib/deploy/guardiaMigraciones.mjs` a propósito y con su confirmación — no
 inventarle un flag, no correrla por otro camino, no hacerla desde el VPS para
 esquivar la guardia. Ese trámite cuesta a propósito, y el día que cuesta es este.
 

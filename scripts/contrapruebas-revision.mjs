@@ -317,6 +317,48 @@ const CASOS = [
     candado: "16. una línea CON snapshot de despacho no ofrece adoptar nada",
     suite: "lib/transferencias/adopcionDePresentacion.test.mjs",
   },
+
+  // ── LOS TRES DE LA GUARDIA DE MIGRACIONES, 2026-09-10 ──────────────────
+  //
+  // La guardia estuvo APAGADA y sus candados en verde: probaban la decisión,
+  // que es una función pura, y el defecto vivía en el hook que nunca llegaba a
+  // llamarla. Estas tres inyecciones son las tres formas de volver a apagarla.
+  {
+    n: "G-1",
+    defecto: "el hook vuelve a depender obligatoriamente de --vps",
+    archivo: "scripts/hook-guardia-migraciones.mjs",
+    // Dentro del VPS el alias `vps-erp` no resuelve, así que el clasificador
+    // sale con 2 y la guardia deniega TODOS los despliegues hechos desde el
+    // servidor. Es el defecto que este arreglo vino a cerrar, al revés.
+    de: 'const MODO_CLASIFICADOR = "--desplegado";',
+    a: 'const MODO_CLASIFICADOR = "--vps";',
+    candado: "EL HOOK LLAMA AL CLASIFICADOR EN EL MODO CANÓNICO, NO EN --vps",
+    suite: "scripts/hook-guardia-migraciones.test.mjs",
+  },
+  {
+    n: "G-2",
+    defecto: "una guardia que no puede cargarse vuelve a dejar pasar el comando",
+    archivo: "scripts/hook-guardia-migraciones.mjs",
+    // Es LITERALMENTE lo que pasó el 2026-09-10: el hook no pudo cargar su
+    // decisión y el `migrate deploy` de producción corrió igual. La diferencia
+    // entre frenar y desaparecer es esta línea.
+    de: "    frenarPorGuardiaRota(e?.message || e);",
+    a: '    responder("allow", "");',
+    candado: "SI LA DECISIÓN NO SE PUEDE CARGAR, EL HOOK DENIEGA",
+    suite: "scripts/hook-guardia-migraciones.test.mjs",
+  },
+  {
+    n: "G-3",
+    defecto: "vuelve a entrar un .js de sintaxis ESM en la cadena de la guardia",
+    archivo: "scripts/clasificar-migraciones.mjs",
+    // La causa raíz del apagón no fue una regla mal escrita: fue una extensión.
+    // Un `.js` con sintaxis ESM, en un repo sin `"type": "module"`, no carga en
+    // Node 18 — que es el del VPS— y mata el proceso antes de que conteste.
+    de: 'from "../lib/deploy/shaDesplegado.mjs";',
+    a: 'from "../lib/deploy/shaDesplegado.js";',
+    candado: "TODA LA CADENA DE LA GUARDIA ES .mjs MIENTRAS EL REPO NO SEA type:module",
+    suite: "scripts/hook-guardia-migraciones.test.mjs",
+  },
 ];
 
 // `node_modules` se ENLAZA en vez de copiarse: son doce copias y nada de lo que
