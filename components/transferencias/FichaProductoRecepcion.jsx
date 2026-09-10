@@ -43,9 +43,13 @@ import { ESTADO_PRODUCTO, estadoDeProducto } from "@/lib/transferencias/controlF
 import {
   ORIGEN_PRESENTACION,
   admiteAdopcion,
+  equivalenciaParaAdoptar,
   hayPresentacionDistinta,
   origenDePresentacion,
 } from "@/lib/transferencias/adopcionDePresentacion";
+// Las físicas de la línea, en milésimas enteras. La MISMA función que alimenta
+// las cards y el filtro: la equivalencia no puede salir de otra cuenta.
+import { enviadoFisicoM } from "@/lib/transferencias/controlFisico";
 import {
   descriptorDeEnvio,
   escalaDeEnvio,
@@ -63,9 +67,20 @@ export const ROTULO_SUELTAS = "Hay unidades sueltas";
 // formas de decir lo mismo: el primero es lo que quedó escrito el día que salió
 // la mercadería, el segundo es lo que el catálogo dice HOY. Mostrarlos juntos y
 // rotulados es lo que hace que adoptar sea una decisión y no una corrección.
-export const ROTULO_REGISTRADO_ORIGINAL = "Registrado originalmente";
+export const ROTULO_HISTORICA = "Transferencia histórica";
+export const TEXTO_SIN_REGISTRO = "Esta línea no registró cómo salió del depósito.";
+export const ROTULO_REMITO_ORIGINAL = "Remito original";
 export const ROTULO_PRESENTACION_ACTUAL = "Presentación actual del depósito";
-export const ACCION_ADOPTAR = "Recibir con presentación actual";
+/** El CTA se arma con el nombre real: "Usar CAJÓN x8 para esta recepción". */
+export const ACCION_ADOPTAR = "Usar";
+export const SUFIJO_ADOPTAR = "para esta recepción";
+/**
+ * Lo que hay que decir para que la decisión no dé miedo: adoptar NO reescribe el
+ * remito. Sin esta línea, "usar otra presentación" se lee como corregir un
+ * documento que salió de otro local.
+ */
+export const AYUDA_ADOPTAR =
+  "No cambia el remito original. Solo fija cómo contar esta línea desde ahora.";
 export const ROTULO_ADOPTADA = "Presentación adoptada en la recepción";
 
 /**
@@ -232,11 +247,34 @@ export default function FichaProductoRecepcion({
   // Esto solo decide si se DIBUJA el ofrecimiento. Quien adopta es el servidor:
   // acá no se elige presentación, ni factor, ni peso — el POST manda dos ids.
   const adoptada = origenDePresentacion(d) === ORIGEN_PRESENTACION.ADOPTADA;
-  const puedeAdoptar =
+  const puedeAdoptarSegunLinea =
     puedeRecibir &&
     admiteAdopcion(d).ok &&
     !!d.presentacionActual &&
     hayPresentacionDistinta(d.presentacionActual, envio);
+
+  // ── LA EQUIVALENCIA, CALCULADA CON LA CONVERSIÓN QUE VA A PERSISTIR ────
+  //
+  // El operador tiene que VER en qué se convierte su línea antes de tocar el
+  // botón. Sale de `equivalenciaParaAdoptar`, que envuelve la misma
+  // `conversionParaAdoptar` que corre el servidor: si fueran dos cuentas, la
+  // pantalla prometería un número y la base guardaría otro.
+  //
+  // Cuando no se puede representar exacto —media unidad suelta, 3,25 piezas—
+  // devuelve `ok: false` y el ofrecimiento no se dibuja: se queda la lectura
+  // histórica, que es la verdad.
+  const fisicasM = enviadoFisicoM(d);
+  const equivalencia =
+    puedeAdoptarSegunLinea && fisicasM !== null
+      ? equivalenciaParaAdoptar({
+          fisicasM,
+          presentacion: d.presentacionActual.presentacion,
+          factor: d.presentacionActual.factor,
+          pesoPiezaKg: d.presentacionActual.pesoPiezaKg,
+        })
+      : null;
+  const fisicasHistoricas = fisicasM === null ? 0 : fisicasM / 1000;
+  const puedeAdoptar = puedeAdoptarSegunLinea && equivalencia?.ok === true;
 
   const adoptar = async () => {
     setError("");
@@ -382,20 +420,48 @@ export default function FichaProductoRecepcion({
           presentación de hoy es suya y explícita. Nunca automática: el sistema
           no sabe cómo salió la mercadería y no lo va a adivinar. */}
       {puedeAdoptar && (
-        <div className="sunmi-surface-soft sunmi-border rounded-lg p-2.5 space-y-2">
+        <div className="sunmi-surface-soft sunmi-border rounded-lg p-2.5 space-y-3">
+          <div className="text-sm2 font-semibold sunmi-text-strong">{ROTULO_HISTORICA}</div>
+
+          {/* BLOQUE 1 · el hecho, dicho como hecho. No es un error del registro:
+              es lo único que se sabe, y por eso no se toca. */}
           <div>
-            <div className="text-sm2 sunmi-text-muted">{ROTULO_REGISTRADO_ORIGINAL}</div>
-            <div className="font-mono tabular-nums sunmi-text-strong">{rotuloDeEnvio(envio)}</div>
+            <div className="text-sm2 sunmi-text-muted">{TEXTO_SIN_REGISTRO}</div>
+            <div className="font-mono tabular-nums sunmi-text-strong">
+              {ROTULO_REMITO_ORIGINAL}: {rotuloDeEnvio(envio)}
+            </div>
           </div>
+
+          {/* BLOQUE 2 · lo que el depósito usa hoy, con la equivalencia EXACTA
+              calculada por la misma conversión que va a persistir el servidor.
+              Para 42 dice "5 CAJÓN x8 + 2 unidades sueltas", nunca 5,25. */}
           <div>
             <div className="text-sm2 sunmi-text-muted">{ROTULO_PRESENTACION_ACTUAL}</div>
             <div className="font-mono tabular-nums sunmi-text-strong">
               {nombreDePresentacion(d.presentacionActual)}
             </div>
+            {equivalencia?.ok && (
+              <div className="text-sm2 sunmi-text-muted">
+                Equivale a {equivalencia.rotulo} para {fmtCantidad(fisicasHistoricas)}{" "}
+                {unidadDeDiferencia(envio)}
+              </div>
+            )}
           </div>
-          <SunmiButton color="amber" onClick={adoptar} disabled={adoptando}>
-            {adoptando ? "Adoptando…" : ACCION_ADOPTAR}
+
+          {/* El CTA nombra la presentación de verdad: "Usar CAJÓN x8…" y no un
+              genérico. Lo que se está por hacer tiene que leerse en el botón. */}
+          <SunmiButton
+            color="amber"
+            onClick={adoptar}
+            disabled={adoptando}
+            className="w-full justify-center"
+          >
+            {adoptando
+              ? "Adoptando…"
+              : `${ACCION_ADOPTAR} ${nombreDePresentacion(d.presentacionActual)} ${SUFIJO_ADOPTAR}`}
           </SunmiButton>
+
+          <div className="text-sm2 sunmi-text-muted">{AYUDA_ADOPTAR}</div>
         </div>
       )}
 

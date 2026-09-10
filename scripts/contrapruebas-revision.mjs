@@ -73,8 +73,11 @@ const CASOS = [
     // tocar Enter. Ahora la guarda es `noFigura`, un booleano derivado del texto
     // contra la transferencia completa. El ancla sigue al código: lo que se
     // inyecta —sacarle la condición al botón— es exactamente lo mismo.
-    de: "noFigura && puedeRecibir && (\n          <SunmiButton color=\"slate\"",
-    a: "puedeRecibir && (\n          <SunmiButton color=\"slate\"",
+    // Y la sangria bajo de diez a ocho espacios cuando el bloque salio de
+    // adentro de la card de busqueda para irse debajo de los filtros. El ancla
+    // sigue al codigo: con la vieja no matcheaba nada y el script lo dijo.
+    de: "noFigura && puedeRecibir && (\n        <SunmiButton color=\"slate\"",
+    a: "puedeRecibir && (\n        <SunmiButton color=\"slate\"",
     candado: "3. la acción del catálogo del origen solo existe tras no encontrar",
     suite: "lib/transferencias/revisionSueltas.test.mjs",
   },
