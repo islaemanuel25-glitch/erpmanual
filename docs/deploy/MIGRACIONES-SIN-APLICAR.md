@@ -16,51 +16,120 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-### `20260910120000_presentacion_adoptada_en_recepcion` — PENDIENTE DE PRODUCCIÓN
+Ninguna. Producción está en **10 migraciones**, las mismas que el árbol.
 
-**Producción sigue en 9 migraciones.** Cuando el PR de
-`feat/recepcion-ux-historicas-y-no-declarados` entre a `main`, el árbol va a
-tener **10** y esta va a ser la que falte: hay que aplicarla en el próximo
-despliegue.
+---
 
-Se registra ACÁ y no después justamente por lo que pasó el 2026-09-10. Ese día el
-paso 0 leyó "Pendientes: ninguna" siendo falso —la migración del snapshot ya
-estaba en `main` sin aplicar— porque el commit que la habría anotado no se hizo.
-El clasificador la detectó igual y no pasó nada, pero este archivo existe para
-que el que despliega **se entere antes de arrancar**, no para que un control
-redundante lo corrija a mitad de camino. Está contado en la entrada del
-2026-09-10, más abajo.
+## 2026-09-10 — `f63c0928`, adopción de presentación en recepción: una migración aplicada
 
-**Qué agrega**, todo sobre `TransferenciaDetalle`:
+Producción pasó de `edad85fba53620555b6b74f7906fd3ff2eb9c449` a
+`f63c092869715573381690d914cd51b21487873e`, que es el **merge del PR #54**. Sus
+dos padres son `edad85fb…` y `b3f1601f…`, el HEAD aprobado, y los dos árboles dan
+el mismo hash —`4015f15ca67378b22bfedcff5d8382f413c9fc59`—, así que lo desplegado
+es exactamente lo que pasó la CI.
 
-- `presentacionAdoptadaAt` — `TIMESTAMP(3)`, **nullable**.
-- `presentacionAdoptadaPorId` — `INTEGER`, **nullable**.
-- FK `TransferenciaDetalle_presentacionAdoptadaPorId_fkey` → `Usuario(id)`, con
-  `ON DELETE SET NULL` y `ON UPDATE CASCADE` — el mismo criterio que las otras
-  tres autorías de esa tabla.
+### La migración aplicada
 
-**Para qué.** Los cinco campos del snapshot significan "así SALIÓ del origen".
-Una transferencia histórica abierta puede recibirse adoptando la presentación que
-el depósito usa hoy, y eso llena esos mismos cinco campos. Sin una marca, la
-línea pasaría a afirmar que su presentación se registró al despachar — falso, y
-dentro de un mes indistinguible de una que sí se registró. Estas dos columnas son
-lo que separa "se despachó así" de "alguien lo adoptó durante la recepción". Ver
-`origenDePresentacion` en `lib/transferencias/adopcionDePresentacion.js`.
+`20260910120000_presentacion_adoptada_en_recepcion`, sobre `TransferenciaDetalle`:
 
-**Lo que NO hace**, y se puede comprobar leyendo el `.sql`:
+- `presentacionAdoptadaAt` — `TIMESTAMP(3)`, nullable;
+- `presentacionAdoptadaPorId` — `INTEGER`, nullable;
+- FK `TransferenciaDetalle_presentacionAdoptadaPorId_fkey` → `Usuario(id)`.
 
-- **cero backfill**: ninguna fila existente se toca;
-- no toca `cantidad` — la física histórica sigue siendo la autoridad;
-- no modifica ninguno de los cinco campos del snapshot que ya existían;
-- sin `DROP`, sin `UPDATE` de datos, sin `DELETE`, sin `INSERT`, sin `NOT NULL`.
+**Comprobado contra la base después de aplicar**, y no solo por el código de
+salida: las dos columnas existen y las dos son nulables; la FK informa
+`confdeltype = n` y `confupdtype = c`, o sea `ON DELETE SET NULL` y
+`ON UPDATE CASCADE`, que es el mismo criterio que las otras tres autorías de esa
+tabla.
 
-**Aditiva y compatible hacia atrás.** El código anterior no nombra ninguna de las
-dos columnas y ninguna es obligatoria, así que sigue funcionando durante toda la
-ventana entre migrar y recrear.
+**Cero backfill, medido:** de **6403** filas de `TransferenciaDetalle`, **0**
+tienen `presentacionAdoptadaAt`. La migración no tocó ninguna fila existente, que
+es lo que decía que no iba a hacer.
 
-Hay un candado que lee el SQL y lo verifica —`adopcionDePresentacion.test.mjs`,
-"la migración es ADITIVA"— con los patrones a nivel SENTENCIA, para que el
-`ON UPDATE CASCADE` de la clave foránea no se confunda con un `UPDATE` de datos.
+**Para qué está.** Los cinco campos del snapshot significan "así SALIÓ del
+origen". Una transferencia histórica abierta puede recibirse adoptando la
+presentación que el depósito usa hoy, y eso llena esos mismos cinco campos. Sin
+una marca, la línea pasaría a afirmar que su presentación se registró al
+despachar — falso, y dentro de un mes indistinguible de una que sí se registró.
+Ver `origenDePresentacion` en `lib/transferencias/adopcionDePresentacion.js`.
+
+### El conteo, que es lo que prueba que se aplicó
+
+El código de salida de `migrate deploy` no alcanza. El árbol del VPS tenía **10**
+migraciones y el contenedor descartable informó **10**, aplicando exactamente
+`20260910120000_presentacion_adoptada_en_recepcion`. Después, `migrate status`
+volvió a informar 10 y "Database schema is up to date!".
+
+### El clasificador, y la guardia que en este entorno no corre
+
+`node scripts/clasificar-migraciones.mjs --desde edad85fba536…`, corrido **antes
+del backup**: **1 archivo**, clasificación **ADITIVA**, **0 coincidencias**,
+**exit 0**.
+
+Se usó `--desde` y no `--vps` por una razón de plomería que conviene dejar
+escrita: **este despliegue se corre desde el propio VPS**, así que el alias ssh
+`vps-erp` no resuelve y el modo `--vps` sale con 2 sin poder mirar nada. El SHA
+que ese modo va a buscar por ssh —el de la imagen que atiende— se leyó acá mismo
+con `docker inspect erpazul_app --format '{{.Config.Image}}'`, que es el mismo
+dato y sin el salto de red en el medio.
+
+**Y de ahí se sigue algo que hay que decir: la guardia `PreToolUse` no intercepta
+el comando en este entorno.** Es el mismo defecto conocido que ya quedó anotado
+el 2026-09-06 y el 2026-09-10, no uno nuevo. Si hubiera corrido, habría llamado
+al clasificador en modo `--vps`, ese modo habría salido con 2 y la guardia habría
+**denegado** el despliegue por no poder determinar el rango — o sea que acá la
+guardia no solo no protege: si funcionara tal como está, frenaría todos los
+despliegues hechos desde el propio servidor. **Es una tanda pendiente**, y hasta
+que se haga, el único control real sobre qué migraciones entran es correr el
+clasificador a mano, con `--desde`, antes del backup.
+
+**No se usó autorización manual.** `.claude/migraciones-autorizadas.log` no
+existe, así que nadie abrió la puerta de `DEPLOY_MIGRACION_AUTORIZADA=1`.
+
+### Backup
+
+`/srv/produccion/backups/pre-f63c0928_20260910_181821.sql.gz`, **4,0 MB**. Los
+cuatro chequeos: `pg_dump` con `set -o pipefail` salió en 0, `gzip -t` sin
+salida, la marca `PostgreSQL database dump complete` en las últimas 20 líneas, y
+**68** `CREATE TABLE`. El quinto chequeo —el de las migraciones de DATOS— no
+aplica: esta no borra ni reescribe nada.
+
+### El corte
+
+**4 segundos** desde `up -d` hasta el primer 200 de `/api/version`, contra un
+tope de 30. Contenedor sin reinicios, logs de diez minutos sin `error` ni
+`fatal`, `/login` en 200 y el árbol del VPS limpio.
+
+### Y el cambio VIAJÓ a la imagen, comprobado con su control
+
+El marcador fue la cadena `"Transferencia histórica"` —texto de interfaz, no un
+identificador, porque el build minifica los identificadores—. En la imagen que
+atendía, `edad85fb…`, aparece en **0** archivos de `/app/.next`; en la nueva, en
+**2**. El control fue `"No declarado"`, que ya existía antes: **2** archivos en
+las dos. Sin el control, el 0 de la imagen vieja no habría significado nada.
+
+Las dos búsquedas se hicieron con `grep -rlF` en **contenedores descartables** de
+cada imagen, nunca dentro del que atiende.
+
+### La sonda de cascada, antes y después
+
+**VERDE las dos veces**, medida contra `https://operix.cloud/login`: el kit solo
+da 3,5 px y 7 px, y con `py-3` y `px-3` encima da 10,5 px — o sea que las 535
+declaraciones que las pantallas escriben sobre `SunmiButton` y `SunmiInput` se
+siguen aplicando.
+
+La hoja pasó de **1604** a **1628** reglas, que es lo esperable de una tanda que
+agrega clases y no saca ninguna.
+
+Un detalle del entorno que costó veinte minutos y conviene no volver a pagar:
+**la sonda corre en un contenedor y ahí Chromium aborta con "GPU process isn't
+usable" si no lleva `--no-sandbox`**. No hace falta tocar el script: el
+`/usr/bin/chromium` de la imagen es un envoltorio que respeta
+`CHROMIUM_USER_FLAGS`, así que alcanza con pasarle esa variable al
+`docker run`, junto con `--shm-size=1g`.
+
+La sonda de la tarjeta de producto **no aplica**: el rango no toca el catálogo,
+ni la tarjeta, ni `SunmiPanel`.
 
 ---
 
