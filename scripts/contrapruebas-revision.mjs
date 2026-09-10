@@ -317,6 +317,46 @@ const CASOS = [
     candado: "16. una línea CON snapshot de despacho no ofrece adoptar nada",
     suite: "lib/transferencias/adopcionDePresentacion.test.mjs",
   },
+
+  // ── LOS TRES DE LA TANDA DE IMPORTES Y SALIDA DEPÓSITO → LOCAL ─────────
+  //
+  // Los tres contratos nuevos que valen la pena defender: que la compra al
+  // proveedor no vuelva a decidir cómo cuenta el local, que la política de
+  // salida siga participando, y que la pantalla no vuelva a calcular plata.
+  {
+    n: "S-1",
+    defecto: "la compra al proveedor vuelve a decidir si algo es una PIEZA",
+    archivo: "lib/conversiones/stock.js",
+    // Es la mezcla exacta que la tanda vino a separar: un fiambre de pieza fija
+    // comprado por bulto volvería a leerse como producto a granel en la
+    // recepción, y con él se pierden las piezas que el destino iba a acreditar.
+    de: "export function elDepositoDespachaPorPieza(base) {\n  if (!base) return false;",
+    a: "export function elDepositoDespachaPorPieza(base) {\n  if (!base) return false;\n  if ((base.modoCompraProveedor || \"\") !== \"UNIDAD\") return false;",
+    candado: "G · y tampoco puede convertir una PIEZA en un kilo",
+    suite: "lib/transferencias/salidaDepositoLocal.test.mjs",
+  },
+  {
+    n: "S-2",
+    defecto: "la política de salida del depósito vuelve a ignorarse",
+    archivo: "lib/productos/presentacionDeProducto.js",
+    // Son los 291 productos medidos: pack o cajón con factor, que el depósito
+    // solo despacha sueltos y que volverían a ofrecerse como "PACK xN".
+    de: "  if (politica === MODO_ENVIO.SOLO_UNIDAD) {",
+    a: "  if (false) {",
+    candado: "SOLO_UNIDAD · un producto que agrupa se propone en UNIDAD, sin factor",
+    suite: "lib/transferencias/salidaDepositoLocal.test.mjs",
+  },
+  {
+    n: "S-3",
+    defecto: "la card vuelve a calcular el importe en vez de mostrar el del servidor",
+    archivo: "components/transferencias/WorkspaceRecepcion.jsx",
+    // Se ve inofensivo y es cómo el mismo remito termina mostrando un número en
+    // la card y otro en el PDF.
+    de: "{fmtMoneda(d.subtotal)}",
+    a: "{fmtMoneda((d.cantidadEnviada ?? 0) * (d.precioCosto ?? 0))}",
+    candado: "5b. y el subtotal que muestra es EXACTAMENTE el que llegó",
+    suite: "components/transferencias/importesRecepcion.test.mjs",
+  },
 ];
 
 // `node_modules` se ENLAZA en vez de copiarse: son doce copias y nada de lo que

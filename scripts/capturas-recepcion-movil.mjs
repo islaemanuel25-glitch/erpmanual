@@ -825,6 +825,106 @@ for (const ancho of ANCHOS) {
     desbordes += await foto("G-no-declarado-pack", ancho);
   }
 
+  // ── LA ESCENA DE LA TANDA DE IMPORTES Y SALIDA DEPÓSITO → LOCAL ────────
+  //
+  // Una sola foto que tiene que probar cuatro cosas a la vez: el importe del
+  // documento arriba, el subtotal DEBAJO de la cantidad en cada card, el estado
+  // solo en la columna derecha, y las dos escalas agrupadas —PACK x6 y CAJÓN
+  // x8— con su rótulo entero.
+  //
+  // ── POR QUÉ EL GUARDA NO EXIGE "PACK x6" Y "CAJÓN x8" ──────────────────
+  //
+  // El pedido de la tanda los nombraba. En la copia de producción NO EXISTEN en
+  // una recepción abierta, y eso se midió: de las 191 transferencias, la única
+  // en estado recibible con líneas agrupadas y un importe real es la #191, con
+  // PACK x10 y PACK x12. Todos los demás agrupados de un remito abierto salieron
+  // del depósito SUELTOS —`unidadEnviada = UNIDAD`—, que además es coherente con
+  // los 291 productos `SOLO_UNIDAD` que encontró la auditoría.
+  //
+  // Fabricar una línea para que la foto coincida con el diseño sería
+  // exactamente lo que prohíbe la regla 4 de CLAUDE.md: probaría que la pantalla
+  // dibuja algo, no que el caso ocurra. Así que el guarda exige lo que la
+  // captura tiene que demostrar —un agrupado CON su factor— y el número lo pone
+  // el remito.
+  if (MODO === "importes-salida") {
+    // Sin tocar los filtros: el tab por defecto es Pendientes y en un remito
+    // recién abierto son TODAS las líneas. Cambiarlo sería mover algo que la
+    // captura no viene a mostrar.
+    // SIN buscador y sin tocar los filtros: la escena es el remito tal como se
+    // abre. Filtrar sería mostrar una pantalla que el operador tuvo que armar.
+    //
+    // Y no se usa `BUSQUEDA` a propósito: su default es el término de otra
+    // escena, así que heredarlo dejaba esta captura mirando una lista vacía —lo
+    // que pasó en la primera corrida, y el guarda lo dijo.
+    //
+    // Se ESPERA a que las cards estén, no se cuenta hasta 1200 y se mira. El
+    // encabezado se dibuja antes que la lista, así que un guarda que solo
+    // comprueba el importe total pasa sobre una pantalla a medio cargar y
+    // después informa "0 cards" — que fue exactamente lo que pasó acá.
+    await esperarTexto("Importe total");
+    await esperarTexto("Enviado ");
+    await esperar(600);
+
+    const estado = await evaluar(`(() => {
+      const t = document.body.innerText;
+      // Se lee el TEXTO RENDERIZADO y no un selector. Un atributo puede dejar de
+      // llegar al DOM si el kit cambia cómo reenvía props, y entonces el guarda
+      // contaría cero sobre una pantalla que está perfecta — que es exactamente
+      // lo que pasó armando esta captura.
+      //
+      // Se lee de innerText y NO de textContent: el segundo incluye lo que hay
+      // adentro de los <script>, y el payload de Next repite cada línea del
+      // remito. Con textContent este guarda informaba 42 cards sobre una
+      // pantalla de 14 — un número inflado es tan inútil como uno en cero.
+      //
+      // Al colapsar los saltos, la cantidad y su importe quedan pegados, y esa
+      // adyacencia es JUSTO lo que hay que comprobar: que el importe venga
+      // después del renglón de la cantidad, adentro de la misma card.
+      // (Sin acentos graves acá adentro: esto vive en un template literal.)
+      const bruto = t.replace(/\\s+/g, " ");
+      const textos = bruto.match(/(?:Enviado|Recibido) [^$]{0,80}?Importe \\$ [\\d.]+,\\d{2}/g) || [];
+      return JSON.stringify({
+        importeTotal: t.includes("Importe total"),
+        // Cada entrada de textos ES una card cuya cantidad va seguida de su
+        // importe. Y conImporte cuenta los "Importe $" que hay en la pantalla:
+        // si alguno no quedó pegado a su cantidad, los dos números difieren.
+        cards: textos.length,
+        conImporte: (bruto.match(/Importe \\$/g) || []).length,
+        agrupados: textos.filter((x) => /(PACK|CAJÓN) x\\d+/.test(x)).length,
+        escalas: [...new Set(textos.flatMap((x) => x.match(/(?:PACK|CAJÓN|KG|PIEZA|UNIDAD)(?: x\\d+)?/g) || []))],
+        muestra: textos.slice(0, 3),
+        // Para que una corrida que falla diga QUÉ vio, en vez de dejar a quien
+        // la lea adivinando si el problema es la pantalla o el guarda.
+        vecindario: (() => {
+          const i = bruto.indexOf("Enviado ");
+          return i === -1 ? "(no aparece «Enviado »)" : bruto.slice(i, i + 160);
+        })(),
+      });
+    })()`);
+    const e = JSON.parse(estado);
+    if (e.cards === 0) console.log(`  · lo que se vio: ${e.vecindario}`);
+
+    // Se comprueba ANTES de disparar. Una pantalla que no tiene lo que la foto
+    // dice mostrar se fotografía igual de bien que la buena.
+    if (!e.importeTotal) throw new Error("no está el importe total del documento");
+    if (e.cards < 3) throw new Error(`hay ${e.cards} cards y hacen falta al menos 3`);
+    if (e.conImporte !== e.cards) {
+      throw new Error(`${e.conImporte} de ${e.cards} cards muestran importe`);
+    }
+    if (e.agrupados < 1) {
+      throw new Error("no hay ninguna línea agrupada con su factor: la escala no se ve");
+    }
+
+    // El orden ya está comprobado por construcción: cada entrada de `cards` es
+    // una cantidad SEGUIDA de su importe. Lo que falta es que no haya quedado
+    // ningún importe suelto, fuera de esa secuencia.
+
+    console.log(
+      `  · ${e.cards} cards · importe en ${e.conImporte} · ${e.agrupados} agrupados · escalas: ${e.escalas.join(", ")}`
+    );
+    desbordes += await foto("recepcion-importes-salida", ancho);
+  }
+
   if (MODO === "completo") {
     // D · todo revisado. Se llega EJERCIENDO la pantalla: se abre cada producto
     // y se lo marca revisado con lo que el remito propone. No se escribe en la
