@@ -6,7 +6,7 @@ import { checkPerm } from "@/lib/authorize";
 import { esComboBase } from "@/lib/combos/guards";
 import { productoDelCatalogoLocal } from "@/lib/productos/buscarCatalogoLocal";
 import { ERRORES_RECEPCION, resolverUnidadEnviada } from "@/lib/transferencias/recepcion";
-import { presentacionDeProducto } from "@/lib/productos/presentacionDeProducto";
+import { presentacionDeSalida } from "@/lib/productos/presentacionDeProducto";
 import {
   PRESENTACION,
   agrupa,
@@ -182,14 +182,19 @@ export async function POST(req) {
     // La decisión sale de los helpers canónicos —`presentacionDeProducto` y
     // `unidadFisicaDe`—, los mismos que usa la pantalla para derivarla. Acá no
     // se escribe ninguna regla nueva.
-    const presentacion = presentacionDeProducto({
+    //
+    // Y la pregunta es CÓMO SALE HOY DEL DEPÓSITO HACIA ESTE LOCAL, no cómo el
+    // depósito lo compra: un producto que se incorpora durante la recepción se
+    // recibe en la escala en que el depósito lo despacha. De ahí `modo_envio`,
+    // y de ahí que `modoCompraProveedor` ya no participe.
+    const presentacion = presentacionDeSalida({
       unidadMedida: producto.base?.unidad_medida,
       factorPack: producto.base?.factor_pack,
+      modoEnvio: producto.base?.modo_envio,
       modoVentaDeposito: producto.base?.modoVentaDeposito,
       pesoReferenciaKg: producto.base?.pesoReferenciaKg,
-      modoCompraProveedor: producto.base?.modoCompraProveedor,
       pesoEsFijo: producto.base?.pesoEsFijo,
-      // SIN `contadoEn`: el pedido no puede influir en qué ES el producto.
+      // SIN `contadoEn`: el pedido no puede influir en cómo sale el producto.
     });
     const unidadAutoritativa = unidadFisicaDe(presentacion);
 

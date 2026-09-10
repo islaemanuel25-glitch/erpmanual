@@ -22,7 +22,7 @@ import {
 import { escalaDeRecepcion } from "@/lib/transferencias/recepcionServidor";
 // La MISMA función con la que la ruta de adopción decide qué es el producto
 // hoy. La pantalla no la vuelve a deducir por su cuenta.
-import { presentacionDeProducto } from "@/lib/productos/presentacionDeProducto";
+import { presentacionDeSalida } from "@/lib/productos/presentacionDeProducto";
 
 function toNumber(v) {
   const n = Number(v);
@@ -338,9 +338,6 @@ export async function GET(req) {
         pesoPiezaKg: toNumber(d.pesoPiezaKg),
         // Lo necesita la reconstrucción para distinguir una PIEZA de un kilo.
         modoVentaDeposito: d.producto?.base?.modoVentaDeposito || null,
-        // Lo exige `esProductoFiambre`, la puerta del predicado único de pieza
-        // fija. Sin él la reconstrucción leería un fiambre como producto a granel.
-        modoCompraProveedor: d.producto?.base?.modoCompraProveedor || null,
         pesoEsFijo: d.producto?.base?.pesoEsFijo ?? null,
         // ── DE DÓNDE SALIÓ ESE SNAPSHOT ─────────────────────────────────
         //
@@ -361,13 +358,17 @@ export async function GET(req) {
         //
         // Informativa: quien adopta es el servidor, releyendo. Esto solo sirve
         // para decidir si se dibuja el ofrecimiento y qué texto mostrar.
+        // Es la presentación de SALIDA DEL DEPÓSITO AL LOCAL —con `modo_envio`
+        // adentro— y no la de compra al proveedor. La ruta de adopción usa
+        // exactamente la misma función, así que lo que se ofrece y lo que se
+        // persiste no pueden discrepar.
         presentacionActual: (() => {
-          const p = presentacionDeProducto({
+          const p = presentacionDeSalida({
             unidadMedida: d.producto?.base?.unidad_medida,
             factorPack: d.producto?.base?.factor_pack,
+            modoEnvio: d.producto?.base?.modo_envio,
             modoVentaDeposito: d.producto?.base?.modoVentaDeposito,
             pesoReferenciaKg: d.producto?.base?.pesoReferenciaKg,
-            modoCompraProveedor: d.producto?.base?.modoCompraProveedor,
             pesoEsFijo: d.producto?.base?.pesoEsFijo,
           });
           return { presentacion: p.presentacion, factor: p.factor, pesoPiezaKg: p.pesoPiezaKg };

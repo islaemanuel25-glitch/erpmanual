@@ -28,7 +28,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { presentacionDeProducto } from "@/lib/productos/presentacionDeProducto";
+import { presentacionDeSalida } from "@/lib/productos/presentacionDeProducto";
 import {
   ErrorRecepcion,
   escalaDeRecepcion,
@@ -131,15 +131,21 @@ export async function POST(req) {
       }
 
       // ── LA PRESENTACIÓN SALE DEL CATÁLOGO, NO DEL PEDIDO ────────────
+      //
+      // Y es la de SALIDA DEL DEPÓSITO AL LOCAL, que es la única pregunta que
+      // la recepción tiene derecho a hacer. Por eso entra `modo_envio`: un
+      // producto que agrupa pero que el depósito solo despacha suelto no puede
+      // proponerse como "PACK x6". Lo que NO entra es `modoCompraProveedor`:
+      // cómo el depósito le compra al proveedor no decide nada acá.
       const base = d.producto?.base;
-      const actual = presentacionDeProducto({
+      const actual = presentacionDeSalida({
         unidadMedida: base?.unidad_medida,
         factorPack: base?.factor_pack,
+        modoEnvio: base?.modo_envio,
         modoVentaDeposito: base?.modoVentaDeposito,
         pesoReferenciaKg: base?.pesoReferenciaKg,
-        modoCompraProveedor: base?.modoCompraProveedor,
         pesoEsFijo: base?.pesoEsFijo,
-        // SIN `contadoEn`: lo que se adopta es qué ES el producto hoy.
+        // SIN `contadoEn`: lo que se adopta es cómo sale hoy del depósito.
       });
 
       // Contra la lectura histórica: si dicen lo mismo, no hay nada que adoptar.
