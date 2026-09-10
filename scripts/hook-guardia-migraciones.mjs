@@ -25,6 +25,30 @@
 // la ventana: a partir de ahí el esquema es nuevo y el código que atiende es el
 // viejo. Recrear la app después no agrega riesgo, lo cierra.
 //
+// MEDIDO, no supuesto: el evento que llega es un PreToolUse de la herramienta
+// **Bash**, con el comando completo en `tool_input.command`. El `/deploy` no es
+// un evento propio —es un skill que se expande a una serie de llamadas Bash—,
+// así que el punto real donde empieza el riesgo es esa llamada y no otra. Está
+// ejercido en scripts/hook-guardia-migraciones.test.mjs con el payload textual.
+//
+// ── POR QUÉ NADA SE IMPORTA ARRIBA ──────────────────────────────────────────
+//
+// EL 2026-09-10 ESTA GUARDIA ESTUVO APAGADA Y NADIE LO VIO. El archivo importaba
+// `../lib/deploy/guardiaMigraciones.js` de forma estática. Ese `.js` tiene
+// sintaxis ESM y el repo no declara `"type": "module"`, así que bajo Node 18
+// —el del VPS de producción— el import lanza un SyntaxError ANTES de correr una
+// sola línea. El proceso muere, no escribe nada, y sin decisión el comando pasa.
+// El `migrate deploy` de producción de ese día corrió sin que nada lo mirara.
+//
+// De ahí las dos defensas de este archivo, y ninguna es cosmética:
+//
+//   1. La cadena entera es `.mjs` — ESM explícito, sin depender de que el motor
+//      detecte la sintaxis. Hay un candado que se pone rojo si vuelve a entrar
+//      un `.js` en el medio.
+//   2. Los módulos se cargan con `await import()` DENTRO de un try/catch, y si
+//      la carga falla se contesta **deny**. Un control que no puede correr tiene
+//      que frenar: dejar pasar es exactamente cómo se apagó solo.
+//
 // ── CÓMO SE AUTORIZA, Y QUÉ NO SE PUEDE AUTORIZAR ───────────────────────────
 //
 // `migrate deploy` se autoriza con `DEPLOY_MIGRACION_AUTORIZADA=1` adelante del
@@ -34,7 +58,7 @@
 // pantalla.
 //
 // `db push` NO se autoriza con nada. El motivo largo está en
-// lib/deploy/guardiaMigraciones.js, al lado de la función que lo decide.
+// lib/deploy/guardiaMigraciones.mjs, al lado de la función que lo decide.
 //
 // ── LÍMITES, QUE HAY QUE TENERLOS PRESENTES ─────────────────────────────────
 //
@@ -51,12 +75,20 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { decidirPorComando } from "../lib/deploy/guardiaMigraciones.js";
-
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(AQUI, "..");
 const CLASIFICADOR = path.join(AQUI, "clasificar-migraciones.mjs");
 const BITACORA = path.join(ROOT, ".claude", "migraciones-autorizadas.log");
+
+/**
+ * El modo canónico del clasificador.
+ *
+ * `--desplegado` averigua solo si el contenedor que atiende se ve desde acá o
+ * hay que preguntarle por ssh. Antes era `--vps`, que obliga a la vía remota:
+ * corrido DENTRO del VPS, donde el alias `vps-erp` no resuelve, salía con 2 y la
+ * guardia denegaba TODOS los despliegues hechos desde el servidor.
+ */
+const MODO_CLASIFICADOR = "--desplegado";
 
 /**
  * Deja el rastro de una autorización manual en un archivo.
@@ -101,10 +133,31 @@ function responder(decision, razon, aviso = null) {
   process.exit(0);
 }
 
+/**
+ * LA ÚNICA RESPUESTA QUE NO PUEDE DEPENDER DE QUE ALGO CARGUE.
+ *
+ * Está escrita acá adentro, corta y sin importar nada, a propósito: si el
+ * módulo de la decisión no se puede cargar, tampoco se puede cargar un texto que
+ * viva en él. Es la respuesta de último recurso, no la del caso normal.
+ */
+function frenarPorGuardiaRota(detalle) {
+  responder(
+    "deny",
+    "FRENADO: la guardia de migraciones no pudo cargarse, así que no miró nada.\n\n" +
+      `  ${String(detalle ?? "").split("\n")[0]}\n\n` +
+      "Esto no es una migración peligrosa: es el control roto. Un control que no puede " +
+      "correr tiene que frenar, porque la alternativa —dejar pasar— es exactamente cómo " +
+      "esta guardia se apagó sola el 2026-09-10 sin que nadie se enterara.\n\n" +
+      "Arreglar el hook antes de seguir. La ruta explícita y auditable mientras tanto es " +
+      "correr el clasificador a mano con --desde <SHA> y llevarle el resultado a Emanuel.",
+    "GUARDIA: el hook de migraciones no pudo cargarse y frenó el comando."
+  );
+}
+
 let entrada = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (c) => (entrada += c));
-process.stdin.on("end", () => {
+process.stdin.on("end", async () => {
   let comando = "";
   try {
     const evento = JSON.parse(entrada || "{}");
@@ -117,6 +170,16 @@ process.stdin.on("end", () => {
     responder("allow", "guardia de migraciones: no se pudo leer el evento, no se comprobó nada");
   }
 
+  let decidirPorComando;
+  let decidirPorClasificacion;
+  try {
+    ({ decidirPorComando, decidirPorClasificacion } = await import(
+      "../lib/deploy/guardiaMigraciones.mjs"
+    ));
+  } catch (e) {
+    frenarPorGuardiaRota(e?.message || e);
+  }
+
   const previa = decidirPorComando(comando);
   if (previa.accion !== "clasificar") {
     // Solo la autorización manual deja rastro: es la única que pasa sin que
@@ -126,35 +189,13 @@ process.stdin.on("end", () => {
     responder(previa.accion, previa.razon, previa.aviso);
   }
 
-  const r = spawnSync(process.execPath, [CLASIFICADOR, "--vps"], {
+  const r = spawnSync(process.execPath, [CLASIFICADOR, MODO_CLASIFICADOR], {
     cwd: ROOT,
     encoding: "utf8",
     timeout: 90_000,
   });
 
   const salida = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim();
-
-  if (r.status === 0) {
-    responder(
-      "allow",
-      `Guardia de migraciones: el clasificador no encontró sentencias marcadas.\n\n${salida}`
-    );
-  }
-
-  const encabezado =
-    r.status === 1
-      ? "FRENADO: hay al menos una migración que rompería a la versión que está atendiendo tráfico durante la ventana entre migrar y recrear."
-      : "FRENADO: la guardia no pudo determinar qué migraciones entran, así que no puede afirmar que sean compatibles.";
-
-  responder(
-    "deny",
-    `${encabezado}\n\n${salida}\n\n` +
-      "NO continuar por criterio propio. Informarle a Emanuel qué migración es, qué " +
-      "sentencia la marcó y por qué rompería a la versión vieja, y esperar su " +
-      "confirmación explícita. Si él confirma, el comando se repite con " +
-      "DEPLOY_MIGRACION_AUTORIZADA=1 adelante.",
-    r.status === 1
-      ? "GUARDIA: se frenó una migración que rompería a la versión vieja durante la ventana."
-      : "GUARDIA: se frenó una migración porque el clasificador no pudo determinar qué entra."
-  );
+  const decision = decidirPorClasificacion({ status: r.status, salida });
+  responder(decision.accion, decision.razon, decision.aviso);
 });
