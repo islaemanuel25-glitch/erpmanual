@@ -124,6 +124,7 @@ export default function RecepcionMovil({
 
   const opcionesEstado = TABS.map((t) => ({ ...t, cantidad: CONTEO[t.clave](resumen || {}) }));
 
+
   // ── QUIÉN TIENE DIFERENCIA LO DECIDE EL MISMO PREDICADO QUE EL FILTRO ───
   //
   // `pasaFiltro(d, DIFERENCIAS)` es lo que alimenta el tab y las cards. Si acá
@@ -386,6 +387,13 @@ export default function RecepcionMovil({
         z={NIVEL_MODAL_GLOBAL}
         forma="hoja"
         // Es carga: hay una cantidad escrita que un toque al costado tiraría.
+        //
+        // Se probó condicionarlo —mientras la hoja es la vista de DECISIÓN de
+        // una histórica no hay ningún campo que perder— y NO va: el candado del
+        // kit acepta solo literales acá, a propósito, para que una expresión
+        // cualquiera no pase como decisión tomada. Hacerlo condicional es una
+        // decisión de criterio que se registra allá, y no era el pedido de esta
+        // tanda.
         destructivo
         espacioCuerpo="gap-2"
       >

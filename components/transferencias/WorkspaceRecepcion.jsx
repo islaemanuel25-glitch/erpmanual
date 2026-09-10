@@ -162,7 +162,17 @@ const TONO_ESTADO_FILA = Object.freeze({
   [ESTADO_PRODUCTO.CORRECTO]: "sunmi-text-success",
   [ESTADO_PRODUCTO.FALTANTE]: "sunmi-text-danger",
   [ESTADO_PRODUCTO.SOBRANTE]: "sunmi-text-warning",
-  [ESTADO_PRODUCTO.NO_DECLARADO]: "sunmi-text-link",
+  // ── "NO DECLARADO" ES UNA ADVERTENCIA, NO UN ENLACE ──────────────────
+  //
+  // Estaba en `sunmi-text-link`, el azul de los enlaces. Semanticamente es lo
+  // que no es: nadie navega a ningun lado desde ahi, y visualmente competia con
+  // los links de verdad de la pantalla.
+  //
+  // Un producto que llego sin estar en el remito es una INCONSISTENCIA FISICA
+  // que alguien informo, y esa es la misma familia que el sobrante — por eso
+  // comparte su token. `sunmi-text-warning` sale de `var(--pos-warning)` y lo
+  // resuelve el tema: aca no hay hex.
+  [ESTADO_PRODUCTO.NO_DECLARADO]: "sunmi-text-warning",
 });
 
 export default function WorkspaceRecepcion({
