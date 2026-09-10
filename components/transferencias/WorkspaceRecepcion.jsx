@@ -50,6 +50,7 @@ import RecepcionMovil from "./RecepcionMovil";
 import FichaProductoRecepcion, { TEXTO_ESTADO } from "./FichaProductoRecepcion";
 import {
   descriptorDeEnvio,
+  firmaDeEdicion,
   rotuloConSueltas,
   rotuloDeEnvio,
 } from "@/lib/transferencias/presentacionEnvio";
@@ -112,7 +113,21 @@ export function FilaProducto({ d, activa, onElegir }) {
             Revisado
           </span>
         ) : (
-          <span className="text-sm2 sunmi-text-muted shrink-0">{TEXTO_ESTADO[estado]}</span>
+          // ── "NO DECLARADO" NO ES "PENDIENTE" ────────────────────────────
+          //
+          // Esta rama pintaba TODO lo no revisado con el mismo gris apagado, y
+          // con eso un producto que llegó sin estar en el remito se veía igual
+          // que uno que todavía nadie contó. Son dos cosas distintas: una es un
+          // paso que falta, la otra es una inconsistencia física que alguien
+          // informó.
+          //
+          // El tono sale del MISMO mapa que usa el resultado de un producto
+          // revisado —`TONO_ESTADO_FILA`, con los tokens semánticos del tema— y
+          // el pendiente cae en el `muted` de siempre por el fallback. Nada de
+          // hex ni de la paleta cruda de Tailwind.
+          <span className={`text-sm2 shrink-0 ${TONO_ESTADO_FILA[estado] || "sunmi-text-muted"}`}>
+            {TEXTO_ESTADO[estado]}
+          </span>
         )}
       </span>
       <span className="text-sm2 sunmi-text-muted">
@@ -348,7 +363,12 @@ export default function WorkspaceRecepcion({
       // `key` con el id: cambiar de producto REMONTA la ficha, y su estado nace
       // del producto nuevo. Sin esto haría falta un efecto que sincronice, y ese
       // efecto deja el primer pintado con los campos vacíos.
-      key={seleccionado.id}
+      // ── LA IDENTIDAD INCLUYE LA ESCALA, NO SOLO EL ID ──────────────
+      // Adoptar la presentación actual cambia en qué se cuenta esta línea
+      // SIN cambiarle el id. Con `key={seleccionado.id}` React conservaba el
+      // estado: el rótulo pasaba a "5 CAJÓN x8" y el campo seguía diciendo
+      // 40. Ver `firmaDeEdicion`.
+      key={firmaDeEdicion(seleccionado)}
       producto={seleccionado}
       puedeRecibir={puedeRecibir}
       guardando={guardando}
@@ -455,32 +475,6 @@ export default function WorkspaceRecepcion({
           )}
         </div>
 
-        {/* ── EL CATÁLOGO DEL ORIGEN ES UN CAMINO DE EXCEPCIÓN ─────────────
-            Antes este botón estaba SIEMPRE, y eso contradice el flujo: lo normal
-            es que el producto esté en el remito, y ofrecer permanentemente el
-            atajo para "informar algo que no figura" invita a usarlo antes de
-            haber buscado — con el resultado de una línea agregada al lado de la
-            del remito, para el mismo producto.
-
-            Aparece solo cuando la búsqueda YA falló, que es cuando significa
-            algo. Y aparece pegado al mensaje que explica por qué. */}
-        {(noFigura || aviso) && (
-          <SunmiAviso tono="warning">
-            {noFigura ? MENSAJE_NO_FIGURA : aviso}
-            {noFigura && puedeRecibir && (
-              <>
-                {" "}
-                Si igual llegó, informalo como producto no declarado.
-              </>
-            )}
-          </SunmiAviso>
-        )}
-
-        {noFigura && puedeRecibir && (
-          <SunmiButton color="slate" onClick={() => setAgregarAbierto(true)}>
-            {ACCION_AGREGAR}
-          </SunmiButton>
-        )}
       </SunmiCard>
 
       {/* ── FILTROS ──────────────────────────────────────────────────────── */}
@@ -499,6 +493,39 @@ export default function WorkspaceRecepcion({
           onCambiar={setCategoriaId}
         />
       </div>
+
+      {/* ── EL CATÁLOGO DEL ORIGEN ES UN CAMINO DE EXCEPCIÓN ─────────────
+          Antes este botón estaba SIEMPRE, y eso contradice el flujo: lo normal
+          es que el producto esté en el remito, y ofrecer permanentemente el
+          atajo para "informar algo que no figura" invita a usarlo antes de
+          haber buscado — con el resultado de una línea agregada al lado de la
+          del remito, para el mismo producto.
+
+          Aparece solo cuando la búsqueda YA falló, que es cuando significa
+          algo. Y aparece pegado al mensaje que explica por qué.
+
+          ── Y DESPUÉS DE LOS FILTROS, NO PEGADO AL BUSCADOR ─────────────
+          Estaba adentro de la card de búsqueda, así que empujaba los filtros
+          hacia abajo cada vez que una búsqueda no encontraba algo. El orden
+          aprobado pone primero las herramientas de siempre y el camino de
+          excepción al final: es lo que pasa poco. */}
+      {(noFigura || aviso) && (
+        <SunmiAviso tono="warning">
+          {noFigura ? MENSAJE_NO_FIGURA : aviso}
+          {noFigura && puedeRecibir && (
+            <>
+              {" "}
+              Si igual llegó, informalo como producto no declarado.
+            </>
+          )}
+        </SunmiAviso>
+      )}
+
+      {noFigura && puedeRecibir && (
+        <SunmiButton color="slate" onClick={() => setAgregarAbierto(true)}>
+          {ACCION_AGREGAR}
+        </SunmiButton>
+      )}
 
       {/* ── LISTADO Y FICHA ──────────────────────────────────────────────────
           Teléfono: la ficha REEMPLAZA al listado mientras hay un producto
