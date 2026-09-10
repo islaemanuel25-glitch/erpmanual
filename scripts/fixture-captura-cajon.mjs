@@ -45,6 +45,12 @@ const arg = (n, def) => {
 
 const BASE_ID = Number(arg("producto", "181"));
 const CAJONES = Number(arg("cajones", "6"));
+/**
+ * Unidades sueltas del ENVÍO: el despacho mixto que el POS permite —cuatro packs
+ * y cinco sueltas del mismo producto en la misma venta—. Viajan como una segunda
+ * línea comercial en modo UNIDAD_REMANENTE, que es como las manda el POS.
+ */
+const SUELTAS = Number(arg("sueltas", "0"));
 const ORIGEN = Number(arg("origen", "1"));
 const DESTINO = Number(arg("destino", "4"));
 
@@ -70,30 +76,38 @@ if (!local) {
 }
 
 const factor = Number(base.factor_pack || 1);
-const fisicas = CAJONES * factor;
+const fisicas = CAJONES * factor + SUELTAS;
 
 // ── LA LÍNEA COMERCIAL, TAL COMO LA ARMA EL POS ─────────────────────────
 //
 // `baseStock` es lo que `pos-ventas/crear` mete en `baseStockMap`: los mismos
 // campos y con los mismos nombres. De ahí sale la presentación congelada.
-const lineasComerciales = [
-  {
-    tipo: "NORMAL",
-    productoLocalId: local.id,
-    productoBaseId: BASE_ID,
-    cantidad: CAJONES,
-    modoVentaLinea: "NORMAL",
-    consumoFisico: { productoLocalId: local.id, cantidadStock: fisicas },
-    baseStock: {
-      modoVentaDeposito: base.modoVentaDeposito || "PESO",
-      pesoReferenciaKg: Number(base.pesoReferenciaKg || 0),
-      modoCompraProveedor: base.modoCompraProveedor || null,
-      pesoEsFijo: base.pesoEsFijo ?? null,
-      factorPack: factor,
-      unidad_medida: base.unidad_medida || "unidad",
-    },
-  },
-];
+const baseStock = {
+  modoVentaDeposito: base.modoVentaDeposito || "PESO",
+  pesoReferenciaKg: Number(base.pesoReferenciaKg || 0),
+  modoCompraProveedor: base.modoCompraProveedor || null,
+  pesoEsFijo: base.pesoEsFijo ?? null,
+  factorPack: factor,
+  unidad_medida: base.unidad_medida || "unidad",
+};
+
+const lineaComercial = (cantidad, modoVentaLinea, cantidadStock) => ({
+  tipo: "NORMAL",
+  productoLocalId: local.id,
+  productoBaseId: BASE_ID,
+  cantidad,
+  modoVentaLinea,
+  consumoFisico: { productoLocalId: local.id, cantidadStock },
+  baseStock,
+});
+
+const lineasComerciales = [lineaComercial(CAJONES, "NORMAL", CAJONES * factor)];
+// El despacho MIXTO: la misma mercadería vendida en dos modos. Consolidado no se
+// puede volver a separar —29/6 no es entero— y por eso el snapshot las guarda
+// aparte.
+if (SUELTAS > 0) {
+  lineasComerciales.push(lineaComercial(SUELTAS, "UNIDAD_REMANENTE", SUELTAS));
+}
 
 // El consumo consolidado, ya en escala de StockLocal: es lo que el POS descontó.
 const plan = mapearVentaATransferencia({
