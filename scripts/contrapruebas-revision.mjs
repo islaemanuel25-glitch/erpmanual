@@ -67,7 +67,13 @@ const CASOS = [
     // fue lo que la primera corrida dejó pasar, y recortarla a la indentación
     // del botón no alcanzó: con ocho espacios el ancla vive DENTRO de la línea
     // de doce. Se ancla en la línea siguiente, que es la que la distingue.
-    de: "MENSAJE_NO_FIGURA && puedeRecibir && (\n          <SunmiButton color=\"slate\"",
+    // ── LA GUARDA CAMBIÓ DE FORMA ────────────────────────────────────────
+    //
+    // Era `aviso === MENSAJE_NO_FIGURA`, y ese aviso solo existía después de
+    // tocar Enter. Ahora la guarda es `noFigura`, un booleano derivado del texto
+    // contra la transferencia completa. El ancla sigue al código: lo que se
+    // inyecta —sacarle la condición al botón— es exactamente lo mismo.
+    de: "noFigura && puedeRecibir && (\n          <SunmiButton color=\"slate\"",
     a: "puedeRecibir && (\n          <SunmiButton color=\"slate\"",
     candado: "3. la acción del catálogo del origen solo existe tras no encontrar",
     suite: "lib/transferencias/revisionSueltas.test.mjs",
@@ -248,6 +254,34 @@ const CASOS = [
     a: "          revisadoEnRecepcionPorId: Number(body?.usuarioId || 0),",
     candado: "24-25. guardar un borrador NO marca revisado; revisar SÍ lo persiste",
     suite: "lib/transferencias/controlFisico.test.mjs",
+  },
+
+  // ── LOS TRES DE LA TANDA DE UX, 2026-09-10 ─────────────────────────────
+  //
+  // Un candado que nunca se vio en rojo se lee igual que uno que funciona. Los
+  // tres defectos que esta tanda vino a cerrar tienen su inyección acá.
+  {
+    n: "U-1",
+    defecto: "«Todos» vuelve a esconder los productos no declarados",
+    archivo: "lib/transferencias/controlFisico.js",
+    // El ancla lleva la línea de arriba porque `return true;` solo, en un
+    // archivo con siete `case`, no identifica cuál se está rompiendo.
+    de: "      // 52. Los dos números son correctos porque cuentan cosas distintas.\n      return true;",
+    a: "      // 52. Los dos números son correctos porque cuentan cosas distintas.\n      return esDelRemito;",
+    candado: "4. un no declarado aparece en «Todos»",
+    suite: "lib/transferencias/busquedaYNoDeclarados.test.mjs",
+  },
+  {
+    n: "U-2",
+    defecto: "«no figura» vuelve a decidirse contra la lista FILTRADA",
+    archivo: "components/transferencias/WorkspaceRecepcion.jsx",
+    // Es el error exacto que el nombre del parámetro existe para evitar: con la
+    // lista filtrada, un producto tapado por un filtro se lee como ausente y la
+    // pantalla ofrece duplicarlo.
+    de: "    () => items.length > 0 && faltaEnLaTransferencia(items, texto),",
+    a: "    () => items.length > 0 && faltaEnLaTransferencia(visibles, texto),",
+    candado: "2c. LA CONTRAPRUEBA: preguntarle a la lista filtrada daría lo contrario",
+    suite: "lib/transferencias/busquedaYNoDeclarados.test.mjs",
   },
 ];
 

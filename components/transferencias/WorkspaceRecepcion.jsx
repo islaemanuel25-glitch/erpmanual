@@ -30,7 +30,7 @@
 // Y como son ~150 productos ya cargados, la búsqueda no consulta al servidor por
 // cada tecla: se resuelve local.
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check } from "lucide-react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
@@ -50,17 +50,18 @@ import RecepcionMovil from "./RecepcionMovil";
 import FichaProductoRecepcion, { TEXTO_ESTADO } from "./FichaProductoRecepcion";
 import {
   descriptorDeEnvio,
-  nombreDePresentacion,
+  rotuloConSueltas,
   rotuloDeEnvio,
 } from "@/lib/transferencias/presentacionEnvio";
 import AgregarProductoRecibido, { ACCION_AGREGAR } from "./AgregarProductoRecibido";
-import { SectionHead, fmtCantidad } from "./detallePresentacion";
+import { SectionHead } from "./detallePresentacion";
 import {
   ESTADO_PRODUCTO,
   FILTRO,
   RESOLUCION,
   categoriasDelRemito,
   estadoDeProducto,
+  faltaEnLaTransferencia,
   productosVisibles,
   resolverEntrada,
   resumenDeRecepcion,
@@ -95,6 +96,10 @@ export function FilaProducto({ d, activa, onElegir }) {
     <SunmiActionCard
       onClick={() => onElegir(d)}
       aria-pressed={activa}
+      // El id en el DOM: es lo que deja llevar la vista hasta la línea recién
+      // agregada sin tener que reenviar un ref por el kit. `SunmiActionCard`
+      // vuelca sus props sobre el `<button>`, así que no hace falta tocarlo.
+      data-detalle-id={d.id}
       className={activa ? "sunmi-state-success" : ""}
     >
       <span className="flex items-start justify-between gap-2 w-full">
@@ -114,7 +119,15 @@ export function FilaProducto({ d, activa, onElegir }) {
         {/* La presentación con la que salió del origen, no las unidades
             físicas: "6 CAJÓN x8" y no "48 UNIDAD". */}
         {d.agregadoEnRecepcion
-          ? `Recibido ${fmtCantidad(d.cantidadRecibida ?? 0)} ${nombreDePresentacion(envio)}`
+          ? // Un no declarado se cuenta igual que cualquier otro, bultos
+            // completos y sueltas incluidas: "Recibido 2 PACK x6 + 1 unidad
+            // suelta". Decir solo "2 PACK x6" perdería la suelta en la única
+            // línea que no tiene un remito contra el cual contrastarla.
+            `Recibido ${rotuloConSueltas({
+              ...envio,
+              cantidad: d.cantidadRecibida ?? 0,
+              sueltas: d.recibidoUnidadesSueltas ?? 0,
+            })}`
           : `Enviado ${rotuloDeEnvio(envio)}`}
         {d.categoria?.nombre ? ` · ${d.categoria.nombre}` : ""}
       </span>
@@ -143,6 +156,8 @@ export default function WorkspaceRecepcion({
   onRevisar,
   onAgregar,
   onQuitarLinea,
+  /** Adoptar la presentación actual sobre una línea histórica. Ver la ficha. */
+  onAdoptarPresentacion,
   guardando = false,
   quitandoId = null,
   // ── LO ADMINISTRATIVO, QUE EN EL TELÉFONO VIVE ADENTRO DE ESTA PANTALLA ──
@@ -183,11 +198,72 @@ export default function WorkspaceRecepcion({
 
   const seleccionado = items.find((d) => d.id === seleccionadoId) || null;
 
+  // ── "NO FIGURA" SE DECIDE MIENTRAS SE ESCRIBE, Y CONTRA TODO EL REMITO ──
+  //
+  // Antes esto dependía de tocar Enter: hasta entonces la pantalla decía "No hay
+  // productos que coincidan con este filtro" y el camino para informar lo que
+  // llegó de más quedaba escondido detrás de una tecla que nadie sabía que había
+  // que apretar.
+  //
+  // Y la pregunta se le hace a `items` ENTERO, nunca a `visibles`. Un producto
+  // que está en la transferencia pero tapado por el filtro de estado o por un
+  // chip de categoría NO es un producto ausente: ofrecer informarlo como no
+  // declarado ahí es el camino directo a una segunda línea del mismo producto.
+  // La distinción vive en `faltaEnLaTransferencia`, con su nombre de parámetro
+  // diciendo qué lista espera.
+  //
+  // `items.length > 0` guarda el caso de la pantalla todavía sin cargar: sin
+  // líneas, todo texto "no figura" y el CTA aparecería sobre una transferencia
+  // que ni siquiera llegó.
+  const noFigura = useMemo(
+    () => items.length > 0 && faltaEnLaTransferencia(items, texto),
+    [items, texto]
+  );
+
   /** Deja el producto a la vista y limpia lo que estorbaría para verlo. */
   const elegir = (d) => {
     setSeleccionadoId(d.id);
     setAviso("");
   };
+
+  // ── AGREGAR ALGO Y VERLO DESAPARECER ES EL PEOR FINAL POSIBLE ───────────
+  //
+  // El operador informa un producto que llegó de más y la pantalla lo manda a
+  // una lista que no está mirando. Antes ni siquiera existía una: "Todos" dejaba
+  // los agregados afuera.
+  //
+  // Ahora "Todos" los incluye, y además la vista se acomoda para que se vea: se
+  // pasa a "Todos", se sueltan los dos filtros que podrían taparlo —el chip de
+  // categoría, porque la categoría de un agregado no es un chip del remito; y el
+  // texto buscado, que es justamente el que no encontró nada— y se lleva el
+  // scroll hasta la card.
+  //
+  // Lo que NO se hace es abrirle la ficha: en el teléfono la ficha REEMPLAZA al
+  // listado, así que "dejarlo visible" terminaría escondiendo la lista entera.
+  // Se lo muestra en su lugar, entre los demás.
+  const [porMostrarId, setPorMostrarId] = useState(null);
+
+  const agregarYMostrar = async (cuerpo) => {
+    const json = await onAgregar?.(cuerpo);
+    if (json?.ok && !json.yaExistia && json.detalleId != null) {
+      setFiltro(FILTRO.TODOS);
+      setCategoriaId(null);
+      setTexto("");
+      setAviso("");
+      setPorMostrarId(json.detalleId);
+    }
+    return json;
+  };
+
+  // El scroll va en un efecto y no adentro del handler porque la línea todavía
+  // no existe en el DOM cuando el POST vuelve: la trae la recarga del padre.
+  useEffect(() => {
+    if (porMostrarId == null) return;
+    if (!items.some((d) => d.id === porMostrarId)) return;
+    const el = document.querySelector(`[data-detalle-id="${porMostrarId}"]`);
+    if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+    setPorMostrarId(null);
+  }, [porMostrarId, items]);
 
   /**
    * Lo que hace un código leído o un texto tecleado con Enter.
@@ -199,7 +275,10 @@ export default function WorkspaceRecepcion({
    *                agregado antes— se abre el suyo, no se agrega otro.
    *   LISTA      → hay varios y **no se elige por el operador**. El texto queda
    *                puesto, así que el listado ya los está mostrando filtrados.
-   *   NO_FIGURA  → recién acá el aviso, que es lo que habilita el catálogo.
+   *   NO_FIGURA  → deja el texto puesto. El aviso y el catálogo YA NO salen de
+   *                acá: los deriva `noFigura` mientras se escribe. Esto sigue
+   *                existiendo para la CÁMARA, que necesita dejar el código leído
+   *                en el campo para que la derivación tenga qué mirar.
    */
   const resolver = (entrada, opciones) => {
     const r = resolverEntrada(items, entrada, opciones);
@@ -215,8 +294,8 @@ export default function WorkspaceRecepcion({
     }
 
     if (r.tipo === RESOLUCION.NO_FIGURA) {
-      setAviso(MENSAJE_NO_FIGURA);
       setTexto(String(entrada || "").trim());
+      setAviso("");
       return r;
     }
 
@@ -247,7 +326,13 @@ export default function WorkspaceRecepcion({
 
   const listado = (
     <div className="space-y-1.5">
-      {visibles.length === 0 && (
+      {/* ── DOS VACÍOS QUE SIGNIFICAN COSAS DISTINTAS ─────────────────
+          Una lista vacía porque el FILTRO tapó lo que hay no es lo mismo que
+          una lista vacía porque el producto NO ESTÁ. Cuando `noFigura` ya lo
+          dijo arriba —y ofreció el camino de salida— repetir "no coincide con
+          este filtro" manda a mirar el filtro, que es justo la confusión que
+          esta tanda vino a sacar. */}
+      {visibles.length === 0 && !noFigura && (
         <p className="text-center py-6 sunmi-text-muted text-sm2">
           No hay productos que coincidan con este filtro.
         </p>
@@ -268,6 +353,7 @@ export default function WorkspaceRecepcion({
       puedeRecibir={puedeRecibir}
       guardando={guardando}
       onRevisar={onRevisar}
+      onAdoptarPresentacion={onAdoptarPresentacion}
       onQuitar={onQuitarLinea}
       quitando={quitandoId === seleccionado.id}
     />
@@ -298,6 +384,7 @@ export default function WorkspaceRecepcion({
           categoriaId={categoriaId}
           texto={texto}
           aviso={aviso}
+          noFigura={noFigura}
           puedeRecibir={puedeRecibir}
           guardando={guardando}
           quitandoId={quitandoId}
@@ -316,6 +403,7 @@ export default function WorkspaceRecepcion({
           onCerrarProducto={() => setSeleccionadoId(null)}
           onRevisar={onRevisar}
           onQuitarLinea={onQuitarLinea}
+          onAdoptarPresentacion={onAdoptarPresentacion}
           onAbrirEscaner={() => setEscaneando(true)}
           onAbrirAgregar={() => setAgregarAbierto(true)}
           accionAgregar={ACCION_AGREGAR}
@@ -376,10 +464,10 @@ export default function WorkspaceRecepcion({
 
             Aparece solo cuando la búsqueda YA falló, que es cuando significa
             algo. Y aparece pegado al mensaje que explica por qué. */}
-        {aviso && (
+        {(noFigura || aviso) && (
           <SunmiAviso tono="warning">
-            {aviso}
-            {aviso === MENSAJE_NO_FIGURA && puedeRecibir && (
+            {noFigura ? MENSAJE_NO_FIGURA : aviso}
+            {noFigura && puedeRecibir && (
               <>
                 {" "}
                 Si igual llegó, informalo como producto no declarado.
@@ -388,7 +476,7 @@ export default function WorkspaceRecepcion({
           </SunmiAviso>
         )}
 
-        {aviso === MENSAJE_NO_FIGURA && puedeRecibir && (
+        {noFigura && puedeRecibir && (
           <SunmiButton color="slate" onClick={() => setAgregarAbierto(true)}>
             {ACCION_AGREGAR}
           </SunmiButton>
@@ -465,7 +553,7 @@ export default function WorkspaceRecepcion({
           abierto={agregarAbierto}
           transferenciaId={item.id}
           onCerrar={() => setAgregarAbierto(false)}
-          onAgregar={onAgregar}
+          onAgregar={agregarYMostrar}
         />
       )}
     </section>

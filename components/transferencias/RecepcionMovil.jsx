@@ -71,7 +71,10 @@ const CONTEO = {
   [FILTRO.PENDIENTES]: (r) => r.pendientes,
   [FILTRO.DIFERENCIAS]: (r) => r.diferencias,
   [FILTRO.REVISADOS]: (r) => r.revisados,
-  [FILTRO.TODOS]: (r) => r.totalRemito,
+  // "Todos" cuenta la mercadería que hay sobre la mesa —agregados incluidos—,
+  // que es lo que ese tab muestra. Los otros tres cuentan el remito. Ver
+  // `resumenDeRecepcion`: son dos totales con dos nombres a propósito.
+  [FILTRO.TODOS]: (r) => r.totalFisico ?? r.totalRemito,
 };
 
 export default function RecepcionMovil({
@@ -84,6 +87,8 @@ export default function RecepcionMovil({
   categoriaId,
   texto,
   aviso,
+  /** Decidido arriba contra la transferencia COMPLETA. Ver `faltaEnLaTransferencia`. */
+  noFigura = false,
   puedeRecibir,
   guardando,
   quitandoId,
@@ -96,6 +101,7 @@ export default function RecepcionMovil({
   onCerrarProducto,
   onRevisar,
   onQuitarLinea,
+  onAdoptarPresentacion,
   onAbrirEscaner,
   onAbrirAgregar,
   accionAgregar,
@@ -210,16 +216,26 @@ export default function RecepcionMovil({
         ariaLabel="Buscar producto de esta transferencia"
       />
 
-      {aviso && (
+      {/* ── EL CAMINO DE EXCEPCIÓN APARECE MIENTRAS SE ESCRIBE ─────────────
+          Acá se comparaba `aviso === mensajeNoFigura`, y ese aviso solo existía
+          después de tocar Enter. El operador escribía "9 de oro", no encontraba
+          nada, y la pantalla le contestaba "No hay productos que coincidan con
+          este filtro" mientras el botón para informarlo quedaba detrás de una
+          tecla que nadie sabía que había que apretar.
+
+          Ahora llega decidido de arriba, en `noFigura`, derivado del texto
+          contra la transferencia COMPLETA. Un booleano y no una comparación de
+          strings: dos textos que se parecen no pueden volver a decidir esto. */}
+      {(noFigura || aviso) && (
         <SunmiAviso tono="warning">
-          {aviso}
-          {aviso === mensajeNoFigura && puedeRecibir && (
+          {noFigura ? mensajeNoFigura : aviso}
+          {noFigura && puedeRecibir && (
             <> Si igual llegó, informalo como producto no declarado.</>
           )}
         </SunmiAviso>
       )}
 
-      {aviso === mensajeNoFigura && puedeRecibir && (
+      {noFigura && puedeRecibir && (
         <SunmiButton color="slate" onClick={onAbrirAgregar} className="w-full justify-center">
           {accionAgregar}
         </SunmiButton>
@@ -304,7 +320,13 @@ export default function RecepcionMovil({
           La misma fila que el escritorio: se toca la tarjeta entera y no hay
           botones adentro. */}
       <div className="space-y-1.5">
-        {visibles.length === 0 && (
+        {/* ── DOS VACÍOS QUE SIGNIFICAN COSAS DISTINTAS ─────────────────
+            Una lista vacía porque el FILTRO tapó lo que hay no es lo mismo que
+            una lista vacía porque el producto NO ESTÁ. Cuando `noFigura` ya lo
+            dijo arriba —y ofreció el camino de salida— repetir "no coincide con
+            este filtro" manda a mirar el filtro, que es justo la confusión que
+            esta tanda vino a sacar. */}
+        {visibles.length === 0 && !noFigura && (
           <p className="text-center py-6 sunmi-text-muted text-sm2">
             No hay productos que coincidan con este filtro.
           </p>
@@ -356,6 +378,7 @@ export default function RecepcionMovil({
             puedeRecibir={puedeRecibir}
             guardando={guardando}
             onRevisar={onRevisar}
+            onAdoptarPresentacion={onAdoptarPresentacion}
             onQuitar={onQuitarLinea}
             quitando={quitandoId === seleccionado.id}
             enHoja
