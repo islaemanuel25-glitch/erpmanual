@@ -274,9 +274,20 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
 
   // La única migración de esta línea de trabajo sigue siendo la que ya está en
   // producción, y esta tanda no agrega ninguna.
+  // ── EL CONTEO SUBIÓ A 9, Y SE ACTUALIZA A PROPÓSITO ───────────────────
+  //
+  // La V2 móvil no traía migraciones y este candado lo fijaba en 8. El
+  // 2026-09-09 entró `20260909170000_presentacion_envio_snapshot`, que es de
+  // OTRA tanda —la del formato de origen— y está autorizada: congela en qué
+  // presentación salió la mercadería para que editar el catálogo no reescriba
+  // un remito ya despachado.
+  //
+  // Lo que este candado sigue afirmando es que nadie agregue una migración sin
+  // que se note. Por eso se nombran las dos.
   const migraciones = fs
     .readdirSync(path.join(RAIZ, "prisma/migrations"))
     .filter((d) => /^\d/.test(d));
-  assert.equal(migraciones.length, 8, "esta tanda no puede agregar ni sacar migraciones");
+  assert.equal(migraciones.length, 9, "apareció una migración que nadie declaró acá");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
+  assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
 });

@@ -34,9 +34,19 @@ const CASOS = [
   {
     n: "1b",
     defecto: "la validación vuelve a partir de lo enviado y no de lo persistido",
-    archivo: "app/api/transferencias/revisar-producto/route.js",
-    de: "          recibido: d.recibido,",
-    a: "          recibido: body.recibido,",
+    // El ancla se MUDÓ, y el script lo dijo en voz alta: "la inyección no aplica
+    // (0 coincidencias)". Al centralizar la escala de recepción, el armado del
+    // detalle a validar salió de la ruta y pasó a `detalleParaValidar`, en el
+    // dominio compartido. La contraprueba sigue al código: si se quedaba
+    // apuntando al archivo viejo, inyectaba sobre nada y dejaba de probar que el
+    // candado 1b sirve — que es exactamente lo que este script existe para
+    // detectar, y por eso frena el CI en vez de pasar en verde.
+    //
+    // La indentación baja de diez espacios a seis: allá la línea vivía dentro
+    // del objeto de la llamada, acá dentro del objeto que devuelve la función.
+    archivo: "lib/transferencias/recepcionServidor.js",
+    de: "      recibido: d.recibido,",
+    a: "      recibido: body.recibido,",
     candado: "1b. y marcar con un cuerpo PARCIAL conserva lo persistido",
     suite: "lib/transferencias/revisionSueltas.test.mjs",
   },

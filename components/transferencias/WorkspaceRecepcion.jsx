@@ -31,6 +31,7 @@
 // cada tecla: se resuelve local.
 
 import { useMemo, useRef, useState } from "react";
+import { Check } from "lucide-react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
@@ -46,7 +47,12 @@ import SunmiEscanerCodigoBarra, {
 
 import ResumenControlFisico from "./ResumenControlFisico";
 import RecepcionMovil from "./RecepcionMovil";
-import FichaProductoRecepcion, { TEXTO_ESTADO, presentacionDelEnvio } from "./FichaProductoRecepcion";
+import FichaProductoRecepcion, { TEXTO_ESTADO } from "./FichaProductoRecepcion";
+import {
+  descriptorDeEnvio,
+  nombreDePresentacion,
+  rotuloDeEnvio,
+} from "@/lib/transferencias/presentacionEnvio";
 import AgregarProductoRecibido, { ACCION_AGREGAR } from "./AgregarProductoRecibido";
 import { SectionHead, fmtCantidad } from "./detallePresentacion";
 import {
@@ -73,6 +79,18 @@ export const MENSAJE_NO_FIGURA = "Este producto no figura en esta transferencia.
 /** Una fila del listado. Se toca entera para abrir la ficha. */
 export function FilaProducto({ d, activa, onElegir }) {
   const estado = estadoDeProducto(d);
+  const envio = descriptorDeEnvio(d);
+
+  // ── REVISADO Y RESULTADO SON DOS DIMENSIONES ────────────────────────────
+  //
+  // "Revisado" dice que ALGUIEN TERMINÓ DE CONTAR este producto. No dice que
+  // esté correcto: un faltante revisado sigue siendo un faltante. Por eso van
+  // en dos renglones y no en uno — "✓ Revisado" arriba, "Faltante" abajo—, y
+  // por eso el verde es del CHECK y no de la tarjeta.
+  //
+  // Pintar la tarjeta entera diría "esto está bien", que es otra cosa.
+  const revisado = d.revisadoEnRecepcion === true && !d.agregadoEnRecepcion;
+
   return (
     <SunmiActionCard
       onClick={() => onElegir(d)}
@@ -81,18 +99,43 @@ export function FilaProducto({ d, activa, onElegir }) {
     >
       <span className="flex items-start justify-between gap-2 w-full">
         <span className="min-w-0 font-semibold sunmi-text-strong break-words">{d.nombre}</span>
-        {/* El estado con TEXTO. No se depende del color. */}
-        <span className="text-sm2 sunmi-text-muted shrink-0">{TEXTO_ESTADO[estado]}</span>
+        {revisado ? (
+          // El verde sale del token semántico del tema —`sunmi-text-success`—,
+          // el mismo que ya usan los estados. Nada de hex ni de `green-500`.
+          <span className="text-sm2 font-semibold sunmi-text-success shrink-0 inline-flex items-center gap-1">
+            <Check size={14} aria-hidden="true" />
+            Revisado
+          </span>
+        ) : (
+          <span className="text-sm2 sunmi-text-muted shrink-0">{TEXTO_ESTADO[estado]}</span>
+        )}
       </span>
       <span className="text-sm2 sunmi-text-muted">
+        {/* La presentación con la que salió del origen, no las unidades
+            físicas: "6 CAJÓN x8" y no "48 UNIDAD". */}
         {d.agregadoEnRecepcion
-          ? `Recibido ${fmtCantidad(d.cantidadRecibida ?? 0)} ${presentacionDelEnvio(d)}`
-          : `Enviado ${fmtCantidad(d.cantidadEnviada)} ${presentacionDelEnvio(d)}`}
+          ? `Recibido ${fmtCantidad(d.cantidadRecibida ?? 0)} ${nombreDePresentacion(envio)}`
+          : `Enviado ${rotuloDeEnvio(envio)}`}
         {d.categoria?.nombre ? ` · ${d.categoria.nombre}` : ""}
       </span>
+      {/* El RESULTADO, en su propio renglón y solo cuando ya se revisó: es la
+          otra dimensión, y mezclarla con "Revisado" borraría la diferencia. */}
+      {revisado && (
+        <span className={`text-sm2 ${TONO_ESTADO_FILA[estado] || "sunmi-text-muted"}`}>
+          {TEXTO_ESTADO[estado]}
+        </span>
+      )}
     </SunmiActionCard>
   );
 }
+
+/** El tono del RESULTADO. El verde de "Revisado" es otra cosa y va aparte. */
+const TONO_ESTADO_FILA = Object.freeze({
+  [ESTADO_PRODUCTO.CORRECTO]: "sunmi-text-success",
+  [ESTADO_PRODUCTO.FALTANTE]: "sunmi-text-danger",
+  [ESTADO_PRODUCTO.SOBRANTE]: "sunmi-text-warning",
+  [ESTADO_PRODUCTO.NO_DECLARADO]: "sunmi-text-link",
+});
 
 export default function WorkspaceRecepcion({
   item,

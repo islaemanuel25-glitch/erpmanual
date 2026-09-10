@@ -14,6 +14,12 @@ import {
   desdeMilesimas,
   milesimasFisicas,
 } from "@/lib/transferencias/recepcion";
+// Y la MISMA resolución de escala que usan las tres rutas que escriben. Este
+// endpoint es de sola lectura, pero de sus números salen "47 de 48" y la marca
+// de diferencia del documento: si interpretara la línea por su cuenta, el stock
+// quedaría bien y el papel mal, que es peor que los dos mal — nadie sospecha del
+// papel.
+import { escalaDeRecepcion } from "@/lib/transferencias/recepcionServidor";
 
 function toNumber(v) {
   const n = Number(v);
@@ -178,16 +184,23 @@ export async function GET(req) {
       // Sumar milésimas físicas no arregla que la suma cruce unidades con kilos
       // —eso ya era así y por eso los totales de pantalla se cuentan por LÍNEA—,
       // pero sí hace que la marca de diferencia diga la verdad línea por línea.
+      //
+      // Y la escala sale de `escalaDeRecepcion`, no de los campos crudos. Con
+      // una línea de 6 CAJÓN x8 persistida como 48 UNIDAD, `milesimasFisicas`
+      // recibía factor 1 y devolvía **null** para un conteo de 5 cajones y 7
+      // sueltas: el total recibido del documento se quedaba en cero y el ajuste
+      // del origen desaparecía, justo en la línea que sí tenía una diferencia.
+      const escala = escalaDeRecepcion(d);
       const envFisM = milesimasFisicas({
-        cantidad: d.cantidad, sueltas: 0,
-        unidad: d.unidadEnviada, factorPack: d.producto?.base?.factor_pack,
+        cantidad: escala.cantidad, sueltas: escala.sueltas,
+        unidad: escala.unidad, factorPack: escala.factorPack,
       });
       const recFisM =
         cantidadRecibida == null
           ? null
           : milesimasFisicas({
               cantidad: d.recibido, sueltas: d.recibidoUnidadesSueltas,
-              unidad: d.unidadEnviada, factorPack: d.producto?.base?.factor_pack,
+              unidad: escala.unidad, factorPack: escala.factorPack,
             });
       itemsEnviados += envFisM == null ? 0 : desdeMilesimas(envFisM);
       itemsRecibidos += recFisM == null ? 0 : desdeMilesimas(recFisM);
@@ -204,7 +217,10 @@ export async function GET(req) {
         cantidadRecibida == null
           ? null
           : calcularAjusteOrigenUnidades({
-              enviada: d.cantidad,
+              enviada: escala.cantidad,
+              // Un despacho mixto —4 packs y 5 sueltas— también tiene sueltas
+              // del lado enviado desde que el snapshot las registra.
+              enviadaSueltas: escala.sueltas,
               recibida: d.recibido,
               // El pack incompleto. Sin esto, una línea de 5 packs + 5 sueltas se
               // leía como 5 packs pelados: el detalle histórico decía que
@@ -212,8 +228,8 @@ export async function GET(req) {
               // pasa las sueltas— quedaba bien. Stock correcto y documento
               // incorrecto es peor que los dos mal: nadie sospecha del papel.
               recibidaSueltas: d.recibidoUnidadesSueltas,
-              unidad: d.unidadEnviada,
-              factorPack: d.producto?.base?.factor_pack,
+              unidad: escala.unidad,
+              factorPack: escala.factorPack,
             });
 
       if (ajusteOrigen != null) {
@@ -299,6 +315,27 @@ export async function GET(req) {
         unidadMedida: d.producto?.base?.unidad_medida || null,
         esFiambreFijo: esFiambreFijo(d.producto?.base),
         pesoReferenciaKg: esFiambreFijo(d.producto?.base) ? toNumber(d.producto?.base?.pesoReferenciaKg) : null,
+        // ── EL SNAPSHOT DE CÓMO SALIÓ, TAL CUAL SE GUARDÓ ──────────────────
+        //
+        // Va crudo y sin interpretar: quien lo lee arma el descriptor con
+        // `descriptorDeEnvio`, que es el único lugar donde se decide si esta
+        // línea contesta con lo REGISTRADO o con una reconstrucción del catálogo
+        // de hoy. Interpretarlo acá obligaría a repetir esa decisión en cada
+        // consumidor.
+        //
+        // En una línea anterior a la migración los cinco vienen en null, y eso es
+        // el dato: no se registró.
+        presentacionEnvio: d.presentacionEnvio || null,
+        cantidadPresentada: toNumber(d.cantidadPresentada),
+        sueltasEnviadas: toNumber(d.sueltasEnviadas),
+        factorPresentacion: d.factorPresentacion == null ? null : Number(d.factorPresentacion),
+        pesoPiezaKg: toNumber(d.pesoPiezaKg),
+        // Lo necesita la reconstrucción para distinguir una PIEZA de un kilo.
+        modoVentaDeposito: d.producto?.base?.modoVentaDeposito || null,
+        // Lo exige `esProductoFiambre`, la puerta del predicado único de pieza
+        // fija. Sin él la reconstrucción leería un fiambre como producto a granel.
+        modoCompraProveedor: d.producto?.base?.modoCompraProveedor || null,
+        pesoEsFijo: d.producto?.base?.pesoEsFijo ?? null,
       };
     });
 

@@ -254,7 +254,28 @@ async function correr(f) {
       grupoId: grupo.id, localId: origen.id, nombre: `${marca}-${nombre}`, stock: stockOrigen,
     });
     if (factorPack > 1) {
-      await prisma.productoBase.update({ where: { id: p.baseId }, data: { factor_pack: factorPack } });
+      // ── UN AGRUPADO SE DECLARA AGRUPADO, TAMBIÉN EN EL FIXTURE ──────────
+      //
+      // Acá solo se escribía `factor_pack`, y eso dejaba una forma que en el
+      // catálogo real NO EXISTE: `unidad_medida = "unidad"` con `factor_pack = 6`.
+      // Medido sobre una copia del respaldo: de 2567 productos no-combo, los que
+      // tienen factor mayor que 1 y unidad de medida "unidad" son CERO. Todos
+      // los que agrupan declaran pack o cajón.
+      //
+      // Con esa forma imposible, el test agregaba el producto como no declarado
+      // mandando BULTO y el servidor lo rechazaba —bien— porque su catálogo no
+      // dice que agrupe. Lo que estaba mal era el dato de prueba, no el
+      // servidor: adaptar la ruta para aceptarlo habría sido moldear producción
+      // alrededor de un fixture inválido, y de paso volver a confiar en la
+      // escala que manda el cliente.
+      //
+      // Es el mismo error que el pie con `total: 0` que ya costó un candado
+      // decorativo en este repo: la forma del dato de prueba tiene que ser la
+      // forma del dato real.
+      await prisma.productoBase.update({
+        where: { id: p.baseId },
+        data: { factor_pack: factorPack, unidad_medida: "pack" },
+      });
     }
     return p;
   };

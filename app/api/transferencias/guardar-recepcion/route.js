@@ -10,6 +10,7 @@ import {
 } from "@/lib/transferencias/recepcion";
 import {
   ErrorRecepcion,
+  detalleParaValidar,
   estadoAdmiteRecepcion,
   puedeRecibir,
   reclamarOFallar,
@@ -114,17 +115,19 @@ export async function POST(req) {
           );
         }
 
+        // La cantidad, la unidad y el factor salen de `detalleParaValidar`, la
+        // MISMA resolución que usan revisar, confirmar y la pantalla. Siguen
+        // saliendo de la base y no del request —si vinieran de ahí, cualquiera
+        // podría marcar una línea del remito como agregada y dejar su tránsito
+        // sin limpiar—; lo que cambia es que ahora la escala respeta el snapshot
+        // en vez de leer `unidadEnviada` y el `factor_pack` vivo.
         const plan = validarDetalleRecepcion({
-          detalle: {
-            cantidad: d.cantidad, // ← fuente de verdad: la base
-            unidadEnviada: d.unidadEnviada,
-            motivoPrincipal: it.motivoPrincipal,
-            motivoDetalle: it.motivoDetalle,
-            // También de la base: si viniera del request, cualquiera podría marcar
-            // una línea del remito como agregada y dejar su tránsito sin limpiar.
-            agregadoEnRecepcion: d.agregadoEnRecepcion,
-          },
-          factorPack: Number(d.producto?.base?.factor_pack || 1),
+          ...detalleParaValidar(d, {
+            detalle: {
+              motivoPrincipal: it.motivoPrincipal,
+              motivoDetalle: it.motivoDetalle,
+            },
+          }),
           recibidoPropuesto: it.recibido,
           sueltasPropuestas: it.recibidoUnidadesSueltas,
         });

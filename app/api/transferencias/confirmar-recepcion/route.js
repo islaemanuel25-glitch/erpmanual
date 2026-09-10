@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { esFiambreFijo, piezasToKg } from "@/lib/conversiones/stock";
+import { piezasToKg } from "@/lib/conversiones/stock";
 import { esComboBase } from "@/lib/combos/guards";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import {
@@ -14,6 +14,9 @@ import {
 } from "@/lib/transferencias/recepcion";
 import {
   cargarDetallesDeRecepcion,
+  escalaDeRecepcion,
+  esPiezaParaRecepcion,
+  pesoPiezaParaRecepcion,
   ErrorRecepcion,
   estadoAdmiteRecepcion,
   originalesSinRevisar,
@@ -21,6 +24,7 @@ import {
   puedeRecibir,
   reclamarOFallar,
 } from "@/lib/transferencias/recepcionServidor";
+import { rotuloConSueltas } from "@/lib/transferencias/presentacionEnvio";
 import { getConfigLocalEfectiva } from "@/lib/config/local";
 
 /** Cantidades siempre con la escala física de StockLocal (3 decimales). */
@@ -377,11 +381,26 @@ export async function POST(req) {
         // StockLocal SIEMPRE en UNIDADES (o kg para local de fiambre fijo).
         // La conversión BULTO→unidades ya la hizo validarDetalleRecepcion, una
         // sola vez y solo si unidadEnviada es BULTO.
-        const esFijo = esFiambreFijo(d.producto.base);
+        //
+        // ── Y SI CONVIERTE O NO TAMBIÉN SALE DEL SNAPSHOT ────────────────
+        //
+        // Acá decía `esFiambreFijo(d.producto.base)`: el peso ya salía de lo
+        // registrado, pero la pregunta de SI convertir seguía leyendo el
+        // catálogo de hoy. Editar `modoVentaDeposito` a PESO después de
+        // despachar hacía que una transferencia de 2 piezas de 3,5 kg acreditara
+        // 2 KG en vez de 7. Ver `esPiezaParaRecepcion`.
+        const esFijo = esPiezaParaRecepcion(d);
 
         // Unidades para sumar al local (KG para fiambre fijo, unidades normal)
+        // ── EL PESO CONGELADO LE GANA AL DEL CATÁLOGO ────────────────────
+        //
+        // De este número sale cuántos KILOS se le acreditan al destino. Leerlo
+        // vivo significaba que editar `pesoReferenciaKg` después de despachar
+        // cambiaba el stock que entraba por un remito que ya había salido.
+        // `pesoPiezaParaRecepcion` usa el snapshot si la línea lo tiene, y el
+        // catálogo si es anterior a la migración — o sea, lo de siempre.
         const incrementoLocal = esFijo
-          ? piezasToKg(recibida, Number(d.producto.base.pesoReferenciaKg))
+          ? piezasToKg(recibida, pesoPiezaParaRecepcion(d))
           : recibidaUnidades;
 
         // ============================================================
@@ -562,6 +581,25 @@ export async function POST(req) {
           const esFaltante = accion === ACCIONES_RECEPCION.FALTANTE;
           const magnitud = esFaltante ? plan.devolucionUnidades : plan.excedenteUnidades;
 
+          // ── LA AUDITORÍA NO PUEDE PERDER LAS SUELTAS ──────────────────
+          //
+          // Decía `recibido ${plan.recibida} ${plan.unidad}`, o sea "recibido 5
+          // BULTO" sobre un conteo de 5 cajones más 7 sueltas. La fila informaba
+          // que se movió 1 unidad y el texto no explicaba de dónde salía ese 1:
+          // quien audite después no tiene cómo llegar a 47 contra 48.
+          //
+          // Los dos rótulos salen del descriptor de la línea —la presentación y
+          // el factor CONGELADOS— y del plan, que ya trae las dos mitades de lo
+          // recibido normalizadas. El de lo enviado incluye las sueltas del
+          // despacho mixto, que también se estaban perdiendo.
+          const envio = escalaDeRecepcion(d).envio;
+          const rotuloEnviado = rotuloConSueltas(envio);
+          const rotuloRecibido = rotuloConSueltas({
+            ...envio,
+            cantidad: plan.recibida,
+            sueltas: plan.recibidaSueltas,
+          });
+
           await tx.auditoriaStock.create({
             data: {
               grupoId: grupoOrigenId,
@@ -573,21 +611,23 @@ export async function POST(req) {
               transferenciaDetalleId: d.id,
               cantidadAnterior: Number(stockOrigen.cantidad),
               cantidadNueva: Number(origenActualizado.cantidad),
-              // Enviado y recibido van en la unidad del REMITO (puede ser BULTO);
-              // el movimiento, en unidades de stock. Se explicita para que la
-              // auditoría no se lea como "2 bultos" cuando son 2 unidades.
+              // Enviado y recibido van en la PRESENTACIÓN del remito —"5 CAJÓN
+              // x8 + 7 unidades sueltas"— y el movimiento en unidades de stock.
+              // Los dos, y explicitado cuál es cuál: sin el primero no se puede
+              // reconstruir de dónde salió el segundo, y sin el segundo la
+              // auditoría se leería como "2 bultos" cuando son 2 unidades.
               motivo: esAgregada
                 ? `Producto agregado durante la recepción — transferencia #${transferenciaId}, ` +
-                  `detalle #${d.id}, enviado 0.000, recibido ${fmt(plan.recibida)} ${plan.unidad}, ` +
+                  `detalle #${d.id}, enviado 0, recibido ${rotuloRecibido}, ` +
                   `descontado del origen ${fmt(magnitud)} (unidades de stock)`
                 : esFaltante
                 ? `Devolución por diferencia de recepción — transferencia #${transferenciaId}, ` +
-                  `detalle #${d.id}, enviado ${fmt(plan.enviada)} ${plan.unidad}, ` +
-                  `recibido ${fmt(plan.recibida)} ${plan.unidad}, ` +
+                  `detalle #${d.id}, enviado ${rotuloEnviado}, ` +
+                  `recibido ${rotuloRecibido}, ` +
                   `devuelto ${fmt(magnitud)} (unidades de stock)`
                 : `Excedente de recepción — transferencia #${transferenciaId}, ` +
-                  `detalle #${d.id}, enviado ${fmt(plan.enviada)} ${plan.unidad}, ` +
-                  `recibido ${fmt(plan.recibida)} ${plan.unidad}, ` +
+                  `detalle #${d.id}, enviado ${rotuloEnviado}, ` +
+                  `recibido ${rotuloRecibido}, ` +
                   `descontado del origen ${fmt(magnitud)} (unidades de stock)`,
             },
           });

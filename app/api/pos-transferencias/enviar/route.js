@@ -8,6 +8,49 @@ import { toUnidades, validarEnvio, esFiambreFijo, piezasToKg } from "@/lib/conve
 import { esComboBase } from "@/lib/combos/guards";
 import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
 import { DESCONTAR_Y_TRANSITO } from "@/lib/transferencias/politicasStock";
+import {
+  PRESENTACION,
+  agrupa,
+  presentacionDeProducto,
+} from "@/lib/productos/presentacionDeProducto";
+
+/**
+ * El snapshot de presentación de una línea preparada a mano.
+ *
+ * Este camino SÍ sabe en qué unidad se contó —`unidadPreparada`— así que no hay
+ * que deducir nada: se le pasa como `contadoEn` y el descriptor resuelve si eso
+ * fue un pack, un cajón, un kilo o una pieza mirando el producto.
+ *
+ * Devuelve `null` cuando falta el producto base: sin él no se puede afirmar la
+ * presentación, y una línea sin snapshot dice "no se registró", que es preferible
+ * a registrar una adivinada.
+ */
+function snapshotDeEnvioManual(item) {
+  const base = item?.detalle?.producto?.base;
+  if (!base) return null;
+
+  const d = presentacionDeProducto({
+    unidadMedida: base.unidad_medida,
+    factorPack: base.factor_pack,
+    modoVentaDeposito: base.modoVentaDeposito,
+    pesoReferenciaKg: base.pesoReferenciaKg,
+    modoCompraProveedor: base.modoCompraProveedor,
+    pesoEsFijo: base.pesoEsFijo,
+    contadoEn: item.unidadEnviada,
+  });
+
+  return {
+    presentacionEnvio: d.presentacion,
+    // La cantidad preparada ya está EN esa presentación: si se contaron 6
+    // bultos, `cantidadRaw` es 6. No se convierte.
+    cantidadPresentada: Number(item.cantidadRaw) || 0,
+    // Este flujo prepara bultos completos: no tiene una casilla para las sueltas.
+    // Cero es un dato, no un hueco.
+    sueltasEnviadas: 0,
+    factorPresentacion: agrupa(d.presentacion) ? d.factor : null,
+    pesoPiezaKg: d.presentacion === PRESENTACION.PIEZA ? d.pesoPiezaKg : null,
+  };
+}
 
 export async function POST(req) {
   try {
@@ -258,6 +301,14 @@ export async function POST(req) {
           unidadEnviada: item.unidadEnviada,
           factorPack: item.factorPack,
           productoLocalOrigen: item.productoLocalOrigen,
+          // ── ACÁ LA PRESENTACIÓN SÍ ESTABA, Y SE PERDÍA IGUAL ──────────────
+          //
+          // Este camino es el bueno: registra en qué unidad se preparó cada
+          // línea. Lo que no sabía decir era si el bulto era un pack o un cajón,
+          // ni distinguir un kilo de una pieza, porque `unidadEnviada` solo
+          // tiene BULTO y UNIDAD. El descriptor lo resuelve con los datos del
+          // producto, y se congela junto con el factor.
+          presentacion: snapshotDeEnvioManual(item),
         })),
       });
 

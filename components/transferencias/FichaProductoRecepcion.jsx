@@ -40,14 +40,34 @@ import { BadgeAgregado, fmtCantidad, fmtDiferencia } from "./detallePresentacion
 import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
 import { motivosParaDiferencia } from "@/lib/transferencias/recepcionUI";
 import { ESTADO_PRODUCTO, estadoDeProducto } from "@/lib/transferencias/controlFisico";
+import {
+  descriptorDeEnvio,
+  escalaDeEnvio,
+  nombreDePresentacion,
+  rotuloDeEnvio,
+  rotuloFisicoDeEnvio,
+  unidadDeDiferencia,
+} from "@/lib/transferencias/presentacionEnvio";
 
 export const ROTULO_SUELTAS = "Hay unidades sueltas";
 
-/** El nombre de la presentación, tal como el remito la nombra. */
+/**
+ * El nombre de la presentación, tal como el remito la nombra.
+ *
+ * ── ESTO DECIDÍA MAL, Y ERA EL DEFECTO CENTRAL ──────────────────────────
+ *
+ * Decía: BULTO → "PACK xN", todo lo demás → "UNIDAD". Con eso un cajón se veía
+ * como pack, un kilo como unidad y una pieza como unidad. Y no podía hacerlo
+ * mejor: `unidadEnviada` solo tiene BULTO y UNIDAD.
+ *
+ * Ahora delega en `descriptorDeEnvio`, que contesta con el snapshot de cómo se
+ * despachó cuando la línea lo tiene, y reconstruye del catálogo cuando es
+ * anterior. La decisión de qué es un pack, un cajón, un kilo o una pieza vive en
+ * un solo lugar del repo — `presentacionDeProducto`— y la comparten los
+ * comprobantes del POS y esta pantalla.
+ */
 export function presentacionDelEnvio(d = {}) {
-  const factor = Number(d.factorPack || 1);
-  if (d.unidadEnviada === "BULTO") return factor > 1 ? `PACK x${factor}` : "BULTO";
-  return "UNIDAD";
+  return nombreDePresentacion(descriptorDeEnvio(d));
 }
 
 /** El texto del estado. NO se depende del color para distinguirlos. */
@@ -118,7 +138,15 @@ export default function FichaProductoRecepcion({
   // React para "resetear estado cuando cambia la identidad", y no necesita un
   // efecto que sincronice.
   const inicial = () => {
-    const propuesto = d?.cantidadRecibida == null ? d?.cantidadEnviada : d.cantidadRecibida;
+    // ── LO PROPUESTO VA EN LA PRESENTACIÓN, NO EN FÍSICO ────────────────
+    //
+    // Decía `d.cantidadEnviada`, que es la cantidad FÍSICA persistida. Para una
+    // línea con snapshot eso proponía 48 debajo de un rótulo que dice "6 CAJÓN
+    // x8": el caso feliz —llegó todo, un toque a "Marcar revisado"— guardaba 48
+    // cajones, o sea 384 unidades. El descriptor contesta en la misma escala en
+    // la que está escrito el campo.
+    const propuesto =
+      d?.cantidadRecibida == null ? descriptorDeEnvio(d || {}).cantidad : d.cantidadRecibida;
     const s = Number(d?.recibidoUnidadesSueltas || 0);
     return {
       recibido: String(propuesto ?? ""),
@@ -141,19 +169,40 @@ export default function FichaProductoRecepcion({
   // defecto que ya rompió esta pantalla una vez.
   if (!d) return null;
 
-  const factor = Number(d.factorPack || 1);
-  const agrupa = d.unidadEnviada === "BULTO" && factor > 1;
+  // ── LA PRESENTACIÓN SALE DEL DESCRIPTOR, NO DE `unidadEnviada` ──────────
+  //
+  // Antes acá se preguntaba `d.unidadEnviada === "BULTO"`, y con eso un cajón se
+  // contaba como pack y un kilo como unidad. El descriptor contesta con lo que
+  // se REGISTRÓ al despachar cuando la línea lo tiene, y reconstruye del
+  // catálogo cuando es anterior a la migración.
+  //
+  // Y la escala —unidad y factor— sale de `escalaDeEnvio`, la MISMA que usan
+  // las cuatro rutas del servidor. Acá se calculaba al lado con las mismas tres
+  // líneas; dos copias de la misma decisión se separan el día que una cambia, y
+  // esta decide qué se le manda a `revisar-producto`.
+  const escala = escalaDeEnvio(d);
+  const envio = escala.envio;
+  const factor = escala.factorPack;
+  // `agrupaEsta` y no `agrupa`: el import del módulo se llama así y sombrearlo
+  // acá adentro dejaría inalcanzable la función del dominio.
+  const agrupaEsta = escala.unidad === "BULTO";
   const estado = estadoDeProducto(d);
 
-  // Las físicas de lo que está escrito AHORA. Misma función que el servidor.
+  // Las físicas de lo que está escrito AHORA. Misma función que el servidor, y
+  // con el factor CONGELADO: si el catálogo cambió después del envío, la cuenta
+  // sigue siendo la del remito.
+  const unidadParaCuenta = escala.unidad;
   const fisicasEditadas = unidadesFisicasDe({
     cantidad: recibido === "" ? 0 : recibido,
-    sueltas: agrupa && conSueltas ? sueltas || 0 : 0,
-    unidad: d.unidadEnviada,
+    sueltas: agrupaEsta && conSueltas ? sueltas || 0 : 0,
+    unidad: unidadParaCuenta,
     factorPack: factor,
   });
   const fisicasEnviadas = unidadesFisicasDe({
-    cantidad: d.cantidadEnviada, sueltas: 0, unidad: d.unidadEnviada, factorPack: factor,
+    cantidad: escala.cantidad,
+    sueltas: escala.sueltas,
+    unidad: unidadParaCuenta,
+    factorPack: factor,
   });
   const diferenciaFisica =
     fisicasEditadas == null || fisicasEnviadas == null ? null : fisicasEditadas - fisicasEnviadas;
@@ -179,7 +228,7 @@ export default function FichaProductoRecepcion({
     const r = await onRevisar?.({
       detalleId: d.id,
       recibido: recibido === "" ? null : recibido,
-      recibidoUnidadesSueltas: agrupa && conSueltas ? sueltas || 0 : 0,
+      recibidoUnidadesSueltas: agrupaEsta && conSueltas ? sueltas || 0 : 0,
       motivoPrincipal: motivos.length > 0 ? motivo : null,
       motivoDetalle: motivos.length > 0 && motivo === "Otro" ? detalleMotivo : null,
     });
@@ -224,11 +273,23 @@ export default function FichaProductoRecepcion({
       <div className="grid grid-cols-2 gap-2">
         <div>
           <div className="text-sm2 sunmi-text-muted">Enviado</div>
+          {/* La presentación REGISTRADA es la principal: "6 CAJÓN x8", no "48
+              UNIDAD". Cuando el envío llevó bultos incompletos, el desglose se
+              dice acá mismo — un remito de 4 packs más 5 sueltas no es "4,833
+              packs" ni "29 unidades". */}
           <div className="font-mono tabular-nums sunmi-text-strong">
-            {d.agregadoEnRecepcion ? "—" : `${fmtCantidad(d.cantidadEnviada)} ${presentacionDelEnvio(d)}`}
+            {d.agregadoEnRecepcion ? "—" : rotuloDeEnvio(envio)}
           </div>
-          {!d.agregadoEnRecepcion && agrupa && (
-            <div className="text-sm2 sunmi-text-muted">{fmtCantidad(fisicasEnviadas)} unidades</div>
+          {!d.agregadoEnRecepcion && envio.sueltas > 0 && (
+            <div className="text-sm2 sunmi-text-muted">
+              + {fmtCantidad(envio.sueltas)} {envio.sueltas === 1 ? "unidad suelta" : "unidades sueltas"}
+            </div>
+          )}
+          {/* Las unidades físicas, SECUNDARIAS y solo donde significan algo. En
+              KG y en PIEZA `rotuloFisicoDeEnvio` devuelve null: decir "3,250
+              unidades" de un fiambre sería falso. */}
+          {!d.agregadoEnRecepcion && rotuloFisicoDeEnvio(envio) && (
+            <div className="text-sm2 sunmi-text-muted">{rotuloFisicoDeEnvio(envio)}</div>
           )}
         </div>
         <div>
@@ -238,19 +299,19 @@ export default function FichaProductoRecepcion({
               type="number"
               value={recibido}
               onChange={(e) => setRecibido(e.target.value)}
-              aria-label={`Cantidad recibida en ${presentacionDelEnvio(d)}`}
+              aria-label={`Cantidad recibida en ${nombreDePresentacion(envio)}`}
             />
           ) : (
             <div className="font-mono tabular-nums sunmi-text-strong">
               {d.cantidadRecibida == null ? "—" : fmtCantidad(d.cantidadRecibida)}
             </div>
           )}
-          <div className="text-sm2 sunmi-text-muted">{presentacionDelEnvio(d)}</div>
+          <div className="text-sm2 sunmi-text-muted">{nombreDePresentacion(envio)}</div>
         </div>
       </div>
 
       {/* ── EL PACK INCOMPLETO ────────────────────────────────────────────── */}
-      {puedeRecibir && agrupa && (
+      {puedeRecibir && agrupaEsta && (
         <div className="space-y-1.5">
           <SunmiButton
             color={conSueltas ? "primary" : "slate"}
@@ -265,7 +326,7 @@ export default function FichaProductoRecepcion({
           {conSueltas && (
             <div>
               <div className="text-sm2 sunmi-text-muted mb-1">
-                Unidades sueltas, fuera de los packs completos
+                Unidades sueltas, fuera de los bultos completos
               </div>
               <SunmiInput
                 type="number"
@@ -281,13 +342,24 @@ export default function FichaProductoRecepcion({
       {/* El total físico y la diferencia. Es lo que va a mover stock. */}
       {fisicasEditadas != null && (
         <div className="text-sm2 sunmi-text-muted">
+          {/* ── LA UNIDAD DEL RESULTADO ES LA DEL DOMINIO ──────────────────
+              Decía "unidades" SIEMPRE. Para un fiambre de 3,250 KG eso es
+              falso, y para una pieza también. `unidadDeDiferencia` contesta
+              con la escala en la que esta línea mide de verdad. */}
           Ingreso físico: <span className="tabular-nums">{fmtCantidad(fisicasEditadas)}</span>{" "}
-          unidades
+          {unidadDeDiferencia(envio)}
           {!d.agregadoEnRecepcion && diferenciaFisica != null && (
             <>
               {" · "}Diferencia{" "}
               <span className="tabular-nums font-semibold">{fmtDiferencia(diferenciaFisica)}</span>{" "}
-              {Math.abs(diferenciaFisica) === 1 ? "unidad" : "unidades"}
+              {/* En KG la diferencia se dice en KG y en PIEZA en piezas. El
+                  singular solo aplica a lo contable: "0,150 KG" no tiene
+                  singular. */}
+              {unidadDeDiferencia(envio) === "unidades"
+                ? Math.abs(diferenciaFisica) === 1
+                  ? "unidad"
+                  : "unidades"
+                : unidadDeDiferencia(envio)}
             </>
           )}
         </div>

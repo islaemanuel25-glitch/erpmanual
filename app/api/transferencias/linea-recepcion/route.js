@@ -6,6 +6,13 @@ import { checkPerm } from "@/lib/authorize";
 import { esComboBase } from "@/lib/combos/guards";
 import { productoDelCatalogoLocal } from "@/lib/productos/buscarCatalogoLocal";
 import { ERRORES_RECEPCION, resolverUnidadEnviada } from "@/lib/transferencias/recepcion";
+import { presentacionDeProducto } from "@/lib/productos/presentacionDeProducto";
+import {
+  PRESENTACION,
+  agrupa,
+  nombreDePresentacion,
+  unidadFisicaDe,
+} from "@/lib/transferencias/presentacionEnvio";
 import {
   ErrorRecepcion,
   estadoAdmiteRecepcion,
@@ -155,7 +162,83 @@ export async function POST(req) {
     // Se resuelve con `resolverUnidadEnviada`, la MISMA función que valida la
     // unidad de las líneas del remito, para que las dos puertas por las que
     // entra una unidad contesten igual.
+    //
+    // Ojo: esto valida la FORMA de lo que mandó el cliente —que sea BULTO o
+    // UNIDAD— y nada más. Que sea la unidad CORRECTA lo decide el bloque de
+    // abajo, contra el catálogo. Las dos preguntas son distintas y les faltaba
+    // la segunda.
     const uni = resolverUnidadEnviada(body?.unidadEnviada);
+
+    // ── Y QUIEN MANDA ES EL CATÁLOGO, NO EL PEDIDO ──────────────────────────
+    //
+    // El producto ya se releyó del catálogo del ORIGEN unas líneas más arriba,
+    // así que el servidor TIENE la respuesta y no hay motivo para confiar en la
+    // del cliente. Un pack de 6 es un pack de 6 lo diga quien lo diga, y un
+    // cliente viejo —o uno manipulado— que mande "UNIDAD" sobre un PACK x6
+    // convierte 2 bultos en 2 unidades: 10 que se le descuentan de menos al
+    // origen y que no aparecen en ningún lado, porque una línea agregada no
+    // tiene envío contra el cual contrastar.
+    //
+    // La decisión sale de los helpers canónicos —`presentacionDeProducto` y
+    // `unidadFisicaDe`—, los mismos que usa la pantalla para derivarla. Acá no
+    // se escribe ninguna regla nueva.
+    const presentacion = presentacionDeProducto({
+      unidadMedida: producto.base?.unidad_medida,
+      factorPack: producto.base?.factor_pack,
+      modoVentaDeposito: producto.base?.modoVentaDeposito,
+      pesoReferenciaKg: producto.base?.pesoReferenciaKg,
+      modoCompraProveedor: producto.base?.modoCompraProveedor,
+      pesoEsFijo: producto.base?.pesoEsFijo,
+      // SIN `contadoEn`: el pedido no puede influir en qué ES el producto.
+    });
+    const unidadAutoritativa = unidadFisicaDe(presentacion);
+
+    // Si el cliente mandó una unidad y NO es la del catálogo, se rechaza y se
+    // dice qué hacer. No se reinterpreta en silencio: la misma cantidad
+    // significa cosas distintas según la escala, y aceptar "2" bajo una unidad
+    // y guardarlo bajo otra es exactamente inventar el dato que faltaba.
+    if (uni.ok && uni.unidad !== unidadAutoritativa) {
+      return NextResponse.json(
+        {
+          ok: false,
+          codigo: "UNIDAD_CONTRADICE_CATALOGO",
+          error:
+            `El catálogo del origen dice que este producto se cuenta en ${nombreDePresentacion(presentacion)}, ` +
+            `y el pedido llegó en ${uni.unidad}. Recargá la pantalla para trabajar con la presentación actual.`,
+        },
+        { status: 409 }
+      );
+    }
+
+    // ── LAS SUELTAS SE VALIDAN CON LA MISMA REGLA QUE LA RECEPCIÓN NORMAL ──
+    //
+    // Solo tienen sentido cuando la presentación AGRUPA: en UNIDAD, en KG y en
+    // PIEZA no hay bultos que completar, y un valor ahí sería un dato sobre una
+    // escala que no existe. Es la misma condición que `validarDetalleRecepcion`
+    // aplica del otro lado con `UNIDADES_SUELTAS_SIN_BULTO`.
+    //
+    // Y la pregunta se le hace a la unidad AUTORITATIVA, no a la del pedido: si
+    // se le hiciera a la del cliente, mandar "BULTO" sobre un producto por kilo
+    // habilitaría un desglose que en esa escala no existe.
+    const sueltasPedidas = Number(body?.recibidoUnidadesSueltas);
+    const traeSueltas = Number.isFinite(sueltasPedidas) && sueltasPedidas > 0;
+    //
+    // El `uni.ok` se conserva para no cambiar QUÉ error gana cuando faltan las
+    // dos cosas: un pedido sin unidad y con desglose sigue contestando
+    // UNIDAD_AUSENTE, como antes.
+    if (traeSueltas && uni.ok && unidadAutoritativa !== "BULTO") {
+      return NextResponse.json(
+        {
+          ok: false,
+          codigo: ERRORES_RECEPCION.SUELTAS_SIN_BULTO,
+          error:
+            "Las unidades sueltas solo tienen sentido cuando la mercadería viene en bultos. " +
+            "En UNIDAD, KG o PIEZA no hay bulto que completar.",
+        },
+        { status: 400 }
+      );
+    }
+    const sueltas = traeSueltas ? sueltasPedidas : null;
     if (!uni.ok) {
       // El CÓDIGO es el compartido, para que el cliente distinga los dos casos
       // igual que en el resto de la recepción. El TEXTO no: el de
@@ -219,7 +302,45 @@ export async function POST(req) {
           // tránsito no se toque y que su diferencia sea todo lo recibido.
           cantidad: 0,
           recibido: body?.recibido == null ? null : body.recibido,
-          unidadEnviada: uni.unidad,
+          // La del CATÁLOGO. `uni.unidad` ya se comprobó contra ésta más arriba
+          // —si difieren, el pedido se rechazó— así que acá son la misma; lo que
+          // cambia es cuál de las dos es la fuente de verdad.
+          unidadEnviada: unidadAutoritativa,
+          // ── EL PACK INCOMPLETO TAMBIÉN EN UNA LÍNEA NO DECLARADA ─────────
+          //
+          // Un producto que llegó sin estar en el remito puede llegar igual de
+          // incompleto que uno declarado: 2 packs de 6 más 1 suelta. Sin esto
+          // había que elegir entre escribir 2,166 packs —el error de exactitud
+          // que todo este modelo evita— o perder la suelta.
+          //
+          // La columna YA existía: es la misma `recibidoUnidadesSueltas` que usa
+          // la recepción normal. Lo único que faltaba era que el contrato la
+          // aceptara. No hay columna nueva ni migración por esto.
+          //
+          // Se valida con la MISMA regla: sueltas solo si la presentación
+          // agrupa. Ver `sueltasParaLineaNueva`.
+          recibidoUnidadesSueltas: sueltas,
+          // ── LA ESCALA CON LA QUE SE INTERPRETÓ LO RECIBIDO, CONGELADA ────
+          //
+          // Una línea no declarada no tuvo envío, así que las dos CANTIDADES
+          // del snapshot van en cero y eso es el dato honesto. Pero la
+          // PRESENTACIÓN y el factor no son cero: son la escala con la que el
+          // operador contó lo que tenía en la mano, y de ellos sale cuánto stock
+          // se descuenta del origen al confirmar.
+          //
+          // Sin congelarlos, la línea quedaba leyendo el catálogo vivo hasta el
+          // momento de confirmar: alguien edita `factor_pack` de 6 a 12 entre
+          // agregar y confirmar, y los 2 packs que se contaron pasan a descontar
+          // 24 unidades en vez de 12. Lo mismo con `pesoReferenciaKg` en una
+          // pieza. Es el mismo agujero que la línea del remito ya tenía tapado.
+          //
+          // No hay columna nueva: son las cinco de esta misma migración.
+          presentacionEnvio: presentacion.presentacion,
+          cantidadPresentada: 0,
+          sueltasEnviadas: 0,
+          factorPresentacion: agrupa(presentacion.presentacion) ? presentacion.factor : null,
+          pesoPiezaKg:
+            presentacion.presentacion === PRESENTACION.PIEZA ? presentacion.pesoPiezaKg : null,
           precioCosto: producto.precio_costo ?? producto.base?.precio_costo ?? null,
           agregadoEnRecepcion: true,
           agregadoEnRecepcionPorId: usuarioId,

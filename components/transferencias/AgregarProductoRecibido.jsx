@@ -13,17 +13,27 @@
 // —qué se busca, qué unidad se eligió, qué cuerpo se manda— vive en
 // `lib/transferencias/recepcionUI.js` y es el mismo código en las dos.
 //
-// ── LOS TRES PASOS, Y POR QUÉ SON TRES ────────────────────────────────────
+// ── ERAN TRES PASOS Y AHORA SON DOS ───────────────────────────────────────
 //
 //   1. buscar el producto en el catálogo del ORIGEN;
-//   2. decir CÓMO se contó —UNIDAD o BULTO—;
-//   3. decir CUÁNTOS.
+//   2. decir CUÁNTOS llegaron.
 //
-// El paso 2 no se puede saltear y no viene contestado. Es el candado de negocio
-// de esta pantalla: una línea agregada DESCUENTA del origen y no hay ningún
-// envío contra el cual contrastar la diferencia, así que una unidad supuesta no
-// se detecta nunca más. Con factor 20, suponer son 57 unidades que no aparecen
-// en ningún lado.
+// El paso que se fue era "decir CÓMO se contó —UNIDAD o BULTO—", y no se sacó
+// por comodidad. El motivo que lo sostenía sigue siendo cierto: una línea
+// agregada DESCUENTA del origen y no hay ningún envío contra el cual contrastar
+// la diferencia, así que una unidad supuesta no se detecta nunca más — con
+// factor 20, suponer son 57 unidades que no aparecen en ningún lado.
+//
+// Lo que estaba mal era de dónde salía la respuesta. **No hace falta suponerla
+// ni preguntarla: el catálogo del origen ya la sabe.** Un producto con
+// `unidad_medida = "cajon"` y factor 8 es un CAJÓN x8; un fiambre de pieza fija
+// es una PIEZA. Pedirle a alguien que traduzca eso al enum técnico BULTO/UNIDAD
+// es pedirle que haga a mano una cuenta que el dominio tiene resuelta, y darle
+// la oportunidad de equivocarla en la única línea que nadie va a poder auditar.
+//
+// Así que la presentación se MUESTRA y no se pregunta, y lo que el operador
+// aporta es lo único que el catálogo no puede saber: cuántos llegaron, y en un
+// agrupado cuántos vinieron sueltos fuera de bulto.
 //
 // ── EL ORIGEN NO SE PIDE ──────────────────────────────────────────────────
 //
@@ -44,15 +54,16 @@ import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiMo
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
-import SunmiSelectorUnidad from "@/components/sunmi/SunmiSelectorUnidad";
+import { nombreDePresentacion, unidadDeDiferencia } from "@/lib/transferencias/presentacionEnvio";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 
 import { Campo, fmtCantidad } from "./detallePresentacion";
 import {
   MENSAJE_YA_EXISTIA,
-  opcionesDeUnidad,
+  presentacionDeProductoNuevo,
   previsualizarIngresoFisico,
+  unidadDeProductoNuevo,
   validarLineaNueva,
 } from "@/lib/transferencias/recepcionUI";
 
@@ -68,8 +79,15 @@ import {
 // endpoint desplegado por una cuestión de redacción.
 export const TITULO_AGREGAR = "Producto no declarado";
 export const ACCION_AGREGAR = "Informar producto no declarado";
-export const ROTULO_UNIDAD = "¿Cómo lo contaste?";
 export const ROTULO_CANTIDAD = "Cantidad recibida";
+
+// ── LOS DOS CAMPOS DE UN AGRUPADO ────────────────────────────────────────
+//
+// Un cajón que llegó con 5 enteros y 7 sueltas no es "5,875 cajones": ese
+// número no existe en el depósito y además no es exacto. Son dos campos, igual
+// que en la ficha de una línea del remito, y el total lo arma el servidor.
+export const ROTULO_COMPLETOS = "Completos";
+export const ROTULO_SUELTAS = "Unidades sueltas";
 
 /** Espera entre la última tecla y el pedido. Mismo patrón que el resto del ERP. */
 const ESPERA_BUSQUEDA = 300;
@@ -128,10 +146,10 @@ export default function AgregarProductoRecibido({
   const [resultados, setResultados] = useState([]);
   const [buscando, setBuscando] = useState(false);
   const [producto, setProducto] = useState(null);
-  // SIN ELEGIR. No es `"UNIDAD"` ni `"BULTO"`: es null, y el usuario tiene que
-  // tocar. Ver el encabezado.
-  const [unidad, setUnidad] = useState(null);
+  // NO HAY ESTADO DE UNIDAD, y esa ausencia es el cambio. Antes era un `null`
+  // que el operador tenía que tocar; ahora la contesta el catálogo del origen.
   const [cantidad, setCantidad] = useState("");
+  const [sueltas, setSueltas] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [enviando, setEnviando] = useState(false);
   const dictado = useRef(false);
@@ -140,13 +158,13 @@ export default function AgregarProductoRecibido({
     setQuery("");
     setResultados([]);
     setProducto(null);
-    setUnidad(null);
     setCantidad("");
+    setSueltas("");
     setMensaje("");
   };
 
-  // Cada apertura empieza de cero: si el modal recordara la unidad de la vez
-  // anterior, el "sin elegir" duraría un solo uso.
+  // Cada apertura empieza de cero: los números de la vez anterior se contaron
+  // mirando otro producto.
   useEffect(() => {
     if (abierto) limpiar();
   }, [abierto]);
@@ -190,33 +208,61 @@ export default function AgregarProductoRecibido({
     return () => clearTimeout(t);
   }, [query, abierto, transferenciaId]);
 
-  const opciones = useMemo(() => (producto ? opcionesDeUnidad(producto) : []), [producto]);
+  // ── QUÉ ES ESTE PRODUCTO, SEGÚN EL CATÁLOGO DEL ORIGEN ──────────────────
+  //
+  // La misma decisión que usa la recepción de una línea del remito, tomada acá
+  // sobre lo que devolvió el buscador del ORIGEN — que es el único catálogo que
+  // esta pantalla consulta, y sigue siéndolo.
+  //
+  // Ya NO recibe `contadoEn`: pasarle lo que el operador había elegido era
+  // dejar que la elección manual pisara al catálogo, que es justamente lo que
+  // esta pantalla dejó de hacer.
+  const presentacionDelCatalogo = useMemo(
+    () =>
+      producto
+        ? presentacionDeProductoNuevo(producto)
+        : { presentacion: "UNIDAD", factor: null, pesoPiezaKg: null },
+    [producto]
+  );
+
+  // El enum técnico, DERIVADO. El operador no lo ve y no lo elige.
+  const unidad = useMemo(
+    () => (producto ? unidadDeProductoNuevo(producto) : null),
+    [producto]
+  );
+  const esAgrupada = unidad === "BULTO";
 
   // Cuántas unidades físicas entran. INFORMATIVO: este número no viaja.
   const ingresoFisico = previsualizarIngresoFisico({
     cantidad,
+    sueltas: esAgrupada ? sueltas : 0,
     unidad,
-    factorPack: producto?.factorPack,
+    factorPack: presentacionDelCatalogo.factor || producto?.factorPack,
   });
 
   const elegir = (p) => {
     setProducto(p);
-    // Cambiar de producto reinicia la unidad Y la cantidad. Las dos son
-    // decisiones que se tomaron mirando OTRO producto: "2" contado en bultos de
-    // 6 no significa lo mismo que "2" en bultos de 24, y dejar el número puesto
-    // invita a confirmar sin volver a pensarlo. Es el mismo motivo por el que la
-    // unidad no tiene default — arrastrarla del producto anterior sería
-    // exactamente eso, un default con otro nombre.
+    // Cambiar de producto reinicia los números contados. "2" contado en bultos
+    // de 6 no significa lo mismo que "2" en bultos de 24, y dejar el número
+    // puesto invita a confirmar sin volver a pensarlo. La unidad ya no hace
+    // falta reiniciarla: se deriva del producto, así que cambia sola.
     //
     // El texto buscado SÍ se conserva: sirve para elegir otro resultado de la
     // misma búsqueda, y no es una decisión sobre el producto.
-    setUnidad(null);
     setCantidad("");
+    setSueltas("");
     setMensaje("");
   };
 
   const agregar = async () => {
-    const plan = validarLineaNueva({ transferenciaId, producto, unidadEnviada: unidad, recibido: cantidad });
+    const plan = validarLineaNueva({
+      transferenciaId,
+      producto,
+      // Del CATÁLOGO, no de un toque. Ver `unidadDeProductoNuevo`.
+      unidadEnviada: unidad,
+      recibido: cantidad,
+      recibidoUnidadesSueltas: esAgrupada ? sueltas : undefined,
+    });
     if (!plan.ok) {
       // NO se llama al POST. El servidor lo rechazaría igual, pero un pedido que
       // ya se sabe que va a fallar solo sirve para que el error llegue más tarde
@@ -335,40 +381,64 @@ export default function AgregarProductoRecibido({
             </SunmiButton>
           </div>
 
-          {/* SIN PRESELECCIÓN. `valor` arranca en null y los dos botones salen
-              sin presionar: el kit ya sabe representar "todavía nada elegido". */}
-          <SunmiSelectorUnidad
-            rotulo={ROTULO_UNIDAD}
-            valor={unidad}
-            opciones={opciones}
-            onCambiar={(v) => {
-              setUnidad(v);
-              setMensaje("");
-            }}
-            nota={
-              opciones.length === 1
-                ? "Este producto no se maneja por bulto."
-                : "Elegí en qué contaste lo que llegó."
-            }
-          />
+          {/* ── LA PRESENTACIÓN LA SABE EL CATÁLOGO DEL ORIGEN ──────────────
+              Preguntar "¿UNIDAD o BULTO?" cuando el producto ya dice que es un
+              CAJÓN x8 es pedirle al operador que traduzca algo que el dominio ya
+              sabe. Se muestra qué es, y la pregunta queda solo donde de verdad
+              hay dos respuestas posibles. */}
+          <Campo label="Presentación de origen">
+            <span className="font-semibold sunmi-text-strong">
+              {nombreDePresentacion(presentacionDelCatalogo)}
+            </span>
+          </Campo>
 
-          {/* 3 · CUÁNTOS */}
+          {/* 3 · CUÁNTOS
+              ── ACÁ ESTABA EL SELECTOR UNIDAD / BULTO, Y SE FUE ─────────────
+              El catálogo del origen ya dijo qué es el producto. Lo único que el
+              operador aporta es lo que el catálogo no puede saber: cuántos
+              llegaron, y en un agrupado cuántos vinieron fuera de bulto. */}
           <div>
-            <div className="text-sm2 sunmi-text-muted mb-1">{ROTULO_CANTIDAD}</div>
+            <div className="text-sm2 sunmi-text-muted mb-1">
+              {esAgrupada
+                ? ROTULO_COMPLETOS
+                : `${ROTULO_CANTIDAD} en ${nombreDePresentacion(presentacionDelCatalogo)}`}
+            </div>
             <SunmiInput
               type="number"
               value={cantidad}
               onChange={(e) => setCantidad(e.target.value)}
               placeholder="0"
+              aria-label={
+                esAgrupada
+                  ? `${ROTULO_COMPLETOS} de ${nombreDePresentacion(presentacionDelCatalogo)}`
+                  : ROTULO_CANTIDAD
+              }
             />
-            {/* La preview. Este número NO se manda: el servidor aplica el factor
-                una sola vez. Ver `previsualizarIngresoFisico`. */}
-            {ingresoFisico != null && (
-              <div className="text-sm2 sunmi-text-muted mt-1">
-                Ingreso físico: {fmtCantidad(ingresoFisico)} unidades
-              </div>
-            )}
           </div>
+
+          {/* El segundo campo del pack incompleto. Solo donde significa algo: en
+              KG, en PIEZA y en UNIDAD la cantidad YA está en unidades físicas y
+              un desglose se sumaría encima de sí mismo. */}
+          {esAgrupada && (
+            <div>
+              <div className="text-sm2 sunmi-text-muted mb-1">{ROTULO_SUELTAS}</div>
+              <SunmiInput
+                type="number"
+                value={sueltas}
+                onChange={(e) => setSueltas(e.target.value)}
+                placeholder="0"
+                aria-label={ROTULO_SUELTAS}
+              />
+            </div>
+          )}
+
+          {/* La preview. Este número NO se manda: el servidor aplica el factor
+              una sola vez. Ver `previsualizarIngresoFisico`. */}
+          {ingresoFisico != null && (
+            <div className="text-sm2 sunmi-text-muted">
+              Ingreso físico: {fmtCantidad(ingresoFisico)} {unidadDeDiferencia(presentacionDelCatalogo)}
+            </div>
+          )}
         </>
       )}
 
