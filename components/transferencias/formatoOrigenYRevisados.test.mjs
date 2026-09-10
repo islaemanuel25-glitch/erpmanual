@@ -192,7 +192,16 @@ test("13b. y acepta el desglose de bultos completos + sueltas", () => {
   const ruta = codigoDe("app/api/transferencias/linea-recepcion/route.js");
   assert.match(ruta, /recibidoUnidadesSueltas: sueltas/);
   // Con la MISMA regla que la recepción normal: sueltas solo si agrupa.
-  assert.match(ruta, /uni\.unidad !== "BULTO"/);
+  //
+  // Y la pregunta se le hace a la unidad AUTORITATIVA —la que el servidor deriva
+  // del catálogo del origen— y no a la que mandó el cliente. Acá decía
+  // `uni.unidad !== "BULTO"`: con eso, un pedido que declarara "BULTO" sobre un
+  // producto por kilo habilitaba un desglose que en esa escala no existe.
+  assert.match(ruta, /traeSueltas && uni\.ok && unidadAutoritativa !== "BULTO"/);
+  assert.ok(
+    !/traeSueltas && uni\.ok && uni\.unidad !== "BULTO"/.test(ruta),
+    "el desglose volvió a juzgarse contra la unidad que mandó el cliente"
+  );
   assert.match(ruta, /SUELTAS_SIN_BULTO/);
 });
 
