@@ -454,6 +454,109 @@ en el plan.
 El procedimiento —qué herramienta recorre qué, cómo enumerar por envoltorios y
 cómo se informa un conteo— está en el skill `/relevar`.
 
+## Qué se verifica en cada tanda
+
+**EL OBJETIVO ES MANTENER EL NIVEL DE SEGURIDAD ACTUAL** eliminando validaciones
+duplicadas, repeticiones causadas por un entorno roto, y builds que no pueden
+validar nada de lo que la tanda cambió.
+
+Esto **no afloja la regla 2**. Verificar ejecutando y no leyendo sigue siendo la
+regla, y sigue siendo la que más veces se cobró. Lo que se elimina es lo otro:
+correr por costumbre algo que no puede observar el cambio, y volver a correr algo
+que ya estaba bien porque el contenedor estaba mal armado.
+
+Y **no toca el skill `/deploy`**. Su lista de "antes de empezar" es de otra cosa:
+un despliegue publica el árbol entero, no el diff de una tanda, así que ahí el
+build y las sondas se corren siempre. Lo de acá es cómo se cierra una tanda de
+trabajo.
+
+### El entorno de pruebas es uno solo y ya está armado
+
+**No se improvisa un contenedor por tanda.** Tres veces salió una falsa falla de
+ahí: sin `bash`, los candados del backup informan `spawnSync bash ENOENT`; sin
+`node_modules`, las suites con JSX no cargan; sin el cliente de Prisma generado,
+caen las que lo importan. Ninguna de las tres era del código, y las tres
+obligaron a correr la suite de nuevo.
+
+- Imagen: **`erpazul-test:estable`** — `node:20-alpine`, hoy **v20.20.2**, la
+  misma mayor que usa la CI, más `bash`, `git`, `gnupg` y `openssh-client`.
+- Dependencias y cliente de Prisma cacheados en
+  **`/home/emanuel/.cache/erpazul-test/node_modules`**, que es parte estable del
+  VPS. Se rehidratan **solo** cuando cambian `package-lock.json` o
+  `prisma/schema.prisma`.
+- Al montar ese cache queda un `node_modules` vacío en el checkout: se borra al
+  terminar.
+
+**La versión de Node no es un detalle de comodidad.** Los módulos de `lib/` son
+ESM escritos en archivos `.js` y el `package.json` no declara `"type": "module"`,
+así que todo esto depende de que Node detecte el módulo solo — disponible desde
+20.19. En Node 18 falla al instanciar, diciendo que un módulo "no exporta" algo
+que sí exporta. El `node` del VPS es v18.19.1, y por eso las suites van en la
+imagen y no a mano.
+
+### La suite
+
+Una corrida completa en verde sobre el **HEAD final** alcanza normalmente. Para
+cambios chicos, primero los tests afectados; la completa queda para el cierre,
+cuando el riesgo o la CI lo pidan.
+
+"Sobre el HEAD final" es **sobre el commit y no sobre el árbol**: el corolario de
+la regla 5 no se toca. Lo que cambia es cuántas veces se corre, no contra qué.
+Con el árbol limpio las dos cosas coinciden; cuando no coinciden, manda el
+commit, y para eso está el clon limpio.
+
+**Si una corrida falla por una causa demostrablemente externa al código, se
+corrige el entorno ANTES de repetirla.** Repetir con el mismo entorno roto es
+precisamente la repetición que hay que eliminar.
+
+**La suite y el build van en serie, no en paralelo.** Este VPS ya mostró
+contención de CPU entre los dos y produjo una falsa falla —un archivo de candados
+cayó entero durante un build y pasa 16 de 16 corriendo solo—. Correrlos juntos
+necesita una medición concreta que muestre que no degrada ni vuelve inestable el
+entorno; sin esa medición, en serie.
+
+### El build es condicional
+
+**No se corre `npm run build` por costumbre.** En este VPS son unos 30 minutos.
+
+Se corre cuando el cambio puede entrar al bundle o al runtime de Next: `app/`,
+`components/`, hooks que la aplicación usa, configuración de Next, dependencias,
+o código compartido que pueda terminar en una ruta o un componente.
+
+No se corre cuando la tanda modifica exclusivamente `docs/`, scripts operativos
+que la aplicación no importa, tests, tooling, hooks de Claude o infraestructura
+de despliegue aislada del runtime web. En ese caso se dice, con estas palabras:
+
+> Build no aplica: la tanda no toca código incluido en el runtime de Next.
+
+**Y no se decide por el nombre de la carpeta.** `lib/` tiene las dos cosas
+adentro: `lib/pos-ventas/` entra al runtime y `lib/deploy/` lo usan un hook y un
+script que la aplicación nunca importa. La pregunta es si ese módulo entra de
+verdad al grafo, y se contesta buscando quién lo importa —regla 10—, no mirando
+la ruta.
+
+### Contrapruebas y capturas
+
+**Contrapruebas** donde protegen contratos críticos, y cuando se agrega o
+modifica un candado. Migraciones, stock, caja, precios, transferencias, seguridad
+y despliegue siguen con control fuerte. Lo que no va es trabajo ceremonial sin
+una regresión concreta que proteger.
+
+**Capturas** solo cuando hay UI, y después de que el código y los tests
+relevantes estén en verde. Nunca para cambios de scripts, backend sin pantalla o
+documentación.
+
+### Y se informa qué se corrió y qué no
+
+El informe final dice **qué validaciones se ejecutaron y cuáles no aplicaban, con
+el motivo**. Las dos mitades: una lista de lo que pasó, sin lo que se salteó, se
+lee como si se hubiera verificado todo.
+
+### Nada de polling
+
+Un proceso largo avisa cuando termina. Preguntar si ya terminó es una ida y
+vuelta completa por pregunta, y no lo apura.
+
 ## Auto-documentación
 
 Al finalizar CADA sesión donde se hayan modificado archivos del proyecto, ejecutar:
