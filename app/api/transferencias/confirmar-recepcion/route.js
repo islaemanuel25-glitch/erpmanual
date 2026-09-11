@@ -25,6 +25,7 @@ import {
   reclamarOFallar,
 } from "@/lib/transferencias/recepcionServidor";
 import { rotuloConSueltas } from "@/lib/transferencias/presentacionEnvio";
+import { aplicarCorreccionEconomica } from "@/lib/transferencias/aplicarCorreccionEconomica";
 import { getConfigLocalEfectiva } from "@/lib/config/local";
 
 /** Cantidades siempre con la escala física de StockLocal (3 decimales). */
@@ -367,6 +368,20 @@ export async function POST(req) {
 
       let tieneDiferencias = false;
 
+      // ── LO QUE DESPUÉS VA A CORREGIR LA PLATA ───────────────────────────
+      //
+      // Se junta ACÁ, con los planes firmes de adentro del lock, y no se vuelve
+      // a calcular después: si la plata partiera de otra lectura podría
+      // corregirse contra cantidades distintas de las que movieron el stock, que
+      // es exactamente el desfase que esta tanda cierra.
+      //
+      // Las líneas AGREGADAS en recepción quedan afuera a propósito. Un producto
+      // que el remito no menciona tampoco está en la venta, así que no tiene
+      // precio comercial congelado — y sacarlo del catálogo de hoy sería
+      // inventar a qué precio se vendió algo que nunca se vendió. Su stock sí
+      // entra, como siempre.
+      const recibidoParaVenta = [];
+
       for (const d of detalles) {
         // Defensa: los combos no tienen stock físico, no se procesan aquí.
         if (esComboBase(d.producto.base)) continue;
@@ -377,6 +392,17 @@ export async function POST(req) {
         const { recibida, recibidaUnidades } = plan;
 
         if (plan.hayDiferencia) tieneDiferencias = true;
+
+        if (!d.agregadoEnRecepcion) {
+          recibidoParaVenta.push({
+            productoBaseId: d.producto.base.id,
+            recibidasFisicas: recibidaUnidades,
+            // El factor de la presentación CANÓNICA, el mismo que resolvió el
+            // stock. Sin esto, 6 packs de 24 se leerían como 6 unidades del otro
+            // lado de la misma transacción.
+            factor: escalaDeRecepcion(d).factorPack,
+          });
+        }
 
         // StockLocal SIEMPRE en UNIDADES (o kg para local de fiambre fijo).
         // La conversión BULTO→unidades ya la hizo validarDetalleRecepcion, una
@@ -656,6 +682,33 @@ export async function POST(req) {
           fechaRecepcion: new Date(),
           tieneDiferencias,
         },
+      });
+
+      // ============================================================
+      // 🟦 LA PLATA — EN ESTA MISMA TRANSACCIÓN, O EN NINGUNA
+      //
+      // Hasta el 2026-09-11 acá terminaba todo, y el comentario del ajuste del
+      // origen decía que resolver el desfase comercial era "una etapa aparte".
+      // Ésta es esa etapa, y NO es un paso aparte: es la última escritura de la
+      // misma transacción.
+      //
+      // El motivo es la regla central. Si esto fuera un segundo request, entre
+      // uno y otro existiría un estado donde el stock ya se corrigió y la venta
+      // todavía factura lo enviado —justo el desfase que se está cerrando—, y
+      // bastaría con que el operador cerrara el navegador para dejarlo así para
+      // siempre. Acá, si la corrección falla, el stock tampoco se movió.
+      //
+      // Qué NO hace, y está medido: no mueve inventario —ya lo movió el bucle de
+      // arriba—, no crea CajaMovimiento —una venta interna con remito está
+      // excluida del arqueo, lo dice `impactoEnArqueo`— y no crea
+      // MovimientoCuenta. Y no exige turno abierto: 147 de las 196 ventas
+      // internas con remito tienen el turno original cerrado.
+      // ============================================================
+      await aplicarCorreccionEconomica(tx, {
+        transferencia,
+        recibido: recibidoParaVenta,
+        usuarioId,
+        grupoId: grupoOrigenId,
       });
     });
 
