@@ -122,6 +122,23 @@ export default function RecepcionMovil({
   const pendientes = resumen?.pendientes ?? 0;
   const todoRevisado = pendientes === 0 && (resumen?.totalRemito ?? 0) > 0;
 
+  // ── LOS TRES IMPORTES ─────────────────────────────────────────────────────
+  //
+  // Los calcula el servidor —`app/api/transferencias/detalle`— y acá NO se
+  // recalcula nada: sumar las cards en el navegador es cómo el mismo documento
+  // termina mostrando dos totales distintos.
+  //
+  // `importeCorregido` llega en null mientras nadie contó, y ahí el único
+  // importe que existe es el enviado. Se compara contra null y no por
+  // truthiness: un remito corregido a 0 —no llegó nada— es un caso real y tiene
+  // que mostrar su diferencia, no desaparecer.
+  const importeOriginal = item?.resumen?.importeOriginal ?? null;
+  const importeCorregido = item?.resumen?.importeCorregido ?? null;
+  const diferenciaImporte = item?.resumen?.diferenciaImporte ?? null;
+  const hayDiferenciaDeImporte =
+    importeCorregido != null && diferenciaImporte != null && diferenciaImporte !== 0;
+  const importeSinDiferencia = importeCorregido ?? importeOriginal;
+
   const opcionesEstado = TABS.map((t) => ({ ...t, cantidad: CONTEO[t.clave](resumen || {}) }));
 
 
@@ -385,13 +402,45 @@ export default function RecepcionMovil({
               misma valorización canónica que el tile de escritorio y los PDF.
               Sumar las cards en el navegador es cómo el mismo documento termina
               mostrando dos totales. */}
-          {item?.resumen?.importeEnviado != null && (
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm2 sunmi-text-muted">Total remito</span>
-              <span className="tabular-nums font-semibold sunmi-text-strong">
-                {fmtMoneda(item.resumen.importeEnviado)}
-              </span>
-            </div>
+          {/* ── EL IMPORTE, Y CUÁL DE LOS TRES ES EL PRINCIPAL ────────────────
+              Mientras no hay diferencia hay UN importe y se muestra solo: poner
+              tres renglones iguales sería ruido en el momento de firmar.
+              Apenas aparece diferencia, el número grande pasa a ser el CORREGIDO
+              —es lo que entró y lo que se va a facturar— y el original baja a
+              antecedente. Nunca se borra: es con lo que se reclama. */}
+          {hayDiferenciaDeImporte ? (
+            <>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-sm2 sunmi-text-muted">Importe corregido</span>
+                <span className="tabular-nums font-semibold sunmi-text-strong">
+                  {fmtMoneda(item.resumen.importeCorregido)}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-sm2 sunmi-text-muted">Importe enviado</span>
+                <span className="tabular-nums text-sm2 sunmi-text-muted">
+                  {fmtMoneda(item.resumen.importeOriginal)}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-sm2 sunmi-text-muted">Diferencia</span>
+                {/* El signo lo lleva el NÚMERO, no un color: un más o un menos se
+                    lee igual en cualquier pantalla y con cualquier tema. */}
+                <span className="tabular-nums text-sm2 sunmi-text-strong">
+                  {item.resumen.diferenciaImporte > 0 ? "+" : ""}
+                  {fmtMoneda(item.resumen.diferenciaImporte)}
+                </span>
+              </div>
+            </>
+          ) : (
+            importeSinDiferencia != null && (
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-sm2 sunmi-text-muted">Importe</span>
+                <span className="tabular-nums font-semibold sunmi-text-strong">
+                  {fmtMoneda(importeSinDiferencia)}
+                </span>
+              </div>
+            )
           )}
           <p className={`text-sm2 ${todoRevisado ? "sunmi-text-success" : "sunmi-text-muted"}`}>
             {todoRevisado

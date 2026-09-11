@@ -27,6 +27,10 @@ import { escalaDeRecepcion } from "@/lib/transferencias/recepcionServidor";
 // La MISMA función con la que la ruta de adopción decide qué es el producto
 // hoy. La pantalla no la vuelve a deducir por su cuenta.
 import { presentacionDeProducto } from "@/lib/productos/presentacionDeProducto";
+// La resta de dos importes arrastra residuo binario —34.125 menos 31.500 puede
+// dar 2.624,9999999996—, y ese número viaja a la pantalla. Se redondea con el
+// mismo helper que usa el resto del dinero del ERP, no con uno propio.
+import { round2 as aDosDecimalesDeImporte } from "@/lib/pos-ventas/pagos";
 
 function toNumber(v) {
   const n = Number(v);
@@ -537,11 +541,32 @@ export async function GET(req) {
         itemsEnviados,
         itemsRecibidos,
         diferenciaTotal,
-        // EL VALOR DEL DOCUMENTO. Inmutable durante la recepción, y el que
-        // muestran las pantallas. Ver los dos acumuladores más arriba.
+        // ── LOS TRES NOMBRES DEL CONTRATO ECONÓMICO ────────────────────────
+        //
+        // Desde el 2026-09-11 confirmar una recepción corrige la venta vinculada,
+        // así que la pantalla dejó de tener un solo importe y pasó a tener tres.
+        // Van con nombre propio porque `importeEnviado` y `costoTotal` decían
+        // CÓMO se calculaban, no QUÉ contestan, y ésa fue la ambigüedad que costó
+        // el defecto de la #198.
+        //
+        //   importeOriginal    = lo que el depósito despachó. Auditoría. No se mueve.
+        //   importeCorregido   = lo que el local recibió, valorizado. Es la verdad
+        //                        operativa en cuanto hay conteo.
+        //   diferenciaImporte  = corregido - original. Con signo.
+        //
+        // `importeCorregido` va en null mientras NADIE contó nada: ahí todavía no
+        // hay una corrección, hay un remito sin abrir, y mandar el enviado con
+        // nombre de corregido sería afirmar un conteo que no ocurrió.
+        importeOriginal: importeEnviado,
+        importeCorregido: itemsRecibidos > 0 ? costoTotal : null,
+        diferenciaImporte: itemsRecibidos > 0 ? aDosDecimalesDeImporte(costoTotal - importeEnviado) : null,
+        // ── Y LOS DOS NOMBRES VIEJOS, QUE SIGUEN SALIENDO ──────────────────
+        //
+        // No se borran: los leen la página de escritorio, la composición móvil y
+        // los candados del PR #57. Romperlos en silencio sería cambiar un
+        // contrato sin que nada se ponga rojo — que es lo contrario de lo que
+        // esta tanda viene arreglando. Son el MISMO número que los de arriba.
         importeEnviado,
-        // Y el valor de lo recibido, con el nombre que ya tenía. Cambia al
-        // contar, a propósito: ésa es su pregunta.
         costoTotal,
         // Unidades físicas de ajuste al stock del origen, en NETO y con signo:
         // positivo vuelve, negativo se descuenta. Se informa el neto y no dos

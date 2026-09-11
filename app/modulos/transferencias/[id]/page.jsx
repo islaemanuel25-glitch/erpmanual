@@ -577,7 +577,20 @@ export default function TransferenciaDetallePage() {
   // `importeEnviado` es lo que salió del depósito y quedó valorizado al enviar.
   // Los dos siguen viniendo en la respuesta: son dos preguntas distintas y
   // tienen dos nombres.
-  const importeTotal = item ? num(item.resumen?.importeEnviado) : 0;
+  //
+  // ── Y DESDE EL 2026-09-11 SON TRES, NO DOS ───────────────────────────────
+  //
+  // Confirmar una recepción ahora corrige la venta vinculada, así que el importe
+  // VIGENTE de la operación pasa a ser el corregido en cuanto hay conteo. El
+  // enviado no desaparece: baja a antecedente, que es lo que sigue respondiendo
+  // "cuánto despachamos". Mientras nadie contó, `importeCorregido` llega en null
+  // y el único importe que existe es el enviado.
+  const importeOriginal = item ? num(item.resumen?.importeOriginal ?? item.resumen?.importeEnviado) : 0;
+  const importeCorregido = item?.resumen?.importeCorregido ?? null;
+  const diferenciaImporte = item?.resumen?.diferenciaImporte ?? null;
+  const hayDiferenciaDeImporte =
+    importeCorregido != null && diferenciaImporte != null && diferenciaImporte !== 0;
+  const importeTotal = hayDiferenciaDeImporte ? num(importeCorregido) : importeOriginal;
 
   const titulo = item ? `Transferencia #${item.id}` : "Ver transferencia";
   const fechaCabecera = item ? (item.fechaEnvio ?? item.fechaCreada) : null;
@@ -783,12 +796,25 @@ export default function TransferenciaDetallePage() {
                     value={lineasDevueltas === 0 ? "—" : fmtCantidad(lineasDevueltas)}
                     tone={lineasDevueltas > 0 ? "accent" : "muted"}
                   />
+                  {/* El rótulo dice CUÁL de los dos importes es. "Importe total"
+                      no distinguía, y esa ambigüedad es la que costó el defecto
+                      de la #198. */}
                   <TotalTile
-                    label="Importe total"
+                    label={hayDiferenciaDeImporte ? "Importe corregido" : "Importe total"}
                     value={fmtMoneda(importeTotal)}
                     tone="success"
                     highlight
                   />
+                  {hayDiferenciaDeImporte && (
+                    <>
+                      <TotalTile label="Importe enviado" value={fmtMoneda(importeOriginal)} tone="muted" />
+                      <TotalTile
+                        label="Diferencia"
+                        value={`${diferenciaImporte > 0 ? "+" : ""}${fmtMoneda(diferenciaImporte)}`}
+                        tone="accent"
+                      />
+                    </>
+                  )}
                 </div>
               </SunmiCard>
             </section>
