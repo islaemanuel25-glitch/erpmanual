@@ -73,6 +73,11 @@ import {
   CLAVES_DE_FILTRO,
 } from "@/lib/productos/filtrosCatalogo";
 import {
+  ORIGEN_DE_URL,
+  crearConfirmadorDiferido,
+  laUrlHidrataElEstado,
+} from "@/lib/productos/busquedaDelCatalogo";
+import {
   GRUPO,
   esPresentacionDeVenta,
   esPresentacionDeCompra,
@@ -493,6 +498,31 @@ export default function ProductosPage() {
   // Salen del mismo estado inicial normalizado que el control — ver `inicialRef`.
   const [filtros, setFiltros] = useState(inicialRef.current.filtros);
 
+  // ── EL TEXTO QUE LA PERSONA ESTÁ ESCRIBIENDO, Y NADA MÁS ────────────────
+  //
+  // Es el DUEÑO EXCLUSIVO del `value` del buscador del celular, y es lo único
+  // que cambia al teclear. No viaja a la URL, no dispara un pedido y no espera
+  // ninguna respuesta.
+  //
+  // Antes ese `value` era `filtros.search`, o sea el mismo estado que el efecto
+  // de la URL reescribe. Con varias navegaciones propias en vuelo, una llegaba
+  // tarde, se aplicaba encima, y el input retrocedía debajo del teclado: la
+  // tecla siguiente se sumaba al texto viejo y salía "quiquilmes". Separar el
+  // borrador del estado confirmado es todo el arreglo — ver
+  // `lib/productos/busquedaDelCatalogo.js`.
+  //
+  // Arranca de la URL como el resto del estado inicial, así que entrar por un
+  // enlace con `?q=` deja el campo escrito.
+  const [textoBusquedaMovil, setTextoBusquedaMovil] = useState(
+    inicialRef.current.filtros.search
+  );
+
+  // Cuántas veces se navegó el historial. Solo sirve como `key` del panel de
+  // filtros del escritorio, que lee `initial` al montarse: sin esto, Atrás
+  // restauraba el listado y la URL pero dejaba el campo del escritorio con el
+  // texto anterior. Cambia SOLO en `popstate`, así que teclear no lo mueve.
+  const [generacionDeHistorial, setGeneracionDeHistorial] = useState(0);
+
   // Los filtros que NO reducen el universo: exactamente el que cuenta la card de
   // "Para revisar". Es el estado al que se vuelve al activar un control.
   //
@@ -531,12 +561,17 @@ export default function ProductosPage() {
     return qs ? `/modulos/productos?${qs}` : "/modulos/productos";
   }, [page, sortKey, sortDir, filtros, control, presentaciones]);
 
-  // ── LA ÚLTIMA URL QUE ESCRIBIÓ ESTA PANTALLA ────────────────────────────
+  // ── QUÉ URL ESTÁ REFLEJADA AHORA MISMO ──────────────────────────────────
   //
-  // Es lo que distingue "la URL cambió porque yo la cambié" de "la URL cambió
-  // porque alguien tocó Atrás". Sin esa distinción los dos efectos se muerden la
-  // cola: el de abajo escribe la URL desde el estado y el de más abajo lee el
-  // estado desde la URL.
+  // Sirve para UNA sola cosa: no volver a escribir la dirección que la barra ya
+  // muestra. Sin eso, volver de un Atrás dejaría una entrada de historial nueva
+  // por cada Atrás, o sea un Atrás que no avanza.
+  //
+  // YA NO CLASIFICA NADA, y esa es la diferencia con la versión anterior. Antes
+  // esto era lo que decidía si una URL entrante era propia o externa, comparando
+  // contra la última escrita — y como escribiendo rápido hay varias propias en
+  // vuelo, una intermedia se leía como externa y pisaba el input. Quién hidrata
+  // ahora lo decide el evento `popstate`, más abajo.
   const ultimaUrlEscritaRef = useRef(null);
 
   // Y la última selección de cards que se escribió, para saber si la que viene
@@ -646,6 +681,16 @@ export default function ProductosPage() {
       setControl(estado.control);
       setPresentaciones(estado.presentaciones);
       setFiltros(estado.filtros);
+      // El borrador del celular se repone junto con el estado confirmado: si
+      // Atrás restaura una búsqueda, el campo tiene que mostrarla. Es el ÚNICO
+      // lugar que escribe el borrador desde afuera, y solo corre en una
+      // navegación real de historial o al entrar. Ver `laUrlHidrataElEstado`.
+      setTextoBusquedaMovil(estado.filtros.search);
+      // Y el panel de filtros del escritorio se remonta con lo restaurado: sus
+      // campos leen `initial` una sola vez, al montarse. El contador cambia SOLO
+      // acá, así que teclear no lo toca y el escritorio sigue comportándose
+      // exactamente como antes mientras se escribe.
+      setGeneracionDeHistorial((n) => n + 1);
       // Lo guardado se descarta: quien vuelve atrás no está apagando una card,
       // está yendo a otro punto del historial, y reponerle unos filtros de antes
       // sería la sorpresa al revés.
@@ -659,15 +704,47 @@ export default function ProductosPage() {
     []
   );
 
+  // ── LA URL HIDRATA POR UN EVENTO, NO POR PARECERSE A OTRA CADENA ────────
+  //
+  // ESTE EFECTO ERA LA CAUSA DEL "quiquilmes". Reaccionaba a CUALQUIER cambio
+  // de `searchParams` y decidía si aplicarlo comparando la URL entrante contra
+  // `ultimaUrlEscritaRef`, que recuerda UNA sola. Escribiendo rápido hay varias
+  // navegaciones propias en vuelo: cuando aterrizaba una intermedia —`?q=qui`
+  // con la ref ya en `?q=quilmes`— la comparación fallaba, se la tomaba por
+  // externa y se aplicaba encima del estado más nuevo. El input retrocedía
+  // debajo del teclado.
+  //
+  // No se arregla agrandando la memoria de URL propias ni mirando si el campo
+  // tiene el foco. Las dos siguen adivinando de dónde vino la URL. Acá se deja
+  // de adivinar: **el navegador ya lo dice**. `popstate` se dispara SOLO al
+  // recorrer el historial —Atrás, Adelante, `history.back()`—; un `pushState` o
+  // un `replaceState` programático no lo dispara nunca. O sea que un eco propio
+  // ya no puede disfrazarse de navegación, por construcción y no por heurística.
+  //
+  // Y el estado inicial NO necesita este efecto: ya se lee de la URL en
+  // `inicialRef` al montar. Por eso el efecto dejó de depender de
+  // `searchParams`: no había un tercer caso que atender.
+  //
+  // Se lee de `window.location.search` y no del `searchParams` de Next: cuando
+  // `popstate` llega, la barra de direcciones ya está en el destino, así que no
+  // hay que esperar a que el router se entere ni importa en qué orden corran.
   useEffect(() => {
-    if (editarId || nuevo === "1") return;
-    const qs = searchParams.toString();
-    const url = qs ? `/modulos/productos?${qs}` : "/modulos/productos";
-    // El eco de lo que escribimos nosotros. No hay nada que aplicar.
-    if (ultimaUrlEscritaRef.current === url) return;
-    ultimaUrlEscritaRef.current = url;
-    aplicarEstadoDeLaUrl(searchParams);
-  }, [searchParams, editarId, nuevo, aplicarEstadoDeLaUrl]);
+    const alNavegarElHistorial = () => {
+      if (!laUrlHidrataElEstado(ORIGEN_DE_URL.HISTORIAL)) return;
+      const sp = new URLSearchParams(window.location.search);
+      // Con el modal abierto la URL no es del listado; se la deja en sus manos,
+      // igual que hacía el guardia anterior.
+      if (sp.get("editar") || sp.get("nuevo") === "1") return;
+      const qs = sp.toString();
+      // Se anota lo que la URL ya dice, para que el efecto de ida no vuelva a
+      // escribir la misma dirección y agregue una entrada por cada Atrás.
+      ultimaUrlEscritaRef.current = qs ? `/modulos/productos?${qs}` : "/modulos/productos";
+      aplicarEstadoDeLaUrl(sp);
+    };
+
+    window.addEventListener("popstate", alNavegarElHistorial);
+    return () => window.removeEventListener("popstate", alNavegarElHistorial);
+  }, [aplicarEstadoDeLaUrl]);
 
   const allColumns = [
     { key: "imagenUrl", label: "Imagen" },
@@ -1780,10 +1857,64 @@ export default function ProductosPage() {
     // cards que el servidor manda, y quedarse callado es mejor que adivinar.
   };
 
-  // El buscador del celular, en un solo lugar: lo usan la ranura de teclear y
-  // la de dictar, que acá tienen que hacer exactamente lo mismo. Pasar dos
-  // funciones "iguales" escritas al lado es cómo empiezan a no serlo.
-  const alBuscarEnElCelular = (texto) => aplicarFiltros({ ...filtros, search: texto });
+  // ── EL BUSCADOR DEL CELULAR: BORRADOR AHORA, BÚSQUEDA DESPUÉS ───────────
+  //
+  // Teclear toca UNA cosa: el borrador. La búsqueda se confirma cuando la
+  // persona deja de escribir, y recién ahí pasa por `aplicarFiltros` —que vuelve
+  // a la página 1 y apaga las cards— y por la URL.
+  //
+  // Antes cada tecla llamaba directo a `aplicarFiltros`. Eso hacía dos cosas
+  // malas a la vez: un `/api/productos/listar` por tecla —siete para
+  // "quilmes"— y una navegación propia por tecla, que es lo que abría la
+  // carrera que pisaba el input.
+  //
+  // El confirmador y la ventana de 250 ms salen de `busquedaDelCatalogo`, que es
+  // la misma que ya usaba `FiltrosProductos` en el escritorio. No se eligió un
+  // número nuevo: el mismo gesto no puede esperar tiempos distintos según la
+  // pantalla.
+  // Qué hacer cuando venza, SIEMPRE en su versión más nueva.
+  //
+  // `aplicarFiltros` lee `control` y `presentaciones` de su clausura, así que
+  // capturarla una sola vez dejaría al temporizador decidiendo con el estado del
+  // primer render: media hora después apagaría una card que ya no está. Se
+  // guarda en una ref que se repone en cada render, que es el patrón de siempre
+  // para un callback que sobrevive a un temporizador.
+  const confirmarBusquedaRef = useRef(null);
+  confirmarBusquedaRef.current = (texto) => {
+    if (filtros.search === texto) return;
+    aplicarFiltros({ ...filtros, search: texto });
+  };
+
+  // El confirmador se crea UNA vez: si se recreara en cada render, cada tecla
+  // estrenaría su propio temporizador y no habría nada que posponer.
+  const confirmadorRef = useRef(null);
+  if (confirmadorRef.current === null) {
+    confirmadorRef.current = crearConfirmadorDiferido((texto) =>
+      confirmarBusquedaRef.current?.(texto)
+    );
+  }
+
+  // Si la pantalla se va con algo en cola, no se confirma sobre un componente
+  // desmontado.
+  useEffect(() => {
+    const confirmador = confirmadorRef.current;
+    return () => confirmador?.cancelar();
+  }, []);
+
+  // Teclear: solo el borrador, y se pospone la confirmación.
+  const alTeclearEnElCelular = (texto) => {
+    setTextoBusquedaMovil(texto);
+    confirmadorRef.current.programar(texto);
+  };
+
+  // Dictar: una transcripción ya es una frase completa, no una tecla. Se
+  // confirma sin esperar, que es lo que hace `buscarInmediato` en el escritorio
+  // para la voz, el escáner y Enter. El borrador se escribe igual, así el campo
+  // muestra lo que se dictó.
+  const alDictarEnElCelular = (texto) => {
+    setTextoBusquedaMovil(texto);
+    confirmadorRef.current.inmediato(texto);
+  };
 
   // ── MARCAR COMO REVISADOS LOS DE ESTA PÁGINA ─────────────────────────────
   //
@@ -2433,11 +2564,15 @@ export default function ProductosPage() {
                   el llamado en vez de escondida adentro de la pieza. */}
               <div className="md:hidden">
                 <SunmiCampoBusquedaVoz
-                  value={filtros.search}
-                  // Por `aplicarFiltros`, que apaga el control si había uno:
-                  // buscar con una card activa rompía el criterio del issue.
-                  onChange={alBuscarEnElCelular}
-                  onVoz={alBuscarEnElCelular}
+                  // EL BORRADOR, no `filtros.search`. Es la línea del defecto:
+                  // atado al estado confirmado, un eco tardío de la URL le
+                  // reescribía el texto a la persona mientras escribía.
+                  value={textoBusquedaMovil}
+                  // Teclear pospone; dictar confirma ya. Los dos terminan en
+                  // `aplicarFiltros`, que apaga el control si había uno: buscar
+                  // con una card activa rompía el criterio del issue.
+                  onChange={alTeclearEnElCelular}
+                  onVoz={alDictarEnElCelular}
                   placeholder="Buscar por nombre o código"
                   ariaLabel="Buscar productos"
                 />
@@ -2559,6 +2694,11 @@ export default function ProductosPage() {
 
               <div className="hidden md:block">
               <FiltrosProductos
+                // Se remonta SOLO cuando se navega el historial: sus campos leen
+                // `initial` al montarse, así que sin esto Atrás restauraba el
+                // listado y dejaba el texto anterior en pantalla. El contador no
+                // se mueve al teclear, así que el escritorio no cambia.
+                key={generacionDeHistorial}
                 initial={filtros}
                 catalogos={catalogos}
                 // `aplicarFiltros` resuelve las dos cosas: vuelve a la página 1 y
@@ -3277,6 +3417,9 @@ export default function ProductosPage() {
         maxWidth="max-w-xl"
       >
         <FiltrosProductos
+          // Mismo criterio que el de escritorio: se remonta con lo restaurado
+          // cuando se navega el historial, y no cuando se escribe.
+          key={generacionDeHistorial}
           initial={filtros}
           catalogos={catalogos}
           onChange={(f) => {
