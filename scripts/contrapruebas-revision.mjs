@@ -384,6 +384,45 @@ const CASOS = [
     candado: "EL HISTORIAL CANCELA LO PENDIENTE ANTES DE HIDRATAR",
     suite: "app/modulos/productos/buscadorMovilCableado.test.mjs",
   },
+
+  // ── LAS TRES DE LA VALORIZACIÓN DEL REMITO ────────────────────────────
+  //
+  // El defecto de la #198: "Costo PACK x24 · $218,75 · Total $1.312,50" sobre
+  // una línea que vale $5.250 el pack y $31.500 la línea. Éstas son las tres
+  // formas de traerlo de vuelta.
+  {
+    n: "V-1",
+    defecto: "la card vuelve a mostrar el costo de la UNIDAD bajo el rótulo del PACK",
+    archivo: "app/api/transferencias/detalle/route.js",
+    de: "        precioCosto: remito.costoPresentacion,",
+    a: "        precioCosto: costoNormalizado,",
+    candado: "la ruta manda el costo DE LA PRESENTACIÓN y el subtotal DEL REMITO",
+    suite: "app/api/transferencias/valorizacionDelDetalle.test.mjs",
+  },
+  {
+    n: "V-2",
+    defecto: "el subtotal vuelve a mezclar escalas: cantidad presentada × costo por unidad",
+    archivo: "lib/transferencias/costoTransferencia.js",
+    // Es LA línea. Sin pasar por las unidades físicas, 6 packs × 218,75 vuelve
+    // a dar 1.312,50 sobre un remito de 31.500.
+    de: "  const unidadesFisicas = unidadesFisicasDelDescriptor(envio);",
+    a: "  const unidadesFisicas = Number(envio.cantidad) || 0;",
+    // Sin `#` en el nombre a propósito: en TAP ese carácter abre un comentario,
+    // node lo escapa como `\#` y el match por nombre de esta contraprueba no lo
+    // encontraba — informaba "el candado NO se puso rojo" sobre un candado que
+    // sí se había puesto rojo.
+    candado: "T198 ·LA LÍNEA REAL: PACK x24, costo 5.250, subtotal 31.500",
+    suite: "lib/transferencias/valorizacionDelRemito.test.mjs",
+  },
+  {
+    n: "V-3",
+    defecto: "valorizar lo recibido vuelve a leer `recibido` crudo, en otra escala",
+    archivo: "lib/transferencias/costoTransferencia.js",
+    de: "  const cantidad = recibidasFisicas / porUnidadDeLaCantidad;",
+    a: "  const cantidad = aNumero(detalle.recibido) ?? 0;",
+    candado: "valorizarDetalle en modo VALORIZAR mide lo RECIBIDO, y ahora en la escala correcta",
+    suite: "lib/transferencias/valorizacionDelRemito.test.mjs",
+  },
 ];
 
 // `node_modules` se ENLAZA en vez de copiarse: son doce copias y nada de lo que
