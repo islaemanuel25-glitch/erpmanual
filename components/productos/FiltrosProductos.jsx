@@ -7,6 +7,7 @@ import SunmiSelectAdv, {
 } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import { Search } from "lucide-react";
+import { MS_DEBOUNCE_BUSQUEDA } from "@/lib/productos/busquedaDelCatalogo";
 
 export default function FiltrosProductos({ onChange, catalogos, initial }) {
   const [search, setSearch] = useState(initial.search || "");
@@ -34,12 +35,17 @@ export default function FiltrosProductos({ onChange, catalogos, initial }) {
     !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 
   // ============================
-  // Debounce 250ms para cambios de texto
+  // Debounce para cambios de texto
   // ============================
+  //
+  // La ventana salió de acá y ahora vive en `busquedaDelCatalogo`, porque el
+  // buscador del celular usa la misma: el mismo gesto no puede esperar tiempos
+  // distintos según la pantalla, y dos números escritos a mano se separan el día
+  // que alguien toca uno solo. El valor no cambió.
   useEffect(() => {
     debounceRef.current = setTimeout(() => {
       onChange({ search, categoria, proveedor, area, estado, tipo });
-    }, 250);
+    }, MS_DEBOUNCE_BUSQUEDA);
 
     return () => clearTimeout(debounceRef.current);
   }, [search, categoria, proveedor, area, estado, tipo]);
