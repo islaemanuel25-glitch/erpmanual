@@ -48,7 +48,7 @@ import { hayEscanerDisponible } from "@/components/sunmi/SunmiEscanerCodigoBarra
 import EstadoTransferenciaBadge from "./EstadoTransferenciaBadge";
 import TransferenciaHeader from "./TransferenciaHeader";
 import FichaProductoRecepcion from "./FichaProductoRecepcion";
-import { fmtCantidad } from "./detallePresentacion";
+import { fmtCantidad, fmtMoneda } from "./detallePresentacion";
 import { FILTRO, pasaFiltro } from "@/lib/transferencias/controlFisico";
 import { firmaDeEdicion } from "@/lib/transferencias/presentacionEnvio";
 import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
@@ -364,6 +364,35 @@ export default function RecepcionMovil({
           —`PRODUCTOS_SIN_REVISAR`—: esto evita el viaje, no reemplaza la regla. */}
       {puedeRecibir && (
         <SunmiCard className="p-3 space-y-2">
+          {/* ── EL VALOR DEL REMITO, ANTES DE CONFIRMAR ──────────────────
+              El celular mostraba el importe de cada línea y ningún total: para
+              saber cuánto vale lo que se está recibiendo había que sumar de
+              cabeza. Va acá, en el bloque de cierre, porque es la pregunta del
+              momento en que se firma.
+
+              Es `importeEnviado`: lo que salió del depósito y quedó valorizado
+              al enviar. NO cambia mientras se cuenta —un importe que se mueve
+              durante el control no sirve para controlar—. Lo que falte o sobre
+              lo informa el flujo de diferencias, no este número.
+
+              Y se llama así y no `totalRemito` porque el `resumen` del control
+              físico, que esta misma pantalla recibe, ya tiene un `totalRemito`
+              que es un CONTEO DE LÍNEAS. Dos campos con el mismo nombre y
+              distinta unidad en la misma composición es cómo alguien termina
+              sumando pesos con productos.
+
+              El importe NO se suma acá: viene resuelto del endpoint, con la
+              misma valorización canónica que el tile de escritorio y los PDF.
+              Sumar las cards en el navegador es cómo el mismo documento termina
+              mostrando dos totales. */}
+          {item?.resumen?.importeEnviado != null && (
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-sm2 sunmi-text-muted">Total remito</span>
+              <span className="tabular-nums font-semibold sunmi-text-strong">
+                {fmtMoneda(item.resumen.importeEnviado)}
+              </span>
+            </div>
+          )}
           <p className={`text-sm2 ${todoRevisado ? "sunmi-text-success" : "sunmi-text-muted"}`}>
             {todoRevisado
               ? "Todo revisado · listo para confirmar"
