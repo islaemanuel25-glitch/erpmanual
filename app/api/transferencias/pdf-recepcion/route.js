@@ -168,9 +168,23 @@ export async function GET(req) {
         {
           cantidad: d.cantidad,
           recibido: d.recibido,
+          // Las sueltas son parte de lo recibido. Sin esto, "1 pack + 100
+          // sueltas" se valorizaba como 1 pack y las 100 unidades no existían
+          // para el acta, que es el documento con el que se reclama.
+          recibidoUnidadesSueltas: d.recibidoUnidadesSueltas,
           unidadEnviada: d.unidadEnviada,
           precioCosto:
             d.precioCosto ?? d.producto?.base?.precio_costo ?? 0,
+          // El snapshot de presentación. El acta sigue contestando CUÁNTO VALE
+          // LO RECIBIDO —esa es su pregunta y no cambia—, pero para leer el
+          // `recibido` en la escala correcta necesita saber en qué presentación
+          // salió: en la #198 son packs de 24, y sin el snapshot se leían como
+          // 6 unidades sueltas. Una escala; dos cantidades posibles.
+          presentacionEnvio: d.presentacionEnvio,
+          cantidadPresentada: d.cantidadPresentada,
+          factorPresentacion: d.factorPresentacion,
+          sueltasEnviadas: d.sueltasEnviadas,
+          pesoPiezaKg: d.pesoPiezaKg,
         },
         d.producto?.base,
         // Igual que el remito: el fiambre de pieza fija sale del depósito en

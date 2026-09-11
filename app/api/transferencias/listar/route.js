@@ -97,6 +97,20 @@ export async function GET(req) {
       recibido: true,
       precioCosto: true,
       unidadEnviada: true,
+      // ── EL SNAPSHOT DE PRESENTACIÓN ─────────────────────────────────────
+      //
+      // Es lo que fija en qué presentación salió la mercadería. Sin él,
+      // `valorizarLineaDelRemito` la reconstruye desde los campos crudos —y
+      // para el importe ENVIADO hoy da el mismo número, está medido—; lo que
+      // se pide acá es que el reporte lea la presentación REGISTRADA y no una
+      // reconstrucción que coincide. Es la misma razón por la que existen los
+      // cuatro del fiambre de acá abajo, con una diferencia honesta: aquéllos
+      // cambian el importe y éstos no. Cambian la fuente.
+      presentacionEnvio: true,
+      cantidadPresentada: true,
+      factorPresentacion: true,
+      sueltasEnviadas: true,
+      pesoPiezaKg: true,
       // `productoId` y los dos nombres alimentan "Productos más transferidos".
       // El join a producto→base YA existía para valorizar (precio_costo,
       // unidad_medida, factor_pack): pedir `nombre` no agrega una consulta, solo
@@ -258,6 +272,13 @@ export async function GET(req) {
         // faltaba: mostraba la #97 en 144.086,40 mientras su detalle decía
         // 155.486,40. El total de arriba ya pasaba el origen, así que la lista
         // ni siquiera cerraba consigo misma.
+        //
+        // QUÉ IMPORTE ES, porque el nombre no lo dice: es el ENVIADO —lo que el
+        // origen despachó—, y no se mueve cuando el destino cuenta. El nombre
+        // `totalCosto` viaja al frontend del reporte y renombrarlo abriría un
+        // diff que no tiene que ver con este arreglo; queda anotado acá, que es
+        // donde se produce. El otro importe, el de lo RECIBIDO, vive en el acta
+        // de recepción y en `subtotalRecibido` del detalle.
         totalCosto: importeDeDetalle(t.detalle, {
           origenEsDeposito: origenEsDepositoDe(t, "listar/fila"),
         }),
@@ -289,9 +310,13 @@ export async function GET(req) {
     // ese bloque contesta.
     const periodoOperativo = soloOperativas(periodo);
 
-    // Importe de TODO el período filtrado. Antes esta clave sumaba solo la
-    // página visible pese a llamarse "global": con más de 25 resultados el
+    // Importe ENVIADO de TODO el período filtrado. Antes esta clave sumaba solo
+    // la página visible pese a llamarse "global": con más de 25 resultados el
     // importe cambiaba al pasar de página.
+    //
+    // Y desde el 2026-09-11 tampoco cambia por la otra puerta: contesta cuánto
+    // se despachó, no cuánto se contó, así que el total de un mes cerrado no se
+    // mueve porque un local termine de recibir un remito viejo.
     const totalCostoGlobal = desdeCentavos(
       periodoOperativo.reduce(
         (acc, t) =>

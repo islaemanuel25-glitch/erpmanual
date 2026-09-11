@@ -567,7 +567,17 @@ export default function TransferenciaDetallePage() {
       (e === ESTADO_PRODUCTO.FALTANTE || e === ESTADO_PRODUCTO.SOBRANTE);
   }).length;
   const lineasDevueltas = lineas.filter((d) => d.devolucionOrigen != null && num(d.devolucionOrigen) > 0).length;
-  const importeTotal = item ? num(item.resumen?.costoTotal) : 0;
+  // EL VALOR DEL REMITO, no el de lo recibido.
+  //
+  // Leía `resumen.costoTotal`, que valoriza lo que FÍSICAMENTE LLEGÓ y por lo
+  // tanto se movía mientras alguien contaba: el mismo tile decía un número antes
+  // de revisar y otro después, bajo el mismo rótulo. Un importe que cambia
+  // durante el control no sirve para controlar.
+  //
+  // `importeEnviado` es lo que salió del depósito y quedó valorizado al enviar.
+  // Los dos siguen viniendo en la respuesta: son dos preguntas distintas y
+  // tienen dos nombres.
+  const importeTotal = item ? num(item.resumen?.importeEnviado) : 0;
 
   const titulo = item ? `Transferencia #${item.id}` : "Ver transferencia";
   const fechaCabecera = item ? (item.fechaEnvio ?? item.fechaCreada) : null;

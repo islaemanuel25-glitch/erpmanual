@@ -384,6 +384,101 @@ const CASOS = [
     candado: "EL HISTORIAL CANCELA LO PENDIENTE ANTES DE HIDRATAR",
     suite: "app/modulos/productos/buscadorMovilCableado.test.mjs",
   },
+
+  // ── LAS TRES DE LA VALORIZACIÓN DEL REMITO ────────────────────────────
+  //
+  // El defecto de la #198: "Costo PACK x24 · $218,75 · Total $1.312,50" sobre
+  // una línea que vale $5.250 el pack y $31.500 la línea. Éstas son las tres
+  // formas de traerlo de vuelta.
+  {
+    n: "V-1",
+    defecto: "la card vuelve a mostrar el costo de la UNIDAD bajo el rótulo del PACK",
+    archivo: "app/api/transferencias/detalle/route.js",
+    de: "        precioCosto: remito.costoPresentacion,",
+    a: "        precioCosto: costoNormalizado,",
+    candado: "la ruta manda el costo DE LA PRESENTACIÓN y el subtotal DEL REMITO",
+    suite: "app/api/transferencias/valorizacionDelDetalle.test.mjs",
+  },
+  {
+    n: "V-2",
+    defecto: "el subtotal vuelve a mezclar escalas: cantidad presentada × costo por unidad",
+    archivo: "lib/transferencias/costoTransferencia.js",
+    // Es LA línea. Sin pasar por las unidades físicas, 6 packs × 218,75 vuelve
+    // a dar 1.312,50 sobre un remito de 31.500.
+    de: "  const unidadesFisicas = unidadesFisicasDelDescriptor(envio);",
+    a: "  const unidadesFisicas = Number(envio.cantidad) || 0;",
+    // Sin `#` en el nombre a propósito: en TAP ese carácter abre un comentario,
+    // node lo escapa como `\#` y el match por nombre de esta contraprueba no lo
+    // encontraba — informaba "el candado NO se puso rojo" sobre un candado que
+    // sí se había puesto rojo.
+    candado: "T198 ·LA LÍNEA REAL: PACK x24, costo 5.250, subtotal 31.500",
+    suite: "lib/transferencias/valorizacionDelRemito.test.mjs",
+  },
+  {
+    n: "V-3",
+    defecto: "valorizar lo recibido vuelve a leer `recibido` crudo, en otra escala",
+    archivo: "lib/transferencias/costoTransferencia.js",
+    de: "  const cantidad = recibidasFisicas / porUnidadDeLaCantidad;",
+    a: "  const cantidad = aNumero(detalle.recibido) ?? 0;",
+    candado: "valorizarDetalle en modo VALORIZAR mide lo RECIBIDO, y ahora en la escala correcta",
+    suite: "lib/transferencias/valorizacionDelRemito.test.mjs",
+  },
+
+  // ── EL REPORTE DEL PERÍODO Y EL ACTA: LOS DOS IMPORTES, CADA UNO EN SU SITIO ─
+  //
+  // Las tres de arriba defienden que la ESCALA se lea bien. Estas cuatro
+  // defienden lo otro que se decidió: que el reporte hable del importe ENVIADO
+  // y el acta del RECIBIDO, y que ninguno de los dos pueda volver al otro sin
+  // que algo se ponga rojo.
+  {
+    n: "V-4",
+    defecto: "el reporte del período vuelve a valorizar lo RECIBIDO, así que su total cambia al contar",
+    archivo: "lib/transferencias/agregadosPeriodo.js",
+    de: "  const { subtotal } = valorizarLineaDelRemito(",
+    a: "  const { subtotal } = valorizarDetalle(",
+    candado: "E1. el importe del remito es el ENVIADO en los cinco estados de recepción",
+    suite: "lib/transferencias/agregadosPeriodo.test.mjs",
+  },
+  {
+    // ── ESTA CONTRAPRUEBA CAMBIÓ DE CANDADO, Y EL MOTIVO VALE MÁS QUE EL CASO ──
+    //
+    // Apuntaba a E2 y daba "el candado NO se puso rojo". No era un candado
+    // débil: sacarle el snapshot al reporte NO cambia el importe enviado —la
+    // reconstrucción coincide, porque `cantidad` ya está en unidades físicas—.
+    // O sea que el candado tenía razón en quedarse verde y la contraprueba
+    // estaba afirmando algo falso sobre el arreglo.
+    //
+    // Se corrigió la afirmación, no el candado: lo que el snapshot defiende acá
+    // es que la FUENTE sea una sola, y eso es lo que ejerce E6.
+    n: "V-5",
+    defecto: "el reporte deja de pasar el snapshot y vuelve a reconstruir la presentación por su cuenta",
+    archivo: "lib/transferencias/agregadosPeriodo.js",
+    de: "      presentacionEnvio: d.presentacionEnvio,",
+    a: "      presentacionEnvio: undefined,",
+    candado: "E6. el reporte le pasa la línea COMPLETA: lee la presentación registrada, no la reconstruye",
+    suite: "lib/transferencias/agregadosPeriodo.test.mjs",
+  },
+  {
+    // Ésta sí encontró un candado débil: con `includes` suelto, renombrar la
+    // clave a `presentacionEnvioNo` lo dejaba verde porque el nombre viejo es
+    // prefijo del nuevo. Se endureció el candado a pedir la clave.
+    n: "V-6",
+    defecto: "el select de la lista deja de traer el snapshot, que es la #97 otra vez con otro sujeto",
+    archivo: "app/api/transferencias/listar/route.js",
+    de: "      presentacionEnvio: true,",
+    a: "      presentacionEnvioNo: true,",
+    candado: "TODAS las rutas que valorizan traen el snapshot de presentación de la línea",
+    suite: "lib/transferencias/formaDelSelect.test.mjs",
+  },
+  {
+    n: "V-7",
+    defecto: "el acta de recepción deja de sumar las sueltas, que es donde viven las diferencias",
+    archivo: "app/api/transferencias/pdf-recepcion/route.js",
+    de: "          recibidoUnidadesSueltas: d.recibidoUnidadesSueltas,",
+    a: "          recibidoUnidadesSueltas: 0,",
+    candado: "ACTA · y la RUTA le pasa el snapshot y las sueltas, no solo `recibido`",
+    suite: "lib/transferencias/formaDelSelect.test.mjs",
+  },
 ];
 
 // `node_modules` se ENLAZA en vez de copiarse: son doce copias y nada de lo que

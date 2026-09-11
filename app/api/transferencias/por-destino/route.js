@@ -118,6 +118,16 @@ export async function GET(req) {
             recibido: true,
             precioCosto: true,
             unidadEnviada: true,
+            // El snapshot de presentación, para que el agrupado por destino
+            // parta de la presentación REGISTRADA y no de una reconstrucción.
+            // Para el importe enviado las dos dan hoy el mismo número —está
+            // medido—: lo que se defiende es que la fuente sea una sola.
+            // Candado: lib/transferencias/formaDelSelect.test.mjs.
+            presentacionEnvio: true,
+            cantidadPresentada: true,
+            factorPresentacion: true,
+            sueltasEnviadas: true,
+            pesoPiezaKg: true,
             producto: {
               select: {
                 precio_costo: true,

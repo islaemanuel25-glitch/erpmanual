@@ -4,7 +4,11 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession, getCookieValue } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { esFiambreFijo } from "@/lib/conversiones/stock";
-import { valorizarDetalle, origenEsDepositoDe } from "@/lib/transferencias/costoTransferencia";
+import {
+  valorizarDetalle,
+  valorizarLineaDelRemito,
+  origenEsDepositoDe,
+} from "@/lib/transferencias/costoTransferencia";
 // EL MISMO helper que usa la recepción para devolver el faltante al origen. Se
 // importa en vez de replicar la fórmula: si la regla cambia, la pantalla no
 // puede quedar mostrando otro número que el que el stock realmente movió.
@@ -125,6 +129,22 @@ export async function GET(req) {
     // ======================================================
     let itemsEnviados = 0;
     let itemsRecibidos = 0;
+    // ── DOS TOTALES CON DOS NOMBRES, PORQUE SON DOS PREGUNTAS ─────────────
+    //
+    // `importeEnviado` es cuánto salió del depósito y quedó valorizado al
+    // enviar. No se mueve durante la recepción, y es el que la pantalla muestra.
+    //
+    // Se llama así y no `totalRemito` por una colisión concreta: el resumen del
+    // control físico —`resumenDeRecepcion`— ya tiene un `totalRemito` que es un
+    // CONTEO DE LÍNEAS, y la composición móvil recibe los dos. Dos campos con el
+    // mismo nombre y distinta unidad en la misma pantalla es cómo alguien suma
+    // pesos con productos sin que nada se queje.
+    //
+    // `costoTotal` es cuánto vale lo que físicamente llegó, que cambia con cada
+    // faltante y cada sobrante. Se conserva con su nombre de siempre y sigue
+    // calculándose igual; lo que se arregló es la escala con la que leía
+    // `recibido`.
+    let importeEnviado = 0;
     let costoTotal = 0;
     // Ajuste del origen, acumulado en milésimas enteras (misma escala que el
     // stock) y CON SIGNO. Solo suma las líneas que YA tienen recepción cargada.
@@ -176,6 +196,28 @@ export async function GET(req) {
         { origenEsDeposito: origenEsDepositoDe(transferencia, "detalle") }
       );
 
+      // ── Y EL VALOR DEL REMITO, QUE ES OTRA PREGUNTA ──────────────────────
+      //
+      // `valorizarDetalle` en su modo default contesta cuánto vale lo que
+      // FÍSICAMENTE LLEGÓ: cambia con cada faltante y con cada sobrante. Eso es
+      // lo correcto para el PDF de recepción y para los agregados por período,
+      // que son los otros dos que lo llaman.
+      //
+      // La pantalla de recepción necesita lo otro: cuánto salió del depósito y
+      // quedó valorizado al enviar. Es inmutable mientras alguien cuenta, y un
+      // documento cuyo total se mueve durante el control no sirve para
+      // controlar. Se pide explícito y con su nombre en vez de reusar el mismo
+      // campo cambiándole el significado a mitad del flujo.
+      //
+      // De acá salen los dos números de la card: el costo de la presentación
+      // que ella misma rotula —"PACK x24" pide el costo del pack, no el de la
+      // unidad— y el subtotal enviado.
+      const remito = valorizarLineaDelRemito(
+        { ...d, precioCosto },
+        d.producto?.base,
+        { origenEsDeposito: origenEsDepositoDe(transferencia, "detalle") }
+      );
+
       // ── ESTOS DOS SE CUENTAN EN FÍSICO, Y ANTES NO ───────────────────────
       //
       // Sumaban la cantidad en la PRESENTACIÓN de cada línea, y de ahí salía
@@ -211,6 +253,7 @@ export async function GET(req) {
       itemsEnviados += envFisM == null ? 0 : desdeMilesimas(envFisM);
       itemsRecibidos += recFisM == null ? 0 : desdeMilesimas(recFisM);
       costoTotal += subtotal;
+      importeEnviado += remito.subtotal;
 
       // Ajuste del origen en UNIDADES FÍSICAS de StockLocal, CON SIGNO:
       //   (enviadaMilésimas - recibidaMilésimas) × factorFisico
@@ -252,11 +295,27 @@ export async function GET(req) {
         codigoBarra: d.producto?.base?.codigo_barra || null,
         cantidadEnviada,
         cantidadRecibida,
-        // Costo YA normalizado a la escala de unidadEnviada: es lo que la
-        // pantalla muestra y lo que hace cuadrar `subtotal`. El valor crudo
-        // persistido no se modifica ni se expone.
-        precioCosto: costoNormalizado,
-        subtotal,
+        // ── LOS DOS NÚMEROS QUE MUESTRA LA CARD ─────────────────────────
+        //
+        // `precioCosto` es el costo de LA PRESENTACIÓN QUE LA CARD ROTULA: si
+        // dice "PACK x24", es el costo de un pack. Antes era el costo de una
+        // unidad bajo ese mismo rótulo —$218,75 donde el pack vale $5.250—, que
+        // es una afirmación falsa, no un redondeo.
+        //
+        // `subtotal` es el del REMITO y no se mueve al contar. Antes pasaba de
+        // 31.500 a 1.312,50 en cuanto alguien revisaba la línea.
+        //
+        // El valor crudo persistido no se modifica ni se expone.
+        precioCosto: remito.costoPresentacion,
+        subtotal: remito.subtotal,
+        // El costo de una unidad física, para lo que necesite razonar en la
+        // escala del stock. No es lo que la card muestra.
+        costoUnitarioFisico: remito.costoUnitarioFisico,
+        // Y lo que vale lo que llegó, que es OTRO concepto y por eso otro
+        // nombre. Hoy no se dibuja en ninguna pantalla; queda expuesto para que
+        // el día que se muestre no haya que volver a calcularlo.
+        subtotalRecibido: subtotal,
+        costoNormalizadoRecibido: costoNormalizado,
 
         ajusteOrigen,
         // Lo que la línea significa para el inventario, ya separado, para que la
@@ -478,6 +537,11 @@ export async function GET(req) {
         itemsEnviados,
         itemsRecibidos,
         diferenciaTotal,
+        // EL VALOR DEL DOCUMENTO. Inmutable durante la recepción, y el que
+        // muestran las pantallas. Ver los dos acumuladores más arriba.
+        importeEnviado,
+        // Y el valor de lo recibido, con el nombre que ya tenía. Cambia al
+        // contar, a propósito: ésa es su pregunta.
         costoTotal,
         // Unidades físicas de ajuste al stock del origen, en NETO y con signo:
         // positivo vuelve, negativo se descuenta. Se informa el neto y no dos
