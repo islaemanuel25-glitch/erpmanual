@@ -317,6 +317,43 @@ const CASOS = [
     candado: "16. una línea CON snapshot de despacho no ofrece adoptar nada",
     suite: "lib/transferencias/adopcionDePresentacion.test.mjs",
   },
+
+  // ── LAS TRES DEL BUSCADOR MÓVIL DE PRODUCTOS ───────────────────────────
+  //
+  // Son las tres formas de traer de vuelta el "quiquilmes": atar el input al
+  // estado confirmado, confirmar por tecla, o volver a hidratar desde
+  // `searchParams` comparando cadenas.
+  {
+    n: "B-1",
+    defecto: "el input vuelve a mostrar el estado confirmado en vez del borrador",
+    archivo: "app/modulos/productos/page.jsx",
+    // Es LA línea. Con esto, un `router.replace` propio que aterriza tarde le
+    // reescribe el texto a quien está escribiendo.
+    de: "                  value={textoBusquedaMovil}",
+    a: "                  value={filtros.search}",
+    candado: "EL BUSCADOR MÓVIL MUESTRA EL BORRADOR, NO EL ESTADO CONFIRMADO",
+    suite: "app/modulos/productos/buscadorMovilCableado.test.mjs",
+  },
+  {
+    n: "B-2",
+    defecto: "vuelve la confirmación por tecla: siete pedidos para «quilmes»",
+    archivo: "app/modulos/productos/page.jsx",
+    de: "    confirmadorRef.current.programar(texto);",
+    a: "    confirmarBusquedaRef.current(texto);",
+    candado: "teclear toca el borrador y NO aplica filtros de una",
+    suite: "app/modulos/productos/buscadorMovilCableado.test.mjs",
+  },
+  {
+    n: "B-3",
+    defecto: "un eco propio de la URL vuelve a poder hidratar el estado",
+    archivo: "lib/productos/busquedaDelCatalogo.js",
+    // La clasificación vieja: cualquier cambio de URL valía, y distinguir el eco
+    // quedaba en manos de comparar contra UNA sola URL recordada.
+    de: "  return origen === ORIGEN_DE_URL.INICIAL || origen === ORIGEN_DE_URL.HISTORIAL;",
+    a: "  return true;",
+    candado: "1. UN ECO PROPIO DE LA URL NO PUEDE HIDRATAR EL ESTADO",
+    suite: "lib/productos/busquedaDelCatalogo.test.mjs",
+  },
 ];
 
 // `node_modules` se ENLAZA en vez de copiarse: son doce copias y nada de lo que
