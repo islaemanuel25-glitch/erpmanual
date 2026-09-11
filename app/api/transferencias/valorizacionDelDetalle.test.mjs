@@ -143,30 +143,81 @@ test("EL NOMBRE NO CHOCA CON EL CONTEO DE LÍNEAS DEL CONTROL FÍSICO", () => {
   );
 });
 
-test("las dos pantallas muestran el importe ENVIADO, no el recibido", () => {
+// ── ESTOS DOS CANDADOS CAMBIARON DE CONTRATO EL 2026-09-11 ─────────────────
+//
+// Afirmaban que las dos pantallas muestran el importe ENVIADO. Era correcto
+// mientras confirmar una recepción NO tocaba la plata: el único importe
+// defendible era el del remito, porque el otro se movía mientras alguien contaba
+// y después no se registraba en ningún lado.
+//
+// Ahora confirmar corrige la venta vinculada, así que el importe VIGENTE de la
+// operación es el corregido. Lo que se conserva —y es lo que estos candados
+// siguen defendiendo— es que el enviado NO desaparezca y que el número no se
+// arme sumando cards en el navegador.
+
+test("las dos pantallas destacan el CORREGIDO y conservan el enviado", () => {
   const movil = codigoDe(MOVIL);
-  assert.match(movil, /item\?\.resumen\?\.importeEnviado != null/);
-  assert.match(movil, /fmtMoneda\(item\.resumen\.importeEnviado\)/);
-  assert.match(movil, /Total remito/);
+  assert.match(movil, /importeCorregido/, "el móvil dejó de mostrar el importe vigente");
+  assert.match(movil, /importeOriginal/, "el móvil perdió el antecedente");
+  assert.match(movil, /diferenciaImporte/);
+  assert.match(movil, /Importe corregido/);
+  assert.match(movil, /Importe enviado/, "el original tiene que seguir a la vista: con eso se reclama");
 
   const escritorio = codigoDe(PAGINA);
-  assert.match(escritorio, /item\.resumen\?\.importeEnviado/);
+  assert.match(escritorio, /importeCorregido/);
+  assert.match(escritorio, /importeOriginal/);
   assert.ok(
     !/num\(item\.resumen\?\.costoTotal\)/.test(escritorio),
-    "el tile de escritorio volvió al total que cambia al contar"
+    "el tile volvió a leer costoTotal crudo en vez del contrato con nombre"
   );
 });
 
-test("el total del móvil va en el bloque de cierre, antes del CTA", () => {
+test("SIN diferencia se muestra UN importe, no tres renglones iguales", () => {
+  // Tres números idénticos en el momento de firmar es ruido, y el ruido en una
+  // pantalla de control es cómo se deja de leer lo que importa.
+  const movil = codigoDe(MOVIL);
+  assert.match(movil, /hayDiferenciaDeImporte \?/, "el móvil muestra siempre los tres");
+  assert.match(movil, /importeSinDiferencia/);
+  const escritorio = codigoDe(PAGINA);
+  assert.match(escritorio, /hayDiferenciaDeImporte &&/, "el escritorio muestra siempre los tres tiles");
+});
+
+test("la diferencia lleva SIGNO en el número, no un color", () => {
+  // Un más o un menos se lee igual en cualquier tema y en cualquier pantalla.
+  for (const rel of [MOVIL, PAGINA]) {
+    assert.match(codigoDe(rel), /diferenciaImporte > 0 \? "\+" : ""/, `${rel} perdió el signo`);
+  }
+});
+
+test("el importe del móvil va en el bloque de cierre, antes del CTA", () => {
   // Es la pregunta del momento en que se firma. Si quedara arriba del todo, se
   // lee antes de contar y no cuando hace falta.
   const src = codigoDe(MOVIL);
-  const iTotal = src.indexOf("Total remito");
+  const iTotal = src.indexOf("Importe corregido");
   const iFalta = src.indexOf("Falta revisar");
   const iCta = src.indexOf("Confirmar recepción");
   assert.ok(iTotal > -1 && iFalta > -1 && iCta > -1);
-  assert.ok(iTotal < iFalta, "el total quedó después del renglón de pendientes");
+  assert.ok(iTotal < iFalta, "el importe quedó después del renglón de pendientes");
   assert.ok(iFalta < iCta, "se movió el orden del bloque de cierre");
+});
+
+test("EL CONTRATO DE LA API TIENE LOS TRES NOMBRES, y no rompe los viejos", () => {
+  const ruta = codigoDe(RUTA);
+  for (const campo of ["importeOriginal:", "importeCorregido:", "diferenciaImporte:"]) {
+    assert.ok(ruta.includes(campo), `la ruta no emite ${campo}`);
+  }
+  // Los dos viejos siguen saliendo: los leen los candados del PR #57 y cualquier
+  // consumidor que no se haya enumerado. Romperlos en silencio sería cambiar un
+  // contrato sin que nada se ponga rojo.
+  assert.match(ruta, /^\s*importeEnviado,$/m, "se borró importeEnviado del resumen");
+  assert.match(ruta, /^\s*costoTotal,$/m, "se borró costoTotal del resumen");
+});
+
+test("importeCorregido es null mientras NADIE contó", () => {
+  // Mandar el enviado con nombre de corregido afirmaría un conteo que no ocurrió.
+  const ruta = codigoDe(RUTA);
+  assert.match(ruta, /importeCorregido: itemsRecibidos > 0 \? costoTotal : null/);
+  assert.match(ruta, /diferenciaImporte: itemsRecibidos > 0 \?/);
 });
 
 test("el móvil NO suma las cards para armar el total", () => {

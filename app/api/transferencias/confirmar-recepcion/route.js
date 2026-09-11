@@ -25,10 +25,33 @@ import {
   reclamarOFallar,
 } from "@/lib/transferencias/recepcionServidor";
 import { rotuloConSueltas } from "@/lib/transferencias/presentacionEnvio";
+import { aplicarCorreccionEconomica } from "@/lib/transferencias/aplicarCorreccionEconomica";
 import { getConfigLocalEfectiva } from "@/lib/config/local";
 
 /** Cantidades siempre con la escala física de StockLocal (3 decimales). */
 const fmt = (n) => Number(n || 0).toFixed(3);
+
+/**
+ * Qué decirle al operador cuando la corrección económica frena la confirmación.
+ *
+ * Cada uno nombra la causa y qué hacer. "Error interno" acá sería dejar a
+ * alguien con la mercadería en la mano sin saber si el problema es el producto
+ * que agregó, la venta, o el sistema.
+ */
+const MENSAJES_CORRECCION = {
+  LINEA_AGREGADA_SIN_PRECIO:
+    "No se puede confirmar la recepción porque un producto agregado no tiene un precio interno " +
+    "congelado. Cargale el costo al producto y volvé a agregarlo a la recepción.",
+  LINEA_SIN_CONSUMO_FISICO:
+    "No se puede confirmar la recepción: una línea de la venta vinculada no registra cuánto stock " +
+    "consumió, así que no se puede recalcular su importe.",
+  VENTA_CON_AJUSTES_NO_SOPORTADOS:
+    "No se puede confirmar la recepción: la venta vinculada tiene descuentos, recargos o comisiones, " +
+    "y todavía no está definido cómo recomponer su total. Avisá antes de continuar.",
+  VENTA_VERSION_DESACTUALIZADA:
+    "No se puede confirmar la recepción: alguien corrigió la venta vinculada mientras contabas. " +
+    "Volvé a abrir el remito y confirmá de nuevo.",
+};
 
 const MENSAJE_STOCK_INSUFICIENTE =
   "Llegó más mercadería de la enviada y el local de origen no tiene stock para cubrir la diferencia. " +
@@ -367,6 +390,20 @@ export async function POST(req) {
 
       let tieneDiferencias = false;
 
+      // ── LO QUE DESPUÉS VA A CORREGIR LA PLATA ───────────────────────────
+      //
+      // Se junta ACÁ, con los planes firmes de adentro del lock, y no se vuelve
+      // a calcular después: si la plata partiera de otra lectura podría
+      // corregirse contra cantidades distintas de las que movieron el stock, que
+      // es exactamente el desfase que esta tanda cierra.
+      //
+      // Las líneas AGREGADAS en recepción quedan afuera a propósito. Un producto
+      // que el remito no menciona tampoco está en la venta, así que no tiene
+      // precio comercial congelado — y sacarlo del catálogo de hoy sería
+      // inventar a qué precio se vendió algo que nunca se vendió. Su stock sí
+      // entra, como siempre.
+      const recibidoParaVenta = [];
+
       for (const d of detalles) {
         // Defensa: los combos no tienen stock físico, no se procesan aquí.
         if (esComboBase(d.producto.base)) continue;
@@ -377,6 +414,34 @@ export async function POST(req) {
         const { recibida, recibidaUnidades } = plan;
 
         if (plan.hayDiferencia) tieneDiferencias = true;
+
+        recibidoParaVenta.push({
+          productoBaseId: d.producto.base.id,
+          recibidasFisicas: recibidaUnidades,
+          // El factor de la presentación CANÓNICA, el mismo que resolvió el
+          // stock. Sin esto, 6 packs de 24 se leerían como 6 unidades del otro
+          // lado de la misma transacción.
+          factor: escalaDeRecepcion(d).factorPack,
+          // ── EL PRODUCTO QUE APARECIÓ AL ABRIR LOS BULTOS ────────────────
+          //
+          // Una línea agregada no tiene VentaDetalle del cual sacar el precio
+          // que se cobró, porque nunca se vendió. Lo que sí tiene es el
+          // `precioCosto` que `linea-recepcion` CONGELÓ al agregarla, y ése es
+          // el que se usa.
+          //
+          // Sale de la COLUMNA de la línea, no de `d.producto.base.precio_costo`:
+          // entre agregar el producto y confirmar la recepción pueden pasar
+          // días, y revalorizar con el precio del día de confirmar cambiaría lo
+          // que costó mercadería que ya está en la góndola. Es el mismo agujero
+          // que el snapshot de presentación ya tiene tapado.
+          //
+          // Si no hay precio congelado, el módulo puro LANZA y se cae toda la
+          // transacción: no entra al stock, no queda fuera del importe y no se
+          // valoriza en cero.
+          agregada: d.agregadoEnRecepcion === true,
+          precioPresentacion: d.agregadoEnRecepcion ? d.precioCosto : null,
+          nombre: d.producto.base.nombre ?? d.producto.nombre ?? null,
+        });
 
         // StockLocal SIEMPRE en UNIDADES (o kg para local de fiambre fijo).
         // La conversión BULTO→unidades ya la hizo validarDetalleRecepcion, una
@@ -657,10 +722,58 @@ export async function POST(req) {
           tieneDiferencias,
         },
       });
+
+      // ============================================================
+      // 🟦 LA PLATA — EN ESTA MISMA TRANSACCIÓN, O EN NINGUNA
+      //
+      // Hasta el 2026-09-11 acá terminaba todo, y el comentario del ajuste del
+      // origen decía que resolver el desfase comercial era "una etapa aparte".
+      // Ésta es esa etapa, y NO es un paso aparte: es la última escritura de la
+      // misma transacción.
+      //
+      // El motivo es la regla central. Si esto fuera un segundo request, entre
+      // uno y otro existiría un estado donde el stock ya se corrigió y la venta
+      // todavía factura lo enviado —justo el desfase que se está cerrando—, y
+      // bastaría con que el operador cerrara el navegador para dejarlo así para
+      // siempre. Acá, si la corrección falla, el stock tampoco se movió.
+      //
+      // Qué NO hace, y está medido: no mueve inventario —ya lo movió el bucle de
+      // arriba—, no crea CajaMovimiento —una venta interna con remito está
+      // excluida del arqueo, lo dice `impactoEnArqueo`— y no crea
+      // MovimientoCuenta. Y no exige turno abierto: 147 de las 196 ventas
+      // internas con remito tienen el turno original cerrado.
+      // ============================================================
+      await aplicarCorreccionEconomica(tx, {
+        transferencia,
+        recibido: recibidoParaVenta,
+        usuarioId,
+        grupoId: grupoOrigenId,
+      });
     });
 
     return NextResponse.json({ ok: true });
   } catch (err) {
+    // ── LOS ABORTOS DE LA CORRECCIÓN ECONÓMICA ──────────────────────────────
+    //
+    // Van con su código y su texto, no con "Error interno". Es la deuda que
+    // CLAUDE.md tiene anotada sobre los mensajes mudos, y acá importa más que en
+    // otros lados: el operador tiene la mercadería en la mano y necesita saber
+    // si el problema es el producto que agregó o cualquier otra cosa.
+    //
+    // Los tres abortan DENTRO de la transacción, así que no quedó nada escrito:
+    // ni el stock, ni la venta, ni la recepción confirmada.
+    if (
+      err.code === "LINEA_AGREGADA_SIN_PRECIO" ||
+      err.code === "LINEA_SIN_CONSUMO_FISICO" ||
+      err.code === "VENTA_CON_AJUSTES_NO_SOPORTADOS" ||
+      err.code === "VENTA_VERSION_DESACTUALIZADA"
+    ) {
+      return NextResponse.json(
+        { ok: false, codigo: err.code, error: MENSAJES_CORRECCION[err.code] },
+        { status: 409 }
+      );
+    }
+
     // Abortos deliberados desde adentro de la transacción: nada quedó escrito.
     // Incluye RECEPCION_TOMADA, que es haber perdido la carrera por el lock.
     if (err.name === "ErrorRecepcion") {

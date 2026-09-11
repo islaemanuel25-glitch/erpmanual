@@ -479,6 +479,98 @@ const CASOS = [
     candado: "ACTA · y la RUTA le pasa el snapshot y las sueltas, no solo `recibido`",
     suite: "lib/transferencias/formaDelSelect.test.mjs",
   },
+
+  // ── LA CORRECCIÓN ECONÓMICA DE LA RECEPCIÓN ───────────────────────────────
+  //
+  // Confirmar una recepción pasó a corregir la venta vinculada. Estas seis son
+  // las formas de volver a romperlo, y cada una tiene que poner rojo el candado
+  // que dice defenderla.
+  {
+    n: "E-1",
+    defecto: "confirmar deja de corregir la venta: vuelve el stock corregido con dinero original",
+    archivo: "app/api/transferencias/confirmar-recepcion/route.js",
+    de: "      await aplicarCorreccionEconomica(tx, {",
+    a: "      await sinCorregirLaVenta(tx, {",
+    candado: "20b. confirmar corrige la venta SOLO por el aplicador, no por su cuenta",
+    suite: "lib/transferencias/recepcionDiferencias.test.mjs",
+  },
+  {
+    n: "E-2",
+    defecto: "el aplicador vuelve a mover stock: las mismas unidades se acreditarían DOS veces",
+    archivo: "lib/transferencias/aplicarCorreccionEconomica.js",
+    de: "  const porOrigen = new Map(venta.detalles.map((d) => [d.id, d]));",
+    a: "  await tx.stockLocal.updateMany({});\n  const porOrigen = new Map(venta.detalles.map((d) => [d.id, d]));",
+    candado: "20d. el aplicador NO mueve inventario: el stock lo movió la recepción",
+    suite: "lib/transferencias/recepcionDiferencias.test.mjs",
+  },
+  {
+    n: "E-3",
+    defecto: "las sueltas vuelven a escribirse como pack fraccionario y se pierde mercadería",
+    archivo: "lib/transferencias/correccionEconomica.js",
+    de: "  const bultos = agrupa ? Math.floor(fisicas / f) : fisicas;",
+    a: "  const bultos = agrupa ? fisicas / f : fisicas;",
+    candado: "NUNCA un pack fraccionario: 5 sueltas no son 0,208 packs",
+    suite: "lib/transferencias/correccionEconomica.test.mjs",
+  },
+  {
+    n: "E-4",
+    defecto: "los pagos dejan de acompañar al total: la venta cobraría un número y facturaría otro",
+    archivo: "lib/transferencias/aplicarCorreccionEconomica.js",
+    de: "      data: { monto: p.monto, neto: p.monto - comision },",
+    a: "      data: { neto: p.monto - comision },",
+    candado: "CAMINO · el pago único cierra EXACTO contra el nuevo total",
+    suite: "lib/transferencias/correccionEconomicaCamino.test.mjs",
+  },
+  {
+    n: "E-5",
+    defecto: "una recepción exacta igual escribe una corrección: ruido en cada auditoría",
+    archivo: "lib/transferencias/correccionEconomica.js",
+    de: "    aplica: !sinCambio,",
+    a: "    aplica: true,",
+    candado: "CAMINO · sin diferencia NO se escribe nada de la venta",
+    suite: "lib/transferencias/correccionEconomicaCamino.test.mjs",
+  },
+  {
+    n: "E-6",
+    defecto: "se abre el bloqueo global: cualquiera podría corregir a mano una venta con remito",
+    archivo: "lib/ventas-internas/integracionVenta.js",
+    de: "  if (!t) return null;\n  if (t.estado === \"Cancelada\") return null;",
+    a: "  return null;",
+    candado: "BLOQUEO · corregir a mano una venta con remito SIGUE devolviendo 409",
+    suite: "lib/transferencias/correccionEconomicaCamino.test.mjs",
+  },
+
+  // ── EL PRODUCTO AGREGADO EN RECEPCIÓN ─────────────────────────────────────
+  //
+  // Entra al stock, así que tiene que entrar al importe. Éstas son las tres
+  // formas de volver a dejarlo afuera, y las tres son silenciosas.
+  {
+    n: "A-1",
+    defecto: "las líneas agregadas vuelven a quedar fuera del importe: stock corregido con dinero original",
+    archivo: "app/api/transferencias/confirmar-recepcion/route.js",
+    de: "          agregada: d.agregadoEnRecepcion === true,",
+    a: "          agregada: false,",
+    candado: "CABLEADO · confirmar YA NO deja las agregadas fuera del importe",
+    suite: "lib/transferencias/correccionEconomicaCamino.test.mjs",
+  },
+  {
+    n: "A-2",
+    defecto: "un agregado sin precio congelado se valoriza en cero en vez de frenar",
+    archivo: "lib/transferencias/correccionEconomica.js",
+    de: "    if (!Number.isFinite(congelado) || congelado <= 0) {",
+    a: "    if (false) {",
+    candado: "AGREGADA 5 · SIN precio congelado FRENA, no vale cero ni busca el catálogo",
+    suite: "lib/transferencias/correccionEconomica.test.mjs",
+  },
+  {
+    n: "A-3",
+    defecto: "el agregado se revaloriza con el catálogo del día de confirmar, no con el precio congelado",
+    archivo: "app/api/transferencias/confirmar-recepcion/route.js",
+    de: "          precioPresentacion: d.agregadoEnRecepcion ? d.precioCosto : null,",
+    a: "          precioPresentacion: d.agregadoEnRecepcion ? d.producto.base.precio_costo : null,",
+    candado: "AGREGADO · la ruta manda el precio de la COLUMNA, no del catálogo",
+    suite: "lib/transferencias/correccionEconomicaCamino.test.mjs",
+  },
 ];
 
 // `node_modules` se ENLAZA en vez de copiarse: son doce copias y nada de lo que
