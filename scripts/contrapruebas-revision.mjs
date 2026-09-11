@@ -539,6 +539,38 @@ const CASOS = [
     candado: "BLOQUEO · corregir a mano una venta con remito SIGUE devolviendo 409",
     suite: "lib/transferencias/correccionEconomicaCamino.test.mjs",
   },
+
+  // ── EL PRODUCTO AGREGADO EN RECEPCIÓN ─────────────────────────────────────
+  //
+  // Entra al stock, así que tiene que entrar al importe. Éstas son las tres
+  // formas de volver a dejarlo afuera, y las tres son silenciosas.
+  {
+    n: "A-1",
+    defecto: "las líneas agregadas vuelven a quedar fuera del importe: stock corregido con dinero original",
+    archivo: "app/api/transferencias/confirmar-recepcion/route.js",
+    de: "          agregada: d.agregadoEnRecepcion === true,",
+    a: "          agregada: false,",
+    candado: "CABLEADO · confirmar YA NO deja las agregadas fuera del importe",
+    suite: "lib/transferencias/correccionEconomicaCamino.test.mjs",
+  },
+  {
+    n: "A-2",
+    defecto: "un agregado sin precio congelado se valoriza en cero en vez de frenar",
+    archivo: "lib/transferencias/correccionEconomica.js",
+    de: "    if (!Number.isFinite(congelado) || congelado <= 0) {",
+    a: "    if (false) {",
+    candado: "AGREGADA 5 · SIN precio congelado FRENA, no vale cero ni busca el catálogo",
+    suite: "lib/transferencias/correccionEconomica.test.mjs",
+  },
+  {
+    n: "A-3",
+    defecto: "el agregado se revaloriza con el catálogo del día de confirmar, no con el precio congelado",
+    archivo: "app/api/transferencias/confirmar-recepcion/route.js",
+    de: "          precioPresentacion: d.agregadoEnRecepcion ? d.precioCosto : null,",
+    a: "          precioPresentacion: d.agregadoEnRecepcion ? d.producto.base.precio_costo : null,",
+    candado: "AGREGADO · la ruta manda el precio de la COLUMNA, no del catálogo",
+    suite: "lib/transferencias/correccionEconomicaCamino.test.mjs",
+  },
 ];
 
 // `node_modules` se ENLAZA en vez de copiarse: son doce copias y nada de lo que
