@@ -129,17 +129,54 @@ test("LA VOZ Y EL TECLADO SON DOS RANURAS, Y CADA PANTALLA ELIGE", () => {
     "el POS dejó de marcar la búsqueda por voz contra el servidor"
   );
 
-  // Y del otro lado, la afirmación opuesta: en Productos las dos ranuras
-  // reciben LA MISMA función, no dos parecidas escritas al lado.
+  // Y del otro lado, la afirmación opuesta: en Productos dictar y teclear
+  // terminan en EL MISMO camino de negocio, sin `fromVoice` ni nada parecido.
+  //
+  // ── LAS DOS RANURAS YA NO RECIBEN LA MISMA FUNCIÓN, Y ES A PROPÓSITO ────
+  //
+  // Antes acá se exigía `onChange={alBuscarEnElCelular}` y
+  // `onVoz={alBuscarEnElCelular}`: una sola función para las dos. Eso dejó de
+  // ser correcto cuando el buscador del celular pasó a tener borrador y
+  // confirmación diferida, porque **una tecla y una transcripción no son la
+  // misma clase de cosa**: una es un fragmento y la otra ya es una frase
+  // completa. Esperar 250 ms después de dictar no aporta nada, y es además lo
+  // que el escritorio ya hacía con `buscarInmediato` para la voz, el escáner y
+  // Enter.
+  //
+  // Lo que este candado defiende no cambió: en Productos la voz no viaja marcada
+  // contra el servidor. Lo que cambió es CUÁNDO se confirma, no adónde va.
   assert.match(
     PRODUCTOS,
-    /onChange=\{alBuscarEnElCelular\}/,
-    "Productos dejó de usar la función única para teclear"
+    /onChange=\{alTeclearEnElCelular\}/,
+    "Productos dejó de mandar el teclado por el borrador"
   );
   assert.match(
     PRODUCTOS,
-    /onVoz=\{alBuscarEnElCelular\}/,
-    "en Productos dictar dejó de alimentar filtros.search igual que escribir"
+    /onVoz=\{alDictarEnElCelular\}/,
+    "Productos dejó de tener un camino propio para el dictado"
+  );
+
+  // Las dos escriben el MISMO borrador y confirman por el MISMO confirmador:
+  // son dos momentos de un solo mecanismo, no dos búsquedas escritas al lado.
+  for (const manejador of ["alTeclearEnElCelular", "alDictarEnElCelular"]) {
+    const cuerpo = PRODUCTOS.slice(PRODUCTOS.indexOf(`const ${manejador} =`));
+    assert.match(
+      cuerpo.slice(0, 220),
+      /setTextoBusquedaMovil\(texto\)/,
+      `${manejador} no escribe el borrador`
+    );
+    assert.match(
+      cuerpo.slice(0, 220),
+      /confirmadorRef\.current\.(programar|inmediato)\(texto\)/,
+      `${manejador} no confirma por el mecanismo compartido`
+    );
+  }
+
+  // Y en Productos la voz sigue sin marcarse contra el servidor, que es la
+  // diferencia con el POS que este candado existe para custodiar.
+  assert.ok(
+    !/fromVoice/.test(PRODUCTOS),
+    "Productos empezó a marcar la búsqueda por voz: eso es del POS"
   );
 });
 
