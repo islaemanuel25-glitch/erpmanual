@@ -141,6 +141,77 @@ test("Atrás repone también el texto del campo, en las dos composiciones", () =
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// UNA PUERTA ÚNICA PARA LAS BÚSQUEDAS QUE NO VINIERON DEL TECLADO
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// El criterio está escrito una vez: una acción explícita de la persona le gana
+// a una búsqueda que todavía no se confirmó, y el campo tiene que decir lo mismo
+// que el listado. Repartir `cancelar()` por la página es la forma de que se
+// cumpla en tres de los cuatro caminos.
+
+test("LA PUERTA ÚNICA CANCELA, FIJA Y REPONE EL BORRADOR, LAS TRES JUNTAS", () => {
+  const src = codigoDe(PAGINA);
+  const cuerpo = src.slice(src.indexOf("const fijarBusquedaConfirmada ="));
+  const bloque = cuerpo.slice(0, 260);
+
+  assert.match(bloque, /confirmadorRef\.current\?\.cancelar\(\)/, "no cancela lo pendiente");
+  assert.match(bloque, /setFiltros\(nuevos\)/, "no fija los filtros");
+  assert.match(
+    bloque,
+    /setTextoBusquedaMovil\(nuevos\.search/,
+    "no repone el borrador: el campo puede quedar diciendo otra cosa que el listado"
+  );
+});
+
+test("NINGÚN CAMINO FIJA FILTROS POR FUERA DE LA PUERTA", () => {
+  // Solo pueden quedar dos `setFiltros`: el de adentro de la puerta y el de
+  // `aplicarEstadoDeLaUrl`, que cancela y repone el borrador por su cuenta
+  // porque además restaura control, presentaciones, página y orden.
+  const src = codigoDe(PAGINA);
+  const cuantos = (src.match(/setFiltros\(/g) || []).length;
+  assert.equal(
+    cuantos,
+    2,
+    "apareció un setFiltros suelto: ese camino no cancela lo pendiente ni repone el campo"
+  );
+});
+
+test("las cards y la hoja de filtros entran por la puerta", () => {
+  const src = codigoDe(PAGINA);
+  // Las dos cards, sin condición: mirar `hayFiltrosPuestos` antes de entrar
+  // dejaba afuera el caso de una búsqueda que todavía no se confirmó.
+  const veces = (src.match(/fijarBusquedaConfirmada\(/g) || []).length;
+  assert.ok(veces >= 4, `solo ${veces} caminos entran por la puerta única`);
+  assert.match(
+    src,
+    /fijarBusquedaConfirmada\(hayFiltrosPuestos\(filtros\) \? filtrosNeutros\(\) : filtros\)/,
+    "una card volvió a limpiar filtros sin pasar por la puerta"
+  );
+  // Y `aplicarFiltros` —por donde entran la hoja, el escritorio y el dictado—
+  // termina ahí también.
+  const cuerpoAplicar = src.slice(src.indexOf("const aplicarFiltros ="));
+  assert.match(
+    cuerpoAplicar.slice(0, 600),
+    /fijarBusquedaConfirmada\(nuevos\)/,
+    "aplicarFiltros dejó de sincronizar el campo del celular"
+  );
+});
+
+test("EL HISTORIAL CANCELA LO PENDIENTE ANTES DE HIDRATAR", () => {
+  // El orden importa: cancelar después de hidratar deja la misma ventana
+  // abierta, porque el temporizador viejo sigue vivo mientras se aplica.
+  const src = codigoDe(PAGINA);
+  const cuerpo = src.slice(src.indexOf("const aplicarEstadoDeLaUrl ="));
+  const iCancelar = cuerpo.indexOf("confirmadorRef.current?.cancelar()");
+  const iHidratar = cuerpo.indexOf("normalizarEstadoDeUrl(");
+  assert.ok(iCancelar > -1, "Atrás no cancela la búsqueda diferida: puede revivir después");
+  assert.ok(
+    iCancelar < iHidratar,
+    "se cancela DESPUÉS de hidratar: la ventana sigue abierta"
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // LO QUE NO SE PODÍA ROMPER
 // ═══════════════════════════════════════════════════════════════════════════
 

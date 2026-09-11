@@ -354,6 +354,36 @@ const CASOS = [
     candado: "1. UN ECO PROPIO DE LA URL NO PUEDE HIDRATAR EL ESTADO",
     suite: "lib/productos/busquedaDelCatalogo.test.mjs",
   },
+  {
+    n: "B-4",
+    defecto: "la puerta única deja de cancelar la búsqueda diferida",
+    archivo: "app/modulos/productos/page.jsx",
+    // Sin esto, tocar una card o elegir un filtro en la hoja quedaba deshecho
+    // 250 ms más tarde por un temporizador que nadie apagó.
+    de: "    confirmadorRef.current?.cancelar();\n    setFiltros(nuevos);",
+    a: "    setFiltros(nuevos);",
+    candado: "LA PUERTA ÚNICA CANCELA, FIJA Y REPONE EL BORRADOR, LAS TRES JUNTAS",
+    suite: "app/modulos/productos/buscadorMovilCableado.test.mjs",
+  },
+  {
+    n: "B-5",
+    defecto: "la puerta única deja de reponer el borrador",
+    archivo: "app/modulos/productos/page.jsx",
+    // El campo sigue diciendo "quilmes" sobre un listado que ya no la filtra.
+    de: "    setTextoBusquedaMovil(nuevos.search ?? \"\");",
+    a: "    void nuevos;",
+    candado: "LA PUERTA ÚNICA CANCELA, FIJA Y REPONE EL BORRADOR, LAS TRES JUNTAS",
+    suite: "app/modulos/productos/buscadorMovilCableado.test.mjs",
+  },
+  {
+    n: "B-6",
+    defecto: "Atrás deja de cancelar lo pendiente y la búsqueda vieja revive",
+    archivo: "app/modulos/productos/page.jsx",
+    de: "      confirmadorRef.current?.cancelar();\n\n      const estado = normalizarEstadoDeUrl({",
+    a: "      const estado = normalizarEstadoDeUrl({",
+    candado: "EL HISTORIAL CANCELA LO PENDIENTE ANTES DE HIDRATAR",
+    suite: "app/modulos/productos/buscadorMovilCableado.test.mjs",
+  },
 ];
 
 // `node_modules` se ENLAZA en vez de copiarse: son doce copias y nada de lo que

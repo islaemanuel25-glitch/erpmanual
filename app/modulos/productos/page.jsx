@@ -523,6 +523,65 @@ export default function ProductosPage() {
   // texto anterior. Cambia SOLO en `popstate`, así que teclear no lo mueve.
   const [generacionDeHistorial, setGeneracionDeHistorial] = useState(0);
 
+  // ── EL CONFIRMADOR DIFERIDO, Y LA REGLA DE QUIÉN LE GANA ────────────────
+  //
+  // Qué hacer cuando venza. Se repone más abajo, en cada render, para que el
+  // temporizador no decida con el estado del primer render.
+  const confirmarBusquedaRef = useRef(null);
+
+  // Se crea UNA vez: si se recreara en cada render, cada tecla estrenaría su
+  // propio temporizador y no habría nada que posponer.
+  const confirmadorRef = useRef(null);
+  if (confirmadorRef.current === null) {
+    confirmadorRef.current = crearConfirmadorDiferido((texto) =>
+      confirmarBusquedaRef.current?.(texto)
+    );
+  }
+
+  // Si la pantalla se va con algo en cola, no se confirma sobre un componente
+  // desmontado.
+  useEffect(() => {
+    const confirmador = confirmadorRef.current;
+    return () => confirmador?.cancelar();
+  }, []);
+
+  /**
+   * ════════════════════════════════════════════════════════════════════════
+   * LA ÚNICA PUERTA POR LA QUE SE FIJA UNA BÚSQUEDA QUE NO VINO DEL TECLADO
+   * ════════════════════════════════════════════════════════════════════════
+   *
+   * Hace tres cosas que van JUNTAS o no sirven:
+   *
+   *   1. cancela la confirmación diferida que estuviera en cola;
+   *   2. fija los filtros;
+   *   3. deja el borrador diciendo lo mismo que el listado.
+   *
+   * ── POR QUÉ UNA PUERTA Y NO UN `cancelar()` EN CADA LUGAR ───────────────
+   *
+   * Porque "acordarse de cancelar" es exactamente la clase de regla que se
+   * cumple en tres de los cuatro caminos. El criterio se escribe una vez y es
+   * éste: **una acción explícita de la persona le gana a una búsqueda que
+   * todavía no se confirmó.** Tocar una card, elegir un filtro en la hoja,
+   * dictar, o navegar el historial son decisiones más nuevas que las letras que
+   * quedaron esperando el vencimiento.
+   *
+   * Sin el punto 1, un temporizador de 250 ms vencía DESPUÉS de la acción y la
+   * deshacía: se tocaba una card y un cuarto de segundo más tarde volvía la
+   * búsqueda a medio escribir, apagándola.
+   *
+   * Sin el punto 3, el campo seguía mostrando "quilmes" con el listado ya sin
+   * esa búsqueda — el texto visible y la búsqueda efectiva diciendo cosas
+   * distintas, que es la mitad del defecto original con otro disfraz.
+   *
+   * El teclado NO pasa por acá: ese camino es `alTeclearEnElCelular`, que escribe
+   * el borrador y programa. Si pasara, se cancelaría a sí mismo en cada letra.
+   */
+  const fijarBusquedaConfirmada = (nuevos) => {
+    confirmadorRef.current?.cancelar();
+    setFiltros(nuevos);
+    setTextoBusquedaMovil(nuevos.search ?? "");
+  };
+
   // Los filtros que NO reducen el universo: exactamente el que cuenta la card de
   // "Para revisar". Es el estado al que se vuelve al activar un control.
   //
@@ -669,6 +728,19 @@ export default function ProductosPage() {
   // abrir ese enlace, o la pantalla se comportaría distinto según cómo se llegó.
   const aplicarEstadoDeLaUrl = useCallback(
     (sp) => {
+      // ── LO PENDIENTE MUERE ANTES DE HIDRATAR, NO DESPUÉS ────────────────
+      //
+      // Sin esto quedaba una carrera nueva, de la misma familia que la que este
+      // arreglo vino a cerrar: se escribe "qui", queda un temporizador de 250 ms,
+      // se toca Atrás antes de que venza, `popstate` restaura bien el estado
+      // anterior… y un momento después el temporizador vence y confirma "qui",
+      // pisando la navegación que la persona acaba de hacer.
+      //
+      // Una navegación real de historial es una intención MÁS NUEVA que unas
+      // letras que todavía no se confirmaron. Va primero, y en el mismo
+      // manejador: cancelar después de hidratar dejaría la misma ventana abierta.
+      confirmadorRef.current?.cancelar();
+
       const estado = normalizarEstadoDeUrl({
         control: controlDeLaUrl(sp),
         presentaciones: presentacionesDeLaUrl(sp),
@@ -1735,7 +1807,9 @@ export default function ProductosPage() {
       // queda igual: si algún día aparece un cuarto camino que los mueva, esto
       // no pisa lo que la persona haya elegido.
       if (guardados && mismosFiltros(filtros, filtrosNeutros())) {
-        setFiltros(guardados);
+        // Por la puerta única: reponer "quilmes" tiene que devolverlo TAMBIÉN al
+        // campo, o el listado buscaría algo que el buscador no muestra.
+        fijarBusquedaConfirmada(guardados);
       }
       return;
     }
@@ -1752,7 +1826,14 @@ export default function ProductosPage() {
     // el listado —que mostraría el cruce— no tiene. Es el mismo invariante que
     // limpia los filtros, aplicado al otro bloque.
     if (hayPresentacionesPuestas(presentaciones)) setPresentaciones(presentacionesNeutras());
-    if (hayFiltrosPuestos(filtros)) setFiltros(filtrosNeutros());
+    // SIN condición, y a propósito: el `if (hayFiltrosPuestos(filtros))` que
+    // había acá miraba los filtros CONFIRMADOS, así que con "qui" todavía
+    // esperando el vencimiento no entraba — no se cancelaba el temporizador y un
+    // cuarto de segundo después la búsqueda revivía y apagaba la card recién
+    // encendida. Pasando siempre por la puerta única, se cancela lo pendiente y
+    // el campo queda diciendo lo mismo que el listado. Cuando no hay filtros que
+    // limpiar, `setFiltros` recibe el mismo objeto y React no re-renderiza.
+    fijarBusquedaConfirmada(hayFiltrosPuestos(filtros) ? filtrosNeutros() : filtros);
   };
 
   // ── TOCAR UNA CARD DE PRESENTACIÓN ──────────────────────────────────────
@@ -1794,7 +1875,9 @@ export default function ProductosPage() {
       setControl(null);
       filtrosAntesDelControlRef.current = null;
     }
-    if (hayFiltrosPuestos(filtros)) setFiltros(filtrosNeutros());
+    // Mismo criterio que en `alternarControl`: siempre por la puerta única, para
+    // que una búsqueda a medio escribir no reviva después de encender la card.
+    fijarBusquedaConfirmada(hayFiltrosPuestos(filtros) ? filtrosNeutros() : filtros);
   };
 
   // ── TOCAR UN FILTRO CON UN CONTROL ACTIVO LO APAGA ──────────────────────
@@ -1826,7 +1909,12 @@ export default function ProductosPage() {
     // pasa a ser un subconjunto. Escribir en el buscador vuelve al catálogo
     // completo, que es lo que esa persona está pidiendo al escribir.
     if (hayPresentacionesPuestas(presentaciones)) setPresentaciones(presentacionesNeutras());
-    setFiltros(nuevos);
+    // Por la puerta única. Es lo que sincroniza el campo del celular cuando la
+    // búsqueda la cambia OTRO: la hoja de Filtros —que tiene su propio borrador
+    // interno—, el panel de escritorio, o el vencimiento del propio debounce.
+    // Sin esto, limpiar la búsqueda desde la hoja dejaba el campo principal
+    // diciendo "quilmes" sobre un listado que ya no la filtraba.
+    fijarBusquedaConfirmada(nuevos);
   };
 
   // ── LAS DOCE CARDS DEL CARRUSEL, EN UN SOLO ARREGLO ─────────────────────
@@ -1879,27 +1967,13 @@ export default function ProductosPage() {
   // primer render: media hora después apagaría una card que ya no está. Se
   // guarda en una ref que se repone en cada render, que es el patrón de siempre
   // para un callback que sobrevive a un temporizador.
-  const confirmarBusquedaRef = useRef(null);
+  //
+  // La ref se DECLARA arriba, junto al confirmador: el confirmador la llama y se
+  // crea antes que esto. Acá solo se repone su contenido.
   confirmarBusquedaRef.current = (texto) => {
     if (filtros.search === texto) return;
     aplicarFiltros({ ...filtros, search: texto });
   };
-
-  // El confirmador se crea UNA vez: si se recreara en cada render, cada tecla
-  // estrenaría su propio temporizador y no habría nada que posponer.
-  const confirmadorRef = useRef(null);
-  if (confirmadorRef.current === null) {
-    confirmadorRef.current = crearConfirmadorDiferido((texto) =>
-      confirmarBusquedaRef.current?.(texto)
-    );
-  }
-
-  // Si la pantalla se va con algo en cola, no se confirma sobre un componente
-  // desmontado.
-  useEffect(() => {
-    const confirmador = confirmadorRef.current;
-    return () => confirmador?.cancelar();
-  }, []);
 
   // Teclear: solo el borrador, y se pospone la confirmación.
   const alTeclearEnElCelular = (texto) => {
@@ -2547,9 +2621,20 @@ export default function ProductosPage() {
                   en casi todas las visitas. Los otros cinco viven en la hoja de
                   "Filtros", que es el botón de al lado.
 
-                  Escribe el MISMO estado `filtros.search` que el buscador de
-                  escritorio, así que no hay dos búsquedas que puedan discrepar:
-                  es el mismo dato con dos entradas.
+                  ── EL CAMPO MUESTRA EL BORRADOR, NO EL ESTADO CONFIRMADO ──
+                  Hasta el 2026-09-11 acá decía que este campo escribía el MISMO
+                  `filtros.search` que el escritorio. Eso era el defecto, no la
+                  virtud: `filtros.search` es también lo que la URL reescribe, y
+                  un `router.replace` propio que aterrizaba tarde le cambiaba el
+                  texto a la persona mientras escribía — "quilmes" terminaba en
+                  "quiquilmes".
+
+                  Ahora el `value` es `textoBusquedaMovil`, que solo cambia con
+                  el teclado. La búsqueda se confirma cuando se deja de escribir
+                  y recién ahí toca el listado y la URL. **Siguen sin poder
+                  discrepar**, pero por el otro lado: cuando la búsqueda la
+                  cambia otro —la hoja de Filtros, una card, Atrás— pasa por
+                  `fijarBusquedaConfirmada`, que repone el borrador.
 
                   ── Y ES EL MISMO CAMPO QUE EL DEL POS ─────────────────────
                   La pieza es `SunmiCampoBusquedaVoz`, la que ya usaba el POS:
@@ -2557,11 +2642,14 @@ export default function ProductosPage() {
                   micrófono y mismo "Escuchando...". No es un campo parecido
                   escrito al lado — es el mismo, y por eso no pueden divergir.
 
-                  DICTAR ES EXACTAMENTE ESCRIBIR ACÁ, y por eso las dos ranuras
-                  reciben la MISMA función. En el POS no es así —allá la voz
-                  viaja con `fromVoice` para que el servidor devuelva cómo
-                  interpretó lo dictado—, y esa diferencia queda a la vista en
-                  el llamado en vez de escondida adentro de la pieza. */}
+                  DICTAR Y ESCRIBIR VAN AL MISMO LUGAR, pero no al mismo tiempo:
+                  una tecla es un fragmento y una transcripción ya es una frase,
+                  así que dictar confirma sin esperar la ventana. Por eso las
+                  ranuras reciben dos funciones y no una. Lo que sigue igual es
+                  que en Productos la voz NO viaja marcada contra el servidor; en
+                  el POS sí —`fromVoice`, para que devuelva cómo interpretó lo
+                  dictado—, y esa diferencia queda a la vista en el llamado en
+                  vez de escondida adentro de la pieza. */}
               <div className="md:hidden">
                 <SunmiCampoBusquedaVoz
                   // EL BORRADOR, no `filtros.search`. Es la línea del defecto:
@@ -2569,8 +2657,9 @@ export default function ProductosPage() {
                   // reescribía el texto a la persona mientras escribía.
                   value={textoBusquedaMovil}
                   // Teclear pospone; dictar confirma ya. Los dos terminan en
-                  // `aplicarFiltros`, que apaga el control si había uno: buscar
-                  // con una card activa rompía el criterio del issue.
+                  // `aplicarFiltros`, que apaga el control si había uno —buscar
+                  // con una card activa rompía el criterio del issue— y de ahí
+                  // en `fijarBusquedaConfirmada`.
                   onChange={alTeclearEnElCelular}
                   onVoz={alDictarEnElCelular}
                   placeholder="Buscar por nombre o código"
