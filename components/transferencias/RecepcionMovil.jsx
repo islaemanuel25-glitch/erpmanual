@@ -351,7 +351,10 @@ export default function RecepcionMovil({
           </p>
         )}
         {visibles.map((d) => (
-          <FilaProducto key={d.id} d={d} activa={false} onElegir={onElegir} />
+          // `conImporte`: la fila de Costo + Total es del diseño aprobado de la
+          // card MÓVIL. Es la misma fila que dibuja escritorio, con una zona
+          // más; escritorio no la pide y queda igual que antes.
+          <FilaProducto key={d.id} d={d} activa={false} onElegir={onElegir} conImporte />
         ))}
       </div>
 
