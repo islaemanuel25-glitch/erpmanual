@@ -391,6 +391,68 @@ const marcaDeFila = (nombreProducto) =>
     return 'mezcla: warning=' + warning + ' lapiz=' + lapiz + ' tilde=' + tilde;
   })()`);
 
+/**
+ * ¿LA LISTA DEL DESPLEGABLE ENTRA EN LA PANTALLA?
+ *
+ * Devuelve un objeto con lo medido, no un booleano: cuando falla hay que saber
+ * por cuántos píxeles y de qué lado, o el rojo no deja arreglar nada.
+ *
+ * Se mide la caja del desplegable contra el viewport. `opciones` cuenta las que
+ * están completamente adentro: una lista que asoma la primera y corta el resto
+ * es exactamente el defecto que se vio en producción, y "hay una opción visible"
+ * lo dejaría pasar.
+ */
+const desplegableEnPantalla = () =>
+  evaluar(`(() => {
+    const caja = [...document.querySelectorAll('.sunmi-select-dropdown')]
+      .find((n) => n.getBoundingClientRect().height > 0);
+    if (!caja) return { abierto: false };
+    const r = caja.getBoundingClientRect();
+    const alto = window.innerHeight;
+    const opciones = [...caja.querySelectorAll('div[class*="cursor-pointer"]')];
+    const dentro = opciones.filter((o) => {
+      const b = o.getBoundingClientRect();
+      return b.top >= 0 && b.bottom <= alto;
+    });
+    return {
+      abierto: true,
+      viewport: alto,
+      top: Math.round(r.top),
+      bottom: Math.round(r.bottom),
+      cortadoArriba: Math.round(Math.max(0, -r.top)),
+      cortadoAbajo: Math.round(Math.max(0, r.bottom - alto)),
+      opciones: opciones.length,
+      opcionesEnteras: dentro.length,
+      // Hacia dónde se abrió, respecto del campo. Sin esto se puede afirmar que
+      // "entra en la pantalla" sin haber ejercido nunca la rama que la da
+      // vuelta — verde sobre un caso que no ocurrió.
+      hacia: (() => {
+        const disparador = [...document.querySelectorAll('.sunmi-select-trigger')]
+          .find((n) => n.getBoundingClientRect().height > 0);
+        if (!disparador) return '(sin disparador)';
+        return r.top < disparador.getBoundingClientRect().top ? 'arriba' : 'abajo';
+      })(),
+    };
+  })()`);
+
+/**
+ * Cambia el ALTO del viewport sin tocar el ancho.
+ *
+ * El arnés mide a 900 px de alto, que es más que cualquier teléfono real. Con
+ * ese alto el desplegable de motivo ENTRA abajo, así que la rama que lo da
+ * vuelta no se ejerce nunca y el candado queda verde sin haber probado el
+ * arreglo. Es el mismo patrón que este repo ya tiene anotado cuatro veces.
+ */
+async function medirAlto(ancho, alto) {
+  await send("Emulation.setDeviceMetricsOverride", {
+    width: ancho,
+    height: alto,
+    deviceScaleFactor: 2,
+    mobile: true,
+  });
+  await esperar(400);
+}
+
 /** ¿El botón de confirmar está trabado? Se lee del DOM, no de la foto. */
 const cierreTrabado = () =>
   evaluar(`(() => {
@@ -960,7 +1022,89 @@ for (const ancho of ANCHOS) {
     // `div` de la etiqueta, y el disparador del select es un botón aparte cuyo
     // texto es el valor elegido —o el placeholder mientras no hay ninguno—.
     await tocar("Seleccionar", { etiqueta: "el desplegable de motivo" });
+    await esperar(600);
+
+    // ── V24 · LAS OPCIONES TIENEN QUE ENTRAR EN LA PANTALLA ───────────
+    //
+    // El defecto de producción: el menú se abría siempre hacia abajo y el borde
+    // lo cortaba. Se veían "Seleccionar…" y "Faltante" a medias y no se podía
+    // elegir — con el motivo obligatorio, eso deja la línea sin poder cerrarse.
+    //
+    // Se MIDE contra el viewport, no se supone: es lo único que distingue "se
+    // abrió" de "se abrió donde se puede usar".
+    const menu = await desplegableEnPantalla();
+    await afirmar(menu && menu.abierto, "el desplegable de motivo no se abrió");
+    await afirmar(
+      menu.cortadoAbajo === 0 && menu.cortadoArriba === 0,
+      `la lista se sale de la pantalla: ${menu.cortadoArriba} px arriba y ${menu.cortadoAbajo} px abajo ` +
+        `(viewport ${menu.viewport}, caja ${menu.top}–${menu.bottom})`
+    );
+    await afirmar(
+      menu.opciones > 0 && menu.opcionesEnteras === menu.opciones,
+      `hay opciones cortadas: ${menu.opcionesEnteras} enteras de ${menu.opciones}`
+    );
+
+    // ── Y AHORA EL CASO QUE DE VERDAD PASÓ EN PRODUCCIÓN ──────────────
+    //
+    // A 900 px de alto la lista entra abajo y la rama que la da vuelta no se
+    // ejerce. El teléfono real tiene menos: se achica el viewport a 640 —que es
+    // lo usable en un celular con la barra del navegador— y ahí sí tiene que
+    // darse vuelta Y seguir entrando entera.
+    // El desplegable YA está abierto. No se vuelve a tocar —eso lo cerraría, que
+    // es el toggle—: se achica la pantalla con la lista abierta, lo que además
+    // ejerce el camino del `resize` de verdad.
+    //
+    // ── QUÉ SE AFIRMA, Y POR QUÉ NO ES "SE ABRE HACIA ARRIBA" ─────────
+    //
+    // El invariante es que la lista ENTRE, no hacia dónde se abra. A 640 todavía
+    // entra abajo y darla vuelta ahí sería de más — el componente hace bien en
+    // no hacerlo. Así que se recorre la pantalla hacia abajo y en CADA alto se
+    // exige que entre entera.
+    //
+    // Y por separado se exige que en ALGUNO se haya dado vuelta. Sin eso, la
+    // corrida podría pasar entera sin ejercer nunca la rama nueva y quedar verde
+    // sobre un caso que no ocurrió — que es el patrón que este repo tiene
+    // anotado cuatro veces, y que ya me pasó con el viewport de 900.
+    let seDioVuelta = false;
+    for (const alto of [640, 520, 440]) {
+      await medirAlto(ancho, alto);
+      await esperar(600);
+      const m = await desplegableEnPantalla();
+      await afirmar(m && m.abierto, `el desplegable se cerró al achicar a ${alto}`);
+      await afirmar(
+        m.cortadoArriba === 0 && m.cortadoAbajo === 0,
+        `a ${alto} px la lista se sale: ${m.cortadoArriba} arriba y ${m.cortadoAbajo} abajo ` +
+          `(caja ${m.top}–${m.bottom}, se abrió ${m.hacia})`
+      );
+      await afirmar(
+        m.opciones > 0 && m.opcionesEnteras === m.opciones,
+        `a ${alto} px hay opciones cortadas: ${m.opcionesEnteras} de ${m.opciones}`
+      );
+      if (m.hacia === "arriba") {
+        seDioVuelta = true;
+        desbordes += await foto("V24-motivo-hacia-arriba", ancho);
+      }
+    }
+    await afirmar(
+      seDioVuelta,
+      "en ningún alto se ejerció la rama que abre hacia arriba: el arreglo quedó sin probar"
+    );
+    await medirAlto(ancho, 900);
+    await esperar(400);
+
     await tocarOpcion("Faltante", { etiqueta: "el motivo Faltante" });
+    await esperar(600);
+    // Y que haya quedado ELEGIDA: abrirse y poder tocarse no alcanza si el valor
+    // no se fija — el guardado siguiente lo rechazaría por falta de motivo.
+    await afirmar(
+      await hayTexto("Faltante"),
+      "se eligió un motivo y el campo no lo muestra"
+    );
+    await afirmar(
+      !(await hayTexto("Seleccionar…")),
+      "el campo sigue mostrando el placeholder después de elegir"
+    );
+
     await tocar("y seguir", { etiqueta: "guardar la diferencia" });
     await esperar(2800);
 

@@ -78,6 +78,28 @@ Producción sigue en el 3000 y no se toca. Al terminar:
 dentro del contenedor, así que hace falta
 `docker run --rm -v …:/app alpine rm -rf /app/.next`—.
 
+## PENDIENTE: el panel de escritorio necesita su propio planteo
+
+**Anotado el 2026-09-12, decisión de Emanuel. No está hecho y es a propósito.**
+
+Cinco tandas seguidas —V21 a V24— rediseñaron el panel de corrección SOLO para el
+teléfono, detrás del `enHoja` que ya existía. Escritorio quedó como estaba en
+todas, con la huella de 1366 exigida en cero.
+
+Eso fue correcto para no mover una pantalla que funciona, pero deja una deuda de
+diseño: **escritorio no es un teléfono grande.** Ahí hay ancho, teclado y mouse,
+así que varias de las decisiones del celular no aplican:
+
+- los `−` y `+` no aportan nada: con teclado se tipea más rápido que tocando;
+- los dos campos no necesitan ir al 35 % con un hueco en el medio — pueden ir en
+  una fila con el resto de los datos;
+- el bloque de importe y el resultado teñido probablemente entren al lado del
+  conteo en vez de apilados.
+
+**Lo que NO hay que hacer es copiar la hoja del celular a 1366.** Es un planteo
+propio, con su diseño, y hasta que exista escritorio se queda con la forma que
+tiene hoy — que anda.
+
 ## PENDIENTE: la huella no cubre la vista de quien NO puede recibir
 
 **Anotado el 2026-09-12, después de encontrar dos defectos vivos ahí.** No está
