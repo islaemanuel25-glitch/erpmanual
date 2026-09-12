@@ -192,13 +192,29 @@ test("la diferencia lleva SIGNO en el número, no un color", () => {
 test("el importe del móvil va en el bloque de cierre, antes del CTA", () => {
   // Es la pregunta del momento en que se firma. Si quedara arriba del todo, se
   // lee antes de contar y no cuando hace falta.
+  //
+  // ── EL ANCLA DEL MEDIO SE CAYÓ, Y NO ES QUE SE AFLOJÓ EL CANDADO ────────
+  //
+  // Comparaba tres posiciones y la del medio era el texto "Falta revisar". El
+  // V15 lo movió a `avisoDeCierre`, una constante derivada que se declara
+  // arriba de todo junto con el resto de lo que la composición calcula — así
+  // que su `indexOf` dejó de decir dónde se RENDERIZA y pasó a decir dónde se
+  // DECLARA. Seguir comparando contra eso sería medir otra cosa con el mismo
+  // nombre.
+  //
+  // Lo que el candado afirma no cambió: el importe va en el cierre y antes del
+  // botón. Se mide contra las dos anclas que siguen siendo de render.
   const src = codigoDe(MOVIL);
   const iTotal = src.indexOf("Importe corregido");
-  const iFalta = src.indexOf("Falta revisar");
+  const iBarra = src.indexOf("sticky bottom-0");
   const iCta = src.indexOf("Confirmar recepción");
-  assert.ok(iTotal > -1 && iFalta > -1 && iCta > -1);
-  assert.ok(iTotal < iFalta, "el importe quedó después del renglón de pendientes");
-  assert.ok(iFalta < iCta, "se movió el orden del bloque de cierre");
+  assert.ok(iTotal > -1 && iBarra > -1 && iCta > -1, "falta alguna de las tres piezas del cierre");
+  assert.ok(iTotal < iBarra, "el importe quedó después de la barra de cierre");
+  assert.ok(iBarra < iCta, "el botón de confirmar se salió de la barra");
+
+  // Y el aviso sigue existiendo, con las dos causas que traban el cierre.
+  assert.match(src, /Falta revisar/);
+  assert.match(src, /diferencias sin motivo/);
 });
 
 test("EL CONTRATO DE LA API TIENE LOS TRES NOMBRES, y no rompe los viejos", () => {
