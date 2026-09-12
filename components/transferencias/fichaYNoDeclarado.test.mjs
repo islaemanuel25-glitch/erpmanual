@@ -29,6 +29,7 @@ import FichaProductoRecepcion, {
   ROTULO_SUELTAS_CAMPO,
 } from "./FichaProductoRecepcion.jsx";
 import {
+  motivosParaDiferencia,
   presentacionDeProductoNuevo,
   unidadDeProductoNuevo,
   previsualizarIngresoFisico,
@@ -588,23 +589,80 @@ test("V23-1b · la unidad ya NO va adentro de la caja, y el kit no quedó con un
   assert.ok(!/sufijo=/.test(ficha), "la ficha sigue pasando un prop que el kit ya no tiene");
 });
 
-test("V22-2 y 3 · el resultado va TEÑIDO y en formato corto", () => {
-  // Sin diferencia: fondo positivo y "N de N · sin diferencia".
+// ── EL V25 CAMBIÓ LA CABEZA DE ESTE TEXTO, Y POR QUÉ ─────────────────────
+//
+// Estos dos afirmaban "40 de 48 · faltan 8" y "56 de 48 · sobran 8": los tres
+// números en unidades FÍSICAS, sobre una línea que se cuenta en CAJÓN x8. El
+// operador tenía 5 cajones en la mano y la pantalla le hablaba de 40.
+//
+// Ahora la cabeza va en la escala del conteo y la diferencia sigue en unidades,
+// con la palabra escrita —"faltan 8 unidades"— porque con la cabeza en cajones
+// un 8 pelado se leería como ocho cajones. No se aflojó nada: son las mismas
+// afirmaciones, sobre el texto que la pantalla dibuja hoy.
+
+test("V22-2 y 3 · el resultado va TEÑIDO, corto y EN LA ESCALA DEL CONTEO", () => {
+  // Sin diferencia: fondo positivo y la cabeza en cajones, no en unidades.
   const igual = pintarFicha(lineaCajon({ cantidadRecibida: 6 }), { enHoja: true });
-  assert.ok(igual.includes("48 de 48 · sin diferencia"), "no está el formato corto");
+  assert.ok(
+    igual.includes("6 CAJÓN x8 de 6 CAJÓN x8 · sin diferencia"),
+    "no está el formato corto en la escala del conteo"
+  );
+  assert.ok(!igual.includes("48 de 48"), "volvió a hablar en unidades físicas");
   assert.ok(igual.includes("sunmi-state-success"), "el bloque no se tiñe de positivo");
   assert.ok(!igual.includes("Ingreso físico:"), "quedó el texto largo de escritorio");
 
-  // Con diferencia: danger. 5 cajones de 8 son 40 contra 48.
+  // Con diferencia: danger. 5 cajones contra 6, y faltan 8 unidades.
   const menos = pintarFicha(lineaCajon({ cantidadRecibida: 5 }), { enHoja: true });
-  assert.ok(menos.includes("40 de 48 · faltan 8"), "el resultado no dice la diferencia");
+  assert.ok(
+    menos.includes("5 CAJÓN x8 de 6 CAJÓN x8 · faltan 8 unidades"),
+    "el resultado no dice la diferencia en la escala del conteo"
+  );
   assert.ok(menos.includes("sunmi-state-danger"), "el bloque no se tiñe de danger");
 });
 
 test("V22-3b · cuando SOBRA se dice al derecho, y el singular se respeta", () => {
   const sobra = pintarFicha(lineaCajon({ cantidadRecibida: 7 }), { enHoja: true });
-  assert.ok(sobra.includes("56 de 48 · sobran 8"), "un sobrante se está diciendo como falta");
+  assert.ok(
+    sobra.includes("7 CAJÓN x8 de 6 CAJÓN x8 · sobran 8 unidades"),
+    "un sobrante se está diciendo como falta"
+  );
   assert.ok(!sobra.includes("faltan"), "dice 'faltan' sobre un sobrante");
+});
+
+test("V25-R · el resto de un bulto se dice como resto, y nunca como fracción", () => {
+  // Lo que la cabeza nueva tiene que resolver y la vieja no tenía: un conteo que
+  // no cae redondo. 5 cajones y 3 sueltas son 43 físicas contra 48.
+  //
+  // "5,375 CAJÓN x8" sería un número que no existe en el depósito, y es
+  // exactamente el error de exactitud que todo este modelo evita.
+  const resto = pintarFicha(
+    lineaCajon({ cantidadRecibida: 5, recibidoUnidadesSueltas: 3 }),
+    { enHoja: true }
+  );
+  assert.ok(
+    resto.includes("5 CAJÓN x8 + 3 de 6 CAJÓN x8 · faltan 5 unidades"),
+    "el resto del bulto no se está diciendo"
+  );
+  assert.ok(!resto.includes("5,375"), "apareció una fracción de cajón");
+});
+
+test("V25-U · una línea en UNIDAD conserva el texto de siempre", () => {
+  // La escala de conteo YA era la física, así que acá no había nada que
+  // arreglar. Este candado existe para que el arreglo de los agrupados no se
+  // lleve puesto el caso más común del ERP.
+  const html = pintarFicha(
+    lineaCajon({
+      unidadEnviada: "UNIDAD",
+      unidadMedida: "unidad",
+      factorPack: 1,
+      presentacionEnvio: null,
+      cantidadEnviada: 48,
+      cantidadRecibida: 47,
+    }),
+    { enHoja: true }
+  );
+  assert.ok(html.includes("47 de 48 · falta 1"), "cambió el texto de una línea en UNIDAD");
+  assert.ok(!html.includes("falta 1 unidad"), "se coló el sufijo de los agrupados");
 });
 
 test("V22-4 · la línea de explicación nombra la presentación de la línea", () => {
@@ -614,6 +672,72 @@ test("V22-4 · la línea de explicación nombra la presentación de la línea", 
     "la explicación no sale de la presentación de la línea"
   );
   assert.ok(html.includes("bulto abierto o una rotura"));
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// V25-3 · EL PANEL NO CRECE CUANDO APARECE EL MOTIVO
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// EL DEFECTO, VISTO EN PRODUCCIÓN: en la hoja, tocar el − o el + hasta que la
+// cantidad deja de coincidir hacía APARECER el bloque de motivo, y el panel
+// crecía de golpe. El botón de guardar está justo abajo, así que se corría
+// mientras el dedo iba hacia él y se terminaba tocando otra cosa.
+//
+// El hueco se reserva con el bloque REAL en `visibility: hidden`, no con un alto
+// en píxeles escrito a mano: así mide exactamente lo que va a ocupar, y lo sigue
+// midiendo el día que cambie el tipo de letra.
+//
+// Este candado mira el MARCADO, que es lo único que se puede afirmar sin
+// navegador: `renderToStaticMarkup` no tiene geometría. Que el alto no cambie de
+// verdad lo mide el arnés de 390 px, que abre el panel y compara los dos altos.
+// Las dos mitades hacen falta y ninguna reemplaza a la otra.
+
+test("V25-3 · en la hoja el bloque de motivo ocupa su lugar aunque la línea coincida", () => {
+  const igual = pintarFicha(lineaCajon({ cantidadRecibida: 6 }), { enHoja: true });
+
+  // Está en el marcado —ocupa alto— pero invisible y fuera de todo alcance.
+  assert.ok(igual.includes('data-motivo-reservado="1"'), "no se reservó el hueco del motivo");
+  assert.ok(igual.includes("Motivo de la diferencia"), "el hueco no mide lo que va a medir");
+  assert.ok(igual.includes("invisible"), "el hueco reservado se ve");
+  assert.ok(igual.includes('aria-hidden="true"'), "un lector de pantalla leería el hueco vacío");
+  assert.ok(igual.includes("pointer-events-none"), "el select invisible se puede tocar");
+});
+
+test("V25-3b · y con diferencia es el bloque de verdad, sin marca de reserva", () => {
+  const dif = pintarFicha(lineaCajon({ cantidadRecibida: 5 }), { enHoja: true });
+
+  assert.ok(dif.includes("Motivo de la diferencia"), "falta el motivo cuando SÍ hay diferencia");
+  assert.ok(!dif.includes("data-motivo-reservado"), "el bloque real quedó marcado como reserva");
+
+  // La apertura del ENVOLTORIO del motivo, y no el HTML entero: la ficha con
+  // diferencia trae otros `aria-hidden` legítimos —los iconos decorativos del
+  // bloque teñido— y mirar todo el render los tomaría por éste. Es el mismo
+  // error de mirar el lugar equivocado que ya se pagó una vez en este módulo.
+  const envoltorio = dif.slice(0, dif.indexOf("Motivo de la diferencia")).lastIndexOf("<div");
+  const apertura = dif.slice(envoltorio, dif.indexOf("Motivo de la diferencia"));
+  assert.ok(!/aria-hidden/.test(apertura), "el motivo obligatorio quedó oculto al lector");
+  assert.ok(!/invisible/.test(apertura), "el motivo obligatorio quedó invisible");
+
+  // Las OPCIONES no se pueden mirar acá y conviene saber por qué: `SunmiSelectAdv`
+  // dibuja su lista en un portal, solo cuando está abierta, así que en el
+  // marcado estático no hay ningún `<option>`. Un candado que buscara "Faltante"
+  // en este HTML daría rojo sobre un render correcto. Qué motivos corresponden
+  // se afirma donde se decide, que es la función pura.
+  assert.deepEqual(
+    motivosParaDiferencia({ enviada: 48, recibida: 40 }).map((m) => m.value),
+    ["Faltante", "Producto dañado", "Otro"]
+  );
+});
+
+test("V25-3c · escritorio NO reserva nada: ahí el bloque aparece y desaparece", () => {
+  // La ficha de escritorio vive al lado de un listado largo y esos 60 px no
+  // mueven ningún botón. Reservar ahí sería un hueco en blanco permanente.
+  const igual = pintarFicha(lineaCajon({ cantidadRecibida: 6 }));
+  assert.ok(!igual.includes("Motivo de la diferencia"), "escritorio empezó a reservar el hueco");
+  assert.ok(!igual.includes("data-motivo-reservado"), "escritorio empezó a reservar el hueco");
+
+  const dif = pintarFicha(lineaCajon({ cantidadRecibida: 5 }));
+  assert.ok(dif.includes("Motivo de la diferencia"), "escritorio perdió el motivo");
 });
 
 test("V22-5 · el botón cambia de nombre Y de color según haya diferencia", () => {

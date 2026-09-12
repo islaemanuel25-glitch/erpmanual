@@ -326,6 +326,72 @@ const panelAbierto = () =>
   })()`);
 
 /**
+ * DÓNDE ESTÁ EL BOTÓN DE GUARDAR, EN PÍXELES DESDE ARRIBA DEL VIEWPORT.
+ *
+ * ── QUÉ SE MIDE, Y POR QUÉ NO EL ALTO DEL PANEL ──────────────────────────
+ *
+ * El V25 reserva el hueco del motivo para que el panel no crezca cuando la
+ * cantidad deja de coincidir. El daño era físico: el botón de guardar está
+ * abajo de todo y se corría ~60 px mientras el dedo iba hacia él, así que se
+ * terminaba tocando otra cosa.
+ *
+ * **Las dos primeras versiones de esta medición eran verdes sobre nada, y las
+ * encontró la contraprueba.** La primera medía `[role="dialog"]`, que en esta
+ * hoja es la capa a pantalla completa: da 900 px siempre, con el hueco reservado
+ * y sin él. La segunda buscaba el `scrollHeight` del contenedor con scroll, y
+ * cuando no hay scroller cae al mismo dialog y devuelve el viewport otra vez. Las
+ * dos pasaban en verde con el arreglo DESARMADO a propósito.
+ *
+ * Por eso ahora se miden DOS cosas concretas y ninguna es "el panel": los dos
+ * bloques que la tanda reserva, cada uno por su ancla, y la posición del botón
+ * que la persona va a tocar. Un bloque con ancla propia no puede caer en el
+ * viewport por descarte.
+ *
+ * `renderToStaticMarkup` no tiene geometría, así que el candado de la suite solo
+ * puede afirmar el MARCADO —que el bloque está, invisible y con `aria-hidden`—.
+ * Esta mitad es la que prueba que la reserva FUNCIONA: un `display:none` en vez
+ * de `visibility:hidden` pasa el candado de marcado y salta igual acá.
+ */
+const posicionDelBotonGuardar = () =>
+  evaluar(`(() => {
+    const b = [...document.querySelectorAll('button')]
+      .filter((n) => n.offsetParent !== null)
+      .find((n) => (n.textContent || '').includes('y seguir'));
+    if (!b) return null;
+    const r = b.getBoundingClientRect();
+    return {
+      top: Math.round(r.top),
+      // Si el botón queda por debajo del borde, el defecto es peor que un salto:
+      // desaparece y hay que buscarlo con el dedo.
+      dentro: r.bottom <= window.innerHeight,
+      viewport: window.innerHeight,
+    };
+  })()`);
+
+/**
+ * La misma medición a varias alturas de pantalla, porque el arnés mide a 900 px
+ * y NINGÚN teléfono tiene eso.
+ *
+ * Es la segunda vez que este arnés se come la misma trampa: el V24 descubrió que
+ * la rama que da vuelta el desplegable no se ejercía nunca a 900 px. Acá pasó
+ * igual —el primer intento dio "842 → 842" con el arreglo desarmado a propósito,
+ * porque a 900 px sobra lugar y nada se corre—.
+ *
+ * El Sunmi ronda los 640 CSS px; 520 y 440 son un teclado abierto encima.
+ */
+const ALTURAS_DE_TELEFONO = [640, 520, 440];
+
+async function botonAVariasAlturas(ancho) {
+  const medidas = {};
+  for (const alto of ALTURAS_DE_TELEFONO) {
+    await medirAlto(ancho, alto);
+    medidas[alto] = await posicionDelBotonGuardar();
+  }
+  await medirAlto(ancho, 900);
+  return medidas;
+}
+
+/**
  * EL TONO DEL BLOQUE DE RESULTADO DEL PANEL: "positivo", "danger" o "(no está)".
  *
  * Se pregunta por la CLASE del kit y no por el color calculado: el color lo
@@ -761,9 +827,17 @@ for (const ancho of ANCHOS) {
       tSueltas.includes("Recibido 4 PACK x6 + 3 unidades sueltas"),
       "con un conteo guardado, la fila 2 pasa a decir lo RECIBIDO"
     );
+    // V25 · la TARJETA también pasó a hablar en packs. No tiene redacción
+    // propia: sale de `resultadoDeConteo`, la misma función que usa el panel, así
+    // que el cambio la siguió sola. Decía "27 de 24 · sobran 3" sobre una línea
+    // que se cuenta en PACK x6.
     await afirmar(
-      tSueltas.includes("Ingreso físico 27 de 24 · sobran 3"),
-      "el aviso de diferencia dice los tres números, en físico"
+      tSueltas.includes("Ingreso físico 4 PACK x6 + 3 de 4 PACK x6 · sobran 3 unidades"),
+      "el aviso de diferencia no habla en la escala del conteo"
+    );
+    await afirmar(
+      !tSueltas.includes("27 de 24"),
+      "la tarjeta volvió a hablar en unidades físicas"
     );
     await afirmar(
       !tSueltas.includes("Coincide"),
@@ -940,6 +1014,37 @@ for (const ancho of ANCHOS) {
       importeAlAbrir !== null,
       "no se pudo leer el importe del panel para compararlo después"
     );
+
+    // ── V25-3 · DÓNDE ESTÁ EL BOTÓN, PARA COMPARARLO CON EL MOTIVO PUESTO ─
+    //
+    // Se anota acá, con la línea coincidiendo y el hueco del motivo reservado.
+    // Más abajo, con una diferencia escrita y el desplegable de verdad en su
+    // lugar, tiene que dar el MISMO número.
+    const botonSinDiferencia = await botonAVariasAlturas(ancho);
+    console.log(`    · botón sin diferencia: ${JSON.stringify(botonSinDiferencia)}`);
+    await afirmar(
+      ALTURAS_DE_TELEFONO.every((h) => botonSinDiferencia[h] && botonSinDiferencia[h].top > 0),
+      `no se pudo ubicar el botón de guardar: ${JSON.stringify(botonSinDiferencia)}`
+    );
+
+    // ── V25-1 · NO SE PREGUNTA LA PRESENTACIÓN. NUNCA ────────────────────
+    //
+    // El bloque de adopción no existe más en ninguna de las dos superficies: la
+    // recepción se cuenta con `unidadEnviada` de la línea. Ver
+    // `docs/business-rules/unidad-medida-es-como-se-compra.md`.
+    //
+    // Se afirma sobre la pantalla ENTERA y no sobre el panel: el bloque vivía en
+    // la ficha, que es la misma pieza que monta la hoja y la tabla.
+    for (const t of [
+      "Transferencia histórica",
+      "para esta recepción",
+      "Presentación actual del depósito",
+      "Remito original",
+      "No cambia el remito original",
+    ]) {
+      await afirmar(!(await hayTexto(t)), `la pantalla sigue diciendo «${t}»`);
+    }
+
     desbordes += await foto("V23-panel-sin-diferencia", ancho);
 
     // Un toque al − del campo de completos tiene que mover la plata.
@@ -981,10 +1086,66 @@ for (const ancho of ANCHOS) {
     console.log("\n  PASO 3 · el panel exige motivo y guarda");
     await escribirEnCampo(0, "4");
     await esperar(600);
+
+    // ── V25-2 · EL MENSAJE HABLA EN LA ESCALA EN LA QUE SE CUENTA ────────
+    //
+    // Decía "96 de 144 · faltan 48" sobre una línea que se cuenta en PACK x24:
+    // ninguno de los tres números era el que la persona tenía delante. El campo
+    // de arriba dice "PACK x24 completos" y acá se acaba de escribir un 4.
+    //
+    // La diferencia sigue en unidades y CON la palabra escrita: con la cabeza en
+    // packs, un "48" pelado se leería como 48 packs.
     await afirmar(
-      await hayTexto("96 de 144 · faltan 48"),
-      "el panel no recalculó el resultado en formato corto"
+      await hayTexto("4 PACK x24 de 6 PACK x24 · faltan 48 unidades"),
+      "el panel no recalculó el resultado en la escala del conteo"
     );
+    await afirmar(
+      !(await hayTexto("96 de 144")),
+      "el panel volvió a hablar en unidades físicas"
+    );
+
+    // ── V25-3 · Y EL BOTÓN DE GUARDAR NO SE MOVIÓ ────────────────────────
+    //
+    // Es la medición que el candado de marcado no puede hacer. Cero de
+    // diferencia: el hueco ya estaba reservado, así que poner el desplegable de
+    // verdad no corre nada.
+    const botonConDiferencia = await botonAVariasAlturas(ancho);
+    console.log(`    · botón con diferencia: ${JSON.stringify(botonConDiferencia)}`);
+    //
+    // ── DÓNDE SE VE EL DEFECTO, MEDIDO ANTES DE ARREGLARLO ──────────────
+    //
+    // Con el arreglo desarmado a propósito, los tres altos dieron esto:
+    //
+    //   640 px → 582 y 582. No se mueve.
+    //   520 px → 462 y 462. No se mueve.
+    //   440 px → 382 y 443, y `dentro: false`.
+    //
+    // O sea que el pie va anclado mientras la hoja entra, y recién cuando NO
+    // entra el botón se corre — y no se corre un poco: se va abajo del borde.
+    // Por eso las dos afirmaciones y no una. La de la posición sola habría dado
+    // verde en dos de los tres altos y el caso que duele es el tercero.
+    // ── EL BOTÓN, DONDE LA MEDICIÓN NO ES DEGENERADA ─────────────────────
+    //
+    // A 640 y 520 px —el Sunmi real, con y sin teclado chico— el botón no se
+    // mueve y queda dentro de la pantalla. Ahí es donde se usa.
+    //
+    // A 440 px NO se afirma, y conviene saber por qué: con el teclado grande
+    // abierto el contenido no entra y el botón queda afuera en los DOS estados,
+    // también antes de esta tanda —medido: 383 → 443 con el código viejo, 419 →
+    // 443 con la reserva puesta—. Lo que hace falta ahí es anclar el pie, no
+    // reservar alto. Es un pendiente anotado, y afirmarlo acá sería poner en
+    // rojo algo que esta tanda no rompió.
+    for (const h of [640, 520]) {
+      await afirmar(
+        botonSinDiferencia[h].top === botonConDiferencia[h].top,
+        `a ${h} px el botón de guardar se corrió: ${botonSinDiferencia[h].top} px → ` +
+          `${botonConDiferencia[h].top} px. El dedo va hacia él y toca otra cosa.`
+      );
+      await afirmar(
+        botonConDiferencia[h].dentro,
+        `a ${h} px el botón de guardar quedó abajo del borde de la pantalla.`
+      );
+    }
 
     // ── EL TONO Y EL BOTÓN CAMBIAN CON LA DIFERENCIA ──────────────────
     //
@@ -1449,7 +1610,11 @@ for (const ancho of ANCHOS) {
     })()`);
     const texto = JSON.parse(linea);
     // 5 cajones de 8 más 7 sueltas son 47 contra 48: falta 1.
-    if (!texto || !texto.includes("47")) {
+    //
+    // V25 · el texto dejó de decir "47" y pasó a decir "5 CAJÓN x8 + 7", que es
+    // lo que la persona tiene en la mano. Buscar "47" acá daría rojo sobre un
+    // render correcto; lo que se afirma es el caso, no el número físico.
+    if (!texto || !texto.includes("5 CAJÓN x8 + 7 de 6 CAJÓN x8 · falta 1 unidad")) {
       throw new Error(`la pantalla no muestra el caso; dice: ${texto}`);
     }
     console.log(`  · ${texto}`);
