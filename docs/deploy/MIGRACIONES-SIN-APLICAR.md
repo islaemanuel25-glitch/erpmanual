@@ -20,6 +20,29 @@ Ninguna. Producción está en **10 migraciones**, las mismas que el árbol.
 
 ---
 
+## 2026-09-12 — `ebc60b24`, limpieza V26 del panel y la tarjeta: CERO migraciones
+
+Producción pasó de `6cc0968601e42e5b68e4dfd2afff71434be86b1b` a
+`ebc60b2405f858ac3688134b385ec863f121bc0b`, el merge de
+`limpieza/panel-y-tarjeta-v26`. **Despliegue solo de código**, el segundo del día
+—con el corte medido en 2 segundos, igual que el anterior—.
+
+El cero se confirmó por los tres caminos de siempre: el diff de `prisma/` vacío y
+`schema.prisma` sin tocar; el clasificador con `--desde 6cc09686…` informando
+«Archivos a mirar: 0»; y `migrate deploy` contando **10**, el mismo número que el
+árbol del VPS. `migrate status` de cierre: 10 y «Database schema is up to date!».
+
+La bitácora `.claude/migraciones-autorizadas.log` quedó **vacía**.
+
+Una nota sobre la tanda, porque toca el kit y eso no es habitual en un despliegue
+solo de código: agregó dos tamaños de letra al config —`base2` y `xl2`— y la
+clase `.sunmi-border-danger`. Se comprobó contra el commit desplegado que **nadie
+usaba esos dos tamaños antes** y que la clase de borde no existía, así que el
+cambio es aditivo y ninguna pantalla existente se mueve. Los tres viajaron al
+build: medidos anclados con la llave —`.text-base2{`, `.text-xl2{`,
+`.sunmi-border-danger{`—, cero archivos en la imagen vieja y uno en la nueva, con
+`.text-sm2{` de control presente en las dos.
+
 ## 2026-09-12 — `6cc09686`, V25 de recepción móvil: CERO migraciones
 
 Producción pasó de `73007aff6619ead283c395de21cda60dd174439c` a
