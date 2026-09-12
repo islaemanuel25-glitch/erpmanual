@@ -117,6 +117,31 @@ con el texto nuevo— **se deja a propósito**: decisión de Emanuel el 2026-09-
 porque cerrarlo obligaría a cambiar una forma aprobada en el V22 a cambio de 24
 píxeles en un caso donde el botón ya no se mueve.
 
+## PENDIENTE: falta una línea por PESO dentro del remito
+
+**Anotado el 2026-09-12, durante la tanda del peso con tres decimales.**
+
+El sembrado crea cuatro líneas de remito —UNIDAD, PACK x24, CAJÓN x12 y el PACK
+x6 con sueltas— y **una sola por KG, que es el producto FUERA del remito**.
+
+Eso alcanza para el paso 8 —corregir un peso desde el panel— pero **no** para
+afirmar el rótulo del enviado de una línea por peso: una línea agregada en
+recepción no tiene remito, así que su "Enviado" dice "—" a propósito, y el precio
+de la presentación cuelga de ese mismo renglón.
+
+Al escribir la tanda del peso, la primera versión del arnés afirmaba "3,250 KG" en
+el panel de esa línea y daba rojo **sobre un render correcto**. Lo que cubre ese
+caso hoy es el candado de render `V28-1`, que monta una línea por peso CON
+snapshot — la combinación que el sembrado no tiene.
+
+**Lo que falta:** una quinta línea, por KG y dentro del remito, con snapshot
+`presentacionEnvio: "KG"`. Con eso el arnés podría afirmar en el navegador el
+rótulo de tres decimales y el precio por kilo, que hoy solo se afirman sobre un
+render a string.
+
+Cuidado al agregarla: varias afirmaciones cuentan líneas —"0 / 4 revisados", el
+cierre trabado, los filtros— y una quinta las mueve todas. No es agregar una fila.
+
 ## EL PIE ANCLADO TAPA EL SÍNTOMA QUE SE MEDÍA. HAY QUE MEDIR EL CAMPO.
 
 **Encontrado el 2026-09-12 sacando una reserva a propósito, y es lo más útil de
