@@ -539,15 +539,21 @@ export default function RecepcionMovil({
             No hay productos que coincidan con este filtro.
           </p>
         )}
-        {/* ── LA TARJETA DE TRABAJO, V15 ────────────────────────────────
+        {/* ── LA TARJETA DE TRABAJO, V21 ────────────────────────────────
             Ya no es `FilaProducto`. Esa fila la comparten el teléfono y la
-            lista de escritorio, y esta tarjeta tiene contador, botón y chips
-            adentro: metérselos allá movería escritorio, que esta tanda no toca.
+            lista de escritorio, y ésta tiene dos acciones propias adentro:
+            metérselas allá movería escritorio, que esta tanda no toca.
+
+            Desde el V21 la tarjeta NO edita cantidades: "Corregir" abre la
+            misma ficha que el escritorio —`onElegir`, la hoja de abajo— y ahí
+            se cargan cantidad, sueltas y motivo. Por eso ya no se le pasa
+            `onDesmarcar`: la tarjeta revisada dejó de tener botón propio y
+            nadie más usaba esa prop.
 
             El `key` incluye la firma de la edición y no solo el id: adoptar la
             presentación cambia EN QUÉ se cuenta la línea sin cambiarle el id, y
-            con `key={d.id}` React conservaría un contador que ya no significa
-            lo mismo. Es el defecto que la ficha ya tiene tapado. */}
+            con `key={d.id}` React conservaría un estado que ya no significa lo
+            mismo. Es el defecto que la ficha ya tiene tapado. */}
         {visibles.map((d) => (
           <TarjetaRecepcionMovil
             key={firmaDeEdicion(d)}
@@ -556,7 +562,6 @@ export default function RecepcionMovil({
             guardando={guardando}
             onRevisar={onRevisar}
             onAbrirFicha={onElegir}
-            onDesmarcar={(x) => onRevisar?.({ detalleId: x.id, revisado: false })}
           />
         ))}
       </div>
