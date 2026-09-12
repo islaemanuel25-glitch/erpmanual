@@ -235,9 +235,25 @@ test("8b. UNA sola lógica: la composición móvil no decide nada", () => {
   // Y el cerebro le pasa lo que ya calculó.
   const ws = codigoDe(WORKSPACE);
   assert.match(ws, /<RecepcionMovil/);
-  for (const prop of ["resumen={resumen}", "visibles={visibles}", "categorias={categorias}", "onRevisar={onRevisar}"]) {
+  for (const prop of ["resumen={resumen}", "categorias={categorias}", "onRevisar={onRevisar}"]) {
     assert.ok(ws.includes(prop), `el cerebro dejó de pasarle ${prop}`);
   }
+
+  // ── EL ORDEN DEL TELÉFONO TAMBIÉN LO DECIDE EL CEREBRO ──────────────────
+  //
+  // Decía `visibles={visibles}`. El V15 manda lo no declarado al TOPE en el
+  // teléfono, y ese reordenamiento vive en el workspace y no acá: la lista sale
+  // de `productosVisibles`, que comparten las dos superficies, y reordenarla
+  // allá movería escritorio.
+  //
+  // Lo que este candado sigue defendiendo es lo mismo de antes: que la
+  // composición móvil reciba la lista hecha y no se arme una. Por eso se exige
+  // que `visiblesMovil` DERIVE de `visibles` —misma fuente, solo otro orden— y
+  // que el móvil no ordene nada por su cuenta.
+  assert.ok(ws.includes("visibles={visiblesMovil}"), "el cerebro dejó de pasarle la lista del móvil");
+  assert.match(ws, /const visiblesMovil = useMemo\(/, "el orden del móvil dejó de vivir en el cerebro");
+  assert.match(ws, /\[\.\.\.visibles\]\.sort\(/, "la lista del móvil dejó de derivar de `visibles`");
+  assert.ok(!movil.includes(".sort("), "la composición móvil se puso a ordenar por su cuenta");
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -250,7 +266,23 @@ test("9. confirmar sigue bloqueado mientras queden productos sin revisar", () =>
   // El deshabilitado se DERIVA del resumen, no de una segunda cuenta.
   assert.match(movil, /const pendientes = resumen\?\.pendientes \?\? 0/);
   assert.match(movil, /const todoRevisado = pendientes === 0 && \(resumen\?\.totalRemito \?\? 0\) > 0/);
-  assert.match(movil, /disabled=\{!todoRevisado \|\| confirmando\}/);
+
+  // ── AHORA SON DOS IMPEDIMENTOS, NO UNO ──────────────────────────────────
+  //
+  // Decía `disabled={!todoRevisado || confirmando}`. El V15 agrega el segundo
+  // caso del diseño: una diferencia que nadie explicó también traba el cierre.
+  // No es aflojar el candado — es que ahora hay más razones para no dejar
+  // confirmar, y las dos siguen derivando del mismo resumen.
+  //
+  // `trabado` junta las dos para que el botón tenga UNA condición y el aviso
+  // pueda decir cuál de las dos es. Si el botón las evaluara por su cuenta,
+  // podrían decir cosas distintas.
+  assert.match(movil, /const trabado = !todoRevisado \|\| sinMotivo > 0/);
+  assert.match(movil, /disabled=\{trabado \|\| confirmando\}/);
+  // Y el aviso nombra la causa con su número: un botón gris que no explica por
+  // qué manda a tocarlo hasta que alguien se rinde.
+  assert.match(movil, /const avisoDeCierre =/);
+  assert.match(movil, /diferencias sin motivo/);
 
   // Y el servidor sigue siendo la autoridad: la guarda no se tocó.
   const confirmar = codigoDe("app/api/transferencias/confirmar-recepcion/route.js");

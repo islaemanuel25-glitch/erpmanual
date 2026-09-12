@@ -51,6 +51,10 @@ const PIEZAS = [
   "components/transferencias/ResumenControlFisico.jsx",
   "components/transferencias/FichaProductoRecepcion.jsx",
   "components/transferencias/AgregarProductoRecibido.jsx",
+  // La tarjeta que el V15 le dio al teléfono el 2026-09-11. Se suma el mismo día
+  // que nace, como pide el encabezado: la lista es explícita, y una pieza nueva
+  // que no se agrega queda sin cubrir sin que nada avise.
+  "components/transferencias/TarjetaRecepcionMovil.jsx",
 ];
 
 /**
@@ -133,7 +137,7 @@ test("las piezas del control físico no tienen NINGÚN valor visual arbitrario",
   assert.deepEqual(hallazgos, [], `\n  ${hallazgos.join("\n  ")}\n`);
 });
 
-test("EL CANDADO ENUMERA DE VERDAD: los ocho archivos existen y se leen", () => {
+test("EL CANDADO ENUMERA DE VERDAD: los nueve archivos existen y se leen", () => {
   // Sin esto, un archivo renombrado dejaría el candado en verde sin mirar nada,
   // que es el patrón que este repo ya se comió tres veces.
   for (const rel of PIEZAS) {
@@ -141,7 +145,9 @@ test("EL CANDADO ENUMERA DE VERDAD: los ocho archivos existen y se leen", () => 
     assert.ok(fs.existsSync(abs), `${rel} no existe: el candado dejó de cubrirlo`);
     assert.ok(codigoDe(rel).length > 200, `${rel} quedó vacío o ilegible`);
   }
-  assert.equal(PIEZAS.length, 8);
+  // El número va escrito para que sumar una pieza sea un acto deliberado: si
+  // fuera `PIEZAS.length` contra sí mismo, este candado no afirmaría nada.
+  assert.equal(PIEZAS.length, 9);
 });
 
 test("y los patrones ENCUENTRAN de verdad lo que dicen encontrar", () => {

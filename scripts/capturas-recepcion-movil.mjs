@@ -197,6 +197,116 @@ async function tocar(fragmento, { etiqueta = null, ultimo = false } = {}) {
   await esperar(900);
 }
 
+// ── LO QUE HACE FALTA PARA EJERCER LA SECUENCIA DEL V15 ───────────────────
+//
+// Los helpers de arriba sacan fotos; estos AFIRMAN. Es la diferencia entre "la
+// pantalla se ve así" y "la pantalla hace esto", y el V15 se pidió con la
+// segunda: tocar Coincide, mover el contador, elegir motivo, y comprobar que el
+// cierre se destraba.
+
+let afirmaciones = 0;
+
+/** Afirma, cuenta, y si falla dice qué había en pantalla. */
+async function afirmar(condicion, mensaje) {
+  if (condicion) {
+    afirmaciones++;
+    console.log(`  ✓ ${mensaje}`);
+    return;
+  }
+  const visto = await evaluar("document.body ? document.body.innerText.slice(0, 700) : '(sin body)'");
+  throw new Error(`FALLÓ: ${mensaje}\n  En pantalla había:\n${visto}`);
+}
+
+/** ¿El texto está en pantalla AHORA? Sin esperar: para afirmar, no para sincronizar. */
+const hayTexto = (fragmento) =>
+  evaluar(`document.body ? document.body.innerText.includes(${JSON.stringify(fragmento)}) : false`);
+
+/**
+ * LA TARJETA DE UN PRODUCTO, Y SOLO ESA.
+ *
+ * Con cuatro tarjetas en pantalla, `tocar("Faltante")` se va a la primera que
+ * encuentre, que puede ser la de otro producto. Acá se acota: se busca el
+ * contenedor MÁS CHICO que contenga a la vez el nombre del producto y algo
+ * tocable que coincida — el más chico es la tarjeta, porque cualquier ancestro
+ * suyo contiene también a las otras.
+ */
+/**
+ * @param {object} opciones
+ * @param {boolean} [opciones.exacto] Comparar el TEXTO exacto del botón y
+ *   ninguna `aria-label`. Hace falta para los chips de motivo: el botón "−"
+ *   tiene `aria-label="Restar uno a V15 Faltante PACK"`, que contiene la palabra
+ *   "Faltante", así que la búsqueda por fragmento se iba al contador y bajaba
+ *   la cantidad en vez de elegir el motivo. El síntoma era desconcertante —el
+ *   chip quedaba sin elegir y la tarjeta seguía pidiendo motivo— y costó una
+ *   corrida entenderlo.
+ */
+async function tocarEnTarjeta(nombreProducto, fragmento, { etiqueta = null, exacto = false } = {}) {
+  const ok = await evaluar(`(() => {
+    const producto = ${JSON.stringify(nombreProducto)};
+    const objetivo = ${JSON.stringify(fragmento)};
+    const exacto = ${exacto ? "true" : "false"};
+    const candidatos = [...document.querySelectorAll('div')]
+      .filter((n) => n.offsetParent !== null && (n.textContent || '').includes(producto))
+      .sort((a, b) => (a.textContent || '').length - (b.textContent || '').length);
+    for (const caja of candidatos) {
+      const el = [...caja.querySelectorAll('button, a, [role="button"]')]
+        .filter((n) => n.offsetParent !== null)
+        .find((n) => exacto
+          ? (n.textContent || '').trim() === objetivo
+          : ((n.getAttribute('aria-label') || '') + ' ' + (n.textContent || '')).includes(objetivo));
+      if (el) { el.scrollIntoView({ block: 'center' }); el.click(); return true; }
+    }
+    return false;
+  })()`);
+  if (!ok) {
+    const inventario = await evaluar(`(() => {
+      const n = [...document.querySelectorAll('button, a, [role="button"]')].filter((e) => e.offsetParent !== null);
+      return n.length + " tocables · " + n.slice(0, 16)
+        .map((e) => JSON.stringify(((e.getAttribute('aria-label') || '') + ' ' + (e.textContent || '')).trim().slice(0, 40)))
+        .join(", ");
+    })()`);
+    throw new Error(
+      `no se encontró «${etiqueta || fragmento}» dentro de la tarjeta de «${nombreProducto}».\n  ${inventario}`
+    );
+  }
+  await esperar(700);
+}
+
+/** ¿El botón de confirmar está trabado? Se lee del DOM, no de la foto. */
+const cierreTrabado = () =>
+  evaluar(`(() => {
+    const b = [...document.querySelectorAll('button')]
+      .filter((n) => n.offsetParent !== null)
+      .find((n) => (n.textContent || '').includes('Confirmar recepción'));
+    if (!b) return 'SIN BOTON';
+    return b.disabled === true;
+  })()`);
+
+/**
+ * El texto de una tarjeta, para afirmar sobre ella y no sobre la pantalla entera.
+ *
+ * ── POR QUÉ NO ALCANZA CON "EL DIV MÁS CHICO QUE CONTIENE EL NOMBRE" ──────
+ *
+ * Ese div es el renglón del encabezado —nombre y estado— y no la tarjeta: el
+ * "Enviado 6 PACK x24" vive en un `<p>` hermano, así que quedaba afuera. El
+ * síntoma era desconcertante, porque la tarjeta SÍ decía lo que se le pedía y
+ * la afirmación fallaba igual.
+ *
+ * Se pide además que contenga algo tocable: el renglón del encabezado no tiene
+ * botones y la tarjeta sí, así que la condición separa una de otra sin depender
+ * de ninguna clase de CSS.
+ */
+const textoDeTarjeta = (nombreProducto) =>
+  evaluar(`(() => {
+    const producto = ${JSON.stringify(nombreProducto)};
+    const c = [...document.querySelectorAll('div')]
+      .filter((n) => n.offsetParent !== null
+        && (n.textContent || '').includes(producto)
+        && n.querySelector('button'))
+      .sort((a, b) => (a.textContent || '').length - (b.textContent || '').length);
+    return c[0] ? c[0].innerText : '(no está la tarjeta)';
+  })()`);
+
 /**
  * Toca una OPCIÓN de `SunmiSelectAdv`, que no es un botón.
  *
@@ -399,6 +509,127 @@ for (const ancho of ANCHOS) {
     desbordes += await foto("B-producto-abierto", ancho);
     await tocar("Cerrar");
 
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // V15 · LA SECUENCIA DE TRABAJO, EJERCIDA Y AFIRMADA
+  //
+  // No saca fotos: TOCA y comprueba. Es la mitad que los candados de
+  // `tarjetaRecepcionV15.test.mjs` no pueden cubrir —montan el componente, no
+  // corren eventos ni persisten— y la que el diseño pidió explícitamente.
+  //
+  // Necesita la base descartable: `scripts/sembrar-v15-recepcion.mjs` deja un
+  // remito de cuatro líneas, una por caso. El procedimiento completo está en
+  // `docs/architecture/base-de-pruebas-v15.md`.
+  // ══════════════════════════════════════════════════════════════════════
+  if (MODO === "v15-secuencia") {
+    const COINCIDE = "V15 Coincide UNIDAD";
+    const FALTANTE = "V15 Faltante PACK";
+    const SOBRANTE = "V15 Sobrante CAJON";
+    const SUELTAS = "V15 Sueltas PACK";
+
+    // ── PASO 0 · EL ESTADO DE PARTIDA ──────────────────────────────────
+    console.log("\n  PASO 0 · estado inicial");
+    await afirmar(await hayTexto(COINCIDE), "la tarjeta que va a coincidir está en la lista");
+    await afirmar(await hayTexto(FALTANTE), "la que va a faltar está en la lista");
+    await afirmar(await hayTexto(SOBRANTE), "la que va a sobrar está en la lista");
+    await afirmar(await hayTexto(SUELTAS), "la del pack incompleto está en la lista");
+
+    // El contador arranca CARGADO con lo enviado, en la presentación.
+    const tCoincide = await textoDeTarjeta(COINCIDE);
+    await afirmar(tCoincide.includes("Enviado 10 UNIDAD"), "el contador arranca con lo enviado (10 UNIDAD)");
+    const tFaltante = await textoDeTarjeta(FALTANTE);
+    await afirmar(
+      tFaltante.includes("Enviado 6 PACK x24"),
+      "y en la presentación: 6 PACK x24, no 144 unidades"
+    );
+
+    // La línea sembrada con sueltas ya nace con diferencia, y sin motivo.
+    await afirmar(
+      (await textoDeTarjeta(SUELTAS)).includes("Motivo obligatorio"),
+      "el pack incompleto nace con diferencia POR LAS SUELTAS y pide motivo"
+    );
+    await afirmar(await cierreTrabado(), "el cierre arranca TRABADO");
+    await afirmar(
+      await hayTexto("1 diferencia sin motivo"),
+      "y el aviso dice CUÁNTAS diferencias sin motivo hay"
+    );
+
+    // ── PASO 1 · COINCIDE, DE UN TOQUE ─────────────────────────────────
+    console.log("\n  PASO 1 · tocar «Coincide»");
+    await tocarEnTarjeta(COINCIDE, "✓ Coincide", { etiqueta: "el botón Coincide" });
+    await esperar(2500);
+    await afirmar(
+      !(await hayTexto(COINCIDE)) || (await textoDeTarjeta(COINCIDE)).includes("Volver a contar"),
+      "la línea quedó revisada de un solo toque, sin pasos extra"
+    );
+
+    // ── PASO 2 · LA DIFERENCIA SE DISPARA SOLA ─────────────────────────
+    console.log("\n  PASO 2 · mover el contador hasta que aparezca el motivo");
+    await afirmar(
+      !(await textoDeTarjeta(FALTANTE)).includes("Motivo obligatorio"),
+      "antes de mover el contador NO se pide motivo"
+    );
+    await tocarEnTarjeta(FALTANTE, "Restar uno a", { etiqueta: "el botón −" });
+    await tocarEnTarjeta(FALTANTE, "Restar uno a", { etiqueta: "el botón −" });
+    const conFaltante = await textoDeTarjeta(FALTANTE);
+    await afirmar(conFaltante.includes("Motivo obligatorio"), "al separarse el contador apareció el motivo, SOLO");
+    await afirmar(
+      conFaltante.includes("Enviado 144 · contaste 96 · faltan 48"),
+      "el renglón dice enviado, contado y diferencia, en físico"
+    );
+    await afirmar(conFaltante.includes("Faltante"), "ofrece el chip Faltante");
+    await afirmar(conFaltante.includes("Roto"), "ofrece el chip Roto");
+    await afirmar(!conFaltante.includes("Sobrante"), "y NO ofrece Sobrante sobre un faltante");
+    await afirmar(await cierreTrabado(), "con la diferencia sin motivo, el cierre sigue trabado");
+
+    // ── PASO 3 · ELEGIR EL MOTIVO ──────────────────────────────────────
+    console.log("\n  PASO 3 · elegir motivo");
+    await tocarEnTarjeta(FALTANTE, "Faltante", { etiqueta: "el chip Faltante", exacto: true });
+    await afirmar(
+      (await textoDeTarjeta(FALTANTE)).includes("Guardar diferencia"),
+      "con el motivo puesto, la tarjeta deja cerrarse"
+    );
+    await tocarEnTarjeta(FALTANTE, "Guardar diferencia", { etiqueta: "guardar la diferencia" });
+    await esperar(2500);
+
+    // ── PASO 4 · EL SOBRANTE, POR EL OTRO LADO ─────────────────────────
+    console.log("\n  PASO 4 · el sobrante");
+    await tocarEnTarjeta(SOBRANTE, "Sumar uno a", { etiqueta: "el botón +" });
+    await tocarEnTarjeta(SOBRANTE, "Sumar uno a", { etiqueta: "el botón +" });
+    const conSobrante = await textoDeTarjeta(SOBRANTE);
+    await afirmar(
+      conSobrante.includes("Enviado 60 · contaste 84 · sobran 24"),
+      "el sobrante se dice al derecho: sobran, no faltan"
+    );
+    await afirmar(!conSobrante.includes("Faltante"), "y NO ofrece Faltante sobre un sobrante");
+    await tocarEnTarjeta(SOBRANTE, "Sobrante", { etiqueta: "el chip Sobrante", exacto: true });
+    await tocarEnTarjeta(SOBRANTE, "Guardar diferencia", { etiqueta: "guardar el sobrante" });
+    await esperar(2500);
+
+    // ── PASO 5 · EL PACK INCOMPLETO ────────────────────────────────────
+    console.log("\n  PASO 5 · el pack incompleto");
+    await afirmar(
+      (await textoDeTarjeta(SUELTAS)).includes("Enviado 24 · contaste 27 · sobran 3"),
+      "las sueltas cuentan para la diferencia: 4 packs de 6 más 3 son 27"
+    );
+    await tocarEnTarjeta(SUELTAS, "Sobrante", { etiqueta: "el chip Sobrante", exacto: true });
+    await tocarEnTarjeta(SUELTAS, "Guardar diferencia", { etiqueta: "guardar el pack incompleto" });
+    await esperar(2500);
+
+    // ── PASO 6 · EL CIERRE SE DESTRABA ─────────────────────────────────
+    console.log("\n  PASO 6 · el cierre");
+    await afirmar(
+      (await cierreTrabado()) === false,
+      "con todo revisado y todos los motivos puestos, el botón de confirmar SE DESTRABÓ"
+    );
+    await afirmar(
+      await hayTexto("Todo revisado"),
+      "y el aviso lo dice: ya no queda nada que impida confirmar"
+    );
+
+    desbordes += await foto("V15-secuencia-final", ancho);
+    console.log(`\n  ${afirmaciones} afirmaciones, todas en verde.`);
   }
 
   if (MODO === "acciones") {

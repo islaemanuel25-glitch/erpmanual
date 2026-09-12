@@ -82,18 +82,21 @@ export const MENSAJE_NO_FIGURA = "Este producto no figura en esta transferencia.
 /**
  * Una fila del listado. Se toca entera para abrir la ficha.
  *
- * ── POR QUÉ EL IMPORTE ES OPCIONAL Y NO VIENE SIEMPRE ────────────────────
+ * ── ESTA FILA YA NO LA DIBUJA EL TELÉFONO ────────────────────────────────
  *
- * Esta MISMA fila la dibujan las dos superficies: el teléfono, a través de
- * `RecepcionMovil`, y la lista de escritorio de abajo. La fila de dinero es del
- * diseño aprobado de la card MÓVIL, y esta tanda no cambia escritorio — así que
- * se pide por prop en vez de agregarse acá adentro para todos.
+ * Hasta el V15 la compartían las dos superficies y tenía una prop `conImporte`
+ * para que el móvil mostrara la fila de dinero y escritorio no. El V15 le dio al
+ * teléfono una tarjeta propia —`TarjetaRecepcionMovil`, con contador, botón y
+ * chips adentro—, así que nadie pedía ya ese importe: la prop quedó en código
+ * muerto, con doce candados defendiendo una rama que no se renderizaba en
+ * ninguna pantalla.
  *
- * No es una card distinta ni una variante por modo comercial: es la misma fila,
- * con una zona más que una de las dos superficies muestra. `false` por defecto
- * deja escritorio idéntico carácter por carácter.
+ * Se sacó en vez de dejarla. Una defensa inalcanzable es peor que no tenerla:
+ * se lee como cubierta y no cubre nada, que es el caso que CLAUDE.md ya tiene
+ * anotado dos veces. Escritorio queda idéntico —esa rama nunca se dibujaba acá—
+ * y la fila de dinero vive ahora donde se ve, en la tarjeta del teléfono.
  */
-export function FilaProducto({ d, activa, onElegir, conImporte = false }) {
+export function FilaProducto({ d, activa, onElegir }) {
   const estado = estadoDeProducto(d);
   const envio = descriptorDeEnvio(d);
 
@@ -160,41 +163,6 @@ export function FilaProducto({ d, activa, onElegir, conImporte = false }) {
           : `Enviado ${rotuloDeEnvio(envio)}`}
         {d.categoria?.nombre ? ` · ${d.categoria.nombre}` : ""}
       </span>
-
-      {/* ── EL DINERO: COSTO A LA IZQUIERDA, TOTAL A LA DERECHA ───────────
-          UNA SOLA FILA, y la misma para todos los modos comerciales. El
-          nombre de la presentación sale de `nombreDePresentacion` sobre el
-          MISMO descriptor que ya usa el renglón de arriba: "PACK x6",
-          "CAJÓN x8", "UNIDAD", "KG", "PIEZA". Acá no se resuelve ninguna
-          presentación — si se resolviera, esta fila podría decir una cosa y la
-          de arriba otra sobre la misma línea.
-
-          Los dos importes vienen del endpoint: `precioCosto` ya está
-          normalizado a la escala del envío y `subtotal` es el producto que la
-          pantalla NO recalcula. Acá solo se formatean, con `fmtMoneda`, el
-          mismo formateador del resto del detalle.
-
-          ── LA ALTURA NO PUEDE DEPENDER DEL MODO ────────────────────────
-          Por eso la izquierda es `min-w-0 truncate` y la derecha
-          `shrink-0 whitespace-nowrap`: un "CAJÓN x8" con un importe largo
-          RECORTA en vez de pasar a dos renglones. Sin eso, la card de un cajón
-          quedaría más alta que la de una unidad, que es justo lo que el diseño
-          aprobado pide evitar. El total nunca se recorta: es el número que se
-          va a leer. */}
-      {conImporte && (
-        <span className="flex items-baseline justify-between gap-2 w-full text-sm2">
-          <span className="min-w-0 truncate sunmi-text-muted">
-            Costo {nombreDePresentacion(envio)} ·{" "}
-            <span className="tabular-nums sunmi-text-strong">{fmtMoneda(d.precioCosto)}</span>
-          </span>
-          <span className="shrink-0 whitespace-nowrap sunmi-text-muted">
-            Total ·{" "}
-            <span className="tabular-nums font-semibold sunmi-text-strong">
-              {fmtMoneda(d.subtotal)}
-            </span>
-          </span>
-        </span>
-      )}
 
       {/* El RESULTADO, en su propio renglón y solo cuando ya se revisó: es la
           otra dimensión, y mezclarla con "Revisado" borraría la diferencia. */}
@@ -270,6 +238,24 @@ export default function WorkspaceRecepcion({
     () => productosVisibles(items, { filtro, categoriaId, texto }),
     [items, filtro, categoriaId, texto]
   );
+
+  // ── EN EL TELÉFONO, LO NO DECLARADO VA AL TOPE ──────────────────────────
+  //
+  // `productosVisibles` ordena los revisados primero y después por id, así que
+  // una línea recién informada —no revisada y con el id más alto— cae ÚLTIMA.
+  // En escritorio eso no molesta: la lista y la ficha están lado a lado. En el
+  // teléfono, con 77 líneas, el operador informa un producto que llegó de más y
+  // lo ve desaparecer al fondo del scroll.
+  //
+  // El reordenamiento vive ACÁ y no en `productosVisibles` porque esa función
+  // la comparten las dos superficies y moverla cambiaría el orden de escritorio,
+  // que esta tanda no toca. Es una copia ESTABLE —`sort` sobre una copia, sin
+  // tocar el array de arriba— y solo cambia el orden, nunca el contenido: los
+  // dos listados muestran exactamente los mismos productos.
+  const visiblesMovil = useMemo(() => {
+    const agregada = (d) => (d.agregadoEnRecepcion === true ? 0 : 1);
+    return [...visibles].sort((a, b) => agregada(a) - agregada(b));
+  }, [visibles]);
 
   const seleccionado = items.find((d) => d.id === seleccionadoId) || null;
 
@@ -458,7 +444,9 @@ export default function WorkspaceRecepcion({
           item={item}
           resumen={resumen}
           categorias={categorias}
-          visibles={visibles}
+          // Los MISMOS productos que escritorio, con lo no declarado al tope.
+          // Ver `visiblesMovil`: solo cambia el orden, nunca el contenido.
+          visibles={visiblesMovil}
           seleccionado={seleccionado}
           filtro={filtro}
           categoriaId={categoriaId}
