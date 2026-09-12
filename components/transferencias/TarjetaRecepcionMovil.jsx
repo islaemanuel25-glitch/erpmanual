@@ -58,15 +58,16 @@ import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import { formatearMoneda } from "@/lib/moneda";
 import {
   chipsDeMotivo,
+  correccionDeCantidad,
   fisicasEnviadasDe,
   fisicasRecibidasDe,
-  resultadoDeConteo,
 } from "@/lib/transferencias/recepcionUI";
+// `nombreDePresentacion` y `rotuloFisicoDeEnvio` se importaban para la fila 2,
+// que el V26 sacó. Un import que solo sostenía código borrado deja el módulo
+// diciendo que depende de algo que ya no usa.
 import {
   descriptorDeEnvio,
-  nombreDePresentacion,
   rotuloConSueltas,
-  rotuloFisicoDeEnvio,
   unidadDeDiferencia,
 } from "@/lib/transferencias/presentacionEnvio";
 
@@ -211,8 +212,22 @@ export default function TarjetaRecepcionMovil({
             corregida ? "sunmi-text-warning" : "sunmi-text-muted"
           }`}
         >
+          {/* La MISMA función que usa la tarjeta abierta cuando ya hay conteo y
+              todavía no se revisó: es el mismo hecho en otro momento.
+
+              Perdió dos palabras con el V26 —decía "enviado 6 → contaste 4 PACK
+              x24"—. La flecha ya dice de qué a qué, y acá esos dos rótulos
+              competían por el ancho con el nombre del producto, que es lo que
+              dice sobre qué línea se está trabajando. El caso está medido cuatro
+              párrafos más arriba: con el botón puesto, los nombres se truncaban
+              a "DON SATUR BIZCO…". */}
           {corregida
-            ? `enviado ${fmtCant(envio.cantidad)} → contaste ${rotuloCantidad}`
+            ? correccionDeCantidad({
+                enviadas: envio.cantidad,
+                recibidas: d.cantidadRecibida ?? 0,
+                sueltas: sueltasGuardadas,
+                envio,
+              })
             : `${rotuloCantidad}${delta === 0 ? " · coincide" : ""}`}
         </span>
 
@@ -288,21 +303,42 @@ export default function TarjetaRecepcionMovil({
   // estaba en el remito. Nada de colores escritos a mano.
   const tono = esAgregada ? "sunmi-state-danger" : hayDiferencia ? "sunmi-state-warning" : "";
 
-  // ── FILA 2: QUÉ HAY, EN TEXTO ────────────────────────────────────────────
-  //
-  // Mientras nadie contó, la referencia es la presentación del envío. En cuanto
-  // hay un conteo guardado, lo que importa es ESE número y no el del remito.
-  //
-  // `rotuloFisicoDeEnvio` devuelve `null` en KG, PIEZA y UNIDAD a propósito:
-  // llamar "unidades físicas" a 3,250 KG es la mentira que ese helper existe
-  // para no decir.
   const tieneConteo = d.cantidadRecibida != null;
-  const fisicoDelEnvio = rotuloFisicoDeEnvio(envio);
-  const queHay = tieneConteo
-    ? `Recibido ${rotuloConSueltas({ ...envio, cantidad: d.cantidadRecibida, sueltas: sueltasGuardadas })}`
-    : `${nombreDePresentacion(envio)}${fisicoDelEnvio ? ` · ${fisicoDelEnvio}` : ""}`;
+  // ── ACÁ SE ARMABA LA FILA 2, Y SE FUE ───────────────────────────────────
+  //
+  // `queHay` decía "PACK x12 · 12 unidades físicas" cuando no había conteo, y
+  // "Recibido 4 PACK x6 + 3 unidades sueltas" cuando sí. La primera forma era la
+  // presentación dicha por SEGUNDA vez —ya estaba arriba, en el enviado— más las
+  // físicas, que son la misma cantidad en la escala en la que no se cuenta.
+  //
+  // La segunda sí traía un dato propio: cuánto conté. Ese no se perdió, subió al
+  // renglón de arriba y con la forma de la línea corregida.
+  //
+  // La regla de que a 3,250 KG no se le dice "3,250 unidades físicas" no vivía
+  // acá: vive en `rotuloFisicoDeEnvio`, con sus cinco candados en
+  // `presentacionEnvio.test.mjs`, uno por presentación. Sacar esta línea no la
+  // afloja.
 
-  // ── EL AVISO DE DIFERENCIA, EN UNA LÍNEA ─────────────────────────────────
+  // ── LO CONTADO, CUANDO DIFIERE Y TODAVÍA NO SE REVISÓ ───────────────────
+  //
+  // La MISMA función que usa la línea ya revisada y corregida. Dos redacciones
+  // para el mismo hecho se separan el día que una cambia, y esta pantalla ya se
+  // comió ese defecto una vez.
+  const correccionPendiente =
+    !esAgregada && hayDiferencia && tieneConteo
+      ? correccionDeCantidad({
+          enviadas: envio.cantidad,
+          recibidas: d.cantidadRecibida,
+          sueltas: sueltasGuardadas,
+          envio,
+        })
+      : null;
+
+  // ── EL AVISO, QUE AHORA ES SOLO EL DEL NO DECLARADO ─────────────────────
+  //
+  // El de diferencia —"Ingreso físico 4 PACK x24 de 6 PACK x24 · faltan 48
+  // unidades"— se fue: decía el enviado que ya está arriba, lo contado que ahora
+  // está arriba también, y la resta de los dos.
   //
   // La unidad se nombra solo cuando decir el número pelado sería ambiguo: en KG
   // y en PIEZA la diferencia vive en esa escala, en los agrupados son unidades y
@@ -324,18 +360,6 @@ export default function TarjetaRecepcionMovil({
     aviso = `No declarado · ingreso físico ${fmtCant(fisicasContadas ?? 0)}${
       unidadDif === "unidades" ? " unidades" : sufijoDif
     }`;
-  } else if (hayDiferencia && delta != null) {
-    // El núcleo —"96 de 144 · faltan 48"— sale de `resultadoDeConteo`, que es la
-    // MISMA función que usa el panel de corrección. Antes estaba escrito acá y
-    // el panel tenía su propia redacción: dos textos para el mismo hecho, sobre
-    // la misma línea y en la misma pantalla. La tarjeta le antepone su rótulo
-    // porque acá el renglón va suelto entre otros; en el panel el bloque ya se
-    // titula solo.
-    aviso = `Ingreso físico ${resultadoDeConteo({
-      recibidas: fisicasContadas,
-      enviadas: fisicasEnviadas,
-      envio,
-    })}`;
   }
 
   return (
@@ -358,14 +382,36 @@ export default function TarjetaRecepcionMovil({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-md2 font-semibold sunmi-text-strong break-words">{d.nombre}</p>
-          {/* Qué mandó el depósito y a qué precio. Una línea no declarada no
-              tiene remito, así que dice otra cosa en vez de inventar
-              un "Enviado 0". */}
-          <p className="text-xs sunmi-text-muted break-words">
-            {esAgregada
-              ? TEXTO_CARGA_NO_DECLARADO
-              : `Enviado ${rotuloConSueltas(envio)} · ${formatearMoneda(d.precioCosto)}`}
-          </p>
+          {/* ── QUÉ MANDÓ EL DEPÓSITO, Y QUÉ CONTÉ SI YA CONTÉ ─────────────
+              Una línea no declarada no tiene remito, así que dice otra cosa en
+              vez de inventar un "Enviado 0".
+
+              ── EL V26 LE SACÓ EL PRECIO ───────────────────────────────────
+              Decía "Enviado 1 PACK x12 · $47.400,00". El importe ya está abajo
+              a la derecha y en grande: eran dos datos distintos peleando por el
+              mismo renglón, y el de acá salía en gris chico. Y la presentación
+              aparecía DOS veces en la tarjeta, las dos en gris: acá y en la fila
+              de abajo. Ahora está una sola vez y con peso.
+
+              ── Y CUANDO YA HAY UN CONTEO DISTINTO, LO DICE ACÁ ────────────
+              Es el mismo hecho que la línea ya corregida —conté algo distinto
+              del remito—, en otro momento: todavía sin revisar. Se dibuja igual,
+              con la misma función y en warning. Son 7 líneas en producción,
+              contadas el 2026-09-12 sobre las transferencias abiertas. */}
+          {esAgregada ? (
+            <p className="text-xs sunmi-text-muted break-words">{TEXTO_CARGA_NO_DECLARADO}</p>
+          ) : correccionPendiente ? (
+            <p className="text-base2 font-semibold tabular-nums sunmi-text-warning break-words">
+              {correccionPendiente}
+            </p>
+          ) : (
+            <p className="flex items-baseline gap-2 break-words">
+              <span className="text-xs sunmi-text-muted shrink-0">Enviado</span>
+              <span className="text-base2 font-semibold tabular-nums sunmi-text-accent">
+                {rotuloConSueltas(envio)}
+              </span>
+            </p>
+          )}
         </div>
 
         {puedeRecibir && !esAgregada && !hayDiferencia && (
@@ -379,8 +425,9 @@ export default function TarjetaRecepcionMovil({
         )}
       </div>
 
-      {/* ── FILA 2: LO QUE HAY. ES TEXTO, NO UN CONTROL ────────────────── */}
-      <p className="text-sm2 sunmi-text-muted break-words">{queHay}</p>
+      {/* La fila 2 se fue con el V26. Ver arriba, donde se armaba `queHay`.
+          La tarjeta queda en TRES filas: el nombre con el enviado y «Coincide»,
+          el separador, y el pie con «Corregir» y el importe. */}
 
       {aviso && (
         <p
