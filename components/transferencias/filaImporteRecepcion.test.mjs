@@ -362,14 +362,18 @@ test("F8. REVISADO se colapsa a una línea y conserva su importe", () => {
   assert.match(t, /AMARGO OBRERO 950ML/);
   assert.match(t, /\$22\.800,00/);
 
-  // CORREGIDA Y COLAPSADA. Acá va UN solo número y es el de lo recibido: a
-  // 390 px, con el nombre, la cantidad y "Corregir" en el mismo renglón, no
-  // entra la flecha. El importe del remito se ve al abrir.
+  // CORREGIDA Y COLAPSADA.
+  //
+  // Acá iba UN solo número mientras el botón "Corregir" ocupaba el renglón: con
+  // el nombre, la cantidad y el botón a 390 px no entraban los dos. El V23 sacó
+  // ese botón —la línea entera pasa a ser tocable— y el importe del remito
+  // vuelve, tachado, arriba del corregido. Lo que se sigue exigiendo es que el
+  // que manda sea el de lo RECIBIDO.
   const c = pintarMovil(
     linea({ revisadoEnRecepcion: true, cantidadRecibida: 5, subtotalRecibido: 57000 })
   );
   assert.match(c, /\$57\.000,00/, "la línea colapsada no muestra el importe de lo RECIBIDO");
-  assert.doesNotMatch(c, /\$22\.800,00/, "la línea colapsada sigue mostrando el del remito");
+  assert.match(c, /\$22\.800,00/, "se perdió el importe del remito de la línea corregida");
   // Colapsada: ya no dibuja el contador ni el botón de cierre.
   assert.doesNotMatch(t, /Coincide/, "la tarjeta revisada sigue mostrando el botón de cierre");
   assert.doesNotMatch(t, /Motivo obligatorio/);

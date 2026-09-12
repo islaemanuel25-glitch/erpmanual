@@ -224,7 +224,18 @@ test("el importe del móvil va en el bloque de cierre, antes del CTA", () => {
   assert.match(src, /const trabado = !todoRevisado \|\| sinMotivo > 0 \|\| sinCargar > 0/);
   assert.match(src, /disabled=\{trabado \|\| confirmando\}/);
   // Y la barra muestra el total, que es lo único que quedó a su izquierda.
-  assert.match(src, />Total</, "la barra dejó de rotular el importe");
+  //
+  // El rótulo dejó de ser el literal `>Total<`: el V23 le agrega cuántas líneas
+  // se corrigieron —"Total · 2 corregidos"— para que al terminar el conteo se
+  // sepa si hay algo que repasar antes de confirmar. Se afirma sobre el texto y
+  // sobre el conteo, que es más de lo que el literal decía.
+  assert.match(src, /\bTotal\b/, "la barra dejó de rotular el importe");
+  assert.match(src, /corregidos?/, "la barra no dice cuántas líneas se corrigieron");
+  assert.match(
+    src,
+    /contarCorregidas\(/,
+    "el conteo de corregidas no sale de la fuente compartida con la lista"
+  );
 });
 
 test("EL CONTRATO DE LA API TIENE LOS TRES NOMBRES, y no rompe los viejos", () => {

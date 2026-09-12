@@ -446,13 +446,84 @@ test("V22-1b · y NO se dibuja dos veces el campo de sueltas", () => {
   assert.ok(!html.includes(ROTULO_SUELTAS), "volvió el botón de escritorio al teléfono");
 });
 
-test("V22-1c · la unidad va ADENTRO de cada campo", () => {
+test("V23-1 · los dos campos tienen − y +, y el mínimo es 0", () => {
+  // El V22 ponía la unidad adentro de la caja. El V23 le puso a cada campo un −
+  // y un + en el mismo marco, y con los dos botones la etiqueta ya no entra: la
+  // unidad se mudó al RÓTULO, que es donde no pelea por el espacio. Lo que se
+  // afirma es lo mismo —que se sepa en qué escala se escribe cada campo— dicho
+  // donde ahora vive.
   const html = pintarFicha(lineaCajon(), { enHoja: true });
-  // "CAJÓN" para el de completos y "UN" para el de sueltas. Sin esto, dos
-  // cantidades en escalas distintas quedan una al lado de la otra sin nada que
-  // las distinga salvo el rótulo de arriba.
-  assert.ok(html.includes(">CAJÓN<"), "falta la unidad adentro del campo de completos");
-  assert.ok(html.includes(">UN<"), "falta la unidad adentro del campo de sueltas");
+  assert.ok(html.includes("CAJÓN x8 completos"), "el rótulo no dice la presentación");
+  assert.ok(html.includes(ROTULO_SUELTAS_CAMPO), "el rótulo del campo de sueltas");
+
+  for (const etiqueta of ["Cantidad recibida en CAJÓN x8", "Unidades sueltas"]) {
+    assert.ok(
+      html.includes(`aria-label="Restar uno a ${etiqueta}"`),
+      `falta el − en «${etiqueta}»`
+    );
+    assert.ok(
+      html.includes(`aria-label="Sumar uno a ${etiqueta}"`),
+      `falta el + en «${etiqueta}»`
+    );
+  }
+
+  // El mínimo es 0, y se afirma sobre el fuente porque un render no dispara el
+  // clic: una cantidad recibida negativa no existe y dejarla escribir obligaría
+  // a validarla después.
+  const src = codigoDe("components/transferencias/FichaProductoRecepcion.jsx");
+  assert.match(src, /Math\.max\(0,/, "el − puede bajar de cero");
+});
+
+test("V23-2 · el bloque de plata se recalcula con lo tipeado, y no fabrica un cero", () => {
+  // Con diferencia: los tres renglones. 5 cajones de 8 son 40 contra 48.
+  const menos = pintarFicha(lineaCajon({ cantidadRecibida: 5 }), { enHoja: true });
+  assert.ok(menos.includes("Importe del remito"), "faltan los tres renglones de plata");
+  assert.ok(menos.includes("Importe corregido"));
+  assert.ok(menos.includes("Diferencia"));
+
+  // Sin diferencia: UNO solo. Repetir el mismo número tres veces con tres
+  // rótulos sugiere que pasó algo que no pasó.
+  const igual = pintarFicha(lineaCajon({ cantidadRecibida: 6 }), { enHoja: true });
+  assert.ok(!igual.includes("Importe del remito"), "sin diferencia sobran los renglones");
+  assert.ok(igual.includes("Importe"), "sin diferencia igual tiene que decir cuánto vale");
+});
+
+test("V23-2b · UN NO DECLARADO NO SE VALORIZA EN $0,00 mientras se lo carga", () => {
+  // ── EL DEFECTO QUE ESTO ATAJA, VISTO EN UNA CAPTURA ─────────────────────
+  //
+  // Para una agregada lo enviado es CERO, así que la regla de tres sobre el
+  // remito no existe y el bloque caía en `subtotalRecibido` — que hasta que no
+  // se guarda sigue siendo el del último guardado, o sea cero para una línea
+  // recién agregada. El panel decía "$0,00" mientras alguien escribía 3,25 KG.
+  //
+  // Es el $0,00 de la #195 otra vez, adentro del panel. El precio sale de
+  // `costoUnitarioFisico`, que el endpoint manda y que no depende de la cantidad.
+  const html = pintarFicha(
+    lineaCajon({
+      agregadoEnRecepcion: true,
+      cantidadEnviada: 0,
+      cantidadPresentada: 0,
+      subtotal: 0,
+      subtotalRecibido: 0,
+      costoUnitarioFisico: 125,
+      cantidadRecibida: 3,
+    }),
+    { enHoja: true }
+  );
+  // 3 cajones de 8 son 24 físicas × $125 = $3.000.
+  assert.ok(html.includes("3.000"), `el no declarado no se valoriza con lo que se está cargando`);
+  assert.ok(!/\$\s?0,00/.test(html), "volvió el $0,00 sobre mercadería que sí llegó");
+});
+
+test("V23-1b · la unidad ya NO va adentro de la caja, y el kit no quedó con un prop muerto", () => {
+  // `sufijo` era del V22 y se quedó sin un solo consumidor. Un prop del kit que
+  // nadie pasa se lee como capacidad disponible y es la familia del `conImporte`
+  // que CLAUDE.md tiene anotado: doce candados montando una prop que ya nadie
+  // pasaba. Se saca, no se deja.
+  const src = codigoDe("components/sunmi/SunmiInput.jsx");
+  assert.ok(!/sufijo/.test(src), "quedó el prop `sufijo` en el kit sin nadie que lo pase");
+  const ficha = codigoDe("components/transferencias/FichaProductoRecepcion.jsx");
+  assert.ok(!/sufijo=/.test(ficha), "la ficha sigue pasando un prop que el kit ya no tiene");
 });
 
 test("V22-2 y 3 · el resultado va TEÑIDO y en formato corto", () => {
