@@ -217,6 +217,51 @@ Y un corolario sobre los candados: **la forma del dato de prueba tiene que ser l
 forma del dato real.** Un pie con `total: 0` y un pie sin el campo no son lo
 mismo, y el candado estaba probando el que nunca ocurre.
 
+**Y ÉSE ES EL DEFECTO QUE MÁS SE REPITE. HAY QUE BUSCARLO EN CADA REVISIÓN.**
+
+Un candado montado sobre un dato que el endpoint NUNCA manda queda **verde para
+siempre y no cubre nada**. No falla, no molesta, no avisa: se lee como cubierto.
+Es peor que no tenerlo, porque cierra la pregunta — nadie vuelve a mirar ahí.
+
+Apareció **tres veces en tres tandas seguidas**, y las tres con la misma forma:
+alguien escribió a mano un fixture "razonable" en vez de copiar el que produce el
+sistema.
+
+1. **El contador de diferencias sin motivo** (2026-09-11). La barra de cierre
+   contaba las líneas con diferencia y sin motivo, derivándolas de
+   `pasaFiltro(DIFERENCIAS)`. Ese filtro solo ve líneas YA REVISADAS —
+   `estadoDeProducto` devuelve PENDIENTE para todo lo no revisado— y el servidor
+   no deja revisar con diferencia y sin motivo. La condición era
+   **inalcanzable**: siempre cero. El candado la afirmaba leyendo el fuente, así
+   que estaba verde.
+2. **`conImporte`** (2026-09-11). Doce candados montaban `FilaProducto` con
+   `conImporte: true` para afirmar la fila de dinero. Cuando esa fila se mudó a
+   la tarjeta móvil, **nadie pasaba más esa prop**: los doce siguieron verdes
+   probando una rama que no se renderizaba en ninguna pantalla.
+3. **F7** (2026-09-12). Afirmaba que un no declarado muestra su importe, pasando
+   `subtotal: 32500` sobre una línea con `agregadoEnRecepcion: true`. El endpoint
+   **nunca** manda eso: `subtotal` sale de `valorizarLineaDelRemito`, que para una
+   agregada opera sobre `cantidadPresentada: 0` y devuelve CERO. Por eso el
+   candado no vio el `$0,00` de la #195 durante una tanda entera, y el defecto lo
+   encontró Emanuel usando la pantalla.
+
+**Cómo se busca**, y es una pregunta que hay que hacerse de cada candado, no una
+que se conteste sola:
+
+- **¿De dónde salió este fixture?** Si se escribió a mano, comprobar contra el
+  endpoint o contra la base que esa combinación de campos exista. Los tres casos
+  eran fixtures plausibles y ninguno ocurría.
+- **¿La condición que afirma puede ser verdadera?** Si es una rama, ejercerla:
+  romperla a propósito y ver el rojo. Es lo que hace la contraprueba, y es lo
+  único que distingue un candado que afirma de uno que acompaña.
+- **¿Quién pasa esta prop HOY?** Un `git grep` del nombre. Si la respuesta es
+  "solo el test", el candado defiende código muerto.
+
+Y el corolario del corolario: **un candado que pasa a ser inalcanzable no avisa,
+pero el código que defendía sí se puede borrar.** Cuando se descubre uno, la
+salida no es arreglarle el fixture: es preguntar si la rama que prueba todavía
+tiene que existir. En el caso 2 la respuesta fue que no, y se sacó.
+
 Corolario, y es de los que más caro salieron: **una consulta de Prisma no se
 prueba con candados ni con el build. Hay que ejercerla contra Postgres.**
 
