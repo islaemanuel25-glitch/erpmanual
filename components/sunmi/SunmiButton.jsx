@@ -47,7 +47,20 @@
 import { baseDeBoton } from "@/lib/sunmi/claseNegociada";
 
 /** Los que existen en styles/sunmi.css. Si se agrega uno allá, va acá también. */
-export const COLORES = Object.freeze(["cyan", "amber", "red", "slate", "primary", "secondary"]);
+// `warning` se agregó el 2026-09-12. `amber` queda porque lo usan 40 y pico de
+// pantallas, pero conviene saber que NO es un color propio: su regla es idéntica
+// a la de `primary` —las dos pintan `--pos-accent`—, así que pedir `amber` para
+// distinguirse de `primary` no distingue nada. El que sí es otro token es
+// `warning`, que sale de `--pos-warning`.
+export const COLORES = Object.freeze([
+  "cyan",
+  "amber",
+  "red",
+  "slate",
+  "primary",
+  "secondary",
+  "warning",
+]);
 
 const FALLBACK = "slate";
 

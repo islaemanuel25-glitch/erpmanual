@@ -120,7 +120,45 @@ const claseDeBoton = (pedido, color = "cyan") =>
 const ACCIONES = [
   { clave: "✓ Coincide", pedido: "shrink-0 sunmi-btn-accent-outline" },
   { clave: "Corregir", pedido: "shrink-0 sunmi-btn-accent-suave" },
+  // ── LOS DOS DEL PANEL, QUE SON COLORES Y NO VARIANTES ──────────────────
+  //
+  // Van con `color` y `pedido` vacío, que es como los pide el panel. `warning`
+  // se agregó el 2026-09-12 porque `amber` resultó ser un alias de `primary`
+  // —misma regla, mismo `--pos-accent`— y el botón cambiaba de texto sin
+  // cambiar de color en ninguno de los catorce temas.
+  //
+  // Se miden los dos juntos a propósito: lo que hay que saber no es solo que
+  // cada uno se lea, sino que sean DISTINGUIBLES entre sí. Eso se afirma abajo.
+  { clave: "Marcar revisado", pedido: "", color: "primary" },
+  { clave: "Guardar diferencia", pedido: "", color: "warning" },
 ];
+
+// ── LA DEUDA PREEXISTENTE DEL KIT, CONGELADA ─────────────────────────────
+//
+// Los dos botones SÓLIDOS del panel —`primary` y `warning`— pintan
+// `color: var(--app-bg)` sobre un fondo de token. Esa combinación no llega a
+// 4,5 en varios temas claros: 2,91 en `sunmiLight`, 3,07 en `ambarCaja`, 4,46
+// en `sunmiSand`.
+//
+// **No lo introdujo esta tanda.** `.sunmi-btn-primary` y `.sunmi-btn-amber` son
+// la misma regla desde siempre, y el panel ya usaba `amber`: el par de colores
+// es idéntico antes y después. Lo único que cambió es que ahora se mide.
+//
+// Y hay CUATRO temas donde `--pos-warning` vale lo mismo que `--pos-accent`
+// —`sunmiSand`, `operixBluePro`, `verdeComercio`, `violetaSaas`—, así que en
+// esos el botón cambia de nombre y no de color. Sigue siendo mejor que antes,
+// que eran los catorce.
+//
+// Arreglarlo es tocar los tokens de los catorce temas, que mueve todas las
+// pantallas del ERP: no es una tanda de recepción. Así que se congela como un
+// trinquete —el patrón que este repo ya usa para el hardcodeo—: se cuenta, se
+// imprime, y la sonda se pone ROJA si el número CRECE. Si baja, también: hay
+// que bajar la línea de base a propósito y decir qué se arregló.
+//
+// Lo que NO entra en la deuda son las dos variantes de la tarjeta. Ésas se
+// exigen en verde siempre, porque las agregó esta serie de tandas.
+const DEUDA_SOLIDOS = 12;
+const DEUDA_MISMO_COLOR = 4;
 
 const morir = (motivo) => {
   console.error("");
@@ -237,6 +275,8 @@ async function evaluar(expresion) {
 }
 
 let fallas = 0;
+let deudaSolidos = 0;
+let deudaMismoColor = 0;
 /** El `--pos-accent` que resolvió cada tema. Ver el chequeo del final. */
 const acentos = new Map();
 
@@ -273,7 +313,7 @@ try {
     ACCIONES.map(
       (a, j) =>
         `<div class="${f.clases}" data-fondo="${i}">` +
-        `<button class="${claseDeBoton(a.pedido)}" data-sonda="${i}-${j}">${a.clave}</button>` +
+        `<button class="${claseDeBoton(a.pedido, a.color || "cyan")}" data-sonda="${i}-${j}">${a.clave}</button>` +
         `</div>`
     ).join("")
   ).join("");
@@ -404,7 +444,13 @@ try {
       const exigeBorde = ACCIONES[j].pedido.includes("outline");
       const okBorde = !exigeBorde || (!sinBorde && cBorde >= MINIMO_GRAFICO);
 
-      if (!okTexto || !okBorde) fallas++;
+      // Un SÓLIDO es deuda congelada; una VARIANTE es rojo duro. Ver
+      // `DEUDA_SOLIDOS` para por qué la diferencia no es una excusa.
+      const esSolido = Boolean(ACCIONES[j].color);
+      if (!okTexto || !okBorde) {
+        if (esSolido) deudaSolidos++;
+        else fallas++;
+      }
       // Los píxeles van en el renglón que falla. Un cociente solo no deja
       // arreglar nada: hay que saber qué color quedó sobre qué fondo, y si el
       // que se pintó es el que se creía.
@@ -419,6 +465,31 @@ try {
             `   ${hex(m.texto)} sobre ${hex(m.adentro)}`)
       );
     }
+    // ── Y QUE LOS DOS BOTONES DEL PANEL SE DISTINGAN ENTRE SÍ ───────────
+    //
+    // Los dos pueden tener contraste de sobra contra el fondo y ser el MISMO
+    // color, que es exactamente lo que pasaba con `amber` y `primary`: cada uno
+    // legible, indistinguibles entre ellos, y el cambio de color existiendo solo
+    // en el código. Un umbral de 1,2 no es WCAG —no hay uno para esto—: es el
+    // piso para decir que dos rellenos no son el mismo color.
+    const fondoDe = (clave) => {
+      const m = medidas.find((x) => ACCIONES[Number(x.clave.split("-")[1])].clave === clave);
+      return m ? m.adentro : null;
+    };
+    const fSin = fondoDe("Marcar revisado");
+    const fCon = fondoDe("Guardar diferencia");
+    if (fSin && fCon) {
+      const entreSi = contraste(fSin, fCon);
+      if (entreSi < 1.2) {
+        deudaMismoColor++;
+        renglones.push(
+          `    ✗ los DOS botones del panel son el mismo color (${entreSi}) — el cambio no se ve`
+        );
+      } else {
+        renglones.push(`    ✓ los dos botones del panel se distinguen entre sí (${entreSi})`);
+      }
+    }
+
     console.log(`  ${esperado}  ·  --pos-accent ${medido.accent}`);
     console.log(renglones.join("\n"));
   }
@@ -441,11 +512,31 @@ try {
   }
 
   console.log("");
+  console.log(
+    `deuda del kit · sólidos ${deudaSolidos}/${DEUDA_SOLIDOS} · mismo color ${deudaMismoColor}/${DEUDA_MISMO_COLOR}`
+  );
+
   if (fallas > 0) {
-    console.error(`ROJO · ${fallas} pares no llegan al umbral: el botón queda ilegible en algún tema.`);
+    console.error(
+      `\nROJO · ${fallas} pares de las VARIANTES no llegan al umbral: la tarjeta queda ilegible en algún tema.`
+    );
     process.exit(1);
   }
-  console.log("VERDE · las dos acciones se leen en los catorce temas, sobre los tres fondos.");
+  // El trinquete, en los dos sentidos. Si crece hay una regresión; si baja, se
+  // arregló algo y la línea de base tiene que bajar a propósito, diciendo qué.
+  if (deudaSolidos !== DEUDA_SOLIDOS || deudaMismoColor !== DEUDA_MISMO_COLOR) {
+    console.error(
+      `\nROJO · la deuda del kit se movió: sólidos ${deudaSolidos} (base ${DEUDA_SOLIDOS}), ` +
+        `mismo color ${deudaMismoColor} (base ${DEUDA_MISMO_COLOR}).`
+    );
+    console.error(
+      "Si creció es una regresión. Si bajó, bajá la línea de base en este archivo y decí qué se arregló."
+    );
+    process.exit(1);
+  }
+  console.log(
+    "\nVERDE · las variantes de la tarjeta se leen en los catorce temas, y la deuda del kit no creció."
+  );
   process.exit(0);
 } catch (e) {
   morir(e?.message || String(e));

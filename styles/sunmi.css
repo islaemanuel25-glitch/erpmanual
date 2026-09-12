@@ -291,6 +291,36 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--pos-accent) 35%, transparent);
 }
 
+/* Botón de ADVERTENCIA, sólido — theme-safe.
+
+   ── POR QUÉ HIZO FALTA, Y NO ES UN COLOR MÁS ─────────────────────────────
+
+   El panel de corrección pide que el botón principal cambie de color cuando lo
+   que se va a guardar es una diferencia. Se había usado `color="amber"`, y eso
+   NO hace nada: `.sunmi-btn-amber` y `.sunmi-btn-primary` son la MISMA regla
+   —`background: var(--pos-accent)`— en las dos. `amber` es un alias histórico
+   de `primary`, no un color distinto, así que el botón cambiaba de texto y
+   quedaba del mismo color en los catorce temas.
+
+   `--pos-warning` sí es otro token, definido por separado en los catorce, y ya
+   viene ajustado por contraste: `sunmiLight` lo baja a `#b45309` justamente
+   porque el ámbar de los oscuros no se leía sobre su fondo blanco.
+
+   Va ACÁ, adentro del bloque de colores y ANTES de las variantes, y eso importa:
+   `variantesDeAccion.test.mjs` exige que toda variante se defina después de
+   todos los colores. Agregarlo al final habría puesto ese candado en rojo. */
+.sunmi-btn-warning {
+  background: var(--pos-warning);
+  color: var(--app-bg);
+}
+.sunmi-btn-warning:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.sunmi-btn-warning:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pos-warning) 35%, transparent);
+}
+
 /* Separador Sunmi */
 .sunmi-separator {
   @apply my-4 flex items-center gap-2;
