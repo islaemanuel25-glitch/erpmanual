@@ -73,6 +73,42 @@ const linea = (extra = {}) => ({
   ...extra,
 });
 
+/**
+ * LA MISMA LÍNEA, PERO CORREGIDA. Es la combinación que faltaba.
+ *
+ * ── POR QUÉ ESTE FIXTURE EXISTE, Y ES LA CUARTA VEZ ─────────────────────
+ *
+ * Todas las afirmaciones de plata de este archivo sobre líneas del remito
+ * —F1, F2, F3 y F8— corrían sobre una línea SIN CONTAR o con recibido igual a
+ * enviado. En esos dos casos `subtotal` y `subtotalRecibido` valen lo MISMO, así
+ * que la afirmación no puede distinguir cuál de los dos leyó la tarjeta.
+ *
+ * Por eso el defecto de la #191 vivió: Papas Congeladas, enviado 4 por $38.000,
+ * corregido a 10, y la tarjeta siguió mostrando $38.000 cuando el total global
+ * —que suma el otro campo— ya decía $95.000. El número correcto existía y estaba
+ * llegando a la pantalla; nadie lo dibujaba.
+ *
+ * Es el mismo patrón que CLAUDE.md tiene anotado tres veces: el fixture nunca
+ * tiene la combinación que expondría el defecto. La diferencia con las otras
+ * tres es que acá el dato SÍ llega del endpoint — lo que faltaba era una línea
+ * donde los dos campos difieran.
+ *
+ * `subtotalRecibido` sale de `valorizarDetalle` y es el mismo número que el
+ * servidor suma para `resumen.importeCorregido`. No se inventa acá: 10 × $9.500.
+ */
+const lineaCorregida = (extra = {}) =>
+  linea({
+    nombre: "Papas Congeladas",
+    unidadEnviada: "UNIDAD",
+    factorPack: 1,
+    cantidadEnviada: 4,
+    cantidadRecibida: 10,
+    precioCosto: 9500,
+    subtotal: 38000,
+    subtotalRecibido: 95000,
+    ...extra,
+  });
+
 /** La tarjeta del teléfono, montada como la monta `RecepcionMovil`. */
 const pintarMovil = (d, props = {}) =>
   texto(
@@ -115,6 +151,22 @@ test("F1. UNIDAD: un solo costo, el de la unidad, y su total", () => {
   );
   assert.match(t, /Enviado 6 UNIDAD · \$3\.100,00/);
   assert.match(t, /\$18\.600,00/);
+
+  // Y LA MISMA LÍNEA CORREGIDA: 6 enviadas, 10 recibidas. El importe que la
+  // tarjeta muestra tiene que ser el de las 10.
+  const c = pintarMovil(
+    linea({
+      nombre: "ALA POLVO MATIC 800GR",
+      unidadEnviada: "UNIDAD",
+      factorPack: 1,
+      cantidadEnviada: 6,
+      cantidadRecibida: 10,
+      precioCosto: 3100,
+      subtotal: 18600,
+      subtotalRecibido: 31000,
+    })
+  );
+  assert.match(c, /\$31\.000,00/, "la tarjeta no muestra el importe de lo RECIBIDO");
 });
 
 test("F2. PACK con factor 6: el costo es el DEL PACK, con su factor", () => {
@@ -123,6 +175,10 @@ test("F2. PACK con factor 6: el costo es el DEL PACK, con su factor", () => {
   assert.match(t, /\$22\.800,00/);
   // Y la etiqueta de presentación de la fila del contador dice lo MISMO.
   assert.match(t, /PACK x6/);
+
+  // CORREGIDA: 2 packs enviados, 5 recibidos. 5 × $11.400 = $57.000.
+  const c = pintarMovil(linea({ cantidadRecibida: 5, subtotalRecibido: 57000 }));
+  assert.match(c, /\$57\.000,00/, "la tarjeta no muestra el importe de lo RECIBIDO");
 });
 
 test("F3. CAJÓN con factor 8: el vocabulario es el del dominio, no 'Bulto'", () => {
@@ -138,6 +194,21 @@ test("F3. CAJÓN con factor 8: el vocabulario es el del dominio, no 'Bulto'", ()
   );
   assert.match(t, /CAJÓN x8/);
   assert.match(t, /\$76\.000,00/);
+
+  // CORREGIDA: 5 cajones enviados, 7 recibidos. 7 × $15.200 = $106.400.
+  const c = pintarMovil(
+    linea({
+      nombre: "COCA COLA 2L",
+      unidadMedida: "cajon",
+      factorPack: 8,
+      cantidadEnviada: 5,
+      cantidadRecibida: 7,
+      precioCosto: 15200,
+      subtotal: 76000,
+      subtotalRecibido: 106400,
+    })
+  );
+  assert.match(c, /\$106\.400,00/, "la tarjeta no muestra el importe de lo RECIBIDO");
   // "Bulto" es la etiqueta del helper DUPLICADO del detalle de escritorio. Si
   // apareciera acá, esta tarjeta estaría resolviendo por su cuenta.
   assert.doesNotMatch(t, /Bulto/i, "la tarjeta usó el vocabulario del helper duplicado");
@@ -189,20 +260,30 @@ test("F6. Y EL IMPORTE NO SE RECALCULA: sale tal cual del endpoint", () => {
   // nada—, así que la tarjeta mostraba $0,00 sobre mercadería que sí llegó. Se
   // vio en la #195.
   //
-  // Lo que el candado defiende no cambió: los dos números salen del endpoint y
-  // la pantalla no multiplica. Lo que cambió es CUÁL de los dos se lee, y eso
-  // ahora se exige explícito.
+  // Y LA #191 lo volvió a romper, por el otro lado: el ternario leía
+  // `subtotalRecibido` SOLO para las agregadas, así que una línea del remito
+  // corregida de 4 a 10 se quedaba en el importe del documento. Ahora los dos
+  // campos se leen siempre, cada uno a una variable con nombre.
+  //
+  // Lo que el candado defiende no cambió en ninguna de las dos vueltas: los
+  // números salen del endpoint y la pantalla no multiplica. Lo que cambia es
+  // cuál se dibuja, y eso se exige por separado —F13, F14 y F15— sobre el
+  // render, que es donde se ve.
   const fuente = codigoDe("components/transferencias/TarjetaRecepcionMovil.jsx");
   assert.match(fuente, /formatearMoneda\(d\.precioCosto\)/);
-  assert.match(
-    fuente,
-    /formatearMoneda\(esAgregada \? d\.subtotalRecibido : d\.subtotal\)/,
-    "la tarjeta volvió a leer un solo campo de importe"
-  );
+  assert.match(fuente, /d\.subtotalRecibido/, "la tarjeta dejó de leer el importe recibido");
+  assert.match(fuente, /d\.subtotal\b/, "la tarjeta dejó de leer el importe del remito");
   assert.doesNotMatch(
     fuente,
     /d\.precioCosto\s*\*|\*\s*d\.precioCosto|d\.subtotal\s*\*|d\.subtotalRecibido\s*\*/,
     "la pantalla está multiplicando para llegar al total"
+  );
+  // Y no vuelve a colgar el importe de si la línea es agregada: esa condición
+  // es la que dejó fuera a las corregidas.
+  assert.doesNotMatch(
+    fuente,
+    /formatearMoneda\(\s*esAgregada\s*\?/,
+    "el importe volvió a decidirse por `esAgregada` en vez de por si difieren"
   );
 });
 
@@ -280,12 +361,66 @@ test("F8. REVISADO se colapsa a una línea y conserva su importe", () => {
   const t = pintarMovil(linea({ revisadoEnRecepcion: true, cantidadRecibida: 2 }));
   assert.match(t, /AMARGO OBRERO 950ML/);
   assert.match(t, /\$22\.800,00/);
+
+  // CORREGIDA Y COLAPSADA. Acá va UN solo número y es el de lo recibido: a
+  // 390 px, con el nombre, la cantidad y "Corregir" en el mismo renglón, no
+  // entra la flecha. El importe del remito se ve al abrir.
+  const c = pintarMovil(
+    linea({ revisadoEnRecepcion: true, cantidadRecibida: 5, subtotalRecibido: 57000 })
+  );
+  assert.match(c, /\$57\.000,00/, "la línea colapsada no muestra el importe de lo RECIBIDO");
+  assert.doesNotMatch(c, /\$22\.800,00/, "la línea colapsada sigue mostrando el del remito");
   // Colapsada: ya no dibuja el contador ni el botón de cierre.
   assert.doesNotMatch(t, /Coincide/, "la tarjeta revisada sigue mostrando el botón de cierre");
   assert.doesNotMatch(t, /Motivo obligatorio/);
 });
 
 // ── ESCRITORIO NO CAMBIA ──────────────────────────────────────────────────
+
+// ── EL CONTRATO NUEVO DEL IMPORTE, QUE ES LO QUE LA #191 PIDIÓ ────────────
+//
+// Dos números cuando difieren, uno solo cuando no. La flecha es la marca de que
+// hubo corrección, así que no puede aparecer sobre una línea que coincide: ahí
+// diría que pasó algo que no pasó.
+
+test("F13. CON DIFERENCIA, LA TARJETA ABIERTA MUESTRA LOS DOS: remito → recibido", () => {
+  const t = pintarMovil(lineaCorregida());
+  assert.match(t, /\$38\.000,00/, "se perdió el importe del REMITO");
+  assert.match(t, /\$95\.000,00/, "no está el importe de lo RECIBIDO");
+  assert.match(t, /→/, "no está la flecha que marca la corrección");
+  // Y en ese orden: el documento primero, la corrección después.
+  assert.ok(
+    t.indexOf("$38.000,00") < t.indexOf("$95.000,00"),
+    "el orden está invertido: primero va el remito y después lo recibido"
+  );
+});
+
+test("F14. SIN DIFERENCIA, UN SOLO NÚMERO Y NINGUNA FLECHA", () => {
+  // Recibido igual a enviado: los dos campos traen lo mismo y mostrar
+  // "22.800 → 22.800" sería ruido que además sugiere una corrección inexistente.
+  const t = pintarMovil(linea({ cantidadRecibida: 2, subtotalRecibido: 22800 }));
+  assert.match(t, /\$22\.800,00/);
+  assert.doesNotMatch(t, /→/, "apareció la flecha sobre una línea que coincide");
+
+  // Y tampoco sobre una línea que nadie contó todavía.
+  const sinContar = pintarMovil(linea());
+  assert.doesNotMatch(sinContar, /→/, "apareció la flecha sobre una línea sin contar");
+});
+
+test("F15. UN NO DECLARADO NO LLEVA FLECHA: no tiene remito contra el cual comparar", () => {
+  const t = pintarMovil(
+    linea({
+      agregadoEnRecepcion: true,
+      cantidadEnviada: 0,
+      cantidadRecibida: 13,
+      subtotal: 0,
+      subtotalRecibido: 32500,
+    })
+  );
+  assert.match(t, /\$32\.500,00/);
+  assert.doesNotMatch(t, /→/, "una agregada no puede mostrar un 'antes' que no existe");
+  assert.doesNotMatch(t, /\$0,00/, "volvió a dibujar el cero del remito");
+});
 
 test("F9. LA FILA DE ESCRITORIO NO MUESTRA DINERO, y ya no puede hacerlo", () => {
   // Antes esto se garantizaba con un default en `false`. Ahora es más fuerte: la

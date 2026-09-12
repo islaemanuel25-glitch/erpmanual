@@ -314,3 +314,46 @@ test("17 · un 0 recibido se dibuja como 0 y no como lo enviado", () => {
   assert.ok(html.includes("-10"), "la diferencia de un 0 recibido tiene que ser -10");
   assert.ok(html.includes('value="0"'), "el campo tendría que mostrar 0, no el total enviado");
 });
+
+// ── EL IMPORTE DE LÍNEA EN ESCRITORIO ─────────────────────────────────────
+//
+// Los dos defectos de la #191 y de la #195 viven también acá, y por el mismo
+// motivo: esta tabla lee `d.subtotal` pelado en sus DOS vistas —la lista de
+// tarjetas y la tabla ancha—, sin siquiera la rama de la línea agregada que el
+// V16 le puso al teléfono.
+//
+// El fixture de este archivo tenía el mismo agujero que el del móvil: todas sus
+// líneas van con `cantidadRecibida: null`, y ahí `subtotal` y `subtotalRecibido`
+// valen lo mismo. Sin una línea corregida, ninguna afirmación sobre plata puede
+// distinguir cuál de los dos se leyó.
+
+/** Enviado 10 por $10.000, recibido 25 por $25.000. */
+const lineaCorregida = (extra = {}) =>
+  linea({ cantidadRecibida: 25, subtotalRecibido: 25000, ...extra });
+
+test("18 · el importe de línea sigue a la CORRECCIÓN, no se queda en el del remito", () => {
+  const items = [lineaCorregida()];
+  const html = pintar({ items, editItems: editar(items) });
+  assert.ok(
+    html.includes("25.000"),
+    "escritorio no muestra el importe de lo RECIBIDO en una línea corregida"
+  );
+});
+
+test("19 · y un producto AGREGADO no se dibuja en $0,00, que es la #195 de este lado", () => {
+  // Una agregada no venía en el remito: su `subtotal` vale cero por definición.
+  // Mostrarlo es decir que no vale nada la mercadería que sí entró.
+  const items = [
+    lineaCorregida({
+      id: 2,
+      nombre: "Fanta 2,25 L",
+      agregadoEnRecepcion: true,
+      cantidadEnviada: 0,
+      cantidadRecibida: 13,
+      subtotal: 0,
+      subtotalRecibido: 32500,
+    }),
+  ];
+  const html = pintar({ items, editItems: editar(items) });
+  assert.ok(html.includes("32.500"), "escritorio no valoriza el producto agregado");
+});
