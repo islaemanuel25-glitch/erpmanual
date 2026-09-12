@@ -691,13 +691,25 @@ for (const ancho of ANCHOS) {
       "y quedó con lo que se guardó: 10 UNIDAD"
     );
     await afirmar(
-      !trasCoincidir.includes("✓ Coincide") && !trasCoincidir.includes("Corregir"),
+      !trasCoincidir.includes("✓ Coincide"),
       "la línea quedó revisada y colapsada de un solo toque"
     );
     await afirmar(
       !trasCoincidir.includes("Volver a contar"),
       "y el V21 sacó el botón de desmarcar de la tarjeta revisada"
     );
+    // Pero SÍ conserva la vuelta. Sin esto, contar mal y guardar deja la línea
+    // sin arreglo posible desde el teléfono, que es donde se recibe.
+    await afirmar(
+      trasCoincidir.includes("Corregir"),
+      "la línea revisada conserva el camino de vuelta"
+    );
+    await tocarEnTarjeta(COINCIDE, "Corregir", { etiqueta: "corregir una línea YA revisada", exacto: true });
+    await esperar(1200);
+    await afirmar(await panelAbierto(), "y ese «Corregir» abre el mismo panel");
+    await tocar("Cerrar", { etiqueta: "cerrar el panel sin tocar nada" });
+    await esperar(900);
+    await afirmar(!(await panelAbierto()), "cerrar sin guardar deja la línea como estaba");
 
     // ── PASO 2 · «CORREGIR» ABRE EL PANEL QUE YA EXISTÍA ───────────────
     console.log("\n  PASO 2 · «Corregir» abre el panel");

@@ -84,7 +84,7 @@ export const TEXTO_CARGA_NO_DECLARADO = "Cargá la cantidad que llegó";
  * accidente que haya que recordar: `variantesDeAccion.test.mjs` lo exige.
  */
 const CLASE_COINCIDE = "sunmi-btn-accent-outline";
-const CLASE_CORREGIR = "sunmi-btn-accent-soft";
+const CLASE_CORREGIR = "sunmi-btn-accent-suave";
 
 /** Cantidades: enteras sin decimales, fraccionarias con hasta 3 útiles. */
 const fmtCant = (n) => {
@@ -127,27 +127,57 @@ export default function TarjetaRecepcionMovil({
   const delta =
     fisicasContadas == null || fisicasEnviadas == null ? null : fisicasContadas - fisicasEnviadas;
 
-  // ── 3 · REVISADO: UNA SOLA LÍNEA ─────────────────────────────────────────
+  // ── 3 · REVISADO: UNA SOLA LÍNEA, Y CON VUELTA ───────────────────────────
   //
   // Hay 77 líneas. Una tarjeta revisada que siga ocupando seis renglones empuja
   // el trabajo que falta abajo de todo.
+  //
+  // ── POR QUÉ TIENE "Corregir" Y NO ES UN AGREGADO DE MÁS ─────────────────
+  //
+  // El V21 sacó "Volver a contar", que era una barra a todo el ancho y hacía
+  // otra cosa: DESMARCABA sin tocar el conteo. Con el panel eso dejó de hacer
+  // falta —se corrige y se vuelve a guardar en un paso—, pero sacarlo sin poner
+  // nada dejaba la línea revisada sin ningún camino de vuelta DESDE EL TELÉFONO.
+  //
+  // Y ahí se recibe: en el local, con la mercadería en la mano y sin una
+  // computadora cerca. Contar mal y guardar es normal; que la única forma de
+  // arreglarlo sea ir hasta el escritorio, no.
+  //
+  // Va el MISMO botón chico del pie, no la barra de antes: es la misma acción y
+  // el mismo verbo en las dos formas de la tarjeta.
   if (revisado) {
     return (
       <SunmiCard className="p-2" data-tarjeta-recepcion={d.nombre}>
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex items-center gap-1.5 min-w-0">
-            <Check size={16} aria-hidden="true" className="shrink-0 sunmi-text-success" />
-            <span className="min-w-0 truncate text-sm2 sunmi-text-strong">{d.nombre}</span>
-          </span>
-          <span className="shrink-0 whitespace-nowrap text-sm2 sunmi-text-muted">
+        {/* ── QUÉ CEDE ANCHO Y QUÉ NO, Y NO ES UN DETALLE ──────────────────
+            Con el botón en la línea, a 390 px sobra poco. La primera versión
+            tenía el bloque de la derecha en `shrink-0`, así que TODO el apretón
+            se lo comía el nombre: quedaba "V15 Co…", y una línea se quedó sin
+            nombre visible. Justamente el nombre es lo que hay que leer para
+            saber qué línea se va a corregir.
+            Ahora el que trunca es el rótulo de la cantidad —que es el dato que
+            el panel muestra entero apenas se abre— y el nombre y el importe
+            conservan su lugar. */}
+        <div className="flex items-center gap-2">
+          <Check size={16} aria-hidden="true" className="shrink-0 sunmi-text-success" />
+          <span className="min-w-0 flex-auto truncate text-sm2 sunmi-text-strong">{d.nombre}</span>
+          <span className="min-w-0 truncate text-sm2 sunmi-text-muted">
             {rotuloConSueltas({ ...envio, cantidad: d.cantidadRecibida ?? 0, sueltas: sueltasGuardadas })}
-            {delta === 0 ? " · coincide" : ""}{" "}
-            {/* Mismo criterio que el pie: una agregada no tiene importe de
-                remito, así que el suyo es el de lo recibido. */}
-            <span className="tabular-nums sunmi-text-strong">
-              {formatearMoneda(esAgregada ? d.subtotalRecibido : d.subtotal)}
-            </span>
+            {delta === 0 ? " · coincide" : ""}
           </span>
+          {/* Mismo criterio que el pie: una agregada no tiene importe de
+              remito, así que el suyo es el de lo recibido. */}
+          <span className="shrink-0 whitespace-nowrap tabular-nums text-sm2 sunmi-text-strong">
+            {formatearMoneda(esAgregada ? d.subtotalRecibido : d.subtotal)}
+          </span>
+          {puedeRecibir && (
+            <SunmiButton
+              onClick={() => onAbrirFicha?.(d)}
+              disabled={guardando}
+              className={`shrink-0 ${CLASE_CORREGIR}`}
+            >
+              {TEXTO_CORREGIR}
+            </SunmiButton>
+          )}
         </div>
       </SunmiCard>
     );

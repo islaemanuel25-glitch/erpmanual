@@ -237,9 +237,37 @@ test("V21-10. REVISADO SE COLAPSA: nombre, cantidad, coincide y total", () => {
   assert.match(t, /6 PACK x24/);
   assert.match(t, /coincide/);
   assert.match(t, /\$31\.500,00/);
-  // Ni el botón del caso feliz ni el de corregir: es una línea de lectura.
+  // "Coincide" no: la línea ya está cerrada, no hay nada que confirmar.
   assert.doesNotMatch(t, /✓ Coincide/);
+  // Y la barra a todo el ancho tampoco vuelve: era otra acción —desmarcar sin
+  // tocar el conteo— y el panel la dejó sin uso.
   assert.doesNotMatch(t, /Volver a contar/, "el V21 sacó el botón de desmarcar");
+});
+
+test("V21-10b. Y SE PUEDE VOLVER: una línea revisada se corrige DESDE EL TELÉFONO", () => {
+  // ── POR QUÉ ESTE CANDADO EXISTE ─────────────────────────────────────────
+  //
+  // Sacar "Volver a contar" sin poner nada dejaba la línea guardada sin ningún
+  // camino de vuelta en el celular, y ahí es donde se recibe: en el local, sin
+  // una computadora cerca. Contar mal y guardar es normal.
+  //
+  // El defecto sería MUDO —una tarjeta que se ve bien y no se puede tocar—, así
+  // que no lo atrapa mirar la pantalla de pasada: hay que preguntárselo.
+  const t = pintar(linea({ revisadoEnRecepcion: true, cantidadRecibida: 4 }));
+  assert.match(t, new RegExp(TEXTO_CORREGIR), "la línea revisada quedó sin camino de vuelta");
+
+  // Y abre el MISMO panel, no otra cosa.
+  const fuente = codigoDe("components/transferencias/TarjetaRecepcionMovil.jsx");
+  const abren = fuente.match(/onClick=\{\(\) => onAbrirFicha\?\.\(d\)\}/g) || [];
+  assert.equal(abren.length, 2, "las dos formas de la tarjeta tienen que abrir la ficha");
+});
+
+test("V21-10c. SIN PERMISO, LA LÍNEA REVISADA NO OFRECE CORREGIR", () => {
+  // Mirar no es escribir: el dato se sigue viendo, la acción no.
+  const t = pintar(linea({ revisadoEnRecepcion: true, cantidadRecibida: 4 }), { puedeRecibir: false });
+  assert.doesNotMatch(t, /Corregir/);
+  assert.match(t, /Pancho 24 Als/);
+  assert.match(t, /\$31\.500,00/);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

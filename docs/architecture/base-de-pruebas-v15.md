@@ -103,6 +103,23 @@ Y los tres números **cambian en cada sembrado**, porque los ids son
 autoincrementales y el script borra y vuelve a crear. Hay que leer los que
 imprime esa corrida, no los de la anterior.
 
+**Los colores de las dos acciones, en los catorce temas.** No necesita sesión ni
+la base sembrada: las variables las sirve el layout raíz, así que mide sobre
+`/login`.
+
+    docker run --rm --network container:erpazul_v15_app --shm-size=1g \
+      -v /home/emanuel/trabajo/erpmanual:/app \
+      -v /home/emanuel/.cache/erpazul-test/node_modules:/app/node_modules -w /app \
+      -e CHROMIUM_USER_FLAGS=--no-sandbox \
+      erpazul-test:estable node --experimental-websocket scripts/sonda-acciones-recepcion.mjs \
+        --base http://localhost:3210 --chrome /usr/bin/chromium
+
+Mide 90 pares —2 acciones × 3 fondos de tarjeta × 15 temas— contra los umbrales
+de WCAG: 4,5 para el texto y 3,0 para el contorno. **Encontró un defecto real la
+primera vez que se corrió**, y por eso está: el acento como color de TEXTO da
+3,19 sobre la tarjeta blanca de `sunmiLight` y de `ambarCaja`, y baja a 2,08
+sobre las teñidas.
+
 **La huella de escritorio a 1366**, antes y después:
 
     node --experimental-websocket scripts/huella-escritorio-recepcion.mjs \
@@ -171,6 +188,31 @@ afirmación sobre esa tarjeta pasa entonces por ausencia: `(no está la tarjeta)
 no contiene "Corregir", y el candado queda verde sin haber mirado nada. La
 secuencia se pasa a "Todos" después del estado inicial, y antes de afirmar sobre
 una tarjeta comprueba que la tarjeta EXISTE.
+
+## Y tres más, de la sonda de temas
+
+**Cambiar `data-theme` y esperar NO sirve: el proveedor lo pisa.**
+`SunmiThemeProvider` reescribe `document.documentElement.dataset.theme` con el
+tema guardado, así que una sonda que pone el tema, duerme y mide, mide quince
+veces el tema por defecto. Y el chequeo obvio —leer el atributo justo después de
+escribirlo— no lo ve, porque en ESE instante todavía está bien: es un candado
+puesto sobre un momento que no es el momento que importa. Hay que comprobarlo al
+MEDIR, y reponerlo si hizo falta.
+
+**Cambiar `data-theme` y medir en el MISMO tick tampoco sirve.** El atributo
+queda bien pero los colores salen viejos: Chromium actualiza la propiedad
+personalizada —`getComputedStyle(el).getPropertyValue('--pos-accent')` devuelve
+el valor nuevo— y sin embargo el `color` que ya derivó de un `var()` sigue siendo
+el anterior. Medido sobre el mismo elemento y en la misma llamada: token
+`#d97706`, color `rgb(251, 191, 36)`. Hay que darle un respiro al navegador entre
+poner el tema y leer.
+
+**Los colores calculados no se parsean con una expresión regular.** Chromium
+devuelve `rgba(...)`, `color(srgb 0.98 0.74 0.14 / 0.4)` y
+`oklab(0.777465 0.0391703 0.153345 / 0.4)` según de dónde venga el color y qué
+tema esté puesto. Perseguir formatos es perder. Se pinta en un canvas de 1×1 y se
+lee el píxel: el navegador entiende sus propios formatos y compone el alfa con la
+misma matemática con la que dibuja la pantalla.
 
 El local no lleva `grupoId`: el vínculo son dos tablas aparte, `GrupoLocal` para
 los locales y `GrupoDeposito` para los depósitos. Sin ellas `getGrupoIdDeLocal`
