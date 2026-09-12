@@ -20,6 +20,37 @@ Ninguna. Producción está en **10 migraciones**, las mismas que el árbol.
 
 ---
 
+## 2026-09-12 — `05e324cc`, peso con tres decimales y los dos precios: CERO migraciones
+
+Producción pasó de `ebc60b2405f858ac3688134b385ec863f121bc0b` a
+`05e324cc2c264b6e40f58bda5ab8f84a52bcba09`. **Despliegue solo de código**, y el
+TERCERO del día —los tres con corte de 2 segundos—.
+
+El cero, por los tres caminos: diff de `prisma/` vacío y `schema.prisma` sin
+tocar; clasificador con `--desde ebc60b24…` en «Archivos a mirar: 0»; y
+`migrate deploy` contando **10**, el mismo número que el árbol del VPS.
+`migrate status` de cierre: 10 y «Database schema is up to date!». Bitácora de
+autorizaciones **vacía**.
+
+### Y una nota sobre el marcador, porque volvió a pasar lo que el skill advierte
+
+El primer marcador elegido fue `unidadCortaDePresentacion`, el helper del que se
+deriva el sufijo del precio. Dio **0 en las dos imágenes** — la vieja y la nueva—,
+que es exactamente lo que está escrito: **un identificador no sirve de marcador,
+porque el build de producción lo minifica.** Un vacío ahí no dice «no viajó»: no
+dice nada.
+
+Se descartó entero y se buscó una CADENA. El que sirvió fue **`" / un"`**, el
+literal del precio por unidad del panel: cero archivos en la vieja y **dos** en
+la nueva, con `"Unidades sueltas"` de control presente en las dos.
+
+Vale anotarlo porque la mayor parte de esta tanda **no deja marcador posible**:
+los tres decimales salen de `minimumFractionDigits: minimos`, con el número
+calculado en runtime, y el sufijo del precio se arma con un `.toLowerCase()` sobre
+el resultado de una función. Nada de eso es una cadena en el bundle. Lo que se
+pudo comprobar dentro de la imagen es el literal del precio por unidad; el resto
+está verificado por la suite y por el arnés, no contra el build.
+
 ## 2026-09-12 — `ebc60b24`, limpieza V26 del panel y la tarjeta: CERO migraciones
 
 Producción pasó de `6cc0968601e42e5b68e4dfd2afff71434be86b1b` a
