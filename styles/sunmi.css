@@ -568,6 +568,27 @@
 .sunmi-btn-accent-soft:hover {
   border-color: color-mix(in srgb, var(--pos-accent) 60%, transparent);
 }
+
+/* Contorno del acento: el MISMO token que `accent-soft`, sin relleno.
+   Existe porque la tarjeta de recepción del teléfono tiene dos acciones en la
+   misma tarjeta —"✓ Coincide" y "Corregir"— y con las dos rellenas pesaban
+   igual. No agrega ningún color: `--pos-accent` ya lo resuelve el tema.
+
+   ── TIENE QUE QUEDAR DEBAJO DEL BLOQUE DE COLORES ─────────────────────
+   `SunmiButton` agrega su `sunmi-btn-<color>` igual, así que las dos reglas
+   conviven con la misma especificidad y decide el orden de esta hoja. Está
+   medido y exigido por `variantesDeAccion.test.mjs`: si alguien la sube arriba
+   de `.sunmi-btn-cyan`, el candado se pone rojo en vez de que el botón cambie
+   de color sin que nadie se entere. */
+.sunmi-btn-accent-outline {
+  background: transparent;
+  border: 1px solid var(--pos-accent);
+  color: var(--pos-accent);
+}
+.sunmi-btn-accent-outline:hover {
+  background: color-mix(in srgb, var(--pos-accent) 12%, transparent);
+}
+
 .sunmi-btn-link-soft {
   background: color-mix(in srgb, var(--pos-link) 20%, transparent);
   border: 1px solid color-mix(in srgb, var(--pos-link) 40%, transparent);
