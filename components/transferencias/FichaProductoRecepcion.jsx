@@ -38,7 +38,7 @@ import SunmiAviso from "@/components/sunmi/SunmiAviso";
 
 import { BadgeAgregado, fmtCantidad, fmtDiferencia } from "./detallePresentacion";
 import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
-import { motivosParaDiferencia } from "@/lib/transferencias/recepcionUI";
+import { motivosParaDiferencia, resultadoDeConteo } from "@/lib/transferencias/recepcionUI";
 import { ESTADO_PRODUCTO, estadoDeProducto } from "@/lib/transferencias/controlFisico";
 import {
   ORIGEN_PRESENTACION,
@@ -54,10 +54,22 @@ import {
   nombreDePresentacion,
   rotuloDeEnvio,
   rotuloFisicoDeEnvio,
+  rotuloConSueltas,
+  unidadCortaDePresentacion,
   unidadDeDiferencia,
 } from "@/lib/transferencias/presentacionEnvio";
 
+/** El BOTÓN de escritorio, que revela el campo. En el teléfono ya no existe. */
 export const ROTULO_SUELTAS = "Hay unidades sueltas";
+
+/**
+ * El RÓTULO DEL CAMPO, que es otra cosa y por eso otra constante.
+ *
+ * En el teléfono el campo está siempre y no hay botón que lo revele, así que
+ * "Hay unidades sueltas" ahí sería una pregunta sin respuesta posible. Rotula
+ * qué se escribe en esa caja, no si existe.
+ */
+export const ROTULO_SUELTAS_CAMPO = "Unidades sueltas";
 
 // ── LOS DOS HECHOS DE UNA HISTÓRICA, CON NOMBRE PROPIO ───────────────────
 //
@@ -334,6 +346,34 @@ export default function FichaProductoRecepcion({
   const diferenciaFisica =
     fisicasEditadas == null || fisicasEnviadas == null ? null : fisicasEditadas - fisicasEnviadas;
 
+  // ── LO QUE EL V22 DIBUJA EN EL TELÉFONO ──────────────────────────────────
+  //
+  // Van acá y no arriba porque dependen de `envio`, `agrupaEsta` y las físicas,
+  // que se derivan más arriba en este mismo render.
+  //
+  // `hayDiferenciaFisica` es un booleano y no el número: decide un COLOR y el
+  // nombre de un botón, y `diferenciaFisica` puede valer `null` —cuando no se
+  // puede saber— que no es lo mismo que cero pero se pinta igual de bien.
+  const hayDiferenciaFisica = diferenciaFisica != null && diferenciaFisica !== 0;
+
+  /**
+   * El rótulo del campo de completos, con la presentación adentro.
+   *
+   * "CAJÓN x8 completos" dice en una línea qué se está contando Y en qué escala.
+   * Decía "Recibido", que con el campo de sueltas al lado no distingue uno del
+   * otro. Donde no hay bultos que completar —KG, PIEZA, UNIDAD— no se escribe
+   * "completos", que ahí no significaría nada.
+   */
+  const rotuloDeCompletos = agrupaEsta
+    ? `${nombreDePresentacion(envio)} completos`
+    : `Recibido en ${nombreDePresentacion(envio)}`;
+
+  // Una agregada no tiene remito contra el cual compararse, así que no hay
+  // "N de M" que decir. Su ingreso físico ya lo muestra la tarjeta.
+  const resultadoCorto = d.agregadoEnRecepcion
+    ? null
+    : resultadoDeConteo({ recibidas: fisicasEditadas, enviadas: fisicasEnviadas, envio });
+
   const motivos = motivosParaDiferencia({
     // La diferencia se mide en FÍSICO: 6 packs + 1 suelta contra 6 enviados es
     // una diferencia aunque los dos números de packs sean 6.
@@ -465,6 +505,66 @@ export default function FichaProductoRecepcion({
         </div>
       </div>
 
+      {/* ── LOS CAMPOS DE CARGA — V22, SOLO EN EL TELÉFONO ─────────────────
+          En la hoja los dos campos van LADO A LADO y los dos están siempre,
+          con la presentación en el rótulo del primero y la unidad adentro de
+          cada caja. Son dos cantidades en escalas distintas escritas una al
+          lado de la otra: sin la unidad en la caja, el rótulo de arriba es lo
+          único que las separa y se lee mal con la mercadería en la mano.
+
+          Escritorio queda EXACTAMENTE como estaba, en la rama de abajo. Es la
+          misma división que ya usaba el botón de las sueltas. */}
+      {enHoja ? (
+        <div className="space-y-2">
+          <div>
+            <div className="text-sm2 sunmi-text-muted">Enviado</div>
+            <div className="font-mono tabular-nums sunmi-text-strong">
+              {d.agregadoEnRecepcion ? "—" : rotuloConSueltas(envio)}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <div className="text-sm2 sunmi-text-muted">{rotuloDeCompletos}</div>
+              {puedeRecibir ? (
+                <SunmiInput
+                  type="number"
+                  value={recibido}
+                  onChange={(e) => setRecibido(e.target.value)}
+                  sufijo={unidadCortaDePresentacion(envio)}
+                  aria-label={`Cantidad recibida en ${nombreDePresentacion(envio)}`}
+                />
+              ) : (
+                <div className="font-mono tabular-nums sunmi-text-strong">
+                  {d.cantidadRecibida == null ? "—" : fmtCantidad(d.cantidadRecibida)}
+                </div>
+              )}
+            </div>
+
+            {/* Las sueltas solo donde significan algo: en KG, PIEZA y UNIDAD la
+                cantidad YA está en unidades físicas y un desglose se sumaría
+                encima de sí mismo. */}
+            {agrupaEsta && (
+              <div>
+                <div className="text-sm2 sunmi-text-muted">{ROTULO_SUELTAS_CAMPO}</div>
+                {puedeRecibir ? (
+                  <SunmiInput
+                    type="number"
+                    value={sueltas}
+                    onChange={(e) => setSueltas(e.target.value)}
+                    sufijo="UN"
+                    aria-label="Unidades sueltas"
+                  />
+                ) : (
+                  <div className="font-mono tabular-nums sunmi-text-strong">
+                    {fmtCantidad(d.recibidoUnidadesSueltas || 0)}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
       <div className="grid grid-cols-2 gap-2">
         <div>
           <div className="text-sm2 sunmi-text-muted">Enviado</div>
@@ -504,6 +604,7 @@ export default function FichaProductoRecepcion({
           <div className="text-sm2 sunmi-text-muted">{nombreDePresentacion(envio)}</div>
         </div>
       </div>
+      )}
 
       {bloqueAdopcion}
 
@@ -516,10 +617,14 @@ export default function FichaProductoRecepcion({
         </div>
       )}
 
-      {/* ── EL PACK INCOMPLETO ──────────────────────────────────────────────
-          En el teléfono el campo está SIEMPRE; en escritorio sigue detrás del
-          botón, tal cual estaba. Ver `sueltasSiempreVisibles`. */}
-      {puedeRecibir && agrupaEsta && (
+      {/* ── EL PACK INCOMPLETO — SOLO ESCRITORIO ────────────────────────────
+          En el teléfono este bloque ya no existe: el V22 subió el campo de
+          sueltas al grid de arriba, al lado del de completos. Si siguiera acá
+          habría DOS campos escribiendo la misma variable, que es peor que
+          ninguno — el segundo taparía al primero sin que nadie lo note.
+
+          En escritorio queda igual que siempre: el botón y el campo detrás. */}
+      {puedeRecibir && agrupaEsta && !enHoja && (
         <div className="space-y-1.5">
           {!sueltasSiempreVisibles && (
             <SunmiButton
@@ -549,8 +654,39 @@ export default function FichaProductoRecepcion({
         </div>
       )}
 
-      {/* El total físico y la diferencia. Es lo que va a mover stock. */}
-      {fisicasEditadas != null && (
+      {/* ── EL RESULTADO — V22, SOLO EN EL TELÉFONO ─────────────────────────
+          Teñido y en formato corto: "10 de 10 · sin diferencia" o
+          "47 de 48 · falta 1". Es el dato que decide si esta línea mueve stock
+          distinto del remito, y en gris chico competía con todo lo demás.
+
+          El fondo y el número van del mismo color, y el color lo decide el
+          HECHO: positivo cuando coincide, danger cuando no. Ver
+          `resultadoDeConteo` para las tres decisiones del texto — el sentido al
+          derecho, el singular, y cuándo se nombra la unidad. */}
+      {enHoja && resultadoCorto && (
+        <div className={`rounded-lg p-2 ${hayDiferenciaFisica ? "sunmi-state-danger" : "sunmi-state-success"}`}>
+          <p
+            className={`text-md2 font-semibold tabular-nums ${
+              hayDiferenciaFisica ? "sunmi-text-danger" : "sunmi-text-success"
+            }`}
+            aria-live="polite"
+          >
+            {resultadoCorto}
+          </p>
+        </div>
+      )}
+
+      {/* La explicación de qué son las sueltas, para que nadie las lea como una
+          cantidad alternativa. Solo donde hay bultos que abrir. */}
+      {enHoja && agrupaEsta && (
+        <p className="text-sm2 sunmi-text-muted">
+          El envío sigue siendo {nombreDePresentacion(envio)}. Las unidades sueltas solo explican un
+          bulto abierto o una rotura.
+        </p>
+      )}
+
+      {/* El total físico y la diferencia, en escritorio. */}
+      {!enHoja && fisicasEditadas != null && (
         <div className="text-sm2 sunmi-text-muted">
           {/* ── LA UNIDAD DEL RESULTADO ES LA DEL DOMINIO ──────────────────
               Decía "unidades" SIEMPRE. Para un fiambre de 3,250 KG eso es
@@ -602,8 +738,14 @@ export default function FichaProductoRecepcion({
 
       {puedeRecibir && (
         <div className="flex flex-wrap gap-2">
+          {/* ── EL COLOR DICE QUÉ SE ESTÁ POR GUARDAR ──────────────────────
+              En la hoja: color de acción cuando la línea coincide —es el cierre
+              normal— y warning cuando hay una diferencia, que es lo que hace
+              que el remito y lo recibido dejen de ser el mismo número. El texto
+              ya lo decía; el color lo dice antes de leerlo.
+              Escritorio sigue en ámbar, como siempre. */}
           <SunmiButton
-            color="amber"
+            color={enHoja ? (hayDiferenciaFisica ? "warning" : "primary") : "amber"}
             onClick={revisar}
             disabled={guardando}
             aria-pressed={d.revisadoEnRecepcion === true}
