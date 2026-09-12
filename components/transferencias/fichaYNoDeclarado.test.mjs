@@ -670,6 +670,110 @@ test("V23-1b · la unidad ya NO va adentro de la caja, y el kit no quedó con un
 // —V26-2—.
 
 // ═══════════════════════════════════════════════════════════════════════════
+// V28 · EL PESO CON TRES DECIMALES Y LOS DOS PRECIOS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** La línea por PESO, con snapshot en KG. 3,250 kg a $16.500 el kilo. */
+const lineaKg = (extra = {}) =>
+  lineaCajon({
+    nombre: "Queso cremoso",
+    presentacionEnvio: "KG",
+    factorPresentacion: null,
+    factorPack: 1,
+    unidadMedida: "kg",
+    cantidadEnviada: 3.25,
+    cantidadPresentada: 3.25,
+    precioCosto: 16500,
+    costoUnitarioFisico: 16500,
+    subtotal: 53625,
+    ...extra,
+  });
+
+test("V28-1 · el peso va con TRES decimales en el rótulo Y en el campo", () => {
+  const html = pintarFicha(lineaKg(), { enHoja: true });
+
+  // El rótulo del enviado, con la coma del castellano.
+  assert.ok(html.includes("3,250 KG"), "el enviado no muestra los tres decimales");
+  assert.ok(!html.includes("3,25 KG"), "quedó el peso con dos decimales");
+
+  // Y el campo, con PUNTO: es un `input type="number"` y ahí "3,250" no es un
+  // valor válido. La diferencia de separador ya existía —el campo decía "3.25"—
+  // y no la introduce la precisión. Lo que queda igual es cuántos dígitos se ven.
+  assert.equal(
+    valorDelCampo(html, "Cantidad recibida en KG"),
+    "3.250",
+    "el campo no arranca con la misma precisión que el rótulo"
+  );
+});
+
+test("V28-1b · los ceros a la derecha son el caso que se perdía", () => {
+  // `4,075` ya salía completo antes del cambio: el máximo era 3. Lo que se comía
+  // el formateador eran los CEROS A LA DERECHA, y ahí está la pérdida real —no se
+  // podía distinguir "la balanza dijo 730 gramos" de "0,73 redondeado"—.
+  const conCeros = pintarFicha(lineaKg({ cantidadEnviada: 0.73, cantidadPresentada: 0.73 }), { enHoja: true });
+  assert.ok(conCeros.includes("0,730 KG"), "el cero de la derecha se sigue perdiendo");
+
+  const significativo = pintarFicha(lineaKg({ cantidadEnviada: 4.075, cantidadPresentada: 4.075 }), { enHoja: true });
+  assert.ok(significativo.includes("4,075 KG"), "se perdió un decimal que ya funcionaba");
+});
+
+test("V28-1c · y NO se desborda: los packs y la PLATA siguen como estaban", () => {
+  // Tres decimales son del peso. Si la regla viviera en el formateador genérico,
+  // "6 CAJÓN x8" pasaría a "6,000 CAJÓN x8".
+  const html = pintarFicha(lineaCajon({ cantidadRecibida: 5 }), { enHoja: true });
+  assert.ok(html.includes("6 CAJÓN x8"), "el cajón perdió su rótulo");
+  assert.ok(!html.includes("6,000"), "los tres decimales se desbordaron a los bultos");
+  assert.equal(valorDelCampo(html, "Cantidad recibida en CAJÓN x8"), "5", "el campo se rellenó de ceros");
+
+  // La plata, en dos decimales en los dos estados y en las dos líneas.
+  for (const [caso, l] of [["cajón", lineaCajon({ cantidadRecibida: 5 })], ["peso", lineaKg()]]) {
+    const h = pintarFicha(l, { enHoja: true });
+    assert.ok(!/\$[\d.]+,\d{3}/.test(h), `en ${caso} un importe salió con tres decimales`);
+    assert.ok(/\$[\d.]+,\d\d/.test(h), `en ${caso} no se encontró ningún importe`);
+  }
+});
+
+test("V28-2 · el precio de la PRESENTACIÓN va al lado del enviado, con su sufijo", () => {
+  // El número que se compara contra el remito del proveedor. Sale de
+  // `d.precioCosto`, que en el DTO es `costoPresentacion` y no la columna cruda.
+  const cajon = pintarFicha(lineaCajon(), { enHoja: true });
+  assert.ok(cajon.includes("/ cajón"), "el sufijo no nombra la presentación de la línea");
+
+  const kg = pintarFicha(lineaKg(), { enHoja: true });
+  assert.ok(kg.includes("/ kg"), "una línea por peso no rotula su precio por kilo");
+
+  const unidad = pintarFicha(
+    lineaCajon({ presentacionEnvio: "UNIDAD", factorPresentacion: null, factorPack: 1, unidadMedida: "unidad" }),
+    { enHoja: true }
+  );
+  assert.ok(unidad.includes("/ un"), "una línea en UNIDAD no rotula su precio por unidad");
+});
+
+test("V28-3 · el precio POR UNIDAD aparece SOLO al lado del campo de sueltas", () => {
+  // Es el pedido textual: fuera de ese campo no aporta y ensucia. Y debajo de
+  // "CAJÓN x8" el costo de la unidad suelta sería una afirmación falsa.
+  const cajon = pintarFicha(lineaCajon({ costoUnitarioFisico: 125 }), { enHoja: true });
+  const posUnidad = cajon.indexOf("/ un");
+  const posSueltas = cajon.indexOf(ROTULO_SUELTAS_CAMPO);
+  assert.ok(posUnidad > 0, "no está el precio por unidad");
+  assert.ok(posSueltas > 0, "no está el campo de sueltas");
+  assert.ok(
+    posUnidad > posSueltas,
+    "el precio por unidad no está pegado al campo de sueltas: aparece antes"
+  );
+
+  // Y en una línea SIN sueltas —KG no agrupa— no hay campo, así que el precio por
+  // unidad no tiene dónde ir. Lo único que se ve es el del kilo.
+  const kg = pintarFicha(lineaKg(), { enHoja: true });
+  assert.ok(!kg.includes(ROTULO_SUELTAS_CAMPO), "apareció el campo de sueltas en una línea por peso");
+  assert.equal(
+    (kg.match(/\/ (un|kg)/g) || []).join(","),
+    "/ kg",
+    "en KG tiene que haber UN solo sufijo, el del kilo"
+  );
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // V26 · LO QUE SE FUE, Y LO ÚNICO QUE QUEDÓ PARA DECIR LA DIFERENCIA
 // ═══════════════════════════════════════════════════════════════════════════
 
