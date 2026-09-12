@@ -127,6 +127,30 @@ export default function TarjetaRecepcionMovil({
   const delta =
     fisicasContadas == null || fisicasEnviadas == null ? null : fisicasContadas - fisicasEnviadas;
 
+  // ── LOS DOS IMPORTES DE LA LÍNEA ────────────────────────────────────────
+  //
+  // El endpoint manda los dos y son dos preguntas distintas:
+  //
+  //   `subtotal`          lo que salió del depósito. No se mueve al contar.
+  //   `subtotalRecibido`  lo que vale lo que llegó. Sigue a la corrección, y es
+  //                       el MISMO número que el servidor suma para el total
+  //                       corregido del documento.
+  //
+  // Hasta la #191 la tarjeta leía el primero salvo para una agregada, así que
+  // corregir 4 a 10 dejaba la línea en $38.000 mientras el total de abajo ya
+  // decía $95.000. El número correcto llegaba a la pantalla y nadie lo dibujaba.
+  //
+  // Se muestran LOS DOS cuando difieren —el documento no se pierde y la
+  // corrección se ve— y uno solo cuando no. La flecha es la marca de que hubo
+  // corrección: sobre una línea que coincide diría que pasó algo que no pasó.
+  //
+  // Una agregada no tiene "antes": no venía en el remito, así que su `subtotal`
+  // vale cero por definición y mostrarlo sería el $0,00 de la #195.
+  const importeRemito = esAgregada ? null : d.subtotal;
+  const importeRecibido = d.subtotalRecibido == null ? d.subtotal : d.subtotalRecibido;
+  const hayCorreccionDeImporte =
+    importeRemito != null && Number(importeRemito) !== Number(importeRecibido);
+
   // ── 3 · REVISADO: UNA SOLA LÍNEA, Y CON VUELTA ───────────────────────────
   //
   // Hay 77 líneas. Una tarjeta revisada que siga ocupando seis renglones empuja
@@ -164,10 +188,13 @@ export default function TarjetaRecepcionMovil({
             {rotuloConSueltas({ ...envio, cantidad: d.cantidadRecibida ?? 0, sueltas: sueltasGuardadas })}
             {delta === 0 ? " · coincide" : ""}
           </span>
-          {/* Mismo criterio que el pie: una agregada no tiene importe de
-              remito, así que el suyo es el de lo recibido. */}
+          {/* ── ACÁ VA UN SOLO NÚMERO, Y ES EL DE LO RECIBIDO ──────────────
+              A 390 px este renglón ya lleva el nombre, la cantidad y
+              "Corregir": la flecha con los dos importes no entra, y lo que
+              importa de una línea cerrada es cuánto entró. El del remito se ve
+              al abrirla. */}
           <span className="shrink-0 whitespace-nowrap tabular-nums text-sm2 sunmi-text-strong">
-            {formatearMoneda(esAgregada ? d.subtotalRecibido : d.subtotal)}
+            {formatearMoneda(importeRecibido)}
           </span>
           {puedeRecibir && (
             <SunmiButton
@@ -322,17 +349,18 @@ export default function TarjetaRecepcionMovil({
           <span />
         )}
 
-        {/* ── DE DÓNDE SALE EL IMPORTE, Y POR QUÉ NO ES SIEMPRE EL MISMO ────
-            `subtotal` es el del REMITO: cuánto salió del depósito. Para una
-            línea agregada vale CERO y es correcto por definición —de un no
-            declarado no salió nada—, pero la tarjeta lo mostraba igual y el
-            operador veía $0,00 sobre mercadería que sí llegó. Eso se vio en
-            la #195.
-
-            `subtotalRecibido` es lo que vale lo que entró, el MISMO número que
-            alimenta `importeCorregido` del resumen. */}
+        {/* ── EL IMPORTE, CON SU ANTES CUANDO LO HAY ─────────────────────
+            El del remito primero y en gris chico, la corrección después y en
+            grande: se lee "de cuánto era" → "cuánto es". El orden no es
+            decorativo — invertido diría que el documento cambió y no cambió.
+            Ver el bloque de arriba para por qué son dos campos. */}
         <span className="shrink-0 whitespace-nowrap tabular-nums text-lg2 font-semibold sunmi-text-strong">
-          {formatearMoneda(esAgregada ? d.subtotalRecibido : d.subtotal)}
+          {hayCorreccionDeImporte && (
+            <span className="text-sm2 font-normal sunmi-text-muted">
+              {formatearMoneda(importeRemito)} →{" "}
+            </span>
+          )}
+          {formatearMoneda(importeRecibido)}
         </span>
       </div>
     </SunmiCard>

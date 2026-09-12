@@ -50,6 +50,29 @@ function num(v) {
 }
 
 /**
+ * EL IMPORTE QUE ESTA TABLA MUESTRA POR LÍNEA.
+ *
+ * El endpoint manda dos: `subtotal` es el del REMITO —lo que salió del
+ * depósito, inmutable mientras alguien cuenta— y `subtotalRecibido` es lo que
+ * vale lo que llegó, que sigue a la corrección y es el mismo número que el
+ * servidor suma para el total corregido del documento.
+ *
+ * Esta tabla leía `subtotal` pelado en sus dos vistas, sin ninguna de las dos
+ * ramas que el teléfono ya tenía. Eso dejaba vivos los dos defectos:
+ *
+ *   · la #195 — un producto agregado se dibujaba en $0,00, porque no venía en
+ *     el remito y su `subtotal` vale cero por definición;
+ *   · la #191 — una línea corregida de 4 a 10 se quedaba en el importe del
+ *     documento mientras el total de abajo ya mostraba el corregido.
+ *
+ * Se lee siempre lo recibido cuando existe. `subtotalRecibido` llega en `null`
+ * solo si nadie contó todavía, y ahí lo enviado ES lo que vale la línea.
+ */
+function importeDeLinea(d) {
+  return d?.subtotalRecibido == null ? d?.subtotal : d.subtotalRecibido;
+}
+
+/**
  * "5 PACK x6 + 5 sueltas". El desglose, no el total.
  *
  * El total solo dice 35; el desglose dice de dónde sale, que es lo que el
@@ -302,7 +325,7 @@ export default function TablaDetalleTransferencia({
                     {d.nombre}
                   </div>
                   <div className="font-mono font-bold text-[15px] sunmi-text-strong whitespace-nowrap tabular-nums">
-                    {fmtMoneda(d.subtotal)}
+                    {fmtMoneda(importeDeLinea(d))}
                   </div>
                 </div>
 
@@ -548,7 +571,7 @@ export default function TablaDetalleTransferencia({
                   </td>
 
                   <td className="px-2.5 py-3 text-right font-mono font-bold tabular-nums sunmi-text-strong whitespace-nowrap">
-                    {fmtMoneda(d.subtotal)}
+                    {fmtMoneda(importeDeLinea(d))}
                   </td>
 
                 </tr>

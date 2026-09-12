@@ -207,6 +207,24 @@ export default function FichaProductoRecepcion({
   const [recibido, setRecibido] = useState(() => inicial().recibido);
   const [sueltas, setSueltas] = useState(() => inicial().sueltas);
   const [conSueltas, setConSueltas] = useState(() => inicial().conSueltas);
+
+  // ── EN EL TELÉFONO LOS DOS CAMPOS ESTÁN SIEMPRE ─────────────────────────
+  //
+  // En escritorio el desglose vive detrás de un botón, y ahí tiene sentido: la
+  // pantalla es ancha, el caso normal es que no haya pack incompleto y el botón
+  // deja el formulario corto.
+  //
+  // En el teléfono no. Ahí el panel es el ÚNICO lugar donde se carga la
+  // cantidad —el V21 sacó el contador de la tarjeta— y esconder la mitad del
+  // desglose detrás de un toque es pedirle al que tiene la mercadería en la mano
+  // que adivine que hay un segundo campo. Se vio recibiendo la #191.
+  //
+  // Va detrás del `enHoja` que ya existía, así que escritorio queda EXACTAMENTE
+  // como estaba: es presentación, no negocio. Y `usaSueltas` reemplaza a
+  // `conSueltas` en las dos cuentas, para que no queden dos condiciones que
+  // puedan decir cosas distintas sobre la misma línea.
+  const sueltasSiempreVisibles = enHoja;
+  const usaSueltas = sueltasSiempreVisibles || conSueltas;
   const [motivo, setMotivo] = useState(() => inicial().motivo);
   const [detalleMotivo, setDetalleMotivo] = useState(() => inicial().detalleMotivo);
   const [error, setError] = useState("");
@@ -303,7 +321,7 @@ export default function FichaProductoRecepcion({
   const unidadParaCuenta = escala.unidad;
   const fisicasEditadas = unidadesFisicasDe({
     cantidad: recibido === "" ? 0 : recibido,
-    sueltas: agrupaEsta && conSueltas ? sueltas || 0 : 0,
+    sueltas: agrupaEsta && usaSueltas ? sueltas || 0 : 0,
     unidad: unidadParaCuenta,
     factorPack: factor,
   });
@@ -337,7 +355,7 @@ export default function FichaProductoRecepcion({
     const r = await onRevisar?.({
       detalleId: d.id,
       recibido: recibido === "" ? null : recibido,
-      recibidoUnidadesSueltas: agrupaEsta && conSueltas ? sueltas || 0 : 0,
+      recibidoUnidadesSueltas: agrupaEsta && usaSueltas ? sueltas || 0 : 0,
       motivoPrincipal: motivos.length > 0 ? motivo : null,
       motivoDetalle: motivos.length > 0 && motivo === "Otro" ? detalleMotivo : null,
     });
@@ -498,20 +516,24 @@ export default function FichaProductoRecepcion({
         </div>
       )}
 
-      {/* ── EL PACK INCOMPLETO ────────────────────────────────────────────── */}
+      {/* ── EL PACK INCOMPLETO ──────────────────────────────────────────────
+          En el teléfono el campo está SIEMPRE; en escritorio sigue detrás del
+          botón, tal cual estaba. Ver `sueltasSiempreVisibles`. */}
       {puedeRecibir && agrupaEsta && (
         <div className="space-y-1.5">
-          <SunmiButton
-            color={conSueltas ? "primary" : "slate"}
-            aria-pressed={conSueltas}
-            onClick={() => {
-              setConSueltas((v) => !v);
-              if (conSueltas) setSueltas("");
-            }}
-          >
-            {ROTULO_SUELTAS}
-          </SunmiButton>
-          {conSueltas && (
+          {!sueltasSiempreVisibles && (
+            <SunmiButton
+              color={conSueltas ? "primary" : "slate"}
+              aria-pressed={conSueltas}
+              onClick={() => {
+                setConSueltas((v) => !v);
+                if (conSueltas) setSueltas("");
+              }}
+            >
+              {ROTULO_SUELTAS}
+            </SunmiButton>
+          )}
+          {usaSueltas && (
             <div>
               <div className="text-sm2 sunmi-text-muted mb-1">
                 Unidades sueltas, fuera de los bultos completos

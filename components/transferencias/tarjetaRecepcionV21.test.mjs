@@ -95,6 +95,24 @@ const linea = (extra = {}) => ({
 });
 
 /**
+ * LA MISMA LÍNEA, CORREGIDA: 6 packs enviados, 10 recibidos.
+ *
+ * Todas las afirmaciones de plata de este archivo —V21-4, V21-10 y V21-17—
+ * corrían sobre una línea sin contar o con recibido igual a enviado, y ahí
+ * `subtotal` y `subtotalRecibido` valen lo mismo: la afirmación no puede
+ * distinguir cuál se leyó. Por eso no vieron el defecto de la #191.
+ *
+ * 10 packs × $5.250 = $52.500, que es lo que `valorizarDetalle` devuelve y lo
+ * que el servidor suma para el total corregido del documento.
+ */
+const lineaCorregida = (extra = {}) =>
+  linea({
+    cantidadRecibida: 10,
+    subtotalRecibido: 52500,
+    ...extra,
+  });
+
+/**
  * Jamón cocido, 3,250 KG. El caso que motivó la tanda entera.
  *
  * No es un adorno: un contador de a uno no puede representar 3,250 y por eso la
@@ -176,6 +194,10 @@ test("V21-4. PENDIENTE: la referencia del remito y el caso feliz a un toque", ()
   assert.match(t, /\$31\.500,00/, "no está el importe de la línea");
   assert.match(t, new RegExp(TEXTO_COINCIDE.replace("✓", "✓")));
   assert.match(t, new RegExp(TEXTO_CORREGIR));
+
+  // Y LA MISMA LÍNEA CORREGIDA a 10 packs: el importe que se lee es el de 10.
+  const c = pintar(lineaCorregida());
+  assert.match(c, /\$52\.500,00/, "la tarjeta no muestra el importe de lo RECIBIDO");
 });
 
 test("V21-5. LA FILA 2 DICE QUÉ HAY, Y ES TEXTO", () => {
@@ -242,6 +264,12 @@ test("V21-10. REVISADO SE COLAPSA: nombre, cantidad, coincide y total", () => {
   // Y la barra a todo el ancho tampoco vuelve: era otra acción —desmarcar sin
   // tocar el conteo— y el panel la dejó sin uso.
   assert.doesNotMatch(t, /Volver a contar/, "el V21 sacó el botón de desmarcar");
+
+  // CORREGIDA Y COLAPSADA: un solo número, y es el de lo recibido. A 390 px no
+  // entra la flecha en ese renglón; el importe del remito se ve al abrir.
+  const c = pintar(lineaCorregida({ revisadoEnRecepcion: true }));
+  assert.match(c, /\$52\.500,00/, "la línea colapsada no muestra el importe de lo RECIBIDO");
+  assert.doesNotMatch(c, /\$31\.500,00/, "la línea colapsada sigue mostrando el del remito");
 });
 
 test("V21-10b. Y SE PUEDE VOLVER: una línea revisada se corrige DESDE EL TELÉFONO", () => {
@@ -381,4 +409,10 @@ test("V21-17. SIN PERMISO DE RECIBIR NO HAY NINGUNA ACCIÓN", () => {
   // Pero el dato se sigue viendo: mirar no es escribir.
   assert.match(t, /Pancho 24 Als/);
   assert.match(t, /\$31\.500,00/);
+
+  // Y sobre una corregida, sin permiso, también se ven los dos importes: el
+  // dato de que hubo corrección no depende de poder corregir.
+  const c = pintar(lineaCorregida(), { puedeRecibir: false });
+  assert.match(c, /\$52\.500,00/, "sin permiso se perdió el importe de lo RECIBIDO");
+  assert.match(c, /\$31\.500,00/, "sin permiso se perdió el importe del remito");
 });

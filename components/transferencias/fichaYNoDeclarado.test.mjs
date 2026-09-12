@@ -24,7 +24,7 @@ import { fileURLToPath } from "node:url";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import FichaProductoRecepcion from "./FichaProductoRecepcion.jsx";
+import FichaProductoRecepcion, { ROTULO_SUELTAS } from "./FichaProductoRecepcion.jsx";
 import {
   presentacionDeProductoNuevo,
   unidadDeProductoNuevo,
@@ -376,5 +376,59 @@ test("17. el catálogo del origen manda: la elección ya no puede pisarlo", () =
   assert.ok(
     !/contadoEn: unidad/.test(src),
     "la presentación volvió a depender de lo que el operador eligió"
+  );
+});
+
+// ── LOS DOS CAMPOS DEL DESGLOSE, Y DÓNDE ─────────────────────────────────
+//
+// En el teléfono el panel es el ÚNICO lugar donde se carga la cantidad: el V21
+// sacó el contador de la tarjeta. Esconder la mitad del desglose detrás de un
+// botón es pedirle al que tiene la mercadería en la mano que adivine que hay un
+// segundo campo. Se vio recibiendo la #191.
+//
+// En escritorio la pantalla es ancha y el botón deja el formulario corto, así
+// que ahí no cambia. El eje es `enHoja`, que ya existía y es presentación.
+
+test("EN HOJA · los dos campos están SIEMPRE, sin botón de por medio", () => {
+  const html = pintarFicha(lineaCajon(), { enHoja: true });
+  assert.ok(
+    valorDelCampo(html, "Unidades sueltas") !== null,
+    "en el teléfono el campo de sueltas no está visible de entrada"
+  );
+  assert.ok(
+    !html.includes(ROTULO_SUELTAS),
+    "quedó el botón «Hay unidades sueltas» en el camino del teléfono"
+  );
+  // Y el de la cantidad sigue estando: son DOS, no uno.
+  assert.ok(
+    valorDelCampo(html, "Cantidad recibida en CAJÓN x8") !== null,
+    "se perdió el campo de la cantidad"
+  );
+});
+
+test("EN ESCRITORIO · el botón sigue ahí y el segundo campo empieza oculto", () => {
+  // Esto es lo que hace que la huella de 1366 no se mueva por esta tanda.
+  const html = pintarFicha(lineaCajon());
+  assert.ok(html.includes(ROTULO_SUELTAS), "desapareció el botón de escritorio");
+  assert.equal(
+    valorDelCampo(html, "Unidades sueltas"),
+    null,
+    "en escritorio el campo de sueltas dejó de estar detrás del botón"
+  );
+});
+
+test("EN HOJA · lo que se escribe en sueltas CUENTA, no queda de adorno", () => {
+  // El defecto silencioso sería mostrar el campo y seguir mandando 0 porque la
+  // cuenta mira `conSueltas`, que en el teléfono nadie toca. Se afirma sobre el
+  // fuente porque un render a string no dispara el guardado.
+  const src = codigoDe("components/transferencias/FichaProductoRecepcion.jsx");
+  assert.ok(
+    !/agrupaEsta && conSueltas \? sueltas/.test(src),
+    "la cuenta volvió a mirar `conSueltas` en vez de `usaSueltas`"
+  );
+  assert.equal(
+    (src.match(/agrupaEsta && usaSueltas \? sueltas/g) || []).length,
+    2,
+    "las dos cuentas —la del ingreso físico y la del guardado— tienen que mirar lo mismo"
   );
 });
