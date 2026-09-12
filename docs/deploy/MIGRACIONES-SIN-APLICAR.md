@@ -20,6 +20,71 @@ Ninguna. Producción está en **10 migraciones**, las mismas que el árbol.
 
 ---
 
+## 2026-09-12 — `660ab51f`, el campo de cantidad al kit: CERO migraciones
+
+Producción pasó de `bca6da586657cfeb2a8f326eae6ad8223d787231` a
+`660ab51fe2dd9886f09607a8c792edbf8e884e46`. **Despliegue solo de código**, el
+QUINTO del día, y los cinco con corte de 2 segundos.
+
+El cero por los tres caminos: diff de `prisma/` vacío en el rango y
+`schema.prisma` sin tocar; clasificador con `--desde bca6da58…` en «Archivos a
+mirar: 0»; y `migrate deploy` contando **10**, el mismo número que el árbol del
+VPS. `migrate status` de cierre: 10 y «Database schema is up to date!». Bitácora
+de autorizaciones **inexistente**: nadie abrió la puerta de
+`DEPLOY_MIGRACION_AUTORIZADA`.
+
+### El marcador, con sus dos sentidos y su control
+
+La tanda saca el control de cantidad a `SunmiCampoCantidad` y con eso el marco
+deja de envolver a las tres piezas para envolver solo al número, así que el
+marcador se pudo armar en los dos sentidos sobre la misma clase:
+
+- **Presencia:** `min-w-0 rounded-lg`, el marco del kit, que se arma con el resto
+  interpolado — **0 archivos en la imagen vieja, 4 en la nueva**.
+- **Desaparición:** `min-w-0 flex-1 rounded-lg`, el literal completo que escribía
+  la ficha antes de la mudanza — **2 en la vieja, 0 en la nueva**.
+- **Control:** `flex items-center gap-1`, **219 en la vieja y 220 en la nueva**,
+  que prueba que la búsqueda encuentra cuando tiene que encontrar. Sube en uno
+  porque el contenedor del campo ahora vive en un archivo más.
+
+Las tres son CADENAS de clase, no identificadores, por el motivo que las entradas
+anteriores ya dejaron medido. Las dos mediciones se hicieron con `grep -rlF` en
+**contenedores descartables** de cada imagen, con `--network none`, nunca dentro
+del que atiende.
+
+### LO QUE ESTE DESPLIEGUE NO PUDO VERIFICAR, Y ES EL CARRITO
+
+La tanda toca `CarritoVenta`, que es la pantalla que cobra. **No existe huella del
+POS** —`generar-huellas.mjs` no tiene `/modulos/pos-ventas` ni PNG de referencia—
+y no se escribió una en esta tanda.
+
+Lo que hay en su lugar es más fuerte para un cambio de marcado y más débil para
+"la pantalla anda": el HTML que el kit produce con los props del carrito es
+**idéntico byte a byte** al de antes de la mudanza en los tres casos —escritorio,
+compacto y kg—, quitando los `aria-label`, que no ocupan lugar. Está congelado en
+`components/sunmi/sunmiCampoCantidad.test.mjs`.
+
+Y lo que NO se pudo afirmar desde acá: `/modulos/pos-ventas` contesta **200**,
+pero su HTML son 9.610 bytes de cascarón —cero apariciones de `pos-control`, de
+`Cantidad` y de `aria-label`—, porque el carrito se arma en el cliente detrás de
+sesión, turno y caja abierta. **Ese 200 prueba que la ruta se sirve, no que el
+carrito se dibuje.** Abrirlo de verdad necesita sesión y turno, y eso es una
+tanda aparte.
+
+### La sonda de cascada, antes y después
+
+**VERDE las dos veces** contra `https://operix.cloud/login`: 1647 reglas en la
+hoja, `1rem = 14px`, y las cuatro mediciones en su valor —3,5 y 10,5 para
+`SunmiButton`, 7 y 10,5 para `SunmiInput`—. La sonda de la tarjeta de producto
+**no aplica**: el rango no toca el catálogo, ni la tarjeta, ni `SunmiPanel`.
+
+Una nota de plomería para el próximo despliegue desde el VPS, que ahorra los
+veinte minutos que ya se pagaron dos veces: la sonda corre en la imagen
+`erpazul-test:estable`, que trae `chromium` con `CHROMIUM_USER_FLAGS=--no-sandbox`
+ya puesto, y necesita **`node --experimental-websocket`** porque su Node 20 no
+tiene `WebSocket` global. Con `--edge /usr/bin/chromium` y `--shm-size=1g` mide
+sin instalar nada en el host.
+
 ## 2026-09-12 — `bca6da58`, el − y el + afuera del marco: CERO migraciones
 
 Producción pasó de `05e324cc2c264b6e40f58bda5ab8f84a52bcba09` a
