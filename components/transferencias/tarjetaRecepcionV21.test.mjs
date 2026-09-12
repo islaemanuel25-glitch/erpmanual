@@ -519,9 +519,28 @@ test("V21-14. UNA LÍNEA POR PESO NOMBRA SU UNIDAD, Y NO LA DA POR OBVIA", () =>
   // así que la afirmación se mueve a donde la unidad se dice ahora: los dos
   // lados de la flecha. La regla no se aflojó; si alguno de los dos saliera
   // pelado, esto se pone rojo.
+  // ── Y CON TRES DECIMALES A LOS DOS LADOS DE LA FLECHA ─────────────────
+  //
+  // Decía "3,25 → 3,1 KG". La balanza pesa en gramos, así que el tercer decimal
+  // es un dato: `0,730` no es `0,73` redondeado. Y los DOS lados tienen que
+  // tener la misma precisión — el izquierdo salía de un formateador que no sabía
+  // la presentación, así que el renglón mostraba "3,25 → 3,100 KG", dos números
+  // de la misma frase con distinta exactitud.
   const t = pintar(lineaPeso({ cantidadRecibida: 3.1 }));
-  assert.match(t, /3,25 → 3,1 KG/, "la línea por peso perdió su unidad");
+  assert.match(t, /3,250 → 3,100 KG/, "la línea por peso perdió su unidad o su precisión");
   assert.doesNotMatch(t, /faltan|0,15/, "volvió la resta dicha en palabras");
+});
+
+test("V21-14b. EL PESO VA CON TRES DECIMALES, Y LA PLATA CON DOS", () => {
+  // Las dos mitades del mismo pedido, y la segunda es la que evita que el cambio
+  // se desborde: tres decimales son del PESO, no de los números en general.
+  const t = pintar(lineaPeso());
+  assert.match(t, /3,250 KG/, "el peso no muestra los tres decimales");
+  // Ningún importe con tres decimales. `$16.500,000` sería el desborde.
+  assert.doesNotMatch(t, /\$[\d.]+,\d{3}/, "un importe salió con tres decimales");
+  // Y los importes que hay están los dos en dos decimales.
+  const importes = t.match(/\$[\d.]+,\d\d/g) || [];
+  assert.ok(importes.length >= 1, `no se encontró ningún importe: ${t}`);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

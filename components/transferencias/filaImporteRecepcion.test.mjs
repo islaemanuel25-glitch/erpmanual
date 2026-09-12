@@ -240,28 +240,49 @@ test("F4. NUNCA HAY DOS COSTOS EN LA MISMA TARJETA", () => {
   // Es la prohibición central del pedido: una línea que salió en pack NO puede
   // mostrar además el costo de la unidad suelta.
   //
-  // ── EL V26 LO VOLVIÓ MÁS FUERTE, NO MÁS DÉBIL ─────────────────────────
+  // ── LO QUE ESTE CANDADO AFIRMA, Y LO QUE NO ───────────────────────────
   //
-  // Antes se contaban las apariciones de "Enviado … · $" y se exigía UNA. Con el
-  // costo unitario fuera del renglón del enviado, ese patrón no puede aparecer
-  // nunca, así que contar uno sería contar nada — verde sobre algo que no
-  // existe, que es el patrón del `conImporte`.
+  // Pasó por tres redacciones y conviene saber por qué, porque dos veces estuvo
+  // a punto de quedar verde sobre nada:
   //
-  // Ahora se cuentan los IMPORTES de la tarjeta, que es lo que el pedido decía:
-  // un solo número de plata por tarjeta pendiente.
-  for (const caso of [
-    linea(),
-    linea({ unidadEnviada: "UNIDAD", factorPack: 1 }),
-    linea({ unidadMedida: "cajon", factorPack: 8 }),
-    linea({ unidadMedida: "kg", unidadEnviada: "UNIDAD", factorPack: 1 }),
+  //   1. contaba "Enviado … · $" y exigía UNA. El V26 sacó el precio de ese
+  //      renglón, así que el patrón no podía aparecer nunca: contar uno era
+  //      contar nada.
+  //   2. contaba los IMPORTES y exigía UNO. La tanda del precio de la
+  //      presentación agregó el segundo A PROPÓSITO, así que ese conteo pasó a
+  //      prohibir lo que el diseño pide.
+  //
+  // Lo que la regla dice de verdad no cambió nunca: **una línea que salió en
+  // pack no puede mostrar el costo de la UNIDAD SUELTA en la tarjeta.** Los dos
+  // números que ahora tiene son el costo de la presentación y el total de la
+  // línea, que son cosas distintas y cada uno dice de qué es.
+  //
+  // El costo por unidad existe y se muestra —pero en el PANEL, pegado al campo
+  // de sueltas, que es el único lugar donde la unidad importa—. Que no se filtre
+  // a la tarjeta es lo que se afirma acá.
+  for (const [caso, unitario] of [
+    [linea(), 11400 / 6],
+    [linea({ unidadMedida: "cajon", factorPack: 8, precioCosto: 15200 }), 15200 / 8],
   ]) {
     const t = pintarMovil(caso);
-    assert.equal(
-      (t.match(/\$[\d.]+,\d\d/g) || []).length,
-      1,
-      `la tarjeta muestra más de un importe: ${t}`
+    // El precio por unidad, formateado como lo formatearía la pantalla.
+    const suelto = unitario.toLocaleString("es-AR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    assert.ok(
+      !t.includes(suelto),
+      `la tarjeta muestra el costo de la unidad suelta (${suelto}) bajo el rótulo del bulto: ${t}`
     );
+    // Y el sufijo del precio que SÍ muestra nombra la presentación, no la unidad.
+    assert.ok(!/\/ un\b/.test(t), `la tarjeta rotuló su precio como "/ un": ${t}`);
   }
+
+  // En UNIDAD y en KG los dos costos COINCIDEN, y eso es la verdad: ahí la unidad
+  // física ES la presentación. No hay nada que prohibir, y prohibirlo sería
+  // pedirle a la pantalla que oculte un número correcto.
+  const enUnidad = pintarMovil(linea({ unidadEnviada: "UNIDAD", factorPack: 1, precioCosto: 1983 }));
+  assert.match(enUnidad, /\/ un/, "una línea en UNIDAD tiene que rotular su precio por unidad");
 });
 
 // ── LA PRESENTACIÓN SALE DE LA FUENTE CANÓNICA ────────────────────────────
@@ -303,19 +324,31 @@ test("F6. Y EL IMPORTE NO SE RECALCULA: sale tal cual del endpoint", () => {
   // cuál se dibuja, y eso se exige por separado —F13, F14 y F15— sobre el
   // render, que es donde se ve.
   const fuente = codigoDe("components/transferencias/TarjetaRecepcionMovil.jsx");
-  // ── Y EL V26 SACÓ EL COSTO UNITARIO, QUE ERA EL TERCER NÚMERO ──────────
+  // ── EL PRECIO DE LA PRESENTACIÓN VOLVIÓ, Y CON RÓTULO ──────────────────
   //
-  // Exigía `formatearMoneda(d.precioCosto)` en el renglón del enviado. Ese
-  // renglón ya no lleva plata: el importe de la línea está abajo y en grande, y
-  // dos cifras en la misma tarjeta se leen como si una explicara a la otra.
+  // El V26 lo había sacado porque era un importe SIN rótulo compitiendo con el
+  // total por el mismo renglón. Volvió con el sufijo que lo hace inequívoco
+  // —"/ pack"—, que es lo que lo vuelve otra cosa y no el mismo defecto.
   //
-  // La afirmación se da vuelta y con eso dice MÁS: que el costo unitario no
-  // vuelva. Lo que el candado defiende —que los números salen del endpoint y la
-  // pantalla no multiplica— sigue abajo, intacto.
-  assert.doesNotMatch(
+  // Y `d.precioCosto` NO es la columna cruda: la ruta manda ahí
+  // `remito.costoPresentacion`. Que la pantalla lea ESE campo y no invente una
+  // división es lo que este candado defiende.
+  assert.match(
     fuente,
     /formatearMoneda\(d\.precioCosto\)/,
-    "volvió el costo unitario a la tarjeta"
+    "la tarjeta dejó de mostrar el precio de la presentación"
+  );
+  // Y el sufijo se DERIVA, no se escribe: una segunda tabla de nombres se
+  // separaría de la primera el día que una cambie.
+  assert.match(
+    fuente,
+    /unidadCortaDePresentacion\(envio\)/,
+    "el sufijo del precio se está escribiendo a mano"
+  );
+  assert.doesNotMatch(
+    fuente,
+    /"\/ pack"|'\/ pack'|"\/ cajón"|'\/ cajón'/,
+    "el sufijo del precio se escribió a mano en la tarjeta"
   );
   assert.match(fuente, /d\.subtotalRecibido/, "la tarjeta dejó de leer el importe recibido");
   assert.match(fuente, /d\.subtotal\b/, "la tarjeta dejó de leer el importe del remito");

@@ -851,11 +851,17 @@ for (const ancho of ANCHOS) {
     // render correcto.
     await afirmar(tCoincide.includes("Enviado"), "falta el rótulo del enviado");
     await afirmar(tCoincide.includes("10 UNIDAD"), "la referencia del remito está: 10 UNIDAD");
-    // V26 · el precio del remito se fue de este renglón: el importe ya está
-    // abajo a la derecha y en grande.
+    // ── V28 · EL PRECIO DE LA PRESENTACIÓN, CON SU SUFIJO ───────────────
+    //
+    // El V26 sacó de este renglón un importe SIN rótulo, que competía con el
+    // total de abajo sin decir cuál era cuál. El V28 lo trae de vuelta con el
+    // sufijo que lo hace inequívoco, derivado de la presentación.
+    //
+    // Es el número que se compara contra el remito del proveedor, y no estaba en
+    // ninguna parte de la pantalla.
     await afirmar(
-      !/10 UNIDAD\s*·\s*\$/.test(tCoincide),
-      "volvió el costo unitario al renglón del enviado"
+      /\$[\d.]+,\d\d \/ un\b/.test(tCoincide),
+      `la tarjeta en UNIDAD no muestra su precio por unidad: ${tCoincide}`
     );
     await afirmar(tCoincide.includes("✓ Coincide"), "el caso feliz se ofrece arriba a la derecha");
     await afirmar(tCoincide.includes("Corregir"), "y «Corregir» está en el pie");
@@ -880,6 +886,19 @@ for (const ancho of ANCHOS) {
     await afirmar(
       !tFaltante.includes("unidades físicas"),
       "volvió la fila de las unidades físicas"
+    );
+    // ── V28 · Y EL PRECIO ES EL DEL PACK, NO EL DE LA UNIDAD SUELTA ─────
+    //
+    // Es la regla que más importa de las dos: debajo de "PACK x24" el costo de
+    // una unidad es una afirmación falsa, no un redondeo. El sufijo tiene que
+    // nombrar la presentación de la línea.
+    await afirmar(
+      /\$[\d.]+,\d\d \/ pack\b/.test(tFaltante),
+      `la tarjeta en PACK no rotula su precio por pack: ${tFaltante}`
+    );
+    await afirmar(
+      !/\/ un\b/.test(tFaltante),
+      `la tarjeta en PACK rotuló su precio como «/ un»: ${tFaltante}`
     );
 
     // ── V26 · LO CONTADO SE DICE CON LA FLECHA ───────────────────────
@@ -1073,6 +1092,48 @@ for (const ancho of ANCHOS) {
 
     // El enviado, que ahora es la única referencia y va con peso.
     await afirmar(await hayTexto("Enviado"), "falta el rótulo del enviado en el panel");
+
+    // ── V28 · LOS DOS PRECIOS, Y CADA UNO EN SU LUGAR ───────────────────
+    //
+    // Arriba el de la PRESENTACIÓN —el que se compara contra el remito del
+    // proveedor—; pegado al campo de sueltas el de la UNIDAD, que es el único
+    // lugar donde la unidad importa: cuando llegaron 3 sueltas rotas y hay que
+    // descontarlas.
+    //
+    // Se mide la POSICIÓN y no solo la presencia: "está en la pantalla" no
+    // distingue "está donde va" de "está en el renglón equivocado", y el renglón
+    // equivocado es exactamente el defecto —el costo de la unidad debajo del
+    // rótulo del pack—.
+    const precios = await evaluar(`(() => {
+      const hoja = [...document.querySelectorAll('[role="dialog"]')]
+        .find((n) => n.getBoundingClientRect().height > 0);
+      if (!hoja) return null;
+      const nodo = (re) => [...hoja.querySelectorAll('*')]
+        .filter((n) => n.children.length === 0 && n.getBoundingClientRect().height > 0)
+        .find((n) => re.test((n.textContent || '').trim()));
+      const y = (n) => (n ? Math.round(n.getBoundingClientRect().top) : null);
+      return {
+        presentacion: y(nodo(/\\/ pack$/)),
+        unidad: y(nodo(/\\/ un$/)),
+        rotuloSueltas: y(nodo(/^Unidades sueltas$/)),
+      };
+    })()`);
+    await afirmar(
+      precios && precios.presentacion !== null,
+      `el panel no muestra el precio de la presentación: ${JSON.stringify(precios)}`
+    );
+    await afirmar(
+      precios.unidad !== null && precios.rotuloSueltas !== null,
+      `el panel no muestra el precio por unidad junto a las sueltas: ${JSON.stringify(precios)}`
+    );
+    await afirmar(
+      precios.unidad > precios.rotuloSueltas,
+      `el precio por unidad no está debajo del campo de sueltas: ${JSON.stringify(precios)}`
+    );
+    await afirmar(
+      precios.presentacion < precios.rotuloSueltas,
+      `el precio de la presentación no está arriba, con el enviado: ${JSON.stringify(precios)}`
+    );
 
     await afirmar(
       await hayTexto("✓ Revisado y seguir"),
@@ -1654,6 +1715,55 @@ for (const ancho of ANCHOS) {
     await tocarEnTarjeta(BUSQUEDA, "Corregir", { etiqueta: "corregir la línea por peso", exacto: true });
     await esperar(1200);
     await afirmar(await panelAbierto(), "el panel se abre también para una línea por peso");
+
+    // ── V28 · EL PESO VA CON TRES DECIMALES, TAMBIÉN EN EL CAMPO ─────────
+    //
+    // La balanza pesa en gramos, así que el tercer decimal es un dato de la
+    // báscula y no un resto de una división: `0,730` no es `0,73` redondeado.
+    // Medido contra producción: 96 líneas con tercer decimal distinto de cero.
+    //
+    // El campo lleva PUNTO y el rótulo COMA, y eso no es un descuido: es un
+    // `input type="number"`, donde "3,250" no es un valor válido. Ya era así con
+    // dos decimales; lo que iguala esta tanda es la cantidad de dígitos.
+    const campoDePeso = await evaluar(`(() => {
+      const c = [...document.querySelectorAll('input[type="number"]')]
+        .filter((n) => n.offsetParent !== null)[0];
+      return c ? { valor: c.value, etiqueta: c.getAttribute('aria-label') } : null;
+    })()`);
+    await afirmar(
+      campoDePeso && /\.\d{3}$/.test(campoDePeso.valor),
+      `el campo de una línea por peso no arranca con tres decimales: ${JSON.stringify(campoDePeso)}`
+    );
+    // ── LO QUE ESTE PASO NO PUEDE AFIRMAR, Y POR QUÉ ────────────────────
+    //
+    // El RÓTULO del enviado con tres decimales —"3,250 KG"— no se puede ejercer
+    // acá, y no es que falte: la única línea por peso que el sembrado tiene es
+    // este NO DECLARADO, y una línea agregada en recepción **no tiene remito**,
+    // así que su enviado dice "—" a propósito. Lo mismo con el precio de la
+    // presentación, que cuelga de ese mismo renglón.
+    //
+    // Afirmarlo igual habría dado rojo sobre un render correcto. Lo que cubre ese
+    // caso es el candado de render V28-1, que monta una línea por peso CON
+    // snapshot — la combinación que el sembrado no tiene.
+    //
+    // Queda anotado en `docs/architecture/base-de-pruebas-v15.md`: para ejercer el
+    // rótulo del peso en el panel hace falta sembrar una quinta línea, por KG y
+    // dentro del remito.
+    const plataDelPanel = await evaluar(`(() => {
+      const hoja = [...document.querySelectorAll('[role="dialog"]')]
+        .find((n) => n.getBoundingClientRect().height > 0);
+      if (!hoja) return null;
+      return ((hoja.innerText || '').match(/\\$[\\d.]+,\\d+/g) || []);
+    })()`);
+    await afirmar(
+      Array.isArray(plataDelPanel) && plataDelPanel.length > 0,
+      `no se encontró plata en el panel: ${JSON.stringify(plataDelPanel)}`
+    );
+    await afirmar(
+      plataDelPanel.every((s) => /,\d\d$/.test(s)),
+      `un importe del panel no está en dos decimales: ${JSON.stringify(plataDelPanel)}`
+    );
+
     await escribirEnCampo(0, "3.25");
     await esperar(600);
     await tocar("y seguir", { etiqueta: "guardar los 3,25 KG" });
@@ -1662,8 +1772,13 @@ for (const ancho of ANCHOS) {
     await afirmar(!(await panelAbierto()), "guardó y cerró: un no declarado no pide motivo");
     const tarjetaPeso = await textoDeTarjeta(BUSQUEDA);
     await afirmar(
-      tarjetaPeso.includes("3,25"),
-      "la tarjeta quedó con los 3,25 KG que se cargaron en el panel"
+      tarjetaPeso.includes("3,250"),
+      `la tarjeta no quedó con los 3,250 KG que se cargaron en el panel: ${tarjetaPeso}`
+    );
+    // Y en la TARJETA la plata también sigue en dos decimales.
+    await afirmar(
+      !/\$[\d.]+,\d{3}/.test(tarjetaPeso),
+      `un importe de la tarjeta salió con tres decimales: ${tarjetaPeso}`
     );
     await afirmar(
       !tarjetaPeso.includes("$0,00"),
