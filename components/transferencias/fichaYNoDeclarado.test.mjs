@@ -476,17 +476,32 @@ test("V23-1 · los dos campos tienen − y +, y el mínimo es 0", () => {
 });
 
 test("V23-2 · el bloque de plata se recalcula con lo tipeado, y no fabrica un cero", () => {
-  // Con diferencia: los tres renglones. 5 cajones de 8 son 40 contra 48.
-  const menos = pintarFicha(lineaCajon({ cantidadRecibida: 5 }), { enHoja: true });
-  assert.ok(menos.includes("Importe del remito"), "faltan los tres renglones de plata");
-  assert.ok(menos.includes("Importe corregido"));
-  assert.ok(menos.includes("Diferencia"));
+  // ── EL V26 LE SACÓ LOS RÓTULOS Y EL RENGLÓN DE LA RESTA ────────────────
+  //
+  // Eran tres renglones rotulados —"Importe del remito", "Importe corregido",
+  // "Diferencia"— y ahora son dos números: el del remito TACHADO arriba y el
+  // corregido abajo, en 22 px y en danger. Dos cifras, una tachada, ya dicen de
+  // cuánto a cuánto sin nombrarlo, y la resta es la resta de las dos.
+  //
+  // Lo que este candado defiende no cambió: que la plata se RECALCULE con lo que
+  // se está tipeando y que no aparezca un cero fabricado. Cambió cómo se lee.
 
-  // Sin diferencia: UNO solo. Repetir el mismo número tres veces con tres
-  // rótulos sugiere que pasó algo que no pasó.
+  // Con diferencia: los dos números, y el viejo tachado. 5 cajones de 8 son 40
+  // contra 48, y el remito son $48.000 contra $40.000 recibidos.
+  const menos = pintarFicha(lineaCajon({ cantidadRecibida: 5 }), { enHoja: true });
+  assert.ok(menos.includes("line-through"), "el importe del remito no está tachado");
+  assert.ok(menos.includes("$48.000,00"), "falta el importe del remito");
+  assert.ok(menos.includes("$40.000,00"), "falta el importe corregido");
+  assert.ok(menos.includes("sunmi-text-danger"), "el importe corregido no va en danger");
+  // Y ninguno de los tres rótulos vuelve: eran el texto que el V26 sacó.
+  for (const r of ["Importe del remito", "Importe corregido", "Diferencia"]) {
+    assert.ok(!menos.includes(r), `volvió el rótulo «${r}»`);
+  }
+
+  // Sin diferencia: UN solo número, sin tachado y sin danger.
   const igual = pintarFicha(lineaCajon({ cantidadRecibida: 6 }), { enHoja: true });
-  assert.ok(!igual.includes("Importe del remito"), "sin diferencia sobran los renglones");
-  assert.ok(igual.includes("Importe"), "sin diferencia igual tiene que decir cuánto vale");
+  assert.ok(igual.includes("$48.000,00"), "sin diferencia igual tiene que decir cuánto vale");
+  assert.ok(!igual.includes("line-through"), "tachó un importe que nadie corrigió");
 });
 
 test("V23-2b · UN NO DECLARADO NO SE VALORIZA EN $0,00 mientras se lo carga", () => {
@@ -518,34 +533,55 @@ test("V23-2b · UN NO DECLARADO NO SE VALORIZA EN $0,00 mientras se lo carga", (
 
 // ── V24 · EL PANEL SE ACORTA PARA QUE EL MOTIVO QUEPA ────────────────────
 
-test("V24-1 · «Enviado» va en UNA sola línea, con las físicas al lado", () => {
+test("V24-1 · «Enviado» va en UNA sola línea, y con PESO", () => {
   // Eran dos renglones y el de arriba no decía nada que el de abajo no dijera.
   // Con el panel más corto, el desplegable de motivo tiene lugar para abrirse
-  // hacia abajo — que es el defecto que esta tanda vino a cerrar.
+  // hacia abajo — que es el defecto que la tanda V24 vino a cerrar.
+  //
+  // ── EL V26 LE SACÓ LAS FÍSICAS Y LE SUBIÓ EL PESO ─────────────────────
+  //
+  // Decía "6 CAJÓN x8 · 48 unidades físicas". Las dos mitades son la misma
+  // cantidad, y la segunda en la escala en la que NO se cuenta. Y dejó de ser un
+  // subtítulo gris: es la referencia contra la que se cuenta, así que el rótulo
+  // va chico y gris y el dato en 15 semibold y en el color de la marca.
   const html = pintarFicha(lineaCajon(), { enHoja: true });
-  assert.ok(
-    html.includes("6 CAJÓN x8 · 48 unidades físicas"),
-    "«Enviado» no quedó en un renglón con sus unidades físicas"
-  );
+  assert.ok(html.includes("Enviado"), "se perdió el rótulo del enviado");
+  assert.ok(html.includes("6 CAJÓN x8"), "se perdió la referencia del remito");
+  assert.ok(!html.includes("unidades físicas"), "volvieron las físicas al renglón del enviado");
+  assert.ok(html.includes("text-base2"), "el dato del enviado no está en 15 px");
+  assert.ok(html.includes("sunmi-text-accent"), "el dato del enviado no está en el color de la marca");
 });
 
-test("V24-1b · en KG no cuelga un separador sin nada detrás", () => {
-  // `rotuloFisicoDeEnvio` devuelve null en KG, PIEZA y UNIDAD: llamarle
-  // "unidades físicas" a 3,250 KG es la mentira que ese helper evita. El
-  // renglón tiene que quedar con una sola mitad, no con un "·" colgando.
-  const html = pintarFicha(
-    lineaCajon({
+test("V24-1b · el teléfono NO dice unidades físicas en NINGUNA presentación", () => {
+  // ── DÓNDE VIVE LA REGLA, QUE NO ES ACÁ ────────────────────────────────
+  //
+  // Este candado nació para que en KG no colgara un "·" sin nada detrás:
+  // `rotuloFisicoDeEnvio` devuelve null en KG, PIEZA y UNIDAD porque llamarle
+  // "unidades físicas" a 3,250 KG es una mentira.
+  //
+  // Esa regla NO se aflojó y no depende de esta pantalla: vive en
+  // `rotuloFisicoDeEnvio`, con un candado por presentación en
+  // `presentacionEnvio.test.mjs` —UNIDAD, PACK, CAJÓN, KG y PIEZA—. Escritorio
+  // lo sigue usando y esos candados lo siguen cubriendo.
+  //
+  // Lo que este afirma ahora es lo NUEVO, y es más fuerte que lo anterior: en el
+  // teléfono las físicas no aparecen en ninguna presentación, ni siquiera donde
+  // decirlas sería cierto.
+  for (const [caso, extra] of [
+    ["CAJÓN", {}],
+    ["KG", {
       presentacionEnvio: "KG",
       factorPresentacion: null,
       factorPack: 1,
       unidadMedida: "kg",
       cantidadEnviada: 3.25,
       cantidadPresentada: 3.25,
-    }),
-    { enHoja: true }
-  );
-  assert.ok(!html.includes("unidades físicas"), "llamó «unidades físicas» a kilos");
-  assert.ok(!/·\s*<\/span>/.test(html), "quedó un separador sin nada detrás");
+    }],
+  ]) {
+    const html = pintarFicha(lineaCajon(extra), { enHoja: true });
+    assert.ok(!html.includes("unidades físicas"), `en ${caso} el teléfono dijo unidades físicas`);
+    assert.ok(!/·\s*<\/span>/.test(html), `en ${caso} quedó un separador sin nada detrás`);
+  }
 });
 
 test("V24-2 · los dos campos van al 35 % y NO llenan el ancho", () => {
@@ -567,10 +603,18 @@ test("V24-2b · el botón del stepper NO se achicó: lo que cede es el número",
   // El área tocable es lo único que no se negocia por espacio. El botón se queda
   // con el relleno del kit; lo que se apretó es el marco —sin `gap` ni padding
   // lateral propio—.
+  //
+  // El marco dejó de ser una cadena fija con el V26: ahora negocia su borde
+  // —2 px y danger cuando lo contado difiere—, así que se lo busca por la
+  // expresión y no por el literal. Un candado anclado al literal habría quedado
+  // rojo sobre un cambio que no toca lo que defiende.
   const src = codigoDe("components/transferencias/FichaProductoRecepcion.jsx");
-  const marco = src.match(/<span className="flex items-center[^"]*rounded-lg border[^"]*">/);
+  const marco = src.match(/className=\{`flex items-center rounded-lg \$\{[\s\S]{0,160}?`\}/);
   assert.ok(marco, "no se encontró el marco del campo con pasos");
   assert.ok(!/px-\d/.test(marco[0]), "el marco volvió a tener relleno lateral propio");
+  // Y las dos ramas del borde siguen siendo del kit, no colores escritos a mano.
+  assert.match(marco[0], /border-2 sunmi-border-danger/, "el borde de la diferencia no es del kit");
+  assert.match(marco[0], /border sunmi-divider/, "se perdió el borde normal del campo");
   // Y el botón sigue sin declarar padding: usa el del kit, que da 36 px de alto.
   assert.ok(
     !/aria-label=\{`Restar uno[\s\S]{0,200}px-0|py-0/.test(src),
@@ -589,89 +633,121 @@ test("V23-1b · la unidad ya NO va adentro de la caja, y el kit no quedó con un
   assert.ok(!/sufijo=/.test(ficha), "la ficha sigue pasando un prop que el kit ya no tiene");
 });
 
-// ── EL V25 CAMBIÓ LA CABEZA DE ESTE TEXTO, Y POR QUÉ ─────────────────────
+// ── LOS CINCO CANDADOS DEL RENGLÓN TEÑIDO Y DE LA EXPLICACIÓN: DE BAJA ───
 //
-// Estos dos afirmaban "40 de 48 · faltan 8" y "56 de 48 · sobran 8": los tres
-// números en unidades FÍSICAS, sobre una línea que se cuenta en CAJÓN x8. El
-// operador tenía 5 cajones en la mano y la pantalla le hablaba de 40.
+// Acá vivían V22-2y3, V22-3b, V25-R, V25-U y V22-4. Los cinco afirmaban TEXTO
+// del panel, y el V26 sacó los dos bloques que lo dibujaban:
 //
-// Ahora la cabeza va en la escala del conteo y la diferencia sigue en unidades,
-// con la palabra escrita —"faltan 8 unidades"— porque con la cabeza en cajones
-// un 8 pelado se leería como ocho cajones. No se aflojó nada: son las mismas
-// afirmaciones, sobre el texto que la pantalla dibuja hoy.
+//   · el renglón teñido —"5 CAJÓN x8 de 6 CAJÓN x8 · faltan 8 unidades"—, que
+//     decía el enviado que ya está arriba, lo contado que está en el campo, y la
+//     resta de los dos;
+//   · el párrafo "El envío sigue siendo CAJÓN x8. Las unidades sueltas solo
+//     explican un bulto abierto o una rotura", que es una regla del sistema y no
+//     un dato de esta línea.
+//
+// Con ellos se dio de baja `resultadoDeConteo`: quedó sin un solo consumidor,
+// que es el patrón del `conImporte`.
+//
+// ── QUÉ SE MIRÓ ANTES DE BORRARLOS, UNO POR UNO ─────────────────────────
+//
+// Un candado que solo afirma que un texto está se va con el texto. Uno que
+// defiende una regla se reescribe donde la regla vive ahora. De los cinco, solo
+// UNO defendía una regla:
+//
+//   · V25-R, "el resto de un bulto se dice como resto y nunca como fracción".
+//     Eso SÍ es una regla —5,958 packs es un número que no existe en el
+//     depósito— y su casa no era este renglón: es `conversionParaAdoptar`, con
+//     el candado 11d, "media unidad suelta no se puede representar y no se
+//     redondea". Sigue verde y sin tocar. Que la PANTALLA la respete se afirma
+//     ahora en la tarjeta, en V21-9.
+//
+//   · Los otros cuatro afirmaban la redacción: el formato corto, el sentido al
+//     derecho, el singular, y que una línea en UNIDAD conservara su texto. Sin
+//     renglón no hay redacción que defender.
+//
+// Lo que reemplaza a los cinco es más chico y está repartido: el campo en danger
+// —V26-1—, el importe tachado —V23-2— y que ninguna de las cadenas vuelva
+// —V26-2—.
 
-test("V22-2 y 3 · el resultado va TEÑIDO, corto y EN LA ESCALA DEL CONTEO", () => {
-  // Sin diferencia: fondo positivo y la cabeza en cajones, no en unidades.
+// ═══════════════════════════════════════════════════════════════════════════
+// V26 · LO QUE SE FUE, Y LO ÚNICO QUE QUEDÓ PARA DECIR LA DIFERENCIA
+// ═══════════════════════════════════════════════════════════════════════════
+
+test("V26-1 · el campo que difiere va en danger, el número Y el borde", () => {
+  // Es TODO lo que quedó para decir que hay una diferencia, junto con el importe
+  // tachado. Nada de texto explicándola.
+  const dif = pintarFicha(lineaCajon({ cantidadRecibida: 5 }), { enHoja: true });
+  assert.ok(dif.includes("border-2 sunmi-border-danger"), "el borde del campo no va en danger");
+  assert.ok(dif.includes("sunmi-text-danger"), "el número del campo no va en danger");
+
+  // Sin diferencia, el campo va normal: si se pintara siempre, el color no
+  // distinguiría nada — que es peor que no tenerlo.
   const igual = pintarFicha(lineaCajon({ cantidadRecibida: 6 }), { enHoja: true });
-  assert.ok(
-    igual.includes("6 CAJÓN x8 de 6 CAJÓN x8 · sin diferencia"),
-    "no está el formato corto en la escala del conteo"
-  );
-  assert.ok(!igual.includes("48 de 48"), "volvió a hablar en unidades físicas");
-  assert.ok(igual.includes("sunmi-state-success"), "el bloque no se tiñe de positivo");
-  assert.ok(!igual.includes("Ingreso físico:"), "quedó el texto largo de escritorio");
-
-  // Con diferencia: danger. 5 cajones contra 6, y faltan 8 unidades.
-  const menos = pintarFicha(lineaCajon({ cantidadRecibida: 5 }), { enHoja: true });
-  assert.ok(
-    menos.includes("5 CAJÓN x8 de 6 CAJÓN x8 · faltan 8 unidades"),
-    "el resultado no dice la diferencia en la escala del conteo"
-  );
-  assert.ok(menos.includes("sunmi-state-danger"), "el bloque no se tiñe de danger");
+  assert.ok(!igual.includes("border-2 sunmi-border-danger"), "pintó un campo que coincide");
+  assert.ok(igual.includes("border sunmi-divider"), "el campo normal perdió su borde");
 });
 
-test("V22-3b · cuando SOBRA se dice al derecho, y el singular se respeta", () => {
-  const sobra = pintarFicha(lineaCajon({ cantidadRecibida: 7 }), { enHoja: true });
-  assert.ok(
-    sobra.includes("7 CAJÓN x8 de 6 CAJÓN x8 · sobran 8 unidades"),
-    "un sobrante se está diciendo como falta"
-  );
-  assert.ok(!sobra.includes("faltan"), "dice 'faltan' sobre un sobrante");
-});
-
-test("V25-R · el resto de un bulto se dice como resto, y nunca como fracción", () => {
-  // Lo que la cabeza nueva tiene que resolver y la vieja no tenía: un conteo que
-  // no cae redondo. 5 cajones y 3 sueltas son 43 físicas contra 48.
-  //
-  // "5,375 CAJÓN x8" sería un número que no existe en el depósito, y es
-  // exactamente el error de exactitud que todo este modelo evita.
-  const resto = pintarFicha(
-    lineaCajon({ cantidadRecibida: 5, recibidoUnidadesSueltas: 3 }),
-    { enHoja: true }
-  );
-  assert.ok(
-    resto.includes("5 CAJÓN x8 + 3 de 6 CAJÓN x8 · faltan 5 unidades"),
-    "el resto del bulto no se está diciendo"
-  );
-  assert.ok(!resto.includes("5,375"), "apareció una fracción de cajón");
-});
-
-test("V25-U · una línea en UNIDAD conserva el texto de siempre", () => {
-  // La escala de conteo YA era la física, así que acá no había nada que
-  // arreglar. Este candado existe para que el arreglo de los agrupados no se
-  // lleve puesto el caso más común del ERP.
+test("V26-1b · un NO DECLARADO no se pinta en danger: no contradice a nadie", () => {
+  // Una agregada no tiene remito contra el cual compararse, así que nunca
+  // difiere. Pintarla de rojo diría que algo está mal cuando lo único que pasa
+  // es que llegó mercadería de más. Es el mismo criterio que el `$0,00` de la
+  // #195: no inventar un defecto donde hay un hecho.
   const html = pintarFicha(
     lineaCajon({
-      unidadEnviada: "UNIDAD",
-      unidadMedida: "unidad",
-      factorPack: 1,
-      presentacionEnvio: null,
-      cantidadEnviada: 48,
-      cantidadRecibida: 47,
+      agregadoEnRecepcion: true,
+      cantidadEnviada: 0,
+      cantidadPresentada: 0,
+      subtotal: 0,
+      costoUnitarioFisico: 125,
+      cantidadRecibida: 3,
     }),
     { enHoja: true }
   );
-  assert.ok(html.includes("47 de 48 · falta 1"), "cambió el texto de una línea en UNIDAD");
-  assert.ok(!html.includes("falta 1 unidad"), "se coló el sufijo de los agrupados");
+  assert.ok(!html.includes("border-2 sunmi-border-danger"), "pintó en rojo un no declarado");
 });
 
-test("V22-4 · la línea de explicación nombra la presentación de la línea", () => {
-  const html = pintarFicha(lineaCajon(), { enHoja: true });
-  assert.ok(
-    html.includes("El envío sigue siendo CAJÓN x8."),
-    "la explicación no sale de la presentación de la línea"
-  );
-  assert.ok(html.includes("bulto abierto o una rotura"));
+test("V26-2 · ninguna de las cadenas que el V26 sacó sobrevive en el panel", () => {
+  // Por TEXTO y sobre los dos estados. Un rediseño que saca prosa deja fácil una
+  // rama olvidada que la sigue dibujando en el caso que nadie miró.
+  for (const [caso, linea] of [
+    ["coincide", lineaCajon({ cantidadRecibida: 6 })],
+    ["difiere", lineaCajon({ cantidadRecibida: 5 })],
+  ]) {
+    const html = pintarFicha(linea, { enHoja: true });
+    for (const t of [
+      "sin diferencia",
+      "faltan",
+      "sobran",
+      "Ingreso físico",
+      "unidades físicas",
+      "El envío sigue siendo",
+      "bulto abierto o una rotura",
+      "Pendiente de revisar",
+      "Sin categoría",
+      "Importe del remito",
+      "Importe corregido",
+      "Diferencia",
+      "Marcar",
+    ]) {
+      assert.ok(!html.includes(t), `en «${caso}» el panel sigue diciendo «${t}»`);
+    }
+  }
+});
+
+test("V26-3 · el panel queda en CINCO elementos, y el código de barras no es uno", () => {
+  // El subtítulo llevaba categoría y código de barras. No ayudan a contar, y en
+  // el celular empujaban los campos —lo único que hay que tocar— más abajo.
+  const html = pintarFicha(lineaCajon({ cantidadRecibida: 5 }), { enHoja: true });
+  assert.ok(!html.includes("7790895000997"), "quedó el código de barras en la hoja");
+
+  // Y lo que SÍ tiene que estar, los cinco: el enviado, los dos campos, el
+  // importe, el motivo y el botón.
+  assert.ok(html.includes("Enviado"), "falta el enviado");
+  assert.ok(html.includes("6 CAJÓN x8"), "falta la referencia del remito");
+  assert.equal((html.match(/w-35p/g) || []).length, 2, "faltan los dos campos");
+  assert.ok(html.includes("$40.000,00"), "falta el importe");
+  assert.ok(html.includes("Motivo de la diferencia"), "falta el motivo");
+  assert.ok(html.includes("y seguir"), "falta el botón");
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -783,11 +859,18 @@ test("V25-4b · y escritorio NO lo lleva: ahí taparía la fila siguiente", () =
 
 test("V22-5 · el botón cambia de nombre Y de color según haya diferencia", () => {
   const igual = pintarFicha(lineaCajon({ cantidadRecibida: 6 }), { enHoja: true });
-  assert.ok(igual.includes("✓ Marcar revisado y seguir"));
+  // El V26 les sacó dos palabras: "Marcar" no agrega nada al tilde que ya está
+  // adelante, y "diferencia" la dicen el campo en rojo y el importe tachado.
+  // Lo que el candado defiende —que el nombre Y el color sigan al hecho— no
+  // cambió. El color es lo que más importa acá: nació de que `amber` era un
+  // alias de `primary` y el cambio existía en el código y no en la pantalla.
+  assert.ok(igual.includes("✓ Revisado y seguir"));
+  assert.ok(!igual.includes("Marcar"), "volvió la palabra que el V26 sacó");
   assert.ok(igual.includes("sunmi-btn-primary"), "sin diferencia el botón no es el de acción");
 
   const dif = pintarFicha(lineaCajon({ cantidadRecibida: 5 }), { enHoja: true });
-  assert.ok(dif.includes("✓ Guardar diferencia y seguir"));
+  assert.ok(dif.includes("✓ Guardar y seguir"));
+  assert.ok(!dif.includes("Guardar diferencia"), "volvió la palabra que el V26 sacó");
   // `warning` y NO `amber`: `.sunmi-btn-amber` es la misma regla que
   // `.sunmi-btn-primary` —las dos pintan `--pos-accent`—, así que pedir `amber`
   // para distinguirse de `primary` dejaba los dos botones del mismo color en los
@@ -798,23 +881,47 @@ test("V22-5 · el botón cambia de nombre Y de color según haya diferencia", ()
 
 // ── Y EL OTRO LADO: ESCRITORIO NO SE MUEVE ───────────────────────────────
 
-test("V22-E · escritorio conserva TODO lo que el V22 cambió en el teléfono", () => {
+// ── ESTE CANDADO SE DIO VUELTA CON EL V26, Y ES LA PARTE QUE IMPORTA ─────
+//
+// Afirmaba por AUSENCIA: que escritorio NO tuviera las cadenas del teléfono
+// —"40 de 48 · faltan 8", el bloque teñido, "El envío sigue siendo"—.
+//
+// El V26 sacó esas tres cadenas del TELÉFONO. O sea que ya no existen en ningún
+// lado, y una afirmación de ausencia sobre algo que no existe en ninguna parte
+// queda verde para siempre sin defender nada. Es exactamente el patrón del
+// `conImporte`: doce candados montando una prop que nadie pasaba.
+//
+// Así que ahora afirma lo que de verdad importa y lo que de verdad puede
+// romperse: que escritorio SIGA teniendo lo suyo. Cada una de estas cosas se la
+// puede llevar puesta una tanda del teléfono por descuido, y eso es lo que hay
+// que atrapar.
+test("V22-E · escritorio conserva TODO lo suyo, tanda tras tanda del teléfono", () => {
   const html = pintarFicha(lineaCajon({ cantidadRecibida: 5 }));
+
   // El botón de las sueltas, y el campo detrás de él.
   assert.ok(html.includes(ROTULO_SUELTAS), "desapareció el botón de escritorio");
   assert.equal(valorDelCampo(html, "Unidades sueltas"), null, "el campo dejó de estar oculto");
-  // El rótulo viejo, no el de la presentación.
+  // Su rótulo, que no es el de la presentación del teléfono.
   assert.ok(html.includes(">Recibido<"), "escritorio perdió su rótulo «Recibido»");
-  assert.ok(!html.includes("CAJÓN x8 completos"), "se filtró el rótulo del teléfono");
-  // El texto largo, sin teñir.
+  // Su texto largo de ingreso físico.
   assert.ok(html.includes("Ingreso físico:"), "escritorio perdió su línea de ingreso físico");
-  assert.ok(!html.includes("40 de 48 · faltan 8"), "se filtró el formato corto del teléfono");
-  assert.ok(!html.includes("sunmi-state-danger"), "se filtró el bloque teñido del teléfono");
-  // La explicación es del teléfono.
-  assert.ok(!html.includes("El envío sigue siendo"), "se filtró la explicación del teléfono");
+  // Las unidades físicas secundarias, que el V26 sacó SOLO del teléfono. Acá es
+  // donde vive el consumidor de `rotuloFisicoDeEnvio` que queda.
+  assert.ok(html.includes("48 unidades físicas"), "escritorio perdió las unidades físicas");
+  // El subtítulo y el estado, que el V26 sacó SOLO del teléfono.
+  assert.ok(html.includes("Sin categoría"), "escritorio perdió el subtítulo");
+  assert.ok(html.includes("Pendiente de revisar"), "escritorio perdió el estado");
   // Y el botón sigue en ámbar con su texto de siempre.
   assert.ok(html.includes("sunmi-btn-amber"), "escritorio cambió el color del botón");
+  assert.ok(html.includes("Marcar como revisado"), "escritorio perdió su texto de botón");
   assert.ok(!html.includes("y seguir"), "se filtró el texto del teléfono");
+
+  // Y lo del teléfono que NO puede filtrarse hacia acá. Éstas sí siguen siendo
+  // afirmaciones de ausencia legítimas, porque las cadenas EXISTEN en el
+  // teléfono: si aparecieran acá, escritorio se movió.
+  assert.ok(!html.includes("CAJÓN x8 completos"), "se filtró el rótulo del teléfono");
+  assert.ok(!html.includes("sticky bottom-0"), "se filtró el pie anclado del teléfono");
+  assert.ok(!html.includes("line-through"), "se filtró el importe tachado del teléfono");
 });
 
 test("EN HOJA · lo que se escribe en sueltas CUENTA, no queda de adorno", () => {
