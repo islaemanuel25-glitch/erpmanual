@@ -20,6 +20,49 @@ Ninguna. Producción está en **10 migraciones**, las mismas que el árbol.
 
 ---
 
+## 2026-09-12 — `bca6da58`, el − y el + afuera del marco: CERO migraciones
+
+Producción pasó de `05e324cc2c264b6e40f58bda5ab8f84a52bcba09` a
+`bca6da586657cfeb2a8f326eae6ad8223d787231`. **Despliegue solo de código**, el
+CUARTO del día, y los cuatro con corte de 2 segundos.
+
+El cero por los tres caminos: diff de `prisma/` vacío y `schema.prisma` sin
+tocar; clasificador con `--desde 05e324cc…` en «Archivos a mirar: 0»; y
+`migrate deploy` contando **10**, el mismo número que el árbol del VPS.
+`migrate status` de cierre: 10 y «Database schema is up to date!». Bitácora de
+autorizaciones **vacía**.
+
+### EL PASO 0 ATRAPÓ UN DESPLIEGUE QUE NO HABRÍA DESPLEGADO NADA
+
+Es el caso exacto para el que ese paso existe, así que queda anotado con nombre.
+
+La tanda anterior se trabajó **sobre `main` en vez de sobre una rama**, y al
+cerrarla se corrió `git push origin feat/peso-tres-decimales-y-precio-presentacion`.
+Ese comando empuja la **rama local de ese nombre**, que seguía en `2ecc9fa4` — no
+los dos commits nuevos, que estaban en `main` local. El push contestó sin error y
+el informe dijo «empujado». **Era falso: `bca6da58` no existía en ningún ref
+remoto**, comprobado con `git branch -r --contains`.
+
+Si el paso 0 no hubiera estado, el despliegue habría corrido entero contra la
+imagen de `ac525fc3` y los cinco valores habrían coincidido —en el commit viejo—,
+que es textualmente el episodio del 2026-08-14 que motivó el paso.
+
+Lo que lo atrapó fue `SIN_EMPUJAR` = 2 contra `origin/main`. Se empujó `main` y se
+volvió a empezar desde el paso 0, como el documento indica.
+
+### El marcador, esta vez con los dos sentidos y su control
+
+- **Presencia:** `min-w-0 flex-1 rounded-lg`, la clase del marco nuevo que rodea
+  solo al número — **0 archivos en la vieja, 2 en la nueva**.
+- **Desaparición:** `flex items-center rounded-lg`, el marco viejo que envolvía a
+  las tres piezas — **2 en la vieja, 0 en la nueva**.
+- **Control:** `flex items-center gap-1`, 219 en las dos, que prueba que la
+  búsqueda encuentra cuando tiene que encontrar.
+
+Los tres son CADENAS de clase, no identificadores. El despliegue anterior dejó
+anotado por qué importa: un identificador se minifica y da vacío en las dos
+imágenes, así que no afirma nada.
+
 ## 2026-09-12 — `05e324cc`, peso con tres decimales y los dos precios: CERO migraciones
 
 Producción pasó de `ebc60b2405f858ac3688134b385ec863f121bc0b` a
