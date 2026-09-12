@@ -17,6 +17,11 @@ así.
   escrituras y qué NO cubre.
 - [themes.md](themes.md) — tres capas de tema apiladas y quién gana.
 - [despliegue.md](despliegue.md) — por qué el VPS no construye.
+- [base-de-pruebas-v15.md](base-de-pruebas-v15.md) — la base descartable
+  `erpazul_v15`, cómo se recrea y las trampas del arnés.
+- [permisos-y-directorios-del-vps.md](permisos-y-directorios-del-vps.md) — qué
+  rutas de afuera del repo se usan, dónde quedó configurado el acceso, y por qué
+  las 57 reglas `allow` del proyecto no están sirviendo.
 
 ## Lo que todavía no tiene mapa
 
