@@ -569,24 +569,66 @@
   border-color: color-mix(in srgb, var(--pos-accent) 60%, transparent);
 }
 
-/* Contorno del acento: el MISMO token que `accent-soft`, sin relleno.
-   Existe porque la tarjeta de recepción del teléfono tiene dos acciones en la
-   misma tarjeta —"✓ Coincide" y "Corregir"— y con las dos rellenas pesaban
-   igual. No agrega ningún color: `--pos-accent` ya lo resuelve el tema.
+/* ══════════════════════════════════════════════════════════════════════════
+   LAS DOS ACCIONES DE LA TARJETA DE RECEPCIÓN
 
-   ── TIENE QUE QUEDAR DEBAJO DEL BLOQUE DE COLORES ─────────────────────
-   `SunmiButton` agrega su `sunmi-btn-<color>` igual, así que las dos reglas
-   conviven con la misma especificidad y decide el orden de esta hoja. Está
-   medido y exigido por `variantesDeAccion.test.mjs`: si alguien la sube arriba
-   de `.sunmi-btn-cyan`, el candado se pone rojo en vez de que el botón cambie
-   de color sin que nadie se entere. */
+   Existen porque esa tarjeta tiene DOS acciones juntas —"✓ Coincide" y
+   "Corregir"— y con las dos rellenas del mismo modo pesaban igual. Una va de
+   contorno y la otra con relleno tenue.
+
+   ── EL ACENTO NO PINTA EL TEXTO, Y ESTO ESTÁ MEDIDO ─────────────────────
+
+   La primera versión ponía `color: var(--pos-accent)`, que es lo que hace
+   `accent-soft`. `scripts/sonda-acciones-recepcion.mjs` lo midió en los catorce
+   temas y falla en varios: `#d97706` sobre la tarjeta blanca de `sunmiLight` y
+   de `ambarCaja` da **3,19** contra el mínimo 4,5 de WCAG para texto normal, y
+   sobre las tarjetas teñidas baja hasta 2,08.
+
+   No es un caso raro: es el mismo problema que `globals.css` ya resolvió para
+   `--pos-warning`, con el comentario al lado —"el ámbar de los oscuros da 2,15
+   sobre este fondo blanco: no se leía"—. Un acento sirve para SEÑALAR, no para
+   escribir encima.
+
+   Así que el texto usa `--app-fg`, que es el par que cada tema garantiza contra
+   su propio fondo, y el acento queda donde se lee sin leerse: el contorno y el
+   relleno. El diseño pide "borde en color de acción" y eso se conserva.
+
+   ── Y EL CONTORNO VA MEZCLADO ───────────────────────────────────────────
+
+   `var(--pos-accent)` pelado tampoco llega a 3,0 —el mínimo de WCAG 1.4.11 para
+   un objeto gráfico— sobre las tarjetas teñidas de los temas claros. Se lo
+   corre hacia el color de texto, que es la misma técnica que usa el bloque de
+   controles de productos y por el mismo motivo. Sigue siendo el acento: cambia
+   cuánto, no cuál.
+
+   ── TIENEN QUE QUEDAR DEBAJO DEL BLOQUE DE COLORES ──────────────────────
+
+   `SunmiButton` agrega su `sunmi-btn-<color>` igual, así que las reglas conviven
+   con la misma especificidad y decide el orden de esta hoja. Lo exige
+   `variantesDeAccion.test.mjs`: si alguien las sube arriba de `.sunmi-btn-cyan`,
+   el candado se pone rojo en vez de que el botón cambie de color sin que nadie
+   se entere.
+   ══════════════════════════════════════════════════════════════════════════ */
 .sunmi-btn-accent-outline {
-  background: transparent;
-  border: 1px solid var(--pos-accent);
-  color: var(--pos-accent);
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--pos-accent) 72%, var(--app-fg));
+  color: var(--app-fg);
 }
 .sunmi-btn-accent-outline:hover {
   background: color-mix(in srgb, var(--pos-accent) 12%, transparent);
+}
+
+/* La hermana rellena. NO se reusó `accent-soft` —que ya existe y hace casi
+   esto— porque `accent-soft` pinta el texto con el acento y la usan diez
+   pantallas: cambiarle el color las movería a todas, y la regla del kit es que
+   la pantalla de donde sale una pieza queda IDÉNTICA. */
+.sunmi-btn-accent-suave {
+  background: color-mix(in srgb, var(--pos-accent) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pos-accent) 45%, transparent);
+  color: var(--app-fg);
+}
+.sunmi-btn-accent-suave:hover {
+  border-color: color-mix(in srgb, var(--pos-accent) 70%, transparent);
 }
 
 .sunmi-btn-link-soft {
