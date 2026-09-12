@@ -886,8 +886,39 @@ export default function FichaProductoRecepcion({
 
       {error && <SunmiAviso tono="warning">{error}</SunmiAviso>}
 
+      {/* ── EL PIE VA ANCLADO EN LA HOJA ────────────────────────────────────
+          EL DEFECTO, MEDIDO: a 390×440 —el teléfono con el teclado grande
+          abierto— el contenido no entra y el botón de guardar quedaba ABAJO del
+          borde de la pantalla. Medido con `botonAVariasAlturas`: top 443 en un
+          viewport de 440, en los dos estados. No se podía tocar.
+
+          Ya pasaba antes del V25: no lo causó reservar el alto del motivo, y
+          por eso reservar más tampoco lo arreglaba. Lo que faltaba era anclar.
+
+          `sticky bottom-0` adentro del cuerpo del modal, que el kit ya dibuja
+          con `overflow-y-auto`: el contenido scrollea POR DETRÁS y el botón se
+          queda pegado abajo.
+
+          El fondo NO es decoración: sin él se leería el importe a través de los
+          botones. Va `sunmi-surface`, que es `--app-bg` y es el único token
+          OPACO en los catorce temas —`--card-bg` es translúcido en `sunmiDark`,
+          que es el del Sunmi—. Es la misma lección que el desplegable de motivo.
+
+          No se usa el slot `footer` del kit, que sería lo estructuralmente
+          correcto, porque los botones dependen del estado interno de la ficha
+          —motivo, cantidad, error, el handler de guardar— y sacarlos a
+          `RecepcionMovil` es un refactor de otra tanda. Anotado.
+
+          Solo en la hoja. En escritorio la ficha vive dentro de un listado que
+          scrollea entero y un pie pegajoso ahí taparía la fila siguiente. */}
       {puedeRecibir && (
-        <div className="flex flex-wrap gap-2">
+        <div
+          className={
+            enHoja
+              ? "sticky bottom-0 sunmi-surface pt-2 pb-1 flex flex-wrap gap-2"
+              : "flex flex-wrap gap-2"
+          }
+        >
           {/* ── EL COLOR DICE QUÉ SE ESTÁ POR GUARDAR ──────────────────────
               En la hoja: color de acción cuando la línea coincide —es el cierre
               normal— y warning cuando hay una diferencia, que es lo que hace

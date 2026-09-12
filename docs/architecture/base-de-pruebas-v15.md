@@ -78,31 +78,44 @@ Producción sigue en el 3000 y no se toca. Al terminar:
 dentro del contenedor, así que hace falta
 `docker run --rm -v …:/app alpine rm -rf /app/.next`—.
 
-## PENDIENTE: a 440 px de alto el botón de guardar queda fuera de pantalla
+## RESUELTO: el botón de guardar quedaba fuera de pantalla a 440 px
 
-**Descubierto midiendo el V25 el 2026-09-12. No está arreglado y no es de esa
-tanda: pasa igual con el código anterior.**
+**Encontrado midiendo el V25 el 2026-09-12 y arreglado en la misma tanda.** Se
+deja escrito porque el número es lo que hace útil el candado.
 
-La hoja de corrección no ancla su pie. Mientras el contenido entra, el botón «✓
-Guardar diferencia y seguir» no se mueve —medido a 640 y a 520 px, cero
-píxeles—. Cuando NO entra, el botón se corre y se va abajo del borde:
+La hoja de corrección no anclaba su pie. Mientras el contenido entraba, el botón
+«✓ Guardar diferencia y seguir» no se movía —medido a 640 y 520 px—. Cuando NO
+entraba, se corría y se iba abajo del borde:
 
 - con el código anterior al V25: 383 px → 443 px, en un viewport de 440;
-- con las dos reservas del V25 puestas: 419 px → 443 px.
+- con las dos reservas de alto del V25: 419 px → 443 px.
 
-O sea que reservar alto redujo el salto de 60 a 24 px y **no resuelve este
-caso**: con el teclado grande abierto el botón queda afuera en los dos estados.
-Lo que hace falta ahí es anclar el pie de la hoja, que es un cambio de
-composición y no de reserva.
+O sea que reservar alto bajó el salto de 60 a 24 px y **no resolvía este caso**.
+Lo que faltaba era anclar: `sticky bottom-0` sobre la fila de acciones, adentro
+del cuerpo del modal que el kit ya dibuja con `overflow-y-auto`. El contenido
+scrollea por detrás.
 
-El arnés lo mide y lo imprime en cada corrida —`botonAVariasAlturas`—, pero a
-440 px **no lo afirma**, a propósito: afirmarlo pondría en rojo algo que la
-tanda no rompió. A 640 y 520 sí lo afirma.
+Medido después: **379 → 379 en las tres alturas, siempre dentro del viewport.**
+El anclaje se llevó puesto también el residuo de 24 px, porque el botón ya no
+depende de cuánto crezca lo de arriba.
 
-Y el residuo de 24 px tiene nombre: el renglón teñido de resultado, que con el
-texto nuevo —«4 PACK x24 de 6 PACK x24 · faltan 48 unidades»— pasa a dos líneas
-a 390 px de ancho. Reservarlo obliga a decidir si ese bloque va SIEMPRE en dos
-líneas, y eso cambia una forma aprobada en el V22.
+El fondo del pie va en `sunmi-surface` —`--app-bg`—, el único token opaco en los
+catorce temas. `--card-bg` es translúcido en `sunmiDark`, que es el del Sunmi:
+usarlo habría dejado leer el importe a través de los botones. Es la misma
+lección que el desplegable de motivo.
+
+**El arnés lo afirma en las tres alturas, incluida 440**, y tiene contraprueba:
+sacando el `sticky` da rojo con «top 426, viewport 440».
+
+**Pendiente menor, anotado:** los botones deberían ir en el slot `footer` del
+kit, que es el anclaje estructural de verdad. No se hizo porque dependen del
+estado interno de la ficha —motivo, cantidad, error, el handler de guardar— y
+sacarlos a `RecepcionMovil` es un refactor propio.
+
+Y el residuo de 24 px a 440 px de alto —el renglón teñido que pasa a dos líneas
+con el texto nuevo— **se deja a propósito**: decisión de Emanuel el 2026-09-12,
+porque cerrarlo obligaría a cambiar una forma aprobada en el V22 a cambio de 24
+píxeles en un caso donde el botón ya no se mueve.
 
 ## PENDIENTE: el panel de escritorio necesita su propio planteo
 

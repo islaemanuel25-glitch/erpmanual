@@ -740,6 +740,47 @@ test("V25-3c · escritorio NO reserva nada: ahí el bloque aparece y desaparece"
   assert.ok(dif.includes("Motivo de la diferencia"), "escritorio perdió el motivo");
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// V25-4 · EL PIE DE LA HOJA VA ANCLADO
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// EL DEFECTO, MEDIDO: a 390×440 —el teléfono con el teclado grande abierto— el
+// contenido no entra y el botón de guardar quedaba ABAJO del borde: top 443 en
+// un viewport de 440, en los dos estados. No se podía tocar.
+//
+// Ya pasaba antes del V25, así que no lo causó reservar el alto del motivo y
+// reservar más tampoco lo arreglaba. Lo que faltaba era anclar.
+//
+// Este candado mira el MARCADO. Que el botón quede DENTRO del viewport lo mide
+// el arnés de 390 px en las tres alturas, y esa es la mitad que tiene los
+// números. Las dos hacen falta.
+
+test("V25-4 · en la hoja el pie es pegajoso y tiene fondo OPACO", () => {
+  const html = pintarFicha(lineaCajon({ cantidadRecibida: 6 }), { enHoja: true });
+  const pie = html.slice(0, html.indexOf("y seguir")).lastIndexOf("<div");
+  const apertura = html.slice(pie, html.indexOf("y seguir"));
+
+  assert.match(apertura, /sticky/, "el pie de la hoja no queda anclado abajo");
+  assert.match(apertura, /bottom-0/, "el pie está pegajoso pero no contra el borde de abajo");
+
+  // El fondo NO es decoración: sin él se lee el importe a través de los botones
+  // mientras el contenido scrollea por detrás.
+  //
+  // Y tiene que ser `sunmi-surface` —`--app-bg`— que es el único token opaco en
+  // los catorce temas. `--card-bg` es translúcido en `sunmiDark`, que es el del
+  // Sunmi: usarlo acá sería el defecto del desplegable de motivo otra vez.
+  assert.match(apertura, /sunmi-surface/, "el pie anclado no tiene fondo opaco");
+});
+
+test("V25-4b · y escritorio NO lo lleva: ahí taparía la fila siguiente", () => {
+  const html = pintarFicha(lineaCajon({ cantidadRecibida: 6 }));
+  const pie = html.slice(0, html.indexOf("Marcar como revisado")).lastIndexOf("<div");
+  const apertura = html.slice(pie, html.indexOf("Marcar como revisado"));
+
+  assert.ok(!/sticky/.test(apertura), "escritorio se llevó el pie pegajoso del teléfono");
+  assert.ok(!/sunmi-surface/.test(apertura), "escritorio se llevó el fondo del pie del teléfono");
+});
+
 test("V22-5 · el botón cambia de nombre Y de color según haya diferencia", () => {
   const igual = pintarFicha(lineaCajon({ cantidadRecibida: 6 }), { enHoja: true });
   assert.ok(igual.includes("✓ Marcar revisado y seguir"));

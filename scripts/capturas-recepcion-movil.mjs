@@ -1124,26 +1124,36 @@ for (const ancho of ANCHOS) {
     // entra el botón se corre — y no se corre un poco: se va abajo del borde.
     // Por eso las dos afirmaciones y no una. La de la posición sola habría dado
     // verde en dos de los tres altos y el caso que duele es el tercero.
-    // ── EL BOTÓN, DONDE LA MEDICIÓN NO ES DEGENERADA ─────────────────────
+    // ── EL BOTÓN: SIEMPRE VISIBLE, EN LAS TRES ALTURAS ───────────────────
     //
     // A 640 y 520 px —el Sunmi real, con y sin teclado chico— el botón no se
-    // mueve y queda dentro de la pantalla. Ahí es donde se usa.
+    // mueve. Ese cero es de la reserva de alto del V25.
     //
-    // A 440 px NO se afirma, y conviene saber por qué: con el teclado grande
-    // abierto el contenido no entra y el botón queda afuera en los DOS estados,
-    // también antes de esta tanda —medido: 383 → 443 con el código viejo, 419 →
-    // 443 con la reserva puesta—. Lo que hace falta ahí es anclar el pie, no
-    // reservar alto. Es un pendiente anotado, y afirmarlo acá sería poner en
-    // rojo algo que esta tanda no rompió.
+    // A 440 px —teclado grande abierto— el botón SÍ se corre, y se deja así: el
+    // residuo son 24 px del renglón teñido que pasa a dos líneas, y cerrarlo
+    // obligaría a cambiar una forma aprobada en el V22. Decisión tomada.
+    //
+    // Lo que NO se deja pasar a ninguna altura es que el botón quede FUERA de la
+    // pantalla. Eso pasaba —medido, top 443 en un viewport de 440, en los dos
+    // estados y también con el código anterior al V25— y lo arregló anclar el
+    // pie de la hoja con `sticky bottom-0`. Se afirma en las tres, incluida 440.
     for (const h of [640, 520]) {
       await afirmar(
         botonSinDiferencia[h].top === botonConDiferencia[h].top,
         `a ${h} px el botón de guardar se corrió: ${botonSinDiferencia[h].top} px → ` +
           `${botonConDiferencia[h].top} px. El dedo va hacia él y toca otra cosa.`
       );
+    }
+    for (const h of ALTURAS_DE_TELEFONO) {
+      await afirmar(
+        botonSinDiferencia[h].dentro,
+        `a ${h} px el botón de guardar quedó FUERA de la pantalla con la línea ` +
+          `coincidiendo (top ${botonSinDiferencia[h].top}, viewport ${h}). No se puede tocar.`
+      );
       await afirmar(
         botonConDiferencia[h].dentro,
-        `a ${h} px el botón de guardar quedó abajo del borde de la pantalla.`
+        `a ${h} px el botón de guardar quedó FUERA de la pantalla con una diferencia ` +
+          `escrita (top ${botonConDiferencia[h].top}, viewport ${h}). No se puede tocar.`
       );
     }
 
