@@ -68,6 +68,7 @@ import {
 import {
   descriptorDeEnvio,
   rotuloConSueltas,
+  unidadCortaDePresentacion,
   unidadDeDiferencia,
 } from "@/lib/transferencias/presentacionEnvio";
 
@@ -405,11 +406,29 @@ export default function TarjetaRecepcionMovil({
               {correccionPendiente}
             </p>
           ) : (
-            <p className="flex items-baseline gap-2 break-words">
+            <p className="flex items-baseline gap-2 flex-wrap break-words">
               <span className="text-xs sunmi-text-muted shrink-0">Enviado</span>
               <span className="text-base2 font-semibold tabular-nums sunmi-text-accent">
                 {rotuloConSueltas(envio)}
               </span>
+              {/* ── EL PRECIO DE LA PRESENTACIÓN ───────────────────────────
+                  El V26 le sacó a este renglón el importe SIN rótulo, que
+                  competía con el total de abajo sin decir cuál era cuál. Vuelve
+                  con el sufijo que lo hace inequívoco: "/ pack" dice de qué es.
+
+                  Sale de `d.precioCosto` del DTO, que NO es la columna cruda: la
+                  ruta manda ahí `remito.costoPresentacion`, el costo de la
+                  presentación que este renglón rotula. Y el sufijo se deriva de
+                  la presentación, no se escribe a mano.
+
+                  En UNIDAD y en KG este número coincide con el costo unitario
+                  físico, y está bien que coincida: ahí la unidad física ES la
+                  presentación. */}
+              {d.precioCosto != null && (
+                <span className="text-xs tabular-nums sunmi-text-muted shrink-0">
+                  · {formatearMoneda(d.precioCosto)} / {unidadCortaDePresentacion(envio).toLowerCase()}
+                </span>
+              )}
             </p>
           )}
         </div>

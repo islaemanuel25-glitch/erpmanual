@@ -54,6 +54,7 @@ import {
   origenDePresentacion,
 } from "@/lib/transferencias/adopcionDePresentacion";
 import {
+  decimalesDeCantidad,
   descriptorDeEnvio,
   escalaDeEnvio,
   nombreDePresentacion,
@@ -63,6 +64,31 @@ import {
   unidadCortaDePresentacion,
   unidadDeDiferencia,
 } from "@/lib/transferencias/presentacionEnvio";
+
+/**
+ * EL VALOR QUE ARRANCA EN EL CAMPO, CON LA PRECISIÓN DEL PESO.
+ *
+ * ── POR QUÉ NO SE USA EL FORMATEADOR DEL RÓTULO ─────────────────────────
+ *
+ * Porque esto va adentro de un `input type="number"`, y ahí el valor tiene que
+ * ser un número en formato HTML: separador PUNTO y sin miles. `0,730` no es un
+ * valor válido y el navegador lo descarta.
+ *
+ * Así que el campo dice `0.730` y el rótulo de arriba dice `0,730`. Esa
+ * diferencia de separador ya existía —el campo decía `0.73`— y no la introduce
+ * la precisión nueva: decir que se van a ver iguales sería falso. Lo que sí
+ * queda igual es cuántos dígitos se ven, que es el pedido.
+ *
+ * `toFixed(3)` solo en KG: sobre una cantidad de packs daría "6.000".
+ */
+function enEscalaDelCampo(valor, presentacion) {
+  if (valor == null || valor === "") return "";
+  const v = Number(valor);
+  if (!Number.isFinite(v)) return "";
+  return decimalesDeCantidad(presentacion) > 0
+    ? v.toFixed(decimalesDeCantidad(presentacion))
+    : String(v);
+}
 
 /** El BOTÓN de escritorio, que revela el campo. En el teléfono ya no existe. */
 export const ROTULO_SUELTAS = "Hay unidades sueltas";
@@ -168,11 +194,15 @@ const TONO_ESTADO = Object.freeze({
  * El color no va solo: el importe de abajo también pasa a danger y muestra el
  * del remito tachado. Un color por sí mismo no se lee, pero acá no está solo.
  */
-function CampoConPasos({ valor, onCambiar, etiqueta, difiere = false }) {
+function CampoConPasos({ valor, onCambiar, etiqueta, difiere = false, decimales = 0 }) {
   const paso = (delta) => {
     const n = Number(valor === "" ? 0 : valor);
     const base = Number.isFinite(n) ? n : 0;
-    onCambiar(String(Math.max(0, base + delta)));
+    const nuevo = Math.max(0, base + delta);
+    // `decimales` conserva el relleno del peso al tocar el − y el +. Sin esto,
+    // un toque al + sobre "0.730" dejaba "1.73": el campo perdía la precisión
+    // justo con el control que existe para no tener que tipear.
+    onCambiar(decimales > 0 ? nuevo.toFixed(decimales) : String(nuevo));
   };
 
   // ── EL MARCO SE APRETÓ, PERO EL ÁREA TOCABLE NO ─────────────────────────
@@ -289,7 +319,7 @@ export default function FichaProductoRecepcion({
       d?.cantidadRecibida == null ? descriptorDeEnvio(d || {}).cantidad : d.cantidadRecibida;
     const s = Number(d?.recibidoUnidadesSueltas || 0);
     return {
-      recibido: String(propuesto ?? ""),
+      recibido: enEscalaDelCampo(propuesto, descriptorDeEnvio(d || {}).presentacion),
       sueltas: s > 0 ? String(s) : "",
       conSueltas: s > 0,
       motivo: d?.motivoPrincipal || "",
@@ -602,11 +632,32 @@ export default function FichaProductoRecepcion({
               Y deja de ser un subtítulo gris: es la referencia contra la que se
               cuenta, así que el rótulo va chico y gris y el dato va en 15
               semibold y en el color de la marca. */}
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-baseline gap-2 flex-wrap">
             <span className="text-xs sunmi-text-muted shrink-0">Enviado</span>
             <span className="min-w-0 text-base2 font-semibold tabular-nums sunmi-text-accent truncate">
               {d.agregadoEnRecepcion ? "—" : rotuloConSueltas(envio)}
             </span>
+            {/* ── EL PRECIO DE LA PRESENTACIÓN ─────────────────────────────
+                Es el número que se compara contra el remito del proveedor, y no
+                estaba en ninguna parte de la pantalla: solo estaba el total de
+                la línea. "$132.000,00" son los 15 packs juntos; lo que hace
+                falta para controlar es cuánto vale UNO.
+
+                Sale de `d.precioCosto`, y acá hay una trampa que conviene saber:
+                ese campo del DTO **no es** la columna cruda. La ruta hace
+                `precioCosto: remito.costoPresentacion`, o sea el costo de la
+                presentación que este mismo renglón rotula. La columna persistida
+                es otra cosa y no se expone.
+
+                El sufijo se DERIVA de la presentación con `unidadCortaDePresentacion`
+                —pack, cajón, un, kg, pieza—, no se escribe a mano: escribirlo
+                sería una segunda tabla de nombres que el día que cambie una va a
+                decir algo distinto que la otra. */}
+            {!d.agregadoEnRecepcion && d.precioCosto != null && (
+              <span className="text-xs tabular-nums sunmi-text-muted shrink-0">
+                · {formatearMoneda(d.precioCosto)} / {unidadCortaDePresentacion(envio).toLowerCase()}
+              </span>
+            )}
           </div>
 
           {/* ── LOS DOS CAMPOS, AL 35 % Y CON UN HUECO EN EL MEDIO ───────
@@ -629,6 +680,7 @@ export default function FichaProductoRecepcion({
                   onCambiar={setRecibido}
                   etiqueta={`Cantidad recibida en ${nombreDePresentacion(envio)}`}
                   difiere={campoDifiere}
+                  decimales={decimalesDeCantidad(envio.presentacion)}
                 />
               ) : (
                 <div className="font-mono tabular-nums sunmi-text-strong">
@@ -645,7 +697,11 @@ export default function FichaProductoRecepcion({
                 <div className="text-sm2 sunmi-text-muted truncate">{ROTULO_SUELTAS_CAMPO}</div>
                 {/* `difiere` va en los DOS campos, porque los dos suman al total
                     que difiere: marcar solo el de completos diría que las
-                    sueltas están bien cuando puede ser al revés. */}
+                    sueltas están bien cuando puede ser al revés.
+
+                    Y las sueltas NO llevan decimales de peso: son unidades
+                    enteras de un bulto abierto. Este campo solo existe cuando la
+                    presentación agrupa, y KG nunca agrupa. */}
                 {puedeRecibir ? (
                   <CampoConPasos
                     valor={sueltas}
@@ -656,6 +712,26 @@ export default function FichaProductoRecepcion({
                 ) : (
                   <div className="font-mono tabular-nums sunmi-text-strong">
                     {fmtCantidad(d.recibidoUnidadesSueltas || 0)}
+                  </div>
+                )}
+
+                {/* ── EL PRECIO POR UNIDAD, Y SOLO ACÁ ────────────────────
+                    Éste es el otro de los dos costos, y sale de
+                    `d.costoUnitarioFisico`: el de UNA unidad de stock, no el del
+                    pack. Los dos ya vienen calculados del endpoint; ninguno se
+                    divide en la pantalla.
+
+                    Va pegado a este campo y a ningún otro lado, porque es acá y
+                    solo acá donde la unidad importa: cuando llegaron 3 sueltas
+                    rotas y hay que descontarlas. Arriba, debajo de "PACK x10",
+                    el costo de la unidad suelta sería una afirmación falsa —es el
+                    defecto que la #191 ya pagó una vez—.
+
+                    Puede dar decimales largos —$9,114583… en el Pancho x24—;
+                    `formatearMoneda` lo lleva a dos, como toda la plata. */}
+                {d.costoUnitarioFisico != null && (
+                  <div className="text-xs2 tabular-nums sunmi-text-muted truncate">
+                    {formatearMoneda(d.costoUnitarioFisico)} / un
                   </div>
                 )}
               </div>
