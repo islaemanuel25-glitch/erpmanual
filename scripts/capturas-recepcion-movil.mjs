@@ -640,6 +640,29 @@ for (const ancho of ANCHOS) {
       "el motivo salió de la tarjeta: ahora es del panel"
     );
 
+    // ── LOS DOS IMPORTES, QUE ES EL DEFECTO DE LA #191 ─────────────────
+    //
+    // Esta línea nace con recepción cargada y diferencia: 4 packs de 6 más 3
+    // sueltas son 27 físicas contra 24 enviadas. El remito vale 4 × $1.800 y lo
+    // recibido 27 × $300. Los dos números tienen que verse, con la flecha en el
+    // medio — hasta la #191 la tarjeta mostraba solo el del remito.
+    await afirmar(
+      tSueltas.includes("$7.200,00"),
+      "no está el importe del REMITO en una línea corregida"
+    );
+    await afirmar(
+      tSueltas.includes("$8.100,00"),
+      "no está el importe de lo RECIBIDO en una línea corregida"
+    );
+    await afirmar(tSueltas.includes("→"), "no está la flecha que marca la corrección");
+
+    // Y sobre una que coincide, un solo número y NINGUNA flecha: la flecha diría
+    // que hubo una corrección que no hubo.
+    await afirmar(
+      !tCoincide.includes("→"),
+      "apareció la flecha sobre una línea que coincide"
+    );
+
     // El punto de partida del avance, para que el "se movió" del paso 3 tenga
     // contra qué compararse. Sin esto, afirmar "2 / 4" más adelante no dice si
     // el número cambió o si ya estaba así.
@@ -764,6 +787,17 @@ for (const ancho of ANCHOS) {
       trasCorregir.includes("4 PACK x24"),
       "y la TARJETA se actualizó con lo que se guardó en el panel"
     );
+    // El IMPORTE también, que es lo que la #191 no hacía: 6 packs enviados por
+    // $31.500 corregidos a 4, que valen $21.000. La línea quedó revisada y
+    // colapsada, y ahí va UN solo número — el de lo recibido.
+    await afirmar(
+      trasCorregir.includes("$21.000,00"),
+      "el importe de la tarjeta no siguió a la cantidad corregida"
+    );
+    await afirmar(
+      !trasCorregir.includes("$31.500,00"),
+      "la línea colapsada sigue mostrando el importe del remito"
+    );
     // Dos: la que coincidió y ésta. El numerador es `revisados + noDeclarados`
     // y el denominador `totalFisico`, que es la misma fuente del tab "Todos".
     await afirmar(
@@ -801,9 +835,28 @@ for (const ancho of ANCHOS) {
     console.log("\n  PASO 5 · el pack incompleto");
     await tocarEnTarjeta(SUELTAS, "Corregir", { etiqueta: "corregir el pack incompleto", exacto: true });
     await esperar(1200);
+    // ── LOS DOS CAMPOS, SIN BOTÓN DE POR MEDIO ────────────────────────
+    //
+    // Antes acá se afirmaba que estuviera el botón "Hay unidades sueltas". En el
+    // teléfono ese botón ya no existe: el panel es el único lugar donde se carga
+    // la cantidad y esconder la mitad del desglose detrás de un toque es pedirle
+    // al que tiene la mercadería en la mano que adivine que hay un segundo
+    // campo. En escritorio el botón sigue, y eso lo afirma `fichaYNoDeclarado`.
     await afirmar(
-      await hayTexto("Hay unidades sueltas"),
-      "el panel sí sabe desglosar bultos y sueltas, que es lo que el contador no podía"
+      !(await hayTexto("Hay unidades sueltas")),
+      "quedó el botón de sueltas en el camino del teléfono"
+    );
+    const camposDelPanel = await evaluar(`(() => {
+      const vis = [...document.querySelectorAll('input[type="number"]')].filter((n) => n.offsetParent !== null);
+      return vis.map((n) => n.getAttribute('aria-label') || '(sin etiqueta)');
+    })()`);
+    await afirmar(
+      Array.isArray(camposDelPanel) && camposDelPanel.length >= 2,
+      `el panel del teléfono tiene que abrir con los DOS campos; abrió con ${camposDelPanel?.length}: ${JSON.stringify(camposDelPanel)}`
+    );
+    await afirmar(
+      camposDelPanel.some((e) => /sueltas/i.test(e)),
+      "ninguno de los campos visibles es el de las unidades sueltas"
     );
     // Por "Seleccionar" y no por el rótulo: "Motivo de la diferencia" es el
     // `div` de la etiqueta, y el disparador del select es un botón aparte cuyo
