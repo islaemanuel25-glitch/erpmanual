@@ -277,7 +277,7 @@ const cierreTrabado = () =>
   evaluar(`(() => {
     const b = [...document.querySelectorAll('button')]
       .filter((n) => n.offsetParent !== null)
-      .find((n) => (n.textContent || '').includes('Confirmar recepción'));
+      .find((n) => (n.textContent || '').includes('Confirmar'));
     if (!b) return 'SIN BOTON';
     return b.disabled === true;
   })()`);
@@ -551,13 +551,17 @@ for (const ancho of ANCHOS) {
     );
     await afirmar(await cierreTrabado(), "el cierre arranca TRABADO");
     await afirmar(
-      await hayTexto("1 diferencia sin motivo"),
-      "y el aviso dice CUÁNTAS diferencias sin motivo hay"
+      await hayTexto("Total"),
+      "la barra de cierre rotula el total y nada más"
+    );
+    await afirmar(
+      !(await hayTexto("Falta revisar")),
+      "el V16 sacó el aviso de la barra: el avance ya está arriba"
     );
 
     // ── PASO 1 · COINCIDE, DE UN TOQUE ─────────────────────────────────
     console.log("\n  PASO 1 · tocar «Coincide»");
-    await tocarEnTarjeta(COINCIDE, "✓ Coincide", { etiqueta: "el botón Coincide" });
+    await tocarEnTarjeta(COINCIDE, "✓ Coincide", { etiqueta: "la acción Coincide" });
     await esperar(2500);
     await afirmar(
       !(await hayTexto(COINCIDE)) || (await textoDeTarjeta(COINCIDE)).includes("Volver a contar"),
@@ -624,11 +628,58 @@ for (const ancho of ANCHOS) {
       "con todo revisado y todos los motivos puestos, el botón de confirmar SE DESTRABÓ"
     );
     await afirmar(
-      await hayTexto("Todo revisado"),
-      "y el aviso lo dice: ya no queda nada que impida confirmar"
+      await hayTexto("Confirmar"),
+      "y el botón de confirmar sigue en la barra"
     );
 
-    desbordes += await foto("V15-secuencia-final", ancho);
+    // ── PASO 7 · EL NO DECLARADO, SIN MODAL (V16) ──────────────────────
+    //
+    // Los tres defectos que salieron de usarlo con la #195: que el importe no
+    // salga en $0,00, que no ofrezca "Coincide", y que agregarlo no abra
+    // ningún modal.
+    console.log("\n  PASO 7 · el no declarado, sin modal");
+
+    // Se escribe en el MISMO buscador de la pantalla. Antes había que escribir
+    // acá, tocar un botón, y volver a escribir lo mismo adentro de un modal.
+    await escribirEnBuscador(BUSQUEDA);
+    await esperar(2500);
+    await afirmar(
+      await hayTexto("No figura en esta transferencia"),
+      "el aviso de que no figura es una línea y dice qué hacer"
+    );
+    await afirmar(await hayTexto("EN EL CATÁLOGO"), "los resultados del catálogo salen en la misma lista");
+
+    const modalesAntes = await evaluar(
+      `document.querySelectorAll('[role="dialog"]').length`
+    );
+    await afirmar(modalesAntes === 0, "buscar en el catálogo NO abre ningún modal");
+
+    // Tocar la fila agrega la línea. Sin segundo tipeo y sin panel.
+    await tocar("Agregar +", { etiqueta: "la fila del catálogo" });
+    await esperar(3000);
+    const modalesDespues = await evaluar(
+      `document.querySelectorAll('[role="dialog"]').length`
+    );
+    await afirmar(modalesDespues === 0, "agregar desde el catálogo NO abre ningún modal");
+
+    await afirmar(await hayTexto("No declarado"), "la línea cayó como no declarada");
+    // Se busca por el NOMBRE del producto, que es único en la pantalla. Anclar
+    // en "No declarado" agarraba el renglón del estado, que no es la tarjeta.
+    const tarjetaAgregada = await textoDeTarjeta(BUSQUEDA);
+    await afirmar(
+      tarjetaAgregada.includes("Cargá la cantidad que llegó"),
+      "la tarjeta nace en cero y dice qué hacer"
+    );
+    await afirmar(
+      !tarjetaAgregada.includes("Coincide"),
+      "el no declarado NO ofrece Coincide: no hay contra qué comparar"
+    );
+    await afirmar(
+      tarjetaAgregada.includes("Ingreso físico"),
+      "en su lugar el pie dice cuánto entró"
+    );
+
+    desbordes += await foto("V16-secuencia-final", ancho);
     console.log(`\n  ${afirmaciones} afirmaciones, todas en verde.`);
   }
 
