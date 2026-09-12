@@ -81,6 +81,65 @@ test("el alto se MIDE, y no se mide cuando la lista todavía no tiene ancho", ()
   assert.match(fuente, /cancelAnimationFrame/, "el frame pedido no se cancela al cerrar");
 });
 
+// ── Y EL FONDO DEL MENÚ ES OPACO ─────────────────────────────────────────
+//
+// Segundo defecto de la misma pantalla: `--card-bg` es TRANSLÚCIDO en dos temas
+// —`rgba(2, 6, 23, 0.6)` en `sunmiDark`, que es el del Sunmi—, así que el menú
+// dejaba leer el importe por detrás de las opciones justo cuando hay que elegir
+// el motivo, que es obligatorio para guardar una diferencia.
+//
+// Una tarjeta translúcida está bien: lo que deja pasar es el fondo de la página.
+// Un menú flota sobre CONTENIDO, así que lo que deja pasar es texto.
+//
+// Este candado lee la hoja y corre en la suite, sin navegador. El alfa calculado
+// en los catorce temas lo mide `scripts/sonda-acciones-recepcion.mjs`: son dos
+// preguntas distintas —qué declara la hoja y qué pinta el navegador— y ninguna
+// reemplaza a la otra.
+
+const hoja = fs.readFileSync(path.join(RAIZ, "styles/sunmi.css"), "utf8");
+const reglaDelMenu = (hoja.match(/\.sunmi-select-dropdown\s*\{[^}]*\}/) || [""])[0];
+
+test("el menú declara una base OPACA, no el token translúcido a secas", () => {
+  assert.ok(reglaDelMenu, "no se encontró la regla del desplegable");
+  assert.match(
+    reglaDelMenu,
+    /background-color:\s*var\(--app-bg\)/,
+    "el menú no apoya sobre una base opaca"
+  );
+  // El color de la tarjeta se conserva, pero como CAPA sobre la base. Si volviera
+  // a ser el `background` entero, el menú vuelve a ser translúcido.
+  assert.doesNotMatch(
+    reglaDelMenu,
+    /background:\s*var\(--card-bg\)/,
+    "volvió el fondo translúcido: `background: var(--card-bg)` a secas"
+  );
+  assert.match(
+    reglaDelMenu,
+    /background-image:\s*linear-gradient\(var\(--card-bg\), var\(--card-bg\)\)/,
+    "se perdió la capa que conserva el color de la tarjeta"
+  );
+});
+
+test("y la base que usa ES opaca en los catorce temas", () => {
+  // `--app-bg` tiene que seguir siendo un hex en los catorce. Si algún tema lo
+  // pasara a `rgba(...)` con alfa, la base dejaría de ser base y el menú
+  // volvería a ser translúcido sin que nadie tocara esta regla.
+  const globals = fs.readFileSync(path.join(RAIZ, "app/globals.css"), "utf8");
+  const bloques = [
+    ...globals.matchAll(/(html\[data-theme="[^"]+"\]|html:not\(\[data-theme\]\))[^{]*\{([^}]*)\}/g),
+  ];
+  const conFondo = bloques
+    .map(([, sel, cuerpo]) => [sel, (cuerpo.match(/--app-bg:\s*([^;]+);/) || [])[1]])
+    .filter(([, v]) => v);
+  assert.ok(conFondo.length >= 14, `solo ${conFondo.length} temas definen --app-bg`);
+  const translucidos = conFondo.filter(([, v]) => !v.trim().startsWith("#"));
+  assert.deepEqual(
+    translucidos.map(([s]) => s),
+    [],
+    "hay temas cuyo --app-bg no es un color opaco: el menú apoyaría sobre nada"
+  );
+});
+
 test("el desplegable sigue en un portal y por encima de todo", () => {
   // Lo que ya funcionaba y esta tanda no puede romper: si la lista dejara de ir
   // en un portal, el `overflow` de la hoja la volvería a recortar — que es el

@@ -375,9 +375,29 @@ try {
     const medido = await evaluar(`(() => {
       const h = document.documentElement;
       const raiz = getComputedStyle(h);
+      // El alfa del fondo del menú del desplegable. Se monta una sonda con la
+      // clase real —no se reescriben sus colores— y se lee lo CALCULADO.
+      let menu = null;
+      {
+        let probeta = document.getElementById('sonda-menu');
+        if (!probeta) {
+          probeta = document.createElement('div');
+          probeta.id = 'sonda-menu';
+          probeta.className = 'sunmi-select-dropdown';
+          document.body.appendChild(probeta);
+        }
+        const cs = getComputedStyle(probeta);
+        const m = (cs.backgroundColor || '').match(/rgba?\\(([^)]+)\\)/);
+        if (m) {
+          const p = m[1].split(',').map((x) => Number(x.trim()));
+          menu = p.length > 3 ? p[3] : 1;
+        }
+      }
+
       const cabecera = {
         tema: h.getAttribute('data-theme') || '(default)',
         accent: raiz.getPropertyValue('--pos-accent').trim(),
+        menu,
       };
       const salida = [];
       for (const b of document.querySelectorAll('[data-sonda]')) {
@@ -488,6 +508,28 @@ try {
       } else {
         renglones.push(`    ✓ los dos botones del panel se distinguen entre sí (${entreSi})`);
       }
+    }
+
+    // ── EL MENÚ DEL DESPLEGABLE TIENE QUE SER OPACO ────────────────────
+    //
+    // `--card-bg` es translúcido en dos temas —`rgba(2, 6, 23, 0.6)` en
+    // `sunmiDark`—, y el menú flota sobre CONTENIDO: lo que deja pasar es texto.
+    // En el panel de recepción se leía el importe por detrás de las opciones
+    // justo cuando hay que elegir el motivo.
+    //
+    // Se mide el ALFA CALCULADO del fondo, que es lo que el navegador va a
+    // pintar. La hoja puede declarar lo que quiera: si el alfa no es 1, se ve a
+    // través. El candado de la suite mira la declaración; éste mira el resultado.
+    if (medido.menu == null) {
+      morir(`en ${esperado} no se pudo medir el fondo del desplegable`);
+    }
+    if (medido.menu < 1) {
+      fallas++;
+      renglones.push(
+        `    ✗ el menú del desplegable es TRANSLÚCIDO (alfa ${medido.menu}): se lee a través`
+      );
+    } else {
+      renglones.push(`    ✓ el menú del desplegable es opaco`);
     }
 
     console.log(`  ${esperado}  ·  --pos-accent ${medido.accent}`);
