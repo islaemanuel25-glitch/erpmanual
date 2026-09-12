@@ -205,51 +205,90 @@ function CampoConPasos({ valor, onCambiar, etiqueta, difiere = false, decimales 
     onCambiar(decimales > 0 ? nuevo.toFixed(decimales) : String(nuevo));
   };
 
-  // ── EL MARCO SE APRETÓ, PERO EL ÁREA TOCABLE NO ─────────────────────────
+  // ── TRES PIEZAS SEPARADAS, NO UNA CAJA CON TRES COSAS ADENTRO ───────────
   //
-  // El V24 bajó los campos de la mitad del ancho a 124 px, así que el marco va
-  // sin `gap` y sin relleno lateral propio. Lo que NO se achicó es el botón: el
-  // `px-2 py-1` de `.sunmi-btn-parte-pad-*` más el ícono de 16 dan una caja de
-  // 36 px de alto —el mínimo del kit— y unos 32 de ancho. Es lo que se toca con
-  // el pulgar, y apretarlo más para ganar píxeles sería cambiar espacio por
-  // toques fallados.
+  // Antes los dos botones vivían DENTRO del marco del campo: `[ − 1 + ]`, todo
+  // en una sola caja con borde. Ahora son tres piezas y el borde rodea SOLO al
+  // número:
   //
-  // Medido a 390: 124 de campo menos dos botones de ~32 dejan ~60 para el
-  // número, que a 13 px entra hasta cinco dígitos. Si algún día el campo baja de
-  // ahí, el número es lo que empieza a apretar — no el botón.
+  //     [−]   [ 1 ]   [+]
+  //
+  // Los botones llevan su propio fondo sutil y su radio; el marco con borde es
+  // del número y de nada más. Eso importa para la señal de diferencia: el borde
+  // danger tiene que decir "este NÚMERO no coincide", no "estos controles están
+  // mal".
+  //
+  // ── EL ÁREA TOCABLE ERA DE 16 PX, Y NADIE LO SABÍA ─────────────────────
+  //
+  // El comentario que estaba acá decía que el botón traía "el `px-2 py-1` del kit
+  // más el ícono de 16: una caja de 36 px de alto —el mínimo—". **Era falso, y se
+  // vio al medirlo.**
+  //
+  // `SunmiLinkButton` no trae padding: su clase es `text-xs sunmi-text-accent
+  // underline` y nada más. Los `px-2 py-1` son de `SunmiButton`, que es otra
+  // pieza. Y con `items-center` el botón queda del alto de su contenido, así que
+  // el objetivo de toque real eran **16 × 16 px** — medido a 390 px con
+  // `cajasDelCampo`. Mientras los botones vivían adentro de la caja con borde eso
+  // no se veía; sacarlos lo dejó a la vista.
+  //
+  // No lo rompió esta tanda: venía así. Se arregla acá porque es donde se vio.
+  //
+  // El `p-2` los lleva a **32 × 32**. No a 40, y el motivo está medido: el campo
+  // son 121 px de contenedor, así que con botones de 40 el marco del número
+  // quedaría en ~33 px y entrarían TRES dígitos — debajo del piso de cuatro que
+  // el pedido fija. Con 32 entran cinco. Es el punto donde las dos cosas caben.
+  //
+  // Lo que cede es el marco del número, y cuánto está MEDIDO y afirmado en el
+  // arnés, no supuesto: `cajasDelCampo` devuelve las tres cajas y cuántos dígitos
+  // entran, calculados con el ancho real de un dígito en la tipografía del campo.
   return (
-    <span
-      className={`flex items-center rounded-lg ${
-        difiere ? "border-2 sunmi-border-danger" : "border sunmi-divider"
-      }`}
-    >
+    <span className="flex items-center gap-1">
       <SunmiLinkButton
         onClick={() => paso(-1)}
         aria-label={`Restar uno a ${etiqueta}`}
-        className="shrink-0 no-underline sunmi-link-accent"
+        className="shrink-0 no-underline sunmi-link-accent rounded-lg sunmi-surface-soft p-2"
       >
         <Minus size={16} aria-hidden="true" />
       </SunmiLinkButton>
-      {/* `border-0` y centrado: el marco es del envoltorio, no del campo. Si el
-          input trajera el suyo se verían dos cajas, una adentro de la otra.
 
-          `text-lg` son los 18 px que pide el V26. Es el tamaño de Tailwind sin
-          redefinir, no un valor escrito a mano: ver el comentario de `base2` en
-          el config. Era el número más chico del panel siendo el único dato que
-          la persona escribe. */}
-      <SunmiInput
-        type="number"
-        value={valor}
-        onChange={(e) => onCambiar(e.target.value)}
-        aria-label={etiqueta}
-        className={`w-full border-0 text-center text-lg ${
-          difiere ? "sunmi-text-danger" : ""
+      {/* El marco, alrededor del número y nada más. `min-w-0` para que el flex
+          lo pueda encoger hasta lo que sobre: sin eso el input reclama su ancho
+          intrínseco y empuja a los botones fuera de los 124 px.
+
+          `border-0` en el input: el marco es de este envoltorio. Si el input
+          trajera el suyo se verían dos cajas, una adentro de la otra.
+
+          `text-lg` son los 18 px que pide el V26 — el tamaño de Tailwind sin
+          redefinir, no un valor escrito a mano. */}
+      <span
+        className={`min-w-0 flex-1 rounded-lg ${
+          difiere ? "border-2 sunmi-border-danger" : "border sunmi-divider"
         }`}
-      />
+      >
+        <SunmiInput
+          type="number"
+          value={valor}
+          onChange={(e) => onCambiar(e.target.value)}
+          aria-label={etiqueta}
+          // `px-0` y no el `px-2` del kit: con el marco alrededor y el texto
+          // centrado, el relleno lateral del input no separa de nada y se come
+          // los dígitos. Medido: con el `px-2` del kit entraban TRES, sin él
+          // entran cinco — y el piso del pedido son cuatro.
+          //
+          // `SunmiInput` es el único componente del kit que NEGOCIA su
+          // `className` en vez de concatenarlo —ver `lib/sunmi/claseAncho.js`—,
+          // así que acá el `px-0` gana de verdad y no queda a merced del orden
+          // de la hoja de estilos.
+          className={`w-full border-0 px-0 text-center text-lg ${
+            difiere ? "sunmi-text-danger" : ""
+          }`}
+        />
+      </span>
+
       <SunmiLinkButton
         onClick={() => paso(1)}
         aria-label={`Sumar uno a ${etiqueta}`}
-        className="shrink-0 no-underline sunmi-link-accent"
+        className="shrink-0 no-underline sunmi-link-accent rounded-lg sunmi-surface-soft p-2"
       >
         <Plus size={16} aria-hidden="true" />
       </SunmiLinkButton>
