@@ -48,12 +48,8 @@ import { motivosParaDiferencia, resultadoDeConteo } from "@/lib/transferencias/r
 import { ESTADO_PRODUCTO, estadoDeProducto } from "@/lib/transferencias/controlFisico";
 import {
   ORIGEN_PRESENTACION,
-  modoAdopcionHistorica,
   origenDePresentacion,
 } from "@/lib/transferencias/adopcionDePresentacion";
-// Las físicas de la línea, en milésimas enteras. La MISMA función que alimenta
-// las cards y el filtro: la equivalencia no puede salir de otra cuenta.
-import { enviadoFisicoM } from "@/lib/transferencias/controlFisico";
 import {
   descriptorDeEnvio,
   escalaDeEnvio,
@@ -77,26 +73,15 @@ export const ROTULO_SUELTAS = "Hay unidades sueltas";
  */
 export const ROTULO_SUELTAS_CAMPO = "Unidades sueltas";
 
-// ── LOS DOS HECHOS DE UNA HISTÓRICA, CON NOMBRE PROPIO ───────────────────
+// ── ACÁ VIVÍAN LOS SIETE RÓTULOS DEL BLOQUE DE ADOPCIÓN ──────────────────
 //
-// "Registrado originalmente" y "Presentación actual del depósito" no son dos
-// formas de decir lo mismo: el primero es lo que quedó escrito el día que salió
-// la mercadería, el segundo es lo que el catálogo dice HOY. Mostrarlos juntos y
-// rotulados es lo que hace que adoptar sea una decisión y no una corrección.
-export const ROTULO_HISTORICA = "Transferencia histórica";
-export const TEXTO_SIN_REGISTRO = "Esta línea no registró cómo salió del depósito.";
-export const ROTULO_REMITO_ORIGINAL = "Remito original";
-export const ROTULO_PRESENTACION_ACTUAL = "Presentación actual del depósito";
-/** El CTA se arma con el nombre real: "Usar CAJÓN x8 para esta recepción". */
-export const ACCION_ADOPTAR = "Usar";
-export const SUFIJO_ADOPTAR = "para esta recepción";
-/**
- * Lo que hay que decir para que la decisión no dé miedo: adoptar NO reescribe el
- * remito. Sin esta línea, "usar otra presentación" se lee como corregir un
- * documento que salió de otro local.
- */
-export const AYUDA_ADOPTAR =
-  "No cambia el remito original. Solo fija cómo contar esta línea desde ahora.";
+// "Transferencia histórica", "Remito original", "Presentación actual del
+// depósito", "Usar … para esta recepción" y su ayuda se fueron con el bloque.
+// No se dejaron exportados por si acaso: una constante que ningún render usa se
+// lee como capacidad disponible y el próximo la vuelve a dibujar.
+//
+// El único que sobrevive es éste, porque tiene seis líneas reales que lo
+// necesitan: las que se adoptaron mientras el botón existió.
 export const ROTULO_ADOPTADA = "Presentación adoptada en la recepción";
 
 /**
@@ -239,13 +224,6 @@ export default function FichaProductoRecepcion({
   enHoja = false,
   /** Se llama después de guardar BIEN. La hoja lo usa para cerrarse sola. */
   onGuardado = null,
-  /**
-   * Adoptar, para ESTA recepción, la presentación que el depósito usa hoy.
-   *
-   * Manda solo el id: la presentación, el factor y el peso los resuelve el
-   * servidor releyendo el catálogo. La pantalla no elige escalas.
-   */
-  onAdoptarPresentacion = null,
 }) {
   const d = producto;
 
@@ -318,11 +296,6 @@ export default function FichaProductoRecepcion({
   const [motivo, setMotivo] = useState(() => inicial().motivo);
   const [detalleMotivo, setDetalleMotivo] = useState(() => inicial().detalleMotivo);
   const [error, setError] = useState("");
-  // Con los otros hooks y NUNCA despues del guard `if (!d) return null`:
-  // React cuenta hooks por render, y un `useState` detras de un return
-  // temprano cambia la cantidad entre un render y el siguiente. Es el
-  // defecto que este archivo ya tiene anotado tres lineas mas abajo.
-  const [adoptando, setAdoptando] = useState(false);
 
   // El guard va DESPUÉS de los hooks: React cuenta hooks por render y retornar
   // antes cambiaría la cantidad entre un render y el siguiente. Es el mismo
@@ -348,62 +321,11 @@ export default function FichaProductoRecepcion({
   const agrupaEsta = escala.unidad === "BULTO";
   const estado = estadoDeProducto(d);
 
-  // ── ¿ESTA LÍNEA ADMITE ADOPTAR LA PRESENTACIÓN DE HOY? ──────────────────
-  //
-  // Tres condiciones, y las tres tienen que darse:
-  //
-  //   · que se pueda recibir —si la transferencia está cerrada, no hay nada
-  //     que contar—;
-  //   · que la línea sea una HISTÓRICA de verdad: sin snapshot de despacho y no
-  //     agregada en recepción. Lo decide `admiteAdopcion`, la misma función que
-  //     el servidor vuelve a preguntar sobre su propia relectura;
-  //   · que el catálogo diga algo DISTINTO. Si coincide, el botón no cambiaría
-  //     nada y sería ruido.
-  //
-  // Esto solo decide si se DIBUJA el ofrecimiento. Quien adopta es el servidor:
-  // acá no se elige presentación, ni factor, ni peso — el POST manda dos ids.
+  // De dónde salió la presentación con la que se está contando. Sigue haciendo
+  // falta después de sacar la adopción: hay seis líneas en producción que se
+  // adoptaron mientras el botón existió, y su ficha tiene que seguir diciendo
+  // que la presentación no la registró el origen.
   const adoptada = origenDePresentacion(d) === ORIGEN_PRESENTACION.ADOPTADA;
-
-  // ── LA CONDICIÓN VIVE EN UN SOLO LUGAR ─────────────────────────────────
-  //
-  // Acá estaban las cinco preguntas escritas a mano, y la hoja móvil tenía que
-  // volver a hacérselas para saber si poner el subtítulo "Transferencia
-  // histórica". Dos copias de la misma condición se separan, y el día que pase
-  // la hoja diría "Transferencia histórica" sobre una ficha normal.
-  //
-  // `modoAdopcionHistorica` las contesta de una vez y devuelve además la
-  // equivalencia ya calculada, así no se computa dos veces.
-  //
-  // Las físicas se le pasan porque las tiene el consumidor: pedírselas evita que
-  // el módulo de adopción dependa de `controlFisico` y se arme un ciclo.
-  const fisicasM = enviadoFisicoM(d);
-  const modo = modoAdopcionHistorica(d, { puedeRecibir, fisicasM });
-  const puedeAdoptar = modo.activo;
-  const equivalencia = modo.equivalencia;
-  const fisicasHistoricas = fisicasM === null ? 0 : fisicasM / 1000;
-
-  // ── EN LA HOJA, LA DECISIÓN OCUPA LA PANTALLA ENTERA ───────────────────
-  //
-  // El diseño aprobado es una vista DEDICADA: mientras haya que decidir en qué
-  // presentación se va a contar, no se muestran la categoría, el estado, el
-  // "Enviado", el "Recibido" ni el input. Pedirle a alguien que cuente en una
-  // escala y al mismo tiempo ofrecerle cambiarla es pedirle dos cosas a la vez,
-  // y la de abajo es la que decide en qué unidad significa el número de arriba.
-  //
-  // En escritorio la composición no cambia: ahí la ficha convive con el listado
-  // y el bloque de decisión entra sin desplazar nada.
-  const soloDecision = enHoja && puedeAdoptar;
-
-  const adoptar = async () => {
-    setError("");
-    setAdoptando(true);
-    try {
-      const r = await onAdoptarPresentacion?.({ detalleId: d.id });
-      if (r && r.ok === false) setError(r.error || "No se pudo adoptar la presentación actual.");
-    } finally {
-      setAdoptando(false);
-    }
-  };
 
   // Las físicas de lo que está escrito AHORA. Misma función que el servidor, y
   // con el factor CONGELADO: si el catálogo cambió después del envío, la cuenta
@@ -572,74 +494,25 @@ export default function FichaProductoRecepcion({
   const Envoltorio = enHoja ? "div" : SunmiCard;
   const claseEnvoltorio = enHoja ? "space-y-2" : "p-3 space-y-2";
 
-  // ── UNA HISTÓRICA ABIERTA, Y CÓMO SE LA PUEDE CONTAR ───────────────────
+  // ── ACÁ ESTABA EL BLOQUE DE ADOPCIÓN, Y SE SACÓ DE LAS DOS PANTALLAS ────
   //
-  // La transferencia se creó antes de que el sistema congelara la presentación,
-  // así que lo único que quedó escrito es la cantidad física: "40 UNIDAD". Eso
-  // es la verdad de lo que se sabe —nadie anotó cómo salió— y no se toca.
+  // La ficha le preguntaba al operador en qué presentación quería contar cuando
+  // la línea no traía snapshot y el catálogo decía otra cosa. La pregunta partía
+  // de una premisa falsa: que el catálogo y el remito se contradicen y hay que
+  // desempatarlos.
   //
-  // Pero el operador tiene cinco cajones en la mano. Se le muestran los DOS
-  // hechos, separados y rotulados, y la decisión de contar en la presentación de
-  // hoy es suya y explícita. Nunca automática: el sistema no sabe cómo salió la
-  // mercadería y no lo va a adivinar.
+  // No se contradicen porque contestan preguntas distintas. `unidad_medida`
+  // guarda cómo se COMPRA el producto; `unidadEnviada` guarda en qué formato
+  // SALIÓ esa línea del depósito. `POETT PERFUMINA` se compra por pack de 12 y
+  // se despachó suelto: los dos datos son ciertos al mismo tiempo.
   //
-  // Extraído a una constante para poder usarlo SOLO —en la hoja— o al lado del
-  // conteo —en escritorio— sin escribirlo dos veces.
-  const bloqueAdopcion = puedeAdoptar ? (
-    <div className="sunmi-surface-soft sunmi-border rounded-lg p-2.5 space-y-3">
-      <div className="text-sm2 font-semibold sunmi-text-strong">{ROTULO_HISTORICA}</div>
-
-      {/* BLOQUE 1 · el hecho, dicho como hecho. No es un error del registro:
-          es lo único que se sabe, y por eso no se toca. */}
-      <div>
-        <div className="text-sm2 sunmi-text-muted">{TEXTO_SIN_REGISTRO}</div>
-        <div className="font-mono tabular-nums sunmi-text-strong">
-          {ROTULO_REMITO_ORIGINAL}: {rotuloDeEnvio(envio)}
-        </div>
-      </div>
-
-      {/* BLOQUE 2 · lo que el depósito usa hoy, con la equivalencia EXACTA
-          calculada por la misma conversión que va a persistir el servidor.
-          Para 42 dice "5 CAJÓN x8 + 2 unidades sueltas", nunca 5,25. */}
-      <div>
-        <div className="text-sm2 sunmi-text-muted">{ROTULO_PRESENTACION_ACTUAL}</div>
-        <div className="font-mono tabular-nums sunmi-text-strong">
-          {nombreDePresentacion(d.presentacionActual)}
-        </div>
-        {equivalencia?.ok && (
-          <div className="text-sm2 sunmi-text-muted">
-            Equivale a {equivalencia.rotulo} para {fmtCantidad(fisicasHistoricas)}{" "}
-            {unidadDeDiferencia(envio)}
-          </div>
-        )}
-      </div>
-
-      {/* El CTA nombra la presentación de verdad: "Usar CAJÓN x8…" y no un
-          genérico. Lo que se está por hacer tiene que leerse en el botón. */}
-      <SunmiButton
-        color="amber"
-        onClick={adoptar}
-        disabled={adoptando}
-        className="w-full justify-center"
-      >
-        {adoptando
-          ? "Adoptando…"
-          : `${ACCION_ADOPTAR} ${nombreDePresentacion(d.presentacionActual)} ${SUFIJO_ADOPTAR}`}
-      </SunmiButton>
-
-      <div className="text-sm2 sunmi-text-muted">{AYUDA_ADOPTAR}</div>
-    </div>
-  ) : null;
-
-  if (soloDecision) {
-    return (
-      <Envoltorio className={claseEnvoltorio}>
-        {bloqueAdopcion}
-        {error && <SunmiAviso tono="warning">{error}</SunmiAviso>}
-      </Envoltorio>
-    );
-  }
-
+  // Para contar una recepción manda el formato de salida, y punto. El descriptor
+  // ya lo hace —camino 2 le pasa `contadoEn: linea.unidadEnviada` a
+  // `presentacionDeProducto`—, así que la escala salía bien y la pantalla
+  // preguntaba encima. Sacar el bloque no cambió una sola cuenta.
+  //
+  // El criterio completo, con las dos veces que el mismo error apareció, está en
+  // `docs/business-rules/unidad-medida-es-como-se-compra.md`.
   return (
     <Envoltorio className={claseEnvoltorio}>
       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -776,8 +649,6 @@ export default function FichaProductoRecepcion({
       </div>
       )}
 
-      {bloqueAdopcion}
-
       {/* Cuando ya se adoptó, la card dice de dónde salió la presentación. Sin
           esto la línea se leería como si el origen la hubiera registrado así. */}
       {adoptada && (
@@ -850,43 +721,79 @@ export default function FichaProductoRecepcion({
           Tres renglones cuando hay diferencia y UNO cuando no: repetir el mismo
           número tres veces con tres rótulos distintos es ruido que además
           sugiere que pasó algo. Se recalcula con lo que se está tipeando, igual
-          que el ingreso físico y los motivos. */}
+          que el ingreso físico y los motivos.
+
+          ── Y ACÁ ESTABA LA OTRA MITAD DEL SALTO DEL V25 ──────────────────
+
+          El pedido decía "el panel crece cuando aparece el motivo", y eso es lo
+          que se ve. Pero al MEDIRLO —arnés de 390 px, `botonAVariasAlturas`— el
+          motivo resultó ser la mitad: este bloque pasaba de UN renglón a TRES al
+          mismo tiempo, y sumaba sus propios ~40 px.
+
+          Reservar solo el motivo dejaba el salto casi igual, y el candado habría
+          quedado verde afirmando un arreglo que no arreglaba. Los números están
+          en el arnés, al lado de la afirmación.
+
+          Por eso los tres renglones se dibujan SIEMPRE y lo que cambia es cuáles
+          se ven. La forma aprobada en el V23 no se mueve: sin diferencia se lee
+          un solo renglón que dice "Importe", igual que antes. */}
       {enHoja && importeEditado != null && (
         <div className="space-y-0.5">
+          {/* El del remito: solo cuando hay algo contra qué comparar. Reserva su
+              alto siempre para que aparecer no empuje nada.
+
+              ── EL RENGLÓN RESERVADO VA MUDO, Y NO ES UN DETALLE ───────────
+              La primera versión dejaba el rótulo y el número puestos detrás del
+              `invisible`. Dos candados viejos se pusieron en rojo y los dos
+              tenían razón: el del V23 encontraba "Importe del remito" en una
+              línea que coincide, y el del `$0,00` encontraba un "$ 0,00" —la
+              diferencia de una línea sin diferencia— sobre mercadería que sí
+              llegó. Ese `$0,00` es el defecto de la #195, y que estuviera
+              invisible no lo hace inofensivo: el día que alguien saque el
+              `invisible` por cualquier motivo, vuelve dibujado.
+              Un hueco solo tiene que ocupar alto. No tiene que decir nada. */}
           {hayDiferenciaDeImporte && importeRemito != null ? (
-            <>
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-sm2 sunmi-text-muted">Importe del remito</span>
-                <span className="tabular-nums text-sm2 sunmi-text-muted">
-                  {formatearMoneda(importeRemito)}
-                </span>
-              </div>
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-sm2 sunmi-text-muted">Importe corregido</span>
-                <span className="tabular-nums text-md2 font-semibold sunmi-text-strong">
-                  {formatearMoneda(importeEditado)}
-                </span>
-              </div>
-              {/* Falta es danger y sobra es warning: son dos hechos distintos y
-                  el segundo no es un error — llegó mercadería de más. */}
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="text-sm2 sunmi-text-muted">Diferencia</span>
-                <span
-                  className={`tabular-nums text-sm2 font-semibold ${
-                    diferenciaImporte < 0 ? "sunmi-text-danger" : "sunmi-text-warning"
-                  }`}
-                >
-                  {diferenciaImporte > 0 ? "+" : "−"}
-                  {formatearMoneda(Math.abs(diferenciaImporte))}
-                </span>
-              </div>
-            </>
-          ) : (
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-sm2 sunmi-text-muted">Importe</span>
-              <span className="tabular-nums text-md2 font-semibold sunmi-text-strong">
-                {formatearMoneda(importeEditado)}
+              <span className="text-sm2 sunmi-text-muted">Importe del remito</span>
+              <span className="tabular-nums text-sm2 sunmi-text-muted">
+                {formatearMoneda(importeRemito)}
               </span>
+            </div>
+          ) : (
+            <div className="flex items-baseline justify-between gap-3" aria-hidden="true">
+              <span className="text-sm2 sunmi-text-muted">{" "}</span>
+            </div>
+          )}
+
+          {/* El renglón que SIEMPRE se ve. Cambia de rótulo, no de lugar. */}
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-sm2 sunmi-text-muted">
+              {hayDiferenciaDeImporte && importeRemito != null ? "Importe corregido" : "Importe"}
+            </span>
+            <span className="tabular-nums text-md2 font-semibold sunmi-text-strong">
+              {formatearMoneda(importeEditado)}
+            </span>
+          </div>
+
+          {/* Falta es danger y sobra es warning: son dos hechos distintos y
+              el segundo no es un error — llegó mercadería de más. */}
+          {hayDiferenciaDeImporte && importeRemito != null ? (
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-sm2 sunmi-text-muted">Diferencia</span>
+              <span
+                className={`tabular-nums text-sm2 font-semibold ${
+                  diferenciaImporte < 0 ? "sunmi-text-danger" : "sunmi-text-warning"
+                }`}
+              >
+                {diferenciaImporte > 0 ? "+" : "−"}
+                {formatearMoneda(Math.abs(diferenciaImporte))}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-baseline justify-between gap-3" aria-hidden="true">
+              {/* Un espacio DURO. Un espacio común lo colapsa el navegador y el
+                  renglón mediría cero, que es no reservar nada. */}
+              <span className="text-sm2 sunmi-text-muted">{" "}</span>
             </div>
           )}
         </div>
@@ -927,10 +834,37 @@ export default function FichaProductoRecepcion({
         </div>
       )}
 
-      {/* El motivo, solo si esta línea tiene que explicar algo. Una agregada no:
-          su procedencia ya está registrada con autor y fecha. */}
-      {puedeRecibir && motivos.length > 0 && (
-        <div className="space-y-1.5">
+      {/* ── EL MOTIVO, Y SU ALTO RESERVADO EN EL TELÉFONO ──────────────────
+          Solo si esta línea tiene que explicar algo. Una agregada no: su
+          procedencia ya está registrada con autor y fecha.
+
+          EL DEFECTO QUE ARREGLA `motivoReservado`: en la hoja, tocar el − o el
+          + hasta que la cantidad deja de coincidir hacía APARECER este bloque,
+          y el panel entero crecía unos 60 px de golpe. El botón de guardar
+          —que está justo abajo— se corría mientras el dedo iba hacia él, así
+          que se terminaba tocando otra cosa. Cambiar un número no puede mover
+          el botón que cierra la línea.
+
+          Se reserva con el bloque REAL, invisible, y no con un alto en píxeles
+          escrito a mano: así el hueco mide exactamente lo que va a ocupar el
+          desplegable, y sigue midiéndolo el día que cambie el tipo de letra.
+          El desplegable reservado no lleva opciones y no le hacen falta: lo que
+          ocupa alto es el campo cerrado, y la lista vive en un portal.
+          `visibility:hidden` saca el contenido del árbol de accesibilidad y del
+          orden de tabulación, y conserva el espacio — que es justo lo que se
+          quiere. El `pointer-events-none` es el cinturón: un select invisible
+          que se pudiera tocar sería peor que el salto.
+
+          En escritorio no se reserva nada: la ficha vive al lado de un listado
+          largo y ahí los 60 px no mueven ningún botón. */}
+      {puedeRecibir && (motivos.length > 0 || enHoja) && (
+        <div
+          className={`space-y-1.5${
+            motivos.length === 0 ? " invisible pointer-events-none" : ""
+          }`}
+          aria-hidden={motivos.length === 0 ? "true" : undefined}
+          data-motivo-reservado={motivos.length === 0 ? "1" : undefined}
+        >
           <div className="text-sm2 sunmi-text-muted">Motivo de la diferencia</div>
           <SunmiSelectAdv value={motivo} onChange={setMotivo}>
             <option value="">Seleccionar…</option>

@@ -203,8 +203,6 @@ export default function WorkspaceRecepcion({
   onRevisar,
   onAgregar,
   onQuitarLinea,
-  /** Adoptar la presentación actual sobre una línea histórica. Ver la ficha. */
-  onAdoptarPresentacion,
   guardando = false,
   quitandoId = null,
   // ── LO ADMINISTRATIVO, QUE EN EL TELÉFONO VIVE ADENTRO DE ESTA PANTALLA ──
@@ -514,7 +512,6 @@ export default function WorkspaceRecepcion({
       puedeRecibir={puedeRecibir}
       guardando={guardando}
       onRevisar={onRevisar}
-      onAdoptarPresentacion={onAdoptarPresentacion}
       onQuitar={onQuitarLinea}
       quitando={quitandoId === seleccionado.id}
     />
@@ -571,7 +568,6 @@ export default function WorkspaceRecepcion({
           onCerrarProducto={() => setSeleccionadoId(null)}
           onRevisar={onRevisar}
           onQuitarLinea={onQuitarLinea}
-          onAdoptarPresentacion={onAdoptarPresentacion}
           onAbrirEscaner={() => setEscaneando(true)}
           onAbrirAgregar={() => setAgregarAbierto(true)}
           accionAgregar={ACCION_AGREGAR}
