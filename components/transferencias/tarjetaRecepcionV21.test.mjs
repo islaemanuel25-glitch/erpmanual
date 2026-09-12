@@ -226,27 +226,44 @@ test("V21-7. CON DIFERENCIA NO SE OFRECE 'Coincide': el único camino es Corregi
   assert.match(t, new RegExp(TEXTO_CORREGIR));
 });
 
-test("V21-8. EL AVISO DE DIFERENCIA ES UNA LÍNEA Y DICE LOS TRES NÚMEROS", () => {
-  // 4 packs de 24 = 96 contra 144 enviadas.
+// ── EL V25 HIZO QUE LA TARJETA TAMBIÉN HABLE EN PACKS ────────────────────
+//
+// Estos dos decían "96 de 144 · faltan 48" sobre una línea que se cuenta en
+// PACK x24. Ninguno de los tres números era el que la persona tenía delante: el
+// campo del panel dice "PACK x24 completos" y el operador cuenta 4.
+//
+// La tarjeta no tiene una redacción propia —sale de `resultadoDeConteo`, que es
+// la misma función que usa el panel—, así que este cambio la siguió sola. Es
+// justamente el motivo por el que el texto vive en el dominio y no acá: si cada
+// superficie tuviera su copia, hoy la tarjeta y el panel dirían cosas distintas
+// sobre la misma línea y en la misma pantalla.
+
+test("V21-8. EL AVISO DE DIFERENCIA ES UNA LÍNEA Y HABLA EN LA ESCALA DEL CONTEO", () => {
+  // 4 packs de 24 contra 6 enviados. La diferencia sigue en unidades, con la
+  // palabra escrita: con la cabeza en packs, un "48" pelado serían 48 packs.
   const faltante = pintar(linea({ cantidadRecibida: 4 }));
-  assert.match(faltante, /Ingreso físico 96 de 144 · faltan 48/);
+  assert.match(faltante, /Ingreso físico 4 PACK x24 de 6 PACK x24 · faltan 48 unidades/);
+  assert.doesNotMatch(faltante, /96 de 144/, "volvió a hablar en unidades físicas");
 
   const sobrante = pintar(linea({ cantidadRecibida: 9 }));
-  assert.match(sobrante, /Ingreso físico 216 de 144 · sobran 72/);
+  assert.match(sobrante, /Ingreso físico 9 PACK x24 de 6 PACK x24 · sobran 72 unidades/);
 });
 
 test("V21-9. UNA SOLA UNIDAD DE DIFERENCIA SE DICE EN SINGULAR", () => {
-  // 143 contra 144. Es el ejemplo textual del diseño —"falta 1"— y el caso más
-  // frecuente de todos: una unidad rota adentro de un pack.
+  // 5 packs y 23 sueltas son 143 contra 144. Es el ejemplo textual del diseño
+  // —"falta 1"— y el caso más frecuente de todos: una unidad rota adentro de un
+  // pack. Ahora la cabeza muestra el pack abierto, que es lo que lo explica.
   const t = pintar(
     linea({ cantidadRecibida: 5, recibidoUnidadesSueltas: 23 })
   );
   // Sin `\b` al final: `texto()` saca las etiquetas sin poner espacios, así que
-  // el renglón siguiente queda pegado —"falta 1Corregir"— y ahí no hay frontera
-  // de palabra entre el 1 y la C. El `\b` hacía fallar al candado sobre un
-  // render correcto, que es peor que no tenerlo.
-  assert.match(t, /Ingreso físico 143 de 144 · falta 1/);
+  // el renglón siguiente queda pegado —"falta 1 unidadCorregir"— y ahí no hay
+  // frontera de palabra. El `\b` hacía fallar al candado sobre un render
+  // correcto, que es peor que no tenerlo.
+  assert.match(t, /Ingreso físico 5 PACK x24 \+ 23 de 6 PACK x24 · falta 1 unidad/);
   assert.doesNotMatch(t, /faltan 1/);
+  // Y el resto del pack se dice como resto, no como fracción.
+  assert.doesNotMatch(t, /5,958/, "apareció una fracción de pack");
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
