@@ -207,14 +207,24 @@ test("el importe del móvil va en el bloque de cierre, antes del CTA", () => {
   const src = codigoDe(MOVIL);
   const iTotal = src.indexOf("Importe corregido");
   const iBarra = src.indexOf("sticky bottom-0");
-  const iCta = src.indexOf("Confirmar recepción");
+  const iCta = src.indexOf("✓ Confirmar");
   assert.ok(iTotal > -1 && iBarra > -1 && iCta > -1, "falta alguna de las tres piezas del cierre");
   assert.ok(iTotal < iBarra, "el importe quedó después de la barra de cierre");
   assert.ok(iBarra < iCta, "el botón de confirmar se salió de la barra");
 
-  // Y el aviso sigue existiendo, con las dos causas que traban el cierre.
-  assert.match(src, /Falta revisar/);
-  assert.match(src, /diferencias sin motivo/);
+  // ── EL AVISO SE FUE, Y NO ES QUE SE AFLOJÓ LA REGLA ─────────────────────
+  //
+  // Este candado exigía además que la barra dijera "Falta revisar N productos"
+  // y "N diferencias sin motivo". El V16 sacó ese renglón porque era el tercer
+  // lugar contando lo mismo: el avance está arriba —"5 / 78 revisados"— y los
+  // tabs de filtro ya traen su número.
+  //
+  // Lo que el candado tiene que seguir defendiendo es el BLOQUEO, que no
+  // cambió. Se mide donde vive: en la condición del botón, no en un texto.
+  assert.match(src, /const trabado = !todoRevisado \|\| sinMotivo > 0 \|\| sinCargar > 0/);
+  assert.match(src, /disabled=\{trabado \|\| confirmando\}/);
+  // Y la barra muestra el total, que es lo único que quedó a su izquierda.
+  assert.match(src, />Total</, "la barra dejó de rotular el importe");
 });
 
 test("EL CONTRATO DE LA API TIENE LOS TRES NOMBRES, y no rompe los viejos", () => {

@@ -277,12 +277,31 @@ test("9. confirmar sigue bloqueado mientras queden productos sin revisar", () =>
   // `trabado` junta las dos para que el botón tenga UNA condición y el aviso
   // pueda decir cuál de las dos es. Si el botón las evaluara por su cuenta,
   // podrían decir cosas distintas.
-  assert.match(movil, /const trabado = !todoRevisado \|\| sinMotivo > 0/);
+  // El V16 sumó la tercera causa: un no declarado agregado en cero es un
+  // borrador, y confirmarlo sería cerrar el remito con una línea que no
+  // informa nada. Las tres van en la MISMA condición.
+  assert.match(movil, /const trabado = !todoRevisado \|\| sinMotivo > 0 \|\| sinCargar > 0/);
+  assert.match(movil, /const sinCargar = \(item\?\.items \|\| \[\]\)\.filter\(/);
   assert.match(movil, /disabled=\{trabado \|\| confirmando\}/);
-  // Y el aviso nombra la causa con su número: un botón gris que no explica por
-  // qué manda a tocarlo hasta que alguien se rinde.
-  assert.match(movil, /const avisoDeCierre =/);
-  assert.match(movil, /diferencias sin motivo/);
+
+  // ── EL AVISO SE FUE EN EL V16; LA REGLA NO ──────────────────────────────
+  //
+  // Este candado exigía `const avisoDeCierre =` y el texto "diferencias sin
+  // motivo". Ese renglón se sacó de la barra porque era el tercer lugar
+  // contando lo mismo, y con él se fue la constante: dejarla habría sido código
+  // muerto con un candado defendiéndolo.
+  //
+  // Lo que se exige ahora es que no haya vuelto por otra puerta —que el botón
+  // no evalúe las dos causas por su cuenta— y que `sinMotivo` siga derivándose
+  // de las líneas. Sin esto, alguien podría dejar `trabado` intacto y aun así
+  // habilitar el botón desde otro lado.
+  assert.ok(!movil.includes("avisoDeCierre"), "volvió el aviso que el V16 sacó de la barra");
+  assert.match(movil, /const sinMotivo = \(item\?\.items \|\| \[\]\)\.filter\(/);
+  assert.equal(
+    (movil.match(/disabled=\{trabado/g) || []).length,
+    1,
+    "hay más de un lugar decidiendo si se puede confirmar"
+  );
 
   // Y el servidor sigue siendo la autoridad: la guarda no se tocó.
   const confirmar = codigoDe("app/api/transferencias/confirmar-recepcion/route.js");

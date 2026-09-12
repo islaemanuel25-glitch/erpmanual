@@ -180,12 +180,28 @@ test("F5. LA TARJETA NO RESUELVE LA PRESENTACIÓN POR SU CUENTA", () => {
 test("F6. Y EL IMPORTE NO SE RECALCULA: sale tal cual del endpoint", () => {
   // Un total calculado en el front puede divergir del que valorizó el servidor,
   // que es el que cuadra con la lista y con los dos PDF.
+  //
+  // ── EL CAMPO DEJÓ DE SER UNO SOLO, Y ESO ES EL ARREGLO ──────────────────
+  //
+  // Este candado exigía la cadena literal `formatearMoneda(d.subtotal)`. El V16
+  // tuvo que romperla: `subtotal` es el importe del REMITO y para una línea
+  // agregada vale cero —correcto por definición, de un no declarado no salió
+  // nada—, así que la tarjeta mostraba $0,00 sobre mercadería que sí llegó. Se
+  // vio en la #195.
+  //
+  // Lo que el candado defiende no cambió: los dos números salen del endpoint y
+  // la pantalla no multiplica. Lo que cambió es CUÁL de los dos se lee, y eso
+  // ahora se exige explícito.
   const fuente = codigoDe("components/transferencias/TarjetaRecepcionMovil.jsx");
   assert.match(fuente, /formatearMoneda\(d\.precioCosto\)/);
-  assert.match(fuente, /formatearMoneda\(d\.subtotal\)/);
+  assert.match(
+    fuente,
+    /formatearMoneda\(esAgregada \? d\.subtotalRecibido : d\.subtotal\)/,
+    "la tarjeta volvió a leer un solo campo de importe"
+  );
   assert.doesNotMatch(
     fuente,
-    /d\.precioCosto\s*\*|\*\s*d\.precioCosto|d\.subtotal\s*\*/,
+    /d\.precioCosto\s*\*|\*\s*d\.precioCosto|d\.subtotal\s*\*|d\.subtotalRecibido\s*\*/,
     "la pantalla está multiplicando para llegar al total"
   );
 });
@@ -202,7 +218,19 @@ test("F6b. UN SOLO FORMATEADOR EN LA TARJETA, y es el del ERP", () => {
 
 // ── LO QUE YA EXISTÍA NO SE MOVIÓ ─────────────────────────────────────────
 
-test("F7. NO DECLARADO dice qué hacer y también muestra su importe", () => {
+test("F7. NO DECLARADO muestra el importe de lo que LLEGÓ, no el del remito", () => {
+  // ── ESTE CANDADO ESTABA VERDE SOBRE UN DATO QUE NO EXISTE ───────────────
+  //
+  // Pasaba `subtotal: 32500` sobre una línea con `agregadoEnRecepcion: true`.
+  // El endpoint NUNCA manda eso: `subtotal` sale de `valorizarLineaDelRemito`,
+  // que para una agregada opera sobre `cantidadPresentada: 0` y devuelve CERO.
+  // O sea que el candado afirmaba sobre una forma de dato imposible y por eso
+  // no vio el defecto de la #195 —$0,00 en la tarjeta— durante toda una tanda.
+  //
+  // Es la regla de CLAUDE.md: la forma del dato de prueba tiene que ser la
+  // forma del dato real. Ahora el fixture es el real: `subtotal: 0` y el valor
+  // en `subtotalRecibido`, que es lo que el endpoint manda de verdad y lo mismo
+  // que alimenta `importeCorregido` del resumen.
   const t = pintarMovil(
     linea({
       nombre: "9 de Oro",
@@ -212,14 +240,35 @@ test("F7. NO DECLARADO dice qué hacer y también muestra su importe", () => {
       unidadEnviada: "UNIDAD",
       factorPack: 1,
       precioCosto: 2500,
-      subtotal: 32500,
+      subtotal: 0,
+      subtotalRecibido: 32500,
     })
   );
   // Una línea agregada no tiene remito, así que no puede decir "Enviado".
   assert.doesNotMatch(t, /Enviado/, "un no declarado no tiene remito contra el cual contrastar");
   assert.match(t, /Cargá la cantidad que llegó/);
   assert.match(t, /No declarado/);
-  assert.match(t, /\$32\.500,00/);
+  assert.match(t, /\$32\.500,00/, "volvió a mostrar el importe del remito, que para una agregada es 0");
+  assert.doesNotMatch(t, /\$0,00/, "sigue dibujando el cero del remito");
+});
+
+test("F7b. Y NO OFRECE 'Coincide': no hay contra qué comparar", () => {
+  // El botón prometía comparar contra un envío que no existe. En su lugar, el
+  // pie dice cuánto entró — que es todo lo que se puede afirmar de esa línea.
+  const t = pintarMovil(
+    linea({
+      nombre: "9 de Oro",
+      agregadoEnRecepcion: true,
+      cantidadEnviada: 0,
+      cantidadRecibida: 13,
+      unidadEnviada: "UNIDAD",
+      factorPack: 1,
+      subtotal: 0,
+      subtotalRecibido: 32500,
+    })
+  );
+  assert.doesNotMatch(t, /Coincide/, "un no declarado no puede ofrecer coincidir con el remito");
+  assert.match(t, /Ingreso físico 13 un/);
 });
 
 test("F8. REVISADO se colapsa a una línea y conserva su importe", () => {

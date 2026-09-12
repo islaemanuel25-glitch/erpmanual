@@ -55,6 +55,9 @@ const PIEZAS = [
   // que nace, como pide el encabezado: la lista es explícita, y una pieza nueva
   // que no se agrega queda sin cubrir sin que nada avise.
   "components/transferencias/TarjetaRecepcionMovil.jsx",
+  // La fila del catálogo, que el V16 sacó del modal el 2026-09-12 para que la
+  // dibujen las dos superficies. Se suma el mismo día que nace.
+  "components/transferencias/FilaCatalogoRecepcion.jsx",
 ];
 
 /**
@@ -137,7 +140,7 @@ test("las piezas del control físico no tienen NINGÚN valor visual arbitrario",
   assert.deepEqual(hallazgos, [], `\n  ${hallazgos.join("\n  ")}\n`);
 });
 
-test("EL CANDADO ENUMERA DE VERDAD: los nueve archivos existen y se leen", () => {
+test("EL CANDADO ENUMERA DE VERDAD: los diez archivos existen y se leen", () => {
   // Sin esto, un archivo renombrado dejaría el candado en verde sin mirar nada,
   // que es el patrón que este repo ya se comió tres veces.
   for (const rel of PIEZAS) {
@@ -147,7 +150,7 @@ test("EL CANDADO ENUMERA DE VERDAD: los nueve archivos existen y se leen", () =>
   }
   // El número va escrito para que sumar una pieza sea un acto deliberado: si
   // fuera `PIEZAS.length` contra sí mismo, este candado no afirmaría nada.
-  assert.equal(PIEZAS.length, 9);
+  assert.equal(PIEZAS.length, 10);
 });
 
 test("y los patrones ENCUENTRAN de verdad lo que dicen encontrar", () => {
