@@ -32,7 +32,7 @@
 // no una decisión de navegación. Y el modal es el del kit: la capa, el velo, el
 // `Escape`, la pila de modales y el portal ya están resueltos ahí.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, MoreHorizontal } from "lucide-react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
@@ -63,7 +63,11 @@ import { FILTRO, pasaFiltro } from "@/lib/transferencias/controlFisico";
 // La escala canónica de una línea, compartida con la tarjeta. Ver el encabezado
 // de `escalaFisicaDeLinea`: leer `unidadEnviada` crudo devuelve null en las
 // líneas con snapshot, y null se lee como "no hay diferencia".
-import { fisicasEnviadasDe, fisicasRecibidasDe } from "@/lib/transferencias/recepcionUI";
+import {
+  contarCorregidas,
+  fisicasEnviadasDe,
+  fisicasRecibidasDe,
+} from "@/lib/transferencias/recepcionUI";
 import { firmaDeEdicion } from "@/lib/transferencias/presentacionEnvio";
 
 /** El texto del buscador, el mismo patrón que Productos y el POS. */
@@ -146,6 +150,24 @@ export default function RecepcionMovil({
 }) {
   const [masAcciones, setMasAcciones] = useState(false);
   const [infoGeneral, setInfoGeneral] = useState(false);
+
+  // ── EL AVISO DE LO QUE SE ACABA DE GUARDAR ──────────────────────────────
+  //
+  // Guardar CIERRA la hoja y devuelve al buscador —eso no cambia, es lo que
+  // hace que 77 líneas sean 77 toques y no 154—. Lo que faltaba era ver QUÉ
+  // quedó guardado: la hoja se iba y con ella el número que uno acababa de
+  // escribir, sin confirmación de ningún tipo.
+  //
+  // Se va solo a los seis segundos, o antes si se guarda la siguiente. El timer
+  // se limpia al desmontar y en cada aviso nuevo: sin eso, guardar cinco líneas
+  // seguidas deja cinco temporizadores vivos y el último apaga un aviso que ya
+  // no es el suyo.
+  const [guardado, setGuardado] = useState(null);
+  useEffect(() => {
+    if (!guardado) return undefined;
+    const id = setTimeout(() => setGuardado(null), 6000);
+    return () => clearTimeout(id);
+  }, [guardado]);
 
   const pendientes = resumen?.pendientes ?? 0;
   const todoRevisado = pendientes === 0 && (resumen?.totalRemito ?? 0) > 0;
@@ -238,6 +260,9 @@ export default function RecepcionMovil({
   // —el avance ya está arriba y los tabs ya traen su número— pero las reglas son
   // las mismas, y el servidor las vuelve a exigir de todas formas.
   const trabado = !todoRevisado || sinMotivo > 0 || sinCargar > 0;
+
+  /** Cuántas quedaron corregidas. Lo dice la barra y lo marca la lista. */
+  const corregidas = contarCorregidas(item?.items);
 
   /**
    * "35 de 36 unidades · faltó 1". En FÍSICO, que es lo que mueve stock.
@@ -528,6 +553,32 @@ export default function RecepcionMovil({
           La misma fila que el escritorio: se toca la tarjeta entera y no hay
           botones adentro. */}
       <div className="space-y-3.5">
+        {/* ── LO QUE SE ACABA DE GUARDAR ────────────────────────────────
+            Cantidad Y plata, las dos. Con una sola no alcanza: "4 → 10" no dice
+            cuánto se movió el documento, y "$38.000 → $95.000" no dice de dónde
+            salió ese número. Es lo único que queda en pantalla después de que la
+            hoja se cierra sola. */}
+        {guardado && (
+          <div className="rounded-lg p-2 sunmi-state-success" aria-live="polite">
+            <p className="text-sm2 font-semibold sunmi-text-success break-words">
+              {guardado.nombre} · guardado
+            </p>
+            <p className="text-sm2 sunmi-text-muted break-words tabular-nums">
+              {guardado.huboCorreccion && guardado.de != null
+                ? `${fmtCantidad(guardado.de)} → ${fmtCantidad(guardado.a)} ${guardado.unidad}`
+                : `${fmtCantidad(guardado.a)} ${guardado.unidad}`}
+              {guardado.importeA != null && (
+                <>
+                  {"   ·   "}
+                  {guardado.huboCorreccion && guardado.importeDe != null
+                    ? `${formatearMoneda(guardado.importeDe)} → ${formatearMoneda(guardado.importeA)}`
+                    : formatearMoneda(guardado.importeA)}
+                </>
+              )}
+            </p>
+          </div>
+        )}
+
         {/* ── DOS VACÍOS QUE SIGNIFICAN COSAS DISTINTAS ─────────────────
             Una lista vacía porque el FILTRO tapó lo que hay no es lo mismo que
             una lista vacía porque el producto NO ESTÁ. Cuando `noFigura` ya lo
@@ -666,7 +717,20 @@ export default function RecepcionMovil({
         <div className="sticky bottom-0 z-10 -mx-4 px-4 pt-2 pb-2 border-t sunmi-divider sunmi-surface">
           <div className="flex items-center justify-between gap-3">
             <span className="min-w-0">
-              <span className="block text-sm2 sunmi-text-muted">Total</span>
+              {/* ── EL RÓTULO DICE CUÁNTAS SE CORRIGIERON ──────────────────
+                  Con 77 líneas, terminado el conteo, "Total" a secas no dice si
+                  hay algo que repasar antes de confirmar. El número sale de
+                  `contarCorregidas`, la MISMA función que decide qué línea de la
+                  lista se marca en warning: con dos criterios distintos la lista
+                  podría marcar tres y el pie decir dos. */}
+              <span
+                className={`block text-sm2 ${corregidas > 0 ? "sunmi-text-warning" : "sunmi-text-muted"}`}
+              >
+                Total
+                {corregidas > 0
+                  ? ` · ${corregidas} ${corregidas === 1 ? "corregido" : "corregidos"}`
+                  : ""}
+              </span>
               <span className="block tabular-nums text-lg2 font-semibold sunmi-text-strong">
                 {formatearMoneda(importeSinDiferencia)}
               </span>
@@ -719,7 +783,13 @@ export default function RecepcionMovil({
             onQuitar={onQuitarLinea}
             quitando={quitandoId === seleccionado.id}
             enHoja
-            onGuardado={onCerrarProducto}
+            onGuardado={(loGuardado) => {
+              // El aviso se arma ACÁ y no adentro de la ficha: la ficha se
+              // desmonta al cerrarse la hoja, así que un aviso dibujado allá se
+              // iría justo cuando hay que leerlo.
+              setGuardado(loGuardado || null);
+              onCerrarProducto?.();
+            }}
           />
         )}
       </SunmiModalLayout>

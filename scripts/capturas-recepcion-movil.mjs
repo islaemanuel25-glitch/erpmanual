@@ -217,6 +217,12 @@ async function afirmar(condicion, mensaje) {
   throw new Error(`FALLÓ: ${mensaje}\n  En pantalla había:\n${visto}`);
 }
 
+/** ¿Existe un control visible con ese nombre accesible EXACTO? */
+const hayEtiquetaTocable = (etiqueta) =>
+  evaluar(`[...document.querySelectorAll('button, a, [role="button"]')]
+    .filter((n) => n.offsetParent !== null)
+    .some((n) => (n.getAttribute('aria-label') || '') === ${JSON.stringify(etiqueta)})`);
+
 /** ¿El texto está en pantalla AHORA? Sin esperar: para afirmar, no para sincronizar. */
 const hayTexto = (fragmento) =>
   evaluar(`document.body ? document.body.innerText.includes(${JSON.stringify(fragmento)}) : false`);
@@ -337,6 +343,52 @@ const tonoDelResultado = () =>
       .find((e) => /\\bde\\b.*·/.test(e.innerText || ''));
     if (!n) return '(no está)';
     return /sunmi-state-success/.test(n.className) ? 'positivo' : 'danger';
+  })()`);
+
+/**
+ * EL IMPORTE QUE EL PANEL ESTÁ MOSTRANDO, como número.
+ *
+ * Se busca el renglón rotulado —"Importe corregido" cuando hay diferencia,
+ * "Importe" cuando no— y se devuelve su valor en centavos enteros, para poder
+ * compararlo sin pelear con el formato. `null` si no está.
+ *
+ * Se lee por el RÓTULO y no por una clase: el rótulo es el contrato con el que
+ * mira la pantalla, y una clase de layout es lo que un rediseño mueve.
+ */
+const importeDelPanel = () =>
+  evaluar(`(() => {
+    const filas = [...document.querySelectorAll('div')].filter((n) => n.offsetParent !== null);
+    const fila = filas.reverse().find((n) => {
+      const t = (n.innerText || '').trim();
+      return /^Importe( corregido)?\\n/.test(t) && n.children.length === 2;
+    });
+    if (!fila) return null;
+    const crudo = (fila.children[1].innerText || '').replace(/[^0-9,-]/g, '').replace(',', '.');
+    const v = Number(crudo);
+    return Number.isFinite(v) ? Math.round(v * 100) : null;
+  })()`);
+
+/**
+ * CÓMO QUEDÓ MARCADA UNA FILA COLAPSADA: "corregida", "coincide" o "(no está)".
+ *
+ * Se pregunta por la CLASE de estado del kit y por el ícono, que son las dos
+ * señales del diseño. No por el color calculado: eso lo resuelve el tema y
+ * cambia en los catorce, así que afirmar un RGB sería afirmar el tema que tenga
+ * puesto el arnés.
+ */
+const marcaDeFila = (nombreProducto) =>
+  evaluar(`(() => {
+    const producto = ${JSON.stringify(nombreProducto)};
+    const n = [...document.querySelectorAll('[data-tarjeta-recepcion]')]
+      .filter((e) => e.offsetParent !== null)
+      .find((e) => (e.getAttribute('data-tarjeta-recepcion') || '').includes(producto));
+    if (!n) return '(no está)';
+    const warning = /sunmi-state-warning/.test(n.className || '');
+    const lapiz = !!n.querySelector('.lucide-pencil');
+    const tilde = !!n.querySelector('.lucide-check');
+    if (warning && lapiz && !tilde) return 'corregida';
+    if (!warning && tilde && !lapiz) return 'coincide';
+    return 'mezcla: warning=' + warning + ' lapiz=' + lapiz + ' tilde=' + tilde;
   })()`);
 
 /** ¿El botón de confirmar está trabado? Se lee del DOM, no de la foto. */
@@ -743,13 +795,25 @@ for (const ancho of ANCHOS) {
     );
     // Pero SÍ conserva la vuelta. Sin esto, contar mal y guardar deja la línea
     // sin arreglo posible desde el teléfono, que es donde se recibe.
+    //
+    // El V23 sacó el botón con caja, así que ya no hay un texto "Corregir" que
+    // buscar: la fila entera es el control y lo que la nombra es su `aria-label`.
+    // Se afirma sobre eso, que además comprueba que el control tenga nombre
+    // accesible —tocable con el dedo y mudo para el lector es un defecto—.
     await afirmar(
-      trasCoincidir.includes("Corregir"),
+      await hayEtiquetaTocable(`Corregir ${COINCIDE}`),
       "la línea revisada conserva el camino de vuelta"
     );
-    await tocarEnTarjeta(COINCIDE, "Corregir", { etiqueta: "corregir una línea YA revisada", exacto: true });
+    // ── V23 · LA LÍNEA ENTERA ES EL ÁREA TOCABLE ──────────────────────
+    //
+    // El botón con caja se fue: a 390 px se comía el nombre, que es lo que dice
+    // sobre qué línea se está trabajando. Ahora se toca la fila, y por eso el
+    // arnés la toca por su NOMBRE y no por un rótulo de botón.
+    await tocarEnTarjeta(COINCIDE, `Corregir ${COINCIDE}`, {
+      etiqueta: "la fila entera de una línea ya revisada",
+    });
     await esperar(1200);
-    await afirmar(await panelAbierto(), "y ese «Corregir» abre el mismo panel");
+    await afirmar(await panelAbierto(), "tocar la fila entera no abrió el panel");
     await tocar("Cerrar", { etiqueta: "cerrar el panel sin tocar nada" });
     await esperar(900);
     await afirmar(!(await panelAbierto()), "cerrar sin guardar deja la línea como estaba");
@@ -803,8 +867,50 @@ for (const ancho of ANCHOS) {
       await hayTexto("✓ Marcar revisado y seguir"),
       "sin diferencia el botón no dice «Marcar revisado»"
     );
-    // El panel es lo que esta tanda rediseñó: sin foto no queda registro.
-    desbordes += await foto("V22-panel-sin-diferencia", ancho);
+    // ── V23 · LOS − / + Y EL BLOQUE DE IMPORTE ────────────────────────
+    //
+    // El bloque de plata tiene que estar de entrada y moverse con los botones.
+    // Es lo que hace que corregir deje de ser a ciegas: hasta el V23 el impacto
+    // recién se veía cerrando la hoja.
+    await afirmar(await hayTexto("Importe"), "el panel no muestra el importe de la línea");
+    const importeAlAbrir = await importeDelPanel();
+    await afirmar(
+      importeAlAbrir !== null,
+      "no se pudo leer el importe del panel para compararlo después"
+    );
+    desbordes += await foto("V23-panel-sin-diferencia", ancho);
+
+    // Un toque al − del campo de completos tiene que mover la plata.
+    await tocar("Restar uno a Cantidad recibida", { etiqueta: "el − de completos" });
+    await esperar(700);
+    const importeTrasMenos = await importeDelPanel();
+    await afirmar(
+      importeTrasMenos !== importeAlAbrir,
+      `el − no movió el importe: quedó en ${importeTrasMenos}`
+    );
+    await afirmar(
+      await hayTexto("Importe del remito"),
+      "con diferencia el panel no muestra los tres renglones de plata"
+    );
+    await afirmar(await hayTexto("Diferencia"), "falta el renglón de la diferencia");
+
+    // Y el + lo devuelve: los dos botones tienen que ser simétricos.
+    await tocar("Sumar uno a Cantidad recibida", { etiqueta: "el + de completos" });
+    await esperar(700);
+    await afirmar(
+      (await importeDelPanel()) === importeAlAbrir,
+      "el + no devolvió el importe al valor de partida"
+    );
+
+    // El segundo campo también tiene sus botones, y también mueven la plata.
+    await tocar("Sumar uno a Unidades sueltas", { etiqueta: "el + de sueltas" });
+    await esperar(700);
+    await afirmar(
+      (await importeDelPanel()) !== importeAlAbrir,
+      "el + de las unidades sueltas no movió el importe"
+    );
+    await tocar("Restar uno a Unidades sueltas", { etiqueta: "el − de sueltas" });
+    await esperar(700);
 
     // ── PASO 3 · EL PANEL EXIGE EL MOTIVO, Y GUARDA ────────────────────
     //
@@ -875,15 +981,56 @@ for (const ancho of ANCHOS) {
       trasCorregir.includes("$21.000,00"),
       "el importe de la tarjeta no siguió a la cantidad corregida"
     );
+    // Y el del REMITO también, tachado arriba. Esta afirmación estaba al revés
+    // hasta el V23 y tenía razón mientras el botón "Corregir" ocupaba el
+    // renglón: no entraban los dos. Sacado el botón, entran — y son justo el par
+    // que dice cuánto se movió el documento sin abrir la línea.
     await afirmar(
-      !trasCorregir.includes("$31.500,00"),
-      "la línea colapsada sigue mostrando el importe del remito"
+      trasCorregir.includes("$31.500,00"),
+      "la línea corregida perdió el importe del remito"
     );
     // Dos: la que coincidió y ésta. El numerador es `revisados + noDeclarados`
     // y el denominador `totalFisico`, que es la misma fuente del tab "Todos".
     await afirmar(
       await hayTexto("2 / 4 revisados"),
       "y el AVANCE de arriba se movió: el total lo recalculó el servidor"
+    );
+
+    // ── V23 · EL AVISO DE LO QUE SE GUARDÓ ────────────────────────────
+    //
+    // Guardar cierra la hoja y devuelve al buscador. Sin el aviso, el número que
+    // uno acaba de escribir se va con la hoja y no queda confirmación de nada.
+    await afirmar(
+      await hayTexto(`${FALTANTE} · guardado`),
+      "no salió el aviso de lo que se acaba de guardar"
+    );
+    await afirmar(
+      await hayTexto("144 → 96"),
+      "el aviso no dice de cuánto a cuánto quedó la CANTIDAD"
+    );
+    await afirmar(
+      await hayTexto("$31.500,00 → $21.000,00"),
+      "el aviso no dice de cuánto a cuánto quedó la PLATA"
+    );
+
+    // ── V23 · LA LÍNEA CORREGIDA SE VE DISTINTA DE LA QUE COINCIDE ────
+    const marcaCorregida = await marcaDeFila(FALTANTE);
+    const marcaCoincide = await marcaDeFila(COINCIDE);
+    await afirmar(
+      marcaCorregida === "corregida",
+      `la línea corregida no se marca como tal: quedó «${marcaCorregida}»`
+    );
+    await afirmar(
+      marcaCoincide === "coincide",
+      `la línea que coincide se marcó como corregida: quedó «${marcaCoincide}»`
+    );
+    await afirmar(
+      (await textoDeTarjeta(FALTANTE)).includes("enviado 6 → contaste 4"),
+      "la línea corregida no dice de cuánto a cuánto"
+    );
+    await afirmar(
+      await hayTexto("1 corregido"),
+      "la barra de abajo no dice cuántas líneas se corrigieron"
     );
 
     // ── PASO 4 · CON DIFERENCIA SIN MOTIVO, EL CIERRE SIGUE TRABADO ────

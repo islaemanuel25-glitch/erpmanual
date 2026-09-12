@@ -142,7 +142,14 @@ test("C7. LA BÚSQUEDA VIVE EN EL WORKSPACE, no en la composición móvil", () =
   for (const prohibido of ["fetch(", "useMemo(", "buscar-productos-origen"]) {
     assert.ok(!movil.includes(prohibido), `la composición móvil está decidiendo: «${prohibido}»`);
   }
-  assert.equal((movil.match(/useState\(/g) || []).length, 2, "el móvil se guardó estado de negocio");
+  // Enumerado por nombre y no contado: un número no dice QUÉ se guardó. Ver el
+  // mismo cambio, con su motivo, en `recepcionMovilV2.test.mjs` — 8b.
+  const estados = [...movil.matchAll(/const \[(\w+), set\w+\] = useState\(/g)].map((m) => m[1]);
+  assert.deepEqual(
+    estados.sort(),
+    ["guardado", "infoGeneral", "masAcciones"],
+    "el móvil se guardó estado de negocio"
+  );
 
   const ws = codigoDe(WORKSPACE);
   assert.match(ws, /buscar-productos-origen/, "el cerebro dejó de consultar el catálogo");

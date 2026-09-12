@@ -150,13 +150,23 @@ test("6. el producto se presenta en una hoja del kit, no en un overlay a mano", 
   );
 
   // La ficha va SIN su tarjeta adentro de la hoja, y cierra sola al guardar.
+  //
+  // `onGuardado` dejó de ser `onCerrarProducto` a secas: el V23 le pasa además
+  // QUÉ se guardó, para el aviso que queda arriba de la lista. Lo que este
+  // candado defiende no cambió —que guardar CIERRA la hoja— y se afirma sobre
+  // eso: el envoltorio tiene que seguir llamando a `onCerrarProducto`.
   assert.match(movil, /enHoja\n/);
-  assert.match(movil, /onGuardado=\{onCerrarProducto\}/);
+  assert.match(movil, /onGuardado=\{/, "la ficha dejó de avisar cuando guarda");
+  assert.match(
+    movil,
+    /onCerrarProducto\?\.\(\)/,
+    "guardar dejó de cerrar la hoja: el salto a la línea siguiente se perdió"
+  );
 
   const ficha = codigoDe(FICHA);
   assert.match(ficha, /const Envoltorio = enHoja \? "div" : SunmiCard/);
-  // Y solo cierra cuando salió BIEN.
-  assert.match(ficha, /setError\([\s\S]{0,80}\);\s*return;\s*\}\s*onGuardado\?\.\(\)/);
+  // Y solo cierra cuando salió BIEN: el `return` del error va ANTES del aviso.
+  assert.match(ficha, /setError\([\s\S]{0,80}\);\s*return;\s*\}[\s\S]{0,900}onGuardado\?\.\(\{/);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -228,9 +238,22 @@ test("8b. UNA sola lógica: la composición móvil no decide nada", () => {
     );
   }
 
-  // Su único estado son las dos hojas que abre. Eso es qué se ve, no negocio.
-  const estados = [...movil.matchAll(/useState\(/g)];
-  assert.equal(estados.length, 2, "la composición móvil se guardó estado de negocio");
+  // ── SU ESTADO SE ENUMERA POR NOMBRE, NO SE CUENTA ──────────────────────
+  //
+  // Contaba `useState(` y exigía 2. El V23 sumó un tercero —el aviso de lo que
+  // se acaba de guardar— y el candado se puso rojo, con razón: había que
+  // mirarlo. Pero subir el número a 3 no afirma nada, porque un 3 puede ser
+  // "dos hojas y un aviso" o "dos hojas y el filtro que se trajo del cerebro".
+  //
+  // Enumerados por nombre, el candado dice QUÉ puede guardar el móvil. Los tres
+  // son presentación: dos hojas abiertas y un aviso efímero. El día que aparezca
+  // un cuarto hay que nombrarlo acá y decir por qué no es negocio.
+  const estados = [...movil.matchAll(/const \[(\w+), set\w+\] = useState\(/g)].map((m) => m[1]);
+  assert.deepEqual(
+    estados.sort(),
+    ["guardado", "infoGeneral", "masAcciones"],
+    "la composición móvil se guardó estado que no es de presentación"
+  );
 
   // Y el cerebro le pasa lo que ya calculó.
   const ws = codigoDe(WORKSPACE);
