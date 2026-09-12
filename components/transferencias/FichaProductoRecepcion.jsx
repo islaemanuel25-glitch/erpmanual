@@ -44,7 +44,10 @@ import { BadgeAgregado, fmtCantidad, fmtDiferencia } from "./detallePresentacion
 // y que NO se puede cambiar sin mover esa tabla.
 import { formatearMoneda } from "@/lib/moneda";
 import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
-import { motivosParaDiferencia, resultadoDeConteo } from "@/lib/transferencias/recepcionUI";
+// `resultadoDeConteo` se importaba acá para el renglón teñido. Se dio de baja
+// con el V26: sin ese renglón y sin el aviso de la tarjeta quedó sin un solo
+// consumidor, que es el patrón del `conImporte`.
+import { motivosParaDiferencia } from "@/lib/transferencias/recepcionUI";
 import { ESTADO_PRODUCTO, estadoDeProducto } from "@/lib/transferencias/controlFisico";
 import {
   ORIGEN_PRESENTACION,
@@ -154,7 +157,18 @@ const TONO_ESTADO = Object.freeze({
  * es lo que está escrito, no un número. Un `""` es "todavía no escribió nada" y
  * no es lo mismo que un 0, que es "contó y no llegó ninguno".
  */
-function CampoConPasos({ valor, onCambiar, etiqueta }) {
+/**
+ * `difiere` pinta el campo en danger — el número Y el borde, a 2 px.
+ *
+ * Es TODO lo que el V26 dejó para decir que hay una diferencia. Antes había un
+ * renglón teñido debajo que decía "3 PACK x4 de 2 PACK x4 · sobran 4 unidades":
+ * tres datos que ya estaban en pantalla —el enviado arriba, lo contado en esta
+ * misma caja, y la resta de los dos— dichos otra vez y en prosa.
+ *
+ * El color no va solo: el importe de abajo también pasa a danger y muestra el
+ * del remito tachado. Un color por sí mismo no se lee, pero acá no está solo.
+ */
+function CampoConPasos({ valor, onCambiar, etiqueta, difiere = false }) {
   const paso = (delta) => {
     const n = Number(valor === "" ? 0 : valor);
     const base = Number.isFinite(n) ? n : 0;
@@ -174,7 +188,11 @@ function CampoConPasos({ valor, onCambiar, etiqueta }) {
   // número, que a 13 px entra hasta cinco dígitos. Si algún día el campo baja de
   // ahí, el número es lo que empieza a apretar — no el botón.
   return (
-    <span className="flex items-center rounded-lg border sunmi-divider">
+    <span
+      className={`flex items-center rounded-lg ${
+        difiere ? "border-2 sunmi-border-danger" : "border sunmi-divider"
+      }`}
+    >
       <SunmiLinkButton
         onClick={() => paso(-1)}
         aria-label={`Restar uno a ${etiqueta}`}
@@ -183,13 +201,20 @@ function CampoConPasos({ valor, onCambiar, etiqueta }) {
         <Minus size={16} aria-hidden="true" />
       </SunmiLinkButton>
       {/* `border-0` y centrado: el marco es del envoltorio, no del campo. Si el
-          input trajera el suyo se verían dos cajas, una adentro de la otra. */}
+          input trajera el suyo se verían dos cajas, una adentro de la otra.
+
+          `text-lg` son los 18 px que pide el V26. Es el tamaño de Tailwind sin
+          redefinir, no un valor escrito a mano: ver el comentario de `base2` en
+          el config. Era el número más chico del panel siendo el único dato que
+          la persona escribe. */}
       <SunmiInput
         type="number"
         value={valor}
         onChange={(e) => onCambiar(e.target.value)}
         aria-label={etiqueta}
-        className="w-full border-0 text-center"
+        className={`w-full border-0 text-center text-lg ${
+          difiere ? "sunmi-text-danger" : ""
+        }`}
       />
       <SunmiLinkButton
         onClick={() => paso(1)}
@@ -368,26 +393,25 @@ export default function FichaProductoRecepcion({
     ? `${nombreDePresentacion(envio)} completos`
     : `Recibido en ${nombreDePresentacion(envio)}`;
 
-  /**
-   * "1 PACK x12 · 12 unidades físicas", en un renglón.
-   *
-   * Las dos mitades son las que el panel ya mostraba por separado: el rótulo del
-   * envío con sus sueltas, y las unidades físicas cuando significan algo.
-   * `rotuloFisicoDeEnvio` devuelve `null` en KG, PIEZA y UNIDAD a propósito
-   * —llamarle "unidades físicas" a 3,250 KG es la mentira que ese helper evita—,
-   * así que ahí el renglón queda con una sola mitad y no con un separador
-   * colgando.
-   */
-  const fisicoDelEnvio = rotuloFisicoDeEnvio(envio);
-  const rotuloDeEnvioUnaLinea = `${rotuloConSueltas(envio)}${
-    fisicoDelEnvio ? ` · ${fisicoDelEnvio}` : ""
-  }`;
+  // Acá se armaba `rotuloDeEnvioUnaLinea` —"1 PACK x12 · 12 unidades físicas"—
+  // para el renglón del enviado en el teléfono. El V26 le sacó la segunda mitad:
+  // son la misma cantidad dicha dos veces, y la segunda en la escala en la que
+  // NO se cuenta. La hoja usa `rotuloConSueltas(envio)` directo.
+  //
+  // `rotuloFisicoDeEnvio` NO se fue del archivo: escritorio lo sigue usando, y es
+  // donde vive la regla de que a 3,250 KG no se le dice "3,250 unidades físicas"
+  // —devuelve `null` en KG, PIEZA y UNIDAD, con un candado por presentación en
+  // `presentacionEnvio.test.mjs`—.
 
-  // Una agregada no tiene remito contra el cual compararse, así que no hay
-  // "N de M" que decir. Su ingreso físico ya lo muestra la tarjeta.
-  const resultadoCorto = d.agregadoEnRecepcion
-    ? null
-    : resultadoDeConteo({ recibidas: fisicasEditadas, enviadas: fisicasEnviadas, envio });
+  // ── EL CAMPO SE PINTA EN DANGER, Y NO HAY RENGLÓN QUE LO EXPLIQUE ──────
+  //
+  // Acá se armaba `resultadoCorto` —"3 PACK x4 de 2 PACK x4 · sobran 4
+  // unidades"— para el renglón teñido de abajo. Se fue entero con el V26.
+  //
+  // Una agregada no tiene remito contra el cual compararse, así que nunca
+  // difiere: su cantidad no contradice a nadie, y pintarla de rojo diría que
+  // algo está mal cuando lo único que pasa es que llegó mercadería de más.
+  const campoDifiere = !d.agregadoEnRecepcion && hayDiferenciaFisica;
 
   // ── LA PLATA, EN VIVO ────────────────────────────────────────────────────
   //
@@ -524,17 +548,32 @@ export default function FichaProductoRecepcion({
           {!enHoja && (
             <h3 className="font-semibold sunmi-text-strong leading-tight break-words">{d.nombre}</h3>
           )}
-          <p className="text-sm2 sunmi-text-muted">
-            {d.categoria?.nombre || "Sin categoría"}
-            {d.codigoBarra ? ` · ${d.codigoBarra}` : ""}
-          </p>
+          {/* ── LA CATEGORÍA Y EL CÓDIGO SE VAN DEL TELÉFONO ─────────────
+              No ayudan a contar. A esta hoja se entra desde una tarjeta que ya
+              tiene el nombre, y en el celular ese renglón empujaba los campos
+              —que son lo único que hay que tocar— más abajo. En escritorio la
+              ficha convive con un listado y ahí sí sirven para ubicarse. */}
+          {!enHoja && (
+            <p className="text-sm2 sunmi-text-muted">
+              {d.categoria?.nombre || "Sin categoría"}
+              {d.codigoBarra ? ` · ${d.codigoBarra}` : ""}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <BadgeAgregado d={d} />
-          {/* El estado con TEXTO, no solo con color. */}
-          <span className={`text-sm2 font-semibold ${TONO_ESTADO[estado]}`}>
-            {TEXTO_ESTADO[estado]}
-          </span>
+          {/* ── EL ESTADO TAMPOCO VA EN LA HOJA ──────────────────────────
+              Decía "Pendiente de revisar" arriba a la derecha. Si la hoja está
+              abierta, la línea está pendiente: es la definición de estar acá.
+              `BadgeAgregado` se queda porque dice otra cosa —que esta línea no
+              venía en el remito— y eso no se deduce de estar en el panel.
+              Escritorio conserva el estado: ahí la ficha se lee al lado de otras
+              y el rótulo es lo que las distingue. */}
+          {!enHoja && (
+            <span className={`text-sm2 font-semibold ${TONO_ESTADO[estado]}`}>
+              {TEXTO_ESTADO[estado]}
+            </span>
+          )}
         </div>
       </div>
 
@@ -549,15 +588,24 @@ export default function FichaProductoRecepcion({
           misma división que ya usaba el botón de las sueltas. */}
       {enHoja ? (
         <div className="space-y-2">
-          {/* ── "ENVIADO" EN UNA SOLA LÍNEA ──────────────────────────────
+          {/* ── "ENVIADO" EN UNA SOLA LÍNEA, Y CON PESO ──────────────────
               Eran dos renglones —el rótulo arriba y el valor abajo— y el de
-              arriba no decía nada que el de abajo no dijera. Con el panel más
-              corto, el desplegable de motivo tiene lugar para abrirse, que es
-              el defecto que esta tanda vino a cerrar. */}
+              arriba no decía nada que el de abajo no dijera.
+
+              El V26 le sacó el "· N unidades físicas" y le subió el peso. Las
+              físicas eran la misma cantidad dicha otra vez: "2 PACK x4 · 8
+              unidades físicas" son dos formas del mismo número, y la segunda
+              está en la escala en la que NO se cuenta. La regla de cuándo esa
+              línea miente —3,250 KG no son "3,250 unidades"— sigue viva en
+              `rotuloFisicoDeEnvio`, que escritorio usa y tiene sus candados.
+
+              Y deja de ser un subtítulo gris: es la referencia contra la que se
+              cuenta, así que el rótulo va chico y gris y el dato va en 15
+              semibold y en el color de la marca. */}
           <div className="flex items-baseline gap-2">
-            <span className="text-sm2 sunmi-text-muted shrink-0">Enviado</span>
-            <span className="min-w-0 font-mono tabular-nums sunmi-text-strong truncate">
-              {d.agregadoEnRecepcion ? "—" : rotuloDeEnvioUnaLinea}
+            <span className="text-xs sunmi-text-muted shrink-0">Enviado</span>
+            <span className="min-w-0 text-base2 font-semibold tabular-nums sunmi-text-accent truncate">
+              {d.agregadoEnRecepcion ? "—" : rotuloConSueltas(envio)}
             </span>
           </div>
 
@@ -572,12 +620,15 @@ export default function FichaProductoRecepcion({
               muerta es una invitación a meterle algo. */}
           <div className="flex justify-between gap-2">
             <div className="w-35p">
-              <div className="text-xs2 sunmi-text-muted truncate">{rotuloDeCompletos}</div>
+              {/* 11 px y no 10: el rótulo dice en qué escala está el número de
+                  abajo, así que leerlo no es opcional. Ver `sm2` en el config. */}
+              <div className="text-sm2 sunmi-text-muted truncate">{rotuloDeCompletos}</div>
               {puedeRecibir ? (
                 <CampoConPasos
                   valor={recibido}
                   onCambiar={setRecibido}
                   etiqueta={`Cantidad recibida en ${nombreDePresentacion(envio)}`}
+                  difiere={campoDifiere}
                 />
               ) : (
                 <div className="font-mono tabular-nums sunmi-text-strong">
@@ -591,12 +642,16 @@ export default function FichaProductoRecepcion({
                 encima de sí mismo. */}
             {agrupaEsta && (
               <div className="w-35p">
-                <div className="text-xs2 sunmi-text-muted truncate">{ROTULO_SUELTAS_CAMPO}</div>
+                <div className="text-sm2 sunmi-text-muted truncate">{ROTULO_SUELTAS_CAMPO}</div>
+                {/* `difiere` va en los DOS campos, porque los dos suman al total
+                    que difiere: marcar solo el de completos diría que las
+                    sueltas están bien cuando puede ser al revés. */}
                 {puedeRecibir ? (
                   <CampoConPasos
                     valor={sueltas}
                     onCambiar={setSueltas}
                     etiqueta={ROTULO_SUELTAS_CAMPO}
+                    difiere={campoDifiere}
                   />
                 ) : (
                   <div className="font-mono tabular-nums sunmi-text-strong">
@@ -695,69 +750,37 @@ export default function FichaProductoRecepcion({
         </div>
       )}
 
-      {/* ── EL RESULTADO — V22, SOLO EN EL TELÉFONO ─────────────────────────
-          Teñido y en formato corto: "10 de 10 · sin diferencia" o
-          "47 de 48 · falta 1". Es el dato que decide si esta línea mueve stock
-          distinto del remito, y en gris chico competía con todo lo demás.
+      {/* ── LA PLATA DE ESTA LÍNEA — V26, SOLO EN EL TELÉFONO ───────────────
+          Acá arriba iba el renglón teñido —"3 PACK x4 de 2 PACK x4 · sobran 4
+          unidades"— y abajo el párrafo que explicaba qué son las unidades
+          sueltas. Los dos se fueron con el V26 y por el mismo motivo: decían
+          con palabras algo que la pantalla ya muestra. El enviado está arriba,
+          lo contado está en el campo, y la diferencia es la resta de los dos.
+          La explicación de las sueltas es una regla del sistema: va en un
+          manual, no repetida en cada línea de cada recepción.
 
-          El fondo y el número van del mismo color, y el color lo decide el
-          HECHO: positivo cuando coincide, danger cuando no. Ver
-          `resultadoDeConteo` para las tres decisiones del texto — el sentido al
-          derecho, el singular, y cuándo se nombra la unidad. */}
-      {enHoja && resultadoCorto && (
-        <div className={`rounded-lg p-2 ${hayDiferenciaFisica ? "sunmi-state-danger" : "sunmi-state-success"}`}>
-          <p
-            className={`text-md2 font-semibold tabular-nums ${
-              hayDiferenciaFisica ? "sunmi-text-danger" : "sunmi-text-success"
-            }`}
-            aria-live="polite"
-          >
-            {resultadoCorto}
-          </p>
-        </div>
-      )}
+          ── CÓMO SE DICE AHORA QUE HAY UNA DIFERENCIA ─────────────────────
+          Sin una palabra nueva: el número del campo y su borde en danger, y
+          acá el importe del remito TACHADO arriba y el corregido abajo en 22
+          px y en danger. El tachado no es lo mismo que el gris: gris dice
+          "secundario", tachado dice "esto ya no vale".
 
-      {/* ── LA PLATA DE ESTA LÍNEA — V23, SOLO EN EL TELÉFONO ───────────────
-          Tres renglones cuando hay diferencia y UNO cuando no: repetir el mismo
-          número tres veces con tres rótulos distintos es ruido que además
-          sugiere que pasó algo. Se recalcula con lo que se está tipeando, igual
-          que el ingreso físico y los motivos.
+          Se fueron también los tres rótulos —"Importe del remito", "Importe
+          corregido", "Diferencia"— y el renglón de la resta. Dos números, uno
+          tachado y el otro no, ya dicen de cuánto a cuánto sin nombrarlo.
 
-          ── Y ACÁ ESTABA LA OTRA MITAD DEL SALTO DEL V25 ──────────────────
-
-          El pedido decía "el panel crece cuando aparece el motivo", y eso es lo
-          que se ve. Pero al MEDIRLO —arnés de 390 px, `botonAVariasAlturas`— el
-          motivo resultó ser la mitad: este bloque pasaba de UN renglón a TRES al
-          mismo tiempo, y sumaba sus propios ~40 px.
-
-          Reservar solo el motivo dejaba el salto casi igual, y el candado habría
-          quedado verde afirmando un arreglo que no arreglaba. Los números están
-          en el arnés, al lado de la afirmación.
-
-          Por eso los tres renglones se dibujan SIEMPRE y lo que cambia es cuáles
-          se ven. La forma aprobada en el V23 no se mueve: sin diferencia se lee
-          un solo renglón que dice "Importe", igual que antes. */}
+          ── EL ALTO SIGUE RESERVADO, Y AHORA ES MÁS BARATO ────────────────
+          El renglón de arriba se dibuja SIEMPRE —mudo cuando no hay
+          diferencia— para que aparecer no empuje el botón de guardar. Que vaya
+          MUDO no es estilo: la primera versión dejaba el número puesto detrás
+          del `invisible` y ahí aparecía un "$ 0,00" sobre mercadería que sí
+          llegó, que es el defecto de la #195 escondido. Un hueco ocupa alto y
+          no dice nada. */}
       {enHoja && importeEditado != null && (
         <div className="space-y-0.5">
-          {/* El del remito: solo cuando hay algo contra qué comparar. Reserva su
-              alto siempre para que aparecer no empuje nada.
-
-              ── EL RENGLÓN RESERVADO VA MUDO, Y NO ES UN DETALLE ───────────
-              La primera versión dejaba el rótulo y el número puestos detrás del
-              `invisible`. Dos candados viejos se pusieron en rojo y los dos
-              tenían razón: el del V23 encontraba "Importe del remito" en una
-              línea que coincide, y el del `$0,00` encontraba un "$ 0,00" —la
-              diferencia de una línea sin diferencia— sobre mercadería que sí
-              llegó. Ese `$0,00` es el defecto de la #195, y que estuviera
-              invisible no lo hace inofensivo: el día que alguien saque el
-              `invisible` por cualquier motivo, vuelve dibujado.
-              Un hueco solo tiene que ocupar alto. No tiene que decir nada. */}
           {hayDiferenciaDeImporte && importeRemito != null ? (
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="text-sm2 sunmi-text-muted">Importe del remito</span>
-              <span className="tabular-nums text-sm2 sunmi-text-muted">
-                {formatearMoneda(importeRemito)}
-              </span>
+            <div className="tabular-nums text-sm2 line-through sunmi-text-muted">
+              {formatearMoneda(importeRemito)}
             </div>
           ) : (
             <div className="flex items-baseline justify-between gap-3" aria-hidden="true">
@@ -765,48 +788,28 @@ export default function FichaProductoRecepcion({
             </div>
           )}
 
-          {/* El renglón que SIEMPRE se ve. Cambia de rótulo, no de lugar. */}
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="text-sm2 sunmi-text-muted">
-              {hayDiferenciaDeImporte && importeRemito != null ? "Importe corregido" : "Importe"}
-            </span>
-            <span className="tabular-nums text-md2 font-semibold sunmi-text-strong">
-              {formatearMoneda(importeEditado)}
-            </span>
+          {/* El que SIEMPRE se ve, y el único número grande del bloque. */}
+          <div
+            className={`tabular-nums text-xl2 font-semibold ${
+              hayDiferenciaDeImporte && importeRemito != null
+                ? "sunmi-text-danger"
+                : "sunmi-text-strong"
+            }`}
+          >
+            {formatearMoneda(importeEditado)}
           </div>
 
-          {/* Falta es danger y sobra es warning: son dos hechos distintos y
-              el segundo no es un error — llegó mercadería de más. */}
-          {hayDiferenciaDeImporte && importeRemito != null ? (
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="text-sm2 sunmi-text-muted">Diferencia</span>
-              <span
-                className={`tabular-nums text-sm2 font-semibold ${
-                  diferenciaImporte < 0 ? "sunmi-text-danger" : "sunmi-text-warning"
-                }`}
-              >
-                {diferenciaImporte > 0 ? "+" : "−"}
-                {formatearMoneda(Math.abs(diferenciaImporte))}
-              </span>
-            </div>
-          ) : (
-            <div className="flex items-baseline justify-between gap-3" aria-hidden="true">
-              {/* Un espacio DURO. Un espacio común lo colapsa el navegador y el
-                  renglón mediría cero, que es no reservar nada. */}
-              <span className="text-sm2 sunmi-text-muted">{" "}</span>
-            </div>
-          )}
+          {/* Acá iba el renglón de la diferencia —"−$4.200,00"—. Es la resta de
+              los dos números de arriba, y los dos están a la vista. Se fue con
+              su hueco: un renglón que no aparece nunca no necesita lugar. */}
         </div>
       )}
 
-      {/* La explicación de qué son las sueltas, para que nadie las lea como una
-          cantidad alternativa. Solo donde hay bultos que abrir. */}
-      {enHoja && agrupaEsta && (
-        <p className="text-sm2 sunmi-text-muted">
-          El envío sigue siendo {nombreDePresentacion(envio)}. Las unidades sueltas solo explican un
-          bulto abierto o una rotura.
-        </p>
-      )}
+      {/* Acá iba el párrafo que explicaba qué son las unidades sueltas —"El
+          envío sigue siendo PACK x4. Las unidades sueltas solo explican un
+          bulto abierto o una rotura."—. Es una regla del sistema y no un dato
+          de esta línea: va en un manual, no repetida en cada línea de cada
+          recepción. El rótulo del campo ya dice "Unidades sueltas". */}
 
       {/* El total físico y la diferencia, en escritorio. */}
       {!enHoja && fisicasEditadas != null && (
@@ -938,9 +941,12 @@ export default function FichaProductoRecepcion({
                 // la hoja y deja el buscador listo para el producto siguiente.
                 // Y nombra lo que se está guardando, que con una diferencia en
                 // pantalla no es lo mismo que "revisado".
+                // El V26 les sacó dos palabras: "Marcar" no agrega nada al tilde
+                // que ya está adelante, y "diferencia" la dice el campo en rojo
+                // y el importe tachado. Lo que queda es qué pasa al tocarlo.
                 diferenciaFisica
-                ? "✓ Guardar diferencia y seguir"
-                : "✓ Marcar revisado y seguir"
+                ? "✓ Guardar y seguir"
+                : "✓ Revisado y seguir"
               : d.revisadoEnRecepcion
               ? "✓ Revisado — guardar de nuevo"
               : "✓ Marcar como revisado"}

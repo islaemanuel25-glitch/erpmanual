@@ -149,7 +149,17 @@ test("F1. UNIDAD: un solo costo, el de la unidad, y su total", () => {
       subtotal: 18600,
     })
   );
-  assert.match(t, /Enviado 6 UNIDAD · \$3\.100,00/);
+  // ── EL V26 LE SACÓ EL COSTO UNITARIO A ESTE RENGLÓN ────────────────────
+  //
+  // Decía "Enviado 6 UNIDAD · $3.100,00". El importe de la línea ya está abajo
+  // a la derecha y en grande: eran dos datos distintos peleando por el mismo
+  // renglón. Queda el enviado, y el dinero en un solo lugar.
+  //
+  // Lo que este candado defiende no cambió —que la tarjeta muestre el importe
+  // correcto y en la escala correcta—, cambió dónde se lo lee.
+  assert.match(t, /Enviado/);
+  assert.match(t, /6 UNIDAD/);
+  assert.doesNotMatch(t, /6 UNIDAD · \$/, "volvió el costo unitario al renglón del enviado");
   assert.match(t, /\$18\.600,00/);
 
   // Y LA MISMA LÍNEA CORREGIDA: 6 enviadas, 10 recibidas. El importe que la
@@ -171,10 +181,20 @@ test("F1. UNIDAD: un solo costo, el de la unidad, y su total", () => {
 
 test("F2. PACK con factor 6: el costo es el DEL PACK, con su factor", () => {
   const t = pintarMovil(linea());
-  assert.match(t, /Enviado 2 PACK x6 · \$11\.400,00/);
+  assert.match(t, /Enviado/);
+  assert.match(t, /2 PACK x6/);
+  assert.doesNotMatch(t, /2 PACK x6 · \$/, "volvió el costo del pack al renglón del enviado");
   assert.match(t, /\$22\.800,00/);
-  // Y la etiqueta de presentación de la fila del contador dice lo MISMO.
-  assert.match(t, /PACK x6/);
+  // ── Y LA PRESENTACIÓN APARECE UNA SOLA VEZ ────────────────────────────
+  //
+  // Es el otro defecto del V26: "PACK x6" salía DOS veces y las dos en gris
+  // chico —en el enviado y en la fila 2, que decía "PACK x6 · 12 unidades
+  // físicas"—. La fila 2 se fue; acá se afirma que no vuelva.
+  assert.equal(
+    (t.match(/PACK x6/g) || []).length,
+    1,
+    `la presentación aparece más de una vez en la tarjeta: ${t}`
+  );
 
   // CORREGIDA: 2 packs enviados, 5 recibidos. 5 × $11.400 = $57.000.
   const c = pintarMovil(linea({ cantidadRecibida: 5, subtotalRecibido: 57000 }));
@@ -219,6 +239,16 @@ test("F3. CAJÓN con factor 8: el vocabulario es el del dominio, no 'Bulto'", ()
 test("F4. NUNCA HAY DOS COSTOS EN LA MISMA TARJETA", () => {
   // Es la prohibición central del pedido: una línea que salió en pack NO puede
   // mostrar además el costo de la unidad suelta.
+  //
+  // ── EL V26 LO VOLVIÓ MÁS FUERTE, NO MÁS DÉBIL ─────────────────────────
+  //
+  // Antes se contaban las apariciones de "Enviado … · $" y se exigía UNA. Con el
+  // costo unitario fuera del renglón del enviado, ese patrón no puede aparecer
+  // nunca, así que contar uno sería contar nada — verde sobre algo que no
+  // existe, que es el patrón del `conImporte`.
+  //
+  // Ahora se cuentan los IMPORTES de la tarjeta, que es lo que el pedido decía:
+  // un solo número de plata por tarjeta pendiente.
   for (const caso of [
     linea(),
     linea({ unidadEnviada: "UNIDAD", factorPack: 1 }),
@@ -227,9 +257,9 @@ test("F4. NUNCA HAY DOS COSTOS EN LA MISMA TARJETA", () => {
   ]) {
     const t = pintarMovil(caso);
     assert.equal(
-      (t.match(/Enviado .* · \$/g) || []).length,
+      (t.match(/\$[\d.]+,\d\d/g) || []).length,
       1,
-      `la tarjeta muestra más de un costo: ${t}`
+      `la tarjeta muestra más de un importe: ${t}`
     );
   }
 });
@@ -238,7 +268,10 @@ test("F4. NUNCA HAY DOS COSTOS EN LA MISMA TARJETA", () => {
 
 test("F5. LA TARJETA NO RESUELVE LA PRESENTACIÓN POR SU CUENTA", () => {
   const fuente = codigoDe("components/transferencias/TarjetaRecepcionMovil.jsx");
-  assert.match(fuente, /nombreDePresentacion\(envio\)/);
+  // `nombreDePresentacion(envio)` se fue con la fila 2. El rótulo lo arma ahora
+  // `rotuloConSueltas`, que es del MISMO módulo canónico y además no pierde las
+  // sueltas — que es la razón por la que ese helper existe.
+  assert.match(fuente, /rotuloConSueltas\(envio\)/);
   assert.match(fuente, /from "@\/lib\/transferencias\/presentacionEnvio"/);
   assert.doesNotMatch(
     fuente,
@@ -270,7 +303,20 @@ test("F6. Y EL IMPORTE NO SE RECALCULA: sale tal cual del endpoint", () => {
   // cuál se dibuja, y eso se exige por separado —F13, F14 y F15— sobre el
   // render, que es donde se ve.
   const fuente = codigoDe("components/transferencias/TarjetaRecepcionMovil.jsx");
-  assert.match(fuente, /formatearMoneda\(d\.precioCosto\)/);
+  // ── Y EL V26 SACÓ EL COSTO UNITARIO, QUE ERA EL TERCER NÚMERO ──────────
+  //
+  // Exigía `formatearMoneda(d.precioCosto)` en el renglón del enviado. Ese
+  // renglón ya no lleva plata: el importe de la línea está abajo y en grande, y
+  // dos cifras en la misma tarjeta se leen como si una explicara a la otra.
+  //
+  // La afirmación se da vuelta y con eso dice MÁS: que el costo unitario no
+  // vuelva. Lo que el candado defiende —que los números salen del endpoint y la
+  // pantalla no multiplica— sigue abajo, intacto.
+  assert.doesNotMatch(
+    fuente,
+    /formatearMoneda\(d\.precioCosto\)/,
+    "volvió el costo unitario a la tarjeta"
+  );
   assert.match(fuente, /d\.subtotalRecibido/, "la tarjeta dejó de leer el importe recibido");
   assert.match(fuente, /d\.subtotal\b/, "la tarjeta dejó de leer el importe del remito");
   assert.doesNotMatch(

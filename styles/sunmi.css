@@ -449,6 +449,16 @@
 .sunmi-surface      { background: var(--app-bg); }
 .sunmi-surface-soft { background: var(--app-input-bg); }
 .sunmi-border       { border: 1px solid var(--app-border); }
+/* ── SOLO EL COLOR DEL BORDE, SIN EL GROSOR ──────────────────────────────
+   `.sunmi-border` declara el `border` ENTERO —grosor, estilo y color—, así que
+   combinarla con un `border-2` de Tailwind es pedirle a dos reglas de la misma
+   familia que se pongan de acuerdo sobre el grosor. Gana el orden de la hoja y
+   no el del atributo: exactamente el defecto que `lib/sunmi/claseAncho.js`
+   documenta.
+   Esta declara el color y nada más, así que el grosor lo sigue decidiendo quien
+   la usa. Primera consumidora: el campo del panel de recepción cuando lo contado
+   difiere del remito, que va a 2 px. */
+.sunmi-border-danger { border-color: var(--pos-danger, #ef4444); }
 
 /* --- Texto semántico --- */
 .sunmi-text-muted   { color: color-mix(in srgb, var(--app-fg) 60%, transparent); }

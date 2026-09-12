@@ -50,6 +50,18 @@ module.exports = {
         // `sm2` — el sufijo `2` marca los tamaños propios del proyecto.
         md2: "16px",
         lg2: "17px",
+        // ── LOS DOS DE LA LIMPIEZA V26 ────────────────────────────────────
+        //
+        // El diseño pide la presentación del enviado en 15 y el importe del
+        // panel en 22. Los otros dos que pide —12 para el rótulo "Enviado" y 18
+        // para el número adentro del campo— NO están acá a propósito: son
+        // `text-xs` y `text-lg` de Tailwind, que este proyecto no redefine, y
+        // agregarlos sería un segundo nombre para un tamaño que ya tiene uno.
+        //
+        // Mismo motivo que `md2` y `lg2`: van al config y no como `text-[15px]`
+        // en el componente, que es lo que el trinquete prohíbe.
+        base2: "15px",
+        xl2: "22px",
       },
 
       boxShadow: {

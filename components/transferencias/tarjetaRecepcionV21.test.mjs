@@ -190,7 +190,15 @@ test("V21-3. 'Cargar sueltas' y 'Total línea' salieron de la tarjeta", () => {
 test("V21-4. PENDIENTE: la referencia del remito y el caso feliz a un toque", () => {
   const t = pintar(linea());
   assert.match(t, /Pancho 24 Als/);
-  assert.match(t, /Enviado 6 PACK x24/, "no está la referencia de lo enviado");
+  // ── SIN ESPACIO ENTRE EL RÓTULO Y EL DATO, Y NO ES UN DESCUIDO ─────────
+  //
+  // El V26 partió este renglón en dos nodos —"Enviado" en 12 gris, "6 PACK x24"
+  // en 15 semibold—, y `texto()` saca las etiquetas sin poner espacios: lo que
+  // queda es "Enviado6 PACK x24". Exigir el espacio haría fallar al candado
+  // sobre un render correcto, que es peor que no tenerlo. Es la misma trampa que
+  // este archivo ya tiene anotada para el `\b` de "falta 1".
+  assert.match(t, /Enviado/, "no está el rótulo de lo enviado");
+  assert.match(t, /6 PACK x24/, "no está la referencia de lo enviado");
   assert.match(t, /\$31\.500,00/, "no está el importe de la línea");
   assert.match(t, new RegExp(TEXTO_COINCIDE.replace("✓", "✓")));
   assert.match(t, new RegExp(TEXTO_CORREGIR));
@@ -200,17 +208,45 @@ test("V21-4. PENDIENTE: la referencia del remito y el caso feliz a un toque", ()
   assert.match(c, /\$52\.500,00/, "la tarjeta no muestra el importe de lo RECIBIDO");
 });
 
-test("V21-5. LA FILA 2 DICE QUÉ HAY, Y ES TEXTO", () => {
-  // Intacta: la presentación y cuántas unidades físicas son.
+// ── EL V26 SACÓ LA FILA 2 ENTERA, Y ACÁ ESTÁ QUÉ PASÓ CON CADA MITAD ─────
+//
+// Decía dos cosas distintas según el estado:
+//
+//   · sin conteo, "PACK x24 · 144 unidades físicas". Eso era la presentación
+//     dicha por SEGUNDA vez —ya está arriba, en el enviado— más las físicas, que
+//     son la misma cantidad en la escala en la que no se cuenta. Se fue, y el
+//     candado que lo afirmaba se dio de baja: solo afirmaba que el texto estaba.
+//
+//   · con conteo, "Recibido 5 PACK x24 + 7 unidades sueltas". Eso SÍ traía un
+//     dato propio, y por eso el candado no se borró: se mudó. Lo contado subió
+//     al renglón de arriba con la forma de la línea corregida.
+//
+// La regla de que a 3,250 KG no se le dice "unidades físicas" nunca vivió acá:
+// vive en `rotuloFisicoDeEnvio`, con un candado por presentación en
+// `presentacionEnvio.test.mjs`. Sacar esta fila no la afloja.
+
+test("V21-5. LA PRESENTACIÓN APARECE UNA SOLA VEZ, Y CON PESO", () => {
   const t = pintar(linea());
-  assert.match(t, /PACK x24 · 144 unidades físicas/);
+  assert.equal(
+    (t.match(/PACK x24/g) || []).length,
+    1,
+    `la presentación aparece más de una vez: ${t}`
+  );
+  assert.doesNotMatch(t, /unidades físicas/, "volvió la línea de las físicas");
 });
 
-test("V21-6. CON UN CONTEO GUARDADO, LA FILA 2 PASA A DECIR LO RECIBIDO", () => {
+test("V21-6. CON UN CONTEO GUARDADO, LO CONTADO SE DICE CON LA FLECHA", () => {
   // 5 packs + 7 sueltas: el caso que un contador de un número no podía
-  // representar sin escribir 5,29 packs.
+  // representar sin escribir 5,29 packs. Ese sigue siendo el punto.
+  //
+  // Lo nuevo es la FORMA: la misma que la línea ya revisada y corregida, porque
+  // es el mismo hecho —conté algo distinto del remito— en otro momento. Sale de
+  // `correccionDeCantidad`, una sola función para los dos.
   const t = pintar(linea({ cantidadRecibida: 5, recibidoUnidadesSueltas: 7 }));
-  assert.match(t, /Recibido 5 PACK x24 \+ 7 unidades sueltas/);
+  assert.match(t, /6 → 5 PACK x24 \+ 7 unidades sueltas/);
+  // Y el enviado deja de decirse aparte: la flecha ya lo dice.
+  assert.doesNotMatch(t, /Enviado/, "quedaron el enviado y la corrección a la vez");
+  assert.doesNotMatch(t, /Recibido/, "volvió el rótulo de la fila 2");
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -226,43 +262,42 @@ test("V21-7. CON DIFERENCIA NO SE OFRECE 'Coincide': el único camino es Corregi
   assert.match(t, new RegExp(TEXTO_CORREGIR));
 });
 
-// ── EL V25 HIZO QUE LA TARJETA TAMBIÉN HABLE EN PACKS ────────────────────
+// ── EL AVISO DE DIFERENCIA SE FUE, Y ESTO ES LO QUE QUEDÓ EN SU LUGAR ────
 //
-// Estos dos decían "96 de 144 · faltan 48" sobre una línea que se cuenta en
-// PACK x24. Ninguno de los tres números era el que la persona tenía delante: el
-// campo del panel dice "PACK x24 completos" y el operador cuenta 4.
+// Decía "Ingreso físico 4 PACK x24 de 6 PACK x24 · faltan 48 unidades". El V26
+// lo sacó por el criterio de toda esa tanda: el enviado ya está en el renglón de
+// arriba, lo contado también, y "faltan 48" es la resta de los dos.
 //
-// La tarjeta no tiene una redacción propia —sale de `resultadoDeConteo`, que es
-// la misma función que usa el panel—, así que este cambio la siguió sola. Es
-// justamente el motivo por el que el texto vive en el dominio y no acá: si cada
-// superficie tuviera su copia, hoy la tarjeta y el panel dirían cosas distintas
-// sobre la misma línea y en la misma pantalla.
+// Los dos candados que afirmaban esa redacción se dieron de baja —solo afirmaban
+// que el texto estaba— y `resultadoDeConteo`, que la producía, se dio de baja
+// con ellos: se quedó sin un solo consumidor, que es el patrón del `conImporte`.
+//
+// Lo que se queda es el HECHO, dicho con la flecha y con la misma función que la
+// línea ya corregida. Eso se afirma en V21-6 y acá, del otro lado.
 
-test("V21-8. EL AVISO DE DIFERENCIA ES UNA LÍNEA Y HABLA EN LA ESCALA DEL CONTEO", () => {
-  // 4 packs de 24 contra 6 enviados. La diferencia sigue en unidades, con la
-  // palabra escrita: con la cabeza en packs, un "48" pelado serían 48 packs.
-  const faltante = pintar(linea({ cantidadRecibida: 4 }));
-  assert.match(faltante, /Ingreso físico 4 PACK x24 de 6 PACK x24 · faltan 48 unidades/);
-  assert.doesNotMatch(faltante, /96 de 144/, "volvió a hablar en unidades físicas");
-
-  const sobrante = pintar(linea({ cantidadRecibida: 9 }));
-  assert.match(sobrante, /Ingreso físico 9 PACK x24 de 6 PACK x24 · sobran 72 unidades/);
+test("V21-8. NO VUELVE NINGUNA DE LAS DOS REDACCIONES VIEJAS", () => {
+  for (const caso of [
+    linea({ cantidadRecibida: 4 }),
+    linea({ cantidadRecibida: 9 }),
+    linea({ cantidadRecibida: 5, recibidoUnidadesSueltas: 23 }),
+  ]) {
+    const t = pintar(caso);
+    assert.doesNotMatch(t, /Ingreso físico/, "volvió el aviso de diferencia");
+    assert.doesNotMatch(t, /faltan|sobran|falta 1|sobra 1/, "volvió la resta dicha en palabras");
+    assert.doesNotMatch(t, /96 de 144|143 de 144/, "volvió a hablar en unidades físicas");
+  }
 });
 
-test("V21-9. UNA SOLA UNIDAD DE DIFERENCIA SE DICE EN SINGULAR", () => {
-  // 5 packs y 23 sueltas son 143 contra 144. Es el ejemplo textual del diseño
-  // —"falta 1"— y el caso más frecuente de todos: una unidad rota adentro de un
-  // pack. Ahora la cabeza muestra el pack abierto, que es lo que lo explica.
-  const t = pintar(
-    linea({ cantidadRecibida: 5, recibidoUnidadesSueltas: 23 })
-  );
-  // Sin `\b` al final: `texto()` saca las etiquetas sin poner espacios, así que
-  // el renglón siguiente queda pegado —"falta 1 unidadCorregir"— y ahí no hay
-  // frontera de palabra. El `\b` hacía fallar al candado sobre un render
-  // correcto, que es peor que no tenerlo.
-  assert.match(t, /Ingreso físico 5 PACK x24 \+ 23 de 6 PACK x24 · falta 1 unidad/);
-  assert.doesNotMatch(t, /faltan 1/);
-  // Y el resto del pack se dice como resto, no como fracción.
+test("V21-9. Y EL PACK ABIERTO SE SIGUE DICIENDO COMO RESTO, NUNCA COMO FRACCIÓN", () => {
+  // 5 packs y 23 sueltas son 143 contra 144. Es el caso más frecuente de todos
+  // —una unidad rota adentro de un pack— y el que un contador de un solo número
+  // no podía representar sin escribir 5,958 packs.
+  //
+  // Ése es el único de los tres que era una regla y no una redacción, así que es
+  // el único que sobrevive de este par. Su casa está en `conversionParaAdoptar`,
+  // con el candado 11d; acá se afirma que la pantalla la respeta.
+  const t = pintar(linea({ cantidadRecibida: 5, recibidoUnidadesSueltas: 23 }));
+  assert.match(t, /6 → 5 PACK x24 \+ 23 unidades sueltas/);
   assert.doesNotMatch(t, /5,958/, "apareció una fracción de pack");
 });
 
@@ -325,10 +360,22 @@ test("V23-1. UNA LÍNEA CORREGIDA NO SE VE COMO UNA QUE COINCIDE", () => {
 });
 
 test("V23-2. Y DICE CUÁNTO CAMBIÓ, no solo lo que quedó", () => {
-  // "enviado 6 → contaste 10 PACK x24". Sin el "de cuánto era" hay que abrir la
-  // línea para saber si la corrección fue de uno o de cincuenta.
+  // "6 → 10 PACK x24". Sin el "de cuánto era" hay que abrir la línea para saber
+  // si la corrección fue de uno o de cincuenta.
+  //
+  // ── EL V26 LE SACÓ DOS PALABRAS, Y NO ES UN AFLOJE ────────────────────
+  //
+  // Decía "enviado 6 → contaste 10 PACK x24". La flecha ya dice de qué a qué, y
+  // esos dos rótulos competían por el ancho con el nombre del producto —el caso
+  // está medido: con el botón puesto, los nombres se truncaban a "DON SATUR
+  // BIZCO…"—. Lo que el candado afirma es el HECHO, no las palabras: que se lean
+  // los dos números y la flecha entre ellos.
+  //
+  // Y la redacción es una sola para las dos superficies: esta línea colapsada y
+  // la tarjeta abierta con conteo sin revisar salen de `correccionDeCantidad`.
   const t = pintar(lineaCorregida({ revisadoEnRecepcion: true }));
-  assert.match(t, /enviado 6 → contaste 10/, "no dice de cuánto a cuánto se corrigió");
+  assert.match(t, /6 → 10 PACK x24/, "no dice de cuánto a cuánto se corrigió");
+  assert.doesNotMatch(t, /enviado 6|contaste/, "volvieron los rótulos que el V26 sacó");
 
   // La que coincide NO lleva flecha: no hubo corrección que contar.
   const c = pintar(linea({ revisadoEnRecepcion: true, cantidadRecibida: 6 }));
@@ -463,11 +510,18 @@ test("V21-13. UNA LÍNEA POR PESO SE LEE SIN MENTIR Y SE PUEDE CORREGIR", () => 
   assert.match(t, new RegExp(TEXTO_CORREGIR), "una línea por peso no se podía corregir");
 });
 
-test("V21-14. LA DIFERENCIA EN PESO SE EXPRESA EN KILOS", () => {
-  // 3,1 contra 3,25: faltan 0,15 KG. Decir "falta 0,15" a secas, sin unidad, es
-  // ambiguo justo donde la unidad no es la obvia.
+test("V21-14. UNA LÍNEA POR PESO NOMBRA SU UNIDAD, Y NO LA DA POR OBVIA", () => {
+  // 3,1 contra 3,25. Antes la tarjeta decía "faltan 0,15 KG" en su aviso, y lo
+  // que este candado defendía era la UNIDAD: decir "falta 0,15" a secas es
+  // ambiguo justo donde la escala no es la obvia.
+  //
+  // El V26 sacó el aviso —la resta de dos números que están los dos a la vista—,
+  // así que la afirmación se mueve a donde la unidad se dice ahora: los dos
+  // lados de la flecha. La regla no se aflojó; si alguno de los dos saliera
+  // pelado, esto se pone rojo.
   const t = pintar(lineaPeso({ cantidadRecibida: 3.1 }));
-  assert.match(t, /0,15 KG/);
+  assert.match(t, /3,25 → 3,1 KG/, "la línea por peso perdió su unidad");
+  assert.doesNotMatch(t, /faltan|0,15/, "volvió la resta dicha en palabras");
 });
 
 // ═══════════════════════════════════════════════════════════════════════════

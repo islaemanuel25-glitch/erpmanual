@@ -117,6 +117,37 @@ con el texto nuevo— **se deja a propósito**: decisión de Emanuel el 2026-09-
 porque cerrarlo obligaría a cambiar una forma aprobada en el V22 a cambio de 24
 píxeles en un caso donde el botón ya no se mueve.
 
+## EL PIE ANCLADO TAPA EL SÍNTOMA QUE SE MEDÍA. HAY QUE MEDIR EL CAMPO.
+
+**Encontrado el 2026-09-12 sacando una reserva a propósito, y es lo más útil de
+la tanda V26 para la próxima.**
+
+El V25 arregló dos cosas distintas sobre el mismo defecto —el panel crece cuando
+aparece el motivo— y una tapó a la otra:
+
+- **la reserva de alto**, que hace que el bloque del motivo ocupe su lugar aunque
+  la línea coincida;
+- **el pie anclado** con `sticky bottom-0`, que clava el botón de guardar.
+
+Con el V26 el panel se acortó bastante, así que se probó si la reserva ya sobraba
+—"no dejes andamiaje que ya no sostiene nada"—. Se la sacó y el arnés dio **137
+afirmaciones, todas en verde**: el botón seguía clavado en 379 px en las tres
+alturas.
+
+**Y el defecto estaba puesto.** Al medir también el CAMPO apareció: **274 → 212 a
+440 px de alto. Sesenta y dos píxeles**, mientras el dedo está tocando el − y
+el +. Con la reserva puesta da 213 → 212.
+
+La causa es la forma de la hoja: va pegada abajo —`justify-end`—, así que crecer
+la empuja hacia ARRIBA. El botón no se mueve porque está anclado; lo que se mueve
+es **todo lo demás**.
+
+**La lección, que vale para cualquier panel de esta familia:** medir el elemento
+ANCLADO para saber si algo se movió es medir justamente lo único que no puede
+moverse. Hay que medir lo que el dedo está usando. El arnés ahora afirma las dos
+cosas, en las tres alturas, con un margen de 1 px por el redondeo sub-píxel —y
+ese margen no puede tapar nada, porque el defecto medía 62.
+
 ## PENDIENTE: el panel de escritorio necesita su propio planteo
 
 **Anotado el 2026-09-12, decisión de Emanuel. No está hecho y es a propósito.**

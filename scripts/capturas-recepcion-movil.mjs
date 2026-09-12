@@ -228,6 +228,30 @@ const hayTexto = (fragmento) =>
   evaluar(`document.body ? document.body.innerText.includes(${JSON.stringify(fragmento)}) : false`);
 
 /**
+ * ¿Lo dice EL PANEL? No la pantalla entera.
+ *
+ * ── POR QUÉ HIZO FALTA, Y ES LA LECCIÓN DE SIEMPRE ───────────────────────
+ *
+ * El V26 sacó del panel los rótulos "Importe del remito", "Importe corregido" y
+ * "Diferencia", y la afirmación de que no volvieran se escribió con `hayTexto`,
+ * que mira `document.body`. Dio rojo enseguida — y tenía razón en dar rojo, pero
+ * por el motivo equivocado: **"Importe corregido" también lo dice la barra de
+ * totales de la pantalla**, que es otro dato y no se toca.
+ *
+ * Un candado que busca un texto en toda la página encuentra el de otro
+ * componente. Es el mismo error que este repo ya tiene anotado dos veces: el
+ * candado que miraba el lugar equivocado, y el que encontraba la palabra adentro
+ * de un comentario.
+ */
+const hayTextoEnPanel = (fragmento) =>
+  evaluar(`(() => {
+    const hoja = [...document.querySelectorAll('[role="dialog"]')]
+      .find((n) => n.getBoundingClientRect().height > 0);
+    if (!hoja) return '(panel cerrado)';
+    return (hoja.innerText || '').includes(${JSON.stringify(fragmento)});
+  })()`);
+
+/**
  * LA TARJETA DE UN PRODUCTO, Y SOLO ESA.
  *
  * Con cuatro tarjetas en pantalla, `tocar("Faltante")` se va a la primera que
@@ -365,6 +389,14 @@ const posicionDelBotonGuardar = () =>
       // desaparece y hay que buscarlo con el dedo.
       dentro: r.bottom <= window.innerHeight,
       viewport: window.innerHeight,
+      // Dónde queda el campo de completos. Es lo que la persona está mirando
+      // mientras toca el − y el +, así que si ESO se mueve al aparecer el motivo
+      // el defecto sigue existiendo aunque el botón esté anclado.
+      campo: (() => {
+        const c = [...document.querySelectorAll('input[type="number"]')]
+          .filter((n) => n.offsetParent !== null)[0];
+        return c ? Math.round(c.getBoundingClientRect().top) : null;
+      })(),
     };
   })()`);
 
@@ -391,25 +423,15 @@ async function botonAVariasAlturas(ancho) {
   return medidas;
 }
 
-/**
- * EL TONO DEL BLOQUE DE RESULTADO DEL PANEL: "positivo", "danger" o "(no está)".
- *
- * Se pregunta por la CLASE del kit y no por el color calculado: el color lo
- * resuelve el tema y cambia en cada uno de los catorce, así que afirmar un RGB
- * sería afirmar el tema que tenga puesto el arnés. La clase es la decisión.
- *
- * El bloque se identifica por su texto —el resultado corto es lo único que dice
- * "de" con un "·" al lado— y no por una clase de layout, que es lo que un
- * rediseño mueve.
- */
-const tonoDelResultado = () =>
-  evaluar(`(() => {
-    const n = [...document.querySelectorAll('div')]
-      .filter((e) => e.offsetParent !== null && /sunmi-state-(success|danger)/.test(e.className || ''))
-      .find((e) => /\\bde\\b.*·/.test(e.innerText || ''));
-    if (!n) return '(no está)';
-    return /sunmi-state-success/.test(n.className) ? 'positivo' : 'danger';
-  })()`);
+// Acá vivía `tonoDelResultado`, que leía si el bloque teñido del panel estaba en
+// success o en danger. El V26 sacó ese bloque y con eso la función quedó sin un
+// solo consumidor — el patrón del `conImporte`, y en un arnés es peor: una
+// función de medición que nadie llama se lee como cobertura que existe.
+//
+// Lo que la reemplaza mide MÁS y sobre el DOM vivo: el borde del campo que
+// difiere, su grosor en píxeles, y que el borde y el número compartan color. El
+// color tampoco se compara contra un RGB fijo, por el mismo motivo que estaba
+// escrito acá: lo decide el tema y cambia en los catorce.
 
 /**
  * EL IMPORTE QUE EL PANEL ESTÁ MOSTRANDO, como número.
@@ -423,13 +445,30 @@ const tonoDelResultado = () =>
  */
 const importeDelPanel = () =>
   evaluar(`(() => {
-    const filas = [...document.querySelectorAll('div')].filter((n) => n.offsetParent !== null);
-    const fila = filas.reverse().find((n) => {
-      const t = (n.innerText || '').trim();
-      return /^Importe( corregido)?\\n/.test(t) && n.children.length === 2;
+    // ── SE BUSCA POR LA FORMA DEL DATO, NO POR EL RÓTULO ─────────────────
+    //
+    // Antes se buscaba un div cuyo texto empezara con "Importe" o "Importe
+    // corregido" y tuviera dos hijos. El V26 le sacó los rótulos al bloque de
+    // plata —quedaron dos números, el del remito tachado y el corregido en 22
+    // px— y con eso ese ancla dejó de existir: la función devolvía null y el
+    // arnés lo habría leído como "no se pudo medir".
+    //
+    // Ahora se toman los nodos del PANEL cuyo texto ES un importe y no tienen
+    // hijos, y se elige el de letra más grande. Eso es exactamente lo que el
+    // diseño dice que hay que leer: el número grande es el que vale.
+    const hoja = [...document.querySelectorAll('[role="dialog"]')]
+      .find((n) => n.getBoundingClientRect().height > 0);
+    if (!hoja) return null;
+    const plata = [...hoja.querySelectorAll('*')].filter((n) => {
+      if (n.children.length > 0) return false;
+      if (n.getBoundingClientRect().height === 0) return false;
+      return /^\\$[\\d.]+,\\d\\d$/.test((n.textContent || '').trim());
     });
-    if (!fila) return null;
-    const crudo = (fila.children[1].innerText || '').replace(/[^0-9,-]/g, '').replace(',', '.');
+    if (plata.length === 0) return null;
+    const grande = plata.sort(
+      (a, b) => parseFloat(getComputedStyle(b).fontSize) - parseFloat(getComputedStyle(a).fontSize)
+    )[0];
+    const crudo = (grande.textContent || '').replace(/[^0-9,-]/g, '').replace(',', '.');
     const v = Number(crudo);
     return Number.isFinite(v) ? Math.round(v * 100) : null;
   })()`);
@@ -757,7 +796,10 @@ for (const ancho of ANCHOS) {
     // hoja no se abría nunca. El texto largo solo lo tienen las filas.
     await tocar("Pendiente de revisar", { etiqueta: "una fila del listado" });
     await esperarTexto("Enviado");
-    await esperarTexto("Ingreso físico");
+    // "y seguir" y no "Ingreso físico": el V26 sacó del panel el renglón teñido,
+    // y ese texto ya solo existe en escritorio. Lo que siempre está en la hoja,
+    // en los dos estados, es el botón que cierra la línea.
+    await esperarTexto("y seguir");
     desbordes += await foto("B-producto-abierto", ancho);
     await tocar("Cerrar");
 
@@ -803,7 +845,18 @@ for (const ancho of ANCHOS) {
     await afirmar(!(await hayContador()), "no quedó ningún contador − / + en la pantalla");
 
     const tCoincide = await textoDeTarjeta(COINCIDE);
-    await afirmar(tCoincide.includes("Enviado 10 UNIDAD"), "la referencia del remito está: 10 UNIDAD");
+    // Sin el espacio entre el rótulo y el dato: el V26 partió el renglón en dos
+    // nodos —"Enviado" en 12 gris, "10 UNIDAD" en 15 semibold— y `texto()` saca
+    // las etiquetas sin poner espacios. Exigirlo haría fallar al arnés sobre un
+    // render correcto.
+    await afirmar(tCoincide.includes("Enviado"), "falta el rótulo del enviado");
+    await afirmar(tCoincide.includes("10 UNIDAD"), "la referencia del remito está: 10 UNIDAD");
+    // V26 · el precio del remito se fue de este renglón: el importe ya está
+    // abajo a la derecha y en grande.
+    await afirmar(
+      !/10 UNIDAD\s*·\s*\$/.test(tCoincide),
+      "volvió el costo unitario al renglón del enviado"
+    );
     await afirmar(tCoincide.includes("✓ Coincide"), "el caso feliz se ofrece arriba a la derecha");
     await afirmar(tCoincide.includes("Corregir"), "y «Corregir» está en el pie");
     await afirmar(
@@ -813,31 +866,45 @@ for (const ancho of ANCHOS) {
 
     const tFaltante = await textoDeTarjeta(FALTANTE);
     await afirmar(
-      tFaltante.includes("Enviado 6 PACK x24"),
+      tFaltante.includes("6 PACK x24"),
       "y en la presentación: 6 PACK x24, no 144 unidades"
     );
+    // ── V26 · LA PRESENTACIÓN, UNA SOLA VEZ ──────────────────────────
+    //
+    // Aparecía DOS veces y las dos en gris chico: en el enviado y en la fila 2,
+    // que decía "PACK x24 · 144 unidades físicas". La fila 2 se fue entera.
     await afirmar(
-      tFaltante.includes("PACK x24 · 144 unidades físicas"),
-      "la fila 2 dice qué hay, en texto"
+      (tFaltante.match(/PACK x24/g) || []).length === 1,
+      `la presentación aparece más de una vez en la tarjeta: ${tFaltante}`
+    );
+    await afirmar(
+      !tFaltante.includes("unidades físicas"),
+      "volvió la fila de las unidades físicas"
     );
 
-    // La línea sembrada con sueltas ya nace con recepción cargada y diferencia.
+    // ── V26 · LO CONTADO SE DICE CON LA FLECHA ───────────────────────
+    //
+    // La línea sembrada con sueltas ya nace con recepción cargada y diferencia:
+    // 4 packs y 3 sueltas contra 4 packs enviados. Es el mismo hecho que la línea
+    // ya corregida —conté algo distinto del remito— en otro momento, así que se
+    // dibuja igual y con la misma función, `correccionDeCantidad`.
+    //
+    // Decía "Recibido 4 PACK x6 + 3 unidades sueltas" en la fila 2 y encima
+    // "Ingreso físico 4 PACK x6 + 3 de 4 PACK x6 · sobran 3 unidades" en el
+    // aviso: el mismo conteo escrito dos veces, y la segunda con la resta que es
+    // la resta de dos números que ya estaban a la vista.
     const tSueltas = await textoDeTarjeta(SUELTAS);
     await afirmar(
-      tSueltas.includes("Recibido 4 PACK x6 + 3 unidades sueltas"),
-      "con un conteo guardado, la fila 2 pasa a decir lo RECIBIDO"
-    );
-    // V25 · la TARJETA también pasó a hablar en packs. No tiene redacción
-    // propia: sale de `resultadoDeConteo`, la misma función que usa el panel, así
-    // que el cambio la siguió sola. Decía "27 de 24 · sobran 3" sobre una línea
-    // que se cuenta en PACK x6.
-    await afirmar(
-      tSueltas.includes("Ingreso físico 4 PACK x6 + 3 de 4 PACK x6 · sobran 3 unidades"),
-      "el aviso de diferencia no habla en la escala del conteo"
+      tSueltas.includes("4 → 4 PACK x6 + 3 unidades sueltas"),
+      `lo contado no se dice con la flecha: ${tSueltas}`
     );
     await afirmar(
-      !tSueltas.includes("27 de 24"),
-      "la tarjeta volvió a hablar en unidades físicas"
+      !tSueltas.includes("Ingreso físico") && !tSueltas.includes("sobran"),
+      "volvió el aviso de diferencia"
+    );
+    await afirmar(
+      !tSueltas.includes("Recibido") && !tSueltas.includes("27 de 24"),
+      "volvió la fila 2 con lo recibido"
     );
     await afirmar(
       !tSueltas.includes("Coincide"),
@@ -983,32 +1050,45 @@ for (const ancho of ANCHOS) {
       await hayTexto("completos"),
       "el rótulo del campo no dice la presentación"
     );
-    await afirmar(
-      await hayTexto("El envío sigue siendo"),
-      "falta la línea que explica qué son las unidades sueltas"
-    );
+    // ── V26 · NINGUNA DE LAS CADENAS QUE SE SACARON ──────────────────
+    //
+    // El renglón teñido —"2 PACK x4 de 2 PACK x4 · sin diferencia"—, el párrafo
+    // de las sueltas, el estado de arriba a la derecha, la categoría con el
+    // código de barras, y las unidades físicas al lado del enviado. Los cinco
+    // decían con palabras algo que la pantalla ya muestra.
+    //
+    // Se afirma ACÁ, con la línea coincidiendo, y otra vez más abajo con una
+    // diferencia escrita: un rediseño que saca prosa deja fácil una rama
+    // olvidada que la sigue dibujando en el caso que nadie miró.
+    for (const t of [
+      "sin diferencia",
+      "El envío sigue siendo",
+      "bulto abierto o una rotura",
+      "Pendiente de revisar",
+      "unidades físicas",
+      "Ingreso físico",
+    ]) {
+      await afirmar((await hayTextoEnPanel(t)) === false, `el panel sigue diciendo «${t}»`);
+    }
 
-    // El resultado arranca en POSITIVO: el panel propone lo enviado, así que
-    // sin tocar nada la línea coincide.
+    // El enviado, que ahora es la única referencia y va con peso.
+    await afirmar(await hayTexto("Enviado"), "falta el rótulo del enviado en el panel");
+
     await afirmar(
-      await hayTexto("sin diferencia"),
-      "el bloque de resultado no dice que la línea coincide"
-    );
-    const tonoInicial = await tonoDelResultado();
-    await afirmar(
-      tonoInicial === "positivo",
-      `el bloque de resultado tendría que arrancar en positivo y está en «${tonoInicial}»`
+      await hayTexto("✓ Revisado y seguir"),
+      "sin diferencia el botón no dice «Revisado y seguir»"
     );
     await afirmar(
-      await hayTexto("✓ Marcar revisado y seguir"),
-      "sin diferencia el botón no dice «Marcar revisado»"
+      (await hayTextoEnPanel("Marcar")) === false,
+      "volvió la palabra «Marcar», que el V26 sacó del botón"
     );
     // ── V23 · LOS − / + Y EL BLOQUE DE IMPORTE ────────────────────────
     //
     // El bloque de plata tiene que estar de entrada y moverse con los botones.
     // Es lo que hace que corregir deje de ser a ciegas: hasta el V23 el impacto
     // recién se veía cerrando la hoja.
-    await afirmar(await hayTexto("Importe"), "el panel no muestra el importe de la línea");
+    // Sin rótulo: el V26 se lo sacó al bloque de plata. Que el importe ESTÉ se
+    // afirma leyéndolo, que es más fuerte que buscar la palabra "Importe".
     const importeAlAbrir = await importeDelPanel();
     await afirmar(
       importeAlAbrir !== null,
@@ -1055,11 +1135,58 @@ for (const ancho of ANCHOS) {
       importeTrasMenos !== importeAlAbrir,
       `el − no movió el importe: quedó en ${importeTrasMenos}`
     );
+    // ── V26 · LOS DOS IMPORTES, SIN RÓTULOS ──────────────────────────
+    //
+    // Eran tres renglones rotulados. Ahora son dos números: el del remito
+    // tachado arriba y el corregido abajo en 22 px y en danger. Dos cifras, una
+    // tachada, dicen de cuánto a cuánto sin nombrarlo.
+    const plata = await evaluar(`(() => {
+      const tachado = [...document.querySelectorAll('[class*="line-through"]')]
+        .filter((n) => n.getBoundingClientRect().height > 0);
+      return { tachados: tachado.length, texto: tachado.map((n) => n.textContent.trim()) };
+    })()`);
     await afirmar(
-      await hayTexto("Importe del remito"),
-      "con diferencia el panel no muestra los tres renglones de plata"
+      plata && plata.tachados === 1,
+      `con diferencia tiene que haber UN importe tachado; hay ${plata?.tachados}: ${JSON.stringify(plata?.texto)}`
     );
-    await afirmar(await hayTexto("Diferencia"), "falta el renglón de la diferencia");
+    for (const t of ["Importe del remito", "Importe corregido", "Diferencia"]) {
+      await afirmar((await hayTextoEnPanel(t)) === false, `volvió el rótulo «${t}»`);
+    }
+
+    // ── V26 · Y EL CAMPO QUE DIFIERE VA EN DANGER ────────────────────
+    //
+    // Es la otra mitad de cómo se dice la diferencia sin una palabra nueva. Se
+    // mide sobre el DOM vivo y no sobre el JSX: lo que importa es que el borde
+    // esté DIBUJADO, y una clase escrita puede no llegar a la hoja.
+    const campoEnDanger = await evaluar(`(() => {
+      const campos = [...document.querySelectorAll('input[type="number"]')]
+        .filter((n) => n.offsetParent !== null);
+      return campos.map((n) => {
+        const marco = n.closest('span');
+        const cs = marco ? getComputedStyle(marco) : null;
+        return {
+          etiqueta: n.getAttribute('aria-label'),
+          borde: cs ? Math.round(parseFloat(cs.borderTopWidth)) : null,
+          colorBorde: cs ? cs.borderTopColor : null,
+          colorTexto: getComputedStyle(n).color,
+        };
+      });
+    })()`);
+    await afirmar(
+      Array.isArray(campoEnDanger) && campoEnDanger.length >= 1,
+      `no se pudo leer el marco de los campos: ${JSON.stringify(campoEnDanger)}`
+    );
+    await afirmar(
+      campoEnDanger.every((c) => c.borde === 2),
+      `el borde del campo que difiere tiene que ser de 2 px: ${JSON.stringify(campoEnDanger)}`
+    );
+    // El color NO se compara contra un RGB fijo: lo decide el tema y cambia en
+    // los catorce. Lo que se afirma es que el borde y el número compartan color,
+    // que es lo que hace que se lean como una sola señal.
+    await afirmar(
+      campoEnDanger.every((c) => c.colorBorde === c.colorTexto),
+      `el borde y el número del campo no van del mismo color: ${JSON.stringify(campoEnDanger)}`
+    );
 
     // Y el + lo devuelve: los dos botones tienen que ser simétricos.
     await tocar("Sumar uno a Cantidad recibida", { etiqueta: "el + de completos" });
@@ -1087,22 +1214,28 @@ for (const ancho of ANCHOS) {
     await escribirEnCampo(0, "4");
     await esperar(600);
 
-    // ── V25-2 · EL MENSAJE HABLA EN LA ESCALA EN LA QUE SE CUENTA ────────
+    // ── V26 · CON UNA DIFERENCIA ESCRITA, TAMPOCO HAY PROSA ──────────────
     //
-    // Decía "96 de 144 · faltan 48" sobre una línea que se cuenta en PACK x24:
-    // ninguno de los tres números era el que la persona tenía delante. El campo
-    // de arriba dice "PACK x24 completos" y acá se acaba de escribir un 4.
+    // Acá vivía el renglón teñido. El V25 lo había arreglado para que hablara en
+    // packs —decía "4 PACK x24 de 6 PACK x24 · faltan 48 unidades"— y el V26 lo
+    // sacó entero: el enviado está arriba, lo contado está en el campo que se
+    // acaba de escribir, y "faltan 48" es la resta de los dos.
     //
-    // La diferencia sigue en unidades y CON la palabra escrita: con la cabeza en
-    // packs, un "48" pelado se leería como 48 packs.
-    await afirmar(
-      await hayTexto("4 PACK x24 de 6 PACK x24 · faltan 48 unidades"),
-      "el panel no recalculó el resultado en la escala del conteo"
-    );
-    await afirmar(
-      !(await hayTexto("96 de 144")),
-      "el panel volvió a hablar en unidades físicas"
-    );
+    // Se vuelve a barrer la lista de cadenas, ahora en el OTRO estado. Un
+    // rediseño que saca prosa deja fácil una rama olvidada que la sigue
+    // dibujando en el caso que nadie miró.
+    for (const t of [
+      "faltan",
+      "sobran",
+      "sin diferencia",
+      "de 6 PACK x24",
+      "96 de 144",
+      "Ingreso físico",
+      "unidades físicas",
+      "El envío sigue siendo",
+    ]) {
+      await afirmar((await hayTextoEnPanel(t)) === false, `con diferencia el panel sigue diciendo «${t}»`);
+    }
 
     // ── V25-3 · Y EL BOTÓN DE GUARDAR NO SE MOVIÓ ────────────────────────
     //
@@ -1144,6 +1277,38 @@ for (const ancho of ANCHOS) {
           `${botonConDiferencia[h].top} px. El dedo va hacia él y toca otra cosa.`
       );
     }
+
+    // ── Y EL CAMPO TAMPOCO SE MUEVE, QUE ES LA MITAD QUE FALTABA ─────────
+    //
+    // MEDIDO el 2026-09-12, sacando la reserva del motivo a propósito: el botón
+    // seguía clavado en 379 en las tres alturas —lo ancla el `sticky`— y el
+    // CAMPO se iba de 274 a 212. Sesenta y dos píxeles, mientras el dedo está
+    // tocando el − y el +.
+    //
+    // O sea que el pie anclado tapaba el síntoma que se mide más arriba: la hoja
+    // va pegada abajo, así que crecer la empuja hacia ARRIBA y lo que se mueve es
+    // todo lo demás. Un candado que mirara solo el botón habría dado verde con el
+    // defecto puesto — y estuvo verde, 137 afirmaciones, durante una corrida.
+    //
+    // Por eso la reserva de alto NO es andamiaje que sobra después del anclaje:
+    // es lo único que sostiene esto.
+    // ── EL MARGEN ES DE 1 PX, Y NO ES UN AFLOJE ─────────────────────────
+    //
+    // Con la reserva puesta la medición da 213 → 212: un píxel, que es el
+    // redondeo sub-píxel de una columna con `space-y-0.5`. Sin la reserva da
+    // 274 → 212. Sesenta y dos contra uno: el margen no puede tapar el defecto
+    // que este candado vino a atrapar, y exigir cero pondría en rojo un render
+    // correcto — que es peor que no tener el candado.
+    const MARGEN_SUBPIXEL = 1;
+    for (const h of ALTURAS_DE_TELEFONO) {
+      const antes = botonSinDiferencia[h].campo;
+      const despues = botonConDiferencia[h].campo;
+      await afirmar(
+        antes !== null && despues !== null && Math.abs(antes - despues) <= MARGEN_SUBPIXEL,
+        `a ${h} px el campo se corrió al aparecer el motivo: ${antes} px → ${despues} px. ` +
+          "Se mueve mientras el dedo toca el − y el +."
+      );
+    }
     for (const h of ALTURAS_DE_TELEFONO) {
       await afirmar(
         botonSinDiferencia[h].dentro,
@@ -1157,22 +1322,21 @@ for (const ancho of ANCHOS) {
       );
     }
 
-    // ── EL TONO Y EL BOTÓN CAMBIAN CON LA DIFERENCIA ──────────────────
+    // ── EL BOTÓN CAMBIA CON LA DIFERENCIA ─────────────────────────────
     //
-    // Es lo que separa el bloque teñido de un adorno: tiene que reaccionar a lo
-    // que se está tipeando, no al estado guardado. Arriba se midió en positivo
-    // sin tocar nada; acá, con 4 escrito, tiene que estar en danger.
-    const tonoConDiferencia = await tonoDelResultado();
+    // Es lo que separa la señal de un adorno: tiene que reaccionar a lo que se
+    // está tipeando, no al estado guardado. Con 4 escrito, el botón dice otra
+    // cosa que con 6 — que es lo que se midió más arriba.
+    //
+    // El TONO del bloque teñido ya no se mide acá porque el bloque no existe: lo
+    // reemplazaron el campo en danger y el importe tachado, los dos afirmados
+    // arriba sobre el DOM vivo.
     await afirmar(
-      tonoConDiferencia === "danger",
-      `al generar una diferencia el bloque tendría que ponerse en danger y está en «${tonoConDiferencia}»`
-    );
-    await afirmar(
-      await hayTexto("✓ Guardar diferencia y seguir"),
+      await hayTexto("✓ Guardar y seguir"),
       "el botón no cambió de nombre al aparecer la diferencia"
     );
     await afirmar(
-      !(await hayTexto("✓ Marcar revisado y seguir")),
+      !(await hayTexto("✓ Revisado y seguir")),
       "quedaron los dos nombres del botón a la vez"
     );
     desbordes += await foto("V22-panel-con-diferencia", ancho);
@@ -1339,8 +1503,12 @@ for (const ancho of ANCHOS) {
       marcaCoincide === "coincide",
       `la línea que coincide se marcó como corregida: quedó «${marcaCoincide}»`
     );
+    // "6 → 4" y no "enviado 6 → contaste 4": el V26 le sacó los dos rótulos,
+    // que competían por el ancho con el nombre del producto. La flecha ya dice
+    // de qué a qué, y ahora la MISMA función lo dibuja acá y en la tarjeta
+    // abierta con conteo sin revisar — son el mismo hecho en dos momentos.
     await afirmar(
-      (await textoDeTarjeta(FALTANTE)).includes("enviado 6 → contaste 4"),
+      (await textoDeTarjeta(FALTANTE)).includes("6 → 4"),
       "la línea corregida no dice de cuánto a cuánto"
     );
     await afirmar(
@@ -1948,10 +2116,11 @@ for (const ancho of ANCHOS) {
       );
       if (!quedan) break;
       await tocar("Pendiente de revisar", { etiqueta: "el próximo pendiente" });
-      await esperarTexto("Ingreso físico");
-      // "y seguir" y no el texto entero: el botón dice "Marcar revisado y
-      // seguir" o "Guardar diferencia y seguir" según haya diferencia, y el
-      // arnés no tiene por qué saber cuál de los dos le toca a este producto.
+      // "y seguir" y no el texto entero: el botón dice "✓ Revisado y seguir" o
+      // "✓ Guardar y seguir" según haya diferencia, y el arnés no tiene por qué
+      // saber cuál de los dos le toca a este producto. Sirve además de espera:
+      // el V26 sacó del panel el "Ingreso físico" que antes se esperaba acá.
+      await esperarTexto("y seguir");
       await tocar("y seguir", { etiqueta: "el botón de marcar" });
       await esperar(1500);
     }
