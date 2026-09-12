@@ -176,8 +176,20 @@ function CampoConPasos({ valor, onCambiar, etiqueta }) {
     onCambiar(String(Math.max(0, base + delta)));
   };
 
+  // ── EL MARCO SE APRETÓ, PERO EL ÁREA TOCABLE NO ─────────────────────────
+  //
+  // El V24 bajó los campos de la mitad del ancho a 124 px, así que el marco va
+  // sin `gap` y sin relleno lateral propio. Lo que NO se achicó es el botón: el
+  // `px-2 py-1` de `.sunmi-btn-parte-pad-*` más el ícono de 16 dan una caja de
+  // 36 px de alto —el mínimo del kit— y unos 32 de ancho. Es lo que se toca con
+  // el pulgar, y apretarlo más para ganar píxeles sería cambiar espacio por
+  // toques fallados.
+  //
+  // Medido a 390: 124 de campo menos dos botones de ~32 dejan ~60 para el
+  // número, que a 13 px entra hasta cinco dígitos. Si algún día el campo baja de
+  // ahí, el número es lo que empieza a apretar — no el botón.
   return (
-    <span className="flex items-center gap-1 rounded-lg border sunmi-divider px-1">
+    <span className="flex items-center rounded-lg border sunmi-divider">
       <SunmiLinkButton
         onClick={() => paso(-1)}
         aria-label={`Restar uno a ${etiqueta}`}
@@ -434,6 +446,21 @@ export default function FichaProductoRecepcion({
     ? `${nombreDePresentacion(envio)} completos`
     : `Recibido en ${nombreDePresentacion(envio)}`;
 
+  /**
+   * "1 PACK x12 · 12 unidades físicas", en un renglón.
+   *
+   * Las dos mitades son las que el panel ya mostraba por separado: el rótulo del
+   * envío con sus sueltas, y las unidades físicas cuando significan algo.
+   * `rotuloFisicoDeEnvio` devuelve `null` en KG, PIEZA y UNIDAD a propósito
+   * —llamarle "unidades físicas" a 3,250 KG es la mentira que ese helper evita—,
+   * así que ahí el renglón queda con una sola mitad y no con un separador
+   * colgando.
+   */
+  const fisicoDelEnvio = rotuloFisicoDeEnvio(envio);
+  const rotuloDeEnvioUnaLinea = `${rotuloConSueltas(envio)}${
+    fisicoDelEnvio ? ` · ${fisicoDelEnvio}` : ""
+  }`;
+
   // Una agregada no tiene remito contra el cual compararse, así que no hay
   // "N de M" que decir. Su ingreso físico ya lo muestra la tarjeta.
   const resultadoCorto = d.agregadoEnRecepcion
@@ -649,16 +676,30 @@ export default function FichaProductoRecepcion({
           misma división que ya usaba el botón de las sueltas. */}
       {enHoja ? (
         <div className="space-y-2">
-          <div>
-            <div className="text-sm2 sunmi-text-muted">Enviado</div>
-            <div className="font-mono tabular-nums sunmi-text-strong">
-              {d.agregadoEnRecepcion ? "—" : rotuloConSueltas(envio)}
-            </div>
+          {/* ── "ENVIADO" EN UNA SOLA LÍNEA ──────────────────────────────
+              Eran dos renglones —el rótulo arriba y el valor abajo— y el de
+              arriba no decía nada que el de abajo no dijera. Con el panel más
+              corto, el desplegable de motivo tiene lugar para abrirse, que es
+              el defecto que esta tanda vino a cerrar. */}
+          <div className="flex items-baseline gap-2">
+            <span className="text-sm2 sunmi-text-muted shrink-0">Enviado</span>
+            <span className="min-w-0 font-mono tabular-nums sunmi-text-strong truncate">
+              {d.agregadoEnRecepcion ? "—" : rotuloDeEnvioUnaLinea}
+            </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <div className="text-sm2 sunmi-text-muted">{rotuloDeCompletos}</div>
+          {/* ── LOS DOS CAMPOS, AL 35 % Y CON UN HUECO EN EL MEDIO ───────
+              Ocupaban la mitad cada uno y llenaban el ancho. Bajan a 124 px
+              sobre 390 —el 35 % del contenedor— y el hueco del medio queda
+              VACÍO a propósito: es lo que separa dos cantidades que se leen de
+              un vistazo y no una columna que haya que llenar.
+
+              `justify-between` y no un grid de tres columnas: la del medio
+              tendría que existir para quedar vacía, y un grid con una celda
+              muerta es una invitación a meterle algo. */}
+          <div className="flex justify-between gap-2">
+            <div className="w-35p">
+              <div className="text-xs2 sunmi-text-muted truncate">{rotuloDeCompletos}</div>
               {puedeRecibir ? (
                 <CampoConPasos
                   valor={recibido}
@@ -676,8 +717,8 @@ export default function FichaProductoRecepcion({
                 cantidad YA está en unidades físicas y un desglose se sumaría
                 encima de sí mismo. */}
             {agrupaEsta && (
-              <div>
-                <div className="text-sm2 sunmi-text-muted">{ROTULO_SUELTAS_CAMPO}</div>
+              <div className="w-35p">
+                <div className="text-xs2 sunmi-text-muted truncate">{ROTULO_SUELTAS_CAMPO}</div>
                 {puedeRecibir ? (
                   <CampoConPasos
                     valor={sueltas}

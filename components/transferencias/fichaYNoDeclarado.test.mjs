@@ -515,6 +515,68 @@ test("V23-2b · UN NO DECLARADO NO SE VALORIZA EN $0,00 mientras se lo carga", (
   assert.ok(!/\$\s?0,00/.test(html), "volvió el $0,00 sobre mercadería que sí llegó");
 });
 
+// ── V24 · EL PANEL SE ACORTA PARA QUE EL MOTIVO QUEPA ────────────────────
+
+test("V24-1 · «Enviado» va en UNA sola línea, con las físicas al lado", () => {
+  // Eran dos renglones y el de arriba no decía nada que el de abajo no dijera.
+  // Con el panel más corto, el desplegable de motivo tiene lugar para abrirse
+  // hacia abajo — que es el defecto que esta tanda vino a cerrar.
+  const html = pintarFicha(lineaCajon(), { enHoja: true });
+  assert.ok(
+    html.includes("6 CAJÓN x8 · 48 unidades físicas"),
+    "«Enviado» no quedó en un renglón con sus unidades físicas"
+  );
+});
+
+test("V24-1b · en KG no cuelga un separador sin nada detrás", () => {
+  // `rotuloFisicoDeEnvio` devuelve null en KG, PIEZA y UNIDAD: llamarle
+  // "unidades físicas" a 3,250 KG es la mentira que ese helper evita. El
+  // renglón tiene que quedar con una sola mitad, no con un "·" colgando.
+  const html = pintarFicha(
+    lineaCajon({
+      presentacionEnvio: "KG",
+      factorPresentacion: null,
+      factorPack: 1,
+      unidadMedida: "kg",
+      cantidadEnviada: 3.25,
+      cantidadPresentada: 3.25,
+    }),
+    { enHoja: true }
+  );
+  assert.ok(!html.includes("unidades físicas"), "llamó «unidades físicas» a kilos");
+  assert.ok(!/·\s*<\/span>/.test(html), "quedó un separador sin nada detrás");
+});
+
+test("V24-2 · los dos campos van al 35 % y NO llenan el ancho", () => {
+  const html = pintarFicha(lineaCajon(), { enHoja: true });
+  // Dos veces la clase: un campo cada una. El hueco del medio queda vacío.
+  assert.equal(
+    (html.match(/w-35p/g) || []).length,
+    2,
+    "los dos campos tienen que ir al 35 %, ni uno ni tres"
+  );
+  assert.ok(!html.includes("grid-cols-2 gap-2"), "quedó el grid que llenaba el ancho");
+
+  // Y los rótulos bajan a 10 px, que es `text-xs2` y no un valor escrito a mano.
+  const src = codigoDe("components/transferencias/FichaProductoRecepcion.jsx");
+  assert.ok(!/text-\[10px\]/.test(src), "el rótulo usa una medida mágica en vez del token");
+});
+
+test("V24-2b · el botón del stepper NO se achicó: lo que cede es el número", () => {
+  // El área tocable es lo único que no se negocia por espacio. El botón se queda
+  // con el relleno del kit; lo que se apretó es el marco —sin `gap` ni padding
+  // lateral propio—.
+  const src = codigoDe("components/transferencias/FichaProductoRecepcion.jsx");
+  const marco = src.match(/<span className="flex items-center[^"]*rounded-lg border[^"]*">/);
+  assert.ok(marco, "no se encontró el marco del campo con pasos");
+  assert.ok(!/px-\d/.test(marco[0]), "el marco volvió a tener relleno lateral propio");
+  // Y el botón sigue sin declarar padding: usa el del kit, que da 36 px de alto.
+  assert.ok(
+    !/aria-label=\{`Restar uno[\s\S]{0,200}px-0|py-0/.test(src),
+    "se le sacó el relleno al botón, que es lo que se toca con el pulgar"
+  );
+});
+
 test("V23-1b · la unidad ya NO va adentro de la caja, y el kit no quedó con un prop muerto", () => {
   // `sufijo` era del V22 y se quedó sin un solo consumidor. Un prop del kit que
   // nadie pasa se lee como capacidad disponible y es la familia del `conImporte`
