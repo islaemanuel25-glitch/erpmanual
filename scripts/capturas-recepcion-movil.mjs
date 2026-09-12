@@ -319,6 +319,26 @@ const panelAbierto = () =>
     return hojas.length > 0 && campos.length > 0;
   })()`);
 
+/**
+ * EL TONO DEL BLOQUE DE RESULTADO DEL PANEL: "positivo", "danger" o "(no está)".
+ *
+ * Se pregunta por la CLASE del kit y no por el color calculado: el color lo
+ * resuelve el tema y cambia en cada uno de los catorce, así que afirmar un RGB
+ * sería afirmar el tema que tenga puesto el arnés. La clase es la decisión.
+ *
+ * El bloque se identifica por su texto —el resultado corto es lo único que dice
+ * "de" con un "·" al lado— y no por una clase de layout, que es lo que un
+ * rediseño mueve.
+ */
+const tonoDelResultado = () =>
+  evaluar(`(() => {
+    const n = [...document.querySelectorAll('div')]
+      .filter((e) => e.offsetParent !== null && /sunmi-state-(success|danger)/.test(e.className || ''))
+      .find((e) => /\\bde\\b.*·/.test(e.innerText || ''));
+    if (!n) return '(no está)';
+    return /sunmi-state-success/.test(n.className) ? 'positivo' : 'danger';
+  })()`);
+
 /** ¿El botón de confirmar está trabado? Se lee del DOM, no de la foto. */
 const cierreTrabado = () =>
   evaluar(`(() => {
@@ -740,10 +760,51 @@ for (const ancho of ANCHOS) {
     await tocarEnTarjeta(FALTANTE, "Corregir", { etiqueta: "la acción Corregir", exacto: true });
     await esperar(1200);
     await afirmar(await panelAbierto(), "«Corregir» abrió el panel de detalle");
+
+    // ── EL V22, EJERCIDO AL ABRIR Y SIN TOCAR NADA ────────────────────
+    //
+    // Los dos campos tienen que estar visibles de entrada. Un render a string
+    // ya lo afirma, pero acá se comprueba sobre el DOM vivo: si algo los
+    // ocultara por CSS —un `hidden` heredado, un contenedor de alto cero— el
+    // candado de render no lo vería y éste sí.
+    const camposAlAbrir = await evaluar(`(() => {
+      const vis = [...document.querySelectorAll('input[type="number"]')].filter((n) => n.offsetParent !== null);
+      return vis.map((n) => n.getAttribute('aria-label') || '(sin etiqueta)');
+    })()`);
     await afirmar(
-      await hayTexto("Ingreso físico"),
-      "y es el panel de siempre: el que muestra el ingreso físico"
+      Array.isArray(camposAlAbrir) && camposAlAbrir.length >= 2,
+      `el panel abre con los DOS campos; abrió con ${camposAlAbrir?.length}: ${JSON.stringify(camposAlAbrir)}`
     );
+    await afirmar(
+      camposAlAbrir.some((e) => /sueltas/i.test(e)),
+      "el campo de sueltas no está visible al abrir"
+    );
+    await afirmar(
+      await hayTexto("completos"),
+      "el rótulo del campo no dice la presentación"
+    );
+    await afirmar(
+      await hayTexto("El envío sigue siendo"),
+      "falta la línea que explica qué son las unidades sueltas"
+    );
+
+    // El resultado arranca en POSITIVO: el panel propone lo enviado, así que
+    // sin tocar nada la línea coincide.
+    await afirmar(
+      await hayTexto("sin diferencia"),
+      "el bloque de resultado no dice que la línea coincide"
+    );
+    const tonoInicial = await tonoDelResultado();
+    await afirmar(
+      tonoInicial === "positivo",
+      `el bloque de resultado tendría que arrancar en positivo y está en «${tonoInicial}»`
+    );
+    await afirmar(
+      await hayTexto("✓ Marcar revisado y seguir"),
+      "sin diferencia el botón no dice «Marcar revisado»"
+    );
+    // El panel es lo que esta tanda rediseñó: sin foto no queda registro.
+    desbordes += await foto("V22-panel-sin-diferencia", ancho);
 
     // ── PASO 3 · EL PANEL EXIGE EL MOTIVO, Y GUARDA ────────────────────
     //
@@ -753,9 +814,29 @@ for (const ancho of ANCHOS) {
     await escribirEnCampo(0, "4");
     await esperar(600);
     await afirmar(
-      await hayTexto("96"),
-      "el panel recalcula el ingreso físico: 4 packs de 24 son 96"
+      await hayTexto("96 de 144 · faltan 48"),
+      "el panel no recalculó el resultado en formato corto"
     );
+
+    // ── EL TONO Y EL BOTÓN CAMBIAN CON LA DIFERENCIA ──────────────────
+    //
+    // Es lo que separa el bloque teñido de un adorno: tiene que reaccionar a lo
+    // que se está tipeando, no al estado guardado. Arriba se midió en positivo
+    // sin tocar nada; acá, con 4 escrito, tiene que estar en danger.
+    const tonoConDiferencia = await tonoDelResultado();
+    await afirmar(
+      tonoConDiferencia === "danger",
+      `al generar una diferencia el bloque tendría que ponerse en danger y está en «${tonoConDiferencia}»`
+    );
+    await afirmar(
+      await hayTexto("✓ Guardar diferencia y seguir"),
+      "el botón no cambió de nombre al aparecer la diferencia"
+    );
+    await afirmar(
+      !(await hayTexto("✓ Marcar revisado y seguir")),
+      "quedaron los dos nombres del botón a la vez"
+    );
+    desbordes += await foto("V22-panel-con-diferencia", ancho);
 
     // Guardar SIN motivo tiene que rebotar, y el panel tiene que seguir abierto.
     await tocar("y seguir", { etiqueta: "guardar sin motivo" });
