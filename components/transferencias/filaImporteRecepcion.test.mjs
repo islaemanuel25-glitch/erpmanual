@@ -289,10 +289,16 @@ test("F4. NUNCA HAY DOS COSTOS EN LA MISMA TARJETA", () => {
 
 test("F5. LA TARJETA NO RESUELVE LA PRESENTACIÓN POR SU CUENTA", () => {
   const fuente = codigoDe("components/transferencias/TarjetaRecepcionMovil.jsx");
-  // `nombreDePresentacion(envio)` se fue con la fila 2. El rótulo lo arma ahora
-  // `rotuloConSueltas`, que es del MISMO módulo canónico y además no pierde las
-  // sueltas — que es la razón por la que ese helper existe.
-  assert.match(fuente, /rotuloConSueltas\(envio\)/);
+  // `nombreDePresentacion(envio)` se fue con la fila 2, y el rótulo pasó por dos
+  // manos más: `rotuloConSueltas` con el V26 y ahora `rotuloConSueltasCorto`,
+  // porque con la forma larga el enviado y el precio no entraban en un renglón y
+  // la tarjeta pasaba de dos líneas a cuatro.
+  //
+  // Los dos son del MISMO módulo canónico y ninguno pierde las sueltas: el corto
+  // dice los dos números y saca las dos palabras que la posición ya explica. Lo
+  // que este candado defiende —que la tarjeta no resuelva la presentación por su
+  // cuenta— no cambió.
+  assert.match(fuente, /rotuloConSueltasCorto\(envio\)/);
   assert.match(fuente, /from "@\/lib\/transferencias\/presentacionEnvio"/);
   assert.doesNotMatch(
     fuente,

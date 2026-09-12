@@ -122,6 +122,91 @@ test("1. sin recepción cargada, la ficha propone la cantidad EN LA PRESENTACIÓ
   assert.ok(html.includes("48 unidades físicas"), "se perdió la línea de unidades físicas");
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// EL ENVÍO MIXTO: LAS SUELTAS SE PROPONEN DEL ENVÍO, IGUAL QUE LOS PACKS
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// EL DEFECTO, VISTO EN PRODUCCIÓN. `CERVEZA 361 1L`, enviada como
+// "0 PACK x6 + 1 unidad suelta": el campo de packs precargaba 0 —bien, es lo
+// enviado— y el de sueltas quedaba EN BLANCO. Con eso el panel calculaba
+// 0 × 6 + 0 = 0 físicas contra 1 enviada, concluía que había diferencia, y
+// dibujaba el borde en danger y un "$0,00" con el importe tachado, sobre una
+// línea que coincide.
+//
+// La causa: los dos campos leían fuentes distintas. Packs, lo ENVIADO; sueltas,
+// lo ya RECIBIDO —que en una línea pendiente es 0—.
+//
+// ── Y ES LA SEXTA VEZ DEL MISMO PATRÓN ──────────────────────────────────
+//
+// Ningún fixture de este archivo tenía la combinación que lo destapa: una línea
+// con `sueltasEnviadas > 0` y SIN contar. `lineaCajon` tiene `sueltasEnviadas: 0`
+// y todos los casos con sueltas traían `recibidoUnidadesSueltas`. O sea que había
+// candados sobre el campo de sueltas y ninguno podía ver esto.
+//
+// Por eso el fixture va primero y con nombre propio.
+
+/** La línea real: 0 packs de 6 y una unidad suelta, sin contar todavía. */
+const lineaMixtaSinContar = (extra = {}) =>
+  lineaCajon({
+    nombre: "CERVEZA 361 1L",
+    presentacionEnvio: "PACK",
+    factorPresentacion: 6,
+    factorPack: 6,
+    unidadMedida: "pack",
+    cantidadEnviada: 1,
+    cantidadPresentada: 0,
+    sueltasEnviadas: 1,
+    cantidadRecibida: null,
+    recibidoUnidadesSueltas: 0,
+    precioCosto: 1480,
+    subtotal: 1480,
+    ...extra,
+  });
+
+test("MIXTO · las sueltas del envío se PRECARGAN, no quedan en blanco", () => {
+  const html = pintarFicha(lineaMixtaSinContar(), { enHoja: true });
+
+  assert.equal(valorDelCampo(html, "Cantidad recibida en PACK x6"), "0", "los packs no precargan 0");
+  assert.equal(
+    valorDelCampo(html, ROTULO_SUELTAS_CAMPO),
+    "1",
+    "el campo de sueltas quedó vacío: el panel va a declarar una diferencia que no existe"
+  );
+});
+
+test("MIXTO · y por lo tanto NO declara una diferencia que no existe", () => {
+  // La consecuencia, que es lo que se vio en la pantalla. Con las sueltas
+  // precargadas la línea coincide, así que no hay borde en danger, no hay importe
+  // tachado y no se pide motivo.
+  const html = pintarFicha(lineaMixtaSinContar(), { enHoja: true });
+
+  assert.ok(!html.includes("border-2 sunmi-border-danger"), "pintó en danger una línea que coincide");
+  assert.ok(!html.includes("line-through"), "tachó el importe de una línea que coincide");
+  assert.ok(!html.includes("$0,00"), "volvió el $0,00 sobre una línea que sí llegó");
+  assert.ok(html.includes("$1.480,00"), "perdió el importe de la línea");
+  assert.ok(
+    html.includes("data-motivo-reservado"),
+    "pidió motivo sobre una línea que coincide: el hueco tendría que estar reservado, no ocupado"
+  );
+});
+
+test("MIXTO · pero una línea YA CONTADA con 0 sueltas reales se queda en 0", () => {
+  // El otro lado, y es el que el arreglo podía romper: si ya se contó y no había
+  // ninguna suelta, ese 0 es un DATO —se miró y no había— y no puede volver al
+  // envío. Lo que lo distingue es `cantidadRecibida`, no las sueltas.
+  const html = pintarFicha(
+    lineaMixtaSinContar({ cantidadRecibida: 0, recibidoUnidadesSueltas: 0 }),
+    { enHoja: true }
+  );
+  assert.equal(
+    valorDelCampo(html, ROTULO_SUELTAS_CAMPO),
+    "",
+    "una línea contada con 0 sueltas volvió a proponer las del envío"
+  );
+  // Y ahí sí hay diferencia: se contó 0 contra 1 enviada.
+  assert.ok(html.includes("border-2 sunmi-border-danger"), "no marcó la diferencia de lo contado");
+});
+
 test("2. con recepción cargada gana lo persistido, no lo propuesto", () => {
   const html = pintarFicha(lineaCajon({ cantidadRecibida: 5, recibidoUnidadesSueltas: 7 }));
   assert.equal(valorDelCampo(html, "Cantidad recibida en CAJÓN x8"), "5");
@@ -149,7 +234,8 @@ test("4. en una línea SIN snapshot la propuesta sigue siendo la de siempre", ()
 
 test("5. la ficha no vuelve a leer `cantidadEnviada` para proponer", () => {
   const src = codigoDe("components/transferencias/FichaProductoRecepcion.jsx");
-  assert.match(src, /descriptorDeEnvio\(d \|\| \{\}\)\.cantidad/);
+  assert.match(src, /const env = descriptorDeEnvio\(d \|\| \{\}\)/);
+  assert.match(src, /sinContar \? env\.cantidad : d\.cantidadRecibida/);
   assert.ok(
     !/cantidadRecibida == null \? d\?\.cantidadEnviada/.test(src),
     "volvió el valor propuesto en escala física"
@@ -472,7 +558,13 @@ test("V23-1 · los dos campos tienen − y +, y el mínimo es 0", () => {
   // clic: una cantidad recibida negativa no existe y dejarla escribir obligaría
   // a validarla después.
   const src = codigoDe("components/transferencias/FichaProductoRecepcion.jsx");
-  assert.match(src, /Math\.max\(0,/, "el − puede bajar de cero");
+  // El piso ya no está en esta pantalla: el − y el + viven en
+  // `SunmiCampoCantidad`. Lo que esta pantalla tiene que seguir haciendo es
+  // PEDIR el mínimo 0 — el default del kit también es 0, pero pasarlo explícito
+  // es lo que hace que el día que el carrito lo cambie, recepción no lo herede.
+  assert.match(src, /minimo=\{0\}/, "la pantalla dejó de pedir el mínimo 0");
+  const kit = codigoDe("components/sunmi/SunmiCampoCantidad.jsx");
+  assert.match(kit, /Math\.max\(minimo,/, "el kit dejó de respetar el mínimo que le pasan");
 });
 
 test("V23-2 · el bloque de plata se recalcula con lo tipeado, y no fabrica un cero", () => {
@@ -600,20 +692,25 @@ test("V24-2 · los dos campos van al 35 % y NO llenan el ancho", () => {
 });
 
 test("V24-2b · el marco es del NÚMERO, y sus dos bordes son del kit", () => {
-  // El marco pasó por tres formas: cadena fija, después expresión con el borde
-  // negociado —V26—, y ahora envuelve SOLO al número con los botones afuera
-  // —V29—. Se lo busca por la expresión y no por el literal, que es lo que evita
-  // que un candado quede rojo por un cambio que no toca lo que defiende.
-  const src = codigoDe("components/transferencias/FichaProductoRecepcion.jsx");
-  const marco = src.match(/className=\{`min-w-0 flex-1 rounded-lg \$\{[\s\S]{0,160}?`\}/);
-  assert.ok(marco, "no se encontró el marco del campo con pasos");
+  // El marco pasó por cuatro formas: cadena fija, expresión con el borde
+  // negociado —V26—, envolviendo solo al número con los botones afuera —V29—, y
+  // ahora VIVE EN EL KIT: `SunmiCampoCantidad`, compartido con el carrito del POS.
+  //
+  // Así que lo que se afirma se partió en dos, y cada mitad donde vive:
+  //   · el kit dibuja el marco y sus dos bordes;
+  //   · esta pantalla PIDE que el marco crezca, que es lo suyo.
+  const kit = codigoDe("components/sunmi/SunmiCampoCantidad.jsx");
+  const marco = kit.match(/className=\{`min-w-0 rounded-lg \$\{[\s\S]{0,200}?`\}/);
+  assert.ok(marco, "no se encontró el marco del campo en el kit");
   assert.ok(!/px-\d/.test(marco[0]), "el marco volvió a tener relleno lateral propio");
-  // Las dos ramas del borde son del kit, no colores escritos a mano.
   assert.match(marco[0], /border-2 sunmi-border-danger/, "el borde de la diferencia no es del kit");
   assert.match(marco[0], /border sunmi-divider/, "se perdió el borde normal del campo");
-  // Y `min-w-0`: sin eso el input reclama su ancho intrínseco y empuja a los
-  // botones fuera de los 124 px del campo.
   assert.match(marco[0], /min-w-0/, "sin min-w-0 el input empuja a los botones afuera del campo");
+
+  // Y la pantalla le pide el `flex-1`: sin eso el marco no ocupa lo que sobra
+  // entre los dos botones y el número queda apretado en su ancho intrínseco.
+  const src = codigoDe("components/transferencias/FichaProductoRecepcion.jsx");
+  assert.match(src, /claseMarco="flex-1"/, "la pantalla dejó de pedir que el marco crezca");
 });
 
 // ── UNA CORRECCIÓN A ESTE CANDADO, Y CONVIENE SABER QUÉ AFIRMABA MAL ─────
@@ -632,17 +729,29 @@ test("V24-2b · el marco es del NÚMERO, y sus dos bordes son del kit", () => {
 // ahí donde se afirma. Si el área tocable resulta más chica de lo cómodo, el
 // número está en la corrida y no en este comentario.
 
-test("V24-2b · el botón NO declara un tamaño propio: lo decide el kit", () => {
+test("V24-2b · el botón lo dimensiona el KIT, no la pantalla", () => {
+  // Este candado ya afirmó algo falso una vez —decía que el botón traía el
+  // `px-2 py-1` del kit y 36 px de alto, y el alto real eran 16— así que conviene
+  // decir qué afirma ahora y dónde.
+  //
+  // El botón se fue al kit con el resto del control. La pantalla no le escribe
+  // NADA: ni tamaño, ni fondo, ni radio. Si algún día hace falta agrandarlo se
+  // agranda en el kit y lo heredan el carrito y recepción.
   const src = codigoDe("components/transferencias/FichaProductoRecepcion.jsx");
-  const menos = src.slice(src.indexOf("Restar uno a") - 260, src.indexOf("Restar uno a") + 120);
-  // Lo que sí se puede afirmar sobre el fuente: que la pantalla no le escriba un
-  // alto ni un ancho, porque eso es del kit. Si algún día hace falta agrandarlo,
-  // se agranda en el kit y lo heredan los dos botones y todo el resto.
-  assert.ok(!/\bh-\d|\bw-\d|\bmin-h-/.test(menos), "la pantalla le escribió un tamaño al botón");
-  // Y las tres clases que la pantalla SÍ le pone, que son de apariencia.
-  assert.match(menos, /shrink-0/, "el botón puede encogerse y perder área tocable");
-  assert.match(menos, /rounded-lg/, "el botón perdió su radio");
-  assert.match(menos, /sunmi-surface-soft/, "el botón perdió su fondo sutil");
+  assert.ok(
+    !/Restar uno a/.test(src),
+    "la pantalla volvió a dibujar el botón en vez de pedirle el campo al kit"
+  );
+
+  const kit = codigoDe("components/sunmi/SunmiCampoCantidad.jsx");
+  // Los dos tamaños, los dos de la escala. Dos cosas salieron mal antes de dar
+  // con esto y las dos las encontró medir: el trinquete atrapó un `w-[30px]`
+  // escrito a mano, y después `w-8` resultó ser 28 px y no 32 —en este proyecto
+  // `1rem` son 14—. El escalón que pasa los 30 es el 9.
+  assert.match(kit, /normal: "w-9 h-9"/, "el tamaño normal dejó de ser w-9");
+  assert.match(kit, /compacto: "w-7 h-7"/, "el compacto dejó de ser el del carrito");
+  // Y el fondo relleno, que es lo que el POS tenía bien y se conservó.
+  assert.match(kit, /pos-control/, "el botón perdió su fondo relleno");
 });
 
 test("V23-1b · la unidad ya NO va adentro de la caja, y el kit no quedó con un prop muerto", () => {
@@ -730,35 +839,35 @@ test("V29-1 · el marco con borde envuelve al número y NO a los botones", () =>
   );
 });
 
-test("V29-1b · los botones llevan su propio fondo y radio, no el borde del campo", () => {
-  // `<button` y no `<a`: `SunmiLinkButton` dibuja un botón de verdad —tocable con
-  // teclado y con foco— y solo toma prestada la APARIENCIA de un enlace. Buscar
-  // `<a` daba rojo sobre un render correcto.
-  const html = pintarFicha(lineaCajon(), { enHoja: true });
-  const i = html.indexOf('<button type="button" aria-label="Restar uno a');
-  assert.ok(i > 0, "no se encontró el botón −");
-  const menos = html.slice(i, html.indexOf(">", html.indexOf("class=", i)));
-
-  assert.match(menos, /sunmi-surface-soft/, "el botón − no tiene su fondo sutil");
-  assert.match(menos, /rounded-lg/, "el botón − no tiene su radio");
-  assert.ok(!/border/.test(menos), "el botón − se llevó un borde que es del número");
+test("V29-1b · los botones llevan su fondo y su radio, y el borde es del número", () => {
+  // Se mide sobre el KIT, que es donde se dibujan desde que el control se
+  // unificó. `<button` y no `<a`: es un botón de verdad y solo toma prestada la
+  // apariencia de un enlace en recepción — en el carrito nunca la tuvo.
+  const kit = codigoDe("components/sunmi/SunmiCampoCantidad.jsx");
+  const claseBoton = kit.match(/rounded pos-control[^"`]*/);
+  assert.ok(claseBoton, "no se encontró la clase del botón en el kit");
+  assert.ok(!/border/.test(claseBoton[0]), "el botón se llevó un borde que es del número");
+  // El radio y el fondo, que son los que lo hacen leer como un control.
+  assert.match(kit, /rounded pos-control/, "el botón perdió su fondo o su radio");
 });
 
 test("V29-1c · y sigue conservando los tres decimales del peso al tocar", () => {
-  // Lo que la tanda anterior arregló y ésta no puede romper: el − y el + pasan
-  // por `decimales`, así que un toque sobre 0.730 no puede dejar 1.73.
+  // Lo que la tanda del peso arregló y la mudanza al kit no puede romper: un
+  // toque al + sobre 0,730 no puede dejar 1,73.
+  //
+  // Vive en dos lados y los dos se afirman: el kit aplica los decimales al paso,
+  // y esta pantalla se los PASA. Con uno solo de los dos el candado quedaría
+  // verde sobre la mitad del camino.
+  const kit = codigoDe("components/sunmi/SunmiCampoCantidad.jsx");
+  assert.match(kit, /decimales > 0 \? n\.toFixed\(decimales\) : String\(n\)/,
+    "el kit dejó de conservar los decimales al dar un paso");
+  assert.match(kit, /Math\.max\(minimo,/, "el − volvió a poder bajar del mínimo");
+
   const src = codigoDe("components/transferencias/FichaProductoRecepcion.jsx");
   assert.match(
     src,
-    /decimales > 0 \? nuevo\.toFixed\(decimales\) : String\(nuevo\)/,
-    "el paso dejó de conservar los decimales del peso"
-  );
-  assert.match(src, /Math\.max\(0,/, "el − volvió a poder bajar de cero");
-  // Y el prop sigue llegando desde el campo de completos.
-  assert.match(
-    src,
     /decimales=\{decimalesDeCantidad\(envio\.presentacion\)\}/,
-    "el campo dejó de pasarle los decimales al stepper"
+    "el campo dejó de pasarle los decimales al kit"
   );
 });
 

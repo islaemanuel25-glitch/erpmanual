@@ -29,12 +29,14 @@
 // tiene que conservar el avance.
 
 import { useState } from "react";
-import { Minus, Plus } from "lucide-react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+// El campo con − y + del kit, el mismo que usa el carrito del POS. Los íconos
+// `Minus` y `Plus` y el `SunmiLinkButton` se fueron con `CampoConPasos`: los
+// dibuja el componente del kit.
+import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 
@@ -159,142 +161,20 @@ const TONO_ESTADO = Object.freeze({
   [ESTADO_PRODUCTO.NO_DECLARADO]: "sunmi-text-warning",
 });
 
-/**
- * UN CAMPO DE CANTIDAD CON − Y +, EN UN SOLO MARCO.
- *
- * ── POR QUÉ VIVE ACÁ Y NO EN EL KIT ─────────────────────────────────────
- *
- * Porque hoy lo usa una sola pantalla, dos veces. La regla del kit dice que la
- * pieza que se agrega sale de una pantalla que YA FUNCIONA, nunca escrita
- * adivinando: el día que un segundo lugar la necesite, se muda con su forma ya
- * probada. Escribirla en el kit ahora sería adivinar qué le va a hacer falta al
- * segundo consumidor.
- *
- * ── QUÉ RESUELVE, Y POR QUÉ NO ES UN CONTADOR COMO EL DEL V15 ───────────
- *
- * El contador que el V21 sacó de la TARJETA reemplazaba al teclado: era la
- * única forma de cargar. Éste lo acompaña — el campo se sigue escribiendo a
- * mano, que es lo que hace que sirva para 3,250 KG y para 47.
- *
- * El mínimo es 0 y el `−` no baja de ahí: una cantidad recibida negativa no
- * existe, y dejarla escribir obligaría a validarla después.
- *
- * El valor viaja como TEXTO, igual que el del campo: el estado del formulario
- * es lo que está escrito, no un número. Un `""` es "todavía no escribió nada" y
- * no es lo mismo que un 0, que es "contó y no llegó ninguno".
- */
-/**
- * `difiere` pinta el campo en danger — el número Y el borde, a 2 px.
- *
- * Es TODO lo que el V26 dejó para decir que hay una diferencia. Antes había un
- * renglón teñido debajo que decía "3 PACK x4 de 2 PACK x4 · sobran 4 unidades":
- * tres datos que ya estaban en pantalla —el enviado arriba, lo contado en esta
- * misma caja, y la resta de los dos— dichos otra vez y en prosa.
- *
- * El color no va solo: el importe de abajo también pasa a danger y muestra el
- * del remito tachado. Un color por sí mismo no se lee, pero acá no está solo.
- */
-function CampoConPasos({ valor, onCambiar, etiqueta, difiere = false, decimales = 0 }) {
-  const paso = (delta) => {
-    const n = Number(valor === "" ? 0 : valor);
-    const base = Number.isFinite(n) ? n : 0;
-    const nuevo = Math.max(0, base + delta);
-    // `decimales` conserva el relleno del peso al tocar el − y el +. Sin esto,
-    // un toque al + sobre "0.730" dejaba "1.73": el campo perdía la precisión
-    // justo con el control que existe para no tener que tipear.
-    onCambiar(decimales > 0 ? nuevo.toFixed(decimales) : String(nuevo));
-  };
-
-  // ── TRES PIEZAS SEPARADAS, NO UNA CAJA CON TRES COSAS ADENTRO ───────────
-  //
-  // Antes los dos botones vivían DENTRO del marco del campo: `[ − 1 + ]`, todo
-  // en una sola caja con borde. Ahora son tres piezas y el borde rodea SOLO al
-  // número:
-  //
-  //     [−]   [ 1 ]   [+]
-  //
-  // Los botones llevan su propio fondo sutil y su radio; el marco con borde es
-  // del número y de nada más. Eso importa para la señal de diferencia: el borde
-  // danger tiene que decir "este NÚMERO no coincide", no "estos controles están
-  // mal".
-  //
-  // ── EL ÁREA TOCABLE ERA DE 16 PX, Y NADIE LO SABÍA ─────────────────────
-  //
-  // El comentario que estaba acá decía que el botón traía "el `px-2 py-1` del kit
-  // más el ícono de 16: una caja de 36 px de alto —el mínimo—". **Era falso, y se
-  // vio al medirlo.**
-  //
-  // `SunmiLinkButton` no trae padding: su clase es `text-xs sunmi-text-accent
-  // underline` y nada más. Los `px-2 py-1` son de `SunmiButton`, que es otra
-  // pieza. Y con `items-center` el botón queda del alto de su contenido, así que
-  // el objetivo de toque real eran **16 × 16 px** — medido a 390 px con
-  // `cajasDelCampo`. Mientras los botones vivían adentro de la caja con borde eso
-  // no se veía; sacarlos lo dejó a la vista.
-  //
-  // No lo rompió esta tanda: venía así. Se arregla acá porque es donde se vio.
-  //
-  // El `p-2` los lleva a **32 × 32**. No a 40, y el motivo está medido: el campo
-  // son 121 px de contenedor, así que con botones de 40 el marco del número
-  // quedaría en ~33 px y entrarían TRES dígitos — debajo del piso de cuatro que
-  // el pedido fija. Con 32 entran cinco. Es el punto donde las dos cosas caben.
-  //
-  // Lo que cede es el marco del número, y cuánto está MEDIDO y afirmado en el
-  // arnés, no supuesto: `cajasDelCampo` devuelve las tres cajas y cuántos dígitos
-  // entran, calculados con el ancho real de un dígito en la tipografía del campo.
-  return (
-    <span className="flex items-center gap-1">
-      <SunmiLinkButton
-        onClick={() => paso(-1)}
-        aria-label={`Restar uno a ${etiqueta}`}
-        className="shrink-0 no-underline sunmi-link-accent rounded-lg sunmi-surface-soft p-2"
-      >
-        <Minus size={16} aria-hidden="true" />
-      </SunmiLinkButton>
-
-      {/* El marco, alrededor del número y nada más. `min-w-0` para que el flex
-          lo pueda encoger hasta lo que sobre: sin eso el input reclama su ancho
-          intrínseco y empuja a los botones fuera de los 124 px.
-
-          `border-0` en el input: el marco es de este envoltorio. Si el input
-          trajera el suyo se verían dos cajas, una adentro de la otra.
-
-          `text-lg` son los 18 px que pide el V26 — el tamaño de Tailwind sin
-          redefinir, no un valor escrito a mano. */}
-      <span
-        className={`min-w-0 flex-1 rounded-lg ${
-          difiere ? "border-2 sunmi-border-danger" : "border sunmi-divider"
-        }`}
-      >
-        <SunmiInput
-          type="number"
-          value={valor}
-          onChange={(e) => onCambiar(e.target.value)}
-          aria-label={etiqueta}
-          // `px-0` y no el `px-2` del kit: con el marco alrededor y el texto
-          // centrado, el relleno lateral del input no separa de nada y se come
-          // los dígitos. Medido: con el `px-2` del kit entraban TRES, sin él
-          // entran cinco — y el piso del pedido son cuatro.
-          //
-          // `SunmiInput` es el único componente del kit que NEGOCIA su
-          // `className` en vez de concatenarlo —ver `lib/sunmi/claseAncho.js`—,
-          // así que acá el `px-0` gana de verdad y no queda a merced del orden
-          // de la hoja de estilos.
-          className={`w-full border-0 px-0 text-center text-lg ${
-            difiere ? "sunmi-text-danger" : ""
-          }`}
-        />
-      </span>
-
-      <SunmiLinkButton
-        onClick={() => paso(1)}
-        aria-label={`Sumar uno a ${etiqueta}`}
-        className="shrink-0 no-underline sunmi-link-accent rounded-lg sunmi-surface-soft p-2"
-      >
-        <Plus size={16} aria-hidden="true" />
-      </SunmiLinkButton>
-    </span>
-  );
-}
+// ── EL CAMPO CON − Y + SE FUE AL KIT ─────────────────────────────────────
+//
+// Acá vivía `CampoConPasos`, escrito para esta pantalla y rediseñado tres tandas
+// seguidas: el marco, los pasos, el mínimo cero, los decimales del peso, el
+// borde en danger, los botones afuera de la caja.
+//
+// **Y existía hecho.** El carrito del POS tenía `CantidadStepper` inline desde
+// mucho antes, con el fondo relleno de los botones y la coma normalizada a punto
+// ya resueltos. Nadie lo sabía porque no estaba exportado.
+//
+// Los dos se unificaron en `SunmiCampoCantidad`. Lo que esta pantalla aporta —y
+// el POS no podía tener— es el mínimo CERO: "no llegó nada" es una respuesta
+// válida en una recepción, y en un carrito una línea de cantidad 0 no significa
+// nada. Por eso el mínimo es un prop y no una constante.
 
 export default function FichaProductoRecepcion({
   producto,
@@ -354,11 +234,34 @@ export default function FichaProductoRecepcion({
     // x8": el caso feliz —llegó todo, un toque a "Marcar revisado"— guardaba 48
     // cajones, o sea 384 unidades. El descriptor contesta en la misma escala en
     // la que está escrito el campo.
-    const propuesto =
-      d?.cantidadRecibida == null ? descriptorDeEnvio(d || {}).cantidad : d.cantidadRecibida;
-    const s = Number(d?.recibidoUnidadesSueltas || 0);
+    const env = descriptorDeEnvio(d || {});
+    const sinContar = d?.cantidadRecibida == null;
+    const propuesto = sinContar ? env.cantidad : d.cantidadRecibida;
+
+    // ── LAS SUELTAS SE PROPONEN DEL ENVÍO, IGUAL QUE LOS PACKS ────────────
+    //
+    // EL DEFECTO, VISTO EN PRODUCCIÓN. `CERVEZA 361 1L`, enviada como
+    // "0 PACK x6 + 1 unidad suelta": el campo de packs precargaba 0 —bien, es lo
+    // enviado— y el de sueltas quedaba EN BLANCO. Con eso el panel calculaba
+    // 0 × 6 + 0 = 0 físicas contra 1 enviada, concluía que había diferencia, y
+    // dibujaba el borde en danger y un "$0,00" con el importe tachado. **Sobre una
+    // línea que coincide.**
+    //
+    // La causa era que los dos campos leían fuentes DISTINTAS: packs de
+    // `descriptorDeEnvio(d).cantidad` —lo ENVIADO— y sueltas de
+    // `d.recibidoUnidadesSueltas` —lo ya RECIBIDO—. En una línea pendiente lo
+    // recibido es 0, así que el campo salía vacío. Medido: el descriptor devuelve
+    // `{cantidad: 0, sueltas: 1}` y la precarga daba `""`.
+    //
+    // Y no era un caso raro: en producción hay 24 líneas con envío mixto, las 24
+    // en transferencias abiertas.
+    //
+    // Ahora es simétrico. Y el `sinContar` es lo que protege el otro lado: en una
+    // línea YA contada con 0 sueltas reales, ese 0 es un dato —se contó y no había
+    // ninguna suelta— y tiene que quedar en 0, no volver al envío.
+    const s = Number((sinContar ? env.sueltas : d?.recibidoUnidadesSueltas) || 0);
     return {
-      recibido: enEscalaDelCampo(propuesto, descriptorDeEnvio(d || {}).presentacion),
+      recibido: enEscalaDelCampo(propuesto, env.presentacion),
       sueltas: s > 0 ? String(s) : "",
       conSueltas: s > 0,
       motivo: d?.motivoPrincipal || "",
@@ -714,12 +617,20 @@ export default function FichaProductoRecepcion({
                   abajo, así que leerlo no es opcional. Ver `sm2` en el config. */}
               <div className="text-sm2 sunmi-text-muted truncate">{rotuloDeCompletos}</div>
               {puedeRecibir ? (
-                <CampoConPasos
+                <SunmiCampoCantidad
                   valor={recibido}
                   onCambiar={setRecibido}
                   etiqueta={`Cantidad recibida en ${nombreDePresentacion(envio)}`}
                   difiere={campoDifiere}
                   decimales={decimalesDeCantidad(envio.presentacion)}
+                  // `minimo` 0 y NO el 1 del carrito: "no llegó nada" es una
+                  // respuesta válida en una recepción. Y sin `normalizaAlSalir`,
+                  // porque acá `""` se guarda como `null` —no revisada— y un 0 se
+                  // guarda como 0: normalizar el vacío perdería esa diferencia.
+                  minimo={0}
+                  tipo="number"
+                  claseMarco="flex-1"
+                  claseInput="text-lg"
                 />
               ) : (
                 <div className="font-mono tabular-nums sunmi-text-strong">
@@ -742,11 +653,15 @@ export default function FichaProductoRecepcion({
                     enteras de un bulto abierto. Este campo solo existe cuando la
                     presentación agrupa, y KG nunca agrupa. */}
                 {puedeRecibir ? (
-                  <CampoConPasos
+                  <SunmiCampoCantidad
                     valor={sueltas}
                     onCambiar={setSueltas}
                     etiqueta={ROTULO_SUELTAS_CAMPO}
                     difiere={campoDifiere}
+                    minimo={0}
+                    tipo="number"
+                    claseMarco="flex-1"
+                    claseInput="text-lg"
                   />
                 ) : (
                   <div className="font-mono tabular-nums sunmi-text-strong">

@@ -68,6 +68,7 @@ import {
 import {
   descriptorDeEnvio,
   rotuloConSueltas,
+  rotuloConSueltasCorto,
   unidadCortaDePresentacion,
   unidadDeDiferencia,
 } from "@/lib/transferencias/presentacionEnvio";
@@ -406,10 +407,24 @@ export default function TarjetaRecepcionMovil({
               {correccionPendiente}
             </p>
           ) : (
-            <p className="flex items-baseline gap-2 flex-wrap break-words">
+            // ── EL ENVÍO MIXTO ENTRABA A LA FUERZA Y ROMPÍA LA TARJETA ──────
+            //
+            // "0 PACK x6 + 1 unidad suelta" son 54 caracteres contra los 38 de una
+            // línea normal, y con el precio al lado no entraba: el enviado se iba a
+            // un renglón propio, el precio a otro, y la tarjeta pasaba de dos
+            // líneas a cuatro mientras las vecinas tenían dos.
+            //
+            // No se trunca el enviado: es el dato que hay que leer. Lo que cede es
+            // el PRECIO, que baja solo cuando no entra —`min-w-0` en el enviado le
+            // da prioridad al reparto, y el precio es el único con `w-full` en su
+            // rama de wrap—. Cuando entran los dos, comparten renglón como antes.
+            //
+            // Medido en producción: 24 líneas con envío mixto, las 24 abiertas, y
+            // las 24 con cero packs.
+            <p className="flex items-baseline gap-x-2 flex-wrap break-words">
               <span className="text-xs sunmi-text-muted shrink-0">Enviado</span>
-              <span className="text-base2 font-semibold tabular-nums sunmi-text-accent">
-                {rotuloConSueltas(envio)}
+              <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-accent">
+                {rotuloConSueltasCorto(envio)}
               </span>
               {/* ── EL PRECIO DE LA PRESENTACIÓN ───────────────────────────
                   El V26 le sacó a este renglón el importe SIN rótulo, que
