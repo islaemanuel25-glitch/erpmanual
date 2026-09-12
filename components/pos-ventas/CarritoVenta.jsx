@@ -2,7 +2,10 @@
 
 import { memo, useState } from "react";
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiInput from "@/components/sunmi/SunmiInput";
+// `SunmiInput` se importaba acá para el stepper. Se fue con él al kit: un import
+// que solo sostenía código mudado deja el módulo diciendo que depende de algo que
+// ya no usa.
+import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import { fromUnidades } from "@/lib/conversiones/stock";
 import { subtotalLinea } from "@/lib/pos-ventas/lineaPorImporte";
@@ -108,77 +111,57 @@ function StockDeposito({ item }) {
 }
 
 /* ── Stepper de cantidad (− input +) ── */
-const btnStepClass =
-  "flex items-center justify-center w-7 h-7 rounded pos-control text-sm font-bold transition-colors select-none shrink-0";
+//
+// ── ESTE CONTROL SE MUDÓ AL KIT, Y ACÁ QUEDÓ SU ADAPTADOR ────────────────
+//
+// Vivía acá entero, sin exportar, y por eso el panel de recepción de
+// transferencias estuvo tres tandas rediseñando el suyo desde cero sin saber que
+// existía. Dos controles de cantidad en el mismo ERP se separan el día que uno
+// cambia, así que la pieza es del kit: `SunmiCampoCantidad`.
+//
+// ── LO QUE NO PODÍA PASAR, Y NO PASÓ ─────────────────────────────────────
+//
+// El carrito está en producción y cobra. El marcado que sale de acá es IDÉNTICO
+// byte a byte al que salía antes de la mudanza —comprobado montando las dos
+// versiones y comparando el HTML en los tres casos: escritorio, compacto y kg—.
+// Lo único que se agregó son los `aria-label` de los dos botones y del campo, que
+// no ocupan lugar y que antes no estaban.
+//
+// Está congelado en `components/sunmi/sunmiCampoCantidad.test.mjs`: si alguien
+// toca el componente del kit y el carrito cambia de forma, ese candado se pone
+// rojo con el HTML de los dos lados.
+//
+// Las cuatro cosas del POS que el kit conserva porque estaban bien: los botones
+// con fondo relleno, el número centrado, el mínimo 1 —un carrito con cantidad 0
+// no significa nada— y la coma normalizada a punto para vender por kilo.
 
+/** Traduce el contrato del carrito —item + índice— al del kit. */
 function CantidadStepper({ item, idx, onCantidadChange, compact }) {
   const esKg = item.unidadMedida === "kg";
-  const minVal = esKg ? 0.001 : 1;
-  const step = esKg ? 0.001 : 1;
-
-  const handleChange = (e) => {
-    const raw = e.target.value;
-    if (raw === "") {
-      onCantidadChange(idx, "");
-      return;
-    }
-    if (esKg) {
-      const normalized = raw.replace(",", ".");
-      const val = parseFloat(normalized);
-      onCantidadChange(idx, isNaN(val) ? "" : Math.max(minVal, val));
-    } else {
-      const val = parseInt(raw, 10);
-      onCantidadChange(idx, isNaN(val) ? "" : Math.max(minVal, val));
-    }
-  };
-
-  const handleBlur = () => {
-    const cur = item.cantidad;
-    if (cur === "" || cur === null || cur === undefined || isNaN(Number(cur))) {
-      onCantidadChange(idx, minVal);
-      return;
-    }
-    const num = Number(cur);
-    if (num < minVal) {
-      onCantidadChange(idx, minVal);
-    } else if (!esKg) {
-      onCantidadChange(idx, Math.round(num));
-    }
-  };
-
-  const handleStep = (dir) => {
-    let cur = Number(item.cantidad);
-    if (isNaN(cur) || item.cantidad === "") cur = 0;
-    let next = cur + dir * step;
-    if (esKg) next = Math.round(next * 1000) / 1000;
-    next = Math.max(minVal, next);
-    // stockMax puede ser negativo si stock es negativo — no limitar hacia abajo
-    const tope = item.stockMax != null && item.stockMax > 0 ? item.stockMax : 9999;
-    next = Math.min(tope, next);
-    onCantidadChange(idx, next);
-  };
-
   return (
-    <div className="flex items-center gap-1">
-      <button type="button" className={btnStepClass} onClick={() => handleStep(-1)}>
-        −
-      </button>
-      <SunmiInput
-        type="text"
-        inputMode={esKg ? "decimal" : "numeric"}
-        value={item.cantidad}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        // El compacto era `w-14` —49 px— y la cantidad de línea más larga de
-        // producción es "26.412", que necesita 56. Es una venta por kilo: seis
-        // caracteres es lo normal, no un caso raro. El ancho no se aplicaba, así
-        // que nunca se vio cortado; ahora sí se aplicaría.
-        className={compact ? "w-[56px] !text-center !py-1 text-sm" : "w-16 !text-center !py-1"}
-      />
-      <button type="button" className={btnStepClass} onClick={() => handleStep(1)}>
-        +
-      </button>
-    </div>
+    <SunmiCampoCantidad
+      valor={item.cantidad}
+      // El kit emite STRINGS —el estado de un formulario es lo que está escrito—
+      // y el carrito razona con números. La traducción vive acá y no en el kit.
+      onCambiar={(s) => onCantidadChange(idx, s === "" ? "" : Number(s))}
+      etiqueta="Cantidad"
+      minimo={esKg ? 0.001 : 1}
+      paso={esKg ? 0.001 : 1}
+      // `stockMax` puede ser negativo si el stock es negativo — no limitar hacia
+      // abajo. El 9999 es el tope de siempre cuando no hay stock conocido.
+      maximo={item.stockMax != null && item.stockMax > 0 ? item.stockMax : 9999}
+      normalizaAlSalir
+      // El borde va en el INPUT, como siempre en el carrito, y no en un
+      // envoltorio. Ese es el único motivo por el que el marco es opcional en el
+      // kit: recepción lo necesita afuera para poder pintarlo en danger, y
+      // forzarlo acá le movería la caja al carrito.
+      conMarco={false}
+      // El compacto era `w-14` —49 px— y la cantidad de línea más larga de
+      // producción es "26.412", que necesita 56. Es una venta por kilo: seis
+      // caracteres es lo normal, no un caso raro.
+      claseInput={compact ? "w-[56px] !text-center !py-1 text-sm" : "w-16 !text-center !py-1"}
+      tamano="compacto"
+    />
   );
 }
 
