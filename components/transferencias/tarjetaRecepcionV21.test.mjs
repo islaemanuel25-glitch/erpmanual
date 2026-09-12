@@ -265,11 +265,94 @@ test("V21-10. REVISADO SE COLAPSA: nombre, cantidad, coincide y total", () => {
   // tocar el conteo— y el panel la dejó sin uso.
   assert.doesNotMatch(t, /Volver a contar/, "el V21 sacó el botón de desmarcar");
 
-  // CORREGIDA Y COLAPSADA: un solo número, y es el de lo recibido. A 390 px no
-  // entra la flecha en ese renglón; el importe del remito se ve al abrir.
+  // CORREGIDA Y COLAPSADA: el importe de lo recibido, que es el que vale.
+  //
+  // Este candado exigía que el del REMITO no apareciera, y tenía razón mientras
+  // el botón "Corregir" ocupaba el renglón: no entraban los dos. El V23 sacó ese
+  // botón —la línea entera pasa a ser tocable— y con el espacio libre entran los
+  // dos, el viejo tachado arriba. Lo que se afirma de la que coincide no cambió.
   const c = pintar(lineaCorregida({ revisadoEnRecepcion: true }));
   assert.match(c, /\$52\.500,00/, "la línea colapsada no muestra el importe de lo RECIBIDO");
-  assert.doesNotMatch(c, /\$31\.500,00/, "la línea colapsada sigue mostrando el del remito");
+  // Y la que coincide sigue con UN solo número: no hay un "antes" que mostrar.
+  assert.equal(
+    (t.match(/\$31\.500,00/g) || []).length,
+    1,
+    "la línea que coincide muestra su importe una sola vez"
+  );
+});
+
+// ── V23 · LA LÍNEA COLAPSADA CORREGIDA SE TIENE QUE VER DISTINTA ─────────
+//
+// El defecto, visto en producción con 77 líneas: todas las revisadas se ven
+// iguales. No hay forma de saber cuáles se corrigieron ni cómo cambió la plata
+// sin abrirlas de a una.
+//
+// Y el estado de los candados hasta acá lo explica: DOS corrían sobre una línea
+// corregida y colapsada —V21-10 y F8, de la tanda del importe— pero las dos
+// afirman solo el IMPORTE. Ninguna afirma nada sobre cómo SE VE. Un rediseño que
+// no se hiciera no habría puesto nada en rojo.
+
+test("V23-1. UNA LÍNEA CORREGIDA NO SE VE COMO UNA QUE COINCIDE", () => {
+  const corregida = crudo(lineaCorregida({ revisadoEnRecepcion: true }));
+  const coincide = crudo(linea({ revisadoEnRecepcion: true, cantidadRecibida: 6 }));
+
+  // El borde de la tarjeta, que es lo que se ve barriendo la lista sin leer.
+  assert.match(corregida, /sunmi-state-warning/, "la corregida no se marca en warning");
+  assert.doesNotMatch(coincide, /sunmi-state-warning/, "la que coincide se marcó como corregida");
+
+  // El ícono: lápiz en la corregida, tilde en la que coincide.
+  assert.match(corregida, /lucide-pencil/, "la corregida no lleva el lápiz");
+  assert.doesNotMatch(corregida, /lucide-check/, "la corregida sigue con el tilde de correcto");
+  assert.match(coincide, /lucide-check/, "la que coincide perdió su tilde");
+  assert.doesNotMatch(coincide, /lucide-pencil/, "la que coincide se marcó con el lápiz");
+});
+
+test("V23-2. Y DICE CUÁNTO CAMBIÓ, no solo lo que quedó", () => {
+  // "enviado 6 → contaste 10 PACK x24". Sin el "de cuánto era" hay que abrir la
+  // línea para saber si la corrección fue de uno o de cincuenta.
+  const t = pintar(lineaCorregida({ revisadoEnRecepcion: true }));
+  assert.match(t, /enviado 6 → contaste 10/, "no dice de cuánto a cuánto se corrigió");
+
+  // La que coincide NO lleva flecha: no hubo corrección que contar.
+  const c = pintar(linea({ revisadoEnRecepcion: true, cantidadRecibida: 6 }));
+  assert.doesNotMatch(c, /→/, "apareció la flecha sobre una línea que coincide");
+  assert.match(c, /coincide/, "la que coincide perdió su rótulo");
+});
+
+test("V23-3. LOS DOS IMPORTES, con el viejo TACHADO", () => {
+  // En la tanda del importe esta línea mostraba UN solo número porque el botón
+  // "Corregir" ocupaba el lugar. El V23 saca ese botón —la línea entera pasa a
+  // ser tocable— y con el espacio que queda entran los dos.
+  const crudoHtml = crudo(lineaCorregida({ revisadoEnRecepcion: true }));
+  const t = texto(crudoHtml);
+  assert.match(t, /\$31\.500,00/, "se perdió el importe del remito");
+  assert.match(t, /\$52\.500,00/, "no está el importe corregido");
+  assert.match(crudoHtml, /line-through/, "el importe viejo no está tachado");
+});
+
+test("V23-4. LA LÍNEA ENTERA ABRE EL PANEL, y el botón con caja se fue", () => {
+  // El motivo está medido en producción: con el botón, a 390 px los nombres se
+  // truncaban a "DON SATUR BIZCO…". El nombre es lo que dice sobre qué línea se
+  // está trabajando, así que gana él.
+  const crudoHtml = crudo(lineaCorregida({ revisadoEnRecepcion: true }));
+  assert.doesNotMatch(
+    crudoHtml,
+    /sunmi-btn-accent-suave/,
+    "quedó el botón con caja en la línea colapsada"
+  );
+  // Pero la vuelta NO se pierde: la línea entera tiene que ser tocable.
+  assert.match(crudoHtml, /<button/, "la línea colapsada dejó de ser tocable");
+  const fuente = codigoDe("components/transferencias/TarjetaRecepcionMovil.jsx");
+  const abren = fuente.match(/onAbrirFicha\?\.\(d\)/g) || [];
+  assert.ok(abren.length >= 2, "las dos formas de la tarjeta tienen que abrir la ficha");
+});
+
+test("V23-5. SIN PERMISO, LA LÍNEA COLAPSADA NO ES TOCABLE", () => {
+  // Mirar no es escribir. El dato se sigue viendo entero.
+  const t = crudo(lineaCorregida({ revisadoEnRecepcion: true }), { puedeRecibir: false });
+  assert.doesNotMatch(t, /<button/, "sin permiso la línea sigue siendo tocable");
+  assert.match(texto(t), /\$52\.500,00/, "sin permiso se perdió el importe");
+  assert.match(texto(t), /Pancho 24 Als/);
 });
 
 test("V21-10b. Y SE PUEDE VOLVER: una línea revisada se corrige DESDE EL TELÉFONO", () => {
@@ -281,13 +364,23 @@ test("V21-10b. Y SE PUEDE VOLVER: una línea revisada se corrige DESDE EL TELÉF
   //
   // El defecto sería MUDO —una tarjeta que se ve bien y no se puede tocar—, así
   // que no lo atrapa mirar la pantalla de pasada: hay que preguntárselo.
-  const t = pintar(linea({ revisadoEnRecepcion: true, cantidadRecibida: 4 }));
-  assert.match(t, new RegExp(TEXTO_CORREGIR), "la línea revisada quedó sin camino de vuelta");
+  // El V23 sacó el botón con caja: la fila ENTERA es el área tocable. Así que
+  // lo que se afirma dejó de ser un texto visible y pasó a ser el nombre
+  // accesible del control, que es donde la acción vive ahora — y es una
+  // afirmación más fuerte, porque un `<button>` sin nombre accesible sería
+  // tocable con el dedo y mudo para el lector de pantalla.
+  const t = crudo(linea({ revisadoEnRecepcion: true, cantidadRecibida: 4 }));
+  assert.match(t, /<button/, "la línea revisada quedó sin camino de vuelta");
+  assert.match(
+    t,
+    /aria-label="Corregir Pancho 24 Als"/,
+    "el área tocable de la fila no dice qué hace ni sobre qué línea"
+  );
 
   // Y abre el MISMO panel, no otra cosa.
   const fuente = codigoDe("components/transferencias/TarjetaRecepcionMovil.jsx");
-  const abren = fuente.match(/onClick=\{\(\) => onAbrirFicha\?\.\(d\)\}/g) || [];
-  assert.equal(abren.length, 2, "las dos formas de la tarjeta tienen que abrir la ficha");
+  const abren = fuente.match(/onAbrirFicha\?\.\(d\)/g) || [];
+  assert.ok(abren.length >= 2, "las dos formas de la tarjeta tienen que abrir la ficha");
 });
 
 test("V21-10c. SIN PERMISO, LA LÍNEA REVISADA NO OFRECE CORREGIR", () => {

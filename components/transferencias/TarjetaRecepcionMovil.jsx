@@ -46,10 +46,13 @@
 // la tarjeta dijera "coincide" sobre una línea sin motivo.
 
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Pencil } from "lucide-react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+// La fila colapsada entera es el área tocable, y necesita un `<button>` de
+// verdad SIN caja: la tarjeta ya es la caja. Ver el comentario en el render.
+import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 
 import { formatearMoneda } from "@/lib/moneda";
@@ -156,61 +159,109 @@ export default function TarjetaRecepcionMovil({
   const hayCorreccionDeImporte =
     importeRemito != null && Number(importeRemito) !== Number(importeRecibido);
 
-  // ── 3 · REVISADO: UNA SOLA LÍNEA, Y CON VUELTA ───────────────────────────
+  // ── 3 · REVISADO: UNA SOLA LÍNEA, Y LA CORREGIDA SE DISTINGUE ────────────
   //
   // Hay 77 líneas. Una tarjeta revisada que siga ocupando seis renglones empuja
   // el trabajo que falta abajo de todo.
   //
-  // ── POR QUÉ TIENE "Corregir" Y NO ES UN AGREGADO DE MÁS ─────────────────
+  // ── EL DEFECTO QUE EL V23 ARREGLA, VISTO CON 77 LÍNEAS ──────────────────
   //
-  // El V21 sacó "Volver a contar", que era una barra a todo el ancho y hacía
-  // otra cosa: DESMARCABA sin tocar el conteo. Con el panel eso dejó de hacer
-  // falta —se corrige y se vuelve a guardar en un paso—, pero sacarlo sin poner
-  // nada dejaba la línea revisada sin ningún camino de vuelta DESDE EL TELÉFONO.
+  // Todas las revisadas se veían IGUALES. Terminado el conteo no había forma de
+  // saber cuáles se habían corregido ni cómo había cambiado la plata sin abrir
+  // de a una. Y son justamente las que hay que repasar antes de confirmar.
   //
-  // Y ahí se recibe: en el local, con la mercadería en la mano y sin una
-  // computadora cerca. Contar mal y guardar es normal; que la única forma de
-  // arreglarlo sea ir hasta el escritorio, no.
+  // Ahora la corregida cambia en cuatro cosas, y las cuatro se leen sin
+  // detenerse: borde en warning, lápiz en vez de tilde, la cantidad dicha como
+  // corrección —"enviado 6 → contaste 10"— y los dos importes, el viejo tachado.
+  // La que coincide queda exactamente como estaba.
   //
-  // Va el MISMO botón chico del pie, no la barra de antes: es la misma acción y
-  // el mismo verbo en las dos formas de la tarjeta.
+  // ── Y EL BOTÓN CON CAJA SE FUE ─────────────────────────────────────────
+  //
+  // La línea entera pasa a ser tocable. El motivo está medido en producción:
+  // con el botón, a 390 px los nombres se truncaban a "DON SATUR BIZCO…" y
+  // "COCA CO…". El nombre es lo que dice sobre qué línea se está trabajando, así
+  // que gana él. La vuelta no se pierde — se agranda: el área tocable pasa de un
+  // botón de 87 px a la fila completa.
   if (revisado) {
-    return (
-      <SunmiCard className="p-2" data-tarjeta-recepcion={d.nombre}>
-        {/* ── QUÉ CEDE ANCHO Y QUÉ NO, Y NO ES UN DETALLE ──────────────────
-            Con el botón en la línea, a 390 px sobra poco. La primera versión
-            tenía el bloque de la derecha en `shrink-0`, así que TODO el apretón
-            se lo comía el nombre: quedaba "V15 Co…", y una línea se quedó sin
-            nombre visible. Justamente el nombre es lo que hay que leer para
-            saber qué línea se va a corregir.
-            Ahora el que trunca es el rótulo de la cantidad —que es el dato que
-            el panel muestra entero apenas se abre— y el nombre y el importe
-            conservan su lugar. */}
-        <div className="flex items-center gap-2">
+    const rotuloCantidad = rotuloConSueltas({
+      ...envio,
+      cantidad: d.cantidadRecibida ?? 0,
+      sueltas: sueltasGuardadas,
+    });
+    // "Corregida" es lo MISMO que mide la barra de abajo —`contarCorregidas`— y
+    // por eso se deriva del mismo par de físicas. Con dos criterios distintos,
+    // la lista podría marcar tres y el pie decir dos.
+    const corregida = !esAgregada && delta != null && delta !== 0;
+
+    const cuerpo = (
+      <div className="flex items-center gap-2">
+        {corregida ? (
+          <Pencil size={16} aria-hidden="true" className="shrink-0 sunmi-text-warning" />
+        ) : (
           <Check size={16} aria-hidden="true" className="shrink-0 sunmi-text-success" />
-          <span className="min-w-0 flex-auto truncate text-sm2 sunmi-text-strong">{d.nombre}</span>
-          <span className="min-w-0 truncate text-sm2 sunmi-text-muted">
-            {rotuloConSueltas({ ...envio, cantidad: d.cantidadRecibida ?? 0, sueltas: sueltasGuardadas })}
-            {delta === 0 ? " · coincide" : ""}
+        )}
+
+        {/* El nombre no cede: sin el botón hay lugar para que entre entero. */}
+        <span className="min-w-0 flex-auto truncate text-sm2 sunmi-text-strong text-left">
+          {d.nombre}
+        </span>
+
+        <span
+          className={`min-w-0 truncate text-sm2 text-right ${
+            corregida ? "sunmi-text-warning" : "sunmi-text-muted"
+          }`}
+        >
+          {corregida
+            ? `enviado ${fmtCant(envio.cantidad)} → contaste ${rotuloCantidad}`
+            : `${rotuloCantidad}${delta === 0 ? " · coincide" : ""}`}
+        </span>
+
+        {/* ── LOS DOS IMPORTES, APILADOS ──────────────────────────────────
+            El viejo arriba, chico y tachado; el corregido abajo, en warning.
+            Tachado y no solo gris: el tachado dice "esto ya no vale", que es
+            otra cosa que "esto es secundario". */}
+        {corregida && hayCorreccionDeImporte ? (
+          <span className="shrink-0 whitespace-nowrap text-right">
+            <span className="block text-xs2 tabular-nums line-through sunmi-text-muted">
+              {formatearMoneda(importeRemito)}
+            </span>
+            <span className="block text-sm2 tabular-nums font-semibold sunmi-text-warning">
+              {formatearMoneda(importeRecibido)}
+            </span>
           </span>
-          {/* ── ACÁ VA UN SOLO NÚMERO, Y ES EL DE LO RECIBIDO ──────────────
-              A 390 px este renglón ya lleva el nombre, la cantidad y
-              "Corregir": la flecha con los dos importes no entra, y lo que
-              importa de una línea cerrada es cuánto entró. El del remito se ve
-              al abrirla. */}
+        ) : (
           <span className="shrink-0 whitespace-nowrap tabular-nums text-sm2 sunmi-text-strong">
             {formatearMoneda(importeRecibido)}
           </span>
-          {puedeRecibir && (
-            <SunmiButton
-              onClick={() => onAbrirFicha?.(d)}
-              disabled={guardando}
-              className={`shrink-0 ${CLASE_CORREGIR}`}
-            >
-              {TEXTO_CORREGIR}
-            </SunmiButton>
-          )}
-        </div>
+        )}
+      </div>
+    );
+
+    // El borde de la tarjeta es lo que se ve barriendo la lista sin leer nada.
+    const tonoTarjeta = corregida ? "sunmi-state-warning border-1.5" : "";
+
+    return (
+      <SunmiCard className={`p-2 ${tonoTarjeta}`} data-tarjeta-recepcion={d.nombre}>
+        {puedeRecibir ? (
+          // ── POR QUÉ `SunmiLinkButton` Y NO `SunmiButton` ───────────────
+          //
+          // Hace falta un `<button>` de verdad —tocable con teclado, con foco—
+          // y SIN caja: la fila ya tiene la suya, que es la tarjeta. Los
+          // colores de `SunmiButton` traen fondo propio y dibujarían una caja
+          // adentro de otra. `SunmiLinkButton` no trae ninguno; lo que sí trae
+          // —subrayado, acento y `text-xs`— lo ceden las clases de acá, que son
+          // utilidades y le ganan por el orden de la hoja.
+          <SunmiLinkButton
+            onClick={() => onAbrirFicha?.(d)}
+            disabled={guardando}
+            aria-label={`Corregir ${d.nombre}`}
+            className="block w-full text-left no-underline text-sm2 sunmi-text-strong"
+          >
+            {cuerpo}
+          </SunmiLinkButton>
+        ) : (
+          cuerpo
+        )}
       </SunmiCard>
     );
   }
