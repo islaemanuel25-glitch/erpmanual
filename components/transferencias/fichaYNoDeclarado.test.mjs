@@ -599,27 +599,50 @@ test("V24-2 · los dos campos van al 35 % y NO llenan el ancho", () => {
   assert.ok(!/text-\[10px\]/.test(src), "el rótulo usa una medida mágica en vez del token");
 });
 
-test("V24-2b · el botón del stepper NO se achicó: lo que cede es el número", () => {
-  // El área tocable es lo único que no se negocia por espacio. El botón se queda
-  // con el relleno del kit; lo que se apretó es el marco —sin `gap` ni padding
-  // lateral propio—.
-  //
-  // El marco dejó de ser una cadena fija con el V26: ahora negocia su borde
-  // —2 px y danger cuando lo contado difiere—, así que se lo busca por la
-  // expresión y no por el literal. Un candado anclado al literal habría quedado
-  // rojo sobre un cambio que no toca lo que defiende.
+test("V24-2b · el marco es del NÚMERO, y sus dos bordes son del kit", () => {
+  // El marco pasó por tres formas: cadena fija, después expresión con el borde
+  // negociado —V26—, y ahora envuelve SOLO al número con los botones afuera
+  // —V29—. Se lo busca por la expresión y no por el literal, que es lo que evita
+  // que un candado quede rojo por un cambio que no toca lo que defiende.
   const src = codigoDe("components/transferencias/FichaProductoRecepcion.jsx");
-  const marco = src.match(/className=\{`flex items-center rounded-lg \$\{[\s\S]{0,160}?`\}/);
+  const marco = src.match(/className=\{`min-w-0 flex-1 rounded-lg \$\{[\s\S]{0,160}?`\}/);
   assert.ok(marco, "no se encontró el marco del campo con pasos");
   assert.ok(!/px-\d/.test(marco[0]), "el marco volvió a tener relleno lateral propio");
-  // Y las dos ramas del borde siguen siendo del kit, no colores escritos a mano.
+  // Las dos ramas del borde son del kit, no colores escritos a mano.
   assert.match(marco[0], /border-2 sunmi-border-danger/, "el borde de la diferencia no es del kit");
   assert.match(marco[0], /border sunmi-divider/, "se perdió el borde normal del campo");
-  // Y el botón sigue sin declarar padding: usa el del kit, que da 36 px de alto.
-  assert.ok(
-    !/aria-label=\{`Restar uno[\s\S]{0,200}px-0|py-0/.test(src),
-    "se le sacó el relleno al botón, que es lo que se toca con el pulgar"
-  );
+  // Y `min-w-0`: sin eso el input reclama su ancho intrínseco y empuja a los
+  // botones fuera de los 124 px del campo.
+  assert.match(marco[0], /min-w-0/, "sin min-w-0 el input empuja a los botones afuera del campo");
+});
+
+// ── UNA CORRECCIÓN A ESTE CANDADO, Y CONVIENE SABER QUÉ AFIRMABA MAL ─────
+//
+// La versión anterior cerraba con esto: "el botón sigue sin declarar padding: usa
+// el del kit, que da 36 px de alto", y lo comprobaba buscando que no apareciera
+// un `px-0` cerca del `aria-label`.
+//
+// **Eso era falso y además vacío.** `SunmiLinkButton` no trae `px-2 py-1`: su
+// clase es `text-xs sunmi-text-accent underline` y nada más. La premisa de los 36
+// px venía de `SunmiButton`, que es otra pieza. Y la afirmación no podía fallar
+// nunca, porque nadie iba a escribir `px-0` ahí.
+//
+// El alto real del botón no se puede medir en un render a string. Lo mide el
+// arnés a 390 px —`cajasDelCampo`, que devuelve la caja de las tres piezas— y es
+// ahí donde se afirma. Si el área tocable resulta más chica de lo cómodo, el
+// número está en la corrida y no en este comentario.
+
+test("V24-2b · el botón NO declara un tamaño propio: lo decide el kit", () => {
+  const src = codigoDe("components/transferencias/FichaProductoRecepcion.jsx");
+  const menos = src.slice(src.indexOf("Restar uno a") - 260, src.indexOf("Restar uno a") + 120);
+  // Lo que sí se puede afirmar sobre el fuente: que la pantalla no le escriba un
+  // alto ni un ancho, porque eso es del kit. Si algún día hace falta agrandarlo,
+  // se agranda en el kit y lo heredan los dos botones y todo el resto.
+  assert.ok(!/\bh-\d|\bw-\d|\bmin-h-/.test(menos), "la pantalla le escribió un tamaño al botón");
+  // Y las tres clases que la pantalla SÍ le pone, que son de apariencia.
+  assert.match(menos, /shrink-0/, "el botón puede encogerse y perder área tocable");
+  assert.match(menos, /rounded-lg/, "el botón perdió su radio");
+  assert.match(menos, /sunmi-surface-soft/, "el botón perdió su fondo sutil");
 });
 
 test("V23-1b · la unidad ya NO va adentro de la caja, y el kit no quedó con un prop muerto", () => {
@@ -668,6 +691,76 @@ test("V23-1b · la unidad ya NO va adentro de la caja, y el kit no quedó con un
 // Lo que reemplaza a los cinco es más chico y está repartido: el campo en danger
 // —V26-1—, el importe tachado —V23-2— y que ninguna de las cadenas vuelva
 // —V26-2—.
+
+// ═══════════════════════════════════════════════════════════════════════════
+// V29 · EL − Y EL + AFUERA DEL MARCO DEL NÚMERO
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Eran `[ − 1 + ]`, todo en una caja con borde. Ahora son tres piezas y el borde
+// rodea SOLO al número. El motivo de fondo no es estético: el borde danger tiene
+// que decir "este NÚMERO no coincide", y envolviendo a los botones diría "estos
+// controles están mal".
+//
+// Este candado mira la ESTRUCTURA del marcado. Que los botones queden fuera del
+// marco medido en el DOM, y cuántos dígitos entran en el número que queda, lo
+// mide el arnés a 390 px con `cajasDelCampo` — un render a string no tiene
+// geometría y ahí "afuera" no se puede medir.
+
+test("V29-1 · el marco con borde envuelve al número y NO a los botones", () => {
+  const html = pintarFicha(lineaCajon({ cantidadRecibida: 5 }), { enHoja: true });
+
+  // El input está dentro de un span con borde; los botones están fuera de él.
+  // Se busca el fragmento que va del botón − al botón +: si el borde estuviera
+  // en el envoltorio de los tres, aparecería ANTES del botón −.
+  const desdeMenos = html.indexOf("Restar uno a");
+  const hastaMas = html.indexOf("Sumar uno a");
+  assert.ok(desdeMenos > 0 && hastaMas > desdeMenos, "no se encontraron los dos botones");
+
+  // Lo que hay entre los dos botones: ahí y solo ahí va el borde.
+  const entre = html.slice(desdeMenos, hastaMas);
+  assert.match(entre, /border-2 sunmi-border-danger/, "el borde no está en la caja del número");
+
+  // Y el contenedor de los tres —lo que está justo antes del botón −— no lo
+  // lleva. Se toma la apertura del span inmediatamente anterior.
+  const aperturaContenedor = html.slice(0, desdeMenos).lastIndexOf("<span");
+  const contenedor = html.slice(aperturaContenedor, desdeMenos);
+  assert.ok(
+    !/border/.test(contenedor),
+    `el contenedor de las tres piezas volvió a llevar el borde: ${contenedor}`
+  );
+});
+
+test("V29-1b · los botones llevan su propio fondo y radio, no el borde del campo", () => {
+  // `<button` y no `<a`: `SunmiLinkButton` dibuja un botón de verdad —tocable con
+  // teclado y con foco— y solo toma prestada la APARIENCIA de un enlace. Buscar
+  // `<a` daba rojo sobre un render correcto.
+  const html = pintarFicha(lineaCajon(), { enHoja: true });
+  const i = html.indexOf('<button type="button" aria-label="Restar uno a');
+  assert.ok(i > 0, "no se encontró el botón −");
+  const menos = html.slice(i, html.indexOf(">", html.indexOf("class=", i)));
+
+  assert.match(menos, /sunmi-surface-soft/, "el botón − no tiene su fondo sutil");
+  assert.match(menos, /rounded-lg/, "el botón − no tiene su radio");
+  assert.ok(!/border/.test(menos), "el botón − se llevó un borde que es del número");
+});
+
+test("V29-1c · y sigue conservando los tres decimales del peso al tocar", () => {
+  // Lo que la tanda anterior arregló y ésta no puede romper: el − y el + pasan
+  // por `decimales`, así que un toque sobre 0.730 no puede dejar 1.73.
+  const src = codigoDe("components/transferencias/FichaProductoRecepcion.jsx");
+  assert.match(
+    src,
+    /decimales > 0 \? nuevo\.toFixed\(decimales\) : String\(nuevo\)/,
+    "el paso dejó de conservar los decimales del peso"
+  );
+  assert.match(src, /Math\.max\(0,/, "el − volvió a poder bajar de cero");
+  // Y el prop sigue llegando desde el campo de completos.
+  assert.match(
+    src,
+    /decimales=\{decimalesDeCantidad\(envio\.presentacion\)\}/,
+    "el campo dejó de pasarle los decimales al stepper"
+  );
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // V28 · EL PESO CON TRES DECIMALES Y LOS DOS PRECIOS

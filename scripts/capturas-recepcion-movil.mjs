@@ -228,6 +228,63 @@ const hayTexto = (fragmento) =>
   evaluar(`document.body ? document.body.innerText.includes(${JSON.stringify(fragmento)}) : false`);
 
 /**
+ * LAS TRES CAJAS DEL CAMPO CON PASOS, Y CUÁNTOS DÍGITOS ENTRAN.
+ *
+ * ── QUÉ SE MIDE, Y POR QUÉ NO SE PUEDE SUPONER ──────────────────────────
+ *
+ * La tanda que sacó el − y el + del marco tiene un costo geométrico: los tres
+ * quedan dentro de los mismos 124 px, así que el marco del número se achica.
+ * Cuánto no se deduce del CSS —depende del padding del kit, del ícono y del
+ * `gap`—, así que se mide.
+ *
+ * Se devuelve además cuántos dígitos entran, calculado con el ancho real de un
+ * carácter en la tipografía y el tamaño que el campo tiene puesto. No es una
+ * estimación: se mide un dígito con `measureText` sobre un canvas con la MISMA
+ * `font` computada del input.
+ *
+ * Y se comprueba lo que de verdad importa de la separación: que los botones estén
+ * FUERA del marco. Se pregunta por contención en el DOM —`marco.contains(boton)`—
+ * y no por la apariencia, porque un botón visualmente separado pero adentro del
+ * marco seguiría llevándose el borde danger, que es el defecto que esto arregla.
+ */
+const cajasDelCampo = (etiqueta) =>
+  evaluar(`(() => {
+    const input = [...document.querySelectorAll('input[type="number"]')]
+      .filter((n) => n.offsetParent !== null)
+      .find((n) => n.getAttribute('aria-label') === ${JSON.stringify(etiqueta)});
+    if (!input) return { hay: false };
+    const menos = document.querySelector('[aria-label="Restar uno a ' + ${JSON.stringify(etiqueta)} + '"]');
+    const mas = document.querySelector('[aria-label="Sumar uno a ' + ${JSON.stringify(etiqueta)} + '"]');
+    const marco = input.parentElement;
+    const caja = (n) => {
+      if (!n) return null;
+      const r = n.getBoundingClientRect();
+      return { ancho: Math.round(r.width), alto: Math.round(r.height), x: Math.round(r.left) };
+    };
+    // Cuántos dígitos entran: se mide UNO con la font real del input.
+    const cs = getComputedStyle(input);
+    const lienzo = document.createElement('canvas').getContext('2d');
+    lienzo.font = cs.font || (cs.fontSize + ' ' + cs.fontFamily);
+    const anchoDigito = lienzo.measureText('8').width;
+    const util = input.clientWidth
+      - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0);
+    return {
+      hay: true,
+      menos: caja(menos),
+      numero: caja(marco),
+      mas: caja(mas),
+      contenedor: caja(marco?.parentElement),
+      anchoDigito: Math.round(anchoDigito * 10) / 10,
+      digitos: anchoDigito > 0 ? Math.floor(util / anchoDigito) : null,
+      // LA pregunta de la tanda: ¿están los botones FUERA del marco del número?
+      menosAdentro: marco && menos ? marco.contains(menos) : null,
+      masAdentro: marco && mas ? marco.contains(mas) : null,
+      bordeDelMarco: Math.round(parseFloat(getComputedStyle(marco).borderTopWidth || 0)),
+      bordeDelMenos: menos ? Math.round(parseFloat(getComputedStyle(menos).borderTopWidth || 0)) : null,
+    };
+  })()`);
+
+/**
  * ¿Lo dice EL PANEL? No la pantalla entera.
  *
  * ── POR QUÉ HIZO FALTA, Y ES LA LECCIÓN DE SIEMPRE ───────────────────────
@@ -1093,6 +1150,60 @@ for (const ancho of ANCHOS) {
     // El enviado, que ahora es la única referencia y va con peso.
     await afirmar(await hayTexto("Enviado"), "falta el rótulo del enviado en el panel");
 
+    // ── V29 · EL − Y EL + VAN AFUERA DEL MARCO DEL NÚMERO ───────────────
+    //
+    // Eran `[ − 1 + ]`, todo en una caja con borde. Ahora son tres piezas y el
+    // borde rodea solo al número. Importa para la señal de diferencia: el borde
+    // danger tiene que decir "este NÚMERO no coincide", no "estos controles están
+    // mal".
+    //
+    // Se pregunta por CONTENCIÓN en el DOM y no por la apariencia: un botón
+    // visualmente separado pero adentro del marco seguiría llevándose el borde.
+    for (const etiqueta of ["Cantidad recibida en PACK x24", "Unidades sueltas"]) {
+      const c = await cajasDelCampo(etiqueta);
+      await afirmar(c && c.hay, `no se encontró el campo «${etiqueta}»: ${JSON.stringify(c)}`);
+      console.log(`    · ${etiqueta}: ${JSON.stringify(c)}`);
+
+      await afirmar(
+        c.menosAdentro === false && c.masAdentro === false,
+        `en «${etiqueta}» los botones siguen DENTRO del marco del número: ${JSON.stringify(c)}`
+      );
+      // Y el orden en pantalla: − a la izquierda, número, + a la derecha.
+      await afirmar(
+        c.menos.x < c.numero.x && c.numero.x < c.mas.x,
+        `en «${etiqueta}» el orden no es − número +: ${JSON.stringify(c)}`
+      );
+      // ── EL ÁREA TOCABLE, Y EL NÚMERO QUE LA JUSTIFICA ──────────────
+      //
+      // Antes de esta tanda los botones medían **16 × 16 px**, medido acá: el
+      // comentario del componente decía 36 y describía a otra pieza del kit.
+      // Sacarlos del marco lo dejó a la vista y se arregló con `p-2`, que los
+      // lleva a 32.
+      //
+      // El piso se pone en 32 y NO en 40, y el motivo también está medido: el
+      // campo son ~121 px, así que con botones de 40 el marco del número queda en
+      // ~33 px y entran TRES dígitos, debajo del piso de cuatro. 32 es el punto
+      // donde el dedo y el número caben los dos.
+      await afirmar(
+        c.menos.alto >= 30 && c.mas.alto >= 30 && c.menos.ancho >= 30 && c.mas.ancho >= 30,
+        `en «${etiqueta}» el botón quedó más chico que 30 px: ${JSON.stringify(c)}`
+      );
+      // ── CUÁNTOS DÍGITOS ENTRAN, MEDIDO ─────────────────────────────
+      //
+      // El pedido pone el piso en CUATRO. Con menos hay que frenar y avisar en
+      // vez de apretar el campo: un conteo de 1.250 packs existe.
+      await afirmar(
+        c.digitos >= 4,
+        `en «${etiqueta}» entran solo ${c.digitos} dígitos en el número ` +
+          `(${c.numero.ancho} px de marco, ${c.anchoDigito} px por dígito). El piso son 4.`
+      );
+      // El borde va en la caja del número y NO en los botones.
+      await afirmar(
+        c.bordeDelMarco >= 1 && (c.bordeDelMenos === 0 || c.bordeDelMenos === null),
+        `en «${etiqueta}» el borde no está solo en la caja del número: ${JSON.stringify(c)}`
+      );
+    }
+
     // ── V28 · LOS DOS PRECIOS, Y CADA UNO EN SU LUGAR ───────────────────
     //
     // Arriba el de la PRESENTACIÓN —el que se compara contra el remito del
@@ -1248,6 +1359,23 @@ for (const ancho of ANCHOS) {
       campoEnDanger.every((c) => c.colorBorde === c.colorTexto),
       `el borde y el número del campo no van del mismo color: ${JSON.stringify(campoEnDanger)}`
     );
+
+    // ── V29 · Y EL DANGER VA EN LA CAJA DEL NÚMERO, NO EN LOS BOTONES ───
+    //
+    // Es el motivo de fondo por el que los botones salieron del marco. Si el
+    // borde los envolviera, la señal diría "estos controles están mal" en vez de
+    // "este número no coincide".
+    for (const etiqueta of ["Cantidad recibida en PACK x24", "Unidades sueltas"]) {
+      const c = await cajasDelCampo(etiqueta);
+      await afirmar(
+        c.bordeDelMarco === 2,
+        `con diferencia el marco de «${etiqueta}» tendría que estar en 2 px: ${JSON.stringify(c)}`
+      );
+      await afirmar(
+        c.bordeDelMenos === 0,
+        `el botón − de «${etiqueta}» se llevó el borde danger: ${JSON.stringify(c)}`
+      );
+    }
 
     // Y el + lo devuelve: los dos botones tienen que ser simétricos.
     await tocar("Sumar uno a Cantidad recibida", { etiqueta: "el + de completos" });
