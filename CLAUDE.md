@@ -23,6 +23,28 @@ agrega al kit, nunca a la pantalla.** Y la pieza que se agrega sale de una
 pantalla que HOY funciona, tal cual está — nunca escrita adivinando casos
 futuros.
 
+**PERO ESO NO SIGNIFICA "100 % COMPONENTES QUE YA EXISTEN".** Una pantalla puede
+tener una composición nueva y buena. La regla es más precisa: si la pieza nueva
+tiene identidad propia y sería útil fuera de esa pantalla, se vuelve candidata a
+componente compartido; si es composición específica, puede quedar local. Lo que
+no se acepta es una segunda versión local de algo que ya existe.
+
+La auditoría de esa decisión vive en `/revisar-pantalla` y usa cuatro estados:
+`REUTILIZA`, `CANDIDATO A KIT`, `LOCAL JUSTIFICADO` y `DUPLICADO`. Solo
+`DUPLICADO` es rojo por sí mismo; `CANDIDATO A KIT` es información para
+decidir, no un freno automático.
+
+**EL SHELL GLOBAL TAMBIÉN ES UNA PIEZA COMPARTIDA.** En `/modulos`, el
+`Header`, navegación, título mobile, contexto, usuario/operador y estructura de
+`LayoutBase` no se rehacen dentro de una pantalla ni se ocultan con una
+excepción por ruta salvo decisión explícita y documentada. Un Figma de contenido
+no autoriza a reemplazar ese shell.
+
+*Por qué:* Configuración POS se diseñó bien por dentro pero se implementó como
+pantalla inmersiva: ocultó el Header global y dibujó uno propio. Compiló, pasó CI
+y se veía prolijo, pero dejó de ser consistente con Productos y con el resto del
+ERP. El error no era hardcodeo: era duplicación de arquitectura.
+
 *Por qué:* las dos que se escribieron adivinando sirven para menos casos de los
 que hay. `SunmiModalLayout` solo sabe centrar, y hay dos pantallas que por eso no
 lo pueden usar. `SunmiButtonIcon` trae `text-amber-300`, `text-red-400` y
