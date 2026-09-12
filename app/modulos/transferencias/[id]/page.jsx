@@ -454,35 +454,17 @@ export default function TransferenciaDetallePage() {
     }
   };
 
-  /**
-   * ADOPTAR, PARA ESTA RECEPCIÓN, LA PRESENTACIÓN QUE EL DEPÓSITO USA HOY.
-   *
-   * Solo manda ids. La presentación, el factor y el peso los resuelve el
-   * servidor releyendo el catálogo del producto: si la pantalla los mandara,
-   * un cliente viejo podría decir "x6" sobre un producto que hoy es x8 y la
-   * recepción entera quedaría contada en la escala equivocada.
-   *
-   * Y se recarga FRESCO, sin preservar edición: lo que cambia es la escala en la
-   * que se cuenta esta línea, así que una cantidad escrita en la escala anterior
-   * dejó de significar lo que significaba. Preservarla sería arrastrar un número
-   * de "40 unidades" a un campo que ahora dice cajones.
-   */
-  const adoptarPresentacion = async ({ detalleId }) => {
-    try {
-      setRevisando(true);
-      const res = await fetch("/api/transferencias/adoptar-presentacion", {
-        method: "POST",
-        body: JSON.stringify({ transferenciaId: item.id, detalleId }),
-      });
-      const json = await res.json();
-      if (json?.ok) await cargar();
-      return json;
-    } catch (err) {
-      return { ok: false, error: err?.message || "No se pudo adoptar la presentación actual." };
-    } finally {
-      setRevisando(false);
-    }
-  };
+  // Acá estaba `adoptarPresentacion`, el POST a
+  // `/api/transferencias/adoptar-presentacion`. Se fue con el bloque que lo
+  // llamaba: la recepción ya no pregunta en qué presentación contar, porque la
+  // contesta `unidadEnviada` de la línea. Ver
+  // `docs/business-rules/unidad-medida-es-como-se-compra.md`.
+  //
+  // La RUTA sigue en pie y no es un olvido: hay seis líneas adoptadas en
+  // producción cuyos datos escribió ese endpoint, y su conversión —`admiteAdopcion`
+  // y `equivalenciaParaAdoptar`— sigue siendo la que valida el servidor. Lo que
+  // queda pendiente y está anotado es decidir si la ruta se da de baja: hoy no
+  // tiene ningún llamador en el cliente.
 
   const quitarLinea = async (detalleId) => {
     try {
@@ -737,7 +719,6 @@ export default function TransferenciaDetallePage() {
                 puedeRecibir={puedeRecibir}
                 onRevisar={revisarProducto}
                 onAgregar={agregarLinea}
-                onAdoptarPresentacion={adoptarPresentacion}
                 onQuitarLinea={quitarLinea}
                 guardando={revisando}
                 quitandoId={quitandoId}

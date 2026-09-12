@@ -129,7 +129,6 @@ export default function RecepcionMovil({
   onCerrarProducto,
   onRevisar,
   onQuitarLinea,
-  onAdoptarPresentacion,
   onAbrirEscaner,
   // ── EL CATÁLOGO DEL ORIGEN, YA BUSCADO POR EL CEREBRO ──────────────────
   //
@@ -779,7 +778,6 @@ export default function RecepcionMovil({
             puedeRecibir={puedeRecibir}
             guardando={guardando}
             onRevisar={onRevisar}
-            onAdoptarPresentacion={onAdoptarPresentacion}
             onQuitar={onQuitarLinea}
             quitando={quitandoId === seleccionado.id}
             enHoja

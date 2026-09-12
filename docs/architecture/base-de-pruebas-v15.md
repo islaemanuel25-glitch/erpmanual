@@ -78,6 +78,45 @@ Producción sigue en el 3000 y no se toca. Al terminar:
 dentro del contenedor, así que hace falta
 `docker run --rm -v …:/app alpine rm -rf /app/.next`—.
 
+## RESUELTO: el botón de guardar quedaba fuera de pantalla a 440 px
+
+**Encontrado midiendo el V25 el 2026-09-12 y arreglado en la misma tanda.** Se
+deja escrito porque el número es lo que hace útil el candado.
+
+La hoja de corrección no anclaba su pie. Mientras el contenido entraba, el botón
+«✓ Guardar diferencia y seguir» no se movía —medido a 640 y 520 px—. Cuando NO
+entraba, se corría y se iba abajo del borde:
+
+- con el código anterior al V25: 383 px → 443 px, en un viewport de 440;
+- con las dos reservas de alto del V25: 419 px → 443 px.
+
+O sea que reservar alto bajó el salto de 60 a 24 px y **no resolvía este caso**.
+Lo que faltaba era anclar: `sticky bottom-0` sobre la fila de acciones, adentro
+del cuerpo del modal que el kit ya dibuja con `overflow-y-auto`. El contenido
+scrollea por detrás.
+
+Medido después: **379 → 379 en las tres alturas, siempre dentro del viewport.**
+El anclaje se llevó puesto también el residuo de 24 px, porque el botón ya no
+depende de cuánto crezca lo de arriba.
+
+El fondo del pie va en `sunmi-surface` —`--app-bg`—, el único token opaco en los
+catorce temas. `--card-bg` es translúcido en `sunmiDark`, que es el del Sunmi:
+usarlo habría dejado leer el importe a través de los botones. Es la misma
+lección que el desplegable de motivo.
+
+**El arnés lo afirma en las tres alturas, incluida 440**, y tiene contraprueba:
+sacando el `sticky` da rojo con «top 426, viewport 440».
+
+**Pendiente menor, anotado:** los botones deberían ir en el slot `footer` del
+kit, que es el anclaje estructural de verdad. No se hizo porque dependen del
+estado interno de la ficha —motivo, cantidad, error, el handler de guardar— y
+sacarlos a `RecepcionMovil` es un refactor propio.
+
+Y el residuo de 24 px a 440 px de alto —el renglón teñido que pasa a dos líneas
+con el texto nuevo— **se deja a propósito**: decisión de Emanuel el 2026-09-12,
+porque cerrarlo obligaría a cambiar una forma aprobada en el V22 a cambio de 24
+píxeles en un caso donde el botón ya no se mueve.
+
 ## PENDIENTE: el panel de escritorio necesita su propio planteo
 
 **Anotado el 2026-09-12, decisión de Emanuel. No está hecho y es a propósito.**
@@ -126,6 +165,24 @@ movió: significaba que la pantalla que cambió no estaba en la foto.
 **Lo que falta:** sembrar un segundo usuario con un rol SIN
 `transferencias.recibir`, y correr la huella también con ese usuario. Son dos
 huellas de escritorio, no una, y la segunda es la que cubre la tabla.
+
+**Y hay un SEGUNDO agujero en la huella, encontrado el 2026-09-12.** El V25 sacó
+el bloque de adopción de las dos superficies, incluida escritorio, y la huella
+dio **184 = 184, cero diferencias**. Ese cero no significa que escritorio no se
+movió: significa que **el bloque nunca estuvo en la foto**.
+
+El sembrado crea cuatro líneas y todas tienen snapshot de despacho, así que
+`admiteAdopcion` devolvía false en las cuatro y el bloque no se dibujaba nunca.
+La huella no podía ver lo que se sacó.
+
+Es el mismo patrón que el de arriba y la misma lección: **un cero de la huella
+solo vale si antes se comprobó que la huella VE el elemento en cuestión.** Lo
+que cubrió el caso fue un candado de render con el fixture de la línea real de
+la #195 —ficha PACK x12, remito UNIDAD, sin snapshot—, que es la combinación que
+el sembrado no tiene.
+
+Si alguna tanda vuelve a tocar algo que solo aparece en una línea histórica sin
+snapshot, hay que sembrar esa quinta línea primero.
 
 Cuidado al hacerlo: el rol del sembrado hoy es `["*"]`. Un rol con la lista de
 permisos enumerada menos uno no es lo mismo que `["*"]` menos uno — hay que mirar
