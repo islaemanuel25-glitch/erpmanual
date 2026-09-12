@@ -78,6 +78,38 @@ Producción sigue en el 3000 y no se toca. Al terminar:
 dentro del contenedor, así que hace falta
 `docker run --rm -v …:/app alpine rm -rf /app/.next`—.
 
+## PENDIENTE: la huella no cubre la vista de quien NO puede recibir
+
+**Anotado el 2026-09-12, después de encontrar dos defectos vivos ahí.** No está
+hecho, y es a propósito: Emanuel lo dejó fuera de la tanda de la #191.
+
+La página elige qué dibujar con `puedeRecibir ? <WorkspaceRecepcion/> :
+<TablaDetalleTransferencia/>`. El sembrado crea **un solo usuario**, con un rol
+de permisos `["*"]`, así que el arnés y la huella entran siempre por la primera
+rama. **`TablaDetalleTransferencia` no la mide nadie.**
+
+No es una vista de segunda: el comentario de la propia página dice que es la que
+usa la mitad de los usuarios —se lee, se imprime y se compara—.
+
+Y ahí vivían los dos defectos que la #191 destapó, los dos a la vez:
+
+- el importe de línea no seguía a la corrección —leía `subtotal` pelado—;
+- un producto agregado se dibujaba en **$0,00**, que es la #195 otra vez, del
+  lado que nunca se arregló.
+
+Los encontró leer el código buscando otra cosa, no una verificación. La huella
+de escritorio dio **cero** sobre esa tanda y ese cero no significaba que nada se
+movió: significaba que la pantalla que cambió no estaba en la foto.
+
+**Lo que falta:** sembrar un segundo usuario con un rol SIN
+`transferencias.recibir`, y correr la huella también con ese usuario. Son dos
+huellas de escritorio, no una, y la segunda es la que cubre la tabla.
+
+Cuidado al hacerlo: el rol del sembrado hoy es `["*"]`. Un rol con la lista de
+permisos enumerada menos uno no es lo mismo que `["*"]` menos uno — hay que mirar
+cómo resuelve `puedeRecibir` antes de escribir la lista, o la vista que se
+termina midiendo vuelve a ser la equivocada.
+
 ## Correr las dos verificaciones
 
 **La secuencia a 390, que afirma cada paso.** Re-sembrar ANTES de cada corrida:
