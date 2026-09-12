@@ -1,75 +1,90 @@
 "use client";
 
-// LA TARJETA DE UN PRODUCTO MIENTRAS SE RECIBE, EN EL TELÉFONO — V15.
+// LA TARJETA DE UN PRODUCTO MIENTRAS SE RECIBE, EN EL TELÉFONO — V21.
 //
-// ── POR QUÉ UN ARCHIVO NUEVO Y NO UNA VARIANTE DE `FilaProducto` ──────────
+// ── LO QUE CAMBIÓ, Y NO ES ESTÉTICA ──────────────────────────────────────
 //
-// `FilaProducto` la dibujan LAS DOS superficies: el teléfono y la lista de
-// escritorio. Es una tarjeta que se toca entera y no tiene ningún control
-// adentro — abrir la ficha es todo lo que hace.
+// La tarjeta DEJÓ DE EDITAR CANTIDADES. Hasta el V16 tenía un contador − / +,
+// un enlace a "Cargar sueltas" y una fila de chips de motivo: tres formas de
+// escribir el mismo dato, repartidas entre la tarjeta y el panel.
 //
-// Esta tarjeta es otra cosa: tiene un contador, un botón y una fila de chips.
-// Meterle eso a `FilaProducto` movería escritorio, que esta tanda no toca y que
-// se mide a 1366 con huella exigida en cero. Son dos piezas porque son dos
-// comportamientos, no porque se haya copiado una.
+// Ahora la cantidad se toca en UN solo lugar —`FichaProductoRecepcion`, el panel
+// que ya existía y que se abre con "Corregir"— y la tarjeta se ocupa de lo que
+// una tarjeta hace bien: decir qué hay, qué falta y cuánto vale.
 //
-// ── EL CONTADOR ARRANCA CARGADO ──────────────────────────────────────────
+// ── EL MOTIVO DE FONDO: EL CONTADOR NO SERVÍA PARA TODO EL CATÁLOGO ──────
 //
-// Con lo ENVIADO, no en cero. El caso normal es que llegue todo: si arrancara en
-// cero, el operador tendría que teclear la cantidad correcta 77 veces para decir
-// "está todo bien". Arrancando cargado, ese caso es un toque a "Coincide".
+// Un contador de a uno supone que la cantidad es un entero chico. "Jamón cocido,
+// 3,250 KG" no se cuenta tocando + tres mil doscientas cincuenta veces, y un
+// pack incompleto —"5 cajones + 7 sueltas"— son DOS números que un contador de
+// uno solo no puede representar sin aplastarlos en 5,833 cajones, que es
+// exactamente el error de exactitud que este modelo evita.
 //
-// Y arranca en la escala de la PRESENTACIÓN —6, no 144—, que es la que el
-// rótulo de arriba dice. Proponer 144 debajo de un rótulo que dice "6 PACK x24"
-// ya rompió esta pantalla una vez: el caso feliz guardaba 144 packs.
+// O sea que el contador nunca cubrió el catálogo entero: cubría el caso fácil y
+// mandaba el resto al panel. El panel, que ya sabía los dos casos, ahora es el
+// único camino y no hay dos lugares que puedan decir cosas distintas.
+//
+// ── DOS TOQUES, CADA UNO EN UNA ESQUINA FIJA ─────────────────────────────
+//
+// "✓ Coincide" arriba a la derecha: el caso feliz —llegó todo lo que decía el
+// remito— en un toque, sin abrir nada. "Corregir" abajo a la izquierda: todo lo
+// demás. Que cada acción esté SIEMPRE en el mismo lugar importa con la
+// mercadería en una mano y el teléfono en la otra.
+//
+// ── LA TARJETA NO TIENE ESTADO DE NEGOCIO ────────────────────────────────
+//
+// Todo lo que dibuja se deriva de `d`. Lo único suyo es el mensaje de error de
+// un guardado que falló. Antes tenía cuatro `useState` —cantidad, motivo,
+// detalle, error— y esa cantidad local era una segunda fuente de verdad: podía
+// decir "coincide" sobre una línea que el servidor iba a rechazar.
 //
 // ── LA DIFERENCIA SE MIDE EN FÍSICO ──────────────────────────────────────
 //
-// Con las MISMAS funciones que usa la ficha y que respalda el servidor. 6 packs
-// más 1 suelta contra 6 packs enviados es una diferencia aunque los dos números
-// de packs sean 6, y si acá se midiera en la presentación la tarjeta diría
-// "coincide" sobre una línea que el servidor va a rechazar por falta de motivo.
-//
-// ── LAS SUELTAS SIGUEN VIVIENDO EN LA FICHA ──────────────────────────────
-//
-// El contador maneja un número. Un pack incompleto —"5 packs + 7 sueltas"— son
-// dos, y aplastarlos en uno es escribir 5,833 packs, que es el error de
-// exactitud que todo este modelo evita. Así que la tarjeta ofrece abrir la ficha
-// cuando la presentación agrupa, y ahí está el desglose completo. No se pierde
-// ninguna capacidad: se saca del camino del 95 % de los casos.
+// Con las MISMAS funciones que usa la barra de cierre y que respalda el
+// servidor. 6 packs más 1 suelta contra 6 packs enviados es una diferencia
+// aunque los dos números de packs sean 6; medirlo en la presentación haría que
+// la tarjeta dijera "coincide" sobre una línea sin motivo.
 
 import { useState } from "react";
-import { Check, Minus, Plus } from "lucide-react";
+import { Check } from "lucide-react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiInput from "@/components/sunmi/SunmiInput";
-import SunmiChipsFiltro from "@/components/sunmi/SunmiChipsFiltro";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
-// La acción como TEXTO y no como píldora. Es la pieza del kit para eso: sin
-// fondo, sin borde y sin padding propio. Escribir un `<button>` a mano acá lo
-// contaría el trinquete como elemento crudo, con razón.
-import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 
 import { formatearMoneda } from "@/lib/moneda";
-import {
-  chipsDeMotivo,
-  fisicasEnviadasDe,
-  fisicasRecibidasDe,
-} from "@/lib/transferencias/recepcionUI";
+import { chipsDeMotivo, fisicasEnviadasDe, fisicasRecibidasDe } from "@/lib/transferencias/recepcionUI";
 import {
   descriptorDeEnvio,
   nombreDePresentacion,
-  agrupa,
   rotuloConSueltas,
+  rotuloFisicoDeEnvio,
+  unidadDeDiferencia,
 } from "@/lib/transferencias/presentacionEnvio";
 
-/** El motivo que además pide un texto. Es un valor de la base, no una etiqueta. */
-const MOTIVO_OTRO = "Otro";
-
 export const TEXTO_COINCIDE = "✓ Coincide";
-export const TEXTO_MOTIVO_OBLIGATORIO = "Motivo obligatorio";
+export const TEXTO_CORREGIR = "Corregir";
 export const TEXTO_CARGA_NO_DECLARADO = "Cargá la cantidad que llegó";
+
+/**
+ * Las dos clases de acción de la tarjeta, y por qué son distintas.
+ *
+ * `accent-soft` trae fondo tenue y `accent-outline` solo el contorno: las dos
+ * salen de `--pos-accent` y ninguna escribe un color. La jerarquía es a
+ * propósito — "Coincide" cierra la línea sin abrir nada y "Corregir" lleva al
+ * panel, así que no pueden pesar igual en la misma tarjeta.
+ *
+ * ── POR QUÉ VAN EN `className` Y NO COMO `color` ────────────────────────
+ *
+ * `SunmiButton` enumera sus colores y estos dos no están en esa lista, a
+ * propósito: el candado del kit lee `.sunmi-btn-<una-sola-palabra>` como color, y
+ * las variantes con guión quedan afuera por la forma del nombre. Conviven con el
+ * `sunmi-btn-<color>` que el componente agrega igual, y ganan porque
+ * `styles/sunmi.css` las define DESPUÉS del bloque de colores. Eso no es un
+ * accidente que haya que recordar: `variantesDeAccion.test.mjs` lo exige.
+ */
+const CLASE_COINCIDE = "sunmi-btn-accent-outline";
+const CLASE_CORREGIR = "sunmi-btn-accent-suave";
 
 /** Cantidades: enteras sin decimales, fraccionarias con hasta 3 útiles. */
 const fmtCant = (n) => {
@@ -84,259 +99,238 @@ export default function TarjetaRecepcionMovil({
   guardando = false,
   onRevisar,
   onAbrirFicha,
-  onDesmarcar,
 }) {
-  const envio = descriptorDeEnvio(d || {});
-  const esAgregada = d?.agregadoEnRecepcion === true;
-
-  // Lo persistido gana sobre lo propuesto; un 0 guardado NO se vuelve a
-  // proponer como "todo bien", porque 0 es un conteo hecho.
-  const propuesto = d?.cantidadRecibida == null ? envio.cantidad : d.cantidadRecibida;
-
-  const [cantidad, setCantidad] = useState(() => Number(esAgregada ? (d?.cantidadRecibida ?? 0) : propuesto) || 0);
-  const [motivo, setMotivo] = useState(() => d?.motivoPrincipal || "");
-  const [detalle, setDetalle] = useState(() => d?.motivoDetalle || "");
   const [error, setError] = useState("");
 
   if (!d) return null;
 
+  const envio = descriptorDeEnvio(d);
+  const esAgregada = d.agregadoEnRecepcion === true;
   const revisado = d.revisadoEnRecepcion === true;
-  const presentacion = nombreDePresentacion(envio);
   const sueltasGuardadas = Number(d.recibidoUnidadesSueltas || 0);
-  const puedeTenerSueltas = agrupa(envio.presentacion);
 
-  // ── LAS FÍSICAS, CON EL FACTOR CONGELADO Y LA ESCALA CANÓNICA ───────────
+  // ── LAS FÍSICAS, DE LA FUENTE CANÓNICA ──────────────────────────────────
   //
-  // De `recepcionUI`, la MISMA fuente que usa la barra de cierre. Con una copia
-  // acá, la tarjeta podría decir "diferencia" mientras el botón de abajo dice
-  // que no hay ninguna — sobre la misma línea y en la misma pantalla.
-  const fisicasContadas = fisicasRecibidasDe(d, { cantidad, sueltas: sueltasGuardadas });
+  // Sin argumentos, `fisicasRecibidasDe` lee lo PERSISTIDO y devuelve `null`
+  // cuando todavía no se contó nada. Ese `null` es el que hace que una línea
+  // recién abierta no tenga diferencia y pueda cerrarse con "Coincide".
+  const fisicasContadas = fisicasRecibidasDe(d);
   const fisicasEnviadas = fisicasEnviadasDe(d);
 
-  // Los chips salen del signo, con la misma función que respalda el servidor.
   const chips = chipsDeMotivo({
     enviada: fisicasEnviadas,
     recibida: fisicasContadas,
     agregadoEnRecepcion: esAgregada,
   });
   const hayDiferencia = chips.length > 0;
-  const faltaMotivo = hayDiferencia && (!motivo || (motivo === MOTIVO_OTRO && !detalle.trim()));
 
   const delta =
     fisicasContadas == null || fisicasEnviadas == null ? null : fisicasContadas - fisicasEnviadas;
 
-  const guardar = async (cant, motivoElegido, detalleElegido) => {
-    setError("");
-    const r = await onRevisar?.({
-      detalleId: d.id,
-      recibido: cant,
-      recibidoUnidadesSueltas: sueltasGuardadas,
-      motivoPrincipal: motivoElegido || null,
-      motivoDetalle: motivoElegido === MOTIVO_OTRO ? detalleElegido : null,
-    });
-    if (r && r.ok === false) setError(r.error || "No se pudo guardar la revisión.");
-  };
-
-  // ── 3 · REVISADO: UNA SOLA LÍNEA ─────────────────────────────────────────
+  // ── 3 · REVISADO: UNA SOLA LÍNEA, Y CON VUELTA ───────────────────────────
   //
   // Hay 77 líneas. Una tarjeta revisada que siga ocupando seis renglones empuja
   // el trabajo que falta abajo de todo.
+  //
+  // ── POR QUÉ TIENE "Corregir" Y NO ES UN AGREGADO DE MÁS ─────────────────
+  //
+  // El V21 sacó "Volver a contar", que era una barra a todo el ancho y hacía
+  // otra cosa: DESMARCABA sin tocar el conteo. Con el panel eso dejó de hacer
+  // falta —se corrige y se vuelve a guardar en un paso—, pero sacarlo sin poner
+  // nada dejaba la línea revisada sin ningún camino de vuelta DESDE EL TELÉFONO.
+  //
+  // Y ahí se recibe: en el local, con la mercadería en la mano y sin una
+  // computadora cerca. Contar mal y guardar es normal; que la única forma de
+  // arreglarlo sea ir hasta el escritorio, no.
+  //
+  // Va el MISMO botón chico del pie, no la barra de antes: es la misma acción y
+  // el mismo verbo en las dos formas de la tarjeta.
   if (revisado) {
     return (
-      <SunmiCard className="p-2">
-        <div className="flex items-center justify-between gap-2">
-          <span className="flex items-center gap-1.5 min-w-0">
-            <Check size={16} aria-hidden="true" className="shrink-0 sunmi-text-success" />
-            <span className="min-w-0 truncate text-sm2 sunmi-text-strong">{d.nombre}</span>
-          </span>
-          <span className="shrink-0 whitespace-nowrap text-sm2 sunmi-text-muted">
+      <SunmiCard className="p-2" data-tarjeta-recepcion={d.nombre}>
+        {/* ── QUÉ CEDE ANCHO Y QUÉ NO, Y NO ES UN DETALLE ──────────────────
+            Con el botón en la línea, a 390 px sobra poco. La primera versión
+            tenía el bloque de la derecha en `shrink-0`, así que TODO el apretón
+            se lo comía el nombre: quedaba "V15 Co…", y una línea se quedó sin
+            nombre visible. Justamente el nombre es lo que hay que leer para
+            saber qué línea se va a corregir.
+            Ahora el que trunca es el rótulo de la cantidad —que es el dato que
+            el panel muestra entero apenas se abre— y el nombre y el importe
+            conservan su lugar. */}
+        <div className="flex items-center gap-2">
+          <Check size={16} aria-hidden="true" className="shrink-0 sunmi-text-success" />
+          <span className="min-w-0 flex-auto truncate text-sm2 sunmi-text-strong">{d.nombre}</span>
+          <span className="min-w-0 truncate text-sm2 sunmi-text-muted">
             {rotuloConSueltas({ ...envio, cantidad: d.cantidadRecibida ?? 0, sueltas: sueltasGuardadas })}
-            {delta === 0 ? " · coincide" : ""}{" "}
-            {/* Mismo criterio que el pie: una agregada no tiene importe de
-                remito, así que el suyo es el de lo recibido. */}
-            <span className="tabular-nums sunmi-text-strong">
-              {formatearMoneda(esAgregada ? d.subtotalRecibido : d.subtotal)}
-            </span>
+            {delta === 0 ? " · coincide" : ""}
           </span>
-        </div>
-        {puedeRecibir && (
-          <div className="pt-1">
-            <SunmiButton color="slate" onClick={() => onDesmarcar?.(d)} className="w-full justify-center">
-              Volver a contar
+          {/* Mismo criterio que el pie: una agregada no tiene importe de
+              remito, así que el suyo es el de lo recibido. */}
+          <span className="shrink-0 whitespace-nowrap tabular-nums text-sm2 sunmi-text-strong">
+            {formatearMoneda(esAgregada ? d.subtotalRecibido : d.subtotal)}
+          </span>
+          {puedeRecibir && (
+            <SunmiButton
+              onClick={() => onAbrirFicha?.(d)}
+              disabled={guardando}
+              className={`shrink-0 ${CLASE_CORREGIR}`}
+            >
+              {TEXTO_CORREGIR}
             </SunmiButton>
-          </div>
-        )}
+          )}
+        </div>
       </SunmiCard>
     );
   }
 
+  /** El caso feliz: lo que el remito dice, tal cual, sin abrir el panel. */
+  const coincidir = async () => {
+    setError("");
+    const r = await onRevisar?.({
+      detalleId: d.id,
+      // En la escala de la PRESENTACIÓN, que es la que el rótulo muestra.
+      // Mandar las físicas acá guardaría 144 packs sobre un envío de 6 PACK x24.
+      recibido: envio.cantidad,
+      recibidoUnidadesSueltas: envio.sueltas || 0,
+      motivoPrincipal: null,
+      motivoDetalle: null,
+    });
+    if (r && r.ok === false) setError(r.error || "No se pudo guardar la revisión.");
+  };
+
   // ── 1, 2 y 4 · PENDIENTE / DIFERENCIA / NO DECLARADO ─────────────────────
   //
-  // El tono de la tarjeta lo decide el estado, con las clases del kit: warning
-  // cuando el contador se separó de lo enviado, danger cuando el producto ni
-  // siquiera estaba en el remito. Nada de colores escritos a mano.
+  // El tono lo decide el estado, con las clases del kit: warning cuando lo
+  // contado se separó de lo enviado, danger cuando el producto ni siquiera
+  // estaba en el remito. Nada de colores escritos a mano.
   const tono = esAgregada ? "sunmi-state-danger" : hayDiferencia ? "sunmi-state-warning" : "";
-  const tonoTexto = esAgregada
-    ? "sunmi-text-danger"
-    : hayDiferencia
-      ? "sunmi-text-warning"
-      : "sunmi-text-muted";
-  const textoEstado = esAgregada ? "No declarado" : hayDiferencia ? "Diferencia" : "Pendiente";
+
+  // ── FILA 2: QUÉ HAY, EN TEXTO ────────────────────────────────────────────
+  //
+  // Mientras nadie contó, la referencia es la presentación del envío. En cuanto
+  // hay un conteo guardado, lo que importa es ESE número y no el del remito.
+  //
+  // `rotuloFisicoDeEnvio` devuelve `null` en KG, PIEZA y UNIDAD a propósito:
+  // llamar "unidades físicas" a 3,250 KG es la mentira que ese helper existe
+  // para no decir.
+  const tieneConteo = d.cantidadRecibida != null;
+  const fisicoDelEnvio = rotuloFisicoDeEnvio(envio);
+  const queHay = tieneConteo
+    ? `Recibido ${rotuloConSueltas({ ...envio, cantidad: d.cantidadRecibida, sueltas: sueltasGuardadas })}`
+    : `${nombreDePresentacion(envio)}${fisicoDelEnvio ? ` · ${fisicoDelEnvio}` : ""}`;
+
+  // ── EL AVISO DE DIFERENCIA, EN UNA LÍNEA ─────────────────────────────────
+  //
+  // La unidad se nombra solo cuando decir el número pelado sería ambiguo: en KG
+  // y en PIEZA la diferencia vive en esa escala, en los agrupados son unidades y
+  // escribirlo sería ruido en la línea más angosta de la tarjeta.
+  const unidadDif = unidadDeDiferencia(envio);
+  const sufijoDif = unidadDif === "unidades" ? "" : ` ${unidadDif}`;
+  let aviso = null;
+  if (esAgregada) {
+    // ── EL RÓTULO "No declarado" SE QUEDA, Y NO ES EL MISMO CASO QUE "Pendiente"
+    //
+    // El V21 saca "Pendiente" porque no dice nada: toda tarjeta que no está
+    // colapsada está pendiente, y el rótulo ocupaba el lugar donde ahora va
+    // "✓ Coincide". "No declarado" es lo contrario: es la única palabra que
+    // explica por qué esta tarjeta está en rojo y por qué no tiene con qué
+    // comparar. Sacarlo dejaba el tono como única señal, y un color no se lee.
+    //
+    // Y no hay remito contra el cual contrastar: no existe "de cuántas". Lo
+    // único que se puede afirmar es cuánto entró.
+    aviso = `No declarado · ingreso físico ${fmtCant(fisicasContadas ?? 0)}${
+      unidadDif === "unidades" ? " unidades" : sufijoDif
+    }`;
+  } else if (hayDiferencia && delta != null) {
+    const falta = delta < 0;
+    const abs = Math.abs(delta);
+    const verbo = falta ? (abs === 1 ? "falta" : "faltan") : abs === 1 ? "sobra" : "sobran";
+    aviso = `Ingreso físico ${fmtCant(fisicasContadas)} de ${fmtCant(fisicasEnviadas)} · ${verbo} ${fmtCant(abs)}${sufijoDif}`;
+  }
 
   return (
-    <SunmiCard className={`p-4 space-y-3 ${tono}`}>
-      {/* ── ENCABEZADO: NOMBRE, SUBTÍTULO Y ESTADO ─────────────────────────
-          El estado va como TEXTO chico a la derecha y no como chip de fondo
-          lleno: con varias tarjetas seguidas, cuatro píldoras de color compiten
-          entre sí y con el importe, que es lo que de verdad hay que leer. */}
+    // ── EL ANCLA DEL ARNÉS, Y POR QUÉ ES UN ATRIBUTO Y NO UNA CLASE ────────
+    //
+    // El arnés necesita leer UNA tarjeta y no la pantalla entera. Lo hacía con
+    // una heurística —"el div más chico que contiene el nombre y algún botón"—
+    // y el V21 la rompió sin tocarla: al mudar "✓ Coincide" al encabezado, esa
+    // fila pasó a contener nombre Y botón, así que ganaba ella y el pie con
+    // "Corregir" quedaba afuera. El síntoma era que la tarjeta "no tenía"
+    // Corregir cuando sí lo tenía.
+    //
+    // Un atributo estable no depende de la forma del DOM, que es justamente lo
+    // que un rediseño cambia. `SunmiCard` reenvía props de más a propósito.
+    <SunmiCard className={`p-4 space-y-3 ${tono}`} data-tarjeta-recepcion={d.nombre}>
+      {/* ── FILA 1: NOMBRE, REFERENCIA Y EL CASO FELIZ ─────────────────────
+          "✓ Coincide" NO aparece cuando ya hay una diferencia declarada: no
+          tiene sentido ofrecer "coincide" en una línea donde alguien ya contó y
+          dijo que no coincide. Ahí el único camino es "Corregir". */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-md2 font-semibold sunmi-text-strong break-words">{d.nombre}</p>
-          {/* La referencia: qué mandó el depósito y a qué precio. Una línea no
-              declarada no tiene remito contra el cual contrastar, así que dice
-              otra cosa en vez de inventar un "Enviado 0". */}
+          {/* Qué mandó el depósito y a qué precio. Una línea no declarada no
+              tiene remito, así que dice otra cosa en vez de inventar
+              un "Enviado 0". */}
           <p className="text-xs sunmi-text-muted break-words">
             {esAgregada
               ? TEXTO_CARGA_NO_DECLARADO
               : `Enviado ${rotuloConSueltas(envio)} · ${formatearMoneda(d.precioCosto)}`}
           </p>
         </div>
-        <span className={`shrink-0 text-sm2 ${tonoTexto}`}>{textoEstado}</span>
+
+        {puedeRecibir && !esAgregada && !hayDiferencia && (
+          <SunmiButton
+            onClick={coincidir}
+            disabled={guardando}
+            className={`shrink-0 ${CLASE_COINCIDE}`}
+          >
+            {TEXTO_COINCIDE}
+          </SunmiButton>
+        )}
       </div>
 
-      {/* ── FILA DE CONTEO ─────────────────────────────────────────────────
-          La presentación y el acceso a las sueltas a la izquierda; el contador
-          a la derecha como UN SOLO marco con borde fino.
+      {/* ── FILA 2: LO QUE HAY. ES TEXTO, NO UN CONTROL ────────────────── */}
+      <p className="text-sm2 sunmi-text-muted break-words">{queHay}</p>
 
-          Antes eran tres cuadrados rellenos y una barra a todo el ancho debajo:
-          tres bloques apilados que hacían la tarjeta pesada. Acá el peso queda
-          para el nombre y el importe, que es lo que el diseño pide. */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm2 sunmi-text-muted truncate">{presentacion}</p>
-          {/* Las sueltas no caben en un contador de un número: un pack
-              incompleto son DOS datos, y aplastarlos es escribir 5,833 packs.
-              La ficha sigue siendo donde se cargan; acá es un enlace, no una
-              barra que compita con el contador. */}
-          {puedeRecibir && puedeTenerSueltas && (
-            <SunmiLinkButton
-              onClick={() => onAbrirFicha?.(d)}
-              className="mt-1 text-sm2 sunmi-link-accent"
-            >
-              {sueltasGuardadas > 0
-                ? `Unidades sueltas · ${fmtCant(sueltasGuardadas)}`
-                : "Cargar sueltas"}
-            </SunmiLinkButton>
-          )}
-        </div>
-
-        <span
-          className={`shrink-0 inline-flex items-center gap-2 rounded-lg border px-2 py-1 ${
-            hayDiferencia ? "sunmi-state-warning" : "sunmi-divider"
-          }`}
+      {aviso && (
+        <p
+          className={`text-sm2 ${esAgregada ? "sunmi-text-danger" : "sunmi-text-warning"}`}
+          aria-live="polite"
         >
-          <SunmiLinkButton
-            onClick={() => setCantidad((n) => Math.max(0, Number(n) - 1))}
-            disabled={!puedeRecibir || guardando || cantidad <= 0}
-            aria-label={`Restar uno a ${d.nombre}`}
-            className="sunmi-link-accent"
-          >
-            <Minus size={16} aria-hidden="true" />
-          </SunmiLinkButton>
-          <span className="tabular-nums sunmi-text-strong" aria-live="polite">
-            {fmtCant(cantidad)}
-          </span>
-          <SunmiLinkButton
-            onClick={() => setCantidad((n) => Number(n) + 1)}
-            disabled={!puedeRecibir || guardando}
-            aria-label={`Sumar uno a ${d.nombre}`}
-            className="sunmi-link-accent"
-          >
-            <Plus size={16} aria-hidden="true" />
-          </SunmiLinkButton>
-        </span>
-      </div>
-
-      {/* ── 2 · LA DIFERENCIA SE DISPARA SOLA ───────────────────────────────
-          No hay botón de "agregar diferencia": aparece cuando el contador se
-          separa de lo enviado, y desaparece cuando vuelve a coincidir. */}
-      {hayDiferencia && (
-        <div className="space-y-1.5 rounded-lg p-2 sunmi-state-warning-soft">
-          {delta != null && !esAgregada && (
-            <p className="text-sm2 sunmi-text-muted">
-              Enviado {fmtCant(fisicasEnviadas)} · contaste {fmtCant(fisicasContadas)} ·{" "}
-              {delta < 0 ? "faltan" : "sobran"} {fmtCant(Math.abs(delta))}
-            </p>
-          )}
-          <p className="text-sm2 font-semibold sunmi-text-warning">{TEXTO_MOTIVO_OBLIGATORIO}</p>
-          <SunmiChipsFiltro
-            opciones={chips}
-            valor={motivo || null}
-            onCambiar={(v) => setMotivo(v == null ? "" : String(v))}
-            textoTodas={null}
-            rotulo={null}
-          />
-          {motivo === MOTIVO_OTRO && (
-            <SunmiInput
-              value={detalle}
-              onChange={(e) => setDetalle(e.target.value)}
-              placeholder="Detallá el motivo"
-              aria-label={`Detalle del motivo de ${d.nombre}`}
-            />
-          )}
-        </div>
+          {aviso}
+        </p>
       )}
 
       {error && <p className="text-sm2 sunmi-text-danger">{error}</p>}
 
       <SunmiSeparator />
 
-      {/* ── EL PIE: LA ACCIÓN A LA IZQUIERDA, EL IMPORTE A LA DERECHA ───────
-          La acción va como TEXTO en color de acción, no como una barra naranja
-          a todo el ancho. Con varias tarjetas seguidas esa barra era lo más
-          pesado de la pantalla y competía con el número que hay que leer.
-          "Elegí un motivo" va en warning porque no es una acción disponible:
-          es lo que falta hacer.
-
-          ── Y UNA LÍNEA AGREGADA NO TIENE "COINCIDE" ─────────────────────
-          No hay nada con qué coincidir: no venía en el remito. Su pie dice
-          cuánto entró y cuánto vale, que es todo lo que se puede afirmar de
-          ella. El importe se guarda con el contador, no con un botón que
-          promete comparar contra un envío que no existe. */}
-      <div className="flex items-baseline justify-between gap-3">
+      {/* ── FILA 3, EL PIE: LA ACCIÓN A LA IZQUIERDA, EL IMPORTE A LA DERECHA
+          Sin rótulo al lado del importe. "Total línea" no le decía nada a nadie:
+          en una tarjeta de una línea, el número grande de abajo a la derecha ya
+          es el total de esa línea. */}
+      <div className="flex items-center justify-between gap-3">
         {puedeRecibir ? (
-          esAgregada ? (
-            <span className="min-w-0 truncate text-sm2 sunmi-text-muted">
-              Ingreso físico {fmtCant(fisicasContadas ?? 0)} un
-            </span>
-          ) : (
-            <SunmiLinkButton
-              onClick={() => guardar(cantidad, hayDiferencia ? motivo : null, detalle)}
-              disabled={guardando || faltaMotivo}
-              className={`min-w-0 truncate ${faltaMotivo ? "sunmi-text-warning" : "sunmi-link-accent"}`}
-            >
-              {hayDiferencia
-                ? faltaMotivo
-                  ? "Elegí un motivo"
-                  : "Guardar diferencia"
-                : TEXTO_COINCIDE}
-            </SunmiLinkButton>
-          )
+          <SunmiButton
+            onClick={() => onAbrirFicha?.(d)}
+            disabled={guardando}
+            className={`shrink-0 ${CLASE_CORREGIR}`}
+          >
+            {TEXTO_CORREGIR}
+          </SunmiButton>
         ) : (
           <span />
         )}
 
         {/* ── DE DÓNDE SALE EL IMPORTE, Y POR QUÉ NO ES SIEMPRE EL MISMO ────
             `subtotal` es el del REMITO: cuánto salió del depósito. Para una
-            línea agregada vale CERO y es correcto por definición — de un no
+            línea agregada vale CERO y es correcto por definición —de un no
             declarado no salió nada—, pero la tarjeta lo mostraba igual y el
-            operador veía $0,00 sobre mercadería que sí llegó y que el resumen
-            de arriba sí estaba contando. Eso se vio en la #195.
+            operador veía $0,00 sobre mercadería que sí llegó. Eso se vio en
+            la #195.
 
             `subtotalRecibido` es lo que vale lo que entró, el MISMO número que
-            alimenta `importeCorregido` del resumen. Para una agregada es el
-            único que existe; para una del remito son dos conceptos distintos y
-            la tarjeta sigue mostrando el del documento. */}
+            alimenta `importeCorregido` del resumen. */}
         <span className="shrink-0 whitespace-nowrap tabular-nums text-lg2 font-semibold sunmi-text-strong">
           {formatearMoneda(esAgregada ? d.subtotalRecibido : d.subtotal)}
         </span>

@@ -245,9 +245,14 @@ async function tocarEnTarjeta(nombreProducto, fragmento, { etiqueta = null, exac
     const producto = ${JSON.stringify(nombreProducto)};
     const objetivo = ${JSON.stringify(fragmento)};
     const exacto = ${exacto ? "true" : "false"};
-    const candidatos = [...document.querySelectorAll('div')]
-      .filter((n) => n.offsetParent !== null && (n.textContent || '').includes(producto))
-      .sort((a, b) => (a.textContent || '').length - (b.textContent || '').length);
+    // Por el ancla estable que la tarjeta se pone sola. Antes se buscaba "el div
+    // más chico que contiene el nombre", que es una inferencia sobre la forma
+    // del DOM y se rompe cada vez que la pantalla se rediseña. El detalle está
+    // en el encabezado de textoDeTarjeta, sin backticks a propósito: esto vive
+    // adentro de un template literal.
+    const candidatos = [...document.querySelectorAll('[data-tarjeta-recepcion]')]
+      .filter((n) => n.offsetParent !== null
+        && (n.getAttribute('data-tarjeta-recepcion') || '').includes(producto));
     for (const caja of candidatos) {
       const el = [...caja.querySelectorAll('button, a, [role="button"]')]
         .filter((n) => n.offsetParent !== null)
@@ -272,6 +277,48 @@ async function tocarEnTarjeta(nombreProducto, fragmento, { etiqueta = null, exac
   await esperar(700);
 }
 
+/**
+ * ¿Quedó algún contador − / + en la pantalla?
+ *
+ * La regla central del V21 es que la tarjeta NO edita cantidades. Se pregunta
+ * por el `aria-label`, que es lo único estable: el botón no tiene texto —lleva
+ * un ícono— así que buscar por `textContent` no lo encontraría aunque estuviera.
+ */
+const hayContador = () =>
+  evaluar(`(() => {
+    return [...document.querySelectorAll('button')]
+      .filter((n) => n.offsetParent !== null)
+      .some((n) => /Restar uno a|Sumar uno a/.test(n.getAttribute('aria-label') || ''));
+  })()`);
+
+/**
+ * ¿Está abierto el panel del producto?
+ *
+ * Se pregunta por el `role="dialog"` de la hoja del kit Y por un campo numérico
+ * visible. Solo el `role` no alcanza: el aviso de "no figura" y la hoja de más
+ * acciones también son diálogos, y lo que hay que afirmar es que se abrió el
+ * panel DONDE SE EDITA, que es el que tiene el campo de la cantidad.
+ *
+ * ── AL DIÁLOGO NO SE LE PREGUNTA POR `offsetParent` ──────────────────────
+ *
+ * Es la tercera vez que esa propiedad engaña en este arnés —antes fueron los
+ * SVG, que no la tienen—. Acá el motivo es otro: `offsetParent` devuelve `null`
+ * para todo elemento con `position: fixed`, y la capa del modal del kit es
+ * precisamente `fixed inset-0`. O sea que filtrar por eso descartaba justo el
+ * diálogo que se estaba buscando, y la sonda contestaba "no se abrió" con el
+ * panel abierto en pantalla.
+ *
+ * El campo SÍ se filtra: vive adentro de la capa fija, así que su `offsetParent`
+ * es esa capa y no es null, y el filtro sirve para descartar los campos de otra
+ * hoja que quedó montada pero oculta.
+ */
+const panelAbierto = () =>
+  evaluar(`(() => {
+    const hojas = [...document.querySelectorAll('[role="dialog"]')];
+    const campos = [...document.querySelectorAll('input[type="number"]')].filter((n) => n.offsetParent !== null);
+    return hojas.length > 0 && campos.length > 0;
+  })()`);
+
 /** ¿El botón de confirmar está trabado? Se lee del DOM, no de la foto. */
 const cierreTrabado = () =>
   evaluar(`(() => {
@@ -285,26 +332,31 @@ const cierreTrabado = () =>
 /**
  * El texto de una tarjeta, para afirmar sobre ella y no sobre la pantalla entera.
  *
- * ── POR QUÉ NO ALCANZA CON "EL DIV MÁS CHICO QUE CONTIENE EL NOMBRE" ──────
+ * ── LA HEURÍSTICA SE CAMBIÓ POR UN ANCLA, Y ÉSTA ES LA HISTORIA ───────────
  *
- * Ese div es el renglón del encabezado —nombre y estado— y no la tarjeta: el
- * "Enviado 6 PACK x24" vive en un `<p>` hermano, así que quedaba afuera. El
- * síntoma era desconcertante, porque la tarjeta SÍ decía lo que se le pedía y
- * la afirmación fallaba igual.
+ * Buscaba "el div más chico que contiene el nombre Y algún botón". La primera
+ * mitad de esa regla ya había fallado una vez —el renglón del encabezado es más
+ * chico que la tarjeta— y se le agregó la segunda para separarlos: el
+ * encabezado no tenía botones y la tarjeta sí.
  *
- * Se pide además que contenga algo tocable: el renglón del encabezado no tiene
- * botones y la tarjeta sí, así que la condición separa una de otra sin depender
- * de ninguna clase de CSS.
+ * El V21 la rompió sin tocarla. Al mudar "✓ Coincide" arriba a la derecha, el
+ * encabezado PASÓ a tener un botón, así que volvió a ganar él y el pie con
+ * "Corregir" quedaba afuera. El arnés informaba que la tarjeta no tenía
+ * "Corregir" mientras la pantalla lo mostraba.
+ *
+ * La lección es la de siempre: una sonda que infiere la estructura se rompe
+ * cuando la estructura cambia, que es exactamente cuando hay que confiar en
+ * ella. Ahora la tarjeta se marca a sí misma con `data-tarjeta-recepcion` y acá
+ * se la busca por ese atributo.
  */
 const textoDeTarjeta = (nombreProducto) =>
   evaluar(`(() => {
     const producto = ${JSON.stringify(nombreProducto)};
-    const c = [...document.querySelectorAll('div')]
-      .filter((n) => n.offsetParent !== null
-        && (n.textContent || '').includes(producto)
-        && n.querySelector('button'))
-      .sort((a, b) => (a.textContent || '').length - (b.textContent || '').length);
-    return c[0] ? c[0].innerText : '(no está la tarjeta)';
+    const marcada = [...document.querySelectorAll('[data-tarjeta-recepcion]')]
+      .filter((n) => n.offsetParent !== null)
+      .find((n) => (n.getAttribute('data-tarjeta-recepcion') || '').includes(producto));
+    if (marcada) return marcada.innerText;
+    return '(no está la tarjeta)';
   })()`);
 
 /**
@@ -512,21 +564,33 @@ for (const ancho of ANCHOS) {
   }
 
   // ══════════════════════════════════════════════════════════════════════
-  // V15 · LA SECUENCIA DE TRABAJO, EJERCIDA Y AFIRMADA
+  // V21 · LA SECUENCIA DE TRABAJO, EJERCIDA Y AFIRMADA
   //
   // No saca fotos: TOCA y comprueba. Es la mitad que los candados de
-  // `tarjetaRecepcionV15.test.mjs` no pueden cubrir —montan el componente, no
+  // `tarjetaRecepcionV21.test.mjs` no pueden cubrir —montan el componente, no
   // corren eventos ni persisten— y la que el diseño pidió explícitamente.
   //
+  // ── POR QUÉ SE REESCRIBIÓ ENTERA Y NO SE RETOCÓ ──────────────────────
+  //
+  // La secuencia del V15 ejercía el contador − / + de la tarjeta: siete de sus
+  // pasos tocaban "Restar uno a" y "Sumar uno a". Ese contador ya no existe.
+  // Retocarla habría dejado un arnés que verifica una mecánica muerta; lo que
+  // hay que ejercer ahora es lo contrario — que la tarjeta NO edite y que el
+  // panel sí—, y eso son pasos distintos, no los mismos con otro selector.
+  //
   // Necesita la base descartable: `scripts/sembrar-v15-recepcion.mjs` deja un
-  // remito de cuatro líneas, una por caso. El procedimiento completo está en
+  // remito de cuatro líneas, una por caso, más un producto por PESO fuera del
+  // remito. El procedimiento completo está en
   // `docs/architecture/base-de-pruebas-v15.md`.
   // ══════════════════════════════════════════════════════════════════════
-  if (MODO === "v15-secuencia") {
+  if (MODO === "v21-secuencia") {
     const COINCIDE = "V15 Coincide UNIDAD";
     const FALTANTE = "V15 Faltante PACK";
     const SOBRANTE = "V15 Sobrante CAJON";
     const SUELTAS = "V15 Sueltas PACK";
+    // El producto por PESO que vive fuera del remito llega por `--buscar`, que
+    // es el mismo parámetro con el que el modo del V16 ejercía el no declarado.
+    // En esta base hay que pasarle "V15 NoDeclarado KG".
 
     // ── PASO 0 · EL ESTADO DE PARTIDA ──────────────────────────────────
     console.log("\n  PASO 0 · estado inicial");
@@ -535,20 +599,51 @@ for (const ancho of ANCHOS) {
     await afirmar(await hayTexto(SOBRANTE), "la que va a sobrar está en la lista");
     await afirmar(await hayTexto(SUELTAS), "la del pack incompleto está en la lista");
 
-    // El contador arranca CARGADO con lo enviado, en la presentación.
+    // LA REGLA CENTRAL DE LA TANDA, ejercida en el navegador y no leída del JSX.
+    await afirmar(!(await hayContador()), "no quedó ningún contador − / + en la pantalla");
+
     const tCoincide = await textoDeTarjeta(COINCIDE);
-    await afirmar(tCoincide.includes("Enviado 10 UNIDAD"), "el contador arranca con lo enviado (10 UNIDAD)");
+    await afirmar(tCoincide.includes("Enviado 10 UNIDAD"), "la referencia del remito está: 10 UNIDAD");
+    await afirmar(tCoincide.includes("✓ Coincide"), "el caso feliz se ofrece arriba a la derecha");
+    await afirmar(tCoincide.includes("Corregir"), "y «Corregir» está en el pie");
+    await afirmar(
+      !tCoincide.includes("Cargar sueltas") && !tCoincide.includes("Total línea"),
+      "salieron «Cargar sueltas» y el rótulo «Total línea»"
+    );
+
     const tFaltante = await textoDeTarjeta(FALTANTE);
     await afirmar(
       tFaltante.includes("Enviado 6 PACK x24"),
       "y en la presentación: 6 PACK x24, no 144 unidades"
     );
-
-    // La línea sembrada con sueltas ya nace con diferencia, y sin motivo.
     await afirmar(
-      (await textoDeTarjeta(SUELTAS)).includes("Motivo obligatorio"),
-      "el pack incompleto nace con diferencia POR LAS SUELTAS y pide motivo"
+      tFaltante.includes("PACK x24 · 144 unidades físicas"),
+      "la fila 2 dice qué hay, en texto"
     );
+
+    // La línea sembrada con sueltas ya nace con recepción cargada y diferencia.
+    const tSueltas = await textoDeTarjeta(SUELTAS);
+    await afirmar(
+      tSueltas.includes("Recibido 4 PACK x6 + 3 unidades sueltas"),
+      "con un conteo guardado, la fila 2 pasa a decir lo RECIBIDO"
+    );
+    await afirmar(
+      tSueltas.includes("Ingreso físico 27 de 24 · sobran 3"),
+      "el aviso de diferencia dice los tres números, en físico"
+    );
+    await afirmar(
+      !tSueltas.includes("Coincide"),
+      "sobre una diferencia ya declarada NO se ofrece Coincide"
+    );
+    await afirmar(
+      !tSueltas.includes("Motivo obligatorio") && !tSueltas.includes("Faltante"),
+      "el motivo salió de la tarjeta: ahora es del panel"
+    );
+
+    // El punto de partida del avance, para que el "se movió" del paso 3 tenga
+    // contra qué compararse. Sin esto, afirmar "2 / 4" más adelante no dice si
+    // el número cambió o si ya estaba así.
+    await afirmar(await hayTexto("0 / 4 revisados"), "el avance arranca en 0 de 4");
     await afirmar(await cierreTrabado(), "el cierre arranca TRABADO");
     await afirmar(
       await hayTexto("Total"),
@@ -559,67 +654,164 @@ for (const ancho of ANCHOS) {
       "el V16 sacó el aviso de la barra: el avance ya está arriba"
     );
 
-    // ── PASO 1 · COINCIDE, DE UN TOQUE ─────────────────────────────────
+    // La foto del estado de TRABAJO, que es lo que esta tanda rediseñó. La del
+    // final retrata la pantalla con todo colapsado y no muestra ninguna tarjeta
+    // viva: sin ésta, el rediseño quedaba sin registro visual.
+    desbordes += await foto("V21-tarjetas-de-trabajo", ancho);
+
+    // ── DE ACÁ EN ADELANTE SE TRABAJA SOBRE «TODOS» ────────────────────
+    //
+    // En "Pendientes" una línea revisada DESAPARECE de la lista. Toda afirmación
+    // sobre una tarjeta ausente pasa sola —`(no está la tarjeta)` no contiene
+    // "Corregir"— y queda verde sin haber mirado nada: es exactamente el candado
+    // sobre un dato que no existe que CLAUDE.md tiene anotado tres veces.
+    //
+    // Con el tab "Todos" la tarjeta sigue en pantalla después de guardarse y se
+    // puede afirmar sobre lo que dice, que es lo que hay que verificar.
+    await tocar("Todos", { etiqueta: "el tab Todos" });
+    await esperar(900);
+
+    // ── PASO 1 · COINCIDE, DE UN TOQUE Y SIN ABRIR NADA ────────────────
     console.log("\n  PASO 1 · tocar «Coincide»");
     await tocarEnTarjeta(COINCIDE, "✓ Coincide", { etiqueta: "la acción Coincide" });
     await esperar(2500);
     await afirmar(
-      !(await hayTexto(COINCIDE)) || (await textoDeTarjeta(COINCIDE)).includes("Volver a contar"),
-      "la línea quedó revisada de un solo toque, sin pasos extra"
+      !(await panelAbierto()),
+      "el caso feliz NO abre el panel: es un toque y nada más"
+    );
+    const trasCoincidir = await textoDeTarjeta(COINCIDE);
+    // Primero que la tarjeta EXISTE. Sin esto, las tres afirmaciones de abajo
+    // pasan por ausencia y no prueban nada.
+    await afirmar(
+      !trasCoincidir.includes("no está la tarjeta"),
+      "la tarjeta sigue en la lista después de guardarse"
+    );
+    await afirmar(
+      trasCoincidir.includes("10 UNIDAD"),
+      "y quedó con lo que se guardó: 10 UNIDAD"
+    );
+    await afirmar(
+      !trasCoincidir.includes("✓ Coincide"),
+      "la línea quedó revisada y colapsada de un solo toque"
+    );
+    await afirmar(
+      !trasCoincidir.includes("Volver a contar"),
+      "y el V21 sacó el botón de desmarcar de la tarjeta revisada"
+    );
+    // Pero SÍ conserva la vuelta. Sin esto, contar mal y guardar deja la línea
+    // sin arreglo posible desde el teléfono, que es donde se recibe.
+    await afirmar(
+      trasCoincidir.includes("Corregir"),
+      "la línea revisada conserva el camino de vuelta"
+    );
+    await tocarEnTarjeta(COINCIDE, "Corregir", { etiqueta: "corregir una línea YA revisada", exacto: true });
+    await esperar(1200);
+    await afirmar(await panelAbierto(), "y ese «Corregir» abre el mismo panel");
+    await tocar("Cerrar", { etiqueta: "cerrar el panel sin tocar nada" });
+    await esperar(900);
+    await afirmar(!(await panelAbierto()), "cerrar sin guardar deja la línea como estaba");
+
+    // ── PASO 2 · «CORREGIR» ABRE EL PANEL QUE YA EXISTÍA ───────────────
+    console.log("\n  PASO 2 · «Corregir» abre el panel");
+    await afirmar(!(await panelAbierto()), "antes de tocar, el panel está cerrado");
+    await tocarEnTarjeta(FALTANTE, "Corregir", { etiqueta: "la acción Corregir", exacto: true });
+    await esperar(1200);
+    await afirmar(await panelAbierto(), "«Corregir» abrió el panel de detalle");
+    await afirmar(
+      await hayTexto("Ingreso físico"),
+      "y es el panel de siempre: el que muestra el ingreso físico"
     );
 
-    // ── PASO 2 · LA DIFERENCIA SE DISPARA SOLA ─────────────────────────
-    console.log("\n  PASO 2 · mover el contador hasta que aparezca el motivo");
+    // ── PASO 3 · EL PANEL EXIGE EL MOTIVO, Y GUARDA ────────────────────
+    //
+    // La regla NO cambió: si la cantidad se tocó, el motivo es obligatorio. Lo
+    // que cambió es QUIÉN la exige — antes la tarjeta, ahora el panel.
+    console.log("\n  PASO 3 · el panel exige motivo y guarda");
+    await escribirEnCampo(0, "4");
+    await esperar(600);
     await afirmar(
-      !(await textoDeTarjeta(FALTANTE)).includes("Motivo obligatorio"),
-      "antes de mover el contador NO se pide motivo"
+      await hayTexto("96"),
+      "el panel recalcula el ingreso físico: 4 packs de 24 son 96"
     );
-    await tocarEnTarjeta(FALTANTE, "Restar uno a", { etiqueta: "el botón −" });
-    await tocarEnTarjeta(FALTANTE, "Restar uno a", { etiqueta: "el botón −" });
-    const conFaltante = await textoDeTarjeta(FALTANTE);
-    await afirmar(conFaltante.includes("Motivo obligatorio"), "al separarse el contador apareció el motivo, SOLO");
-    await afirmar(
-      conFaltante.includes("Enviado 144 · contaste 96 · faltan 48"),
-      "el renglón dice enviado, contado y diferencia, en físico"
-    );
-    await afirmar(conFaltante.includes("Faltante"), "ofrece el chip Faltante");
-    await afirmar(conFaltante.includes("Roto"), "ofrece el chip Roto");
-    await afirmar(!conFaltante.includes("Sobrante"), "y NO ofrece Sobrante sobre un faltante");
-    await afirmar(await cierreTrabado(), "con la diferencia sin motivo, el cierre sigue trabado");
 
-    // ── PASO 3 · ELEGIR EL MOTIVO ──────────────────────────────────────
-    console.log("\n  PASO 3 · elegir motivo");
-    await tocarEnTarjeta(FALTANTE, "Faltante", { etiqueta: "el chip Faltante", exacto: true });
+    // Guardar SIN motivo tiene que rebotar, y el panel tiene que seguir abierto.
+    await tocar("y seguir", { etiqueta: "guardar sin motivo" });
+    await esperar(1200);
     await afirmar(
-      (await textoDeTarjeta(FALTANTE)).includes("Guardar diferencia"),
-      "con el motivo puesto, la tarjeta deja cerrarse"
+      await panelAbierto(),
+      "guardar con diferencia y SIN motivo no cerró el panel: lo rechazó"
     );
-    await tocarEnTarjeta(FALTANTE, "Guardar diferencia", { etiqueta: "guardar la diferencia" });
-    await esperar(2500);
-
-    // ── PASO 4 · EL SOBRANTE, POR EL OTRO LADO ─────────────────────────
-    console.log("\n  PASO 4 · el sobrante");
-    await tocarEnTarjeta(SOBRANTE, "Sumar uno a", { etiqueta: "el botón +" });
-    await tocarEnTarjeta(SOBRANTE, "Sumar uno a", { etiqueta: "el botón +" });
-    const conSobrante = await textoDeTarjeta(SOBRANTE);
     await afirmar(
-      conSobrante.includes("Enviado 60 · contaste 84 · sobran 24"),
-      "el sobrante se dice al derecho: sobran, no faltan"
+      await hayTexto("Elegí el motivo"),
+      "y lo dijo con un mensaje, no en silencio"
     );
-    await afirmar(!conSobrante.includes("Faltante"), "y NO ofrece Faltante sobre un sobrante");
-    await tocarEnTarjeta(SOBRANTE, "Sobrante", { etiqueta: "el chip Sobrante", exacto: true });
-    await tocarEnTarjeta(SOBRANTE, "Guardar diferencia", { etiqueta: "guardar el sobrante" });
-    await esperar(2500);
 
-    // ── PASO 5 · EL PACK INCOMPLETO ────────────────────────────────────
+    // Por "Seleccionar" y no por el rótulo: "Motivo de la diferencia" es el
+    // `div` de la etiqueta, y el disparador del select es un botón aparte cuyo
+    // texto es el valor elegido —o el placeholder mientras no hay ninguno—.
+    await tocar("Seleccionar", { etiqueta: "el desplegable de motivo" });
+    await tocarOpcion("Faltante", { etiqueta: "el motivo Faltante" });
+    await tocar("y seguir", { etiqueta: "guardar la diferencia" });
+    await esperar(2800);
+
+    await afirmar(!(await panelAbierto()), "con el motivo puesto, guardó y la hoja se cerró sola");
+    const trasCorregir = await textoDeTarjeta(FALTANTE);
+    await afirmar(
+      !trasCorregir.includes("no está la tarjeta"),
+      "la tarjeta corregida sigue en la lista"
+    );
+    await afirmar(
+      trasCorregir.includes("4 PACK x24"),
+      "y la TARJETA se actualizó con lo que se guardó en el panel"
+    );
+    // Dos: la que coincidió y ésta. El numerador es `revisados + noDeclarados`
+    // y el denominador `totalFisico`, que es la misma fuente del tab "Todos".
+    await afirmar(
+      await hayTexto("2 / 4 revisados"),
+      "y el AVANCE de arriba se movió: el total lo recalculó el servidor"
+    );
+
+    // ── PASO 4 · CON DIFERENCIA SIN MOTIVO, EL CIERRE SIGUE TRABADO ────
+    //
+    // La línea de las sueltas nació con recepción cargada, diferencia y SIN
+    // motivo. Mientras esté así, el cierre no se destraba — y el panel es ahora
+    // el único lugar donde se le puede poner el motivo.
+    console.log("\n  PASO 4 · el sobrante, y el cierre trabado");
+    await tocarEnTarjeta(SOBRANTE, "Corregir", { etiqueta: "corregir el sobrante", exacto: true });
+    await esperar(1200);
+    await escribirEnCampo(0, "7");
+    await esperar(600);
+    // Por "Seleccionar" y no por el rótulo: "Motivo de la diferencia" es el
+    // `div` de la etiqueta, y el disparador del select es un botón aparte cuyo
+    // texto es el valor elegido —o el placeholder mientras no hay ninguno—.
+    await tocar("Seleccionar", { etiqueta: "el desplegable de motivo" });
+    await tocarOpcion("Sobrante", { etiqueta: "el motivo Sobrante" });
+    await tocar("y seguir", { etiqueta: "guardar el sobrante" });
+    await esperar(2800);
+    await afirmar(
+      (await textoDeTarjeta(SOBRANTE)).includes("7 CAJÓN x12"),
+      "el sobrante también se guardó desde el panel"
+    );
+    await afirmar(
+      await cierreTrabado(),
+      "queda el pack incompleto con diferencia y sin motivo: el cierre SIGUE trabado"
+    );
+
+    // ── PASO 5 · EL PACK INCOMPLETO, DONDE EL CONTADOR NO LLEGABA ──────
     console.log("\n  PASO 5 · el pack incompleto");
+    await tocarEnTarjeta(SUELTAS, "Corregir", { etiqueta: "corregir el pack incompleto", exacto: true });
+    await esperar(1200);
     await afirmar(
-      (await textoDeTarjeta(SUELTAS)).includes("Enviado 24 · contaste 27 · sobran 3"),
-      "las sueltas cuentan para la diferencia: 4 packs de 6 más 3 son 27"
+      await hayTexto("Hay unidades sueltas"),
+      "el panel sí sabe desglosar bultos y sueltas, que es lo que el contador no podía"
     );
-    await tocarEnTarjeta(SUELTAS, "Sobrante", { etiqueta: "el chip Sobrante", exacto: true });
-    await tocarEnTarjeta(SUELTAS, "Guardar diferencia", { etiqueta: "guardar el pack incompleto" });
-    await esperar(2500);
+    // Por "Seleccionar" y no por el rótulo: "Motivo de la diferencia" es el
+    // `div` de la etiqueta, y el disparador del select es un botón aparte cuyo
+    // texto es el valor elegido —o el placeholder mientras no hay ninguno—.
+    await tocar("Seleccionar", { etiqueta: "el desplegable de motivo" });
+    await tocarOpcion("Sobrante", { etiqueta: "el motivo Sobrante" });
+    await tocar("y seguir", { etiqueta: "guardar el pack incompleto" });
+    await esperar(2800);
 
     // ── PASO 6 · EL CIERRE SE DESTRABA ─────────────────────────────────
     console.log("\n  PASO 6 · el cierre");
@@ -675,11 +867,50 @@ for (const ancho of ANCHOS) {
       "el no declarado NO ofrece Coincide: no hay contra qué comparar"
     );
     await afirmar(
-      tarjetaAgregada.includes("Ingreso físico"),
-      "en su lugar el pie dice cuánto entró"
+      tarjetaAgregada.includes("No declarado · ingreso físico"),
+      "el aviso dice por qué está en rojo y cuánto entró"
+    );
+    await afirmar(
+      tarjetaAgregada.includes("Corregir"),
+      "y ofrece «Corregir», que es el único camino para cargarle la cantidad"
+    );
+    await afirmar(await cierreTrabado(), "un no declarado en cero vuelve a trabar el cierre");
+
+    // ── PASO 8 · UNA LÍNEA POR PESO SE CORRIGE, QUE ES EL MOTIVO DE FONDO
+    //
+    // El producto sembrado fuera del remito es KG a propósito: 3,250 KG no se
+    // puede contar tocando + tres mil doscientas cincuenta veces, y ésa es la
+    // razón por la que la edición se mudó al panel. Si este paso no pasa, la
+    // tanda no resolvió aquello para lo que se hizo.
+    console.log("\n  PASO 8 · corregir una línea por PESO");
+    await afirmar(
+      !tarjetaAgregada.includes("unidades físicas"),
+      "en KG no dice «unidades físicas», que sería mentira"
+    );
+    await tocarEnTarjeta(BUSQUEDA, "Corregir", { etiqueta: "corregir la línea por peso", exacto: true });
+    await esperar(1200);
+    await afirmar(await panelAbierto(), "el panel se abre también para una línea por peso");
+    await escribirEnCampo(0, "3.25");
+    await esperar(600);
+    await tocar("y seguir", { etiqueta: "guardar los 3,25 KG" });
+    await esperar(2800);
+
+    await afirmar(!(await panelAbierto()), "guardó y cerró: un no declarado no pide motivo");
+    const tarjetaPeso = await textoDeTarjeta(BUSQUEDA);
+    await afirmar(
+      tarjetaPeso.includes("3,25"),
+      "la tarjeta quedó con los 3,25 KG que se cargaron en el panel"
+    );
+    await afirmar(
+      !tarjetaPeso.includes("$0,00"),
+      "y su importe dejó de ser cero: se valoriza con lo recibido"
+    );
+    await afirmar(
+      (await cierreTrabado()) === false,
+      "con el no declarado cargado, el cierre se vuelve a destrabar"
     );
 
-    desbordes += await foto("V16-secuencia-final", ancho);
+    desbordes += await foto("V21-secuencia-final", ancho);
     console.log(`\n  ${afirmaciones} afirmaciones, todas en verde.`);
   }
 

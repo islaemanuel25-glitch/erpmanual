@@ -574,6 +574,35 @@ const CASOS = [
     candado: "AGREGADO · la ruta manda el precio de la COLUMNA, no del catálogo",
     suite: "lib/transferencias/correccionEconomicaCamino.test.mjs",
   },
+
+  // ── LAS DOS DEL V21: LA VARIANTE DE ACCIÓN DE LA TARJETA ────────────────
+  //
+  // El modo de fallar de las dos es MUDO. No rompen el build ni ponen roja
+  // ninguna otra suite: el botón se dibuja del color equivocado, o sin estilo
+  // ninguno, y solo se ve abriendo esa pantalla en el teléfono. Por eso el
+  // candado existe, y por eso tiene que verse en rojo al menos una vez.
+  {
+    n: "V21-a",
+    defecto: "un color nuevo se agrega al final de la hoja y le gana a las variantes",
+    archivo: "styles/sunmi.css",
+    // El ancla es la llave de apertura: `.sunmi-btn-accent-outline:hover` no
+    // matchea, así que hay una sola coincidencia.
+    de: ".sunmi-btn-accent-outline {",
+    a: ".sunmi-btn-nuevo {\n  background: var(--pos-accent);\n}\n.sunmi-btn-accent-outline {",
+    candado: "toda variante se define DESPUÉS de todos los colores",
+    suite: "components/sunmi/variantesDeAccion.test.mjs",
+  },
+  {
+    n: "V21-b",
+    defecto: "la variante que la tarjeta pide por className deja de existir en el CSS",
+    archivo: "styles/sunmi.css",
+    // Un `className` que el CSS no define es un botón SIN ESTILO que compila
+    // igual: es el defecto del "botón invisible" que ya pasó con `color="accent"`.
+    de: ".sunmi-btn-accent-outline {",
+    a: ".sunmi-btn-accentoutline {",
+    candado: "las dos variantes que usa la tarjeta de recepción existen",
+    suite: "components/sunmi/variantesDeAccion.test.mjs",
+  },
 ];
 
 // `node_modules` se ENLAZA en vez de copiarse: son doce copias y nada de lo que

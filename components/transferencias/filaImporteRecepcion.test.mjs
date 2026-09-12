@@ -268,7 +268,10 @@ test("F7b. Y NO OFRECE 'Coincide': no hay contra qué comparar", () => {
     })
   );
   assert.doesNotMatch(t, /Coincide/, "un no declarado no puede ofrecer coincidir con el remito");
-  assert.match(t, /Ingreso físico 13 un/);
+  // El V21 mudó este dato del pie al aviso —el pie ahora es "Corregir" y el
+  // importe— y le puso la unidad en vez del "un" fijo, que era falso en KG. Lo
+  // que se afirma no cambió: la tarjeta dice cuánto entró.
+  assert.match(t, /No declarado · ingreso físico 13 unidades/);
 });
 
 test("F8. REVISADO se colapsa a una línea y conserva su importe", () => {

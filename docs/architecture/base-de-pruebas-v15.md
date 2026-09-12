@@ -6,7 +6,8 @@ crearla. Está acá para no volver a discutirlo.
 ## Por qué existe
 
 Verificar la pantalla de recepción **ejerciéndola** —tocar "Coincide", mover el
-contador, elegir un motivo, comprobar que el cierre se destraba— **escribe**:
+corregir una cantidad, elegir un motivo, comprobar que el cierre se destraba—
+**escribe**:
 `revisar-producto` persiste el conteo, el autor y la fecha. Eso no puede correr
 contra producción.
 
@@ -90,7 +91,34 @@ siguiente encuentra fuera del filtro "Pendientes".
       -e CHROMIUM_USER_FLAGS=--no-sandbox -e AUTH_SECRET="$SECRETO" \
       erpazul-test:estable node --experimental-websocket scripts/capturas-recepcion-movil.mjs \
         --base http://localhost:3210 --transferencia N --usuario N --local N \
-        --anchos 390 --modo v15-secuencia --chrome /usr/bin/chromium --salida /salida
+        --anchos 390 --modo v21-secuencia --buscar "V15 NoDeclarado KG" \
+        --chrome /usr/bin/chromium --salida /salida
+
+El `--buscar` **no es opcional** desde el V21: el paso 8 corrige una línea por
+PESO, y la única que hay es el producto que vive fuera del remito. Sin él, el
+arnés busca el default de producción —que en esta base no existe— y el paso del
+no declarado no tiene con qué trabajar.
+
+Y los tres números **cambian en cada sembrado**, porque los ids son
+autoincrementales y el script borra y vuelve a crear. Hay que leer los que
+imprime esa corrida, no los de la anterior.
+
+**Los colores de las dos acciones, en los catorce temas.** No necesita sesión ni
+la base sembrada: las variables las sirve el layout raíz, así que mide sobre
+`/login`.
+
+    docker run --rm --network container:erpazul_v15_app --shm-size=1g \
+      -v /home/emanuel/trabajo/erpmanual:/app \
+      -v /home/emanuel/.cache/erpazul-test/node_modules:/app/node_modules -w /app \
+      -e CHROMIUM_USER_FLAGS=--no-sandbox \
+      erpazul-test:estable node --experimental-websocket scripts/sonda-acciones-recepcion.mjs \
+        --base http://localhost:3210 --chrome /usr/bin/chromium
+
+Mide 90 pares —2 acciones × 3 fondos de tarjeta × 15 temas— contra los umbrales
+de WCAG: 4,5 para el texto y 3,0 para el contorno. **Encontró un defecto real la
+primera vez que se corrió**, y por eso está: el acento como color de TEXTO da
+3,19 sobre la tarjeta blanca de `sunmiLight` y de `ambarCaja`, y baja a 2,08
+sobre las teñidas.
 
 **La huella de escritorio a 1366**, antes y después:
 
@@ -129,10 +157,62 @@ productos y un remito de cuatro líneas. Cuatro líneas iguales probarían cuatr
 veces lo mismo; éstas cubren los cuatro estados que el diseño distingue:
 
 - **UNIDAD, 10 enviadas** — la secuencia toca "Coincide".
-- **PACK x24, 6 packs** — baja el contador dos veces: faltante con motivo.
-- **CAJÓN x12, 5 cajones** — sube el contador dos veces: sobrante con motivo.
+- **PACK x24, 6 packs** — se corrige a 4 en el panel: faltante con motivo.
+- **CAJÓN x12, 5 cajones** — se corrige a 7 en el panel: sobrante con motivo.
 - **PACK x6, 4 packs + 3 sueltas ya cargadas** — nace con diferencia **por las
   sueltas**, que es el caso que un contador de un solo número no puede producir.
+
+Y un quinto producto **fuera del remito**, `V15 NoDeclarado KG`, que cubre dos
+casos de una vez: el alta de un no declarado desde el catálogo —sin modal, como
+quedó en el V16— y la corrección de una línea por **PESO**, que es el motivo de
+fondo por el que el V21 sacó el contador de la tarjeta. 3,250 KG no se cuenta
+tocando "+" tres mil doscientas cincuenta veces.
+
+## Lo que el arnés aprendió a la mala, y conviene no volver a pisar
+
+**Una sonda que infiere la estructura del DOM se rompe justo cuando hay que
+confiar en ella.** `textoDeTarjeta` buscaba "el div más chico que contiene el
+nombre y algún botón". El V21 mudó "✓ Coincide" al encabezado, esa fila pasó a
+tener un botón, y la sonda empezó a devolver el encabezado en vez de la tarjeta:
+informaba que no había "Corregir" mientras la pantalla lo mostraba. Ahora la
+tarjeta se marca con `data-tarjeta-recepcion` y la sonda busca ese atributo.
+
+**`offsetParent` es `null` en todo elemento `position: fixed`.** La capa del
+modal del kit lo es, así que filtrar los diálogos por `offsetParent !== null`
+descarta exactamente el diálogo que se está buscando. Es la segunda forma en que
+esa propiedad engaña acá —la primera fueron los SVG, que directamente no la
+tienen—.
+
+**En el tab "Pendientes" una línea revisada desaparece de la lista.** Cualquier
+afirmación sobre esa tarjeta pasa entonces por ausencia: `(no está la tarjeta)`
+no contiene "Corregir", y el candado queda verde sin haber mirado nada. La
+secuencia se pasa a "Todos" después del estado inicial, y antes de afirmar sobre
+una tarjeta comprueba que la tarjeta EXISTE.
+
+## Y tres más, de la sonda de temas
+
+**Cambiar `data-theme` y esperar NO sirve: el proveedor lo pisa.**
+`SunmiThemeProvider` reescribe `document.documentElement.dataset.theme` con el
+tema guardado, así que una sonda que pone el tema, duerme y mide, mide quince
+veces el tema por defecto. Y el chequeo obvio —leer el atributo justo después de
+escribirlo— no lo ve, porque en ESE instante todavía está bien: es un candado
+puesto sobre un momento que no es el momento que importa. Hay que comprobarlo al
+MEDIR, y reponerlo si hizo falta.
+
+**Cambiar `data-theme` y medir en el MISMO tick tampoco sirve.** El atributo
+queda bien pero los colores salen viejos: Chromium actualiza la propiedad
+personalizada —`getComputedStyle(el).getPropertyValue('--pos-accent')` devuelve
+el valor nuevo— y sin embargo el `color` que ya derivó de un `var()` sigue siendo
+el anterior. Medido sobre el mismo elemento y en la misma llamada: token
+`#d97706`, color `rgb(251, 191, 36)`. Hay que darle un respiro al navegador entre
+poner el tema y leer.
+
+**Los colores calculados no se parsean con una expresión regular.** Chromium
+devuelve `rgba(...)`, `color(srgb 0.98 0.74 0.14 / 0.4)` y
+`oklab(0.777465 0.0391703 0.153345 / 0.4)` según de dónde venga el color y qué
+tema esté puesto. Perseguir formatos es perder. Se pinta en un canvas de 1×1 y se
+lee el píxel: el navegador entiende sus propios formatos y compone el alfa con la
+misma matemática con la que dibuja la pantalla.
 
 El local no lleva `grupoId`: el vínculo son dos tablas aparte, `GrupoLocal` para
 los locales y `GrupoDeposito` para los depósitos. Sin ellas `getGrupoIdDeLocal`
