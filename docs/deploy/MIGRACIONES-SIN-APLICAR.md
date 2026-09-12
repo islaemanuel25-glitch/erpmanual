@@ -20,6 +20,32 @@ Ninguna. Producción está en **10 migraciones**, las mismas que el árbol.
 
 ---
 
+## 2026-09-12 — `6cc09686`, V25 de recepción móvil: CERO migraciones
+
+Producción pasó de `73007aff6619ead283c395de21cda60dd174439c` a
+`6cc0968601e42e5b68e4dfd2afff71434be86b1b`, el merge de
+`fix/presentacion-manda-la-linea`. **Despliegue solo de código.**
+
+Cómo se confirmó el cero, que son tres cosas distintas y ninguna alcanza sola:
+
+- `git diff --name-only 73007aff..HEAD -- prisma/` da **vacío**, y
+  `schema.prisma` tampoco se tocó;
+- el clasificador con `--desde 73007aff…` informó **«Archivos a mirar: 0»** y
+  salió con 0. Se le pasó la base a mano porque el `--vps` no resuelve el
+  hostname `vps-erp` **desde adentro del propio VPS**, que es donde se corrió
+  esta vez: salió con 2 y frenó, como tiene que hacer;
+- `migrate deploy` informó **10 migrations found**, el mismo número que
+  `ls -1 prisma/migrations | grep -c '^[0-9]'` en el árbol del VPS. Ese conteo es
+  el chequeo que vale: el código de salida 0 con «No pending migrations» también
+  lo devuelve una imagen atrasada.
+
+`migrate status` de cierre: 10 y «Database schema is up to date!».
+
+La bitácora `.claude/migraciones-autorizadas.log` quedó **vacía**: no se usó
+`DEPLOY_MIGRACION_AUTORIZADA` en ningún momento.
+
+---
+
 ## 2026-09-10 — `f63c0928`, adopción de presentación en recepción: una migración aplicada
 
 Producción pasó de `edad85fba53620555b6b74f7906fd3ff2eb9c449` a
