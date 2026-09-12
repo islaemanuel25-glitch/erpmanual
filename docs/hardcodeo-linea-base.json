@@ -2,13 +2,13 @@
   "_lea_esto": "Línea de base del hardcodeo. La sella scripts/hardcodeo.mjs --linea-base --sellar; sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
   "_commit": "`commit` es el árbol que se ESCANEÓ, no la fecha en que se selló: pueden diferir. Cuando se corrige un falso positivo del contador, la base se REEXPRESA desde el árbol histórico —no desde main— para no perdonar la deuda que entró después.",
   "_inventario": "El trinquete compara el INVENTARIO, no los totales: una ocurrencia es archivo + categoría + texto, con cantidad. Sin número de línea, para que mover código no invente violaciones. Un alta en cualquier clave pone rojo aunque el total baje.",
-  "generada": "2026-09-07 02:55",
-  "commit": "32757049cafa4f7dbf39fe931a19d9b773bee5cc",
+  "generada": "2026-09-12 00:45",
+  "commit": "aa39b04932a2b3227d09cea0a71a01939180f269",
   "total": {
-    "color": 288,
-    "medida": 1912,
-    "modal": 36,
-    "crudo": 318,
+    "color": 284,
+    "medida": 1893,
+    "modal": 34,
+    "crudo": 311,
     "celda": 461,
     "kit-pisado": 0,
     "tema-paralelo": 87
@@ -16,7 +16,7 @@
   "porPantalla": {
     "(kit)": {
       "color": 32,
-      "medida": 53,
+      "medida": 52,
       "modal": 1,
       "crudo": 0,
       "celda": 0,
@@ -43,7 +43,7 @@
     },
     "auditoria-pos-ventas": {
       "color": 43,
-      "medida": 189,
+      "medida": 188,
       "modal": 0,
       "crudo": 13,
       "celda": 61,
@@ -114,11 +114,20 @@
       "tema-paralelo": 0
     },
     "configuracion": {
-      "color": 9,
+      "color": 7,
       "medida": 19,
       "modal": 1,
       "crudo": 1,
       "celda": 6,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "configuracion-pos": {
+      "color": 0,
+      "medida": 0,
+      "modal": 0,
+      "crudo": 0,
+      "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -194,6 +203,15 @@
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
+    "ofertas": {
+      "color": 0,
+      "medida": 0,
+      "modal": 0,
+      "crudo": 0,
+      "celda": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
     "operador": {
       "color": 0,
       "medida": 10,
@@ -241,9 +259,9 @@
     },
     "productos": {
       "color": 38,
-      "medida": 208,
+      "medida": 201,
       "modal": 1,
-      "crudo": 32,
+      "crudo": 31,
       "celda": 91,
       "kit-pisado": 0,
       "tema-paralelo": 0
@@ -294,17 +312,17 @@
       "tema-paralelo": 0
     },
     "stock_locales": {
-      "color": 5,
-      "medida": 33,
-      "modal": 2,
-      "crudo": 14,
+      "color": 3,
+      "medida": 24,
+      "modal": 0,
+      "crudo": 8,
       "celda": 10,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
     "transferencias": {
       "color": 0,
-      "medida": 68,
+      "medida": 67,
       "modal": 0,
       "crudo": 7,
       "celda": 29,
@@ -673,12 +691,6 @@
         "<input>": 1
       }
     },
-    "app/modulos/configuracion/pos-ventas/page.jsx": {
-      "color": {
-        "bg-green-": 1,
-        "bg-red-": 1
-      }
-    },
     "app/modulos/configuracion/stock/page.jsx": {
       "color": {
         "bg-green-": 1,
@@ -906,7 +918,6 @@
         "text-[10px]": 2,
         "min-h-[24px]": 1,
         "text-[11px]": 19,
-        "gap-[9px]": 1,
         "text-[12px]": 14
       },
       "celda": {
@@ -1094,7 +1105,6 @@
     "components/auditoria-pos-ventas/TablaMediosPago.jsx": {
       "medida": {
         "text-[11px]": 1,
-        "text-[10px]": 1,
         "text-[9px]": 2,
         "min-w-[520px]": 1,
         "min-w-[540px]": 1
@@ -2218,16 +2228,7 @@
     },
     "components/productos/TarjetaProductoMovil.jsx": {
       "medida": {
-        "min-h-[51.5px]": 1,
-        "w-[202px]": 1,
-        "text-[9px]": 1,
-        "text-[25px]": 1,
-        "w-[44px]": 1,
-        "h-[44px]": 1,
         "text-[10px]": 1
-      },
-      "crudo": {
-        "<button>": 1
       }
     },
     "components/productos/VoiceFieldButton.jsx": {
@@ -2615,53 +2616,33 @@
       }
     },
     "components/stock_locales/ModalAjuste.jsx": {
+      "medida": {
+        "text-[13px]": 5,
+        "text-[11px]": 6
+      },
       "color": {
-        "bg-black/": 1,
         "text-slate-": 2
       },
-      "modal": {
-        "fixed inset-0": 1
-      },
       "crudo": {
-        "<button>": 2,
         "<input>": 3
-      },
-      "medida": {
-        "text-[14px]": 1,
-        "text-[12px]": 1,
-        "text-[13px]": 6,
-        "text-[11px]": 6
       }
     },
     "components/stock_locales/ModalLimites.jsx": {
-      "color": {
-        "bg-black/": 1
-      },
-      "modal": {
-        "fixed inset-0": 1
-      },
-      "crudo": {
-        "<button>": 2
-      },
       "medida": {
-        "text-[14px]": 1,
-        "text-[12px]": 1,
-        "text-[11px]": 2,
-        "text-[13px]": 1
+        "text-[11px]": 2
       }
     },
     "components/stock_locales/TablaStock.jsx": {
       "medida": {
         "text-[10px]": 4,
-        "text-[13px]": 2,
-        "text-[12px]": 2,
+        "text-[12px]": 1,
         "text-[11px]": 2
       },
       "celda": {
         "<td>": 10
       },
       "crudo": {
-        "<button>": 4
+        "<button>": 2
       }
     },
     "components/sunmi/SunmiBadge.jsx": {
@@ -2768,7 +2749,6 @@
     "components/sunmi/SunmiProductoCard.jsx": {
       "medida": {
         "px-[13px]": 1,
-        "h-[44px]": 1,
         "pt-[9px]": 1,
         "text-[10.5px]": 1,
         "text-[15px]": 1,
@@ -2938,7 +2918,6 @@
     },
     "components/transferencias/detallePresentacion.jsx": {
       "medida": {
-        "text-[10px]": 1,
         "text-[11px]": 3
       }
     },
