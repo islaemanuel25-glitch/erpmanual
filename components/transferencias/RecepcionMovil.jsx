@@ -48,8 +48,21 @@ import { hayEscanerDisponible } from "@/components/sunmi/SunmiEscanerCodigoBarra
 import EstadoTransferenciaBadge from "./EstadoTransferenciaBadge";
 import TransferenciaHeader from "./TransferenciaHeader";
 import FichaProductoRecepcion from "./FichaProductoRecepcion";
-import { fmtCantidad, fmtMoneda } from "./detallePresentacion";
+import TarjetaRecepcionMovil from "./TarjetaRecepcionMovil";
+import { fmtCantidad } from "./detallePresentacion";
+// ── UN SOLO FORMATEADOR DE PLATA EN ESTA PANTALLA ────────────────────────
+//
+// `formatearMoneda` y no el `fmtMoneda` local: es el del ERP, y el diseño lo
+// pide explícito. Los dos dan es-AR con punto de miles y coma decimal; difieren
+// en un espacio —`$1.234,00` contra `$ 1.234,00`—, así que NO se puede cambiar
+// el de `detallePresentacion` sin mover la tabla de escritorio, que esta tanda
+// mide en cero. Por eso el móvil migra y aquél queda donde está.
+import { formatearMoneda } from "@/lib/moneda";
 import { FILTRO, pasaFiltro } from "@/lib/transferencias/controlFisico";
+// La escala canónica de una línea, compartida con la tarjeta. Ver el encabezado
+// de `escalaFisicaDeLinea`: leer `unidadEnviada` crudo devuelve null en las
+// líneas con snapshot, y null se lee como "no hay diferencia".
+import { fisicasEnviadasDe, fisicasRecibidasDe } from "@/lib/transferencias/recepcionUI";
 import { firmaDeEdicion } from "@/lib/transferencias/presentacionEnvio";
 import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
 
@@ -149,6 +162,46 @@ export default function RecepcionMovil({
   // cosas distintas sobre los mismos productos. El DTO además NO trae un campo
   // `diferencia`: derivarlo a mano habría dado `0` para todos, en silencio.
   const diferencias = (item?.items || []).filter((d) => pasaFiltro(d, FILTRO.DIFERENCIAS));
+
+  // ── LOS DOS MOTIVOS POR LOS QUE NO SE PUEDE CONFIRMAR ───────────────────
+  //
+  // Falta contar, o hay una diferencia que nadie explicó. Son dos impedimentos
+  // distintos con dos arreglos distintos, así que se cuentan por separado y el
+  // aviso dice CUÁL es y cuántas son. Un botón gris sin explicación manda a
+  // tocarlo hasta que alguien se rinde.
+  //
+  // Una línea AGREGADA no entra: su procedencia ya está registrada con autor y
+  // fecha, y pedirle además un motivo es pedir dos veces lo mismo. Es la misma
+  // regla que `exigeMotivo` aplica en el servidor — acá no se inventa otra.
+  //
+  // ── Y NO SALE DE `diferencias`, AUNQUE PAREZCA LO OBVIO ─────────────────
+  //
+  // Se escribió primero filtrando esa lista y quedaba SIEMPRE en cero, sin que
+  // nada avisara. El motivo es que `estadoDeProducto` devuelve PENDIENTE para
+  // toda línea no revisada, así que el filtro DIFERENCIAS solo ve las YA
+  // revisadas — y el servidor no deja revisar con diferencia y sin motivo. La
+  // condición era inalcanzable: una defensa que se lee como puesta y no cubre
+  // nada, que es el caso que CLAUDE.md tiene anotado dos veces.
+  //
+  // Lo que SÍ ocurre, y es lo que el diseño quiere frenar: alguien contó, dejó
+  // una diferencia cargada y se fue sin explicarla. Esa línea tiene recepción
+  // persistida, no está revisada y no tiene motivo. Se deriva de la línea, con
+  // la misma función que el renglón de abajo, y en FÍSICO — que es donde la
+  // diferencia cuenta.
+  const sinMotivo = (item?.items || []).filter((d) => {
+    if (d.agregadoEnRecepcion || d.motivoPrincipal) return false;
+    if (d.cantidadRecibida == null) return false;
+    const env = fisicasEnviadasDe(d);
+    const rec = fisicasRecibidasDe(d);
+    return env != null && rec != null && rec !== env;
+  }).length;
+  const trabado = !todoRevisado || sinMotivo > 0;
+  const avisoDeCierre =
+    sinMotivo > 0
+      ? `${sinMotivo} ${sinMotivo === 1 ? "diferencia sin motivo" : "diferencias sin motivo"}`
+      : todoRevisado
+        ? "Todo revisado · listo para confirmar"
+        : `Falta revisar ${pendientes} ${pendientes === 1 ? "producto" : "productos"}`;
 
   /** "35 de 36 unidades · faltó 1". En FÍSICO, que es lo que mueve stock. */
   const detalleDiferencia = (d) => {
@@ -367,11 +420,25 @@ export default function RecepcionMovil({
             No hay productos que coincidan con este filtro.
           </p>
         )}
+        {/* ── LA TARJETA DE TRABAJO, V15 ────────────────────────────────
+            Ya no es `FilaProducto`. Esa fila la comparten el teléfono y la
+            lista de escritorio, y esta tarjeta tiene contador, botón y chips
+            adentro: metérselos allá movería escritorio, que esta tanda no toca.
+
+            El `key` incluye la firma de la edición y no solo el id: adoptar la
+            presentación cambia EN QUÉ se cuenta la línea sin cambiarle el id, y
+            con `key={d.id}` React conservaría un contador que ya no significa
+            lo mismo. Es el defecto que la ficha ya tiene tapado. */}
         {visibles.map((d) => (
-          // `conImporte`: la fila de Costo + Total es del diseño aprobado de la
-          // card MÓVIL. Es la misma fila que dibuja escritorio, con una zona
-          // más; escritorio no la pide y queda igual que antes.
-          <FilaProducto key={d.id} d={d} activa={false} onElegir={onElegir} conImporte />
+          <TarjetaRecepcionMovil
+            key={firmaDeEdicion(d)}
+            d={d}
+            puedeRecibir={puedeRecibir}
+            guardando={guardando}
+            onRevisar={onRevisar}
+            onAbrirFicha={onElegir}
+            onDesmarcar={(x) => onRevisar?.({ detalleId: x.id, revisado: false })}
+          />
         ))}
       </div>
 
@@ -413,13 +480,13 @@ export default function RecepcionMovil({
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-sm2 sunmi-text-muted">Importe corregido</span>
                 <span className="tabular-nums font-semibold sunmi-text-strong">
-                  {fmtMoneda(item.resumen.importeCorregido)}
+                  {formatearMoneda(item.resumen.importeCorregido)}
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-sm2 sunmi-text-muted">Importe enviado</span>
                 <span className="tabular-nums text-sm2 sunmi-text-muted">
-                  {fmtMoneda(item.resumen.importeOriginal)}
+                  {formatearMoneda(item.resumen.importeOriginal)}
                 </span>
               </div>
               <div className="flex items-baseline justify-between gap-2">
@@ -428,7 +495,7 @@ export default function RecepcionMovil({
                     lee igual en cualquier pantalla y con cualquier tema. */}
                 <span className="tabular-nums text-sm2 sunmi-text-strong">
                   {item.resumen.diferenciaImporte > 0 ? "+" : ""}
-                  {fmtMoneda(item.resumen.diferenciaImporte)}
+                  {formatearMoneda(item.resumen.diferenciaImporte)}
                 </span>
               </div>
             </>
@@ -437,25 +504,55 @@ export default function RecepcionMovil({
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-sm2 sunmi-text-muted">Importe</span>
                 <span className="tabular-nums font-semibold sunmi-text-strong">
-                  {fmtMoneda(importeSinDiferencia)}
+                  {formatearMoneda(importeSinDiferencia)}
                 </span>
               </div>
             )
           )}
-          <p className={`text-sm2 ${todoRevisado ? "sunmi-text-success" : "sunmi-text-muted"}`}>
-            {todoRevisado
-              ? "Todo revisado · listo para confirmar"
-              : `Falta revisar ${pendientes} ${pendientes === 1 ? "producto" : "productos"}`}
-          </p>
+        </SunmiCard>
+      )}
+
+      {/* ── 7 · LA BARRA DE CIERRE, PEGADA ABAJO ───────────────────────────
+          Con 77 líneas, el botón de confirmar quedaba al final de un scroll
+          largo: para saber si ya se podía confirmar había que llegar hasta
+          abajo. Pegada, la respuesta está siempre a la vista.
+
+          `sticky` y no `fixed`: se queda dentro del flujo de la página, así que
+          no tapa el último producto ni hay que compensar con un relleno al
+          final. Y el nivel de apilado es el de la escala —no un número escrito
+          a mano—, porque esto no es un modal: tiene que quedar POR DEBAJO de
+          las hojas del kit, no por encima.
+
+          ── POR QUÉ EL BOTÓN SE BLOQUEA POR DOS COSAS DISTINTAS ────────────
+          Falta revisar productos, o hay diferencias sin motivo. Son dos
+          impedimentos con dos arreglos distintos y por eso el aviso dice cuál
+          es, con el número. Un botón gris que no explica por qué manda a
+          tocarlo hasta que alguien se rinde.
+
+          Esto EVITA EL VIAJE, no reemplaza la regla: el servidor vuelve a
+          exigir las dos —`PRODUCTOS_SIN_REVISAR` y el motivo obligatorio— y es
+          él quien manda. */}
+      {puedeRecibir && (
+        <div className="sticky bottom-0 z-10 -mx-4 px-4 pt-2 pb-2 border-t sunmi-divider sunmi-surface">
+          <div className="flex items-baseline justify-between gap-2 pb-2">
+            <span className={`min-w-0 text-sm2 ${trabado ? "sunmi-text-warning" : "sunmi-text-success"}`}>
+              {avisoDeCierre}
+            </span>
+            <span className="shrink-0 whitespace-nowrap text-sm2 sunmi-text-muted">
+              <span className="tabular-nums font-semibold sunmi-text-strong">
+                {formatearMoneda(importeSinDiferencia)}
+              </span>
+            </span>
+          </div>
           <SunmiButton
             color="amber"
             onClick={confirmarRecepcion}
-            disabled={!todoRevisado || confirmando}
+            disabled={trabado || confirmando}
             className="w-full justify-center"
           >
             {confirmando ? "Confirmando..." : "✓ Confirmar recepción"}
           </SunmiButton>
-        </SunmiCard>
+        </div>
       )}
 
       {/* ── LA HOJA DEL PRODUCTO ──────────────────────────────────────────
