@@ -238,8 +238,11 @@ test("V15-12. EL TONO DE CADA ESTADO SALE DEL KIT, no de un color a mano", () =>
   assert.match(crudo(linea({ cantidadRecibida: 4 })), /sunmi-state-warning/);
   assert.match(crudo(linea({ agregadoEnRecepcion: true, cantidadRecibida: 0 })), /sunmi-state-danger/);
   // Y el recuadro del número también cambia con la diferencia.
+  // El marco del contador pasó de `sunmi-border` —los cuatro bordes del kit— a
+  // `sunmi-divider`, que es el token de LÍNEA. El V16 lo pide como un marco fino
+  // y no como una caja, y `sunmi-border` traía además su propio grosor.
   const fuente = codigoDe("components/transferencias/TarjetaRecepcionMovil.jsx");
-  assert.match(fuente, /hayDiferencia \? "sunmi-state-warning" : "sunmi-border"/);
+  assert.match(fuente, /hayDiferencia \? "sunmi-state-warning" : "sunmi-divider"/);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -249,7 +252,9 @@ test("V15-12. EL TONO DE CADA ESTADO SALE DEL KIT, no de un color a mano", () =>
 test("V15-13. UNA PRESENTACIÓN QUE AGRUPA OFRECE CARGAR SUELTAS", () => {
   // El contador maneja un número; un pack incompleto son dos. Aplastarlos sería
   // escribir 5,833 packs, el error de exactitud que este modelo evita.
-  assert.match(pintar(linea()), /Cargar unidades sueltas/);
+  // "Cargar sueltas" y no "Cargar unidades sueltas": en el V16 es un enlace al
+  // lado del contador, no una barra a todo el ancho, y el texto largo no entra.
+  assert.match(pintar(linea()), /Cargar sueltas/);
   assert.match(
     pintar(linea({ recibidoUnidadesSueltas: 7, cantidadRecibida: 5 })),
     /Unidades sueltas · 7/
@@ -286,5 +291,91 @@ test("V15-16. QUIEN NO RECIBE VE LA TARJETA Y NINGÚN CONTROL", () => {
   const t = pintar(linea(), { puedeRecibir: false });
   assert.match(t, /Pancho 24 Als/);
   assert.doesNotMatch(t, /✓ Coincide/);
-  assert.doesNotMatch(t, /Cargar unidades sueltas/);
+  assert.doesNotMatch(t, /Cargar sueltas/);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// V16 · LO QUE SALIÓ DE USARLO CON LA #195
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** Un no declarado con la forma REAL del endpoint: subtotal 0, valor en recibido. */
+const agregada = (extra = {}) =>
+  linea({
+    id: 9001,
+    nombre: "BARRA TREMBLAY",
+    agregadoEnRecepcion: true,
+    cantidadEnviada: 0,
+    cantidadRecibida: 3,
+    presentacionEnvio: "KG",
+    cantidadPresentada: 0,
+    factorPresentacion: null,
+    sueltasEnviadas: 0,
+    factorPack: 1,
+    unidadEnviada: "UNIDAD",
+    precioCosto: 10120,
+    // `valorizarLineaDelRemito` opera sobre `cantidadPresentada: 0` y devuelve
+    // CERO. No es un defecto: de un no declarado no salió nada del depósito.
+    subtotal: 0,
+    subtotalRecibido: 30360,
+    ...extra,
+  });
+
+test("V16-1. EL NO DECLARADO MUESTRA LO QUE VALE LO QUE LLEGÓ, no $0,00", () => {
+  // El defecto de la #195: la tarjeta decía $0,00 sobre 3 KG que sí llegaron,
+  // mientras el resumen de arriba SÍ los contaba —corregido 1.422.185,82 contra
+  // enviado 1.391.825,82—. El número existía y la tarjeta leía el campo
+  // equivocado.
+  const t = pintar(agregada());
+  assert.match(t, /\$30\.360,00/, "sigue leyendo el importe del remito, que para una agregada es 0");
+  assert.doesNotMatch(t, /\$0,00/);
+});
+
+test("V16-2. Y NO OFRECE 'Coincide': no hay contra qué comparar", () => {
+  const t = pintar(agregada());
+  assert.doesNotMatch(t, /Coincide/, "un no declarado no puede coincidir con un remito que no lo menciona");
+  // En su lugar, el pie dice cuánto entró.
+  assert.match(t, /Ingreso físico 3 un/);
+});
+
+test("V16-3. UNA LÍNEA DEL REMITO SIGUE MOSTRANDO EL IMPORTE DEL REMITO", () => {
+  // La otra mitad: el arreglo no puede cambiar lo que muestran las demás. Para
+  // una línea del remito, `subtotal` y `subtotalRecibido` son dos conceptos y la
+  // tarjeta sigue mostrando el del documento.
+  const t = pintar(linea({ subtotal: 31500, subtotalRecibido: 21000, cantidadRecibida: 4 }));
+  assert.match(t, /\$31\.500,00/);
+  assert.doesNotMatch(t, /\$21\.000,00/, "una línea del remito empezó a mostrar el importe de lo recibido");
+});
+
+test("V16-4. LA TARJETA NO TIENE BARRAS A TODO EL ANCHO", () => {
+  // El diseño: la acción y las sueltas van como TEXTO, no como bloques
+  // rellenos. Tres barras apiladas era lo que hacía la tarjeta pesada con
+  // varias seguidas.
+  //
+  // Se mira SOLO la tarjeta activa. La revisada es otra cosa —una línea
+  // colapsada con su "Volver a contar"— y el diseño la dejó como estaba; medir
+  // las dos juntas pondría rojo un bloque que nadie pidió cambiar.
+  const fuente = codigoDe("components/transferencias/TarjetaRecepcionMovil.jsx");
+  const iRevisada = fuente.indexOf("if (revisado)");
+  const iActiva = fuente.indexOf("const tono =", iRevisada);
+  assert.ok(iRevisada > 0 && iActiva > iRevisada, "cambió la estructura: revisar este candado");
+  const activa = fuente.slice(iActiva);
+
+  assert.ok(
+    !/w-full justify-center/.test(activa),
+    "volvió un bloque a todo el ancho adentro de la tarjeta"
+  );
+  assert.match(activa, /SunmiLinkButton/, "la acción dejó de ser un enlace");
+  assert.match(activa, /<SunmiSeparator \/>/, "se perdió el separador del pie");
+});
+
+test("V16-5. EL PESO VISUAL ESTÁ SOLO EN EL NOMBRE Y EN EL IMPORTE", () => {
+  const fuente = codigoDe("components/transferencias/TarjetaRecepcionMovil.jsx");
+  // Los dos que el diseño pide con peso, con los tamaños de la escala.
+  assert.match(fuente, /text-md2 font-semibold/, "el nombre perdió su tamaño");
+  assert.match(fuente, /text-lg2 font-semibold/, "el importe de línea perdió su tamaño");
+  // Y el contador dejó de estar en negrita: compite con el importe.
+  assert.ok(
+    !/tabular-nums font-semibold sunmi-text-strong" aria-live/.test(fuente),
+    "el número del contador volvió a la negrita"
+  );
 });

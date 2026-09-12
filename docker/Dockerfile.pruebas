@@ -1,0 +1,57 @@
+# LA IMAGEN CON LA QUE SE CORREN LOS CANDADOS Y LOS ARNESES.
+#
+#   docker build -f docker/Dockerfile.pruebas -t erpazul-test:estable .
+#
+# ── POR QUÉ ESTO ES UN ARCHIVO Y NO UN COMANDO QUE ALGUIEN RECUERDA ──────────
+#
+# Esta imagen se armó a mano el 2026-09-10 y el 2026-09-12 un `prune` se la
+# llevó junto con las otras dos variantes. El disco estaba al 6 %, así que no fue
+# presión de espacio: fue una limpieza. Con la imagen perdida, la verificación
+# con arnés quedó sin entorno hasta reconstruirla de memoria.
+#
+# Escrita acá, reconstruirla es un comando y deja de depender de que alguien se
+# acuerde de qué tenía adentro.
+#
+# ── QUÉ TIENE, Y POR QUÉ CADA COSA ──────────────────────────────────────────
+#
+# NODE 20, no 22. Es una elección forzada: las imágenes `node:22` no traen
+# Chromium en Alpine y los arneses lo necesitan. La contra es que el `WebSocket`
+# global de Node 20 está detrás de una bandera, así que los arneses se corren con
+# `node --experimental-websocket`. Está anotado en
+# `docs/architecture/base-de-pruebas-v15.md`.
+#
+# CHROMIUM, para los arneses que abren la pantalla de verdad. En Alpine el
+# binario queda en `/usr/bin/chromium`, que NO es el default del arnés de
+# capturas — hay que pasarle `--chrome /usr/bin/chromium`.
+#
+# BASH, porque varios scripts del repo lo asumen y `sh` no alcanza.
+#
+# GIT, porque la suite se enumera con `git ls-files` y varios candados leen el
+# historial. Sin él, la enumeración devuelve cero archivos y la suite pasa en
+# verde sin haber corrido nada — que es el peor modo de fallar.
+#
+# ── LO QUE NO TIENE: `node_modules` ─────────────────────────────────────────
+#
+# A propósito. Instalarlos acá ataría la imagen a un `package-lock` y habría que
+# reconstruirla en cada cambio de dependencia. Viven en una cache del host
+# —`~/.cache/erpazul-test/node_modules`— que se monta sobre `/app/node_modules`
+# al correr. Ver el mismo documento.
+
+FROM node:20-alpine
+
+# `chromium` trae sus dependencias; las fuentes son aparte y sin ellas el
+# navegador dibuja cuadritos vacíos en vez de texto, que después aparecen en las
+# capturas y parecen un defecto de la pantalla.
+RUN apk add --no-cache \
+      chromium \
+      nss freetype harfbuzz ca-certificates ttf-freefont font-noto \
+      bash git
+
+# El sandbox de Chromium no funciona dentro de un contenedor sin privilegios
+# extra: sin esto el navegador aborta con "GPU process isn't usable". El wrapper
+# de Alpine respeta esta variable, así que no hace falta parchear cada llamada.
+ENV CHROMIUM_USER_FLAGS=--no-sandbox
+ENV CHROME_BIN=/usr/bin/chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
+WORKDIR /app

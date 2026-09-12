@@ -126,6 +126,20 @@ const PRODUCTOS = [
   { clave: "faltante", nombre: "V15 Faltante PACK", unidad_medida: "pack", factor_pack: 24, costo: 5250 },
   { clave: "sobrante", nombre: "V15 Sobrante CAJON", unidad_medida: "cajon", factor_pack: 12, costo: 8400 },
   { clave: "sueltas", nombre: "V15 Sueltas PACK", unidad_medida: "pack", factor_pack: 6, costo: 1800 },
+  // ── EL QUINTO NO VA EN EL REMITO, Y ÉSE ES EL PUNTO ──────────────────
+  //
+  // Está en el catálogo del origen y NO en la transferencia: es el único que
+  // puede ejercer el camino del no declarado. Sin él, buscar cualquier cosa
+  // daba "tampoco está en el catálogo" y la verificación del V16 no tenía con
+  // qué probar que agregar desde el catálogo funciona.
+  {
+    clave: "noDeclarado",
+    nombre: "V15 NoDeclarado KG",
+    unidad_medida: "kg",
+    factor_pack: null,
+    costo: 10120,
+    fueraDelRemito: true,
+  },
 ];
 
 const base = {};
@@ -242,6 +256,7 @@ for (const l of LINEAS) {
 
 log("");
 log("SEMBRADO LISTO");
+log(`  fuera del remito: ${PRODUCTOS.find((p) => p.fueraDelRemito).nombre}`);
 log(`  transferencia : ${transferencia.id}`);
 log(`  usuario       : ${usuario.id}  (${SEMBRADO.usuario})`);
 log(`  local destino : ${destino.id}  (${SEMBRADO.destino})`);

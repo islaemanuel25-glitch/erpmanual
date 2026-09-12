@@ -56,6 +56,10 @@ import {
   rotuloDeEnvio,
 } from "@/lib/transferencias/presentacionEnvio";
 import AgregarProductoRecibido, { ACCION_AGREGAR } from "./AgregarProductoRecibido";
+// Las MISMAS funciones que usa el modal para decidir la unidad y armar el
+// cuerpo. Con dos armadores, el día que el contrato cambie uno de los dos manda
+// un pedido que el servidor rechaza.
+import { unidadDeProductoNuevo, validarLineaNueva } from "@/lib/transferencias/recepcionUI";
 import { SectionHead, fmtMoneda } from "./detallePresentacion";
 import {
   ESTADO_PRODUCTO,
@@ -281,6 +285,97 @@ export default function WorkspaceRecepcion({
     [items, texto]
   );
 
+  // ══════════════════════════════════════════════════════════════════════
+  // EL CATÁLOGO DEL ORIGEN, SIN MODAL (V16)
+  //
+  // ── QUÉ RESUELVE ────────────────────────────────────────────────────
+  //
+  // Informar un producto que llegó sin estar en el remito eran DOS búsquedas
+  // para lo mismo: se escribía acá, la pantalla avisaba que no figuraba, se
+  // tocaba un botón, se abría un modal, y HABÍA QUE VOLVER A ESCRIBIR lo
+  // mismo. Con la mercadería en la mano eso es tipear dos veces para informar
+  // una caja.
+  //
+  // Ahora el mismo texto que ya se escribió busca también en el catálogo del
+  // origen, y los resultados bajan a la composición móvil como filas de la
+  // misma lista.
+  //
+  // ── Y VIVE ACÁ, NO EN `RecepcionMovil` ──────────────────────────────
+  //
+  // Porque esa pieza es presentación: no tiene estado de negocio, no llama a
+  // ningún endpoint y hay candados que lo exigen —cero `fetch(`, cero
+  // `useMemo(` y exactamente dos `useState`—. El cerebro es este archivo, que
+  // ya es el único que habla con el servidor.
+  //
+  // El modal sigue existiendo para ESCRITORIO: allá la lista y la ficha van
+  // lado a lado y el panel no estorba. Una sola fila para los dos —
+  // `FilaCatalogoRecepcion`— para que no puedan decir cosas distintas.
+  const [catalogo, setCatalogo] = useState([]);
+  const [buscandoCatalogo, setBuscandoCatalogo] = useState(false);
+
+  // Solo se consulta cuando el producto NO figura en la transferencia. Buscar
+  // el catálogo en cada tecla sería pedirle al servidor 150 veces algo que el
+  // 99 % de las veces ya está en la lista de arriba.
+  useEffect(() => {
+    if (!noFigura || !puedeRecibir || !item?.id) {
+      setCatalogo([]);
+      return undefined;
+    }
+    const q = String(texto || "").trim();
+    if (q.length < 2) {
+      setCatalogo([]);
+      return undefined;
+    }
+
+    // El mismo respiro que tenía el modal. Sin él, cada tecla es un viaje.
+    let vigente = true;
+    setBuscandoCatalogo(true);
+    const t = setTimeout(async () => {
+      try {
+        const url = `/api/transferencias/buscar-productos-origen?transferenciaId=${item.id}&q=${encodeURIComponent(q)}`;
+        const json = await (await fetch(url)).json();
+        if (vigente) setCatalogo(json?.ok ? json.items || [] : []);
+      } catch {
+        if (vigente) setCatalogo([]);
+      } finally {
+        if (vigente) setBuscandoCatalogo(false);
+      }
+    }, 300);
+
+    return () => {
+      vigente = false;
+      clearTimeout(t);
+    };
+  }, [noFigura, puedeRecibir, item?.id, texto]);
+
+  /**
+   * Agrega el producto elegido con cantidad CERO y lo deja a la vista.
+   *
+   * Cero y no uno: el operador tiene que cargar cuánto llegó, y proponer un 1
+   * es proponer un dato que nadie contó. La tarjeta nace con el contador en 0 y
+   * la leyenda "Cargá la cantidad que llegó".
+   *
+   * El cuerpo lo arma `validarLineaNueva`, la misma función que usa el modal:
+   * con dos armadores, el día que el contrato cambie uno de los dos manda un
+   * pedido que el servidor rechaza.
+   */
+  const agregarDesdeCatalogo = async (producto) => {
+    const plan = validarLineaNueva({
+      transferenciaId: item.id,
+      producto,
+      unidadEnviada: unidadDeProductoNuevo(producto),
+      recibido: 0,
+      // El cero acá es "todavía no lo conté", no "llegaron cero". La tarjeta lo
+      // pide y la barra de abajo no deja confirmar hasta que se cargue.
+      permitirCero: true,
+    });
+    if (!plan.ok) {
+      setAviso(plan.mensaje || "No se pudo agregar el producto.");
+      return plan;
+    }
+    return agregarYMostrar(plan.cuerpo);
+  };
+
   /** Deja el producto a la vista y limpia lo que estorbaría para verlo. */
   const elegir = (d) => {
     setSeleccionadoId(d.id);
@@ -447,6 +542,11 @@ export default function WorkspaceRecepcion({
           // Los MISMOS productos que escritorio, con lo no declarado al tope.
           // Ver `visiblesMovil`: solo cambia el orden, nunca el contenido.
           visibles={visiblesMovil}
+          // El catálogo del origen, ya buscado acá. La composición móvil los
+          // dibuja; no los pide ni los filtra.
+          catalogo={catalogo}
+          buscandoCatalogo={buscandoCatalogo}
+          onAgregarDesdeCatalogo={agregarDesdeCatalogo}
           seleccionado={seleccionado}
           filtro={filtro}
           categoriaId={categoriaId}

@@ -49,6 +49,7 @@ import EstadoTransferenciaBadge from "./EstadoTransferenciaBadge";
 import TransferenciaHeader from "./TransferenciaHeader";
 import FichaProductoRecepcion from "./FichaProductoRecepcion";
 import TarjetaRecepcionMovil from "./TarjetaRecepcionMovil";
+import FilaCatalogoRecepcion, { ROTULO_CATALOGO } from "./FilaCatalogoRecepcion";
 import { fmtCantidad } from "./detallePresentacion";
 // ── UN SOLO FORMATEADOR DE PLATA EN ESTA PANTALLA ────────────────────────
 //
@@ -64,13 +65,22 @@ import { FILTRO, pasaFiltro } from "@/lib/transferencias/controlFisico";
 // líneas con snapshot, y null se lee como "no hay diferencia".
 import { fisicasEnviadasDe, fisicasRecibidasDe } from "@/lib/transferencias/recepcionUI";
 import { firmaDeEdicion } from "@/lib/transferencias/presentacionEnvio";
-import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
 
 /** El texto del buscador, el mismo patrón que Productos y el POS. */
 export const PLACEHOLDER_BUSCADOR = "Buscar producto, código o categoría...";
 
 export const TITULO_MAS_ACCIONES = "Más acciones";
 export const TITULO_INFO_GENERAL = "Información general";
+
+/**
+ * El aviso de "no figura", en UNA línea.
+ *
+ * Decía la frase larga más "informalo como producto no declarado", que mandaba
+ * a buscar un botón. Ahora los resultados del catálogo están justo abajo, así
+ * que el aviso solo tiene que decir qué pasó y qué hacer.
+ */
+export const MENSAJE_NO_FIGURA_CORTO =
+  "No figura en esta transferencia. Si llegó igual, tocalo y se agrega.";
 
 /** Los cuatro estados del trabajo. Fijos, y todos a la vista. */
 const TABS = [
@@ -117,9 +127,14 @@ export default function RecepcionMovil({
   onQuitarLinea,
   onAdoptarPresentacion,
   onAbrirEscaner,
-  onAbrirAgregar,
-  accionAgregar,
-  mensajeNoFigura,
+  // ── EL CATÁLOGO DEL ORIGEN, YA BUSCADO POR EL CEREBRO ──────────────────
+  //
+  // Llegan hechos. Esta pieza no consulta ningún endpoint ni filtra nada: hay
+  // candados que lo exigen, y con razón — si buscara por su cuenta, el teléfono
+  // y el escritorio podrían ofrecer productos distintos para el mismo texto.
+  catalogo = [],
+  buscandoCatalogo = false,
+  onAgregarDesdeCatalogo,
   FilaProducto,
   // Lo administrativo, que ya vive en la página y acá solo se acomoda.
   confirmarRecepcion,
@@ -151,6 +166,15 @@ export default function RecepcionMovil({
   const hayDiferenciaDeImporte =
     importeCorregido != null && diferenciaImporte != null && diferenciaImporte !== 0;
   const importeSinDiferencia = importeCorregido ?? importeOriginal;
+
+  // Cuánto pesa lo que NO venía en el remito. Es la diferencia entre los dos
+  // importes que el servidor ya calculó — no una suma de las cards, que es cómo
+  // el mismo documento termina mostrando dos totales. Se muestra solo mientras
+  // se está por agregar algo, con signo, para saber contra qué se suma.
+  const importeNoDeclarados =
+    importeCorregido != null && importeOriginal != null
+      ? Math.max(0, importeCorregido - importeOriginal)
+      : 0;
 
   const opcionesEstado = TABS.map((t) => ({ ...t, cantidad: CONTEO[t.clave](resumen || {}) }));
 
@@ -195,21 +219,43 @@ export default function RecepcionMovil({
     const rec = fisicasRecibidasDe(d);
     return env != null && rec != null && rec !== env;
   }).length;
-  const trabado = !todoRevisado || sinMotivo > 0;
-  const avisoDeCierre =
-    sinMotivo > 0
-      ? `${sinMotivo} ${sinMotivo === 1 ? "diferencia sin motivo" : "diferencias sin motivo"}`
-      : todoRevisado
-        ? "Todo revisado · listo para confirmar"
-        : `Falta revisar ${pendientes} ${pendientes === 1 ? "producto" : "productos"}`;
+  // ── Y LA TERCERA, QUE EL V16 TRAJO CON EL ALTA EN LÍNEA ─────────────────
+  //
+  // Tocar un producto del catálogo crea la línea EN CERO, para cargarla en la
+  // tarjeta. Ese cero es "todavía no lo conté", no "llegaron cero" —la regla que
+  // lo impedía sigue en pie para el panel de escritorio, ver `permitirCero` en
+  // `validarLineaNueva`—, y por eso no puede quedar suelto: un borrador olvidado
+  // se confirmaría como una línea que informa nada.
+  //
+  // Una agregada no es "pendiente" ni pide motivo, así que ninguna de las otras
+  // dos causas la ve. Ésta sí.
+  const sinCargar = (item?.items || []).filter(
+    (d) => d.agregadoEnRecepcion && !(Number(d.cantidadRecibida) > 0)
+  ).length;
 
-  /** "35 de 36 unidades · faltó 1". En FÍSICO, que es lo que mueve stock. */
+  // Las tres causas juntas en UNA condición, para que el botón tenga una sola y
+  // no puedan decir cosas distintas. El V16 sacó el renglón que las anunciaba
+  // —el avance ya está arriba y los tabs ya traen su número— pero las reglas son
+  // las mismas, y el servidor las vuelve a exigir de todas formas.
+  const trabado = !todoRevisado || sinMotivo > 0 || sinCargar > 0;
+
+  /**
+   * "35 de 36 unidades · faltó 1". En FÍSICO, que es lo que mueve stock.
+   *
+   * ── LEÍA LA ESCALA CRUDA, Y DABA UN NÚMERO FALSO ──────────────────────
+   *
+   * Usaba `d.unidadEnviada` y `d.factorPack` directo. En una línea con snapshot
+   * —"6 PACK x24" persistido como UNIDAD, que es lo que escribe el POS— eso
+   * ignora el factor: con 4 packs contados sobre 6 enviados decía "4 de 144
+   * unidades · faltó 140" en vez de "96 de 144 · faltó 48". Se vio corriendo el
+   * arnés del V16, en el resumen de cierre.
+   *
+   * Ahora sale de la misma fuente que la tarjeta y que la barra:
+   * `escalaFisicaDeLinea` lee el snapshot cuando está y reconstruye cuando no.
+   */
   const detalleDiferencia = (d) => {
-    const args = { unidad: d.unidadEnviada, factorPack: d.factorPack };
-    const env = unidadesFisicasDe({ cantidad: d.cantidadEnviada, sueltas: 0, ...args });
-    const rec = unidadesFisicasDe({
-      cantidad: d.cantidadRecibida, sueltas: d.recibidoUnidadesSueltas, ...args,
-    });
+    const env = fisicasEnviadasDe(d);
+    const rec = fisicasRecibidasDe(d);
     if (env == null || rec == null) return null;
     const delta = rec - env;
     const cuantas = Math.abs(delta);
@@ -259,9 +305,28 @@ export default function RecepcionMovil({
         </p>
 
         <div className="flex items-baseline justify-between gap-2">
+          {/* ── LAS DOS CUENTAS SALEN DEL MISMO UNIVERSO ──────────────────
+              Decía `revisados / totalRemito` —4 / 77— mientras el tab de al
+              lado decía "Todos 78". Los dos números eran correctos y contaban
+              cosas distintas: el remito por un lado, la mercadería sobre la
+              mesa por el otro. A cinco centímetros de distancia, eso no se lee
+              como dos preguntas: se lee como una cuenta que no cierra, y fue lo
+              primero que saltó al usarlo con la #195.
+
+              Se unifica contra el universo FÍSICO, que es el que el operador
+              tiene delante: el denominador es `totalFisico` —el mismo del tab—
+              y el numerador suma los no declarados, que están resueltos por
+              definición. Ninguno de los dos se inventa: los dos salen de
+              `resumenDeRecepcion`.
+
+              `todoRevisado` NO se toca y sigue mirando `totalRemito`: contesta
+              otra pregunta —si queda alguna línea DEL REMITO sin contar— y
+              moverlo trabaría el cierre de cualquier transferencia que tenga un
+              no declarado. */}
           <span className="text-sm2 sunmi-text-muted">
             <span className="tabular-nums sunmi-text-strong font-semibold">
-              {resumen?.revisados ?? 0} / {resumen?.totalRemito ?? 0}
+              {(resumen?.revisados ?? 0) + (resumen?.noDeclarados ?? 0)} /{" "}
+              {resumen?.totalFisico ?? resumen?.totalRemito ?? 0}
             </span>{" "}
             revisados
           </span>
@@ -345,17 +410,71 @@ export default function RecepcionMovil({
           donde corresponde a algo que pasa poco. */}
       {(noFigura || aviso) && (
         <SunmiAviso tono="warning">
-          {noFigura ? mensajeNoFigura : aviso}
-          {noFigura && puedeRecibir && (
-            <> Si igual llegó, informalo como producto no declarado.</>
-          )}
+          {noFigura ? MENSAJE_NO_FIGURA_CORTO : aviso}
         </SunmiAviso>
       )}
 
+      {/* ── EL CATÁLOGO DEL ORIGEN, COMO FILAS DE ESTA MISMA LISTA ─────────
+          Antes acá había un botón que abría un modal, y adentro del modal había
+          que VOLVER A ESCRIBIR lo mismo que ya se había escrito arriba. Dos
+          búsquedas para informar una caja.
+
+          Ahora el mismo texto busca en los dos lados: primero en la
+          transferencia —que es donde está el 99 %— y, solo si no figura, en el
+          catálogo del origen. Tocar una fila agrega la línea con cantidad CERO
+          y la deja al tope para cargarla. Cero modales.
+
+          La búsqueda NO se hace acá: los resultados llegan hechos de
+          `WorkspaceRecepcion`, igual que todo lo demás. */}
       {noFigura && puedeRecibir && (
-        <SunmiButton color="slate" onClick={onAbrirAgregar} className="w-full justify-center">
-          {accionAgregar}
-        </SunmiButton>
+        <div className="space-y-1.5">
+          <p className="text-sm2 font-semibold sunmi-text-muted">{ROTULO_CATALOGO}</p>
+
+          {buscandoCatalogo && catalogo.length === 0 && (
+            <p className="text-sm2 sunmi-text-muted">Buscando en el catálogo…</p>
+          )}
+          {!buscandoCatalogo && catalogo.length === 0 && (
+            <p className="text-sm2 sunmi-text-muted">
+              Tampoco está en el catálogo del origen.
+            </p>
+          )}
+
+          {catalogo.map((p) => (
+            <FilaCatalogoRecepcion
+              key={p.productoLocalId}
+              p={p}
+              onElegir={onAgregarDesdeCatalogo}
+              agregando={guardando}
+            />
+          ))}
+
+          {/* ── QUÉ IMPACTO TIENE LO QUE SE ESTÁ POR AGREGAR ──────────────
+              Los tres números del resumen, acá abajo, para no tener que
+              scrollear hasta el cierre para saber contra qué se está sumando.
+              Salen del servidor, como el resto: acá no se suma nada. */}
+          {importeOriginal != null && (
+            <div className="pt-1 space-y-1">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-sm2 sunmi-text-muted">Importe enviado</span>
+                <span className="tabular-nums text-sm2 sunmi-text-muted">
+                  {formatearMoneda(importeOriginal)}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-sm2 sunmi-text-muted">No declarados</span>
+                <span className="tabular-nums text-sm2 sunmi-text-danger">
+                  +{formatearMoneda(importeNoDeclarados)}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-sm2 sunmi-text-muted">Importe corregido</span>
+                <span className="tabular-nums text-sm2 font-semibold sunmi-text-strong">
+                  {formatearMoneda(importeCorregido ?? importeOriginal)}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
 
@@ -408,7 +527,7 @@ export default function RecepcionMovil({
       {/* ── 5 · LOS PRODUCTOS ─────────────────────────────────────────────
           La misma fila que el escritorio: se toca la tarjeta entera y no hay
           botones adentro. */}
-      <div className="space-y-1.5">
+      <div className="space-y-3.5">
         {/* ── DOS VACÍOS QUE SIGNIFICAN COSAS DISTINTAS ─────────────────
             Una lista vacía porque el FILTRO tapó lo que hay no es lo mismo que
             una lista vacía porque el producto NO ESTÁ. Cuando `noFigura` ya lo
@@ -523,35 +642,39 @@ export default function RecepcionMovil({
           a mano—, porque esto no es un modal: tiene que quedar POR DEBAJO de
           las hojas del kit, no por encima.
 
-          ── POR QUÉ EL BOTÓN SE BLOQUEA POR DOS COSAS DISTINTAS ────────────
-          Falta revisar productos, o hay diferencias sin motivo. Son dos
-          impedimentos con dos arreglos distintos y por eso el aviso dice cuál
-          es, con el número. Un botón gris que no explica por qué manda a
-          tocarlo hasta que alguien se rinde.
+          ── QUÉ DICE LA BARRA, Y QUÉ DEJÓ DE DECIR ─────────────────────────
+          El total y el botón. Nada más.
 
-          Esto EVITA EL VIAJE, no reemplaza la regla: el servidor vuelve a
-          exigir las dos —`PRODUCTOS_SIN_REVISAR` y el motivo obligatorio— y es
-          él quien manda. */}
+          Anunciaba además cuánto faltaba revisar, y el V16 lo sacó porque era
+          ruido: el avance ya está arriba —"5 / 78 revisados"— y los tabs de
+          filtro ya traen su número, a un toque. Tres lugares contando lo mismo.
+
+          EL BLOQUEO NO CAMBIÓ. `trabado` sigue siendo `!todoRevisado ||
+          sinMotivo > 0` y sigue deshabilitando el botón por las dos causas: que
+          falte contar, o que haya una diferencia que nadie explicó. Lo que se
+          sacó es el ANUNCIO, no la regla.
+
+          Y esto EVITA EL VIAJE, no reemplaza nada: el servidor vuelve a exigir
+          las dos —`PRODUCTOS_SIN_REVISAR` y el motivo obligatorio— y es él
+          quien manda. */}
       {puedeRecibir && (
         <div className="sticky bottom-0 z-10 -mx-4 px-4 pt-2 pb-2 border-t sunmi-divider sunmi-surface">
-          <div className="flex items-baseline justify-between gap-2 pb-2">
-            <span className={`min-w-0 text-sm2 ${trabado ? "sunmi-text-warning" : "sunmi-text-success"}`}>
-              {avisoDeCierre}
-            </span>
-            <span className="shrink-0 whitespace-nowrap text-sm2 sunmi-text-muted">
-              <span className="tabular-nums font-semibold sunmi-text-strong">
+          <div className="flex items-center justify-between gap-3">
+            <span className="min-w-0">
+              <span className="block text-sm2 sunmi-text-muted">Total</span>
+              <span className="block tabular-nums text-lg2 font-semibold sunmi-text-strong">
                 {formatearMoneda(importeSinDiferencia)}
               </span>
             </span>
+            <SunmiButton
+              color="amber"
+              onClick={confirmarRecepcion}
+              disabled={trabado || confirmando}
+              className="shrink-0 justify-center"
+            >
+              {confirmando ? "Confirmando..." : "✓ Confirmar"}
+            </SunmiButton>
           </div>
-          <SunmiButton
-            color="amber"
-            onClick={confirmarRecepcion}
-            disabled={trabado || confirmando}
-            className="w-full justify-center"
-          >
-            {confirmando ? "Confirmando..." : "✓ Confirmar recepción"}
-          </SunmiButton>
         </div>
       )}
 

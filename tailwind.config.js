@@ -37,6 +37,19 @@ module.exports = {
         xs2: "10px",
         sm2: "11px",
         base: "14px",
+        // ── LOS DOS DEL REDISEÑO V16 DE LA RECEPCIÓN ──────────────────────
+        //
+        // El diseño pide el nombre de la tarjeta en 16 y el importe de línea en
+        // 17. Ninguno de los dos cae en la escala: este proyecto redefine `base`
+        // a 14, así que el salto va de 14 a `text-lg` (18).
+        //
+        // Van ACÁ y no en la pantalla como `text-[16px]`. Un valor fuera de la
+        // escala escrito en un componente es lo que el candado de cero hardcodeo
+        // prohíbe, y con razón: el día que el diseño mueva ese tamaño habría que
+        // buscarlo archivo por archivo. Siguen la convención que ya usan `xs2` y
+        // `sm2` — el sufijo `2` marca los tamaños propios del proyecto.
+        md2: "16px",
+        lg2: "17px",
       },
 
       boxShadow: {

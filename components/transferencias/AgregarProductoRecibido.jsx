@@ -52,6 +52,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+
+import FilaCatalogoRecepcion from "./FilaCatalogoRecepcion";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import { nombreDePresentacion, unidadDeDiferencia } from "@/lib/transferencias/presentacionEnvio";
@@ -100,40 +102,15 @@ const ESPERA_BUSQUEDA = 300;
  * la izquierda y ancho completo, que es lo único que una fila necesita que un
  * botón no traiga.
  */
-function FilaResultado({ p, onElegir }) {
-  const factor = Number(p.factorPack || 1);
-  return (
-    <SunmiButton
-      color="slate"
-      onClick={() => onElegir(p)}
-      className="w-full !justify-start text-left"
-    >
-      <span className="block min-w-0">
-        <span className="block font-semibold sunmi-text-strong break-words">{p.nombre}</span>
-        {/* ── NI STOCK NI COSTO ────────────────────────────────────────────
-            Acá decía "Stock origen N". Se sacó por dos motivos y el segundo es
-            peor que el primero.
-
-            El de fondo: quien informa mercadería que llegó de más no necesita
-            saber cuánto hay en el origen, y `transferencias.recibir` no es el
-            permiso de ver stock ni costos. El endpoint ya dejó de mandarlos.
-
-            El inmediato: como el endpoint dejó de mandarlos, esto venía
-            dibujando "Stock origen 0" para TODOS los productos — un dato falso,
-            que es peor que un dato que no está.
-
-            Lo que sí hace falta para identificar lo que se tiene en la mano: el
-            nombre, el código y en qué presentación viene. */}
-        <span className="block text-sm2 sunmi-text-muted">
-          <span className="font-mono">{p.codigoBarra || "Sin código"}</span>
-          {" · "}
-          {factor > 1 ? `PACK x${factor}` : "Unidad"}
-          {p.categoriaNombre ? ` · ${p.categoriaNombre}` : ""}
-        </span>
-      </span>
-    </SunmiButton>
-  );
-}
+// ── LA FILA SE MUDÓ A SU PROPIO ARCHIVO ────────────────────────────────────
+//
+// El V16 puso los resultados del catálogo como filas de la lista en el teléfono,
+// sin modal. Este panel sigue existiendo para ESCRITORIO, donde la lista y la
+// ficha van lado a lado y no estorba — pero la fila tiene que ser UNA sola: con
+// una copia de cada lado, el día que una cambie el teléfono y la computadora
+// dirían cosas distintas sobre el mismo producto.
+//
+// Ver `FilaCatalogoRecepcion`.
 
 export default function AgregarProductoRecibido({
   abierto,
@@ -359,7 +336,7 @@ export default function AgregarProductoRecibido({
             </div>
           )}
           {resultados.map((p) => (
-            <FilaResultado key={p.productoLocalId} p={p} onElegir={elegir} />
+            <FilaCatalogoRecepcion key={p.productoLocalId} p={p} onElegir={elegir} />
           ))}
         </div>
       )}

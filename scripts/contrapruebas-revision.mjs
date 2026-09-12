@@ -51,11 +51,14 @@ const CASOS = [
     suite: "lib/transferencias/revisionSueltas.test.mjs",
   },
   {
+    // La fila se mudó a `FilaCatalogoRecepcion` con el V16 —la dibujan las dos
+    // superficies— así que la inyección se mudó con ella. El candado ya mira los
+    // dos archivos; lo que había que seguir es DÓNDE se rompe.
     n: 2,
     defecto: "vuelve el stock del origen a la pantalla de recepción",
-    archivo: "components/transferencias/AgregarProductoRecibido.jsx",
-    de: "          <span className=\"font-mono\">{p.codigoBarra || \"Sin código\"}</span>",
-    a: "          <span className=\"font-mono\">Stock origen {p.stockActual}</span>",
+    archivo: "components/transferencias/FilaCatalogoRecepcion.jsx",
+    de: "            <span className=\"font-mono\">{p?.codigoBarra || \"Sin código\"}</span>",
+    a: "            <span className=\"font-mono\">Stock origen {p?.stockActual}</span>",
     candado: "2. la búsqueda de producto no declarado no muestra stock ni costo",
     suite: "lib/transferencias/revisionSueltas.test.mjs",
   },
