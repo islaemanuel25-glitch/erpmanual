@@ -757,8 +757,41 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--pos-accent) 30%, transparent);
 }
 
+/* El menú flotante del desplegable. OPACO, y no es un detalle estético.
+
+   ── EL DEFECTO, VISTO EN PRODUCCIÓN ─────────────────────────────────────
+
+   Decía `background: var(--card-bg)`, y `--card-bg` es TRANSLÚCIDO en dos
+   temas: `rgba(2, 6, 23, 0.6)` en `sunmiDark` —el que se usa en el Sunmi— y
+   `rgba(15, 23, 42, 0.9)` en `sunmiDarkCompact`.
+
+   Una tarjeta translúcida sobre la página se ve bien: lo que deja pasar es el
+   fondo. Un MENÚ es otra cosa: flota sobre contenido, así que lo que deja pasar
+   es TEXTO. En el panel de recepción se leía el importe corregido por detrás de
+   las opciones, justo cuando hay que elegir el motivo — que es obligatorio para
+   guardar una diferencia.
+
+   ── CÓMO SE HACE OPACO SIN CAMBIARLE EL COLOR ───────────────────────────
+
+   No se reemplaza `--card-bg` por otro token: eso le cambiaría el color en los
+   catorce temas. Se pinta el MISMO color sobre una base opaca —`--app-bg`, que
+   es hex en los catorce, comprobado—, así que el resultado es exactamente el
+   que hoy se ve cuando el menú cae sobre la página, y deja de serlo cuando cae
+   sobre contenido.
+
+   El `background-image` se pinta ENCIMA del `background-color`: ése es el
+   orden, y por eso la base va como color y la capa de tarjeta como gradiente de
+   un solo tono. En los doce temas donde `--card-bg` ya es opaco, la capa tapa
+   la base por completo y no cambia nada.
+
+   ── Y NO VUELVE EN SILENCIO ─────────────────────────────────────────────
+
+   `selectSeDaVuelta.test.mjs` exige la base opaca leyendo esta hoja, y
+   `sonda-acciones-recepcion.mjs` mide el alfa calculado en los catorce temas.
+   Volver a `background: var(--card-bg)` pone los dos en rojo. */
 .sunmi-select-dropdown {
-  background: var(--card-bg);
+  background-color: var(--app-bg);
+  background-image: linear-gradient(var(--card-bg), var(--card-bg));
   border: 1px solid var(--app-border);
   color: var(--app-fg);
 }

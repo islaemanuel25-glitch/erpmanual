@@ -79,11 +79,61 @@ export default function SunmiSelectAdv({
     onChange(newArr);
   };
 
+  /**
+   * DÓNDE SE ABRE LA LISTA, Y POR QUÉ NO SIEMPRE ABAJO.
+   *
+   * ── EL DEFECTO, VISTO EN PRODUCCIÓN ─────────────────────────────────────
+   *
+   * Ponía `top: r.bottom + 6` SIEMPRE, sin mirar si abajo quedaba lugar. En el
+   * panel de recepción del teléfono el campo de motivo está cerca del pie, así
+   * que la lista se abría contra el borde de la pantalla: se veían
+   * "Seleccionar…" y "Faltante" a medias y el resto quedaba afuera. No se podía
+   * elegir un motivo — y el motivo es obligatorio para guardar una diferencia.
+   *
+   * ── SE DA VUELTA SOLO CUANDO NO ENTRA, NO SIEMPRE ───────────────────────
+   *
+   * Abrir siempre hacia arriba arreglaría el panel y rompería cualquier
+   * desplegable que esté cerca del BORDE DE ARRIBA, que hoy anda bien. La
+   * condición mira las dos distancias y elige: si abajo no entra Y arriba hay
+   * más lugar, se da vuelta. Con eso solo cambia el caso que hoy está roto.
+   *
+   * ── Y SE MIDE LA LISTA, NO SE ESTIMA ────────────────────────────────────
+   *
+   * El alto sale de `getBoundingClientRect` del propio desplegable, que para
+   * cuando esto corre ya está montado —el portal se monta en el mismo commit y
+   * esto es un efecto de layout—. Estimarlo con `max-h-52` daría 208 px para
+   * una lista de tres opciones que mide 120, y se daría vuelta de más.
+   *
+   * Si todavía no se pudo medir, abre abajo: es el comportamiento de siempre.
+   */
   const updatePos = () => {
     const el = btnRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    setPos({ top: r.bottom + 6, left: r.left, width: r.width });
+    // ── EL ALTO SOLO VALE SI LA LISTA YA TIENE ANCHO ────────────────────
+    //
+    // `pos` arranca en `{top:0,left:0,width:0}`, así que en la PRIMERA pasada el
+    // desplegable está renderizado con ancho cero: su texto se envuelve letra
+    // por letra y mide cientos de píxeles de alto. Medir ahí diría que no entra
+    // abajo nunca, y todos los desplegables del ERP se darían vuelta.
+    //
+    // Con ancho cero se ignora el alto y se abre abajo, como siempre. La segunda
+    // pasada —el `requestAnimationFrame` del efecto— ya lo encuentra con su
+    // ancho real y ahí sí decide.
+    const caja = dropdownRef.current;
+    const alto = caja && caja.offsetWidth > 0 ? caja.getBoundingClientRect().height : 0;
+
+    const espacioAbajo = window.innerHeight - r.bottom - 6;
+    const espacioArriba = r.top - 6;
+    const entraAbajo = alto === 0 || alto <= espacioAbajo;
+
+    if (entraAbajo || espacioArriba <= espacioAbajo) {
+      setPos({ top: r.bottom + 6, left: r.left, width: r.width });
+      return;
+    }
+    // Hacia arriba, y nunca por encima del borde: si la lista es más alta que
+    // todo lo que hay arriba, se ancla en 6 y su propio scroll hace el resto.
+    setPos({ top: Math.max(6, r.top - 6 - alto), left: r.left, width: r.width });
   };
 
   useEffect(() => {
@@ -92,6 +142,10 @@ export default function SunmiSelectAdv({
       return;
     }
     updatePos();
+    // La segunda pasada, con la lista ya dibujada a su ancho real. Ver el
+    // comentario de `updatePos`: sin esto el alto medido es el de un desplegable
+    // de ancho cero.
+    const raf = requestAnimationFrame(updatePos);
 
     const onScroll = () => updatePos();
     const onResize = () => updatePos();
@@ -105,6 +159,7 @@ export default function SunmiSelectAdv({
     }
 
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", onResize);
     };

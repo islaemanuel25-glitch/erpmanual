@@ -84,6 +84,22 @@ module.exports = {
       borderWidth: {
         1.5: "1.5px",
       },
+
+      // ── EL ANCHO DE LOS CAMPOS DEL PANEL DE RECEPCIÓN ─────────────────
+      //
+      // El V24 los baja de la mitad cada uno a 124 px sobre 390, que es el 35 %
+      // del contenedor, con un hueco vacío en el medio a propósito.
+      //
+      // Va como porcentaje y no como `124px`: en un teléfono de 360 el fijo
+      // ocuparía 34,4 % y en uno de 412 el 30 %, y el rótulo "PACK x12
+      // completos" entra JUSTO — el diseño lo dice—. Con el porcentaje la
+      // relación se mantiene.
+      //
+      // `w-1/3` da 33,3 % y estaría a 5 px, que sobre un rótulo que entra justo
+      // es la diferencia entre que entre y que no. Por eso el valor exacto.
+      width: {
+        "35p": "35%",
+      },
     },
   },
   plugins: [],
