@@ -29,14 +29,20 @@
 // tiene que conservar el avance.
 
 import { useState } from "react";
+import { Minus, Plus } from "lucide-react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 
 import { BadgeAgregado, fmtCantidad, fmtDiferencia } from "./detallePresentacion";
+// El formateador del ERP, el mismo que usa la tarjeta. `detallePresentacion`
+// tiene otro —con espacio después del signo— que sirve a la tabla de escritorio
+// y que NO se puede cambiar sin mover esa tabla.
+import { formatearMoneda } from "@/lib/moneda";
 import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
 import { motivosParaDiferencia, resultadoDeConteo } from "@/lib/transferencias/recepcionUI";
 import { ESTADO_PRODUCTO, estadoDeProducto } from "@/lib/transferencias/controlFisico";
@@ -138,6 +144,66 @@ const TONO_ESTADO = Object.freeze({
   // resuelve el tema: aca no hay hex.
   [ESTADO_PRODUCTO.NO_DECLARADO]: "sunmi-text-warning",
 });
+
+/**
+ * UN CAMPO DE CANTIDAD CON − Y +, EN UN SOLO MARCO.
+ *
+ * ── POR QUÉ VIVE ACÁ Y NO EN EL KIT ─────────────────────────────────────
+ *
+ * Porque hoy lo usa una sola pantalla, dos veces. La regla del kit dice que la
+ * pieza que se agrega sale de una pantalla que YA FUNCIONA, nunca escrita
+ * adivinando: el día que un segundo lugar la necesite, se muda con su forma ya
+ * probada. Escribirla en el kit ahora sería adivinar qué le va a hacer falta al
+ * segundo consumidor.
+ *
+ * ── QUÉ RESUELVE, Y POR QUÉ NO ES UN CONTADOR COMO EL DEL V15 ───────────
+ *
+ * El contador que el V21 sacó de la TARJETA reemplazaba al teclado: era la
+ * única forma de cargar. Éste lo acompaña — el campo se sigue escribiendo a
+ * mano, que es lo que hace que sirva para 3,250 KG y para 47.
+ *
+ * El mínimo es 0 y el `−` no baja de ahí: una cantidad recibida negativa no
+ * existe, y dejarla escribir obligaría a validarla después.
+ *
+ * El valor viaja como TEXTO, igual que el del campo: el estado del formulario
+ * es lo que está escrito, no un número. Un `""` es "todavía no escribió nada" y
+ * no es lo mismo que un 0, que es "contó y no llegó ninguno".
+ */
+function CampoConPasos({ valor, onCambiar, etiqueta }) {
+  const paso = (delta) => {
+    const n = Number(valor === "" ? 0 : valor);
+    const base = Number.isFinite(n) ? n : 0;
+    onCambiar(String(Math.max(0, base + delta)));
+  };
+
+  return (
+    <span className="flex items-center gap-1 rounded-lg border sunmi-divider px-1">
+      <SunmiLinkButton
+        onClick={() => paso(-1)}
+        aria-label={`Restar uno a ${etiqueta}`}
+        className="shrink-0 no-underline sunmi-link-accent"
+      >
+        <Minus size={16} aria-hidden="true" />
+      </SunmiLinkButton>
+      {/* `border-0` y centrado: el marco es del envoltorio, no del campo. Si el
+          input trajera el suyo se verían dos cajas, una adentro de la otra. */}
+      <SunmiInput
+        type="number"
+        value={valor}
+        onChange={(e) => onCambiar(e.target.value)}
+        aria-label={etiqueta}
+        className="w-full border-0 text-center"
+      />
+      <SunmiLinkButton
+        onClick={() => paso(1)}
+        aria-label={`Sumar uno a ${etiqueta}`}
+        className="shrink-0 no-underline sunmi-link-accent"
+      >
+        <Plus size={16} aria-hidden="true" />
+      </SunmiLinkButton>
+    </span>
+  );
+}
 
 export default function FichaProductoRecepcion({
   producto,
@@ -374,6 +440,54 @@ export default function FichaProductoRecepcion({
     ? null
     : resultadoDeConteo({ recibidas: fisicasEditadas, enviadas: fisicasEnviadas, envio });
 
+  // ── LA PLATA, EN VIVO ────────────────────────────────────────────────────
+  //
+  // El panel no mostraba plata en ningún lado: se corregía a ciegas y el impacto
+  // recién se veía al cerrar la hoja y mirar la tarjeta.
+  //
+  // ── NO SE CALCULA NADA NUEVO ACÁ, Y ES LA REGLA ────────────────────────
+  //
+  // `subtotal` y `subtotalRecibido` son los MISMOS campos que alimentan la
+  // tarjeta y el total del documento. Lo único que se hace es una regla de tres
+  // sobre lo que el operador está tipeando AHORA, porque el servidor todavía no
+  // lo sabe: mientras no se guarde, `subtotalRecibido` es el del último guardado.
+  //
+  // ── DE DÓNDE SALE EL PRECIO POR UNIDAD FÍSICA ──────────────────────────
+  //
+  // Primero `costoUnitarioFisico`, que el endpoint ya manda y que es
+  // exactamente eso: el costo de UNA unidad de stock. No se usa `precioCosto`,
+  // que es el de la PRESENTACIÓN: multiplicarlo por físicas mezcla escalas, y
+  // ésa es la #198.
+  //
+  // El respaldo —dividir el importe del remito por sus físicas— existe para las
+  // líneas viejas que no traigan el campo.
+  //
+  // Que sea `costoUnitarioFisico` y no la división arregla un defecto que se vio
+  // en la captura: para un NO DECLARADO lo enviado es cero, así que la división
+  // no existe y el bloque caía en `subtotalRecibido`, que hasta que no se guarda
+  // sigue siendo el del último guardado — cero para una línea recién agregada.
+  // El panel decía "$0,00" mientras alguien escribía 3,25 KG. Es el $0,00 de la
+  // #195 otra vez, adentro del panel.
+  const costoFisico =
+    d.costoUnitarioFisico != null && Number.isFinite(Number(d.costoUnitarioFisico))
+      ? Number(d.costoUnitarioFisico)
+      : fisicasEnviadas && Number(fisicasEnviadas) !== 0 && d.subtotal != null
+        ? Number(d.subtotal) / Number(fisicasEnviadas)
+        : null;
+  const importeRemito = d.agregadoEnRecepcion ? null : d.subtotal;
+  const importeEditado =
+    costoFisico != null && fisicasEditadas != null
+      ? costoFisico * Number(fisicasEditadas)
+      : d.subtotalRecibido == null
+        ? d.subtotal
+        : d.subtotalRecibido;
+  const diferenciaImporte =
+    importeRemito == null || importeEditado == null
+      ? null
+      : Number(importeEditado) - Number(importeRemito);
+  const hayDiferenciaDeImporte =
+    diferenciaImporte != null && Math.abs(diferenciaImporte) >= 0.005;
+
   const motivos = motivosParaDiferencia({
     // La diferencia se mide en FÍSICO: 6 packs + 1 suelta contra 6 enviados es
     // una diferencia aunque los dos números de packs sean 6.
@@ -403,9 +517,28 @@ export default function FichaProductoRecepcion({
       setError(r.error || "No se pudo guardar la revisión.");
       return;
     }
+    // ── QUÉ SE LE CUENTA A LA LISTA ────────────────────────────────────────
+    //
     // Solo cuando salió bien. Si la hoja se cerrara igual ante un error, el
     // operador vería desaparecer el producto creyendo que quedó guardado.
-    onGuardado?.();
+    //
+    // Y se le pasa QUÉ quedó guardado, porque el aviso vive arriba de la lista y
+    // no acá: esta ficha se desmonta al cerrarse la hoja, así que un aviso
+    // dibujado adentro se iría con ella justo cuando hay que leerlo.
+    //
+    // Los números son los que la ficha tenía en pantalla en el momento de
+    // guardar. No se vuelven a calcular ni se esperan del servidor: el aviso
+    // dice "esto es lo que mandé", y si el servidor hubiera guardado otra cosa
+    // la tarjeta —que sí se recarga— lo mostraría distinto.
+    onGuardado?.({
+      nombre: d.nombre,
+      de: fisicasEnviadas,
+      a: fisicasEditadas,
+      unidad: unidadDeDiferencia(envio),
+      importeDe: importeRemito,
+      importeA: importeEditado,
+      huboCorreccion: Boolean(hayDiferenciaFisica),
+    });
   };
 
   // Adentro de una hoja la tarjeta la pone el modal. Ver `enHoja`.
@@ -527,12 +660,10 @@ export default function FichaProductoRecepcion({
             <div>
               <div className="text-sm2 sunmi-text-muted">{rotuloDeCompletos}</div>
               {puedeRecibir ? (
-                <SunmiInput
-                  type="number"
-                  value={recibido}
-                  onChange={(e) => setRecibido(e.target.value)}
-                  sufijo={unidadCortaDePresentacion(envio)}
-                  aria-label={`Cantidad recibida en ${nombreDePresentacion(envio)}`}
+                <CampoConPasos
+                  valor={recibido}
+                  onCambiar={setRecibido}
+                  etiqueta={`Cantidad recibida en ${nombreDePresentacion(envio)}`}
                 />
               ) : (
                 <div className="font-mono tabular-nums sunmi-text-strong">
@@ -548,12 +679,10 @@ export default function FichaProductoRecepcion({
               <div>
                 <div className="text-sm2 sunmi-text-muted">{ROTULO_SUELTAS_CAMPO}</div>
                 {puedeRecibir ? (
-                  <SunmiInput
-                    type="number"
-                    value={sueltas}
-                    onChange={(e) => setSueltas(e.target.value)}
-                    sufijo="UN"
-                    aria-label="Unidades sueltas"
+                  <CampoConPasos
+                    valor={sueltas}
+                    onCambiar={setSueltas}
+                    etiqueta={ROTULO_SUELTAS_CAMPO}
                   />
                 ) : (
                   <div className="font-mono tabular-nums sunmi-text-strong">
@@ -673,6 +802,52 @@ export default function FichaProductoRecepcion({
           >
             {resultadoCorto}
           </p>
+        </div>
+      )}
+
+      {/* ── LA PLATA DE ESTA LÍNEA — V23, SOLO EN EL TELÉFONO ───────────────
+          Tres renglones cuando hay diferencia y UNO cuando no: repetir el mismo
+          número tres veces con tres rótulos distintos es ruido que además
+          sugiere que pasó algo. Se recalcula con lo que se está tipeando, igual
+          que el ingreso físico y los motivos. */}
+      {enHoja && importeEditado != null && (
+        <div className="space-y-0.5">
+          {hayDiferenciaDeImporte && importeRemito != null ? (
+            <>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-sm2 sunmi-text-muted">Importe del remito</span>
+                <span className="tabular-nums text-sm2 sunmi-text-muted">
+                  {formatearMoneda(importeRemito)}
+                </span>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-sm2 sunmi-text-muted">Importe corregido</span>
+                <span className="tabular-nums text-md2 font-semibold sunmi-text-strong">
+                  {formatearMoneda(importeEditado)}
+                </span>
+              </div>
+              {/* Falta es danger y sobra es warning: son dos hechos distintos y
+                  el segundo no es un error — llegó mercadería de más. */}
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-sm2 sunmi-text-muted">Diferencia</span>
+                <span
+                  className={`tabular-nums text-sm2 font-semibold ${
+                    diferenciaImporte < 0 ? "sunmi-text-danger" : "sunmi-text-warning"
+                  }`}
+                >
+                  {diferenciaImporte > 0 ? "+" : "−"}
+                  {formatearMoneda(Math.abs(diferenciaImporte))}
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-sm2 sunmi-text-muted">Importe</span>
+              <span className="tabular-nums text-md2 font-semibold sunmi-text-strong">
+                {formatearMoneda(importeEditado)}
+              </span>
+            </div>
+          )}
         </div>
       )}
 
