@@ -24,7 +24,10 @@ import { fileURLToPath } from "node:url";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import FichaProductoRecepcion, { ROTULO_SUELTAS } from "./FichaProductoRecepcion.jsx";
+import FichaProductoRecepcion, {
+  ROTULO_SUELTAS,
+  ROTULO_SUELTAS_CAMPO,
+} from "./FichaProductoRecepcion.jsx";
 import {
   presentacionDeProductoNuevo,
   unidadDeProductoNuevo,
@@ -415,6 +418,105 @@ test("EN ESCRITORIO · el botón sigue ahí y el segundo campo empieza oculto", 
     null,
     "en escritorio el campo de sueltas dejó de estar detrás del botón"
   );
+});
+
+// ── V22 · EL PANEL DE CORRECCIÓN EN EL TELÉFONO ──────────────────────────
+//
+// Cinco cambios, todos detrás de `enHoja`. Cada uno tiene su candado Y su par
+// de escritorio: lo que hace que esto sea seguro no es que el teléfono quede
+// bien, es que escritorio no se mueva, y eso hay que afirmarlo por separado —la
+// huella de 1366 se exige en cero—.
+
+test("V22-1 · los dos campos van LADO A LADO, con la presentación en el rótulo", () => {
+  const html = pintarFicha(lineaCajon(), { enHoja: true });
+  assert.ok(html.includes("CAJÓN x8 completos"), "el rótulo no dice la presentación");
+  assert.ok(html.includes(ROTULO_SUELTAS_CAMPO), "no está el rótulo del campo de sueltas");
+  // Los dos campos existen de entrada, sin tocar nada.
+  assert.ok(valorDelCampo(html, "Cantidad recibida en CAJÓN x8") !== null);
+  assert.ok(valorDelCampo(html, "Unidades sueltas") !== null);
+});
+
+test("V22-1b · y NO se dibuja dos veces el campo de sueltas", () => {
+  // El defecto que esto ataja es mudo y caro: dos inputs escribiendo la misma
+  // variable. El segundo tapa al primero y lo que se ve escrito no es lo que se
+  // guarda. Pasa si el bloque viejo del pack incompleto sigue montándose.
+  const html = pintarFicha(lineaCajon(), { enHoja: true });
+  const campos = (html.match(/aria-label="Unidades sueltas"/g) || []).length;
+  assert.equal(campos, 1, `hay ${campos} campos de sueltas; tiene que haber exactamente uno`);
+  assert.ok(!html.includes(ROTULO_SUELTAS), "volvió el botón de escritorio al teléfono");
+});
+
+test("V22-1c · la unidad va ADENTRO de cada campo", () => {
+  const html = pintarFicha(lineaCajon(), { enHoja: true });
+  // "CAJÓN" para el de completos y "UN" para el de sueltas. Sin esto, dos
+  // cantidades en escalas distintas quedan una al lado de la otra sin nada que
+  // las distinga salvo el rótulo de arriba.
+  assert.ok(html.includes(">CAJÓN<"), "falta la unidad adentro del campo de completos");
+  assert.ok(html.includes(">UN<"), "falta la unidad adentro del campo de sueltas");
+});
+
+test("V22-2 y 3 · el resultado va TEÑIDO y en formato corto", () => {
+  // Sin diferencia: fondo positivo y "N de N · sin diferencia".
+  const igual = pintarFicha(lineaCajon({ cantidadRecibida: 6 }), { enHoja: true });
+  assert.ok(igual.includes("48 de 48 · sin diferencia"), "no está el formato corto");
+  assert.ok(igual.includes("sunmi-state-success"), "el bloque no se tiñe de positivo");
+  assert.ok(!igual.includes("Ingreso físico:"), "quedó el texto largo de escritorio");
+
+  // Con diferencia: danger. 5 cajones de 8 son 40 contra 48.
+  const menos = pintarFicha(lineaCajon({ cantidadRecibida: 5 }), { enHoja: true });
+  assert.ok(menos.includes("40 de 48 · faltan 8"), "el resultado no dice la diferencia");
+  assert.ok(menos.includes("sunmi-state-danger"), "el bloque no se tiñe de danger");
+});
+
+test("V22-3b · cuando SOBRA se dice al derecho, y el singular se respeta", () => {
+  const sobra = pintarFicha(lineaCajon({ cantidadRecibida: 7 }), { enHoja: true });
+  assert.ok(sobra.includes("56 de 48 · sobran 8"), "un sobrante se está diciendo como falta");
+  assert.ok(!sobra.includes("faltan"), "dice 'faltan' sobre un sobrante");
+});
+
+test("V22-4 · la línea de explicación nombra la presentación de la línea", () => {
+  const html = pintarFicha(lineaCajon(), { enHoja: true });
+  assert.ok(
+    html.includes("El envío sigue siendo CAJÓN x8."),
+    "la explicación no sale de la presentación de la línea"
+  );
+  assert.ok(html.includes("bulto abierto o una rotura"));
+});
+
+test("V22-5 · el botón cambia de nombre Y de color según haya diferencia", () => {
+  const igual = pintarFicha(lineaCajon({ cantidadRecibida: 6 }), { enHoja: true });
+  assert.ok(igual.includes("✓ Marcar revisado y seguir"));
+  assert.ok(igual.includes("sunmi-btn-primary"), "sin diferencia el botón no es el de acción");
+
+  const dif = pintarFicha(lineaCajon({ cantidadRecibida: 5 }), { enHoja: true });
+  assert.ok(dif.includes("✓ Guardar diferencia y seguir"));
+  // `warning` y NO `amber`: `.sunmi-btn-amber` es la misma regla que
+  // `.sunmi-btn-primary` —las dos pintan `--pos-accent`—, así que pedir `amber`
+  // para distinguirse de `primary` dejaba los dos botones del mismo color en los
+  // catorce temas. El cambio de color existía en el código y no en la pantalla.
+  assert.ok(dif.includes("sunmi-btn-warning"), "con diferencia el botón no es warning");
+  assert.ok(!dif.includes("sunmi-btn-primary"), "quedaron los dos colores a la vez");
+});
+
+// ── Y EL OTRO LADO: ESCRITORIO NO SE MUEVE ───────────────────────────────
+
+test("V22-E · escritorio conserva TODO lo que el V22 cambió en el teléfono", () => {
+  const html = pintarFicha(lineaCajon({ cantidadRecibida: 5 }));
+  // El botón de las sueltas, y el campo detrás de él.
+  assert.ok(html.includes(ROTULO_SUELTAS), "desapareció el botón de escritorio");
+  assert.equal(valorDelCampo(html, "Unidades sueltas"), null, "el campo dejó de estar oculto");
+  // El rótulo viejo, no el de la presentación.
+  assert.ok(html.includes(">Recibido<"), "escritorio perdió su rótulo «Recibido»");
+  assert.ok(!html.includes("CAJÓN x8 completos"), "se filtró el rótulo del teléfono");
+  // El texto largo, sin teñir.
+  assert.ok(html.includes("Ingreso físico:"), "escritorio perdió su línea de ingreso físico");
+  assert.ok(!html.includes("40 de 48 · faltan 8"), "se filtró el formato corto del teléfono");
+  assert.ok(!html.includes("sunmi-state-danger"), "se filtró el bloque teñido del teléfono");
+  // La explicación es del teléfono.
+  assert.ok(!html.includes("El envío sigue siendo"), "se filtró la explicación del teléfono");
+  // Y el botón sigue en ámbar con su texto de siempre.
+  assert.ok(html.includes("sunmi-btn-amber"), "escritorio cambió el color del botón");
+  assert.ok(!html.includes("y seguir"), "se filtró el texto del teléfono");
 });
 
 test("EN HOJA · lo que se escribe en sueltas CUENTA, no queda de adorno", () => {

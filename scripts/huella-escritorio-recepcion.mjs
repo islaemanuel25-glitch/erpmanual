@@ -130,6 +130,53 @@ for (let i = 0; i < 90; i++) {
 }
 await esperar(2500);
 
+// ── Y SE ABRE EL PANEL, PORQUE SI NO LA HUELLA NO LO VE ──────────────────
+//
+// Hasta el V22 esta huella medía la pantalla con NINGÚN producto abierto, así
+// que `FichaProductoRecepcion` no se renderizaba y no entraba en la foto.
+// Medido el 2026-09-12: ni "Recibido" ni "Hay unidades sueltas" aparecían en
+// los 163 elementos.
+//
+// O sea que un cambio en el panel daba huella CERO, y ese cero se leía como
+// "escritorio no se movió" cuando lo que pasaba era que la pantalla que cambió
+// no estaba en la foto. Es el mismo agujero que la vista de tabla —anotado en
+// `docs/architecture/base-de-pruebas-v15.md`— y la misma familia del candado
+// verde sobre algo que no existe.
+//
+// Se abre la primera línea y se mide con el panel desplegado. Si no se puede
+// abrir, la huella FRENA en vez de medir de menos: una foto sin el panel ya no
+// es comparable con una que sí lo tiene, y compararlas daría una diferencia
+// inventada.
+// Se prefiere una línea AGRUPADA —PACK o CAJÓN—, y no es un capricho: el
+// bloque del pack incompleto de escritorio, con su botón "Hay unidades
+// sueltas", solo se dibuja cuando la presentación agrupa. Abriendo una línea en
+// UNIDAD ese bloque queda fuera de la foto, y justamente es el que el V22 tocó
+// del lado del teléfono. Medido: con una línea UNIDAD el botón daba 0
+// apariciones en la huella.
+const abrio = await evaluar(`(() => {
+  const filas = [...document.querySelectorAll('button, [role="button"], tr')]
+    .filter((n) => n.offsetParent !== null && /Pendiente de revisar/.test(n.textContent || ''));
+  if (!filas.length) return 'SIN FILAS';
+  const agrupada = filas.find((n) => /PACK|CAJÓN|CAJON/.test(n.textContent || ''));
+  const elegida = agrupada || filas[0];
+  elegida.scrollIntoView({ block: 'center' });
+  elegida.click();
+  return agrupada ? true : 'SIN LINEA AGRUPADA';
+})()`);
+if (abrio !== true) {
+  console.error(`ROJO · no se pudo abrir el panel para medirlo: ${abrio}`);
+  console.error("Una huella sin el panel no es comparable con una que lo tiene.");
+  process.exit(1);
+}
+await esperar(1500);
+const panelVisible = await evaluar(
+  `[...document.querySelectorAll('input[type="number"]')].some((n) => n.offsetParent !== null)`
+);
+if (!panelVisible) {
+  console.error("ROJO · se tocó la fila y el panel no apareció: la huella mediría de menos.");
+  process.exit(1);
+}
+
 const huella = await evaluar(`(() => {
   // ── SE MIDE LO QUE OCUPA LUGAR, Y ESO NO ES offsetParent ───────────────
   //

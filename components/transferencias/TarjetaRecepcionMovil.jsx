@@ -53,7 +53,12 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 
 import { formatearMoneda } from "@/lib/moneda";
-import { chipsDeMotivo, fisicasEnviadasDe, fisicasRecibidasDe } from "@/lib/transferencias/recepcionUI";
+import {
+  chipsDeMotivo,
+  fisicasEnviadasDe,
+  fisicasRecibidasDe,
+  resultadoDeConteo,
+} from "@/lib/transferencias/recepcionUI";
 import {
   descriptorDeEnvio,
   nombreDePresentacion,
@@ -269,10 +274,17 @@ export default function TarjetaRecepcionMovil({
       unidadDif === "unidades" ? " unidades" : sufijoDif
     }`;
   } else if (hayDiferencia && delta != null) {
-    const falta = delta < 0;
-    const abs = Math.abs(delta);
-    const verbo = falta ? (abs === 1 ? "falta" : "faltan") : abs === 1 ? "sobra" : "sobran";
-    aviso = `Ingreso físico ${fmtCant(fisicasContadas)} de ${fmtCant(fisicasEnviadas)} · ${verbo} ${fmtCant(abs)}${sufijoDif}`;
+    // El núcleo —"96 de 144 · faltan 48"— sale de `resultadoDeConteo`, que es la
+    // MISMA función que usa el panel de corrección. Antes estaba escrito acá y
+    // el panel tenía su propia redacción: dos textos para el mismo hecho, sobre
+    // la misma línea y en la misma pantalla. La tarjeta le antepone su rótulo
+    // porque acá el renglón va suelto entre otros; en el panel el bloque ya se
+    // titula solo.
+    aviso = `Ingreso físico ${resultadoDeConteo({
+      recibidas: fisicasContadas,
+      enviadas: fisicasEnviadas,
+      envio,
+    })}`;
   }
 
   return (
