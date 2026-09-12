@@ -78,6 +78,32 @@ Producción sigue en el 3000 y no se toca. Al terminar:
 dentro del contenedor, así que hace falta
 `docker run --rm -v …:/app alpine rm -rf /app/.next`—.
 
+## PENDIENTE: a 440 px de alto el botón de guardar queda fuera de pantalla
+
+**Descubierto midiendo el V25 el 2026-09-12. No está arreglado y no es de esa
+tanda: pasa igual con el código anterior.**
+
+La hoja de corrección no ancla su pie. Mientras el contenido entra, el botón «✓
+Guardar diferencia y seguir» no se mueve —medido a 640 y a 520 px, cero
+píxeles—. Cuando NO entra, el botón se corre y se va abajo del borde:
+
+- con el código anterior al V25: 383 px → 443 px, en un viewport de 440;
+- con las dos reservas del V25 puestas: 419 px → 443 px.
+
+O sea que reservar alto redujo el salto de 60 a 24 px y **no resuelve este
+caso**: con el teclado grande abierto el botón queda afuera en los dos estados.
+Lo que hace falta ahí es anclar el pie de la hoja, que es un cambio de
+composición y no de reserva.
+
+El arnés lo mide y lo imprime en cada corrida —`botonAVariasAlturas`—, pero a
+440 px **no lo afirma**, a propósito: afirmarlo pondría en rojo algo que la
+tanda no rompió. A 640 y 520 sí lo afirma.
+
+Y el residuo de 24 px tiene nombre: el renglón teñido de resultado, que con el
+texto nuevo —«4 PACK x24 de 6 PACK x24 · faltan 48 unidades»— pasa a dos líneas
+a 390 px de ancho. Reservarlo obliga a decidir si ese bloque va SIEMPRE en dos
+líneas, y eso cambia una forma aprobada en el V22.
+
 ## PENDIENTE: el panel de escritorio necesita su propio planteo
 
 **Anotado el 2026-09-12, decisión de Emanuel. No está hecho y es a propósito.**
@@ -126,6 +152,24 @@ movió: significaba que la pantalla que cambió no estaba en la foto.
 **Lo que falta:** sembrar un segundo usuario con un rol SIN
 `transferencias.recibir`, y correr la huella también con ese usuario. Son dos
 huellas de escritorio, no una, y la segunda es la que cubre la tabla.
+
+**Y hay un SEGUNDO agujero en la huella, encontrado el 2026-09-12.** El V25 sacó
+el bloque de adopción de las dos superficies, incluida escritorio, y la huella
+dio **184 = 184, cero diferencias**. Ese cero no significa que escritorio no se
+movió: significa que **el bloque nunca estuvo en la foto**.
+
+El sembrado crea cuatro líneas y todas tienen snapshot de despacho, así que
+`admiteAdopcion` devolvía false en las cuatro y el bloque no se dibujaba nunca.
+La huella no podía ver lo que se sacó.
+
+Es el mismo patrón que el de arriba y la misma lección: **un cero de la huella
+solo vale si antes se comprobó que la huella VE el elemento en cuestión.** Lo
+que cubrió el caso fue un candado de render con el fixture de la línea real de
+la #195 —ficha PACK x12, remito UNIDAD, sin snapshot—, que es la combinación que
+el sembrado no tiene.
+
+Si alguna tanda vuelve a tocar algo que solo aparece en una línea histórica sin
+snapshot, hay que sembrar esa quinta línea primero.
 
 Cuidado al hacerlo: el rol del sembrado hoy es `["*"]`. Un rol con la lista de
 permisos enumerada menos uno no es lo mismo que `["*"]` menos uno — hay que mirar
