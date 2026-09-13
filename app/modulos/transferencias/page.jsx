@@ -56,6 +56,7 @@ import ColumnSettingsPanel from "@/components/transferencias/ColumnSettingsPanel
 import TablaTransferencias from "@/components/transferencias/TablaTransferencias";
 import CardTransferencia from "@/components/transferencias/CardTransferencia";
 import ReporteTransferenciasPorDestino from "@/components/transferencias/ReporteTransferenciasPorDestino";
+import TableroMovil from "@/components/transferencias/TableroMovil";
 
 const TZ_AR = "America/Argentina/Cordoba";
 
@@ -263,6 +264,19 @@ export default function TransferenciasPage() {
   const { perfil: perfilTr, cargando: cargandoTr } = useUser();
   const permisosTr = perfilTr?.permisos || [];
   const esAdminTr = Array.isArray(permisosTr) && permisosTr.includes("*");
+
+  // ── EL REPORTE PASA A ESTAR DETRÁS DE UN BOTÓN, EN EL TELÉFONO ──────────
+  //
+  // Abajo de 1024 px lo primero que se ve es la lista de trabajo —`TableroMovil`—
+  // y este reporte queda a un toque, con el botón "Reporte" del encabezado. De
+  // 1024 para arriba no cambia NADA: el reporte es lo único que se dibuja, con
+  // las mismas clases de siempre, y por eso el `hidden` solo aplica abajo de ese
+  // ancho.
+  //
+  // Se resuelve con dos ramas y no mudando el reporte a otro archivo porque son
+  // 650 líneas de estado compartido —filtros, paginación, contexto de retorno—
+  // y mudarlas sería una tanda entera con su propia superficie de error.
+  const [reporteEnMovil, setReporteEnMovil] = useState(false);
 
   const [items, setItems] = useState([]);
   const [estado, setEstado] = useState("");
@@ -494,9 +508,34 @@ export default function TransferenciasPage() {
   if (!esAdminTr && !permisosTr.includes("transferencias.ver")) return <SinPermisos />;
 
   return (
-    // Mismo contenedor que Ventas: ancho útil completo (Ventas quitó su `max-w` a
-    // propósito), padding p-2 / lg:p-3 y separación vertical space-y-3.
-    <div className="w-full min-h-full p-2 lg:p-3 space-y-3">
+    <>
+      {/* MÓVIL: la lista de trabajo. Es lo que se ve al abrir. */}
+      {!reporteEnMovil && (
+        <div className="lg:hidden">
+          <TableroMovil onAbrirReporte={() => setReporteEnMovil(true)} />
+        </div>
+      )}
+
+      {/* En el teléfono, el camino de vuelta del reporte a la lista. */}
+      {reporteEnMovil && (
+        <div className="lg:hidden px-4 pt-4">
+          <SunmiButton
+            type="button"
+            color="slate"
+            onClick={() => setReporteEnMovil(false)}
+            className="px-3.5 py-2 rounded-lg text-sm3 font-medium"
+          >
+            ← Volver a la lista
+          </SunmiButton>
+        </div>
+      )}
+
+      {/* ESCRITORIO: el reporte de siempre, con las mismas clases. */}
+      <div
+        className={`w-full min-h-full p-2 lg:p-3 space-y-3 ${
+          reporteEnMovil ? "" : "hidden lg:block"
+        }`}
+      >
       {/* 1 · Encabezado + filtros en una franja compacta (una sola fila en desktop) */}
       <SunmiCard className="p-3 overflow-visible backdrop-blur-0">
         {/* Encabezado idéntico al de Ventas: solo título y subtítulo. No lleva
@@ -905,7 +944,8 @@ export default function TransferenciasPage() {
           </div>
         </SunmiCard>
       )}
-    </div>
+      </div>
+    </>
   );
 }
 

@@ -1,0 +1,239 @@
+"use client";
+
+// components/transferencias/TableroMovil.jsx
+//
+// LO QUE SE VE AL ABRIR TRANSFERENCIAS EN EL TELÉFONO.
+//
+// ── QUÉ CAMBIA RESPECTO DE LO QUE HABÍA ───────────────────────────────────
+//
+// Había un formulario de reporte: dos fechas, un estado y "Generar reporte",
+// arrancando con Desde y Hasta en el mismo día — así que para ver qué hay que
+// recibir primero había que corregir las fechas. Lo que hace falta al abrir no
+// es un reporte: es la lista de trabajo. El reporte sigue entero, detrás de su
+// botón.
+//
+// ── DOS VISTAS, Y LA ELIGE UN DATO QUE YA EXISTE ──────────────────────────
+//
+// El depósito ve una cuenta por local; el local ve la suya. La decide
+// `Local.es_deposito` en el servidor —no el `modo` de `resolveVistaOperativa`,
+// que dice el ALCANCE y no quién sos— y acá llega resuelta en `vista`.
+//
+// ── EL PERÍODO SE RECALCULA EN EL SERVIDOR ────────────────────────────────
+//
+// Tocar un chip vuelve a pedir. Podría calcularse acá si el teléfono tuviera
+// las líneas, y no las tiene a propósito: el importe a pagar se valoriza línea
+// por línea y esa cuenta vive en un solo lado. Ver `/api/transferencias/tablero`.
+
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { TriangleAlert } from "lucide-react";
+
+import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import SunmiDateRangePicker from "@/components/sunmi/SunmiDateRangePicker";
+import SunmiAviso from "@/components/sunmi/SunmiAviso";
+import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
+
+import EncabezadoMovil, { CLASE_ACCION_ENCABEZADO } from "./EncabezadoMovil";
+import ChipsDePeriodo, { CLAVE_OTRO } from "./ChipsDePeriodo";
+import BloqueLocal from "./BloqueLocal";
+import CabeceraDeCuenta from "./CabeceraDeCuenta";
+import FilaTransferenciaLocal from "./FilaTransferenciaLocal";
+
+import { UNIDADES } from "@/lib/transferencias/periodoDePago";
+
+/** El mismo formato de importe que usa el reporte de al lado. */
+function money(n) {
+  return `$ ${Number(n || 0).toLocaleString("es-AR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+export default function TableroMovil({ onAbrirReporte }) {
+  const router = useRouter();
+
+  const [unidad, setUnidad] = useState(UNIDADES.SEMANA);
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
+  const [datos, setDatos] = useState(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
+  const [abiertos, setAbiertos] = useState(() => new Set());
+
+  // Con "Otro" elegido y sin las dos fechas todavía, NO se consulta: un rango a
+  // medias no es un rango, y pedirlo devolvería el período de la semana sin que
+  // nadie lo haya pedido.
+  const esperandoFechas = unidad === CLAVE_OTRO && !(desde && hasta);
+
+  const cargar = useCallback(async () => {
+    if (esperandoFechas) {
+      setCargando(false);
+      return;
+    }
+    setCargando(true);
+    setError("");
+    try {
+      const url = new URL("/api/transferencias/tablero", window.location.origin);
+      // Con "Otro" la unidad no significa nada —el rango lo eligió el usuario—
+      // así que se manda la semana y mandan las dos fechas.
+      url.searchParams.set("unidad", unidad === CLAVE_OTRO ? UNIDADES.SEMANA : unidad);
+      if (unidad === CLAVE_OTRO) {
+        url.searchParams.set("desde", desde);
+        url.searchParams.set("hasta", hasta);
+      }
+      const res = await fetch(url.toString(), { cache: "no-store" });
+      const j = await res.json();
+      if (!res.ok || !j.ok) throw new Error(j?.error || "No se pudo cargar la lista de trabajo.");
+      setDatos(j);
+    } catch (e) {
+      setError(e.message);
+      setDatos(null);
+    } finally {
+      setCargando(false);
+    }
+  }, [unidad, desde, hasta, esperandoFechas]);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  const alternar = (localId) => {
+    setAbiertos((prev) => {
+      const s = new Set(prev);
+      if (s.has(localId)) s.delete(localId);
+      else s.add(localId);
+      return s;
+    });
+  };
+
+  const recibir = (t) => router.push(`/modulos/transferencias/${t.id}`);
+
+  const sinConfigurar = (datos?.bloques || []).filter((b) => b.sinConfigurar).length;
+
+  return (
+    // Padding 14 a los lados y arriba —`p-4` en la escala del proyecto— y 12,25
+    // entre bloques.
+    <div className="w-full min-h-full px-4 pt-4 pb-4 space-y-3.5">
+      <EncabezadoMovil
+        titulo="Transferencias"
+        accion={
+          <SunmiButton
+            type="button"
+            color="slate"
+            onClick={onAbrirReporte}
+            className={CLASE_ACCION_ENCABEZADO}
+          >
+            Reporte
+          </SunmiButton>
+        }
+      />
+
+      <ChipsDePeriodo valor={unidad} onCambiar={setUnidad} />
+
+      {unidad === CLAVE_OTRO && (
+        <SunmiDateRangePicker
+          valueDesde={desde}
+          valueHasta={hasta}
+          onChangeDesde={setDesde}
+          onChangeHasta={setHasta}
+          onApply={cargar}
+        />
+      )}
+
+      {/* ── LO QUE FALTA CONFIGURAR SE DICE ARRIBA, NO SOLO EN CADA BLOQUE ──
+          La píldora del bloque marca CUÁL cae al domingo sin que nadie lo haya
+          decidido; este renglón es el camino para arreglarlo. Aparece solo
+          cuando hay algo que arreglar: un enlace permanente a una pantalla de
+          configuración en la lista de trabajo diaria sería ruido. */}
+      {sinConfigurar > 0 && (
+        <SunmiAviso tono="warning" icon={TriangleAlert} titulo="Corte de semana sin configurar">
+          {sinConfigurar === 1
+            ? "Hay 1 local sin corte configurado: se le está aplicando el domingo."
+            : `Hay ${sinConfigurar} locales sin corte configurado: se les está aplicando el domingo.`}{" "}
+          <SunmiLinkButton onClick={() => router.push("/modulos/transferencias/corte-de-semana")}>
+            Configurar
+          </SunmiLinkButton>
+        </SunmiAviso>
+      )}
+
+      {esperandoFechas && (
+        <div className="text-center py-12 sunmi-text-muted text-xs">
+          Elegí las dos fechas del período.
+        </div>
+      )}
+
+      {cargando && !esperandoFechas && (
+        <div className="py-12">
+          <SunmiLoader />
+        </div>
+      )}
+
+      {error && !cargando && (
+        <div className="rounded-xl border sunmi-border-danger px-4 py-3 text-xs sunmi-text-danger">
+          {error}
+        </div>
+      )}
+
+      {/* `!esperandoFechas` no es redundante: con "Otro" recién elegido, `datos`
+          todavía tiene el período anterior, y dibujarlo debajo de "Elegí las dos
+          fechas" mostraría bloques que no son del rango que se está por pedir. */}
+      {!cargando && !error && !esperandoFechas && datos?.vista === "DEPOSITO" && (
+        <>
+          {(datos.bloques || []).length === 0 ? (
+            <div className="text-center py-12 sunmi-text-muted text-xs">
+              Ningún local tuvo movimiento en este período.
+            </div>
+          ) : (
+            <div className="space-y-3.5">
+              {datos.bloques.map((b) => (
+                <BloqueLocal
+                  key={b.localId}
+                  bloque={b}
+                  abierto={abiertos.has(b.localId)}
+                  onAlternar={() => alternar(b.localId)}
+                  onRecibir={recibir}
+                  money={money}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {!cargando && !error && !esperandoFechas && datos?.vista === "LOCAL" && datos?.cuenta && (
+        <>
+          <CabeceraDeCuenta cuenta={datos.cuenta} unidad={unidad} money={money} />
+
+          {datos.cuenta.paraRecibir.length > 0 && (
+            <section className="space-y-3.5">
+              <h2 className="text-xs2 font-semibold sunmi-text-muted tracking-wider">
+                PARA RECIBIR
+              </h2>
+              {datos.cuenta.paraRecibir.map((t) => (
+                <FilaTransferenciaLocal key={t.id} t={t} onRecibir={recibir} money={money} />
+              ))}
+            </section>
+          )}
+
+          {datos.cuenta.yaRecibidas.length > 0 && (
+            <section className="space-y-3.5">
+              <h2 className="text-xs2 font-semibold sunmi-text-muted tracking-wider">
+                YA RECIBIDAS
+              </h2>
+              {datos.cuenta.yaRecibidas.map((t) => (
+                <FilaTransferenciaLocal key={t.id} t={t} money={money} />
+              ))}
+            </section>
+          )}
+
+          {datos.cuenta.paraRecibir.length === 0 && datos.cuenta.yaRecibidas.length === 0 && (
+            <div className="text-center py-12 sunmi-text-muted text-xs">
+              No hubo transferencias en este período.
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
