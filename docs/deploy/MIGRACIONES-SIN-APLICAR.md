@@ -20,6 +20,60 @@ Ninguna. Producción está en **10 migraciones**, las mismas que el árbol.
 
 ---
 
+## 2026-09-13 — `1487c1f6`, la línea sin bultos enteros se cuenta por unidad: CERO migraciones
+
+Producción pasó de `660ab51fe2dd9886f09607a8c792edbf8e884e46` a
+`1487c1f6c8e29096e1b022acbc63bc3136fad919`. **Despliegue solo de código**, con
+corte de **2 segundos**.
+
+El cero por los tres caminos: diff de `prisma/` vacío en el rango y
+`schema.prisma` sin tocar; clasificador con `--desde 660ab51f…` en «Archivos a
+mirar: 0»; y `migrate deploy` contando **10**, el mismo número que el árbol del
+VPS. `migrate status` de cierre: 10 y «Database schema is up to date!». Bitácora
+de autorizaciones **inexistente**.
+
+### NO SE PUDO ARMAR UN MARCADOR, Y ES LA PRIMERA VEZ QUE PASA
+
+La tanda **no deja ninguna cadena nueva en el build**, así que no hay marcador
+posible. Queda escrito con el detalle porque el método dice que en ese caso se
+declara no verificado en vez de darlo por bueno.
+
+Lo que cambia son identificadores —`seCuentaPorUnidad`, `envioComoSeCuenta`,
+`costoMostradoDe`—, que el build minifica y por eso no afirman nada. No agrega ni
+saca una sola clase de Tailwind: la hoja servida quedó en **1647 reglas, igual que
+antes**, que es lo esperable y además coherente. Y la única cadena de interfaz
+nueva es el rótulo **«Unidades»**, que **ya existía en la imagen vieja**: se probó
+anclada con sus comillas y dio **2 archivos** en el commit desplegado. El `git
+grep` contra ese commit dijo de dónde salía —`app/modulos/reportes-stock/page.jsx`
+tiene un KPI titulado así— así que el candidato se descartó entero, como
+corresponde cuando un marcador aparece en la imagen que no tiene la tanda.
+
+Lo que sí se midió, y **es un conteo, no un marcador**: esa cadena anclada pasó de
+**2 a 4 archivos** entre las dos imágenes, con el control —`"Unidades sueltas"`—
+en **2 en las dos**, que prueba que la búsqueda encuentra cuando tiene que
+encontrar. Es consistente con que el cambio viajó y no equivale a un marcador,
+porque la cadena ya estaba antes por otro motivo.
+
+O sea que **esta tanda está verificada por la suite, el arnés y la huella, no
+contra el build.** Suite 5837 sin rojos, arnés de 390 en 178 afirmaciones —eran
+166—, huella de escritorio idéntica en sus 189 elementos.
+
+### La sonda de cascada
+
+**VERDE antes y después** contra `https://operix.cloud/login`, con las cuatro
+mediciones en su valor y 1647 reglas en las dos corridas. La de la tarjeta de
+producto **no aplica**: el rango no toca el catálogo, ni la tarjeta, ni
+`SunmiPanel`.
+
+### Y ESTE DESPLIEGUE NO ARREGLA EL DATO DEL INC-0008
+
+Lo que sale a producción es la CAUSA: el panel de una línea sin bultos enteros ya
+no ofrece un campo de packs. **El detalle 6519 sigue con `recibido = 6` en la
+base**, o sea leyéndose como 180 unidades contra 8 enviadas, y la transferencia
+#195 sigue en «Recibiendo» sin haber movido stock. Se corrige desde la pantalla,
+que ahora abre mostrando esas 180 con el borde en danger. Ver
+[`INC-0008`](../incidents/INC-0008-packs-contados-sobre-un-envio-sin-bultos.md).
+
 ## 2026-09-12 — `660ab51f`, el campo de cantidad al kit: CERO migraciones
 
 Producción pasó de `bca6da586657cfeb2a8f326eae6ad8223d787231` a
