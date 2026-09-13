@@ -20,6 +20,64 @@ Ninguna. Producción está en **11 migraciones**, las mismas que el árbol.
 
 ---
 
+## 2026-09-13 — `0acacafd`, el local dado de baja: CERO migraciones
+
+Producción pasó de `78999b8e560b2104efab39c8c1e400bb7f88953e` a
+`0acacafd9eeead46d690ad3d05ab542f1d911263`. **Despliegue solo de código**, con
+corte de **2 segundos**.
+
+**TERCER DESPLIEGUE DEL DÍA**, y el skill pide expresamente no encadenarlos
+—quince en un día son quince cortes—. Se hicieron igual porque cada uno cerraba
+una corrección de producto que Emanuel pidió en el momento, y los tres cortaron
+2 segundos. Queda anotado como lo que fue: una excepción tomada a propósito, no
+la costumbre.
+
+El cero por tres caminos: la sección de pendientes vacía, el `git diff` de
+`prisma/migrations` sin nada en el rango —y `schema.prisma` sin tocar—, y el
+clasificador con `--desde 78999b8e…` en «Archivos a mirar: 0».
+
+El conteo confirmó que la imagen no estaba atrasada: **11 migrations found**, el
+mismo número que el árbol. `migrate status` de cierre: 11 y "Database schema is
+up to date!". Bitácora de autorizaciones: **inexistente**.
+
+### Qué sale
+
+Dos cosas del mismo relevamiento:
+
+**El local DADO DE BAJA.** Con movimiento en el período aparece en la lista de
+trabajo y va marcado con una píldora "Dado de baja"; sin movimiento no aparece.
+Como el inactivo sin movimiento no entra nunca, cada vez que esa píldora se
+dibuja hay plata de por medio.
+
+**Los destinos de una transferencia nueva salen de una puerta, no de una
+creencia.** La pantalla de crear los ofrecía con `getLocalesDeGrupo`, que
+devuelve todas las filas de `GrupoLocal` sin filtrar: ofrecía como destino a un
+local dado de baja, y su "EXCLUYE depósitos" se cumplía solo porque los depósitos
+viven en otra tabla. Ahora las dos pantallas usan la misma lista y el mismo
+criterio, y el modo admin de esa ruta también.
+
+**`getLocalesDeGrupo` NO se tocó**, a propósito: sus otros tres consumidores la
+usan para replicar el CATÁLOGO, y filtrar ahí por `activo` dejaría a un local
+reactivado sin los productos creados durante su baja. Hay un candado que lo dice.
+
+### Medido en producción, antes y después
+
+Cuatro locales en la relación y **los cuatro activos**, así que los cuatro siguen
+siendo destinos válidos y la lista de trabajo no cambia lo que muestra. **El caso
+del local dado de baja existe en el modelo y no en los datos**: lo único que lo
+cubre son los tres candados con su fixture, y no hay captura de esa píldora.
+
+### El marcador, con su control
+
+`"Dado de baja"` —texto de interfaz— da **0 archivos en la imagen vieja y 2 en la
+nueva**, con `grep -rlF` en contenedores descartables. Dos controles, los dos
+presentes en las dos imágenes: `"Sin corte"` en 2 y 2, y
+`"Sin transferencias en el período"` en 2 y 2.
+
+Un candidato se **descartó**: `puedeRecibirTransferencias` no existía en el commit
+anterior, pero es un IDENTIFICADOR y el build lo minifica, así que su vacío no
+habría afirmado nada — ni a favor ni en contra.
+
 ## 2026-09-13 — `78999b8e`, todos los locales en la lista: CERO migraciones
 
 Producción pasó de `7375ac9cb24559259150bf9ed8ae59b4329f9bf5` a
