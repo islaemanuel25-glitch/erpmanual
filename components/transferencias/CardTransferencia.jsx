@@ -17,14 +17,21 @@
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import EstadoTransferenciaBadge, { DiferenciasBadge } from "./EstadoTransferenciaBadge";
+import { diferenciaDeLinea } from "@/lib/transferencias/recepcionUI";
 
 export default function CardTransferencia({ t, onVer, fechaHoraAR, formatCantidad, money }) {
   // `null` = todavía no se registró recepción → "—".
   // `0`    = se registró que no llegó nada     → "0".
   const sinRecepcion = t.cantidadRecibida == null;
-  const faltante = sinRecepcion
-    ? 0
-    : Number(t.cantidadEnviada || 0) - Number(t.cantidadRecibida || 0);
+  // La diferencia sale de `diferenciaDeLinea` —`recibida − enviada`, negativo es
+  // falta— y no de una resta escrita acá con el signo al revés. Es la misma
+  // función que usa la ficha: el mismo hecho, un solo signo. El rótulo sigue
+  // diciendo la palabra "Faltante" con la magnitud, así que no cambia lo que se ve.
+  const diferencia = diferenciaDeLinea({
+    enviada: t.cantidadEnviada,
+    recibida: sinRecepcion ? null : t.cantidadRecibida,
+  });
+  const faltante = diferencia != null && diferencia < 0 ? -diferencia : 0;
 
   return (
     <div className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1.5">

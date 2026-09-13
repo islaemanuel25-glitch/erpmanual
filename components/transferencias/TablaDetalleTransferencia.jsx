@@ -37,6 +37,7 @@ import {
 } from "./detallePresentacion";
 import {
   ESTADO_LINEA,
+  diferenciaDeLinea,
   escalaFisicaDeLinea,
   estadoDeLinea,
   fisicasEnviadasDe,
@@ -220,7 +221,11 @@ export default function TablaDetalleTransferencia({
             // tabla ya no es el editor de la recepción.
             sueltas: d.recibidoUnidadesSueltas,
           });
-    const diff = envFis == null || recFis == null ? null : recFis - envFis;
+    // La resta se PIDE. `diferenciaDeLinea` es la que fija el signo —negativo es
+    // falta— para el detalle, el listado y el reporte, así que el mismo hecho no
+    // puede tener dos signos según la pantalla. El guard de `envFis` se conserva:
+    // sin lo enviado no hay diferencia que calcular, y eso no es cero.
+    const diff = envFis == null ? null : diferenciaDeLinea({ enviada: envFis, recibida: recFis });
     // `estadoLinea` y no `estado`: el `estado` de arriba es el de la
     // TRANSFERENCIA. Con el mismo nombre uno sombrea al otro adentro de este
     // callback.

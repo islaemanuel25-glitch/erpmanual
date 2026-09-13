@@ -14,6 +14,7 @@
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import EstadoTransferenciaBadge, { DiferenciasBadge } from "./EstadoTransferenciaBadge";
+import { diferenciaDeLinea } from "@/lib/transferencias/recepcionUI";
 
 export default function FilaTransferencia({
   t,
@@ -25,9 +26,18 @@ export default function FilaTransferencia({
 }) {
   // `null` = sin recepción registrada → "—"; `0` = llegó vacío → "0".
   const sinRecepcion = t.cantidadRecibida == null;
-  const faltante = sinRecepcion
-    ? 0
-    : Number(t.cantidadEnviada || 0) - Number(t.cantidadRecibida || 0);
+  // ── LA DIFERENCIA SALE DE LA FUNCIÓN DEL DOMINIO ──────────────────────
+  //
+  // Se restaba acá a mano, y en el signo contrario al del resto del repo. Ahora
+  // sale de `diferenciaDeLinea` —`recibida − enviada`, negativo es falta—, la
+  // misma que usa la ficha, así que el mismo hecho no puede tener dos signos en
+  // dos pantallas. El rótulo de abajo sigue escribiendo su propio "−" sobre la
+  // magnitud, así que lo que se ve no cambia.
+  const diferencia = diferenciaDeLinea({
+    enviada: t.cantidadEnviada,
+    recibida: sinRecepcion ? null : t.cantidadRecibida,
+  });
+  const faltante = diferencia != null && diferencia < 0 ? -diferencia : 0;
 
   return (
     <tr className="align-middle sunmi-row-hover transition-colors border-t sunmi-divider">

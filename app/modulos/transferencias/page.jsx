@@ -217,7 +217,14 @@ function cantidadOGuion(n) {
 // cargada no hay diferencia que juzgar.
 function claseDiferencia(n) {
   if (n === null || n === undefined) return "sunmi-text-muted";
-  if (Number(n) > 0) return "sunmi-text-warning";
+  // ── EL SIGNO SE UNIFICÓ EL 2026-09-13: NEGATIVO ES FALTA ──────────────
+  //
+  // Decía `> 0`, porque `productosMasTransferidos` restaba `enviada − recibida` y
+  // acá un faltante llegaba positivo. Ahora esa función devuelve
+  // `recibida − enviada`, como `diferenciaDeLinea` y como todo lo que se dibuja en
+  // el detalle, así que la alarma va del otro lado. Si esto no se hubiera dado
+  // vuelta con ella, el color habría pasado a marcar los EXCEDENTES como falta.
+  if (Number(n) < 0) return "sunmi-text-warning";
   return "sunmi-text-muted";
 }
 

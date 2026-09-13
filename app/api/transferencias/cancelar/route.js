@@ -32,7 +32,11 @@ import prisma from "@/lib/prisma";
 import { requirePerm } from "@/lib/authorize";
 import { getCookieValue } from "@/lib/auth";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
-import { toUnidades } from "@/lib/conversiones/stock";
+// `toUnidades` se importaba acá para convertir lo enviado con las columnas
+// crudas. Lo reemplazó `fisicasEnviadasDe`, que lee el snapshot; un import que
+// solo sostenía código borrado deja el módulo diciendo que depende de algo que ya
+// no usa.
+import { fisicasEnviadasDe } from "@/lib/transferencias/recepcionUI";
 import {
   reversionStockOrigen,
   politicaDeLaTransferencia,
@@ -227,12 +231,22 @@ export async function POST(req) {
       for (const d of t.detalle) {
         const enviada = Number(d.cantidad || 0);
         if (enviada <= 0) continue;
-        const unidades = toUnidades({
-          cantidad: enviada,
-          unidad: d.unidadEnviada || "BULTO",
-          factorPack: Number(d.producto?.base?.factor_pack || 1),
-        });
-        if (unidades <= 0) continue;
+        // ── LAS FÍSICAS SALEN DE LA PUERTA CANÓNICA, NO DE LAS COLUMNAS ────
+        //
+        // Decía `toUnidades({cantidad: d.cantidad, unidad: d.unidadEnviada ||
+        // "BULTO", factorPack: base.factor_pack})`. Hoy acertaba, y por los datos y
+        // no por construcción: cero líneas en producción combinan un snapshot
+        // agrupado con `unidadEnviada = BULTO` y `cantidad > 0` —medido el
+        // 2026-09-13—. El día que apareciera una, esto multiplicaba una cantidad
+        // que YA es física por el factor del catálogo y le devolvía al origen el
+        // doble de lo que salió.
+        //
+        // `fisicasEnviadasDe` lee el snapshot con el factor congelado y entiende
+        // esta fila de Prisma. Devuelve `null` cuando el dato no es representable,
+        // y acá eso se saltea igual que un cero: esta ruta devuelve stock y no
+        // puede inventar cuánto.
+        const unidades = fisicasEnviadasDe(d);
+        if (unidades == null || unidades <= 0) continue;
 
         // El detalle apunta al ProductoLocal del DESTINO; el del origen se
         // resuelve por baseId.
