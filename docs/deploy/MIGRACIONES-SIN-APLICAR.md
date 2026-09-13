@@ -20,6 +20,56 @@ Ninguna. Producción está en **11 migraciones**, las mismas que el árbol.
 
 ---
 
+## 2026-09-13 — `3cd4a4c5`, el criterio del cliente vinculado: CERO migraciones
+
+Producción pasó de `0acacafd9eeead46d690ad3d05ab542f1d911263` a
+`3cd4a4c53268e017e5944cadd80fb6d726072056`. **Despliegue solo de código**, con
+corte de **2 segundos**. Cuarto del día; los cuatro cortaron 2 segundos.
+
+Cero migraciones por los tres caminos de siempre, y el conteo confirmando que la
+imagen no estaba atrasada: **11 informadas, 11 en el árbol**. `migrate status`:
+11 y "Database schema is up to date!". Bitácora de autorizaciones: **inexistente**.
+
+### Qué sale
+
+El criterio de quién opera por transferencia: el **cliente vinculado**. Un local
+sin un `Cliente.localVinculadoId` que lo apunte no aparece en la lista de
+trabajo, no se ofrece como destino y no se le ofrece configurar el corte de
+semana.
+
+### EL MARCADOR ES DE COMPORTAMIENTO, Y VALE LA PENA SABER POR QUÉ
+
+**Esta tanda no agregó una sola cadena de interfaz.** Cambió lógica: un predicado
+gana una condición. No hay texto nuevo, no hay clase nueva de Tailwind, y los
+nombres de función no sirven —el build los minifica y su vacío no afirma nada—.
+Por el procedimiento, eso terminaría en "no se pudo verificar".
+
+En vez de eso se **ejerció el criterio adentro de cada imagen**, con un
+contenedor descartable y `node --input-type=module`, sobre el módulo que cambió:
+
+- **MARCADOR** — un local activo, SIN el dato del vínculo:
+  **`true` en la imagen vieja, `false` en la nueva.** El criterio nuevo viajó.
+- **CONTROL 1** — un local dado de baja: **`false` en las dos.** La lógica
+  anterior sigue viva y la prueba mide de verdad.
+- **CONTROL 2** — un local activo CON vínculo: **`true` en las dos.** No se rompió
+  lo que ya funcionaba.
+
+Es más fuerte que un marcador de cadena: no comprueba que el texto viajó, sino
+que **la decisión cambió, y cambió exactamente donde tenía que cambiar**. Queda
+como técnica para las tandas de lógica pura.
+
+Lo que NO se pudo hacer por ese camino: importar `relacionesDelDeposito.js` suelto
+dentro del contenedor. Usa `@/lib/prisma`, y ese alias lo resuelve Next, no Node.
+Se verificó por sus partes —el criterio por comportamiento, las consultas contra
+PostgreSQL—.
+
+### Medido contra producción, después de desplegar
+
+Los cuatro locales: activos y con cliente vinculado. **4 de 4 califican como
+destino**, así que no cambia nada de lo que se ve hoy. Se va a notar el día que
+se cargue un local nuevo: hasta que no se le vincule su cliente, no aparece en
+transferencias.
+
 ## 2026-09-13 — `0acacafd`, el local dado de baja: CERO migraciones
 
 Producción pasó de `78999b8e560b2104efab39c8c1e400bb7f88953e` a
