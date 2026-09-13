@@ -274,7 +274,7 @@ export default function TablaDetalleTransferencia({
       agregadoEnRecepcion: d.agregadoEnRecepcion,
     });
     return {
-      d, idx, edit, enviada, recibido, diff, estadoLinea, tono, fisico, sePuedeQuitar, motivos,
+      d, idx, edit, enviada, recibido, recFis, diff, estadoLinea, tono, fisico, sePuedeQuitar, motivos,
     };
   });
 
@@ -364,7 +364,7 @@ export default function TablaDetalleTransferencia({
         {/* ══════════ Móvil: una card por línea ══════════ */}
         {allItems.length > 0 && (
           <div className="md:hidden space-y-2">
-            {filasVisibles.map(({ d, idx, edit, enviada, recibido, diff, estadoLinea, fisico, sePuedeQuitar, motivos }) => (
+            {filasVisibles.map(({ d, idx, edit, enviada, recibido, recFis, diff, estadoLinea, fisico, sePuedeQuitar, motivos }) => (
               <div key={d.id} className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1.5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 font-semibold sunmi-text-strong text-[14px] leading-tight break-words">
@@ -391,8 +391,17 @@ export default function TablaDetalleTransferencia({
                   {verRecibida && !inputsHabilitados && (
                     <span>
                       Recibida{" "}
+                      {/* ── LAS DOS EN LA MISMA ESCALA, Y ESO FALTABA ──────────
+                          Decía `recibido`, que está en la escala de la
+                          PRESENTACIÓN, al lado de un "Enviada" en unidades
+                          FÍSICAS. En la #200 se leía "Enviada 72 · Recibida 3"
+                          sobre tres packs de 24 que llegaron completos: la resta
+                          de al lado daba 0 y el par de números decía que faltaba
+                          casi todo.
+                          `recFis` son las mismas físicas con las que se calcula
+                          la diferencia, así que las tres columnas hablan igual. */}
                       <span className="tabular-nums sunmi-text-strong">
-                        {cantidadOGuion(recibido)}
+                        {cantidadOGuion(recFis)}
                       </span>
                     </span>
                   )}
@@ -435,7 +444,16 @@ export default function TablaDetalleTransferencia({
                 {/* El DESGLOSE, no solo el total. "35 unidades" a secas pierde
                     de dónde salieron; "5 PACK x6 + 5 sueltas" es lo que el
                     operador contó y lo que hace verificable el 35. */}
-                {fisico != null && (
+                {/* ── Y SOLO MIENTRAS SE EDITA ──────────────────────────────
+                    Con la columna "Recibida" ya en unidades físicas, este renglón
+                    en modo lectura repetía el mismo número en gris y más abajo:
+                    "Recibida 72" arriba y "= 72 unidades" acá. Si un dato ya está
+                    en la pantalla no se repite, que es el criterio de toda la
+                    tanda.
+                    Mientras se EDITA sí aporta, y es lo único que aporta: ahí el
+                    campo dice 3 —la escala en la que se guarda— y este renglón es
+                    el que explica que eso son 72 unidades de stock. */}
+                {inputsHabilitados && fisico != null && (
                   <div className="text-sm2 sunmi-text-muted">
                     Ingreso físico: {desgloseFisico(d, recibido)} = {fmtCantidad(fisico)} unidades
                   </div>
@@ -498,7 +516,7 @@ export default function TablaDetalleTransferencia({
         {allItems.length > 0 && (
           <div className="hidden md:block overflow-x-auto">
             <SunmiTable headers={headers}>
-              {filasVisibles.map(({ d, idx, edit, enviada, recibido, diff, estadoLinea, tono, fisico, sePuedeQuitar, motivos }) => (
+              {filasVisibles.map(({ d, idx, edit, enviada, recibido, recFis, diff, estadoLinea, tono, fisico, sePuedeQuitar, motivos }) => (
                 <tr
                   key={d.id}
                   className={`align-middle sunmi-row-hover transition-colors ${tono}`}
@@ -545,11 +563,16 @@ export default function TablaDetalleTransferencia({
                           onChange={(e) => onRecibidoChange(idx, enviada, e.target.value)}
                         />
                       ) : (
-                        <span className="font-mono tabular-nums">{cantidadOGuion(recibido)}</span>
+                        // En unidades FÍSICAS, la misma escala que "Enviada" y que
+                        // la diferencia. Ver el comentario de la card.
+                        <span className="font-mono tabular-nums">{cantidadOGuion(recFis)}</span>
                       )}
                       {/* Mismo dato que en la card del teléfono: el número escrito
-                          no es el que mueve stock cuando la línea va en BULTO. */}
-                      {fisico != null && (
+                          no es el que mueve stock cuando la línea va en BULTO.
+                          Y por eso solo mientras se edita: en lectura la celda de
+                          arriba ya dice las unidades, y esto sería el mismo número
+                          repetido debajo. */}
+                      {inputsHabilitados && fisico != null && (
                         <div className="text-xs2 sunmi-text-muted leading-tight">
                           {fmtCantidad(fisico)} unidades
                         </div>

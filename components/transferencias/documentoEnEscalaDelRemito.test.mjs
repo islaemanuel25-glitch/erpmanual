@@ -176,22 +176,67 @@ test("CERRADA · y el excedente REAL se informa como +12, no como un guion", () 
   );
   // Y el faltante que daría la resta cruda tampoco vuelve por otro camino.
   assert.ok(!t.includes("−138") && !t.includes("-138"), `apareció el faltante de la escala cruda: ${t}`);
+  // Y las columnas, en el caso del EXCEDENTE: 156 físicas contra 144, no "6".
+  // Es el otro lado de la misma regla —las dos en la misma escala— y hace falta
+  // porque una diferencia positiva se lee distinto que una en cero.
+  assert.match(
+    t,
+    /Enviada\s+144\s+Recibida\s+156\s+Diferencia\s+\+12/,
+    `las columnas no están en la misma escala sobre un excedente: ${t}`
+  );
 });
 
-test("CERRADA · el desglose nombra la presentación del REMITO, no «PACK» a mano", () => {
-  // `desgloseFisico` escribía la palabra PACK como literal, así que una línea que
-  // salió en cajones se leía "4 PACK x8". Es el mismo error de fondo que la
-  // resta: escribir a mano lo que el snapshot ya sabe.
+test("CERRADA · las dos columnas hablan la MISMA escala, y el desglose no se repite", () => {
+  // ── LO QUE FALTABA DESPUÉS DE ARREGLAR LA RESTA ───────────────────────
+  //
+  // La diferencia ya daba 0, pero "Recibida" seguía mostrando `recibido` —la
+  // escala de la PRESENTACIÓN— al lado de un "Enviada" en unidades físicas. En la
+  // #200 se leía "Enviada 72 · Recibida 3" sobre tres packs de 24 que llegaron
+  // completos: el par de números decía que faltaba casi todo y la resta de al lado
+  // decía 0. Lo primero que se lee no puede contradecir a lo segundo.
   const t = texto(pintarCerrada([cocaDelRemito()]));
+  assert.match(
+    t,
+    /Enviada\s+32\s+Recibida\s+32\s+Diferencia\s+0/,
+    `las tres columnas no están en la misma escala: ${t}`
+  );
+  // Y con la columna ya en físico, el renglón gris de abajo repetía el mismo
+  // número. Si un dato ya está en la pantalla no se repite.
+  assert.ok(
+    !/Ingreso f[ií]sico/.test(t),
+    `el desglose se repite debajo de una columna que ya dice las unidades: ${t}`
+  );
+});
+
+test("EDITANDO · ahí SÍ va el desglose, y nombra la presentación del REMITO", () => {
+  // El desglose no se fue del componente: se fue del modo lectura. Mientras se
+  // edita es lo único que explica la escala, porque el campo dice 4 —lo que se
+  // guarda— y lo que mueve stock son 32.
+  //
+  // Y ahí sigue vivo el otro defecto que este candado defiende: `desgloseFisico`
+  // escribía la palabra PACK como literal, así que una línea despachada en cajones
+  // se leía "4 PACK x8".
+  const linea = cocaDelRemito({ cantidadRecibida: null, subtotalRecibido: null });
+  const html = renderToStaticMarkup(
+    React.createElement(TablaDetalleTransferencia, {
+      item: {
+        id: 9,
+        estado: "Recibiendo",
+        items: [linea],
+        origen: { id: 1, nombre: "depo" },
+        destino: { id: 2, nombre: "mini el 7" },
+        resumen: { costoTotal: 93333.32 },
+      },
+      editItems: construirEditItems([linea]),
+      setEditItems: () => {},
+      inputsHabilitados: true,
+      quitandoId: null,
+    })
+  );
+  const t = texto(html);
+  assert.ok(/Ingreso f[ií]sico/.test(t), `no dibuja el desglose mientras se edita: ${t}`);
   assert.ok(!/\bPACK x8\b/.test(t), `dice PACK sobre una línea que salió en cajones: ${t}`);
   assert.ok(/CAJÓN x8/.test(t), `no nombra la presentación del remito: ${t}`);
-  // Y el desglose tiene que EXISTIR: con la escala cruda, `agrupa` daba falso
-  // —porque `unidadEnviada` es UNIDAD— y el renglón desaparecía justo donde
-  // explicaba de dónde salen las 32.
-  assert.ok(
-    /Ingreso f[ií]sico/.test(t),
-    `no dibuja el desglose físico, que es el renglón que explica la escala: ${t}`
-  );
   assert.ok(/32 unidades/.test(t), `el desglose no llega a las 32 unidades: ${t}`);
 });
 
