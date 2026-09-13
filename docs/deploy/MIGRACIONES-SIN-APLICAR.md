@@ -20,6 +20,62 @@ Ninguna. Producción está en **10 migraciones**, las mismas que el árbol.
 
 ---
 
+## 2026-09-13 — `3eab5c04`, el documento de escritorio lee la escala del remito: CERO migraciones
+
+Producción pasó de `1487c1f6c8e29096e1b022acbc63bc3136fad919` a
+`3eab5c04d7a6795327382095046bc116eca83a11`. **Despliegue solo de código**, con
+corte de **2 segundos**.
+
+El cero por los tres caminos: diff de `prisma/` vacío en el rango y
+`schema.prisma` sin tocar; clasificador con `--desde 1487c1f6…` en «Archivos a
+mirar: 0»; y `migrate deploy` contando **10**, el mismo número que el árbol del
+VPS. `migrate status` de cierre: 10 y «Database schema is up to date!». Bitácora
+de autorizaciones **inexistente**.
+
+### El marcador, y esta vez sí se pudo armar
+
+Al revés del despliegue anterior. La tanda **no agrega** ninguna cadena de
+interfaz nueva —los textos que cambian son números calculados en runtime— pero
+**saca** tres literales de comparación de `presentacionDeLinea`, que dejó de
+preguntar por `unidadMedida` para leer el descriptor.
+
+- **Desaparición:** `"kilogramo"`, anclado con sus comillas — **2 archivos en la
+  imagen vieja, 0 en la nueva**.
+- **Control:** `"Fiambre"` — **8 archivos en las dos**, que prueba que la búsqueda
+  encuentra cuando tiene que encontrar.
+
+Por qué ése y no otro, que es la parte que hay que mirar antes de elegir:
+`kilogramo` también aparece en `VoiceProductWizard.jsx`, pero **dentro de una
+expresión regular**, sin comillas. Anclado con ellas, el único que lo escribía así
+era el archivo que esta tanda cambia. Comprobado con `git grep` contra el commit
+desplegado antes de usarlo.
+
+Y una candidata que se descartó midiendo: `" PACK x"` —el literal que el desglose
+escribía a mano— quedó en **5 archivos en las dos imágenes**. Se fue de la tabla,
+pero `FilaCatalogoRecepcion.jsx` lo sigue escribiendo, así que no discrimina. Es
+la misma trampa que el `my-0` dentro de `!my-0`: la cadena existe por otro motivo.
+
+### La sonda de cascada
+
+**VERDE antes y después**, 1647 reglas en las dos corridas y las cuatro
+mediciones en su valor. La de la tarjeta de producto **no aplica**.
+
+### LO QUE ESTE DESPLIEGUE CORRIGE EN EL PAPEL, Y LO QUE NO TOCA EN LA BASE
+
+Sale el arreglo de `INC-0009`: el documento de una transferencia cerrada dejó de
+restar dos escalas. Las **595 unidades** que informaba como faltantes en 14 líneas
+de las transferencias #186, #198, #200 y #204 —todas con destino mini el 7— eran
+mercadería que está en el local: **el stock siempre estuvo bien y no se tocó
+ningún dato.**
+
+Y sale además el cierre de una trampa que **escribía stock**: el editor de
+escritorio proponía la cantidad física en el campo que se persiste en la escala de
+la presentación, así que un "Guardar cambios" habría convertido 144 unidades en
+144 packs. Nunca se ejerció —cero líneas con esa firma, medido— y ya no se puede.
+
+**El `INC-0008` sigue abierto y este despliegue no lo toca:** el detalle 6519
+conserva sus 6 packs contados sobre un envío sin packs.
+
 ## 2026-09-13 — `1487c1f6`, la línea sin bultos enteros se cuenta por unidad: CERO migraciones
 
 Producción pasó de `660ab51fe2dd9886f09607a8c792edbf8e884e46` a
