@@ -1,6 +1,6 @@
 # Modulo: POS Transferencias
 
-**Última actualización:** 2026-09-13 18:20
+**Última actualización:** 2026-09-13 20:05
 
 ## Ubicacion
 - UI: `app/modulos/pos-transferencias/page.jsx`, `app/modulos/pos-transferencias/nueva/page.jsx`
@@ -97,6 +97,7 @@ model PosTransferenciaDetalle {
 ```
 
 ## Cambios recientes
+- 2026-09-13: fix(transferencias): el criterio es el CLIENTE VINCULADO, y vale en las tres pantallas
 - 2026-09-13: fix(transferencias): el local dado de baja, y una sola puerta para los destinos
 - 2026-07-28: feat(productos): codigo de barras propio por ubicacion
 - 2026-07-27: feat(pos): agregar servicios de importe variable

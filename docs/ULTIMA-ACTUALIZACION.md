@@ -1,23 +1,23 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-13 18:20
+**Fecha:** 2026-09-13 20:05
 
 ## Módulos modificados recientemente
 
 ### pos-transferencias
-- fix(transferencias): el local dado de baja, y una sola puerta para los destinos
+- fix(transferencias): el criterio es el CLIENTE VINCULADO, y vale en las tres pantallas, fix(transferencias): el local dado de baja, y una sola puerta para los destinos
 - Archivos: 1 modificados (1 total)
 
 ### transferencias
-- fix(transferencias): el local dado de baja, y una sola puerta para los destinos, fix(transferencias): todos los locales aparecen, tengan o no movimiento, feat(transferencias): el botón sube al renglón del shell, la edición deja de ser un color y el corte entra al menú
+- fix(transferencias): el criterio es el CLIENTE VINCULADO, y vale en las tres pantallas, fix(transferencias): el local dado de baja, y una sola puerta para los destinos, fix(transferencias): todos los locales aparecen, tengan o no movimiento
 - Archivos: 16 nuevos, 11 modificados (27 total)
 
 
 ## Archivos nuevos desde última sincronización
-- app/api/transferencias/tablero/route.js
-- components/transferencias/BloqueLocal.jsx
-- components/transferencias/tableroMovil.test.mjs
 - app/api/transferencias/acuerdos/route.js
+- app/api/transferencias/tablero/route.js
+- components/transferencias/tableroMovil.test.mjs
+- components/transferencias/BloqueLocal.jsx
 - app/modulos/transferencias/corte-de-semana/page.jsx
 - components/transferencias/AccionDePantalla.jsx
 - components/transferencias/EncabezadoMovil.jsx
