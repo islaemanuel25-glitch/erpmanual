@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { getGrupoIdDeLocal, getLocalesDeGrupo } from "@/lib/grupos";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { relacionesDelDeposito } from "@/lib/transferencias/relacionesDelDeposito";
+import {
+  destinosDeTransferencia,
+  puedeRecibirTransferencias,
+} from "@/lib/transferencias/destinosDeTransferencia";
 
 export async function GET(req) {
   try {
@@ -60,8 +65,26 @@ export async function GET(req) {
       }
 
       if (deposito.es_deposito) {
-        // MODO DEPÓSITO
-        const destinos = await getLocalesDeGrupo(grupoId);
+        // ── MODO DEPÓSITO: LOS DESTINOS SALEN DE LA PUERTA DE TRANSFERENCIAS ──
+        //
+        // Antes era `getLocalesDeGrupo(grupoId)`, que devuelve TODAS las filas
+        // de `GrupoLocal` sin filtrar nada. Eso tenía dos agujeros:
+        //
+        //   · un local DADO DE BAJA se ofrecía como destino de una operación
+        //     nueva — empezar a mover mercadería contra algo que ya no opera;
+        //   · el "EXCLUYE depósitos" que dice su comentario no es un filtro,
+        //     es una creencia: se cumple solo porque los depósitos viven en
+        //     `GrupoDeposito`. El día que uno quede vinculado por las dos
+        //     tablas, el depósito se ofrecería a sí mismo.
+        //
+        // Ahora la lista y el criterio son los MISMOS que usa la lista de
+        // trabajo. Dos pantallas, una puerta.
+        //
+        // `getLocalesDeGrupo` sigue existiendo y NO se tocó: sus otros tres
+        // consumidores la usan para replicar el CATÁLOGO, que es otra pregunta.
+        // El porqué está en `lib/transferencias/destinosDeTransferencia.js`.
+        const { locales } = await relacionesDelDeposito(grupoId);
+        const destinos = destinosDeTransferencia(locales, { depositoLocalId: localId });
 
         return NextResponse.json({
           ok: true,
@@ -133,9 +156,13 @@ export async function GET(req) {
           nombre: l.nombre,
           esDeposito: true,
         })),
+      // El admin elige el destino de la misma lista, así que le corre el mismo
+      // criterio: un local dado de baja no se ofrece por ser admin quien mira.
+      // El `include: { local: true }` de arriba trae la fila entera, así que
+      // `activo` está — que es lo que `puedeRecibirTransferencias` exige.
       locales: g.localesGrupo
         .map((rel) => rel.local)
-        .filter((l) => !l.es_deposito)
+        .filter((l) => puedeRecibirTransferencias(l))
         .map((l) => ({
           id: l.id,
           nombre: l.nombre,

@@ -342,6 +342,26 @@ transferencia completa. Queda en el filtro del reporte.
    locales de la LISTA. Con cuatro relaciones sin configurar y un solo local con
    movimiento, informaba **una**. Medido en producción el 2026-09-13. Está
    congelado en el candado `E2c`.
+
+   **EL LOCAL DADO DE BAJA tiene su propia regla, de dos mitades** (2026-09-13):
+   con movimiento en el período **aparece, y MARCADO** —"Dado de baja", en
+   `danger`—, porque se le debe plata y esconderlo sería perder una cuenta a
+   cobrar sin que nadie se entere; sin movimiento **no aparece**, porque un local
+   que no opera y que además no movió nada es ruido. Candados `E2e`, `E2f` y
+   `E2g`.
+
+   **Y crear transferencia usa AHORA la misma puerta.** Antes ofrecía los
+   destinos con `getLocalesDeGrupo`, que no filtra nada: un local dado de baja se
+   ofrecía como destino de una operación nueva, y el "EXCLUYE depósitos" de su
+   comentario es una creencia que se cumple de rebote porque los depósitos viven
+   en otra tabla. El criterio vive en
+   `lib/transferencias/destinosDeTransferencia.js`, con sus candados.
+
+   **`getLocalesDeGrupo` NO se tocó, y es deliberado:** sus otros tres
+   consumidores la usan para replicar el CATÁLOGO, que es otra pregunta.
+   Filtrar ahí por `activo` dejaría a un local reactivado sin los productos
+   creados durante su baja. Hay un candado que lo dice y que se pone rojo si
+   alguien "unifica" las dos.
 4. **El acuerdo cuelga del PAR depósito–local**, no de `GrupoLocal`: un grupo puede
    tener más de un depósito y colgarlo del local sería ambiguo.
 5. **Sin default en la base para `diaDeCorte`.** Una relación sin fila es "no se

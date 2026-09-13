@@ -298,6 +298,10 @@ export async function GET(req) {
           // El local que existe y esta semana no recibió nada. La pantalla lo
           // dibuja corto: sin rango, sin borde de aviso y sin nada que abrir.
           sinMovimiento: b.sinMovimiento,
+          // DADO DE BAJA. Solo puede llegar acá con movimiento —el inactivo sin
+          // movimiento no entra a la lista—, así que cada vez que este campo
+          // viene en `true` hay plata de por medio y la pantalla lo marca.
+          inactivo: b.inactivo,
           transferencias: b.transferencias.map(resumir),
         })),
       });

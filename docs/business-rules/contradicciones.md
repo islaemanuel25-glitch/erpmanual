@@ -255,3 +255,56 @@ buscando esa forma.
 **La lección:** un candado que verifica que algo *esté* no verifica que *funcione*.
 Cuando lo que se afirma es "esta ruta valida permisos", la forma de la llamada es
 parte de la afirmación.
+
+---
+
+## C-15 — `Local.tipo` y `Local.es_deposito` son el MISMO hecho en dos columnas · **ABIERTA**
+
+Relevada el 2026-09-13, midiendo producción, mientras se arreglaba de qué lista
+salen los destinos de una transferencia. **Anotada aparte a pedido de Emanuel:
+no se mezcló con esa tanda.**
+
+### Los dos campos dicen lo mismo, y uno se DERIVA del otro
+
+`app/api/locales/route.js` —el alta— escribe:
+
+- `tipo: tipo === "deposito" ? "deposito" : "local"`
+- `es_deposito: tipo === "deposito"`
+
+Y el `es_deposito` que manda el formulario lleva al lado el comentario
+**"(se ignora: se deriva de tipo)"**. O sea que al crear un local NO hay dos
+datos: hay uno, guardado dos veces.
+
+### Pero al EDITAR pueden separarse
+
+`app/api/locales/[id]/route.js` usa otra regla:
+
+    esDeposito = body?.tipo === "deposito" || body?.es_deposito === true
+
+Con ese `||`, una edición que mande `tipo: "local"` y `es_deposito: true` deja la
+fila diciendo las dos cosas a la vez. El alta no lo permite; la edición sí.
+
+### Medido en producción el 2026-09-13
+
+Cinco locales, y **los cinco coherentes**: `depo` con `tipo = deposito` y
+`es_deposito = true`; los otros cuatro con `tipo = local` y `es_deposito = false`.
+Así que hoy la contradicción es **posible pero no ocurrida**.
+
+### Por qué importa, y no es estética
+
+Es el caso de la regla 3 de `CLAUDE.md` —un hecho, una columna— al revés: acá
+no hay dos hechos distintos que se estén pisando, hay **uno solo repetido**, y el
+repo ya consulta los dos indistintamente. `lib/grupos.js` y las rutas de
+transferencias preguntan por `es_deposito`; la pantalla de locales muestra
+`tipo`. El día que una fila diga las dos cosas, cada lector va a contestar
+distinto y ninguno va a estar equivocado.
+
+### Lo que hay que decidir cuando se cierre
+
+Cuál manda. Lo más probable es que sea `es_deposito` —es el que consulta el
+código— y que `tipo` quede como etiqueta de presentación derivada, o que se vaya.
+Lo que no puede quedar es la rama de edición con el `||`, que es la única que
+permite la divergencia.
+
+**No se tocó nada de esto**: cambiar cuál manda toca el alta de locales, la
+edición, la pantalla y todo lo que hoy pregunta por cualquiera de los dos.

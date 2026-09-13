@@ -56,6 +56,28 @@ function PildoraSinCorte() {
   );
 }
 
+/**
+ * EL LOCAL QUE YA NO OPERA Y AL QUE IGUAL SE LE ESTÁ COBRANDO.
+ *
+ * Solo puede aparecer con movimiento en el período: el dado de baja sin
+ * movimiento no entra a la lista. O sea que cada vez que esta píldora se dibuja
+ * hay plata de por medio, y ése es exactamente el caso que no se puede descubrir
+ * de casualidad.
+ *
+ * Va en `danger` y no en `warning` para no confundirse con "Sin corte", que
+ * convive con ella en el mismo renglón y dice algo mucho más leve —falta
+ * configurar un día—. Y las dos se distinguen además por el TEXTO, que no
+ * depende de ningún tono: en `sunmiSand` los tres tokens de color son
+ * cercanos, y eso ya está medido en `senalDeEdicion.test.mjs`.
+ */
+function PildoraDeBaja() {
+  return (
+    <span className="shrink-0 rounded-lg border sunmi-border-danger sunmi-text-danger text-xs2 font-semibold px-1.5 py-1 leading-none">
+      Dado de baja
+    </span>
+  );
+}
+
 export default function BloqueLocal({ bloque, abierto = false, onAlternar, onRecibir, money }) {
   const abierta = !bloque?.totalCerrado;
 
@@ -75,6 +97,7 @@ export default function BloqueLocal({ bloque, abierto = false, onAlternar, onRec
             <span className="text-lg2 font-semibold sunmi-text-strong truncate">
               {bloque?.nombre || "—"}
             </span>
+            {bloque?.inactivo && <PildoraDeBaja />}
             {bloque?.sinConfigurar && <PildoraSinCorte />}
           </div>
           <div className="text-xs sunmi-text-muted">{rotuloDeBloque(bloque)}</div>
@@ -121,6 +144,7 @@ export default function BloqueLocal({ bloque, abierto = false, onAlternar, onRec
             <span className="text-lg2 font-semibold sunmi-text-strong truncate">
               {bloque?.nombre || "—"}
             </span>
+            {bloque?.inactivo && <PildoraDeBaja />}
             {bloque?.sinConfigurar && <PildoraSinCorte />}
           </div>
 

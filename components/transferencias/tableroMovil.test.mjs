@@ -251,6 +251,83 @@ test("E2c · EL DEFECTO QUE ESTO CIERRA · el aviso contaba UNO de cuatro sin co
   );
 });
 
+// ── EL LOCAL DADO DE BAJA ─────────────────────────────────────────────────
+//
+// Ningún candado cubría `activo = false`, y en producción no hay ninguno, así
+// que el caso no ocurre en los datos y tampoco ocurría en las pruebas: la
+// definición de un candado verde sobre nada.
+//
+// La regla que decidió Emanuel el 2026-09-13 tiene dos mitades y las dos están
+// acá, porque una sin la otra es un defecto distinto:
+//
+//   · CON movimiento, aparece. Se le debe plata, y esconderlo sería perder una
+//     cuenta a cobrar sin que nadie se entere.
+//   · SIN movimiento, no aparece. Es ruido: un local que no opera y encima no
+//     movió nada esta semana no tiene por qué ocupar un renglón.
+//
+// Y si aparece, VA MARCADO: *"no quiero descubrir de casualidad que le estoy
+// cobrando a un local dado de baja"*.
+
+test("E2e · un local INACTIVO con movimiento aparece, y MARCADO", () => {
+  const bs = bloquesPorLocal({
+    transferencias: [transferencia(1, 4, "Casiano casas", "Recibida", "2026-09-15", 4)],
+    acuerdos: ACUERDOS,
+    unidad: UNIDADES.SEMANA,
+    hoy: MIERCOLES,
+    locales: [
+      { id: 2, nombre: "mini el 7", activo: true },
+      { id: 4, nombre: "Casiano casas", activo: false },
+    ],
+  });
+
+  const baja = bs.find((b) => b.localId === 4);
+  assert.ok(baja, "un local dado de baja CON movimiento no puede desaparecer: se le debe plata");
+  assert.equal(baja.inactivo, true, "el bloque no viene marcado como dado de baja");
+  assert.ok(baja.aPagar > 0, "tiene movimiento, así que tiene importe");
+
+  const salida = html(React.createElement(BloqueLocal, { bloque: bloqueListo(baja), money }));
+  assert.ok(
+    salida.includes("Dado de baja"),
+    "se está cobrando a un local dado de baja y la pantalla no lo dice"
+  );
+});
+
+test("E2f · un local INACTIVO sin movimiento NO aparece", () => {
+  const bs = bloquesPorLocal({
+    transferencias: [transferencia(1, 2, "mini el 7", "Recibida", "2026-09-15", 4)],
+    acuerdos: ACUERDOS,
+    unidad: UNIDADES.SEMANA,
+    hoy: MIERCOLES,
+    locales: [
+      { id: 2, nombre: "mini el 7", activo: true },
+      { id: 4, nombre: "Casiano casas", activo: false },
+      { id: 5, nombre: "Mini unidas", activo: true },
+    ],
+  });
+
+  assert.deepEqual(
+    bs.map((b) => b.localId).sort(),
+    [2, 5],
+    "el inactivo sin movimiento es ruido y no va; los dos activos sí, tengan o no movimiento"
+  );
+});
+
+test("E2g · un local ACTIVO nunca se marca como dado de baja", () => {
+  // La contraprueba de la marca: si se dibujara siempre, el candado de arriba
+  // pasaría igual y no estaría afirmando nada.
+  const bs = bloquesPorLocal({
+    transferencias: [transferencia(1, 2, "mini el 7", "Recibida", "2026-09-15", 4)],
+    acuerdos: ACUERDOS,
+    unidad: UNIDADES.SEMANA,
+    hoy: MIERCOLES,
+    locales: [{ id: 2, nombre: "mini el 7", activo: true }],
+  });
+
+  assert.equal(bs[0].inactivo, false);
+  const salida = html(React.createElement(BloqueLocal, { bloque: bloqueListo(bs[0]), money }));
+  assert.ok(!salida.includes("Dado de baja"), "marcó de baja a un local que opera");
+});
+
 test("E2d · el orden es por importe, y los que están en cero van al final", () => {
   const bs = bloquesPorLocal({
     transferencias: [
