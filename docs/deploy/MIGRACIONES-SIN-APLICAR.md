@@ -20,6 +20,54 @@ Ninguna. Producción está en **11 migraciones**, las mismas que el árbol.
 
 ---
 
+## 2026-09-13 — `78999b8e`, todos los locales en la lista: CERO migraciones
+
+Producción pasó de `7375ac9cb24559259150bf9ed8ae59b4329f9bf5` a
+`78999b8e560b2104efab39c8c1e400bb7f88953e`. **Despliegue solo de código**, con
+corte de **2 segundos**. Segundo del día, y encadenarlos lo pidió Emanuel: la
+corrección arreglaba una lista incompleta, no un detalle.
+
+El cero por **tres** caminos, que es lo que lo hace un hecho y no una impresión:
+la sección de pendientes de este archivo estaba vacía; el `git diff` de
+`prisma/migrations` en el rango no devuelve nada y `schema.prisma` no se tocó; y
+el clasificador con `--desde 7375ac9c…` informa «Archivos a mirar: 0».
+
+**Y el conteo confirmó que la imagen no estaba atrasada**, que es la otra cara
+del mismo chequeo: `migrate deploy` informó **11 migrations found**, el mismo
+número que el árbol, antes de decir "No pending migrations to apply". Si la
+imagen hubiera sido la vieja, habría informado menos de 11 — ése es el defecto
+del 2026-08-10 y por eso el conteo se mira aunque el despliegue no traiga nada.
+`migrate status` de cierre: 11 y "Database schema is up to date!".
+
+Bitácora de autorizaciones: **inexistente**. El clasificador se volvió a correr
+con `--desde` y no con `--vps`, por el motivo ya anotado arriba.
+
+### Qué sale
+
+Los locales SIN movimiento en el período ahora **aparecen**. Antes la lista se
+armaba desde las transferencias, así que un local sin envíos de la semana no
+existía para la pantalla — y con él se iba su marca de "sin corte", porque el
+aviso de arriba cuenta los locales de la LISTA.
+
+Medido en producción antes de tocar nada: **cuatro locales, y uno solo con
+movimiento** en la semana del 13 al 19. O sea que el aviso informaba una relación
+sin configurar de cuatro, y las otras tres no estaban en ninguna parte.
+Verificado de nuevo después de desplegar, contra la base: la lista de locales
+devuelve los cuatro —Casiano casas, mini el 7, Minimarket ayala y Mini unidas— y
+solo mini el 7 tiene transferencias (cuatro) en el período.
+
+### El marcador, con su control
+
+`"Sin transferencias en el período"` —texto de interfaz, no identificador— da
+**0 archivos en la imagen vieja y 2 en la nueva**, buscado con `grep -rlF` en
+contenedores descartables. Control `"Sin corte"`, que ya existía: **2 en las
+dos**, así que la búsqueda anda.
+
+Dos candidatos se **descartaron y conviene saber por qué**: `sinMovimiento` ya
+aparecía en un archivo del commit viejo, y `relacionesDelDeposito` no existía
+pero es un IDENTIFICADOR — el build lo minifica, así que un vacío suyo no
+afirmaría nada, ni a favor ni en contra.
+
 ## 2026-09-13 — `7375ac9c`, el corte de semana: UNA migración, APLICADA
 
 Producción pasó de `94432c429c52cb6d2baa2ce88d9efcb6bf8a308d` a
