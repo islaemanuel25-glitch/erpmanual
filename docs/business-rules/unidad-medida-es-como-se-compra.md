@@ -120,6 +120,20 @@ el bloque de adopción de las dos superficies el 2026-09-12.
 Es el mismo error las dos veces: **tratar `unidad_medida` como si fuera la escala
 de la operación que se está haciendo.** No lo es en ninguna de las dos.
 
+**Tercera, en el documento de una transferencia cerrada** —2026-09-13—. La píldora
+de presentación del detalle preguntaba primero `unidadMedida` y después
+`unidadEnviada` crudo, y decía **"Unidad"** sobre una línea despachada como 4 CAJÓN
+x8. En el mismo renglón, la diferencia se calculaba con esas mismas columnas y
+daba **−28** sobre una línea que llegó completa: el papel informaba mercadería
+faltante que estaba en el local. Son **595 unidades** en 14 líneas de 4
+transferencias cerradas, y el stock estaba bien en todas.
+
+Lo que agrega esta tercera vez: **el error no necesita la ficha para ocurrir.**
+Acá `unidadEnviada` —que es un dato de la línea, no del producto— también miente,
+porque la venta interna consolida los packs a unidades antes de guardar. La única
+fuente que contesta bien es el snapshot, y se lee con `descriptorDeEnvio`. Está en
+[`INC-0009`](../incidents/INC-0009-el-documento-resta-dos-escalas.md).
+
 ## Lo que queda abierto
 
 La ruta `app/api/transferencias/adoptar-presentacion/route.js` sigue existiendo y

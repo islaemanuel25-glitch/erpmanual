@@ -37,12 +37,17 @@ import {
 } from "./detallePresentacion";
 import {
   ESTADO_LINEA,
+  escalaFisicaDeLinea,
   estadoDeLinea,
+  fisicasEnviadasDe,
+  fisicasRecibidasDe,
   motivoSigueSiendoValido,
   motivosParaDiferencia,
   sePuedeQuitarLinea,
 } from "@/lib/transferencias/recepcionUI";
-import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
+// `unidadesFisicasDe` se importaba acá y se llamaba con las columnas CRUDAS. Ver
+// el bloque de la diferencia: eso era el defecto, no un detalle de estilo.
+import { descriptorDeEnvio, nombreDePresentacion } from "@/lib/transferencias/presentacionEnvio";
 
 function num(v) {
   const n = Number(v);
@@ -79,11 +84,19 @@ function importeDeLinea(d) {
  * operador contó y lo que permite verificarlo sin rehacer la cuenta.
  */
 function desgloseFisico(d, recibido) {
-  const factor = Number(d.factorPack || 1);
+  // ── LA PRESENTACIÓN SE DERIVA, NO SE ESCRIBE ──────────────────────────
+  //
+  // Decía `PACK x${d.factorPack}`, con la palabra a mano y el factor del catálogo
+  // de HOY. Con eso una línea que salió en cajones se leía "4 PACK x8", y si
+  // alguien editaba el producto después del envío el factor del papel cambiaba.
+  //
+  // `nombreDePresentacion` sobre el descriptor contesta las dos cosas —"CAJÓN x8"—
+  // leyendo el snapshot de cómo salió. Es la misma función que rotula en el
+  // teléfono, así que los dos documentos dicen lo mismo de la misma línea.
+  const bultos = `${fmtCantidad(recibido)} ${nombreDePresentacion(descriptorDeEnvio(d))}`;
   const sueltas = num(d.recibidoUnidadesSueltas);
-  const packs = `${fmtCantidad(recibido)} PACK x${factor}`;
-  if (!sueltas) return packs;
-  return `${packs} + ${fmtCantidad(sueltas)} ${sueltas === 1 ? "suelta" : "sueltas"}`;
+  if (!sueltas) return bultos;
+  return `${bultos} + ${fmtCantidad(sueltas)} ${sueltas === 1 ? "suelta" : "sueltas"}`;
 }
 
 // ── LOS MOTIVOS YA NO SON UNA LISTA FIJA ───────────────────────────────────
@@ -178,19 +191,34 @@ export default function TablaDetalleTransferencia({
     //
     // Se mide con `milesimasFisicas`, la misma del servidor. No hay una fórmula
     // acá.
-    const envFis = unidadesFisicasDe({
-      cantidad: enviada, sueltas: 0, unidad: d.unidadEnviada, factorPack: d.factorPack,
-    });
+    //
+    // ── Y LA ESCALA SALE DEL SNAPSHOT, QUE ES EL DEFECTO QUE ESTO CIERRA ──
+    //
+    // Acá se llamaba a `unidadesFisicasDe` pasándole las columnas CRUDAS
+    // `d.unidadEnviada` y `d.factorPack`. Y `unidadEnviada` dice `UNIDAD` en casi
+    // todas estas líneas, porque la venta interna del POS consolida a físicas
+    // antes de guardar: con eso el factor es 1, y los 4 CAJÓN x8 que la recepción
+    // persistió en `recibido` se leían como 4 unidades contra 32 enviadas.
+    //
+    // Producción, transferencia #204: "Enviada 32 · Recibida 4 · Diferencia −28"
+    // sobre una línea que llegó COMPLETA. Y en la #198, con sueltas de por medio,
+    // `milesimasFisicas` devolvía null y la diferencia salía "—" sobre un
+    // excedente real de 12 unidades que el servidor ya había movido.
+    //
+    // `fisicasEnviadasDe` y `fisicasRecibidasDe` son las funciones de este mismo
+    // módulo que leen el descriptor, o sea el snapshot cuando la línea lo tiene y
+    // la reconstrucción del catálogo cuando es anterior. Las usaba el teléfono y
+    // no esta tabla: el defecto no era la falta de una función, era entrar por la
+    // puerta equivocada. Ver `INC-0009`.
+    const envFis = fisicasEnviadasDe(d);
     const recFis =
       recibido == null
         ? null
-        : unidadesFisicasDe({
+        : fisicasRecibidasDe(d, {
             cantidad: recibido,
             // Mientras se edita, las sueltas persistidas son las que hay: esta
             // tabla ya no es el editor de la recepción.
             sueltas: d.recibidoUnidadesSueltas,
-            unidad: d.unidadEnviada,
-            factorPack: d.factorPack,
           });
     const diff = envFis == null || recFis == null ? null : recFis - envFis;
     // `estadoLinea` y no `estado`: el `estado` de arriba es el de la
@@ -215,16 +243,29 @@ export default function TablaDetalleTransferencia({
     // `previsualizarIngresoFisico` no las conocía y por eso mostraba 30 donde
     // había 35. Se muestra solo cuando aporta —en BULTO con factor > 1—, que es
     // el criterio que tenía.
-    const agrupa = d.unidadEnviada === "BULTO" && Number(d.factorPack || 1) > 1;
+    //
+    // Y esta pregunta también salía de las columnas crudas, con el mismo efecto
+    // dado vuelta: `unidadEnviada` en `UNIDAD` daba falso, así que el renglón que
+    // EXPLICA la escala —"4 CAJÓN x8 = 32 unidades"— desaparecía justo en las
+    // líneas donde los dos números no coinciden. El criterio no cambia: agrupa y
+    // con factor mayor que uno. Lo que cambia es de dónde sale la respuesta.
+    const escalaDeLaLinea = escalaFisicaDeLinea(d);
+    const agrupa = escalaDeLaLinea.agrupa && Number(escalaDeLaLinea.factorPack || 1) > 1;
     const fisico = agrupa && recFis != null && recFis > 0 ? recFis : null;
     const sePuedeQuitar = sePuedeQuitarLinea({ linea: d, puedeRecibir: inputsHabilitados });
     // Qué motivos ofrece ESTA línea. Lista vacía = no se le pide ninguno, y hay
     // dos razones: no hay diferencia, o la línea se agregó en recepción y su
     // procedencia ya está registrada con autor y fecha. La decisión no se toma
     // acá: sale de `exigeMotivo`, la misma que aplica el servidor.
+    //
+    // Y se preguntan con las FÍSICAS, que es la tercera vez que aparece la misma
+    // mezcla en este archivo: `enviada` es física y `edit.recibido` está en la
+    // presentación, así que sobre una línea agrupada la lista se elegía comparando
+    // dos escalas. El signo decide QUÉ motivos se ofrecen —Faltante o Sobrante—,
+    // y con la mezcla ofrecía "Faltante" sobre una línea completa.
     const motivos = motivosParaDiferencia({
-      enviada,
-      recibida: edit?.recibido,
+      enviada: envFis,
+      recibida: recibidoCrudo == null ? null : recFis,
       agregadoEnRecepcion: d.agregadoEnRecepcion,
     });
     return {

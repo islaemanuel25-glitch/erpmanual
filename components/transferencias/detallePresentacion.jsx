@@ -10,6 +10,11 @@
 
 import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import { signoDeDiferencia } from "@/lib/transferencias/recepcionUI";
+import {
+  PRESENTACION,
+  agrupa,
+  descriptorDeEnvio,
+} from "@/lib/transferencias/presentacionEnvio";
 
 export function fmtMoneda(n) {
   if (n == null) return "—";
@@ -85,14 +90,26 @@ export function fmtFechaHoraAR(iso) {
 export function presentacionDeLinea(d = {}) {
   if (d.esFiambreFijo) return "Fiambre";
 
-  const unidadMedida = typeof d.unidadMedida === "string" ? d.unidadMedida.toLowerCase() : "";
-  const unidadEnviada = typeof d.unidadEnviada === "string" ? d.unidadEnviada.toUpperCase() : "";
-
-  if (unidadMedida === "pieza" || unidadMedida === "piezas") return "Pieza";
-  if (unidadMedida === "kg" || unidadMedida === "kilo" || unidadMedida === "kilogramo") return "Kg";
-
-  if (unidadEnviada === "BULTO") return "Bulto";
-  if (unidadEnviada === "UNIDAD") return "Unidad";
+  // ── LA PRESENTACIÓN SALE DEL DESCRIPTOR, NO DE LA FICHA NI DE LA COLUMNA ──
+  //
+  // Acá se preguntaba primero `unidadMedida` —cómo se COMPRA el producto— y
+  // después `unidadEnviada` crudo. Las dos mienten sobre cómo salió la línea, y
+  // es el error que `unidad-medida-es-como-se-compra.md` describe: en la
+  // transferencia #204 la píldora decía **Unidad** sobre una línea despachada
+  // como 4 CAJÓN x8, porque "cajon" no matcheaba ninguna de las ramas de arriba
+  // y `unidadEnviada` dice UNIDAD —la venta interna consolida a físicas—.
+  //
+  // El descriptor contesta con el snapshot cuando la línea lo tiene y reconstruye
+  // del catálogo cuando es anterior, que es lo que hacía esta función pero bien.
+  //
+  // **El vocabulario de la píldora NO cambia** —Bulto, Unidad, Kg, Pieza— y por
+  // eso tampoco cambia el color, que se decide con `label === "Bulto"`. Lo único
+  // que cambia es cuál de los cuatro le toca a cada línea.
+  const envio = descriptorDeEnvio(d);
+  if (envio.presentacion === PRESENTACION.PIEZA) return "Pieza";
+  if (envio.presentacion === PRESENTACION.KG) return "Kg";
+  if (agrupa(envio.presentacion)) return "Bulto";
+  if (envio.presentacion === PRESENTACION.UNIDAD) return "Unidad";
 
   // Fallback legible: nunca "undefined" en pantalla.
   return "—";
