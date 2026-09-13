@@ -26,6 +26,53 @@ empezada.** Último commit de la tanda: `464b8e16`.
 
 ---
 
+## LA GRILLA DE ESTE PROYECTO ES `1rem = 14 px`, Y ESO CAMBIA TODA ESPECIFICACIÓN
+
+**Esto vale para cualquier pantalla, no solo para ésta.** Está acá porque acá se
+cobró: la especificación de los tres frames V28/V28b/V29 vino con valores exactos
+en píxeles, y ninguno de sus espaciados caía en la escala.
+
+Figma dibuja por defecto sobre una grilla de **16**, y este proyecto redefine
+`base` a **14** — medido, no deducido: la sonda de cascada lo informa en cada
+despliegue. Así que la escala de Tailwind acá aterriza en **3,5 · 7 · 10,5 · 14 ·
+17,5 · 21**, y los múltiplos de 16 quedan sistemáticamente entre dos escalones.
+
+**La consecuencia práctica, y es la que evita la pregunta: cuando llegue una
+especificación con números exactos, se AJUSTAN a la escala del proyecto sin
+preguntar.** Esos números casi nunca son una decisión de diseño; son el default de
+la herramienta. Lo que sí se hace es decir en el informe qué se corrió y cuánto.
+
+### La tabla de ajuste que se usó acá, para que la próxima sea igual
+
+Espaciados: 16 → 14 (`p-4`) · 14 → 14 (`p-4`) · 13 → 14 (`p-4`) · 12 → 12,25
+(`p-3.5`) · 10 → 10,5 (`p-3`) · 9 → 8,75 (`p-2.5`) · 8 → 7 (`p-2`) · 7 → 7
+(`p-2`) · 6 → 5,25 (`p-1.5`) · 4 → 3,5 (`p-1`).
+
+Radios: 8 y 9 → 7 (`rounded-lg`) · 11 → 10,5 (`rounded-xl`) · 14 → 14
+(`rounded-xl2`, que ya estaba en el config).
+
+**El 9 de los radios se ajusta a 7 y no a 10,5, aunque 10,5 esté 0,5 px más
+cerca.** No es una cuenta: 9 es el radio de los botones y los chips de la
+especificación, y todos los botones del repo son `rounded-lg`. Un botón nuevo con
+otro radio que el resto se ve; medio píxel no.
+
+### Los tamaños de letra son el caso contrario y SÍ entran al config
+
+Un espaciado corrido 1,25 px no se ve. Un importe de 28 mostrado en 22 sí — son
+seis píxeles en el número más grande de la pantalla. Por eso de esta
+especificación entraron tres tamaños nuevos a `tailwind.config.js` —`sm3: 13`,
+`lg3: 19`, `xl3: 28`— y ningún espaciado ni radio.
+
+**Y entran los dos lados el mismo día:** un `fontSize` nuevo en el config tiene
+que sumarse a `ESCALA` en `lib/sunmi/claseNegociada.js` en el mismo commit, o el
+kit no lo reconoce como tamaño y la pieza vuelve a imponer el suyo.
+
+**Por qué al config y no `text-[13px]` en la pantalla:** el trinquete
+(`scripts/hardcodeo.mjs`) cuenta las medidas mágicas, y con razón — el día que el
+diseño mueva ese tamaño habría que buscarlo archivo por archivo.
+
+---
+
 ## EL PROBLEMA QUE ESTO VIENE A RESOLVER
 
 Hoy la pantalla es un formulario de reporte: dos fechas, un estado y "Generar
@@ -125,9 +172,50 @@ enviado o lo recibido de una transferencia.
 
 ---
 
-## LO QUE FALTA: LA PANTALLA
+## LA PANTALLA — CONSTRUIDA EL 2026-09-13
 
-Nada de esto está empezado.
+Lo de abajo es la especificación que se implementó, y queda como está porque es
+contra lo que se compara. Lo que se construyó:
+
+- `components/transferencias/TableroMovil.jsx` — la pantalla: encabezado, chips,
+  y las dos vistas. Se monta en `app/modulos/transferencias/page.jsx` abajo de
+  1024 px; **de 1024 para arriba no cambia nada** y el reporte se dibuja con las
+  mismas clases de siempre.
+- `ChipsDePeriodo.jsx`, `BloqueLocal.jsx`, `CabeceraDeCuenta.jsx`,
+  `FilaTransferenciaLocal.jsx`, `FilaCorteDeSemana.jsx`, `EncabezadoMovil.jsx`.
+- `app/modulos/transferencias/corte-de-semana/page.jsx` — el V29.
+- `app/api/transferencias/tablero/route.js` y
+  `app/api/transferencias/acuerdos/route.js`.
+- `lib/transferencias/rotulosDeTransferencia.js` — los textos que las dos vistas
+  comparten, en un solo lugar.
+- Candados: `components/transferencias/tableroMovil.test.mjs`, 12, con las tres
+  verificaciones que Emanuel pidió y una contraprueba permanente.
+
+### Lo que se decidió SIN DISEÑO, y conviene revisar
+
+1. **El bloque abre por toque en toda la fila**, no con un control aparte. Por eso
+   la píldora "Sin corte" es un `span` y no un enlace: un interactivo adentro de
+   otro no es válido.
+2. **El camino a la pantalla de corte** es un aviso arriba de la lista que aparece
+   solo cuando hay relaciones sin configurar. No hay entrada permanente en el
+   menú.
+3. **El rango, en la vista del local, va en la tarjeta de cuenta**, debajo del
+   importe — mismo criterio que en el bloque del depósito.
+4. **El rótulo del importe sigue al chip**: "A pagar hoy" / "esta semana" / "este
+   mes". La especificación lo escribía fijo en la semana.
+5. **El denominador del avance** —"20 de 56 revisados"— son las líneas ORIGINALES,
+   sin las agregadas en recepción. La especificación traía dos números distintos
+   (56 ítems, 77 revisables) que no se pueden reconciliar.
+6. **El chip "Otro" ignora el día de corte**: el rango lo eligió el usuario y vale
+   igual para todos los locales (`rangoFijo` en `bloquesPorLocal`).
+7. **El permiso del PUT de acuerdos es `transferencias.crear`**, el del depósito.
+   No se inventó uno nuevo.
+8. **Tres clases nuevas del kit**: `.sunmi-border-warning`, `.sunmi-border-accent`
+   —solo color, como la de `danger`— y el color `ghost` de `SunmiButton`, que es
+   la ausencia de relleno. Sin ese último, el botón "Cambiar" transparente con
+   borde en accent solo se podía escribir peleando contra el orden de la hoja.
+
+### La especificación implementada
 
 ### Vista DEPÓSITO (Figma V28, nodo `230:478`)
 
