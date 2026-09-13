@@ -64,6 +64,15 @@ export const SEMBRADO = Object.freeze({
   //
   // No entra en ninguna transferencia, así que el arnés de recepción no lo ve.
   destinoSinMovimiento: "Local V15 sin movimiento",
+  // ── EL LOCAL QUE NO OPERA POR TRANSFERENCIA ────────────────────────────
+  //
+  // Existe en el grupo y está activo, pero NO tiene cliente vinculado: al que
+  // no tiene ese vínculo se le VENDE y nada más. Es el caso del local recién
+  // cargado, y tiene que quedar FUERA de la lista de trabajo y de los destinos.
+  //
+  // Sin él, ese filtro no se podría ejercer en el navegador: los otros dos
+  // locales sembrados sí operan, así que el caso nunca ocurriría.
+  destinoSinVinculo: "Local V15 sin vínculo",
   rol: "Recepción V15",
   usuario: "v15@local",
 });
@@ -81,7 +90,14 @@ if (grupoViejo) {
     // quedara de una corrida anterior, la siembra siguiente lo encontraría
     // duplicado y la lista mostraría dos locales con el mismo nombre.
     where: {
-      nombre: { in: [SEMBRADO.deposito, SEMBRADO.destino, SEMBRADO.destinoSinMovimiento] },
+      nombre: {
+        in: [
+          SEMBRADO.deposito,
+          SEMBRADO.destino,
+          SEMBRADO.destinoSinMovimiento,
+          SEMBRADO.destinoSinVinculo,
+        ],
+      },
     },
     select: { id: true },
   });
@@ -93,6 +109,10 @@ if (grupoViejo) {
   await prisma.stockLocal.deleteMany({ where: { localId: { in: ids } } });
   await prisma.productoLocal.deleteMany({ where: { localId: { in: ids } } });
   await prisma.productoBase.deleteMany({ where: { grupoId: grupoViejo.id } });
+  // Los clientes vinculados a esos locales. Van ANTES que los locales: el
+  // vínculo es `onDelete: SetNull`, así que borrar el local dejaría la ficha
+  // huérfana en la base de pruebas y la siembra siguiente crearía otra al lado.
+  await prisma.cliente.deleteMany({ where: { grupoId: grupoViejo.id } });
   await prisma.usuario.deleteMany({ where: { email: SEMBRADO.usuario } });
   await prisma.rol.deleteMany({ where: { nombre: SEMBRADO.rol } });
   await prisma.local.deleteMany({ where: { id: { in: ids } } });
@@ -119,9 +139,32 @@ const destino = await prisma.local.create({
 const sinMovimiento = await prisma.local.create({
   data: { nombre: SEMBRADO.destinoSinMovimiento, tipo: "local", es_deposito: false },
 });
+// Y el que NO opera por transferencia: se queda sin cliente vinculado.
+const sinVinculo = await prisma.local.create({
+  data: { nombre: SEMBRADO.destinoSinVinculo, tipo: "local", es_deposito: false },
+});
 await prisma.grupoDeposito.create({ data: { grupoId: grupo.id, localId: deposito.id } });
 await prisma.grupoLocal.create({ data: { grupoId: grupo.id, localId: destino.id } });
 await prisma.grupoLocal.create({ data: { grupoId: grupo.id, localId: sinMovimiento.id } });
+await prisma.grupoLocal.create({ data: { grupoId: grupo.id, localId: sinVinculo.id } });
+
+// ── LOS CLIENTES VINCULADOS, QUE SON LO QUE DICE QUE UN LOCAL OPERA ───────
+//
+// `Cliente.localVinculadoId` es el criterio: sin ese vínculo, al local se le
+// VENDE y no aparece en transferencias. Los dos primeros lo tienen; el tercero
+// no, a propósito.
+//
+// Sin esto el sembrado dejaría el tablero VACÍO —ningún local operaría— y el
+// arnés se caería sin decir por qué.
+for (const local of [destino, sinMovimiento]) {
+  await prisma.cliente.create({
+    data: {
+      grupoId: grupo.id,
+      nombre: `Cliente de ${local.nombre}`,
+      localVinculadoId: local.id,
+    },
+  });
+}
 
 // El rol lleva `["*"]` porque lo que se está verificando es la PANTALLA, no el
 // sistema de permisos. El arnés además firma los permisos en el token.
@@ -312,6 +355,7 @@ log(`  transferencia : ${transferencia.id}`);
 log(`  usuario       : ${usuario.id}  (${SEMBRADO.usuario})`);
 log(`  local destino : ${destino.id}  (${SEMBRADO.destino})`);
 log(`  local en cero : ${sinMovimiento.id}  (${SEMBRADO.destinoSinMovimiento}) — sin transferencias, a propósito`);
+log(`  local sin vínculo: ${sinVinculo.id}  (${SEMBRADO.destinoSinVinculo}) — SIN cliente vinculado: no opera por transferencia`);
 log(`  local origen  : ${deposito.id}  (${SEMBRADO.deposito})`);
 log("");
 log("  El arnés se corre con esos tres números:");

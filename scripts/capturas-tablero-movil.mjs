@@ -359,6 +359,16 @@ await afirmar(
   "el aviso cuenta los DOS, no solo el que tuvo movimiento"
 );
 
+// ── EL QUE NO OPERA POR TRANSFERENCIA NO ESTÁ ───────────────────────────
+//
+// El sembrado crea un tercer local, activo y en el grupo, pero SIN cliente
+// vinculado. A ése se le VENDE y nada más, así que esta pantalla no tiene nada
+// que decirle — y por eso tampoco entra en la cuenta del aviso, que dice DOS.
+await afirmar(
+  !(await hayTexto("Local V15 sin vínculo")),
+  "apareció un local sin cliente vinculado: a ése se le vende, no se le transfiere"
+);
+
 // Y el que está en cero no compite: va al final, después del que sí recibió.
 await afirmar(
   await evaluar(`(() => {
@@ -391,6 +401,12 @@ await afirmar(await hayTexto("Arranca"), "se ve qué día arranca hoy");
 await afirmar(
   await hayTexto("Local V15 sin movimiento"),
   "la pantalla de corte también lista al local que no recibió nada: el acuerdo es de la RELACIÓN, no del movimiento"
+);
+// Pero NO al que no opera por transferencia: un local al que se le vende no
+// tiene ningún corte de pago que acordar.
+await afirmar(
+  !(await hayTexto("Local V15 sin vínculo")),
+  "la pantalla de corte ofrece configurar un local que no opera por transferencia"
 );
 const marcasAntes = await marcasSinConfigurar();
 await afirmar(marcasAntes === 2, `las dos relaciones arrancan sin configurar (son ${marcasAntes})`);

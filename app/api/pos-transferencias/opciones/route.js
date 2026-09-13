@@ -145,6 +145,24 @@ export async function GET(req) {
       },
     });
 
+    // ── EL VÍNCULO CON EL CLIENTE, TAMBIÉN PARA EL ADMIN ───────────────────
+    //
+    // `include: { local: true }` trae la fila entera de `Local`, así que `activo`
+    // y `es_deposito` están — pero el vínculo NO vive en esa tabla: vive en
+    // `Cliente.localVinculadoId`. Sin resolverlo acá,
+    // `puedeRecibirTransferencias` —que lo exige— dejaría al admin sin un solo
+    // destino en todos los grupos.
+    //
+    // Una sola consulta para todos los grupos, no una por grupo.
+    const vinculados = new Set(
+      (
+        await prisma.cliente.findMany({
+          where: { localVinculadoId: { not: null } },
+          select: { localVinculadoId: true },
+        })
+      ).map((c) => c.localVinculadoId)
+    );
+
     const payload = grupos.map((g) => ({
       id: g.id,
       nombre: g.nombre,
@@ -157,12 +175,13 @@ export async function GET(req) {
           esDeposito: true,
         })),
       // El admin elige el destino de la misma lista, así que le corre el mismo
-      // criterio: un local dado de baja no se ofrece por ser admin quien mira.
-      // El `include: { local: true }` de arriba trae la fila entera, así que
-      // `activo` está — que es lo que `puedeRecibirTransferencias` exige.
+      // criterio: ni un local dado de baja ni uno sin cliente vinculado se
+      // ofrecen por ser admin quien mira.
       locales: g.localesGrupo
         .map((rel) => rel.local)
-        .filter((l) => puedeRecibirTransferencias(l))
+        .filter((l) =>
+          puedeRecibirTransferencias({ ...l, tieneClienteVinculado: vinculados.has(l.id) })
+        )
         .map((l) => ({
           id: l.id,
           nombre: l.nombre,

@@ -49,6 +49,7 @@ import {
   estaRecibida,
 } from "@/lib/transferencias/bloquesPorLocal";
 import { relacionesDelDeposito } from "@/lib/transferencias/relacionesDelDeposito";
+import { destinosDeTransferencia } from "@/lib/transferencias/destinosDeTransferencia";
 
 /** `YYYY-MM-DD`, que es la forma en la que `periodoDePago` compara. */
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -278,7 +279,19 @@ export async function GET(req) {
         acuerdos,
         unidad,
         rangoFijo,
-        locales,
+        // ── LA MISMA PUERTA QUE OFRECE LOS DESTINOS ─────────────────────
+        //
+        // No es "los locales del grupo": es "los locales que operan por
+        // transferencia con este depósito". Un local sin cliente vinculado se
+        // le VENDE y nada más, así que una lista de trabajo de transferencias
+        // no tiene nada que decirle — y un local recién cargado no aparece acá
+        // hasta que se le vincule su cliente.
+        //
+        // Es literalmente la misma función que filtra los destinos al crear una
+        // transferencia. Si fueran dos criterios parecidos, el día que uno
+        // cambie habría un local al que se le puede transferir y que no aparece
+        // en la lista, o al revés.
+        locales: destinosDeTransferencia(locales, { depositoLocalId: deposito?.localId }),
       });
       return NextResponse.json({
         ok: true,

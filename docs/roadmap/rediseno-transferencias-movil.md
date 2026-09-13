@@ -350,6 +350,27 @@ transferencia completa. Queda en el filtro del reporte.
    que no opera y que además no movió nada es ruido. Candados `E2e`, `E2f` y
    `E2g`.
 
+   **EL CRITERIO QUE DEFINE LA PANTALLA, encontrado el 2026-09-13: el CLIENTE
+   VINCULADO.** Un local opera con el depósito por TRANSFERENCIA solo si tiene un
+   cliente con `localVinculadoId` apuntándolo. Sin ese vínculo **se le VENDE y
+   nada más**, y eso no es un defecto: ese local no lleva su stock en este
+   sistema, así que no hay a dónde sumarle mercadería.
+
+   Se buscó como un campo del modelo `Local` —en `tipo`, en `activo`— y no está
+   ahí. Los DATOS lo dijeron antes que el código: los dos locales que recibían
+   transferencias eran exactamente los dos que tenían cliente vinculado, y los
+   dos que no, acumulaban **cero transferencias en toda su historia**.
+
+   Y es el mismo dato que ENCIENDE el remito: `/api/pos-ventas/crear` lo consulta
+   para decidir si una venta del depósito genera su transferencia. Medido: desde
+   que un local tiene cliente vinculado, **el 100 % de sus ventas generó remito**
+   —140 de 140 en uno, 66 de 66 en el otro—. O sea que el filtro no inventa una
+   regla: nombra la que el sistema ya venía aplicando.
+
+   **Se nota el día que se carga un local nuevo:** hasta que no se le vincule su
+   cliente, no aparece en transferencias ni se ofrece como destino. Candados
+   `E2h` y los dos de `destinosDeTransferencia`.
+
    **Y crear transferencia usa AHORA la misma puerta.** Antes ofrecía los
    destinos con `getLocalesDeGrupo`, que no filtra nada: un local dado de baja se
    ofrecía como destino de una operación nueva, y el "EXCLUYE depósitos" de su

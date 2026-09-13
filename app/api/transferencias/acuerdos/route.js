@@ -29,6 +29,7 @@ import { checkPerm } from "@/lib/authorize";
 import { resolveVistaOperativa } from "@/lib/grupos";
 import { acuerdoDeLocal } from "@/lib/transferencias/bloquesPorLocal";
 import { relacionesDelDeposito } from "@/lib/transferencias/relacionesDelDeposito";
+import { destinosDeTransferencia } from "@/lib/transferencias/destinosDeTransferencia";
 import {
   UNIDADES,
   esDiaDeCorteValido,
@@ -48,7 +49,17 @@ async function relacionesDelGrupo(grupoId) {
     select: { localId: true, diaDeCorte: true },
   });
 
-  const relaciones = locales
+  // ── LA MISMA PUERTA, TAMBIÉN ACÁ ────────────────────────────────────────
+  //
+  // El corte de semana es el acuerdo de PAGO de las transferencias. Un local
+  // que no opera por transferencia —sin cliente vinculado— no tiene ningún corte
+  // que acordar, así que ofrecer una fila para configurárselo sería ofrecer una
+  // decisión que no se usa en ninguna parte.
+  //
+  // Es el mismo criterio que decide quién aparece en la lista de trabajo y quién
+  // se ofrece como destino: las tres pantallas preguntan lo mismo en el mismo
+  // lugar.
+  const relaciones = destinosDeTransferencia(locales, { depositoLocalId: deposito.localId })
     .map((l) => {
       // La misma puerta que usa la lista de trabajo, para que las dos pantallas
       // no puedan decir días distintos del mismo local.

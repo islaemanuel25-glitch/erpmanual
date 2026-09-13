@@ -40,6 +40,7 @@ import FilaCorteDeSemana from "./FilaCorteDeSemana.jsx";
 import ChipsDePeriodo from "./ChipsDePeriodo.jsx";
 
 import { bloquesPorLocal, cuentaDelLocal } from "@/lib/transferencias/bloquesPorLocal";
+import { destinosDeTransferencia } from "@/lib/transferencias/destinosDeTransferencia";
 import { UNIDADES } from "@/lib/transferencias/periodoDePago";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -326,6 +327,40 @@ test("E2g · un local ACTIVO nunca se marca como dado de baja", () => {
   assert.equal(bs[0].inactivo, false);
   const salida = html(React.createElement(BloqueLocal, { bloque: bloqueListo(bs[0]), money }));
   assert.ok(!salida.includes("Dado de baja"), "marcó de baja a un local que opera");
+});
+
+test("E2h · UN LOCAL SIN CLIENTE VINCULADO NO APARECE EN EL TABLERO", () => {
+  // El criterio que define la pantalla: un local opera por transferencia solo si
+  // tiene un cliente con `localVinculadoId` apuntándolo. Sin ese vínculo se le
+  // VENDE, y una lista de trabajo de transferencias no tiene nada que decirle.
+  //
+  // El caso real es el local recién cargado: hasta que no se le vincula su
+  // cliente, no tiene que aparecer acá. Hoy no se nota —los cuatro de producción
+  // están vinculados— y por eso el candado es lo único que lo cubre.
+  const bs = bloquesPorLocal({
+    transferencias: [transferencia(1, 2, "mini el 7", "Recibida", "2026-09-15", 4)],
+    acuerdos: ACUERDOS,
+    unidad: UNIDADES.SEMANA,
+    hoy: MIERCOLES,
+    locales: destinosDeTransferencia(
+      [
+        { id: 2, nombre: "mini el 7", activo: true, tieneClienteVinculado: true },
+        { id: 5, nombre: "Mini unidas", activo: true, tieneClienteVinculado: true },
+        { id: 11, nombre: "Local nuevo", activo: true, tieneClienteVinculado: false },
+      ],
+      { depositoLocalId: 1 }
+    ),
+  });
+
+  assert.deepEqual(
+    bs.map((b) => b.nombre).sort(),
+    ["Mini unidas", "mini el 7"],
+    "el local sin cliente vinculado no opera por transferencia: no va en esta lista"
+  );
+  const pantalla = bs
+    .map((b) => html(React.createElement(BloqueLocal, { bloque: bloqueListo(b), money })))
+    .join("");
+  assert.ok(!pantalla.includes("Local nuevo"), "se dibujó un local que no opera por transferencia");
 });
 
 test("E2d · el orden es por importe, y los que están en cero van al final", () => {
