@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-09-13 15:39
+**Última actualización:** 2026-09-13 16:16
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -194,6 +194,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-09-13: feat(transferencias): el botón sube al renglón del shell, la edición deja de ser un color y el corte entra al menú
 - 2026-09-13: feat(transferencias): la pantalla móvil pasa a ser la lista de trabajo
 - 2026-09-13: feat(transferencias): el corte de período sale del código y pasa a ser un acuerdo
 - 2026-09-13: fix(transferencias): "Enviada" y "Recibida" en la misma escala, y el desglose se va de lectura
