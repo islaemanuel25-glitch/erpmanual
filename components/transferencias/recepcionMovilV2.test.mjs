@@ -364,8 +364,13 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // El 2026-09-10 entro la tercera: `20260910120000_presentacion_adoptada_en_recepcion`,
   // que registra QUIEN y CUANDO adopto la presentacion actual sobre una linea
   // historica. Dos columnas nulables y una FK, sin backfill.
-  assert.equal(migraciones.length, 10, "aparecio una migracion que nadie declaro aca");
+  // Y el 2026-09-13 la cuarta: `20260913120000_acuerdo_deposito_local`, que saca
+  // el corte de semana del código y lo pone en la relación depósito–local. Una
+  // tabla nueva, sin tocar ninguna columna y sin backfill. Se declara acá porque
+  // eso es lo que este conteo existe para obligar.
+  assert.equal(migraciones.length, 11, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));
+  assert.ok(migraciones.includes("20260913120000_acuerdo_deposito_local"));
 });

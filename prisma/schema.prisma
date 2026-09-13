@@ -35,6 +35,7 @@ model Grupo {
   codigosProveedor ProductoCodigoProveedor[]
   importacionesLista ImportacionListaProveedor[]
   ofertas            Oferta[]
+  acuerdosDepositoLocal AcuerdoDepositoLocal[]
 }
 
 model GrupoDeposito {
@@ -67,6 +68,63 @@ model GrupoLocal {
   @@unique([grupoId, localId], name: "grupolocal_unique")
 }
 
+/// EL ACUERDO DE CORTE ENTRE UN DEPÓSITO Y UN LOCAL.
+///
+/// Cada local le paga al depósito por PERÍODO, normalmente semanal, y todas las
+/// transferencias de ese período se pagan juntas. Dónde corta la semana es un
+/// acuerdo entre esos dos y no una constante del sistema: el depósito puede
+/// cortar domingo con un local y lunes con otro.
+///
+/// ── POR QUÉ CUELGA DEL PAR Y NO DE `GrupoLocal` ─────────────────────────
+///
+/// Porque `GrupoLocal` dice grupo→local, y un grupo PUEDE tener más de un
+/// depósito —`Grupo.locales` es una lista de `GrupoDeposito`—. Hoy hay uno solo,
+/// así que colgarlo de ahí funcionaría y sería ambiguo el día que haya dos, que
+/// es justamente el caso que la regla contempla.
+///
+/// ── SIN DEFAULT EN LA BASE, A PROPÓSITO ─────────────────────────────────
+///
+/// Una relación sin fila acá significa "todavía no se configuró", que NO es lo
+/// mismo que "corta domingo". La pantalla cae al domingo para poder mostrar algo
+/// y marca esa relación como SIN CONFIGURAR: quien entra tiene que ver cuáles
+/// faltan. Un default en la base borraría esa diferencia sin que nadie lo note.
+///
+/// ── LO QUE ESTE MODELO NO SOPORTA TODAVÍA, Y HAY QUE SABERLO ANTES ──────
+///
+/// **Hoy el corte es SOLO DE PRESENTACIÓN.** El sistema no registra pagos: dice
+/// cuánto se debe y nada más. Por eso cambiar `diaDeCorte` puede mover una
+/// transferencia de una semana a otra sin consecuencia.
+///
+/// **El día que exista el registro de un pago, eso deja de ser inocuo.** Ese día:
+///
+///   · el período tiene que quedar CONGELADO en el pago —sus fechas de inicio y
+///     fin guardadas en la fila del pago— y no recalcularse desde este acuerdo.
+///     Si no, cambiar el corte movería plata ya cobrada de una semana a otra, y
+///     dos semanas consecutivas podrían cobrar o perderse los mismos días;
+///   · y esta tabla va a necesitar HISTORIAL, no un solo `diaDeCorte`: "cortaba
+///     domingo hasta el 3 de octubre y lunes desde el 4". Con un único valor no
+///     se puede reconstruir en qué período cayó una transferencia vieja.
+///
+/// Las dos cosas se deciden ese día y no éste, pero se anotan acá porque quien
+/// escriba el registro de pagos va a leer este modelo antes.
+model AcuerdoDepositoLocal {
+  id              Int      @id @default(autoincrement())
+  grupoId         Int
+  depositoLocalId Int
+  localId         Int
+  /// 0 = domingo … 6 = sábado. Es el día en que ARRANCA el período.
+  diaDeCorte      Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  grupo    Grupo @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  deposito Local @relation("acuerdo_deposito", fields: [depositoLocalId], references: [id], onDelete: Cascade)
+  local    Local @relation("acuerdo_local", fields: [localId], references: [id], onDelete: Cascade)
+
+  @@unique([depositoLocalId, localId], name: "acuerdo_deposito_local_unique")
+  @@index([grupoId])
+}
+
 model Local {
   id                    Int      @id @default(autoincrement())
   nombre                String
@@ -97,6 +155,10 @@ model Local {
 
   posTransferenciasOrigen  PosTransferencia[] @relation("pos_origen")
   posTransferenciasDestino PosTransferencia[] @relation("pos_destino")
+
+  /// Los acuerdos de corte de período, por los dos lados de la relación.
+  acuerdosComoDeposito AcuerdoDepositoLocal[] @relation("acuerdo_deposito")
+  acuerdosComoLocal    AcuerdoDepositoLocal[] @relation("acuerdo_local")
 
   ventas            Venta[]
   turnos            Turno[]
