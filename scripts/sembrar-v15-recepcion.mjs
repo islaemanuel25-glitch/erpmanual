@@ -51,6 +51,19 @@ export const SEMBRADO = Object.freeze({
   grupo: "Grupo V15",
   deposito: "Depósito V15",
   destino: "Local V15",
+  // ── EL SEGUNDO LOCAL NO RECIBE NADA, Y ÉSE ES EL PUNTO ─────────────────
+  //
+  // Existe para que la lista de trabajo tenga un local SIN MOVIMIENTO que
+  // mostrar. Con un solo local sembrado, la corrección del 2026-09-13 —que
+  // todos los locales del grupo aparecen, tengan o no transferencias— no se
+  // puede ejercer: el caso que arregla no ocurre en la base de pruebas.
+  //
+  // Es la forma del dato REAL: en producción hay cuatro locales y uno solo con
+  // movimiento en la semana. Sembrar solo el que recibe habría dejado el
+  // candado del navegador probando el caso que nunca falla.
+  //
+  // No entra en ninguna transferencia, así que el arnés de recepción no lo ve.
+  destinoSinMovimiento: "Local V15 sin movimiento",
   rol: "Recepción V15",
   usuario: "v15@local",
 });
@@ -64,7 +77,12 @@ const log = (...a) => console.log(...a);
 const grupoViejo = await prisma.grupo.findUnique({ where: { nombre: SEMBRADO.grupo } });
 if (grupoViejo) {
   const locales = await prisma.local.findMany({
-    where: { nombre: { in: [SEMBRADO.deposito, SEMBRADO.destino] } },
+    // El local sin movimiento entra en la limpieza como los otros dos: si
+    // quedara de una corrida anterior, la siembra siguiente lo encontraría
+    // duplicado y la lista mostraría dos locales con el mismo nombre.
+    where: {
+      nombre: { in: [SEMBRADO.deposito, SEMBRADO.destino, SEMBRADO.destinoSinMovimiento] },
+    },
     select: { id: true },
   });
   const ids = locales.map((l) => l.id);
@@ -97,8 +115,13 @@ const deposito = await prisma.local.create({
 const destino = await prisma.local.create({
   data: { nombre: SEMBRADO.destino, tipo: "local", es_deposito: false },
 });
+// El local que existe y no recibe nada. Ver el porqué en `SEMBRADO`.
+const sinMovimiento = await prisma.local.create({
+  data: { nombre: SEMBRADO.destinoSinMovimiento, tipo: "local", es_deposito: false },
+});
 await prisma.grupoDeposito.create({ data: { grupoId: grupo.id, localId: deposito.id } });
 await prisma.grupoLocal.create({ data: { grupoId: grupo.id, localId: destino.id } });
+await prisma.grupoLocal.create({ data: { grupoId: grupo.id, localId: sinMovimiento.id } });
 
 // El rol lleva `["*"]` porque lo que se está verificando es la PANTALLA, no el
 // sistema de permisos. El arnés además firma los permisos en el token.
@@ -288,6 +311,7 @@ log(`  fuera del remito: ${PRODUCTOS.find((p) => p.fueraDelRemito).nombre}`);
 log(`  transferencia : ${transferencia.id}`);
 log(`  usuario       : ${usuario.id}  (${SEMBRADO.usuario})`);
 log(`  local destino : ${destino.id}  (${SEMBRADO.destino})`);
+log(`  local en cero : ${sinMovimiento.id}  (${SEMBRADO.destinoSinMovimiento}) — sin transferencias, a propósito`);
 log(`  local origen  : ${deposito.id}  (${SEMBRADO.deposito})`);
 log("");
 log("  El arnés se corre con esos tres números:");

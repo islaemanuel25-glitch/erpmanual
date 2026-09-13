@@ -48,6 +48,7 @@ import {
   cuentaDelLocal,
   estaRecibida,
 } from "@/lib/transferencias/bloquesPorLocal";
+import { relacionesDelDeposito } from "@/lib/transferencias/relacionesDelDeposito";
 
 /** `YYYY-MM-DD`, que es la forma en la que `periodoDePago` compara. */
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -140,10 +141,16 @@ export async function GET(req) {
       : null;
     const esDeposito = vista.modo === "GLOBAL" || localPropio?.es_deposito === true;
 
-    const deposito = await prisma.grupoDeposito.findFirst({
-      where: { grupoId: vista.grupoId },
-      select: { localId: true, local: { select: { id: true, nombre: true } } },
-    });
+    // ── TODOS LOS LOCALES, TENGAN O NO MOVIMIENTO ─────────────────────────
+    //
+    // Hasta el 2026-09-13 la lista se armaba solo con los locales que aparecían
+    // en alguna transferencia del período, y eso hacía que un local sin
+    // movimiento no existiera para esta pantalla: con cuatro locales y uno solo
+    // con envíos de la semana, el que abría veía un bloque y no tenía forma de
+    // saber que había tres más. Y arrastraba un defecto peor porque era
+    // silencioso: el aviso de "sin corte configurado" cuenta los locales de la
+    // lista, así que de cuatro relaciones sin configurar informaba una.
+    const { deposito, locales } = await relacionesDelDeposito(vista.grupoId);
 
     const acuerdos = await prisma.acuerdoDepositoLocal.findMany({
       where: { grupoId: vista.grupoId },
@@ -266,12 +273,18 @@ export async function GET(req) {
     };
 
     if (esDeposito) {
-      const bloques = bloquesPorLocal({ transferencias: filas, acuerdos, unidad, rangoFijo });
+      const bloques = bloquesPorLocal({
+        transferencias: filas,
+        acuerdos,
+        unidad,
+        rangoFijo,
+        locales,
+      });
       return NextResponse.json({
         ok: true,
         vista: "DEPOSITO",
         unidad,
-        depositoNombre: deposito?.local?.nombre || localPropio?.nombre || null,
+        depositoNombre: deposito?.nombre || localPropio?.nombre || null,
         bloques: bloques.map((b) => ({
           localId: b.localId,
           nombre: b.nombre,
@@ -282,6 +295,9 @@ export async function GET(req) {
           cantidadTransferencias: b.cantidadTransferencias,
           sinRecibir: b.sinRecibir,
           totalCerrado: b.totalCerrado,
+          // El local que existe y esta semana no recibió nada. La pantalla lo
+          // dibuja corto: sin rango, sin borde de aviso y sin nada que abrir.
+          sinMovimiento: b.sinMovimiento,
           transferencias: b.transferencias.map(resumir),
         })),
       });
@@ -300,7 +316,7 @@ export async function GET(req) {
       vista: "LOCAL",
       unidad,
       localNombre: localPropio?.nombre || null,
-      depositoNombre: deposito?.local?.nombre || null,
+      depositoNombre: deposito?.nombre || null,
       cuenta: {
         localId: cuenta.localId,
         diaDeCorte: cuenta.diaDeCorte,

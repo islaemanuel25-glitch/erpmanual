@@ -40,8 +40,55 @@ import {
   tituloDeTransferencia,
 } from "@/lib/transferencias/rotulosDeTransferencia";
 
+/**
+ * LA PÍLDORA DE "SIN CORTE", que las dos formas del bloque comparten.
+ *
+ * Está acá y no escrita dos veces porque el local SIN MOVIMIENTO es justamente
+ * el que más la necesita: hasta el 2026-09-13 no aparecía en la lista, así que
+ * su falta de acuerdo era invisible. Escribirla dos veces sería dejar que una de
+ * las dos se quede vieja.
+ */
+function PildoraSinCorte() {
+  return (
+    <span className="shrink-0 rounded-lg border sunmi-border-warning sunmi-state-warning-soft sunmi-text-warning text-xs2 font-semibold px-1.5 py-1 leading-none">
+      Sin corte
+    </span>
+  );
+}
+
 export default function BloqueLocal({ bloque, abierto = false, onAlternar, onRecibir, money }) {
   const abierta = !bloque?.totalCerrado;
+
+  // ── EL LOCAL SIN MOVIMIENTO ES CORTO, Y NO ES UN BLOQUE DESHABILITADO ───
+  //
+  // Aparece porque existe: con cuatro locales y uno solo con envíos de la
+  // semana, mostrar únicamente ése dejaba a los otros tres sin forma de saber
+  // que están. Pero no tiene que competir con los que sí tuvieron movimiento,
+  // así que va en una sola línea, sin el rango, SIN borde de aviso —su total no
+  // está abierto: es cero y está cerrado— y SIN ser un botón, porque no hay
+  // nada que abrir. Un botón que no hace nada al tocarlo se lee como un defecto.
+  if (bloque?.sinMovimiento) {
+    return (
+      <section className="sunmi-surface rounded-xl2 px-4 py-4 border sunmi-border flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-lg2 font-semibold sunmi-text-strong truncate">
+              {bloque?.nombre || "—"}
+            </span>
+            {bloque?.sinConfigurar && <PildoraSinCorte />}
+          </div>
+          <div className="text-xs sunmi-text-muted">{rotuloDeBloque(bloque)}</div>
+        </div>
+
+        <div className="shrink-0 text-right">
+          <div className="text-xs2 sunmi-text-muted">A pagar</div>
+          <div className="text-lg3 font-semibold sunmi-text-muted tabular-nums">
+            {money ? money(bloque?.aPagar) : bloque?.aPagar}
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section
@@ -74,11 +121,7 @@ export default function BloqueLocal({ bloque, abierto = false, onAlternar, onRec
             <span className="text-lg2 font-semibold sunmi-text-strong truncate">
               {bloque?.nombre || "—"}
             </span>
-            {bloque?.sinConfigurar && (
-              <span className="shrink-0 rounded-lg border sunmi-border-warning sunmi-state-warning-soft sunmi-text-warning text-xs2 font-semibold px-1.5 py-1 leading-none">
-                Sin corte
-              </span>
-            )}
+            {bloque?.sinConfigurar && <PildoraSinCorte />}
           </div>
 
           <div className={`text-xs ${abierta ? "sunmi-text-warning" : "sunmi-text-muted"}`}>

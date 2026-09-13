@@ -262,6 +262,10 @@ ofrece "Cambiar"—.
 
 ### Vista DEPÓSITO (Figma V28, nodo `230:478`)
 
+**Corregido el 2026-09-13: un bloque por CADA local del grupo, tenga o no
+movimiento.** Lo de abajo describe el bloque del que sí tuvo; el que no, va en
+versión corta — ver la decisión 3.
+
 Al abrir, sin tocar nada: un bloque por local. Cada bloque con el nombre del local,
 **"A pagar"** con el importe corregido acumulado del período **en grande**, y
 debajo `"5 transferencias · 2 sin recibir"`.
@@ -319,8 +323,25 @@ transferencia completa. Queda en el filtro del reporte.
    componente propio. Aquél agrupa por destino sin importar quién sos, su importe
    es el ENVIADO, y su período es uno solo para todos. Se queda donde está
    contestando su pregunta.
-3. **Un local sin transferencias en el período NO aparece.** Para verlos todos está
-   el reporte.
+3. ~~**Un local sin transferencias en el período NO aparece.**~~ **DADA VUELTA
+   POR EMANUEL EL 2026-09-13: aparecen TODOS los locales del grupo que tengan
+   relación con este depósito, tengan o no movimiento.** Se deja tachada y no se
+   borra, porque el motivo de la vuelta es el que hay que recordar:
+
+   *"Lo pensé como una lista de cuentas a cobrar, pero si un local solo aparece
+   cuando tiene una transferencia asociada, no hay forma de saber que existe.
+   Arrancás viendo un local y no sabés que hay cuatro."*
+
+   El local sin movimiento va en **versión corta**: nombre, "Sin transferencias
+   en el período" e importe en $ 0,00. **Sin borde de aviso** —su total no está
+   abierto: es cero y está cerrado— y **sin nada que abrir**, así que tampoco es
+   un botón. El orden es **por importe, con los que están en cero al final**.
+
+   **Y arrastraba un segundo defecto, que es el que lo hace algo más que una
+   preferencia de listado:** el aviso de "sin corte configurado" cuenta los
+   locales de la LISTA. Con cuatro relaciones sin configurar y un solo local con
+   movimiento, informaba **una**. Medido en producción el 2026-09-13. Está
+   congelado en el candado `E2c`.
 4. **El acuerdo cuelga del PAR depósito–local**, no de `GrupoLocal`: un grupo puede
    tener más de un depósito y colgarlo del local sería ambiguo.
 5. **Sin default en la base para `diaDeCorte`.** Una relación sin fila es "no se

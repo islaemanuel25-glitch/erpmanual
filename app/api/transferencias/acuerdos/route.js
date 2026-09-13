@@ -28,6 +28,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { resolveVistaOperativa } from "@/lib/grupos";
 import { acuerdoDeLocal } from "@/lib/transferencias/bloquesPorLocal";
+import { relacionesDelDeposito } from "@/lib/transferencias/relacionesDelDeposito";
 import {
   UNIDADES,
   esDiaDeCorteValido,
@@ -36,27 +37,18 @@ import {
 
 /** Las relaciones del grupo, con acuerdo o con la marca de que falta. */
 async function relacionesDelGrupo(grupoId) {
-  const deposito = await prisma.grupoDeposito.findFirst({
-    where: { grupoId },
-    select: { localId: true, local: { select: { id: true, nombre: true } } },
-  });
+  // La lista de locales sale de la MISMA puerta que usa la lista de trabajo. Si
+  // cada pantalla armara la suya, un local podría aparecer en una y no en la
+  // otra sin que nada lo explique.
+  const { deposito, locales } = await relacionesDelDeposito(grupoId);
   if (!deposito) return { deposito: null, relaciones: [] };
 
-  const [vinculos, acuerdos] = await Promise.all([
-    prisma.grupoLocal.findMany({
-      where: { grupoId },
-      select: { local: { select: { id: true, nombre: true, es_deposito: true } } },
-    }),
-    prisma.acuerdoDepositoLocal.findMany({
-      where: { grupoId },
-      select: { localId: true, diaDeCorte: true },
-    }),
-  ]);
+  const acuerdos = await prisma.acuerdoDepositoLocal.findMany({
+    where: { grupoId },
+    select: { localId: true, diaDeCorte: true },
+  });
 
-  const relaciones = vinculos
-    .map((v) => v.local)
-    .filter((l) => l && l.id !== deposito.localId && !l.es_deposito)
-    .sort((a, b) => a.nombre.localeCompare(b.nombre))
+  const relaciones = locales
     .map((l) => {
       // La misma puerta que usa la lista de trabajo, para que las dos pantallas
       // no puedan decir días distintos del mismo local.
@@ -64,7 +56,7 @@ async function relacionesDelGrupo(grupoId) {
       return {
         localId: l.id,
         localNombre: l.nombre,
-        depositoNombre: deposito.local?.nombre || "Depósito",
+        depositoNombre: deposito.nombre,
         diaDeCorte,
         sinConfigurar,
         rango: rangoDelPeriodo({ unidad: UNIDADES.SEMANA, diaDeCorte }),

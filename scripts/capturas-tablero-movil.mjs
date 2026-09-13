@@ -141,6 +141,12 @@ const filaDelShell = () =>
     return n ? n.innerText.replace(/\\s+/g, ' ').trim() : null;
   })()`);
 
+/** Cuántas relaciones están marcadas como sin configurar, AHORA y en pantalla. */
+const marcasSinConfigurar = () =>
+  evaluar(
+    `(document.body.innerText.match(/Sin configurar/g) || []).length`
+  );
+
 const hayTexto = (fragmento) =>
   evaluar(`document.body ? document.body.innerText.includes(${JSON.stringify(fragmento)}) : false`);
 
@@ -333,9 +339,36 @@ await afirmar(
   "el menú ofrece «Corte de semana» aunque no falte configurar nada"
 );
 
-// La marca de "sin configurar", que es lo que Emanuel pidió ver.
+// ── TODOS LOS LOCALES, TENGAN O NO MOVIMIENTO ───────────────────────────
+//
+// El sembrado crea dos locales y le manda transferencias a UNO solo. Antes del
+// 2026-09-13 el otro no aparecía, y con él se iba su marca de "sin corte": el
+// aviso de arriba contaba los locales de la lista, así que informaba uno de dos.
 await medir(ALTOS[0]);
 await abrir("/modulos/transferencias", "Transferencias");
+await afirmar(
+  await hayTexto("Local V15 sin movimiento"),
+  "el local que no recibió nada aparece igual: si no, no hay forma de saber que existe"
+);
+await afirmar(
+  await hayTexto("Sin transferencias en el período"),
+  "y lo dice con una frase, no con un «0 transferencias» que se lee como un dato que falta"
+);
+await afirmar(
+  await hayTexto("Hay 2 locales sin corte configurado"),
+  "el aviso cuenta los DOS, no solo el que tuvo movimiento"
+);
+
+// Y el que está en cero no compite: va al final, después del que sí recibió.
+await afirmar(
+  await evaluar(`(() => {
+    const t = document.body.innerText;
+    return t.indexOf("Local V15 sin movimiento") > t.indexOf("$");
+  })()`),
+  "el local en cero va DESPUÉS del que tiene movimiento"
+);
+
+// La marca de "sin configurar", que es lo que Emanuel pidió ver.
 await afirmar(
   await hayTexto("Sin corte"),
   "la relación sin acuerdo se ve MARCADA en el renglón del local"
@@ -355,6 +388,12 @@ await foto(`v28-bloque-abierto-${ANCHO}`);
 await abrir("/modulos/transferencias/corte-de-semana", "Corte de semana");
 await afirmar(await hayTexto("Sin configurar"), "la relación sin acuerdo llega marcada");
 await afirmar(await hayTexto("Arranca"), "se ve qué día arranca hoy");
+await afirmar(
+  await hayTexto("Local V15 sin movimiento"),
+  "la pantalla de corte también lista al local que no recibió nada: el acuerdo es de la RELACIÓN, no del movimiento"
+);
+const marcasAntes = await marcasSinConfigurar();
+await afirmar(marcasAntes === 2, `las dos relaciones arrancan sin configurar (son ${marcasAntes})`);
 await foto(`v29-corte-${ANCHO}`);
 
 // La barra del shell tiene que decir DÓNDE ESTÁS. Por ruta diría
@@ -390,18 +429,27 @@ await foto(`v29-editando-${ANCHO}`);
 await tocar("Mié", { exacto: true });
 await tocar("Guardar");
 await esperar(1500);
+
+// ── SE CUENTAN LAS MARCAS, NO SE PREGUNTA SI QUEDA ALGUNA ───────────────
+//
+// Con dos relaciones y una sola configurada, "¿queda algún 'Sin configurar'?"
+// contesta que sí y eso es CORRECTO — la otra sigue sin configurar. Lo que
+// prueba que el guardado funcionó es que la cuenta BAJÓ en uno. Preguntar por
+// la ausencia total habría obligado a configurar las dos para que el candado
+// pasara, o —peor— a aflojarlo.
 await afirmar(
-  !(await hayTexto("Sin configurar")),
-  "guardado el acuerdo, la marca de 'sin configurar' DESAPARECE"
+  (await marcasSinConfigurar()) === marcasAntes - 1,
+  `guardado el acuerdo, queda UNA marca menos (antes ${marcasAntes}, ahora ${await marcasSinConfigurar()})`
 );
 await afirmar(await hayTexto("Mié."), "y el día guardado es el que se tocó");
 await foto(`v29-guardado-${ANCHO}`);
 
-// Y el cambio se ve del otro lado: el rango del bloque tiene que haber cambiado.
+// Y el cambio se ve del otro lado: el local que se configuró deja de estar
+// marcado en la lista de trabajo, y el que no se tocó sigue marcado.
 await abrir("/modulos/transferencias", "Transferencias");
 await afirmar(
-  !(await hayTexto("Sin corte")),
-  "la lista de trabajo ya no marca al local: el acuerdo quedó guardado"
+  await hayTexto("Hay 1 local sin corte configurado"),
+  "el aviso baja a uno: el que se configuró salió de la cuenta y el otro sigue"
 );
 await foto(`v28-ya-configurado-${ANCHO}`);
 

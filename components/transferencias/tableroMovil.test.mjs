@@ -134,9 +134,26 @@ test("E1 · dos locales con cortes distintos muestran RANGOS DISTINTOS en la mis
   assert.ok(pantalla.includes("14/09 al 20/09"), "falta el rango del local que corta lunes");
 });
 
-test("E2 · un local SIN MOVIMIENTO en su período no aparece", () => {
+// ── EL CRITERIO CAMBIÓ EL 2026-09-13, Y ESTE CANDADO AFIRMABA LO VIEJO ────
+//
+// Decía "un local sin movimiento NO aparece", que era la decisión 3 del
+// roadmap. Emanuel la dio vuelta con el motivo escrito: *"si un local solo
+// aparece cuando tiene una transferencia asociada, no hay forma de saber que
+// existe. Arrancás viendo un local y no sabés que hay cuatro."*
+//
+// No se aflojó el candado: se reescribió para afirmar la decisión nueva, que es
+// más fuerte —ahora hay que probar que el local SÍ está y además que está en la
+// forma corta—. El caso de prueba es el mismo y sigue siendo el bueno: Casiano
+// tiene una transferencia, pero NO en su semana.
+const LOCALES = [
+  { id: 2, nombre: "mini el 7" },
+  { id: 4, nombre: "Casiano casas" },
+];
+
+test("E2 · un local SIN MOVIMIENTO en su período aparece igual, en cero y en versión corta", () => {
   // El domingo 13 cae en la semana del que corta domingo y NO en la del que
-  // corta lunes, que arranca el 14. Así que Casiano se queda sin bloque.
+  // corta lunes, que arranca el 14. Así que Casiano no tiene nada QUE MOSTRAR
+  // en su período — y aun así tiene que estar en la lista.
   const bs = bloquesPorLocal({
     transferencias: [
       transferencia(1, 2, "mini el 7", "Recibida", "2026-09-13", 4),
@@ -145,12 +162,125 @@ test("E2 · un local SIN MOVIMIENTO en su período no aparece", () => {
     acuerdos: ACUERDOS,
     unidad: UNIDADES.SEMANA,
     hoy: MIERCOLES,
+    locales: LOCALES,
   });
 
-  const pantalla = bs.map((b) => html(React.createElement(BloqueLocal, { bloque: bloqueListo(b), money }))).join("");
+  assert.equal(bs.length, 2, "los dos locales tienen que estar en la lista");
 
+  const casiano = bs.find((b) => b.localId === 4);
+  assert.equal(casiano.sinMovimiento, true, "Casiano no tuvo movimiento en SU semana");
+  assert.equal(casiano.cantidadTransferencias, 0);
+  assert.equal(casiano.aPagar, 0);
+  assert.equal(casiano.totalCerrado, true, "sin pendientes, el total de cero está cerrado");
+
+  const pantalla = bs
+    .map((b) => html(React.createElement(BloqueLocal, { bloque: bloqueListo(b), money })))
+    .join("");
   assert.ok(pantalla.includes("mini el 7"), "el local con movimiento tiene que estar");
-  assert.ok(!pantalla.includes("Casiano"), "un local sin movimiento en su período NO se dibuja");
+  assert.ok(pantalla.includes("Casiano casas"), "el local sin movimiento TAMBIÉN tiene que estar");
+  assert.ok(
+    pantalla.includes("Sin transferencias en el período"),
+    "el local en cero lo dice con una frase, no con un '0 transferencias'"
+  );
+});
+
+test("E2b · el bloque en cero no tiene nada que abrir ni borde de aviso", () => {
+  const enCero = {
+    localId: 9,
+    nombre: "Mini unidas",
+    rango: { desde: "2026-09-13", hasta: "2026-09-19" },
+    aPagar: 0,
+    cantidadTransferencias: 0,
+    sinRecibir: 0,
+    totalCerrado: true,
+    sinMovimiento: true,
+    transferencias: [],
+  };
+  const salida = html(React.createElement(BloqueLocal, { bloque: enCero, money }));
+
+  assert.ok(salida.includes("Mini unidas"), "falta el nombre");
+  assert.ok(salida.includes("$ 0.00"), "el importe en cero se muestra igual");
+  assert.ok(
+    !salida.includes("sunmi-border-warning"),
+    "un total de cero está CERRADO: marcarlo en advertencia sería falso"
+  );
+  assert.ok(!salida.includes("<button"), "no hay nada que abrir, así que no es un botón");
+  assert.ok(
+    !salida.includes("13/09 al 19/09"),
+    "sin movimiento no se muestra el rango: no tiene que competir con los que sí tuvieron"
+  );
+});
+
+test("E2c · EL DEFECTO QUE ESTO CIERRA · el aviso contaba UNO de cuatro sin configurar", () => {
+  // Medido en producción el 2026-09-13: cuatro locales, los cuatro sin acuerdo,
+  // y UNO SOLO con movimiento en la semana. El aviso de arriba cuenta los
+  // bloques con `sinConfigurar`, así que con la lista armada desde las
+  // transferencias informaba "1 local sin corte" — y las otras tres relaciones
+  // no estaban en ninguna parte de la pantalla.
+  const cuatro = [
+    { id: 2, nombre: "mini el 7" },
+    { id: 3, nombre: "Minimarket ayala" },
+    { id: 4, nombre: "Casiano casas" },
+    { id: 5, nombre: "Mini unidas" },
+  ];
+  const soloUnoConMovimiento = [transferencia(1, 2, "mini el 7", "Enviada", "2026-09-14", null)];
+
+  const viejo = bloquesPorLocal({
+    transferencias: soloUnoConMovimiento,
+    acuerdos: [],
+    unidad: UNIDADES.SEMANA,
+    hoy: MIERCOLES,
+  });
+  assert.equal(
+    viejo.filter((b) => b.sinConfigurar).length,
+    1,
+    "así era antes: de cuatro relaciones sin configurar, el aviso veía una"
+  );
+
+  const ahora = bloquesPorLocal({
+    transferencias: soloUnoConMovimiento,
+    acuerdos: [],
+    unidad: UNIDADES.SEMANA,
+    hoy: MIERCOLES,
+    locales: cuatro,
+  });
+  assert.equal(
+    ahora.filter((b) => b.sinConfigurar).length,
+    4,
+    "ahora el aviso cuenta las cuatro, que es la verdad"
+  );
+});
+
+test("E2d · el orden es por importe, y los que están en cero van al final", () => {
+  const bs = bloquesPorLocal({
+    transferencias: [
+      // Casiano recibe DOS, así que paga el doble que mini el 7.
+      transferencia(1, 4, "Casiano casas", "Recibida", "2026-09-15", 4),
+      transferencia(2, 4, "Casiano casas", "Recibida", "2026-09-15", 4),
+      transferencia(3, 2, "mini el 7", "Recibida", "2026-09-15", 4),
+    ],
+    acuerdos: ACUERDOS,
+    unidad: UNIDADES.SEMANA,
+    hoy: MIERCOLES,
+    locales: [
+      { id: 2, nombre: "mini el 7" },
+      { id: 3, nombre: "Minimarket ayala" },
+      { id: 4, nombre: "Casiano casas" },
+      { id: 5, nombre: "Mini unidas" },
+    ],
+  });
+
+  assert.deepEqual(
+    bs.map((b) => b.nombre),
+    ["Casiano casas", "mini el 7", "Mini unidas", "Minimarket ayala"],
+    "primero el que más debe; los dos en cero al final y entre ellos por nombre"
+  );
+  assert.ok(bs[0].aPagar > bs[1].aPagar, "el primero tiene que ser el de mayor importe");
+  assert.deepEqual(
+    bs.slice(2).map((b) => b.sinMovimiento),
+    [true, true],
+    "los dos últimos son los que no tuvieron movimiento"
+  );
 });
 
 test("E3 · una relación SIN ACUERDO se ve marcada, y no cae al domingo en silencio", () => {
