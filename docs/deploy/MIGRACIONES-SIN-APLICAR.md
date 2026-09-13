@@ -16,7 +16,53 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **10 migraciones**, las mismas que el árbol.
+### `20260913120000_acuerdo_deposito_local` — el corte de semana
+
+Commiteada en `ad39cecd`. **Es la primera migración en el rango desde el
+2026-09-10**, así que el próximo despliegue NO es solo de código.
+
+**Qué hace:** crea la tabla `AcuerdoDepositoLocal` —el día en que arranca la
+semana de cada par depósito–local—, con un único sobre el par, un índice por
+grupo y tres foráneas en CASCADE.
+
+**Es puramente aditiva.** Una tabla nueva y nada más: no hay DROP, ni UPDATE, ni
+DELETE, ni INSERT, ni backfill, y ninguna columna existente se toca.
+
+**Y por eso la ventana entre migrar y recrear es inofensiva:** el código viejo no
+nombra esa tabla, así que no puede romperse por ella, y no hay ninguna columna
+nueva en una tabla que el código viejo escriba.
+
+**Deja CERO filas.** Ninguna relación queda configurada: se configuran de a una
+desde la pantalla de "Corte de semana", con autor. En producción hay 1 grupo, 1
+depósito y 4 locales, así que quedan **4 relaciones por configurar**, y hasta que
+alguien las configure la lista de trabajo las muestra marcadas como "Sin corte" y
+les aplica el domingo — nunca en silencio.
+
+**EL QUINTO CHEQUEO DEL BACKUP NO APLICA.** Ese chequeo existe para las
+migraciones de DATOS: comprobar que un valor de los que se van a perder esté
+adentro del dump. Acá no se pierde ningún dato, así que no hay valor que buscar.
+**Los cuatro de siempre sí, y completos** — código de salida del `pg_dump` con
+`pipefail`, `gzip -t`, la marca de cierre en las últimas 20 líneas, y 40 tablas o
+más.
+
+**Estado medido en producción el 2026-09-13, solo lectura:** `to_regclass` sobre
+`AcuerdoDepositoLocal` devuelve vacío —la tabla NO existe— y no hay ninguna fila
+en `_prisma_migrations` con ese nombre. La última aplicada es
+`20260910120000_presentacion_adoptada_en_recepcion`.
+
+**Aplicada y verificada en la base de PRUEBAS** (`erpazul_v15`): siete columnas,
+`diaDeCorte` sin default, el único sobre el par, las tres foráneas con
+`confdeltype = c` y cero filas.
+
+**Lo que NO se pudo correr desde acá, y conviene saberlo antes de empezar:**
+`node scripts/clasificar-migraciones.mjs --vps` aborta con INDETERMINADO, porque
+resuelve la imagen del contenedor por `ssh vps-erp` y **este VPS no tiene ese
+alias** —la sesión corre adentro del servidor, no contra él—. El rango se calculó
+a mano y por otros dos caminos que coinciden: `git diff` de `prisma/migrations`
+entre el SHA que informa `/api/version` y `origin/main` devuelve exactamente esta
+migración, y la consulta de arriba confirma que en la base no está. El
+clasificador sigue siendo el chequeo que manda: si en el despliegue vuelve a dar
+INDETERMINADO, eso es una frenada y no un trámite.
 
 ---
 
