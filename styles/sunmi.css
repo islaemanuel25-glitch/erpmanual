@@ -321,6 +321,37 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--pos-warning) 35%, transparent);
 }
 
+/* Botón SIN RELLENO — el contorno lo pone quien lo usa.
+
+   ── POR QUÉ HIZO FALTA ───────────────────────────────────────────────────
+
+   La pantalla de corte de semana pide un botón "Cambiar" transparente, con
+   borde y texto en accent. Ninguno de los siete colores lo da: los siete
+   PINTAN el fondo, que es lo que los hace colores.
+
+   Se probó el camino sin pieza —`color="secondary"` más `sunmi-border-accent` y
+   `sunmi-text-accent` encima— y es justo el defecto que este archivo tiene
+   documentado dos veces: `.sunmi-btn-secondary` declara `border` y `color`, las
+   clases sueltas declaran lo mismo, las dos tienen especificidad 0-1-0 y decide
+   el orden de la HOJA. Hoy ganarían las sueltas por estar más abajo, y el día
+   que alguien mueva un bloque el botón vuelve a tener fondo sin que nada avise.
+
+   Así que esta variante no declara borde ni color de texto: declara que NO hay
+   relleno y que el texto lo hereda. No hay dos reglas peleando porque solo hay
+   una. El contorno, el radio y el tono son del consumidor, como en cualquier
+   botón fantasma.
+
+   `color: inherit` y no un token: un botón fantasma toma el color de la frase
+   donde vive. El que lo quiera en accent escribe `sunmi-text-accent`, que es una
+   clase del kit y no un hex.
+
+   Va ANTES de las variantes por el mismo motivo que `warning`:
+   `variantesDeAccion.test.mjs` exige que todo color se defina primero. */
+.sunmi-btn-ghost {
+  background: transparent;
+  color: inherit;
+}
+
 /* Separador Sunmi */
 .sunmi-separator {
   @apply my-4 flex items-center gap-2;
@@ -459,6 +490,19 @@
    la usa. Primera consumidora: el campo del panel de recepción cuando lo contado
    difiere del remito, que va a 2 px. */
 .sunmi-border-danger { border-color: var(--pos-danger, #ef4444); }
+/* Las dos hermanas, por el mismo motivo y con el mismo contrato: SOLO color.
+   `warning` es el token de `--pos-warning`, el MISMO que `.sunmi-text-warning`,
+   para que el borde de un bloque y el texto que explica por qué está marcado
+   sean visiblemente la misma advertencia y no dos amarillos parecidos.
+   Ojo con `.sunmi-state-warning`, que existe y es otra cosa: aquélla pinta
+   TAMBIÉN el fondo y sale de `--pos-accent`. Sirve para una tarjeta tintada
+   —la línea corregida de la recepción—, no para marcar el contorno de un bloque
+   que tiene que quedar sobre el fondo normal.
+   Primeras consumidoras: el bloque de local con transferencias sin recibir
+   (warning, 1,5 px) y la fila del corte de semana mientras se edita (accent,
+   1,5 px). */
+.sunmi-border-warning { border-color: var(--pos-warning, #f59e0b); }
+.sunmi-border-accent  { border-color: var(--pos-accent); }
 
 /* --- Texto semántico --- */
 .sunmi-text-muted   { color: color-mix(in srgb, var(--app-fg) 60%, transparent); }

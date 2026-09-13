@@ -62,6 +62,36 @@ module.exports = {
         // en el componente, que es lo que el trinquete prohíbe.
         base2: "15px",
         xl2: "22px",
+        // ── LOS TRES DEL REDISEÑO DE TRANSFERENCIAS (V28/V28b/V29) ─────────
+        //
+        // 13 para los chips y los botones chicos, 19 para el importe de cada
+        // bloque de local, 28 para el importe grande de la cuenta del local.
+        //
+        // ── Y POR QUÉ ESTOS TRES SÍ Y LOS ESPACIADOS NO ───────────────────
+        //
+        // La especificación de esas tres pantallas vino dibujada sobre la grilla
+        // de 16 px que Figma trae por defecto, y este proyecto corre sobre
+        // `1rem = 14px` —medido, no deducido: la sonda de cascada lo informa en
+        // cada despliegue—. Así que sus padding y radios —16, 13, 12, 9, 6, 4;
+        // radios 8, 9, 11— no caen en la escala.
+        //
+        // Esos se AJUSTARON a la escala del proyecto y no entraron acá, a
+        // propósito: se corren como mucho 1,25 px, no se ven, y meterlos habría
+        // dado trece entradas nuevas y una pantalla con su propio ritmo al lado
+        // de todas las demás.
+        //
+        // Los tamaños de letra son el caso contrario y por eso sí entran: son los
+        // números protagonistas. El importe de bloque en 19 contra el `lg2` de 17,
+        // y el de la cuenta en 28 contra el `xl2` de 22 — seis píxeles en el
+        // número más grande de la pantalla, que sí se ven.
+        //
+        // El sufijo `3` marca el segundo escalón propio de esa familia, siguiendo
+        // la convención del `2`. Y como siempre: si entran acá, entran el mismo
+        // día a `ESCALA` en `lib/sunmi/claseNegociada.js`, o el kit no los
+        // reconoce como tamaño y la pieza vuelve a poner el suyo.
+        sm3: "13px",
+        lg3: "19px",
+        xl3: "28px",
       },
 
       boxShadow: {

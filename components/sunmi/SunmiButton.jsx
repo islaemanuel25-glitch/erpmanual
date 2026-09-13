@@ -60,6 +60,10 @@ export const COLORES = Object.freeze([
   "primary",
   "secondary",
   "warning",
+  // `ghost` se agregó el 2026-09-13 y NO es un color más: es la ausencia de
+  // relleno. No pinta fondo ni texto —hereda—, así que el contorno y el tono
+  // los pone la pantalla con clases del kit. El porqué está en `styles/sunmi.css`.
+  "ghost",
 ]);
 
 const FALLBACK = "slate";
