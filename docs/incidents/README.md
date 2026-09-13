@@ -34,6 +34,7 @@ un incidente y una anécdota.
 | [INC-0006](INC-0006-editar-proveedor-500.md) | Editar un proveedor devuelve 500 desde el 2026-07-26 | Arreglado, sin desplegar |
 | [INC-0007](INC-0007-proveedores-listar-sin-permiso.md) | 19 rutas de lectura le contestan a un rol sin el permiso | 13 arregladas, 6 a decidir |
 | [INC-0008](INC-0008-packs-contados-sobre-un-envio-sin-bultos.md) | 6 packs contados sobre un envío sin packs: 180 unidades donde llegaron 8 | **ABIERTO** (la fila sigue mal; no movió stock) |
+| [INC-0009](INC-0009-el-documento-resta-dos-escalas.md) | El documento de una transferencia cerrada resta dos escalas: 595 unidades informadas como faltantes que están en el local | Arreglado, sin desplegar (el stock estaba bien) |
 
 ## Incidentes que existen pero no se documentaron acá
 
