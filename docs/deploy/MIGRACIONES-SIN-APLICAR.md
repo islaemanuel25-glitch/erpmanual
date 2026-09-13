@@ -20,6 +20,68 @@ Ninguna. Producción está en **10 migraciones**, las mismas que el árbol.
 
 ---
 
+## 2026-09-13 — `c9aac14b`, una sola verdad para lo enviado y lo recibido: CERO migraciones
+
+Producción pasó de `3eab5c04d7a6795327382095046bc116eca83a11` a
+`c9aac14bc8047787ed8c76d4d203160bfcb3be40`. **Despliegue solo de código**, con
+corte de **4 segundos**.
+
+El cero por los tres caminos: diff de `prisma/` vacío en el rango y
+`schema.prisma` sin tocar; clasificador con `--desde 3eab5c04…` en «Archivos a
+mirar: 0»; y `migrate deploy` contando **10**, el mismo número que el árbol del
+VPS. `migrate status` de cierre: 10 y «Database schema is up to date!». Bitácora
+de autorizaciones **inexistente**.
+
+### El marcador, y por primera vez sale de un mensaje de error
+
+La tanda no agrega texto de interfaz: lo que cambia son números calculados. Pero
+sí agrega una **cadena de runtime** que antes no existía — el mensaje del error que
+`recibidoDeLinea` tira cuando le llega un objeto que no trae ni
+`cantidadRecibida` ni `recibido`.
+
+- **Presencia:** `recibidoDeLinea: la línea no trae` — **0 archivos en la imagen
+  vieja, 7 en la nueva**.
+- **Control:** `unidad suelta` — **24 en la vieja y 28 en la nueva**, o sea presente
+  en las dos, que es lo que el control tiene que probar.
+
+Dos cosas que conviene dejar dichas. La primera: un mensaje de error **sí** sirve
+de marcador, al revés que un identificador, porque es una cadena y el build no la
+mangla. La segunda: el control **subió** de 24 a 28, y eso no es ruido ni una hoja
+cacheada — `presentacionEnvio.js` entra ahora en más chunks, porque los agregados
+del período pasaron a importar `controlFisico`, que lo importa. Un control que se
+mueve sigue sirviendo mientras esté en las dos; el que no sirve es el que da vacío.
+
+### La sonda de cascada
+
+**VERDE antes y después**, 1647 reglas las dos veces y las cuatro mediciones en su
+valor. La de la tarjeta de producto **no aplica**.
+
+### QUÉ QUEDA ARRIBA, Y ES LO QUE CIERRA TRES INCIDENTES DE RAÍZ
+
+El relevamiento del repo entero encontró que "cuánto se envió y cuánto llegó"
+estaba escrito **seis veces**, y tres copias se habían equivocado. Sale:
+
+- **El pozo que las causaba.** Las funciones canónicas leían solo el nombre del DTO
+  —`cantidadRecibida`— y devolvían `null` en silencio ante una fila de Prisma.
+  Ahora hay una puerta que entiende las dos formas y **tira un error** cuando le
+  llega un objeto que no puede contestar. Eso es lo que había empujado a los
+  agregados a escribir la cuenta a mano.
+- **Las dos funciones que quedaban mal**, con sus cinco superficies: el listado en
+  sus dos vistas pasó de «40 enviadas · 5 recibidas» a **40 y 40**, la tarjeta
+  perdió su «Faltante: 35», el reporte por destino pasó de «env 40 · rec 5» a
+  **«env 40 · rec 40»**, y el panel de productos de diferencias 28 y 7 a **cero**.
+- **El signo unificado** en `recibida − enviada`: un faltante se lee igual en todas
+  las pantallas.
+- **`cancelar/route.js`**, que era una trampa latente de stock —devolvía al origen
+  el doble el día que apareciera una línea con snapshot agrupado y
+  `unidadEnviada = BULTO`— y ahora lee el snapshot.
+- **Y el candado de repo entero** que prohíbe escribir esa cuenta a mano fuera de
+  diez módulos con nombre y motivo, con su contraprueba permanente sobre los cuatro
+  defectos reales.
+
+El `INC-0008` sigue abierto y este despliegue no lo toca: el detalle 6519 conserva
+sus 6 packs contados sobre un envío sin packs.
+
 ## 2026-09-13 — `3eab5c04`, el documento de escritorio lee la escala del remito: CERO migraciones
 
 Producción pasó de `1487c1f6c8e29096e1b022acbc63bc3136fad919` a
