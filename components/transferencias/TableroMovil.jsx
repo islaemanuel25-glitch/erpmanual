@@ -30,6 +30,7 @@ import { TriangleAlert } from "lucide-react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiDateRangePicker from "@/components/sunmi/SunmiDateRangePicker";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
@@ -68,6 +69,7 @@ export default function TableroMovil({ onAbrirReporte }) {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [abiertos, setAbiertos] = useState(() => new Set());
+  const [numero, setNumero] = useState("");
 
   // EL BOTÓN VIAJA EN EL RENGLÓN QUE YA EXISTE. El shell dibuja el título de la
   // pantalla y pone a su derecha lo que la pantalla registre acá, así que en un
@@ -134,7 +136,31 @@ export default function TableroMovil({ onAbrirReporte }) {
     });
   };
 
+  // ── LOS DOS CAMINOS VAN A LA MISMA PANTALLA, Y ESO ES CORRECTO ─────────
+  //
+  // `/modulos/transferencias/[id]` ya decide qué mostrar según el estado: la
+  // recepción si está para recibir, el documento si ya se recibió. Mandar la
+  // recibida a otro lado habría sido inventar una segunda pantalla de detalle
+  // al lado de la que existe.
+  //
+  // Se dejan como dos funciones con nombre porque son dos intenciones distintas
+  // —"voy a contar" y "voy a mirar"— y el día que una de las dos necesite otra
+  // cosa, el cambio es de una línea y no hay que descubrir cuál era cuál.
   const recibir = (t) => router.push(`/modulos/transferencias/${t.id}`);
+  const ver = (t) => router.push(`/modulos/transferencias/${t.id}`);
+
+  // ── EL BUSCADOR POR NÚMERO ────────────────────────────────────────────
+  //
+  // El "#N" salió de la lista porque no dice nada al mirar; sigue sirviendo
+  // cuando ya se sabe cuál se busca —hablando por teléfono con el depósito—.
+  // Por eso es un campo y no una columna.
+  //
+  // Filtra sobre lo que YA se trajo, sin volver a consultar: el período
+  // completo está en memoria y una transferencia de otro período no se
+  // encontraría igual. Si el número no está en la lista, se dice.
+  const buscado = numero.trim().replace(/^#/, "");
+  const filtrarPorNumero = (transferencias) =>
+    buscado ? (transferencias || []).filter((t) => String(t.id).includes(buscado)) : transferencias;
 
   const sinConfigurar = (datos?.bloques || []).filter((b) => b.sinConfigurar).length;
 
@@ -145,6 +171,17 @@ export default function TableroMovil({ onAbrirReporte }) {
       <AccionDePantalla>{botonDeReporte}</AccionDePantalla>
 
       <ChipsDePeriodo valor={unidad} onCambiar={setUnidad} />
+
+      {/* EL BUSCADOR POR NÚMERO. El "#N" salió de la lista porque al mirar no
+          dice nada; acá sirve, que es cuando ya se sabe cuál se busca. */}
+      <SunmiInput
+        value={numero}
+        onChange={(e) => setNumero(e.target.value)}
+        placeholder="Buscar transferencia por número"
+        inputMode="numeric"
+        aria-label="Buscar transferencia por número"
+        className="w-full rounded-xl text-sm3"
+      />
 
       {unidad === CLAVE_OTRO && (
         <SunmiDateRangePicker
@@ -206,10 +243,18 @@ export default function TableroMovil({ onAbrirReporte }) {
               {datos.bloques.map((b) => (
                 <BloqueLocal
                   key={b.localId}
-                  bloque={b}
-                  abierto={abiertos.has(b.localId)}
+                  bloque={
+                    buscado
+                      ? { ...b, transferencias: filtrarPorNumero(b.transferencias) }
+                      : b
+                  }
+                  // Buscando, los bloques se abren solos: esconder el resultado
+                  // detrás de un toque más sería pedirle al que ya escribió el
+                  // número que además adivine en qué local está.
+                  abierto={Boolean(buscado) || abiertos.has(b.localId)}
                   onAlternar={() => alternar(b.localId)}
                   onRecibir={recibir}
+                  onVer={ver}
                   money={money}
                 />
               ))}
@@ -239,7 +284,7 @@ export default function TableroMovil({ onAbrirReporte }) {
                 YA RECIBIDAS
               </h2>
               {datos.cuenta.yaRecibidas.map((t) => (
-                <FilaTransferenciaLocal key={t.id} t={t} money={money} />
+                <FilaTransferenciaLocal key={t.id} t={t} onVer={ver} money={money} />
               ))}
             </section>
           )}

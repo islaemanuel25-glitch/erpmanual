@@ -38,6 +38,11 @@ import { resolveVistaOperativa } from "@/lib/grupos";
 import { origenEsDepositoDe } from "@/lib/transferencias/costoTransferencia";
 import { importeRecibidoDeDetalle } from "@/lib/transferencias/agregadosPeriodo";
 import {
+  diferenciaDeLinea,
+  fisicasEnviadasDe,
+  fisicasRecibidasDe,
+} from "@/lib/transferencias/recepcionUI";
+import {
   DIA_DE_CORTE_POR_DEFECTO,
   UNIDADES,
   esDiaDeCorteValido,
@@ -53,6 +58,43 @@ import { destinosDeTransferencia } from "@/lib/transferencias/destinosDeTransfer
 
 /** `YYYY-MM-DD`, que es la forma en la que `periodoDePago` compara. */
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Cuántas LÍNEAS de este remito difieren de lo que se envió.
+ *
+ * Se cuentan líneas, no unidades: la pantalla dice "2 diferencias" y eso son dos
+ * productos que no coinciden, sin importar por cuánto.
+ *
+ * Solo cuentan las que YA SE CONTARON. `fisicasRecibidasDe` devuelve `null`
+ * cuando nadie registró recepción de esa línea, y una línea sin contar no es una
+ * diferencia: es una pregunta sin responder. Colapsarlas daría "77 diferencias"
+ * en una transferencia recién abierta.
+ *
+ * La línea que la puerta no puede leer —una histórica sin snapshot ni
+ * presentación adoptada— se saltea en vez de suponer. Contarla como diferencia
+ * sería inventar un faltante; contarla como coincidencia, esconderlo.
+ */
+function contarLineasConDiferencia(detalle = []) {
+  let n = 0;
+  for (const d of detalle) {
+    let enviada;
+    let recibida;
+    try {
+      enviada = fisicasEnviadasDe(d);
+      recibida = fisicasRecibidasDe(d);
+    } catch {
+      continue;
+    }
+    if (recibida == null) continue;
+    const dif = diferenciaDeLinea({ enviada, recibida });
+    // El umbral es media milésima: las cantidades son `Decimal(12,3)`, así que
+    // cualquier diferencia real es de al menos una milésima. Comparar contra
+    // cero pelado haría que un residuo binario de una conversión cuente como
+    // faltante.
+    if (dif != null && Math.abs(dif) > 0.0005) n += 1;
+  }
+  return n;
+}
 
 /**
  * La ventana que hay que traer de la base.
@@ -267,6 +309,25 @@ export async function GET(req) {
         cantidadItems: detalle.length,
         itemsRevisables: revisables.length,
         itemsRevisados: revisables.filter((d) => d.revisadoEnRecepcion).length,
+        // ── CUÁNTAS LÍNEAS DIFIEREN, Y POR QUÉ NO SALE DE LA COLUMNA ──────
+        //
+        // `Transferencia.tieneDiferencias` existe y se llama parecido, y NO se
+        // usa. Dos motivos, medidos sobre producción el 2026-09-13:
+        //
+        //   · es un BOOLEANO, y la pantalla dice el número —"2 diferencias"—;
+        //   · solo se escribe al CONFIRMAR. De las 15 transferencias en
+        //     `Recibiendo`, la columna dice `false` en las 15 y las líneas dicen
+        //     que 7 ya tienen diferencia. Mientras se cuenta, la columna miente
+        //     por omisión.
+        //
+        // Sobre las 62 recibidas la columna sí coincide exactamente con las
+        // líneas. Aun así se descarta: una sola fuente para los dos casos es
+        // mejor que dos que coinciden en uno.
+        //
+        // La cuenta NO se escribe a mano —el candado de repo entero lo prohíbe—:
+        // sale de `diferenciaDeLinea`, que es `recibida − enviada` en unidades
+        // físicas, sobre las puertas canónicas de la escala.
+        lineasConDiferencia: contarLineasConDiferencia(detalle),
         importe: importeRecibidoDeDetalle(detalle, {
           origenEsDeposito: origenEsDepositoDe(t, "tablero"),
         }),
@@ -275,7 +336,22 @@ export async function GET(req) {
 
     if (esDeposito) {
       const bloques = bloquesPorLocal({
-        transferencias: filas,
+        // ── EL CONTEO DE DIFERENCIAS VIAJA CON LA FILA, NO DESPUÉS ───────
+        //
+        // `bloquesPorLocal` suma `lineasConDiferencia` para la cabecera del
+        // local, y lo lee de cada transferencia. Si se le pasaran las filas
+        // crudas de Prisma —que no lo traen— el campo sería `undefined`, la
+        // suma daría CERO y la cabecera diría "0 con diferencias" mientras las
+        // filas de abajo muestran "Recibida · 1 diferencia".
+        //
+        // Eso fue exactamente lo que pasó: el candado no lo vio porque armaba
+        // el bloque a mano con el conteo ya puesto, y lo encontró el arnés
+        // abriendo la pantalla. Es el defecto que este repo tiene anotado como
+        // el que más se repite — un fixture que el endpoint nunca produce.
+        transferencias: filas.map((t) => ({
+          ...t,
+          lineasConDiferencia: contarLineasConDiferencia(t.detalle || []),
+        })),
         acuerdos,
         unidad,
         rangoFijo,
@@ -307,6 +383,8 @@ export async function GET(req) {
           aPagar: b.aPagar,
           cantidadTransferencias: b.cantidadTransferencias,
           sinRecibir: b.sinRecibir,
+          // Cuántas transferencias del período no cerraron, para la cabecera.
+          conDiferencias: b.conDiferencias,
           totalCerrado: b.totalCerrado,
           // El local que existe y esta semana no recibió nada. La pantalla lo
           // dibuja corto: sin rango, sin borde de aviso y sin nada que abrir.

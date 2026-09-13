@@ -348,6 +348,62 @@ for (const l of LINEAS) {
   });
 }
 
+// ── 5 · UNA TRANSFERENCIA YA RECIBIDA, DE OTRO DÍA ───────────────────────
+//
+// Existe para dos cosas que sin ella no se pueden ejercer en el navegador:
+//
+//   · el AGRUPADO POR DÍA. Con un solo remito hay una sola banda, y "se agrupan
+//     por día" se afirmaría sobre el caso que no puede fallar. Ésta va con
+//     fecha de AYER, así que la lista tiene dos bandas y se puede comprobar que
+//     la más reciente va primero.
+//   · la RECIBIDA QUE SE ABRE, que es el defecto principal de esta vuelta. La
+//     otra está `Enviada`, así que su control es "Recibir" y nunca mostraría el
+//     camino al detalle.
+//
+// Llega CON UNA DIFERENCIA a propósito —se recibieron 5 de 6 packs— para que el
+// conteo de la cabecera tenga algo que contar y no se afirme siempre sobre cero.
+const AYER = new Date(Date.now() - 24 * 60 * 60 * 1000);
+const recibida = await prisma.transferencia.create({
+  data: {
+    origenId: deposito.id,
+    destinoId: destino.id,
+    estado: "Recibida",
+    fechaEnvio: AYER,
+    fechaRecepcion: AYER,
+    creadaPor: usuario.id,
+    // La columna se escribe como la escribiría `confirmar-recepcion`. La
+    // pantalla NO la usa —cuenta las líneas— y se pone igual para que el dato
+    // de prueba tenga la forma del dato real.
+    tieneDiferencias: true,
+  },
+});
+
+for (const l of [
+  { clave: "coincide", cantidad: 10, recibido: 10, precioCosto: 500 },
+  // 6 PACK x24: salieron 144 y llegaron 120. Una línea con diferencia.
+  { clave: "faltante", cantidad: 144, recibido: 5, precioCosto: 8000,
+    presentacionEnvio: "PACK", cantidadPresentada: 6, factorPresentacion: 24 },
+]) {
+  await prisma.transferenciaDetalle.create({
+    data: {
+      transferenciaId: recibida.id,
+      productoId: local[l.clave].id,
+      cantidad: l.cantidad,
+      recibido: l.recibido,
+      precioCosto: l.precioCosto,
+      unidadEnviada: "UNIDAD",
+      presentacionEnvio: l.presentacionEnvio ?? null,
+      cantidadPresentada: l.cantidadPresentada ?? null,
+      factorPresentacion: l.factorPresentacion ?? null,
+      revisadoEnRecepcion: true,
+      revisadoEnRecepcionPorId: usuario.id,
+      revisadoEnRecepcionAt: AYER,
+      fechaRecepcion: AYER,
+      confirmadoPorId: usuario.id,
+    },
+  });
+}
+
 log("");
 log("SEMBRADO LISTO");
 log(`  fuera del remito: ${PRODUCTOS.find((p) => p.fueraDelRemito).nombre}`);

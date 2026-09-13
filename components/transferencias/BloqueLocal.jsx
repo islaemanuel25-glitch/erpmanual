@@ -34,11 +34,9 @@
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import { rotuloDelRango } from "@/lib/transferencias/periodoDePago";
-import {
-  rotuloDeBloque,
-  subtituloConEstado,
-  tituloDeTransferencia,
-} from "@/lib/transferencias/rotulosDeTransferencia";
+import { diasDeTransferencias } from "@/lib/transferencias/diasDeTransferencias";
+import { rotuloDeBloque } from "@/lib/transferencias/rotulosDeTransferencia";
+import DiaDeTransferencias from "./DiaDeTransferencias";
 
 /**
  * LA PÍLDORA DE "SIN CORTE", que las dos formas del bloque comparten.
@@ -78,7 +76,14 @@ function PildoraDeBaja() {
   );
 }
 
-export default function BloqueLocal({ bloque, abierto = false, onAlternar, onRecibir, money }) {
+export default function BloqueLocal({
+  bloque,
+  abierto = false,
+  onAlternar,
+  onRecibir,
+  onVer,
+  money,
+}) {
   const abierta = !bloque?.totalCerrado;
 
   // ── EL LOCAL SIN MOVIMIENTO ES CORTO, Y NO ES UN BLOQUE DESHABILITADO ───
@@ -165,42 +170,23 @@ export default function BloqueLocal({ bloque, abierto = false, onAlternar, onRec
       </SunmiButton>
 
       {abierto && (
-        <div className="mt-3.5">
+        <div className="mt-3.5 space-y-3.5">
           {/* El separador de la especificación: 1 px al 70 %. */}
           <div className="border-t sunmi-divider opacity-70" aria-hidden="true" />
 
-          {(bloque?.transferencias || []).map((t) => {
-            const pendiente = !t?.recibida;
-            return (
-              <div key={t.id} className="py-2.5 flex items-center justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="text-base font-medium sunmi-text-strong truncate">
-                    {tituloDeTransferencia(t)}
-                  </div>
-                  <div
-                    className={`text-sm2 ${pendiente ? "sunmi-text-warning" : "sunmi-text-muted"}`}
-                  >
-                    {subtituloConEstado(t)}
-                  </div>
-                </div>
-
-                {pendiente ? (
-                  <SunmiButton
-                    type="button"
-                    color="primary"
-                    onClick={() => onRecibir?.(t)}
-                    className="shrink-0 px-3.5 py-2 rounded-lg text-sm3 font-semibold"
-                  >
-                    Recibir
-                  </SunmiButton>
-                ) : (
-                  <div className="shrink-0 text-base font-semibold sunmi-text-strong tabular-nums">
-                    {money ? money(t?.importe) : t?.importe}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {/* ── LAS TRANSFERENCIAS, AGRUPADAS POR DÍA ────────────────────
+              Antes era una lista plana titulada por el número interno. El
+              agrupado lo hace `diasDeTransferencias`, que ordena del día más
+              reciente al más viejo y suma el importe de cada uno. */}
+          {diasDeTransferencias(bloque?.transferencias || []).map((dia) => (
+            <DiaDeTransferencias
+              key={dia.clave}
+              dia={dia}
+              onRecibir={onRecibir}
+              onVer={onVer}
+              money={money}
+            />
+          ))}
         </div>
       )}
     </section>

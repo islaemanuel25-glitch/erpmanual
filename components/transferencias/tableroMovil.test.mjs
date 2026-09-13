@@ -521,14 +521,27 @@ test("E7 · el rótulo del importe sigue al chip, no dice siempre 'esta semana'"
 test("E8 · el avance NO cuenta las líneas agregadas en la recepción", () => {
   // La guarda de confirmación pregunta por los ORIGINALES sin revisar, así que
   // una agregada en el denominador haría que el avance nunca llegue al total.
-  const t = comoLaManda(transferencia(7, 2, "mini el 7", "Enviada", "2026-09-14", null), {
+  //
+  // ── REESCRITO EL 2026-09-13, NO AFLOJADO ────────────────────────────────
+  //
+  // Afirmaba el texto viejo —"3 ítems · 2 de 2 revisados"— sobre
+  // `subtituloConAvance`, que se fue junto con `subtituloConEstado`: las dos
+  // decían lo mismo de dos formas y quedaron sin consumidor. El HECHO que este
+  // candado defiende no cambió —el denominador excluye las agregadas— y ahora
+  // vive en `estadoEnPalabras`, así que se afirma sobre el texto que se ve hoy.
+  const t = comoLaManda(transferencia(7, 2, "mini el 7", "Recibiendo", "2026-09-14", 2), {
+    estado: "Recibiendo",
+    recibida: false,
     cantidadItems: 3,
     itemsRevisables: 2,
     itemsRevisados: 2,
   });
 
   const salida = html(React.createElement(FilaTransferenciaLocal, { t, money }));
-  assert.ok(salida.includes("3 ítems · 2 de 2 revisados"), "el avance no sale del campo de revisables");
+  assert.ok(
+    salida.includes("Contando · 2 de 2"),
+    "el denominador no sale de `itemsRevisables`: con las agregadas diría 'de 3'"
+  );
   assert.ok(salida.includes("Recibir"), "una pendiente ofrece recibirla");
 });
 

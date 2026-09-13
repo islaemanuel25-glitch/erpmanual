@@ -16,29 +16,51 @@
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import {
-  subtituloConAvance,
+  estadoEnPalabras,
   tituloDeTransferencia,
 } from "@/lib/transferencias/rotulosDeTransferencia";
 
-export default function FilaTransferenciaLocal({ t, onRecibir, money }) {
+export default function FilaTransferenciaLocal({ t, onRecibir, onVer, money }) {
   const pendiente = !t?.recibida;
+  const estado = estadoEnPalabras(t);
 
-  return (
-    <div
-      className={`sunmi-surface rounded-xl2 p-4 flex items-center justify-between gap-3 ${
-        pendiente ? "border-1.5 sunmi-border-warning" : "border sunmi-border"
-      }`}
-    >
-      <div className="min-w-0 flex-1">
+  const marco = `sunmi-surface rounded-xl2 p-4 flex items-center justify-between gap-3 ${
+    pendiente ? "border-1.5 sunmi-border-warning" : "border sunmi-border"
+  }`;
+
+  const contenido = (
+    <>
+      <div className="min-w-0 flex-1 text-left">
         <div className="text-base2 font-semibold sunmi-text-strong truncate">
           {tituloDeTransferencia(t)}
         </div>
-        <div className={`text-sm2 ${pendiente ? "sunmi-text-warning" : "sunmi-text-muted"}`}>
-          {subtituloConAvance(t)}
+        {/* EL ESTADO EN PALABRAS, el mismo que la vista del depósito. Antes acá
+            decía "20 de 77 revisados" y allá el nombre del estado: dos formas de
+            contar lo mismo, que es como empiezan a divergir. */}
+        <div
+          className={`text-sm2 ${
+            estado.tono === "warning" ? "sunmi-text-warning" : "sunmi-text-muted"
+          }`}
+        >
+          {estado.texto}
         </div>
       </div>
 
-      {pendiente ? (
+      {pendiente ? null : (
+        <div className="shrink-0 text-right">
+          <div className="text-base2 font-semibold sunmi-text-strong tabular-nums">
+            {money ? money(t?.importe) : t?.importe}
+          </div>
+          <div className="text-sm2 font-medium sunmi-text-accent">Ver ›</div>
+        </div>
+      )}
+    </>
+  );
+
+  if (pendiente) {
+    return (
+      <div className={marco}>
+        {contenido}
         <SunmiButton
           type="button"
           color="primary"
@@ -47,11 +69,23 @@ export default function FilaTransferenciaLocal({ t, onRecibir, money }) {
         >
           Recibir
         </SunmiButton>
-      ) : (
-        <div className="shrink-0 text-base2 font-semibold sunmi-text-strong tabular-nums">
-          {money ? money(t?.importe) : t?.importe}
-        </div>
-      )}
-    </div>
+      </div>
+    );
+  }
+
+  // ── LA RECIBIDA SE ABRE, Y LA TARJETA ENTERA ES EL OBJETIVO ────────────
+  //
+  // Era el mismo defecto que en la vista del depósito: la ya recibida no tenía
+  // forma de abrirse. El "Ver ›" es la señal, no el botón — si fuera el único
+  // objetivo, en un teléfono habría que acertarle a dos palabras.
+  return (
+    <SunmiButton
+      type="button"
+      color="ghost"
+      onClick={() => onVer?.(t)}
+      className={`${marco} w-full min-h-0 text-left`}
+    >
+      {contenido}
+    </SunmiButton>
   );
 }

@@ -392,6 +392,84 @@ await foto(`v28-sin-configurar-${ANCHO}`);
 // El bloque abierto: la transferencia con su botón.
 await tocar("A pagar");
 await afirmar(await hayTexto("Recibir"), "al abrir el bloque, la pendiente ofrece recibirla");
+
+// ── LA SEGUNDA VUELTA (V32) ───────────────────────────────────────────────
+//
+// El sembrado tiene dos remitos de días distintos: uno de hoy sin abrir y otro
+// de ayer ya recibido y con una diferencia.
+//
+// SE MIRA CON EL CHIP EN «MES», y no es un rodeo: el corte por defecto es el
+// domingo, así que en un domingo la semana arranca HOY y el remito de ayer cae
+// en la semana anterior. Con la semana habría un solo día en pantalla y el
+// agrupado se afirmaría sobre el caso que no puede fallar. El mes contiene los
+// dos, y de paso ejerce el chip.
+// El bloque YA está abierto y `abiertos` sobrevive al cambio de chip, así que no
+// se vuelve a tocar: un segundo toque lo cerraría. Costó una corrida saberlo.
+await tocar("Mes");
+await esperar(1500);
+
+await afirmar(
+  !(await hayTexto("#")),
+  "el número interno salió de la lista: no dice qué día ni qué trae"
+);
+await afirmar(await hayTexto("Sin abrir"), "el estado se dice en palabras");
+await afirmar(
+  await hayTexto("Recibida · 1 diferencia"),
+  "la recibida dice cuántas líneas no cerraron"
+);
+await afirmar(await hayTexto("Ver ›"), "la recibida ofrece abrirse");
+await afirmar(
+  await hayTexto("con diferencia"),
+  "la cabecera del local cuenta las que no cerraron"
+);
+
+// LAS DOS BANDAS DE DÍA, y la más reciente primero.
+const dias = await evaluar(`(() => {
+  const t = document.body.innerText;
+  const m = t.match(/(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo) \\d+/g) || [];
+  return [...new Set(m)];
+})()`);
+await afirmar(
+  Array.isArray(dias) && dias.length >= 2,
+  `las transferencias se agrupan por día (encontrados: ${JSON.stringify(dias)})`
+);
+
+// ── LA BANDA SE PINTA PAREJA ─────────────────────────────────────────────
+//
+// El defecto a no repetir: un hijo con fondo propio tapa la franja y deja un
+// rectángulo del color de la tarjeta en el medio. Se mide el fondo COMPUTADO de
+// la banda y el de todos sus descendientes: los hijos tienen que ser
+// transparentes.
+const banda = await evaluar(`(() => {
+  const b = [...document.querySelectorAll("div")]
+    .filter((e) => e.offsetParent !== null && e.className.includes("sunmi-surface-soft"))
+    .find((e) => /(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo) \\d+/.test(e.innerText));
+  if (!b) return null;
+  const fondo = getComputedStyle(b).backgroundColor;
+  const hijos = [...b.querySelectorAll("*")].map((h) => getComputedStyle(h).backgroundColor);
+  const opacos = hijos.filter((c) => c && c !== "rgba(0, 0, 0, 0)" && c !== "transparent");
+  return { fondo, hijos: hijos.length, opacos: opacos.length, ejemplos: opacos.slice(0, 3) };
+})()`);
+await afirmar(
+  banda && banda.fondo !== "rgba(0, 0, 0, 0)",
+  `la banda del día tiene fondo propio (computado: ${JSON.stringify(banda)})`
+);
+await afirmar(
+  banda && banda.opacos === 0,
+  `NINGÚN hijo de la banda se pinta: si uno lo hace, tapa la franja (${JSON.stringify(banda)})`
+);
+
+await foto(`v32-dias-${ANCHO}`);
+
+// Y la recibida ABRE el detalle.
+await tocar("Ver ›");
+await esperarTexto("Productos transferidos", 30000);
+await afirmar(true, "tocar una recibida lleva al detalle que ya existía");
+await foto(`v32-detalle-${ANCHO}`);
+// Se vuelve a la SEMANA, que es como arranca la pantalla, para que el resto de
+// la corrida siga midiendo el estado por defecto.
+await abrir("/modulos/transferencias", "Transferencias");
+await tocar("A pagar");
 await foto(`v28-bloque-abierto-${ANCHO}`);
 
 // ── 2 · EL CORTE DE SEMANA: SE VE, SE CAMBIA Y SE GUARDA ─────────────────

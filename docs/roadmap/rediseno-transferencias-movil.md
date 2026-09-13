@@ -196,6 +196,57 @@ contra lo que se compara. Lo que se construyó:
   `components/transferencias/senalDeEdicion.test.mjs`, 5, que vuelve a medir los
   catorce temas en cada corrida.
 
+### SEGUNDA VUELTA (V32), del 2026-09-13 — el día, el estado y la recibida
+
+La lista de un local era plana y titulada por el número interno: "#200", "#204".
+Ese número no dice qué día salió, ni qué traía, ni si hubo diferencia. Y una
+transferencia ya recibida **no tenía forma de abrirse** — el único control era
+"Recibir", que es para las otras. Ése era el defecto principal.
+
+**Ahora:** las transferencias se agrupan por DÍA, del más reciente al más viejo,
+con una banda por día que lleva su total. Cada fila dice la hora, los ítems y el
+estado EN PALABRAS. La recibida es tocable entera y lleva al detalle que ya
+existía. Arriba hay un buscador por número, que es cuando el "#N" sí sirve.
+
+**El conteo de diferencias NO sale de `Transferencia.tieneDiferencias`**, aunque
+se llame parecido. Medido sobre producción: es un booleano —y la pantalla dice el
+número— y solo se escribe al CONFIRMAR, así que de las 15 transferencias en
+`Recibiendo` la columna decía `false` en las 15 mientras las líneas decían que 7
+ya tenían diferencia. Sale de `diferenciaDeLinea` sobre las puertas canónicas.
+Sobre las 62 recibidas la columna sí coincidía exactamente, y aun así se
+descartó: una sola fuente para los dos casos.
+
+**El agrupado es por fecha de ENVÍO**, la misma que decide el período. Y hay un
+motivo que lo cierra: de las 207 transferencias vivas, las 145 no recibidas **no
+tienen `fechaRecepcion`**. Agrupar por recepción dejaría sin día justamente a las
+que hay que trabajar.
+
+**LA BANDA SE PINTA PAREJA Y TIENE CANDADO.** El fondo va en un solo nodo y
+ninguno de sus hijos declara superficie propia: un hijo pintado tapa la franja y
+deja un rectángulo del color de la tarjeta en el medio. Lo afirma el candado
+sobre el HTML renderizado y el arnés sobre el fondo COMPUTADO de los cuatro
+descendientes.
+
+**Dos defectos los encontró la pantalla, no los candados**, y los dos con la
+misma forma —un fixture que el endpoint nunca produce—:
+
+1. La ruta le pasaba a `bloquesPorLocal` las filas CRUDAS de Prisma, sin
+   `lineasConDiferencia`, así que la cabecera sumaba cero. El candado no lo vio
+   porque armaba el bloque a mano con el conteo ya puesto. Ahora lo arma con la
+   función real.
+2. La cabecera contaba también las que están a medio contar, así que decía "2 con
+   diferencias" con una sola fila mostrándolas. Se cuentan solo las RECIBIDAS:
+   la cabecera cuenta lo que las filas MUESTRAN.
+
+**ESCRITORIO QUEDA ANOTADO.** Nada de esto toca la vista de 1024 px para arriba:
+el reporte sigue dibujándose con las mismas clases y el arnés lo comprueba a
+1366. Agrupar por día el detalle de escritorio es una tanda propia.
+
+**Se fueron `subtituloConEstado` y `subtituloConAvance`**, que decían lo mismo de
+dos formas y quedaron sin un solo consumidor. Su conocimiento caro —el
+denominador del avance excluye las líneas agregadas en recepción— vive ahora en
+`estadoEnPalabras`.
+
 ### Las tres correcciones de Emanuel, del 2026-09-13
 
 **1 · El encabezado propio desaparece: el botón viaja en el renglón del shell.**
