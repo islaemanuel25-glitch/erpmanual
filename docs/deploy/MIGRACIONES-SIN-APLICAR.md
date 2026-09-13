@@ -16,53 +16,88 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-### `20260913120000_acuerdo_deposito_local` — el corte de semana
+Ninguna. Producción está en **11 migraciones**, las mismas que el árbol.
 
-Commiteada en `ad39cecd`. **Es la primera migración en el rango desde el
-2026-09-10**, así que el próximo despliegue NO es solo de código.
+---
 
-**Qué hace:** crea la tabla `AcuerdoDepositoLocal` —el día en que arranca la
-semana de cada par depósito–local—, con un único sobre el par, un índice por
-grupo y tres foráneas en CASCADE.
+## 2026-09-13 — `7375ac9c`, el corte de semana: UNA migración, APLICADA
 
-**Es puramente aditiva.** Una tabla nueva y nada más: no hay DROP, ni UPDATE, ni
-DELETE, ni INSERT, ni backfill, y ninguna columna existente se toca.
+Producción pasó de `94432c429c52cb6d2baa2ce88d9efcb6bf8a308d` a
+`7375ac9cb24559259150bf9ed8ae59b4329f9bf5`. **Corte de 2 segundos.**
 
-**Y por eso la ventana entre migrar y recrear es inofensiva:** el código viejo no
-nombra esa tabla, así que no puede romperse por ella, y no hay ninguna columna
-nueva en una tabla que el código viejo escriba.
+### `20260913120000_acuerdo_deposito_local` — APLICADA
 
-**Deja CERO filas.** Ninguna relación queda configurada: se configuran de a una
-desde la pantalla de "Corte de semana", con autor. En producción hay 1 grupo, 1
-depósito y 4 locales, así que quedan **4 relaciones por configurar**, y hasta que
-alguien las configure la lista de trabajo las muestra marcadas como "Sin corte" y
-les aplica el domingo — nunca en silencio.
+Crea la tabla `AcuerdoDepositoLocal`: el día en que arranca la semana de cada par
+depósito–local. Hasta acá el corte estaba escrito en el código.
 
-**EL QUINTO CHEQUEO DEL BACKUP NO APLICA.** Ese chequeo existe para las
-migraciones de DATOS: comprobar que un valor de los que se van a perder esté
-adentro del dump. Acá no se pierde ningún dato, así que no hay valor que buscar.
-**Los cuatro de siempre sí, y completos** — código de salida del `pg_dump` con
-`pipefail`, `gzip -t`, la marca de cierre en las últimas 20 líneas, y 40 tablas o
-más.
+**El conteo subió y coincide**, que es lo único que prueba que se aplicó: el
+árbol tenía 11 y el contenedor descartable informó **"11 migrations found"** y
+`Applying migration 20260913120000_acuerdo_deposito_local`. El código de salida
+no alcanza y por eso no se mira solo.
 
-**Estado medido en producción el 2026-09-13, solo lectura:** `to_regclass` sobre
-`AcuerdoDepositoLocal` devuelve vacío —la tabla NO existe— y no hay ninguna fila
-en `_prisma_migrations` con ese nombre. La última aplicada es
-`20260910120000_presentacion_adoptada_en_recepcion`.
+**Verificada contra PostgreSQL después de aplicar**, y da exactamente lo que la
+migración prometía: **7 columnas**, `diaDeCorte` **sin default**, **3 foráneas
+con `confdeltype = c`** y **0 filas**. `migrate status`: 11 y "Database schema is
+up to date!".
 
-**Aplicada y verificada en la base de PRUEBAS** (`erpazul_v15`): siete columnas,
-`diaDeCorte` sin default, el único sobre el par, las tres foráneas con
-`confdeltype = c` y cero filas.
+**Clasificador: ADITIVA, salida 0.** Corrido con `--desde 94432c42…` —el SHA de
+la imagen que estaba atendiendo— y no con `--vps`, por el motivo de abajo.
 
-**Lo que NO se pudo correr desde acá, y conviene saberlo antes de empezar:**
-`node scripts/clasificar-migraciones.mjs --vps` aborta con INDETERMINADO, porque
-resuelve la imagen del contenedor por `ssh vps-erp` y **este VPS no tiene ese
-alias** —la sesión corre adentro del servidor, no contra él—. El rango se calculó
-a mano y por otros dos caminos que coinciden: `git diff` de `prisma/migrations`
-entre el SHA que informa `/api/version` y `origin/main` devuelve exactamente esta
-migración, y la consulta de arriba confirma que en la base no está. El
-clasificador sigue siendo el chequeo que manda: si en el despliegue vuelve a dar
-INDETERMINADO, eso es una frenada y no un trámite.
+**Y lo que el clasificador NO puede leer, leído a mano:** el propio script avisa
+que no entra a un bloque `DO $$` ni evalúa si un `CREATE UNIQUE INDEX` va a
+chocar con duplicados. Los dos casos existen en esta migración y los dos están
+mirados: adentro del bloque hay tres `ADD CONSTRAINT … FOREIGN KEY … ON DELETE
+CASCADE` y nada más —ningún DROP, ningún ALTER de columna existente—, y el índice
+único es sobre una tabla **recién creada y vacía**, así que no hay duplicado
+posible con el que chocar.
+
+**El quinto chequeo del backup no aplicó**, y el motivo es que no había nada que
+buscar: la migración no borra ni reescribe un solo dato. Los cuatro de siempre sí
+—`pg_dump` con `pipefail` en 0, `gzip -t` limpio, la marca de cierre en las
+últimas 20 líneas, **68 tablas**— sobre
+`pre-7375ac9c_20260913_163250.sql.gz`, 4,2 MB.
+
+**Quedan 4 relaciones por configurar.** La migración deja cero filas a propósito:
+el corte se acuerda de a uno desde la pantalla, con autor. Hasta que alguien las
+configure, la lista de trabajo las muestra marcadas como "Sin corte" y les aplica
+el domingo — nunca en silencio.
+
+### EL CLASIFICADOR CON `--vps` NO CORRE DESDE ACÁ, Y NO ES UN DETALLE
+
+`node scripts/clasificar-migraciones.mjs --vps` sale con **2, INDETERMINADO**:
+resuelve la imagen del contenedor por `ssh vps-erp`, y **este VPS no tiene ese
+alias** porque la sesión corre ADENTRO del servidor, no contra él. Falla cerrado,
+que es lo correcto.
+
+La salida no es abrir `DEPLOY_MIGRACION_AUTORIZADA=1` —eso sería convertir una
+puerta en un trámite—, sino darle la base a mano, que es lo que el propio
+procedimiento ofrece: `--desde <SHA_QUE_ATENDÍA>`, leído de
+`docker inspect erpazul_app --format '{{.Config.Image}}'`, que es exactamente el
+mismo dato que `--vps` iba a buscar por ssh. Con eso el rango es el bueno y el
+script contesta.
+
+**Lo mismo vale para todo el procedimiento corrido desde acá:** donde el skill
+dice `ssh vps-erp '…'`, el comando va directo, con rutas absolutas y
+`docker compose --project-directory /srv/produccion/erpazul`. No hay `cd`.
+
+### La bitácora de autorizaciones está vacía
+
+`.claude/migraciones-autorizadas.log` **no existe**: no se usó ninguna
+autorización manual en este despliegue. La guardia no tuvo que ceder.
+
+### El marcador de apariencia, con su control
+
+`.text-xl3{` —el tamaño de 28 px que entró con la cuenta del local— buscado con
+`grep -rlF` adentro de cada imagen, en contenedores **descartables**: **0
+archivos en la vieja, 1 en la nueva**. Control `.text-xl2{`, que existía antes:
+**1 en las dos**, así que la búsqueda anda.
+
+Segundo par, de texto de interfaz: `"Sin corte"` da **0 en la vieja y 2 en la
+nueva**; el control `"Recibir"`, **27 y 32** — presente en las dos.
+
+Elegidos así y no de memoria: `git grep -F` contra el commit `94432c42` dio cero
+para los dos marcadores. Un tercer candidato, `border-dashed`, **se descartó**
+porque ya lo usaban cinco archivos.
 
 ---
 
