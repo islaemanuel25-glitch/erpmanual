@@ -34,13 +34,16 @@ import SunmiDateRangePicker from "@/components/sunmi/SunmiDateRangePicker";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 
-import EncabezadoMovil, { CLASE_ACCION_ENCABEZADO } from "./EncabezadoMovil";
+import AccionDePantalla, { CLASE_ACCION_DE_PANTALLA } from "./AccionDePantalla";
 import ChipsDePeriodo, { CLAVE_OTRO } from "./ChipsDePeriodo";
 import BloqueLocal from "./BloqueLocal";
 import CabeceraDeCuenta from "./CabeceraDeCuenta";
 import FilaTransferenciaLocal from "./FilaTransferenciaLocal";
 
+import { useUser } from "@/app/context/UserContext";
+import { useAccionDePagina } from "@/app/context/AccionDePaginaContext";
 import { UNIDADES } from "@/lib/transferencias/periodoDePago";
+import { RUTA_CORTE_DE_SEMANA, puedeConfigurarElCorte } from "./corteDeSemana";
 
 /** El mismo formato de importe que usa el reporte de al lado. */
 function money(n) {
@@ -52,6 +55,11 @@ function money(n) {
 
 export default function TableroMovil({ onAbrirReporte }) {
   const router = useRouter();
+  const { perfil } = useUser();
+  // El atajo solo se ofrece a quien puede usarlo. Un "Configurar" que lleva a
+  // una pantalla donde no se puede configurar nada es peor que no ofrecerlo: el
+  // aviso igual explica por qué ese local está cayendo al domingo.
+  const puedeConfigurar = puedeConfigurarElCorte(perfil?.permisos);
 
   const [unidad, setUnidad] = useState(UNIDADES.SEMANA);
   const [desde, setDesde] = useState("");
@@ -60,6 +68,25 @@ export default function TableroMovil({ onAbrirReporte }) {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [abiertos, setAbiertos] = useState(() => new Set());
+
+  // EL BOTÓN VIAJA EN EL RENGLÓN QUE YA EXISTE. El shell dibuja el título de la
+  // pantalla y pone a su derecha lo que la pantalla registre acá, así que en un
+  // teléfono "Reporte" no cuesta un renglón propio ni obliga a repetir la
+  // palabra "Transferencias". El mismo nodo se reusa en el repuesto de abajo,
+  // que es el que aparece de 768 px para arriba, donde el del shell se apaga.
+  const botonDeReporte = useAccionDePagina(
+    () => (
+      <SunmiButton
+        type="button"
+        color="slate"
+        onClick={onAbrirReporte}
+        className={CLASE_ACCION_DE_PANTALLA}
+      >
+        Reporte
+      </SunmiButton>
+    ),
+    [onAbrirReporte]
+  );
 
   // Con "Otro" elegido y sin las dos fechas todavía, NO se consulta: un rango a
   // medias no es un rango, y pedirlo devolvería el período de la semana sin que
@@ -115,19 +142,7 @@ export default function TableroMovil({ onAbrirReporte }) {
     // Padding 14 a los lados y arriba —`p-4` en la escala del proyecto— y 12,25
     // entre bloques.
     <div className="w-full min-h-full px-4 pt-4 pb-4 space-y-3.5">
-      <EncabezadoMovil
-        titulo="Transferencias"
-        accion={
-          <SunmiButton
-            type="button"
-            color="slate"
-            onClick={onAbrirReporte}
-            className={CLASE_ACCION_ENCABEZADO}
-          >
-            Reporte
-          </SunmiButton>
-        }
-      />
+      <AccionDePantalla>{botonDeReporte}</AccionDePantalla>
 
       <ChipsDePeriodo valor={unidad} onCambiar={setUnidad} />
 
@@ -151,9 +166,11 @@ export default function TableroMovil({ onAbrirReporte }) {
           {sinConfigurar === 1
             ? "Hay 1 local sin corte configurado: se le está aplicando el domingo."
             : `Hay ${sinConfigurar} locales sin corte configurado: se les está aplicando el domingo.`}{" "}
-          <SunmiLinkButton onClick={() => router.push("/modulos/transferencias/corte-de-semana")}>
-            Configurar
-          </SunmiLinkButton>
+          {puedeConfigurar && (
+            <SunmiLinkButton onClick={() => router.push(RUTA_CORTE_DE_SEMANA)}>
+              Configurar
+            </SunmiLinkButton>
+          )}
         </SunmiAviso>
       )}
 

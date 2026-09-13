@@ -24,6 +24,32 @@
 // un día y abajo cambia el rango de la semana en curso. Sin eso, elegir "Mar"
 // es elegir a ciegas.
 //
+// ── LA FILA EN EDICIÓN SE DISTINGUE POR LA FORMA, NO POR EL COLOR ─────────
+//
+// La primera versión la marcaba con el borde en `accent` y la relación sin
+// configurar con el borde en `warning`. Eso NO FUNCIONA, y está medido sobre
+// los catorce temas de `app/globals.css`:
+//
+//   · en **sunmiSand** `--pos-accent` y `--pos-warning` son EL MISMO hex
+//     (#b45309): los dos estados quedan idénticos, no parecidos;
+//   · en siete de los catorce la distancia perceptual entre los dos es menor a
+//     20 —los cuatro ámbar de #fbbf24 contra #f59e0b, y sunmiLight y ambarCaja
+//     de #d97706 contra #b45309—.
+//
+// Así que la señal es el ESTILO del borde: **punteado mientras se edita**,
+// sólido en los otros dos estados. Un `border-style` no depende de ninguna
+// variable de tema, así que funciona igual en los catorce, y además dice lo que
+// pasa: lo punteado es provisorio, todavía no se guardó.
+//
+// Se conserva el color `accent` encima porque en los siete temas donde SÍ se
+// distingue ayuda y no cuesta nada. Lo que no se conserva es depender de él: el
+// candado `lib/sunmi/senalNoCromatica.test.mjs` afirma que la diferencia entre
+// los estados sobrevive con las dos variables puestas en el mismo valor.
+//
+// Y la marca de "sin configurar" NO se pierde cuando esa misma fila se está
+// editando: la píldora sigue en el renglón del local, que es donde vive el
+// hecho. El borde dice qué estoy haciendo; la píldora, cómo está la relación.
+//
 // ── LO QUE NO SABE ────────────────────────────────────────────────────────
 //
 // Si se está guardando bien o mal, ni quién más está editando. Recibe el día
@@ -37,6 +63,9 @@ export default function FilaCorteDeSemana({
   editando = false,
   diaElegido,
   guardando = false,
+  /** Sin el permiso del depósito la fila se LEE, y no ofrece un botón que el
+   *  servidor va a rechazar con 403. El permiso se vuelve a pedir allá. */
+  puedeEditar = true,
   onElegirDia,
   onEditar,
   onGuardar,
@@ -47,10 +76,10 @@ export default function FilaCorteDeSemana({
     <section
       className={`sunmi-surface rounded-xl2 p-4 space-y-3.5 ${
         editando
-          ? "border-1.5 sunmi-border-accent"
+          ? "border-1.5 border-dashed sunmi-border-accent"
           : relacion?.sinConfigurar
-            ? "border-1.5 sunmi-border-warning"
-            : "border sunmi-border"
+            ? "border-1.5 border-solid sunmi-border-warning"
+            : "border border-solid sunmi-border"
       }`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -125,7 +154,7 @@ export default function FilaCorteDeSemana({
           >
             {guardando ? "Guardando…" : "Guardar"}
           </SunmiButton>
-        ) : (
+        ) : !puedeEditar ? null : (
           // Fantasma: el relleno no existe, el contorno y el tono los pone esta
           // pantalla con clases del kit. Ver `.sunmi-btn-ghost`.
           <SunmiButton

@@ -324,7 +324,10 @@ test("E9 · la fila del corte: sin editar muestra el día, editando muestra los 
     editando.includes("15/09 al 21/09"),
     "el pie tiene que mostrar el rango que produce el día TOCADO, no el guardado"
   );
-  assert.ok(editando.includes("sunmi-border-accent"), "la fila en edición no se distingue");
+  // La fila en edición se distingue por el borde PUNTEADO y no por un color:
+  // en sunmiSand `--pos-accent` y `--pos-warning` son el mismo hexadecimal. El
+  // porqué, medido sobre los catorce temas, está en `senalDeEdicion.test.mjs`.
+  assert.ok(editando.includes("border-dashed"), "la fila en edición no se distingue");
 });
 
 test("E10 · los cuatro chips de período, uno solo activo", () => {

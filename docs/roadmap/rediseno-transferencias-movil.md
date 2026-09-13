@@ -182,35 +182,78 @@ contra lo que se compara. Lo que se construyó:
   1024 px; **de 1024 para arriba no cambia nada** y el reporte se dibuja con las
   mismas clases de siempre.
 - `ChipsDePeriodo.jsx`, `BloqueLocal.jsx`, `CabeceraDeCuenta.jsx`,
-  `FilaTransferenciaLocal.jsx`, `FilaCorteDeSemana.jsx`, `EncabezadoMovil.jsx`.
+  `FilaTransferenciaLocal.jsx`, `FilaCorteDeSemana.jsx`, `AccionDePantalla.jsx` y
+  `corteDeSemana.js` —la ruta y el permiso de la pantalla de corte, en un solo
+  lugar, porque los nombran el menú, el atajo del aviso y el botón "Cambiar"—.
+- `lib/menu/registry.js` gana el ítem permanente "Corte de semana".
 - `app/modulos/transferencias/corte-de-semana/page.jsx` — el V29.
 - `app/api/transferencias/tablero/route.js` y
   `app/api/transferencias/acuerdos/route.js`.
 - `lib/transferencias/rotulosDeTransferencia.js` — los textos que las dos vistas
   comparten, en un solo lugar.
 - Candados: `components/transferencias/tableroMovil.test.mjs`, 12, con las tres
-  verificaciones que Emanuel pidió y una contraprueba permanente.
+  verificaciones que Emanuel pidió y una contraprueba permanente; y
+  `components/transferencias/senalDeEdicion.test.mjs`, 5, que vuelve a medir los
+  catorce temas en cada corrida.
+
+### Las tres correcciones de Emanuel, del 2026-09-13
+
+**1 · El encabezado propio desaparece: el botón viaja en el renglón del shell.**
+`LayoutBase` ya dibujaba el título de la pantalla y, si la pantalla registra una
+acción con `useAccionDePagina`, la pone a la derecha de ESE título. O sea que el
+renglón que se estaba gastando en repetir "Transferencias" no hacía falta para
+nada: el botón "Reporte" entra gratis arriba. Lo mismo el "Volver" del corte.
+La pantalla que NO se llama como su ruta —el corte— registra además su título con
+`useTituloDePagina`, así la barra dice "Corte de semana" y no el nombre del
+módulo. Las dos puertas ya existían; lo que había era una barra escrita al lado.
+
+Queda `AccionDePantalla`, y es SOLO un repuesto: la fila del shell es
+`md:hidden`, y estas pantallas no terminan en 768 px —la lista llega a 1024 y la
+de corte no tiene tope—, así que de 768 para arriba el botón registrado no se
+dibujaría en ninguna parte. Ese repuesto muestra el MISMO nodo que devuelve
+`useAccionDePagina`, así que las dos filas no pueden decir cosas distintas.
+Medido en el navegador: a 390 px el renglón del shell dice exactamente
+"Transferencias Reporte" y "Corte de semana Volver".
+
+**2 · La fila en edición se distingue por la FORMA, no por el color.** Medido
+sobre los catorce temas de `app/globals.css`: en **sunmiSand** `--pos-accent` y
+`--pos-warning` son **el mismo hexadecimal** (`#b45309`), y en siete de los
+catorce la distancia perceptual entre los dos es menor a 20. Distinguir "editando"
+de "sin configurar" por el tono no podía funcionar. La señal es el **borde
+punteado** mientras se edita, sólido en los otros dos estados: `border-style` no
+sale de ninguna variable de tema, y además dice lo que pasa —lo punteado es
+provisorio, todavía no se guardó—. El color accent se conserva encima porque en
+los siete temas donde sí se distingue ayuda, pero la diferencia no cuelga de él.
+Lo afirma `components/transferencias/senalDeEdicion.test.mjs`, que vuelve a medir
+los catorce temas en cada corrida, y el arnés lo comprueba además sobre el
+`border-style` **computado** por el navegador.
+
+**3 · La entrada al corte es permanente y está en el menú**, dentro del grupo
+Transferencias, con `permiso: "transferencias.crear"`. Una pantalla a la que solo
+se llega cuando algo está mal no existe el día que hay que cambiar un corte que ya
+está bien, que es justamente cuando se la busca. El aviso de "sin configurar"
+queda igual: es un atajo cuando falta algo, no la puerta. Quien no tiene el
+permiso no ve el ítem y, si llega por el atajo, la pantalla se LEE —la fila no
+ofrece "Cambiar"—.
 
 ### Lo que se decidió SIN DISEÑO, y conviene revisar
 
 1. **El bloque abre por toque en toda la fila**, no con un control aparte. Por eso
    la píldora "Sin corte" es un `span` y no un enlace: un interactivo adentro de
    otro no es válido.
-2. **El camino a la pantalla de corte** es un aviso arriba de la lista que aparece
-   solo cuando hay relaciones sin configurar. No hay entrada permanente en el
-   menú.
-3. **El rango, en la vista del local, va en la tarjeta de cuenta**, debajo del
+2. **El rango, en la vista del local, va en la tarjeta de cuenta**, debajo del
    importe — mismo criterio que en el bloque del depósito.
-4. **El rótulo del importe sigue al chip**: "A pagar hoy" / "esta semana" / "este
+3. **El rótulo del importe sigue al chip**: "A pagar hoy" / "esta semana" / "este
    mes". La especificación lo escribía fijo en la semana.
-5. **El denominador del avance** —"20 de 56 revisados"— son las líneas ORIGINALES,
+4. **El denominador del avance** —"20 de 56 revisados"— son las líneas ORIGINALES,
    sin las agregadas en recepción. La especificación traía dos números distintos
    (56 ítems, 77 revisables) que no se pueden reconciliar.
-6. **El chip "Otro" ignora el día de corte**: el rango lo eligió el usuario y vale
+5. **El chip "Otro" ignora el día de corte**: el rango lo eligió el usuario y vale
    igual para todos los locales (`rangoFijo` en `bloquesPorLocal`).
-7. **El permiso del PUT de acuerdos es `transferencias.crear`**, el del depósito.
-   No se inventó uno nuevo.
-8. **Tres clases nuevas del kit**: `.sunmi-border-warning`, `.sunmi-border-accent`
+6. **El permiso del PUT de acuerdos es `transferencias.crear`**, el del depósito.
+   No se inventó uno nuevo. El mismo permiso gobierna el ítem del menú y el botón
+   "Cambiar", desde `components/transferencias/corteDeSemana.js`.
+7. **Tres clases nuevas del kit**: `.sunmi-border-warning`, `.sunmi-border-accent`
    —solo color, como la de `danger`— y el color `ghost` de `SunmiButton`, que es
    la ausencia de relleno. Sin ese último, el botón "Cambiar" transparente con
    borde en accent solo se podía escribir peleando contra el orden de la hoja.

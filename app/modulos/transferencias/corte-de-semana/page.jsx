@@ -16,23 +16,40 @@
 // transferencia con ese id — que además no puede existir, porque los ids son
 // enteros.
 //
-// ── EL CAMINO PARA LLEGAR ─────────────────────────────────────────────────
+// ── EL CAMINO PARA LLEGAR: EL MENÚ, SIEMPRE ───────────────────────────────
 //
-// Desde el aviso de la lista de trabajo, que aparece cuando hay al menos una
-// relación sin configurar. No hay entrada permanente en el menú: es lo que
-// decide `TableroMovil`, y queda anotado como decisión sin diseño.
+// "Corte de semana", adentro del grupo Transferencias, al lado de la pantalla
+// que configura. Está ahí SIEMPRE, esté todo configurado o no: una pantalla a
+// la que solo se llega cuando algo está mal no existe el día que hay que
+// cambiar un corte ya configurado, que es justamente cuando se la busca.
+//
+// El aviso de "sin configurar" de la lista de trabajo se queda igual, y es otra
+// cosa: un atajo para cuando falta algo, no la puerta.
+//
+// ── Y EL TÍTULO SE REGISTRA EN EL SHELL ──────────────────────────────────
+//
+// La barra de arriba la dibuja el shell, y por ruta diría "Transferencias" —el
+// módulo—, que acá sería mentira. `useTituloDePagina` es la puerta que ya
+// existe para que una pantalla titule su propia fila, y se usa en vez de
+// escribir un título adentro del cuerpo: si el título viviera abajo, la barra
+// de arriba seguiría diciendo mal dónde estás.
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
 
 import { useUser } from "@/app/context/UserContext";
+import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
 import SinPermisos from "@/components/auth/SinPermisos";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 
-import EncabezadoMovil from "@/components/transferencias/EncabezadoMovil";
+import AccionDePantalla from "@/components/transferencias/AccionDePantalla";
 import FilaCorteDeSemana from "@/components/transferencias/FilaCorteDeSemana";
+import {
+  RUTA_TRANSFERENCIAS,
+  puedeConfigurarElCorte,
+} from "@/components/transferencias/corteDeSemana";
 
 import { UNIDADES, rangoDelPeriodo } from "@/lib/transferencias/periodoDePago";
 
@@ -44,6 +61,13 @@ export default function CorteDeSemanaPage() {
   const { perfil, cargando: cargandoUsuario } = useUser();
   const permisos = perfil?.permisos || [];
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
+  const puedeEditar = puedeConfigurarElCorte(permisos);
+
+  useTituloDePagina("Corte de semana");
+  const volver = useAccionDePagina(
+    () => <SunmiBackButton href={RUTA_TRANSFERENCIAS} />,
+    []
+  );
 
   const [relaciones, setRelaciones] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -102,10 +126,7 @@ export default function CorteDeSemanaPage() {
 
   return (
     <div className="w-full min-h-full px-4 pt-4 pb-4 space-y-3.5">
-      <EncabezadoMovil
-        titulo="Corte de semana"
-        accion={<SunmiBackButton href="/modulos/transferencias" />}
-      />
+      <AccionDePantalla>{volver}</AccionDePantalla>
 
       <p className="text-xs sunmi-text-muted">
         Definí qué día arranca la semana para cada local. Cambia el rango que toma el chip Semana
@@ -148,6 +169,7 @@ export default function CorteDeSemanaPage() {
               editando={esta}
               diaElegido={diaElegido}
               guardando={guardando && esta}
+              puedeEditar={puedeEditar}
               onElegirDia={setDiaElegido}
               onEditar={() => empezarAEditar(r)}
               onGuardar={(dia) => guardar(r.localId, dia)}
