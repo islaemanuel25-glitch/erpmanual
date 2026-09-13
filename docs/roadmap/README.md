@@ -18,6 +18,12 @@ Relevado sobre `d20afa98e9edece663fb3dda694d3c99783ab788` — 2026-08-10.
 
 ## PENDIENTE CONFIRMADO
 
+- **Terminar el rediseño MÓVIL de la pantalla de Transferencias.** El dominio está
+  hecho, verificado y empujado —`464b8e16`—; la pantalla no está empezada. Dónde
+  quedamos exactamente, qué falta y las siete decisiones ya tomadas están en
+  [rediseno-transferencias-movil.md](rediseno-transferencias-movil.md). Incluye una
+  migración **commiteada y aplicada solo en la base de pruebas**:
+  `20260913120000_acuerdo_deposito_local`.
 - **Limpiar las columnas muertas de `ImportacionListaFila`.** El propio schema
   dice que `unidadesConfirmadas` y `factorConfirmado` "se eliminan en una
   migración de limpieza" (`prisma/schema.prisma:2490-2493`).
