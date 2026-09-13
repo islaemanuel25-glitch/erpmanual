@@ -27,6 +27,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import FichaProductoRecepcion, {
   ROTULO_SUELTAS,
   ROTULO_SUELTAS_CAMPO,
+  ROTULO_UNIDADES,
 } from "./FichaProductoRecepcion.jsx";
 import {
   motivosParaDiferencia,
@@ -145,7 +146,12 @@ test("1. sin recepción cargada, la ficha propone la cantidad EN LA PRESENTACIÓ
 //
 // Por eso el fixture va primero y con nombre propio.
 
-/** La línea real: 0 packs de 6 y una unidad suelta, sin contar todavía. */
+/**
+ * La línea real: 0 packs de 6 y una unidad suelta, sin contar todavía.
+ *
+ * Los dos costos son los de producción: el PACK vale 8880 —es lo que el DTO manda
+ * en `precioCosto`, que es el costo de la presentación— y la unidad 1480.
+ */
 const lineaMixtaSinContar = (extra = {}) =>
   lineaCajon({
     nombre: "CERVEZA 361 1L",
@@ -158,19 +164,63 @@ const lineaMixtaSinContar = (extra = {}) =>
     sueltasEnviadas: 1,
     cantidadRecibida: null,
     recibidoUnidadesSueltas: 0,
-    precioCosto: 1480,
+    precioCosto: 8880,
+    costoUnitarioFisico: 1480,
     subtotal: 1480,
     ...extra,
   });
 
-test("MIXTO · las sueltas del envío se PRECARGAN, no quedan en blanco", () => {
-  const html = pintarFicha(lineaMixtaSinContar(), { enHoja: true });
+/** El mixto DE VERDAD: dos packs enteros y tres sueltas, sin contar. */
+const lineaMixtaConBultos = (extra = {}) =>
+  lineaMixtaSinContar({
+    cantidadEnviada: 15,
+    cantidadPresentada: 2,
+    sueltasEnviadas: 3,
+    subtotal: 22200,
+    ...extra,
+  });
 
-  assert.equal(valorDelCampo(html, "Cantidad recibida en PACK x6"), "0", "los packs no precargan 0");
+// ── ESTOS TRES CANDADOS SE REESCRIBIERON, Y CONVIENE SABER POR QUÉ ────────
+//
+// Nacieron el 2026-09-12 afirmando que la línea de arriba abría con DOS campos:
+// packs en 0 y sueltas en 1. El 2026-09-13 se decidió que una línea que salió sin
+// ningún bulto entero se cuenta por unidad —el pack no está en juego, así que no
+// se nombra ni se ofrece contarlo—, y con eso esa forma dejó de existir en la
+// hoja. Ver `seCuentaPorUnidad`.
+//
+// No se aflojaron: el DEFECTO que defendían es el mismo y sigue defendido. Era
+// que el campo del desglose se precargaba de lo RECIBIDO en vez de lo ENVIADO, y
+// por eso salía vacío y el panel declaraba una diferencia inexistente. Lo que
+// cambió es dónde se ejerce: el caso de los dos campos se mudó al mixto de
+// verdad —`lineaMixtaConBultos`, que sí tiene bultos completos y sueltas— y el de
+// un campo se afirma sobre la línea real.
+//
+// La forma nueva vive en `lineaSoloSueltas.test.mjs`, con la tarjeta y el panel
+// juntos.
+
+test("MIXTO · las sueltas del envío se PRECARGAN, no quedan en blanco", () => {
+  // El caso donde los dos campos siguen existiendo: 2 packs enteros y 3 sueltas.
+  // Es acá donde el defecto original todavía se puede cometer.
+  const html = pintarFicha(lineaMixtaConBultos(), { enHoja: true });
+
+  assert.equal(valorDelCampo(html, "Cantidad recibida en PACK x6"), "2", "los packs no precargan lo enviado");
   assert.equal(
     valorDelCampo(html, ROTULO_SUELTAS_CAMPO),
-    "1",
+    "3",
     "el campo de sueltas quedó vacío: el panel va a declarar una diferencia que no existe"
+  );
+});
+
+test("SIN BULTOS · y con un solo campo, la suelta igual se precarga", () => {
+  // El mismo defecto en la forma nueva: si el campo único saliera vacío, el panel
+  // calcularía 0 contra 1 enviada y volvería a pintar el danger sobre una línea
+  // que coincide.
+  const html = pintarFicha(lineaMixtaSinContar(), { enHoja: true });
+  assert.equal(valorDelCampo(html, ROTULO_UNIDADES), "1", "el campo único salió vacío");
+  assert.equal(
+    valorDelCampo(html, "Cantidad recibida en PACK x6"),
+    null,
+    "volvió el campo de packs sobre una línea que no trajo ningún pack"
   );
 });
 
@@ -184,6 +234,11 @@ test("MIXTO · y por lo tanto NO declara una diferencia que no existe", () => {
   assert.ok(!html.includes("line-through"), "tachó el importe de una línea que coincide");
   assert.ok(!html.includes("$0,00"), "volvió el $0,00 sobre una línea que sí llegó");
   assert.ok(html.includes("$1.480,00"), "perdió el importe de la línea");
+  // Y el precio del PACK no aparece en ningún lado: es el de algo que no vino.
+  assert.ok(
+    !html.includes("$8.880,00"),
+    "mostró el costo de un pack sobre una línea que salió por unidad"
+  );
   assert.ok(
     html.includes("data-motivo-reservado"),
     "pidió motivo sobre una línea que coincide: el hueco tendría que estar reservado, no ocupado"
@@ -194,14 +249,18 @@ test("MIXTO · pero una línea YA CONTADA con 0 sueltas reales se queda en 0", (
   // El otro lado, y es el que el arreglo podía romper: si ya se contó y no había
   // ninguna suelta, ese 0 es un DATO —se miró y no había— y no puede volver al
   // envío. Lo que lo distingue es `cantidadRecibida`, no las sueltas.
+  //
+  // Con la forma nueva el campo es uno solo y lo que se afirma es lo mismo: un
+  // cero CONTADO no vuelve a la cantidad del envío. Lo que lo distingue sigue
+  // siendo `cantidadRecibida`, no las sueltas.
   const html = pintarFicha(
     lineaMixtaSinContar({ cantidadRecibida: 0, recibidoUnidadesSueltas: 0 }),
     { enHoja: true }
   );
   assert.equal(
-    valorDelCampo(html, ROTULO_SUELTAS_CAMPO),
-    "",
-    "una línea contada con 0 sueltas volvió a proponer las del envío"
+    valorDelCampo(html, ROTULO_UNIDADES),
+    "0",
+    "una línea contada en cero volvió a proponer lo del envío"
   );
   // Y ahí sí hay diferencia: se contó 0 contra 1 enviada.
   assert.ok(html.includes("border-2 sunmi-border-danger"), "no marcó la diferencia de lo contado");
@@ -864,9 +923,13 @@ test("V29-1c · y sigue conservando los tres decimales del peso al tocar", () =>
   assert.match(kit, /Math\.max\(minimo,/, "el − volvió a poder bajar del mínimo");
 
   const src = codigoDe("components/transferencias/FichaProductoRecepcion.jsx");
+  // Los decimales salen de la presentación MOSTRADA y no de la del snapshot: son
+  // los del número que está escrito en el campo. Hoy las dos coinciden en KG
+  // —el peso nunca agrupa, así que nunca se colapsa—, y la que manda es la
+  // mostrada porque es la escala en la que se tipea.
   assert.match(
     src,
-    /decimales=\{decimalesDeCantidad\(envio\.presentacion\)\}/,
+    /decimales=\{decimalesDeCantidad\(mostrado\.presentacion\)\}/,
     "el campo dejó de pasarle los decimales al kit"
   );
 });
@@ -1234,14 +1297,31 @@ test("EN HOJA · lo que se escribe en sueltas CUENTA, no queda de adorno", () =>
   // El defecto silencioso sería mostrar el campo y seguir mandando 0 porque la
   // cuenta mira `conSueltas`, que en el teléfono nadie toca. Se afirma sobre el
   // fuente porque un render a string no dispara el guardado.
+  //
+  // ── SE MIRA CON EL ESPACIADO NORMALIZADO, Y NO ES UN DETALLE ───────────
+  //
+  // La versión anterior buscaba la expresión tal como estaba escrita en una
+  // línea. Cuando la condición creció y el formateo la partió en varias, el
+  // candado se puso rojo sin que nada del comportamiento cambiara — y el riesgo
+  // simétrico es peor: si lo que crece es otra cosa, un candado atado al
+  // espaciado puede dejar de encontrar lo que defiende y no avisar.
   const src = codigoDe("components/transferencias/FichaProductoRecepcion.jsx");
+  const plano = src.replace(/\s+/g, " ");
   assert.ok(
-    !/agrupaEsta && conSueltas \? sueltas/.test(src),
+    !/agrupaEsta && conSueltas \? sueltas/.test(plano),
     "la cuenta volvió a mirar `conSueltas` en vez de `usaSueltas`"
   );
   assert.equal(
-    (src.match(/agrupaEsta && usaSueltas \? sueltas/g) || []).length,
+    (plano.match(/muestraSueltas && usaSueltas \? sueltas \|\| 0 : 0/g) || []).length,
     2,
     "las dos cuentas —la del ingreso físico y la del guardado— tienen que mirar lo mismo"
+  );
+  // Y la rama del campo único, que es la otra mitad de las mismas dos cuentas: lo
+  // tipeado va al hueco de las sueltas con los completos en cero. Si una de las
+  // dos se olvidara, el panel mostraría un ingreso físico que no es el que guarda.
+  assert.equal(
+    (plano.match(/cuentaPorUnidad \? recibido === "" \? 0 : recibido \|\| 0/g) || []).length,
+    2,
+    "el campo único no entra por el mismo hueco en las dos cuentas"
   );
 });

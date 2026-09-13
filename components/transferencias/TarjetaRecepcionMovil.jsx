@@ -59,6 +59,7 @@ import { formatearMoneda } from "@/lib/moneda";
 import {
   chipsDeMotivo,
   correccionDeCantidad,
+  costoMostradoDe,
   fisicasEnviadasDe,
   fisicasRecibidasDe,
 } from "@/lib/transferencias/recepcionUI";
@@ -67,6 +68,7 @@ import {
 // diciendo que depende de algo que ya no usa.
 import {
   descriptorDeEnvio,
+  envioComoSeCuenta,
   rotuloConSueltas,
   rotuloConSueltasCorto,
   unidadCortaDePresentacion,
@@ -116,6 +118,18 @@ export default function TarjetaRecepcionMovil({
   if (!d) return null;
 
   const envio = descriptorDeEnvio(d);
+  // ── CÓMO SE MUESTRA, QUE NO ES LO MISMO QUE CÓMO SE GUARDA ──────────────
+  //
+  // Una línea que salió sin ningún bulto entero se cuenta por unidad, así que el
+  // pack no se nombra. `envioComoSeCuenta` devuelve el mismo objeto cuando no hay
+  // nada que colapsar, y por eso la comparación por identidad alcanza para saber
+  // en qué caso estamos.
+  //
+  // `envio` NO se reemplaza: la diferencia, las físicas y lo que se manda a
+  // guardar siguen saliendo de él, en la escala en la que la línea está
+  // persistida. Ver `seCuentaPorUnidad`.
+  const mostrado = envioComoSeCuenta(envio);
+  const porUnidad = mostrado !== envio;
   const esAgregada = d.agregadoEnRecepcion === true;
   const revisado = d.revisadoEnRecepcion === true;
   const sueltasGuardadas = Number(d.recibidoUnidadesSueltas || 0);
@@ -137,6 +151,25 @@ export default function TarjetaRecepcionMovil({
 
   const delta =
     fisicasContadas == null || fisicasEnviadas == null ? null : fisicasContadas - fisicasEnviadas;
+
+  // ── LOS NÚMEROS EN LA ESCALA EN LA QUE SE MUESTRAN ──────────────────────
+  //
+  // Cuando hay bultos son los de la presentación —"6 → 4 PACK x24"— y cuando la
+  // línea se cuenta por unidad son las FÍSICAS, que es lo que esa línea tiene de
+  // verdad: el detalle 6519 dice "8 → 180 UNIDAD" y no "0 → 6", que no se
+  // entendería ni se podría corregir.
+  //
+  // Van derivados una sola vez y se usan en los tres lugares que dicen una
+  // cantidad contada: la flecha de la colapsada, la de la abierta y el rótulo de
+  // la que coincide. Con la rama escrita en cada uno, el día que cambie una las
+  // otras dos dirían otra cosa sobre la misma línea.
+  const enviadasMostradas = porUnidad ? fisicasEnviadas : envio.cantidad;
+  const recibidasMostradas = porUnidad ? fisicasContadas : d.cantidadRecibida;
+  const sueltasMostradas = porUnidad ? 0 : sueltasGuardadas;
+
+  // El costo que va al lado del enviado. Se pide una vez: dos llamadas idénticas
+  // en el JSX son dos oportunidades de que una quede con el argumento viejo.
+  const costoMostrado = costoMostradoDe(d, envio);
 
   // ── LOS DOS IMPORTES DE LA LÍNEA ────────────────────────────────────────
   //
@@ -187,9 +220,9 @@ export default function TarjetaRecepcionMovil({
   // botón de 87 px a la fila completa.
   if (revisado) {
     const rotuloCantidad = rotuloConSueltas({
-      ...envio,
-      cantidad: d.cantidadRecibida ?? 0,
-      sueltas: sueltasGuardadas,
+      ...mostrado,
+      cantidad: recibidasMostradas ?? 0,
+      sueltas: sueltasMostradas,
     });
     // "Corregida" es lo MISMO que mide la barra de abajo —`contarCorregidas`— y
     // por eso se deriva del mismo par de físicas. Con dos criterios distintos,
@@ -225,10 +258,10 @@ export default function TarjetaRecepcionMovil({
               a "DON SATUR BIZCO…". */}
           {corregida
             ? correccionDeCantidad({
-                enviadas: envio.cantidad,
-                recibidas: d.cantidadRecibida ?? 0,
-                sueltas: sueltasGuardadas,
-                envio,
+                enviadas: enviadasMostradas,
+                recibidas: recibidasMostradas ?? 0,
+                sueltas: sueltasMostradas,
+                envio: mostrado,
               })
             : `${rotuloCantidad}${delta === 0 ? " · coincide" : ""}`}
         </span>
@@ -329,10 +362,10 @@ export default function TarjetaRecepcionMovil({
   const correccionPendiente =
     !esAgregada && hayDiferencia && tieneConteo
       ? correccionDeCantidad({
-          enviadas: envio.cantidad,
-          recibidas: d.cantidadRecibida,
-          sueltas: sueltasGuardadas,
-          envio,
+          enviadas: enviadasMostradas,
+          recibidas: recibidasMostradas,
+          sueltas: sueltasMostradas,
+          envio: mostrado,
         })
       : null;
 
@@ -424,7 +457,11 @@ export default function TarjetaRecepcionMovil({
             <p className="flex items-baseline gap-x-2 flex-wrap break-words">
               <span className="text-xs sunmi-text-muted shrink-0">Enviado</span>
               <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-accent">
-                {rotuloConSueltasCorto(envio)}
+                {/* `mostrado` y no `envio`: si no salió ningún bulto entero esto
+                    dice "1 UNIDAD" y no "0 PACK x6 + 1". La forma corta sigue
+                    sirviendo para el mixto de verdad —"2 PACK x6 + 3"—, que es
+                    donde el renglón compite con el precio. */}
+                {rotuloConSueltasCorto(mostrado)}
               </span>
               {/* ── EL PRECIO DE LA PRESENTACIÓN ───────────────────────────
                   El V26 le sacó a este renglón el importe SIN rótulo, que
@@ -438,10 +475,14 @@ export default function TarjetaRecepcionMovil({
 
                   En UNIDAD y en KG este número coincide con el costo unitario
                   físico, y está bien que coincida: ahí la unidad física ES la
-                  presentación. */}
-              {d.precioCosto != null && (
+                  presentación.
+
+                  Y cuál de los dos costos se muestra lo decide `costoMostradoDe`,
+                  en `recepcionUI`: sobre una línea que salió sin ningún bulto
+                  entero, el precio del pack sería el de algo que no vino. */}
+              {costoMostrado != null && (
                 <span className="text-xs tabular-nums sunmi-text-muted shrink-0">
-                  · {formatearMoneda(d.precioCosto)} / {unidadCortaDePresentacion(envio).toLowerCase()}
+                  · {formatearMoneda(costoMostrado)} / {unidadCortaDePresentacion(mostrado).toLowerCase()}
                 </span>
               )}
             </p>

@@ -887,6 +887,9 @@ for (const ancho of ANCHOS) {
     const FALTANTE = "V15 Faltante PACK";
     const SOBRANTE = "V15 Sobrante CAJON";
     const SUELTAS = "V15 Sueltas PACK";
+    // El pack ROTO: cero bultos enteros y una unidad suelta. Su nombre no lleva
+    // la palabra "pack" porque el arnés afirma que su tarjeta no la dice.
+    const ROTO = "V15 Bulto Roto";
     // El producto por PESO que vive fuera del remito llega por `--buscar`, que
     // es el mismo parámetro con el que el modo del V16 ejercía el no declarado.
     // En esta base hay que pasarle "V15 NoDeclarado KG".
@@ -897,6 +900,7 @@ for (const ancho of ANCHOS) {
     await afirmar(await hayTexto(FALTANTE), "la que va a faltar está en la lista");
     await afirmar(await hayTexto(SOBRANTE), "la que va a sobrar está en la lista");
     await afirmar(await hayTexto(SUELTAS), "la del pack incompleto está en la lista");
+    await afirmar(await hayTexto(ROTO), "la del pack roto está en la lista");
 
     // LA REGLA CENTRAL DE LA TANDA, ejercida en el navegador y no leída del JSX.
     await afirmar(!(await hayContador()), "no quedó ningún contador − / + en la pantalla");
@@ -1017,7 +1021,10 @@ for (const ancho of ANCHOS) {
     // El punto de partida del avance, para que el "se movió" del paso 3 tenga
     // contra qué compararse. Sin esto, afirmar "2 / 4" más adelante no dice si
     // el número cambió o si ya estaba así.
-    await afirmar(await hayTexto("0 / 4 revisados"), "el avance arranca en 0 de 4");
+    // Cinco desde que el sembrado trae el pack roto. El denominador sale del
+    // servidor —`totalFisico`, la misma fuente del tab "Todos"—, así que el número
+    // acompaña al sembrado y no se elige acá.
+    await afirmar(await hayTexto("0 / 5 revisados"), "el avance arranca en 0 de 5");
     await afirmar(await cierreTrabado(), "el cierre arranca TRABADO");
     await afirmar(
       await hayTexto("Total"),
@@ -1660,7 +1667,7 @@ for (const ancho of ANCHOS) {
     // Dos: la que coincidió y ésta. El numerador es `revisados + noDeclarados`
     // y el denominador `totalFisico`, que es la misma fuente del tab "Todos".
     await afirmar(
-      await hayTexto("2 / 4 revisados"),
+      await hayTexto("2 / 5 revisados"),
       "y el AVANCE de arriba se movió: el total lo recalculó el servidor"
     );
 
@@ -1765,6 +1772,73 @@ for (const ancho of ANCHOS) {
     await tocarOpcion("Sobrante", { etiqueta: "el motivo Sobrante" });
     await tocar("y seguir", { etiqueta: "guardar el pack incompleto" });
     await esperar(2800);
+
+    // ── PASO 5b · EL PACK ROTO: CERO BULTOS ENTEROS Y UNA SUELTA ───────
+    //
+    // La línea salió sin ningún bulto completo, así que se cuenta POR UNIDAD y el
+    // pack no se nombra. Lo que se mide acá es lo que ningún candado de la suite
+    // puede medir: que no haya un segundo campo VISIBLE en la pantalla real, y
+    // que el botón de guardar siga donde tiene que estar con un campo menos.
+    //
+    // Va antes del PASO 6 y TERMINA revisando la línea, porque el PASO 6 afirma
+    // que el cierre se destraba con todo revisado: una quinta línea pendiente lo
+    // dejaría trabado y el rojo señalaría al cierre en vez de a esta escena.
+    console.log("\n  PASO 5b · el pack roto, que se cuenta por unidad");
+    const tRoto = await textoDeTarjeta(ROTO);
+    await afirmar(
+      !/PACK/i.test(tRoto),
+      `la tarjeta del pack roto nombra el pack: ${JSON.stringify(tRoto)}`
+    );
+    await afirmar(tRoto.includes("1 UNIDAD"), `la tarjeta no dice «1 UNIDAD»: ${JSON.stringify(tRoto)}`);
+    // Los dos precios se distinguen a propósito en el sembrado —el pack 8880, la
+    // unidad 1480—, así que mostrar el equivocado no puede pasar desapercibido.
+    await afirmar(
+      tRoto.includes("$1.480,00"),
+      `la tarjeta no muestra el costo de la unidad: ${JSON.stringify(tRoto)}`
+    );
+    await afirmar(
+      !tRoto.includes("$8.880,00"),
+      "la tarjeta muestra el costo de un pack que no vino"
+    );
+
+    await tocarEnTarjeta(ROTO, "Corregir", { etiqueta: "corregir el pack roto", exacto: true });
+    await esperar(1200);
+    const camposDelRoto = await evaluar(`(() => {
+      const vis = [...document.querySelectorAll('input[type="number"]')].filter((n) => n.offsetParent !== null);
+      return vis.map((n) => ({ etiqueta: n.getAttribute('aria-label') || '(sin etiqueta)', valor: n.value }));
+    })()`);
+    await afirmar(
+      Array.isArray(camposDelRoto) && camposDelRoto.length === 1,
+      `el panel tiene que abrir con UN campo; abrió con ${camposDelRoto?.length}: ${JSON.stringify(camposDelRoto)}`
+    );
+    await afirmar(
+      camposDelRoto[0].etiqueta === "Unidades",
+      `el campo único no se rotula «Unidades»: ${JSON.stringify(camposDelRoto[0])}`
+    );
+    await afirmar(
+      camposDelRoto[0].valor === "1",
+      `el campo único no precargó la unidad suelta: ${JSON.stringify(camposDelRoto[0])}`
+    );
+    await afirmar(
+      !(await hayTextoEnPanel("PACK")),
+      "el panel del pack roto sigue nombrando el pack"
+    );
+    await afirmar(
+      await hayTextoEnPanel("1 UNIDAD"),
+      "el panel perdió el enviado en unidades"
+    );
+    // Y el pie sigue alcanzable con un campo menos, que es lo que el V25 ancló.
+    const botonDelRoto = await botonAVariasAlturas(ancho);
+    console.log(`    · botón del pack roto: ${JSON.stringify(botonDelRoto)}`);
+    await afirmar(
+      ALTURAS_DE_TELEFONO.every((h) => botonDelRoto[h] && botonDelRoto[h].dentro),
+      `el botón de guardar se fue de pantalla con un solo campo: ${JSON.stringify(botonDelRoto)}`
+    );
+    // Coincide —1 contra 1— así que guarda sin pedir motivo, y el PASO 6 sigue
+    // afirmando lo mismo que antes.
+    await tocar("y seguir", { etiqueta: "guardar el pack roto" });
+    await esperar(2800);
+    await afirmar(!(await panelAbierto()), "el panel del pack roto no cerró al guardar");
 
     // ── PASO 6 · EL CIERRE SE DESTRABA ─────────────────────────────────
     console.log("\n  PASO 6 · el cierre");

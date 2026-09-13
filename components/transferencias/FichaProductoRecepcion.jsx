@@ -49,17 +49,20 @@ import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
 // `resultadoDeConteo` se importaba acá para el renglón teñido. Se dio de baja
 // con el V26: sin ese renglón y sin el aviso de la tarjeta quedó sin un solo
 // consumidor, que es el patrón del `conImporte`.
-import { motivosParaDiferencia } from "@/lib/transferencias/recepcionUI";
+import { costoMostradoDe, motivosParaDiferencia } from "@/lib/transferencias/recepcionUI";
 import { ESTADO_PRODUCTO, estadoDeProducto } from "@/lib/transferencias/controlFisico";
 import {
   ORIGEN_PRESENTACION,
   origenDePresentacion,
 } from "@/lib/transferencias/adopcionDePresentacion";
 import {
+  PRESENTACION,
   decimalesDeCantidad,
   descriptorDeEnvio,
+  envioComoSeCuenta,
   escalaDeEnvio,
   nombreDePresentacion,
+  seCuentaPorUnidad,
   rotuloDeEnvio,
   rotuloFisicoDeEnvio,
   rotuloConSueltas,
@@ -103,6 +106,20 @@ export const ROTULO_SUELTAS = "Hay unidades sueltas";
  * qué se escribe en esa caja, no si existe.
  */
 export const ROTULO_SUELTAS_CAMPO = "Unidades sueltas";
+
+/**
+ * EL RÓTULO DEL CAMPO CUANDO LA ESCALA ES LA UNIDAD.
+ *
+ * Uno solo para los dos casos que terminan en lo mismo: una línea que salió por
+ * unidad, y una que salió sin ningún bulto entero y por lo tanto también se
+ * cuenta por unidad. Antes el primero decía "Recibido en UNIDAD" y el segundo no
+ * existía; dos nombres para la misma escala son dos cosas que el operador tiene
+ * que aprender por separado.
+ *
+ * Solo en la hoja. Escritorio sigue diciendo "Cantidad recibida en …" con la
+ * presentación del remito, y eso no se toca en esta tanda.
+ */
+export const ROTULO_UNIDADES = "Unidades";
 
 // ── ACÁ VIVÍAN LOS SIETE RÓTULOS DEL BLOQUE DE ADOPCIÓN ──────────────────
 //
@@ -260,6 +277,36 @@ export default function FichaProductoRecepcion({
     // línea YA contada con 0 sueltas reales, ese 0 es un dato —se contó y no había
     // ninguna suelta— y tiene que quedar en 0, no volver al envío.
     const s = Number((sinContar ? env.sueltas : d?.recibidoUnidadesSueltas) || 0);
+
+    // ── SI NO SALIÓ NINGÚN BULTO ENTERO, HAY UN SOLO CAMPO Y ES EN UNIDADES ──
+    //
+    // El campo único lleva las unidades FÍSICAS, que es la escala en la que esa
+    // línea se cuenta. Y por eso lo persistido se lee convertido: para el detalle
+    // 6519, que tiene 6 guardado en el campo de packs con factor 30, el campo
+    // arranca en 180 —las unidades que el sistema hoy cree que llegaron—, así que
+    // el número equivocado se VE y se puede corregir desde la pantalla. Mostrar 0
+    // lo dejaría escondido y sin forma de alcanzarlo.
+    //
+    // Lo que se guarda no cambia: el par sigue siendo "recibido 0 · sueltas N",
+    // que es exactamente lo que hoy escriben los dos campos con los packs en cero.
+    // Ver `revisar`.
+    if (enHoja && seCuentaPorUnidad(env)) {
+      const fisicas = sinContar
+        ? Number(env.sueltas) || 0
+        : (Number(d?.cantidadRecibida) || 0) * (Number(env.factor) || 1) +
+          (Number(d?.recibidoUnidadesSueltas) || 0);
+      return {
+        // La escala sale del propio descriptor mostrado y no de una constante
+        // escrita acá: si mañana el colapso eligiera otra presentación, los
+        // decimales del campo la siguen sin que nadie se acuerde de este lugar.
+        recibido: enEscalaDelCampo(fisicas, envioComoSeCuenta(env).presentacion),
+        sueltas: "",
+        conSueltas: false,
+        motivo: d?.motivoPrincipal || "",
+        detalleMotivo: d?.motivoDetalle || "",
+      };
+    }
+
     return {
       recibido: enEscalaDelCampo(propuesto, env.presentacion),
       sueltas: s > 0 ? String(s) : "",
@@ -316,6 +363,23 @@ export default function FichaProductoRecepcion({
   // `agrupaEsta` y no `agrupa`: el import del módulo se llama así y sombrearlo
   // acá adentro dejaría inalcanzable la función del dominio.
   const agrupaEsta = escala.unidad === "BULTO";
+
+  // ── CÓMO SE MUESTRA, QUE NO ES CÓMO SE GUARDA ───────────────────────────
+  //
+  // Una línea que salió sin ningún bulto entero se cuenta por unidad: un solo
+  // campo, y el pack no se nombra. `agrupaEsta` NO se toca — es la escala en la
+  // que la línea está persistida y en la que el servidor la valida, y de ella
+  // sigue saliendo lo que se manda a guardar.
+  //
+  // Va detrás de `enHoja`: escritorio queda exactamente como estaba, con sus dos
+  // campos y la presentación del remito en el rótulo. Es presentación, no
+  // negocio, y el rediseño de escritorio es una tanda propia.
+  const cuentaPorUnidad = enHoja && seCuentaPorUnidad(envio);
+  const mostrado = envioComoSeCuenta(envio);
+  // El segundo campo existe cuando hay bultos que completar Y se está contando en
+  // esa escala. Con una sola de las dos condiciones, el envío mixto de verdad
+  // perdería su desglose o el pack roto volvería a ofrecerlo.
+  const muestraSueltas = agrupaEsta && !cuentaPorUnidad;
   const estado = estadoDeProducto(d);
 
   // De dónde salió la presentación con la que se está contando. Sigue haciendo
@@ -328,9 +392,19 @@ export default function FichaProductoRecepcion({
   // con el factor CONGELADO: si el catálogo cambió después del envío, la cuenta
   // sigue siendo la del remito.
   const unidadParaCuenta = escala.unidad;
+  // Con un solo campo, lo tipeado YA son unidades físicas, así que entra por el
+  // hueco de las sueltas con los completos en cero: es la misma codificación con
+  // la que se va a guardar, y por eso la cuenta la hace la MISMA función y no un
+  // atajo que sume aparte.
   const fisicasEditadas = unidadesFisicasDe({
-    cantidad: recibido === "" ? 0 : recibido,
-    sueltas: agrupaEsta && usaSueltas ? sueltas || 0 : 0,
+    cantidad: cuentaPorUnidad ? 0 : recibido === "" ? 0 : recibido,
+    sueltas: cuentaPorUnidad
+      ? recibido === ""
+        ? 0
+        : recibido || 0
+      : muestraSueltas && usaSueltas
+        ? sueltas || 0
+        : 0,
     unidad: unidadParaCuenta,
     factorPack: factor,
   });
@@ -361,9 +435,26 @@ export default function FichaProductoRecepcion({
    * otro. Donde no hay bultos que completar —KG, PIEZA, UNIDAD— no se escribe
    * "completos", que ahí no significaría nada.
    */
-  const rotuloDeCompletos = agrupaEsta
+  const rotuloDeCompletos = muestraSueltas
     ? `${nombreDePresentacion(envio)} completos`
-    : `Recibido en ${nombreDePresentacion(envio)}`;
+    : enHoja && mostrado.presentacion === PRESENTACION.UNIDAD
+      ? ROTULO_UNIDADES
+      : `Recibido en ${nombreDePresentacion(envio)}`;
+
+  /**
+   * EL NOMBRE ACCESIBLE DEL CAMPO, que es lo que el arnés y el lector de pantalla
+   * usan para encontrarlo.
+   *
+   * Sigue al rótulo visible en el único caso donde cambió —la escala unidad en la
+   * hoja— y en todos los demás queda EXACTAMENTE como estaba: hay unos treinta
+   * candados y dos pasadas del arnés que buscan el campo por
+   * "Cantidad recibida en PACK x24", y cambiarlo de forma pareja los rompería a
+   * todos para ganar consistencia en un caso.
+   */
+  const etiquetaDelCampo =
+    rotuloDeCompletos === ROTULO_UNIDADES
+      ? ROTULO_UNIDADES
+      : `Cantidad recibida en ${nombreDePresentacion(envio)}`;
 
   // Acá se armaba `rotuloDeEnvioUnaLinea` —"1 PACK x12 · 12 unidades físicas"—
   // para el renglón del enviado en el teléfono. El V26 le sacó la segunda mitad:
@@ -453,8 +544,29 @@ export default function FichaProductoRecepcion({
     }
     const r = await onRevisar?.({
       detalleId: d.id,
-      recibido: recibido === "" ? null : recibido,
-      recibidoUnidadesSueltas: agrupaEsta && usaSueltas ? sueltas || 0 : 0,
+      // ── LO QUE SE GUARDA NO CAMBIÓ, Y ES DELIBERADO ────────────────────
+      //
+      // Con un solo campo, lo tipeado son unidades físicas y se persiste en el
+      // hueco de las sueltas con los completos en CERO: el mismo par que hoy
+      // escriben los dos campos cuando los packs quedan en cero. La escala en la
+      // que la línea está guardada sigue siendo la del snapshot, así que el
+      // servidor valida lo mismo, el stock entra igual, y las líneas ya contadas
+      // con "recibido 0 · sueltas N" siguen siendo legibles y confirmables.
+      //
+      // Colapsar TAMBIÉN la escala persistida haría que ese par —que existe en la
+      // base— pase a ser irrepresentable, y dejaría transferencias sin poder
+      // confirmar. Medido. Ver `seCuentaPorUnidad`.
+      //
+      // El vacío sigue significando "no revisada" en los dos caminos: es lo que
+      // distingue una línea sin contar de una contada en cero.
+      recibido: recibido === "" ? null : cuentaPorUnidad ? 0 : recibido,
+      recibidoUnidadesSueltas: cuentaPorUnidad
+        ? recibido === ""
+          ? 0
+          : recibido || 0
+        : muestraSueltas && usaSueltas
+          ? sueltas || 0
+          : 0,
       motivoPrincipal: motivos.length > 0 ? motivo : null,
       motivoDetalle: motivos.length > 0 && motivo === "Otro" ? detalleMotivo : null,
     });
@@ -577,7 +689,11 @@ export default function FichaProductoRecepcion({
           <div className="flex items-baseline gap-2 flex-wrap">
             <span className="text-xs sunmi-text-muted shrink-0">Enviado</span>
             <span className="min-w-0 text-base2 font-semibold tabular-nums sunmi-text-accent truncate">
-              {d.agregadoEnRecepcion ? "—" : rotuloConSueltas(envio)}
+              {/* `mostrado`: si no salió ningún bulto entero esto dice "1 UNIDAD",
+                  no "0 PACK x6 + 1 unidad suelta". La forma LARGA se queda acá
+                  —y en la auditoría de stock— para el mixto de verdad, donde la
+                  palabra "sueltas" hace falta y hay lugar para escribirla. */}
+              {d.agregadoEnRecepcion ? "—" : rotuloConSueltas(mostrado)}
             </span>
             {/* ── EL PRECIO DE LA PRESENTACIÓN ─────────────────────────────
                 Es el número que se compara contra el remito del proveedor, y no
@@ -595,9 +711,9 @@ export default function FichaProductoRecepcion({
                 —pack, cajón, un, kg, pieza—, no se escribe a mano: escribirlo
                 sería una segunda tabla de nombres que el día que cambie una va a
                 decir algo distinto que la otra. */}
-            {!d.agregadoEnRecepcion && d.precioCosto != null && (
+            {!d.agregadoEnRecepcion && costoMostradoDe(d, envio) != null && (
               <span className="text-xs tabular-nums sunmi-text-muted shrink-0">
-                · {formatearMoneda(d.precioCosto)} / {unidadCortaDePresentacion(envio).toLowerCase()}
+                · {formatearMoneda(costoMostradoDe(d, envio))} / {unidadCortaDePresentacion(mostrado).toLowerCase()}
               </span>
             )}
           </div>
@@ -620,9 +736,9 @@ export default function FichaProductoRecepcion({
                 <SunmiCampoCantidad
                   valor={recibido}
                   onCambiar={setRecibido}
-                  etiqueta={`Cantidad recibida en ${nombreDePresentacion(envio)}`}
+                  etiqueta={etiquetaDelCampo}
                   difiere={campoDifiere}
-                  decimales={decimalesDeCantidad(envio.presentacion)}
+                  decimales={decimalesDeCantidad(mostrado.presentacion)}
                   // `minimo` 0 y NO el 1 del carrito: "no llegó nada" es una
                   // respuesta válida en una recepción. Y sin `normalizaAlSalir`,
                   // porque acá `""` se guarda como `null` —no revisada— y un 0 se
@@ -642,7 +758,7 @@ export default function FichaProductoRecepcion({
             {/* Las sueltas solo donde significan algo: en KG, PIEZA y UNIDAD la
                 cantidad YA está en unidades físicas y un desglose se sumaría
                 encima de sí mismo. */}
-            {agrupaEsta && (
+            {muestraSueltas && (
               <div className="w-35p">
                 <div className="text-sm2 sunmi-text-muted truncate">{ROTULO_SUELTAS_CAMPO}</div>
                 {/* `difiere` va en los DOS campos, porque los dos suman al total

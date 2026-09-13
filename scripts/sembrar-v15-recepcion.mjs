@@ -126,6 +126,23 @@ const PRODUCTOS = [
   { clave: "faltante", nombre: "V15 Faltante PACK", unidad_medida: "pack", factor_pack: 24, costo: 5250 },
   { clave: "sobrante", nombre: "V15 Sobrante CAJON", unidad_medida: "cajon", factor_pack: 12, costo: 8400 },
   { clave: "sueltas", nombre: "V15 Sueltas PACK", unidad_medida: "pack", factor_pack: 6, costo: 1800 },
+  // ── EL PACK ROTO: CERO BULTOS ENTEROS Y UNA SUELTA ───────────────────
+  //
+  // El depósito rompió un pack y despachó suelto, así que esta línea SALIÓ POR
+  // UNIDAD aunque el producto se compre en pack. El costo es el del PACK —8880,
+  // igual que la línea real de producción— así que la unidad vale 1480 y los dos
+  // números se distinguen: si la pantalla mostrara el precio equivocado, se ve.
+  //
+  // Es la combinación que el sembrado NO tenía: las cuatro líneas de arriba
+  // tienen `sueltasEnviadas: 0`, y la que se llama "sueltas" las tiene del lado
+  // RECIBIDO. Por eso el arnés no podía ver ni este caso ni el defecto que dejó
+  // 6 packs contados sobre un envío sin packs —`INC-0008`—.
+  //
+  // El nombre NO lleva la palabra "pack" a propósito: el arnés afirma que la
+  // tarjeta y el panel de esta línea no dicen "PACK" en ningún lado, y el nombre
+  // del producto se dibuja adentro de la tarjeta. Con "V15 PackRoto PACK" esa
+  // afirmación habría dado rojo por el nombre y no por el defecto.
+  { clave: "packRoto", nombre: "V15 Bulto Roto", unidad_medida: "pack", factor_pack: 6, costo: 8880 },
   // ── EL QUINTO NO VA EN EL REMITO, Y ÉSE ES EL PUNTO ──────────────────
   //
   // Está en el catálogo del origen y NO en la transferencia: es el único que
@@ -228,6 +245,17 @@ const LINEAS = [
     cantidad: 24, presentacionEnvio: "PACK", cantidadPresentada: 4,
     factorPresentacion: 6, sueltasEnviadas: 0, precioCosto: 1800,
     recibido: 4, recibidoUnidadesSueltas: 3,
+  },
+  {
+    // EL PACK ROTO, sin contar: cero packs enteros y una unidad suelta. La
+    // cantidad física es 1 —0 × 6 + 1—, que es la que el origen puso en tránsito.
+    //
+    // Sin contar a propósito: lo que hay que poder medir es cómo ABRE el panel,
+    // y con un conteo cargado esa pregunta ya estaría contestada por lo guardado.
+    clave: "packRoto",
+    cantidad: 1, presentacionEnvio: "PACK", cantidadPresentada: 0,
+    factorPresentacion: 6, sueltasEnviadas: 1, precioCosto: 8880,
+    recibido: null, recibidoUnidadesSueltas: null,
   },
 ];
 

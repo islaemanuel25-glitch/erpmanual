@@ -298,7 +298,13 @@ test("F5. LA TARJETA NO RESUELVE LA PRESENTACIÓN POR SU CUENTA", () => {
   // dice los dos números y saca las dos palabras que la posición ya explica. Lo
   // que este candado defiende —que la tarjeta no resuelva la presentación por su
   // cuenta— no cambió.
-  assert.match(fuente, /rotuloConSueltasCorto\(envio\)/);
+  // Y ahora recibe `mostrado`, que es el MISMO descriptor pasado por
+  // `envioComoSeCuenta`: una línea que salió sin ningún bulto entero se rotula
+  // "1 UNIDAD" y no "0 PACK x6 + 1". Sigue siendo el módulo canónico el que
+  // resuelve la presentación — lo que este candado defiende—; lo que se agrega es
+  // en qué escala se la pide.
+  assert.match(fuente, /rotuloConSueltasCorto\(mostrado\)/);
+  assert.match(fuente, /envioComoSeCuenta\(envio\)/, "la escala mostrada se está decidiendo a mano");
   assert.match(fuente, /from "@\/lib\/transferencias\/presentacionEnvio"/);
   assert.doesNotMatch(
     fuente,
@@ -339,16 +345,28 @@ test("F6. Y EL IMPORTE NO SE RECALCULA: sale tal cual del endpoint", () => {
   // Y `d.precioCosto` NO es la columna cruda: la ruta manda ahí
   // `remito.costoPresentacion`. Que la pantalla lea ESE campo y no invente una
   // división es lo que este candado defiende.
+  // ── Y DESDE EL 2026-09-13 CUÁL DE LOS DOS COSTOS SE ELIGE AFUERA ───────
+  //
+  // El endpoint manda los dos —`precioCosto`, el de la presentación, y
+  // `costoUnitarioFisico`, el de una unidad— y la elección la hace
+  // `costoMostradoDe`, en `recepcionUI`, porque la necesitan la tarjeta y el
+  // panel. Lo que este candado defiende no cambió: la pantalla LEE un campo del
+  // endpoint y no divide. Lo que se agrega es que tampoco elige por su cuenta.
   assert.match(
     fuente,
-    /formatearMoneda\(d\.precioCosto\)/,
+    /costoMostradoDe\(d, envio\)/,
     "la tarjeta dejó de mostrar el precio de la presentación"
+  );
+  assert.doesNotMatch(
+    fuente,
+    /d\.costoUnitarioFisico/,
+    "la tarjeta eligió el costo por su cuenta en vez de pedirlo a `costoMostradoDe`"
   );
   // Y el sufijo se DERIVA, no se escribe: una segunda tabla de nombres se
   // separaría de la primera el día que una cambie.
   assert.match(
     fuente,
-    /unidadCortaDePresentacion\(envio\)/,
+    /unidadCortaDePresentacion\(mostrado\)/,
     "el sufijo del precio se está escribiendo a mano"
   );
   assert.doesNotMatch(

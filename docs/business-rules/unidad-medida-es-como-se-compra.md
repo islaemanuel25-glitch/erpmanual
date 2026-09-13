@@ -34,6 +34,52 @@ El caso testigo es real y está en producción. `POETT PERFUMINA SOLO PARA TI`:
 No hay contradicción, no hay nada que arreglar en la ficha, y no hay ningún
 desempate que pedirle a una persona.
 
+## Y SI NO SALIÓ NINGÚN BULTO ENTERO, SALIÓ POR UNIDAD
+
+Escrito el 2026-09-13. Es el mismo criterio un paso más adelante: acá la línea no
+le gana a la ficha, **le gana a su propio snapshot.**
+
+El depósito puede romper un pack y despachar suelto. Cuando eso pasa el snapshot
+queda diciendo `presentacionEnvio: PACK`, `cantidadPresentada: 0`,
+`sueltasEnviadas: 1` — y las dos cosas son ciertas: el producto se compra en pack
+y **esa línea salió por unidad**. La presentación real de esa línea es la unidad,
+porque de la otra no salió nada.
+
+**La regla:** si el envío tiene cero bultos completos, la línea se cuenta por
+unidad y **el pack no se nombra en ningún lado** — ni en el rótulo, ni con un
+campo para contarlo, ni en el precio, que pasa a ser el de la unidad.
+
+Un pack enunciado sobre una línea que no trajo ningún pack no es un rótulo de
+más: es una invitación a contar algo que no vino, y ya produjo el número
+equivocado en producción —180 unidades donde llegaron 8, multiplicando por 30—.
+Está en
+[`INC-0008`](../incidents/INC-0008-packs-contados-sobre-un-envio-sin-bultos.md).
+
+**Dónde vive:** `seCuentaPorUnidad` y `envioComoSeCuenta`, en
+`lib/transferencias/presentacionEnvio.js`. Las consultan la tarjeta y el panel del
+teléfono, y nadie más.
+
+**Y LO QUE ESTA REGLA NO HACE, que es la parte que hay que leer antes de
+extenderla:** no cambia la escala en la que la línea se GUARDA ni en la que el
+servidor la valida. Es de presentación, y tiene que seguir siendo de
+presentación.
+
+El motivo no es de estilo. Hay líneas ya contadas con el par
+`recibido = 0 · recibidoUnidadesSueltas = N`, que es la codificación correcta en la
+escala del snapshot. Con factor 1 ese par es **irrepresentable**:
+`milesimasFisicas` rechaza un desglose sobre una presentación que no agrupa, a
+propósito, porque ahí la cantidad ya contiene las sueltas y sumarlas las contaría
+dos veces. Colapsar la escala del servidor haría que
+`validarDetalleRecepcion` devuelva `UNIDADES_SUELTAS_SIN_BULTO` sobre datos que hoy
+funcionan, y **la transferencia #191 no se podría confirmar.** Medido ejecutándolo
+el 2026-09-13, no deducido.
+
+Así que el campo único de la pantalla lleva unidades FÍSICAS y se persiste en el
+hueco de las sueltas con los completos en cero: exactamente los mismos bytes que
+escribían los dos campos. Si algún día la escala persistida tiene que cambiar, eso
+es una migración de datos y una decisión, no un ajuste de rótulo. Lo defiende un
+candado que comprueba que ningún módulo del servidor importe esas dos funciones.
+
 ## Cuál manda, según para qué
 
 - **Para contar una recepción manda cómo SALIÓ.** El depósito despachó de una
