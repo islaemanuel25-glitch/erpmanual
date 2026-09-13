@@ -20,6 +20,64 @@ Ninguna. Producción está en **10 migraciones**, las mismas que el árbol.
 
 ---
 
+## 2026-09-13 — `94432c42`, las dos columnas en la misma escala: CERO migraciones
+
+Producción pasó de `c9aac14bc8047787ed8c76d4d203160bfcb3be40` a
+`94432c429c52cb6d2baa2ce88d9efcb6bf8a308d`. **Despliegue solo de código**, con
+corte de **4 segundos**.
+
+El cero por los tres caminos: diff de `prisma/` vacío en el rango y
+`schema.prisma` sin tocar; clasificador con `--desde c9aac14b…` en «Archivos a
+mirar: 0»; y `migrate deploy` contando **10**, el mismo número que el árbol del
+VPS. `migrate status` de cierre: 10 y «Database schema is up to date!». Bitácora
+de autorizaciones **inexistente**.
+
+Qué sale: la columna "Recibida" del detalle pasa a unidades FÍSICAS, la misma
+escala que "Enviada" y que la diferencia. En la #200 se leía «Enviada 72 · Recibida
+3» sobre tres packs de 24 que llegaron completos; ahora dice **72 y 72**. Y con eso
+el renglón «Ingreso físico» se fue del modo lectura, donde repetía el número que la
+columna ya dice; sigue estando mientras se edita, que es donde el campo habla en
+packs y hace falta traducirlo.
+
+### NO SE PUDO ARMAR UN MARCADOR, y es la segunda vez
+
+La tanda **no deja rastro en el build**, y se comprobó antes de buscarlo:
+
+- Las cadenas que aparecen en el diff —`"Enviada 72 · Recibida 3"`, `"Recibida 72"`,
+  `"= 72 unidades"`— están **dentro de comentarios** que explican el defecto. El
+  build las borra, así que no sirven.
+- Lo que cambió de verdad es `recibido` por `recFis` en dos celdas: un
+  **identificador**, que el build minifica y por lo tanto no afirma nada.
+- Y `"Ingreso físico"` **no desaparece**: sigue escrito en el archivo, ahora detrás
+  de `inputsHabilitados`. Un marcador de desaparición sobre esa cadena habría dado
+  falso, que es exactamente la trampa del `!my-0` anotada más abajo.
+
+Así que **esta tanda está verificada por los candados de render y por la medición
+sobre las líneas reales, no contra el build.** Antes: «Pan hamburguesa 72 · 3 · 0»
+y «HUEVO KINDER 12 · 2 · +12». Después: **«72 · 72 · 0»** y **«12 · 24 · +12»**,
+sin el renglón repetido.
+
+### La sonda de cascada
+
+**VERDE antes y después**, 1647 reglas las dos veces.
+
+### Y UNA NOTA DE PROCEDIMIENTO: EL `pull` SE PASÓ DE LOS DIEZ MINUTOS
+
+El `docker compose pull app` se cortó por el tope de la herramienta con la imagen a
+medio bajar. **No dejó nada a medias en producción** —el contenedor seguía
+sirviendo la imagen vieja y `/login` daba 200— porque el orden del procedimiento
+pone el `pull` antes de recrear, justamente para que una descarga interrumpida no
+toque lo que atiende.
+
+Se comprobó el estado real antes de reintentar: `docker image inspect` decía "No
+such image", o sea que no había bajado nada usable, y `APP_IMAGE` ya apuntaba al
+tag nuevo, que es lo correcto en ese punto. El reintento fue en segundo plano, con
+una espera atada a que la imagen exista y no a un tiempo fijo.
+
+Queda anotado porque el próximo despliegue desde acá se puede encontrar con lo
+mismo: **el `pull` es el único paso que puede pasar de diez minutos**, y la forma
+de correrlo es en segundo plano.
+
 ## 2026-09-13 — `c9aac14b`, una sola verdad para lo enviado y lo recibido: CERO migraciones
 
 Producción pasó de `3eab5c04d7a6795327382095046bc116eca83a11` a
