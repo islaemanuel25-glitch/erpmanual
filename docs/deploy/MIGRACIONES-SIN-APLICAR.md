@@ -20,6 +20,43 @@ Ninguna. Producción está en **11 migraciones**, las mismas que el árbol.
 
 ---
 
+## 2026-09-13 — `9d101cb4`, el día como encabezado: CERO migraciones
+
+Producción pasó de `3cd4a4c53268e017e5944cadd80fb6d726072056` a
+`9d101cb445f45486b6b7b07f83e2ccb78085d8f2`. **Despliegue solo de código**, con
+corte de **2 segundos**. Quinto del día, y los cinco cortaron 2 segundos.
+
+Cero migraciones por tres caminos —pendientes vacío, `prisma/` sin tocar en el
+rango, clasificador en «Archivos a mirar: 0»— y el conteo confirmando que la
+imagen no estaba atrasada: **11 informadas, 11 en el árbol**. `migrate status`:
+11 y "Database schema is up to date!". Bitácora de autorizaciones: **inexistente**.
+
+### Qué sale
+
+La segunda vuelta del tablero móvil: las transferencias de un local se agrupan
+por DÍA, cada fila dice la hora y el estado en palabras en vez del número
+interno, la ya recibida se puede abrir, y arriba hay un buscador por número.
+
+### El marcador: TRES cadenas de interfaz, con su control
+
+Esta vez la tanda sí agregó texto, así que el marcador volvió a ser el normal
+—cadenas, que el build no minifica— y se usaron tres en vez de una:
+
+- `"Buscar transferencia por número"`: **0 en la vieja, 2 en la nueva**
+- `"Sin abrir"`: **0 y 2**
+- `"Ver ›"`: **0 y 2**
+
+Control `"Sin corte"`, que ya existía: **2 en las dos**, así que la búsqueda
+anda. Los tres elegidos con `git grep -F` contra el commit desplegado, no de
+memoria.
+
+### Lo que se va a ver hoy, medido
+
+En la semana en curso hay **4 transferencias, todas del domingo 13 y ninguna
+recibida**. Así que la pantalla muestra **una sola banda de día** con cuatro
+filas en "Sin abrir": el agrupado por día y el camino de la recibida se notan
+recién con el chip en Mes, o cuando lleguen envíos de otro día.
+
 ## 2026-09-13 — `3cd4a4c5`, el criterio del cliente vinculado: CERO migraciones
 
 Producción pasó de `0acacafd9eeead46d690ad3d05ab542f1d911263` a
