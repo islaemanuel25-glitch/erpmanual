@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-09-13] - Actualización: transferencias
+
+### Modificado
+- **transferencias**: feat(transferencias): la pantalla móvil pasa a ser la lista de trabajo
+- **transferencias**: feat(transferencias): el corte de período sale del código y pasa a ser un acuerdo
+- **transferencias**: fix(transferencias): "Enviada" y "Recibida" en la misma escala, y el desglose se va de lectura
+- **transferencias**: fix(transferencias): "cuánto se envió y cuánto llegó" se pregunta en un solo lugar
+- **transferencias**: fix(transferencias): la recepción de escritorio lee la escala del remito, en el documento y en el editor
+- **transferencias**: feat(recepcion): si no salió ningún bulto entero, la línea se cuenta por unidad
+
+
 ## [2026-09-09] - Actualización: transferencias
 
 <!-- ESTA ENTRADA SE EDITÓ A MANO Y NO SE VUELVE A GENERAR.

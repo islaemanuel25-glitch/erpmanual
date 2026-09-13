@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-09-09 02:17
+**Última actualización:** 2026-09-13 15:39
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -194,6 +194,12 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-09-13: feat(transferencias): la pantalla móvil pasa a ser la lista de trabajo
+- 2026-09-13: feat(transferencias): el corte de período sale del código y pasa a ser un acuerdo
+- 2026-09-13: fix(transferencias): "Enviada" y "Recibida" en la misma escala, y el desglose se va de lectura
+- 2026-09-13: fix(transferencias): "cuánto se envió y cuánto llegó" se pregunta en un solo lugar
+- 2026-09-13: fix(transferencias): la recepción de escritorio lee la escala del remito, en el documento y en el editor
+- 2026-09-13: feat(recepcion): si no salió ningún bulto entero, la línea se cuenta por unidad
 - 2026-09-09: fix(transferencias): tres defectos de integración del control físico
 - 2026-09-09: fix(transferencias): los siete defectos de la revisión arquitectónica
 - 2026-09-08: fix(transferencias): recibiendo no hay guardado por lotes, y es por seguridad
