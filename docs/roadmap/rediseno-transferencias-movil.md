@@ -767,6 +767,62 @@ palabra: `git grep --untracked`. Verificado por contraprueba —un consumidor nu
 sin commitear ahora pone el censo en rojo— y las dos listas se actualizaron a
 propósito, que es para lo que el censo existe.
 
+### EL BARRIDO DE TRANSFERENCIAS — 2026-09-14, MEDIDO EN EL NAVEGADOR
+
+El defecto de la tarjeta no era de la entrada: `sunmi-surface` se llama "surface"
+y pinta `--app-bg`, el fondo de la **aplicación**. En todo el repo hay **82
+lugares** con esa clase junto a `rounded`, en 41 archivos.
+
+**La clasificación por texto no sirve, y eso se decidió antes de tocar.** Con esa
+clase conviven cuatro cosas distintas: tarjetas apoyadas en la página, superficies
+que FLOTAN —donde `--app-bg` es el único token opaco en los catorce temas y
+`--card-bg` dejaría leer el texto de abajo—, piezas INTERNAS de una tarjeta
+—donde `--app-bg` es el contraste correcto contra `--card-bg`— y pares de
+contraste por estado. Lo que las distingue no está en la clase: está en **qué
+tienen arriba**.
+
+**La regla que sí sirve, y es una sola:** nada puede ser del color de aquello
+sobre lo que está apoyado. Se mide el fondo computado del elemento contra el de
+su primer ancestro que realmente pinta algo. Con eso, una tarjeta sobre la página
+da rojo y un azulejo adentro de una tarjeta da verde, sin tener que decidir a
+cuál grupo pertenece. Está en `afirmarSuperficies()` del arnés y corre en las
+seis pantallas que el arnés recorre.
+
+**Lo que cambió, cinco lugares en cinco archivos**, y los cinco los señaló la
+medición, no una lista: `CuentaDelPeriodoCerrado`, `DiaDeTransferencias`,
+`FilaCorteDeSemana`, `CabeceraDeCuenta` y `FilaTransferenciaLocal` —este último
+vale por cuatro elementos, porque su `marco` se usa en las dos formas de la fila,
+el `div` de la pendiente y el `SunmiButton` de la recibida—.
+
+**La contraprueba no hubo que fabricarla: el arnés se puso rojo tres veces
+seguidas durante el barrido**, y cada vez nombró exactamente las tarjetas que
+faltaban, con su texto en pantalla y su color. Al arreglarlas pasó a verde.
+
+### LO QUE NO SE BARRIÓ, Y POR QUÉ
+
+- **`ColumnSettingsPanel` y `ReporteTransferenciasPorDestino`** (3 ocurrencias).
+  Viven en el reporte de escritorio y **el arnés nunca las dibuja**: a 1366 px
+  llega al formulario, y esas piezas aparecen recién después de generar el
+  reporte. Sin medición no se tocan — era la condición del barrido.
+- **`BloqueLocal`** (2 ocurrencias). **Ninguna pantalla lo renderiza**:
+  `git grep --untracked` da solo el propio archivo y dos de candados. Es código
+  muerto desde que la entrada reemplazó la lista de bloques, y con él quedaron
+  **doce candados defendiendo una pieza que nadie dibuja**. No se barrió porque
+  barrer código muerto no arregla nada; la pregunta es si el componente tiene que
+  seguir existiendo, y ésa es una decisión aparte.
+
+### UN CANDADO QUE SE PUSO ROJO, Y OTRO QUE SE HABÍA QUEDADO SIN AFIRMAR
+
+`D4` —"la banda se pinta entera"— dio rojo al cambiar la clase. Hizo bien:
+CUENTA cuántos nodos declaran fondo, y `sunmi-bg-card` no estaba en su lista, así
+que leía "uno" donde hay dos. **Se le agregó la clase, no se bajó el número**:
+bajarlo de 2 a 1 habría dejado el candado sin ver la tarjeta.
+
+Y al lado tenía una afirmación que ya no afirmaba nada: comparaba la posición de
+la banda contra `lastIndexOf("sunmi-surface")`, y como `sunmi-surface-soft`
+CONTIENE `sunmi-surface`, esa búsqueda encontraba la banda misma y la comparaba
+contra sí misma. Se cambió por la clase real de la tarjeta.
+
 ### ESTADO AL CERRAR
 
 Suite **5898 en verde**, 0 en rojo (1 TODO viejo: los siete candados del contrato

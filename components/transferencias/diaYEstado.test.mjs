@@ -99,8 +99,20 @@ test("D4 · LA BANDA SE PINTA ENTERA: ningún hijo suyo declara fondo propio", (
 
   // En un día hay EXACTAMENTE dos superficies: la banda y la tarjeta de las
   // filas. Cualquier tercera es un hijo que se pintó por su cuenta.
+  // ── LA LISTA DE CLASES QUE PINTAN ES UNA LISTA, Y HAY QUE MANTENERLA ────
+  //
+  // `sunmi-bg-card` entró el 2026-09-14, cuando la tarjeta del día dejó de usar
+  // `sunmi-surface` —que se llama "surface" y pinta `--app-bg`, el fondo de la
+  // APLICACIÓN, así que la tarjeta salía del color de la página—.
+  //
+  // Este candado se puso ROJO con ese cambio y eso es exactamente lo que tiene
+  // que hacer: cuenta cuántos nodos declaran fondo, y una clase que no está en
+  // la lista se lee como "ninguno". Si en vez de agregarla se hubiera bajado el
+  // número esperado de 2 a 1, el candado habría quedado sin ver la tarjeta —
+  // verde y sin cubrir nada.
   const soft = salida.match(/sunmi-surface-soft/g) || [];
-  const todas = salida.match(/sunmi-surface\b|sunmi-surface-soft|sunmi-card\b|\bbg-\[/g) || [];
+  const todas =
+    salida.match(/sunmi-surface\b|sunmi-surface-soft|sunmi-bg-card\b|sunmi-card\b|\bbg-\[/g) || [];
 
   assert.equal(soft.length, 1, "la banda tiene que ser el ÚNICO nodo con el fondo tenue");
   assert.equal(
@@ -109,8 +121,14 @@ test("D4 · LA BANDA SE PINTA ENTERA: ningún hijo suyo declara fondo propio", (
     `un nodo de más declara fondo y va a tapar la franja (encontrados: ${todas.join(", ")})`
   );
   // Y el orden: primero la banda, después la tarjeta.
+  //
+  // Se compara contra `sunmi-bg-card`, que es la clase de la tarjeta desde el
+  // 2026-09-14. La versión anterior buscaba `lastIndexOf("sunmi-surface")` y,
+  // cuando la tarjeta cambió de clase, esa búsqueda pasó a encontrar la BANDA
+  // —`sunmi-surface-soft` contiene `sunmi-surface`— y comparaba la banda contra
+  // sí misma. No es que se rompió: se quedó sin nada que afirmar.
   assert.ok(
-    salida.indexOf("sunmi-surface-soft") < salida.lastIndexOf("sunmi-surface"),
+    salida.indexOf("sunmi-surface-soft") < salida.indexOf("sunmi-bg-card"),
     "la banda tiene que ir antes que la tarjeta"
   );
 });

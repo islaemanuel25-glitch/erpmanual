@@ -37,7 +37,11 @@ export default function CuentaDelPeriodoCerrado({ cerrado, enCurso, unidadNombre
   return (
     <div className="space-y-2">
       <section
-        className={`sunmi-surface rounded-xl2 p-4 space-y-3 ${
+        // `sunmi-bg-card` y no `sunmi-surface`: aquélla se llama "surface" pero
+        // pinta `--app-bg`, el fondo de la APLICACIÓN, así que la tarjeta salía
+        // del mismo color que la página. Medido en el navegador: esta tarjeta y
+        // el fondo daban los dos `rgb(15, 23, 42)`.
+        className={`sunmi-bg-card rounded-xl2 p-4 space-y-3 ${
           abierta ? "border-1.5 sunmi-border-warning" : "border sunmi-border"
         }`}
       >

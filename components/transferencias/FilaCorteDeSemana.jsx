@@ -74,7 +74,11 @@ export default function FilaCorteDeSemana({
 
   return (
     <section
-      className={`sunmi-surface rounded-xl2 p-4 space-y-3.5 ${
+      // `sunmi-bg-card` y no `sunmi-surface`: aquélla pinta `--app-bg`, el fondo
+      // de la APLICACIÓN, así que la fila salía del mismo color que la página y
+      // lo único que la separaba era el borde. Medido: los dos en
+      // `rgb(15, 23, 42)`. El borde no se toca — acá además señala el estado.
+      className={`sunmi-bg-card rounded-xl2 p-4 space-y-3.5 ${
         editando
           ? "border-1.5 border-dashed sunmi-border-accent"
           : relacion?.sinConfigurar

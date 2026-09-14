@@ -206,6 +206,74 @@ async function foto(nombre) {
   );
 }
 
+// ── NINGUNA SUPERFICIE DEL COLOR DE AQUELLO SOBRE LO QUE SE APOYA ────────
+//
+// ── POR QUÉ SE MIDE EL PADRE Y NO LA PÁGINA ──────────────────────────────
+//
+// El defecto del 2026-09-14 —la tarjeta de local pintada con `sunmi-surface`,
+// que es `--app-bg`— se descubrió comparando la tarjeta contra la PÁGINA. Pero
+// esa comparación solo sirve para lo que está apoyado en la página.
+//
+// En el repo hay 82 lugares con esa clase y NO todos son tarjetas: hay azulejos,
+// chips y solapas que viven ADENTRO de una tarjeta, y ahí `--app-bg` es el
+// contraste correcto contra `--card-bg`. Cambiarlos los haría desaparecer: el
+// mismo defecto al revés.
+//
+// Lo que distingue un caso del otro no está en la clase, está en QUÉ TIENE
+// ARRIBA. Por eso se busca el primer ancestro que realmente pinta algo y se
+// compara contra ése. La regla queda igual de simple y sirve para los dos:
+// **nada puede ser del color de aquello sobre lo que está apoyado.**
+//
+// Se excluye lo que flota —`fixed`, `absolute`, `sticky`— porque ahí la
+// separación la dan la sombra y el borde, y además esas superficies necesitan
+// ser OPACAS: `--card-bg` es translúcido en dos de los catorce temas y dejaría
+// leer el texto de abajo. Es el defecto ya documentado de `.sunmi-select-dropdown`.
+async function superficiesPegadasAlFondo() {
+  return evaluar(`(() => {
+    const transparente = (c) => !c || c === "rgba(0, 0, 0, 0)" || c === "transparent";
+    const flota = (el) => {
+      for (let n = el; n && n !== document.body; n = n.parentElement) {
+        const p = getComputedStyle(n).position;
+        if (p === "fixed" || p === "absolute" || p === "sticky") return true;
+      }
+      return false;
+    };
+    const salida = [];
+    for (const el of document.querySelectorAll("*")) {
+      if (el.offsetParent === null) continue;
+      const cls = typeof el.className === "string" ? el.className : "";
+      if (!/(^|\\s)sunmi-surface(\\s|$)/.test(cls)) continue;
+      if (flota(el)) continue;
+      const propio = getComputedStyle(el).backgroundColor;
+      if (transparente(propio)) continue;
+      let padre = null, fondoPadre = null;
+      for (let n = el.parentElement; n; n = n.parentElement) {
+        const c = getComputedStyle(n).backgroundColor;
+        if (!transparente(c)) { padre = n; fondoPadre = c; break; }
+      }
+      if (!fondoPadre) { padre = document.body; fondoPadre = getComputedStyle(document.body).backgroundColor; }
+      if (propio !== fondoPadre) continue;
+      salida.push({
+        clases: cls.replace(/\\s+/g, " ").slice(0, 70),
+        texto: (el.innerText || "").replace(/\\s+/g, " ").trim().slice(0, 40),
+        fondo: propio,
+        apoyadoEn: padre === document.body ? "la página" : (typeof padre.className === "string" ? padre.className : "").slice(0, 40),
+      });
+    }
+    return salida;
+  })()`);
+}
+
+/** Se llama en cada pantalla, con su nombre para que el rojo diga DÓNDE. */
+async function afirmarSuperficies(pantalla) {
+  const pegadas = await superficiesPegadasAlFondo();
+  await afirmar(
+    pegadas.length === 0,
+    `${pantalla} · ninguna superficie es del color de aquello sobre lo que se apoya` +
+      (pegadas.length ? `\n  PEGADAS: ${JSON.stringify(pegadas, null, 2)}` : "")
+  );
+}
+
 /** Toca el primer control VISIBLE cuyo texto contenga el fragmento. */
 async function tocar(fragmento, { exacto = false } = {}) {
   const ok = await evaluar(`(() => {
@@ -507,6 +575,7 @@ await afirmar(
   "el aviso de arriba dice cuántas faltan, con el camino para arreglarlo"
 );
 await foto(`v40-sin-configurar-${ANCHO}`);
+await afirmarSuperficies("entrada");
 
 // ── LA FACHADA: LA QUE DICE LA FUNCIÓN, Y LA MISMA ENTRE CORRIDAS ────────
 //
@@ -626,6 +695,7 @@ await afirmar(
 );
 
 await foto(`v40-local-${ANCHO}`);
+await afirmarSuperficies("adentro del local");
 
 // ── LA SEGUNDA VUELTA (V32), AHORA ADENTRO DEL LOCAL ─────────────────────
 //
@@ -689,6 +759,7 @@ await afirmar(
 );
 
 await foto(`v32-dias-${ANCHO}`);
+await afirmarSuperficies("adentro del local, con los días");
 
 // ── EL BUSCADOR POR NÚMERO, EJERCIDO ─────────────────────────────────────
 //
@@ -801,6 +872,7 @@ await afirmar(
 const marcasAntes = await marcasSinConfigurar();
 await afirmar(marcasAntes === 2, `las dos relaciones arrancan sin configurar (son ${marcasAntes})`);
 await foto(`v29-corte-${ANCHO}`);
+await afirmarSuperficies("corte de semana");
 
 // La barra del shell tiene que decir DÓNDE ESTÁS. Por ruta diría
 // "Transferencias" —el módulo—, así que la pantalla registra el suyo.
@@ -898,6 +970,7 @@ for (const alto of ALTOS) {
   await afirmar(await hayTexto("A pagar esta semana"), `${alto} · la cuenta del local`);
   await afirmar(await hayTexto("PARA RECIBIR"), `${alto} · la sección de lo pendiente`);
   await foto(`v28b-local-${ANCHO}x${alto}`);
+  await afirmarSuperficies(`vista del local a ${alto}`);
 }
 
 // ── 4 · Y EL ESCRITORIO NO SE MOVIÓ ──────────────────────────────────────
@@ -935,6 +1008,7 @@ await afirmar(
   "1366 · la entrada móvil NO se cuela en el escritorio"
 );
 await foto("escritorio-1366");
+await afirmarSuperficies("escritorio 1366");
 
 console.log(`\n${afirmaciones} afirmaciones en verde · ${desbordes} capturas con desborde`);
 console.log(`Capturas en ${SALIDA}`);

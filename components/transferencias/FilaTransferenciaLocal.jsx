@@ -24,7 +24,11 @@ export default function FilaTransferenciaLocal({ t, onRecibir, onVer, money }) {
   const pendiente = !t?.recibida;
   const estado = estadoEnPalabras(t);
 
-  const marco = `sunmi-surface rounded-xl2 p-4 flex items-center justify-between gap-3 ${
+  // `sunmi-bg-card` y no `sunmi-surface`: aquélla pinta `--app-bg`, el fondo de
+  // la APLICACIÓN, así que la fila salía del color de la página. Este marco se
+  // usa en las DOS formas de la fila —el `div` de la pendiente y el
+  // `SunmiButton` de la recibida—, así que el cambio vale para las dos.
+  const marco = `sunmi-bg-card rounded-xl2 p-4 flex items-center justify-between gap-3 ${
     pendiente ? "border-1.5 sunmi-border-warning" : "border sunmi-border"
   }`;
 

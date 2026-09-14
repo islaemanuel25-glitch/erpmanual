@@ -29,8 +29,11 @@ import { avisoDeTotalAbierto, rotuloDeCuenta } from "@/lib/transferencias/rotulo
 export default function CabeceraDeCuenta({ cuenta, unidad, money }) {
   const aviso = avisoDeTotalAbierto(cuenta || {});
 
+  // `sunmi-bg-card` y no `sunmi-surface`: aquélla pinta `--app-bg`, el fondo de
+  // la APLICACIÓN, así que la tarjeta salía del color de la página. Medido en el
+  // navegador: los dos daban `rgb(15, 23, 42)`.
   return (
-    <section className="sunmi-surface rounded-xl2 border sunmi-border p-4 space-y-3">
+    <section className="sunmi-bg-card rounded-xl2 border sunmi-border p-4 space-y-3">
       <div>
         <div className="text-xs sunmi-text-muted">{rotuloDeCuenta(unidad)}</div>
         <div className="text-xl3 font-semibold sunmi-text-strong tabular-nums">

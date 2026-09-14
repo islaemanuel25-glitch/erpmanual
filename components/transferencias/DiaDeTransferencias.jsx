@@ -49,7 +49,11 @@ export default function DiaDeTransferencias({ dia, onRecibir, onVer, money }) {
         </div>
       </div>
 
-      <div className="sunmi-surface rounded-xl2 border sunmi-border overflow-hidden">
+      {/* `sunmi-bg-card` y no `sunmi-surface`: aquélla pinta `--app-bg`, el fondo
+          de la APLICACIÓN, así que la tarjeta del día salía del mismo color que
+          la página. La banda de adentro sigue en `sunmi-surface-soft`, que es
+          otro token y contrasta contra ésta. */}
+      <div className="sunmi-bg-card rounded-xl2 border sunmi-border overflow-hidden">
         {(dia?.transferencias || []).map((t, i) => (
           <FilaDelDia
             key={t.id}
