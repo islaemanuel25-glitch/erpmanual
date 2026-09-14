@@ -73,6 +73,27 @@ export default function EntradaDeLocales({
         </div>
       )}
 
+      {/* ── EL RÓTULO DE LA LISTA ──────────────────────────────────────────
+          Faltaba, y sin él la primera tarjeta arranca pegada al aviso sin que
+          nada diga de qué es la lista.
+
+          Las clases son las MISMAS que los dos rótulos de sección que el módulo
+          ya tenía —`text-xs2 font-semibold sunmi-text-muted tracking-wider`— y
+          no una combinación nueva al lado. El diseño pide 10 SemiBold en
+          text/secondary con letter-spacing 0,6: los tres primeros dan exacto
+          (`xs2` es 10 px y `sunmi-text-muted` es el token secundario), y el
+          cuarto queda en 0,5 px, que es lo que `tracking-wider` —0,05em— vale a
+          10 px. Escribir `tracking-[0.6px]` sería hardcodeo en la pantalla, y
+          sumar una entrada a la escala del proyecto para ganar una décima de
+          píxel dejaría este rótulo distinto de sus dos hermanos por algo que no
+          se ve. Queda anotado, no decidido en silencio.
+
+          No se dibuja si la lista está vacía: un rótulo arriba de nada es un
+          encabezado que promete contenido que no está. */}
+      {!cargando && !error && locales.length > 0 && (
+        <h2 className="text-xs2 font-semibold sunmi-text-muted tracking-wider">LOCALES</h2>
+      )}
+
       {!cargando &&
         !error &&
         locales.map((l) => <TarjetaDeLocal key={l.localId} local={l} onEntrar={onEntrar} />)}

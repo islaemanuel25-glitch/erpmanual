@@ -370,3 +370,71 @@ test("V15 · el período cerrado vacío se dice una sola vez, y lo dice la tarje
     "la frase del período vacío tiene que estar en la tarjeta"
   );
 });
+
+// ── 6 · LAS TRES CORRECCIONES VISTAS EN PRODUCCIÓN (98fbb667) ─────────────
+
+// ── V16 · LA TARJETA TIENE FONDO DE TARJETA, NO EL DE LA APLICACIÓN ───────
+//
+// `.sunmi-surface` se llama "surface" y pinta `--app-bg`, que es el fondo de la
+// APLICACIÓN. Con esa clase la tarjeta salía exactamente del color de la página
+// y lo único que la separaba era el borde. Se vio en el teléfono, en el tema
+// crema, donde `--app-bg` es `#FFFBEB` y `--card-bg` es `#FFFFFF`.
+//
+// No era cosa de ese tema: en los CATORCE los dos tokens son distintos, así que
+// la tarjeta perdía su fondo propio siempre.
+//
+// El candado mira la clase y no un color, porque el color lo pone el tema. Y
+// mira las dos cosas: que esté la de tarjeta y que NO esté la de la aplicación —
+// preguntar solo por la primera dejaría pasar que alguien las ponga juntas, que
+// es la forma en que esto vuelve sin que nadie lo note.
+test("V16 · la tarjeta de local se pinta con el fondo de TARJETA, no con el de la aplicación", () => {
+  const salida = html(
+    React.createElement(TarjetaDeLocal, { local: LOCALES[0], onEntrar: () => {} })
+  );
+
+  assert.match(salida, /sunmi-bg-card/, "la tarjeta no usa el fondo de tarjeta");
+  assert.ok(
+    !/sunmi-surface(?![-\w])/.test(salida),
+    "la tarjeta sigue pintada con `sunmi-surface`, que es el fondo de la APLICACIÓN"
+  );
+  // El borde se queda en el de la aplicación: el diseño pide border/default, y
+  // en `sunmiLight` el de tarjeta es MÁS claro, o sea menos separación.
+  assert.match(salida, /sunmi-border(?![-\w])/, "la tarjeta perdió el borde por defecto");
+
+  // Y la clase existe de verdad en el kit. Sin esto el candado pasaría con una
+  // clase inventada que no pinta nada, que es exactamente el síntoma que hay
+  // que impedir: una tarjeta sin fondo propio.
+  const hoja = fs.readFileSync(path.join(RAIZ, "styles/sunmi.css"), "utf8");
+  assert.match(
+    hoja,
+    /\.sunmi-bg-card\s*\{[^}]*background:\s*var\(--card-bg\)/,
+    "`.sunmi-bg-card` no está en la hoja, o no pinta --card-bg"
+  );
+});
+
+// ── V17 · EL RÓTULO DE LA LISTA ──────────────────────────────────────────
+//
+// Faltaba en producción. Y no se dibuja sobre una lista vacía: un encabezado
+// arriba de nada promete contenido que no está.
+test("V17 · la entrada rotula la lista, y no lo hace si no hay locales", () => {
+  const conLocales = html(React.createElement(EntradaDeLocales, { locales: LOCALES }));
+  assert.ok(conLocales.includes(">LOCALES<"), "falta el rótulo de la lista");
+
+  // Las mismas clases que los dos rótulos de sección que el módulo ya tenía.
+  assert.match(
+    conLocales,
+    /text-xs2 font-semibold sunmi-text-muted tracking-wider[^"]*">LOCALES</,
+    "el rótulo no usa las clases de los rótulos de sección del módulo"
+  );
+
+  const vacia = html(React.createElement(EntradaDeLocales, { locales: [] }));
+  assert.ok(!vacia.includes(">LOCALES<"), "rotula una lista que no tiene nada");
+  assert.ok(
+    vacia.includes("Ningún local opera por transferencia"),
+    "sin locales tiene que decir por qué, no quedar en blanco"
+  );
+
+  // Y cargando tampoco: el rótulo aparecería arriba del loader.
+  const cargando = html(React.createElement(EntradaDeLocales, { cargando: true }));
+  assert.ok(!cargando.includes(">LOCALES<"), "rotula la lista mientras todavía carga");
+});

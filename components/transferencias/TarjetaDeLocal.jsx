@@ -24,6 +24,18 @@
 //
 // La franja SÍ sale del tema —es interfaz—, a diferencia de la fachada, que es
 // un dibujo. Por eso una usa un token y la otra una paleta.
+//
+// ── EL FONDO ES `sunmi-bg-card`, Y EL NOMBRE DE LA OTRA ENGAÑA ───────────
+//
+// La primera versión usaba `sunmi-surface`. Se llama "surface" y pinta
+// `--app-bg`: el fondo de la APLICACIÓN. O sea que la tarjeta salía exactamente
+// del color de la página y lo único que la separaba era el borde. Se vio en
+// producción, en el tema crema, donde los dos tonos son casi el mismo.
+//
+// No era cosa de ese tema: medido en los catorce, `--app-bg` y `--card-bg` son
+// distintos en los catorce, así que la tarjeta perdía su fondo propio siempre.
+// El motivo de que la clase nueva exista —y de que no sirvan `.sunmi-card` ni
+// `.sunmi-card-surface`— está en la hoja, al lado de su declaración.
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import FachadaDelLocal from "./FachadaDelLocal";
@@ -37,7 +49,7 @@ export default function TarjetaDeLocal({ local, onEntrar }) {
       aria-label={`Abrir ${local?.nombre || "el local"}`}
       // `p-0` y `overflow-hidden` son los dos que hacen que la franja llegue a
       // los extremos. El resto son los ejes que `SunmiButton` cede.
-      className="flex w-full items-stretch p-0 min-h-0 rounded-xl2 overflow-hidden border sunmi-border sunmi-surface text-left"
+      className="flex w-full items-stretch p-0 min-h-0 rounded-xl2 overflow-hidden border sunmi-border sunmi-bg-card text-left"
     >
       <span className="w-1.5 shrink-0 self-stretch sunmi-bg-accent" aria-hidden="true" />
 

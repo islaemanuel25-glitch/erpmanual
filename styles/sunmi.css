@@ -512,6 +512,35 @@
    nombre de una pieza donde no hay ninguna. */
 .sunmi-bg-accent      { background: var(--pos-accent); }
 
+/* EL FONDO DE UNA TARJETA, y solo el fondo.
+
+   ── EL DEFECTO QUE LA TRAJO, VISTO EN PRODUCCIÓN ────────────────────────
+
+   `.sunmi-surface` se llama "surface" y pinta `--app-bg`, que es **el fondo de
+   la aplicación**. Una tarjeta con esa clase queda EXACTAMENTE del color de la
+   página, así que lo único que la separa es el borde. No es un problema de un
+   tema: medido en los catorce, `--app-bg` y `--card-bg` son distintos en los
+   catorce, o sea que la tarjeta pierde su fondo propio siempre. En `ambarCaja`
+   —crema `#FFFBEB` contra blanco `#FFFFFF`— fue donde se vio.
+
+   ── POR QUÉ UNA CLASE NUEVA Y NO UNA DE LAS QUE YA ESTÁN ────────────────
+
+   Las dos que pintan `--card-bg` traen más cosas: `.sunmi-card` agrega
+   `rounded-2xl`, `shadow-md`, `p-4`, `mb-3` y `backdrop-blur-md`, que cambiarían
+   la geometría de la pieza; `.sunmi-card-surface` agrega además el borde en
+   `--card-border`, y el diseño de la tarjeta de local pide border/default, que
+   es `--app-border`. Los dos bordes coinciden en 12 de los 14 temas y difieren
+   en `sunmiLight` y `sunmiDarkCompact` — justamente en `sunmiLight` el de
+   tarjeta es MÁS claro, o sea menos separación, que es lo contrario de lo que
+   esto viene a arreglar.
+
+   Así que va el fondo solo, y el borde lo sigue poniendo `.sunmi-border`.
+
+   `--card-bg` es translúcido en `sunmiDark` y `sunmiDarkCompact`. Acá eso está
+   bien y es distinto del caso del desplegable: una tarjeta apoyada en la página
+   deja pasar el FONDO; un menú flotante dejaría pasar TEXTO. */
+.sunmi-bg-card        { background: var(--card-bg); }
+
 /* --- Texto semántico --- */
 .sunmi-text-muted   { color: color-mix(in srgb, var(--app-fg) 60%, transparent); }
 .sunmi-text-strong  { color: var(--app-fg); }
