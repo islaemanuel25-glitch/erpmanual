@@ -503,6 +503,14 @@
    1,5 px). */
 .sunmi-border-warning { border-color: var(--pos-warning, #f59e0b); }
 .sunmi-border-accent  { border-color: var(--pos-accent); }
+/* SOLO EL FONDO EN ACCENT, sin color de texto.
+   `.sunmi-badge-accent` y `.sunmi-header-accent` ya pintan este mismo fondo,
+   pero las dos traen además un `color` —son piezas con texto adentro—. Esta es
+   para una superficie DECORATIVA que no lleva texto: la franja vertical de la
+   tarjeta de local, que marca el borde izquierdo a todo el alto. Usar el badge
+   ahí habría traído un color de texto que nadie va a ver y habría dejado el
+   nombre de una pieza donde no hay ninguna. */
+.sunmi-bg-accent      { background: var(--pos-accent); }
 
 /* --- Texto semántico --- */
 .sunmi-text-muted   { color: color-mix(in srgb, var(--app-fg) 60%, transparent); }

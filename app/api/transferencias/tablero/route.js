@@ -36,7 +36,11 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { resolveVistaOperativa } from "@/lib/grupos";
 import { origenEsDepositoDe } from "@/lib/transferencias/costoTransferencia";
-import { importeRecibidoDeDetalle } from "@/lib/transferencias/agregadosPeriodo";
+import {
+  desdeCentavos,
+  importeRecibidoDeDetalle,
+  importeRecibidoDeDetalleCentavos,
+} from "@/lib/transferencias/agregadosPeriodo";
 import {
   diferenciaDeLinea,
   fisicasEnviadasDe,
@@ -45,13 +49,18 @@ import {
 import {
   DIA_DE_CORTE_POR_DEFECTO,
   UNIDADES,
+  caeEnElPeriodo,
   esDiaDeCorteValido,
   rangoDelPeriodo,
+  rangoDelPeriodoCerrado,
 } from "@/lib/transferencias/periodoDePago";
 import {
+  acuerdoDeLocal,
   bloquesPorLocal,
   cuentaDelLocal,
+  entraEnLaVistaPrincipal,
   estaRecibida,
+  fechaDeCorte,
 } from "@/lib/transferencias/bloquesPorLocal";
 import { relacionesDelDeposito } from "@/lib/transferencias/relacionesDelDeposito";
 import { destinosDeTransferencia } from "@/lib/transferencias/destinosDeTransferencia";
@@ -200,8 +209,73 @@ export async function GET(req) {
       select: { localId: true, depositoLocalId: true, diaDeCorte: true },
     });
 
+    // ── LA ENTRADA DEL DEPÓSITO: SOLO LA LISTA DE LOCALES ─────────────────
+    //
+    // Sale antes de tocar `Transferencia`, y ése es el punto: la pantalla de
+    // entrada no muestra importes ni períodos, así que traer el detalle de todas
+    // las transferencias del período para después no usarlo sería pagar la
+    // consulta más cara de este módulo por nada.
+    //
+    // El período no puede vivir en esa pantalla porque cada local corta su
+    // semana el día que acordó: recién adentro del local se sabe cuál es.
+    if (searchParams.get("entrada") === "1" && esDeposito) {
+      return NextResponse.json({
+        ok: true,
+        vista: "ENTRADA",
+        depositoNombre: deposito?.nombre || localPropio?.nombre || null,
+        locales: destinosDeTransferencia(locales, { depositoLocalId: deposito?.localId }).map(
+          (l) => {
+            const { sinConfigurar } = acuerdoDeLocal(acuerdos, l.id);
+            return { localId: l.id, nombre: l.nombre, sinConfigurar };
+          }
+        ),
+      });
+    }
+
     const hoy = undefined; // `rangoDelPeriodo` resuelve el día argentino por su cuenta.
-    const ventana = rangoFijo || ventanaDeConsulta({ unidad, acuerdos, hoy });
+
+    // ── EL MODO "UN LOCAL", que es la pantalla de adentro ──────────────────
+    //
+    // Con `destino` la respuesta deja de ser la lista de bloques y pasa a ser la
+    // cuenta de ESE local, con SUS dos períodos: el que ya cerró —que es la
+    // respuesta a "cuánto me tienen que pagar"— y el que está en curso.
+    //
+    // El período no puede vivir arriba de la pantalla porque cada local corta su
+    // semana el día que acordó: recién sabiendo de qué local se habla se puede
+    // decir qué semana es. Por eso este modo existe.
+    //
+    // ── SE LLAMA `destino` Y NO `localId`, Y NO ES UNA PREFERENCIA ─────────
+    //
+    // `localId` es un parámetro RESERVADO en toda esta API: `resolveVistaOperativa`
+    // lo lee como "el local cuyo alcance estoy pidiendo" y, para una sesión que
+    // no es admin, exige que sea el suyo —`lib/grupos.js`, "Local fuera de tu
+    // alcance"—. El depósito es un local como cualquier otro, así que pedir
+    // `?localId=<otro local>` le daba 403 y la pantalla de adentro mostraba ese
+    // cartel en vez de la cuenta.
+    //
+    // Y el 403 era CORRECTO: acá no se está cambiando de alcance. El alcance
+    // sigue siendo el del depósito —mira lo que él despachó— y esto es un filtro
+    // por DESTINO. Dos cosas distintas no pueden compartir el nombre del
+    // parámetro. Lo encontró el arnés al abrir la pantalla; ningún candado lo
+    // podía ver, porque los dos lados eran correctos por separado.
+    const localPedido = Number(searchParams.get("destino") || 0) || null;
+    const { diaDeCorte: corteDelLocal, sinConfigurar: localSinCorte } = localPedido
+      ? acuerdoDeLocal(acuerdos, localPedido)
+      : { diaDeCorte: DIA_DE_CORTE_POR_DEFECTO, sinConfigurar: true };
+
+    const periodoCerrado = localPedido
+      ? rangoDelPeriodoCerrado({ unidad, diaDeCorte: corteDelLocal, hoy })
+      : null;
+    const periodoEnCurso = localPedido
+      ? rangoDelPeriodo({ unidad, diaDeCorte: corteDelLocal, hoy })
+      : null;
+
+    // La ventana cubre los DOS períodos de una sola consulta: del inicio del
+    // cerrado al fin del en curso. Dos consultas traerían lo mismo y abrirían la
+    // puerta a que una use un rango y la otra otro.
+    const ventana = localPedido
+      ? { desde: periodoCerrado.desde, hasta: periodoEnCurso.hasta }
+      : rangoFijo || ventanaDeConsulta({ unidad, acuerdos, hoy });
 
     // ── EL FILTRO DE FECHA SIGUE A `fechaDeCorte`, NO A UNA COLUMNA ────────
     //
@@ -229,13 +303,16 @@ export async function GET(req) {
     };
 
     // El alcance: el depósito mira lo que DESPACHÓ, el local lo que le LLEGA.
-    const alcance = esDeposito
+    // Y con `localId` se acota además a ese destino: la pantalla de adentro es
+    // de un local, así que traer los demás sería traer para descartar.
+    const alcanceBase = esDeposito
       ? deposito?.localId
         ? { origenId: deposito.localId }
         : vista.localId
           ? { origenId: vista.localId }
           : { origenId: { in: vista.localIds || [] } }
       : { destinoId: vista.localId };
+    const alcance = localPedido ? { ...alcanceBase, destinoId: localPedido } : alcanceBase;
 
     const filas = await prisma.transferencia.findMany({
       where: { AND: [alcance, enVentana, { estado: { not: "Cancelada" } }] },
@@ -333,6 +410,60 @@ export async function GET(req) {
         }),
       };
     };
+
+    // ── LA PANTALLA DE ADENTRO DE UN LOCAL ────────────────────────────────
+    if (localPedido) {
+      const conConteo = filas.map((t) => ({
+        ...t,
+        lineasConDiferencia: contarLineasConDiferencia(t.detalle || []),
+      }));
+      const deEsteLocal = conConteo.filter(entraEnLaVistaPrincipal);
+
+      /** Las de un rango, ya resumidas y con su cuenta. */
+      const armar = (rango) => {
+        const dentro = deEsteLocal.filter((t) => caeEnElPeriodo(fechaDeCorte(t), rango));
+        const transferencias = dentro.map(resumir);
+        return {
+          rango,
+          transferencias,
+          cantidad: transferencias.length,
+          sinRecibir: transferencias.filter((t) => !t.recibida).length,
+          // Solo las RECIBIDAS informan diferencias: lo que falta contar todavía
+          // puede cambiar. Es la misma regla que la cabecera del bloque.
+          conDiferencias: transferencias.filter((t) => t.recibida && t.lineasConDiferencia > 0)
+            .length,
+          aPagar: desdeCentavos(
+            dentro.reduce(
+              (acc, t) =>
+                acc +
+                importeRecibidoDeDetalleCentavos(t.detalle || [], {
+                  origenEsDeposito: origenEsDepositoDe(t, "tablero/local"),
+                }),
+              0
+            )
+          ),
+        };
+      };
+
+      const cerrado = armar(periodoCerrado);
+      return NextResponse.json({
+        ok: true,
+        vista: "UN_LOCAL",
+        unidad,
+        local: {
+          id: localPedido,
+          nombre: locales.find((l) => l.id === localPedido)?.nombre || "—",
+          diaDeCorte: corteDelLocal,
+          sinConfigurar: localSinCorte,
+        },
+        // EL QUE YA CERRÓ va primero porque es la pregunta de la pantalla:
+        // cuánto hay que cobrar. El en curso es contexto.
+        cerrado: { ...cerrado, totalCerrado: cerrado.sinRecibir === 0 },
+        // Del en curso alcanza con el resumen: sus transferencias todavía no se
+        // cobran, así que mandarlas sería peso sin uso.
+        enCurso: (({ transferencias, ...resto }) => resto)(armar(periodoEnCurso)),
+      });
+    }
 
     if (esDeposito) {
       const bloques = bloquesPorLocal({

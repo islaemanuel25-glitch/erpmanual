@@ -37,7 +37,7 @@ import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 
 import AccionDePantalla, { CLASE_ACCION_DE_PANTALLA } from "./AccionDePantalla";
 import ChipsDePeriodo, { CLAVE_OTRO } from "./ChipsDePeriodo";
-import BloqueLocal from "./BloqueLocal";
+import EntradaDeLocales from "./EntradaDeLocales";
 import CabeceraDeCuenta from "./CabeceraDeCuenta";
 import FilaTransferenciaLocal from "./FilaTransferenciaLocal";
 
@@ -107,6 +107,9 @@ export default function TableroMovil({ onAbrirReporte }) {
       // Con "Otro" la unidad no significa nada —el rango lo eligió el usuario—
       // así que se manda la semana y mandan las dos fechas.
       url.searchParams.set("unidad", unidad === CLAVE_OTRO ? UNIDADES.SEMANA : unidad);
+      // El depósito entra por la lista de locales; el servidor decide y, si es
+      // depósito, contesta sin tocar `Transferencia`.
+      url.searchParams.set("entrada", "1");
       if (unidad === CLAVE_OTRO) {
         url.searchParams.set("desde", desde);
         url.searchParams.set("hasta", hasta);
@@ -162,26 +165,21 @@ export default function TableroMovil({ onAbrirReporte }) {
   const filtrarPorNumero = (transferencias) =>
     buscado ? (transferencias || []).filter((t) => String(t.id).includes(buscado)) : transferencias;
 
-  const sinConfigurar = (datos?.bloques || []).filter((b) => b.sinConfigurar).length;
-
   return (
     // Padding 14 a los lados y arriba —`p-4` en la escala del proyecto— y 12,25
     // entre bloques.
     <div className="w-full min-h-full px-4 pt-4 pb-4 space-y-3.5">
       <AccionDePantalla>{botonDeReporte}</AccionDePantalla>
 
-      <ChipsDePeriodo valor={unidad} onCambiar={setUnidad} />
+      {/* ── NI CHIPS NI BUSCADOR EN LA ENTRADA ────────────────────────────
+          El período no puede vivir arriba de la pantalla: cada local corta su
+          semana el día que acordó, así que un chip global tendría que elegir UN
+          período para todos y cualquiera que elija es el equivocado para
+          alguien. Aparece adentro del local, con su corte.
 
-      {/* EL BUSCADOR POR NÚMERO. El "#N" salió de la lista porque al mirar no
-          dice nada; acá sirve, que es cuando ya se sabe cuál se busca. */}
-      <SunmiInput
-        value={numero}
-        onChange={(e) => setNumero(e.target.value)}
-        placeholder="Buscar transferencia por número"
-        inputMode="numeric"
-        aria-label="Buscar transferencia por número"
-        className="w-full rounded-xl text-sm3"
-      />
+          El buscador se fue al mismo lugar: el número sirve cuando ya se sabe
+          cuál se busca, y eso pasa adentro de un local. */}
+      {datos?.vista === "LOCAL" && <ChipsDePeriodo valor={unidad} onCambiar={setUnidad} />}
 
       {unidad === CLAVE_OTRO && (
         <SunmiDateRangePicker
@@ -191,24 +189,6 @@ export default function TableroMovil({ onAbrirReporte }) {
           onChangeHasta={setHasta}
           onApply={cargar}
         />
-      )}
-
-      {/* ── LO QUE FALTA CONFIGURAR SE DICE ARRIBA, NO SOLO EN CADA BLOQUE ──
-          La píldora del bloque marca CUÁL cae al domingo sin que nadie lo haya
-          decidido; este renglón es el camino para arreglarlo. Aparece solo
-          cuando hay algo que arreglar: un enlace permanente a una pantalla de
-          configuración en la lista de trabajo diaria sería ruido. */}
-      {sinConfigurar > 0 && (
-        <SunmiAviso tono="warning" icon={TriangleAlert} titulo="Corte de semana sin configurar">
-          {sinConfigurar === 1
-            ? "Hay 1 local sin corte configurado: se le está aplicando el domingo."
-            : `Hay ${sinConfigurar} locales sin corte configurado: se les está aplicando el domingo.`}{" "}
-          {puedeConfigurar && (
-            <SunmiLinkButton onClick={() => router.push(RUTA_CORTE_DE_SEMANA)}>
-              Configurar
-            </SunmiLinkButton>
-          )}
-        </SunmiAviso>
       )}
 
       {esperandoFechas && (
@@ -232,35 +212,14 @@ export default function TableroMovil({ onAbrirReporte }) {
       {/* `!esperandoFechas` no es redundante: con "Otro" recién elegido, `datos`
           todavía tiene el período anterior, y dibujarlo debajo de "Elegí las dos
           fechas" mostraría bloques que no son del rango que se está por pedir. */}
-      {!cargando && !error && !esperandoFechas && datos?.vista === "DEPOSITO" && (
-        <>
-          {(datos.bloques || []).length === 0 ? (
-            <div className="text-center py-12 sunmi-text-muted text-xs">
-              Ningún local tuvo movimiento en este período.
-            </div>
-          ) : (
-            <div className="space-y-3.5">
-              {datos.bloques.map((b) => (
-                <BloqueLocal
-                  key={b.localId}
-                  bloque={
-                    buscado
-                      ? { ...b, transferencias: filtrarPorNumero(b.transferencias) }
-                      : b
-                  }
-                  // Buscando, los bloques se abren solos: esconder el resultado
-                  // detrás de un toque más sería pedirle al que ya escribió el
-                  // número que además adivine en qué local está.
-                  abierto={Boolean(buscado) || abiertos.has(b.localId)}
-                  onAlternar={() => alternar(b.localId)}
-                  onRecibir={recibir}
-                  onVer={ver}
-                  money={money}
-                />
-              ))}
-            </div>
-          )}
-        </>
+      {datos?.vista === "ENTRADA" && (
+        <EntradaDeLocales
+          locales={datos.locales || []}
+          sinConfigurar={(datos.locales || []).filter((l) => l.sinConfigurar).length}
+          puedeConfigurar={puedeConfigurar}
+          onConfigurar={() => router.push(RUTA_CORTE_DE_SEMANA)}
+          onEntrar={(l) => router.push(`/modulos/transferencias/local/${l.localId}`)}
+        />
       )}
 
       {!cargando && !error && !esperandoFechas && datos?.vista === "LOCAL" && datos?.cuenta && (
