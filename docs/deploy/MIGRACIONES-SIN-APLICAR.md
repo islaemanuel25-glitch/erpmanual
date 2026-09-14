@@ -20,6 +20,57 @@ Ninguna. Producción está en **11 migraciones**, las mismas que el árbol.
 
 ---
 
+## 2026-09-14 — `4a24dccb`, el navegador de período y la pantalla unificada: CERO migraciones
+
+Producción pasó de `671e9690f7237ac287313ebc4b8d9cf310a0e029` a
+`4a24dccbf1b5d9f6c4539386d11a51fdd17736f5`. **Despliegue solo de código**, con
+corte de **2 segundos**.
+
+Cero migraciones por tres caminos —pendientes vacío, `prisma/` sin tocar en el
+rango, clasificador en «Archivos a mirar: 0»—, con el conteo confirmando que la
+imagen no estaba atrasada: **11 informadas, 11 en el árbol**. `migrate status`:
+11 y "Database schema is up to date!". Bitácora de autorizaciones: **inexistente**.
+
+### Qué sale
+
+La cuarta vuelta del tablero móvil, y **es el cambio más de fondo de la línea**:
+
+- el rótulo del importe SIGUE AL PERÍODO —"Para cobrar" si terminó, "Va
+  acumulado" si está en curso—. Antes la pantalla escribía "Semana cerrada" a
+  mano aunque el chip estuviera en Mes: el título decía una cosa y el rango de
+  abajo otra;
+- un NAVEGADOR de período con flechas que se mueven en la unidad del chip;
+- la vista del LOCAL se unificó con la del depósito. Eran dos implementaciones de
+  la misma pregunta y la del local seguía mostrando el período EN CURSO — o sea
+  el defecto original, intacto del lado del que cobra.
+
+### El marcador: DOS cadenas nuevas, con DOS controles
+
+- `"Va acumulado"`: **0 en la imagen vieja, 4 en la nueva**
+- `"Período anterior"` —el `aria-label` de la flecha—: **0 y 3**
+
+Controles `"Para cobrar"` y `"Buscar transferencia"`, que ya existían: **2 y 2 en
+la vieja, 4 y 3 en la nueva**. Presentes en las dos, así que la búsqueda anda.
+
+**UN MARCADOR DE DESAPARICIÓN SE DESCARTÓ ANTES DE USARLO**, y es el caso que la
+sección de marcadores describe. La tanda saca las secciones "PARA RECIBIR" / "YA
+RECIBIDAS", así que parecía el marcador perfecto al revés. Pero `git grep` sobre
+`HEAD` devuelve **tres archivos que todavía la nombran**: dos en COMENTARIOS que
+explican por qué se sacó, y `FilaTransferenciaLocal.jsx`, que quedó huérfano. Un
+marcador de desaparición ahí habría dado falso.
+
+### Y quedaron TRES componentes huérfanos, medido
+
+`FilaTransferenciaLocal`, `CabeceraDeCuenta` y `BloqueLocal`: `git grep
+--untracked` sobre `app` y `components`, descartando su propio archivo y los
+`*.test.mjs`, devuelve **cero consumidores** para los tres. Son lo que quedó de
+las dos pantallas paralelas, y con ellos quedan candados defendiendo piezas que
+ninguna pantalla dibuja. **No se tocaron en esta tanda** —borrar código no se
+mezcla con un despliegue— y es la deuda a resolver, con la decisión de si esos
+candados tienen que seguir existiendo.
+
+---
+
 ## 2026-09-14 — `671e9690`, las enumeraciones y el barrido: CERO migraciones
 
 Producción pasó de `98fbb667a1f9b2e2c0f8df69986b63e361d63866` a
