@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-09-06 20:39
+**Última actualización:** 2026-09-14 16:45
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-09-14: test: las enumeraciones de los candados ven lo que todavía no se commiteó
 - 2026-09-06: test: los fixtures traen comisionPendiente, que es lo que trae una venta real
 - 2026-09-06: fix(pos): comisionEsExacta falla cerrado y todos los consumidores quedan cubiertos
 - 2026-09-06: fix(auditoria): un backtick adentro de la plantilla SQL la cerraba

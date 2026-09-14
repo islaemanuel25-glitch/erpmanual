@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-09-14 14:29
+**Última actualización:** 2026-09-14 16:45
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -194,6 +194,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-09-14: fix(transferencias): las tarjetas dejan de ser del color de la página
 - 2026-09-14: fix(transferencias): la tarjeta con fondo de tarjeta, el rótulo de la lista y el orden estable
 - 2026-09-14: feat(transferencias): la entrada es la lista de locales y el período vive adentro
 - 2026-09-13: feat(transferencias): el día como encabezado, el estado en palabras y la recibida que se abre
