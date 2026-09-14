@@ -20,6 +20,54 @@ Ninguna. Producción está en **11 migraciones**, las mismas que el árbol.
 
 ---
 
+## 2026-09-14 — `98fbb667`, la pantalla partida en dos: CERO migraciones
+
+Producción pasó de `9d101cb445f45486b6b7b07f83e2ccb78085d8f2` a
+`98fbb667a1f9b2e2c0f8df69986b63e361d63866`. **Despliegue solo de código**, con
+corte de **2 segundos**.
+
+Cero migraciones por tres caminos —pendientes vacío, `prisma/migrations` sin
+tocar en el rango, clasificador en «Archivos a mirar: 0»— y el conteo
+confirmando que la imagen no estaba atrasada: **11 informadas, 11 en el árbol**.
+`migrate status`: 11 y "Database schema is up to date!". Bitácora de
+autorizaciones: **inexistente**, así que ninguna manual.
+
+El clasificador se corrió con `--desde 9d101cb4…` y no con `--vps`. **Desde este
+VPS `--vps` sale con 2**, porque no existe el alias ssh `vps-erp` — se está
+corriendo EN el servidor, no contra él. La respuesta correcta es pasarle el SHA
+de la imagen que atiende, que es exactamente la base que `--vps` iría a buscar;
+nunca `DEPLOY_MIGRACION_AUTORIZADA=1`, que saltearía el chequeo en vez de
+alimentarlo.
+
+### Qué sale
+
+La tercera vuelta del tablero móvil. La entrada pasa a ser SOLO la lista de
+locales —sin chips, sin importes, sin transferencias y sin buscador— y adentro
+de cada local aparece el período **CERRADO** con su rango, la semana en curso
+como una línea de contexto, el agrupado por día y el buscador.
+
+El defecto que lo motivó es de negocio: la pantalla mostraba el período EN CURSO,
+así que el domingo 2026-09-13 —con la semana arrancando ese mismo día— mostraba
+lo que todavía no se cobra y escondía lo que hay que cobrar.
+
+### El marcador: DOS cadenas, con su control
+
+- `"Para cobrar"`: **0 en la vieja, 2 en la nueva**
+- `"No se le envió nada en ese período"`: **0 y 2**
+
+Control `"Buscar transferencia por número"`, que lo agregó el despliegue
+anterior: **2 en las dos**, así que la búsqueda anda.
+
+**Un tercer candidato se descartó ANTES de usarlo**, y conviene saber por qué:
+`"Semana cerrada"` da 0 en el commit desplegado —parecía un marcador perfecto—
+pero también da **0 en HEAD**, porque el componente lo arma interpolado
+(`{unidadNombre} cerrada`) y esa cadena contigua no existe en ningún archivo. Un
+marcador así habría dado vacío en las dos imágenes y ese vacío se habría leído
+como "no viajó". Se comprueba pidiendo que el marcador dé **mayor que cero en
+HEAD**, no solo cero en el commit viejo.
+
+---
+
 ## 2026-09-13 — `9d101cb4`, el día como encabezado: CERO migraciones
 
 Producción pasó de `3cd4a4c53268e017e5944cadd80fb6d726072056` a
