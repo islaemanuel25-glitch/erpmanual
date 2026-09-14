@@ -2,7 +2,11 @@
 //
 //   node scripts/capturas-tablero-movil.mjs --base http://localhost:3210 \
 //     --chrome /usr/bin/chromium --salida /tmp/capturas-tablero \
-//     --usuario 4 --deposito 3 --local 4
+//     --usuario 4 --deposito 3 --local 4 --recibida-cerrada 12
+//
+// Los cuatro números los imprime la siembra. `--recibida-cerrada` es el de la
+// transferencia que cae en el PERÍODO CERRADO, que desde la tercera vuelta es
+// el que la pantalla muestra.
 //
 // ── POR QUÉ NO SE REUSA `capturas-recepcion-movil.mjs` ───────────────────
 //
@@ -53,11 +57,24 @@ const SECRETO = process.env.AUTH_SECRET;
 const USUARIO = Number(arg("usuario", "4"));
 const DEPOSITO = Number(arg("deposito", "3"));
 const LOCAL = Number(arg("local", "4"));
+// El número de la recibida QUE CAE EN EL PERÍODO CERRADO. Lo imprime la siembra.
+// Sin él el buscador se ejerce a medias: se puede comprobar que un número
+// inventado no aparece, que es el caso fácil, y no que el verdadero filtre.
+const RECIBIDA_CERRADA = Number(arg("recibida-cerrada", "0"));
 const ANCHO = Number(arg("ancho", "390"));
 const ALTOS = arg("altos", "640,520,440").split(",").map(Number);
 
 if (!SECRETO) {
   console.error("ABORTADO: falta AUTH_SECRET; sin eso no se puede firmar la sesión.");
+  process.exit(2);
+}
+
+// SE ABORTA, no se saltea el paso. Un arnés que mide de menos cuando le falta un
+// argumento informa verde con menos afirmaciones y nadie lo nota.
+if (!RECIBIDA_CERRADA) {
+  console.error(
+    "ABORTADO: falta --recibida-cerrada <id>. Lo imprime la siembra, en la línea «recibida con diferencia»."
+  );
   process.exit(2);
 }
 
@@ -302,16 +319,54 @@ await send("Page.enable");
 await send("Runtime.enable");
 await send("Network.enable");
 
-// ── 1 · LA VISTA DEL DEPÓSITO, EN LAS TRES ALTURAS ───────────────────────
+// ── 1 · LA ENTRADA DEL DEPÓSITO, EN LAS TRES ALTURAS ─────────────────────
+//
+// Desde la TERCERA vuelta esta pantalla es SOLO la lista de locales. Lo que
+// antes se afirmaba acá —el importe, los chips de período— ahora vive adentro
+// del local, y por eso las afirmaciones de abajo son en NEGATIVO: que nada de
+// eso esté. Un chip de período arriba de la pantalla tendría que elegir UN
+// período para todos los locales, y cada uno corta su semana el día que acordó.
 await entrarComo(DEPOSITO, "DEPÓSITO");
 for (const alto of ALTOS) {
   await medir(alto);
   await abrir("/modulos/transferencias", "Transferencias");
-  await afirmar(await hayTexto("A pagar"), `${alto} · el bloque muestra el importe a pagar`);
+  await afirmar(await hayTexto("Local V15"), `${alto} · la entrada lista los locales`);
   await afirmar(await hayTexto("Reporte"), `${alto} · el reporte sigue a un toque`);
-  await afirmar(await hayTexto("Semana"), `${alto} · están los chips de período`);
-  await foto(`v28-deposito-${ANCHO}x${alto}`);
+  await afirmar(
+    !(await hayTexto("A pagar")),
+    `${alto} · la entrada NO muestra importes: un importe es siempre el de UN período, y acá no hay ninguno elegido`
+  );
+  await foto(`v40-entrada-${ANCHO}x${alto}`);
 }
+
+await medir(ALTOS[0]);
+await abrir("/modulos/transferencias", "Transferencias");
+
+// NI CHIPS NI BUSCADOR. Se pregunta por los CONTROLES y no por el texto: la
+// palabra "semana" aparece igual en el aviso del corte, así que buscarla en el
+// `innerText` daría un falso rojo — y peor, buscar "Semana" con mayúscula daría
+// un falso VERDE el día que el chip vuelva escrito distinto.
+const controlesDePeriodo = await evaluar(`(() => {
+  const chips = ["Día", "Semana", "Mes", "Otro"];
+  return [...document.querySelectorAll('button, [role="button"]')]
+    .filter((n) => n.offsetParent !== null)
+    .map((n) => (n.textContent || "").trim())
+    .filter((t) => chips.includes(t));
+})()`);
+await afirmar(
+  Array.isArray(controlesDePeriodo) && controlesDePeriodo.length === 0,
+  `la entrada no tiene chips de período (encontrados: ${JSON.stringify(controlesDePeriodo)})`
+);
+await afirmar(
+  (await evaluar(
+    `[...document.querySelectorAll('input')].filter((i) => i.offsetParent !== null).length`
+  )) === 0,
+  "la entrada no tiene buscador: el número sirve cuando ya se sabe cuál se busca, y eso pasa adentro de un local"
+);
+await afirmar(
+  !(await hayTexto("PARA RECIBIR")),
+  "la entrada no lista transferencias"
+);
 
 // EL TÍTULO NO SE REPITE. La barra del shell ya dice "Transferencias"; cuando la
 // pantalla lo escribía otra vez, los dos quedaban pegados en el texto de la
@@ -344,15 +399,9 @@ await afirmar(
 // El sembrado crea dos locales y le manda transferencias a UNO solo. Antes del
 // 2026-09-13 el otro no aparecía, y con él se iba su marca de "sin corte": el
 // aviso de arriba contaba los locales de la lista, así que informaba uno de dos.
-await medir(ALTOS[0]);
-await abrir("/modulos/transferencias", "Transferencias");
 await afirmar(
   await hayTexto("Local V15 sin movimiento"),
   "el local que no recibió nada aparece igual: si no, no hay forma de saber que existe"
-);
-await afirmar(
-  await hayTexto("Sin transferencias en el período"),
-  "y lo dice con una frase, no con un «0 transferencias» que se lee como un dato que falta"
 );
 await afirmar(
   await hayTexto("Hay 2 locales sin corte configurado"),
@@ -369,45 +418,139 @@ await afirmar(
   "apareció un local sin cliente vinculado: a ése se le vende, no se le transfiere"
 );
 
-// Y el que está en cero no compite: va al final, después del que sí recibió.
-await afirmar(
-  await evaluar(`(() => {
-    const t = document.body.innerText;
-    return t.indexOf("Local V15 sin movimiento") > t.indexOf("$");
-  })()`),
-  "el local en cero va DESPUÉS del que tiene movimiento"
-);
-
-// La marca de "sin configurar", que es lo que Emanuel pidió ver.
-await afirmar(
-  await hayTexto("Sin corte"),
-  "la relación sin acuerdo se ve MARCADA en el renglón del local"
-);
+// EL ORDEN YA NO ES POR IMPORTE, y no puede serlo: no hay importe en esta
+// pantalla. Lo que se afirma es que los dos están y que el que no opera por
+// transferencia no.
 await afirmar(
   await hayTexto("sin corte configurado"),
-  "y el aviso de arriba dice cuántas faltan, con el camino para arreglarlo"
+  "el aviso de arriba dice cuántas faltan, con el camino para arreglarlo"
 );
-await foto(`v28-sin-configurar-${ANCHO}`);
+await foto(`v40-sin-configurar-${ANCHO}`);
 
-// El bloque abierto: la transferencia con su botón.
-await tocar("A pagar");
-await afirmar(await hayTexto("Recibir"), "al abrir el bloque, la pendiente ofrece recibirla");
-
-// ── LA SEGUNDA VUELTA (V32) ───────────────────────────────────────────────
+// ── LA FACHADA: LA QUE DICE LA FUNCIÓN, Y LA MISMA ENTRE CORRIDAS ────────
 //
-// El sembrado tiene dos remitos de días distintos: uno de hoy sin abrir y otro
-// de ayer ya recibido y con una diferencia.
+// ── POR QUÉ ACÁ NO SE AFIRMA QUE LOS DOS LOCALES DIFIERAN ────────────────
 //
-// SE MIRA CON EL CHIP EN «MES», y no es un rodeo: el corte por defecto es el
-// domingo, así que en un domingo la semana arranca HOY y el remito de ayer cae
-// en la semana anterior. Con la semana habría un solo día en pantalla y el
-// agrupado se afirmaría sobre el caso que no puede fallar. El mes contiene los
-// dos, y de paso ejerce el chip.
-// El bloque YA está abierto y `abiertos` sobrevive al cambio de chip, así que no
-// se vuelve a tocar: un segundo toque lo cerraría. Costó una corrida saberlo.
-await tocar("Mes");
-await esperar(1500);
+// Sería una afirmación falsa, y la primera versión de este arnés la tenía. Hay
+// CUATRO paletas: dos nombres cualesquiera pueden caer en la misma sin que nada
+// esté roto, y los dos del sembrado —"Local V15" y "Local V15 sin movimiento"—
+// caen los dos en verde. Medido. Exigir que difieran habría obligado a
+// renombrar un local del sembrado para que la foto saliera linda, que es
+// exactamente lo que no se hace.
+//
+// Que la paleta REPARTA se mide donde se puede medir de verdad: en el candado
+// V4, contra los CUATRO nombres reales de producción, que tienen que dar cuatro
+// paletas distintas. Ahí fue donde se encontró el defecto del hash.
+//
+// Lo que sí se afirma acá, y es el contrato de esta pantalla: que el navegador
+// dibuje LA PALETA QUE LA FUNCIÓN DECIDE para ese nombre. Se importa la misma
+// función que usa el componente —no se copia la tabla de colores— así que si
+// mañana cambia la derivación, esto la sigue.
+const { paletaDelLocal } = await import("../lib/transferencias/fachadaDelLocal.js");
 
+// Se mide el color de los rellenos del SVG: lo que importa es lo que el
+// navegador dibuja, no el nombre de la paleta.
+const paletaEnPantalla = () =>
+  evaluar(`(() => {
+    const firma = (nombre) => {
+      const tarjeta = [...document.querySelectorAll('[aria-label]')]
+        .find((n) => n.getAttribute('aria-label') === 'Abrir ' + nombre);
+      if (!tarjeta) return null;
+      const svg = tarjeta.querySelector('svg');
+      if (!svg) return null;
+      return [...svg.querySelectorAll('*')]
+        .map((e) => e.getAttribute('fill') || '')
+        .filter(Boolean)
+        .join('|');
+    };
+    return {
+      conMovimiento: firma('Local V15'),
+      sinMovimiento: firma('Local V15 sin movimiento'),
+    };
+  })()`);
+
+const fachadas = await paletaEnPantalla();
+await afirmar(
+  fachadas && fachadas.conMovimiento && fachadas.sinMovimiento,
+  `cada local dibuja su fachada (${JSON.stringify(fachadas).slice(0, 160)})`
+);
+for (const [clave, nombre] of [
+  ["conMovimiento", "Local V15"],
+  ["sinMovimiento", "Local V15 sin movimiento"],
+]) {
+  const esperada = paletaDelLocal(nombre);
+  await afirmar(
+    fachadas[clave].includes(esperada.toldoA) && fachadas[clave].includes(esperada.cartel),
+    `«${nombre}» se dibuja con la paleta ${esperada.nombre}, que es la que su nombre decide`
+  );
+}
+
+// Estable entre corridas: se recarga la pantalla entera y tiene que dar lo
+// mismo. Con un color al azar esto sería rojo, y un color al azar es peor que
+// no tener color.
+await abrir("/modulos/transferencias", "Transferencias");
+const fachadasOtraVez = await paletaEnPantalla();
+await afirmar(
+  fachadasOtraVez.conMovimiento === fachadas.conMovimiento &&
+    fachadasOtraVez.sinMovimiento === fachadas.sinMovimiento,
+  "la fachada de un local es la MISMA entre dos cargas de la pantalla"
+);
+
+// ── 1.bis · ADENTRO DEL LOCAL ────────────────────────────────────────────
+//
+// Se entra por el `aria-label` EXACTO y no por el texto: "Local V15" es un
+// prefijo de "Local V15 sin movimiento", así que tocar por texto entraría al
+// que quedó primero en el DOM y la corrida mediría otro local sin avisar.
+async function entrarAlLocal(nombre) {
+  const ok = await evaluar(`(() => {
+    const el = [...document.querySelectorAll('button, a, [role="button"]')]
+      .filter((n) => n.offsetParent !== null)
+      .find((n) => n.getAttribute('aria-label') === ${JSON.stringify(`Abrir ${nombre}`)});
+    if (!el) return false;
+    el.scrollIntoView({ block: 'center' });
+    el.click();
+    return true;
+  })()`);
+  if (!ok) throw new Error(`no se encontró la tarjeta de «${nombre}» por su aria-label`);
+  await esperarTexto("Para cobrar", 30000);
+  await esperar(900);
+}
+
+await entrarAlLocal("Local V15");
+
+// EL PERÍODO CERRADO ES LA RESPUESTA, la semana en curso es el contexto.
+await afirmar(await hayTexto("Para cobrar"), "adentro del local, la pregunta es cuánto hay que cobrar");
+await afirmar(
+  await hayTexto("Semana cerrada ·"),
+  "y se dice de qué período es: el CERRADO, con su rango"
+);
+await afirmar(
+  await hayTexto("Semana en curso"),
+  "la semana en curso no desaparece: baja de jerarquía a una línea"
+);
+
+// LA BARRA DICE DÓNDE ESTÁS. Por ruta diría "Transferencias", que es de dónde
+// se vino y no dónde se está.
+await afirmar(
+  (await filaDelShell())?.includes("Local V15"),
+  `la barra de arriba dice el nombre del local (dice: ${JSON.stringify(await filaDelShell())})`
+);
+
+// Y el buscador SÍ está acá, que es el otro lado de la afirmación de la entrada.
+await afirmar(
+  (await evaluar(
+    `[...document.querySelectorAll('input')].filter((i) => i.offsetParent !== null).length`
+  )) >= 1,
+  "el buscador por número vive adentro del local"
+);
+
+await foto(`v40-local-${ANCHO}`);
+
+// ── LA SEGUNDA VUELTA (V32), AHORA ADENTRO DEL LOCAL ─────────────────────
+//
+// El sembrado pone DOS transferencias en el período cerrado, de días distintos:
+// una recibida con una diferencia y otra sin recibir. Sin ellas todo esto
+// miraría una lista vacía y no se pondría rojo — se volvería inalcanzable.
 await afirmar(
   !(await hayTexto("#")),
   "el número interno salió de la lista: no dice qué día ni qué trae"
@@ -418,9 +561,14 @@ await afirmar(
   "la recibida dice cuántas líneas no cerraron"
 );
 await afirmar(await hayTexto("Ver ›"), "la recibida ofrece abrirse");
+
+// EL TOTAL TODAVÍA PUEDE CAMBIAR, y eso se dice. El período cerró pero le queda
+// una transferencia sin contar, así que el importe de arriba no es definitivo.
+// Es el caso que el sembrado pone a propósito: sin una sin recibir en el período
+// cerrado, este aviso no se podría fotografiar nunca.
 await afirmar(
-  await hayTexto("con diferencia"),
-  "la cabecera del local cuenta las que no cerraron"
+  await hayTexto("sin recibir · el total todavía no está cerrado"),
+  "con una sin contar, la cuenta avisa que el total no está cerrado"
 );
 
 // LAS DOS BANDAS DE DÍA, y la más reciente primero.
@@ -461,16 +609,99 @@ await afirmar(
 
 await foto(`v32-dias-${ANCHO}`);
 
+// ── EL BUSCADOR POR NÚMERO, EJERCIDO ─────────────────────────────────────
+//
+// Se escribe con el setter nativo y un evento `input`: asignar `.value` a secas
+// no le avisa a React y el campo queda con el texto puesto y el estado viejo,
+// así que la lista no se filtraría y el arnés afirmaría sobre una pantalla que
+// no cambió.
+async function escribirEnElBuscador(valor) {
+  await evaluar(`(() => {
+    const campo = [...document.querySelectorAll('input')].find((i) => i.offsetParent !== null);
+    if (!campo) return false;
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+    setter.call(campo, ${JSON.stringify(valor)});
+    campo.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+  await esperar(700);
+}
+
+// Un número que NO está: la pantalla lo dice en vez de mostrar una lista vacía.
+await escribirEnElBuscador("999999");
+await afirmar(
+  await hayTexto("Ninguna transferencia de este período tiene ese número"),
+  "un número que no está se contesta con una frase, no con una lista vacía"
+);
+await foto(`v40-buscador-sin-resultado-${ANCHO}`);
+
+// Y el número real de la recibida sí la encuentra, y deja sola a esa.
+await escribirEnElBuscador(String(RECIBIDA_CERRADA));
+await afirmar(
+  await hayTexto("Recibida · 1 diferencia"),
+  "buscando su número, la transferencia aparece"
+);
+await afirmar(
+  !(await hayTexto("Sin abrir")),
+  "y la otra queda afuera: si no, el buscador no estaría filtrando nada"
+);
+await escribirEnElBuscador("");
+
 // Y la recibida ABRE el detalle.
 await tocar("Ver ›");
 await esperarTexto("Productos transferidos", 30000);
 await afirmar(true, "tocar una recibida lleva al detalle que ya existía");
 await foto(`v32-detalle-${ANCHO}`);
-// Se vuelve a la SEMANA, que es como arranca la pantalla, para que el resto de
-// la corrida siga midiendo el estado por defecto.
+
+// ── EL LOCAL SIN MOVIMIENTO: EL RANGO EXISTE Y ESTÁ VACÍO ────────────────
+//
+// No es lo mismo que "no hay período". El período está —siempre hay una semana
+// anterior— y lo que no hay es movimiento. Decir que falta el dato sería otra
+// cosa, y sería falsa.
 await abrir("/modulos/transferencias", "Transferencias");
-await tocar("A pagar");
-await foto(`v28-bloque-abierto-${ANCHO}`);
+await entrarAlLocal("Local V15 sin movimiento");
+await afirmar(
+  await hayTexto("Semana cerrada ·"),
+  "el local sin movimiento igual tiene período cerrado: es una cuenta de calendario, no de datos"
+);
+await afirmar(
+  await hayTexto("No se le envió nada en ese período"),
+  "y se dice que está vacío, con una frase"
+);
+
+// UNA SOLA VEZ Y CON UNA SOLA REDACCIÓN. La primera versión lo decía dos veces
+// —"No se le envió nada en ese período" arriba y "No hay transferencias en el
+// período cerrado" abajo— y las dos frases no eran ni siquiera la misma. Lo
+// encontró la captura, no una afirmación: por eso ahora hay una.
+await afirmar(
+  !(await hayTexto("No hay transferencias en el período cerrado")),
+  "el período vacío se dice UNA vez: dos frases distintas para el mismo hecho se leen como dos hechos"
+);
+await afirmar(
+  (await evaluar(
+    `[...document.querySelectorAll('input')].filter((i) => i.offsetParent !== null).length`
+  )) === 0,
+  "y sin nada que listar tampoco hay buscador: no puede encontrar nada"
+);
+await foto(`v40-local-vacio-${ANCHO}`);
+
+// EL ATRÁS VUELVE A LA LISTA, que es el motivo por el que esto es una ruta y no
+// un estado de la entrada.
+await tocar("Volver");
+// Se espera "Reporte" y no el nombre del local: el nombre TAMBIÉN está en la
+// pantalla de la que se viene —es su título— así que esperarlo daría por
+// llegada una navegación que todavía no pasó. "Reporte" solo lo registra la
+// entrada.
+await esperarTexto("Reporte", 20000);
+await esperar(600);
+await afirmar(
+  !(await hayTexto("Para cobrar")),
+  "el botón de atrás vuelve a la lista de locales, no a otra pantalla del local"
+);
+await afirmar(
+  await hayTexto("Local V15 sin movimiento"),
+  "y la lista sigue entera al volver"
+);
 
 // ── 2 · EL CORTE DE SEMANA: SE VE, SE CAMBIA Y SE GUARDA ─────────────────
 await abrir("/modulos/transferencias/corte-de-semana", "Corte de semana");
@@ -545,7 +776,38 @@ await afirmar(
   await hayTexto("Hay 1 local sin corte configurado"),
   "el aviso baja a uno: el que se configuró salió de la cuenta y el otro sigue"
 );
-await foto(`v28-ya-configurado-${ANCHO}`);
+await foto(`v40-ya-configurado-${ANCHO}`);
+
+// ── DOS CORTES DISTINTOS, DOS PERÍODOS DISTINTOS ─────────────────────────
+//
+// Es el motivo de fondo por el que la pantalla se partió en dos, y hasta acá no
+// se había podido ver: uno de los dos locales quedó con el miércoles y el otro
+// sigue con el domingo por defecto, así que su "semana cerrada" NO puede ser la
+// misma. Si diera lo mismo, el corte por local sería decorativo y un chip global
+// habría alcanzado.
+//
+// Se compara el RÓTULO, que es lo que se lee en pantalla. Cuál de los dos quedó
+// configurado no importa: lo que se afirma es que difieren.
+async function rangoCerradoDe(nombre) {
+  await abrir("/modulos/transferencias", "Transferencias");
+  await entrarAlLocal(nombre);
+  return evaluar(`(() => {
+    const m = document.body.innerText.match(/Semana cerrada · ([^\\n]+)/);
+    return m ? m[1].trim() : null;
+  })()`);
+}
+
+const rangoConMovimiento = await rangoCerradoDe("Local V15");
+const rangoSinMovimiento = await rangoCerradoDe("Local V15 sin movimiento");
+await afirmar(
+  rangoConMovimiento && rangoSinMovimiento,
+  `los dos locales dicen su período cerrado (${rangoConMovimiento} / ${rangoSinMovimiento})`
+);
+await afirmar(
+  rangoConMovimiento !== rangoSinMovimiento,
+  `con cortes distintos, el período cerrado es distinto (dieron: ${rangoConMovimiento} y ${rangoSinMovimiento})`
+);
+await foto(`v40-corte-propio-${ANCHO}`);
 
 // ── 3 · LA VISTA DEL LOCAL ───────────────────────────────────────────────
 await entrarComo(LOCAL, "LOCAL");
@@ -576,9 +838,20 @@ await afirmar(
   await hayTexto("Historial de transferencias entre Depósito y Locales"),
   "1366 · el reporte de escritorio sigue siendo lo que se dibuja"
 );
+// Se pregunta por las TARJETAS DE LOCAL y no por un texto: desde la tercera
+// vuelta la entrada móvil no escribe "A pagar" en ningún lado, así que
+// preguntar por esa frase daba verde sin mirar nada. Las tarjetas son lo que la
+// entrada móvil dibuja hoy, y son lo que no tiene que colarse acá.
+// `offsetParent !== null` y no la sola presencia en el DOM: la entrada móvil se
+// apaga con `hidden lg:block`, así que sus nodos EXISTEN a 1366 y están
+// ocultos. Contarlos sin mirar si se ven daba rojo sobre una pantalla correcta.
 await afirmar(
-  !(await hayTexto("A pagar")),
-  "1366 · y la lista de trabajo NO se cuela en el escritorio"
+  (await evaluar(
+    `[...document.querySelectorAll('[aria-label]')]
+       .filter((n) => n.offsetParent !== null)
+       .filter((n) => (n.getAttribute('aria-label') || '').startsWith('Abrir Local')).length`
+  )) === 0,
+  "1366 · la entrada móvil NO se cuela en el escritorio"
 );
 await foto("escritorio-1366");
 

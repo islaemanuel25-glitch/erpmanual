@@ -55,12 +55,21 @@ tiene razón.
       -v /home/emanuel/.cache/erpazul-test/node_modules:/app/node_modules -w /app \
       -e DATABASE_URL="postgresql://erpazul:${PWD_DB}@localhost:5432/erpazul_v15" \
       -e NODE_ENV=test \
-      erpazul-test:estable node scripts/sembrar-v15-recepcion.mjs
+      erpazul-test:estable node --import ./scripts/alias-loader.mjs scripts/sembrar-v15-recepcion.mjs
+
+**El `--import` no es opcional desde el 2026-09-14.** La siembra calcula el
+período cerrado con `rangoDelPeriodoCerrado`, la MISMA función que usa la
+pantalla, y ésa resuelve un alias `@/`. Sin el loader la siembra aborta al
+importar. Se hizo así y no calculando la semana anterior a mano porque una resta
+escrita al lado se desincroniza el día que el corte cambie de definición, y
+entonces la base queda sembrando en un período que la pantalla no mira — las
+afirmaciones del arnés no se pondrían rojas, se volverían inalcanzables.
 
 El script es **idempotente**: borra lo que sembró antes —por nombre, no por id— y
-lo vuelve a crear. Imprime al final los tres números que el arnés necesita, y
-cambian en cada corrida porque los ids son autoincrementales: hay que leerlos, no
-memorizarlos.
+lo vuelve a crear. Imprime al final los números que el arnés necesita, y cambian
+en cada corrida porque los ids son autoincrementales: hay que leerlos, no
+memorizarlos. Desde la tercera vuelta del tablero imprime también el rango del
+**período cerrado** y las dos transferencias que siembra adentro.
 
 **4 · Levantar la app contra esa base.** Acotada, para no competir con producción.
 

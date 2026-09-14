@@ -1,7 +1,11 @@
 // SIEMBRA LA BASE DESCARTABLE CON LA QUE SE VERIFICA LA RECEPCIÓN MÓVIL V15.
 //
 //   DATABASE_URL=postgresql://…@localhost:5432/erpazul_v15 \
-//     node scripts/sembrar-v15-recepcion.mjs
+//     node --import ./scripts/alias-loader.mjs scripts/sembrar-v15-recepcion.mjs
+//
+// El `--import` NO es opcional desde el 2026-09-14: la siembra calcula el
+// período cerrado con la misma función que la pantalla, y ésa resuelve un alias
+// `@/`. Sin el loader aborta al importar. El motivo largo está abajo.
 //
 // ── POR QUÉ EXISTE ───────────────────────────────────────────────────────
 //
@@ -43,6 +47,29 @@
 // mismo estado y una corrida no contamina a la siguiente.
 
 import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
+
+// ── SE CORRE CON EL LOADER DE ALIAS, Y NO ES UN CAPRICHO ─────────────────
+//
+// Esta línea importa el MISMO `rangoDelPeriodoCerrado` que usa la pantalla, y
+// ese módulo resuelve `@/lib/fechas/rangoArgentina`. Sin el loader el alias no
+// existe fuera de Next y la siembra aborta al importar.
+//
+// La alternativa era calcular acá la semana anterior a mano, y eso es
+// exactamente lo que la regla 1 prohíbe: una función parecida al lado de la que
+// decide. Si el corte cambia de definición, la siembra tiene que moverse con
+// él, o la base de pruebas queda sembrando en un período que la pantalla no
+// mira — y entonces las afirmaciones del arnés se vuelven inalcanzables sin
+// ponerse rojas.
+//
+// Va DESPUÉS de la fábrica de Prisma a propósito: la fábrica tiene que
+// importarse antes que cualquier cosa que arrastre a `@prisma/client`. Éste no
+// lo arrastra —`periodoDePago` es aritmética de fechas— y aun así el orden se
+// respeta, porque el día que alguien agregue un import acá el orden ya está bien.
+import {
+  DIA_DE_CORTE_POR_DEFECTO,
+  UNIDADES,
+  rangoDelPeriodoCerrado,
+} from "../lib/transferencias/periodoDePago.js";
 
 const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 
@@ -404,17 +431,139 @@ for (const l of [
   });
 }
 
+// ── 6 · DOS TRANSFERENCIAS EN EL PERÍODO CERRADO ─────────────────────────
+//
+// ── POR QUÉ HIZO FALTA AGREGARLAS ────────────────────────────────────────
+//
+// Las dos de arriba son de HOY y de AYER, así que caen en el período EN CURSO.
+// Hasta la segunda vuelta eso alcanzaba, porque la pantalla mostraba el período
+// en curso. Desde la tercera muestra el CERRADO —la pregunta es cuánto hay que
+// cobrar, y eso se contesta con el período terminado— y con esta base el bloque
+// habría salido siempre vacío.
+//
+// Y ahí está el daño, que no es que falte una foto: las afirmaciones del arnés
+// sobre el agrupado por día, sobre la recibida con diferencia y sobre el
+// buscador quedarían mirando una lista que nunca tiene filas. No se pondrían
+// rojas: se volverían INALCANZABLES, que es el defecto que más se repite en
+// este proyecto y el que no avisa.
+//
+// ── LAS FECHAS SALEN DE LA PUERTA, NO DE UNA RESTA ───────────────────────
+//
+// "Hace ocho días" NO sirve: si la siembra corre justo el día del corte, ocho
+// días atrás cae en el período anterior al cerrado y las filas se van de la
+// pantalla. Se le pregunta a `rangoDelPeriodoCerrado` cuál es el período con el
+// corte POR DEFECTO —que es el que tienen los dos locales recién sembrados, sin
+// acuerdo— y se siembra adentro.
+//
+// Van al mediodía argentino: el filtro de la ruta arma los bordes del rango en
+// hora de Argentina, y las 15:00 UTC quedan lejos de los dos extremos. A
+// medianoche UTC la fila caería en el día anterior acá y podría irse del rango.
+const CERRADO = rangoDelPeriodoCerrado({
+  unidad: UNIDADES.SEMANA,
+  diaDeCorte: DIA_DE_CORTE_POR_DEFECTO,
+});
+const mediodiaDe = (iso) => new Date(`${iso}T15:00:00.000Z`);
+
+// Dos DÍAS distintos adentro del período, para que el agrupado tenga dos bandas
+// que agrupar. El último día del período y el anterior: los dos están adentro
+// siempre, porque un período de semana tiene siete.
+const ultimoDiaISO = CERRADO.hasta;
+const anteriorISO = (() => {
+  const d = new Date(`${CERRADO.hasta}T12:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+})();
+
+/**
+ * Una transferencia con dos líneas. `recibido` en `null` la deja SIN RECIBIR
+ * —y con eso el total del período queda abierto, que es el aviso que hay que
+ * poder ver—; con número, llega recibida.
+ */
+async function sembrarEnElCerrado({ iso, estado, recibidoDelSegundo }) {
+  const fecha = mediodiaDe(iso);
+  const recibida = estado === "Recibida";
+  const t = await prisma.transferencia.create({
+    data: {
+      origenId: deposito.id,
+      destinoId: destino.id,
+      estado,
+      fechaEnvio: fecha,
+      fechaRecepcion: recibida ? fecha : null,
+      creadaPor: usuario.id,
+      // Se escribe como la escribiría `confirmar-recepcion`. La pantalla NO la
+      // usa —cuenta las líneas— y se pone igual para que el dato de prueba
+      // tenga la forma del dato real.
+      tieneDiferencias: recibida ? recibidoDelSegundo !== 6 : false,
+    },
+  });
+  for (const l of [
+    { clave: "coincide", cantidad: 10, recibido: recibida ? 10 : null, precioCosto: 500 },
+    // 6 PACK x24. Si llegan 5, la línea tiene diferencia y hay algo que contar.
+    {
+      clave: "faltante",
+      cantidad: 144,
+      recibido: recibida ? recibidoDelSegundo : null,
+      precioCosto: 8000,
+      presentacionEnvio: "PACK",
+      cantidadPresentada: 6,
+      factorPresentacion: 24,
+    },
+  ]) {
+    await prisma.transferenciaDetalle.create({
+      data: {
+        transferenciaId: t.id,
+        productoId: local[l.clave].id,
+        cantidad: l.cantidad,
+        recibido: l.recibido,
+        precioCosto: l.precioCosto,
+        unidadEnviada: "UNIDAD",
+        presentacionEnvio: l.presentacionEnvio ?? null,
+        cantidadPresentada: l.cantidadPresentada ?? null,
+        factorPresentacion: l.factorPresentacion ?? null,
+        revisadoEnRecepcion: recibida,
+        revisadoEnRecepcionPorId: recibida ? usuario.id : null,
+        revisadoEnRecepcionAt: recibida ? fecha : null,
+        fechaRecepcion: recibida ? fecha : null,
+        confirmadoPorId: recibida ? usuario.id : null,
+      },
+    });
+  }
+  return t;
+}
+
+// La del último día llega RECIBIDA y con una diferencia: es la que se puede
+// abrir y la que le da algo que contar a la cabecera.
+const cerradaRecibida = await sembrarEnElCerrado({
+  iso: ultimoDiaISO,
+  estado: "Recibida",
+  recibidoDelSegundo: 5,
+});
+// La del día anterior queda SIN RECIBIR, y eso es lo que mantiene el total del
+// período ABIERTO. Sin una así, el aviso de "todavía puede cambiar" no se puede
+// fotografiar nunca.
+const cerradaPendiente = await sembrarEnElCerrado({
+  iso: anteriorISO,
+  estado: "Enviada",
+  recibidoDelSegundo: null,
+});
+
 log("");
 log("SEMBRADO LISTO");
 log(`  fuera del remito: ${PRODUCTOS.find((p) => p.fueraDelRemito).nombre}`);
 log(`  transferencia : ${transferencia.id}`);
+log(`  período cerrado: ${CERRADO.desde} → ${CERRADO.hasta} (corte por defecto)`);
+log(`    recibida con diferencia: ${cerradaRecibida.id}  (${ultimoDiaISO})`);
+log(`    sin recibir            : ${cerradaPendiente.id}  (${anteriorISO})`);
 log(`  usuario       : ${usuario.id}  (${SEMBRADO.usuario})`);
 log(`  local destino : ${destino.id}  (${SEMBRADO.destino})`);
 log(`  local en cero : ${sinMovimiento.id}  (${SEMBRADO.destinoSinMovimiento}) — sin transferencias, a propósito`);
 log(`  local sin vínculo: ${sinVinculo.id}  (${SEMBRADO.destinoSinVinculo}) — SIN cliente vinculado: no opera por transferencia`);
 log(`  local origen  : ${deposito.id}  (${SEMBRADO.deposito})`);
 log("");
-log("  El arnés se corre con esos tres números:");
-log(`    --transferencia ${transferencia.id} --usuario ${usuario.id} --local ${destino.id}`);
+log("  Los arneses se corren con estos números:");
+log(`    recepción: --transferencia ${transferencia.id} --usuario ${usuario.id} --local ${destino.id}`);
+log(
+  `    tablero  : --usuario ${usuario.id} --deposito ${deposito.id} --local ${destino.id} --recibida-cerrada ${cerradaRecibida.id}`
+);
 
 await prisma.$disconnect();
