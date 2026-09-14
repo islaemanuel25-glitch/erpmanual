@@ -6,6 +6,12 @@ parada.** La sesión anterior se cerró porque el conector de Figma no cargaba.
 **Estado: el DOMINIO está hecho, verificado y empujado. La PANTALLA no está
 empezada.** Último commit de la tanda: `464b8e16`.
 
+> **AL 2026-09-14 ESTO YA NO ES EL ESTADO.** La pantalla se construyó y lleva
+> **tres vueltas**. Producción corre la segunda (`9d101cb4`); la tercera está
+> empujada **y sin desplegar**. Lo de abajo se conserva porque es contra lo que se
+> compara, pero para saber qué hay HOY hay que leer primero
+> "TERCERA VUELTA · LA PANTALLA SE PARTIÓ EN DOS", al final.
+
 ---
 
 ## LO PRIMERO QUE HAY QUE SABER
@@ -500,3 +506,178 @@ tabla del detalle. Lo que cubre los cambios de estas pantallas son los candados 
 render.
 
 Suite al cerrar la sesión: **5871 en verde**, lint y trinquete limpios.
+
+---
+
+## TERCERA VUELTA · LA PANTALLA SE PARTIÓ EN DOS — 2026-09-14
+
+### EL DEFECTO QUE LA MOTIVÓ, Y ES DE NEGOCIO, NO DE DIBUJO
+
+La pantalla mostraba el **período EN CURSO**. El día que Emanuel la abrió, la
+semana en curso había arrancado ese mismo día: la pantalla le mostraba lo que
+todavía no había pasado y le escondía lo que tenía que cobrar. Un tablero de
+cuentas a cobrar que muestra el período abierto está mostrando un número que
+nadie puede reclamar todavía.
+
+Y el chip global de período era la misma equivocación una capa más arriba: **cada
+local corta su semana el día que acordó**, así que "Semana" arriba de la pantalla
+tenía que elegir UN período para todos, y cualquiera que eligiera era el
+equivocado para alguien.
+
+### CÓMO QUEDÓ REPARTIDO
+
+**Pantalla 1 · la entrada** (`EntradaDeLocales`, dentro de `TableroMovil`): solo
+la lista de locales. Sin chips, sin importes, sin transferencias y sin buscador.
+Cada local es una tarjeta con una franja de acento de 6 px, una ilustración de
+fachada de 56 px, el nombre y un `›`.
+
+**Pantalla 2 · adentro del local**
+(`app/modulos/transferencias/local/[localId]/page.jsx`): el período **CERRADO**
+—"Para cobrar"—, la semana en curso como un renglón compacto, el agrupamiento por
+día de la vuelta anterior, y el buscador por número.
+
+**Por qué una ruta y no un estado**, que fue una de las tres preguntas: por el
+botón atrás del teléfono —con estado, "atrás" saldría de Transferencias entero en
+vez de volver a la lista— y porque al volver del detalle de una transferencia hay
+que caer en el local. Con una ruta las dos son gratis. De yapa, el arnés puede
+abrirla por URL sin tocar la lista. No choca con `/modulos/transferencias/[id]`
+porque `local` es un segmento estático y Next lo resuelve primero, igual que
+`corte-de-semana`.
+
+**Qué es el período cerrado:** `rangoDelPeriodoCerrado` en
+`lib/transferencias/periodoDePago.js`, que es el período que contiene al día
+ANTERIOR al arranque del que está en curso. No es "restarle siete días": con
+`unidad = MES` restar siete no da el mes pasado, y con un corte cambiado tampoco.
+Se apoya en `rangoDelPeriodo`, que ya sabe dónde empieza cada período.
+
+**Y si todavía no hay ningún período cerrado**, que era la segunda pregunta: el
+rango **existe igual** —es una cuenta de calendario, no de datos— y lo que puede
+venir vacío es la lista. Entonces se dice: "No se le envió nada en ese período."
+No se esconde el bloque ni se cae a la semana en curso, porque las dos cosas
+harían pensar que el dato falta cuando lo que pasa es que no hubo movimiento.
+
+### LA FACHADA: POR QUÉ SUS COLORES ESTÁN EN `lib/`
+
+Los hex de la ilustración **no son interfaz, son un dibujo**. El verde de un toldo
+es como el color de una foto: no cambia porque el usuario pase a tema oscuro.
+
+Viven en `lib/transferencias/fachadaDelLocal.js` y hay una consecuencia práctica
+que era parte del pedido: el trinquete (`scripts/hardcodeo.mjs`) enumera
+`app/**/*.jsx` y `components/**/*.jsx`, y `check-theme-tokens.js` mira
+`app/modulos` y `components/caja`. **`lib/` no entra en ninguno de los dos.** Así
+que los hex de la fachada no se cuentan como hardcodeo de interfaz, y no porque
+se los haya escondido, sino porque están en el único lugar donde son lo que dicen
+ser: datos.
+
+`FachadaDelLocal.jsx` no escribe **ni un solo color**. La primera versión sí
+—cinco neutros sueltos en el JSX, tres líneas debajo del comentario que afirmaba
+lo contrario— y **el trinquete los contó, con razón**. Se mudaron a
+`NEUTROS_DE_LA_FACHADA` y hay un candado (V6) que sostiene la afirmación. La
+franja de la tarjeta es otra cosa y sí sale del tema: eso sí es interfaz.
+
+### EL DEFECTO DE LA PALETA, QUE LO ATRAPÓ SU PROPIO CANDADO
+
+La paleta se deriva del **nombre** del local, no del id: el id no viaja a las
+pruebas —cambia en cada siembra— y el nombre sí, así que un candado puede afirmar
+"mini el 7 es ámbar" y eso vale en cualquier base.
+
+La primera versión era un **djb2 pelado** y con los cuatro locales de producción
+**los cuatro daban azul**. No fue mala suerte, es aritmética: `33 ≡ 1 (mod 4)`, así
+que `h % 4` dependía únicamente de la suma de los códigos de los caracteres, y
+nombres parecidos —"mini el 7", "Mini unidas"— caían juntos. Con cuatro paletas y
+un módulo de 4, los bits bajos de djb2 no alcanzan.
+
+El arreglo es un paso de **mezcla** después del djb2 (el `fmix32` de MurmurHash3):
+tres xor-shifts y dos multiplicaciones que reparten la entropía de los bits altos
+hacia los bajos. Con `Math.imul` y no `*`, porque la multiplicación de JavaScript
+pasa por punto flotante y pierde precisión arriba de 2^53. Medido después del
+arreglo: mini el 7 ámbar, Casiano casas verde, Minimarket ayala rojo, Mini unidas
+azul. **Cuatro locales, cuatro paletas.**
+
+Lo que importa del episodio no es el hash: es que **el candado estaba escrito
+sobre los nombres REALES de producción**. Con un fixture de "local a / local b" no
+habría mostrado nada, y la pantalla habría salido con cuatro fachadas idénticas
+cumpliendo con un suite en verde. Por eso V4 ahora exige las cuatro paletas
+distintas, y no "al menos dos".
+
+### LOS DOS DEFECTOS QUE ENCONTRÓ ABRIR LA PANTALLA
+
+Los dos con la misma forma de siempre: suite en verde, build limpio, y el defecto
+viviendo en el espacio entre dos piezas que cada candado probaba por separado.
+
+**1 · `localId` es un parámetro RESERVADO de toda la API.** La pantalla de adentro
+pedía `/api/transferencias/tablero?localId=<el local>` y el depósito recibía un
+**403 — "Local fuera de tu alcance"** en vez de la cuenta. No es un defecto del
+módulo: `resolveVistaOperativa` (`lib/grupos.js`) lee `localId` como "el alcance
+que estoy pidiendo" y, para una sesión que no es admin, exige que sea el suyo. El
+depósito es un local como cualquier otro.
+
+Y el 403 estaba **bien**: acá no se cambia de alcance. El alcance sigue siendo el
+del depósito —mira lo que él despachó— y esto es un filtro por DESTINO. Dos cosas
+distintas no pueden compartir el nombre del parámetro. Se renombró a `destino`, y
+el candado **V14** lo sostiene de los dos lados. El segmento de la URL sí sigue
+llamándose `localId`: ahí no hay ninguna convención que pisar.
+
+**2 · El período vacío se decía DOS veces, y con dos redacciones.** En el local sin
+movimiento la tarjeta decía "No se le envió nada en ese período." y abajo aparecía
+"No hay transferencias en el período cerrado.". Dos frases distintas para un solo
+hecho se leen como dos hechos. Lo dice la tarjeta, que es donde está el importe en
+cero; y el buscador tampoco se dibuja si no hay filas, porque no puede encontrar
+nada. Candado **V15**.
+
+Ninguno de los dos lo vio un candado. A los dos los encontró abrir la pantalla —el
+primero con el arnés, el segundo mirando la captura.
+
+### LOS QUINCE CANDADOS
+
+`components/transferencias/entradaYPeriodoCerrado.test.mjs`. Los que hay que
+conocer: V4 (la paleta es estable entre corridas **y reparte**), V6 (el componente
+de la fachada no tiene un solo hex), V12 (sin período cerrado el rango existe y se
+dice que está vacío), V13 (la ruta tiene los dos modos y el cerrado sale de la
+puerta, no de una resta a mano), V14 (`destino` y nunca `localId`) y V15 (el vacío
+se dice una sola vez).
+
+### LA SIEMBRA Y EL ARNÉS TAMBIÉN CAMBIARON, Y HACÍA FALTA
+
+**La siembra ahora pone dos transferencias en el PERÍODO CERRADO**, de días
+distintos: una recibida con una diferencia y otra sin recibir. Las que había son
+de hoy y de ayer, o sea del período EN CURSO, y desde esta vuelta la pantalla
+muestra el cerrado. Sin las nuevas, las afirmaciones sobre el agrupado por día,
+sobre la recibida y sobre el buscador quedaban mirando una lista que nunca tiene
+filas: no se pondrían rojas, se volverían **inalcanzables**.
+
+Las fechas salen de `rangoDelPeriodoCerrado`, la misma función que la pantalla, y
+no de una resta: "hace ocho días" cae fuera del período cerrado si la siembra
+corre justo el día del corte. Por eso la siembra ahora **se corre con
+`node --import ./scripts/alias-loader.mjs`** — esa función resuelve un alias `@/`.
+El comando actualizado está en `docs/architecture/base-de-pruebas-v15.md`.
+
+**El arnés** (`scripts/capturas-tablero-movil.mjs`) pasó a afirmar en negativo
+sobre la entrada —ni chips, ni importes, ni buscador, ni transferencias— y ganó la
+pantalla de adentro, el buscador ejercido, el vuelta-atrás y la comparación de los
+dos cortes. Necesita un argumento nuevo, `--recibida-cerrada <id>`, que imprime la
+siembra; sin él **aborta**, no mide de menos.
+
+Una afirmación que escribí y saqué, porque era falsa: "dos locales distintos no
+comparten paleta". Hay cuatro paletas, así que dos nombres cualesquiera pueden
+coincidir sin que nada esté roto — y los dos del sembrado caen los dos en verde.
+Sostenerla habría obligado a renombrar un local del sembrado para que la foto
+saliera linda. Lo que el arnés afirma ahora es que el navegador dibuja **la paleta
+que la función decide** para ese nombre, importando la misma función que el
+componente. Que reparta se mide en V4, contra los nombres reales.
+
+**Corrida final: 68 afirmaciones en verde, 0 capturas con desborde.** El arnés
+sigue sin ser idempotente —guarda un acuerdo— así que va una corrida por siembra.
+
+### LO QUE QUEDA ANOTADO Y NO SE HIZO
+
+- **El escritorio.** Todo esto es móvil. De 768 px para arriba la pantalla sigue
+  siendo la de la segunda vuelta.
+- **`tipo` contra `es_deposito`**, que ya venía anotado de la vuelta anterior.
+
+### ESTADO AL CERRAR
+
+Suite **5893 en verde**, 0 en rojo (1 TODO viejo: los siete candados del contrato
+de `EXCLUIDO`). Trinquete sin cambios en los siete contadores. Build limpio. Arnés
+en 68 afirmaciones. **NO desplegado**: producción sigue en `9d101cb4`, que es la
+segunda vuelta.
