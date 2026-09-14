@@ -630,9 +630,25 @@ test("E11 · la ruta manda TODOS los campos que estos componentes leen", () => {
     assert.ok(new RegExp(`\\b${campo}:`).test(src), `la ruta no manda '${campo}' por transferencia`);
   }
 
-  // Y de la cuenta del local.
+  // ── Y DE LA CUENTA DEL LOCAL, QUE YA NO ES UNA FORMA APARTE ────────────
+  //
+  // Hasta la V40 acá se exigían `paraRecibir` y `yaRecibidas`: la vista del
+  // local era una SEGUNDA implementación de la misma pregunta, con su propia
+  // forma de respuesta, y se había quedado mostrando el período EN CURSO — el
+  // defecto que abrió esta línea de trabajo, del lado del que cobra.
+  //
+  // Ahora el local entra por el modo de un local y ve la misma pantalla que el
+  // depósito. Lo que se afirma es que esos dos campos NO VOLVIERON: si vuelven,
+  // volvió la pantalla paralela.
   for (const campo of ["paraRecibir", "yaRecibidas"]) {
-    assert.ok(new RegExp(`\\b${campo}:`).test(src), `la ruta no manda '${campo}'`);
+    assert.ok(
+      !new RegExp(`\\b${campo}:`).test(src),
+      `volvió '${campo}': era la forma de la vista paralela del local`
+    );
+  }
+  // Y lo que sí tiene que mandar, que es lo que la pantalla unificada lee.
+  for (const campo of ["periodo:", "descripcion:", "puedeAvanzar", "puedeRetroceder"]) {
+    assert.ok(new RegExp(campo).test(src), `la ruta no manda '${campo}'`);
   }
 });
 

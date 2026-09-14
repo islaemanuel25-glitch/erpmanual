@@ -120,17 +120,26 @@ test("D4 · LA BANDA SE PINTA ENTERA: ningún hijo suyo declara fondo propio", (
     2,
     `un nodo de más declara fondo y va a tapar la franja (encontrados: ${todas.join(", ")})`
   );
-  // Y el orden: primero la banda, después la tarjeta.
+  // ── EL ORDEN SE DIO VUELTA EN LA V41, Y ES LO CORRECTO ─────────────────
   //
-  // Se compara contra `sunmi-bg-card`, que es la clase de la tarjeta desde el
-  // 2026-09-14. La versión anterior buscaba `lastIndexOf("sunmi-surface")` y,
-  // cuando la tarjeta cambió de clase, esa búsqueda pasó a encontrar la BANDA
-  // —`sunmi-surface-soft` contiene `sunmi-surface`— y comparaba la banda contra
-  // sí misma. No es que se rompió: se quedó sin nada que afirmar.
+  // Antes eran DOS bloques hermanos con aire en el medio —la banda arriba, la
+  // tarjeta de filas abajo— y no se leía que iban juntos. Ahora hay UN marco que
+  // envuelve a las dos, así que el marco ABRE primero y la banda va adentro.
+  //
+  // Por eso se afirma al revés que antes, y hay que leerlo así: `sunmi-bg-card`
+  // —el marco— tiene que aparecer ANTES que `sunmi-surface-soft` —la banda—,
+  // porque uno contiene a la otra.
+  //
+  // Dos versiones atrás esta línea buscaba `lastIndexOf("sunmi-surface")` y,
+  // cuando la tarjeta cambió de clase, esa búsqueda pasó a encontrar la banda
+  // —`sunmi-surface-soft` CONTIENE `sunmi-surface`— y comparaba la banda contra
+  // sí misma. No se rompió: se quedó sin nada que afirmar.
   assert.ok(
-    salida.indexOf("sunmi-surface-soft") < salida.indexOf("sunmi-bg-card"),
-    "la banda tiene que ir antes que la tarjeta"
+    salida.indexOf("sunmi-bg-card") < salida.indexOf("sunmi-surface-soft"),
+    "el marco tiene que envolver a la banda, no ir después"
   );
+  // Y el marco recorta, o la banda se come las esquinas redondeadas.
+  assert.ok(salida.includes("overflow-hidden"), "sin recorte la banda pisa las esquinas");
 });
 
 // ── 2 · EL ESTADO EN PALABRAS ─────────────────────────────────────────────

@@ -30,7 +30,12 @@ import {
   numeroDelNombre,
   paletaDelLocal,
 } from "@/lib/transferencias/fachadaDelLocal";
-import { rangoDelPeriodo, rangoDelPeriodoCerrado } from "@/lib/transferencias/periodoDePago";
+import {
+  UNIDADES,
+  rangoDelPeriodo,
+  rangoDelPeriodoCerrado,
+} from "@/lib/transferencias/periodoDePago";
+import { descripcionDelPeriodo } from "@/lib/transferencias/descripcionDelPeriodo";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const html = (n) => renderToStaticMarkup(n);
@@ -70,10 +75,22 @@ test("V2 · y la pantalla del tablero no pide el período en la entrada", () => 
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
     .replace(/\/\/[^\n]*/g, "");
-  assert.match(
-    src,
-    /vista === "LOCAL" && <ChipsDePeriodo/,
-    "los chips volvieron a dibujarse sin condición: en la entrada no hay período"
+  // ── DESDE LA V41 LOS CHIPS NO ESTÁN EN EL TABLERO EN ABSOLUTO ──────────
+  //
+  // Antes se dibujaban condicionados a `vista === "LOCAL"`. Ahora la vista del
+  // local ES la misma pantalla que la del depósito —`CuentaDeUnLocal`— y los
+  // chips viven adentro de ella, así que el tablero no los nombra.
+  //
+  // El candado se da vuelta: lo que se afirma es que esta pantalla NO dibuja
+  // chips, porque la entrada del depósito no tiene período que elegir.
+  assert.ok(
+    !/ChipsDePeriodo/.test(src),
+    "el tablero volvió a dibujar chips: en la entrada no hay período que elegir"
+  );
+  assert.match(src, /<CuentaDeUnLocal/, "el local tiene que ver la MISMA pantalla que el depósito");
+  assert.ok(
+    !/CabeceraDeCuenta|FilaTransferenciaLocal|PARA RECIBIR|YA RECIBIDAS/.test(src),
+    "volvió la pantalla paralela del local: era la que mostraba el período EN CURSO"
   );
 });
 
@@ -200,63 +217,114 @@ test("V10 · el mes cerrado es el mes anterior COMPLETO, no treinta días atrás
 
 // ── 4 · LA CUENTA, DIBUJADA ───────────────────────────────────────────────
 
-test("V11 · la cuenta dice «Para cobrar», el rango cerrado y la semana en curso aparte", () => {
-  const salida = html(
+test("V11 · el rótulo del importe SIGUE AL PERÍODO, y el título no se escribe a mano", () => {
+  // El defecto de la V40: este componente escribía "Semana cerrada" fijo en el
+  // JSX, aunque el chip estuviera en Mes. Ahora los tres textos —título, rango y
+  // rótulo del importe— vienen de `descripcionDelPeriodo`, así que no pueden
+  // contradecirse entre ellos.
+  const cerrado = html(
     React.createElement(CuentaDelPeriodoCerrado, {
-      cerrado: {
-        rango: { desde: "2026-09-06", hasta: "2026-09-12" },
+      periodo: {
         aPagar: 133080,
         cantidad: 3,
         sinRecibir: 14,
-        totalCerrado: false,
+        descripcion: descripcionDelPeriodo({
+          unidad: UNIDADES.SEMANA, diaDeCorte: 0, hoy: "2026-09-14", desplazamiento: -1,
+        }),
       },
-      enCurso: { rango: { desde: "2026-09-13", hasta: "2026-09-19" }, aPagar: 88080, cantidad: 4 },
-      unidadNombre: "Semana",
       money,
     })
   );
-
-  assert.ok(salida.includes("Para cobrar"), "falta el rótulo de la pregunta");
-  assert.ok(salida.includes("Semana cerrada · 06/09 al 12/09"), "falta el rango cerrado");
+  assert.ok(cerrado.includes("Para cobrar"), "un período terminado se cobra");
+  assert.ok(cerrado.includes("Semana cerrada"), "falta el título del período");
+  assert.ok(cerrado.includes("dom 6 al s"), "falta el rango en largo");
   assert.ok(
-    salida.includes("14 transferencias sin recibir · el total todavía no está cerrado"),
+    cerrado.includes("14 sin recibir · el total no est"),
     "falta el aviso de total abierto"
   );
-  assert.ok(salida.includes("Semana en curso"), "falta la línea de la semana en curso");
-  assert.ok(salida.includes("13/09 al 19/09 · 4 transferencias"), "falta el rango en curso");
-  assert.ok(salida.includes("sunmi-border-warning"), "con pendientes va marcada");
+  assert.ok(cerrado.includes("sunmi-border-warning"), "con pendientes va marcada");
+
+  // Y EN CURSO dice lo contrario. Es la mitad que faltaba: pedirle a alguien que
+  // cobre un número que mañana es otro es el defecto que abrió esta línea.
+  const abierto = html(
+    React.createElement(CuentaDelPeriodoCerrado, {
+      periodo: {
+        aPagar: 88080,
+        cantidad: 4,
+        sinRecibir: 0,
+        descripcion: descripcionDelPeriodo({
+          unidad: UNIDADES.SEMANA, diaDeCorte: 0, hoy: "2026-09-14", desplazamiento: 0,
+        }),
+      },
+      money,
+    })
+  );
+  assert.ok(abierto.includes("Va acumulado"), "un período abierto NO se cobra todavía");
+  assert.ok(!abierto.includes("Para cobrar"), "un período abierto rotulado para cobrar");
+  assert.ok(abierto.includes("Semana en curso"), "falta el título del período en curso");
 });
 
-test("V12 · un local SIN período cerrado todavía: el rango existe y se dice que está vacío", () => {
-  // El caso del local recién vinculado. El rango SIEMPRE existe —siempre hay una
-  // semana anterior— así que se muestra con importe en cero y una frase. Decir
-  // "no hay período" sería falso: lo hay, y está vacío, que es otra respuesta.
+test("V11b · con el chip en MES el título NO dice «semana»", () => {
+  // El defecto textual, tal cual estaba en producción.
   const salida = html(
     React.createElement(CuentaDelPeriodoCerrado, {
-      cerrado: {
-        rango: { desde: "2026-09-06", hasta: "2026-09-12" },
-        aPagar: 0,
-        cantidad: 0,
-        sinRecibir: 0,
-        totalCerrado: true,
+      periodo: {
+        aPagar: 10, cantidad: 1, sinRecibir: 0,
+        descripcion: descripcionDelPeriodo({
+          unidad: UNIDADES.MES, hoy: "2026-09-14", desplazamiento: -1,
+        }),
       },
-      enCurso: { rango: { desde: "2026-09-13", hasta: "2026-09-19" }, aPagar: 0, cantidad: 0 },
-      unidadNombre: "Semana",
+      money,
+    })
+  );
+  assert.ok(salida.includes("Agosto"), "falta el nombre del mes");
+  assert.ok(!/[Ss]emana/.test(salida), "el título de un mes dice «semana»");
+  assert.ok(salida.includes("Para cobrar"), "agosto terminó: se cobra");
+});
+
+test("V12 · un período SIN movimiento: el rango existe y se dice que está vacío", () => {
+  // El caso del local recién vinculado, y ahora también el de caminar hacia
+  // atrás con las flechas. El rango SIEMPRE existe —es calendario, no datos— así
+  // que se muestra con importe en cero y una frase. Decir "no hay período" sería
+  // falso: lo hay, y está vacío, que es otra respuesta.
+  const salida = html(
+    React.createElement(CuentaDelPeriodoCerrado, {
+      periodo: {
+        aPagar: 0, cantidad: 0, sinRecibir: 0,
+        descripcion: descripcionDelPeriodo({
+          unidad: UNIDADES.SEMANA, diaDeCorte: 0, hoy: "2026-09-14", desplazamiento: -1,
+        }),
+      },
       money,
     })
   );
 
   assert.ok(salida.includes("$ 0.00"), "el importe en cero se muestra igual");
-  assert.ok(salida.includes("06/09 al 12/09"), "el rango existe y se muestra");
+  assert.ok(salida.includes("dom 6 al s"), "el rango existe y se muestra");
   assert.ok(
-    salida.includes("No se le envió nada en ese período"),
+    salida.includes("No se le envi") && salida.includes("en ese per"),
     "un cero sin explicación se lee como un dato que falta"
   );
   assert.ok(!salida.includes("sunmi-border-warning"), "sin pendientes no va marcada");
-  assert.ok(
-    !salida.includes("todavía no está cerrado"),
-    "sin pendientes el total SÍ está cerrado: el aviso sería falso"
+  assert.ok(!salida.includes("no est"), "sin pendientes el total SÍ está cerrado");
+});
+
+test("V12b · el atajo al corte SOLO lo dibuja quien se lo pasa", () => {
+  const base = {
+    periodo: {
+      aPagar: 0, cantidad: 0, sinRecibir: 2,
+      descripcion: descripcionDelPeriodo({
+        unidad: UNIDADES.SEMANA, diaDeCorte: 0, hoy: "2026-09-14", desplazamiento: -1,
+      }),
+    },
+    money,
+  };
+  const sin = html(React.createElement(CuentaDelPeriodoCerrado, base));
+  const con = html(
+    React.createElement(CuentaDelPeriodoCerrado, { ...base, puedeConfigurarCorte: true })
   );
+  assert.ok(!sin.includes("Corte de semana"), "ofreció el atajo a quien no puede usarlo");
+  assert.ok(con.includes("Corte de semana"), "falta el atajo para quien sí puede");
 });
 
 // ── 5 · EL CIERRE: LA RUTA MANDA LO QUE ESTO LEE ──────────────────────────
@@ -269,10 +337,17 @@ test("V13 · la ruta tiene el modo entrada y el modo un-local, y el cerrado sale
 
   assert.match(src, /vista: "ENTRADA"/, "falta el modo entrada");
   assert.match(src, /vista: "UN_LOCAL"/, "falta el modo de un local");
-  assert.match(src, /rangoDelPeriodoCerrado\(/, "el período cerrado no sale de la puerta");
-  for (const campo of ["cerrado:", "enCurso:", "conDiferencias:"]) {
-    assert.ok(new RegExp(`\\b${campo}`).test(src), `la ruta no manda '${campo}'`);
+  // El período que se muestra sale de la puerta que sabe caminar entre períodos,
+  // no de una resta a mano.
+  assert.match(src, /rangoDesplazado\(/, "el período no sale de la puerta");
+  assert.match(src, /descripcionDelPeriodo\(/, "los rótulos no salen de la puerta");
+  for (const campo of ["periodo:", "desplazamiento", "puedeAvanzar", "puedeRetroceder", "conDiferencias:"]) {
+    assert.ok(new RegExp(campo).test(src), `la ruta no manda '${campo}'`);
   }
+  // Y la vista paralela del local YA NO EXISTE: era la que le mostraba el
+  // período en curso al que cobra.
+  assert.ok(!/vista: "LOCAL"/.test(src), "volvió la vista paralela del local");
+  assert.ok(!/cuentaDelLocal\(/.test(src), "la ruta volvió a armar la cuenta por el camino viejo");
 });
 
 // ── V14 · EL LOCAL DE LA PANTALLA VIAJA COMO `destino`, NUNCA COMO `localId`
@@ -306,7 +381,11 @@ test("V14 · el local de la pantalla viaja como `destino`: `localId` es un pará
       .replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
 
   const ruta = sinComentarios("app/api/transferencias/tablero/route.js");
-  const pagina = sinComentarios("app/modulos/transferencias/local/[localId]/page.jsx");
+  // La consulta se mudó de la página al hook que comparten las DOS entradas —la
+  // del depósito y la del local— cuando se unificaron en la V41. El candado
+  // sigue al código: si mirara la página seguiría verde sin afirmar nada, que es
+  // el defecto del patrón que se muda.
+  const pagina = sinComentarios("components/transferencias/useCuentaDeLocal.js");
 
   assert.match(
     ruta,
@@ -341,10 +420,7 @@ test("V14 · el local de la pantalla viaja como `destino`: `localId` es un pará
 // una lista sin filas no puede encontrar nada.
 test("V15 · el período cerrado vacío se dice una sola vez, y lo dice la tarjeta", () => {
   const pagina = fs
-    .readFileSync(
-      path.join(RAIZ, "app/modulos/transferencias/local/[localId]/page.jsx"),
-      "utf8"
-    )
+    .readFileSync(path.join(RAIZ, "components/transferencias/CuentaDeUnLocal.jsx"), "utf8")
     .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/\/\/[^\n]*/g, "");

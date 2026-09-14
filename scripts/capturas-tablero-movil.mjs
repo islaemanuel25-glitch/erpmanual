@@ -264,6 +264,33 @@ async function superficiesPegadasAlFondo() {
   })()`);
 }
 
+/** De qué piezas está hecha la cuenta, para comparar las dos entradas. */
+const piezasDeLaCuenta = () =>
+  evaluar(`(() => {
+    const hay = (t) => document.body.innerText.includes(t);
+    return {
+      navegador: !!document.querySelector('[aria-label="Período anterior"]'),
+      chips: ["Día","Semana","Mes"].filter((c) =>
+        [...document.querySelectorAll('button')].some((b) => (b.textContent||"").trim() === c)).length,
+      paraCobrar: hay("Para cobrar") || hay("Va acumulado"),
+      buscador: [...document.querySelectorAll('input')].filter((i) => i.offsetParent !== null).length,
+      secciones: hay("PARA RECIBIR") || hay("YA RECIBIDAS"),
+    };
+  })()`);
+
+/** El período que se está mirando y qué trae, para comparar antes y después. */
+const estadoDelPeriodo = () =>
+  evaluar(`(() => {
+    const t = document.body.innerText;
+    const imp = t.match(/\\$ [\\d.,]+/);
+    const nav = document.querySelector('[aria-label="Período anterior"]')?.parentElement;
+    return {
+      subtitulo: nav ? nav.innerText.replace(/\\s+/g, " ").trim() : null,
+      importe: imp ? imp[0] : null,
+      filas: document.querySelectorAll('[class*="sunmi-bg-card"]').length,
+    };
+  })()`);
+
 /** Se llama en cada pantalla, con su nombre para que el rojo diga DÓNDE. */
 async function afirmarSuperficies(pantalla) {
   const pegadas = await superficiesPegadasAlFondo();
@@ -674,9 +701,40 @@ await afirmar(
   await hayTexto("Semana cerrada ·"),
   "y se dice de qué período es: el CERRADO, con su rango"
 );
+// ── EL NAVEGADOR REEMPLAZÓ A LA LÍNEA DE "SEMANA EN CURSO" ──────────────
+//
+// Hasta la V40 el período en curso iba como un renglón compacto debajo de la
+// cuenta. Ahora está a una flecha, que es mejor: aquél mostraba UNO solo —el
+// siguiente— y esto llega a cualquiera.
 await afirmar(
-  await hayTexto("Semana en curso"),
-  "la semana en curso no desaparece: baja de jerarquía a una línea"
+  await hayTexto("Período anterior") || (await evaluar(
+    `[...document.querySelectorAll('[aria-label]')].some((n) => n.getAttribute('aria-label') === 'Período anterior')`
+  )),
+  "falta el navegador de período"
+);
+
+// ── EL ROTULO SIGUE AL PERÍODO, QUE ES EL PUNTO DE LA V41 ───────────────
+//
+// La pantalla abre en el período CERRADO, así que tiene que decir "Para cobrar".
+await afirmar(await hayTexto("Para cobrar"), "un período terminado se rotula para cobrar");
+await afirmar(
+  !(await hayTexto("Va acumulado")),
+  "un período terminado NO puede decir «va acumulado»"
+);
+
+// Y la flecha de ADELANTE tiene que estar disponible: se está mirando el
+// período anterior, así que hay a dónde avanzar.
+const flecha = (etiqueta) =>
+  evaluar(`(() => {
+    const b = [...document.querySelectorAll('button')]
+      .find((n) => n.getAttribute('aria-label') === ${JSON.stringify(etiqueta)});
+    if (!b) return null;
+    return { deshabilitada: b.disabled, atenuada: (b.className || "").includes("opacity-35") };
+  })()`);
+const adelanteEnCerrado = await flecha("Período siguiente");
+await afirmar(
+  adelanteEnCerrado && !adelanteEnCerrado.deshabilitada,
+  `desde el período cerrado se tiene que poder avanzar (${JSON.stringify(adelanteEnCerrado)})`
 );
 
 // LA BARRA DICE DÓNDE ESTÁS. Por ruta diría "Transferencias", que es de dónde
@@ -718,7 +776,7 @@ await afirmar(await hayTexto("Ver ›"), "la recibida ofrece abrirse");
 // Es el caso que el sembrado pone a propósito: sin una sin recibir en el período
 // cerrado, este aviso no se podría fotografiar nunca.
 await afirmar(
-  await hayTexto("sin recibir · el total todavía no está cerrado"),
+  await hayTexto("sin recibir · el total no está cerrado"),
   "con una sin contar, la cuenta avisa que el total no está cerrado"
 );
 
@@ -967,11 +1025,100 @@ await entrarComo(LOCAL, "LOCAL");
 for (const alto of ALTOS) {
   await medir(alto);
   await abrir("/modulos/transferencias", "Transferencias");
-  await afirmar(await hayTexto("A pagar esta semana"), `${alto} · la cuenta del local`);
-  await afirmar(await hayTexto("PARA RECIBIR"), `${alto} · la sección de lo pendiente`);
-  await foto(`v28b-local-${ANCHO}x${alto}`);
+  // ── EL LOCAL VE LA MISMA PANTALLA QUE EL DEPÓSITO ────────────────────
+  //
+  // Hasta la V40 veía otra: chips arriba, el período EN CURSO y dos secciones
+  // "PARA RECIBIR" / "YA RECIBIDAS". O sea que el defecto que abrió esta línea
+  // de trabajo seguía intacto justo del lado del que cobra.
+  await afirmar(await hayTexto("Para cobrar"), `${alto} · el local ve el período CERRADO`);
+  await afirmar(
+    !(await hayTexto("PARA RECIBIR")) && !(await hayTexto("YA RECIBIDAS")),
+    `${alto} · volvieron las secciones de la pantalla paralela del local`
+  );
+  await afirmar(
+    !(await hayTexto("A pagar esta semana")),
+    `${alto} · volvió el rótulo de la pantalla paralela`
+  );
   await afirmarSuperficies(`vista del local a ${alto}`);
+  await foto(`v42-local-${ANCHO}x${alto}`);
 }
+
+// ── Y ES LA MISMA PANTALLA, NO UNA PARECIDA ──────────────────────────────
+//
+// Se comparan las PIEZAS que dibuja, no una captura: el depósito entra por la
+// lista y el local directo, así que la barra de arriba dice distinto y las fotos
+// nunca serían idénticas. Lo que tiene que coincidir es de qué está hecha.
+await medir(ALTOS[0]);
+await abrir("/modulos/transferencias", "Para cobrar");
+const piezasDelLocal = await piezasDeLaCuenta();
+await entrarComo(DEPOSITO, "DEPÓSITO (para comparar)");
+await abrir("/modulos/transferencias", "Transferencias");
+await entrarAlLocal("Local V15");
+const piezasDelDeposito = await piezasDeLaCuenta();
+await afirmar(
+  JSON.stringify(piezasDelLocal) === JSON.stringify(piezasDelDeposito),
+  `el local y el depósito ven la MISMA pantalla\n  local:    ${JSON.stringify(piezasDelLocal)}\n  depósito: ${JSON.stringify(piezasDelDeposito)}`
+);
+
+// ── MOVERSE ENTRE PERÍODOS CAMBIA EL RANGO, LOS DATOS Y EL RÓTULO ───────
+//
+// Se navega HACIA ADELANTE y no hacia atrás, y el motivo es el tope: el
+// sembrado tiene cuatro días de historia, así que la semana que la pantalla
+// abre YA empieza antes de la primera transferencia de este local y la flecha
+// de atrás está —correctamente— apagada. Medirlo hacia atrás habría dado rojo
+// sobre un comportamiento correcto.
+const antes = await estadoDelPeriodo();
+await afirmar(
+  await hayTexto("Para cobrar"),
+  `el período cerrado se rotula «Para cobrar» (${antes.subtitulo})`
+);
+
+// EL TOPE HACIA ATRÁS, que es la respuesta a "¿hasta dónde?": hasta donde haya
+// dato. Más atrás de la primera transferencia del local no hay nada que mirar.
+const atras = await flecha("Período anterior");
+await afirmar(
+  atras && atras.deshabilitada && atras.atenuada,
+  `sin historia más atrás, la flecha se apaga y se atenúa (${JSON.stringify(atras)})`
+);
+
+await tocar("Período siguiente");
+await esperar(1400);
+const despues = await estadoDelPeriodo();
+
+await afirmar(
+  antes.subtitulo !== despues.subtitulo,
+  `la flecha no movió el período (${antes.subtitulo} → ${despues.subtitulo})`
+);
+await afirmar(
+  antes.importe !== despues.importe,
+  `el período cambió pero el importe no (${antes.importe} → ${despues.importe})`
+);
+
+// ── Y EL RÓTULO CAMBIÓ CON ÉL, QUE ES EL PUNTO DE LA V41 ───────────────
+//
+// El período en curso NO se cobra todavía. Que el mismo número cambie de nombre
+// al cambiar de período es lo que esta vuelta vino a arreglar: antes decía
+// "Semana cerrada" siempre, aunque no lo estuviera.
+await afirmar(
+  await hayTexto("Va acumulado"),
+  "el período EN CURSO tiene que decir «va acumulado», no «para cobrar»"
+);
+await afirmar(
+  !(await hayTexto("Para cobrar")),
+  "un período abierto rotulado «para cobrar» es el defecto que abrió esta línea"
+);
+await afirmar(
+  await hayTexto("Semana en curso"),
+  `el título tiene que seguir al período (dice: ${despues.subtitulo})`
+);
+
+// Y desde el período actual NO se puede avanzar: no hay futuro que mirar.
+const adelante = await flecha("Período siguiente");
+await afirmar(
+  adelante && adelante.deshabilitada && adelante.atenuada,
+  `en el período actual la flecha de adelante se apaga (${JSON.stringify(adelante)})`
+);
+await foto(`v42-semana-en-curso-${ANCHO}`);
 
 // ── 4 · Y EL ESCRITORIO NO SE MOVIÓ ──────────────────────────────────────
 //

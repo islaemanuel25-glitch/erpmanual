@@ -52,8 +52,10 @@ import {
   caeEnElPeriodo,
   esDiaDeCorteValido,
   rangoDelPeriodo,
-  rangoDelPeriodoCerrado,
+  rangoDesplazado,
 } from "@/lib/transferencias/periodoDePago";
+import { descripcionDelPeriodo } from "@/lib/transferencias/descripcionDelPeriodo";
+import { fechaArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import {
   acuerdoDeLocal,
   bloquesPorLocal,
@@ -258,14 +260,47 @@ export async function GET(req) {
     // por DESTINO. Dos cosas distintas no pueden compartir el nombre del
     // parámetro. Lo encontró el arnés al abrir la pantalla; ningún candado lo
     // podía ver, porque los dos lados eran correctos por separado.
-    const localPedido = Number(searchParams.get("destino") || 0) || null;
+    // ── Y EL LOCAL ENTRA POR ACÁ TAMBIÉN, SIN PASAR `destino` ─────────────
+    //
+    // Hasta la V40 había DOS caminos para la misma pregunta: el depósito entraba
+    // por este modo y el local por `vista: "LOCAL"`, que devolvía otra forma
+    // —`cuenta` con `paraRecibir`/`yaRecibidas`— y solo el período EN CURSO.
+    //
+    // O sea que el defecto que abrió toda esta línea de trabajo —mostrar el
+    // período abierto en la pantalla que dice cuánto cobrar— seguía intacto del
+    // lado del local. Dos implementaciones del mismo hecho se desincronizan el
+    // día que una cambia, y ésta ya se había desincronizado.
+    //
+    // El local no manda `destino` porque no elige: su cuenta es la suya. Se
+    // resuelve acá y no en la pantalla, para que el alcance lo siga decidiendo
+    // el servidor.
+    const destinoPedido = Number(searchParams.get("destino") || 0) || null;
+    const localPedido = destinoPedido || (!esDeposito ? vista.localId : null);
+
     const { diaDeCorte: corteDelLocal, sinConfigurar: localSinCorte } = localPedido
       ? acuerdoDeLocal(acuerdos, localPedido)
       : { diaDeCorte: DIA_DE_CORTE_POR_DEFECTO, sinConfigurar: true };
 
-    const periodoCerrado = localPedido
-      ? rangoDelPeriodoCerrado({ unidad, diaDeCorte: corteDelLocal, hoy })
+    // ── EL DESPLAZAMIENTO: CUÁNTOS PERÍODOS ATRÁS SE ESTÁ MIRANDO ─────────
+    //
+    // 0 es el período en curso y -1 el que acaba de cerrar, que es el que la
+    // pantalla abre por defecto: la pregunta es cuánto hay que cobrar, y eso se
+    // contesta con el período terminado.
+    //
+    // HACIA ADELANTE SE CORTA EN 0. No es una preferencia de interfaz: un
+    // período futuro no tiene transferencias por definición, así que la pantalla
+    // mostraría siempre cero y el que la mira no tendría cómo saber si es que no
+    // hubo movimiento o que se pasó de largo. El tope se aplica en el SERVIDOR y
+    // no solo deshabilitando la flecha, porque la flecha es una sugerencia y la
+    // URL se puede escribir a mano.
+    const desplazamientoPedido = Math.trunc(Number(searchParams.get("desplazamiento") ?? -1) || 0);
+    const desplazamiento = Math.min(0, desplazamientoPedido);
+
+    const periodoMirado = localPedido
+      ? rangoDesplazado({ unidad, diaDeCorte: corteDelLocal, hoy, desplazamiento })
       : null;
+    // El período en curso se sigue calculando: es el borde superior de la
+    // ventana de consulta y lo que decide si se puede avanzar.
     const periodoEnCurso = localPedido
       ? rangoDelPeriodo({ unidad, diaDeCorte: corteDelLocal, hoy })
       : null;
@@ -273,8 +308,11 @@ export async function GET(req) {
     // La ventana cubre los DOS períodos de una sola consulta: del inicio del
     // cerrado al fin del en curso. Dos consultas traerían lo mismo y abrirían la
     // puerta a que una use un rango y la otra otro.
+    // Con navegación, el borde de abajo ya no es el período cerrado sino el que
+    // se está mirando, que puede ser de hace meses. El de arriba sigue siendo el
+    // fin del período en curso.
     const ventana = localPedido
-      ? { desde: periodoCerrado.desde, hasta: periodoEnCurso.hasta }
+      ? { desde: periodoMirado.desde, hasta: periodoEnCurso.hasta }
       : rangoFijo || ventanaDeConsulta({ unidad, acuerdos, hoy });
 
     // ── EL FILTRO DE FECHA SIGUE A `fechaDeCorte`, NO A UNA COLUMNA ────────
@@ -445,23 +483,69 @@ export async function GET(req) {
         };
       };
 
-      const cerrado = armar(periodoCerrado);
+      const mirado = armar(periodoMirado);
+
+      // ── EL TOPE HACIA ATRÁS SALE DE LOS DATOS, NO DE UN NÚMERO ────────────
+      //
+      // "Hasta N períodos atrás" es un número inventado: con N chico se tapa
+      // historia que existe, y con N grande igual se llega a meses vacíos.
+      //
+      // Lo único que no es arbitrario es la primera transferencia de ESTE local:
+      // antes de esa fecha está probado que no hubo nada. La pantalla apaga la
+      // flecha cuando el período que muestra ya empieza antes, así que el
+      // recorrido termina donde termina el dato.
+      //
+      // Se pide con un `findFirst` ordenado y acotado al destino, que es una fila
+      // y usa el mismo índice que la consulta de arriba.
+      const primero = await prisma.transferencia.findFirst({
+        where: { ...alcance, estado: { not: "Cancelada" } },
+        orderBy: { fechaEnvio: "asc" },
+        select: { fechaEnvio: true, createdAt: true },
+      });
+      const primerMovimiento = primero
+        ? fechaArgentinaISO(primero.fechaEnvio || primero.createdAt)
+        : null;
+
       return NextResponse.json({
         ok: true,
         vista: "UN_LOCAL",
         unidad,
+        desplazamiento,
         local: {
           id: localPedido,
           nombre: locales.find((l) => l.id === localPedido)?.nombre || "—",
           diaDeCorte: corteDelLocal,
           sinConfigurar: localSinCorte,
         },
-        // EL QUE YA CERRÓ va primero porque es la pregunta de la pantalla:
-        // cuánto hay que cobrar. El en curso es contexto.
-        cerrado: { ...cerrado, totalCerrado: cerrado.sinRecibir === 0 },
-        // Del en curso alcanza con el resumen: sus transferencias todavía no se
-        // cobran, así que mandarlas sería peso sin uso.
-        enCurso: (({ transferencias, ...resto }) => resto)(armar(periodoEnCurso)),
+        // ── UN SOLO PERÍODO, EL QUE SE ESTÁ MIRANDO ────────────────────────
+        //
+        // Antes viajaban dos —`cerrado` y `enCurso`— porque la pantalla mostraba
+        // uno arriba y el otro como contexto. Con el navegador, el período lo
+        // elige quien mira, así que mandar dos obligaría a decidir cuál de los
+        // dos es "el" período en cada rótulo, y ése es justamente el error que
+        // hacía que el título dijera "Semana cerrada" con el chip en Mes.
+        //
+        // `descripcion` viaja desde el SERVIDOR y no se arma en la pantalla por
+        // el mismo motivo por el que viaja el rango: quien sabe qué período se
+        // consultó es el que lo consultó.
+        periodo: {
+          ...mirado,
+          totalCerrado: mirado.sinRecibir === 0,
+          descripcion: descripcionDelPeriodo({
+            unidad,
+            diaDeCorte: corteDelLocal,
+            hoy,
+            desplazamiento,
+          }),
+        },
+        // Hacia adelante solo se puede si NO se está ya en el período en curso.
+        puedeAvanzar: desplazamiento < 0,
+        // Hacia atrás, hasta donde haya dato. `null` = este local no recibió nada
+        // nunca, y ahí no hay a dónde ir.
+        puedeRetroceder: Boolean(
+          primerMovimiento && periodoMirado.desde > primerMovimiento
+        ),
+        primerMovimiento,
       });
     }
 
@@ -529,32 +613,22 @@ export async function GET(req) {
       });
     }
 
-    const cuenta = cuentaDelLocal({
-      transferencias: filas,
-      acuerdos,
-      localId: vista.localId,
-      unidad,
-      rangoFijo,
-    });
-
-    return NextResponse.json({
-      ok: true,
-      vista: "LOCAL",
-      unidad,
-      localNombre: localPropio?.nombre || null,
-      depositoNombre: deposito?.nombre || null,
-      cuenta: {
-        localId: cuenta.localId,
-        diaDeCorte: cuenta.diaDeCorte,
-        sinConfigurar: cuenta.sinConfigurar,
-        rango: cuenta.rango,
-        aPagar: cuenta.aPagar,
-        sinRecibir: cuenta.sinRecibir,
-        totalCerrado: cuenta.totalCerrado,
-        paraRecibir: cuenta.paraRecibir.map(resumir),
-        yaRecibidas: cuenta.yaRecibidas.map(resumir),
-      },
-    });
+    // ── ACÁ NO SE LLEGA, Y ESO ES EL PUNTO ────────────────────────────────
+    //
+    // Hasta la V40 este era el camino del LOCAL: devolvía `cuenta` con
+    // `paraRecibir`/`yaRecibidas` y SOLO el período en curso. Era la segunda
+    // implementación de la misma pregunta, y estaba desincronizada — le seguía
+    // mostrando al local el período abierto en la pantalla que dice cuánto le
+    // van a pagar, que es el defecto que abrió toda esta línea de trabajo.
+    //
+    // Ahora el local entra por el modo de un local, arriba, sin pasar `destino`.
+    // Si el flujo llega hasta acá es que alguien cambió esa resolución y el
+    // local quedó sin vista: se contesta con un error explícito en vez de
+    // devolver una forma que ninguna pantalla sabe leer.
+    return NextResponse.json(
+      { ok: false, error: "No se pudo determinar la vista del local." },
+      { status: 500 }
+    );
   } catch (e) {
     console.error("[transferencias/tablero]", e);
     return NextResponse.json(
