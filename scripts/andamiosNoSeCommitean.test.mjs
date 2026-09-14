@@ -43,7 +43,24 @@ import { fileURLToPath } from "node:url";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-/** Los andamios TRACKEADOS. `git ls-files` lista lo trackeado, que es la pregunta. */
+/**
+ * Los andamios TRACKEADOS. `git ls-files` lista lo trackeado, que es la pregunta.
+ *
+ * ── ESTE ES EL ÚNICO QUE NO LLEVA `--others`, Y ES A PROPÓSITO ───────────
+ *
+ * El 2026-09-14 se barrieron todas las enumeraciones del repo para agregarles
+ * `--others --exclude-standard` / `--untracked`: `git ls-files` y `git grep` a
+ * secas miran solo lo trackeado, así que un archivo nuevo sin commitear pasa
+ * invisible y el candado da verde sin haber podido mirar.
+ *
+ * Acá NO corresponde, porque la pregunta de este candado es literalmente
+ * "¿QUEDÓ ALGÚN ANDAMIO COMMITEADO?". Un andamio sin commitear es el caso
+ * BUENO: es alguien trabajando. Agregarle `--others` haría que este candado se
+ * ponga rojo cada vez que alguien tiene un andamio abierto en su máquina, que es
+ * exactamente lo que no tiene que hacer.
+ *
+ * Si una auditoría futura vuelve a pasar por acá: no es un olvido, está mirado.
+ */
 function andamiosTrackeados() {
   return execSync("git ls-files app", { cwd: RAIZ, encoding: "utf8" })
     .split("\n")

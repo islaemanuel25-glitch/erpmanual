@@ -41,7 +41,10 @@ const ejecutar = (cmd) => execSync(cmd, { cwd: RAIZ, encoding: "utf8" });
  * se filtra por el USO: un archivo es consumidor si abre la etiqueta.
  */
 function consumidoresDelKit() {
-  return ejecutar("git grep -l SunmiModalLayout -- app components")
+  // `--untracked`: sin eso el censo mira solo lo trackeado, así que una pantalla
+  // nueva que use el modal y todavía no esté commiteada no aparecería y este
+  // candado se quedaría verde. Agujero del 2026-09-14.
+  return ejecutar("git grep --untracked -l SunmiModalLayout -- app components")
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l && !l.endsWith("SunmiModalLayout.jsx") && !l.endsWith(".test.mjs"))

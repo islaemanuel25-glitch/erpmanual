@@ -92,8 +92,14 @@ test("LAS PARTES DE LA BASE VIVEN EN SU PROPIO ESPACIO Y NO SE LEEN COMO COLORES
 
 test("NINGÚN LUGAR DEL REPO PIDE UN COLOR QUE NO EXISTE", () => {
   // Se enumera con git: recorre el repo entero, incluidos los subdirectorios que
-  // `readdirSync` se saltea.
-  const archivos = execFileSync("git", ["ls-files", "*.jsx"], { cwd: RAIZ, encoding: "utf8" })
+  // `readdirSync` se saltea. Y con `--others --exclude-standard`, porque a secas
+  // lista solo lo trackeado: una pantalla nueva sin commitear que pida un color
+  // inexistente pasaría en verde. Agujero del 2026-09-14.
+  const archivos = execFileSync(
+    "git",
+    ["ls-files", "--cached", "--others", "--exclude-standard", "*.jsx"],
+    { cwd: RAIZ, encoding: "utf8" }
+  )
     .split("\n")
     .filter(Boolean);
 

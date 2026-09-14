@@ -323,9 +323,28 @@ function delegaElChequeo(cuerpo, fuenteLimpia, archivoRel, nivel = 0) {
   return false;
 }
 
-/** Las rutas del repo, con `git ls-files` para no perder subdirectorios (regla 10). */
+/**
+ * Las rutas del repo, con `git ls-files` para no perder subdirectorios (regla 10).
+ *
+ * ── `--others --exclude-standard` NO ES OPCIONAL ─────────────────────────
+ *
+ * `git ls-files` a secas lista solo lo TRACKEADO. Una ruta nueva, escrita y
+ * todavía sin commitear, no entra — así que este candado la dejaría pasar SIN
+ * chequeo de permiso, en verde, y se pondría rojo recién en la tanda siguiente:
+ * después de empujar, y quizá después de desplegar.
+ *
+ * Es el agujero que se encontró el 2026-09-14 en los censos de
+ * `lib/layout/accionDePagina.test.mjs`, y acá pesa más: aquello era una lista de
+ * consumidores de un slot de interfaz, esto es quién puede leer qué.
+ *
+ * `--exclude-standard` respeta `.gitignore`, así que no arrastra `node_modules`
+ * ni `.next`.
+ */
 function rutasDelRepo() {
-  return execSync('git ls-files "app/api/**/route.js"', { cwd: RAIZ, encoding: "utf8" })
+  return execSync('git ls-files --cached --others --exclude-standard "app/api/**/route.js"', {
+    cwd: RAIZ,
+    encoding: "utf8",
+  })
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean);

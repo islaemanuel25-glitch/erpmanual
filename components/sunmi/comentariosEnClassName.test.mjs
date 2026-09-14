@@ -111,7 +111,13 @@ export function llevaComentario(cadena) {
 }
 
 function archivosDelRepo() {
-  return execSync('git ls-files "*.jsx" "*.js"', { cwd: RAIZ, encoding: "utf8" })
+  // `--others --exclude-standard`: sin eso `git ls-files` lista solo lo
+  // trackeado, así que un archivo nuevo todavía sin commitear no entra y este
+  // candado lo deja pasar en verde. Agujero encontrado el 2026-09-14.
+  return execSync('git ls-files --cached --others --exclude-standard "*.jsx" "*.js"', {
+    cwd: RAIZ,
+    encoding: "utf8",
+  })
     .split("\n").map((s) => s.trim())
     .filter((s) => s && (s.startsWith("app/") || s.startsWith("components/") || s.startsWith("lib/")));
 }

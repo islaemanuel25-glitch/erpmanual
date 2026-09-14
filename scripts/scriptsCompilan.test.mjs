@@ -30,8 +30,19 @@ import { fileURLToPath } from "node:url";
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const RAIZ = path.resolve(AQUI, "..");
 
-/** `git ls-files` recorre el repo entero; `readdirSync` mira un solo nivel. */
-const listados = execSync("git ls-files scripts", { cwd: RAIZ, encoding: "utf8" })
+/**
+ * `git ls-files` recorre el repo entero; `readdirSync` mira un solo nivel.
+ *
+ * Y `--others --exclude-standard` porque a secas lista solo lo TRACKEADO: un
+ * script nuevo, todavía sin commitear, no entraría — así que este candado diría
+ * que "todos compilan" sin haber mirado justamente el único que se acaba de
+ * escribir, que es el que más chances tiene de no compilar. Agujero encontrado
+ * el 2026-09-14 en los censos de `lib/layout/accionDePagina.test.mjs`.
+ */
+const listados = execSync("git ls-files --cached --others --exclude-standard scripts", {
+  cwd: RAIZ,
+  encoding: "utf8",
+})
   .split("\n")
   .map((l) => l.trim())
   .filter((l) => /\.(mjs|cjs|js)$/.test(l))
