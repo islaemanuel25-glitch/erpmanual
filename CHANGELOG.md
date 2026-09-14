@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-09-14] - Actualización: transferencias
+
+### Modificado
+- **transferencias**: feat(transferencias): la entrada es la lista de locales y el período vive adentro
+
+
 ## [2026-09-13] - Actualización: transferencias
 
 ### Modificado

@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-09-13 21:19
+**Última actualización:** 2026-09-14 10:14
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -194,6 +194,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-09-14: feat(transferencias): la entrada es la lista de locales y el período vive adentro
 - 2026-09-13: feat(transferencias): el día como encabezado, el estado en palabras y la recibida que se abre
 - 2026-09-13: fix(transferencias): el criterio es el CLIENTE VINCULADO, y vale en las tres pantallas
 - 2026-09-13: fix(transferencias): el local dado de baja, y una sola puerta para los destinos
