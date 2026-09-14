@@ -716,7 +716,7 @@ letter-spacing 0,6; los tres primeros dan exacto y el cuarto queda en **0,5 px**
 que es lo que `tracking-wider` —0,05em— vale a 10 px. Escribir `tracking-[0.6px]`
 sería hardcodeo en la pantalla, y sumar una entrada a la escala para ganar una
 décima de píxel dejaría este rótulo distinto de sus dos hermanos por algo que no
-se ve. **Queda anotado, no decidido en silencio.**
+se ve. Se le preguntó a Emanuel y **confirmó el 0,5**: queda así, no es deuda.
 
 No se dibuja si la lista está vacía ni mientras carga: un encabezado arriba de
 nada promete contenido que no está.

@@ -491,6 +491,32 @@ En la práctica: `git ls-files` y `git grep` recorren el repo entero;
 conteo alimenta una afirmación —"son 54 scripts", "son tres rutas"— decir con qué
 se enumeró es parte de la afirmación.
 
+**Y RECORRER EL REPO ENTERO NO ES LO MISMO QUE VERLO ENTERO: `git ls-files` Y
+`git grep` MIRAN SOLO LO TRACKEADO.** Un archivo recién escrito y todavía sin
+commitear no existe para ninguno de los dos. La corrida entra en verde, se
+empuja, y el candado se pone rojo en la tanda SIGUIENTE — cuando el archivo ya
+está commiteado y la tanda ya se desplegó.
+
+Es la peor forma del problema porque **es indistinguible de un verde bueno**: no
+avisa, no tarda más, no deja rastro. El candado no falló, no pudo mirar.
+
+Pasó dos veces, con los dos comandos. El 2026-08-10 la suite informó 2575
+candados con nueve recién escritos que no había corrido —`git ls-files`—. El
+2026-09-14 los dos censos de `lib/layout/accionDePagina.test.mjs` dieron verde
+sobre una pantalla nueva que consumía el slot —`git grep`— y se pusieron rojos
+después de desplegar.
+
+Las banderas son `--cached --others --exclude-standard` para `ls-files` y
+`--untracked` para `grep`; las dos respetan `.gitignore`. **Ya no hay que
+acordarse:** `scripts/enumeracionesVenLoSinCommitear.test.mjs` recorre todos los
+`*.test.mjs` y se pone rojo si alguno enumera sin ellas. Tiene una sola exención
+—`andamiosNoSeCommitean`, donde lo trackeado ES la pregunta— y está en una lista
+con su motivo, no en un `if`.
+
+Medido con contraprueba, y por eso vale: con una ruta GET sin chequeo de permiso
+escrita y sin commitear, `scripts/permisoEnCadaGet.test.mjs` daba **5 en verde y
+0 en rojo**. Con la bandera puesta, rojo nombrando la ruta.
+
 Corolario para los campos compartidos: buscar el nombre del campo en todo el
 repo, no solo donde se lo está por cambiar. Buscar `aumentoEsperadoMinPct` dio
 **cinco lectores en cuatro archivos**, tres de ellos componentes que no estaban
