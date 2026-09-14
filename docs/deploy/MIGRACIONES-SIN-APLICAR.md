@@ -20,6 +20,51 @@ Ninguna. Producción está en **11 migraciones**, las mismas que el árbol.
 
 ---
 
+## 2026-09-14 — `671e9690`, las enumeraciones y el barrido: CERO migraciones
+
+Producción pasó de `98fbb667a1f9b2e2c0f8df69986b63e361d63866` a
+`671e9690f7237ac287313ebc4b8d9cf310a0e029`. **Despliegue solo de código**, con
+corte de **2 segundos**. Nueve commits, DOS tandas juntadas a propósito para no
+encadenar dos cortes.
+
+Cero migraciones por tres caminos —pendientes vacío, `prisma/` sin tocar en el
+rango, clasificador en «Archivos a mirar: 0»—, con el conteo confirmando que la
+imagen no estaba atrasada: **11 informadas, 11 en el árbol**. `migrate status`:
+11 y "Database schema is up to date!". Bitácora de autorizaciones: **inexistente**.
+
+### Qué sale
+
+**Dos tandas.** La primera arregla 17 enumeraciones de candados que miraban solo
+lo trackeado —`git ls-files` y `git grep` sin sus banderas—, así que un archivo
+nuevo sin commitear pasaba invisible y el candado daba verde sin poder mirar. Las
+dos que más pesan son de seguridad: `permisoEnCadaGet` y `visibilidad.proveedores`.
+Trae además el candado que lo impide de acá en más.
+
+La segunda es la primera pantalla del barrido de `sunmi-surface`: cinco tarjetas
+de transferencias dejan de pintarse con `--app-bg` —el fondo de la aplicación— y
+pasan a `--card-bg`.
+
+### El marcador: UNA CLASE NUEVA, con dos controles
+
+- `.sunmi-bg-card{` en la hoja: **0 en la imagen vieja, 1 en la nueva**
+- `sunmi-bg-card` en el JS: **0 y 7**
+
+Controles `.sunmi-bg-accent{` y `sunmi-bg-accent`, que ya existían: **1 y 3 en
+las dos imágenes**, así que la búsqueda anda.
+
+**Confirmado además en la HOJA VIVA de `operix.cloud`**, que es la prueba que
+vale: `/_next/static/chunks/14d89bfb1e00a57a.css` trae `.sunmi-bg-card{`, con
+`.sunmi-bg-accent{` y `.sunmi-surface{` presentes en el mismo archivo. La hoja
+pasó de 1659 a 1664 reglas.
+
+**Y un falso negativo que el control atajó, vale anotarlo.** El primer intento
+extrajo mal la ruta del CSS del HTML y terminó buscando dentro de la página de
+login: el marcador dio 0 **y los controles también**. Ese cero no significaba
+"no viajó", significaba "no se pudo preguntar" — que es exactamente para lo que
+está la regla de descartar el marcador entero cuando el control da vacío.
+
+---
+
 ## 2026-09-14 — `98fbb667`, la pantalla partida en dos: CERO migraciones
 
 Producción pasó de `9d101cb445f45486b6b7b07f83e2ccb78085d8f2` a
