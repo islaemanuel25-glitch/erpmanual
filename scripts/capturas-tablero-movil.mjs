@@ -368,6 +368,60 @@ await afirmar(
   "la entrada no lista transferencias"
 );
 
+// ── EL RÓTULO DE LA LISTA ────────────────────────────────────────────────
+await afirmar(await hayTexto("LOCALES"), "la lista está rotulada");
+
+// ── LA TARJETA NO ES DEL COLOR DE LA PÁGINA ──────────────────────────────
+//
+// El defecto, visto en el teléfono el 2026-09-14: la tarjeta usaba
+// `sunmi-surface`, que pinta `--app-bg` —el fondo de la APLICACIÓN—, así que
+// salía exactamente del color de la página y lo único que la separaba era el
+// borde.
+//
+// Se comparan los fondos COMPUTADOS, no las clases: el candado ya afirma la
+// clase, y ésta es la otra pregunta —si el navegador termina pintando dos
+// colores distintos—. Una clase puede estar y no llegar al fondo si otra le
+// gana por orden de hoja.
+//
+// SE PRUEBA EN LOS CATORCE TEMAS, y no solo en el que trae el arnés: el defecto
+// se reportó en el crema, donde los dos tonos son casi el mismo, pero la causa
+// era de todos. Un tema solo no distingue "lo arreglé" de "en éste no se nota".
+const TEMAS = [
+  "sunmiDark", "sunmiDarkCompact", "sunmiLight", "sunmiGraphite", "sunmiSand",
+  "sunmiBlueClassic", "sunmiFrance", "sunmiFranceSplit", "operixBluePro",
+  "operixNight", "verdeComercio", "grafitoEjecutivo", "ambarCaja", "violetaSaas",
+];
+const fondosPorTema = [];
+for (const tema of TEMAS) {
+  await evaluar(`document.documentElement.setAttribute("data-theme", ${JSON.stringify(tema)})`);
+  await esperar(150);
+  const medida = await evaluar(`(() => {
+    const tarjeta = [...document.querySelectorAll('[aria-label]')]
+      .find((n) => (n.getAttribute('aria-label') || '').startsWith('Abrir Local'));
+    if (!tarjeta) return null;
+    return {
+      tarjeta: getComputedStyle(tarjeta).backgroundColor,
+      pagina: getComputedStyle(document.body).backgroundColor,
+    };
+  })()`);
+  fondosPorTema.push({ tema, ...(medida || {}) });
+}
+const pegados = fondosPorTema.filter((f) => !f.tarjeta || f.tarjeta === f.pagina);
+const crema = fondosPorTema.find((f) => f.tema === "ambarCaja");
+await afirmar(
+  pegados.length === 0,
+  `la tarjeta tiene fondo propio en los ${TEMAS.length} temas (crema: tarjeta ${crema?.tarjeta} sobre página ${crema?.pagina})`
+);
+
+// La foto va en el tema CREMA, que es donde se reportó: ahí `--app-bg` es
+// `#FFFBEB` y `--card-bg` es `#FFFFFF`, o sea el caso donde los dos tonos están
+// más cerca y donde un fondo mal puesto se ve como una tarjeta que no existe.
+await evaluar(`document.documentElement.setAttribute("data-theme", "ambarCaja")`);
+await esperar(300);
+await foto(`v41-entrada-crema-${ANCHO}`);
+await evaluar(`document.documentElement.removeAttribute("data-theme")`);
+await esperar(150);
+
 // EL TÍTULO NO SE REPITE. La barra del shell ya dice "Transferencias"; cuando la
 // pantalla lo escribía otra vez, los dos quedaban pegados en el texto de la
 // página. Esta afirmación busca exactamente esa adyacencia.
@@ -402,6 +456,33 @@ await afirmar(
 await afirmar(
   await hayTexto("Local V15 sin movimiento"),
   "el local que no recibió nada aparece igual: si no, no hay forma de saber que existe"
+);
+
+// ── EL ORDEN ES SIEMPRE EL MISMO ─────────────────────────────────────────
+//
+// En producción la lista arrancaba por "Casiano casas" en una carga y por
+// "mini el 7" en la siguiente: `grupoLocal` se consultaba sin `orderBy`, así que
+// el orden lo elegía el plan de Postgres.
+//
+// Se compara contra una SEGUNDA carga y no contra una lista escrita a mano: lo
+// que se afirma es que no se mueve, y eso solo se ve mirando dos veces.
+const ordenDeLosLocales = () =>
+  evaluar(`[...document.querySelectorAll('[aria-label]')]
+     .filter((n) => (n.getAttribute('aria-label') || '').startsWith('Abrir '))
+     .map((n) => n.getAttribute('aria-label'))`);
+
+const orden1 = await ordenDeLosLocales();
+await abrir("/modulos/transferencias", "Transferencias");
+const orden2 = await ordenDeLosLocales();
+await afirmar(
+  JSON.stringify(orden1) === JSON.stringify(orden2),
+  `la lista no se mueve entre dos cargas (${JSON.stringify(orden1)})`
+);
+// Y es alfabético: "Local V15" antes que "Local V15 sin movimiento".
+await afirmar(
+  JSON.stringify(orden1) ===
+    JSON.stringify(["Abrir Local V15", "Abrir Local V15 sin movimiento"]),
+  `y el orden es el alfabético (${JSON.stringify(orden1)})`
 );
 await afirmar(
   await hayTexto("Hay 2 locales sin corte configurado"),

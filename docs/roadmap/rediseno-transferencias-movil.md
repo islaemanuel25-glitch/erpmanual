@@ -675,9 +675,103 @@ sigue sin ser idempotente —guarda un acuerdo— así que va una corrida por si
   siendo la de la segunda vuelta.
 - **`tipo` contra `es_deposito`**, que ya venía anotado de la vuelta anterior.
 
+### LAS TRES CORRECCIONES DEL 2026-09-14, VISTAS EN EL CELULAR SOBRE `98fbb667`
+
+**1 · LA TARJETA ESTABA PINTADA DEL COLOR DEL FONDO, Y EL NOMBRE DE LA CLASE
+ENGAÑA.**
+
+`.sunmi-surface` se llama "surface" y pinta `--app-bg`, que es el fondo de la
+APLICACIÓN. Una tarjeta con esa clase queda exactamente del color de la página y
+lo único que la separa es el borde.
+
+No era cosa del tema crema, que es donde se vio: **medido en los catorce,
+`--app-bg` y `--card-bg` son distintos en los catorce**, así que la tarjeta
+perdía su fondo propio siempre. En `ambarCaja` —crema `#FFFBEB` contra blanco
+`#FFFFFF`— es donde los dos tonos están más cerca y donde se nota.
+
+Se agregó `.sunmi-bg-card` al kit. **No sirven las dos que ya pintan `--card-bg`**:
+`.sunmi-card` trae además `rounded-2xl`, `shadow-md`, `p-4`, `mb-3` y
+`backdrop-blur-md`, que cambiarían la geometría; `.sunmi-card-surface` trae el
+borde en `--card-border`, y el diseño pide border/default. Los dos bordes
+coinciden en 12 de los 14 temas, y en `sunmiLight` el de tarjeta es MÁS claro —o
+sea menos separación, lo contrario de lo que esto viene a arreglar—.
+
+**Y EL ALCANCE ES MUCHO MAYOR QUE ESTA PANTALLA, aunque acá solo se tocó la
+tarjeta de local.** Contado con `git grep` sobre `app/**/*.jsx` y
+`components/**/*.jsx`: **80 usos de `sunmi-surface` junto a `rounded` en 39
+archivos**, o sea 80 lugares donde algo con forma de tarjeta se pinta del color
+de la página. Ocho de esos archivos son de transferencias —`BloqueLocal`,
+`CabeceraDeCuenta`, `CuentaDelPeriodoCerrado`, `DiaDeTransferencias`,
+`FilaCorteDeSemana`, `FilaTransferenciaLocal`, `ColumnSettingsPanel` y
+`ReporteTransferenciasPorDestino`—. **No se tocaron**: el pedido era la entrada y
+nada más. Queda como deuda medida, no como sospecha.
+
+Ojo al revisarlo: `sunmi-surface-soft` es OTRO token —`--app-input-bg`— y ése sí
+es distinto del fondo. No entra en la cuenta.
+
+**2 · FALTABA EL RÓTULO "LOCALES".** Va con las mismas clases que los dos rótulos
+de sección que el módulo ya tenía: `text-xs2 font-semibold sunmi-text-muted
+tracking-wider`. El diseño pide 10 SemiBold en text/secondary con
+letter-spacing 0,6; los tres primeros dan exacto y el cuarto queda en **0,5 px**,
+que es lo que `tracking-wider` —0,05em— vale a 10 px. Escribir `tracking-[0.6px]`
+sería hardcodeo en la pantalla, y sumar una entrada a la escala para ganar una
+décima de píxel dejaría este rótulo distinto de sus dos hermanos por algo que no
+se ve. **Queda anotado, no decidido en silencio.**
+
+No se dibuja si la lista está vacía ni mientras carga: un encabezado arriba de
+nada promete contenido que no está.
+
+**3 · EL ORDEN NO ERA ESTABLE.** `relacionesDelDeposito` consulta `grupoLocal`
+**sin `orderBy`**, y sin `ORDER BY` Postgres devuelve las filas en el orden que
+le conviene al plan. En producción la lista arrancaba por "Casiano casas" en una
+carga y por "mini el 7" en la siguiente.
+
+El orden se puso en `destinosDeTransferencia` —la puerta— y no en la pantalla que
+lo reportó, porque **los cuatro consumidores tenían el mismo problema**: la
+entrada, la lista de bloques del depósito, el corte de semana y el desplegable de
+destinos al crear una transferencia. Las cuatro son listas que mira una persona y
+ninguna tiene un orden propio que defender. La del depósito sí lo tiene —por
+plata, con los vacíos al final— y lo aplica DESPUÉS, en `bloquesPorLocal`, así
+que este no lo pisa.
+
+Es `localeCompare` y no un `orderBy` de Prisma: un `orderBy` ordenaría con la
+intercalación de la base, que no es la misma en todas las instalaciones, y ningún
+candado podría afirmarlo porque los candados no tocan la base.
+
+Medido: lo que sostiene el orden es `localeCompare`, **no** `sensitivity: "base"`.
+Con `a < b` de strings, "mini el 7" se va al final —en ASCII las minúsculas van
+después de todas las mayúsculas— y el candado da rojo. Sin `sensitivity` el orden
+no cambia para estos cuatro nombres; se deja igual porque fija la intención y el
+comportamiento ante un cambio de intercalación de Node, y eso está escrito como
+lo que es: una decisión, no una necesidad.
+
+Y un detalle que parece invertido y no lo es: **"Mini unidas" va antes que
+"Minimarket ayala"**, porque el espacio ordena antes que una letra. La primera
+versión del candado lo esperaba al revés y se puso roja sobre una salida
+correcta.
+
+### EL CANDADO QUE ESTUVO VERDE POR EL MOTIVO EQUIVOCADO
+
+**Y se desplegó así.** Los dos censos de `lib/layout/accionDePagina.test.mjs`
+—quién consume el slot de acción y quién registra un título— enumeran con
+`git grep -l`, que **solo mira archivos trackeados**.
+
+En la tanda anterior la suite se corrió con
+`app/modulos/transferencias/local/[localId]/page.jsx` todavía **sin commitear**,
+así que los dos censos no lo vieron y dieron verde. Se pusieron rojos recién en
+esta tanda, con el archivo ya trackeado — o sea **después de desplegar**.
+
+El candado no falló: **no pudo mirar**. Es la misma familia que la nota de
+`git ls-files` en `CLAUDE.md`, sobre otro comando, y el arreglo es de una
+palabra: `git grep --untracked`. Verificado por contraprueba —un consumidor nuevo
+sin commitear ahora pone el censo en rojo— y las dos listas se actualizaron a
+propósito, que es para lo que el censo existe.
+
 ### ESTADO AL CERRAR
 
-Suite **5893 en verde**, 0 en rojo (1 TODO viejo: los siete candados del contrato
+Suite **5898 en verde**, 0 en rojo (1 TODO viejo: los siete candados del contrato
 de `EXCLUIDO`). Trinquete sin cambios en los siete contadores. Build limpio. Arnés
-en 68 afirmaciones. **NO desplegado**: producción sigue en `9d101cb4`, que es la
-segunda vuelta.
+en **72 afirmaciones**, 0 capturas con desborde.
+
+**Producción corre `98fbb667`**, que es la tercera vuelta SIN las tres
+correcciones de arriba. Éstas quedan empujadas y sin desplegar.
