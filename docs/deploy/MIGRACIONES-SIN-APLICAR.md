@@ -20,6 +20,50 @@ Ninguna. Producción está en **11 migraciones**, las mismas que el árbol.
 
 ---
 
+## 2026-09-15 — `2579bfe4`, la pantalla móvil de crear oferta: CERO migraciones
+
+Producción pasó de `4a24dccbf1b5d9f6c4539386d11a51fdd17736f5` a
+`2579bfe46484dfa71941320fce3d888e1af81866`. **Despliegue solo de código**, con
+corte de **1 segundo** — el más corto medido hasta ahora.
+
+Cero migraciones por tres caminos —pendientes vacío, `prisma/` sin tocar en el
+rango, clasificador en «Archivos a mirar: 0»—, con el conteo confirmando que la
+imagen no estaba atrasada: **11 informadas, 11 en el árbol**. `migrate status`:
+11 y "Database schema is up to date!". Bitácora de autorizaciones: **inexistente**.
+
+### Qué sale
+
+La pantalla móvil de crear oferta, con un cambio de regla de negocio adentro:
+**la oferta ya no tiene nombre propio**, se llama como el producto y el nombre lo
+pone el servidor. La única oferta que había en producción se llama "91100"
+exactamente porque el formulario pedía un nombre y había que llenarlo.
+
+Además, el buscador de la pantalla es `components/pos-ventas/BuscadorProductos`
+TAL CUAL —el mismo del POS y de Stock— apuntado por `apiPath` al endpoint de
+ofertas, que pasó a devolver la misma forma más el costo.
+
+### El marcador: una frase nueva y una clase nueva
+
+- `"Qué producto ponés en oferta"`: **0 en la imagen vieja, 2 en la nueva**
+- `.sunmi-bg-pie{` en la hoja: **0 y 1**
+
+Controles `"Va acumulado"` y `.sunmi-bg-card{`, que ya existían: **4 y 1 en las
+dos imágenes**, así que la búsqueda anda.
+
+**Confirmado además en la HOJA VIVA de `operix.cloud`**:
+`/_next/static/chunks/7a2d728f24b49094.css` trae `.sunmi-bg-pie{` con el control
+presente en el mismo archivo. La hoja pasó de 1666 a 1667 reglas — una regla
+nueva, que es exactamente la que se agregó.
+
+### La clase nueva existe por un motivo que conviene no perder
+
+El diseño pedía el pie con fondo `--pos-surface`, y ese token es **translúcido en
+cinco de los catorce temas**. Un pie ANCLADO flota sobre contenido que scrollea,
+así que lo que dejaría pasar no es el fondo: es texto. Es el mismo defecto que ya
+se pagó en el desplegable de motivo de la recepción. `.sunmi-bg-pie` pinta el
+color pedido encima de una base opaca, que es la solución que ya estaba escrita
+allá.
+
 ## 2026-09-14 — `4a24dccb`, el navegador de período y la pantalla unificada: CERO migraciones
 
 Producción pasó de `671e9690f7237ac287313ebc4b8d9cf310a0e029` a
