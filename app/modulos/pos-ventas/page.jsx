@@ -1548,9 +1548,22 @@ export default function PosVentasPage() {
           showSuccess(msg);
         }
         
-        // Guardar breakdown del backend (si existe)
+        // ── EL RECUADRO SE LIMPIA CUANDO LA VENTA ENTRA ────────────────────
+        //
+        // EL DEFECTO, CON SU NÚMERO: cerrada la "Venta #67" con una modalidad al
+        // 7 %, el carrito quedaba vacío y este recuadro seguía diciendo
+        // Subtotal $200.000 / Total $214.000. Con el carrito en cero, un total
+        // más alto que el subtotal se lee como plata que alguien todavía debe.
+        //
+        // Antes de que existieran las modalidades el problema no se veía: sin
+        // recargo los dos números eran iguales y el recuadro repetía el
+        // subtotal. El recargo lo destapó, no lo causó — el recuadro siempre
+        // sobrevivía a la venta que lo había llenado.
+        //
+        // `bd` se sigue usando abajo para armar el ticket: lo que se limpia es
+        // lo que queda EN PANTALLA después, no el dato de la venta.
         const bd = data.breakdown || null;
-        setUltimoBreakdown(bd);
+        setUltimoBreakdown(null);
 
         // Una venta cambia el efectivo esperado y puede haber cruzado el
         // vencimiento del intervalo: se refresca el estado del arqueo.

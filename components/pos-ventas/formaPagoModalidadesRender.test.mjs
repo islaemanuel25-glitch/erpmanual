@@ -26,6 +26,7 @@ import FormaPago from "@/components/pos-ventas/FormaPago";
 import SelectorModalidad from "@/components/pos-ventas/SelectorModalidad";
 import { botonesDeCobro, opcionesDeModalidad } from "@/lib/pos-ventas/cobroPantalla";
 import { componerModalidades } from "@/lib/pos-ventas/modalidadesDeMedio";
+import { CLASE_BOTON_MEDIO } from "@/lib/pos-ventas/mediosCobroPantalla";
 import { totalesPorOpcionDeCobro } from "@/lib/ofertas/previewPos";
 
 // ── El local del ejemplo: Mercado Pago con DOS modalidades CREDITO ─────────
@@ -168,8 +169,12 @@ test("el selector muestra las modalidades ACTIVAS con su recargo y su total", ()
 
   assert.ok(html.includes("Crédito 1 pago"));
   assert.ok(html.includes("Crédito cuotas"));
-  assert.ok(html.includes("Recargo 4 %"));
-  assert.ok(html.includes("Recargo 8 %"));
+  // EL SIGNO ADELANTE, que antes no estaba: "4 %" al lado de un importe se
+  // puede leer como un descuento. El texto lo decide
+  // `etiquetaRecargoDeOpcion`, que tiene sus propios candados.
+  assert.ok(html.includes("+4 %"), "falta el recargo de la primera");
+  assert.ok(html.includes("+8 %"), "falta el recargo de la segunda");
+  assert.equal(html.includes("Recargo 4 %"), false, "quedó la redacción vieja");
   assert.ok(html.includes("2.080,00"), "el total de la primera");
   assert.ok(html.includes("2.160,00"), "el total de la segunda");
 });
@@ -179,12 +184,57 @@ test("una modalidad inactiva NO es cobrable: no aparece en el selector", () => {
   assert.equal(html.includes("QR guardado"), false);
 });
 
-test("el selector pide elegir, y sus opciones son botones de verdad", () => {
+test("las opciones son botones de verdad, y ya no hay línea que pida elegir", () => {
   const html = dibujarSelector();
-  assert.ok(html.includes("Elegí la modalidad"));
   // `SunmiButton` renderiza `<button>`: se puede tocar y se puede alcanzar con
   // Tab. Una fila de `div` clickeable se vería igual y no sería alcanzable.
   assert.equal(html.split("<button").length - 1, 2, "un botón por modalidad activa");
+
+  // SE SACÓ "Elegí la modalidad". El encabezado que dibuja `FormaPago` ya dice
+  // de qué medio son estas opciones, así que la línea repetía el contexto y
+  // empujaba las opciones fuera del pulgar en una pantalla de 360 px.
+  assert.equal(html.includes("Elegí la modalidad"), false, "volvió la línea que se sacó");
+});
+
+test("una opción se dibuja con LA MISMA clase que un botón de medio del panel", () => {
+  // ── POR QUÉ ESTO ES UN CANDADO Y NO UN DETALLE DE ESTILO ────────────────
+  //
+  // El selector se veía mal porque usaba `SunmiButton color="secondary"`, que es
+  // la variante GENÉRICA del kit, mientras el panel usa la del POS
+  // —`sunmi-pos-btn-secondary`—. Son dos reglas distintas del CSS: las opciones
+  // salían con otro fondo, otro alto y otra tipografía que los botones de los
+  // que cuelgan.
+  //
+  // Lo que lo cierra es que las dos salgan de la MISMA constante. Si alguien
+  // vuelve a escribir las clases al lado, esto se pone rojo aunque el resultado
+  // se parezca ese día.
+  const selector = dibujarSelector();
+  const panel = dibujarPanel();
+
+  for (const clase of CLASE_BOTON_MEDIO.split(" ")) {
+    assert.ok(selector.includes(clase), `la opción no lleva "${clase}"`);
+    assert.ok(panel.includes(clase), `el botón del panel no lleva "${clase}"`);
+  }
+});
+
+test("una modalidad SIN recargo lo dice en palabras, no con un cero", () => {
+  const sinRecargo = {
+    ...MEDIOS[1],
+    modalidades: componerModalidades([
+      { id: 201, nombre: "QR / dinero en cuenta", activo: true, orden: 1, tipoContable: "MERCADOPAGO", recargoPct: 0 },
+    ]),
+  };
+  const boton = botonesDeCobro([sinRecargo]).find((b) => b.nombre === "Mercado Pago");
+  const html = renderToStaticMarkup(
+    createElement(SelectorModalidad, {
+      opciones: opcionesDeModalidad(boton),
+      totalDe: () => 2000,
+      onElegir: () => {},
+      formatearImporte: (n) => String(n),
+    })
+  );
+  assert.ok(html.includes("Sin recargo"));
+  assert.equal(html.includes("+0 %"), false, "un cero entre porcentajes se lee salteado");
 });
 
 test("el encabezado con Volver lo pone el panel, no el selector", () => {
@@ -206,4 +256,51 @@ test("el encabezado con Volver lo pone el panel, no el selector", () => {
 
 test("el panel ofrece dividir el pago", () => {
   assert.ok(dibujarPanel().includes("Dividir pago"));
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DESPUÉS DE LA VENTA, EL PANEL NO ARRASTRA NADA
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ── EL DEFECTO, CON SU NÚMERO ──────────────────────────────────────────────
+//
+// Registrada la "Venta #67" con una modalidad, el carrito quedaba vacío y el
+// panel seguía en el selector: "Elegí la modalidad" con las opciones en $0,00.
+// El cajero tenía que apretar "← Volver" para poder cobrar la siguiente, y nada
+// en la pantalla decía que había que hacerlo.
+//
+// ── LO QUE ESTOS DOS CANDADOS PRUEBAN Y LO QUE NO ──────────────────────────
+//
+// `renderToStaticMarkup` dibuja el estado INICIAL: no hay clicks ni estado, así
+// que desde acá no se puede entrar al selector y despues vaciar el carrito. Lo
+// que sí se puede afirmar es el ESTADO AL QUE HAY QUE VOLVER, que es la mitad
+// que se puede romper en silencio: si mañana el panel con el carrito vacío
+// dibujara un total con recargo, esto se pone rojo.
+//
+// La secuencia completa —tocar Mercado Pago, vaciar el carrito y comprobar que
+// el panel volvió solo— la ejerce `scripts/capturas-cobro-modalidades.mjs`
+// contra un navegador de verdad, sobre el andamio.
+
+test("con el carrito vacío el panel está en modo simple y no pide elegir modalidad", () => {
+  const vacio = totalesPorOpcionDeCobro({ carrito: [], medios: MEDIOS });
+  const html = dibujarPanel({ subtotal: 0, previewPorOpcion: vacio });
+
+  assert.equal(html.includes("Elegí la modalidad"), false);
+  assert.equal(html.includes("Volver"), false, "quedó adentro de una pantalla de segundo nivel");
+  assert.ok(html.includes("Elegí cómo cobrar"), "no volvió al panel de medios");
+});
+
+test("con el carrito vacío el total NO arrastra el recargo de la venta anterior", () => {
+  // El preview se recalcula con el carrito vacío, así que todas las opciones dan
+  // cero y no hay ningún medio que "difiera": el panel muestra un único total en
+  // cero, que es lo mismo que mostraba antes de que existieran las modalidades.
+  const vacio = totalesPorOpcionDeCobro({ carrito: [], medios: MEDIOS });
+  const html = dibujarPanel({ subtotal: 0, previewPorOpcion: vacio });
+
+  assert.ok(html.includes("Total a cobrar"));
+  assert.equal(html.includes("Total según el medio"), false, "sin carrito no hay rango que mostrar");
+  assert.ok(html.includes("$0,00"));
+  for (const arrastre of ["2.080,00", "2.160,00", "2.120,00"]) {
+    assert.equal(html.includes(arrastre), false, `quedó pegado el importe ${arrastre}`);
+  }
 });

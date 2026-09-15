@@ -180,11 +180,38 @@ function FormaPago({
   // Recalcular ante cambios del carrito: si cambió el total o el mínimo de servicios,
   // resetear las filas del "Dividir pago" para no arrastrar importes obsoletos.
   // Patrón React de "ajustar estado al cambiar props durante el render".
-  const carritoKey = `${totalCent}-${minEfCent}`;
+  //
+  // ── LA CLAVE MIRA EL CARRITO, NO EL TOTAL QUE SE DIBUJA ──────────────────
+  //
+  // `totalCent` sale de `total`, que con preview es el de una OPCIÓN. Dos
+  // carritos distintos pueden dar el mismo total —cambiar un producto por otro
+  // del mismo precio— y entonces la clave no se movía y las filas quedaban con
+  // importes de un carrito que ya no existe. El subtotal adelante es el dato del
+  // carrito, y solo puede hacer que el reset ocurra MÁS veces, nunca menos.
+  const carritoKey = `${aCentavos(subtotal)}-${totalCent}-${minEfCent}`;
   const [prevCarritoKey, setPrevCarritoKey] = useState(carritoKey);
   if (carritoKey !== prevCarritoKey) {
     setPrevCarritoKey(carritoKey);
     setFilas(filasIniciales(BOTONES));
+
+    // ── Y SI EL CARRITO QUEDÓ VACÍO, EL PANEL VUELVE AL PRINCIPIO ──────────
+    //
+    // EL DEFECTO, CON SU NÚMERO: registrada la "Venta #67", el carrito se vacía
+    // pero el panel se quedaba en el selector de modalidad —"Elegí la
+    // modalidad", con las opciones en $0,00— porque este bloque reseteaba solo
+    // `filas`. El cajero tenía que apretar "← Volver" antes de poder cobrar la
+    // venta siguiente, y nada en la pantalla decía que había que hacerlo.
+    //
+    // Vale para los dos modos de adentro: el selector y "Dividir pago". Los dos
+    // son pantallas DE ESTA venta, y sin venta no tienen nada que mostrar.
+    //
+    // Se pregunta por el carrito vacío y no por cualquier cambio a propósito:
+    // sumar un producto mientras se está dividiendo un pago no puede echar al
+    // cajero de la pantalla en la que está trabajando.
+    if (subtotal <= 0) {
+      setModo("simple");
+      setBotonAbierto(null);
+    }
   }
 
   // ── Cobro SIMPLE: una opción → payload server-authoritative ───────────────
@@ -324,10 +351,18 @@ function FormaPago({
   // volver, título, y un hueco para que el título quede centrado. Escribirla dos
   // veces es como empiezan a separarse —una gana un margen, la otra cambia el
   // tamaño— y además duplicaría un `<button>` crudo que el trinquete cuenta.
-  const encabezado = (titulo) => (
+  //
+  // ── UN RÓTULO VA EN MAYÚSCULAS; UN DATO, COMO LO CARGARON ───────────────
+  //
+  // "Dividir pago" es una etiqueta de la interfaz y la escribimos nosotros, así
+  // que va como el resto de los títulos. El nombre de un medio es un DATO del
+  // local: si alguien lo cargó como "Mercado Pago", forzarlo a "MERCADO PAGO"
+  // es la pantalla contradiciendo a la configuración. Es la misma regla por la
+  // que los botones del panel muestran `m.nombre` tal cual.
+  const encabezado = (titulo, { esDato = false } = {}) => (
     <div className="flex items-center justify-between">
       <button type="button" onClick={volverSimple} className="text-sm pos-text-link">← Volver</button>
-      <span className="text-sm font-bold uppercase tracking-wide">{titulo}</span>
+      <span className={`text-sm font-bold ${esDato ? "" : "uppercase tracking-wide"}`}>{titulo}</span>
       <span className="w-12" />
     </div>
   );
@@ -348,7 +383,7 @@ function FormaPago({
       {modo === "modalidad" && botonAbierto ? (
         /* ═══════════════ ELEGIR MODALIDAD ═══════════════ */
         <>
-          {encabezado(botonAbierto.nombre)}
+          {encabezado(botonAbierto.nombre, { esDato: true })}
           <SelectorModalidad
             opciones={opcionesDeModalidad(botonAbierto)}
             totalDe={(clave) => totalDeClave(clave) ?? base}
