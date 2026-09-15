@@ -504,3 +504,87 @@ Cinco y no uno porque son cinco decisiones de distinto peso. FINALIZAR va
 separado de EDITAR —bajar una promoción antes de tiempo es una decisión
 comercial, no una corrección— y ELIMINAR es el único que destruye una fila.
 Ninguno se ata a un rol: los roles los reciben desde el sistema existente.
+
+---
+
+## LA PANTALLA MÓVIL DE CREAR OFERTA — 2026-09-15
+
+### EL CAMBIO DE REGLA: LA OFERTA NO TIENE NOMBRE PROPIO
+
+Se llama como el producto, y el nombre lo pone el **servidor** al crear.
+
+Una oferta es UN producto —varios son un combo, que es otra cosa y otra
+pantalla— así que pedir un nombre aparte era pedir lo mismo dos veces. La única
+oferta que llegó a producción se llama **"91100"** exactamente por eso: el campo
+estaba, había que llenarlo, y se llenó con cualquier cosa. El libro de eventos
+muestra que arrancó llamándose "9 de oro" y terminó así, tres minutos después.
+
+**No hay campo oculto.** Un campo que nadie ve y que igual viaja es la forma de
+que mañana alguien lo llene con otra cosa y las dos fuentes se contradigan. El
+nombre sale de `referencias`, que se lee de la base — la misma fuente con la que
+se congelan el precio y el costo de cada línea, y por el mismo motivo.
+
+La ruta sigue aceptando varias líneas —es de todos, no solo de esta pantalla— y
+las nombra "<primero> y N más". Una oferta sin nombre es un dato roto en la lista.
+
+### EL BUSCADOR ES EL DEL POS, SIN TOCARLO
+
+`components/pos-ventas/BuscadorProductos` tal cual, apuntado con su prop
+`apiPath` a `/api/ofertas/buscar-producto`. Es el mismo que usan el POS y Stock:
+trae el escáner, el dictado por voz, el auto-agregado por código exacto y el
+ranking.
+
+Para que eso sea posible, `buscarProductosOfertables` pasó a devolver la **misma
+forma que el buscador del POS** —`precioVenta`, `stock`, `codigoBarra`,
+`disponibleParaVenta`, `unidadMedida`, `factorPack`— más el `costo`, que es lo
+único que agrega y el motivo por el que el endpoint existe separado: quien arma
+una oferta necesita verlo para no fijar el precio a ciegas, y el cajero no tiene
+por qué. Los nombres de campo no se eligieron: son los que el componente ya lee.
+
+**`disponibleParaVenta` va siempre en `true`, y es una diferencia deliberada con
+el POS.** Allá `false` impide vender y está bien. Acá se está PROGRAMANDO un
+precio para los próximos días, y que hoy no haya stock no dice nada sobre mañana.
+La pantalla avisa y deja seguir.
+
+### AVISA, NO BLOQUEA — LAS TRES VECES
+
+- **Sin stock hoy:** se dice y se deja cargar.
+- **Precio por debajo del costo:** se dice con todas las letras, se informa
+  cuánto falta para cubrirlo, y **se puede publicar igual**. Vender bajo costo es
+  una decisión comercial legítima y el sistema no opina sobre el negocio. Es la
+  misma regla que ya estaba escrita en `validarPrecioOferta`.
+- **Precio mayor o igual al normal:** eso sí impide publicar, porque no es una
+  oferta — es el precio de siempre con otro nombre.
+
+### LA VENTANA ES SEMIABIERTA Y ESO DECIDE LA CUENTA DE LOS CHIPS
+
+"Hoy" NO termina hoy a las 23:59:59: termina **mañana a las 00:00**. El modelo
+guarda `[inicioEn, finEn)` y en el instante `finEn` la oferta ya no rige.
+Escribirlo como 23:59:59 deja un segundo muerto donde la oferta no está ni viva
+ni vencida, y dos ofertas consecutivas se pisan o dejan un hueco.
+
+Lo que se GUARDA y lo que se MUESTRA son distintos, y por eso son dos funciones:
+se guarda el corte a medianoche y se dice "Termina el lunes 21", que es el último
+día en que rige.
+
+### QUEDA FUERA DE ALCANCE, DECIDIDO Y NO EMPEZADO
+
+Cuatro cosas, anotadas para que no se las descubra como si faltaran:
+
+1. **Que la oferta se apague sola cuando el stock llega a cero.** Hoy no pasa: la
+   oferta sigue vigente y el POS sigue cobrando el precio promocional aunque no
+   haya nada que entregar.
+2. **El cartel de "sin conexión no se aplican ofertas" en el POS.** La regla está
+   implementada —una venta encolada offline no aplica ofertas— pero el cajero no
+   ve ningún aviso, así que la venta sale a otro precio y nada lo anuncia.
+3. **El sello de OFERTA en la pantalla de Productos.** La API ya lo devuelve y
+   nadie lo pinta.
+4. **La pantalla de lista de ofertas.** Sigue siendo la que estaba.
+
+### UN HUECO DEL KIT, ANOTADO
+
+`SunmiToggle` es un `div` con `onClick`: no es un `button`, no declara
+`role="switch"` ni `aria-checked`, y no acepta etiqueta accesible. El arnés tiene
+que llegar a él por la fila que lo contiene en vez de por el control. No se
+arregló en esta tanda porque tocar una pieza compartida por otras pantallas es
+otra tanda, con sus capturas.

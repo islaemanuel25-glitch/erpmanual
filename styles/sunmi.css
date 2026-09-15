@@ -541,6 +541,37 @@
    deja pasar el FONDO; un menú flotante dejaría pasar TEXTO. */
 .sunmi-bg-card        { background: var(--card-bg); }
 
+/* EL PIE ANCLADO: la superficie del panel, y OPACA.
+
+   ── POR QUÉ NO ALCANZA CON `.pos-bg-surface` ────────────────────────────
+
+   Esa clase existe y pinta el mismo token, pero es del tema paralelo del POS:
+   el trinquete la cuenta como hardcodeo cuando aparece fuera de ese módulo, y
+   tiene razón — son dos vocabularios y mezclarlos es cómo se vuelven uno solo
+   sin que nadie lo decida.
+
+   ── Y POR QUÉ NO ES `background: var(--pos-surface)` A SECAS ────────────
+
+   Porque `--pos-surface` es TRANSLÚCIDO en cinco de los catorce temas
+   —`rgba(30,41,59,.6)` en `sunmiDark`, `rgba(15,23,42,.7)` en
+   `sunmiDarkCompact`, y parecidos en `sunmiGraphite`, `sunmiBlueClassic` y
+   `operixNight`—. Un pie ANCLADO no está apoyado en la página: flota sobre
+   contenido que scrollea por detrás, así que lo que dejaría pasar no es el
+   fondo, es TEXTO.
+
+   Es exactamente el defecto que ya se pagó una vez en el desplegable de motivo
+   de la recepción, donde se leía el importe corregido por detrás de las
+   opciones. La solución es la misma que se escribió allá: pintar el color
+   buscado ENCIMA de una base opaca —`--app-bg`, que es hex en los catorce,
+   comprobado— con un gradiente de un solo tono.
+
+   En los nueve temas donde `--pos-surface` ya es opaco, la capa tapa la base por
+   completo y no cambia nada. */
+.sunmi-bg-pie {
+  background-color: var(--app-bg);
+  background-image: linear-gradient(var(--pos-surface), var(--pos-surface));
+}
+
 /* --- Texto semántico --- */
 .sunmi-text-muted   { color: color-mix(in srgb, var(--app-fg) 60%, transparent); }
 .sunmi-text-strong  { color: var(--app-fg); }
