@@ -593,7 +593,26 @@ try {
   const enPantalla = await evaluar(`(() => {
     return ${TARJETAS}.map((t) => {
       const cuerpo = t.firstElementChild;
-      const nombre = cuerpo ? cuerpo.firstElementChild : null;
+      // ── EL NOMBRE NO ES SIEMPRE EL PRIMER HIJO ────────────────────────
+      //
+      // La ranura "destacado" del kit va ABSOLUTA y se dibuja ANTES del nombre:
+      // el orden en el DOM no importa para el dibujo, pero si para quien lea.
+      // Mientras el unico sello era "ultimo editado" —que aparece un momento y
+      // sobre una sola tarjeta— esto no se notaba; con el sello de OFERTA,
+      // firstElementChild paso a devolver la pildora y la sonda informo
+      // "1 de 2 tarjetas no casan con ninguna fila (primera: OFERTA)".
+      //
+      // Es lo que advierte el comentario de mas abajo: buscar por FORMA ata la
+      // sonda a un acomodo que puede cambiar. El nombre no tiene atributo propio
+      // en el kit, asi que lo que se puede hacer sin tocarlo es saltear el nodo
+      // absoluto, que si se reconoce por su clase.
+      //
+      // OJO: este bloque vive adentro de un template literal. Un backtick en un
+      // comentario de aca cierra la cadena y el archivo deja de parsear — ya
+      // paso al escribir esta misma nota.
+      const nombre = cuerpo
+        ? [...cuerpo.children].find((n) => !String(n.className).includes("absolute")) || null
+        : null;
       const fila = t.querySelector('.items-baseline');
       // Por ATRIBUTO, no por texto ni por forma. Buscarlo por su contenido lo
       // ataba a las palabras que esta tanda cambió, y la condición de "sin hijos
