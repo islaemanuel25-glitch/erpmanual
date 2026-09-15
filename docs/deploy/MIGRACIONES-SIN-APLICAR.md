@@ -16,34 +16,31 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-### `20260915200000_codigo_barra_unico_por_ubicacion` — **NO ADITIVA (DROP de índice)**
+Ninguna. Producción está en **14 migraciones**, las mismas que el árbol.
 
-Producción está en **13 migraciones** y el árbol en **14**.
+---
 
-Reemplaza el índice único `(grupoId, codigo_barra)` de `ProductoBase` por
-`(grupoId, creadoEnLocalId, codigo_barra)`. Es lo que permite que Mini el 7 y
-Casiano carguen el mismo helado, que hoy está prohibido.
+## 2026-09-15 — `3a76b9ec`, el código de barras por ubicación: **UNA NO ADITIVA, AUTORIZADA**
 
-**El clasificador la marca NO ADITIVA y frena, por el `DROP INDEX`.** Está
-AUTORIZADA por Emanuel, por escrito y nombrando el motivo. Se continúa con
-`DEPLOY_MIGRACION_AUTORIZADA=1`.
+Producción pasó de `39625985844fba4b287fbf1ec09df6a283568877` a
+`3a76b9ecef3cea05b08d3e2f619009dd3c47e56b`. Corte de **2 segundos**.
 
-**AFLOJA, no aprieta**, y eso es lo que hace segura la ventana entre migrar y
-recrear: la restricción nueva es más débil que la vieja, así que todo lo que
-entraba antes entra ahora. El código viejo —que valida contra todo el grupo—
-sigue funcionando contra el índice nuevo, porque nunca intenta escribir nada que
-el índice nuevo rechace.
+`20260915200000_codigo_barra_unico_por_ubicacion`. Reemplaza el índice único
+`(grupoId, codigo_barra)` de `ProductoBase` por
+`(grupoId, creadoEnLocalId, codigo_barra)`.
 
-**El quinto chequeo del backup NO aplica**: no se borra ni se modifica ningún
-dato, solo un índice.
+**El clasificador la marcó NO ADITIVA y frenó con código 1**, nombrando el
+`DROP INDEX` de la línea 50. No era un falso positivo: es un drop deliberado. Se
+continuó con **`DEPLOY_MIGRACION_AUTORIZADA=1`** sobre la autorización que
+Emanuel dejó por escrito en el pedido, nombrando la migración y el motivo.
 
-**Medido contra producción antes de escribirla.** La clave nueva simulada sobre
-las 2840 filas reales: cero colisiones. `creadoEnLocalId` sin ningún nulo.
+**El quinto chequeo del backup no aplicaba**: no se toca ningún dato, solo un
+índice.
 
-**La reposición está escrita adentro de la migración**, con la consulta que hay
-que correr primero para saber si todavía es posible: volver al índice viejo solo
-se puede mientras dos locales no hayan cargado el mismo código, que es justo lo
-que esta migración viene a permitir.
+Verificado después de recrear: `migrate status` dice "Database schema is up to
+date", el contenedor informa **14 migraciones** y el árbol tiene **14**, y el
+único índice único con `codigo_barra` en `ProductoBase` es el nuevo — el viejo ya
+no está.
 
 ---
 
