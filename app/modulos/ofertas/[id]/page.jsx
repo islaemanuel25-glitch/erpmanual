@@ -16,6 +16,8 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 
 import EstadoOfertaPill from "@/components/ofertas/EstadoOfertaPill";
+import ModalConfirmarOferta from "@/components/ofertas/ModalConfirmarOferta";
+import { carteDeEliminar, carteDeFinalizar } from "@/lib/ofertas/confirmaciones";
 import EditorProductosOferta from "@/components/ofertas/EditorProductosOferta";
 import FormularioOferta from "@/components/ofertas/FormularioOferta";
 import { fechaHora, pesos, porcentaje, paraInputFechaHora, desdeInputFechaHora } from "@/lib/ofertas/formato";
@@ -51,6 +53,15 @@ export default function DetalleOfertaPage() {
   const [lineasEditadas, setLineasEditadas] = useState([]);
   const [editandoDatos, setEditandoDatos] = useState(false);
   const [datos, setDatos] = useState(null);
+  // ── LA ACCIÓN QUE ESTÁ ESPERANDO CONFIRMACIÓN ──────────────────────────
+  //
+  // `null` es "no hay ningún cartel abierto". Guardar CUÁL —y no un booleano por
+  // acción— es lo que impide que se puedan abrir los dos a la vez, y hace que
+  // agregar una tercera no agregue otro estado.
+  //
+  // Nada se escribe hasta que se toca el botón que confirma: abrir el cartel no
+  // llama a ninguna ruta.
+  const [confirmando, setConfirmando] = useState(null);
 
   const cargar = useCallback(async () => {
     setCargandoDetalle(true);
@@ -371,15 +382,7 @@ export default function DetalleOfertaPage() {
             <SunmiButton
               color="amber"
               disabled={trabajando}
-              onClick={async () => {
-                if (!confirm(`¿Finalizar "${oferta.nombre}"? Deja de aplicarse y pasa al archivo.`)) return;
-                const r = await llamar(
-                  `/api/ofertas/${ofertaId}/finalizar`,
-                  { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
-                  "Oferta finalizada."
-                );
-                if (r) cargar();
-              }}
+              onClick={() => setConfirmando("FINALIZAR")}
             >
               Finalizar
             </SunmiButton>
@@ -388,17 +391,53 @@ export default function DetalleOfertaPage() {
             <SunmiButton
               color="red"
               disabled={trabajando}
-              onClick={async () => {
-                if (!confirm(`¿Eliminar "${oferta.nombre}" definitivamente?`)) return;
-                const r = await llamar(`/api/ofertas/${ofertaId}`, { method: "DELETE" });
-                if (r) router.push("/modulos/ofertas");
-              }}
+              onClick={() => setConfirmando("ELIMINAR")}
             >
               Eliminar
             </SunmiButton>
           )}
         </div>
       </SunmiCard>
+
+      {/* EL CARTEL. Se dibuja una sola vez y decide qué dice según la acción que
+          esté esperando: dos modales separados serían dos lugares donde el
+          `destructivo` y el `z` se pueden separar. */}
+      <ModalConfirmarOferta
+        abierto={confirmando !== null}
+        cartel={
+          confirmando === "FINALIZAR"
+            ? carteDeFinalizar({ oferta, money: pesos })
+            : confirmando === "ELIMINAR"
+              ? carteDeEliminar({ oferta, money: pesos })
+              : null
+        }
+        color={confirmando === "ELIMINAR" ? "red" : "amber"}
+        trabajando={trabajando}
+        error={error}
+        onCerrar={() => setConfirmando(null)}
+        onConfirmar={async () => {
+          if (confirmando === "FINALIZAR") {
+            const r = await llamar(
+              `/api/ofertas/${ofertaId}/finalizar`,
+              { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
+              "Oferta finalizada."
+            );
+            // El cartel se cierra solo si salió bien. Si falló, el error se
+            // dibuja ADENTRO: cerrarlo dejaría el mensaje detrás de un modal que
+            // ya no está y la persona no sabría qué pasó.
+            if (r) {
+              setConfirmando(null);
+              cargar();
+            }
+          } else if (confirmando === "ELIMINAR") {
+            const r = await llamar(`/api/ofertas/${ofertaId}`, { method: "DELETE" });
+            if (r) {
+              setConfirmando(null);
+              router.push("/modulos/ofertas");
+            }
+          }
+        }}
+      />
     </div>
   );
 }

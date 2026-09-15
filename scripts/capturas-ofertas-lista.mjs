@@ -99,6 +99,28 @@ async function foto(nombre) {
   console.log(`  ✓ ${nombre}.png  ${desborde === 0 ? "sin scroll horizontal" : `⚠ DESBORDA ${desborde}px`}`);
 }
 
+// ── TOCAR ADENTRO DEL CARTEL, Y NO EN CUALQUIER LADO ────────────────────
+//
+// El detalle de la oferta tiene su propio botón "Volver" —el del encabezado, que
+// va a la lista— y el cartel tiene otro. `tocar("Volver")` agarraba el primero:
+// el arnés se iba a la lista, el cartel "se cerraba" y las dos afirmaciones que
+// venían después pasaban sin medir nada. Un falso verde sobre un recorrido que
+// ni siquiera estaba ocurriendo.
+async function tocarEnElCartel(fragmento) {
+  const ok = await evaluar(`(() => {
+    const dialogo = document.querySelector('[role="dialog"]');
+    if (!dialogo) return false;
+    const el = [...dialogo.querySelectorAll('button')]
+      .filter((n) => n.offsetParent !== null && !n.disabled)
+      .find((n) => (n.textContent || '').includes(${JSON.stringify(fragmento)}));
+    if (!el) return false;
+    el.click();
+    return true;
+  })()`);
+  if (!ok) throw new Error(`no se encontró «${fragmento}» adentro del cartel`);
+  await esperar(900);
+}
+
 async function tocar(fragmento) {
   const ok = await evaluar(`(() => {
     const objetivo = ${JSON.stringify(fragmento)};
@@ -392,6 +414,108 @@ await afirmar(
 // terminarse y el arnés no se habría enterado.
 await afirmar(await hayTexto("Finalizar"), "el detalle tiene la acción de finalizar");
 await foto(`ofertas-detalle-${ANCHO}`);
+
+// ── 5 · EL CARTEL ES DEL SISTEMA, NO DEL NAVEGADOR ───────────────────────
+//
+// ── POR QUÉ SE INTERCEPTA `window.confirm` Y NO SE MIRA EL FUENTE ────────
+//
+// Un candado de fuente diría que la cadena `confirm(` no está; esto dice que no
+// SE LLAMA. Y hay un motivo práctico además del de principio: un `confirm()` de
+// verdad BLOQUEA el hilo del navegador, así que el arnés se colgaría en vez de
+// informar. Interceptándolo, si alguien lo repone el candado lo nombra.
+await evaluar(`(() => {
+  window.__confirms = [];
+  window.confirm = (m) => { window.__confirms.push(String(m)); return false; };
+  window.alert = (m) => { window.__confirms.push('alert:' + String(m)); };
+  return true;
+})()`);
+
+const idOferta = Number(id);
+const antesDelCartel = await prisma.oferta.findUnique({
+  where: { id: idOferta }, select: { finalizadaEn: true },
+});
+await afirmar(antesDelCartel?.finalizadaEn === null, "la oferta arranca sin terminar");
+
+await tocar("Finalizar");
+await afirmar(
+  (await evaluar("window.__confirms.length")) === 0,
+  `se llamó a confirm() del navegador: ${JSON.stringify(await evaluar("window.__confirms"))}`
+);
+await afirmar(await hayTexto("Terminar esta oferta"), "se abre el cartel del kit");
+await afirmar(
+  await hayTexto("QUILMES CERVEZA 1L"),
+  "el cartel dice QUÉ producto se termina"
+);
+await afirmar(
+  await evaluar(`/Pasa de \\$[\\d.,]+ a \\$[\\d.,]+/.test(document.body.innerText)`),
+  "y a qué precio vuelve, con los dos importes"
+);
+await afirmar(
+  await hayTexto("no hay es un botón para volver a prenderla"),
+  "y que no se puede deshacer"
+);
+await afirmar(
+  await hayTexto("Finalizar la oferta") && await hayTexto("Volver"),
+  "están los dos botones, con el que confirma nombrando la acción"
+);
+await foto(`ofertas-cartel-finalizar-${ANCHO}`);
+
+// ── ABRIR EL CARTEL NO ESCRIBE NADA ─────────────────────────────────────
+const conElCartelAbierto = await prisma.oferta.findUnique({
+  where: { id: idOferta }, select: { finalizadaEn: true },
+});
+await afirmar(
+  conElCartelAbierto?.finalizadaEn === null,
+  "abrir el cartel NO finalizó la oferta"
+);
+
+// ── EL VELO NO CIERRA: ES `destructivo` ─────────────────────────────────
+await evaluar(`(() => {
+  const velo = [...document.querySelectorAll('div')]
+    .find((d) => d.offsetParent !== null && /fixed/.test(d.className) && /inset-0/.test(d.className));
+  if (velo) velo.click();
+  return !!velo;
+})()`);
+await esperar(700);
+await afirmar(
+  await hayTexto("Terminar esta oferta"),
+  "tocar afuera NO cierra el cartel: por eso es destructivo"
+);
+
+// ── Y «VOLVER» NO ESCRIBE NADA ──────────────────────────────────────────
+const rutaAntesDeVolver = await evaluar("location.pathname");
+await tocarEnElCartel("Volver");
+await afirmar(!(await hayTexto("Terminar esta oferta")), "«Volver» cierra el cartel");
+await afirmar(
+  (await evaluar("location.pathname")) === rutaAntesDeVolver,
+  "y deja la pantalla donde estaba: no se tocó el «Volver» del encabezado"
+);
+const despuesDeVolver = await prisma.oferta.findUnique({
+  where: { id: idOferta }, select: { finalizadaEn: true, finalizadaPorId: true },
+});
+await afirmar(
+  despuesDeVolver?.finalizadaEn === null && despuesDeVolver?.finalizadaPorId === null,
+  `«Volver» NO escribió nada (${JSON.stringify(despuesDeVolver)})`
+);
+
+// ── AHORA SÍ ────────────────────────────────────────────────────────────
+await tocar("Finalizar");
+await esperar(700);
+await tocarEnElCartel("Finalizar la oferta");
+await esperar(2000);
+await afirmar(
+  (await evaluar("window.__confirms.length")) === 0,
+  "no se usó ningún confirm() del navegador en todo el recorrido"
+);
+const terminada = await prisma.oferta.findUnique({
+  where: { id: idOferta }, select: { finalizadaEn: true, finalizadaPorId: true },
+});
+await afirmar(
+  terminada?.finalizadaEn !== null && terminada?.finalizadaPorId !== null,
+  `confirmar SÍ finaliza, con autor (${JSON.stringify(terminada)})`
+);
+await afirmar(!(await hayTexto("Terminar esta oferta")), "y el cartel se cierra al confirmar");
+await foto(`ofertas-despues-de-finalizar-${ANCHO}`);
 
 console.log(`\n${afirmaciones} afirmaciones en verde · ${desbordes} capturas con desborde`);
 console.log(`Capturas en ${SALIDA}`);

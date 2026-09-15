@@ -799,11 +799,51 @@ a donde lleva "Editar". El arnes lo comprueba: toca Editar, llega al detalle de
 ESA oferta y verifica que ahi este "Finalizar". Sin eso, sacar el boton de la
 tarjeta habria dejado la oferta sin forma de terminarse.
 
-**Deuda anotada:** la confirmacion del detalle es un `confirm()` del navegador,
-no un modal del kit. El modal que se habia escrito para la lista —que decia que
-producto y a que precio vuelve— se borro al sacar la accion, porque quedaba sin
-ningun lector. Si el detalle adopta uno, se escribe contra sus necesidades
-reales, que incluyen el motivo de finalizacion.
+### EL CARTEL ES DEL SISTEMA, NO DEL NAVEGADOR
+
+El detalle confirmaba con dos `confirm()` del navegador:
+
+    ¿Finalizar "X"? Deja de aplicarse y pasa al archivo.
+    ¿Eliminar "X" definitivamente?
+
+Los dos se reemplazaron por `ModalConfirmarOferta`, sobre `SunmiModalLayout` y
+marcado como **`destructivo`**: el velo no cierra tocando afuera, que es lo que
+hace falta cuando se toca desde un celular.
+
+El problema de un `confirm()` no es que sea feo: **se cierra con Enter**, aparece
+como un cartel del sistema encima de todo con dos botones identicos, y el que
+dice "Aceptar" esta donde el pulgar ya estaba. Y ninguno de los dos decia a
+cuanto pasa a venderse el producto, que es lo unico que hace falta saber antes de
+bajar una promocion.
+
+**El texto vive en `lib/ofertas/confirmaciones.js`**, no en el componente, porque
+son tres preguntas con borde:
+
+- **¿A que precio vuelve?** Al de HOY (`precioNormalActual`), no al que se
+  congelo al cargar la oferta. Decir la referencia seria prometer un numero que
+  no va a salir — y la diferencia entre los dos es justo lo que el aviso de
+  revisar existe para señalar. Se cae a la referencia solo si no hay actual.
+- **¿Y si tiene varios productos?** No hay "el" precio: se dice cuantos son.
+- **¿Y si falta un numero?** El renglon no se dibuja. `Number(null)` es 0 y un
+  cero se lee como un dato.
+
+**Finalizar y eliminar NO dicen lo mismo**, y hay un candado que compara los dos
+carteles campo por campo. Finalizar archiva —la oferta queda en Terminadas—;
+eliminar borra la fila y no deja nada. Dos carteles iguales para dos cosas
+distintas es como se aprende a tocar "Si" sin leer.
+
+**Un censo impide que vuelva un tercero.** Lee los archivos del modulo SIN
+COMENTARIOS antes de buscar: la primera version usaba `git grep` y se puso roja
+nombrando los comentarios de este mismo cambio, que es la cuarta vez que ese
+defecto aparece en el repo. Tiene contraprueba — el patron se corre contra todo
+`app/modulos`, donde esta medido que hay varios, y tiene que encontrarlos.
+
+**Deuda anotada: el modulo tiene DOS formateadores de plata.** `pesos` en
+`formato.js` escribe `$3.700,00` y `money` en `crearOfertaMovil.js` escribe
+`$ 3.700,00`, con espacio. El cartel usa `pesos`, que es el de la pantalla donde
+vive, y la lista usa `money`. El mismo importe se lee distinto en dos pantallas
+del mismo modulo. No se unifico en esta tanda: elegir cual queda es una decision
+de como se ve.
 
 ### LOS IMPORTES LLEVAN CENTAVOS
 

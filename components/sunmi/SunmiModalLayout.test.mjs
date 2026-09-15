@@ -693,6 +693,17 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // renombre de `destructivo`.
     "components/proveedores/listas/ModalRevertir.jsx": true,
     "components/proveedores/listas/ModalTerminar.jsx": true,
+    // ── EL CARTEL DE FINALIZAR O BORRAR UNA OFERTA ────────────────────────
+    //
+    // Reemplaza a dos `confirm()` del navegador. No hay nada escrito adentro que
+    // se pueda perder, así que por el criterio NUEVO iría en `false`; declara
+    // `true` por el VIEJO, igual que los dos de arriba, y se revisa con ellos al
+    // cerrar la fase 2.
+    //
+    // Lo que sí es propio: viene de reemplazar un `confirm()`, que se cierra con
+    // Enter y con el botón donde el pulgar ya estaba. Aflojar el velo acá sería
+    // devolverle parte de eso.
+    "components/ofertas/ModalConfirmarOferta.jsx": true,
     // ── EL ÚNICO ARCHIVO CON DOS MODALES, Y NO CONTESTAN LO MISMO ────────────
     //
     // `app/modulos/clientes/page.jsx` tiene "Cuenta Corriente", que SÍ lo declara
