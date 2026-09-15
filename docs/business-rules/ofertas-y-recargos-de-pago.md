@@ -588,3 +588,127 @@ Cuatro cosas, anotadas para que no se las descubra como si faltaran:
 que llegar a él por la fila que lo contiene en vez de por el control. No se
 arregló en esta tanda porque tocar una pieza compartida por otras pantallas es
 otra tanda, con sus capturas.
+
+## EL BLOQUE DE PRECIO: MARGEN, REDONDEO Y ARRANQUE EN EL MARGEN REAL
+
+Verificado en código y ejercido en el navegador (`scripts/capturas-oferta-nueva.mjs`,
+70 afirmaciones).
+
+### LOS DOS CAMPOS SON EL MISMO NÚMERO VISTO DE DOS MANERAS
+
+`lib/ofertas/precioConMargen.js`. La cuenta es **margen sobre el costo**
+—`precio = costo x (1 + % / 100)`— y no margen sobre la venta. Son dos numeros
+distintos: el mismo producto da 30 % en uno y 23 % en el otro. En este mismo repo
+convive la otra, `margenOferta` en `precio.js`, que calcula sobre el precio y
+alimenta la linea informativa "te queda X % de margen". **No se unificaron a
+proposito:** son dos preguntas distintas y unificarlas cambiaria un numero que ya
+se muestra.
+
+El campo que se esta tocando NO se reescribe. `origen` dice cual es y vuelve tal
+cual; el otro se recalcula. Sin eso no se puede tipear "12" sin que salte a "1".
+
+### ARRANCAN EN EL MARGEN DE HOY, NO VACIOS
+
+Al elegir el producto los dos campos ya traen el margen y el precio que ese
+producto tiene HOY, para que se vea de donde se parte. Ese estado inicial **no es
+una oferta** —es el precio normal escrito en dos campos— y por eso Publicar
+arranca apagado y se enciende recien cuando el precio baja del normal.
+
+Sin costo cargado no se dibuja el campo de margen y se dice por que: no hay de
+que calcularlo, y dividir por cero daria infinito.
+
+### EL % QUE SE MUESTRA ES EL DE DESPUES DEL REDONDEO
+
+El redondeo usa `redondear100`, la MISMA funcion con la que el POS redondea el
+precio unitario. No se escribio una segunda regla: dos reglas de redondeo es como
+empezo el problema de escala de la tanda anterior.
+
+Si se tipea 18 % y el redondeo deja un precio que da 16 %, el campo dice 16. El
+margen que va a quedar es el segundo, y es el que decide si la oferta conviene.
+
+**Y EL REDONDEO ES HACIA ARRIBA, LO QUE PUEDE CANCELAR LA OFERTA.** Es una
+consecuencia que no es obvia y esta medida: sobre un producto de $ 500, escribir
+$ 450 con el redondeo puesto termina cobrando $ 500, y la oferta deja de ser una
+oferta. La pantalla lo dice —"Redondeado de $ 450,00" y "no es menos que
+$ 500,00: todavia no es una oferta"— y Publicar queda apagado. Para cobrar
+exactamente lo escrito hay que apagar el interruptor.
+
+### LA DECISION DE REDONDEAR SE GUARDA CON LA OFERTA
+
+`OfertaLinea` gano dos columnas, las dos opcionales y sin DEFAULT
+(`20260915180000_oferta_redondeo_y_precio_exacto`, aditiva):
+
+- `redondeoAplicado` — si el interruptor quedo puesto.
+- `precioSinRedondear` — el precio exacto del que se partio.
+
+`null` significa **"no se registro"**, que es distinto de "no se redondeo". Un
+`false` por defecto diria algo que nadie sabe, y las lineas historicas no lo
+saben. Los dos vienen del navegador y NO se recalculan en el servidor, a
+diferencia del precio normal y el costo: no son hechos del producto, son lo que
+la persona decidio.
+
+### LAS VALIDACIONES AVISAN; UNA SOLA BLOQUEA
+
+- **Precio mayor o igual al normal:** bloquea. No es una oferta.
+- **Precio bajo el costo:** avisa con el numero —"te falta $ X para cubrir el
+  costo"— y **deja publicar**. Es una decision comercial legitima.
+- **Margen negativo TIPEADO:** bloquea, porque es un tipeo y no una decision.
+- **Margen negativo DERIVADO de un precio bajo el costo:** NO bloquea. Los dos
+  campos estan sincronizados, asi que escribir un precio bajo el costo deja un
+  margen negativo escrito que nadie tipeo. Sin esta distincion la pantalla
+  frenaria exactamente la venta bajo costo que dice permitir. Lo decide
+  `margenInvalido(margen, origen)` y lo cierran los candados M19 y M20.
+
+### LO QUE SE ESTA CARGANDO SOBREVIVE A UN REFRESH
+
+`lib/ofertas/ofertaEnCurso.js`, copia deliberada de
+`lib/compras-proveedor/retornoPedido.js`: una clave de `sessionStorage`, una
+funcion que serializa y otra que deserializa. **No** se crea un borrador en el
+servidor: eso haria aparecer una oferta en la lista que nadie pidio crear.
+
+Se guardan el producto, los dos campos **como texto** —para que "18." a medio
+tipear no vuelva como 18—, el interruptor de redondeo, la duracion y el medio de
+pago. **NO** se guardan el costo ni el precio normal: se vuelven a pedir al
+servidor, porque entre que se fue y volvio pudieron cambiar.
+
+El cartel va **adentro del encabezado**, no del contenedor que scrollea: adentro
+se iria de la vista al bajar. No se restaura solo — aparece el cartel y la
+persona decide, igual que en compras.
+
+### EL AVISO DE STOCK SIGUE LA CONFIGURACION DEL LOCAL
+
+`avisaSinStock({ permiteVenderSinStock, stock })` en `crearOfertaMovil.js`. Con
+la venta sin stock HABILITADA no avisa nunca: un negativo ahi es normal y un
+aviso permanente se deja de leer. Con la venta DESHABILITADA y stock en cero o
+menos, avisa — y **no bloquea**, porque se esta programando un precio para los
+proximos dias y el pedido puede estar por llegar.
+
+Esta como funcion y no como condicion adentro del JSX porque en la base de
+pruebas todos los productos tienen stock: adentro del JSX la rama que dibuja el
+aviso era inalcanzable y el candado del navegador quedaba verde midiendo siempre
+el mismo lado. Las dos ramas se ejercen en O18, O19 y O20.
+
+### DOS DEFECTOS QUE ENCONTRO LA PANTALLA Y NO LOS CANDADOS
+
+1. **La oferta a medio armar se perdia en TODOS los refrescos.** El efecto que
+   guarda corre tambien al montar, con `producto` todavia en `null`, asi que
+   borraba la clave antes de que el efecto que lee la mirara. No daba ninguna
+   senal: el cartel simplemente no aparecia. Lo encontro el arnes recargando de
+   verdad. El arreglo no cuenta montajes —React monta dos veces en desarrollo—:
+   el efecto **no borra lo que no escribio el**.
+2. **El resumen del pie anunciaba el precio TIPEADO y no el cobrado.** Con $ 433
+   escritos decia "pasa de $ 500,00 a $ 433,00" mientras el bloque de arriba
+   decia que el precio quedaba en $ 500. El pie es la ultima frase que se lee
+   antes de publicar, asi que es la que no puede mentir. Aparecio mirando una
+   captura; ningun candado podia verlo, porque el pie y el bloque se arman con
+   funciones distintas y cada una tenia los suyos en verde.
+
+### DEUDA ABIERTA DE ESTA TANDA
+
+`lineasDePrecio` y `puedePublicar`, en `crearOfertaMovil.js`, **quedaron sin
+ningun lector en el repo**: el bloque de precio los reemplazo por `resolverBloque`
+y `listo`. Sus 14 afirmaciones siguen en verde defendiendo codigo que ninguna
+pantalla llama, que es exactamente el caso que `CLAUDE.md` marca como el que mas
+se repite. No se borraron en esta tanda —es otra unidad revertible— pero la
+pregunta que hay que contestar no es como arreglarlos: es si esas ramas todavia
+tienen que existir.

@@ -32,7 +32,7 @@
 // encabezados en un teléfono de 390 px.
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useUser } from "@/app/context/UserContext";
@@ -46,27 +46,30 @@ import SunmiToggle from "@/components/sunmi/SunmiToggle";
 
 import AccionDePantalla from "@/components/transferencias/AccionDePantalla";
 import BuscadorProductos from "@/components/pos-ventas/BuscadorProductos";
+import BloqueDePrecio from "@/components/ofertas/BloqueDePrecio";
 import {
+  CLAVE_OFERTA_EN_CURSO,
+  deserializarOfertaEnCurso,
+  serializarOfertaEnCurso,
+  textoDelCartel,
+} from "@/lib/ofertas/ofertaEnCurso";
+import { estadoInicial, margenInvalido, resolverBloque } from "@/lib/ofertas/precioConMargen";
+// `lineasDePrecio` y `puedePublicar` YA NO SE IMPORTAN: el bloque de precio los
+// reemplazó por `resolverBloque` y `listo`. Quedaron sin ningún lector en el
+// repo —solo los llaman sus propios candados— y eso está anotado para resolverlo
+// en su propia tanda, no de paso en ésta.
+import {
+  avisaSinStock,
   DURACIONES,
   DURACION_POR_DEFECTO,
   finDeLaOferta,
-  lineasDePrecio,
   money,
-  puedePublicar,
   resumenDeLaOferta,
   textoDeVigencia,
 } from "@/lib/ofertas/crearOfertaMovil";
 import { CONDICION_PAGO_OFERTA } from "@/lib/ofertas/vigencia";
 
 const RUTA_OFERTAS = "/modulos/ofertas";
-
-/** El tono que devuelve el dominio, traducido a token del tema. */
-const COLOR_DE_TONO = {
-  ok: "sunmi-text-success",
-  perdida: "sunmi-text-danger",
-  invalida: "sunmi-text-danger",
-  neutro: "sunmi-text-muted",
-};
 
 /** Un rótulo de bloque: 11px peso 500, apagado. */
 function Rotulo({ children }) {
@@ -92,6 +95,12 @@ export default function NuevaOfertaPage() {
 
   const [producto, setProducto] = useState(null);
   const [precio, setPrecio] = useState("");
+  const [margen, setMargen] = useState("");
+  // EL ÚLTIMO CAMPO TOCADO. Es lo que decide cuál NO se reescribe.
+  const [origen, setOrigen] = useState("PRECIO");
+  // ENCENDIDO POR DEFECTO, como el POS redondea el precio unitario.
+  const [redondear, setRedondear] = useState(true);
+  const [enCurso, setEnCurso] = useState(null);
   const [duracion, setDuracion] = useState(DURACION_POR_DEFECTO);
   const [fechaElegida, setFechaElegida] = useState("");
   const [soloEfectivo, setSoloEfectivo] = useState(false);
@@ -105,12 +114,115 @@ export default function NuevaOfertaPage() {
     () => finDeLaOferta({ duracion, fechaElegida }),
     [duracion, fechaElegida]
   );
-  const lineas = lineasDePrecio({
-    precioNormal: producto?.precioNormal,
-    precioOferta: precio,
+  // El bloque de precio, resuelto: la cuenta vive en `resolverBloque` y acá
+  // solo se le pasan los dos campos y quién se está tocando.
+  const bloque = resolverBloque({
+    origen,
+    margen,
+    precio,
     costo: producto?.costo,
+    precioNormal: producto?.precioNormal,
+    redondear,
   });
-  const listo = puedePublicar({ producto, precioOferta: precio, finEn });
+
+  // PUBLICAR NECESITA QUE SEA UNA OFERTA DE VERDAD. El estado inicial —el precio
+  // normal en los dos campos— no lo es, así que arranca apagado.
+  //
+  // Y el margen negativo TIPEADO frena acá, que es la única de las validaciones
+  // que bloquea. El derivado de un precio bajo el costo no: eso es el líder de
+  // pérdida y se publica igual. La distinción la hace `margenInvalido` mirando
+  // el origen; sin ella, este renglón frenaría la venta bajo costo.
+  const listo =
+    Boolean(producto) && Boolean(finEn) && bloque.esOferta && !margenInvalido(margen, origen);
+
+  // ── LO QUE SE ESTÁ CARGANDO SE GUARDA EN LA PESTAÑA ────────────────────
+  //
+  // Mismo mecanismo que el pedido a proveedor en curso: `sessionStorage`, una
+  // clave propia y las dos funciones puras de `ofertaEnCurso`. No se crea un
+  // borrador en el servidor — eso haría aparecer una oferta en la lista que
+  // nadie pidió crear.
+  // ── Y NO SE GUARDA EN EL PRIMER RENDER ─────────────────────────────────
+  //
+  // Éste es el defecto que tuvo esta pantalla y que ningún candado podía ver:
+  // al montar, `producto` todavía es `null`, así que `serializarOfertaEnCurso`
+  // devolvía `null` y la rama del `else` BORRABA la clave — antes de que el
+  // efecto de abajo alcanzara a leerla. La oferta a medio armar se perdía en
+  // todos los refrescos, que es exactamente lo que este bloque existe para
+  // impedir, y la pantalla no daba ninguna señal: el cartel simplemente no
+  // aparecía. Lo encontró el arnés recargando de verdad.
+  //
+  // El `else` se conserva —al soltar el producto hay que limpiar, o quedaría un
+  // cartel ofreciendo retomar algo que ya no está—, pero SOLO BORRA LO QUE ESTE
+  // EFECTO ESCRIBIÓ. No se cuentan montajes: en desarrollo React monta dos veces
+  // y un contador de "primera corrida" volvería a borrar en la segunda.
+  const yaGuardo = useRef(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const guardar = serializarOfertaEnCurso({
+        productoLocalId: producto?.productoLocalId,
+        productoBaseId: producto?.productoBaseId,
+        nombre: producto?.nombre,
+        margen, precio, redondear, duracion, fechaElegida, soloEfectivo,
+      });
+      if (guardar) {
+        sessionStorage.setItem(CLAVE_OFERTA_EN_CURSO, JSON.stringify(guardar));
+        yaGuardo.current = true;
+      } else if (yaGuardo.current) {
+        sessionStorage.removeItem(CLAVE_OFERTA_EN_CURSO);
+      }
+    } catch {
+      // Sin sessionStorage se pierde lo cargado al volver, pero no se rompe la
+      // pantalla: es una comodidad, no un requisito.
+    }
+  }, [producto, margen, precio, redondear, duracion, fechaElegida, soloEfectivo]);
+
+  // Al montar: si había algo a medio armar, se avisa. NO se restaura solo —
+  // aparece el cartel y la persona decide, igual que en compras.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const g = deserializarOfertaEnCurso(sessionStorage.getItem(CLAVE_OFERTA_EN_CURSO));
+      if (g && !producto) setEnCurso(g);
+    } catch {
+      /* ídem */
+    }
+    // Solo al montar: si corriera con cada cambio, el cartel volvería a aparecer
+    // mientras se está escribiendo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const limpiarEnCurso = () => {
+    try {
+      sessionStorage.removeItem(CLAVE_OFERTA_EN_CURSO);
+    } catch {
+      /* ídem */
+    }
+    setEnCurso(null);
+  };
+
+  /** Repone lo guardado. El costo y el precio normal NO salen de acá: se vuelven
+   *  a pedir al servidor, porque entre que se fue y volvió pudieron cambiar. */
+  const retomar = async () => {
+    if (!enCurso) return;
+    setMargen(enCurso.margen);
+    setPrecio(enCurso.precio);
+    setRedondear(enCurso.redondear);
+    setDuracion(enCurso.duracion || DURACION_POR_DEFECTO);
+    setFechaElegida(enCurso.fechaElegida || "");
+    setSoloEfectivo(enCurso.soloEfectivo);
+    try {
+      const url = new URL("/api/ofertas/buscar-producto", window.location.origin);
+      url.searchParams.set("q", enCurso.nombre || "");
+      const res = await fetch(url.toString(), { credentials: "include" });
+      const j = await res.json();
+      const p = (j?.items || []).find((x) => x.productoLocalId === enCurso.productoLocalId);
+      if (p) setProducto(p);
+    } catch {
+      setError("No se pudo recuperar el producto. Buscalo de nuevo.");
+    }
+    setEnCurso(null);
+  };
 
   if (cargandoUsuario) return null;
   if (!esAdmin && !permisos.includes("ofertas.crear")) return <SinPermisos />;
@@ -138,7 +250,15 @@ export default function NuevaOfertaPage() {
             ? CONDICION_PAGO_OFERTA.SOLO_EFECTIVO
             : CONDICION_PAGO_OFERTA.CUALQUIER_MEDIO,
           lineas: [
-            { productoLocalId: producto.productoLocalId, precioOferta: Number(precio) },
+            {
+              productoLocalId: producto.productoLocalId,
+              precioOferta: bloque.precioFinal,
+              // POR QUÉ ESE PRECIO TERMINÓ SIENDO ÉSE. Ninguno de los dos se
+              // puede reconstruir después: un precio redondo no prueba que hubo
+              // redondeo, y uno con decimales no prueba que no lo hubo.
+              redondeoAplicado: redondear,
+              precioSinRedondear: bloque.precioSinRedondear,
+            },
           ],
         }),
       });
@@ -166,6 +286,10 @@ export default function NuevaOfertaPage() {
           return;
         }
       }
+      // SE LIMPIA AL GUARDAR, en las dos salidas: publicando o como borrador.
+      // Lo que quedó guardado ya está en el servidor; dejarlo en la pestaña
+      // haría aparecer el cartel sobre una oferta que ya existe.
+      limpiarEnCurso();
       router.push(`${RUTA_OFERTAS}/${json.ofertaId}`);
     } catch (e) {
       setError(`No se pudo hablar con el servidor: ${e.message}`);
@@ -180,6 +304,48 @@ export default function NuevaOfertaPage() {
     <div className="w-full min-h-full flex flex-col">
       <AccionDePantalla>{volver}</AccionDePantalla>
 
+      {/* ── EL CARTEL VIVE DENTRO DEL ENCABEZADO, NO EN EL CONTENIDO ───────
+          Es el error que ya se pagó una vez en compras y está escrito allá: un
+          cartel en el contenido que scrollea se ve entero en reposo y al bajar
+          queda tapado, justo cuando la persona está mirando lo que cargó. Acá
+          va fuera del contenedor con `overflow-y-auto`, así que no se mueve.
+
+          Y NO se restaura solo: aparece el cartel y la persona decide. Reponer
+          en silencio haría que la pantalla se llene sola con algo de otro
+          momento sin que nadie lo haya pedido. */}
+      {enCurso && !producto && (
+        <div className="shrink-0 px-4 pt-4">
+          <div className="rounded-xl2 border-1.5 sunmi-border-warning sunmi-bg-card px-4 py-3 flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-sm3 font-medium sunmi-text-warning">
+                {textoDelCartel(enCurso)}
+              </div>
+              <div className="text-xs sunmi-text-muted">
+                El costo y el precio normal se vuelven a leer del sistema, por si cambiaron.
+              </div>
+            </div>
+            <div className="shrink-0 flex flex-col gap-1.5">
+              <SunmiButton
+                type="button"
+                color="primary"
+                onClick={retomar}
+                className="min-h-0 px-3 py-1.5 rounded-md text-sm2 font-medium"
+              >
+                Retomar
+              </SunmiButton>
+              <SunmiButton
+                type="button"
+                color="ghost"
+                onClick={limpiarEnCurso}
+                className="min-h-0 px-3 py-1.5 rounded-md text-sm2 font-medium sunmi-text-muted"
+              >
+                Descartar
+              </SunmiButton>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* `pb` grande: el pie está anclado abajo y sin esto tapa el último bloque
           cuando el contenido llega hasta ahí. */}
       <div className="flex-1 px-4 pt-4 pb-4 space-y-3.5 overflow-y-auto">
@@ -192,7 +358,14 @@ export default function NuevaOfertaPage() {
             mostrarStock
             onAgregar={(p) => {
               setProducto(p);
-              setPrecio("");
+              // ARRANCA EN EL MARGEN REAL DE HOY, no vacío: así se ve de dónde
+              // se parte y cuánto se resigna al bajar. Ese estado NO es una
+              // oferta —es el precio normal— y por eso Publicar sigue apagado.
+              const ini = estadoInicial({ precioNormal: p.precioNormal, costo: p.costo });
+              setMargen(ini.margen == null ? "" : String(ini.margen));
+              setPrecio(ini.precio == null ? "" : String(ini.precio));
+              setOrigen("PRECIO");
+              setEnCurso(null);
             }}
           />
         </div>
@@ -209,12 +382,20 @@ export default function NuevaOfertaPage() {
                 valor={String(producto.stock ?? 0)}
               />
             </div>
-            {/* SIN STOCK AVISA, NO BLOQUEA: acá se está programando un precio
-                para los próximos días, y que hoy no haya no dice nada sobre
-                mañana — puede estar por llegar el pedido. */}
-            {Number(producto.stock ?? 0) <= 0 && (
+            {/* ── EL AVISO RESPETA LA CONFIGURACIÓN DEL LOCAL ──────────────
+                Con venta sin stock HABILITADA un negativo es normal: el local
+                vende igual y el stock se regulariza después. Avisar ahí sería
+                ruido permanente, y un aviso que siempre está se deja de leer.
+
+                Con venta sin stock DESHABILITADA y stock en cero o menos, el
+                aviso dice lo que de verdad pasa: ese producto HOY no se puede
+                vender en este local. No bloquea —se está programando un precio
+                para los próximos días y el pedido puede estar por llegar—. */}
+            {avisaSinStock(producto) && (
               <div className="text-sm3 font-medium sunmi-text-warning">
-                Hoy no hay stock de este producto. Igual podés dejar la oferta cargada.
+                Hoy este producto no se puede vender en {nombreDelLocal || "esta ubicación"}:
+                no hay stock y el local no tiene habilitada la venta sin stock. Igual podés
+                dejar la oferta cargada.
               </div>
             )}
           </section>
@@ -222,33 +403,48 @@ export default function NuevaOfertaPage() {
 
         {/* ── 3 · PRECIO DE OFERTA ─────────────────────────────────────── */}
         {producto && (
-          <section className="sunmi-bg-card rounded-xl2 border sunmi-border p-4 space-y-3">
-            <Rotulo>Precio de oferta</Rotulo>
-            <SunmiInput
-              value={precio}
-              onChange={(e) => setPrecio(e.target.value)}
-              inputMode="decimal"
-              placeholder="0"
-              aria-label="Precio de oferta"
-              className="w-full text-xl2 tabular-nums"
-            />
-            {lineas.principal && (
-              <div className="space-y-1">
-                <div className={`text-sm3 font-medium ${COLOR_DE_TONO[lineas.tono]}`}>
-                  {lineas.principal}
-                </div>
-                {lineas.secundaria && (
-                  <div
-                    className={`text-xs ${
-                      lineas.tono === "ok" ? "sunmi-text-muted" : COLOR_DE_TONO[lineas.tono]
-                    }`}
-                  >
-                    {lineas.secundaria}
-                  </div>
-                )}
-              </div>
-            )}
-          </section>
+          <BloqueDePrecio
+            costo={producto.costo}
+            precioNormal={producto.precioNormal}
+            escala={producto.escala || "por unidad"}
+            margen={margen}
+            precio={precio}
+            redondear={redondear}
+            origen={origen}
+            bloque={bloque}
+            money={money}
+            onMargen={(v) => {
+              setOrigen("MARGEN");
+              setMargen(v);
+              // El OTRO campo se recalcula. Se hace acá y no adentro del
+              // componente para que el estado siga viviendo en un solo lugar.
+              const r = resolverBloque({
+                origen: "MARGEN", margen: v, costo: producto.costo,
+                precioNormal: producto.precioNormal, redondear,
+              });
+              setPrecio(r.precioFinal == null ? "" : String(r.precioFinal));
+            }}
+            onPrecio={(v) => {
+              setOrigen("PRECIO");
+              setPrecio(v);
+              const r = resolverBloque({
+                origen: "PRECIO", precio: v, costo: producto.costo,
+                precioNormal: producto.precioNormal, redondear,
+              });
+              setMargen(r.margenReal == null ? "" : String(r.margenReal));
+            }}
+            onRedondear={(v) => {
+              setRedondear(v);
+              // Al cambiar el interruptor se recalcula desde el campo que se
+              // tocó último: si no, el precio quedaría con el redondeo viejo.
+              const r = resolverBloque({
+                origen, margen, precio, costo: producto.costo,
+                precioNormal: producto.precioNormal, redondear: v,
+              });
+              if (origen === "MARGEN") setPrecio(r.precioFinal == null ? "" : String(r.precioFinal));
+              else setMargen(r.margenReal == null ? "" : String(r.margenReal));
+            }}
+          />
         )}
 
         {/* ── 4 · HASTA CUÁNDO ─────────────────────────────────────────── */}
@@ -312,9 +508,16 @@ export default function NuevaOfertaPage() {
           sin leerla. */}
       <div className="sticky bottom-0 border-t sunmi-border sunmi-bg-pie px-4 pt-3 pb-4 space-y-3">
         <div className="text-sm3 sunmi-text-muted-strong">
+          {/* EL RESUMEN DICE EL PRECIO QUE SE VA A COBRAR, NO EL TIPEADO.
+              Decía `precio` —el texto del campo— y con el redondeo puesto eso
+              es un número que el POS nunca va a cobrar: con $ 433 escritos el
+              pie anunciaba "pasa de $ 500,00 a $ 433,00" mientras el bloque de
+              arriba decía que el precio quedaba en $ 500. La frase del pie es la
+              que se lee antes de publicar, así que es la que no puede mentir.
+              Lo encontró una captura, no un candado. */}
           {resumenDeLaOferta({
             producto,
-            precioOferta: precio,
+            precioOferta: bloque.precioFinal,
             finEn,
             nombreDelLocal,
             soloEfectivo,

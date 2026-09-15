@@ -87,7 +87,22 @@ export async function POST(req) {
         );
       }
 
+      // ── POR QUÉ ESE PRECIO TERMINÓ SIENDO ÉSE ──────────────────────────
+      //
+      // Los dos vienen del navegador y NO se recalculan acá, a diferencia del
+      // precio normal y el costo, que se leen de la base. El motivo es que estos
+      // dos no son hechos del producto: son lo que la persona DECIDIÓ —dejó el
+      // interruptor puesto, y el precio exacto del que se partió—. El servidor
+      // no tiene forma de saberlo y recalcularlo sería inventarlo.
+      //
+      // `null` cuando no vienen: significa "no se registró", que es distinto de
+      // "no se redondeó". Un `false` por defecto diría algo que nadie sabe.
+      const redondeo = l?.redondeoAplicado;
+      const exacto = Number(l?.precioSinRedondear);
+
       lineasAGuardar.push({
+        redondeoAplicado: typeof redondeo === "boolean" ? redondeo : null,
+        precioSinRedondear: Number.isFinite(exacto) && exacto > 0 ? exacto : null,
         productoLocalId: pid,
         productoBaseId: ref.productoBaseId,
         precioOferta: carga.precioOferta,

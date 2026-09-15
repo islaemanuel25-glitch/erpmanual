@@ -368,10 +368,12 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // el corte de semana del código y lo pone en la relación depósito–local. Una
   // tabla nueva, sin tocar ninguna columna y sin backfill. Se declara acá porque
   // eso es lo que este conteo existe para obligar.
+  // 13 desde el 2026-09-15: entra además `20260915180000_oferta_redondeo_y_precio_exacto`,
+  // aditiva, dos columnas opcionales en `OfertaLinea`.
   // 12 desde el 2026-09-15: entra `20260915120000_borrar_oferta_con_escala_vieja`,
   // la que borra la única oferta cargada antes del arreglo de escala. Es de
   // DATOS y no de esquema, así que no toca nada de lo que este candado defiende.
-  assert.equal(migraciones.length, 12, "aparecio una migracion que nadie declaro aca");
+  assert.equal(migraciones.length, 13, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

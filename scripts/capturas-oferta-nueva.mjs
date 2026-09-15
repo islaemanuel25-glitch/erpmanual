@@ -322,6 +322,176 @@ await afirmar(await hayTexto("Solo si paga en efectivo"), "aparece el interrupto
 await afirmar(await hayTexto("Termina el"), "la vigencia se dice en criollo");
 await foto(`oferta-producto-elegido-${ANCHO}`);
 
+// ── 2.bis · EL BLOQUE DE PRECIO ARRANCA EN EL MARGEN DE HOY ──────────────
+//
+// No arranca vacío. Al elegir el producto los dos campos ya traen el margen y el
+// precio que ese producto tiene HOY, para que se vea de dónde se parte. Lo que
+// se afirma no es "hay algo escrito" sino que el margen mostrado es EL QUE SALE
+// de los dos números que la propia pantalla está mostrando: si fuera un cero
+// puesto por defecto, la cuenta no daría.
+//
+// Se lee del navegador y no del dominio: `estadoInicial` ya tiene su candado, y
+// lo que acá falta saber es si la pantalla la llama al elegir el producto.
+const leerCampos = `(() => {
+  const campo = (etiqueta) => {
+    const i = [...document.querySelectorAll('input')]
+      .filter((n) => n.offsetParent !== null)
+      .find((n) => (n.getAttribute('aria-label') || '').includes(etiqueta));
+    return i ? i.value : null;
+  };
+  const num = (re) => {
+    const m = document.body.innerText.match(re);
+    return m ? Number(m[1].replace(/\\./g, "").replace(",", ".")) : null;
+  };
+  return {
+    margen: campo("Margen sobre el costo"),
+    precio: campo("Precio de oferta"),
+    costo: num(/Costo\\s*\\$ ([\\d.,]+)/),
+    normal: num(/Precio normal\\s*\\$ ([\\d.,]+)/),
+  };
+})()`;
+
+const arranque = await evaluar(leerCampos);
+await afirmar(
+  arranque.margen !== null && arranque.margen !== "",
+  `el campo de margen arranca LLENO, no vacío (${arranque.margen})`
+);
+await afirmar(
+  arranque.precio !== null && arranque.precio !== "",
+  `el campo de precio arranca LLENO (${arranque.precio})`
+);
+await afirmar(
+  arranque.costo > 0 && arranque.normal > 0,
+  `se pudieron leer costo (${arranque.costo}) y precio normal (${arranque.normal})`
+);
+// El margen real de hoy: (normal / costo − 1) × 100. Se recalcula acá, del lado
+// del arnés, contra los números que la pantalla dibuja.
+const margenDeHoy = Math.round(((arranque.normal / arranque.costo - 1) * 100) * 100) / 100;
+await afirmar(
+  Math.abs(Number(arranque.margen) - margenDeHoy) < 0.02,
+  `y ES EL MARGEN REAL DE HOY: la pantalla dice ${arranque.margen} %, la cuenta da ${margenDeHoy} %`
+);
+await afirmar(
+  Math.abs(Number(arranque.precio) - arranque.normal) < 0.02,
+  `y el precio arranca en el normal (${arranque.precio} contra ${arranque.normal})`
+);
+// Y ese arranque NO ES UNA OFERTA: es el precio normal escrito en dos campos.
+await afirmar(
+  (await evaluar(`[...document.querySelectorAll('button')].filter((b) => b.offsetParent !== null && /Publicar/.test(b.textContent) && b.disabled).length`)) === 1,
+  "el arranque no es una oferta todavía: Publicar está apagado"
+);
+
+// ── 2.ter · LOS DOS CAMPOS SE SINCRONIZAN EN LOS DOS SENTIDOS ────────────
+//
+// Es el corazón del bloque y no se puede afirmar leyendo: lo que hace falta
+// saber es si el manejador de UN campo escribe en el OTRO, y eso solo se ve
+// tipeando. Se prueba en las dos direcciones porque son dos manejadores
+// distintos y romper uno solo deja el otro andando.
+await escribir("Margen sobre el costo", "40");
+const trasMargen = await evaluar(leerCampos);
+await afirmar(
+  trasMargen.margen === "40",
+  `el campo TOCADO no se reescribe bajo el dedo (quedó «${trasMargen.margen}»)`
+);
+const esperadoDe40 = Math.ceil((arranque.costo * 1.4) / 100) * 100;
+await afirmar(
+  Number(trasMargen.precio) === esperadoDe40,
+  `MARGEN → PRECIO: con 40 % sobre ${arranque.costo} el precio quedó en ${trasMargen.precio} y la cuenta da ${esperadoDe40}`
+);
+
+// Y ahora al revés, con un precio que NO es múltiplo de 100 a propósito.
+const precioCrudo = Math.round((arranque.normal * 0.77) / 100) * 100 + 33;
+await escribir("Precio de oferta", String(precioCrudo));
+const trasPrecio = await evaluar(leerCampos);
+await afirmar(
+  trasPrecio.precio === String(precioCrudo),
+  `el campo tocado tampoco se reescribe en este sentido (quedó «${trasPrecio.precio}»)`
+);
+await afirmar(
+  trasPrecio.margen !== "" && trasPrecio.margen !== trasMargen.margen,
+  `PRECIO → MARGEN: el margen se movió solo (${trasMargen.margen} → ${trasPrecio.margen})`
+);
+
+// ── 2.quater · EL % QUE SE MUESTRA ES EL DE DESPUÉS DEL REDONDEO ─────────
+//
+// Con el redondeo encendido, el precio que se va a cobrar NO es el tipeado. El
+// margen que se muestra tiene que ser el del precio COBRADO, no el del tipeado:
+// si dijera el segundo estaría mostrando una intención donde va un hecho.
+const redondeado = Math.ceil(precioCrudo / 100) * 100;
+const margenDelCrudo = Math.round(((precioCrudo / arranque.costo - 1) * 100) * 100) / 100;
+const margenDelRedondeado = Math.round(((redondeado / arranque.costo - 1) * 100) * 100) / 100;
+await afirmar(
+  redondeado !== precioCrudo,
+  `el precio elegido (${precioCrudo}) no es múltiplo de 100, así que el redondeo tiene algo que hacer`
+);
+await afirmar(
+  Math.abs(Number(trasPrecio.margen) - margenDelRedondeado) < 0.02,
+  `el % es el de DESPUÉS del redondeo: dice ${trasPrecio.margen} %, el de ${redondeado} da ${margenDelRedondeado} % y el del tipeado daría ${margenDelCrudo} %`
+);
+await afirmar(
+  await hayTexto("Redondeado de"),
+  "y se dice que se redondeó, con el precio del que se partió"
+);
+
+// ── Y EL PIE DICE EL PRECIO QUE SE VA A COBRAR, NO EL TIPEADO ───────────
+//
+// El pie es la última frase que se lee antes de tocar Publicar, así que es la
+// que no puede mentir. Decía el texto del campo: con $ 433 escritos anunciaba
+// "pasa de $ 500,00 a $ 433,00" mientras el bloque de arriba decía que el
+// precio quedaba en $ 500. Ningún candado lo veía —el pie y el bloque se arman
+// con funciones distintas, cada una con los suyos en verde— y apareció mirando
+// una captura.
+const precioDelPie = await evaluar(
+  `(document.body.innerText.match(/pasa de \\$ [\\d.,]+ a \\$ ([\\d.,]+)/) || [])[1] || ""`
+);
+await afirmar(
+  Number(precioDelPie.replace(/\./g, "").replace(",", ".")) === redondeado,
+  `el pie anuncia el precio COBRADO: dice $ ${precioDelPie} y lo que se cobra es ${redondeado} (se tipeó ${precioCrudo})`
+);
+await foto(`oferta-redondeo-${ANCHO}`);
+
+// Apagar el interruptor tiene que mover el % al del precio exacto.
+const tocarInterruptor = (rotulo) => evaluar(`(() => {
+  const fila = [...document.querySelectorAll('div')]
+    .filter((d) => d.offsetParent !== null)
+    .find((d) => new RegExp(${JSON.stringify(rotulo)}).test(d.innerText) && d.className.includes('justify-between'));
+  if (!fila) return false;
+  const toggle = [...fila.querySelectorAll('div')].find((d) => d.className.includes('select-none'));
+  if (!toggle) return false;
+  toggle.click();
+  return true;
+})()`);
+
+await afirmar(await tocarInterruptor("Redondear a"), "se encontró el interruptor de redondeo");
+await esperar(800);
+const sinRedondeo = await evaluar(leerCampos);
+await afirmar(
+  Math.abs(Number(sinRedondeo.margen) - margenDelCrudo) < 0.02,
+  `apagado el redondeo, el % pasa al del precio exacto (${sinRedondeo.margen} contra ${margenDelCrudo})`
+);
+await afirmar(
+  !(await hayTexto("Redondeado de")),
+  "y desaparece el renglón del redondeo, porque ya no hay nada que redondear"
+);
+await tocarInterruptor("Redondear a");
+await esperar(800);
+
+// ── 2.quinquies · EL MARGEN NEGATIVO: TIPEADO FRENA, DERIVADO NO ─────────
+//
+// Las dos reglas se tocan y la pantalla es donde se juntan. Un "-20" escrito a
+// mano es un tipeo y apaga el botón; el margen negativo que queda solo al
+// escribir un precio por debajo del costo es el líder de pérdida, y se publica.
+await escribir("Margen sobre el costo", "-20");
+await afirmar(
+  await hayTexto("no puede ser negativo"),
+  "un margen negativo TIPEADO se frena en el campo"
+);
+await afirmar(
+  (await evaluar(`[...document.querySelectorAll('button')].filter((b) => b.offsetParent !== null && /Publicar/.test(b.textContent) && b.disabled).length`)) === 1,
+  "y apaga el botón: es la única validación que bloquea"
+);
+await foto(`oferta-margen-negativo-${ANCHO}`);
+
 // ── 3 · EL PRECIO, EN VIVO ───────────────────────────────────────────────
 const precioNormal = await evaluar(`(() => {
   const m = document.body.innerText.match(/Precio normal\\s*\\$ ([\\d.,]+)/);
@@ -338,6 +508,32 @@ await afirmar(
 );
 await foto(`oferta-precio-invalido-${ANCHO}`);
 
+// ── EL REDONDEO ES HACIA ARRIBA, Y PUEDE CANCELAR LA OFERTA ─────────────
+//
+// `redondear100` es la regla del POS y redondea SIEMPRE hacia arriba. Sobre un
+// precio de oferta eso tiene una consecuencia que no es obvia: un precio por
+// debajo del normal puede volver AL normal y dejar de ser una oferta. Acá el
+// producto vale $ 500 y escribir $ 450 termina cobrando $ 500.
+//
+// No es un defecto silencioso —la pantalla lo dice, y eso es lo que se afirma—
+// pero SÍ es una trampa, y por eso queda escrita como candado: si algún día el
+// redondeo pasa a ser hacia el más cercano o hacia abajo, este renglón se pone
+// rojo y obliga a decidirlo a propósito.
+await escribir("Precio de oferta", String(Math.round(precioNormal * 0.9)));
+await afirmar(
+  await hayTexto("Redondeado de"),
+  "el redondeo hacia arriba se declara"
+);
+await afirmar(
+  await hayTexto("no es una oferta"),
+  `redondeado hacia arriba, ${Math.round(precioNormal * 0.9)} vuelve a ${precioNormal} y la pantalla avisa que dejó de ser oferta`
+);
+await afirmar(
+  (await evaluar(`[...document.querySelectorAll('button')].filter((b) => b.offsetParent !== null && /Publicar/.test(b.textContent) && b.disabled).length`)) === 1,
+  "y no se puede publicar algo que no baja el precio"
+);
+await foto(`oferta-redondeo-cancela-${ANCHO}`);
+
 // ── UN PRECIO POR DEBAJO DEL COSTO: AVISA Y **DEJA PUBLICAR** ───────────
 //
 // Es la regla que más importa de esta pantalla y la que un candado de render no
@@ -349,9 +545,31 @@ await foto(`oferta-precio-invalido-${ANCHO}`);
 // sembrado crea los productos con `precio_venta = precio_costo`, así que NO
 // EXISTE un precio menor al normal y mayor al costo. El caso bueno está cubierto
 // por el candado O7, que es donde se puede elegir los números.
+//
+// Y SE APAGA EL REDONDEO ANTES, por lo que se acaba de medir arriba: con el
+// redondeo puesto no hay ningún precio por debajo de $ 500 que siga estando por
+// debajo de $ 500 después de redondear, así que el caso sería inalcanzable y
+// este candado quedaría verde sin probar nada. Apagarlo es lo que haría
+// cualquiera que quiera cobrar exactamente lo que escribió.
+await tocarInterruptor("Redondear a");
+await esperar(800);
 await escribir("Precio de oferta", String(Math.round(precioNormal * 0.9)));
 await afirmar(await hayTexto("a pérdida"), "bajo costo se avisa con todas las letras");
-await afirmar(await hayTexto("Te falta"), "y se dice cuánto falta para cubrir el costo");
+// Y SE DICE CUÁNTO FALTA, EN PESOS. El bloque viejo lo decía en su segunda
+// línea; al rediseñarlo ese renglón desapareció y este candado quedó rojo. Se
+// reescribió el renglón, no el candado: sin el número, "a pérdida" no dice de
+// qué tamaño es la pérdida y hay que ir a hacer la cuenta a otro lado.
+// El número que se afirma es el que sale de la resta, no "hay un número": con
+// el redondeo apagado el precio que se cobra es el tipeado, así que lo que falta
+// para cubrir el costo es exactamente `costo − precio`.
+const faltante = await evaluar(
+  `(document.body.innerText.match(/te falta \\$ ([\\d.,]+) para cubrir el costo/) || [])[1] || ""`
+);
+const faltanteEsperado = arranque.costo - Math.round(precioNormal * 0.9);
+await afirmar(
+  Math.abs(Number(faltante.replace(/\./g, "").replace(",", ".")) - faltanteEsperado) < 0.02,
+  `y se dice CUÁNTO falta: la pantalla dice $ ${faltante} y la resta da ${faltanteEsperado}`
+);
 await afirmar(
   (await evaluar(`[...document.querySelectorAll('button')].filter((b) => b.offsetParent !== null && /Publicar/.test(b.textContent) && !b.disabled).length`)) === 1,
   "AVISA, NO BLOQUEA: a pérdida se puede publicar igual"
@@ -444,6 +662,98 @@ await afirmar(
   anclaje.despues > 0 && anclaje.despues <= anclaje.alto,
   `y queda dentro de la pantalla (alto ${anclaje.alto}, pie termina en ${anclaje.despues})`
 );
+
+// ── 6 · EL AVISO DE STOCK SIGUE LA CONFIGURACIÓN DEL LOCAL ───────────────
+//
+// No se afirma "sale el aviso" ni "no sale": se afirma que la pantalla dibuja lo
+// que la CONFIGURACIÓN decide. Se le pregunta al endpoint —el mismo que usó el
+// buscador— si este local permite vender sin stock, y se compara contra lo que
+// el navegador está mostrando. Así el candado sirve con cualquier configuración
+// y no hay que fabricar una fila para que dé verde.
+//
+// ── Y ACÁ SE EJERCE UNA SOLA RAMA, A PROPÓSITO ──────────────────────────
+//
+// En la base de pruebas todos los productos tienen stock, así que lo que se
+// mide desde el navegador es siempre el lado que NO dibuja el aviso. Eso solo
+// no alcanza —sería un candado que no puede ponerse rojo—, y por eso la
+// decisión se sacó a `avisaSinStock`, cuyas dos ramas se ejercen en los
+// candados O18, O19 y O20. Acá se afirma la otra mitad, la que ningún candado
+// puede afirmar: que la pantalla LLAMA a esa función con los datos del
+// endpoint, en vez de decidir por su cuenta.
+const stock = await evaluar(`(async () => {
+  const nombre = document.querySelector('section .text-lg2')?.textContent || "";
+  const r = await fetch('/api/ofertas/buscar-producto?q=' + encodeURIComponent(nombre) + '&destino=');
+  const j = await r.json();
+  const it = (j?.items || [])[0] || {};
+  return {
+    nombre,
+    permite: it.permiteVenderSinStock === true,
+    stock: Number(it.stock ?? 0),
+    avisoDibujado: /no se puede vender en/.test(document.body.innerText),
+    hubo: (j?.items || []).length > 0,
+  };
+})()`);
+await afirmar(stock.hubo, `el endpoint contestó por «${stock.nombre}»`);
+const avisoEsperado = !stock.permite && stock.stock <= 0;
+await afirmar(
+  stock.avisoDibujado === avisoEsperado,
+  `el aviso de stock sigue a la configuración: permiteVenderSinStock=${stock.permite}, stock=${stock.stock}, esperado=${avisoEsperado}, dibujado=${stock.avisoDibujado}`
+);
+
+// ── 7 · LO QUE SE ESTABA CARGANDO SOBREVIVE AL REFRESH ───────────────────
+//
+// Es lo único de esta pantalla que no se puede probar sin recargar de verdad, y
+// por eso va último: la recarga se lleva puesto todo lo anterior.
+const antesDeRecargar = await evaluar(leerCampos);
+await abrir("/modulos/ofertas/nueva", "Nueva oferta");
+
+await afirmar(
+  await hayTexto("Tenés una oferta a medio armar"),
+  "al volver, el cartel avisa que había algo a medio cargar"
+);
+await afirmar(
+  await hayTexto(antesDeRecargar.nombre || stock.nombre),
+  "y el cartel nombra el producto, para saber cuál quedó a medias"
+);
+
+// EL CARTEL VA ADENTRO DEL ENCABEZADO, NO DEL CUERPO QUE SCROLLEA. Si estuviera
+// adentro del contenedor con scroll, se iría de la vista al bajar y el aviso no
+// serviría de nada. Se mide en el navegador: `closest` sobre el contenedor que
+// scrollea contesta por la cadena real de padres, no por la clase escrita.
+const dondeVaElCartel = await evaluar(`(() => {
+  const nodos = [...document.querySelectorAll('div')]
+    .filter((d) => d.offsetParent !== null && /Tenés una oferta a medio armar/.test(d.innerText));
+  const cartel = nodos[nodos.length - 1];
+  if (!cartel) return { hay: false };
+  return {
+    hay: true,
+    dentroDelScroll: !!cartel.closest('.overflow-y-auto'),
+  };
+})()`);
+await afirmar(dondeVaElCartel.hay, "se encontró el cartel en el DOM");
+await afirmar(
+  dondeVaElCartel.dentroDelScroll === false,
+  "el cartel está en el ENCABEZADO: no vive adentro del contenedor que scrollea"
+);
+await foto(`oferta-cartel-en-curso-${ANCHO}`);
+
+// Y lo guardado se repone TAL CUAL. No se restaura solo: la persona decide.
+await tocar("Retomar");
+await esperar(2000);
+const repuesto = await evaluar(leerCampos);
+await afirmar(
+  repuesto.margen === antesDeRecargar.margen && repuesto.precio === antesDeRecargar.precio,
+  `lo guardado vuelve tal cual: margen «${antesDeRecargar.margen}»→«${repuesto.margen}», precio «${antesDeRecargar.precio}»→«${repuesto.precio}»`
+);
+await afirmar(
+  !(await hayTexto("Tenés una oferta a medio armar")),
+  "y el cartel se va: ya se retomó"
+);
+await afirmar(
+  await hayTexto("Precio normal"),
+  "el producto se volvió a pedir al servidor, con su costo y su precio de HOY"
+);
+await foto(`oferta-retomada-${ANCHO}`);
 
 console.log(`\n${afirmaciones} afirmaciones en verde · ${desbordes} capturas con desborde`);
 console.log(`Capturas en ${SALIDA}`);

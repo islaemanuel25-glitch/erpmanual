@@ -4,6 +4,8 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { buscarProductosOfertables } from "@/lib/ofertas/servidor";
 import { descuentoPctDesdePrecios, margenOferta } from "@/lib/ofertas/precio";
+import { getConfigLocalEfectiva } from "@/lib/config/local";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
 
 // BUSCADOR DE PRODUCTOS PARA ARMAR UNA OFERTA.
 //
@@ -28,10 +30,33 @@ export async function GET(req) {
 
     const items = await buscarProductosOfertables(prisma, { localId, q });
 
+    // ── ¿ESTE LOCAL PUEDE VENDER SIN STOCK? ────────────────────────────────
+    //
+    // Sale de `getConfigLocalEfectiva`, que es la MISMA puerta que usa el
+    // buscador del POS —y que existe porque antes se leía `ConfiguracionGrupo`
+    // directo y el aviso visual divergía del enforcement real por ubicación—.
+    //
+    // La pantalla lo necesita para decidir si un stock en cero o negativo es una
+    // ALERTA o un dato más: con venta sin stock habilitada, un negativo es
+    // normal y avisar sería ruido permanente.
+    const grupoIdDelLocal = await getGrupoIdDeLocal(localId);
+    let permiteVenderSinStock = false;
+    if (grupoIdDelLocal) {
+      const eff = await getConfigLocalEfectiva(localId, grupoIdDelLocal, {});
+      permiteVenderSinStock = eff.allowNegativeStock === true;
+    }
+
     return NextResponse.json({
       ok: true,
+      permiteVenderSinStock,
       items: items.map((p) => ({
         ...p,
+        // Viaja EN CADA ITEM y no solo en la raíz: la pantalla monta
+        // `BuscadorProductos`, que le pasa al `onAgregar` el item elegido y
+        // nada más. Un campo en la raíz no llegaría nunca al producto que se
+        // eligió, que es donde se necesita para decidir si el stock es una
+        // alerta o un dato.
+        permiteVenderSinStock,
         // El margen que tendría hoy a precio normal. Sirve para que la persona
         // vea con cuánto aire cuenta ANTES de escribir el precio de oferta.
         margenNormal: margenOferta(p.precioNormal, p.costo).importe,

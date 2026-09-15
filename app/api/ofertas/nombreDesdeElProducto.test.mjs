@@ -67,11 +67,20 @@ test("N2 · el nombre sale de las referencias, que se leen de la BASE", () => {
 
 test("N3 · la PANTALLA no manda nombre, ni visible ni oculto", () => {
   const src = sinComentarios(PANTALLA);
-  // Lo que se afirma no es que falte un input: es que el nombre NO VIAJA. Un
-  // campo oculto daría el mismo resultado hoy y abriría la puerta a dos fuentes.
+  // ── SE MIRA EL CUERPO DEL REQUEST, NO EL ARCHIVO ENTERO ───────────────
+  //
+  // La primera versión buscaba `nombre:` en todo el archivo y dio un falso rojo
+  // cuando la pantalla empezó a guardar la oferta a medio armar: ahí `nombre` es
+  // el del PRODUCTO, para poder decir en el cartel cuál quedó a medias, y no
+  // tiene nada que ver con el nombre de la oferta.
+  //
+  // Lo que se afirma es que el nombre NO VIAJA AL SERVIDOR. Un campo oculto
+  // daría el mismo resultado hoy y abriría la puerta a dos fuentes.
+  const cuerpo = /JSON\.stringify\(\{[\s\S]*?\n\s{8}\}\)/.exec(src)?.[0] || "";
+  assert.ok(cuerpo, "no se encontró el cuerpo del request de crear");
   assert.ok(
-    !/nombre:/.test(src),
-    "la pantalla volvió a mandar un nombre en el cuerpo del request"
+    !/\bnombre\b/.test(cuerpo),
+    `la pantalla volvió a mandar un nombre al crear:\n${cuerpo}`
   );
   // Y tampoco pide uno.
   assert.ok(
@@ -89,8 +98,17 @@ test("N4 · la pantalla carga UN solo producto: no hay «agregar otro»", () => 
     !/Agregar otro|agregarProducto|\[\.\.\.lineas/.test(src),
     "volvió la carga de varios productos: eso es un combo, no una oferta"
   );
-  // El cuerpo manda un array de UNA línea, que es lo que la ruta espera.
-  assert.match(src, /lineas: \[\s*\{ productoLocalId/, "la pantalla no manda la línea única");
+  // El cuerpo manda un array de UNA sola línea, que es lo que la ruta espera.
+  // Se cuenta cuántos `productoLocalId:` hay adentro del array en vez de
+  // matchear su forma exacta: la forma cambió al agregar los campos del
+  // redondeo y el candado dio rojo sobre una pantalla correcta.
+  const arrayDeLineas = /lineas: \[([\s\S]*?)\n\s{10}\]/.exec(src)?.[1] || "";
+  assert.ok(arrayDeLineas, "no se encontró el array de líneas");
+  assert.equal(
+    (arrayDeLineas.match(/productoLocalId:/g) || []).length,
+    1,
+    "la pantalla manda más de una línea: eso es un combo, no una oferta"
+  );
 });
 
 test("N5 · la ruta sigue aceptando varias líneas, y las nombra sin romperse", () => {

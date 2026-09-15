@@ -3792,6 +3792,19 @@ model OfertaLinea {
   /// los dos sería tener dos números que dicen lo mismo y se pueden contradecir.
   precioOferta Decimal @db.Decimal(12, 2)
 
+  /// POR QUÉ ESE PRECIO TERMINÓ SIENDO ÉSE.
+  ///
+  /// `precioOferta` es lo que se cobra; estos dos dicen cómo se llegó. No se
+  /// deducen de él: un $3.400 redondo no prueba que hubo redondeo —se puede
+  /// tipear— y un precio con decimales tampoco prueba que no lo hubo.
+  ///
+  /// `null` significa "se cargó antes de que esto se registrara", que es
+  /// distinto de "no se redondeó". Por eso NO llevan default: un `false` diría
+  /// de las líneas viejas algo que nadie sabe.
+  redondeoAplicado   Boolean?
+  /// El precio exacto ANTES de subir al siguiente 100.
+  precioSinRedondear Decimal? @db.Decimal(12, 2)
+
   /// Fotos del momento en que se cargó o se revisó la línea. No se actualizan
   /// solas: si el producto cambia de precio o de costo, estas NO se mueven — de
   /// esa diferencia sale justamente el aviso de revisar.
