@@ -35,10 +35,6 @@ export async function POST(req) {
     }
 
     const body = await req.json();
-    const nombre = String(body?.nombre || "").trim();
-    if (!nombre) {
-      return NextResponse.json({ ok: false, error: "La oferta necesita un nombre." }, { status: 400 });
-    }
 
     const ventana = validarVentana({ inicioEn: body?.inicioEn, finEn: body?.finEn });
     if (!ventana.valido) {
@@ -99,6 +95,35 @@ export async function POST(req) {
         costoReferencia: ref.costo,
       });
     }
+
+    // ── EL NOMBRE SALE DEL PRODUCTO, NO DE UN CAMPO ──────────────────────────
+    //
+    // Una oferta es UN producto —varios productos son un combo, que es otra cosa
+    // y otra pantalla— así que pedir un nombre aparte es pedir lo mismo dos
+    // veces. La única oferta que llegó a producción terminó llamándose "91100"
+    // exactamente por eso: el campo estaba, había que llenarlo, y se llenó con
+    // cualquier cosa.
+    //
+    // Se resuelve ACÁ y no con un campo oculto en el formulario. Un campo que
+    // nadie ve y que igual viaja es la forma de que mañana alguien lo llene con
+    // otra cosa y las dos fuentes se contradigan.
+    //
+    // El nombre sale de `referencias`, que se lee de la BASE, no del cuerpo del
+    // request: es el mismo criterio con el que se congelan el precio y el costo
+    // tres bloques más arriba, y por el mismo motivo.
+    //
+    // Con más de una línea se nombra la primera y se dice cuántas más hay. Ese
+    // caso no lo produce la pantalla móvil —que carga un solo producto— pero la
+    // ruta lo acepta, y una oferta sin nombre es un dato roto en la lista.
+    const nombresDeLinea = lineasAGuardar
+      .map((l) => referencias[l.productoLocalId]?.nombre)
+      .filter(Boolean);
+    const nombre =
+      nombresDeLinea.length === 0
+        ? "Oferta sin productos"
+        : nombresDeLinea.length === 1
+          ? nombresDeLinea[0]
+          : `${nombresDeLinea[0]} y ${nombresDeLinea.length - 1} más`;
 
     // ── Solapamiento ─────────────────────────────────────────────────────────
     // Se pregunta ANTES de escribir y DENTRO de la transacción, con un lock por
