@@ -403,7 +403,10 @@ await evaluar(`(() => {
   b.click();
   return true;
 })()`);
-await esperarTexto("Volver", 20000);
+// Se espera un texto DEL DETALLE, no el botón de volver: ese era propio de
+// la pantalla vieja y se fue —lo da el shell—. Esperarlo hacía que el arnés
+// se colgara veinte segundos sobre una pantalla que había cargado bien.
+await esperarTexto("Hasta cuándo dura", 20000);
 const id = ancla.split(":")[1];
 await afirmar(
   (await evaluar("location.pathname")).endsWith(`/modulos/ofertas/${id}`),
@@ -414,6 +417,98 @@ await afirmar(
 // terminarse y el arnés no se habría enterado.
 await afirmar(await hayTexto("Finalizar"), "el detalle tiene la acción de finalizar");
 await foto(`ofertas-detalle-${ANCHO}`);
+
+const idOferta = Number(id);
+
+// ── 4.bis · EL DETALLE ES LA MISMA PANTALLA QUE CREAR ────────────────────
+//
+// Antes era una tabla con dos botones que abrían otros dos formularios. Ahora
+// tiene los MISMOS bloques que `nueva`, con los valores cargados. Se afirma que
+// están los cinco y que el precio viene puesto — no vacío, que es lo que pasaría
+// si el detalle dibujara el bloque sin reponer la oferta.
+await afirmar(await hayTexto("QUILMES CERVEZA 1L"), "el detalle nombra el producto");
+await afirmar(await hayTexto("Precio normal"), "está la tarjeta del producto");
+await afirmar(await hayTexto("Stock hoy en"), "con su stock");
+await afirmar(await hayTexto("Margen sobre el costo"), "está el bloque de precio completo");
+await afirmar(await hayTexto("Redondear a"), "con el interruptor de redondeo");
+await afirmar(await hayTexto("Hasta cuándo dura"), "está el bloque de duración");
+await afirmar(await hayTexto("Solo si paga en efectivo"), "y el interruptor de efectivo");
+await afirmar(
+  !(await hayTexto("Editar productos")) && !(await hayTexto("Editar datos")),
+  "se fueron los dos editores"
+);
+
+const campos = await evaluar(`(() => {
+  const v = (etiqueta) => {
+    const i = [...document.querySelectorAll('input')]
+      .filter((n) => n.offsetParent !== null)
+      .find((n) => (n.getAttribute('aria-label') || '').includes(etiqueta));
+    return i ? i.value : null;
+  };
+  return { margen: v("Margen sobre el costo"), precio: v("Precio de oferta") };
+})()`);
+await afirmar(
+  Number(campos.precio) === 3300,
+  `el precio viene CARGADO de la oferta (${JSON.stringify(campos)})`
+);
+await afirmar(
+  campos.margen !== null && campos.margen !== "",
+  `y el margen se deriva del costo de hoy (${JSON.stringify(campos)})`
+);
+
+// El pie de una oferta PUBLICADA dice "Guardar cambios", no "Guardar borrador".
+await afirmar(await hayTexto("Guardar cambios"), "el pie de una publicada dice Guardar cambios");
+await afirmar(!(await hayTexto("Publicar")), "y no ofrece publicar algo ya publicado");
+await foto(`ofertas-detalle-bloques-${ANCHO}`);
+
+// ── 4.ter · «GUARDAR CAMBIOS» GUARDA DE VERDAD ──────────────────────────
+//
+// Es el candado de comportamiento de esta pantalla. Dibujar los campos no sirve
+// de nada si no escriben: el detalle manda DOS llamadas —la ventana por `PATCH`
+// y el precio por `PUT /lineas`— y con una sola que falle en silencio la
+// persona se va creyendo que guardó.
+//
+// Se comprueba contra Postgres, que es el único lugar donde "se guardó" es un
+// hecho y no una animación.
+const antesDeGuardar = await prisma.ofertaLinea.findFirst({
+  where: { ofertaId: idOferta }, select: { precioOferta: true },
+});
+await afirmar(
+  Number(antesDeGuardar?.precioOferta) === 3300,
+  `la oferta arranca en 3300 (${JSON.stringify(antesDeGuardar)})`
+);
+
+await evaluar(`(() => {
+  const campo = [...document.querySelectorAll('input')]
+    .filter((i) => i.offsetParent !== null)
+    .find((i) => (i.getAttribute('aria-label') || '').includes("Precio de oferta"));
+  const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+  set.call(campo, "3100");
+  campo.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
+})()`);
+await esperar(800);
+await tocar("Guardar cambios");
+await esperar(2500);
+
+const despuesDeGuardar = await prisma.ofertaLinea.findFirst({
+  where: { ofertaId: idOferta }, select: { precioOferta: true },
+});
+await afirmar(
+  Number(despuesDeGuardar?.precioOferta) === 3100,
+  `el precio nuevo SE GUARDÓ (${JSON.stringify(despuesDeGuardar)})`
+);
+await afirmar(await hayTexto("Cambios guardados"), "y la pantalla lo dice");
+
+// Y el precio normal NO se tocó: editar una oferta no cambia el producto.
+const productoIntacto = await prisma.productoLocal.findFirst({
+  where: { id: Number((await prisma.ofertaLinea.findFirst({ where: { ofertaId: idOferta }, select: { productoLocalId: true } }))?.productoLocalId) },
+  select: { precio_venta: true },
+});
+await afirmar(
+  Number(productoIntacto?.precio_venta) === 3700,
+  `guardar la oferta NO tocó el precio del producto (${JSON.stringify(productoIntacto)})`
+);
 
 // ── 5 · EL CARTEL ES DEL SISTEMA, NO DEL NAVEGADOR ───────────────────────
 //
@@ -430,7 +525,6 @@ await evaluar(`(() => {
   return true;
 })()`);
 
-const idOferta = Number(id);
 const antesDelCartel = await prisma.oferta.findUnique({
   where: { id: idOferta }, select: { finalizadaEn: true },
 });
@@ -447,7 +541,10 @@ await afirmar(
   "el cartel dice QUÉ producto se termina"
 );
 await afirmar(
-  await evaluar(`/Pasa de \\$[\\d.,]+ a \\$[\\d.,]+/.test(document.body.innerText)`),
+  // El importe lleva ESPACIO después del signo desde que el módulo unificó
+  // sus dos formateadores. La expresión lo contempla en vez de dar por
+  // sentado el formato viejo.
+  await evaluar(`/Pasa de \\$\\s?[\\d.,]+ a \\$\\s?[\\d.,]+/.test(document.body.innerText)`),
   "y a qué precio vuelve, con los dos importes"
 );
 await afirmar(

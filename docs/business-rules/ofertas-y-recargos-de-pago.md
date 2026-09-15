@@ -875,3 +875,92 @@ usarla. Sigue nombrada en `lib/sunmi/actionCard.test.mjs` y en dos sondas, que l
 enumeran como consumidora de `SunmiActionCard`. No se borro en esta tanda porque
 sacarla obliga a tocar esos tres, y eso es otra unidad revertible. La pregunta a
 contestar no es como arreglarla: es si esa tarjeta todavia tiene que existir.
+
+## EL DETALLE ES LA MISMA PANTALLA QUE CREAR
+
+Verificado en el navegador (`scripts/capturas-ofertas-lista.mjs`, 61
+afirmaciones) y con la pantalla de crear comparada contra sí misma.
+
+Eran dos pantallas distintas: crear tenia los dos campos sincronizados, los
+chips y el pie anclado, y entrar a una oferta mostraba una tabla con dos botones
+—"Editar productos" y "Editar datos"— que abrian dos formularios mas. **Tres
+formas de tocar lo mismo.**
+
+Ahora los bloques son LOS MISMOS componentes —`TarjetaDelProducto`,
+`BloqueDePrecio`, `BloqueDeDuracion`, `InterruptorSoloEfectivo` y
+`PieDeOferta`— y los dos campos se mueven con el mismo hook
+(`useBloqueDePrecioDeOferta`). Lo unico que cambia son los botones del pie,
+porque dependen del estado: en BORRADOR "Guardar borrador" y "Publicar"; ya
+publicada, "Guardar cambios" y "Finalizar".
+
+`EditorProductosOferta` y `FormularioOferta` se borraron: quedaron sin lectores.
+
+### LO QUE SE VERIFICO ANTES DE DIBUJAR
+
+Las dos preguntas que habia que contestar antes de poner campos que quiza no
+guardan. **Las dos dieron que SI:**
+
+- **El precio SE PUEDE editar despues de publicar.** Lo dice `[id]/lineas` con
+  su motivo: la oferta estaba en $900 y pasa a $950; desde ese momento las
+  ventas nuevas usan $950 y las anteriores NO cambian, porque cada venta guardo
+  su propio snapshot. Solo se bloquea sobre una FINALIZADA.
+- **El conjunto de productos tambien.** La misma ruta concilia: agrega, cambia y
+  saca, revalidando choques con otras ofertas.
+
+Asi que el bloque de precio va EDITABLE. Lo que no va es el buscador: el diseno
+no lo pide y la tarjeta del producto es fija.
+
+### UNA OFERTA DE VARIOS PRODUCTOS NO SE EDITA ACA, Y NO ES ESTETICA
+
+`[id]/lineas` recibe el CONJUNTO COMPLETO y **borra lo que no viene**. Esta
+pantalla manda una sola linea, asi que sobre una oferta de dos productos guardar
+el precio BORRARIA el otro.
+
+Con mas de una linea el bloque de precio no se dibuja: se listan los precios en
+lectura y se dice que se editan desde escritorio. La fecha y el medio de pago si
+se pueden cambiar, porque van por `PATCH` y no tocan las lineas.
+
+### DOS GUARDADOS, PORQUE SON DOS RUTAS
+
+`PATCH /api/ofertas/[id]` guarda la ventana y la condicion de pago;
+`PUT /api/ofertas/[id]/lineas` guarda el precio. Son dos llamadas y el boton es
+uno: si la primera falla, la segunda no sale, y se dice cual fallo.
+
+Hay un candado que lo ejerce contra Postgres: cambia el precio, guarda, y
+comprueba que la linea quedo en el numero nuevo **y que el precio del producto
+no se movio**.
+
+### LA DURACION ARRANCA EN "ELEGIR", CON LA FECHA PUESTA
+
+Los chips son atajos para una oferta nueva. Una ya cargada puede terminar
+cualquier dia, asi que adivinar que chip le corresponde seria inventar: se
+muestra la fecha real y los chips siguen ahi para reemplazarla de un toque.
+
+Y el dia que muestra el campo es el **ultimo dia vigente**, no `finEn`: la
+ventana es semiabierta, asi que poner `finEn` correria la oferta un dia cada vez
+que se abre y se guarda sin tocar nada.
+
+### LA PLATA DEL MODULO QUEDO UNIFICADA
+
+Habia dos formateadores: `pesos` escribia `$3.700,00` y `money` escribia
+`$ 3.700,00`. Ahora hay **una sola implementacion**, con la forma CON ESPACIO, y
+`money` delega en `pesos`.
+
+Lo que NO se unifico es la politica de ausencia, y es una distincion real:
+`pesos` muestra "—" porque lo suyo es mostrar un hecho que puede faltar, y
+`money` muestra "$ 0,00" porque se usa donde se esta TIPEANDO un precio y ahi un
+cero es un estado legitimo.
+
+### COMO SE PROBO QUE CREAR NO SE MOVIO
+
+La extraccion saco bloques de una pantalla que funciona, asi que la prueba es
+que esa pantalla quede IDENTICA.
+
+**Las capturas de esa pantalla tienen ruido**, y eso se midio primero: la misma
+version corrida dos veces produce 11 de 13 archivos distintos. Con ruido,
+cualquier diagnostico sobre pixeles es inventado.
+
+Se comparo el DOM y la geometria, que SI son deterministas —dos corridas de la
+misma version dan cero diferencias— y dieron **identicos**: mismo `innerHTML`,
+mismas cinco cajas con las mismas coordenadas, mismo alto. Mas las 70
+afirmaciones del arnes de crear, en verde.

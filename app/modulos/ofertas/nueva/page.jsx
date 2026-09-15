@@ -47,13 +47,18 @@ import SunmiToggle from "@/components/sunmi/SunmiToggle";
 import AccionDePantalla from "@/components/transferencias/AccionDePantalla";
 import BuscadorProductos from "@/components/pos-ventas/BuscadorProductos";
 import BloqueDePrecio from "@/components/ofertas/BloqueDePrecio";
+import TarjetaDelProducto from "@/components/ofertas/TarjetaDelProducto";
+import BloqueDeDuracion from "@/components/ofertas/BloqueDeDuracion";
+import InterruptorSoloEfectivo from "@/components/ofertas/InterruptorSoloEfectivo";
+import PieDeOferta from "@/components/ofertas/PieDeOferta";
 import {
   CLAVE_OFERTA_EN_CURSO,
   deserializarOfertaEnCurso,
   serializarOfertaEnCurso,
   textoDelCartel,
 } from "@/lib/ofertas/ofertaEnCurso";
-import { estadoInicial, margenInvalido, resolverBloque } from "@/lib/ofertas/precioConMargen";
+import { margenInvalido } from "@/lib/ofertas/precioConMargen";
+import useBloqueDePrecioDeOferta from "@/hooks/useBloqueDePrecioDeOferta";
 // `lineasDePrecio` y `puedePublicar` YA NO SE IMPORTAN: el bloque de precio los
 // reemplazó por `resolverBloque` y `listo`. Quedaron sin ningún lector en el
 // repo —solo los llaman sus propios candados— y eso está anotado para resolverlo
@@ -94,12 +99,17 @@ export default function NuevaOfertaPage() {
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
 
   const [producto, setProducto] = useState(null);
-  const [precio, setPrecio] = useState("");
-  const [margen, setMargen] = useState("");
-  // EL ÚLTIMO CAMPO TOCADO. Es lo que decide cuál NO se reescribe.
-  const [origen, setOrigen] = useState("PRECIO");
-  // ENCENDIDO POR DEFECTO, como el POS redondea el precio unitario.
-  const [redondear, setRedondear] = useState(true);
+  // ── LOS DOS CAMPOS SINCRONIZADOS VIVEN EN UN HOOK ──────────────────────
+  //
+  // El estado y los tres manejadores son IDÉNTICOS en el detalle de la oferta.
+  // Copiarlos allá habría sido el caso que la regla 1 nombra: dos funciones que
+  // hacen lo mismo se rompen el día que una cambia. El estado sigue viviendo
+  // acá arriba —esta pantalla lo necesita para `sessionStorage`— y lo que se
+  // comparte es cómo se mueve.
+  const {
+    margen, precio, origen, redondear, bloque,
+    arrancarEn, reponer, onMargen, onPrecio, onRedondear,
+  } = useBloqueDePrecioDeOferta({ costo: producto?.costo, precioNormal: producto?.precioNormal });
   const [enCurso, setEnCurso] = useState(null);
   const [duracion, setDuracion] = useState(DURACION_POR_DEFECTO);
   const [fechaElegida, setFechaElegida] = useState("");
@@ -114,17 +124,6 @@ export default function NuevaOfertaPage() {
     () => finDeLaOferta({ duracion, fechaElegida }),
     [duracion, fechaElegida]
   );
-  // El bloque de precio, resuelto: la cuenta vive en `resolverBloque` y acá
-  // solo se le pasan los dos campos y quién se está tocando.
-  const bloque = resolverBloque({
-    origen,
-    margen,
-    precio,
-    costo: producto?.costo,
-    precioNormal: producto?.precioNormal,
-    redondear,
-  });
-
   // PUBLICAR NECESITA QUE SEA UNA OFERTA DE VERDAD. El estado inicial —el precio
   // normal en los dos campos— no lo es, así que arranca apagado.
   //
@@ -205,9 +204,7 @@ export default function NuevaOfertaPage() {
    *  a pedir al servidor, porque entre que se fue y volvió pudieron cambiar. */
   const retomar = async () => {
     if (!enCurso) return;
-    setMargen(enCurso.margen);
-    setPrecio(enCurso.precio);
-    setRedondear(enCurso.redondear);
+    reponer({ margen: enCurso.margen, precio: enCurso.precio, redondear: enCurso.redondear });
     setDuracion(enCurso.duracion || DURACION_POR_DEFECTO);
     setFechaElegida(enCurso.fechaElegida || "");
     setSoloEfectivo(enCurso.soloEfectivo);
@@ -361,10 +358,7 @@ export default function NuevaOfertaPage() {
               // ARRANCA EN EL MARGEN REAL DE HOY, no vacío: así se ve de dónde
               // se parte y cuánto se resigna al bajar. Ese estado NO es una
               // oferta —es el precio normal— y por eso Publicar sigue apagado.
-              const ini = estadoInicial({ precioNormal: p.precioNormal, costo: p.costo });
-              setMargen(ini.margen == null ? "" : String(ini.margen));
-              setPrecio(ini.precio == null ? "" : String(ini.precio));
-              setOrigen("PRECIO");
+              arrancarEn({ precioNormal: p.precioNormal, costo: p.costo });
               setEnCurso(null);
             }}
           />
@@ -413,37 +407,9 @@ export default function NuevaOfertaPage() {
             origen={origen}
             bloque={bloque}
             money={money}
-            onMargen={(v) => {
-              setOrigen("MARGEN");
-              setMargen(v);
-              // El OTRO campo se recalcula. Se hace acá y no adentro del
-              // componente para que el estado siga viviendo en un solo lugar.
-              const r = resolverBloque({
-                origen: "MARGEN", margen: v, costo: producto.costo,
-                precioNormal: producto.precioNormal, redondear,
-              });
-              setPrecio(r.precioFinal == null ? "" : String(r.precioFinal));
-            }}
-            onPrecio={(v) => {
-              setOrigen("PRECIO");
-              setPrecio(v);
-              const r = resolverBloque({
-                origen: "PRECIO", precio: v, costo: producto.costo,
-                precioNormal: producto.precioNormal, redondear,
-              });
-              setMargen(r.margenReal == null ? "" : String(r.margenReal));
-            }}
-            onRedondear={(v) => {
-              setRedondear(v);
-              // Al cambiar el interruptor se recalcula desde el campo que se
-              // tocó último: si no, el precio quedaría con el redondeo viejo.
-              const r = resolverBloque({
-                origen, margen, precio, costo: producto.costo,
-                precioNormal: producto.precioNormal, redondear: v,
-              });
-              if (origen === "MARGEN") setPrecio(r.precioFinal == null ? "" : String(r.precioFinal));
-              else setMargen(r.margenReal == null ? "" : String(r.margenReal));
-            }}
+            onMargen={onMargen}
+            onPrecio={onPrecio}
+            onRedondear={onRedondear}
           />
         )}
 
@@ -502,53 +468,43 @@ export default function NuevaOfertaPage() {
         )}
       </div>
 
-      {/* ── EL PIE, ANCLADO ───────────────────────────────────────────────
-          No scrollea con el contenido: el resumen y los dos botones son la
-          decisión, y una decisión que hay que ir a buscar hacia abajo se toma
-          sin leerla. */}
-      <div className="sticky bottom-0 border-t sunmi-border sunmi-bg-pie px-4 pt-3 pb-4 space-y-3">
-        <div className="text-sm3 sunmi-text-muted-strong">
-          {/* EL RESUMEN DICE EL PRECIO QUE SE VA A COBRAR, NO EL TIPEADO.
-              Decía `precio` —el texto del campo— y con el redondeo puesto eso
-              es un número que el POS nunca va a cobrar: con $ 433 escritos el
-              pie anunciaba "pasa de $ 500,00 a $ 433,00" mientras el bloque de
-              arriba decía que el precio quedaba en $ 500. La frase del pie es la
-              que se lee antes de publicar, así que es la que no puede mentir.
-              Lo encontró una captura, no un candado. */}
-          {resumenDeLaOferta({
+      <PieDeOferta
+        resumen={
+          /* EL RESUMEN DICE EL PRECIO QUE SE VA A COBRAR, NO EL TIPEADO.
+             Decía `precio` —el texto del campo— y con el redondeo puesto eso es
+             un número que el POS nunca va a cobrar: con $ 433 escritos el pie
+             anunciaba "pasa de $ 500,00 a $ 433,00" mientras el bloque de arriba
+             decía que el precio quedaba en $ 500. La frase del pie es la que se
+             lee antes de publicar, así que es la que no puede mentir. */
+          resumenDeLaOferta({
             producto,
             precioOferta: bloque.precioFinal,
             finEn,
             nombreDelLocal,
             soloEfectivo,
-          })}
-        </div>
-
-        <div className="flex gap-2">
-          <SunmiButton
-            type="button"
-            color="secondary"
-            onClick={() => guardar(false)}
-            disabled={!listo || guardando}
-            className="flex-1 justify-center text-sm3 font-medium"
-          >
-            Guardar borrador
-          </SunmiButton>
-          <SunmiButton
-            type="button"
-            color="primary"
-            onClick={() => guardar(true)}
-            disabled={!listo || guardando}
-            className="flex-1 justify-center text-sm3 font-medium"
-          >
-            {guardando ? "Guardando…" : "Publicar"}
-          </SunmiButton>
-        </div>
-
-        <div className="text-sm2 sunmi-text-muted">
-          Desde que publicás, el POS ya cobra este precio.
-        </div>
-      </div>
+          })
+        }
+        advertencia="Desde que publicás, el POS ya cobra este precio."
+      >
+        <SunmiButton
+          type="button"
+          color="secondary"
+          onClick={() => guardar(false)}
+          disabled={!listo || guardando}
+          className="flex-1 justify-center text-sm3 font-medium"
+        >
+          Guardar borrador
+        </SunmiButton>
+        <SunmiButton
+          type="button"
+          color="primary"
+          onClick={() => guardar(true)}
+          disabled={!listo || guardando}
+          className="flex-1 justify-center text-sm3 font-medium"
+        >
+          {guardando ? "Guardando…" : "Publicar"}
+        </SunmiButton>
+      </PieDeOferta>
     </div>
   );
 }

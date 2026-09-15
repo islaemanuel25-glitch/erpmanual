@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { resolveLocalAndGrupo, getGrupoIdDeLocal } from "@/lib/grupos";
+import { getConfigLocalEfectiva } from "@/lib/config/local";
 import { checkPerm } from "@/lib/authorize";
 import { ofertaParaDetalle } from "@/lib/ofertas/dto";
 import { estadoOferta, ESTADO_OFERTA } from "@/lib/ofertas/estados";
@@ -64,9 +65,28 @@ export async function GET(req, { params }) {
       productoLocalIds: oferta.lineas.map((l) => l.productoLocalId),
     });
 
+    // ── LA CONFIGURACIÓN DE VENTA SIN STOCK, IGUAL QUE EN EL BUSCADOR ────
+    //
+    // Decide si un stock en cero es una ALERTA o un dato más. Viaja en la raíz y
+    // también en cada línea: la tarjeta del producto recibe UNA línea y nada
+    // más, así que un campo suelto en la raíz no llegaría nunca a donde se usa.
+    // Es el mismo motivo por el que `buscar-producto` lo duplica.
+    const grupoIdDelLocal = await getGrupoIdDeLocal(localId);
+    let permiteVenderSinStock = false;
+    if (grupoIdDelLocal) {
+      const eff = await getConfigLocalEfectiva(localId, grupoIdDelLocal, {});
+      permiteVenderSinStock = eff.allowNegativeStock === true;
+    }
+
+    const dto = ofertaParaDetalle(oferta, { actualesPorProductoLocal: actuales });
+
     return NextResponse.json({
       ok: true,
-      oferta: ofertaParaDetalle(oferta, { actualesPorProductoLocal: actuales }),
+      permiteVenderSinStock,
+      oferta: {
+        ...dto,
+        lineas: (dto?.lineas || []).map((l) => ({ ...l, permiteVenderSinStock })),
+      },
     });
   } catch (err) {
     console.error("Error leyendo oferta:", err);
