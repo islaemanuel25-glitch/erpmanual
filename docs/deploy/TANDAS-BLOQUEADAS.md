@@ -65,30 +65,22 @@ Si se lo anota como bloqueado, el paso 0 podría cortar el rango ANTES de ese
 commit y dejarlo afuera indefinidamente. No es eso lo que hay que hacer: hay que
 dejarlo viajar con la primera tanda que sí toque el runtime.
 
-### Vigente: `c5d89841` — el arreglo de la guardia de migraciones
+### Vigente: la reescritura de dos afirmaciones de `sonda-modalidades-cobro.mjs`
 
-Empujado el 2026-09-15 y **no desplegado a propósito**. No está bloqueado: sale
-con el próximo despliegue, sin hacer nada especial.
+Empujada el 2026-09-15, después del despliegue de `ef359d8f`. No está bloqueada:
+sale con el próximo despliegue, sin hacer nada especial.
 
-**Por qué no salió solo.** No tiene una sola línea que llegue al runtime de Next.
-Toca el skill de deploy, tres documentos, dos scripts, el módulo de la guardia y
-un candado — nada de `app/`, `components/`, `hooks/` ni `context/`, y el único
-archivo de `lib/` que toca lo importan solamente el hook y su test. Desplegarlo
-habría cortado producción para publicar una imagen funcionalmente idéntica a la
-que ya estaba corriendo.
+Toca **un script y nada más**. La sonda preguntaba por la línea "Elegí la
+modalidad" para saber si el selector había abierto, y esa línea se sacó en la
+misma tanda que se acaba de desplegar; quedaba afirmando sobre un texto que ya no
+existe. Se reescribió por su intención —lo que prueba que el selector abrió es el
+"← Volver"— y eso no cambia una sola línea de lo que corre en producción.
 
-**Y la guardia ya está arreglada sin desplegar nada**, porque es herramienta
-local: el hook corre en la máquina desde la que se despliega, no adentro del
-contenedor. El arreglo tuvo efecto en el momento en que se commiteó.
-
-**Lo que sí se verificó antes de decidir**, porque el propio skill lo advierte: el
-escaneo de Tailwind cubre `./lib/**/*.{js,jsx}`, así que renombrar un `.js` de ahí
-a `.mjs` lo saca del escaneo y podría hacer desaparecer una clase de la hoja. Ese
-archivo nombra **cero** clases, así que la hoja no se puede mover. Sin esa
-medición, "no toca el runtime" habría sido una suposición.
-
-**Cuándo se borra esta entrada:** cuando `c5d89841` esté en producción, que va a
-pasar solo. No hay nada que recordar hacer.
+**Cómo funcionó la entrada anterior, que es el motivo de que esto esté escrito
+así.** `c5d89841` —el arreglo de la guardia de migraciones— quedó anotado acá el
+2026-09-15 por la misma razón, y **viajó solo** con el despliegue de `ef359d8f`
+sin que nadie tuviera que acordarse de nada. Ya está en producción y por eso su
+entrada se borró.
 
 ---
 

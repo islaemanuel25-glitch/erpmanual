@@ -677,8 +677,19 @@ try {
   const abrio = await clickEn(botonConTexto(nombrePadre));
   afirmar(abrio, "se puede tocar el botón padre");
   await sleep(400);
+  // ── CÓMO SE SABE QUE EL SELECTOR ABRIÓ, Y POR QUÉ CAMBIÓ ────────────────
+  //
+  // Esto preguntaba por la línea "Elegí la modalidad". Esa línea se sacó el
+  // 2026-09-15 —el encabezado ya dice de qué medio son las opciones, y la línea
+  // empujaba las opciones fuera del pulgar a 360 px—, así que la afirmación
+  // habría dado rojo por un texto que se fue, no por un selector que no abre.
+  //
+  // Se reescribe por su INTENCIÓN: lo que prueba que el selector abrió es que
+  // esté el "← Volver", que solo existe en las pantallas de segundo nivel. Las
+  // dos afirmaciones de abajo —las modalidades como botones— lo confirman desde
+  // el otro lado.
   afirmar(
-    await evaluar(`document.body.innerText.includes("Elegí la modalidad")`),
+    await evaluar(`document.body.innerText.includes("Volver")`),
     "tocarlo abre el selector en vez de cobrar",
     (await evaluar(`document.body.innerText`)).slice(0, 300)
   );
@@ -904,7 +915,7 @@ try {
   await clickEn(botonConTexto(nombrePadre));
   await sleep(400);
   afirmar(
-    await evaluar(`document.body.innerText.includes("Elegí la modalidad")`),
+    await evaluar(`document.body.innerText.includes("Volver")`),
     "el selector abre igual en escritorio"
   );
   afirmar(
