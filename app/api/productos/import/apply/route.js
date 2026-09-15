@@ -5,7 +5,10 @@ import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal, getLocalesDeGrupo, inheritDepositoProductsToLocal } from "@/lib/grupos";
 import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { getContextoActivo } from "@/lib/contexto";
-import { validarUnicidadCodigos } from "@/lib/productos/validarCodigosBarra";
+import {
+  bloquearCodigosDelGrupo,
+  validarUnicidadCodigos,
+} from "@/lib/productos/validarCodigosBarra";
 import { esComboBase } from "@/lib/combos/guards";
 import { puedeEditarCosto, puedeEditarBaseProducto } from "@/lib/productos/propiedadCosto";
 
@@ -109,10 +112,16 @@ export async function POST(req) {
             const esPack = unidadMedida === "pack" || unidadMedida === "cajon";
             const fp = p.factor_pack && p.factor_pack > 1 ? p.factor_pack : null;
 
-            // Defensa: el estado pudo cambiar entre preview y apply.
+            // Defensa: el estado pudo cambiar entre preview y apply. El bloqueo
+            // va primero, por la misma razón que en el alta de a uno: sin él dos
+            // importaciones simultáneas con el mismo código pasan las dos.
+            await bloquearCodigosDelGrupo(tx, grupoId);
             const v = await validarUnicidadCodigos({
               prisma: tx,
               grupoId,
+              // El producto nace del local que importa, así que ése es su ámbito.
+              ambitoLocalId: localId,
+              depositoLocalId,
               baseIdExcluir: null,
               principal: p.codigo_barra || null,
               secundario: p.codigo_barra_secundario || null,
@@ -220,9 +229,14 @@ export async function POST(req) {
             const puedeBase = puedeEditarBaseProducto(localId, baseActual.creadoEnLocalId, depositoLocalId);
 
             // Defensa: el estado pudo cambiar entre preview y apply.
+            await bloquearCodigosDelGrupo(tx, grupoId);
             const v = await validarUnicidadCodigos({
               prisma: tx,
               grupoId,
+              // Acá el ámbito es el del producto QUE YA EXISTE, no el del local
+              // que importa: es su `creadoEnLocalId` el que decide dónde se ve.
+              ambitoLocalId: baseActual.creadoEnLocalId,
+              depositoLocalId,
               baseIdExcluir: p.productoBaseId,
               principal: p.codigo_barra || null,
               secundario: p.codigo_barra_secundario || null,

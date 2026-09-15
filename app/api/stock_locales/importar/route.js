@@ -6,6 +6,11 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { resolveLocalAndGrupo, getLocalIdsDeGrupo } from "@/lib/grupos";
+import {
+  bloquearCodigosDelGrupo,
+  validarUnicidadCodigos,
+} from "@/lib/productos/validarCodigosBarra";
+import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 
 export async function POST(req) {
   try {
@@ -95,9 +100,44 @@ export async function POST(req) {
     // ================================
     // 3) INSERTAR PRODUCTO BASE
     // ================================
-    await prisma.productoBase.createMany({
-      data: productosBaseData,
-      skipDuplicates: true,
+    //
+    // ── ESTA RUTA NO VALIDABA NINGÚN CÓDIGO ──────────────────────────────
+    //
+    // Se apoyaba solo en `skipDuplicates`, que esquiva el índice de la base y
+    // nada más: una fila que chocara contra el SECUNDARIO de otro producto, o
+    // contra un código propio de la ubicación, entraba igual — y encima entraba
+    // en silencio, porque `skipDuplicates` no dice qué salteó.
+    //
+    // Ahora se pregunta por cada fila con la misma función que todos los demás
+    // caminos de alta, y si alguna choca NO SE IMPORTA NADA: un archivo a medio
+    // aplicar, sin decir qué filas entraron, es peor que uno rechazado.
+    const depositoLocalId = await getDepositoIdDeGrupo(ctx.grupoId, prisma);
+    await prisma.$transaction(async (tx) => {
+      await bloquearCodigosDelGrupo(tx, ctx.grupoId);
+
+      for (let i = 0; i < productosBaseData.length; i++) {
+        const fila = productosBaseData[i];
+        if (!fila.codigo_barra) continue;
+        const v = await validarUnicidadCodigos({
+          prisma: tx,
+          grupoId: fila.grupoId,
+          ambitoLocalId: fila.creadoEnLocalId,
+          depositoLocalId,
+          baseIdExcluir: null,
+          principal: fila.codigo_barra,
+          secundario: null,
+        });
+        if (!v.ok) {
+          const e = new Error(`Fila ${i + 1} ("${fila.nombre}"): ${v.error}`);
+          e.esCodigoEnUso = true;
+          throw e;
+        }
+      }
+
+      await tx.productoBase.createMany({
+        data: productosBaseData,
+        skipDuplicates: true,
+      });
     });
 
     // ================================
@@ -167,6 +207,10 @@ export async function POST(req) {
     return NextResponse.json({ ok: true });
 
   } catch (err) {
+    // Un código ocupado es un 400 con su texto y el número de fila.
+    if (err.esCodigoEnUso) {
+      return NextResponse.json({ ok: false, error: err.message }, { status: 400 });
+    }
     console.error("❌ ERROR IMPORTAR:", err);
     return NextResponse.json(
       { ok: false, error: err.message },

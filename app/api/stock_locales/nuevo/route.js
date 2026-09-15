@@ -5,6 +5,12 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import {
+  bloquearCodigosDelGrupo,
+  normalizarCodigosBarra,
+  validarUnicidadCodigos,
+} from "@/lib/productos/validarCodigosBarra";
+import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 
 export async function POST(req) {
   try {
@@ -118,28 +124,49 @@ export async function POST(req) {
     }
 
     // --------------------------------------------
-    // 3. Validar duplicado (código de barras)
+    // 3. Código de barras
     // --------------------------------------------
-    if (data.codigoBarra) {
-      const repetido = await prisma.productoBase.findFirst({
-        where: {
-          grupoId: data.grupoId,
-          codigo_barra: data.codigoBarra,
-        },
-      });
-
-      if (repetido) {
-        return NextResponse.json(
-          { ok: false, error: "Ya existe un producto con ese código de barras" },
-          { status: 400 }
-        );
-      }
+    //
+    // ── ESTA RUTA TENÍA SU PROPIA VALIDACIÓN, Y ERA LA MÁS POBRE ──────────
+    //
+    // Miraba únicamente `codigo_barra` contra `codigo_barra` en todo el grupo:
+    // no veía el secundario de nadie, no conocía el código propio, y el texto
+    // del rechazo era otro distinto del de crear y del de importar. Cinco
+    // definiciones de "este código ya está en uso" con cuatro mensajes es cómo
+    // se empieza a rechazar en una pantalla lo que la otra acepta.
+    //
+    // Ahora usa la misma función que todos los caminos de alta, con el mismo
+    // ámbito y el mismo bloqueo.
+    const norm = normalizarCodigosBarra({
+      codigoBarra: data.codigoBarra,
+      codigoBarraSecundario: null,
+    });
+    if (!norm.ok) {
+      return NextResponse.json({ ok: false, error: norm.error }, { status: 400 });
     }
+    data.codigoBarra = norm.principal;
+    const depositoLocalId = await getDepositoIdDeGrupo(data.grupoId, prisma);
 
     // --------------------------------------------
     // 4. Crear productoBase + productoLocal + stockLocal
     // --------------------------------------------
     const base = await prisma.$transaction(async (tx) => {
+      await bloquearCodigosDelGrupo(tx, data.grupoId);
+      const vUnic = await validarUnicidadCodigos({
+        prisma: tx,
+        grupoId: data.grupoId,
+        ambitoLocalId: data.creadoEnLocalId,
+        depositoLocalId,
+        baseIdExcluir: null,
+        principal: norm.principal,
+        secundario: null,
+      });
+      if (!vUnic.ok) {
+        const e = new Error(vUnic.error);
+        e.esCodigoEnUso = true;
+        throw e;
+      }
+
       const creado = await tx.productoBase.create({
         data: {
           grupoId: data.grupoId,
@@ -224,6 +251,10 @@ export async function POST(req) {
     });
 
   } catch (err) {
+    // Un código ocupado es un 400 con su texto, no un error del servidor.
+    if (err.esCodigoEnUso) {
+      return NextResponse.json({ ok: false, error: err.message }, { status: 400 });
+    }
     console.error("❌ ERROR STOCK NUEVO:", err);
     return NextResponse.json(
       { ok: false, error: err.message },

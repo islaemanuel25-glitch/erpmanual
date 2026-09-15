@@ -6,6 +6,7 @@ import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { getContextoActivo } from "@/lib/contexto";
 import { defaultModoEnvio } from "@/lib/conversiones/stock";
 import { normalizarCodigosBarra } from "@/lib/productos/validarCodigosBarra";
+import { productoVisibleWhere } from "@/lib/visibilidad";
 
 const UNIDADES_VALIDAS = ["unidad", "pack", "cajon", "kg"];
 
@@ -146,10 +147,26 @@ export async function POST(req) {
     const areaMap = new Map(areas.map((a) => [a.nombre.toLowerCase().trim(), a.id]));
 
     // ══════════════════════════════════════════════════════
-    // 2. Cargar productos existentes del grupo (por principal y secundario)
+    // 2. Cargar los productos VISIBLES EN ESTE LOCAL
     // ══════════════════════════════════════════════════════
+    //
+    // ── ANTES CARGABA TODO EL GRUPO, Y ESO TENÍA DOS CONSECUENCIAS ────────
+    //
+    // La importación crea productos del local que importa, así que su ámbito es
+    // ese local: el depósito más lo suyo. Mirando todo el grupo pasaban dos
+    // cosas, las dos malas:
+    //
+    //   1. un producto PROPIO DE OTRO LOCAL con el mismo código se tomaba como
+    //      "el existente", y la fila se clasificaba como ACTUALIZAR — le iba a
+    //      pisar el nombre y el precio a un producto de un local ajeno;
+    //   2. y si no coincidía el principal, se informaba un conflicto contra un
+    //      producto que en esta caja no se ve, sin forma de resolverlo.
+    //
+    // `productoVisibleWhere` es la misma regla con la que se decide qué se ve en
+    // un local; usarla acá es lo que hace que la vista previa diga lo mismo que
+    // va a decidir `validarUnicidadCodigos` al aplicar.
     const existentes = await prisma.productoBase.findMany({
-      where: { grupoId },
+      where: { grupoId, AND: [productoVisibleWhere(localId)] },
       select: { id: true, codigo_barra: true, codigo_barra_secundario: true, nombre: true },
     });
 
@@ -162,6 +179,21 @@ export async function POST(req) {
       if (p.codigo_barra_secundario) {
         existentesPorSecundario.set(p.codigo_barra_secundario.trim(), p);
       }
+    }
+
+    // LOS CÓDIGOS PROPIOS DE ESTA UBICACIÓN TAMBIÉN OCUPAN. Viven en otra tabla,
+    // así que la vista previa no los miraba y el archivo pasaba en verde para
+    // después fallar al aplicar, fila por fila y sin poder corregirlo antes.
+    const propiosDelLocal = await prisma.productoLocal.findMany({
+      where: { localId, codigo_barra_propio: { not: null }, base: { grupoId } },
+      select: { baseId: true, codigo_barra_propio: true, base: { select: { nombre: true } } },
+    });
+    const existentesPorPropio = new Map();
+    for (const pl of propiosDelLocal) {
+      existentesPorPropio.set(pl.codigo_barra_propio.trim(), {
+        id: pl.baseId,
+        nombre: pl.base?.nombre || "otro producto",
+      });
     }
 
     // ══════════════════════════════════════════════════════
@@ -311,6 +343,21 @@ export async function POST(req) {
           erroresArr.push({
             field: "codigo_barra_secundario",
             message: `ya está usado como secundario de "${conflictoS.nombre}" (id ${conflictoS.id})`,
+          });
+        }
+      }
+
+      // 4) el código de la fila está puesto como código PROPIO en esta ubicación
+      for (const [campo, valor] of [
+        ["codigo_barra", codigoBarra],
+        ["codigo_barra_secundario", codigoBarraSecundario],
+      ]) {
+        if (!valor) continue;
+        const choque = existentesPorPropio.get(valor);
+        if (choque && choque.id !== existenteId) {
+          erroresArr.push({
+            field: campo,
+            message: `está puesto como código propio de "${choque.nombre}" en esta ubicación`,
           });
         }
       }

@@ -258,9 +258,25 @@ export async function PUT(req, context) {
           { status: 400 }
         );
       }
+      // ── EL ÁMBITO ES EL DEL PRODUCTO, NO EL DE QUIEN EDITA ──────────────
+      //
+      // `creadoEnLocalId` decide en qué cajas se escanea, así que es contra
+      // ésas que el código tiene que estar libre. Editar desde el depósito un
+      // producto de Casiano no lo hace competir con los códigos de Mini el 7.
+      //
+      // ── LA VENTANA DE CONCURRENCIA DE ESTE CAMINO SIGUE ABIERTA ─────────
+      //
+      // Los caminos de ALTA validan adentro de una transacción y detrás de
+      // `bloquearCodigosDelGrupo`. Éste no: la escritura la hacen `editarBase` y
+      // `editarOverride`, que propagan precios y no reciben un `tx`. Meterlas en
+      // la transacción es un cambio en el motor de precios y va en su propia
+      // tanda. Lo que hoy respalda este camino es el índice de la base, que
+      // cubre el principal contra otro del MISMO creador y nada más.
       const vUnic = await validarUnicidadCodigos({
         prisma,
         grupoId: baseScope.grupoId,
+        ambitoLocalId: baseScope.creadoEnLocalId,
+        depositoLocalId,
         baseIdExcluir: baseId,
         principal: norm.principal,
         secundario: norm.secundario,

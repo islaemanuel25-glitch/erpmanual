@@ -1,0 +1,53 @@
+-- EL CÓDIGO DE BARRAS DEJA DE SER ÚNICO POR GRUPO Y PASA A SERLO POR CREADOR.
+--
+-- ── QUÉ ARREGLA ─────────────────────────────────────────────────────────────
+--
+-- Mini el 7 y Casiano venden el mismo helado. Con `(grupoId, codigo_barra)`
+-- único, el primero que lo cargaba se quedaba con el código y el otro no lo
+-- podía usar — aunque los dos productos NUNCA se ven en la misma caja: un
+-- producto creado por un local no-depósito existe solo en ese local
+-- (`lib/visibilidad.js`, regla A).
+--
+-- ── ES NO ADITIVA Y AFLOJA, NO APRIETA ──────────────────────────────────────
+--
+-- Tiene un DROP de índice, así que el clasificador la marca NO ADITIVA y frena.
+-- Está AUTORIZADA por Emanuel. Lo que hace es reemplazar una restricción por
+-- otra MÁS DÉBIL: todo lo que entraba antes entra ahora. Por eso la ventana
+-- entre migrar y recrear es segura en las dos direcciones — el código viejo,
+-- que valida contra todo el grupo, sigue funcionando contra el índice nuevo
+-- porque nunca intenta escribir nada que el índice nuevo rechace.
+--
+-- ── MEDIDO ANTES DE ESCRIBIRLA, CONTRA PRODUCCIÓN ───────────────────────────
+--
+-- La clave nueva se simuló sobre las 2840 filas reales:
+--
+--   SELECT "grupoId", COALESCE("creadoEnLocalId",-1), codigo_barra, count(*)
+--     FROM "ProductoBase" WHERE codigo_barra IS NOT NULL
+--    GROUP BY 1,2,3 HAVING count(*) > 1;
+--
+-- Cero filas: el índice entra sin romper nada. Y `creadoEnLocalId` no tiene
+-- ningún nulo (0 de 2840), así que la rama de los huérfanos no la ejerce nadie.
+--
+-- ── CÓMO SE REPONE, SI HAY QUE VOLVER ───────────────────────────────────────
+--
+-- Escrito ANTES de aplicarla, que es cuando sirve. Volver al índice viejo es
+-- posible mientras no se haya creado ningún par que el viejo rechace — o sea,
+-- mientras dos locales no hayan cargado el mismo código, que es exactamente lo
+-- que esta migración viene a permitir. Se comprueba primero:
+--
+--   SELECT "grupoId", codigo_barra, count(*) FROM "ProductoBase"
+--    WHERE codigo_barra IS NOT NULL GROUP BY 1,2 HAVING count(*) > 1;
+--
+-- Si eso devuelve cero filas, la reposición es:
+--
+--   DROP INDEX "ProductoBase_grupoId_creadoEnLocalId_codigo_barra_key";
+--   CREATE UNIQUE INDEX "ProductoBase_grupoId_codigo_barra_key"
+--     ON "ProductoBase"("grupoId", codigo_barra);
+--
+-- Si devuelve filas, NO se puede reponer sin decidir qué producto pierde su
+-- código: hay locales usando el mismo, que es el estado que se buscaba.
+
+DROP INDEX IF EXISTS "ProductoBase_grupoId_codigo_barra_key";
+
+CREATE UNIQUE INDEX "ProductoBase_grupoId_creadoEnLocalId_codigo_barra_key"
+  ON "ProductoBase"("grupoId", "creadoEnLocalId", codigo_barra);

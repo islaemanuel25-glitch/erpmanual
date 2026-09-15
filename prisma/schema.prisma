@@ -495,7 +495,27 @@ model ProductoBase {
 
   filasImportacionLista ImportacionListaFila[]
 
-  @@unique([grupoId, codigo_barra])
+  // UNICIDAD DEL CÓDIGO POR CREADOR, NO POR GRUPO.
+  //
+  // Era `@@unique([grupoId, codigo_barra])` y eso le daba el código al primero
+  // que lo cargaba en TODO el grupo: Mini el 7 y Casiano venden el mismo helado
+  // y el segundo no lo podía dar de alta. Los locales son independientes — un
+  // producto de un local no-depósito existe solo ahí (`productoVisibleWhere`).
+  //
+  // Con el creador adentro de la clave, la base garantiza exactamente lo que
+  // puede garantizar mirando una sola tabla: que el depósito no repita un código
+  // entre los suyos, y que cada local no lo repita entre los suyos.
+  //
+  // Lo que NO garantiza, y por eso vive en `validarUnicidadCodigos`: el cruce
+  // principal ↔ secundario (dos columnas de la misma fila), el cruce
+  // local ↔ depósito (filas de creadores distintos) y el cruce contra
+  // `codigo_barra_propio` (otra tabla).
+  //
+  // `creadoEnLocalId` es nullable y en Postgres dos NULL no chocan, así que dos
+  // productos huérfanos podrían repetir código. Hoy no hay ninguno —medido en
+  // producción: 0 de 2840— y la función cierra ese caso igual, porque trata al
+  // huérfano como de depósito (decisión D2).
+  @@unique([grupoId, creadoEnLocalId, codigo_barra])
   @@index([grupoId])
   @@index([grupoId, codigo_barra_secundario])
   @@index([creadoEnLocalId])

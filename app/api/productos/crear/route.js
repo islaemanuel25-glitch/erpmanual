@@ -3,7 +3,12 @@ import prisma from "@/lib/prisma";
 import { resolveScope, getLocalesDeGrupo } from "@/lib/grupos";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { normalizarCodigosBarra, validarUnicidadCodigos } from "@/lib/productos/validarCodigosBarra";
+import {
+  bloquearCodigosDelGrupo,
+  normalizarCodigosBarra,
+  validarUnicidadCodigos,
+} from "@/lib/productos/validarCodigosBarra";
+import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { esModalidadServicio, validarRecargoServicioPct } from "@/lib/pos-ventas/servicios";
 
 // Validar modo_pedido según unidad_medida y factor_pack
@@ -90,16 +95,13 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: norm.error }, { status: 400 });
     }
 
-    const vUnic = await validarUnicidadCodigos({
-      prisma,
-      grupoId,
-      baseIdExcluir: null,
-      principal: norm.principal,
-      secundario: norm.secundario,
-    });
-    if (!vUnic.ok) {
-      return NextResponse.json({ ok: false, error: vUnic.error }, { status: 400 });
-    }
+    // LA UNICIDAD SE VALIDA ADENTRO DE LA TRANSACCIÓN, más abajo, detrás del
+    // bloqueo por grupo. Acá arriba corría suelta: entre preguntar y escribir
+    // había una ventana por la que dos altas simultáneas del mismo código
+    // pasaban las dos. El índice de la base tapaba una parte —y devolvía un
+    // P2002 crudo con 500—, pero las reglas que cruzan creadores o tablas no las
+    // mira ningún índice.
+    const depositoLocalId = await getDepositoIdDeGrupo(grupoId, prisma);
 
     // 4) Armar baseData
     const baseData = {
@@ -180,6 +182,28 @@ export async function POST(req) {
 
     // 4) Transacción: crear base + (productoLocal/stock) según caso
     const result = await prisma.$transaction(async (tx) => {
+      // El bloqueo va PRIMERO: preguntar por el código después de escribir ya
+      // sería tarde, y preguntar sin bloquear deja pasar la segunda alta.
+      await bloquearCodigosDelGrupo(tx, grupoId);
+
+      const vUnic = await validarUnicidadCodigos({
+        prisma: tx,
+        grupoId,
+        // El ámbito lo decide el DUEÑO del producto —el local que va a quedar
+        // escrito en `creadoEnLocalId`—, no desde dónde se opera. Es lo que
+        // decide en qué cajas se va a poder escanear.
+        ambitoLocalId: localId,
+        depositoLocalId,
+        baseIdExcluir: null,
+        principal: norm.principal,
+        secundario: norm.secundario,
+      });
+      if (!vUnic.ok) {
+        const e = new Error(vUnic.error);
+        e.esCodigoEnUso = true;
+        throw e;
+      }
+
       // 4.1) Crear ProductoBase (con fallback si faltan columnas)
       let base;
       try {
@@ -318,6 +342,13 @@ export async function POST(req) {
       meta: { replicatedTo: result.replicatedTo },
     });
   } catch (e) {
+    // UN CÓDIGO OCUPADO NO ES UN ERROR DEL SERVIDOR. Viaja como 400 con su
+    // texto, que es el que dice qué producto lo tiene y en qué local. Sale del
+    // catch porque la validación vive adentro de la transacción y la única
+    // forma de abortarla es tirando.
+    if (e.esCodigoEnUso) {
+      return NextResponse.json({ ok: false, error: e.message }, { status: 400 });
+    }
     console.error("🔥 ERROR CREAR PRODUCTO >>>", e);
     return NextResponse.json(
       { ok: false, error: e.message || String(e) },
