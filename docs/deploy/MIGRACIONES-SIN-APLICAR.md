@@ -16,32 +16,33 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-### `20260915180000_oferta_redondeo_y_precio_exacto` — **ADITIVA**
-
-Producción está en **12 migraciones** y el árbol en **13**.
-
-Agrega dos columnas a `OfertaLinea`, las dos **nullable y sin DEFAULT**:
-
-- `redondeoAplicado BOOLEAN` — si el interruptor de redondear quedó puesto.
-- `precioSinRedondear DECIMAL(12,2)` — el precio exacto del que se partió.
-
-`null` significa **"no se registró"**, que no es lo mismo que "no se redondeó".
-Las líneas que ya existen no lo saben, y un `false` por defecto diría algo que
-nadie sabe. Por eso no llevan DEFAULT ni se rellenan.
-
-**El clasificador la marcó `aditiva` y salió con 0**: no hay `DROP`, no hay
-`DELETE`, no hay `NOT NULL` sobre una tabla con filas. **No hace falta
-`DEPLOY_MIGRACION_AUTORIZADA`.**
-
-**El quinto chequeo del backup NO aplica**: no se borra ningún dato, así que no
-hay ningún valor que comprobar dentro del dump. Los cuatro chequeos normales sí.
-
-`ALTER TABLE ... ADD COLUMN` con columnas nullable no reescribe la tabla en
-PostgreSQL 16, así que la ventana entre migrar y recrear es de código viejo
-contra un esquema que tiene dos columnas de más y no las mira. No hay
-incompatibilidad.
+Ninguna. Producción está en **13 migraciones**, las mismas que el árbol.
 
 ---
+
+## 2026-09-15 — `39625985`, el bloque de precio de ofertas: **UNA MIGRACIÓN ADITIVA**
+
+Producción pasó de `df749cdecaf27aa479d14669e4215270cf177e54` a
+`39625985844fba4b287fbf1ec09df6a283568877`. Corte de **2 segundos**.
+
+`20260915180000_oferta_redondeo_y_precio_exacto`. Dos columnas nuevas en
+`OfertaLinea`, las dos nullable y sin DEFAULT: `redondeoAplicado BOOLEAN` y
+`precioSinRedondear DECIMAL(12,2)`. `null` es "no se registró", que no es lo
+mismo que "no se redondeó".
+
+**El clasificador la marcó `aditiva` y salió con 0.** No hizo falta
+`DEPLOY_MIGRACION_AUTORIZADA`, y el quinto chequeo del backup no aplicaba porque
+no se borra ningún dato.
+
+Verificado contra Postgres después de recrear: las dos columnas existen, las dos
+`is_nullable = YES`. El contenedor informó **13 migraciones encontradas** y el
+árbol tiene **13**.
+
+**El clasificador hubo que correrlo con `--desde`**, porque `--vps` resuelve el
+alias `vps-erp` por ssh y esta sesión corre DENTRO del VPS, donde ese nombre no
+existe. La base se pasó a mano con el SHA de la imagen que atendía —el mismo que
+el paso 2 anota como rollback— así que el rango se calculó igual de bien. Queda
+anotado porque va a volver a pasar en cada despliegue hecho desde el servidor.
 
 ## 2026-09-15 — `df749cde`, el arreglo de escala: **UNA MIGRACIÓN DE DATOS**
 
