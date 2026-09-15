@@ -11,6 +11,7 @@ import SunmiProductoCard, {
   RotuloBloqueValor,
 } from "@/components/sunmi/SunmiProductoCard";
 import SunmiPill from "@/components/sunmi/SunmiPill";
+import SelloDeOferta from "@/components/ofertas/SelloDeOferta";
 import { TEXTO_ULTIMO_EDITADO } from "@/lib/productos/estadoDeRetorno";
 import { hayEquivalenciaDeBulto, nombreCortoDe } from "@/lib/productos/carasDeTarjeta";
 import { formatearMoneda } from "@/lib/moneda";
@@ -204,6 +205,13 @@ export default function TarjetaProductoMovil({
   // No es el id pelado a propósito: las dos numeraciones se pisan.
   ancla = null,
   ultimoEditado = false,
+  // ── EL SELLO DE OFERTA ──────────────────────────────────────────────────
+  //
+  // Llega RESUELTO por el servidor —`item.oferta` de `/api/productos/listar`—,
+  // que lo arma con la misma función que usa el POS para cobrar. Acá no se
+  // decide nada sobre vigencia: escribir un `if` de fechas sería la segunda
+  // versión de una regla que ya existe.
+  oferta = null,
 }) {
   const [enLaOtraEscala, setEnLaOtraEscala] = useState(false);
 
@@ -252,8 +260,25 @@ export default function TarjetaProductoMovil({
       // con la sonda: si mañana cambia, cambia en los tres a la vez. Escrito acá
       // a mano, la sonda seguiría buscando el viejo y pasaría en verde sobre una
       // pantalla que dice otra cosa.
+      // ── DOS SELLOS EN LA MISMA RANURA, Y NO COMPITEN ──────────────────
+      //
+      // `destacado` recibe UN nodo, así que los dos van adentro de una fila.
+      // Dicen cosas distintas y las dos importan: OFERTA es del producto —está
+      // cobrando distinto ahora mismo— y "último editado" es del recorrido de
+      // quien está mirando, y dura un momento.
+      //
+      // El orden no es casual: el sello de oferta va PRIMERO porque es el que
+      // sigue estando mañana. La fila se alinea a la derecha, así que el que
+      // queda pegado al borde es el transitorio.
+      //
+      // Está medido que no empuja el alto de la tarjeta: la ranura es absoluta.
       destacado={
-        ultimoEditado ? <SunmiPill color="amber">{TEXTO_ULTIMO_EDITADO}</SunmiPill> : null
+        oferta || ultimoEditado ? (
+          <span className="flex items-center gap-1">
+            <SelloDeOferta oferta={oferta} />
+            {ultimoEditado && <SunmiPill color="amber">{TEXTO_ULTIMO_EDITADO}</SunmiPill>}
+          </span>
+        ) : null
       }
       nombre={nombre}
       empresa={empresa}

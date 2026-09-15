@@ -21,6 +21,7 @@ import {
 } from "@/lib/productos/navegacionPorFilas";
 
 import { Pencil, Trash2, Warehouse, Eye, Power, PowerOff } from "lucide-react";
+import SelloDeOferta from "@/components/ofertas/SelloDeOferta";
 
 // Campos que se pueden ordenar desde el backend
 const SORTABLE_KEYS = [
@@ -168,6 +169,23 @@ export default function SunmiTablaProductos({
       render: (v, row) => (
         <span>
           {v}
+          {/* ── EL SELLO DE OFERTA, EN LÍNEA DESPUÉS DEL NOMBRE ───────────
+              Acá y no en una columna propia: una columna nueva le saca ancho a
+              todas las demás en una tabla que ya se pasa 203 px del ancho
+              disponible a 1366, y estaría vacía en la enorme mayoría de las
+              filas. En línea no cuesta ancho —la columna del nombre envuelve— y
+              queda junto a "Combo" y "Fiambre", que son de la misma familia:
+              cosas que hay que saber de ese producto antes de mirar el precio.
+
+              Es `SunmiPill`, la misma pieza y el mismo verde que en la tarjeta
+              del celular y que "ACTIVA" en la lista de ofertas. Los dos sellos
+              de al lado están escritos a mano con clases sueltas; no se tocan en
+              esta tanda, pero el nuevo no suma otro. */}
+          {row.oferta && (
+            <span className="ml-1.5 align-middle">
+              <SelloDeOferta oferta={row.oferta} />
+            </span>
+          )}
           {row.esCombo && (
             <span className="ml-1.5 inline-block px-1.5 py-[2px] text-[9px] font-bold uppercase rounded sunmi-badge-accent leading-none align-middle">
               Combo

@@ -2960,6 +2960,11 @@ export default function ProductosPage() {
                       ultimoEditado !== null &&
                       claveDeAncla(identidadDeFila(p)) === claveDeAncla(ultimoEditado)
                     }
+                    // EL SELLO DE OFERTA. `p.oferta` lo arma el servidor con la
+                    // misma función con la que el POS decide cobrar el precio
+                    // promocional. Venía en cada listado desde que existe el
+                    // módulo y no lo leía nadie.
+                    oferta={p.oferta ?? null}
                     nombre={p.nombre}
                     // `false` es "esta pantalla no lo muestra" y `null` es "no
                     // hay dato": la tarjeta los dibuja al revés —el segundo deja

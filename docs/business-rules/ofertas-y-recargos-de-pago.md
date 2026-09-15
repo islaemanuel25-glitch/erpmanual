@@ -964,3 +964,91 @@ Se comparo el DOM y la geometria, que SI son deterministas —dos corridas de la
 misma version dan cero diferencias— y dieron **identicos**: mismo `innerHTML`,
 mismas cinco cajas con las mismas coordenadas, mismo alto. Mas las 70
 afirmaciones del arnes de crear, en verde.
+
+## EL SELLO DE OFERTA EN EL CATALOGO
+
+Verificado en codigo y medido en el navegador (`scripts/capturas-sello-oferta.mjs`,
+9 afirmaciones).
+
+`/api/productos/listar` armaba `item.oferta` con `sellosDeOfertaVigente` desde
+que existe el modulo y **no lo leia nadie**: se calculaba en cada listado y se
+tiraba. Quien miraba el catalogo veia un precio y el POS cobraba otro.
+
+### LA CONDICION ES LA DEL POS, Y NO ESTA ESCRITA DOS VECES
+
+`sellosDeOfertaVigente` llama a `ofertasVigentesPorProductoLocal`, que es la
+MISMA funcion con la que `pos-ventas/crear` decide cobrar y con la que el
+buscador del POS la informa. Si el POS no la aplica, no hay sello.
+
+La tarjeta no pregunta nada: recibe el sello resuelto. Hay un candado que
+prohibe que el componente mencione `inicioEn`, `finEn`, `publicadaEn` o
+`new Date(` — cualquiera de esas seria la segunda version de "vigente".
+
+**Lo que el sello NO puede saber:** una oferta de SOLO EFECTIVO esta vigente
+igual, y el POS la aplica o no segun con que se pague, que se decide despues. El
+sello dice que hay una oferta vigente —es verdad—; no promete el precio final.
+
+### DONDE VA
+
+- **Movil:** en la ranura `destacado` de `SunmiProductoCard`, con `SunmiPill`
+  verde. La misma ranura y la misma pieza que el estado en la lista de ofertas.
+  **No se toco el kit.**
+- **Escritorio:** en linea despues del nombre, en la columna `nombre`, junto a
+  "Combo" y "Fiambre". Ahi y no en una columna propia: una columna nueva le saca
+  ancho a todas las demas en una tabla que ya se pasa 203 px del ancho
+  disponible a 1366, y estaria vacia en casi todas las filas.
+
+**Convive con "ultimo editado".** Los dos van en la misma ranura, adentro de una
+fila. El de oferta va PRIMERO porque es el que sigue estando manana; el
+transitorio queda pegado al borde.
+
+### MEDIDO: NO EMPUJA NADA
+
+Con nombres largos —los que son mayoria en el catalogo— y a 390 px:
+
+- **alto de la tarjeta: 201 px con sello y 201 px sin sello.** Cero.
+- **el sello NO tapa el texto de "Editar": 0 px.** La tarjeta del catalogo tiene
+  UNA sola accion y va centrada a lo ancho, asi que esa esquina esta vacia — es
+  la misma razon por la que la lista de ofertas se arreglo dejando una sola.
+- el verde medido es `rgb(52, 211, 153)`, el mismo que "ACTIVA".
+
+Ademas el candado de markup compara la tarjeta del nombre para abajo, con uno y
+con dos sellos: identica. Lo unico que el sello agrega fuera del nodo absoluto es
+`aria-current`, que es un atributo y no dibuja.
+
+## LOS DOS PENDIENTES QUE SE REVISARON
+
+### EL CARTEL DE OFFLINE **NO** SE PUEDE TACHAR
+
+**Un local SI puede vender sin conexion.** `app/modulos/pos-ventas/page.jsx`
+encola la venta —"Sin conexion: ventas en efectivo se guardan como pendientes"—
+y `pos-ventas/crear` la repone con `origenOffline: true`. En ese camino:
+
+    const esReplayOffline = origenOffline === true;
+    const ofertasPorProductoLocal = esReplayOffline ? {} : await ofertasVigentes...
+    const recargosPorMedio = esReplayOffline ? {} : await recargosDelLocal(...)
+
+O sea que **las ofertas y los recargos se saltean a proposito**, y la venta se
+registra exactamente como se cobro. Esta bien que sea asi —el precio ya se le
+cobro al cliente y recalcularlo despues haria que la venta encolada se rechace—
+pero significa que una venta offline de un producto en oferta se cobra al precio
+NORMAL.
+
+**Y hoy nadie lo dice.** El unico mensaje es "ventas en efectivo se guardan como
+pendientes", que no menciona las ofertas. El pendiente sigue vivo y ahora tiene
+lugar exacto: al lado de ese aviso.
+
+### EL APAGADO POR STOCK CERO **SI** SE PUEDE TACHAR
+
+**Ofertas no agrega ninguna regla de stock.** `lib/ofertas/motorVenta.js` no
+menciona `stock` ni una sola vez. Quien decide es el POS:
+
+- `pos-ventas/buscar-producto` marca `disponibleParaVenta = !sinStock ||
+  allowNegativeStock`, asi que el producto no se puede ni agregar a la venta;
+- y `pos-ventas/crear` lo vuelve a decidir en el servidor con
+  `getConfigLocalEfectiva` y `aplicarConsumoStock`.
+
+O sea que una oferta sobre un producto sin stock, en un local que NO permite
+vender sin stock, **simplemente no se vende**: el POS lo frena antes de que la
+oferta importe. Apagar la oferta seria una segunda regla que dice lo mismo, en
+otro lugar, y que podria contradecir a la primera.
