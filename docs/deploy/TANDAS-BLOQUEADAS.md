@@ -54,5 +54,43 @@ Ninguno.
 
 ---
 
+## NO ES LO MISMO "FRENADO" QUE "NO JUSTIFICA SU PROPIO CORTE"
+
+Hay un tercer estado además de "sale" y "no sale", y confundirlo con un bloqueo
+hace daño en la dirección contraria: un commit que **puede** salir, que **debe**
+salir con el próximo despliegue, y que **no justifica un corte de producción él
+solo**.
+
+Si se lo anota como bloqueado, el paso 0 podría cortar el rango ANTES de ese
+commit y dejarlo afuera indefinidamente. No es eso lo que hay que hacer: hay que
+dejarlo viajar con la primera tanda que sí toque el runtime.
+
+### Vigente: `c5d89841` — el arreglo de la guardia de migraciones
+
+Empujado el 2026-09-15 y **no desplegado a propósito**. No está bloqueado: sale
+con el próximo despliegue, sin hacer nada especial.
+
+**Por qué no salió solo.** No tiene una sola línea que llegue al runtime de Next.
+Toca el skill de deploy, tres documentos, dos scripts, el módulo de la guardia y
+un candado — nada de `app/`, `components/`, `hooks/` ni `context/`, y el único
+archivo de `lib/` que toca lo importan solamente el hook y su test. Desplegarlo
+habría cortado producción para publicar una imagen funcionalmente idéntica a la
+que ya estaba corriendo.
+
+**Y la guardia ya está arreglada sin desplegar nada**, porque es herramienta
+local: el hook corre en la máquina desde la que se despliega, no adentro del
+contenedor. El arreglo tuvo efecto en el momento en que se commiteó.
+
+**Lo que sí se verificó antes de decidir**, porque el propio skill lo advierte: el
+escaneo de Tailwind cubre `./lib/**/*.{js,jsx}`, así que renombrar un `.js` de ahí
+a `.mjs` lo saca del escaneo y podría hacer desaparecer una clase de la hoja. Ese
+archivo nombra **cero** clases, así que la hoja no se puede mover. Sin esa
+medición, "no toca el runtime" habría sido una suposición.
+
+**Cuándo se borra esta entrada:** cuando `c5d89841` esté en producción, que va a
+pasar solo. No hay nada que recordar hacer.
+
+---
+
 El bloqueo que motivó este archivo —`289a036`, la tanda de la tarjeta— lo levantó
 Emanuel el 2026-08-19 y esa tanda ya está en producción.
