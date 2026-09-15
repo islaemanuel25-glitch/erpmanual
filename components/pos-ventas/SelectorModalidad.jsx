@@ -1,7 +1,7 @@
 "use client";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import { formatearPct } from "@/lib/pos-ventas/mediosCobroPantalla";
+import { CLASE_BOTON_MEDIO, etiquetaRecargoDeOpcion } from "@/lib/pos-ventas/mediosCobroPantalla";
 
 // ELEGIR CON QUÉ MODALIDAD SE COBRA — lo que abre un botón padre.
 //
@@ -24,13 +24,27 @@ import { formatearPct } from "@/lib/pos-ventas/mediosCobroPantalla";
 // El porcentaje que se muestra al lado del nombre es de LECTURA: dice por qué
 // ese total es distinto del otro. No se usa para calcularlo.
 //
-// ── LOS BOTONES SON DEL KIT, Y EL ENCABEZADO NO ESTÁ ACÁ ───────────────────
+// ── UNA OPCIÓN SE VE COMO UN BOTÓN DE MEDIO, PORQUE ES UNO ─────────────────
 //
-// Las opciones son `SunmiButton`: un `<button>` crudo acá sería hardcodeo nuevo
-// teniendo la pieza al lado, y además se pierde el tratamiento de foco que el
-// kit ya resolvió. El "← Volver" y el título los dibuja `FormaPago` con el MISMO
+// Elegir "Crédito 1 pago" adentro de Mercado Pago es otra forma de tocar el
+// mismo botón, no otra clase de cosa. Así que las opciones llevan
+// `CLASE_BOTON_MEDIO`, LA MISMA constante que el panel: mismo alto, mismo radio,
+// misma variante y misma tipografía, sin una sola clase escrita al lado.
+//
+// Antes se dibujaban con `SunmiButton color="secondary"`, que es la variante
+// GENÉRICA del kit y no la del POS —`sunmi-pos-btn-secondary`—. Son dos reglas
+// distintas del CSS: las opciones salían con otro fondo y otro alto que los
+// botones de los que colgaban, y por eso se veía mal.
+//
+// El "← Volver" y el nombre del medio los dibuja `FormaPago` con el MISMO
 // encabezado que usa el panel de dividir: escribirlo dos veces es como empiezan
 // a separarse.
+//
+// ── Y NO HAY LÍNEA QUE DIGA "ELEGÍ LA MODALIDAD" ──────────────────────────
+//
+// La había, arriba de todo. El encabezado ya dice "Mercado Pago" y abajo están
+// las opciones: la línea del medio no agregaba información y empujaba las
+// opciones fuera del pulgar en una pantalla de 360 px.
 
 /**
  * @param {object} props
@@ -46,32 +60,35 @@ export default function SelectorModalidad({
   formatearImporte,
 }) {
   return (
-    <>
-      <div className="text-sm font-medium text-center sunmi-text-muted">Elegí la modalidad</div>
-
-      <div className="flex flex-col gap-2">
-        {opciones.map((opcion) => (
-          <SunmiButton
-            key={opcion.clave}
-            color="secondary"
-            type="button"
-            disabled={deshabilitado}
-            onClick={() => onElegir(opcion)}
-            className="min-h-14 rounded-md px-3 flex items-center justify-between gap-3 text-left"
-          >
-            <span className="min-w-0 flex flex-col">
-              <span className="text-sm font-semibold truncate">{opcion.nombre}</span>
-              <span className="text-xs sunmi-text-muted">
-                {opcion.recargoPct > 0 ? `Recargo ${formatearPct(opcion.recargoPct)}` : "Sin recargo"}
-              </span>
+    <div className="flex flex-col gap-2">
+      {opciones.map((opcion) => (
+        <SunmiButton
+          key={opcion.clave}
+          // `ghost` NO es un color: es la ausencia de relleno. El fondo, el
+          // borde y el tono los pone `sunmi-pos-btn-secondary`, que es la
+          // variante del POS y la que usan los botones del panel. Pedir
+          // `secondary` traería la del KIT y volveríamos al defecto.
+          color="ghost"
+          type="button"
+          disabled={deshabilitado}
+          onClick={() => onElegir(opcion)}
+          className={`${CLASE_BOTON_MEDIO} w-full px-3 flex items-center justify-between gap-3 text-left`}
+        >
+          {/* El nombre hereda el tamaño y el peso del botón: es el mismo texto
+              que el nombre de un medio en el panel, y no se lo pisa con otra
+              clase para que no puedan separarse. */}
+          <span className="min-w-0 flex flex-col">
+            <span className="truncate">{opcion.nombre}</span>
+            <span className="text-xs font-normal sunmi-text-muted">
+              {etiquetaRecargoDeOpcion(opcion.recargoPct)}
             </span>
-            {/* EL NÚMERO QUE EL CAJERO LE VA A DECIR AL CLIENTE. Del preview. */}
-            <span className="text-base font-black sunmi-text-accent tabular-nums shrink-0">
-              ${formatearImporte(totalDe(opcion.clave))}
-            </span>
-          </SunmiButton>
-        ))}
-      </div>
-    </>
+          </span>
+          {/* EL NÚMERO QUE EL CAJERO LE VA A DECIR AL CLIENTE. Del preview. */}
+          <span className="text-lg font-black sunmi-text-accent tabular-nums shrink-0">
+            ${formatearImporte(totalDe(opcion.clave))}
+          </span>
+        </SunmiButton>
+      ))}
+    </div>
   );
 }
