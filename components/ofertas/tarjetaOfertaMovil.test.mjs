@@ -58,7 +58,6 @@ const deOferta = (over = {}) =>
     createElement(TarjetaOfertaMovil, {
       oferta: OFERTA,
       ahora: AHORA,
-      puedeFinalizar: true,
       puedeEditar: true,
       ...over,
     })
@@ -115,18 +114,28 @@ test("O1 · el panel, el cuerpo y la fila del valor son los MISMOS que en Stock"
   assert.equal(o.filaValor, s.filaValor, "la fila del valor no es la misma");
 });
 
-test("O2 · la fila de acciones es la misma con una acción o con dos", () => {
-  const dos = armazon(deOferta());
-  const una = armazon(deOferta({ puedeFinalizar: false }));
-  const stock = armazon(deStock());
+test("O2 · la fila de acciones es la misma que la de Stock", () => {
+  const o = armazon(deOferta());
+  assert.ok(o.acciones, "no se encontró la fila de acciones");
+  assert.equal(o.acciones, armazon(deStock()).acciones, "ofertas dibuja su propia fila de acciones");
+});
 
-  assert.ok(dos.acciones, "no se encontró la fila de acciones");
-  assert.equal(dos.acciones, stock.acciones, "ofertas dibuja su propia fila de acciones");
-  assert.equal(
-    una.acciones,
-    dos.acciones,
-    "la fila cambia según cuántos botones hay: el reparto lo hace el kit, no el adaptador"
-  );
+test("O2.bis · HAY UNA SOLA ACCIÓN, y ése es el arreglo del choque", () => {
+  // ── POR QUÉ ESTO ES UN CANDADO Y NO UNA PREFERENCIA ────────────────────
+  //
+  // Con DOS acciones la píldora de estado —que el kit pone absoluta abajo a la
+  // derecha— se monta sobre el texto del segundo botón. Medido a 390 px:
+  // PROGRAMADA tapaba 35 px, VENCE HOY 21 y ACTIVA 0. Dependía del largo de la
+  // palabra, así que aparecía en unas tarjetas y en otras no.
+  //
+  // Con una sola, el botón ocupa el ancho entero y su texto queda centrado,
+  // lejos de esa esquina. Si alguien vuelve a poner dos, el choque vuelve — y
+  // este candado se pone rojo antes de que llegue a producción.
+  const markup = deOferta();
+  const botones = markup.match(/<button/g) || [];
+  assert.equal(botones.length, 1, `la tarjeta tiene ${botones.length} acciones, y con dos la píldora tapa la segunda`);
+  assert.match(markup, /Editar/);
+  assert.ok(!/Terminar ahora/.test(markup), "volvió «Terminar ahora» a la tarjeta");
 });
 
 test("O3 · el adaptador no agrega NINGUNA caja propia", () => {
@@ -164,8 +173,8 @@ test("O5 · el espaciador va ANTES de la fila de acciones", () => {
   assert.ok(iEsp < iAcc, "el espaciador quedó después de las acciones");
 });
 
-test("O6 · sin ningún permiso no hay fila de acciones, y el espaciador se queda", () => {
-  const o = armazon(deOferta({ puedeFinalizar: false, puedeEditar: false }));
+test("O6 · sin permiso de editar no hay fila de acciones, y el espaciador se queda", () => {
+  const o = armazon(deOferta({ puedeEditar: false }));
   assert.equal(o.acciones, null, "se dibujó una fila de acciones vacía");
   assert.equal(o.espaciador, true);
 });

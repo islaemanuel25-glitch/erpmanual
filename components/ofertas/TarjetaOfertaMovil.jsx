@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Square } from "lucide-react";
+import { Pencil } from "lucide-react";
 
 import SunmiProductoCard, {
   AccionTarjeta,
@@ -33,7 +33,10 @@ import {
 //               con " · Solo efectivo" pegado si corresponde. Es la ranura del
 //               renglón chico debajo del nombre; que en el catálogo sea el
 //               proveedor no la ata a eso, igual que stock la usa para lo suyo.
-//   marca       dos renglones cortos: "Normal $ 3.700" y "11 % menos". Entran en
+//   marca       dos renglones cortos: "Normal $ 3.700,00" y "11 % menos". El
+//               importe lleva los centavos porque pasa por `money`, el MISMO
+//               formateador del módulo: una segunda forma de escribir plata es
+//               cómo empiezan a discrepar dos pantallas. Entran en
 //               la mitad izquierda de la fila del valor SIN costar un renglón,
 //               que es la única forma de agregarle algo a esta tarjeta.
 //   valor       el precio de oferta, con su rótulo.
@@ -42,7 +45,24 @@ import {
 //   códigos     los dos en `false`: esta pantalla no los muestra, y `false` es
 //               "no va" mientras que `null` sería "no hay dato" y dejaría el
 //               renglón diciendo "sin código de barras".
-//   acciones    Terminar ahora y Editar, cada una sujeta a su permiso.
+//   acciones    UNA sola: Editar, a lo ancho, igual que la del catálogo.
+//
+// ── POR QUÉ UNA SOLA ACCIÓN, Y NO DOS ────────────────────────────────────
+//
+// Tenía dos —"Terminar ahora" y "Editar"— y con dos la píldora de estado, que el
+// kit pone absoluta abajo a la derecha, se montaba sobre el texto del SEGUNDO
+// botón. Medido a 390 px: PROGRAMADA tapaba 35 px, VENCE HOY 21 y ACTIVA 0.
+//
+// El detalle importa: dependía del LARGO de la palabra, así que el choque
+// aparecía en unas tarjetas y en otras no — que es lo que lo hacía fácil de
+// pasar por alto y difícil de reproducir.
+//
+// Con una sola acción el botón ocupa el ancho entero y su texto queda centrado,
+// lejos de la esquina donde vive la píldora. El problema desaparece sin tocar el
+// kit —que dibuja también el catálogo y stock— y sin acortar ninguna palabra.
+//
+// Terminar la oferta se hace desde el DETALLE, que es a donde lleva Editar, y
+// que ya tenía su acción de finalizar para los cuatro estados que la admiten.
 //
 // ── EL ESTADO VA EN LA PÍLDORA Y NO EN `aviso` ───────────────────────────
 //
@@ -54,20 +74,17 @@ import {
 // `destacado` ya es la ranura para un sello: recibe el nodo entero, así que el
 // color lo decide quien la usa. Es la que el catálogo usa para "último editado".
 //
-// ── LA PÍLDORA VA ABAJO A LA DERECHA, SOBRE LA FRANJA DE ACCIONES ────────
+// ── LA PÍLDORA VA ABAJO A LA DERECHA, Y AHORA NO TAPA NADA ───────────────
 //
-// Es donde el kit la pone, absoluta y sin ocupar alto. En el catálogo esa zona
-// está vacía porque "Editar" va centrado; acá hay DOS acciones, así que el
-// segundo botón queda debajo de la píldora. Está medido en el arnés y el ancho
-// de la píldora no alcanza a tapar el texto de la acción — si algún día lo
-// tapara, se mueve de lugar y se avisa, no se cambia el kit.
+// Es donde el kit la pone, absoluta y sin ocupar alto. Con una sola acción
+// centrada a lo ancho, esa esquina queda vacía —exactamente como en el
+// catálogo—, así que la píldora no se monta sobre ningún texto. El arnés lo
+// mide en los tres estados y se pone rojo si vuelve a haber superposición.
 
 export default function TarjetaOfertaMovil({
   oferta,
   ahora = undefined,
-  puedeFinalizar = false,
   puedeEditar = false,
-  onTerminar,
   onEditar,
 }) {
   if (!oferta) return null;
@@ -116,19 +133,10 @@ export default function TarjetaOfertaMovil({
       }
       aviso={null}
       acciones={
-        puedeFinalizar || puedeEditar ? (
-          <>
-            {puedeFinalizar && (
-              <AccionTarjeta icono={Square} onClick={() => onTerminar?.(oferta)}>
-                Terminar ahora
-              </AccionTarjeta>
-            )}
-            {puedeEditar && (
-              <AccionTarjeta icono={Pencil} onClick={() => onEditar?.(oferta)}>
-                Editar
-              </AccionTarjeta>
-            )}
-          </>
+        puedeEditar ? (
+          <AccionTarjeta icono={Pencil} onClick={() => onEditar?.(oferta)}>
+            Editar
+          </AccionTarjeta>
         ) : null
       }
     />

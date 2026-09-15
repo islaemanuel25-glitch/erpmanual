@@ -39,7 +39,6 @@ import SunmiSolapas from "@/components/sunmi/SunmiSolapas";
 import SunmiListaProductoCards from "@/components/sunmi/SunmiListaProductoCards";
 
 import TarjetaOfertaMovil from "@/components/ofertas/TarjetaOfertaMovil";
-import ModalTerminarOferta from "@/components/ofertas/ModalTerminarOferta";
 
 const EN_CURSO = "EN_CURSO";
 const TERMINADAS = "TERMINADAS";
@@ -64,18 +63,15 @@ export default function OfertasPage() {
 
   const puedeVer = puede("ofertas.ver");
   const puedeCrear = puede("ofertas.crear");
-  const puedeFinalizar = puede("ofertas.finalizar");
+  // `ofertas.finalizar` NO se mira acá: terminar una oferta se hace desde el
+  // detalle, que ya tiene su acción y su propio chequeo. La tarjeta de la lista
+  // tiene UNA sola acción, y el motivo está escrito en `TarjetaOfertaMovil`.
   const puedeEditar = puede("ofertas.editar");
 
   const [solapa, setSolapa] = useState(EN_CURSO);
   const [items, setItems] = useState([]);
   const [cargandoLista, setCargandoLista] = useState(true);
   const [error, setError] = useState(null);
-
-  // El modal de terminar: qué oferta, si está trabajando y qué falló.
-  const [aTerminar, setATerminar] = useState(null);
-  const [terminando, setTerminando] = useState(false);
-  const [errorTerminar, setErrorTerminar] = useState(null);
 
   const archivadas = solapa === TERMINADAS;
 
@@ -130,31 +126,6 @@ export default function OfertasPage() {
     if (!puedeVer) return;
     cargar();
   }, [puedeVer, cargar]);
-
-  const terminarAhora = async () => {
-    if (!aTerminar) return;
-    setTerminando(true);
-    setErrorTerminar(null);
-    try {
-      const res = await fetch(`/api/ofertas/${aTerminar.id}/finalizar`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      const json = await res.json().catch(() => null);
-      if (!res.ok || !json?.ok) {
-        setErrorTerminar(json?.error || `No se pudo terminar (HTTP ${res.status}).`);
-        return;
-      }
-      setATerminar(null);
-      await cargar();
-    } catch (e) {
-      setErrorTerminar(`No se pudo hablar con el servidor: ${e.message}`);
-    } finally {
-      setTerminando(false);
-    }
-  };
 
   if (cargando) return null;
   if (!puedeVer) return <SinPermisos />;
@@ -215,28 +186,12 @@ export default function OfertasPage() {
             <TarjetaOfertaMovil
               key={o.id}
               oferta={o}
-              // Una oferta ya terminada no se puede volver a terminar: la ruta
-              // contesta 409 y el botón no tendría qué hacer.
-              puedeFinalizar={puedeFinalizar && !archivadas}
               puedeEditar={puedeEditar}
-              onTerminar={(of) => {
-                setErrorTerminar(null);
-                setATerminar(of);
-              }}
               onEditar={(of) => router.push(`/modulos/ofertas/${of.id}`)}
             />
           ))}
         </SunmiListaProductoCards>
       )}
-
-      <ModalTerminarOferta
-        abierto={!!aTerminar}
-        oferta={aTerminar}
-        trabajando={terminando}
-        error={errorTerminar}
-        onCerrar={() => setATerminar(null)}
-        onTerminar={terminarAhora}
-      />
     </div>
   );
 }

@@ -296,17 +296,18 @@ await afirmar(
   `las acciones quedan a la MISMA distancia del pie en las tres (${JSON.stringify(pies)})`
 );
 
-// ── 2.bis · LA PÍLDORA SE MONTA SOBRE «EDITAR», Y ESTÁ MEDIDO ───────────
+// ── 2.bis · LA PÍLDORA NO TAPA LA ACCIÓN, Y ESO SE MIDE ─────────────────
 //
-// El kit pone `destacado` absoluto abajo a la derecha. En el catálogo eso cae en
-// zona vacía porque "Editar" es la ÚNICA acción y va centrada a lo ancho de la
-// tarjeta. Acá hay DOS, así que el segundo botón ocupa la mitad derecha y su
-// texto —también centrado— queda justo debajo de la píldora.
+// El kit pone `destacado` absoluto abajo a la derecha. Con DOS acciones el
+// segundo botón ocupaba la mitad derecha y su texto —centrado— quedaba justo
+// debajo de la píldora: medido a 390 px, PROGRAMADA tapaba 35 px, VENCE HOY 21 y
+// ACTIVA 0. Dependía del largo de la palabra, así que el choque aparecía en unas
+// tarjetas y en otras no.
 //
-// Esta afirmación NO dice que esté bien: deja el número anotado. Si alguien
-// mueve la píldora de lugar, se pone roja y tiene que leer esto antes de
-// seguir. Mover el sello afecta al catálogo y a stock, así que la decisión es
-// de Emanuel y está informada, no tomada acá.
+// Con UNA sola acción el botón ocupa el ancho entero y su texto queda centrado,
+// lejos de esa esquina — exactamente como en el catálogo. Esta afirmación exige
+// CERO superposición en los tres estados, así que se pone roja si alguien vuelve
+// a poner dos acciones, y también si mueve la píldora a un lugar peor.
 const choque = await evaluar(`(() => {
   const cards = [...document.querySelectorAll('[data-ancla^="oferta:"]')];
   return cards.map((c) => {
@@ -318,20 +319,25 @@ const choque = await evaluar(`(() => {
     const r = document.createRange(); r.selectNodeContents(ultimo);
     const t = r.getBoundingClientRect();
     return { sello: pill.textContent.trim(), accion: ultimo.textContent.trim(),
+      acciones: botones.length,
       tapa: Math.round(Math.max(0, Math.min(p.right, t.right) - Math.max(p.left, t.left))) };
   }).filter(Boolean);
 })()`);
 console.log(`  · píldora sobre la acción: ${JSON.stringify(choque)}`);
-// Depende del LARGO de la palabra: "ACTIVA" no llega a tocarlo, "PROGRAMADA"
-// se come 35 px. O sea que el choque no se ve en todas las tarjetas, que es
-// justo lo que lo haría fácil de pasar por alto.
+// Se miran LOS TRES estados y no uno: el sello más ancho es el que choca
+// primero, y "ACTIVA" —el más corto— no tocaba el texto ni con dos acciones. Un
+// candado sobre una sola tarjeta habría dado verde sobre el defecto.
 await afirmar(
-  choque.length === 3 && choque.some((c) => c.tapa > 0),
-  `la píldora SIGUE montada sobre el texto de la última acción — decisión pendiente de Emanuel (${JSON.stringify(choque)})`
+  choque.length === 3,
+  `se midieron los tres sellos contra su acción (${JSON.stringify(choque)})`
 );
 await afirmar(
-  Math.max(...choque.map((c) => c.tapa)) <= 35,
-  `el solapamiento EMPEORÓ respecto de lo medido (35 px con «PROGRAMADA») (${JSON.stringify(choque)})`
+  choque.every((c) => c.tapa === 0),
+  `la píldora NO tapa el texto de la acción en ninguno de los tres (${JSON.stringify(choque)})`
+);
+await afirmar(
+  choque.every((c) => c.acciones === 1),
+  `y hay UNA sola acción por tarjeta, que es lo que lo resuelve (${JSON.stringify(choque)})`
 );
 
 // ── 3 · LAS SOLAPAS CAMBIAN LO QUE SE PIDE ───────────────────────────────
@@ -347,53 +353,45 @@ await tocar("En curso");
 await esperar(1200);
 await afirmar(await hayTexto("QUILMES CERVEZA 1L"), "y al volver se repone la lista");
 
-// ── 4 · TERMINAR PIDE CONFIRMACIÓN, Y DICE EL NÚMERO ─────────────────────
+// ── 4 · «EDITAR» LLEVA AL DETALLE, QUE ES DONDE SE TERMINA ──────────────
 //
-// Se toca el botón DE UNA TARJETA ELEGIDA, no el primero que aparezca. La lista
-// viene ordenada por fecha de inicio, así que arriba está la PROGRAMADA: con
-// `tocar("Terminar ahora")` a secas el modal se abría sobre otra oferta y la
-// afirmación del precio fallaba señalando al modal, cuando el equivocado era el
-// arnés.
-async function terminarLaDe(nombre) {
-  const ok = await evaluar(`(() => {
-    const cards = [...document.querySelectorAll('[data-ancla^="oferta:"]')];
-    const card = cards.find((c) => c.innerText.includes(${JSON.stringify("")} + ${JSON.stringify(nombre)}));
-    if (!card) return false;
-    const btn = [...card.querySelectorAll('button')].find((b) => /Terminar ahora/.test(b.textContent));
-    if (!btn) return false;
-    btn.scrollIntoView({ block: 'center' });
-    btn.click();
-    return true;
-  })()`);
-  if (!ok) throw new Error(`no se encontró «Terminar ahora» en la tarjeta de ${nombre}`);
-  await esperar(900);
-}
-
-await terminarLaDe("QUILMES CERVEZA 1L");
-await afirmar(await hayTexto("Terminar esta oferta ahora"), "se abre el modal");
+// La tarjeta ya no tiene "Terminar ahora". Lo que se afirma es que la única
+// acción existe, es la de editar, y lleva al detalle de ESA oferta — que es donde
+// vive la acción de finalizar para los cuatro estados que la admiten.
+const destinos = await evaluar(`(() => {
+  const cards = [...document.querySelectorAll('[data-ancla^="oferta:"]')];
+  return cards.map((c) => {
+    const botones = [...c.querySelectorAll('button')];
+    return { ancla: c.getAttribute('data-ancla'), acciones: botones.map((b) => b.textContent.trim()) };
+  });
+})()`);
 await afirmar(
-  await hayTexto("Pasa de $ 3.300,00 a $ 3.700,00"),
-  "el modal dice de qué precio a qué precio vuelve"
+  destinos.every((d) => d.acciones.length === 1 && d.acciones[0] === "Editar"),
+  `cada tarjeta tiene UNA acción y es Editar (${JSON.stringify(destinos)})`
 );
-await afirmar(await hayTexto("QUILMES CERVEZA 1L"), "y qué producto es");
-await foto(`ofertas-terminar-${ANCHO}`);
+await afirmar(
+  !(await hayTexto("Terminar ahora")),
+  "«Terminar ahora» ya no está en la lista"
+);
 
-// Y NO TERMINA NADA HASTA CONFIRMAR, que es todo el punto del modal.
-await tocar("No, dejarla");
-await esperar(900);
-await afirmar(!(await hayTexto("Terminar esta oferta ahora")), "«No, dejarla» cierra sin hacer nada");
-const sigueViva = await prisma.oferta.count({ where: { finalizadaEn: null } });
-await afirmar(sigueViva === 3, `las tres siguen vivas (${sigueViva})`);
-
-// Ahora sí.
-await terminarLaDe("QUILMES CERVEZA 1L");
-await tocar("Sí, terminar");
-await esperar(1800);
-await afirmar(!(await hayTexto("Terminar esta oferta ahora")), "el modal se cierra al confirmar");
-const vivas = await prisma.oferta.count({ where: { finalizadaEn: null } });
-await afirmar(vivas === 2, `quedaron dos en curso (${vivas})`);
-await afirmar(!(await hayTexto("QUILMES CERVEZA 1L")), "y la lista se recarga sin ella");
-await foto(`ofertas-despues-de-terminar-${ANCHO}`);
+const ancla = destinos[1].ancla;
+await evaluar(`(() => {
+  const c = document.querySelector('[data-ancla="' + ${JSON.stringify(ancla)} + '"]');
+  const b = [...c.querySelectorAll('button')].find((x) => /Editar/.test(x.textContent));
+  b.click();
+  return true;
+})()`);
+await esperarTexto("Volver", 20000);
+const id = ancla.split(":")[1];
+await afirmar(
+  (await evaluar("location.pathname")).endsWith(`/modulos/ofertas/${id}`),
+  `Editar lleva al detalle de esa oferta (${await evaluar("location.pathname")})`
+);
+// Y AHÍ SÍ se puede terminar, que es el motivo por el que la acción salió de la
+// tarjeta. Sin esto, sacar el botón habría dejado la oferta sin forma de
+// terminarse y el arnés no se habría enterado.
+await afirmar(await hayTexto("Finalizar"), "el detalle tiene la acción de finalizar");
+await foto(`ofertas-detalle-${ANCHO}`);
 
 console.log(`\n${afirmaciones} afirmaciones en verde · ${desbordes} capturas con desborde`);
 console.log(`Capturas en ${SALIDA}`);

@@ -729,7 +729,7 @@ y fila de acciones— y otro que prohibe que aparezca una segunda caja.
 
 Las ranuras: `nombre` el producto, `empresa` la linea de cuando, `marca` el
 precio normal y el porcentaje, `valor` el precio de oferta, `aviso` en null,
-`destacado` el sello, los dos codigos en `false`, y `acciones` las dos.
+`destacado` el sello, los dos codigos en `false`, y `acciones` UNA sola: Editar.
 
 ### EL SELLO VA EN LA PILDORA, NO EN EL AVISO
 
@@ -771,15 +771,45 @@ fuera el de la oferta es una afirmacion falsa sobre las otras.
 El flujo movil crea ofertas de UN producto, asi que el caso de varias solo llega
 desde escritorio. En produccion hoy no hay ninguna.
 
-### TERMINAR AHORA PIDE CONFIRMACION Y NO TOCA NADA MAS
+### UNA SOLA ACCION EN LA TARJETA, Y EL MOTIVO ES MEDIBLE
+
+La tarjeta tiene **solo "Editar"**, a lo ancho, igual que la del catalogo.
+
+Tuvo dos —"Terminar ahora" y "Editar"— y con dos la pildora de estado, que el kit
+pone absoluta abajo a la derecha, se montaba sobre el texto del SEGUNDO boton.
+Medido a 390 px: **PROGRAMADA tapaba 35 px, VENCE HOY 21 y ACTIVA 0**. Dependia
+del largo de la palabra, asi que el choque aparecia en unas tarjetas y en otras
+no — que es lo que lo hacia facil de pasar por alto.
+
+Con una sola accion el boton ocupa el ancho entero y su texto queda centrado,
+lejos de esa esquina. **El problema desaparece sin tocar el kit** —que dibuja
+tambien el catalogo y stock— y sin acortar ninguna palabra. El arnes mide cero
+superposicion en los tres estados y se pone rojo si alguien vuelve a poner dos.
+
+### TERMINAR LA OFERTA SE HACE DESDE EL DETALLE
 
 `[id]/finalizar` escribe `finalizadaEn`, su autor y su motivo, levanta las marcas
 de revision y registra el evento. **No toca precio, costo ni stock**, y eso esta
-medido tomando una foto de las tres tablas antes y despues.
+medido tomando una foto de las tres tablas antes y despues
+(`scripts/integracion-terminar-oferta.mjs`).
 
-El modal es `destructivo` —el velo no cierra— y dice QUE producto y A QUE PRECIO
-vuelve, en vez de preguntar si estas seguro. Una pregunta generica se contesta
-con el pulgar; un precio se lee.
+La accion vive en el DETALLE, que ya la tenia para los cuatro estados que la
+admiten —PROGRAMADA, ACTIVA, REVISAR y VENCIDA, segun `accionesDisponibles`— y es
+a donde lleva "Editar". El arnes lo comprueba: toca Editar, llega al detalle de
+ESA oferta y verifica que ahi este "Finalizar". Sin eso, sacar el boton de la
+tarjeta habria dejado la oferta sin forma de terminarse.
+
+**Deuda anotada:** la confirmacion del detalle es un `confirm()` del navegador,
+no un modal del kit. El modal que se habia escrito para la lista —que decia que
+producto y a que precio vuelve— se borro al sacar la accion, porque quedaba sin
+ningun lector. Si el detalle adopta uno, se escribe contra sus necesidades
+reales, que incluyen el motivo de finalizacion.
+
+### LOS IMPORTES LLEVAN CENTAVOS
+
+La marca dice "Normal $ 3.700,00" y no "Normal $ 3.700". El importe pasa por
+`money`, el MISMO formateador del modulo: una segunda forma de escribir plata es
+como empiezan a discrepar dos pantallas.
 
 ### LO QUE SE SACO
 
@@ -790,19 +820,6 @@ conteos.
 
 **El encabezado propio.** La pantalla registraba su titulo en un `SunmiCardHeader`
 adentro de la tarjeta, asi que en el celular "Ofertas" se veia dos veces.
-
-### UN CHOQUE MEDIDO Y NO RESUELTO
-
-La pildora de estado va absoluta abajo a la derecha, que es donde el kit la pone.
-En el catalogo eso cae en zona vacia porque "Editar" es la UNICA accion y va
-centrada a lo ancho. Aca hay DOS, asi que el segundo boton ocupa la mitad derecha
-y su texto queda debajo de la pildora.
-
-Medido a 390 px: **PROGRAMADA tapa 35 px del texto de "Editar", VENCE HOY 21 px,
-y ACTIVA 0** — depende del largo de la palabra, o sea que el choque no se ve en
-todas las tarjetas. Esta anotado en el arnes con el numero, y **no se movio**:
-cambiar donde va el sello afecta al catalogo y a stock. La decision es de
-Emanuel.
 
 ### FUERA DE ALCANCE, ANOTADO Y NO EMPEZADO
 
