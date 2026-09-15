@@ -16,7 +16,30 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **12 migraciones**, las mismas que el árbol.
+### `20260915180000_oferta_redondeo_y_precio_exacto` — **ADITIVA**
+
+Producción está en **12 migraciones** y el árbol en **13**.
+
+Agrega dos columnas a `OfertaLinea`, las dos **nullable y sin DEFAULT**:
+
+- `redondeoAplicado BOOLEAN` — si el interruptor de redondear quedó puesto.
+- `precioSinRedondear DECIMAL(12,2)` — el precio exacto del que se partió.
+
+`null` significa **"no se registró"**, que no es lo mismo que "no se redondeó".
+Las líneas que ya existen no lo saben, y un `false` por defecto diría algo que
+nadie sabe. Por eso no llevan DEFAULT ni se rellenan.
+
+**El clasificador la marcó `aditiva` y salió con 0**: no hay `DROP`, no hay
+`DELETE`, no hay `NOT NULL` sobre una tabla con filas. **No hace falta
+`DEPLOY_MIGRACION_AUTORIZADA`.**
+
+**El quinto chequeo del backup NO aplica**: no se borra ningún dato, así que no
+hay ningún valor que comprobar dentro del dump. Los cuatro chequeos normales sí.
+
+`ALTER TABLE ... ADD COLUMN` con columnas nullable no reescribe la tabla en
+PostgreSQL 16, así que la ventana entre migrar y recrear es de código viejo
+contra un esquema que tiene dos columnas de más y no las mira. No hay
+incompatibilidad.
 
 ---
 
