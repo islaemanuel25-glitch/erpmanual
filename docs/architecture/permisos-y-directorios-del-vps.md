@@ -94,7 +94,7 @@ estar viva de golpe:
 - **Cuatro contradicen a la guardia de migraciones**: `Bash(npx prisma db
   push:*)` y `Bash(npx prisma migrate deploy:*)`, más sus gemelas de
   PowerShell. `db push` está en la lista de rechazo de
-  `lib/deploy/guardiaMigraciones.js`, que no tiene autorización posible. Hoy
+  `lib/deploy/guardiaMigraciones.mjs`, que no tiene autorización posible. Hoy
   gana la guardia —es un hook, corre antes— pero tener un `allow` de algo que
   el repo bloquea siempre es una contradicción escrita que confunde al que la
   lea.

@@ -44,7 +44,7 @@ dominio `https://operix.cloud`, backups en `/srv/produccion/backups/`.
    autorización posible**: `db push`, `migrate reset`, `db execute` y
    `migrate resolve`. No es un olvido ni una regla que se afloje cuando aprieta.
    La lista, el criterio por el que es esa y no otra, y lo que se miró y NO se
-   tapó están en `lib/deploy/guardiaMigraciones.js`. Ver "Los cuatro comandos
+   tapó están en `lib/deploy/guardiaMigraciones.mjs`. Ver "Los cuatro comandos
    bloqueados" en el paso 4 antes de tocarlos.
 
 ## EL TOPE DE CORTE: 30 SEGUNDOS
@@ -405,8 +405,21 @@ sino el paso 5, cuando la ventana ya se cerró. Y es el dato correcto: durante l
 ventana lo que importa es qué CÓDIGO está sirviendo pedidos, no qué commit tiene
 checkouteado el repo del servidor.
 
-Sigue fallando cerrado: si el ssh no llega, si el contenedor no está, o si la
-etiqueta no es un SHA de 40 —`latest`, una imagen construida a mano— sale con 2.
+**Y lee la imagen por el camino que corresponda según dónde corra.** Si en la
+máquina existe `/srv/produccion/erpazul` con su compose —la firma del servidor de
+producción y de ningún otro lado— pregunta al docker local; si no, va por ssh.
+
+Eso se agregó el 2026-09-15 y es la otra mitad del mismo daño: desplegando desde
+adentro del VPS, `vps-erp` no existe —es un alias del ssh de la máquina de
+trabajo— así que el chequeo salía INDETERMINADO por "Could not resolve hostname",
+y la única salida volvía a ser la autorización manual. **La puerta que se abre
+siempre, otra vez, por otra causa.** La condición NO es "¿hay docker?": una
+máquina de desarrollo también tiene, y podría tener un contenedor con el mismo
+nombre.
+
+Sigue fallando cerrado: si no puede leer la imagen —ni local ni por ssh—, si el
+contenedor no está, o si la etiqueta no es un SHA de 40 —`latest`, una imagen
+construida a mano— sale con 2.
 
 Comprobado en los dos sentidos, que es lo que hace que el arreglo valga: con un
 rango sano y cero migraciones **pasa sin pedir nada**; y con una migración de
@@ -671,9 +684,44 @@ con 0. Autorizar a mano es explícito y visible en la línea:
 `DEPLOY_MIGRACION_AUTORIZADA=1` adelante del comando, misma idea que
 `SEED_DESTRUCTIVO`.
 
-La decisión vive en `lib/deploy/guardiaMigraciones.js`, que es una función pura
+La decisión vive en `lib/deploy/guardiaMigraciones.mjs`, que es una función pura
 con sus candados al lado; el hook solo lee la entrada, corre el clasificador
 cuando hace falta y escribe la respuesta.
+
+### LA GUARDIA ESTUVO MUERTA Y NADIE SE ENTERÓ — 2026-09-15
+
+**Un control que falla abierto es peor que no tener control**, porque se lee como
+presente. Pasó, y conviene saber la forma exacta para reconocerla en otro lado.
+
+El hook importaba `lib/deploy/guardiaMigraciones` cuando ese archivo se llamaba
+`.js`. Tiene sintaxis de módulo ES, y como el `package.json` del repo no declara
+`"type": "module"`, un `.js` es CommonJS. **Node 20 lo disimula** —reparsea como
+ESM y sigue— **y node 18 no**. El node del sistema del VPS es 18, y es el que
+ejecuta los hooks.
+
+Resultado: la guardia andaba en la CI y en el entorno de pruebas, y estaba muerta
+**justo en la máquina desde la que se despliega**. El hook se caía con un error de
+sintaxis, salía con código 1 —que para un PreToolUse no es un bloqueo— y el
+comando corría igual. Se descubrió después de un despliegue que ya había corrido
+`migrate deploy` sin guardia, y no lo encontró ningún control: se encontró
+mirando a propósito.
+
+Los cuatro comandos bloqueados **tampoco** estaban bloqueados en esa máquina.
+
+Lo que quedó, y son tres cosas porque una sola no alcanzaba:
+
+1. El módulo se llama `.mjs`. Arregla el caso conocido.
+2. El hook carga con `import()` adentro de un `try` que **DENIEGA** si no puede
+   cargar. La próxima causa no va a ser una extensión y no la vamos a ver venir;
+   esto la ataja igual. Para no volverse inusable, la red de último recurso solo
+   frena lo que nombra `prisma` y deja pasar el resto **diciendo** que no
+   comprobó nada.
+3. `scripts/hooksSeCargan.test.mjs`, que se pone rojo si un hook vuelve a
+   alcanzar un `.js` con sintaxis de módulo ES. **Afirma sobre la CAUSA y no
+   sobre el síntoma**, a propósito: la suite corre con node 20, donde el defecto
+   no se reproduce, así que un candado que solo ejecutara el hook habría estado
+   en verde todo el tiempo. Verificado por contraprueba: reintroducido el
+   defecto, ese candado da rojo mientras los que ejecutan el hook siguen verdes.
 
 **Desde el 2026-08-10 esta guardia importa más que antes.** Ese día Emanuel sacó
 los pedidos de permiso —`defaultMode` en `dontAsk`— porque un cartel que siempre
@@ -744,7 +792,7 @@ decide Emanuel—, porque una guardia que estorba todos los días se termina
 apagando, y ahí deja de proteger de todo.
 
 **Lo que se miró y NO se tapó**, con el motivo, está en la constante
-`NO_TAPADOS` de `lib/deploy/guardiaMigraciones.js`: `migrate dev` (puede resetear
+`NO_TAPADOS` de `lib/deploy/guardiaMigraciones.mjs`: `migrate dev` (puede resetear
 la base, pero es el comando del trabajo diario), `studio` (edita cualquier fila,
 pero el daño lo hace una persona haciendo clic y eso no lo distingue un match de
 texto), `db seed` (ya está protegido mejor por `scripts/lib/clientePrisma.mjs`) y
@@ -1116,7 +1164,7 @@ hipótesis a comprobar mirando la base, no como un hecho.
 sentencia, qué quedó aplicado, si el local sigue operando, y cuáles son las
 opciones. **No decidir por criterio propio y no desbloquear nada.** Si la salida
 es marcar la migración, eso significa sacarla de la lista de rechazo de
-`lib/deploy/guardiaMigraciones.js` a propósito y con su confirmación — no
+`lib/deploy/guardiaMigraciones.mjs` a propósito y con su confirmación — no
 inventarle un flag, no correrla por otro camino, no hacerla desde el VPS para
 esquivar la guardia. Ese trámite cuesta a propósito, y el día que cuesta es este.
 

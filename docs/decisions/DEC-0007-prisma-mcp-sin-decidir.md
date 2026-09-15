@@ -64,7 +64,7 @@ ninguna línea en ninguna bitácora. Se descubriría el día que algo ya pasó.
 
 ## Relacionado
 
-- La lista de comandos bloqueados y su criterio: `lib/deploy/guardiaMigraciones.js`
+- La lista de comandos bloqueados y su criterio: `lib/deploy/guardiaMigraciones.mjs`
 - Por dónde se saltea la guardia, punto 8: skill `/deploy`
 - `DEC-0006-fabrica-de-cliente-prisma.md`, que protege el otro camino a la base
   —los scripts— y que **sí seguiría valiendo**, porque vive en el código y no en

@@ -220,16 +220,50 @@ function correr(programa, argumentos, comoFalla) {
  *
  * Si el ssh falla, si el contenedor no está, o si la etiqueta no es un SHA de 40
  * —`latest`, una imagen construida a mano— no se adivina: INDETERMINADO.
+ *
+ * ── Y DESDE ADENTRO DEL VPS NO HAY SSH, QUE ES LA OTRA MITAD ───────────────
+ *
+ * `vps-erp` es un alias del ssh de la máquina de trabajo. Corriendo EN el
+ * servidor no existe, así que este chequeo salía INDETERMINADO por "Could not
+ * resolve hostname" — no porque no pudiera decidir, sino porque se estaba
+ * preguntando por teléfono algo que tenía al lado.
+ *
+ * Y es exactamente el mismo daño que el párrafo de arriba describe: frena TODOS
+ * los despliegues hechos desde el servidor y la única salida vuelve a ser la
+ * autorización manual. La puerta que se abre siempre, otra vez, por otra causa.
+ * Encontrado el 2026-09-15, desplegando desde el VPS.
+ *
+ * Por eso ahora mira primero si el contenedor está acá. La condición no es
+ * "¿hay docker?" —una máquina de desarrollo también tiene, y puede tener un
+ * contenedor con el mismo nombre— sino **si en esta máquina vive el directorio
+ * de despliegue**. Esa es la firma del servidor de producción y de ningún otro
+ * lado, así que no hay forma de leer por error la imagen de un docker local.
  */
-function shaQueAtiende() {
-  const etiqueta = correr(
-    "ssh",
-    [
-      "-o", "ConnectTimeout=20", "-o", "BatchMode=yes", ALIAS_VPS,
-      `docker inspect ${CONTENEDOR_APP} --format '{{.Config.Image}}'`,
-    ],
-    `no se pudo leer la imagen del contenedor ${CONTENEDOR_APP} por ssh`
+const DIR_DESPLIEGUE = "/srv/produccion/erpazul";
+
+/** ¿Esta máquina ES el servidor de producción? */
+function estamosEnElVps() {
+  return (
+    fs.existsSync(DIR_DESPLIEGUE) &&
+    fs.existsSync(path.join(DIR_DESPLIEGUE, "docker-compose.prod.yml"))
   );
+}
+
+function shaQueAtiende() {
+  const etiqueta = estamosEnElVps()
+    ? correr(
+        "docker",
+        ["inspect", CONTENEDOR_APP, "--format", "{{.Config.Image}}"],
+        `no se pudo leer la imagen del contenedor ${CONTENEDOR_APP} con el docker local`
+      )
+    : correr(
+        "ssh",
+        [
+          "-o", "ConnectTimeout=20", "-o", "BatchMode=yes", ALIAS_VPS,
+          `docker inspect ${CONTENEDOR_APP} --format '{{.Config.Image}}'`,
+        ],
+        `no se pudo leer la imagen del contenedor ${CONTENEDOR_APP} por ssh`
+      );
   return shaDeLaEtiqueta(etiqueta);
 }
 

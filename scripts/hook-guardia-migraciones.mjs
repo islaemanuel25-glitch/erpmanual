@@ -34,7 +34,7 @@
 // pantalla.
 //
 // `db push` NO se autoriza con nada. El motivo largo está en
-// lib/deploy/guardiaMigraciones.js, al lado de la función que lo decide.
+// lib/deploy/guardiaMigraciones.mjs, al lado de la función que lo decide.
 //
 // ── LÍMITES, QUE HAY QUE TENERLOS PRESENTES ─────────────────────────────────
 //
@@ -45,13 +45,38 @@
 //
 // Salida: JSON con permissionDecision allow/deny. Si la guardia misma falla,
 // DENIEGA: no puede distinguir "no hay problema" de "no pude comprobar".
+//
+// ── Y ESA FRASE DE ARRIBA ERA FALSA EN EL ÚNICO CASO QUE IMPORTABA ──────────
+//
+// Decía "si la guardia misma falla, DENIEGA", y valía para todo lo que pasa
+// DESPUÉS de que el módulo carga. No valía para el momento anterior: si el
+// `import` de abajo no resolvía, este archivo se caía con un error de sintaxis
+// antes de tener una opinión, salía con código 1 — que para un PreToolUse no es
+// un bloqueo— y el comando corría igual.
+//
+// Falló ABIERTA, que es lo contrario de lo que este comentario prometía, y no
+// avisó nunca. Se descubrió el 2026-09-15 desplegando, y para entonces ese
+// despliegue ya había corrido `migrate deploy` sin guardia.
+//
+// La causa era una letra: `lib/deploy/guardiaMigraciones` se llamaba `.js` y
+// tiene sintaxis de módulo ES. Este `package.json` no declara `"type": "module"`,
+// así que un `.js` es CommonJS. Node 20 lo disimula —reparsea como ESM y sigue,
+// con un warning—; **node 18 no**, y el node del sistema del VPS, que es el que
+// ejecuta los hooks, es 18. O sea que la guardia andaba en la CI y estaba muerta
+// justo en la máquina desde la que se despliega.
+//
+// El hermano que sí andaba lo demuestra: `hook-trinquete-hardcodeo.mjs` importa
+// `contador.mjs` y carga con los dos nodes. La diferencia era la extensión.
+//
+// Por eso ahora son dos cosas y no una: el módulo se llama `.mjs`, y la carga
+// pasó a ser `import()` adentro de un `try` que DENIEGA si no puede cargar. La
+// primera arregla el caso conocido; la segunda cubre el próximo, que no va a ser
+// una extensión y no lo vamos a ver venir.
 
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-
-import { decidirPorComando } from "../lib/deploy/guardiaMigraciones.js";
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(AQUI, "..");
@@ -101,10 +126,24 @@ function responder(decision, razon, aviso = null) {
   process.exit(0);
 }
 
+/**
+ * LA RED DE ÚLTIMO RECURSO, para cuando el módulo que decide no carga.
+ *
+ * A propósito es MÁS ANCHA que la regla de verdad: cualquier mención de prisma
+ * alcanza. Sin el módulo no hay forma de distinguir un comando peligroso de uno
+ * inofensivo, y en esa duda la única dirección aceptable es bloquear de más.
+ *
+ * No se usa para decidir cuando el módulo SÍ cargó: ahí manda `decidirPorComando`
+ * y ésta no se mira. Duplicar la regla sería escribir una segunda parecida al
+ * lado, que es justo lo que no se hace; ésta no es una segunda regla, es el
+ * cartel de "no puedo mirar".
+ */
+const MENCIONA_PRISMA = /prisma/i;
+
 let entrada = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (c) => (entrada += c));
-process.stdin.on("end", () => {
+process.stdin.on("end", async () => {
   let comando = "";
   try {
     const evento = JSON.parse(entrada || "{}");
@@ -115,6 +154,37 @@ process.stdin.on("end", () => {
     // afirmar que sea inofensivo — pero tampoco se bloquea todo el trabajo del
     // repo por un evento mal formado. Se deja pasar y se dice.
     responder("allow", "guardia de migraciones: no se pudo leer el evento, no se comprobó nada");
+  }
+
+  // ── SE CARGA ACÁ, Y SI NO CARGA SE DENIEGA ────────────────────────────────
+  //
+  // Con el `import` arriba, un módulo que no resuelve mata el proceso antes de
+  // esta línea y el comando pasa. Acá abajo el fallo es un objeto que se puede
+  // mirar, así que la guardia puede contestar "no pude comprobar" en vez de no
+  // contestar nada — que es la diferencia entre fallar cerrada y fallar abierta.
+  let decidirPorComando;
+  try {
+    ({ decidirPorComando } = await import("../lib/deploy/guardiaMigraciones.mjs"));
+  } catch (e) {
+    const detalle = e?.message ? ` (${String(e.message).split("\n")[0]})` : "";
+    if (!MENCIONA_PRISMA.test(comando)) {
+      // Que la guardia esté rota no puede dejar el repo sin poder correr un `ls`.
+      // Se deja pasar lo que ni de lejos le compete, y se dice que no se miró.
+      responder(
+        "allow",
+        `guardia de migraciones: NO SE PUDO CARGAR${detalle}. Este comando no nombra prisma, así que se deja pasar sin comprobar. ARREGLARLA ES URGENTE: mientras esté así, no protege nada.`,
+        "GUARDIA ROTA: no se pudo cargar el módulo que decide. No está protegiendo."
+      );
+    }
+    responder(
+      "deny",
+      `FRENADO: la guardia de migraciones NO SE PUDO CARGAR${detalle}, así que no puede afirmar que este comando sea seguro.\n\n` +
+        "Un chequeo que no pudo mirar no es un chequeo que pasó, y este comando nombra prisma.\n\n" +
+        "No lo corras esquivando la guardia. Arreglá la carga del módulo " +
+        "lib/deploy/guardiaMigraciones.mjs y volvé a intentar. El candado " +
+        "scripts/hooksSeCargan.test.mjs dice exactamente qué se rompió.",
+      "GUARDIA ROTA: se frenó un comando de prisma porque la guardia no se pudo cargar."
+    );
   }
 
   const previa = decidirPorComando(comando);
