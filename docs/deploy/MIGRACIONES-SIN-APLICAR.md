@@ -16,7 +16,34 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **13 migraciones**, las mismas que el árbol.
+### `20260915200000_codigo_barra_unico_por_ubicacion` — **NO ADITIVA (DROP de índice)**
+
+Producción está en **13 migraciones** y el árbol en **14**.
+
+Reemplaza el índice único `(grupoId, codigo_barra)` de `ProductoBase` por
+`(grupoId, creadoEnLocalId, codigo_barra)`. Es lo que permite que Mini el 7 y
+Casiano carguen el mismo helado, que hoy está prohibido.
+
+**El clasificador la marca NO ADITIVA y frena, por el `DROP INDEX`.** Está
+AUTORIZADA por Emanuel, por escrito y nombrando el motivo. Se continúa con
+`DEPLOY_MIGRACION_AUTORIZADA=1`.
+
+**AFLOJA, no aprieta**, y eso es lo que hace segura la ventana entre migrar y
+recrear: la restricción nueva es más débil que la vieja, así que todo lo que
+entraba antes entra ahora. El código viejo —que valida contra todo el grupo—
+sigue funcionando contra el índice nuevo, porque nunca intenta escribir nada que
+el índice nuevo rechace.
+
+**El quinto chequeo del backup NO aplica**: no se borra ni se modifica ningún
+dato, solo un índice.
+
+**Medido contra producción antes de escribirla.** La clave nueva simulada sobre
+las 2840 filas reales: cero colisiones. `creadoEnLocalId` sin ningún nulo.
+
+**La reposición está escrita adentro de la migración**, con la consulta que hay
+que correr primero para saber si todavía es posible: volver al índice viejo solo
+se puede mientras dos locales no hayan cargado el mismo código, que es justo lo
+que esta migración viene a permitir.
 
 ---
 
