@@ -1138,3 +1138,50 @@
 .sunmi-product-card-action {
   height: var(--sunmi-product-action-height);
 }
+
+/* ── LAS SOLAPAS ──────────────────────────────────────────────────────────
+
+   Mismo criterio que las medidas de la tarjeta de producto de acá arriba: los
+   números viven UNA vez, con nombre, y el JSX pasa a nombrar la intención en vez
+   de escribir `rounded-[7px]`.
+
+   Son tres radios y un padding, y los tres radios son distintos a propósito: el
+   de afuera envuelve, el de adentro tiene que quedar concéntrico con 3 px de
+   padding en el medio. Atarlos entre sí con una cuenta los volvería a separar el
+   día que el padding cambie.
+
+   El TAMAÑO DE LETRA no está acá: son 13 px y eso ya es `text-sm3` en el config
+   de Tailwind. Un token nuevo al lado sería el mismo número con dos nombres. */
+:root {
+  --sunmi-solapas-radio: 7px;
+  --sunmi-solapas-padding: 3px;
+  --sunmi-solapa-radio: 3.5px;
+}
+
+.sunmi-solapas {
+  border-radius: var(--sunmi-solapas-radio);
+  padding: var(--sunmi-solapas-padding);
+  background: var(--pos-control-bg);
+}
+.sunmi-solapa {
+  border-radius: var(--sunmi-solapa-radio);
+  color: var(--pos-control-text);
+}
+.sunmi-solapa-activa {
+  background: var(--pos-accent);
+  color: var(--pos-btn-primary-fg);
+}
+
+/* EL ALTO DE UNA ACCIÓN QUE VA A LO ANCHO.
+
+   36 px no está en la escala de Tailwind —`min-h-9` son 31,5 acá, porque 1 rem
+   son 14— así que el número vive una vez y con nombre, igual que los 44 px del
+   área táctil de la tarjeta. Son dos decisiones distintas: aquél es el mínimo
+   de WCAG para un botón chico en una fila, éste el alto de la acción principal
+   de una pantalla. */
+:root {
+  --sunmi-accion-ancha-alto: 36px;
+}
+.sunmi-accion-ancha {
+  min-height: var(--sunmi-accion-ancha-alto);
+}

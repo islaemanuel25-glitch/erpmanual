@@ -1,55 +1,83 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Search, Archive, ArrowLeft } from "lucide-react";
-
-import { useUser } from "@/app/context/UserContext";
-import SinPermisos from "@/components/auth/SinPermisos";
-
-import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiCardHeader from "@/components/sunmi/SunmiCardHeader";
-import SunmiInput from "@/components/sunmi/SunmiInput";
-import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
-import SunmiPill from "@/components/sunmi/SunmiPill";
-import SunmiLoader from "@/components/sunmi/SunmiLoader";
-
-import TarjetaOferta from "@/components/ofertas/TarjetaOferta";
-import { ESTADO_OFERTA, ESTADOS_OPERATIVOS } from "@/lib/ofertas/estados";
-
-// PANTALLA PRINCIPAL DE OFERTAS.
+// LA LISTA DE OFERTAS, EN EL TELÉFONO.
 //
-// ── LO ARCHIVADO NO ES UNA PESTAÑA MÁS ─────────────────────────────────────
+// ── LA TARJETA ES LA DEL KIT, NO UNA NUEVA ───────────────────────────────
 //
-// La vista de todos los días muestra lo que está rigiendo, lo que va a regir y
-// lo que hay que decidir. Las finalizadas se llegan por "Ver archivadas", que
-// cambia la pantalla entera en vez de agregar una solapa gigante: una lista de
-// ofertas viejas al lado de las vivas hace que la vista útil se lea peor todos
-// los días para servir a algo que se consulta una vez por mes.
+// `TarjetaOfertaMovil` adapta una oferta a `SunmiProductoCard`, que es la MISMA
+// pieza que dibujan el catálogo y stock, y la grilla es `SunmiListaProductoCards`,
+// la misma de las otras dos listas. Acá no se dibuja un píxel: esta pantalla
+// decide qué se pide, qué se muestra y qué se puede tocar.
 //
-// ── EL BARRIDO CORRE AL ENTRAR ─────────────────────────────────────────────
+// ── EL BUSCADOR SE FUE ───────────────────────────────────────────────────
+//
+// Había un campo de búsqueda por nombre arriba de todo. Con las ofertas que hay
+// —una en producción— no sirve para nada y ocupa el lugar de lo que importa, que
+// es ver qué está cobrando el POS ahora. Vuelve cuando haya volumen que lo
+// justifique; el endpoint sigue aceptando `q`, así que devolverlo es una línea.
+//
+// Con él se fue el filtro por estado, que era una fila de botones con conteos: la
+// vista operativa entra en una pantalla y filtrar cinco tarjetas es más trabajo
+// que mirarlas.
+//
+// ── EL BARRIDO CORRE AL ENTRAR, Y ESO NO CAMBIÓ ──────────────────────────
 //
 // Antes de listar se dispara la comparación de costos. Es acá y no en una tarea
 // programada porque el proyecto no tiene planificador. La consecuencia hay que
 // saberla: si nadie entra en tres días, nadie se entera de que cambió un costo.
 
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+
+import { useUser } from "@/app/context/UserContext";
+import { useTituloDePagina } from "@/app/context/AccionDePaginaContext";
+import SinPermisos from "@/components/auth/SinPermisos";
+
+import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import SunmiSolapas from "@/components/sunmi/SunmiSolapas";
+import SunmiListaProductoCards from "@/components/sunmi/SunmiListaProductoCards";
+
+import TarjetaOfertaMovil from "@/components/ofertas/TarjetaOfertaMovil";
+import ModalTerminarOferta from "@/components/ofertas/ModalTerminarOferta";
+
+const EN_CURSO = "EN_CURSO";
+const TERMINADAS = "TERMINADAS";
+
+const SOLAPAS = [
+  { valor: EN_CURSO, texto: "En curso" },
+  { valor: TERMINADAS, texto: "Terminadas" },
+];
+
 export default function OfertasPage() {
   const router = useRouter();
   const { perfil, cargando } = useUser();
 
+  useTituloDePagina("Ofertas");
+
   const permisos = useMemo(() => perfil?.permisos || [], [perfil]);
   const esAdmin = permisos.includes("*");
-  const puedeVer = esAdmin || permisos.includes("ofertas.ver");
-  const puedeCrear = esAdmin || permisos.includes("ofertas.crear");
+  const puede = useCallback(
+    (code) => esAdmin || permisos.includes(code),
+    [esAdmin, permisos]
+  );
 
-  const [archivadas, setArchivadas] = useState(false);
-  const [q, setQ] = useState("");
-  const [estadoFiltro, setEstadoFiltro] = useState("");
+  const puedeVer = puede("ofertas.ver");
+  const puedeCrear = puede("ofertas.crear");
+  const puedeFinalizar = puede("ofertas.finalizar");
+  const puedeEditar = puede("ofertas.editar");
+
+  const [solapa, setSolapa] = useState(EN_CURSO);
   const [items, setItems] = useState([]);
-  const [resumen, setResumen] = useState({});
   const [cargandoLista, setCargandoLista] = useState(true);
   const [error, setError] = useState(null);
+
+  // El modal de terminar: qué oferta, si está trabajando y qué falló.
+  const [aTerminar, setATerminar] = useState(null);
+  const [terminando, setTerminando] = useState(false);
+  const [errorTerminar, setErrorTerminar] = useState(null);
+
+  const archivadas = solapa === TERMINADAS;
 
   const cargar = useCallback(async () => {
     setCargandoLista(true);
@@ -57,8 +85,6 @@ export default function OfertasPage() {
     try {
       const params = new URLSearchParams();
       if (archivadas) params.set("archivadas", "1");
-      if (q.trim()) params.set("q", q.trim());
-      if (estadoFiltro) params.set("estado", estadoFiltro);
 
       const res = await fetch(`/api/ofertas/listar?${params.toString()}`, {
         credentials: "include",
@@ -75,17 +101,16 @@ export default function OfertasPage() {
         return;
       }
       setItems(json.items || []);
-      setResumen(json.resumen || {});
     } catch (e) {
       setItems([]);
       setError(`No se pudo hablar con el servidor: ${e.message}`);
     } finally {
       setCargandoLista(false);
     }
-  }, [archivadas, q, estadoFiltro]);
+  }, [archivadas]);
 
   // El barrido se dispara una vez al entrar, y solo para la vista operativa: en
-  // el archivo no hay nada que revisar. Si falla, no frena la pantalla — el
+  // las terminadas no hay nada que revisar. Si falla, no frena la pantalla — el
   // listado vale igual aunque la comparación de costos no haya corrido.
   useEffect(() => {
     if (!puedeVer || archivadas) return;
@@ -103,127 +128,115 @@ export default function OfertasPage() {
 
   useEffect(() => {
     if (!puedeVer) return;
-    const t = setTimeout(cargar, q ? 250 : 0);
-    return () => clearTimeout(t);
-  }, [puedeVer, cargar, q]);
+    cargar();
+  }, [puedeVer, cargar]);
+
+  const terminarAhora = async () => {
+    if (!aTerminar) return;
+    setTerminando(true);
+    setErrorTerminar(null);
+    try {
+      const res = await fetch(`/api/ofertas/${aTerminar.id}/finalizar`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        setErrorTerminar(json?.error || `No se pudo terminar (HTTP ${res.status}).`);
+        return;
+      }
+      setATerminar(null);
+      await cargar();
+    } catch (e) {
+      setErrorTerminar(`No se pudo hablar con el servidor: ${e.message}`);
+    } finally {
+      setTerminando(false);
+    }
+  };
 
   if (cargando) return null;
   if (!puedeVer) return <SinPermisos />;
 
-  const totalPorRevisar = items.reduce((a, o) => a + (o.lineasPorRevisar || 0), 0);
-
   return (
-    <div className="w-full min-h-full">
-      <SunmiCard>
-        <SunmiCardHeader
-          title={archivadas ? "Ofertas archivadas" : "Ofertas"}
-          subtitle={
-            archivadas
-              ? "Las que ya se finalizaron. Se pueden duplicar para volver a usarlas."
-              : "Lo que está en la calle, lo que viene y lo que hay que decidir."
-          }
-        />
+    <div className="w-full min-h-full p-4 flex flex-col gap-3.5">
+      {puedeCrear && (
+        <SunmiButton
+          onClick={() => router.push("/modulos/ofertas/nueva")}
+          className="w-full sunmi-accion-ancha rounded-md text-sm3 font-medium"
+        >
+          + Crear oferta
+        </SunmiButton>
+      )}
 
-        {/* Resumen compacto. Solo se dibujan los estados que tienen algo: una
-            fila de ceros ocupa lugar y no dice nada. */}
-        {!archivadas && (
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {ESTADOS_OPERATIVOS.filter((e) => (resumen[e] || 0) > 0).map((e) => (
-              <SunmiButton
-                key={e}
-                color={estadoFiltro === e ? "cyan" : "slate"}
-                onClick={() => setEstadoFiltro(estadoFiltro === e ? "" : e)}
-              >
-                {resumen[e]} {e}
-              </SunmiButton>
-            ))}
-            {totalPorRevisar > 0 && (
-              <SunmiPill color="amber">
-                {totalPorRevisar} {totalPorRevisar === 1 ? "producto por revisar" : "productos por revisar"}
-              </SunmiPill>
-            )}
-          </div>
-        )}
+      <SunmiSolapas
+        opciones={SOLAPAS}
+        valor={solapa}
+        onCambiar={setSolapa}
+        etiqueta="Qué ofertas mostrar"
+      />
 
-        <SunmiSeparator label="Buscar" />
-        <div className="flex flex-col md:flex-row md:items-center gap-2">
-          <div className="flex-1 relative">
-            <Search
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-              style={{ color: "var(--pos-link)" }}
-              aria-hidden="true"
-            />
-            <SunmiInput
-              placeholder="Buscar oferta por nombre..."
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              className="!pl-9"
-            />
-          </div>
-          <div className="flex gap-2 md:shrink-0">
-            {puedeCrear && !archivadas && (
-              <SunmiButton onClick={() => router.push("/modulos/ofertas/nueva")}>+ Crear oferta</SunmiButton>
-            )}
-            <SunmiButton
-              color="slate"
-              onClick={() => {
-                setEstadoFiltro("");
-                setArchivadas((v) => !v);
-              }}
-            >
-              {archivadas ? (
-                <span className="inline-flex items-center gap-1">
-                  <ArrowLeft size={14} aria-hidden="true" /> Volver
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1">
-                  <Archive size={14} aria-hidden="true" /> Ver archivadas
-                </span>
-              )}
+      {error && (
+        <div className="sunmi-panel rounded-lg p-3 text-sm3 sunmi-text-danger">
+          {error}
+          <div className="mt-2">
+            <SunmiButton color="slate" onClick={cargar}>
+              Reintentar
             </SunmiButton>
           </div>
         </div>
+      )}
 
-        <SunmiSeparator label={archivadas ? "Archivadas" : "En curso"} />
+      {cargandoLista && !error && <SunmiLoader />}
 
-        {error && (
-          <div className="sunmi-panel rounded-lg p-3 text-sm sunmi-text-danger mb-2">
-            {error}
-            <div className="mt-2">
-              <SunmiButton color="slate" onClick={cargar}>Reintentar</SunmiButton>
-            </div>
-          </div>
-        )}
-
-        {cargandoLista && !error && <SunmiLoader />}
-
-        {!cargandoLista && !error && items.length === 0 && (
-          <div className="sunmi-panel rounded-lg p-4 text-sm sunmi-text-muted text-center">
+      {/* ── EL VACÍO NO MANDA A NINGÚN LADO ──────────────────────────────
+          Antes decía "Creá la primera con el botón de arriba", que es una
+          instrucción para usar un botón que está a la vista. Lo que falta saber
+          es qué pasa cuando hay una, y eso es lo que dice ahora. */}
+      {!cargandoLista && !error && items.length === 0 && (
+        <div className="text-center py-4">
+          <div className="text-base2 font-medium sunmi-text-strong">
             {archivadas
-              ? "Todavía no hay ofertas archivadas."
-              : estadoFiltro || q
-              ? "Ninguna oferta coincide con lo buscado."
-              : "No hay ofertas todavía. Creá la primera con el botón de arriba."}
+              ? "Todavía no terminaste ninguna oferta"
+              : "No hay ninguna oferta corriendo"}
           </div>
-        )}
+          <div className="mt-1 text-sm3 sunmi-pos-muted leading-snug">
+            {archivadas
+              ? "Las que termines van a quedar acá, con quién las terminó y cuándo."
+              : "Cuando publiques una, el POS la cobra sola y la vas a ver acá con lo que falta para que termine."}
+          </div>
+        </div>
+      )}
 
-        {!cargandoLista && !error && items.length > 0 && (
-          <div className="flex flex-col gap-2">
-            {items.map((o) => (
-              <TarjetaOferta
-                key={o.id}
-                oferta={o}
-                onAbrir={(of) => router.push(`/modulos/ofertas/${of.id}`)}
-              />
-            ))}
-          </div>
-        )}
-      </SunmiCard>
+      {!cargandoLista && !error && items.length > 0 && (
+        <SunmiListaProductoCards>
+          {items.map((o) => (
+            <TarjetaOfertaMovil
+              key={o.id}
+              oferta={o}
+              // Una oferta ya terminada no se puede volver a terminar: la ruta
+              // contesta 409 y el botón no tendría qué hacer.
+              puedeFinalizar={puedeFinalizar && !archivadas}
+              puedeEditar={puedeEditar}
+              onTerminar={(of) => {
+                setErrorTerminar(null);
+                setATerminar(of);
+              }}
+              onEditar={(of) => router.push(`/modulos/ofertas/${of.id}`)}
+            />
+          ))}
+        </SunmiListaProductoCards>
+      )}
+
+      <ModalTerminarOferta
+        abierto={!!aTerminar}
+        oferta={aTerminar}
+        trabajando={terminando}
+        error={errorTerminar}
+        onCerrar={() => setATerminar(null)}
+        onTerminar={terminarAhora}
+      />
     </div>
   );
 }

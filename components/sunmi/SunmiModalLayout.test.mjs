@@ -693,6 +693,18 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // renombre de `destructivo`.
     "components/proveedores/listas/ModalRevertir.jsx": true,
     "components/proveedores/listas/ModalTerminar.jsx": true,
+    // ── TERMINAR UNA OFERTA: MISMO CASO QUE LOS DOS DE ARRIBA ──────────────
+    //
+    // No hay nada escrito adentro que se pueda perder, así que por el criterio
+    // NUEVO iría en `false`. Declara `true` por el VIEJO —la acción cambia lo que
+    // el POS cobra y no tiene vuelta atrás— y es el mismo caso que
+    // `ModalTerminar` y `ModalRevertir`, así que se revisa con ellos al cerrar
+    // la fase 2.
+    //
+    // Y hay un motivo propio, del teléfono: este modal se abre desde una LISTA
+    // de tarjetas, con el botón en la franja de abajo. El pulgar queda justo al
+    // costado del modal, que es donde el velo cierra.
+    "components/ofertas/ModalTerminarOferta.jsx": true,
     // ── EL ÚNICO ARCHIVO CON DOS MODALES, Y NO CONTESTAN LO MISMO ────────────
     //
     // `app/modulos/clientes/page.jsx` tiene "Cuenta Corriente", que SÍ lo declara

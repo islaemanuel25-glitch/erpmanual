@@ -712,3 +712,109 @@ pantalla llama, que es exactamente el caso que `CLAUDE.md` marca como el que mas
 se repite. No se borraron en esta tanda —es otra unidad revertible— pero la
 pregunta que hay que contestar no es como arreglarlos: es si esas ramas todavia
 tienen que existir.
+
+## LA LISTA DE OFERTAS EN EL CELULAR
+
+Verificado en código y ejercido en el navegador (`scripts/capturas-ofertas-lista.mjs`,
+33 afirmaciones) y contra Postgres (`scripts/integracion-terminar-oferta.mjs`,
+15 afirmaciones).
+
+### LA TARJETA ES LA DEL KIT, NO UNA NUEVA
+
+`TarjetaOfertaMovil` adapta una oferta a `SunmiProductoCard`, que es la MISMA
+pieza que dibujan el catalogo y stock, y la grilla es `SunmiListaProductoCards`.
+El adaptador no dibuja un pixel: ni un padding, ni un radio, ni un color. Hay un
+candado que compara el armazon contra el de stock —panel, cuerpo, fila del valor
+y fila de acciones— y otro que prohibe que aparezca una segunda caja.
+
+Las ranuras: `nombre` el producto, `empresa` la linea de cuando, `marca` el
+precio normal y el porcentaje, `valor` el precio de oferta, `aviso` en null,
+`destacado` el sello, los dos codigos en `false`, y `acciones` las dos.
+
+### EL SELLO VA EN LA PILDORA, NO EN EL AVISO
+
+`aviso` sale SIEMPRE en ambar y con triangulo, fijo en la pieza del kit. Poner
+ACTIVA en verde ahi obligaria a que la tarjeta aceptara un color, y eso cambia
+`SunmiProductoCard`, que dibuja tambien el catalogo y stock.
+
+`SunmiPill` gano el color `green`, que NO es un color nuevo: `.sunmi-badge-success`
+ya estaba en el kit y sale de `--pos-success`. Es aditivo — los tres colores
+anteriores dicen exactamente lo mismo.
+
+### "VENCE HOY" NO ES UN ESTADO
+
+Los estados de una oferta son seis y estan derivados en `estados.js`. "VENCE HOY"
+es una oferta ACTIVA sobre la que ademas hay algo que decidir hoy. Si fuera un
+estado habria que agregarlo al enum y el POS tendria que saber que hacer con el,
+cuando para el POS es exactamente una oferta activa.
+
+Vive en `lib/ofertas/tarjetaDeOferta.js`, la capa que decide que se muestra, y
+gana sobre ACTIVA: si ACTIVA se preguntara primero el aviso seria inalcanzable —
+el mismo orden que `estados.js` ya resolvio poniendo REVISAR antes que ACTIVA.
+
+### LAS FECHAS SON DIAS CALENDARIO ARGENTINOS
+
+"Termina hoy" comparado con el reloj del proceso da mal desde las 21:00
+argentinas, que es justo cuando alguien mira el celular para ver que cierra. Se
+compara con `fechaArgentinaISO`. Y el dia que se muestra es el ULTIMO VIGENTE, no
+`finEn`: la ventana es semiabierta, asi que `finEn` es el dia siguiente y
+preguntar por el corre todo un dia. Reusa `ultimoDiaVigente`, la misma que usa la
+pantalla de crear.
+
+### UNA OFERTA DE VARIOS PRODUCTOS NO MUESTRA PRECIO
+
+El DTO de la lista trae `producto`, `precioOferta` y `precioNormal` SOLO cuando la
+oferta tiene una unica linea. Con mas de una vienen en `null` y la tarjeta dice
+cuantos productos hay, sin bloque de precio: mostrar el de una linea como si
+fuera el de la oferta es una afirmacion falsa sobre las otras.
+
+El flujo movil crea ofertas de UN producto, asi que el caso de varias solo llega
+desde escritorio. En produccion hoy no hay ninguna.
+
+### TERMINAR AHORA PIDE CONFIRMACION Y NO TOCA NADA MAS
+
+`[id]/finalizar` escribe `finalizadaEn`, su autor y su motivo, levanta las marcas
+de revision y registra el evento. **No toca precio, costo ni stock**, y eso esta
+medido tomando una foto de las tres tablas antes y despues.
+
+El modal es `destructivo` —el velo no cierra— y dice QUE producto y A QUE PRECIO
+vuelve, en vez de preguntar si estas seguro. Una pregunta generica se contesta
+con el pulgar; un precio se lee.
+
+### LO QUE SE SACO
+
+**El buscador de ofertas.** Con una oferta en produccion no sirve y ocupa el
+lugar de lo que importa. El endpoint sigue aceptando `q`, asi que devolverlo es
+una linea. Con el se fue el filtro por estado, que era una fila de botones con
+conteos.
+
+**El encabezado propio.** La pantalla registraba su titulo en un `SunmiCardHeader`
+adentro de la tarjeta, asi que en el celular "Ofertas" se veia dos veces.
+
+### UN CHOQUE MEDIDO Y NO RESUELTO
+
+La pildora de estado va absoluta abajo a la derecha, que es donde el kit la pone.
+En el catalogo eso cae en zona vacia porque "Editar" es la UNICA accion y va
+centrada a lo ancho. Aca hay DOS, asi que el segundo boton ocupa la mitad derecha
+y su texto queda debajo de la pildora.
+
+Medido a 390 px: **PROGRAMADA tapa 35 px del texto de "Editar", VENCE HOY 21 px,
+y ACTIVA 0** — depende del largo de la palabra, o sea que el choque no se ve en
+todas las tarjetas. Esta anotado en el arnes con el numero, y **no se movio**:
+cambiar donde va el sello afecta al catalogo y a stock. La decision es de
+Emanuel.
+
+### FUERA DE ALCANCE, ANOTADO Y NO EMPEZADO
+
+El detalle de la oferta y la pantalla de editar; renovar; el apagado automatico
+por stock cero; el cartel de offline en el POS; y el sello de OFERTA en
+Productos.
+
+### DEUDA ABIERTA DE ESTA TANDA
+
+`components/ofertas/TarjetaOferta.jsx` —la tarjeta vieja, sobre
+`SunmiActionCard`— **quedo sin ningun lector de pantalla**: la lista dejo de
+usarla. Sigue nombrada en `lib/sunmi/actionCard.test.mjs` y en dos sondas, que la
+enumeran como consumidora de `SunmiActionCard`. No se borro en esta tanda porque
+sacarla obliga a tocar esos tres, y eso es otra unidad revertible. La pregunta a
+contestar no es como arreglarla: es si esa tarjeta todavia tiene que existir.

@@ -19,11 +19,19 @@ import { ESTADO_OFERTA, ESTADOS_OPERATIVOS } from "@/lib/ofertas/estados";
 // revisión) se aplica después sobre lo ya traído, que son pocas filas: las
 // ofertas vivas de UN local.
 //
-// ── POR QUÉ LAS LÍNEAS VIENEN FILTRADAS ─────────────────────────────────────
+// ── LAS LÍNEAS YA NO VIENEN FILTRADAS, Y HAY UN MOTIVO ──────────────────────
 //
-// `lineas` trae SOLO las marcadas para revisar, y el total sale de `_count`. Así
-// la tarjeta puede decir "8 productos, 2 cambiaron de costo" sin traer las ocho
-// filas de cada oferta.
+// Antes traía SOLO las marcadas para revisar: alcanzaba para decir "8 productos,
+// 2 cambiaron de costo" con el total sacado de `_count`.
+//
+// La tarjeta del celular muestra además EL PRECIO —"$ 3.300" contra "Normal
+// $ 3.700"— y eso vive en la línea. Con el filtro puesto, una oferta sin nada
+// que revisar llegaba sin líneas y la tarjeta no tenía qué mostrar.
+//
+// El select sigue siendo chico —cuatro campos y el nombre— y son las ofertas
+// VIVAS de UN local: el archivo ya viene con `take: 100`. `_count` se conserva
+// porque es el que decide si hay UNA línea o varias, y esa pregunta no se
+// contesta con `lineas.length` cuando el archivo está paginado.
 
 export async function GET(req) {
   try {
@@ -56,8 +64,15 @@ export async function GET(req) {
         local: { select: { nombre: true } },
         _count: { select: { lineas: true } },
         lineas: {
-          where: { revisionPendienteDesde: { not: null } },
-          select: { id: true, revisionPendienteDesde: true },
+          select: {
+            id: true,
+            revisionPendienteDesde: true,
+            precioOferta: true,
+            precioNormalReferencia: true,
+            productoLocal: {
+              select: { nombre: true, base: { select: { nombre: true } } },
+            },
+          },
         },
       },
     });
