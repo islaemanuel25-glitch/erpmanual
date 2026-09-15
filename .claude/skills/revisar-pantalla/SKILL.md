@@ -1,6 +1,6 @@
 ---
 name: revisar-pantalla
-description: Ficha de hardcodeo de una pantalla — colores fijos, medidas mágicas, modales a mano, elementos crudos y clases del tema paralelo, con archivo, línea y el reemplazo que ya existe.
+description: Auditoría de una pantalla — hardcodeo y procedencia de componentes: qué reutiliza del sistema, qué pieza nueva debería pasar al kit, qué puede quedar local y qué duplica algo que ya existe.
 context: fork
 agent: auditor
 allowed-tools: Read, Glob, Grep
@@ -40,9 +40,9 @@ Cuatro bloques, en este orden, y nada más:
    tal archivo", no treinta.
 3. **EL RESTO, RESUMIDO**: dos o tres líneas por categoría con el total y dónde
    se concentra. Sin listar ubicaciones.
-4. **LO QUE LA FICHA NO DICE**: falsos positivos que detectaste, patrones detrás
-   de los números, y qué no se puede arreglar todavía porque falta el componente
-   o el token.
+4. **LO QUE LA FICHA NO DICE**: falsos positivos, patrones detrás de los números,
+   qué no se puede arreglar todavía y la **procedencia de componentes** de la
+   pantalla con la clasificación que se define más abajo.
 
 Como referencia de largo: **cuarenta líneas está bien, ochenta ya es demasiado.**
 Si no entra, es que se está copiando la ficha en vez de leerla.
@@ -75,6 +75,100 @@ Y decí lo que la ficha NO dice:
 - **Si hay un patrón detrás de los números.** "Los 30 colores fijos son todos del
   mismo archivo" es información; "hay 30 colores fijos" no.
 - **Qué no se puede arreglar todavía** porque falta el componente o el token.
+
+## La segunda mitad: procedencia de componentes
+
+La ficha automática cuenta hardcodeo. **No puede decidir si la pantalla está
+inventando una segunda versión de una pieza que ya existe, ni si una pieza nueva
+merece entrar al kit.** Eso se audita leyendo la pantalla y buscando sus
+equivalentes en `components/sunmi/` y en los componentes compartidos del repo.
+
+No se busca que una pantalla sea "100 % componentes existentes". Esa regla sería
+mala: impediría diseñar algo nuevo. Se busca otra cosa:
+
+> **Una pantalla puede crear una composición nueva. No puede crear una segunda
+> versión local de una pieza reutilizable.**
+
+### Las cuatro clasificaciones
+
+Cada pieza visual relevante que no sea mera composición de layout se clasifica en
+una de estas cuatro categorías. **No inventes una quinta.**
+
+- **REUTILIZA** — usa una pieza compartida que ya existe y corresponde al caso.
+  Es verde. Ejemplos: `SunmiCard`, `SunmiInput`, `SunmiModalLayout`, un
+  selector o badge ya existente.
+
+- **CANDIDATO A KIT** — la pieza no existe hoy, la solución es buena y tiene
+  sentido fuera de esta pantalla. **No es un error y no bloquea.** Se informa
+  para decidir si conviene extraerla ahora o en otra tanda. Ejemplo: una tarjeta
+  de navegación "icono + título + descripción + estado + chevron" que puede
+  aparecer en otras portadas.
+
+- **LOCAL JUSTIFICADO** — la pieza es composición o comportamiento propio de esta
+  pantalla y extraerla no daría reutilización real. Es verde. Un `div` local no
+  es un problema por existir; el problema es duplicar una abstracción.
+
+- **DUPLICADO** — ya existe una pieza compartida equivalente y la pantalla la
+  rehízo localmente, o reimplementa chrome global del ERP que ya provee el
+  layout. **Este es el único rojo de esta auditoría.** Tiene que nombrar la pieza
+  existente y el archivo concreto que debería usarse.
+
+### Qué mirar, sin convertir esto en un policía que frena todo
+
+No clasifiques cada `div`, `span` ni wrapper. Mirá solo las piezas con
+identidad visual o de interacción: cards, chips, badges, headers, bloques de
+estado, botones, inputs, selects, modales, filas navegables, avisos, tabs,
+toolbars y patrones equivalentes.
+
+Para cada pieza nueva:
+
+1. Leer sus imports y JSX.
+2. Buscar por función y forma en `components/sunmi/` y en `components/`.
+3. Si ya existe un equivalente real, marcar **DUPLICADO**.
+4. Si no existe, preguntar si tiene sentido en otra pantalla:
+   - sí → **CANDIDATO A KIT**;
+   - no → **LOCAL JUSTIFICADO**.
+5. Si ya importa la pieza correcta → **REUTILIZA**.
+
+**Parecido no alcanza para declarar DUPLICADO.** Dos cards pueden tener objetivos
+distintos. Para poner rojo tiene que existir un reemplazo concreto que cubra el
+caso sin perder comportamiento necesario. Si hay duda, es CANDIDATO A KIT o
+LOCAL JUSTIFICADO, no rojo.
+
+### El shell del ERP también cuenta como componente compartido
+
+`Header`, navegación, título mobile, contexto activo, usuario/operador,
+sidebar/topbar/bottom-nav y el padding estructural que pone `LayoutBase` son
+chrome global. Una pantalla de `/modulos` no los reimplementa ni los oculta por
+su cuenta.
+
+Si una pantalla agrega su propio header, duplica el título global o mete una
+excepción por ruta para saltear el chrome, clasificar **DUPLICADO**, salvo que
+haya una excepción arquitectónica documentada y explícitamente aprobada para esa
+ruta.
+
+Un Figma de contenido **no es autorización para reemplazar el shell**. Si el
+trabajo es un rediseño de una pantalla, se presume que cambia el contenido dentro
+del shell existente. El shell solo cambia si el pedido lo dice de manera
+explícita.
+
+### Cómo entra esto en el informe
+
+No agregues un quinto bloque. Va dentro de **LO QUE LA FICHA NO DICE**, resumido.
+
+Formato esperado, solo para las piezas que importan:
+
+- `REUTILIZA — SunmiCard / SunmiButton / ...`
+- `CANDIDATO A KIT — [pieza]: por qué sería reutilizable`
+- `LOCAL JUSTIFICADO — [pieza]: por qué es propia de esta pantalla`
+- `DUPLICADO — [pieza local] duplica [pieza compartida], en [archivo]`
+
+Si no hay DUPLICADOS, decirlo. Si hay diez REUTILIZA iguales, agruparlos. La
+auditoría tiene que ayudar a decidir, no producir inventario.
+
+**CANDIDATO A KIT nunca pone rojo por sí solo.** Que una pieza buena todavía viva
+localmente puede ser una deuda aceptable. El rojo es haber ignorado una pieza
+compartida que ya existía o haber rehecho el shell global sin autorización.
 
 ## Cómo se cierra el informe
 
