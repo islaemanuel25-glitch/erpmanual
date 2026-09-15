@@ -16,7 +16,73 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **11 migraciones**, las mismas que el árbol.
+Ninguna. Producción está en **12 migraciones**, las mismas que el árbol.
+
+---
+
+## 2026-09-15 — `df749cde`, el arreglo de escala: **UNA MIGRACIÓN DE DATOS**
+
+Producción pasó de `2579bfe46484dfa71941320fce3d888e1af81866` a
+`df749cdecaf27aa479d14669e4215270cf177e54`. Corte de **2 segundos**.
+
+**Es el primer despliegue con migración de datos desde el 2026-08-10.**
+
+### La migración
+
+`20260915120000_borrar_oferta_con_escala_vieja`. Borra la única oferta cargada
+antes del arreglo de escala, porque sus referencias congeladas estaban en escala
+de BULTO y desde este despliegue todo el módulo trabaja en la escala en que la
+ubicación vende.
+
+**El clasificador la marcó NO ADITIVA y frenó con código 1**, nombrando el
+`DELETE FROM` de la línea 65. No era un falso positivo: es una borrada de datos
+deliberada. Se continuó con **`DEPLOY_MIGRACION_AUTORIZADA=1`** sobre la
+confirmación explícita y por escrito de Emanuel, que nombró la fila, el motivo y
+que fuera con su rastro.
+
+**Conteo:** 12 informadas por el contenedor contra 12 en el árbol. `migrate
+status` cerró en 12 y "Database schema is up to date!".
+
+**Efecto medido contra la base, antes y después:**
+
+| | antes | después |
+|---|---|---|
+| `Oferta` | 1 | **0** |
+| `OfertaLinea` | 1 | **0** (cascada) |
+| `OfertaEvento` | 4 | **0** (cascada) |
+| `VentaDetalle` con `ofertaId` | 0 | **0** |
+| `Venta` (control) | 18.435 | **18.435** |
+
+Y antes de escribir el `DELETE` se corrió su condición como `SELECT` contra
+producción: borraría exactamente 1 fila, con 0 ventas que la usaran.
+
+### El quinto chequeo del backup, que acá sí aplicaba
+
+`pre-df749cde_20260915_011526.sql.gz`. Además de los cuatro de siempre, se
+comprobó que **lo que se iba a borrar estuviera adentro del dump**: la cadena
+"91100" aparece 5 veces, el precio de oferta "22500.00" 71 veces, y la tabla
+`OfertaEvento` está volcada. La reposición manual está escrita en el propio
+`migration.sql`.
+
+### LO QUE NO FUNCIONÓ, Y HAY QUE ARREGLARLO
+
+**La bitácora de autorizaciones NO se escribió.** Se usó
+`DEPLOY_MIGRACION_AUTORIZADA=1` y `.claude/migraciones-autorizadas.log` **no
+existe**.
+
+El hook está registrado sobre todas las llamadas Bash
+(`.claude/settings.json:73`) y el código que escribe la bitácora está en
+`scripts/hook-guardia-migraciones.mjs:79`. Lo que no se pudo determinar es si el
+hook no se disparó o si se disparó y la escritura falló: **el `catch` que la
+envuelve es silencioso a propósito** (línea 80, "a propósito en silencio").
+
+Eso importa más que el archivo. El skill dice que la bitácora existe porque "el
+aviso de pantalla no alcanza" y que es "el único control que quedó de ese caso".
+En este despliegue ese control no dejó nada, y su falla es invisible por diseño.
+**El único rastro de esta autorización es este documento y el commit.**
+
+Queda como pendiente con nombre: que la escritura de la bitácora falle RUIDOSA,
+o que el hook confirme que corrió.
 
 ---
 
