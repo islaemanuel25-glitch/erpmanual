@@ -64,6 +64,10 @@ const RECIBIDA_CERRADA = Number(arg("recibida-cerrada", "0"));
 const ANCHO = Number(arg("ancho", "390"));
 const ALTOS = arg("altos", "640,520,440").split(",").map(Number);
 
+// La ruta propia del tablero. Antes vivía en `/modulos/transferencias`, bajo un
+// `lg:hidden`, compartiendo archivo con el reporte de escritorio.
+const RUTA_CUENTA_MOVIL = "/modulos/transferencias/cuenta";
+
 if (!SECRETO) {
   console.error("ABORTADO: falta AUTH_SECRET; sin eso no se puede firmar la sesión.");
   process.exit(2);
@@ -424,7 +428,7 @@ await send("Network.enable");
 await entrarComo(DEPOSITO, "DEPÓSITO");
 for (const alto of ALTOS) {
   await medir(alto);
-  await abrir("/modulos/transferencias", "Transferencias");
+  await abrir(RUTA_CUENTA_MOVIL, "Transferencias");
   await afirmar(await hayTexto("Local V15"), `${alto} · la entrada lista los locales`);
   await afirmar(await hayTexto("Reporte"), `${alto} · el reporte sigue a un toque`);
   await afirmar(
@@ -435,7 +439,7 @@ for (const alto of ALTOS) {
 }
 
 await medir(ALTOS[0]);
-await abrir("/modulos/transferencias", "Transferencias");
+await abrir(RUTA_CUENTA_MOVIL, "Transferencias");
 
 // NI CHIPS NI BUSCADOR. Se pregunta por los CONTROLES y no por el texto: la
 // palabra "semana" aparece igual en el aviso del corte, así que buscarla en el
@@ -567,7 +571,7 @@ const ordenDeLosLocales = () =>
      .map((n) => n.getAttribute('aria-label'))`);
 
 const orden1 = await ordenDeLosLocales();
-await abrir("/modulos/transferencias", "Transferencias");
+await abrir(RUTA_CUENTA_MOVIL, "Transferencias");
 const orden2 = await ordenDeLosLocales();
 await afirmar(
   JSON.stringify(orden1) === JSON.stringify(orden2),
@@ -579,9 +583,35 @@ await afirmar(
     JSON.stringify(["Abrir Local V15", "Abrir Local V15 sin movimiento"]),
   `y el orden es el alfabético (${JSON.stringify(orden1)})`
 );
+// ── EL AVISO CUENTA AL QUE NO TUVO MOVIMIENTO, Y ESO ES LO QUE AFIRMA ───
+//
+// Decía "Hay 2 locales sin corte configurado", con el número escrito. El
+// sembrado pasó a configurarle el corte a "Local V15" —hay un acuerdo suyo en
+// `AcuerdoDepositoLocal`— así que hoy el aviso cuenta UNO.
+//
+// El número era incidental: lo que este chequeo defiende es que el aviso NO mire
+// solo a los locales que movieron algo. Con el sembrado de hoy se ve MEJOR que
+// antes, porque el único que cuenta es justamente el que no tuvo movimiento.
+//
+// El paso de arriba RECARGA la lista dos veces, así que primero hay que esperar
+// a que vuelva a dibujarse: sin eso se mide una pantalla a medio montar.
+await esperarTexto("LOCALES", 20000);
+const textoDelAviso = await evaluar(`(() => {
+  const l = document.body.innerText.split("\\n").find((x) => x.includes("sin corte configurado"));
+  return l || "";
+})()`);
+await afirmar(Boolean(textoDelAviso), `el aviso de corte está (${textoDelAviso})`);
+const sinCorte = Number(textoDelAviso.replace(/[^0-9]/g, "").slice(0, 2)) || 0;
+const localesListados = await evaluar(
+  `document.querySelectorAll('[aria-label^="Abrir Local"]').length`
+);
 await afirmar(
-  await hayTexto("Hay 2 locales sin corte configurado"),
-  "el aviso cuenta los DOS, no solo el que tuvo movimiento"
+  sinCorte >= 1 && sinCorte <= localesListados,
+  `el aviso cuenta entre 1 y los ${localesListados} locales listados (dice ${sinCorte})`
+);
+await afirmar(
+  await hayTexto("Local V15 sin movimiento"),
+  "y el local SIN MOVIMIENTO está listado: el aviso no mira solo a los que movieron"
 );
 
 // ── EL QUE NO OPERA POR TRANSFERENCIA NO ESTÁ ───────────────────────────
@@ -665,7 +695,7 @@ for (const [clave, nombre] of [
 // Estable entre corridas: se recarga la pantalla entera y tiene que dar lo
 // mismo. Con un color al azar esto sería rojo, y un color al azar es peor que
 // no tener color.
-await abrir("/modulos/transferencias", "Transferencias");
+await abrir(RUTA_CUENTA_MOVIL, "Transferencias");
 const fachadasOtraVez = await paletaEnPantalla();
 await afirmar(
   fachadasOtraVez.conMovimiento === fachadas.conMovimiento &&
@@ -692,6 +722,176 @@ async function entrarAlLocal(nombre) {
   await esperarTexto("Para cobrar", 30000);
   await esperar(900);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// VOLVER AL MISMO LUGAR
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ── EL DEFECTO, CON SU NÚMERO ───────────────────────────────────────────
+//
+// Entrar a una transferencia desde un período pasado y volver caía SIEMPRE en el
+// período de hoy: el local, el chip y el desplazamiento se perdían. Con 33
+// transferencias sin recibir de una semana pasada, eso es renavegar 33 veces.
+//
+// ── POR QUÉ SE MIDE ACÁ Y NO CON UN CANDADO ─────────────────────────────
+//
+// Porque vive en la NAVEGACIÓN. `contextoDelTablero.test.mjs` afirma que la URL
+// se arma y se lee bien —15 candados— y eso no dice nada sobre si la pantalla la
+// usa, si "Volver" va al lado correcto, ni cuántas entradas deja el historial.
+// Un candado de render tampoco: la pantalla se ve igual.
+
+await medir(ALTOS[0]);
+
+// ── 0 · LA RUTA VIEJA SIGUE LLEVANDO ACÁ ───────────────────────────────
+//
+// El tablero se mudó, pero el menú y cualquier atajo guardado apuntan a
+// `/modulos/transferencias`. En un teléfono esa ruta redirige, y con `replace`:
+// es un puente, no un lugar al que volver con el back.
+await abrir("/modulos/transferencias", "LOCALES");
+await afirmar(
+  (await evaluar("location.pathname")) === RUTA_CUENTA_MOVIL,
+  `la ruta vieja redirige al tablero (quedó en ${await evaluar("location.pathname")})`
+);
+
+// ── Y EL RESTO SE MIDE EN LA CUENTA DE UN LOCAL ────────────────────────
+//
+// El navegador de período y las transferencias viven ahí. La cuenta del
+// DEPÓSITO es la lista de locales: no tiene chips ni flechas, a propósito —cada
+// local corta su semana el día que acordó, así que un período global tendría que
+// elegir uno y sería el equivocado para alguien—.
+const RUTA_DEL_LOCAL = `/modulos/transferencias/local/${LOCAL}`;
+
+// ── 1 · DIEZ FLECHAS, UNA SOLA ENTRADA EN EL HISTORIAL ──────────────────
+// ── SE ARRANCA HONDO Y SE AVANZA ────────────────────────────────────────
+//
+// La flecha de ATRÁS la deshabilita el servidor cuando no hay más datos hacia
+// atrás —`puedeRetroceder`— y con el sembrado de una sola transferencia eso
+// pasa enseguida. Medido: en el período cerrado la flecha llega `disabled`.
+//
+// Así que se entra por URL a un período hondo, donde avanzar SÍ está permitido,
+// y se aprieta diez veces la de adelante. Se mide lo mismo —diez toques, una
+// entrada— con el control que de verdad se puede usar.
+await abrir(`${RUTA_DEL_LOCAL}?desp=-11`, "Semana");
+await afirmar(
+  (await evaluar("location.search")).includes("desp=-11"),
+  "se entró por URL a un período hondo, que es lo que hace usable la flecha de adelante"
+);
+
+// ── NUEVE Y NO DIEZ, Y EL MOTIVO ES DE DISEÑO ───────────────────────────
+//
+// Diez avances desde -11 llegan a -1, que es el período POR DEFECTO — y los
+// defaults no se escriben en la URL, a propósito: `?desp=-1` dice lo mismo que
+// la URL pelada y se vería como si alguien hubiera navegado.
+//
+// La primera versión de esta afirmación pedía `desp=-1` en la barra y daba rojo
+// sobre un comportamiento correcto. Con nueve se llega a -2, que sí deja rastro,
+// y se sigue midiendo lo mismo.
+const largoInicial = await evaluar("history.length");
+for (let i = 0; i < 9; i++) {
+  await tocar("Período siguiente");
+}
+const largoDespues = await evaluar("history.length");
+await afirmar(
+  largoDespues === largoInicial,
+  `nueve flechas dejan UNA entrada en el historial (antes ${largoInicial}, después ${largoDespues})`
+);
+
+// Y el período SÍ se movió nueve. Sin esto, un botón que no hace nada daría el
+// mismo "una entrada" y el candado pasaría sobre una pantalla que no navega.
+const urlTrasFlechas = await evaluar("location.pathname + location.search");
+await afirmar(
+  urlTrasFlechas.includes("desp=-2"),
+  `y el período avanzó nueve, de -11 a -2: la URL dice ${urlTrasFlechas}`
+);
+
+// ── 2 · ENTRAR A UNA TRANSFERENCIA Y VOLVER ─────────────────────────────
+//
+// EL PERÍODO SE BUSCA, NO SE SUPONE. El sembrado pone la transferencia en una
+// fecha fija, así que según qué día se corra el arnés cae en el período abierto
+// o en el cerrado. Suponer uno hacía que la prueba fallara los días equivocados
+// por un motivo que no es el suyo.
+let despDePrueba = null;
+for (const d of [0, -1, -2, -3]) {
+  await abrir(`${RUTA_DEL_LOCAL}?desp=${d}`, "Semana");
+  const hay = await evaluar(
+    `[...document.querySelectorAll('button')].filter((n) => n.offsetParent !== null && /Recibir|Ver /.test(n.textContent || '')).length`
+  );
+  if (hay > 0) { despDePrueba = d; break; }
+}
+await afirmar(
+  despDePrueba !== null,
+  "se encontró un período con transferencias para ejercer la vuelta"
+);
+await abrir(`${RUTA_DEL_LOCAL}?desp=${despDePrueba}`, "Semana");
+const urlAntes = await evaluar("location.pathname + location.search");
+// EL RANGO SE LEE COMO SE ESCRIBE, y esto costó una corrida: la primera versión
+// buscaba `dd/mm` y la pantalla dice «mié 24 al mar 30 de junio». No hay barras
+// en ningún lado, así que la lectura volvía vacía y el rojo no era del período
+// sino del lector.
+const leerRango = () =>
+  evaluar(
+    `(() => { const l = document.body.innerText.split("\\n").find((x) => /\\d{1,2} (al|de) /.test(x)); return l || ""; })()`
+  );
+const rangoAntes = await leerRango();
+await afirmar(Boolean(rangoAntes), `se pudo leer el rango del período (${rangoAntes})`);
+
+// La fila de una transferencia NO tiene `aria-label`: es un botón entero, y el
+// texto que la distingue es "Recibir" o "Ver ›".
+const entro = await evaluar(`(() => {
+  const t = [...document.querySelectorAll('button')]
+    .filter((n) => n.offsetParent !== null)
+    .find((n) => /Recibir|Ver /.test(n.textContent || ''));
+  if (!t) return false;
+  t.click();
+  return true;
+})()`);
+await afirmar(entro, "se pudo entrar a una transferencia desde el tablero");
+await esperar(2500);
+
+const urlQueQuedo = await evaluar("location.pathname + location.search");
+await afirmar(
+  /\/modulos\/transferencias\/\d+/.test(urlQueQuedo),
+  `se abrió el detalle (${urlQueQuedo})`
+);
+await afirmar(
+  urlQueQuedo.includes("tab=1"),
+  `y se llevó la marca del tablero, que es lo que decide a dónde vuelve (${urlQueQuedo})`
+);
+
+await tocar("Volver");
+await esperar(2500);
+const urlDespues = await evaluar("location.pathname + location.search");
+const rangoDespues = await leerRango();
+await afirmar(
+  urlDespues === urlAntes,
+  `volver deja la MISMA url (antes ${urlAntes}, después ${urlDespues})`
+);
+await afirmar(
+  rangoDespues === rangoAntes,
+  `y el MISMO período (antes «${rangoAntes}», después «${rangoDespues}»)`
+);
+await foto(`volver-al-mismo-lugar-${ANCHO}`);
+
+// ── 3 · Y DESDE UN PERÍODO PASADO DE VERDAD ─────────────────────────────
+await abrir(`${RUTA_DEL_LOCAL}?desp=-3`, "Semana");
+const rangoLejano = await leerRango();
+await afirmar(
+  rangoLejano !== rangoAntes,
+  `tres períodos atrás es OTRO rango («${rangoLejano}» contra «${rangoAntes}»)`
+);
+await afirmar(
+  (await evaluar("location.search")).includes("desp=-3"),
+  "y la URL lo dice, así que el enlace se puede compartir"
+);
+
+// ── SE DEVUELVE LA PANTALLA A LA LISTA ──────────────────────────────────
+//
+// Todo lo de arriba navegó a la cuenta de UN local. Lo que sigue arranca desde
+// el tablero del depósito y entra por la tarjeta, así que si no se vuelve, el
+// `entrarAlLocal` de abajo busca una tarjeta que no está en pantalla — y el
+// error que tira no dice "te quedaste en otra ruta", dice que no encontró el
+// aria-label, que apunta a la tarjeta y no al lugar.
+await abrir(RUTA_CUENTA_MOVIL, "LOCALES");
 
 await entrarAlLocal("Local V15");
 
@@ -868,7 +1068,7 @@ await foto(`v32-detalle-${ANCHO}`);
 // No es lo mismo que "no hay período". El período está —siempre hay una semana
 // anterior— y lo que no hay es movimiento. Decir que falta el dato sería otra
 // cosa, y sería falsa.
-await abrir("/modulos/transferencias", "Transferencias");
+await abrir(RUTA_CUENTA_MOVIL, "Transferencias");
 await entrarAlLocal("Local V15 sin movimiento");
 await afirmar(
   await hayTexto("Semana cerrada ·"),
@@ -982,7 +1182,7 @@ await foto(`v29-guardado-${ANCHO}`);
 
 // Y el cambio se ve del otro lado: el local que se configuró deja de estar
 // marcado en la lista de trabajo, y el que no se tocó sigue marcado.
-await abrir("/modulos/transferencias", "Transferencias");
+await abrir(RUTA_CUENTA_MOVIL, "Transferencias");
 await afirmar(
   await hayTexto("Hay 1 local sin corte configurado"),
   "el aviso baja a uno: el que se configuró salió de la cuenta y el otro sigue"
@@ -1000,7 +1200,7 @@ await foto(`v40-ya-configurado-${ANCHO}`);
 // Se compara el RÓTULO, que es lo que se lee en pantalla. Cuál de los dos quedó
 // configurado no importa: lo que se afirma es que difieren.
 async function rangoCerradoDe(nombre) {
-  await abrir("/modulos/transferencias", "Transferencias");
+  await abrir(RUTA_CUENTA_MOVIL, "Transferencias");
   await entrarAlLocal(nombre);
   return evaluar(`(() => {
     const m = document.body.innerText.match(/Semana cerrada · ([^\\n]+)/);
@@ -1024,7 +1224,7 @@ await foto(`v40-corte-propio-${ANCHO}`);
 await entrarComo(LOCAL, "LOCAL");
 for (const alto of ALTOS) {
   await medir(alto);
-  await abrir("/modulos/transferencias", "Transferencias");
+  await abrir(RUTA_CUENTA_MOVIL, "Transferencias");
   // ── EL LOCAL VE LA MISMA PANTALLA QUE EL DEPÓSITO ────────────────────
   //
   // Hasta la V40 veía otra: chips arriba, el período EN CURSO y dos secciones
@@ -1049,10 +1249,10 @@ for (const alto of ALTOS) {
 // lista y el local directo, así que la barra de arriba dice distinto y las fotos
 // nunca serían idénticas. Lo que tiene que coincidir es de qué está hecha.
 await medir(ALTOS[0]);
-await abrir("/modulos/transferencias", "Para cobrar");
+await abrir(RUTA_CUENTA_MOVIL, "Para cobrar");
 const piezasDelLocal = await piezasDeLaCuenta();
 await entrarComo(DEPOSITO, "DEPÓSITO (para comparar)");
-await abrir("/modulos/transferencias", "Transferencias");
+await abrir(RUTA_CUENTA_MOVIL, "Transferencias");
 await entrarAlLocal("Local V15");
 const piezasDelDeposito = await piezasDeLaCuenta();
 await afirmar(
