@@ -26,12 +26,15 @@
 // dinámico. Es el mismo criterio que ya usa `corte-de-semana`.
 "use client";
 
+import { Suspense } from "react";
+
 import { useParams, useRouter } from "next/navigation";
 
 import { useUser } from "@/app/context/UserContext";
 import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
 import SinPermisos from "@/components/auth/SinPermisos";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
+import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
 import AccionDePantalla from "@/components/transferencias/AccionDePantalla";
 import CuentaDeUnLocal from "@/components/transferencias/CuentaDeUnLocal";
@@ -41,8 +44,32 @@ import {
   puedeConfigurarElCorte,
 } from "@/components/transferencias/corteDeSemana";
 import { money, useCuentaDeLocal } from "@/components/transferencias/useCuentaDeLocal";
+import { urlDelDetalle } from "@/lib/transferencias/contextoDelTablero";
 
+// ── EL LÍMITE DE SUSPENSE, Y POR QUÉ NO ES BUROCRACIA ───────────────────
+//
+// `useCuentaDeLocal` lee el período de la URL con `useSearchParams`, y Next pide
+// un `Suspense` alrededor de quien lo use. Sin él la página se comporta como si
+// la query no existiera: las flechas llamaban a `router.replace`, el arnés midió
+// diez clics y la barra seguía en `/modulos/transferencias/local/6`, sin
+// parámetros. El período no se movía y nada avisaba.
+//
+// Es el mismo envoltorio que tiene `/modulos/transferencias/cuenta`.
 export default function LocalDeTransferenciasPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-12">
+          <SunmiLoader />
+        </div>
+      }
+    >
+      <CuentaDelLocal />
+    </Suspense>
+  );
+}
+
+function CuentaDelLocal() {
   const { localId } = useParams();
   const router = useRouter();
   const { perfil, cargando: cargandoUsuario } = useUser();
@@ -67,7 +94,9 @@ export default function LocalDeTransferenciasPage() {
         money={money}
         puedeConfigurarCorte={puedeConfigurarElCorte(perfil?.permisos)}
         onConfigurarCorte={() => router.push(RUTA_CORTE_DE_SEMANA)}
-        onAbrirTransferencia={(t) => router.push(`/modulos/transferencias/${t.id}`)}
+        // Igual que en el tablero: el contexto viaja para poder volver acá, a
+        // este local y a este período.
+        onAbrirTransferencia={(t) => router.push(urlDelDetalle(t.id, cuenta.contexto))}
       />
     </div>
   );

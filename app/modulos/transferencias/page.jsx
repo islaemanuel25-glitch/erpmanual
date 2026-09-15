@@ -32,7 +32,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import {
   Settings2,
@@ -57,6 +57,8 @@ import TablaTransferencias from "@/components/transferencias/TablaTransferencias
 import CardTransferencia from "@/components/transferencias/CardTransferencia";
 import ReporteTransferenciasPorDestino from "@/components/transferencias/ReporteTransferenciasPorDestino";
 import TableroMovil from "@/components/transferencias/TableroMovil";
+import useEsEscritorio from "@/hooks/useEsEscritorio";
+import { RUTA_CUENTA } from "@/lib/transferencias/contextoDelTablero";
 
 const TZ_AR = "America/Argentina/Cordoba";
 
@@ -276,7 +278,31 @@ export default function TransferenciasPage() {
   // Se resuelve con dos ramas y no mudando el reporte a otro archivo porque son
   // 650 líneas de estado compartido —filtros, paginación, contexto de retorno—
   // y mudarlas sería una tanda entera con su propia superficie de error.
-  const [reporteEnMovil, setReporteEnMovil] = useState(false);
+  // ── EL TABLERO SE MUDÓ, Y ESTA RUTA LO MANDA PARA ALLÁ ─────────────────
+  //
+  // El tablero vivía acá, bajo un `lg:hidden`, compartiendo archivo con este
+  // reporte. Eso obligaba a elegir: el reporte decidió no escribir la URL —para
+  // no entrar en loops estado↔URL, y tiene razón— y el tablero necesita
+  // exactamente lo contrario para poder volver al período donde estabas.
+  //
+  // Ahora el tablero tiene su ruta, `/modulos/transferencias/cuenta`, y acá se
+  // redirige. Con `replace` y no `push`: esta pantalla es un puente, no un lugar
+  // al que volver con el back.
+  //
+  // El menú, los enlaces viejos y cualquier atajo guardado siguen llegando.
+  //
+  // `?reporte=1` es la puerta de atrás: el botón "Reporte" del tablero llega con
+  // ese parámetro y entonces NO se redirige. Sin eso, el teléfono se quedaba sin
+  // forma de abrir el reporte.
+  const esEscritorio = useEsEscritorio();
+  const pedidoDeReporte = useSearchParams().get("reporte") === "1";
+  const [reporteEnMovil, setReporteEnMovil] = useState(pedidoDeReporte);
+
+  useEffect(() => {
+    // `null` es "todavía no se sabe": no se decide con un valor inventado.
+    if (esEscritorio !== false || pedidoDeReporte) return;
+    router.replace(RUTA_CUENTA);
+  }, [esEscritorio, pedidoDeReporte, router]);
 
   const [items, setItems] = useState([]);
   const [estado, setEstado] = useState("");

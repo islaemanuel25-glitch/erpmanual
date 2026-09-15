@@ -18,7 +18,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import { useAccionDePagina } from "@/app/context/AccionDePaginaContext";
@@ -27,6 +27,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
+import { urlDeVuelta, vinoDelTablero } from "@/lib/transferencias/contextoDelTablero";
 
 import SinPermisos from "@/components/auth/SinPermisos";
 import EstadoTransferenciaBadge, { DiferenciasBadge } from "@/components/transferencias/EstadoTransferenciaBadge";
@@ -63,6 +64,8 @@ function fmtFechaHoraAR(iso) {
 export default function TransferenciaDetallePage() {
   const { id } = useParams();
   const router = useRouter();
+  // La query trae el contexto del tablero cuando se vino de ahí.
+  const params = useSearchParams();
   const { contexto } = useContextoActivo();
 
   const [item, setItem] = useState(null);
@@ -174,7 +177,24 @@ export default function TransferenciaDetallePage() {
   // El hook va acá arriba, con los demás: `if (!me) return` está más abajo y un
   // hook detrás de un retorno temprano cambia la cantidad de hooks entre
   // renders. Es el defecto que ya rompió esta pantalla una vez.
-  useAccionDePagina(() => <SunmiBackButton href={LISTADO} />, []);
+  // ── A DÓNDE VUELVE, Y POR QUÉ NO ES SIEMPRE EL MISMO LADO ──────────────
+  //
+  // A esta pantalla se llega por DOS caminos y cada uno tiene su retorno:
+  //
+  //   · desde el TABLERO del teléfono, que manda su contexto en la URL —local,
+  //     chip y período— y espera volver exactamente ahí. Antes no lo mandaba y
+  //     volver caía en el período de hoy: con 33 transferencias sin recibir de
+  //     una semana pasada, eso era renavegar 33 veces.
+  //   · desde la TABLA del reporte de escritorio, que dejó su contexto en
+  //     `sessionStorage` y lo hidrata al montarse. Ése funciona y no se toca.
+  //
+  // `SunmiBackButton` NO se modifica: son 39 archivos y ya hay precedente —el
+  // detalle de Productos le pasa un `returnUrl` armado, por esta misma razón—.
+  const destinoDeVuelta = vinoDelTablero(params) ? urlDeVuelta(params) : LISTADO;
+  useAccionDePagina(
+    () => <SunmiBackButton href={destinoDeVuelta} />,
+    [destinoDeVuelta]
+  );
 
   /**
    * Imprimir el ticket en la impresora del POS.
@@ -275,7 +295,7 @@ export default function TransferenciaDetallePage() {
   // acá no hace falta reenviarlo. Por eso NO se usa un href fijo suelto: se
   // navega con el router para que el listado se monte y lo hidrate.
   const volver = () => {
-    router.push(LISTADO);
+    router.push(destinoDeVuelta);
   };
 
   if (!me) return <div className="p-4 sunmi-text-muted">Cargando usuario...</div>;

@@ -22,10 +22,17 @@
 // `-1`, no `0`. La pregunta de esta pantalla es cuánto hay que cobrar, y eso se
 // contesta con el período TERMINADO. El en curso está a una flecha.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 
 import { CLAVE_OTRO } from "./ChipsDePeriodo";
 import { UNIDADES } from "@/lib/transferencias/periodoDePago";
+import {
+  DESPLAZAMIENTO_POR_DEFECTO as DEFECTO,
+  parseContextoDelTablero,
+  serializarContextoDelTablero,
+} from "@/lib/transferencias/contextoDelTablero";
 
 /** El mismo formato de importe que el resto del módulo. */
 export function money(n) {
@@ -35,12 +42,56 @@ export function money(n) {
   })}`;
 }
 
-/** El período que la pantalla abre: el que acaba de cerrar. */
-export const DESPLAZAMIENTO_POR_DEFECTO = -1;
+/**
+ * El período que la pantalla abre: el que acaba de cerrar.
+ *
+ * Se re-exporta desde `contextoDelTablero`, que es donde vive ahora: lo necesita
+ * también quien lee la URL, para saber si hay algo distinto del default que
+ * valga la pena escribir. Dos constantes con el mismo número en dos archivos es
+ * cómo se separan.
+ */
+export const DESPLAZAMIENTO_POR_DEFECTO = DEFECTO;
 
+/**
+ * ── EL PERÍODO VIVE EN LA URL, NO EN `useState` ─────────────────────────
+ *
+ * Vivía acá adentro, y por eso entrar a una transferencia y volver caía siempre
+ * en el período de hoy: al desmontar la pantalla el estado se pierde POR
+ * CONSTRUCCIÓN. Con 33 transferencias sin recibir de una semana pasada, eso era
+ * renavegar 33 veces.
+ *
+ * Ahora la URL manda. El estado de React queda como ESPEJO de lo que dice la
+ * barra —no como fuente— así que el back del navegador, el botón "Volver" y un
+ * enlace pegado hacen todos lo mismo.
+ *
+ * ── LAS FLECHAS USAN `replace`, Y NO ES UN DETALLE ──────────────────────
+ *
+ * Con `push`, diez flechas serían diez entradas en el historial y el back del
+ * navegador te haría recorrerlas una por una en vez de salir de la pantalla.
+ * `replace` deja UNA. El `push` se guarda para entrar al detalle, que sí es un
+ * lugar distinto.
+ */
 export function useCuentaDeLocal({ destino = null } = {}) {
-  const [unidad, setUnidad] = useState(UNIDADES.SEMANA);
-  const [desplazamiento, setDesplazamiento] = useState(DESPLAZAMIENTO_POR_DEFECTO);
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+
+  // La URL es la fuente. `useMemo` sobre la cadena y no sobre el objeto: el
+  // objeto que devuelve `useSearchParams` cambia de identidad en cada render.
+  const ctx = useMemo(() => parseContextoDelTablero(params), [params]);
+  const unidad = ctx.unidad;
+  const desplazamiento = ctx.desp;
+
+  const escribirUrl = useCallback(
+    (siguiente) => {
+      const qs = serializarContextoDelTablero({ ...ctx, ...siguiente, local: null });
+      // `scroll: false` para que cambiar de período no salte al principio de la
+      // lista: lo que cambió es el rango, no el lugar donde estaba mirando.
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    },
+    [ctx, pathname, router]
+  );
+
   const [datos, setDatos] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -85,16 +136,35 @@ export function useCuentaDeLocal({ destino = null } = {}) {
   }, [cargar]);
 
   /** Cambiar de unidad VUELVE al período por defecto. Ver el encabezado. */
-  const onCambiarUnidad = useCallback((u) => {
-    setUnidad(u);
-    setDesplazamiento(DESPLAZAMIENTO_POR_DEFECTO);
-  }, []);
+  const onCambiarUnidad = useCallback(
+    (u) => escribirUrl({ unidad: u, desp: DEFECTO }),
+    [escribirUrl]
+  );
 
   // Los topes los decide el SERVIDOR —`puedeAvanzar` y `puedeRetroceder`— y acá
   // solo se respeta lo que contestó. Dejar que la pantalla calcule el suyo sería
   // tener dos reglas para lo mismo, y la de la pantalla no conoce los datos.
-  const onAtras = useCallback(() => setDesplazamiento((d) => d - 1), []);
-  const onAdelante = useCallback(() => setDesplazamiento((d) => Math.min(0, d + 1)), []);
+  const onAtras = useCallback(
+    () => escribirUrl({ desp: desplazamiento - 1 }),
+    [escribirUrl, desplazamiento]
+  );
+  const onAdelante = useCallback(
+    () => escribirUrl({ desp: Math.min(0, desplazamiento + 1) }),
+    [escribirUrl, desplazamiento]
+  );
 
-  return { datos, cargando, error, unidad, onCambiarUnidad, onAtras, onAdelante, recargar: cargar };
+  return {
+    datos,
+    cargando,
+    error,
+    unidad,
+    onCambiarUnidad,
+    onAtras,
+    onAdelante,
+    recargar: cargar,
+    // El contexto, para que la pantalla pueda armar la URL del detalle con él.
+    // Lleva el `destino` adentro: es el local cuya cuenta se está mirando, y es
+    // lo que decide a dónde vuelve el botón.
+    contexto: { unidad, desp: desplazamiento, local: destino ? Number(destino) : null },
+  };
 }

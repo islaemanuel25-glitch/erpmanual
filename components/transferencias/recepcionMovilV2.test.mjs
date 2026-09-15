@@ -82,13 +82,34 @@ test("2. el teléfono NO dibuja «Volver al listado»", () => {
 
 test("3. el «Volver» del teléfono usa el slot del shell y SunmiBackButton", () => {
   const pagina = codigoDe(PAGINA);
+  // ── EL DESTINO DEJÓ DE SER FIJO, Y ESO ES EL ARREGLO ──────────────────
+  //
+  // Afirmaba el literal `href={LISTADO}`. Eso era incidental: lo que este
+  // candado defiende es que la pantalla use el SLOT del shell y el botón del
+  // KIT, y que no se invente un mecanismo propio.
+  //
+  // El destino ahora se calcula, porque a esta pantalla se llega por dos
+  // caminos: del tablero del teléfono —que manda su contexto en la URL y espera
+  // volver a ese período— y de la tabla de escritorio, que tiene su retorno en
+  // `sessionStorage`. Volver siempre al listado pelado era el defecto:
+  // reaparecía el período de hoy y había que renavegar.
   assert.match(
     pagina,
-    /useAccionDePagina\(\(\) => <SunmiBackButton href=\{LISTADO\} \/>, \[\]\)/,
+    /useAccionDePagina\(\s*\(\) => <SunmiBackButton href=\{destinoDeVuelta\} \/>/,
     "la pantalla no registra su acción en el slot genérico del shell"
+  );
+  assert.match(
+    pagina,
+    /const destinoDeVuelta = vinoDelTablero\(params\) \? urlDeVuelta\(params\) : LISTADO/,
+    "el destino dejó de distinguir de dónde se vino: uno de los dos retornos se rompe"
   );
   assert.match(pagina, /from "@\/app\/context\/AccionDePaginaContext"/);
   assert.match(pagina, /from "@\/components\/sunmi\/SunmiBackButton"/);
+  // Y el botón del kit sigue sin tocarse: lo que cambia es quién le pasa el href.
+  assert.ok(
+    !/SunmiBackButton\s*=|function SunmiBackButton/.test(pagina),
+    "la pantalla redefinió el botón en vez de pasarle el destino"
+  );
 
   // Y no se inventó un mecanismo propio ni se tocó el shell.
   assert.ok(!/AccionDePaginaProvider/.test(pagina), "la pantalla no monta su propio proveedor");

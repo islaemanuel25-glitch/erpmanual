@@ -41,8 +41,9 @@ import { money, useCuentaDeLocal } from "./useCuentaDeLocal";
 import { useUser } from "@/app/context/UserContext";
 import { useAccionDePagina } from "@/app/context/AccionDePaginaContext";
 import { RUTA_CORTE_DE_SEMANA, puedeConfigurarElCorte } from "./corteDeSemana";
+import { urlDelDetalle } from "@/lib/transferencias/contextoDelTablero";
 
-export default function TableroMovil({ onAbrirReporte }) {
+export default function TableroMovil({ onAbrirReporte = null }) {
   const router = useRouter();
   const { perfil } = useUser();
   // El atajo solo se ofrece a quien puede usarlo. Un "Configurar" que lleva a
@@ -63,17 +64,21 @@ export default function TableroMovil({ onAbrirReporte }) {
   // pantalla y pone a su derecha lo que la pantalla registre acá, así que en un
   // teléfono "Reporte" no cuesta un renglón propio ni obliga a repetir la
   // palabra "Transferencias".
+  //
+  // En su ruta propia no hay reporte al que ir —vive en `/modulos/transferencias`,
+  // que es de escritorio— así que sin `onAbrirReporte` el botón no se registra.
   const botonDeReporte = useAccionDePagina(
-    () => (
-      <SunmiButton
-        type="button"
-        color="slate"
-        onClick={onAbrirReporte}
-        className={CLASE_ACCION_DE_PANTALLA}
-      >
-        Reporte
-      </SunmiButton>
-    ),
+    () =>
+      onAbrirReporte ? (
+        <SunmiButton
+          type="button"
+          color="slate"
+          onClick={onAbrirReporte}
+          className={CLASE_ACCION_DE_PANTALLA}
+        >
+          Reporte
+        </SunmiButton>
+      ) : null,
     [onAbrirReporte]
   );
 
@@ -117,7 +122,11 @@ export default function TableroMovil({ onAbrirReporte }) {
           money={money}
           puedeConfigurarCorte={puedeConfigurar}
           onConfigurarCorte={() => router.push(RUTA_CORTE_DE_SEMANA)}
-          onAbrirTransferencia={(t) => router.push(`/modulos/transferencias/${t.id}`)}
+          // EL CONTEXTO VIAJA CON EL LINK. Sin esto, volver del detalle caía en
+          // el período de hoy: la pantalla se remonta y el estado arranca en su
+          // valor por defecto. Es un `push` —el detalle SÍ es otro lugar— y las
+          // flechas usan `replace`, que es lo que deja una sola entrada.
+          onAbrirTransferencia={(t) => router.push(urlDelDetalle(t.id, cuenta.contexto))}
         />
       )}
     </div>
