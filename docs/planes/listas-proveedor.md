@@ -6,6 +6,49 @@ migraciones. Lo único que se escribió es este documento.
 
 ---
 
+## 0 · Dónde se hizo esto, y qué se tocó en el VPS
+
+**Todo este relevamiento se corrió en el VPS de producción, `srv1431538`, y ese
+fue un error: correspondía la máquina de desarrollo.** Se deja escrito porque
+explica qué se pudo medir y qué no.
+
+Lo que se creó en el VPS durante la investigación, y su estado ahora:
+
+- Una base `erpazul_plan_listas`, restaurada del backup del día para no leer
+  contra producción. **Borrada.** `psql -l` ya no la lista.
+- Un contenedor `erpazul_plan_app` sirviendo la aplicación contra esa copia.
+  **Eliminado.** Solo quedan `erpazul_app` y `erpazul_db`, los dos de producción.
+- Dos scripts temporales en `scripts/` —`.recorrido-listas.mjs` y
+  `.detalle-listas.mjs`—. **Borrados**, y el árbol del repo quedó limpio.
+- Capturas y logs en `/tmp`, fuera del repo.
+
+**Producción no se tocó en ningún momento**: las únicas consultas contra la base
+`erpazul` fueron `SELECT`.
+
+**Lo que este error costó, y es la mitad del encargo:** la base `erpazul_al` y la
+carpeta `erpazul-fixtures-dev` **no existen en el VPS** —comprobado con `psql -l`
+y con `find` sobre `/home/emanuel`—, y desde acá no hay ruta a la máquina de
+desarrollo: el `~/.ssh/config` solo tiene GitHub, y ninguna de las sesiones
+visibles corre allá. Así que el circuito completo con los Excel de verdad quedó
+**sin recorrer**, y con él la parte de la evaluación de uso que necesita
+cronómetro. Está marcado caso por caso más abajo.
+
+### Lo que falta correr, y es lo primero de la próxima tanda
+
+En la máquina de desarrollo, contra `erpazul_al`, con los archivos de
+`erpazul-fixtures-dev` —el de agosto, hash `d0d283f2…`, que es el mismo de la
+importación #3, y el de códigos de barras—:
+
+1. Subir el de agosto y conciliar de cero, cronometrando.
+2. Confirmar lecturas sobre las filas que el sistema no resolvió.
+3. Aplicar, revertir y terminar.
+4. Cargar después la lista siguiente del mismo proveedor, que es lo que hace un
+   usuario real y es donde aparece el problema de encontrar la lista anterior.
+
+Contando toques y pantallas en cada paso, a 360 px.
+
+---
+
 ## 1 · Cómo funciona hoy, en criollo
 
 El proveedor manda un Excel con su lista de precios. El módulo lo lee, lo compara
@@ -221,7 +264,149 @@ volver a ejercer el circuito completo con datos verdaderos.**
 
 ---
 
-## 5 · El plan
+## 5 · Evaluación de uso
+
+El usuario no es técnico, trabaja en un Sunmi de 360 px y va a subir **más de
+diez listas por día** entre Emanuel y los locales. Todo lo de abajo se mira con
+ese usuario en la cabeza, no con el de escritorio.
+
+Cada punto dice **cómo se midió**. Donde dice *pendiente*, es de lo que quedó
+bloqueado por haber corrido esto en el VPS.
+
+### 5.1 · Cuántos toques lleva la tarea típica
+
+La tarea típica es "subir una lista y aplicar lo que está bien". Contado
+**leyendo las tres pantallas**, sin ninguna fila que decidir, el camino más corto
+es: Compras → Listas → Nueva importación → elegir proveedor → elegir archivo →
+Importar → esperar → Aplicar → confirmar → Terminar → confirmar.
+
+Son **cinco pantallas** —listado, nueva, detalle, y dos confirmaciones— y del
+orden de **diez toques**, de los cuales dos son confirmaciones de "¿seguro?".
+
+*Pendiente de confirmar con cronómetro en el recorrido real*, junto con lo que
+más importa y no se puede deducir del código: **cuánto tarda la conciliación de
+917 filas**. Ese tiempo es el que decide si diez listas por día son media hora o
+son la mañana entera, y hoy no lo sabemos.
+
+### 5.2 · Pantalla por pantalla
+
+**El listado.** Se entiende. Dice qué es el módulo y tiene un botón grande de
+"Nueva importación". Dos problemas, los dos medidos leyendo la pantalla: el
+titular miente —problema 3— y **no hay ninguna forma de buscar**. El único
+control es una casilla "Ver también las canceladas", y la casilla mide **14 × 14
+píxeles** (`h-4 w-4`, y en este proyecto `1rem` son 14 px). En un Sunmi eso es un
+blanco que se falla.
+
+**Nueva importación.** Se entiende lo importante —"No se modifica ningún precio
+todavía"— pero pide dos números que un usuario no técnico no sabe contestar:
+"Recargo que se aplica" (viene en 5,00 %) y **"Umbral de variación"**. El segundo
+es jerga: no dice qué pasa si lo sube o lo baja.
+
+**El detalle.** Es la pantalla del trabajo y es la más cargada: a 360 px muestra
+**siete tarjetas de números** —listos, necesitan que decidas, actualizados, sin
+código guardado, con código pero la lista no lo trajo, discontinuados— antes de
+llegar a nada que se pueda hacer. El encabezado de una terminada miente
+(problema 1).
+
+**El panel de decisión**, que es donde se resuelve fila por fila, es el peor y
+está en 5.3.
+
+### 5.3 · Las decisiones que el módulo le pide al usuario
+
+**Cuántas.** Sobre la lista real de agosto —la importación #4, 972 filas— el
+sistema resolvió solo casi todo y dejó **230 filas "necesitan que decidas"**
+contra **1 sola lista para aplicar**. En la #3, con 917 filas, dejó 1. Medido
+leyendo la pantalla de detalle de cada una contra la copia de producción.
+
+Doscientas treinta decisiones es el número que define este módulo. Todo lo demás
+del plan es chico al lado.
+
+**Si se pueden resolver desde el celular.** Se pueden tocar, pero el texto está
+escrito para alguien que conoce el dominio. Estas son cadenas reales que el
+usuario ve, sacadas del código:
+
+- `UxBU 12 · dato logístico` — en el panel de decisión y en las piezas de la
+  lista. "UxBU" no se explica en ninguna parte.
+- `· factor 6` — al vincular un producto.
+- `"Precio del bulto"` y `"Precio del display"` como las dos opciones entre las
+  que hay que elegir. Un display no es una palabra del mostrador.
+- `"gramaje, factor o variación alta"` como explicación de por qué una fila tiene
+  alerta.
+- `Macheo`, `macheo` — el panel se llama así.
+- El buscador de productos dice `"Buscar por nombre, SKU o código de barras"`.
+
+Son seis términos que el usuario no puede contestar sin que alguien se los
+explique, y aparecen justo en la pantalla donde tiene que tomar 230 decisiones.
+
+**Cuánto llevaría.** *Pendiente de cronometrar.* Lo que sí se puede afirmar sin
+cronómetro: aunque cada decisión llevara diez segundos —optimista, porque hay que
+leer dos precios y elegir—, 230 filas son **cerca de 40 minutos de una sola
+lista**, en un teléfono, tocando de a una. Con diez listas por día eso no cierra.
+
+### 5.4 · El listado con diez listas por día
+
+**No se sostiene, y no hace falta esperar a tener cien para saberlo.** La pantalla
+no tiene buscador, no tiene filtro por proveedor y no tiene filtro por estado: lo
+único que ofrece es paginación y la casilla de canceladas. Medido leyendo
+`app/modulos/proveedores/listas/page.jsx`: el único `input` de la pantalla es esa
+casilla.
+
+Con diez por día, al tercer día la lista de ayer del mismo proveedor ya está en
+la página dos. La forma de encontrarla es acordarse de la fecha y paginar.
+
+### 5.5 · Frontend
+
+Medido con `node scripts/hardcodeo.mjs --ficha proveedores`, que es la
+herramienta del repo:
+
+- **398 hallazgos en 24 archivos.** Los que importan: **27 `<button>` crudos**
+  donde va `SunmiButton`, **8 `<input>` crudos** donde va `SunmiInput`, y **39
+  `<td>` escritos a mano** donde va `SunmiTable`. Buena parte cae justo en las
+  pantallas de listas: el detalle, la nueva y el listado aparecen nombrados con
+  línea y todo.
+- **Un color fijo** fuera de los tokens del tema, en un modal de proveedores.
+- **Errores en consola: ninguno.** En las cuatro pantallas, a 360 y a 1366, el
+  único error de red es un 404 de `/favicon.ico`.
+- **Tamaños de toque:** el único medido es la casilla de canceladas, 14 × 14 px,
+  muy por debajo de lo que se puede tocar con el pulgar. El resto *pendiente*.
+- **Contraste:** *pendiente*, necesita el navegador con la hoja real.
+
+---
+
+## 6 · Veredicto
+
+**¿Cumple su finalidad?** Sí. El motor anda: concilia 917 filas, propone costos,
+no escribe nada hasta que alguien aplica, deja aplicar por tandas, y se puede
+deshacer. Los números de la pantalla de detalle cierran contra la base. Eso es lo
+difícil y está hecho.
+
+**¿Es fácil de usar para el usuario descrito?** **No.** Por tres motivos, en
+orden de peso:
+
+1. **Le pide 230 decisiones por lista, de a una, en un teléfono.** Con diez
+   listas por día el trabajo no entra en el día. Este solo motivo alcanza.
+2. **Esas decisiones están escritas en un idioma que ese usuario no habla**:
+   UxBU, factor, display, macheo, gramaje. No es que estén mal explicadas: no
+   están explicadas.
+3. **El listado deja de servir a la semana**, porque no se puede buscar.
+
+Nada de esto es un defecto de programación: el módulo hace lo que dice. Es que
+está diseñado para alguien que entiende el dominio del proveedor, y el que lo va
+a usar no es esa persona.
+
+Por eso el plan cambia de forma: las tres tandas técnicas siguen, pero **el grueso
+del trabajo pasa a ser de uso**, y va antes de cualquier higiene.
+
+---
+
+## 7 · El plan
+
+Siete tandas. Las tres primeras son las técnicas del relevamiento anterior y
+quedan en ese orden; después van las de uso, que son las que deciden si el
+módulo sirve. **La tanda de sacar los dos estados del enum sale del plan** y pasa
+al roadmap como higiene: no arregla nada que se note, es la única que necesita
+migración, y no corresponde gastar un corte de producción en ella mientras el
+usuario no pueda terminar una lista.
 
 ### Tanda 1 — Guardar el archivo original, siempre
 
@@ -231,104 +416,182 @@ deja de ser `null`. Sin retención corta: se guardan todos y no se borran solos.
 **Decisión tomada:** se reusa `lib/compras-proveedor/comprobante/almacenDisco.js`,
 que ya resuelve lo difícil —centinela para no escribir en un volumen sin montar,
 aviso al arrancar sin tumbar la aplicación, y `exigirAlmacen()` antes de cada
-escritura— en vez de escribir un segundo almacén al lado. Lo que hace falta es
+escritura— en vez de escribir un segundo almacén al lado. Hace falta
 generalizarlo para que acepte otra variable de ruta además de
-`COMPROBANTES_VOLUMEN_PATH`; hoy esa constante está fija adentro del archivo.
+`COMPROBANTES_VOLUMEN_PATH`, que hoy está fija adentro del archivo.
 
-**Archivos.** `lib/compras-proveedor/comprobante/almacenDisco.js` (parametrizar la
-variable de ruta), un `lib/proveedores/listas/almacenArchivo.js` fino que lo use,
-`app/api/proveedores/listas/importar/route.js` (escribir el binario y guardar la
-ruta), `docker-compose.prod.yml` (un volumen `erpazul_listas`), y el comentario
-del schema, que hoy afirma algo que dejó de ser cierto.
+**Archivos.** `lib/compras-proveedor/comprobante/almacenDisco.js`, un
+`lib/proveedores/listas/almacenArchivo.js` fino que lo use,
+`app/api/proveedores/listas/importar/route.js`, `docker-compose.prod.yml` (un
+volumen `erpazul_listas`) y el comentario del schema, que hoy afirma algo que
+dejó de ser cierto.
 
-**Migración: no.** La columna ya existe y es nullable.
+**Migración: no.** La columna existe y es nullable.
 
-**Cómo se prueba.** Candados sobre el almacén parametrizado, incluida la
-contraprueba de que sin volumen montado la importación FALLA en vez de guardar a
-medias. Y el circuito completo en el navegador contra una copia de producción:
-subir un Excel, comprobar que el archivo quedó en el volumen y que la fila lo
-apunta. Ese mismo Excel queda como insumo para poder ejercer la conciliación de
-cero, que hoy no se puede.
+**Cómo se prueba.** Candados sobre el almacén parametrizado, con la contraprueba
+de que sin volumen montado la importación FALLA en vez de guardar a medias. Y el
+circuito completo en el navegador contra `erpazul_al`, **en la máquina de
+desarrollo**, con el Excel de `erpazul-fixtures-dev`.
 
 ### Tanda 2 — Que la pantalla no diga que hay trabajo cuando está cerrado
 
 **Qué se hace.** El encabezado del detalle y las tarjetas de arriba dejan de
-hablar de trabajo pendiente cuando la importación no está abierta. Una TERMINADA
-dice qué quedó sin aplicar, en pasado y sin llamar a la acción.
+hablar de trabajo pendiente cuando la importación no está abierta.
 
-**Decisión tomada:** la pantalla no decide esto por su cuenta. La pregunta
-"¿esta importación acepta trabajo?" ya está contestada por `esImportacionAbierta`
-en `persistencia.js`, y es esa la que manda. El texto se arma en una función con
-candados, no adentro del JSX.
+**Decisión tomada:** la pregunta "¿esta importación acepta trabajo?" ya la
+contesta `esImportacionAbierta` en `persistencia.js`, y es esa la que manda. El
+texto se arma en una función con candados, no adentro del JSX.
+
+**Cómo queda la pantalla.** Una importación terminada abre diciendo, en texto
+normal y sin color de alerta, qué pasó: cuántos productos se actualizaron y
+cuántas filas quedaron sin resolver, en pasado. La tarjeta "Listos para aplicar"
+no se resalta ni invita a nada. Lo único que se ofrece es ver el reporte o
+deshacer.
 
 **Archivos.** `app/modulos/proveedores/listas/[id]/page.jsx` y una función nueva
-en `lib/proveedores/listas/` para el texto del encabezado, con su candado.
+en `lib/proveedores/listas/` con su candado. **Migración: no.**
 
-**Migración: no.**
-
-**Cómo se prueba.** Candados sobre el texto para los cinco estados que el circuito
-produce. Y capturas del detalle de una TERMINADA y de una PARCIALMENTE_APLICADA a
-360 y 1366, contra la copia de producción, comprobando que la primera no invita a
-aplicar nada.
+**Cómo se prueba.** Candados sobre el texto para los cinco estados que el
+circuito produce, y el detalle de una TERMINADA y una PARCIALMENTE_APLICADA a
+360 y 1366.
 
 ### Tanda 3 — Que el total del listado sea el número real
 
-**Qué se hace.** La tapa deja de sumar los conteos por importación y pasa a contar
-productos distintos una sola vez.
+**Qué se hace.** La tapa deja de sumar los conteos por importación y pasa a
+contar productos distintos una sola vez.
 
-**Decisión tomada:** el conteo se hace en el servidor, en la misma consulta que ya
-cuenta por importación, y no sumando en el navegador. La pantalla no puede saber
-qué productos se repiten entre dos importaciones: solo recibe números.
+**Decisión tomada:** el conteo se hace en el servidor, en la misma consulta que
+ya cuenta por importación. La pantalla no puede saber qué productos se repiten
+entre dos listas: solo recibe números.
 
-**Archivos.** `app/api/proveedores/listas/route.js` (un conteo global además de
-los por importación) y `app/modulos/proveedores/listas/page.jsx` (mostrarlo en vez
-de sumar).
+**Archivos.** `app/api/proveedores/listas/route.js` y
+`app/modulos/proveedores/listas/page.jsx`. **Migración: no.**
 
+**Cómo se prueba.** Contra una copia de producción, donde la respuesta correcta
+se conoce: 279. Más un candado con dos importaciones que comparten productos.
+
+### Tanda 4 — El idioma: sacar la jerga de las pantallas
+
+**Qué se hace.** Se traducen los seis términos que el usuario no puede contestar.
+Es la tanda más barata del plan y la que más cambia la experiencia, porque sin
+ella las 230 decisiones no se pueden tomar aunque la pantalla sea cómoda.
+
+**Decisión tomada, término por término:**
+
+- `UxBU 12 · dato logístico` → **"vienen 12 por bulto"**.
+- `factor 6` → **"1 bulto = 6 unidades"**.
+- `"Precio del bulto"` / `"Precio del display"` → **"Precio del bulto (12 u.)"**
+  y **"Precio de la caja chica (3 u.)"**, con la cantidad real adentro del
+  rótulo: lo que hace entendible la opción no es el nombre, es el número.
+- `Macheo` → **"Coincidencias"**.
+- `"gramaje, factor o variación alta"` → **"el peso, la cantidad por bulto o un
+  salto de precio grande"**.
+- `"Umbral de variación"` → **"Avisame si un costo sube más de X %"**.
+
+Los textos van en un módulo de `lib/proveedores/listas/` con candados, no
+sueltos en el JSX: son decisiones de redacción y se van a querer ajustar.
+
+**Archivos.** `components/proveedores/listas/PanelDecision.jsx`,
+`PiezasListas.jsx`, `PanelVincular.jsx`, `PanelAplicar.jsx`, `PanelMacheo.jsx`,
+`app/modulos/proveedores/listas/nueva/page.jsx`, y el módulo de textos nuevo.
 **Migración: no.**
 
-**Cómo se prueba.** Contra la copia de producción, donde la respuesta correcta se
-conoce: 279. Candado sobre el armado del número con dos importaciones que
-comparten productos, que es el caso que hoy da mal.
+**Cómo se prueba.** Un candado que recorre las pantallas del módulo y se pone
+rojo si vuelve a aparecer alguno de los seis términos en texto visible. Es el
+mismo mecanismo del trinquete: lo que no se mide, vuelve.
 
-### Tanda 4 — Sacar del enum lo que nadie produce
+### Tanda 5 — La cola de decisiones, pensada para el pulgar
 
-**Qué se hace.** Se sacan `APLICADA` y `DESCARTADA`, y con ellos la comparación
-inalcanzable de `finalizar/route.js`.
+**Qué se hace.** Es la tanda grande y la que define si el módulo sirve. Hoy 230
+decisiones se toman de a una, abriendo un panel por fila, dentro de una pantalla
+que además muestra siete tarjetas de números.
 
-**Decisión tomada:** se hace ÚLTIMA y sola. Un enum de Postgres no se recorta
-sin migración, y es la única tanda del plan que toca la base: conviene que salga
-cuando las otras tres ya estén andando. Antes de sacarlos se vuelve a contar en
-producción que sigan en cero, porque el relevamiento tiene fecha.
+**Decisión tomada:** una **cola a pantalla completa**. Se entra una vez —"Resolvé
+las 230"— y a partir de ahí cada fila ocupa la pantalla entera: arriba el
+producto y lo que trajo la lista, en el medio las dos o tres opciones como
+botones grandes con su precio adentro, y abajo "Saltear". Al elegir, pasa sola a
+la siguiente. Un contador arriba dice "12 de 230". Se puede salir cuando sea y al
+volver retoma donde estaba.
 
-**Archivos.** `prisma/schema.prisma`, `lib/proveedores/listas/persistencia.js`,
-`app/api/proveedores/listas/[id]/finalizar/route.js` y una migración.
+**Y la decisión que más tiempo ahorra: resolver en lote lo que se repite.** Antes
+de la cola, la pantalla agrupa las filas que tienen la misma forma de duda —el
+mismo multiplicador, el mismo tipo de alerta— y ofrece resolverlas juntas: "138
+filas vienen por bulto de 12 · aplicar a todas". Lo que quede sin agrupar va a la
+cola de a una. Esto sale de los datos, no de una idea: de las 230 de la #4, hay
+que medir cuántas comparten forma, y ese conteo es el primer paso de la tanda.
 
-**Migración: SÍ**, y es de las que el clasificador va a marcar: recortar un enum
-no es aditivo. Va con el procedimiento de `/deploy` y su autorización explícita.
+**Archivos.** Una pantalla nueva bajo
+`app/modulos/proveedores/listas/[id]/decidir/`, `PanelDecision.jsx` como pieza
+reusada adentro, y una función de agrupamiento en `lib/proveedores/listas/` con
+sus candados. **Migración: no** — lo que se guarda por fila ya existe.
 
-**Cómo se prueba.** El conteo por estado en producción antes y después, y la suite
-completa. Si aparece aunque sea una fila con esos estados, la tanda se frena y se
-informa.
+**Cómo se prueba.** El conteo de grupos sobre las 230 filas reales de la #4,
+antes y después. Y el recorrido completo a 360 px en la máquina de desarrollo:
+entrar a la cola, resolver un lote, resolver tres de a una, salir, volver y
+comprobar que retomó donde estaba.
 
-### Orden y por qué
+### Tanda 6 — El listado con diez listas por día
 
-Primero el archivo, porque sin él no se puede volver a ejercer el circuito
-completo y las tandas que siguen se prueban a medias. Después las dos de
-pantalla, que son las que se ven todos los días y no tocan la base. La del enum
-al final, sola, porque es la única con migración y la única que no arregla nada
-que se note: ordena.
+**Qué se hace.** Buscador y filtros, y que cada tarjeta diga qué falta hacer.
+
+**Decisión tomada:** un campo de búsqueda por proveedor arriba de todo —que es
+como se busca, por proveedor y no por fecha—, un filtro de estado con tres
+opciones visibles como chips ("Abiertas", "Terminadas", "Canceladas") en vez de
+la casilla de 14 píxeles, y que la tarjeta de cada importación diga en una línea
+qué le falta: "230 esperando que decidas" o "terminada, 279 actualizados". Por
+defecto se abren las abiertas, que es lo que se va a buscar nueve de cada diez
+veces.
+
+**Archivos.** `app/modulos/proveedores/listas/page.jsx` y
+`app/api/proveedores/listas/route.js` (filtro por proveedor y por estado en la
+consulta, no en el navegador). **Migración: no.**
+
+**Cómo se prueba.** Con las cuatro importaciones de la copia de producción, que
+alcanzan para ejercer los tres filtros, y midiendo que los chips tengan un blanco
+tocable a 360.
+
+### Tanda 7 — Pasar las pantallas del módulo al kit
+
+**Qué se hace.** Los 27 `<button>`, los 8 `<input>` y los 39 `<td>` crudos pasan a
+las piezas del kit.
+
+**Decisión tomada:** va **última**, y no porque no importe: tocar 74 lugares de
+las mismas pantallas que las tandas 2, 4, 5 y 6 van a reescribir es trabajo
+tirado. Se hace cuando el dibujo esté decidido, y ahí se hace de una.
+
+**Archivos.** Los del módulo. **Migración: no.**
+
+**Cómo se prueba.** El trinquete tiene que BAJAR, y la pantalla tiene que quedar
+idéntica, comparada con capturas antes y después.
+
+### Fuera del plan: sacar los dos estados del enum
+
+`APLICADA` y `DESCARTADA` están en el enum y ninguna importación de producción
+las tiene. **Se anota como higiene en el roadmap y no entra en este plan**,
+porque no arregla nada que el usuario note y es la única que necesita migración
+—recortar un enum de Postgres no es aditivo— y por lo tanto su propio corte de
+producción. Cuando se haga, primero se vuelve a contar en producción que sigan en
+cero, porque el relevamiento tiene fecha.
 
 ---
 
-## 6 · Preguntas para Emanuel
+## 8 · Preguntas para Emanuel
 
-**Ninguna.** Todo lo que había que decidir se resolvió leyendo el repo o midiendo:
-dónde guardar el archivo —el volumen que ya existe—, qué número es el correcto
-para la tapa —279, y lo confirma el comentario del propio código—, y qué estados
-sobran —los que producción no tiene—. Lo de guardar siempre el archivo, sin
-retención corta, ya venía decidido en el encargo.
+Dos, y las dos son de negocio. Van con recomendación para que alcance con decir
+que sí.
 
-Lo único que conviene que sepas, y no es una pregunta: **el problema más grave que
-se sospechaba ya está arreglado y desplegado.** Una importación aplicada sí se
-puede terminar y cancelar; la #3 ya está cerrada por ese camino. Lo que queda es
-más chico de lo que parecía.
+**1 · ¿Cuánto vale tu tiempo contra la precisión, en las filas que el sistema no
+puede resolver solo?** Si alguna vez preferís "aplicá lo que estás casi seguro y
+mostrame después qué hiciste" antes que decidir 230 veces, el módulo puede
+resolver en lote mucho más de lo que resuelve hoy. *Recomendación: dejarlo como
+está por ahora —el sistema solo aplica lo que está seguro— y decidir esto recién
+cuando la tanda 5 mida cuántas de las 230 se pueden agrupar. Si se agrupan en
+diez o quince lotes, esta pregunta se cae sola.*
+
+**2 · "Precio de la caja chica": ¿es la palabra que usás?** Hoy la pantalla dice
+"display", que es la del proveedor. Necesito el nombre que usan en el mostrador
+para el paquete intermedio —el que no es bulto ni unidad—. *Recomendación: si no
+hay un nombre propio, va "Precio del paquete de 3", con la cantidad adentro; el
+número se entiende siempre y el nombre no.*
+
+Nada más. Todo lo demás se resolvió midiendo o leyendo el repo.
