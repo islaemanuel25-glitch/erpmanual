@@ -36,6 +36,7 @@ import { esComboBase } from "@/lib/combos/guards";
 import { OPCIONES_TX } from "@/lib/proveedores/listas/persistencia";
 import { recalcularContadores } from "@/lib/proveedores/listas/contadores";
 import { rangoValido } from "@/lib/proveedores/listas/rangoAumento";
+import { resolverParserDeProveedor } from "@/lib/proveedores/listas/registro";
 import {
   puedeConfirmarse,
   analizarFila,
@@ -100,6 +101,8 @@ export async function POST(req, context) {
         id: true, estado: true, recargoPct: true, umbralVariacionPct: true, localOperativoId: true,
         impuestoAdicionalPct: true,
         aumentoEsperadoMinPct: true, aumentoEsperadoMaxPct: true,
+        // Para saber QUIÉN enumera las lecturas de esta fila. Ver abajo.
+        proveedor: { select: { id: true, parserListaId: true } },
       },
     });
     if (!importacion) {
@@ -109,7 +112,16 @@ export async function POST(req, context) {
     const fila = await prisma.importacionListaFila.findFirst({
       where: { id: filaIdNum, importacionId },
     });
-    const permitido = puedeConfirmarse(fila, importacion);
+    // ── QUIÉN ENUMERA LAS LECTURAS ──────────────────────────────────────
+    //
+    // El mismo enumerador con el que se conciliaron las filas. Si acá se usara
+    // otro, la pantalla podría ofrecer una lectura que este endpoint rechaza por
+    // "no corresponde a lo que informa el archivo", que es justo el defecto que
+    // el comentario de `eleccionDeLectura.js` cuenta que ya ocurrió una vez.
+    const reg = resolverParserDeProveedor(importacion.proveedor);
+    const lecturasPosibles = reg.ok ? reg.config?.lecturasPosibles ?? null : null;
+
+    const permitido = puedeConfirmarse(fila, importacion, { lecturasPropias: Boolean(lecturasPosibles) });
     if (!permitido.ok) {
       return NextResponse.json(
         { ok: false, error: TEXTO_NO_CONFIRMABLE[permitido.motivo], codigo: permitido.motivo },
@@ -177,10 +189,11 @@ export async function POST(req, context) {
 
     const r = resultadoConfirmacion({
       fila, base, clave, cantidadPresentacion, recargoPct, rango, impuestoAdicionalPct,
+      lecturasPosibles,
       umbralVariacionPct: Number(importacion.umbralVariacionPct),
     });
     if (!r.ok) {
-      const analisis = analizarFila({ fila, base, recargoPct, rango, impuestoAdicionalPct });
+      const analisis = analizarFila({ fila, base, recargoPct, rango, impuestoAdicionalPct, lecturasPosibles });
       return NextResponse.json(
         { ok: false, error: r.motivo, hipotesis: analisis.evaluadas },
         { status: 400 }
