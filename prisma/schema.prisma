@@ -378,6 +378,35 @@ model Proveedor {
   umbralRevisarPct      Decimal? @db.Decimal(6, 3)
   umbralSospechaBajaPct Decimal? @db.Decimal(6, 3)
 
+  /// ── CONFIGURACIÓN DE LISTAS DE PRECIOS DE ESTE PROVEEDOR ──────────────
+  ///
+  /// El rango de aumento esperado, el recargo comercial y los impuestos que este
+  /// proveedor agrega por fuera de los de su lista. Hasta el 2026-09-16 vivían
+  /// escritos en el código y valían lo mismo para todos.
+  ///
+  /// NULL = no está configurado, y NO hay valor de fábrica: sin rango y sin
+  /// respuesta de impuestos, una lista de este proveedor NO se puede conciliar.
+  /// La pantalla de subir los pide la primera vez. Esa es la diferencia que un
+  /// DEFAULT en la base borraría, y es el mismo motivo por el que los dos
+  /// umbrales de arriba son nullable.
+  ///
+  /// El prefijo `lista` los separa de esos umbrales, que son del módulo de
+  /// comprobantes: dos pares de porcentajes sin prefijo se confunden, y los dos
+  /// deciden costos.
+  listaAumentoEsperadoMinPct Decimal? @db.Decimal(6, 3)
+  listaAumentoEsperadoMaxPct Decimal? @db.Decimal(6, 3)
+  listaRecargoPct            Decimal? @db.Decimal(6, 3)
+  listaImpuestoAdicionalPct  Decimal? @db.Decimal(6, 3)
+  /// ¿Ya se contestó si este proveedor tiene impuestos adicionales?
+  ///
+  /// NO SE DERIVA de `listaImpuestoAdicionalPct`. Un proveedor sin impuestos
+  /// adicionales carga 0 % a propósito, y eso es un hecho distinto de no haber
+  /// contestado todavía; sin este booleano los dos casos se guardarían igual.
+  /// Es la misma forma del `total` obligatorio del lector de comprobantes que
+  /// describe el CLAUDE.md: lo que puede faltar se pregunta aparte, con un
+  /// booleano que no se pueda derivar de los otros datos.
+  listaImpuestosDefinidos    Boolean  @default(false)
+
   /// Una receta POR GRUPO. `Proveedor` no tiene `grupoId` —es compartido entre
   /// grupos, y las tablas que cuelgan de él llevan el suyo—, así que desde acá
   /// se ven varias aunque cada grupo tenga una sola. La unicidad real la
@@ -3013,6 +3042,11 @@ model ImportacionListaProveedor {
   /// no toca productos ni filas ya confirmadas.
   aumentoEsperadoMinPct Decimal? @db.Decimal(6, 3)
   aumentoEsperadoMaxPct Decimal? @db.Decimal(6, 3)
+  /// El impuesto adicional CON EL QUE SE CONCILIÓ ESTA LISTA, copiado de la
+  /// configuración del proveedor al crearla. Misma razón que el rango de acá
+  /// arriba: cambiarle el impuesto al proveedor después no puede reescribir con
+  /// qué criterio se decidió una lista vieja.
+  impuestoAdicionalPct  Decimal? @db.Decimal(6, 3)
   /// Qué se hará con el precio de venta al aplicar. Se guarda desde ahora para
   /// que la decisión quede registrada junto a la propuesta; todavía no se usa.
   modoPrecioVenta    String  @default("NO_TOCAR")
