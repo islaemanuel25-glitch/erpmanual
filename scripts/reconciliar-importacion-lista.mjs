@@ -28,7 +28,7 @@ import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
 
 import { cargarDatosDeConciliacion } from "../lib/proveedores/listas/cargaErp.js";
 import { conciliarLista, TIPO_COINCIDENCIA, digitosDeSufijo } from "../lib/proveedores/listas/conciliarLista.js";
-import { CONFIG_ARCOR } from "../lib/proveedores/listas/configuraciones/arcor.js";
+import { resolverParserPorId } from "../lib/proveedores/listas/registro.js";
 import { filaAPersistir, contadoresDeCabecera, OPCIONES_TX } from "../lib/proveedores/listas/persistencia.js";
 
 const prisma = await crearClientePrisma({ nivel: ESCRITURA });
@@ -136,7 +136,16 @@ async function main() {
 
   // El recargo que vale es el GUARDADO en la importación, no el default de la
   // configuración: la propuesta que el usuario vio se calculó con ese.
-  const config = { ...CONFIG_ARCOR, recargoPct: Number(cab.recargoPct), umbralVariacionPct: Number(cab.umbralVariacionPct) };
+  // Y LA CONFIGURACIÓN SALE DEL LECTOR CON EL QUE SE LEYÓ ESTA LISTA. Con
+  // `CONFIG_ARCOR` fija, este script informaba sobre una lista genérica con las
+  // reglas de otro proveedor: la de Arcor veta toda fila cuya unidad comercial
+  // no sea UN, DI o BU, y un archivo cualquiera no trae esa columna.
+  const regLectura = resolverParserPorId(cab.parser);
+  if (!regLectura.ok) {
+    console.error(regLectura.error);
+    process.exit(2);
+  }
+  const config = { ...regLectura.config, recargoPct: Number(cab.recargoPct), umbralVariacionPct: Number(cab.umbralVariacionPct) };
 
   console.log(`
 UNIVERSO: ${datos.diagnostico.productosDelProveedor} productos del ERP asociados a este proveedor`);

@@ -37,7 +37,15 @@ import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
 import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { ESTADO_IMPORTACION, esImportacionAbierta } from "@/lib/proveedores/listas/persistencia";
-import { CONFIG_ARCOR } from "@/lib/proveedores/listas/configuraciones/arcor";
+// LA CONFIGURACIÓN SALE DEL PARSER CON EL QUE SE LEYÓ ESTA LISTA, NO DE ARCOR.
+//
+// Acá estaba `CONFIG_ARCOR` fija, de cuando el único lector que existía era el
+// de Arcor. La primera lista genérica que se aplicó OMITIÓ LAS 369 FILAS con
+// "no se pudo calcular el costo": la configuración de Arcor exige que la unidad
+// comercial de la fila sea UN, DI o BU, y un archivo cualquiera no trae esa
+// columna. La pantalla lo dijo sin mentir —"se actualizaron 0 productos"— y ésa
+// fue la única señal: los candados estaban todos en verde.
+import { resolverParserPorId } from "@/lib/proveedores/listas/registro";
 import { alertasDeFila, presentacionDe } from "@/lib/proveedores/listas/alertas";
 import {
   MODO_PRECIO_VENTA,
@@ -133,6 +141,9 @@ export async function GET(req, context) {
       where: { id: importacionId, grupoId },
       select: {
         id: true, estado: true, recargoPct: true, localOperativoId: true,
+        // CON QUÉ LECTOR SE LEYÓ. Sin este campo la previa calcularía con las
+        // reglas de Arcor sobre una lista que no es de Arcor.
+        parser: true,
         // El rango y el impuesto con los que se concilió: son los que
         // `revalidarFila` necesita para volver a elegir la lectura. Sin ellos
         // preguntaría sin rango y omitiría todas las filas.
@@ -141,6 +152,10 @@ export async function GET(req, context) {
     });
     if (!importacion) {
       return NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 });
+    }
+    const regPrevia = resolverParserPorId(importacion.parser);
+    if (!regPrevia.ok) {
+      return NextResponse.json({ ok: false, error: regPrevia.error }, { status: 409 });
     }
 
     const filas = await prisma.importacionListaFila.findMany({
@@ -167,7 +182,7 @@ export async function GET(req, context) {
     // evalúa cada fila que no tiene uno congelado. Sin ella, `revalidarFila`
     // preguntaría sin rango y omitiría todo.
     const contexto = { operandoEnLocalId: Number(localId), depositoLocalId, cabecera: importacion };
-    const configPrevia = { ...CONFIG_ARCOR, impuestoAdicionalPct: numeroONull(importacion.impuestoAdicionalPct) };
+    const configPrevia = { ...regPrevia.config, impuestoAdicionalPct: numeroONull(importacion.impuestoAdicionalPct) };
     const recargoPct = Number(importacion.recargoPct);
 
     let cantidad = 0;
@@ -251,6 +266,9 @@ export async function POST(req, context) {
       where: { id: importacionId, grupoId },
       select: {
         id: true, estado: true, proveedorId: true, localOperativoId: true,
+        // CON QUÉ LECTOR SE LEYÓ ESTA LISTA. Es lo que decide la configuración
+        // con la que se revalida cada fila antes de escribir un costo.
+        parser: true,
         recargoPct: true, archivoNombre: true, aplicadaEn: true,
         aumentoEsperadoMinPct: true, aumentoEsperadoMaxPct: true, impuestoAdicionalPct: true,
         aplicadas: true, omitidas: true, modoPrecioVenta: true,
@@ -302,7 +320,11 @@ export async function POST(req, context) {
     // El impuesto adicional con el que se concilió ESTA lista entra en la
     // configuración, igual que en `importar`. Si se tomara el de la ficha del
     // proveedor, cambiárselo hoy reescribiría el costo de una lista vieja.
-    const config = { ...CONFIG_ARCOR, impuestoAdicionalPct: numeroONull(importacion.impuestoAdicionalPct) };
+    const reg = resolverParserPorId(importacion.parser);
+    if (!reg.ok) {
+      return NextResponse.json({ ok: false, error: reg.error }, { status: 409 });
+    }
+    const config = { ...reg.config, impuestoAdicionalPct: numeroONull(importacion.impuestoAdicionalPct) };
     const recargoPct = Number(importacion.recargoPct);
     const usuarioId = Number(session?.id ?? session?.userId) || null;
 

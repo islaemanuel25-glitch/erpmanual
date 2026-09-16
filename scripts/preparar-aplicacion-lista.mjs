@@ -30,7 +30,7 @@
 import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
 
 import { TIPO_COINCIDENCIA } from "../lib/proveedores/listas/conciliarLista.js";
-import { CONFIG_ARCOR } from "../lib/proveedores/listas/configuraciones/arcor.js";
+import { resolverParserPorId } from "../lib/proveedores/listas/registro.js";
 import {
   revalidarFila,
   ventaParaModo,
@@ -78,6 +78,15 @@ async function main() {
     depositoLocalId: depo?.localId ?? null,
   };
   const recargoPct = Number(cab.recargoPct);
+  // LA CONFIGURACIÓN ES LA DEL LECTOR CON EL QUE SE LEYÓ ESTA LISTA, no la de
+  // Arcor: la de Arcor veta toda fila cuya unidad comercial no sea UN, DI o BU,
+  // y un archivo genérico no trae esa columna. Fija, este script decía que no
+  // se podía aplicar NADA de una lista que se aplica entera.
+  const regLectura = resolverParserPorId(cab.parser);
+  if (!regLectura.ok) {
+    console.error(regLectura.error);
+    process.exit(2);
+  }
 
   const filas = await prisma.importacionListaFila.findMany({
     where: { importacionId: ID },
@@ -134,7 +143,7 @@ async function main() {
 
     // Revalidación real contra el producto vivo: costo, presentación, propiedad,
     // combo, kg/fiambre y precio creíble.
-    const v = revalidarFila({ fila: f, base, contexto, config: CONFIG_ARCOR, recargoPct });
+    const v = revalidarFila({ fila: f, base, contexto, config: regLectura.config, recargoPct });
     if (!v.aplicable) { rechazo(`revalidación: ${textoOmision(v.motivo)}`); continue; }
 
     // Precio de venta propuesto, con el modo que se va a usar al aplicar.
