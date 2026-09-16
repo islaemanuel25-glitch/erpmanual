@@ -107,6 +107,28 @@ module.exports = {
         4.5: "18px",
       },
 
+      // ── EL BLANCO DE TOQUE ────────────────────────────────────────────
+      //
+      // 44 px es el mínimo que se puede tocar con el pulgar sin fallar, y en
+      // este proyecto no es un número de diseño: es un requisito, porque el
+      // usuario trabaja en un Sunmi de 360 px.
+      //
+      // Se mide en PÍXELES y no en la escala de espaciado a propósito. La escala
+      // está en `rem` y este proyecto corre con `1rem = 14px`, así que `h-11`
+      // —2,75rem— da 38,5 px: se lee como 44 y no lo es. Ése es exactamente el
+      // tipo de error que el CLAUDE.md describe con la casilla "de 14 × 14", que
+      // en el código dice `h-4 w-4`.
+      //
+      // Va acá y no como `min-h-[44px]` en cada pantalla, que es lo que el
+      // trinquete cuenta como medida mágica. La clave ES el nombre de la regla:
+      // `min-h-toque` se lee solo.
+      minHeight: {
+        toque: "44px",
+      },
+      minWidth: {
+        toque: "44px",
+      },
+
       // ── EL BORDE DE LA LÍNEA CORREGIDA ────────────────────────────────
       //
       // El diseño del V23 pide 1,5 px para el borde de una línea corregida en
