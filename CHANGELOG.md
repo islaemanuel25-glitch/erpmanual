@@ -1,5 +1,19 @@
 # Changelog
 
+## [2026-09-16] - Actualización: proveedores, transferencias, pos-ventas
+
+### Modificado
+- **proveedores**: feat(listas): una puerta de entrada para cualquier formato, y la API que confirma las columnas
+- **proveedores**: fix(listas): la fila que queda para revisar muestra su costo y su porcentaje
+- **proveedores**: feat(listas): la pantalla de subir pide y edita la configuración del proveedor
+- **proveedores**: feat(listas): el rango del proveedor elige la lectura, y el display deja de bloquear
+- **transferencias**: feat(listas): lector genérico de PDF con texto, para la lista de cualquier proveedor
+- **transferencias**: feat(listas): receta de lectura por proveedor — migración
+- **transferencias**: feat(listas): el rango del proveedor elige la lectura, y el display deja de bloquear
+- **pos-ventas**: fix(pos): el cobro en efectivo vuelve a abrir el modal de vuelto
+- **pos-ventas**: fix(pos): la grilla de botones de medio queda pareja y alineada
+
+
 ## [2026-09-14] - Actualización: transferencias
 
 ### Modificado

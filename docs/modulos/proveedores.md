@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-08-27 09:55
+**Última actualización:** 2026-09-16 21:04
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,10 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-09-16: feat(listas): una puerta de entrada para cualquier formato, y la API que confirma las columnas
+- 2026-09-16: fix(listas): la fila que queda para revisar muestra su costo y su porcentaje
+- 2026-09-16: feat(listas): la pantalla de subir pide y edita la configuración del proveedor
+- 2026-09-16: feat(listas): el rango del proveedor elige la lectura, y el display deja de bloquear
 - 2026-08-27: feat(compras): Facturas y Listas escriben y leen la misma memoria del proveedor
 - 2026-08-09: feat(listas): TERMINADA cierra el trabajo sin cerrar la vuelta atrás
 - 2026-08-09: fix(listas): la tapa cuenta lo mismo que adentro, y en productos
