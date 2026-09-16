@@ -1,42 +1,26 @@
 "use client";
 
-// LA PANTALLA DE UNA IMPORTACIÓN, DADA VUELTA.
+// 4 · RESULTADO DE LA LISTA — y 6 · CONFIRMAR APLICAR, que es su hoja inferior.
 //
-// La unidad es el PRODUCTO del sistema, no la fila del archivo. El archivo de
-// Arcor trae 917 filas y 625 de ellas son productos que este negocio no tiene:
-// medir contra ellas decía que faltaba el 68 % cuando el trabajo real estaba casi
-// terminado. El número que manda ahora es 376, los productos de Arcor que hay en
-// el sistema.
+// ── LA PANTALLA CONTESTA UNA PREGUNTA ───────────────────────────────────────
 //
-// ── LA CABECERA DICE QUÉ HACER HOY ──────────────────────────────────────────
+// "¿Qué va a pasar si aplico esto?". Todo lo demás es secundario: el número
+// grande de lo que está listo, entre qué porcentajes aumenta, tres ejemplos para
+// mirarlos, y cuántos quedan para revisar.
 //
-// Un titular en criollo que cambia con el estado —recién importada habla de lo
-// que hay para actualizar, ya aplicada de lo que quedó con el precio viejo— y
-// cinco cards sobre esos 376. La de "listos para aplicar" lleva el botón adentro
-// y se apaga sola cuando el número da cero.
+// La versión anterior de esta pantalla era una tabla de novecientas filas con
+// filtros, selección múltiple y ocho paneles. Eso sigue existiendo y se llega
+// desde acá —"Ver los 850"—, pero dejó de ser lo primero: con novecientas filas
+// adelante, la pregunta de arriba no se contesta.
 //
-// ── UN SOLO SISTEMA DE FILTRO ───────────────────────────────────────────────
+// ── UNA LISTA TERMINADA NO INVITA A TRABAJAR ────────────────────────────────
 //
-// LAS CARDS SON EL FILTRO. Tocar una la marca y filtra la tabla. No hay chips.
-//
-// Antes había diecinueve chips Y un desplegable de estado: dos sistemas que se
-// pisaban y que obligaban a entender el vocabulario del motor —FACTOR_DUDOSO,
-// CODIGO_DUPLICADO— para poder filtrar. Después quedaron cinco chips, que era
-// mejor pero seguía siendo un segundo sistema: decían las mismas cinco palabras
-// y los mismos cinco números que las cards de arriba, y se comían una banda de
-// alto que en la Sunmi dejaba la tabla abajo del pliegue.
-//
-// La búsqueda por texto va aparte y se combina, no reemplaza.
-//
-// ── EL ARCHIVO ES DIAGNÓSTICO ───────────────────────────────────────────────
-//
-// Las 917 filas y los criterios de macheo viven plegados abajo. Se abren cuando
-// algo no cierra; en un día normal nadie necesita saber cuántas machearon por
-// sufijo de cinco dígitos.
+// Cuando ya se aplicó y se terminó, esta pantalla muestra lo que pasó y ofrece
+// SOLO lo que se puede hacer. Un botón "Aplicar los 0 precios" apagado, en una
+// lista cerrada, es una pantalla que pide algo que no existe.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, CheckCheck, Search, Undo2, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -44,32 +28,30 @@ import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
+import { ErrorRecuperable } from "@/components/proveedores/listas/PiezasListas";
+import {
+  Encabezado,
+  TarjetaGrande,
+  TarjetaChica,
+  FilaDeCambio,
+  Aviso,
+  pct,
+} from "@/components/proveedores/listas/PiezasPantallas";
+import HojaConfirmarAplicar from "@/components/proveedores/listas/HojaConfirmarAplicar";
+// Deshacer y terminar YA tenían su modal, con su previa y su candado contra la
+// previa vieja. Se reusan: escribir otro botón al lado sería tener dos caminos
+// para escribir costos, y uno de los dos sin el candado.
 import ModalRevertir from "@/components/proveedores/listas/ModalRevertir";
 import ModalTerminar from "@/components/proveedores/listas/ModalTerminar";
-import PanelVincular from "@/components/proveedores/listas/PanelVincular";
-import PanelAplicar from "@/components/proveedores/listas/PanelAplicar";
-import PanelDecision from "@/components/proveedores/listas/PanelDecision";
-import PanelProducto from "@/components/proveedores/listas/PanelProducto";
-import CabeceraCatalogo, { ORDEN_CARDS } from "@/components/proveedores/listas/CabeceraCatalogo";
-import TablaCatalogo from "@/components/proveedores/listas/TablaCatalogo";
-import DiagnosticoArchivo from "@/components/proveedores/listas/DiagnosticoArchivo";
-import BotonReporte from "@/components/proveedores/listas/BotonReporte";
-import { ErrorRecuperable, Paginacion } from "@/components/proveedores/listas/PiezasListas";
-import { formaDelPanel, PREGUNTA } from "@/lib/proveedores/listas/panelDecision";
-import { GRUPO_PRODUCTO, titularDeCatalogo } from "@/lib/proveedores/listas/gruposProducto";
+import { fechaHora } from "@/lib/proveedores/listas/presentacion";
+import { esImportacionAbierta, ESTADOS_A_MEDIAS } from "@/lib/proveedores/listas/persistencia";
 
-/** Los cinco filtros SON las cards, en su orden. Acá solo se usa para elegir en
- *  cuál arranca la pantalla. */
-const FILTROS = ORDEN_CARDS;
-
-export default function CatalogoImportacionPage() {
+export default function ResultadoDeListaPage() {
   const router = useRouter();
   const params = useParams();
-  const busqueda = useSearchParams();
-  const id = params?.id;
+  const id = Number(params?.id);
 
   const sesion = useUser() || {};
   const perfil = sesion.perfil;
@@ -78,693 +60,391 @@ export default function CatalogoImportacionPage() {
 
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
-  const [cab, setCab] = useState(null);
-  const [productos, setProductos] = useState([]);
-  const [porGrupo, setPorGrupo] = useState({});
-  const [universo, setUniverso] = useState(0);
-  const [cobertura, setCobertura] = useState(null);
-  const [pag, setPag] = useState({ page: 1, paginas: 1, total: 0 });
-  const [archivo, setArchivo] = useState(null);
-  const [macheo, setMacheo] = useState(null);
-  const [resumenSeleccion, setResumenSeleccion] = useState(null);
-
-  const [grupo, setGrupo] = useState(() => busqueda?.get("grupo") ?? null);
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(25);
-  const [q, setQ] = useState(() => busqueda?.get("q") ?? "");
-  const [qAplicado, setQAplicado] = useState(() => busqueda?.get("q") ?? "");
-
-  const [abierta, setAbierta] = useState(null);
-  // La elección del panel vive acá y se limpia al cambiar de producto abierto:
-  // una tarjeta elegida en una fila no puede quedar marcada en la siguiente.
-  const [eleccionPanel, setEleccionPanel] = useState(null);
-  const [confirmandoPanel, setConfirmandoPanel] = useState(false);
-  const [vinculando, setVinculando] = useState(null);
-  const [aviso, setAviso] = useState("");
-  const [trabajandoProducto, setTrabajandoProducto] = useState(false);
-
-  // La aplicación: el botón vive en la card y el panel se revela debajo.
-  const [mostrarAplicar, setMostrarAplicar] = useState(false);
-  const [previo, setPrevio] = useState(null);
-  const [cargandoPrevio, setCargandoPrevio] = useState(false);
-  const [trabajando, setTrabajando] = useState(false);
-  const [resultado, setResultado] = useState(null);
-  const [errorAplicar, setErrorAplicar] = useState("");
-  const [cancelando, setCancelando] = useState(false);
-  const [revirtiendo, setRevirtiendo] = useState(false);
+  const [datos, setDatos] = useState(null);
+  const [confirmando, setConfirmando] = useState(false);
+  const [deshaciendo, setDeshaciendo] = useState(false);
   const [terminando, setTerminando] = useState(false);
-  const [trabajandoTerminar, setTrabajandoTerminar] = useState(false);
-  const [trabajandoCancelar, setTrabajandoCancelar] = useState(false);
+  const [aplicando, setAplicando] = useState(false);
+  const [aviso, setAviso] = useState(null);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
 
   const cargar = useCallback(async () => {
-    if (!id) return;
     setCargando(true);
     setError("");
     try {
-      const url = new URL(`/api/proveedores/listas/${id}/catalogo`, window.location.origin);
-      if (grupo) url.searchParams.set("grupo", grupo);
-      url.searchParams.set("page", String(page));
-      url.searchParams.set("pageSize", String(pageSize));
-      if (qAplicado) url.searchParams.set("q", qAplicado);
-
-      // El catálogo trae los productos y los contadores. El endpoint viejo sigue
-      // dando lo que describe al ARCHIVO —macheo, filas, selección—, que ahora es
-      // el bloque de diagnóstico. Se piden en paralelo.
-      const [rCat, rArch] = await Promise.all([
-        fetch(url.toString(), { credentials: "include", cache: "no-store" }),
-        fetch(`/api/proveedores/listas/${id}?pageSize=1`, { credentials: "include", cache: "no-store" }),
-      ]);
-      const jCat = await rCat.json();
-      if (!rCat.ok || !jCat?.ok) {
-        setError(jCat?.error || "No se pudo cargar el catálogo.");
+      const r = await fetch(`/api/proveedores/listas/${id}/resultado`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      const json = await r.json();
+      if (!r.ok || !json?.ok) {
+        setError(json?.error || "No se pudo cargar el resultado de esta lista.");
         return;
       }
-      setProductos(jCat.productos ?? []);
-      setPorGrupo(Object.fromEntries((jCat.grupos ?? []).map((g) => [g.clave, g.valor])));
-      setUniverso(jCat.cobertura?.universo ?? 0);
-      setCobertura(jCat.cobertura ?? null);
-      setPag(jCat.paginacion ?? { page: 1, paginas: 1, total: 0 });
-
-      const jArch = await rArch.json().catch(() => null);
-      if (jArch?.ok) {
-        setCab(jArch.importacion);
-        setArchivo(jArch.archivo ?? null);
-        setMacheo(jArch.macheo ?? null);
-        setResumenSeleccion(jArch.seleccion ?? null);
-      }
+      setDatos(json);
     } catch {
-      setError("Error de conexión.");
+      setError("No se pudo conectar con el servidor. Probá de nuevo.");
     } finally {
       setCargando(false);
     }
-  }, [id, grupo, page, pageSize, qAplicado]);
+  }, [id]);
 
   useEffect(() => {
-    if (cargandoUser || cargandoCtx || !esAdmin || needsContexto) return;
+    if (cargandoUser || cargandoCtx || !esAdmin || needsContexto || !Number.isInteger(id)) return;
     cargar();
-  }, [cargar, cargandoUser, cargandoCtx, esAdmin, needsContexto]);
+  }, [cargar, cargandoUser, cargandoCtx, esAdmin, needsContexto, id]);
 
-  // El filtro arranca en la primera card que tenga trabajo. Se decide UNA vez:
-  // re-derivarlo en cada carga pelearía con los clics del usuario.
-  useEffect(() => {
-    if (grupo !== null || !Object.keys(porGrupo).length) return;
-    const conTrabajo = FILTROS.find((g) => Number(porGrupo[g] ?? 0) > 0);
-    setGrupo(conTrabajo ?? GRUPO_PRODUCTO.ACTUALIZADO);
-  }, [porGrupo, grupo]);
-
-  const titular = useMemo(() => titularDeCatalogo({ porGrupo, universo }), [porGrupo, universo]);
-  const abierto =
-    cab?.estado !== "CANCELADA" && cab?.estado !== "APLICADA" && cab?.estado !== "TERMINADA";
-
-  // ¿Hay algo escrito que se pueda deshacer? Sale del contador de productos
-  // actualizados, que es el mismo número que muestra la card: si hay
-  // actualizados es porque hubo filas aplicadas.
-  const hayAplicadas = Number(porGrupo[GRUPO_PRODUCTO.ACTUALIZADO] ?? 0) > 0;
-
-  // ── Acciones ────────────────────────────────────────────────────────────
-
-  const mandarSeleccion = useCallback(
-    async (cuerpo) => {
-      setErrorAplicar("");
-      try {
-        const r = await fetch(`/api/proveedores/listas/${id}/seleccion`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(cuerpo),
-        });
-        const json = await r.json();
-        if (!r.ok || !json?.ok) {
-          setErrorAplicar(json?.error || "No se pudo cambiar la selección.");
-          return null;
-        }
-        setResumenSeleccion(json.resumen);
-        return json;
-      } catch {
-        setErrorAplicar("Error de conexión.");
-        return null;
-      }
-    },
-    [id]
-  );
-
-  /** Abrir el panel de aplicar: se marcan todas las listas y se pide el previo. */
-  const abrirAplicar = async () => {
-    setMostrarAplicar(true);
-    await mandarSeleccion({ accion: "TODOS" });
-    await pedirPrevio();
-  };
-
-  const pedirPrevio = async () => {
-    setCargandoPrevio(true);
-    setPrevio(null);
-    try {
-      const r = await fetch(`/api/proveedores/listas/${id}/aplicar`, {
-        credentials: "include", cache: "no-store",
-      });
-      const json = await r.json();
-      if (r.ok && json?.ok) setPrevio(json);
-      else setErrorAplicar(json?.error || "No se pudo calcular el resumen.");
-    } catch {
-      setErrorAplicar("Error de conexión.");
-    } finally {
-      setCargandoPrevio(false);
-    }
-  };
-
-  const aplicar = async (modoPrecioVenta) => {
-    setTrabajando(true);
-    setErrorAplicar("");
-    setResultado(null);
+  const aplicar = async () => {
+    setAplicando(true);
+    setAviso(null);
     try {
       const r = await fetch(`/api/proveedores/listas/${id}/aplicar`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ modoPrecioVenta }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alcance: "SELECCIONADAS" }),
       });
-      const json = await r.json();
-      if (!r.ok || !json?.ok) {
-        setErrorAplicar(json?.error || "No se pudo aplicar la lista.");
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) {
+        setAviso({ tono: "danger", texto: j?.error || "No se pudieron aplicar los precios." });
         return;
       }
-      setResultado(json);
-      setMostrarAplicar(false);
+      setConfirmando(false);
+      setAviso({
+        tono: "success",
+        texto: `Listo. Se actualizaron ${j.aplicadas ?? 0} ${(j.aplicadas ?? 0) === 1 ? "producto" : "productos"}.`,
+      });
       await cargar();
     } catch {
-      setErrorAplicar("Error de conexión. No se aplicó nada.");
+      setAviso({ tono: "danger", texto: "No se pudo conectar con el servidor. Probá de nuevo." });
     } finally {
-      setTrabajando(false);
+      setAplicando(false);
     }
   };
 
-  const cancelarImportacion = async () => {
-    setTrabajandoCancelar(true);
-    setErrorAplicar("");
+  const terminar = async () => {
+    setAplicando(true);
+    setAviso(null);
     try {
-      const r = await fetch(`/api/proveedores/listas/${id}/cancelar`, {
-        method: "POST", credentials: "include",
+      const r = await fetch(`/api/proveedores/listas/${id}/finalizar`, {
+        method: "POST",
+        credentials: "include",
       });
-      const json = await r.json();
-      if (!r.ok || !json?.ok) {
-        setErrorAplicar(json?.error || "No se pudo cancelar la importación.");
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) {
+        setAviso({ tono: "danger", texto: j?.error || "No se pudo terminar la lista." });
         return;
       }
-      setCancelando(false);
+      setTerminando(false);
+      setAviso({ tono: "success", texto: "Lista terminada." });
       await cargar();
     } catch {
-      setErrorAplicar("Error de conexión.");
+      setAviso({ tono: "danger", texto: "No se pudo conectar con el servidor. Probá de nuevo." });
     } finally {
-      setTrabajandoCancelar(false);
+      setAplicando(false);
     }
-  };
-
-  /** La decisión del panel de una FILA. El panel elige; la página escribe. */
-  const confirmarDecision = async ({ fila, clave, producto }) => {
-    if (producto?.productoBaseId && producto.productoBaseId !== fila.erp?.id) {
-      const rv = await fetch(`/api/proveedores/listas/${id}/filas/${fila.id}/vincular`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ productoBaseId: producto.productoBaseId }),
-      });
-      if (!rv.ok) {
-        setAviso("No se pudo vincular el producto elegido.");
-        return;
-      }
-    }
-    const r = await fetch(`/api/proveedores/listas/${id}/filas/${fila.id}/confirmar`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ clave, cantidadPresentacion: null }),
-    });
-    const json = await r.json().catch(() => null);
-    if (!r.ok || !json?.ok) {
-      setAviso(json?.error || "No se pudo confirmar la decisión.");
-      return;
-    }
-    setAviso(`Fila ${json.fila.filaExcel} confirmada.`);
-    setAbierta(null);
-    await cargar();
-  };
-
-  const buscarCandidatos = async (fila) => {
-    const r = await fetch(`/api/proveedores/listas/${id}/filas/${fila.id}/candidatos`, {
-      credentials: "include", cache: "no-store",
-    });
-    if (!r.ok) return [];
-    const json = await r.json().catch(() => null);
-    return Array.isArray(json?.candidatos) ? json.candidatos : [];
-  };
-
-  /** CASO A: el producto sin código es esta fila del archivo. */
-  const vincularFilaAProducto = async (producto, filaId) => {
-    setTrabajandoProducto(true);
-    try {
-      const r = await fetch(`/api/proveedores/listas/${id}/filas/${filaId}/vincular`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ productoBaseId: producto.id }),
-      });
-      const json = await r.json().catch(() => null);
-      if (!r.ok || !json?.ok) {
-        setAviso(json?.error || "No se pudo vincular la fila.");
-        return;
-      }
-      setAviso(`${producto.nombre} quedó vinculado con la fila ${json.fila?.filaExcel ?? filaId}.`);
-      setAbierta(null);
-      await cargar();
-    } finally {
-      setTrabajandoProducto(false);
-    }
-  };
-
-  /** CASO B: qué hacer con un producto que la lista no trajo. */
-  const resolverDestino = async (producto, destino) => {
-    if (destino === "DEJAR_COMO_ESTA") {
-      setAviso(`${producto.nombre} queda como está.`);
-      setAbierta(null);
-      return;
-    }
-    if (destino === "REVISAR_CODIGO") {
-      router.push(`/modulos/productos/${producto.id}/editar`);
-      return;
-    }
-    setTrabajandoProducto(true);
-    try {
-      const r = await fetch(`/api/proveedores/listas/${id}/vinculos/baja`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ productoBaseId: producto.id }),
-      });
-      const json = await r.json().catch(() => null);
-      if (!r.ok || !json?.ok) {
-        setAviso(json?.error || "No se pudo dar de baja el código.");
-        return;
-      }
-      setAviso(`${producto.nombre}: se dio de baja el código del proveedor. El producto no se tocó.`);
-      setAbierta(null);
-      await cargar();
-    } finally {
-      setTrabajandoProducto(false);
-    }
-  };
-
-  /**
-   * Qué panel le corresponde a un producto.
-   *
-   * Con filas del archivo, el de siempre: la comparación y sus dos preguntas. Sin
-   * filas, la tercera forma. La decisión no se toma acá — sale del grupo, que
-   * calculó el servidor con el mismo predicado que arma los contadores.
-   */
-  const renderPanel = (p) => {
-    if (!p.filas?.length) {
-      return (
-        <PanelProducto
-          producto={p}
-          importacion={cab}
-          onVincularFila={(filaId) => vincularFilaAProducto(p, filaId)}
-          onDestino={(d) => resolverDestino(p, d)}
-          trabajando={trabajandoProducto}
-        />
-      );
-    }
-    // La fila principal es la primera del archivo. El panel de siempre espera la
-    // fila con su lado del ERP adentro, así que se arma acá desde el producto.
-    const fila = {
-      ...p.filas[0],
-      importacionId: cab?.id,
-      erp: {
-        id: p.id,
-        nombre: p.nombre,
-        codigosProveedor: (p.codigosProveedor ?? []).filter((c) => c.activo).map((c) => c.codigo),
-        codigoBarra: p.codigoBarra,
-        codigoBarraSecundario: p.codigoBarraSecundario,
-        actualizadoEn: p.actualizadoEn,
-        unidadMedida: p.unidadMedida,
-        factorPack: p.factorPack,
-        modoCompraProveedor: p.modoCompraProveedor,
-        costoActual: p.costoActual,
-        ventaActual: p.ventaActual,
-        esCombo: p.esCombo,
-      },
-    };
-    const forma = formaDelPanel({
-      estado: fila.estado,
-      tieneProducto: true,
-      resultado: fila.resultadoInterpretacion ?? null,
-      aplicada: !!fila.aplicada,
-      excluida: fila.excluidaManual === true,
-      confirmada: !!fila.confirmadoEn && (!fila.vinculadoEn || new Date(fila.confirmadoEn) > new Date(fila.vinculadoEn)),
-    });
-    return (
-      <PanelDecision
-        fila={fila}
-        importacion={cab}
-        forma={forma}
-        candidatos={[]}
-        productoElegido={null}
-        eleccion={eleccionPanel}
-        onElegir={setEleccionPanel}
-        confirmando={confirmandoPanel}
-        // La clave la manda el panel: con una sola lectura no hay elección
-        // guardada acá porque no hubo nada que tocar.
-        onConfirmar={async (clave) => {
-          setConfirmandoPanel(true);
-          try {
-            await confirmarDecision({ fila, clave, producto: null });
-          } finally {
-            setConfirmandoPanel(false);
-          }
-        }}
-        onVincularOtro={() => setVinculando(fila)}
-      />
-    );
   };
 
   if (cargandoUser || cargandoCtx) return null;
   if (!esAdmin) return <SinPermisos />;
 
-  return (
-    <Marco router={router}>
-      {cargando && !cab && (
-        <SunmiCard className="p-6">
-          <SunmiLoader />
+  if (needsContexto) {
+    return (
+      <Marco>
+        <SunmiCard className="p-4">
+          <p className="text-sm2 text-center sunmi-text-muted">
+            Seleccioná un contexto operativo para ver esta lista.
+          </p>
         </SunmiCard>
+      </Marco>
+    );
+  }
+
+  if (cargando) {
+    return (
+      <Marco>
+        <SunmiCard className="p-6"><SunmiLoader /></SunmiCard>
+      </Marco>
+    );
+  }
+
+  if (error) {
+    return (
+      <Marco>
+        <ErrorRecuperable mensaje={error} onReintentar={cargar} />
+      </Marco>
+    );
+  }
+
+  const { cabecera, conteo, variacion, muestra, lectura } = datos;
+  const abierta = esImportacionAbierta(cabecera.estado);
+  const aMedias = ESTADOS_A_MEDIAS.includes(cabecera.estado);
+  const listos = conteo.listos;
+  const puedeDeshacer = cabecera.productosActualizados > 0;
+
+  return (
+    <Marco>
+      <Encabezado
+        volverTexto="Listas de proveedor"
+        onVolver={() => router.push("/modulos/proveedores/listas")}
+        titulo={cabecera.proveedor?.nombre ?? "—"}
+        subtitulo={`${cabecera.archivoNombre} · leída ${fechaHora(cabecera.leidaEn)} · ${estadoEnCastellano(cabecera)}`}
+      />
+
+      {aviso && <Aviso tono={aviso.tono}>{aviso.texto}</Aviso>}
+
+      {/* CON QUÉ COLUMNA SE LEYÓ. Es la decisión de la que cuelga todo lo demás,
+          así que se dice, y se dice con su respaldo. */}
+      {lectura?.titulo && (
+        <p className="text-sm2 sunmi-text-muted leading-snug">
+          Los precios salieron de la columna «{lectura.titulo}»
+          {lectura.conDescuento ? ", con el descuento aplicado" : ""}
+          {lectura.comparables
+            ? `, que coincide con tus costos en ${Math.round((lectura.explicadas / lectura.comparables) * 100)} de cada 100 productos.`
+            : "."}
+          {lectura.aMano ? " La elegiste vos." : ""}
+        </p>
       )}
 
-      {!cargando && error && !cab && <ErrorRecuperable mensaje={error} onReintentar={cargar} />}
+      {aMedias ? (
+        <TarjetaGrande
+          numero={listos}
+          titulo={listos === 1 ? "producto listo para actualizar" : "productos listos para actualizar"}
+          detalle={textoDeVariacion(variacion, cabecera.rango)}
+        />
+      ) : (
+        <TarjetaGrande
+          tono="warning"
+          numero={cabecera.productosActualizados}
+          titulo={
+            cabecera.estado === "CANCELADA"
+              ? "Cancelada: no se actualizó nada"
+              : cabecera.productosActualizados === 1
+                ? "producto actualizado"
+                : "productos actualizados"
+          }
+          detalle={cabecera.estado === "TERMINADA" ? "Esta lista está terminada." : null}
+        />
+      )}
 
-      {cab && (
-        <>
-          {/* ── Cabecera ──────────────────────────────────────────────── */}
-          <SunmiCard className="p-3 space-y-2.5">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="text-[13px] font-bold sunmi-text-strong">
-                Importación #{cab.id}
-              </span>
-              <span className="text-[11px] sunmi-text-muted">{cab.proveedor?.nombre}</span>
-              <span className="text-[11px] sunmi-text-muted hidden sm:inline">
-                {cab.archivoNombre}
-              </span>
-              <div className="ml-auto">
-                <BotonReporte
-                  importacionId={cab.id}
-                  cabecera={cab}
-                  proveedor={cab.proveedor}
-                  usuario={cab.usuario?.nombre}
-                />
-              </div>
-            </div>
+      <div className="grid grid-cols-2 gap-3">
+        <TarjetaChica
+          numero={conteo.paraRevisar}
+          titulo="para revisar"
+          // UNA LISTA CERRADA NO INVITA A TRABAJAR. "Tocá para verlos" sobre una
+          // terminada ofrece un trabajo que ya no se puede hacer: confirmar o
+          // excluir una fila necesita la importación abierta y el servidor lo
+          // rechaza. El número sigue estando —es información de lo que quedó—
+          // pero sin la invitación y sin el toque.
+          detalle={aMedias ? "Tocá para verlos" : "Quedaron sin resolver"}
+          tono="warning"
+          ariaLabel={aMedias ? `Ver los ${conteo.paraRevisar} para revisar` : undefined}
+          onClick={
+            aMedias && conteo.paraRevisar > 0
+              ? () => router.push(`/modulos/proveedores/listas/${id}/revisar`)
+              : undefined
+          }
+        />
+        {/* ── LA TARJETA GRIS DICE LO QUE DE VERDAD PASA ──────────────────
+            El diseño pedía "N filas salteadas · No eran productos". Ese dato NO
+            EXISTE en este motor: los títulos y encabezados que el lector saltea
+            no llegan nunca a ser filas, se descartan al parsear, así que no hay
+            nada que contar. Lo que sí existe son dos cosas que se parecen y no
+            son lo mismo: las que ya valían igual, y las que la persona decidió
+            dejar como están. El número es la suma y el renglón de abajo las
+            separa cuando hay de las dos. */}
+        <TarjetaChica
+          numero={conteo.dejadas + conteo.sinCambio}
+          titulo="que no se tocan"
+          detalle={
+            conteo.dejadas > 0
+              ? `${conteo.dejadas} las dejaste vos`
+              : "Su costo ya estaba igual"
+          }
+        />
+      </div>
 
-            <CabeceraCatalogo
-              titular={titular}
-              porGrupo={porGrupo}
-              universo={universo}
-              grupoActivo={grupo}
-              onGrupo={(g) => {
-                setGrupo(g);
-                setPage(1);
-                setAbierta(null);
-              }}
-              onAplicar={abrirAplicar}
-              puedeAplicar={abierto}
-              onVerDiscontinuados={() => {
-                setGrupo(GRUPO_PRODUCTO.DISCONTINUADO);
-                setPage(1);
-              }}
-            />
-
-            {cobertura && !cobertura.cierra ? (
-              <p className="text-[11px] sunmi-text-danger">
-                Los grupos suman {cobertura.suma} y el catálogo tiene {cobertura.universo}: faltan{" "}
-                {cobertura.faltante} productos por clasificar. Avisá, es un error del sistema.
-              </p>
-            ) : null}
-
-            {aviso ? <p className="text-[11.5px] sunmi-text-success leading-snug">{aviso}</p> : null}
-
-            {mostrarAplicar && abierto ? (
-              <PanelAplicar
-                importacion={cab}
-                resumenSeleccion={resumenSeleccion}
-                previo={previo}
-                cargandoPrevio={cargandoPrevio}
-                onPedirPrevio={pedirPrevio}
-                trabajando={trabajando}
-                onSeleccionarTodos={() => mandarSeleccion({ accion: "TODOS" })}
-                onDeseleccionar={() => mandarSeleccion({ accion: "NINGUNO" })}
-                onAplicar={aplicar}
-                resultado={resultado}
-                error={errorAplicar}
+      {/* ── LA MUESTRA SE CALLA CUANDO NO HAY NADA QUE MOSTRAR ──────────────
+          `muestra` son filas en LISTO_PARA_ACTUALIZAR, o sea las que se
+          aplicarían. En una lista cerrada SIN nada aplicado —terminada sin
+          aplicar, o aplicada y después deshecha— esas filas siguen existiendo y
+          el título decía "Algunos de los que se actualizaron" arriba de
+          `$1.342,90 → $1.430,19`. Los costos habían vuelto a los de antes: la
+          pantalla afirmaba un cambio que no ocurrió. */}
+      {muestra.length > 0 && (aMedias || cabecera.productosActualizados > 0) && (
+        <section className="space-y-1">
+          <h2 className="text-sm3 font-semibold sunmi-text-strong">
+            {aMedias ? "Algunos de los que se actualizan" : "Algunos de los que se actualizaron"}
+          </h2>
+          <SunmiCard className="p-3 divide-y sunmi-divide">
+            {muestra.map((m) => (
+              <FilaDeCambio
+                key={m.id}
+                nombre={m.nombre}
+                costoAnterior={m.costoAnterior}
+                costoNuevo={m.costoNuevo}
+                variacionPct={m.variacionPct}
               />
-            ) : null}
-
-            {/* UNA TERMINADA NO ACEPTA TRABAJO, PERO SÍ DESHACER. Por eso este
-                bloque va antes que el de cancelada y no comparte su camino: si
-                cayera en el `else`, el botón de deshacer desaparecería justo en
-                la lista donde más falta hace, que es la que ya escribió costos. */}
-            {cab.estado === "TERMINADA" ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="sunmi-surface-soft sunmi-border border rounded-lg px-3 py-2 min-w-0 flex-1">
-                  <span className="text-[12.5px] font-semibold sunmi-text-strong">
-                    Importación terminada
-                  </span>
-                  <p className="text-[11.5px] sunmi-text-muted leading-snug mt-0.5">
-                    No se puede confirmar ni aplicar nada más. Lo que ya se aplicó se puede deshacer.
-                  </p>
-                </div>
-                {hayAplicadas ? (
-                  <SunmiButton
-                    color="slate"
-                    onClick={() => setRevirtiendo(true)}
-                    className="py-1.5 px-2.5 text-[11px] inline-flex items-center gap-1"
-                  >
-                    <Undo2 size={13} aria-hidden="true" /> Deshacer la aplicación
-                  </SunmiButton>
-                ) : null}
-              </div>
-            ) : cab.estado === "CANCELADA" ? (
-              <div className="sunmi-surface-soft sunmi-border border rounded-lg px-3 py-2">
-                <span className="text-[12.5px] font-semibold sunmi-text-danger">
-                  Importación cancelada
-                </span>
-                <p className="text-[11.5px] sunmi-text-muted leading-snug mt-0.5">
-                  Queda solo como historial. No se puede aplicar y el archivo quedó liberado.
-                </p>
-              </div>
-            ) : abierto ? (
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Deshacer vive al lado de cancelar porque son la misma
-                    familia: lo que se hace con la importación entera. Aparece
-                    solo si hay algo escrito que deshacer. */}
-                {hayAplicadas ? (
-                  <SunmiButton
-                    color="slate"
-                    onClick={() => setRevirtiendo(true)}
-                    className="py-1.5 px-2.5 text-[11px] inline-flex items-center gap-1"
-                  >
-                    <Undo2 size={13} aria-hidden="true" /> Deshacer la aplicación
-                  </SunmiButton>
-                ) : null}
-                {/* Terminar cierra el trabajo. Va acá, con cancelar y deshacer:
-                    las tres son decisiones sobre la importación entera. */}
-                <SunmiButton
-                  color="slate"
-                  onClick={() => setTerminando(true)}
-                  disabled={trabajandoTerminar}
-                  className="py-1.5 px-2.5 text-[11px] inline-flex items-center gap-1"
-                >
-                  <CheckCheck size={13} aria-hidden="true" /> Terminar importación
-                </SunmiButton>
-                <SunmiButton
-                  color="slate"
-                  onClick={() => setCancelando(true)}
-                  disabled={trabajandoCancelar}
-                  className="py-1.5 px-2.5 text-[11px]"
-                >
-                  Cancelar importación
-                </SunmiButton>
-                {cancelando && (
-                  <div className="w-full sunmi-surface-soft sunmi-border border rounded-lg p-3 space-y-2">
-                    <p className="text-[12px] sunmi-text-strong leading-snug">
-                      ¿Cancelar esta importación? Queda como historial y no se va a poder aplicar.
-                      No se modifica ningún costo ni producto.
-                    </p>
-                    <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2">
-                      <SunmiButton color="slate" onClick={() => setCancelando(false)} className="py-2 text-xs">
-                        No, volver
-                      </SunmiButton>
-                      <SunmiButton
-                        color="red"
-                        onClick={cancelarImportacion}
-                        disabled={trabajandoCancelar}
-                        className="py-2 font-bold text-xs"
-                      >
-                        {trabajandoCancelar ? "Cancelando…" : "Sí, cancelar"}
-                      </SunmiButton>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : null}
+            ))}
           </SunmiCard>
+          <SunmiButton
+            color="ghost"
+            onClick={() => router.push(`/modulos/proveedores/listas/${id}/filas`)}
+            className="sunmi-text-link min-h-toque px-0 text-sm3"
+          >
+            Ver los {listos}
+          </SunmiButton>
+        </section>
+      )}
 
-          {/* ── La búsqueda. El filtro son las cards, no hay chips ────── */}
-          <SunmiCard className="p-2.5 space-y-2">
-            {/* La búsqueda se COMBINA con el filtro, no lo reemplaza. */}
-            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2">
-              <SunmiInput
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    setPage(1);
-                    setQAplicado(q.trim());
-                  }
-                }}
-                placeholder="Buscar por nombre, SKU o código de barras"
-                className="!py-1.5 !text-[12px]"
-              />
-              <SunmiButton
-                color="cyan"
-                onClick={() => {
-                  setPage(1);
-                  setQAplicado(q.trim());
-                }}
-                className="py-1.5 px-3 text-[11px] inline-flex items-center gap-1"
-              >
-                <Search size={13} aria-hidden="true" /> Buscar
-              </SunmiButton>
-              <SunmiButton
-                color="slate"
-                onClick={() => {
-                  setQ("");
-                  setQAplicado("");
-                  setPage(1);
-                }}
-                disabled={!qAplicado}
-                className="py-1.5 px-3 text-[11px] inline-flex items-center gap-1"
-              >
-                <X size={13} aria-hidden="true" /> Limpiar
-              </SunmiButton>
-            </div>
-          </SunmiCard>
+      {/* LAS ACCIONES POSIBLES, Y SOLO ESAS. */}
+      {abierta && listos > 0 && (
+        <div className="space-y-2">
+          <SunmiButton
+            color="cyan"
+            onClick={() => setConfirmando(true)}
+            disabled={aplicando}
+            className="w-full min-h-toque text-base font-bold"
+          >
+            Aplicar los {listos} precios
+          </SunmiButton>
+          {conteo.paraRevisar > 0 && (
+            <SunmiButton
+              color="slate"
+              onClick={() => router.push(`/modulos/proveedores/listas/${id}/revisar`)}
+              className="w-full min-h-toque text-sm3"
+            >
+              Revisar los {conteo.paraRevisar}
+            </SunmiButton>
+          )}
+          <p className="text-sm2 sunmi-text-muted text-center leading-snug">
+            {conteo.paraRevisar > 0
+              ? `Los ${conteo.paraRevisar} para revisar no se tocan al aplicar. Todo se puede deshacer.`
+              : "Todo se puede deshacer."}
+          </p>
+        </div>
+      )}
 
-          {/* ── La tabla de PRODUCTOS ─────────────────────────────────── */}
-          <TablaCatalogo
-            productos={productos}
-            cargando={cargando}
-            abierta={abierta}
-            onAbrir={(x) => {
-              setAbierta(x);
-              setEleccionPanel(null);
-            }}
-            renderPanel={renderPanel}
-          />
+      {abierta && listos === 0 && conteo.paraRevisar > 0 && (
+        <SunmiButton
+          color="cyan"
+          onClick={() => router.push(`/modulos/proveedores/listas/${id}/revisar`)}
+          className="w-full min-h-toque text-base font-bold"
+        >
+          Revisar los {conteo.paraRevisar}
+        </SunmiButton>
+      )}
 
-          <Paginacion
-            page={pag.page}
-            paginas={pag.paginas}
-            total={pag.total}
-            onPage={(n) => {
-              setPage(n);
-              setAbierta(null);
-            }}
-          />
+      {puedeDeshacer && (
+        <SunmiButton
+          color="slate"
+          onClick={() => setDeshaciendo(true)}
+          disabled={aplicando}
+          className="w-full min-h-toque text-sm3"
+        >
+          Deshacer los {cabecera.productosActualizados} que se actualizaron
+        </SunmiButton>
+      )}
 
-          {vinculando ? (
-            <PanelVincular
-              importacionId={id}
-              fila={vinculando}
-              onCerrar={() => setVinculando(null)}
-              onVinculada={async () => {
-                setVinculando(null);
-                await cargar();
-              }}
-            />
-          ) : null}
+      {/* ── TERMINAR SE OFRECE MIENTRAS LA LISTA ESTÉ ABIERTA ───────────────
+          La primera versión lo mostraba solo con `listos === 0 && paraRevisar
+          === 0`, y esa condición no se cumple casi nunca: la lista real de M Y F
+          quedó con 560 filas para revisar —la mayoría productos que este cliente
+          no vende— y ninguna se va a resolver jamás. Con la regla vieja esa lista
+          se quedaba "a medias" para siempre, ocupando la sección de arriba del
+          historial, sin ninguna forma de cerrarla desde acá.
+          Terminar es justamente decir "con esta lista ya está", y el servidor lo
+          acepta sobre cualquier importación abierta: la pantalla no tiene por qué
+          ser más estricta que él. Va último y en gris, detrás de su modal, que
+          explica qué se pierde y que se puede volver atrás. */}
+      {abierta && (
+        <SunmiButton
+          color="slate"
+          onClick={() => setTerminando(true)}
+          disabled={aplicando}
+          className="w-full min-h-toque text-sm3"
+        >
+          Terminar esta lista
+        </SunmiButton>
+      )}
 
-          <ModalTerminar
-            abierto={terminando}
-            // Los pendientes SON los productos que quedan sin aplicar: los que
-            // esperan decisión más los ya decididos que nadie aplicó. Sale de los
-            // mismos contadores que muestran las cards.
-            sinAplicar={
-              Number(porGrupo[GRUPO_PRODUCTO.NECESITA_DECISION] ?? 0) +
-              Number(porGrupo[GRUPO_PRODUCTO.LISTO_PARA_APLICAR] ?? 0)
-            }
-            actualizados={Number(porGrupo[GRUPO_PRODUCTO.ACTUALIZADO] ?? 0)}
-            trabajando={trabajandoTerminar}
-            onCerrar={() => setTerminando(false)}
-            onTerminar={async () => {
-              setTrabajandoTerminar(true);
-              try {
-                const r = await fetch(`/api/proveedores/listas/${id}/finalizar`, {
-                  method: "POST",
-                  credentials: "include",
-                });
-                const j = await r.json();
-                if (!r.ok || !j?.ok) {
-                  setAviso(j?.error || "No se pudo terminar la importación.");
-                  return;
-                }
-                setTerminando(false);
-                await cargar();
-                setAviso(
-                  `Importación terminada. ${j.pendientesSinResolver ?? 0} filas quedaron sin aplicar.`
-                );
-              } catch {
-                setAviso("Error de conexión.");
-              } finally {
-                setTrabajandoTerminar(false);
-              }
-            }}
-          />
+      <ModalRevertir
+        abierto={deshaciendo}
+        importacionId={id}
+        onCerrar={() => setDeshaciendo(false)}
+        onRevertido={async (r) => {
+          setDeshaciendo(false);
+          // EL AVISO DICE LO QUE QUEDÓ, y los números se releen de la base:
+          // escribir "se deshizo todo" sin volver a preguntar dejaría la pantalla
+          // mostrando el estado de antes con un cartel diciendo lo contrario.
+          setAviso({
+            tono: "success",
+            texto: `Se deshizo. ${r?.resumen?.revierten ?? 0} ${
+              (r?.resumen?.revierten ?? 0) === 1 ? "producto volvió" : "productos volvieron"
+            } a su costo anterior.`,
+          });
+          await cargar();
+        }}
+      />
 
-          <ModalRevertir
-            abierto={revirtiendo}
-            importacionId={id}
-            onCerrar={() => setRevirtiendo(false)}
-            onRevertido={async (r) => {
-              setRevirtiendo(false);
-              // Recargar entero: las cards recuentan, los productos vuelven a
-              // "listos para aplicar" y el botón de aplicar reaparece solo.
-              await cargar();
-              setAviso(
-                `Se deshizo la aplicación: ${r?.escrito?.productos ?? 0} productos volvieron al costo anterior` +
-                  `${r?.escrito?.ventas ? ` y ${r.escrito.ventas} precios de venta se recalcularon` : ""}.`
-              );
-            }}
-          />
+      <ModalTerminar
+        abierto={terminando}
+        sinAplicar={conteo.paraRevisar}
+        actualizados={cabecera.productosActualizados}
+        trabajando={aplicando}
+        onCerrar={() => setTerminando(false)}
+        onTerminar={terminar}
+      />
 
-          {/* ── El archivo, como diagnóstico ──────────────────────────── */}
-          <DiagnosticoArchivo archivo={archivo} macheo={macheo} cabecera={cab} />
-        </>
+      {confirmando && (
+        <HojaConfirmarAplicar
+          cantidad={listos}
+          proveedor={cabecera.proveedor?.nombre ?? ""}
+          paraRevisar={conteo.paraRevisar}
+          trabajando={aplicando}
+          onAplicar={aplicar}
+          onVolver={() => setConfirmando(false)}
+        />
       )}
     </Marco>
   );
 }
 
-function Marco({ children, router }) {
-  return (
-    <div className="min-h-screen sunmi-bg p-3 space-y-2.5">
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => router.push("/modulos/proveedores/listas")}
-          className="inline-flex items-center gap-1 text-[12px] sunmi-text-muted hover:underline"
-        >
-          <ArrowLeft size={14} aria-hidden="true" /> Volver al historial
-        </button>
-      </div>
-      {children}
-    </div>
-  );
+/** En qué situación está la lista, dicho como lo diría una persona. */
+function estadoEnCastellano(cabecera) {
+  if (cabecera.estado === "CANCELADA") return "cancelada";
+  if (cabecera.estado === "TERMINADA") {
+    return `terminada: se actualizaron ${cabecera.productosActualizados} productos`;
+  }
+  if (cabecera.productosActualizados > 0) {
+    return `${cabecera.productosActualizados} productos ya actualizados`;
+  }
+  return "todavía no cambió ningún precio";
+}
+
+/**
+ * "Todos aumentan entre 5 % y 8 %, como esperabas."
+ *
+ * Los dos extremos salen del servidor, medidos sobre las filas que SE VAN A
+ * aplicar. Decir el rango configurado en vez del real sería prometer algo que no
+ * se miró: son los mismos números solo cuando todo salió bien.
+ */
+function textoDeVariacion(variacion, rango) {
+  if (variacion?.minPct === null || variacion?.maxPct === null) return null;
+  const min = pct(variacion.minPct);
+  const max = pct(variacion.maxPct);
+  const iguales = Math.round(variacion.minPct * 10) === Math.round(variacion.maxPct * 10);
+  const dentro =
+    rango?.minPct !== null &&
+    rango?.maxPct !== null &&
+    variacion.minPct >= rango.minPct - 0.05 &&
+    variacion.maxPct <= rango.maxPct + 0.05;
+  const cola = dentro ? ", como esperabas." : ".";
+  return iguales ? `Todos aumentan ${min}${cola}` : `Todos aumentan entre ${min} y ${max}${cola}`;
+}
+
+function Marco({ children }) {
+  return <div className="p-3 space-y-3 w-full max-w-3xl mx-auto">{children}</div>;
 }

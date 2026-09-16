@@ -1,35 +1,31 @@
 "use client";
 
-// NUEVA IMPORTACIÓN de una lista de precios.
+// 2 · SUBIR UNA LISTA — y, si hace falta, 3 · ¿LEÍ BIEN LA LISTA?
 //
-// Elegir proveedor, subir el Excel, importar. Al terminar se va derecho a la
-// conciliación: el número que importa no es "se subió", es qué propone.
+// ── POR QUÉ LAS DOS PANTALLAS SON UNA SOLA PÁGINA ───────────────────────────
 //
-// ── ACÁ SE CARGA LA CONFIGURACIÓN COMERCIAL, Y SIN ELLA NO SE CONCILIA ──────
+// Porque entre una y otra está el archivo. Confirmar las columnas es contestar
+// una pregunta SOBRE ESE archivo, y si fueran dos direcciones habría que volver a
+// subirlo: son 10 MB por un teléfono, y son dos toques más justo cuando el
+// usuario ya contestó lo que se le preguntó.
 //
-// Hasta el 2026-09-16 esta pantalla MOSTRABA el recargo, el umbral y el rango, y
-// al lado decía, con estas palabras: "Son los valores configurados para el
-// proveedor y no se pueden cambiar después". Lo segundo era cierto y lo primero
-// no — no existía ninguna configuración por proveedor: los tres números salían de
-// constantes del código y valían lo mismo para todos.
+// Acá el archivo se queda en memoria y la pantalla cambia de paso. La pregunta se
+// hace una vez por proveedor, así que la segunda lista de M Y F no la ve nunca.
 //
-// Ahora se cargan acá, precargados con lo que tenga el proveedor, y editables. Si
-// el proveedor no tiene nada guardado la pantalla los pide y NO deja importar: no
-// hay valores de fábrica, porque un default que decide costos es una respuesta
-// inventada que se ve igual que una contestada.
+// ── TRES TARJETAS NUMERADAS, NO UN FORMULARIO ───────────────────────────────
 //
-// ── DOS BOTONES, DOS DECISIONES ─────────────────────────────────────────────
+// Antes era un formulario largo con el proveedor, la configuración y el archivo
+// mezclados, y el botón al final. Numerarlas es lo que permite contestar "dónde
+// estoy" sin leerlo entero, que en un teléfono es la diferencia entre avanzar y
+// abandonar.
 //
-// "Importar y conciliar" usa estos valores SOLO PARA ESTA LISTA. "Guardar para
-// las próximas" es un botón aparte que escribe la ficha del proveedor. Están
-// separados porque un mes atípico no puede reescribir el criterio de todos los
-// meses siguientes sin que nadie lo pida.
+// ── LO QUE ESTA PANTALLA NO HACE ────────────────────────────────────────────
 //
-// El endpoint sigue siendo la autoridad y revalida todo con la misma función.
+// No cambia ningún precio, y lo dice abajo del botón. Leer una lista deja una
+// propuesta revisable; aplicar es otra pantalla y otra confirmación.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowLeft, Upload } from "lucide-react";
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -42,6 +38,8 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 
 import { ErrorRecuperable } from "@/components/proveedores/listas/PiezasListas";
+import { Encabezado, Aviso } from "@/components/proveedores/listas/PiezasPantallas";
+import ConfirmarColumnas from "@/components/proveedores/listas/ConfirmarColumnas";
 import {
   proveedorAdmiteImportacion,
   validarArchivoEnCliente,
@@ -55,7 +53,10 @@ import { LIMITES } from "@/lib/proveedores/listas/persistencia";
 // ofreciendo un botón que el servidor después no acepta.
 import { faltantesDeConfiguracion } from "@/lib/proveedores/listas/configuracionProveedor";
 
-export default function NuevaImportacionPage() {
+/** Los dos pasos de esta página. */
+const PASO = { SUBIR: "SUBIR", COLUMNAS: "COLUMNAS" };
+
+export default function SubirListaPage() {
   const router = useRouter();
   const sesion = useUser() || {};
   const perfil = sesion.perfil;
@@ -64,17 +65,18 @@ export default function NuevaImportacionPage() {
 
   const inputArchivo = useRef(null);
 
+  const [paso, setPaso] = useState(PASO.SUBIR);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState("");
   const [proveedores, setProveedores] = useState([]);
   const [proveedorId, setProveedorId] = useState("");
-  // La importación sin terminar de este proveedor, si la hay. Se avisa, no se
-  // bloquea: ver el cartel más abajo.
   const [abierta, setAbierta] = useState(null);
   const [archivo, setArchivo] = useState(null);
   const [errorArchivo, setErrorArchivo] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState(null);
+  // Lo que contestó el servidor cuando hace falta confirmar las columnas.
+  const [pregunta, setPregunta] = useState(null);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
@@ -94,7 +96,7 @@ export default function NuevaImportacionPage() {
       }
       setProveedores(json.items ?? []);
     } catch {
-      setErrorCarga("Error de conexión.");
+      setErrorCarga("No se pudo conectar con el servidor. Probá de nuevo.");
     } finally {
       setCargando(false);
     }
@@ -110,10 +112,8 @@ export default function NuevaImportacionPage() {
     [proveedores, proveedorId]
   );
   const compat = proveedorAdmiteImportacion(proveedor);
+  const extensiones = proveedor?.extensiones?.length ? proveedor.extensiones : LIMITES.extensiones;
 
-  // ¿Este proveedor ya tiene una lista sin terminar? Se pregunta al mismo
-  // endpoint del historial —que ya filtra por proveedor y esconde las
-  // canceladas— en vez de inventar uno nuevo para la misma pregunta.
   useEffect(() => {
     if (!proveedorId) {
       setAbierta(null);
@@ -136,39 +136,26 @@ export default function NuevaImportacionPage() {
         // El aviso es de cortesía: si no se puede consultar, no se traba nada.
       }
     })();
-    return () => {
-      vivo = false;
-    };
+    return () => { vivo = false; };
   }, [proveedorId]);
 
   // ── LOS VALORES COMERCIALES DE ESTA LISTA ────────────────────────────────
   //
   // Viven como TEXTO mientras se editan. Un campo numérico controlado con un
-  // número no deja escribir "0," ni borrar el contenido para escribir otra cosa:
-  // el estado se guarda tal como se tipea y se convierte recién al mandar.
+  // número no deja escribir "0," ni borrar el contenido para escribir otra cosa.
   const [minPct, setMinPct] = useState("");
   const [maxPct, setMaxPct] = useState("");
   const [recargoPct, setRecargoPct] = useState("");
-  // `null` es "todavía no contestó", que NO es lo mismo que "no tiene". Sin esa
-  // diferencia, un proveedor sin configurar arrancaría diciendo que no tiene
-  // impuestos adicionales sin que nadie lo haya dicho.
+  // `null` es "todavía no contestó", que NO es lo mismo que "no tiene".
   const [tieneImpuestos, setTieneImpuestos] = useState(null);
   const [impuestoPct, setImpuestoPct] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [avisoGuardado, setAvisoGuardado] = useState("");
 
-  // Al elegir un proveedor se precarga lo suyo. Lo que no tenga queda vacío y la
-  // pantalla lo pide.
-  //
-  // ── DEPENDE DEL ID, NO DEL OBJETO ────────────────────────────────────────
-  //
-  // Dependía de `proveedor`, que sale de un `useMemo` sobre la lista. Guardar la
-  // configuración reemplaza ese objeto —para que la lista quede con lo guardado—
-  // así que este efecto volvía a correr y BORRABA el aviso de "Guardado." en el
-  // mismo instante en que aparecía: el usuario apretaba el botón y no veía nada.
-  //
-  // Apareció apretando el botón en el navegador. La suite no lo podía ver: son
-  // funciones puras y esto es una carrera entre dos renders.
+  // DEPENDE DEL ID, NO DEL OBJETO. Dependía de `proveedor`, que sale de un
+  // `useMemo` sobre la lista; guardar la configuración reemplaza ese objeto y
+  // este efecto borraba el aviso de "Guardado." en el mismo instante en que
+  // aparecía.
   useEffect(() => {
     const c = proveedor?.configuracion ?? null;
     const txt = (v) => (v === null || v === undefined ? "" : String(v));
@@ -191,6 +178,7 @@ export default function NuevaImportacionPage() {
 
   const faltan = useMemo(() => faltantesDeConfiguracion(configEditada), [configEditada]);
   const configCompleta = faltan.length === 0;
+  const yaGuardado = (proveedor?.faltaConfigurar ?? []).length === 0 && !!proveedor?.configuracion;
 
   const guardarParaLasProximas = async () => {
     if (!proveedor || !configCompleta || guardando) return;
@@ -218,14 +206,12 @@ export default function NuevaImportacionPage() {
         setAvisoGuardado(j?.error || "No se pudo guardar.");
         return;
       }
-      // La lista de proveedores queda con lo guardado, así que volver a elegirlo
-      // muestra lo nuevo y no lo viejo.
       setProveedores((ant) =>
         ant.map((p) => (p.id === proveedor.id ? { ...p, configuracion: j.configuracion, faltaConfigurar: [] } : p))
       );
       setAvisoGuardado(`Guardado. Las próximas listas de ${proveedor.nombre} arrancan con estos valores.`);
     } catch {
-      setAvisoGuardado("Error de conexión.");
+      setAvisoGuardado("No se pudo conectar con el servidor. Probá de nuevo.");
     } finally {
       setGuardando(false);
     }
@@ -241,7 +227,7 @@ export default function NuevaImportacionPage() {
     }
     const v = validarArchivoEnCliente(f, {
       tamanoMaxBytes: LIMITES.tamanoMaxBytes,
-      extensiones: LIMITES.extensiones,
+      extensiones,
     });
     setArchivo(v.ok ? f : null);
     setErrorArchivo(v.ok ? "" : v.error);
@@ -251,21 +237,30 @@ export default function NuevaImportacionPage() {
   const puedeEnviar =
     !!proveedor && compat.admite && !!archivo && !errorArchivo && !enviando && configCompleta;
 
-  const importar = async () => {
-    if (!puedeEnviar) return;
+  /**
+   * Manda el archivo a leer.
+   *
+   * `extra` lleva lo que el usuario contestó en el paso de columnas: cuál es la
+   * columna de precio y si lleva descuento. Va por la misma puerta y no por una
+   * aparte, así que el camino que corre es el mismo que el de siempre.
+   */
+  const leerLista = async (extra = {}) => {
+    if (!proveedor || !archivo) return;
     setEnviando(true);
     setErrorEnvio(null);
     try {
       const fd = new FormData();
       fd.append("archivo", archivo, archivo.name);
       fd.append("proveedorId", String(proveedor.id));
-      // Los valores de ESTA lista. El endpoint los revalida con la misma función
-      // que usa la pantalla y rechaza si falta alguno.
       fd.append("aumentoEsperadoMinPct", String(configEditada.minPct));
       fd.append("aumentoEsperadoMaxPct", String(configEditada.maxPct));
       fd.append("recargoPct", String(configEditada.recargoPct));
       fd.append("impuestosDefinidos", "true");
       fd.append("impuestoAdicionalPct", String(configEditada.impuestoAdicionalPct));
+      if (extra.columnaPrecio !== undefined && extra.columnaPrecio !== null) {
+        fd.append("columnaPrecio", String(extra.columnaPrecio));
+        fd.append("conDescuento", extra.conDescuento ? "true" : "false");
+      }
 
       const r = await fetch("/api/proveedores/listas/importar", {
         method: "POST",
@@ -274,16 +269,80 @@ export default function NuevaImportacionPage() {
       });
       const json = await r.json().catch(() => null);
 
+      // ── LAS DOS PREGUNTAS QUE NO SON ERRORES ────────────────────────────
+      //
+      // "Falta confirmar las columnas" y "no pude elegir la columna de precio"
+      // llegan como 409 porque el pedido no se pudo completar, pero para el
+      // usuario no son fallas: son preguntas. Mostrarlas como error rojo mandaría
+      // a buscar qué se hizo mal cuando lo único que hay que hacer es contestar.
+      if (r.status === 409 && json?.codigo === "FALTA_CONFIRMAR_COLUMNAS") {
+        setPregunta({ ...json, empate: false });
+        setPaso(PASO.COLUMNAS);
+        return;
+      }
+      if (r.status === 409 && (json?.codigo === "EMPATE" || json?.codigo === "NINGUNA_OPCION_CLARA")) {
+        setPregunta({ ...json, empate: true });
+        setPaso(PASO.COLUMNAS);
+        return;
+      }
+
       if (!r.ok || !json?.ok) {
         setErrorEnvio(mensajeDeError(json, r.status));
         return;
       }
       router.replace(`/modulos/proveedores/listas/${json.importacionId}`);
     } catch {
-      setErrorEnvio({ mensaje: "Error de conexión.", duplicada: false });
+      setErrorEnvio({ mensaje: "No se pudo conectar con el servidor. Probá de nuevo.", duplicada: false });
     } finally {
       setEnviando(false);
     }
+  };
+
+  /**
+   * Lo que pasa cuando el usuario contesta la pregunta de las columnas.
+   *
+   * Dos cosas, y en este orden: se GUARDA el mapa para el proveedor —así la lista
+   * del mes que viene no vuelve a preguntar— y recién después se lee el archivo.
+   * Al revés, una lectura que fallara por cualquier motivo dejaría la respuesta
+   * perdida y habría que contestarla otra vez.
+   *
+   * El guardado NO es obligatorio para seguir: si falla, se lee igual con lo que
+   * el usuario contestó y se avisa que no quedó guardado. Trabar la lectura por
+   * no poder guardar una preferencia sería cambiar el problema por uno peor.
+   */
+  const confirmarYLeer = async (extra) => {
+    const hayQueGuardar = pregunta?.codigo === "FALTA_CONFIRMAR_COLUMNAS";
+    if (hayQueGuardar && extra?.mapeo && extra?.huella) {
+      try {
+        const r = await fetch("/api/proveedores/listas/lectura/confirmar", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            proveedorId: proveedor.id,
+            titulos: extra.titulos,
+            huella: extra.huella,
+            mapeo: extra.mapeo,
+            columnaPrecioElegida: extra.columnaPrecio,
+            descuentoAplicado: extra.conDescuento === true,
+          }),
+        });
+        const j = await r.json().catch(() => null);
+        if (!r.ok || !j?.ok) {
+          setAvisoGuardado(
+            (j?.error || "No se pudo guardar el mapa de columnas.") +
+              " La lista se va a leer igual, pero la próxima te lo va a volver a preguntar."
+          );
+        }
+      } catch {
+        setAvisoGuardado(
+          "No se pudo guardar el mapa de columnas. La lista se va a leer igual, pero la próxima te lo va a volver a preguntar."
+        );
+      }
+    }
+    setPaso(PASO.SUBIR);
+    setPregunta(null);
+    await leerLista({ columnaPrecio: extra?.columnaPrecio, conDescuento: extra?.conDescuento });
   };
 
   if (cargandoUser || cargandoCtx) return null;
@@ -291,26 +350,38 @@ export default function NuevaImportacionPage() {
 
   if (needsContexto) {
     return (
-      <Marco router={router}>
-        <SunmiCard>
-          <p className="text-sm text-center py-6 sunmi-text-muted">
-            Seleccioná un contexto operativo para importar una lista.
+      <Marco>
+        <SunmiCard className="p-4">
+          <p className="text-sm2 text-center sunmi-text-muted">
+            Seleccioná un contexto operativo para subir una lista.
           </p>
         </SunmiCard>
       </Marco>
     );
   }
 
+  // ── 3 · ¿LEÍ BIEN LA LISTA? ──────────────────────────────────────────────
+  if (paso === PASO.COLUMNAS && pregunta) {
+    return (
+      <Marco>
+        <ConfirmarColumnas
+          proveedor={proveedor}
+          pregunta={pregunta}
+          trabajando={enviando}
+          onVolver={() => { setPaso(PASO.SUBIR); setPregunta(null); }}
+          onConfirmado={confirmarYLeer}
+        />
+      </Marco>
+    );
+  }
+
   return (
-    <Marco router={router}>
-      <SunmiCard className="p-3">
-        <h1 className="text-base sm:text-lg font-bold sunmi-text-strong leading-tight">
-          Nueva importación
-        </h1>
-        <p className="text-[11px] sm:text-xs sunmi-text-muted leading-tight">
-          Se calcula qué costo propone la lista. No se modifica ningún precio todavía.
-        </p>
-      </SunmiCard>
+    <Marco>
+      <Encabezado
+        volverTexto="Listas de proveedor"
+        onVolver={() => router.push("/modulos/proveedores/listas")}
+        titulo="Subir una lista"
+      />
 
       {cargando && (
         <SunmiCard className="p-6">
@@ -323,121 +394,143 @@ export default function NuevaImportacionPage() {
       )}
 
       {!cargando && !errorCarga && (
-        <SunmiCard className="p-3 space-y-4">
-          {/* ── Proveedor ─────────────────────────────────────────────── */}
-          <div className="space-y-1">
-            <label htmlFor="proveedor" className="text-[12px] font-semibold sunmi-text-strong block">
-              Proveedor
-            </label>
-            <SunmiSelectAdv
-              id="proveedor"
-              value={proveedorId}
-              onChange={(v) => {
-                setProveedorId(v);
-                setErrorEnvio(null);
-              }}
-              placeholder="Elegí un proveedor"
-              searchable
-            >
-              {/* Los que no admiten importación se listan igual, con la marca.
-                  Esconderlos dejaría al usuario buscando un proveedor que está
-                  ahí y que solo necesita que le configuren el formato. */}
-              {proveedores.map((prov) => (
-                <SunmiSelectOption key={prov.id} value={String(prov.id)}>
-                  {prov.admiteImportacion
-                    ? prov.nombre
-                    : `${prov.nombre} — sin formato configurado`}
-                </SunmiSelectOption>
-              ))}
-            </SunmiSelectAdv>
-            {proveedor && !compat.admite && (
-              <p className="text-[11.5px] sunmi-text-danger leading-snug">{compat.motivo}</p>
-            )}
+        <>
+          {/* ── 1 ─────────────────────────────────────────────────────── */}
+          <SunmiCard className="p-4 space-y-3">
+            <h2 className="text-base font-semibold sunmi-text-strong">1. ¿De qué proveedor es?</h2>
+            <div className="space-y-1">
+              <label htmlFor="proveedor" className="text-sm2 sunmi-text-muted block">
+                Proveedor
+              </label>
+              <SunmiSelectAdv
+                id="proveedor"
+                value={proveedorId}
+                onChange={(v) => { setProveedorId(v); setErrorEnvio(null); }}
+                placeholder="Elegí un proveedor"
+                searchable
+                className="min-h-toque"
+              >
+                {proveedores.map((prov) => (
+                  <SunmiSelectOption key={prov.id} value={String(prov.id)}>
+                    {prov.nombre}
+                  </SunmiSelectOption>
+                ))}
+              </SunmiSelectAdv>
+              {proveedor && !compat.admite && (
+                <p className="text-sm2 sunmi-text-danger leading-snug">{compat.motivo}</p>
+              )}
+              {proveedores.length === 0 && (
+                <p className="text-sm2 sunmi-text-muted">No hay proveedores en este contexto.</p>
+              )}
+            </div>
 
-            {/* AVISA, NO BLOQUEA. Importar una lista nueva teniendo otra abierta
-                del mismo proveedor es legítimo —una lista corregida, una de otro
-                mes— pero casi siempre es que quedó una sin terminar. Se dice, con
-                el enlace para ir a verla, y se deja seguir: bloquear obligaría a
-                cerrar algo sin haberlo mirado. */}
+            {/* AVISA, NO BLOQUEA: importar teniendo otra abierta es legítimo. */}
             {abierta && (
-              <div className="rounded-lg border sunmi-border p-2 flex items-start gap-2">
-                <AlertTriangle size={14} className="mt-0.5 shrink-0 sunmi-text-warning" aria-hidden="true" />
-                <div className="min-w-0 text-[11.5px] leading-snug">
-                  <span className="sunmi-text-warning font-semibold">
-                    Este proveedor ya tiene una importación sin terminar.
-                  </span>{" "}
-                  <span className="sunmi-text-muted">
-                    {abierta.archivoNombre} · {fechaHora(abierta.createdAt)}. Podés importar igual;
-                    las dos van a quedar abiertas.
-                  </span>{" "}
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/modulos/proveedores/listas/${abierta.id}`)}
-                    className="sunmi-text-accent hover:underline"
-                  >
-                    Ver la que está abierta
-                  </button>
-                </div>
-              </div>
+              <Aviso tono="warning">
+                Este proveedor ya tiene una lista sin terminar: {abierta.archivoNombre} ·{" "}
+                {fechaHora(abierta.createdAt)}.{" "}
+                <SunmiButton
+                  color="ghost"
+                  onClick={() => router.push(`/modulos/proveedores/listas/${abierta.id}`)}
+                  className="sunmi-text-link underline px-0 min-h-toque"
+                >
+                  Ver la que está abierta
+                </SunmiButton>
+              </Aviso>
             )}
-            {proveedores.length === 0 && (
-              <p className="text-[11.5px] sunmi-text-muted">
-                No hay proveedores visibles en este contexto.
-              </p>
-            )}
-          </div>
+          </SunmiCard>
 
-          {/* ── Cómo se leen los precios de este proveedor ─────────────── */}
+          {/* ── 2 ─────────────────────────────────────────────────────── */}
+          <SunmiCard className="p-4 space-y-3">
+            <h2 className="text-base font-semibold sunmi-text-strong">2. El archivo</h2>
+
+            {/* LA ZONA ES LA ETIQUETA DEL INPUT. Un `<input type=file>` estilado
+                nunca queda igual en los navegadores y su botón nativo mide menos
+                de 44 px; envolviéndolo en un `<label>` de alto completo, tocar
+                cualquier parte de la zona abre el selector. */}
+            <label
+              htmlFor="archivo"
+              className="flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed sunmi-border p-5 text-center cursor-pointer min-h-toque"
+            >
+              <span className="text-base font-semibold sunmi-text-strong">
+                {archivo ? `📄 ${archivo.name}` : "Tocá para elegir el archivo"}
+              </span>
+              <span className="text-sm2 sunmi-text-muted">
+                {archivo
+                  ? `${tipoDeArchivo(archivo.name)} · ${tamanoArchivo(archivo.size)} · Tocá para cambiar`
+                  : `Hasta ${Math.round(LIMITES.tamanoMaxBytes / 1024 / 1024)} MB`}
+              </span>
+            </label>
+            <input
+              ref={inputArchivo}
+              id="archivo"
+              name="archivo"
+              type="file"
+              accept={extensiones.join(",")}
+              onChange={elegirArchivo}
+              disabled={enviando}
+              className="sr-only"
+            />
+            {errorArchivo && <p className="text-sm2 sunmi-text-danger">{errorArchivo}</p>}
+            <p className="text-sm2 sunmi-text-muted leading-snug">
+              {proveedor?.parserListaId
+                ? `Este proveedor tiene un formato propio configurado: sirve ${extensiones.join(", ")}.`
+                : "Sirve PDF, Excel o CSV, tal como te lo manda el proveedor."}
+            </p>
+          </SunmiCard>
+
+          {/* ── 3 ─────────────────────────────────────────────────────── */}
           {proveedor && compat.admite && (
-            <div className="sunmi-surface-soft sunmi-border border rounded-lg p-3 space-y-3">
-              <div>
-                <h2 className="text-sm3 font-semibold sunmi-text-strong leading-tight">
-                  Cómo se leen los precios de {proveedor.nombre}
-                </h2>
-                <p className="text-sm2 sunmi-text-muted leading-snug mt-0.5">
-                  Con esto el sistema decide solo qué costo corresponde. Vale para esta
-                  lista; para dejarlo fijo está el botón de abajo.
+            <SunmiCard className="p-4 space-y-4">
+              <h2 className="text-base font-semibold sunmi-text-strong">3. Cómo controlo los precios</h2>
+
+              {yaGuardado ? (
+                <p className="text-sm2 sunmi-text-success leading-snug">
+                  Ya guardado para {proveedor.nombre}. Podés cambiarlo solo para esta lista.
                 </p>
-              </div>
+              ) : (
+                <p className="text-sm2 sunmi-text-warning leading-snug">
+                  Falta completar esto para poder leer la lista.
+                </p>
+              )}
 
-              {/* CUÁNTO SE ESPERA QUE AUMENTE. Es el dato del que cuelga todo:
-                  el sistema calcula las lecturas posibles de cada precio y se
-                  queda con la que cae acá adentro. */}
-              <CampoConfig
-                etiqueta="Cuánto suele aumentar este proveedor"
-                ayuda="Un producto que quede fuera de este rango se marca para revisar y no se aplica solo."
+              <Campo
+                etiqueta="¿Cuánto suele aumentar?"
+                ayuda="Si un producto aumenta menos o más que esto, no se cambia: te lo muestro para que lo mires."
               >
-                <div className="flex items-center gap-2">
-                  <SunmiInput
-                    id="minPct"
-                    type="number"
-                    inputMode="decimal"
-                    value={minPct}
-                    onChange={(e) => setMinPct(e.target.value)}
-                    placeholder="desde"
-                    aria-label="Aumento mínimo esperado, en por ciento"
-                    className="min-h-toque text-base w-full"
-                  />
-                  <span className="text-sm3 sunmi-text-muted shrink-0">% a</span>
-                  <SunmiInput
-                    id="maxPct"
-                    type="number"
-                    inputMode="decimal"
-                    value={maxPct}
-                    onChange={(e) => setMaxPct(e.target.value)}
-                    placeholder="hasta"
-                    aria-label="Aumento máximo esperado, en por ciento"
-                    className="min-h-toque text-base w-full"
-                  />
-                  <span className="text-sm3 sunmi-text-muted shrink-0">%</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <ConPorciento rotulo="Desde">
+                    <SunmiInput
+                      id="minPct"
+                      type="number"
+                      inputMode="decimal"
+                      value={minPct}
+                      onChange={(e) => setMinPct(e.target.value)}
+                      placeholder="5"
+                      aria-label="Aumento mínimo esperado, en por ciento"
+                      className="min-h-toque text-base w-full"
+                    />
+                  </ConPorciento>
+                  <ConPorciento rotulo="Hasta">
+                    <SunmiInput
+                      id="maxPct"
+                      type="number"
+                      inputMode="decimal"
+                      value={maxPct}
+                      onChange={(e) => setMaxPct(e.target.value)}
+                      placeholder="8"
+                      aria-label="Aumento máximo esperado, en por ciento"
+                      className="min-h-toque text-base w-full"
+                    />
+                  </ConPorciento>
                 </div>
-              </CampoConfig>
+              </Campo>
 
-              <CampoConfig
-                etiqueta="Qué se le suma al precio de lista"
-                ayuda="El recargo comercial que este proveedor cobra por encima de su lista."
+              <Campo
+                etiqueta="¿Le sumás algo al precio de la lista?"
+                ayuda="Por ejemplo, el flete. Poné 0 si no le sumás nada."
               >
-                <div className="flex items-center gap-2">
+                <ConPorciento>
                   <SunmiInput
                     id="recargoPct"
                     type="number"
@@ -448,185 +541,137 @@ export default function NuevaImportacionPage() {
                     aria-label="Recargo, en por ciento"
                     className="min-h-toque text-base w-full"
                   />
-                  <span className="text-sm3 sunmi-text-muted shrink-0">%</span>
-                </div>
-              </CampoConfig>
+                </ConPorciento>
+              </Campo>
 
-              {/* SÍ O NO CON DOS BOTONES GRANDES, no con una casilla.
-                  El kit no tiene casilla y las dos que hay en el módulo miden
-                  14 × 14 px, que en un Sunmi es un blanco que se falla. Dos
-                  botones de 44 se tocan con el pulgar y además muestran cuál
-                  está elegido sin mirar de cerca.
-                  Y arranca en NINGUNO elegido a propósito: "no contestó" y "no
-                  tiene" son hechos distintos y la pantalla no puede contestar
-                  por el usuario. */}
-              <CampoConfig
-                etiqueta="¿Suma algún impuesto aparte de los de la lista?"
-                ayuda="Si la factura de este proveedor trae algún impuesto que la lista no incluye."
-              >
-                <div className="grid grid-cols-2 gap-2">
+              {/* SÍ O NO CON DOS BOTONES GRANDES, no con una casilla: las dos
+                  casillas que había en el módulo medían 14 × 14 px, que en un
+                  Sunmi es un blanco que se falla. Y arranca en NINGUNO elegido:
+                  "no contestó" y "no tiene" son hechos distintos. */}
+              <Campo etiqueta="¿Tiene algún impuesto aparte de la lista?">
+                <div className="grid grid-cols-2 gap-3">
                   <SunmiButton
                     color={tieneImpuestos === false ? "cyan" : "slate"}
                     onClick={() => { setTieneImpuestos(false); setImpuestoPct("0"); }}
                     aria-pressed={tieneImpuestos === false}
-                    className="min-h-toque text-sm3 font-semibold"
+                    className="min-h-toque text-base font-semibold"
                   >
-                    No suma nada
+                    No
                   </SunmiButton>
                   <SunmiButton
                     color={tieneImpuestos === true ? "cyan" : "slate"}
                     onClick={() => setTieneImpuestos(true)}
                     aria-pressed={tieneImpuestos === true}
-                    className="min-h-toque text-sm3 font-semibold"
+                    className="min-h-toque text-base font-semibold"
                   >
-                    Sí, suma
+                    Sí
                   </SunmiButton>
                 </div>
                 {tieneImpuestos === true && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <SunmiInput
-                      id="impuestoPct"
-                      type="number"
-                      inputMode="decimal"
-                      value={impuestoPct}
-                      onChange={(e) => setImpuestoPct(e.target.value)}
-                      placeholder="0"
-                      aria-label="Impuesto adicional, en por ciento"
-                      className="min-h-toque text-base w-full"
-                    />
-                    <span className="text-sm3 sunmi-text-muted shrink-0">%</span>
+                  <div className="mt-3">
+                    <ConPorciento>
+                      <SunmiInput
+                        id="impuestoPct"
+                        type="number"
+                        inputMode="decimal"
+                        value={impuestoPct}
+                        onChange={(e) => setImpuestoPct(e.target.value)}
+                        placeholder="0"
+                        aria-label="Impuesto adicional, en por ciento"
+                        className="min-h-toque text-base w-full"
+                      />
+                    </ConPorciento>
                   </div>
                 )}
-              </CampoConfig>
+              </Campo>
 
-              {/* QUÉ FALTA, dicho en la pantalla y no descubierto al apretar.
-                  El texto sale del mismo módulo que usa el servidor para
-                  rechazar. */}
-              {!configCompleta && (
-                <p className="text-sm2 sunmi-text-warning leading-snug">
-                  Falta completar esto para poder importar la lista.
-                </p>
-              )}
-
-              <div className="pt-1">
+              <div>
                 <SunmiButton
                   color="slate"
                   onClick={guardarParaLasProximas}
                   disabled={!configCompleta || guardando}
                   className="w-full min-h-toque text-sm3"
                 >
-                  {guardando ? "Guardando…" : `Guardar para las próximas de ${proveedor.nombre}`}
+                  {guardando ? "Guardando…" : `Guardar para las próximas de ${nombreCorto(proveedor.nombre)}`}
                 </SunmiButton>
                 {avisoGuardado && (
-                  <p className="text-sm2 sunmi-text-muted leading-snug mt-1">{avisoGuardado}</p>
+                  <p className="text-sm2 sunmi-text-muted leading-snug mt-2">{avisoGuardado}</p>
                 )}
               </div>
-            </div>
+            </SunmiCard>
           )}
 
-          {/* ── Archivo ───────────────────────────────────────────────── */}
-          <div className="space-y-1">
-            <label htmlFor="archivo" className="text-[12px] font-semibold sunmi-text-strong block">
-              Archivo de la lista ({LIMITES.extensiones.join(", ")})
-            </label>
-            <input
-              ref={inputArchivo}
-              id="archivo"
-              name="archivo"
-              type="file"
-              accept=".xlsx"
-              onChange={elegirArchivo}
-              disabled={enviando}
-              className="block w-full text-[12px] sunmi-text-muted file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:sunmi-btn-base file:sunmi-btn-slate"
-            />
-            {archivo && (
-              <p className="text-[11.5px] sunmi-text-success">
-                {archivo.name} · {tamanoArchivo(archivo.size)}
-              </p>
-            )}
-            {errorArchivo && <p className="text-[11.5px] sunmi-text-danger">{errorArchivo}</p>}
-            <p className="text-[10.5px] sunmi-text-muted">
-              Hasta {Math.round(LIMITES.tamanoMaxBytes / 1024 / 1024)} MB y {LIMITES.filasMax} filas.
-            </p>
-          </div>
-
-          {/* ── El error del servidor ─────────────────────────────────── */}
           {errorEnvio && (
-            <div className="sunmi-surface-soft sunmi-border border rounded-lg p-3 space-y-2">
-              <p className="text-[12px] sunmi-text-danger leading-snug">{errorEnvio.mensaje}</p>
-              {errorEnvio.detalle && (
-                <p className="text-[11.5px] sunmi-text-muted">{errorEnvio.detalle}</p>
-              )}
+            <Aviso tono="danger">
+              <p className="leading-snug">{errorEnvio.mensaje}</p>
+              {errorEnvio.detalle && <p className="mt-1 sunmi-text-muted">{errorEnvio.detalle}</p>}
               {errorEnvio.duplicada && errorEnvio.importacionId && (
                 <SunmiButton
                   color="slate"
-                  onClick={() =>
-                    router.push(`/modulos/proveedores/listas/${errorEnvio.importacionId}`)
-                  }
-                  className="py-2 text-xs"
+                  onClick={() => router.push(`/modulos/proveedores/listas/${errorEnvio.importacionId}`)}
+                  className="mt-2 min-h-toque text-sm2"
                 >
-                  Abrir la importación existente
+                  Abrir la que ya está
                 </SunmiButton>
               )}
-            </div>
+            </Aviso>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2 pt-1">
-            <SunmiButton
-              color="slate"
-              onClick={() => router.push("/modulos/proveedores/listas")}
-              disabled={enviando}
-              className="py-3 text-xs order-2 sm:order-1"
-            >
-              Cancelar
-            </SunmiButton>
+          <div className="space-y-2">
             <SunmiButton
               color="cyan"
-              onClick={importar}
+              onClick={() => leerLista()}
               disabled={!puedeEnviar}
-              className="py-3 font-bold text-xs order-1 sm:order-2 inline-flex items-center justify-center gap-1"
+              className="w-full min-h-toque text-base font-bold"
             >
-              <Upload size={14} aria-hidden="true" />
-              {enviando ? "Importando…" : "Importar y conciliar"}
+              {enviando ? "Leyendo…" : "Leer la lista"}
             </SunmiButton>
+            <p className="text-sm2 sunmi-text-muted text-center leading-snug">
+              Leer no cambia ningún precio. Vas a ver el resultado antes de aplicar.
+            </p>
           </div>
-        </SunmiCard>
+        </>
       )}
     </Marco>
   );
 }
 
-/**
- * Un campo de la configuración comercial: rótulo, control y una línea que dice
- * para qué sirve.
- *
- * La ayuda NO es decorativa y por eso va en la pieza y no como un `<p>` suelto
- * al lado de cada campo: el que carga esto no sabe qué es un "rango de aumento
- * esperado", y un rótulo solo lo dejaría adivinando. Está acá adentro para que
- * ningún campo pueda quedarse sin ella por olvido.
- */
-function CampoConfig({ etiqueta, ayuda, children }) {
+/** "PDF", "Excel" o "CSV", que es como lo nombra el que lo manda. */
+function tipoDeArchivo(nombre) {
+  const n = String(nombre ?? "").toLowerCase();
+  if (n.endsWith(".pdf")) return "PDF";
+  if (n.endsWith(".csv") || n.endsWith(".txt")) return "CSV";
+  return "Excel";
+}
+
+/** El nombre del proveedor sin la forma societaria, para que entre en un botón. */
+function nombreCorto(nombre) {
+  return String(nombre ?? "").replace(/\s+(s\.?a\.?|s\.?r\.?l\.?|s\.?a\.?i\.?c\.?)\.?$/i, "").trim();
+}
+
+function Campo({ etiqueta, ayuda, children }) {
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
       <p className="text-sm3 font-semibold sunmi-text-strong leading-tight">{etiqueta}</p>
       {children}
-      <p className="text-sm2 sunmi-text-muted leading-snug">{ayuda}</p>
+      {ayuda && <p className="text-sm2 sunmi-text-muted leading-snug">{ayuda}</p>}
     </div>
   );
 }
 
-function Marco({ children, router }) {
+/** Un campo con su rótulo arriba y el signo de porciento al lado. */
+function ConPorciento({ rotulo, children }) {
   return (
-    <div className="p-2 lg:p-3 space-y-3 w-full max-w-[720px] mx-auto">
-      <button
-        type="button"
-        onClick={() => router.push("/modulos/proveedores/listas")}
-        className="text-[11px] sunmi-text-muted inline-flex items-center gap-1"
-      >
-        <ArrowLeft size={14} aria-hidden="true" />
-        Volver al historial
-      </button>
-      {children}
+    <div>
+      {rotulo && <div className="text-xs2 sunmi-text-muted mb-1">{rotulo}</div>}
+      <div className="flex items-center gap-2">
+        {children}
+        <span className="text-base sunmi-text-muted shrink-0">%</span>
+      </div>
     </div>
   );
+}
+
+function Marco({ children }) {
+  return <div className="p-3 space-y-3 w-full max-w-3xl mx-auto">{children}</div>;
 }

@@ -693,6 +693,17 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // renombre de `destructivo`.
     "components/proveedores/listas/ModalRevertir.jsx": true,
     "components/proveedores/listas/ModalTerminar.jsx": true,
+    // ── LA HOJA DE CONFIRMAR APLICAR, Y VA EN `false` POR EL CRITERIO NUEVO ─
+    //
+    // Sus dos hermanos de arriba declaran `true` por el criterio VIEJO —"la
+    // acción es peligrosa"— y quedan así hasta que se revisen. Ésta nace después
+    // del criterio nuevo, así que lo sigue: adentro hay cuatro renglones para
+    // leer y dos botones, no hay NADA escrito que se pueda perder, y en un
+    // teléfono es una hoja con el pulgar al lado. Que el toque afuera la cierre
+    // es lo que espera quien la abrió sin querer.
+    //
+    // Lo grave lo sostiene el botón "Sí, aplicar", que hay que ir a buscar.
+    "components/proveedores/listas/HojaConfirmarAplicar.jsx": false,
     // ── EL CARTEL DE FINALIZAR O BORRAR UNA OFERTA ────────────────────────
     //
     // Reemplaza a dos `confirm()` del navegador. No hay nada escrito adentro que

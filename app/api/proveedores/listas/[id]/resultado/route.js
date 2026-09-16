@@ -60,6 +60,11 @@ const CAMPOS_CONTEO = {
   motivo: true,
   costoAnterior: true,
   productoBaseId: true,
+  // SIN ESTA COLUMNA EL CONTADOR NO PUEDE VER LO QUE LA PERSONA DECIDIÓ.
+  // `excluidaManual` es donde vive "dejala como está"; sin pedirla, cada fila
+  // llegaba con el campo en `undefined` y la cola seguía contando 595 después de
+  // sacar una. El botón parecía no hacer nada.
+  excluidaManual: true,
 };
 
 export async function GET(req, context) {
@@ -132,8 +137,12 @@ export async function GET(req, context) {
     });
 
     // ── La muestra: tres de las que se van a actualizar ──────────────────
+    // `excluidaManual: false` en los dos: una fila que el motor dejó lista y que
+    // después alguien excluyó a mano NO se va a aplicar, así que no puede
+    // aparecer entre "algunos de los que se actualizan" ni estirar el rango de
+    // aumentos que la tarjeta grande promete.
     const muestra = await prisma.importacionListaFila.findMany({
-      where: { importacionId: id, estado: ESTADO_LINEA.LISTO_PARA_ACTUALIZAR },
+      where: { importacionId: id, estado: ESTADO_LINEA.LISTO_PARA_ACTUALIZAR, excluidaManual: false },
       orderBy: { filaExcel: "asc" },
       take: MUESTRA,
       select: {
@@ -152,7 +161,7 @@ export async function GET(req, context) {
     // "Todos aumentan entre 5 % y 8 %, como esperabas" solo se puede escribir si
     // se mira. Sale de la base con un agregado y no trayendo 850 porcentajes.
     const extremos = await prisma.importacionListaFila.aggregate({
-      where: { importacionId: id, estado: ESTADO_LINEA.LISTO_PARA_ACTUALIZAR },
+      where: { importacionId: id, estado: ESTADO_LINEA.LISTO_PARA_ACTUALIZAR, excluidaManual: false },
       _min: { diferenciaPct: true },
       _max: { diferenciaPct: true },
     });
@@ -230,10 +239,21 @@ async function armarCola({ id, motivo, url, cabecera }) {
   const candidatas = await prisma.importacionListaFila.findMany({
     where: {
       importacionId: id,
-      estado: { notIn: [ESTADO_LINEA.LISTO_PARA_ACTUALIZAR, ESTADO_LINEA.SIN_CAMBIOS, ESTADO_LINEA.EXCLUIDO] },
+      estado: { notIn: [ESTADO_LINEA.LISTO_PARA_ACTUALIZAR, ESTADO_LINEA.SIN_CAMBIOS] },
+      // LO QUE LA PERSONA YA RESOLVIÓ SE VA DE LA COLA, Y SE FILTRA EN LA BASE.
+      // `ESTADO_LINEA.EXCLUIDO` no sirve para esto: está en el enum y nada lo
+      // escribe nunca. Lo que se escribe es `excluidaManual`.
+      excluidaManual: false,
     },
     orderBy: { filaExcel: "asc" },
-    select: { id: true, estado: true, motivo: true, costoAnterior: true, productoBaseId: true },
+    select: {
+      id: true,
+      estado: true,
+      motivo: true,
+      costoAnterior: true,
+      productoBaseId: true,
+      excluidaManual: true,
+    },
   });
   const delGrupo = candidatas.filter((f) => motivoDeRevision(f) === motivo);
   const ids = delGrupo.slice(skip, skip + take).map((f) => f.id);

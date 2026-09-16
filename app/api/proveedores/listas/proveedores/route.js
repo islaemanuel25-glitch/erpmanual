@@ -21,7 +21,7 @@ import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
 import { proveedorVisibleWhere } from "@/lib/visibilidad";
-import { listarParsers } from "@/lib/proveedores/listas/registro";
+import { listarParsers, resolverParserDeProveedor } from "@/lib/proveedores/listas/registro";
 import {
   configuracionDeProveedor,
   faltantesDeConfiguracion,
@@ -69,7 +69,13 @@ export async function GET(req) {
           id: p.id,
           nombre: p.nombre,
           parserListaId: p.parserListaId,
-          admiteImportacion: !!p.parserListaId,
+          // Todos admiten: el que no tiene formato propio va al lector genérico.
+          admiteImportacion: true,
+          // Qué archivos acepta ESTE proveedor, que depende de su lector. El de
+          // Arcor solo .xlsx; el genérico también PDF, .xls y .csv. La pantalla
+          // lo usa para el `accept` del selector de archivo y para avisar antes
+          // de subir 10 MB que no van a servir.
+          extensiones: resolverParserDeProveedor(p).extensiones ?? [],
           configuracion: config,
           // Qué le falta para poder importar. Se manda calculado y no se deja que
           // lo deduzca la pantalla: la regla de qué está completo es la misma que
