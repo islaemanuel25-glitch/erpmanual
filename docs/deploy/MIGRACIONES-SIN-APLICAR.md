@@ -16,7 +16,38 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **14 migraciones**, las mismas que el árbol.
+Ninguna. Producción está en **15 migraciones**, las mismas que el árbol.
+
+---
+
+## 2026-09-16 — `6dfe0b70`, la configuración de listas por proveedor: **ADITIVA**
+
+Producción pasó de `a2361da0f7c540072bc772c475d48abe96a81530` a
+`6dfe0b7030c57e2d4dfd7bfa20761bc46df60b28`. Corte de **2 segundos**.
+
+`20260916120000_configuracion_lista_por_proveedor`. Cinco columnas nuevas en
+`Proveedor` —rango de aumento mínimo y máximo, recargo, impuesto adicional y el
+booleano que dice si los impuestos ya se contestaron— y una en
+`ImportacionListaProveedor`, que congela con qué impuesto se concilió esa lista.
+
+**El clasificador la marcó ADITIVA y salió con 0**: solo `ADD COLUMN`, sin DROP,
+sin UPDATE, sin DELETE y sin backfill. **No hizo falta autorización manual**, y
+la bitácora `.claude/migraciones-autorizadas.log` sigue sin existir.
+
+**El quinto chequeo del backup no aplicaba**: no se borra ni se reescribe ningún
+dato.
+
+Verificado después de recrear: `migrate status` informa 15 y "Database schema is
+up to date!", las seis columnas existen, y los 43 proveedores quedaron con el
+rango en NULL — que es lo que la migración pretende, porque no hay valores de
+fábrica y la configuración se carga desde la pantalla.
+
+**Y quedó una lección de procedimiento:** este archivo decía "Ninguna · 14
+migraciones" cuando el árbol ya traía la número 15. O sea que el paso 0 del
+despliegue leyó "esto es solo código" sobre una tanda que traía migración. No
+hizo daño porque el clasificador la encontró igual —calcula el rango solo— pero
+es exactamente el caso que este archivo existe para evitar: **la lista se
+actualiza en la misma tanda que agrega la migración, no en la que la despliega.**
 
 ---
 
