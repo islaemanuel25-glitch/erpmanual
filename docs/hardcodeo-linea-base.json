@@ -2,14 +2,14 @@
   "_lea_esto": "Línea de base del hardcodeo. La sella scripts/hardcodeo.mjs --linea-base --sellar; sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
   "_commit": "`commit` es el árbol que se ESCANEÓ, no la fecha en que se selló: pueden diferir. Cuando se corrige un falso positivo del contador, la base se REEXPRESA desde el árbol histórico —no desde main— para no perdonar la deuda que entró después.",
   "_inventario": "El trinquete compara el INVENTARIO, no los totales: una ocurrencia es archivo + categoría + texto, con cantidad. Sin número de línea, para que mover código no invente violaciones. Un alta en cualquier clave pone rojo aunque el total baje.",
-  "generada": "2026-09-12 23:39",
-  "commit": "009671d6a56d8234e7bcf6c2107c4f496115702d",
+  "generada": "2026-09-16 23:16",
+  "commit": "be4001b3b8222ae880340e7ad2821a8576c36574",
   "total": {
     "color": 284,
-    "medida": 1893,
+    "medida": 1840,
     "modal": 34,
-    "crudo": 309,
-    "celda": 461,
+    "crudo": 304,
+    "celda": 447,
     "kit-pisado": 0,
     "tema-paralelo": 87
   },
@@ -268,10 +268,10 @@
     },
     "proveedores": {
       "color": 1,
-      "medida": 323,
+      "medida": 270,
       "modal": 0,
-      "crudo": 35,
-      "celda": 39,
+      "crudo": 30,
+      "celda": 25,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -924,7 +924,7 @@
         "<td>": 48
       }
     },
-    "app/modulos/proveedores/listas/[id]/page.jsx": {
+    "app/modulos/proveedores/listas/[id]/filas/page.jsx": {
       "medida": {
         "text-[13px]": 1,
         "text-[11px]": 9,
@@ -937,35 +937,8 @@
       }
     },
     "app/modulos/proveedores/listas/nueva/page.jsx": {
-      "medida": {
-        "text-[11px]": 2,
-        "text-[12px]": 4,
-        "text-[11.5px]": 6,
-        "text-[10.5px]": 2,
-        "max-w-[720px]": 1
-      },
       "crudo": {
-        "<button>": 2,
         "<input>": 1
-      }
-    },
-    "app/modulos/proveedores/listas/page.jsx": {
-      "medida": {
-        "text-[11px]": 17,
-        "text-[12.5px]": 1,
-        "text-[11.5px]": 3,
-        "text-[12px]": 12,
-        "max-w-[24ch]": 1,
-        "text-[10px]": 1,
-        "text-[13px]": 1,
-        "max-w-[1600px]": 1
-      },
-      "crudo": {
-        "<input>": 1,
-        "<button>": 1
-      },
-      "celda": {
-        "<td>": 14
       }
     },
     "app/modulos/proveedores/page.jsx": {
@@ -2368,14 +2341,13 @@
     "components/proveedores/listas/PanelAplicar.jsx": {
       "medida": {
         "text-[12.5px]": 4,
-        "text-[11.5px]": 11,
+        "text-[11.5px]": 10,
         "text-[10.5px]": 1,
         "text-[11px]": 2,
         "text-[12px]": 8,
         "max-h-[320px]": 1
       },
       "crudo": {
-        "<input>": 1,
         "<button>": 1
       }
     },
