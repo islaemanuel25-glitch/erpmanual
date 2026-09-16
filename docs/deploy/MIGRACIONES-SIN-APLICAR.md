@@ -16,7 +16,33 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **15 migraciones**, las mismas que el árbol.
+**Una.** Producción está en **15 migraciones** y el árbol tiene **16**.
+
+### `20260916140000_receta_de_lectura_de_listas` — **ADITIVA**
+
+Cómo se lee la lista de cada proveedor deja de ser código y pasa a ser un dato:
+dos columnas en `Proveedor` —el mapa de columnas y la huella de la estructura del
+archivo con el que se confirmó—, tres en `ImportacionListaProveedor` —qué columna
+de precio se eligió para esa lista, si llevaba el descuento aplicado y la
+decisión completa para poder explicarla meses después— y una en
+`ImportacionListaFila`, el descuento que traía esa fila.
+
+**Seis `ADD COLUMN` y nada más**: sin DROP, sin UPDATE, sin DELETE, sin INSERT y
+sin backfill. Ninguna columna existente se toca y ninguna fila existente cambia.
+Las seis son nullable, así que un INSERT del código viejo sigue siendo válido
+durante toda la ventana entre migrar y recrear, y Arcor anda sin ninguna de
+ellas: su receta es su parser.
+
+Por la misma forma que la anterior, se espera que el clasificador la marque
+ADITIVA y salga con 0, sin autorización manual. **Eso lo confirma el despliegue,
+no este archivo**: acá se anota lo que trae el árbol, no lo que va a pasar.
+
+Entró en `1af2e7c`, en la tanda del lector genérico.
+
+**Este renglón se escribe acá y no al desplegar**, que es la lección que dejó
+anotada el despliegue de `6dfe0b70` más abajo: aquella vez este archivo decía
+"Ninguna · 14 migraciones" mientras el árbol ya traía la 15, así que el paso 0
+leyó "solo código" sobre una tanda con migración.
 
 ---
 
