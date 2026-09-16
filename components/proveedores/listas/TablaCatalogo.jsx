@@ -41,6 +41,31 @@ function estadoDe(p) {
   if (conPropuesta) {
     return { texto: money(conPropuesta.costoMaestroPropuesto), detalle: "propuesto" };
   }
+
+  // ── LA FILA QUE QUEDÓ PARA REVISAR TAMBIÉN MUESTRA SU NÚMERO ─────────────
+  //
+  // Desde el 2026-09-16 una fila cuyo costo se va del rango esperado NO recibe
+  // costo propuesto —no se aplica— y acá caía en el guion: "revisá esto" sin
+  // decir cuánto da. Desde un teléfono eso no se puede revisar.
+  //
+  // El costo que habría salido se reconstruye de dos columnas que el motor sí
+  // persiste: el costo anterior y la diferencia. No hace falta una columna
+  // nueva para un número que ya está.
+  //
+  // Se muestra APAGADO y con "fuera de lo esperado" al lado, para que no se
+  // confunda con una propuesta: es lo que el sistema descartó, no lo que
+  // propone.
+  const paraRevisar = p.filas?.find(
+    (f) => f.costoAnterior !== null && f.diferencia !== null && f.diferencia !== undefined
+  );
+  if (paraRevisar) {
+    const candidato = Number(paraRevisar.costoAnterior) + Number(paraRevisar.diferencia);
+    return {
+      texto: money(candidato),
+      detalle: `${pct(paraRevisar.diferenciaPct)} · fuera de lo esperado`,
+    };
+  }
+
   return { texto: "—", detalle: null };
 }
 

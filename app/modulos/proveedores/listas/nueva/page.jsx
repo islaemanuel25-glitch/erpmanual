@@ -159,6 +159,16 @@ export default function NuevaImportacionPage() {
 
   // Al elegir un proveedor se precarga lo suyo. Lo que no tenga queda vacío y la
   // pantalla lo pide.
+  //
+  // ── DEPENDE DEL ID, NO DEL OBJETO ────────────────────────────────────────
+  //
+  // Dependía de `proveedor`, que sale de un `useMemo` sobre la lista. Guardar la
+  // configuración reemplaza ese objeto —para que la lista quede con lo guardado—
+  // así que este efecto volvía a correr y BORRABA el aviso de "Guardado." en el
+  // mismo instante en que aparecía: el usuario apretaba el botón y no veía nada.
+  //
+  // Apareció apretando el botón en el navegador. La suite no lo podía ver: son
+  // funciones puras y esto es una carrera entre dos renders.
   useEffect(() => {
     const c = proveedor?.configuracion ?? null;
     const txt = (v) => (v === null || v === undefined ? "" : String(v));
@@ -168,7 +178,8 @@ export default function NuevaImportacionPage() {
     setTieneImpuestos(c?.impuestosDefinidos ? Number(c?.impuestoAdicionalPct) > 0 : null);
     setImpuestoPct(txt(c?.impuestoAdicionalPct));
     setAvisoGuardado("");
-  }, [proveedor]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [proveedorId]);
 
   const configEditada = useMemo(() => ({
     minPct: minPct === "" ? null : Number(minPct),

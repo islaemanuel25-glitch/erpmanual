@@ -163,6 +163,12 @@ export async function GET(req, context) {
               estado: true, motivo: true, tipoCoincidencia: true, resultadoInterpretacion: true,
               aplicada: true, excluidaManual: true, seleccionada: true,
               costoAnterior: true, costoMaestroPropuesto: true, costoAplicado: true,
+              // LA DIFERENCIA Y EL PORCENTAJE VIAJAN SIEMPRE, no solo cuando hay
+              // costo propuesto. Una fila que quedó fuera del rango NO tiene
+              // propuesta —no se aplica— y sin estos dos campos la tabla la
+              // muestra con un guion: "revisá esto" sin decir cuánto da, que
+              // desde un teléfono no se puede revisar.
+              diferencia: true, diferenciaPct: true,
               aplicadaEn: true, confirmadoEn: true, vinculadoEn: true,
               // QUÉ lectura se confirmó, no solo que se confirmó. Sin esto el
               // panel abre una fila ya resuelta con las tarjetas en blanco, y
@@ -286,6 +292,8 @@ export async function GET(req, context) {
           costoAnterior: numero(f.costoAnterior),
           costoMaestroPropuesto: numero(f.costoMaestroPropuesto),
           costoAplicado: numero(f.costoAplicado),
+          diferencia: numero(f.diferencia),
+          diferenciaPct: numero(f.diferenciaPct),
         })),
       };
     });
