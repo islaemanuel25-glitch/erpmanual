@@ -523,7 +523,19 @@ export async function POST(req) {
         columna: eleccion.columna,
         titulo: generico.titulos[eleccion.columna] ?? "",
         conDescuento: eleccion.conDescuento === true,
-        aMano: generico.eleccionManual !== null,
+        // ── "A MANO" ES HABER CORREGIDO AL MOTOR, NO HABERLE DICHO QUE SÍ ───
+        //
+        // La pantalla 3 manda siempre la columna, también cuando la persona
+        // aprieta "Está bien, seguir" sobre la que el motor propuso. Mirando
+        // solo `eleccionManual !== null`, aceptar quedaba registrado como elegir,
+        // y el resultado decía "La elegiste vos" sobre una columna que la
+        // persona nunca tocó. Es un dato de auditoría: si un costo sale mal, la
+        // primera pregunta es quién eligió esa columna.
+        aMano:
+          generico.eleccionManual !== null &&
+          (decision.eleccion === null ||
+            decision.eleccion.columna !== eleccion.columna ||
+            decision.eleccion.conDescuento !== eleccion.conDescuento),
         explicadas: decision.eleccion?.explicadas ?? null,
         comparables: decision.eleccion?.comparables ?? null,
         // Lo que el motor habría elegido solo, esté o no de acuerdo con lo que

@@ -203,8 +203,9 @@ export default function ConfirmarColumnas({ proveedor, pregunta, trabajando, onV
 
       {conteo && (
         <p className="text-sm2 sunmi-text-muted leading-snug">
-          Salteé {conteo.descartadas} {conteo.descartadas === 1 ? "fila" : "filas"} que no son productos
-          (títulos y encabezados).
+          {conteo.descartadas === 1
+            ? "Salteé 1 fila que no es un producto (un título o un encabezado)."
+            : `Salteé ${conteo.descartadas} filas que no son productos (títulos y encabezados).`}
         </p>
       )}
 

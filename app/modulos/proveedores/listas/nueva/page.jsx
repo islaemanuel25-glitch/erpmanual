@@ -51,7 +51,14 @@ import { LIMITES } from "@/lib/proveedores/listas/persistencia";
 // Qué le falta a un proveedor para poder importar. Se le pregunta a la MISMA
 // función que usa el endpoint para rechazar: dos copias de esa regla terminarían
 // ofreciendo un botón que el servidor después no acepta.
-import { faltantesDeConfiguracion } from "@/lib/proveedores/listas/configuracionProveedor";
+import {
+  faltantesDeConfiguracion,
+  TEXTO_FALTA_CONFIGURACION,
+} from "@/lib/proveedores/listas/configuracionProveedor";
+// Y CUÁLES DE LOS "NO PUDE ELEGIR LA COLUMNA" SON PREGUNTAS Y NO ERRORES. La
+// lista estaba escrita acá y le faltaban dos de los cuatro motivos; ahora la
+// contesta el módulo que define el enum.
+import { seContestaEligiendoColumna } from "@/lib/proveedores/listas/decisionDeLista";
 
 /** Los dos pasos de esta página. */
 const PASO = { SUBIR: "SUBIR", COLUMNAS: "COLUMNAS" };
@@ -280,7 +287,7 @@ export default function SubirListaPage() {
         setPaso(PASO.COLUMNAS);
         return;
       }
-      if (r.status === 409 && (json?.codigo === "EMPATE" || json?.codigo === "NINGUNA_OPCION_CLARA")) {
+      if (r.status === 409 && seContestaEligiendoColumna(json?.codigo)) {
         setPregunta({ ...json, empate: true });
         setPaso(PASO.COLUMNAS);
         return;
@@ -484,14 +491,38 @@ export default function SubirListaPage() {
             <SunmiCard className="p-4 space-y-4">
               <h2 className="text-base font-semibold sunmi-text-strong">3. Cómo controlo los precios</h2>
 
+              {/* ── TRES ESTADOS, NO DOS ───────────────────────────────────
+                  El diseño pide dos renglones: el verde de "ya guardado" y el
+                  ámbar de "falta completar", este último con el botón principal
+                  apagado. Faltaba el tercero, que es el que se ve mientras se
+                  completa: apenas alguien escribe el rango, el botón se
+                  enciende y el renglón ámbar seguía diciendo que faltaba algo.
+                  Un aviso que no se apaga cuando el problema se resuelve deja de
+                  ser un aviso. */}
               {yaGuardado ? (
                 <p className="text-sm2 sunmi-text-success leading-snug">
                   Ya guardado para {proveedor.nombre}. Podés cambiarlo solo para esta lista.
                 </p>
-              ) : (
-                <p className="text-sm2 sunmi-text-warning leading-snug">
-                  Falta completar esto para poder leer la lista.
+              ) : configCompleta ? (
+                <p className="text-sm2 sunmi-text-success leading-snug">
+                  Listo para esta lista. Si querés que valga para las próximas de{" "}
+                  {proveedor.nombre}, guardalo con el botón de abajo.
                 </p>
+              ) : (
+                // Y DICE QUÉ FALTA, no que falta algo. Con el rango y el
+                // impuesto contestados pero el recargo vacío, "Falta completar
+                // esto" dejaba un botón apagado y ninguna pista de cuál de los
+                // tres campos lo apagaba — y el recargo es justamente el que se
+                // deja en blanco, porque su ayuda dice "poné 0 si no le sumás
+                // nada" y el 0 que se ve es el de la marca de agua.
+                <div className="text-sm2 sunmi-text-warning leading-snug space-y-1">
+                  <p>Falta completar esto para poder leer la lista:</p>
+                  <ul className="list-disc pl-5">
+                    {faltan.map((f) => (
+                      <li key={f}>{TEXTO_FALTA_CONFIGURACION[f] ?? f}</li>
+                    ))}
+                  </ul>
+                </div>
               )}
 
               <Campo
