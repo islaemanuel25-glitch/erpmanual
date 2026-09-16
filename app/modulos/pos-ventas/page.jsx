@@ -18,7 +18,8 @@ import CarritoVenta from "@/components/pos-ventas/CarritoVenta";
 import FormaPago from "@/components/pos-ventas/FormaPago";
 import ModalPagoEfectivo from "@/components/pos-ventas/ModalPagoEfectivo";
 import ModalImporteServicio from "@/components/pos-ventas/ModalImporteServicio";
-import { sumarTotalServicios, componerCobroSimple } from "@/lib/pos-ventas/servicios";
+import { sumarTotalServicios, componerCobroSimple, esTenderDeEfectivo } from "@/lib/pos-ventas/servicios";
+import { aCentavos } from "@/lib/pos-ventas/pagos";
 import { totalesPorMedio, totalesPorOpcionDeCobro, hayOfertaSoloEfectivoEnCarrito } from "@/lib/ofertas/previewPos";
 import { normalizarRecargos } from "@/lib/recargos-pago/recargoPago";
 import { itemsCrearPayload } from "@/lib/pos-ventas/payloadVenta";
@@ -1403,9 +1404,42 @@ export default function PosVentasPage() {
     // "paga con"/vuelto SOBRE EL MONTO EFECTIVO APLICADO (no el total). Los otros
     // tenders y el restante ya están fijados; el vuelto es solo display.
     if (Array.isArray(pagos) && pagos.length > 0) {
-      const efectivoTender = pagos.find((p) => p.medio === "efectivo");
+      // ── EL TENDER DE EFECTIVO SE RECONOCE POR SU TIPO, NO POR UN TEXTO ────
+      //
+      // Esto preguntaba `p.medio === "efectivo"`. Desde `868c04d7` un tender con
+      // identidad NO trae `medio` —lleva `medioCobroLocalId` y `modalidadId`, que
+      // es lo que el servidor quiere— así que la búsqueda no encontraba nada y el
+      // efectivo cobraba de largo, sin abrir el modal de "Cliente paga con" y sin
+      // vuelto. Tres meses así.
+      //
+      // `esTenderDeEfectivo` resuelve la identidad contra los medios del local
+      // que esta pantalla ya tiene cargados, y delega el criterio en la misma
+      // función que usa el panel para sus filas.
+      const efectivoTender = pagos.find((p) => esTenderDeEfectivo(p, mediosCobro));
       if (efectivoTender) {
-        dispatch({ type: ActionTypes.OPEN_MODAL, payload: { modal: "modalEfectivo", data: { total: tot, montoEfectivo: Number(efectivoTender.monto), formaPago: fp, pagos, totalPantalla } } });
+        // ── CUÁNTO SE COBRA EN EFECTIVO, Y CÓMO SE ROTULA ──────────────────
+        //
+        // Si el tender cubre la venta entera es el cobro simple de siempre, y el
+        // modal dice "Total a cobrar". Si cubre una parte —Dividir pago, o el
+        // mínimo de efectivo por servicios— el vuelto se calcula SOBRE ESA PARTE
+        // y el modal lo dice: "Efectivo a cubrir".
+        //
+        // Antes esto se distinguía por si había `pagos`. Ya no alcanza: el
+        // efectivo simple también los trae desde que hay identidad.
+        const cubreTodo = aCentavos(efectivoTender.monto) === aCentavos(tot);
+        dispatch({
+          type: ActionTypes.OPEN_MODAL,
+          payload: {
+            modal: "modalEfectivo",
+            data: {
+              total: tot,
+              ...(cubreTodo ? {} : { montoEfectivo: Number(efectivoTender.monto) }),
+              formaPago: fp,
+              pagos,
+              totalPantalla,
+            },
+          },
+        });
       } else {
         ejecutarCobro({ formaPago: fp, total: tot, pagos, totalPantalla });
       }
