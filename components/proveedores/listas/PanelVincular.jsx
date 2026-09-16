@@ -137,7 +137,10 @@ export default function PanelVincular({ importacionId, fila, onVinculada, onCerr
           type="button"
           onClick={onCerrar}
           aria-label="Cerrar el panel de vinculación"
-          className="shrink-0 sunmi-text-muted"
+          // La cruz dibuja 16 px; lo que se toca con el pulgar son los 44 del
+          // botón que la contiene. Sin esto, cerrar el panel en un Sunmi de 360
+          // es apuntarle a un ícono.
+          className="shrink-0 sunmi-text-muted min-h-toque min-w-toque inline-flex items-center justify-center"
         >
           <X size={16} aria-hidden="true" />
         </button>
@@ -160,7 +163,7 @@ export default function PanelVincular({ importacionId, fila, onVinculada, onCerr
           {/* El texto NO repite el del botón de la fila. Dos botones con la
               misma etiqueta y distinto efecto —uno abre el panel, el otro elige
               el producto— es una trampa: el usuario cree que ya confirmó. */}
-          <SunmiButton color="cyan" onClick={elegirSugerido} className="py-1.5 px-3 text-xs">
+          <SunmiButton color="cyan" onClick={elegirSugerido} className="min-h-toque px-3 text-xs">
             Usar este producto
           </SunmiButton>
         </div>
@@ -190,7 +193,8 @@ export default function PanelVincular({ importacionId, fila, onVinculada, onCerr
               color="cyan"
               onClick={buscar}
               disabled={buscando}
-              className="py-2 px-3 text-xs"
+              aria-label="Buscar el producto"
+              className="min-h-toque min-w-toque px-3 text-xs"
             >
               <Search size={14} aria-hidden="true" />
             </SunmiButton>
@@ -206,7 +210,7 @@ export default function PanelVincular({ importacionId, fila, onVinculada, onCerr
                   <button
                     type="button"
                     onClick={() => elegirDeBusqueda(c)}
-                    className="w-full text-left sunmi-border border rounded-md px-2.5 py-2 sunmi-row-hover"
+                    className="w-full text-left sunmi-border border rounded-md px-2.5 py-2 min-h-toque sunmi-row-hover"
                   >
                     <div className="text-[12.5px] sunmi-text-strong break-words">{c.nombre}</div>
                     <div className="text-[11px] sunmi-text-muted">
@@ -273,7 +277,7 @@ export default function PanelVincular({ importacionId, fila, onVinculada, onCerr
                 setError(null);
               }}
               disabled={confirmando}
-              className="py-2 text-xs order-2 sm:order-1"
+              className="min-h-toque text-xs order-2 sm:order-1"
             >
               Elegir otro
             </SunmiButton>
@@ -281,7 +285,7 @@ export default function PanelVincular({ importacionId, fila, onVinculada, onCerr
               color="cyan"
               onClick={confirmar}
               disabled={confirmando}
-              className="py-2 font-bold text-xs order-1 sm:order-2"
+              className="min-h-toque font-bold text-xs order-1 sm:order-2"
             >
               {confirmando ? "Vinculando…" : "Confirmar vínculo"}
             </SunmiButton>

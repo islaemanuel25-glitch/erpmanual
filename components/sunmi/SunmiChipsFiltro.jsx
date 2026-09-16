@@ -66,7 +66,12 @@ export default function SunmiChipsFiltro({
               color={activa ? "primary" : "slate"}
               aria-pressed={activa}
               onClick={() => onCambiar?.(clave === CLAVE_TODAS ? null : clave)}
-              className="shrink-0"
+              // 44 DE ALTO, QUE ES LO QUE SE TOCA CON EL PULGAR. El alto por
+              // defecto del botón deja el chip en 36 px, y una fila de chips es
+              // justamente lo que más se toca de una pantalla de filtros. La
+              // pieza del kit cede su alto cuando quien la usa declara un
+              // `min-h-`, así que acá no hay dos declaraciones peleando.
+              className="shrink-0 min-h-toque"
             >
               {o.texto}
               {/* El conteo va adentro del chip: saber cuántos hay antes de

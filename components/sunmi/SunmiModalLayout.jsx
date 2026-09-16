@@ -627,9 +627,18 @@ export default function SunmiModalLayout({
               // `SunmiButton` no acepta `size`: lo desparramaba sobre el
               // `<button>` con el resto de los props, así que el botón nunca se
               // achicó y quedaba un atributo inválido en el DOM.
+              //
+              // 44 DE ALTO: es el botón de cerrar de TODOS los modales del ERP y
+              // medía 36 × 65. Está en la esquina del encabezado, que es el peor
+              // lugar de un teléfono para apuntar —se falla hacia el borde— y es
+              // la salida de emergencia de cualquier modal.
+              //
+              // El alto del encabezado no cambia: el botón ya entraba con aire,
+              // y el `min-h-` solo estira su zona sensible.
               <SunmiButton
                 color="slate"
                 onClick={onClose}
+                className="min-h-toque min-w-toque"
               >
                 Cerrar
               </SunmiButton>

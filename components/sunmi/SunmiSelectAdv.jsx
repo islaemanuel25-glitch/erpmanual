@@ -7,6 +7,7 @@ import {
   isValidElement,
 } from "react";
 import { componerClaseInput } from "@/lib/sunmi/claseAncho";
+import { declaraAltoMinimo } from "@/lib/sunmi/claseNegociada";
 import { createPortal } from "react-dom";
 import { ChevronDown, Check, Search } from "lucide-react";
 
@@ -285,18 +286,42 @@ export default function SunmiSelectAdv({
     //
     // Se reusa `componerClaseInput`, que es la misma pieza que usa `SunmiInput`
     // y ya resolvía esto. No se escribe una función parecida al lado.
-    <div ref={wrapRef} className={componerClaseInput(className)} {...restProps}>
+    // EL ENVOLTORIO SE VUELVE FLEX CUANDO SE PIDIÓ UN ALTO.
+    //
+    // `min-h-` sobre el envoltorio le da 44 al `div`, pero el botón de adentro
+    // sigue midiendo lo que mide su contenido: quedaban veinte píxeles de la zona
+    // que se ven tocables y no responden. Con el envoltorio en flex y el botón
+    // estirado, la zona que responde es la que se ve.
+    //
+    // Solo cuando se pidió: sin `min-h-`, el envoltorio queda exactamente como
+    // hoy y ninguna de las 39 pantallas que usan esta pieza se mueve.
+    <div
+      ref={wrapRef}
+      className={`${componerClaseInput(className)}${declaraAltoMinimo(className) ? " flex" : ""}`}
+      {...restProps}
+    >
       <button
         ref={btnRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="
-          w-full px-3 py-1.5
-          rounded-md
-          sunmi-select-trigger
-          text-[13px]
-          flex items-center justify-between
-        "
+        // ── EL ALTO TAMBIÉN SE NEGOCIA, IGUAL QUE EL ANCHO ─────────────────
+        //
+        // `py-1.5` deja el disparador en 32 px, y una zona que se toca con el
+        // pulgar necesita 44. Subirlo acá para todos movería píxeles en las 39
+        // pantallas que usan esta pieza, y ninguna de ellas se puede comprobar
+        // desde esta tanda.
+        //
+        // Así que cede, con la misma regla que ya usa `SunmiButton`: si quien lo
+        // usa declara un `min-h-`, la pieza NO pone su padding vertical y no hay
+        // dos declaraciones peleando. Sin `min-h-`, queda exactamente como hoy.
+        // EL `min-h-` VA AL ENVOLTORIO, ASÍ QUE EL BOTÓN TIENE QUE LLENARLO.
+        //
+        // `componerClaseInput` pone el `className` de quien usa la pieza en el
+        // `div` de afuera. Sacarle el `py-1.5` al botón y nada más lo dejaba MÁS
+        // BAJO, no más alto: el envoltorio medía 44 y el botón 24, con veinte
+        // píxeles de la zona sin responder al toque. Con `h-full` el botón ocupa
+        // el alto que el envoltorio declaró, que es lo que se quiso pedir.
+        className={`w-full px-3 ${declaraAltoMinimo(className) ? "" : "py-1.5"} rounded-md sunmi-select-trigger text-[13px] flex items-center justify-between`}
       >
         {/*
           `min-w-0` NO ES DECORACIÓN: sin él, `truncate` NO TRUNCA.
