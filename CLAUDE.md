@@ -570,6 +570,36 @@ Cada afirmación de esos documentos va etiquetada como verificada en código,
 documentada, inferida o dudosa. **Si no tiene etiqueta ni evidencia, no es un
 hecho del proyecto.**
 
+## EN EL VPS DE PRODUCCIÓN NO SE INVESTIGA
+
+**El VPS se toca solo desde `/deploy` y desde `/backup`. Nada más.**
+
+No se investiga, **no se restauran bases**, **no se levantan contenedores** y
+**no se crean archivos**. Lo que haga falta para entender o medir un módulo
+—recorrer pantallas, sembrar datos, simular una regla, cronometrar— va en la
+máquina de desarrollo, contra `erpazul_al` y con los archivos de
+`erpazul-fixtures-dev`, que es la carpeta hermana del repo.
+
+*Por qué:* el 2026-09-16, relevando el módulo de listas de proveedor, se
+restauró una base `erpazul_plan_listas` del backup del día y se levantó un
+contenedor `erpazul_plan_app` **al lado de producción**, en la misma máquina y
+contra el mismo Docker y el mismo PostgreSQL que atienden a los cinco locales.
+No rompió nada, y esa es exactamente la razón por la que hay que escribirlo: se
+sintió gratis. Un `next dev` con 917 filas compite por CPU y por conexiones con
+el POS, y una restauración de varios cientos de MB compite por E/S con la base
+que registra las ventas.
+
+Y hay un segundo daño, más silencioso: **la investigación salió mal igual.** La
+base y los archivos de prueba no están en el VPS, así que el circuito completo
+—subir el Excel, conciliar de cero, cronometrar— quedó sin recorrer y la mitad
+del relevamiento quedó marcada como pendiente. Se pagó el riesgo y no se obtuvo
+el resultado.
+
+**En la práctica, lo primero de cualquier tanda de investigación es comprobar
+dónde se está**: `hostname`, que exista la base `erpazul_al` y que exista la
+carpeta `erpazul-fixtures-dev`. Si falta alguna de las tres, se frena y se dice
+—no se sigue en otra máquina "mientras tanto"—.
+
 ## Procedimientos que viven en skills
 
 Son recetas de varios pasos, con sus trampas y su verificación de cierre. No se
