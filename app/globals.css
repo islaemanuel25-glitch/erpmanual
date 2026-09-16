@@ -259,9 +259,33 @@ html[data-theme="sunmiLight"] {
   --sidebar-border: var(--chrome-border);
 
   /* POS */
-  --pos-accent: #d97706;
-  --pos-link: #0891b2;
-  --pos-link-hover: #0e7490;
+
+  /* Los tres que no llegaban a 4,5:1 en este tema, medidos en el navegador y no
+     deducidos. Los tres son EXACTAMENTE los que ya tiene `sunmiSand`, que es el
+     otro tema claro del kit: no son valores inventados para esta tanda, son los
+     que el repo ya usa sobre un fondo claro.
+
+     `--pos-accent` #d97706 pintaba el chip de filtro elegido con letra
+     `--app-bg`: 2,91. Con #b45309 da 4,58 sobre #f1f5f9 y 5,02 sobre blanco. Es
+     el mismo ámbar que `--pos-warning` ya había tenido que bajar acá arriba por
+     este motivo, tres renglones más abajo del comentario que lo explica.
+
+     `--pos-link` #0891b2 es el fondo de TODOS los botones cian —"Subir una
+     lista", "Aplicar los N precios", "Usar $X"— y también la letra de los
+     fantasma como "Ver los 359": 3,36 en los dos sentidos, porque es el mismo
+     par de colores dado vuelta. Con #0e7490 da 4,89 y 5,36.
+
+     `--pos-success` #059669 es `.sunmi-text-success`, o sea el renglón verde de
+     cada tarjeta del historial: 3,77 sobre la tarjeta blanca. Con #047857 da
+     5,48 sobre blanco y 5,01 sobre el fondo de la página — y #047857 ya estaba
+     en este mismo bloque como `--pos-success-soft`.
+
+     LOS TRES SUBEN EL CONTRASTE Y NINGUNO LO BAJA, así que lo que arreglan en
+     las pantallas nuevas lo arreglan igual en el resto del tema claro. Medido
+     antes y después en cinco pantallas que esta tanda no toca. */
+  --pos-accent: #b45309;
+  --pos-link: #0e7490;
+  --pos-link-hover: #155e75;
   --pos-muted: #64748b;
   --pos-muted-strong: #475569;
   --pos-surface: #f1f5f9;
@@ -274,7 +298,7 @@ html[data-theme="sunmiLight"] {
   --pos-row-bg: #ffffff;
   --pos-row-hover: #f8fafc;
   --pos-panel-bg: #f1f5f9;
-  --pos-success: #059669;
+  --pos-success: #047857; /* 5,48 sobre blanco — ver el comentario de arriba */
   --pos-success-soft: #047857;
   --pos-success-bg: rgba(16,185,129,0.1);
   --pos-success-border: rgba(16,185,129,0.3);
