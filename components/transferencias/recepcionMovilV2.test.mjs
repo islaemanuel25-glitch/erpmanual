@@ -403,7 +403,12 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // Cinco columnas nullable en `Proveedor` y una en `ImportacionListaProveedor`,
   // sin DROP y sin backfill. Se declara acá porque eso es lo que este conteo
   // existe para obligar.
-  assert.equal(migraciones.length, 15, "aparecio una migracion que nadie declaro aca");
+  // 16 desde el 2026-09-17: entra `20260917120000_receta_de_lectura_de_listas`,
+  // que guarda por proveedor CÓMO se lee su lista de precios —el mapa de
+  // columnas y la firma del archivo con el que se confirmó— y qué se decidió
+  // para cada importación. Dos columnas en `Proveedor`, tres en la cabecera de
+  // importación y una en la fila; todas nullable, sin DROP y sin backfill.
+  assert.equal(migraciones.length, 16, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

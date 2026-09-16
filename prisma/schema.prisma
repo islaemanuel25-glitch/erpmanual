@@ -407,6 +407,29 @@ model Proveedor {
   /// booleano que no se pueda derivar de los otros datos.
   listaImpuestosDefinidos    Boolean  @default(false)
 
+  /// ── CÓMO SE LEE LA LISTA DE ESTE PROVEEDOR ────────────────────────────
+  ///
+  /// El mapa de qué columna del archivo es el código, el código de barras, la
+  /// descripción, la cantidad por bulto, el descuento y la o las de precio. Lo
+  /// propone el sistema la primera vez, lo confirma el usuario desde la pantalla,
+  /// y desde la segunda lista se aplica solo.
+  ///
+  /// Es JSON y no seis columnas porque cuántas columnas tiene un archivo no se
+  /// sabe de antemano: una lista trae una de precio y otra trae cinco. El
+  /// contenido lo valida `recetaDeLista.js`, no la base; un JSON que no cumple el
+  /// contrato se trata como "sin receta" y se vuelve a pedir confirmación.
+  ///
+  /// NULL = este proveedor todavía no confirmó ninguna. Arcor no la necesita: su
+  /// receta es su parser.
+  listaRecetaLectura Json?
+  /// La firma de la ESTRUCTURA del archivo con el que se confirmó la receta.
+  ///
+  /// Si el proveedor manda el mes que viene un archivo con otra forma, la huella
+  /// no coincide y se vuelve a pedir confirmación en vez de leer con un mapa que
+  /// ya no corresponde. Va aparte del JSON porque es un hecho distinto: uno dice
+  /// CÓMO leer y el otro PARA QUÉ ARCHIVO vale ese cómo.
+  listaRecetaHuella  String?
+
   /// Una receta POR GRUPO. `Proveedor` no tiene `grupoId` —es compartido entre
   /// grupos, y las tablas que cuelgan de él llevan el suyo—, así que desde acá
   /// se ven varias aunque cada grupo tenga una sola. La unicidad real la
@@ -3047,6 +3070,20 @@ model ImportacionListaProveedor {
   /// arriba: cambiarle el impuesto al proveedor después no puede reescribir con
   /// qué criterio se decidió una lista vieja.
   impuestoAdicionalPct  Decimal? @db.Decimal(6, 3)
+  /// ── QUÉ SE DECIDIÓ PARA TODA ESTA LISTA ───────────────────────────────
+  ///
+  /// Con qué columna de precio se leyó y si se aplicó el descuento de la fila.
+  /// Se deciden UNA VEZ PARA TODA LA LISTA —probando cada opción contra los
+  /// productos que tienen costo y quedándose con la que cae en el rango en la
+  /// gran mayoría— para que nunca se lea un producto con el neto y el de al lado
+  /// con el final.
+  ///
+  /// Se guardan para poder explicar meses después por qué una lista se leyó de
+  /// una manera y otra del mismo proveedor de otra. `decisionDeLectura` lleva el
+  /// detalle: cuántas filas votaron cada opción.
+  columnaPrecioElegida  String?
+  descuentoAplicado     Boolean?
+  decisionDeLectura     Json?
   /// Qué se hará con el precio de venta al aplicar. Se guarda desde ahora para
   /// que la decisión quede registrada junto a la propuesta; todavía no se usa.
   modoPrecioVenta    String  @default("NO_TOCAR")
@@ -3123,6 +3160,10 @@ model ImportacionListaFila {
   /// trae valores como 1404.602001 y truncarlos falsearía la propuesta.
   precioConIva     Decimal  @db.Decimal(18, 6)
   precioSinIva     Decimal? @db.Decimal(18, 6)
+  /// El descuento QUE TRAÍA ESTA FILA, tal como lo informó el archivo. NO es el
+  /// que se aplicó: si se aplicó o no lo dice `descuentoAplicado` de la cabecera,
+  /// que es una decisión de toda la lista. Dos hechos, dos lugares.
+  descuentoPct     Decimal? @db.Decimal(6, 3)
 
   productoBaseId           Int?
   codigoProveedorId        Int?
