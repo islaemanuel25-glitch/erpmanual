@@ -48,6 +48,139 @@ import {
   configuracionParaLaLista,
   TEXTO_FALTA_CONFIGURACION,
 } from "@/lib/proveedores/listas/configuracionProveedor";
+import {
+  leerArchivoDeLista,
+  TEXTO_MOTIVO_LECTURA_ARCHIVO,
+} from "@/lib/proveedores/listas/lectura/lecturaDeArchivo";
+import { proponerMapeo } from "@/lib/proveedores/listas/lectura/deteccionDeColumnas";
+import {
+  recetaAplicable,
+  TEXTO_MOTIVO_RECETA,
+  diferenciaDeEstructura,
+} from "@/lib/proveedores/listas/lectura/recetaDeLista";
+import {
+  filasDelArchivo,
+  decidirColumnaDeLaLista,
+  aplicarEleccion,
+} from "@/lib/proveedores/listas/importacionGenerica";
+
+/**
+ * EL CAMINO GENÉRICO: abrir el archivo y saber qué columna es cada cosa.
+ *
+ * Devuelve las filas con TODOS los precios candidatos adentro; cuál de ellos es
+ * el precio se decide más adelante, cuando ya están el catálogo y el rango.
+ *
+ * Corta con 409 en los dos casos en que hace falta una persona:
+ *
+ *   FALTA_CONFIRMAR_COLUMNAS  es la primera lista de este proveedor, o el
+ *                             archivo cambió de estructura. No se adivina: el
+ *                             mapa que quedó guardado apunta a columnas por
+ *                             número, y una columna de más corre todos los
+ *                             índices sin que nada falle.
+ *   (el motor no pudo elegir) lo resuelve el paso 8.bis, que es el que sabe.
+ *
+ * El 409 lleva TODO lo que la pantalla necesita para preguntar —los títulos, la
+ * propuesta con ejemplos, la huella— así que no hace falta volver a subir el
+ * archivo para contestar.
+ */
+async function leerArchivoGenerico({ bytes, nombre, proveedor, form }) {
+  const leido = await leerArchivoDeLista(bytes, { nombre, hoja: form.get("hoja") || null });
+  if (!leido.ok) {
+    return {
+      ok: false,
+      status: 400,
+      cuerpo: {
+        ok: false,
+        codigo: leido.motivo,
+        error: TEXTO_MOTIVO_LECTURA_ARCHIVO[leido.motivo] ?? "No se pudo leer el archivo.",
+        formato: leido.formato,
+      },
+    };
+  }
+
+  const { tabla } = leido;
+  const columnas = tabla.titulos.map((titulo, indice) => ({
+    indice,
+    titulo,
+    valores: tabla.filas.map((f) => f.valores[indice]),
+  }));
+  const propuesta = proponerMapeo(columnas);
+  const uso = recetaAplicable({
+    guardada: proveedor.listaRecetaLectura,
+    huella: proveedor.listaRecetaHuella,
+    titulos: tabla.titulos,
+  });
+
+  const descartes = {};
+  for (const d of tabla.filasDescartadas) descartes[d.motivo] = (descartes[d.motivo] ?? 0) + 1;
+  const ejemplos = tabla.filas.slice(0, 8).map((f) => ({ y: f.y, pagina: f.pagina, valores: f.valores }));
+
+  if (!uso.ok) {
+    return {
+      ok: false,
+      status: 409,
+      cuerpo: {
+        ok: false,
+        codigo: "FALTA_CONFIRMAR_COLUMNAS",
+        error: TEXTO_MOTIVO_RECETA[uso.motivo],
+        motivoConfirmacion: uso.motivo,
+        queCambio: diferenciaDeEstructura({ huella: proveedor.listaRecetaHuella, titulos: tabla.titulos }),
+        titulos: tabla.titulos,
+        mapeo: propuesta.mapeo,
+        propuesta: {
+          confianza: propuesta.confianza,
+          motivosDeDuda: propuesta.motivosDeDuda,
+          columnas: propuesta.columnas,
+        },
+        huella: uso.huellaNueva,
+        ejemplos,
+        conteo: { filas: tabla.filas.length, descartadas: tabla.filasDescartadas.length, descartesPorMotivo: descartes },
+        formato: leido.formato,
+      },
+    };
+  }
+
+  const mapeo = {
+    codigo: uso.receta.codigo,
+    codigoBarra: uso.receta.codigoBarra,
+    descripcion: uso.receta.descripcion,
+    cantidad: uso.receta.cantidad,
+    descuento: uso.receta.descuento,
+    precios: uso.receta.precios,
+  };
+
+  // La columna elegida a mano, si la pantalla la mandó. Se valida contra las
+  // candidatas: un índice que no es una de ellas no se acepta, porque sería
+  // costear con una columna que ni siquiera parece un precio.
+  const columnaPedida = Number(form.get("columnaPrecio"));
+  const eleccionManual = Number.isInteger(columnaPedida) && mapeo.precios.includes(columnaPedida)
+    ? { columna: columnaPedida, conDescuento: leerBooleano(form.get("conDescuento")) === true }
+    : null;
+
+  return {
+    ok: true,
+    mapeo,
+    titulos: tabla.titulos,
+    huella: uso.huellaNueva,
+    formato: leido.formato,
+    descartes,
+    ejemplos,
+    eleccionManual,
+    salidaParser: {
+      productos: filasDelArchivo({ tabla, mapeo, hojaNombre: leido.detalle?.hoja ?? null }),
+      categorias: [],
+      advertencias: [],
+      errores: [],
+      resumen: {
+        hojaNombre: leido.detalle?.hoja ?? null,
+        formato: leido.formato,
+        productos: tabla.filas.length,
+        filasDescartadas: tabla.filasDescartadas.length,
+        descartesPorMotivo: descartes,
+      },
+    },
+  };
+}
 
 /**
  * El "sí o no" de los impuestos adicionales, tal como viaja en el formulario.
@@ -109,18 +242,6 @@ export async function POST(req) {
       );
     }
 
-    const chequeo = validarArchivo({
-      nombre: archivo.name,
-      tamano: archivo.size,
-      mime: archivo.type,
-    });
-    if (!chequeo.ok) {
-      return NextResponse.json(
-        { ok: false, error: chequeo.error, codigo: chequeo.codigo },
-        { status: 400 }
-      );
-    }
-
     // ── 3. El proveedor tiene que ser de este alcance ────────────────────
     //
     // `Proveedor` no tiene grupoId: su pertenencia se deriva de los productos y
@@ -134,6 +255,7 @@ export async function POST(req) {
         id: true, nombre: true, parserListaId: true, activo: true,
         listaAumentoEsperadoMinPct: true, listaAumentoEsperadoMaxPct: true,
         listaRecargoPct: true, listaImpuestoAdicionalPct: true, listaImpuestosDefinidos: true,
+        listaRecetaLectura: true, listaRecetaHuella: true,
       },
     });
     if (!proveedor) {
@@ -146,6 +268,28 @@ export async function POST(req) {
     const reg = resolverParserDeProveedor(proveedor);
     if (!reg.ok) {
       return NextResponse.json({ ok: false, error: reg.error, codigo: reg.codigo }, { status: 400 });
+    }
+
+    // ── 3.bis. QUÉ ARCHIVOS ACEPTA ESTE PROVEEDOR ───────────────────────
+    //
+    // La validación va DESPUÉS de resolver el parser y no antes, porque la
+    // respuesta depende de cuál sea: el de Arcor lee un .xlsx y nada más, y el
+    // genérico lee además PDF, .xls y .csv. Validar antes obligaría a aceptar la
+    // unión de todas las extensiones y a rechazar el archivo recién al parsear,
+    // con un mensaje mucho peor.
+    const chequeo = validarArchivo({
+      nombre: archivo.name,
+      tamano: archivo.size,
+      mime: archivo.type,
+      extensionesPermitidas: reg.extensiones,
+      mimesPermitidos: reg.generico ? LIMITES.mimesLista : LIMITES.mimes,
+      queSeEsperaba: reg.generico ? "un PDF, una planilla o un CSV" : "una planilla",
+    });
+    if (!chequeo.ok) {
+      return NextResponse.json(
+        { ok: false, error: chequeo.error, codigo: chequeo.codigo },
+        { status: 400 }
+      );
     }
 
     // ── 4. Bytes y hash ──────────────────────────────────────────────────
@@ -200,18 +344,30 @@ export async function POST(req) {
 
     // ── 6. Parsear ───────────────────────────────────────────────────────
     //
+    // Dos caminos y una sola salida. El de Arcor lee su Excel con las columnas
+    // que ese proveedor manda siempre; el genérico abre PDF, planilla o CSV y
+    // averigua qué columna es cada cosa. Los dos entregan la misma lista de
+    // productos, así que de acá para abajo el motor no sabe cuál corrió.
+    //
     // `cellFormula` para poder distinguir una fórmula sin valor cacheado de una
     // celda vacía. No se ejecuta ninguna fórmula ni ninguna macro: `xlsx` no las
     // corre, y el .xlsm ni siquiera pasa la validación de extensión.
     let salidaParser;
-    try {
-      const wb = XLSX.read(bytes, { type: "buffer", cellFormula: true });
-      salidaParser = reg.parser(wb);
-    } catch (e) {
-      return NextResponse.json(
-        { ok: false, error: "No se pudo leer el archivo como planilla.", codigo: "PARSER_ERROR" },
-        { status: 400 }
-      );
+    let generico = null;
+    if (reg.generico) {
+      generico = await leerArchivoGenerico({ bytes, nombre: archivo.name, proveedor, form });
+      if (!generico.ok) return NextResponse.json(generico.cuerpo, { status: generico.status });
+      salidaParser = generico.salidaParser;
+    } else {
+      try {
+        const wb = XLSX.read(bytes, { type: "buffer", cellFormula: true });
+        salidaParser = reg.parser(wb);
+      } catch (e) {
+        return NextResponse.json(
+          { ok: false, error: "No se pudo leer el archivo como planilla.", codigo: "PARSER_ERROR" },
+          { status: 400 }
+        );
+      }
     }
 
     const erroresDeArchivo = (salidaParser.errores ?? []).filter((e) => e.filaExcel === undefined);
@@ -311,8 +467,87 @@ export async function POST(req) {
       impuestoAdicionalPct,
     };
 
+    // ── 8.bis. QUÉ COLUMNA DEL ARCHIVO ES EL PRECIO ──────────────────────
+    //
+    // Solo el camino genérico. Es una decisión DE LA LISTA y no de cada fila:
+    // una fila sola no puede decir cuál de las seis columnas es el precio,
+    // porque siempre hay una que le queda linda a su costo viejo. Lo que la
+    // decide es que la misma columna le quede bien a las novecientas.
+    //
+    // Va acá y no en el paso 6 porque necesita las dos cosas que recién ahora
+    // existen: el catálogo —para saber contra qué costo se compara cada fila— y
+    // el rango esperado del proveedor, que es el criterio.
+    let decisionDeLectura = null;
+    let filasParaConciliar = salidaParser.productos;
+    if (generico) {
+      const rango = { minPct: resuelta.config.minPct, maxPct: resuelta.config.maxPct };
+      const decision = decidirColumnaDeLaLista({
+        filas: salidaParser.productos,
+        productos,
+        codigosProveedor,
+        columnasDePrecio: generico.mapeo.precios,
+        config: { rango, recargoPct, impuestoAdicionalPct, pisoPrecioCreible: reg.config.pisoPrecioCreible },
+      });
+
+      // A MANO GANA, pero se informa igual lo que el motor habría elegido: si
+      // alguien eligió la columna equivocada, la única forma de darse cuenta es
+      // ver que el sistema decía otra cosa.
+      const eleccion = generico.eleccionManual ?? decision.eleccion;
+
+      if (!eleccion) {
+        return NextResponse.json(
+          {
+            ok: false,
+            codigo: decision.motivoLista,
+            error: decision.textoMotivoLista,
+            // Con qué elegir a mano: cada columna candidata, cómo le fue, y sus
+            // valores de ejemplo. Es la pantalla 3 abierta en "elegí el precio".
+            opciones: decision.opciones.map((o) => ({
+              columna: o.columna,
+              titulo: generico.titulos[o.columna] ?? "",
+              conDescuento: o.conDescuento,
+              explicadas: o.explicadas,
+              comparables: o.comparables,
+            })),
+            titulos: generico.titulos,
+            mapeo: generico.mapeo,
+            huella: generico.huella,
+            ejemplos: generico.ejemplos,
+          },
+          { status: 409 }
+        );
+      }
+
+      filasParaConciliar = aplicarEleccion({ filas: salidaParser.productos, eleccion });
+      decisionDeLectura = {
+        columna: eleccion.columna,
+        titulo: generico.titulos[eleccion.columna] ?? "",
+        conDescuento: eleccion.conDescuento === true,
+        aMano: generico.eleccionManual !== null,
+        explicadas: decision.eleccion?.explicadas ?? null,
+        comparables: decision.eleccion?.comparables ?? null,
+        // Lo que el motor habría elegido solo, esté o no de acuerdo con lo que
+        // se eligió a mano.
+        delMotor: decision.eleccion
+          ? { columna: decision.eleccion.columna, conDescuento: decision.eleccion.conDescuento }
+          : null,
+        opciones: decision.opciones.map((o) => ({
+          columna: o.columna,
+          titulo: generico.titulos[o.columna] ?? "",
+          conDescuento: o.conDescuento,
+          explicadas: o.explicadas,
+          comparables: o.comparables,
+        })),
+        titulos: generico.titulos,
+        mapeo: generico.mapeo,
+        huella: generico.huella,
+        formato: generico.formato,
+        descartes: generico.descartes,
+      };
+    }
+
     const conciliacion = conciliarLista({
-      filas: salidaParser.productos,
+      filas: filasParaConciliar,
       productos,
       codigosProveedor,
       contexto: { grupoId, proveedorId, operandoEnLocalId: localId, depositoLocalId, cabecera },
@@ -349,6 +584,17 @@ export async function POST(req) {
             ...cabecera,
             modoPrecioVenta: MODO_PRECIO_VENTA.NO_TOCAR,
             estado: ESTADO_IMPORTACION.BORRADOR,
+            // CON QUÉ COLUMNA SE LEYÓ ESTA LISTA, asentado con la importación.
+            //
+            // Es el mismo motivo por el que se asienta el rango: dentro de tres
+            // meses, mirando una conciliación vieja, "el precio salió de la
+            // columna FINAL, sin aplicar el descuento" es la única forma de
+            // entender por qué los números son los que son. Y `decisionDeLectura`
+            // guarda además lo que el motor habría elegido solo, así que una
+            // elección a mano equivocada se puede encontrar después.
+            columnaPrecioElegida: decisionDeLectura ? String(decisionDeLectura.titulo || decisionDeLectura.columna) : null,
+            descuentoAplicado: decisionDeLectura ? decisionDeLectura.conDescuento : null,
+            decisionDeLectura: decisionDeLectura ?? undefined,
             ...contadores,
           },
           select: { id: true },
@@ -369,7 +615,16 @@ export async function POST(req) {
     } catch (e) {
       // La carrera contra el índice único: dos pedidos con el mismo archivo al
       // mismo tiempo. El que perdió devuelve el mismo 409 que el chequeo previo.
-      if (e?.code === "P2002") {
+      //
+      // SOLO SI EL CHOQUE ES ÉSE. Antes cualquier P2002 contestaba "este archivo
+      // ya fue importado", y eso mandó una tarde entera a buscar una importación
+      // duplicada que no existía: el choque real estaba en otra tabla y el
+      // mensaje señalaba a la equivocada. Cuando no es el del archivo se relanza,
+      // y lo atiende el catch de afuera, que sí lo registra.
+      const choqueDelArchivo =
+        e?.code === "P2002" &&
+        String(JSON.stringify(e?.meta?.target ?? "")).toLowerCase().includes("hash");
+      if (choqueDelArchivo) {
         const existente = await prisma.importacionListaProveedor.findFirst({
           where: { grupoId, proveedorId, archivoHash },
           select: { id: true, createdAt: true, estado: true, archivoNombre: true },
@@ -393,6 +648,7 @@ export async function POST(req) {
       estado: importacion.estado,
       proveedor: { id: proveedor.id, nombre: proveedor.nombre },
       parser: { id: reg.id, version: reg.parserVersion },
+      lectura: decisionDeLectura,
       archivo: { nombre: archivo.name, tamano: bytes.length, hash: archivoHash },
       resumen: {
         ...conciliacion.resumen,
@@ -405,7 +661,15 @@ export async function POST(req) {
       faltantes: conciliacion.faltantes.length,
     });
   } catch (error) {
+    // EL MENSAJE DICE QUÉ PASÓ Y QUÉ HACER. "Error interno" fue lo único que se
+    // vio el día que producción se cayó, y no le sirvió a nadie.
     console.error("Error importando lista de proveedor:", error);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "No se pudo terminar de importar la lista. No se guardó nada: probá de nuevo, y si sigue avisá con el nombre del archivo.",
+      },
+      { status: 500 }
+    );
   }
 }
