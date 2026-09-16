@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-16 21:04
+**Fecha:** 2026-09-16 23:17
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- feat(listas): una puerta de entrada para cualquier formato, y la API que confirma las columnas, fix(listas): la fila que queda para revisar muestra su costo y su porcentaje, feat(listas): la pantalla de subir pide y edita la configuración del proveedor
-- Archivos: 3 nuevos, 6 modificados (9 total)
+- fix(listas): tres cosas que la pantalla decía mal, encontradas recorriéndola, feat(listas): las seis pantallas del diseño, enganchadas con el motor, fix(listas): aplicar usa las reglas del lector que leyó la lista
+- Archivos: 8 nuevos, 9 modificados (17 total)
 
 ### transferencias
 - feat(listas): lector genérico de PDF con texto, para la lista de cualquier proveedor, feat(listas): receta de lectura por proveedor — migración, feat(listas): el rango del proveedor elige la lectura, y el display deja de bloquear
@@ -18,6 +18,11 @@
 
 
 ## Archivos nuevos desde última sincronización
+- app/api/proveedores/listas/[id]/resultado/route.js
+- app/api/proveedores/listas/lectura/olvidar/route.js
+- app/modulos/proveedores/listas/[id]/filas/page.jsx
+- app/modulos/proveedores/listas/[id]/revisar/page.jsx
+- app/modulos/proveedores/listas/tarjetaDelHistorial.test.mjs
 - app/api/proveedores/listas/lectura/confirmar/route.js
 - app/api/proveedores/listas/lectura/proponer/route.js
 - app/api/proveedores/listas/proveedores/[id]/configuracion/route.js
