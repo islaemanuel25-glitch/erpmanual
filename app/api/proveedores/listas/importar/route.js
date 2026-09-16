@@ -44,14 +44,26 @@ import {
   enLotes,
   OPCIONES_TX,
 } from "@/lib/proveedores/listas/persistencia";
-import { RANGO_POR_DEFECTO } from "@/lib/proveedores/listas/rangoAumento";
+import {
+  configuracionParaLaLista,
+  TEXTO_FALTA_CONFIGURACION,
+} from "@/lib/proveedores/listas/configuracionProveedor";
 
-/** Un porcentaje del formulario, o el default de la configuración. */
-function porcentaje(valor, porDefecto) {
-  if (valor === null || valor === undefined || valor === "") return porDefecto;
-  const n = Number(valor);
-  if (!Number.isFinite(n) || n < 0 || n > 1000) return porDefecto;
-  return n;
+/**
+ * El "sí o no" de los impuestos adicionales, tal como viaja en el formulario.
+ *
+ * Devuelve `undefined` cuando el formulario no lo mandó, que NO es lo mismo que
+ * "no": undefined deja que mande lo que tiene guardado el proveedor, y false
+ * significa que alguien contestó que no. Si esto devolviera false ante la
+ * ausencia, subir una lista sin tocar el campo borraría la respuesta del
+ * proveedor.
+ */
+function leerBooleano(valor) {
+  if (valor === null || valor === undefined || valor === "") return undefined;
+  const v = String(valor).trim().toLowerCase();
+  if (v === "true" || v === "1" || v === "si" || v === "sí") return true;
+  if (v === "false" || v === "0" || v === "no") return false;
+  return undefined;
 }
 
 export async function POST(req) {
@@ -118,7 +130,11 @@ export async function POST(req) {
     // que un proveedor de otro alcance simplemente no existe para esta consulta.
     const proveedor = await prisma.proveedor.findFirst({
       where: { id: proveedorId, ...proveedorVisibleWhere(localId, grupoId) },
-      select: { id: true, nombre: true, parserListaId: true, activo: true },
+      select: {
+        id: true, nombre: true, parserListaId: true, activo: true,
+        listaAumentoEsperadoMinPct: true, listaAumentoEsperadoMaxPct: true,
+        listaRecargoPct: true, listaImpuestoAdicionalPct: true, listaImpuestosDefinidos: true,
+      },
     });
     if (!proveedor) {
       return NextResponse.json(
@@ -238,13 +254,46 @@ export async function POST(req) {
     });
     const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
 
-    // ── 8. Conciliar, en memoria ─────────────────────────────────────────
-    const recargoPct = porcentaje(form.get("recargoPct"), reg.config.recargoPct);
-    const umbralVariacionPct = porcentaje(
-      form.get("umbralVariacionPct"),
-      reg.config.umbralVariacionPct
-    );
-    const config = { ...reg.config, recargoPct, umbralVariacionPct };
+    // ── 8. La configuración comercial, que ahora es del PROVEEDOR ────────
+    //
+    // El rango de aumento esperado, el recargo y el impuesto adicional salen de
+    // la ficha del proveedor. El formulario puede pisarlos SOLO PARA ESTA LISTA:
+    // guardar los valores en el proveedor es otra acción, en otra ruta, porque un
+    // mes raro no puede reescribir el criterio de todos los meses sin que nadie
+    // lo pida.
+    //
+    // Y SI FALTA ALGO, NO SE CONCILIA. Antes se caía a las constantes del código
+    // —10 a 20 de rango, 5 de recargo— y el resultado se veía igual que uno
+    // evaluado con el criterio de Emanuel. Con el rango de fábrica puesto, todas
+    // las filas de una lista real caen fuera del rango: el default no era una
+    // comodidad, era una respuesta inventada.
+    const resuelta = configuracionParaLaLista(proveedor, {
+      minPct: form.get("aumentoEsperadoMinPct"),
+      maxPct: form.get("aumentoEsperadoMaxPct"),
+      recargoPct: form.get("recargoPct"),
+      impuestoAdicionalPct: form.get("impuestoAdicionalPct"),
+      impuestosDefinidos: leerBooleano(form.get("impuestosDefinidos")),
+    });
+    if (!resuelta.ok) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: resuelta.faltan.map((f) => TEXTO_FALTA_CONFIGURACION[f]).join(" "),
+          codigo: "CONFIGURACION_INCOMPLETA",
+          faltan: resuelta.faltan,
+        },
+        { status: 400 }
+      );
+    }
+
+    const recargoPct = resuelta.config.recargoPct;
+    const impuestoAdicionalPct = resuelta.config.impuestoAdicionalPct;
+    // `umbralVariacionPct` deja de ser una constante del proveedor: es el techo
+    // del rango. Un aumento por encima del máximo esperado ES la variación alta,
+    // y tener dos números para el mismo hecho garantizaba que un día dijeran
+    // cosas distintas. El 30 fijo de `CONFIG_ARCOR` se fue con esto.
+    const umbralVariacionPct = resuelta.config.maxPct;
+    const config = { ...reg.config, recargoPct, umbralVariacionPct, impuestoAdicionalPct };
 
     // La cabecera todavía no existe —se crea en el paso 9— así que al motor se le
     // pasa el rango con el que va a nacer, y ES EL MISMO OBJETO que se persiste
@@ -256,11 +305,10 @@ export async function POST(req) {
     // guardaba con qué criterio se la evaluó, así que cambiar el default mañana
     // reescribiría en silencio el criterio de todas las viejas. Es la misma razón
     // por la que el rango se congela en la fila al confirmar.
-    //
-    // El formulario todavía no ofrece elegirlo. Cuando lo ofrezca, entra por acá.
     const cabecera = {
-      aumentoEsperadoMinPct: RANGO_POR_DEFECTO.minPct,
-      aumentoEsperadoMaxPct: RANGO_POR_DEFECTO.maxPct,
+      aumentoEsperadoMinPct: resuelta.config.minPct,
+      aumentoEsperadoMaxPct: resuelta.config.maxPct,
+      impuestoAdicionalPct,
     };
 
     const conciliacion = conciliarLista({

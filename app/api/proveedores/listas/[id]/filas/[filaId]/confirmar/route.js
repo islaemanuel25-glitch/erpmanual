@@ -35,7 +35,7 @@ import { puedeEditarCosto } from "@/lib/productos/propiedadCosto";
 import { esComboBase } from "@/lib/combos/guards";
 import { OPCIONES_TX } from "@/lib/proveedores/listas/persistencia";
 import { recalcularContadores } from "@/lib/proveedores/listas/contadores";
-import { RANGO_POR_DEFECTO, rangoValido } from "@/lib/proveedores/listas/rangoAumento";
+import { rangoValido } from "@/lib/proveedores/listas/rangoAumento";
 import {
   puedeConfirmarse,
   analizarFila,
@@ -45,14 +45,23 @@ import {
   CANTIDAD_MAX,
 } from "@/lib/proveedores/listas/confirmarPresentacion";
 
-/** El rango vigente de una importación, con el de Arcor como respaldo. */
+/**
+ * El rango con el que se evalúa esta importación.
+ *
+ * Devuelve null cuando la importación no tiene rango, y el que llama CORTA. Acá
+ * había un respaldo —el 10 a 20 de Arcor— y era peor que no tener ninguno: una
+ * fila se confirmaba contra un criterio que nadie eligió, y el resultado se veía
+ * igual que uno bien evaluado. Desde el 2026-09-16 el rango se carga por
+ * proveedor y una importación sin rango no se puede crear; una vieja, sin él, no
+ * se puede confirmar y lo dice.
+ */
 function rangoDe(importacion) {
   const minPct = importacion.aumentoEsperadoMinPct;
   const maxPct = importacion.aumentoEsperadoMaxPct;
   if (minPct !== null && maxPct !== null && rangoValido({ minPct: Number(minPct), maxPct: Number(maxPct) })) {
     return { minPct: Number(minPct), maxPct: Number(maxPct) };
   }
-  return RANGO_POR_DEFECTO;
+  return null;
 }
 
 export async function POST(req, context) {
@@ -89,6 +98,7 @@ export async function POST(req, context) {
       where: { id: importacionId, grupoId },
       select: {
         id: true, estado: true, recargoPct: true, umbralVariacionPct: true, localOperativoId: true,
+        impuestoAdicionalPct: true,
         aumentoEsperadoMinPct: true, aumentoEsperadoMaxPct: true,
       },
     });
@@ -144,13 +154,33 @@ export async function POST(req, context) {
 
     const recargoPct = Number(importacion.recargoPct);
     const rango = rangoDe(importacion);
+    const impuestoAdicionalPct =
+      importacion.impuestoAdicionalPct === null || importacion.impuestoAdicionalPct === undefined
+        ? null
+        : Number(importacion.impuestoAdicionalPct);
+
+    // SIN RANGO NO SE CONFIRMA. Antes se caía a un respaldo y la fila quedaba
+    // evaluada contra un criterio que nadie eligió, indistinguible de una bien
+    // evaluada. Se corta acá, con el motivo dicho, que es lo que el usuario
+    // puede arreglar.
+    if (!rango) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Esta importación no tiene cargado el rango de aumento esperado, así que no hay contra qué comparar el costo. Subí la lista de nuevo cargando el rango del proveedor.",
+          codigo: "IMPORTACION_SIN_RANGO",
+        },
+        { status: 409 }
+      );
+    }
 
     const r = resultadoConfirmacion({
-      fila, base, clave, cantidadPresentacion, recargoPct, rango,
+      fila, base, clave, cantidadPresentacion, recargoPct, rango, impuestoAdicionalPct,
       umbralVariacionPct: Number(importacion.umbralVariacionPct),
     });
     if (!r.ok) {
-      const analisis = analizarFila({ fila, base, recargoPct, rango });
+      const analisis = analizarFila({ fila, base, recargoPct, rango, impuestoAdicionalPct });
       return NextResponse.json(
         { ok: false, error: r.motivo, hipotesis: analisis.evaluadas },
         { status: 400 }

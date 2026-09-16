@@ -22,6 +22,10 @@ import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
 import { proveedorVisibleWhere } from "@/lib/visibilidad";
 import { listarParsers } from "@/lib/proveedores/listas/registro";
+import {
+  configuracionDeProveedor,
+  faltantesDeConfiguracion,
+} from "@/lib/proveedores/listas/configuracionProveedor";
 
 export async function GET(req) {
   try {
@@ -42,7 +46,16 @@ export async function GET(req) {
     const items = await prisma.proveedor.findMany({
       where: { activo: true, ...proveedorVisibleWhere(localId, grupoId) },
       orderBy: { nombre: "asc" },
-      select: { id: true, nombre: true, parserListaId: true },
+      select: {
+        id: true, nombre: true, parserListaId: true,
+        // La configuración comercial viaja con el proveedor y no en una llamada
+        // aparte: la pantalla la necesita en el mismo momento en que se elige el
+        // proveedor —para precargar el formulario— y pedirla después dejaría los
+        // campos vacíos un instante, que en un teléfono se lee como "no hay
+        // nada configurado".
+        listaAumentoEsperadoMinPct: true, listaAumentoEsperadoMaxPct: true,
+        listaRecargoPct: true, listaImpuestoAdicionalPct: true, listaImpuestosDefinidos: true,
+      },
     });
 
     return NextResponse.json({
@@ -50,12 +63,21 @@ export async function GET(req) {
       // Se devuelven TODOS los visibles, incluidos los que no admiten
       // importación. Esconderlos dejaría al usuario buscando un proveedor que
       // está ahí; mostrarlos con el motivo le dice qué le falta configurar.
-      items: items.map((p) => ({
-        id: p.id,
-        nombre: p.nombre,
-        parserListaId: p.parserListaId,
-        admiteImportacion: !!p.parserListaId,
-      })),
+      items: items.map((p) => {
+        const config = configuracionDeProveedor(p);
+        return {
+          id: p.id,
+          nombre: p.nombre,
+          parserListaId: p.parserListaId,
+          admiteImportacion: !!p.parserListaId,
+          configuracion: config,
+          // Qué le falta para poder importar. Se manda calculado y no se deja que
+          // lo deduzca la pantalla: la regla de qué está completo es la misma que
+          // usa `importar` para rechazar, y dos copias de esa regla terminan
+          // ofreciendo un botón que el servidor después no acepta.
+          faltaConfigurar: faltantesDeConfiguracion(config),
+        };
+      }),
       // Los formatos disponibles, por si la pantalla quiere explicar cuáles hay.
       parsers: listarParsers(),
     });

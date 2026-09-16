@@ -56,6 +56,13 @@ import {
 // vínculo, no acá: es la misma pregunta que resuelve la vinculación a mano.
 import { vinculoAPersistirAlAplicar, ORIGEN_ALTA_VINCULO } from "@/lib/proveedores/listas/vinculacion";
 
+/** Un Decimal de Prisma como número, o null. Null no es cero: es "sin cargar". */
+function numeroONull(v) {
+  if (v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 // Una corrida grande escribe miles de filas. El default de 5 s de Prisma no
 // alcanza ni de lejos; el de la persistencia (60 s) tampoco para una lista
 // entera. Se sube solo acá, donde la transacción es inherentemente larga.
@@ -124,7 +131,13 @@ export async function GET(req, context) {
 
     const importacion = await prisma.importacionListaProveedor.findFirst({
       where: { id: importacionId, grupoId },
-      select: { id: true, estado: true, recargoPct: true, localOperativoId: true },
+      select: {
+        id: true, estado: true, recargoPct: true, localOperativoId: true,
+        // El rango y el impuesto con los que se concilió: son los que
+        // `revalidarFila` necesita para volver a elegir la lectura. Sin ellos
+        // preguntaría sin rango y omitiría todas las filas.
+        aumentoEsperadoMinPct: true, aumentoEsperadoMaxPct: true, impuestoAdicionalPct: true,
+      },
     });
     if (!importacion) {
       return NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 });
@@ -150,7 +163,11 @@ export async function GET(req, context) {
     const porId = new Map(productos.map((p) => [p.id, p]));
 
     const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
-    const contexto = { operandoEnLocalId: Number(localId), depositoLocalId };
+    // La CABECERA viaja en el contexto porque de ahí sale el rango con el que se
+    // evalúa cada fila que no tiene uno congelado. Sin ella, `revalidarFila`
+    // preguntaría sin rango y omitiría todo.
+    const contexto = { operandoEnLocalId: Number(localId), depositoLocalId, cabecera: importacion };
+    const configPrevia = { ...CONFIG_ARCOR, impuestoAdicionalPct: numeroONull(importacion.impuestoAdicionalPct) };
     const recargoPct = Number(importacion.recargoPct);
 
     let cantidad = 0;
@@ -161,7 +178,7 @@ export async function GET(req, context) {
 
     for (const f of filas) {
       const base = f.productoBaseId === null ? null : porId.get(f.productoBaseId) ?? null;
-      const v = revalidarFila({ fila: f, base, contexto, config: CONFIG_ARCOR, recargoPct });
+      const v = revalidarFila({ fila: f, base, contexto, config: configPrevia, recargoPct });
       if (!v.aplicable) {
         noAplicables++;
         continue;
@@ -235,6 +252,7 @@ export async function POST(req, context) {
       select: {
         id: true, estado: true, proveedorId: true, localOperativoId: true,
         recargoPct: true, archivoNombre: true, aplicadaEn: true,
+        aumentoEsperadoMinPct: true, aumentoEsperadoMaxPct: true, impuestoAdicionalPct: true,
         aplicadas: true, omitidas: true, modoPrecioVenta: true,
         proveedor: { select: { id: true, nombre: true } },
       },
@@ -277,8 +295,14 @@ export async function POST(req, context) {
     }
 
     const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
-    const contexto = { operandoEnLocalId: Number(localId), depositoLocalId };
-    const config = CONFIG_ARCOR;
+    // La CABECERA viaja en el contexto porque de ahí sale el rango con el que se
+    // evalúa cada fila que no tiene uno congelado. Sin ella, `revalidarFila`
+    // preguntaría sin rango y omitiría todo.
+    const contexto = { operandoEnLocalId: Number(localId), depositoLocalId, cabecera: importacion };
+    // El impuesto adicional con el que se concilió ESTA lista entra en la
+    // configuración, igual que en `importar`. Si se tomara el de la ficha del
+    // proveedor, cambiárselo hoy reescribiría el costo de una lista vieja.
+    const config = { ...CONFIG_ARCOR, impuestoAdicionalPct: numeroONull(importacion.impuestoAdicionalPct) };
     const recargoPct = Number(importacion.recargoPct);
     const usuarioId = Number(session?.id ?? session?.userId) || null;
 
