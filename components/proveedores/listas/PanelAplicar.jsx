@@ -39,7 +39,6 @@ export default function PanelAplicar({
 }) {
   const [modo, setModo] = useState(MODO_PRECIO_VENTA_DEFAULT);
   const [confirmando, setConfirmando] = useState(false);
-  const [confirmadoLeido, setConfirmadoLeido] = useState(false);
 
   // Solo APLICADA cierra. PARCIALMENTE_APLICADA sigue aceptando tandas.
   const yaAplicada = importacion?.estado === "APLICADA";
@@ -111,7 +110,6 @@ export default function PanelAplicar({
         <SunmiButton
           color="cyan"
           onClick={() => {
-            setConfirmadoLeido(false);
             setConfirmando(true);
             onPedirPrevio?.();
           }}
@@ -201,27 +199,21 @@ export default function PanelAplicar({
             </div>
           )}
 
+          {/* LA CASILLA QUE HABÍA ACÁ SE SACÓ, Y NO ES UN AHORRO DE UN TOQUE.
+              Medía 16 px en un teléfono de 360, o sea un blanco que se falla, y
+              lo que hacía no era proteger: quien la tilda sin leer queda igual de
+              expuesto, y quien sí lee tiene que apuntar dos veces. Lo que protege
+              es SABER QUÉ VA A PASAR, y eso lo dice el renglón de abajo con el
+              número de productos adentro. Es la misma decisión que la hoja de
+              confirmar de la pantalla 4, y por eso el módulo no tiene dos
+              maneras distintas de habilitar una escritura. */}
           <p className="text-[11.5px] sunmi-text-warning leading-snug">
-            Se van a modificar costos reales de productos. Los precios de venta que dependen
-            del margen se recalculan. Esto no se deshace desde esta pantalla.
+            Se van a modificar los costos de{" "}
+            <span className="font-semibold">{previo?.cantidad ?? seleccionadas}</span>{" "}
+            {(previo?.cantidad ?? seleccionadas) === 1 ? "producto" : "productos"}. Los precios
+            de venta que dependen del margen se recalculan. Esto no se deshace desde esta
+            pantalla.
           </p>
-
-          {/* Confirmación explícita: hay que tildar antes de poder aplicar. Un
-              botón solo se aprieta sin leer; una casilla obliga a un acto
-              deliberado sobre la frase que dice qué va a pasar. */}
-          <label className="flex items-start gap-2 text-[11.5px] sunmi-text-strong cursor-pointer">
-            <input
-              type="checkbox"
-              checked={confirmadoLeido}
-              onChange={(e) => setConfirmadoLeido(e.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0"
-            />
-            <span>
-              Revisé la lista y confirmo que se actualicen los costos de{" "}
-              <span className="font-semibold">{previo?.cantidad ?? seleccionadas}</span>{" "}
-              {(previo?.cantidad ?? seleccionadas) === 1 ? "producto" : "productos"}.
-            </span>
-          </label>
           <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-2">
             <SunmiButton
               color="slate"
@@ -236,7 +228,7 @@ export default function PanelAplicar({
                 setConfirmando(false);
                 onAplicar?.(modo);
               }}
-              disabled={!confirmadoLeido || cargandoPrevio}
+              disabled={cargandoPrevio}
               className="py-2 font-bold text-xs order-1 sm:order-2"
             >
               Sí, aplicar {seleccionadas} {seleccionadas === 1 ? "fila" : "filas"}
