@@ -65,22 +65,16 @@ Si se lo anota como bloqueado, el paso 0 podría cortar el rango ANTES de ese
 commit y dejarlo afuera indefinidamente. No es eso lo que hay que hacer: hay que
 dejarlo viajar con la primera tanda que sí toque el runtime.
 
-### Vigente: la reescritura de dos afirmaciones de `sonda-modalidades-cobro.mjs`
+### Ninguna vigente
 
-Empujada el 2026-09-15, después del despliegue de `ef359d8f`. No está bloqueada:
-sale con el próximo despliegue, sin hacer nada especial.
+La última fue la reescritura de dos afirmaciones de `sonda-modalidades-cobro.mjs`,
+anotada el 2026-09-15: **viajó sola** con el despliegue de `4ff57967`, sin que
+nadie tuviera que acordarse de nada. Antes había pasado lo mismo con `c5d89841`,
+el arreglo de la guardia de migraciones.
 
-Toca **un script y nada más**. La sonda preguntaba por la línea "Elegí la
-modalidad" para saber si el selector había abierto, y esa línea se sacó en la
-misma tanda que se acaba de desplegar; quedaba afirmando sobre un texto que ya no
-existe. Se reescribió por su intención —lo que prueba que el selector abrió es el
-"← Volver"— y eso no cambia una sola línea de lo que corre en producción.
-
-**Cómo funcionó la entrada anterior, que es el motivo de que esto esté escrito
-así.** `c5d89841` —el arreglo de la guardia de migraciones— quedó anotado acá el
-2026-09-15 por la misma razón, y **viajó solo** con el despliegue de `ef359d8f`
-sin que nadie tuviera que acordarse de nada. Ya está en producción y por eso su
-entrada se borró.
+Dos por dos: el mecanismo funciona. Un commit que no justifica su propio corte se
+anota acá, sale con la primera tanda que sí toca el runtime, y su entrada se
+borra cuando está en producción.
 
 ---
 
