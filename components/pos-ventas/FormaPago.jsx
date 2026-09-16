@@ -14,6 +14,7 @@ import {
   botonesDeCobro,
   claveDeOpcion,
   condicionesDeFilas,
+  etiquetaImporteDeBoton,
   filaDeBoton,
   filasIniciales,
   formaPagoDeSeleccion,
@@ -598,24 +599,30 @@ function FormaPago({
                           "Mercado Pago" entre en una sola línea, sin deformarlo. */}
                       {totalPorMedioDifiere ? (
                         <>
-                          <span className="flex items-center gap-1.5 whitespace-nowrap text-xs">
-                            <IconoMedio tipoContable={m.tipoContable} procesador={m.procesador}
-                              size={m.tipoContable === "MERCADOPAGO" ? 16 : 18} /> {m.nombre}
+                          {/* ── LAS DOS FILAS TIENEN ALTO FIJO ─────────────────
+                              Sin esto, el alto de cada fila lo decidía su
+                              contenido —el ícono más grande, un importe que
+                              partía en dos— y entonces el nombre de un botón
+                              quedaba a distinta altura que el del botón de al
+                              lado. Con alto declarado, la posición del nombre y
+                              la del importe son las mismas en los cuatro. */}
+                          <span className="h-6 flex items-center gap-1.5 whitespace-nowrap overflow-hidden text-xs">
+                            <IconoMedio tipoContable={m.tipoContable} procesador={m.procesador} size={18} />
+                            {m.nombre}
                           </span>
                           {/* EL NÚMERO QUE EL CAJERO NECESITA ANTES DE TOCAR NADA.
                               Sale del mismo motor que va a cobrar el servidor. Con
                               modalidades de distinto recargo no hay UN número: se
-                              muestra el rango y el importe exacto está adentro. */}
-                          <span className="text-base font-black sunmi-text-accent tabular-nums leading-tight">
-                            {r.difiere
-                              ? `$${formatPrecio(r.min)} – $${formatPrecio(r.max)}`
-                              : `$${formatPrecio(r.total)}`}
+                              dice el piso con "desde", y el importe exacto de cada
+                              una está a un toque, en el selector. */}
+                          <span className="h-5 flex items-center justify-center whitespace-nowrap text-base font-black sunmi-text-accent tabular-nums leading-none">
+                            {etiquetaImporteDeBoton(r, formatPrecio)}
                           </span>
                         </>
                       ) : (
                         <>
-                          <IconoMedio tipoContable={m.tipoContable} procesador={m.procesador}
-                            size={m.tipoContable === "MERCADOPAGO" ? 19 : 22} /> {m.nombre}
+                          <IconoMedio tipoContable={m.tipoContable} procesador={m.procesador} size={22} />
+                          {" "}{m.nombre}
                         </>
                       )}
                     </button>

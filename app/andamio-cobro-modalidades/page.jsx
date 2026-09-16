@@ -64,6 +64,45 @@ const MEDIOS = [
 // $214.000, el número que quedaba pegado en el recuadro después de la venta.
 const CARRITO = [{ productoLocalId: 1, nombre: "Heladera", cantidad: 1, precio: 200000 }];
 
+// ── EL SEGUNDO CASO: LA GRILLA DESPAREJA ──────────────────────────────────
+//
+// Cuatro medios, uno de ellos con DOS modalidades de distinto recargo —que es
+// lo que hace aparecer el importe en cada botón— y una oferta de SOLO EFECTIVO,
+// que separa el total de efectivo del de los demás. Con los cuatro dando lo
+// mismo el panel no dibuja importes y el defecto no se puede ver.
+//
+// La oferta tiene la forma de la real: `precioOferta` y `condicionPago`, los
+// campos con los que la manda el carrito. El motor decide a qué medio se le
+// aplica; acá no se resta nada.
+const OFERTA_EFECTIVO = {
+  ofertaId: 7,
+  ofertaNombre: "Semana del vino",
+  precioOferta: 3800,
+  condicionPago: "SOLO_EFECTIVO",
+};
+
+const MEDIOS_GRILLA = [
+  { id: 30, nombre: "Efectivo", activo: true, orden: 1, tipoContable: "EFECTIVO", procesador: null, recargoPct: 0, comisionPct: 0, modalidades: [] },
+  { id: 40, nombre: "Débito", activo: true, orden: 2, tipoContable: "DEBITO", procesador: "BANCO", recargoPct: 3, comisionPct: 2, modalidades: [] },
+  {
+    id: 10, nombre: "Mercado Pago", activo: true, orden: 3, tipoContable: "MERCADOPAGO",
+    procesador: "MERCADOPAGO", recargoPct: 0, comisionPct: 5,
+    modalidades: componerModalidades([
+      { id: 201, nombre: "Crédito 1 pago", activo: true, orden: 1, tipoContable: "CREDITO", recargoPct: 4, comisionPct: 3 },
+      { id: 202, nombre: "Crédito 6 cuotas", activo: true, orden: 2, tipoContable: "CREDITO", recargoPct: 12, comisionPct: 7 },
+    ]),
+  },
+  { id: 20, nombre: "Crédito", activo: true, orden: 4, tipoContable: "CREDITO", procesador: "BANCO", recargoPct: 9, comisionPct: 9, modalidades: [] },
+];
+
+const CARRITO_GRILLA = [
+  { productoLocalId: 42, productoBaseId: 11, nombre: "Nueve de Oro", cantidad: 1, precio: 3959,
+    stockMax: 100, factorPack: 1, unidadMedida: "unidad", modoVentaLinea: "NORMAL", oferta: OFERTA_EFECTIVO },
+];
+
+const PREVIEW_GRILLA = totalesPorOpcionDeCobro({ carrito: CARRITO_GRILLA, medios: MEDIOS_GRILLA });
+const SUBTOTAL_GRILLA = CARRITO_GRILLA.reduce((a, l) => a + l.precio * l.cantidad, 0);
+
 const PREVIEW_CON_CARRITO = totalesPorOpcionDeCobro({ carrito: CARRITO, medios: MEDIOS });
 const PREVIEW_VACIO = totalesPorOpcionDeCobro({ carrito: [], medios: MEDIOS });
 const SUBTOTAL = CARRITO.reduce((a, l) => a + l.precio * l.cantidad, 0);
@@ -88,6 +127,24 @@ export default function AndamioCobroModalidades() {
         mediosCobro={MEDIOS}
         previewPorOpcion={hayCarrito ? PREVIEW_CON_CARRITO : PREVIEW_VACIO}
       />
+
+      {/* LA GRILLA DE BOTONES, con importe en cada uno. Es el caso donde se ve
+          si los cuatro tienen el mismo alto y si el nombre y el importe quedan
+          a la misma altura entre columnas. Va en su propio panel para poder
+          medirla sin que el de arriba la mueva. */}
+      <div data-andamio="grilla">
+        <FormaPago
+          subtotal={SUBTOTAL_GRILLA}
+          formaPago="efectivo"
+          onFormaPagoChange={() => {}}
+          onCobrar={() => {}}
+          cobrando={false}
+          disabled={false}
+          mediosCobro={MEDIOS_GRILLA}
+          previewPorOpcion={PREVIEW_GRILLA}
+          hayOfertaSoloEfectivo
+        />
+      </div>
 
       {/* Lo que hace la pantalla al registrar la venta, y nada más: vaciar el
           carrito. El panel tiene que volver solo al principio. */}

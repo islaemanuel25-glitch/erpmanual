@@ -43,16 +43,28 @@ export function IconoCredito(props) {
 
 export function IconoMercadoPago({ size = 22, className = "" }) {
   // Logo OFICIAL de Mercado Pago servido como asset (public/logos/mercado-pago.png).
-  // Es un óvalo (más ancho que alto): fijamos la ALTURA y dejamos el ancho automático
-  // para no deformarlo. Para actualizarlo, basta reemplazar ese archivo.
+  // Para actualizarlo, basta reemplazar ese archivo.
+  //
+  // ── ENTRA EN LA CAJA, NO LA ESTIRA ──────────────────────────────────────
+  //
+  // Es un óvalo: más ancho que alto. Antes se le fijaba la ALTURA y se dejaba el
+  // ancho libre, así que ocupaba 25,8 px de ancho donde los demás ocupaban 18, y
+  // encima quedaba 16 de alto contra los 18 de los otros. Esa diferencia de dos
+  // píxeles corría la fila del nombre y, con ella, la del importe: en la misma
+  // fila de la grilla el nombre de Mercado Pago quedaba un píxel más abajo que
+  // el de Crédito.
+  //
+  // Ahora se limitan las DOS medidas al tamaño de la caja y se deja que el lado
+  // largo mande. El óvalo entra entero, centrado y sin deformarse, y ocupa
+  // exactamente lo mismo que un ícono cuadrado.
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src="/logos/mercado-pago.png"
       alt="Mercado Pago"
       draggable={false}
-      style={{ height: size, width: "auto" }}
-      className={className}
+      style={{ maxHeight: size, maxWidth: size, width: "auto", height: "auto" }}
+      className={`object-contain ${className}`}
     />
   );
 }
@@ -95,5 +107,22 @@ export function IconoMedio({ medio, tipoContable = null, procesador = null, size
   const clave = medio ?? (tipoContable ? String(tipoContable).toLowerCase() : null);
   const Comp = ICONO_POR_MEDIO[clave] || (procesador ? ICONO_POR_PROCESADOR[procesador] : null);
   if (!Comp) return null;
-  return <Comp size={size} className={`shrink-0 ${className}`} />;
+  // ── TODOS LOS ÍCONOS OCUPAN LA MISMA CAJA ──────────────────────────────
+  //
+  // Los dibujados son SVG cuadrados de `size × size`; un logo de marca es una
+  // imagen con la proporción que tenga. Sin caja, cada uno ocupaba lo suyo y la
+  // fila del nombre cambiaba de alto según el medio, que es lo que desalineaba
+  // la grilla de botones.
+  //
+  // La caja se declara acá y no en cada pantalla a propósito: vale para
+  // cualquier medio con logo propio, no solo para Mercado Pago, y el que agregue
+  // el próximo no tiene que enterarse de nada.
+  return (
+    <span
+      style={{ width: size, height: size }}
+      className={`shrink-0 inline-flex items-center justify-center ${className}`}
+    >
+      <Comp size={size} />
+    </span>
+  );
 }

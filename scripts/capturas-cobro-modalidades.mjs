@@ -144,6 +144,73 @@ for (const vista of VISTAS) {
   // ── 1 · EL PANEL, CON EL CARRITO CARGADO ────────────────────────────────
   await foto(`panel-${vista.nombre}`);
 
+  // ── 1.bis · LA GRILLA QUEDA PAREJA, Y SE MIDE ───────────────────────────
+  //
+  // EL DEFECTO, CON SUS NÚMEROS: a 360 px el botón de un medio con modalidades
+  // mostraba el rango completo —"$4.117,36 – $4.434,08"—, no entraba en una
+  // línea y partía en dos. Ese botón medía 60 px contra los 49 de los demás, y
+  // en su misma fila el nombre quedaba a 4,5 mientras el del vecino quedaba a
+  // 12,3. El ícono de Mercado Pago tampoco ayudaba: 25,8 × 16 contra 18 × 18.
+  //
+  // Se mide la POSICIÓN, no el aspecto: el top del nombre y el del importe
+  // dentro de cada botón. Si los cuatro dan el mismo número, están alineados; si
+  // alguien vuelve a poner un contenido que crece, esto se pone rojo con el
+  // número exacto en vez de "se ve raro".
+  const grilla = await evaluar(`(() => {
+    const panel = document.querySelector('[data-andamio="grilla"]');
+    if (!panel) return { error: "no está el panel de la grilla" };
+    const caja = [...panel.querySelectorAll('div')].find(
+      (d) => d.className.includes('grid-cols-2') && d.querySelectorAll('button').length >= 3
+    );
+    if (!caja) return { error: "no se encontró la grilla de botones" };
+    return {
+      botones: [...caja.querySelectorAll('button')].map((b) => {
+        const r = b.getBoundingClientRect();
+        const spans = [...b.querySelectorAll('span')];
+        // El importe CONTIENE un $; "desde $4.117,36" no empieza con uno.
+        const importe = spans.find((s) => /\\$/.test(s.textContent || ''));
+        const nombre = spans.find((s) => s !== importe && (s.textContent || '').trim() && !/\\$/.test(s.textContent || ''));
+        const ico = b.querySelector('img, svg');
+        const ri = ico && ico.getBoundingClientRect();
+        return {
+          texto: (b.textContent || '').replace(/\\s+/g, ' ').trim(),
+          alto: +r.height.toFixed(1),
+          nombreTop: nombre ? +(nombre.getBoundingClientRect().top - r.top).toFixed(1) : null,
+          importeTop: importe ? +(importe.getBoundingClientRect().top - r.top).toFixed(1) : null,
+          iconoAlto: ri ? +ri.height.toFixed(1) : null,
+          iconoAncho: ri ? +ri.width.toFixed(1) : null,
+        };
+      }),
+    };
+  })()`);
+
+  await afirmar(grilla && !grilla.error, `se pudo medir la grilla (${grilla?.error ?? "ok"})`);
+  if (grilla && !grilla.error) {
+    for (const b of grilla.botones) {
+      console.log(`     ${b.texto.padEnd(30)} alto ${b.alto} · nombre@${b.nombreTop} · importe@${b.importeTop} · ícono ${b.iconoAncho}x${b.iconoAlto}`);
+    }
+    const unico = (eje) => [...new Set(grilla.botones.map((b) => b[eje]))];
+    await afirmar(unico("alto").length === 1, `todos los botones miden lo mismo (${unico("alto").join(", ")})`);
+    await afirmar(unico("nombreTop").length === 1, `el nombre está a la misma altura en todos (${unico("nombreTop").join(", ")})`);
+    await afirmar(unico("importeTop").length === 1, `el importe está a la misma altura en todos (${unico("importeTop").join(", ")})`);
+    await afirmar(
+      unico("iconoAncho").length === 1,
+      `todos los íconos ocupan el mismo ancho (${unico("iconoAncho").join(", ")})`
+    );
+
+    // Y que el botón con modalidades diga el piso en UNA línea, no el rango.
+    const conModalidades = grilla.botones.find((b) => b.texto.includes("Mercado Pago"));
+    await afirmar(
+      conModalidades != null && /desde \$/.test(conModalidades.texto),
+      `el medio con modalidades dice el piso: «${conModalidades?.texto ?? "no se encontró"}»`
+    );
+    await afirmar(
+      conModalidades != null && !conModalidades.texto.includes("–"),
+      "y ya no muestra el rango, que es lo que no entraba en una línea"
+    );
+  }
+  await foto(`grilla-${vista.nombre}`);
+
   // ── 2 · EL SELECTOR DE MODALIDAD ────────────────────────────────────────
   await tocar("Mercado Pago");
   const enSelector = await textoDe();
