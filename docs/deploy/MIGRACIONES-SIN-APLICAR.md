@@ -16,7 +16,40 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **16 migraciones**, las mismas que el árbol.
+Ninguna. Producción está en **17 migraciones**, las mismas que el árbol.
+
+---
+
+## 2026-09-17 — `27c70832`, la lectura por producto y el costo fuera de rango: **ADITIVA**
+
+Producción pasó de `1522c3c581c83283f1d70dd0fbee15129312019a` a
+`27c70832c3bdcccd9a199ed6ffb22db29ffd5dd5`. Corte de **3 segundos**.
+
+`20260917120000_lectura_por_producto_y_fuera_de_rango`. Una tabla nueva,
+`LecturaProductoProveedor` —cómo se lee cada producto de cada proveedor, con
+quién lo confirmó— con su índice único y dos índices de búsqueda, más dos
+columnas nullable en `ImportacionListaFila` para registrar quién aceptó un costo
+fuera del rango y cuándo.
+
+**El clasificador la marcó ADITIVA y salió con 0.** Sin autorización manual; la
+bitácora sigue sin existir. El quinto chequeo del backup no aplicaba: no se borra
+ni se reescribe ningún dato.
+
+**Sobre el `CREATE UNIQUE INDEX`**, que es lo que el propio skill nombra como el
+caso que el clasificador no puede ver: acá no hay riesgo, porque el índice se
+crea sobre la tabla que la MISMA migración acaba de crear. Nace vacía, así que no
+puede chocar con duplicados que ya existan. Comprobado después: 0 filas.
+
+Verificado después de recrear: `migrate status` informa 17 y "Database schema is
+up to date!", la tabla existe con sus cuatro índices, y de las 4.748 filas de
+importación ninguna quedó marcada como aceptada fuera de rango — que es lo que
+corresponde a una migración que solo agrega.
+
+**Y la lista volvió a quedar desfasada**, por segunda vez: decía "Ninguna · 16
+migraciones" cuando el árbol ya traía la 17. La lección está escrita dos veces
+más abajo y no alcanzó. Si vuelve a pasar, el próximo paso no es escribirla de
+nuevo: es un candado que compare este archivo contra `prisma/migrations` y se
+ponga rojo solo.
 
 ---
 
