@@ -16,7 +16,21 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **18 migraciones**, las mismas que el árbol.
+Producción está en **18 migraciones** y el árbol tiene 19.
+
+- `20260917150000_precios_por_columna` — **ADITIVA**. Una sola columna nullable,
+  `preciosPorColumna` (JSONB), en `ImportacionListaFila`. Sin DROP, sin
+  `ALTER COLUMN` y sin backfill: las 6.388 filas que ya existen quedan en NULL.
+
+  Guarda, por fila, lo que decía **cada** columna de precio del archivo. Hace
+  falta porque el archivo no se guarda —`archivoUbicacion` queda en null— y hasta
+  ahora de cada fila quedaba solo el precio de la columna elegida: el de la otra
+  se perdía al importar, así que descubrir que la lista se leyó con la columna
+  equivocada obligaba a volver a subir el archivo.
+
+  Las filas viejas no se pueden rellenar —reconstruirlas necesita el archivo— y
+  no hace falta: una fila sin este dato simplemente no admite cambio de columna,
+  y la pantalla lo dice en vez de ofrecer un botón que falle.
 
 ---
 

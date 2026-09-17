@@ -419,7 +419,12 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // solo controlarlos— y qué productos se dejan sin cambiar para ese proveedor.
   // Es de otra tanda, no toca nada de transferencias, y es aditiva: una columna
   // nullable y una tabla nueva, sin DROP y sin backfill.
-  assert.equal(migraciones.length, 18, "aparecio una migracion que nadie declaro aca");
+  // 19 desde el 2026-09-17: entra `20260917150000_precios_por_columna`, que
+  // guarda por fila de importación lo que decía CADA columna de precio del
+  // archivo, para poder cambiar con qué columna se leyó una lista sin volver a
+  // subirla. Es de otra tanda, no toca nada de transferencias, y es aditiva: una
+  // sola columna nullable, sin DROP y sin backfill.
+  assert.equal(migraciones.length, 19, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

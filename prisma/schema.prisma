@@ -3189,6 +3189,28 @@ model ImportacionListaFila {
   /// que se aplicó: si se aplicó o no lo dice `descuentoAplicado` de la cabecera,
   /// que es una decisión de toda la lista. Dos hechos, dos lugares.
   descuentoPct     Decimal? @db.Decimal(6, 3)
+  /// ── LO QUE DECÍA CADA COLUMNA DE PRECIO DEL ARCHIVO ──────────────────
+  ///
+  /// `{ "4": 858.86, "5": 1039.22 }` — el índice de columna contra su valor
+  /// crudo. `precioConIva` guarda el de la columna ELEGIDA; esto guarda todas,
+  /// para poder cambiar de columna después.
+  ///
+  /// ── POR QUÉ HACE FALTA GUARDARLAS ────────────────────────────────────
+  ///
+  /// Porque el archivo NO se guarda —`archivoUbicacion` queda en null— así que
+  /// sin esto, descubrir que la lista se leyó con la columna equivocada obliga a
+  /// volver a subir el archivo, y para eso hay que tenerlo a mano. Es
+  /// justamente lo que no pasa cuando alguien abre el resultado dos días
+  /// después desde el celular.
+  ///
+  /// Solo la tiene el camino GENÉRICO: Arcor trae las dos columnas en
+  /// `precioConIva` y `precioSinIva`, que ya eran dos campos.
+  ///
+  /// Nullable a propósito: las 4.748 filas que ya existen no la tienen, y no se
+  /// puede reconstruir sin el archivo. Una fila sin esto simplemente no admite
+  /// cambio de columna, y la pantalla lo dice en vez de ofrecer un botón que
+  /// falle.
+  preciosPorColumna Json?
 
   productoBaseId           Int?
   codigoProveedorId        Int?
