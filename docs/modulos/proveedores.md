@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-09-17 01:49
+**Última actualización:** 2026-09-17 03:09
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,12 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-09-17: fix: el volver mide 44, y el nombre de la pantalla va una sola vez
+- 2026-09-17: fix: lo que ya se escribió no se cuenta como "se actualiza"
+- 2026-09-17: feat: pantalla 7 — tus productos de este proveedor que no cambian
+- 2026-09-17: feat: Se actualizan (v2) — cada producto se toca y se puede sacar de la lista
+- 2026-09-17: feat: Resultado (v2) — todas las tarjetas se tocan y llevan a su lista
+- 2026-09-17: fix: la barra de la app dice dónde estás, y el volver no se va de pantalla
 - 2026-09-17: fix: dos textos que no entraban a 360, vistos en la captura
 - 2026-09-17: fix: "Se actualizan" dice cuántos son y cuánto aumentan de verdad
 - 2026-09-17: fix: deshacer ya no se cae con 500 cuando la lista se subió dos veces
