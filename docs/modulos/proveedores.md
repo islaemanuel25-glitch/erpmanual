@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-09-16 23:17
+**Última actualización:** 2026-09-17 01:49
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,21 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-09-17: fix: dos textos que no entraban a 360, vistos en la captura
+- 2026-09-17: fix: "Se actualizan" dice cuántos son y cuánto aumentan de verdad
+- 2026-09-17: fix: deshacer ya no se cae con 500 cuando la lista se subió dos veces
+- 2026-09-17: fix: el rango que anuncia el resumen nunca se sale del configurado
+- 2026-09-17: fix: el botón principal de revisar ya no ofrece un costo fuera de rango
+- 2026-09-17: refactor: sacar el orden de la cola de revisión a una función pura
+- 2026-09-17: fix: sacar "Arcor" escrito fijo de todo el módulo de listas
+- 2026-09-17: fix: un solo título en el historial de listas
+- 2026-09-17: fix: el selector de proveedor dice por qué está vacío
+- 2026-09-17: feat: revisar de a uno también sirve para vincular los que no tenés
+- 2026-09-17: feat: el resultado separa lo que no es trabajo y nombra el motivo real
+- 2026-09-17: feat: pantalla "Los que se actualizan" (4b) en vez de la tabla vieja
+- 2026-09-17: refactor: borrar la pantalla vieja del detalle de listas
+- 2026-09-17: feat(listas): el sistema se acuerda de cómo se lee cada producto
+- 2026-09-17: fix(listas): ningún costo fuera del rango queda listo ni se escribe solo
 - 2026-09-16: fix(listas): tres cosas que la pantalla decía mal, encontradas recorriéndola
 - 2026-09-16: feat(listas): las seis pantallas del diseño, enganchadas con el motor
 - 2026-09-16: fix(listas): aplicar usa las reglas del lector que leyó la lista

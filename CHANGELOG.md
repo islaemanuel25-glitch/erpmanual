@@ -1,5 +1,26 @@
 # Changelog
 
+## [2026-09-17] - Actualización: proveedores, transferencias
+
+### Modificado
+- **proveedores**: fix: dos textos que no entraban a 360, vistos en la captura
+- **proveedores**: fix: "Se actualizan" dice cuántos son y cuánto aumentan de verdad
+- **proveedores**: fix: deshacer ya no se cae con 500 cuando la lista se subió dos veces
+- **proveedores**: fix: el rango que anuncia el resumen nunca se sale del configurado
+- **proveedores**: fix: el botón principal de revisar ya no ofrece un costo fuera de rango
+- **proveedores**: refactor: sacar el orden de la cola de revisión a una función pura
+- **proveedores**: fix: sacar "Arcor" escrito fijo de todo el módulo de listas
+- **proveedores**: fix: un solo título en el historial de listas
+- **proveedores**: fix: el selector de proveedor dice por qué está vacío
+- **proveedores**: feat: revisar de a uno también sirve para vincular los que no tenés
+- **proveedores**: feat: el resultado separa lo que no es trabajo y nombra el motivo real
+- **proveedores**: feat: pantalla "Los que se actualizan" (4b) en vez de la tabla vieja
+- **proveedores**: refactor: borrar la pantalla vieja del detalle de listas
+- **proveedores**: feat(listas): el sistema se acuerda de cómo se lee cada producto
+- **proveedores**: fix(listas): ningún costo fuera del rango queda listo ni se escribe solo
+- **transferencias**: fix(listas): ningún costo fuera del rango queda listo ni se escribe solo
+
+
 ## [2026-09-16] - Actualización: proveedores, transferencias, pos-ventas
 
 ### Modificado
