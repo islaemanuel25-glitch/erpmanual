@@ -83,6 +83,19 @@ export default function BotonReporte({ importacionId, cabecera, sistema, proveed
     setTrabajando(opcion.tipo);
     setError("");
     try {
+      // ── EL RESUMEN SE BUSCA ACÁ SI NO LO DAN ────────────────────────────
+      //
+      // La pantalla vieja del detalle ya lo tenía cargado y se lo pasaba. Esa
+      // pantalla se eliminó, y el resultado —que es donde vive ahora el reporte—
+      // no lo necesita para nada más: pedirle que lo cargue en cada visita sería
+      // una consulta de más en la pantalla que más se abre, para un botón que
+      // casi nunca se toca. Se busca recién cuando alguien lo pide.
+      const resumen = sistema ?? (await (async () => {
+        const r = await fetch(`/api/proveedores/listas/${importacionId}`, { credentials: "include" });
+        const j = await r.json();
+        if (!j?.ok) throw new Error(j?.error || "No se pudo leer el resumen de la importación.");
+        return j.sistema ?? null;
+      })());
       // Los productos, de a una situación y completos: el PDF no se pagina por
       // pantallas.
       const traer = async (situacion) => {
@@ -132,7 +145,7 @@ export default function BotonReporte({ importacionId, cabecera, sistema, proveed
           cabecera,
           proveedor,
           usuario,
-          sistema,
+          sistema: resumen,
           actualizados: partes.ACTUALIZADOS?.items ?? [],
           pendientes: partes.PENDIENTES?.items ?? [],
           ausentes: partes.AUSENTES?.items ?? [],
@@ -171,7 +184,7 @@ export default function BotonReporte({ importacionId, cabecera, sistema, proveed
         color="slate"
         onClick={() => setAbierto((v) => !v)}
         aria-expanded={abierto}
-        className="py-1.5 px-3 text-[11.5px] inline-flex items-center gap-1"
+        className="min-h-toque px-3 text-sm2 inline-flex items-center gap-1"
       >
         <FileText size={13} aria-hidden="true" />
         Descargar / compartir reporte

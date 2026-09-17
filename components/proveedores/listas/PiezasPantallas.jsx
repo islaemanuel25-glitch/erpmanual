@@ -179,19 +179,39 @@ export function AccionesDeFila({ textoUsar, onDejar, onUsar, trabajando, deshabi
 }
 
 /** El encabezado de una pantalla: de dónde se vuelve, y de qué se está hablando. */
+/**
+ * EL VOLVER DEL MÓDULO. Uno solo, igual en las cinco pantallas.
+ *
+ * ── POR QUÉ ES UNA PIEZA Y NO UN BOTÓN EN CADA PANTALLA ────────────────────
+ *
+ * Porque cada pantalla lo escribió por su cuenta y salieron distintos: distinto
+ * tamaño de letra, distinto alto de toque, y en una faltaba. Emanuel llegó a la
+ * pantalla vieja del detalle por un "Volver al historial" que ninguna otra
+ * pantalla tenía.
+ *
+ * El destino lo pone quien la usa —Resultado vuelve al listado, Revisar y Se
+ * actualizan vuelven a Resultado, Subir vuelve al listado, el listado vuelve a
+ * Compras— porque eso sí es propio de cada pantalla. Lo que no cambia es cómo se
+ * ve y que se pueda tocar con el pulgar.
+ */
+export function VolverDelModulo({ texto, onVolver }) {
+  if (!onVolver) return null;
+  return (
+    <SunmiButton
+      color="ghost"
+      type="button"
+      onClick={onVolver}
+      className="text-sm2 sunmi-text-muted inline-flex items-center gap-1 min-h-toque min-w-toque px-2 justify-start"
+    >
+      ‹ {texto}
+    </SunmiButton>
+  );
+}
+
 export function Encabezado({ volverTexto, onVolver, titulo, subtitulo }) {
   return (
     <div className="space-y-1">
-      {onVolver && (
-        <SunmiButton
-          color="ghost"
-          type="button"
-          onClick={onVolver}
-          className="text-sm2 sunmi-text-muted inline-flex items-center gap-1 min-h-toque min-w-toque px-2 justify-start"
-        >
-          ‹ {volverTexto}
-        </SunmiButton>
-      )}
+      <VolverDelModulo texto={volverTexto} onVolver={onVolver} />
       <h1 className="text-xl font-bold sunmi-text-strong leading-tight">{titulo}</h1>
       {subtitulo && <p className="text-sm2 sunmi-text-muted leading-snug">{subtitulo}</p>}
     </div>

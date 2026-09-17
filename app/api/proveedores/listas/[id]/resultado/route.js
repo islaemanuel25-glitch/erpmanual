@@ -43,7 +43,7 @@ import { baseParaHelpers } from "@/lib/proveedores/listas/conciliarLista";
 import { resolverParserDeProveedor } from "@/lib/proveedores/listas/registro";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { filtroDeLaCola } from "@/lib/proveedores/listas/panelDecision";
-import { whereDelGrupo, GRUPO_PRODUCTO } from "@/lib/proveedores/listas/gruposProducto";
+import { whereDelGrupo, GRUPO_PRODUCTO, GRUPOS_PRECIO_VIEJO } from "@/lib/proveedores/listas/gruposProducto";
 
 /** Cuántas filas de ejemplo muestra la tapa. */
 const MUESTRA = 3;
@@ -160,6 +160,31 @@ export async function GET(req, context) {
       }),
     });
 
+    // ── CUÁNTOS PRODUCTOS TUYOS NO APARECEN EN ESTA LISTA ───────────────
+    //
+    // Es la mitad que faltaba del panorama, y es la que Emanuel no tenía en
+    // ningún lado: la pantalla contaba las filas del archivo —incluidos los 554
+    // productos que el proveedor vende y él no— y no decía nada sobre lo suyo
+    // que el proveedor NO informó, que es lo que le va a quedar con el costo
+    // viejo después de aplicar.
+    //
+    // Son los dos grupos de "sigue con el precio viejo": sin código guardado y
+    // con código pero no traído. Los DISCONTINUADOS no entran: alguien ya dio de
+    // baja ese vínculo, así que contarlos volvería a pedir por segunda vez una
+    // decisión que ya se tomó.
+    const tuyosQueNoAparecen = await prisma.productoBase.count({
+      where: {
+        OR: GRUPOS_PRECIO_VIEJO.map((g) =>
+          whereDelGrupo(g, {
+            universoWhere,
+            importacionId: id,
+            proveedorId: cab.proveedor?.id,
+            filtroCola: filtroDeLaCola(),
+          })
+        ),
+      },
+    });
+
     // ── La muestra: tres de las que se van a actualizar ──────────────────
     // `excluidaManual: false` en los dos: una fila que el motor dejó lista y que
     // después alguien excluyó a mano NO se va a aplicar, así que no puede
@@ -207,6 +232,7 @@ export async function GET(req, context) {
         archivoNombre: cab.archivoNombre,
         leidaEn: cab.conciliadaEn ?? cab.createdAt,
         productosActualizados,
+        tuyosQueNoAparecen,
         rango: {
           minPct: numero(cab.aumentoEsperadoMinPct),
           maxPct: numero(cab.aumentoEsperadoMaxPct),

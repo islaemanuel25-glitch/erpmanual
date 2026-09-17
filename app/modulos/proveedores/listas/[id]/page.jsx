@@ -45,7 +45,9 @@ import HojaConfirmarAplicar from "@/components/proveedores/listas/HojaConfirmarA
 // para escribir costos, y uno de los dos sin el candado.
 import ModalRevertir from "@/components/proveedores/listas/ModalRevertir";
 import ModalTerminar from "@/components/proveedores/listas/ModalTerminar";
+import BotonReporte from "@/components/proveedores/listas/BotonReporte";
 import { fechaHora } from "@/lib/proveedores/listas/presentacion";
+import { MOTIVO_REVISION } from "@/lib/proveedores/listas/resultadoDeLaLista";
 import { esImportacionAbierta, ESTADOS_A_MEDIAS } from "@/lib/proveedores/listas/persistencia";
 
 export default function ResultadoDeListaPage() {
@@ -266,6 +268,58 @@ export default function ResultadoDeListaPage() {
         />
       </div>
 
+      {/* ── LO QUE NO ES TRABAJO DE ESTA LISTA, PERO HAY QUE VERLO ──────────
+          Dos números que antes no estaban, o estaban donde confundían.
+
+          El primero son los productos que la lista trae y este negocio no
+          vende: en la #5 eran 554 de 595, y estaban DENTRO de "para revisar".
+          La pantalla decía "595 para revisar" sobre un trabajo que en realidad
+          eran 41 decisiones, y eso convertía la cola en algo que nadie iba a
+          empezar nunca. No son una decisión pendiente: son el catálogo del
+          proveedor. Se pueden mirar y vincular si alguno sí es tuyo, y por eso
+          la tarjeta es tocable, pero fuera de la cola.
+
+          El segundo es el espejo y no existía en ningún lado: lo tuyo de este
+          proveedor que la lista NO trajo. Es lo que va a quedar con el costo
+          viejo después de aplicar, y hasta ahora había que deducirlo. */}
+      {(conteo.sinProducto > 0 || cabecera.tuyosQueNoAparecen > 0) && (
+        <div className="grid grid-cols-2 gap-3">
+          {conteo.sinProducto > 0 && (
+            <TarjetaChica
+              numero={conteo.sinProducto}
+              titulo={
+                conteo.sinProducto === 1
+                  ? "producto de la lista que no tenés"
+                  : "productos de la lista que no tenés"
+              }
+              detalle={abierta ? "Verlos y vincular" : "No están en tu catálogo"}
+              ariaLabel={
+                abierta ? `Ver los ${conteo.sinProducto} productos de la lista que no tenés` : undefined
+              }
+              onClick={
+                abierta
+                  ? () =>
+                      router.push(
+                        `/modulos/proveedores/listas/${id}/revisar?solo=${MOTIVO_REVISION.SIN_PRODUCTO}`
+                      )
+                  : undefined
+              }
+            />
+          )}
+          {cabecera.tuyosQueNoAparecen > 0 && (
+            <TarjetaChica
+              numero={cabecera.tuyosQueNoAparecen}
+              titulo={
+                cabecera.tuyosQueNoAparecen === 1
+                  ? `producto tuyo de ${cabecera.proveedor?.nombre ?? "este proveedor"} que no aparece en esta lista`
+                  : `productos tuyos de ${cabecera.proveedor?.nombre ?? "este proveedor"} que no aparecen en esta lista`
+              }
+              detalle="Se quedan con el costo de ahora"
+            />
+          )}
+        </div>
+      )}
+
       {/* ── LA MUESTRA SE CALLA CUANDO NO HAY NADA QUE MOSTRAR ──────────────
           `muestra` son filas en LISTO_PARA_ACTUALIZAR, o sea las que se
           aplicarían. En una lista cerrada SIN nada aplicado —terminada sin
@@ -291,7 +345,7 @@ export default function ResultadoDeListaPage() {
           </SunmiCard>
           <SunmiButton
             color="ghost"
-            onClick={() => router.push(`/modulos/proveedores/listas/${id}/filas`)}
+            onClick={() => router.push(`/modulos/proveedores/listas/${id}/actualizan`)}
             className="sunmi-text-link min-h-toque px-0 text-sm3"
           >
             Ver los {listos}
@@ -369,6 +423,20 @@ export default function ResultadoDeListaPage() {
           Terminar esta lista
         </SunmiButton>
       )}
+
+      {/* ── EL REPORTE, COMO ACCIÓN SECUNDARIA ─────────────────────────────
+          Vivía en la pantalla vieja del detalle, arriba de todo y al lado del
+          título. Esa pantalla se eliminó y el reporte se conserva porque es lo
+          que se le manda al proveedor para discutir un aumento — pero acá va
+          último y en gris: no es lo que se viene a hacer a esta pantalla.
+          No pide el resumen del sistema al abrir: se lo busca solo cuando
+          alguien despliega el menú. */}
+      <BotonReporte
+        importacionId={id}
+        cabecera={cabecera}
+        proveedor={cabecera.proveedor}
+        usuario={perfil}
+      />
 
       <ModalRevertir
         abierto={deshaciendo}
