@@ -35,6 +35,7 @@ import { motivoDeRevision, MOTIVO_REVISION } from "@/lib/proveedores/listas/resu
 import { analizarFila } from "@/lib/proveedores/listas/confirmarPresentacion";
 import { resolverParserDeProveedor } from "@/lib/proveedores/listas/registro";
 import { lecturaParaPantalla } from "@/lib/proveedores/listas/explicarLectura";
+import { ordenDeLaCola, posicionActual } from "@/lib/proveedores/listas/colaDeRevision";
 
 const numero = (v) => (v === null || v === undefined ? null : Number(v));
 
@@ -129,14 +130,18 @@ export async function GET(req, context) {
         .map((x) => Number(x))
         .filter((x) => Number.isInteger(x))
     );
+    // El orden y la posición viven en `colaDeRevision.js`. Estaban acá, entre
+    // dos consultas, y así la única forma de comprobar que salir a la mitad y
+    // volver retoma donde quedó era hacer veinte productos a mano en la
+    // pantalla. Son dos funciones puras sobre listas de números.
     const cola = pendientes.map((f) => f.id);
-    const sinSaltear = cola.filter((x) => !salteados.has(x));
-    // Los salteados van AL FINAL, no afuera: "dejalo para después" es después,
-    // no nunca. Si solo quedan salteados, se vuelve a ofrecer el primero.
-    const orden = [...sinSaltear, ...cola.filter((x) => salteados.has(x))];
+    const orden = ordenDeLaCola(cola, [...salteados]);
 
-    const pedido = Number(url.searchParams.get("filaId"));
-    const actualId = Number.isInteger(pedido) && orden.includes(pedido) ? pedido : orden[0] ?? null;
+    const pedidoCrudo = Number(url.searchParams.get("filaId"));
+    const { actualId, indice } = posicionActual(
+      orden,
+      Number.isInteger(pedidoCrudo) ? pedidoCrudo : null
+    );
 
     const cuerpo = {
       ok: true,
@@ -151,7 +156,7 @@ export async function GET(req, context) {
       total: cola.length,
       // 1-based y sobre el orden en el que se va a recorrer, que es lo que la
       // pantalla dibuja como "3 de 70".
-      indice: actualId === null ? 0 : orden.indexOf(actualId) + 1,
+      indice,
       cola: orden,
       fila: null,
     };
