@@ -33,6 +33,7 @@ model Grupo {
   configuracion   ConfiguracionGrupo?
   listasPrecio    ListaPrecio[]
   codigosProveedor ProductoCodigoProveedor[]
+  lecturasDeProducto LecturaProductoProveedor[]
   importacionesLista ImportacionListaProveedor[]
   ofertas            Oferta[]
   acuerdosDepositoLocal AcuerdoDepositoLocal[]
@@ -441,6 +442,13 @@ model Proveedor {
   /// `recetas`, que tiene @@unique([grupoId, proveedorId]) justamente porque la
   /// receta de impuestos de un proveedor es UNA.
   recetasLectura RecetaLecturaProveedor[]
+  /// CÓMO SE LEE EL PRECIO DE CADA PRODUCTO DE ESTE PROVEEDOR.
+  ///
+  /// Distinto de `listaRecetaLectura`, que dice qué columna del ARCHIVO es el
+  /// precio. Esto dice, para UN producto, si ese precio es por unidad o por caja
+  /// y con qué cantidad — que es lo que una persona contesta una vez y el
+  /// sistema no tiene por qué volver a preguntar.
+  lecturasDeProducto LecturaProductoProveedor[]
   comprobantes ComprobanteProveedor[]
 
   dias_pedido DiaPedido[] @default([])
@@ -544,6 +552,7 @@ model ProductoBase {
   ventaDetalles   VentaDetalle[]
   codigosProveedor ProductoCodigoProveedor[]
   componenteEnVentas VentaDetalleComponente[]
+  lecturasDeProveedor LecturaProductoProveedor[]
 
   filasImportacionLista ImportacionListaFila[]
 
@@ -3254,6 +3263,19 @@ model ImportacionListaFila {
   /// rango después no puede reescribir con qué criterio se decidió.
   aumentoEsperadoMinPct  Decimal? @db.Decimal(6, 3)
   aumentoEsperadoMaxPct  Decimal? @db.Decimal(6, 3)
+  /// ── LA PERSONA ACEPTÓ UN COSTO FUERA DEL RANGO ────────────────────────
+  ///
+  /// Un hecho distinto de `confirmadoEn`, y por eso una columna aparte.
+  /// `confirmadoEn` dice que alguien contestó CÓMO leer el precio;
+  /// `fueraDeRangoAceptadaEn` dice que además le avisaron que ese costo NO cae
+  /// en el rango del proveedor y siguió igual.
+  ///
+  /// Sin esta distinción no se podía separar "lo eligió sabiendo" de "apretó un
+  /// botón que decía solo $11.083,72": la pantalla vieja ofrecía la lectura
+  /// absurda con un toque y sin el porcentaje, y así fue como la importación #5
+  /// terminó con productos listos a +1.008 % sobre un rango de 2 a 15.
+  fueraDeRangoAceptadaEn           DateTime?
+  fueraDeRangoAceptadaPorUsuarioId Int?
   /// Columnas de diseños anteriores, sin uso y sin datos. Se eliminan en una
   /// migración de limpieza, cuando ninguna versión en ejecución las lea.
   unidadesConfirmadas    Int?
@@ -3474,6 +3496,67 @@ model RecetaLecturaProveedor {
   /// Varias por proveedor, una por nombre de variante.
   @@unique([grupoId, proveedorId, nombre])
   @@index([proveedorId])
+}
+
+/// CÓMO SE LEE EL PRECIO DE UN PRODUCTO EN LAS LISTAS DE UN PROVEEDOR.
+///
+/// ── QUÉ RESUELVE ───────────────────────────────────────────────────────────
+///
+/// La regla de Emanuel: lo que él contesta una vez, el sistema lo recuerda. Si
+/// dijo que el precio que M Y F publica para el producto 4478 es el de la CAJA
+/// DE 12, la lista del mes que viene no se lo vuelve a preguntar.
+///
+/// ── POR QUÉ NO ES UNA COLUMNA EN ProductoCodigoProveedor ───────────────────
+///
+/// Porque son dos hechos distintos y se aprenden en momentos distintos. Aquella
+/// tabla contesta QUIÉN ES el producto —qué código del proveedor le corresponde—
+/// y se llena también desde Facturas. Ésta contesta CÓMO SE LEE SU PRECIO, que
+/// es una decisión de esta pantalla y que puede cambiar sin que cambie el
+/// vínculo: el proveedor puede empezar a publicar por unidad el mismo producto.
+/// Mezcladas, revincular un código borraría la lectura, y corregir la lectura
+/// tocaría una fila que Facturas también escribe.
+///
+/// ── LO QUE ESTA TABLA NO DECIDE ────────────────────────────────────────────
+///
+/// No habilita nada por sí sola. La lectura guardada se usa únicamente si el
+/// costo que produce cae en el rango del proveedor; si queda afuera, la fila
+/// vuelve a la cola y se pregunta de nuevo. Guardar una respuesta no es guardar
+/// un permiso.
+model LecturaProductoProveedor {
+  id             Int @id @default(autoincrement())
+  grupoId        Int
+  proveedorId    Int
+  productoBaseId Int
+
+  /// La lectura elegida, con el vocabulario del motor: `MISMA_PRESENTACION`,
+  /// `PACK_12`, `UNIDAD_SUELTA`… Se guarda la clave y NO solo el multiplicador
+  /// porque la clave dice de dónde salió la cantidad, y eso es lo que permite
+  /// explicarle después a una persona por qué se leyó así.
+  clave String
+
+  /// Por cuánto se multiplica el precio de la lista. 1 es "tal cual".
+  multiplicador Int
+
+  /// Cuántas unidades tiene la presentación que se eligió, cuando se sabe. Es un
+  /// dato de la decisión, no del producto: NUNCA se escribe en
+  /// `ProductoBase.factor_pack`.
+  cantidad Int?
+
+  confirmadaPorUsuarioId Int?
+  confirmadaEn           DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  grupo        Grupo        @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  proveedor    Proveedor    @relation(fields: [proveedorId], references: [id])
+  productoBase ProductoBase @relation(fields: [productoBaseId], references: [id], onDelete: Cascade)
+
+  /// UNA lectura vigente por producto y proveedor. Corregirla es reemplazarla,
+  /// no acumular: lo que vale es la última respuesta.
+  @@unique([grupoId, proveedorId, productoBaseId], name: "lectura_unica_por_producto_y_proveedor", map: "lectura_unica_por_producto_y_proveedor")
+  @@index([grupoId, proveedorId])
+  @@index([productoBaseId])
 }
 
 model ComprobanteProveedor {
