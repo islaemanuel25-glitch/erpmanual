@@ -287,19 +287,26 @@ export default function ResultadoDeListaPage() {
           El segundo es el espejo y no existía en ningún lado: lo tuyo de este
           proveedor que la lista NO trajo. Es lo que va a quedar con el costo
           viejo después de aplicar, y hasta ahora había que deducirlo. */}
+      {/* ── LOS TÍTULOS SON CORTOS PORQUE LA TARJETA MIDE 159 px ─────────────
+          La primera versión decía "productos de la lista que no tenés" y
+          "productos tuyos de M Y F SRL que no aparecen en esta lista". A 360 px
+          eso son tres y cinco renglones adentro de una tarjeta de media
+          pantalla: el detalle de abajo quedaba cortado por el borde —"…s y
+          vincular"— y con eso se perdía justo la parte que dice que se puede
+          tocar. Se vio en la captura, no leyendo el código.
+          El nombre del proveedor no hace falta: está en el título de la
+          pantalla, dos dedos más arriba. */}
       {(conteo.sinProducto > 0 || cabecera.tuyosQueNoAparecen > 0) && (
         <div className="grid grid-cols-2 gap-3">
           {conteo.sinProducto > 0 && (
             <TarjetaChica
               numero={conteo.sinProducto}
-              titulo={
-                conteo.sinProducto === 1
-                  ? "producto de la lista que no tenés"
-                  : "productos de la lista que no tenés"
-              }
-              detalle={abierta ? "Verlos y vincular" : "No están en tu catálogo"}
+              titulo={conteo.sinProducto === 1 ? "no lo tenés" : "no los tenés"}
+              detalle={abierta ? "De la lista. Verlos y vincular" : "De la lista, sin vincular"}
               ariaLabel={
-                abierta ? `Ver los ${conteo.sinProducto} productos de la lista que no tenés` : undefined
+                abierta
+                  ? `Ver los ${conteo.sinProducto} productos de la lista que no tenés en tu catálogo`
+                  : undefined
               }
               onClick={
                 abierta
@@ -314,12 +321,8 @@ export default function ResultadoDeListaPage() {
           {cabecera.tuyosQueNoAparecen > 0 && (
             <TarjetaChica
               numero={cabecera.tuyosQueNoAparecen}
-              titulo={
-                cabecera.tuyosQueNoAparecen === 1
-                  ? `producto tuyo de ${cabecera.proveedor?.nombre ?? "este proveedor"} que no aparece en esta lista`
-                  : `productos tuyos de ${cabecera.proveedor?.nombre ?? "este proveedor"} que no aparecen en esta lista`
-              }
-              detalle="Se quedan con el costo de ahora"
+              titulo={cabecera.tuyosQueNoAparecen === 1 ? "tuyo sin precio" : "tuyos sin precio"}
+              detalle="No vinieron en esta lista"
             />
           )}
         </div>

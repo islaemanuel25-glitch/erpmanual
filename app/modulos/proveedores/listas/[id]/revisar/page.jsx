@@ -531,7 +531,14 @@ function ConfirmarFueraDeRango({ lectura, costoDeHoy, rangoTexto, trabajando, on
   return (
     <SunmiModalLayout
       open
-      title="Este aumento no se parece a los de este proveedor"
+      // ── UN TÍTULO DE UN RENGLÓN, Y NO ES ESTÉTICA ─────────────────────────
+      //
+      // Decía "Este aumento no se parece a los de este proveedor" y a 360 px eso
+      // son dos renglones, que empujan el botón "Cerrar" del kit contra el borde
+      // de la tarjeta hasta recortarle la palabra. Se vio comparando esta hoja
+      // con la de aplicar, cuyo título entra en uno. Lo que el título perdió lo
+      // dice el primer renglón del cuerpo, que además trae los números.
+      title="Este aumento no es habitual"
       color="amber"
       onClose={trabajando ? undefined : onCerrar}
       espacioCuerpo="mt-2 gap-3"
