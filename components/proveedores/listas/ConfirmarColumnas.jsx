@@ -31,7 +31,7 @@ import { useMemo, useState } from "react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import { Encabezado, Aviso, money } from "@/components/proveedores/listas/PiezasPantallas";
+import { Aviso, money } from "@/components/proveedores/listas/PiezasPantallas";
 import { CAMPO } from "@/lib/proveedores/listas/lectura/deteccionDeColumnas";
 import { numeroDeLista } from "@/lib/proveedores/listas/lectura/numeroDeLista";
 
@@ -101,16 +101,17 @@ export default function ConfirmarColumnas({ proveedor, pregunta, trabajando, onV
 
   return (
     <>
-      <Encabezado
-        volverTexto="Volver"
-        onVolver={onVolver}
-        titulo="¿Leí bien la lista?"
-        subtitulo={
-          pregunta?.empate
-            ? pregunta?.error
-            : `Es la primera lista de ${proveedor?.nombre ?? "este proveedor"}. Fijate que estos datos estén bien: te lo pregunto una sola vez.`
-        }
-      />
+      {/* El título ya lo pone la página en la fila del shell —cambia a "¿Leí
+          bien la lista?" al entrar a este paso— y la salida también. Acá queda
+          el subtítulo, que es propio de esta pregunta y no del paso.
+          El volver del shell vuelve al listado, y para retroceder AL PASO
+          ANTERIOR sin perder el archivo está "Algo está mal", abajo: son dos
+          vueltas distintas y antes las dos decían "Volver". */}
+      <p className="text-sm2 sunmi-text-muted leading-snug">
+        {pregunta?.empate
+          ? pregunta?.error
+          : `Es la primera lista de ${proveedor?.nombre ?? "este proveedor"}. Fijate que estos datos estén bien: te lo pregunto una sola vez.`}
+      </p>
 
       {pregunta?.queCambio && <Aviso tono="warning">{pregunta.queCambio}</Aviso>}
 

@@ -37,7 +37,8 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiChipsFiltro, { CLAVE_TODAS } from "@/components/sunmi/SunmiChipsFiltro";
 
 import { Paginacion, Vacio, ErrorRecuperable } from "@/components/proveedores/listas/PiezasListas";
-import { VolverDelModulo } from "@/components/proveedores/listas/PiezasPantallas";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
+import { useAccionDePagina } from "@/app/context/AccionDePaginaContext";
 import { fechaHora } from "@/lib/proveedores/listas/presentacion";
 import { ESTADOS_A_MEDIAS } from "@/lib/proveedores/listas/persistencia";
 
@@ -112,6 +113,19 @@ export default function HistorialListasPage() {
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
 
+  // ── ACÁ SÍ MANDA EL TÍTULO DEL MENÚ ─────────────────────────────────────
+  //
+  // Esta pantalla NO registra título: "Listas de proveedores" es correcto y es
+  // el único lugar donde lo es. Adentro de una lista cada pantalla registra el
+  // suyo, que es de lo que se trata el cambio.
+  //
+  // La salida sí va al slot del shell, como en las otras cinco: la misma pieza,
+  // el mismo alto de toque y la misma fila que nunca scrollea.
+  useAccionDePagina(
+    () => <SunmiBackButton href="/modulos/compras" texto="Compras" />,
+    []
+  );
+
   const cargar = useCallback(async () => {
     setCargando(true);
     setError("");
@@ -176,17 +190,6 @@ export default function HistorialListasPage() {
 
   return (
     <Marco>
-      {/* ── UN SOLO TÍTULO ──────────────────────────────────────────────────
-          Acá había un `<Encabezado titulo="Listas de proveedor" />` y arriba, en
-          la barra del shell, ya decía "Listas de proveedores". Dos títulos casi
-          iguales, uno en singular y otro en plural, con el hueco de un `h1`
-          entre medio: en un teléfono de 360 eso es la mitad de la primera
-          pantalla gastada en decir dos veces dónde estás.
-          El que manda es el del shell, que sale del menú y es el mismo que se ve
-          al llegar desde cualquier lado. Lo único que faltaba acá era la salida,
-          que es lo que queda. */}
-      <VolverDelModulo texto="Compras" onVolver={() => router.push("/modulos/compras")} />
-
       <SunmiButton
         color="cyan"
         onClick={() => router.push("/modulos/proveedores/listas/nueva")}

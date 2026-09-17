@@ -38,7 +38,9 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 
 import { ErrorRecuperable } from "@/components/proveedores/listas/PiezasListas";
-import { Encabezado, Aviso } from "@/components/proveedores/listas/PiezasPantallas";
+import { Aviso } from "@/components/proveedores/listas/PiezasPantallas";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
+import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
 import ConfirmarColumnas from "@/components/proveedores/listas/ConfirmarColumnas";
 import {
   proveedorAdmiteImportacion,
@@ -91,6 +93,15 @@ export default function SubirListaPage() {
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
+
+  // El título y la salida van a la fila del shell, igual que en las otras cinco
+  // pantallas del módulo. Acá el título cambia con el paso: el de columnas es
+  // otra pregunta y merece su propio nombre arriba.
+  useTituloDePagina(paso === PASO.COLUMNAS ? "¿Leí bien la lista?" : "Subir una lista");
+  useAccionDePagina(
+    () => <SunmiBackButton href="/modulos/proveedores/listas" texto="Listas" />,
+    []
+  );
 
   const cargarProveedores = useCallback(async () => {
     setCargando(true);
@@ -399,12 +410,6 @@ export default function SubirListaPage() {
 
   return (
     <Marco>
-      <Encabezado
-        volverTexto="Listas de proveedor"
-        onVolver={() => router.push("/modulos/proveedores/listas")}
-        titulo="Subir una lista"
-      />
-
       {cargando && (
         <SunmiCard className="p-6">
           <SunmiLoader />
