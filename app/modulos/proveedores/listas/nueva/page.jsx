@@ -76,6 +76,10 @@ export default function SubirListaPage() {
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState("");
   const [proveedores, setProveedores] = useState([]);
+  // Dónde está parado. Solo se usa para explicar una lista vacía, y por eso
+  // viene del servidor junto con los proveedores: es el mismo alcance con el que
+  // se los buscó, no otro que la pantalla deduzca por su cuenta.
+  const [ubicacion, setUbicacion] = useState(null);
   const [proveedorId, setProveedorId] = useState("");
   const [abierta, setAbierta] = useState(null);
   const [archivo, setArchivo] = useState(null);
@@ -96,12 +100,23 @@ export default function SubirListaPage() {
         credentials: "include",
         cache: "no-store",
       });
-      const json = await r.json();
+      // ── UN 500 NO SE PUEDE LEER COMO UNA LISTA VACÍA ────────────────────
+      //
+      // `r.json()` explota cuando el servidor contesta una página de error en
+      // vez de JSON, y ese throw caía en el `catch` de abajo diciendo "no se
+      // pudo conectar": justo lo contrario de lo que pasó —se conectó y falló—.
+      // Peor todavía era el caso sin throw: sin proveedores el selector dibuja
+      // "Sin resultados", que es lo que dice una búsqueda que anduvo bien.
+      const json = await r.json().catch(() => null);
       if (!r.ok || !json?.ok) {
-        setErrorCarga(json?.error || "No se pudieron cargar los proveedores.");
+        setErrorCarga(
+          json?.error ||
+            `No se pudo leer la lista de proveedores (error ${r.status}). Probá de nuevo.`
+        );
         return;
       }
       setProveedores(json.items ?? []);
+      setUbicacion(json.ubicacion ?? null);
     } catch {
       setErrorCarga("No se pudo conectar con el servidor. Probá de nuevo.");
     } finally {
@@ -426,8 +441,24 @@ export default function SubirListaPage() {
               {proveedor && !compat.admite && (
                 <p className="text-sm2 sunmi-text-danger leading-snug">{compat.motivo}</p>
               )}
-              {proveedores.length === 0 && (
-                <p className="text-sm2 sunmi-text-muted">No hay proveedores en este contexto.</p>
+              {/* ── UNA LISTA VACÍA TIENE DOS MOTIVOS Y UNO TIENE ARREGLO ──
+                  Los proveedores se ven desde donde se cargaron los productos, y
+                  los productos se cargan en el depósito. Parado en un local la
+                  consulta contesta bien y contesta VACÍO, y "No hay proveedores
+                  en este contexto" no decía ni qué contexto ni qué hacer: la
+                  pantalla quedaba sin salida sobre algo que se resuelve en dos
+                  toques. Desde un depósito, en cambio, vacío sí quiere decir que
+                  no hay ninguno cargado. */}
+              {proveedores.length === 0 && ubicacion?.esDeposito === false && (
+                <p className="text-sm2 sunmi-text-warning leading-snug">
+                  Los proveedores se manejan desde el depósito. Cambiá a un depósito para subir una
+                  lista.
+                </p>
+              )}
+              {proveedores.length === 0 && ubicacion?.esDeposito !== false && (
+                <p className="text-sm2 sunmi-text-muted leading-snug">
+                  Todavía no hay ningún proveedor cargado acá.
+                </p>
               )}
             </div>
 

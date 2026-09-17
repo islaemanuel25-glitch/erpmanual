@@ -43,6 +43,18 @@ export async function GET(req) {
     }
     const { grupoId, localId } = scope;
 
+    // ── DÓNDE ESTÁ PARADO, PARA PODER EXPLICAR UNA LISTA VACÍA ───────────
+    //
+    // `proveedorVisibleWhere` muestra los proveedores cuyos productos se
+    // crearon en la ubicación activa, y los productos se crean en el depósito.
+    // Desde un local la respuesta es correcta y es VACÍA, y una lista vacía sin
+    // explicación se lee como "no hay ninguno" o, peor, como que la pantalla
+    // está rota. Con este dato la pantalla puede decir la única frase que sirve:
+    // que hay que cambiar a un depósito.
+    const ubicacion = localId
+      ? await prisma.local.findFirst({ where: { id: localId }, select: { id: true, nombre: true, es_deposito: true } })
+      : null;
+
     const items = await prisma.proveedor.findMany({
       where: { activo: true, ...proveedorVisibleWhere(localId, grupoId) },
       orderBy: { nombre: "asc" },
@@ -60,6 +72,9 @@ export async function GET(req) {
 
     return NextResponse.json({
       ok: true,
+      ubicacion: ubicacion
+        ? { id: ubicacion.id, nombre: ubicacion.nombre, esDeposito: ubicacion.es_deposito === true }
+        : null,
       // Se devuelven TODOS los visibles, incluidos los que no admiten
       // importación. Esconderlos dejaría al usuario buscando un proveedor que
       // está ahí; mostrarlos con el motivo le dice qué le falta configurar.
@@ -88,7 +103,14 @@ export async function GET(req) {
       parsers: listarParsers(),
     });
   } catch (error) {
+    // "Error interno" no le dice a nadie qué pasó, y en esta pantalla era peor
+    // que mudo: el selector quedaba sin opciones y mostraba "Sin resultados",
+    // que es la respuesta de una búsqueda que anduvo bien. Un 500 se veía igual
+    // que un proveedor que no existe.
     console.error("Error listando proveedores para listas:", error);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "No se pudo leer la lista de proveedores. Probá de nuevo." },
+      { status: 500 }
+    );
   }
 }
