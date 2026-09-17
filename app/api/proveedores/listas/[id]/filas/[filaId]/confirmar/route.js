@@ -274,6 +274,49 @@ export async function POST(req, context) {
         },
       });
 
+      // ── EL SISTEMA SE ACUERDA ─────────────────────────────────────────
+      //
+      // La regla de Emanuel: lo que contesta una vez no se le vuelve a
+      // preguntar. Se guarda CÓMO SE LEE el precio de este producto en las
+      // listas de este proveedor, con su multiplicador y su cantidad.
+      //
+      // Va adentro de la misma transacción que la fila: si se guardara aparte y
+      // fallara, el sistema habría dicho "me acuerdo" sobre algo que no guardó.
+      //
+      // `upsert` y no `create`: corregir una lectura es reemplazarla, no
+      // acumular historial. Lo que vale es la última respuesta.
+      //
+      // Y NO ES UN PERMISO: la lectura guardada se usa en la lista siguiente
+      // solo si el costo que produce cae en el rango. Ver `costoDeLaFila`.
+      if (fila.productoBaseId && r.clave) {
+        await tx.lecturaProductoProveedor.upsert({
+          where: {
+            lectura_unica_por_producto_y_proveedor: {
+              grupoId,
+              proveedorId: importacion.proveedor.id,
+              productoBaseId: fila.productoBaseId,
+            },
+          },
+          create: {
+            grupoId,
+            proveedorId: importacion.proveedor.id,
+            productoBaseId: fila.productoBaseId,
+            clave: r.clave,
+            multiplicador: r.multiplicador,
+            cantidad: r.cantidadPresentacion ?? null,
+            confirmadaPorUsuarioId: Number(session?.id ?? session?.userId) || null,
+            confirmadaEn: ahora,
+          },
+          update: {
+            clave: r.clave,
+            multiplicador: r.multiplicador,
+            cantidad: r.cantidadPresentacion ?? null,
+            confirmadaPorUsuarioId: Number(session?.id ?? session?.userId) || null,
+            confirmadaEn: ahora,
+          },
+        });
+      }
+
       await recalcularContadores(tx, importacionId);
 
       const fresca = await tx.importacionListaFila.findUnique({
