@@ -65,6 +65,21 @@ const CAMPOS_CONTEO = {
   // llegaba con el campo en `undefined` y la cola seguía contando 595 después de
   // sacar una. El botón parecía no hacer nada.
   excluidaManual: true,
+  // ── LO QUE HACE FALTA PARA JUZGAR EL RANGO, Y ES TODO O NADA ────────────
+  //
+  // El porcentaje guardado, el rango congelado en la fila y las tres marcas que
+  // dicen si una persona eligió ese costo sabiendo que quedaba afuera. Si
+  // faltara cualquiera de ellas, `estaFueraDelRangoSinElegir` contestaría sobre
+  // campos en `undefined` y el contador volvería a decir que un +1.008 % está
+  // listo. Es el mismo defecto que costó la columna `excluidaManual` de acá
+  // arriba, y por eso van juntas y con este comentario.
+  diferenciaPct: true,
+  aumentoEsperadoMinPct: true,
+  aumentoEsperadoMaxPct: true,
+  confirmadoEn: true,
+  vinculadoEn: true,
+  multiplicadorConfirmado: true,
+  fueraDeRangoAceptadaEn: true,
 };
 
 export async function GET(req, context) {
@@ -118,7 +133,16 @@ export async function GET(req, context) {
       where: { importacionId: id },
       select: CAMPOS_CONTEO,
     });
-    const conteo = contarResultado(paraContar);
+    // EL RANGO VIAJA AL CONTADOR. Sin él, una fila que quedó
+    // LISTO_PARA_ACTUALIZAR con +1.008 % sobre un proveedor de 2 a 15 se contaba
+    // como lista: el estado se congela al conciliar y `clasificarLinea` no mira
+    // el rango. Es lo que hizo que la #5 mostrara "112 productos listos · Todos
+    // aumentan entre +2,6 % y +1.008,5 %".
+    const rangoDelProveedor = {
+      minPct: numero(cab.aumentoEsperadoMinPct),
+      maxPct: numero(cab.aumentoEsperadoMaxPct),
+    };
+    const conteo = contarResultado(paraContar, rangoDelProveedor);
 
     // ── CUÁNTOS PRODUCTOS SE ACTUALIZARON, CONTADOS SIN DUPLICADOS ──────
     //
@@ -156,16 +180,17 @@ export async function GET(req, context) {
       },
     });
 
-    // ── El rango de los que SÍ se aplican, para poder decirlo ────────────
+    // ── EL RANGO DE LOS LISTOS SALE DEL MISMO CONTEO, NO DE OTRA CONSULTA ──
     //
-    // "Todos aumentan entre 5 % y 8 %, como esperabas" solo se puede escribir si
-    // se mira. Sale de la base con un agregado y no trayendo 850 porcentajes.
-    const extremos = await prisma.importacionListaFila.aggregate({
-      where: { importacionId: id, estado: ESTADO_LINEA.LISTO_PARA_ACTUALIZAR, excluidaManual: false },
-      _min: { diferenciaPct: true },
-      _max: { diferenciaPct: true },
-    });
-
+    // Acá había un `aggregate` aparte que pedía min y max de `diferenciaPct`
+    // sobre `estado = LISTO_PARA_ACTUALIZAR`. Eran DOS respuestas a la misma
+    // pregunta —cuáles son los listos— y se separaron: el contador ya sacaba de
+    // los listos a las que quedaron fuera del rango sin que nadie las eligiera,
+    // y este agregado las seguía incluyendo. El número grande decía 112 y el
+    // renglón de abajo seguía diciendo "+1.008,5 %".
+    //
+    // Ahora `contarResultado` devuelve el rango de las filas que contó como
+    // listas, así que el texto no puede hablar de filas que el número no cuenta.
     const url = new URL(req.url);
     const motivoPedido = url.searchParams.get("motivo");
     let cola = null;
@@ -193,10 +218,7 @@ export async function GET(req, context) {
         cierra: resultadoCierra(conteo),
         orden: ORDEN_MOTIVOS,
       },
-      variacion: {
-        minPct: numero(extremos._min.diferenciaPct),
-        maxPct: numero(extremos._max.diferenciaPct),
-      },
+      variacion: conteo.rangoDeLosListos,
       muestra: muestra.map((f) => ({
         id: f.id,
         nombre: f.productoBase?.nombre || f.descripcionProveedor,
@@ -236,10 +258,21 @@ async function armarCola({ id, motivo, url, cabecera }) {
     pageSize: url.searchParams.get("pageSize"),
   });
 
+  // ── LAS "LISTAS" TAMBIÉN SON CANDIDATAS, Y ES EL ARREGLO DE LA #5 ───────
+  //
+  // Acá se descartaba en la base todo lo que estuviera LISTO_PARA_ACTUALIZAR. El
+  // contador dejó de contar como listas a las que quedaron fuera del rango sin
+  // que nadie las eligiera, así que con el filtro viejo esas filas no aparecían
+  // en ningún lado: ni entre los listos ni en la cola. La pantalla habría dicho
+  // "41 para revisar" y al abrir la cola habría mostrado 40.
+  //
+  // El que decide sigue siendo `motivoDeRevision`, que es el mismo que usa el
+  // contador y ahora recibe el mismo rango. Dos respuestas a la misma pregunta
+  // es como el resumen y la cola se separan.
   const candidatas = await prisma.importacionListaFila.findMany({
     where: {
       importacionId: id,
-      estado: { notIn: [ESTADO_LINEA.LISTO_PARA_ACTUALIZAR, ESTADO_LINEA.SIN_CAMBIOS] },
+      estado: { not: ESTADO_LINEA.SIN_CAMBIOS },
       // LO QUE LA PERSONA YA RESOLVIÓ SE VA DE LA COLA, Y SE FILTRA EN LA BASE.
       // `ESTADO_LINEA.EXCLUIDO` no sirve para esto: está en el enum y nada lo
       // escribe nunca. Lo que se escribe es `excluidaManual`.
@@ -253,9 +286,20 @@ async function armarCola({ id, motivo, url, cabecera }) {
       costoAnterior: true,
       productoBaseId: true,
       excluidaManual: true,
+      diferenciaPct: true,
+      aumentoEsperadoMinPct: true,
+      aumentoEsperadoMaxPct: true,
+      confirmadoEn: true,
+      vinculadoEn: true,
+      multiplicadorConfirmado: true,
+      fueraDeRangoAceptadaEn: true,
     },
   });
-  const delGrupo = candidatas.filter((f) => motivoDeRevision(f) === motivo);
+  const rangoDelProveedor = {
+    minPct: numero(cabecera?.aumentoEsperadoMinPct),
+    maxPct: numero(cabecera?.aumentoEsperadoMaxPct),
+  };
+  const delGrupo = candidatas.filter((f) => motivoDeRevision(f, rangoDelProveedor) === motivo);
   const ids = delGrupo.slice(skip, skip + take).map((f) => f.id);
 
   const filas = ids.length === 0 ? [] : await prisma.importacionListaFila.findMany({

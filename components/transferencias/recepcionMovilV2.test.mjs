@@ -408,7 +408,13 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // columnas y la firma del archivo con el que se confirmó— y qué se decidió
   // para cada importación. Dos columnas en `Proveedor`, tres en la cabecera de
   // importación y una en la fila; todas nullable, sin DROP y sin backfill.
-  assert.equal(migraciones.length, 16, "aparecio una migracion que nadie declaro aca");
+  // 17 desde el 2026-09-17: entra
+  // `20260917120000_lectura_por_producto_y_fuera_de_rango`, que guarda por
+  // producto y proveedor CÓMO se lee su precio —para no volver a preguntar lo
+  // que Emanuel ya contestó— y deja registrado cuándo una persona aceptó un
+  // costo que NO cae en el rango del proveedor. Una tabla nueva y dos columnas
+  // nullable, sin DROP y sin backfill.
+  assert.equal(migraciones.length, 17, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

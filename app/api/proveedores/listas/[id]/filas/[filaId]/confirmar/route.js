@@ -94,6 +94,10 @@ export async function POST(req, context) {
       body?.cantidadPresentacion === null || body?.cantidadPresentacion === undefined
         ? null
         : Number(body.cantidadPresentacion);
+    // SOLO `true` EXACTO ACEPTA. Con `Boolean(body?.…)` alcanzaría un "0" o un
+    // "no" para habilitar la escritura de un costo fuera de rango, que es
+    // justamente lo que este campo existe para impedir.
+    const aceptarFueraDeRango = body?.aceptarFueraDeRango === true;
 
     const importacion = await prisma.importacionListaProveedor.findFirst({
       where: { id: importacionId, grupoId },
@@ -191,16 +195,32 @@ export async function POST(req, context) {
       fila, base, clave, cantidadPresentacion, recargoPct, rango, impuestoAdicionalPct,
       lecturasPosibles,
       umbralVariacionPct: Number(importacion.umbralVariacionPct),
+      // Lo manda la pantalla cuando ya le mostró a la persona que ese costo
+      // queda fuera del rango. El default es `false`, así que un cliente viejo
+      // —o uno que no avisó— no puede confirmar un costo fuera de rango.
+      aceptarFueraDeRango,
     });
     if (!r.ok) {
       const analisis = analizarFila({ fila, base, recargoPct, rango, impuestoAdicionalPct, lecturasPosibles });
       return NextResponse.json(
-        { ok: false, error: r.motivo, hipotesis: analisis.evaluadas },
+        {
+          ok: false,
+          error: r.motivo,
+          hipotesis: analisis.evaluadas,
+          // La pantalla necesita distinguir "no se puede" de "se puede, pero
+          // avisando": con esto vuelve a pedir con el aviso dado en vez de
+          // dejar a la persona sin salida.
+          fueraDeRango: r.fueraDeRango === true,
+          codigo: r.fueraDeRango === true ? "FUERA_DE_RANGO" : undefined,
+        },
         { status: 400 }
       );
     }
 
     const listo = r.estado === "LISTO_PARA_ACTUALIZAR";
+    // Una sola marca de tiempo para todo el acto: confirmar y aceptar el aviso
+    // pasaron juntos, y `laEligioUnaPersona` compara las dos fechas.
+    const ahora = new Date();
 
     const salida = await prisma.$transaction(async (tx) => {
       // Se revalida dentro: entre leer y escribir la fila pudo aplicarse desde
@@ -221,7 +241,19 @@ export async function POST(req, context) {
           aumentoEsperadoMinPct: r.rango.minPct,
           aumentoEsperadoMaxPct: r.rango.maxPct,
           confirmadoPorUsuarioId: Number(session?.id ?? session?.userId) || null,
-          confirmadoEn: new Date(),
+          confirmadoEn: ahora,
+          // ── LA ACEPTACIÓN SE ESCRIBE CON FECHA Y AUTOR, O SE BORRA ───────
+          //
+          // Con la MISMA fecha que la confirmación y no una posterior: son el
+          // mismo acto. Y cuando el costo cae adentro del rango se pone en NULL
+          // a propósito, no se deja lo que hubiera: cambiar de una lectura
+          // fuera de rango a una de adentro tiene que borrar el permiso viejo,
+          // porque si después se vuelve a cambiar la lectura ese permiso no
+          // cubre nada.
+          fueraDeRangoAceptadaEn: r.fueraDeRango ? ahora : null,
+          fueraDeRangoAceptadaPorUsuarioId: r.fueraDeRango
+            ? Number(session?.id ?? session?.userId) || null
+            : null,
           // `factorErp` sigue siendo el factor DEL PRODUCTO: es la foto contra la
           // que la aplicación detecta que la ficha cambió entre confirmar y
           // aplicar. No se escribe nada en ProductoBase.
