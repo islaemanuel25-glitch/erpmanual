@@ -34,6 +34,7 @@ model Grupo {
   listasPrecio    ListaPrecio[]
   codigosProveedor ProductoCodigoProveedor[]
   lecturasDeProducto LecturaProductoProveedor[]
+  productosQueNoSeCambian ProductoQueNoSeCambia[]
   importacionesLista ImportacionListaProveedor[]
   ofertas            Oferta[]
   acuerdosDepositoLocal AcuerdoDepositoLocal[]
@@ -449,6 +450,7 @@ model Proveedor {
   /// y con qué cantidad — que es lo que una persona contesta una vez y el
   /// sistema no tiene por qué volver a preguntar.
   lecturasDeProducto LecturaProductoProveedor[]
+  productosQueNoSeCambian ProductoQueNoSeCambia[]
   comprobantes ComprobanteProveedor[]
 
   dias_pedido DiaPedido[] @default([])
@@ -553,6 +555,7 @@ model ProductoBase {
   codigosProveedor ProductoCodigoProveedor[]
   componenteEnVentas VentaDetalleComponente[]
   lecturasDeProveedor LecturaProductoProveedor[]
+  noSeCambiaDeProveedor ProductoQueNoSeCambia[]
 
   filasImportacionLista ImportacionListaFila[]
 
@@ -3090,6 +3093,19 @@ model ImportacionListaProveedor {
   /// Se guardan para poder explicar meses después por qué una lista se leyó de
   /// una manera y otra del mismo proveedor de otra. `decisionDeLectura` lleva el
   /// detalle: cuántas filas votaron cada opción.
+  /// PARA QUÉ SE SUBIÓ ESTA LISTA: `ACTUALIZAR` o `CONTROLAR`.
+  ///
+  /// `CONTROLAR` compara la lista contra los costos de hoy y NO escribe nada.
+  /// Nace porque Emanuel subió una lista con el rango en 0 % a 0 % a propósito,
+  /// para controlar, y el motor la tomó por una lista de actualizar imposible:
+  /// con 0–0 una fila solo "explica" una columna si el precio da exactamente el
+  /// costo, al centavo, así que ninguna columna llegó a la mayoría y quedaron
+  /// 213 filas diciendo "entre 0,0 % y 0,0 %".
+  ///
+  /// Sin valor son las importaciones de antes de esta columna, y son todas de
+  /// actualizar: `modoDeImportacion` cae a `ACTUALIZAR` y no hace falta
+  /// escribir el histórico.
+  modo                  String?
   columnaPrecioElegida  String?
   descuentoAplicado     Boolean?
   decisionDeLectura     Json?
@@ -3522,6 +3538,48 @@ model RecetaLecturaProveedor {
 /// costo que produce cae en el rango del proveedor; si queda afuera, la fila
 /// vuelve a la cola y se pregunta de nuevo. Guardar una respuesta no es guardar
 /// un permiso.
+/// LOS PRODUCTOS QUE NO SE TOCAN CON LAS LISTAS DE ESTE PROVEEDOR.
+///
+/// ── POR QUÉ NO ES UNA COLUMNA DE `LecturaProductoProveedor` ────────────────
+///
+/// Porque son dos hechos distintos con dos vidas distintas. "Cómo se lee el
+/// precio" y "no le escribas el costo" se deciden por separado, se corrigen por
+/// separado, y uno puede existir sin el otro: un producto puede estar marcado
+/// para no cambiar sin que nadie haya elegido nunca cómo leer su precio. Meter
+/// el segundo en la tabla del primero obligaría a inventarle una `clave` de
+/// lectura a algo que no tiene lectura.
+///
+/// ── POR QUÉ EXISTE ────────────────────────────────────────────────────────
+///
+/// "No lo cambio" valía para UNA lista —vive en `ImportacionListaFila.
+/// excluidaManual`, que es de esa importación— así que la lista siguiente del
+/// mismo proveedor volvía a preguntar por el mismo producto. Es la regla de
+/// Emanuel: si ya lo explicó una vez, las cien listas que vengan son iguales.
+///
+/// Se puede deshacer desde "No cambian": borrar la fila es volver a incluir el
+/// producto en las listas que vengan.
+model ProductoQueNoSeCambia {
+  id             Int @id @default(autoincrement())
+  grupoId        Int
+  proveedorId    Int
+  productoBaseId Int
+
+  decididoPorUsuarioId Int?
+  decididoEn           DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  grupo        Grupo        @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  proveedor    Proveedor    @relation(fields: [proveedorId], references: [id])
+  productoBase ProductoBase @relation(fields: [productoBaseId], references: [id], onDelete: Cascade)
+
+  /// UNA decisión por producto y proveedor. No se acumula: o está marcado o no.
+  @@unique([grupoId, proveedorId, productoBaseId], name: "no_se_cambia_unico_por_producto_y_proveedor", map: "no_se_cambia_unico_por_producto_y_proveedor")
+  @@index([grupoId, proveedorId])
+  @@index([productoBaseId])
+}
+
 model LecturaProductoProveedor {
   id             Int @id @default(autoincrement())
   grupoId        Int

@@ -16,7 +16,18 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **17 migraciones**, las mismas que el árbol.
+Producción está en **17 migraciones**. Falta una:
+
+- `20260918120000_modo_de_lista_y_no_lo_cambio` — **ADITIVA**. Una columna
+  nullable `modo` en `ImportacionListaProveedor` —para qué se subió la lista,
+  actualizar o controlar— y una tabla nueva `ProductoQueNoSeCambia` con su
+  índice único y dos de búsqueda, que recuerda por producto y proveedor los que
+  no se tocan con las listas.
+
+  No borra, no reescribe y no cambia el tipo de nada. El `CREATE UNIQUE INDEX`
+  es sobre la tabla que la misma migración acaba de crear, así que nace vacía y
+  no puede chocar con duplicados. Las 4.748 filas de importación que ya existen
+  quedan como están: `modo` en null se lee como ACTUALIZAR, que es lo que eran.
 
 ---
 
