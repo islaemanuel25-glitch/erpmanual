@@ -46,6 +46,9 @@ import {
   pct,
 } from "@/components/proveedores/listas/PiezasPantallas";
 import HojaConfirmarAplicar from "@/components/proveedores/listas/HojaConfirmarAplicar";
+// Pasar un control a actualizar precios: pide el rango, que controlar no
+// pregunta y actualizar no puede resolver sin él.
+import HojaPasarAActualizar from "@/components/proveedores/listas/HojaPasarAActualizar";
 // Deshacer y terminar YA tenían su modal, con su previa y su candado contra la
 // previa vieja. Se reusan: escribir otro botón al lado sería tener dos caminos
 // para escribir costos, y uno de los dos sin el candado.
@@ -54,6 +57,9 @@ import ModalTerminar from "@/components/proveedores/listas/ModalTerminar";
 import BotonReporte from "@/components/proveedores/listas/BotonReporte";
 import { fechaHora } from "@/lib/proveedores/listas/presentacion";
 import { MOTIVO_REVISION } from "@/lib/proveedores/listas/resultadoDeLaLista";
+// PARA QUÉ SE SUBIÓ LA LISTA. Decide si esta pantalla muestra el resultado de
+// siempre o el del control, que son dos cuerpos distintos y no dos textos.
+import { CONTROL, MODO_LISTA } from "@/lib/proveedores/listas/modoDeLaLista";
 import { esImportacionAbierta, ESTADOS_A_MEDIAS } from "@/lib/proveedores/listas/persistencia";
 
 export default function ResultadoDeListaPage() {
@@ -74,6 +80,12 @@ export default function ResultadoDeListaPage() {
   const [terminando, setTerminando] = useState(false);
   const [aplicando, setAplicando] = useState(false);
   const [aviso, setAviso] = useState(null);
+  // Pasar un control a actualizar precios. Dos estados y no uno: `abierta` es la
+  // hoja que pide el rango, `pasando` es el pedido en vuelo. Con uno solo, el
+  // botón de la hoja no podría decir "Pasando…" sin cerrarla.
+  const [pasandoAActualizar, setPasandoAActualizar] = useState(false);
+  const [pasando, setPasando] = useState(false);
+  const [errorAlPasar, setErrorAlPasar] = useState(null);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
@@ -128,6 +140,63 @@ export default function ResultadoDeListaPage() {
     if (cargandoUser || cargandoCtx || !esAdmin || needsContexto || !Number.isInteger(id)) return;
     cargar();
   }, [cargar, cargandoUser, cargandoCtx, esAdmin, needsContexto, id]);
+
+  /**
+   * Pasa este control a actualizar precios, con el rango que se acaba de pedir.
+   *
+   * No escribe ningún costo: vuelve a conciliar la misma importación y la deja
+   * en el resultado de siempre, con su botón de aplicar y su confirmación.
+   */
+  const pasarAActualizar = async ({ minPct, maxPct }) => {
+    setPasando(true);
+    setErrorAlPasar(null);
+    try {
+      const r = await fetch(`/api/proveedores/listas/${id}/pasar-a-actualizar`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ minPct, maxPct }),
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) {
+        // EL ERROR SE QUEDA EN LA HOJA, con el rango escrito a la vista. Sacarlo
+        // afuera cerraría la hoja y habría que volver a escribir los dos
+        // números para leer qué estuvo mal con ellos.
+        setErrorAlPasar(j?.error || `No se pudo pasar a actualizar precios (error ${r.status}).`);
+        return;
+      }
+      setPasandoAActualizar(false);
+      setAviso({
+        tono: "success",
+        texto:
+          `Listo: se volvió a leer con un aumento esperado de ${j.rango.minPct} % a ${j.rango.maxPct} %. ` +
+          "Todavía no se cambió ningún costo.",
+      });
+      await cargar();
+    } catch {
+      setErrorAlPasar("No se pudo conectar con el servidor. Probá de nuevo.");
+    } finally {
+      setPasando(false);
+    }
+  };
+
+  /**
+   * Baja el control entero como CSV.
+   *
+   * ── POR QUÉ UNA RUTA Y NO UN BLOB ARMADO ACÁ ────────────────────────────
+   *
+   * Porque acá NO están los datos. La pantalla tiene `muestra`, que son TRES
+   * filas de ejemplo, y los contadores — no las novecientas líneas con su
+   * diferencia. Armar el archivo con lo que hay a mano habría bajado un CSV de
+   * tres renglones titulado "el control": un archivo que se abre, se ve
+   * perfecto, y miente por omisión sobre el 99 % de la lista.
+   *
+   * Es una navegación y no un `fetch`: el navegador maneja la descarga y el
+   * `Content-Disposition` de la ruta pone el nombre del archivo.
+   */
+  const descargarElControl = () => {
+    window.location.href = `/api/proveedores/listas/${id}/control.csv`;
+  };
 
   const aplicar = async () => {
     setAplicando(true);
@@ -211,7 +280,8 @@ export default function ResultadoDeListaPage() {
     );
   }
 
-  const { cabecera, conteo, variacion, muestra, lectura } = datos;
+  const { cabecera, conteo, variacion, muestra, lectura, control } = datos;
+  const controlando = cabecera.modo === MODO_LISTA.CONTROLAR;
   const abierta = esImportacionAbierta(cabecera.estado);
   const aMedias = ESTADOS_A_MEDIAS.includes(cabecera.estado);
   const listos = conteo.listos;
@@ -237,9 +307,22 @@ export default function ResultadoDeListaPage() {
 
           Lo que el shell NO puede decir es de qué archivo se trata, cuándo se
           leyó y en qué estado está — y eso es lo que queda. */}
+      {/* ── CONTROLANDO, EL RENGLÓN DICE QUE NO SE CAMBIÓ NADA ─────────────
+          Y lo dice acá arriba, junto al nombre del archivo, no al pie: es la
+          primera pregunta que se hace alguien que abre esta pantalla —"¿esto ya
+          me tocó los costos?"— y la respuesta tiene que estar antes que los
+          números, no después de recorrerlos. */}
       <p className="text-sm2 sunmi-text-muted leading-snug">
-        {cabecera.archivoNombre} · leída {fechaHora(cabecera.leidaEn)} · {estadoEnCastellano(cabecera)}
+        {cabecera.archivoNombre} ·{" "}
+        {controlando
+          ? "no se cambió ningún precio"
+          : `leída ${fechaHora(cabecera.leidaEn)} · ${estadoEnCastellano(cabecera)}`}
       </p>
+
+      {/* EL AVISO DEL 0 A 0. Se deduce de lo guardado, así que sigue estando la
+          semana que viene: quien puso 0 % tiene que poder entender por qué esta
+          lista terminó siendo un control, y no descubrirlo por descarte. */}
+      {cabecera.avisoDeModo && <Aviso tono="warning">{cabecera.avisoDeModo}</Aviso>}
 
       {aviso && <Aviso tono={aviso.tono}>{aviso.texto}</Aviso>}
 
@@ -256,7 +339,106 @@ export default function ResultadoDeListaPage() {
         </p>
       )}
 
-      {aMedias ? (
+      {controlando ? (
+        <>
+          {/* ── LOS TRES GRUPOS DEL CONTROL ────────────────────────────────
+              El verde arriba y solo, porque es la respuesta a la pregunta que
+              trajo a alguien acá: "¿la lista coincide con lo que tengo?". Los
+              dos desacuerdos van abajo y en pareja, porque son la misma
+              pregunta mirada de los dos lados. */}
+          <TarjetaGrande
+            numero={control?.coinciden ?? 0}
+            titulo="coinciden con tu costo"
+            detalle={
+              (control?.coinciden ?? 0) > 0
+                ? "El precio de la lista es el que ya tenías, salvo redondeo."
+                : "Ningún producto de la lista coincide con tu costo de hoy."
+            }
+            ariaLabel={
+              (control?.coinciden ?? 0) > 0
+                ? `Ver los ${control.coinciden} que coinciden con tu costo`
+                : undefined
+            }
+            onClick={
+              (control?.coinciden ?? 0) > 0
+                ? () => irA(`/actualizan?control=${CONTROL.COINCIDE}`)
+                : undefined
+            }
+          />
+
+          <div className="grid grid-cols-2 gap-3">
+            <TarjetaChica
+              numero={control?.tuCostoMasBajo ?? 0}
+              titulo="tu costo es más bajo"
+              detalle="La lista dice más"
+              tono="warning"
+              ariaLabel={
+                (control?.tuCostoMasBajo ?? 0) > 0
+                  ? `Ver los ${control.tuCostoMasBajo} donde la lista dice más que tu costo`
+                  : undefined
+              }
+              onClick={
+                (control?.tuCostoMasBajo ?? 0) > 0
+                  ? () => irA(`/actualizan?control=${CONTROL.TU_COSTO_MAS_BAJO}`)
+                  : undefined
+              }
+            />
+            <TarjetaChica
+              numero={control?.tuCostoMasAlto ?? 0}
+              titulo="tu costo es más alto"
+              detalle="La lista dice menos"
+              tono="warning"
+              ariaLabel={
+                (control?.tuCostoMasAlto ?? 0) > 0
+                  ? `Ver los ${control.tuCostoMasAlto} donde la lista dice menos que tu costo`
+                  : undefined
+              }
+              onClick={
+                (control?.tuCostoMasAlto ?? 0) > 0
+                  ? () => irA(`/actualizan?control=${CONTROL.TU_COSTO_MAS_ALTO}`)
+                  : undefined
+              }
+            />
+          </div>
+
+          {/* Los dos que no son una diferencia de precio sino una diferencia de
+              catálogo. Son los MISMOS dos que muestra el modo de actualizar, con
+              las mismas pantallas detrás: controlar no inventa grupos nuevos
+              para lo que ya tenía nombre. */}
+          <div className="grid grid-cols-2 gap-3">
+            <TarjetaChica
+              numero={cabecera.tuyosQueNoAparecen ?? 0}
+              titulo={cabecera.tuyosQueNoAparecen === 1 ? "tuyo que no vino" : "tuyos que no vinieron"}
+              detalle="No están en esta lista"
+              ariaLabel={
+                (cabecera.tuyosQueNoAparecen ?? 0) > 0
+                  ? `Ver los ${cabecera.tuyosQueNoAparecen} tuyos que no vinieron en esta lista`
+                  : undefined
+              }
+              onClick={
+                (cabecera.tuyosQueNoAparecen ?? 0) > 0
+                  ? () => irA("/no-cambian?filtro=NO_VINO")
+                  : undefined
+              }
+            />
+            <TarjetaChica
+              numero={conteo.sinProducto}
+              titulo={conteo.sinProducto === 1 ? "de la lista que no tenés" : "de la lista que no tenés"}
+              detalle={abierta ? "Ver y vincular" : "Sin vincular"}
+              ariaLabel={
+                abierta && conteo.sinProducto > 0
+                  ? `Ver y vincular los ${conteo.sinProducto} de la lista que no tenés`
+                  : undefined
+              }
+              onClick={
+                abierta && conteo.sinProducto > 0
+                  ? () => irA(`/revisar?solo=${MOTIVO_REVISION.SIN_PRODUCTO}`)
+                  : undefined
+              }
+            />
+          </div>
+        </>
+      ) : aMedias ? (
         <TarjetaGrande
           numero={listos}
           titulo={listos === 1 ? "se actualiza" : "se actualizan"}
@@ -288,6 +470,13 @@ export default function ResultadoDeListaPage() {
         />
       )}
 
+      {/* ── LAS TARJETAS DEL MODO DE ACTUALIZAR NO SE DIBUJAN CONTROLANDO ──
+          No es cosmética: "para revisar" y "los dejaste igual" ofrecen trabajo
+          que en un control no existe —confirmar una lectura para poder aplicar,
+          excluir una fila de una aplicación que no va a pasar—. Y "se actualizan"
+          sería directamente falso. Los cuatro se reemplazan por los tres grupos
+          del control, que son la pregunta que este modo vino a contestar. */}
+      {!controlando && (
       <div className="grid grid-cols-2 gap-3">
         <TarjetaChica
           numero={conteo.paraRevisar}
@@ -320,7 +509,9 @@ export default function ResultadoDeListaPage() {
           onClick={conteo.dejadas > 0 ? () => irA("/no-cambian?filtro=DEJADO") : undefined}
         />
       </div>
+      )}
 
+      {!controlando && (
       <div className="grid grid-cols-2 gap-3">
         {/* Los dos que no son trabajo de esta lista y sí hay que poder mirar. */}
         <TarjetaChica
@@ -354,10 +545,13 @@ export default function ResultadoDeListaPage() {
           }
         />
       </div>
+      )}
 
       {/* LOS TRES GRUPOS JUNTOS, que es como los mira Emanuel: lo suyo de este
-          proveedor que después de aplicar va a seguir con el costo viejo. */}
-      {noCambian > 0 && (
+          proveedor que después de aplicar va a seguir con el costo viejo.
+          Controlando no corresponde: NINGÚN producto cambia, así que "los que no
+          cambian" sería la lista entera y no distinguiría nada. */}
+      {!controlando && noCambian > 0 && (
         <TarjetaAncha
           titulo={`Tus productos de ${cabecera.proveedor?.nombre ?? "este proveedor"} que no cambian · ${noCambian}`}
           detalle={renglonDeLosQueNoCambian(conteo, cabecera.tuyosQueNoAparecen ?? 0)}
@@ -373,7 +567,14 @@ export default function ResultadoDeListaPage() {
           el título decía "Algunos de los que se actualizaron" arriba de
           `$1.342,90 → $1.430,19`. Los costos habían vuelto a los de antes: la
           pantalla afirmaba un cambio que no ocurrió. */}
-      {muestra.length > 0 && (aMedias || cabecera.productosActualizados > 0) && (
+      {/* ── Y CONTROLANDO NO SE MUESTRA NINGUNA, porque no se actualiza nada.
+          `muestra` son filas en LISTO_PARA_ACTUALIZAR, que es un estado que
+          controlando también se escribe —el motor clasifica igual— así que la
+          sección aparecía igual, encabezada "Algunos de los que se actualizan",
+          debajo del renglón que acababa de decir que no se cambió ningún precio.
+          Se vio en la captura a 360; leyendo el código no se notaba, porque la
+          condición `aMedias` es verdadera en los dos modos. */}
+      {!controlando && muestra.length > 0 && (aMedias || cabecera.productosActualizados > 0) && (
         <section className="space-y-1">
           <h2 className="text-sm3 font-semibold sunmi-text-strong">
             {aMedias ? "Algunos de los que se actualizan" : "Algunos de los que se actualizaron"}
@@ -399,8 +600,38 @@ export default function ResultadoDeListaPage() {
         </section>
       )}
 
+      {/* ── LAS DOS ACCIONES DE UN CONTROL ─────────────────────────────────
+          Ninguna de las dos escribe un costo. "Pasar a actualizar precios"
+          convierte ESTA importación sin volver a subir el archivo —que es lo que
+          uno quiere después de mirar el control y decidir que sí— y el que
+          escribe sigue siendo el botón de aplicar de la pantalla de después,
+          con su confirmación. */}
+      {controlando && abierta && (
+        <div className="space-y-2">
+          <SunmiButton
+            color="cyan"
+            onClick={() => setPasandoAActualizar(true)}
+            disabled={pasando}
+            className="w-full min-h-toque text-base font-bold"
+          >
+            {pasando ? "Pasando…" : "Pasar a actualizar precios"}
+          </SunmiButton>
+          <SunmiButton
+            color="slate"
+            onClick={descargarElControl}
+            className="w-full min-h-toque text-sm3"
+          >
+            Descargar el control
+          </SunmiButton>
+          <p className="text-sm2 sunmi-text-muted text-center leading-snug">
+            Pasar a actualizar no cambia nada todavía: vuelve a leer esta misma lista con el
+            aumento que esperás y te muestra el resultado antes de aplicar.
+          </p>
+        </div>
+      )}
+
       {/* LAS ACCIONES POSIBLES, Y SOLO ESAS. */}
-      {abierta && listos > 0 && (
+      {!controlando && abierta && listos > 0 && (
         <div className="space-y-2">
           <SunmiButton
             color="cyan"
@@ -427,7 +658,7 @@ export default function ResultadoDeListaPage() {
         </div>
       )}
 
-      {abierta && listos === 0 && conteo.paraRevisar > 0 && (
+      {!controlando && abierta && listos === 0 && conteo.paraRevisar > 0 && (
         <SunmiButton
           color="cyan"
           onClick={() => irA("/revisar")}
@@ -524,6 +755,24 @@ export default function ResultadoDeListaPage() {
         onCerrar={() => setTerminando(false)}
         onTerminar={terminar}
       />
+
+      {pasandoAActualizar && (
+        <HojaPasarAActualizar
+          proveedor={cabecera.proveedor?.nombre ?? ""}
+          // El rango del proveedor, si tiene, para no arrancar con dos campos en
+          // blanco. Controlando la cabecera lo guarda en null, así que esto sale
+          // de la ficha y no de la importación.
+          minSugerido={cabecera.rango?.minPct ?? null}
+          maxSugerido={cabecera.rango?.maxPct ?? null}
+          trabajando={pasando}
+          error={errorAlPasar}
+          onPasar={pasarAActualizar}
+          onVolver={() => {
+            setPasandoAActualizar(false);
+            setErrorAlPasar(null);
+          }}
+        />
+      )}
 
       {confirmando && (
         <HojaConfirmarAplicar

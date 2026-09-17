@@ -21,7 +21,7 @@
 // que buscar un producto no depende de haber llegado a su página.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -37,6 +37,9 @@ import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
 
 import { ErrorRecuperable } from "@/components/proveedores/listas/PiezasListas";
+// Los tres grupos del control y sus textos. Esta misma pantalla los lista, y el
+// título sale de acá para que diga lo mismo que la tarjeta que trajo hasta acá.
+import { CONTROL, TEXTO_CONTROL } from "@/lib/proveedores/listas/modoDeLaLista";
 import {
   AvisoCostoRedondo,
   Chevron,
@@ -47,6 +50,7 @@ import {
 export default function LosQueSeActualizanPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = Number(params?.id);
 
   const sesion = useUser() || {};
@@ -65,10 +69,25 @@ export default function LosQueSeActualizanPage() {
   const [abierto, setAbierto] = useState(null);
   const [trabajando, setTrabajando] = useState(false);
 
+  // Qué grupo del control se está mirando, si es que se está mirando uno. Sale
+  // de la URL y se valida contra el enum: un valor inventado se ignora y la
+  // pantalla es la de siempre, en vez de romperse por un parámetro pegado mal.
+  const controlCrudo = searchParams?.get("control") ?? null;
+  const grupoDeControl = Object.values(CONTROL).includes(controlCrudo) ? controlCrudo : null;
+
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
 
-  useTituloDePagina("Se actualizan");
+  // ── EL TÍTULO DICE QUÉ LISTA SE ESTÁ MIRANDO ──────────────────────────
+  //
+  // La misma pantalla sirve para "los que se actualizan" y para cada grupo del
+  // control, porque lo que dibuja —tu costo, lo que dice la lista, la
+  // diferencia— es lo mismo en los dos casos. Lo que NO puede ser lo mismo es el
+  // título: "Se actualizan" sobre un control sería falso, y es el único texto de
+  // la pantalla que afirma qué va a pasar con estos productos.
+  useTituloDePagina(
+    grupoDeControl ? TEXTO_CONTROL[grupoDeControl].titulo : "Se actualizan"
+  );
   useAccionDePagina(
     () => <SunmiBackButton href={`/modulos/proveedores/listas/${id}`} texto="Resultado" className="min-h-toque" />,
     [id]
@@ -80,6 +99,10 @@ export default function LosQueSeActualizanPage() {
     try {
       const qs = new URLSearchParams({ hasta: String(tope) });
       if (texto) qs.set("buscar", texto);
+      // EL GRUPO VIAJA AL SERVIDOR. Sin esto, la pantalla se titularía "tu costo
+      // es más bajo" y listaría los que se actualizan: un título correcto sobre
+      // datos de otra cosa, que es peor que un error.
+      if (grupoDeControl) qs.set("control", grupoDeControl);
       const r = await fetch(`/api/proveedores/listas/${id}/actualizan?${qs}`, {
         credentials: "include",
         cache: "no-store",
@@ -95,7 +118,7 @@ export default function LosQueSeActualizanPage() {
     } finally {
       setCargando(false);
     }
-  }, [id]);
+  }, [id, grupoDeControl]);
 
   /**
    * "Dejarlo como está": la fila se excluye de ESTA lista.
@@ -180,10 +203,20 @@ export default function LosQueSeActualizanPage() {
           <span className="sunmi-text-strong font-semibold">{total}</span> productos de{" "}
           {datos?.proveedor?.nombre ?? "—"}
           {/* El rango REAL de estas filas, no el configurado del proveedor. */}
+          {/* ── CONTROLANDO NADIE "AUMENTA" NADA ─────────────────────────
+              El porcentaje es el mismo número, pero la frase no puede ser la
+              misma: "todos aumentan +12,0 %" sobre un control afirma que estos
+              costos van a subir, y este modo no cambia ninguno. Lo que el
+              porcentaje dice acá es cuánto se aparta la lista de lo que ya
+              tenés. Se vio en la captura a 360. */}
           {hayRango
-            ? unSoloPorcentaje
-              ? ` · todos aumentan ${pct(rango.minPct)}`
-              : ` · entre ${pct(rango.minPct)} y ${pct(rango.maxPct)}`
+            ? grupoDeControl
+              ? unSoloPorcentaje
+                ? ` · la lista dice ${pct(rango.minPct)}`
+                : ` · la lista dice entre ${pct(rango.minPct)} y ${pct(rango.maxPct)}`
+              : unSoloPorcentaje
+                ? ` · todos aumentan ${pct(rango.minPct)}`
+                : ` · entre ${pct(rango.minPct)} y ${pct(rango.maxPct)}`
             : ""}
           {/* La invitación va en el subtítulo y no en un cartel aparte: es una
               pantalla que hasta ayer era de solo leer, y nadie toca una fila que

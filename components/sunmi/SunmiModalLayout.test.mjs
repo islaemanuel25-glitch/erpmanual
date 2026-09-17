@@ -704,6 +704,19 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     //
     // Lo grave lo sostiene el botón "Sí, aplicar", que hay que ir a buscar.
     "components/proveedores/listas/HojaConfirmarAplicar.jsx": false,
+    // ── PASAR UN CONTROL A ACTUALIZAR: `true`, Y ES SU HERMANA LA QUE LO
+    //    EXPLICA ───────────────────────────────────────────────────────────
+    //
+    // Contesta distinto que la hoja de aplicar de acá arriba, con el MISMO
+    // criterio y por eso conviene verlas juntas: el que decide no es qué tan
+    // grave es la acción sino QUÉ SE PIERDE al cerrar sin querer.
+    //
+    // La de aplicar no tiene nada escrito: cuatro renglones para leer. Ésta pide
+    // el rango de aumento esperado —desde y hasta, dos campos que la persona
+    // tipea— porque controlar no lo pregunta y actualizar no puede sin él. Un
+    // toque del pulgar al costado, que en un teléfono pasa solo, los borra los
+    // dos y hay que volver a pensarlos.
+    "components/proveedores/listas/HojaPasarAActualizar.jsx": true,
     // ── LA PREGUNTA DE "ESTE AUMENTO NO SE PARECE A LOS DE ESTE PROVEEDOR" ──
     //
     // Vive adentro de la pantalla de revisar de a uno. Mismo caso que la hoja de

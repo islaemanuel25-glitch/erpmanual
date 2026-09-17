@@ -24,6 +24,9 @@ import { ESTADO_LINEA } from "@/lib/proveedores/listas/estados";
 import { motivoDeRevision } from "@/lib/proveedores/listas/resultadoDeLaLista";
 import { costoParaMirar } from "@/lib/proveedores/listas/costoSospechoso";
 import { esImportacionAbierta } from "@/lib/proveedores/listas/persistencia";
+// EL GRUPO DE CONTROL DE UNA FILA. Es la misma función que usa `contarControl`
+// para el número de la tarjeta que trae hasta acá.
+import { CONTROL, compararConLaLista } from "@/lib/proveedores/listas/modoDeLaLista";
 
 const numero = (v) => (v === null || v === undefined ? null : Number(v));
 const PAGINA = 20;
@@ -67,6 +70,22 @@ export async function GET(req, context) {
     const buscar = String(url.searchParams.get("buscar") ?? "").trim();
     const hasta = Math.max(PAGINA, Number(url.searchParams.get("hasta")) || PAGINA);
 
+    // ── EL MISMO LISTADO, CON OTRO FILTRO ────────────────────────────────
+    //
+    // Esta pantalla dibuja, por producto, el costo de hoy, lo que dice la lista
+    // y la diferencia — que es EXACTAMENTE lo que hay que mostrar de un grupo
+    // del control. Lo único distinto es qué filas entran.
+    //
+    // Por eso se parametriza en vez de escribir una pantalla parecida al lado:
+    // dos listados que muestran lo mismo con dos consultas distintas se separan
+    // el día que se le agrega una columna a uno.
+    //
+    // Un `control` inválido se ignora en vez de rechazarse: lo peor que puede
+    // pasar es mostrar el listado de siempre, y tirar un 400 sobre un parámetro
+    // de la URL rompería la pantalla por algo que no es del usuario.
+    const controlPedido = url.searchParams.get("control");
+    const grupoDeControl = Object.values(CONTROL).includes(controlPedido) ? controlPedido : null;
+
     const rango = {
       minPct: numero(cab.aumentoEsperadoMinPct),
       maxPct: numero(cab.aumentoEsperadoMaxPct),
@@ -74,7 +93,15 @@ export async function GET(req, context) {
 
     const where = {
       importacionId: id,
-      estado: ESTADO_LINEA.LISTO_PARA_ACTUALIZAR,
+      // CONTROLANDO NO SE FILTRA POR ESTADO NI POR `aplicada`. Los estados los
+      // decidió `clasificarLinea` pensando en escribir costos —listo, sin
+      // cambios, para revisar— y controlando no se escribe ninguno: un producto
+      // cuya lista dice el doble puede estar en cualquiera de los tres, y los
+      // tres son igual de interesantes para quien vino a comparar. Filtrar por
+      // LISTO dejaría afuera justo los casos raros.
+      ...(grupoDeControl
+        ? {}
+        : { estado: ESTADO_LINEA.LISTO_PARA_ACTUALIZAR, aplicada: false }),
       excluidaManual: false,
       // ── LO QUE YA SE ESCRIBIÓ NO "SE ACTUALIZA" ─────────────────────────
       //
@@ -85,7 +112,6 @@ export async function GET(req, context) {
       // `aplicar` filtra por `aplicada: false`, así que ésas ya no las toca
       // nadie. Lo que se hace con una fila aplicada es deshacer, que es otro
       // botón y otra pantalla.
-      aplicada: false,
       ...(buscar
         ? {
             OR: [
@@ -137,10 +163,25 @@ export async function GET(req, context) {
       },
     });
 
-    // EL MISMO FILTRO QUE EL CONTADOR. Una fila LISTO que quedó fuera del rango
-    // sin que nadie la eligiera NO se va a actualizar: mostrarla acá diría que
-    // se actualizan 112 cuando se actualizan 111.
-    const aplicables = crudas.filter((f) => motivoDeRevision(f, rango) === null);
+    // EL MISMO FILTRO QUE EL CONTADOR, y controlando el mismo que el resumen.
+    //
+    // Sin control: una fila LISTO que quedó fuera del rango sin que nadie la
+    // eligiera NO se va a actualizar, y mostrarla acá diría que se actualizan
+    // 112 cuando se actualizan 111.
+    //
+    // Con control: el grupo sale de `compararConLaLista`, que es la misma
+    // función que usa `contarControl` para el número de la tarjeta. Si acá se
+    // escribiera la comparación otra vez, la tarjeta diría 21 y la lista
+    // mostraría 19 sin que nada avisara cuál de las dos tiene razón.
+    const aplicables = grupoDeControl
+      ? crudas.filter(
+          (f) =>
+            compararConLaLista({
+              costoActual: numero(f.costoAnterior),
+              precio: numero(f.costoMaestroPropuesto),
+            }) === grupoDeControl
+        )
+      : crudas.filter((f) => motivoDeRevision(f, rango) === null);
     const hayMas = aplicables.length > hasta;
     const pagina = aplicables.slice(0, hasta);
 
@@ -186,7 +227,15 @@ export async function GET(req, context) {
       // Con la lista cerrada la pantalla muestra y no deja tocar: el servidor
       // rechaza excluir una fila de una importación que no está abierta, así
       // que ofrecerlo sería ofrecer algo que falla.
-      editable: esImportacionAbierta(cab.estado),
+      //
+      // Y CONTROLANDO NO SE EDITA NUNCA, esté abierta o no: los botones de esta
+      // pantalla —dejar como está, excluir— deciden qué se escribe al aplicar, y
+      // un control no aplica nada. Ofrecerlos sería ofrecer trabajo que no tiene
+      // efecto, que es peor que no ofrecerlos.
+      editable: grupoDeControl ? false : esImportacionAbierta(cab.estado),
+      // Qué grupo del control se está mirando, para que la pantalla se titule.
+      // `null` cuando es el listado de siempre.
+      control: grupoDeControl,
       // El configurado se manda igual, con su nombre, porque no es lo mismo y
       // alguna pantalla puede querer contrastarlos.
       rangoEsperado: rango,

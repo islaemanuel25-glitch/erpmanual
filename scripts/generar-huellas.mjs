@@ -494,6 +494,17 @@ const edge = spawn(
     // ruta relativa no abre el puerto y con absoluta contesta a los 6 segundos.
     `--user-data-dir=${path.resolve(SALIDA, "edge-profile")}`,
     "--no-first-run", "--no-default-browser-check", "--disable-gpu", "--hide-scrollbars",
+    // ── `--sin-sandbox`: PARA CORRER DENTRO DE UN CONTENEDOR ───────────────
+    //
+    // Chromium se niega a arrancar como root si el sandbox está activo, y en un
+    // contenedor de desarrollo todo corre como root. El síntoma no dice eso: el
+    // navegador muere en silencio, el puerto de depuración nunca abre y el arnés
+    // informa "Edge no respondió al puerto de depuración", que apunta al puerto.
+    //
+    // Va como bandera y NO siempre: apagar el sandbox es bajarle una defensa al
+    // navegador, y en la máquina de alguien que corre esto con su usuario normal
+    // no hace falta. Que haya que pedirlo obliga a saber que se está pidiendo.
+    ...(process.argv.includes("--sin-sandbox") ? ["--no-sandbox"] : []),
     "about:blank",
   ],
   { stdio: "ignore" }
