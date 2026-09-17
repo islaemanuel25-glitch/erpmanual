@@ -37,7 +37,7 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiChipsFiltro, { CLAVE_TODAS } from "@/components/sunmi/SunmiChipsFiltro";
 
 import { Paginacion, Vacio, ErrorRecuperable } from "@/components/proveedores/listas/PiezasListas";
-import { Encabezado } from "@/components/proveedores/listas/PiezasPantallas";
+import { VolverDelModulo } from "@/components/proveedores/listas/PiezasPantallas";
 import { fechaHora } from "@/lib/proveedores/listas/presentacion";
 import { ESTADOS_A_MEDIAS } from "@/lib/proveedores/listas/persistencia";
 
@@ -176,7 +176,16 @@ export default function HistorialListasPage() {
 
   return (
     <Marco>
-      <Encabezado titulo="Listas de proveedor" />
+      {/* ── UN SOLO TÍTULO ──────────────────────────────────────────────────
+          Acá había un `<Encabezado titulo="Listas de proveedor" />` y arriba, en
+          la barra del shell, ya decía "Listas de proveedores". Dos títulos casi
+          iguales, uno en singular y otro en plural, con el hueco de un `h1`
+          entre medio: en un teléfono de 360 eso es la mitad de la primera
+          pantalla gastada en decir dos veces dónde estás.
+          El que manda es el del shell, que sale del menú y es el mismo que se ve
+          al llegar desde cualquier lado. Lo único que faltaba acá era la salida,
+          que es lo que queda. */}
+      <VolverDelModulo texto="Compras" onVolver={() => router.push("/modulos/compras")} />
 
       <SunmiButton
         color="cyan"
