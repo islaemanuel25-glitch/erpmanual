@@ -48,6 +48,8 @@ import {
   configuracionParaLaLista,
   TEXTO_FALTA_CONFIGURACION,
 } from "@/lib/proveedores/listas/configuracionProveedor";
+// PARA QUÉ SE SUBIÓ LA LISTA, y la conversión del 0 a 0 en un control.
+import { MODO_LISTA, resolverModo } from "@/lib/proveedores/listas/modoDeLaLista";
 import {
   leerArchivoDeLista,
   TEXTO_MOTIVO_LECTURA_ARCHIVO,
@@ -423,12 +425,28 @@ export async function POST(req) {
     // evaluado con el criterio de Emanuel. Con el rango de fábrica puesto, todas
     // las filas de una lista real caen fuera del rango: el default no era una
     // comodidad, era una respuesta inventada.
+    // ── PARA QUÉ SE SUBIÓ ESTA LISTA ─────────────────────────────────────
+    //
+    // Se resuelve ANTES de la configuración porque cambia lo que la
+    // configuración tiene que exigir: controlar no pide rango.
+    //
+    // Y acá es donde el 0 a 0 escrito a mano se convierte en un control, con su
+    // aviso. Nadie espera que sus costos suban "entre 0 % y 0 %": quien escribe
+    // eso está pidiendo que no se cambie nada. Tratarlo como una lista de
+    // actualizar es lo que produjo las 213 filas diciendo "entre 0,0 % y 0,0 %".
+    const { modo, aviso: avisoDeModo } = resolverModo({
+      modoPedido: form.get("modo"),
+      minPct: form.get("aumentoEsperadoMinPct"),
+      maxPct: form.get("aumentoEsperadoMaxPct"),
+    });
+
     const resuelta = configuracionParaLaLista(proveedor, {
       minPct: form.get("aumentoEsperadoMinPct"),
       maxPct: form.get("aumentoEsperadoMaxPct"),
       recargoPct: form.get("recargoPct"),
       impuestoAdicionalPct: form.get("impuestoAdicionalPct"),
       impuestosDefinidos: leerBooleano(form.get("impuestosDefinidos")),
+      modo,
     });
     if (!resuelta.ok) {
       return NextResponse.json(
@@ -465,6 +483,11 @@ export async function POST(req) {
       aumentoEsperadoMinPct: resuelta.config.minPct,
       aumentoEsperadoMaxPct: resuelta.config.maxPct,
       impuestoAdicionalPct,
+      // EL MODO VIAJA CON EL RANGO Y POR EL MISMO MOTIVO: es de esta
+      // importación, no del proveedor. Y como este objeto es EL MISMO que se
+      // persiste y el que se le pasa al motor, no hay forma de que la cabecera
+      // diga que es un control y el motor haya conciliado como si actualizara.
+      modo,
     };
 
     // ── 8.bis. QUÉ COLUMNA DEL ARCHIVO ES EL PRECIO ──────────────────────
@@ -486,7 +509,11 @@ export async function POST(req) {
         productos,
         codigosProveedor,
         columnasDePrecio: generico.mapeo.precios,
-        config: { rango, recargoPct, impuestoAdicionalPct, pisoPrecioCreible: reg.config.pisoPrecioCreible },
+        // EL MODO ENTRA ACÁ, y es la mitad del arreglo: sin él, `decidirLista`
+        // puntúa cada columna por caída en rango, y con el rango en cero eso
+        // exige que el precio dé el costo de hoy al centavo. Las dos columnas de
+        // Arcor sacaron cero y el motor pidió elegir sin mostrar evidencia.
+        config: { rango, recargoPct, impuestoAdicionalPct, pisoPrecioCreible: reg.config.pisoPrecioCreible, modo },
       });
 
       // A MANO GANA, pero se informa igual lo que el motor habría elegido: si
@@ -660,6 +687,12 @@ export async function POST(req) {
       estado: importacion.estado,
       proveedor: { id: proveedor.id, nombre: proveedor.nombre },
       parser: { id: reg.id, version: reg.parserVersion },
+      // PARA QUÉ SE LEYÓ, Y SI HUBO QUE CORREGIRLO. El aviso viaja porque un
+      // cambio de comportamiento que no se anuncia es indistinguible de un
+      // defecto: quien puso 0 a 0 tiene que enterarse de que se tomó como un
+      // control, y no descubrirlo porque la pantalla siguiente dice otra cosa.
+      modo,
+      avisoDeModo,
       lectura: decisionDeLectura,
       archivo: { nombre: archivo.name, tamano: bytes.length, hash: archivoHash },
       resumen: {
