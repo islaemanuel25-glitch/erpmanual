@@ -1011,6 +1011,42 @@ Y si para algo no se puede armar un marcador con su control —porque el cambio 
 deja rastro en el build, por ejemplo—, **se dice que no se pudo verificar** en vez
 de darlo por bueno.
 
+### Y con el despliegue ya verificado: la auditoría de costos fuera de rango
+
+```bash
+DATABASE_URL="<la de producción>" node --import ./scripts/alias-loader.mjs \
+  scripts/auditoria/costos-aplicados-fuera-de-rango.mjs
+```
+
+**Va DESPUÉS de verificar el despliegue, no antes**, y el orden importa: si el
+despliegue se cayó o hubo que hacer rollback, lo que este informe mire no es lo
+que está atendiendo. Primero se confirma qué versión quedó corriendo, después se
+le pregunta a la base.
+
+**Qué contesta.** Por cada importación que escribió costos, cuáles quedaron fuera
+del rango que ese proveedor tenía configurado: producto, costo anterior, costo
+escrito y porcentaje. Separa los que **alguien eligió a mano sabiendo** —que son
+legítimos y llevan su marca— de los que **nadie eligió**, que son los que
+importan.
+
+**De dónde viene.** Hasta `27c70832` nada volvía a controlar el rango al aplicar:
+el estado de una fila se congela al conciliar, `clasificarLinea` nunca miró el
+rango, y la rama de las filas confirmadas se salteaba el cálculo entero. Con eso
+se podía escribir un +1.008 % sobre un proveedor que aumenta entre 2 y 15. Desde
+`27c70832` no puede volver a pasar, pero **lo que ya se escribió sigue escrito**,
+y esto es lo que lo busca.
+
+**Es de SOLO LECTURA y se puede comprobar**: pide el cliente en nivel `LECTURA`
+—el único que la fábrica deja apuntar a un host que no sea local— y no tiene una
+sola llamada de escritura. Hay un candado, `scripts/auditoria/soloLectura.test.mjs`,
+que lo afirma leyendo el fuente y se pone rojo si alguien le agrega un `update`
+"para arreglar de paso".
+
+**El resultado va en el informe**, aunque dé cero: "ningún costo fuera de rango"
+es un dato, y no decirlo hace que la próxima vez nadie sepa si se corrió. Si
+aparece alguno sin elegir, va con su número y su producto — **y no se corrige
+desde acá**: lo que haya que arreglar se arregla desde la aplicación.
+
 ### Y antes de escribir el reporte: la bitácora de autorizaciones
 
 ```bash
