@@ -89,7 +89,7 @@ export default function LosQueNoCambianPage() {
 
   useTituloDePagina("No cambian");
   useAccionDePagina(
-    () => <SunmiBackButton href={`/modulos/proveedores/listas/${id}`} texto="Resultado" />,
+    () => <SunmiBackButton href={`/modulos/proveedores/listas/${id}`} texto="Resultado" className="min-h-toque" />,
     [id]
   );
 
@@ -219,14 +219,14 @@ export default function LosQueNoCambianPage() {
 
   return (
     <Marco>
-      <div className="space-y-1">
-        <h1 className="text-xl font-bold sunmi-text-strong leading-tight">
-          No cambian · {conteo.total}
-        </h1>
-        <p className="text-sm2 sunmi-text-muted leading-snug">
-          Productos de {proveedor} que tenés cargados y esta lista no va a corregir.
-        </p>
-      </div>
+      {/* El nombre de la pantalla ya está en la barra del shell, arriba: un
+          `<h1>` que dijera "No cambian" otra vez sería la misma repetición que
+          se sacó del resultado. Lo que el shell no puede decir es CUÁNTOS son y
+          de qué proveedor, y eso es lo que queda. */}
+      <p className="text-sm2 sunmi-text-muted leading-snug">
+        <span className="sunmi-text-strong font-semibold">{conteo.total}</span> productos de{" "}
+        {proveedor} que tenés cargados y esta lista no va a corregir.
+      </p>
 
       <SunmiChipsFiltro
         opciones={opciones}

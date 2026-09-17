@@ -99,7 +99,7 @@ export default function SubirListaPage() {
   // otra pregunta y merece su propio nombre arriba.
   useTituloDePagina(paso === PASO.COLUMNAS ? "¿Leí bien la lista?" : "Subir una lista");
   useAccionDePagina(
-    () => <SunmiBackButton href="/modulos/proveedores/listas" texto="Listas" />,
+    () => <SunmiBackButton href="/modulos/proveedores/listas" texto="Listas" className="min-h-toque" />,
     []
   );
 

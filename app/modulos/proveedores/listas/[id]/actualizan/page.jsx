@@ -70,7 +70,7 @@ export default function LosQueSeActualizanPage() {
 
   useTituloDePagina("Se actualizan");
   useAccionDePagina(
-    () => <SunmiBackButton href={`/modulos/proveedores/listas/${id}`} texto="Resultado" />,
+    () => <SunmiBackButton href={`/modulos/proveedores/listas/${id}`} texto="Resultado" className="min-h-toque" />,
     [id]
   );
 
@@ -173,11 +173,11 @@ export default function LosQueSeActualizanPage() {
 
   return (
     <Marco>
+      {/* "Se actualizan" ya lo dice la barra del shell. Acá va el número, que
+          es lo que el shell no puede decir, y de qué proveedor. */}
       <div className="space-y-1">
-        <h1 className="text-xl font-bold sunmi-text-strong leading-tight">
-          Se actualizan · {total}
-        </h1>
         <p className="text-sm2 sunmi-text-muted leading-snug">
+          <span className="sunmi-text-strong font-semibold">{total}</span> productos de{" "}
           {datos?.proveedor?.nombre ?? "—"}
           {/* El rango REAL de estas filas, no el configurado del proveedor. */}
           {hayRango

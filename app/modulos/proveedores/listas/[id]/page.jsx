@@ -99,7 +99,7 @@ export default function ResultadoDeListaPage() {
   //
   // Es la misma llamada que hacen las 32 pantallas que ya usan el slot.
   useAccionDePagina(
-    () => <SunmiBackButton href="/modulos/proveedores/listas" texto="Listas" />,
+    () => <SunmiBackButton href="/modulos/proveedores/listas" texto="Listas" className="min-h-toque" />,
     []
   );
 
@@ -228,14 +228,18 @@ export default function ResultadoDeListaPage() {
       {/* El volver y el título ya no se dibujan acá: van al slot del shell, que
           es una fila que vive AFUERA de `<main>`. Ver el comentario del registro,
           arriba. */}
-      <div>
-        <h1 className="text-xl font-bold sunmi-text-strong leading-tight">
-          {cabecera.proveedor?.nombre ?? "—"}
-        </h1>
-        <p className="text-sm2 sunmi-text-muted leading-snug">
-          {cabecera.archivoNombre} · leída {fechaHora(cabecera.leidaEn)} · {estadoEnCastellano(cabecera)}
-        </p>
-      </div>
+      {/* ── EL NOMBRE DEL PROVEEDOR VA UNA SOLA VEZ, Y ESTÁ ARRIBA ──────────
+          Acá había un `<h1>` con el nombre del proveedor. Ahora la barra del
+          shell dice ese mismo nombre, dos centímetros más arriba: en la captura
+          a 360 se leía "M Y F SRL" y justo debajo "M Y F SRL" otra vez. Es el
+          mismo título duplicado que el listado ya tuvo, con el agravante de que
+          acá las dos copias quedan pegadas.
+
+          Lo que el shell NO puede decir es de qué archivo se trata, cuándo se
+          leyó y en qué estado está — y eso es lo que queda. */}
+      <p className="text-sm2 sunmi-text-muted leading-snug">
+        {cabecera.archivoNombre} · leída {fechaHora(cabecera.leidaEn)} · {estadoEnCastellano(cabecera)}
+      </p>
 
       {aviso && <Aviso tono={aviso.tono}>{aviso.texto}</Aviso>}
 
@@ -313,7 +317,7 @@ export default function ResultadoDeListaPage() {
           ariaLabel={
             conteo.dejadas > 0 ? `Ver los ${conteo.dejadas} que dejaste igual` : undefined
           }
-          onClick={conteo.dejadas > 0 ? () => irA("/no-cambian?filtro=DEJADOS") : undefined}
+          onClick={conteo.dejadas > 0 ? () => irA("/no-cambian?filtro=DEJADO") : undefined}
         />
       </div>
 
@@ -345,7 +349,7 @@ export default function ResultadoDeListaPage() {
           }
           onClick={
             (cabecera.tuyosQueNoAparecen ?? 0) > 0
-              ? () => irA("/no-cambian?filtro=NO_VINIERON")
+              ? () => irA("/no-cambian?filtro=NO_VINO")
               : undefined
           }
         />

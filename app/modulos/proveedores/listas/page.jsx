@@ -122,7 +122,7 @@ export default function HistorialListasPage() {
   // La salida sí va al slot del shell, como en las otras cinco: la misma pieza,
   // el mismo alto de toque y la misma fila que nunca scrollea.
   useAccionDePagina(
-    () => <SunmiBackButton href="/modulos/compras" texto="Compras" />,
+    () => <SunmiBackButton href="/modulos/compras" texto="Compras" className="min-h-toque" />,
     []
   );
 

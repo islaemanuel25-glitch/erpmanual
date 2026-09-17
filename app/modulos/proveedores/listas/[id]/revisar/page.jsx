@@ -127,7 +127,7 @@ export default function RevisarDeAUnoPage() {
         ? { href: `/modulos/proveedores/listas/${id}/no-cambian`, texto: "No cambian" }
         : { href: `/modulos/proveedores/listas/${id}`, texto: "Resultado" };
   useAccionDePagina(
-    () => <SunmiBackButton href={destinoDeVuelta.href} texto={destinoDeVuelta.texto} />,
+    () => <SunmiBackButton href={destinoDeVuelta.href} texto={destinoDeVuelta.texto} className="min-h-toque" />,
     [destinoDeVuelta.href, destinoDeVuelta.texto]
   );
 
