@@ -704,6 +704,18 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     //
     // Lo grave lo sostiene el botón "Sí, aplicar", que hay que ir a buscar.
     "components/proveedores/listas/HojaConfirmarAplicar.jsx": false,
+    // ── LA PREGUNTA DE "ESTE AUMENTO NO SE PARECE A LOS DE ESTE PROVEEDOR" ──
+    //
+    // Vive adentro de la pantalla de revisar de a uno. Mismo caso que la hoja de
+    // aplicar y misma respuesta: tres renglones para leer y dos botones, nada
+    // escrito adentro que se pueda perder. Cerrar sin querer no cuesta nada —la
+    // lectura sigue ahí, en su tarjeta— y lo grave lo sostiene el botón, que
+    // dice el porcentaje que se acepta.
+    //
+    // Y hay un motivo propio para que el velo cierre: esta hoja se abre tocando
+    // una tarjeta de lectura, que es un blanco grande. Abrirla sin querer va a
+    // pasar, y ahí el toque afuera es la salida que se busca.
+    "app/modulos/proveedores/listas/[id]/revisar/page.jsx": false,
     // ── EL CARTEL DE FINALIZAR O BORRAR UNA OFERTA ────────────────────────
     //
     // Reemplaza a dos `confirm()` del navegador. No hay nada escrito adentro que

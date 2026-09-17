@@ -31,7 +31,7 @@
 //   Saltear            lo deja para después. No recuerda nada: al recargar la
 //                      pantalla vuelve a aparecer.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import { useUser } from "@/app/context/UserContext";
@@ -41,6 +41,7 @@ import SinPermisos from "@/components/auth/SinPermisos";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 
 import { ErrorRecuperable } from "@/components/proveedores/listas/PiezasListas";
 import { VolverDelModulo, Aviso, money, pct } from "@/components/proveedores/listas/PiezasPantallas";
@@ -66,12 +67,34 @@ export default function RevisarDeAUnoPage() {
   const [trabajando, setTrabajando] = useState(false);
   const [aviso, setAviso] = useState(null);
   const [vinculando, setVinculando] = useState(null);
+  // La lectura fuera de rango que se está por confirmar. Mientras vale algo, la
+  // pantalla pregunta; el `aceptarFueraDeRango` sale solo de contestar que sí.
+  const [confirmandoFuera, setConfirmandoFuera] = useState(null);
   // Los salteados de esta vuelta. NO se guardan: al recargar vuelven, que es lo
   // que "dejalo para después" quiere decir.
   const [salteados, setSalteados] = useState([]);
   // Cuál se está mirando. `null` es "el primero de la cola", que es lo que hace
   // que salir y volver retome donde quedó sin guardar nada.
   const [filaId, setFilaId] = useState(null);
+  // ── POR QUÉ HACE FALTA UN CONTADOR DE VUELTAS ───────────────────────────
+  //
+  // ENCONTRADO ABRIENDO LA PANTALLA, no por un candado: después de confirmar un
+  // producto, la pantalla NO SE MOVÍA. Se tocaba "Usar $X y seguir", el
+  // servidor guardaba bien, y adelante seguía el mismo producto con los mismos
+  // botones. Tocarlos de nuevo escribía otra decisión sobre la fila que ya
+  // estaba resuelta — así quedó una fila confirmada Y excluida a la vez.
+  //
+  // El motivo: avanzar hacía `setFilaId(null)` y `filaId` YA valía `null`
+  // —nunca se había pedido una fila concreta—, así que React no veía un cambio
+  // de estado, el efecto no volvía a correr y no se pedía nada. El defecto
+  // aparecía solo en el PRIMER producto de cada visita, que es el que se toca
+  // siempre.
+  //
+  // Esto no se arregla con `cargar()` suelto adentro de `avanzar`: habría dos
+  // caminos para traer los datos y el de arriba seguiría sin enterarse. Un
+  // contador que sube siempre es un cambio de estado de verdad, y deja un solo
+  // camino.
+  const [vuelta, setVuelta] = useState(0);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
@@ -104,7 +127,7 @@ export default function RevisarDeAUnoPage() {
   useEffect(() => {
     if (cargandoUser || cargandoCtx || !esAdmin || needsContexto || !Number.isInteger(id)) return;
     cargar({ pedir: filaId, saltados: salteados });
-  }, [cargar, cargandoUser, cargandoCtx, esAdmin, needsContexto, id, filaId, salteados]);
+  }, [cargar, cargandoUser, cargandoCtx, esAdmin, needsContexto, id, filaId, salteados, vuelta]);
 
   const fila = datos?.fila ?? null;
   const proveedor = datos?.cabecera?.proveedor?.nombre ?? "";
@@ -115,7 +138,12 @@ export default function RevisarDeAUnoPage() {
     // cola, así que el primero es el siguiente. Pedir un id concreto obligaría a
     // saber cuál era, y ese cálculo se puede equivocar cuando el servidor
     // reordena.
+    //
+    // La vuelta sube SIEMPRE: `filaId` casi siempre ya vale `null`, y volver a
+    // ponerlo en `null` no es un cambio de estado. Ver el comentario largo de
+    // `vuelta`, arriba.
     setFilaId(null);
+    setVuelta((v) => v + 1);
   }, []);
 
   const usarLectura = async (lectura, { aceptarFueraDeRango = false } = {}) => {
@@ -175,7 +203,11 @@ export default function RevisarDeAUnoPage() {
     if (!fila) return;
     setAviso(null);
     setSalteados((prev) => (prev.includes(fila.id) ? prev : [...prev, fila.id]));
+    // Acá el cambio de `salteados` ya dispara el efecto, pero se sube la vuelta
+    // igual: saltear el ÚLTIMO que quedaba sin saltear no cambia la lista —ya
+    // estaba adentro— y sin esto la pantalla se quedaría quieta en ese caso.
     setFilaId(null);
+    setVuelta((v) => v + 1);
   };
 
   if (cargandoUser || cargandoCtx) return null;
@@ -219,6 +251,13 @@ export default function RevisarDeAUnoPage() {
 
   const total = datos.total ?? 0;
   const indice = datos.indice ?? 0;
+  // La única lectura que el motor da por creíble, si hay alguna. NO hay caída a
+  // "la primera": ver el comentario del botón principal, más abajo.
+  const recomendada = fila.lecturas?.find((l) => l.recomendada) ?? null;
+  const rangoTexto =
+    datos.cabecera?.rango?.minPct !== null && datos.cabecera?.rango?.minPct !== undefined
+      ? `entre ${pct(datos.cabecera.rango.minPct)} y ${pct(datos.cabecera.rango.maxPct)}`
+      : "";
 
   return (
     <Marco>
@@ -265,7 +304,13 @@ export default function RevisarDeAUnoPage() {
                 key={l.clave}
                 lectura={l}
                 trabajando={trabajando}
-                onElegir={() => usarLectura(l, { aceptarFueraDeRango: l.fueraDeRango })}
+                // UNA LECTURA FUERA DE RANGO NO SE ELIGE DE UN TOQUE. Se
+                // pregunta con el número adelante, y recién la respuesta manda
+                // `aceptarFueraDeRango`. Sin este paso, "explícitamente" sería
+                // haber tocado un botón que dice un precio.
+                onElegir={() =>
+                  l.fueraDeRango ? setConfirmandoFuera(l) : usarLectura(l, { aceptarFueraDeRango: false })
+                }
               />
             ))}
           </div>
@@ -290,20 +335,38 @@ export default function RevisarDeAUnoPage() {
             Vincular con uno de los míos
           </SunmiButton>
         )}
-        {!fila.sinProducto && fila.lecturas.length > 0 && (
+        {/* ── EL BOTÓN GRANDE SOLO EXISTE SI HAY UNA LECTURA CREÍBLE ────────
+            Y ÉSTE ES EL DEFECTO DE LA #5, ENCONTRADO OTRA VEZ USANDO LA
+            PANTALLA. Acá decía `find(recomendada) ?? lecturas[0]`: cuando
+            NINGUNA lectura cae en el rango —que es exactamente el caso por el
+            que la fila está en esta cola— el `??` agarraba la primera y la
+            ofrecía en el botón principal, en cian, a ancho completo y en
+            negrita, diciendo "Usar $ 1.320,09 y seguir" sobre un producto de
+            $ 661,70. Un +99,5 % presentado como la opción obvia.
+
+            Es la misma forma del botón viejo que dejó 112 productos a +1.008 %,
+            con más información alrededor. El veto de aplicar lo atajaba —no se
+            escribe sin elección informada— pero un toque en ese botón CONTABA
+            como la elección informada, así que el veto no llegaba a actuar.
+
+            Sin lectura creíble no hay acción principal: la decisión se toma
+            tocando la tarjeta de la lectura, que muestra el porcentaje y la
+            cuenta, y contesta la pregunta de al lado. */}
+        {!fila.sinProducto && recomendada && (
           <SunmiButton
             color="cyan"
-            onClick={() => {
-              const elegida = fila.lecturas.find((l) => l.recomendada) ?? fila.lecturas[0];
-              usarLectura(elegida, { aceptarFueraDeRango: elegida.fueraDeRango });
-            }}
+            onClick={() => usarLectura(recomendada, { aceptarFueraDeRango: false })}
             disabled={trabajando}
             className="w-full min-h-toque text-base font-bold"
           >
-            {trabajando
-              ? "Guardando…"
-              : (fila.lecturas.find((l) => l.recomendada) ?? fila.lecturas[0]).textoBoton}
+            {trabajando ? "Guardando…" : recomendada.textoBoton}
           </SunmiButton>
+        )}
+        {!fila.sinProducto && !recomendada && fila.lecturas.length > 0 && (
+          <p className="text-sm2 sunmi-text-warning leading-snug text-center">
+            Ninguna forma de leerlo da un aumento como los de este proveedor
+            {rangoTexto ? ` (${rangoTexto})` : ""}. Si igual querés usar una, tocala arriba.
+          </p>
         )}
         <div className="grid grid-cols-2 gap-2">
           <SunmiButton
@@ -339,6 +402,21 @@ export default function RevisarDeAUnoPage() {
             : `Me acuerdo: en las próximas listas de ${proveedor} este producto se lee así solo, sin preguntarte.`}
         </p>
       </SunmiCard>
+
+      {confirmandoFuera && (
+        <ConfirmarFueraDeRango
+          lectura={confirmandoFuera}
+          costoDeHoy={fila.costoAnterior}
+          rangoTexto={rangoTexto}
+          trabajando={trabajando}
+          onCerrar={() => setConfirmandoFuera(null)}
+          onConfirmar={async () => {
+            const l = confirmandoFuera;
+            setConfirmandoFuera(null);
+            await usarLectura(l, { aceptarFueraDeRango: true });
+          }}
+        />
+      )}
 
       {vinculando && (
         <PanelVincular
@@ -431,6 +509,67 @@ function SinProductoDelCatalogo({ fila }) {
         qué compararlo. Dice {money(fila.precioLista)}.
       </p>
     </SunmiCard>
+  );
+}
+
+/**
+ * LA PREGUNTA QUE CONVIERTE UN TOQUE EN UNA ELECCIÓN.
+ *
+ * ── POR QUÉ NO ALCANZA CON QUE LA TARJETA LO DIGA ───────────────────────────
+ *
+ * La tarjeta ya muestra el porcentaje y la advertencia, y aun así el defecto de
+ * la #5 fue exactamente ése: información al lado de un botón que se toca sin
+ * leerla. El costo fuera de rango es el único que después nadie vuelve a
+ * controlar —el veto de aplicar lo deja pasar justamente porque una persona lo
+ * eligió— así que la elección tiene que ser un acto aparte, con el número de
+ * hoy y el número nuevo enfrentados, y con el botón diciendo qué se acepta.
+ *
+ * El texto del botón NO dice "Sí" ni "Aceptar": dice el porcentaje. Un "Sí"
+ * contesta a un título que a esa altura ya no se está mirando.
+ */
+function ConfirmarFueraDeRango({ lectura, costoDeHoy, rangoTexto, trabajando, onCerrar, onConfirmar }) {
+  return (
+    <SunmiModalLayout
+      open
+      title="Este aumento no se parece a los de este proveedor"
+      color="amber"
+      onClose={trabajando ? undefined : onCerrar}
+      espacioCuerpo="mt-2 gap-3"
+      z={9999}
+      footer={
+        <div className="space-y-2 w-full">
+          <SunmiButton
+            color="cyan"
+            onClick={onConfirmar}
+            disabled={trabajando}
+            className="w-full min-h-toque text-base font-bold"
+          >
+            {trabajando ? "Guardando…" : `Usar igual: ${pct(lectura.variacionPct)}`}
+          </SunmiButton>
+          <SunmiButton
+            color="slate"
+            onClick={onCerrar}
+            disabled={trabajando}
+            className="w-full min-h-toque text-sm3"
+          >
+            Volver
+          </SunmiButton>
+        </div>
+      }
+    >
+      <div className="space-y-3">
+        <p className="text-sm3 sunmi-text-strong leading-snug">
+          Hoy lo tenés a {money(costoDeHoy)} y esto lo deja en {money(lectura.costoNuevo)}, que es{" "}
+          {pct(lectura.variacionPct)}
+          {rangoTexto ? `. Esperabas ${rangoTexto}.` : "."}
+        </p>
+        <p className="text-sm2 sunmi-text-muted leading-snug">{lectura.cuenta}</p>
+        <p className="text-sm2 sunmi-text-muted leading-snug">
+          Si lo usás, se va a escribir al aplicar la lista, y me lo voy a acordar para las próximas
+          listas de este proveedor.
+        </p>
+      </div>
+    </SunmiModalLayout>
   );
 }
 
