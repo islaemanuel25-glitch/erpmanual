@@ -195,6 +195,28 @@ ese commit. Lista vacía = todo lo que está en `origin/main` se puede desplegar
 luz verde sobre una tanda bloqueada y lo único que lo frenó fue que quien
 desplegaba se acordara. El detalle está en el propio archivo.
 
+### Y ANTES DE SEGUIR: ¿ESTE RANGO CAMBIA EL PROCEDIMIENTO?
+
+```bash
+git diff --name-only $DESPLEGADO..$REMOTO -- .claude/skills/deploy/SKILL.md
+```
+
+**Si devuelve algo, este archivo cambió adentro del rango que se está por
+desplegar, y la versión que se está leyendo es la VIEJA.** Hay que volver a
+leerlo entero desde el árbol actualizado y seguir esa versión, no ésta.
+
+*Por qué, con su caso:* el 2026-09-17, desplegando `ffb85675`, la tanda traía un
+paso nuevo —la auditoría de costos fuera de rango, que entró en `d988b50b`— y el
+despliegue **no lo corrió**. No se salteó por olvido: el procedimiento se carga
+al invocar `/deploy`, y en ese momento el clon estaba en el commit anterior. El
+`git merge --ff-only` del paso 0 actualizó el árbol, pero el texto que ya estaba
+leído siguió siendo el de antes. Se desplegó bien y el informe salió completo
+**según un procedimiento que ya no era el vigente**.
+
+Es la misma familia que el `git fetch` que falta: algo que se compara contra un
+recuerdo en vez de contra lo que hay. Y tiene el mismo síntoma, que es el que lo
+hace difícil de ver — **no falla, sale bien de menos.**
+
 ### Lo que este chequeo NO contesta
 
 Que `origin/main` tenga el commit **no** prueba que Actions haya terminado de
@@ -1046,6 +1068,17 @@ que lo afirma leyendo el fuente y se pone rojo si alguien le agrega un `update`
 es un dato, y no decirlo hace que la próxima vez nadie sepa si se corrió. Si
 aparece alguno sin elegir, va con su número y su producto — **y no se corrige
 desde acá**: lo que haya que arreglar se arregla desde la aplicación.
+
+**ESTE PASO CORRE SIEMPRE, traiga migraciones el despliegue o no.** No depende de
+que la tanda haya tocado el módulo de listas: lo que busca son costos que ya
+estaban escritos de antes, así que el día que no se corre es justamente el día en
+que nadie mira.
+
+La primera corrida fue a mano el 2026-09-17, después del despliegue de
+`ffb85675` y porque Emanuel la pidió — el despliegue mismo no la había hecho, por
+el motivo que está en el paso 0. Encontró **186 costos fuera de rango, 162 sin
+que nadie los eligiera**, repartidos en tres importaciones de agosto y
+septiembre. O sea que el paso no es teórico: la primera vez que corrió, encontró.
 
 ### Y antes de escribir el reporte: la bitácora de autorizaciones
 
