@@ -84,12 +84,24 @@ export async function GET(req, context) {
         : {}),
     };
 
-    // Se traen `hasta + 1` para poder decir si queda algo más sin una segunda
-    // consulta de conteo.
+    // ── SE TRAEN TODAS Y SE PAGINA ACÁ ──────────────────────────────────
+    //
+    // Se traían `hasta + 1` para poder decir "hay más" sin una segunda
+    // consulta, y el título salía "Se actualizan · 20+" sobre 360 productos.
+    // Un "20+" no es un número: no dice si son 21 o 900, que es justo lo que
+    // esta pantalla viene a contestar.
+    //
+    // Contar en la base no alcanza, porque quién entra no es una columna: sale
+    // de `motivoDeRevision`, que mira el estado, el porcentaje y el rango
+    // juntos. Escribir esa regla como SQL sería tenerla en dos idiomas, y el
+    // día que cambie una sola el título diría un número y la lista otro.
+    //
+    // El costo está acotado y medido: son las filas LISTO de la importación
+    // —359 en la lista real de M Y F— con un `select` de doce campos, la misma
+    // consulta que ya hace el endpoint del resultado sobre las 954.
     const crudas = await prisma.importacionListaFila.findMany({
       where,
       orderBy: { filaExcel: "asc" },
-      take: hasta + 1,
       select: {
         id: true,
         estado: true,
@@ -119,10 +131,30 @@ export async function GET(req, context) {
     const hayMas = aplicables.length > hasta;
     const pagina = aplicables.slice(0, hasta);
 
+    // ── EL RANGO QUE SE MUESTRA ES EL DE ESTAS FILAS ────────────────────
+    //
+    // Se mandaba el rango CONFIGURADO del proveedor y el renglón decía "todos
+    // aumentan entre +2,0 % y +15,0 %" sin haber mirado una sola fila. Es la
+    // misma familia del cartel de la #5: una frase sobre los productos que en
+    // realidad describe otra cosa. Si los 359 aumentan todos +5 %, eso es lo
+    // que hay que decir.
+    let minReal = null;
+    let maxReal = null;
+    for (const f of aplicables) {
+      const p = numero(f.diferenciaPct);
+      if (p === null) continue;
+      minReal = minReal === null ? p : Math.min(minReal, p);
+      maxReal = maxReal === null ? p : Math.max(maxReal, p);
+    }
+
     return NextResponse.json({
       ok: true,
       proveedor: cab.proveedor,
-      rango,
+      // El configurado se manda igual, con su nombre, porque no es lo mismo y
+      // alguna pantalla puede querer contrastarlos.
+      rangoEsperado: rango,
+      rango: { minPct: minReal, maxPct: maxReal },
+      total: aplicables.length,
       hayMas,
       items: pagina.map((f) => ({
         id: f.id,

@@ -113,19 +113,30 @@ export default function LosQueSeActualizanPage() {
 
   const items = datos?.items ?? [];
   const rango = datos?.rango ?? {};
-  const hayRango = rango.minPct !== null && rango.maxPct !== null;
+  const hayRango =
+    rango.minPct !== null && rango.minPct !== undefined && rango.maxPct !== null;
+  const unSoloPorcentaje =
+    hayRango && Math.round(rango.minPct * 10) === Math.round(rango.maxPct * 10);
+  // El total de los que se actualizan, que NO es cuántos entran en la página.
+  // El título decía "Se actualizan · 20+" sobre 360 productos: un "20+" no
+  // distingue 21 de 900, que es justo lo que se viene a mirar acá.
+  const total = datos?.total ?? items.length;
 
   return (
     <Marco>
       <div className="space-y-1">
         <VolverDelModulo texto="Resultado" onVolver={volver} />
         <h1 className="text-xl font-bold sunmi-text-strong leading-tight">
-          Se actualizan · {items.length}
-          {datos?.hayMas ? "+" : ""}
+          Se actualizan · {total}
         </h1>
         <p className="text-sm2 sunmi-text-muted leading-snug">
           {datos?.proveedor?.nombre ?? "—"}
-          {hayRango ? ` · todos aumentan entre ${pct(rango.minPct)} y ${pct(rango.maxPct)}` : ""}
+          {/* El rango REAL de estas filas, no el configurado del proveedor. */}
+          {hayRango
+            ? unSoloPorcentaje
+              ? ` · todos aumentan ${pct(rango.minPct)}`
+              : ` · aumentan entre ${pct(rango.minPct)} y ${pct(rango.maxPct)}`
+            : ""}
         </p>
       </div>
 
@@ -182,7 +193,9 @@ export default function LosQueSeActualizanPage() {
           disabled={cargando}
           className="w-full min-h-toque text-sm3"
         >
-          {cargando ? "Cargando…" : "Ver 20 más"}
+          {/* Cuántos faltan, no "20 más": con 360 productos y 20 en pantalla,
+              "Ver 20 más" no dice si queda uno o diecisiete toques. */}
+          {cargando ? "Cargando…" : `Ver 20 más · faltan ${Math.max(0, total - items.length)}`}
         </SunmiButton>
       )}
     </Marco>
