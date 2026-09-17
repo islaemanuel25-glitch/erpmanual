@@ -83,6 +83,17 @@ export async function POST(req) {
       titulos,
       columnaPrecioElegida: body.columnaPrecioElegida ?? null,
       descuentoAplicado: typeof body.descuentoAplicado === "boolean" ? body.descuentoAplicado : null,
+      // ── SI LA COLUMNA LA ELIGIÓ UNA PERSONA ────────────────────────────
+      //
+      // Lo que distingue una columna DECIDIDA de una PROPUESTA por el nombre.
+      // Una propuesta guardada acá se lee el mes que viene como si alguien
+      // hubiera decidido, y le gana al motor: es el camino por el que se escribió
+      // un costo 17 % abajo sin que nada avisara.
+      //
+      // `=== true` y no un `??`: lo que no venga explícitamente en true se guarda
+      // como que no la eligió nadie, que es el lado seguro —el motor vuelve a
+      // medir o vuelve a preguntar—.
+      precioLoEligioUnaPersona: body.precioLoEligioUnaPersona === true,
     });
     if (!armada.ok) {
       return NextResponse.json(

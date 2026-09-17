@@ -314,6 +314,13 @@ export default function SubirListaPage() {
       if (extra.columnaPrecio !== undefined && extra.columnaPrecio !== null) {
         fd.append("columnaPrecio", String(extra.columnaPrecio));
         fd.append("conDescuento", extra.conDescuento ? "true" : "false");
+        // ── Y SI LA ELIGIÓ LA PERSONA O SOLO ACEPTÓ LA PROPUESTA ───────────
+        //
+        // Sin esto el servidor no puede distinguirlas, y la propuesta —hecha por
+        // el nombre de la columna— le gana al motor y se traga la pregunta que
+        // el motor quería hacer. Ver el encabezado de `precioElegidoPorUsuario`
+        // en `ConfirmarColumnas`.
+        fd.append("precioElegidoPorUsuario", extra.precioElegidoPorUsuario === true ? "true" : "false");
       }
 
       const r = await fetch("/api/proveedores/listas/importar", {
@@ -379,6 +386,11 @@ export default function SubirListaPage() {
             mapeo: extra.mapeo,
             columnaPrecioElegida: extra.columnaPrecio,
             descuentoAplicado: extra.conDescuento === true,
+            // Lo que hace que esa columna guardada valga como respuesta el mes
+            // que viene, en vez de ser un dato de color. Una propuesta guardada
+            // se lee después como si alguien hubiera decidido, y es justamente
+            // lo que dejaba al motor sin poder preguntar.
+            precioLoEligioUnaPersona: extra.precioElegidoPorUsuario === true,
           }),
         });
         const j = await r.json().catch(() => null);
@@ -396,7 +408,11 @@ export default function SubirListaPage() {
     }
     setPaso(PASO.SUBIR);
     setPregunta(null);
-    await leerLista({ columnaPrecio: extra?.columnaPrecio, conDescuento: extra?.conDescuento });
+    await leerLista({
+      columnaPrecio: extra?.columnaPrecio,
+      conDescuento: extra?.conDescuento,
+      precioElegidoPorUsuario: extra?.precioElegidoPorUsuario === true,
+    });
   };
 
   if (cargandoUser || cargandoCtx) return null;

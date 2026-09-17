@@ -57,6 +57,36 @@ export default function ConfirmarColumnas({ proveedor, pregunta, trabajando, onV
     const precios = pregunta?.mapeo?.precios ?? [];
     return precios.length > 0 ? precios[0] : null;
   });
+
+  /**
+   * ¿LA COLUMNA DE PRECIO LA ELIGIÓ LA PERSONA, O LA PROPUSO LA PANTALLA?
+   *
+   * Arranca en false SIEMPRE, incluso cuando arriba se preseleccionó una: eso es
+   * una PROPUESTA, hecha por el orden de las candidatas, que sale de lo que el
+   * título de cada columna parece.
+   *
+   * ── POR QUÉ ESTE BOOLEANO EXISTE ──────────────────────────────────────────
+   *
+   * Porque esta pantalla manda `columnaPrecio` siempre, y hasta el 2026-09-17 el
+   * servidor no podía distinguir "la eligió" de "le dijo que sí a la que le
+   * propuse". Las dos llegaban igual, y una elección manual le gana al motor:
+   * así, apretar "Está bien, seguir" —el botón obvio, el único que avanza— se
+   * tragaba la pregunta que el motor quería hacer.
+   *
+   * Medido: una lista se leyó con S/IVA, que explicaba 1 de cada 9 productos,
+   * teniendo al lado C/IVA, que explicaba 4. Un costo quedó 17 % abajo y se
+   * aplicó sin advertencia, porque contra el costo viejo daba +15,7 % y eso cae
+   * adentro del rango esperado.
+   *
+   * No se puede derivar de nada: ni de que haya una columna elegida —siempre hay
+   * una cuando no hubo empate—, ni de comparar contra la propuesta —elegir a
+   * mano la misma columna que el sistema propuso es un gesto distinto de no
+   * tocarla, y solo esta bandera los separa—. Es la misma forma que el CLAUDE.md
+   * describe para el total del lector de comprobantes: lo que puede faltar se
+   * pregunta aparte, con un booleano que no se pueda calcular con los otros
+   * datos.
+   */
+  const [precioElegidoPorUsuario, setPrecioElegidoPorUsuario] = useState(false);
   const [conDescuento, setConDescuento] = useState(false);
   const [cambiando, setCambiando] = useState(null);
 
@@ -90,6 +120,10 @@ export default function ConfirmarColumnas({ proveedor, pregunta, trabajando, onV
 
   const elegirPrecio = (indice) => {
     setColumnaPrecio(indice);
+    // ACÁ, Y EN NINGÚN OTRO LADO, es donde la elección pasa a ser de la persona.
+    // Este `onElegir` solo se dispara desde el botón de una columna del
+    // desplegable de precio: no hay forma de llegar sin haberlo tocado.
+    setPrecioElegidoPorUsuario(true);
     setMapeo((ant) => ({
       ...ant,
       // La elegida va primera entre las candidatas, y las demás se conservan: el
@@ -213,7 +247,20 @@ export default function ConfirmarColumnas({ proveedor, pregunta, trabajando, onV
       <div className="space-y-2">
         <SunmiButton
           color="cyan"
-          onClick={() => onConfirmado({ columnaPrecio, conDescuento, mapeo, titulos, huella: pregunta?.huella })}
+          onClick={() =>
+            onConfirmado({
+              columnaPrecio,
+              // Viaja al lado de la columna y no en su lugar: el servidor
+              // necesita las dos cosas —qué columna y si alguien la eligió— y
+              // mandar `null` cuando no la eligió perdería la propuesta, que la
+              // pantalla igual quiere mostrar.
+              precioElegidoPorUsuario,
+              conDescuento,
+              mapeo,
+              titulos,
+              huella: pregunta?.huella,
+            })
+          }
           disabled={!puedeSeguir}
           className="w-full min-h-toque text-base font-bold"
         >
