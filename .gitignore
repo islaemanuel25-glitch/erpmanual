@@ -138,6 +138,21 @@ dist
 
 # ─── ERP Azul ───
 
+# ─────────────────────────────────────────────────────────────────────────────
+# DATOS Y SECRETOS QUE NO ENTRAN AL REPOSITORIO
+#
+# Esto no es higiene: es la consecuencia de un incidente. El repositorio estuvo
+# PÚBLICO desde el 23/11/2025 hasta el 17/09/2026, y en su primer commit entró
+# `pgdata/` —el directorio de datos de PostgreSQL entero, 71,5 MB— con los datos
+# de las tablas y los hashes de contraseña de los usuarios. Se sacó del árbol en
+# febrero, pero sigue en el historial: ver `docs/seguridad/limpieza-historial.md`.
+#
+# Lo que estas reglas impiden es que vuelva a pasar SIN QUE NADIE LO NOTE. El
+# candado `scripts/nadaDeDatosNiSecretos.test.mjs` las hace valer sobre lo que
+# realmente está trackeado, que es la pregunta que un `.gitignore` no contesta:
+# ignorar un archivo NO desindexa el que ya estaba adentro.
+# ─────────────────────────────────────────────────────────────────────────────
+
 # PostgreSQL data (local dev)
 pgdata/
 
@@ -146,7 +161,35 @@ backup_*.sql
 diff.sql
 fix_column.sql
 *.dump
+*.backup
 backups/
+
+# ── TODO .sql, MENOS LAS MIGRACIONES ──────────────────────────────────────
+#
+# Un `.sql` suelto es casi siempre un volcado: lo que se exporta para mirar, lo
+# que se guarda "por las dudas". Se ignoran todos.
+#
+# Y SE DESIGNORAN LAS MIGRACIONES, que es la mitad que no se puede olvidar. Sin
+# estas tres líneas, la próxima migración que alguien escriba quedaría ignorada:
+# no aparecería en `git status`, se commitearía la tanda sin ella, y el
+# despliegue correría contra una base sin la columna. El `.gitignore` no
+# desindexa lo ya trackeado, así que el daño no se vería hasta la migración
+# SIGUIENTE — y para entonces nadie lo ata a este archivo.
+*.sql
+!prisma/migrations/**/*.sql
+!tests/migraciones/**/*.sql
+!scripts/**/*.sql
+
+# ── VARIABLES DE ENTORNO: TODAS, MENOS LAS DE EJEMPLO ─────────────────────
+#
+# `.env*` y no la lista de nombres conocidos: la lista de arriba tenía seis
+# entradas y no cubría `.env.vps`, `.env.backup` ni ningún nombre nuevo. Lo que
+# se versiona es el EJEMPLO, que dice qué variables hacen falta sin decir sus
+# valores.
+.env*
+!.env.example
+!*.env.example
+!.env.*.example
 
 # Archives
 *.zip
