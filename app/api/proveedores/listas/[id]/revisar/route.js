@@ -106,12 +106,22 @@ export async function GET(req, context) {
       orderBy: { filaExcel: "asc" },
       select: CAMPOS_COLA,
     });
+    const url = new URL(req.url);
+    // ── LA MISMA PANTALLA, CON LA COLA DE LOS QUE NO ESTÁN EN EL CATÁLOGO ──
+    //
+    // `?solo=SIN_PRODUCTO` da vuelta el filtro: en vez de sacarlos, muestra solo
+    // esos. Es lo que necesita la tarjeta "N productos de la lista que no
+    // tenés" del resultado, y no es una pantalla nueva — el recorrido es el
+    // mismo (uno por vez, con progreso, con salir y volver), lo único que cambia
+    // es qué se puede hacer con el que está adelante: vincular en vez de elegir
+    // un precio, que es una rama que esta pantalla ya tenía.
+    const soloSinProducto = url.searchParams.get("solo") === MOTIVO_REVISION.SIN_PRODUCTO;
     const pendientes = candidatas.filter((f) => {
       const m = motivoDeRevision(f, rango);
-      return m !== null && m !== MOTIVO_REVISION.SIN_PRODUCTO;
+      if (m === null) return false;
+      return soloSinProducto ? m === MOTIVO_REVISION.SIN_PRODUCTO : m !== MOTIVO_REVISION.SIN_PRODUCTO;
     });
 
-    const url = new URL(req.url);
     // Los salteados de ESTA vuelta. No se guardan: al recargar vuelven.
     const salteados = new Set(
       String(url.searchParams.get("salteados") ?? "")
@@ -137,6 +147,7 @@ export async function GET(req, context) {
         rango,
         recargoPct: numero(cab.recargoPct),
       },
+      solo: soloSinProducto ? MOTIVO_REVISION.SIN_PRODUCTO : null,
       total: cola.length,
       // 1-based y sobre el orden en el que se va a recorrer, que es lo que la
       // pantalla dibuja como "3 de 70".
