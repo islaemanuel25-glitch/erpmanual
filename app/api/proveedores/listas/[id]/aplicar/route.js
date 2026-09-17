@@ -63,6 +63,8 @@ import {
 // El macheo que deja una fila aplicada. Vive con las demás decisiones de
 // vínculo, no acá: es la misma pregunta que resuelve la vinculación a mano.
 import { vinculoAPersistirAlAplicar, ORIGEN_ALTA_VINCULO } from "@/lib/proveedores/listas/vinculacion";
+// PARA QUÉ SE SUBIÓ LA LISTA. Una de control no escribe costos.
+import { MODO_LISTA, modoDeImportacion } from "@/lib/proveedores/listas/modoDeLaLista";
 
 /** Un Decimal de Prisma como número, o null. Null no es cero: es "sin cargar". */
 function numeroONull(v) {
@@ -148,6 +150,13 @@ export async function GET(req, context) {
         // `revalidarFila` necesita para volver a elegir la lectura. Sin ellos
         // preguntaría sin rango y omitiría todas las filas.
         aumentoEsperadoMinPct: true, aumentoEsperadoMaxPct: true, impuestoAdicionalPct: true,
+        // PARA QUÉ SE SUBIÓ. Sin este campo, `modoDeImportacion` leería
+        // `undefined`, contestaría ACTUALIZAR —que es el default correcto para
+        // las importaciones viejas— y el corte de `revalidarFila` no se
+        // dispararía NUNCA: una lista de control escribiría costos con el
+        // candado en verde. El campo que un gate necesita y el `select` no trae
+        // es exactamente la forma del defecto que este repo ya pisó tres veces.
+        modo: true,
       },
     });
     if (!importacion) {
@@ -156,6 +165,20 @@ export async function GET(req, context) {
     const regPrevia = resolverParserPorId(importacion.parser);
     if (!regPrevia.ok) {
       return NextResponse.json({ ok: false, error: regPrevia.error }, { status: 409 });
+    }
+
+    // ── UNA LISTA DE CONTROL NO ENTRA ACÁ ────────────────────────────────
+    //
+    // `revalidarFila` ya corta fila por fila, así que esto no es lo que impide
+    // la escritura: es lo que hace que la respuesta se entienda. Sin este corte
+    // el pedido devolvería doscientas omisiones con el mismo motivo repetido, y
+    // el usuario tendría que deducir de esa lista que el problema es uno solo y
+    // es de la lista entera.
+    if (modoDeImportacion(importacion) === MODO_LISTA.CONTROLAR) {
+      return NextResponse.json(
+        { ok: false, error: textoOmision(MOTIVO_OMISION.LISTA_DE_CONTROL), modo: MODO_LISTA.CONTROLAR },
+        { status: 409 }
+      );
     }
 
     const filas = await prisma.importacionListaFila.findMany({
@@ -272,11 +295,25 @@ export async function POST(req, context) {
         recargoPct: true, archivoNombre: true, aplicadaEn: true,
         aumentoEsperadoMinPct: true, aumentoEsperadoMaxPct: true, impuestoAdicionalPct: true,
         aplicadas: true, omitidas: true, modoPrecioVenta: true,
+        // PARA QUÉ SE SUBIÓ. Ver el comentario del mismo campo en el GET: sin
+        // él, `modoDeImportacion` contesta ACTUALIZAR y el corte no se dispara.
+        modo: true,
         proveedor: { select: { id: true, nombre: true } },
       },
     });
     if (!importacion) {
       return NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 });
+    }
+
+    // ── UNA LISTA DE CONTROL NO ESCRIBE ──────────────────────────────────
+    //
+    // Va antes de la idempotencia y de todo lo demás: es lo primero que se
+    // contesta porque no depende del estado de nada, solo de para qué se subió.
+    if (modoDeImportacion(importacion) === MODO_LISTA.CONTROLAR) {
+      return NextResponse.json(
+        { ok: false, error: textoOmision(MOTIVO_OMISION.LISTA_DE_CONTROL), modo: MODO_LISTA.CONTROLAR },
+        { status: 409 }
+      );
     }
 
     // ── Idempotencia: ya aplicada → se devuelve lo de antes, sin escribir ──
