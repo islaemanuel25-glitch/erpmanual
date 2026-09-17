@@ -424,9 +424,28 @@ async function sembrar(db) {
       nombre: t.nombre,
       precio_costo: num(t.costo),
       precio_venta: num(t.costo * 1.5),
-      unidad_medida: t.modo === "BULTO" ? "cajon" : "unidad",
+      // ── LA FORMA SALE DE LA BASE, NO DE LA CABEZA ──────────────────────
+      //
+      // La primera versión ponía `modoCompraProveedor: "UNIDAD"` para los
+      // productos sueltos, que es lo que la palabra sugiere. En este ERP
+      // significa otra cosa: `naturalezaLinea` devuelve **FIAMBRE** para
+      // `modoCompraProveedor === "UNIDAD"` —producto que se compra por pieza y
+      // se costea por kilo— y `bloqueoPorUnidad` bloquea el fiambre contra una
+      // lista que informa por unidad. Resultado: NUEVE de las once filas del
+      // banco salieron BLOQUEADO por UNIDAD_INCOMPATIBLE_CON_LISTA y el
+      // recorrido no llegaba a ejercer nada.
+      //
+      // Contado con `GROUP BY` sobre los 1.345 productos de Arcor y M Y F, las
+      // formas que EXISTEN son dos, y las dos son BULTO:
+      //   · suelto  → BULTO + unidad_medida "unidad" + sin factor   (356)
+      //   · por caja→ BULTO + unidad_medida "pack"   + factor > 1   (250)
+      // No hay ni un solo producto con `modoCompraProveedor: UNIDAD`.
+      //
+      // Es el corolario del CLAUDE.md sobre los datos del andamio, y es la
+      // tercera vez del mismo patrón: la forma se saca de donde vive de verdad.
+      unidad_medida: t.modo === "BULTO" ? "pack" : "unidad",
       factor_pack: t.factor,
-      modoCompraProveedor: t.modo,
+      modoCompraProveedor: "BULTO",
       creadoEnLocalId: deposito.id,
       activo: true,
       es_combo: false,
