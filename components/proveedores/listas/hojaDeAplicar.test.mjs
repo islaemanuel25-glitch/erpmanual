@@ -70,26 +70,32 @@ test("la hoja dice las cuatro cosas que tiene que decir", () => {
 });
 
 test("NINGÚN camino para aplicar esconde el botón detrás de una casilla", () => {
-  // Las dos superficies que escriben costos: la hoja nueva y el panel de la
-  // pantalla de filas. Si mañana vuelve una casilla en cualquiera de las dos,
-  // el módulo tendría otra vez dos maneras distintas de habilitar lo mismo.
-  for (const p of [
-    "components/proveedores/listas/HojaConfirmarAplicar.jsx",
-    "components/proveedores/listas/PanelAplicar.jsx",
-    "app/modulos/proveedores/listas/[id]/page.jsx",
-  ]) {
+  // ── QUEDA UNA SOLA SUPERFICIE, Y ESO NO AFLOJA EL CANDADO ────────────────
+  //
+  // Eran dos: esta hoja y el `PanelAplicar` de la pantalla vieja del detalle.
+  // Esa pantalla se eliminó entera —era de la versión anterior del módulo y
+  // Emanuel llegaba a ella sin querer— así que su panel se fue con ella.
+  //
+  // Lo que este candado afirma sigue valiendo sobre TODO lo que existe hoy: se
+  // recorre la carpeta en vez de nombrar archivos, así que una superficie nueva
+  // que naciera con una casilla entra sola en la cuenta. Sin eso, borrar el
+  // segundo archivo habría dejado el candado mirando uno solo y sin decirlo.
+  const dir = path.join(RAIZ, "components/proveedores/listas");
+  const superficies = fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith(".jsx"))
+    .map((f) => `components/proveedores/listas/${f}`)
+    .concat([
+      "app/modulos/proveedores/listas/[id]/page.jsx",
+      "app/modulos/proveedores/listas/[id]/revisar/page.jsx",
+      "app/modulos/proveedores/listas/[id]/actualizan/page.jsx",
+    ]);
+  assert.ok(superficies.length >= 4, "la enumeración quedó vacía y el candado no miraría nada");
+  for (const p of superficies) {
     const fuente = leer(p);
     assert.ok(!/type="checkbox"/.test(fuente), `${p} volvió a poner una casilla`);
     assert.ok(!/confirmadoLeido/.test(fuente), `${p} volvió a condicionar el botón a un tilde`);
   }
-});
-
-test("el panel viejo sigue diciendo CUÁNTOS productos toca", () => {
-  // Lo que la casilla llevaba adentro era el número. Sacarla sin poner el número
-  // en otro lado habría dejado un botón que escribe costos sin decir cuántos.
-  const fuente = leer("components/proveedores/listas/PanelAplicar.jsx");
-  assert.match(fuente, /Se van a modificar los costos de/);
-  assert.match(fuente, /previo\?\.cantidad \?\? seleccionadas/);
 });
 
 test("los dos botones de la hoja llegan a los 44 px", () => {
