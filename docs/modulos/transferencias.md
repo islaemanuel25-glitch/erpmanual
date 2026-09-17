@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-09-17 01:49
+**Última actualización:** 2026-09-17 15:34
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -194,6 +194,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-09-17: feat: la pantalla de subir pregunta para qué, y el resultado cuenta el control
 - 2026-09-17: fix(listas): ningún costo fuera del rango queda listo ni se escribe solo
 - 2026-09-16: feat(listas): lector genérico de PDF con texto, para la lista de cualquier proveedor
 - 2026-09-16: feat(listas): receta de lectura por proveedor — migración

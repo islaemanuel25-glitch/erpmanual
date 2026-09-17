@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-09-17 03:09
+**Última actualización:** 2026-09-17 15:34
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,13 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-09-17: feat: rescatar la lista que ya quedó leída con el rango en cero
+- 2026-09-17: feat: "No lo cambio" deja de ser por lista y vale para las que vengan
+- 2026-09-17: feat: "No es este producto" — elegir el renglón correcto de la lista
+- 2026-09-17: feat: la pantalla del control, pasar a actualizar y bajar el control
+- 2026-09-17: feat: la pantalla de subir pregunta para qué, y el resultado cuenta el control
+- 2026-09-17: feat: subir una lista para controlar, y el 0 a 0 como control con su aviso
+- 2026-09-17: feat: el modo controlar llega al motor, y controlar no escribe costos
 - 2026-09-17: fix: el volver mide 44, y el nombre de la pantalla va una sola vez
 - 2026-09-17: fix: lo que ya se escribió no se cuenta como "se actualiza"
 - 2026-09-17: feat: pantalla 7 — tus productos de este proveedor que no cambian
