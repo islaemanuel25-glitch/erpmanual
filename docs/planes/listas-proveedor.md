@@ -1003,3 +1003,106 @@ marcarla con una señal, para que se revise después en vez de antes.
 venta y al margen, y encontrarlo después es mucho más caro que resolver la fila
 antes. Además, si la tanda 2 sale bien, estas filas van a ser pocas — y cuántas son
 es justamente el número que falta medir.*
+
+---
+
+# Plan pendiente: pantalla «Costos para verificar»
+
+**Escrito el 2026-09-17 contra `bafc06a8`. No se construyó nada de esto en esta
+tanda: se diseña en Figma antes de construir.** Acá queda lo que se sabe y lo que
+falta decidir, para que quien lo agarre no tenga que volver a medirlo.
+
+## Qué encontró la auditoría, y con qué
+
+`scripts/auditoria/costos-aplicados-fuera-de-rango.mjs`, corrido contra
+producción. Es de solo lectura; no tocó nada.
+
+En las importaciones **#3 y #4 de Arcor, de agosto**, hay **162 costos escritos
+fuera del rango que nadie eligió**. En esas dos importaciones el rango era el
+**10 a 20 % de fábrica**, que es el que traía el sistema antes de que se pudiera
+configurar por proveedor — o sea que nadie lo eligió tampoco.
+
+Cómo se reparten, que es lo que decide qué hacer con cada uno:
+
+- **34 subieron de más.** Son los peores y los que hay que mirar primero. Tres
+  "arcor masiso" pasaron de $13.000 a $28.402, un **+118,5 %**.
+- **11 bajaron.** Una salsa Pomarola de 340 g pasó de $1.169 a $426, un
+  **−63,6 %**. Una bajada de ese tamaño es tan sospechosa como una subida: si el
+  costo quedó mal bajo, el margen que se calcula encima está mal alto.
+- **49 subieron menos del 10 %**, o sea por debajo del mínimo del rango.
+- **68 se movieron menos del 1 %.** Éstos son ruido de redondeo y casi seguro
+  están bien; están en la lista porque el rango arrancaba en 10 %, no porque el
+  costo esté mal.
+
+**Los 162 son de dos importaciones de agosto y de un solo proveedor.** No es un
+goteo repartido: es un episodio acotado, con fecha y con causa conocida.
+
+## Por qué no se puede arreglar solo
+
+Porque **no se sabe cuál era el costo bueno**. Lo que hay guardado es el costo
+anterior a esa importación, y ése tampoco tiene por qué ser el correcto: puede
+venir de otra lista mal leída, o de la carga inicial del producto. Revertir en
+masa a "lo de antes" cambiaría 162 costos sin saber si mejora alguno.
+
+Y el dato que sí serviría —la factura de esa compra— no está en el sistema.
+
+## Qué tendría que hacer la pantalla
+
+Una lista de trabajo, no un informe. Por cada producto:
+
+- el costo que tiene hoy y de cuánto venía;
+- **qué lista se lo escribió y cuándo**, que es lo que permite ir a buscar el
+  papel;
+- el porcentaje, y por qué quedó marcado —subió de más, bajó, se movió poco—;
+- y una acción por producto: **confirmarlo** (queda como está y sale de la lista)
+  o **corregirlo** escribiendo el costo bueno.
+
+Lo que NO tiene que hacer: una corrección masiva. Ciento sesenta y dos productos
+revisados de a uno es una tarde; ciento sesenta y dos costos cambiados de una vez
+sin mirar es el mismo error otra vez, en la otra dirección.
+
+## Lo que hay que decidir antes de construir, y por qué no se decide acá
+
+**1 · ¿Los 68 que se movieron menos del 1 % entran en la lista?**
+
+Son el 42 % del total y casi seguro están bien. Meterlos hace que la lista se vea
+imposible de terminar; dejarlos afuera es decidir por Emanuel que no le importan.
+
+*Recomendación: entran, pero agrupados y al final, con su propio chip. Que se
+puedan confirmar todos juntos con un botón, porque para eso sí alcanza mirar el
+número.*
+
+**2 · ¿Confirmar un costo deja rastro?**
+
+Si confirmar solo lo saca de la lista, la próxima auditoría lo vuelve a traer y el
+trabajo se pierde. Hace falta una marca — y eso es una columna, o sea una
+migración.
+
+*Recomendación: una columna `costoVerificadoEn` en `ProductoBase`, aditiva. Es un
+hecho nuevo y no pisa ninguno: el costo sigue donde está, y la marca dice que
+alguien lo miró. Un hecho, una columna.*
+
+**3 · ¿La pantalla se alimenta del script o de una consulta propia?**
+
+El script existe, es de solo lectura y ya está probado. Una pantalla que corra esa
+misma lógica en un endpoint duplica la regla en dos idiomas.
+
+*Recomendación: sacar el predicado a un módulo puro de `lib/proveedores/listas/`
+—como se hizo con `losQueNoCambian.js`— y que el script y el endpoint lo importen
+los dos. Es la regla 1 del CLAUDE.md, y este módulo ya se quemó con eso.*
+
+**4 · ¿Dónde vive la pantalla?**
+
+No es de una importación: mira todo el historial de un proveedor. No puede colgar
+de `listas/[id]`.
+
+*Recomendación: `/modulos/proveedores/costos-para-verificar`, con un filtro por
+proveedor. Y una entrada desde el listado de listas, que es donde Emanuel ya está
+cuando le importa esto.*
+
+## Lo que este plan NO contesta
+
+**Cuántos hay fuera de Arcor.** La auditoría se corrió sobre todo el historial y
+los 162 son de Arcor, pero eso es de hoy: si mañana aparece una importación vieja
+de otro proveedor con el rango de fábrica, el número cambia. La pantalla tiene que
+contarlos ella, no traer 162 escrito.
