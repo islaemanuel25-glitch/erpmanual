@@ -16,18 +16,50 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **17 migraciones**. Falta una:
+Ninguna. Producción está en **18 migraciones**, las mismas que el árbol.
 
-- `20260917130000_modo_de_lista_y_no_lo_cambio` — **ADITIVA**. Una columna
-  nullable `modo` en `ImportacionListaProveedor` —para qué se subió la lista,
-  actualizar o controlar— y una tabla nueva `ProductoQueNoSeCambia` con su
-  índice único y dos de búsqueda, que recuerda por producto y proveedor los que
-  no se tocan con las listas.
+---
 
-  No borra, no reescribe y no cambia el tipo de nada. El `CREATE UNIQUE INDEX`
-  es sobre la tabla que la misma migración acaba de crear, así que nace vacía y
-  no puede chocar con duplicados. Las 4.748 filas de importación que ya existen
-  quedan como están: `modo` en null se lee como ACTUALIZAR, que es lo que eran.
+## 2026-09-17 — `ee34f817`, el modo de lista y la memoria de "no lo cambio": **ADITIVA**
+
+Producción pasó de `ffb856759b9aeabdecae2d224ddf20885370cd53` a
+`ee34f81786fc959366e63b7fc5e074d88307ffb2`. Corte de **2 segundos**.
+
+`20260917130000_modo_de_lista_y_no_lo_cambio`. Una columna nullable `modo` en
+`ImportacionListaProveedor` y la tabla nueva `ProductoQueNoSeCambia`, con su
+índice único y dos de búsqueda.
+
+**El clasificador la marcó ADITIVA y salió con 0.** Sin autorización manual. El
+índice único va sobre la tabla que la misma migración acaba de crear, así que
+nace vacía y no puede chocar con duplicados.
+
+Verificado después de recrear: el esquema informa 18 y queda al día, la tabla
+nueva tiene 0 filas, y de las 7 importaciones que ya existían **ninguna quedó con
+`modo`** — en null se lee como ACTUALIZAR, que es lo que eran.
+
+### Y acá casi se rompe: el repo del servidor se quedó atrás y no lo dijo
+
+El `git fetch` del paso 4.1 **falló** —`could not read Username for
+'https://github.com'`— y el paso siguió igual. El HEAD del repo del servidor
+quedó en `bafc06a8` y su `prisma/migrations` mostraba **17** cuando el árbol de
+verdad tiene 18.
+
+**La causa:** el repositorio pasó a privado y el repo de despliegue lo tenía
+apuntado por **HTTPS anónimo**. El clon de trabajo usa SSH con clave, así que no
+se enteró de nada: el síntoma aparece solo del lado del servidor.
+
+**Lo que habría pasado sin mirar:** el paso de migrar lee ese directorio. Con 17
+archivos habría informado "17 migrations found · No pending migrations to apply"
+y salido con **0**. La app se habría recreado con el código nuevo contra una base
+sin la tabla `ProductoQueNoSeCambia`, y la rotura habría aparecido recién en la
+primera consulta que la tocara, con gente usando el sistema.
+
+**Lo atrapó el chequeo del conteo**, que existe exactamente para esto: el árbol
+decía 18 y el servidor 17.
+
+**El arreglo:** el remoto del repo de despliegue pasó a SSH,
+`git@github.com:…`, igual que el clon de trabajo. Después de eso el fetch anduvo,
+el HEAD llegó a `ee34f817` y el conteo dio 18 contra 18.
 
 ---
 

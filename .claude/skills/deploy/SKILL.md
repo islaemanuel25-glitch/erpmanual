@@ -504,6 +504,27 @@ bitácora muestra que los despliegues del 12 de agosto sí corrían
 `git fetch origin --quiet && git merge --ff-only origin/main`. La línea se perdió
 al escribir este documento, no en el procedimiento.
 
+**Y EL 2026-09-17 EL FETCH ESTABA ESCRITO Y FALLÓ IGUAL.** El repositorio pasó a
+privado y el repo del servidor lo tenía apuntado por **HTTPS anónimo**: el fetch
+cortó con `could not read Username for 'https://github.com'` y el `&&` impidió el
+merge, así que el HEAD del servidor se quedó dos commits atrás **y el despliegue
+siguió**. Su `prisma/migrations` mostraba 17 cuando el árbol tenía 18.
+
+Lo atrapó el chequeo del conteo del paso 4, que para eso está. Pero conviene
+saber la forma, porque el clon de trabajo **no la ve**: ése usa SSH con clave y
+anda perfecto. El síntoma vive solo del lado del servidor.
+
+El arreglo fue apuntar el remoto del repo de despliegue a SSH, igual que el clon:
+
+```bash
+git -C /srv/produccion/erpazul remote set-url origin git@github.com:islaemanuel25-glitch/erpmanual.git
+```
+
+**Y la lección general:** el `&&` del snippet hace que el merge no corra si el
+fetch falla, que está bien — pero nada frena el despliegue ahí. Después del paso
+4.1, mirar que el HEAD del servidor sea el SHA que se está desplegando, antes de
+seguir. Son dos segundos y es el único momento barato para enterarse.
+
 ### LA COPIA DEL `.env` VA FUERA DEL ÁRBOL, Y NO ES ORDEN
 
 Hasta el 2026-08-13 el paso 2 escribía `.env.bak-pre<SHA>` **al lado del
