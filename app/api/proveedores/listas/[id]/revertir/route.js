@@ -118,7 +118,11 @@ async function cargarProductos(db, { importacionId, grupoId, proveedorId }) {
 async function cargarImportacion(db, { importacionId, grupoId }) {
   return db.importacionListaProveedor.findFirst({
     where: { id: importacionId, grupoId },
-    select: { id: true, estado: true, proveedorId: true, archivoNombre: true },
+    // `archivoHash` hace falta para saber si otra importación ABIERTA del mismo
+    // archivo está ocupando el índice único antes de intentar reabrir ésta.
+    // Sin él la única forma de enterarse era el P2002, que se lleva puesta la
+    // transacción entera.
+    select: { id: true, estado: true, proveedorId: true, archivoNombre: true, archivoHash: true },
   });
 }
 
@@ -222,7 +226,10 @@ export async function GET(req, context) {
     });
   } catch (e) {
     console.error("[listas/revertir] previa:", e);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "No se pudo calcular qué se deshace. No se tocó ningún costo. Probá de nuevo." },
+      { status: 500 }
+    );
   }
 }
 
@@ -296,16 +303,45 @@ export async function POST(req, context) {
         filasRevertidas += item.filas.length;
       }
 
-      // La cabecera vuelve a estar abierta: quedaron filas sin aplicar.
+      // ── LA CABECERA VUELVE A ABRIRSE, SALVO QUE NO PUEDA ─────────────────
+      //
+      // Reabrirla la mete en el índice único `importacion_archivo_unica`, que
+      // impide dos importaciones ABIERTAS del mismo archivo para el mismo
+      // proveedor. Si mientras tanto alguien subió otra vez ese mismo archivo
+      // —que es exactamente lo que pasa cuando se prueba subir la lista dos
+      // veces— el `update` explota con un P2002 y se lleva puesta TODA la
+      // transacción: los costos no se revertían y la pantalla decía "Error
+      // interno".
+      //
+      // Deshacer es una sola cosa: devolver los costos. Eso se hace igual. Lo
+      // que no se puede hacer es reabrir la lista, así que se informa en vez de
+      // fallar: la lista queda cerrada, con sus costos devueltos, y el mensaje
+      // dice cuál es la otra importación que ocupa el lugar.
+      let noSePudoReabrir = null;
       if (productosRevertidos > 0) {
-        await tx.importacionListaProveedor.update({
-          where: { id: importacionId },
-          data: { estado: "PARCIALMENTE_APLICADA" },
+        const ocupa = await tx.importacionListaProveedor.findFirst({
+          where: {
+            grupoId: scope.grupoId,
+            proveedorId: importacion.proveedorId,
+            archivoHash: importacion.archivoHash,
+            estado: { in: ["BORRADOR", "CONCILIADA", "PARCIALMENTE_APLICADA"] },
+            id: { not: importacionId },
+          },
+          select: { id: true, archivoNombre: true },
         });
+        if (ocupa) {
+          noSePudoReabrir = ocupa;
+        } else {
+          await tx.importacionListaProveedor.update({
+            where: { id: importacionId },
+            data: { estado: "PARCIALMENTE_APLICADA" },
+          });
+        }
       }
 
       return {
         conflicto: false,
+        noSePudoReabrir,
         resumen: r,
         escrito: {
           productos: productosRevertidos,
@@ -338,7 +374,17 @@ export async function POST(req, context) {
 
     return NextResponse.json({ ok: true, importacionId, ...resultado });
   } catch (e) {
+    // El día que producción se cayó, lo único que se vio fue "Error interno".
+    // Salía de un `catch` como éste. La transacción es atómica, así que se
+    // puede afirmar lo que más importa saber: que no quedó nada a medias.
     console.error("[listas/revertir] ejecución:", e);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "No se pudo deshacer. Ningún costo cambió: la operación es todo o nada, así que quedó como estaba. Probá de nuevo.",
+      },
+      { status: 500 }
+    );
   }
 }
