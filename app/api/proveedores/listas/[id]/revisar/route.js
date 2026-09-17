@@ -253,6 +253,26 @@ export async function GET(req, context) {
       precioLista: numero(fila.precioConIva),
       motivo: motivoDeRevision(fila, rango),
       lecturas,
+      // ── CON QUÉ RENGLÓN DE LA LISTA SE LO EMPAREJÓ ────────────────────
+      //
+      // Es el dato que faltaba para poder desconfiar. El caso: el producto
+      // "MOGUL CONITOS" tiene guardado el código 13113 y la lista trae un 13113
+      // que es OTRO producto —"MOGUL GOMITAS 30G X 12"—; el que corresponde es
+      // el 3113. La pantalla mostraba el nombre del producto del catálogo y el
+      // precio, y con eso el emparejamiento equivocado era invisible: los dos
+      // renglones se ven igual de plausibles hasta que se lee la descripción
+      // QUE TRAE EL ARCHIVO.
+      //
+      // Por eso van los cuatro datos del renglón y no solo el código: la
+      // descripción es la que delata, y la unidad con la cantidad son las que
+      // explican por qué el precio no se parece.
+      enLaLista: {
+        codigo: fila.codigoCrudo,
+        descripcion: fila.descripcionProveedor,
+        precio: numero(fila.precioConIva),
+        unidad: fila.unidadProveedor,
+        cantidad: fila.unidadesPorBulto,
+      },
       // Lo que ya está guardado para este producto con este proveedor, si lo
       // hay. La pantalla lo usa para decir "esto ya lo contestaste".
       sinProducto: !fila.productoBaseId,

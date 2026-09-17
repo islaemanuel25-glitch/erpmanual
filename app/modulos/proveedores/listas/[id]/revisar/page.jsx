@@ -48,6 +48,9 @@ import { Aviso, AvisoCostoRedondo, money, pct } from "@/components/proveedores/l
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
 import PanelVincular from "@/components/proveedores/listas/PanelVincular";
+// EL RANGO DICHO EN PALABRAS, y vacío cuando no hay ninguno. Vive con el modo
+// porque lo que decide es qué significa un 0 a 0.
+import { textoDelRango } from "@/lib/proveedores/listas/modoDeLaLista";
 
 export default function RevisarDeAUnoPage() {
   const router = useRouter();
@@ -285,10 +288,18 @@ export default function RevisarDeAUnoPage() {
   // La única lectura que el motor da por creíble, si hay alguna. NO hay caída a
   // "la primera": ver el comentario del botón principal, más abajo.
   const recomendada = fila.lecturas?.find((l) => l.recomendada) ?? null;
-  const rangoTexto =
-    datos.cabecera?.rango?.minPct !== null && datos.cabecera?.rango?.minPct !== undefined
-      ? `entre ${pct(datos.cabecera.rango.minPct)} y ${pct(datos.cabecera.rango.maxPct)}`
-      : "";
+  // ── EL RANGO, Y VACÍO CUANDO NO HAY NINGUNO QUE DECIR ─────────────────
+  //
+  // La condición estaba escrita acá y solo miraba que `minPct` no fuera null,
+  // así que un 0 a 0 —que es lo que guarda una lista de control salida de un 0
+  // escrito a mano— pasaba y la pantalla decía "un aumento como los de este
+  // proveedor (entre 0,0 % y 0,0 %)". Es exactamente la frase que Emanuel vio
+  // 213 veces, y apareció en la captura de esta tanda sobre la lista nueva.
+  //
+  // Ahora la contesta `textoDelRango`, que vive donde ya se sabe qué significa
+  // un 0 a 0. Con el texto vacío, las frases de abajo se leen igual de bien: son
+  // todas de la forma "...como los de este proveedor{ (rango)}".
+  const rangoTexto = textoDelRango(datos.cabecera?.rango, pct);
 
   return (
     <Marco>
@@ -325,6 +336,44 @@ export default function RevisarDeAUnoPage() {
         <SinProductoDelCatalogo fila={fila} />
       ) : (
         <>
+          {/* ── CON QUÉ RENGLÓN DE LA LISTA SE LO EMPAREJÓ ─────────────────
+              Va ARRIBA de las lecturas y no abajo, porque es la pregunta
+              anterior: de nada sirve elegir cómo leer un precio si el precio es
+              de otro producto.
+
+              El caso que lo trae: "MOGUL CONITOS" tiene guardado el código
+              13113, la lista trae un 13113 que es "MOGUL GOMITAS 30G X 12", y el
+              que corresponde es el 3113. Sin este bloque el emparejamiento
+              equivocado era invisible —la pantalla mostraba el nombre del
+              producto del catálogo, que es el correcto— y lo único raro era que
+              ninguna lectura del precio cerraba. Emanuel lo encontró mirando el
+              papel, no la pantalla. */}
+          {fila.enLaLista && (
+            <SunmiCard className="p-3 space-y-2">
+              <p className="text-sm2 sunmi-text-muted">Lo encontré en la lista como:</p>
+              <div className="space-y-0.5">
+                <p className="text-sm3 font-semibold sunmi-text-strong leading-snug break-words">
+                  {fila.enLaLista.codigo} · {fila.enLaLista.descripcion}
+                </p>
+                <p className="text-sm2 sunmi-text-muted leading-snug tabular-nums">
+                  {money(fila.enLaLista.precio)}
+                  {fila.enLaLista.unidad ? ` · ${fila.enLaLista.unidad}` : ""}
+                  {fila.enLaLista.cantidad > 1 ? ` · por ${fila.enLaLista.cantidad}` : ""}
+                </p>
+              </div>
+              <SunmiButton
+                color="slate"
+                onClick={() => router.push(
+                  `/modulos/proveedores/listas/${id}/elegir-fila?fila=${fila.id}`
+                )}
+                disabled={trabajando}
+                className="w-full min-h-toque text-sm2"
+              >
+                No es este producto → elegir otro de la lista
+              </SunmiButton>
+            </SunmiCard>
+          )}
+
           <SunmiCard className="p-3 flex items-center justify-between gap-2">
             <span className="text-sm3 sunmi-text-muted">Costo de hoy</span>
             <span className="text-base font-bold sunmi-text-strong tabular-nums">

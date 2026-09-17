@@ -284,7 +284,24 @@ export async function POST(req, context) {
         data: {
           ...cabecera,
           umbralVariacionPct,
-          estado: ESTADO_IMPORTACION.BORRADOR,
+          // ── QUEDA CONCILIADA, NO EN BORRADOR ──────────────────────────
+          //
+          // BORRADOR es el estado de una importación a la que todavía le faltan
+          // filas: `esImportacionAbierta` lo deja AFUERA, así que una lista
+          // pasada a actualizar quedaba sin poder confirmarse, ni excluir una
+          // fila, ni corregir un vínculo. La pantalla se veía perfecta y cada
+          // acción contestaba "esta lista está cerrada".
+          //
+          // Lo encontró el arnés de "No es este producto" al probar sobre una
+          // importación recién pasada; leyendo el código no se notaba, porque
+          // BORRADOR es efectivamente el estado con el que NACE una importación
+          // en `importar` — lo que no se veía es que ahí dura tres líneas, hasta
+          // que entran las filas.
+          //
+          // Acá las filas ya entraron en esta misma transacción, así que el
+          // estado que corresponde es el mismo con el que `importar` cierra.
+          estado: ESTADO_IMPORTACION.CONCILIADA,
+          conciliadaEn: new Date(),
           ...contadores,
         },
       });
