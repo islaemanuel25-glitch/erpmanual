@@ -285,7 +285,7 @@ export async function GET(req, context) {
       filasImportacionLista: { some: { importacionId, aplicada: false } },
     };
 
-    const [actualizados, pendientes, ausentes, sinCodigoArcor, filasAplicadas] = await Promise.all([
+    const [actualizados, pendientes, ausentes, sinCodigoDelProveedor, filasAplicadas] = await Promise.all([
       prisma.productoBase.count({ where: { ...universoWhere, ...conFilaAplicada } }),
       prisma.productoBase.count({
         where: { ...universoWhere, NOT: conFilaAplicada, ...conFilaSinAplicar },
@@ -359,7 +359,7 @@ export async function GET(req, context) {
     const sistema = resumenDelSistema({
       universo: productosDelProveedor,
       actualizados, pendientes, ausentes,
-      sinCodigo: sinCodigoArcor,
+      sinCodigo: sinCodigoDelProveedor,
       conAlerta,
       filasAplicadas,
     });
