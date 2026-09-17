@@ -217,11 +217,12 @@ export async function POST(req, context) {
       aumentoEsperadoMaxPct: null,
     }));
 
-    const { codigosProveedor, productos, lecturasRecordadas } = await cargarDatosDeConciliacion({
-      grupoId,
-      proveedorId: cab.proveedorId,
-      localId,
-    });
+    const { codigosProveedor, productos, lecturasRecordadas, productosQueNoSeCambian } =
+      await cargarDatosDeConciliacion({
+        grupoId,
+        proveedorId: cab.proveedorId,
+        localId,
+      });
     const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
 
     const recargoPct = Number(cab.recargoPct ?? 0);
@@ -251,6 +252,7 @@ export async function POST(req, context) {
         depositoLocalId,
         cabecera,
         lecturasRecordadas,
+        productosQueNoSeCambian,
       },
       config: { ...reg.config, recargoPct, umbralVariacionPct, impuestoAdicionalPct },
     });

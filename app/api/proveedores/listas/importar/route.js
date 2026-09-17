@@ -405,7 +405,13 @@ export async function POST(req) {
     // ── 7. El catálogo, en bloque ────────────────────────────────────────
     // `localId` va también: define qué productos se ven —un exclusivo de otro
     // local no puede sugerirse— y qué códigos de barras propios cuentan.
-    const { codigosProveedor, productos, diagnostico, lecturasRecordadas } = await cargarDatosDeConciliacion({
+    const {
+      codigosProveedor,
+      productos,
+      diagnostico,
+      lecturasRecordadas,
+      productosQueNoSeCambian,
+    } = await cargarDatosDeConciliacion({
       grupoId,
       proveedorId,
       localId,
@@ -605,7 +611,14 @@ export async function POST(req) {
       filas: filasParaConciliar,
       productos,
       codigosProveedor,
-      contexto: { grupoId, proveedorId, operandoEnLocalId: localId, depositoLocalId, cabecera, lecturasRecordadas },
+      contexto: {
+        grupoId, proveedorId, operandoEnLocalId: localId, depositoLocalId, cabecera,
+        lecturasRecordadas,
+        // Lo que la persona ya dijo que no se cambia para este proveedor. Viaja
+        // por el contexto como las lecturas recordadas y por el mismo motivo: es
+        // memoria del PRODUCTO, no un dato del archivo.
+        productosQueNoSeCambian,
+      },
       config,
     });
 

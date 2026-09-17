@@ -60,7 +60,11 @@ export async function POST(req, context) {
 
     const importacion = await prisma.importacionListaProveedor.findFirst({
       where: { id: importacionId, grupoId },
-      select: { id: true, estado: true },
+      // `proveedorId` desde esta tanda: "no lo cambio" se recuerda POR PRODUCTO
+      // Y PROVEEDOR, así que sin este campo la memoria no sabría de quién es.
+      // Sin pedirlo llegaría `undefined` y el `createMany` fallaría contra
+      // Postgres —columna no nula— recién al apretar el botón.
+      select: { id: true, estado: true, proveedorId: true },
     });
     if (!importacion) {
       return NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 });
@@ -99,6 +103,17 @@ export async function POST(req, context) {
         return NextResponse.json({ ok: false, error: "Ninguna fila pertenece a esta importación." }, { status: 404 });
       }
       const excluir = accion === "EXCLUIR";
+      // Los productos de las filas que se están tocando. Se sacan ACÁ, de las
+      // filas ya traídas, y no con otra consulta: el `select` de arriba ya pide
+      // `productoBaseId`.
+      const productosTocados = [
+        ...new Set(
+          filas
+            .filter((f) => objetivo.includes(f.id) && f.productoBaseId)
+            .map((f) => f.productoBaseId)
+        ),
+      ];
+
       await prisma.$transaction(async (tx) => {
         await tx.importacionListaFila.updateMany({
           where: { id: { in: objetivo }, importacionId },
@@ -108,6 +123,50 @@ export async function POST(req, context) {
             ? { excluidaManual: true, seleccionada: false }
             : { excluidaManual: false },
         });
+
+        // ── "NO LO CAMBIO" DEJÓ DE SER POR LISTA ──────────────────────────
+        //
+        // La regla de Emanuel, textual: "si ya le expliqué en una pasada, las
+        // 100 listas que vengan son iguales". Antes esto excluía la fila y valía
+        // para ESA lista nada más, así que el mismo producto volvía a la cola
+        // todos los meses y había que volver a contestarlo.
+        //
+        // Va en la MISMA transacción que la exclusión de la fila: si se
+        // escribiera aparte, un error entre las dos dejaría la fila excluida sin
+        // memoria —y la decisión desaparecería en la lista siguiente— o la
+        // memoria sin la fila, que es peor porque el usuario no vería su efecto
+        // hasta el mes que viene.
+        //
+        // Y desmarcar lo DESHACE, que es la otra mitad: una decisión que no se
+        // puede revertir desde donde se ve no es una decisión, es una trampa.
+        if (productosTocados.length > 0) {
+          if (excluir) {
+            // `skipDuplicates` en vez de comprobar antes: el único de la tabla
+            // ya garantiza uno por producto y proveedor, y preguntar primero
+            // abriría una carrera entre la pregunta y la escritura.
+            await tx.productoQueNoSeCambia.createMany({
+              data: productosTocados.map((productoBaseId) => ({
+                grupoId,
+                proveedorId: importacion.proveedorId,
+                productoBaseId,
+                // QUIÉN LO DECIDIÓ. Sale de la sesión que ya resolvió
+                // `requireAdmin`, no de una segunda lectura del token: es un
+                // dato de autoría y tiene que ser el mismo con el que se
+                // autorizó el pedido.
+                decididoPorUsuarioId: admin.session?.id ?? null,
+              })),
+              skipDuplicates: true,
+            });
+          } else {
+            await tx.productoQueNoSeCambia.deleteMany({
+              where: {
+                grupoId,
+                proveedorId: importacion.proveedorId,
+                productoBaseId: { in: productosTocados },
+              },
+            });
+          }
+        }
       }, OPCIONES_TX);
 
       const frescasEx = await prisma.importacionListaFila.findMany({

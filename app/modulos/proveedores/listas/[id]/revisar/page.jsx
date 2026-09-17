@@ -80,6 +80,15 @@ export default function RevisarDeAUnoPage() {
   const [datos, setDatos] = useState(null);
   const [trabajando, setTrabajando] = useState(false);
   const [aviso, setAviso] = useState(null);
+  // ── UN MENSAJE QUE SE VA SOLO, Y POR QUÉ ES OTRO ESTADO ────────────────
+  //
+  // `aviso` se dibuja arriba del producto y se queda hasta que algo lo limpia.
+  // Para "listo, seguí" eso está mal: la pantalla ya avanzó al producto
+  // siguiente, así que el cartel queda encima de OTRO producto y parece hablar
+  // de ése. Emanuel lo vio con el "Queda con el costo de ahora".
+  //
+  // Éste vive aparte, se dibuja abajo de todo y desaparece a los tres segundos.
+  const [avisoPasajero, setAvisoPasajero] = useState("");
   const [vinculando, setVinculando] = useState(null);
   // La lectura fuera de rango que se está por confirmar. Mientras vale algo, la
   // pantalla pregunta; el `aceptarFueraDeRango` sale solo de contestar que sí.
@@ -87,6 +96,15 @@ export default function RevisarDeAUnoPage() {
   // Los salteados de esta vuelta. NO se guardan: al recargar vuelven, que es lo
   // que "dejalo para después" quiere decir.
   const [salteados, setSalteados] = useState([]);
+
+  // Se borra solo. El `clearTimeout` de la vuelta no es decorativo: dos "no lo
+  // cambio" seguidos dejarían dos relojes corriendo y el primero en vencer
+  // apagaría el mensaje del segundo antes de tiempo.
+  useEffect(() => {
+    if (!avisoPasajero) return undefined;
+    const t = setTimeout(() => setAvisoPasajero(""), 3000);
+    return () => clearTimeout(t);
+  }, [avisoPasajero]);
   // Cuál se está mirando. `null` es "el primero de la cola", que es lo que hace
   // que salir y volver retome donde quedó sin guardar nada. Se siembra con el
   // `?filaId=` de la URL cuando se vino a ver un producto concreto.
@@ -225,7 +243,16 @@ export default function RevisarDeAUnoPage() {
         setAviso({ tono: "danger", texto: j?.error || "No se pudo marcar." });
         return;
       }
-      setAviso({ tono: "success", texto: "Queda con el costo de ahora, solo en esta lista." });
+      // ── EL AVISO NO SE PEGA AL PRODUCTO SIGUIENTE ─────────────────────
+      //
+      // Decía "Queda con el costo de ahora, solo en esta lista" y quedaba
+      // dibujado ARRIBA DEL PRODUCTO SIGUIENTE, así que parecía hablar de ése:
+      // el cartel afirmaba algo sobre un producto que nadie había tocado
+      // todavía. Ahora es un mensaje que se va solo, y el texto dice la regla
+      // nueva: la decisión vale para las próximas listas, no para ésta sola.
+      setAvisoPasajero(
+        `Listo. ${proveedor} puede mandarlo en las próximas listas y lo voy a dejar igual.`
+      );
       avanzar();
     } catch {
       setAviso({ tono: "danger", texto: "No se pudo conectar con el servidor. Probá de nuevo." });
@@ -482,13 +509,32 @@ export default function RevisarDeAUnoPage() {
           esté decidiendo: una lectura se recuerda como lectura, y un vínculo
           como vínculo. Prometer "se lee así solo" sobre una pantalla donde lo
           único que se puede hacer es vincular sería prometer de más. */}
+      {/* ── Y AHORA NOMBRA LAS TRES COSAS QUE SE RECUERDAN ────────────────
+          Antes decía solo la lectura. Desde esta tanda se recuerdan tres, y las
+          tres son decisiones que Emanuel no quiere volver a tomar: qué producto
+          de la lista corresponde, cómo se lee su precio, y si lo deja igual.
+          Nombrar una sola prometía menos de lo que el sistema hace, y de las
+          otras dos nadie se enteraba. */}
       <SunmiCard className="p-3">
         <p className="text-sm2 sunmi-text-muted leading-snug">
           {fila.sinProducto
             ? `Me acuerdo: una vez que lo vinculás, las próximas listas de ${proveedor} lo reconocen solas.`
-            : `Me acuerdo: en las próximas listas de ${proveedor} este producto se lee así solo, sin preguntarte.`}
+            : `Todo lo que decidas acá lo recuerdo para las próximas listas de ${proveedor}: el producto que corresponde, cómo se lee y si lo dejás igual.`}
         </p>
       </SunmiCard>
+
+      {/* EL MENSAJE QUE SE VA SOLO. Va ABAJO DE TODO, no arriba: lo que se dice
+          es sobre el producto ANTERIOR, y la pantalla ya está mostrando el
+          siguiente. Arriba se leía como un cartel sobre el que está a la vista. */}
+      {avisoPasajero && (
+        <p
+          role="status"
+          aria-live="polite"
+          className="text-sm2 sunmi-text-success leading-snug text-center"
+        >
+          {avisoPasajero}
+        </p>
+      )}
 
       {confirmandoFuera && (
         <ConfirmarFueraDeRango

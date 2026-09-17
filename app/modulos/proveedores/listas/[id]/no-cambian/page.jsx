@@ -341,8 +341,20 @@ function HojaDelQueNoCambia({ item, trabajando, onCerrar, onVolverAIncluir, onVe
               disabled={trabajando || !item.filaId}
               className="w-full min-h-toque text-base font-bold"
             >
-              {trabajando ? "Guardando…" : "Volver a incluirlo en esta lista"}
+              {trabajando ? "Guardando…" : "Volver a tenerlo en cuenta"}
             </SunmiButton>
+          )}
+          {/* ── EL BOTÓN YA NO DESHACE SOLO ESTA LISTA ────────────────────
+              Decía "Volver a incluirlo en esta lista" y era verdad mientras "no
+              lo cambio" valía para una lista sola. Ahora la decisión se recuerda
+              para las próximas, así que deshacerla también: dejar el texto viejo
+              prometería menos de lo que el botón hace, y alguien que quiere
+              volver a considerar el producto para siempre no sabría que con
+              esto alcanza. */}
+          {esDejado && (
+            <p className="text-sm2 sunmi-text-muted leading-snug">
+              Vuelve a esta lista y a las próximas de este proveedor.
+            </p>
           )}
           <SunmiButton
             color="slate"
