@@ -184,10 +184,13 @@ export default function BotonReporte({ importacionId, cabecera, sistema, proveed
         color="slate"
         onClick={() => setAbierto((v) => !v)}
         aria-expanded={abierto}
-        className="min-h-toque px-3 text-sm2 inline-flex items-center gap-1"
+        className="w-full min-h-toque px-3 text-sm3 inline-flex items-center justify-center gap-1"
       >
         <FileText size={13} aria-hidden="true" />
-        Descargar / compartir reporte
+        {/* Decía "Descargar / compartir reporte" y no entraba en media pantalla.
+            Qué hace lo explica el menú que abre, renglón por renglón; el botón
+            solo tiene que decir de qué se trata. */}
+        Reporte
       </SunmiButton>
 
       {abierto && (

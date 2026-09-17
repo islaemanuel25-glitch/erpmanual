@@ -20,6 +20,7 @@
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { textoDelCostoSospechoso } from "@/lib/proveedores/listas/costoSospechoso";
 
 /** El peso en pesos, con el formato de siempre. */
 export function money(v) {
@@ -43,14 +44,81 @@ export function pct(v) {
  * Verde: lo que está listo. Es lo primero que se lee al abrir la pantalla, así
  * que el número va en grande y el resto abajo.
  */
-export function TarjetaGrande({ numero, titulo, detalle, tono = "success" }) {
+export function TarjetaGrande({ numero, titulo, detalle, tono = "success", onClick, ariaLabel }) {
   const fondo = tono === "success" ? "sunmi-state-success" : "sunmi-state-warning";
+  const cuerpo = (
+    <>
+      <div className="min-w-0 flex-1">
+        <div className="text-4xl font-bold leading-none tabular-nums">{numero}</div>
+        <div className="mt-3 text-base font-semibold">{titulo}</div>
+        {detalle && <div className="mt-1 text-sm2 leading-snug">{detalle}</div>}
+      </div>
+      {onClick && <Chevron />}
+    </>
+  );
+  if (!onClick) {
+    return <SunmiCard className={`p-4 ${fondo}`}><div className="flex items-center gap-2">{cuerpo}</div></SunmiCard>;
+  }
   return (
-    <SunmiCard className={`p-4 ${fondo}`}>
-      <div className="text-4xl font-bold leading-none tabular-nums">{numero}</div>
-      <div className="mt-3 text-base font-semibold">{titulo}</div>
-      {detalle && <div className="mt-1 text-sm2 leading-snug">{detalle}</div>}
-    </SunmiCard>
+    <SunmiButton
+      color="ghost"
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      className={`w-full block rounded-xl p-4 text-left min-h-toque ${fondo}`}
+    >
+      <span className="flex items-center gap-2">{cuerpo}</span>
+    </SunmiButton>
+  );
+}
+
+/**
+ * LA FLECHA QUE DICE QUE LA TARJETA SE TOCA.
+ *
+ * ── POR QUÉ UNA PIEZA PARA UN CARÁCTER ─────────────────────────────────────
+ *
+ * Porque lo que importa no es el glifo sino que TODAS las tarjetas tocables lo
+ * tengan y ninguna de las otras. Emanuel tocó la tarjeta verde del resultado
+ * esperando ver los 111 y no pasó nada: la de "para revisar" llevaba a algún
+ * lado y la verde no, y desde afuera se veían iguales.
+ *
+ * `aria-hidden` porque no aporta nada leído: el nombre accesible del botón ya
+ * dice a dónde va.
+ */
+export function Chevron() {
+  return (
+    <span aria-hidden="true" className="shrink-0 text-2xl leading-none sunmi-text-muted">
+      ›
+    </span>
+  );
+}
+
+/**
+ * LA TARJETA ANCHA: un titular largo y su explicación, tocable.
+ *
+ * No es una `TarjetaChica` estirada: ahí el número manda y el texto es la
+ * etiqueta. Acá manda la frase —"Tus productos de M Y F que no cambian · 117"—
+ * porque el número solo no se entiende sin ella.
+ */
+export function TarjetaAncha({ titulo, detalle, onClick, ariaLabel }) {
+  return (
+    <SunmiButton
+      color="ghost"
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      className="w-full block rounded-xl p-3 text-left min-h-toque sunmi-surface-soft"
+    >
+      <span className="flex items-center gap-2">
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm3 font-semibold sunmi-text-strong leading-snug">{titulo}</span>
+          {detalle && (
+            <span className="block mt-1 text-sm2 sunmi-text-muted leading-snug">{detalle}</span>
+          )}
+        </span>
+        <Chevron />
+      </span>
+    </SunmiButton>
   );
 }
 
@@ -64,9 +132,16 @@ export function TarjetaGrande({ numero, titulo, detalle, tono = "success" }) {
 export function TarjetaChica({ numero, titulo, detalle, tono = "muted", onClick, ariaLabel }) {
   const fondo =
     tono === "warning" ? "sunmi-state-warning" : tono === "danger" ? "sunmi-state-danger" : "sunmi-surface-soft";
+  // La flecha va PEGADA al número, en su renglón, y no centrada al alto de la
+  // tarjeta: las dos tarjetas de una fila pueden tener títulos de distinto largo
+  // —"para revisar" contra "de la lista que no tenés"— y con la flecha centrada
+  // las dos quedaban a alturas distintas.
   const cuerpo = (
     <>
-      <div className="text-2xl font-bold leading-none tabular-nums">{numero}</div>
+      <div className="flex items-center gap-1">
+        <div className="min-w-0 flex-1 text-2xl font-bold leading-none tabular-nums">{numero}</div>
+        {onClick && <Chevron />}
+      </div>
       <div className="mt-2 text-sm2 font-semibold">{titulo}</div>
       {detalle && <div className="text-xs2 sunmi-text-muted">{detalle}</div>}
     </>
@@ -109,6 +184,24 @@ export function FilaDeCambio({ nombre, costoAnterior, costoNuevo, variacionPct, 
       </div>
       <div className="text-sm2 font-semibold tabular-nums sunmi-text-success shrink-0">{pct(variacionPct)}</div>
     </div>
+  );
+}
+
+/**
+ * EL AVISO DE QUE EL COSTO DE HOY PARECE PUESTO A MANO.
+ *
+ * Aparece en la lista de los que se actualizan y en la revisión de a uno, que
+ * son los dos lugares donde se mira un porcentaje calculado contra ese costo.
+ * El porqué —y cuándo se considera sospechoso— está en `costoSospechoso.js`.
+ *
+ * No bloquea nada: es un renglón, en ámbar, al lado del número que pone en
+ * duda. Un costo redondo puede ser real.
+ */
+export function AvisoCostoRedondo({ costo }) {
+  return (
+    <span className="block text-xs2 sunmi-text-warning leading-snug">
+      {textoDelCostoSospechoso(costo)}
+    </span>
   );
 }
 
@@ -178,45 +271,26 @@ export function AccionesDeFila({ textoUsar, onDejar, onUsar, trabajando, deshabi
   );
 }
 
-/** El encabezado de una pantalla: de dónde se vuelve, y de qué se está hablando. */
-/**
- * EL VOLVER DEL MÓDULO. Uno solo, igual en las cinco pantallas.
- *
- * ── POR QUÉ ES UNA PIEZA Y NO UN BOTÓN EN CADA PANTALLA ────────────────────
- *
- * Porque cada pantalla lo escribió por su cuenta y salieron distintos: distinto
- * tamaño de letra, distinto alto de toque, y en una faltaba. Emanuel llegó a la
- * pantalla vieja del detalle por un "Volver al historial" que ninguna otra
- * pantalla tenía.
- *
- * El destino lo pone quien la usa —Resultado vuelve al listado, Revisar y Se
- * actualizan vuelven a Resultado, Subir vuelve al listado, el listado vuelve a
- * Compras— porque eso sí es propio de cada pantalla. Lo que no cambia es cómo se
- * ve y que se pueda tocar con el pulgar.
- */
-export function VolverDelModulo({ texto, onVolver }) {
-  if (!onVolver) return null;
-  return (
-    <SunmiButton
-      color="ghost"
-      type="button"
-      onClick={onVolver}
-      className="text-sm2 sunmi-text-muted inline-flex items-center gap-1 min-h-toque min-w-toque px-2 justify-start"
-    >
-      ‹ {texto}
-    </SunmiButton>
-  );
-}
+// ── SE FUERON `VolverDelModulo` Y `Encabezado` ─────────────────────────────
+//
+// Eran el volver y el título propios del módulo, dibujados como primer hijo del
+// contenido. Dos problemas, y el segundo es el que Emanuel vio:
+//
+//   1. **Ya existían en el kit.** `SunmiBackButton` es la pieza de volver del
+//      proyecto y la usan 32 pantallas; `useTituloDePagina` es el slot por donde
+//      una pantalla le pone título a la fila del shell. Tener una copia propia
+//      es tener dos piezas que se separan el día que alguien corrige una — que
+//      es justamente lo que había pasado: el volver del módulo medía distinto
+//      que el del resto de la aplicación.
+//
+//   2. **Estaban adentro de `<main>`, que es el que scrollea.** En el resultado,
+//      que es largo, el volver se iba de pantalla apenas se bajaba. La fila del
+//      shell vive AFUERA de ese scroll: ahí no se puede ir ni se puede tapar.
+//
+// Lo que el módulo necesitaba y el kit no tenía era poder NOMBRAR el destino
+// —"‹ Resultado", "‹ Listas"— y eso se le agregó al kit, con "Volver" de
+// default para que las 32 pantallas que ya lo usan queden idénticas.
 
-export function Encabezado({ volverTexto, onVolver, titulo, subtitulo }) {
-  return (
-    <div className="space-y-1">
-      <VolverDelModulo texto={volverTexto} onVolver={onVolver} />
-      <h1 className="text-xl font-bold sunmi-text-strong leading-tight">{titulo}</h1>
-      {subtitulo && <p className="text-sm2 sunmi-text-muted leading-snug">{subtitulo}</p>}
-    </div>
-  );
-}
 
 /** Un aviso con el motivo, para cuando algo no se pudo hacer. */
 export function Aviso({ tono = "warning", children }) {

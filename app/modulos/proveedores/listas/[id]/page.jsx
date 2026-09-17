@@ -30,11 +30,17 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
+import {
+  useAccionDePagina,
+  useTituloDePagina,
+} from "@/app/context/AccionDePaginaContext";
+
 import { ErrorRecuperable } from "@/components/proveedores/listas/PiezasListas";
 import {
-  Encabezado,
   TarjetaGrande,
   TarjetaChica,
+  TarjetaAncha,
   FilaDeCambio,
   Aviso,
   pct,
@@ -71,6 +77,31 @@ export default function ResultadoDeListaPage() {
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
+
+  // ── LA BARRA DE LA APP DICE DÓNDE ESTÁS ─────────────────────────────────
+  //
+  // Decía "Listas de proveedores" en las seis pantallas del módulo, que es el
+  // nombre del ítem del menú. Adentro de una lista eso no informa nada: Emanuel
+  // ya sabe que está en listas, lo que necesita saber es DE CUÁL.
+  //
+  // El mecanismo ya existía y lo usan las pantallas de cobros y de medios de
+  // pago: `useTituloDePagina` registra un título que gana sobre el de la ruta.
+  // El nombre del proveedor es un dato que ninguna tabla de rutas puede
+  // contener, que es exactamente para lo que se hizo ese slot.
+  useTituloDePagina(datos?.cabecera?.proveedor?.nombre || "Lista de proveedor");
+
+  // ── Y EL VOLVER VA EN LA FILA DEL SHELL, NO ADENTRO DEL CONTENIDO ───────
+  //
+  // Estaba dibujado como primer hijo del `<main>`, y `<main>` es el que
+  // scrollea: en el resultado, que es largo, el volver se iba de pantalla
+  // apenas se bajaba un poco. No es z-index ni sticky, es en qué caja está.
+  // La fila del shell vive AFUERA del scroll, así que ahí no se puede ir.
+  //
+  // Es la misma llamada que hacen las 32 pantallas que ya usan el slot.
+  useAccionDePagina(
+    () => <SunmiBackButton href="/modulos/proveedores/listas" texto="Listas" />,
+    []
+  );
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -186,14 +217,25 @@ export default function ResultadoDeListaPage() {
   const listos = conteo.listos;
   const puedeDeshacer = cabecera.productosActualizados > 0;
 
+  const irA = (sub) => router.push(`/modulos/proveedores/listas/${id}${sub}`);
+  // Los tres grupos que esta lista NO va a corregir, juntos. Es el número de la
+  // tarjeta ancha y el total de la pantalla 7: sale de sumar acá y no de una
+  // consulta aparte para que las dos no puedan decir cosas distintas.
+  const noCambian = conteo.paraRevisar + conteo.dejadas + (cabecera.tuyosQueNoAparecen ?? 0);
+
   return (
     <Marco>
-      <Encabezado
-        volverTexto="Listas de proveedor"
-        onVolver={() => router.push("/modulos/proveedores/listas")}
-        titulo={cabecera.proveedor?.nombre ?? "—"}
-        subtitulo={`${cabecera.archivoNombre} · leída ${fechaHora(cabecera.leidaEn)} · ${estadoEnCastellano(cabecera)}`}
-      />
+      {/* El volver y el título ya no se dibujan acá: van al slot del shell, que
+          es una fila que vive AFUERA de `<main>`. Ver el comentario del registro,
+          arriba. */}
+      <div>
+        <h1 className="text-xl font-bold sunmi-text-strong leading-tight">
+          {cabecera.proveedor?.nombre ?? "—"}
+        </h1>
+        <p className="text-sm2 sunmi-text-muted leading-snug">
+          {cabecera.archivoNombre} · leída {fechaHora(cabecera.leidaEn)} · {estadoEnCastellano(cabecera)}
+        </p>
+      </div>
 
       {aviso && <Aviso tono={aviso.tono}>{aviso.texto}</Aviso>}
 
@@ -213,13 +255,19 @@ export default function ResultadoDeListaPage() {
       {aMedias ? (
         <TarjetaGrande
           numero={listos}
-          titulo={listos === 1 ? "producto listo para actualizar" : "productos listos para actualizar"}
+          titulo={listos === 1 ? "se actualiza" : "se actualizan"}
           detalle={textoDeVariacion(
             variacion,
             cabecera.rango,
             conteo.listosElegidosFueraDeRango ?? 0,
             conteo.rangoDeLosElegidos ?? null
           )}
+          // LA TARJETA VERDE TAMBIÉN SE TOCA, y es la que más falta hacía: es el
+          // número que Emanuel viene a mirar, y era la única de la pantalla que
+          // no llevaba a ningún lado. El "Ver los N" que hacía ese trabajo era
+          // un texto suelto quince centímetros más abajo.
+          ariaLabel={listos > 0 ? `Ver los ${listos} que se actualizan` : undefined}
+          onClick={listos > 0 ? () => irA("/actualizan") : undefined}
         />
       ) : (
         <TarjetaGrande
@@ -240,92 +288,78 @@ export default function ResultadoDeListaPage() {
         <TarjetaChica
           numero={conteo.paraRevisar}
           titulo="para revisar"
-          // UNA LISTA CERRADA NO INVITA A TRABAJAR. "Tocá para verlos" sobre una
+          // UNA LISTA CERRADA NO INVITA A TRABAJAR. "De a uno" sobre una
           // terminada ofrece un trabajo que ya no se puede hacer: confirmar o
           // excluir una fila necesita la importación abierta y el servidor lo
           // rechaza. El número sigue estando —es información de lo que quedó—
           // pero sin la invitación y sin el toque.
-          detalle={aMedias ? "Tocá para verlos" : "Quedaron sin resolver"}
+          detalle={aMedias ? "De a uno" : "Quedaron sin resolver"}
           tono="warning"
-          ariaLabel={aMedias ? `Ver los ${conteo.paraRevisar} para revisar` : undefined}
+          ariaLabel={aMedias ? `Revisar los ${conteo.paraRevisar} de a uno` : undefined}
+          onClick={aMedias && conteo.paraRevisar > 0 ? () => irA("/revisar") : undefined}
+        />
+        {/* ── "LOS DEJASTE IGUAL" YA NO SE MEZCLA CON "YA VALÍAN LO MISMO" ──
+            Eran un solo número —"que no se tocan"— y son dos cosas distintas:
+            una es una decisión de Emanuel, que se puede deshacer y que él quiere
+            poder revisar; la otra es que el proveedor mandó el mismo precio, que
+            no es trabajo de nadie. Sumarlas daba una tarjeta que no llevaba a
+            ningún lado porque no se podía: la mitad de su número no tenía
+            pantalla. Separadas, ésta lleva a la 7 filtrada en "Los dejaste", y
+            las que ya valían igual dejan de ocupar una tarjeta. */}
+        <TarjetaChica
+          numero={conteo.dejadas}
+          titulo={conteo.dejadas === 1 ? "lo dejaste igual" : "los dejaste igual"}
+          detalle={aMedias ? "Ver cuáles" : "No se tocaron"}
+          ariaLabel={
+            conteo.dejadas > 0 ? `Ver los ${conteo.dejadas} que dejaste igual` : undefined
+          }
+          onClick={conteo.dejadas > 0 ? () => irA("/no-cambian?filtro=DEJADOS") : undefined}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {/* Los dos que no son trabajo de esta lista y sí hay que poder mirar. */}
+        <TarjetaChica
+          numero={conteo.sinProducto}
+          titulo={conteo.sinProducto === 1 ? "no lo tenés" : "no los tenés"}
+          detalle={abierta ? "De la lista. Ver y vincular" : "De la lista, sin vincular"}
+          ariaLabel={
+            abierta && conteo.sinProducto > 0
+              ? `Ver y vincular los ${conteo.sinProducto} de la lista que no tenés`
+              : undefined
+          }
           onClick={
-            aMedias && conteo.paraRevisar > 0
-              ? () => router.push(`/modulos/proveedores/listas/${id}/revisar`)
+            abierta && conteo.sinProducto > 0
+              ? () => irA(`/revisar?solo=${MOTIVO_REVISION.SIN_PRODUCTO}`)
               : undefined
           }
         />
-        {/* ── LA TARJETA GRIS DICE LO QUE DE VERDAD PASA ──────────────────
-            El diseño pedía "N filas salteadas · No eran productos". Ese dato NO
-            EXISTE en este motor: los títulos y encabezados que el lector saltea
-            no llegan nunca a ser filas, se descartan al parsear, así que no hay
-            nada que contar. Lo que sí existe son dos cosas que se parecen y no
-            son lo mismo: las que ya valían igual, y las que la persona decidió
-            dejar como están. El número es la suma y el renglón de abajo las
-            separa cuando hay de las dos. */}
         <TarjetaChica
-          numero={conteo.dejadas + conteo.sinCambio}
-          titulo="que no se tocan"
-          detalle={
-            conteo.dejadas > 0
-              ? `${conteo.dejadas} las dejaste vos`
-              : "Su costo ya estaba igual"
+          numero={cabecera.tuyosQueNoAparecen ?? 0}
+          titulo={cabecera.tuyosQueNoAparecen === 1 ? "tuyo sin precio" : "tuyos sin precio"}
+          detalle="No vinieron. Ver cuáles"
+          ariaLabel={
+            (cabecera.tuyosQueNoAparecen ?? 0) > 0
+              ? `Ver los ${cabecera.tuyosQueNoAparecen} tuyos que no vinieron en esta lista`
+              : undefined
+          }
+          onClick={
+            (cabecera.tuyosQueNoAparecen ?? 0) > 0
+              ? () => irA("/no-cambian?filtro=NO_VINIERON")
+              : undefined
           }
         />
       </div>
 
-      {/* ── LO QUE NO ES TRABAJO DE ESTA LISTA, PERO HAY QUE VERLO ──────────
-          Dos números que antes no estaban, o estaban donde confundían.
-
-          El primero son los productos que la lista trae y este negocio no
-          vende: en la #5 eran 554 de 595, y estaban DENTRO de "para revisar".
-          La pantalla decía "595 para revisar" sobre un trabajo que en realidad
-          eran 41 decisiones, y eso convertía la cola en algo que nadie iba a
-          empezar nunca. No son una decisión pendiente: son el catálogo del
-          proveedor. Se pueden mirar y vincular si alguno sí es tuyo, y por eso
-          la tarjeta es tocable, pero fuera de la cola.
-
-          El segundo es el espejo y no existía en ningún lado: lo tuyo de este
-          proveedor que la lista NO trajo. Es lo que va a quedar con el costo
-          viejo después de aplicar, y hasta ahora había que deducirlo. */}
-      {/* ── LOS TÍTULOS SON CORTOS PORQUE LA TARJETA MIDE 159 px ─────────────
-          La primera versión decía "productos de la lista que no tenés" y
-          "productos tuyos de M Y F SRL que no aparecen en esta lista". A 360 px
-          eso son tres y cinco renglones adentro de una tarjeta de media
-          pantalla: el detalle de abajo quedaba cortado por el borde —"…s y
-          vincular"— y con eso se perdía justo la parte que dice que se puede
-          tocar. Se vio en la captura, no leyendo el código.
-          El nombre del proveedor no hace falta: está en el título de la
-          pantalla, dos dedos más arriba. */}
-      {(conteo.sinProducto > 0 || cabecera.tuyosQueNoAparecen > 0) && (
-        <div className="grid grid-cols-2 gap-3">
-          {conteo.sinProducto > 0 && (
-            <TarjetaChica
-              numero={conteo.sinProducto}
-              titulo={conteo.sinProducto === 1 ? "no lo tenés" : "no los tenés"}
-              detalle={abierta ? "De la lista. Verlos y vincular" : "De la lista, sin vincular"}
-              ariaLabel={
-                abierta
-                  ? `Ver los ${conteo.sinProducto} productos de la lista que no tenés en tu catálogo`
-                  : undefined
-              }
-              onClick={
-                abierta
-                  ? () =>
-                      router.push(
-                        `/modulos/proveedores/listas/${id}/revisar?solo=${MOTIVO_REVISION.SIN_PRODUCTO}`
-                      )
-                  : undefined
-              }
-            />
-          )}
-          {cabecera.tuyosQueNoAparecen > 0 && (
-            <TarjetaChica
-              numero={cabecera.tuyosQueNoAparecen}
-              titulo={cabecera.tuyosQueNoAparecen === 1 ? "tuyo sin precio" : "tuyos sin precio"}
-              detalle="No vinieron en esta lista"
-            />
-          )}
-        </div>
+      {/* LOS TRES GRUPOS JUNTOS, que es como los mira Emanuel: lo suyo de este
+          proveedor que después de aplicar va a seguir con el costo viejo. */}
+      {noCambian > 0 && (
+        <TarjetaAncha
+          titulo={`Tus productos de ${cabecera.proveedor?.nombre ?? "este proveedor"} que no cambian · ${noCambian}`}
+          detalle={renglonDeLosQueNoCambian(conteo, cabecera.tuyosQueNoAparecen ?? 0)}
+          ariaLabel={`Ver los ${noCambian} productos tuyos que esta lista no va a corregir`}
+          onClick={() => irA("/no-cambian")}
+        />
       )}
 
       {/* ── LA MUESTRA SE CALLA CUANDO NO HAY NADA QUE MOSTRAR ──────────────
@@ -351,13 +385,13 @@ export default function ResultadoDeListaPage() {
               />
             ))}
           </SunmiCard>
-          <SunmiButton
-            color="ghost"
-            onClick={() => router.push(`/modulos/proveedores/listas/${id}/actualizan`)}
-            className="sunmi-text-link min-h-toque px-0 text-sm3"
-          >
-            Ver los {listos}
-          </SunmiButton>
+          {/* ── SE FUE EL "Ver los N" ───────────────────────────────────────
+              Era un texto suelto que funcionaba como botón, y era la ÚNICA
+              forma de llegar a la lista de los que se actualizan: la tarjeta
+              verde de arriba, que es el número que se viene a mirar, no llevaba
+              a ningún lado. Emanuel la tocó y no pasó nada.
+              Ahora lleva la tarjeta, que es lo que se toca primero, y acá no
+              queda nada: tres ejemplos para mirar y se terminó. */}
         </section>
       )}
 
@@ -375,10 +409,10 @@ export default function ResultadoDeListaPage() {
           {conteo.paraRevisar > 0 && (
             <SunmiButton
               color="slate"
-              onClick={() => router.push(`/modulos/proveedores/listas/${id}/revisar`)}
+              onClick={() => irA("/revisar")}
               className="w-full min-h-toque text-sm3"
             >
-              Revisar los {conteo.paraRevisar}
+              Revisar los {conteo.paraRevisar} de a uno
             </SunmiButton>
           )}
           <p className="text-sm2 sunmi-text-muted text-center leading-snug">
@@ -392,10 +426,10 @@ export default function ResultadoDeListaPage() {
       {abierta && listos === 0 && conteo.paraRevisar > 0 && (
         <SunmiButton
           color="cyan"
-          onClick={() => router.push(`/modulos/proveedores/listas/${id}/revisar`)}
+          onClick={() => irA("/revisar")}
           className="w-full min-h-toque text-base font-bold"
         >
-          Revisar los {conteo.paraRevisar}
+          Revisar los {conteo.paraRevisar} de a uno
         </SunmiButton>
       )}
 
@@ -421,30 +455,31 @@ export default function ResultadoDeListaPage() {
           acepta sobre cualquier importación abierta: la pantalla no tiene por qué
           ser más estricta que él. Va último y en gris, detrás de su modal, que
           explica qué se pierde y que se puede volver atrás. */}
-      {abierta && (
-        <SunmiButton
-          color="slate"
-          onClick={() => setTerminando(true)}
-          disabled={aplicando}
-          className="w-full min-h-toque text-sm3"
-        >
-          Terminar esta lista
-        </SunmiButton>
-      )}
-
-      {/* ── EL REPORTE, COMO ACCIÓN SECUNDARIA ─────────────────────────────
-          Vivía en la pantalla vieja del detalle, arriba de todo y al lado del
-          título. Esa pantalla se eliminó y el reporte se conserva porque es lo
-          que se le manda al proveedor para discutir un aumento — pero acá va
-          último y en gris: no es lo que se viene a hacer a esta pantalla.
-          No pide el resumen del sistema al abrir: se lo busca solo cuando
-          alguien despliega el menú. */}
-      <BotonReporte
-        importacionId={id}
-        cabecera={cabecera}
-        proveedor={cabecera.proveedor}
-        usuario={perfil}
-      />
+      {/* ── LOS DOS SECUNDARIOS, EN UNA FILA ────────────────────────────────
+          Terminar y el reporte ocupaban un renglón cada uno, a ancho completo y
+          en gris, abajo de todo: dos bloques del mismo peso visual que el botón
+          de aplicar, para dos cosas que casi nunca se hacen. En una fila de dos
+          ocupan la mitad y se siguen tocando igual, que es lo que importa. */}
+      <div className="grid grid-cols-2 gap-2">
+        {abierta ? (
+          <SunmiButton
+            color="slate"
+            onClick={() => setTerminando(true)}
+            disabled={aplicando}
+            className="min-h-toque text-sm3"
+          >
+            Terminar lista
+          </SunmiButton>
+        ) : (
+          <span />
+        )}
+        <BotonReporte
+          importacionId={id}
+          cabecera={cabecera}
+          proveedor={cabecera.proveedor}
+          usuario={perfil}
+        />
+      </div>
 
       <ModalRevertir
         abierto={deshaciendo}
@@ -519,6 +554,26 @@ function estadoEnCastellano(cabecera) {
  * aplicar. Decir el rango configurado en vez del real sería prometer algo que no
  * se miró: son los mismos números solo cuando todo salió bien.
  */
+/**
+ * El renglón de la tarjeta ancha: de qué está hecho ese número.
+ *
+ * Se arma nombrando los grupos que EXISTEN y no los tres siempre: con cero
+ * dejados, "y el que dejaste" habla de algo que no está, y ese es el tipo de
+ * frase que hace dudar del número de al lado.
+ */
+function renglonDeLosQueNoCambian(conteo, noVinieron) {
+  const partes = [];
+  if (conteo.paraRevisar > 0) partes.push(`los ${conteo.paraRevisar} para revisar`);
+  if (conteo.dejadas === 1) partes.push("el que dejaste");
+  else if (conteo.dejadas > 1) partes.push(`los ${conteo.dejadas} que dejaste`);
+  if (noVinieron > 0) partes.push(`los ${noVinieron} que no vinieron`);
+  if (partes.length === 0) return null;
+  if (partes.length === 1) return `${partes[0].charAt(0).toUpperCase()}${partes[0].slice(1)}.`;
+  const ultimo = partes.pop();
+  const frase = `${partes.join(", ")} y ${ultimo}, juntos`;
+  return `${frase.charAt(0).toUpperCase()}${frase.slice(1)}.`;
+}
+
 // ── EL RENGLÓN QUE MENTÍA, Y CÓMO DEJA DE MENTIR ──────────────────────────
 //
 // Decía "Todos aumentan entre +2,6 % y +1.008,5 %" sobre un proveedor que
