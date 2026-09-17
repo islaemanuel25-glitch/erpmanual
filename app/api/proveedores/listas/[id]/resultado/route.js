@@ -41,8 +41,10 @@ import {
 // PARA QUÉ SE SUBIÓ LA LISTA, y el aviso del 0 a 0 deducido de lo guardado.
 import {
   AVISO_CERO_A_CERO,
+  AVISO_QUEDO_ATRAPADA,
   fueUnCeroACeroConvertido,
   modoDeImportacion,
+  quedoAtrapadaEnElCeroACero,
 } from "@/lib/proveedores/listas/modoDeLaLista";
 import { ESTADO_LINEA } from "@/lib/proveedores/listas/estados";
 import { analizarFila } from "@/lib/proveedores/listas/confirmarPresentacion";
@@ -267,6 +269,14 @@ export async function GET(req, context) {
         // el aviso sigue estando una semana después, sin una columna más.
         modo: modoDeImportacion(cab),
         avisoDeModo: fueUnCeroACeroConvertido(cab) ? AVISO_CERO_A_CERO : null,
+        // ── LA QUE QUEDÓ ATRAPADA EN EL DEFECTO VIEJO ────────────────────
+        //
+        // Una importación leída ANTES de esta tanda con el rango en 0 a 0: el
+        // motor no pudo elegir la columna y dejó todo para revisar. No se
+        // arregla sola —habría que volver a conciliar— así que se avisa cuando
+        // alguien la abre y se le ofrece pasarla a control.
+        quedoAtrapada: quedoAtrapadaEnElCeroACero(cab),
+        avisoAtrapada: quedoAtrapadaEnElCeroACero(cab) ? AVISO_QUEDO_ATRAPADA : null,
       },
       // ── LOS TRES GRUPOS DEL CONTROL ──────────────────────────────────
       //

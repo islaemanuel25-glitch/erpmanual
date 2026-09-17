@@ -27,7 +27,7 @@
 //
 // ── ESTA RUTA NO ESCRIBE NINGÚN COSTO ───────────────────────────────────────
 //
-// No toca `ProductoBase` ni `ProductoLocal`: deja la importación en BORRADOR con
+// No toca `ProductoBase` ni `ProductoLocal`: deja la importación CONCILIADA con
 // su resultado, y el que escribe sigue siendo `aplicar`, con su confirmación.
 
 import { NextResponse } from "next/server";
@@ -36,16 +36,11 @@ import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
 import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
-import { cargarDatosDeConciliacion } from "@/lib/proveedores/listas/cargaErp";
-import { conciliarLista } from "@/lib/proveedores/listas/conciliarLista";
 import { resolverParserPorId } from "@/lib/proveedores/listas/registro";
-import {
-  ESTADO_IMPORTACION,
-  esImportacionAbierta,
-  filasAPersistir,
-  contadoresDeCabecera,
-  enLotes,
-} from "@/lib/proveedores/listas/persistencia";
+import { esImportacionAbierta } from "@/lib/proveedores/listas/persistencia";
+// La relectura entera de una importación ya leída. La comparten esta ruta y la
+// de pasar a controlar: son la misma operación con distinto destino.
+import { reconciliarImportacion } from "@/lib/proveedores/listas/reconciliarImportacion";
 import { rangoValido } from "@/lib/proveedores/listas/rangoAumento";
 import { MODO_LISTA, modoDeImportacion } from "@/lib/proveedores/listas/modoDeLaLista";
 
@@ -166,155 +161,49 @@ export async function POST(req, context) {
       return NextResponse.json({ ok: false, error: reg.error }, { status: 409 });
     }
 
-    // ── Las filas, tal como quedaron al leer el archivo ───────────────────
+    // ── Volver a conciliar, con el modo y el rango nuevos ────────────────
     //
-    // Se piden EXACTAMENTE los campos que el motor consume. Traer la fila entera
-    // arrastraría además el veredicto viejo —estado, costo propuesto, motivo— y
-    // eso es lo que se va a recalcular: pasarlo de vuelta al motor sería darle
-    // como dato de entrada su propia respuesta anterior.
-    const persistidas = await prisma.importacionListaFila.findMany({
-      where: { importacionId },
-      select: {
-        filaExcel: true,
-        hojaNombre: true,
-        codigoCrudo: true,
-        codigoNormalizado: true,
-        codigoComparableSinCeros: true,
-        codigoBarraProveedor: true,
-        descripcionProveedor: true,
-        unidadProveedor: true,
-        unidadesPorBulto: true,
-        precioConIva: true,
-        precioSinIva: true,
-        categoriaCruda: true,
+    // La relectura entera vive en `reconciliarImportacion` y no acá, porque
+    // "pasar a controlar" hace exactamente lo mismo con otro destino. Escribir
+    // la segunda al lado de ésta sería la copia que este proyecto prohíbe: lo
+    // que cambiaría el día que una se toque es qué campos se le pasan al motor,
+    // o sea qué costos se calculan.
+    const cabecera = {
+      aumentoEsperadoMinPct: minPct,
+      aumentoEsperadoMaxPct: maxPct,
+      impuestoAdicionalPct: numeroONull(cab.impuestoAdicionalPct),
+      modo: MODO_LISTA.ACTUALIZAR,
+    };
+
+    const r = await reconciliarImportacion(prisma, {
+      cab,
+      cabecera,
+      config: {
+        ...reg.config,
+        recargoPct: Number(cab.recargoPct ?? 0),
+        // El techo del rango ES el umbral de variación alta. Son el mismo hecho
+        // y tener dos números para él garantiza que un día digan cosas distintas.
+        umbralVariacionPct: maxPct,
+        impuestoAdicionalPct: numeroONull(cab.impuestoAdicionalPct),
       },
-      orderBy: { filaExcel: "asc" },
+      alcance: { grupoId, localId, depositoLocalId: await getDepositoIdDeGrupo(grupoId) },
+      opcionesTx: TX,
     });
-    if (persistidas.length === 0) {
+
+    if (!r.ok) {
       return NextResponse.json(
-        { ok: false, error: "Esta lista no tiene filas para volver a leer.", codigo: "SIN_FILAS" },
+        { ok: false, error: "Esta lista no tiene filas para volver a leer.", codigo: r.codigo },
         { status: 409 }
       );
     }
 
-    const filas = persistidas.map((f) => ({
-      ...f,
-      precioConIva: numeroONull(f.precioConIva),
-      precioSinIva: numeroONull(f.precioSinIva),
-      // ── LO CONFIRMADO A MANO NO SE ARRASTRA, Y ES DELIBERADO ───────────
-      //
-      // Controlando, una confirmación de lectura se tomó con otro criterio —la
-      // más parecida al costo de hoy— y el rango congelado en la fila es el del
-      // control, o sea ninguno. Pasarlos al motor con el rango nuevo haría que
-      // una decisión tomada para comparar habilitara una escritura.
-      //
-      // La memoria POR PRODUCTO Y PROVEEDOR sí sobrevive: vive en otra tabla,
-      // la trae `cargarDatosDeConciliacion` y `costoDeLaFila` la vuelve a
-      // aplicar, esta vez con el rango puesto.
-      confirmadoEn: null,
-      vinculadoEn: null,
-      aumentoEsperadoMinPct: null,
-      aumentoEsperadoMaxPct: null,
-    }));
-
-    const { codigosProveedor, productos, lecturasRecordadas, productosQueNoSeCambian } =
-      await cargarDatosDeConciliacion({
-        grupoId,
-        proveedorId: cab.proveedorId,
-        localId,
-      });
-    const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
-
-    const recargoPct = Number(cab.recargoPct ?? 0);
-    const impuestoAdicionalPct = numeroONull(cab.impuestoAdicionalPct);
-    // El techo del rango ES el umbral de variación alta. Son el mismo hecho y
-    // tener dos números para él garantiza que un día digan cosas distintas.
-    const umbralVariacionPct = maxPct;
-
-    // La cabecera COMO VA A QUEDAR. Es el mismo objeto que se le pasa al motor y
-    // el que se escribe unas líneas más abajo, igual que en `importar`: no hay
-    // forma de que la cabecera diga un criterio y el motor haya usado otro.
-    const cabecera = {
-      aumentoEsperadoMinPct: minPct,
-      aumentoEsperadoMaxPct: maxPct,
-      impuestoAdicionalPct,
-      modo: MODO_LISTA.ACTUALIZAR,
-    };
-
-    const conciliacion = conciliarLista({
-      filas,
-      productos,
-      codigosProveedor,
-      contexto: {
-        grupoId,
-        proveedorId: cab.proveedorId,
-        operandoEnLocalId: localId,
-        depositoLocalId,
-        cabecera,
-        lecturasRecordadas,
-        productosQueNoSeCambian,
-      },
-      config: { ...reg.config, recargoPct, umbralVariacionPct, impuestoAdicionalPct },
-    });
-
-    const contadores = contadoresDeCabecera(conciliacion);
-    const nuevas = filasAPersistir(conciliacion);
-
-    await prisma.$transaction(async (tx) => {
-      // ── SE BORRAN Y SE REESCRIBEN, NO SE ACTUALIZAN UNA POR UNA ────────
-      //
-      // Porque el motor no devuelve las filas emparejadas con sus ids: devuelve
-      // el resultado de conciliar, en el mismo orden en que entraron. Actualizar
-      // por posición sería atar la identidad de una fila a un índice de array, y
-      // el día que el motor filtre una, todas las de abajo se escribirían con el
-      // veredicto de su vecina.
-      //
-      // Se puede borrar sin perder nada porque UN CONTROL NO ESCRIBIÓ NADA: no
-      // hay `aplicada`, ni `costoAplicado`, ni autoría de una confirmación que
-      // valga para actualizar. En una lista de actualizar esto sería
-      // destructivo, y por eso el endpoint rechaza las que no son controles.
-      await tx.importacionListaFila.deleteMany({ where: { importacionId } });
-
-      for (const lote of enLotes(nuevas, 500)) {
-        await tx.importacionListaFila.createMany({
-          data: lote.map((f) => ({ ...f, importacionId })),
-        });
-      }
-
-      await tx.importacionListaProveedor.update({
-        where: { id: importacionId },
-        data: {
-          ...cabecera,
-          umbralVariacionPct,
-          // ── QUEDA CONCILIADA, NO EN BORRADOR ──────────────────────────
-          //
-          // BORRADOR es el estado de una importación a la que todavía le faltan
-          // filas: `esImportacionAbierta` lo deja AFUERA, así que una lista
-          // pasada a actualizar quedaba sin poder confirmarse, ni excluir una
-          // fila, ni corregir un vínculo. La pantalla se veía perfecta y cada
-          // acción contestaba "esta lista está cerrada".
-          //
-          // Lo encontró el arnés de "No es este producto" al probar sobre una
-          // importación recién pasada; leyendo el código no se notaba, porque
-          // BORRADOR es efectivamente el estado con el que NACE una importación
-          // en `importar` — lo que no se veía es que ahí dura tres líneas, hasta
-          // que entran las filas.
-          //
-          // Acá las filas ya entraron en esta misma transacción, así que el
-          // estado que corresponde es el mismo con el que `importar` cierra.
-          estado: ESTADO_IMPORTACION.CONCILIADA,
-          conciliadaEn: new Date(),
-          ...contadores,
-        },
-      });
-    }, TX);
 
     return NextResponse.json({
       ok: true,
       importacionId,
       modo: MODO_LISTA.ACTUALIZAR,
       rango: { minPct, maxPct },
-      resumen: conciliacion.resumen,
+      resumen: r.resumen,
     });
   } catch (error) {
     // EL MENSAJE DICE QUÉ PASÓ Y QUÉ HACER. "Error interno" fue lo único que se

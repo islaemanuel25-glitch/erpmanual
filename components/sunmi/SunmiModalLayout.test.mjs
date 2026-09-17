@@ -717,6 +717,17 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // toque del pulgar al costado, que en un teléfono pasa solo, los borra los
     // dos y hay que volver a pensarlos.
     "components/proveedores/listas/HojaPasarAActualizar.jsx": true,
+    // ── CANCELAR UNA IMPORTACIÓN: `false`, y es el contraste con la de
+    //    arriba ─────────────────────────────────────────────────────────────
+    //
+    // Las dos son de la misma pantalla y contestan distinto, con el mismo
+    // criterio: qué se pierde al cerrar sin querer. La de pasar a actualizar
+    // tiene dos campos tipeados y responde `true`; ésta tiene dos renglones
+    // para leer y dos botones, así que no hay nada que perder.
+    //
+    // Que la acción sea grave no entra en la cuenta: lo grave lo sostiene el
+    // botón "Sí, cancelar", que hay que ir a buscar.
+    "components/proveedores/listas/ModalCancelarImportacion.jsx": false,
     // ── LA PREGUNTA DE "ESTE AUMENTO NO SE PARECE A LOS DE ESTE PROVEEDOR" ──
     //
     // Vive adentro de la pantalla de revisar de a uno. Mismo caso que la hoja de

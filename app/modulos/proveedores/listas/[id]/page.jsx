@@ -49,6 +49,9 @@ import HojaConfirmarAplicar from "@/components/proveedores/listas/HojaConfirmarA
 // Pasar un control a actualizar precios: pide el rango, que controlar no
 // pregunta y actualizar no puede resolver sin él.
 import HojaPasarAActualizar from "@/components/proveedores/listas/HojaPasarAActualizar";
+// Cancelar una importación que quedó inservible. Con su propia palabra: no es
+// lo mismo que terminarla.
+import ModalCancelarImportacion from "@/components/proveedores/listas/ModalCancelarImportacion";
 // Deshacer y terminar YA tenían su modal, con su previa y su candado contra la
 // previa vieja. Se reusan: escribir otro botón al lado sería tener dos caminos
 // para escribir costos, y uno de los dos sin el candado.
@@ -86,6 +89,9 @@ export default function ResultadoDeListaPage() {
   const [pasandoAActualizar, setPasandoAActualizar] = useState(false);
   const [pasando, setPasando] = useState(false);
   const [errorAlPasar, setErrorAlPasar] = useState(null);
+  // La confirmación de cancelar. Cancelar no escribe ningún costo, pero cierra
+  // la lista y eso no se deshace desde acá: se pregunta.
+  const [cancelando, setCancelando] = useState(false);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
@@ -175,6 +181,64 @@ export default function ResultadoDeListaPage() {
       await cargar();
     } catch {
       setErrorAlPasar("No se pudo conectar con el servidor. Probá de nuevo.");
+    } finally {
+      setPasando(false);
+    }
+  };
+
+  /**
+   * Rescata una lista que quedó leída con el rango en 0 a 0.
+   *
+   * No pide nada: el rango se conserva tal cual —es lo que distingue este
+   * control de uno elegido a propósito— y lo único que cambia es con qué
+   * pregunta se vuelve a conciliar.
+   */
+  const pasarAControlar = async () => {
+    setPasando(true);
+    setAviso(null);
+    try {
+      const r = await fetch(`/api/proveedores/listas/${id}/pasar-a-controlar`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) {
+        setAviso({ tono: "danger", texto: j?.error || `No se pudo pasar a control (error ${r.status}).` });
+        return;
+      }
+      setAviso({
+        tono: "success",
+        texto: "Listo: ahora es un control. No se cambió ningún costo.",
+      });
+      await cargar();
+    } catch {
+      setAviso({ tono: "danger", texto: "No se pudo conectar con el servidor. Probá de nuevo." });
+    } finally {
+      setPasando(false);
+    }
+  };
+
+  /** Cancela la importación. No toca ningún costo: solo la cierra. */
+  const cancelarLista = async () => {
+    setPasando(true);
+    setAviso(null);
+    try {
+      const r = await fetch(`/api/proveedores/listas/${id}/cancelar`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) {
+        setAviso({ tono: "danger", texto: j?.error || `No se pudo cancelar (error ${r.status}).` });
+        return;
+      }
+      setCancelando(false);
+      setAviso({ tono: "success", texto: "Lista cancelada. No se cambió ningún costo." });
+      await cargar();
+    } catch {
+      setAviso({ tono: "danger", texto: "No se pudo conectar con el servidor. Probá de nuevo." });
     } finally {
       setPasando(false);
     }
@@ -323,6 +387,36 @@ export default function ResultadoDeListaPage() {
           semana que viene: quien puso 0 % tiene que poder entender por qué esta
           lista terminó siendo un control, y no descubrirlo por descarte. */}
       {cabecera.avisoDeModo && <Aviso tono="warning">{cabecera.avisoDeModo}</Aviso>}
+
+      {/* ── LA QUE QUEDÓ ATRAPADA EN EL DEFECTO VIEJO ──────────────────────
+          Una lista leída antes de esta tanda con el rango en 0 a 0: el motor no
+          pudo elegir la columna de precio y dejó todo para revisar. No se
+          arregla sola, así que se avisa al abrirla y se ofrecen las dos
+          salidas. Sin esto, la pantalla se ve como una lista normal que
+          simplemente no pudo con nada, y no hay forma de saber por qué. */}
+      {cabecera.quedoAtrapada && (
+        <Aviso tono="warning">
+          <p className="leading-snug">{cabecera.avisoAtrapada}</p>
+          <div className="mt-2 space-y-2">
+            <SunmiButton
+              color="cyan"
+              onClick={pasarAControlar}
+              disabled={pasando}
+              className="w-full min-h-toque text-sm3"
+            >
+              {pasando ? "Pasando…" : "Pasarla a control"}
+            </SunmiButton>
+            <SunmiButton
+              color="slate"
+              onClick={() => setCancelando(true)}
+              disabled={pasando}
+              className="w-full min-h-toque text-sm3"
+            >
+              Cancelar esta lista
+            </SunmiButton>
+          </div>
+        </Aviso>
+      )}
 
       {aviso && <Aviso tono={aviso.tono}>{aviso.texto}</Aviso>}
 
@@ -754,6 +848,19 @@ export default function ResultadoDeListaPage() {
         trabajando={aplicando}
         onCerrar={() => setTerminando(false)}
         onTerminar={terminar}
+      />
+
+      {/* ── CANCELAR SE PREGUNTA, Y CON SU PROPIA PALABRA ───────────────
+          No se reusa `ModalTerminar`: dice "Sí, terminar" y enumera cuántos
+          productos quedan sin aplicar, que es el balance de un trabajo hecho.
+          Sobre una lista que se está descartando, ese texto cuenta una historia
+          que no ocurrió. */}
+      <ModalCancelarImportacion
+        abierto={cancelando}
+        archivo={cabecera.archivoNombre}
+        trabajando={pasando}
+        onCerrar={() => setCancelando(false)}
+        onCancelar={cancelarLista}
       />
 
       {pasandoAActualizar && (
