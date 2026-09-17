@@ -214,7 +214,12 @@ export default function ResultadoDeListaPage() {
         <TarjetaGrande
           numero={listos}
           titulo={listos === 1 ? "producto listo para actualizar" : "productos listos para actualizar"}
-          detalle={textoDeVariacion(variacion, cabecera.rango)}
+          detalle={textoDeVariacion(
+            variacion,
+            cabecera.rango,
+            conteo.listosElegidosFueraDeRango ?? 0,
+            conteo.rangoDeLosElegidos ?? null
+          )}
         />
       ) : (
         <TarjetaGrande
@@ -447,11 +452,23 @@ export default function ResultadoDeListaPage() {
           // EL AVISO DICE LO QUE QUEDÓ, y los números se releen de la base:
           // escribir "se deshizo todo" sin volver a preguntar dejaría la pantalla
           // mostrando el estado de antes con un cartel diciendo lo contrario.
+          const cuantos = r?.resumen?.revierten ?? 0;
+          // ── SI LA LISTA NO SE PUDO REABRIR, SE DICE ─────────────────────
+          //
+          // Deshacer devuelve los costos y además reabre la lista. Lo segundo
+          // no se puede cuando ya hay otra importación abierta del MISMO
+          // archivo —el índice único no deja dos— y eso pasa de verdad: es lo
+          // que queda después de subir la misma lista dos veces. Antes el
+          // servidor explotaba con un P2002 y la pantalla decía "Error
+          // interno"; ahora los costos vuelven igual y acá se explica por qué
+          // la lista quedó cerrada, nombrando a la que ocupa el lugar.
+          const otra = r?.noSePudoReabrir ?? null;
           setAviso({
-            tono: "success",
-            texto: `Se deshizo. ${r?.resumen?.revierten ?? 0} ${
-              (r?.resumen?.revierten ?? 0) === 1 ? "producto volvió" : "productos volvieron"
-            } a su costo anterior.`,
+            tono: otra ? "warning" : "success",
+            texto: otra
+              ? `Se deshizo: ${cuantos} ${cuantos === 1 ? "producto volvió" : "productos volvieron"} a su costo anterior. ` +
+                `La lista queda cerrada porque ya tenés abierta otra importación del mismo archivo (#${otra.id}).`
+              : `Se deshizo. ${cuantos} ${cuantos === 1 ? "producto volvió" : "productos volvieron"} a su costo anterior.`,
           });
           await cargar();
         }}
@@ -499,8 +516,34 @@ function estadoEnCastellano(cabecera) {
  * aplicar. Decir el rango configurado en vez del real sería prometer algo que no
  * se miró: son los mismos números solo cuando todo salió bien.
  */
-function textoDeVariacion(variacion, rango) {
-  if (variacion?.minPct === null || variacion?.maxPct === null) return null;
+// ── EL RENGLÓN QUE MENTÍA, Y CÓMO DEJA DE MENTIR ──────────────────────────
+//
+// Decía "Todos aumentan entre +2,6 % y +1.008,5 %" sobre un proveedor que
+// aumenta entre 2 y 15. Eso ya está arreglado de raíz —una fila fuera de rango
+// que nadie eligió no se cuenta entre los listos— pero queda un caso legítimo
+// que lo volvería a sacar del rango: una fila que Emanuel eligió A PROPÓSITO
+// sabiendo que estaba afuera. Ésa sí se va a escribir.
+//
+// Mezclarla en el mismo rango daría "entre +5,0 % y +99,5 %", que es otra vez
+// una frase que se sale de lo configurado y que no dice por qué. Así que se
+// cuenta aparte y se nombra: el rango anunciado nunca se sale del configurado,
+// y lo que se sale tiene nombre, número y autor.
+function textoDeVariacion(variacion, rango, elegidos = 0, rangoElegidos = null) {
+  const cola = (() => {
+    if (!elegidos) return "";
+    const min = rangoElegidos?.minPct;
+    const max = rangoElegidos?.maxPct;
+    if (min === null || min === undefined) return ` Más ${elegidos} que elegiste vos.`;
+    const iguales = Math.round(min * 10) === Math.round(max * 10);
+    const cuanto = iguales ? pct(min) : `entre ${pct(min)} y ${pct(max)}`;
+    return elegidos === 1
+      ? ` Más uno que elegiste vos, de ${cuanto}.`
+      : ` Más ${elegidos} que elegiste vos, ${iguales ? `de ${cuanto}` : cuanto}.`;
+  })();
+
+  if (variacion?.minPct === null || variacion?.maxPct === null) {
+    return cola ? cola.trim() : null;
+  }
   const min = pct(variacion.minPct);
   const max = pct(variacion.maxPct);
   const iguales = Math.round(variacion.minPct * 10) === Math.round(variacion.maxPct * 10);
@@ -509,8 +552,11 @@ function textoDeVariacion(variacion, rango) {
     rango?.maxPct !== null &&
     variacion.minPct >= rango.minPct - 0.05 &&
     variacion.maxPct <= rango.maxPct + 0.05;
-  const cola = dentro ? ", como esperabas." : ".";
-  return iguales ? `Todos aumentan ${min}${cola}` : `Todos aumentan entre ${min} y ${max}${cola}`;
+  const remate = dentro ? ", como esperabas." : ".";
+  const cuerpo = iguales
+    ? `Todos aumentan ${min}${remate}`
+    : `Todos aumentan entre ${min} y ${max}${remate}`;
+  return `${cuerpo}${cola}`;
 }
 
 function Marco({ children }) {
