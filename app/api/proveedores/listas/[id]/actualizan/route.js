@@ -22,6 +22,8 @@ import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
 import { ESTADO_LINEA } from "@/lib/proveedores/listas/estados";
 import { motivoDeRevision } from "@/lib/proveedores/listas/resultadoDeLaLista";
+import { costoParaMirar } from "@/lib/proveedores/listas/costoSospechoso";
+import { esImportacionAbierta } from "@/lib/proveedores/listas/persistencia";
 
 const numero = (v) => (v === null || v === undefined ? null : Number(v));
 const PAGINA = 20;
@@ -51,6 +53,7 @@ export async function GET(req, context) {
       where: { id, grupoId },
       select: {
         id: true,
+        estado: true,
         aumentoEsperadoMinPct: true,
         aumentoEsperadoMaxPct: true,
         proveedor: { select: { id: true, nombre: true } },
@@ -120,7 +123,7 @@ export async function GET(req, context) {
         vinculadoEn: true,
         multiplicadorConfirmado: true,
         fueraDeRangoAceptadaEn: true,
-        productoBase: { select: { nombre: true, factor_pack: true } },
+        productoBase: { select: { id: true, nombre: true, factor_pack: true } },
       },
     });
 
@@ -147,9 +150,33 @@ export async function GET(req, context) {
       maxReal = maxReal === null ? p : Math.max(maxReal, p);
     }
 
+    // ── ¿EL COSTO DE HOY PARECE CARGADO A MANO? ─────────────────────────
+    //
+    // Se pregunta SOLO por los productos de esta página —veinte, no 954— y con
+    // una consulta sola: cuántas veces alguna lista le escribió el costo a cada
+    // uno. Cero aplicaciones más un costo redondo es la forma de un número
+    // puesto para salir del paso, que es lo que pasa con los TOSTEX de $1.000.
+    //
+    // El criterio vive en `costoSospechoso.js` y no acá: lo dicen dos pantallas
+    // y tiene su candado.
+    const idsBase = [...new Set(pagina.map((f) => f.productoBase?.id).filter(Boolean))];
+    const aplicacionesPorProducto = new Map();
+    if (idsBase.length > 0) {
+      const previas = await prisma.importacionListaFila.groupBy({
+        by: ["productoBaseId"],
+        where: { productoBaseId: { in: idsBase }, aplicada: true },
+        _count: { _all: true },
+      });
+      for (const p of previas) aplicacionesPorProducto.set(p.productoBaseId, p._count._all);
+    }
+
     return NextResponse.json({
       ok: true,
       proveedor: cab.proveedor,
+      // Con la lista cerrada la pantalla muestra y no deja tocar: el servidor
+      // rechaza excluir una fila de una importación que no está abierta, así
+      // que ofrecerlo sería ofrecer algo que falla.
+      editable: esImportacionAbierta(cab.estado),
       // El configurado se manda igual, con su nombre, porque no es lo mismo y
       // alguna pantalla puede querer contrastarlos.
       rangoEsperado: rango,
@@ -163,6 +190,10 @@ export async function GET(req, context) {
         costoAnterior: numero(f.costoAnterior),
         costoNuevo: numero(f.costoMaestroPropuesto),
         variacionPct: numero(f.diferenciaPct),
+        costoRedondo: costoParaMirar({
+          costoActual: numero(f.costoAnterior),
+          vecesAplicado: aplicacionesPorProducto.get(f.productoBase?.id) ?? 0,
+        }),
       })),
     });
   } catch (e) {

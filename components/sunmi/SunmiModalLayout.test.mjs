@@ -716,6 +716,23 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // una tarjeta de lectura, que es un blanco grande. Abrirla sin querer va a
     // pasar, y ahí el toque afuera es la salida que se busca.
     "app/modulos/proveedores/listas/[id]/revisar/page.jsx": false,
+    // ── LAS DOS HOJAS DE PRODUCTO DEL MÓDULO DE LISTAS ────────────────────
+    //
+    // La de "Se actualizan" —nombre, cuánto pasa a cuánto, y tres salidas— y la
+    // de "No cambian" —costo de hoy, por qué no cambia, y volver a incluirlo—.
+    //
+    // Las dos en `false`, por el criterio nuevo y con el mismo motivo que sus
+    // hermanas de este módulo: adentro no hay NADA escrito que se pueda perder,
+    // son dos o tres renglones para leer. Y las dos se abren tocando una FILA de
+    // una lista larga, que es el blanco más fácil de errar con el pulgar
+    // bajando: abrirlas sin querer va a pasar seguido, y ahí el toque afuera es
+    // la salida que se busca.
+    //
+    // Lo que puede escribir —"Dejarlo como está", "Volver a incluirlo"— está en
+    // botones que hay que ir a buscar, y las dos acciones son reversibles desde
+    // la otra pantalla.
+    "app/modulos/proveedores/listas/[id]/actualizan/page.jsx": false,
+    "app/modulos/proveedores/listas/[id]/no-cambian/page.jsx": false,
     // ── EL CARTEL DE FINALIZAR O BORRAR UNA OFERTA ────────────────────────
     //
     // Reemplaza a dos `confirm()` del navegador. No hay nada escrito adentro que

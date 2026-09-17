@@ -44,7 +44,9 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 
 import { ErrorRecuperable } from "@/components/proveedores/listas/PiezasListas";
-import { VolverDelModulo, Aviso, money, pct } from "@/components/proveedores/listas/PiezasPantallas";
+import { Aviso, AvisoCostoRedondo, money, pct } from "@/components/proveedores/listas/PiezasPantallas";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
+import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
 import PanelVincular from "@/components/proveedores/listas/PanelVincular";
 
 export default function RevisarDeAUnoPage() {
@@ -54,7 +56,16 @@ export default function RevisarDeAUnoPage() {
   // `?solo=SIN_PRODUCTO` es la cola de los que la lista trae y no están en el
   // catálogo. Viaja en la URL y no en un estado para que el botón de atrás del
   // teléfono devuelva a la misma cola y no a la otra.
-  const solo = useSearchParams().get("solo") || null;
+  const parametros = useSearchParams();
+  const solo = parametros.get("solo") || null;
+  // ── DE DÓNDE VINO, Y A QUÉ PRODUCTO ─────────────────────────────────────
+  //
+  // `?filaId=` lo mandan la lista de los que se actualizan y la de los que no
+  // cambian: ahí se toca UN producto y hay que abrir ESE, no la cola desde el
+  // principio. `?desde=` dice a qué pantalla volver, que ya no es siempre el
+  // resultado.
+  const filaPedida = Number(parametros.get("filaId")) || null;
+  const desde = parametros.get("desde") || null;
 
   const sesion = useUser() || {};
   const perfil = sesion.perfil;
@@ -74,8 +85,9 @@ export default function RevisarDeAUnoPage() {
   // que "dejalo para después" quiere decir.
   const [salteados, setSalteados] = useState([]);
   // Cuál se está mirando. `null` es "el primero de la cola", que es lo que hace
-  // que salir y volver retome donde quedó sin guardar nada.
-  const [filaId, setFilaId] = useState(null);
+  // que salir y volver retome donde quedó sin guardar nada. Se siembra con el
+  // `?filaId=` de la URL cuando se vino a ver un producto concreto.
+  const [filaId, setFilaId] = useState(filaPedida);
   // ── POR QUÉ HACE FALTA UN CONTADOR DE VUELTAS ───────────────────────────
   //
   // ENCONTRADO ABRIENDO LA PANTALLA, no por un candado: después de confirmar un
@@ -98,6 +110,26 @@ export default function RevisarDeAUnoPage() {
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
+
+  // La barra dice en qué cola estás, que son dos distintas: la de decidir
+  // precios y la de vincular lo que no tenés.
+  useTituloDePagina(solo ? "Vincular" : "Para revisar");
+  // ── EL VOLVER VUELVE DE DONDE SE VINO ───────────────────────────────────
+  //
+  // Se llega acá desde tres lados: el resultado, la lista de los que se
+  // actualizan y la de los que no cambian. Volver siempre al resultado dejaba a
+  // Emanuel un toque más lejos de la lista que estaba recorriendo, y encima
+  // perdía el filtro y la posición.
+  const destinoDeVuelta =
+    desde === "actualizan"
+      ? { href: `/modulos/proveedores/listas/${id}/actualizan`, texto: "Se actualizan" }
+      : desde === "no-cambian"
+        ? { href: `/modulos/proveedores/listas/${id}/no-cambian`, texto: "No cambian" }
+        : { href: `/modulos/proveedores/listas/${id}`, texto: "Resultado" };
+  useAccionDePagina(
+    () => <SunmiBackButton href={destinoDeVuelta.href} texto={destinoDeVuelta.texto} />,
+    [destinoDeVuelta.href, destinoDeVuelta.texto]
+  );
 
   const cargar = useCallback(async ({ pedir = null, saltados = [] } = {}) => {
     setCargando(true);
@@ -236,7 +268,6 @@ export default function RevisarDeAUnoPage() {
   if (!fila) {
     return (
       <Marco>
-        <VolverDelModulo texto="Resultado" onVolver={volverAlResultado} />
         <SunmiCard className="p-5 text-center space-y-3">
           <p className="text-base font-semibold sunmi-text-success">
             {solo ? "No queda ninguno sin vincular." : "No queda nada para revisar."}
@@ -261,16 +292,19 @@ export default function RevisarDeAUnoPage() {
 
   return (
     <Marco>
-      {/* El volver y el progreso comparten renglón: en un teléfono el alto de
-          arriba es lo que empuja la decisión abajo del pliegue. */}
-      <div className="flex items-center justify-between gap-2">
-        <VolverDelModulo texto="Resultado" onVolver={volverAlResultado} />
-        <span className="text-sm2 sunmi-text-muted tabular-nums shrink-0">
+      {/* El volver se fue a la fila del shell, con el resto del módulo. Acá
+          queda el progreso, que ahora ocupa el renglón entero y se lee de un
+          vistazo en vez de compartirlo con un botón.
+          Y NO SE DIBUJA cuando se vino a ver un producto suelto desde otra
+          pantalla: ahí no hay cola que recorrer, así que un "0 de 41" sería un
+          número sobre algo que no está pasando. */}
+      {!datos.suelta && (
+        <p className="text-sm2 sunmi-text-muted tabular-nums">
           {indice} de {total}
-        </span>
-      </div>
+        </p>
+      )}
 
-      <BarraDeProgreso hechos={indice - 1} total={total} />
+      {!datos.suelta && <BarraDeProgreso hechos={indice - 1} total={total} />}
 
       {aviso && <Aviso tono={aviso.tono}>{aviso.texto}</Aviso>}
 
@@ -281,6 +315,10 @@ export default function RevisarDeAUnoPage() {
           {fila.codigo ? ` · código ${fila.codigo}` : ""}
           {fila.factorPack ? ` · lo tenés cargado por caja de ${fila.factorPack}` : ""}
         </p>
+        {/* El aviso va debajo del nombre y no al lado del costo: lo que pone en
+            duda es el costo de hoy, que es contra lo que se calculan TODOS los
+            porcentajes de abajo. */}
+        {fila.costoRedondo && <AvisoCostoRedondo costo={fila.costoAnterior} />}
       </div>
 
       {fila.sinProducto ? (

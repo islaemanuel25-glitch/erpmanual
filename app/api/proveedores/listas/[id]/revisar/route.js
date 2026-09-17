@@ -36,6 +36,7 @@ import { analizarFila } from "@/lib/proveedores/listas/confirmarPresentacion";
 import { resolverParserDeProveedor } from "@/lib/proveedores/listas/registro";
 import { lecturaParaPantalla } from "@/lib/proveedores/listas/explicarLectura";
 import { ordenDeLaCola, posicionActual } from "@/lib/proveedores/listas/colaDeRevision";
+import { costoParaMirar } from "@/lib/proveedores/listas/costoSospechoso";
 
 const numero = (v) => (v === null || v === undefined ? null : Number(v));
 
@@ -138,10 +139,32 @@ export async function GET(req, context) {
     const orden = ordenDeLaCola(cola, [...salteados]);
 
     const pedidoCrudo = Number(url.searchParams.get("filaId"));
-    const { actualId, indice } = posicionActual(
-      orden,
-      Number.isInteger(pedidoCrudo) ? pedidoCrudo : null
-    );
+    const pedido = Number.isInteger(pedidoCrudo) ? pedidoCrudo : null;
+
+    // ── UNA FILA QUE NO ESTÁ EN LA COLA TAMBIÉN SE PUEDE MIRAR ───────────
+    //
+    // "Ver cómo se leyó y cambiarlo", desde la lista de los que se actualizan,
+    // apunta a una fila que JUSTAMENTE no está en la cola: si estuviera, no se
+    // estaría actualizando. Con solo `posicionActual` esa fila no se encontraba
+    // y la pantalla abría en el primero de la cola — el usuario tocaba un
+    // producto y le aparecía otro, que es peor que no poder entrar.
+    //
+    // Se mira si la fila existe EN ESTA IMPORTACIÓN, que es el único permiso que
+    // hace falta: el scope ya se resolvió sobre la cabecera. Una fila de otra
+    // importación no entra por acá.
+    const fueraDeLaCola =
+      pedido !== null && !orden.includes(pedido)
+        ? await prisma.importacionListaFila.findFirst({
+            where: { id: pedido, importacionId: id },
+            select: { id: true },
+          })
+        : null;
+
+    const { actualId: actualDeLaCola, indice } = posicionActual(orden, pedido);
+    // La suelta no tiene posición en la cola —no está— así que el progreso queda
+    // en cero y la pantalla no dibuja un "3 de 70" que no significa nada.
+    const actualId = fueraDeLaCola ? fueraDeLaCola.id : actualDeLaCola;
+    const sueltaFueraDeLaCola = Boolean(fueraDeLaCola);
 
     const cuerpo = {
       ok: true,
@@ -156,7 +179,11 @@ export async function GET(req, context) {
       total: cola.length,
       // 1-based y sobre el orden en el que se va a recorrer, que es lo que la
       // pantalla dibuja como "3 de 70".
-      indice,
+      indice: sueltaFueraDeLaCola ? 0 : indice,
+      // Una fila que se vino a mirar de a una, desde otra pantalla. La pantalla
+      // lo usa para no dibujar el progreso ni ofrecer "saltear": no hay cola que
+      // recorrer, hay un producto que alguien vino a ver.
+      suelta: sueltaFueraDeLaCola,
       cola: orden,
       fila: null,
     };
@@ -205,19 +232,33 @@ export async function GET(req, context) {
       })
     );
 
+    // ¿El costo de hoy tiene forma de cargado a mano? Es una consulta más,
+    // sobre UN producto, en una pantalla que ya trae una fila entera. Va acá y
+    // no adentro del literal porque un `await` en medio de un objeto se lee mal
+    // y esconde que hay un viaje a la base.
+    const costoDeHoy = numero(fila.costoAnterior) ?? numero(fila.productoBase?.precio_costo);
+    const vecesAplicado = fila.productoBaseId
+      ? await prisma.importacionListaFila.count({
+          where: { productoBaseId: fila.productoBaseId, aplicada: true },
+        })
+      : 0;
+
     cuerpo.fila = {
       id: fila.id,
       nombre: fila.productoBase?.nombre || fila.descripcionProveedor,
       nombreEnElArchivo: fila.descripcionProveedor,
       codigo: fila.codigoCrudo,
       factorPack,
-      costoAnterior: numero(fila.costoAnterior) ?? numero(fila.productoBase?.precio_costo),
+      costoAnterior: costoDeHoy,
       precioLista: numero(fila.precioConIva),
       motivo: motivoDeRevision(fila, rango),
       lecturas,
       // Lo que ya está guardado para este producto con este proveedor, si lo
       // hay. La pantalla lo usa para decir "esto ya lo contestaste".
       sinProducto: !fila.productoBaseId,
+      // El costo de hoy es contra lo que se calculan TODOS los porcentajes de
+      // esta pantalla: si es dudoso, hay que decirlo acá.
+      costoRedondo: costoParaMirar({ costoActual: costoDeHoy, vecesAplicado }),
     };
 
     return NextResponse.json(cuerpo);
