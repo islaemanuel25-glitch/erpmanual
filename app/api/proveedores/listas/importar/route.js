@@ -439,6 +439,9 @@ export async function POST(req) {
       minPct: form.get("aumentoEsperadoMinPct"),
       maxPct: form.get("aumentoEsperadoMaxPct"),
     });
+    // Si hubo aviso, el control salió de un 0 a 0 y no de elegirlo. Se guarda
+    // como booleano acá porque abajo decide qué rango se asienta en la cabecera.
+    const elCeroACero = avisoDeModo !== null;
 
     const resuelta = configuracionParaLaLista(proveedor, {
       minPct: form.get("aumentoEsperadoMinPct"),
@@ -480,8 +483,21 @@ export async function POST(req) {
     // reescribiría en silencio el criterio de todas las viejas. Es la misma razón
     // por la que el rango se congela en la fila al confirmar.
     const cabecera = {
-      aumentoEsperadoMinPct: resuelta.config.minPct,
-      aumentoEsperadoMaxPct: resuelta.config.maxPct,
+      // ── CONTROLANDO A PROPÓSITO, EL RANGO SE ASIENTA EN NULL ───────────
+      //
+      // No es un descuido: es que no hay ningún criterio de rango que asentar.
+      // Dejar el del proveedor —que es lo que haría `configuracionParaLaLista`
+      // por su cuenta, porque cae a la ficha cuando el formulario viene vacío—
+      // guardaría un "se evaluó con 5 a 8" sobre una lista que no se evaluó con
+      // ningún porcentaje.
+      //
+      // Y ADEMÁS ES LO QUE DISTINGUE LOS DOS CONTROLES. Un control elegido a
+      // mano queda con el rango en null; uno que salió de un 0 a 0 escrito a
+      // mano queda con 0 y 0, que es lo que la persona efectivamente escribió.
+      // `fueUnCeroACeroConvertido` lee esos dos hechos y contesta cuál fue, sin
+      // que haga falta una columna más.
+      aumentoEsperadoMinPct: modo === MODO_LISTA.CONTROLAR && !elCeroACero ? null : resuelta.config.minPct,
+      aumentoEsperadoMaxPct: modo === MODO_LISTA.CONTROLAR && !elCeroACero ? null : resuelta.config.maxPct,
       impuestoAdicionalPct,
       // EL MODO VIAJA CON EL RANGO Y POR EL MISMO MOTIVO: es de esta
       // importación, no del proveedor. Y como este objeto es EL MISMO que se

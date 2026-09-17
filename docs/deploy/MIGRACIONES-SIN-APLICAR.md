@@ -18,7 +18,7 @@ Si la lista está vacía, el despliegue es solo de código.
 
 Producción está en **17 migraciones**. Falta una:
 
-- `20260918120000_modo_de_lista_y_no_lo_cambio` — **ADITIVA**. Una columna
+- `20260917130000_modo_de_lista_y_no_lo_cambio` — **ADITIVA**. Una columna
   nullable `modo` en `ImportacionListaProveedor` —para qué se subió la lista,
   actualizar o controlar— y una tabla nueva `ProductoQueNoSeCambia` con su
   índice único y dos de búsqueda, que recuerda por producto y proveedor los que

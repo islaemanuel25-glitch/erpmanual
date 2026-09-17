@@ -414,7 +414,12 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // que Emanuel ya contestó— y deja registrado cuándo una persona aceptó un
   // costo que NO cae en el rango del proveedor. Una tabla nueva y dos columnas
   // nullable, sin DROP y sin backfill.
-  assert.equal(migraciones.length, 17, "aparecio una migracion que nadie declaro aca");
+  // 18 desde el 2026-09-17: entra `20260917130000_modo_de_lista_y_no_lo_cambio`,
+  // que guarda para qué se subió una lista de proveedor —actualizar precios o
+  // solo controlarlos— y qué productos se dejan sin cambiar para ese proveedor.
+  // Es de otra tanda, no toca nada de transferencias, y es aditiva: una columna
+  // nullable y una tabla nueva, sin DROP y sin backfill.
+  assert.equal(migraciones.length, 18, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

@@ -32,11 +32,18 @@ import { requireAdmin } from "@/lib/authorize";
 import { paginacion } from "@/lib/proveedores/listas/persistencia";
 import {
   contarResultado,
+  contarControl,
   motivoDeRevision,
   resultadoCierra,
   MOTIVO_REVISION,
   ORDEN_MOTIVOS,
 } from "@/lib/proveedores/listas/resultadoDeLaLista";
+// PARA QUÉ SE SUBIÓ LA LISTA, y el aviso del 0 a 0 deducido de lo guardado.
+import {
+  AVISO_CERO_A_CERO,
+  fueUnCeroACeroConvertido,
+  modoDeImportacion,
+} from "@/lib/proveedores/listas/modoDeLaLista";
 import { ESTADO_LINEA } from "@/lib/proveedores/listas/estados";
 import { analizarFila } from "@/lib/proveedores/listas/confirmarPresentacion";
 import { baseParaHelpers } from "@/lib/proveedores/listas/conciliarLista";
@@ -86,6 +93,12 @@ const CAMPOS_CONTEO = {
   vinculadoEn: true,
   multiplicadorConfirmado: true,
   fueraDeRangoAceptadaEn: true,
+  // EL COSTO QUE SALE DE LA LISTA. Lo pide `contarControl`, que agrupa por la
+  // diferencia entre éste y `costoAnterior`. Sin la columna, las dos llegarían
+  // con una en `undefined`, `compararConLaLista` contestaría `null` para todas y
+  // el control diría "0 coinciden, 0 más bajo, 0 más alto" sobre una lista
+  // entera — un resumen prolijo y completamente vacío.
+  costoMaestroPropuesto: true,
 };
 
 export async function GET(req, context) {
@@ -127,6 +140,11 @@ export async function GET(req, context) {
         columnaPrecioElegida: true,
         descuentoAplicado: true,
         decisionDeLectura: true,
+        // PARA QUÉ SE SUBIÓ. Decide qué pantalla se dibuja: el resultado de
+        // siempre o el del control. Sin la columna, `modoDeImportacion` contesta
+        // ACTUALIZAR y una lista de control se vería como una que va a escribir
+        // costos — con su botón de aplicar incluido.
+        modo: true,
         proveedor: { select: { id: true, nombre: true, parserListaId: true } },
       },
     });
@@ -243,7 +261,19 @@ export async function GET(req, context) {
           minPct: numero(cab.aumentoEsperadoMinPct),
           maxPct: numero(cab.aumentoEsperadoMaxPct),
         },
+        // PARA QUÉ SE SUBIÓ, y si hubo que corregirlo. El aviso se DEDUCE de lo
+        // guardado en vez de haberse persistido: un control elegido a mano queda
+        // con el rango en null y uno que salió de un 0 a 0 queda con 0 y 0. Así
+        // el aviso sigue estando una semana después, sin una columna más.
+        modo: modoDeImportacion(cab),
+        avisoDeModo: fueUnCeroACeroConvertido(cab) ? AVISO_CERO_A_CERO : null,
       },
+      // ── LOS TRES GRUPOS DEL CONTROL ──────────────────────────────────
+      //
+      // Van SIEMPRE, aunque la lista sea de actualizar, y en ese caso dan cero:
+      // es la misma regla que ya sigue `resumirEstados` —devolver todas las
+      // claves para que la pantalla no tenga que preguntar si existen—.
+      control: contarControl(paraContar),
       lectura: cab.decisionDeLectura ?? null,
       conteo: {
         ...conteo,

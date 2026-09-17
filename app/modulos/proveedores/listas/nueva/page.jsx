@@ -61,6 +61,11 @@ import {
 // lista estaba escrita acá y le faltaban dos de los cuatro motivos; ahora la
 // contesta el módulo que define el enum.
 import { seContestaEligiendoColumna } from "@/lib/proveedores/listas/decisionDeLista";
+// PARA QUÉ SE SUBE LA LISTA. Los textos de los dos botones salen de acá y no
+// escritos en el JSX: los muestra también el resultado del control y la lista de
+// importaciones, y tres copias de una frase se separan el día que alguien
+// corrige una.
+import { MODO_LISTA, TEXTO_MODO } from "@/lib/proveedores/listas/modoDeLaLista";
 
 /** Los dos pasos de esta página. */
 const PASO = { SUBIR: "SUBIR", COLUMNAS: "COLUMNAS" };
@@ -90,6 +95,10 @@ export default function SubirListaPage() {
   const [errorEnvio, setErrorEnvio] = useState(null);
   // Lo que contestó el servidor cuando hace falta confirmar las columnas.
   const [pregunta, setPregunta] = useState(null);
+  // PARA QUÉ SE SUBE. Arranca en actualizar porque es lo que se hace casi
+  // siempre; controlar es la pregunta que uno se hace de vez en cuando.
+  const [modo, setModo] = useState(MODO_LISTA.ACTUALIZAR);
+  const controlando = modo === MODO_LISTA.CONTROLAR;
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
@@ -209,7 +218,14 @@ export default function SubirListaPage() {
     impuestosDefinidos: tieneImpuestos !== null,
   }), [minPct, maxPct, recargoPct, tieneImpuestos, impuestoPct]);
 
-  const faltan = useMemo(() => faltantesDeConfiguracion(configEditada), [configEditada]);
+  // EL MODO ENTRA EN LA VALIDACIÓN DE LA PANTALLA, porque si no el botón
+  // quedaría apagado pidiendo un rango que el servidor no va a exigir. Es la
+  // misma función que usa el endpoint, con el mismo argumento: dos copias de
+  // esta regla terminarían ofreciendo un botón que el servidor después rechaza.
+  const faltan = useMemo(
+    () => faltantesDeConfiguracion(configEditada, { modo }),
+    [configEditada, modo]
+  );
   const configCompleta = faltan.length === 0;
   const yaGuardado = (proveedor?.faltaConfigurar ?? []).length === 0 && !!proveedor?.configuracion;
 
@@ -285,8 +301,13 @@ export default function SubirListaPage() {
       const fd = new FormData();
       fd.append("archivo", archivo, archivo.name);
       fd.append("proveedorId", String(proveedor.id));
-      fd.append("aumentoEsperadoMinPct", String(configEditada.minPct));
-      fd.append("aumentoEsperadoMaxPct", String(configEditada.maxPct));
+      fd.append("modo", modo);
+      // CONTROLANDO NO SE MANDA RANGO, y va vacío en vez de ir en cero: un 0 a 0
+      // es lo que el servidor interpreta como "quiso controlar sin saberlo" y
+      // le pone su aviso. Mandarlo desde acá, donde el modo YA está elegido,
+      // haría que el aviso apareciera sobre una elección explícita.
+      fd.append("aumentoEsperadoMinPct", controlando ? "" : String(configEditada.minPct));
+      fd.append("aumentoEsperadoMaxPct", controlando ? "" : String(configEditada.maxPct));
       fd.append("recargoPct", String(configEditada.recargoPct));
       fd.append("impuestosDefinidos", "true");
       fd.append("impuestoAdicionalPct", String(configEditada.impuestoAdicionalPct));
@@ -422,6 +443,35 @@ export default function SubirListaPage() {
 
       {!cargando && !errorCarga && (
         <>
+          {/* ── 0. PARA QUÉ SE SUBE ────────────────────────────────────
+              VA PRIMERO, ANTES DEL PROVEEDOR, y no es un capricho de orden: es
+              lo que decide qué preguntas siguen. Con "Solo controlar" no se
+              pide el rango ni el recargo, así que ponerlo después obligaría a
+              contestar campos que después desaparecen. */}
+          <SunmiCard className="p-4 space-y-3">
+            <h2 className="text-base font-semibold sunmi-text-strong">¿Para qué subís esta lista?</h2>
+            <div className="grid gap-2">
+              {[MODO_LISTA.ACTUALIZAR, MODO_LISTA.CONTROLAR].map((m) => (
+                <SunmiButton
+                  key={m}
+                  color={modo === m ? "primary" : "ghost"}
+                  onClick={() => { setModo(m); setErrorEnvio(null); }}
+                  aria-pressed={modo === m}
+                  className="w-full min-h-toque text-left flex-col items-start gap-0.5 py-3"
+                >
+                  <span className="text-base font-semibold">{TEXTO_MODO[m].titulo}</span>
+                  <span className="text-sm2 font-normal opacity-90">{TEXTO_MODO[m].detalle}</span>
+                </SunmiButton>
+              ))}
+            </div>
+            {controlando && (
+              <p className="text-sm2 sunmi-text-muted leading-snug">
+                Con «Solo controlar» no se pide cuánto suele aumentar: no se cambia ningún costo,
+                solo se compara la lista con los que ya tenés.
+              </p>
+            )}
+          </SunmiCard>
+
           {/* ── 1 ─────────────────────────────────────────────────────── */}
           <SunmiCard className="p-4 space-y-3">
             <h2 className="text-base font-semibold sunmi-text-strong">1. ¿De qué proveedor es?</h2>
@@ -525,7 +575,9 @@ export default function SubirListaPage() {
           {/* ── 3 ─────────────────────────────────────────────────────── */}
           {proveedor && compat.admite && (
             <SunmiCard className="p-4 space-y-4">
-              <h2 className="text-base font-semibold sunmi-text-strong">3. Cómo controlo los precios</h2>
+              <h2 className="text-base font-semibold sunmi-text-strong">
+                {controlando ? "3. Cómo leo los precios" : "3. Cómo controlo los precios"}
+              </h2>
 
               {/* ── TRES ESTADOS, NO DOS ───────────────────────────────────
                   El diseño pide dos renglones: el verde de "ya guardado" y el
@@ -561,6 +613,11 @@ export default function SubirListaPage() {
                 </div>
               )}
 
+              {/* CONTROLANDO NO SE PREGUNTA, porque no se usa para nada. Y
+                  desaparece entero en vez de quedar apagado: un campo gris que
+                  no se puede tocar invita a preguntarse qué hay que hacer para
+                  habilitarlo, y acá la respuesta es "nada". */}
+              {!controlando && (
               <Campo
                 etiqueta="¿Cuánto suele aumentar?"
                 ayuda="Si un producto aumenta menos o más que esto, no se cambia: te lo muestro para que lo mires."
@@ -592,6 +649,7 @@ export default function SubirListaPage() {
                   </ConPorciento>
                 </div>
               </Campo>
+              )}
 
               <Campo
                 etiqueta="¿Le sumás algo al precio de la lista?"
@@ -652,6 +710,15 @@ export default function SubirListaPage() {
                 )}
               </Campo>
 
+              {/* CONTROLANDO NO SE OFRECE GUARDAR PARA LAS PRÓXIMAS. El
+                  guardado escribe el rango en la ficha del proveedor, y
+                  controlando el rango está vacío: el botón habría guardado dos
+                  nulos encima de lo que el proveedor ya tenía cargado.
+
+                  Se esconde en vez de apagarse, por lo mismo que el campo del
+                  rango: un botón gris pide que alguien averigüe cómo
+                  encenderlo, y acá no hay forma porque no corresponde. */}
+              {!controlando && (
               <div>
                 <SunmiButton
                   color="slate"
@@ -665,6 +732,7 @@ export default function SubirListaPage() {
                   <p className="text-sm2 sunmi-text-muted leading-snug mt-2">{avisoGuardado}</p>
                 )}
               </div>
+              )}
             </SunmiCard>
           )}
 
@@ -694,7 +762,9 @@ export default function SubirListaPage() {
               {enviando ? "Leyendo…" : "Leer la lista"}
             </SunmiButton>
             <p className="text-sm2 sunmi-text-muted text-center leading-snug">
-              Leer no cambia ningún precio. Vas a ver el resultado antes de aplicar.
+              {controlando
+                ? "Controlar no cambia ningún precio: solo compara la lista con tus costos de hoy."
+                : "Leer no cambia ningún precio. Vas a ver el resultado antes de aplicar."}
             </p>
           </div>
         </>
