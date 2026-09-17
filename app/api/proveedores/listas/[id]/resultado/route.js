@@ -65,6 +65,12 @@ const CAMPOS_CONTEO = {
   // llegaba con el campo en `undefined` y la cola seguía contando 595 después de
   // sacar una. El botón parecía no hacer nada.
   excluidaManual: true,
+  // SIN ESTA COLUMNA EL CONTADOR NO SABE QUÉ YA SE ESCRIBIÓ. Es la misma
+  // familia de `excluidaManual`, dos comentarios más abajo: sin pedirla, cada
+  // fila llega con el campo en `undefined`, `f?.aplicada === true` da false
+  // siempre, y el resumen cuenta como "se actualizan" 361 costos que ya están
+  // escritos.
+  aplicada: true,
   // ── LO QUE HACE FALTA PARA JUZGAR EL RANGO, Y ES TODO O NADA ────────────
   //
   // El porcentaje guardado, el rango congelado en la fila y las tres marcas que

@@ -76,6 +76,16 @@ export async function GET(req, context) {
       importacionId: id,
       estado: ESTADO_LINEA.LISTO_PARA_ACTUALIZAR,
       excluidaManual: false,
+      // ── LO QUE YA SE ESCRIBIÓ NO "SE ACTUALIZA" ─────────────────────────
+      //
+      // Esta pantalla se llama "Se actualizan" y ahora cada fila se toca. Sobre
+      // una fila YA APLICADA, "Dejarlo como está" ofrece no escribir un costo
+      // que ya está escrito: el botón no miente por poco, miente del todo.
+      //
+      // `aplicar` filtra por `aplicada: false`, así que ésas ya no las toca
+      // nadie. Lo que se hace con una fila aplicada es deshacer, que es otro
+      // botón y otra pantalla.
+      aplicada: false,
       ...(buscar
         ? {
             OR: [
