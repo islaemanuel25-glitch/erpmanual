@@ -10,6 +10,7 @@ import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
 import { paginacion } from "@/lib/proveedores/listas/persistencia";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
+import { productoActivoWhere } from "@/lib/proveedores/listas/productoDeBaja";
 import { filtroDeLaCola } from "@/lib/proveedores/listas/panelDecision";
 import { whereDelGrupo, GRUPO_PRODUCTO } from "@/lib/proveedores/listas/gruposProducto";
 import { ESTADOS_A_MEDIAS } from "@/lib/proveedores/listas/persistencia";
@@ -127,7 +128,11 @@ export async function GET(req) {
     // regla, cambian los dos.
     const conteos = await Promise.all(
       items.map(async (i) => {
-        const universoWhere = { grupoId, ...productoDelProveedorWhere(i.proveedor?.id) };
+        const universoWhere = {
+          grupoId,
+          ...productoDelProveedorWhere(i.proveedor?.id),
+          ...productoActivoWhere(),
+        };
         const base = { universoWhere, importacionId: i.id, proveedorId: i.proveedor?.id, filtroCola: filtroDeLaCola() };
         const [listos, actualizados] = await Promise.all([
           prisma.productoBase.count({ where: whereDelGrupo(GRUPO_PRODUCTO.LISTO_PARA_APLICAR, base) }),

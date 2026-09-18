@@ -21,6 +21,7 @@ import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
+import { productoActivoWhere } from "@/lib/proveedores/listas/productoDeBaja";
 import { SITUACION_DETALLE } from "@/lib/proveedores/listas/detalleSistema";
 import { rangoDeLaFila } from "@/lib/proveedores/listas/vigenciaConfirmacion";
 
@@ -110,7 +111,11 @@ export async function GET(req, context) {
       return NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 });
     }
 
-    const universo = { grupoId, ...productoDelProveedorWhere(importacion.proveedorId) };
+    const universo = {
+      grupoId,
+      ...productoDelProveedorWhere(importacion.proveedorId),
+      ...productoActivoWhere(),
+    };
     const conAplicada = { filasImportacionLista: { some: { importacionId, aplicada: true } } };
     const conFila = { filasImportacionLista: { some: { importacionId } } };
 

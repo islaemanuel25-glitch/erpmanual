@@ -195,6 +195,13 @@ export async function GET(req, context) {
             redondeo_100: true, es_combo: true, creadoEnLocalId: true,
             unidad_medida: true, factor_pack: true, modoCompraProveedor: true,
             pesoReferenciaKg: true,
+            // Para el chequeo de baja de `revalidarFila`. NO se filtra por
+            // `activo` en el `where`: un producto dado de baja tiene que LLEGAR
+            // hasta la revalidación, porque lo que corresponde es omitir la fila
+            // con su motivo. Filtrándolo acá caería en PRODUCTO_INEXISTENTE y el
+            // cartel diría que hay que vincularla a otro producto, que es falso.
+            activo: true,
+            locales: { select: { activo: true } },
           },
         })
       : [];
@@ -394,6 +401,10 @@ export async function POST(req, context) {
           margen: true, redondeo_100: true, es_combo: true, creadoEnLocalId: true,
           unidad_medida: true, factor_pack: true, modoCompraProveedor: true,
           pesoReferenciaKg: true,
+          // Igual que en la simulación: llega dado de baja y lo rechaza
+          // `revalidarFila`, dentro de la misma transacción que escribe.
+          activo: true,
+          locales: { select: { activo: true } },
         },
       });
       const porId = new Map(productos.map((p) => [p.id, p]));

@@ -51,6 +51,7 @@ import { analizarFila } from "@/lib/proveedores/listas/confirmarPresentacion";
 import { baseParaHelpers } from "@/lib/proveedores/listas/conciliarLista";
 import { resolverParserDeProveedor } from "@/lib/proveedores/listas/registro";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
+import { productoActivoWhere } from "@/lib/proveedores/listas/productoDeBaja";
 import { filtroDeLaCola } from "@/lib/proveedores/listas/panelDecision";
 import { whereDelGrupo, GRUPO_PRODUCTO, GRUPOS_PRECIO_VIEJO } from "@/lib/proveedores/listas/gruposProducto";
 
@@ -176,7 +177,11 @@ export async function GET(req, context) {
     // del catálogo —`whereDelGrupo`— que es el que ya usa el historial. Contar
     // filas daría de más: dos filas del archivo pueden terminar en el mismo
     // producto, y el número de la tapa y el del detalle dirían cosas distintas.
-    const universoWhere = { grupoId, ...productoDelProveedorWhere(cab.proveedor?.id) };
+    const universoWhere = {
+      grupoId,
+      ...productoDelProveedorWhere(cab.proveedor?.id),
+      ...productoActivoWhere(),
+    };
     const productosActualizados = await prisma.productoBase.count({
       where: whereDelGrupo(GRUPO_PRODUCTO.ACTUALIZADO, {
         universoWhere,

@@ -461,6 +461,20 @@ export default function ResultadoDeListaPage() {
 
       {aviso && <Aviso tono={aviso.tono}>{aviso.texto}</Aviso>}
 
+      {/* ── FILAS QUE QUEDARON AFUERA POR UNA BAJA POSTERIOR ───────────────
+          El archivo trae N renglones y la pantalla muestra menos. Sin este
+          cartel la diferencia no se explica y parece que se perdieron filas:
+          lo que pasó es que su producto se dio de baja DESPUÉS de conciliar,
+          así que no hay nada que aplicarles. Se dice el número, porque "algunas"
+          no deja comprobar nada. */}
+      {datos?.filasConProductoDeBaja > 0 && (
+        <Aviso tono="warning">
+          {datos.filasConProductoDeBaja === 1
+            ? "Una fila quedó afuera: el producto que tenía vinculado se dio de baja después de conciliar. No se le escribe costo."
+            : `${datos.filasConProductoDeBaja} filas quedaron afuera: los productos que tenían vinculados se dieron de baja después de conciliar. No se les escribe costo.`}
+        </Aviso>
+      )}
+
       {/* ── LA COLUMNA QUE EXPLICA POCO, ARRIBA Y CON SU SALIDA ────────────
           Cuando la columna con la que se leyó explica menos de la MITAD de los
           productos comparables, hay motivo para dudar de ella — y el caso que

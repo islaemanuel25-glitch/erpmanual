@@ -41,6 +41,10 @@ import { motivoDePendiente, pendienteEnAlerta } from "@/lib/proveedores/listas/d
 import { filtroDeLaCola } from "@/lib/proveedores/listas/panelDecision";
 import { rangoDeLaFila } from "@/lib/proveedores/listas/vigenciaConfirmacion";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
+import {
+  productoActivoWhere,
+  filaConProductoDeBajaWhere,
+} from "@/lib/proveedores/listas/productoDeBaja";
 import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
 import { paginacion, LIMITES } from "@/lib/proveedores/listas/persistencia";
@@ -136,6 +140,26 @@ export async function GET(req, context) {
     });
 
     const where = { importacionId };
+
+    // ── LAS FILAS CUYO PRODUCTO SE DIO DE BAJA DESPUÉS DE CONCILIAR ─────────
+    //
+    // El universo ya deja afuera a los dados de baja, pero eso vale para una
+    // conciliación nueva. Una lista conciliada la semana pasada tiene filas YA
+    // ESCRITAS apuntando a productos que quizá se apagaron en el medio: esas
+    // filas existen y hay que sacarlas de acá, no dejarlas ofreciendo un costo
+    // que `aplicar` va a rechazar igual.
+    //
+    // Se excluyen de TODO lo que la pantalla muestra y cuenta —el listado, la
+    // cola, los grupos— con una sola condición, puesta sobre el `where` común.
+    // Y se avisa cuántas son: desaparecer en silencio haría que los números no
+    // cerraran contra el archivo y nadie sabría por qué.
+    // Va en `AND` y no como `where.NOT`, por lo mismo que está escrito más abajo
+    // para el filtro de la cola: el que llegue después a agregar una condición
+    // encuentra la ranura ocupada y la pisa sin que nada avise.
+    (where.AND ??= []).push({ NOT: filaConProductoDeBajaWhere() });
+    const filasConProductoDeBaja = await prisma.importacionListaFila.count({
+      where: { importacionId, ...filaConProductoDeBajaWhere() },
+    });
 
     const estado = url.searchParams.get("estado");
     if (estado) {
@@ -241,7 +265,9 @@ export async function GET(req, context) {
     ]);
 
     const filasParaResumen = await prisma.importacionListaFila.findMany({
-      where: { importacionId },
+      // Con la MISMA exclusión que el listado: si una fila no se muestra pero se
+      // cuenta, el contador de seleccionadas promete aplicar algo que no está.
+      where: { importacionId, NOT: filaConProductoDeBajaWhere() },
       select: {
         id: true, estado: true, aplicada: true, seleccionada: true,
         productoBaseId: true, costoMaestroPropuesto: true, excluidaManual: true,
@@ -255,7 +281,7 @@ export async function GET(req, context) {
     // decir cómo se macheó el archivo entero. Se piden solo las tres columnas
     // que deciden el grupo, no la fila completa.
     const filasParaMacheo = await prisma.importacionListaFila.findMany({
-      where: { importacionId },
+      where: { importacionId, NOT: filaConProductoDeBajaWhere() },
       select: { tipoCoincidencia: true, productoBaseId: true, vinculadoPorUsuarioId: true },
     });
 
@@ -263,7 +289,7 @@ export async function GET(req, context) {
     // sus tres relaciones. Es un número del CATÁLOGO, no del archivo, y por eso
     // se informa aparte.
     const productosDelProveedor = await prisma.productoBase.count({
-      where: { grupoId, ...productoDelProveedorWhere(cabecera.proveedor.id) },
+      where: { grupoId, ...productoDelProveedorWhere(cabecera.proveedor.id), ...productoActivoWhere() },
     });
 
     const macheo = resumirMacheo(filasParaMacheo, { productosDelProveedor });
@@ -277,7 +303,11 @@ export async function GET(req, context) {
     //
     // Son tres `count` con EXISTS sobre un índice ya existente
     // `(importacionId, productoBaseId)`; no recorren filas en memoria.
-    const universoWhere = { grupoId, ...productoDelProveedorWhere(cabecera.proveedor.id) };
+    const universoWhere = {
+      grupoId,
+      ...productoDelProveedorWhere(cabecera.proveedor.id),
+      ...productoActivoWhere(),
+    };
     const conFilaAplicada = {
       filasImportacionLista: { some: { importacionId, aplicada: true } },
     };
@@ -323,7 +353,12 @@ export async function GET(req, context) {
         importacionId,
         aplicada: false,
         productoBase: {
-          is: { grupoId, ...productoDelProveedorWhere(cabecera.proveedor.id), NOT: conFilaAplicada },
+          is: {
+            grupoId,
+            ...productoDelProveedorWhere(cabecera.proveedor.id),
+            ...productoActivoWhere(),
+            NOT: conFilaAplicada,
+          },
         },
       },
       include: {
@@ -559,6 +594,9 @@ export async function GET(req, context) {
       },
       filas: filasSalida,
       vista,
+      // Cuántas filas quedaron afuera porque su producto se dio de baja después
+      // de conciliar. Cero es lo normal; cuando no lo es, la pantalla lo dice.
+      filasConProductoDeBaja,
       macheo,
       // El resumen principal: qué pasó con los productos que YA existen en el
       // ERP. El del archivo queda como bloque secundario.

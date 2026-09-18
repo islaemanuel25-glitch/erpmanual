@@ -102,6 +102,11 @@ async function main() {
       unidad_medida: true, factor_pack: true, modoCompraProveedor: true,
       pesoReferenciaKg: true,
       proveedor_id: true, proveedor2_id: true, proveedor3_id: true,
+      // `revalidarFila` rechaza los productos dados de baja y falla CERRADO: sin
+      // estos dos campos daría por baja a todos y este script no propondría
+      // aplicar nada. Son parte del contrato de lo que espera esa función.
+      activo: true,
+      locales: { select: { activo: true } },
     },
   });
   const porId = new Map(productos.map((p) => [p.id, p]));

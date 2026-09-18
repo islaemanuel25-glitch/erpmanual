@@ -29,6 +29,7 @@ import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
+import { productoActivoWhere } from "@/lib/proveedores/listas/productoDeBaja";
 import {
   contarLosQueNoCambian,
   chipsCierran,
@@ -100,7 +101,7 @@ export async function GET(req, context) {
 
     // ── EL UNIVERSO: tus productos de este proveedor ─────────────────────
     const productos = await prisma.productoBase.findMany({
-      where: { grupoId, ...productoDelProveedorWhere(cab.proveedor?.id) },
+      where: { grupoId, ...productoDelProveedorWhere(cab.proveedor?.id), ...productoActivoWhere() },
       orderBy: { nombre: "asc" },
       select: {
         id: true,
