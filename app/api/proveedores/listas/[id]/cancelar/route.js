@@ -31,7 +31,11 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
 import { requireAdmin } from "@/lib/authorize";
-import { ESTADO_IMPORTACION, OPCIONES_TX } from "@/lib/proveedores/listas/persistencia";
+import {
+  ESTADO_IMPORTACION,
+  OPCIONES_TX,
+  esImportacionAbierta,
+} from "@/lib/proveedores/listas/persistencia";
 
 export async function POST(req, context) {
   try {
@@ -57,7 +61,13 @@ export async function POST(req, context) {
 
     const importacion = await prisma.importacionListaProveedor.findFirst({
       where: { id: importacionId, grupoId },
-      select: { id: true, estado: true, archivoNombre: true, canceladaEn: true },
+      select: {
+        id: true,
+        estado: true,
+        archivoNombre: true,
+        canceladaEn: true,
+        terminadaEn: true,
+      },
     });
     if (!importacion) {
       return NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 });
@@ -72,13 +82,37 @@ export async function POST(req, context) {
       });
     }
 
-    if (importacion.estado === ESTADO_IMPORTACION.APLICADA) {
+    // ── SOLO SE CANCELA LO QUE ESTÁ SIN CERRAR ───────────────────────────
+    //
+    // Abierta —CONCILIADA o PARCIALMENTE_APLICADA— o en BORRADOR, que es la que
+    // quedó a medio leer. Nada más.
+    //
+    // ── POR QUÉ NO ALCANZABA CON RECHAZAR LA APLICADA ────────────────────
+    //
+    // Porque hasta el 2026-09-18 lo único rechazado era APLICADA, así que una
+    // lista TERMINADA se podía cancelar por la API: quedaba con `terminadaEn` Y
+    // `canceladaEn`, o sea terminada y cancelada a la vez. Nada fallaba y el
+    // historial mostraba una de las dos según qué campo mirara cada pantalla.
+    //
+    // No era un agujero teórico: desde esta tanda el botón de cancelar aparece en
+    // el listado, y en el listado conviven las abiertas con las terminadas.
+    //
+    // Y el motivo NO es el mismo para las dos, así que se dicen distinto: una
+    // aplicada tiene costos escritos y llamarla cancelada sería mentir; una
+    // terminada ya la cerró alguien y lo que corresponde es mirarla, no
+    // descartarla.
+    const abierta =
+      esImportacionAbierta(importacion.estado) ||
+      importacion.estado === ESTADO_IMPORTACION.BORRADOR;
+
+    if (!abierta) {
+      const error =
+        importacion.estado === ESTADO_IMPORTACION.APLICADA
+          ? "Esta lista ya se aplicó: sus costos están escritos y cancelarla no los revierte. " +
+            "Si querés volver atrás, primero deshacé la aplicación."
+          : "Esta lista ya está cerrada, así que no hay nada que cancelar.";
       return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "Esta importación ya se aplicó: sus costos están escritos y cancelarla no los revierte.",
-        },
+        { ok: false, error, codigo: "NO_ESTA_ABIERTA", estado: importacion.estado },
         { status: 409 }
       );
     }
@@ -94,8 +128,13 @@ export async function POST(req, context) {
         where: { id: importacionId },
         select: { estado: true },
       });
-      if (actual.estado === ESTADO_IMPORTACION.APLICADA) return { carrera: true };
       if (actual.estado === ESTADO_IMPORTACION.CANCELADA) return { yaCancelada: true };
+      // El MISMO predicado que afuera, no una lista de estados escrita otra vez:
+      // dos copias de esta regla se separan el día que alguien agregue un estado,
+      // y la de adentro de la transacción es la que decide.
+      const sigueAbierta =
+        esImportacionAbierta(actual.estado) || actual.estado === ESTADO_IMPORTACION.BORRADOR;
+      if (!sigueAbierta) return { carrera: true, estado: actual.estado };
 
       // Las filas conservan su estado y sus números; solo se desmarcan.
       const { count } = await tx.importacionListaFila.updateMany({
@@ -117,7 +156,11 @@ export async function POST(req, context) {
 
     if (resultado.carrera) {
       return NextResponse.json(
-        { ok: false, error: "La importación se aplicó mientras se cancelaba." },
+        {
+          ok: false,
+          error: `La lista se cerró (${resultado.estado}) mientras se cancelaba.`,
+          codigo: "NO_ESTA_ABIERTA",
+        },
         { status: 409 }
       );
     }

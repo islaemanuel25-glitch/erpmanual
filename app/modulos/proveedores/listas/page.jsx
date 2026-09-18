@@ -37,6 +37,10 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiChipsFiltro, { CLAVE_TODAS } from "@/components/sunmi/SunmiChipsFiltro";
 
 import { Paginacion, Vacio, ErrorRecuperable } from "@/components/proveedores/listas/PiezasListas";
+// LA MISMA confirmación que usa el resultado. Escribir acá una parecida dejaría
+// dos versiones de lo que pasa con los costos aplicados, y el día que una se
+// corrija la otra miente.
+import ModalCancelarImportacion from "@/components/proveedores/listas/ModalCancelarImportacion";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import { useAccionDePagina } from "@/app/context/AccionDePaginaContext";
 import { fechaHora } from "@/lib/proveedores/listas/presentacion";
@@ -109,6 +113,11 @@ export default function HistorialListasPage() {
   const [buscado, setBuscado] = useState("");
   const [pag, setPag] = useState({ page: 1, paginas: 1, total: 0 });
   const [page, setPage] = useState(1);
+  /** La lista que se está por cancelar, o null. El objeto entero, no el id: el
+   *  modal necesita el nombre del archivo y cuántos costos ya aplicó. */
+  const [aCancelar, setACancelar] = useState(null);
+  const [cancelando, setCancelando] = useState(false);
+  const [errorAlCancelar, setErrorAlCancelar] = useState(null);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
@@ -148,6 +157,37 @@ export default function HistorialListasPage() {
       setCargando(false);
     }
   }, [page, filtro, buscado]);
+
+  /**
+   * Cancela la lista que el modal tiene abierta.
+   *
+   * Al volver se RECARGA el listado: la cancelada sale de "Quedaron a medias" y
+   * pasa a las cerradas. Sin recargar, la tarjeta se quedaría entre las
+   * pendientes con la lista ya cancelada en la base, que es exactamente la clase
+   * de pantalla que hace dudar de si el botón hizo algo.
+   */
+  const cancelarLista = async () => {
+    if (!aCancelar) return;
+    setCancelando(true);
+    setErrorAlCancelar(null);
+    try {
+      const r = await fetch(`/api/proveedores/listas/${aCancelar.id}/cancelar`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) {
+        setErrorAlCancelar(j?.error || `No se pudo cancelar la lista (error ${r.status}).`);
+        return;
+      }
+      setACancelar(null);
+      await cargar();
+    } catch {
+      setErrorAlCancelar("No se pudo conectar con el servidor. Probá de nuevo.");
+    } finally {
+      setCancelando(false);
+    }
+  };
 
   useEffect(() => {
     if (cargandoUser || cargandoCtx || !esAdmin || needsContexto) return;
@@ -247,7 +287,7 @@ export default function HistorialListasPage() {
       {!cargando && !error && aMedias.length > 0 && (
         <Grupo titulo="Quedaron a medias">
           {aMedias.map((i) => (
-            <TarjetaLista key={i.id} item={i} router={router} />
+            <TarjetaLista key={i.id} item={i} router={router} onCancelar={setACancelar} />
           ))}
         </Grupo>
       )}
@@ -255,10 +295,27 @@ export default function HistorialListasPage() {
       {!cargando && !error && cerradas.length > 0 && (
         <Grupo titulo={filtro === "CANCELADAS" ? "Canceladas" : "Terminadas hace poco"}>
           {cerradas.map((i) => (
-            <TarjetaLista key={i.id} item={i} router={router} />
+            <TarjetaLista key={i.id} item={i} router={router} onCancelar={setACancelar} />
           ))}
         </Grupo>
       )}
+
+      {/* El mismo modal que usa el resultado, con el mismo texto. Escribir acá
+          una confirmación parecida dejaría dos versiones de lo que pasa con los
+          costos aplicados, y el día que una se corrija la otra miente. */}
+      <ModalCancelarImportacion
+        abierto={aCancelar !== null}
+        archivo={aCancelar?.archivoNombre}
+        aplicados={aCancelar?.productosActualizados ?? 0}
+        trabajando={cancelando}
+        onCerrar={() => {
+          setACancelar(null);
+          setErrorAlCancelar(null);
+        }}
+        onCancelar={cancelarLista}
+      />
+
+      {errorAlCancelar && <ErrorRecuperable mensaje={errorAlCancelar} onReintentar={cargar} />}
 
       {!cargando && !error && items.length > 0 && (
         <Paginacion
@@ -289,9 +346,10 @@ function Grupo({ titulo, children }) {
  * no hay nada que seguir, y ofrecerlo igual convierte la pantalla en una lista de
  * botones que no hacen lo que dicen. Para verla igual, la tarjeta entera lleva.
  */
-function TarjetaLista({ item, router }) {
+function TarjetaLista({ item, router, onCancelar }) {
   const linea = lineaDeEstado(item);
   const ir = () => router.push(`/modulos/proveedores/listas/${item.id}`);
+  const aMedias = quedoAMedias(item);
 
   return (
     <SunmiCard className="p-3">
@@ -305,7 +363,7 @@ function TarjetaLista({ item, router }) {
           </div>
           <div className={`text-sm2 font-semibold ${linea.tono}`}>{linea.texto}</div>
         </div>
-        {quedoAMedias(item) ? (
+        {aMedias ? (
           <SunmiButton color="cyan" onClick={ir} className="min-h-toque min-w-toque shrink-0 text-sm2">
             Seguir
           </SunmiButton>
@@ -315,6 +373,26 @@ function TarjetaLista({ item, router }) {
           </SunmiButton>
         )}
       </div>
+
+      {/* ── CANCELAR, DESDE ACÁ Y SOLO EN LAS QUE QUEDARON A MEDIAS ───────
+          Es la pantalla donde se ve el problema: la sección "Quedaron a medias"
+          junta las listas que nadie cerró, y hasta ahora la única forma de sacar
+          una de ahí era entrar, no encontrar cómo cancelarla, y terminarla —con lo
+          que quedaba en el historial como trabajo terminado.
+          Va en su propio renglón y no al lado de "Seguir": son dos acciones de
+          peso muy distinto y a 360 px un toque de más al costado del pulgar es
+          justamente el que no se quiere. */}
+      {aMedias && (
+        <div className="mt-2 flex justify-end">
+          <SunmiButton
+            color="ghost"
+            onClick={() => onCancelar(item)}
+            className="min-h-toque text-sm2 sunmi-text-muted"
+          >
+            Cancelar esta lista
+          </SunmiButton>
+        </div>
+      )}
     </SunmiCard>
   );
 }

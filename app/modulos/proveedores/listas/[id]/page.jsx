@@ -868,19 +868,35 @@ export default function ResultadoDeListaPage() {
           en gris, abajo de todo: dos bloques del mismo peso visual que el botón
           de aplicar, para dos cosas que casi nunca se hacen. En una fila de dos
           ocupan la mitad y se siguen tocando igual, que es lo que importa. */}
+      {/* ── TERMINAR Y CANCELAR, JUNTOS Y MIENTRAS LA LISTA ESTÉ ABIERTA ──
+          Cancelar existía en UN solo lugar de esta pantalla: adentro del aviso de
+          la lista atrapada en el rango 0 a 0, que es un caso puntual y viejo.
+          Sobre una lista normal no había ninguna salida que no fuera aplicar o
+          terminar, así que subir el archivo equivocado terminaba en «Terminar» —y
+          en el historial quedaba como trabajo terminado.
+          Van en la misma fila porque son la misma decisión mirada de los dos
+          lados: cerrar esto porque ya está, o cerrarlo porque no servía. */}
       <div className="grid grid-cols-2 gap-2">
         {abierta ? (
-          <SunmiButton
-            color="slate"
-            onClick={() => setTerminando(true)}
-            disabled={aplicando}
-            className="min-h-toque text-sm3"
-          >
-            Terminar lista
-          </SunmiButton>
-        ) : (
-          <span />
-        )}
+          <>
+            <SunmiButton
+              color="slate"
+              onClick={() => setTerminando(true)}
+              disabled={aplicando || pasando}
+              className="min-h-toque text-sm3"
+            >
+              Terminar lista
+            </SunmiButton>
+            <SunmiButton
+              color="slate"
+              onClick={() => setCancelando(true)}
+              disabled={aplicando || pasando}
+              className="min-h-toque text-sm3"
+            >
+              Cancelar esta lista
+            </SunmiButton>
+          </>
+        ) : null}
         <BotonReporte
           importacionId={id}
           cabecera={cabecera}
@@ -937,6 +953,11 @@ export default function ResultadoDeListaPage() {
       <ModalCancelarImportacion
         abierto={cancelando}
         archivo={cabecera.archivoNombre}
+        // Cuántos costos ya escribió esta lista. Con una PARCIALMENTE_APLICADA
+        // —que sigue abierta, así que se puede cancelar— el modal tiene que decir
+        // que lo aplicado NO se deshace: sin este dato decía "no se cambia ningún
+        // costo" sobre una lista que ya había cambiado varios.
+        aplicados={cabecera.productosActualizados ?? 0}
         trabajando={pasando}
         onCerrar={() => setCancelando(false)}
         onCancelar={cancelarLista}

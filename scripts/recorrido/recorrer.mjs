@@ -1120,22 +1120,21 @@ async function cancelar({ db, imp }) {
 
   let cab = await db.importacionListaProveedor.findFirst({
     where: { id: imp.id },
-    select: { estado: true, canceladaEn: true },
+    select: { estado: true, canceladaEn: true, terminadaEn: true },
   });
 
-  // ── LO QUE SE ENCONTRÓ: CANCELAR NO SE OFRECE CASI NUNCA ──────────────
+  // ── CANCELAR SE OFRECE SIEMPRE QUE LA LISTA ESTÉ ABIERTA ──────────────
   //
-  // "Cancelar esta lista" existe en UN solo lugar de la pantalla: adentro del
-  // aviso de la lista que quedó atrapada en el 0 a 0, que es un caso viejo y
-  // puntual. Sobre una lista abierta normal no hay ningún botón para
-  // descartarla: las únicas salidas son aplicar o terminar.
+  // Hasta el 2026-09-18 "Cancelar esta lista" existía en UN solo lugar: adentro
+  // del aviso de la lista atrapada en el rango 0 a 0, que es un caso viejo y
+  // puntual. Sobre una lista abierta normal no había ninguna salida que no fuera
+  // aplicar o terminar, así que el archivo equivocado terminaba en "Terminar" y
+  // en el historial quedaba como trabajo terminado.
   await comprobar(abrio, {
     pantalla: "Resultado",
     hice: "Busqué cómo descartar una lista abierta que subí por error",
-    esperaba: "Un botón para cancelarla",
-    paso:
-      "no hay ninguno: «Cancelar esta lista» solo aparece adentro del aviso de la lista " +
-      "atrapada en el rango 0 a 0. En una lista normal las únicas salidas son aplicar o terminar",
+    esperaba: "Un botón para cancelarla, al lado de «Terminar lista»",
+    paso: "no hay ninguno en la fila de abajo",
     severidad: AMARILLO,
   });
 
@@ -1147,14 +1146,45 @@ async function cancelar({ db, imp }) {
       paso: `${confirmo ? "" : "no está la confirmación; "}la base dice ${cab?.estado}`,
       severidad: ROJO,
     });
+
+    // ── Y NUNCA TERMINADA Y CANCELADA A LA VEZ ──────────────────────────
+    //
+    // La lista se cierra por UN camino. Con las dos fechas puestas, cada pantalla
+    // mostraría una según qué campo mire, y el historial diría dos cosas del
+    // mismo trabajo.
+    await comprobar(cab?.terminadaEn === null, {
+      pantalla: "Resultado",
+      hice: "Cancelé la lista y miré las fechas de cierre en la base",
+      esperaba: "Solo la de cancelada",
+      paso: `quedó también con fecha de terminada (${cab?.terminadaEn})`,
+      severidad: ROJO,
+    });
+
+    // ── Y NO ACEPTA MÁS TRABAJO ─────────────────────────────────────────
+    //
+    // Se pregunta al endpoint que escribe costos, que es el que importa: una
+    // cancelada que todavía aplicara sería una lista cerrada escribiendo precios.
+    const aplicar = await evaluar(
+      `fetch("/api/proveedores/listas/${imp.id}/aplicar", {
+         method: "POST", credentials: "same-origin",
+         headers: { "Content-Type": "application/json" }, body: "{}",
+       }).then((r) => r.status + "")`
+    );
+    await comprobar(aplicar === "409", {
+      pantalla: "Cancelada",
+      hice: "Pedí aplicar sobre la lista que acabo de cancelar",
+      esperaba: "Que lo rechace con 409",
+      paso: `contestó ${aplicar}`,
+      severidad: ROJO,
+    });
   } else {
-    // El recorrido sigue igual: se cierra con "Terminar", que es la salida que
-    // la pantalla SÍ ofrece. Sin cerrarla, la subida siguiente del mismo archivo
+    // Si el botón no estuviera, el recorrido sigue: se cierra con "Terminar", que
+    // es la otra salida. Sin cerrarla, la subida siguiente del mismo archivo
     // choca con `importacion_archivo_unica` y el resto del recorrido no corre.
     await terminar({ db, imp });
     cab = await db.importacionListaProveedor.findFirst({
       where: { id: imp.id },
-      select: { estado: true, canceladaEn: true },
+      select: { estado: true, canceladaEn: true, terminadaEn: true },
     });
   }
 
