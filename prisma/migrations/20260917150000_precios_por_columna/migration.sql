@@ -1,0 +1,27 @@
+-- LO QUE DECÍA CADA COLUMNA DE PRECIO DEL ARCHIVO, GUARDADO POR FILA.
+--
+-- ADITIVA: una sola columna nullable. No borra, no reescribe y no cambia el tipo
+-- de nada. Las 4.748 filas de importación que hay quedan como están, con la
+-- columna en NULL.
+--
+-- ── PARA QUÉ ────────────────────────────────────────────────────────────────
+--
+-- Para poder cambiar con qué columna se leyó una lista SIN volver a subir el
+-- archivo. El archivo no se guarda —`archivoUbicacion` queda en null— y hasta
+-- ahora, de cada fila solo quedaba el precio de la columna elegida: el de la
+-- otra columna se perdía en el momento de importar.
+--
+-- Eso convertía "se leyó con la columna equivocada" en un problema sin salida
+-- desde la pantalla. Y es un caso real y medido: una lista con las columnas
+-- S/IVA y C/IVA se leyó con la de sin IVA, que explicaba 1 de cada 9 productos
+-- teniendo al lado una que explicaba 4, y el costo escrito quedó 17 % abajo.
+--
+-- ── POR QUÉ NULLABLE, Y POR QUÉ NO SE RELLENA ──────────────────────────────
+--
+-- Porque no se puede: reconstruir lo que decía la otra columna necesita el
+-- archivo, y el archivo no está. Una fila vieja no admite cambio de columna, y
+-- la pantalla lo dice en vez de ofrecer un botón que falle.
+--
+-- Solo la escribe el camino GENÉRICO. El de Arcor ya tenía las dos columnas en
+-- dos campos —`precioConIva` y `precioSinIva`— así que no necesita un tercero.
+ALTER TABLE "ImportacionListaFila" ADD COLUMN "preciosPorColumna" JSONB;

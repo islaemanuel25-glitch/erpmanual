@@ -57,6 +57,36 @@ export default function ConfirmarColumnas({ proveedor, pregunta, trabajando, onV
     const precios = pregunta?.mapeo?.precios ?? [];
     return precios.length > 0 ? precios[0] : null;
   });
+
+  /**
+   * ¿LA COLUMNA DE PRECIO LA ELIGIÓ LA PERSONA, O LA PROPUSO LA PANTALLA?
+   *
+   * Arranca en false SIEMPRE, incluso cuando arriba se preseleccionó una: eso es
+   * una PROPUESTA, hecha por el orden de las candidatas, que sale de lo que el
+   * título de cada columna parece.
+   *
+   * ── POR QUÉ ESTE BOOLEANO EXISTE ──────────────────────────────────────────
+   *
+   * Porque esta pantalla manda `columnaPrecio` siempre, y hasta el 2026-09-17 el
+   * servidor no podía distinguir "la eligió" de "le dijo que sí a la que le
+   * propuse". Las dos llegaban igual, y una elección manual le gana al motor:
+   * así, apretar "Está bien, seguir" —el botón obvio, el único que avanza— se
+   * tragaba la pregunta que el motor quería hacer.
+   *
+   * Medido: una lista se leyó con S/IVA, que explicaba 1 de cada 9 productos,
+   * teniendo al lado C/IVA, que explicaba 4. Un costo quedó 17 % abajo y se
+   * aplicó sin advertencia, porque contra el costo viejo daba +15,7 % y eso cae
+   * adentro del rango esperado.
+   *
+   * No se puede derivar de nada: ni de que haya una columna elegida —siempre hay
+   * una cuando no hubo empate—, ni de comparar contra la propuesta —elegir a
+   * mano la misma columna que el sistema propuso es un gesto distinto de no
+   * tocarla, y solo esta bandera los separa—. Es la misma forma que el CLAUDE.md
+   * describe para el total del lector de comprobantes: lo que puede faltar se
+   * pregunta aparte, con un booleano que no se pueda calcular con los otros
+   * datos.
+   */
+  const [precioElegidoPorUsuario, setPrecioElegidoPorUsuario] = useState(false);
   const [conDescuento, setConDescuento] = useState(false);
   const [cambiando, setCambiando] = useState(null);
 
@@ -69,6 +99,9 @@ export default function ConfirmarColumnas({ proveedor, pregunta, trabajando, onV
     }
     return m;
   }, [opciones]);
+
+  /** Las candidatas comparadas en una línea, con la mejor primero. */
+  const comparacion = useMemo(() => comparacionDeColumnas(opciones, titulos), [opciones, titulos]);
 
   const precioElegido = columnaPrecio !== null && columnaPrecio !== undefined;
   const puedeSeguir = !trabajando && mapeo.codigo !== null && mapeo.descripcion !== null && precioElegido;
@@ -90,6 +123,10 @@ export default function ConfirmarColumnas({ proveedor, pregunta, trabajando, onV
 
   const elegirPrecio = (indice) => {
     setColumnaPrecio(indice);
+    // ACÁ, Y EN NINGÚN OTRO LADO, es donde la elección pasa a ser de la persona.
+    // Este `onElegir` solo se dispara desde el botón de una columna del
+    // desplegable de precio: no hay forma de llegar sin haberlo tocado.
+    setPrecioElegidoPorUsuario(true);
     setMapeo((ant) => ({
       ...ant,
       // La elegida va primera entre las candidatas, y las demás se conservan: el
@@ -137,6 +174,7 @@ export default function ConfirmarColumnas({ proveedor, pregunta, trabajando, onV
           titulo="Precio"
           nombreColumna={precioElegido ? titulos[columnaPrecio] : null}
           textoSinElegir="Elegí cuál es"
+          comparacion={comparacion}
           evidencia={evidenciaDePrecio(respaldo.get(columnaPrecio))}
           abierto={cambiando === "precio"}
           titulos={titulos}
@@ -213,7 +251,20 @@ export default function ConfirmarColumnas({ proveedor, pregunta, trabajando, onV
       <div className="space-y-2">
         <SunmiButton
           color="cyan"
-          onClick={() => onConfirmado({ columnaPrecio, conDescuento, mapeo, titulos, huella: pregunta?.huella })}
+          onClick={() =>
+            onConfirmado({
+              columnaPrecio,
+              // Viaja al lado de la columna y no en su lugar: el servidor
+              // necesita las dos cosas —qué columna y si alguien la eligió— y
+              // mandar `null` cuando no la eligió perdería la propuesta, que la
+              // pantalla igual quiere mostrar.
+              precioElegidoPorUsuario,
+              conDescuento,
+              mapeo,
+              titulos,
+              huella: pregunta?.huella,
+            })
+          }
           disabled={!puedeSeguir}
           className="w-full min-h-toque text-base font-bold"
         >
@@ -239,6 +290,54 @@ function evidenciaDePrecio(r) {
   return `Es la que coincide con tus costos en ${de100} de cada 100 productos.`;
 }
 
+/**
+ * LA COMPARACIÓN ENTRE LAS CANDIDATAS, EN UNA LÍNEA.
+ *
+ * "C/IVA coincide en 4 de cada 9; S/IVA, en 1." Ordenada de mejor a peor.
+ *
+ * ── POR QUÉ HACE FALTA, SI CADA OPCIÓN YA TRAE SU NÚMERO ──────────────────
+ *
+ * Porque los números de cada opción solo se ven con el desplegable ABIERTO, y la
+ * pregunta que hay que contestar es comparativa: no "¿esta columna es buena?"
+ * sino "¿cuál de las dos?". Sin verlas juntas, elegir bien depende de abrir el
+ * desplegable y acordarse del primer número mientras se lee el segundo.
+ *
+ * Devuelve null cuando no hay con qué comparar —una sola candidata, o ninguna
+ * medida—, porque una comparación de un solo término no es una comparación.
+ *
+ * @returns { texto, empate } | null
+ */
+export function comparacionDeColumnas(opciones = [], titulos = []) {
+  const medidas = opciones
+    .filter((o) => !o.conDescuento && Number(o.comparables) > 0)
+    .map((o) => ({
+      titulo: titulos[o.columna] || `Columna ${o.columna + 1}`,
+      explicadas: Number(o.explicadas) || 0,
+      comparables: Number(o.comparables),
+    }))
+    .sort((a, b) => b.explicadas - a.explicadas);
+
+  if (medidas.length < 2) return null;
+
+  const [mejor, segunda] = medidas;
+  const partes = medidas.map((m, i) =>
+    i === 0
+      ? `${m.titulo} coincide con tus costos en ${m.explicadas} de cada ${m.comparables}`
+      : `${m.titulo}, en ${m.explicadas}`
+  );
+
+  return {
+    texto: partes.join("; ") + ".",
+    // ── EL EMPATE SE DICE, NO SE DESEMPATA ──────────────────────────────
+    //
+    // Dos columnas que explican lo mismo son dos respuestas igual de defendibles
+    // con la evidencia que hay, y elegir una por el orden sería volver a decidir
+    // por el nombre, que es de donde vino todo esto. Se dice que empataron y se
+    // pide elegir.
+    empate: mejor.explicadas === segunda.explicadas,
+  };
+}
+
 function valor(ejemplo, indice) {
   if (indice === null || indice === undefined) return "";
   return String(ejemplo?.valores?.[indice] ?? "").trim();
@@ -260,10 +359,30 @@ function Dato({
   titulos = [],
   soloEstas = null,
   respaldo = null,
+  comparacion = null,
   onAbrir,
   onElegir,
 }) {
-  const indices = (soloEstas ?? titulos.map((_, i) => i));
+  // ── LA MEJOR ARRIBA, Y "MEJOR" ES LA QUE EXPLICA MÁS ────────────────────
+  //
+  // El orden que llega en `soloEstas` es el de las candidatas por lo que su
+  // TÍTULO parece, y ese orden no dice nada sobre cuál es el precio que hay que
+  // costear: "S/IVA" se parece a un precio tanto como "C/IVA". Poner primera a
+  // la que explica más productos es poner primera a la que tiene evidencia.
+  //
+  // No es cosmético: la primera opción de una lista es la que se toca sin
+  // pensar, y acá lo que se toca decide todos los costos de la lista.
+  //
+  // Sin respaldo —la pantalla de la primera lectura todavía no lo tiene— se
+  // respeta el orden que vino, que es lo único que hay.
+  const indices = [...(soloEstas ?? titulos.map((_, i) => i))].sort((a, b) => {
+    const ra = respaldo?.get(a);
+    const rb = respaldo?.get(b);
+    if (!ra && !rb) return 0;
+    if (!ra) return 1;
+    if (!rb) return -1;
+    return (rb.explicadas ?? 0) - (ra.explicadas ?? 0);
+  });
   return (
     <div className="p-3 border-b sunmi-border last:border-b-0">
       <div className="flex items-center gap-2">
@@ -273,6 +392,16 @@ function Dato({
             {nombreColumna ? `columna «${nombreColumna}»` : textoSinElegir}
           </div>
           {evidencia && <div className="text-sm2 sunmi-text-success leading-snug">{evidencia}</div>}
+          {/* LA COMPARACIÓN, siempre visible y sin abrir nada: la pregunta es
+              cuál de las dos, y para contestarla hay que verlas juntas. */}
+          {comparacion && (
+            <div className="text-sm2 sunmi-text-muted leading-snug">{comparacion.texto}</div>
+          )}
+          {comparacion?.empate && (
+            <div className="text-sm2 sunmi-text-warning leading-snug">
+              Las dos coinciden igual: con tus costos no se puede saber cuál es. Elegí vos.
+            </div>
+          )}
         </div>
         <SunmiButton
           color="slate"

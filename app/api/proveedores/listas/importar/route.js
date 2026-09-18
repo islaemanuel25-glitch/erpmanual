@@ -64,6 +64,7 @@ import {
   filasDelArchivo,
   decidirColumnaDeLaLista,
   aplicarEleccion,
+  respaldoDe,
 } from "@/lib/proveedores/listas/importacionGenerica";
 
 /**
@@ -151,13 +152,61 @@ async function leerArchivoGenerico({ bytes, nombre, proveedor, form }) {
     precios: uso.receta.precios,
   };
 
-  // La columna elegida a mano, si la pantalla la mandó. Se valida contra las
-  // candidatas: un índice que no es una de ellas no se acepta, porque sería
-  // costear con una columna que ni siquiera parece un precio.
-  const columnaPedida = Number(form.get("columnaPrecio"));
-  const eleccionManual = Number.isInteger(columnaPedida) && mapeo.precios.includes(columnaPedida)
-    ? { columna: columnaPedida, conDescuento: leerBooleano(form.get("conDescuento")) === true }
-    : null;
+  // ── LA COLUMNA ELEGIDA A MANO, Y SOLO SI DE VERDAD LA ELIGIÓ ALGUIEN ─────
+  //
+  // Se valida contra las candidatas: un índice que no es una de ellas no se
+  // acepta, porque sería costear con una columna que ni siquiera parece un
+  // precio.
+  //
+  // ── EL DEFECTO QUE ESTA DISTINCIÓN ARREGLA ───────────────────────────────
+  //
+  // La pantalla manda `columnaPrecio` SIEMPRE: también cuando lo único que hizo
+  // la persona fue apretar "Está bien, seguir" sobre la columna que la propia
+  // pantalla había propuesto. Hasta el 2026-09-17 eso alcanzaba para que
+  // `eleccionManual` quedara cargada, y una elección manual le gana al motor y
+  // saltea el 409 con el que el motor pide ayuda.
+  //
+  // Medido: un archivo con las dos columnas de Arcor se leyó con S/IVA, que
+  // explicaba 1 de cada 9 productos, teniendo al lado C/IVA, que explicaba 4. El
+  // motor había medido las dos y no había elegido ninguna —ninguna llega a los
+  // dos tercios que pide `MAYORIA_MINIMA`— así que quería preguntar; la
+  // propuesta hecha por el nombre de la columna se tragó la pregunta. ARCOR
+  // ARVEJAS quedó en $858,86 en vez de $1.039,22, un 17 % abajo, y como contra
+  // el costo viejo da +15,7 % cayó adentro del rango esperado y se aplicó sin
+  // una sola advertencia. La columna equivocada no produce un disparate visible:
+  // produce un aumento plausible.
+  //
+  // Así que ahora hacen falta DOS cosas para que cuente como elección: el índice
+  // y el gesto. `precioElegidoPorUsuario` lo manda la pantalla solo cuando la
+  // persona tocó una columna para elegirla.
+  //
+  // El otro camino legítimo es una elección de una persona que ya quedó
+  // guardada en la receta del proveedor: se decidió una vez, con las manos, y no
+  // hay por qué volver a preguntarlo cada mes.
+  // Y el guardado se lee de la RECETA, no del formulario: cuando la receta
+  // aplica, la pantalla de columnas no se muestra y el formulario no manda nada.
+  // Esperar el índice por el formulario dejaría sin efecto la elección guardada
+  // justo en el caso para el que se guardó.
+  const laTocoAhora =
+    leerBooleano(form.get("precioElegidoPorUsuario")) === true
+      ? Number(form.get("columnaPrecio"))
+      : null;
+  const laGuardoAntes =
+    uso.receta.precioLoEligioUnaPersona === true ? uso.receta.columnaPrecioElegida : null;
+
+  const columnaElegida = laTocoAhora ?? laGuardoAntes;
+  const eleccionManual =
+    Number.isInteger(columnaElegida) && mapeo.precios.includes(columnaElegida)
+      ? {
+          columna: columnaElegida,
+          conDescuento:
+            laTocoAhora !== null
+              ? leerBooleano(form.get("conDescuento")) === true
+              : uso.receta.descuentoAplicado === true,
+          // De dónde salió el gesto, para poder contarlo en el resultado.
+          origen: laTocoAhora !== null ? "LA_ELEGISTE_AHORA" : "LA_ELEGISTE_ANTES",
+        }
+      : null;
 
   return {
     ok: true,
@@ -572,21 +621,34 @@ export async function POST(req) {
         columna: eleccion.columna,
         titulo: generico.titulos[eleccion.columna] ?? "",
         conDescuento: eleccion.conDescuento === true,
-        // ── "A MANO" ES HABER CORREGIDO AL MOTOR, NO HABERLE DICHO QUE SÍ ───
+        // ── "A MANO" ES QUE LA ELIGIÓ UNA PERSONA ──────────────────────────
         //
-        // La pantalla 3 manda siempre la columna, también cuando la persona
-        // aprieta "Está bien, seguir" sobre la que el motor propuso. Mirando
-        // solo `eleccionManual !== null`, aceptar quedaba registrado como elegir,
-        // y el resultado decía "La elegiste vos" sobre una columna que la
-        // persona nunca tocó. Es un dato de auditoría: si un costo sale mal, la
-        // primera pregunta es quién eligió esa columna.
-        aMano:
-          generico.eleccionManual !== null &&
-          (decision.eleccion === null ||
-            decision.eleccion.columna !== eleccion.columna ||
-            decision.eleccion.conDescuento !== eleccion.conDescuento),
-        explicadas: decision.eleccion?.explicadas ?? null,
-        comparables: decision.eleccion?.comparables ?? null,
+        // Desde el 2026-09-17 `eleccionManual` ya solo se carga cuando alguien
+        // tocó una columna para elegirla —ahora o en una lista anterior de este
+        // proveedor—, así que esto es directo. Antes había que descontarle acá
+        // los casos en que la persona solo había aceptado la propuesta, porque
+        // esa propuesta llegaba por el mismo camino que una elección; el
+        // resultado decía "La elegiste vos" sobre una columna que nadie tocó.
+        //
+        // Es un dato de auditoría, y es de los que importan: si un costo sale
+        // mal, la primera pregunta es quién eligió esa columna.
+        aMano: generico.eleccionManual !== null,
+        // Cuál de los dos gestos fue, que no es lo mismo para quien audita: una
+        // elección de hoy la tomó alguien mirando esta lista; una guardada la
+        // tomó alguien mirando otra, hace un mes.
+        origenDeLaEleccion: generico.eleccionManual?.origen ?? "LA_ELIGIO_EL_SISTEMA",
+        // ── EL RESPALDO ES EL DE LA COLUMNA QUE SE USÓ ────────────────────
+        //
+        // Antes salía de `decision.eleccion`, que es lo que el MOTOR habría
+        // elegido. Cuando el motor no puede elegir —que es cuando la persona
+        // tiene que meter mano— eso es null, así que justo en el caso en que más
+        // falta hace, el resultado se quedaba sin poder decir cuántos productos
+        // explica la columna con la que se leyó la lista.
+        //
+        // Ahora sale de la opción que corresponde a la columna efectivamente
+        // usada. Es el número que el aviso de abajo necesita para poder decir
+        // "esta columna explica menos de la mitad".
+        ...respaldoDe(decision.opciones, eleccion),
         // Lo que el motor habría elegido solo, esté o no de acuerdo con lo que
         // se eligió a mano.
         delMotor: decision.eleccion

@@ -49,6 +49,10 @@ import HojaConfirmarAplicar from "@/components/proveedores/listas/HojaConfirmarA
 // Pasar un control a actualizar precios: pide el rango, que controlar no
 // pregunta y actualizar no puede resolver sin él.
 import HojaPasarAActualizar from "@/components/proveedores/listas/HojaPasarAActualizar";
+import HojaCambiarColumna from "@/components/proveedores/listas/HojaCambiarColumna";
+// El mismo predicado que usa el servidor para decidir si una columna explica
+// poco. Escribir acá una comparación parecida es lo que CLAUDE.md prohíbe.
+import { explicaPoco } from "@/lib/proveedores/listas/importacionGenerica";
 // Cancelar una importación que quedó inservible. Con su propia palabra: no es
 // lo mismo que terminarla.
 import ModalCancelarImportacion from "@/components/proveedores/listas/ModalCancelarImportacion";
@@ -87,6 +91,7 @@ export default function ResultadoDeListaPage() {
   // hoja que pide el rango, `pasando` es el pedido en vuelo. Con uno solo, el
   // botón de la hoja no podría decir "Pasando…" sin cerrarla.
   const [pasandoAActualizar, setPasandoAActualizar] = useState(false);
+  const [cambiandoColumna, setCambiandoColumna] = useState(false);
   const [pasando, setPasando] = useState(false);
   const [errorAlPasar, setErrorAlPasar] = useState(null);
   // La confirmación de cancelar. Cancelar no escribe ningún costo, pero cierra
@@ -177,6 +182,42 @@ export default function ResultadoDeListaPage() {
         texto:
           `Listo: se volvió a leer con un aumento esperado de ${j.rango.minPct} % a ${j.rango.maxPct} %. ` +
           "Todavía no se cambió ningún costo.",
+      });
+      await cargar();
+    } catch {
+      setErrorAlPasar("No se pudo conectar con el servidor. Probá de nuevo.");
+    } finally {
+      setPasando(false);
+    }
+  };
+
+  /**
+   * VUELVE A LEER LA LISTA CON OTRA COLUMNA DE PRECIO.
+   *
+   * No pide el archivo: cada fila guarda lo que decía cada columna. Y no toca el
+   * modo ni el rango — lo único que cambia es de qué número se parte—, porque si
+   * cambiaran dos cosas a la vez, mirando el resultado nadie podría decir cuál
+   * de las dos lo movió.
+   */
+  const cambiarColumna = async ({ columna, conDescuento }) => {
+    setPasando(true);
+    setErrorAlPasar(null);
+    try {
+      const r = await fetch(`/api/proveedores/listas/${id}/columna-de-precio`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ columna, conDescuento }),
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) {
+        setErrorAlPasar(j?.error || `No se pudo volver a leer con esa columna (error ${r.status}).`);
+        return;
+      }
+      setCambiandoColumna(false);
+      setAviso({
+        tono: "success",
+        texto: `Listo: se volvió a leer con la columna «${j.titulo}». Todavía no se cambió ningún costo.`,
       });
       await cargar();
     } catch {
@@ -420,16 +461,54 @@ export default function ResultadoDeListaPage() {
 
       {aviso && <Aviso tono={aviso.tono}>{aviso.texto}</Aviso>}
 
+      {/* ── LA COLUMNA QUE EXPLICA POCO, ARRIBA Y CON SU SALIDA ────────────
+          Cuando la columna con la que se leyó explica menos de la MITAD de los
+          productos comparables, hay motivo para dudar de ella — y el caso que
+          originó esto demuestra que dudar tarde sale caro: la columna
+          equivocada no da un disparate visible, da un aumento plausible que se
+          aplica solo.
+          Va arriba de todo y con el botón al lado, porque un aviso que dice que
+          algo puede estar mal sin decir qué hacer es peor que no avisar. */}
+      {explicaPoco(lectura) && abierta && (
+        <Aviso tono="warning">
+          <p className="leading-snug">
+            Los precios salieron de la columna «{lectura.titulo}», que coincide con tus costos en{" "}
+            {lectura.explicadas} de cada {lectura.comparables} productos. Puede no ser la columna
+            del precio que te factura este proveedor.
+          </p>
+          <div className="mt-2">
+            <SunmiButton
+              color="cyan"
+              onClick={() => setCambiandoColumna(true)}
+              disabled={pasando}
+              className="w-full min-h-toque text-sm3"
+            >
+              Leer con otra columna
+            </SunmiButton>
+          </div>
+        </Aviso>
+      )}
+
       {/* CON QUÉ COLUMNA SE LEYÓ. Es la decisión de la que cuelga todo lo demás,
-          así que se dice, y se dice con su respaldo. */}
-      {lectura?.titulo && (
+          así que se dice, y se dice con su respaldo.
+          NO se muestra cuando arriba está el aviso: los dos dicen lo mismo, y
+          además lo dicen con denominadores distintos —"0 de cada 9" y "0 de cada
+          100"— así que juntos se leen como dos mediciones que no coinciden. */}
+      {lectura?.titulo && !(explicaPoco(lectura) && abierta) && (
         <p className="text-sm2 sunmi-text-muted leading-snug">
           Los precios salieron de la columna «{lectura.titulo}»
           {lectura.conDescuento ? ", con el descuento aplicado" : ""}
           {lectura.comparables
             ? `, que coincide con tus costos en ${Math.round((lectura.explicadas / lectura.comparables) * 100)} de cada 100 productos.`
             : "."}
-          {lectura.aMano ? " La elegiste vos." : ""}
+          {/* QUIÉN LA ELIGIÓ, y las tres respuestas son distintas para quien
+              audita: no es lo mismo una decisión tomada hoy mirando esta lista
+              que una tomada hace un mes mirando otra, ni que ninguna. */}
+          {lectura.origenDeLaEleccion === "LA_ELEGISTE_AHORA" || (lectura.aMano && !lectura.origenDeLaEleccion)
+            ? " La elegiste vos."
+            : lectura.origenDeLaEleccion === "LA_ELEGISTE_ANTES"
+              ? " La elegiste vos en una lista anterior de este proveedor."
+              : " La eligió el sistema."}
         </p>
       )}
 
@@ -876,6 +955,19 @@ export default function ResultadoDeListaPage() {
           onPasar={pasarAActualizar}
           onVolver={() => {
             setPasandoAActualizar(false);
+            setErrorAlPasar(null);
+          }}
+        />
+      )}
+
+      {cambiandoColumna && (
+        <HojaCambiarColumna
+          lectura={lectura}
+          trabajando={pasando}
+          error={errorAlPasar}
+          onCambiar={cambiarColumna}
+          onVolver={() => {
+            setCambiandoColumna(false);
             setErrorAlPasar(null);
           }}
         />
