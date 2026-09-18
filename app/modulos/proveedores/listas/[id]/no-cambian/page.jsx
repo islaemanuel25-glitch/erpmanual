@@ -17,9 +17,25 @@
 //   Para revisar   hay una decisión pendiente. Tocarlo abre su revisión.
 //   Lo dejaste     fue una decisión tuya, y es reversible: tocarlo lo vuelve a
 //                  incluir en esta lista.
-//   No vino        el proveedor no lo informó. No hay nada que decidir acá: lo
-//                  que se puede es mirar su ficha y cuándo se le tocó el costo
-//                  por última vez.
+//   No vino        NO se encontró con el código que tiene guardado. Lo primero
+//                  que se ofrece es buscarlo en la lista, porque el renglón casi
+//                  siempre está con otro nombre.
+//
+// ── POR QUÉ «NO VINO» DEJÓ DE SER UN CALLEJÓN SIN SALIDA (2026-09-18) ──────
+//
+// La hoja decía "el proveedor no lo informó en esta lista" y ofrecía dos salidas:
+// ver la ficha, o cerrar. Las dos terminan en nada.
+//
+// El caso real: "ala 800 lavado total con bica", costo $60.120,00, caja de 24. En
+// la lista de M Y F estaba, con otro nombre y otro código —"ALA PVO LAV MANO C
+// BICARBONATO 24X800"—. La afirmación de la hoja era FALSA, y era la más costosa
+// de las dos cosas que estaban mal: le decía a Emanuel que no había nada que
+// hacer justo en el caso donde sí lo había, y el producto se quedaba con el costo
+// viejo lista tras lista sin que nadie entendiera por qué.
+//
+// Que no aparezca casi nunca significa que el proveedor lo dejó de traer.
+// Significa que el código guardado está mal o falta. Por eso la hoja ahora dice
+// eso —no se encontró con el código guardado— y ofrece buscarlo.
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -51,6 +67,10 @@ import {
   TONO_GRUPO_NO_CAMBIA,
 } from "@/lib/proveedores/listas/losQueNoCambian";
 import { fechaHora } from "@/lib/proveedores/listas/presentacion";
+// El link a la ficha sale de la lista blanca de orígenes, que es la que sabe
+// volver acá con el filtro puesto. Armar la ruta a mano es lo que dejó el botón
+// apuntando a la pantalla equivocada durante toda la vida de esta pantalla.
+import { linkEditarProducto, ORIGENES } from "@/lib/compras-proveedor/retornoPedido";
 
 /** Lo que dice cada chip. El conteo se le pega al armar. */
 const ETIQUETA_CHIP = {
@@ -72,7 +92,10 @@ export default function LosQueNoCambianPage() {
   const sesion = useUser() || {};
   const perfil = sesion.perfil;
   const cargandoUser = sesion.cargando !== false;
-  const { loading: cargandoCtx, needsContexto } = useContextoActivo();
+  // El `localId` hace falta para el link a la ficha: la pantalla de editar
+  // producto lo pide para saber de qué local es el costo que muestra.
+  const { loading: cargandoCtx, needsContexto, contexto } = useContextoActivo();
+  const localId = contexto?.localId || 0;
 
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -161,6 +184,56 @@ export default function LosQueNoCambianPage() {
     } finally {
       setTrabajando(false);
     }
+  };
+
+  /**
+   * BUSCAR EL RENGLÓN DE ESTE PRODUCTO EN LA LISTA.
+   *
+   * Es la MISMA pantalla que «No es este producto» abre desde revisar de a uno,
+   * entrando por la otra puerta: `?producto=` en vez de `?fila=`. Escribir una
+   * segunda pantalla de elegir renglón sería la copia que el CLAUDE.md prohíbe, y
+   * lo que se separaría el día que una cambie es cómo se ordenan las candidatas.
+   *
+   * El filtro viaja para que la vuelta caiga en el mismo chip.
+   */
+  const buscarEnLaLista = (item) => {
+    if (!item?.productoBaseId) return;
+    const qs = new URLSearchParams({ producto: String(item.productoBaseId) });
+    if (filtro) qs.set("filtro", filtro);
+    router.push(`/modulos/proveedores/listas/${id}/elegir-fila?${qs}`);
+  };
+
+  /**
+   * LA FICHA DEL PRODUCTO QUE SE ESTÁ MIRANDO.
+   *
+   * ── EL DEFECTO QUE ESTO ARREGLA, Y POR QUÉ NADIE LO VIO ───────────────────
+   *
+   * Decía `/modulos/productos/editar/${id}`. Esa ruta EXISTE —así que no daba 404,
+   * no había error en la consola y el botón no parecía roto— pero monta
+   * `ModalProductoFinal`, que se titula según si le llegó `initialData`. Ahí llega
+   * `null`, así que la pantalla se presentaba como «Nuevo producto» con el
+   * formulario vacío: el que apretaba veía una ficha en blanco donde esperaba la
+   * de su producto.
+   *
+   * La que sirve es `/modulos/productos/[id]/editar`, con `FormProducto`, y es la
+   * que ya sabe volver por la lista blanca de orígenes. Por eso el link no se
+   * arma acá: lo arma `linkEditarProducto`, que además valida que haya `localId`.
+   */
+  const verFicha = (item) => {
+    const url = linkEditarProducto({
+      baseId: item?.productoBaseId,
+      localId,
+      origen: ORIGENES.LISTA_NO_CAMBIAN,
+      importacionId: id,
+      filtro,
+    });
+    // Sin `localId` no hay ficha que mostrar —el costo es por local— y no se
+    // adivina uno: se lo dice, que es mejor que abrir una pantalla en blanco.
+    if (!url) {
+      setError("Seleccioná un contexto operativo para ver la ficha del producto.");
+      return;
+    }
+    router.push(url);
   };
 
   const tocar = (item) => {
@@ -308,7 +381,8 @@ export default function LosQueNoCambianPage() {
           trabajando={trabajando}
           onCerrar={() => setAbierto(null)}
           onVolverAIncluir={() => volverAIncluir(abierto)}
-          onVerFicha={() => router.push(`/modulos/productos/editar/${abierto.productoBaseId}`)}
+          onVerFicha={() => verFicha(abierto)}
+          onBuscarEnLaLista={() => buscarEnLaLista(abierto)}
         />
       )}
     </Marco>
@@ -322,8 +396,16 @@ export default function LosQueNoCambianPage() {
  * incluirlo" sobre un producto que el proveedor no informó sería ofrecer algo
  * que no existe —no hay precio nuevo para incluir—.
  */
-function HojaDelQueNoCambia({ item, trabajando, onCerrar, onVolverAIncluir, onVerFicha }) {
+function HojaDelQueNoCambia({
+  item,
+  trabajando,
+  onCerrar,
+  onVolverAIncluir,
+  onVerFicha,
+  onBuscarEnLaLista,
+}) {
   const esDejado = item.grupo === GRUPO_NO_CAMBIA.DEJADO;
+  const esNoVino = item.grupo === GRUPO_NO_CAMBIA.NO_VINO;
   return (
     <SunmiModalLayout
       open
@@ -356,6 +438,26 @@ function HojaDelQueNoCambia({ item, trabajando, onCerrar, onVolverAIncluir, onVe
               Vuelve a esta lista y a las próximas de este proveedor.
             </p>
           )}
+          {/* ── LA ACCIÓN PRINCIPAL DE UN «NO VINO» ES BUSCARLO ───────────
+              Va primera y en cyan, como el «volver a tenerlo en cuenta» de un
+              dejado, porque es lo que hay que hacer en casi todos los casos: el
+              renglón está y el código guardado es el que está mal. Dejarla abajo
+              y en gris, al lado de «Cerrar», la haría leer como una curiosidad. */}
+          {esNoVino && (
+            <SunmiButton
+              color="cyan"
+              onClick={onBuscarEnLaLista}
+              disabled={trabajando}
+              className="w-full min-h-toque text-base font-bold"
+            >
+              Buscarlo en la lista
+            </SunmiButton>
+          )}
+          {esNoVino && (
+            <p className="text-sm2 sunmi-text-muted leading-snug">
+              Si lo encontrás, queda atado para siempre y esta lista lo corrige.
+            </p>
+          )}
           <SunmiButton
             color="slate"
             onClick={onVerFicha}
@@ -380,10 +482,17 @@ function HojaDelQueNoCambia({ item, trabajando, onCerrar, onVolverAIncluir, onVe
           Costo de hoy {money(item.costoActual)}
           {item.factorPack ? ` · caja de ${item.factorPack}` : ""}.
         </p>
+        {/* ── LA HOJA YA NO AFIRMA QUE EL PROVEEDOR NO LO TRAE ──────────────
+            Decía "el proveedor no lo informó en esta lista, así que no hay precio
+            nuevo para él", y en el caso real era falso: el renglón estaba, con
+            otro nombre y otro código. Lo único que el sistema SABE es con qué
+            código buscó y que no dio; de ahí a que el proveedor lo dejó de traer
+            hay un salto que la pantalla no puede dar, y que dado hacía que nadie
+            fuera a buscarlo. */}
         <p className="text-sm2 sunmi-text-muted leading-snug">
           {esDejado
             ? "Lo dejaste con el costo de ahora para esta lista. Se puede volver atrás."
-            : "El proveedor no lo informó en esta lista, así que no hay precio nuevo para él."}
+            : "No lo encontré en esta lista con el código que tiene guardado. Casi siempre está, con otro nombre y otro código."}
         </p>
         <p className="text-sm2 sunmi-text-muted leading-snug">
           {item.actualizadoEn
