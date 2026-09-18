@@ -1929,6 +1929,25 @@ export default function ProductosPage() {
   // estado intermedio donde el carrusel tenga cuatro cards y después doce.
   const cardsDelCarrusel = [...controles, ...cardsPresentacion];
 
+  // ── LOS TRES GRUPOS, PARA QUE NINGUNA PÁGINA LOS MEZCLE ─────────────────
+  //
+  // El reparto ya no se puede dejar al corte de a cuatro: "Para revisar" pasó de
+  // cuatro controles a seis —los dos de código de barras— y el corte plano
+  // dejaba dos controles y dos modalidades de venta en la misma página, abajo
+  // del encabezado que dice "Para revisar".
+  //
+  // La partición sale del DOMINIO y no de contar a mano: `esPresentacionDeVenta`
+  // y `esPresentacionDeCompra` —los mismos predicados que esta pantalla ya usa
+  // para decidir qué card alterna cuál filtro— dicen de qué grupo es cada una.
+  // Partir por índice —"las cuatro primeras, después las cuatro siguientes"—
+  // volvería a romperse en silencio el día que un grupo cambie de tamaño, que es
+  // justo lo que acaba de pasar.
+  const gruposDelCarrusel = [
+    controles,
+    cardsPresentacion.filter((c) => esPresentacionDeVenta(c.id)),
+    cardsPresentacion.filter((c) => esPresentacionDeCompra(c.id)),
+  ];
+
   // ── UNA SOLA PUERTA DE ENTRADA, QUE REPARTE POR EL ID ───────────────────
   //
   // El carrusel es uno, así que su `onSelect` es uno. Quién atiende cada toque
@@ -2607,6 +2626,17 @@ export default function ProductosPage() {
               <div className="md:hidden">
                 <CarruselControles
                   controles={cardsDelCarrusel}
+                  // ── DÓNDE CORTA EL CARRUSEL, DICHO POR GRUPO ──────────
+                  //
+                  // Antes cortaba de a cuatro sobre la lista entera y caía
+                  // justo, porque los tres grupos medían cuatro. Con los dos
+                  // controles nuevos "Para revisar" mide seis, y ese corte
+                  // dejaba una página con dos controles y dos modalidades de
+                  // venta bajo el encabezado "Para revisar".
+                  //
+                  // Con los grupos declarados, cada uno arranca en su propia
+                  // página: controles (2 páginas), venta (1), compra (1).
+                  grupos={gruposDelCarrusel}
                   activo={[control, presentaciones.venta, presentaciones.compra]}
                   onSelect={alTocarCard}
                   cargando={cargandoControles}
@@ -2978,6 +3008,15 @@ export default function ProductosPage() {
                     // listado ya lo traía y nadie lo estaba mirando.
                     imagenUrl={p.imagenUrl ?? null}
                     codigoBarra={muestraCodigoBarra ? p.codigoBarra ?? p.sku ?? null : false}
+                    // ── EL CRUDO, PARA EL AVISO DEL CÓDIGO DE CAJA ──────────
+                    //
+                    // Va aparte del de arriba a propósito. Aquél es lo que la
+                    // tarjeta DIBUJA —se apaga con el personalizador y le cae al
+                    // SKU—, y un producto con el código de la caja no deja de
+                    // tenerlo porque alguien apagó la columna. Además un SKU de
+                    // catorce dígitos no es un código de caja, así que el aviso
+                    // tiene que mirar `codigo_barra` y nada más.
+                    codigoBarraPrincipal={p.codigoBarra ?? null}
                     // ── ACÁ IBA EL ID DEL PRODUCTO, Y ERA UN DEFECTO ────────
                     //
                     // Decía `p.id ?? p.productoLocalId`, o sea la clave primaria

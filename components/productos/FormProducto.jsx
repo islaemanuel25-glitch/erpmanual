@@ -32,6 +32,7 @@ import {
 import useVersionGuard from "@/hooks/useVersionGuard";
 import AvisoVersionNueva from "@/components/version/AvisoVersionNueva";
 import AvisoCambioDeEscala from "@/components/productos/AvisoCambioDeEscala";
+import AvisoCodigoDeCaja from "@/components/productos/AvisoCodigoDeCaja";
 import { useUser } from "@/app/context/UserContext";
 
 function parseVoiceNumber(text) {
@@ -519,6 +520,67 @@ export default function FormProducto({
     setAvisoEscala(null);
   }, [form.unidad_medida, form.factor_pack, form.pesoEsFijo, form.modoVentaDeposito, form.pesoReferenciaKg]);
 
+  // ── LO QUE EL SERVIDOR SABE DEL CÓDIGO DE CAJA ──────────────────────────
+  //
+  // La cuenta —de catorce a trece— la hace el propio aviso sin preguntar nada.
+  // Lo que se pide acá son las tres cosas que no se pueden calcular: si el código
+  // de la unidad ya lo tiene otro producto, si el campo secundario está libre
+  // para guardar el de catorce, y si alguien más vio ese trece en una lista de
+  // proveedor.
+  //
+  // Se pide UNA vez al abrir la ficha y no en cada tecla: lo que se consulta es
+  // el código GUARDADO, no el que se está escribiendo. Recalcularlo mientras
+  // alguien tipea mostraría un "ya lo tiene otro producto" sobre un código a
+  // medio escribir.
+  const [datosCodigoCaja, setDatosCodigoCaja] = useState(null);
+  useEffect(() => {
+    const id = initialData?.id;
+    if (!id) return undefined;
+    let vivo = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/productos/codigo-de-caja?productoBaseId=${id}`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const data = await res.json().catch(() => null);
+        if (!vivo) return;
+        // DEGRADA SIN ROMPER, PERO NO EN SILENCIO: igual que el aviso de escala.
+        // Sin respuesta el aviso se queda diciendo "buscando" y NO ofrece el
+        // botón, que es lo correcto: no se propone un código sin saber si está
+        // libre.
+        if (!res.ok || !data?.ok) {
+          console.error(
+            `productos/codigo-de-caja: no se pudo revisar (id=${id} status=${res.status}): ${data?.error ?? "sin detalle"}`
+          );
+          return;
+        }
+        setDatosCodigoCaja(data);
+      } catch (e) {
+        console.error(`productos/codigo-de-caja: no se pudo consultar (id=${id}): ${e?.message}`);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [initialData?.id]);
+
+  /**
+   * EL BOTÓN DEL AVISO: completa los dos campos y no guarda nada.
+   *
+   * El código de la unidad va al principal y el de catorce al secundario, salvo
+   * que el secundario ya tenga otra cosa — ahí NO se pisa, y el aviso ya se lo
+   * dijo a quien está mirando antes de que apretara. Guardar sigue siendo el
+   * Guardar de siempre, con su validación de unicidad.
+   */
+  const usarCodigoDeUnidad = ({ unidad, caja, secundarioOcupado }) => {
+    setForm((p) => ({
+      ...p,
+      codigo_barra: unidad,
+      codigo_barra_secundario: secundarioOcupado ? p.codigo_barra_secundario : caja,
+    }));
+  };
+
   const consultarAvisoDeEscala = async () => {
     // Solo en edición: un producto nuevo no tiene precio viejo que quede mal.
     if (!initialData?.id) return null;
@@ -729,6 +791,20 @@ export default function FormProducto({
                 )}
               </div>
             </Field>
+
+            {/* ── EL AVISO VA ARRIBA DE LOS DOS CAMPOS ────────────────────
+                Porque habla de los dos: el principal tiene el código de la caja
+                y el secundario es adonde va a parar. Ponerlo abajo lo dejaría
+                después del campo que propone cambiar, y quien baja escribiendo
+                el código ya lo pasó de largo. El componente devuelve `null`
+                cuando el código no es de catorce, así que en los 2.635
+                productos restantes esta línea no dibuja nada. */}
+            <AvisoCodigoDeCaja
+              codigoBarra={initialData?.codigo_barra ?? initialData?.codigoBarra ?? null}
+              modo="ficha"
+              datos={datosCodigoCaja}
+              onUsarUnidad={usarCodigoDeUnidad}
+            />
 
             <Field label="Código barras" fieldKey="codigo_barra">
               <div className="flex items-center gap-2">
