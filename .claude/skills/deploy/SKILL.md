@@ -988,6 +988,30 @@ Dos cosas que hacen falta para anclar bien y que se pagan si no se saben:
 - **Se busca con `grep -F`**, cadena fija. Un punto y una llave son metacaracteres
   y ya hicieron dar "ausente" a reglas que estaban.
 
+**Y UN MARCADOR QUE VIVE SOLO EN UN COMENTARIO DA VACÍO: EL BUILD LOS BORRA.**
+
+*El caso, del 2026-09-18, desplegando `652a5c03`.* El marcador elegido fue
+`BUSCARLO EN LA LISTA`, una cadena en mayúsculas que el `git grep` encontraba en
+dos archivos de `app/` y **cero veces** en el commit desplegado — o sea que pasaba
+la comprobación de "no existía antes" con holgura. Adentro de la imagen dio
+**vacío**, con el control encontrando bien. Leído según la regla de arriba, eso
+dice "no viajó", que para un despliegue ya recreado es una frenada.
+
+No era eso. Las dos apariciones estaban **adentro de comentarios** —un encabezado
+de sección y un título de archivo—, y el build de producción los saca. La cadena
+nunca iba a estar, con la tanda desplegada o sin desplegar.
+
+**Es el primo del caso de Tailwind, y va al revés.** Allá el build tiene DE MÁS
+—una clase se sigue generando porque un comentario la nombra— y acá tiene DE
+MENOS. La regla que sale de los dos juntos: lo que un comentario hace con un
+marcador depende de quién lo lee. Tailwind escanea el archivo crudo y los ve; el
+compilador de JavaScript los borra.
+
+En la práctica, después de comprobar que el marcador no existía antes, **mirar
+CÓMO está escrito donde sí existe**: si las apariciones son todas comentarios, no
+sirve. El que sirvió fue `Elegí un renglón de la lista.`, que es el texto de un
+error que la ruta devuelve de verdad.
+
 **Y su par, que es la otra mitad: un vacío solo significa algo si la misma
 búsqueda encuentra algo cuando tiene que encontrarlo.**
 
