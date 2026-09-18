@@ -64,6 +64,7 @@ import {
   filasDelArchivo,
   decidirColumnaDeLaLista,
   aplicarEleccion,
+  respaldoDe,
 } from "@/lib/proveedores/listas/importacionGenerica";
 
 /**
@@ -636,8 +637,18 @@ export async function POST(req) {
         // elección de hoy la tomó alguien mirando esta lista; una guardada la
         // tomó alguien mirando otra, hace un mes.
         origenDeLaEleccion: generico.eleccionManual?.origen ?? "LA_ELIGIO_EL_SISTEMA",
-        explicadas: decision.eleccion?.explicadas ?? null,
-        comparables: decision.eleccion?.comparables ?? null,
+        // ── EL RESPALDO ES EL DE LA COLUMNA QUE SE USÓ ────────────────────
+        //
+        // Antes salía de `decision.eleccion`, que es lo que el MOTOR habría
+        // elegido. Cuando el motor no puede elegir —que es cuando la persona
+        // tiene que meter mano— eso es null, así que justo en el caso en que más
+        // falta hace, el resultado se quedaba sin poder decir cuántos productos
+        // explica la columna con la que se leyó la lista.
+        //
+        // Ahora sale de la opción que corresponde a la columna efectivamente
+        // usada. Es el número que el aviso de abajo necesita para poder decir
+        // "esta columna explica menos de la mitad".
+        ...respaldoDe(decision.opciones, eleccion),
         // Lo que el motor habría elegido solo, esté o no de acuerdo con lo que
         // se eligió a mano.
         delMotor: decision.eleccion

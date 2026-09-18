@@ -717,6 +717,17 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // toque del pulgar al costado, que en un teléfono pasa solo, los borra los
     // dos y hay que volver a pensarlos.
     "components/proveedores/listas/HojaPasarAActualizar.jsx": true,
+    // ── LEER CON OTRA COLUMNA: `false`, y es el contraste con su vecina ────
+    //
+    // Misma pantalla, mismo criterio, respuesta distinta. La de pasar a
+    // actualizar tiene dos números TIPEADOS y por eso declara `true`; ésta no
+    // tiene nada escrito: es elegir una de dos columnas tocando un botón. Si el
+    // velo la cierra sin querer, lo que se pierde es un toque.
+    //
+    // Y la acción no es grave: volver a leer con otra columna recalcula la
+    // propuesta y no escribe ningún costo — el que escribe sigue siendo
+    // "aplicar", con su confirmación aparte.
+    "components/proveedores/listas/HojaCambiarColumna.jsx": false,
     // ── CANCELAR UNA IMPORTACIÓN: `false`, y es el contraste con la de
     //    arriba ─────────────────────────────────────────────────────────────
     //
