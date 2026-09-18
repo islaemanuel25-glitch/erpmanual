@@ -234,3 +234,16 @@ capturas-retorno/
 # Las de la comparación de la tabla de escritorio (`medir-tabla-escritorio.mjs
 # --captura`). Mismo criterio: se sacan de a pares para comparar y adjuntar.
 capturas-productos-desktop/
+
+# ── EL BANCO DE PRUEBA DEL RECORRIDO ──────────────────────────────────────
+#
+# `scripts/recorrido/bancoDeListas.mjs --sembrar` escribe acá los archivos de
+# lista que después se suben: Excels y un PDF con precios de proveedor. Son
+# DATOS, y el motivo por el que no se versionan es el mismo que el de `pgdata/`
+# —ver el encabezado de este archivo—.
+#
+# Lo que SÍ se versiona es el generador: el banco se rehace con un comando y por
+# eso no hace falta guardar su salida. Lo mismo vale para las capturas y el
+# informe crudo del recorrido.
+.banco-de-prueba/
+capturas-recorrido/
