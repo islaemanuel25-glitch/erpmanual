@@ -16,21 +16,36 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **18 migraciones** y el árbol tiene 19.
+Ninguna. Producción está en **19 migraciones**, las mismas que el árbol.
 
-- `20260917150000_precios_por_columna` — **ADITIVA**. Una sola columna nullable,
-  `preciosPorColumna` (JSONB), en `ImportacionListaFila`. Sin DROP, sin
-  `ALTER COLUMN` y sin backfill: las 6.388 filas que ya existen quedan en NULL.
+---
 
-  Guarda, por fila, lo que decía **cada** columna de precio del archivo. Hace
-  falta porque el archivo no se guarda —`archivoUbicacion` queda en null— y hasta
-  ahora de cada fila quedaba solo el precio de la columna elegida: el de la otra
-  se perdía al importar, así que descubrir que la lista se leyó con la columna
-  equivocada obligaba a volver a subir el archivo.
+## 2026-09-18 — `e174c655`, los precios de cada columna del archivo: **ADITIVA**
 
-  Las filas viejas no se pueden rellenar —reconstruirlas necesita el archivo— y
-  no hace falta: una fila sin este dato simplemente no admite cambio de columna,
-  y la pantalla lo dice en vez de ofrecer un botón que falle.
+Producción pasó de `ee34f81786fc959366e63b7fc5e074d88307ffb2` a
+`e174c6554409bd77b2746b411c5614544dcb42d8`. Corte de **2 segundos**.
+
+`20260917150000_precios_por_columna`. Una sola columna nullable,
+`preciosPorColumna` (JSONB), en `ImportacionListaFila`. Sin DROP, sin
+`ALTER COLUMN` y sin backfill.
+
+**El clasificador la marcó ADITIVA y salió con 0.** Sin autorización manual.
+
+Guarda, por fila, lo que decía **cada** columna de precio del archivo. Hace falta
+porque el archivo no se guarda: hasta ahora de cada fila quedaba solo el precio
+de la columna elegida, así que descubrir que la lista se leyó con la columna
+equivocada obligaba a volver a subir el archivo.
+
+Verificado después de recrear: el esquema informa 19 y queda al día, y de las
+**6.692 filas de importación que ya existían, 0 quedaron con el campo escrito** —
+todas en NULL, que es lo previsto. Las viejas no se pueden rellenar porque
+reconstruirlas necesita el archivo, y no hace falta: una fila sin el dato no
+admite cambio de columna y la pantalla lo dice en vez de ofrecer un botón que
+falle.
+
+El `git fetch` del repo del servidor **anduvo**, que era la duda que dejó el
+despliegue anterior: el remoto ya está por SSH y el HEAD llegó al SHA correcto
+antes de migrar, con 19 contra 19.
 
 ---
 
