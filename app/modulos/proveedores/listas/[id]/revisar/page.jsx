@@ -52,6 +52,15 @@ import PanelVincular from "@/components/proveedores/listas/PanelVincular";
 // porque lo que decide es qué significa un 0 a 0.
 import { textoDelRango } from "@/lib/proveedores/listas/modoDeLaLista";
 
+/**
+ * Qué acción rechazó el servidor, cuando no fue una lectura.
+ *
+ * Las lecturas se identifican por su `clave` —`MISMA_PRESENTACION`, `PACK_12`—
+ * así que hace falta un valor que ninguna pueda tener. Con un `true` suelto no se
+ * podría saber cuál de los botones fue.
+ */
+const ACCION_NO_LO_CAMBIO = "__NO_LO_CAMBIO__";
+
 export default function RevisarDeAUnoPage() {
   const router = useRouter();
   const params = useParams();
@@ -89,6 +98,19 @@ export default function RevisarDeAUnoPage() {
   //
   // Éste vive aparte, se dibuja abajo de todo y desaparece a los tres segundos.
   const [avisoPasajero, setAvisoPasajero] = useState("");
+  // ── EL RECHAZO DEL SERVIDOR VA DONDE SE TOCÓ, Y NO ARRIBA DE TODO ────────
+  //
+  // `aviso` se dibuja arriba del nombre del producto: antes de la tarjeta del
+  // costo, de las lecturas y de los botones. A 360 eso queda FUERA DE LA
+  // PANTALLA cuando el pulgar está en «Usar $X y seguir», que es el borde de
+  // abajo. El cartel rojo existía y estaba bien escrito, y Emanuel tocó el
+  // botón, no pasó nada, y se quedó mirando una pantalla que parecía intacta.
+  //
+  // Un rechazo tiene DOS partes y las dos hacen falta: qué contestó el servidor,
+  // y CUÁL de las acciones fue la rechazada. Con la segunda el botón que se tocó
+  // puede dejar de verse como si no hubiera pasado nada, que es lo que lo hacía
+  // indistinguible de un toque que no registró.
+  const [rechazo, setRechazo] = useState(null);
   const [vinculando, setVinculando] = useState(null);
   // La lectura fuera de rango que se está por confirmar. Mientras vale algo, la
   // pantalla pregunta; el `aceptarFueraDeRango` sale solo de contestar que sí.
@@ -185,6 +207,16 @@ export default function RevisarDeAUnoPage() {
   const fila = datos?.fila ?? null;
   const proveedor = datos?.cabecera?.proveedor?.nombre ?? "";
 
+  // ── UN RECHAZO NO SOBREVIVE AL PRODUCTO SOBRE EL QUE OCURRIÓ ─────────────
+  //
+  // Es el mismo defecto que ya se arregló con el aviso de "no lo cambio": un
+  // cartel que queda dibujado sobre el producto SIGUIENTE parece hablar de ése.
+  // Acá sería peor, porque además marcaría como rechazado un botón que nadie
+  // tocó todavía.
+  useEffect(() => {
+    setRechazo(null);
+  }, [fila?.id]);
+
   /** El siguiente de la cola, salteando el que se acaba de resolver. */
   const avanzar = useCallback(() => {
     // Se vuelve a pedir desde el principio: la fila resuelta ya no está en la
@@ -203,6 +235,7 @@ export default function RevisarDeAUnoPage() {
     if (!fila) return;
     setTrabajando(true);
     setAviso(null);
+    setRechazo(null);
     try {
       const r = await fetch(`/api/proveedores/listas/${id}/filas/${fila.id}/confirmar`, {
         method: "POST",
@@ -212,7 +245,12 @@ export default function RevisarDeAUnoPage() {
       });
       const j = await r.json().catch(() => null);
       if (!r.ok || !j?.ok) {
-        setAviso({ tono: "danger", texto: j?.error || "No se pudo usar ese precio." });
+        // El texto del servidor tal cual: es el que sabe QUÉ pasó. Acá se agrega
+        // lo único que el servidor no puede saber, que es dónde estaba el dedo.
+        setRechazo({
+          accion: lectura.clave,
+          texto: j?.error || "El servidor no pudo guardar esta lectura y no dijo por qué.",
+        });
         return;
       }
       setAviso({
@@ -221,7 +259,10 @@ export default function RevisarDeAUnoPage() {
       });
       avanzar();
     } catch {
-      setAviso({ tono: "danger", texto: "No se pudo conectar con el servidor. Probá de nuevo." });
+      setRechazo({
+        accion: lectura.clave,
+        texto: "No se pudo conectar con el servidor. Nada quedó guardado: probá de nuevo.",
+      });
     } finally {
       setTrabajando(false);
     }
@@ -231,6 +272,7 @@ export default function RevisarDeAUnoPage() {
     if (!fila) return;
     setTrabajando(true);
     setAviso(null);
+    setRechazo(null);
     try {
       const r = await fetch(`/api/proveedores/listas/${id}/seleccion`, {
         method: "POST",
@@ -240,7 +282,10 @@ export default function RevisarDeAUnoPage() {
       });
       const j = await r.json().catch(() => null);
       if (!r.ok || !j?.ok) {
-        setAviso({ tono: "danger", texto: j?.error || "No se pudo marcar." });
+        setRechazo({
+          accion: ACCION_NO_LO_CAMBIO,
+          texto: j?.error || "El servidor no pudo dejarlo como está y no dijo por qué.",
+        });
         return;
       }
       // ── EL AVISO NO SE PEGA AL PRODUCTO SIGUIENTE ─────────────────────
@@ -255,7 +300,10 @@ export default function RevisarDeAUnoPage() {
       );
       avanzar();
     } catch {
-      setAviso({ tono: "danger", texto: "No se pudo conectar con el servidor. Probá de nuevo." });
+      setRechazo({
+        accion: ACCION_NO_LO_CAMBIO,
+        texto: "No se pudo conectar con el servidor. Nada quedó guardado: probá de nuevo.",
+      });
     } finally {
       setTrabajando(false);
     }
@@ -264,6 +312,7 @@ export default function RevisarDeAUnoPage() {
   const saltear = () => {
     if (!fila) return;
     setAviso(null);
+    setRechazo(null);
     setSalteados((prev) => (prev.includes(fila.id) ? prev : [...prev, fila.id]));
     // Acá el cambio de `salteados` ya dispara el efecto, pero se sube la vuelta
     // igual: saltear el ÚLTIMO que quedaba sin saltear no cambia la lista —ya
@@ -425,6 +474,10 @@ export default function RevisarDeAUnoPage() {
                 onElegir={() =>
                   l.fueraDeRango ? setConfirmandoFuera(l) : usarLectura(l, { aceptarFueraDeRango: false })
                 }
+                // LA TARJETA QUE SE TOCÓ DEJA DE VERSE INTACTA. Es un botón, y
+                // un botón que se ve igual después de tocarlo es indistinguible
+                // de uno que no registró el toque.
+                rechazada={rechazo?.accion === l.clave}
               />
             ))}
           </div>
@@ -439,6 +492,18 @@ export default function RevisarDeAUnoPage() {
       )}
 
       <div className="space-y-2">
+        {/* ── EL RECHAZO DEL SERVIDOR, PEGADO A LOS BOTONES ──────────────────
+            Acá y no arriba de todo. El cartel rojo ya existía y decía lo
+            correcto, pero se dibujaba antes del nombre del producto: a 360, con
+            la tarjeta del costo y las lecturas en el medio, queda fuera de la
+            pantalla justo cuando el pulgar está en el botón de abajo. Tocar y no
+            ver nada es lo que hace pensar que el toque no registró. */}
+        {rechazo && (
+          <Aviso tono="danger">
+            {rechazo.texto}
+            <span className="block mt-1 font-semibold">No se guardó nada.</span>
+          </Aviso>
+        )}
         {fila.sinProducto && (
           <SunmiButton
             color="cyan"
@@ -473,7 +538,14 @@ export default function RevisarDeAUnoPage() {
             disabled={trabajando}
             className="w-full min-h-toque text-base font-bold"
           >
-            {trabajando ? "Guardando…" : recomendada.textoBoton}
+            {/* SI EL SERVIDOR LO RECHAZÓ, EL BOTÓN LO DICE. Volver a mostrar
+                "Usar $31.636,08 y seguir", idéntico, es lo que hacía que la
+                pantalla se viera como si el toque nunca hubiera ocurrido. */}
+            {trabajando
+              ? "Guardando…"
+              : rechazo?.accion === recomendada.clave
+                ? "No se pudo. Probá de nuevo"
+                : recomendada.textoBoton}
           </SunmiButton>
         )}
         {!fila.sinProducto && !recomendada && fila.lecturas.length > 0 && (
@@ -492,7 +564,11 @@ export default function RevisarDeAUnoPage() {
             {/* Es el mismo botón y la misma acción —la fila se deja afuera de
                 esta lista— pero sobre un producto que ni siquiera es tuyo "No lo
                 cambio" no quiere decir nada: no hay nada que cambiar. */}
-            {fila.sinProducto ? "No lo tengo" : "No lo cambio"}
+            {rechazo?.accion === ACCION_NO_LO_CAMBIO
+              ? "No se pudo"
+              : fila.sinProducto
+                ? "No lo tengo"
+                : "No lo cambio"}
           </SunmiButton>
           <SunmiButton
             color="slate"
@@ -585,14 +661,18 @@ export default function RevisarDeAUnoPage() {
  * el porcentaje, y abajo la cuenta escrita — sin ella el número no se puede
  * verificar contra el papel que el proveedor mandó.
  */
-function TarjetaDeLectura({ lectura, trabajando, onElegir }) {
-  const tono = lectura.recomendada
-    ? "sunmi-state-success"
-    : lectura.absurda
-      ? "sunmi-state-danger"
-      : lectura.fueraDeRango
-        ? "sunmi-state-warning"
-        : "";
+function TarjetaDeLectura({ lectura, trabajando, onElegir, rechazada = false }) {
+  // El rechazo manda sobre el tono normal: mientras esté, lo que hay que ver es
+  // que ESTA lectura es la que el servidor no aceptó, no si era la recomendada.
+  const tono = rechazada
+    ? "sunmi-state-danger"
+    : lectura.recomendada
+      ? "sunmi-state-success"
+      : lectura.absurda
+        ? "sunmi-state-danger"
+        : lectura.fueraDeRango
+          ? "sunmi-state-warning"
+          : "";
   return (
     <SunmiButton
       color="ghost"
@@ -613,9 +693,14 @@ function TarjetaDeLectura({ lectura, trabajando, onElegir }) {
       {lectura.advertencia && (
         <span className="block text-xs2 font-semibold leading-snug mt-1">{lectura.advertencia}</span>
       )}
-      {lectura.recomendada && (
+      {lectura.recomendada && !rechazada && (
         <span className="block text-xs2 sunmi-text-success leading-snug mt-1">
           Es la más probable: es la única que da un aumento como los de este proveedor.
+        </span>
+      )}
+      {rechazada && (
+        <span className="block text-xs2 font-semibold leading-snug mt-1">
+          Ésta es la que tocaste y no se pudo guardar. El motivo está abajo.
         </span>
       )}
     </SunmiButton>

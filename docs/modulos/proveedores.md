@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-09-18 02:27
+**Última actualización:** 2026-09-18 13:06
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-09-18: fix: el rechazo del servidor se ve donde está el pulgar
 - 2026-09-18: fix: la hoja de un producto que no vino deja de ser un callejón sin salida
 - 2026-09-18: feat: elegir el renglón de la lista se entra por dos puertas
 - 2026-09-18: feat: un producto que "no vino" se puede buscar en la lista
