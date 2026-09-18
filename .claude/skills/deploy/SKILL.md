@@ -1012,6 +1012,35 @@ CÓMO está escrito donde sí existe**: si las apariciones son todas comentarios
 sirve. El que sirvió fue `Elegí un renglón de la lista.`, que es el texto de un
 error que la ruta devuelve de verdad.
 
+**Y UN MARCADOR CON ACENTOS NO SIRVE SI EL TEXTO VIVE EN UN TEMPLATE LITERAL.**
+
+*El caso, del 2026-09-18, desplegando `37cf5c87`.* El marcador era el cartel
+nuevo de la pantalla, y se buscó por `quedaron afuera: los productos que tenían
+vinculados`. Dio **vacío** — con el marcador hermano encontrando y el control
+encontrando, o sea con la búsqueda funcionando perfectamente. Leído según las
+reglas de arriba, eso dice "no viajó".
+
+El texto estaba. Lo que pasa es que ese cartel se arma con un **template
+literal** —lleva un número interpolado adelante— y ahí el build **escapa los
+caracteres no ASCII**: en el archivo, `tenían` quedó escrito `ten\xedan` y
+`después` quedó `despu\xe9s`. La cadena con la `í` de verdad no matchea nada.
+
+**Y en el mismo archivo, a tres caracteres de distancia, los acentos SÍ
+sobreviven**: la otra rama del mismo cartel es un string normal entre comillas y
+ahí `Una fila quedó afuera` se encuentra tal cual. La diferencia no está en el
+texto ni en el archivo: está en **qué clase de literal lo contiene**.
+
+En la práctica: **el trozo que se busca va sin acentos**. `quedaron afuera: los
+productos` encuentra; la misma frase estirada hasta la primera `í`, no. Es gratis
+—siempre hay un tramo ASCII largo— y evita exactamente esta media hora.
+
+Van tres variantes de la misma familia y conviene nombrarla entera: **el texto
+del repo y el texto del build no son la misma cadena.** Tailwind ve los
+comentarios y el compilador los borra; el minificador mangla identificadores; y
+un template literal escapa lo que no es ASCII. Antes de creerle a un vacío, mirar
+CÓMO quedó escrito lo que se busca —`grep -oE 'trozo.{0,120}'` sobre el chunk lo
+muestra en un comando—.
+
 **Y su par, que es la otra mitad: un vacío solo significa algo si la misma
 búsqueda encuentra algo cuando tiene que encontrarlo.**
 
