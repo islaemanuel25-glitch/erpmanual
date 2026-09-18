@@ -290,28 +290,47 @@ async function subirLaLista({ db, modo, rango = RANGO, etiqueta }) {
     return null;
   }
 
-  const lectura = await revisarLaLectura();
-
-  // ── LA RAMA EN QUE EL MOTOR SÍ PREGUNTA ───────────────────────────────
+  // ── LA LECTURA SE CONFIRMA HASTA QUE DEJE DE PREGUNTAR ────────────────
   //
-  // Cuando ninguna columna explica los aumentos, la pantalla dice "Elegí cuál
-  // es" y no deja seguir sin elegir. Es la rama CORRECTA — y es la que NO se
-  // ejerce la primera vez que se sube una lista de este proveedor, que es
-  // justamente el hallazgo. Acá se la atiende para que el recorrido pueda
-  // seguir, eligiendo a mano la columna que mejor explica.
-  if (lectura.pidePrecio) {
-    console.log("  la pantalla pide elegir la columna de precio: elijo C/IVA");
-    // "Elegí cuál es" es el TEXTO del dato vacío, no un botón. El que abre el
-    // desplegable es el "Cambiar" de esa fila, y como hay uno por cada dato
-    // —código, producto, unidades, precio— el del precio es el ÚLTIMO.
-    await tocar("Cambiar", { ultimo: true, esperaMs: 1500 });
-    const eligio = await tocar("C/IVA", { ultimo: true, esperaMs: 1500 });
-    console.log(`  columna elegida a mano: ${eligio ? "C/IVA" : "no se pudo"}`);
-    await esperar(1200);
-  }
+  // Son DOS vueltas por esta pantalla, y la segunda apareció con el arreglo del
+  // 2026-09-17. Antes bastaba una: la columna que la pantalla proponía contaba
+  // como elegida, así que "Está bien, seguir" cerraba el paso y creaba la
+  // importación —con la columna equivocada, que era el defecto—.
+  //
+  // Ahora la propuesta NO cuenta como elección, así que al confirmar el motor
+  // por fin decide; y cuando no puede, la pantalla VUELVE con la pregunta de
+  // cuál es la columna de precio. Eso es lo correcto y es lo que el arnés tiene
+  // que saber recorrer: un arnés que confirma una sola vez informa "no se creó
+  // la importación" sobre un módulo que está haciendo justamente lo que hay que
+  // hacer.
+  //
+  // El tope de dos vueltas no es decoración: si la pantalla preguntara para
+  // siempre, un `while` sin límite dejaría el recorrido colgado sin decir por
+  // qué.
+  let lectura = null;
+  for (let vuelta = 1; vuelta <= 2; vuelta++) {
+    lectura = await revisarLaLectura({ primera: vuelta === 1 });
 
-  await tocar("Está bien, seguir", { ultimo: true, esperaMs: 5000 });
-  await esperar(3000);
+    // Cuando ninguna columna explica los aumentos, la pantalla dice "Elegí cuál
+    // es" y no deja seguir sin elegir. Se elige a mano la que mejor explica.
+    if (lectura.pidePrecio) {
+      console.log("  la pantalla pide elegir la columna de precio: elijo C/IVA");
+      // "Elegí cuál es" es el TEXTO del dato vacío, no un botón. El que abre el
+      // desplegable es el "Cambiar" de esa fila, y como hay uno por cada dato
+      // —código, producto, unidades, precio— el del precio es el ÚLTIMO.
+      await tocar("Cambiar", { ultimo: true, esperaMs: 1500 });
+      const eligio = await tocar("C/IVA", { ultimo: true, esperaMs: 1500 });
+      console.log(`  columna elegida a mano: ${eligio ? "C/IVA" : "no se pudo"}`);
+      await esperar(1200);
+    }
+
+    await tocar("Está bien, seguir", { ultimo: true, esperaMs: 5000 });
+    await esperar(3500);
+
+    // Si la pantalla se fue, el paso terminó.
+    if (!(await dice("¿Leí bien la lista?"))) break;
+    console.log("  la pantalla de lectura volvió a preguntar: contesto otra vez");
+  }
 
   // ── CONTRA LA BASE: ¿se creó la importación? ──────────────────────────
   const creada = await db.importacionListaProveedor.findFirst({
@@ -383,7 +402,7 @@ async function subirLaLista({ db, modo, rango = RANGO, etiqueta }) {
  * puede detectar — la conciliación compara contra el número que esta pantalla
  * dejó entrar.
  */
-async function revisarLaLectura() {
+async function revisarLaLectura({ primera = true } = {}) {
   const texto = await textoDelContenido();
 
   // ── LA COLUMNA DE PRECIO ──────────────────────────────────────────────
@@ -407,9 +426,14 @@ async function revisarLaLectura() {
   // El aviso solo aparece si salteó ALGO, así que "no está la frase" y "dice
   // cero" son cosas distintas y no se pueden leer igual: tomar la ausencia como
   // un cero informaría un hallazgo en cada pantalla que no tiene el aviso.
+  //
+  // Y solo en la PRIMERA vuelta: la segunda es la pregunta por la columna de
+  // precio, que llega por otro 409 y no trae el conteo de filas descartadas.
+  // Exigirlo ahí informaría dos veces el mismo hallazgo, una de ellas con un
+  // "no dice nada" que es de la otra pantalla.
   const dicho = texto.match(/Salte[ée]\s+(\d+)\s+fila/);
   const salteadas = dicho ? Number(dicho[1]) : null;
-  await comprobar(salteadas === 3, {
+  await comprobar(!primera || salteadas === 3, {
     pantalla: "¿Leí bien la lista?",
     hice: "Subí un archivo con tres títulos de rubro (GOLOSINAS, CHOCOLATES, ALIMENTOS), cada uno con $0.00",
     esperaba: "Que diga que salteó 3 filas que no son productos",
@@ -691,17 +715,38 @@ async function recorrerActualizan({ db, imp }) {
   await esperar(2500);
 
   const texto = await textoDelContenido();
+
+  // ── SE BUSCA EL NOMBRE DEL PRODUCTO, NO LA DESCRIPCIÓN DEL PROVEEDOR ──
+  //
+  // Son dos textos distintos y la pantalla muestra el del CATÁLOGO, que es lo
+  // correcto: quien mira quiere reconocer su producto, no cómo lo escribe el
+  // proveedor. En este banco la diferencia es evidente —la lista dice
+  // "MOGUL x1 Kg CONITOS (450u)" y la ficha se llama "ZZBP MOGUL CONITOS"— y la
+  // primera versión de este paso buscaba la descripción del proveedor, así que
+  // informó en ROJO que un producto no estaba cuando estaba con su otro nombre.
+  //
+  // Mirar el nombre de la ficha además afirma MÁS: que la fila está mostrada
+  // junto al producto al que quedó vinculada, que es lo que decide qué costo se
+  // escribe.
   const enLaBase = await db.importacionListaFila.findMany({
     where: { importacionId: imp.id, estado: "LISTO_PARA_ACTUALIZAR" },
-    select: { descripcionProveedor: true, costoAnterior: true, costoMaestroPropuesto: true },
+    select: {
+      descripcionProveedor: true,
+      costoAnterior: true,
+      costoMaestroPropuesto: true,
+      productoBase: { select: { nombre: true } },
+    },
   });
 
   for (const f of enLaBase) {
-    await comprobar(texto.includes(f.descripcionProveedor), {
+    const nombre = f.productoBase?.nombre ?? null;
+    await comprobar(nombre !== null && texto.includes(nombre), {
       pantalla: "Se actualizan",
-      hice: `Busqué «${f.descripcionProveedor}», que la base tiene como LISTO_PARA_ACTUALIZAR`,
+      hice:
+        `Busqué «${nombre ?? "(la fila no tiene producto vinculado)"}», el producto de la fila ` +
+        `«${f.descripcionProveedor}», que la base tiene como LISTO_PARA_ACTUALIZAR`,
       esperaba: "Que aparezca en la lista de los que se actualizan",
-      paso: "no está en pantalla",
+      paso: nombre === null ? "la fila está lista para actualizar y no tiene producto" : "no está en pantalla",
       severidad: ROJO,
     });
   }

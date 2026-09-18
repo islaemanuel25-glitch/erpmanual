@@ -8,6 +8,23 @@ verdad y sesión real, en 360 px y en 1366 px, con tema claro y oscuro.
 
 **En esta tanda no se arregló nada.** Es el relevamiento.
 
+## Estado — actualizado el 2026-09-18
+
+Este documento nació como relevamiento y se mantiene como tablero: cada defecto
+lleva su estado arriba, y el texto del hallazgo **no se reescribe** cuando se
+arregla. Lo que se midió el 2026-09-17 sigue diciendo lo que decía; lo que cambia
+es el encabezado. Borrar la descripción de un defecto arreglado deja el arreglo
+sin el caso que lo justifica, y es lo primero que se busca cuando algo vuelve.
+
+- **1 — Columna de precio equivocada** — 🔴 **ARREGLADO** en `e174c655`, desplegado.
+- **2, 3 y 6 — Los títulos de rubro** — 🟡 **ARREGLADO** en esta tanda.
+- **5 — No se puede cancelar una lista abierta** — 🟡 **ARREGLADO** en esta tanda.
+- **4 — El desplegable no se puede usar con el teclado** — 🟡 abierto. Es del kit
+  y le pasa a todos los `SunmiSelectAdv` del ERP, así que no es de este módulo.
+- **7 — El estado guardado no nombra el problema** — 🟢 abierto.
+
+**Quedan dos:** un amarillo que es del kit y un verde interno.
+
 Cada afirmación de acá se comprobó contra Postgres, no contra lo que muestra la
 pantalla. Es a propósito y es la parte cara: un módulo que dibuja bien y no
 escribe pasaría un recorrido hecho de capturas, y ese es el defecto que este repo
@@ -26,6 +43,19 @@ el rango en cero. Un defecto que aparece en los cuatro no es un caso de borde.
 ---
 
 ## 🔴 1 — La lista se lee con la columna de precio equivocada, y nadie avisa
+
+> ✅ **ARREGLADO** en `e174c655`, ya desplegado. La propuesta que hace la pantalla
+> dejó de contar como una elección de la persona: ahora hacen falta el índice y
+> el gesto, así que al confirmar con «Está bien, seguir» el motor decide y, si no
+> puede, pregunta —también la primera vez—. La pantalla muestra cuántos productos
+> explica cada columna con la mejor primero, el resultado avisa si la que se usó
+> explica menos de la mitad, y se puede cambiar de columna sin volver a subir el
+> archivo. Los candados están en `lib/proveedores/listas/columnaLaEligeElMotor.test.mjs`.
+>
+> **Quedó un límite conocido y sin arreglar:** con UNA sola fila comparable el
+> motor decide igual —1 de 1 llega a los dos tercios— y elige mal. Falta una
+> muestra mínima. Está medido en su propio candado para que no se lea como
+> cubierto; sobre listas reales no ocurre, traen entre 56 y 983 renglones.
 
 **Severidad:** ROJO · **Pantalla:** «¿Leí bien la lista?» → Resultado · visto 1 vez
 
