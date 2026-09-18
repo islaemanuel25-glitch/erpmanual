@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-09-17 15:34
+**Última actualización:** 2026-09-18 02:27
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,12 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-09-18: fix: la hoja de un producto que no vino deja de ser un callejón sin salida
+- 2026-09-18: feat: elegir el renglón de la lista se entra por dos puertas
+- 2026-09-18: feat: un producto que "no vino" se puede buscar en la lista
+- 2026-09-18: fix(listas): una lista abierta se puede cancelar, y desde los dos lados
+- 2026-09-18: fix(listas): un título de rubro no es un producto
+- 2026-09-18: feat(listas): la evidencia de cada columna a la vista, y cómo salir si se leyó mal
 - 2026-09-17: feat: rescatar la lista que ya quedó leída con el rango en cero
 - 2026-09-17: feat: "No lo cambio" deja de ser por lista y vale para las que vengan
 - 2026-09-17: feat: "No es este producto" — elegir el renglón correcto de la lista

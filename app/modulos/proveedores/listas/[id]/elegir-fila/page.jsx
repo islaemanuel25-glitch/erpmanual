@@ -14,6 +14,14 @@
 // estaba mal era el código guardado, y no había forma de corregirlo desde donde
 // se ve el problema.
 //
+// ── DOS PUERTAS, UNA PANTALLA ──────────────────────────────────────────────
+//
+// Desde el 2026-09-18 se entra por `?fila=` —«No es este producto», con una fila
+// atada al producto equivocado— o por `?producto=` —«No vinieron», con un producto
+// que no tiene NINGUNA fila—. La pregunta es la misma y la lista de candidatas es
+// la misma; lo que cambia —endpoint, a dónde se vuelve, si «No está en la lista»
+// escribe— sale todo de `entradaDeElegirFila` y no de ternarios repartidos acá.
+//
 // ── SOLO LOS RENGLONES DE ESTA LISTA ───────────────────────────────────────
 //
 // Buscar en todo el catálogo del proveedor ofrecería productos que esta lista no
@@ -44,13 +52,33 @@ import { ErrorRecuperable } from "@/components/proveedores/listas/PiezasListas";
 import { Aviso } from "@/components/proveedores/listas/PiezasPantallas";
 import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
 import { money } from "@/lib/proveedores/listas/presentacion";
+import {
+  entradaDeElegirFila,
+  destinoTrasVincular,
+  PUERTA,
+} from "@/lib/proveedores/listas/entradaDeElegirFila";
 
 export default function ElegirFilaDeLaListaPage() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const id = Number(params?.id);
-  const filaId = Number(searchParams?.get("fila"));
+  const entrada = useMemo(
+    () =>
+      entradaDeElegirFila({
+        importacionId: id,
+        fila: searchParams?.get("fila"),
+        producto: searchParams?.get("producto"),
+        filtro: searchParams?.get("filtro"),
+      }),
+    [id, searchParams]
+  );
+  // Con la puerta inválida no hay endpoint ni vuelta: la pantalla lo dice y no le
+  // pide nada al servidor. El volver igual tiene que llevar a algún lado, y la
+  // cola de revisar es la pantalla de la que cuelga esta ruta.
+  const endpoint = entrada?.endpoint ?? null;
+  const volverA = entrada?.volverA ?? `/modulos/proveedores/listas/${id}/revisar`;
+  const textoVolver = entrada?.textoVolver ?? "Revisar";
 
   const sesion = useUser() || {};
   const perfil = sesion.perfil;
@@ -73,22 +101,23 @@ export default function ElegirFilaDeLaListaPage() {
   // escriben las otras cinco del módulo: el candado de `volverDelModulo` busca
   // exactamente `useAccionDePagina(() => <SunmiBackButton`, y con el JSX
   // envuelto no lo encuentra y da rojo diciendo que el volver no está en el slot.
+  // El destino y el texto del volver salen de la PUERTA: desde «No vinieron» hay
+  // que volver a «No cambian» con su filtro, no a la cola de revisar, que no es
+  // de donde se vino.
   useAccionDePagina(
-    () => <SunmiBackButton href={`/modulos/proveedores/listas/${id}/revisar`} texto="Revisar" className="min-h-toque" />,
-    [id]
+    () => <SunmiBackButton href={volverA} texto={textoVolver} className="min-h-toque" />,
+    [volverA, textoVolver]
   );
 
   const cargar = useCallback(
     async (texto) => {
+      if (!endpoint) return;
       setCargando(true);
       setError("");
       try {
         const qs = new URLSearchParams();
         if (texto) qs.set("buscar", texto);
-        const r = await fetch(
-          `/api/proveedores/listas/${id}/filas/${filaId}/otra-fila?${qs}`,
-          { credentials: "include", cache: "no-store" }
-        );
+        const r = await fetch(`${endpoint}?${qs}`, { credentials: "include", cache: "no-store" });
         // ── UN 500 NO SE PUEDE LEER COMO UNA LISTA VACÍA ──────────────────
         //
         // `r.json()` explota cuando el servidor contesta una página de error en
@@ -106,14 +135,14 @@ export default function ElegirFilaDeLaListaPage() {
         setCargando(false);
       }
     },
-    [id, filaId]
+    [endpoint]
   );
 
   useEffect(() => {
     if (cargandoUser || cargandoCtx || !esAdmin || needsContexto) return;
-    if (!Number.isInteger(id) || !Number.isInteger(filaId)) return;
+    if (!endpoint) return;
     cargar("");
-  }, [cargandoUser, cargandoCtx, esAdmin, needsContexto, id, filaId, cargar]);
+  }, [cargandoUser, cargandoCtx, esAdmin, needsContexto, endpoint, cargar]);
 
   // La búsqueda va al SERVIDOR, con una espera. Filtrar en el navegador buscaría
   // dentro de las treinta que se trajeron, así que escribir el nombre de un
@@ -135,7 +164,7 @@ export default function ElegirFilaDeLaListaPage() {
     setTrabajando(true);
     setAviso(null);
     try {
-      const r = await fetch(`/api/proveedores/listas/${id}/filas/${filaId}/otra-fila`, {
+      const r = await fetch(endpoint, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -146,9 +175,11 @@ export default function ElegirFilaDeLaListaPage() {
         setAviso({ tono: "danger", texto: j?.error || `No se pudo corregir (error ${r.status}).` });
         return;
       }
-      // Vuelve a revisar, que es de donde se vino: la fila nueva queda con sus
-      // lecturas recalculadas y hay que contestarlas.
-      router.push(`/modulos/proveedores/listas/${id}/revisar`);
+      // La fila queda con sus lecturas recalculadas y hay que contestarlas. Desde
+      // «No vinieron» se va DERECHO a ese renglón —es el único que le importa a
+      // quien vino hasta acá— y desde «No es este producto», a la cola, que es de
+      // donde se venía. El por qué está en `destinoTrasVincular`.
+      router.push(destinoTrasVincular(entrada, j?.filaId));
     } catch {
       setAviso({ tono: "danger", texto: "No se pudo conectar con el servidor. Probá de nuevo." });
     } finally {
@@ -158,12 +189,12 @@ export default function ElegirFilaDeLaListaPage() {
 
   if (cargandoUser || cargandoCtx) return <Marco><SunmiLoader /></Marco>;
   if (!esAdmin) return <SinPermisos />;
-  if (!Number.isInteger(filaId)) {
+  if (!entrada) {
     return (
       <Marco>
         <Aviso tono="danger">
-          No se dijo qué producto hay que buscar en la lista. Volvé a revisar y entrá desde
-          «No es este producto».
+          No se dijo qué producto hay que buscar en la lista. Entrá desde «No es este producto»,
+          en revisar, o desde «Buscarlo en la lista», en los que no vinieron.
         </Aviso>
       </Marco>
     );
@@ -175,6 +206,18 @@ export default function ElegirFilaDeLaListaPage() {
         Buscá en la lista de {datos?.proveedor?.nombre ?? "este proveedor"}. Te muestro primero las
         que se parecen.
       </p>
+
+      {/* ── POR QUÉ SE LE DICE QUE CASI SIEMPRE ESTÁ ──────────────────────
+          Desde «No vinieron» la persona llega creyendo que el proveedor dejó de
+          traer el producto: es lo que decía la hoja. Que el motivo casi siempre
+          sea otro —el código guardado— es justamente lo que la trajo a buscar, y
+          si no se lo dice acá se va a rendir en la primera búsqueda que no dé. */}
+      {entrada.puerta === PUERTA.PRODUCTO && (
+        <p className="text-sm2 sunmi-text-muted leading-snug">
+          Casi siempre está con otro nombre y otro código. Cuando lo encuentres, queda atado para
+          siempre y esta lista lo va a corregir.
+        </p>
+      )}
 
       {aviso && <Aviso tono={aviso.tono}>{aviso.texto}</Aviso>}
 
@@ -272,17 +315,26 @@ export default function ElegirFilaDeLaListaPage() {
           </p>
         )}
 
+        {/* ── «NO ESTÁ EN LA LISTA» HACE DOS COSAS DISTINTAS Y DICE CUÁL ────
+            Desde «No es este producto» hay una fila que desvincular, y eso se
+            escribe. Desde «No vinieron» el producto YA está afuera —por eso
+            apareció ahí— así que confirmarlo es volver sin escribir nada.
+            Mandar un POST igual le inventaría una decisión a alguien que solo
+            miró y se fue. Cuál de las dos es lo decide `entradaDeElegirFila`. */}
         <SunmiButton
           color="slate"
-          onClick={() => corregir({ noEstaEnLaLista: true })}
-          disabled={trabajando || !datos?.editable}
+          onClick={() =>
+            entrada.sacarDeLaListaEscribe ? corregir({ noEstaEnLaLista: true }) : router.push(volverA)
+          }
+          disabled={trabajando || (entrada.sacarDeLaListaEscribe && !datos?.editable)}
           className="w-full min-h-toque text-sm3"
         >
           No está en la lista
         </SunmiButton>
         <p className="text-sm2 sunmi-text-muted leading-snug">
-          Sale de esta lista y queda con el costo que tiene ahora. El producto no se borra de
-          ningún lado.
+          {entrada.sacarDeLaListaEscribe
+            ? "Sale de esta lista y queda con el costo que tiene ahora. El producto no se borra de ningún lado."
+            : "Queda como está, con el costo de ahora, y esta lista no lo va a corregir."}
         </p>
       </div>
     </Marco>
