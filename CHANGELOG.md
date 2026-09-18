@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-09-18] - Actualización: proveedores
+
+### Modificado
+- **proveedores**: fix: la hoja de un producto que no vino deja de ser un callejón sin salida
+- **proveedores**: feat: elegir el renglón de la lista se entra por dos puertas
+- **proveedores**: feat: un producto que "no vino" se puede buscar en la lista
+- **proveedores**: fix(listas): una lista abierta se puede cancelar, y desde los dos lados
+- **proveedores**: fix(listas): un título de rubro no es un producto
+- **proveedores**: feat(listas): la evidencia de cada columna a la vista, y cómo salir si se leyó mal
+
+
 ## [2026-09-17] - Actualización: proveedores, transferencias
 
 ### Modificado
