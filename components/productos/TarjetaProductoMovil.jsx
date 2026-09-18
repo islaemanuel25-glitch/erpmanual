@@ -15,6 +15,7 @@ import SelloDeOferta from "@/components/ofertas/SelloDeOferta";
 import { TEXTO_ULTIMO_EDITADO } from "@/lib/productos/estadoDeRetorno";
 import { hayEquivalenciaDeBulto, nombreCortoDe } from "@/lib/productos/carasDeTarjeta";
 import { formatearMoneda } from "@/lib/moneda";
+import AvisoCodigoDeCaja from "@/components/productos/AvisoCodigoDeCaja";
 
 const SIN_PRECIO_FIJO = "Importe variable";
 const ACENTO_CARD = "color-mix(in srgb, var(--pos-accent) 88%, var(--app-fg))";
@@ -212,6 +213,14 @@ export default function TarjetaProductoMovil({
   // decide nada sobre vigencia: escribir un `if` de fechas sería la segunda
   // versión de una regla que ya existe.
   oferta = null,
+  // ── EL CÓDIGO PRINCIPAL CRUDO, APARTE DEL QUE SE MUESTRA ────────────────
+  //
+  // `codigoBarra`, arriba, es lo que la tarjeta DIBUJA: la pantalla lo apaga con
+  // el personalizador y le cae al SKU cuando no hay código. Para el aviso de
+  // "esto es el código de la caja" hace falta el dato crudo —`codigo_barra` de la
+  // ficha— porque el problema existe tenga la columna prendida o apagada, y
+  // porque un SKU de catorce dígitos no es un código de caja.
+  codigoBarraPrincipal = null,
 }) {
   const [enLaOtraEscala, setEnLaOtraEscala] = useState(false);
 
@@ -310,7 +319,14 @@ export default function TarjetaProductoMovil({
           onAlternar={() => setEnLaOtraEscala((v) => !v)}
         />
       }
-      aviso={null}
+      // ── EL SLOT DE AVISO YA ESTABA Y NADIE LO USABA ───────────────────
+      //
+      // Es el lugar donde la pieza del kit dibuja lo que hay que decir de este
+      // producto, así que el aviso del código de caja va acá y no pegado al
+      // nombre: no compite con el precio ni corre nada de lugar cuando no hay
+      // nada que avisar —el componente devuelve `null` y la ranura queda vacía,
+      // que es exactamente lo que había antes con el `null` escrito a mano.
+      aviso={<AvisoCodigoDeCaja codigoBarra={codigoBarraPrincipal} modo="tarjeta" />}
       acciones={
         <AccionTarjeta icono={Pencil} onClick={onEditar}>
           Editar
