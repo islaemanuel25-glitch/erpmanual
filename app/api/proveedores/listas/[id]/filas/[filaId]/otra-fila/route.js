@@ -45,22 +45,28 @@ import {
   conciliarFila,
   indexarCodigosProveedor,
   indexarCodigosBarra,
-  parecidoNombre,
 } from "@/lib/proveedores/listas/conciliarLista";
 import { filaAPersistir, OPCIONES_TX, esImportacionAbierta } from "@/lib/proveedores/listas/persistencia";
 import { recalcularContadores } from "@/lib/proveedores/listas/contadores";
 import { clavesDeCodigo } from "@/lib/proveedores/listas/normalizarCodigo";
-import { ORIGEN_ALTA_VINCULO } from "@/lib/proveedores/listas/vinculacion";
 import { modoDeImportacion } from "@/lib/proveedores/listas/modoDeLaLista";
 import { ESTADO_LINEA } from "@/lib/proveedores/listas/estados";
-// El normalizador de texto del ERP, el mismo que usa `vincular`: si el vínculo
-// nuevo guardara la descripción normalizada con otras reglas, no participaría de
-// la misma búsqueda que los demás.
-import { normalizarTexto } from "@/lib/productos/busquedaFuzzyProducto";
+// ── LAS TRES PIEZAS QUE COMPARTE CON «BUSCARLO EN LA LISTA» ─────────────────
+//
+// Ordenar las candidatas, guardar el código de la fila elegida y darle al motor
+// la forma que consume. Las dos pantallas hacen la misma operación desde lados
+// distintos, y lo que se separaría el día que una cambie es qué código queda
+// guardado para un producto — o sea qué costo se le escribe el mes que viene.
+import {
+  candidatasConPuntaje,
+  guardarCodigoDeLaFila,
+  filaParaElMotor,
+  productoParaElMotor,
+  motorParaEstaLista,
+  CAMPOS_PRODUCTO_PARA_EL_MOTOR,
+  CAMPOS_CABECERA_PARA_EL_MOTOR,
+} from "@/lib/proveedores/listas/vincularConUnaFila";
 
-const numero = (v) => (v === null || v === undefined ? null : Number(v));
-/** Cuántas candidatas se ofrecen. Más que esto no se lee en un teléfono. */
-const TOPE = 30;
 
 /** El id de la importación y el de la fila, validados. */
 async function ids(context) {
@@ -154,20 +160,16 @@ export async function GET(req, context) {
 
     // ── PRIMERO LAS QUE SE PARECEN ───────────────────────────────────────
     //
-    // El parecido se le pregunta a `parecidoNombre`, que es la misma función con
-    // la que el motor sugiere por nombre. Escribir acá otra medida de parecido
-    // haría que la pantalla ordenara distinto de como sugiere el motor sobre los
-    // mismos dos nombres.
+    // El puntaje y el armado de la lista viven en `vincularConUnaFila.js` desde
+    // el 2026-09-18, porque «Buscarlo en la lista» —la pantalla que le encuentra
+    // el renglón a un producto que no apareció— ofrece EXACTAMENTE estas
+    // candidatas y las tiene que ordenar igual. Dos ordenamientos del mismo par
+    // de nombres se separan el día que uno se toque.
     //
-    // Se compara contra el nombre DEL PRODUCTO —que es el que la persona está
-    // mirando— y no contra la descripción del renglón actual, que es justamente
-    // la que se sospecha equivocada.
+    // Se compara contra el nombre DEL PRODUCTO —el que la persona está mirando—
+    // y no contra la descripción del renglón actual, que es justamente la que se
+    // sospecha equivocada.
     const nombreDelProducto = fila.productoBase?.nombre ?? fila.descripcionProveedor ?? "";
-    const conPuntaje = candidatas.map((c) => ({
-      ...c,
-      puntaje: parecidoNombre(nombreDelProducto, c.descripcionProveedor ?? ""),
-    }));
-    conPuntaje.sort((a, b) => b.puntaje - a.puntaje);
 
     return NextResponse.json({
       ok: true,
@@ -179,21 +181,12 @@ export async function GET(req, context) {
       // Cuál es la que está ahora, para poder marcarla "la que estaba".
       actual: fila.id,
       total: candidatas.length,
-      items: conPuntaje.slice(0, TOPE).map((c) => ({
-        id: c.id,
-        codigo: c.codigoCrudo,
-        descripcion: c.descripcionProveedor,
-        unidad: c.unidadProveedor,
-        cantidad: c.unidadesPorBulto,
-        precio: numero(c.precioConIva),
-        // SI YA ESTÁ TOMADA POR OTRO PRODUCTO, SE DICE. Elegir una fila que ya
-        // es de otro producto no es un error —puede ser que ESE sea el mal
-        // vinculado— pero la persona tiene que verlo antes de decidir.
-        tomadaPor: c.productoBaseId && c.productoBaseId !== fila.productoBaseId
-          ? c.productoBase?.nombre ?? null
-          : null,
-        laQueEstaba: c.id === fila.id,
-      })),
+      items: candidatasConPuntaje({
+        filas: candidatas,
+        nombreDelProducto,
+        productoBaseId: fila.productoBaseId,
+        filaActualId: fila.id,
+      }),
     });
   } catch (e) {
     console.error("[listas/otra-fila GET]", e);
@@ -227,11 +220,7 @@ export async function POST(req, context) {
 
     const cab = await prisma.importacionListaProveedor.findFirst({
       where: { id: importacionId, grupoId },
-      select: {
-        id: true, estado: true, proveedorId: true, recargoPct: true, parser: true,
-        aumentoEsperadoMinPct: true, aumentoEsperadoMaxPct: true, impuestoAdicionalPct: true,
-        modo: true,
-      },
+      select: CAMPOS_CABECERA_PARA_EL_MOTOR,
     });
     if (!cab) {
       return NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 });
@@ -279,11 +268,7 @@ export async function POST(req, context) {
 
     const producto = await prisma.productoBase.findFirst({
       where: { id: productoBaseId, grupoId },
-      select: {
-        id: true, nombre: true, precio_costo: true, factor_pack: true,
-        unidad_medida: true, modoCompraProveedor: true, pesoReferenciaKg: true,
-        creadoEnLocalId: true, es_combo: true,
-      },
+      select: CAMPOS_PRODUCTO_PARA_EL_MOTOR,
     });
     if (!producto) {
       return NextResponse.json({ ok: false, error: "El producto ya no existe." }, { status: 404 });
@@ -291,32 +276,14 @@ export async function POST(req, context) {
 
     const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
     const ahora = new Date();
-    const recargoPct = Number(cab.recargoPct ?? 0);
-    const config = {
-      ...reg.config,
-      recargoPct,
-      impuestoAdicionalPct: numero(cab.impuestoAdicionalPct),
-      umbralVariacionPct: numero(cab.aumentoEsperadoMaxPct),
-    };
-    const contextoMotor = {
+    const { config, contexto: contextoMotor } = motorParaEstaLista({
+      cab,
+      reg,
       grupoId,
-      proveedorId: cab.proveedorId,
       operandoEnLocalId: localId,
       depositoLocalId,
-      cabecera: cab,
-    };
-    const productoParaMotor = {
-      productoBaseId: producto.id,
-      nombre: producto.nombre,
-      precioCostoActual: numero(producto.precio_costo),
-      factorPack: producto.factor_pack,
-      unidadMedida: producto.unidad_medida,
-      modoCompraProveedor: producto.modoCompraProveedor,
-      pesoReferenciaKg: numero(producto.pesoReferenciaKg),
-      creadoEnLocalId: producto.creadoEnLocalId,
-      esCombo: producto.es_combo === true,
-      codigosBarra: [],
-    };
+    });
+    const productoParaMotor = productoParaElMotor(producto);
 
     // ── "NO ESTÁ EN LA LISTA" ──────────────────────────────────────────────
     //
@@ -375,30 +342,12 @@ export async function POST(req, context) {
     }
 
     const recalculada = conciliarFila({
-      fila: {
-        filaExcel: filaNueva.filaExcel,
-        hojaNombre: filaNueva.hojaNombre,
-        codigoCrudo: filaNueva.codigoCrudo,
-        codigoNormalizado: filaNueva.codigoNormalizado,
-        codigoComparableSinCeros: filaNueva.codigoComparableSinCeros,
-        codigoBarraProveedor: filaNueva.codigoBarraProveedor,
-        descripcionProveedor: filaNueva.descripcionProveedor,
-        unidadProveedor: filaNueva.unidadProveedor,
-        unidadesPorBulto: filaNueva.unidadesPorBulto,
-        precioConIva: numero(filaNueva.precioConIva),
-        precioSinIva: numero(filaNueva.precioSinIva),
-        categoriaCruda: filaNueva.categoriaCruda,
-        // ── LA CONFIRMACIÓN VIEJA NO VIAJA AL RENGLÓN NUEVO ────────────────
-        //
-        // Si alguien había confirmado cómo se leía el precio, esa respuesta era
-        // sobre el renglón EQUIVOCADO: otra unidad, otra cantidad, otro precio.
-        // Arrastrarla haría que una decisión tomada sobre un producto habilitara
-        // la escritura del costo de otro.
-        confirmadoEn: null,
-        vinculadoEn: ahora,
-        aumentoEsperadoMinPct: null,
-        aumentoEsperadoMaxPct: null,
-      },
+      // La confirmación vieja NO viaja al renglón nuevo, y el por qué está
+      // escrito en `filaParaElMotor`: era una respuesta sobre el renglón
+      // EQUIVOCADO —otra unidad, otra cantidad, otro precio—, así que
+      // arrastrarla haría que una decisión tomada sobre un producto habilitara
+      // la escritura del costo de otro.
+      fila: filaParaElMotor(filaNueva, { vinculadoEn: ahora }),
       indice: indexarCodigosProveedor([
         { id: 0, productoBaseId, codigoInterno: codigoNuevo, activo: true },
       ]),
@@ -421,41 +370,11 @@ export async function POST(req, context) {
       //    este proveedor van a usar el 3113 para este producto sin preguntar.
       //    Es el pedido de Emanuel con todas las letras —lo que explica una vez
       //    no se vuelve a explicar— y por eso se persiste acá y no en la fila.
-      // El único se llama `codigo_interno_unico_por_proveedor` y NO es el nombre
-      // que Prisma arma solo: el modelo lo nombra a mano. Con el nombre por
-      // default esto ni siquiera compila el tipo, y con la forma equivocada
-      // fallaría recién contra Postgres.
-      await tx.productoCodigoProveedor.upsert({
-        where: {
-          codigo_interno_unico_por_proveedor: {
-            grupoId,
-            proveedorId: cab.proveedorId,
-            codigoInterno: codigoNuevo,
-          },
-        },
-        create: {
-          grupoId,
-          proveedorId: cab.proveedorId,
-          productoBaseId,
-          codigoInterno: codigoNuevo,
-          // La descripción cruda Y la normalizada, como las escribe `vincular`:
-          // la normalizada es la que indexa el macheo por nombre, y dejarla en
-          // null haría que este vínculo no participe de esa búsqueda.
-          descripcionProveedor: filaNueva.descripcionProveedor ?? null,
-          descripcionNormalizada: filaNueva.descripcionProveedor
-            ? normalizarTexto(filaNueva.descripcionProveedor)
-            : null,
-          activo: true,
-          origenAlta: ORIGEN_ALTA_VINCULO.MANUAL,
-        },
-        update: {
-          productoBaseId,
-          activo: true,
-          descripcionProveedor: filaNueva.descripcionProveedor ?? null,
-          descripcionNormalizada: filaNueva.descripcionProveedor
-            ? normalizarTexto(filaNueva.descripcionProveedor)
-            : null,
-        },
+      await guardarCodigoDeLaFila(tx, {
+        grupoId,
+        proveedorId: cab.proveedorId,
+        productoBaseId,
+        fila: filaNueva,
       });
 
       // 3. El renglón VIEJO queda libre: vuelve a ser una fila sin producto y
