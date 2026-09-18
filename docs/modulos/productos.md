@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-09-14 16:45
+**Última actualización:** 2026-09-18 22:25
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,8 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-09-18: fix: el carrusel pagina por grupo, así ninguna página mezcla temas
+- 2026-09-18: feat: el aviso del código de caja, con su confirmación y su botón
 - 2026-09-14: test: las enumeraciones de los candados ven lo que todavía no se commiteó
 - 2026-09-05: test(alertas): mandar la ficha entera, y que la ruta diga que salio mal
 - 2026-09-04: feat(productos): el listado informa si un producto está en una oferta vigente SIN VERIFICAR
