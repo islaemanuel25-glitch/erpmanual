@@ -142,8 +142,24 @@ export default function CarruselControles({
   // que sigue diciendo "Para revisar"—, que es la prueba de que la pieza salió
   // bien: la pantalla de donde se sacó no se movió.
   titulo = "Para revisar",
+  // ── CADA GRUPO ARRANCA EN SU PROPIA PÁGINA ──────────────────────────────
+  //
+  // `grupos` es opcional y cambia UNA cosa: dónde se corta. Sin él, las cards
+  // se parten de a cuatro sobre la lista entera, que es lo que hacía cuando los
+  // tres grupos medían exactamente cuatro y el corte caía justo.
+  //
+  // Dejó de caer justo cuando "Para revisar" pasó de cuatro controles a seis: la
+  // página 2 quedaba con dos controles y dos modalidades de venta, bajo un
+  // encabezado que dice "Para revisar". No es un problema de estética — hay un
+  // candado que fija que una página no mezcla grupos, y se puso rojo.
+  //
+  // Con `grupos`, cada uno se pagina por separado y arranca limpio. Una página a
+  // medias adentro de un grupo está bien: son cards del mismo tema.
+  grupos = null,
 }) {
-  const paginas = enPaginas(controles);
+  const paginas = Array.isArray(grupos) && grupos.length > 0
+    ? grupos.filter((g) => Array.isArray(g) && g.length > 0).flatMap((g) => enPaginas(g))
+    : enPaginas(controles);
 
   // ── `activo` ACEPTA UNO O VARIOS, Y ESO ES LO QUE PERMITE COMBINAR ────────
   //

@@ -37,6 +37,30 @@ const doce = (n = 5) => [
   ...PRESENTACIONES.map((p) => ({ ...p, cantidad: n })),
 ];
 
+// ── CUÁNTAS SON, PREGUNTADO Y NO ESCRITO ──────────────────────────────────
+//
+// Acá había un `12` escrito a mano en cinco candados. El día que "Para revisar"
+// pasó de cuatro controles a seis —los dos de código de barras— los cinco se
+// pusieron rojos por la CUENTA, no por un defecto: seguían dibujándose todas.
+//
+// El número sale del dominio. Lo que los candados afirman es el comportamiento
+// —todas se dibujan, todas son botones, ninguna página mezcla grupos— y eso no
+// depende de cuántas haya. El largo lo fija `enPaginas` más abajo.
+const CUANTAS = CONTROLES.length + PRESENTACIONES.length;
+
+/**
+ * Los grupos, como los pasa la pantalla.
+ *
+ * Es la partición que hace que una página no mezcle temas: controles por un
+ * lado, venta por otro, compra por otro. Antes no hacía falta —los tres medían
+ * cuatro y el corte de a cuatro caía justo— y por eso el reparto era invisible.
+ */
+const gruposDe = (cards) => [
+  cards.filter((c) => CONTROLES.some((x) => x.id === c.id)),
+  cards.filter((c) => IDS_VENTA.includes(c.id)),
+  cards.filter((c) => IDS_COMPRA.includes(c.id)),
+];
+
 test("G1. en cero y con conteo completo, la card dice que está sana", () => {
   const html = render({ controles: conCantidad(0) });
   assert.match(html, /al día/);
@@ -105,7 +129,11 @@ test("G9. la sonda mide la misma mezcla de contraste que el componente", () => {
 
 test("G10. vuelve la estructura 2x2 de cuatro cards por página", () => {
   assert.equal(POR_PAGINA, 4);
-  assert.equal(enPaginas(CONTROLES).length, 1);
+  // Cuatro cards entran en una página; cinco ya necesitan dos. Se afirma la
+  // REGLA de corte y no el largo de `CONTROLES`, que creció a seis y hacía rojo
+  // este candado sin que nada estuviera mal.
+  assert.equal(enPaginas(CONTROLES.slice(0, 4)).length, 1);
+  assert.equal(enPaginas(CONTROLES.slice(0, 5)).length, 2);
   const html = render({ controles: conCantidad(7) });
   assert.match(html, /grid-cols-2 grid-rows-2/);
   assert.doesNotMatch(html, /width:43%/);
@@ -147,25 +175,59 @@ test("G13. la semántica de salud no sale de tokens del POS", () => {
 // Estos candados fijan las dos mitades del arreglo: que las doce vivan en un
 // bloque solo, y que las cuatro de siempre no hayan cambiado al mudarse ahí.
 
-test("G14. DOCE CARDS, TRES PÁGINAS DE CUATRO, TRES INDICADORES", () => {
-  const html = render({ controles: doce() });
-  assert.equal(doce().length, 12, "no son doce cards");
-  assert.equal(enPaginas(doce()).length, 3, "no quedaron tres páginas");
+test("G14. NINGUNA PÁGINA MEZCLA GRUPOS, y todas las cards se dibujan", () => {
+  // ── ESTE CANDADO CAMBIÓ DE FORMA, Y CONVIENE SABER POR QUÉ ─────────────
+  //
+  // Decía "DOCE CARDS, TRES PÁGINAS DE CUATRO" y fijaba el reparto contando:
+  // página 1 los cuatro controles, página 2 Venta, página 3 Compra. Eso valía
+  // porque los tres grupos medían exactamente cuatro y el corte de a cuatro
+  // sobre la lista entera caía justo.
+  //
+  // Al sumar los dos controles de código de barras, "Para revisar" pasó a seis y
+  // el corte plano dejó una página con DOS controles y DOS modalidades de venta,
+  // abajo del encabezado que dice "Para revisar". El candado se puso rojo y tenía
+  // razón: lo que protegía no era el número doce, era que una página no mezcla
+  // temas.
+  //
+  // Así que ahora se afirma eso, que es lo que importaba desde el principio, y
+  // se afirma sobre el reparto POR GRUPOS que la pantalla le pasa al carrusel.
+  const grupos = gruposDe(doce());
+  const html = render({ controles: doce(), grupos });
+
+  assert.equal(doce().length, CUANTAS);
   assert.equal(POR_PAGINA, 4);
 
-  // El reparto, página por página, con los ids del dominio.
-  const paginas = enPaginas(doce()).map((p) => p.map((c) => c.id));
-  assert.deepEqual(paginas[0], CONTROLES.map((c) => c.id), "la página 1 no son los cuatro controles");
-  assert.deepEqual(paginas[1], IDS_VENTA, "la página 2 no son las cuatro de Venta");
-  assert.deepEqual(paginas[2], IDS_COMPRA, "la página 3 no son las cuatro de Compra");
+  // Cada grupo arranca en su propia página: el reparto es la concatenación de
+  // paginar cada uno por separado.
+  const paginas = grupos.flatMap((g) => enPaginas(g));
+  const idsPorPagina = paginas.map((p) => p.map((c) => c.id));
 
-  // Tres indicadores, ni dos ni cuatro.
-  assert.match(html, /Página 1 de 3/);
-  assert.match(html, /Página 2 de 3/);
-  assert.match(html, /Página 3 de 3/);
-  assert.doesNotMatch(html, /Página 4 de/);
+  const deQueGrupo = (id) => {
+    if (CONTROLES.some((c) => c.id === id)) return "controles";
+    if (IDS_VENTA.includes(id)) return "venta";
+    if (IDS_COMPRA.includes(id)) return "compra";
+    return "?";
+  };
+  for (const [i, ids] of idsPorPagina.entries()) {
+    const gruposEnLaPagina = new Set(ids.map(deQueGrupo));
+    assert.equal(
+      gruposEnLaPagina.size,
+      1,
+      `la página ${i + 1} mezcla ${[...gruposEnLaPagina].join(" y ")}: ${ids.join(", ")}`
+    );
+  }
 
-  // Y las doce se dibujan de verdad.
+  // Venta y Compra siguen entrando enteras, cada una en UNA página.
+  assert.deepEqual(idsPorPagina.at(-2), IDS_VENTA, "Venta dejó de ser una página entera");
+  assert.deepEqual(idsPorPagina.at(-1), IDS_COMPRA, "Compra dejó de ser una página entera");
+
+  // Y los indicadores dicen cuántas páginas hay de verdad.
+  const n = paginas.length;
+  assert.match(html, new RegExp(`Página 1 de ${n}`));
+  assert.match(html, new RegExp(`Página ${n} de ${n}`));
+  assert.doesNotMatch(html, new RegExp(`Página ${n + 1} de`));
+
+  // Y todas se dibujan de verdad, que es lo que el número doce quería decir.
   for (const c of doce()) {
     assert.ok(html.includes(c.titulo), `falta la card de ${c.id}`);
   }
@@ -210,10 +272,14 @@ test("G16. LAS CUATRO DE SIEMPRE NO CAMBIARON AL MUDARSE", () => {
 
   const a = cardsDeLaPrimeraPagina(soloCuatro);
   const b = cardsDeLaPrimeraPagina(conLasDoce);
+  // En la primera página entran hasta cuatro. Decía `CONTROLES.length` y valía
+  // mientras los controles fueran cuatro; con seis, la primera página son cuatro
+  // y las otras dos van en la segunda. Lo que el candado afirma —que se dibujan
+  // igual solas que acompañadas— no cambia.
   assert.equal(
     (a.match(/<button/g) || []).length,
-    CONTROLES.length,
-    "el ancla no está agarrando las cuatro cards"
+    Math.min(CONTROLES.length, POR_PAGINA),
+    "el ancla no está agarrando las cards de la primera página"
   );
   assert.equal(
     a,
@@ -283,7 +349,9 @@ test("G21. DOS CARDS ENCENDIDAS A LA VEZ, una de venta y una de compra", () => {
   const veces = (s) => (html.match(new RegExp(s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
   assert.equal(veces(fondoActivo), 2, "no quedaron dos cards encendidas");
   assert.equal((html.match(/ring-2/g) || []).length, 2);
-  assert.equal(veces("background:var(--card-bg)"), 12 - 2);
+  // Las apagadas son todas menos las dos encendidas. El `12` escrito acá se
+  // rompía cada vez que el catálogo de cards crecía, sin que nada estuviera mal.
+  assert.equal(veces("background:var(--card-bg)"), CUANTAS - 2);
 });
 
 test("G22. un arreglo con las tres ranuras vacías no enciende nada", () => {
@@ -373,7 +441,11 @@ test("G28. un conteo parcial no se declara sano en ninguna de las dos clases", (
 
 test("G29. el contrato accesible se conserva en las doce", () => {
   const html = render({ controles: doce(7), activo: [CONTROLES[0].id, PRESENTACION.VENTA_PACK, null] });
-  assert.equal((html.match(/aria-pressed/g) || []).length, 12, "no todas las cards son botones anunciables");
+  assert.equal(
+    (html.match(/aria-pressed/g) || []).length,
+    CUANTAS,
+    "no todas las cards son botones anunciables"
+  );
   assert.match(html, /aria-pressed="true"/);
   assert.match(html, /Tocá para quitar el filtro/);
   assert.match(html, /Tocá para filtrar/);
