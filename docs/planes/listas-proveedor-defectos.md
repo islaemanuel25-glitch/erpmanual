@@ -25,6 +25,34 @@ sin el caso que lo justifica, y es lo primero que se busca cuando algo vuelve.
 
 **Quedan dos:** un amarillo que es del kit y un verde interno.
 
+### La última corrida del arnés — 2026-09-18
+
+**26 pasos, 134 comprobaciones, 2 hallazgos: 0 rojos, 1 amarillo, 1 verde.**
+Los dos que quedan son el 4 y el 7 de la lista de arriba. No apareció ninguno
+nuevo.
+
+Lo que la corrida confirmó contra la base, que es lo que vale:
+
+- La importación guarda **13 filas** de las 16 del archivo, `filaExcel` de 1 a 13
+  sin huecos, y ninguna sin código — así que no hay nada que la cola pueda ofrecer
+  para vincular.
+- «No los tenés» pasó de **6 a 3**, que son los tres renglones de producto que de
+  verdad no están en el catálogo.
+- La pantalla de lectura dice «Leí 13 productos, y salteé 4 renglones que no son
+  productos (1 encabezado y 3 títulos de rubro, sin código)», y el aviso ahora
+  sigue estando en la segunda lectura, cuando pide elegir la columna.
+- Cancelar una lista abierta la deja CANCELADA, con fecha de cancelada y **sin**
+  fecha de terminada, y pedir aplicar sobre ella contesta 409.
+- Las seis pantallas se midieron a 360 y a 1366, en claro y en oscuro: sin
+  desborde horizontal y con los dos temas dando distinto.
+
+**Y una diferencia con lo que se había pedido, que conviene saber.** El pedido
+decía «guarda 13 y cuenta 3 salteadas». Cuenta **4**: los 3 títulos de rubro más
+el encabezado de la tabla, que el lector ya descartaba antes —era el «salteé 1
+fila» de la versión vieja—. Decir 3 habría sido no contar el encabezado, y el
+número que se muestra es el de renglones del papel que no eran productos. El
+detalle entre paréntesis deja ver los dos por separado.
+
 Cada afirmación de acá se comprobó contra Postgres, no contra lo que muestra la
 pantalla. Es a propósito y es la parte cara: un módulo que dibuja bien y no
 escribe pasaría un recorrido hecho de capturas, y ese es el defecto que este repo
@@ -113,6 +141,18 @@ todavía una referencia para desconfiar.
 
 ## 🟡 2 — Los títulos de rubro entran como productos
 
+> ✅ **ARREGLADO el 2026-09-18**, junto con el 3 y el 6: son el mismo defecto
+> visto en tres pantallas. Una fila sin código, o con todas sus columnas de precio
+> en cero, ya no se guarda como producto: se descarta y se cuenta.
+>
+> El descarte va donde se aplica el MAPA de columnas y no en el lector, porque el
+> lector decide por la forma del renglón y el título de rubro tiene tres celdas
+> llenas —el nombre y los dos `$0.00`—. Los candados están en
+> `lib/proveedores/listas/titulosDeRubroNoSonProductos.test.mjs`.
+>
+> Medido: el archivo de 16 renglones guarda 13, «no los tenés» pasó de 6 a 3, y
+> ninguna fila guardada queda sin código.
+
 **Severidad:** AMARILLO · **Pantalla:** «¿Leí bien la lista?» y Resultado · visto 1 vez (el conteo) y 4 (la vista previa)
 
 **Qué hice.** Subí un archivo con tres títulos de sección —GOLOSINAS, CHOCOLATES
@@ -146,6 +186,9 @@ lo frena— así que no escribe nada mal. Ensucia y hace perder tiempo.
 ---
 
 ## 🟡 3 — La vista previa muestra lo que dice haber salteado
+
+> ✅ **ARREGLADO el 2026-09-18**, con el 2. «Así quedan los primeros productos»
+> sale de las filas que quedaron, no de todo lo que tenía forma de fila.
 
 **Severidad:** AMARILLO · **Pantalla:** «¿Leí bien la lista?» · visto 4 veces
 
@@ -190,6 +233,17 @@ y sin mouse o sin dedo no hay forma de darlo.
 
 ## 🟡 5 — Una lista abierta no se puede cancelar
 
+> ✅ **ARREGLADO el 2026-09-18.** «Cancelar esta lista» está en el Resultado, al
+> lado de «Terminar lista» y mientras la lista esté abierta, y en el listado en las
+> que quedaron a medias. La confirmación dice qué pasa con lo ya aplicado —los
+> costos NO se deshacen, y si se quiere volver atrás va primero «Deshacer»— y que
+> la lista sale del trabajo pendiente.
+>
+> De paso se tapó un agujero que el botón nuevo volvía alcanzable: la ruta
+> rechazaba solo la APLICADA, así que cancelar una TERMINADA la dejaba con las dos
+> fechas puestas. Los candados están en
+> `lib/proveedores/listas/cancelarUnaListaAbierta.test.mjs`.
+
 **Severidad:** AMARILLO · **Pantalla:** Resultado · visto 1 vez
 
 **Qué hice.** Subí una lista y busqué cómo descartarla, como si me hubiera
@@ -217,6 +271,10 @@ declararlo terminado.
 ---
 
 ## 🟡 6 — El aviso de filas salteadas no aparece cuando hay que elegir la columna
+
+> ✅ **ARREGLADO el 2026-09-18**, con el 2. El conteo viaja también en el 409 que
+> pide elegir la columna de precio, que es la pantalla donde más sirve: es la que
+> pide una decisión sobre cómo se leyó el archivo.
 
 **Severidad:** AMARILLO · **Pantalla:** «¿Leí bien la lista?» · visto 3 veces
 
