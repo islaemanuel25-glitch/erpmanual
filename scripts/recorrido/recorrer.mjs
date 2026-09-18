@@ -423,21 +423,36 @@ async function revisarLaLectura({ primera = true } = {}) {
   // "$0.00" en las dos columnas de precio. Es la trampa del archivo real: si el
   // lector no los descarta, entran como productos de precio cero.
   //
-  // El aviso solo aparece si salteó ALGO, así que "no está la frase" y "dice
-  // cero" son cosas distintas y no se pueden leer igual: tomar la ausencia como
-  // un cero informaría un hallazgo en cada pantalla que no tiene el aviso.
+  // ── LOS DOS NÚMEROS, Y POR QUÉ SE MIRAN LOS DOS ───────────────────────
   //
-  // Y solo en la PRIMERA vuelta: la segunda es la pregunta por la columna de
-  // precio, que llega por otro 409 y no trae el conteo de filas descartadas.
-  // Exigirlo ahí informaría dos veces el mismo hallazgo, una de ellas con un
-  // "no dice nada" que es de la otra pantalla.
-  const dicho = texto.match(/Salte[ée]\s+(\d+)\s+fila/);
-  const salteadas = dicho ? Number(dicho[1]) : null;
-  await comprobar(!primera || salteadas === 3, {
+  // "Leí 13 productos, y salteé 4 renglones que no son productos (1 encabezado y
+  // 3 títulos de rubro, sin código)."
+  //
+  // Se afirma el 13, que es el que se puede verificar contra la base, y el 3 de
+  // los títulos por su motivo. El TOTAL de salteados es 4 y no 3: además de los
+  // tres rubros está el encabezado de la tabla, que el lector ya descartaba antes
+  // —era el "salteé 1 fila" de la versión vieja—. Sumarlos es lo correcto: al que
+  // mira no le importa en qué etapa se descartó un renglón, le importa cuántos
+  // del papel no eran productos.
+  //
+  // Se mira el motivo y no solo el total porque el total solo no distingue "tres
+  // rubros y un encabezado" de "cuatro productos que se perdieron".
+  const leidos = Number(texto.match(/Le[íi]\s+(\d+)\s+producto/)?.[1] ?? NaN);
+  const rubros = Number(texto.match(/(\d+)\s+t[íi]tulos? de rubro/)?.[1] ?? NaN);
+
+  await comprobar(!primera || leidos === 13, {
     pantalla: "¿Leí bien la lista?",
-    hice: "Subí un archivo con tres títulos de rubro (GOLOSINAS, CHOCOLATES, ALIMENTOS), cada uno con $0.00",
-    esperaba: "Que diga que salteó 3 filas que no son productos",
-    paso: salteadas === null ? "no dice nada de filas salteadas" : `dice que salteó ${salteadas}`,
+    hice: "Subí un archivo de 16 renglones con tres títulos de rubro (GOLOSINAS, CHOCOLATES, ALIMENTOS), cada uno con $0.00",
+    esperaba: "Que diga que leyó 13 productos",
+    paso: Number.isNaN(leidos) ? "no dice cuántos productos leyó" : `dice que leyó ${leidos}`,
+    severidad: AMARILLO,
+  });
+
+  await comprobar(!primera || rubros === 3, {
+    pantalla: "¿Leí bien la lista?",
+    hice: "Miré el detalle de lo que salteó",
+    esperaba: "Que diga que salteó 3 títulos de rubro",
+    paso: Number.isNaN(rubros) ? "no dice cuántos títulos de rubro salteó" : `dice ${rubros}`,
     severidad: AMARILLO,
   });
 
@@ -459,7 +474,7 @@ async function revisarLaLectura({ primera = true } = {}) {
     severidad: AMARILLO,
   });
 
-  return { columna, salteadas, pidePrecio };
+  return { columna, leidos, rubros, pidePrecio };
 }
 
 /**
@@ -589,6 +604,37 @@ async function recorrerResultado({ db, imp }) {
     paso:
       `están las ${rubrosComoFila.length} (${rubrosComoFila.map((f) => f.descripcionProveedor).join(", ")}), ` +
       `con precio 0 y estado ${rubrosComoFila[0]?.estado}, y engordan «no los tenés» (${noMacheados})`,
+    severidad: AMARILLO,
+  });
+
+  // ── Y NINGUNA FILA GUARDADA SE PUEDE OFRECER PARA VINCULAR SIN CÓDIGO ──
+  //
+  // La afirmación fuerte, sobre la propiedad y no sobre los tres nombres del
+  // banco: lo que ofrecía vincular GOLOSINAS era la cola de "no los tenés", que
+  // se alimenta de las filas guardadas. Un candado que solo busque esos tres
+  // nombres pasa el día que el rubro se llame PANIFICADOS.
+  const guardadasSinCodigo = filas.filter((f) => !String(f.codigoCrudo ?? "").trim());
+  await comprobar(guardadasSinCodigo.length === 0, {
+    pantalla: "Resultado",
+    hice: "Busqué filas guardadas sin código, que son las que la cola ofrece vincular",
+    esperaba: "Ninguna: sin código no hay con qué vincular",
+    paso: `hay ${guardadasSinCodigo.length} (${guardadasSinCodigo.map((f) => f.descripcionProveedor).join(", ")})`,
+    severidad: AMARILLO,
+  });
+
+  // ── «NO LOS TENÉS» CUENTA SOLO PRODUCTOS DE VERDAD ────────────────────
+  //
+  // El número que Emanuel ve. Contra la base: las NO_MACHEADO que sí tienen
+  // código. Antes la tarjeta decía 6 sobre 3 productos reales, porque los tres
+  // rubros entraban ahí.
+  const noMacheadosReales = filas.filter(
+    (f) => f.estado === "NO_MACHEADO" && String(f.codigoCrudo ?? "").trim()
+  ).length;
+  await comprobar(noMacheados === noMacheadosReales, {
+    pantalla: "Resultado",
+    hice: "Comparé «no los tenés» contra las filas NO_MACHEADO que tienen código",
+    esperaba: `${noMacheadosReales}, que son los renglones de producto que no están en el catálogo`,
+    paso: `la base tiene ${noMacheados} NO_MACHEADO y solo ${noMacheadosReales} tienen código`,
     severidad: AMARILLO,
   });
 

@@ -116,7 +116,48 @@ async function leerArchivoGenerico({ bytes, nombre, proveedor, form }) {
 
   const descartes = {};
   for (const d of tabla.filasDescartadas) descartes[d.motivo] = (descartes[d.motivo] ?? 0) + 1;
-  const ejemplos = tabla.filas.slice(0, 8).map((f) => ({ y: f.y, pagina: f.pagina, valores: f.valores }));
+
+  // ── EL MAPA CON EL QUE SE CUENTA Y SE MUESTRA LA VISTA PREVIA ────────────
+  //
+  // El de la receta guardada si aplica, y si no el PROPUESTO. Los dos existen en
+  // este punto, y hace falta uno para poder decir cuántos renglones no son
+  // productos: sin saber qué columna es el código, un título de rubro es
+  // indistinguible de un producto.
+  //
+  // ── POR QUÉ IMPORTA QUE SEA EL PROPUESTO EN LA PRIMERA LECTURA ───────────
+  //
+  // Porque la primera lectura de un proveedor corta ACÁ, con el 409 que pide
+  // confirmar las columnas, y es la pantalla donde se ve el contador y la vista
+  // previa. Contando solo lo que descartó el lector, esa pantalla decía "salteé 1
+  // fila" sobre un archivo con tres títulos de rubro —el 1 era el encabezado— y
+  // más arriba mostraba GOLOSINAS como si fuera un producto, con "Código —" y
+  // "$ 0,00". Las dos cosas en la misma pantalla y a tres renglones de distancia.
+  const mapeoParaContar = uso.ok ? uso.receta : propuesta.mapeo;
+  const lectura = filasDelArchivo({
+    tabla,
+    mapeo: mapeoParaContar,
+    hojaNombre: leido.detalle?.hoja ?? null,
+  });
+  for (const d of lectura.descartadas) descartes[d.motivo] = (descartes[d.motivo] ?? 0) + 1;
+  const salteadas = tabla.filasDescartadas.length + lectura.descartadas.length;
+
+  // ── Y LA VISTA PREVIA SALE DE LAS FILAS QUE QUEDARON ────────────────────
+  //
+  // No de `tabla.filas`, que es todo lo que tenía forma de fila. Es la otra
+  // mitad del mismo defecto: la pantalla dibujaba el título de rubro con la misma
+  // forma que un producto, en el bloque "Así quedan los primeros productos".
+  //
+  // Se reconstruyen los `valores` del renglón porque la pantalla muestra celdas
+  // por índice de columna, no los campos ya mapeados: cambiarle la forma a este
+  // dato obligaría a rehacer la pantalla, y lo que estaba mal no era la pantalla.
+  const porRenglon = new Map(
+    tabla.filas.map((f) => [`${f.pagina ?? 1}:${f.y ?? 0}`, f])
+  );
+  const ejemplos = lectura.filas
+    .slice(0, 8)
+    .map((p) => porRenglon.get(`${p.pagina ?? 1}:${p.renglonEnLaPagina ?? 0}`))
+    .filter(Boolean)
+    .map((f) => ({ y: f.y, pagina: f.pagina, valores: f.valores }));
 
   if (!uso.ok) {
     return {
@@ -137,7 +178,7 @@ async function leerArchivoGenerico({ bytes, nombre, proveedor, form }) {
         },
         huella: uso.huellaNueva,
         ejemplos,
-        conteo: { filas: tabla.filas.length, descartadas: tabla.filasDescartadas.length, descartesPorMotivo: descartes },
+        conteo: { filas: lectura.filas.length, descartadas: salteadas, descartesPorMotivo: descartes },
         formato: leido.formato,
       },
     };
@@ -208,6 +249,41 @@ async function leerArchivoGenerico({ bytes, nombre, proveedor, form }) {
         }
       : null;
 
+  // Las filas de producto ya se separaron arriba, con este mismo mapa: cuando la
+  // receta aplica, `mapeoParaContar` ES `uso.receta`. No se vuelve a calcular
+  // —leer el archivo dos veces con el mismo mapa daría lo mismo hasta el día que
+  // no, y ese día habría dos respuestas y ninguna forma de saber cuál se guardó.
+  const productos = lectura.filas;
+
+  // ── UN ARCHIVO DEL QUE NO SALIÓ NINGÚN PRODUCTO NO SE IMPORTA ───────────
+  //
+  // Antes del descarte de arriba esto no podía pasar: todo renglón con forma de
+  // fila entraba, aunque no tuviera código ni precio. Ahora sí puede, y el caso
+  // que lo produce es uno concreto: la columna de precio mapeada a una que no
+  // trae números, con lo que las 900 filas quedan sin precio.
+  //
+  // Se corta con un motivo que dice qué mirar. Importar cero filas "con éxito"
+  // dejaría una lista vacía en el historial y a alguien buscando sus productos en
+  // una pantalla que no los perdió: nunca los tuvo.
+  if (productos.length === 0) {
+    return {
+      ok: false,
+      status: 422,
+      cuerpo: {
+        ok: false,
+        codigo: "NINGUN_PRODUCTO",
+        error:
+          `Del archivo no salió ningún producto: los ${salteadas} renglones que tiene no ` +
+          `traen código o no traen precio. Revisá qué columna es el código y cuál el precio.`,
+        conteo: { filas: 0, descartadas: salteadas, descartesPorMotivo: descartes },
+        titulos: tabla.titulos,
+        mapeo,
+        ejemplos,
+        formato: leido.formato,
+      },
+    };
+  }
+
   return {
     ok: true,
     mapeo,
@@ -215,18 +291,19 @@ async function leerArchivoGenerico({ bytes, nombre, proveedor, form }) {
     huella: uso.huellaNueva,
     formato: leido.formato,
     descartes,
+    salteadas,
     ejemplos,
     eleccionManual,
     salidaParser: {
-      productos: filasDelArchivo({ tabla, mapeo, hojaNombre: leido.detalle?.hoja ?? null }),
+      productos,
       categorias: [],
       advertencias: [],
       errores: [],
       resumen: {
         hojaNombre: leido.detalle?.hoja ?? null,
         formato: leido.formato,
-        productos: tabla.filas.length,
-        filasDescartadas: tabla.filasDescartadas.length,
+        productos: productos.length,
+        filasDescartadas: salteadas,
         descartesPorMotivo: descartes,
       },
     },
@@ -611,6 +688,22 @@ export async function POST(req) {
             mapeo: generico.mapeo,
             huella: generico.huella,
             ejemplos: generico.ejemplos,
+            // ── EL CONTEO VIAJA TAMBIÉN ACÁ ───────────────────────────────
+            //
+            // Es la MISMA pantalla que la de confirmar columnas, pero llega por
+            // otro 409, y éste no mandaba el conteo: el cartel de "salteé N filas
+            // que no son productos" aparecía en la primera lectura y desaparecía
+            // en la segunda, sobre el mismo archivo.
+            //
+            // Y desaparecía justo donde más sirve: la segunda lectura es la que
+            // pide elegir la columna de precio, o sea la que pide una decisión
+            // sobre cómo se leyó el archivo. Saber qué se descartó es parte de
+            // poder tomarla.
+            conteo: {
+              filas: salidaParser.productos.length,
+              descartadas: generico.salteadas,
+              descartesPorMotivo: generico.descartes,
+            },
           },
           { status: 409 }
         );

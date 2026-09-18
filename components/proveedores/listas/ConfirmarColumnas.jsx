@@ -240,11 +240,19 @@ export default function ConfirmarColumnas({ proveedor, pregunta, trabajando, onV
         ))}
       </div>
 
+      {/* CUÁNTOS PRODUCTOS SALIERON Y CUÁNTOS RENGLONES NO LO ERAN.
+          Los dos números juntos, porque uno solo no se puede verificar contra el
+          papel: "salteé 3" no dice si el archivo tenía 16 renglones o 300. */}
       {conteo && (
         <p className="text-sm2 sunmi-text-muted leading-snug">
-          {conteo.descartadas === 1
-            ? "Salteé 1 fila que no es un producto (un título o un encabezado)."
-            : `Salteé ${conteo.descartadas} filas que no son productos (títulos y encabezados).`}
+          {conteo.filas === 1 ? "Leí 1 producto" : `Leí ${conteo.filas} productos`}
+          {conteo.descartadas > 0
+            ? `, y salteé ${
+                conteo.descartadas === 1
+                  ? "1 renglón que no es un producto"
+                  : `${conteo.descartadas} renglones que no son productos`
+              } (${motivosEnCriollo(conteo.descartesPorMotivo)}).`
+            : "."}
         </p>
       )}
 
@@ -281,6 +289,38 @@ export default function ConfirmarColumnas({ proveedor, pregunta, trabajando, onV
       </div>
     </>
   );
+}
+
+/**
+ * POR QUÉ SE SALTEARON, EN CRIOLLO Y CONTADO.
+ *
+ * "2 encabezados y 3 títulos de rubro". Los motivos vienen del servidor como
+ * claves —`ENCABEZADO`, `SIN_CODIGO`, `SIN_PRECIO`, `TITULO_O_SUELTA`— y cada una
+ * sale de un lugar distinto de la lectura: las dos primeras del lector, que mira
+ * la forma del renglón, y las otras del mapa de columnas, que ya sabe cuál es el
+ * código y cuál el precio.
+ *
+ * Un motivo que no esté en esta tabla se muestra con su clave y no se esconde: un
+ * motivo nuevo que apareciera en silencio dejaría el número sin explicación, y el
+ * número sin explicación es lo que había antes.
+ */
+const EN_CRIOLLO = {
+  ENCABEZADO: ["encabezado", "encabezados"],
+  TITULO_O_SUELTA: ["título o renglón suelto", "títulos y renglones sueltos"],
+  SIN_CODIGO: ["título de rubro, sin código", "títulos de rubro, sin código"],
+  SIN_PRECIO: ["renglón sin precio", "renglones sin precio"],
+};
+
+function motivosEnCriollo(porMotivo) {
+  const entradas = Object.entries(porMotivo ?? {}).filter(([, n]) => Number(n) > 0);
+  if (entradas.length === 0) return "títulos y encabezados";
+  return entradas
+    .map(([motivo, n]) => {
+      const nombres = EN_CRIOLLO[motivo];
+      if (!nombres) return `${n} × ${motivo}`;
+      return `${n} ${n === 1 ? nombres[0] : nombres[1]}`;
+    })
+    .join(" y ");
 }
 
 /** "Es la que coincide con tus costos en 94 de cada 100 productos". */
