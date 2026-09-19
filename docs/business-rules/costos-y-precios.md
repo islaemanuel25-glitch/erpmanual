@@ -237,3 +237,27 @@ puede: aplicar los lee. La importación #12 contaba 11 y aplicar escribió 3.
 
 Las que el recálculo va a omitir salen de `listos`, tienen su propio contador
 —`omitidasAlAplicar`— y se muestran con el valor de antes y el de ahora.
+
+---
+
+## RN-23 — El precio se multiplica por el bulto a precisión completa, y la comparación no es al centavo · **[CÓDIGO]**
+
+Dos mitades de la misma regla.
+
+**La cuenta**: el unitario NO se redondea antes de multiplicarlo por el factor
+del bulto. Está escrito en `calculoCosto.js` desde el principio —redondear antes
+arrastra el error por el factor— y hasta el 2026-09-19 el `lecturasPosibles` del
+lector genérico era el único lugar que no lo seguía: conciliar guardaba
+`round2(round2(P) × F)` y aplicar recalculaba `round2(P × F)`.
+
+**La comparación**: al aplicar, el costo recalculado se compara con el guardado
+usando `difierenSoloEnElRedondeo` (`calculoCosto.js`), no al centavo. El margen es
+el mayor entre `TOLERANCIA_REDONDEO_PCT` (0,1 %) y `TOLERANCIA_REDONDEO_PESOS`
+($1) — dos umbrales porque el porcentaje no cubre los costos chicos y el piso no
+cubre los grandes. Por debajo se escribe el **recalculado**, que es el que sale de
+los datos de hoy.
+
+Es el [INC-0011](../incidents/INC-0011-siete-centavos-frenaban-la-aplicacion.md):
+siete centavos sobre $31.428 —el 0,0002 %— frenaban la escritura, y el cartel
+afirmaba que el precio había cambiado. La tolerancia es la red para las filas ya
+conciliadas con el número viejo, no el arreglo.

@@ -36,6 +36,7 @@ un incidente y una anécdota.
 | [INC-0008](INC-0008-packs-contados-sobre-un-envio-sin-bultos.md) | 6 packs contados sobre un envío sin packs: 180 unidades donde llegaron 8 | **ABIERTO** (la fila sigue mal; no movió stock) |
 | [INC-0009](INC-0009-el-documento-resta-dos-escalas.md) | El documento de una transferencia cerrada resta dos escalas: 595 unidades informadas como faltantes que están en el local | Arreglado, sin desplegar (el stock estaba bien) |
 | [INC-0010](INC-0010-la-propuesta-confirmada-a-mano-no-se-podia-aplicar.md) | Con impuesto adicional, ninguna fila confirmada a mano se podía aplicar: 8 de 11 omitidas en silencio en la #12 | Arreglado, sin desplegar (ningún costo quedó mal) |
+| [INC-0011](INC-0011-siete-centavos-frenaban-la-aplicacion.md) | Siete centavos sobre $31.428 frenaban la aplicación, y el cartel afirmaba que el precio había cambiado | Arreglado, sin desplegar (ningún costo quedó mal) |
 
 ## Incidentes que existen pero no se documentaron acá
 
