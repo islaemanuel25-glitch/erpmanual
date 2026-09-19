@@ -120,7 +120,17 @@ export default function NuevaCompraProveedorPage() {
   // Filtro "Pedido (N)": muestra SOLO las filas que están en el pedido (itemsMap).
   // Es un overlay, no toca `vista` ni el orden estable del catálogo. Se guarda la
   // página del catálogo para restaurarla al salir del filtro.
-  const [soloPedido, setSoloPedido] = useState(false);
+  // ── LA PANTALLA ARRANCA EN "CARGADOS" ───────────────────────────────────
+  //
+  // Arrancaba en "Sugeridos", y ahí sacar un producto lo hacía DESAPARECER de
+  // la vista: se perdía de vista lo que se llevaba armado justo cuando se lo
+  // estaba corrigiendo. "Cargados" es la lista de lo que se está pidiendo, así
+  // que es la que tiene que estar a la vista.
+  //
+  // Vale para los dos modos. En automático los sugeridos ya vienen cargados y
+  // la lista no arranca vacía; en manual sí arranca vacía, y está bien: todavía
+  // no se cargó nada, y el cartel lo dice.
+  const [soloPedido, setSoloPedido] = useState(true);
   const pageAntesPedido = useRef(1);
 
   // Modo de armado del pedido: "automatico" (sugeridos precargados por faltante)
@@ -309,7 +319,7 @@ export default function NuevaCompraProveedorPage() {
     setAvisoImportacion("");
     setDraftCant({}); // limpiar borradores de cantidad al cambiar de proveedor
     setCategoriaFilter("");
-    setSoloPedido(false);
+    setSoloPedido(true);
     if (esContinuar) return;
     // Cambiar de proveedor arranca un pedido limpio (los sugeridos se resiembran
     // luego en cargarProductos si el modo es automático).
@@ -697,7 +707,29 @@ export default function NuevaCompraProveedorPage() {
   const getDraft = (prod) => {
     const d = draftCant[prod.productoLocalId] || {};
     return {
-      cant: d.cant !== undefined ? d.cant : prod.sugerido > 0 ? prod.sugerido : "",
+      // ── EL BORRADOR ARRANCA VACÍO, NO EN EL SUGERIDO ────────────────────
+      //
+      // Decía `prod.sugerido > 0 ? prod.sugerido : ""`, y ése era el defecto:
+      // una fila que NO está en el pedido mostraba el sugerido en el stepper
+      // —269, 213— mientras el contador de arriba decía "0 / 228 cargados" y el
+      // total $0, porque `items` estaba vacío. La pantalla mostraba cantidades
+      // que no estaban en el pedido.
+      //
+      // En automático no se notaba: el autorrelleno siembra `items`, así que el
+      // stepper lee del ítem y no del borrador. Se veía en manual, y después de
+      // "empezar de nuevo (vaciar pedido)", que es donde `items` queda vacío y
+      // el catálogo sigue trayendo su `sugerido`.
+      //
+      // Y tenía una segunda cara peor que la primera: para cargar el producto
+      // había que mover la cantidad, o sea pasar de 269 a 270. El número que ya
+      // se veía nunca era el que se iba a pedir.
+      //
+      // Ahora el stepper muestra lo que hay en el pedido y nada más. Cuánto
+      // propone el sistema se lee al lado, en "Sugerido N", que es texto y no
+      // finge ser un dato cargado. Vacío y no `0` literal porque el campo ya
+      // tiene `placeholder="0"`: se ve el cero igual y no hay que borrarlo
+      // antes de escribir.
+      cant: d.cant !== undefined ? d.cant : "",
       costo: d.costo !== undefined ? d.costo : Number(prod.precio_costo || 0),
       unidad: d.unidad !== undefined ? d.unidad : unidadDefault(prod),
     };
@@ -925,7 +957,7 @@ export default function NuevaCompraProveedorPage() {
     setVista("sugeridos");
     setCategoriaFilter("");
     setModo("automatico");
-    setSoloPedido(false);
+    setSoloPedido(true);
     setResumenOpen(false);
     setModalEnvioOpen(false);
     setPedidoEnvio(null);
@@ -943,7 +975,9 @@ export default function NuevaCompraProveedorPage() {
       autofillRef.current = null;
     }
     setVista(nuevoModo === "manual" ? "todos" : "sugeridos");
-    setSoloPedido(false);
+    // Cambiar de modo vuelve a "Cargados" por lo mismo que la pantalla arranca
+    // ahí: lo que se está armando es lo que tiene que quedar a la vista.
+    setSoloPedido(true);
     setModo(nuevoModo);
     setConfirmModo(null);
   };
@@ -1088,21 +1122,23 @@ export default function NuevaCompraProveedorPage() {
       setSoloPedido(false);
       setPageNum(pageAntesPedido.current);
     } else {
-      if (lineasCount === 0) return;
+      // Sin el guard de "no entres si está vacío": Cargados es ahora la vista
+      // por defecto y un pedido vacío es un estado legítimo de esa vista.
       pageAntesPedido.current = pageNum;
       setSoloPedido(true);
       setPageNum(1);
     }
   };
 
-  // Si el pedido queda vacío estando en el filtro, salir solo (no dejarlo en una
-  // vista vacía) y volver a la página del catálogo donde estaba.
-  useEffect(() => {
-    if (soloPedido && lineasCount === 0) {
-      setSoloPedido(false);
-      setPageNum(pageAntesPedido.current);
-    }
-  }, [soloPedido, lineasCount]);
+  // ── ACÁ HABÍA UN EFECTO QUE SACABA DEL FILTRO AL VACIARSE EL PEDIDO ──────
+  //
+  // Tenía sentido cuando "Cargados" era una vista a la que se entraba a
+  // propósito: quedarse en una lista vacía se leía como algo roto. Ahora es la
+  // vista por DEFECTO, así que ese mismo efecto peleaba con el arranque —en
+  // manual, con el pedido vacío, sacaba a la persona de Cargados sin que
+  // tocara nada— y además hacía imposible quedarse mirando un pedido que se
+  // acaba de vaciar, que es justo cuando alguien quiere ver que quedó vacío.
+  // Un pedido sin líneas ya tiene su cartel: "El pedido está vacío."
 
   // Categorías presentes en el catálogo del proveedor (para el filtro).
   const categorias = useMemo(() => {
@@ -1583,7 +1619,9 @@ export default function NuevaCompraProveedorPage() {
 
     const elegir = (clave) => {
       if (clave === "cargados") {
-        if (lineasCount === 0 || soloPedido) return;
+        // Sin el corte por pedido vacío: Cargados es la vista por defecto y se
+        // puede volver a ella aunque no haya nada cargado todavía.
+        if (soloPedido) return;
         togglePedido();
         return;
       }
@@ -2255,20 +2293,37 @@ export default function NuevaCompraProveedorPage() {
           {rv.enPedido && botonQuitar(p, 16)}
         </div>
 
-        {/* Renglón 2: de dónde sale la cantidad sugerida y a qué precio, contra
-            el control que la cambia. */}
-        <div className="flex items-center gap-3">
-          <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-            {sugerido > 0 && (
-              <span className="text-sm3 font-medium sunmi-text-accent">
-                Sugerido {sugerido}
-              </span>
-            )}
-            <span className="text-sm3 sunmi-text-muted truncate">
-              {rv.costoUnidad} · {fmtPesos(costoNum)}
+        {/* Renglón 2: de dónde sale la cantidad sugerida y a qué precio.
+            Sube acá, debajo del nombre, para dejarle el renglón de abajo al
+            control y al importe. */}
+        <div className="flex items-baseline gap-2 min-w-0">
+          {sugerido > 0 && (
+            <span className="text-sm3 font-medium sunmi-text-accent shrink-0">
+              Sugerido {sugerido}
             </span>
-          </div>
+          )}
+          <span className="text-sm3 sunmi-text-muted truncate">
+            {rv.costoUnidad} · {fmtPesos(costoNum)}
+          </span>
+        </div>
+
+        {/* ── RENGLÓN 3: LA CANTIDAD Y LO QUE SALE ──────────────────────────
+            El importe de la línea vuelve a la tarjeta. Es lo que Emanuel mira
+            para decidir cuánto pedir, y estaba solo en el total de abajo, que
+            no dice cuánto pesa ESTE producto.
+            Va a la derecha y el stepper se corre a la izquierda, que es una de
+            las dos salidas posibles: medido a 360, la tarjeta tiene 282 px
+            útiles y el stepper ocupa unos 118; con el rótulo y el costo en el
+            mismo renglón no entraba un importe de siete cifras sin cortar algo,
+            y con el renglón para los dos solos entra holgado.
+            Mismo cuerpo que el nombre —17— porque es el otro número que se
+            mira. Sale de `rv.r`, el mismo subtotal que usa el escritorio, así
+            que se mueve con la cantidad sin una segunda cuenta acá. */}
+        <div className="flex items-center justify-between gap-3">
           <div className="shrink-0">{stepper(p, rv, true)}</div>
+          <span className="text-lg2 font-semibold sunmi-text-strong tabular-nums truncate">
+            {fmtPesos(rv.r?.subtotal ?? 0)}
+          </span>
         </div>
       </SunmiCard>
     );
