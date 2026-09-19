@@ -16,6 +16,30 @@ Colores principales: **amber-400** (primario), **cyan-500** (secundario), **slat
 
 ## Componentes de Layout
 
+### SunmiPantallaDeTrabajo
+El armado de una pantalla de trabajo en el telefono: donde estoy, buscar,
+filtrar, la lista y la barra de abajo. Salio de `RecepcionMovil` tal cual
+estaba. Fija lo que ninguna pantalla puede cambiar —que no scrollea nada
+adentro, el gutter unico, la separacion entre bloques y el pie en `sticky`— y
+recibe el contenido por ranuras.
+```jsx
+<SunmiPantallaDeTrabajo
+  contexto={<>{filas}</>}
+  buscador={<SunmiCampoBusquedaVoz … />}
+  filtros={<SunmiFiltroEstado … />}
+  categoria={<SunmiSelectAdv id="categoria-x" … />}
+  idCategoria="categoria-x"
+  lista={items.map(…)}
+  pieDePantalla={<>{total}{boton}</>}
+/>
+```
+Props: `contexto?`, `buscador?`, `filtros?`, `categoria?`, `idCategoria?`,
+`rotuloCategoria?`, `antesDeLista?`, `lista?`, `despuesDeLista?`,
+`pieDePantalla?`, `despuesDelPie?`
+
+La ranura del pie se llama `pieDePantalla` y no `pie` porque `pie={` ya es el
+pie de `SunmiTabla`, con otro contrato y su propio candado.
+
 ### SunmiCard
 Contenedor principal con bordes redondeados y sombra.
 ```jsx

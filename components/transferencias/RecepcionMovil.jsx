@@ -36,6 +36,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, MoreHorizontal } from "lucide-react";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiPantallaDeTrabajo from "@/components/sunmi/SunmiPantallaDeTrabajo";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
@@ -288,14 +289,27 @@ export default function RecepcionMovil({
     } ${fmtCantidad(cuantas)}`;
   };
 
+  // EL ARMADO LO PONE `SunmiPantallaDeTrabajo`, Y SALIÓ DE ACÁ.
+  //
+  // Esta pantalla era el único lugar del repo donde existía: la separación
+  // entre bloques, el gutter, el contenedor de la lista y el pie pegajoso
+  // estaban escritos a mano en este `return`. La pieza los tiene tal cual —se
+  // extrajeron, no se rediseñaron— y lo que queda acá es el CONTENIDO.
+  //
+  // Los nodos de cada ranura son los mismos de antes, en el mismo orden. Las
+  // ranuras que agrupan varios bloques van en un fragmento: React lo disuelve,
+  // así que siguen siendo hijos directos de la `<section>` y `space-y-3` los
+  // separa igual que antes. Eso es lo que hace que la pantalla quede idéntica.
   return (
-    <section className="space-y-3">
+    <SunmiPantallaDeTrabajo
+      idCategoria="categoria-recepcion"
+      contexto={
+        <>
       {/* ── 1 · DÓNDE ESTOY ───────────────────────────────────────────────
           Compacto a propósito. El título "Transferencias" y el "Volver" los
           dibuja el shell —ver `useAccionDePagina` en la página—, así que acá no
           se repiten. Lo que falta para saber dónde estamos es el número, el
           estado, las dos puntas y el avance. Nada más. */}
-      <SunmiCard className="p-3 space-y-1">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span className="font-semibold sunmi-text-strong truncate">
@@ -360,38 +374,37 @@ export default function RecepcionMovil({
               : "Sin pendientes"}
           </span>
         </div>
-      </SunmiCard>
-
-      {/* ── 2 · BUSCAR ────────────────────────────────────────────────────
+        </>
+      }
+      /* ── 2 · BUSCAR ────────────────────────────────────────────────────
           El MISMO componente que Productos y el POS: lupa, campo y micrófono.
           No hay un botón de "Escanear" al lado — un lector físico escribe el
           código y manda Enter, que entra por `onKeyDown` igual que un nombre
           tecleado, y la cámara vive en "⋯" mientras no haya una composición
-          aprobada para ella. */}
-      <SunmiCampoBusquedaVoz
-        value={texto}
-        onChange={onTexto}
-        onVoz={onVoz}
-        onKeyDown={onTeclear}
-        placeholder={PLACEHOLDER_BUSCADOR}
-        ariaLabel="Buscar producto de esta transferencia"
-      />
-
-      {/* ── 3 · FILTROS ───────────────────────────────────────────────────
+          aprobada para ella. */
+      buscador={
+        <SunmiCampoBusquedaVoz
+          value={texto}
+          onChange={onTexto}
+          onVoz={onVoz}
+          onKeyDown={onTeclear}
+          placeholder={PLACEHOLDER_BUSCADOR}
+          ariaLabel="Buscar producto de esta transferencia"
+        />
+      }
+      /* ── 3 · FILTROS ───────────────────────────────────────────────────
           El estado del trabajo primero, en grilla para que entren los cuatro
           con su número. La categoría abajo y en un desplegable: es un filtro
-          secundario y no tiene que competir con el principal. */}
-      <SunmiFiltroEstado
-        opciones={opcionesEstado}
-        valor={filtro}
-        onCambiar={onFiltrar}
-        ariaLabel="Filtrar productos por estado"
-      />
-
-      <div>
-        <label className="text-sm2 sunmi-text-muted mb-1 block" htmlFor="categoria-recepcion">
-          Categoría
-        </label>
+          secundario y no tiene que competir con el principal. */
+      filtros={
+        <SunmiFiltroEstado
+          opciones={opcionesEstado}
+          valor={filtro}
+          onCambiar={onFiltrar}
+          ariaLabel="Filtrar productos por estado"
+        />
+      }
+      categoria={
         <SunmiSelectAdv
           id="categoria-recepcion"
           value={categoriaId == null ? "" : String(categoriaId)}
@@ -413,8 +426,9 @@ export default function RecepcionMovil({
             </option>
           ))}
         </SunmiSelectAdv>
-      </div>
-
+      }
+      antesDeLista={
+        <>
       {/* ── 4 · EL CAMINO DE EXCEPCIÓN, DESPUÉS DE LOS FILTROS ─────────────
           Acá se comparaba `aviso === mensajeNoFigura`, y ese aviso solo existía
           después de tocar Enter. El operador escribía "9 de oro", no encontraba
@@ -547,11 +561,13 @@ export default function RecepcionMovil({
           )}
         </SunmiCard>
       )}
-
-      {/* ── 5 · LOS PRODUCTOS ─────────────────────────────────────────────
+        </>
+      }
+      /* ── 5 · LOS PRODUCTOS ─────────────────────────────────────────────
           La misma fila que el escritorio: se toca la tarjeta entera y no hay
-          botones adentro. */}
-      <div className="space-y-3.5">
+          botones adentro. El contenedor y su `space-y-3.5` los pone la pieza. */
+      lista={
+        <>
         {/* ── LO QUE SE ACABA DE GUARDAR ────────────────────────────────
             Cantidad Y plata, las dos. Con una sola no alcanza: "4 → 10" no dice
             cuánto se movió el documento, y "$38.000 → $95.000" no dice de dónde
@@ -614,8 +630,10 @@ export default function RecepcionMovil({
             onAbrirFicha={onElegir}
           />
         ))}
-      </div>
-
+        </>
+      }
+      despuesDeLista={
+        <>
       {/* ── 6 · CONFIRMAR ─────────────────────────────────────────────────
           El estado del botón NO se decide acá: sale de `pendientes`, que sale
           del mismo resumen que las cards. Y el servidor lo vuelve a comprobar
@@ -685,17 +703,16 @@ export default function RecepcionMovil({
           )}
         </SunmiCard>
       )}
-
-      {/* ── 7 · LA BARRA DE CIERRE, PEGADA ABAJO ───────────────────────────
+        </>
+      }
+      /* ── 7 · LA BARRA DE CIERRE, PEGADA ABAJO ───────────────────────────
           Con 77 líneas, el botón de confirmar quedaba al final de un scroll
           largo: para saber si ya se podía confirmar había que llegar hasta
           abajo. Pegada, la respuesta está siempre a la vista.
 
-          `sticky` y no `fixed`: se queda dentro del flujo de la página, así que
-          no tapa el último producto ni hay que compensar con un relleno al
-          final. Y el nivel de apilado es el de la escala —no un número escrito
-          a mano—, porque esto no es un modal: tiene que quedar POR DEBAJO de
-          las hojas del kit, no por encima.
+          El `sticky`, el `-mx-4` y el `z-10` se fueron a la pieza, con su
+          motivo: son del ARMADO y valen para cualquier pantalla de trabajo, no
+          solo para ésta.
 
           ── QUÉ DICE LA BARRA, Y QUÉ DEJÓ DE DECIR ─────────────────────────
           El total y el botón. Nada más.
@@ -711,9 +728,9 @@ export default function RecepcionMovil({
 
           Y esto EVITA EL VIAJE, no reemplaza nada: el servidor vuelve a exigir
           las dos —`PRODUCTOS_SIN_REVISAR` y el motivo obligatorio— y es él
-          quien manda. */}
-      {puedeRecibir && (
-        <div className="sticky bottom-0 z-10 -mx-4 px-4 pt-2 pb-2 border-t sunmi-divider sunmi-surface">
+          quien manda. */
+      pieDePantalla={
+        puedeRecibir ? (
           <div className="flex items-center justify-between gap-3">
             <span className="min-w-0">
               {/* ── EL RÓTULO DICE CUÁNTAS SE CORRIGIERON ──────────────────
@@ -743,9 +760,10 @@ export default function RecepcionMovil({
               {confirmando ? "Confirmando..." : "✓ Confirmar"}
             </SunmiButton>
           </div>
-        </div>
-      )}
-
+        ) : null
+      }
+      despuesDelPie={
+        <>
       {/* ── LA HOJA DEL PRODUCTO ──────────────────────────────────────────
           `forma="hoja"` del kit: pegada abajo, con su velo y su `Escape`. La
           ficha va sin su tarjeta —`enHoja`— porque el modal ya pone una. */}
@@ -889,6 +907,8 @@ export default function RecepcionMovil({
       {/* El panel de cancelación lo dibuja la página, con su preview y su
           motivo. Acá solo se lo deja aparecer cuando está abierto. */}
       {panelCancelar}
-    </section>
+        </>
+      }
+    />
   );
 }

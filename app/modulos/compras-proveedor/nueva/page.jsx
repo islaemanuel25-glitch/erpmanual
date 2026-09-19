@@ -9,7 +9,9 @@ import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SunmiFiltroEstado from "@/components/sunmi/SunmiFiltroEstado";
+import SunmiPantallaDeTrabajo from "@/components/sunmi/SunmiPantallaDeTrabajo";
 import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiPill from "@/components/sunmi/SunmiPill";
@@ -1478,8 +1480,8 @@ export default function NuevaCompraProveedorPage() {
    *  a cinco centímetros de distancia, que es el defecto que la recepción ya
    *  tuvo una vez y dejó anotado.
    */
-  const tarjetaDeContexto = () => (
-    <SunmiCard className="p-3 space-y-1">
+  const contenidoDeContexto = () => (
+    <>
       <div className="flex items-center gap-2 min-w-0">
         <span className="font-semibold sunmi-text-strong truncate">
           Pedido {nombreProveedorActivo}
@@ -1541,7 +1543,7 @@ export default function NuevaCompraProveedorPage() {
           </div>
         </div>
       )}
-    </SunmiCard>
+    </>
   );
 
   /** ── LOS FILTROS, CON LA PIEZA DEL KIT ────────────────────────────────
@@ -1590,42 +1592,170 @@ export default function NuevaCompraProveedorPage() {
     };
 
     return (
-      <>
-        <SunmiFiltroEstado
-          opciones={opciones}
-          valor={elegido}
-          onCambiar={elegir}
-          ariaLabel="Filtrar productos del pedido"
-        />
-
-        {categorias.length > 0 && (
-          <div>
-            <label
-              className="text-sm2 sunmi-text-muted mb-1 block"
-              htmlFor="categoria-pedido"
-            >
-              Categoría
-            </label>
-            <SunmiSelectAdv
-              id="categoria-pedido"
-              value={categoriaFilter}
-              onChange={setCategoriaFilter}
-            >
-              {/* El rótulo de la opción y no el placeholder: la pieza muestra
-                  el texto de la opción que coincide con el valor, y sin filtro
-                  el valor es "". */}
-              <SunmiSelectOption value="">Todas · {conteosFiltro.todos}</SunmiSelectOption>
-              {categorias.map((c) => (
-                <SunmiSelectOption key={c.id} value={String(c.id)}>
-                  {c.nombre}
-                </SunmiSelectOption>
-              ))}
-            </SunmiSelectAdv>
-          </div>
-        )}
-      </>
+      <SunmiFiltroEstado
+        opciones={opciones}
+        valor={elegido}
+        onCambiar={elegir}
+        ariaLabel="Filtrar productos del pedido"
+      />
     );
   };
+
+  /** El desplegable de categoría. Su rótulo y su caja los pone la pieza, que
+   *  es la que decide que este filtro va abajo y de ancho completo. */
+  const selectorDeCategoria = () => (
+    <SunmiSelectAdv
+      id="categoria-pedido"
+      value={categoriaFilter}
+      onChange={setCategoriaFilter}
+    >
+      {/* El rótulo de la opción y no el placeholder: la pieza muestra el texto
+          de la opción que coincide con el valor, y sin filtro el valor es "". */}
+      <SunmiSelectOption value="">Todas · {conteosFiltro.todos}</SunmiSelectOption>
+      {categorias.map((c) => (
+        <SunmiSelectOption key={c.id} value={String(c.id)}>
+          {c.nombre}
+        </SunmiSelectOption>
+      ))}
+    </SunmiSelectAdv>
+  );
+
+  /** El buscador con voz. Igual que en la recepción, la voz se trata como el
+   *  teclado: esta pantalla filtra un listado, no auto-agrega como el POS. */
+  const buscadorDelPedido = () => (
+    <SunmiCampoBusquedaVoz
+      placeholder="Buscar producto o código"
+      ariaLabel="Buscar producto o código"
+      value={search}
+      onChange={(v) => {
+        setSearch(v);
+        setPostVinculoMsg("");
+      }}
+      onVoz={(v) => {
+        setSearch(v);
+        setPostVinculoMsg("");
+      }}
+      className="w-full min-h-campoBusqueda text-lg2"
+    />
+  );
+
+  /** Avisos y caminos de excepción, entre los filtros y la lista. Es la ranura
+   *  que en la recepción lleva el "no figura" y el catálogo del origen. */
+  const avisosDelPedido = () => (
+    <>
+      {mostrarWarningDia && (
+        <SunmiAviso tono="warning">
+          <b>Hoy es {formatDiaLabel(diaActualEnum())}.</b>{" "}
+          {proveedorSel.nombre} recibe:{" "}
+          {proveedorSel.dias_pedido.map((dx) => formatDiaLabel(dx)).join(", ")}. Podés
+          crear la compra igual.
+        </SunmiAviso>
+      )}
+
+      {avisoImportacion && <SunmiAviso tono="neutral">{avisoImportacion}</SunmiAviso>}
+
+      {postVinculoMsg && (
+        <span className="block text-sm2 sunmi-text-accent">{postVinculoMsg}</span>
+      )}
+
+      {/* Vincular al vuelo (código no encontrado) */}
+      {search.trim() &&
+        !loadingProds &&
+        productos.length === 0 &&
+        avisoSinDeposito.length === 0 &&
+        !postVinculoMsg && (
+          <div className="flex flex-col gap-1.5">
+            <span className="text-sm2 sunmi-text-muted">
+              No se encontró “{search.trim()}” para este proveedor.
+            </span>
+            <SunmiButton color="slate" type="button" onClick={() => setVincularOpen(true)}>
+              Vincular código interno
+            </SunmiButton>
+          </div>
+        )}
+
+      {bannerBorrador(true)}
+    </>
+  );
+
+  /** Las tarjetas y su paginador. El contenedor y la separación los pone la
+   *  pieza, que es lo que hace que midan igual que las de la recepción. */
+  const listaDelPedido = () => (
+    <>
+      {loadingProds && productos.length === 0 ? (
+        <p className="text-center py-6 sunmi-text-muted text-sm2">Buscando...</p>
+      ) : listaRender.length === 0 ? (
+        <p className="text-center py-6 sunmi-text-muted text-sm2">
+          {soloPedido
+            ? "El pedido está vacío."
+            : vista === "sugeridos"
+            ? "Sin sugeridos. Cambiá a “Todos”."
+            : "Sin productos."}
+        </p>
+      ) : (
+        pageRows.map(filaMobile)
+      )}
+
+      {listaRender.length > pageSize && (
+        <div className="flex items-center justify-center gap-2 text-sm2">
+          <SunmiButton
+            color="slate"
+            disabled={pageEff <= 1}
+            onClick={() => setPageNum((n) => Math.max(1, n - 1))}
+          >
+            « Ant.
+          </SunmiButton>
+          <span className="sunmi-text-muted whitespace-nowrap">
+            Pág. {pageEff}/{totalPages}
+          </span>
+          <SunmiButton
+            color="slate"
+            disabled={pageEff >= totalPages}
+            onClick={() => setPageNum((n) => Math.min(totalPages, n + 1))}
+          >
+            Sig. »
+          </SunmiButton>
+        </div>
+      )}
+    </>
+  );
+
+  /** El contenido de la barra de abajo. La barra —su `sticky`, su borde y su
+   *  superficie— la pone la pieza. */
+  const pieDelPedido = () => (
+    <>
+      {/* El resumen es TEXTO, no un botón. "Ver resumen" abría una hoja con lo
+          mismo que ya está en la pantalla, y como el renglón entero era tocable
+          competía con los dos botones de abajo. */}
+      <div className="flex items-center gap-2 mb-2.5">
+        <span className="text-sm3 sunmi-text-muted flex-1 min-w-0 truncate">
+          {lineasCount} {lineasCount === 1 ? "producto" : "productos"}
+        </span>
+        <span className="text-lg2 font-bold sunmi-text-strong tabular-nums shrink-0">
+          {fmtPesos(total)}
+        </span>
+      </div>
+      {/* Dos botones del mismo alto y el mismo ancho: `flex-1` con `gap-3`. */}
+      <div className="flex gap-3">
+        <SunmiButton
+          color="slate"
+          className="flex-1 min-h-toque text-sm3"
+          disabled={accionesDeshabilitadas}
+          onClick={guardarPendiente}
+        >
+          {saving ? "Guardando..." : "Guardar"}
+        </SunmiButton>
+        <SunmiButton
+          color="primary"
+          className="flex-1 min-h-toque text-sm3"
+          disabled={accionesDeshabilitadas}
+          onClick={enviarPedido}
+        >
+          Enviar pedido
+        </SunmiButton>
+      </div>
+    </>
+  );
 
   // ── ACÁ ESTABA LA SALIDA A IMPORTAR DESDE ARCHIVO, Y SE FUE ────────────────
   //
@@ -1821,45 +1951,15 @@ export default function NuevaCompraProveedorPage() {
     );
   };
 
-  // ── Barra resumen fija (reemplaza la columna derecha) ──
-  // Desktop: sticky al pie del contenido (no tapa el sidebar). Mobile: fixed.
-  const barraResumen = (mobile = false) =>
-    mobile ? (
-      <div className="fixed bottom-0 left-0 right-0 z-40 h-28 border-t sunmi-divider sunmi-surface px-4 pt-2.5 pb-3 shadow-[0_-2px_10px_rgba(0,0,0,0.25)]">
-        {/* El resumen es TEXTO, no un botón. "Ver resumen" abría una hoja con
-            lo mismo que ya está en la pantalla, y como el renglón entero era
-            tocable competía con los dos botones de abajo. */}
-        <div className="flex items-center gap-2 mb-2.5">
-          <span className="text-sm3 sunmi-text-muted flex-1 min-w-0 truncate">
-            {lineasCount} {lineasCount === 1 ? "producto" : "productos"}
-          </span>
-          <span className="text-lg2 font-bold sunmi-text-strong tabular-nums shrink-0">
-            {fmtPesos(total)}
-          </span>
-        </div>
-        {/* Dos botones del mismo alto y el mismo ancho: `flex-1` con `gap-3`
-            sobre los 358 útiles da los 174 de cada uno que pide el diseño, sin
-            fijar el ancho a mano. */}
-        <div className="flex gap-3">
-          <SunmiButton
-            color="slate"
-            className="flex-1 min-h-toque text-sm3"
-            disabled={accionesDeshabilitadas}
-            onClick={guardarPendiente}
-          >
-            {saving ? "Guardando..." : "Guardar"}
-          </SunmiButton>
-          <SunmiButton
-            color="primary"
-            className="flex-1 min-h-toque text-sm3"
-            disabled={accionesDeshabilitadas}
-            onClick={enviarPedido}
-          >
-            Enviar pedido
-          </SunmiButton>
-        </div>
-      </div>
-    ) : (
+  // ── Barra resumen del ESCRITORIO ──
+  //
+  // La variante móvil se fue: era un `fixed bottom-0 h-28` contra la ventana
+  // que tapaba la última tarjeta y obligaba a compensar con un relleno al
+  // final. Ahora el pie del teléfono lo pone `SunmiPantallaDeTrabajo`, en
+  // `sticky` y dentro del flujo, igual que la recepción de transferencias.
+  // Acá queda solo el de escritorio, que ya era sticky al pie del contenido
+  // para no taparle el sidebar.
+  const barraResumen = () => (
       <div className="sticky bottom-0 z-40 mt-3 rounded-xl border sunmi-divider sunmi-surface px-4 py-2.5 shadow-[0_-2px_12px_rgba(0,0,0,0.18)]">
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-1.5 text-[13px] sunmi-text-strong min-w-0">
@@ -2406,14 +2506,19 @@ export default function NuevaCompraProveedorPage() {
             </div>
 
             {/* ── Barra resumen fija al pie (reemplaza la columna derecha) ── */}
-            {barraResumen(false)}
+            {barraResumen()}
           </div>
         )}
       </div>
       {/* ^ fin DESKTOP */}
 
-      {/* ===================== MOBILE ===================== */}
-      <div className="md:hidden">
+      {/* ===================== MOBILE =====================
+          EL `p-2` ES EL GUTTER, Y ESTÁ MEDIDO. La página de transferencias lo
+          pone en su div raíz y por eso su contenido arranca en x=21 y mide 310
+          a 360 px; el pedido no lo tenía y arrancaba en x=14 midiendo 324, que
+          es por qué sus filtros se veían distintos. Va en la rama móvil y no en
+          la raíz para no correr 7 px el escritorio, que esta tanda no toca. */}
+      <div className="md:hidden p-2">
         {/* ── ELEGIR PROVEEDOR ────────────────────────────────────────────
             El estado inicial de un pedido nuevo tiene su propia pantalla, sin
             el encabezado pegajoso del catálogo: acá no hay nada que fijar
@@ -2427,174 +2532,27 @@ export default function NuevaCompraProveedorPage() {
             onElegir={setProveedorId}
           />
         ) : (
-        <>
-        {/* ── LOS CONTROLES, EN EL ORDEN DE LA RECEPCIÓN DE TRANSFERENCIAS ──
-            Dónde estoy, buscar, filtrar. Tres bloques y en ese orden, que es el
-            de `RecepcionMovil`.
-            Eran SEIS antes de ver un producto: fila de título, tipo de pedido,
-            buscador, chips, desplegable de categorías y el botón de importar.
-            El "Volver" lo lleva el slot del shell y el título sale de la ruta;
-            la identidad del pedido y su avance los dice la tarjeta de contexto,
-            que antes no existía. */}
-        {/* ── NADA DE ESTO ES PEGAJOSO, Y ES EL CAMBIO ──────────────────────
-            Era un `sticky top-0 z-30` con fondo y borde propios, y adentro la
-            tarjeta de contexto, el buscador y los filtros: unos 250 px de
-            encabezado clavados arriba. Eso convertía el resto en una ventanita
-            que se desplazaba sola, que es lo que se siente como "scrollea
-            adentro de un contenedor".
-            La recepción de transferencias no tiene NINGÚN `sticky top-*`: todo
-            baja con la página y lo único que queda arriba es la fila del shell
-            con el título y el Volver, que vive afuera de `<main>` y por eso no
-            se puede ir con el scroll. Su único pegajoso es el de ABAJO, y acá
-            ese ya estaba.
-            También se va el `px-2`: metía el encabezado 7 px más adentro que
-            las tarjetas de la lista, que solo tienen el padding de `<main>`.
-            Ahora comparten gutter, como allá. */}
-        <div className="flex flex-col gap-3">
-
-          {/* Acá vivía el desplegable de proveedor. Ya no: sin proveedor esta
-              rama no se dibuja —la pantalla es `ElegirProveedor`— y con
-              proveedor el desplegable no tenía nada que elegir. */}
-
-          {proveedorId && (
-            <>
-              {tarjetaDeContexto()}
-              {/* EL BUSCADOR ES EL DEL POS, CON SU MICRÓFONO.
-                  Era un `SunmiInput` pelado. Buscar entre cientos de productos
-                  tecleando en un Sunmi es lento y dictarlo no, y esa pieza ya
-                  la tienen el POS, Productos y transferencias: la lupa y el
-                  botón de voz vienen adentro.
-                  La voz se trata igual que el teclado —la misma función en los
-                  dos avisos— porque acá no hay nada que interpretar distinto:
-                  esta pantalla filtra un listado, no auto-agrega como el POS. */}
-              <SunmiCampoBusquedaVoz
-                placeholder="Buscar producto o código"
-                ariaLabel="Buscar producto o código"
-                value={search}
-                onChange={(v) => {
-                  setSearch(v);
-                  setPostVinculoMsg("");
-                }}
-                onVoz={(v) => {
-                  setSearch(v);
-                  setPostVinculoMsg("");
-                }}
-                className="w-full min-h-campoBusqueda text-lg2"
-              />
-              {filtrosDelPedido()}
-              {/* El cartel del pedido en curso, en su variante de UNA LÍNEA.
-                  Iba arriba porque el encabezado era pegajoso y abajo quedaba
-                  tapado; ahora que nada se clava, sigue acá simplemente porque
-                  es una decisión sobre el pedido y va antes de la lista. */}
-              {bannerBorrador(true)}
-            </>
-          )}
-        </div>
-
-        {/* Sin `px-2`: la lista comparte el gutter de `<main>` con el
-            encabezado, que es lo que hace que las tarjetas se lean alineadas
-            con la tarjeta de contexto. El hueco de abajo lo sigue pidiendo la
-            barra anclada del total. */}
-        <div className="pt-3 pb-[96px]">
-
-          {mostrarWarningDia && (
-            <div
-              className="rounded-lg border px-2.5 py-1.5 mb-2 text-[11px]"
-              style={{ borderColor: "var(--pos-warning, #f59e0b)" }}
-            >
-              <b style={{ color: "var(--pos-warning, #f59e0b)" }}>
-                Hoy es {formatDiaLabel(diaActualEnum())}.
-              </b>{" "}
-              <span className="sunmi-text-muted">
-                {proveedorSel.nombre} recibe:{" "}
-                {proveedorSel.dias_pedido.map((dx) => formatDiaLabel(dx)).join(", ")}. Podés
-                crear la compra igual.
-              </span>
-            </div>
-          )}
-
-          {proveedorId && (
-            <>
-              {/* El botón naranja de ancho completo y el contador se fueron a
-                  la fila de contexto del encabezado: el primero competía con
-                  "Enviar pedido" por ser el más pesado de la pantalla, y el
-                  segundo decía en dos renglones lo que entra en uno. */}
-              {avisoImportacion && (
-                <div className="rounded-lg border px-2.5 py-1.5 mb-2 text-sm2 sunmi-text-accent sunmi-divider">
-                  {avisoImportacion}
-                </div>
-              )}
-
-              {postVinculoMsg && (
-                <div className="mb-2 text-[11px] sunmi-text-accent">{postVinculoMsg}</div>
-              )}
-
-              {/* Vincular al vuelo (código no encontrado) */}
-              {search.trim() &&
-                !loadingProds &&
-                productos.length === 0 &&
-                avisoSinDeposito.length === 0 &&
-                !postVinculoMsg && (
-                  <div className="mb-2 flex flex-col gap-1.5 text-[11px]">
-                    <span className="sunmi-text-muted">
-                      No se encontró “{search.trim()}” para este proveedor.
-                    </span>
-                    <SunmiButton color="slate" type="button" onClick={() => setVincularOpen(true)}>
-                      Vincular código interno
-                    </SunmiButton>
-                  </div>
-                )}
-
-              {/* Tarjetas sueltas con aire entre ellas, no una lista dividida:
-                  cada producto es una decisión aparte y el separador de 1 px
-                  las leía como renglones de una tabla. */}
-              <div className="flex flex-col gap-2">
-                {loadingProds && productos.length === 0 ? (
-                  <div className="px-3 py-8 text-center text-xs sunmi-text-muted">Buscando...</div>
-                ) : listaRender.length === 0 ? (
-                  <div className="px-3 py-8 text-center text-xs sunmi-text-muted">
-                    {soloPedido
-                      ? "El pedido está vacío."
-                      : vista === "sugeridos"
-                      ? "Sin sugeridos. Cambiá a “Todos”."
-                      : "Sin productos."}
-                  </div>
-                ) : (
-                  pageRows.map(filaMobile)
-                )}
-              </div>
-
-              {/* Pager mobile */}
-              {listaRender.length > pageSize && (
-                <div className="flex items-center justify-center gap-2 mt-2 text-[11px]">
-                  <SunmiButton
-                    color="slate"
-                    className="px-2.5 py-1"
-                    disabled={pageEff <= 1}
-                    onClick={() => setPageNum((n) => Math.max(1, n - 1))}
-                  >
-                    « Ant.
-                  </SunmiButton>
-                  <span className="sunmi-text-muted whitespace-nowrap">
-                    Pág. {pageEff}/{totalPages}
-                  </span>
-                  <SunmiButton
-                    color="slate"
-                    className="px-2.5 py-1"
-                    disabled={pageEff >= totalPages}
-                    onClick={() => setPageNum((n) => Math.min(totalPages, n + 1))}
-                  >
-                    Sig. »
-                  </SunmiButton>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Barra resumen fija inferior */}
-        {proveedorId && barraResumen(true)}
-        </>
+        /* ── EL ARMADO LO PONE LA PIEZA ────────────────────────────────────
+            `SunmiPantallaDeTrabajo` salió de `RecepcionMovil` y trae el orden
+            de los bloques, la separación entre ellos, el gutter, el contenedor
+            de la lista y el pie pegajoso. Esta pantalla ya no declara nada de
+            eso, y por eso acá no hay ni un `sticky`, ni un `gap`, ni padding
+            lateral propio.
+            Lo que se fue con la pieza y antes estaba escrito acá: el encabezado
+            clavado arriba —que convertía el resto en una ventanita que se
+            desplazaba sola— y la barra de abajo en `fixed`, que tapaba la
+            última tarjeta y obligaba a compensar con un relleno de 96 px contra
+            una barra de 98. */
+          <SunmiPantallaDeTrabajo
+            idCategoria="categoria-pedido"
+            contexto={contenidoDeContexto()}
+            buscador={buscadorDelPedido()}
+            filtros={filtrosDelPedido()}
+            categoria={categorias.length > 0 ? selectorDeCategoria() : null}
+            antesDeLista={avisosDelPedido()}
+            lista={listaDelPedido()}
+            pieDePantalla={pieDelPedido()}
+          />
         )}
       </div>
       {/* ^ fin MOBILE */}
