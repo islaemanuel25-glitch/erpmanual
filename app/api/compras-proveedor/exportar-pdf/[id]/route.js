@@ -25,6 +25,7 @@ import {
   nombreDeArchivo,
   tituloDelDocumento,
 } from "@/lib/compras-proveedor/documentoDelPedido";
+import { cantidadParaElProveedor } from "@/lib/compras-proveedor/cantidadParaElProveedor";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 function fmt(n) {
@@ -90,7 +91,19 @@ export async function GET(req, { params }) {
           include: {
             producto: {
               include: {
-                base: { select: { nombre: true, sku: true } },
+                // `unidad_medida` y `factor_pack` son lo que permite escribir
+                // la cantidad convertida en vez de "40 BULTO". Sin ellos en el
+                // select, `cantidadParaElProveedor` recibe `null` y cae en el
+                // caso "no hay factor": escribiría el número solo en TODAS las
+                // líneas, que es el defecto disfrazado de cautela.
+                base: {
+                  select: {
+                    nombre: true,
+                    sku: true,
+                    unidad_medida: true,
+                    factor_pack: true,
+                  },
+                },
               },
             },
           },
@@ -187,8 +200,19 @@ export async function GET(req, { params }) {
 
     draw("Producto", col.producto, y, 10, bold);
     draw("SKU", col.sku, y, 10, bold);
-    draw("Cant.", col.cant, y, 10, bold);
-    draw("Unidad", col.unidad, y, 10, bold);
+    // ── EN EL DOCUMENTO DEL PROVEEDOR, "CANTIDAD" ES UNA SOLA COLUMNA ──────
+    //
+    // Eran dos —"Cant." y "Unidad"— y juntas decían "40 BULTO", que del otro
+    // lado no se puede usar: el proveedor no sabe si nuestro bulto trae 12, 24
+    // o 30. Ahora la cantidad va convertida y escrita entera, y para eso
+    // necesita el ancho de las dos. La prefactura, que es para adentro y se
+    // controla contra una factura en bultos, conserva las dos columnas.
+    if (conPrecios) {
+      draw("Cant.", col.cant, y, 10, bold);
+      draw("Unidad", col.unidad, y, 10, bold);
+    } else {
+      draw("Cantidad", col.cant, y, 10, bold);
+    }
     // Las dos columnas de dinero SOLO existen en la prefactura. No se dibujan
     // vacías ni con una raya: una columna "Costo" en blanco invita a que alguien
     // la complete a mano, y el documento del proveedor no tiene por qué tener ese
@@ -233,8 +257,24 @@ export async function GET(req, { params }) {
 
       draw(nombre, col.producto, y);
       draw(String(sku), col.sku, y);
-      draw(String(cantidad), col.cant, y);
-      draw(unidad, col.unidad, y);
+      if (conPrecios) {
+        draw(String(cantidad), col.cant, y);
+        draw(unidad, col.unidad, y);
+      } else {
+        // El MISMO módulo que arma el texto que se copia. Dos formas de decir
+        // la misma cantidad en los dos documentos que salen del mismo pedido es
+        // cómo se llega a que uno diga 960 y el otro 40.
+        draw(
+          cantidadParaElProveedor({
+            cantidad,
+            unidad,
+            unidadMedida: d.producto?.base?.unidad_medida || null,
+            factorPack: Number(d.producto?.base?.factor_pack) || 0,
+          }),
+          col.cant,
+          y
+        );
+      }
       if (conPrecios) {
         draw(costo > 0 ? `$${fmt(costo)}` : "-", col.costo, y);
         draw(subtotal > 0 ? `$${fmt(subtotal)}` : "-", col.subtotal, y);

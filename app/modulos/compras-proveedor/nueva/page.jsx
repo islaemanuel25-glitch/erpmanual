@@ -106,7 +106,61 @@ export default function NuevaCompraProveedorPage() {
   const autofillRef = useRef(null);
   // Se arma en el primer render: si venimos de editar un producto, la carga del
   // catálogo tiene que restaurar el pedido en vez de arrancar vacía.
-  const restaurarRef = useRef(debeReabrirPedido(searchParams));
+  // ── EL PEDIDO EN ARMADO SOBREVIVE A SALIR DE LA PANTALLA ────────────────
+  //
+  // Los ítems viven en el estado de React, así que un refresco, un "volver" del
+  // navegador o que el sistema descarte la pestaña los perdía enteros — y como
+  // el proveedor también es estado, se volvía a la pantalla de elegir proveedor
+  // sin rastro de lo que se había cargado.
+  //
+  // El guardado YA EXISTÍA, en `retornoPedido.js`, pero lo llamaba un solo
+  // lugar: `irAEditarProducto`. O sea que el carrito sobrevivía exactamente a
+  // una salida —ir a editar un producto— y a ninguna otra. Acá no se escribe un
+  // segundo mecanismo al lado: se reusa el mismo serializador, la misma clave y
+  // el mismo `sessionStorage`, y se lo llama en todos los caminos.
+  //
+  // ── POR QUÉ `sessionStorage` Y NO `localStorage` ────────────────────────
+  //
+  // Es la decisión que el módulo ya tenía escrita —"vive en la pestaña y se
+  // descarta solo"— y cubre los tres casos que hacían falta: refrescar, volver
+  // atrás, y que el navegador descarte la pestaña, porque al reactivarla la
+  // restaura. Lo que NO cubre es cerrar la pestaña, y eso es a propósito: un
+  // carrito de hace tres días reapareciendo sobre otro pedido es peor que
+  // perderlo, y nadie lo estaría esperando.
+  const guardarEnCurso = useCallback((prov, its, nts) => {
+    try {
+      const enCurso = serializarPedidoEnCurso({ proveedorId: prov, items: its, notas: nts });
+      if (enCurso) sessionStorage.setItem(CLAVE_PEDIDO_EN_CURSO, JSON.stringify(enCurso));
+      else sessionStorage.removeItem(CLAVE_PEDIDO_EN_CURSO);
+    } catch {
+      // Sin almacenamiento el carrito no sobrevive, pero la pantalla sigue
+      // andando: es preferible a romper la navegación.
+    }
+  }, []);
+
+  const limpiarEnCurso = useCallback(() => {
+    try {
+      sessionStorage.removeItem(CLAVE_PEDIDO_EN_CURSO);
+    } catch {}
+  }, []);
+
+  /** Lo guardado, si lo hay. Se lee una sola vez, en el primer render. */
+  const guardadoAlAbrir = useRef(null);
+  if (guardadoAlAbrir.current === null) {
+    try {
+      guardadoAlAbrir.current =
+        typeof window === "undefined"
+          ? false
+          : deserializarPedidoEnCurso(sessionStorage.getItem(CLAVE_PEDIDO_EN_CURSO)) || false;
+    } catch {
+      guardadoAlAbrir.current = false;
+    }
+  }
+
+  // Hay que restaurar cuando se vuelve de editar un producto —lo dice la URL— y
+  // también cuando simplemente había un pedido a medio armar. El segundo caso
+  // es el que faltaba.
+  const restaurarRef = useRef(debeReabrirPedido(searchParams) || !!guardadoAlAbrir.current);
 
   // Items del pedido (sugeridos precargados + los agregados manualmente).
   const [items, setItems] = useState([]);
@@ -313,6 +367,34 @@ export default function NuevaCompraProveedorPage() {
     };
   }, [esContinuar, pedidoIdParam, router]);
 
+  // ── AL ABRIR: VOLVER AL PROVEEDOR QUE SE ESTABA USANDO ──────────────────
+  //
+  // Sin esto el carrito guardado no se restaura nunca aunque esté entero: la
+  // restauración vive adentro de `cargarProductos`, que solo corre con un
+  // proveedor elegido, y después de un refresco no hay ninguno. Se veía como
+  // "se perdió todo" cuando en realidad estaba guardado y nadie lo iba a buscar.
+  //
+  // Corre UNA vez y solo si no venimos a continuar un borrador del servidor.
+  useEffect(() => {
+    if (esContinuar) return;
+    const g = guardadoAlAbrir.current;
+    if (g && !proveedorId) setProveedorId(String(g.proveedorId));
+    // Deliberadamente sin `proveedorId` en las dependencias: esto es el arranque,
+    // no un sincronizador. Con él, limpiar el proveedor a mano lo volvería a
+    // poner y no se podría salir de la pantalla del pedido.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esContinuar]);
+
+  // ── Y EN CADA CAMBIO: GUARDAR ───────────────────────────────────────────
+  //
+  // Un solo efecto y un solo llamado. En "continuar" no se guarda nada: ese
+  // pedido ya vive en el servidor y cada cambio se persiste al toque, así que
+  // una copia en el navegador sería una segunda verdad sobre el mismo pedido.
+  useEffect(() => {
+    if (esContinuar) return;
+    guardarEnCurso(proveedorId, items, notas);
+  }, [esContinuar, proveedorId, items, notas, guardarEnCurso]);
+
   // Al cambiar el proveedor, chequear si ya hay BORRADOR pendiente para él.
   useEffect(() => {
     setBorradorExistente(null); // reset en cada cambio de proveedor
@@ -324,6 +406,13 @@ export default function NuevaCompraProveedorPage() {
     // Cambiar de proveedor arranca un pedido limpio (los sugeridos se resiembran
     // luego en cargarProductos si el modo es automático).
     setItems([]);
+    // Y se tira el carrito del proveedor anterior. Un carrito fantasma de otro
+    // proveedor es peor que perderlo: sus productos pueden no existir en el
+    // catálogo del nuevo, y los que existan entran con el costo del otro.
+    // El efecto de guardado de arriba vuelve a escribirlo en cuanto haya algo.
+    if (!guardadoAlAbrir.current || String(guardadoAlAbrir.current.proveedorId) !== String(proveedorId)) {
+      limpiarEnCurso();
+    }
     if (!proveedorId) return;
 
     let cancelado = false;
@@ -336,6 +425,19 @@ export default function NuevaCompraProveedorPage() {
         const data = await res.json();
         if (cancelado) return;
         if (data.ok && Array.isArray(data.items)) {
+          // ── SI HAY LAS DOS COSAS, GANA EL CARRITO DEL NAVEGADOR ────────
+          //
+          // Puede haber un borrador guardado en el servidor para este proveedor
+          // Y un pedido a medio armar en la pestaña. En pantalla gana el del
+          // navegador, y el motivo es cuál de los dos se perdería: el borrador
+          // del servidor está guardado y se puede abrir cuando se quiera; lo de
+          // la pestaña no existe en ningún otro lado y desaparece si se pisa.
+          //
+          // El borrador no se esconde: sigue apareciendo en su cartel, que es
+          // una elección explícita —"continuar borrador"— y no un reemplazo
+          // silencioso. Elegirlo navega con `?pedidoId=`, y ahí manda el
+          // servidor: en ese modo esta pantalla no guarda nada en el navegador.
+          //
           // Ignorar borradores VACÍOS: no se puede "continuar" un pedido sin
           // productos. Se ofrece el borrador más reciente que tenga ítems.
           const conItems = data.items.find((it) => (it.cantItems || 0) > 0);
@@ -414,13 +516,19 @@ export default function NuevaCompraProveedorPage() {
         // mostraría el costo viejo, que es justo lo que se fue a cambiar.
         if (restaurarRef.current) {
           restaurarRef.current = false;
-          let guardado = null;
-          try {
-            guardado = deserializarPedidoEnCurso(sessionStorage.getItem(CLAVE_PEDIDO_EN_CURSO));
-            sessionStorage.removeItem(CLAVE_PEDIDO_EN_CURSO);
-          } catch {
-            guardado = null;
-          }
+          // ── SE LEE DE MEMORIA, NO DEL ALMACENAMIENTO, Y ES UNA CARRERA ──
+          //
+          // El efecto que guarda corre en cada cambio de `items`. Al abrir, la
+          // lista arranca vacía, así que ese efecto escribe "nada" y BORRA la
+          // clave — y lo hace antes de que el catálogo termine de cargar, que
+          // es cuando recién corre esta restauración. Leyendo el
+          // `sessionStorage` acá, el carrito ya no estaba: se habría perdido
+          // exactamente igual que antes, pero con el guardado puesto.
+          //
+          // `guardadoAlAbrir` se leyó UNA vez, en el primer render, y vive en
+          // memoria. No lo puede pisar ningún efecto.
+          const guardado = guardadoAlAbrir.current || null;
+          guardadoAlAbrir.current = false;
           if (guardado && String(guardado.proveedorId) === String(proveedorId)) {
             const porId = new Map((data.items || []).map((pr) => [pr.productoLocalId, pr]));
             // Las que no se pudieron restaurar se AVISAN. Restaurar el resto está
@@ -942,6 +1050,9 @@ export default function NuevaCompraProveedorPage() {
 
   // Tras guardar/enviar, dejar la pantalla lista para armar otro pedido.
   const resetParaNuevoPedido = useCallback(() => {
+    // Enviado o guardado, el pedido ya vive en el servidor: dejar el carrito
+    // del navegador haría reaparecer una copia sin número al refrescar.
+    limpiarEnCurso();
     setProveedorId("");
     setProveedorNombre("");
     setNotas("");
@@ -964,7 +1075,7 @@ export default function NuevaCompraProveedorPage() {
     setBorradorExistente(null);
     setAvisoImportacion("");
     router.replace("/modulos/compras-proveedor/nueva");
-  }, [router]);
+  }, [router, limpiarEnCurso]);
 
   // Aplica el cambio de modo (llamado tras confirmar, o directo si no hay ítems).
   const aplicarModo = (nuevoModo, vaciar) => {
@@ -973,6 +1084,9 @@ export default function NuevaCompraProveedorPage() {
       setDraftCant({});
       // Permite resembrar los sugeridos si vuelve a automático.
       autofillRef.current = null;
+      // Y se lleva el guardado: si no, refrescar después de vaciar resucita lo
+      // que la persona acaba de tirar.
+      limpiarEnCurso();
     }
     setVista(nuevoModo === "manual" ? "todos" : "sugeridos");
     // Cambiar de modo vuelve a "Cargados" por lo mismo que la pantalla arranca
@@ -1308,17 +1422,7 @@ export default function NuevaCompraProveedorPage() {
   // justamente que cambió. Restaurar el costo guardado mostraría el viejo.
   const irAEditarProducto = (item) => {
     if (!item?.baseId) return;
-    const enCurso = serializarPedidoEnCurso({ proveedorId, items, notas });
-    try {
-      if (enCurso) {
-        sessionStorage.setItem(CLAVE_PEDIDO_EN_CURSO, JSON.stringify(enCurso));
-      } else {
-        sessionStorage.removeItem(CLAVE_PEDIDO_EN_CURSO);
-      }
-    } catch {
-      // Sin sessionStorage se pierde el carrito al volver, pero no se rompe la
-      // navegación: es preferible a quedarse sin poder editar el producto.
-    }
+    guardarEnCurso(proveedorId, items, notas);
     const url = linkEditarProducto({
       baseId: item.baseId,
       localId: contexto?.localId,
