@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-09-19 02:20
+**Última actualización:** 2026-09-19 03:17
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-09-19: fix: el cartel dice en cuánto difiere en vez de afirmar que el precio cambió
 - 2026-09-19: feat: el resultado dice cuáles no se van a actualizar y por qué
 - 2026-09-19: feat: el resultado revalida lo mismo que aplicar, y ofrece volver a leer
 - 2026-09-19: fix: aplicar cero no es un cartel verde que diga "Listo"
