@@ -1,13 +1,30 @@
 // app/api/compras-proveedor/exportar-pdf/[id]/route.js
 //
-// Devuelve el PDF descargable del pedido a proveedor.
-// Sin cambios de estado ni de stock — solo lectura.
+// Devuelve el PDF descargable del pedido. Sin cambios de estado ni de stock —
+// solo lectura.
+//
+// ── DOS DOCUMENTOS, UNA RUTA ──────────────────────────────────────────────
+//
+// `?documento=proveedor` —el default— es el que se le manda al proveedor: NO
+// lleva costo unitario, ni subtotal, ni total. `?documento=prefactura` es el de
+// adentro y los lleva, que es exactamente lo que esta ruta devolvía siempre.
+//
+// El enum, el default y el nombre del archivo NO se escriben acá: viven en
+// `lib/compras-proveedor/documentoDelPedido.js`, que es el mismo módulo que lee
+// el cliente para armar la URL. Es una ruta y un cliente que tienen que estar de
+// acuerdo sobre un nombre, y el default cae del lado sin precios a propósito.
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { pedidoEnAlcance } from "@/lib/compras/scope";
+import {
+  documentoPedido,
+  llevaPrecios,
+  nombreDeArchivo,
+  tituloDelDocumento,
+} from "@/lib/compras-proveedor/documentoDelPedido";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 function fmt(n) {
@@ -57,6 +74,11 @@ export async function GET(req, { params }) {
       );
     }
 
+    // Cuál de los dos documentos. Cualquier valor que no sea exactamente
+    // "prefactura" cae en el del proveedor: ver el porqué en el módulo.
+    const documento = documentoPedido(new URL(req.url).searchParams.get("documento"));
+    const conPrecios = llevaPrecios(documento);
+
     const pedido = await prisma.pedidoProveedor.findUnique({
       where: { id: pedidoId },
       include: {
@@ -89,7 +111,7 @@ export async function GET(req, { params }) {
     // Armado del PDF (pdf-lib, mismo patrón que /transferencias/pdf)
     // ===========================================================
     const pdf = await PDFDocument.create();
-    pdf.setTitle(`Pedido a proveedor #${pedido.id}`);
+    pdf.setTitle(tituloDelDocumento(documento, pedido.id));
     pdf.setAuthor("ERP Azul");
 
     const pageWidth = 595;   // A4
@@ -106,7 +128,7 @@ export async function GET(req, { params }) {
       page.drawText(String(text), { x, y: yy, size, font: f });
 
     // Encabezado
-    draw(`Pedido a proveedor #${pedido.id}`, margin, y, 18, bold);
+    draw(tituloDelDocumento(documento, pedido.id), margin, y, 18, bold);
     y -= 28;
 
     draw("Proveedor:", margin, y, 10, bold);
@@ -129,9 +151,16 @@ export async function GET(req, { params }) {
     draw(pedido.deposito?.nombre || "-", margin + 90, y);
     y -= 14;
 
-    draw("Estado:", margin, y, 10, bold);
-    draw(pedido.estado, margin + 90, y);
-    y -= 14;
+    // EL ESTADO ES VOCABULARIO DE ADENTRO. "RECIBIDO" o "CONFIRMADO" describen
+    // en qué paso del circuito está el pedido para nosotros, no dicen nada al
+    // proveedor y en el peor caso confunden: un papel que dice "RECIBIDO" cuando
+    // todavía no mandó nada se lee como un error. Queda en la prefactura, que es
+    // donde sirve.
+    if (conPrecios) {
+      draw("Estado:", margin, y, 10, bold);
+      draw(pedido.estado, margin + 90, y);
+      y -= 14;
+    }
 
     draw("Fecha pedido:", margin, y, 10, bold);
     draw(fmtFecha(pedido.fechaConfirmado || pedido.createdAt), margin + 90, y);
@@ -160,8 +189,14 @@ export async function GET(req, { params }) {
     draw("SKU", col.sku, y, 10, bold);
     draw("Cant.", col.cant, y, 10, bold);
     draw("Unidad", col.unidad, y, 10, bold);
-    draw("Costo", col.costo, y, 10, bold);
-    draw("Subtotal", col.subtotal, y, 10, bold);
+    // Las dos columnas de dinero SOLO existen en la prefactura. No se dibujan
+    // vacías ni con una raya: una columna "Costo" en blanco invita a que alguien
+    // la complete a mano, y el documento del proveedor no tiene por qué tener ese
+    // renglón.
+    if (conPrecios) {
+      draw("Costo", col.costo, y, 10, bold);
+      draw("Subtotal", col.subtotal, y, 10, bold);
+    }
     y -= 12;
 
     page.drawLine({
@@ -200,8 +235,10 @@ export async function GET(req, { params }) {
       draw(String(sku), col.sku, y);
       draw(String(cantidad), col.cant, y);
       draw(unidad, col.unidad, y);
-      draw(costo > 0 ? `$${fmt(costo)}` : "-", col.costo, y);
-      draw(subtotal > 0 ? `$${fmt(subtotal)}` : "-", col.subtotal, y);
+      if (conPrecios) {
+        draw(costo > 0 ? `$${fmt(costo)}` : "-", col.costo, y);
+        draw(subtotal > 0 ? `$${fmt(subtotal)}` : "-", col.subtotal, y);
+      }
 
       y -= 16;
       row++;
@@ -223,13 +260,18 @@ export async function GET(req, { params }) {
     });
     y -= 18;
 
-    if (totalEstimado > 0) {
-      draw("Total estimado:", col.costo - 50, y, 12, bold);
-      draw(`$${fmt(totalEstimado)}`, col.subtotal, y, 12, bold);
-      y -= 20;
-    } else {
-      draw("Total estimado: sin costos cargados.", margin, y, 10);
-      y -= 16;
+    // EL TOTAL ES EL DATO QUE MÁS NO PUEDE SALIR, así que su rama entera cuelga
+    // de `conPrecios` — incluido el "sin costos cargados", que también habla de
+    // dinero y le diría al proveedor que no sabemos cuánto vale lo que pedimos.
+    if (conPrecios) {
+      if (totalEstimado > 0) {
+        draw("Total estimado:", col.costo - 50, y, 12, bold);
+        draw(`$${fmt(totalEstimado)}`, col.subtotal, y, 12, bold);
+        y -= 20;
+      } else {
+        draw("Total estimado: sin costos cargados.", margin, y, 10);
+        y -= 16;
+      }
     }
 
     // Notas
@@ -256,7 +298,7 @@ export async function GET(req, { params }) {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename=pedido-proveedor-${pedido.id}.pdf`,
+        "Content-Disposition": `attachment; filename=${nombreDeArchivo(documento, pedido.id)}`,
       },
     });
   } catch (err) {

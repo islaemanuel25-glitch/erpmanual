@@ -124,6 +124,19 @@ module.exports = {
       // `min-h-toque` se lee solo.
       minHeight: {
         toque: "44px",
+        // ── LA ACCIÓN PRINCIPAL DE UN MODAL: 48 px ──────────────────────
+        //
+        // 44 es el mínimo que se puede tocar; 48 es el que se DISTINGUE de los
+        // demás. En el modal de enviar un pedido hay un botón que manda el pedido
+        // y dos que solo bajan un archivo, y los tres del mismo alto se leen como
+        // tres opciones equivalentes — que es justo lo que este modal venía
+        // haciendo mal.
+        //
+        // Va acá y no como `min-h-[48px]` en la pantalla, por el mismo motivo que
+        // `toque`: la escala está en `rem` con `1rem = 14px`, así que `h-12`
+        // —3rem— da 42 y se lee como 48 sin serlo. Y escrito a mano el trinquete
+        // lo cuenta como medida mágica, con razón.
+        principal: "48px",
       },
       minWidth: {
         toque: "44px",
