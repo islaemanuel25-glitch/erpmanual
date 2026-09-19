@@ -35,6 +35,26 @@ más cinco pantallas que lo usan como bandera informativa.
 
 ---
 
+### El admin también pasa por la propiedad · *desde el 2026-09-19*
+
+`resolverRutaEdicion` (`:91`) tenía una rama para el admin que se ruteaba **solo
+por la ubicación desde la que se opera** y nunca miraba `creadoEnLocalId`. Un
+admin parado en un local recibía 403 sobre un producto que ese mismo local había
+creado, con el texto "administrado por el depósito" — el dueño podía menos que un
+usuario común sobre lo suyo. Es el
+[INC-0012](../incidents/INC-0012-el-local-no-manda-en-su-propio-producto.md).
+
+Ahora, si la ubicación que opera es la **dueña**, la ruta es `'base'` para
+cualquiera. El resto de la rama del admin queda igual: el cambio solo convierte
+un `'override'` en `'base'`, nunca al revés, y un candado lo afirma casilla por
+casilla.
+
+**Un producto creado por un local es de ese local**: lo edita, le pone proveedor
+y le carga costo y precio, igual que el depósito con los suyos. Lo del depósito
+sigue siendo del depósito.
+
+---
+
 ## RN-11 — Sin guardado engañoso · **[CÓDIGO]**
 
 Si un local que no es dueño manda cambios de ficha maestra, el servidor
