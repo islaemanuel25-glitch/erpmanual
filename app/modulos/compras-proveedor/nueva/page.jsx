@@ -2122,13 +2122,27 @@ export default function NuevaCompraProveedorPage() {
     const costoNum = Number(rv.costoActual) || 0;
     const sugerido = Number(p.sugerido) || 0;
     return (
-      <div
+      // LA TARJETA ES `SunmiCard`, LA MISMA PIEZA QUE LA RECEPCIÓN.
+      //
+      // Estaba escrita a mano con `sunmi-surface`, y esa clase pinta
+      // `--app-bg` —el fondo de la APLICACIÓN, no el de una tarjeta—. O sea que
+      // la tarjeta salía exactamente del color de la página y lo único que la
+      // separaba era el borde: crema sobre crema en `sunmiLight`. Está medido y
+      // anotado en `styles/sunmi.css`, donde dice que `--app-bg` y `--card-bg`
+      // difieren en los catorce temas.
+      //
+      // Se usa la pieza y no `sunmi-bg-card` suelta para que el fondo Y el
+      // borde salgan del mismo lugar que en `TarjetaRecepcionMovil`, que es
+      // `SunmiCard` con su `theme.card`. El padding y el alto los cede la
+      // pieza: `paddingQueSobrevive` deja pasar el que declara la pantalla.
+      //
+      // Y SE FUE LA BARRA DE COLOR DE LA IZQUIERDA —un `borderLeft` de 3 px en
+      // acento cuando la línea estaba en el pedido—. La recepción no la tiene,
+      // y que un producto esté cargado ya se ve en el número del stepper y en
+      // el botón de quitar, que solo aparece cuando está.
+      <SunmiCard
         key={p.productoLocalId}
-        className="min-h-tarjetaPedido rounded-xl border sunmi-divider sunmi-surface px-4 py-3 flex flex-col gap-3"
-        style={{
-          borderLeftWidth: rv.enPedido ? "3px" : undefined,
-          borderLeftColor: rv.enPedido ? "var(--pos-accent, #f59e0b)" : undefined,
-        }}
+        className="min-h-tarjetaPedido px-4 py-3 flex flex-col gap-3"
       >
         {/* Renglón 1: el nombre con todo el ancho, y la salida para quitarlo. */}
         <div className="flex items-start gap-3">
@@ -2156,7 +2170,7 @@ export default function NuevaCompraProveedorPage() {
           </div>
           <div className="shrink-0">{stepper(p, rv, true)}</div>
         </div>
-      </div>
+      </SunmiCard>
     );
   };
 
@@ -2422,7 +2436,21 @@ export default function NuevaCompraProveedorPage() {
             El "Volver" lo lleva el slot del shell y el título sale de la ruta;
             la identidad del pedido y su avance los dice la tarjeta de contexto,
             que antes no existía. */}
-        <div className="sticky top-0 z-30 sunmi-surface border-b sunmi-divider px-2 pb-2.5 flex flex-col gap-2">
+        {/* ── NADA DE ESTO ES PEGAJOSO, Y ES EL CAMBIO ──────────────────────
+            Era un `sticky top-0 z-30` con fondo y borde propios, y adentro la
+            tarjeta de contexto, el buscador y los filtros: unos 250 px de
+            encabezado clavados arriba. Eso convertía el resto en una ventanita
+            que se desplazaba sola, que es lo que se siente como "scrollea
+            adentro de un contenedor".
+            La recepción de transferencias no tiene NINGÚN `sticky top-*`: todo
+            baja con la página y lo único que queda arriba es la fila del shell
+            con el título y el Volver, que vive afuera de `<main>` y por eso no
+            se puede ir con el scroll. Su único pegajoso es el de ABAJO, y acá
+            ese ya estaba.
+            También se va el `px-2`: metía el encabezado 7 px más adentro que
+            las tarjetas de la lista, que solo tienen el padding de `<main>`.
+            Ahora comparten gutter, como allá. */}
+        <div className="flex flex-col gap-3">
 
           {/* Acá vivía el desplegable de proveedor. Ya no: sin proveedor esta
               rama no se dibuja —la pantalla es `ElegirProveedor`— y con
@@ -2454,21 +2482,20 @@ export default function NuevaCompraProveedorPage() {
                 className="w-full min-h-campoBusqueda text-lg2"
               />
               {filtrosDelPedido()}
-              {/* El cartel del pedido en curso vive ACÁ, dentro del encabezado
-                  pegajoso, y no debajo en el contenido.
-                  Antes se desplazaba con la lista y se metía por debajo del
-                  encabezado: en reposo se veía entero y al bajar quedaba tapado,
-                  primero por el buscador y después por el título. Un aviso que se
-                  esconde justo cuando la persona está trabajando no sirve.
-                  Va en su variante de UNA LÍNEA para no comerse media pantalla:
-                  el encabezado ya mide 190 px y el cartel completo lo llevaba a
-                  ~250 sobre un alto de 800. */}
+              {/* El cartel del pedido en curso, en su variante de UNA LÍNEA.
+                  Iba arriba porque el encabezado era pegajoso y abajo quedaba
+                  tapado; ahora que nada se clava, sigue acá simplemente porque
+                  es una decisión sobre el pedido y va antes de la lista. */}
               {bannerBorrador(true)}
             </>
           )}
         </div>
 
-        <div className="px-2 pt-2 pb-[96px]">
+        {/* Sin `px-2`: la lista comparte el gutter de `<main>` con el
+            encabezado, que es lo que hace que las tarjetas se lean alineadas
+            con la tarjeta de contexto. El hueco de abajo lo sigue pidiendo la
+            barra anclada del total. */}
+        <div className="pt-3 pb-[96px]">
 
           {mostrarWarningDia && (
             <div
