@@ -15,7 +15,36 @@ export async function GET(req) {
       );
     }
 
-    const { grupoId, session } = ctx;
+    // ── A NOMBRE DE QUIÉN SE COMPRA: LA UBICACIÓN QUE OPERA ────────────────
+    //
+    // Acá se resolvía el depósito del grupo y se usaba para las TRES cosas: qué
+    // productos son visibles, de qué ubicación son las filas de ProductoLocal y
+    // de qué ubicación es el stock que se muestra. O sea que un local abriendo
+    // esta pantalla armaba el pedido del depósito.
+    //
+    // El efecto medido: un local le ponía su proveedor propio a un producto que
+    // él mismo había creado y después ese producto NO APARECÍA en el catálogo
+    // del pedido —0 productos—, así que no lo podía comprar. Un producto creado
+    // por un local es de ese local, y ese local hace con él lo mismo que el
+    // depósito con los suyos: lo edita, le pone proveedor y LO COMPRA.
+    //
+    // ── LO QUE ESTO NO CAMBIA ──────────────────────────────────────────────
+    //
+    // La regla asimétrica queda intacta, y es `productoVisibleWhere` quien la
+    // sostiene: lo del depósito se ve en los locales, lo del local NO se ve en
+    // el depósito. Pasándole la ubicación que opera:
+    //
+    //   · el LOCAL ve sus productos propios MÁS los del depósito;
+    //   · el DEPÓSITO sigue sin ver nada creado por un local.
+    //
+    // Por eso la frase de abajo —"el depósito no arma pedidos con productos
+    // creados por un local"— sigue siendo verdadera y se conserva. Lo que estaba
+    // mal era aplicarle ese mismo recorte AL LOCAL sobre lo suyo.
+    //
+    // Y para el depósito no cambia NADA: operando desde ahí, `localId` ES el
+    // depósito, así que las tres consultas quedan idénticas a las de antes.
+    const { grupoId, localId, session } = ctx;
+    const ubicacionDelPedido = Number(localId);
 
     const perm = checkPerm(session, "compras.ver");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
@@ -31,24 +60,19 @@ export async function GET(req) {
       );
     }
 
-    // Resolver depósito del grupo
-    const gd = await prisma.grupoDeposito.findFirst({
-      where: { grupoId },
-      select: { localId: true },
-    });
-
-    if (!gd) {
-      return NextResponse.json(
-        { ok: false, error: "No se encontró depósito para el grupo" },
-        { status: 400 }
-      );
-    }
-
-    const depositoId = gd.localId;
+    // ── EL DEPÓSITO DEL GRUPO YA NO HACE FALTA ACÁ ────────────────────────
+    //
+    // Se resolvía con un `grupoDeposito.findFirst` propio —no con
+    // `getDepositoIdDeGrupo`, que es la función del repo para esto— solo para
+    // usarlo como ubicación del pedido. Ahora la ubicación es la que opera, así
+    // que la consulta no tiene consumidor y se va con ella el 400 "No se
+    // encontró depósito para el grupo": un grupo sin depósito configurado deja
+    // de impedir que un local le compre a su proveedor, que es una consecuencia
+    // directa de comprar a nombre propio y no del depósito.
 
     // Vínculos activos de códigos internos para este proveedor (Etapa 4).
     // Amplían el universo comprable y permiten buscar por código interno.
-    // No alteran la resolución de ProductoLocal del depósito.
+    // No alteran de qué ubicación salen las filas de ProductoLocal.
     const vinculos = await prisma.productoCodigoProveedor.findMany({
       where: { grupoId, proveedorId, activo: true },
       select: {
@@ -106,8 +130,10 @@ export async function GET(req) {
         { proveedor3_id: proveedorId },
         ...(baseIdsVinculados.length ? [{ id: { in: baseIdsVinculados } }] : []),
       ],
-      // Regla A: el depósito no arma pedidos con productos creados por un local.
-      ...productoVisibleWhere(depositoId),
+      // Regla A, con la ubicación que opera: el depósito no arma pedidos con
+      // productos creados por un local —eso sigue igual— y un local sí arma el
+      // suyo con los propios, además de los del depósito.
+      ...productoVisibleWhere(ubicacionDelPedido),
       // Los combos no se compran a proveedor: se compran sus componentes.
       es_combo: false,
     };
@@ -128,7 +154,10 @@ export async function GET(req) {
 
     const productosLocal = await prisma.productoLocal.findMany({
       where: {
-        localId: depositoId,
+        // Las filas de la ubicación que compra: son las que tienen SU costo y
+        // SU estado. Con las del depósito, un local veía precios y activaciones
+        // que no son los suyos.
+        localId: ubicacionDelPedido,
         activo: true,
         base: baseWhere,
       },
@@ -154,7 +183,10 @@ export async function GET(req) {
           },
         },
         stock: {
-          where: { localId: depositoId },
+          // Y el stock que se muestra para decidir cuánto pedir es el de quien
+          // pide. Mostrarle a un local lo que hay en el depósito lo haría pedir
+          // sobre un número que no es el suyo.
+          where: { localId: ubicacionDelPedido },
           select: {
             cantidad: true,
             stockMin: true,
