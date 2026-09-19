@@ -8,6 +8,8 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
+import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiFiltroEstado from "@/components/sunmi/SunmiFiltroEstado";
 import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiPill from "@/components/sunmi/SunmiPill";
@@ -18,7 +20,7 @@ import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 import ElegirProveedor from "@/components/compras-proveedor/ElegirProveedor";
-import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
+import { useAccionDePagina } from "@/app/context/AccionDePaginaContext";
 import ModalVincularCodigo from "@/components/compras-proveedor/ModalVincularCodigo";
 import ModalEnviarPedido from "@/components/compras-proveedor/ModalEnviarPedido";
 import CarritoPedido from "@/components/compras-proveedor/CarritoPedido";
@@ -210,11 +212,19 @@ export default function NuevaCompraProveedorPage() {
   const nombreProveedorActivo =
     proveedorNombre || proveedorSel?.nombre || "";
 
-  // EL TÍTULO DEL SHELL DICE A QUIÉN SE LE COMPRA. Con el proveedor elegido la
-  // pantalla ya no es "Nuevo pedido" sino el pedido de ESE proveedor, y esa es
-  // la única cosa que el encabezado tiene que recordar mientras se carga. Sin
-  // proveedor devuelve `null` y el título lo sigue resolviendo la ruta.
-  useTituloDePagina(nombreProveedorActivo ? `Pedido ${nombreProveedorActivo}` : null);
+  // EL TÍTULO DEL SHELL VUELVE A SALIR DE LA RUTA, y es un cambio de opinión
+  // respecto del 2026-09-19, cuando esta pantalla registraba "Pedido Arcor".
+  //
+  // El motivo es la tarjeta de contexto que ahora abre la pantalla. Con el
+  // nombre del proveedor en el shell Y en el primer renglón de la tarjeta, la
+  // misma palabra aparecía dos veces a sesenta píxeles de distancia. La
+  // recepción de transferencias —que es la forma que se vino a copiar— reparte
+  // eso al revés y funciona: el shell dice el MÓDULO ("Transferencias") y la
+  // tarjeta dice la INSTANCIA ("Transferencia #12", con su estado al lado).
+  // Acá queda igual: shell "Nuevo pedido", tarjeta "Pedido Arcor · Borrador".
+  //
+  // Por eso ya no se llama a `useTituloDePagina`, y por eso esta pantalla sale
+  // de su censo en `lib/layout/accionDePagina.test.mjs`.
 
   // Mostrar warning solo si el proveedor tiene dias_pedido configurados
   // y hoy NO es uno de esos días. Si dias_pedido está vacío, no inferimos nada.
@@ -1159,14 +1169,21 @@ export default function NuevaCompraProveedorPage() {
     [itemsMap]
   );
 
+  /** Lo que falta por hacer: hace falta y todavía no se cargó. */
+  const esPendiente = useCallback(
+    (p) => p.sugerido > 0 && !itemsMap.has(p.productoLocalId),
+    [itemsMap]
+  );
+
   // Los números que van al lado de cada filtro. "Cargados" ya lo cuenta
   // `lineasCount`, que mira las líneas con cantidad > 0 y no el catálogo.
   const conteosFiltro = useMemo(
     () => ({
       sugeridos: listaBase.filter(esSugerido).length,
       todos: listaBase.length,
+      pendientes: listaBase.filter(esPendiente).length,
     }),
-    [listaBase, esSugerido]
+    [listaBase, esSugerido, esPendiente]
   );
 
   // Lista a renderizar.
@@ -1192,6 +1209,8 @@ export default function NuevaCompraProveedorPage() {
       const v = modoManual ? "todos" : vista;
       if (v === "sugeridos") {
         lista = lista.filter(esSugerido);
+      } else if (v === "pendientes") {
+        lista = lista.filter(esPendiente);
       }
     }
 
@@ -1208,7 +1227,7 @@ export default function NuevaCompraProveedorPage() {
       if (t !== 0) return t;
       return ordenarUrgencia(a, b);
     });
-  }, [productos, listaBase, esSugerido, vista, modoManual, soloPedido, itemsMap, buscando, categoriaFilter]);
+  }, [productos, listaBase, esSugerido, esPendiente, vista, modoManual, soloPedido, itemsMap, buscando, categoriaFilter]);
 
   // Paginación cliente del listado (Mostrar 25/50/100).
   const totalPages = Math.max(1, Math.ceil(listaRender.length / pageSize));
@@ -1445,106 +1464,166 @@ export default function NuevaCompraProveedorPage() {
   // Es la única forma de bajar de 36 sin tocar la pieza, y el diseño pide 32
   // para el segmentado y 30 para los chips.
 
-  /** Tipo de pedido + el enlace para cambiar de proveedor, en una sola fila. */
-  const filaTipoDePedido = () =>
-    !esContinuar && (
-      <div className="flex items-center gap-2 h-segmento">
-        <div className="inline-flex w-48 h-segmento rounded-control overflow-hidden border sunmi-divider shrink-0">
-          {[
-            ["automatico", "Automático"],
-            ["manual", "Manual"],
-          ].map(([val, label]) => (
-            <SunmiButton
-              key={val}
-              type="button"
-              color={modo === val ? "primary" : "slate"}
-              onClick={() => cambiarModo(val)}
-              aria-pressed={modo === val}
-              className="min-h-0 h-segmento flex-1 rounded-none px-3 py-2 text-sm3 font-medium"
-            >
-              {label}
-            </SunmiButton>
-          ))}
-        </div>
-        {/* ACÁ VIVÍA "CAMBIAR PROVEEDOR", Y SE FUE POR DUPLICADO.
-            El Volver del shell ahora hace exactamente eso —vuelve a la pantalla
-            de elegir proveedor—, así que eran dos salidas al mismo lugar a
-            quince píxeles una de otra. */}
-      </div>
-    );
-
-  /** LOS FILTROS, EN CUADRÍCULA DE DOS POR DOS.
+  /** ── DÓNDE ESTOY ──────────────────────────────────────────────────────
    *
-   *  Eran una fila que se ARRASTRABA, y en el teléfono eso se veía como algo
-   *  roto: "Almacen" y el que seguía quedaban partidos contra el borde derecho,
-   *  sin ninguna señal de que había más a la derecha. Con cuatro celdas de media
-   *  pantalla no hay nada que cortar y no hay nada que descubrir arrastrando.
+   *  La misma tarjeta que abre la recepción de una transferencia, con la misma
+   *  forma: quién es, en qué estado está, y cuánto falta. Antes de esto el
+   *  segmentado quedaba suelto arriba de todo y el avance —"N sugeridos por
+   *  faltante"— vivía abajo, entre los filtros y la lista, donde no lo mira
+   *  nadie: el contexto se armaba leyendo tres pedazos separados.
    *
-   *  El número va al lado del rótulo y no adentro del paréntesis: es un dato
-   *  aparte —cuántos hay— y se lee como tal cuando pesa distinto que la palabra.
+   *  Los tres números salen de `conteosFiltro` y de `lineasCount`, que son los
+   *  mismos que alimentan los filtros. No hay una segunda cuenta acá: el día
+   *  que divergieran, la tarjeta y el filtro dirían cosas distintas de lo mismo
+   *  a cinco centímetros de distancia, que es el defecto que la recepción ya
+   *  tuvo una vez y dejó anotado.
    */
-  const cuadriculaDeFiltros = () => {
-    const claseCelda =
-      "min-h-toque w-full rounded-control px-filtro gap-dentroFiltro text-sm3 font-medium";
-    /** El rótulo y su número, con el número más apagado que la palabra. */
-    const celda = (label, numero) => (
-      <>
-        {label}
-        {numero != null && <span className="font-normal opacity-70">{numero}</span>}
-      </>
-    );
-    return (
-      <div className="grid grid-cols-2 gap-entreFiltros">
-        {esAuto &&
-          FILTROS_VISTA.map(([v, label]) => (
-            <SunmiButton
-              key={v}
-              type="button"
-              color={vista === v && !soloPedido ? "primary" : "slate"}
-              aria-pressed={vista === v && !soloPedido}
-              onClick={() => {
-                setSoloPedido(false);
-                setVista(v);
-              }}
-              className={claseCelda}
-            >
-              {celda(label, conteosFiltro[v])}
-            </SunmiButton>
-          ))}
-        <SunmiButton
-          type="button"
-          color={soloPedido ? "primary" : "slate"}
-          aria-pressed={soloPedido}
-          disabled={lineasCount === 0}
-          onClick={togglePedido}
-          className={claseCelda}
-        >
-          {celda("Cargados", lineasCount)}
-        </SunmiButton>
-        {/* CATEGORÍAS VUELVE A SER UNA SOLA ENTRADA, y no un chip por categoría:
-            en una cuadrícula de cuatro celdas no entra una cantidad variable.
-            Se reusa el MISMO desplegable que ya usa el escritorio —misma lista,
-            mismo estado— en vez de escribir un segundo selector al lado. */}
-        {categorias.length > 0 && (
-          <SunmiSelectAdv
-            value={categoriaFilter}
-            onChange={setCategoriaFilter}
-            placeholder="Categorías"
-            className="min-h-toque w-full"
-          >
-            {/* Dice "Categorías" a secas y no "Categorías: todas": la pieza
-                muestra el rótulo de la opción que coincide con el valor, no el
-                placeholder, y sin filtro el valor es "". Medido a 360: con el
-                rótulo largo la celda mostraba "Categorías: todas". */}
-            <SunmiSelectOption value="">Categorías</SunmiSelectOption>
-            {categorias.map((c) => (
-              <SunmiSelectOption key={c.id} value={String(c.id)}>
-                {c.nombre}
-              </SunmiSelectOption>
-            ))}
-          </SunmiSelectAdv>
-        )}
+  const tarjetaDeContexto = () => (
+    <SunmiCard className="p-3 space-y-1">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="font-semibold sunmi-text-strong truncate">
+          Pedido {nombreProveedorActivo}
+        </span>
+        {/* "Enviado" no se puede ver acá: la pantalla rebota al detalle
+            cualquier pedido que no esté en BORRADOR. Sin proveedor guardado
+            todavía no existe fila en la base, y eso se dice. */}
+        <SunmiPill color="slate">{esContinuar ? "Borrador" : "Sin guardar"}</SunmiPill>
       </div>
+
+      <p className="text-sm2 sunmi-text-muted truncate">
+        {modoManual ? "Manual" : "Automático"} · {conteosFiltro.sugeridos} sugeridos
+        por faltante
+      </p>
+
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-sm2 sunmi-text-muted">
+          <span className="tabular-nums sunmi-text-strong font-semibold">
+            {lineasCount} / {conteosFiltro.sugeridos}
+          </span>{" "}
+          cargados
+        </span>
+        <span
+          className={`text-sm2 ${
+            conteosFiltro.pendientes > 0 ? "sunmi-text-accent" : "sunmi-text-success"
+          }`}
+        >
+          {conteosFiltro.pendientes > 0
+            ? `${conteosFiltro.pendientes} ${
+                conteosFiltro.pendientes === 1 ? "pendiente" : "pendientes"
+              }`
+            : "Sin pendientes"}
+        </span>
+      </div>
+
+      {/* El segmentado va ADENTRO de la tarjeta y no debajo: es lo que cambia
+          cómo se arma este pedido, así que pertenece al bloque que lo describe
+          —el renglón de arriba ya dice en qué modo está—. Separado por una
+          línea para que se lea como un control y no como un cuarto dato.
+          En "continuar" no aparece: el borrador ya trae sus ítems. */}
+      {!esContinuar && (
+        <div className="pt-2 mt-1 border-t sunmi-divider">
+          <div className="inline-flex w-48 h-segmento rounded-control overflow-hidden border sunmi-divider">
+            {[
+              ["automatico", "Automático"],
+              ["manual", "Manual"],
+            ].map(([val, label]) => (
+              <SunmiButton
+                key={val}
+                type="button"
+                color={modo === val ? "primary" : "slate"}
+                onClick={() => cambiarModo(val)}
+                aria-pressed={modo === val}
+                className="min-h-0 h-segmento flex-1 rounded-none px-3 py-2 text-sm3 font-medium"
+              >
+                {label}
+              </SunmiButton>
+            ))}
+          </div>
+        </div>
+      )}
+    </SunmiCard>
+  );
+
+  /** ── LOS FILTROS, CON LA PIEZA DEL KIT ────────────────────────────────
+   *
+   *  Es `SunmiFiltroEstado`, la misma que usa la recepción de transferencias.
+   *  Estaba escrita a mano acá —cuatro `SunmiButton` con su propia grilla, su
+   *  propio alto y su propio espaciado—, que es exactamente lo que la regla 1
+   *  llama "escribir una parecida al lado": las celdas salían más chicas que
+   *  las de transferencias sin que nadie hubiera decidido que fueran distintas.
+   *
+   *  Y CATEGORÍAS SALE DE LA CUADRÍCULA. Era un desplegable blanco metido como
+   *  cuarta celda: rompía la grilla porque no es un filtro de estado del
+   *  trabajo sino una taxonomía, y las dos cosas no se eligen igual. Va abajo,
+   *  con su rótulo y de ancho completo, igual que en la recepción.
+   *
+   *  El cuarto filtro real es "Pendientes" —hace falta y todavía no se cargó—,
+   *  que es el mismo número que la tarjeta de arriba muestra en acento.
+   */
+  const filtrosDelPedido = () => {
+    const opciones = esAuto
+      ? [
+          { clave: "sugeridos", texto: "Sugeridos", cantidad: conteosFiltro.sugeridos },
+          { clave: "todos", texto: "Todos", cantidad: conteosFiltro.todos },
+          { clave: "cargados", texto: "Cargados", cantidad: lineasCount },
+          { clave: "pendientes", texto: "Pendientes", cantidad: conteosFiltro.pendientes },
+        ]
+      : [
+          { clave: "todos", texto: "Todos", cantidad: conteosFiltro.todos },
+          { clave: "cargados", texto: "Cargados", cantidad: lineasCount },
+        ];
+
+    // "Cargados" no es un valor de `vista`: es el filtro del pedido, que vive
+    // en `soloPedido` y tiene su propia vuelta atrás de paginación. Acá se
+    // presentan como cuatro opciones de lo mismo porque para quien lo usa lo
+    // son, pero el estado de abajo no se toca.
+    const elegido = soloPedido ? "cargados" : vista;
+
+    const elegir = (clave) => {
+      if (clave === "cargados") {
+        if (lineasCount === 0 || soloPedido) return;
+        togglePedido();
+        return;
+      }
+      if (soloPedido) togglePedido();
+      setVista(clave);
+    };
+
+    return (
+      <>
+        <SunmiFiltroEstado
+          opciones={opciones}
+          valor={elegido}
+          onCambiar={elegir}
+          ariaLabel="Filtrar productos del pedido"
+        />
+
+        {categorias.length > 0 && (
+          <div>
+            <label
+              className="text-sm2 sunmi-text-muted mb-1 block"
+              htmlFor="categoria-pedido"
+            >
+              Categoría
+            </label>
+            <SunmiSelectAdv
+              id="categoria-pedido"
+              value={categoriaFilter}
+              onChange={setCategoriaFilter}
+            >
+              {/* El rótulo de la opción y no el placeholder: la pieza muestra
+                  el texto de la opción que coincide con el valor, y sin filtro
+                  el valor es "". */}
+              <SunmiSelectOption value="">Todas · {conteosFiltro.todos}</SunmiSelectOption>
+              {categorias.map((c) => (
+                <SunmiSelectOption key={c.id} value={String(c.id)}>
+                  {c.nombre}
+                </SunmiSelectOption>
+              ))}
+            </SunmiSelectAdv>
+          </div>
+        )}
+      </>
     );
   };
 
@@ -1563,17 +1642,13 @@ export default function NuevaCompraProveedorPage() {
   // función: medido, esta pantalla era el ÚNICO camino hacia ella, así que
   // después de esto queda alcanzable solo escribiendo la URL.
 
-  /** Cuántos hay y de dónde salen. */
-  const filaDeContexto = () => (
-    <div className="flex items-center gap-2">
-      {/* "228 sugeridos por faltante": el número y de dónde salen, juntos. El
-          contador vivía aparte, en otro renglón, repitiendo "productos". */}
-      <span className="text-sm3 sunmi-text-muted flex-1 min-w-0 truncate">
-        {listaRender.length}{" "}
-        {tituloSeccion.charAt(0).toLowerCase() + tituloSeccion.slice(1)}
-      </span>
-    </div>
-  );
+  // ── Y ACÁ ESTABA "N SUGERIDOS POR FALTANTE", SUELTO ───────────────────────
+  //
+  // Un renglón de texto entre los filtros y la lista, que es donde en la
+  // recepción de transferencias no hay nada. Ese dato es CONTEXTO del pedido,
+  // no un encabezado de la lista, y se fue a la tarjeta de arriba, que ya dice
+  // el modo y el avance. Acá solo agregaba una cuarta franja al encabezado
+  // pegajoso, que ya venía midiendo 190 px.
 
   // Valor visible del costo: el costo se guarda a full precisión (para no perder
   // exactitud al alternar Pack/Unidad). Acá se redondea SOLO para mostrar/editar,
@@ -2339,14 +2414,14 @@ export default function NuevaCompraProveedorPage() {
           />
         ) : (
         <>
-        {/* ── LOS CONTROLES ────────────────────────────────────────────────
-            Eran SEIS bloques antes de ver un producto: fila de título, tipo de
-            pedido, buscador, chips, desplegable de categorías y el botón naranja
-            de importar. Ahora son CUATRO.
-            El título y el "Volver" se fueron al shell —`useTituloDePagina` dice
-            "Pedido Arcor" y el slot lleva el botón—, categorías pasó a ser un
-            chip más, y lo de importar dejó de ser un botón de ancho completo que
-            competía con "Enviar pedido". */}
+        {/* ── LOS CONTROLES, EN EL ORDEN DE LA RECEPCIÓN DE TRANSFERENCIAS ──
+            Dónde estoy, buscar, filtrar. Tres bloques y en ese orden, que es el
+            de `RecepcionMovil`.
+            Eran SEIS antes de ver un producto: fila de título, tipo de pedido,
+            buscador, chips, desplegable de categorías y el botón de importar.
+            El "Volver" lo lleva el slot del shell y el título sale de la ruta;
+            la identidad del pedido y su avance los dice la tarjeta de contexto,
+            que antes no existía. */}
         <div className="sticky top-0 z-30 sunmi-surface border-b sunmi-divider px-2 pb-2.5 flex flex-col gap-2">
 
           {/* Acá vivía el desplegable de proveedor. Ya no: sin proveedor esta
@@ -2355,7 +2430,7 @@ export default function NuevaCompraProveedorPage() {
 
           {proveedorId && (
             <>
-              {filaTipoDePedido()}
+              {tarjetaDeContexto()}
               {/* EL BUSCADOR ES EL DEL POS, CON SU MICRÓFONO.
                   Era un `SunmiInput` pelado. Buscar entre cientos de productos
                   tecleando en un Sunmi es lento y dictarlo no, y esa pieza ya
@@ -2378,8 +2453,7 @@ export default function NuevaCompraProveedorPage() {
                 }}
                 className="w-full min-h-campoBusqueda text-lg2"
               />
-              {cuadriculaDeFiltros()}
-              {filaDeContexto()}
+              {filtrosDelPedido()}
               {/* El cartel del pedido en curso vive ACÁ, dentro del encabezado
                   pegajoso, y no debajo en el contenido.
                   Antes se desplazaba con la lista y se metía por debajo del
