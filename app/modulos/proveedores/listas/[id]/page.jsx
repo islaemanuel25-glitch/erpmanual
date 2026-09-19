@@ -303,6 +303,26 @@ export default function ResultadoDeListaPage() {
     window.location.href = `/api/proveedores/listas/${id}/control.csv`;
   };
 
+  /**
+   * LOS MOTIVOS DE OMISIÓN, EN UNA FRASE.
+   *
+   * El servidor ya manda cada motivo con su texto en criollo —`textoOmision`— y
+   * su cantidad, ordenados por cantidad. Acá NO se traduce nada: escribir los
+   * textos de nuevo sería una segunda tabla de motivos, y el día que el servidor
+   * agregue uno la pantalla lo mostraría como un código en mayúsculas.
+   *
+   * Se nombran los dos más grandes y el resto se resume. Con catorce motivos
+   * distintos, listarlos todos sería un párrafo que nadie lee.
+   */
+  const textoDeMotivos = (motivos) => {
+    if (!Array.isArray(motivos) || motivos.length === 0) return "";
+    const conTexto = motivos.filter((m) => m?.texto);
+    if (conTexto.length === 0) return "";
+    const partes = conTexto.slice(0, 2).map((m) => `${m.cantidad}, ${m.texto}`);
+    const resto = conTexto.length - partes.length;
+    return partes.join(" ") + (resto > 0 ? ` Y ${resto} por otros motivos.` : "");
+  };
+
   const aplicar = async () => {
     setAplicando(true);
     setAviso(null);
@@ -319,10 +339,44 @@ export default function ResultadoDeListaPage() {
         return;
       }
       setConfirmando(false);
-      setAviso({
-        tono: "success",
-        texto: `Listo. Se actualizaron ${j.aplicadas ?? 0} ${(j.aplicadas ?? 0) === 1 ? "producto" : "productos"}.`,
-      });
+      // ── EL NÚMERO SALE DE DONDE EL SERVIDOR LO MANDA ────────────────────
+      //
+      // Acá decía `j.aplicadas`, y el endpoint NUNCA mandó ese campo: manda
+      // `resumen.aplicadas`. O sea que el cartel decía "Se actualizaron 0
+      // productos" SIEMPRE, hubiera escrito cero o trescientos. Es el texto que
+      // Emanuel vio, y lo peor es que en su caso además era cierto — así que el
+      // cartel tapaba el otro defecto en vez de delatarlo.
+      const escritos = Number(j?.resumen?.aplicadas ?? 0);
+      const omitidas = Number(j?.resumen?.omitidas ?? 0);
+      const motivos = Array.isArray(j?.resumen?.motivos) ? j.resumen.motivos : [];
+
+      if (escritos > 0) {
+        setAviso({
+          tono: "success",
+          texto:
+            `Listo. Se ${escritos === 1 ? "actualizó" : "actualizaron"} ${escritos} ` +
+            `${escritos === 1 ? "producto" : "productos"}.` +
+            (omitidas > 0 ? ` Quedaron ${omitidas} sin aplicar: ${textoDeMotivos(motivos)}` : ""),
+        });
+      } else {
+        // ── CERO NO ES UN ÉXITO ───────────────────────────────────────────
+        //
+        // Un cartel verde que dice "Listo" sobre una operación que no escribió
+        // nada es la pantalla afirmando que el trabajo está hecho. Emanuel tocó
+        // el botón tres veces seguidas creyendo que algo había pasado.
+        //
+        // El motivo viene del servidor y se dice tal cual: es el que sabe por
+        // qué omitió cada fila. Sin motivos —que no debería pasar— se dice eso
+        // mismo, que es más honesto que inventar una explicación.
+        setAviso({
+          tono: "warning",
+          texto:
+            motivos.length > 0
+              ? `No se actualizó ningún costo. ${textoDeMotivos(motivos)}`
+              : "No se actualizó ningún costo, y el servidor no dijo por qué. " +
+                "Abrí «se actualizan» y fijate si las filas siguen tildadas.",
+        });
+      }
       await cargar();
     } catch {
       setAviso({ tono: "danger", texto: "No se pudo conectar con el servidor. Probá de nuevo." });
@@ -663,6 +717,34 @@ export default function ResultadoDeListaPage() {
           excluir una fila de una aplicación que no va a pasar—. Y "se actualizan"
           sería directamente falso. Los cuatro se reemplazan por los tres grupos
           del control, que son la pregunta que este modo vino a contestar. */}
+      {/* ── LAS QUE ESTÁN LISTAS Y NO SE VAN A ESCRIBIR ──────────────────
+          Hasta esta tanda estas filas se contaban entre las que "se actualizan",
+          y aplicar las salteaba porque consulta por `seleccionada`. Sacarlas del
+          número grande era la mitad del arreglo; la otra mitad es decirlas. Si
+          no, el número baja de 8 a 0 sin que nadie entienda a dónde se fueron —
+          que es la misma clase de mentira, al revés.
+
+          Solo se dibuja cuando hay alguna: una tarjeta en cero acá sería un
+          problema que no existe ocupando lugar. */}
+      {!controlando && (conteo.listosSinTildar ?? 0) > 0 && (
+        <SunmiCard className="p-3">
+          <p className="text-sm2 sunmi-text-warning leading-snug">
+            <span className="font-bold sunmi-text-strong">{conteo.listosSinTildar}</span>{" "}
+            {conteo.listosSinTildar === 1 ? "está listo" : "están listos"} pero sin tildar, así que
+            aplicar no {conteo.listosSinTildar === 1 ? "lo" : "los"} va a tocar.
+          </p>
+          {abierta && (
+            <SunmiButton
+              color="ghost"
+              onClick={() => irA("/actualizan")}
+              className="mt-2 w-full min-h-toque text-sm3"
+            >
+              Abrirlos para tildarlos
+            </SunmiButton>
+          )}
+        </SunmiCard>
+      )}
+
       {!controlando && (
       <div className="grid grid-cols-2 gap-3">
         <TarjetaChica
@@ -862,7 +944,9 @@ export default function ResultadoDeListaPage() {
           disabled={aplicando}
           className="w-full min-h-toque text-sm3"
         >
-          Deshacer los {cabecera.productosActualizados} que se actualizaron
+          {cabecera.productosActualizados === 1
+            ? "Deshacer el que se actualizó"
+            : `Deshacer los ${cabecera.productosActualizados} que se actualizaron`}
         </SunmiButton>
       )}
 
@@ -1029,7 +1113,13 @@ function estadoEnCastellano(cabecera) {
     return `terminada: se actualizaron ${cabecera.productosActualizados} productos`;
   }
   if (cabecera.productosActualizados > 0) {
-    return `${cabecera.productosActualizados} productos ya actualizados`;
+    // Los tres números que tienen que cerrar entre sí —éste, el del botón y el
+    // de deshacer— son los que Emanuel mira para saber si algo pasó. "1
+    // productos ya actualizados" al lado de "Deshacer los 1" los hace ver como
+    // texto generado y no como una cuenta.
+    return cabecera.productosActualizados === 1
+      ? "1 producto ya actualizado"
+      : `${cabecera.productosActualizados} productos ya actualizados`;
   }
   return "todavía no cambió ningún precio";
 }

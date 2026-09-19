@@ -81,6 +81,12 @@ const CAMPOS_CONTEO = {
   // siempre, y el resumen cuenta como "se actualizan" 361 costos que ya están
   // escritos.
   aplicada: true,
+  // SIN ESTA COLUMNA EL CONTADOR PROMETE ESCRITURAS QUE NO OCURREN. Es la
+  // tercera de la misma familia —`excluidaManual`, `aplicada` y ahora ésta— y la
+  // que más caro salió: `aplicar` consulta por `seleccionada: true`, el contador
+  // no la miraba, y el resultado decía "8 se actualizan" sobre una operación que
+  // escribió cero. Medido: 361 listos contra 1 escrito en la importación 22.
+  seleccionada: true,
   // ── LO QUE HACE FALTA PARA JUZGAR EL RANGO, Y ES TODO O NADA ────────────
   //
   // El porcentaje guardado, el rango congelado en la fila y las tres marcas que

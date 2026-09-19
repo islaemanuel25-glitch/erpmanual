@@ -1,5 +1,23 @@
 # Changelog
 
+## [2026-09-19] - Actualización: proveedores, productos
+
+### Modificado
+- **proveedores**: fix: aplicar cero no es un cartel verde que diga "Listo"
+- **proveedores**: fix: deshacer devuelve la fila TILDADA, no solo sin aplicar
+- **proveedores**: fix: lo que el resultado cuenta es lo que aplicar escribe
+- **proveedores**: fix(listas): un producto dado de baja no participa de una lista de proveedor
+- **proveedores**: fix: el rechazo del servidor se ve donde está el pulgar
+- **proveedores**: fix: la hoja de un producto que no vino deja de ser un callejón sin salida
+- **proveedores**: feat: elegir el renglón de la lista se entra por dos puertas
+- **proveedores**: feat: un producto que "no vino" se puede buscar en la lista
+- **proveedores**: fix(listas): una lista abierta se puede cancelar, y desde los dos lados
+- **proveedores**: fix(listas): un título de rubro no es un producto
+- **proveedores**: feat(listas): la evidencia de cada columna a la vista, y cómo salir si se leyó mal
+- **productos**: fix: el carrusel pagina por grupo, así ninguna página mezcla temas
+- **productos**: feat: el aviso del código de caja, con su confirmación y su botón
+
+
 ## [2026-09-18] - Actualización: proveedores
 
 ### Modificado

@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-09-18 13:06
+**Última actualización:** 2026-09-19 00:35
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,10 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-09-19: fix: aplicar cero no es un cartel verde que diga "Listo"
+- 2026-09-19: fix: deshacer devuelve la fila TILDADA, no solo sin aplicar
+- 2026-09-19: fix: lo que el resultado cuenta es lo que aplicar escribe
+- 2026-09-18: fix(listas): un producto dado de baja no participa de una lista de proveedor
 - 2026-09-18: fix: el rechazo del servidor se ve donde está el pulgar
 - 2026-09-18: fix: la hoja de un producto que no vino deja de ser un callejón sin salida
 - 2026-09-18: feat: elegir el renglón de la lista se entra por dos puertas

@@ -295,9 +295,34 @@ export async function POST(req, context) {
         // confirmada: el trabajo de decidir cómo se lee el precio no se pierde
         // por deshacer la escritura. El historial de la aplicación tampoco se
         // borra: es la prueba de qué se había escrito.
+        //
+        // ── Y VUELVE TILDADA, QUE ES LA MITAD QUE FALTABA ──────────────────
+        //
+        // `aplicar` apaga `seleccionada` al escribir —una fila cerrada marcada
+        // para aplicar es una contradicción— y acá se la devolvía a pendiente
+        // SIN volver a tildarla. El resultado: la fila volvía a contarse entre
+        // las que se actualizan y `aplicar`, que consulta por `seleccionada`,
+        // no la tocaba nunca más. Deshacer dejaba filas imposibles de aplicar.
+        //
+        // Es el caso que Emanuel encontró: una lista con tres deshechos y ocho
+        // "listas" donde aplicar escribía cero, una y otra vez.
+        //
+        // Se tilda solo lo SELECCIONABLE y no excluido, que es el mismo
+        // criterio con el que nace una fila al conciliar —`seleccionadaPorDefecto
+        // = seleccionable`—. Una fila que alguien dejó como está sigue dejada:
+        // deshacer devuelve un costo, no borra decisiones.
         await tx.importacionListaFila.updateMany({
           where: { id: { in: item.filas }, importacionId },
           data: { aplicada: false, revertidaEn: ahora, revertidaPorUsuarioId: usuarioId },
+        });
+        await tx.importacionListaFila.updateMany({
+          where: {
+            id: { in: item.filas },
+            importacionId,
+            seleccionable: true,
+            excluidaManual: false,
+          },
+          data: { seleccionada: true },
         });
         productosRevertidos++;
         filasRevertidas += item.filas.length;
