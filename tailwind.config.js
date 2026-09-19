@@ -108,6 +108,20 @@ module.exports = {
 
       spacing: {
         4.5: "18px",
+
+        // ── LOS TRES DE LA CUADRÍCULA DE FILTROS DEL PEDIDO ───────────────
+        //
+        // El diseño pide 12 de padding lateral en cada botón, 8 entre botones
+        // y entre filas, y 6 entre el rótulo y su número. Ninguno cae en la
+        // grilla: con `1rem = 14px` los pasos son múltiplos de 3,5 —`px-3` da
+        // 10,5 y `px-3.5` da 12,25; `gap-2` da 7 y `gap-2.5` da 8,75—.
+        //
+        // Van con nombre semántico y no como la medida, al revés que el `4.5`
+        // de arriba, porque `p-3` y `gap-2` ya existen y redefinirlos movería
+        // todo el repo: es el mismo criterio que `h-fila` y `h-chip`.
+        filtro: "12px",
+        entreFiltros: "8px",
+        dentroFiltro: "6px",
       },
 
       // ── EL BLANCO DE TOQUE ────────────────────────────────────────────
@@ -136,6 +150,18 @@ module.exports = {
         // recortado. Con una línea la tarjeta mide los 101 pedidos; con dos,
         // crece lo que haga falta.
         tarjetaPedido: "101px",
+
+        // ── EL ALTO DEL BUSCADOR CON VOZ ──────────────────────────────────
+        //
+        // El diseño pide 52. `SunmiCampoBusquedaVoz` trae `min-h-12` adentro,
+        // que con `1rem = 14px` son 42 —medido a 360 en producción: el campo
+        // sale 310 × 42—. 52 no cae en la grilla: `min-h-14` da 49 y
+        // `min-h-15` da 52,5.
+        //
+        // Va como MÍNIMO porque eso es lo que la pieza declara, y una utilidad
+        // de `extend` se emite después de la escala del núcleo, así que le
+        // gana a `min-h-12` sin tener que forzar nada con `!`.
+        campoBusqueda: "52px",
       },
 
       // ── EL ALTO DE UNA FILA DE LISTA ──────────────────────────────────
