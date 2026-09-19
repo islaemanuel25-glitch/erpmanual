@@ -44,6 +44,10 @@ import {
   FilaDeCambio,
   Aviso,
   pct,
+  // El peso con el formato de siempre. Se reusa el del kit y no se escribe otro
+  // `toLocaleString` acá: dos formatos de moneda en la misma pantalla se separan
+  // el día que uno cambie de decimales.
+  money,
 } from "@/components/proveedores/listas/PiezasPantallas";
 import HojaConfirmarAplicar from "@/components/proveedores/listas/HojaConfirmarAplicar";
 // Pasar un control a actualizar precios: pide el rango, que controlar no
@@ -97,6 +101,8 @@ export default function ResultadoDeListaPage() {
   // La confirmación de cancelar. Cancelar no escribe ningún costo, pero cierra
   // la lista y eso no se deshace desde acá: se pregunta.
   const [cancelando, setCancelando] = useState(false);
+  /** Mientras se vuelven a leer las propuestas que quedaron viejas. */
+  const [releyendo, setReleyendo] = useState(false);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
@@ -188,6 +194,63 @@ export default function ResultadoDeListaPage() {
       setErrorAlPasar("No se pudo conectar con el servidor. Probá de nuevo.");
     } finally {
       setPasando(false);
+    }
+  };
+
+  /**
+   * VUELVE A CALCULAR LA PROPUESTA DE LAS FILAS QUE QUEDARON VIEJAS.
+   *
+   * No manda ids: el servidor decide cuáles son con la misma función que decide
+   * qué escribe aplicar. Mandarlos desde acá haría que una pantalla que quedó
+   * abierta un rato pidiera releer filas que hoy ya se pueden aplicar.
+   *
+   * Y el aviso dice DÓNDE quedaron. "Listo" sin más dejaría a la persona
+   * buscando: algunas vuelven a quedar listas con el número nuevo y otras caen en
+   * la cola de revisión, y son dos próximos pasos distintos.
+   */
+  const releerPropuestas = async () => {
+    setReleyendo(true);
+    setAviso(null);
+    try {
+      const r = await fetch(`/api/proveedores/listas/${id}/releer-propuestas`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j?.ok) {
+        setAviso({
+          tono: "danger",
+          texto: j?.error || `No se pudieron volver a leer esos precios (error ${r.status}).`,
+        });
+        return;
+      }
+      const partes = [];
+      if (j.quedaronListas > 0) {
+        partes.push(
+          j.quedaronListas === 1
+            ? "1 quedó lista con el precio de hoy"
+            : `${j.quedaronListas} quedaron listas con los precios de hoy`
+        );
+      }
+      if (j.quedaronParaRevisar > 0) {
+        partes.push(
+          j.quedaronParaRevisar === 1
+            ? "1 pasó a la cola para que la mires"
+            : `${j.quedaronParaRevisar} pasaron a la cola para que las mires`
+        );
+      }
+      setAviso({
+        tono: j.releidas === 0 ? "warning" : "success",
+        texto:
+          j.releidas === 0
+            ? "No quedaba ninguna con la propuesta vieja: ya estaban al día."
+            : `Se volvieron a leer ${j.releidas}. ${partes.join(" y ")}. Todavía no se cambió ningún costo.`,
+      });
+      await cargar();
+    } catch {
+      setAviso({ tono: "danger", texto: "No se pudo conectar con el servidor. Probá de nuevo." });
+    } finally {
+      setReleyendo(false);
     }
   };
 
@@ -440,6 +503,12 @@ export default function ResultadoDeListaPage() {
   }
 
   const { cabecera, conteo, variacion, muestra, lectura, control } = datos;
+  // Lo que el recálculo de HOY va a omitir, con el motivo y los dos números. El
+  // default no es `{}` pelado: la tarjeta lee dos listas y con `{}` habría que
+  // preguntar por cada una en tres lugares. Una importación vieja de un cliente
+  // con la pantalla en caché puede no traer el campo, y ahí no hay omisiones que
+  // mostrar, no una pantalla rota.
+  const omitidas = datos.omitidasAlAplicar ?? { total: 0, porMotivo: [], propuestaDiferente: [] };
   const controlando = cabecera.modo === MODO_LISTA.CONTROLAR;
   const abierta = esImportacionAbierta(cabecera.estado);
   const aMedias = ESTADOS_A_MEDIAS.includes(cabecera.estado);
@@ -742,6 +811,87 @@ export default function ResultadoDeListaPage() {
               Abrirlos para tildarlos
             </SunmiButton>
           )}
+        </SunmiCard>
+      )}
+
+      {/* ── LAS QUE APLICAR VA A OMITIR PORQUE EL PRECIO CAMBIÓ ──────────
+          De la importación #12 de producción: la pantalla decía "11 se
+          actualizan · Aplicar los 11 precios", Emanuel aplicó, y se escribieron
+          3. Las otras 8 salieron omitidas por propuesta diferente y NADIE SE
+          ENTERÓ: ni antes —el número las contaba— ni después, porque el aviso de
+          la corrida daba el total y no decía qué les había pasado ni a cuáles.
+
+          Ahora las cuenta `conteo.omitidasAlAplicar`, salen del número grande, y
+          acá se dicen con nombre y con los DOS números. Los dos son el punto:
+          "el costo da distinto" sin decir distinto de qué obliga a abrir cada
+          fila para enterarse, y son justamente las filas que ya se miraron una
+          vez. */}
+      {!controlando && (conteo.omitidasAlAplicar ?? 0) > 0 && (
+        <SunmiCard className="p-3">
+          <p className="text-sm2 sunmi-text-warning leading-snug">
+            <span className="font-bold sunmi-text-strong">{conteo.omitidasAlAplicar}</span>{" "}
+            {conteo.omitidasAlAplicar === 1
+              ? "no se va a actualizar: su precio cambió"
+              : "no se van a actualizar: sus precios cambiaron"}{" "}
+            desde que se leyó la lista, así que {conteo.omitidasAlAplicar === 1 ? "el costo" : "los costos"}{" "}
+            que {conteo.omitidasAlAplicar === 1 ? "se calculó" : "se calcularon"} entonces ya no{" "}
+            {conteo.omitidasAlAplicar === 1 ? "es el que sale" : "son los que salen"} hoy. Aplicar no
+            escribe un número que nadie miró.
+          </p>
+
+          {/* Los dos valores, fila por fila: el que se había propuesto y el de
+              hoy. Se muestran hasta cinco —en un teléfono más no se lee— y si
+              hay más se dice cuántas quedan, en vez de cortar en silencio. */}
+          {(omitidas.propuestaDiferente ?? []).length > 0 && (
+            <div className="mt-2 divide-y sunmi-divide">
+              {(omitidas.propuestaDiferente ?? []).slice(0, 5).map((o) => (
+                <div key={o.filaId} className="py-2">
+                  <div className="text-sm2 sunmi-text-strong truncate" title={o.nombre ?? ""}>
+                    {o.nombre ?? `Fila ${o.filaExcel ?? o.filaId}`}
+                  </div>
+                  <div className="text-sm2 sunmi-text-muted tabular-nums">
+                    Antes se iba a poner {money(o.costoGuardado)} y ahora daría{" "}
+                    <span className="sunmi-text-strong">{money(o.costoRecalculado)}</span>
+                  </div>
+                </div>
+              ))}
+              {(omitidas.propuestaDiferente ?? []).length > 5 && (
+                <p className="pt-2 text-xs2 sunmi-text-muted">
+                  Y {(omitidas.propuestaDiferente ?? []).length - 5} más.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* LA SALIDA. Volver a leerlas recalcula la propuesta con los datos de
+              hoy y las deja para mirar de nuevo: no escribe ningún costo. Solo
+              se ofrece con la lista abierta y cuando hay alguna de este motivo —
+              las demás omisiones se arreglan en otro lado y cada una dice dónde. */}
+          {abierta && (omitidas.propuestaDiferente ?? []).length > 0 && (
+            <SunmiButton
+              color="ghost"
+              onClick={releerPropuestas}
+              disabled={releyendo}
+              className="mt-2 w-full min-h-toque text-sm3"
+            >
+              {releyendo
+                ? "Volviendo a leer…"
+                : (omitidas.propuestaDiferente ?? []).length === 1
+                  ? "Volver a leer ese precio"
+                  : `Volver a leer esos ${(omitidas.propuestaDiferente ?? []).length} precios`}
+            </SunmiButton>
+          )}
+
+          {/* Las omisiones que NO son de propuesta diferente también se nombran:
+              cada motivo ya tiene su texto con el qué pasó y el qué hacer, y
+              callarlas dejaría el número sin explicación. */}
+          {(omitidas.porMotivo ?? [])
+            .filter((m) => m.motivo !== "PROPUESTA_DIFERENTE")
+            .map((m) => (
+              <p key={m.motivo} className="mt-2 text-xs2 sunmi-text-muted leading-snug">
+                {m.cantidad === 1 ? "Una más" : `${m.cantidad} más`}: {m.texto}
+              </p>
+            ))}
         </SunmiCard>
       )}
 
