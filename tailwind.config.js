@@ -101,6 +101,9 @@ module.exports = {
 
       borderRadius: {
         xl2: "14px",
+        // 8 px, el radio de los controles del pedido —segmentado y botones del
+        // stepper—. `rounded-lg` da 7 y `rounded-xl` 10,5: ninguno es 8.
+        control: "8px",
       },
 
       spacing: {
@@ -124,6 +127,15 @@ module.exports = {
       // `min-h-toque` se lee solo.
       minHeight: {
         toque: "44px",
+
+        // ── EL ALTO DE LA TARJETA DE PRODUCTO DEL PEDIDO ──────────────────
+        //
+        // El diseño la pide de 101 px. Va como MÍNIMO y no como alto fijo a
+        // propósito: el mismo diseño dice que el nombre puede ocupar DOS
+        // renglones y que no se trunque, y con `h-` el segundo renglón quedaría
+        // recortado. Con una línea la tarjeta mide los 101 pedidos; con dos,
+        // crece lo que haga falta.
+        tarjetaPedido: "101px",
       },
 
       // ── EL ALTO DE UNA FILA DE LISTA ──────────────────────────────────
@@ -142,6 +154,24 @@ module.exports = {
       // repo: es el mismo error que este archivo ya documenta para `border-2`.
       height: {
         fila: "60px",
+
+        // ── LOS CONTROLES DEL PEDIDO ──────────────────────────────────────
+        //
+        // 32 el segmentado de tipo de pedido y 30 el chip de filtro, pedidos
+        // por el diseño de la pantalla de productos del pedido. Ninguno cae en
+        // la grilla: con `1rem = 14px` los pasos son múltiplos de 3,5.
+        //
+        // Van por DEBAJO de los 36 px que declara `.sunmi-btn-base`, y eso se
+        // puede: el botón cede el eje del alto cuando la pantalla declara un
+        // `min-h-*` —ver `declaraAltoMinimo` en `lib/sunmi/claseNegociada.js`—,
+        // así que se usan junto a `min-h-0` y la pieza no se toca.
+        segmento: "32px",
+        chip: "30px",
+      },
+
+      width: {
+        // El cuadro del número del stepper. 62 tampoco cae en la grilla.
+        cajaCantidad: "62px",
       },
       minWidth: {
         toque: "44px",

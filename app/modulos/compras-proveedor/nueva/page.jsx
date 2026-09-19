@@ -17,7 +17,7 @@ import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
 import ElegirProveedor from "@/components/compras-proveedor/ElegirProveedor";
-import { useAccionDePagina } from "@/app/context/AccionDePaginaContext";
+import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
 import ModalVincularCodigo from "@/components/compras-proveedor/ModalVincularCodigo";
 import ModalEnviarPedido from "@/components/compras-proveedor/ModalEnviarPedido";
 import CarritoPedido from "@/components/compras-proveedor/CarritoPedido";
@@ -172,9 +172,13 @@ export default function NuevaCompraProveedorPage() {
   // va de pantalla apenas la lista baja. La fábrica devuelve `null` cuando ya
   // hay proveedor, que es la forma de registrar bajo condición sin llamar al
   // hook condicionalmente.
+  // Vale para los DOS estados de la pantalla: eligiendo proveedor y con el
+  // proveedor ya elegido. Antes el segundo dibujaba su propio "Volver" adentro
+  // de una fila pegajosa, y con él un segundo título: en el teléfono eso era
+  // un encabezado entero repetido.
   useAccionDePagina(
-    () => (eligiendoProveedor ? <SunmiBackButton href="/modulos/inicio" /> : null),
-    [eligiendoProveedor]
+    () => (esContinuar ? null : <SunmiBackButton href="/modulos/inicio" />),
+    [esContinuar]
   );
 
   // Proveedor seleccionado (objeto completo) para mostrar info de dias_pedido.
@@ -186,6 +190,12 @@ export default function NuevaCompraProveedorPage() {
 
   const nombreProveedorActivo =
     proveedorNombre || proveedorSel?.nombre || "";
+
+  // EL TÍTULO DEL SHELL DICE A QUIÉN SE LE COMPRA. Con el proveedor elegido la
+  // pantalla ya no es "Nuevo pedido" sino el pedido de ESE proveedor, y esa es
+  // la única cosa que el encabezado tiene que recordar mientras se carga. Sin
+  // proveedor devuelve `null` y el título lo sigue resolviendo la ruta.
+  useTituloDePagina(nombreProveedorActivo ? `Pedido ${nombreProveedorActivo}` : null);
 
   // Mostrar warning solo si el proveedor tiene dias_pedido configurados
   // y hoy NO es uno de esos días. Si dias_pedido está vacío, no inferimos nada.
@@ -1379,6 +1389,132 @@ export default function NuevaCompraProveedorPage() {
       </div>
     );
 
+  // ── LOS CONTROLES DEL PEDIDO EN EL TELÉFONO ──────────────────────────────
+  //
+  // Van acá abajo, en tres piezas, y no mezclados en el JSX: la rama móvil ya
+  // tenía seis bloques encadenados y era imposible ver qué entraba y qué no.
+  //
+  // Los tres usan `SunmiButton` con `min-h-0` adelante. Eso NO es un truco: la
+  // base del botón declara 36 px de mínimo y CEDE ese eje cuando quien la usa
+  // declara un `min-h-*` —`declaraAltoMinimo`, en `lib/sunmi/claseNegociada.js`—.
+  // Es la única forma de bajar de 36 sin tocar la pieza, y el diseño pide 32
+  // para el segmentado y 30 para los chips.
+
+  /** Tipo de pedido + el enlace para cambiar de proveedor, en una sola fila. */
+  const filaTipoDePedido = () =>
+    !esContinuar && (
+      <div className="flex items-center gap-2 h-segmento">
+        <div className="inline-flex w-48 h-segmento rounded-control overflow-hidden border sunmi-divider shrink-0">
+          {[
+            ["automatico", "Automático"],
+            ["manual", "Manual"],
+          ].map(([val, label]) => (
+            <SunmiButton
+              key={val}
+              type="button"
+              color={modo === val ? "primary" : "slate"}
+              onClick={() => cambiarModo(val)}
+              aria-pressed={modo === val}
+              className="min-h-0 h-segmento flex-1 rounded-none px-3 py-2 text-sm3 font-medium"
+            >
+              {label}
+            </SunmiButton>
+          ))}
+        </div>
+        {/* Reemplaza al botón "Cambiar" que vivía pegado al título: es una
+            salida, no una acción del pedido, así que va como texto. */}
+        <SunmiButton
+          type="button"
+          color="ghost"
+          onClick={() => setProveedorId("")}
+          className="min-h-0 h-segmento flex-1 justify-end px-0 text-sm3 font-medium sunmi-text-accent"
+        >
+          Cambiar proveedor
+        </SunmiButton>
+      </div>
+    );
+
+  /** Sugeridos · Todos · Cargados (N) · una entrada por categoría. */
+  const chipsDelPedido = () => {
+    const claseChip = "min-h-0 h-chip shrink-0 rounded-full px-3 py-1.5 text-sm3 font-medium";
+    return (
+      <div className="flex items-center gap-1.5 overflow-x-auto -mx-1 px-1">
+        {esAuto &&
+          FILTROS_VISTA.map(([v, label]) => (
+            <SunmiButton
+              key={v}
+              type="button"
+              color={vista === v && !soloPedido ? "primary" : "slate"}
+              aria-pressed={vista === v && !soloPedido}
+              onClick={() => {
+                setSoloPedido(false);
+                setVista(v);
+              }}
+              className={claseChip}
+            >
+              {label}
+            </SunmiButton>
+          ))}
+        <SunmiButton
+          type="button"
+          color={soloPedido ? "primary" : "slate"}
+          aria-pressed={soloPedido}
+          disabled={lineasCount === 0}
+          onClick={togglePedido}
+          className={claseChip}
+        >
+          Cargados ({lineasCount})
+        </SunmiButton>
+        {/* CATEGORÍAS DEJA DE SER UN DESPLEGABLE. Era el sexto bloque de
+            controles y escondía sus opciones detrás de dos toques; acá cada
+            categoría es un chip más de la misma fila, que ya se arrastra. */}
+        {categorias.map((c) => (
+          <SunmiButton
+            key={c.id}
+            type="button"
+            color={String(categoriaFilter) === String(c.id) ? "primary" : "slate"}
+            aria-pressed={String(categoriaFilter) === String(c.id)}
+            onClick={() =>
+              setCategoriaFilter((actual) =>
+                String(actual) === String(c.id) ? "" : String(c.id)
+              )
+            }
+            className={claseChip}
+          >
+            {c.nombre}
+          </SunmiButton>
+        ))}
+      </div>
+    );
+  };
+
+  /** Cuántos hay y de dónde salen, más la salida a importar desde archivo. */
+  const filaDeContexto = () => (
+    <div className="flex items-center gap-2">
+      {/* "228 sugeridos por faltante": el número y de dónde salen, juntos. El
+          contador vivía aparte, en otro renglón, repitiendo "productos". */}
+      <span className="text-sm3 sunmi-text-muted flex-1 min-w-0 truncate">
+        {listaRender.length}{" "}
+        {tituloSeccion.charAt(0).toLowerCase() + tituloSeccion.slice(1)}
+      </span>
+      <SunmiButton
+        type="button"
+        color="ghost"
+        disabled={!proveedorId || loadingProds}
+        onClick={() => {
+          if (borradorExistente) {
+            router.push(`/modulos/compras-proveedor/importar?pedidoId=${borradorExistente.id}`);
+            return;
+          }
+          router.push(`/modulos/compras-proveedor/importar?proveedorId=${proveedorId}`);
+        }}
+        className="min-h-0 shrink-0 px-0 text-sm3 font-medium sunmi-text-accent"
+      >
+        {borradorExistente ? "Continuar borrador" : "Desde foto o Excel"}
+      </SunmiButton>
+    </div>
+  );
+
   const botonImportar = (compact = false) => (
     <div className={compact ? "mb-2" : "mb-3"}>
       <SunmiButton
@@ -1575,38 +1711,33 @@ export default function NuevaCompraProveedorPage() {
   // Desktop: sticky al pie del contenido (no tapa el sidebar). Mobile: fixed.
   const barraResumen = (mobile = false) =>
     mobile ? (
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t sunmi-divider sunmi-surface px-3 py-2 shadow-[0_-2px_10px_rgba(0,0,0,0.25)]">
-        <button
-          type="button"
-          onClick={() => lineasCount > 0 && setResumenOpen(true)}
-          disabled={lineasCount === 0}
-          className="w-full flex items-center gap-1.5 text-[12.5px] sunmi-text-strong mb-1.5 disabled:opacity-60"
-          aria-label="Ver resumen del pedido"
-        >
-          <ShoppingCart size={15} className="shrink-0" />
-          <span className="truncate whitespace-nowrap">
-            <b>{lineasCount}</b> {lineasCount === 1 ? "producto" : "productos"}{" "}
-            <span className="sunmi-text-muted">· Total</span>{" "}
-            <b className="sunmi-text-accent tabular-nums">{fmtPesos(total)}</b>
+      <div className="fixed bottom-0 left-0 right-0 z-40 h-28 border-t sunmi-divider sunmi-surface px-4 pt-2.5 pb-3 shadow-[0_-2px_10px_rgba(0,0,0,0.25)]">
+        {/* El resumen es TEXTO, no un botón. "Ver resumen" abría una hoja con
+            lo mismo que ya está en la pantalla, y como el renglón entero era
+            tocable competía con los dos botones de abajo. */}
+        <div className="flex items-center gap-2 mb-2.5">
+          <span className="text-sm3 sunmi-text-muted flex-1 min-w-0 truncate">
+            {lineasCount} {lineasCount === 1 ? "producto" : "productos"}
           </span>
-          {lineasCount > 0 && (
-            <span className="ml-auto flex items-center gap-1 text-[11px] shrink-0" style={{ color: "var(--pos-link)" }}>
-              Ver resumen <ChevronUp size={13} />
-            </span>
-          )}
-        </button>
-        <div className="flex gap-2">
+          <span className="text-lg2 font-bold sunmi-text-strong tabular-nums shrink-0">
+            {fmtPesos(total)}
+          </span>
+        </div>
+        {/* Dos botones del mismo alto y el mismo ancho: `flex-1` con `gap-3`
+            sobre los 358 útiles da los 174 de cada uno que pide el diseño, sin
+            fijar el ancho a mano. */}
+        <div className="flex gap-3">
           <SunmiButton
-            color="cyan"
-            className="flex-1 py-1.5 text-[13px]"
+            color="slate"
+            className="flex-1 min-h-toque text-sm3"
             disabled={accionesDeshabilitadas}
             onClick={guardarPendiente}
           >
             {saving ? "Guardando..." : "Guardar"}
           </SunmiButton>
           <SunmiButton
-            color="amber"
-            className="flex-1 py-1.5 text-[13px]"
+            color="primary"
+            className="flex-1 min-h-toque text-sm3"
             disabled={accionesDeshabilitadas}
             onClick={enviarPedido}
           >
@@ -1859,92 +1990,58 @@ export default function NuevaCompraProveedorPage() {
   };
 
   // ── Fila del catálogo (mobile) ──
+  // ── LA TARJETA DEL PRODUCTO, DE CUATRO RENGLONES A DOS ───────────────────
+  //
+  // Emanuel mira DOS cosas: el nombre y la cantidad. Todo lo demás bajó a
+  // texto chico o se fue.
+  //
+  // SE FUERON: la línea de stock, la insignia MIN y el subtotal de la línea.
+  // El stock no se decide acá —se decide en la reposición— y el subtotal es
+  // consecuencia de la cantidad, que ya está al lado; el total sigue abajo.
+  //
+  // EL NOMBRE NO SE TRUNCA. Es lo que más se mira y puede ocupar dos renglones:
+  // por eso la tarjeta lleva `min-h-tarjetaPedido` y no un alto fijo —con `h-`
+  // el segundo renglón quedaría recortado—. Con una línea mide los 101 px del
+  // diseño; con dos, crece.
   const filaMobile = (p) => {
     const rv = rowVars(p);
-    const seg = costoSecundario(rv);
-    const meta = metaEstado(p, rv);
     const costoNum = Number(rv.costoActual) || 0;
+    const sugerido = Number(p.sugerido) || 0;
     return (
-      // BOCETO 2026-08-10 — fila mobile reorganizada.
-      //
-      // El problema: en 360 px el nombre quedaba en UNA letra ("C.", "B.") y el
-      // precio unitario aparecía debajo del botón de restar. La fila era de dos
-      // columnas —datos a la izquierda, controles a la derecha— y la columna de
-      // controles se quedaba con casi todo el ancho.
-      //
-      // El criterio decidido: GANA EL NOMBRE. Así que deja de ser una fila de
-      // dos columnas y pasa a ser un bloque apilado, donde el nombre ocupa el
-      // ancho completo y los controles bajan a su propio renglón.
       <div
         key={p.productoLocalId}
-        className="px-2.5 py-2"
-        style={{ borderLeft: rv.enPedido ? "3px solid var(--pos-accent, #f59e0b)" : "3px solid transparent" }}
+        className="min-h-tarjetaPedido rounded-xl border sunmi-divider sunmi-surface px-4 py-3 flex flex-col gap-3"
+        style={{
+          borderLeftWidth: rv.enPedido ? "3px" : undefined,
+          borderLeftColor: rv.enPedido ? "var(--pos-accent, #f59e0b)" : undefined,
+        }}
       >
-        {/* 1) El nombre, con TODO el ancho. Hasta dos renglones: con uno solo,
-               los nombres largos de verdad seguían cortándose. */}
-        <div className="flex items-start gap-1 leading-tight">
+        {/* Renglón 1: el nombre con todo el ancho, y la salida para quitarlo. */}
+        <div className="flex items-start gap-3">
           <span
-            className="text-[12.5px] font-medium sunmi-text-strong flex-1 min-w-0 break-words"
-            style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}
+            className="text-lg2 font-medium sunmi-text-strong flex-1 min-w-0 break-words"
             title={p.nombre}
           >
             {p.nombre}
           </span>
-          <div className="shrink-0 flex items-center gap-1">
-            {badges(rv, p, true)}
-            {rv.enPedido && botonQuitar(p, 13)}
-          </div>
+          {rv.enPedido && botonQuitar(p, 16)}
         </div>
 
-        {/* 2) Estado del producto: stock, sugerido. */}
-        <div className="text-[10.5px] sunmi-text-muted leading-tight mt-0.5">
-          {meta.map((m, idx) => (
-            <span key={idx}>
-              {idx > 0 && " · "}
-              <span
-                className={
-                  m.danger ? "sunmi-text-danger" : m.accent ? "sunmi-text-accent" : m.ok ? "sunmi-text-success" : ""
-                }
-              >
-                {m.txt}
+        {/* Renglón 2: de dónde sale la cantidad sugerida y a qué precio, contra
+            el control que la cambia. */}
+        <div className="flex items-center gap-3">
+          <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+            {sugerido > 0 && (
+              <span className="text-sm3 font-medium sunmi-text-accent">
+                Sugerido {sugerido}
               </span>
-            </span>
-          ))}
-        </div>
-
-        {/* 3) Unidad + precio unitario a la izquierda, stepper a la derecha.
-               El precio ya no queda debajo de ningún botón: comparten renglón
-               pero cada uno tiene su lugar, y el precio puede achicarse. */}
-        <div className="flex items-center gap-2 mt-1.5">
-          <div className="flex items-center gap-1.5 min-w-0 flex-1">
-            {toggleUnidad(p, rv)}
-            <span className="text-[10.5px] sunmi-text-muted truncate">
-              ${costoNum.toFixed(2)}/{rv.costoUnidad}
-              {rv.activa && seg && <span> · {seg.replace("≈ ", "")}</span>}
+            )}
+            <span className="text-sm3 sunmi-text-muted truncate">
+              {rv.costoUnidad} · {fmtPesos(costoNum)}
             </span>
           </div>
           <div className="shrink-0">{stepper(p, rv, true)}</div>
         </div>
-
-        {/* 4) Equivalencia del pack y subtotal, en el mismo renglón: los dos son
-               consecuencia de la cantidad y se leen juntos. */}
-        {(rv.esPack || (rv.activa && rv.r.subtotal != null)) && (
-          <div className="flex items-baseline justify-between gap-2 mt-1">
-            <span className="text-[10px] sunmi-text-muted min-w-0 truncate">
-              {rv.esPack && (
-                <>
-                  1 pack = {rv.factor} un
-                  {rv.disp === "BULTO" && rv.cantNum > 0 && (
-                    <span className="sunmi-text-accent"> · equivale a {rv.cantNum * rv.factor} un</span>
-                  )}
-                </>
-              )}
-            </span>
-            <span className="text-[12px] font-semibold tabular-nums sunmi-text-strong shrink-0">
-              {rv.activa && rv.r.subtotal != null ? fmtPesos(rv.r.subtotal) : ""}
-            </span>
-          </div>
-        )}
       </div>
     );
   };
@@ -2204,27 +2301,15 @@ export default function NuevaCompraProveedorPage() {
           />
         ) : (
         <>
-        {/* Header sticky: volver + título + buscar + filtros */}
-        <div className="sticky top-0 z-30 sunmi-surface border-b sunmi-divider px-2 pt-2 pb-1.5">
-          <div className="flex items-center gap-2 mb-1.5">
-            <SunmiBackButton href="/modulos/inicio" />
-            <h1 className="text-[15px] font-semibold sunmi-text-strong truncate flex-1 min-w-0">
-              {nombreProveedorActivo
-                ? `Pedido ${nombreProveedorActivo}`
-                : esContinuar
-                ? `Continuar #${pedidoIdParam}`
-                : "Nuevo pedido"}
-            </h1>
-            {!esContinuar && proveedorId && (
-              <button
-                type="button"
-                onClick={() => setProveedorId("")}
-                className="px-2 py-1 rounded text-[11px] font-medium sunmi-control shrink-0"
-              >
-                Cambiar
-              </button>
-            )}
-          </div>
+        {/* ── LOS CONTROLES ────────────────────────────────────────────────
+            Eran SEIS bloques antes de ver un producto: fila de título, tipo de
+            pedido, buscador, chips, desplegable de categorías y el botón naranja
+            de importar. Ahora son CUATRO.
+            El título y el "Volver" se fueron al shell —`useTituloDePagina` dice
+            "Pedido Arcor" y el slot lleva el botón—, categorías pasó a ser un
+            chip más, y lo de importar dejó de ser un botón de ancho completo que
+            competía con "Enviar pedido". */}
+        <div className="sticky top-0 z-30 sunmi-surface border-b sunmi-divider px-2 pb-2.5 flex flex-col gap-2">
 
           {/* Acá vivía el desplegable de proveedor. Ya no: sin proveedor esta
               rama no se dibuja —la pantalla es `ElegirProveedor`— y con
@@ -2232,24 +2317,23 @@ export default function NuevaCompraProveedorPage() {
 
           {proveedorId && (
             <>
-              {selectorModo(true)}
-              <div className="relative mb-1.5">
-                <Search
-                  size={15}
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none z-10"
-                  style={{ color: "var(--pos-link)" }}
-                />
-                <SunmiInput
-                  placeholder="Buscar producto..."
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    setPostVinculoMsg("");
-                  }}
-                  className="!pl-8 !py-1.5 w-full"
-                />
-              </div>
-              {chipsFiltros("sm")}
+              {filaTipoDePedido()}
+              {/* El buscador DECLARA su alto, su padding y su letra; el kit los
+                  cede por la cascada. Mismo criterio que en elegir proveedor.
+                  Se le sacó la lupa absoluta: ocupaba el padding de la
+                  izquierda y obligaba al `!pl-8` que peleaba con la pieza. */}
+              <SunmiInput
+                placeholder="Buscar producto"
+                aria-label="Buscar producto"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPostVinculoMsg("");
+                }}
+                className="w-full min-h-toque px-4 text-lg2"
+              />
+              {chipsDelPedido()}
+              {filaDeContexto()}
               {/* El cartel del pedido en curso vive ACÁ, dentro del encabezado
                   pegajoso, y no debajo en el contenido.
                   Antes se desplazaba con la lista y se metía por debajo del
@@ -2284,21 +2368,15 @@ export default function NuevaCompraProveedorPage() {
 
           {proveedorId && (
             <>
-              {botonImportar(true)}
+              {/* El botón naranja de ancho completo y el contador se fueron a
+                  la fila de contexto del encabezado: el primero competía con
+                  "Enviar pedido" por ser el más pesado de la pantalla, y el
+                  segundo decía en dos renglones lo que entra en uno. */}
               {avisoImportacion && (
                 <div className="rounded-lg border px-2.5 py-1.5 mb-2 text-sm2 sunmi-text-accent sunmi-divider">
                   {avisoImportacion}
                 </div>
               )}
-              {/* Contador + sección */}
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <span className="text-[11px] sunmi-text-muted truncate">
-                  {tituloSeccion}
-                </span>
-                <span className="text-[11px] sunmi-text-muted shrink-0">
-                  {listaRender.length} {listaRender.length === 1 ? "producto" : "productos"}
-                </span>
-              </div>
 
               {postVinculoMsg && (
                 <div className="mb-2 text-[11px] sunmi-text-accent">{postVinculoMsg}</div>
@@ -2320,8 +2398,10 @@ export default function NuevaCompraProveedorPage() {
                   </div>
                 )}
 
-              {/* Lista compacta tipo app de pedidos */}
-              <div className="rounded-lg border sunmi-border sunmi-surface divide-y sunmi-divide overflow-hidden">
+              {/* Tarjetas sueltas con aire entre ellas, no una lista dividida:
+                  cada producto es una decisión aparte y el separador de 1 px
+                  las leía como renglones de una tabla. */}
+              <div className="flex flex-col gap-2">
                 {loadingProds && productos.length === 0 ? (
                   <div className="px-3 py-8 text-center text-xs sunmi-text-muted">Buscando...</div>
                 ) : listaRender.length === 0 ? (
