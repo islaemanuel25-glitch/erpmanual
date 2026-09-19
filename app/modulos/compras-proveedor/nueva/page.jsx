@@ -1532,7 +1532,11 @@ export default function NuevaCompraProveedorPage() {
             placeholder="Categorías"
             className="min-h-toque w-full"
           >
-            <SunmiSelectOption value="">Categorías: todas</SunmiSelectOption>
+            {/* Dice "Categorías" a secas y no "Categorías: todas": la pieza
+                muestra el rótulo de la opción que coincide con el valor, no el
+                placeholder, y sin filtro el valor es "". Medido a 360: con el
+                rótulo largo la celda mostraba "Categorías: todas". */}
+            <SunmiSelectOption value="">Categorías</SunmiSelectOption>
             {categorias.map((c) => (
               <SunmiSelectOption key={c.id} value={String(c.id)}>
                 {c.nombre}
