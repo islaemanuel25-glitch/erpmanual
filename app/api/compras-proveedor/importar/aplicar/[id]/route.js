@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
-import { pedidoEnAlcance } from "@/lib/compras/scope";
+import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
 import { esComboBase } from "@/lib/combos/guards";
 import { sumarCantidadesImportadas, datosDetalleNuevo } from "@/lib/compras-proveedor/importacion/merge";
 import { aliasesDeImportacion } from "@/lib/compras-proveedor/importacion/aliases";
@@ -62,8 +62,11 @@ export async function POST(req, { params }) {
     // navegador, el defecto que esto arregla se podría volver a producir desde
     // afuera. `unidad_medida` y `modoCompraProveedor` son lo que `naturalezaLinea`
     // necesita para saber si el factor entra o no en el dinero.
+    // La ubicación DUEÑA del pedido, la misma que contesta `agregar-item` y la
+    // misma a la que `recibir` le suma el stock. Antes decía `pedido.depositoId`,
+    // así que un pedido de un local rechazaba sus propias filas.
     const productos = await prisma.productoLocal.findMany({
-      where: { id: { in: ids }, localId: pedido.depositoId, activo: true },
+      where: { id: { in: ids }, localId: ownerLocalIdDePedido(pedido), activo: true },
       select: {
         id: true,
         baseId: true,
@@ -79,7 +82,7 @@ export async function POST(req, { params }) {
       },
     });
     if (productos.length !== ids.length || productos.some((p) => esComboBase(p.base))) {
-      return NextResponse.json({ ok: false, error: "Uno de los productos no pertenece al depósito o no se puede comprar." }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "Uno de los productos no pertenece a la ubicación del pedido o no se puede comprar." }, { status: 400 });
     }
 
     // ── EL CANDADO DE MAGNITUD, TAMBIÉN ACÁ ───────────────────────────────

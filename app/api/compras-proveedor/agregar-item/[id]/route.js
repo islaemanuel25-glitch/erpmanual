@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { esComboBase } from "@/lib/combos/guards";
-import { pedidoEnAlcance } from "@/lib/compras/scope";
+import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
 
 export async function POST(req, { params }) {
   try {
@@ -67,7 +67,18 @@ export async function POST(req, { params }) {
       );
     }
 
-    // Verificar que el ProductoLocal existe y pertenece al depósito del pedido
+    // ── LA FILA TIENE QUE SER DE LA UBICACIÓN DUEÑA DEL PEDIDO ────────────
+    //
+    // Acá se comparaba contra `pedido.depositoId`. Con el catálogo sirviendo las
+    // filas de la ubicación que opera, un local veía su producto en la pantalla
+    // y al agregarlo al pedido recibía "Producto no pertenece al depósito del
+    // pedido" — la pantalla ofreciendo lo que el servidor rechaza.
+    //
+    // Quién es el dueño lo contesta `ownerLocalIdDePedido`, que ya existe y ya es
+    // la que usa `recibir` para decidir a qué ubicación entra el stock. Así la
+    // línea que se agrega y el stock que después entra hablan de la misma
+    // ubicación, en vez de dos consultas distintas para la misma pregunta.
+    const ubicacionDelPedido = ownerLocalIdDePedido(pedido);
     const pl = await prisma.productoLocal.findUnique({
       where: { id: Number(productoLocalId) },
       include: {
@@ -77,9 +88,9 @@ export async function POST(req, { params }) {
       },
     });
 
-    if (!pl || pl.localId !== pedido.depositoId) {
+    if (!pl || Number(pl.localId) !== Number(ubicacionDelPedido)) {
       return NextResponse.json(
-        { ok: false, error: "Producto no pertenece al depósito del pedido" },
+        { ok: false, error: "Producto no pertenece a la ubicación del pedido" },
         { status: 400 }
       );
     }
