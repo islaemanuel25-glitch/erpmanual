@@ -83,9 +83,13 @@ para impedir.
 Corolario de cómo nace una pieza: **negocia el `className`, no lo concatena.**
 Dos clases de Tailwind de la misma familia tienen la misma especificidad, así que
 no decide el orden dentro del atributo sino el de la hoja de estilos — poner las
-dos es dejar que gane cualquiera. Hoy 16 de los 19 componentes del kit concatenan
-y por eso un ancho escrito en la pantalla no se aplica; `SunmiInput` es el único
-que lo hace bien, y el porqué está en `lib/sunmi/claseAncho.js`.
+dos es dejar que gane cualquiera. Cuando esto se escribió eran 16 de 19 los que
+concatenaban, y por eso un ancho escrito en la pantalla no se aplicaba;
+`SunmiInput` era el único que lo hacía bien, y el porqué sigue estando en
+`lib/sunmi/claseAncho.js`. **El número de hoy —14 que negocian contra 19 que
+concatenan, sobre los 33 que aceptan `className`— está medido, con qué se contó,
+en la sección del kit al final de este archivo.** El corolario no cambió: la
+pieza negocia.
 
 Corolario: el default de un valor se define UNA vez. Buscar el rango de aumento
 esperado dio cinco lugares distintos, tres de ellos con `?? 10` y `?? 20` escritos
@@ -650,3 +654,351 @@ que hacían `TRUNCATE` de todas las tablas protegidos solamente por que la palab
   como script.** Las migraciones ya tienen su lugar en el despliegue, quedan
   registradas y se aplican una sola vez; un script suelto no. Corolario: si algo
   necesita correr en el VPS, no es un script — es una migración.
+
+## El kit Sunmi
+
+Relevado el 2026-09-19 sobre `9eb66e3`. **Enumerado con
+`git ls-files --cached --others --exclude-standard 'components/sunmi/*.jsx'`**, que
+es el mismo universo que usa `lib/sunmi/propsDelKit.test.mjs` para decidir qué es
+"del kit": `components/sunmi/` y un nombre que empieza en mayúscula. Con esa
+definición son **56 archivos**. `readdirSync` no sirve acá: la regla 10 de este
+archivo tiene el caso.
+
+### Las tres reglas
+
+**1. Las pantallas se arman con piezas del kit.** Nada de elementos crudos ni
+medidas escritas a mano. Si la pieza no existe, se agrega al kit sacándola de una
+pantalla que HOY funciona — nunca se escribe una parecida al lado, y nunca
+adivinando casos futuros. El porqué largo, con los dos casos que salieron mal, está
+en la regla 1. Los dos que ya están cerrados: no se usa `<select>` ni `<input>`
+nativo —van `SunmiSelectAdv` y `SunmiInput`—, y un tamaño de letra o un alto de
+toque van como token del config, no como `text-[16px]` ni `min-h-[44px]`.
+
+**2. El diseño de pantallas se hace en Figma ANTES de implementar.** La pieza no se
+inventa mientras se escribe el JSX. `SunmiLinkButton` es el precedente y está
+anotado adentro del archivo: su contrato —sin fondo, sin borde, sin radio, sin
+padding, el margen exterior es del consumidor— lo cerró el archivo de Figma
+`fYqIEZxHRb6yx6pIUrUG2h`, nodo `13:2`, y por eso la pieza no tiene que discutirse
+de nuevo cada vez que alguien la usa. **La biblioteca de Figma se arma con los
+componentes de este inventario, no con dibujos**: un boceto hecho con rectángulos
+produce props que la pieza no tiene, que es el defecto que
+`lib/sunmi/propsDelKit.test.mjs` existe para atrapar.
+
+Y una medida que el diseño traiga de la grilla de 16 px de Figma **no se copia
+tal cual**: este proyecto corre con `1rem = 14px`, fijado en `app/globals.css`
+sobre el `html`. Por eso `h-11` da 38,5 px y no 44. La decisión ya tomada, escrita
+en `tailwind.config.js`: los TAMAÑOS DE LETRA del diseño entran a la escala porque
+se ven —son los números protagonistas—; los paddings y radios se AJUSTAN a la
+escala del proyecto, porque se corren como mucho 1,25 px.
+
+**3. El contador del trinquete.** Vive en `lib/hardcodeo/contador.mjs`; el comando
+es `node scripts/hardcodeo.mjs`, con `--trinquete` para comparar y
+`--linea-base [--sellar]` para mirar o sellar. La línea de base es
+`docs/hardcodeo-linea-base.json` y **no se edita a mano**. El hook
+`scripts/hook-trinquete-hardcodeo.mjs` corre en PostToolUse sobre `Edit` y `Write`
+de `.jsx` bajo `app/` o `components/`: avisa y no revierte, y si él mismo se cae
+deja pasar diciéndolo.
+
+**Que un número suba significa que entró deuda visual**: una decisión de
+apariencia escrita en una pantalla en vez de pedida al kit. No es un error de
+compilación y no lo ve ningún otro candado. Las salidas son dos y las dos son
+explícitas: usar la pieza que ya existe, o subir la base a propósito diciendo por
+qué en el commit. El trinquete compara el INVENTARIO —archivo, categoría, texto y
+cantidad—, no los totales, así que mover una ocurrencia de lugar también se ve.
+
+Las siete categorías, con el número medido hoy —`--linea-base`, delta cero contra
+la base sellada en `266cbe1`—: colores fijos 284; clases del tema paralelo del POS
+87; modales armados a mano 34; componentes del kit que pisan la clase recibida 0;
+elementos crudos con reemplazo en el kit 283; celdas de tabla escritas a mano 430;
+medidas mágicas 1625.
+
+El camino corto para una pantalla concreta —qué tiene hardcodeado y con qué pieza
+se reemplaza— es el skill `/revisar-pantalla`.
+
+### Cómo negocia una pieza, que es su contrato real
+
+Una pieza del kit **no concatena el `className` que recibe: cede el eje que la
+pantalla declaró**. Las funciones están en `lib/sunmi/claseNegociada.js` —un
+`declaraX` por eje, más `tarjetaQueSobrevive`, `paddingQueSobrevive`,
+`componerClaseTexto`, `claseDeFila`, `claseDeTabla`, `baseDeBoton`— y en
+`lib/sunmi/claseAncho.js` para el ancho de los campos.
+
+El botón es el caso a copiar: `sunmi-btn-base` está partida en nueve sub-clases
+—`PARTES_DEL_BOTON`— y cada una cede ante su eje; `sunmi-btn-parte-nucleo` no cede
+nunca. Si un tamaño nuevo entra a `tailwind.config.js`, entra el mismo día a
+`ESCALA` en `claseNegociada.js`, o el kit no lo reconoce como tamaño y la pieza
+vuelve a poner el suyo.
+
+Medido hoy con `git grep` sobre los 56: **33 aceptan `className`. De esos, 14
+negocian y 19 todavía concatenan.** Los que negocian: `SunmiButton`,
+`SunmiBackButton` —por delegar en él—, `SunmiCard`, `SunmiPanel`, `SunmiInput`,
+`SunmiTextarea`, `SunmiSeparator`, `SunmiTable`, `SunmiTableRow`, `SunmiPar`,
+`SunmiSelectAdv`, `SunmiSelectorUnidad`, `SunmiModalLayout` y `SunmiProductoCard`.
+
+### Los tokens, que son lo que se dibuja en Figma
+
+- **Escala de letra propia**, en `tailwind.config.js`: `xs2` 10, `sm2` 11, `sm3`
+  13, `base` 14, `base2` 15, `md2` 16, `lg2` 17, `lg3` 19, `xl2` 22, `xl3` 28 —
+  todos en px. Usados hoy: `text-sm2` 312 veces, `text-sm3` 101, `text-xs2` 46,
+  `text-base2` 13 (contado con `grep -rhoE` sobre `app` y `components`).
+- **Toque**: `min-h-toque` y `min-w-toque` son 44 px, escritos en px a propósito.
+- **Otros del config**: radio `xl2` 14 px, `spacing.4.5` 18 px, `borderWidth.1.5`
+  1,5 px, `width.35p` 35 %, sombras `soft` y `card`.
+- **El botón, en CSS** (`styles/sunmi.css`): alto mínimo 36 px, radio 0.375rem,
+  letra 13 px, peso 500, padding 0.25rem por 1rem, transición 150 ms, `:disabled`
+  opacidad 0,5 y `:active` escala 0,98.
+- **Medidas de la tarjeta de producto y de las solapas**, como variables CSS:
+  hueco de lista 9 px, bloque de valor 202 × 51,5 px con rótulo de 9 px y número
+  de 25 px, miniatura 44 px, acción 44 px; solapas radio 7 px con padding 3 px y
+  solapa 3,5 px; acción ancha 36 px.
+- **Color: nunca fijo.** Sale de las clases `sunmi-*` de `styles/sunmi.css`, que
+  leen variables `--pos-*` y `--app-*`. Los temas son **14**, en
+  `lib/sunmiThemes.js`: `sunmiDark`, `sunmiDarkCompact`, `sunmiLight`,
+  `sunmiGraphite`, `sunmiSand`, `sunmiBlueClassic`, `sunmiFrance`,
+  `sunmiFranceSplit`, `operixBluePro`, `operixNight`, `verdeComercio`,
+  `grafitoEjecutivo`, `ambarCaja`, `violetaSaas`. Una pieza con `text-amber-300`
+  adentro se ve igual en los catorce, que es el defecto que `SunmiButtonIcon`
+  tiene anotado.
+
+### El inventario
+
+Los usos están contados así, y el número no significa nada sin eso: **IMPORTAN**
+es cuántos archivos lo importan por su ruta —`git grep -l` de
+`components/sunmi/<Nombre>"`, excluyendo el archivo mismo—; **USOS** es cuántas
+etiquetas `<Nombre` hay en los `.jsx` del repo FUERA de `components/sunmi/`, con
+`git grep -oE`. Los dos con `--untracked`. Un componente que otra pieza del kit
+usa por dentro tiene USOS bajo y no está muerto.
+
+El detalle prop por prop, largo, está en `docs/03-COMPONENTES-SUNMI.md`. Acá va lo
+que hace falta para elegir una pieza y para dibujarla.
+
+**Estructura y superficie**
+
+- `SunmiCard` — 135 / 275. Props: `children`, `className`, resto reenviado.
+  Tarjeta `rounded-xl`, `shadow-md`, `backdrop-blur-sm`, padding `p-6`. Negocia
+  tarjeta, sombra, difuminado y padding.
+- `SunmiPanel` — 10 / 35. Props: `children`, `className`, `noPadding`, `elevado`.
+  `rounded-2xl`, padding `px-4 py-4`. `elevado` agrega `sunmi-elevado` y cede ante
+  un `outline` de la pantalla. Marca `data-sunmi-panel` para el arnés.
+- `SunmiCardHeader` — 11 / 9. Props: `title`, `subtitle`, `children`. Título 15 px
+  semibold; subtítulo 11 px. `mb-3 px-1`.
+- `SunmiHeader` — 34 / 34. Props: `title`, `color` (`amber` | `cyan`), `subtitle`,
+  `children`. Cinta en degradado, `rounded-xl`, `px-4 py-2`, 13 px, bold,
+  MAYÚSCULAS. El subtítulo va debajo de la cinta, 11 px.
+- `SunmiSection` — 0 / 0. Props: `title`, `description`, `children`, `footer`,
+  `noSeparator`, `className`. Título 13 px, descripción 11 px. **Sin consumidores.**
+- `SunmiSeparator` — 40 / 89. Props: `label`, `className`. 12 px, `my-2`
+  negociado, línea de 1 px del borde del tema.
+- `SunmiRow` — 1 / 1. Props: `left`, `right`, `center`, `align`
+  (`start` | `center` | `end`), `className`. `gap-3 py-1`.
+- `SunmiGrid` — 0 / 0. Props: `children`, `className`, `minWidth` (260),
+  `gap` (16). Grilla `auto-fill minmax`, en estilo inline. **Sin consumidores.**
+- `SunmiPar` — 1 / 2. Props: `arriba`, `abajo`, `className`, `classNameAbajo`,
+  `title`, `titleAbajo`, resto. La línea de abajo es `text-xs2` +
+  `sunmi-text-muted`, negociada.
+
+**Acción**
+
+- `SunmiButton` — 188 / 606. Props: `color`, `children`, `className`, resto.
+  **Colores válidos, enumerados en el archivo: `cyan`, `amber`, `red`, `slate`,
+  `primary`, `secondary`, `warning`, `ghost`.** Un color desconocido cae en
+  `slate`, que es visible: antes se quedaba sin fondo y parecía texto suelto.
+  `amber` y `primary` pintan el mismo token, así que pedir `amber` para
+  distinguirse de `primary` no distingue nada; `ghost` es la ausencia de relleno.
+- `SunmiButtonIcon` — 7 / 16. Props: `icon`, `color` (`amber` | `red` | `slate`),
+  `size` (16), `onClick`, `className`, resto. `p-1 rounded`. **Los tres colores son
+  fijos de Tailwind, no tokens**: se ven igual en los catorce temas. Anotado en el
+  roadmap, fase 3.
+- `SunmiBackButton` — 40 / 48. Props: `href`, `onVolver`, `texto` ("Volver"),
+  `className`. Delega en `SunmiButton` color `slate` con flecha de 15 px. **Va en
+  el slot del shell con `useAccionDePagina`** —`lib/layout/accionDePagina.js`, 21
+  pantallas—, que vive afuera del `<main>` que scrollea; dibujado adentro del
+  contenido se va de pantalla al bajar.
+- `SunmiLinkButton` — 4 / 4. Props: `children`, `className`, `type`, resto.
+  `text-xs`, `sunmi-text-accent`, subrayado. Sin fondo, borde, radio ni padding: el
+  margen exterior es del consumidor. Foco nativo a propósito.
+- `SunmiActionCard` — 3 / 3. Props: `children`, `className`, `type`, resto.
+  `<button>` de ancho completo, `sunmi-card-surface`, `rounded-lg p-3`.
+- `SunmiNavCard` — 4 / 3. Props: `icon`, `insignia`, `label`, `descripcion`,
+  `estado`, `href`, `atenuado`, `className`. Redondel `size-12 rounded-xl`, título
+  18 px, descripción 14 px. Sin `href` no dibuja la flecha.
+- `SunmiEntityCard` — 0 / 0. Props: `title`, `subtitle`, `color`, `icon`,
+  `actions`, `children`, `className`. **Sin consumidores.**
+
+**Campos**
+
+- `SunmiInput` — 105 / 247. Props: `className` y todo lo del `<input>`, con `ref`.
+  Clase `sunmi-input`; `w-full` solo si la pantalla no declaró ancho. **Es el que
+  inauguró la negociación.**
+- `SunmiTextarea` — 1 / 1. Igual que el anterior, sobre `<textarea>`.
+- `SunmiSelect` — 1 / 3. Props: `className`, `children`, resto. `<select>` nativo
+  con flecha. **No se usa en pantallas nuevas: va `SunmiSelectAdv`.**
+- `SunmiSelectAdv` — 53 / 98. Props: `value`, `onChange`, `children`,
+  `placeholder` ("Seleccionar..."), `className`, `multiple`, `searchable`,
+  `onClose`, resto. Las opciones son `SunmiSelectOption` —`value`, `children`,
+  `encabezado`—; al buscar, los encabezados se sacan.
+- `SunmiSelectConCrearRapido` — 1 / 5. Props: `label`, `value`, `onChange`,
+  `items`, `placeholder`, `getOptionLabel`, `getOptionValue`, `crearLabel`
+  ("+ Nuevo"), `tituloModal`, `campos`, `onCrear`, `disabled`, `searchable`,
+  `puedeCrear`. Con `puedeCrear` en false se oculta el "+ Nuevo"; el backend igual
+  exige admin.
+- `SunmiCampoCantidad` — 2 / 3. Props: `valor`, `onCambiar`, `etiqueta`, `minimo`
+  (0), `maximo`, `paso` (1), `decimales` (0), `normalizaAlSalir`, `difiere`,
+  `tipo`, `conMarco`, `claseMarco`, `claseInput`, `tamano`
+  (`normal` = 9×9 / `compacto` = 7×7). Con decimales o paso fraccionario acepta
+  coma y usa `parseFloat`; sin ellos `parseInt`.
+- `SunmiSelectorUnidad` — 2 / 2. Props: `valor`, `onCambiar`, `rotulo`
+  ("Ver precios por"), `nota`, `opciones`, `className`. Exporta `UNIDAD`
+  (`pack` | `un`) y `OPCIONES_PRECIO`. El radio lo pone el envoltorio, no los
+  botones: `SunmiButton` cede las ocho esquinas y un token de un lado repone
+  cuatro.
+- `SunmiCampoBusquedaVoz` — 5 / 5. Props: `value`, `onChange`, `onVoz`,
+  `inputRef`, `placeholder`, `id`, `ariaLabel`, `onKeyDown`, `autoFocus`,
+  `className`, `onEscuchandoChange`, `avisoDeEstado`. Exporta `soportaVoz()`,
+  `IDIOMA_VOZ` (`es-AR`) y `TEXTO_ESCUCHANDO`.
+- `SunmiToggle` — 12 / 14. Props: `value`, `onChange`, `label`, `disabled`. Track
+  8×4, thumb 4×4, texto 12 px. **Guarda estado propio con `useState`**, así que un
+  `value` que cambie de afuera no lo mueve.
+- `SunmiToggleEstado` — 7 / 10. Props: `value`, `onChange`. Track 10×5, thumb 5×5.
+  Dice "Habilitado" / "Inactivo".
+- `SunmiDateRangePicker` — 1 / 1. Props: `valueDesde`, `valueHasta`,
+  `onChangeDesde`, `onChangeHasta`, `onApply`, `placeholder`, `maxDate`,
+  `className`. Calendario propio, semana de lunes a domingo.
+- `SunmiEscanerCodigoBarra` — 2 / 1. Props: `abierto`, `onCerrar`, `onCodigo`,
+  `onSinCamara`, `titulo`, `ayuda`. Exporta `hayEscanerDisponible()`,
+  `FORMATOS_CODIGO`, `MOTIVO_SIN_CAMARA` y `MENSAJES_SIN_CAMARA`. El texto de ayuda
+  es neutral a propósito: la pieza no sabe qué se escanea.
+
+**Tabla**
+
+- `SunmiTable` — 37 / 53. Dos modos. Crudo: `headers`, `children`. **Por columnas:
+  `columnas` —`clave`, `titulo`, `align` (`izq` | `der` | `centro`), `ordenable`,
+  `render`, `thClassName`, `tdClassName`, `title`— más `filas`, `claveFila`.** Y
+  `densidad` (`compacta` `px-2 py-1` | `normal` `px-2 py-1.5` | `comoda`
+  `px-3 py-2.5`), `cargando`, `vacio`, `onSort`, `ordenClave`, `ordenDir`,
+  `tonoFila`, `filaExpandible`, `onClickFila`, `filaSeleccionada`, `pie`,
+  `stickyHeader`, `maxHeightClass` (`max-h-[70dvh]`), `scrollId`, `altoLibre`,
+  `className`.
+- `SunmiTableRow` — 26 / 36. Props: `children`, `selected`, `onClick`,
+  `className`, `tono`, `intensidad` (`ambiente`). Los tonos son las clases
+  `sunmi-fila-*`: `ok`, `atencion`, `alerta`, `apagado`, `fuerte`, `ambiente`,
+  `seleccionada`. Tamaño de fila 12 px, en `TAMANO_DE_FILA`.
+- `SunmiTableEmpty` — 21 / 24. Props: `message` ("Sin datos disponibles"),
+  `colSpan` (50). 12 px, itálica, `py-3`.
+- `SunmiTableMaster` — 0 / 0. Props: `columns`, `rows`, `actions`, `page`,
+  `totalPages`, `onPrev`, `onNext`, `pageSize`, `pageSizeOptions`,
+  `onChangePageSize`, `loading`, `emptyMessage`. **Sin consumidores.**
+- `SunmiPaginador` — 3 / 3. Props: `page`, `pageSize`, `totalPages`, `totalItems`,
+  `onNext`, `onPrev`, `onGoToPage`, `onPageSizeChange`. Dos diseños, celular y
+  escritorio, con `data-paginador` como asidero de captura. Los botones del celular
+  son 44×44 escritos en px.
+- `SunmiPageSizer` — 4 / 4. Props: `value` (25), `onChange`, `options`
+  (25/50/100), `label` ("Mostrar"), `className`.
+
+**Estado y aviso**
+
+- `SunmiAviso` — 13 / 11. Props: `icon`, `titulo`, `children`, `tono`
+  (`neutral` | `success` | `danger` | `warning`), `className`. `rounded-2xl p-4`,
+  redondel `size-10`, texto 14 px.
+- `SunmiPill` — 17 / 45. Props: `children`, `color`
+  (`amber` | `cyan` | `green` | `slate`). `px-1.5 py-[1px] rounded-md`, 10,5 px.
+- `SunmiBadgeEstado` — 10 / 10. Prop: `value`. Dice "Activo" / "Inactivo".
+  `rounded-md`, 10,5 px.
+- `SunmiBadge` — 0 / 0. **Es un duplicado de `SunmiBadgeEstado` con otras medidas
+  —`rounded-full`, 11 px, `px-2 py-0.5`— y con la función exportada llamada
+  `SunmiBadgeEstado` adentro. Prop `estado` en vez de `value`. Sin consumidores:
+  candidato a borrar, no a usar.**
+- `SunmiEstadoCell` — 0 / 0. Prop: `value`. Centra un `SunmiBadgeEstado`.
+  **Sin consumidores.**
+- `SunmiLoader` — 66 / 72. Prop: `size` (20). Anillo que gira, `border-2`, en un
+  `flex justify-center py-2`.
+- `SunmiToast` — 4 / 0. No es un componente con props: exporta `showSuccess`,
+  `showError`, `showWarning`, `showInfo` y el `SunmiToaster` que va en el shell.
+  **El `SunmiToaster` tiene los colores y el radio escritos fijos, no en tokens.**
+- `SunmiSolapas` — 1 / 1. Props: `opciones` (`valor`, `texto`), `valor`,
+  `onCambiar`, `etiqueta`. `role="tablist"`, solapa `py-1.5`, `text-sm3`.
+- `SunmiChipsFiltro` — 3 / 3. Props: `opciones` (`clave`, `texto`, `cantidad`),
+  `valor`, `onCambiar`, `rotulo`, `textoTodas` ("Todas"), `className`. Exporta
+  `CLAVE_TODAS`. Scrollea en horizontal y los chips no se encogen.
+- `SunmiFiltroEstado` — 1 / 1. Props: `opciones`, `valor`, `onCambiar`, `rotulo`,
+  `ariaLabel`, `className`. Grilla de 3, 4 o 5 columnas según cuántas opciones.
+
+**Listas**
+
+- `SunmiProductoCard` — 4 / 4. Props: `nombre`, `empresa`, `codigoBarra`,
+  `codigoInterno`, `valor`, `marca`, `aviso`, `acciones`, `ancla`, `destacado`,
+  `className`. Exporta además `BloqueValorTarjeta`, `RotuloBloqueValor`,
+  `NumeroBloqueValor`, `MiniaturaProductoTarjeta`, `AccionTarjeta` y
+  `PieDeCodigosTarjeta`. `aviso` y `marca` son RANURAS: la pieza sabe dibujarlas,
+  no sabe cuándo corresponden.
+- `SunmiListaProductoCards` — 3 / 3. Solo `children`. Grilla de una columna con
+  `auto-rows-fr`.
+- `SunmiListItem` — 4 / 19. Props: `label`, `description`, `left`, `right`,
+  `onClick`, `clickable`, `className`. Label 13 px, descripción 11 px.
+- `SunmiList` — 0 / 0. Props: `children`, `className`. **Sin consumidores.**
+- `SunmiListCard` — 1 / 2, `SunmiListCardItem` — 1 / 2, `SunmiListCardRemove` —
+  1 / 2. Trío de una sola pantalla. **`SunmiListCardItem` dibuja su separador con
+  una clase ARMADA POR CONCATENACIÓN** a partir del borde del tema, así que el
+  nombre final nunca aparece literal en ningún archivo y Tailwind no lo genera:
+  comprobado, no hay una sola aparición literal de `bg-slate-<n>/20` en `app`,
+  `components` ni `lib`, y en once de los catorce temas el borde es un hex
+  arbitrario, con lo que la clase pedida sería `bg-[#243244]/20` y tampoco existe.
+  **Ese separador no se pinta en ningún tema.**
+- `SunmiUserCell` — 1 / 1. Props: `nombre`, `email`. Avatar `w-8 h-8` con
+  `bg-amber-400` o `bg-cyan-400` fijos.
+
+**Modal**
+
+- `SunmiModalLayout` — 39 / 43. Props: `open`, `title`, `subtitle`, `color`,
+  `onClose`, `children`, `footer`, `maxWidth` (`max-w-xl`), `showCloseButton`,
+  `destructivo`, `forma`, `z`, `espacioCuerpo`, `espacioPie` (`mt-3`), `alto`
+  (`max-h-[90vh]`). **Formas: `centrado`, `hoja`, `cajon`, `hoja-o-centrado`.**
+  Exporta `COLOR_VELO`, `OPACIDAD_VELO` y `NIVEL_MODAL_GLOBAL` (9999); marca la
+  tarjeta con `data-sunmi-modal`. `destructivo` significa que tocar el velo no
+  cierra, y el criterio es **qué se pierde al cerrar sin querer, no qué tan
+  peligrosa es la acción**: lo declaran los de carga y edición, no los de
+  confirmación. El nombre arrastra esa confusión y es candidato a renombrarse al
+  cerrar la fase 2.
+
+**Infraestructura, no dibujan nada**
+
+- `SunmiThemeProvider` — 13 importadores. Exporta `useSunmiTheme()`; props
+  `children`, `institucionalInicial`. Guarda en `localStorage` bajo
+  `erp-sunmi-theme`.
+- `ThemeClientWrapper` — 1. Envuelve al provider y monta el `SunmiToaster`.
+- `AparienciaInstitucionalSync` — 1. Lee `/api/config/apariencia-local` y aplica el
+  tema del local. Devuelve `null`.
+
+### Lo que NO es del kit y conviene no confundir
+
+Con nombre Sunmi pero fuera de `components/sunmi/`, y son tablas de una pantalla:
+`components/locales/SunmiTableLocales.jsx`,
+`components/productos/SunmiTablaProductos.jsx` y
+`components/usuarios/SunmiTableUsuarios.jsx`.
+
+Compartido de verdad y fuera del kit hay uno solo: `components/auth/SinPermisos.jsx`,
+con 74 importadores —contados con `git grep -l` de su ruta—. El shell vive en
+`components/layout/` y su slot de acción en `lib/layout/accionDePagina.js`.
+
+**Y HAY UN `Aviso` PARALELO, DEFINIDO TRES VECES.** `SunmiAviso` existe en el kit
+con 13 importadores, y además hay tres componentes llamados `Aviso` afuera, usados
+por 13 archivos —enumerado con `git grep -ln 'function Aviso('` y
+`git grep -l '<Aviso[ >]'`—: uno en `components/caja/PanelesRetiro.jsx` con tonos
+`warning` / `danger` / `info` y `rounded-lg p-2 text-[11px]`; uno en
+`components/proveedores/listas/PiezasPantallas.jsx` con `warning` / `danger` /
+`success` y `rounded-lg p-3 text-sm2`; y uno privado en
+`components/comprobantes/PanelComprobantes.jsx` que dibuja una barra de color con
+`bg-current`. Los tres tienen tablas de tonos DISTINTAS entre sí y distintas de la
+del kit —`SunmiAviso` usa `neutral` / `success` / `danger` / `warning`, así que un
+`tono="info"` cae en neutral sin avisar—.
+
+Es el caso de la regla 1 con nombre y apellido: **la misma cosa visual escrita
+cuatro veces.** Para la biblioteca de Figma va UNO, el del kit, y los otros tres
+se migran; dibujar los cuatro sería copiar la duplicación al diseño.
+
+**Siete piezas no tienen NINGÚN importador hoy**: `SunmiBadge`, `SunmiEntityCard`,
+`SunmiEstadoCell`, `SunmiGrid`, `SunmiList`, `SunmiSection` y `SunmiTableMaster`.
+Antes de llevarlas a Figma hay que decidir si existen o se borran: dibujar en la
+biblioteca una pieza que el repo no usa es prometer un componente que nadie
+mantiene. `SunmiRow` NO está en esa lista: tiene un importador,
+`components/productos/actualizacion-precios/ActualizacionPreciosPage.jsx`.
