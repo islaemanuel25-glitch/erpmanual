@@ -121,3 +121,35 @@ anotadas.
 **`resolveGrupo` sigue pudiendo devolver `localId` indefinido**
 (`lib/grupos.js:161-163`). Es el resolutor del INC-0006 y sigue disponible para
 que una ruta nueva lo elija por el nombre.
+
+---
+
+## SEGUIMIENTO — 2026-09-19: el local ya lo puede comprar
+
+Lo que quedaba anotado arriba —"el local sigue sin poder comprar su producto"—
+se resolvió en la tanda siguiente, con la decisión de negocio ya tomada: **el
+catálogo del pedido a proveedor se evalúa con la ubicación que opera**, no con el
+depósito.
+
+**La regla asimétrica no cambió**, y es `productoVisibleWhere` quien la sostiene:
+el local ve lo suyo MÁS lo del depósito, y el depósito sigue sin ver nada creado
+por un local. Medido con curl y cookie real, admin y no admin: desde el Local 1,
+946 productos con 2 propios y 2 del depósito; desde el depósito, 944 con **0**
+del local — el mismo 0 de antes, que es el resultado correcto.
+
+Hubo que tocar algo más que el catálogo, y no por ensanchar el alcance sino
+porque sin eso la pantalla mentía: **las tres puertas por las que entra una línea
+a un pedido** —crear, agregar ítem, aplicar importación— exigían que la fila de
+ProductoLocal fuera del DEPÓSITO. Medido antes de tocarlas: HTTP 400 "no
+pertenece al depósito" sobre el mismo producto que el catálogo acababa de
+ofrecer. Las tres le preguntan ahora a `ownerLocalIdDePedido`, que ya existía y
+es la misma que usa `recibir` para decidir a qué ubicación entra el stock.
+
+**La parte que no se podía llegar a ejercer hasta ahora, ejercida**: recepción
+completa desde el Local 1 —crear, confirmar, enviar, recibir—. El stock entró en
+el Local 1 y el costo maestro se escribió, $100 a $180 y a $90, porque el local
+ES el dueño del producto. Esa rama de `puedeEditarCosto` nunca había corrido en
+este flujo.
+
+Lo demás que apareció mirando el flujo quedó anotado, sin tocar, en
+[el roadmap](../roadmap/lo-que-quedo-del-producto-del-local.md).
