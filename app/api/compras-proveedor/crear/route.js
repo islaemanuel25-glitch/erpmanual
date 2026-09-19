@@ -22,6 +22,10 @@ export async function POST(req) {
     }
 
     const { grupoId, localId, session } = ctx;
+    // La ubicación que compra, con el mismo nombre que en el catálogo: las dos
+    // rutas tienen que mirar la misma o la pantalla ofrece lo que el guardado
+    // rechaza.
+    const ubicacionDelPedido = Number(localId);
 
     const perm = checkPerm(session, "compras.crear");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
@@ -113,15 +117,33 @@ export async function POST(req) {
     }
 
     // Los combos no se compran a proveedor: se compran sus componentes. Los
-    // productos salen del depósito autorizado; un id de otro local en el cuerpo
-    // no puede crear una línea ni una memoria de proveedor fuera de alcance.
+    // productos salen de LA UBICACIÓN QUE COMPRA, que es la del contexto
+    // autorizado; un id de otra ubicación en el cuerpo no puede crear una línea
+    // ni una memoria de proveedor fuera de alcance.
+    //
+    // ── POR QUÉ NO ES EL DEPÓSITO ─────────────────────────────────────────
+    //
+    // Acá decía `localId: depId`, o sea que se exigía que la fila de
+    // ProductoLocal fuera del DEPÓSITO. Con el catálogo sirviendo ahora las
+    // filas de la ubicación que opera, un local veía su producto propio en la
+    // pantalla y al guardar recibía "Uno de los productos no pertenece al
+    // depósito o no se puede comprar". Medido con curl antes de tocar esto:
+    // HTTP 400 sobre el mismo producto que el catálogo acababa de ofrecer.
+    //
+    // Una pantalla que ofrece lo que el servidor después rechaza es el guardado
+    // engañoso que este repo tiene prohibido, así que la validación mira la
+    // MISMA ubicación que el catálogo. Sigue siendo del servidor y no del
+    // cuerpo, que es lo que esta guarda defiende.
+    //
+    // `depositoId` NO cambia: es la referencia del grupo, y el destino del stock
+    // lo fija `creadoEnLocalId`, como dice el comentario de arriba.
     const productosLocales = await prisma.productoLocal.findMany({
-      where: { id: { in: ids }, localId: depId, activo: true },
+      where: { id: { in: ids }, localId: ubicacionDelPedido, activo: true },
       select: { id: true, baseId: true, base: { select: { id: true, es_combo: true } } },
     });
     if (productosLocales.length !== ids.length || productosLocales.some((pl) => esComboBase(pl.base))) {
       return NextResponse.json(
-        { ok: false, error: "Uno de los productos no pertenece al depósito o no se puede comprar." },
+        { ok: false, error: "Uno de los productos no pertenece a esta ubicación o no se puede comprar." },
         { status: 400 }
       );
     }

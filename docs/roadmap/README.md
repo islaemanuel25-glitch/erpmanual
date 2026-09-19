@@ -47,6 +47,12 @@ Relevado sobre `d20afa98e9edece663fb3dda694d3c99783ab788` — 2026-08-10.
 Ordenada por lo que puede doler. La evidencia completa está en
 [../CURRENT_STATE.md](../CURRENT_STATE.md).
 
+**Siete cosas que quedaron anotadas el 2026-09-19** al hacer que un local mande
+en su propio producto y pueda comprarlo, con su medición y su motivo, en
+[lo-que-quedo-del-producto-del-local.md](lo-que-quedo-del-producto-del-local.md).
+La primera es la que más va a doler: **el alta de un producto no se audita**, y
+por eso no se pudo reatribuir nada cuando hizo falta.
+
 1. ~~**`/api/me` es fail-open.**~~ **RESUELTO 2026-08-10** — commit `32e0d51`.
 2. **`lib/compras-proveedor/` escribe costos en producción sin un solo candado
    propio.** Tres rutas dependen de él.
