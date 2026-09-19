@@ -351,6 +351,10 @@ export async function GET(req, context) {
           costoGuardado: o.costoGuardado,
           costoRecalculado: o.costoRecalculado,
           costoActual: o.costoActual,
+          // EN CUÁNTO DIFIEREN. Lo calcula la misma función que decidió frenar,
+          // así que el cartel no puede decir un número distinto del que tomó la
+          // decisión. Restarlo en la pantalla sería la segunda cuenta.
+          diferencia: o.diferencia ?? null,
         })),
       },
       variacion: conteo.rangoDeLosListos,

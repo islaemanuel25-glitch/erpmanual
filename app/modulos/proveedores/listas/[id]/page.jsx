@@ -828,15 +828,22 @@ export default function ResultadoDeListaPage() {
           vez. */}
       {!controlando && (conteo.omitidasAlAplicar ?? 0) > 0 && (
         <SunmiCard className="p-3">
+          {/* ── EL CARTEL NO AFIRMA QUE EL PRECIO CAMBIÓ ──────────────────
+              Acá decía "sus precios cambiaron desde que se leyó la lista", y en
+              la #12 eso era FALSO en las siete filas que nombraba: lo que
+              difería eran siete centavos sobre $31.428 por dónde caía un
+              redondeo. El precio no se había movido.
+
+              El sistema no sabe por qué difieren los dos números —puede ser un
+              precio nuevo, o el armado del producto, o la cuenta—. Lo que SÍ
+              sabe es cuánto difieren, así que eso es lo que dice. La causa la
+              ve la persona mirando los dos importes. */}
           <p className="text-sm2 sunmi-text-warning leading-snug">
             <span className="font-bold sunmi-text-strong">{conteo.omitidasAlAplicar}</span>{" "}
-            {conteo.omitidasAlAplicar === 1
-              ? "no se va a actualizar: su precio cambió"
-              : "no se van a actualizar: sus precios cambiaron"}{" "}
-            desde que se leyó la lista, así que {conteo.omitidasAlAplicar === 1 ? "el costo" : "los costos"}{" "}
-            que {conteo.omitidasAlAplicar === 1 ? "se calculó" : "se calcularon"} entonces ya no{" "}
-            {conteo.omitidasAlAplicar === 1 ? "es el que sale" : "son los que salen"} hoy. Aplicar no
-            escribe un número que nadie miró.
+            {conteo.omitidasAlAplicar === 1 ? "no se va a actualizar" : "no se van a actualizar"}:
+            con los datos de hoy {conteo.omitidasAlAplicar === 1 ? "el costo da" : "los costos dan"}{" "}
+            distinto del que se había propuesto, y la diferencia es grande como para
+            escribirla sin que la mires.
           </p>
 
           {/* Los dos valores, fila por fila: el que se había propuesto y el de
@@ -853,6 +860,21 @@ export default function ResultadoDeListaPage() {
                     Antes se iba a poner {money(o.costoGuardado)} y ahora daría{" "}
                     <span className="sunmi-text-strong">{money(o.costoRecalculado)}</span>
                   </div>
+                  {/* EN CUÁNTO DIFIERE, que es el dato que decide. Los dos
+                      importes solos obligan a restarlos de cabeza, y con
+                      números de cinco cifras eso no se hace en un teléfono.
+                      Sale del servidor, calculado por la misma función que
+                      decidió frenar: si se restara acá podrían decir cosas
+                      distintas. */}
+                  {o.diferencia?.pesos !== null && o.diferencia?.pesos !== undefined && (
+                    <div className="text-xs2 sunmi-text-warning tabular-nums">
+                      Son {money(Math.abs(o.diferencia.pesos))} de diferencia
+                      {o.diferencia?.pct === null || o.diferencia?.pct === undefined
+                        ? ""
+                        : ` (${pct(o.diferencia.pct)})`}
+                      .
+                    </div>
+                  )}
                 </div>
               ))}
               {(omitidas.propuestaDiferente ?? []).length > 5 && (
