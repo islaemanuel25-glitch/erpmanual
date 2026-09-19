@@ -197,3 +197,43 @@ se elige en la tarjeta "Lista predeterminada del depósito", que escribe
 `GrupoDeposito.listaPrecioDefaultId`.
 
 Reconectarlo toca la resolución de precio y sigue siendo una tanda propia.
+
+---
+
+## RN-21 — El costo que propone una lista sale de `precio → recargo → impuesto`, y lo arma UNA función · **[CÓDIGO]**
+
+`lib/proveedores/listas/configuracionProveedor.js` (`precioBaseDelCosto`). El
+orden no es libre: el **recargo comercial** construye el costo del proveedor y el
+**impuesto adicional** es lo que ese proveedor agrega por fuera de los de su
+lista, así que va sobre el costo ya armado. El multiplicador de la presentación
+va después de los dos y conmuta, que es por qué no se pregunta "por unidad o por
+pack".
+
+La consultan los tres que deciden un costo: `hipotesisDeCosto`, el
+`lecturasPosibles` del lector genérico y el atajo de fila confirmada de
+`revalidarFila`.
+
+**Los tres, desde el 2026-09-19.** Antes la composición estaba escrita dos veces
+y **faltaba en la tercera** —la que escribe—, así que toda fila confirmada a mano
+de un proveedor con impuesto distinto de cero se omitía al aplicar con
+PROPUESTA_DIFERENTE. Es el [INC-0010](../incidents/INC-0010-la-propuesta-confirmada-a-mano-no-se-podia-aplicar.md).
+
+**La columna `precioConRecargo` de la fila es otra cosa y sigue siéndolo**: guarda
+**solo el recargo comercial**, fiel a su nombre. El costo se reconstruye desde la
+fila como precio con recargo, por el impuesto, por el multiplicador.
+
+---
+
+## RN-22 — Lo que la pantalla del resultado cuenta es lo que aplicar va a escribir, revalidado contra el producto de hoy · **[CÓDIGO]**
+
+`lib/proveedores/listas/aplicacion.js` (`revisarAntesDeAplicar` → `revalidarFila`).
+El resultado y el previo de aplicar preguntan a la **misma** función, con el
+**mismo** `where` —`seleccionada: true, aplicada: false`— y el **mismo** `select`
+de producto (`CAMPOS_PRODUCTO_PARA_REVALIDAR`).
+
+Hasta el 2026-09-19 el contador decidía solo con lo que dice la fila, y su propio
+comentario afirmaba que el resto "no se puede saber sin leer los productos". Se
+puede: aplicar los lee. La importación #12 contaba 11 y aplicar escribió 3.
+
+Las que el recálculo va a omitir salen de `listos`, tienen su propio contador
+—`omitidasAlAplicar`— y se muestran con el valor de antes y el de ahora.
