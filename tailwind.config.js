@@ -125,6 +125,24 @@ module.exports = {
       minHeight: {
         toque: "44px",
       },
+
+      // ── EL ALTO DE UNA FILA DE LISTA ──────────────────────────────────
+      //
+      // 60 px, pedido por el diseño de "Elegir proveedor". Va acá por el mismo
+      // motivo que `toque` y no como `h-[60px]` en la pantalla, que es lo que
+      // el trinquete cuenta como medida mágica.
+      //
+      // Y no se puede escribir con la escala: este proyecto corre con
+      // `1rem = 14px`, así que los pasos son múltiplos de 3,5 —`h-16` da 56 y
+      // `h-17` no existe—. 60 no cae en la grilla, y aproximarlo a 56 sería
+      // justamente lo que el diseño pidió no hacer.
+      //
+      // Nombre semántico y no la medida, al revés que `4.5`, porque `h-60` ya
+      // existe en Tailwind —15rem— y redefinirlo le cambiaría el alto a todo el
+      // repo: es el mismo error que este archivo ya documenta para `border-2`.
+      height: {
+        fila: "60px",
+      },
       minWidth: {
         toque: "44px",
       },
