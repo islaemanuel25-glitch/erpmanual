@@ -252,10 +252,15 @@ lector genérico era el único lugar que no lo seguía: conciliar guardaba
 
 **La comparación**: al aplicar, el costo recalculado se compara con el guardado
 usando `difierenSoloEnElRedondeo` (`calculoCosto.js`), no al centavo. El margen es
-el mayor entre `TOLERANCIA_REDONDEO_PCT` (0,1 %) y `TOLERANCIA_REDONDEO_PESOS`
-($1) — dos umbrales porque el porcentaje no cubre los costos chicos y el piso no
-cubre los grandes. Por debajo se escribe el **recalculado**, que es el que sale de
-los datos de hoy.
+`TOLERANCIA_REDONDEO_PESOS` — **un peso fijo**, el mismo para un costo de $40 que
+para uno de $65.000. Por debajo se escribe el **recalculado**, que es el que sale
+de los datos de hoy.
+
+Empezó siendo el mayor entre un 0,1 % y ese peso, y el porcentaje se apagó el
+2026-09-19: sobre costos grandes admitía decenas de pesos —$65 sobre $65.000—
+cuando lo que hay que tolerar son centavos. `TOLERANCIA_REDONDEO_PCT` sigue
+existiendo, vale 0, y hay un candado que afirma que el corte no depende del
+tamaño del costo.
 
 Es el [INC-0011](../incidents/INC-0011-siete-centavos-frenaban-la-aplicacion.md):
 siete centavos sobre $31.428 —el 0,0002 %— frenaban la escritura, y el cartel

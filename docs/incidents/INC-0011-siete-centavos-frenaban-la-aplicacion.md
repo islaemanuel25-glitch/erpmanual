@@ -58,10 +58,10 @@ seguía.
    aplicar dan ahora el **mismo número**, comprobado sobre cinco precios cuyo
    unitario no cae justo en un centavo.
 2. **La red**: la comparación deja de ser al centavo. Si la diferencia es menor
-   que el mayor entre el **0,1 %** y **un peso**, se aplica el **recalculado**
-   —el que sale de los datos de hoy— sin avisar. Son dos umbrales porque uno solo
-   no alcanza: el 0,1 % de $40 son cuatro centavos, y un peso sobre $65.000 es más
-   ajustado que lo que puede arrastrar un bulto de 24.
+   que **un peso**, se aplica el **recalculado** —el que sale de los datos de
+   hoy— sin avisar. El umbral es el mismo para un costo de $40 y para uno de
+   $65.000: lo que hay que tolerar son centavos, así que el corte no depende del
+   tamaño del número.
 3. **El cartel** deja de afirmar que el precio cambió —no lo sabe— y dice **en
    cuánto difiere**, en pesos y en porcentaje, y que por eso no se escribe.
 
@@ -82,11 +82,25 @@ casos de la #12 y contraprueba sobre las tres cosas que defienden.
 
 ## Lo que queda anotado
 
-**El umbral del 0,1 % es generoso sobre costos grandes**: sobre $65.000 admite
-$65 de diferencia sin avisar. Las diferencias medidas son de centavos —tres
-órdenes de magnitud menos— así que el margen sobra por mucho; si se quiere más
-ajustado, el lugar es `TOLERANCIA_REDONDEO_PCT` y hay un candado que fija dónde
-cae el corte.
+**El umbral empezó siendo el mayor entre el 0,1 % y un peso, y el porcentaje se
+apagó el mismo día.** Sobre costos grandes admitía demasiado: el 0,1 % de $65.000
+son $65, y las diferencias medidas son de 6 a 8 centavos —tres órdenes de
+magnitud menos—. Un margen que deja pasar $65 sin avisar no es una red contra el
+redondeo, es una puerta para un cambio de precio real. Quedó en un peso fijo;
+`TOLERANCIA_REDONDEO_PCT` sigue existiendo, vale 0, y hay un candado que afirma
+que el corte no depende del tamaño del costo.
+
+Un peso cubre el caso normal: el redondeo que puede arrastrar un bulto es, como
+mucho, medio centavo por el factor — doce centavos sobre un bulto de 24, bien
+adentro del peso.
+
+**Dónde no alcanza, y está medido**: con un factor de 200 o más el arrastre pasa
+el peso. Contado sobre `erpazul_al` con un `count` por `factor_pack`: de **951**
+productos que son bulto, **16** tienen factor de 200 o más y el mayor es **576**,
+que da hasta **$2,88**. Esas filas, si quedaron conciliadas con el número viejo,
+van a frenar y aparecer informadas — con el importe de la diferencia y el botón
+para volver a leerlas, que es el comportamiento correcto. Afecta solo a lo ya
+conciliado: las listas nuevas dan el mismo número de los dos lados.
 
 **Las filas ya conciliadas mantienen el número viejo.** No hay migración: se
 aplican por la tolerancia, escribiendo el valor recalculado. Las importaciones
