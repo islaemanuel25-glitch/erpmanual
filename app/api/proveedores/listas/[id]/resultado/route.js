@@ -45,11 +45,21 @@ import {
   fueUnCeroACeroConvertido,
   modoDeImportacion,
   quedoAtrapadaEnElCeroACero,
+  MODO_LISTA,
 } from "@/lib/proveedores/listas/modoDeLaLista";
 import { ESTADO_LINEA } from "@/lib/proveedores/listas/estados";
+// LA MISMA REVALIDACIÓN QUE HACE APLICAR. Ver `loQueElRecalculoVaAOmitir`.
+import {
+  revisarAntesDeAplicar,
+  omitidasPorMotivo,
+  CAMPOS_PRODUCTO_PARA_REVALIDAR,
+  MOTIVO_OMISION,
+  textoOmision,
+} from "@/lib/proveedores/listas/aplicacion";
+import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { analizarFila } from "@/lib/proveedores/listas/confirmarPresentacion";
 import { baseParaHelpers } from "@/lib/proveedores/listas/conciliarLista";
-import { resolverParserDeProveedor } from "@/lib/proveedores/listas/registro";
+import { resolverParserDeProveedor, resolverParserPorId } from "@/lib/proveedores/listas/registro";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { productoActivoWhere } from "@/lib/proveedores/listas/productoDeBaja";
 import { filtroDeLaCola } from "@/lib/proveedores/listas/panelDecision";
@@ -124,7 +134,10 @@ export async function GET(req, context) {
         { status: scope.status }
       );
     }
-    const { grupoId } = scope;
+    // `localId` entra porque la revalidación decide la PROPIEDAD DEL COSTO con la
+    // ubicación desde la que se está operando, igual que aplicar. Sin él, el
+    // resultado contaría como omitidas filas que desde acá sí se pueden escribir.
+    const { grupoId, localId } = scope;
 
     const params = await context.params;
     const id = Number(params?.id);
@@ -149,6 +162,11 @@ export async function GET(req, context) {
         columnaPrecioElegida: true,
         descuentoAplicado: true,
         decisionDeLectura: true,
+        // CON QUÉ LECTOR SE LEYÓ ESTA LISTA. Lo necesita la revalidación, que
+        // tiene que preguntarle a la MISMA configuración que va a usar aplicar:
+        // con la de otro proveedor, todas las filas saldrían omitidas —es lo que
+        // pasó de verdad cuando acá había `CONFIG_ARCOR` fija—.
+        parser: true,
         // PARA QUÉ SE SUBIÓ. Decide qué pantalla se dibuja: el resultado de
         // siempre o el del control. Sin la columna, `modoDeImportacion` contesta
         // ACTUALIZAR y una lista de control se vería como una que va a escribir
@@ -175,7 +193,16 @@ export async function GET(req, context) {
       minPct: numero(cab.aumentoEsperadoMinPct),
       maxPct: numero(cab.aumentoEsperadoMaxPct),
     };
-    const conteo = contarResultado(paraContar, rangoDelProveedor);
+
+    // ── LO QUE EL RECÁLCULO DE HOY VA A OMITIR, CON SUS DOS NÚMEROS ───────
+    //
+    // Hasta acá el contador decidía con lo que dice la FILA y nada más, y el
+    // comentario de `seVaAEscribir` decía que lo demás "no se puede saber sin leer
+    // los productos". Se puede: aplicar los lee. La #12 mostró lo que costaba no
+    // hacerlo —la pantalla contaba 11, aplicar escribió 3— así que acá se hace la
+    // misma revalidación que hace aplicar, con la misma función.
+    const revision = await loQueElRecalculoVaAOmitir({ importacionId: id, grupoId, localId, cab });
+    const conteo = contarResultado(paraContar, rangoDelProveedor, revision.ids);
 
     // ── CUÁNTOS PRODUCTOS SE ACTUALIZARON, CONTADOS SIN DUPLICADOS ──────
     //
@@ -300,6 +327,31 @@ export async function GET(req, context) {
         ...conteo,
         cierra: resultadoCierra(conteo),
         orden: ORDEN_MOTIVOS,
+      },
+      // ── LAS QUE APLICAR VA A OMITIR, CON QUÉ LES PASA ──────────────────
+      //
+      // El número ya sale de `conteo.omitidasAlAplicar`; esto es el detalle que
+      // hace falta para poder decirlo en criollo. Va la propuesta guardada y la
+      // recalculada de HOY, que es exactamente la diferencia que causa la
+      // omisión: sin los dos números, "el costo da distinto" obliga a abrir la
+      // fila para saber distinto de qué.
+      //
+      // `PROPUESTA_DIFERENTE` viaja aparte de las demás porque es la única que
+      // tiene una salida propia —volver a leer esas filas— y porque es la que se
+      // comió las 8 de la #12 en silencio.
+      omitidasAlAplicar: {
+        total: revision.omitidas.length,
+        porMotivo: Object.entries(revision.porMotivo)
+          .map(([motivo, cantidad]) => ({ motivo, cantidad, texto: textoOmision(motivo) }))
+          .sort((a, b) => b.cantidad - a.cantidad),
+        propuestaDiferente: omitidasPorMotivo(revision, MOTIVO_OMISION.PROPUESTA_DIFERENTE).map((o) => ({
+          filaId: o.filaId,
+          filaExcel: o.filaExcel,
+          nombre: o.nombre,
+          costoGuardado: o.costoGuardado,
+          costoRecalculado: o.costoRecalculado,
+          costoActual: o.costoActual,
+        })),
       },
       variacion: conteo.rangoDeLosListos,
       muestra: muestra.map((f) => ({
@@ -482,6 +534,84 @@ function numero(v) {
   if (v === null || v === undefined) return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * LAS FILAS QUE APLICAR VA A OMITIR HOY, CON EL MOTIVO Y LOS DOS NÚMEROS.
+ *
+ * ── POR QUÉ ESTA PANTALLA TAMBIÉN REVALIDA ────────────────────────────────
+ *
+ * Porque es la que muestra el número grande y el botón, y los dos prometían
+ * escrituras que aplicar después no hacía. Medido en producción, importación #12:
+ * "11 se actualizan · Aplicar los 11 precios", y aplicar escribió 3. Las otras 8
+ * salieron OMITIDAS con PROPUESTA_DIFERENTE y nadie se enteró — el aviso de
+ * después daba el total y no el detalle, y la pantalla no volvía a decir nada.
+ *
+ * ── LAS TRES CONSULTAS SON LAS DE APLICAR, NO UNAS PARECIDAS ──────────────
+ *
+ * El `where` de las filas —`seleccionada: true, aplicada: false`—, la fila
+ * ENTERA sin `select` y el `select` del producto salen de la misma ruta que
+ * escribe. Ésa es la parte que no se puede aproximar: una fila traída con menos
+ * campos llega con `undefined` en los que las guardas miran, y la revalidación
+ * contestaría distinto de como va a contestar al aplicar. Es el defecto que este
+ * módulo ya pagó tres veces, y acá lo pagaría al revés: diciendo que una fila se
+ * va a omitir cuando se va a escribir.
+ *
+ * NO ESCRIBE NADA y no falla la pantalla: si algo sale mal, se contesta que no se
+ * averiguó —`ids: null`— y el contador vuelve a ser el techo de antes. Una
+ * revalidación que no se pudo hacer no puede dejar el resultado sin dibujar.
+ */
+async function loQueElRecalculoVaAOmitir({ importacionId, grupoId, localId, cab }) {
+  const vacio = { ids: null, omitidas: [], porMotivo: {} };
+  try {
+    // Una lista de control no escribe nada, así que no hay nada que revalidar: la
+    // revalidación contestaría LISTA_DE_CONTROL para TODAS las filas y la pantalla
+    // del control mostraría un aviso de omisiones sobre algo que nunca iba a
+    // escribir. Es el mismo corte que hace la ruta de aplicar, por el mismo
+    // motivo.
+    if (modoDeImportacion(cab) === MODO_LISTA.CONTROLAR) return vacio;
+
+    const reg = resolverParserPorId(cab.parser);
+    if (!reg.ok) return vacio;
+
+    const filas = await prisma.importacionListaFila.findMany({
+      where: { importacionId, seleccionada: true, aplicada: false },
+      orderBy: { filaExcel: "asc" },
+    });
+    if (filas.length === 0) return { ids: new Set(), omitidas: [], porMotivo: {} };
+
+    const baseIds = [...new Set(filas.map((f) => f.productoBaseId).filter((x) => x !== null))];
+    const productos = baseIds.length
+      ? await prisma.productoBase.findMany({
+          where: { id: { in: baseIds }, grupoId },
+          select: CAMPOS_PRODUCTO_PARA_REVALIDAR,
+        })
+      : [];
+    const porId = new Map(productos.map((p) => [p.id, p]));
+
+    const revision = revisarAntesDeAplicar({
+      filas,
+      productoDe: (f) => (f.productoBaseId === null ? null : porId.get(f.productoBaseId) ?? null),
+      contexto: {
+        operandoEnLocalId: Number(localId),
+        depositoLocalId: await getDepositoIdDeGrupo(grupoId),
+        cabecera: cab,
+      },
+      config: { ...reg.config, impuestoAdicionalPct: numero(cab.impuestoAdicionalPct) },
+      recargoPct: Number(cab.recargoPct),
+    });
+
+    return {
+      ids: new Set(revision.idsOmitidas),
+      omitidas: revision.omitidas,
+      porMotivo: revision.porMotivo,
+    };
+  } catch (e) {
+    // Se registra con su detalle y no se traga: si esto falla seguido, el contador
+    // volvió a ser el techo viejo y hay que enterarse por el log, no por la #12.
+    console.error("[listas/resultado] no se pudo revalidar lo que aplicar va a omitir:", e);
+    return vacio;
+  }
 }
 
 /**

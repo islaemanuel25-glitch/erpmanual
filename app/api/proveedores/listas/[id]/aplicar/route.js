@@ -52,6 +52,8 @@ import {
   modoPrecioVentaValido,
   resolverModoPrecioVenta,
   revalidarFila,
+  revisarAntesDeAplicar,
+  CAMPOS_PRODUCTO_PARA_REVALIDAR,
   ventaParaModo,
   debeActualizarOverride,
   debeActualizarVentaOverride,
@@ -190,19 +192,9 @@ export async function GET(req, context) {
     const productos = baseIds.length
       ? await prisma.productoBase.findMany({
           where: { id: { in: baseIds }, grupoId },
-          select: {
-            id: true, nombre: true, precio_costo: true, precio_venta: true, margen: true,
-            redondeo_100: true, es_combo: true, creadoEnLocalId: true,
-            unidad_medida: true, factor_pack: true, modoCompraProveedor: true,
-            pesoReferenciaKg: true,
-            // Para el chequeo de baja de `revalidarFila`. NO se filtra por
-            // `activo` en el `where`: un producto dado de baja tiene que LLEGAR
-            // hasta la revalidación, porque lo que corresponde es omitir la fila
-            // con su motivo. Filtrándolo acá caería en PRODUCTO_INEXISTENTE y el
-            // cartel diría que hay que vincularla a otro producto, que es falso.
-            activo: true,
-            locales: { select: { activo: true } },
-          },
+          // Los campos que `revalidarFila` mira, en un solo lugar. Por qué el
+          // producto dado de baja NO se filtra acá está escrito con la constante.
+          select: CAMPOS_PRODUCTO_PARA_REVALIDAR,
         })
       : [];
     const porId = new Map(productos.map((p) => [p.id, p]));
@@ -215,28 +207,32 @@ export async function GET(req, context) {
     const configPrevia = { ...regPrevia.config, impuestoAdicionalPct: numeroONull(importacion.impuestoAdicionalPct) };
     const recargoPct = Number(importacion.recargoPct);
 
-    let cantidad = 0;
+    // QUIÉN DECIDE ES `revisarAntesDeAplicar`, LA MISMA QUE MIRA EL RESULTADO.
+    // Acá vivía este mismo `for` escrito a mano, y el resultado necesitaba la
+    // misma respuesta para su número grande y su botón: dos copias de "¿esta fila
+    // se aplica?" es como la pantalla y el motor dejan de coincidir.
+    const revision = revisarAntesDeAplicar({
+      filas,
+      productoDe: (f) => (f.productoBaseId === null ? null : porId.get(f.productoBaseId) ?? null),
+      contexto,
+      config: configPrevia,
+      recargoPct,
+    });
+
     let costoTotalAnterior = 0;
     let costoTotalNuevo = 0;
     let conAlerta = 0;
-    let noAplicables = 0;
 
-    for (const f of filas) {
-      const base = f.productoBaseId === null ? null : porId.get(f.productoBaseId) ?? null;
-      const v = revalidarFila({ fila: f, base, contexto, config: configPrevia, recargoPct });
-      if (!v.aplicable) {
-        noAplicables++;
-        continue;
-      }
-      cantidad++;
-      costoTotalAnterior += Number(v.costoActual ?? 0);
-      costoTotalNuevo += Number(v.costoNuevo ?? 0);
+    // Los costos son los que devolvió la revalidación, no un segundo cálculo.
+    for (const a of revision.aplicables) {
+      costoTotalAnterior += Number(a.costoActual ?? 0);
+      costoTotalNuevo += Number(a.costoNuevo ?? 0);
 
       const presentacionConciliada = presentacionDe({
-        unidadMedida: base.unidad_medida,
-        factorPack: f.factorErp,
+        unidadMedida: a.base.unidad_medida,
+        factorPack: a.fila.factorErp,
       });
-      if (alertasDeFila({ ...f, presentacionConciliada }, base).length > 0) conAlerta++;
+      if (alertasDeFila({ ...a.fila, presentacionConciliada }, a.base).length > 0) conAlerta++;
     }
 
     const variacionPct =
@@ -244,11 +240,15 @@ export async function GET(req, context) {
 
     return NextResponse.json({
       ok: true,
-      cantidad,
+      cantidad: revision.cuantasAplicables,
       seleccionadas: filas.length,
       // Seleccionadas que la revalidación descartaría. Si es > 0, el usuario
       // marcó filas que ya no se pueden aplicar y conviene que lo sepa antes.
-      noAplicables,
+      noAplicables: revision.omitidas.length,
+      // Y CON QUÉ MOTIVO CADA UNA. El número solo decía cuántas; el motivo es lo
+      // que permite decirle a la persona qué pasó y qué hacer.
+      omitidas: revision.omitidas,
+      porMotivo: revision.porMotivo,
       costoTotalAnterior: Math.round(costoTotalAnterior * 100) / 100,
       costoTotalNuevo: Math.round(costoTotalNuevo * 100) / 100,
       variacionPct,
@@ -396,16 +396,10 @@ export async function POST(req, context) {
       const baseIds = [...new Set(filas.map((f) => f.productoBaseId).filter((x) => x !== null))];
       const productos = await tx.productoBase.findMany({
         where: { id: { in: baseIds }, grupoId },
-        select: {
-          id: true, nombre: true, precio_costo: true, precio_venta: true,
-          margen: true, redondeo_100: true, es_combo: true, creadoEnLocalId: true,
-          unidad_medida: true, factor_pack: true, modoCompraProveedor: true,
-          pesoReferenciaKg: true,
-          // Igual que en la simulación: llega dado de baja y lo rechaza
-          // `revalidarFila`, dentro de la misma transacción que escribe.
-          activo: true,
-          locales: { select: { activo: true } },
-        },
+        // Los campos que `revalidarFila` mira, en un solo lugar. El producto dado
+        // de baja llega igual y lo rechaza la revalidación, dentro de la misma
+        // transacción que escribe.
+        select: CAMPOS_PRODUCTO_PARA_REVALIDAR,
       });
       const porId = new Map(productos.map((p) => [p.id, p]));
 
