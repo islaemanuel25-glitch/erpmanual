@@ -16,6 +16,8 @@ import { Search, Trash2, ShoppingCart, ChevronUp, FileUp } from "lucide-react";
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 import SinPermisos from "@/components/auth/SinPermisos";
+import ElegirProveedor from "@/components/compras-proveedor/ElegirProveedor";
+import { useAccionDePagina } from "@/app/context/AccionDePaginaContext";
 import ModalVincularCodigo from "@/components/compras-proveedor/ModalVincularCodigo";
 import ModalEnviarPedido from "@/components/compras-proveedor/ModalEnviarPedido";
 import CarritoPedido from "@/components/compras-proveedor/CarritoPedido";
@@ -69,6 +71,11 @@ export default function NuevaCompraProveedorPage() {
   // Proveedores
   const [proveedores, setProveedores] = useState([]);
   const [proveedorId, setProveedorId] = useState(proveedorIdParam);
+  // Lo que se escribió en el buscador de la pantalla de ELEGIR PROVEEDOR. Es
+  // otro estado que `search`, que filtra PRODUCTOS: son dos pantallas distintas
+  // y compartirlo haría que al elegir proveedor el buscador de productos
+  // apareciera ya escrito.
+  const [filtroProveedor, setFiltroProveedor] = useState("");
   const [notas, setNotas] = useState("");
 
   // En modo continuar: nombre del proveedor cargado para mostrar como readonly.
@@ -154,6 +161,21 @@ export default function NuevaCompraProveedorPage() {
 
   // Detección de pedido BORRADOR existente para el proveedor seleccionado.
   const [borradorExistente, setBorradorExistente] = useState(null);
+
+  // ── LA PANTALLA DE ELEGIR PROVEEDOR ────────────────────────────────────
+  //
+  // Es el estado inicial de un pedido NUEVO: todavía no hay proveedor. En
+  // "continuar" no aparece nunca, porque el pedido ya trae el suyo.
+  const eligiendoProveedor = !esContinuar && !proveedorId;
+
+  // El botón de volver va al slot del shell y no adentro del contenido: ahí se
+  // va de pantalla apenas la lista baja. La fábrica devuelve `null` cuando ya
+  // hay proveedor, que es la forma de registrar bajo condición sin llamar al
+  // hook condicionalmente.
+  useAccionDePagina(
+    () => (eligiendoProveedor ? <SunmiBackButton href="/modulos/inicio" /> : null),
+    [eligiendoProveedor]
+  );
 
   // Proveedor seleccionado (objeto completo) para mostrar info de dias_pedido.
   const proveedorSel = useMemo(
@@ -2168,6 +2190,20 @@ export default function NuevaCompraProveedorPage() {
 
       {/* ===================== MOBILE ===================== */}
       <div className="md:hidden">
+        {/* ── ELEGIR PROVEEDOR ────────────────────────────────────────────
+            El estado inicial de un pedido nuevo tiene su propia pantalla, sin
+            el encabezado pegajoso del catálogo: acá no hay nada que fijar
+            arriba porque todavía no hay productos, y el título y el volver los
+            pone el shell. */}
+        {eligiendoProveedor ? (
+          <ElegirProveedor
+            proveedores={proveedores}
+            filtro={filtroProveedor}
+            onFiltro={setFiltroProveedor}
+            onElegir={setProveedorId}
+          />
+        ) : (
+        <>
         {/* Header sticky: volver + título + buscar + filtros */}
         <div className="sticky top-0 z-30 sunmi-surface border-b sunmi-divider px-2 pt-2 pb-1.5">
           <div className="flex items-center gap-2 mb-1.5">
@@ -2190,18 +2226,9 @@ export default function NuevaCompraProveedorPage() {
             )}
           </div>
 
-          {!esContinuar && !proveedorId && (
-            <div className="mb-1.5">
-              <SunmiSelectAdv value={proveedorId} onChange={setProveedorId} searchable>
-                <SunmiSelectOption value="">-- Seleccionar proveedor --</SunmiSelectOption>
-                {proveedores.map((pr) => (
-                  <SunmiSelectOption key={pr.id} value={String(pr.id)}>
-                    {pr.nombre}
-                  </SunmiSelectOption>
-                ))}
-              </SunmiSelectAdv>
-            </div>
-          )}
+          {/* Acá vivía el desplegable de proveedor. Ya no: sin proveedor esta
+              rama no se dibuja —la pantalla es `ElegirProveedor`— y con
+              proveedor el desplegable no tenía nada que elegir. */}
 
           {proveedorId && (
             <>
@@ -2340,6 +2367,8 @@ export default function NuevaCompraProveedorPage() {
 
         {/* Barra resumen fija inferior */}
         {proveedorId && barraResumen(true)}
+        </>
+        )}
       </div>
       {/* ^ fin MOBILE */}
 
