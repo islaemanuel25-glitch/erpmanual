@@ -204,9 +204,22 @@ test("el importe del móvil va en el bloque de cierre, antes del CTA", () => {
   //
   // Lo que el candado afirma no cambió: el importe va en el cierre y antes del
   // botón. Se mide contra las dos anclas que siguen siendo de render.
+  // ── Y EL ANCLA DE LA BARRA TAMBIÉN SE MUDÓ, POR LA MISMA FAMILIA DE MOTIVO
+  //
+  // Era el literal `sticky bottom-0`, y el 2026-09-19 el armado de la pantalla
+  // —la separación entre bloques, el gutter, el contenedor de la lista y esta
+  // barra— salió a `SunmiPantallaDeTrabajo`. La clase sigue existiendo, pero en
+  // la pieza: buscarla acá devolvía -1 y el candado se caía sin que la regla
+  // hubiera cambiado.
+  //
+  // Se reancla en `pieDePantalla={`, que es donde esta composición declara HOY
+  // el contenido de la barra. Sigue siendo una posición de render y sigue
+  // midiendo lo mismo: que el importe se escriba antes de la barra y el botón
+  // adentro de ella. Y NO se ancla en "pie=" a secas: ese nombre es del pie de
+  // `SunmiTabla`, que tiene otro contrato y su propio candado.
   const src = codigoDe(MOVIL);
   const iTotal = src.indexOf("Importe corregido");
-  const iBarra = src.indexOf("sticky bottom-0");
+  const iBarra = src.indexOf("pieDePantalla={");
   const iCta = src.indexOf("✓ Confirmar");
   assert.ok(iTotal > -1 && iBarra > -1 && iCta > -1, "falta alguna de las tres piezas del cierre");
   assert.ok(iTotal < iBarra, "el importe quedó después de la barra de cierre");

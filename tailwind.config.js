@@ -101,10 +101,27 @@ module.exports = {
 
       borderRadius: {
         xl2: "14px",
+        // 8 px, el radio de los controles del pedido —segmentado y botones del
+        // stepper—. `rounded-lg` da 7 y `rounded-xl` 10,5: ninguno es 8.
+        control: "8px",
       },
 
       spacing: {
         4.5: "18px",
+
+        // ── LOS TRES DE LA CUADRÍCULA DE FILTROS DEL PEDIDO ───────────────
+        //
+        // El diseño pide 12 de padding lateral en cada botón, 8 entre botones
+        // y entre filas, y 6 entre el rótulo y su número. Ninguno cae en la
+        // grilla: con `1rem = 14px` los pasos son múltiplos de 3,5 —`px-3` da
+        // 10,5 y `px-3.5` da 12,25; `gap-2` da 7 y `gap-2.5` da 8,75—.
+        //
+        // Van con nombre semántico y no como la medida, al revés que el `4.5`
+        // de arriba, porque `p-3` y `gap-2` ya existen y redefinirlos movería
+        // todo el repo: es el mismo criterio que `h-fila` y `h-chip`.
+        filtro: "12px",
+        entreFiltros: "8px",
+        dentroFiltro: "6px",
       },
 
       // ── EL BLANCO DE TOQUE ────────────────────────────────────────────
@@ -137,7 +154,60 @@ module.exports = {
         // —3rem— da 42 y se lee como 48 sin serlo. Y escrito a mano el trinquete
         // lo cuenta como medida mágica, con razón.
         principal: "48px",
+
+        // ── EL ALTO DE LA TARJETA DE PRODUCTO DEL PEDIDO ──────────────────
+        //
+        // El diseño la pide de 101 px. Va como MÍNIMO y no como alto fijo a
+        // propósito: el mismo diseño dice que el nombre puede ocupar DOS
+        // renglones y que no se trunque, y con `h-` el segundo renglón quedaría
+        // recortado. Con una línea la tarjeta mide los 101 pedidos; con dos,
+        // crece lo que haga falta.
+        tarjetaPedido: "101px",
+
+        // ── EL ALTO DEL BUSCADOR CON VOZ ──────────────────────────────────
+        //
+        // El diseño pide 52. `SunmiCampoBusquedaVoz` trae `min-h-12` adentro,
+        // que con `1rem = 14px` son 42 —medido a 360 en producción: el campo
+        // sale 310 × 42—. 52 no cae en la grilla: `min-h-14` da 49 y
+        // `min-h-15` da 52,5.
+        //
+        // Va como MÍNIMO porque eso es lo que la pieza declara, y una utilidad
+        // de `extend` se emite después de la escala del núcleo, así que le
+        // gana a `min-h-12` sin tener que forzar nada con `!`.
+        campoBusqueda: "52px",
       },
+
+      // ── EL ALTO DE UNA FILA DE LISTA ──────────────────────────────────
+      //
+      // 60 px, pedido por el diseño de "Elegir proveedor". Va acá por el mismo
+      // motivo que `toque` y no como `h-[60px]` en la pantalla, que es lo que
+      // el trinquete cuenta como medida mágica.
+      //
+      // Y no se puede escribir con la escala: este proyecto corre con
+      // `1rem = 14px`, así que los pasos son múltiplos de 3,5 —`h-16` da 56 y
+      // `h-17` no existe—. 60 no cae en la grilla, y aproximarlo a 56 sería
+      // justamente lo que el diseño pidió no hacer.
+      //
+      // Nombre semántico y no la medida, al revés que `4.5`, porque `h-60` ya
+      // existe en Tailwind —15rem— y redefinirlo le cambiaría el alto a todo el
+      // repo: es el mismo error que este archivo ya documenta para `border-2`.
+      height: {
+        fila: "60px",
+
+        // ── LOS CONTROLES DEL PEDIDO ──────────────────────────────────────
+        //
+        // 32 el segmentado de tipo de pedido y 30 el chip de filtro, pedidos
+        // por el diseño de la pantalla de productos del pedido. Ninguno cae en
+        // la grilla: con `1rem = 14px` los pasos son múltiplos de 3,5.
+        //
+        // Van por DEBAJO de los 36 px que declara `.sunmi-btn-base`, y eso se
+        // puede: el botón cede el eje del alto cuando la pantalla declara un
+        // `min-h-*` —ver `declaraAltoMinimo` en `lib/sunmi/claseNegociada.js`—,
+        // así que se usan junto a `min-h-0` y la pieza no se toca.
+        segmento: "32px",
+        chip: "30px",
+      },
+
       minWidth: {
         toque: "44px",
       },
@@ -174,8 +244,21 @@ module.exports = {
       //
       // `w-1/3` da 33,3 % y estaría a 5 px, que sobre un rótulo que entra justo
       // es la diferencia entre que entre y que no. Por eso el valor exacto.
+      // ── UN SOLO BLOQUE `width`, Y ACÁ ESTÁ EL PORQUÉ ──────────────────
+      //
+      // Había DOS `width:` en este mismo objeto: uno con `cajaCantidad` arriba y
+      // este con `35p`. En JavaScript la segunda clave gana, así que
+      // `w-cajaCantidad` NO EXISTÍA en el CSS generado y el cuadro del número
+      // del stepper tomaba el ancho que le tocara. No fallaba en ningún lado: el
+      // build compila, los candados pasan, y la clase simplemente no matchea —
+      // la misma familia que el `sunmi-btn-accent` que dejaba botones invisibles.
+      //
+      // Se juntan en uno. Si hace falta agregar un ancho, va ACÁ ADENTRO.
       width: {
         "35p": "35%",
+
+        // El cuadro del número del stepper. 62 tampoco cae en la grilla.
+        cajaCantidad: "62px",
       },
     },
   },

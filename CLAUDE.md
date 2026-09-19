@@ -434,6 +434,43 @@ Preguntar de a una cosa por vez le hace perder el día.
 Sin bloques de código ni tablas en los informes: al copiarlos al teléfono los
 bloques quedan como "Código" y las tablas se desarman. Texto corrido y listas.
 
+### 8.bis. Lo que NO se hace en una tanda
+
+Las diez reglas de arriba dicen qué hacer. Ésta dice qué **dejar de hacer**, y
+existe porque todo lo que sigue se hizo más de una vez sin que nadie lo pidiera.
+
+**NO se sacan capturas de pantalla como entregable.** Ni con el arnés, ni con
+`screenshot()`, ni "para mostrar el resultado". Emanuel no corrige mirando una
+foto: abre la pantalla en su celular y la usa. Una captura cuesta tokens, alarga
+la tanda y no la mira nadie.
+
+*La única excepción:* cuando la tanda es específicamente **de medición** —medir
+un desborde, comparar un antes y un después— y **el número medido es el
+entregable**. Ahí la imagen es un subproducto del que se saca el número, no el
+informe. El criterio se comprueba con una pregunta: si lo que se va a informar es
+"se ve bien", la captura sobra; si es "mide 310 × 52 y el contrato pedía 358 ×
+52", la medición es el punto.
+
+**NO se corre el arnés completo con navegador después de cada arreglo.** Solo
+cuando la tanda es de relevar defectos. Verificar ejecutando —la regla 2— no
+significa correr todo el arnés cada vez: significa ejercer lo que se tocó.
+
+**NO se corre la suite más de una vez por tanda.** Una sola, al final, contra el
+HEAD que se va a empujar. Si hay que ir a un candado puntual mientras se
+trabaja, se corre ese archivo, no la suite entera. Y si una corrida falla por el
+entorno y no por el código, se arregla el entorno ANTES de repetirla — repetir
+con el entorno roto es exactamente la repetición que hay que eliminar.
+
+**El informe va corto.** No se narra el camino recorrido ni se listan los
+archivos tocados, salvo que un archivo haga falta para entender una decisión. El
+diff ya dice qué cambió; el informe dice qué pasa ahora.
+
+**Y lo que SÍ se informa siempre, aunque el informe sea corto:** qué quedó **sin
+verificar**, y **qué medidas del contrato no se cumplieron y por qué**. Son las
+dos cosas que nadie puede deducir leyendo el código, y las dos que se vuelven
+caras cuando faltan: una medida aproximada en silencio se descubre en el
+teléfono, y algo dado por verificado sin estarlo se descubre en producción.
+
 ### 9. Cuándo frenar
 
 No empezar un cambio delicado sin margen para verificarlo. **Mejor decir "no

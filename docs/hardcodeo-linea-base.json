@@ -2,13 +2,13 @@
   "_lea_esto": "Línea de base del hardcodeo. La sella scripts/hardcodeo.mjs --linea-base --sellar; sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
   "_commit": "`commit` es el árbol que se ESCANEÓ, no la fecha en que se selló: pueden diferir. Cuando se corrige un falso positivo del contador, la base se REEXPRESA desde el árbol histórico —no desde main— para no perdonar la deuda que entró después.",
   "_inventario": "El trinquete compara el INVENTARIO, no los totales: una ocurrencia es archivo + categoría + texto, con cantidad. Sin número de línea, para que mover código no invente violaciones. Un alta en cualquier clave pone rojo aunque el total baje.",
-  "generada": "2026-09-19 22:19",
-  "commit": "41a5f9f7a49c8daa3e94f68377d6b648a766d5b4",
+  "generada": "2026-09-19 20:30",
+  "commit": "ea5812d2188b3508fc4ef0fd5974967fac1a8a44",
   "total": {
-    "color": 284,
-    "medida": 1623,
+    "color": 280,
+    "medida": 1607,
     "modal": 34,
-    "crudo": 283,
+    "crudo": 281,
     "celda": 430,
     "kit-pisado": 0,
     "tema-paralelo": 87
@@ -96,10 +96,10 @@
       "tema-paralelo": 0
     },
     "compras-proveedor": {
-      "color": 21,
-      "medida": 169,
+      "color": 17,
+      "medida": 153,
       "modal": 4,
-      "crudo": 20,
+      "crudo": 18,
       "celda": 26,
       "kit-pisado": 0,
       "tema-paralelo": 0
@@ -599,14 +599,14 @@
     },
     "app/modulos/compras-proveedor/nueva/page.jsx": {
       "crudo": {
-        "<button>": 12
+        "<button>": 10
       },
       "medida": {
-        "text-[11px]": 20,
-        "text-[12px]": 15,
+        "text-[11px]": 12,
+        "text-[12px]": 14,
         "w-[148px]": 1,
         "text-[8.5px]": 2,
-        "text-[10px]": 5,
+        "text-[10px]": 4,
         "w-[80px]": 1,
         "text-[16px]": 1,
         "text-[14px]": 3,
@@ -614,18 +614,18 @@
         "h-[30px]": 1,
         "w-[22px]": 1,
         "h-[22px]": 1,
-        "text-[13px]": 9,
+        "text-[13px]": 7,
         "w-[54px]": 1,
         "w-[50px]": 1,
-        "text-[12.5px]": 6,
-        "text-[15px]": 2,
+        "text-[15px]": 1,
         "max-w-[380px]": 1,
+        "text-[12.5px]": 4,
         "max-w-[400px]": 1,
         "text-[9.5px]": 4,
         "w-[26px]": 1,
         "h-[26px]": 1,
         "min-w-[200px]": 2,
-        "text-[10.5px]": 4,
+        "text-[10.5px]": 2,
         "w-[112px]": 4,
         "w-[96px]": 2,
         "w-[104px]": 5,
@@ -635,13 +635,11 @@
         "w-[34px]": 2,
         "w-[260px]": 1,
         "max-h-[62dvh]": 1,
-        "min-w-[860px]": 2,
-        "pb-[96px]": 1
+        "min-w-[860px]": 2
       },
       "color": {
-        "#f59e0b": 9,
+        "#f59e0b": 6,
         "bg-amber-": 1,
-        "rgba(0,0,0,0.25)": 1,
         "rgba(0,0,0,0.18)": 1,
         "bg-black/": 2,
         "bg-red-": 1
@@ -1264,6 +1262,11 @@
         "text-[10px]": 2,
         "text-[11px]": 1,
         "text-[12px]": 1
+      }
+    },
+    "components/compras-proveedor/ModalEnviarPedido.jsx": {
+      "medida": {
+        "text-[11px]": 2
       }
     },
     "components/compras-proveedor/ModalVincularCodigo.jsx": {
