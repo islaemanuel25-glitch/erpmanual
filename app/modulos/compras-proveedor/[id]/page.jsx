@@ -268,8 +268,20 @@ export default function DetallePedidoProveedorPage({ params }) {
     }
   };
 
-  // Compartir el pedido al proveedor (PDF / copia) — hook compartido con el modal de /nueva.
-  const { descargarPDF, copiarPedido } = useAccionesEnvioPedido(pedido);
+  // Compartir el pedido — hook compartido con el modal de /nueva.
+  //
+  // LAS ACCIONES ESTÁN PARTIDAS POR DESTINATARIO Y NO POR FORMATO. Hasta el
+  // 2026-09-19 esta pantalla tenía "Descargar PDF" y "Copiar pedido", y las dos
+  // mandaban el documento CON los costos y el total — o sea que el botón que se
+  // usa para mandarle el pedido al proveedor le decía con qué número esperábamos
+  // que facture. Ahora las del proveedor no llevan dinero y la prefactura es una
+  // cuarta acción, con su nombre puesto.
+  const {
+    copiarTextoDelProveedor,
+    descargarPdfDelProveedor,
+    descargarPrefactura,
+    copiarTextoDeLaPrefactura,
+  } = useAccionesEnvioPedido(pedido);
 
   // ── EDITAR Y QUITAR UNA LÍNEA SE FUERON CON EL EDITOR DE BORRADOR ─────────
   //
@@ -737,11 +749,21 @@ export default function DetallePedidoProveedorPage({ params }) {
 
           {pedido.estado === "CONFIRMADO" && (
             <>
-              <SunmiButton color="slate" onClick={descargarPDF}>
-                Descargar PDF
+              {/* Los dos del proveedor: sin precios. */}
+              <SunmiButton color="slate" onClick={descargarPdfDelProveedor}>
+                PDF para el proveedor
               </SunmiButton>
-              <SunmiButton color="slate" onClick={copiarPedido}>
-                Copiar pedido
+              <SunmiButton color="slate" onClick={copiarTextoDelProveedor}>
+                Copiar para el proveedor
+              </SunmiButton>
+              {/* Y los dos de adentro. Van con la palabra "prefactura" porque es
+                  lo que distingue un documento del otro: el que lleva los costos
+                  no se le manda a nadie. */}
+              <SunmiButton color="slate" onClick={descargarPrefactura}>
+                Descargar prefactura
+              </SunmiButton>
+              <SunmiButton color="slate" onClick={copiarTextoDeLaPrefactura}>
+                Copiar prefactura
               </SunmiButton>
               <SunmiButton
                 color="cyan"

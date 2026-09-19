@@ -19,6 +19,14 @@ import { useState } from "react";
 import { Download, FileText, Share2 } from "lucide-react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
+// LA CASCADA DE COMPARTIR SE MUDÓ A `lib/compartir/compartirArchivo.js`.
+//
+// Estaba escrita acá adentro —`conviensCompartir`, `descargar` y el try/catch con
+// la guarda de AbortError— y la necesitaba igual el envío del pedido a
+// proveedor. Se sacó tal cual estaba; lo único que cambió de este archivo es de
+// dónde viene, y el comportamiento es el mismo carácter por carácter. El porqué
+// completo, y qué NO se llevó, están en el encabezado del módulo.
+import { compartirODescargar, RESULTADO_COMPARTIR } from "@/lib/compartir/compartirArchivo";
 import { TIPO_REPORTE, TITULO_REPORTE } from "@/lib/proveedores/listas/reporteImportacion";
 import { rangoDeLaFila } from "@/lib/proveedores/listas/vigenciaConfirmacion";
 
@@ -39,39 +47,6 @@ const OPCIONES = [
     situaciones: ["PENDIENTES", "AUSENTES"],
   },
 ];
-
-/**
- * ¿Conviene compartir en vez de descargar?
- *
- * Solo en dispositivos táctiles. En una computadora el menú de compartir es un
- * rodeo —lo que se quiere es el archivo en Descargas— y además varios
- * navegadores de escritorio dicen que pueden compartir y después rechazan el
- * pedido si no viene de un gesto directo.
- */
-function conviensCompartir(archivo) {
-  try {
-    if (typeof navigator === "undefined" || typeof window === "undefined") return false;
-    const tactil = window.matchMedia?.("(pointer: coarse)")?.matches === true;
-    if (!tactil) return false;
-    return !!navigator.canShare?.({ files: [archivo] });
-  } catch {
-    return false;
-  }
-}
-
-/** Bajar el archivo. Es el camino por defecto y el respaldo de compartir. */
-function descargar(blob, nombre) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = nombre;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  // Se libera en el próximo tick: revocarla en el mismo cancela la descarga en
-  // algunos navegadores.
-  setTimeout(() => URL.revokeObjectURL(url), 0);
-}
 
 export default function BotonReporte({ importacionId, cabecera, sistema, proveedor, usuario }) {
   const [abierto, setAbierto] = useState(false);
@@ -152,27 +127,27 @@ export default function BotonReporte({ importacionId, cabecera, sistema, proveed
         },
       });
 
-      const archivo = new File([blob], nombre, { type: "application/pdf" });
-      if (conviensCompartir(archivo)) {
-        try {
-          await navigator.share({
-            files: [archivo],
-            title: `${TITULO_REPORTE[opcion.tipo]} · Importación #${cabecera?.id}`,
-          });
-        } catch (e) {
-          // Cancelar el menú es una decisión, no un error: ahí no se descarga
-          // nada. Cualquier otra falla cae al camino normal para que el reporte
-          // no se pierda.
-          if (e?.name === "AbortError") throw e;
-          descargar(blob, nombre);
-        }
-      } else {
-        descargar(blob, nombre);
-      }
+      const resultado = await compartirODescargar({
+        blob,
+        nombre,
+        titulo: `${TITULO_REPORTE[opcion.tipo]} · Importación #${cabecera?.id}`,
+      });
+
+      // CANCELAR DEJA EL MENÚ ABIERTO, y eso es lo que hacía antes: la cancelación
+      // llegaba como un AbortError que saltaba al `catch` de abajo, así que este
+      // `setAbierto(false)` no se ejecutaba. La pieza ahora devuelve el caso en vez
+      // de tirar, así que el corte se escribe acá — es el mismo comportamiento, no
+      // uno nuevo. Quien se arrepintió sigue viendo las tres opciones.
+      if (resultado === RESULTADO_COMPARTIR.CANCELADO) return;
+
       setAbierto(false);
     } catch (e) {
-      // Cancelar el menú de compartir tira AbortError y no es un error.
-      if (e?.name !== "AbortError") setError(e?.message || "No se pudo generar el reporte.");
+      // LA GUARDA DE AbortError SE FUE, y conviene saber por qué: cancelar el
+      // menú ya no llega acá. La pieza de compartir devuelve CANCELADO en vez de
+      // tirar, y ese caso sale antes con un `return`. Dejar la guarda escrita
+      // sería una defensa que no se puede alcanzar, que es justo lo que este
+      // repo tiene anotado como peor que no tenerla: se lee como cubierta.
+      setError(e?.message || "No se pudo generar el reporte.");
     } finally {
       setTrabajando("");
     }
