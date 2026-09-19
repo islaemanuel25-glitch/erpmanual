@@ -238,6 +238,39 @@ try {
     `el botón está ${vacio.enviarHabilitado ? "habilitado" : "ausente"}`
   );
 
+  // ── Y AHORA CON LAS FILAS A LA VISTA, QUE ES LO QUE DE VERDAD PRUEBA ─────
+  //
+  // Vaciado, la pantalla arranca en "Cargados" y no dibuja ninguna fila: la
+  // suma da cero porque no hay nada que sumar. Eso es verde por AUSENCIA, que
+  // es la forma de candado que este proyecto tiene anotada como la peor —queda
+  // verde para siempre y no cubre nada—.
+  //
+  // El defecto vivía justamente en las filas NO cargadas, así que hay que
+  // mirarlas: se pasa a "Todos", donde el catálogo entero se dibuja con el
+  // pedido vacío. Si el borrador volviera a arrancar en el sugerido, acá los
+  // steppers sumarían miles otra vez.
+  if (!(await tocarPorTexto("^Todos"))) morir("no encontré el filtro Todos");
+  await sleep(2500);
+
+  const todos = JSON.parse(await leerPantalla());
+  console.log(`\n  manual · Todos: ${todos.steppers} steppers, suma ${todos.sumaSteppers}, dice "${todos.cargados} / ${todos.universo} cargados"\n`);
+
+  afirmar(
+    todos.steppers > 0,
+    "la vista “Todos” dibuja filas, así que hay algo que mirar",
+    "no se dibujó ninguna fila: la afirmación de abajo sería verde por ausencia"
+  );
+  afirmar(
+    todos.sumaSteppers === 0,
+    "con filas a la vista y el pedido vacío, los steppers siguen en cero",
+    `suman ${todos.sumaSteppers} en ${todos.steppers} filas: el borrador volvió a arrancar en el sugerido`
+  );
+  afirmar(
+    todos.cargados === 0,
+    "y el contador sigue diciendo 0 cargados",
+    `dice ${todos.cargados}`
+  );
+
   console.log("");
   if (fallas.length) {
     console.log(`ROJO · ${fallas.length} ${fallas.length === 1 ? "afirmación falló" : "afirmaciones fallaron"}.`);
