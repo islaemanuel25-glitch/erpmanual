@@ -142,9 +142,13 @@ test("Configuración POS conserva el header y el título mobile globales del ERP
     /<Header onOpenMobileMenu=\{headerMobileHandler\} \/>/,
     "el Header global debe renderizarse normalmente"
   );
+  // La cadena se actualizó el 2026-09-19 junto con el título del shell, que
+  // pasó a `text-xl2 font-bold` —22 px, los del diseño—. Lo que este candado
+  // defiende es que Configuración POS NO se invente su propio encabezado: el
+  // tamaño de la letra del shell es otra pregunta y no es la de acá.
   assert.match(
     layout,
-    /<div className="md:hidden px-4 py-3 text-xl font-semibold">[\s\S]*\{tituloMobile\}/,
+    /<div className="md:hidden px-4 py-3 text-xl2 font-bold">[\s\S]*\{tituloMobile\}/,
     "el título mobile global debe seguir activo"
   );
 

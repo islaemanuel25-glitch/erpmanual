@@ -76,7 +76,13 @@ export default function LayoutBase({ children }) {
             Con acción, la fila se reparte: el título a la izquierda, la acción
             a la derecha. `min-w-0 truncate` es lo que hace que un título largo
             se recorte en vez de empujar la acción fuera de la pantalla. */}
-        <div className="md:hidden px-4 py-3 text-xl font-semibold">
+        {/* EL TÍTULO DE PÁGINA VA EN 22 px BOLD, y no es un gusto.
+            Estaba en `text-xl font-semibold`, que con `1rem = 14px` da 17,5 px
+            y peso 600. Medido a 360 el 2026-09-19: el título ocupaba 117 × 25
+            al lado de un `SunmiBackButton` de 88 × 36, o sea que el botón
+            secundario era MÁS ALTO que el título de la pantalla. `xl2` es el
+            token de 22 px que ya estaba en el config. */}
+        <div className="md:hidden px-4 py-3 text-xl2 font-bold">
           {accionDePagina ? (
             <div className="flex items-center justify-between gap-3">
               <span className="min-w-0 truncate">{tituloMobile}</span>
