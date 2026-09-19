@@ -2,11 +2,11 @@
   "_lea_esto": "Línea de base del hardcodeo. La sella scripts/hardcodeo.mjs --linea-base --sellar; sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
   "_commit": "`commit` es el árbol que se ESCANEÓ, no la fecha en que se selló: pueden diferir. Cuando se corrige un falso positivo del contador, la base se REEXPRESA desde el árbol histórico —no desde main— para no perdonar la deuda que entró después.",
   "_inventario": "El trinquete compara el INVENTARIO, no los totales: una ocurrencia es archivo + categoría + texto, con cantidad. Sin número de línea, para que mover código no invente violaciones. Un alta en cualquier clave pone rojo aunque el total baje.",
-  "generada": "2026-09-19 18:48",
-  "commit": "7156d69b78bb34e3a7f82a87bb72d13e046482fb",
+  "generada": "2026-09-19 20:30",
+  "commit": "ea5812d2188b3508fc4ef0fd5974967fac1a8a44",
   "total": {
-    "color": 283,
-    "medida": 1612,
+    "color": 280,
+    "medida": 1607,
     "modal": 34,
     "crudo": 281,
     "celda": 430,
@@ -96,8 +96,8 @@
       "tema-paralelo": 0
     },
     "compras-proveedor": {
-      "color": 20,
-      "medida": 158,
+      "color": 17,
+      "medida": 153,
       "modal": 4,
       "crudo": 18,
       "celda": 26,
@@ -602,7 +602,7 @@
         "<button>": 10
       },
       "medida": {
-        "text-[11px]": 16,
+        "text-[11px]": 12,
         "text-[12px]": 14,
         "w-[148px]": 1,
         "text-[8.5px]": 2,
@@ -635,13 +635,11 @@
         "w-[34px]": 2,
         "w-[260px]": 1,
         "max-h-[62dvh]": 1,
-        "min-w-[860px]": 2,
-        "pb-[96px]": 1
+        "min-w-[860px]": 2
       },
       "color": {
-        "#f59e0b": 8,
+        "#f59e0b": 6,
         "bg-amber-": 1,
-        "rgba(0,0,0,0.25)": 1,
         "rgba(0,0,0,0.18)": 1,
         "bg-black/": 2,
         "bg-red-": 1
