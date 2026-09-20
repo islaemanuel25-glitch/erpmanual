@@ -37,6 +37,8 @@ import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import { formatearMoneda } from "@/lib/moneda";
 import {
   ESTADO_LINEA,
+  cantidadEnEscalaDelPedido,
+  cantidadFueConvertida,
   diferenciaDeCantidad,
   estadoDeLinea,
   porcentajeDelPrecio,
@@ -63,7 +65,12 @@ export default function TarjetaLineaFactura({ fila, onCorregir, onCoincide, guar
   const porcentaje = porcentajeDelPrecio(fila);
   const faltan = diferenciaDeCantidad(fila);
   const esNoPedida = estado === ESTADO_LINEA.NO_PEDIDO;
+  const sinVincular = estado === ESTADO_LINEA.SIN_VINCULAR;
   const resuelta = estado === ESTADO_LINEA.COINCIDE;
+  // La cantidad SIEMPRE en la escala del pedido. Lo crudo se muestra al lado
+  // cuando se convirtió, para que se pueda cotejar con el papel sin dudar.
+  const cantidad = cantidadEnEscalaDelPedido(fila);
+  const convertida = cantidadFueConvertida(fila);
 
   // ── LA TARJETA COLAPSADA, PARA LO QUE NO TIENE NADA QUE DECIDIR ─────────
   //
@@ -79,7 +86,7 @@ export default function TarjetaLineaFactura({ fila, onCorregir, onCoincide, guar
             {fila?.producto || fila?.textoCrudo || "Sin nombre"}
           </span>
           <span className="shrink-0 whitespace-nowrap tabular-nums text-sm2 sunmi-text-strong">
-            {fmtCant(fila?.cantidad)} · {formatearMoneda(fila?.subtotal ?? 0)}
+            {fmtCant(cantidad)} · {formatearMoneda(fila?.subtotal ?? 0)}
           </span>
         </div>
       </SunmiCard>
@@ -97,7 +104,11 @@ export default function TarjetaLineaFactura({ fila, onCorregir, onCoincide, guar
             {fila?.producto || fila?.textoCrudo || "Sin nombre"}
           </p>
 
-          {esNoPedida ? (
+          {sinVincular ? (
+            <p className="text-xs sunmi-text-muted break-words">
+              Todavía no se sabe qué producto es. Tocá Corregir para elegirlo.
+            </p>
+          ) : esNoPedida ? (
             <p className="text-xs sunmi-text-muted break-words">
               El proveedor lo facturó y no estaba en el pedido.
             </p>
@@ -112,8 +123,16 @@ export default function TarjetaLineaFactura({ fila, onCorregir, onCoincide, guar
               <p className="flex items-baseline gap-x-2 flex-wrap break-words">
                 <span className="text-xs sunmi-text-muted shrink-0">Factura</span>
                 <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-accent">
-                  {fmtCant(fila?.cantidad)}
+                  {fmtCant(cantidad)}
                 </span>
+                {/* De dónde salió ese número, cuando no es el del papel. Sin
+                    esto, quien coteja renglón por renglón ve 8 donde el papel
+                    dice 80 y no sabe si la pantalla se equivocó. */}
+                {convertida && (
+                  <span className="text-xs tabular-nums sunmi-text-muted shrink-0">
+                    el papel dice {fmtCant(fila?.cantidad)} u
+                  </span>
+                )}
                 {faltan != null && faltan !== 0 && (
                   <span className="text-xs tabular-nums sunmi-text-muted shrink-0">
                     {faltan > 0 ? `falta ${fmtCant(faltan)}` : `sobra ${fmtCant(-faltan)}`}
@@ -160,7 +179,7 @@ export default function TarjetaLineaFactura({ fila, onCorregir, onCoincide, guar
 
         {/* El caso feliz en un toque, sin abrir nada: lo que la factura dice es
             lo que llegó. Misma idea y misma clase que allá. */}
-        {!esNoPedida && (
+        {!esNoPedida && !sinVincular && (
           <SunmiLinkButton
             onClick={() => onCoincide?.(fila)}
             disabled={guardando}
