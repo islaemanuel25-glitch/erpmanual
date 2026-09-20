@@ -83,6 +83,18 @@ export default function DetallePedidoProveedorPage({ params }) {
   // la del pedido, decide el vínculo y analiza el precio. La pantalla no
   // recalcula nada: pide y muestra.
   const [conciliacion, setConciliacion] = useState(null);
+  // ── VA ACÁ ARRIBA, Y NO AL LADO DE LO QUE LA USA ───────────────────────
+  //
+  // Se incrementa cuando algo cambió del lado del servidor —vincular, aceptar
+  // un precio— y hay que volver a pedir la conciliación.
+  //
+  // Estaba declarada 19 líneas DESPUÉS del `useEffect` que la nombra en su
+  // arreglo de dependencias. Un `const` no existe antes de su declaración: el
+  // arreglo se evalúa en cada render y tiraba `Cannot access ... before
+  // initialization`, o sea que la pantalla reventaba al abrirse. El build
+  // compila igual —es un error de ejecución, no de sintaxis— y ningún candado
+  // lo ve, porque ninguno monta esta pantalla.
+  const [recargarConciliacion, setRecargarConciliacion] = useState(0);
   const [lineaACorregir, setLineaACorregir] = useState(null);
 
   // El primer comprobante con líneas leídas. Con varios, se muestra el primero:
@@ -321,9 +333,6 @@ export default function DetallePedidoProveedorPage({ params }) {
   // y darlo por controlado es poner el tilde verde sobre un renglón que nadie
   // miró. Se llena con el toque —"✓ Coincide"— o guardando la hoja.
   const [revisadas, setRevisadas] = useState({});
-  // Se incrementa cuando algo cambió del lado del servidor —vincular, aceptar
-  // un precio— y hay que volver a pedir la conciliación.
-  const [recargarConciliacion, setRecargarConciliacion] = useState(0);
 
   // El caso feliz en un toque: lo que la factura dice es lo que llegó. Mismo
   // gesto que "✓ Coincide" en la recepción de una transferencia.
