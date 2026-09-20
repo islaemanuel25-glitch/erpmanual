@@ -301,6 +301,19 @@ module.exports = {
 
         // El cuadro del número del stepper. 62 tampoco cae en la grilla.
         cajaCantidad: "62px",
+
+        // ── LOS CUATRO DE RECIBIR UN PEDIDO ───────────────────────────────
+        //
+        // 56 el rótulo de la comparación —"Pediste" y "Factura" alineados en
+        // columna—, 83 el botón Corregir, 62 el rótulo de cada stepper de la
+        // hoja y 48 los botones de más y menos. Ninguno cae en la grilla de
+        // 3,5, y los de rótulo tienen que ser FIJOS: si se reparten, los dos
+        // valores dejan de arrancar a la misma altura y la comparación deja de
+        // leerse como una comparación.
+        rotuloComparacion: "56px",
+        botonCorregir: "83px",
+        rotuloStepper: "62px",
+        cajaStepper: "48px",
       },
     },
   },
