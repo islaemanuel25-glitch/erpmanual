@@ -58,6 +58,19 @@ export default function ListaDeLaFactura({
     [filas]
   );
 
+  // ── QUÉ SE PIERDE CON ESTE PAPEL, EN UNA LÍNEA ────────────────────────
+  //
+  // Un comprobante SIN_TOTAL se concilia igual, pero hay algo que no se pudo
+  // hacer y quien controla tiene que saberlo antes de empezar: no hubo total
+  // impreso contra el cual verificar la lectura. Va en una línea y no en un
+  // párrafo, porque es un dato y no una explicación.
+  const avisoDelComprobante =
+    comprobante?.estado === "SIN_TOTAL"
+      ? "Sin total impreso: controlá el papel renglón por renglón."
+      : comprobante?.estado === "CARGADO"
+        ? "Lectura verificada contra el total del papel."
+        : comprobante?.estado || "—";
+
   // Los dos números del encabezado salen de los MISMOS predicados que los
   // filtros: el que dice cuántas hay para revisar y el filtro que las muestra
   // no pueden separarse.
@@ -85,16 +98,16 @@ export default function ListaDeLaFactura({
         <>
           <div className="flex items-center gap-2 min-w-0">
             <span className="font-semibold sunmi-text-strong truncate">
-              Factura {comprobante?.numero ? `#${comprobante.numero}` : `#${comprobante?.id}`}
+              {comprobante?.identidad || `Factura #${comprobante?.id}`}
             </span>
-            <SunmiPill color={resumen.revisar > 0 ? "amber" : "slate"}>
-              {comprobante?.estado === "CARGADO" ? "Leída" : comprobante?.estado || "—"}
+            <SunmiPill color={comprobante?.estado === "SIN_TOTAL" ? "amber" : "slate"}>
+              {comprobante?.estado === "SIN_TOTAL" ? "Sin total" : "Leída"}
             </SunmiPill>
           </div>
 
-          <p className="text-sm2 sunmi-text-muted truncate">
-            {comprobante?.proveedorNombre || "—"}
-          </p>
+          {/* El estado del papel en criollo, que es lo que hay que saber antes
+              de empezar a controlar. */}
+          <p className="text-sm2 sunmi-text-muted truncate">{avisoDelComprobante}</p>
 
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-sm2 sunmi-text-muted">

@@ -52,6 +52,10 @@ export async function POST(req) {
       where: { id: lineaId, comprobante: { grupoId } },
       select: {
         id: true, cantidad: true, netoUnitario: true, internoUnitario: true,
+        // `subtotalImpreso` es lo que permite comprobar que la cuenta de ESTA
+        // línea cierra. Con un papel sin total impreso es lo único que queda
+        // para verificar el precio, así que sin él la guarda no puede decidir.
+        subtotalImpreso: true,
         // El escalar, no una relación: `productoLocal` no existe en el esquema y
         // pedirla acá rompía la ruta contra Postgres. El producto se trae aparte.
         productoLocalId: true, pedidoDetalleId: true,

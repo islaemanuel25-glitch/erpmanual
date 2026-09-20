@@ -88,14 +88,20 @@ export default function DetallePedidoProveedorPage({ params }) {
   // el caso de dos facturas en un mismo pedido existe y se resuelve en la tanda
   // del cierre, no acá — mostrar dos listas encadenadas sin decir cuál es cuál
   // sería peor que mostrar una.
-  const comprobanteActivo = useMemo(
-    () => (conciliacion?.grupos || []).find((g) => (g.lineas || []).length > 0) || null,
+  // ── LA FORMA SALE DEL ENDPOINT, NO DE LA MEMORIA ───────────────────────
+  //
+  // Acá se leía `g.lineas` y el comprobante como si el grupo fuera plano. El
+  // endpoint devuelve otra cosa: `{ tipo, comprobante: {...}, filas: [...] }`.
+  // O sea que la lista NUNCA se dibujaba, ni con un comprobante perfecto —y el
+  // síntoma se leía como "SIN_TOTAL no deja conciliar", que era una causa
+  // equivocada para un defecto real. Medido sobre el pedido 232: el endpoint ya
+  // devolvía sus 15 filas.
+  const grupoActivo = useMemo(
+    () => (conciliacion?.grupos || []).find((g) => (g.filas || []).length > 0) || null,
     [conciliacion]
   );
-  const filasDeFactura = useMemo(
-    () => comprobanteActivo?.lineas || [],
-    [comprobanteActivo]
-  );
+  const comprobanteActivo = grupoActivo?.comprobante || null;
+  const filasDeFactura = useMemo(() => grupoActivo?.filas || [], [grupoActivo]);
 
   // ── RECIBIENDO, EL TÍTULO Y EL VOLVER LOS PONE EL SHELL ────────────────
   //
