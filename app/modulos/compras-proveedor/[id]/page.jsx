@@ -16,6 +16,7 @@ import PanelComprobantes from "@/components/comprobantes/PanelComprobantes";
 import ListaConciliacion from "@/components/comprobantes/ListaConciliacion";
 import ListaDeLaFactura from "@/components/compras-proveedor/ListaDeLaFactura";
 import HojaCorregirLinea from "@/components/compras-proveedor/HojaCorregirLinea";
+import { cantidadEnEscalaDelPedido } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 import TarjetaContextoDelPedido from "@/components/compras-proveedor/TarjetaContextoDelPedido";
 import BloqueDeLaFactura from "@/components/compras-proveedor/BloqueDeLaFactura";
 
@@ -314,12 +315,23 @@ export default function DetallePedidoProveedorPage({ params }) {
   // fallara en el medio.
   const [sueltas, setSueltas] = useState({});
   const [motivos, setMotivos] = useState({});
+  // ── QUÉ LÍNEAS CONTROLÓ LA PERSONA ──────────────────────────────────────
+  //
+  // No se deduce de que la cantidad coincida: eso es lo que el sistema calcula,
+  // y darlo por controlado es poner el tilde verde sobre un renglón que nadie
+  // miró. Se llena con el toque —"✓ Coincide"— o guardando la hoja.
+  const [revisadas, setRevisadas] = useState({});
 
   // El caso feliz en un toque: lo que la factura dice es lo que llegó. Mismo
   // gesto que "✓ Coincide" en la recepción de una transferencia.
   const aceptarLoQueDiceLaFactura = useCallback((fila) => {
     if (!fila?.pedidoDetalleId) return;
-    setRecibidos((prev) => ({ ...prev, [fila.pedidoDetalleId]: Number(fila.cantidad) || 0 }));
+    // EN LA ESCALA DEL PEDIDO. `fila.cantidad` es lo crudo del papel —80
+    // unidades— y guardarlo como cantidad recibida metería diez veces lo que
+    // llegó. Es el mismo número convertido que muestra la tarjeta.
+    const enEscala = cantidadEnEscalaDelPedido(fila);
+    setRecibidos((prev) => ({ ...prev, [fila.pedidoDetalleId]: Number(enEscala) || 0 }));
+    setRevisadas((prev) => ({ ...prev, [fila.pedidoDetalleId]: true }));
   }, []);
 
   const guardarCorreccion = useCallback((datos) => {
@@ -335,6 +347,9 @@ export default function DetallePedidoProveedorPage({ params }) {
         ? { principal: datos.motivoPrincipal, detalle: datos.motivoDetalle }
         : undefined,
     }));
+    // Guardar la hoja también es controlar el renglón: alguien lo miró, contó y
+    // decidió. Es el otro camino por el que una línea queda revisada.
+    setRevisadas((prev) => ({ ...prev, [id]: true }));
     setLineaACorregir(null);
   }, []);
 
@@ -827,6 +842,7 @@ export default function DetallePedidoProveedorPage({ params }) {
               filas={filasDeFactura}
               onCorregir={setLineaACorregir}
               onCoincide={aceptarLoQueDiceLaFactura}
+              revisadas={revisadas}
               accionDelPie={
                 <SunmiButton
                   color="amber"

@@ -39,6 +39,8 @@ export default function ListaDeLaFactura({
   filas = [],
   onCorregir,
   onCoincide,
+  /** Qué líneas marcó la persona como controladas. `{ pedidoDetalleId: true }` */
+  revisadas = {},
   /** La acción del pie. Se llama así y no `pie` porque `pie={` ya es el pie de
    *  `SunmiTabla`, con otro contrato y su propio candado: dos props con el
    *  mismo nombre y distinto significado es cómo un candado empieza a mirar el
@@ -71,15 +73,22 @@ export default function ListaDeLaFactura({
         ? "Lectura verificada contra el total del papel."
         : comprobante?.estado || "—";
 
-  // Los dos números del encabezado salen de los MISMOS predicados que los
-  // filtros: el que dice cuántas hay para revisar y el filtro que las muestra
-  // no pueden separarse.
+  // ── EL CONTADOR CUENTA LO MISMO QUE MUESTRAN LAS TARJETAS ──────────────
+  //
+  // Cuenta REVISADAS: las que la persona marcó. Antes contaba las que el
+  // cálculo decía que coincidían, mientras las tarjetas se ponían en verde por
+  // otra cosa — y la pantalla se contradecía sola, con tarjetas en "Coincide"
+  // y el contador diciendo "0 / 15 sin diferencias · 15 para revisar".
+  //
+  // Un número de arriba que no es el que se ve abajo es peor que no tenerlo:
+  // obliga a decidir a cuál de los dos creerle.
+  const yaRevisada = (f) => !!revisadas?.[f?.pedidoDetalleId];
   const resumen = useMemo(
     () => ({
-      coinciden: (filas || []).filter((f) => pasaFiltro(f, FILTRO.COINCIDEN)).length,
-      revisar: (filas || []).filter((f) => !pasaFiltro(f, FILTRO.COINCIDEN)).length,
+      revisadas: (filas || []).filter(yaRevisada).length,
+      pendientes: (filas || []).filter((f) => !yaRevisada(f)).length,
     }),
-    [filas]
+    [filas, revisadas]
   );
 
   // ── LO MISMO QUE DIBUJA LA RECEPCIÓN DE UNA TRANSFERENCIA ─────────────
@@ -112,18 +121,18 @@ export default function ListaDeLaFactura({
           <div className="flex items-baseline justify-between gap-2">
             <span className="text-sm2 sunmi-text-muted">
               <span className="tabular-nums sunmi-text-strong font-semibold">
-                {resumen.coinciden} / {filas.length}
+                {resumen.revisadas} / {filas.length}
               </span>{" "}
-              sin diferencias
+              revisadas
             </span>
             <span
               className={`text-sm2 ${
-                resumen.revisar > 0 ? "sunmi-text-accent" : "sunmi-text-success"
+                resumen.pendientes > 0 ? "sunmi-text-accent" : "sunmi-text-success"
               }`}
             >
-              {resumen.revisar > 0
-                ? `${resumen.revisar} ${resumen.revisar === 1 ? "para revisar" : "para revisar"}`
-                : "Sin diferencias"}
+              {resumen.pendientes > 0
+                ? `${resumen.pendientes} sin revisar`
+                : "Todo revisado"}
             </span>
           </div>
         </>
@@ -147,6 +156,7 @@ export default function ListaDeLaFactura({
             <TarjetaLineaFactura
               key={f.lineaId}
               fila={f}
+              revisada={yaRevisada(f)}
               onCorregir={onCorregir}
               onCoincide={onCoincide}
             />

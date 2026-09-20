@@ -34,6 +34,8 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import { formatearMoneda } from "@/lib/moneda";
 import {
+  cantidadEnEscalaDelPedido,
+  cantidadFueConvertida,
   diferenciaDeCantidad,
   porcentajeDelPrecio,
   precioCambio,
@@ -134,10 +136,23 @@ export default function HojaCorregirLinea({
   // lo que dice la factura, que es la propuesta razonable —el papel ya afirma
   // cuánto mandó—. Nunca de lo PEDIDO: eso daría por contado algo que nadie
   // contó, que es el defecto que ya arreglamos en el stepper del pedido.
+  // ── EL STEPPER ABRE EN LA ESCALA DEL PEDIDO ────────────────────────────
+  //
+  // Abría en `fila.cantidad`, que es lo CRUDO del papel: con la planilla de
+  // Mauro eso son 80 unidades, así que el stepper de Bultos decía 80 y la barra
+  // de abajo calculaba 800 al stock. Un factor de diez en lo que entra.
+  //
+  // Se usa el MISMO número convertido que muestra la tarjeta —no se recalcula
+  // acá—, que sale de la lectura que `deducirUnidad` ya eligió.
+  const cantidadDeLaFactura = cantidadEnEscalaDelPedido(fila);
+  const convertida = cantidadFueConvertida(fila);
+
   useEffect(() => {
     if (!abierta || !fila) return;
     setBultos(
-      fila.cantidadRecibida != null ? String(fila.cantidadRecibida) : String(fila.cantidad ?? "")
+      fila.cantidadRecibida != null
+        ? String(fila.cantidadRecibida)
+        : String(cantidadEnEscalaDelPedido(fila) ?? "")
     );
     setSueltas(fila.unidadesSueltas != null ? String(fila.unidadesSueltas) : "");
     setMotivo(fila.motivoPrincipal ?? null);
@@ -154,6 +169,8 @@ export default function HojaCorregirLinea({
   }, [bultos, sueltas, vaPorPack, fila?.factorPack]);
 
   const cantidadDifiere = useMemo(() => {
+    // Las dos en bultos: `cantidadPedida` ya lo está y `bultos` es lo que el
+    // stepper muestra, que ahora arranca convertido.
     const pedida = Number(fila?.cantidadPedida);
     const contada = Number(bultos);
     if (!Number.isFinite(pedida) || !Number.isFinite(contada)) return false;
@@ -203,10 +220,22 @@ export default function HojaCorregirLinea({
       {/* ── 1 · CUÁNTO ENTRÓ ─────────────────────────────────────────────── */}
       <div className="flex flex-col gap-renglon">
         <span className="text-sm3 font-medium sunmi-text-strong">Cuánto entró</span>
+        {/* ── LAS DOS ESCALAS NO SE MEZCLAN EN LA MISMA FRASE ───────────
+            Decía "Pediste 8 · la factura dice 80 · 1 bulto = 10 u": los dos
+            primeros números están en escalas distintas y la frase no lo dice,
+            así que se leen como una diferencia de 72. Ahora los dos van en
+            bultos, que es la unidad del pedido, y lo que dice el papel va
+            aparte — igual que en la tarjeta. */}
         <span className="text-sm3 sunmi-text-muted">
-          Pediste {limpio(fila.cantidadPedida)} · la factura dice {limpio(fila.cantidad)}
+          Pediste {limpio(fila.cantidadPedida)} · la factura dice{" "}
+          {limpio(cantidadDeLaFactura)}
           {vaPorPack ? ` · 1 bulto = ${limpio(fila.factorPack)} u` : ""}
         </span>
+        {convertida && (
+          <span className="text-sm3 sunmi-text-muted">
+            El papel dice {limpio(fila.cantidad)} unidades.
+          </span>
+        )}
 
         <FilaStepper rotulo="Bultos" valor={bultos} onCambiar={setBultos} />
         {/* Sin pack no hay sueltas que contar: el bulto ES la unidad. */}

@@ -59,24 +59,47 @@ const fmtCant = (n) => {
   return Number.isInteger(v) ? String(v) : String(Number(v.toFixed(3)));
 };
 
-export default function TarjetaLineaFactura({ fila, onCorregir, onCoincide, guardando = false }) {
+export default function TarjetaLineaFactura({
+  fila,
+  onCorregir,
+  onCoincide,
+  /**
+   * ── QUIÉN DICE QUE ESTA LÍNEA ESTÁ REVISADA ─────────────────────────────
+   *
+   * La persona, tocando "✓ Coincide". No el sistema.
+   *
+   * Acá la tarjeta se colapsaba cuando el cálculo daba "coincide" —cantidad
+   * igual y precio igual—, o sea que se ponía el tilde verde sola y daba por
+   * controlado un renglón que nadie miró. Y la pantalla se contradecía: las
+   * tarjetas en verde mientras el contador de arriba decía "0 / 15 sin
+   * diferencias · 15 para revisar".
+   *
+   * En la recepción de una transferencia ese botón es la MARCA de que alguien
+   * controló el renglón contra el papel. Acá es lo mismo. Lo que el sistema
+   * calculó se sigue mostrando como dato —la comparación, el precio— pero no
+   * marca nada por su cuenta.
+   */
+  revisada = false,
+  guardando = false,
+}) {
   const estado = estadoDeLinea(fila);
   const cambio = precioCambio(fila);
   const porcentaje = porcentajeDelPrecio(fila);
   const faltan = diferenciaDeCantidad(fila);
   const esNoPedida = estado === ESTADO_LINEA.NO_PEDIDO;
   const sinVincular = estado === ESTADO_LINEA.SIN_VINCULAR;
-  const resuelta = estado === ESTADO_LINEA.COINCIDE;
+  const resuelta = revisada;
   // La cantidad SIEMPRE en la escala del pedido. Lo crudo se muestra al lado
   // cuando se convirtió, para que se pueda cotejar con el papel sin dudar.
   const cantidad = cantidadEnEscalaDelPedido(fila);
   const convertida = cantidadFueConvertida(fila);
 
-  // ── LA TARJETA COLAPSADA, PARA LO QUE NO TIENE NADA QUE DECIDIR ─────────
+  // ── LA TARJETA COLAPSADA, PARA LO QUE YA SE CONTROLÓ ───────────────────
   //
-  // Misma condición que allá: una línea sin diferencia se lee de un vistazo y
-  // no ocupa media pantalla. Con 197 líneas es la diferencia entre barrer la
-  // lista y scrollear un documento.
+  // Mismo criterio que allá: una línea ya revisada se lee de un vistazo y no
+  // ocupa media pantalla. Con 197 líneas es la diferencia entre barrer la lista
+  // y scrollear un documento. Lo que la colapsa es el toque de la persona, no
+  // el cálculo.
   if (resuelta) {
     return (
       <SunmiCard className="p-2" data-linea-factura={fila?.producto || fila?.lineaId}>
@@ -179,7 +202,12 @@ export default function TarjetaLineaFactura({ fila, onCorregir, onCoincide, guar
 
         {/* El caso feliz en un toque, sin abrir nada: lo que la factura dice es
             lo que llegó. Misma idea y misma clase que allá. */}
-        {!esNoPedida && !sinVincular && (
+        {/* ── "✓ COINCIDE" SE OFRECE, NO SE APLICA ──────────────────────
+            Se ofrece cuando el cálculo no encontró diferencias: ahí el gesto es
+            de un toque. Con una diferencia a la vista, el camino es Corregir —
+            ofrecer "coincide" sobre algo que no coincide invita a cerrar sin
+            mirar, que es justo lo que este botón tiene que evitar. */}
+        {!esNoPedida && !sinVincular && estado === ESTADO_LINEA.COINCIDE && (
           <SunmiLinkButton
             onClick={() => onCoincide?.(fila)}
             disabled={guardando}
