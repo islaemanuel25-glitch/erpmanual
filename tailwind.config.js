@@ -130,6 +130,14 @@ module.exports = {
         // da 3,5 y `gap-2.5` da 8,75.
         dato: "4px",
         renglon: "10px",
+
+        // ── LOS DOS DE RECIBIR UN PEDIDO ──────────────────────────────────
+        //
+        // 3 arriba y abajo del chip de estado, y 16 a los costados del bloque
+        // de la factura. `py-0.5` da 1,75 y `px-4` da 14: ninguno de los dos
+        // cae en la grilla.
+        chip: "3px",
+        bloque: "16px",
       },
 
       // ── EL BLANCO DE TOQUE ────────────────────────────────────────────
@@ -200,6 +208,15 @@ module.exports = {
         buscadorListado: "48px",
         entradaSinPedido: "64px",
         botonRecibir: "40px",
+
+        // ── LOS TRES DE RECIBIR UN PEDIDO ─────────────────────────────────
+        //
+        // 70 la tarjeta de contexto, 236 el bloque de la factura y 48 su botón.
+        // Van como MÍNIMO: el nombre de un proveedor largo parte el primer
+        // renglón en dos, y con alto fijo el segundo quedaría cortado.
+        contextoPedido: "70px",
+        bloqueFactura: "236px",
+        botonFoto: "48px",
       },
 
       // ── EL ALTO DE UNA FILA DE LISTA ──────────────────────────────────

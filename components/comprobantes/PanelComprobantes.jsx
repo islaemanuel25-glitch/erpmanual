@@ -106,7 +106,37 @@ async function mensajeDeRespuesta(r) {
   return null;
 }
 
-export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir = true }) {
+export default function PanelComprobantes({
+  pedidoId,
+  proveedorId,
+  puedeRecibir = true,
+  /**
+   * ── LA PRESENTACIÓN DEL ESTADO VACÍO, PUESTA DESDE AFUERA ───────────────
+   *
+   * Cuando todavía no hay ningún comprobante, la pantalla de recibir un pedido
+   * no quiere una tabla vacía que diga "Todavía no hay comprobantes": quiere el
+   * bloque de la factura, que es la única acción que hay para hacer ahí.
+   *
+   * Se pasa como función y no como nodo para que reciba los DOS disparadores y
+   * el estado de subida. Así el bloque de afuera no tiene que conocer el
+   * endpoint, la validación de tamaño, la detección de duplicados ni el modal
+   * de "¿es una factura nueva o una hoja?": sigue habiendo UN solo circuito de
+   * subida y lo que cambia es la cara.
+   *
+   * Sin esta prop el panel se dibuja exactamente como antes.
+   */
+  vacio = null,
+  /**
+   * Cuántos comprobantes hay, avisado hacia afuera.
+   *
+   * La pantalla de recibir necesita saberlo para decidir qué muestra debajo: sin
+   * ningún comprobante no tiene sentido dibujar las 197 líneas del pedido.
+   * Avisa el panel, que es el que ya los carga, en vez de que la pantalla pida
+   * la misma lista por su cuenta — dos consultas de lo mismo se separan el día
+   * que una se filtra distinto.
+   */
+  onCantidad = null,
+}) {
   const [items, setItems] = useState([]);
   const [cobertura, setCobertura] = useState(null);
   const [cuota, setCuota] = useState(null);
@@ -134,6 +164,7 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
       const d = await r.json();
       if (d.ok) {
         setItems(d.items || []);
+        onCantidad?.((d.items || []).length);
         setCobertura(d.cobertura ?? null);
         setCuota(d.cuota ?? null);
       } else setMensaje({ tipo: "error", texto: d.error });
@@ -148,6 +179,14 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
   }, [pedidoId, proveedorId]);
 
   // ── Elegir archivos: acá se decide si hace falta preguntar ─────────────
+  // ── LA CÁMARA ES OTRO CAMPO, NO OTRO CIRCUITO ──────────────────────────
+  //
+  // `capture` no se puede prender y apagar sobre el mismo `input`: el navegador
+  // lo lee al abrir el selector, y cambiarlo por estado deja una carrera entre
+  // el render y el toque. Dos campos ocultos, el mismo `onChange`, la misma
+  // subida.
+  const inputCamaraRef = useRef(null);
+
   function alElegirArchivos(e) {
     const archivos = Array.from(e.target.files || []);
     if (!archivos.length) return;
@@ -326,6 +365,16 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
           className="hidden"
           onChange={alElegirArchivos}
         />
+        {/* El de la cámara. Mismo `onChange` y misma subida: lo único que
+            cambia es de dónde sale el archivo. */}
+        <SunmiInput
+          ref={inputCamaraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={alElegirArchivos}
+        />
       </div>
 
       {/* ── LA COBERTURA DEL PEDIDO ─────────────────────────────────────
@@ -376,6 +425,19 @@ export default function PanelComprobantes({ pedidoId, proveedorId, puedeRecibir 
 
       {cargando ? (
         <SunmiLoader />
+      ) : items.length === 0 && vacio ? (
+        // ── SIN COMPROBANTES: LA CARA QUE PONE LA PANTALLA ────────────────
+        //
+        // En vez de una tabla vacía que dice "Todavía no hay comprobantes", la
+        // pantalla de recibir un pedido pone acá el bloque de la factura, que
+        // es la única acción que hay para hacer en ese estado. Los dos
+        // disparadores salen de este panel: el circuito de subida sigue siendo
+        // uno solo.
+        vacio({
+          sacarFoto: () => inputCamaraRef.current?.click(),
+          subir: () => inputRef.current?.click(),
+          subiendo,
+        })
       ) : (
         <>
           {/* ── Escritorio: tabla ────────────────────────────────────── */}

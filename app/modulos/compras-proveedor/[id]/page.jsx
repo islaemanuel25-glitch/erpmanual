@@ -14,8 +14,11 @@ import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import PanelComprobantes from "@/components/comprobantes/PanelComprobantes";
 import ListaConciliacion from "@/components/comprobantes/ListaConciliacion";
+import TarjetaContextoDelPedido from "@/components/compras-proveedor/TarjetaContextoDelPedido";
+import BloqueDeLaFactura from "@/components/compras-proveedor/BloqueDeLaFactura";
 
 import { useUser } from "@/app/context/UserContext";
+import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 // Esta pantalla ya no importa `avisoCostoLinea`: el contador que lo usaba
 // comparaba lo pedido contra el catálogo, que es la pregunta de cuando se arma el
@@ -59,6 +62,33 @@ export default function DetallePedidoProveedorPage({ params }) {
   const [pedido, setPedido] = useState(null);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
+
+  // ── "LLEGÓ SIN FACTURA": LA SALIDA SECUNDARIA DEL ESTADO 1 ──────────────
+  //
+  // Mientras no hay ningún comprobante, la pantalla ofrece sacarle una foto a
+  // la factura. Si no hay factura, esto destapa el conteo a mano, que es lo que
+  // esta pantalla ya sabía hacer. No es un modo nuevo: es dejar ver lo que ya
+  // estaba, cuando corresponde.
+  const [sinFactura, setSinFactura] = useState(false);
+  // Cuántos comprobantes tiene el pedido. Lo avisa `PanelComprobantes`, que es
+  // el que los carga: la pantalla no pide la misma lista por su cuenta.
+  const [hayComprobantes, setHayComprobantes] = useState(0);
+
+  // ── RECIBIENDO, EL TÍTULO Y EL VOLVER LOS PONE EL SHELL ────────────────
+  //
+  // La pantalla decía "Compras" arriba y abajo "PEDIDO #237" en una cinta
+  // naranja del tamaño de un botón que no es un botón. Dos encabezados, y el
+  // segundo gritando. Ahora el shell dice "Recibir pedido" y lleva el Volver a
+  // su derecha, que es donde está en las otras 33 pantallas.
+  //
+  // Solo en ENVIADO: los otros estados de esta ruta son de consulta y siguen
+  // con su encabezado propio, que esta tanda no toca.
+  const enRecepcion = pedido?.estado === "ENVIADO";
+  useTituloDePagina(enRecepcion ? "Recibir pedido" : null);
+  useAccionDePagina(
+    () => (enRecepcion ? <SunmiBackButton href="/modulos/compras-proveedor/recepcion" /> : null),
+    [enRecepcion]
+  );
 
   // Para recepción: cantidades recibidas editables
   const [recibidos, setRecibidos] = useState({});
@@ -505,84 +535,97 @@ export default function DetallePedidoProveedorPage({ params }) {
   return (
     <div className="sunmi-bg w-full min-h-full p-4">
       <SunmiCard>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <SunmiHeader title={`Pedido #${pedido.id}`} />
-            <span
-              className={`px-2 py-0.5 rounded text-xs font-medium ${
-                ESTADO_BADGE[pedido.estado] || ""
-              }`}
-            >
-              {pedido.estado === "BORRADOR" ? "EN CURSO" : pedido.estado}
-            </span>
+        {/* ── EL ENCABEZADO Y LA FICHA SON DE LOS OTROS ESTADOS ───────────
+            Recibiendo, el título y el Volver los pone el shell —abajo, con
+            `useTituloDePagina` y `useAccionDePagina`— y la identidad del pedido
+            la dice la tarjeta de contexto. Acá quedan para CONFIRMADO,
+            RECIBIDO y ANULADO, que esta tanda no toca: son pantallas de
+            consulta y la ficha con sus fechas es lo que se va a mirar. */}
+        {!esRecepcion && (
+          <>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <SunmiHeader title={`Pedido #${pedido.id}`} />
+              <span
+                className={`px-2 py-0.5 rounded text-xs font-medium ${
+                  ESTADO_BADGE[pedido.estado] || ""
+                }`}
+              >
+                {pedido.estado === "BORRADOR" ? "EN CURSO" : pedido.estado}
+              </span>
+            </div>
+
+            <SunmiBackButton href="/modulos/compras-proveedor" />
           </div>
 
-          <SunmiBackButton href="/modulos/compras-proveedor" />
-        </div>
+          {/* Info del pedido */}
+          <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div>
+                <span className="sunmi-text-muted text-xs">Proveedor</span>
+                <p className="sunmi-text-strong">{pedido.proveedor?.nombre}</p>
+              </div>
+              <div>
+                <span className="sunmi-text-muted text-xs">Depósito</span>
+                <p className="sunmi-text-strong">{pedido.deposito?.nombre}</p>
+              </div>
+              <div>
+                <span className="sunmi-text-muted text-xs">Creado</span>
+                <p className="sunmi-text-strong">{formatFecha(pedido.createdAt)}</p>
+              </div>
+              <div>
+                <span className="sunmi-text-muted text-xs">Notas</span>
+                <p className="sunmi-text-strong">{pedido.notas || "-"}</p>
+              </div>
+            </div>
 
-        {/* Info del pedido */}
-        <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <span className="sunmi-text-muted text-xs">Proveedor</span>
-              <p className="sunmi-text-strong">{pedido.proveedor?.nombre}</p>
+            {/* Fechas de flujo */}
+            <div className="grid grid-cols-4 gap-4 text-sm mt-3 pt-3 border-t sunmi-divider">
+              <div>
+                <span className="sunmi-text-muted text-xs">Confirmado</span>
+                <p className="sunmi-text-strong">{formatFecha(pedido.fechaConfirmado)}</p>
+              </div>
+              <div>
+                <span className="sunmi-text-muted text-xs">Enviado</span>
+                <p className="sunmi-text-strong">{formatFecha(pedido.fechaEnviado)}</p>
+              </div>
+              <div>
+                <span className="sunmi-text-muted text-xs">Recibido</span>
+                <p className="sunmi-text-strong">{formatFecha(pedido.fechaRecibido)}</p>
+              </div>
+              <div>
+                <span className="sunmi-text-muted text-xs">Anulado</span>
+                <p className={pedido.fechaAnulado ? "sunmi-text-danger" : "sunmi-text-strong"}>
+                  {formatFecha(pedido.fechaAnulado)}
+                </p>
+              </div>
             </div>
-            <div>
-              <span className="sunmi-text-muted text-xs">Depósito</span>
-              <p className="sunmi-text-strong">{pedido.deposito?.nombre}</p>
-            </div>
-            <div>
-              <span className="sunmi-text-muted text-xs">Creado</span>
-              <p className="sunmi-text-strong">{formatFecha(pedido.createdAt)}</p>
-            </div>
-            <div>
-              <span className="sunmi-text-muted text-xs">Notas</span>
-              <p className="sunmi-text-strong">{pedido.notas || "-"}</p>
-            </div>
-          </div>
-
-          {/* Fechas de flujo */}
-          <div className="grid grid-cols-4 gap-4 text-sm mt-3 pt-3 border-t sunmi-divider">
-            <div>
-              <span className="sunmi-text-muted text-xs">Confirmado</span>
-              <p className="sunmi-text-strong">{formatFecha(pedido.fechaConfirmado)}</p>
-            </div>
-            <div>
-              <span className="sunmi-text-muted text-xs">Enviado</span>
-              <p className="sunmi-text-strong">{formatFecha(pedido.fechaEnviado)}</p>
-            </div>
-            <div>
-              <span className="sunmi-text-muted text-xs">Recibido</span>
-              <p className="sunmi-text-strong">{formatFecha(pedido.fechaRecibido)}</p>
-            </div>
-            <div>
-              <span className="sunmi-text-muted text-xs">Anulado</span>
-              <p className={pedido.fechaAnulado ? "sunmi-text-danger" : "sunmi-text-strong"}>
-                {formatFecha(pedido.fechaAnulado)}
-              </p>
-            </div>
-          </div>
-        </SunmiPanel>
-
-        {/* Banner ENVIADO: esperando mercadería */}
-        {esRecepcion && (
-          <div
-            className="rounded-2xl border p-3 mb-4"
-            style={{ borderColor: "var(--pos-warning, #f59e0b)" }}
-          >
-            <div
-              className="text-[13px] font-semibold mb-1"
-              style={{ color: "var(--pos-warning, #f59e0b)" }}
-            >
-              Pedido enviado al proveedor. Esperando mercadería.
-            </div>
-            <div className="text-[12px] sunmi-text-muted">
-              No marques recepción hasta que la mercadería haya llegado físicamente
-              al depósito. Cuando llegue, usá el botón &quot;Recibir mercadería&quot;
-              al final del detalle.
-            </div>
-          </div>
+          </SunmiPanel>
+          </>
         )}
+
+        {/* ── RECIBIENDO: DÓNDE ESTOY, EN DOS RENGLONES ───────────────────
+            Reemplaza media pantalla de ficha —proveedor, depósito, creado,
+            notas y cuatro fechas de las cuales dos están siempre vacías— por
+            lo único que hace falta para saber dónde se está parado. */}
+        {esRecepcion && (
+          <TarjetaContextoDelPedido
+            proveedorNombre={pedido.proveedor?.nombre || "—"}
+            pedidoId={pedido.id}
+            cantItems={pedido.detalles?.length || 0}
+            totalEstimado={computedTotalFactura}
+            estado="Esperando mercadería"
+          />
+        )}
+
+        {/* ── ACÁ ESTABA EL CARTEL NARANJA DE TRES RENGLONES ──────────────
+            Decía "Pedido enviado al proveedor. Esperando mercadería." y después
+            explicaba que no se marcara la recepción hasta que la mercadería
+            llegara, usando "el botón Recibir mercadería al final del detalle"
+            — un botón que estaba veinte centímetros más abajo.
+            Lo que decía ahora lo dice el chip de la tarjeta de contexto, en una
+            palabra, y el detalle de cuándo tocar qué lo resuelve que la pantalla
+            ofrezca UNA sola acción por estado. */}
 
         {/* Los comprobantes del pedido: subir, ver, agrupar y leer. La
             conciliación línea por línea contra el pedido viene después. */}
@@ -591,294 +634,334 @@ export default function DetallePedidoProveedorPage({ params }) {
             pedidoId={pedido.id}
             proveedorId={pedido.proveedor?.id ?? pedido.proveedorId}
             puedeRecibir={esRecepcion}
+            onCantidad={setHayComprobantes}
+            // ── SIN COMPROBANTES Y RECIBIENDO: EL BLOQUE DE LA FACTURA ─────
+            //
+            // El panel sigue siendo el dueño de la subida —el endpoint, la
+            // validación de tamaño, los duplicados y el modal de "¿factura
+            // nueva u otra hoja?"—. Lo único que cambia es la cara del estado
+            // vacío, y los dos disparadores salen de él.
+            //
+            // "Llegó sin factura" destapa lo que esta pantalla ya sabía hacer:
+            // el conteo a mano contra el pedido.
+            vacio={
+              esRecepcion && !sinFactura
+                ? ({ sacarFoto, subir, subiendo }) => (
+                    <BloqueDeLaFactura
+                      onSacarFoto={sacarFoto}
+                      onSubir={subir}
+                      onSinFactura={() => setSinFactura(true)}
+                      subiendo={subiendo}
+                    />
+                  )
+                : null
+            }
           />
         )}
 
-        {/* Panel factura — editable en ENVIADO, readonly en RECIBIDO */}
-        {(esRecepcion || pedido.estado === "RECIBIDO") && (
-          <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
-            <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
-              <h3 className="text-[13px] font-semibold sunmi-text-strong">
-                Factura y ganancia
-              </h3>
-            </div>
+        {/* ── TODO LO DE ABAJO ES EL CONTEO CONTRA EL PEDIDO ──────────────
+            Recibiendo y sin ningún comprobante todavía, no se dibuja: en ese
+            estado lo único que hay para hacer es sacarle una foto a la factura,
+            y 197 tarjetas debajo del bloque que lo pide son exactamente lo que
+            hacía falta scrollear para encontrarlo.
 
-            {esRecepcion ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-xs sunmi-text-muted mb-1">Total factura ($)</label>
-                  <p className="text-lg font-bold sunmi-text-accent">
-                    ${computedTotalFactura.toFixed(2)}
-                  </p>
-                  <p className="text-[10px] sunmi-text-muted">Calculado: cant. recibida × costo</p>
-                </div>
-                <div>
-                  <label className="block text-xs sunmi-text-muted mb-1">Total real ($)</label>
-                  <SunmiInput
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={totalReal}
-                    onChange={(e) => setTotalReal(e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs sunmi-text-muted mb-1">Nro factura</label>
-                  <SunmiInput
-                    value={nroFactura}
-                    onChange={(e) => setNroFactura(e.target.value)}
-                    placeholder="Opcional"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs sunmi-text-muted mb-1">Fecha factura</label>
-                  <SunmiInput
-                    type="date"
-                    value={fechaFactura}
-                    onChange={(e) => setFechaFactura(e.target.value)}
-                  />
-                </div>
-                {totalReal && (
-                  <div className="col-span-2 md:col-span-4 pt-2 border-t sunmi-divider">
-                    <span className="text-xs sunmi-text-muted">Ganancia depósito: </span>
-                    <span className={`text-sm font-bold ${
-                      computedTotalFactura - Number(totalReal) >= 0 ? "sunmi-text-success" : "sunmi-text-danger"
-                    }`}>
-                      ${(computedTotalFactura - Number(totalReal)).toFixed(2)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <span className="sunmi-text-muted text-xs">Total factura</span>
-                  <p className="sunmi-text-strong">
-                    {pedido.totalFactura != null ? `$${Number(pedido.totalFactura).toFixed(2)}` : "-"}
-                  </p>
-                </div>
-                <div>
-                  <span className="sunmi-text-muted text-xs">Total real</span>
-                  <p className="sunmi-text-strong">
-                    {pedido.totalReal != null ? `$${Number(pedido.totalReal).toFixed(2)}` : "-"}
-                  </p>
-                </div>
-                <div>
-                  <span className="sunmi-text-muted text-xs">Nro factura</span>
-                  <p className="sunmi-text-strong">{pedido.nroFactura || "-"}</p>
-                </div>
-                <div>
-                  <span className="sunmi-text-muted text-xs">Fecha factura</span>
-                  <p className="sunmi-text-strong">
-                    {pedido.fechaFactura ? new Date(pedido.fechaFactura).toLocaleDateString("es-AR") : "-"}
-                  </p>
-                </div>
-                {pedido.totalFactura != null && pedido.totalReal != null && (
-                  <div className="col-span-2 md:col-span-4 pt-2 border-t sunmi-divider">
-                    <span className="text-xs sunmi-text-muted">Ganancia depósito: </span>
-                    <span className={`text-sm font-bold ${
-                      Number(pedido.totalFactura) - Number(pedido.totalReal) >= 0 ? "sunmi-text-success" : "sunmi-text-danger"
-                    }`}>
-                      ${(Number(pedido.totalFactura) - Number(pedido.totalReal)).toFixed(2)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-          </SunmiPanel>
-        )}
+            Aparece cuando hay un comprobante —porque entonces hay algo que
+            conciliar— o cuando se eligió "Llegó sin factura", que es el conteo
+            a mano. En los otros estados del pedido se dibuja siempre, como
+            antes.
 
-        {/* Detalle de productos */}
-        <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
-          <div className="flex items-center gap-2 flex-wrap pb-2 mb-3 border-b sunmi-divider">
-            <h3 className="text-[13px] font-semibold sunmi-text-strong">
-              Detalle ({pedido.detalles?.length || 0} items)
-            </h3>
-          </div>
-
-          {/* ── ACÁ VIVÍA EL EDITOR DE BORRADOR, Y SE BORRÓ ENTERO ──────────
-              La tabla de escritorio, las tarjetas de mobile y el banner "Estás
-              editando un borrador" colgaban todos de `esBorrador`, que es siempre
-              falso por el `return null` de más arriba: no se dibujaron nunca.
-
-              NO SE CONECTARON, SE BORRARON, y es una decisión de negocio y no de
-              plomería: BORRADOR es "todavía se está armando" y se edita en
-              `/nueva`; ENVIADO es "ya se armó". Lo que cambia después no lo hace
-              uno —lo hace el proveedor, que manda de menos o cobra distinto— y eso
-              se captura CONTRA LA BOLETA al recibir, que es a lo que vino el
-              módulo de comprobantes. Editar el pedido acá sería reescribir lo que
-              se pidió para que coincida con lo que llegó, y así la diferencia
-              —que es el dato— desaparece.
-
-              En recepción y en recibido va la lista única, abajo. */}
-
-          {/* ── LA LISTA ÚNICA ────────────────────────────────────────────────
-              Cada línea de la factura con lo que le corresponde del pedido al
-              lado, agrupada por comprobante, y las del pedido que ningún
-              comprobante trajo aparte y al final. Reemplaza a las DOS listas que
-              había —las líneas de la factura arriba y el detalle del pedido
-              abajo— que obligaban a cruzarlas de memoria.
-
-              OJO CON EL NOMBRE: `esRecepcion` es el estado ENVIADO. Es
-              justamente el estado en el que se suben y se leen las facturas, así
-              que la conciliación SÍ está disponible ahí. El nombre engaña y ya
-              hizo dudar una vez si faltaba un estado; no falta.
-
-              El estado de lo recibido y su guardado siguen viviendo en esta
-              página: la lista solo dibuja los campos. Cambiar cómo se ve y cómo
-              se guarda en la misma tanda junta dos fuentes de error en la misma
-              ventana. */}
+            El rediseño de estas líneas y de la hoja de corregir es la tanda
+            siguiente: necesita dos columnas que hoy no existen —el motivo de la
+            diferencia y las unidades sueltas— y eso es una migración. */}
+        {(!esRecepcion || sinFactura || hayComprobantes > 0) && (
+          <>
+          {/* Panel factura — editable en ENVIADO, readonly en RECIBIDO */}
           {(esRecepcion || pedido.estado === "RECIBIDO") && (
-            <ListaConciliacion
-              pedidoId={pedido.id}
-              estadoPedido={pedido.estado}
-              esRecepcion={esRecepcion}
-              puedeRecibir={esRecepcion}
-              recibidos={recibidos}
-              setRecibidos={setRecibidos}
-              kgRecibidos={kgRecibidos}
-              setKgRecibidos={setKgRecibidos}
-              onCambio={cargar}
-            />
-          )}
-        </SunmiPanel>
+            <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+              <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
+                <h3 className="text-[13px] font-semibold sunmi-text-strong">
+                  Factura y ganancia
+                </h3>
+              </div>
 
-        {/* Agregar productos al pedido — visible en BORRADOR y ENVIADO */}
-        {(esRecepcion || esBorrador) && (
+              {esRecepcion ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-xs sunmi-text-muted mb-1">Total factura ($)</label>
+                    <p className="text-lg font-bold sunmi-text-accent">
+                      ${computedTotalFactura.toFixed(2)}
+                    </p>
+                    <p className="text-[10px] sunmi-text-muted">Calculado: cant. recibida × costo</p>
+                  </div>
+                  <div>
+                    <label className="block text-xs sunmi-text-muted mb-1">Total real ($)</label>
+                    <SunmiInput
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={totalReal}
+                      onChange={(e) => setTotalReal(e.target.value)}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs sunmi-text-muted mb-1">Nro factura</label>
+                    <SunmiInput
+                      value={nroFactura}
+                      onChange={(e) => setNroFactura(e.target.value)}
+                      placeholder="Opcional"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs sunmi-text-muted mb-1">Fecha factura</label>
+                    <SunmiInput
+                      type="date"
+                      value={fechaFactura}
+                      onChange={(e) => setFechaFactura(e.target.value)}
+                    />
+                  </div>
+                  {totalReal && (
+                    <div className="col-span-2 md:col-span-4 pt-2 border-t sunmi-divider">
+                      <span className="text-xs sunmi-text-muted">Ganancia depósito: </span>
+                      <span className={`text-sm font-bold ${
+                        computedTotalFactura - Number(totalReal) >= 0 ? "sunmi-text-success" : "sunmi-text-danger"
+                      }`}>
+                        ${(computedTotalFactura - Number(totalReal)).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <span className="sunmi-text-muted text-xs">Total factura</span>
+                    <p className="sunmi-text-strong">
+                      {pedido.totalFactura != null ? `$${Number(pedido.totalFactura).toFixed(2)}` : "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="sunmi-text-muted text-xs">Total real</span>
+                    <p className="sunmi-text-strong">
+                      {pedido.totalReal != null ? `$${Number(pedido.totalReal).toFixed(2)}` : "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="sunmi-text-muted text-xs">Nro factura</span>
+                    <p className="sunmi-text-strong">{pedido.nroFactura || "-"}</p>
+                  </div>
+                  <div>
+                    <span className="sunmi-text-muted text-xs">Fecha factura</span>
+                    <p className="sunmi-text-strong">
+                      {pedido.fechaFactura ? new Date(pedido.fechaFactura).toLocaleDateString("es-AR") : "-"}
+                    </p>
+                  </div>
+                  {pedido.totalFactura != null && pedido.totalReal != null && (
+                    <div className="col-span-2 md:col-span-4 pt-2 border-t sunmi-divider">
+                      <span className="text-xs sunmi-text-muted">Ganancia depósito: </span>
+                      <span className={`text-sm font-bold ${
+                        Number(pedido.totalFactura) - Number(pedido.totalReal) >= 0 ? "sunmi-text-success" : "sunmi-text-danger"
+                      }`}>
+                        ${(Number(pedido.totalFactura) - Number(pedido.totalReal)).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </SunmiPanel>
+          )}
+
+          {/* Detalle de productos */}
           <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
-            <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
+            <div className="flex items-center gap-2 flex-wrap pb-2 mb-3 border-b sunmi-divider">
               <h3 className="text-[13px] font-semibold sunmi-text-strong">
-                {esBorrador ? "Agregar productos al pedido" : "Agregar producto extra"}
+                Detalle ({pedido.detalles?.length || 0} items)
               </h3>
             </div>
 
-            <SunmiInput
-              type="text"
-              placeholder="Buscar producto extra (nombre / SKU / código de barra)"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              value={extraSearch}
-              onChange={(e) => buscarExtra(e.target.value)}
-              className="mb-3"
-            />
+            {/* ── ACÁ VIVÍA EL EDITOR DE BORRADOR, Y SE BORRÓ ENTERO ──────────
+                La tabla de escritorio, las tarjetas de mobile y el banner "Estás
+                editando un borrador" colgaban todos de `esBorrador`, que es siempre
+                falso por el `return null` de más arriba: no se dibujaron nunca.
 
-            {extraLoading && (
-              <p className="text-xs sunmi-text-muted">Buscando...</p>
-            )}
+                NO SE CONECTARON, SE BORRARON, y es una decisión de negocio y no de
+                plomería: BORRADOR es "todavía se está armando" y se edita en
+                `/nueva`; ENVIADO es "ya se armó". Lo que cambia después no lo hace
+                uno —lo hace el proveedor, que manda de menos o cobra distinto— y eso
+                se captura CONTRA LA BOLETA al recibir, que es a lo que vino el
+                módulo de comprobantes. Editar el pedido acá sería reescribir lo que
+                se pidió para que coincida con lo que llegó, y así la diferencia
+                —que es el dato— desaparece.
 
-            {!extraLoading && extraSearch.trim() && extraResults.length === 0 && (
-              <p className="text-xs sunmi-text-muted">Sin resultados</p>
-            )}
+                En recepción y en recibido va la lista única, abajo. */}
 
-            {extraResults.length > 0 && (
-              <div className="overflow-x-auto rounded border sunmi-border">
-                <SunmiTable headers={["Producto", "SKU", "Cód. barra", "Modo", "Costo", ""]}>
-                  {extraResults.map((p) => (
-                    <SunmiTableRow key={p.productoLocalId}>
-                      <td className="px-3 py-1.5 text-sm">{p.nombre}</td>
-                      <td className="px-3 py-1.5 text-xs sunmi-text-muted">{p.sku || "-"}</td>
-                      <td className="px-3 py-1.5 text-xs sunmi-text-muted">{p.codigo_barra || "-"}</td>
-                      <td className="px-3 py-1.5 text-xs">
-                        {p.modoCompra === "UNIDAD" ? (
-                          <span className="sunmi-text-link">FIAMBRE</span>
-                        ) : (
-                          "BULTO"
-                        )}
-                      </td>
-                      <td className="px-3 py-1.5 text-xs">
-                        {p.precio_costo ? `$${Number(p.precio_costo).toFixed(2)}` : "-"}
-                      </td>
-                      <td className="px-3 py-1.5">
-                        <SunmiButton
-                          color="cyan"
-                          size="xs"
-                          disabled={extraAdding === p.productoLocalId}
-                          onClick={() => agregarExtra(p)}
-                        >
-                          {extraAdding === p.productoLocalId ? "..." : "Agregar"}
-                        </SunmiButton>
-                      </td>
-                    </SunmiTableRow>
-                  ))}
-                </SunmiTable>
-              </div>
+            {/* ── LA LISTA ÚNICA ────────────────────────────────────────────────
+                Cada línea de la factura con lo que le corresponde del pedido al
+                lado, agrupada por comprobante, y las del pedido que ningún
+                comprobante trajo aparte y al final. Reemplaza a las DOS listas que
+                había —las líneas de la factura arriba y el detalle del pedido
+                abajo— que obligaban a cruzarlas de memoria.
+
+                OJO CON EL NOMBRE: `esRecepcion` es el estado ENVIADO. Es
+                justamente el estado en el que se suben y se leen las facturas, así
+                que la conciliación SÍ está disponible ahí. El nombre engaña y ya
+                hizo dudar una vez si faltaba un estado; no falta.
+
+                El estado de lo recibido y su guardado siguen viviendo en esta
+                página: la lista solo dibuja los campos. Cambiar cómo se ve y cómo
+                se guarda en la misma tanda junta dos fuentes de error en la misma
+                ventana. */}
+            {(esRecepcion || pedido.estado === "RECIBIDO") && (
+              <ListaConciliacion
+                pedidoId={pedido.id}
+                estadoPedido={pedido.estado}
+                esRecepcion={esRecepcion}
+                puedeRecibir={esRecepcion}
+                recibidos={recibidos}
+                setRecibidos={setRecibidos}
+                kgRecibidos={kgRecibidos}
+                setKgRecibidos={setKgRecibidos}
+                onCambio={cargar}
+              />
             )}
           </SunmiPanel>
-        )}
 
-        {/* Acciones */}
-        <div className="flex justify-end gap-3">
-          {["BORRADOR", "CONFIRMADO", "ENVIADO"].includes(pedido.estado) && (
-            <SunmiButton
-              color="red"
-              disabled={acting}
-              onClick={() => {
-                if (!confirm("¿Anular este pedido? Esta acción no se puede deshacer.")) return;
-                ejecutarAccion("anular");
-              }}
-            >
-              {acting ? "Procesando..." : "Anular pedido"}
-            </SunmiButton>
+          {/* Agregar productos al pedido — visible en BORRADOR y ENVIADO */}
+          {(esRecepcion || esBorrador) && (
+            <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
+              <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
+                <h3 className="text-[13px] font-semibold sunmi-text-strong">
+                  {esBorrador ? "Agregar productos al pedido" : "Agregar producto extra"}
+                </h3>
+              </div>
+
+              <SunmiInput
+                type="text"
+                placeholder="Buscar producto extra (nombre / SKU / código de barra)"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                value={extraSearch}
+                onChange={(e) => buscarExtra(e.target.value)}
+                className="mb-3"
+              />
+
+              {extraLoading && (
+                <p className="text-xs sunmi-text-muted">Buscando...</p>
+              )}
+
+              {!extraLoading && extraSearch.trim() && extraResults.length === 0 && (
+                <p className="text-xs sunmi-text-muted">Sin resultados</p>
+              )}
+
+              {extraResults.length > 0 && (
+                <div className="overflow-x-auto rounded border sunmi-border">
+                  <SunmiTable headers={["Producto", "SKU", "Cód. barra", "Modo", "Costo", ""]}>
+                    {extraResults.map((p) => (
+                      <SunmiTableRow key={p.productoLocalId}>
+                        <td className="px-3 py-1.5 text-sm">{p.nombre}</td>
+                        <td className="px-3 py-1.5 text-xs sunmi-text-muted">{p.sku || "-"}</td>
+                        <td className="px-3 py-1.5 text-xs sunmi-text-muted">{p.codigo_barra || "-"}</td>
+                        <td className="px-3 py-1.5 text-xs">
+                          {p.modoCompra === "UNIDAD" ? (
+                            <span className="sunmi-text-link">FIAMBRE</span>
+                          ) : (
+                            "BULTO"
+                          )}
+                        </td>
+                        <td className="px-3 py-1.5 text-xs">
+                          {p.precio_costo ? `$${Number(p.precio_costo).toFixed(2)}` : "-"}
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <SunmiButton
+                            color="cyan"
+                            size="xs"
+                            disabled={extraAdding === p.productoLocalId}
+                            onClick={() => agregarExtra(p)}
+                          >
+                            {extraAdding === p.productoLocalId ? "..." : "Agregar"}
+                          </SunmiButton>
+                        </td>
+                      </SunmiTableRow>
+                    ))}
+                  </SunmiTable>
+                </div>
+              )}
+            </SunmiPanel>
           )}
 
-          {pedido.estado === "BORRADOR" && (
-            <SunmiButton
-              color="amber"
-              disabled={acting}
-              onClick={() => ejecutarAccion("confirmar")}
-            >
-              {acting ? "Procesando..." : "Confirmar pedido"}
-            </SunmiButton>
-          )}
-
-          {pedido.estado === "CONFIRMADO" && (
-            <>
-              {/* Los dos del proveedor: sin precios. */}
-              <SunmiButton color="slate" onClick={descargarPdfDelProveedor}>
-                PDF para el proveedor
-              </SunmiButton>
-              <SunmiButton color="slate" onClick={copiarTextoDelProveedor}>
-                Copiar para el proveedor
-              </SunmiButton>
-              {/* Y los dos de adentro. Van con la palabra "prefactura" porque es
-                  lo que distingue un documento del otro: el que lleva los costos
-                  no se le manda a nadie. */}
-              <SunmiButton color="slate" onClick={descargarPrefactura}>
-                Descargar prefactura
-              </SunmiButton>
-              <SunmiButton color="slate" onClick={copiarTextoDeLaPrefactura}>
-                Copiar prefactura
-              </SunmiButton>
+          {/* Acciones */}
+          <div className="flex justify-end gap-3">
+            {["BORRADOR", "CONFIRMADO", "ENVIADO"].includes(pedido.estado) && (
               <SunmiButton
-                color="cyan"
+                color="red"
                 disabled={acting}
                 onClick={() => {
-                  if (!confirm("¿Confirmás que este pedido ya fue enviado al proveedor?")) return;
-                  ejecutarAccion("enviar");
+                  if (!confirm("¿Anular este pedido? Esta acción no se puede deshacer.")) return;
+                  ejecutarAccion("anular");
                 }}
               >
-                {acting ? "Procesando..." : "Marcar como enviado"}
+                {acting ? "Procesando..." : "Anular pedido"}
               </SunmiButton>
-            </>
-          )}
+            )}
 
-          {pedido.estado === "ENVIADO" && (
-            <SunmiButton
-              color="amber"
-              disabled={acting}
-              title="Solo continuar si la mercadería llegó físicamente al depósito"
-              onClick={() => {
-                if (!confirm("Solo continuar si la mercadería llegó físicamente.\n\n¿Confirmás la recepción de este pedido?")) return;
-                ejecutarAccion("recibir");
-              }}
-            >
-              {acting ? "Procesando..." : "Recibir mercadería"}
-            </SunmiButton>
-          )}
-        </div>
+            {pedido.estado === "BORRADOR" && (
+              <SunmiButton
+                color="amber"
+                disabled={acting}
+                onClick={() => ejecutarAccion("confirmar")}
+              >
+                {acting ? "Procesando..." : "Confirmar pedido"}
+              </SunmiButton>
+            )}
+
+            {pedido.estado === "CONFIRMADO" && (
+              <>
+                {/* Los dos del proveedor: sin precios. */}
+                <SunmiButton color="slate" onClick={descargarPdfDelProveedor}>
+                  PDF para el proveedor
+                </SunmiButton>
+                <SunmiButton color="slate" onClick={copiarTextoDelProveedor}>
+                  Copiar para el proveedor
+                </SunmiButton>
+                {/* Y los dos de adentro. Van con la palabra "prefactura" porque es
+                    lo que distingue un documento del otro: el que lleva los costos
+                    no se le manda a nadie. */}
+                <SunmiButton color="slate" onClick={descargarPrefactura}>
+                  Descargar prefactura
+                </SunmiButton>
+                <SunmiButton color="slate" onClick={copiarTextoDeLaPrefactura}>
+                  Copiar prefactura
+                </SunmiButton>
+                <SunmiButton
+                  color="cyan"
+                  disabled={acting}
+                  onClick={() => {
+                    if (!confirm("¿Confirmás que este pedido ya fue enviado al proveedor?")) return;
+                    ejecutarAccion("enviar");
+                  }}
+                >
+                  {acting ? "Procesando..." : "Marcar como enviado"}
+                </SunmiButton>
+              </>
+            )}
+
+            {pedido.estado === "ENVIADO" && (
+              <SunmiButton
+                color="amber"
+                disabled={acting}
+                title="Solo continuar si la mercadería llegó físicamente al depósito"
+                onClick={() => {
+                  if (!confirm("Solo continuar si la mercadería llegó físicamente.\n\n¿Confirmás la recepción de este pedido?")) return;
+                  ejecutarAccion("recibir");
+                }}
+              >
+                {acting ? "Procesando..." : "Recibir mercadería"}
+              </SunmiButton>
+            )}
+          </div>
+          </>
+        )}
       </SunmiCard>
     </div>
   );
