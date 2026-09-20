@@ -44,20 +44,26 @@ import { analizarPrecioDeLinea } from "@/lib/compras-proveedor/comprobante/preci
 import { RECETA_POR_DEFECTO } from "@/lib/compras-proveedor/comprobante/impuestos";
 import { productosDeLasFilas } from "@/lib/compras-proveedor/comprobante/productoDeLaFila";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
-import { resolverLineaDelPedido } from "@/lib/compras-proveedor/comprobante/vinculo";
-import { aplanarDetalles } from "@/lib/compras-proveedor/comprobante/analisisDeComprobante";
+import {
+  aplanarDetalles,
+  analizarLineas,
+  cargarContexto,
+} from "@/lib/compras-proveedor/comprobante/analisisDeComprobante";
 import { guardarDecisionDePrecio } from "@/lib/compras-proveedor/comprobante/guardarDecisionDePrecio";
 import {
   DECISION_DE_PRECIO,
   esDecisionConocida,
   mismoPrecio,
 } from "@/lib/compras-proveedor/decisionDePrecio";
+import { motivoSinComparacion } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 
 export async function POST(req) {
   try {
     const ctx = await resolveLocalAndGrupo(req);
     if (ctx.error) return NextResponse.json({ ok: false, error: ctx.error }, { status: ctx.status });
-    const { grupoId, session } = ctx;
+    // `localId` hace falta para cargar el universo del proveedor con el mismo
+    // alcance que la pantalla: el vínculo de un producto se mira desde un local.
+    const { grupoId, localId, session } = ctx;
 
     const perm = checkPerm(session, "compras.recibir");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
@@ -81,6 +87,11 @@ export async function POST(req) {
       where: { id: lineaId, comprobante: { grupoId } },
       select: {
         id: true, cantidad: true, netoUnitario: true, internoUnitario: true,
+        // EL TEXTO DEL PAPEL Y EL CÓDIGO DEL PROVEEDOR son lo que la cascada de
+        // vínculo machea. Sin ellos, una línea que la pantalla resuelve por
+        // alias acá quedaría sin producto, que es exactamente el defecto que
+        // esta tanda arregla.
+        textoCrudo: true, codigoProveedor: true,
         // `subtotalImpreso` es lo que permite comprobar que la cuenta de ESTA
         // línea cierra. Con un papel sin total impreso es lo único que queda
         // para verificar el precio, así que sin él la guarda no puede decidir.
@@ -102,52 +113,23 @@ export async function POST(req) {
 
     const receta = linea.comprobante.recetaUsada ?? { ...RECETA_POR_DEFECTO };
 
-    // El producto vinculado, en una consulta aparte. Se piden los tres campos
-    // que el análisis usa y ninguno más.
-    const porProductoLocal = await productosDeLasFilas(prisma, [linea], {
-      id: true, nombre: true, factor_pack: true, precio_costo: true,
-    });
-    const base = porProductoLocal.get(Number(linea.productoLocalId))?.base ?? null;
-
-    // LOS CINCO PASOS SALEN DEL MÓDULO COMPARTIDO, el mismo que alimenta la
-    // pantalla. Se recalculan acá en vez de aceptar lo que llegó en el pedido:
-    // el precio que se escribe no puede venir del cliente.
-    const analisis = analizarPrecioDeLinea({
-      linea,
-      producto: base,
-      receta,
-      proveedor: linea.comprobante.proveedor,
-      // Lo único que se toma del pedido es la ELECCIÓN de unidad, cuando el
-      // cociente no alcanza para decidir. Es una decisión de una persona que
-      // miró la factura, no un número calculado.
-      unidadElegida: body?.unidad,
-    });
-
-    // Sin análisis no hay precio que escribir, y se frena ANTES de la puerta.
-    // `puedeAceptarse` no lo atajaría: mira el vínculo y la unidad, y un
-    // `undefined?.requiereDecision` es falso, o sea que pasaría — y el `throw`
-    // caería después, con un "Error interno" que no explica nada.
-    if (!analisis) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "El producto vinculado no tiene costo ni bulto cargados, así que no hay con qué comparar.",
-        },
-        { status: 409 }
-      );
-    }
-
-    // ── A QUÉ LÍNEA DEL PEDIDO PERTENECE, CON EL CRITERIO ÚNICO ──────────
+    // ── LA RESOLUCIÓN ES LA DE LA PANTALLA, NO UNA PARECIDA ──────────────
     //
-    // Antes esto se leía de `linea.pedidoDetalleId` y nada más. Esa columna
-    // solo se escribe si quien llama a vincular la manda, y la pantalla no la
-    // manda: medido, 0 de 21 líneas la tienen. O sea que la guarda de abajo
-    // cortaba siempre y aceptar un precio no funcionaba nunca.
+    // Acá había una versión corta: el producto salía de `productoLocalId` y la
+    // línea del pedido de `resolverLineaDelPedido`. La pantalla usa otra cosa
+    // —la cascada de vínculo entera, que además resuelve por ALIAS del
+    // proveedor— y por eso las dos podían contestar distinto sobre la misma
+    // línea. Contestaron distinto: sobre la 112 del comprobante 5 la hoja
+    // mostraba la comparación hecha contra Philips 20 red común, resuelto por
+    // un alias, mientras esta ruta veía `productoLocalId` en null y devolvía
+    // "el producto vinculado no tiene costo ni bulto cargados" — un cartel que
+    // contradecía a la hoja Y nombraba una causa falsa: ese producto tiene
+    // costo 26.460 y bulto de 10 cargados.
     //
-    // `resolverLineaDelPedido` es el mismo criterio que alimenta la fila que la
-    // persona está mirando: la columna manda cuando está, y si no se deduce por
-    // producto. Con dos criterios, la pantalla mostraba una línea y el servidor
-    // buscaba otra.
+    // Ahora las dos salen de `analizarLineas`, la misma función, con los mismos
+    // datos, para la línea sola. Es la regla 1 de CLAUDE.md: dos funciones que
+    // deciden lo mismo no se rompen el día que se escriben, se rompen el día
+    // que una cambia.
     const detallesDelPedido = aplanarDetalles(
       await prisma.pedidoProveedorDetalle.findMany({
         where: { pedidoId: linea.comprobante.pedidoId },
@@ -155,15 +137,60 @@ export async function POST(req) {
           id: true,
           cantidad: true,
           precioCosto: true,
-          producto: { select: { baseId: true } },
+          // El NOMBRE del producto del pedido no es decoración acá: la cascada
+          // lo usa para machear el texto del papel contra lo que se encargó, y
+          // sin él una línea que la pantalla resuelve sola quedaría sin resolver
+          // de este lado. Es el mismo select que hace la ruta de la pantalla.
+          producto: { select: { baseId: true, base: { select: { id: true, nombre: true, factor_pack: true } } } },
         },
       })
     );
-    const delPedido = resolverLineaDelPedido({
-      linea,
-      productoBaseId: base?.id ?? null,
-      detalles: detallesDelPedido,
+    const contexto = await cargarContexto(prisma, {
+      grupoId,
+      localId,
+      proveedorId: linea.comprobante.proveedor.id,
     });
+    const porProductoLocal = await productosDeLasFilas(prisma, [linea]);
+    const [analizada] = analizarLineas({
+      comprobante: { ...linea.comprobante, lineas: [linea] },
+      contexto,
+      detallesPlanos: detallesDelPedido,
+      porProductoLocal,
+    });
+
+    // El producto es el que resolvió esa cascada, tomado del MISMO catálogo que
+    // usó la pantalla para comparar.
+    const base = analizada?.productoBaseId ? contexto.datosPorBase.get(analizada.productoBaseId) ?? null : null;
+    const delPedido = { detalle: analizada?.pedidoDetalle ?? null };
+
+    // El precio se recalcula acá y no se acepta lo que llegó en el pedido: el
+    // número que se escribe no puede venir del cliente. Con el mismo producto y
+    // la misma receta da lo mismo que muestra la hoja; lo único que agrega es
+    // la unidad que una persona haya elegido mirando la factura, que la
+    // pantalla no puede saber de antemano.
+    const analisis = analizarPrecioDeLinea({
+      linea,
+      producto: base,
+      receta,
+      proveedor: linea.comprobante.proveedor,
+      unidadElegida: body?.unidad,
+    });
+
+    // ── LA GUARDA MIRA LOS DOS NÚMEROS DE LA COMPARACIÓN, Y NADA MÁS ─────
+    //
+    // Si la hoja pudo comparar, la decisión se puede guardar. Si no pudo, no
+    // hay opciones que ofrecer y se dice CUÁL de los dos falta — la misma
+    // función que usa la hoja para decidir si muestra las opciones o el aviso,
+    // así no pueden volver a contestar distinto.
+    const comparacion = {
+      costoFactura: analisis?.precioAEscribir ?? null,
+      costoCatalogo: delPedido.detalle?.precioCosto ?? null,
+      pedidoDetalleId: delPedido.detalle?.id ?? null,
+    };
+    const sinComparacion = motivoSinComparacion(comparacion);
+    if (sinComparacion) {
+      return NextResponse.json({ ok: false, error: sinComparacion, queHacer: sinComparacion }, { status: 409 });
+    }
 
     // ── DEJAR EL PROPIO NO ESCRIBE NINGÚN COSTO ─────────────────────────
     //
@@ -172,16 +199,13 @@ export async function POST(req) {
     // factura no entre sin que alguien lo mire, y acá no entra ninguno. Lo
     // único que hace falta es contra QUÉ costo se decidió, que es el de la
     // línea del pedido — el mismo número que la pantalla mostró.
+    //
+    // Acá había un segundo chequeo de que la línea del pedido existiera. Quedó
+    // INALCANZABLE al entrar la guarda de arriba —sin línea de pedido no hay
+    // costo propio y la comparación ya frenó—, así que se saca en vez de
+    // dejarlo: una rama que no puede ejecutarse se lee como protección y no
+    // protege de nada.
     if (decisionPedida === DECISION_DE_PRECIO.DEJA_EL_MIO) {
-      if (!delPedido.detalle) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: "Esa línea todavía no está apareada con una del pedido, así que no hay contra qué decidir.",
-          },
-          { status: 409 }
-        );
-      }
       await guardarDecisionDePrecio(prisma, {
         grupoId,
         proveedorId: linea.comprobante.proveedor.id,
@@ -205,6 +229,10 @@ export async function POST(req) {
 
     const puede = puedeAceptarse({
       linea,
+      // El producto que resolvió la cascada, no la columna: es el que la hoja
+      // muestra, y es contra el que se hizo la comparación que se está
+      // decidiendo.
+      productoBaseId: analizada?.productoBaseId ?? null,
       lineaDePedidoId: delPedido.detalle?.id ?? null,
       comprobante: linea.comprobante,
       decision: analisis.decision,

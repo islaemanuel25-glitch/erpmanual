@@ -40,12 +40,14 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import { BuscadorProducto } from "@/components/comprobantes/PiezasConciliacion";
 import { formatearMoneda } from "@/lib/moneda";
+import { aceptarEstaBloqueado } from "@/lib/compras-proveedor/comprobante/aceptarPrecio";
 import {
   ESTADO_LINEA,
   cantidadEnEscalaDelPedido,
   cantidadFueConvertida,
   diferenciaDeCantidad,
   estadoDeLinea,
+  motivoSinComparacion,
   porcentajeDelPrecio,
   precioCambio,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
@@ -235,6 +237,18 @@ export default function HojaCorregirLinea({
   // preguntar no se lea como que el sistema se olvidó.
   const yaDecidido = decisionVigente(fila);
   const decisionVieja = decisionVencida(fila);
+  // ── LO QUE NO SE PUEDE COMPARAR NO SE PREGUNTA ─────────────────────────
+  //
+  // Si falta uno de los dos precios no hay nada que decidir, y la hoja lo dice
+  // en vez de ofrecer dos opciones que el servidor va a rechazar. Es la misma
+  // función que usa la ruta, así que no pueden contestar distinto: eso es lo
+  // que producía una comparación hecha arriba y un "no hay con qué comparar" en
+  // rojo abajo.
+  const sinComparacion = motivoSinComparacion(fila);
+  // Y lo que ya está decidido por regla tampoco se ofrece: una baja no se
+  // aplica sola y un salto brusco no es un precio nuevo. La respuesta que queda
+  // es dejar el propio, que es la única que corresponde.
+  const noSePuedeAceptar = aceptarEstaBloqueado(fila?.precio?.decision);
   // Va por pack cuando el pedido se hizo en bultos y el bulto trae más de uno.
   const vaPorPack = (fila?.unidadPedido ?? "BULTO") === "BULTO" && Number(fila?.factorPack) > 1;
 
@@ -286,7 +300,10 @@ export default function HojaCorregirLinea({
     // seleccionado sobre una línea donde se había dicho lo contrario, y un
     // toque en Guardar daría vuelta la decisión sin que nadie lo pidiera.
     const decidida = decisionVigente(fila);
-    setAceptaPrecio(decidida ? decidida.decision === DECISION_DE_PRECIO.ACEPTA_FACTURA : true);
+    const bloqueada = aceptarEstaBloqueado(fila?.precio?.decision);
+    setAceptaPrecio(
+      bloqueada ? false : decidida ? decidida.decision === DECISION_DE_PRECIO.ACEPTA_FACTURA : true
+    );
     setCambiandoPrecio(false);
     setError("");
     setCambiandoProducto(false);
@@ -445,7 +462,23 @@ export default function HojaCorregirLinea({
         </div>
       </div>
 
-      {/* ── 2 · EL PRECIO, SOLO SI CAMBIÓ ────────────────────────────────── */}
+      {/* ── 2.a · CUANDO NO HAY CON QUÉ COMPARAR, SE DICE Y NO SE PREGUNTA ──
+          Sin uno de los dos precios no hay decisión posible, así que no se
+          ofrecen opciones: entra la mercadería y el costo no se toca, que es lo
+          único que se puede hacer sin comparación. Y se dice CUÁL falta, porque
+          "no hay con qué comparar" a secas manda a buscar el problema a
+          cualquier lado. */}
+      {sinComparacion && (
+        <div className="border-t sunmi-divider pt-hoja flex flex-col gap-dato">
+          <span className="text-sm3 font-medium sunmi-text-strong">El precio no se puede comparar</span>
+          <span className="text-sm3 sunmi-text-muted break-words">{sinComparacion}</span>
+          <span className="text-sm3 sunmi-text-muted break-words">
+            La mercadería entra igual y tu costo no se toca.
+          </span>
+        </div>
+      )}
+
+      {/* ── 2.b · EL PRECIO, SOLO SI CAMBIÓ ──────────────────────────────── */}
       {cambio && (
         <div className="border-t sunmi-divider pt-hoja flex flex-col gap-renglon">
           {yaDecidido && !cambiandoPrecio ? (
@@ -502,13 +535,27 @@ export default function HojaCorregirLinea({
                 </span>
               )}
 
+              {/* ── LO QUE YA ESTÁ DECIDIDO POR REGLA NO SE OFRECE ────────
+                  Una baja no se aplica sola y un salto brusco no es un precio
+                  nuevo: el servidor rechaza las dos, así que ofrecer el botón
+                  es ofrecer un error. Se dice el porqué, con el texto que esa
+                  regla ya tiene escrito, y queda la respuesta que sí
+                  corresponde. */}
+              {noSePuedeAceptar && fila?.precio?.decision?.detalle && (
+                <span className="text-sm3 sunmi-text-muted break-words">
+                  {fila.precio.decision.detalle}
+                </span>
+              )}
+
               <div className="flex flex-col gap-0.5">
-                <OpcionDePrecio
-                  elegida={aceptaPrecio}
-                  titulo="Aceptar el precio nuevo"
-                  detalle="Pasa a ser tu costo. El margen se recalcula."
-                  onElegir={() => setAceptaPrecio(true)}
-                />
+                {!noSePuedeAceptar && (
+                  <OpcionDePrecio
+                    elegida={aceptaPrecio}
+                    titulo="Aceptar el precio nuevo"
+                    detalle="Pasa a ser tu costo. El margen se recalcula."
+                    onElegir={() => setAceptaPrecio(true)}
+                  />
+                )}
                 <OpcionDePrecio
                   elegida={!aceptaPrecio}
                   titulo="Dejar el que tenía"
