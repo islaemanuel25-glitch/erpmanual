@@ -49,6 +49,11 @@ export async function POST(req) {
       where: { id: lineaId, comprobante: { grupoId } },
       select: {
         id: true, textoCrudo: true,
+        // Lo que colgaba del vínculo ANTERIOR. Si el producto cambia, esto hay
+        // que deshacerlo: si no, queda un costo aceptado escrito sobre la línea
+        // de pedido equivocada y nadie se entera.
+        productoLocalId: true, pedidoDetalleId: true,
+        precioPedidoPrevio: true, costoFinalUnitario: true,
         // `pedidoId` para poder resolver a qué línea del pedido corresponde.
         comprobante: {
           select: { id: true, pedidoId: true, proveedorId: true, estado: true, confirmadoEn: true },
@@ -132,10 +137,45 @@ export async function POST(req) {
       detalleDelPedido = delPedido.detalle?.id ?? null;
     }
 
+    // ── ¿CAMBIA DE LÍNEA DE PEDIDO? ENTONCES HAY QUE DESHACER LO ANTERIOR ─
+    //
+    // Re-vincular no es vincular por primera vez: puede haber un costo ya
+    // aceptado escrito sobre la línea del pedido VIEJA. Sin deshacerlo queda un
+    // precio de la factura aplicado a un producto que esa factura no trae, y no
+    // se ve: el número es plausible y nadie lo va a ir a buscar.
+    //
+    // Se restaura desde `precioPedidoPrevio`, que es la columna que
+    // `aceptar-precio` llena justamente para poder contestar "a cuánto estaba
+    // antes". Si está en null no se toca nada: no hay a qué volver.
+    const cambiaDeDetalle =
+      linea.pedidoDetalleId != null && linea.pedidoDetalleId !== detalleDelPedido;
+    const habiaPrecioAceptado = linea.costoFinalUnitario != null;
+
     const resultado = await prisma.$transaction(async (tx) => {
+      if (cambiaDeDetalle && habiaPrecioAceptado && linea.precioPedidoPrevio != null) {
+        await tx.pedidoProveedorDetalle.update({
+          where: { id: linea.pedidoDetalleId },
+          data: { precioCosto: linea.precioPedidoPrevio },
+        });
+      }
+
       await tx.comprobanteLinea.update({
         where: { id: linea.id },
-        data: { productoLocalId: productoLocal.id, pedidoDetalleId: detalleDelPedido },
+        data: {
+          productoLocalId: productoLocal.id,
+          pedidoDetalleId: detalleDelPedido,
+          // Y se limpia la decisión de precio: era sobre el producto anterior.
+          // Dejarla haría que la pantalla mostrara un costo "aceptado" que no se
+          // aceptó para este producto.
+          ...(cambiaDeDetalle
+            ? {
+                precioPedidoPrevio: null,
+                costoFinalUnitario: null,
+                claseDiferencia: null,
+                diferenciaPct: null,
+              }
+            : {}),
+        },
       });
 
       // El alias va en la MISMA transacción. Que quede el vínculo sin el alias

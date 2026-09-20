@@ -224,6 +224,14 @@ export default function HojaCorregirLinea({
   const [detalleMotivo, setDetalleMotivo] = useState("");
   const [aceptaPrecio, setAceptaPrecio] = useState(true);
   const [error, setError] = useState("");
+  // ── CAMBIAR EL PRODUCTO DE UNA LÍNEA YA VINCULADA ──────────────────────
+  //
+  // Una vez vinculada, no había forma de corregirla: la hoja dejaba de ofrecer
+  // el selector porque "ya tiene producto". Y equivocarse ahí no se queda en
+  // esa línea — vincular ESCRIBE UN ALIAS, así que la próxima factura de ese
+  // proveedor machea sola contra el producto equivocado, y el error no se ve
+  // porque el producto que queda al lado es plausible.
+  const [cambiandoProducto, setCambiandoProducto] = useState(false);
 
   // Al abrir se arranca de lo que ya hay: lo contado antes si lo hubo, y si no
   // lo que dice la factura, que es la propuesta razonable —el papel ya afirma
@@ -252,6 +260,7 @@ export default function HojaCorregirLinea({
     setDetalleMotivo(fila.motivoDetalle ?? "");
     setAceptaPrecio(true);
     setError("");
+    setCambiandoProducto(false);
   }, [abierta, fila]);
 
   const entraAlStock = useMemo(() => {
@@ -329,15 +338,43 @@ export default function HojaCorregirLinea({
       espacioCuerpo="gap-hoja"
     >
       {/* ── 0 · QUÉ PRODUCTO ES, CUANDO NO SE SABE ──────────────────────── */}
-      {sinProducto ? (
+      {sinProducto || cambiandoProducto ? (
+        // EL MISMO selector, no un segundo camino. Lo único que cambia es a
+        // dónde vuelve Cancelar: sin producto, cierra la hoja; cambiándolo,
+        // vuelve a la hoja con el producto que ya tenía.
         <ElegirProducto
           fila={fila}
           onVincular={onVincular}
-          onCerrar={onCerrar}
+          onCerrar={cambiandoProducto ? () => setCambiandoProducto(false) : onCerrar}
           guardando={guardando}
         />
       ) : (
       <>
+      {/* ── 0.bis · A QUÉ PRODUCTO ESTÁ VINCULADA ────────────────────────
+          El título de la hoja es el nombre del producto, pero eso no dice que
+          sea una ELECCIÓN que se puede cambiar. Acá se dice, y al lado está
+          cómo: el papel dice una cosa y el producto del ERP es otra, y la
+          única forma de notar un vínculo equivocado es verlos juntos. */}
+      <div className="flex flex-col gap-dato">
+        <span className="text-sm3 sunmi-text-muted break-words">
+          El papel dice “{fila.textoCrudo || "—"}”.
+        </span>
+        <div className="flex items-center justify-between gap-renglon">
+          <span className="text-sm3 font-medium sunmi-text-strong truncate">
+            {fila.producto || "Sin producto"}
+          </span>
+          <SunmiButton
+            color="slate"
+            type="button"
+            disabled={guardando}
+            onClick={() => setCambiandoProducto(true)}
+            className="shrink-0 min-h-toque rounded-control px-4 text-sm3"
+          >
+            Cambiar
+          </SunmiButton>
+        </div>
+      </div>
+
       {/* ── 1 · CUÁNTO ENTRÓ ─────────────────────────────────────────────── */}
       <div className="flex flex-col gap-renglon">
         <span className="text-sm3 font-medium sunmi-text-strong">Cuánto entró</span>
