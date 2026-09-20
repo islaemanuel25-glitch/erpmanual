@@ -30,6 +30,8 @@ import { analizarPrecioDeLinea } from "@/lib/compras-proveedor/comprobante/preci
 import { RECETA_POR_DEFECTO } from "@/lib/compras-proveedor/comprobante/impuestos";
 import { productosDeLasFilas } from "@/lib/compras-proveedor/comprobante/productoDeLaFila";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
+import { resolverLineaDelPedido } from "@/lib/compras-proveedor/comprobante/vinculo";
+import { aplanarDetalles } from "@/lib/compras-proveedor/comprobante/analisisDeComprobante";
 
 export async function POST(req) {
   try {
@@ -55,7 +57,9 @@ export async function POST(req) {
         productoLocalId: true, pedidoDetalleId: true,
         comprobante: {
           select: {
-            id: true, estado: true, confirmadoEn: true, recetaUsada: true,
+            // `pedidoId` para poder resolver a qué línea del pedido pertenece
+            // esta línea, con el mismo criterio que usa la pantalla.
+            id: true, pedidoId: true, estado: true, confirmadoEn: true, recetaUsada: true,
             proveedor: { select: { id: true, umbralRevisarPct: true, umbralSospechaBajaPct: true } },
           },
         },
@@ -100,8 +104,37 @@ export async function POST(req) {
       );
     }
 
+    // ── A QUÉ LÍNEA DEL PEDIDO PERTENECE, CON EL CRITERIO ÚNICO ──────────
+    //
+    // Antes esto se leía de `linea.pedidoDetalleId` y nada más. Esa columna
+    // solo se escribe si quien llama a vincular la manda, y la pantalla no la
+    // manda: medido, 0 de 21 líneas la tienen. O sea que la guarda de abajo
+    // cortaba siempre y aceptar un precio no funcionaba nunca.
+    //
+    // `resolverLineaDelPedido` es el mismo criterio que alimenta la fila que la
+    // persona está mirando: la columna manda cuando está, y si no se deduce por
+    // producto. Con dos criterios, la pantalla mostraba una línea y el servidor
+    // buscaba otra.
+    const detallesDelPedido = aplanarDetalles(
+      await prisma.pedidoProveedorDetalle.findMany({
+        where: { pedidoId: linea.comprobante.pedidoId },
+        select: {
+          id: true,
+          cantidad: true,
+          precioCosto: true,
+          producto: { select: { baseId: true } },
+        },
+      })
+    );
+    const delPedido = resolverLineaDelPedido({
+      linea,
+      productoBaseId: base?.id ?? null,
+      detalles: detallesDelPedido,
+    });
+
     const puede = puedeAceptarse({
       linea,
+      lineaDePedidoId: delPedido.detalle?.id ?? null,
       comprobante: linea.comprobante,
       decision: analisis.decision,
       unidad: analisis.unidad,
@@ -117,7 +150,7 @@ export async function POST(req) {
 
     const resultado = await prisma.$transaction(async (tx) => {
       const detalle = await tx.pedidoProveedorDetalle.findUnique({
-        where: { id: linea.pedidoDetalleId },
+        where: { id: delPedido.detalle.id },
         select: { id: true, precioCosto: true },
       });
       if (!detalle) throw new Error("La línea del pedido ya no existe.");

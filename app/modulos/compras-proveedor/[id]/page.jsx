@@ -26,6 +26,11 @@ import useAccionesEnvioPedido from "@/hooks/useAccionesEnvioPedido";
 // editor de borrador que se borró. Los dos siguen vivos en el módulo y los usan
 // `/nueva` y `CarritoPedido`, así que no se tocaron ahí.
 import { subtotalLinea } from "@/lib/compras-proveedor/calculoPedido";
+import {
+  CLAVE_RECEPCION_EN_CURSO,
+  serializarRecepcionEnCurso,
+  deserializarRecepcionEnCurso,
+} from "@/lib/compras-proveedor/retornoPedido";
 
 const ESTADO_BADGE = {
   BORRADOR: "sunmi-badge-muted",
@@ -58,6 +63,51 @@ export default function DetallePedidoProveedorPage({ params }) {
   // Para recepción: cantidades recibidas editables
   const [recibidos, setRecibidos] = useState({});
   const [kgRecibidos, setKgRecibidos] = useState({});
+
+  // ── LA RECEPCIÓN A MEDIO CARGAR SOBREVIVE A SALIR DE LA PANTALLA ────────
+  //
+  // Las cantidades contadas vivían SOLO en el estado de React y se escribían
+  // recién al tocar "Recibir mercadería". Cargar cuarenta líneas y que se
+  // recargue la página eran cuarenta líneas de vuelta a contar.
+  //
+  // Es el mismo defecto que tenía el pedido en armado y se arregla con el mismo
+  // mecanismo: el serializador vive en `retornoPedido.js`, al lado del otro, y
+  // acá hay un solo par guardar/limpiar que usan todos los caminos.
+  const guardarRecepcion = useCallback((pid, rec, kg) => {
+    try {
+      const enCurso = serializarRecepcionEnCurso({ pedidoId: pid, recibidos: rec, kgRecibidos: kg });
+      if (enCurso) sessionStorage.setItem(CLAVE_RECEPCION_EN_CURSO, JSON.stringify(enCurso));
+      else sessionStorage.removeItem(CLAVE_RECEPCION_EN_CURSO);
+    } catch {
+      // Sin almacenamiento la carga no sobrevive, pero la pantalla sigue
+      // andando: es preferible a romper la recepción.
+    }
+  }, []);
+
+  const limpiarRecepcion = useCallback(() => {
+    try {
+      sessionStorage.removeItem(CLAVE_RECEPCION_EN_CURSO);
+    } catch {}
+  }, []);
+
+  // ── SE LEE UNA SOLA VEZ, EN EL PRIMER RENDER, Y VIVE EN MEMORIA ─────────
+  //
+  // Es la carrera que apareció en la pantalla del pedido y que acá pasaría
+  // igual: el efecto que guarda dispara con los mapas vacíos, escribe "nada" y
+  // BORRA la clave, y lo hace antes de que `cargar()` termine de traer el
+  // pedido, que es cuando recién se puede restaurar. Leyendo el
+  // `sessionStorage` ahí, lo guardado ya no está.
+  const recepcionAlAbrir = useRef(null);
+  if (recepcionAlAbrir.current === null) {
+    try {
+      recepcionAlAbrir.current =
+        typeof window === "undefined"
+          ? false
+          : deserializarRecepcionEnCurso(sessionStorage.getItem(CLAVE_RECEPCION_EN_CURSO)) || false;
+    } catch {
+      recepcionAlAbrir.current = false;
+    }
+  }
 
   // Costos editables por ítem (en recepción Y en borrador)
   const [costos, setCostos] = useState({});
@@ -102,6 +152,25 @@ export default function DetallePedidoProveedorPage({ params }) {
             }
           }
         }
+        // ── LO GUARDADO PISA A LOS VALORES POR DEFECTO ──────────────────
+        //
+        // Los defaults de arriba son "lo pedido", que es de dónde se arranca a
+        // contar. Si hay una carga a medio hacer para ESTE pedido, manda ella:
+        // es trabajo que alguien hizo y que no existe en ningún otro lado.
+        //
+        // Se compara el `pedidoId` guardado: abrir otro pedido no restaura
+        // encima las cantidades del anterior.
+        const guardadaEnCurso = recepcionAlAbrir.current || null;
+        recepcionAlAbrir.current = false;
+        if (guardadaEnCurso && Number(guardadaEnCurso.pedidoId) === Number(data.item.id)) {
+          for (const [detId, valor] of Object.entries(guardadaEnCurso.recibidos || {})) {
+            if (detId in rec) rec[detId] = valor;
+          }
+          for (const [detId, valor] of Object.entries(guardadaEnCurso.kgRecibidos || {})) {
+            if (detId in kgRec) kgRec[detId] = valor;
+          }
+        }
+
         setRecibidos(rec);
         setKgRecibidos(kgRec);
 
@@ -138,6 +207,16 @@ export default function DetallePedidoProveedorPage({ params }) {
   useEffect(() => {
     if (id) cargar();
   }, [id]);
+
+  // ── Y EN CADA CAMBIO: GUARDAR ───────────────────────────────────────────
+  //
+  // Solo con el pedido en ENVIADO, que es el único estado en el que se cuenta
+  // mercadería. En los demás los campos no se editan y guardar dejaría una
+  // clave que nadie va a restaurar.
+  useEffect(() => {
+    if (!pedido?.id || pedido.estado !== "ENVIADO") return;
+    guardarRecepcion(pedido.id, recibidos, kgRecibidos);
+  }, [pedido?.id, pedido?.estado, recibidos, kgRecibidos, guardarRecepcion]);
 
   // BORRADOR (PENDIENTE) se edita SOLO en /nueva. Si el pedido está en borrador,
   // redirigir al editor único en vez de mantener un editor duplicado acá.
@@ -180,6 +259,14 @@ export default function DetallePedidoProveedorPage({ params }) {
 
       const data = await res.json();
       if (data.ok) {
+        // ── LA CARGA A MEDIO HACER SE TIRA CUANDO YA NO SIRVE ─────────────
+        //
+        // Al recibir, porque las cantidades ya quedaron escritas en la base y
+        // dejarlas en el navegador haría reaparecer una copia sin guardar sobre
+        // un pedido que ya está RECIBIDO. Al anular, porque ese pedido no se va
+        // a recibir nunca.
+        if (accion === "recibir" || accion === "anular") limpiarRecepcion();
+
         // Marcar como enviado → salir del detalle para evitar que el usuario
         // siga "tocando botones" hasta recibir por error.
         if (accion === "enviar") {
