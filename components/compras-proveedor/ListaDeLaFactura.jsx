@@ -24,8 +24,10 @@
 import { useMemo, useState } from "react";
 
 import SunmiFiltroEstado from "@/components/sunmi/SunmiFiltroEstado";
+import SunmiPantallaDeTrabajo from "@/components/sunmi/SunmiPantallaDeTrabajo";
+import SunmiPill from "@/components/sunmi/SunmiPill";
 import TarjetaLineaFactura from "./TarjetaLineaFactura";
-import TarjetaContextoDelPedido from "./TarjetaContextoDelPedido";
+import { formatearMoneda } from "@/lib/moneda";
 import {
   FILTRO,
   opcionesDeFiltro,
@@ -36,6 +38,12 @@ export default function ListaDeLaFactura({
   comprobante,
   filas = [],
   onCorregir,
+  onCoincide,
+  /** La acción del pie. Se llama así y no `pie` porque `pie={` ya es el pie de
+   *  `SunmiTabla`, con otro contrato y su propio candado: dos props con el
+   *  mismo nombre y distinto significado es cómo un candado empieza a mirar el
+   *  archivo equivocado. */
+  accionDelPie = null,
 }) {
   const [filtro, setFiltro] = useState(FILTRO.TODOS);
 
@@ -50,36 +58,99 @@ export default function ListaDeLaFactura({
     [filas]
   );
 
+  // Los dos números del encabezado salen de los MISMOS predicados que los
+  // filtros: el que dice cuántas hay para revisar y el filtro que las muestra
+  // no pueden separarse.
+  const resumen = useMemo(
+    () => ({
+      coinciden: (filas || []).filter((f) => pasaFiltro(f, FILTRO.COINCIDEN)).length,
+      revisar: (filas || []).filter((f) => !pasaFiltro(f, FILTRO.COINCIDEN)).length,
+    }),
+    [filas]
+  );
+
+  // ── LO MISMO QUE DIBUJA LA RECEPCIÓN DE UNA TRANSFERENCIA ─────────────
+  //
+  // Mismas ranuras de `SunmiPantallaDeTrabajo` y en el mismo orden: dónde
+  // estoy, filtrar, la lista. El armado —gutter, separación entre bloques,
+  // contenedor de la lista y pie— lo pone la pieza, que salió de allá.
+  //
+  // No hay buscador ni desplegable de categoría: una factura tiene los
+  // renglones que tiene y se controla con el papel al lado, así que buscar
+  // entre ellos es resolver un problema que no existe. Las ranuras que no se
+  // usan van vacías y la pieza no les reserva separación.
   return (
-    <div className="flex flex-col gap-3">
-      {/* La misma tarjeta de contexto que el resto de la pantalla, con lo que
-          identifica al PAPEL: de quién es, qué número y cuánto suma. */}
-      <TarjetaContextoDelPedido
-        proveedorNombre={comprobante?.proveedorNombre || "Factura"}
-        pedidoId={comprobante?.numero || comprobante?.id}
-        cantItems={filas?.length || 0}
-        totalEstimado={total}
-        estado={comprobante?.estado === "CARGADO" ? "Leída" : comprobante?.estado}
-      />
+    <SunmiPantallaDeTrabajo
+      contexto={
+        <>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-semibold sunmi-text-strong truncate">
+              Factura {comprobante?.numero ? `#${comprobante.numero}` : `#${comprobante?.id}`}
+            </span>
+            <SunmiPill color={resumen.revisar > 0 ? "amber" : "slate"}>
+              {comprobante?.estado === "CARGADO" ? "Leída" : comprobante?.estado || "—"}
+            </SunmiPill>
+          </div>
 
-      <SunmiFiltroEstado
-        opciones={opciones}
-        valor={filtro}
-        onCambiar={setFiltro}
-        ariaLabel="Filtrar líneas de la factura"
-      />
-
-      <div className="flex flex-col gap-3">
-        {visibles.length === 0 ? (
-          <p className="text-center py-6 sunmi-text-muted text-sm2">
-            No hay líneas que coincidan con este filtro.
+          <p className="text-sm2 sunmi-text-muted truncate">
+            {comprobante?.proveedorNombre || "—"}
           </p>
-        ) : (
-          visibles.map((f) => (
-            <TarjetaLineaFactura key={f.lineaId} fila={f} onCorregir={onCorregir} />
-          ))
-        )}
-      </div>
-    </div>
+
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-sm2 sunmi-text-muted">
+              <span className="tabular-nums sunmi-text-strong font-semibold">
+                {resumen.coinciden} / {filas.length}
+              </span>{" "}
+              sin diferencias
+            </span>
+            <span
+              className={`text-sm2 ${
+                resumen.revisar > 0 ? "sunmi-text-accent" : "sunmi-text-success"
+              }`}
+            >
+              {resumen.revisar > 0
+                ? `${resumen.revisar} ${resumen.revisar === 1 ? "para revisar" : "para revisar"}`
+                : "Sin diferencias"}
+            </span>
+          </div>
+        </>
+      }
+      filtros={
+        <SunmiFiltroEstado
+          opciones={opciones}
+          valor={filtro}
+          onCambiar={setFiltro}
+          ariaLabel="Filtrar líneas de la factura"
+        />
+      }
+      lista={
+        <>
+          {visibles.length === 0 && (
+            <p className="text-center py-6 sunmi-text-muted text-sm2">
+              No hay líneas que coincidan con este filtro.
+            </p>
+          )}
+          {visibles.map((f) => (
+            <TarjetaLineaFactura
+              key={f.lineaId}
+              fila={f}
+              onCorregir={onCorregir}
+              onCoincide={onCoincide}
+            />
+          ))}
+        </>
+      }
+      pieDePantalla={
+        <div className="flex items-center justify-between gap-3">
+          <span className="min-w-0">
+            <span className="block text-sm2 sunmi-text-muted">Total de la factura</span>
+            <span className="block tabular-nums text-lg2 font-semibold sunmi-text-strong">
+              {formatearMoneda(total)}
+            </span>
+          </span>
+          {accionDelPie}
+        </div>
+      }
+    />
   );
 }

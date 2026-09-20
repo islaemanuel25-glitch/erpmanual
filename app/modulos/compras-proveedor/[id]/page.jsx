@@ -309,6 +309,13 @@ export default function DetallePedidoProveedorPage({ params }) {
   const [sueltas, setSueltas] = useState({});
   const [motivos, setMotivos] = useState({});
 
+  // El caso feliz en un toque: lo que la factura dice es lo que llegó. Mismo
+  // gesto que "✓ Coincide" en la recepción de una transferencia.
+  const aceptarLoQueDiceLaFactura = useCallback((fila) => {
+    if (!fila?.pedidoDetalleId) return;
+    setRecibidos((prev) => ({ ...prev, [fila.pedidoDetalleId]: Number(fila.cantidad) || 0 }));
+  }, []);
+
   const guardarCorreccion = useCallback((datos) => {
     const id = datos?.pedidoDetalleId;
     if (!id) return;
@@ -744,6 +751,18 @@ export default function DetallePedidoProveedorPage({ params }) {
             //
             // "Llegó sin factura" destapa lo que esta pantalla ya sabía hacer:
             // el conteo a mano contra el pedido.
+            // ── UN SOLO BLOQUE DE COMPROBANTES, NO DOS QUE SE TURNAN ──────
+            //
+            // Antes en una pantalla se veía "Sacar foto" y en otra "Subir
+            // fotos", según hubiera o no un papel cargado. Eran las dos caras
+            // del mismo panel alternándose, y eso es lo que se veía desprolijo.
+            //
+            // Ahora la subida es SIEMPRE el bloque de la foto —el panel ya no
+            // dibuja su botón en esta pantalla— y cuando hay comprobantes el
+            // panel suma su lista debajo, que es de donde sale "Leer". La
+            // ranura solo dibuja el bloque grande cuando no hay ninguno: con
+            // uno cargado, lo que hace falta arriba es la lista, no volver a
+            // ofrecer la foto en tamaño protagonista.
             vacio={
               esRecepcion && !sinFactura
                 ? ({ sacarFoto, subir, subiendo }) => (
@@ -786,6 +805,21 @@ export default function DetallePedidoProveedorPage({ params }) {
               comprobante={comprobanteActivo}
               filas={filasDeFactura}
               onCorregir={setLineaACorregir}
+              onCoincide={aceptarLoQueDiceLaFactura}
+              accionDelPie={
+                <SunmiButton
+                  color="amber"
+                  type="button"
+                  disabled={acting}
+                  onClick={() => {
+                    if (!confirm("Solo continuar si la mercadería llegó físicamente.")) return;
+                    ejecutarAccion("recibir");
+                  }}
+                  className="shrink-0 justify-center"
+                >
+                  {acting ? "Procesando..." : "Recibir mercadería"}
+                </SunmiButton>
+              }
             />
             <HojaCorregirLinea
               fila={lineaACorregir}

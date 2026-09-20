@@ -217,6 +217,8 @@ module.exports = {
         contextoPedido: "70px",
         bloqueFactura: "236px",
         botonFoto: "48px",
+        // La barra de "Entra al stock" en la hoja de corregir. 32 tampoco cae.
+        barraStock: "32px",
       },
 
       // ── EL ALTO DE UNA FILA DE LISTA ──────────────────────────────────
@@ -302,16 +304,19 @@ module.exports = {
         // El cuadro del número del stepper. 62 tampoco cae en la grilla.
         cajaCantidad: "62px",
 
-        // ── LOS CUATRO DE RECIBIR UN PEDIDO ───────────────────────────────
+        // ── LOS DOS DEL STEPPER DE LA HOJA DE CORREGIR ────────────────────
         //
-        // 56 el rótulo de la comparación —"Pediste" y "Factura" alineados en
-        // columna—, 83 el botón Corregir, 62 el rótulo de cada stepper de la
-        // hoja y 48 los botones de más y menos. Ninguno cae en la grilla de
-        // 3,5, y los de rótulo tienen que ser FIJOS: si se reparten, los dos
-        // valores dejan de arrancar a la misma altura y la comparación deja de
-        // leerse como una comparación.
-        rotuloComparacion: "56px",
-        botonCorregir: "83px",
+        // 62 el rótulo de cada fila y 48 los botones de más y menos. El rótulo
+        // tiene que ser FIJO: si se reparte, "Bultos" y "Sueltas" dejan de
+        // arrancar a la misma altura y los dos steppers dejan de leerse como un
+        // par.
+        //
+        // Acá vivían también `rotuloComparacion` y `botonCorregir`, del diseño
+        // propio que tenía la tarjeta de una línea de factura. Se fueron con
+        // él: esa tarjeta ahora COPIA la de la recepción de una transferencia y
+        // su geometría sale de `SunmiCard` y de las clases de esa pieza, no de
+        // números escritos acá. Un token que nadie usa es una medida esperando
+        // a que alguien la vuelva a inventar distinta.
         rotuloStepper: "62px",
         cajaStepper: "48px",
       },

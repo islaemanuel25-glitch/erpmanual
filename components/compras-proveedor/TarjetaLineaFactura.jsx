@@ -1,35 +1,39 @@
 "use client";
 
-// UNA LÍNEA DE LA FACTURA, COMPARADA CONTRA LA DEL PEDIDO.
+// UNA LÍNEA DE LA FACTURA, CON LA MISMA TARJETA QUE LA RECEPCIÓN DE UNA
+// TRANSFERENCIA.
 //
-// ── QUÉ REEMPLAZA ─────────────────────────────────────────────────────────
+// ── ESTO ES UNA COPIA, NO UNA INSPIRACIÓN ─────────────────────────────────
 //
-// Tarjetas que decían "Pediste 1 bulto a $30780.00. Ningún comprobante la
-// trajo." — una oración por línea, con el precio a seis decimales, repetida 197
-// veces. Nadie revisa 197 oraciones: se revisa una columna.
+// La composición, las clases y los dos estados —colapsada cuando no hay nada
+// que decidir, abierta cuando sí— salen de `TarjetaRecepcionMovil` tal cual
+// están. No se eligió ningún tamaño acá: `p-2` colapsada, `p-4 space-y-3`
+// abierta, `text-sm2` en la línea de resumen, `text-md2 font-semibold` en el
+// nombre, `text-lg2 font-semibold` en el importe, y las dos clases de botón que
+// ese archivo define —`sunmi-btn-accent-outline` para el caso feliz y
+// `sunmi-btn-accent-suave` para corregir—.
 //
-// ── LA COMPARACIÓN ES DOS RENGLONES Y UN RÓTULO FIJO ──────────────────────
+// Las tandas anteriores fueron con medidas y el resultado se veía distinto,
+// justamente porque una medida escrita a mano al lado de una pieza no es la
+// pieza: es otro número que coincide hasta que uno de los dos se mueve.
 //
-// "Pediste" arriba y "Factura" abajo, con los rótulos de ancho FIJO para que
-// los dos valores arranquen a la misma altura. Si el rótulo se reparte, los
-// números quedan desalineados y deja de leerse como una comparación: hay que
-// mirar dos veces para saber cuál es cuál.
+// ── LO ÚNICO QUE NO EXISTE ALLÁ: EL PRECIO ────────────────────────────────
 //
-// ── EL PRECIO SOLO APARECE SI CAMBIÓ ──────────────────────────────────────
+// Una transferencia se mueve entre dos locales del mismo grupo y su recepción
+// no mira precios. Una factura puede traer el mismo producto a otro precio, y
+// eso hay que verlo y decidirlo.
 //
-// Es la regla que hace usable la pantalla. Con el precio siempre visible, las
-// 197 líneas tienen un número en acento y el color deja de significar algo.
-// Mostrándolo solo cuando cambió, el naranja aparece únicamente donde hay una
-// decisión que tomar, y se puede barrer la lista sin leer.
-//
-// ── DE DÓNDE SALIÓ LA COMPOSICIÓN ─────────────────────────────────────────
-//
-// De `TarjetaRecepcionMovil`, la de transferencias: tarjeta con el nombre y el
-// estado arriba, el detalle en el medio y la acción abajo. Lo que cambia es el
-// contenido —allá el eje es cuántos bultos llegaron, acá hay además el eje del
-// precio— y por eso es otra pieza y no la misma con props.
+// Se agrega CON LA FORMA QUE ESA PIEZA YA TIENE para un número que cambió: el
+// anterior arriba, en chico y tachado, y el nuevo abajo, en grande y en
+// warning. Es exactamente cómo ella muestra un importe corregido — se lee "de
+// cuánto era" → "cuánto es". No se inventó un tratamiento nuevo.
 
+import { Check, Pencil } from "lucide-react";
+
+import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import { formatearMoneda } from "@/lib/moneda";
 import {
   ESTADO_LINEA,
@@ -37,108 +41,140 @@ import {
   estadoDeLinea,
   porcentajeDelPrecio,
   precioCambio,
-  rotuloDeEstado,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 
-/** Un número como lo escribiría una persona: sin decimales si no hacen falta. */
-function limpio(n) {
+/** Las mismas dos clases de botón que usa la tarjeta de transferencias. */
+const CLASE_COINCIDE = "sunmi-btn-accent-outline";
+const CLASE_CORREGIR = "sunmi-btn-accent-suave";
+
+export const TEXTO_COINCIDE = "✓ Coincide";
+export const TEXTO_CORREGIR = "Corregir";
+
+/** Cantidades: enteras sin decimales, fraccionarias con hasta 3 útiles. */
+const fmtCant = (n) => {
   const v = Number(n);
   if (!Number.isFinite(v)) return "—";
   return Number.isInteger(v) ? String(v) : String(Number(v.toFixed(3)));
-}
+};
 
-/** "+5,1 %" / "−3,0 %", con la coma decimal de acá. */
-function pct(valor) {
-  const signo = valor > 0 ? "+" : "−";
-  return `${signo}${Math.abs(valor).toFixed(1).replace(".", ",")} %`;
-}
-
-/** Un renglón de la comparación: rótulo de ancho fijo y su valor. */
-function Renglon({ rotulo, children }) {
-  return (
-    <div className="min-h-renglonComparacion flex items-baseline gap-entreFiltros">
-      <span className="w-rotuloComparacion shrink-0 text-sm3 sunmi-text-muted">{rotulo}</span>
-      {children}
-    </div>
-  );
-}
-
-export default function TarjetaLineaFactura({ fila, onCorregir }) {
+export default function TarjetaLineaFactura({ fila, onCorregir, onCoincide, guardando = false }) {
   const estado = estadoDeLinea(fila);
   const cambio = precioCambio(fila);
   const porcentaje = porcentajeDelPrecio(fila);
   const faltan = diferenciaDeCantidad(fila);
-  const noPedida = estado === ESTADO_LINEA.NO_PEDIDO;
-  const pideAtencion = estado !== ESTADO_LINEA.COINCIDE;
+  const esNoPedida = estado === ESTADO_LINEA.NO_PEDIDO;
+  const resuelta = estado === ESTADO_LINEA.COINCIDE;
+
+  // ── LA TARJETA COLAPSADA, PARA LO QUE NO TIENE NADA QUE DECIDIR ─────────
+  //
+  // Misma condición que allá: una línea sin diferencia se lee de un vistazo y
+  // no ocupa media pantalla. Con 197 líneas es la diferencia entre barrer la
+  // lista y scrollear un documento.
+  if (resuelta) {
+    return (
+      <SunmiCard className="p-2" data-linea-factura={fila?.producto || fila?.lineaId}>
+        <div className="flex items-center gap-2">
+          <Check size={16} aria-hidden="true" className="shrink-0 sunmi-text-success" />
+          <span className="min-w-0 flex-auto truncate text-sm2 sunmi-text-strong text-left">
+            {fila?.producto || fila?.textoCrudo || "Sin nombre"}
+          </span>
+          <span className="shrink-0 whitespace-nowrap tabular-nums text-sm2 sunmi-text-strong">
+            {fmtCant(fila?.cantidad)} · {formatearMoneda(fila?.subtotal ?? 0)}
+          </span>
+        </div>
+      </SunmiCard>
+    );
+  }
+
+  // ── LA TARJETA ABIERTA, PARA LO QUE HAY QUE MIRAR ──────────────────────
+  const tono = esNoPedida ? "sunmi-state-danger" : "sunmi-state-warning";
 
   return (
-    <div className="rounded-xl border sunmi-divider sunmi-bg-card px-4 py-filtro flex flex-col gap-renglon">
-      {/* ── FILA 1: QUÉ ES Y CÓMO ESTÁ ─────────────────────────────────── */}
-      <div className="min-h-filaNombre flex items-center gap-renglon">
-        <span className="flex-1 min-w-0 text-lg2 font-bold sunmi-text-strong truncate">
-          {fila?.producto || fila?.textoCrudo || "Sin nombre"}
-        </span>
-        <span
-          className={`shrink-0 rounded-control border px-renglon py-dentroFiltro text-sm3 font-medium ${
-            pideAtencion ? "sunmi-border-accent sunmi-text-accent" : "sunmi-divider sunmi-text-muted"
-          }`}
-        >
-          {rotuloDeEstado(fila)}
-        </span>
-      </div>
+    <SunmiCard className={`p-4 space-y-3 ${tono}`} data-linea-factura={fila?.producto || fila?.lineaId}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-md2 font-semibold sunmi-text-strong break-words">
+            {fila?.producto || fila?.textoCrudo || "Sin nombre"}
+          </p>
 
-      {/* ── FILA 2: LA COMPARACIÓN ──────────────────────────────────────── */}
-      <div className="flex flex-col gap-hilo">
-        <Renglon rotulo="Pediste">
-          {noPedida ? (
-            <span className="text-sm3 sunmi-text-muted">no lo pediste</span>
+          {esNoPedida ? (
+            <p className="text-xs sunmi-text-muted break-words">
+              El proveedor lo facturó y no estaba en el pedido.
+            </p>
           ) : (
-            <span className="text-sm3 sunmi-text-strong tabular-nums">
-              {limpio(fila?.cantidadPedida)}
-              {cambio && fila?.costoCatalogo != null
-                ? ` · ${formatearMoneda(fila.costoCatalogo)}`
+            <>
+              <p className="flex items-baseline gap-x-2 flex-wrap break-words">
+                <span className="text-xs sunmi-text-muted shrink-0">Pediste</span>
+                <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-strong">
+                  {fmtCant(fila?.cantidadPedida)}
+                </span>
+              </p>
+              <p className="flex items-baseline gap-x-2 flex-wrap break-words">
+                <span className="text-xs sunmi-text-muted shrink-0">Factura</span>
+                <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-accent">
+                  {fmtCant(fila?.cantidad)}
+                </span>
+                {faltan != null && faltan !== 0 && (
+                  <span className="text-xs tabular-nums sunmi-text-muted shrink-0">
+                    {faltan > 0 ? `falta ${fmtCant(faltan)}` : `sobra ${fmtCant(-faltan)}`}
+                  </span>
+                )}
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* ── EL PRECIO, CON LA FORMA DEL IMPORTE CORREGIDO ────────────────
+            El anterior arriba, chico y tachado; el nuevo abajo, grande y en
+            warning. Es la misma composición con la que esa tarjeta muestra un
+            importe que cambió. Solo aparece cuando el precio cambió: si no, el
+            número no dice nada que la línea no diga ya. */}
+        {cambio && (
+          <span className="shrink-0 whitespace-nowrap text-right">
+            <span className="block text-xs2 tabular-nums line-through sunmi-text-muted">
+              {formatearMoneda(fila?.costoCatalogo)}
+            </span>
+            <span className="block text-sm2 tabular-nums font-semibold sunmi-text-warning">
+              {formatearMoneda(fila?.costoFactura)}
+              {porcentaje != null
+                ? ` (${porcentaje > 0 ? "+" : "−"}${Math.abs(porcentaje)
+                    .toFixed(1)
+                    .replace(".", ",")} %)`
                 : ""}
             </span>
-          )}
-        </Renglon>
-
-        <Renglon rotulo="Factura">
-          <span className="text-sm3 font-bold sunmi-text-accent tabular-nums">
-            {limpio(fila?.cantidad)}
-            {cambio && fila?.costoFactura != null
-              ? ` · ${formatearMoneda(fila.costoFactura)}`
-              : ""}
           </span>
-
-          {/* El lugar de la derecha lo ocupa UNA cosa: el porcentaje si lo que
-              cambió es el precio, o cuánto falta si lo que cambió es la
-              cantidad. Nunca las dos, porque nunca pasan juntas: si la cantidad
-              difiere, el estado ya es "falta" o "sobra". */}
-          {cambio && porcentaje != null && (
-            <span className="text-sm3 font-bold sunmi-text-accent">{pct(porcentaje)}</span>
-          )}
-          {!cambio && faltan != null && faltan !== 0 && (
-            <span className="text-sm3 font-bold sunmi-text-accent">
-              {faltan > 0 ? `falta ${limpio(faltan)}` : `sobra ${limpio(-faltan)}`}
-            </span>
-          )}
-        </Renglon>
+        )}
       </div>
 
-      {/* ── FILA 3: LA ACCIÓN Y LA PLATA ────────────────────────────────── */}
-      <div className="min-h-toque flex items-center justify-between gap-renglon">
+      <SunmiSeparator />
+
+      <div className="flex items-center justify-between gap-3">
         <SunmiButton
-          color="slate"
           type="button"
           onClick={() => onCorregir?.(fila)}
-          className="w-botonCorregir min-h-toque justify-center rounded-control text-sm3"
+          disabled={guardando}
+          className={`shrink-0 ${CLASE_CORREGIR}`}
         >
-          Corregir
+          {TEXTO_CORREGIR}
         </SunmiButton>
-        <span className="text-lg3 font-bold sunmi-text-strong tabular-nums text-right">
+
+        {/* El caso feliz en un toque, sin abrir nada: lo que la factura dice es
+            lo que llegó. Misma idea y misma clase que allá. */}
+        {!esNoPedida && (
+          <SunmiLinkButton
+            onClick={() => onCoincide?.(fila)}
+            disabled={guardando}
+            aria-label={`Aceptar lo que dice la factura para ${fila?.producto || "esta línea"}`}
+            className={`shrink-0 no-underline ${CLASE_COINCIDE}`}
+          >
+            {TEXTO_COINCIDE}
+          </SunmiLinkButton>
+        )}
+
+        <span className="shrink-0 whitespace-nowrap tabular-nums text-lg2 font-semibold sunmi-text-strong">
           {formatearMoneda(fila?.subtotal ?? 0)}
         </span>
       </div>
-    </div>
+    </SunmiCard>
   );
 }

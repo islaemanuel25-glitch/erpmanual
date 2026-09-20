@@ -339,7 +339,7 @@ export default function PanelComprobantes({
             este quedaba justo encima: dos botones pegados que hacen lo mismo,
             y el de arriba naranja y de ancho completo. Mientras no haya ningún
             comprobante y la pantalla haya puesto su cara, manda la de ella. */}
-        {puedeRecibir && !(items.length === 0 && vacio) && (
+        {puedeRecibir && !vacio && (
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             {seleccion.length >= 2 && (
               <SunmiButton color="slate" type="button" onClick={unir}>
@@ -431,7 +431,7 @@ export default function PanelComprobantes({
 
       {cargando ? (
         <SunmiLoader />
-      ) : items.length === 0 && vacio ? (
+      ) : vacio && items.length === 0 ? (
         // ── SIN COMPROBANTES: LA CARA QUE PONE LA PANTALLA ────────────────
         //
         // En vez de una tabla vacía que dice "Todavía no hay comprobantes", la
