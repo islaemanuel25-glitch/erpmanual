@@ -2,22 +2,54 @@
 
 // LA HOJA DE CORREGIR UNA LÍNEA DE LA FACTURA.
 //
-// ── NUNCA SE MUESTRA UNA DECISIÓN QUE NO HAY QUE TOMAR ────────────────────
+// ── LA HOJA SE VE IGUAL SIEMPRE, Y ESO ES EL DISEÑO ───────────────────────
 //
-// Es la regla que ordena toda la hoja. Las tres secciones son condicionales:
-// el precio solo si cambió, el motivo solo si la cantidad no coincide, y la
-// fila de sueltas solo si el producto va por pack. Cuando todo coincide, la
-// hoja queda en una sección y dos botones.
+// Antes cambiaba de forma según el caso: el bloque de precio aparecía solo si
+// el precio había cambiado, el de motivo solo si la cantidad no coincidía, y
+// abajo se apilaban hasta tres botones —"Desmarcar" tapando a "Cancelar"—. Con
+// 197 líneas eso es una pantalla distinta cada vez, y no se aprende ninguna.
 //
-// Lo contrario —mostrar las tres siempre, deshabilitadas o vacías— convierte
-// cada línea en un formulario de once campos, y con 197 líneas eso es la
-// pantalla que esta tanda vino a sacar.
+// Ahora el orden es fijo —producto, cantidad, precio— y el bloque de precio
+// ESTÁ SIEMPRE: con la pregunta, con lo que ya se decidió, o diciendo que el
+// precio es el mismo. Un bloque que desaparece obliga a buscar; uno que dice
+// "no hay nada que decidir" se lee de un vistazo y se pasa de largo.
 //
-// ── LA HOJA ES LA DEL KIT ─────────────────────────────────────────────────
+// El único que sigue siendo condicional es el MOTIVO, y no por estilo: solo
+// existe cuando la cantidad no coincide, y preguntar por qué difiere algo que
+// no difiere no tiene respuesta posible.
 //
-// `SunmiModalLayout forma="hoja"`, la misma que usa la recepción de una
-// transferencia para corregir un producto: trae la capa, el velo, el `Escape`,
-// la pila de modales y el portal. Lo que se dibuja adentro es de acá.
+// ── DE DÓNDE SALE CADA MEDIDA ─────────────────────────────────────────────
+//
+// De `components/transferencias/FichaProductoRecepcion.jsx`, que hace el mismo
+// trabajo del otro lado del depósito y ya está resuelta. Se copian:
+//
+//   · los DOS CAMPOS AL 35 % con el hueco vacío en el medio —`w-35p` y
+//     `justify-between`—, cada uno con su rótulo arriba diciendo en qué escala
+//     está el número de abajo;
+//   · `SunmiCampoCantidad`, la pieza del kit con − y +. Acá había un stepper
+//     escrito a mano, con su propio ancho de rótulo y su propio ancho de tecla;
+//   · el pie con UN botón principal ancho que dice qué pasa después.
+//
+// No se eligió ningún tamaño en este archivo. La separación entre bloques es
+// `renglon`, el token que ya existe para separar bloques en este módulo.
+//
+// ── Y UN DEFECTO MEDIDO QUE EXPLICA "TODO AMONTONADO" ─────────────────────
+//
+// El cuerpo usaba `gap-hoja` y los bloques `pt-hoja`. **Ninguna de las dos
+// clases existe**: no están en `tailwind.config.js` y no aparecen en la hoja de
+// estilos que sirve producción —comprobado con `grep` sobre el CSS del
+// contenedor: cero apariciones de `.gap-hoja{` y `.pt-hoja{`, contra una de
+// `.gap-renglon{`—. O sea que entre los bloques no había NADA de separación, y
+// no por falta de criterio: por dos nombres que no existían y que nadie podía
+// ver que no existían.
+//
+// ── LO QUE PINTA Y LO QUE NO ──────────────────────────────────────────────
+//
+// La hoja no pinta ningún fondo propio: los bloques se separan con espacio y
+// una línea fina. El color queda donde dibuja algo — las teclas del campo de
+// cantidad, los botones, y la franja de "Entra al stock", que es un resultado y
+// no un bloque. Una caja de color por bloque convierte tres secciones en tres
+// cajas, y ahí hay que leer los bordes antes que el contenido.
 //
 // ── QUÉ GUARDA Y DÓNDE ────────────────────────────────────────────────────
 //
@@ -36,6 +68,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import { BuscadorProducto } from "@/components/comprobantes/PiezasConciliacion";
@@ -45,7 +78,6 @@ import {
   ESTADO_LINEA,
   cantidadEnEscalaDelPedido,
   cantidadFueConvertida,
-  diferenciaDeCantidad,
   estadoDeLinea,
   motivoSinComparacion,
   porcentajeDelPrecio,
@@ -73,42 +105,25 @@ const limpio = (n) => {
   return Number.isInteger(v) ? String(v) : String(Number(v.toFixed(3)));
 };
 
-/** Un stepper de una fila: rótulo de ancho fijo y los tres controles. */
-function FilaStepper({ rotulo, valor, onCambiar }) {
-  const n = Number(valor) || 0;
+/**
+ * UN BLOQUE DE LA HOJA: línea fina arriba, título, y su contenido.
+ *
+ * Los tres se dibujan con esta misma pieza para que se vean iguales. Escritos a
+ * mano uno por uno, el día que uno cambie de separación los otros dos se
+ * quedan — que es exactamente cómo la hoja llegó a verse distinta en cada caso.
+ *
+ * `accion` es la ranura de la derecha del título, para el "Cambiar" del precio
+ * ya decidido. Vacía no reserva espacio.
+ */
+function Bloque({ titulo, accion = null, children }) {
   return (
-    <div className="min-h-botonFoto flex items-center gap-renglon">
-      <span className="w-rotuloStepper shrink-0 text-sm3 sunmi-text-muted">{rotulo}</span>
-      <div className="flex-1 flex items-center gap-renglon">
-        <SunmiButton
-          color="slate"
-          type="button"
-          aria-label={`Restar ${rotulo.toLowerCase()}`}
-          onClick={() => onCambiar(Math.max(0, n - 1))}
-          className="w-cajaStepper min-h-botonFoto shrink-0 justify-center rounded-control text-lg2"
-        >
-          −
-        </SunmiButton>
-        <SunmiInput
-          type="text"
-          inputMode="numeric"
-          aria-label={rotulo}
-          value={valor === "" || valor == null ? "" : String(valor)}
-          placeholder="0"
-          onChange={(e) => onCambiar(e.target.value.replace(/[^\d]/g, ""))}
-          className="flex-1 min-h-botonFoto text-center text-lg2 font-bold tabular-nums"
-        />
-        <SunmiButton
-          color="slate"
-          type="button"
-          aria-label={`Sumar ${rotulo.toLowerCase()}`}
-          onClick={() => onCambiar(n + 1)}
-          className="w-cajaStepper min-h-botonFoto shrink-0 justify-center rounded-control text-lg2"
-        >
-          +
-        </SunmiButton>
+    <section className="border-t sunmi-divider pt-renglon flex flex-col gap-renglon">
+      <div className="flex items-center justify-between gap-renglon">
+        <span className="text-sm3 font-medium sunmi-text-strong">{titulo}</span>
+        {accion}
       </div>
-    </div>
+      {children}
+    </section>
   );
 }
 
@@ -207,7 +222,7 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando }) {
         color="slate"
         type="button"
         onClick={onCerrar}
-        className="w-full min-h-botonFoto justify-center text-sm3"
+        className="w-full min-h-toque justify-center text-sm3"
       >
         Cancelar
       </SunmiButton>
@@ -274,10 +289,10 @@ export default function HojaCorregirLinea({
   // lo que dice la factura, que es la propuesta razonable —el papel ya afirma
   // cuánto mandó—. Nunca de lo PEDIDO: eso daría por contado algo que nadie
   // contó, que es el defecto que ya arreglamos en el stepper del pedido.
-  // ── EL STEPPER ABRE EN LA ESCALA DEL PEDIDO ────────────────────────────
+  // ── EL CAMPO ABRE EN LA ESCALA DEL PEDIDO ──────────────────────────────
   //
   // Abría en `fila.cantidad`, que es lo CRUDO del papel: con la planilla de
-  // Mauro eso son 80 unidades, así que el stepper de Bultos decía 80 y la barra
+  // Mauro eso son 80 unidades, así que el campo de Bultos decía 80 y la barra
   // de abajo calculaba 800 al stock. Un factor de diez en lo que entra.
   //
   // Se usa el MISMO número convertido que muestra la tarjeta —no se recalcula
@@ -318,7 +333,7 @@ export default function HojaCorregirLinea({
 
   const cantidadDifiere = useMemo(() => {
     // Las dos en bultos: `cantidadPedida` ya lo está y `bultos` es lo que el
-    // stepper muestra, que ahora arranca convertido.
+    // campo muestra, que ahora arranca convertido.
     const pedida = Number(fila?.cantidadPedida);
     const contada = Number(bultos);
     if (!Number.isFinite(pedida) || !Number.isFinite(contada)) return false;
@@ -344,6 +359,14 @@ export default function HojaCorregirLinea({
   // tarjeta las mostraba comparadas y listas para contar. Dos criterios para la
   // misma pregunta, y la hoja contradiciendo a la tarjeta que la abrió.
   const sinProducto = estadoDeLinea(fila) === ESTADO_LINEA.SIN_VINCULAR;
+  const eligiendoProducto = sinProducto || cambiandoProducto;
+
+  /** El rótulo del campo dice en qué escala está el número: no es opcional. */
+  const rotuloDeCompletos = vaPorPack
+    ? `Bultos de ${limpio(fila.factorPack)}`
+    : (fila.unidadPedido ?? "BULTO") === "UNIDAD"
+      ? "Unidades"
+      : "Bultos";
 
   const guardar = async () => {
     setError("");
@@ -382,6 +405,25 @@ export default function HojaCorregirLinea({
     });
   };
 
+  // ── EL TÍTULO DEL BLOQUE DE PRECIO DICE EN CUÁL DE LOS CUATRO CASOS ESTÁ ──
+  const tituloDelPrecio = sinComparacion
+    ? "El precio no se puede comparar"
+    : yaDecidido && !cambiandoPrecio
+      ? "Ya decidiste este precio"
+      : cambio
+        ? `El precio ${porcentaje != null && porcentaje < 0 ? "bajó" : "subió"} ${
+            porcentaje != null ? `${Math.abs(porcentaje).toFixed(1).replace(".", ",")} %` : ""
+          }`.trim()
+        : "El precio es el mismo";
+
+  /** Los dos números, en una línea. Es lo que se compara, en los cuatro casos. */
+  const losDosPrecios = (
+    <span className="text-sm3 sunmi-text-muted">
+      Tenías {formatearMoneda(fila.costoCatalogo)} · la factura trae{" "}
+      {formatearMoneda(fila.costoFactura)}
+    </span>
+  );
+
   return (
     <SunmiModalLayout
       open={!!abierta}
@@ -390,10 +432,48 @@ export default function HojaCorregirLinea({
       z={NIVEL_MODAL_GLOBAL}
       forma="hoja"
       destructivo
-      espacioCuerpo="gap-hoja"
+      // `renglon` y no `hoja`: ese token no existe. Ver el encabezado.
+      espacioCuerpo="gap-renglon"
+      footer={
+        eligiendoProducto ? null : (
+          // ── UN SOLO BOTÓN PRINCIPAL, Y DESMARCAR DEBAJO ────────────────
+          //
+          // Eran tres en una fila que envolvía, así que "Desmarcar" terminaba
+          // tapando a "Cancelar". Cancelar se fue —"Cerrar" del encabezado hace
+          // lo mismo y está donde está en todos los modales del ERP— y lo que
+          // queda es la acción de cierre, ancha, con "Desmarcar esta línea"
+          // abajo y solo cuando hay algo que desmarcar.
+          //
+          // El texto y el color NO cambian según el caso, a diferencia de
+          // transferencias: la hoja tiene que verse igual siempre, y un botón
+          // que cambia de color es lo primero que se nota.
+          <div className="w-full flex flex-col gap-renglon">
+            <SunmiButton
+              color="primary"
+              type="button"
+              disabled={guardando}
+              onClick={guardar}
+              className="w-full min-h-toque justify-center text-sm3"
+            >
+              {guardando ? "Guardando…" : "✓ Revisado y seguir"}
+            </SunmiButton>
+
+            {revisada && (
+              <SunmiButton
+                color="slate"
+                type="button"
+                disabled={guardando}
+                onClick={() => onDesmarcar?.(fila)}
+                className="w-full min-h-toque justify-center text-sm3"
+              >
+                Desmarcar esta línea
+              </SunmiButton>
+            )}
+          </div>
+        )
+      }
     >
-      {/* ── 0 · QUÉ PRODUCTO ES, CUANDO NO SE SABE ──────────────────────── */}
-      {sinProducto || cambiandoProducto ? (
+      {eligiendoProducto ? (
         // EL MISMO selector, no un segundo camino. Lo único que cambia es a
         // dónde vuelve Cancelar: sin producto, cierra la hoja; cambiándolo,
         // vuelve a la hoja con el producto que ya tenía.
@@ -404,240 +484,228 @@ export default function HojaCorregirLinea({
           guardando={guardando}
         />
       ) : (
-      <>
-      {/* ── 0.bis · A QUÉ PRODUCTO ESTÁ VINCULADA ────────────────────────
-          El título de la hoja es el nombre del producto, pero eso no dice que
-          sea una ELECCIÓN que se puede cambiar. Acá se dice, y al lado está
-          cómo: el papel dice una cosa y el producto del ERP es otra, y la
-          única forma de notar un vínculo equivocado es verlos juntos. */}
-      <div className="flex flex-col gap-dato">
-        <span className="text-sm3 sunmi-text-muted break-words">
-          El papel dice “{fila.textoCrudo || "—"}”.
-        </span>
-        <div className="flex items-center justify-between gap-renglon">
-          <span className="text-sm3 font-medium sunmi-text-strong truncate">
-            {fila.producto || "Sin producto"}
-          </span>
-          <SunmiButton
-            color="slate"
-            type="button"
-            disabled={guardando}
-            onClick={() => setCambiandoProducto(true)}
-            className="shrink-0 min-h-toque rounded-control px-4 text-sm3"
-          >
-            Cambiar
-          </SunmiButton>
-        </div>
-      </div>
-
-      {/* ── 1 · CUÁNTO ENTRÓ ─────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-renglon">
-        <span className="text-sm3 font-medium sunmi-text-strong">Cuánto entró</span>
-        {/* ── LAS DOS ESCALAS NO SE MEZCLAN EN LA MISMA FRASE ───────────
-            Decía "Pediste 8 · la factura dice 80 · 1 bulto = 10 u": los dos
-            primeros números están en escalas distintas y la frase no lo dice,
-            así que se leen como una diferencia de 72. Ahora los dos van en
-            bultos, que es la unidad del pedido, y lo que dice el papel va
-            aparte — igual que en la tarjeta. */}
-        <span className="text-sm3 sunmi-text-muted">
-          Pediste {limpio(fila.cantidadPedida)} · la factura dice{" "}
-          {limpio(cantidadDeLaFactura)}
-          {vaPorPack ? ` · 1 bulto = ${limpio(fila.factorPack)} u` : ""}
-        </span>
-        {convertida && (
-          <span className="text-sm3 sunmi-text-muted">
-            El papel dice {limpio(fila.cantidad)} unidades.
-          </span>
-        )}
-
-        <FilaStepper rotulo="Bultos" valor={bultos} onCambiar={setBultos} />
-        {/* Sin pack no hay sueltas que contar: el bulto ES la unidad. */}
-        {vaPorPack && <FilaStepper rotulo="Sueltas" valor={sueltas} onCambiar={setSueltas} />}
-
-        <div className="min-h-barraStock sunmi-control rounded-control px-filtro py-entreFiltros flex items-center justify-between gap-renglon">
-          <span className="text-sm3 sunmi-text-muted">Entra al stock</span>
-          <span className="text-sm3 font-bold tabular-nums">
-            {limpio(entraAlStock)} {entraAlStock === 1 ? "unidad" : "unidades"}
-          </span>
-        </div>
-      </div>
-
-      {/* ── 2.a · CUANDO NO HAY CON QUÉ COMPARAR, SE DICE Y NO SE PREGUNTA ──
-          Sin uno de los dos precios no hay decisión posible, así que no se
-          ofrecen opciones: entra la mercadería y el costo no se toca, que es lo
-          único que se puede hacer sin comparación. Y se dice CUÁL falta, porque
-          "no hay con qué comparar" a secas manda a buscar el problema a
-          cualquier lado. */}
-      {sinComparacion && (
-        <div className="border-t sunmi-divider pt-hoja flex flex-col gap-dato">
-          <span className="text-sm3 font-medium sunmi-text-strong">El precio no se puede comparar</span>
-          <span className="text-sm3 sunmi-text-muted break-words">{sinComparacion}</span>
-          <span className="text-sm3 sunmi-text-muted break-words">
-            La mercadería entra igual y tu costo no se toca.
-          </span>
-        </div>
-      )}
-
-      {/* ── 2.b · EL PRECIO, SOLO SI CAMBIÓ ──────────────────────────────── */}
-      {cambio && (
-        <div className="border-t sunmi-divider pt-hoja flex flex-col gap-renglon">
-          {yaDecidido && !cambiandoPrecio ? (
-            // ── YA CONTESTADA: SE DICE, NO SE PREGUNTA ──────────────────
-            //
-            // Mismo trato que el producto vinculado, tres bloques más arriba:
-            // qué se decidió, y un botón para cambiarlo. Volver a mostrar las
-            // dos opciones sobre algo ya contestado es la pregunta otra vez,
-            // aunque venga con la respuesta marcada.
-            <>
-              <span className="text-sm3 font-medium sunmi-text-strong">
-                Ya decidiste este precio
-              </span>
-              <div className="flex items-center justify-between gap-renglon">
-                <span className="min-w-0 text-sm3 sunmi-text-muted break-words">
-                  {textoDeDecision(yaDecidido.decision)} ·{" "}
-                  {formatearMoneda(
-                    yaDecidido.decision === DECISION_DE_PRECIO.DEJA_EL_MIO
-                      ? fila.costoCatalogo
-                      : fila.costoFactura
-                  )}
+        <>
+          {/* ── 1 · EL PRODUCTO ───────────────────────────────────────────
+              Va primero y sin línea arriba: es el primer bloque de la hoja.
+              El título del modal ya dice el nombre del producto, pero eso no
+              dice que sea una ELECCIÓN que se puede cambiar. Acá se dice, y al
+              lado está cómo — el papel dice una cosa y el producto del ERP es
+              otra, y la única forma de notar un vínculo equivocado es verlos
+              juntos. */}
+          <div className="flex flex-col gap-dato">
+            <span className="text-sm3 sunmi-text-muted break-words">
+              El papel dice “{fila.textoCrudo || "—"}”.
+            </span>
+            <div className="flex items-center justify-between gap-renglon">
+              <span className="min-w-0">
+                <span className="block text-sm3 sunmi-text-muted">Va a este producto</span>
+                <span className="block text-sm3 font-medium sunmi-text-strong truncate">
+                  {fila.producto || "Sin producto"}
                 </span>
+              </span>
+              <SunmiButton
+                color="slate"
+                type="button"
+                disabled={guardando}
+                aria-label="Cambiar el producto de esta línea"
+                onClick={() => setCambiandoProducto(true)}
+                className="shrink-0 min-h-toque rounded-control px-4 text-sm3"
+              >
+                Cambiar
+              </SunmiButton>
+            </div>
+          </div>
+
+          {/* ── 2 · CUÁNTO ENTRÓ ─────────────────────────────────────────── */}
+          <Bloque titulo="Cuánto entró">
+            {/* UNA SOLA LÍNEA DE CONTEXTO, y las escalas no se mezclan en la
+                misma frase. Decía "Pediste 8 · la factura dice 80": los dos
+                números están en escalas distintas y la frase no lo dice, así
+                que se leen como una diferencia de 72. Ahora los dos van en la
+                unidad del pedido y lo que dice el papel va al final, nombrado
+                como lo que es. El tamaño del bulto no está acá: está arriba del
+                campo, que es donde se usa. */}
+            <span className="text-sm3 sunmi-text-muted">
+              Pediste {limpio(fila.cantidadPedida)} · la factura dice {limpio(cantidadDeLaFactura)}
+              {convertida ? ` · el papel dice ${limpio(fila.cantidad)} u` : ""}
+            </span>
+
+            {/* ── LOS DOS CAMPOS, AL 35 % Y CON UN HUECO EN EL MEDIO ──────
+                Copiado de la ficha de transferencias, hueco incluido: lo que
+                separa dos cantidades que se leen de un vistazo es el vacío del
+                medio, no una columna que haya que llenar. */}
+            <div className="flex justify-between gap-2">
+              <div className="w-35p">
+                <div className="text-sm2 sunmi-text-muted truncate">{rotuloDeCompletos}</div>
+                <SunmiCampoCantidad
+                  valor={bultos}
+                  onCambiar={setBultos}
+                  etiqueta={rotuloDeCompletos}
+                  difiere={cantidadDifiere}
+                  // `minimo` 0 y no 1: "no llegó nada" es una respuesta válida
+                  // en una recepción. Sin `normalizaAlSalir`, porque el vacío
+                  // se guarda como `null` —no contado— y un 0 como 0.
+                  minimo={0}
+                  tipo="number"
+                  claseMarco="flex-1"
+                  claseInput="text-lg"
+                />
+              </div>
+
+              {/* Las sueltas solo donde significan algo: sin pack, el bulto ES
+                  la unidad y un desglose se sumaría encima de sí mismo. */}
+              {vaPorPack && (
+                <div className="w-35p">
+                  <div className="text-sm2 sunmi-text-muted truncate">Sueltas</div>
+                  <SunmiCampoCantidad
+                    valor={sueltas}
+                    onCambiar={setSueltas}
+                    etiqueta="Sueltas"
+                    difiere={cantidadDifiere}
+                    minimo={0}
+                    tipo="number"
+                    claseMarco="flex-1"
+                    claseInput="text-lg"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* La franja SÍ lleva fondo: es el resultado de los dos campos de
+                arriba, no un bloque. */}
+            <div className="min-h-barraStock sunmi-control rounded-control px-filtro py-entreFiltros flex items-center justify-between gap-renglon">
+              <span className="text-sm3 sunmi-text-muted">Entra al stock</span>
+              <span className="text-sm3 font-bold tabular-nums">
+                {limpio(entraAlStock)} {entraAlStock === 1 ? "unidad" : "unidades"}
+              </span>
+            </div>
+          </Bloque>
+
+          {/* ── 3 · EL MOTIVO, SOLO SI LA CANTIDAD NO COINCIDE ─────────────
+              El único bloque condicional que queda, y no por estilo: sin
+              diferencia no hay por qué preguntar por qué difiere. */}
+          {cantidadDifiere && (
+            <Bloque titulo="Motivo de la diferencia">
+              <div className="flex flex-wrap gap-dentroFiltro">
+                {MOTIVOS.map((m) => (
+                  <SunmiButton
+                    key={m.valor}
+                    color={motivo === m.valor ? "primary" : "slate"}
+                    type="button"
+                    aria-pressed={motivo === m.valor}
+                    onClick={() => setMotivo(m.valor)}
+                    className="flex-1 min-h-toque justify-center rounded-control text-sm3"
+                  >
+                    {m.texto}
+                  </SunmiButton>
+                ))}
+              </div>
+              {motivo === "Otro" && (
+                <SunmiInput
+                  type="text"
+                  aria-label="Qué pasó"
+                  placeholder="Contá qué pasó"
+                  value={detalleMotivo}
+                  onChange={(e) => setDetalleMotivo(e.target.value)}
+                  className="w-full min-h-toque px-4 text-sm3"
+                />
+              )}
+            </Bloque>
+          )}
+
+          {/* ── 4 · EL PRECIO, SIEMPRE ────────────────────────────────────
+              Los cuatro casos viven en el mismo bloque y en el mismo lugar de
+              la hoja. Lo único que cambia es el título y qué se ofrece. */}
+          <Bloque
+            titulo={tituloDelPrecio}
+            accion={
+              yaDecidido && !cambiandoPrecio ? (
                 <SunmiButton
                   color="slate"
                   type="button"
                   disabled={guardando}
+                  aria-label="Cambiar la decisión de precio"
                   onClick={() => setCambiandoPrecio(true)}
                   className="shrink-0 min-h-toque rounded-control px-4 text-sm3"
                 >
                   Cambiar
                 </SunmiButton>
-              </div>
-            </>
-          ) : (
-            <>
-              <span className="text-sm3 font-medium sunmi-text-strong">
-                El precio {porcentaje != null && porcentaje < 0 ? "bajó" : "subió"}{" "}
-                {porcentaje != null ? `${Math.abs(porcentaje).toFixed(1).replace(".", ",")} %` : ""}
-              </span>
-              <span className="text-sm3 sunmi-text-muted">
-                Tenías {formatearMoneda(fila.costoCatalogo)} · la factura trae{" "}
-                {formatearMoneda(fila.costoFactura)}
-              </span>
-
-              {/* ── LO QUE SE HABÍA DECIDIDO, CUANDO YA NO APLICA ────────
-                  Preguntar de cero sobre algo que ya se contestó una vez se
-                  lee como que el sistema se olvidó. Se dice qué se había
-                  decidido, sobre qué números, y cuál de los dos se movió. */}
-              {decisionVieja && (
+              ) : null
+            }
+          >
+            {sinComparacion ? (
+              // Sin uno de los dos precios no hay decisión posible: se dice cuál
+              // falta y qué pasa igual. Nada que elegir.
+              <>
+                <span className="text-sm3 sunmi-text-muted break-words">{sinComparacion}</span>
                 <span className="text-sm3 sunmi-text-muted break-words">
-                  Antes decidiste: {textoDeDecision(decisionVieja.decision).toLowerCase()}, cuando
-                  la factura traía {formatearMoneda(decisionVieja.precioFacturado)} contra tu{" "}
-                  {formatearMoneda(decisionVieja.precioPropio)}. {textoDeLoQueCambio(fila)}
+                  La mercadería entra igual y tu costo no se toca.
                 </span>
-              )}
-
-              {/* ── LO QUE YA ESTÁ DECIDIDO POR REGLA NO SE OFRECE ────────
-                  Una baja no se aplica sola y un salto brusco no es un precio
-                  nuevo: el servidor rechaza las dos, así que ofrecer el botón
-                  es ofrecer un error. Se dice el porqué, con el texto que esa
-                  regla ya tiene escrito, y queda la respuesta que sí
-                  corresponde. */}
-              {noSePuedeAceptar && fila?.precio?.decision?.detalle && (
-                <span className="text-sm3 sunmi-text-muted break-words">
-                  {fila.precio.decision.detalle}
-                </span>
-              )}
-
-              <div className="flex flex-col gap-0.5">
-                {!noSePuedeAceptar && (
-                  <OpcionDePrecio
-                    elegida={aceptaPrecio}
-                    titulo="Aceptar el precio nuevo"
-                    detalle="Pasa a ser tu costo. El margen se recalcula."
-                    onElegir={() => setAceptaPrecio(true)}
-                  />
+              </>
+            ) : yaDecidido && !cambiandoPrecio ? (
+              // Ya contestada: se dice qué quedó. Volver a mostrar las dos
+              // opciones sobre algo ya contestado es la pregunta otra vez,
+              // aunque venga con la respuesta marcada.
+              <span className="text-sm3 sunmi-text-muted break-words">
+                {textoDeDecision(yaDecidido.decision)} ·{" "}
+                {formatearMoneda(
+                  yaDecidido.decision === DECISION_DE_PRECIO.DEJA_EL_MIO
+                    ? fila.costoCatalogo
+                    : fila.costoFactura
                 )}
-                <OpcionDePrecio
-                  elegida={!aceptaPrecio}
-                  titulo="Dejar el que tenía"
-                  detalle="Entra la mercadería sin tocar el costo."
-                  onElegir={() => setAceptaPrecio(false)}
-                />
-              </div>
-            </>
-          )}
-        </div>
-      )}
+              </span>
+            ) : cambio ? (
+              <>
+                {losDosPrecios}
 
-      {/* ── 3 · EL MOTIVO, SOLO SI LA CANTIDAD NO COINCIDE ───────────────── */}
-      {cantidadDifiere && (
-        <div className="border-t sunmi-divider pt-hoja flex flex-col gap-renglon">
-          <span className="text-sm3 font-medium sunmi-text-strong">Motivo de la diferencia</span>
-          <div className="flex flex-wrap gap-dentroFiltro">
-            {MOTIVOS.map((m) => (
-              <SunmiButton
-                key={m.valor}
-                color={motivo === m.valor ? "primary" : "slate"}
-                type="button"
-                aria-pressed={motivo === m.valor}
-                onClick={() => setMotivo(m.valor)}
-                className="flex-1 min-h-toque justify-center rounded-control text-sm3"
-              >
-                {m.texto}
-              </SunmiButton>
-            ))}
-          </div>
-          {motivo === "Otro" && (
-            <SunmiInput
-              type="text"
-              aria-label="Qué pasó"
-              placeholder="Contá qué pasó"
-              value={detalleMotivo}
-              onChange={(e) => setDetalleMotivo(e.target.value)}
-              className="w-full min-h-toque px-4 text-sm3"
-            />
-          )}
-        </div>
-      )}
+                {/* ── LO QUE SE HABÍA DECIDIDO, CUANDO YA NO APLICA ───────
+                    Preguntar de cero sobre algo que ya se contestó una vez se
+                    lee como que el sistema se olvidó. Se dice qué se había
+                    decidido, sobre qué números, y cuál de los dos se movió. */}
+                {decisionVieja && (
+                  <span className="text-sm3 sunmi-text-muted break-words">
+                    Antes decidiste: {textoDeDecision(decisionVieja.decision).toLowerCase()}, cuando
+                    la factura traía {formatearMoneda(decisionVieja.precioFacturado)} contra tu{" "}
+                    {formatearMoneda(decisionVieja.precioPropio)}. {textoDeLoQueCambio(fila)}
+                  </span>
+                )}
 
-      {error && <span className="text-sm3 sunmi-text-danger">{error}</span>}
+                {/* Lo que ya está decidido por regla no se ofrece: el servidor
+                    rechaza una baja y un salto brusco, así que el botón sería
+                    un error seguro. Se dice el porqué con el texto que esa
+                    regla ya tiene escrito. */}
+                {noSePuedeAceptar && fila?.precio?.decision?.detalle && (
+                  <span className="text-sm3 sunmi-text-muted break-words">
+                    {fila.precio.decision.detalle}
+                  </span>
+                )}
 
-      {/* ── DESMARCAR: SE PUEDE VOLVER ATRÁS ────────────────────────────
-          Una línea marcada por error quedaba marcada para siempre. Es el mismo
-          botón y el mismo lugar que en la ficha de recepción de una
-          transferencia: devuelve la línea a pendiente y nada más. Solo se
-          ofrece si está marcada — sobre una pendiente no tendría qué deshacer. */}
-      {revisada && (
-        <SunmiButton
-          color="slate"
-          type="button"
-          disabled={guardando}
-          onClick={() => onDesmarcar?.(fila)}
-          className="w-full min-h-toque justify-center text-sm3"
-        >
-          Desmarcar
-        </SunmiButton>
-      )}
+                <div className="flex flex-col gap-0.5">
+                  {!noSePuedeAceptar && (
+                    <OpcionDePrecio
+                      elegida={aceptaPrecio}
+                      titulo="Aceptar el precio nuevo"
+                      detalle="Pasa a ser tu costo. El margen se recalcula."
+                      onElegir={() => setAceptaPrecio(true)}
+                    />
+                  )}
+                  <OpcionDePrecio
+                    elegida={!aceptaPrecio}
+                    titulo="Dejar el que tenía"
+                    detalle="Entra la mercadería sin tocar el costo."
+                    onElegir={() => setAceptaPrecio(false)}
+                  />
+                </div>
+              </>
+            ) : (
+              // Los dos números son el mismo: se muestran igual, y no hay nada
+              // que decidir. El bloque está para que la hoja no cambie de forma.
+              losDosPrecios
+            )}
+          </Bloque>
 
-      <div className="flex gap-renglon">
-        <SunmiButton
-          color="slate"
-          type="button"
-          onClick={onCerrar}
-          className="flex-1 min-h-botonFoto justify-center text-sm3"
-        >
-          Cancelar
-        </SunmiButton>
-        <SunmiButton
-          color="primary"
-          type="button"
-          disabled={guardando}
-          onClick={guardar}
-          className="flex-1 min-h-botonFoto justify-center text-sm3"
-        >
-          {guardando ? "Guardando…" : "Guardar"}
-        </SunmiButton>
-      </div>
-      </>
+          {error && <span className="text-sm3 sunmi-text-danger">{error}</span>}
+        </>
       )}
     </SunmiModalLayout>
   );

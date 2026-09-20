@@ -304,21 +304,20 @@ module.exports = {
         // El cuadro del número del stepper. 62 tampoco cae en la grilla.
         cajaCantidad: "62px",
 
-        // ── LOS DOS DEL STEPPER DE LA HOJA DE CORREGIR ────────────────────
+        // ── ACÁ VIVÍAN LOS DOS DEL STEPPER DE LA HOJA DE CORREGIR ────────
         //
-        // 62 el rótulo de cada fila y 48 los botones de más y menos. El rótulo
-        // tiene que ser FIJO: si se reparte, "Bultos" y "Sueltas" dejan de
-        // arrancar a la misma altura y los dos steppers dejan de leerse como un
-        // par.
+        // `rotuloStepper` (62) y `cajaStepper` (48), del stepper que esa hoja
+        // tenía escrito a mano: una fila por cantidad, con el rótulo a la
+        // izquierda y las teclas de más y menos a los costados del número.
         //
-        // Acá vivían también `rotuloComparacion` y `botonCorregir`, del diseño
-        // propio que tenía la tarjeta de una línea de factura. Se fueron con
-        // él: esa tarjeta ahora COPIA la de la recepción de una transferencia y
-        // su geometría sale de `SunmiCard` y de las clases de esa pieza, no de
-        // números escritos acá. Un token que nadie usa es una medida esperando
-        // a que alguien la vuelva a inventar distinta.
-        rotuloStepper: "62px",
-        cajaStepper: "48px",
+        // Se fueron con él. La hoja ahora usa `SunmiCampoCantidad` —la pieza
+        // del kit— con los dos campos al 35 % uno al lado del otro, que es como
+        // lo hace la ficha de recepción de una transferencia: su geometría sale
+        // de la pieza y de `w-35p`, no de números escritos acá.
+        //
+        // Es el mismo motivo por el que antes se fueron `rotuloComparacion` y
+        // `botonCorregir`: un token que nadie usa es una medida esperando a que
+        // alguien la vuelva a inventar distinta.
       },
     },
   },
