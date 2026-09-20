@@ -2,11 +2,11 @@
   "_lea_esto": "Línea de base del hardcodeo. La sella scripts/hardcodeo.mjs --linea-base --sellar; sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
   "_commit": "`commit` es el árbol que se ESCANEÓ, no la fecha en que se selló: pueden diferir. Cuando se corrige un falso positivo del contador, la base se REEXPRESA desde el árbol histórico —no desde main— para no perdonar la deuda que entró después.",
   "_inventario": "El trinquete compara el INVENTARIO, no los totales: una ocurrencia es archivo + categoría + texto, con cantidad. Sin número de línea, para que mover código no invente violaciones. Un alta en cualquier clave pone rojo aunque el total baje.",
-  "generada": "2026-09-19 22:24",
-  "commit": "54f4dd67a9509647a21310a835a3c9b5834399be",
+  "generada": "2026-09-20 09:39",
+  "commit": "a70f3afd6922d455641ef0ac5bc9fd6bcae7ffca",
   "total": {
-    "color": 280,
-    "medida": 1605,
+    "color": 278,
+    "medida": 1603,
     "modal": 34,
     "crudo": 281,
     "celda": 430,
@@ -96,8 +96,8 @@
       "tema-paralelo": 0
     },
     "compras-proveedor": {
-      "color": 17,
-      "medida": 151,
+      "color": 15,
+      "medida": 149,
       "modal": 4,
       "crudo": 18,
       "celda": 26,
@@ -576,12 +576,8 @@
       }
     },
     "app/modulos/compras-proveedor/[id]/page.jsx": {
-      "color": {
-        "#f59e0b": 2
-      },
       "medida": {
-        "text-[13px]": 4,
-        "text-[12px]": 1,
+        "text-[13px]": 3,
         "text-[10px]": 1
       },
       "celda": {
