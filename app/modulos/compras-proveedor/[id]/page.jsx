@@ -640,8 +640,23 @@ export default function DetallePedidoProveedorPage({ params }) {
   );
 
   return (
-    <div className="sunmi-bg w-full min-h-full p-4">
-      <SunmiCard>
+    // ── EL MISMO ENVOLTORIO QUE LA RECEPCIÓN DE UNA TRANSFERENCIA ────────
+    //
+    // `p-2 lg:p-3` y no `p-4`. Medido a 360: con `p-4` el contenido arrancaba
+    // en x=14 y medía 324; transferencias arranca en x=21 y mide 310, porque su
+    // raíz agrega `p-2` sobre el `p-4` del `<main>`. Eran siete píxeles por
+    // lado, y es la diferencia que hacía que las dos pantallas no midieran
+    // igual por más que las piezas de adentro fueran las mismas.
+    <div className="sunmi-bg w-full min-h-full p-2 lg:p-3">
+      {/* ── Y SIN LA TARJETA QUE ENVOLVÍA TODO ──────────────────────────
+          Acá había un `<SunmiCard>` alrededor de la pantalla entera. Ése es el
+          origen de las cajas anidadas: la tarjeta de afuera, el panel adentro y
+          la tabla adentro del panel, tres bordes y tres fondos uno dentro de
+          otro, que es lo que se veía como rayas a los costados.
+          La recepción de una transferencia no envuelve nada: sus bloques se
+          apoyan directo sobre el fondo de la página, y cada uno pone su propia
+          tarjeta cuando le corresponde. */}
+      <>
         {/* ── EL ENCABEZADO Y LA FICHA SON DE LOS OTROS ESTADOS ───────────
             Recibiendo, el título y el Volver los pone el shell —abajo, con
             `useTituloDePagina` y `useAccionDePagina`— y la identidad del pedido
@@ -1041,7 +1056,7 @@ export default function DetallePedidoProveedorPage({ params }) {
           </div>
           </>
         )}
-      </SunmiCard>
+      </>
     </div>
   );
 }
