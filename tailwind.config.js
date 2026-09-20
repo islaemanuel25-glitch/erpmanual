@@ -122,6 +122,14 @@ module.exports = {
         filtro: "12px",
         entreFiltros: "8px",
         dentroFiltro: "6px",
+
+        // ── LOS DOS DEL LISTADO DE RECIBIR MERCADERÍA ─────────────────────
+        //
+        // 4 entre los datos apilados de la tarjeta del total, y 10 entre los
+        // bloques de un renglón de pedido. Ninguno cae en la grilla: `gap-1`
+        // da 3,5 y `gap-2.5` da 8,75.
+        dato: "4px",
+        renglon: "10px",
       },
 
       // ── EL BLANCO DE TOQUE ────────────────────────────────────────────
@@ -175,6 +183,19 @@ module.exports = {
         // de `extend` se emite después de la escala del núcleo, así que le
         // gana a `min-h-12` sin tener que forzar nada con `!`.
         campoBusqueda: "52px",
+
+        // ── LOS CINCO DEL LISTADO DE RECIBIR MERCADERÍA ───────────────────
+        //
+        // Ninguno cae en la grilla de 3,5: 127, 63, 87, 48, 64 y 40 quedan
+        // entre dos pasos. Van como MÍNIMO y no como alto fijo porque todos
+        // llevan texto que puede ir a dos renglones —un nombre de proveedor
+        // largo, un rótulo de período— y con `h-` el segundo quedaría cortado.
+        tarjetaPorEntrar: "127px",
+        diaCabecera: "63px",
+        filaPedido: "87px",
+        buscadorListado: "48px",
+        entradaSinPedido: "64px",
+        botonRecibir: "40px",
       },
 
       // ── EL ALTO DE UNA FILA DE LISTA ──────────────────────────────────

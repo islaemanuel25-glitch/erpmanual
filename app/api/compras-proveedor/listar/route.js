@@ -59,6 +59,18 @@ export async function GET(req) {
           proveedor: { select: { id: true, nombre: true } },
           deposito: { select: { id: true, nombre: true } },
           _count: { select: { detalles: true } },
+          // ── LAS LÍNEAS, SOLO PARA SUMAR EL ESTIMADO ──────────────────────
+          //
+          // El listado de "Recibir mercadería" muestra cuánta plata está por
+          // entrar, y ese número no existía en ninguna columna: `totalFactura`
+          // y `totalReal` se llenan al recibir y al facturar, o sea DESPUÉS.
+          // Lo único que se sabe al mandar el pedido es lo que se calculó al
+          // pedirlo, que es la suma de cantidad × costo de cada línea.
+          //
+          // Se traen los dos campos y se suma acá en vez de pedir un
+          // `aggregate` aparte por pedido: son dos números por línea y el
+          // listado ya trae como mucho una página de pedidos.
+          detalles: { select: { cantidad: true, precioCosto: true } },
         },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * pageSize,
@@ -76,6 +88,14 @@ export async function GET(req) {
       depositoNombre: p.deposito.nombre,
       depositoId: p.deposito.id,
       cantItems: p._count.detalles,
+      // ESTIMADO, y el nombre lo dice. Una línea sin costo cargado no suma
+      // cero: no suma, igual que en el texto del pedido. Si ninguna tiene
+      // costo el total da 0, y la pantalla lo muestra como lo que es —no se
+      // sabe cuánto vale— en vez de afirmar que vale nada.
+      totalEstimado: (p.detalles || []).reduce((acc, d) => {
+        const costo = Number(d.precioCosto) || 0;
+        return costo > 0 ? acc + (Number(d.cantidad) || 0) * costo : acc;
+      }, 0),
       fechaConfirmado: p.fechaConfirmado,
       fechaEnviado: p.fechaEnviado,
       fechaRecibido: p.fechaRecibido,
