@@ -33,20 +33,43 @@ export default function DiaDePedidos({ dia, onRecibir }) {
 
   return (
     <div className="rounded-xl border sunmi-divider sunmi-bg-card overflow-hidden">
-      {/* ── EL ENCABEZADO DEL DÍA ──────────────────────────────────────────
-          A la izquierda qué día y cuántos hay; a la derecha lo que suma. El
-          subtotal va acá y no repetido en cada fila: la pregunta del encabezado
-          es "cuánto pedí este día". */}
-      <div className="min-h-diaCabecera px-4 py-filtro flex items-center justify-between gap-renglon">
-        <div className="min-w-0">
-          <div className="text-lg2 font-bold sunmi-text-strong truncate">{dia?.rotulo}</div>
-          <div className="text-sm3 sunmi-text-muted">
-            {pedidos.length} {pedidos.length === 1 ? "pedido esperando" : "pedidos esperando"}
+      {/* ── LA FRANJA DEL DÍA ──────────────────────────────────────────────
+          Con el encabezado del mismo blanco que las filas, dos días seguidos se
+          leían como una lista continua: no se veía dónde terminaba uno y
+          empezaba el otro. La franja lleva el fondo de los botones secundarios
+          —`--pos-control-bg`, el mismo token— y eso alcanza para separarlos sin
+          agregar ninguna línea más.
+
+          Es lo PRIMERO de la tarjeta, así que el redondeo de arriba se lo
+          recorta el `overflow-hidden` del contenedor. Sin ese recorte el fondo
+          saldría cuadrado por encima del borde redondeado.
+
+          `sunmi-control` trae un `:hover` que acá no significa nada —esto no se
+          toca— pero en un teléfono no hay hover, y usar la clase que ya existe
+          es preferible a escribir una variante nueva para ahorrarse una regla
+          que nunca se activa. */}
+      <div className="sunmi-control px-4 py-renglon flex items-baseline gap-renglon">
+        <div className="text-sm3 font-bold sunmi-text-strong flex-1 min-w-0 truncate">
+          {dia?.rotulo}
+        </div>
+
+        {/* La cuenta, en gris: dice cuántos hay sin competir con el día. */}
+        <div className="text-sm3 sunmi-text-muted shrink-0">
+          {pedidos.length} {pedidos.length === 1 ? "pedido" : "pedidos"}
+        </div>
+
+        {/* ── EL SUBTOTAL SOLO CUANDO SUMA ALGO ──────────────────────────
+            Con un solo pedido en el día, el subtotal de la franja y el importe
+            de la fila son el mismo número escrito dos veces a treinta píxeles
+            de distancia. Dos números iguales juntos no se leen como una suma:
+            se leen como una repetición, y quien mira se pregunta cuál de los
+            dos es el bueno. Desde dos pedidos sí suma algo que no está escrito
+            en ningún otro lado. */}
+        {pedidos.length > 1 && (
+          <div className="text-sm3 font-bold sunmi-text-strong tabular-nums shrink-0">
+            {formatearMoneda(dia?.total || 0)}
           </div>
-        </div>
-        <div className="text-lg2 font-bold sunmi-text-strong tabular-nums shrink-0">
-          {formatearMoneda(dia?.total || 0)}
-        </div>
+        )}
       </div>
 
       {pedidos.map((p, i) => (

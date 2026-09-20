@@ -186,12 +186,16 @@ module.exports = {
 
         // ── LOS CINCO DEL LISTADO DE RECIBIR MERCADERÍA ───────────────────
         //
-        // Ninguno cae en la grilla de 3,5: 127, 63, 87, 48, 64 y 40 quedan
-        // entre dos pasos. Van como MÍNIMO y no como alto fijo porque todos
-        // llevan texto que puede ir a dos renglones —un nombre de proveedor
-        // largo, un rótulo de período— y con `h-` el segundo quedaría cortado.
+        // Ninguno cae en la grilla de 3,5: 127, 87, 48, 64 y 40 quedan entre
+        // dos pasos. Van como MÍNIMO y no como alto fijo porque todos llevan
+        // texto que puede ir a dos renglones —un nombre de proveedor largo, un
+        // rótulo de período— y con `h-` el segundo quedaría cortado.
+        //
+        // Acá vivía `diaCabecera: 63px`, el alto del encabezado del día. Se fue
+        // con el rediseño de la franja: ahora el alto lo da su padding —10
+        // arriba y abajo— y un mínimo encima habría sido un segundo criterio
+        // para lo mismo.
         tarjetaPorEntrar: "127px",
-        diaCabecera: "63px",
         filaPedido: "87px",
         buscadorListado: "48px",
         entradaSinPedido: "64px",
