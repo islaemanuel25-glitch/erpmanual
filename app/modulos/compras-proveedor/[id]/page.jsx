@@ -16,7 +16,14 @@ import PanelComprobantes from "@/components/comprobantes/PanelComprobantes";
 import ListaConciliacion from "@/components/comprobantes/ListaConciliacion";
 import ListaDeLaFactura from "@/components/compras-proveedor/ListaDeLaFactura";
 import HojaCorregirLinea from "@/components/compras-proveedor/HojaCorregirLinea";
-import { cantidadEnEscalaDelPedido } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
+import {
+  cantidadEnEscalaDelPedido,
+  precioCambio,
+} from "@/lib/compras-proveedor/estadoDeLineaFacturada";
+import {
+  DECISION_DE_PRECIO,
+  decisionVigente,
+} from "@/lib/compras-proveedor/decisionDePrecio";
 import TarjetaContextoDelPedido from "@/components/compras-proveedor/TarjetaContextoDelPedido";
 import BloqueDeLaFactura from "@/components/compras-proveedor/BloqueDeLaFactura";
 
@@ -334,17 +341,87 @@ export default function DetallePedidoProveedorPage({ params }) {
   // miró. Se llena con el toque —"✓ Coincide"— o guardando la hoja.
   const [revisadas, setRevisadas] = useState({});
 
+  // ── LAS DOS DECISIONES DE PRECIO VAN ACÁ ARRIBA ────────────────────────
+  //
+  // Antes de quien las usa, y no al lado de la hoja: "✓ Coincide" aplica la
+  // decisión ya tomada, así que la nombra. Un `const` declarado después no
+  // existe cuando el arreglo de dependencias se evalúa, y eso es exactamente lo
+  // que tiró la pantalla en producción con `recargarConciliacion`.
+  const aceptarPrecioDeLinea = useCallback(async (fila) => {
+    try {
+      const r = await fetch("/api/compras-proveedor/comprobantes/aceptar-precio", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lineaId: fila?.lineaId,
+          unidad: fila?.unidad?.elegida,
+          decision: DECISION_DE_PRECIO.ACEPTA_FACTURA,
+        }),
+      });
+      const d = await r.json().catch(() => null);
+      if (!d?.ok) return { ok: false, error: d?.queHacer || d?.error || "No se pudo aceptar." };
+      // Se vuelve a pedir la conciliación: el precio cambió y la comparación de
+      // todas las filas de ese producto ya no es la misma.
+      setRecargarConciliacion((n) => n + 1);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e?.message || "No se pudo aceptar." };
+    }
+  }, []);
+
+  // ── DEJAR EL PROPIO TAMBIÉN SE GUARDA ──────────────────────────────────
+  //
+  // Es la MISMA ruta con la otra respuesta, no una segunda: no escribe ningún
+  // costo, solo registra que sobre estos dos precios ya se contestó. Sin esto,
+  // "dejo el mío" era la única decisión que la próxima factura volvía a
+  // preguntar, porque no dejaba rastro en ningún lado.
+  const dejarMiPrecioDeLinea = useCallback(async (fila) => {
+    try {
+      const r = await fetch("/api/compras-proveedor/comprobantes/aceptar-precio", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lineaId: fila?.lineaId,
+          unidad: fila?.unidad?.elegida,
+          decision: DECISION_DE_PRECIO.DEJA_EL_MIO,
+        }),
+      });
+      const d = await r.json().catch(() => null);
+      if (!d?.ok) return { ok: false, error: d?.queHacer || d?.error || "No se pudo guardar." };
+      // La fila cambia de estado —deja de estar para revisar— así que se vuelve
+      // a pedir la conciliación, igual que al aceptar.
+      setRecargarConciliacion((n) => n + 1);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e?.message || "No se pudo guardar." };
+    }
+  }, []);
+
   // El caso feliz en un toque: lo que la factura dice es lo que llegó. Mismo
   // gesto que "✓ Coincide" en la recepción de una transferencia.
-  const aceptarLoQueDiceLaFactura = useCallback((fila) => {
+  const aceptarLoQueDiceLaFactura = useCallback(async (fila) => {
     if (!fila?.pedidoDetalleId) return;
+    // ── SI EL PRECIO YA ESTABA DECIDIDO, ESTE TOQUE LO APLICA ──────────
+    //
+    // La tarjeta dice "Ya decidido · $X" y ofrece el tilde, así que el precio
+    // no entra solo: entra porque alguien decidió ese número una vez y lo está
+    // confirmando ahora. Sin esto, una línea con decisión de aceptar quedaría
+    // en verde y la mercadería entraría al costo viejo en silencio, que es peor
+    // que preguntar de más.
+    const decidida = decisionVigente(fila);
+    if (precioCambio(fila) && decidida?.decision === DECISION_DE_PRECIO.ACEPTA_FACTURA) {
+      const r = await aceptarPrecioDeLinea(fila);
+      if (r && r.ok === false) return;
+    }
     // EN LA ESCALA DEL PEDIDO. `fila.cantidad` es lo crudo del papel —80
     // unidades— y guardarlo como cantidad recibida metería diez veces lo que
     // llegó. Es el mismo número convertido que muestra la tarjeta.
     const enEscala = cantidadEnEscalaDelPedido(fila);
     setRecibidos((prev) => ({ ...prev, [fila.pedidoDetalleId]: Number(enEscala) || 0 }));
     setRevisadas((prev) => ({ ...prev, [fila.pedidoDetalleId]: true }));
-  }, []);
+  }, [aceptarPrecioDeLinea]);
 
   const guardarCorreccion = useCallback((datos) => {
     const id = datos?.pedidoDetalleId;
@@ -365,8 +442,6 @@ export default function DetallePedidoProveedorPage({ params }) {
     setLineaACorregir(null);
   }, []);
 
-  // El precio SÍ se escribe en el momento: es una decisión propia y la ruta ya
-  // existe y ya valida todo lo que hay que validar.
   // Volver una línea a pendiente. El mismo gesto que "Desmarcar" en la ficha
   // de recepción de una transferencia: devuelve la línea y nada más.
   const desmarcarLinea = useCallback((fila) => {
@@ -405,25 +480,6 @@ export default function DetallePedidoProveedorPage({ params }) {
       return { ok: true };
     } catch (e) {
       return { ok: false, error: e?.message || "No se pudo vincular." };
-    }
-  }, []);
-
-  const aceptarPrecioDeLinea = useCallback(async (fila) => {
-    try {
-      const r = await fetch("/api/compras-proveedor/comprobantes/aceptar-precio", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lineaId: fila?.lineaId, unidad: fila?.unidad?.elegida }),
-      });
-      const d = await r.json().catch(() => null);
-      if (!d?.ok) return { ok: false, error: d?.queHacer || d?.error || "No se pudo aceptar." };
-      // Se vuelve a pedir la conciliación: el precio cambió y la comparación de
-      // todas las filas de ese producto ya no es la misma.
-      setRecargarConciliacion((n) => n + 1);
-      return { ok: true };
-    } catch (e) {
-      return { ok: false, error: e?.message || "No se pudo aceptar." };
     }
   }, []);
 
@@ -916,6 +972,7 @@ export default function DetallePedidoProveedorPage({ params }) {
               abierta={!!lineaACorregir}
               onCerrar={() => setLineaACorregir(null)}
               onAceptarPrecio={aceptarPrecioDeLinea}
+              onDejarMiPrecio={dejarMiPrecioDeLinea}
               onGuardar={guardarCorreccion}
               onVincular={vincularLinea}
               onDesmarcar={desmarcarLinea}

@@ -2,6 +2,20 @@
 //
 // Acepta el precio de una línea leída y lo escribe EN LA LÍNEA DEL PEDIDO.
 //
+// ── Y TAMBIÉN GUARDA LA OTRA RESPUESTA, QUE ES LA MISMA DECISIÓN ───────────
+//
+// `decision: "DEJA_EL_MIO"` no escribe ningún costo: solo registra que sobre
+// estos dos precios ya se contestó. Está en ESTA ruta y no en una al lado
+// porque es el mismo hecho con el otro valor —un `ProductoQueNoSeCambia` del
+// precio— y porque las dos necesitan exactamente lo mismo para poder guardarse:
+// a qué producto es, a qué línea del pedido corresponde y cuáles son los dos
+// números que se compararon. Con dos rutas, cualquiera de esas tres se
+// resolvería distinto de un lado que del otro, que es el defecto que este
+// módulo ya tuvo dos veces.
+//
+// El default es aceptar, así que quien ya la llamaba —la conciliación de
+// escritorio— sigue llamándola igual.
+//
 // ── UN SOLO ESCRITOR DE COSTO ──────────────────────────────────────────────
 //
 // Esta ruta NO toca el costo del producto. Escribe el precio en
@@ -32,6 +46,12 @@ import { productosDeLasFilas } from "@/lib/compras-proveedor/comprobante/product
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { resolverLineaDelPedido } from "@/lib/compras-proveedor/comprobante/vinculo";
 import { aplanarDetalles } from "@/lib/compras-proveedor/comprobante/analisisDeComprobante";
+import { guardarDecisionDePrecio } from "@/lib/compras-proveedor/comprobante/guardarDecisionDePrecio";
+import {
+  DECISION_DE_PRECIO,
+  esDecisionConocida,
+  mismoPrecio,
+} from "@/lib/compras-proveedor/decisionDePrecio";
 
 export async function POST(req) {
   try {
@@ -46,6 +66,15 @@ export async function POST(req) {
     const lineaId = Number(body?.lineaId);
     if (!Number.isFinite(lineaId)) {
       return NextResponse.json({ ok: false, error: "Falta la línea." }, { status: 400 });
+    }
+
+    // Sin `decision` es aceptar, que es lo que esta ruta hacía siempre.
+    const decisionPedida = body?.decision ?? DECISION_DE_PRECIO.ACEPTA_FACTURA;
+    if (!esDecisionConocida(decisionPedida)) {
+      return NextResponse.json(
+        { ok: false, error: "Esa no es una decisión de precio conocida." },
+        { status: 400 }
+      );
     }
 
     const linea = await prisma.comprobanteLinea.findFirst({
@@ -136,6 +165,44 @@ export async function POST(req) {
       detalles: detallesDelPedido,
     });
 
+    // ── DEJAR EL PROPIO NO ESCRIBE NINGÚN COSTO ─────────────────────────
+    //
+    // Solo registra que sobre estos dos precios ya se contestó, y por eso no
+    // pasa por `puedeAceptarse`: esa guarda existe para que un precio de la
+    // factura no entre sin que alguien lo mire, y acá no entra ninguno. Lo
+    // único que hace falta es contra QUÉ costo se decidió, que es el de la
+    // línea del pedido — el mismo número que la pantalla mostró.
+    if (decisionPedida === DECISION_DE_PRECIO.DEJA_EL_MIO) {
+      if (!delPedido.detalle) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Esa línea todavía no está apareada con una del pedido, así que no hay contra qué decidir.",
+          },
+          { status: 409 }
+        );
+      }
+      await guardarDecisionDePrecio(prisma, {
+        grupoId,
+        proveedorId: linea.comprobante.proveedor.id,
+        productoBaseId: base.id,
+        decision: DECISION_DE_PRECIO.DEJA_EL_MIO,
+        precioFacturado: analisis.precioAEscribir,
+        precioPropio: Number(delPedido.detalle.precioCosto),
+        comprobanteLineaId: linea.id,
+        usuarioId: session?.id ?? null,
+      });
+      return NextResponse.json({
+        ok: true,
+        lineaId: linea.id,
+        decision: DECISION_DE_PRECIO.DEJA_EL_MIO,
+        producto: base?.nombre ?? null,
+        queHacer:
+          "Queda tu costo. No se vuelve a preguntar mientras la factura traiga el mismo precio " +
+          "contra el mismo costo tuyo.",
+      });
+    }
+
     const puede = puedeAceptarse({
       linea,
       lineaDePedidoId: delPedido.detalle?.id ?? null,
@@ -177,6 +244,32 @@ export async function POST(req) {
         where: { id: detalle.id },
         data: { precioCosto: precioAEscribir },
       });
+
+      // LA DECISIÓN, CON LOS DOS PRECIOS QUE SE COMPARARON. El propio es el de
+      // ANTES de esta escritura: es contra ése que se decidió, y es el que la
+      // próxima factura va a encontrar si el costo no se movió. Guardar el
+      // nuevo dejaría una decisión que nunca vuelve a aplicar, porque los dos
+      // lados serían el mismo número.
+      //
+      // Va adentro de la transacción: una decisión guardada sobre un costo que
+      // no llegó a escribirse haría que la próxima factura no pregunte por algo
+      // que no pasó.
+      //
+      // Y no se guarda nada si los dos números ya eran el mismo: ahí no hubo
+      // ninguna pregunta que contestar, y la fila quedaría diciendo "antes
+      // decidiste" sobre una comparación que nunca existió.
+      if (!mismoPrecio(detalle.precioCosto, precioAEscribir)) {
+        await guardarDecisionDePrecio(tx, {
+          grupoId,
+          proveedorId: linea.comprobante.proveedor.id,
+          productoBaseId: base.id,
+          decision: DECISION_DE_PRECIO.ACEPTA_FACTURA,
+          precioFacturado: precioAEscribir,
+          precioPropio: Number(detalle.precioCosto),
+          comprobanteLineaId: linea.id,
+          usuarioId: session?.id ?? null,
+        });
+      }
 
       return { anterior: detalle.precioCosto, nuevo: precioAEscribir };
     });

@@ -431,7 +431,14 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // unidades sueltas— para la hoja de corregir una línea al recibir un pedido a
   // proveedor. Aditiva, sin backfill y de OTRO módulo. Se nombra acá porque
   // este candado existe para que ninguna migración aparezca sin que se note.
-  assert.equal(migraciones.length, 20, "aparecio una migracion que nadie declaro aca");
+  // 21 desde el 2026-09-20: entra
+  // `20260920190000_decision_de_precio_por_proveedor`, una tabla nueva que
+  // guarda lo que ya se decidió sobre el precio de un producto de un proveedor
+  // —aceptar el de la factura o dejar el propio— con los dos precios que se
+  // compararon, para que la próxima factura no vuelva a preguntar lo mismo. Es
+  // de otra tanda, no toca nada de transferencias, y es aditiva: una tabla
+  // nueva, sin DROP y sin backfill.
+  assert.equal(migraciones.length, 21, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

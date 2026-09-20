@@ -27,6 +27,14 @@
 // anterior arriba, en chico y tachado, y el nuevo abajo, en grande y en
 // warning. Es exactamente cómo ella muestra un importe corregido — se lee "de
 // cuánto era" → "cuánto es". No se inventó un tratamiento nuevo.
+//
+// ── Y UN PRECIO YA DECIDIDO NO SE MUESTRA COMO PROBLEMA ───────────────────
+//
+// La diferencia entre lo que factura el proveedor y el costo interno es la
+// ganancia del depósito: es estable y vuelve igual en cada recepción. Una vez
+// decidida, sigue siendo una diferencia y se sigue viendo —el número no se
+// esconde— pero deja el tono de alerta y el tachado, que son la forma de decir
+// "esto hay que resolverlo". Lo que queda es una línea que dice qué se decidió.
 
 import { Check, Pencil } from "lucide-react";
 
@@ -41,9 +49,14 @@ import {
   cantidadFueConvertida,
   diferenciaDeCantidad,
   estadoDeLinea,
+  hayQueDecidirElPrecio,
   porcentajeDelPrecio,
   precioCambio,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
+import {
+  DECISION_DE_PRECIO,
+  decisionVigente,
+} from "@/lib/compras-proveedor/decisionDePrecio";
 
 /** Las mismas dos clases de botón que usa la tarjeta de transferencias. */
 const CLASE_COINCIDE = "sunmi-btn-accent-outline";
@@ -83,7 +96,10 @@ export default function TarjetaLineaFactura({
   guardando = false,
 }) {
   const estado = estadoDeLinea(fila);
-  const cambio = precioCambio(fila);
+  // Dos preguntas distintas: si el precio cambió, y si hay que decidirlo. Con
+  // la decisión ya tomada sobre estos dos números, lo segundo es que no.
+  const decidido = decisionVigente(fila);
+  const cambio = hayQueDecidirElPrecio(fila);
   const porcentaje = porcentajeDelPrecio(fila);
   const faltan = diferenciaDeCantidad(fila);
   const esNoPedida = estado === ESTADO_LINEA.NO_PEDIDO;
@@ -126,10 +142,22 @@ export default function TarjetaLineaFactura({
   }
 
   // ── LA TARJETA ABIERTA, PARA LO QUE HAY QUE MIRAR ──────────────────────
-  const tono = esNoPedida ? "sunmi-state-danger" : "sunmi-state-warning";
+  //
+  // El tono de alerta es para lo que hay que resolver. Una línea que coincide
+  // —y una cuyo único desvío era un precio ya decidido— no tiene nada que
+  // resolver: se muestra igual, porque nadie la controló todavía, pero sin el
+  // naranja que dice "acá hay un problema".
+  const tono = esNoPedida
+    ? "sunmi-state-danger"
+    : estado === ESTADO_LINEA.COINCIDE
+      ? ""
+      : "sunmi-state-warning";
 
   return (
-    <SunmiCard className={`p-4 space-y-3 ${tono}`} data-linea-factura={fila?.producto || fila?.lineaId}>
+    <SunmiCard
+      className={`p-4 space-y-3 ${tono}`.trimEnd()}
+      data-linea-factura={fila?.producto || fila?.lineaId}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-md2 font-semibold sunmi-text-strong break-words">
@@ -192,6 +220,24 @@ export default function TarjetaLineaFactura({
                     .toFixed(1)
                     .replace(".", ",")} %)`
                 : ""}
+            </span>
+          </span>
+        )}
+
+        {/* ── LO QUE YA SE DECIDIÓ, EN UNA LÍNEA ──────────────────────────
+            Mismo lugar y misma forma que el precio que cambió, porque es el
+            mismo dato contestado: arriba qué se decidió, abajo con qué número
+            queda. Sin tachado y sin warning — no hay nada que resolver. Se
+            cambia desde Corregir, que es el mismo camino de siempre. */}
+        {!cambio && decidido && precioCambio(fila) && (
+          <span className="shrink-0 whitespace-nowrap text-right">
+            <span className="block text-xs2 sunmi-text-muted">Ya decidido</span>
+            <span className="block text-sm2 tabular-nums font-semibold sunmi-text-strong">
+              {formatearMoneda(
+                decidido.decision === DECISION_DE_PRECIO.DEJA_EL_MIO
+                  ? fila?.costoCatalogo
+                  : fila?.costoFactura
+              )}
             </span>
           </span>
         )}

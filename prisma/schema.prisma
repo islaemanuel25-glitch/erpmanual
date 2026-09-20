@@ -33,6 +33,7 @@ model Grupo {
   configuracion   ConfiguracionGrupo?
   listasPrecio    ListaPrecio[]
   codigosProveedor ProductoCodigoProveedor[]
+  decisionesDePrecio DecisionDePrecioProveedor[]
   lecturasDeProducto LecturaProductoProveedor[]
   productosQueNoSeCambian ProductoQueNoSeCambia[]
   importacionesLista ImportacionListaProveedor[]
@@ -475,6 +476,7 @@ model Proveedor {
   productos3        ProductoBase[]    @relation("productoProveedor3")
   pedidosProveedor  PedidoProveedor[]
   codigosProveedor  ProductoCodigoProveedor[]
+  decisionesDePrecio DecisionDePrecioProveedor[]
   importacionesLista ImportacionListaProveedor[]
 
   @@index([creadoEnLocalId])
@@ -553,6 +555,7 @@ model ProductoBase {
   locales         ProductoLocal[]
   ventaDetalles   VentaDetalle[]
   codigosProveedor ProductoCodigoProveedor[]
+  decisionesDePrecio DecisionDePrecioProveedor[]
   componenteEnVentas VentaDetalleComponente[]
   lecturasDeProveedor LecturaProductoProveedor[]
   noSeCambiaDeProveedor ProductoQueNoSeCambia[]
@@ -669,6 +672,83 @@ model ProductoCodigoProveedor {
   @@index([grupoId, proveedorId, descripcionNormalizada], map: "ProductoCodigoProveedor_grupoId_proveedorId_descripcionNorma_id")
   @@index([productoBaseId])
   @@index([proveedorId])
+}
+
+/// LO QUE YA SE DECIDIÓ SOBRE EL PRECIO DE UN PRODUCTO DE UN PROVEEDOR.
+///
+/// ── QUÉ PROBLEMA RESUELVE ──────────────────────────────────────────────────
+///
+/// La diferencia entre lo que factura el proveedor y el costo interno es la
+/// ganancia del depósito: es ESTABLE y esperada, así que vuelve idéntica en
+/// cada factura. Hasta ahora nada la recordaba, y la pantalla volvía a
+/// preguntar lo mismo sobre el mismo número en cada recepción. Medido sobre el
+/// comprobante 5 del pedido 232: TRECE de sus quince renglones preguntan, y
+/// ninguna de las trece respuestas sobrevive a la recepción.
+///
+/// ── POR QUÉ POR PROVEEDOR + PRODUCTO, IGUAL QUE EL ALIAS ───────────────────
+///
+/// Es la misma idea que `ProductoCodigoProveedor` —"ya te dije qué hacer con
+/// esto"— aplicada al precio en vez de al producto. No va en la línea del
+/// comprobante porque ahí muere con el papel, que es exactamente lo que pasa
+/// hoy; ni en el producto, porque cada proveedor factura a su precio y una
+/// decisión sobre el de uno no dice nada sobre el del otro.
+///
+/// ── SE GUARDAN LAS DOS RESPUESTAS, NO UNA ──────────────────────────────────
+///
+/// "Acepto el de la factura" y "dejo el mío" son las dos decisiones, y las dos
+/// tienen que callar la pregunta la próxima vez. Guardar solo la primera —que
+/// es la que deja rastro, porque escribe un costo— dejaría a la segunda
+/// preguntando para siempre, que es el caso que más molesta.
+///
+/// ── Y SE GUARDAN LOS DOS PRECIOS QUE SE COMPARARON ─────────────────────────
+///
+/// Una decisión vale mientras el papel siga diciendo lo mismo CONTRA lo mismo.
+/// Por eso se guardan los dos lados de la comparación tal como se le mostraron
+/// a quien decidió: si cambia el de la factura, o si cambia el propio porque
+/// alguien tocó el costo por otro lado, la comparación es OTRA y hay que
+/// volver a preguntar — mostrando que antes se había decidido otra cosa.
+///
+/// Un hecho por columna: la decisión, y los dos números sobre los que se tomó.
+/// Con un solo número guardado no se podría distinguir "cambió la factura" de
+/// "cambió mi costo", que son dos cosas distintas para quien mira.
+model DecisionDePrecioProveedor {
+  id             Int @id @default(autoincrement())
+  grupoId        Int
+  proveedorId    Int
+  productoBaseId Int
+
+  /// ACEPTA_FACTURA | DEJA_EL_MIO. Los valores son los de DECISION_DE_PRECIO en
+  /// `lib/compras-proveedor/decisionDePrecio.js`, que es el único lugar donde se
+  /// escriben — la ruta y la pantalla los importan de ahí.
+  decision String
+
+  /// El precio de la factura sobre el que se decidió, en escala final y de
+  /// bulto: el MISMO número que la pantalla mostró, no el neto impreso.
+  precioFacturado Decimal @db.Decimal(18, 6)
+  /// El costo propio contra el que se lo comparó, el mismo instante.
+  precioPropio    Decimal @db.Decimal(18, 6)
+
+  /// De qué renglón salió. Sirve para rastrear una decisión hasta el papel que
+  /// la originó; no se usa para leerla, que siempre es por los tres primeros
+  /// campos. Sin relación a propósito: la línea puede borrarse con su
+  /// comprobante y la decisión sigue valiendo.
+  comprobanteLineaId   Int?
+  decididaPorUsuarioId Int?
+  decididaEn           DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  grupo        Grupo        @relation(fields: [grupoId], references: [id], onDelete: Cascade)
+  proveedor    Proveedor    @relation(fields: [proveedorId], references: [id])
+  productoBase ProductoBase @relation(fields: [productoBaseId], references: [id], onDelete: Cascade)
+
+  /// UNA decisión por producto y proveedor, igual que "no lo cambio": la última
+  /// manda. No se acumula historial — lo que hay que contestar es "qué dijiste
+  /// sobre esto", y dos respuestas viejas no ayudan a contestarlo.
+  @@unique([grupoId, proveedorId, productoBaseId], name: "decision_precio_unica_por_proveedor", map: "decision_precio_unica_por_proveedor")
+  @@index([grupoId, proveedorId])
+  @@index([productoBaseId])
 }
 
 model ProductoLocal {

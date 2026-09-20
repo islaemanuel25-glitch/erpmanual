@@ -26,6 +26,12 @@
 // excepción: se escribe en el momento con `aceptar-precio`, porque cambiar el
 // costo de una línea es una decisión propia y no parte del conteo — y porque
 // esa ruta ya existe y ya valida todo lo que hay que validar.
+//
+// Y la DECISIÓN de precio se guarda siempre, sea cual sea: la misma ruta con
+// `decision: "DEJA_EL_MIO"` no escribe ningún costo y solo registra que sobre
+// estos dos precios ya se contestó. Por eso una línea ya decidida no vuelve a
+// mostrar las dos opciones: dice qué se decidió y ofrece cambiarlo, igual que
+// el producto vinculado.
 
 import { useEffect, useMemo, useState } from "react";
 
@@ -43,6 +49,13 @@ import {
   porcentajeDelPrecio,
   precioCambio,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
+import {
+  DECISION_DE_PRECIO,
+  decisionVencida,
+  decisionVigente,
+  textoDeDecision,
+  textoDeLoQueCambio,
+} from "@/lib/compras-proveedor/decisionDePrecio";
 
 /** Los MISMOS motivos que la recepción de una transferencia, con sus valores
  *  canónicos: un reporte por motivo no puede ver dos vocabularios. */
@@ -206,6 +219,8 @@ export default function HojaCorregirLinea({
   onCerrar,
   onGuardar,
   onAceptarPrecio,
+  /** Guarda "dejo el mío" para que no se vuelva a preguntar. No escribe costo. */
+  onDejarMiPrecio,
   /** Vincula la línea a un producto. Devuelve `{ ok, error? }`. */
   onVincular,
   /** Devuelve la línea a pendiente. Solo se ofrece si ya está revisada. */
@@ -215,6 +230,11 @@ export default function HojaCorregirLinea({
 }) {
   const cambio = precioCambio(fila);
   const porcentaje = porcentajeDelPrecio(fila);
+  // Lo que ya se contestó sobre estos dos precios, y lo que se había contestado
+  // cuando eran otros. La segunda no decide nada: se muestra, para que volver a
+  // preguntar no se lea como que el sistema se olvidó.
+  const yaDecidido = decisionVigente(fila);
+  const decisionVieja = decisionVencida(fila);
   // Va por pack cuando el pedido se hizo en bultos y el bulto trae más de uno.
   const vaPorPack = (fila?.unidadPedido ?? "BULTO") === "BULTO" && Number(fila?.factorPack) > 1;
 
@@ -223,6 +243,9 @@ export default function HojaCorregirLinea({
   const [motivo, setMotivo] = useState(null);
   const [detalleMotivo, setDetalleMotivo] = useState("");
   const [aceptaPrecio, setAceptaPrecio] = useState(true);
+  // Con una decisión vigente la hoja no pregunta: dice qué se decidió y ofrece
+  // cambiarlo. Esto es el toque de "Cambiar", no una segunda decisión.
+  const [cambiandoPrecio, setCambiandoPrecio] = useState(false);
   const [error, setError] = useState("");
   // ── CAMBIAR EL PRODUCTO DE UNA LÍNEA YA VINCULADA ──────────────────────
   //
@@ -258,7 +281,13 @@ export default function HojaCorregirLinea({
     setSueltas(fila.unidadesSueltas != null ? String(fila.unidadesSueltas) : "");
     setMotivo(fila.motivoPrincipal ?? null);
     setDetalleMotivo(fila.motivoDetalle ?? "");
-    setAceptaPrecio(true);
+    // La opción marcada arranca en lo que se decidió la vez pasada, si sigue
+    // valiendo. Sin esto, "Cambiar" mostraría "Aceptar el precio nuevo"
+    // seleccionado sobre una línea donde se había dicho lo contrario, y un
+    // toque en Guardar daría vuelta la decisión sin que nadie lo pidiera.
+    const decidida = decisionVigente(fila);
+    setAceptaPrecio(decidida ? decidida.decision === DECISION_DE_PRECIO.ACEPTA_FACTURA : true);
+    setCambiandoPrecio(false);
     setError("");
     setCambiandoProducto(false);
   }, [abierta, fila]);
@@ -311,10 +340,19 @@ export default function HojaCorregirLinea({
     }
     // El precio primero: si falla, no se guarda un conteo que la persona iba a
     // acompañar con una decisión de costo que no ocurrió.
-    if (cambio && aceptaPrecio) {
-      const r = await onAceptarPrecio?.(fila);
+    //
+    // ── LAS DOS RESPUESTAS SE GUARDAN, Y LAS DOS SE VUELVEN A APLICAR ────
+    //
+    // "Dejo el mío" también se guarda: es una decisión, y si no se guardara
+    // sería la única que volvería a preguntar en cada factura. Y la ya decidida
+    // se vuelve a mandar aunque nadie la haya tocado, porque una decisión sobre
+    // ESTE precio todavía tiene que aplicarse a ESTA línea del pedido — si no,
+    // la mercadería entraría al costo viejo en silencio. Las dos rutas son
+    // idempotentes sobre los mismos números.
+    if (cambio) {
+      const r = aceptaPrecio ? await onAceptarPrecio?.(fila) : await onDejarMiPrecio?.(fila);
       if (r && r.ok === false) {
-        setError(r.error || "No se pudo aceptar el precio.");
+        setError(r.error || "No se pudo guardar la decisión de precio.");
         return;
       }
     }
@@ -410,29 +448,76 @@ export default function HojaCorregirLinea({
       {/* ── 2 · EL PRECIO, SOLO SI CAMBIÓ ────────────────────────────────── */}
       {cambio && (
         <div className="border-t sunmi-divider pt-hoja flex flex-col gap-renglon">
-          <span className="text-sm3 font-medium sunmi-text-strong">
-            El precio {porcentaje != null && porcentaje < 0 ? "bajó" : "subió"}{" "}
-            {porcentaje != null ? `${Math.abs(porcentaje).toFixed(1).replace(".", ",")} %` : ""}
-          </span>
-          <span className="text-sm3 sunmi-text-muted">
-            Tenías {formatearMoneda(fila.costoCatalogo)} · la factura trae{" "}
-            {formatearMoneda(fila.costoFactura)}
-          </span>
+          {yaDecidido && !cambiandoPrecio ? (
+            // ── YA CONTESTADA: SE DICE, NO SE PREGUNTA ──────────────────
+            //
+            // Mismo trato que el producto vinculado, tres bloques más arriba:
+            // qué se decidió, y un botón para cambiarlo. Volver a mostrar las
+            // dos opciones sobre algo ya contestado es la pregunta otra vez,
+            // aunque venga con la respuesta marcada.
+            <>
+              <span className="text-sm3 font-medium sunmi-text-strong">
+                Ya decidiste este precio
+              </span>
+              <div className="flex items-center justify-between gap-renglon">
+                <span className="min-w-0 text-sm3 sunmi-text-muted break-words">
+                  {textoDeDecision(yaDecidido.decision)} ·{" "}
+                  {formatearMoneda(
+                    yaDecidido.decision === DECISION_DE_PRECIO.DEJA_EL_MIO
+                      ? fila.costoCatalogo
+                      : fila.costoFactura
+                  )}
+                </span>
+                <SunmiButton
+                  color="slate"
+                  type="button"
+                  disabled={guardando}
+                  onClick={() => setCambiandoPrecio(true)}
+                  className="shrink-0 min-h-toque rounded-control px-4 text-sm3"
+                >
+                  Cambiar
+                </SunmiButton>
+              </div>
+            </>
+          ) : (
+            <>
+              <span className="text-sm3 font-medium sunmi-text-strong">
+                El precio {porcentaje != null && porcentaje < 0 ? "bajó" : "subió"}{" "}
+                {porcentaje != null ? `${Math.abs(porcentaje).toFixed(1).replace(".", ",")} %` : ""}
+              </span>
+              <span className="text-sm3 sunmi-text-muted">
+                Tenías {formatearMoneda(fila.costoCatalogo)} · la factura trae{" "}
+                {formatearMoneda(fila.costoFactura)}
+              </span>
 
-          <div className="flex flex-col gap-0.5">
-            <OpcionDePrecio
-              elegida={aceptaPrecio}
-              titulo="Aceptar el precio nuevo"
-              detalle="Pasa a ser tu costo. El margen se recalcula."
-              onElegir={() => setAceptaPrecio(true)}
-            />
-            <OpcionDePrecio
-              elegida={!aceptaPrecio}
-              titulo="Dejar el que tenía"
-              detalle="Entra la mercadería sin tocar el costo."
-              onElegir={() => setAceptaPrecio(false)}
-            />
-          </div>
+              {/* ── LO QUE SE HABÍA DECIDIDO, CUANDO YA NO APLICA ────────
+                  Preguntar de cero sobre algo que ya se contestó una vez se
+                  lee como que el sistema se olvidó. Se dice qué se había
+                  decidido, sobre qué números, y cuál de los dos se movió. */}
+              {decisionVieja && (
+                <span className="text-sm3 sunmi-text-muted break-words">
+                  Antes decidiste: {textoDeDecision(decisionVieja.decision).toLowerCase()}, cuando
+                  la factura traía {formatearMoneda(decisionVieja.precioFacturado)} contra tu{" "}
+                  {formatearMoneda(decisionVieja.precioPropio)}. {textoDeLoQueCambio(fila)}
+                </span>
+              )}
+
+              <div className="flex flex-col gap-0.5">
+                <OpcionDePrecio
+                  elegida={aceptaPrecio}
+                  titulo="Aceptar el precio nuevo"
+                  detalle="Pasa a ser tu costo. El margen se recalcula."
+                  onElegir={() => setAceptaPrecio(true)}
+                />
+                <OpcionDePrecio
+                  elegida={!aceptaPrecio}
+                  titulo="Dejar el que tenía"
+                  detalle="Entra la mercadería sin tocar el costo."
+                  onElegir={() => setAceptaPrecio(false)}
+                />
+              </div>
+            </>
+          )}
         </div>
       )}
 
