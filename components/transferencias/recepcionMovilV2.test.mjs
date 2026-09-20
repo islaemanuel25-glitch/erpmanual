@@ -424,7 +424,14 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // archivo, para poder cambiar con qué columna se leyó una lista sin volver a
   // subirla. Es de otra tanda, no toca nada de transferencias, y es aditiva: una
   // sola columna nullable, sin DROP y sin backfill.
-  assert.equal(migraciones.length, 19, "aparecio una migracion que nadie declaro aca");
+  // ── Y EL 2026-09-20 ENTRÓ LA VIGÉSIMA ──────────────────────────────────
+  //
+  // `20260920120000_recepcion_motivo_y_sueltas`: tres columnas nullable sobre
+  // `PedidoProveedorDetalle` —el motivo de una diferencia, su detalle y las
+  // unidades sueltas— para la hoja de corregir una línea al recibir un pedido a
+  // proveedor. Aditiva, sin backfill y de OTRO módulo. Se nombra acá porque
+  // este candado existe para que ninguna migración aparezca sin que se note.
+  assert.equal(migraciones.length, 20, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

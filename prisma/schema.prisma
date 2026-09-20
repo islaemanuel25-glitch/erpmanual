@@ -2671,6 +2671,17 @@ model PedidoProveedorDetalle {
   unidad           ModoPedido @default(BULTO)
   cantidadRecibida Decimal?   @db.Decimal(12, 2)
   kgRecibidos      Decimal?   @db.Decimal(12, 3)
+  /// Cuántas unidades sueltas llegaron, además de los bultos enteros. Solo
+  /// tiene sentido en los productos que van por pack: 6 cajas y 5 unidades no
+  /// es "6,2 bultos". NULL = no se preguntó, que es distinto de 0.
+  unidadesSueltas  Int?
+  /// Por qué la cantidad recibida no coincide con la pedida. Los MISMOS valores
+  /// canónicos que usa la recepción de una transferencia —"Faltante",
+  /// "Producto dañado", "Otro"— para que un reporte por motivo no vea dos
+  /// vocabularios para lo mismo.
+  motivoPrincipal  String?
+  /// El texto libre cuando el motivo es "Otro".
+  motivoDetalle    String?
   // Costo por unidad de pedido (BULTO/UNIDAD). Alta precisión (6 decimales) para
   // no perder el costo unitario derivado de packs con factor no divisor
   // (ej. 1480/18 = 82,222222). Los TOTALES/montos siguen en 2 decimales; la

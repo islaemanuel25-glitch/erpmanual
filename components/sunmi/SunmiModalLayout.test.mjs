@@ -619,6 +619,11 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     "components/roles/ModalRol.jsx": true,
     "components/categorias/ModalCategoria.jsx": true,
     "components/compras-proveedor/ModalVincularCodigo.jsx": true,
+    // La hoja de corregir una línea de la factura: adentro hay un conteo
+    // cargado, una decisión de precio y un motivo elegido. Cerrarla de un toque
+    // al costado pierde las tres. Mismo criterio que la ficha de recepción de
+    // una transferencia, que es de donde salió la composición.
+    "components/compras-proveedor/HojaCorregirLinea.jsx": true,
     "components/listas-precios/ModalListaPrecio.jsx": true,
     "components/caja/ModalCambioPrevio.jsx": true,
     // Agregar un producto que llegó y el remito no menciona. Se pierde lo

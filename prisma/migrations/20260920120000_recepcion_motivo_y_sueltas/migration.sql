@@ -1,0 +1,45 @@
+-- EL MOTIVO DE UNA DIFERENCIA Y LAS UNIDADES SUELTAS, AL RECIBIR UN PEDIDO.
+--
+-- ADITIVA: tres columnas nullable sobre `PedidoProveedorDetalle`. No borra, no
+-- reescribe y no cambia el tipo de nada. Las 2.474 líneas de pedido que hay
+-- quedan como están, con las tres en NULL.
+--
+-- ── PARA QUÉ ────────────────────────────────────────────────────────────────
+--
+-- La hoja de corregir una línea, al recibir mercadería, pide dos cosas que hoy
+-- no tienen dónde guardarse:
+--
+--   · POR QUÉ la cantidad no coincide. Es la misma pregunta que la recepción de
+--     una transferencia ya hace —Faltante, Producto dañado, Otro— y que allá se
+--     guarda en `motivoPrincipal` y `motivoDetalle`. Sin eso, una línea que
+--     entró de menos entra igual y nadie sabe si faltó, si vino roto o si el
+--     proveedor lo anotó mal. Se escriben los mismos valores canónicos que
+--     transferencias, para que un reporte por motivo no vea dos vocabularios.
+--
+--   · CUÁNTAS UNIDADES SUELTAS llegaron, para los productos que van por pack.
+--     Llegan 6 cajas y 5 unidades: eso no es "6,2 bultos". El número entero de
+--     bultos ya vive en `cantidadRecibida`; lo que faltaba era el resto.
+--
+-- ── POR QUÉ NO SE REUSÓ `kgRecibidos` PARA LAS SUELTAS ─────────────────────
+--
+-- Se miró y no da. Esa columna es `Decimal(12,3)` y significa KILOS REALES de
+-- fiambre: la usa `recibir/[id]` para valorizar la línea y para mover el stock
+-- en kilos, y solo tiene sentido en los 64 productos con `modoCompraProveedor`
+-- en UNIDAD. Hay 39 líneas que ya la tienen cargada con kilos de verdad.
+--
+-- Las sueltas son otra cosa: enteras, de los productos que van por PACK —que
+-- son los otros— y entran al stock en unidades. Guardarlas ahí dejaría una
+-- columna que significa kilos en unas filas y unidades en otras, decidido por
+-- un campo del producto. Es el doble significado que después nadie entiende, y
+-- además rompería la valorización de esas 39 líneas el día que alguien se
+-- confunda.
+--
+-- ── POR QUÉ NULLABLE Y SIN RELLENO ─────────────────────────────────────────
+--
+-- Porque no se puede reconstruir: de una recepción vieja no quedó registrado ni
+-- el motivo ni el desglose. Un 0 en `unidadesSueltas` diría "se contó y no
+-- había sueltas", que es un dato que nadie cargó. NULL dice lo único cierto:
+-- no se preguntó.
+ALTER TABLE "PedidoProveedorDetalle" ADD COLUMN "motivoPrincipal" TEXT;
+ALTER TABLE "PedidoProveedorDetalle" ADD COLUMN "motivoDetalle" TEXT;
+ALTER TABLE "PedidoProveedorDetalle" ADD COLUMN "unidadesSueltas" INTEGER;

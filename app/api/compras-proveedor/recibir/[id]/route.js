@@ -123,6 +123,15 @@ export async function POST(req, { params }) {
     const body = await req.json().catch(() => ({}));
     const recibidos = body.recibidos || {}; // { detalleId: cantidadRecibida }
     const kgRecibidosMap = body.kgRecibidos || {}; // { detalleId: kgReales }
+    // ── LO QUE LA HOJA DE CORREGIR AGREGA AL CONTEO ─────────────────────
+    //
+    // `sueltas` son unidades sueltas además de los bultos enteros, y `motivos`
+    // es por qué la cantidad no coincide. Los dos llegan como mapas por
+    // detalle, igual que las cantidades, y se escriben en la misma pasada: son
+    // parte del mismo conteo y separarlos dejaría una recepción guardada a
+    // medias si una de las dos escrituras fallara.
+    const sueltasMap = body.sueltas || {}; // { detalleId: unidadesSueltas }
+    const motivosMap = body.motivos || {}; // { detalleId: { principal, detalle } }
 
     // ── LA FRONTERA ENTRE RECIBIR Y ESCRIBIR EL COSTO ────────────────────
     //
@@ -244,6 +253,17 @@ export async function POST(req, { params }) {
     }
 
     // Validar kg recibidos para fiambres
+    for (const [detId, sueltas] of Object.entries(sueltasMap)) {
+      if (sueltas === "" || sueltas === null || sueltas === undefined) continue;
+      const sv = Number(sueltas);
+      if (!Number.isInteger(sv) || sv < 0) {
+        return NextResponse.json(
+          { ok: false, error: `unidadesSueltas debe ser un entero >= 0 (detalleId: ${detId})` },
+          { status: 400 }
+        );
+      }
+    }
+
     for (const [detId, kg] of Object.entries(kgRecibidosMap)) {
       const k = Number(kg);
       if (!Number.isFinite(k) || k < 0) {
@@ -361,6 +381,20 @@ export async function POST(req, { params }) {
           kgRecibidos: kgReales,
         };
 
+        // Las sueltas y el motivo solo se escriben si vinieron: un `undefined`
+        // no puede borrar lo que alguien anotó en una pasada anterior, y un 0
+        // escrito por omisión diría "se contó y no había", que es un dato que
+        // nadie cargó.
+        const sueltas = sueltasMap[det.id];
+        if (sueltas !== undefined && sueltas !== "" && sueltas !== null) {
+          detData.unidadesSueltas = Number(sueltas);
+        }
+        const motivo = motivosMap[det.id];
+        if (motivo !== undefined) {
+          detData.motivoPrincipal = motivo?.principal || null;
+          detData.motivoDetalle = motivo?.detalle || null;
+        }
+
         const costoEditado = costosMap[det.id];
         if (costoEditado !== undefined && costoEditado !== "" && costoEditado !== null) {
           const cv = Number(costoEditado);
@@ -446,6 +480,38 @@ export async function POST(req, { params }) {
         }
       }
 
+      // ── LO QUE LA FOTO YA SABE, NO SE VUELVE A PEDIR ───────────────────
+      //
+      // El número, la fecha y el total de la factura salen del comprobante
+      // leído cuando la pantalla no los manda. Antes eran tres campos para
+      // teclear a mano al lado del botón que los completa solo, y el manual es
+      // el que se equivoca.
+      //
+      // Se toma el PRIMER comprobante del pedido que tenga número: con varios
+      // —una factura de dos hojas subidas por separado— todos traen el mismo, y
+      // si difieren es otro problema que esta ruta no resuelve.
+      //
+      // `totalLeido` puede venir en null y se respeta: es el papel que no trae
+      // total impreso, que tiene su propio estado. Inventar ahí la suma de las
+      // líneas es exactamente el agujero que el lector ya tiene documentado.
+      let nroFinal = nroFactura;
+      let fechaFinal = fechaFactura;
+      let totalFinal = totalReal;
+      if (nroFinal == null || fechaFinal == null || totalFinal == null) {
+        const delPapel = await tx.comprobanteProveedor.findFirst({
+          where: { pedidoId, grupoId },
+          orderBy: { id: "asc" },
+          select: { numero: true, fecha: true, totalLeido: true },
+        });
+        if (delPapel) {
+          if (nroFinal == null && delPapel.numero) nroFinal = delPapel.numero;
+          if (fechaFinal == null && delPapel.fecha) fechaFinal = delPapel.fecha;
+          if (totalFinal == null && delPapel.totalLeido != null) {
+            totalFinal = Number(delPapel.totalLeido);
+          }
+        }
+      }
+
       // Marcar pedido como RECIBIDO + guardar factura/ganancia
       await tx.pedidoProveedor.update({
         where: { id: pedidoId },
@@ -453,9 +519,9 @@ export async function POST(req, { params }) {
           estado: "RECIBIDO",
           fechaRecibido: new Date(),
           totalFactura: totalFacturaComputed,
-          totalReal,
-          nroFactura,
-          fechaFactura,
+          totalReal: totalFinal,
+          nroFactura: nroFinal,
+          fechaFactura: fechaFinal,
         },
       });
     });

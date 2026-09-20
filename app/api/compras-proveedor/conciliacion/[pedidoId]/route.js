@@ -64,6 +64,10 @@ export async function GET(req, { params }) {
       select: {
         id: true, cantidad: true, precioCosto: true, cantidadRecibida: true, unidad: true,
         kgRecibidos: true,
+        // Lo que la hoja de corregir necesita para contar: cuántas sueltas se
+        // anotaron y por qué la cantidad no coincide. Sin esto la hoja se abre
+        // en blanco cada vez y la corrección de ayer se pierde de vista.
+        unidadesSueltas: true, motivoPrincipal: true, motivoDetalle: true,
         // `modoCompraProveedor` es lo que decide si la línea es fiambre, y de eso
         // depende que aparezca la columna de kilos. El fiambre entra por PIEZA en
         // el depósito y se mide en KILOS en los locales: si esa columna
@@ -71,7 +75,17 @@ export async function GET(req, { params }) {
         producto: {
           select: {
             id: true, baseId: true,
-            base: { select: { id: true, nombre: true, modoCompraProveedor: true } },
+            // `factor_pack` es cuántas unidades trae un bulto. Lo usa la hoja
+            // para decir "1 bulto = 24 u" y para calcular qué entra al stock
+            // con los dos steppers. Sin él, la hoja no puede sumar sueltas.
+            base: {
+              select: {
+                id: true,
+                nombre: true,
+                modoCompraProveedor: true,
+                factor_pack: true,
+              },
+            },
           },
         },
       },

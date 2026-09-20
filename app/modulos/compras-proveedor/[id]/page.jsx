@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, use } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
 import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 
@@ -14,6 +14,8 @@ import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import PanelComprobantes from "@/components/comprobantes/PanelComprobantes";
 import ListaConciliacion from "@/components/comprobantes/ListaConciliacion";
+import ListaDeLaFactura from "@/components/compras-proveedor/ListaDeLaFactura";
+import HojaCorregirLinea from "@/components/compras-proveedor/HojaCorregirLinea";
 import TarjetaContextoDelPedido from "@/components/compras-proveedor/TarjetaContextoDelPedido";
 import BloqueDeLaFactura from "@/components/compras-proveedor/BloqueDeLaFactura";
 
@@ -73,6 +75,27 @@ export default function DetallePedidoProveedorPage({ params }) {
   // Cuántos comprobantes tiene el pedido. Lo avisa `PanelComprobantes`, que es
   // el que los carga: la pantalla no pide la misma lista por su cuenta.
   const [hayComprobantes, setHayComprobantes] = useState(0);
+
+  // ── LA FACTURA LEÍDA, CON SUS LÍNEAS EN EL ORDEN DEL PAPEL ─────────────
+  //
+  // Sale del endpoint de conciliación, que es el que ya cruza cada línea contra
+  // la del pedido, decide el vínculo y analiza el precio. La pantalla no
+  // recalcula nada: pide y muestra.
+  const [conciliacion, setConciliacion] = useState(null);
+  const [lineaACorregir, setLineaACorregir] = useState(null);
+
+  // El primer comprobante con líneas leídas. Con varios, se muestra el primero:
+  // el caso de dos facturas en un mismo pedido existe y se resuelve en la tanda
+  // del cierre, no acá — mostrar dos listas encadenadas sin decir cuál es cuál
+  // sería peor que mostrar una.
+  const comprobanteActivo = useMemo(
+    () => (conciliacion?.grupos || []).find((g) => (g.lineas || []).length > 0) || null,
+    [conciliacion]
+  );
+  const filasDeFactura = useMemo(
+    () => comprobanteActivo?.lineas || [],
+    [comprobanteActivo]
+  );
 
   // ── RECIBIENDO, EL TÍTULO Y EL VOLVER LOS PONE EL SHELL ────────────────
   //
@@ -248,6 +271,81 @@ export default function DetallePedidoProveedorPage({ params }) {
     guardarRecepcion(pedido.id, recibidos, kgRecibidos);
   }, [pedido?.id, pedido?.estado, recibidos, kgRecibidos, guardarRecepcion]);
 
+  // ── TRAER LA FACTURA LEÍDA ──────────────────────────────────────────────
+  //
+  // Solo recibiendo y solo si hay algún comprobante: sin papel no hay nada que
+  // conciliar y pedirlo sería un viaje por nada. Se vuelve a pedir cuando
+  // cambia la cantidad de comprobantes —o sea después de subir o de leer—.
+  useEffect(() => {
+    if (!pedido?.id || pedido.estado !== "ENVIADO" || hayComprobantes === 0) {
+      setConciliacion(null);
+      return;
+    }
+    let vigente = true;
+    (async () => {
+      try {
+        const r = await fetch(`/api/compras-proveedor/conciliacion/${pedido.id}`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const d = await r.json();
+        if (vigente && d?.ok) setConciliacion(d);
+      } catch {
+        // Sin conciliación la pantalla cae al conteo viejo, que sigue estando.
+      }
+    })();
+    return () => {
+      vigente = false;
+    };
+  }, [pedido?.id, pedido?.estado, hayComprobantes]);
+
+  // ── LO QUE LA HOJA GUARDA ───────────────────────────────────────────────
+  //
+  // Cantidad, sueltas y motivo van al estado de la pantalla, que ya los
+  // persiste en el navegador y los escribe todos juntos al recibir. No hay una
+  // ruta por línea a propósito: recibir es una sola transacción que mueve
+  // stock, y guardar cada línea aparte dejaría media recepción escrita si algo
+  // fallara en el medio.
+  const [sueltas, setSueltas] = useState({});
+  const [motivos, setMotivos] = useState({});
+
+  const guardarCorreccion = useCallback((datos) => {
+    const id = datos?.pedidoDetalleId;
+    if (!id) return;
+    if (datos.cantidadRecibida != null) {
+      setRecibidos((prev) => ({ ...prev, [id]: datos.cantidadRecibida }));
+    }
+    setSueltas((prev) => ({ ...prev, [id]: datos.unidadesSueltas }));
+    setMotivos((prev) => ({
+      ...prev,
+      [id]: datos.motivoPrincipal
+        ? { principal: datos.motivoPrincipal, detalle: datos.motivoDetalle }
+        : undefined,
+    }));
+    setLineaACorregir(null);
+  }, []);
+
+  // El precio SÍ se escribe en el momento: es una decisión propia y la ruta ya
+  // existe y ya valida todo lo que hay que validar.
+  const aceptarPrecioDeLinea = useCallback(async (fila) => {
+    try {
+      const r = await fetch("/api/compras-proveedor/comprobantes/aceptar-precio", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lineaId: fila?.lineaId, unidad: fila?.unidad?.elegida }),
+      });
+      const d = await r.json().catch(() => null);
+      if (!d?.ok) return { ok: false, error: d?.queHacer || d?.error || "No se pudo aceptar." };
+      // Se vuelve a pedir la conciliación: el precio cambió y la comparación de
+      // todas las filas de ese producto ya no es la misma.
+      setHayComprobantes((n) => n);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e?.message || "No se pudo aceptar." };
+    }
+  }, []);
+
   // BORRADOR (PENDIENTE) se edita SOLO en /nueva. Si el pedido está en borrador,
   // redirigir al editor único en vez de mantener un editor duplicado acá.
   useEffect(() => {
@@ -273,6 +371,8 @@ export default function DetallePedidoProveedorPage({ params }) {
         bodyData = {
           recibidos,
           kgRecibidos,
+          sueltas,
+          motivos,
           costos,
           totalReal: totalReal || null,
           nroFactura: nroFactura || null,
@@ -673,102 +773,47 @@ export default function DetallePedidoProveedorPage({ params }) {
             El rediseño de estas líneas y de la hoja de corregir es la tanda
             siguiente: necesita dos columnas que hoy no existen —el motivo de la
             diferencia y las unidades sueltas— y eso es una migración. */}
-        {(!esRecepcion || sinFactura || hayComprobantes > 0) && (
+        {/* ── RECIBIENDO CON LA FACTURA LEÍDA: LA LISTA NUEVA ────────────
+            En el orden del papel, con los cuatro filtros y la hoja de corregir.
+            Reemplaza al detalle viejo, que dibujaba una tarjeta por línea del
+            PEDIDO con una oración adentro —"Pediste 1 bulto a $30780.00. Ningún
+            comprobante la trajo."— y los tres marcos anidados que desbordaban.
+            Si se eligió "Llegó sin factura" no hay papel que mostrar y se cae
+            al conteo viejo, que es lo que esa salida ofrece. */}
+        {esRecepcion && !sinFactura && filasDeFactura.length > 0 && (
           <>
-          {/* Panel factura — editable en ENVIADO, readonly en RECIBIDO */}
-          {(esRecepcion || pedido.estado === "RECIBIDO") && (
-            <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
-              <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
-                <h3 className="text-[13px] font-semibold sunmi-text-strong">
-                  Factura y ganancia
-                </h3>
-              </div>
+            <ListaDeLaFactura
+              comprobante={comprobanteActivo}
+              filas={filasDeFactura}
+              onCorregir={setLineaACorregir}
+            />
+            <HojaCorregirLinea
+              fila={lineaACorregir}
+              abierta={!!lineaACorregir}
+              onCerrar={() => setLineaACorregir(null)}
+              onAceptarPrecio={aceptarPrecioDeLinea}
+              onGuardar={guardarCorreccion}
+            />
+          </>
+        )}
 
-              {esRecepcion ? (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-xs sunmi-text-muted mb-1">Total factura ($)</label>
-                    <p className="text-lg font-bold sunmi-text-accent">
-                      ${computedTotalFactura.toFixed(2)}
-                    </p>
-                    <p className="text-[10px] sunmi-text-muted">Calculado: cant. recibida × costo</p>
-                  </div>
-                  <div>
-                    <label className="block text-xs sunmi-text-muted mb-1">Total real ($)</label>
-                    <SunmiInput
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={totalReal}
-                      onChange={(e) => setTotalReal(e.target.value)}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs sunmi-text-muted mb-1">Nro factura</label>
-                    <SunmiInput
-                      value={nroFactura}
-                      onChange={(e) => setNroFactura(e.target.value)}
-                      placeholder="Opcional"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs sunmi-text-muted mb-1">Fecha factura</label>
-                    <SunmiInput
-                      type="date"
-                      value={fechaFactura}
-                      onChange={(e) => setFechaFactura(e.target.value)}
-                    />
-                  </div>
-                  {totalReal && (
-                    <div className="col-span-2 md:col-span-4 pt-2 border-t sunmi-divider">
-                      <span className="text-xs sunmi-text-muted">Ganancia depósito: </span>
-                      <span className={`text-sm font-bold ${
-                        computedTotalFactura - Number(totalReal) >= 0 ? "sunmi-text-success" : "sunmi-text-danger"
-                      }`}>
-                        ${(computedTotalFactura - Number(totalReal)).toFixed(2)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <span className="sunmi-text-muted text-xs">Total factura</span>
-                    <p className="sunmi-text-strong">
-                      {pedido.totalFactura != null ? `$${Number(pedido.totalFactura).toFixed(2)}` : "-"}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="sunmi-text-muted text-xs">Total real</span>
-                    <p className="sunmi-text-strong">
-                      {pedido.totalReal != null ? `$${Number(pedido.totalReal).toFixed(2)}` : "-"}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="sunmi-text-muted text-xs">Nro factura</span>
-                    <p className="sunmi-text-strong">{pedido.nroFactura || "-"}</p>
-                  </div>
-                  <div>
-                    <span className="sunmi-text-muted text-xs">Fecha factura</span>
-                    <p className="sunmi-text-strong">
-                      {pedido.fechaFactura ? new Date(pedido.fechaFactura).toLocaleDateString("es-AR") : "-"}
-                    </p>
-                  </div>
-                  {pedido.totalFactura != null && pedido.totalReal != null && (
-                    <div className="col-span-2 md:col-span-4 pt-2 border-t sunmi-divider">
-                      <span className="text-xs sunmi-text-muted">Ganancia depósito: </span>
-                      <span className={`text-sm font-bold ${
-                        Number(pedido.totalFactura) - Number(pedido.totalReal) >= 0 ? "sunmi-text-success" : "sunmi-text-danger"
-                      }`}>
-                        ${(Number(pedido.totalFactura) - Number(pedido.totalReal)).toFixed(2)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </SunmiPanel>
-          )}
+        {(!esRecepcion || sinFactura) && (
+          <>
+          {/* ── ACÁ ESTABA "FACTURA Y GANANCIA" ────────────────────────────
+              Cuatro campos para teclear a mano: total factura (calculado),
+              total real, número y fecha. Los tres que se cargaban a mano los
+              trae la factura leída —`numero`, `fecha` y `totalLeido` de
+              `ComprobanteProveedor`— y ahora `recibir/[id]` los toma de ahí
+              cuando la pantalla no los manda.
+
+              Pedirlos al lado del botón que los completa solo era ofrecer dos
+              caminos para lo mismo, y el manual es el que se equivoca.
+
+              LO QUE LA FOTO NO PUEDE LLENAR: el total cuando el papel no trae
+              total impreso. Ese caso tiene su propio estado —SIN_TOTAL— y la
+              lectura devuelve `totalLeido` en null a propósito, sin inventar la
+              suma de las líneas. Queda anotado para la tanda del cierre, que es
+              donde se decide qué se exige antes de pasar a RECIBIDO. */}
 
           {/* Detalle de productos */}
           <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">

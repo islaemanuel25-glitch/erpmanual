@@ -333,7 +333,13 @@ export default function PanelComprobantes({
                 (resumen.malLeidos ? ` · ${resumen.malLeidos} sin poder leer` : "")}
           </p>
         </div>
-        {puedeRecibir && (
+        {/* ── EL BOTÓN PROPIO DEL PANEL SE CALLA CUANDO LA PANTALLA PONE
+            EL SUYO ────────────────────────────────────────────────────────
+            Con la pantalla de recibir dibujando su bloque de "Sacar foto",
+            este quedaba justo encima: dos botones pegados que hacen lo mismo,
+            y el de arriba naranja y de ancho completo. Mientras no haya ningún
+            comprobante y la pantalla haya puesto su cara, manda la de ella. */}
+        {puedeRecibir && !(items.length === 0 && vacio) && (
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             {seleccion.length >= 2 && (
               <SunmiButton color="slate" type="button" onClick={unir}>

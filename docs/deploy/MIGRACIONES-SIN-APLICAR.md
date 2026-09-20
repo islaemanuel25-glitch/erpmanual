@@ -16,7 +16,34 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **19 migraciones**, las mismas que el árbol.
+Producción está en **19 migraciones** y el árbol en **20**.
+
+- `20260920120000_recepcion_motivo_y_sueltas` — **ADITIVA**
+
+Tres columnas nullable sobre `PedidoProveedorDetalle`: `motivoPrincipal`,
+`motivoDetalle` y `unidadesSueltas`. Sin DROP, sin `ALTER COLUMN` y sin
+backfill. Las 2.474 líneas de pedido que hay quedan como están, con las tres en
+NULL.
+
+**Para qué:** la hoja de corregir una línea al recibir un pedido pregunta por
+qué la cantidad no coincide —los mismos valores canónicos que transferencias:
+"Faltante", "Producto dañado", "Otro"— y cuántas unidades sueltas llegaron
+además de los bultos enteros. Hoy ninguna de las dos cosas tiene dónde
+guardarse.
+
+**Qué dijo el clasificador:** sin coincidencias; no toca ninguna columna
+existente ni borra nada.
+
+**El quinto chequeo del backup NO aplica:** no hay ningún dato que se vaya a
+perder, porque no se borra ni se reescribe nada. Las tres columnas nacen vacías.
+
+**Por qué no se reusó `kgRecibidos` para las sueltas:** se miró. Esa columna es
+`Decimal(12,3)` y significa kilos reales de fiambre —la usa `recibir/[id]` para
+valorizar y para mover el stock en kilos—, solo aplica a los 64 productos con
+`modoCompraProveedor` en UNIDAD, y hay 39 líneas que ya la tienen cargada con
+kilos de verdad. Las sueltas son enteras, de los productos que van por pack, y
+entran al stock en unidades. Sería una columna que significa kilos en unas filas
+y unidades en otras.
 
 ---
 
