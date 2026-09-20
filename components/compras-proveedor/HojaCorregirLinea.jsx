@@ -35,9 +35,11 @@ import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiMo
 import { BuscadorProducto } from "@/components/comprobantes/PiezasConciliacion";
 import { formatearMoneda } from "@/lib/moneda";
 import {
+  ESTADO_LINEA,
   cantidadEnEscalaDelPedido,
   cantidadFueConvertida,
   diferenciaDeCantidad,
+  estadoDeLinea,
   porcentajeDelPrecio,
   precioCambio,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
@@ -280,7 +282,13 @@ export default function HojaCorregirLinea({
   // Con la línea sin vincular la hoja arranca —y termina— por elegir el
   // producto. No se pide cuánto entró de algo que todavía no se sabe qué es:
   // preguntarlo invita a contestar cualquier cosa para poder seguir.
-  const sinProducto = fila.productoLocalId == null;
+  // EL MISMO PREDICADO QUE LA TARJETA, y no uno parecido. Medido: hay líneas
+  // con `productoLocalId` en nulo que SÍ tienen su línea de pedido resuelta
+  // —el motor las sugirió y dedujo a cuál corresponden—. Preguntando solo por
+  // `productoLocalId`, esas cuatro abrían el selector de producto mientras la
+  // tarjeta las mostraba comparadas y listas para contar. Dos criterios para la
+  // misma pregunta, y la hoja contradiciendo a la tarjeta que la abrió.
+  const sinProducto = estadoDeLinea(fila) === ESTADO_LINEA.SIN_VINCULAR;
 
   const guardar = async () => {
     setError("");
