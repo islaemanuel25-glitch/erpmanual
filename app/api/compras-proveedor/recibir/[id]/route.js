@@ -298,12 +298,34 @@ export async function POST(req, { params }) {
       let totalFacturaComputed = 0;
 
       for (const det of pedido.detalles) {
-        const cantRecibida =
-          recibidos[det.id] !== undefined
-            ? Number(recibidos[det.id])
-            : Number(det.cantidad);
+        // ── LO QUE NADIE CONTÓ NO ENTRA AL STOCK ──────────────────────────
+        //
+        // Acá decía: sin cantidad declarada, `Number(det.cantidad)` — o sea, se
+        // daba por recibido TODO lo pedido. Medido sobre el pedido 232: nueve
+        // líneas que ningún comprobante trajo entraron igual, con la cantidad
+        // pedida, y metieron 620 unidades por $1.263.705,60 que nadie vio
+        // llegar. El stock queda más alto que la realidad y la diferencia
+        // recién aparece cuando alguien cuenta el depósito.
+        //
+        // Ahora lo que no se declaró vale CERO. La pantalla declara línea por
+        // línea, incluida la respuesta "no llegó", y el servidor no completa
+        // por su cuenta: completar es inventar.
+        const declarada = recibidos[det.id];
+        const seDeclaro = declarada !== undefined && declarada !== null && declarada !== "";
+        const cantRecibida = seDeclaro ? Number(declarada) : 0;
 
-        if (cantRecibida <= 0) continue;
+        if (cantRecibida <= 0) {
+          // UN CERO DECLARADO ES UN DATO: "se contó y no llegó". Se guarda,
+          // porque es distinto de `null` —nunca se contó— y esa diferencia es
+          // la que deja saber después si alguien miró la línea.
+          if (seDeclaro) {
+            await tx.pedidoProveedorDetalle.update({
+              where: { id: det.id },
+              data: { cantidadRecibida: 0 },
+            });
+          }
+          continue;
+        }
 
         const base = det.producto?.base;
         // Los combos no reciben StockLocal ni actualizan costo físico.

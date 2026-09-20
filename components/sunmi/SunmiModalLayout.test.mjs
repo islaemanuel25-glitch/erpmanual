@@ -624,6 +624,13 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // al costado pierde las tres. Mismo criterio que la ficha de recepción de
     // una transferencia, que es de donde salió la composición.
     "components/compras-proveedor/HojaCorregirLinea.jsx": true,
+    // La hoja de cerrar la recepción: adentro hay una respuesta POR LÍNEA sobre
+    // las que ningún comprobante trajo —llegó o no llegó—, y cada una decide si
+    // esa mercadería entra al stock. Cerrarla de un toque al costado pierde
+    // todas juntas, y con el pulgar en el borde de abajo ese toque pasa solo.
+    // Lo que se pierde no es un formulario: es la única vez que alguien contesta
+    // esa pregunta antes de que el pedido quede cerrado.
+    "components/compras-proveedor/HojaCerrarRecepcion.jsx": true,
     "components/listas-precios/ModalListaPrecio.jsx": true,
     "components/caja/ModalCambioPrevio.jsx": true,
     // Agregar un producto que llegó y el remito no menciona. Se pierde lo

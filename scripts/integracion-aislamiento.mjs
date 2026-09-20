@@ -188,11 +188,23 @@ async function main() {
     const row = await prisma.stockLocal.findUnique({ where: { localId_productoId: { localId, productoId: plId } } });
     return row ? Number(row.cantidad) : null;
   };
-  await check("29. Local A recibe su compra → 200", req("POST", `/api/compras-proveedor/recibir/${S.pedidoStockA}`, { cookie: A, body: {} }), 200);
+  // ── LA CANTIDAD VA EXPLÍCITA, Y NO ES CEREMONIA ────────────────────────
+  //
+  // Estos dos pasos mandaban `{}` y el servidor completaba con lo pedido. Ese
+  // completar era el defecto: una línea que nadie contó entraba igual al stock
+  // —medido sobre el pedido 232, nueve líneas sin ningún comprobante metieron
+  // 620 unidades—. Ahora lo que no se declara vale cero, así que el arnés
+  // declara lo que quiere recibir, que además es lo que estas dos afirmaciones
+  // siempre quisieron decir.
+  const detDe = async (pedidoId) => {
+    const d = await prisma.pedidoProveedorDetalle.findFirst({ where: { pedidoId }, select: { id: true, cantidad: true } });
+    return { [d.id]: Number(d.cantidad) };
+  };
+  await check("29. Local A recibe su compra → 200", req("POST", `/api/compras-proveedor/recibir/${S.pedidoStockA}`, { cookie: A, body: { recibidos: await detDe(S.pedidoStockA) } }), 200);
   assertOk("30. Stock de Local A subió a 5", (await stockDe(S.localA, S.plLocalA)) === 5);
   assertOk("31. Stock del DEPÓSITO NO cambió (sigue 0)", (await stockDe(S.depo, S.plDepo)) === 0);
   assertOk("32. Local B no tiene stock de ese producto (sin PL)", (await prisma.productoLocal.findFirst({ where: { localId: S.localB, baseId: S.base } })) === null);
-  await check("33. Depósito recibe su compra → 200", req("POST", `/api/compras-proveedor/recibir/${S.pedidoStockDepo}`, { cookie: DEPO, body: {} }), 200);
+  await check("33. Depósito recibe su compra → 200", req("POST", `/api/compras-proveedor/recibir/${S.pedidoStockDepo}`, { cookie: DEPO, body: { recibidos: await detDe(S.pedidoStockDepo) } }), 200);
   assertOk("34. Stock del depósito subió a 3", (await stockDe(S.depo, S.plDepo)) === 3);
   assertOk("35. Stock de Local A quedó intacto en 5", (await stockDe(S.localA, S.plLocalA)) === 5);
   await check("36. Local B intenta recibir compra de Local A → 403/404", req("POST", `/api/compras-proveedor/recibir/${S.pedidoStockA}`, { cookie: B, body: {} }), [403, 404]);

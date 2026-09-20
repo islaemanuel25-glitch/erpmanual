@@ -16,6 +16,7 @@ import PanelComprobantes from "@/components/comprobantes/PanelComprobantes";
 import ListaConciliacion from "@/components/comprobantes/ListaConciliacion";
 import ListaDeLaFactura from "@/components/compras-proveedor/ListaDeLaFactura";
 import HojaCorregirLinea from "@/components/compras-proveedor/HojaCorregirLinea";
+import HojaCerrarRecepcion from "@/components/compras-proveedor/HojaCerrarRecepcion";
 import {
   cantidadEnEscalaDelPedido,
   precioCambio,
@@ -103,6 +104,9 @@ export default function DetallePedidoProveedorPage({ params }) {
   // lo ve, porque ninguno monta esta pantalla.
   const [recargarConciliacion, setRecargarConciliacion] = useState(0);
   const [lineaACorregir, setLineaACorregir] = useState(null);
+  // La hoja que se abre antes de cerrar: pregunta por las líneas que ningún
+  // comprobante trajo y dice qué queda a medias.
+  const [cerrandoRecepcion, setCerrandoRecepcion] = useState(false);
 
   // El primer comprobante con líneas leídas. Con varios, se muestra el primero:
   // el caso de dos facturas en un mismo pedido existe y se resuelve en la tanda
@@ -299,11 +303,20 @@ export default function DetallePedidoProveedorPage({ params }) {
 
   // ── TRAER LA FACTURA LEÍDA ──────────────────────────────────────────────
   //
-  // Solo recibiendo y solo si hay algún comprobante: sin papel no hay nada que
-  // conciliar y pedirlo sería un viaje por nada. Se vuelve a pedir cuando
-  // cambia la cantidad de comprobantes —o sea después de subir o de leer—.
+  // Solo si hay algún comprobante: sin papel no hay nada que conciliar y
+  // pedirlo sería un viaje por nada. Se vuelve a pedir cuando cambia la
+  // cantidad de comprobantes —o sea después de subir o de leer—.
+  //
+  // ── Y TAMBIÉN CON EL PEDIDO YA RECIBIDO ────────────────────────────────
+  //
+  // Antes esto era solo ENVIADO, así que un pedido cerrado no tenía de dónde
+  // sacar las filas y caía en la tabla densa de escritorio: columnas apretadas,
+  // el nombre cortado, y las cantidades SIN CONVERTIR —"Factura 80" donde son 8
+  // bultos—, que es justo lo que la recepción arregló. Es la misma información:
+  // se lee con las mismas tarjetas.
+  const estadoConConciliacion = ["ENVIADO", "RECIBIDO"];
   useEffect(() => {
-    if (!pedido?.id || pedido.estado !== "ENVIADO" || hayComprobantes === 0) {
+    if (!pedido?.id || !estadoConConciliacion.includes(pedido.estado) || hayComprobantes === 0) {
       setConciliacion(null);
       return;
     }
@@ -534,7 +547,11 @@ export default function DetallePedidoProveedorPage({ params }) {
     }
   }, [pedido, router]);
 
-  const ejecutarAccion = async (accion) => {
+  // `extra` lo manda la hoja de cierre con lo que entra por CADA línea, ya
+  // resuelto: lo contado, lo que dice el papel, y la respuesta por línea de las
+  // que ningún comprobante trajo. El servidor dejó de completar lo que falta,
+  // así que este mapa es lo único que decide qué entra al stock.
+  const ejecutarAccion = async (accion, extra = null) => {
     setActing(true);
     try {
       let url = "";
@@ -549,7 +566,7 @@ export default function DetallePedidoProveedorPage({ params }) {
       } else if (accion === "recibir") {
         url = `/api/compras-proveedor/recibir/${id}`;
         bodyData = {
-          recibidos,
+          recibidos: extra?.recibidos ?? recibidos,
           kgRecibidos,
           sueltas,
           motivos,
@@ -987,6 +1004,44 @@ export default function DetallePedidoProveedorPage({ params }) {
             comprobante la trajo."— y los tres marcos anidados que desbordaban.
             Si se eligió "Llegó sin factura" no hay papel que mostrar y se cae
             al conteo viejo, que es lo que esa salida ofrece. */}
+        {/* ── UN PEDIDO YA RECIBIDO SE LEE CON LAS MISMAS TARJETAS ────────
+            Abría en la tabla densa de escritorio: columnas apretadas, el nombre
+            cortado con puntos suspensivos, las cantidades SIN CONVERTIR
+            —"Factura 80" donde son 8 bultos— y botones que invitaban a actuar
+            sobre algo ya cerrado. Es la misma información que la recepción, así
+            que se dibuja con la misma lista, sin acciones, y con lo único que
+            importa después: qué entró, a qué costo, y la ganancia arriba. */}
+        {pedido.estado === "RECIBIDO" && filasDeFactura.length > 0 && (
+          <ListaDeLaFactura
+            comprobante={comprobanteActivo}
+            filas={filasDeFactura}
+            revisadas={{}}
+            soloLectura
+            despuesDeLista={
+              (conciliacion?.sinComprobante || []).length > 0 ? (
+                <div className="flex flex-col gap-dato pt-renglon border-t sunmi-divider">
+                  <span className="text-sm3 font-medium sunmi-text-strong">
+                    {conciliacion.sinComprobante.length} líneas que ningún comprobante trajo
+                  </span>
+                  {conciliacion.sinComprobante.map((d) => (
+                    <span
+                      key={d.pedidoDetalleId}
+                      className="flex items-baseline justify-between gap-renglon"
+                    >
+                      <span className="min-w-0 text-sm2 sunmi-text-muted truncate">
+                        {d.producto || "Sin nombre"}
+                      </span>
+                      <span className="shrink-0 text-sm2 tabular-nums sunmi-text-strong">
+                        entró {d.cantidadRecibida == null ? "—" : Number(d.cantidadRecibida)}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              ) : null
+            }
+          />
+        )}
+
         {esRecepcion && !sinFactura && filasDeFactura.length > 0 && (
           <>
             <ListaDeLaFactura
@@ -1000,10 +1055,14 @@ export default function DetallePedidoProveedorPage({ params }) {
                   color="amber"
                   type="button"
                   disabled={acting}
-                  onClick={() => {
-                    if (!confirm("Solo continuar si la mercadería llegó físicamente.")) return;
-                    ejecutarAccion("recibir");
-                  }}
+                  // ── ACÁ HABÍA UN `confirm()` DEL NAVEGADOR ──────────────
+                  //
+                  // "Solo continuar si la mercadería llegó físicamente", que se
+                  // acepta sin leer — y detrás el servidor daba por recibido
+                  // todo lo pedido, incluidas las líneas que ningún comprobante
+                  // trajo. Ahora abre la hoja de cierre, que pregunta por esas
+                  // líneas una por una y dice qué queda a medias.
+                  onClick={() => setCerrandoRecepcion(true)}
                   // El alto de la barra de acción del módulo, el mismo que usa
                   // el bloque de la factura: `w-full min-h-botonFoto`. Antes
                   // era un botón encogido al lado de cuatro renglones de
@@ -1029,6 +1088,19 @@ export default function DetallePedidoProveedorPage({ params }) {
               revisada={
                 revisadas[lineaACorregir?.lineaId] ?? lineaACorregir?.revisada === true
               }
+            />
+
+            <HojaCerrarRecepcion
+              abierta={cerrandoRecepcion}
+              onCerrar={() => setCerrandoRecepcion(false)}
+              filas={filasDeFactura}
+              sinComprobante={conciliacion?.sinComprobante || []}
+              contados={recibidos}
+              guardando={acting}
+              onConfirmar={(recibidosDelCierre) => {
+                setCerrandoRecepcion(false);
+                ejecutarAccion("recibir", { recibidos: recibidosDelCierre });
+              }}
             />
           </>
         )}
@@ -1091,7 +1163,13 @@ export default function DetallePedidoProveedorPage({ params }) {
                 página: la lista solo dibuja los campos. Cambiar cómo se ve y cómo
                 se guarda en la misma tanda junta dos fuentes de error en la misma
                 ventana. */}
-            {(esRecepcion || pedido.estado === "RECIBIDO") && (
+            {/* ── Y CON EL PEDIDO CERRADO YA NO SE DIBUJA ──────────────────
+                La tabla densa se quedó para la recepción, donde todavía se
+                edita. Un pedido RECIBIDO se lee arriba, con las tarjetas y la
+                conversión de la recepción: dos vistas de lo mismo, una de ellas
+                sin convertir las cantidades, es cómo la pantalla terminó
+                diciendo "Factura 80" sobre 8 bultos. */}
+            {esRecepcion && (
               <ListaConciliacion
                 pedidoId={pedido.id}
                 estadoPedido={pedido.estado}

@@ -94,6 +94,14 @@ export default function TarjetaLineaFactura({
    */
   revisada = false,
   guardando = false,
+  /**
+   * ── UN PEDIDO YA RECIBIDO SE LEE, NO SE TOCA ──────────────────────────
+   *
+   * La misma tarjeta y la misma conversión que en la recepción —es la misma
+   * información— pero sin los botones, que invitarían a hacer algo que ya no
+   * corresponde, y con lo único que cambia después de cerrar: cuánto entró.
+   */
+  soloLectura = false,
 }) {
   const estado = estadoDeLinea(fila);
   // Dos preguntas distintas: si el precio cambió, y si hay que decidirlo. Con
@@ -104,7 +112,9 @@ export default function TarjetaLineaFactura({
   const faltan = diferenciaDeCantidad(fila);
   const esNoPedida = estado === ESTADO_LINEA.NO_PEDIDO;
   const sinVincular = estado === ESTADO_LINEA.SIN_VINCULAR;
-  const resuelta = revisada;
+  // Con el pedido cerrado la tarjeta va SIEMPRE abierta: no hay nada que
+  // controlar, y colapsarla escondería justo lo que se viene a leer.
+  const resuelta = revisada && !soloLectura;
   // La cantidad SIEMPRE en la escala del pedido. Lo crudo se muestra al lado
   // cuando se convirtió, para que se pueda cotejar con el papel sin dudar.
   const cantidad = cantidadEnEscalaDelPedido(fila);
@@ -245,6 +255,25 @@ export default function TarjetaLineaFactura({
 
       <SunmiSeparator />
 
+      {/* ── CERRADO: LO ÚNICO QUE IMPORTA DESPUÉS ────────────────────────
+          Qué entró y cuánto vale, en la misma línea donde estaban los botones.
+          `cantidadRecibida` es lo que el cierre escribió en la línea del
+          pedido: un `null` es "nunca se contó" y se dice así, en vez de
+          mostrarlo como un cero que alguien haya decidido. */}
+      {soloLectura ? (
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-sm2 sunmi-text-muted">
+            Entró{" "}
+            <span className="tabular-nums font-semibold sunmi-text-strong">
+              {fila?.cantidadRecibida == null ? "—" : fmtCant(fila.cantidadRecibida)}
+            </span>{" "}
+            a {formatearMoneda(fila?.costoCatalogo)}
+          </span>
+          <span className="shrink-0 whitespace-nowrap tabular-nums text-lg2 font-semibold sunmi-text-strong">
+            {formatearMoneda(fila?.subtotal ?? 0)}
+          </span>
+        </div>
+      ) : (
       <div className="flex items-center justify-between gap-3">
         <SunmiButton
           type="button"
@@ -277,6 +306,7 @@ export default function TarjetaLineaFactura({
           {formatearMoneda(fila?.subtotal ?? 0)}
         </span>
       </div>
+      )}
     </SunmiCard>
   );
 }
