@@ -1,0 +1,50 @@
+-- QUIÉN DIO POR CONTROLADO UN RENGLÓN DE LA FACTURA, Y CUÁNDO.
+--
+-- ── EL DEFECTO QUE LA TRAE ──────────────────────────────────────────────────
+--
+-- La marca de "revisada" vivía en el estado de React y en ningún lado más: no
+-- está en la base y tampoco en el `sessionStorage`, que solo guarda las
+-- cantidades recibidas y los kilos. Un refresco devolvía la pantalla a 0 de 15
+-- revisadas MIENTRAS las cantidades y las decisiones de precio sí sobrevivían,
+-- así que la pantalla quedaba en un estado que nadie había dejado. Con 197
+-- líneas eso es media hora de control tirada.
+--
+-- ── ES PURAMENTE ADITIVA ────────────────────────────────────────────────────
+--
+-- Tres columnas sobre `ComprobanteLinea`. No hay DROP, no hay UPDATE, no hay
+-- DELETE, no hay INSERT y no hay backfill. Las líneas de comprobante que ya
+-- existen quedan con `revisadoEnRecepcion` en FALSE y las otras dos en NULL.
+--
+-- ── POR QUÉ NO SE RELLENA NADA ──────────────────────────────────────────────
+--
+-- Porque no se puede: lo marcado hasta hoy nunca salió de la memoria de una
+-- pestaña. No está en la base ni en el almacenamiento del navegador, así que no
+-- hay de dónde recuperarlo. Inventar un TRUE diría que alguien controló un
+-- renglón que quizás nadie miró, que es exactamente lo contrario de lo que esta
+-- columna existe para registrar.
+--
+-- ── LA MARCA ES DEL RENGLÓN DEL PAPEL, NO DE LA LÍNEA DEL PEDIDO ────────────
+--
+-- El estado de React se indexaba por `pedidoDetalleId`, y dos renglones de una
+-- factura pueden apuntar a la misma línea del pedido: medido sobre el
+-- comprobante 5 del pedido 232, las líneas 120 y 121 van las dos al detalle
+-- 2565. Marcar una marcaba la otra y el contador de arriba contaba dos. Lo que
+-- una persona controla es el renglón que tiene delante.
+--
+-- ── LOS NOMBRES SON LOS DE TRANSFERENCIAS ───────────────────────────────────
+--
+-- `TransferenciaDetalle` guarda este mismo hecho del otro lado del depósito con
+-- `revisadoEnRecepcion`, `revisadoEnRecepcionPorId` y `revisadoEnRecepcionAt`.
+-- Se copian tal cual: dos vocabularios para "lo revisó una persona" obligan a
+-- cualquier reporte a conocer los dos.
+--
+-- ── SIN ÍNDICE, A PROPÓSITO ─────────────────────────────────────────────────
+--
+-- La bandera se lee junto con la línea —la pantalla trae el comprobante entero
+-- por `comprobanteId`, que ya tiene su índice— y no se filtra por ella. Un
+-- índice que nadie usa solo cuesta escrituras. Transferencias sí tiene el suyo
+-- porque allá una guarda de confirmación filtra por la bandera; acá esa guarda
+-- es la tanda del cierre y todavía no existe.
+ALTER TABLE "ComprobanteLinea" ADD COLUMN "revisadoEnRecepcion" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "ComprobanteLinea" ADD COLUMN "revisadoEnRecepcionPorId" INTEGER;
+ALTER TABLE "ComprobanteLinea" ADD COLUMN "revisadoEnRecepcionAt" TIMESTAMP(3);

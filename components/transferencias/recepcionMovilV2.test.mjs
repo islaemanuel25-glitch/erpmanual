@@ -438,7 +438,12 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // compararon, para que la próxima factura no vuelva a preguntar lo mismo. Es
   // de otra tanda, no toca nada de transferencias, y es aditiva: una tabla
   // nueva, sin DROP y sin backfill.
-  assert.equal(migraciones.length, 21, "aparecio una migracion que nadie declaro aca");
+  // 22 desde el 2026-09-20: entra `20260920223000_linea_de_factura_revisada`,
+  // tres columnas nullable —más una booleana con default— sobre
+  // `ComprobanteLinea`, para que la marca de "renglón controlado" deje de ser
+  // estado de React y sobreviva a un refresco. Es de otra tanda, no toca nada
+  // de transferencias, y es aditiva: sin DROP y sin backfill.
+  assert.equal(migraciones.length, 22, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

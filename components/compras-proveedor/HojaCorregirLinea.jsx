@@ -397,6 +397,10 @@ export default function HojaCorregirLinea({
       }
     }
     onGuardar?.({
+      // El renglón del papel, para marcarlo controlado, y la línea del pedido,
+      // que es donde van la cantidad y el motivo. Son dos cosas distintas: dos
+      // renglones pueden apuntar a la misma línea del pedido.
+      lineaId: fila.lineaId,
       pedidoDetalleId: fila.pedidoDetalleId,
       cantidadRecibida: bultos === "" ? null : Number(bultos),
       unidadesSueltas: vaPorPack && sueltas !== "" ? Number(sueltas) : null,

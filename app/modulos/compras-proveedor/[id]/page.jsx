@@ -339,7 +339,53 @@ export default function DetallePedidoProveedorPage({ params }) {
   // No se deduce de que la cantidad coincida: eso es lo que el sistema calcula,
   // y darlo por controlado es poner el tilde verde sobre un renglón que nadie
   // miró. Se llena con el toque —"✓ Coincide"— o guardando la hoja.
+  //
+  // ── ESTO YA NO ES LA VERDAD: ES UN ECO OPTIMISTA ───────────────────────
+  //
+  // La marca vive en la base, en `ComprobanteLinea.revisadoEnRecepcion`, y
+  // llega en cada fila. Este mapa solo adelanta lo que el servidor va a
+  // contestar, para que el tilde no tarde un viaje de red en aparecer; si la
+  // escritura falla, se saca de acá y la fila vuelve a mostrar lo que dice la
+  // base. La clave es el RENGLÓN DEL PAPEL —`lineaId`— y no la línea del
+  // pedido: dos renglones pueden apuntar a la misma línea del pedido y marcar
+  // uno marcaba el otro.
   const [revisadas, setRevisadas] = useState({});
+
+  // ── MARCAR ES ESCRIBIR, Y SE ESCRIBE APENAS OCURRE ─────────────────────
+  //
+  // La cantidad, las sueltas y el motivo se juntan y se escriben todos al
+  // recibir, porque recibir es una sola transacción que mueve stock. La marca
+  // no mueve stock: su riesgo es perderse, y por eso va sola y en el momento.
+  const marcarRevisada = useCallback(async (lineaId, revisada = true) => {
+    if (!lineaId) return { ok: false, error: "Falta la línea." };
+    setRevisadas((prev) => ({ ...prev, [lineaId]: revisada }));
+    try {
+      const r = await fetch("/api/compras-proveedor/comprobantes/marcar-revisada", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lineaId, revisada }),
+      });
+      const d = await r.json().catch(() => null);
+      if (!d?.ok) {
+        // El eco se retira: si no se guardó, el tilde no puede quedar puesto.
+        setRevisadas((prev) => {
+          const n = { ...prev };
+          delete n[lineaId];
+          return n;
+        });
+        return { ok: false, error: d?.queHacer || d?.error || "No se pudo guardar la marca." };
+      }
+      return { ok: true };
+    } catch (e) {
+      setRevisadas((prev) => {
+        const n = { ...prev };
+        delete n[lineaId];
+        return n;
+      });
+      return { ok: false, error: e?.message || "No se pudo guardar la marca." };
+    }
+  }, []);
 
   // ── LAS DOS DECISIONES DE PRECIO VAN ACÁ ARRIBA ────────────────────────
   //
@@ -420,8 +466,8 @@ export default function DetallePedidoProveedorPage({ params }) {
     // llegó. Es el mismo número convertido que muestra la tarjeta.
     const enEscala = cantidadEnEscalaDelPedido(fila);
     setRecibidos((prev) => ({ ...prev, [fila.pedidoDetalleId]: Number(enEscala) || 0 }));
-    setRevisadas((prev) => ({ ...prev, [fila.pedidoDetalleId]: true }));
-  }, [aceptarPrecioDeLinea]);
+    await marcarRevisada(fila.lineaId, true);
+  }, [aceptarPrecioDeLinea, marcarRevisada]);
 
   const guardarCorreccion = useCallback((datos) => {
     const id = datos?.pedidoDetalleId;
@@ -437,23 +483,20 @@ export default function DetallePedidoProveedorPage({ params }) {
         : undefined,
     }));
     // Guardar la hoja también es controlar el renglón: alguien lo miró, contó y
-    // decidió. Es el otro camino por el que una línea queda revisada.
-    setRevisadas((prev) => ({ ...prev, [id]: true }));
+    // decidió. Es el otro camino por el que una línea queda revisada — y se
+    // guarda por el mismo lugar, no por uno parecido.
+    marcarRevisada(datos?.lineaId, true);
     setLineaACorregir(null);
-  }, []);
+  }, [marcarRevisada]);
 
   // Volver una línea a pendiente. El mismo gesto que "Desmarcar" en la ficha
-  // de recepción de una transferencia: devuelve la línea y nada más.
+  // de recepción de una transferencia: devuelve la línea y nada más. Borra
+  // también quién y cuándo — si nadie la controló, un autor colgado diría
+  // que sí.
   const desmarcarLinea = useCallback((fila) => {
-    const id = fila?.pedidoDetalleId;
-    if (!id) return;
-    setRevisadas((prev) => {
-      const n = { ...prev };
-      delete n[id];
-      return n;
-    });
+    marcarRevisada(fila?.lineaId, false);
     setLineaACorregir(null);
-  }, []);
+  }, [marcarRevisada]);
 
   // ── VINCULAR: LA LÍNEA PASA A SABER QUÉ PRODUCTO ES ────────────────────
   //
@@ -961,7 +1004,11 @@ export default function DetallePedidoProveedorPage({ params }) {
                     if (!confirm("Solo continuar si la mercadería llegó físicamente.")) return;
                     ejecutarAccion("recibir");
                   }}
-                  className="shrink-0 justify-center"
+                  // El alto de la barra de acción del módulo, el mismo que usa
+                  // el bloque de la factura: `w-full min-h-botonFoto`. Antes
+                  // era un botón encogido al lado de cuatro renglones de
+                  // números, y por eso se montaba encima del porcentaje.
+                  className="w-full min-h-botonFoto justify-center text-sm3 font-bold"
                 >
                   {acting ? "Procesando..." : "Recibir mercadería"}
                 </SunmiButton>
@@ -976,7 +1023,12 @@ export default function DetallePedidoProveedorPage({ params }) {
               onGuardar={guardarCorreccion}
               onVincular={vincularLinea}
               onDesmarcar={desmarcarLinea}
-              revisada={!!revisadas[lineaACorregir?.pedidoDetalleId]}
+              // El eco optimista manda mientras exista; si no, lo que dice la
+              // base. La misma regla que usa la lista, y por eso el botón
+              // "Desmarcar" aparece justo cuando el tilde está puesto.
+              revisada={
+                revisadas[lineaACorregir?.lineaId] ?? lineaACorregir?.revisada === true
+              }
             />
           </>
         )}

@@ -3998,6 +3998,37 @@ model ComprobanteLinea {
   claseDiferencia String?
   diferenciaPct   Decimal? @db.Decimal(6, 3)
 
+  /// ── QUIÉN DIO POR CONTROLADO ESTE RENGLÓN DEL PAPEL ────────────────────
+  ///
+  /// No se deduce de que la cantidad coincida: eso es lo que el sistema
+  /// calcula, y darlo por controlado es poner el tilde verde sobre un renglón
+  /// que nadie miró. Lo marca la persona, tocando "✓ Coincide" o guardando la
+  /// hoja de corregir.
+  ///
+  /// Y NO PUEDE SER ESTADO DE REACT, que es como estaba: un refresco devolvía
+  /// la pantalla a 0 de 15 revisadas mientras las cantidades y las decisiones
+  /// de precio sí sobrevivían, así que quedaba en un estado que nadie dejó. Con
+  /// 197 líneas eso es media hora de trabajo tirada.
+  ///
+  /// LA MARCA ES DEL RENGLÓN DE LA FACTURA Y NO DE LA LÍNEA DEL PEDIDO, y esa
+  /// es la diferencia que la arregla de verdad: el estado de React se indexaba
+  /// por `pedidoDetalleId`, y DOS renglones del papel pueden apuntar a la misma
+  /// línea del pedido —medido: las líneas 120 y 121 del comprobante 5 van las
+  /// dos al detalle 2565—. Marcando una se marcaba la otra, y el contador de
+  /// arriba contaba dos. Lo que se controla es el renglón del papel.
+  ///
+  /// Los MISMOS nombres que `TransferenciaDetalle`, que guarda este mismo hecho
+  /// del otro lado del depósito: dos vocabularios para "lo revisó una persona"
+  /// hacen que un reporte tenga que conocer los dos.
+  ///
+  /// `revisadoEnRecepcionPorId` va como escalar y sin relación, igual que
+  /// `DecisionDePrecioProveedor.decididaPorUsuarioId`: hoy no se muestra el
+  /// nombre en ninguna pantalla. El día que se muestre se agrega la relación,
+  /// que es otra migración y otra decisión.
+  revisadoEnRecepcion      Boolean   @default(false)
+  revisadoEnRecepcionPorId Int?
+  revisadoEnRecepcionAt    DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

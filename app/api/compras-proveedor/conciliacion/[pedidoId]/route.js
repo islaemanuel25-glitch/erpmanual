@@ -106,6 +106,10 @@ export async function GET(req, { params }) {
             id: true, orden: true, textoCrudo: true, codigoProveedor: true, cantidad: true,
             netoUnitario: true, subtotalImpreso: true, internoUnitario: true,
             productoLocalId: true, pedidoDetalleId: true, precioPedidoPrevio: true,
+            // La marca de controlado, que ahora es un hecho guardado y no
+            // estado de React: sin esto la pantalla vuelve a 0 revisadas en
+            // cada refresco.
+            revisadoEnRecepcion: true, revisadoEnRecepcionAt: true,
           },
         },
       },

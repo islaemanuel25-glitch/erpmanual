@@ -39,7 +39,7 @@ import {
 } from "@/lib/compras-proveedor/gananciaDelDeposito";
 
 /**
- * Un renglón del pie: rótulo a la izquierda, número a la derecha.
+ * Un renglón de importe: rótulo a la izquierda, número a la derecha.
  *
  * Los tres se dibujan con la misma pieza para que las comas queden alineadas y
  * los tres números se lean como una cuenta y no como tres datos sueltos.
@@ -49,7 +49,7 @@ import {
  * línea que se factura por encima del precio interno. Un número negativo sin
  * señal se lee como uno positivo cuando se mira rápido.
  */
-function RenglonDelPie({ rotulo, valor, porcentaje = null, fuerte = false }) {
+function RenglonDeImporte({ rotulo, valor, porcentaje = null, fuerte = false }) {
   const negativo = Number(valor) < 0;
   return (
     <span className="flex items-baseline justify-between gap-renglon">
@@ -131,7 +131,18 @@ export default function ListaDeLaFactura({
   //
   // Un número de arriba que no es el que se ve abajo es peor que no tenerlo:
   // obliga a decidir a cuál de los dos creerle.
-  const yaRevisada = (f) => !!revisadas?.[f?.pedidoDetalleId];
+  // ── LA MARCA ES DEL RENGLÓN, Y LA VERDAD ESTÁ EN LA BASE ───────────────
+  //
+  // `revisadas` es el eco optimista de la pantalla —lo que se acaba de tocar y
+  // todavía no volvió del servidor—; `f.revisada` es lo que dice la base. El
+  // eco manda mientras exista, y cuando la conciliación se recarga los dos
+  // dicen lo mismo.
+  //
+  // La clave es `lineaId` y no `pedidoDetalleId`: dos renglones del papel
+  // pueden apuntar a la misma línea del pedido —las 120 y 121 del comprobante 5
+  // van las dos al detalle 2565— y con la clave vieja marcar uno marcaba el
+  // otro, y el contador de arriba contaba dos.
+  const yaRevisada = (f) => revisadas?.[f?.lineaId] ?? f?.revisada === true;
   const resumen = useMemo(
     () => ({
       revisadas: (filas || []).filter(yaRevisada).length,
@@ -184,6 +195,26 @@ export default function ListaDeLaFactura({
                 : "Todo revisado"}
             </span>
           </div>
+
+          {/* ── LOS TRES NÚMEROS VAN ACÁ ARRIBA, NO EN EL PIE ─────────────
+              Vivían en el pie pegajoso, que tapa la última tarjeta de la lista
+              mientras se scrollea, y el botón de recibir se les montaba encima.
+              Acá están donde ya está el resumen del pedido, no se mueven con el
+              scroll de la lista, y el pie queda con una sola cosa adentro. */}
+          <div className="border-t sunmi-divider pt-renglon flex flex-col gap-dato">
+            <RenglonDeImporte rotulo="Factura" valor={cuenta.facturado} />
+            <RenglonDeImporte rotulo="Al precio del ERP" valor={cuenta.interno} />
+            <RenglonDeImporte
+              rotulo="Ganancia"
+              valor={cuenta.ganancia}
+              porcentaje={cuenta.porcentaje}
+              fuerte
+            />
+            {/* CUÁNTAS LÍNEAS RESPALDAN EL NÚMERO. Sin esto, una factura con la
+                mitad de las líneas sin vincular muestra una ganancia a media
+                asta que se lee como el total. */}
+            <span className="text-xs2 sunmi-text-muted break-words">{textoDeLaCuenta(cuenta)}</span>
+          </div>
         </>
       }
       filtros={
@@ -212,25 +243,13 @@ export default function ListaDeLaFactura({
           ))}
         </>
       }
-      pieDePantalla={
-        <div className="flex items-end justify-between gap-renglon">
-          <span className="min-w-0 flex-1 flex flex-col gap-dato">
-            <RenglonDelPie rotulo="Factura" valor={cuenta.facturado} />
-            <RenglonDelPie rotulo="Al precio del ERP" valor={cuenta.interno} />
-            <RenglonDelPie
-              rotulo="Ganancia"
-              valor={cuenta.ganancia}
-              porcentaje={cuenta.porcentaje}
-              fuerte
-            />
-            {/* CUÁNTAS LÍNEAS RESPALDAN EL NÚMERO. Sin esto, una factura con la
-                mitad de las líneas sin vincular muestra una ganancia a media
-                asta que se lee como el total. */}
-            <span className="text-xs2 sunmi-text-muted break-words">{textoDeLaCuenta(cuenta)}</span>
-          </span>
-          {accionDelPie}
-        </div>
-      }
+      // ── EN EL PIE QUEDA LA ACCIÓN, SOLA ─────────────────────────────────
+      //
+      // Un pie pegajoso tapa lo que hay detrás mientras se scrollea, así que
+      // todo lo que se meta ahí es alto que la lista pierde. Con los tres
+      // importes adentro medía cuatro renglones y el botón se les montaba
+      // encima. Ahora lleva una sola cosa y el alto es el del botón.
+      pieDePantalla={accionDelPie}
     />
   );
 }

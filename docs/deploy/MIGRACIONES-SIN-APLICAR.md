@@ -16,8 +16,33 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **21 migraciones** y el árbol en **21**. No hay ninguna
-pendiente: el próximo despliegue es solo de código.
+Producción está en **21 migraciones** y el árbol en **22**.
+
+- `20260920223000_linea_de_factura_revisada` — **ADITIVA**
+
+Tres columnas sobre `ComprobanteLinea`: `revisadoEnRecepcion` booleana con
+default `false`, más `revisadoEnRecepcionPorId` y `revisadoEnRecepcionAt`
+nullables. Sin DROP, sin `ALTER COLUMN` y sin backfill.
+
+**Para qué:** la marca de "este renglón de la factura ya lo controlé" vivía en
+el estado de React y en ningún lado más. Un refresco devolvía la pantalla a 0 de
+15 revisadas mientras las cantidades y las decisiones de precio sí sobrevivían,
+así que quedaba en un estado que nadie había dejado. Con 197 líneas eso es media
+hora de control tirada.
+
+**Qué dijo el clasificador:** sin coincidencias; no toca ninguna columna
+existente ni borra nada.
+
+**El quinto chequeo del backup NO aplica:** no hay ningún dato que se vaya a
+perder. Las tres columnas nacen vacías sobre las líneas que ya existen.
+
+**No se rellena nada, y no se puede:** lo marcado hasta hoy nunca salió de la
+memoria de una pestaña —no está en la base ni en el `sessionStorage`, que solo
+guarda cantidades y kilos—. Un `true` inventado diría que alguien controló un
+renglón que quizás nadie miró.
+
+**La ventana entre migrar y recrear es inofensiva:** el código viejo no nombra
+estas columnas, así que mientras corra se comporta exactamente como hoy.
 
 Las dos últimas salieron de esta lista con el despliegue de `70d2429b`
 —`20260920120000_recepcion_motivo_y_sueltas` y
