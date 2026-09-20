@@ -33,6 +33,44 @@ import {
   opcionesDeFiltro,
   pasaFiltro,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
+import {
+  gananciaDelDeposito,
+  textoDeLaCuenta,
+} from "@/lib/compras-proveedor/gananciaDelDeposito";
+
+/**
+ * Un renglón del pie: rótulo a la izquierda, número a la derecha.
+ *
+ * Los tres se dibujan con la misma pieza para que las comas queden alineadas y
+ * los tres números se lean como una cuenta y no como tres datos sueltos.
+ *
+ * La ganancia va en `fuerte` —es la respuesta— y en rojo cuando es NEGATIVA,
+ * que es un caso real y no teórico: en el comprobante 5 del pedido 232 hay una
+ * línea que se factura por encima del precio interno. Un número negativo sin
+ * señal se lee como uno positivo cuando se mira rápido.
+ */
+function RenglonDelPie({ rotulo, valor, porcentaje = null, fuerte = false }) {
+  const negativo = Number(valor) < 0;
+  return (
+    <span className="flex items-baseline justify-between gap-renglon">
+      <span className={`${fuerte ? "text-sm2 sunmi-text-strong" : "text-sm2 sunmi-text-muted"}`}>
+        {rotulo}
+      </span>
+      <span
+        className={`shrink-0 whitespace-nowrap tabular-nums ${
+          fuerte
+            ? `text-lg2 font-semibold ${negativo ? "sunmi-text-danger" : "sunmi-text-strong"}`
+            : "text-sm2 sunmi-text-strong"
+        }`}
+      >
+        {formatearMoneda(valor)}
+        {porcentaje != null
+          ? ` (${porcentaje < 0 ? "−" : ""}${Math.abs(porcentaje).toFixed(1).replace(".", ",")} %)`
+          : ""}
+      </span>
+    </span>
+  );
+}
 
 export default function ListaDeLaFactura({
   comprobante,
@@ -55,10 +93,21 @@ export default function ListaDeLaFactura({
     [filas, filtro]
   );
 
-  const total = useMemo(
-    () => (filas || []).reduce((acc, f) => acc + (Number(f?.subtotal) || 0), 0),
-    [filas]
-  );
+  // ── LOS TRES NÚMEROS DEL PIE ───────────────────────────────────────────
+  //
+  // Lo que factura el proveedor, lo que vale esa misma mercadería al precio
+  // interno, y la diferencia — que es LA GANANCIA DEL DEPÓSITO, el margen con
+  // el que le vende a los locales. Antes acá había un solo número, el total de
+  // la factura, y saber cuánto se gana en la compra pedía hacer la cuenta a
+  // mano renglón por renglón.
+  //
+  // ESTA SUMA NO ES LA QUE VERIFICA LA LECTURA. Aquélla —`verificarComprobante`—
+  // suma las líneas para compararlas contra el total impreso del papel, y por
+  // eso no puede usarse cuando el papel no trae total: compararía la cuenta
+  // contra sí misma. Ésta suma para saber cuánto se paga y cuánto se gana, no
+  // se compara contra nada del papel y no habilita ninguna escritura. Las dos
+  // están explicadas juntas en `gananciaDelDeposito`.
+  const cuenta = useMemo(() => gananciaDelDeposito(filas), [filas]);
 
   // ── QUÉ SE PIERDE CON ESTE PAPEL, EN UNA LÍNEA ────────────────────────
   //
@@ -164,12 +213,20 @@ export default function ListaDeLaFactura({
         </>
       }
       pieDePantalla={
-        <div className="flex items-center justify-between gap-3">
-          <span className="min-w-0">
-            <span className="block text-sm2 sunmi-text-muted">Total de la factura</span>
-            <span className="block tabular-nums text-lg2 font-semibold sunmi-text-strong">
-              {formatearMoneda(total)}
-            </span>
+        <div className="flex items-end justify-between gap-renglon">
+          <span className="min-w-0 flex-1 flex flex-col gap-dato">
+            <RenglonDelPie rotulo="Factura" valor={cuenta.facturado} />
+            <RenglonDelPie rotulo="Al precio del ERP" valor={cuenta.interno} />
+            <RenglonDelPie
+              rotulo="Ganancia"
+              valor={cuenta.ganancia}
+              porcentaje={cuenta.porcentaje}
+              fuerte
+            />
+            {/* CUÁNTAS LÍNEAS RESPALDAN EL NÚMERO. Sin esto, una factura con la
+                mitad de las líneas sin vincular muestra una ganancia a media
+                asta que se lee como el total. */}
+            <span className="text-xs2 sunmi-text-muted break-words">{textoDeLaCuenta(cuenta)}</span>
           </span>
           {accionDelPie}
         </div>
