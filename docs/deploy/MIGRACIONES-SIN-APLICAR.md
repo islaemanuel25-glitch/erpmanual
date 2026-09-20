@@ -16,33 +16,20 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **20 migraciones** y el árbol en **21**.
+Producción está en **21 migraciones** y el árbol en **21**. No hay ninguna
+pendiente: el próximo despliegue es solo de código.
 
-`20260920120000_recepcion_motivo_y_sueltas` salió de esta lista: se aplicó en
-producción con el despliegue del 2026-09-20 y está confirmada leyendo
-`_prisma_migrations`, no por acordarse. Quedó acá una tanda de más porque
-borrarla es un paso del despliegue que se saltea fácil — vale la pena releer
-esta sección después de cada uno.
+Las dos últimas salieron de esta lista con el despliegue de `70d2429b`
+—`20260920120000_recepcion_motivo_y_sueltas` y
+`20260920190000_decision_de_precio_por_proveedor`—, las dos confirmadas leyendo
+`_prisma_migrations` y `migrate status`, no por acordarse.
 
-- `20260920190000_decision_de_precio_por_proveedor` — **ADITIVA**
-
-Una tabla nueva, `DecisionDePrecioProveedor`. No hay `ALTER` sobre ninguna
-existente, ni DROP, ni UPDATE, ni INSERT, ni backfill: nace vacía.
-
-**Para qué:** guardar lo que ya se decidió sobre el precio de un producto de un
-proveedor —aceptar el de la factura o dejar el propio— junto con los dos precios
-que se compararon. Hoy esa respuesta no se guarda en ningún lado y la recepción
-siguiente vuelve a preguntar lo mismo sobre el mismo número: medido sobre el
-comprobante 5 del pedido 232, trece de sus quince renglones preguntan.
-
-**Qué dijo el clasificador:** sin coincidencias; no toca ninguna columna
-existente ni borra nada.
-
-**El quinto chequeo del backup NO aplica:** no hay ningún dato que se vaya a
-perder. La tabla nace vacía y ninguna fila existente se toca.
-
-**La ventana entre migrar y recrear es inofensiva:** el código viejo no nombra
-esta tabla, así que mientras corra sigue comportándose exactamente como hoy.
+**Y la primera de las dos se quedó acá una tanda de más**, ya aplicada, porque
+borrarla es el paso del despliegue que se saltea más fácil: el archivo se lee al
+principio, cuando todavía hace falta, y se edita al final, cuando ya terminó
+todo. Vale la pena releer esta sección después de cada despliegue — el candado
+`scripts/migracionesPendientesAlDia.test.mjs` compara las cuentas, pero no puede
+saber cuál de los dos números quedó viejo.
 
 ---
 
