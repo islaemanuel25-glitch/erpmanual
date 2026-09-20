@@ -117,10 +117,26 @@ export async function POST(req) {
     // pantalla y la ruta de aceptar un precio. Si el cuerpo la manda, manda el
     // cuerpo: puede haber varias líneas del mismo producto y ahí eligió una
     // persona.
+    // ── AL CAMBIAR DE PRODUCTO, LA COLUMNA GUARDADA NO MANDA ─────────────
+    //
+    // `resolverLineaDelPedido` devuelve la columna cuando está, y con razón: no
+    // pisa en silencio una línea que alguien eligió a mano. Pero al RE-VINCULAR
+    // esa columna es del producto anterior, así que devolverla deja la línea
+    // apuntando a la línea de pedido equivocada.
+    //
+    // Medido: cambiar la línea 110 de Philips 10 a Chester 10 dejó
+    // `pedidoDetalleId` en 2574, que es la línea de Philips. El producto decía
+    // una cosa y la comparación se hacía contra otra.
+    //
+    // Así que cuando el producto cambia se deduce de cero, por el producto
+    // nuevo.
+    const cambiaDeProducto =
+      linea.productoLocalId != null && linea.productoLocalId !== productoLocal.id;
+
     let detalleDelPedido = pedidoDetalleId;
     if (!detalleDelPedido && linea.comprobante.pedidoId) {
       const delPedido = resolverLineaDelPedido({
-        linea,
+        linea: cambiaDeProducto ? { ...linea, pedidoDetalleId: null } : linea,
         productoBaseId,
         detalles: aplanarDetalles(
           await prisma.pedidoProveedorDetalle.findMany({
