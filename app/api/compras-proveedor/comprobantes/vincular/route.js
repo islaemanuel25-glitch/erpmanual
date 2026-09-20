@@ -19,7 +19,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
-import { aliasAEscribir } from "@/lib/compras-proveedor/comprobante/vinculo";
+import { aliasAEscribir, resolverLineaDelPedido } from "@/lib/compras-proveedor/comprobante/vinculo";
+import { aplanarDetalles } from "@/lib/compras-proveedor/comprobante/analisisDeComprobante";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 
 export async function POST(req) {
@@ -48,7 +49,10 @@ export async function POST(req) {
       where: { id: lineaId, comprobante: { grupoId } },
       select: {
         id: true, textoCrudo: true,
-        comprobante: { select: { id: true, proveedorId: true, estado: true, confirmadoEn: true } },
+        // `pedidoId` para poder resolver a qué línea del pedido corresponde.
+        comprobante: {
+          select: { id: true, pedidoId: true, proveedorId: true, estado: true, confirmadoEn: true },
+        },
       },
     });
     if (!linea) {
@@ -97,10 +101,41 @@ export async function POST(req) {
       proveedorId: linea.comprobante.proveedorId,
     });
 
+    // ── SI NADIE LA MANDA, LA LÍNEA DEL PEDIDO SE RESUELVE ACÁ ───────────
+    //
+    // `pedidoDetalleId` venía SOLO del cuerpo, y ningún cliente lo mandaba:
+    // medido el 2026-09-20, 0 de 21 líneas la tenían. La columna es lo que
+    // después permite aceptar un precio, así que una línea recién vinculada
+    // quedaba sin poder decidir su costo.
+    //
+    // Se deduce con `resolverLineaDelPedido`, el MISMO criterio que usan la
+    // pantalla y la ruta de aceptar un precio. Si el cuerpo la manda, manda el
+    // cuerpo: puede haber varias líneas del mismo producto y ahí eligió una
+    // persona.
+    let detalleDelPedido = pedidoDetalleId;
+    if (!detalleDelPedido && linea.comprobante.pedidoId) {
+      const delPedido = resolverLineaDelPedido({
+        linea,
+        productoBaseId,
+        detalles: aplanarDetalles(
+          await prisma.pedidoProveedorDetalle.findMany({
+            where: { pedidoId: linea.comprobante.pedidoId },
+            select: {
+              id: true,
+              cantidad: true,
+              precioCosto: true,
+              producto: { select: { baseId: true } },
+            },
+          })
+        ),
+      });
+      detalleDelPedido = delPedido.detalle?.id ?? null;
+    }
+
     const resultado = await prisma.$transaction(async (tx) => {
       await tx.comprobanteLinea.update({
         where: { id: linea.id },
-        data: { productoLocalId: productoLocal.id, pedidoDetalleId },
+        data: { productoLocalId: productoLocal.id, pedidoDetalleId: detalleDelPedido },
       });
 
       // El alias va en la MISMA transacción. Que quede el vínculo sin el alias

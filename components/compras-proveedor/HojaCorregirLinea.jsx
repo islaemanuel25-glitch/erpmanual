@@ -32,6 +32,7 @@ import { useEffect, useMemo, useState } from "react";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
+import { BuscadorProducto } from "@/components/comprobantes/PiezasConciliacion";
 import { formatearMoneda } from "@/lib/moneda";
 import {
   cantidadEnEscalaDelPedido,
@@ -112,12 +113,102 @@ function OpcionDePrecio({ elegida, titulo, detalle, onElegir }) {
   );
 }
 
+/**
+ * ELEGIR QUÉ PRODUCTO ES, CUANDO LA LÍNEA NO ESTÁ VINCULADA.
+ *
+ * ── EL ORDEN DE LOS CANDIDATOS NO SE DECIDE ACÁ ───────────────────────────
+ *
+ * Llegan rankeados por el motor: primero lo que está en el pedido, después el
+ * universo del proveedor, al final el ERP entero. Esta pieza no reordena nada
+ * — si ordenara, habría dos criterios de qué es "el más probable" y un día
+ * dirían distinto.
+ *
+ * ── Y SIEMPRE HAY SALIDA A MANO ───────────────────────────────────────────
+ *
+ * El motor puede no tener ningún candidato, o tenerlos todos mal. `Buscar` abre
+ * el buscador del catálogo, que es la misma pieza que usa la conciliación de
+ * escritorio: no se escribe un segundo buscador.
+ */
+function ElegirProducto({ fila, onVincular, onCerrar, guardando }) {
+  const [buscando, setBuscando] = useState(false);
+  const [error, setError] = useState("");
+  const candidatos = fila?.candidatos ?? [];
+
+  const elegir = async (productoBaseId) => {
+    setError("");
+    const r = await onVincular?.(fila, productoBaseId);
+    if (r && r.ok === false) setError(r.error || "No se pudo vincular.");
+  };
+
+  return (
+    <div className="flex flex-col gap-renglon">
+      <span className="text-sm3 font-medium sunmi-text-strong">Qué producto es</span>
+      <span className="text-sm3 sunmi-text-muted break-words">
+        El papel dice “{fila?.textoCrudo || "—"}”.
+      </span>
+
+      {buscando ? (
+        <BuscadorProducto
+          onElegir={(p) => elegir(p.baseId ?? p.productoBaseId ?? p.id)}
+          onCancelar={() => setBuscando(false)}
+        />
+      ) : (
+        <>
+          {candidatos.length === 0 && (
+            <span className="text-sm3 sunmi-text-muted">
+              El motor no encontró ninguno parecido. Buscalo a mano.
+            </span>
+          )}
+
+          {candidatos.map((c) => (
+            <SunmiButton
+              key={c.productoBaseId}
+              color="slate"
+              type="button"
+              disabled={guardando}
+              onClick={() => elegir(c.productoBaseId)}
+              className="w-full min-h-toque justify-start text-left text-sm3"
+            >
+              {c.nombre}
+            </SunmiButton>
+          ))}
+
+          <SunmiButton
+            color="ghost"
+            type="button"
+            onClick={() => setBuscando(true)}
+            className="w-full min-h-toque justify-center text-sm3 sunmi-text-accent"
+          >
+            {candidatos.length > 0 ? "Buscar otro…" : "Buscar"}
+          </SunmiButton>
+        </>
+      )}
+
+      {error && <span className="text-sm3 sunmi-text-danger">{error}</span>}
+
+      <SunmiButton
+        color="slate"
+        type="button"
+        onClick={onCerrar}
+        className="w-full min-h-botonFoto justify-center text-sm3"
+      >
+        Cancelar
+      </SunmiButton>
+    </div>
+  );
+}
+
 export default function HojaCorregirLinea({
   fila,
   abierta,
   onCerrar,
   onGuardar,
   onAceptarPrecio,
+  /** Vincula la línea a un producto. Devuelve `{ ok, error? }`. */
+  onVincular,
+  /** Devuelve la línea a pendiente. Solo se ofrece si ya está revisada. */
+  onDesmarcar,
+  revisada = false,
   guardando = false,
 }) {
   const cambio = precioCambio(fila);
@@ -179,6 +270,18 @@ export default function HojaCorregirLinea({
 
   if (!fila) return null;
 
+  // ── SIN PRODUCTO NO HAY NADA QUE DECIDIR ───────────────────────────────
+  //
+  // La tarjeta mandaba a Corregir para elegir el producto y adentro no había
+  // ningún buscador: cantidad y motivo sobre una línea de la que no se sabe
+  // qué es. Once de las quince líneas de la planilla de Mauro estaban así, o
+  // sea inutilizables.
+  //
+  // Con la línea sin vincular la hoja arranca —y termina— por elegir el
+  // producto. No se pide cuánto entró de algo que todavía no se sabe qué es:
+  // preguntarlo invita a contestar cualquier cosa para poder seguir.
+  const sinProducto = fila.productoLocalId == null;
+
   const guardar = async () => {
     setError("");
     if (cantidadDifiere && !motivo) {
@@ -217,6 +320,16 @@ export default function HojaCorregirLinea({
       destructivo
       espacioCuerpo="gap-hoja"
     >
+      {/* ── 0 · QUÉ PRODUCTO ES, CUANDO NO SE SABE ──────────────────────── */}
+      {sinProducto ? (
+        <ElegirProducto
+          fila={fila}
+          onVincular={onVincular}
+          onCerrar={onCerrar}
+          guardando={guardando}
+        />
+      ) : (
+      <>
       {/* ── 1 · CUÁNTO ENTRÓ ─────────────────────────────────────────────── */}
       <div className="flex flex-col gap-renglon">
         <span className="text-sm3 font-medium sunmi-text-strong">Cuánto entró</span>
@@ -311,6 +424,23 @@ export default function HojaCorregirLinea({
 
       {error && <span className="text-sm3 sunmi-text-danger">{error}</span>}
 
+      {/* ── DESMARCAR: SE PUEDE VOLVER ATRÁS ────────────────────────────
+          Una línea marcada por error quedaba marcada para siempre. Es el mismo
+          botón y el mismo lugar que en la ficha de recepción de una
+          transferencia: devuelve la línea a pendiente y nada más. Solo se
+          ofrece si está marcada — sobre una pendiente no tendría qué deshacer. */}
+      {revisada && (
+        <SunmiButton
+          color="slate"
+          type="button"
+          disabled={guardando}
+          onClick={() => onDesmarcar?.(fila)}
+          className="w-full min-h-toque justify-center text-sm3"
+        >
+          Desmarcar
+        </SunmiButton>
+      )}
+
       <div className="flex gap-renglon">
         <SunmiButton
           color="slate"
@@ -330,6 +460,8 @@ export default function HojaCorregirLinea({
           {guardando ? "Guardando…" : "Guardar"}
         </SunmiButton>
       </div>
+      </>
+      )}
     </SunmiModalLayout>
   );
 }

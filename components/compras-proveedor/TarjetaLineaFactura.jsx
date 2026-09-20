@@ -103,6 +103,14 @@ export default function TarjetaLineaFactura({
   if (resuelta) {
     return (
       <SunmiCard className="p-2" data-linea-factura={fila?.producto || fila?.lineaId}>
+        {/* Tocarla la vuelve a abrir, que es de donde sale "Desmarcar". Mismo
+            gesto que la tarjeta colapsada de la recepción de una transferencia:
+            la lista queda atrás y cerrar es un gesto, no una decisión. */}
+        <SunmiLinkButton
+          onClick={() => onCorregir?.(fila)}
+          aria-label={`Ver ${fila?.producto || "esta línea"}`}
+          className="block w-full text-left no-underline"
+        >
         <div className="flex items-center gap-2">
           <Check size={16} aria-hidden="true" className="shrink-0 sunmi-text-success" />
           <span className="min-w-0 flex-auto truncate text-sm2 sunmi-text-strong text-left">
@@ -112,6 +120,7 @@ export default function TarjetaLineaFactura({
             {fmtCant(cantidad)} · {formatearMoneda(fila?.subtotal ?? 0)}
           </span>
         </div>
+        </SunmiLinkButton>
       </SunmiCard>
     );
   }

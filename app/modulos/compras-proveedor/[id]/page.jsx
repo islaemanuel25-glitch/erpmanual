@@ -304,7 +304,7 @@ export default function DetallePedidoProveedorPage({ params }) {
     return () => {
       vigente = false;
     };
-  }, [pedido?.id, pedido?.estado, hayComprobantes]);
+  }, [pedido?.id, pedido?.estado, hayComprobantes, recargarConciliacion]);
 
   // ── LO QUE LA HOJA GUARDA ───────────────────────────────────────────────
   //
@@ -321,6 +321,9 @@ export default function DetallePedidoProveedorPage({ params }) {
   // y darlo por controlado es poner el tilde verde sobre un renglón que nadie
   // miró. Se llena con el toque —"✓ Coincide"— o guardando la hoja.
   const [revisadas, setRevisadas] = useState({});
+  // Se incrementa cuando algo cambió del lado del servidor —vincular, aceptar
+  // un precio— y hay que volver a pedir la conciliación.
+  const [recargarConciliacion, setRecargarConciliacion] = useState(0);
 
   // El caso feliz en un toque: lo que la factura dice es lo que llegó. Mismo
   // gesto que "✓ Coincide" en la recepción de una transferencia.
@@ -355,6 +358,47 @@ export default function DetallePedidoProveedorPage({ params }) {
 
   // El precio SÍ se escribe en el momento: es una decisión propia y la ruta ya
   // existe y ya valida todo lo que hay que validar.
+  // Volver una línea a pendiente. El mismo gesto que "Desmarcar" en la ficha
+  // de recepción de una transferencia: devuelve la línea y nada más.
+  const desmarcarLinea = useCallback((fila) => {
+    const id = fila?.pedidoDetalleId;
+    if (!id) return;
+    setRevisadas((prev) => {
+      const n = { ...prev };
+      delete n[id];
+      return n;
+    });
+    setLineaACorregir(null);
+  }, []);
+
+  // ── VINCULAR: LA LÍNEA PASA A SABER QUÉ PRODUCTO ES ────────────────────
+  //
+  // La ruta resuelve sola a qué línea del pedido corresponde, así que después
+  // de esto la línea queda con su `pedidoDetalleId` y recién ahí se le puede
+  // aceptar el precio. Se vuelve a pedir la conciliación porque cambian el
+  // vínculo, la comparación y el análisis de precio de esa fila.
+  const vincularLinea = useCallback(async (fila, productoBaseId) => {
+    try {
+      const r = await fetch("/api/compras-proveedor/comprobantes/vincular", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lineaId: fila?.lineaId,
+          productoBaseId,
+          codigoProveedor: fila?.codigoProveedor ?? null,
+        }),
+      });
+      const d = await r.json().catch(() => null);
+      if (!d?.ok) return { ok: false, error: d?.queHacer || d?.error || "No se pudo vincular." };
+      setRecargarConciliacion((n) => n + 1);
+      setLineaACorregir(null);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e?.message || "No se pudo vincular." };
+    }
+  }, []);
+
   const aceptarPrecioDeLinea = useCallback(async (fila) => {
     try {
       const r = await fetch("/api/compras-proveedor/comprobantes/aceptar-precio", {
@@ -367,7 +411,7 @@ export default function DetallePedidoProveedorPage({ params }) {
       if (!d?.ok) return { ok: false, error: d?.queHacer || d?.error || "No se pudo aceptar." };
       // Se vuelve a pedir la conciliación: el precio cambió y la comparación de
       // todas las filas de ese producto ya no es la misma.
-      setHayComprobantes((n) => n);
+      setRecargarConciliacion((n) => n + 1);
       return { ok: true };
     } catch (e) {
       return { ok: false, error: e?.message || "No se pudo aceptar." };
@@ -864,6 +908,9 @@ export default function DetallePedidoProveedorPage({ params }) {
               onCerrar={() => setLineaACorregir(null)}
               onAceptarPrecio={aceptarPrecioDeLinea}
               onGuardar={guardarCorreccion}
+              onVincular={vincularLinea}
+              onDesmarcar={desmarcarLinea}
+              revisada={!!revisadas[lineaACorregir?.pedidoDetalleId]}
             />
           </>
         )}
