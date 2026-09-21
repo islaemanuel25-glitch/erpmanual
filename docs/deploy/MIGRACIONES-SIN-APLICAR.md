@@ -40,6 +40,69 @@ saber cuál de los dos números quedó viejo.
 
 ---
 
+## 2026-09-21 — `401774ff`, la pantalla deja de decir que no hay papel: CERO migraciones
+
+Producción pasó de `037ac9158dad243d23a6ae0e43a92938de7164e0` a
+`401774ffa7f85c28b0945cc3800b412cc97f5e72`, con el commit de documentación del
+corte anterior en el medio. Sin migraciones: 22 en el árbol y 22 informadas por
+el contenedor descartable, clasificador en 0 archivos a mirar, `migrate status`
+con "Database schema is up to date!".
+
+- Los cinco valores coinciden en `401774ff…`; **arriba a los 2 segundos**; 0
+  reinicios; logs sin `error`, `fatal` ni `panic`; `/login` en 200; árbol del
+  VPS limpio; `erpazul_db` **no** recreado —cuatro semanas arriba, `healthy`—.
+- Imagen validada contra el registry: `linux/amd64`, digest
+  `sha256:1dbfdd217e824d368c86218e55fe25f8bfba33c21d7cf3c60788989ecbdd179b`,
+  label de revisión con el SHA completo.
+- Rollback registrado antes de tocar `APP_IMAGE`: RepoTag
+  `ghcr.io/islaemanuel25-glitch/erpmanual:037ac9158dad243d23a6ae0e43a92938de7164e0`,
+  image ID `sha256:2546ed89e54e0c17ca696b0a39c5ca58a2b503980f87ee25e9e32aeb90108b3a`.
+  No hizo falta usarla.
+- Backup validado con los cuatro chequeos: `pre-401774ff_20260921_012711.sql.gz`,
+  72 tablas. La auditoría de costos fuera de rango volvió a dar **208 / 162 sin
+  elegir**, los mismos números de hace una hora. Bitácora de autorizaciones
+  inexistente: la guardia no tuvo que ceder.
+
+### QUÉ SE ESTABA ARREGLANDO, PORQUE EL DESPLIEGUE ANTERIOR LO CAUSÓ
+
+`037ac915` dejó la pantalla de un pedido RECIBIDO afirmando "este pedido se
+cerró sin ningún papel del proveedor" sobre el pedido 232, que tiene el
+comprobante 5 leído con 15 renglones. Dos criterios para la misma pregunta: el
+servidor busca los comprobantes en la base, y la pantalla esperaba el aviso de un
+panel que en esa pantalla no se monta.
+
+**Nada de lo que corre en un despliegue podía verlo**, y conviene tenerlo
+presente antes de confiar en la lista de controles: la suite eran funciones
+puras, el build compiló, el marcador probó que el texto VIAJÓ —no que se diga en
+el momento correcto— y `sonda-consola` mira si la pantalla explota, no qué dice.
+La pantalla cargaba perfecto y mentía perfecto.
+
+### El marcador, con su control — Y LA TRAMPA DEL ACENTO, TERCERA VEZ
+
+`todavía no se leyó` y `No se pudo leer el papel`, con `grep -rlF` adentro de
+cada imagen: **0 archivos en la vieja y 2 en la nueva**, cada uno.
+
+El control salió mal la primera vez y vale anotarlo: `Te facturó` dio **0 en las
+dos**, que leído rápido dice "la búsqueda no anda". Anda: ese texto vive en un
+**template literal** —lleva el nombre del proveedor interpolado— y ahí el build
+escapa lo que no es ASCII, así que `facturó` quedó escrito `factur\xf3`. Con el
+trozo ASCII —`Te factur`— da **2 en las dos**, y con `A tus precios vale`
+también. Es la misma trampa que ya está anotada más abajo, y sigue apareciendo.
+
+### Las sondas
+
+`sonda-pedido-recibido.mjs` es nueva y es la que faltaba: le pregunta lo mismo al
+servidor y a la pantalla y exige que no se contradigan. **Contra producción con
+el defecto todavía arriba dio ROJO con seis afirmaciones**, nombrando la
+contradicción —"el servidor encontró 1 comprobante(s) y la pantalla dice que no
+hay ninguno"—; después de recrear, **VERDE las ocho**. Esa corrida roja es su
+contraprueba y no hubo que fabricarla.
+
+`sonda-consola` OK sobre la 232 y la bandeja. Sonda de cascada **verde antes y
+después**, con las cuatro mediciones en su valor.
+
+---
+
 ## 2026-09-21 — `037ac915`, la pantalla de un pedido recibido: CERO migraciones
 
 Producción pasó de `0291c3a7abe92757f30f6b2f915ac31ca1adfb91` a
