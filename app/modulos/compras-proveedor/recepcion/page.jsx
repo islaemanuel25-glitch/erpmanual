@@ -68,6 +68,36 @@ export default function RecepcionMercaderiaPage() {
   const { perfil } = useUser();
   const { loading: loadingCtx, needsContexto } = useContextoActivo();
 
+  // ── LLEGÓ ALGO SIN PEDIDO: EL PASO DE ELEGIR PROVEEDOR ─────────────────
+  //
+  // Vive ACÁ ADENTRO y no en una ruta nueva, por dos motivos y el segundo es el
+  // que manda:
+  //
+  // 1. La pantalla de elegir proveedor ya existe —`ElegirProveedor`, la misma
+  //    que usa Nuevo pedido— y lo único que necesita es quién le pasa la lista.
+  //
+  // 2. LO QUE YA NOS PASÓ. El enlace "Crear borrador desde foto" se sacó de
+  //    Nuevo pedido porque navegar ahí PERDÍA EL PEDIDO QUE SE ESTABA ARMANDO:
+  //    los ítems viven en el estado de React y esa navegación no pasaba por el
+  //    guardado. Entrar por acá no puede repetirlo: esta bandeja no tiene nada
+  //    a medias —es una lista— y no toca ni el borrador de `/nueva` ni la
+  //    recepción en curso, que son las dos cosas que sí viven en
+  //    `sessionStorage`.
+  const [eligiendoProveedor, setEligiendoProveedor] = useState(false);
+  const [proveedores, setProveedores] = useState([]);
+  const [filtroProveedor, setFiltroProveedor] = useState("");
+  const [creando, setCreando] = useState(false);
+  const [errorCrear, setErrorCrear] = useState("");
+
+  // ── VA ANTES DEL HOOK QUE LA NOMBRA, Y NO ES ORDEN ────────────────────
+  //
+  // `useAccionDePagina` lleva `eligiendoProveedor` en su arreglo de
+  // dependencias, que se evalúa en CADA render. Declarada después, un `const`
+  // no existe todavía: la pantalla tiraba "Cannot access 'k' before
+  // initialization" y se veía como "Application error", con el build limpio y
+  // la suite en verde. Es el MISMO defecto que ya había pasado en
+  // `[id]/page.jsx`, anotado ahí arriba de `recargarConciliacion`.
+
   // El Volver va al slot del shell, que es donde viven los de las otras 32
   // pantallas. Antes esta pantalla no tenía ninguno.
   //
@@ -94,26 +124,6 @@ export default function RecepcionMercaderiaPage() {
   const [desplazamiento, setDesplazamiento] = useState(0);
   const [busqueda, setBusqueda] = useState("");
 
-  // ── LLEGÓ ALGO SIN PEDIDO: EL PASO DE ELEGIR PROVEEDOR ─────────────────
-  //
-  // Vive ACÁ ADENTRO y no en una ruta nueva, por dos motivos y el segundo es el
-  // que manda:
-  //
-  // 1. La pantalla de elegir proveedor ya existe —`ElegirProveedor`, la misma
-  //    que usa Nuevo pedido— y lo único que necesita es quién le pasa la lista.
-  //
-  // 2. LO QUE YA NOS PASÓ. El enlace "Crear borrador desde foto" se sacó de
-  //    Nuevo pedido porque navegar ahí PERDÍA EL PEDIDO QUE SE ESTABA ARMANDO:
-  //    los ítems viven en el estado de React y esa navegación no pasaba por el
-  //    guardado. Entrar por acá no puede repetirlo: esta bandeja no tiene nada
-  //    a medias —es una lista— y no toca ni el borrador de `/nueva` ni la
-  //    recepción en curso, que son las dos cosas que sí viven en
-  //    `sessionStorage`.
-  const [eligiendoProveedor, setEligiendoProveedor] = useState(false);
-  const [proveedores, setProveedores] = useState([]);
-  const [filtroProveedor, setFiltroProveedor] = useState("");
-  const [creando, setCreando] = useState(false);
-  const [errorCrear, setErrorCrear] = useState("");
 
   const periodo = useMemo(
     () =>
