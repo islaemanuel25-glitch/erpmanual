@@ -84,6 +84,16 @@ export async function GET(req, { params }) {
                 nombre: true,
                 modoCompraProveedor: true,
                 factor_pack: true,
+                // ── PARA PONER LOS DOS PRECIOS EN LA MISMA UNIDAD ─────────
+                //
+                // El costo del catálogo de un producto en kilos está POR KILO,
+                // y el depósito puede contarlo por PIEZA. Sin estos campos la
+                // tarjeta comparaba $8.166,54 la bolsa contra $3.800 el kilo y
+                // mostraba +114,9 % sobre un renglón donde el depósito gana.
+                unidad_medida: true,
+                modoVentaDeposito: true,
+                pesoEsFijo: true,
+                pesoReferenciaKg: true,
               },
             },
           },

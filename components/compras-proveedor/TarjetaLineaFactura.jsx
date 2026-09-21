@@ -43,20 +43,20 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import { formatearMoneda } from "@/lib/moneda";
+import { renglonesDeLaTarjeta } from "@/lib/compras-proveedor/tarjetaDeRecepcion";
 import {
   ESTADO_LINEA,
   cantidadEnEscalaDelPedido,
   cantidadFueConvertida,
   diferenciaDeCantidad,
   estadoDeLinea,
-  hayQueDecidirElPrecio,
-  porcentajeDelPrecio,
-  precioCambio,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
-import {
-  DECISION_DE_PRECIO,
-  decisionVigente,
-} from "@/lib/compras-proveedor/decisionDePrecio";
+// ── LA DECISIÓN DE PRECIO YA NO SE MIRA DESDE LA TARJETA ──────────────────
+//
+// Se importaban `decisionVigente`, `hayQueDecidirElPrecio` y `precioCambio`
+// para elegir entre el bloque tachado y el de "Ya decidido", que eran los dos
+// que se fueron. La decisión no cambió de reglas: sigue viviendo en la hoja de
+// Corregir, que es la que la toma y la guarda.
 
 /** Las mismas dos clases de botón que usa la tarjeta de transferencias. */
 const CLASE_COINCIDE = "sunmi-btn-accent-outline";
@@ -108,11 +108,9 @@ export default function TarjetaLineaFactura({
   sinPedidoPrevio = false,
 }) {
   const estado = estadoDeLinea(fila);
-  // Dos preguntas distintas: si el precio cambió, y si hay que decidirlo. Con
-  // la decisión ya tomada sobre estos dos números, lo segundo es que no.
-  const decidido = decisionVigente(fila);
-  const cambio = hayQueDecidirElPrecio(fila);
-  const porcentaje = porcentajeDelPrecio(fila);
+  // Los tres renglones —Factura, Papel y ERP— ya resueltos, con los dos
+  // precios en la MISMA unidad. El módulo es puro y tiene sus candados.
+  const renglones = renglonesDeLaTarjeta(fila);
   const faltan = diferenciaDeCantidad(fila);
   const esNoPedida = estado === ESTADO_LINEA.NO_PEDIDO;
   const sinVincular = estado === ESTADO_LINEA.SIN_VINCULAR;
@@ -205,20 +203,19 @@ export default function TarjetaLineaFactura({
             </p>
           ) : (
             <>
-              <p className="flex items-baseline gap-x-2 flex-wrap break-words">
-                <span className="text-xs sunmi-text-muted shrink-0">Pediste</span>
-                <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-strong">
-                  {fmtCant(fila?.cantidadPedida)}
-                </span>
-              </p>
+              {/* ── LÍNEA 1 · FACTURA ────────────────────────────────────
+                  Cuánto vino, en la escala del PEDIDO. Misma forma que el
+                  "Enviado" de la tarjeta de transferencias: rótulo chico en
+                  gris y el número en acento, que es el dato que se cotejа
+                  contra el papel. */}
               <p className="flex items-baseline gap-x-2 flex-wrap break-words">
                 <span className="text-xs sunmi-text-muted shrink-0">Factura</span>
                 <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-accent">
-                  {fmtCant(cantidad)}
+                  {renglones.cantidad ?? "—"}
                 </span>
                 {/* De dónde salió ese número, cuando no es el del papel. Sin
-                    esto, quien coteja renglón por renglón ve 8 donde el papel
-                    dice 80 y no sabe si la pantalla se equivocó. */}
+                    esto, quien coteja ve 8 donde el papel dice 80 y no sabe si
+                    la pantalla se equivocó. */}
                 {convertida && (
                   <span className="text-xs tabular-nums sunmi-text-muted shrink-0">
                     el papel dice {fmtCant(fila?.cantidad)} u
@@ -230,69 +227,74 @@ export default function TarjetaLineaFactura({
                   </span>
                 )}
               </p>
+
+              {/* ── LÍNEA 2 · PAPEL ──────────────────────────────────────
+                  Lo que el proveedor cobra por UNA unidad de compra, con el
+                  sufijo que la hace inequívoca. El sufijo se deriva, no se
+                  escribe: es el mismo "/ pack" de la tarjeta de transferencias
+                  y por el mismo motivo — un importe sin unidad al lado de otro
+                  importe no se puede comparar. */}
+              {renglones.papel && (
+                <p className="flex items-baseline gap-x-2 flex-wrap break-words">
+                  <span className="text-xs sunmi-text-muted shrink-0">Papel</span>
+                  <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-strong">
+                    {formatearMoneda(renglones.papel.importe)}
+                    <span className="text-xs font-normal sunmi-text-muted">
+                      {" "}/ {renglones.papel.unidad}
+                    </span>
+                  </span>
+                </p>
+              )}
+
+              {/* ── LÍNEA 3 · ERP, EN LA MISMA UNIDAD ────────────────────
+                  El precio interno y cuánto gana el depósito sobre él. Verde
+                  con "+" cuando el ERP es mayor, naranja con "−" cuando el
+                  proveedor cobra más. El signo y el color dicen lo mismo a
+                  propósito: un color solo no se lee.
+
+                  No se dibuja si no hay con qué comparar —renglón sin vincular,
+                  producto sin costo—. Una comparación contra nada es peor que
+                  ninguna. */}
+              {renglones.erp && (
+                <p className="flex items-baseline gap-x-2 flex-wrap break-words">
+                  <span className="text-xs sunmi-text-muted shrink-0">ERP</span>
+                  <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-strong">
+                    {formatearMoneda(renglones.erp.importe)}
+                    <span className="text-xs font-normal sunmi-text-muted">
+                      {" "}/ {renglones.erp.unidad}
+                    </span>
+                  </span>
+                  {renglones.erp.texto && (
+                    <span
+                      className={`text-sm2 font-semibold tabular-nums shrink-0 ${
+                        renglones.erp.gana ? "sunmi-text-success" : "sunmi-text-warning"
+                      }`}
+                    >
+                      {renglones.erp.texto}
+                    </span>
+                  )}
+                </p>
+              )}
             </>
           )}
         </div>
 
-        {/* ── EL PRECIO, CON LA FORMA DEL IMPORTE CORREGIDO ────────────────
-            El anterior arriba, chico y tachado; el nuevo abajo, grande y en
-            warning. Es la misma composición con la que esa tarjeta muestra un
-            importe que cambió. Solo aparece cuando el precio cambió: si no, el
-            número no dice nada que la línea no diga ya. */}
-        {cambio && (
-          <span className="shrink-0 whitespace-nowrap text-right">
-            <span className="block text-xs2 tabular-nums line-through sunmi-text-muted">
-              {formatearMoneda(fila?.costoCatalogo)}
-            </span>
-            <span className="block text-sm2 tabular-nums font-semibold sunmi-text-warning">
-              {formatearMoneda(fila?.costoFactura)}
-              {porcentaje != null
-                ? ` (${porcentaje > 0 ? "+" : "−"}${Math.abs(porcentaje)
-                    .toFixed(1)
-                    .replace(".", ",")} %)`
-                : ""}
-            </span>
-          </span>
-        )}
+        {/* ── "✓ COINCIDE" ARRIBA A LA DERECHA ────────────────────────────
+            La misma esquina fija que la tarjeta de transferencias: el caso
+            feliz en un toque, sin abrir nada. Se ofrece solo cuando el cálculo
+            no encontró diferencias — ofrecerlo sobre algo que no coincide
+            invita a cerrar sin mirar, que es justo lo que tiene que evitar.
 
-        {/* ── LO QUE YA SE DECIDIÓ, EN UNA LÍNEA ──────────────────────────
-            Mismo lugar y misma forma que el precio que cambió, porque es el
-            mismo dato contestado: arriba qué se decidió, abajo con qué número
-            queda. Sin tachado y sin warning — no hay nada que resolver. Se
-            cambia desde Corregir, que es el mismo camino de siempre. */}
-        {!cambio && decidido && precioCambio(fila) && (
-          <span className="shrink-0 whitespace-nowrap text-right">
-            <span className="block text-xs2 sunmi-text-muted">Ya decidido</span>
-            <span className="block text-sm2 tabular-nums font-semibold sunmi-text-strong">
-              {formatearMoneda(
-                decidido.decision === DECISION_DE_PRECIO.DEJA_EL_MIO
-                  ? fila?.costoCatalogo
-                  : fila?.costoFactura
-              )}
-            </span>
-          </span>
-        )}
-      </div>
+            ── ACÁ ESTABAN EL TACHADO Y "YA DECIDIDO", Y SE FUERON ────────
+            Eran dos bloques de precio sin rótulo, en la misma esquina, que se
+            turnaban. El tachado ponía el costo del ERP arriba y el del papel
+            abajo en warning; "Ya decidido" ponía el número que quedó. Los dos
+            decían en gris y chico lo que ahora dicen las líneas Papel y ERP con
+            su nombre al lado, y el tachado además afirmaba que algo se
+            reemplazó cuando la decisión todavía no se tomó.
 
-      <SunmiSeparator />
-
-      <div className="flex items-center justify-between gap-3">
-        <SunmiButton
-          type="button"
-          onClick={() => onCorregir?.(fila)}
-          disabled={guardando}
-          className={`shrink-0 ${CLASE_CORREGIR}`}
-        >
-          {TEXTO_CORREGIR}
-        </SunmiButton>
-
-        {/* El caso feliz en un toque, sin abrir nada: lo que la factura dice es
-            lo que llegó. Misma idea y misma clase que allá. */}
-        {/* ── "✓ COINCIDE" SE OFRECE, NO SE APLICA ──────────────────────
-            Se ofrece cuando el cálculo no encontró diferencias: ahí el gesto es
-            de un toque. Con una diferencia a la vista, el camino es Corregir —
-            ofrecer "coincide" sobre algo que no coincide invita a cerrar sin
-            mirar, que es justo lo que este botón tiene que evitar. */}
+            La decisión de precio no se movió: sigue viviendo en la hoja de
+            Corregir, con los mismos dos caminos. */}
         {!esNoPedida && !sinVincular && estado === ESTADO_LINEA.COINCIDE && (
           <SunmiLinkButton
             onClick={() => onCoincide?.(fila)}
@@ -303,6 +305,23 @@ export default function TarjetaLineaFactura({
             {TEXTO_COINCIDE}
           </SunmiLinkButton>
         )}
+      </div>
+
+      <SunmiSeparator />
+
+      {/* ── EL PIE: LA ACCIÓN A LA IZQUIERDA, EL TOTAL A LA DERECHA ──────
+          Las dos esquinas fijas de la tarjeta de transferencias, copiadas. Sin
+          rótulo al lado del importe: en una tarjeta de un producto, el número
+          grande de abajo a la derecha ya es el total de ese producto. */}
+      <div className="flex items-center justify-between gap-3">
+        <SunmiButton
+          type="button"
+          onClick={() => onCorregir?.(fila)}
+          disabled={guardando}
+          className={`shrink-0 ${CLASE_CORREGIR}`}
+        >
+          {TEXTO_CORREGIR}
+        </SunmiButton>
 
         <span className="shrink-0 whitespace-nowrap tabular-nums text-lg2 font-semibold sunmi-text-strong">
           {formatearMoneda(fila?.subtotal ?? 0)}
