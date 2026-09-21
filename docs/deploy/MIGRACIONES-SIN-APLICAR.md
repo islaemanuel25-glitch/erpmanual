@@ -54,6 +54,57 @@ saber cuál de los dos números quedó viejo.
 
 ---
 
+## 2026-09-21 — `032dcd42`, el pedido nacido de factura y sus cuatro mentiras: CERO migraciones
+
+Producción pasó de `672c6fbc611b063ea65596b772375f888af61fd4` a
+`032dcd42a75ba0909f7437174087c9a91de685f6`. Sin migraciones: 23 y 23,
+clasificador en 0 archivos.
+
+- Los cinco valores coinciden; **arriba a los 2 segundos**; 0 reinicios; logs
+  limpios; `/login` en 200; árbol del VPS limpio; `erpazul_db` no recreado.
+- Rollback: RepoTag
+  `ghcr.io/islaemanuel25-glitch/erpmanual:672c6fbc611b063ea65596b772375f888af61fd4`,
+  image ID `sha256:018fa2e917883990b7258eac1d85529b73972830e528e7aac12d393a3d35791b`.
+- Backup validado con los cuatro chequeos, 72 tablas.
+- `sonda-consola` OK sobre la bandeja y el 240, antes y después.
+
+### LO QUE ENSEÑÓ EL PRIMER USO REAL
+
+El 240 lo cargó Emanuel con un proveedor real y salió mal de cuatro maneras. Las
+cuatro estaban a la vista de cualquiera que abriera la pantalla, y **ninguna la
+podía ver la prueba del día anterior**, que manejó el circuito por API: crear,
+subir y leer con `curl`. Esa prueba nunca dibujó una pantalla, así que no podía
+ver que nada leía solo después de subir, ni en qué rama caía la pantalla con
+cero líneas, ni qué decía la tarjeta de arriba, ni qué cartel salía cuando la
+lectura falla — yo leía el JSON crudo, no el cartel.
+
+**La regla que queda:** un camino nuevo no está probado hasta que alguien lo
+recorre DESDE EL BOTÓN. Medir la API prueba el motor; el defecto vive entre la
+API y la pantalla, que es donde este módulo ya lo encontró cinco veces.
+
+### EL CARTEL QUE MENTÍA, Y POR QUÉ IMPORTA MÁS QUE LOS OTROS TRES
+
+"La aplicación no está respondiendo. **No se subió nada.**" — con la foto subida
+y listada dos centímetros más abajo, en la misma pantalla. El texto es el del
+502 de la SUBIDA, usado para un 502 de la LECTURA porque el panel le pide el
+mensaje al mismo ayudante para las dos cosas.
+
+Es la misma familia que "Error interno": un mensaje que **afirma sobre lo que se
+guardó o no se guardó**, que es justo lo que la persona no puede comprobar. Y
+llevó a lo demás: el único botón que quedaba para seguir era "Llegó sin
+factura", que es la puerta a la pantalla vieja.
+
+### El lector estuvo caído todo el día
+
+Seis intentos sobre el comprobante del 240 —10:25, 10:25, 10:30, 10:39, 10:44 y
+los de después—, todos `SERVICIO_CAIDO` salvo uno `TARDO_DEMASIADO`. Es el
+segundo día seguido. El respaldo **está configurado** —`COMPROBANTE_LECTOR_RESPALDO`
+existe en el contenedor— pero el pase automático sigue apagado
+(`IA_RESPALDO_AUTOMATICO` no está puesta), que es la decisión del 2026-08-27 y
+por eso no se tocó: prenderla gasta cuota del respaldo y es de Emanuel.
+
+---
+
 ## 2026-09-21 — `943d9bff` y `672c6fbc`, llegó algo sin pedido: UNA migración, APLICADA
 
 Dos cortes seguidos, y el segundo arregla lo que rompió el primero. Va entero
