@@ -30,6 +30,22 @@ import { textoDeFallo } from "@/components/compras-proveedor/ExplicacionDelPapel
 import { comoLoEntendio } from "@/lib/compras-proveedor/comprobante/pruebaDeExplicacion";
 
 export const TITULO = "Este papel no cierra";
+/**
+ * ── CUANDO LA LECTURA ES VIEJA, SE DICE — NO SE ACUSA A NADIE ──────────────
+ *
+ * Una lectura anterior a la explicación del proveedor no trae el descuento de
+ * cada renglón. El control por renglón no juzga sin ese dato —para no acusar a
+ * un renglón bueno, que es lo que le pasó al Butler del #242— así que el bloque
+ * no tiene nada que señalar y quedaría mudo.
+ *
+ * Decirlo es mejor que quedarse callado: la acción que resuelve esto es volver
+ * a leer, y el botón está a dos centímetros, arriba, en la lista de
+ * comprobantes.
+ */
+export const LECTURA_VIEJA =
+  "Esta lectura es anterior a la explicación del proveedor: no trae el descuento de cada " +
+  "producto, así que no se puede comprobar renglón por renglón. Tocá «Leer de nuevo» en el " +
+  "comprobante de arriba.";
 export const BAJADA =
   "Hasta que cierre no se propone ningún costo. Mirá la foto y decí qué dice el papel.";
 
@@ -86,6 +102,15 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
 
   const hayCambios = Object.keys(correcciones).length > 0;
 
+  // ── ¿ESTA LECTURA TRAE LO QUE EL CONTROL NECESITA? ─────────────────────
+  //
+  // Si NINGÚN renglón tiene descuento leído, la lectura es de antes de que se
+  // pidiera esa columna. No es que el papel no tenga descuentos —eso vendría
+  // como cero— es que no se preguntó.
+  const lecturaSinDescuentos =
+    Boolean(lectura?.lineas?.length) &&
+    lectura.lineas.every((l) => l?.bonificacion === null || l?.bonificacion === undefined);
+
   async function guardar() {
     setGuardando(true);
     setMensaje(null);
@@ -127,6 +152,12 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
         <span className="block font-semibold sunmi-text-strong break-words">{TITULO}</span>
         <p className="text-sm2 sunmi-text-muted break-words">{BAJADA}</p>
       </SunmiCard>
+
+      {lecturaSinDescuentos && (
+        <SunmiCard className="p-3 sunmi-state-warning">
+          <p className="text-sm3 sunmi-text-strong break-words">{LECTURA_VIEJA}</p>
+        </SunmiCard>
+      )}
 
       <AsiLoEntendio
         resultado={resultado}

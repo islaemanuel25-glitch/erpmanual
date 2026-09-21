@@ -383,11 +383,20 @@ export default function PanelComprobantes({
       if (!d.ok) {
         setMensaje({ tipo: "error", texto: d.error || d.queHacer });
       } else {
+        // ── ACÁ SALÍA EL CARTEL NARANJA LARGO ───────────────────────────
+        //
+        // Mostraba `d.porque`, que nombraba el renglón por su número —"la 5"—,
+        // escribía los importes en formato de máquina y rehacía una cuenta que
+        // no es la del control. Todo eso lo dice mejor el bloque de arriba de la
+        // conciliación, con el nombre del producto, los dos números y la foto.
+        //
+        // Acá queda el resultado en una línea, que es lo que hace falta saber
+        // justo después de tocar «Leer».
         setMensaje({
           tipo: d.cierra ? "ok" : "aviso",
           texto: d.cierra
-            ? `Leído y verificado: ${d.lineas} líneas.`
-            : d.porque,
+            ? `Leído y verificado: ${d.lineas} ${d.lineas === 1 ? "producto" : "productos"}.`
+            : "Leído, pero la cuenta no cierra. Está señalado abajo, con la foto al lado.",
           detalles: d.usoRespaldo ? ["Lo leyó el lector de respaldo."] : [],
         });
       }

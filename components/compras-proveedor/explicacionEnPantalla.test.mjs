@@ -36,6 +36,7 @@ import ExplicacionDelPapel, {
   TEXTO_LEYENDO,
 } from "./ExplicacionDelPapel.jsx";
 import { TEXTO_LEER_DE_NUEVO } from "../comprobantes/PanelComprobantes.jsx";
+import { LECTURA_VIEJA } from "./CorregirComprobante.jsx";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -371,4 +372,35 @@ test("PROBAR NO ESPERA LA LECTURA: PIDE TURNO Y PREGUNTA", () => {
     "la ruta volvió a esperar la lectura adentro del pedido"
   );
   assert.match(ruta, /leyendo: true/);
+});
+
+// ── EL CARTEL NARANJA VIEJO NO SE DIBUJA EN NINGUNA PANTALLA ──────────────
+
+test("NINGUNA PANTALLA MUESTRA EL MOTIVO LARGO DEL VERIFICADOR", () => {
+  // Decía: "El precio por unidad no coincide con el subtotal impreso en la 5
+  // (30 × $2442.01 no da $46896.56)". Nombraba el renglón por su número,
+  // escribía los importes en formato de máquina y rehacía una cuenta que NO es
+  // la del control —la del control lleva kilos y descuento—. Todo eso lo dice
+  // mejor el bloque de arriba de la conciliación.
+  for (const pantalla of [PANEL, RECEPCION, CORRECCION, EXPLICACION, BLOQUE]) {
+    const c = codigoDe(pantalla);
+    assert.ok(!/texto: d\.porque/.test(c), `${pantalla} volvió a mostrar el motivo largo`);
+    assert.ok(!/\{d\.porque\}/.test(c), `${pantalla} volvió a dibujar el motivo largo`);
+  }
+  // Y lo que el panel dice ahora manda al bloque, sin números ni renglones.
+  const panel = codigoDe(PANEL);
+  assert.match(panel, /la cuenta no cierra\. Está señalado abajo/);
+});
+
+test("Y CUANDO LA LECTURA ES VIEJA, LO DICE EN CASTELLANO", () => {
+  // Una lectura anterior a la explicación no trae el descuento de cada renglón,
+  // así que el control no juzga nada y el bloque quedaría mudo. Decirlo es
+  // mejor: la acción que lo resuelve es «Leer de nuevo», que está arriba.
+  const c = codigoDe(CORRECCION);
+  assert.match(c, /lecturaSinDescuentos/);
+  assert.match(c, /l\?\.bonificacion === null \|\| l\?\.bonificacion === undefined/);
+  assert.match(LECTURA_VIEJA, /anterior a la explicación/);
+  assert.match(LECTURA_VIEJA, /Leer de nuevo/);
+  // No acusa a ningún producto: solo dice qué falta y qué tocar.
+  assert.ok(!/Da la cuenta/.test(LECTURA_VIEJA));
 });
