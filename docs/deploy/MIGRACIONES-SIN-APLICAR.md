@@ -61,6 +61,44 @@ saber cuál de los dos números quedó viejo.
 
 ---
 
+## 2026-09-21 — `d5837d50`, vincular busca en el universo del proveedor: CERO migraciones
+
+Producción pasó de `0e64c01eceb5f8b62db897958233e2821b27dd07` a
+`d5837d50997ea986e7e192c3236af5524f285fe6`. Sin migraciones: 24 y 24.
+
+- Los cinco valores coinciden; **arriba a los 2 segundos**; 0 reinicios; logs
+  limpios; `/login` en 200; árbol limpio; `erpazul_db` no recreado.
+- Rollback: RepoTag
+  `ghcr.io/islaemanuel25-glitch/erpmanual:0e64c01eceb5f8b62db897958233e2821b27dd07`,
+  image ID `sha256:d3c98a983a43095a887492db2045ddff573b99bb053a6cbb4d5bc874076c6726`.
+- Backup validado, 72 tablas. `sonda-consola` OK sobre la bandeja y el 242.
+
+### EL NÚMERO QUE LO EXPLICA
+
+El universo de Paty son **26 productos**; el catálogo, **2.711**. Buscando
+"manteca": el catálogo del proveedor devuelve **2** —sus dos Tremblay— y el
+catálogo entero **5**, con dos Serenisima de otro proveedor en el medio. Ésa es
+la distancia entre vincular bien y vincular mal, y un vínculo mal escribe un
+alias que se repite en cada factura que venga.
+
+### UN CANDADO VIEJO FRENÓ LA PRIMERA SOLUCIÓN, Y TENÍA RAZÓN
+
+Para que un producto traído del catálogo entero quede asociado al proveedor, lo
+primero que se escribió fue llenar `proveedor2_id` — la afirmación más fuerte y
+la que usa `productoDelProveedorWhere`. La suite lo frenó: **ninguna ruta de
+pedido escribe sobre `ProductoBase`, salvo recibir**, que es el candado que
+existe desde que los costos se filtraban al catálogo como efecto lateral de
+cargar un pedido.
+
+El mecanismo que se usó es **el alias**, y ya existía: `vincular` escribe
+`ProductoCodigoProveedor`, el catálogo del proveedor suma las bases con código
+vinculado activo, y la cascada las reconoce solas por `ALIAS_DESCRIPCION`. O sea
+que la próxima factura lo encuentra sin salir del universo. Queda escrito en el
+módulo POR QUÉ no se hizo de la otra forma, para que el próximo intento se
+encuentre con el motivo y no solo con el rojo.
+
+---
+
 ## 2026-09-21 — `0e64c01e`, el tope de 20 era del plan gratis: CERO migraciones
 
 Producción pasó de `fab17d6c7eb99349c1c56582c7e1cd4e82f9c7d0` a
