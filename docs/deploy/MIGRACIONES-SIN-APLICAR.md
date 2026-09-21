@@ -61,6 +61,49 @@ saber cuál de los dos números quedó viejo.
 
 ---
 
+## 2026-09-21 — `0e64c01e`, el tope de 20 era del plan gratis: CERO migraciones
+
+Producción pasó de `fab17d6c7eb99349c1c56582c7e1cd4e82f9c7d0` a
+`0e64c01eceb5f8b62db897958233e2821b27dd07`. Sin migraciones: 24 y 24.
+
+- Los cinco valores coinciden; **arriba a los 3 segundos**; 0 reinicios; logs
+  limpios; `/login` en 200; árbol limpio; `erpazul_db` no recreado.
+- Rollback: RepoTag
+  `ghcr.io/islaemanuel25-glitch/erpmanual:fab17d6c7eb99349c1c56582c7e1cd4e82f9c7d0`,
+  image ID `sha256:9f0a6c04ca8b2edf129ed36c2978f6abddc43cd807bdcfe532d5ae62bff7a37c`.
+- Backup validado con los cuatro chequeos, 72 tablas.
+- `sonda-consola` OK sobre la bandeja y el pedido 242.
+
+### EL QUE CORTABA ERA EL NUESTRO, Y SE MIDIÓ
+
+Emanuel pasó el proyecto a Nivel 1 prepago y el ERP seguía contestando "se agotó
+la cuota gratuita del día". **La llamada no llegaba a Google**: al tocar «Leer»
+la tabla de la bitácora quedó en las mismas 27 filas —antes y después— y, al
+mismo tiempo, la API contestaba **200** con la misma clave y el mismo modelo. El
+que cortaba era el contador propio, con el tope del plan gratuito adentro.
+
+### El tope no se sacó: cambió de dueño
+
+De 20 a **200 por día**, configurable por `IA_LIMITE_DIARIO`, y ahora es un tope
+de GASTO y no una copia de la regla de Google: con plan pago un bucle de
+lecturas no se frena solo, gasta plata. El número sale del uso real —el día más
+cargado de la semana llegó a 20— y doscientas son diez veces eso.
+
+### Tres textos que dejaron de afirmar lo que no saben
+
+El tope propio dice que es del sistema y para cuidar el gasto. El 429 de Google
+dejó de llamarse "gratuita" y viaja con lo que contestó el servicio. Y se agregó
+**SIN_SALDO** —"Se terminó el saldo de Gemini. Hay que cargar más en Google"—,
+que contesta **402** y no 429, porque no sobra demanda: falta plata.
+
+**La trampa, con candado:** el 429 del nivel gratuito dice "check your plan and
+billing details", así que un detector ingenuo de "billing" lo leería como falta
+de saldo. La marca `free_tier` gana primero. Y queda dicho que el cuerpo de "sin
+saldo" **no está medido** —habría que gastar el saldo para verlo—: el default es
+el conservador.
+
+---
+
 ## 2026-09-21 — `7c6c73b9` y `fab17d6c`, por qué no leía: UNA migración, APLICADA
 
 Dos cortes seguidos sobre lo mismo: que cada error del lector diga lo que es.
