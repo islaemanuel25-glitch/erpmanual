@@ -23,6 +23,10 @@ import { aliasAEscribir, resolverLineaDelPedido } from "@/lib/compras-proveedor/
 import { aplanarDetalles } from "@/lib/compras-proveedor/comprobante/analisisDeComprobante";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { sembrarPedidoDesdeFactura } from "@/lib/compras-proveedor/sembrarPedidoDesdeFactura";
+import {
+  textoDeLaAsociacion,
+  yaEsDelProveedor,
+} from "@/lib/compras-proveedor/comprobante/asociarAlProveedor";
 
 export async function POST(req) {
   try {
@@ -87,7 +91,20 @@ export async function POST(req) {
     // ubicación: el vínculo apunta a `productoLocalId`, que es por local.
     const productoLocal = await prisma.productoLocal.findFirst({
       where: { localId, baseId: productoBaseId, base: { grupoId } },
-      select: { id: true, base: { select: { id: true, nombre: true } } },
+      select: {
+        id: true,
+        base: {
+          select: {
+            id: true,
+            nombre: true,
+            // Las tres relaciones que DEFINEN el universo del proveedor. Hacen
+            // falta para saber si este producto ya es suyo o hay que asociarlo.
+            proveedor_id: true,
+            proveedor2_id: true,
+            proveedor3_id: true,
+          },
+        },
+      },
     });
     if (!productoLocal) {
       return NextResponse.json(
@@ -195,6 +212,32 @@ export async function POST(req) {
         },
       });
 
+      // ── QUÉ HACE QUE EL PRODUCTO APAREZCA LA PRÓXIMA VEZ ──────────────
+      //
+      // El buscador de la hoja ofrece por defecto el universo del proveedor y
+      // tiene una salida explícita al catálogo entero, para lo que el proveedor
+      // trae por primera vez. Lo que hace que ESE producto aparezca la próxima
+      // vez sin salir del universo es EL ALIAS que se escribe acá abajo: el
+      // catálogo del proveedor suma las bases con un código vinculado activo
+      // —`baseIdsVinculados` en `compras-proveedor/productos`— y la cascada lo
+      // reconoce sola por `ALIAS_DESCRIPCION`, que es su segundo escalón.
+      //
+      // ── Y POR QUÉ NO SE ESCRIBE LA RELACIÓN DEL PRODUCTO ──────────────
+      //
+      // Se intentó: llenar `proveedor2_id` sería la afirmación más fuerte —"a
+      // este proveedor se le compra esto"—. Lo frenó un candado que existe
+      // desde antes y tiene razón: NINGUNA ruta de pedido escribe sobre
+      // ProductoBase, salvo recibir. Los datos del producto se editan en editar
+      // producto y no como efecto lateral de otra cosa; así fue como los costos
+      // se filtraban al catálogo sin que nadie lo pidiera.
+      //
+      // El alias alcanza para lo que se pedía y no toca la ficha del producto.
+      // Si algún día hace falta la relación, es una decisión de Emanuel y va
+      // por editar producto, no por acá.
+      const asociacion = { accion: yaEsDelProveedor(productoLocal.base, linea.comprobante.proveedorId)
+        ? "YA_ESTABA"
+        : "POR_ALIAS" };
+
       // El alias va en la MISMA transacción. Que quede el vínculo sin el alias
       // haría que la próxima factura volviera a preguntar lo mismo, y que quede
       // el alias sin el vínculo dejaría un macheo automático que nadie confirmó.
@@ -219,7 +262,7 @@ export async function POST(req) {
           select: { id: true, codigoInterno: true },
         });
       }
-      return { aliasGuardado };
+      return { aliasGuardado, asociacion };
     });
 
     // ── SI EL PEDIDO NACIÓ DE LA FACTURA, LA LÍNEA DEL PEDIDO SE CREA ACÁ ─
@@ -257,9 +300,20 @@ export async function POST(req) {
       siembra: siembra?.ok === true ? siembra : null,
       producto: productoLocal.base,
       alias: resultado.aliasGuardado,
-      queHacer: resultado.aliasGuardado
-        ? `Vinculado. La próxima factura de este proveedor va a reconocer "${linea.textoCrudo}" sola.`
-        : "Vinculado. No se pudo guardar el alias porque la línea no trae ni código ni descripción.",
+      queHacer: [
+        resultado.aliasGuardado
+          ? `Vinculado. La próxima factura de este proveedor va a reconocer "${linea.textoCrudo}" sola.`
+          : "Vinculado. No se pudo guardar el alias porque la línea no trae ni código ni descripción.",
+        // Sin el nombre del proveedor: esta ruta no lo trae, y pedirlo solo
+        // para el texto sería una consulta más por cada vínculo. El default
+        // dice "este proveedor", que en la pantalla del pedido no es ambiguo.
+        textoDeLaAsociacion(resultado.asociacion),
+      ]
+        .filter(Boolean)
+        .join(" "),
+      // Qué pasó con la asociación al proveedor, para poder contarlo sin
+      // deducirlo del texto.
+      asociadoAlProveedor: resultado.asociacion?.accion ?? null,
     });
   } catch (err) {
     console.error("Error comprobantes/vincular:", err);

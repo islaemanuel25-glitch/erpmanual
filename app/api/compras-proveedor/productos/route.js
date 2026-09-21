@@ -1,6 +1,7 @@
 // app/api/compras-proveedor/productos/route.js
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { productoVisibleWhere } from "@/lib/visibilidad";
 import { checkPerm } from "@/lib/authorize";
@@ -124,10 +125,19 @@ export async function GET(req) {
     const baseWhere = {
       grupoId,
       activo: true,
+      // ── UNA SOLA DEFINICIÓN DE "QUÉ SE LE COMPRA A ESTE PROVEEDOR" ────
+      //
+      // Acá estaban las tres relaciones escritas de nuevo, al lado de
+      // `productoDelProveedorWhere`, que es la que usa la cascada de vínculo y
+      // la conciliación de listas. Dos copias no se rompen el día que se
+      // escriben: se rompen el día que una cambia. Ahora es la misma función.
+      //
+      // Lo que se SUMA acá y no está allá son los productos que este proveedor
+      // ya nombró con un código interno: son suyos aunque nadie haya llenado la
+      // relación, y esta pantalla los tiene que poder ofrecer. Va explícito
+      // para que se vea que es un agregado y no otra definición.
       OR: [
-        { proveedor_id: proveedorId },
-        { proveedor2_id: proveedorId },
-        { proveedor3_id: proveedorId },
+        ...productoDelProveedorWhere(proveedorId).OR,
         ...(baseIdsVinculados.length ? [{ id: { in: baseIdsVinculados } }] : []),
       ],
       // Regla A, con la ubicación que opera: el depósito no arma pedidos con

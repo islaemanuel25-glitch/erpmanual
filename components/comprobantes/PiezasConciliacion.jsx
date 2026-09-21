@@ -178,11 +178,40 @@ export function Precio({ p, onAceptar, onNo, puede, aceptando, decidida }) {
  *    nombre". Un fallo de red y un catálogo sin resultados NO son lo mismo, y
  *    decir uno por el otro manda a buscar el problema donde no está.
  */
-export function BuscadorProducto({ onElegir, onCancelar }) {
+export const TEXTO_TODO_EL_CATALOGO = "Buscar en todo el catálogo";
+
+export function BuscadorProducto({
+  onElegir,
+  onCancelar,
+  /**
+   * ── SE BUSCA ENTRE LO QUE SE LE COMPRA A ESTE PROVEEDOR ─────────────────
+   *
+   * Sin esto el buscador traía el catálogo ENTERO. Medido el 2026-09-21 con la
+   * factura de Paty: su universo son 26 productos y el catálogo 2.711. Elegir
+   * entre 2.711 para vincular un renglón de Paty no es difícil, es peligroso —
+   * un vínculo equivocado escribe un alias que se repite en cada factura que
+   * venga, y el costo entra en el producto que no era.
+   *
+   * Sin `proveedorId` se busca en todo, que es como se comportaba antes: las
+   * pantallas que todavía no lo pasan no cambian.
+   */
+  proveedorId = null,
+  proveedorNombre = null,
+}) {
   const [q, setQ] = useState("");
   const [items, setItems] = useState([]);
   const [buscando, setBuscando] = useState(false);
   const [fallo, setFallo] = useState(null);
+  /**
+   * ── LA SALIDA PARA UN PRODUCTO NUEVO DEL PROVEEDOR ─────────────────────
+   *
+   * Un proveedor trae por primera vez algo que nunca le compramos: ese producto
+   * NO está en su universo y sin esta puerta no se podría vincular nunca. Es
+   * explícita —hay que tocarla— para que quede claro que se está saliendo del
+   * universo, y al vincularlo el servidor lo asocia al proveedor para que la
+   * próxima vez aparezca en la búsqueda normal.
+   */
+  const [enTodoElCatalogo, setEnTodoElCatalogo] = useState(!proveedorId);
   const abortRef = useRef(null);
 
   useEffect(() => {
@@ -199,10 +228,15 @@ export function BuscadorProducto({ onElegir, onCancelar }) {
       setBuscando(true);
       setFallo(null);
       try {
-        const r = await fetch(
-          `/api/productos/listar?q=${encodeURIComponent(texto)}&pageSize=8`,
-          { credentials: "include", signal: ctrl.signal }
-        );
+        // El catálogo del proveedor es el MISMO endpoint que arma un pedido
+        // para él: ahí ya vive la definición de qué se le compra, con sus tres
+        // relaciones y los códigos que ya se le vincularon. No se escribe una
+        // segunda búsqueda al lado.
+        const url = enTodoElCatalogo
+          ? `/api/productos/listar?q=${encodeURIComponent(texto)}&pageSize=8`
+          : `/api/compras-proveedor/productos?proveedorId=${proveedorId}` +
+            `&search=${encodeURIComponent(texto)}`;
+        const r = await fetch(url, { credentials: "include", signal: ctrl.signal });
         const d = await r.json().catch(() => null);
         if (!r.ok) {
           // El mensaje del servidor gana: sabe más que cualquier tabla de acá.
@@ -224,7 +258,7 @@ export function BuscadorProducto({ onElegir, onCancelar }) {
       }
     }, 300);
     return () => clearTimeout(t);
-  }, [q]);
+  }, [q, enTodoElCatalogo, proveedorId]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -240,11 +274,39 @@ export function BuscadorProducto({ onElegir, onCancelar }) {
         />
         <SunmiButton color="slate" type="button" onClick={onCancelar}>Cancelar</SunmiButton>
       </div>
+      {/* DÓNDE SE ESTÁ BUSCANDO, dicho siempre. Sin esto, "Ninguno con ese
+          nombre" es ambiguo: no se sabe si el producto no existe o si existe
+          pero no es de este proveedor, que son dos cosas distintas y se
+          resuelven distinto. */}
+      {proveedorId && (
+        <p className="text-sm2 sunmi-text-muted mt-1">
+          {enTodoElCatalogo
+            ? "Buscando en TODO el catálogo."
+            : `Buscando entre lo que se le compra a ${proveedorNombre || "este proveedor"}.`}
+        </p>
+      )}
       {buscando && <p className="text-sm2 sunmi-text-muted mt-1">Buscando…</p>}
       {/* EL FALLO SE DICE COMO FALLO. No se disfraza de catálogo vacío. */}
       {!buscando && fallo && <p className="text-sm2 sunmi-text-danger mt-1 leading-snug">{fallo}</p>}
       {!buscando && !fallo && q.trim().length >= 3 && items.length === 0 && (
-        <p className="text-sm2 sunmi-text-muted mt-1">Ninguno con ese nombre.</p>
+        <p className="text-sm2 sunmi-text-muted mt-1">
+          {enTodoElCatalogo
+            ? "Ninguno con ese nombre."
+            : "Ninguno con ese nombre entre los de este proveedor."}
+        </p>
+      )}
+
+      {/* La puerta al catálogo entero: solo cuando hay un universo que la haga
+          falta, y solo hasta que se abre. */}
+      {proveedorId && !enTodoElCatalogo && (
+        <SunmiButton
+          color="slate"
+          type="button"
+          className="mt-1 w-full justify-center"
+          onClick={() => setEnTodoElCatalogo(true)}
+        >
+          {TEXTO_TODO_EL_CATALOGO}
+        </SunmiButton>
       )}
       <div className="flex flex-col gap-1 mt-1">
         {items.map((p) => (

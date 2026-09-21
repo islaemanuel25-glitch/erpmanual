@@ -1137,6 +1137,11 @@ export default function DetallePedidoProveedorPage({ params }) {
             />
             <HojaCorregirLinea
               sinPedidoPrevio={sinPedidoPrevio}
+              // A quién se le compra. De acá sale en qué universo busca el
+              // buscador de la hoja: lo que se le compra a este proveedor, y no
+              // el catálogo entero.
+              proveedorId={pedido.proveedor?.id ?? pedido.proveedorId ?? null}
+              proveedorNombre={pedido.proveedor?.nombre ?? null}
               fila={lineaACorregir}
               abierta={!!lineaACorregir}
               onCerrar={() => setLineaACorregir(null)}
@@ -1255,6 +1260,7 @@ export default function DetallePedidoProveedorPage({ params }) {
             {esRecepcion && (
               <ListaConciliacion
                 pedidoId={pedido.id}
+                proveedorIdDelPedido={pedido.proveedor?.id ?? pedido.proveedorId ?? null}
                 estadoPedido={pedido.estado}
                 esRecepcion={esRecepcion}
                 puedeRecibir={esRecepcion}

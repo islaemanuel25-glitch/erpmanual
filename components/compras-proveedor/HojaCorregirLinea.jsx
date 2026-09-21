@@ -74,6 +74,7 @@ import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiMo
 import { BuscadorProducto } from "@/components/comprobantes/PiezasConciliacion";
 import { formatearMoneda } from "@/lib/moneda";
 import { aceptarEstaBloqueado } from "@/lib/compras-proveedor/comprobante/aceptarPrecio";
+import { ORIGEN_VINCULO } from "@/lib/compras-proveedor/comprobante/vinculo";
 import {
   ESTADO_LINEA,
   cantidadEnEscalaDelPedido,
@@ -161,10 +162,24 @@ function OpcionDePrecio({ elegida, titulo, detalle, onElegir }) {
  * el buscador del catálogo, que es la misma pieza que usa la conciliación de
  * escritorio: no se escribe un segundo buscador.
  */
-function ElegirProducto({ fila, onVincular, onCerrar, guardando }) {
+function ElegirProducto({ fila, onVincular, onCerrar, guardando, proveedorId, proveedorNombre }) {
   const [buscando, setBuscando] = useState(false);
   const [error, setError] = useState("");
-  const candidatos = fila?.candidatos ?? [];
+  // ── LOS CANDIDATOS DE AFUERA DEL UNIVERSO NO SE OFRECEN SOLOS ──────────
+  //
+  // La cascada busca en tres lugares y devuelve el primero que encuentra: el
+  // pedido, lo que se le compra al proveedor, y el ERP entero. Ese tercer
+  // escalón es una red para no quedarse sin nada, pero ofrecido como si fuera
+  // igual que los otros dos convierte "no hay ninguno de este proveedor" en una
+  // lista de productos ajenos con el botón puesto al lado.
+  //
+  // Medido con la factura de Paty: su universo son 26 productos y el catálogo
+  // 2.711. Los candidatos que se veían salían de los 2.711.
+  //
+  // No se pierden: se llega a ellos por "Buscar en todo el catálogo", que es
+  // explícito y dice dónde está buscando.
+  const deTodoElErp = fila?.origen === ORIGEN_VINCULO.ERP_COMPLETO;
+  const candidatos = deTodoElErp ? [] : fila?.candidatos ?? [];
 
   const elegir = async (productoBaseId) => {
     setError("");
@@ -181,6 +196,8 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando }) {
 
       {buscando ? (
         <BuscadorProducto
+          proveedorId={proveedorId}
+          proveedorNombre={proveedorNombre}
           onElegir={(p) => elegir(p.baseId ?? p.productoBaseId ?? p.id)}
           onCancelar={() => setBuscando(false)}
         />
@@ -188,7 +205,11 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando }) {
         <>
           {candidatos.length === 0 && (
             <span className="text-sm3 sunmi-text-muted">
-              El motor no encontró ninguno parecido. Buscalo a mano.
+              {deTodoElErp
+                ? `No hay ninguno parecido entre lo que se le compra a ${
+                    proveedorNombre || "este proveedor"
+                  }. Buscalo a mano, y si es la primera vez que lo trae, usá "todo el catálogo".`
+                : "El motor no encontró ninguno parecido. Buscalo a mano."}
             </span>
           )}
 
@@ -234,6 +255,9 @@ export default function HojaCorregirLinea({
   // El pedido nació de esta factura: no hubo pedido contra el cual comparar,
   // así que la frase de "Pediste X · la factura dice Y" no se dibuja.
   sinPedidoPrevio = false,
+  // A quién se le compra: define en qué universo se buscan los productos.
+  proveedorId = null,
+  proveedorNombre = null,
   fila,
   abierta,
   onCerrar,
@@ -485,6 +509,8 @@ export default function HojaCorregirLinea({
         // dónde vuelve Cancelar: sin producto, cierra la hoja; cambiándolo,
         // vuelve a la hoja con el producto que ya tenía.
         <ElegirProducto
+          proveedorId={proveedorId}
+          proveedorNombre={proveedorNombre}
           fila={fila}
           onVincular={onVincular}
           onCerrar={cambiandoProducto ? () => setCambiandoProducto(false) : onCerrar}

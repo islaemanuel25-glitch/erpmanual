@@ -66,6 +66,10 @@ const cant = (v) => (v == null ? "—" : Number.isInteger(Number(v)) ? String(Nu
 
 export default function ListaConciliacion({
   pedidoId,
+  // A quién se le compra: el buscador de abajo busca en SU universo y no en el
+  // catálogo entero. Viene de la pantalla, que ya tiene el pedido cargado; no
+  // se deduce acá para no tener dos formas de saber lo mismo.
+  proveedorIdDelPedido = null,
   estadoPedido,
   esRecepcion = false,
   puedeRecibir = true,
@@ -185,6 +189,7 @@ export default function ListaConciliacion({
 
       {datos.grupos.map((g) => (
         <GrupoComprobante
+          proveedorIdDelPedido={proveedorIdDelPedido}
           key={g.comprobante.id}
           g={g}
           esRecepcion={esRecepcion && !cerrado}
@@ -337,7 +342,7 @@ function CamposRecepcion({ detalleId, esFiambre, tieneFiambre, recibidos, setRec
  * permite mirar veintiuna filas sin volver a aprender dónde está cada cosa.
  */
 function GrupoComprobante({
-  g, esRecepcion, cerrado, tieneFiambre, puedeRecibir,
+  g, esRecepcion, cerrado, tieneFiambre, puedeRecibir, proveedorIdDelPedido,
   recibidos, setRecibidos, kgRecibidos, setKgRecibidos,
   buscandoEn, setBuscandoEn, unidadElegida, setUnidadElegida,
   aceptando, decididas, setDecididas, onVincular, onAceptar,
@@ -459,6 +464,7 @@ function GrupoComprobante({
           filaExpandible={(f) =>
             abiertas.has(f.lineaId) ? (
               <DetalleFila
+                proveedorIdDelPedido={proveedorIdDelPedido}
                 f={f}
                 esRecepcion={esRecepcion}
                 cerrado={cerrado}
@@ -494,7 +500,7 @@ function GrupoComprobante({
  * aparece, y eso lo decidió `formaDeLaFila` — acá no se vuelve a decidir.
  */
 function DetalleFila({
-  f, esRecepcion, cerrado, tieneFiambre, puedeRecibir,
+  f, esRecepcion, cerrado, tieneFiambre, puedeRecibir, proveedorIdDelPedido,
   recibidos, setRecibidos, kgRecibidos, setKgRecibidos,
   buscandoEn, setBuscandoEn, unidadElegida, setUnidadElegida,
   aceptando, decididas, setDecididas, onVincular, onAceptar,
@@ -632,6 +638,7 @@ function DetalleFila({
 
           {buscandoEn === f.lineaId && (
             <BuscadorProducto
+              proveedorId={proveedorIdDelPedido}
               onElegir={(p) => onVincular(f.lineaId, p.productoBaseId)}
               onCancelar={() => setBuscandoEn(null)}
             />
