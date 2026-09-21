@@ -36,7 +36,10 @@ import {
 } from "@/lib/compras-proveedor/comprobante/lector/recetaDelProveedor";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { sembrarPedidoDesdeFactura } from "@/lib/compras-proveedor/sembrarPedidoDesdeFactura";
-import { MOTIVO_LECTURA } from "@/lib/compras-proveedor/comprobante/lector/contrato";
+import {
+  estadoDeLaFalla,
+  MOTIVO_LECTURA,
+} from "@/lib/compras-proveedor/comprobante/lector/contrato";
 // El MISMO contador que usa el importador: la cuota es una sola.
 import { usadasHoy } from "@/lib/ia/contadorDeIa";
 import { hayCuota, limiteDiario } from "@/lib/ia/limiteDiario";
@@ -248,8 +251,18 @@ export async function POST(req, { params }) {
           usoRespaldo: resultado.usoRespaldo === true,
           porQuePaso: resultado.porQuePaso ?? null,
           intentos: comprobante.intentosLectura + 1,
+          // El detalle crudo también viaja a la pantalla: es lo que deja
+          // avisar con precisión en vez de "probá de nuevo".
+          detalle: (resultado.intentos || []).find((i) => !i.ok)?.detalle ?? null,
         },
-        { status: 502 }
+        // ── EL ESTADO TAMBIÉN TIENE QUE DECIR LO QUE ES ──────────────────
+        //
+        // Acá todo fallo de lectura contestaba 502, y 502 significa "la
+        // aplicación no responde". Con la cuota agotada eso es falso dos veces:
+        // la aplicación contestó perfecto, y lo que pasó no se arregla
+        // reintentando. Además el 502 es el estado que el proxy reemplaza por
+        // su propia página, y ahí se pierde el cuerpo con el motivo.
+        { status: estadoDeLaFalla(resultado.motivo) }
       );
     }
 
