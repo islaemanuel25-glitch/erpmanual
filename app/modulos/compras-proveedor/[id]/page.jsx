@@ -17,6 +17,7 @@ import ListaConciliacion from "@/components/comprobantes/ListaConciliacion";
 import ListaDeLaFactura from "@/components/compras-proveedor/ListaDeLaFactura";
 import HojaCorregirLinea from "@/components/compras-proveedor/HojaCorregirLinea";
 import HojaCerrarRecepcion from "@/components/compras-proveedor/HojaCerrarRecepcion";
+import PedidoRecibido from "@/components/compras-proveedor/PedidoRecibido";
 import {
   cantidadEnEscalaDelPedido,
   precioCambio,
@@ -138,9 +139,20 @@ export default function DetallePedidoProveedorPage({ params }) {
   // con su encabezado propio, que esta tanda no toca.
   const enRecepcion = pedido?.estado === "ENVIADO";
   useTituloDePagina(enRecepcion ? "Recibir pedido" : null);
+  // ── Y UN PEDIDO CERRADO TAMBIÉN LLEVA EL VOLVER EN EL SHELL ───────────
+  //
+  // Su pantalla ya no dibuja el encabezado viejo —el que traía su propio
+  // Volver— así que sin esto quedaba sin salida. Va al listado de compras y no
+  // a la bandeja de recepción: de un pedido ya recibido no se vuelve a recibir.
+  const yaRecibido = pedido?.estado === "RECIBIDO";
   useAccionDePagina(
-    () => (enRecepcion ? <SunmiBackButton href="/modulos/compras-proveedor/recepcion" /> : null),
-    [enRecepcion]
+    () =>
+      enRecepcion ? (
+        <SunmiBackButton href="/modulos/compras-proveedor/recepcion" />
+      ) : yaRecibido ? (
+        <SunmiBackButton href="/modulos/compras-proveedor" />
+      ) : null,
+    [enRecepcion, yaRecibido]
   );
 
   // Para recepción: cantidades recibidas editables
@@ -829,6 +841,28 @@ export default function DetallePedidoProveedorPage({ params }) {
     0
   );
 
+  // ── UN PEDIDO RECIBIDO ES OTRA PANTALLA, Y SALE ACÁ ────────────────────
+  //
+  // No se esconden bloques uno por uno: se devuelve otra cosa. Mientras las dos
+  // pantallas compartan el árbol, cada cosa que se agregue a la recepción
+  // aparece también en la cerrada y hay que acordarse de taparla — que es
+  // exactamente como llegaron ahí el contador de revisadas, los cuatro filtros,
+  // la tabla de comprobantes con su cuadradito y un "Detalle (24 items)" vacío.
+  //
+  // El título y el Volver los pone el shell, igual que en la recepción.
+  if (pedido.estado === "RECIBIDO") {
+    return (
+      <div className="sunmi-bg w-full min-h-full p-2 lg:p-3">
+        <PedidoRecibido
+          pedido={pedido}
+          comprobante={comprobanteActivo}
+          filas={filasDeFactura}
+          sinComprobante={conciliacion?.sinComprobante || []}
+        />
+      </div>
+    );
+  }
+
   return (
     // ── EL MISMO ENVOLTORIO QUE LA RECEPCIÓN DE UNA TRANSFERENCIA ────────
     //
@@ -1004,44 +1038,11 @@ export default function DetallePedidoProveedorPage({ params }) {
             comprobante la trajo."— y los tres marcos anidados que desbordaban.
             Si se eligió "Llegó sin factura" no hay papel que mostrar y se cae
             al conteo viejo, que es lo que esa salida ofrece. */}
-        {/* ── UN PEDIDO YA RECIBIDO SE LEE CON LAS MISMAS TARJETAS ────────
-            Abría en la tabla densa de escritorio: columnas apretadas, el nombre
-            cortado con puntos suspensivos, las cantidades SIN CONVERTIR
-            —"Factura 80" donde son 8 bultos— y botones que invitaban a actuar
-            sobre algo ya cerrado. Es la misma información que la recepción, así
-            que se dibuja con la misma lista, sin acciones, y con lo único que
-            importa después: qué entró, a qué costo, y la ganancia arriba. */}
-        {pedido.estado === "RECIBIDO" && filasDeFactura.length > 0 && (
-          <ListaDeLaFactura
-            comprobante={comprobanteActivo}
-            filas={filasDeFactura}
-            revisadas={{}}
-            soloLectura
-            despuesDeLista={
-              (conciliacion?.sinComprobante || []).length > 0 ? (
-                <div className="flex flex-col gap-dato pt-renglon border-t sunmi-divider">
-                  <span className="text-sm3 font-medium sunmi-text-strong">
-                    {conciliacion.sinComprobante.length} líneas que ningún comprobante trajo
-                  </span>
-                  {conciliacion.sinComprobante.map((d) => (
-                    <span
-                      key={d.pedidoDetalleId}
-                      className="flex items-baseline justify-between gap-renglon"
-                    >
-                      <span className="min-w-0 text-sm2 sunmi-text-muted truncate">
-                        {d.producto || "Sin nombre"}
-                      </span>
-                      <span className="shrink-0 text-sm2 tabular-nums sunmi-text-strong">
-                        entró {d.cantidadRecibida == null ? "—" : Number(d.cantidadRecibida)}
-                      </span>
-                    </span>
-                  ))}
-                </div>
-              ) : null
-            }
-          />
-        )}
-
+        {/* ── ACÁ ESTABA LA LISTA DEL PEDIDO YA RECIBIDO ────────────────
+            Se fue entera: un pedido RECIBIDO devuelve otra pantalla mucho más
+            arriba, y esto quedaba inalcanzable. Una rama muerta que se lee como
+            viva es peor que no tenerla — la próxima persona la toca creyendo
+            que dibuja algo. */}
         {esRecepcion && !sinFactura && filasDeFactura.length > 0 && (
           <>
             <ListaDeLaFactura

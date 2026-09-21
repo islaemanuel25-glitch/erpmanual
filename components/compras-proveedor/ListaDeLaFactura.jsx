@@ -84,15 +84,15 @@ export default function ListaDeLaFactura({
    *  mismo nombre y distinto significado es cómo un candado empieza a mirar el
    *  archivo equivocado. */
   accionDelPie = null,
-  /**
-   * Un pedido ya recibido se LEE: las mismas tarjetas y la misma conversión,
-   * sin botones que inviten a hacer algo que ya no corresponde y sin pie de
-   * acción. Lo que cambia es lo que cada tarjeta muestra al final: qué entró.
-   */
-  soloLectura = false,
-  /** Lo que va después de la lista. En un pedido cerrado, las líneas que
-   *  ningún comprobante trajo, que también son parte de lo que se leyó. */
-  despuesDeLista = null,
+  // ── ACÁ ESTABAN `soloLectura` Y `despuesDeLista` ────────────────────────
+  //
+  // Los trajo el primer intento de mostrar un pedido ya recibido con esta misma
+  // lista. No alcanzaba: un pedido cerrado no tiene filtros, ni contador de
+  // revisadas, ni tarjetas para operar, así que terminó siendo otra pantalla
+  // —`PedidoRecibido`— y estas dos props se quedaron sin nadie que las pasara.
+  //
+  // Se sacan en vez de dejarlas "por si acaso": una prop que nadie usa se lee
+  // como una capacidad de la pieza, y la próxima persona la va a mantener.
 }) {
   const [filtro, setFiltro] = useState(FILTRO.TODOS);
 
@@ -248,19 +248,17 @@ export default function ListaDeLaFactura({
               revisada={yaRevisada(f)}
               onCorregir={onCorregir}
               onCoincide={onCoincide}
-              soloLectura={soloLectura}
             />
           ))}
         </>
       }
-      despuesDeLista={despuesDeLista}
       // ── EN EL PIE QUEDA LA ACCIÓN, SOLA ─────────────────────────────────
       //
       // Un pie pegajoso tapa lo que hay detrás mientras se scrollea, así que
       // todo lo que se meta ahí es alto que la lista pierde. Con los tres
       // importes adentro medía cuatro renglones y el botón se les montaba
       // encima. Ahora lleva una sola cosa y el alto es el del botón.
-      pieDePantalla={soloLectura ? null : accionDelPie}
+      pieDePantalla={accionDelPie}
     />
   );
 }
