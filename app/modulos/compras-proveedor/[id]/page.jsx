@@ -26,6 +26,7 @@ import {
   DECISION_DE_PRECIO,
   decisionVigente,
 } from "@/lib/compras-proveedor/decisionDePrecio";
+import { hayQuePedirLaConciliacion } from "@/lib/compras-proveedor/papelDelPedido";
 import TarjetaContextoDelPedido from "@/components/compras-proveedor/TarjetaContextoDelPedido";
 import BloqueDeLaFactura from "@/components/compras-proveedor/BloqueDeLaFactura";
 
@@ -92,6 +93,9 @@ export default function DetallePedidoProveedorPage({ params }) {
   // la del pedido, decide el vínculo y analiza el precio. La pantalla no
   // recalcula nada: pide y muestra.
   const [conciliacion, setConciliacion] = useState(null);
+  // Se pidió la conciliación y no se pudo. Es un estado propio y no la ausencia
+  // de datos: sin él, "no se pudo saber" y "no hay papel" son el mismo null.
+  const [falloLaConciliacion, setFalloLaConciliacion] = useState(false);
   // ── VA ACÁ ARRIBA, Y NO AL LADO DE LO QUE LA USA ───────────────────────
   //
   // Se incrementa cuando algo cambió del lado del servidor —vincular, aceptar
@@ -326,10 +330,23 @@ export default function DetallePedidoProveedorPage({ params }) {
   // el nombre cortado, y las cantidades SIN CONVERTIR —"Factura 80" donde son 8
   // bultos—, que es justo lo que la recepción arregló. Es la misma información:
   // se lee con las mismas tarjetas.
-  const estadoConConciliacion = ["ENVIADO", "RECIBIDO"];
+  //
+  // ── Y EN RECIBIDO NO SE PREGUNTA POR EL CONTADOR DEL PANEL ─────────────
+  //
+  // Acá decía `hayComprobantes === 0`. Ese contador lo llena `PanelComprobantes`
+  // por su callback, y en RECIBIDO ese panel NO SE MONTA: la pantalla cerrada
+  // devuelve otro árbol varias decenas de líneas más abajo. O sea que el
+  // contador se quedaba en 0 para siempre, la conciliación no se pedía NUNCA, y
+  // la pantalla concluía "este pedido se cerró sin ningún papel" sobre el 232,
+  // que tiene un comprobante leído con 15 renglones.
+  //
+  // La condición vive en `hayQuePedirLaConciliacion` para que sea una sola y se
+  // pueda ejercer: el candado la corre con un RECIBIDO y cero avisos, que es
+  // exactamente el caso que fallaba.
   useEffect(() => {
-    if (!pedido?.id || !estadoConConciliacion.includes(pedido.estado) || hayComprobantes === 0) {
+    if (!pedido?.id || !hayQuePedirLaConciliacion({ estado: pedido.estado, hayComprobantes })) {
       setConciliacion(null);
+      setFalloLaConciliacion(false);
       return;
     }
     let vigente = true;
@@ -340,9 +357,20 @@ export default function DetallePedidoProveedorPage({ params }) {
           cache: "no-store",
         });
         const d = await r.json();
-        if (vigente && d?.ok) setConciliacion(d);
+        if (!vigente) return;
+        if (d?.ok) {
+          setConciliacion(d);
+          setFalloLaConciliacion(false);
+        } else {
+          // ── UN ERROR QUE LA PANTALLA NO PUEDE DESCARTAR ───────────────
+          //
+          // Tragarlo dejaba la conciliación en null, y null se leía igual que
+          // "no hay papel". Preferimos decir que no se pudo saber antes que
+          // afirmar algo falso sobre lo que entró.
+          setFalloLaConciliacion(true);
+        }
       } catch {
-        // Sin conciliación la pantalla cae al conteo viejo, que sigue estando.
+        if (vigente) setFalloLaConciliacion(true);
       }
     })();
     return () => {
@@ -858,6 +886,11 @@ export default function DetallePedidoProveedorPage({ params }) {
           comprobante={comprobanteActivo}
           filas={filasDeFactura}
           sinComprobante={conciliacion?.sinComprobante || []}
+          // La respuesta entera, y no solo lo que se dibuja: es de donde sale
+          // cuántos comprobantes tiene el pedido, que es la pregunta que la
+          // pantalla estaba contestando por su cuenta y mal.
+          conciliacion={conciliacion}
+          falloElPapel={falloLaConciliacion}
         />
       </div>
     );

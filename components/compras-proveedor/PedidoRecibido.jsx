@@ -28,14 +28,25 @@
 // `SunmiCard` con su `p-3`, los tokens de espacio `renglon` y `dato`, la escala
 // de letra del proyecto y `SunmiSeparator` para los separadores finos. No se
 // eligió ningún número acá.
+//
+// ── Y ESTA PANTALLA NO DECIDE SI HAY PAPEL ────────────────────────────────
+//
+// Lo pregunta. El criterio vive en `lib/compras-proveedor/papelDelPedido`, con
+// su candado, porque esta pantalla ya afirmó una vez "se cerró sin ningún
+// papel" sobre un pedido con comprobante leído: lo dedujo de que su lista de
+// filas viniera vacía, sin saber que venía vacía porque nadie la había pedido.
+// Son cuatro estados y no un booleano, a propósito — "todavía no sé" y "no se
+// pudo saber" no se pueden dibujar como "no hay".
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import { diaMesAR, horaAR } from "@/lib/fechas/formatearFechaHora";
 import { formatearMoneda } from "@/lib/moneda";
 import { gananciaDelDeposito } from "@/lib/compras-proveedor/gananciaDelDeposito";
 import { loQueEntro, textoDeCantidad } from "@/lib/compras-proveedor/loQueEntro";
+import { PAPEL, papelDelPedido } from "@/lib/compras-proveedor/papelDelPedido";
 
 /** Un renglón de producto: nombre arriba, cuenta abajo, total a la derecha. */
 function RenglonDeProducto({ r }) {
@@ -81,33 +92,29 @@ export default function PedidoRecibido({
   comprobante = null,
   filas = [],
   sinComprobante = [],
+  conciliacion = null,
+  falloElPapel = false,
 }) {
   const proveedor = pedido?.proveedor?.nombre || "el proveedor";
-  const hayPapel = filas.length > 0;
+
+  // ── SI HAY PAPEL NO LO DECIDE ESTA PANTALLA ───────────────────────────
+  //
+  // Lo contesta `papelDelPedido` mirando la MISMA respuesta que trae las filas,
+  // que es la que el servidor usa para resolverlo. Acá se miraba `filas.length`,
+  // y una lista vacía puede ser tres cosas distintas: que no haya comprobantes,
+  // que los haya y no estén leídos, o —el defecto— que la pantalla nunca haya
+  // preguntado. Las tres se veían como "se cerró sin ningún papel", que sobre el
+  // pedido 232 era falso y hablaba de mercadería.
+  const estadoDelPapel = papelDelPedido({ conciliacion, fallo: falloElPapel });
+  const hayPapel = estadoDelPapel === PAPEL.CON_PAPEL;
   const cuenta = gananciaDelDeposito(filas);
 
-  // ── UN PEDIDO CERRADO SIN NINGÚN PAPEL TAMBIÉN SE LEE ──────────────────
-  //
-  // Es el camino de "llegó sin factura": se cuenta contra el pedido y se cierra
-  // sin comprobante. Ahí no hay conciliación de dónde sacar las filas, y sin
-  // esto la pantalla quedaba con el encabezado y nada más.
-  //
-  // Las líneas del pedido entran por el mismo lugar que las que ningún
-  // comprobante trajo, porque es exactamente lo que son. Y la plata no se
-  // dibuja: sin papel no hay precio facturado contra el cual comparar, y un
-  // "Te facturó $0,00" sería una afirmación falsa.
-  const sinPapelDelPedido =
-    hayPapel || sinComprobante.length > 0
-      ? sinComprobante
-      : (pedido?.detalles || []).map((d) => ({
-          pedidoDetalleId: d.id,
-          producto: d.producto?.base?.nombre || null,
-          cantidadRecibida: d.cantidadRecibida,
-          costoCatalogo: d.precioCosto,
-          unidad: d.unidad,
-        }));
-
-  const { delPapel, sinPapel } = loQueEntro({ filas, sinComprobante: sinPapelDelPedido });
+  // Las líneas que ningún comprobante trajo salen SIEMPRE de la conciliación:
+  // cuando el pedido no tiene papel, o lo tiene sin leer, ahí vienen todas las
+  // del pedido, que es exactamente lo que hay que mostrar. La lista que esta
+  // pantalla armaba por su cuenta con `pedido.detalles` se fue: era una segunda
+  // fuente para el mismo dato, y solo la alcanzaba la rama equivocada.
+  const { delPapel, sinPapel } = loQueEntro({ filas, sinComprobante });
 
   return (
     <section className="space-y-3">
@@ -126,11 +133,31 @@ export default function PedidoRecibido({
         </p>
       </SunmiCard>
 
-      {/* ── 2 · LA PLATA, ARRIBA Y EN CASTELLANO ───────────────────────────
-          "Te facturó" y "a tus precios vale" en vez de factura y precio del
-          ERP; la ganancia en grande porque es la respuesta, y debajo, en
-          chico, qué significa. */}
-      {!hayPapel && (
+      {/* ── MIENTRAS NO SE SABE, NO SE AFIRMA ────────────────────────────
+          Cada estado dice lo suyo. Lo que no puede pasar —y es de donde salió
+          este bloque— es que "todavía no pregunté" se dibuje con el mismo
+          cartel que "no hay papel". */}
+      {estadoDelPapel === PAPEL.CARGANDO && <SunmiLoader />}
+
+      {estadoDelPapel === PAPEL.NO_SE_PUDO && (
+        <SunmiCard className="p-3">
+          <p className="text-sm2 sunmi-text-muted break-words">
+            No se pudo leer el papel de este pedido. Volvé a entrar en un rato: lo que entró está
+            guardado, lo que falta es mostrarlo.
+          </p>
+        </SunmiCard>
+      )}
+
+      {estadoDelPapel === PAPEL.SIN_LEER && (
+        <SunmiCard className="p-3">
+          <p className="text-sm2 sunmi-text-muted break-words">
+            El papel de {proveedor} está subido pero todavía no se leyó, así que no hay con qué
+            comparar lo que costó: abajo está lo que entró, a tus precios.
+          </p>
+        </SunmiCard>
+      )}
+
+      {estadoDelPapel === PAPEL.SIN_PAPEL && (
         <SunmiCard className="p-3">
           <p className="text-sm2 sunmi-text-muted break-words">
             Este pedido se cerró sin ningún papel del proveedor, así que no hay con qué comparar
@@ -139,6 +166,10 @@ export default function PedidoRecibido({
         </SunmiCard>
       )}
 
+      {/* ── 2 · LA PLATA, ARRIBA Y EN CASTELLANO ───────────────────────────
+          "Te facturó" y "a tus precios vale" en vez de factura y precio del
+          ERP; la ganancia en grande porque es la respuesta, y debajo, en
+          chico, qué significa. */}
       {hayPapel && (
       <SunmiCard className="p-3 space-y-dato">
         <RenglonDePlata rotulo={`Te facturó ${proveedor}`} valor={cuenta.facturado} />
@@ -195,21 +226,34 @@ export default function PedidoRecibido({
       {/* ── 5 · LOS QUE NO VENÍAN EN EL PAPEL ──────────────────────────────
           Entraron con la cantidad pedida porque el cierre viejo completaba lo
           que nadie declaraba. Se dice con todas las letras: es el único lugar
-          donde alguien puede notar que algo no llegó. */}
+          donde alguien puede notar que algo no llegó.
+
+          Y EL TÍTULO DEPENDE DE SI HAY PAPEL. Sin papel, estas líneas no son
+          "las que el papel no trajo": son todo lo que entró, y llamarlas por la
+          ausencia de algo que no existe es la misma clase de frase falsa que
+          trajo esta corrección. */}
       {sinPapel.length > 0 && (
         <div className="space-y-1">
           <span className="block text-sm3 font-medium sunmi-text-strong">
-            {sinPapel.length === 1
-              ? "Este no venía en el papel"
-              : `Estos ${sinPapel.length} no venían en el papel`}
+            {!hayPapel
+              ? "Entró esto"
+              : sinPapel.length === 1
+                ? "Este no venía en el papel"
+                : `Estos ${sinPapel.length} no venían en el papel`}
           </span>
           <SunmiCard className="p-3 space-y-renglon">
-            <p className="text-sm2 sunmi-text-muted break-words">
-              Entraron con la cantidad que habías pedido. Si alguno no llegó, hay que corregirlo.
-            </p>
+            {hayPapel && (
+              <p className="text-sm2 sunmi-text-muted break-words">
+                Entraron con la cantidad que habías pedido. Si alguno no llegó, hay que corregirlo.
+              </p>
+            )}
             {sinPapel.map((r, i) => (
               <div key={r.pedidoDetalleId ?? i} className="space-y-renglon">
-                <SunmiSeparator />
+                {/* El separador va entre renglones. Con la frase de arriba
+                    presente también va antes del primero, porque ahí separa del
+                    texto; sin ella, un separador arriba de todo es una línea
+                    suelta contra el borde de la tarjeta. */}
+                {(hayPapel || i > 0) && <SunmiSeparator />}
                 <RenglonDeProducto r={r} />
               </div>
             ))}
