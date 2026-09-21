@@ -4078,6 +4078,17 @@ model LlamadaLector {
   /// El código de MOTIVO_LECTURA cuando falló. Texto y no enum: los motivos los
   /// define el contrato del lector y no queremos una migración por cada uno.
   motivo String?
+  /// LO QUE CONTESTÓ EL SERVICIO, TAL CUAL Y RECORTADO.
+  ///
+  /// El 2026-09-21 el lector no leyó en todo el día y esta tabla decía
+  /// SERVICIO_CAIDO diecinueve veces, sin poder contestar por qué. Hubo que
+  /// volver a llamar a la API a mano para descubrir que abajo había DOS causas
+  /// distintas —un 503 de demanda y un 429 de cuota diaria agotada, límite 20—
+  /// y que el cuerpo del error se estaba tirando.
+  ///
+  /// Guarda el estado y el mensaje del proveedor. Nunca la clave: lo que se
+  /// escribe sale del cuerpo de la respuesta, que no la contiene.
+  detalle String?
   /// Contra qué comprobante fue, cuando lo hubo. Nullable porque la cuota es del
   /// proyecto entero y una llamada vale igual sin comprobante detrás.
   comprobanteId Int?

@@ -16,8 +16,27 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **23 migraciones** y el árbol en **23**. No hay ninguna
-pendiente: el próximo despliegue es solo de código.
+Producción está en **23 migraciones** y el árbol en **24**. Hay **una
+pendiente**, y es aditiva.
+
+- `20260921160000_llamada_lector_detalle` — **ADITIVA**
+
+Una columna de texto nullable en `LlamadaLector`: `detalle`. Guarda lo que
+contestó el servicio de lectura —estado y mensaje—, que hasta hoy se tiraba.
+
+**Por qué:** el 2026-09-21 el lector de facturas no leyó en toda la jornada y la
+bitácora repetía `SERVICIO_CAIDO` diecinueve veces sin poder contestar por qué.
+Hubo que volver a llamar a la API a mano para descubrir que abajo había dos
+causas distintas —un 503 de demanda y un 429 de cuota diaria agotada— y que el
+cuerpo del error no se guardaba en ningún lado.
+
+**Qué dijo el clasificador:** sin coincidencias. Es un `ADD COLUMN` de texto
+nullable, sin default, sin DROP y sin backfill.
+
+**Compatible hacia atrás:** la versión vieja no lee esa columna. Las filas que ya
+existen quedan en NULL, que es la verdad — de esas llamadas no se guardó nada.
+
+**El quinto chequeo del backup NO aplica:** no es de datos y no borra nada.
 
 `20260921020000_pedido_nacido_de_factura` salió de esta lista con el despliegue
 de `943d9bff`: el contenedor descartable informó las 23 del árbol, la aplicó, y

@@ -1,0 +1,17 @@
+-- QUÉ CONTESTÓ EL SERVICIO DE LECTURA, GUARDADO.
+--
+-- El 2026-09-21 el lector de facturas no leyó en todo el día. La bitácora tenía
+-- diecinueve filas diciendo SERVICIO_CAIDO y ninguna podía contestar por qué:
+-- el lector mapeaba cualquier respuesta que no fuera 200 ni 429 a esa etiqueta
+-- y TIRABA el cuerpo del error.
+--
+-- Hubo que volver a llamar a la API a mano, con la clave de producción y la
+-- misma foto, para descubrir que abajo de esa única palabra había dos causas
+-- distintas: un 503 "high demand" y un 429 "Quota exceeded ... limit: 20,
+-- model: gemini-3.6-flash". Una se arregla esperando; la otra no se arregla
+-- hasta mañana, y cada reintento la empeora.
+--
+-- ADITIVA: una columna de texto nullable. Las filas que ya existen quedan en
+-- NULL, que es la verdad —de esas llamadas no se guardó el cuerpo— y es lo que
+-- la versión vieja del código ve durante la ventana: una columna que no lee.
+ALTER TABLE "LlamadaLector" ADD COLUMN "detalle" TEXT;

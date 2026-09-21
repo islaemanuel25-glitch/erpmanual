@@ -36,6 +36,10 @@ import {
 } from "@/lib/compras-proveedor/comprobante/lector/recetaDelProveedor";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { sembrarPedidoDesdeFactura } from "@/lib/compras-proveedor/sembrarPedidoDesdeFactura";
+import { MOTIVO_LECTURA } from "@/lib/compras-proveedor/comprobante/lector/contrato";
+// El MISMO contador que usa el importador: la cuota es una sola.
+import { usadasHoy } from "@/lib/ia/contadorDeIa";
+import { hayCuota, limiteDiario } from "@/lib/ia/limiteDiario";
 
 export async function POST(req, { params }) {
   try {
@@ -125,6 +129,34 @@ export async function POST(req, { params }) {
       );
     }
 
+    // ── ¿QUEDA CUOTA DEL DÍA? SE PREGUNTA ANTES DE LLAMAR ────────────────
+    //
+    // El tope del nivel gratuito son VEINTE consultas por día y **una consulta
+    // que falla gasta una igual**. El 2026-09-21 se hicieron 22 en el día,
+    // casi todas reintentos de una lectura que no salía: cada toque de «Leer»
+    // se comía una de las veinte, y la pantalla contestaba "el servicio de
+    // lectura no respondió", que invita a tocar de nuevo. El círculo se cierra
+    // solo.
+    //
+    // El contador ya existía —`lib/ia/contadorDeIa`, sobre esta misma tabla— y
+    // lo usaba el importador. Esta ruta no lo miraba: dos consumidores de la
+    // misma cuota y uno solo llevando la cuenta. Acá se pregunta con la MISMA
+    // función, que es lo que hace que los dos números digan lo mismo.
+    const cuota = hayCuota({ usadasHoy: await usadasHoy(), limite: limiteDiario() });
+    if (!cuota.puede) {
+      return NextResponse.json(
+        {
+          ok: false,
+          motivo: MOTIVO_LECTURA.CUOTA_AGOTADA,
+          error: queHacerLectura(MOTIVO_LECTURA.CUOTA_AGOTADA),
+          // El número, porque "se agotó" sin cuántas eran no deja entender por
+          // qué se agotó tan rápido.
+          cuota: { usadas: cuota.usadas, limite: cuota.limite },
+        },
+        { status: 429 }
+      );
+    }
+
     // ── La receta del proveedor: es lo que guía qué buscar ───────────────
     const recetaFila = await prisma.recetaProveedor.findUnique({
       where: { grupoId_proveedorId: { grupoId, proveedorId: comprobante.proveedorId } },
@@ -176,6 +208,13 @@ export async function POST(req, { params }) {
             modelo: i.lector,
             ok: i.ok === true,
             motivo: i.ok ? null : i.motivo ?? null,
+            // ── LO QUE DIJO EL SERVICIO, TAL CUAL ─────────────────────
+            //
+            // Sin esto, la bitácora contesta "SERVICIO_CAIDO" y nada más. El
+            // 2026-09-21 hubo que volver a llamar a la API a mano para poder
+            // contestar por qué no leía: la respuesta estaba en el cuerpo del
+            // error y se tiraba. Ahora queda guardada.
+            detalle: i.ok ? null : i.detalle ?? null,
             comprobanteId: comprobante.id,
           })),
         });

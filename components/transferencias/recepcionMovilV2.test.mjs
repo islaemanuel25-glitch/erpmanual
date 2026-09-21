@@ -448,7 +448,11 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // que nacen de una factura —llegó mercadería de un proveedor al que nadie le
   // pidió nada— y es de otra tanda: no toca nada de acá, no tiene DROP y no
   // tiene backfill. Se declara porque eso es lo que este conteo obliga.
-  assert.equal(migraciones.length, 23, "aparecio una migracion que nadie declaro aca");
+  // 24 desde el 2026-09-21: entra `20260921160000_llamada_lector_detalle`, una
+  // columna de texto nullable en `LlamadaLector` para guardar lo que contestó el
+  // servicio de lectura. Aditiva, sin DROP y sin backfill, y de otro módulo: se
+  // declara porque eso es lo que este conteo obliga.
+  assert.equal(migraciones.length, 24, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));
