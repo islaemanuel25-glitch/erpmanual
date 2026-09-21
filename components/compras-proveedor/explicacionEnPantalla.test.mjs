@@ -33,6 +33,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import ExplicacionDelPapel, {
   AVISO_PROBAR,
   TITULO_PROBAR,
+  TEXTO_LEYENDO,
 } from "./ExplicacionDelPapel.jsx";
 import { TEXTO_LEER_DE_NUEVO } from "../comprobantes/PanelComprobantes.jsx";
 
@@ -62,16 +63,27 @@ const aLaVista = (html) => html.replace(/<[^>]*>/g, " ");
 
 const ROTULO_GUARDAR = "GUARDAR: SOLO LA EXPLICACIÓN";
 
-/** Las dos ramas del POST de la receta, cortadas por su rótulo y sin prosa. */
-function ramasDelPost() {
+/**
+ * Los TRES trozos de la ruta, cortados por su rótulo y ya sin prosa.
+ *
+ * Eran dos hasta el 2026-09-21. Ahora la lectura corre APARTE del pedido
+ * —`leerElPapel`, para que ningún proxy pueda cortarla por tiempo— así que el
+ * código que antes vivía adentro de la rama de probar está en una función al
+ * final del archivo. Los candados de abajo siguen afirmando lo mismo; lo que
+ * cambia es dónde hay que mirarlo, y por eso se corta en tres y no en dos.
+ */
+function trozosDeLaRuta() {
   const crudo = textoDe(RUTA);
   const arranqueProbar = crudo.indexOf("body?.probar === true");
   const arranqueGuardar = crudo.indexOf(ROTULO_GUARDAR);
+  const arranqueWorker = crudo.indexOf("async function leerElPapel(");
   assert.ok(arranqueProbar > 0, "no se encontró la rama de probar");
   assert.ok(arranqueGuardar > arranqueProbar, "no se encontró la rama de guardar");
+  assert.ok(arranqueWorker > arranqueGuardar, "no se encontró la lectura que corre aparte");
   return {
     probar: sinComentarios(crudo.slice(arranqueProbar, arranqueGuardar)),
-    guardar: sinComentarios(crudo.slice(arranqueGuardar)),
+    guardar: sinComentarios(crudo.slice(arranqueGuardar, arranqueWorker)),
+    worker: sinComentarios(crudo.slice(arranqueWorker)),
   };
 }
 
@@ -85,18 +97,23 @@ test("PROBAR AVISA QUE NO GUARDA NADA, ANTES DE TOCARLO", () => {
 
 test("Y PROBAR NO ESCRIBE: LA RUTA LO GARANTIZA DEL LADO DEL SERVIDOR", () => {
   // La promesa de la pantalla no vale si la ruta escribe igual.
-  const ramaProbar = ramasDelPost().probar;
-  assert.ok(
-    !/comprobanteProveedor\.(update|upsert|create)|comprobanteLinea\.(update|create|createMany|deleteMany)|recetaProveedor\.(update|upsert)/.test(ramaProbar),
-    "probar volvió a escribir algo"
-  );
+  const { probar, worker } = trozosDeLaRuta();
+  // Se miran LOS DOS: la rama que arranca el turno y la lectura que corre
+  // aparte. Mirar solo una dejaría la mitad del camino sin candado, que es
+  // justo lo que pasa cuando un candado sobrevive a una mudanza sin releerse.
+  for (const [donde, codigo] of [["la rama de probar", probar], ["la lectura aparte", worker]]) {
+    assert.ok(
+      !/comprobanteProveedor\.(update|upsert|create)|comprobanteLinea\.(update|create|createMany|deleteMany)|recetaProveedor\.(update|upsert)/.test(codigo),
+      `probar volvió a escribir algo en ${donde}`
+    );
+  }
   // Lo único que sí escribe es la bitácora de llamadas, y tiene que seguir
   // haciéndolo: esa consulta gastó cuota igual que cualquier otra.
-  assert.match(ramaProbar, /llamadaLector\.createMany/);
+  assert.match(worker, /llamadaLector\.createMany/);
 });
 
 test("GUARDAR GUARDA SOLO LA EXPLICACIÓN", () => {
-  const ramaGuardar = ramasDelPost().guardar;
+  const ramaGuardar = trozosDeLaRuta().guardar;
   assert.match(ramaGuardar, /recetaProveedor\.upsert/);
   // Ni relee, ni toca comprobantes, ni pisa los impuestos de la receta.
   assert.ok(!/leerConCadena|comprobante/i.test(ramaGuardar), "guardar hace algo más que guardar");
@@ -187,7 +204,7 @@ test("Y LA UNIDAD QUE RESOLVIÓ EL SERVIDOR NO SE PIERDE AL CORREGIR", () => {
   // número. Si los productos no viajaran, esa segunda pasada los perdería y el
   // rótulo "el kilo" desaparecería solo, sin que nadie tocara nada.
   const c = codigoDe(EXPLICACION);
-  assert.match(c, /setProductos\(d\.productos \?\? null\)/);
+  assert.match(c, /setProductos\(d2\.productos \?\? null\)/);
   assert.match(c, /\[lectura, receta, correcciones, productos\]/);
   // Y el servidor manda SOLO la unidad: el costo del producto no tiene nada
   // que hacer en la pantalla donde se prueba cómo se lee un papel.
@@ -273,4 +290,68 @@ test("LA FOTO SE SIRVE POR LA RUTA NUEVA, CON EL MISMO PERMISO", () => {
   // El alcance va en el WHERE: un comprobante de otro grupo no existe.
   assert.match(foto, /comprobante: \{ id: comprobanteId, grupoId \}/);
   assert.match(foto, /checkPerm\(session, \["compras\.ver", "compras\.recibir"\]\)/);
+});
+
+// ── NINGUNA PANTALLA DE ESTE CIRCUITO MUESTRA UN CÓDIGO HTTP ──────────────
+
+test("NADIE ESCRIBE UN NÚMERO DE HTTP EN PANTALLA", () => {
+  // Lo que Emanuel leyó en el celular el 2026-09-21 fue "El servidor contestó
+  // 504." Un número no le dice a nadie qué hacer, y el catálogo con la frase
+  // correcta —"la lectura tardó más de lo que el servidor espera"— existía
+  // desde antes: estas pantallas no lo estaban usando.
+  const PANTALLAS = [
+    EXPLICACION,
+    CORRECCION,
+    BLOQUE,
+    "components/comprobantes/ListaConciliacion.jsx",
+    "components/comprobantes/PiezasConciliacion.jsx",
+    "components/comprobantes/PanelComprobantes.jsx",
+  ];
+  for (const pantalla of PANTALLAS) {
+    const c = codigoDe(pantalla);
+    assert.ok(
+      !/contestó \$\{[^}]*status/.test(c),
+      `${pantalla} vuelve a mostrar el código que contestó el servidor`
+    );
+    assert.ok(!/\$\{r\.status\}/.test(c), `${pantalla} interpola un estado HTTP en un texto`);
+  }
+});
+
+test("EL TEXTO DE UN FALLO SALE DEL CATÁLOGO QUE YA EXISTE", () => {
+  // Reusar, no escribir al lado: `queHacerHttp` con `OPERACION.LECTURA` ya
+  // tiene la frase de cada estado, incluida la del 504.
+  const c = codigoDe(EXPLICACION);
+  assert.match(c, /export function textoDeFallo/);
+  assert.match(c, /queHacerHttp\(status, \{ operacion: OPERACION\.LECTURA \}\)/);
+  // Y lo que el servidor haya mandado gana, porque sabe más que la tabla.
+  assert.match(c, /if \(cuerpo\?\.queHacer\) return cuerpo\.queHacer;/);
+  // Las otras tres pantallas lo usan en vez de tener su propia frase.
+  for (const pantalla of [
+    CORRECCION,
+    "components/comprobantes/ListaConciliacion.jsx",
+    "components/comprobantes/PiezasConciliacion.jsx",
+  ]) {
+    assert.match(codigoDe(pantalla), /textoDeFallo\(d, r\.status\)/, pantalla);
+  }
+});
+
+test("PROBAR NO ESPERA LA LECTURA: PIDE TURNO Y PREGUNTA", () => {
+  // La defensa contra el 504 no es un timeout más chico —el que corta vive en
+  // nginx, en otra máquina— sino que no haya ningún pedido HTTP largo.
+  const c = codigoDe(EXPLICACION);
+  assert.match(c, /probar: true/);
+  assert.match(c, /await esperarElTurno\(d\.turno\)/);
+  assert.match(c, /\?turno=\$\{encodeURIComponent\(turno\)\}/);
+  assert.match(c, /CADA_CUANTO_SE_PREGUNTA_MS/);
+  // Y mientras espera, dice cuánto puede tardar.
+  assert.match(TEXTO_LEYENDO, /puede tardar hasta un minuto/);
+
+  // Del lado del servidor: arrancar y contestar, sin `await` de la lectura.
+  const ruta = codigoDe(RUTA);
+  assert.match(ruta, /arrancarTurno\(\{/);
+  assert.ok(
+    !/await leerElPapel\(/.test(ruta),
+    "la ruta volvió a esperar la lectura adentro del pedido"
+  );
+  assert.match(ruta, /leyendo: true/);
 });

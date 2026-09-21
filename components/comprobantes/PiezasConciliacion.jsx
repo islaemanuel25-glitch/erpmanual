@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import { textoDeFallo } from "@/components/compras-proveedor/ExplicacionDelPapel";
 
 /**
  * El estado del vínculo, con PALABRA propia.
@@ -241,7 +242,7 @@ export function BuscadorProducto({
         if (!r.ok) {
           // El mensaje del servidor gana: sabe más que cualquier tabla de acá.
           setItems([]);
-          setFallo(d?.queHacer || d?.error || `El servidor contestó ${r.status}.`);
+          setFallo(textoDeFallo(d, r.status));
           return;
         }
         setItems(d?.items || d?.productos || []);

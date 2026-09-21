@@ -39,6 +39,13 @@ import {
   buscarProductoDeLaLinea,
 } from "@/lib/compras-proveedor/comprobante/analisisDeComprobante";
 import { esAutomatico } from "@/lib/compras-proveedor/comprobante/vinculo";
+import {
+  arrancarTurno,
+  mirarTurno,
+  olvidarTurno,
+  ESTADO_TURNO,
+} from "@/lib/compras-proveedor/comprobante/lector/lecturasEnCurso";
+import { randomUUID } from "node:crypto";
 import { usadasHoy } from "@/lib/ia/contadorDeIa";
 import { hayCuota, limiteDiario, MOTIVO_LIMITE, TEXTO_LIMITE } from "@/lib/ia/limiteDiario";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
@@ -87,6 +94,27 @@ export async function GET(req) {
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const parametros = new URL(req.url).searchParams;
+
+    // ── ¿CÓMO VA MI LECTURA? ────────────────────────────────────────────
+    //
+    // Es lo que pregunta la pantalla cada dos segundos mientras dice "Leyendo
+    // el papel…". Contesta en lo que tarda mirar un Map, así que este pedido no
+    // puede vencer por tiempo ni aunque la lectura tarde un minuto.
+    //
+    // Devuelve 200 SIEMPRE que la pregunta se haya podido contestar, incluso
+    // cuando la lectura falló: que una lectura salga mal no es un error de
+    // ESTE pedido, y un estado HTTP de error acá haría que la pantalla lo
+    // muestre como "el servidor contestó tal número" en vez del motivo.
+    const turno = parametros.get("turno");
+    if (turno) {
+      const estado = mirarTurno(turno, { dueño: session.id });
+      if (estado.estado === ESTADO_TURNO.LISTO || estado.estado === ESTADO_TURNO.FALLO) {
+        // Ya lo leyó la pantalla: no hace falta que siga ocupando memoria.
+        olvidarTurno(turno);
+      }
+      return NextResponse.json({ ok: true, turno: estado });
+    }
+
     const proveedorId = Number(parametros.get("proveedorId"));
     const comprobanteId = Number(parametros.get("comprobanteId"));
     if (!Number.isFinite(proveedorId)) {
@@ -187,136 +215,27 @@ export async function POST(req) {
       const { receta } = recetaDelProveedor(fila);
       const recetaProbada = { ...receta, explicacion };
 
-      const cadena = armarCadena();
-      if (!cadena.titular?.ok) {
-        return NextResponse.json(
-          { ok: false, motivo: cadena.titular?.motivo, error: cadena.titular?.queHacer },
-          { status: 503 }
-        );
-      }
-
-      let archivos;
-      try {
-        archivos = await Promise.all(
-          papel.archivos.map(async (a) => ({
-            bytes: await readFile(a.ubicacion),
-            mime: a.mime,
-            orden: a.orden,
-          }))
-        );
-      } catch {
-        return NextResponse.json(
-          { ok: false, error: "No se pudo abrir la foto del comprobante." },
-          { status: 503 }
-        );
-      }
-
-      const proveedor = await prisma.proveedor.findUnique({
-        where: { id: proveedorId },
-        select: { nombre: true },
+      // ── ACÁ ARRANCA LA LECTURA Y ACÁ MISMO SE CONTESTA ──────────────────
+      //
+      // Lo que sigue NO se espera. Se devuelve un número de turno en lo que
+      // tarda una consulta a la base, y la pantalla pregunta por él cada dos
+      // segundos. Así ningún proxy puede cortar por tiempo: no hay ningún
+      // pedido HTTP largo que cortar.
+      //
+      // El porqué largo, con los 60 segundos de nginx medidos, está en
+      // `lecturasEnCurso.js`.
+      const turno = randomUUID();
+      arrancarTurno({
+        id: turno,
+        dueño: session.id,
+        trabajo: () => leerElPapel({ papel, receta: recetaProbada, proveedorId, grupoId, localId: ctx.localId }),
       });
-      const resultado = await leerConCadena({
-        cadena,
-        archivos,
-        receta: recetaProbada,
-        proveedorNombre: proveedor?.nombre ?? null,
-      });
-
-      // La llamada SÍ se registra: gastó cuota igual que cualquier otra, y el
-      // contador existe para que nadie se entere de que no quedan con el camión
-      // en la puerta. Lo que no se escribe es el comprobante.
-      try {
-        const intentos = Array.isArray(resultado.intentos) ? resultado.intentos : [];
-        if (intentos.length) {
-          await prisma.llamadaLector.createMany({
-            data: intentos.map((i) => ({
-              modelo: i.lector,
-              ok: i.ok === true,
-              motivo: i.ok ? null : i.motivo ?? null,
-              detalle: i.ok ? null : i.detalle ?? null,
-              comprobanteId: papel.id,
-            })),
-          });
-        }
-      } catch (e) {
-        console.error("No se pudo registrar la llamada de la prueba:", e?.message);
-      }
-
-      if (!resultado.ok) {
-        return NextResponse.json(
-          {
-            ok: false,
-            motivo: resultado.motivo,
-            error: queHacerLectura(resultado.motivo),
-            detalle: (resultado.intentos || []).find((i) => !i.ok)?.detalle ?? null,
-          },
-          { status: estadoDeLaFalla(resultado.motivo) }
-        );
-      }
-
-      // ── QUÉ PRODUCTO ES CADA RENGLÓN, SI SE PUEDE SABER YA ──────────────
-      //
-      // Solo por ALIAS: el código del proveedor o un nombre que alguien ya
-      // asoció antes. Son los dos orígenes que el ERP ya considera automáticos
-      // —`esAutomatico`— porque no requieren que nadie confirme nada.
-      //
-      // Para qué: para poder decir "el kilo" o "cada una" en vez de deducirlo
-      // del peso impreso, que es justamente lo que no se puede hacer. Sin
-      // producto, el renglón se muestra con su subtotal y sin unidad, que es la
-      // verdad — esta pantalla está probando cómo se LEE el papel, y eso no
-      // depende de contra qué producto va.
-      //
-      // Si esto falla, la prueba sigue: la unidad es un rótulo, no el resultado.
-      let productosPorIndice = null;
-      try {
-        const contexto = await cargarContexto(prisma, { grupoId, localId: ctx.localId, proveedorId });
-        productosPorIndice = new Map();
-        (resultado.lectura?.lineas ?? []).forEach((l, i) => {
-          const busqueda = buscarProductoDeLaLinea({
-            linea: { codigoProveedor: l.codigoProveedor, descripcion: l.descripcion },
-            contexto,
-          });
-          const baseId = busqueda?.vinculoAutomatico?.productoBaseId ?? null;
-          if (baseId != null && esAutomatico(busqueda?.origen)) {
-            const producto = contexto.datosPorBase.get(baseId);
-            if (producto) productosPorIndice.set(i, producto);
-          }
-        });
-      } catch (e) {
-        console.error("No se pudo asociar los renglones a productos:", e?.message);
-        productosPorIndice = null;
-      }
 
       return NextResponse.json({
         ok: true,
-        probado: true,
+        leyendo: true,
+        turno,
         comprobanteId: papel.id,
-        resultado: comoLoEntendio({
-          lectura: resultado.lectura,
-          receta: recetaProbada,
-          productos: productosPorIndice,
-        }),
-        // ── LA LECTURA CRUDA Y LA RECETA TAMBIÉN VIAJAN ─────────────────
-        //
-        // Cuando la persona corrige un número, la pantalla rehace los dos
-        // controles con `comoLoEntendio`, la MISMA función que corrió acá. Sin
-        // estos dos, tendría que reconstruir la lectura desde el resultado ya
-        // armado, que es un segundo criterio esperando el día en que uno de
-        // los dos cambie.
-        lectura: resultado.lectura,
-        receta: recetaProbada,
-        // ── Y LOS PRODUCTOS, PARA QUE LA PANTALLA REHAGA LA MISMA CUENTA ───
-        //
-        // Cuando alguien corrige un número, la pantalla vuelve a llamar a
-        // `comoLoEntendio` con lo corregido. Sin esto, la unidad que el
-        // servidor resolvió se perdería en esa segunda pasada y el rótulo
-        // cambiaría solo. Viaja SOLO `unidad_medida`: es lo único que decide la
-        // unidad, y el costo del producto no tiene nada que hacer en esta
-        // pantalla.
-        productos: (resultado.lectura?.lineas ?? []).map((_, i) => {
-          const p = productosPorIndice?.get(i);
-          return p ? { unidad_medida: p.unidad_medida } : null;
-        }),
       });
     }
 
@@ -356,4 +275,136 @@ export async function POST(req) {
         quedo: "Si estabas probando, no se guardó nada: la prueba nunca escribe.",
       }) }, { status: 500 });
   }
+}
+
+
+/**
+ * LA LECTURA DE VERDAD. Corre APARTE del pedido que la pidió.
+ *
+ * Todo lo que antes vivía adentro del `POST` está acá igual, con una sola
+ * diferencia: lo que antes se devolvía, ahora se devuelve al turno. Quien lo
+ * espera es la pantalla, preguntando; nadie tiene un socket abierto mientras
+ * tanto.
+ *
+ * NO ESCRIBE NADA del comprobante ni de la receta, igual que antes. Lo único
+ * que escribe es la bitácora de llamadas, que gastó cuota igual que cualquier
+ * otra y tiene que quedar registrada.
+ */
+async function leerElPapel({ papel, receta, proveedorId, grupoId, localId }) {
+  const cadena = armarCadena();
+  if (!cadena.titular?.ok) {
+    return { ok: false, motivo: cadena.titular?.motivo, error: cadena.titular?.queHacer };
+  }
+
+  let archivos;
+  try {
+    archivos = await Promise.all(
+      papel.archivos.map(async (a) => ({
+        bytes: await readFile(a.ubicacion),
+        mime: a.mime,
+        orden: a.orden,
+      }))
+    );
+  } catch {
+    return {
+      ok: false,
+      error: "No se pudo abrir la foto del comprobante.",
+      queHacer: "Puede que la foto ya se haya borrado: viven siete días.",
+    };
+  }
+
+  const proveedor = await prisma.proveedor.findUnique({
+    where: { id: proveedorId },
+    select: { nombre: true },
+  });
+  const resultado = await leerConCadena({
+    cadena,
+    archivos,
+    receta,
+    proveedorNombre: proveedor?.nombre ?? null,
+  });
+
+  // La llamada SÍ se registra: gastó cuota igual que cualquier otra, y el
+  // contador existe para que nadie se entere de que no quedan con el camión en
+  // la puerta. Lo que no se escribe es el comprobante.
+  try {
+    const intentos = Array.isArray(resultado.intentos) ? resultado.intentos : [];
+    if (intentos.length) {
+      await prisma.llamadaLector.createMany({
+        data: intentos.map((i) => ({
+          modelo: i.lector,
+          ok: i.ok === true,
+          motivo: i.ok ? null : i.motivo ?? null,
+          detalle: i.ok ? null : i.detalle ?? null,
+          comprobanteId: papel.id,
+        })),
+      });
+    }
+  } catch (e) {
+    console.error("No se pudo registrar la llamada de la prueba:", e?.message);
+  }
+
+  if (!resultado.ok) {
+    return {
+      ok: false,
+      motivo: resultado.motivo,
+      error: queHacerLectura(resultado.motivo),
+      detalle: (resultado.intentos || []).find((i) => !i.ok)?.detalle ?? null,
+    };
+  }
+
+  // ── QUÉ PRODUCTO ES CADA RENGLÓN, SI SE PUEDE SABER YA ────────────────
+  //
+  // Solo por ALIAS: el código del proveedor o un nombre que alguien ya asoció
+  // antes. Son los dos orígenes que el ERP ya considera automáticos
+  // —`esAutomatico`— porque no requieren que nadie confirme nada.
+  //
+  // Para qué: para poder decir "el kilo" o "cada una" en vez de deducirlo del
+  // peso impreso, que es justamente lo que no se puede hacer. Sin producto, el
+  // renglón se muestra con su subtotal y sin unidad, que es la verdad.
+  //
+  // Si esto falla, la prueba sigue: la unidad es un rótulo, no el resultado.
+  let productosPorIndice = null;
+  try {
+    const contexto = await cargarContexto(prisma, { grupoId, localId, proveedorId });
+    productosPorIndice = new Map();
+    (resultado.lectura?.lineas ?? []).forEach((l, i) => {
+      const busqueda = buscarProductoDeLaLinea({
+        linea: { codigoProveedor: l.codigoProveedor, descripcion: l.descripcion },
+        contexto,
+      });
+      const baseId = busqueda?.vinculoAutomatico?.productoBaseId ?? null;
+      if (baseId != null && esAutomatico(busqueda?.origen)) {
+        const producto = contexto.datosPorBase.get(baseId);
+        if (producto) productosPorIndice.set(i, producto);
+      }
+    });
+  } catch (e) {
+    console.error("No se pudo asociar los renglones a productos:", e?.message);
+    productosPorIndice = null;
+  }
+
+  return {
+    ok: true,
+    probado: true,
+    comprobanteId: papel.id,
+    resultado: comoLoEntendio({
+      lectura: resultado.lectura,
+      receta,
+      productos: productosPorIndice,
+    }),
+    // La lectura cruda y la receta viajan para que la pantalla pueda rehacer
+    // los dos controles con `comoLoEntendio` —la MISMA función— cuando alguien
+    // corrige un número. Reconstruirlos del resultado ya armado sería un
+    // segundo criterio esperando el día en que uno de los dos cambie.
+    lectura: resultado.lectura,
+    receta,
+    // Y la unidad de cada renglón, para que esa segunda pasada no la pierda.
+    // Viaja SOLO `unidad_medida`: el costo del producto no tiene nada que hacer
+    // en la pantalla donde se prueba cómo se lee un papel.
+    productos: (resultado.lectura?.lineas ?? []).map((_, i) => {
+      const p = productosPorIndice?.get(i);
+      return p ? { unidad_medida: p.unidad_medida } : null;
+    }),
+  };
 }

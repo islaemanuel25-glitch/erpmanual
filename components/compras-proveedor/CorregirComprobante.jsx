@@ -26,6 +26,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import AsiLoEntendio from "@/components/compras-proveedor/AsiLoEntendio";
+import { textoDeFallo } from "@/components/compras-proveedor/ExplicacionDelPapel";
 import { comoLoEntendio } from "@/lib/compras-proveedor/comprobante/pruebaDeExplicacion";
 
 export const TITULO = "Este papel no cierra";
@@ -104,7 +105,7 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
       });
       const d = await r.json().catch(() => null);
       if (!d?.ok) {
-        setMensaje({ tipo: "error", texto: d?.queHacer || d?.error || `El servidor contestó ${r.status}.` });
+        setMensaje({ tipo: "error", texto: textoDeFallo(d, r.status) });
         return;
       }
       setMensaje({ tipo: d.cierra ? "ok" : "aviso", texto: d.queHacer });

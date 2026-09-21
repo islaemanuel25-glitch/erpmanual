@@ -35,9 +35,44 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiTextarea from "@/components/sunmi/SunmiTextarea";
 import AsiLoEntendio, { fotoDelComprobante } from "@/components/compras-proveedor/AsiLoEntendio";
 import { comoLoEntendio } from "@/lib/compras-proveedor/comprobante/pruebaDeExplicacion";
+import {
+  OPERACION,
+  queHacerHttp,
+  SIN_RESPUESTA_LECTURA,
+} from "@/lib/compras-proveedor/comprobante/subida";
+import {
+  ESTADO_TURNO,
+  TEXTO_TURNO,
+} from "@/lib/compras-proveedor/comprobante/lector/lecturasEnCurso";
 
 export const TITULO_PROBAR = "Probar: ver cómo lo entiende";
 export const AVISO_PROBAR = "Todavía no se guarda nada. Primero te muestra cómo leyó el papel.";
+/** Lo que se ve mientras la lectura corre aparte. El minuto NO es adorno: una
+ *  lectura real tarda entre 12 y 45 segundos, y sin decirlo la espera se lee
+ *  como que se colgó. */
+export const TEXTO_LEYENDO = TEXTO_TURNO[ESTADO_TURNO.LEYENDO];
+/** Cada cuánto se pregunta por el turno. */
+export const CADA_CUANTO_SE_PREGUNTA_MS = 2000;
+
+/**
+ * QUÉ DECIR CUANDO ALGO SALE MAL. NUNCA UN NÚMERO DE HTTP.
+ *
+ * Lo que el servidor haya mandado gana, porque sabe más. Si no mandó nada
+ * —una página de error del proxy, una respuesta que no es JSON— sale del
+ * CATÁLOGO que ya existe, el mismo que usa la recepción: `queHacerHttp` con
+ * `OPERACION.LECTURA`, que para un 504 dice "la lectura tardó más de lo que el
+ * servidor espera".
+ *
+ * Acá decía `El servidor contestó ${r.status}.`, y eso fue literalmente lo que
+ * Emanuel leyó en el celular el 2026-09-21: "El servidor contestó 504." Un
+ * número no le dice a nadie qué hacer. El catálogo existía desde antes; esta
+ * pantalla no lo estaba usando.
+ */
+export function textoDeFallo(cuerpo, status) {
+  if (cuerpo?.queHacer) return cuerpo.queHacer;
+  if (cuerpo?.error) return cuerpo.error;
+  return queHacerHttp(status, { operacion: OPERACION.LECTURA }).texto;
+}
 export const BAJADA =
   "Explicale cómo se lee, como se lo explicarías a una persona. Se hace una sola vez.";
 
@@ -55,6 +90,8 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
   const [papel, setPapel] = useState(null);
   const [explicacion, setExplicacion] = useState("");
   const [probando, setProbando] = useState(false);
+  // Qué decirle a quien espera mientras la lectura corre aparte.
+  const [leyendo, setLeyendo] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
   const [lectura, setLectura] = useState(null);
@@ -119,6 +156,11 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
     setMensaje(null);
     setCorrecciones({});
     try {
+      // ── ARRANCAR: ESTO CONTESTA ENSEGUIDA ────────────────────────────
+      //
+      // No espera la lectura. Devuelve un número de turno y la espera se hace
+      // preguntando, para que ningún proxy pueda cortar por tiempo — que es
+      // exactamente lo que pasó el 2026-09-21 con un 504 a los 60 segundos.
       const r = await fetch("/api/compras-proveedor/recetas/explicacion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -126,23 +168,65 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
         body: JSON.stringify({ proveedorId, comprobanteId, explicacion, probar: true }),
       });
       const d = await r.json().catch(() => null);
-      if (!d?.ok) {
-        setMensaje({ tipo: "error", texto: d?.queHacer || d?.error || `El servidor contestó ${r.status}.` });
+      if (!d?.ok || !d?.turno) {
+        setMensaje({ tipo: "error", texto: textoDeFallo(d, r.status) });
         return;
       }
-      // ── SE GUARDA LA LECTURA CRUDA, NO LO YA MASTICADO ──────────────
-      //
-      // Corregir un número obliga a rehacer los dos controles, y rehacerlos
-      // sobre el resultado ya armado sería reconstruir lo que el servidor ya
-      // hizo — o sea, un segundo criterio. Con la lectura y la receta acá,
-      // `comoLoEntendio` es literalmente la misma función de los dos lados.
-      setLectura(d.lectura);
-      setReceta(d.receta);
-      setProductos(d.productos ?? null);
+      await esperarElTurno(d.turno);
     } catch {
-      setMensaje({ tipo: "error", texto: "Se cortó la conexión mientras probaba. No se guardó nada." });
+      setMensaje({ tipo: "error", texto: SIN_RESPUESTA_LECTURA.texto });
     } finally {
       setProbando(false);
+    }
+  }
+
+  /** Preguntar por el turno hasta que esté, mostrando mientras tanto qué pasa. */
+  async function esperarElTurno(turno) {
+    setLeyendo(TEXTO_LEYENDO);
+    try {
+      // Sin tope de intentos a propósito: el que decide cuándo deja de esperar
+      // es quien mira la pantalla, no un número acá adentro. La lectura tiene
+      // su propio corte del lado del servidor y siempre termina — bien o mal—,
+      // así que este bucle no puede quedarse girando para siempre.
+      for (;;) {
+        await new Promise((listo) => setTimeout(listo, CADA_CUANTO_SE_PREGUNTA_MS));
+        const r = await fetch(
+          `/api/compras-proveedor/recetas/explicacion?turno=${encodeURIComponent(turno)}`,
+          { credentials: "include", cache: "no-store" }
+        );
+        const d = await r.json().catch(() => null);
+        if (!d?.ok) {
+          setMensaje({ tipo: "error", texto: textoDeFallo(d, r.status) });
+          return;
+        }
+        const t = d.turno;
+        if (t.estado === ESTADO_TURNO.LEYENDO) {
+          setLeyendo(t.texto || TEXTO_LEYENDO);
+          continue;
+        }
+        if (t.estado === ESTADO_TURNO.NO_ESTA) {
+          setMensaje({ tipo: "error", texto: t.texto });
+          return;
+        }
+        if (t.estado === ESTADO_TURNO.FALLO || !t.resultado?.ok) {
+          setMensaje({
+            tipo: "error",
+            texto:
+              t.resultado?.queHacer ||
+              t.resultado?.error ||
+              "No se pudo leer el papel. Probá de nuevo: no se guardó nada.",
+          });
+          return;
+        }
+        // ── LISTO ────────────────────────────────────────────────────
+        const d2 = t.resultado;
+        setLectura(d2.lectura);
+        setReceta(d2.receta);
+        setProductos(d2.productos ?? null);
+        return;
+      }
+    } finally {
+      setLeyendo(null);
     }
   }
 
@@ -160,7 +244,7 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
       setMensaje(
         d?.ok
           ? { tipo: "ok", texto: d.queHacer }
-          : { tipo: "error", texto: d?.error || `El servidor contestó ${r.status}.` }
+          : { tipo: "error", texto: textoDeFallo(d, r.status) }
       );
       if (d?.ok) onGuardado?.();
     } catch {
@@ -243,7 +327,7 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
             onClick={probar}
             className="w-full min-h-botonFoto justify-center text-sm3 font-bold"
           >
-            {probando ? "Leyendo el papel…" : TITULO_PROBAR}
+            {probando ? (leyendo || TEXTO_LEYENDO) : TITULO_PROBAR}
           </SunmiButton>
           <span className="text-sm3 sunmi-text-muted text-center">{AVISO_PROBAR}</span>
         </div>

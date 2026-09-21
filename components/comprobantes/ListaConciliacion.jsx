@@ -46,6 +46,7 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiPar from "@/components/sunmi/SunmiPar";
 import { comoSeDice } from "@/lib/compras-proveedor/comprobante/pantalla";
+import { textoDeFallo } from "@/components/compras-proveedor/ExplicacionDelPapel";
 import {
   estadoDeLaFila,
   origenDelCandidato,
@@ -108,7 +109,7 @@ export default function ListaConciliacion({
       });
       const d = await r.json().catch(() => null);
       if (d?.ok) setDatos(d);
-      else setMensaje({ tipo: "error", texto: d?.error || `El servidor contestó ${r.status}.` });
+      else setMensaje({ tipo: "error", texto: textoDeFallo(d, r.status) });
     } catch {
       setMensaje({ tipo: "error", texto: "No se pudo cargar la recepción: se cortó la conexión." });
     } finally {
@@ -128,7 +129,7 @@ export default function ListaConciliacion({
         body: JSON.stringify({ lineaId, productoBaseId }),
       });
       const d = await r.json().catch(() => null);
-      setMensaje({ tipo: d?.ok ? "ok" : "error", texto: d?.queHacer || d?.error || `Contestó ${r.status}.` });
+      setMensaje({ tipo: d?.ok ? "ok" : "error", texto: textoDeFallo(d, r.status) });
       setBuscandoEn(null);
       await recargar();
       onCambio?.();
@@ -148,7 +149,7 @@ export default function ListaConciliacion({
         body: JSON.stringify({ lineaId, unidad: unidadElegida[lineaId] ?? undefined }),
       });
       const d = await r.json().catch(() => null);
-      setMensaje({ tipo: d?.ok ? "ok" : "error", texto: d?.queHacer || d?.error || `Contestó ${r.status}.` });
+      setMensaje({ tipo: d?.ok ? "ok" : "error", texto: textoDeFallo(d, r.status) });
       if (d?.ok) setDecididas((s) => ({ ...s, [lineaId]: "SI" }));
       await recargar();
       onCambio?.();
