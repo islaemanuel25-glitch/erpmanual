@@ -100,16 +100,6 @@ export async function GET(req) {
               },
             },
           },
-          // ── SI YA HAY UN PAPEL LEÍDO, EL ESTIMADO DEJA DE SER LA NOTICIA ──
-          //
-          // Lo que se estimó al pedir sirve mientras no haya nada mejor. En
-          // cuanto el proveedor factura, lo que importa es cuánto facturó: es
-          // la plata que hay que pagar, y es un número del papel y no una
-          // cuenta nuestra. Se traen los comprobantes LEÍDOS con su total.
-          comprobantes: {
-            where: { estado: { not: "ANULADO" }, leidoEn: { not: null } },
-            select: { totalLeido: true },
-          },
         },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * pageSize,
@@ -117,6 +107,32 @@ export async function GET(req) {
       }),
       prisma.pedidoProveedor.count({ where }),
     ]);
+
+    // ── LO QUE FACTURÓ EL PAPEL, EN UNA CONSULTA APARTE ──────────────────
+    //
+    // `PedidoProveedor` NO tiene relación de Prisma hacia sus comprobantes:
+    // `ComprobanteProveedor.pedidoId` es un escalar pelado. Pedirlos con
+    // `include` compila igual y revienta contra Postgres — pasó acá mismo, y es
+    // el mismo incidente del 2026-08-12 con `productoLocal`.
+    //
+    // Se agrupa por pedido en una sola consulta sobre los que están en pantalla.
+    const totalesPorPedido = new Map();
+    if (items.length) {
+      const porPedido = await prisma.comprobanteProveedor.groupBy({
+        by: ["pedidoId"],
+        where: {
+          grupoId,
+          pedidoId: { in: items.map((p) => p.id) },
+          estado: { not: "ANULADO" },
+          leidoEn: { not: null },
+        },
+        _sum: { totalLeido: true },
+      });
+      for (const f of porPedido) {
+        const total = Number(f._sum.totalLeido) || 0;
+        if (total > 0) totalesPorPedido.set(f.pedidoId, total);
+      }
+    }
 
     const mapped = items.map((p) => ({
       id: p.id,
@@ -151,8 +167,10 @@ export async function GET(req) {
       // `null` mientras no haya ninguno leído, y ahí manda el estimado. Un
       // papel sin total impreso —un remito— deja esto en null también: no hay
       // número que mostrar y el estimado sigue siendo lo mejor que se tiene.
-      totalFacturado:
-        (p.comprobantes || []).reduce((acc, c) => acc + (Number(c.totalLeido) || 0), 0) || null,
+      // `null` mientras no haya ningún papel leído, y ahí manda el estimado. Un
+      // papel sin total impreso —un remito— también queda en null: no hay
+      // número que mostrar y el estimado sigue siendo lo mejor que se tiene.
+      totalFacturado: totalesPorPedido.get(p.id) ?? null,
       fechaConfirmado: p.fechaConfirmado,
       fechaEnviado: p.fechaEnviado,
       fechaRecibido: p.fechaRecibido,
