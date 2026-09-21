@@ -16,27 +16,15 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **23 migraciones** y el árbol en **24**. Hay **una
-pendiente**, y es aditiva.
+Producción está en **24 migraciones** y el árbol en **24**. No hay ninguna
+pendiente: el próximo despliegue es solo de código.
 
-- `20260921160000_llamada_lector_detalle` — **ADITIVA**
-
-Una columna de texto nullable en `LlamadaLector`: `detalle`. Guarda lo que
-contestó el servicio de lectura —estado y mensaje—, que hasta hoy se tiraba.
-
-**Por qué:** el 2026-09-21 el lector de facturas no leyó en toda la jornada y la
-bitácora repetía `SERVICIO_CAIDO` diecinueve veces sin poder contestar por qué.
-Hubo que volver a llamar a la API a mano para descubrir que abajo había dos
-causas distintas —un 503 de demanda y un 429 de cuota diaria agotada— y que el
-cuerpo del error no se guardaba en ningún lado.
-
-**Qué dijo el clasificador:** sin coincidencias. Es un `ADD COLUMN` de texto
-nullable, sin default, sin DROP y sin backfill.
-
-**Compatible hacia atrás:** la versión vieja no lee esa columna. Las filas que ya
-existen quedan en NULL, que es la verdad — de esas llamadas no se guardó nada.
-
-**El quinto chequeo del backup NO aplica:** no es de datos y no borra nada.
+`20260921160000_llamada_lector_detalle` salió de esta lista con el despliegue de
+`7c6c73b9`: el contenedor descartable informó las 24 del árbol, la aplicó, y
+`migrate status` cerró con "Database schema is up to date!". Comprobada contra la
+base después de recrear: la primera lectura fallida posterior guardó en `detalle`
+el cuerpo del 429 de Google, que es exactamente lo que la columna existe para
+guardar.
 
 `20260921020000_pedido_nacido_de_factura` salió de esta lista con el despliegue
 de `943d9bff`: el contenedor descartable informó las 23 del árbol, la aplicó, y
@@ -70,6 +58,66 @@ principio, cuando todavía hace falta, y se edita al final, cuando ya terminó
 todo. Vale la pena releer esta sección después de cada despliegue — el candado
 `scripts/migracionesPendientesAlDia.test.mjs` compara las cuentas, pero no puede
 saber cuál de los dos números quedó viejo.
+
+---
+
+## 2026-09-21 — `7c6c73b9` y `fab17d6c`, por qué no leía: UNA migración, APLICADA
+
+Dos cortes seguidos sobre lo mismo: que cada error del lector diga lo que es.
+
+### LA CAUSA, CON LA RESPUESTA CRUDA
+
+El lector no leyó en toda la jornada y la bitácora decía `SERVICIO_CAIDO`
+diecinueve veces. La etiqueta era **nuestra**: el lector mapeaba cualquier
+respuesta que no fuera 200 ni 429 a "servicio caído" y **tiraba el cuerpo**.
+Llamando a la API desde producción, con la clave real y la misma foto,
+aparecieron dos causas distintas:
+
+    HTTP 503 UNAVAILABLE
+    "This model is currently experiencing high demand. Spikes in demand are
+     usually temporary. Please try again later."
+
+    HTTP 429 RESOURCE_EXHAUSTED
+    "Quota exceeded for metric: generativelanguage.googleapis.com/
+     generate_content_free_tier_requests, limit: 20, model: gemini-3.6-flash"
+    quotaId: GenerateRequestsPerDayPerProjectPerModel-FreeTier
+
+**El tope del nivel gratuito son 20 consultas por día y una que falla gasta una
+igual.** El 2026-09-21 se hicieron **20 de 20**, casi todas reintentos: cada
+toque de «Leer» se comía una mientras la pantalla decía "el servicio no
+respondió", que es exactamente lo que invita a tocar de nuevo.
+
+Descartado con evidencia, el mismo día y desde el contenedor de producción: el
+modelo `gemini-3.6-flash` **existe** —una llamada de texto contestó 200—, la
+clave **es válida**, el servidor **sale a la red de Google**, y el tamaño de la
+foto **no es el problema**: la de 1,9 MB y la de 6,7 MB fallan igual, y
+`gemini-flash-latest` con la misma foto también da 503.
+
+### Qué cambió
+
+- El mapeo dice lo que es: 404 el modelo no existe, 401/403 la clave no sirve,
+  400 el pedido fue rechazado, 5xx sigue siendo el servicio caído.
+- El cuerpo del error **se guarda** en `LlamadaLector.detalle`.
+- La ruta pregunta por la cuota **antes** de llamar, con el MISMO contador que
+  ya usaba el importador sobre esa misma tabla: había dos consumidores de la
+  misma cuota y uno solo llevaba la cuenta.
+- El estado HTTP también dice lo que es: 429 la cuota, 422 la foto, 504 el
+  vencimiento, 500 lo que es de configuración. Antes todo era 502 —"la
+  aplicación no responde"—, que además es el estado que el proxy reemplaza por
+  su página de error, perdiendo el cuerpo con el motivo.
+
+### Los dos cortes
+
+- Los cinco valores coinciden en `fab17d6c…`; **arriba a los 2 y 3 segundos**;
+  0 reinicios; logs limpios; `/login` en 200; árbol del VPS limpio;
+  `erpazul_db` no recreado.
+- Rollback del segundo: RepoTag
+  `ghcr.io/islaemanuel25-glitch/erpmanual:7c6c73b966bcc52e968ab51d93daeb5abbf00e9d`,
+  image ID `sha256:c89f0c7cbce76dd977e4d91f52212b85d6ee4ac137906affc5b80c499d436727`.
+- **Y un error del procedimiento, que lo atajó el procedimiento:** al escribir
+  `APP_IMAGE` para el segundo corte puse un SHA inventado. Lo mostró
+  `config --images`, que es el chequeo barato que el paso 4 pide justamente para
+  eso, antes de bajar nada. Se corrigió y recién después se siguió.
 
 ---
 
