@@ -24,6 +24,7 @@
 // palabra, no el tono. Los textos están en lib/.../pantalla.js con su candado.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
@@ -47,6 +48,23 @@ import {
   SIN_RESPUESTA,
   SIN_RESPUESTA_LECTURA,
 } from "@/lib/compras-proveedor/comprobante/subida";
+
+/**
+ * VOLVER A LEER UN PAPEL QUE YA SE LEYÓ.
+ *
+ * Decía "Releer", que es una palabra de sistema. Dice lo que hace.
+ *
+ * ── CUÁNDO APARECE, QUE ES LO QUE IMPORTA ─────────────────────────────────
+ *
+ * Solo con `puedeRecibir`, que en la recepción es el estado ENVIADO. En un
+ * pedido RECIBIDO no está, y no puede estar: recibir ya movió stock y escribió
+ * costos, así que releer el papel cambiaría las líneas de abajo de números que
+ * ya se aplicaron.
+ *
+ * Existe para esto: con la explicación del proveedor recién guardada, el mismo
+ * papel se vuelve a leer y ahora cierra.
+ */
+export const TEXTO_LEER_DE_NUEVO = "Leer de nuevo";
 
 const TONOS = {
   ok: "sunmi-text-success",
@@ -160,7 +178,17 @@ export default function PanelComprobantes({
    * que una se filtra distinto.
    */
   onCantidad = null,
+  /**
+   * Cuáles comprobantes no cerraron, avisado hacia afuera.
+   *
+   * La pantalla de recibir dibuja arriba de la conciliación el bloque para
+   * corregirlos, y lo hace con la lista que este panel YA cargó. Pedirla por
+   * segunda vez desde afuera sería dos consultas de lo mismo, que se separan el
+   * día que una se filtre distinto.
+   */
+  onMalLeidos = null,
 }) {
+  const router = useRouter();
   const [items, setItems] = useState([]);
   const [cobertura, setCobertura] = useState(null);
   const [cuota, setCuota] = useState(null);
@@ -189,6 +217,7 @@ export default function PanelComprobantes({
       if (d.ok) {
         setItems(d.items || []);
         onCantidad?.((d.items || []).length);
+        onMalLeidos?.((d.items || []).filter((c) => c.estado === "MAL_LEIDO").map((c) => c.id));
         setCobertura(d.cobertura ?? null);
         setCuota(d.cuota ?? null);
       } else setMensaje({ tipo: "error", texto: d.error });
@@ -286,10 +315,52 @@ export default function PanelComprobantes({
     }
   }
 
+  /**
+   * ── ANTES DE LEER: ¿ALGUIEN EXPLICÓ CÓMO SE LEE ESTE PAPEL? ─────────────
+   *
+   * Sin explicación, el modelo adivina qué columna es la cantidad, si hay
+   * descuento y si el precio es por kilo. Medido sobre el papel de Paty: sin
+   * explicación no cerraba, con explicación cierra. Leer igual gasta una
+   * consulta de IA de las que hay contadas por día para conseguir un MAL_LEIDO
+   * casi seguro, y encima deja al que recibe con un cartel rojo y nada que
+   * hacer.
+   *
+   * Así que la primera vez se va a la receta, CON ESTA FOTO como papel de
+   * prueba: se explica una vez, se prueba ahí mismo, y al guardar se vuelve.
+   *
+   * No es un bloqueo escondido: la receta muestra la misma foto y termina en
+   * «Leer de nuevo». Y es una sola vez por proveedor — con la explicación
+   * guardada, este camino no se vuelve a tomar.
+   */
+  async function faltaLaExplicacion() {
+    if (!proveedorId) return false;
+    try {
+      const r = await fetch(
+        `/api/compras-proveedor/recetas/explicacion?proveedorId=${proveedorId}`,
+        { cache: "no-store" }
+      );
+      const d = await r.json();
+      // Si no se pudo preguntar, se lee igual. Un problema para consultar la
+      // receta no puede convertirse en "no se puede leer la factura".
+      if (!d?.ok) return false;
+      return !String(d.explicacion || "").trim();
+    } catch {
+      return false;
+    }
+  }
+
   async function leer(id) {
     setLeyendo(id);
     setMensaje(null);
     try {
+      if (await faltaLaExplicacion()) {
+        const volverA = typeof window !== "undefined" ? window.location.pathname : "";
+        router.push(
+          `/modulos/proveedores/recetas/${proveedorId}?comprobante=${id}` +
+            `&volverA=${encodeURIComponent(volverA)}`
+        );
+        return;
+      }
       const r = await fetch(`/api/compras-proveedor/comprobantes/leer/${id}`, { method: "POST" });
       const fallo = await mensajeDeRespuesta(r, OPERACION.LECTURA);
       if (fallo) {
@@ -545,7 +616,7 @@ export default function PanelComprobantes({
                           disabled={leyendo === c.id}
                           onClick={() => leer(c.id)}
                         >
-                          {leyendo === c.id ? "Leyendo…" : c.leidoEn ? "Releer" : "Leer"}
+                          {leyendo === c.id ? "Leyendo…" : c.leidoEn ? TEXTO_LEER_DE_NUEVO : "Leer"}
                         </SunmiButton>
                       )}
                       {puedeRecibir && sePuedeBorrar(c).ok && (
@@ -599,7 +670,7 @@ export default function PanelComprobantes({
                         disabled={leyendo === c.id}
                         onClick={() => leer(c.id)}
                       >
-                        {leyendo === c.id ? "Leyendo…" : c.leidoEn ? "Releer" : "Leer"}
+                        {leyendo === c.id ? "Leyendo…" : c.leidoEn ? TEXTO_LEER_DE_NUEVO : "Leer"}
                       </SunmiButton>
                     )}
                     {puedeRecibir && sePuedeBorrar(c).ok && (

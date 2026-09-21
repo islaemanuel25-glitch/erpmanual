@@ -15,6 +15,7 @@ import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import PanelComprobantes from "@/components/comprobantes/PanelComprobantes";
 import ListaConciliacion from "@/components/comprobantes/ListaConciliacion";
 import ListaDeLaFactura from "@/components/compras-proveedor/ListaDeLaFactura";
+import CorregirComprobante from "@/components/compras-proveedor/CorregirComprobante";
 import HojaCorregirLinea from "@/components/compras-proveedor/HojaCorregirLinea";
 import HojaCerrarRecepcion from "@/components/compras-proveedor/HojaCerrarRecepcion";
 import PedidoRecibido from "@/components/compras-proveedor/PedidoRecibido";
@@ -86,6 +87,12 @@ export default function DetallePedidoProveedorPage({ params }) {
   // Cuántos comprobantes tiene el pedido. Lo avisa `PanelComprobantes`, que es
   // el que los carga: la pantalla no pide la misma lista por su cuenta.
   const [hayComprobantes, setHayComprobantes] = useState(0);
+  // ── LOS QUE NO CERRARON, PARA PODER ARREGLARLOS ANTES DE CONCILIAR ────
+  //
+  // Un comprobante MAL_LEIDO no propone ningún costo, así que la conciliación
+  // de abajo queda trabada hasta que cierre. La lista la avisa
+  // `PanelComprobantes`, que ya la tiene cargada.
+  const [malLeidos, setMalLeidos] = useState([]);
 
   // ── LA FACTURA LEÍDA, CON SUS LÍNEAS EN EL ORDEN DEL PAPEL ─────────────
   //
@@ -1032,6 +1039,7 @@ export default function DetallePedidoProveedorPage({ params }) {
             proveedorId={pedido.proveedor?.id ?? pedido.proveedorId}
             puedeRecibir={esRecepcion}
             onCantidad={setHayComprobantes}
+            onMalLeidos={setMalLeidos}
             // ── SIN COMPROBANTES Y RECIBIENDO: EL BLOQUE DE LA FACTURA ─────
             //
             // El panel sigue siendo el dueño de la subida —el endpoint, la
@@ -1257,6 +1265,17 @@ export default function DetallePedidoProveedorPage({ params }) {
                 conversión de la recepción: dos vistas de lo mismo, una de ellas
                 sin convertir las cantidades, es cómo la pantalla terminó
                 diciendo "Factura 80" sobre 8 bultos. */}
+            {/* ── EL PAPEL QUE NO CIERRA SE ARREGLA ACÁ, ANTES DE LA LISTA ──
+                Es el mismo bloque que la receta —`AsiLoEntendio`— y la
+                diferencia es qué pasa con lo que se elige: allá solo recalcula
+                en pantalla, acá se guarda en la línea del comprobante y el
+                papel se vuelve a verificar con la misma puerta que usa la
+                lectura. */}
+            {esRecepcion &&
+              malLeidos.map((id) => (
+                <CorregirComprobante key={id} comprobanteId={id} onCorregido={cargar} />
+              ))}
+
             {esRecepcion && (
               <ListaConciliacion
                 pedidoId={pedido.id}
