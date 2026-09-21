@@ -250,13 +250,28 @@ export default function RecetasPage() {
                     </p>
                   )}
                 </div>
-                <SunmiButton
-                  color={p.tieneReceta ? "slate" : "cyan"}
-                  type="button"
-                  onClick={() => (abierto === p.proveedorId ? setAbierto(null) : abrir(p.proveedorId))}
-                >
-                  {abierto === p.proveedorId ? "Cerrar" : p.tieneReceta ? "Cambiar" : "Cargar"}
-                </SunmiButton>
+                <div className="flex flex-col gap-dato shrink-0">
+                  {/* ── LO QUE CAMBIA DE PAPEL A PAPEL SE EXPLICA, NO SE CARGA ──
+                      Los campos de abajo son los impuestos, que son cuatro y
+                      casi nunca cambian. Lo que cambia entre proveedores —qué
+                      columna es la cantidad, si hay descuento, si el precio es
+                      por kilo— se explica en castellano, una sola vez, y se
+                      prueba contra una foto de verdad antes de guardarla. */}
+                  <SunmiButton
+                    color="cyan"
+                    type="button"
+                    onClick={() => router.push(`/modulos/proveedores/recetas/${p.proveedorId}`)}
+                  >
+                    Explicar el papel
+                  </SunmiButton>
+                  <SunmiButton
+                    color={p.tieneReceta ? "slate" : "cyan"}
+                    type="button"
+                    onClick={() => (abierto === p.proveedorId ? setAbierto(null) : abrir(p.proveedorId))}
+                  >
+                    {abierto === p.proveedorId ? "Cerrar" : p.tieneReceta ? "Impuestos" : "Impuestos"}
+                  </SunmiButton>
+                </div>
               </div>
 
               {abierto === p.proveedorId && (
