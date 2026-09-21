@@ -200,6 +200,16 @@ try {
     afirmar(dice("Ganás"), "dice la ganancia del depósito");
     afirmar(dice("El papel de"), "está la tarjeta del papel");
     afirmar(dice("Entró esto"), "está la lista de lo que entró");
+    // ── Y EN CASTELLANO, QUE ES LA OTRA MITAD ───────────────────────────
+    //
+    // "Renglón", "línea" e "ítem" son idioma de sistema. Esto no es estilo: la
+    // pantalla la mira alguien que acaba de recibir mercadería, y lo que hay en
+    // el papel son productos. Se mira el texto de la pantalla, no el marcado,
+    // así que las clases de Tailwind —`items-center`— no cuentan.
+    for (const deSistema of ["renglón", "renglones", "línea", "líneas", "ítems", " items"]) {
+      afirmar(!dice(deSistema), `no usa la palabra de sistema "${deSistema.trim()}"`,
+        `aparece en la pantalla: ${(texto.match(new RegExp(`.{0,40}${deSistema.trim()}.{0,20}`)) || [])[0] || ""}`);
+    }
   }
   if (!conPapel) {
     afirmar(

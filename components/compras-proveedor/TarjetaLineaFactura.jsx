@@ -124,7 +124,7 @@ export default function TarjetaLineaFactura({
             la lista queda atrás y cerrar es un gesto, no una decisión. */}
         <SunmiLinkButton
           onClick={() => onCorregir?.(fila)}
-          aria-label={`Ver ${fila?.producto || "esta línea"}`}
+          aria-label={`Ver ${fila?.producto || "este producto"}`}
           className="block w-full text-left no-underline"
         >
         <div className="flex items-center gap-2">
@@ -266,7 +266,7 @@ export default function TarjetaLineaFactura({
           <SunmiLinkButton
             onClick={() => onCoincide?.(fila)}
             disabled={guardando}
-            aria-label={`Aceptar lo que dice la factura para ${fila?.producto || "esta línea"}`}
+            aria-label={`Aceptar lo que dice la factura para ${fila?.producto || "este producto"}`}
             className={`shrink-0 no-underline ${CLASE_COINCIDE}`}
           >
             {TEXTO_COINCIDE}

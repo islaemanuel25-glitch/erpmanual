@@ -1161,7 +1161,8 @@ export default function DetallePedidoProveedorPage({ params }) {
           <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
             <div className="flex items-center gap-2 flex-wrap pb-2 mb-3 border-b sunmi-divider">
               <h3 className="text-[13px] font-semibold sunmi-text-strong">
-                Detalle ({pedido.detalles?.length || 0} items)
+                Detalle ({pedido.detalles?.length || 0}{" "}
+                {pedido.detalles?.length === 1 ? "producto" : "productos"})
               </h3>
             </div>
 

@@ -126,7 +126,7 @@ export default function ListaDeLaFactura({
   // párrafo, porque es un dato y no una explicación.
   const avisoDelComprobante =
     comprobante?.estado === "SIN_TOTAL"
-      ? "Sin total impreso: controlá el papel renglón por renglón."
+      ? "Sin total impreso: controlá el papel producto por producto."
       : comprobante?.estado === "CARGADO"
         ? "Lectura verificada contra el total del papel."
         : comprobante?.estado || "—";
@@ -231,14 +231,14 @@ export default function ListaDeLaFactura({
           opciones={opciones}
           valor={filtro}
           onCambiar={setFiltro}
-          ariaLabel="Filtrar líneas de la factura"
+          ariaLabel="Filtrar productos de la factura"
         />
       }
       lista={
         <>
           {visibles.length === 0 && (
             <p className="text-center py-6 sunmi-text-muted text-sm2">
-              No hay líneas que coincidan con este filtro.
+              No hay productos que coincidan con este filtro.
             </p>
           )}
           {visibles.map((f) => (

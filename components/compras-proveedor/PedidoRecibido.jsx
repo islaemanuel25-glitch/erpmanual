@@ -18,10 +18,14 @@
 //
 // ── EL IDIOMA ─────────────────────────────────────────────────────────────
 //
-// Nada de "línea", "item", "al precio del ERP" ni "SIN_TOTAL". Se dice
-// renglones del papel, productos, bultos, "te facturó", "a tus precios vale",
-// "ganás". El que mira esta pantalla acaba de recibir mercadería, no de
-// depurar un sistema.
+// Nada de "línea", "item", "renglón", "al precio del ERP" ni "SIN_TOTAL". Se
+// dice PRODUCTOS —también donde antes decía renglones del papel—, bultos, "te
+// facturó", "a tus precios vale", "ganás". El que mira esta pantalla acaba de
+// recibir mercadería, no de depurar un sistema.
+//
+// Y cuando la palabra lleva un número al lado, el número se cuenta con esa
+// palabra: "15 productos" se cuenta por producto y no por renglón impreso, o la
+// frase es falsa el día que un producto venga en dos renglones.
 //
 // ── LAS MEDIDAS SON LAS QUE YA USA ESTA PANTALLA ──────────────────────────
 //
@@ -45,7 +49,7 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import { diaMesAR, horaAR } from "@/lib/fechas/formatearFechaHora";
 import { formatearMoneda } from "@/lib/moneda";
 import { gananciaDelDeposito } from "@/lib/compras-proveedor/gananciaDelDeposito";
-import { loQueEntro, textoDeCantidad } from "@/lib/compras-proveedor/loQueEntro";
+import { cuantosProductos, loQueEntro, textoDeCantidad } from "@/lib/compras-proveedor/loQueEntro";
 import { PAPEL, papelDelPedido } from "@/lib/compras-proveedor/papelDelPedido";
 
 /** Un renglón de producto: nombre arriba, cuenta abajo, total a la derecha. */
@@ -115,6 +119,7 @@ export default function PedidoRecibido({
   // pantalla armaba por su cuenta con `pedido.detalles` se fue: era una segunda
   // fuente para el mismo dato, y solo la alcanzaba la rama equivocada.
   const { delPapel, sinPapel } = loQueEntro({ filas, sinComprobante });
+  const productosDelPapel = cuantosProductos(filas);
 
   return (
     <section className="space-y-3">
@@ -194,13 +199,18 @@ export default function PedidoRecibido({
       {comprobante && (
         <SunmiCard className="p-3 space-y-dato">
           <span className="text-sm3 sunmi-text-strong break-words">
-            El papel de {proveedor} · {filas.length}{" "}
-            {filas.length === 1 ? "renglón" : "renglones"}
+            {/* EL NÚMERO CUENTA PRODUCTOS, NO RENGLONES. Acá decía
+                `filas.length`, que es cuántas veces aparece algo impreso en el
+                papel: con un producto repartido en dos renglones, "15
+                productos" sobre 14 distintos sería falso. El criterio está en
+                `cuantosProductos` y es el mismo en toda la pantalla. */}
+            El papel de {proveedor} · {productosDelPapel}{" "}
+            {productosDelPapel === 1 ? "producto" : "productos"}
           </span>
           <p className="text-sm2 sunmi-text-muted break-words">
             {comprobante.estado === "SIN_TOTAL"
               ? "No traía total impreso, así que el total lo sumó el sistema."
-              : "El total del papel coincidió con la suma de sus renglones."}
+              : "El total del papel coincidió con la suma de sus productos."}
           </p>
         </SunmiCard>
       )}

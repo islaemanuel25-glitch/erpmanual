@@ -445,7 +445,7 @@ export default function HojaCorregirLinea({
           // Eran tres en una fila que envolvía, así que "Desmarcar" terminaba
           // tapando a "Cancelar". Cancelar se fue —"Cerrar" del encabezado hace
           // lo mismo y está donde está en todos los modales del ERP— y lo que
-          // queda es la acción de cierre, ancha, con "Desmarcar esta línea"
+          // queda es la acción de cierre, ancha, con "Desmarcar este producto"
           // abajo y solo cuando hay algo que desmarcar.
           //
           // El texto y el color NO cambian según el caso, a diferencia de
@@ -470,7 +470,7 @@ export default function HojaCorregirLinea({
                 onClick={() => onDesmarcar?.(fila)}
                 className="w-full min-h-toque justify-center text-sm3"
               >
-                Desmarcar esta línea
+                Desmarcar este producto
               </SunmiButton>
             )}
           </div>
@@ -507,11 +507,14 @@ export default function HojaCorregirLinea({
                   {fila.producto || "Sin producto"}
                 </span>
               </span>
+              {/* "Cambiar el producto de esta línea" no se podía traducir
+                  palabra por palabra: "el producto de este producto" no dice
+                  nada. La acción es la misma y se nombra por lo que hace. */}
               <SunmiButton
                 color="slate"
                 type="button"
                 disabled={guardando}
-                aria-label="Cambiar el producto de esta línea"
+                aria-label="Elegir otro producto"
                 onClick={() => setCambiandoProducto(true)}
                 className="shrink-0 min-h-toque rounded-control px-4 text-sm3"
               >

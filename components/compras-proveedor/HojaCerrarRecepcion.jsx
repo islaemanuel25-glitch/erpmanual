@@ -121,8 +121,8 @@ export default function HojaCerrarRecepcion({
         <div className="flex flex-col gap-renglon">
           <span className="text-sm3 font-medium sunmi-text-strong">
             {sinComprobante.length === 1
-              ? "Una línea del pedido que ningún comprobante trajo"
-              : `${sinComprobante.length} líneas del pedido que ningún comprobante trajo`}
+              ? "Un producto del pedido que ningún comprobante trajo"
+              : `${sinComprobante.length} productos del pedido que ningún comprobante trajo`}
           </span>
           <span className="text-sm3 sunmi-text-muted break-words">
             Pueden haber llegado sin papel o no haber llegado. Lo que digas que no llegó no entra
@@ -175,7 +175,7 @@ export default function HojaCerrarRecepcion({
         </div>
       ) : (
         <span className="text-sm3 sunmi-text-muted break-words">
-          Todas las líneas del pedido tienen un comprobante que las respalda.
+          Todos los productos del pedido tienen un comprobante que los respalda.
         </span>
       )}
 
