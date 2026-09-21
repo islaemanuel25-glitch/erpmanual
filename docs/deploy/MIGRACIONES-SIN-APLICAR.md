@@ -40,6 +40,72 @@ saber cuál de los dos números quedó viejo.
 
 ---
 
+## 2026-09-21 — `037ac915`, la pantalla de un pedido recibido: CERO migraciones
+
+Producción pasó de `0291c3a7abe92757f30f6b2f915ac31ca1adfb91` a
+`037ac9158dad243d23a6ae0e43a92938de7164e0`. **Un solo commit en el rango** y
+ninguna migración: `migrate deploy` informó **22 migraciones, las mismas 22 del
+árbol**, y "No pending migrations to apply"; `migrate status` cerró con "Database
+schema is up to date!". El clasificador contestó **0 archivos a mirar** —con
+`--vps`, que desde adentro del servidor ya resuelve la imagen por el docker local
+y no por el alias ssh que acá no existe—.
+
+- Los cinco valores coinciden: `origin/main`, HEAD del VPS, tag de la imagen,
+  `APP_BUILD_ID` y `/api/version`, todos en `037ac915…`.
+- Imagen validada contra el registry antes de recrear: `linux/amd64`, digest
+  `sha256:a134da9498c4693fcb97094e729d44437fd668d9090e58dc26af68b8ee6d218c`, y el
+  label `org.opencontainers.image.revision` con el SHA completo.
+- Referencia de rollback registrada antes de tocar `APP_IMAGE`: RepoTag
+  `ghcr.io/islaemanuel25-glitch/erpmanual:0291c3a7abe92757f30f6b2f915ac31ca1adfb91`,
+  image ID `sha256:90209100b2833fceb23bb0b950ee4a73b795bb6a9c7aef7f1711e26e8dd1fc8d`.
+  No hizo falta usarla.
+- **PostgreSQL NO fue recreado**: `erpazul_db` sigue con cuatro semanas de
+  levantado y `healthy`. Todo con `--no-deps app`.
+- `erpazul_app`: **arriba a los 2 segundos**, 0 reinicios, logs sin `error`,
+  `fatal` ni `panic`, `/login` en 200 y el árbol del VPS limpio.
+- Backup previo validado con los cuatro chequeos:
+  `pre-037ac915_20260921_004200.sql.gz`, `pg_dump` en 0, `gzip -t` sin salida, la
+  marca de cierre en las últimas veinte líneas y **72 tablas**. No hacía falta el
+  quinto: no hay migración de datos.
+- La bitácora `.claude/migraciones-autorizadas.log` **no existe**: no se usó
+  ninguna autorización manual y la guardia no tuvo que ceder.
+
+### El marcador: dos cadenas nuevas, con su control
+
+`A tus precios vale` y `Entraron con la cantidad que hab` —las dos de la pantalla
+nueva—, buscadas con `grep -rlF` adentro de cada imagen en contenedores
+descartables: **0 archivos en la vieja y 2 en la nueva**, cada una. Control
+`Sin vincular`, que existía antes: **7 en las dos**, así que la búsqueda anda.
+
+Elegidas así y no de memoria: `git grep -F` contra el commit `0291c3a7` dio cero
+para las dos. Y las dos se cortaron **antes del primer acento** a propósito —el
+texto completo dice "habías"—, que es la trampa del template literal ya anotada
+más abajo.
+
+### La sonda de cascada
+
+Verde **antes y después** contra `https://operix.cloud`, con las cuatro
+mediciones en su valor: 3,5 y 10,5 px del botón, 7 y 10,5 px del input, con
+`1rem = 14px`. La hoja pasó de **1678 a 1680 reglas**.
+
+Y una nota de procedimiento, porque el próximo despliegue desde el servidor se va
+a encontrar con lo mismo: el host tiene **node 18 y ningún navegador**, así que la
+sonda corre en un contenedor descartable `node:22-alpine` con el `chromium` de
+Alpine y un envoltorio de dos líneas que le agrega `--no-sandbox`. Sin eso, lo
+único que se ve es "Edge no respondió al puerto de depuración", que no nombra la
+causa real —Chromium no puede crear los namespaces de su sandbox adentro de un
+contenedor—.
+
+### La auditoría de costos fuera de rango
+
+Corrida después de verificar, contra la base de producción y de solo lectura:
+**208 costos fuera de rango sobre 6 importaciones con costos escritos, y 162 que
+nadie eligió.** Los 162 sin elegir son **los mismos** que informó la corrida del
+2026-09-17; lo que creció fueron los elegidos a mano, de 24 a 46. No se corrigió
+nada desde acá: lo que haya que arreglar se arregla desde la aplicación.
+
+---
+
 ## 2026-09-18 — `e174c655`, los precios de cada columna del archivo: **ADITIVA**
 
 Producción pasó de `ee34f81786fc959366e63b7fc5e074d88307ffb2` a
