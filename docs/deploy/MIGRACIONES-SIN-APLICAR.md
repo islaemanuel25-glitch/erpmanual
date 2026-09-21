@@ -40,6 +40,47 @@ saber cuál de los dos números quedó viejo.
 
 ---
 
+## 2026-09-21 — `d59907a9`, en el papel hay productos: CERO migraciones
+
+Producción pasó de `401774ffa7f85c28b0945cc3800b412cc97f5e72` a
+`d59907a9d1840a60b9f06823ab5b4c0c72bae611`. Sin migraciones: 22 en el árbol y 22
+informadas por el contenedor descartable, clasificador en 0 archivos a mirar.
+
+- Los cinco valores coinciden en `d59907a9…`; **arriba a los 2 segundos**; 0
+  reinicios; logs limpios; `/login` en 200; árbol del VPS limpio; `erpazul_db`
+  **no** recreado.
+- Imagen validada: `linux/amd64`, digest
+  `sha256:5d30fa32ce33de2d91c6013b8ede402c3f94ed2aaf1089e24cb6eda9c4a92dce`.
+- Rollback: RepoTag
+  `ghcr.io/islaemanuel25-glitch/erpmanual:401774ffa7f85c28b0945cc3800b412cc97f5e72`,
+  image ID `sha256:9d31b3320a479b20639c2dc6bf444840b7b7650ea1d4470d46d75a21da801cf3`.
+  No hizo falta.
+- Backup `pre-d59907a9_20260921_015948.sql.gz`, cuatro chequeos, 72 tablas.
+  Auditoría de costos: **208 / 162 sin elegir**, sin cambios. Bitácora de
+  autorizaciones inexistente.
+
+### El marcador, en los dos sentidos
+
+Entra `producto por producto`: **0 archivos en la imagen vieja, 2 en la nueva**.
+Se va `No hay líneas que coincidan`: **2 en la vieja, 0 en la nueva**. Control
+`A tus precios vale`: **2 en las dos**.
+
+**Y uno que se descartó, que es lo que vale anotar:** `No hay productos que
+coincidan` daba **2 en la imagen vieja**, o sea antes de esta tanda — esa frase
+ya existía en otra pantalla del ERP. Habría leído como "mi cambio ya estaba".
+Un marcador se comprueba contra la imagen vieja, no contra el recuerdo de
+haberlo escrito.
+
+### La sonda, roja antes y verde después
+
+`sonda-pedido-recibido.mjs` aprendió a mirar el idioma: seis afirmaciones nuevas
+sobre las palabras de sistema. **Antes de desplegar, contra producción: ROJO en
+"renglones"**, que era la palabra que estaba en la pantalla; después de recrear,
+**VERDE las catorce**, con la tarjeta diciendo "El papel de Mauro · 15
+productos". `sonda-consola` OK sobre la 232 y la bandeja, antes y después.
+
+---
+
 ## 2026-09-21 — `401774ff`, la pantalla deja de decir que no hay papel: CERO migraciones
 
 Producción pasó de `037ac9158dad243d23a6ae0e43a92938de7164e0` a
