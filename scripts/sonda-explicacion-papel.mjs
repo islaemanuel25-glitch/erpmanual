@@ -321,6 +321,13 @@ async function unaCorrida({ bytes, mime, clave }) {
     "descripción".padEnd(34) +
       "cant".padStart(6) +
       "peso".padStart(9) +
+      // El precio de lista y el descuento se imprimen porque son los DOS
+      // números con los que el sistema hace el control por renglón. Sin ellos,
+      // un candado que quiera usar esta corrida como fixture tendría que
+      // inventarlos — y un fixture inventado es cómo tres candados de este repo
+      // quedaron verdes para siempre sin probar nada.
+      "precio".padStart(12) +
+      "bonif".padStart(7) +
       "subtotal".padStart(14) +
       "neto".padStart(14) +
       "  control"
@@ -336,6 +343,8 @@ async function unaCorrida({ bytes, mime, clave }) {
       String(l.descripcion || "").slice(0, 33).padEnd(34) +
         String(l.cantidad ?? "—").padStart(6) +
         String(l.peso ?? "—").padStart(9) +
+        pesos(l.precio).padStart(12) +
+        String(l.bonificacion ?? "—").padStart(7) +
         pesos(l.subtotal).padStart(14) +
         pesos(l.neto).padStart(14) +
         "  " +

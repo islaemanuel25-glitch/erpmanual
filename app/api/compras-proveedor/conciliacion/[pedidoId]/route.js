@@ -105,6 +105,9 @@ export async function GET(req, { params }) {
           select: {
             id: true, orden: true, textoCrudo: true, codigoProveedor: true, cantidad: true,
             netoUnitario: true, subtotalImpreso: true, internoUnitario: true,
+            // Los kilos y el descuento del papel: el costo real de un renglón
+            // con peso sale de dividir por ellos, no por las piezas.
+            pesoKg: true, bonificacionPct: true,
             productoLocalId: true, pedidoDetalleId: true, precioPedidoPrevio: true,
             // La marca de controlado, que ahora es un hecho guardado y no
             // estado de React: sin esto la pantalla vuelve a 0 revisadas en

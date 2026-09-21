@@ -16,8 +16,30 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **24 migraciones** y el árbol en **24**. No hay ninguna
-pendiente: el próximo despliegue es solo de código.
+Producción está en **24 migraciones** y el árbol en **25**. Hay **una**
+pendiente.
+
+- `20260921180000_receta_explicada_y_kilos`
+
+**Qué hace:** agrega **cinco columnas, todas nullable y todas nuevas**. Tres en
+`RecetaProveedor` —`explicacion`, `explicacionActualizadaEn`,
+`explicacionActualizadaPor`— para guardar, en castellano, cómo se lee el papel
+de ese proveedor. Dos en `ComprobanteLinea` —`pesoKg` y `bonificacionPct`— para
+los kilos y el descuento de cada renglón, que es lo que el papel de Paty trae y
+el de Mauro no.
+
+**Aditiva: sin DROP, sin backfill y sin cambio de tipo.** Ninguna fila existente
+se toca y ninguna columna existente se modifica. Las cinco quedan en `NULL` para
+todo lo que ya está cargado, que es la verdad: nadie explicó todavía ningún
+papel, y ninguna línea leída hasta hoy trae kilos ni descuento porque el lector
+no los pedía.
+
+**La ventana entre migrar y recrear no rompe nada.** El código viejo no conoce
+las cinco columnas y no las lee; el esquema nuevo no le exige nada. Lo único que
+pasa durante esa ventana es que las facturas se siguen leyendo como hasta hoy.
+
+**El quinto chequeo del backup NO aplica:** no se borra ni se transforma ningún
+dato, así que no hay ningún valor que comprobar dentro del dump.
 
 `20260921160000_llamada_lector_detalle` salió de esta lista con el despliegue de
 `7c6c73b9`: el contenedor descartable informó las 24 del árbol, la aplicó, y

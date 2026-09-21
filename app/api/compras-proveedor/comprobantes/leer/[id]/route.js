@@ -324,6 +324,12 @@ export async function POST(req, { params }) {
             netoUnitario: l.netoUnitario,
             subtotalImpreso: l.subtotalImpreso ?? l.netoUnitario * l.cantidad,
             internoUnitario: l.internoUnitario ?? null,
+            // Los kilos del papel y el descuento del renglón. Con kilos, el
+            // costo real sale de dividir el subtotal por ellos y no por las
+            // piezas; el descuento no se aplica a nada —el subtotal ya lo
+            // tiene— y sirve para señalar un renglón mal leído.
+            pesoKg: l.peso ?? null,
+            bonificacionPct: l.bonificacion ?? null,
           })),
         });
       }

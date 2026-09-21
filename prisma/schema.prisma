@@ -3576,6 +3576,26 @@ model RecetaProveedor {
 
   facturaPor FacturaPor @default(UNIDAD)
 
+  /// ── LA RECETA, EXPLICADA EN PALABRAS ──────────────────────────────────
+  ///
+  /// Hay unos treinta proveedores y cada papel es distinto. Los campos de
+  /// arriba cubren impuestos y nada más, y lo que cambia de papel a papel es
+  /// CÓMO SE LEE: qué columna es la cantidad, si hay descuento, si el precio es
+  /// por kilo. Acá va eso, dicho como se lo explicarías a una persona.
+  ///
+  /// MEDIDO antes de construirlo, con el papel real de Paty (la sonda
+  /// `sonda-explicacion-papel.mjs`, cd05b779): con una explicación de cuatro
+  /// frases, 11 de 11 renglones quedaron bien interpretados y las tres corridas
+  /// dieron los mismos números. Sin ella ese papel salía MAL_LEIDO.
+  ///
+  /// NO reemplaza a los campos de arriba: el IVA y las percepciones siguen
+  /// armando su parte del pedido al modelo y toda la verificación.
+  explicacion               String?
+  explicacionActualizadaEn  DateTime?
+  /// Quién la escribió. Sin autor, dentro de seis meses nadie sabe a quién
+  /// preguntarle por qué el papel se lee así.
+  explicacionActualizadaPor Int?
+
   /// Sube cada vez que alguien la edita. Se copia en el comprobante para poder
   /// explicar un resultado viejo, igual que parserVersion en las listas.
   version Int @default(1)
@@ -3978,6 +3998,20 @@ model ComprobanteLinea {
   /// medido en la factura de DAS, dos de tres líneas difieren un centavo y
   /// recalcular desvía el comprobante tres centavos, fuera de la tolerancia.
   subtotalImpreso Decimal  @db.Decimal(12, 2)
+  /// ── LOS KILOS DEL PAPEL ───────────────────────────────────────────────
+  ///
+  /// Cuando el renglón trae peso, el precio es POR KILO y la cantidad son
+  /// piezas: el costo real sale de dividir el subtotal por los kilos, no por
+  /// las piezas. Hasta ahora esos kilos no se leían, y por eso el fiambre
+  /// quedaba afuera de la cuenta de la ganancia con el motivo escrito en
+  /// `gananciaDelDeposito`: "los kilos no están en el papel". Ahora sí están,
+  /// cuando el papel los trae.
+  pesoKg          Decimal? @db.Decimal(12, 3)
+  /// El descuento del renglón, en porcentaje y como viene impreso. NO se aplica
+  /// a nada: el subtotal impreso ya lo tiene adentro. Sirve para el control por
+  /// renglón —(kilos o cantidad) × precio × (1 − bonif) contra el subtotal— que
+  /// es lo que señala un número mal leído.
+  bonificacionPct Decimal? @db.Decimal(5, 2)
   descuento       Decimal? @db.Decimal(12, 2)
   internoUnitario Decimal? @db.Decimal(18, 6)
   ivaPct          Decimal? @db.Decimal(5, 2)
