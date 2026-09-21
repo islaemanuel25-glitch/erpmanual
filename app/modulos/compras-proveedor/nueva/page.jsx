@@ -41,6 +41,9 @@ import {
   permiteToggleUnidad,
   convertirUnidadPedido,
 } from "@/lib/compras-proveedor/calculoPedido";
+// LA CONVERSIÓN DE ESCALA YA EXISTÍA, en el módulo de importación: sabe además
+// que un fiambre o un producto por kilo NO se divide por el pack.
+import { costoParaUnidad } from "@/lib/compras-proveedor/importacion/merge";
 import {
   recibeHoy,
   formatDiaLabel,
@@ -499,7 +502,15 @@ export default function NuevaCompraProveedorPage() {
               unidadPedido: pr.modoCompra === "UNIDAD" ? "UNIDAD" : "BULTO",
               unidad_medida: pr.unidad_medida,
               cantidad: pr.sugerido,
-              precioCosto: Number(pr.precio_costo || 0),
+              // EL COSTO VA EN LA UNIDAD DE LA LÍNEA. `precio_costo` de un
+              // producto PACK está por bulto; si la línea nace en UNIDAD, sin
+              // esto la cantidad queda en sueltas y el costo en packs.
+              precioCosto:
+                costoParaUnidad({
+                  costoMaestro: pr.precio_costo,
+                  unidad: pr.modoCompra === "UNIDAD" ? "UNIDAD" : "BULTO",
+                  producto: pr,
+                }) ?? 0,
               factorPack: Number(pr.factor_pack) || 1,
               sugerido: pr.sugerido,
               sinParametros: pr.sinParametros,
@@ -557,8 +568,16 @@ export default function NuevaCompraProveedorPage() {
                   unidadPedido: l.unidadPedido || (pr.modoCompra === "UNIDAD" ? "UNIDAD" : "BULTO"),
                   unidad_medida: pr.unidad_medida,
                   cantidad: l.cantidad,
-                  // Del catálogo, NO del guardado: es el costo nuevo.
-                  precioCosto: Number(pr.precio_costo || 0),
+                  // Del catálogo, NO del guardado: es el costo nuevo. Y puesto
+                  // en la unidad de ESTA línea, que puede no ser la de fábrica
+                  // del producto: un borrador guardado en UNIDAD sobre un
+                  // producto PACK tiene que recibir el costo unitario.
+                  precioCosto:
+                    costoParaUnidad({
+                      costoMaestro: pr.precio_costo,
+                      unidad: l.unidadPedido || (pr.modoCompra === "UNIDAD" ? "UNIDAD" : "BULTO"),
+                      producto: pr,
+                    }) ?? 0,
                   factorPack: Number(pr.factor_pack) || 1,
                   sugerido: pr.sugerido,
                   sinParametros: pr.sinParametros,
@@ -626,10 +645,23 @@ export default function NuevaCompraProveedorPage() {
         : prod.sugerido > 0
         ? prod.sugerido
         : 1;
-    const costoInicial =
-      costoParam != null ? Number(costoParam) || 0 : Number(prod.precio_costo || 0);
     const unidadInicial =
       unidadParam || (prod.modoCompra === "UNIDAD" ? "UNIDAD" : "BULTO");
+    // ── EL COSTO, EN LA UNIDAD EN QUE QUEDÓ LA LÍNEA ────────────────────
+    //
+    // Un costo que viene dado —`costoParam`— ya está en la unidad de quien lo
+    // pasó y se respeta. El del CATÁLOGO está por bulto, así que si la línea
+    // nace en UNIDAD hay que bajarlo al unitario. Sin esto se guarda la
+    // cantidad en sueltas y el precio en packs, que es lo que le pasó al
+    // renglón de las hamburguesas del pedido #242.
+    const costoInicial =
+      costoParam != null
+        ? Number(costoParam) || 0
+        : costoParaUnidad({
+            costoMaestro: prod.precio_costo,
+            unidad: unidadInicial,
+            producto: prod,
+          }) ?? 0;
     const nuevoItemBase = {
       productoLocalId: prod.productoLocalId,
       baseId: prod.baseId ?? null,
@@ -838,7 +870,21 @@ export default function NuevaCompraProveedorPage() {
       // tiene `placeholder="0"`: se ve el cero igual y no hay que borrarlo
       // antes de escribir.
       cant: d.cant !== undefined ? d.cant : "",
-      costo: d.costo !== undefined ? d.costo : Number(prod.precio_costo || 0),
+      // ── EL COSTO DEL BORRADOR VA EN LA UNIDAD DEL BORRADOR ──────────────
+      //
+      // Este par viaja tal cual a `agregarItem`, y allá un costo que viene dado
+      // se respeta: si acá entrara el maestro sin convertir, la conversión de
+      // allá no correría nunca y la línea nacería con la cantidad en sueltas y
+      // el precio en packs. Es el mismo defecto del renglón de las
+      // hamburguesas del #242, por la puerta de al lado.
+      costo:
+        d.costo !== undefined
+          ? d.costo
+          : costoParaUnidad({
+              costoMaestro: prod.precio_costo,
+              unidad: d.unidad !== undefined ? d.unidad : unidadDefault(prod),
+              producto: prod,
+            }) ?? 0,
       unidad: d.unidad !== undefined ? d.unidad : unidadDefault(prod),
     };
   };
