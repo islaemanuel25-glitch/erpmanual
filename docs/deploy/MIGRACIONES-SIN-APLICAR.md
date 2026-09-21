@@ -16,26 +16,22 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **22 migraciones** y el árbol en **23**. Hay **una
-pendiente**, y es aditiva.
+Producción está en **23 migraciones** y el árbol en **23**. No hay ninguna
+pendiente: el próximo despliegue es solo de código.
 
-- `20260921020000_pedido_nacido_de_factura` — **ADITIVA**
+`20260921020000_pedido_nacido_de_factura` salió de esta lista con el despliegue
+de `943d9bff`: el contenedor descartable informó las 23 del árbol, la aplicó, y
+`migrate status` cerró con "Database schema is up to date!". Comprobado contra
+la base antes de recrear: **238 pedidos, los 238 en false**, que es la verdad
+—todos tuvieron pedido previo— y es lo que la versión vieja veía durante la
+ventana: una columna que no lee.
 
-Una columna booleana con default false en `PedidoProveedor`:
-`nacidoDeFactura`. Marca los pedidos que nacen de una factura —llegó mercadería
-de un proveedor al que nadie le pidió nada— para que la pantalla no diga
-"Pediste" sobre un pedido que no existió y para que el historial lo distinga.
-
-**Qué dijo el clasificador:** sin coincidencias. No hay DROP, ni RENAME, ni SET
-NOT NULL, ni UPDATE: es un `ADD COLUMN` con default.
-
-**Compatible hacia atrás durante la ventana:** la versión vieja no lee esa
-columna, así que puede seguir atendiendo con el esquema nuevo sin enterarse. Los
-2.675 pedidos que ya existen quedan en false, que es la verdad — todos tuvieron
-pedido previo.
-
-**El quinto chequeo del backup NO aplica:** no es una migración de datos y no
-borra nada, así que no hay ningún valor que comprobar dentro del dump.
+**Y una corrección sobre el comentario de esa migración, que ya está aplicada y
+por eso no se toca:** dice "los 2.675 pedidos que ya existen". Son **238**. El
+2.675 es la cantidad de pares pedido+producto que se había medido para otra
+pregunta —si un pedido repite un producto, que no pasa nunca— y se coló en la
+frase. El archivo no se edita porque cambiarlo después de aplicado le cambia el
+checksum a `_prisma_migrations`; queda corregido acá.
 
 `20260920223000_linea_de_factura_revisada` salió de esta lista con el despliegue
 de `73984cce`: `migrate deploy` informó las 22 del árbol y la aplicó, y
@@ -55,6 +51,74 @@ principio, cuando todavía hace falta, y se edita al final, cuando ya terminó
 todo. Vale la pena releer esta sección después de cada despliegue — el candado
 `scripts/migracionesPendientesAlDia.test.mjs` compara las cuentas, pero no puede
 saber cuál de los dos números quedó viejo.
+
+---
+
+## 2026-09-21 — `943d9bff` y `672c6fbc`, llegó algo sin pedido: UNA migración, APLICADA
+
+Dos cortes seguidos, y el segundo arregla lo que rompió el primero. Va entero
+porque la parte fea es la que sirve.
+
+### `20260921020000_pedido_nacido_de_factura` — APLICADA
+
+`migrate deploy` informó **23 migraciones**, aplicó la que faltaba y
+`migrate status` cerró con "Database schema is up to date!". El clasificador la
+marcó **aditiva** —un `ADD COLUMN` con default, sin DROP ni UPDATE— y antes de
+recrear se leyó la columna contra la base: **238 pedidos, los 238 en false**.
+El quinto chequeo del backup no aplicaba: no borra nada.
+
+### EL PRIMER CORTE DEJÓ UNA PANTALLA ROTA EN PRODUCCIÓN
+
+`943d9bff` rompió **Recibir mercadería**: "Application error", con la consola
+diciendo `Cannot access 'k' before initialization`. La causa es de una línea —
+`useAccionDePagina` lleva `eligiendoProveedor` en su arreglo de dependencias, que
+se evalúa en cada render, y la declaración estaba más abajo—.
+
+**Nada de lo que corre en un despliegue podía verlo:** el build compiló, la
+suite quedó en verde con 6.653 candados, los cinco valores coincidieron y
+`/login` contestó 200. Lo encontró `sonda-consola.mjs`, corrida DESPUÉS de
+recrear porque en este servidor no hay dónde levantar la aplicación para
+probarla antes. Entre un corte y el otro pasaron unos minutos con esa pantalla
+caída; las demás no se tocaron.
+
+**Es la segunda vez con la misma forma** —la primera fue `recargarConciliacion`
+en la pantalla del pedido— y la primera se arregló sin candado, así que volvió.
+Ahora hay uno: `scripts/dependenciasDeclaradasAntes.test.mjs` recorre las
+pantallas y se pone rojo si un hook nombra en sus dependencias algo declarado
+más abajo. Verificado por contraprueba con el código exacto que rompió
+producción.
+
+### EL CAMINO NUEVO, EJERCIDO DE PUNTA A PUNTA EN PRODUCCIÓN
+
+Con una factura real de Mauro: se creó el **pedido 239** —ENVIADO, marcado como
+nacido de factura, cero renglones—, se subió la foto, y la lectura lo armó solo:
+**15 renglones leídos, 15 productos, 15 vinculados solos, 0 sin vincular**, cada
+línea con la cantidad en BULTOS y el precio interno del ERP. **No se cerró**:
+cerrar mueve stock.
+
+Dos cosas que costaron y conviene saber. La guarda de duplicados rechaza el
+mismo archivo para el mismo proveedor —correcto—, así que para subir la misma
+factura real hubo que cambiarle los bytes de cola; la imagen es idéntica. Y el
+lector devolvió **SERVICIO_CAIDO tres veces seguidas** antes de leer bien a la
+cuarta: Gemini estaba caído, quedó registrado en `LlamadaLector`, y el pase al
+respaldo NO corrió porque está apagado por defecto desde el 2026-08-27 —
+`IA_RESPALDO_AUTOMATICO` no está puesta—, que es lo que corresponde.
+
+### Los dos cortes
+
+- Los cinco valores coinciden en `672c6fbc…`; **arriba a los 3 segundos** el
+  primero y a los 3 el segundo; 0 reinicios; logs limpios; `/login` en 200;
+  árbol del VPS limpio; `erpazul_db` no recreado.
+- Rollback del segundo: RepoTag
+  `ghcr.io/islaemanuel25-glitch/erpmanual:943d9bffcf9fcb49818787aac108b1865166550b`,
+  image ID `sha256:dbdb1584ee0a55d730dbdb071655d91251d9d5c32d4eea9b0d7d1de1a839d8a2`.
+  **No servía para volver del defecto**: la imagen anterior es justamente la que
+  lo traía. El camino de vuelta habría sido `d59907a9`.
+- Backups validados con los cuatro chequeos antes de cada uno, 72 tablas.
+  Auditoría de costos: **208 / 162 sin elegir**, sin cambios. Bitácora de
+  autorizaciones inexistente.
+- `sonda-consola` OK sobre la bandeja, el pedido nuevo y el 232;
+  `sonda-pedido-recibido` **VERDE las catorce**.
 
 ---
 
