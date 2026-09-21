@@ -79,7 +79,13 @@ export default function BloqueDeLaFactura({
       {/* ── LA SALIDA SECUNDARIA ────────────────────────────────────────────
           Existe porque el caso pasa: el camión llega y la factura viene después,
           o no viene. Va en slate y abajo, no compitiendo con la foto, y dice lo
-          que cuesta —contar los bultos a mano— en vez de dejarlo descubrir. */}
+          que cuesta —contar los bultos a mano— en vez de dejarlo descubrir.
+
+          SIN MANEJADOR NO SE DIBUJA. Un pedido nacido de una factura no tiene
+          esta salida: el pedido ES la factura, así que sin papel no hay nada
+          que contar a mano. Dibujar el botón y no hacer nada es peor que no
+          tenerlo. */}
+      {onSinFactura && (
       <div className="flex flex-col gap-dato">
         <SunmiButton
           color="slate"
@@ -91,6 +97,7 @@ export default function BloqueDeLaFactura({
         </SunmiButton>
         <span className="text-sm3 sunmi-text-muted text-center">{BAJADA_SIN_FACTURA}</span>
       </div>
+      )}
     </>
   );
 }

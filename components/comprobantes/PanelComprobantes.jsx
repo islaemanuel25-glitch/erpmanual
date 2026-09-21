@@ -41,7 +41,12 @@ import {
   resumenDeLista,
 } from "@/lib/compras-proveedor/comprobante/pantalla";
 import { sePuedeBorrar, textoDeBorrado } from "@/lib/compras-proveedor/comprobante/borrado";
-import { queHacerHttp, SIN_RESPUESTA } from "@/lib/compras-proveedor/comprobante/subida";
+import {
+  OPERACION,
+  queHacerHttp,
+  SIN_RESPUESTA,
+  SIN_RESPUESTA_LECTURA,
+} from "@/lib/compras-proveedor/comprobante/subida";
 
 const TONOS = {
   ok: "sunmi-text-success",
@@ -91,9 +96,15 @@ function Aviso({ estado }) {
  * página HTML, así que `r.json()` revienta y todo el mensaje del servidor se
  * pierde en un `catch` genérico. Eso fue justamente lo que pasó.
  */
-async function mensajeDeRespuesta(r) {
+async function mensajeDeRespuesta(r, operacion = OPERACION.SUBIDA) {
   if (!r.ok) {
-    const { texto } = queHacerHttp(r.status);
+    // ── QUÉ SE ESTABA HACIENDO, NO SOLO QUÉ CONTESTÓ EL SERVIDOR ────────
+    //
+    // El mismo 502 significa cosas distintas subiendo y leyendo, y el texto de
+    // la subida AFIRMA "No se subió nada". Usado para una lectura fallida, eso
+    // es falso: la foto ya está guardada, y la pantalla la está mostrando dos
+    // centímetros más abajo. Pasó en producción con el pedido 240.
+    const { texto } = queHacerHttp(r.status, { operacion });
     // Si el servidor mandó JSON con su propio motivo, ese gana: sabe más que la
     // tabla por estado. Si no se puede leer —página de error del proxy—, queda
     // el texto del estado, que igual dice qué pasó.
@@ -108,6 +119,19 @@ async function mensajeDeRespuesta(r) {
 
 export default function PanelComprobantes({
   pedidoId,
+  /**
+   * ── LEER APENAS SE SUBE ─────────────────────────────────────────────────
+   *
+   * Para un pedido que NACE de la factura el camino acordado es uno solo: foto
+   * → se lee → se arma el pedido. Sin esto queda en "Sin leer" esperando un
+   * toque más, y el pedido queda vacío: no hay nada que recibir hasta que
+   * alguien toque «Leer». Pasó en producción con el pedido 240.
+   *
+   * En un pedido NORMAL sigue apagado, y a propósito: ahí el pedido ya tiene
+   * sus líneas, la foto es para conciliar, y leer sola gastaría una consulta de
+   * IA que nadie pidió —la cuota son veinte por día—.
+   */
+  leerAlSubir = false,
   proveedorId,
   puedeRecibir = true,
   /**
@@ -237,6 +261,21 @@ export default function PanelComprobantes({
           texto: `${d.subidos} subida(s).`,
           detalles: fallados.map((f) => `${f.nombre}: ${f.queHacer || f.error}`),
         });
+
+        // ── Y SE LEE SOLA, CUANDO EL PEDIDO NACE DE ESTA FACTURA ────────
+        //
+        // Solo si entró UN comprobante: con dos, cuál leer primero es una
+        // decisión y la toma la persona. `leer` se encarga del resto, incluido
+        // el mensaje de lo que pasó, que reemplaza al "1 subida(s)" de arriba
+        // porque es lo último que ocurrió.
+        const nuevos = [
+          ...new Set((d.resultados || []).filter((x) => x.ok && x.comprobanteId).map((x) => x.comprobanteId)),
+        ];
+        if (leerAlSubir && nuevos.length === 1) {
+          setSubiendo(false);
+          await leer(nuevos[0]);
+          return;
+        }
       }
       await recargar();
     } catch {
@@ -252,7 +291,7 @@ export default function PanelComprobantes({
     setMensaje(null);
     try {
       const r = await fetch(`/api/compras-proveedor/comprobantes/leer/${id}`, { method: "POST" });
-      const fallo = await mensajeDeRespuesta(r);
+      const fallo = await mensajeDeRespuesta(r, OPERACION.LECTURA);
       if (fallo) {
         setMensaje(fallo);
         await recargar();
@@ -272,7 +311,7 @@ export default function PanelComprobantes({
       }
       await recargar();
     } catch {
-      setMensaje({ tipo: "error", texto: SIN_RESPUESTA.texto });
+      setMensaje({ tipo: "error", texto: SIN_RESPUESTA_LECTURA.texto });
     } finally {
       setLeyendo(null);
     }

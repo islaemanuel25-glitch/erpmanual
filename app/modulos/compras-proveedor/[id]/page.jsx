@@ -1004,7 +1004,10 @@ export default function DetallePedidoProveedorPage({ params }) {
             pedidoId={pedido.id}
             cantItems={pedido.detalles?.length || 0}
             totalEstimado={computedTotalFactura}
-            estado="Esperando mercadería"
+            // No hubo pedido: "0 ítems · $0,00 estimado al pedir" habla de algo
+            // que nunca se encargó, y el $0,00 se lee como un error.
+            nacidoDeFactura={sinPedidoPrevio}
+            estado={sinPedidoPrevio ? "Llegó sin pedido" : "Esperando mercadería"}
           />
         )}
 
@@ -1022,6 +1025,10 @@ export default function DetallePedidoProveedorPage({ params }) {
         {(pedido.proveedor?.id ?? pedido.proveedorId) && (
           <PanelComprobantes
             pedidoId={pedido.id}
+            // Nacido de una factura: foto → se lee → se arma el pedido, sin un
+            // toque en el medio. Es el camino que se acordó y el único que deja
+            // el pedido con algo adentro.
+            leerAlSubir={sinPedidoPrevio}
             proveedorId={pedido.proveedor?.id ?? pedido.proveedorId}
             puedeRecibir={esRecepcion}
             onCantidad={setHayComprobantes}
@@ -1052,7 +1059,11 @@ export default function DetallePedidoProveedorPage({ params }) {
                     <BloqueDeLaFactura
                       onSacarFoto={sacarFoto}
                       onSubir={subir}
-                      onSinFactura={() => setSinFactura(true)}
+                      // Sin pedido previo NO se ofrece "Llegó sin factura":
+                      // el pedido ES la factura, y sin papel no hay nada que
+                      // recibir —cero líneas—. Ofrecerlo mandaba a la rama
+                      // vieja, que es donde terminó el 240.
+                      onSinFactura={sinPedidoPrevio ? null : () => setSinFactura(true)}
                       subiendo={subiendo}
                     />
                   )
@@ -1162,7 +1173,21 @@ export default function DetallePedidoProveedorPage({ params }) {
           </>
         )}
 
-        {(!esRecepcion || sinFactura) && (
+        {/* ── LA RAMA VIEJA NO EXISTE PARA UN PEDIDO NACIDO DE FACTURA ────
+            Acá cae "Detalle (N productos)", "Agregar producto extra", la tabla
+            de conciliación vieja —la que dice "Todavía no hay comprobantes ni
+            líneas del pedido"— y los dos botones de abajo.
+
+            Un pedido nacido de una factura SIN LEER tiene cero líneas, y con
+            `sinFactura` en true esta rama se dibujaba igual: el pedido 240 de
+            Paty mostró "Detalle (0 productos)" y "Todavía no hay comprobantes
+            ni líneas del pedido" con un comprobante subido y visible dos
+            centímetros más arriba. Las dos frases eran falsas.
+
+            No hay nada acá que sirva para este caso: los productos los pone el
+            papel, no se agregan a mano, y hasta que se lea no hay nada que
+            mostrar más que la foto y en qué anda la lectura. */}
+        {(!esRecepcion || sinFactura) && !sinPedidoPrevio && (
           <>
           {/* ── ACÁ ESTABA "FACTURA Y GANANCIA" ────────────────────────────
               Cuatro campos para teclear a mano: total factura (calculado),

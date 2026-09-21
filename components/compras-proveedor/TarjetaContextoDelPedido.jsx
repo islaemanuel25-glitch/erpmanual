@@ -30,6 +30,18 @@ export default function TarjetaContextoDelPedido({
   cantItems = 0,
   totalEstimado = 0,
   estado = "",
+  /**
+   * ── UN PEDIDO QUE NACIÓ DE UNA FACTURA NO TIENE "ESTIMADO AL PEDIR" ─────
+   *
+   * Nadie encargó nada, así que no hubo estimación: el renglón de abajo decía
+   * "0 ítems · $0,00 estimado al pedir", y las tres cosas —los ítems, la plata
+   * y el "al pedir"— hablan de un pedido que no existió. El $0,00 además se lee
+   * como un error del sistema.
+   *
+   * Se dice de dónde vino, que es el dato que sí existe y el que explica por
+   * qué la pantalla se ve distinta.
+   */
+  nacidoDeFactura = false,
 }) {
   return (
     <div className="min-h-contextoPedido rounded-xl border sunmi-divider sunmi-bg-card px-4 py-filtro flex flex-col gap-dato">
@@ -48,8 +60,13 @@ export default function TarjetaContextoDelPedido({
       </div>
 
       <span className="text-sm3 sunmi-text-muted">
-        {cantItems} {cantItems === 1 ? "ítem" : "ítems"} ·{" "}
-        {formatearMoneda(totalEstimado)} estimado al pedir
+        {nacidoDeFactura
+          ? cantItems > 0
+            ? `Nació de una factura · ${cantItems} ${cantItems === 1 ? "producto" : "productos"} del papel`
+            : "Nació de una factura · los productos los pone el papel"
+          : `${cantItems} ${cantItems === 1 ? "ítem" : "ítems"} · ${formatearMoneda(
+              totalEstimado
+            )} estimado al pedir`}
       </span>
     </div>
   );
