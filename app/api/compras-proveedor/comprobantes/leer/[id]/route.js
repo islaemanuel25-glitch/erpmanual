@@ -42,7 +42,7 @@ import {
 } from "@/lib/compras-proveedor/comprobante/lector/contrato";
 // El MISMO contador que usa el importador: la cuota es una sola.
 import { usadasHoy } from "@/lib/ia/contadorDeIa";
-import { hayCuota, limiteDiario } from "@/lib/ia/limiteDiario";
+import { hayCuota, limiteDiario, MOTIVO_LIMITE, TEXTO_LIMITE } from "@/lib/ia/limiteDiario";
 
 export async function POST(req, { params }) {
   try {
@@ -150,10 +150,20 @@ export async function POST(req, { params }) {
       return NextResponse.json(
         {
           ok: false,
-          motivo: MOTIVO_LECTURA.CUOTA_AGOTADA,
-          error: queHacerLectura(MOTIVO_LECTURA.CUOTA_AGOTADA),
-          // El número, porque "se agotó" sin cuántas eran no deja entender por
-          // qué se agotó tan rápido.
+          // ── EL TOPE PROPIO NO SE DISFRAZA DE CUOTA DE GOOGLE ──────────
+          //
+          // Acá se contestaba con el motivo y el texto del proveedor, y decía
+          // "se agotó la cuota gratuita del día" SIN haber llamado a nadie.
+          // El 2026-09-21, con el proyecto ya en plan pago, eso cortó la
+          // lectura de una factura real afirmando dos cosas falsas: que la
+          // cuota era gratuita y que la había agotado Google. Medido: el
+          // contador de llamadas no se movió y la API contestaba 200.
+          //
+          // El motivo y el texto son los del tope PROPIO, que es lo que pasó.
+          motivo: MOTIVO_LIMITE,
+          error: TEXTO_LIMITE,
+          // El número, porque un tope sin decir cuál es no se puede ni discutir
+          // ni subir.
           cuota: { usadas: cuota.usadas, limite: cuota.limite },
         },
         { status: 429 }
