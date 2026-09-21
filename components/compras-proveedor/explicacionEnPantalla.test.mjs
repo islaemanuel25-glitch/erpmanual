@@ -166,9 +166,32 @@ test("EL BLOQUE ES UNO SOLO, USADO POR LAS DOS PANTALLAS", () => {
 test("LA CUENTA SE REHACE CON LA MISMA FUNCIÓN QUE EL SERVIDOR", () => {
   // Si una pantalla recalculara por su lado, el "cierra" de acá y el de allá
   // podrían decir cosas distintas sobre el mismo papel.
-  assert.match(codigoDe(EXPLICACION), /comoLoEntendio\(\{ lectura: conCorrecciones, receta \}\)/);
-  assert.match(codigoDe(CORRECCION), /comoLoEntendio\(\{ lectura: conCorrecciones, receta \}\)/);
-  assert.match(codigoDe(RUTA), /comoLoEntendio\(\{ lectura: resultado\.lectura/);
+  //
+  // El tercer argumento —`productos`— es opcional y solo lo pasa la receta, que
+  // es la que resolvió qué producto es cada renglón para poder decir "el kilo"
+  // o "cada una". Lo que este candado afirma es que la CUENTA la hace la misma
+  // función, no que las tres llamadas sean idénticas letra por letra.
+  assert.match(
+    codigoDe(EXPLICACION),
+    /comoLoEntendio\(\{ lectura: conCorrecciones, receta(, productos)? \}\)/
+  );
+  assert.match(
+    codigoDe(CORRECCION),
+    /comoLoEntendio\(\{ lectura: conCorrecciones, receta(, productos)? \}\)/
+  );
+  assert.match(codigoDe(RUTA), /comoLoEntendio\(\{\s*lectura: resultado\.lectura/);
+});
+
+test("Y LA UNIDAD QUE RESOLVIÓ EL SERVIDOR NO SE PIERDE AL CORREGIR", () => {
+  // La receta rehace la cuenta en pantalla cada vez que alguien elige un
+  // número. Si los productos no viajaran, esa segunda pasada los perdería y el
+  // rótulo "el kilo" desaparecería solo, sin que nadie tocara nada.
+  const c = codigoDe(EXPLICACION);
+  assert.match(c, /setProductos\(d\.productos \?\? null\)/);
+  assert.match(c, /\[lectura, receta, correcciones, productos\]/);
+  // Y el servidor manda SOLO la unidad: el costo del producto no tiene nada
+  // que hacer en la pantalla donde se prueba cómo se lee un papel.
+  assert.match(codigoDe(RUTA), /\{ unidad_medida: p\.unidad_medida \}/);
 });
 
 test("LA CORRECCIÓN SE GUARDA, Y EL PAPEL VUELVE A PASAR POR LA MISMA PUERTA", () => {

@@ -59,6 +59,10 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
   const [mensaje, setMensaje] = useState(null);
   const [lectura, setLectura] = useState(null);
   const [receta, setReceta] = useState(null);
+  // Qué producto resultó ser cada renglón, cuando se pudo saber por su alias.
+  // Lo resuelve el servidor y viaja para que la cuenta se rehaga acá con los
+  // MISMOS datos: si no, corregir un número haría cambiar la unidad sola.
+  const [productos, setProductos] = useState(null);
   const [correcciones, setCorrecciones] = useState({});
 
   useEffect(() => {
@@ -104,8 +108,8 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
         correcciones[i] !== undefined ? { ...l, subtotalImpreso: correcciones[i] } : l
       ),
     };
-    return comoLoEntendio({ lectura: conCorrecciones, receta });
-  }, [lectura, receta, correcciones]);
+    return comoLoEntendio({ lectura: conCorrecciones, receta, productos });
+  }, [lectura, receta, correcciones, productos]);
 
   const sePuedeGuardar =
     !resultado || resultado.hayTotal === false ? Boolean(explicacion.trim()) : resultado.cierra;
@@ -134,6 +138,7 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
       // `comoLoEntendio` es literalmente la misma función de los dos lados.
       setLectura(d.lectura);
       setReceta(d.receta);
+      setProductos(d.productos ?? null);
     } catch {
       setMensaje({ tipo: "error", texto: "Se cortó la conexión mientras probaba. No se guardó nada." });
     } finally {
@@ -277,6 +282,7 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
               type="button"
               onClick={() => {
                 setLectura(null);
+                setProductos(null);
                 setCorrecciones({});
               }}
               className="w-full min-h-toque justify-center text-sm3"

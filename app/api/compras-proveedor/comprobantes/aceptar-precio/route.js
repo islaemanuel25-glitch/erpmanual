@@ -176,6 +176,23 @@ export async function POST(req) {
       unidadElegida: body?.unidad,
     });
 
+    // ── SIN LOS KILOS NO HAY PRECIO QUE ACEPTAR, Y SE DICE CUÁL FALTA ────
+    //
+    // Un producto que se mide en kilos cuyo papel no los trae no tiene precio
+    // todavía: los kilos se pesan al recibir. Sin este aviso, el caso caía en
+    // "falta el costo de la factura", que es verdad y no dice qué hacer.
+    if (analisis?.faltanKilos) {
+      const falta = "Este producto se maneja por kilo y el papel no trae los kilos.";
+      return NextResponse.json(
+        {
+          ok: false,
+          error: falta,
+          queHacer: "Pesá la mercadería y cargá los kilos al recibir. Con los kilos, el precio sale solo.",
+        },
+        { status: 409 }
+      );
+    }
+
     // ── LA GUARDA MIRA LOS DOS NÚMEROS DE LA COMPARACIÓN, Y NADA MÁS ─────
     //
     // Si la hoja pudo comparar, la decisión se puede guardar. Si no pudo, no

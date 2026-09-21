@@ -34,6 +34,11 @@ import {
   MOTIVO_LECTURA,
 } from "@/lib/compras-proveedor/comprobante/lector/contrato";
 import { comoLoEntendio } from "@/lib/compras-proveedor/comprobante/pruebaDeExplicacion";
+import {
+  cargarContexto,
+  buscarProductoDeLaLinea,
+} from "@/lib/compras-proveedor/comprobante/analisisDeComprobante";
+import { esAutomatico } from "@/lib/compras-proveedor/comprobante/vinculo";
 import { usadasHoy } from "@/lib/ia/contadorDeIa";
 import { hayCuota, limiteDiario, MOTIVO_LIMITE, TEXTO_LIMITE } from "@/lib/ia/limiteDiario";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
@@ -249,11 +254,48 @@ export async function POST(req) {
         );
       }
 
+      // ── QUÉ PRODUCTO ES CADA RENGLÓN, SI SE PUEDE SABER YA ──────────────
+      //
+      // Solo por ALIAS: el código del proveedor o un nombre que alguien ya
+      // asoció antes. Son los dos orígenes que el ERP ya considera automáticos
+      // —`esAutomatico`— porque no requieren que nadie confirme nada.
+      //
+      // Para qué: para poder decir "el kilo" o "cada una" en vez de deducirlo
+      // del peso impreso, que es justamente lo que no se puede hacer. Sin
+      // producto, el renglón se muestra con su subtotal y sin unidad, que es la
+      // verdad — esta pantalla está probando cómo se LEE el papel, y eso no
+      // depende de contra qué producto va.
+      //
+      // Si esto falla, la prueba sigue: la unidad es un rótulo, no el resultado.
+      let productosPorIndice = null;
+      try {
+        const contexto = await cargarContexto(prisma, { grupoId, localId: ctx.localId, proveedorId });
+        productosPorIndice = new Map();
+        (resultado.lectura?.lineas ?? []).forEach((l, i) => {
+          const busqueda = buscarProductoDeLaLinea({
+            linea: { codigoProveedor: l.codigoProveedor, descripcion: l.descripcion },
+            contexto,
+          });
+          const baseId = busqueda?.vinculoAutomatico?.productoBaseId ?? null;
+          if (baseId != null && esAutomatico(busqueda?.origen)) {
+            const producto = contexto.datosPorBase.get(baseId);
+            if (producto) productosPorIndice.set(i, producto);
+          }
+        });
+      } catch (e) {
+        console.error("No se pudo asociar los renglones a productos:", e?.message);
+        productosPorIndice = null;
+      }
+
       return NextResponse.json({
         ok: true,
         probado: true,
         comprobanteId: papel.id,
-        resultado: comoLoEntendio({ lectura: resultado.lectura, receta: recetaProbada }),
+        resultado: comoLoEntendio({
+          lectura: resultado.lectura,
+          receta: recetaProbada,
+          productos: productosPorIndice,
+        }),
         // ── LA LECTURA CRUDA Y LA RECETA TAMBIÉN VIAJAN ─────────────────
         //
         // Cuando la persona corrige un número, la pantalla rehace los dos
@@ -263,6 +305,18 @@ export async function POST(req) {
         // los dos cambie.
         lectura: resultado.lectura,
         receta: recetaProbada,
+        // ── Y LOS PRODUCTOS, PARA QUE LA PANTALLA REHAGA LA MISMA CUENTA ───
+        //
+        // Cuando alguien corrige un número, la pantalla vuelve a llamar a
+        // `comoLoEntendio` con lo corregido. Sin esto, la unidad que el
+        // servidor resolvió se perdería en esa segunda pasada y el rótulo
+        // cambiaría solo. Viaja SOLO `unidad_medida`: es lo único que decide la
+        // unidad, y el costo del producto no tiene nada que hacer en esta
+        // pantalla.
+        productos: (resultado.lectura?.lineas ?? []).map((_, i) => {
+          const p = productosPorIndice?.get(i);
+          return p ? { unidad_medida: p.unidad_medida } : null;
+        }),
       });
     }
 
