@@ -230,12 +230,29 @@ test("LA CORRECCIÓN SE GUARDA, Y EL PAPEL VUELVE A PASAR POR LA MISMA PUERTA", 
   }
 });
 
-test("EL BLOQUE DE CORRECCIÓN SE DIBUJA ARRIBA DE LA CONCILIACIÓN", () => {
+test("EL BLOQUE DE CORRECCIÓN SE DIBUJA, Y NO ADENTRO DE UNA RAMA MUERTA", () => {
   const p = codigoDe(RECEPCION);
   const corregir = p.indexOf("<CorregirComprobante");
   const lista = p.indexOf("<ListaConciliacion");
   assert.ok(corregir > 0, "la recepción no dibuja el bloque de corrección");
   assert.ok(corregir < lista, "el bloque de corrección quedó debajo de la conciliación");
+
+  // ── Y ACÁ ESTÁ LO QUE ESTE CANDADO NO MIRABA ────────────────────────
+  //
+  // Nació afirmando solo el ORDEN en el archivo, y el bloque estaba metido
+  // adentro de `(!esRecepcion || sinFactura)` —la rama del pedido SIN papel—
+  // junto con la conciliación. Las dos posiciones eran correctas y ninguna de
+  // las dos se dibujaba nunca durante una recepción con factura: en el #242 el
+  // bloque del yogur no apareció jamás y este candado estuvo en verde.
+  //
+  // Es el defecto que CLAUDE.md llama "un candado montado sobre algo que nunca
+  // ocurre": no falla, no avisa, y cierra la pregunta.
+  const ramaSinPapel = p.indexOf("(!esRecepcion || sinFactura)");
+  assert.ok(ramaSinPapel > 0, "se perdió la rama del pedido sin papel; revisá este candado");
+  assert.ok(
+    corregir < ramaSinPapel,
+    "el bloque para arreglar un papel volvió a quedar adentro de la rama que solo corre SIN papel"
+  );
   // Y la lista de los que no cerraron sale del panel, que ya la tiene: pedirla
   // por segunda vez son dos consultas de lo mismo.
   assert.match(p, /onMalLeidos=\{setMalLeidos\}/);

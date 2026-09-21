@@ -87,15 +87,26 @@ export default function DiaDePedidos({ dia, onRecibir }) {
               {p.proveedorNombre} <span className="sunmi-text-muted">#{p.id}</span>
             </div>
             <div className="text-sm3 sunmi-text-muted truncate">
+              {/* PRODUCTOS, no "ítems". Es la palabra del mostrador y la que
+                  usa el resto del módulo desde la tanda del #232. */}
               {horaAR(p.fechaEnviado || p.createdAt)} · {p.cantItems}{" "}
-              {p.cantItems === 1 ? "ítem" : "ítems"}
+              {p.cantItems === 1 ? "producto" : "productos"}
             </div>
             <div className="text-sm3 sunmi-text-accent truncate">Esperando mercadería</div>
           </div>
 
           <div className="shrink-0 flex flex-col items-end gap-dato">
+            {/* ── EL PAPEL MANDA SOBRE EL ESTIMADO ─────────────────────────
+                Lo que se estimó al pedir sirve mientras no haya nada mejor. En
+                cuanto el proveedor factura, lo que importa es cuánto facturó:
+                es la plata que hay que pagar, y sale del papel y no de una
+                cuenta nuestra. El rótulo cambia con el número para que nadie
+                tenga que adivinar cuál de los dos está mirando. */}
             <span className="text-sm3 font-bold sunmi-text-strong tabular-nums">
-              {formatearMoneda(p.totalEstimado || 0)}
+              {formatearMoneda(p.totalFacturado ?? p.totalEstimado ?? 0)}
+            </span>
+            <span className="text-sm2 sunmi-text-muted">
+              {p.totalFacturado != null ? "te facturó" : "estimado al pedir"}
             </span>
             <SunmiButton
               type="button"

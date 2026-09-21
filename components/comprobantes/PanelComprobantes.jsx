@@ -89,6 +89,17 @@ function identidad(c) {
 /** La tira de aviso: barra de color, frase corta en negrita, detalle chico. */
 function Aviso({ estado }) {
   const v = comoSeDice(estado);
+  // ── EL CARTEL ROJO DE "NO SE PUDO LEER BIEN" YA NO VA ────────────────
+  //
+  // Decía que la lectura no es confiable y que hay que sacar otra foto o
+  // cargarlo a mano, y arriba de la lista ahora está el bloque que señala QUÉ
+  // renglón no da su cuenta y ofrece los dos números. Un cartel que manda a
+  // repetir todo, dibujado encima de la herramienta que arregla el renglón
+  // suelto, empuja al camino caro.
+  //
+  // El estado sigue estando —la tarjeta lo dice en su título— y los otros
+  // avisos quedan como estaban.
+  if (estado === "MAL_LEIDO") return null;
   return (
     // La barra usa `bg-current`, o sea el MISMO color que el texto del título.
     // No hay una segunda tabla de colores que pueda quedar desfasada del tono.
@@ -657,10 +668,20 @@ export default function PanelComprobantes({
                   <Aviso estado={c.estado} />
                 </div>
                 <div className="mt-2 flex items-center justify-between gap-2">
+                  {/* ── ACÁ DECÍA "1 foto(s) · 11 líneas · gemini-3.6-flash" ──
+                      Tres cosas que no son del mostrador: el paréntesis de
+                      plural, la palabra "líneas" —son PRODUCTOS— y el nombre
+                      del modelo, que no le dice nada a quien recibe la
+                      mercadería y ocupa el lugar de algo que sí. El modelo se
+                      sigue guardando: se mira en la base cuando hay que medir
+                      cuál lee mejor, que es para lo que existe. */}
                   <p className="text-sm2 sunmi-text-muted">
-                    {c.fotos === 0 ? "fotos vencidas" : `${c.fotos} foto(s)`}
-                    {c._count?.lineas ? ` · ${c._count.lineas} líneas` : ""}
-                    {c.modeloLectura ? ` · ${c.modeloLectura}` : ""}
+                    {c.fotos === 0
+                      ? "fotos vencidas"
+                      : `${c.fotos} ${c.fotos === 1 ? "foto" : "fotos"}`}
+                    {c._count?.lineas
+                      ? ` · ${c._count.lineas} ${c._count.lineas === 1 ? "producto" : "productos"}`
+                      : ""}
                   </p>
                   <div className="flex gap-1">
                     {puedeRecibir && c.fotos > 0 && (

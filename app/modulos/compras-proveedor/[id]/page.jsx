@@ -1106,6 +1106,32 @@ export default function DetallePedidoProveedorPage({ params }) {
             arriba, y esto quedaba inalcanzable. Una rama muerta que se lee como
             viva es peor que no tenerla — la próxima persona la toca creyendo
             que dibuja algo. */}
+        {/* ── EL PAPEL QUE NO CIERRA SE ARREGLA ACÁ, ARRIBA DE TODO ──────
+            Es el mismo bloque que la receta —`AsiLoEntendio`— y la diferencia
+            es qué pasa con lo que se elige: allá solo recalcula en pantalla,
+            acá se guarda en la línea del comprobante y el papel se vuelve a
+            verificar con la misma puerta que usa la lectura.
+
+            ── Y ACÁ ESTUVO SIN DIBUJARSE NUNCA ───────────────────────────
+            Nació metido adentro de `(!esRecepcion || sinFactura)`, que es la
+            rama del pedido SIN papel. O sea que el bloque que existe para
+            arreglar un papel solo se dibujaba cuando no había ninguno: en el
+            #242, con su comprobante leído y sin cerrar, la condición daba falso
+            y no aparecía nada.
+
+            Su candado estaba en VERDE, porque afirmaba que el bloque va antes
+            de la conciliación EN EL ARCHIVO — y los dos estaban adentro de la
+            misma rama muerta. Es el defecto que CLAUDE.md llama "un candado
+            montado sobre algo que nunca ocurre": no falla, no avisa, y cierra
+            la pregunta. Ahora el candado exige además que NO esté anidado ahí.
+
+            Va afuera de las dos ramas a propósito: el papel que no cierra hay
+            que poder arreglarlo se dibuje la lista que se dibuje. */}
+        {esRecepcion &&
+          malLeidos.map((id) => (
+            <CorregirComprobante key={id} comprobanteId={id} onCorregido={cargar} />
+          ))}
+
         {esRecepcion && !sinFactura && filasDeFactura.length > 0 && (
           <>
             <ListaDeLaFactura
@@ -1265,17 +1291,6 @@ export default function DetallePedidoProveedorPage({ params }) {
                 conversión de la recepción: dos vistas de lo mismo, una de ellas
                 sin convertir las cantidades, es cómo la pantalla terminó
                 diciendo "Factura 80" sobre 8 bultos. */}
-            {/* ── EL PAPEL QUE NO CIERRA SE ARREGLA ACÁ, ANTES DE LA LISTA ──
-                Es el mismo bloque que la receta —`AsiLoEntendio`— y la
-                diferencia es qué pasa con lo que se elige: allá solo recalcula
-                en pantalla, acá se guarda en la línea del comprobante y el
-                papel se vuelve a verificar con la misma puerta que usa la
-                lectura. */}
-            {esRecepcion &&
-              malLeidos.map((id) => (
-                <CorregirComprobante key={id} comprobanteId={id} onCorregido={cargar} />
-              ))}
-
             {esRecepcion && (
               <ListaConciliacion
                 pedidoId={pedido.id}

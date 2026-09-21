@@ -28,6 +28,9 @@ import SunmiPantallaDeTrabajo from "@/components/sunmi/SunmiPantallaDeTrabajo";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import TarjetaLineaFactura from "./TarjetaLineaFactura";
 import { formatearMoneda } from "@/lib/moneda";
+// El catálogo que dice el estado del papel en castellano. Sin esto, el último
+// `||` devolvía el nombre crudo del enum —"MAL_LEIDO"— al celular.
+import { comoSeDice } from "@/lib/compras-proveedor/comprobante/pantalla";
 import {
   FILTRO,
   opcionesDeFiltro,
@@ -127,12 +130,21 @@ export default function ListaDeLaFactura({
   // hacer y quien controla tiene que saberlo antes de empezar: no hubo total
   // impreso contra el cual verificar la lectura. Va en una línea y no en un
   // párrafo, porque es un dato y no una explicación.
+  // ── Y ACÁ SE ESCAPABA "MAL_LEIDO" A LA PANTALLA ──────────────────────
+  //
+  // El último `||` devolvía el ESTADO CRUDO del enum, así que un comprobante
+  // que no cerraba mostraba literalmente "MAL_LEIDO" en el celular. El catálogo
+  // que lo dice en castellano —`comoSeDice`— existe desde hace tandas y esta
+  // pantalla no lo estaba usando: tenía dos casos escritos a mano y el resto
+  // caía al enum.
   const avisoDelComprobante =
     comprobante?.estado === "SIN_TOTAL"
       ? "Sin total impreso: controlá el papel producto por producto."
       : comprobante?.estado === "CARGADO"
         ? "Lectura verificada contra el total del papel."
-        : comprobante?.estado || "—";
+        : comprobante?.estado
+          ? comoSeDice(comprobante.estado).titulo
+          : "—";
 
   // ── EL CONTADOR CUENTA LO MISMO QUE MUESTRAN LAS TARJETAS ──────────────
   //

@@ -1,5 +1,9 @@
 // app/api/compras-proveedor/listar/route.js
 import { NextResponse } from "next/server";
+
+// LA FÓRMULA ECONÓMICA ÚNICA DEL MÓDULO. Acá se multiplicaba en crudo, que es
+// lo que esta función existe para que nadie haga.
+import { totalPedido } from "@/lib/compras-proveedor/calculoPedido";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
@@ -70,7 +74,42 @@ export async function GET(req) {
           // Se traen los dos campos y se suma acá en vez de pedir un
           // `aggregate` aparte por pedido: son dos números por línea y el
           // listado ya trae como mucho una página de pedidos.
-          detalles: { select: { cantidad: true, precioCosto: true } },
+          // `unidad` y los datos del PRODUCTO van porque la plata de una línea
+          // NO es siempre cantidad × costo: `subtotalLinea` —la fórmula
+          // económica única del módulo— valoriza el fiambre por KILO, que es
+          // piezas × peso por pieza × costo por kilo. Sin estos campos esta
+          // ruta no puede ni preguntar, y por eso multiplicaba en crudo.
+          detalles: {
+            select: {
+              cantidad: true,
+              precioCosto: true,
+              unidad: true,
+              kgRecibidos: true,
+              producto: {
+                select: {
+                  base: {
+                    select: {
+                      modoCompraProveedor: true,
+                      unidad_medida: true,
+                      factor_pack: true,
+                      pesoReferenciaKg: true,
+                      pesoPromedioKg: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          // ── SI YA HAY UN PAPEL LEÍDO, EL ESTIMADO DEJA DE SER LA NOTICIA ──
+          //
+          // Lo que se estimó al pedir sirve mientras no haya nada mejor. En
+          // cuanto el proveedor factura, lo que importa es cuánto facturó: es
+          // la plata que hay que pagar, y es un número del papel y no una
+          // cuenta nuestra. Se traen los comprobantes LEÍDOS con su total.
+          comprobantes: {
+            where: { estado: { not: "ANULADO" }, leidoEn: { not: null } },
+            select: { totalLeido: true },
+          },
         },
         orderBy: { createdAt: "desc" },
         skip: (page - 1) * pageSize,
@@ -92,10 +131,28 @@ export async function GET(req) {
       // cero: no suma, igual que en el texto del pedido. Si ninguna tiene
       // costo el total da 0, y la pantalla lo muestra como lo que es —no se
       // sabe cuánto vale— en vez de afirmar que vale nada.
-      totalEstimado: (p.detalles || []).reduce((acc, d) => {
-        const costo = Number(d.precioCosto) || 0;
-        return costo > 0 ? acc + (Number(d.cantidad) || 0) * costo : acc;
-      }, 0),
+      totalEstimado: totalPedido(
+        (p.detalles || [])
+          // Una línea sin costo cargado no suma CERO: no suma. Si ninguna
+          // tiene costo el total da 0 y la pantalla lo muestra como lo que es
+          // —no se sabe cuánto vale— en vez de afirmar que vale nada.
+          .filter((d) => Number(d.precioCosto) > 0)
+          .map((d) => ({
+            base: d.producto?.base ?? null,
+            cantidad: d.cantidad,
+            costo: d.precioCosto,
+            // Los kilos pesados al recibir, si ya se pesó. `subtotalLinea` los
+            // prefiere sobre el peso de referencia, que es una estimación.
+            kg: d.kgRecibidos ?? undefined,
+          }))
+      ),
+      // ── LO QUE FACTURÓ EL PAPEL, CUANDO HAY PAPEL ─────────────────────
+      //
+      // `null` mientras no haya ninguno leído, y ahí manda el estimado. Un
+      // papel sin total impreso —un remito— deja esto en null también: no hay
+      // número que mostrar y el estimado sigue siendo lo mejor que se tiene.
+      totalFacturado:
+        (p.comprobantes || []).reduce((acc, c) => acc + (Number(c.totalLeido) || 0), 0) || null,
       fechaConfirmado: p.fechaConfirmado,
       fechaEnviado: p.fechaEnviado,
       fechaRecibido: p.fechaRecibido,
