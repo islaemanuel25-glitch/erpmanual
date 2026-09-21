@@ -35,7 +35,7 @@
 // pondría todo en un montón. La fecha de envío contesta la pregunta real, que
 // es hace cuánto que esto está esperando.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import SunmiInput from "@/components/sunmi/SunmiInput";
@@ -51,6 +51,7 @@ import { descripcionDelPeriodo } from "@/lib/transferencias/descripcionDelPeriod
 import TarjetaPorEntrar from "@/components/compras-proveedor/TarjetaPorEntrar";
 import DiaDePedidos from "@/components/compras-proveedor/DiaDePedidos";
 import EntradaSinPedido from "@/components/compras-proveedor/EntradaSinPedido";
+import ElegirProveedor from "@/components/compras-proveedor/ElegirProveedor";
 import usePedidosProveedor from "@/components/compras-proveedor/usePedidosProveedor";
 import { agruparPedidosPorDia, diasEsperando } from "@/lib/compras-proveedor/diasDePedidos";
 
@@ -69,7 +70,19 @@ export default function RecepcionMercaderiaPage() {
 
   // El Volver va al slot del shell, que es donde viven los de las otras 32
   // pantallas. Antes esta pantalla no tenía ninguno.
-  useAccionDePagina(() => <SunmiBackButton href="/modulos/compras" />, []);
+  //
+  // Eligiendo proveedor, VUELVE A LA LISTA y no a compras: es un paso adentro
+  // de esta pantalla, y mandarlo afuera haría que salir de un toque dado sin
+  // querer costara volver a entrar a la bandeja.
+  useAccionDePagina(
+    () =>
+      eligiendoProveedor ? (
+        <SunmiBackButton onVolver={() => setEligiendoProveedor(false)} />
+      ) : (
+        <SunmiBackButton href="/modulos/compras" />
+      ),
+    [eligiendoProveedor]
+  );
 
   // ── EL PERÍODO ──────────────────────────────────────────────────────────
   //
@@ -80,6 +93,27 @@ export default function RecepcionMercaderiaPage() {
   const [unidad, setUnidad] = useState(UNIDADES.SEMANA);
   const [desplazamiento, setDesplazamiento] = useState(0);
   const [busqueda, setBusqueda] = useState("");
+
+  // ── LLEGÓ ALGO SIN PEDIDO: EL PASO DE ELEGIR PROVEEDOR ─────────────────
+  //
+  // Vive ACÁ ADENTRO y no en una ruta nueva, por dos motivos y el segundo es el
+  // que manda:
+  //
+  // 1. La pantalla de elegir proveedor ya existe —`ElegirProveedor`, la misma
+  //    que usa Nuevo pedido— y lo único que necesita es quién le pasa la lista.
+  //
+  // 2. LO QUE YA NOS PASÓ. El enlace "Crear borrador desde foto" se sacó de
+  //    Nuevo pedido porque navegar ahí PERDÍA EL PEDIDO QUE SE ESTABA ARMANDO:
+  //    los ítems viven en el estado de React y esa navegación no pasaba por el
+  //    guardado. Entrar por acá no puede repetirlo: esta bandeja no tiene nada
+  //    a medias —es una lista— y no toca ni el borrador de `/nueva` ni la
+  //    recepción en curso, que son las dos cosas que sí viven en
+  //    `sessionStorage`.
+  const [eligiendoProveedor, setEligiendoProveedor] = useState(false);
+  const [proveedores, setProveedores] = useState([]);
+  const [filtroProveedor, setFiltroProveedor] = useState("");
+  const [creando, setCreando] = useState(false);
+  const [errorCrear, setErrorCrear] = useState("");
 
   const periodo = useMemo(
     () =>
@@ -116,6 +150,59 @@ export default function RecepcionMercaderiaPage() {
     });
   }, [items, periodo.rango, busqueda]);
 
+  // La lista de proveedores se pide al entrar a elegir, no al abrir la
+  // bandeja: el camino de todos los días es tocar un pedido de la lista, y
+  // pedirla siempre sería un viaje por cada vez que alguien mira qué llegó.
+  useEffect(() => {
+    if (!eligiendoProveedor || proveedores.length) return;
+    let vigente = true;
+    (async () => {
+      try {
+        const r = await fetch("/api/proveedores/listar?estado=activos&pageSize=200", {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const d = await r.json();
+        if (vigente && d?.ok) setProveedores(d.items || []);
+        else if (vigente) setErrorCrear("No se pudo traer la lista de proveedores.");
+      } catch {
+        if (vigente) setErrorCrear("No se pudo traer la lista de proveedores.");
+      }
+    })();
+    return () => {
+      vigente = false;
+    };
+  }, [eligiendoProveedor, proveedores.length]);
+
+  /**
+   * Crea el pedido vacío y cae en la recepción, que es donde está el bloque de
+   * la foto. El pedido nace ENVIADO y marcado: sus renglones los va a poner el
+   * papel cuando se lea.
+   */
+  const entrarSinPedido = async (proveedorId) => {
+    if (creando) return;
+    setCreando(true);
+    setErrorCrear("");
+    try {
+      const r = await fetch("/api/compras-proveedor/crear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ proveedorId: Number(proveedorId), nacidoDeFactura: true }),
+      });
+      const d = await r.json();
+      if (!d?.ok || !d?.item?.id) {
+        setErrorCrear(d?.error || "No se pudo abrir la recepción para ese proveedor.");
+        setCreando(false);
+        return;
+      }
+      router.push(`/modulos/compras-proveedor/${d.item.id}`);
+    } catch {
+      setErrorCrear("No se pudo abrir la recepción para ese proveedor.");
+      setCreando(false);
+    }
+  };
+
   const dias = useMemo(() => agruparPedidosPorDia(visibles), [visibles]);
   const total = useMemo(
     () => visibles.reduce((acc, p) => acc + (Number(p.totalEstimado) || 0), 0),
@@ -134,6 +221,29 @@ export default function RecepcionMercaderiaPage() {
   // cambia quién puede entrar.
   const autorizado = permisos.includes("*") || permisos.includes("compras.ver");
   if (!autorizado) return <SinPermisos />;
+
+  // ── ELEGIR PROVEEDOR: LA MISMA PANTALLA QUE NUEVO PEDIDO ───────────────
+  //
+  // Se entra a hacer UNA cosa, así que ocupa la pantalla entera en vez de
+  // abrirse como una capa arriba de la lista. El título y el volver los pone el
+  // shell, igual que allá.
+  if (eligiendoProveedor) {
+    return (
+      <div className="md:hidden p-2 flex flex-col gap-renglon">
+        {errorCrear && (
+          <p className="text-sm3 sunmi-text-danger break-words" role="alert">
+            {errorCrear}
+          </p>
+        )}
+        <ElegirProveedor
+          proveedores={proveedores}
+          filtro={filtroProveedor}
+          onFiltro={setFiltroProveedor}
+          onElegir={entrarSinPedido}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="md:hidden p-2">
@@ -205,20 +315,21 @@ export default function RecepcionMercaderiaPage() {
           )
         }
         despuesDeLista={
-          // ── LA PUERTA DE "LLEGÓ ALGO SIN PEDIDO", SIN DESTINO TODAVÍA ───
+          // ── LA PUERTA DE "LLEGÓ ALGO SIN PEDIDO", YA CON DESTINO ────────
           //
-          // Medido: NO existe hoy ningún camino para subir una factura sin un
-          // pedido detrás. Subir un comprobante vive adentro del detalle de un
-          // pedido —`PanelComprobantes`, en `[id]/page.jsx`— así que siempre
-          // hay que elegir primero a qué pedido pertenece, que es exactamente
-          // lo que este caso no tiene.
-          //
-          // Queda VISIBLE y sin handler a propósito, porque mandarla a
-          // cualquiera de las pantallas que sí existen sería peor: el listado
-          // de pendientes no sube nada y el detalle de un pedido pide elegir un
-          // pedido que no hay. A dónde debería ir es la forma 2 y es la próxima
-          // tanda.
-          <EntradaSinPedido />
+          // Tres pasos y NINGUNA pantalla nueva: elegir el proveedor con la
+          // misma pantalla de Nuevo pedido, y caer en la recepción, que es
+          // donde vive el bloque de la foto. Lo que falta en el medio —el
+          // pedido— se crea vacío y marcado como nacido de una factura, y sus
+          // renglones los pone el papel al leerse.
+          <>
+            {errorCrear && (
+              <p className="text-sm3 sunmi-text-danger break-words" role="alert">
+                {errorCrear}
+              </p>
+            )}
+            <EntradaSinPedido onEntrar={() => setEligiendoProveedor(true)} />
+          </>
         }
       />
     </div>

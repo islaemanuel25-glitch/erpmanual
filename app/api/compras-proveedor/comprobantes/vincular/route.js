@@ -22,6 +22,7 @@ import { checkPerm } from "@/lib/authorize";
 import { aliasAEscribir, resolverLineaDelPedido } from "@/lib/compras-proveedor/comprobante/vinculo";
 import { aplanarDetalles } from "@/lib/compras-proveedor/comprobante/analisisDeComprobante";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
+import { sembrarPedidoDesdeFactura } from "@/lib/compras-proveedor/sembrarPedidoDesdeFactura";
 
 export async function POST(req) {
   try {
@@ -221,10 +222,39 @@ export async function POST(req) {
       return { aliasGuardado };
     });
 
+    // ── SI EL PEDIDO NACIÓ DE LA FACTURA, LA LÍNEA DEL PEDIDO SE CREA ACÁ ─
+    //
+    // En un pedido normal, vincular a un producto que nadie pidió deja la línea
+    // "no pedida" y eso está bien: el papel trajo algo de más. En uno nacido de
+    // una factura no existe tal cosa —el pedido ES el papel—, así que un
+    // producto recién vinculado necesita su línea de pedido o no se va a poder
+    // ni decidir su precio ni recibir.
+    //
+    // Se llama a la MISMA siembra que corre al leer, que ya sabe en qué escala
+    // entra cada renglón y es idempotente. Escribir acá una creación parecida
+    // al lado sería el segundo criterio de siempre. Devuelve sin tocar nada
+    // —una consulta— cuando el pedido no nació de una factura, que es el caso
+    // de todos los días.
+    let siembra = null;
+    if (detalleDelPedido == null && linea.comprobante.pedidoId) {
+      try {
+        siembra = await sembrarPedidoDesdeFactura(prisma, {
+          pedidoId: linea.comprobante.pedidoId,
+          grupoId,
+          localId,
+        });
+      } catch (e) {
+        console.error("No se pudo armar la línea del pedido para la línea vinculada:", e?.message);
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       lineaId: linea.id,
       productoLocalId: productoLocal.id,
+      // Cuántas líneas de pedido se armaron con esto, cuando el pedido nació de
+      // una factura. Null en el caso normal.
+      siembra: siembra?.ok === true ? siembra : null,
       producto: productoLocal.base,
       alias: resultado.aliasGuardado,
       queHacer: resultado.aliasGuardado

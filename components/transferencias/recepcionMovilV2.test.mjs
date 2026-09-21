@@ -443,7 +443,12 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // `ComprobanteLinea`, para que la marca de "renglón controlado" deje de ser
   // estado de React y sobreviva a un refresco. Es de otra tanda, no toca nada
   // de transferencias, y es aditiva: sin DROP y sin backfill.
-  assert.equal(migraciones.length, 22, "aparecio una migracion que nadie declaro aca");
+  // 23 desde el 2026-09-21: entra `20260921020000_pedido_nacido_de_factura`, una
+  // columna booleana con default false en `PedidoProveedor`. Marca los pedidos
+  // que nacen de una factura —llegó mercadería de un proveedor al que nadie le
+  // pidió nada— y es de otra tanda: no toca nada de acá, no tiene DROP y no
+  // tiene backfill. Se declara porque eso es lo que este conteo obliga.
+  assert.equal(migraciones.length, 23, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

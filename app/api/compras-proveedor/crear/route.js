@@ -32,6 +32,24 @@ export async function POST(req) {
 
     const body = await req.json();
     const { proveedorId, notas, items } = body;
+    // ── UN PEDIDO QUE NACE DE UNA FACTURA ────────────────────────────────
+    //
+    // Llegó mercadería de un proveedor al que nadie le pidió nada: se elige el
+    // proveedor y el pedido nace VACÍO, esperando la foto del papel. Sus
+    // renglones los dicta la factura al leerse —`sembrarPedidoDesdeFactura`—,
+    // no esta ruta.
+    //
+    // Va acá y no en una ruta nueva al lado porque es la misma operación: crear
+    // un pedido para un proveedor, con el mismo permiso, el mismo depósito, el
+    // mismo aislamiento por ubicación y el mismo dueño. Lo único que cambia es
+    // de dónde salen los renglones, y eso es un dato del pedido, no otro
+    // procedimiento.
+    const nacidoDeFactura = body?.nacidoDeFactura === true;
+    // Una sola lista para todo lo que sigue. Nacido de una factura viene vacía,
+    // y con ella vacías las validaciones de item no corren, no hay alias que
+    // persistir y el pedido se crea sin renglones — sin una segunda rama que
+    // mantener al lado de la de siempre.
+    const listaItems = Array.isArray(items) ? items : [];
 
     if (!proveedorId) {
       return NextResponse.json(
@@ -54,7 +72,19 @@ export async function POST(req) {
     }
     const depId = gd.localId;
 
-    if (!Array.isArray(items) || items.length === 0) {
+    // Nacido de una factura, la lista vacía es la única correcta: los productos
+    // los trae el papel. Con productos en el cuerpo se rechaza en vez de
+    // ignorarlos, que es como se cuelan dos maneras de armar lo mismo.
+    if (nacidoDeFactura && Array.isArray(items) && items.length > 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Un pedido que nace de una factura no lleva productos: los pone el papel.",
+        },
+        { status: 400 }
+      );
+    }
+    if (!nacidoDeFactura && (!Array.isArray(items) || items.length === 0)) {
       return NextResponse.json(
         { ok: false, error: "Debe incluir al menos un producto" },
         { status: 400 }
@@ -62,7 +92,7 @@ export async function POST(req) {
     }
 
     // Validar cantidades: entero finito >= 1
-    for (const it of items) {
+    for (const it of listaItems) {
       const c = Number(it.cantidad);
       if (!Number.isFinite(c) || !Number.isInteger(c) || c < 1) {
         return NextResponse.json(
@@ -98,8 +128,8 @@ export async function POST(req) {
       );
     }
 
-    const ids = [...new Set(items.map((item) => Number(item.productoLocalId)))];
-    if (ids.length !== items.length || ids.some((id) => !Number.isInteger(id) || id < 1)) {
+    const ids = [...new Set(listaItems.map((item) => Number(item.productoLocalId)))];
+    if (ids.length !== listaItems.length || ids.some((id) => !Number.isInteger(id) || id < 1)) {
       return NextResponse.json(
         { ok: false, error: "Hay productos repetidos o inválidos." },
         { status: 400 }
@@ -111,7 +141,7 @@ export async function POST(req) {
     // Esta ruta la usa también "Nuevo pedido", donde no hay ningún papel: en ese
     // caso `subtotalPapel` no viene y la comprobación no aplica. Solo mira los
     // items que dicen traer un importe del papel Y haber tomado el costo de ahí.
-    const noCierra = itemQueNoCierra(items);
+    const noCierra = itemQueNoCierra(listaItems);
     if (noCierra) {
       return NextResponse.json({ ok: false, error: textoItemQueNoCierra(noCierra) }, { status: 400 });
     }
@@ -150,7 +180,7 @@ export async function POST(req) {
 
     const productosPorLocal = new Map(productosLocales.map((p) => [p.id, p]));
     const aliases = aliasesDeImportacion({
-      items,
+      items: listaItems,
       productosPorLocal,
       grupoId,
       proveedorId: Number(proveedorId),
@@ -172,8 +202,22 @@ export async function POST(req) {
           proveedorId: Number(proveedorId),
           notas: notas || null,
           creadoPorId: session.id,
+          // ── NACE YA ENVIADO, Y NO ES UN ATAJO ─────────────────────────
+          //
+          // Los tres estados anteriores —BORRADOR, CONFIRMADO, ENVIADO— son
+          // los pasos de encargar mercadería, y acá no se encargó nada: la
+          // mercadería YA ESTÁ en la puerta. Dejarlo en BORRADOR obligaría a
+          // recorrer dos pantallas de un pedido que nunca se hizo, y ninguna
+          // de las dos tendría qué mostrar.
+          //
+          // `fechaEnviado` se llena con la misma marca de tiempo: es la única
+          // fecha del flujo que ocurrió de verdad, y dejarla vacía haría que el
+          // historial mostrara un pedido enviado sin cuándo.
+          ...(nacidoDeFactura
+            ? { estado: "ENVIADO", fechaEnviado: new Date(), nacidoDeFactura: true }
+            : {}),
           detalles: {
-            create: items.map((it) => ({
+            create: listaItems.map((it) => ({
               productoLocalId: Number(it.productoLocalId),
               cantidad: Number(it.cantidad || 1),
               unidad: it.unidad || "BULTO",

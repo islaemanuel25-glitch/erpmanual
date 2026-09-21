@@ -2718,6 +2718,19 @@ model PedidoProveedor {
   creadoEnLocalId Int?
   proveedorId     Int
   estado          EstadoPedidoProveedor  @default(BORRADOR)
+  /// NACIÓ DE UNA FACTURA, sin que nadie hubiera pedido nada.
+  ///
+  /// Llega mercadería de un proveedor al que no se le encargó: se elige el
+  /// proveedor, se le saca una foto al papel y el pedido se arma con lo que el
+  /// papel dice. Es un hecho del pedido y por eso es una columna y no algo que
+  /// se deduzca de "no tiene fecha de enviado" o de "se creó el mismo día" —
+  /// las dos cosas son ciertas también en pedidos normales.
+  ///
+  /// Lo que cambia cuando está en true, y está decidido: la tarjeta NO muestra
+  /// "Pediste" —no hubo pedido, y un "Pediste 0" o un "sobra 8" serían falsos—,
+  /// no existe el bloque de "productos que el papel no trajo" porque todo sale
+  /// del papel, y la hoja de cierre no pregunta por ellos.
+  nacidoDeFactura Boolean                @default(false)
   notas           String?
   fechaConfirmado DateTime?
   fechaEnviado    DateTime?

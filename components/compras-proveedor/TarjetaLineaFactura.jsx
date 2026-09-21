@@ -94,6 +94,18 @@ export default function TarjetaLineaFactura({
    */
   revisada = false,
   guardando = false,
+  /**
+   * ── EL PEDIDO NACIÓ DE ESTA FACTURA: NO HUBO PEDIDO ─────────────────────
+   *
+   * Llegó mercadería de un proveedor al que nadie le encargó nada. Entonces
+   * "Pediste" no se dibuja, y tampoco "falta" ni "sobra": los tres comparan
+   * contra un pedido que no existió, y un "Pediste 0" o un "sobra 8" serían
+   * afirmaciones falsas sobre la mercadería.
+   *
+   * Viene del PEDIDO y no se deduce de la fila: una línea no pedida de un
+   * pedido normal tiene exactamente la misma forma, y ahí "sobra 8" es verdad.
+   */
+  sinPedidoPrevio = false,
 }) {
   const estado = estadoDeLinea(fila);
   // Dos preguntas distintas: si el precio cambió, y si hay que decidirlo. Con
@@ -147,7 +159,10 @@ export default function TarjetaLineaFactura({
   // —y una cuyo único desvío era un precio ya decidido— no tiene nada que
   // resolver: se muestra igual, porque nadie la controló todavía, pero sin el
   // naranja que dice "acá hay un problema".
-  const tono = esNoPedida
+  // Sin pedido previo NADA es "no pedido": no hubo pedido. Pintar de rojo una
+  // línea por no estar en un pedido que no existió sería marcar como problema
+  // la mercadería que se está recibiendo.
+  const tono = esNoPedida && !sinPedidoPrevio
     ? "sunmi-state-danger"
     : estado === ESTADO_LINEA.COINCIDE
       ? ""
@@ -167,6 +182,22 @@ export default function TarjetaLineaFactura({
           {sinVincular ? (
             <p className="text-xs sunmi-text-muted break-words">
               Todavía no se sabe qué producto es. Tocá Corregir para elegirlo.
+            </p>
+          ) : sinPedidoPrevio ? (
+            /* Sin pedido previo se muestra LO QUE DICE EL PAPEL y nada más. No
+               hay comparación posible y tampoco hace falta: lo que importa de
+               esta línea —el precio contra el interno del ERP— está a la
+               derecha, igual que siempre. */
+            <p className="flex items-baseline gap-x-2 flex-wrap break-words">
+              <span className="text-xs sunmi-text-muted shrink-0">Factura</span>
+              <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-accent">
+                {fmtCant(cantidad)}
+              </span>
+              {convertida && (
+                <span className="text-xs tabular-nums sunmi-text-muted shrink-0">
+                  el papel dice {fmtCant(fila?.cantidad)} u
+                </span>
+              )}
             </p>
           ) : esNoPedida ? (
             <p className="text-xs sunmi-text-muted break-words">

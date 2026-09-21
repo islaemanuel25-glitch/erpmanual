@@ -73,6 +73,9 @@ function RenglonDeImporte({ rotulo, valor, porcentaje = null, fuerte = false }) 
 }
 
 export default function ListaDeLaFactura({
+  // El pedido nació de una factura: no hubo pedido contra el cual comparar.
+  // Viaja hasta la tarjeta, que es la que dibuja "Pediste".
+  sinPedidoPrevio = false,
   comprobante,
   filas = [],
   onCorregir,
@@ -243,6 +246,7 @@ export default function ListaDeLaFactura({
           )}
           {visibles.map((f) => (
             <TarjetaLineaFactura
+              sinPedidoPrevio={sinPedidoPrevio}
               key={f.lineaId}
               fila={f}
               revisada={yaRevisada(f)}

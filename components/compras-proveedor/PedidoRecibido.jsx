@@ -98,6 +98,9 @@ export default function PedidoRecibido({
   sinComprobante = [],
   conciliacion = null,
   falloElPapel = false,
+  // El pedido nació de esta factura: todo lo que entró salió del papel, así que
+  // el bloque de "los que no venían en el papel" no tiene de qué hablar.
+  sinPedidoPrevio = false,
 }) {
   const proveedor = pedido?.proveedor?.nombre || "el proveedor";
 
@@ -242,7 +245,7 @@ export default function PedidoRecibido({
           "las que el papel no trajo": son todo lo que entró, y llamarlas por la
           ausencia de algo que no existe es la misma clase de frase falsa que
           trajo esta corrección. */}
-      {sinPapel.length > 0 && (
+      {sinPapel.length > 0 && !sinPedidoPrevio && (
         <div className="space-y-1">
           <span className="block text-sm3 font-medium sunmi-text-strong">
             {!hayPapel

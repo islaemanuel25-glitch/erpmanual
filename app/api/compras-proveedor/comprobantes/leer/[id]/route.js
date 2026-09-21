@@ -35,6 +35,7 @@ import {
   fechaLeidaONull,
 } from "@/lib/compras-proveedor/comprobante/lector/recetaDelProveedor";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
+import { sembrarPedidoDesdeFactura } from "@/lib/compras-proveedor/sembrarPedidoDesdeFactura";
 
 export async function POST(req, { params }) {
   try {
@@ -66,6 +67,9 @@ export async function POST(req, { params }) {
         imagenBorradaEn: true,
         estado: true,
         cerroEnIntento: true,
+        // A qué pedido pertenece: lo necesita la siembra de abajo, que solo
+        // corre cuando ese pedido nació de esta misma factura.
+        pedidoId: true,
         // TODAS las fotos, en orden: se leen juntas como el papel que son.
         archivos: {
           orderBy: { orden: "asc" },
@@ -264,10 +268,38 @@ export async function POST(req, { params }) {
       return { actualizado, cuantasLineas: lineas.length };
     });
 
+    // ── SI EL PEDIDO NACIÓ DE ESTA FACTURA, SUS LÍNEAS SALEN DE ACÁ ──────
+    //
+    // Es el único momento en que existe todo lo que hace falta: las líneas
+    // leídas, el proveedor y el pedido vacío esperándolas. Va DESPUÉS de la
+    // transacción de la lectura y no adentro: la cascada de vínculo lee el
+    // catálogo entero, y tener eso abierto dentro de la transacción que guarda
+    // el papel alargaría un bloqueo por algo que se puede repetir.
+    //
+    // Best-effort a propósito: si esto falla, la lectura NO se pierde —ya costó
+    // una llamada de IA— y volver a leer vuelve a intentarlo, porque sembrar es
+    // idempotente. Lo que sí se dice es que no se pudo, para que la pantalla no
+    // muestre un pedido vacío sin explicación.
+    let siembra = null;
+    if (comprobante.pedidoId) {
+      try {
+        siembra = await sembrarPedidoDesdeFactura(prisma, {
+          pedidoId: comprobante.pedidoId,
+          grupoId,
+          localId: ctx.localId,
+        });
+      } catch (e) {
+        console.error("No se pudieron armar las líneas del pedido desde la factura:", e?.message);
+        siembra = { ok: false, motivo: "NO_SE_PUDO" };
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       comprobanteId: comprobante.id,
       estado: guardado.actualizado.estado,
+      // Null cuando el pedido no nació de una factura, que es el caso normal.
+      siembra: siembra?.ok === true ? siembra : siembra?.motivo === "NO_NACIO_DE_FACTURA" ? null : siembra,
       cierra: puerta.cierra,
       // La única puerta hacia una propuesta de costo.
       proponeCostos: puerta.proponeCostos,

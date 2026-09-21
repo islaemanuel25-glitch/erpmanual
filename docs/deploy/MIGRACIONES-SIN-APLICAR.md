@@ -16,8 +16,26 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **22 migraciones** y el árbol en **22**. No hay ninguna
-pendiente: el próximo despliegue es solo de código.
+Producción está en **22 migraciones** y el árbol en **23**. Hay **una
+pendiente**, y es aditiva.
+
+- `20260921020000_pedido_nacido_de_factura` — **ADITIVA**
+
+Una columna booleana con default false en `PedidoProveedor`:
+`nacidoDeFactura`. Marca los pedidos que nacen de una factura —llegó mercadería
+de un proveedor al que nadie le pidió nada— para que la pantalla no diga
+"Pediste" sobre un pedido que no existió y para que el historial lo distinga.
+
+**Qué dijo el clasificador:** sin coincidencias. No hay DROP, ni RENAME, ni SET
+NOT NULL, ni UPDATE: es un `ADD COLUMN` con default.
+
+**Compatible hacia atrás durante la ventana:** la versión vieja no lee esa
+columna, así que puede seguir atendiendo con el esquema nuevo sin enterarse. Los
+2.675 pedidos que ya existen quedan en false, que es la verdad — todos tuvieron
+pedido previo.
+
+**El quinto chequeo del backup NO aplica:** no es una migración de datos y no
+borra nada, así que no hay ningún valor que comprobar dentro del dump.
 
 `20260920223000_linea_de_factura_revisada` salió de esta lista con el despliegue
 de `73984cce`: `migrate deploy` informó las 22 del árbol y la aplicó, y

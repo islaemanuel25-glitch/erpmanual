@@ -96,6 +96,16 @@ export default function DetallePedidoProveedorPage({ params }) {
   // Se pidió la conciliación y no se pudo. Es un estado propio y no la ausencia
   // de datos: sin él, "no se pudo saber" y "no hay papel" son el mismo null.
   const [falloLaConciliacion, setFalloLaConciliacion] = useState(false);
+  // ── ESTE PEDIDO NACIÓ DE UNA FACTURA ───────────────────────────────────
+  //
+  // Nadie pidió nada: llegó mercadería y el pedido se armó con lo que el papel
+  // dice. Tres cosas de la pantalla cambian por eso, y están decididas: no se
+  // muestra "Pediste", no existe el bloque de lo que el papel no trajo, y la
+  // hoja de cierre no pregunta por él.
+  //
+  // Es una columna del pedido y no algo que se deduzca acá: "no tiene líneas
+  // pedidas" también es cierto en un pedido normal recién creado.
+  const sinPedidoPrevio = pedido?.nacidoDeFactura === true;
   // ── VA ACÁ ARRIBA, Y NO AL LADO DE LO QUE LA USA ───────────────────────
   //
   // Se incrementa cuando algo cambió del lado del servidor —vincular, aceptar
@@ -883,6 +893,7 @@ export default function DetallePedidoProveedorPage({ params }) {
       <div className="sunmi-bg w-full min-h-full p-2 lg:p-3">
         <PedidoRecibido
           pedido={pedido}
+          sinPedidoPrevio={sinPedidoPrevio}
           comprobante={comprobanteActivo}
           filas={filasDeFactura}
           sinComprobante={conciliacion?.sinComprobante || []}
@@ -1079,6 +1090,12 @@ export default function DetallePedidoProveedorPage({ params }) {
         {esRecepcion && !sinFactura && filasDeFactura.length > 0 && (
           <>
             <ListaDeLaFactura
+              // NACIÓ DE UNA FACTURA: no hubo pedido, así que la tarjeta no
+              // puede decir "Pediste". Viaja desde acá porque es un hecho del
+              // PEDIDO, y deducirlo en la tarjeta —"no tiene cantidad pedida"—
+              // sería el segundo criterio de siempre: una línea no pedida de un
+              // pedido normal se ve igual.
+              sinPedidoPrevio={sinPedidoPrevio}
               comprobante={comprobanteActivo}
               filas={filasDeFactura}
               onCorregir={setLineaACorregir}
@@ -1108,6 +1125,7 @@ export default function DetallePedidoProveedorPage({ params }) {
               }
             />
             <HojaCorregirLinea
+              sinPedidoPrevio={sinPedidoPrevio}
               fila={lineaACorregir}
               abierta={!!lineaACorregir}
               onCerrar={() => setLineaACorregir(null)}
@@ -1128,7 +1146,12 @@ export default function DetallePedidoProveedorPage({ params }) {
               abierta={cerrandoRecepcion}
               onCerrar={() => setCerrandoRecepcion(false)}
               filas={filasDeFactura}
-              sinComprobante={conciliacion?.sinComprobante || []}
+              // Sin pedido previo NO HAY "productos que el papel no trajo":
+              // todo sale del papel. Se le pasa vacío en vez de esconder el
+              // bloque adentro de la hoja, para que la hoja siga contestando
+              // una sola pregunta —qué llegó de lo que nadie facturó— y no
+              // tenga que saber de dónde nació el pedido.
+              sinComprobante={sinPedidoPrevio ? [] : conciliacion?.sinComprobante || []}
               contados={recibidos}
               guardando={acting}
               onConfirmar={(recibidosDelCierre) => {

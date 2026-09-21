@@ -231,6 +231,9 @@ function ElegirProducto({ fila, onVincular, onCerrar, guardando }) {
 }
 
 export default function HojaCorregirLinea({
+  // El pedido nació de esta factura: no hubo pedido contra el cual comparar,
+  // así que la frase de "Pediste X · la factura dice Y" no se dibuja.
+  sinPedidoPrevio = false,
   fila,
   abierta,
   onCerrar,
@@ -532,8 +535,13 @@ export default function HojaCorregirLinea({
                 unidad del pedido y lo que dice el papel va al final, nombrado
                 como lo que es. El tamaño del bulto no está acá: está arriba del
                 campo, que es donde se usa. */}
+            {/* Sin pedido previo no hay "Pediste": el pedido nació de esta
+                misma factura, y comparar contra él sería comparar el papel
+                consigo mismo. Queda lo único que hay: lo que dice la factura. */}
             <span className="text-sm3 sunmi-text-muted">
-              Pediste {limpio(fila.cantidadPedida)} · la factura dice {limpio(cantidadDeLaFactura)}
+              {sinPedidoPrevio
+                ? `La factura dice ${limpio(cantidadDeLaFactura)}`
+                : `Pediste ${limpio(fila.cantidadPedida)} · la factura dice ${limpio(cantidadDeLaFactura)}`}
               {convertida ? ` · el papel dice ${limpio(fila.cantidad)} u` : ""}
             </span>
 

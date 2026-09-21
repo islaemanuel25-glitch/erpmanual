@@ -1,0 +1,12 @@
+-- UN PEDIDO PUEDE NACER DE UNA FACTURA, SIN QUE NADIE HAYA PEDIDO NADA.
+--
+-- Llega mercadería de un proveedor al que no se le encargó. Hasta hoy no había
+-- forma de recibirla: todo el circuito de recepción cuelga de un pedido, y no
+-- había ninguno. Ahora se elige el proveedor, se le saca una foto al papel y el
+-- pedido se arma con lo que el papel dice.
+--
+-- ADITIVA: una columna nueva con default false. Los 2.675 pedidos que ya
+-- existen quedan en false, que es la verdad —todos tuvieron pedido previo— y es
+-- lo que la versión vieja del código ve si le toca atender durante la ventana:
+-- una columna que no lee.
+ALTER TABLE "PedidoProveedor" ADD COLUMN "nacidoDeFactura" BOOLEAN NOT NULL DEFAULT false;
