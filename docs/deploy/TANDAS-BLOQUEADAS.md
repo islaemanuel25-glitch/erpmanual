@@ -65,9 +65,18 @@ Si se lo anota como bloqueado, el paso 0 podría cortar el rango ANTES de ese
 commit y dejarlo afuera indefinidamente. No es eso lo que hay que hacer: hay que
 dejarlo viajar con la primera tanda que sí toque el runtime.
 
-### Ninguna vigente
+### Vigente
 
-La última fue la reescritura de dos afirmaciones de `sonda-modalidades-cobro.mjs`,
+**`--achicar` en `scripts/sonda-explicacion-papel.mjs`** (2026-09-22). Es la
+bandera con la que se midió el achicado de la tanda `18a4e401`: manda la foto
+como la manda la recepción desde ese commit. Toca SOLO un script de medición,
+que no viaja en el runtime, así que no justifica un corte de producción él solo.
+Sale con la próxima tanda que sí toque la aplicación, y esta entrada se borra
+cuando esté desplegada.
+
+### Anteriores
+
+La última antes de ésa fue la reescritura de dos afirmaciones de `sonda-modalidades-cobro.mjs`,
 anotada el 2026-09-15: **viajó sola** con el despliegue de `4ff57967`, sin que
 nadie tuviera que acordarse de nada. Antes había pasado lo mismo con `c5d89841`,
 el arreglo de la guardia de migraciones.

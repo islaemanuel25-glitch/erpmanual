@@ -60,6 +60,7 @@ import { MODELO_POR_DEFECTO } from "@/lib/compras-proveedor/comprobante/lector/g
 // El tope y la ventana del día salen de donde ya viven. Lo único que se escribe
 // acá es el `count`, porque `usadasHoy` cuelga de `@/lib/prisma` y no carga.
 import { desdeCuandoSeCuenta, hayCuota, limiteDiario } from "@/lib/ia/limiteDiario";
+import { achicarParaLeer } from "@/lib/compras-proveedor/comprobante/lector/achicarFoto";
 
 const arg = (n, d = null) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -69,6 +70,8 @@ const arg = (n, d = null) => {
 };
 
 const PEDIDO = Number(arg("pedido", "242"));
+/** Mandar la foto achicada, como la manda la recepción desde `18a4e401`. */
+const ACHICAR = process.argv.includes("--achicar");
 const CORRIDAS = Number(arg("corridas", "3"));
 const BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const ESPERA_MAX_MS = 90_000;
@@ -273,12 +276,40 @@ async function unaCorrida({ bytes, mime, clave }) {
     console.error(`El pedido ${PEDIDO} no tiene ninguna foto que leer.`);
     process.exit(2);
   }
-  const bytes = await readFile(foto.ubicacion);
+  const original = await readFile(foto.ubicacion);
+
+  // ── CON --achicar SE MANDA LO MISMO QUE MANDA LA RECEPCIÓN ────────────
+  //
+  // Desde el 2026-09-22 la recepción achica la foto antes de mandarla: lado
+  // largo 3000 px y JPEG 85. Esta sonda existe para medir contra un papel real,
+  // así que tiene que poder mandar exactamente eso — medir con la foto entera
+  // una lectura que en producción va achicada sería medir otra cosa.
+  //
+  // La original NO se toca: lo que cambia es lo que viaja.
+  let bytes = original;
+  let mime = foto.mime || "image/jpeg";
+  let achicado = null;
+  if (ACHICAR) {
+    const { default: sharp } = await import("sharp");
+    const r = await achicarParaLeer({ bytes: original, mime, orden: 1 }, sharp);
+    bytes = r.bytes;
+    mime = r.mime;
+    achicado = r.achicado;
+  }
 
   console.log(
     `\nPapel: comprobante ${comprobante.id} de ${comprobante.proveedor?.nombre} ` +
-      `(${(bytes.length / 1024 / 1024).toFixed(2)} MB) · modelo ${MODELO_POR_DEFECTO}\n`
+      `(${(original.length / 1024 / 1024).toFixed(2)} MB) · modelo ${MODELO_POR_DEFECTO}\n`
   );
+  if (achicado) {
+    console.log(
+      achicado.hubo
+        ? `Achicada para mandar: ${(achicado.bytesAntes / 1024 / 1024).toFixed(2)} MB → ` +
+            `${(achicado.bytesDespues / 1024 / 1024).toFixed(2)} MB · ` +
+            `${achicado.ancho}×${achicado.alto} px\n`
+        : `NO se achicó (${achicado.motivo}): viaja la original.\n`
+    );
+  }
   console.log("── LA EXPLICACIÓN QUE SE LE ANTEPONE ───────────────────────────");
   console.log(EXPLICACION_DEL_PROVEEDOR);
   console.log("");
@@ -288,7 +319,7 @@ async function unaCorrida({ bytes, mime, clave }) {
   let tokensSalida = 0;
 
   for (let i = 1; i <= CORRIDAS; i++) {
-    const r = await unaCorrida({ bytes, mime: foto.mime || "image/jpeg", clave });
+    const r = await unaCorrida({ bytes, mime, clave });
     if (!r.ok) {
       console.log(`CORRIDA ${i}: FALLÓ · HTTP ${r.estado} · ${r.detalle}`);
       corridas.push({ ok: false });
