@@ -31,6 +31,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiTextarea from "@/components/sunmi/SunmiTextarea";
 import AsiLoEntendio from "@/components/compras-proveedor/AsiLoEntendio";
