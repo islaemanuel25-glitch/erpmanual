@@ -512,6 +512,9 @@ export default function HojaCorregirLinea({
       // que es donde van la cantidad y el motivo. Son dos cosas distintas: dos
       // renglones pueden apuntar a la misma línea del pedido.
       lineaId: fila.lineaId,
+      // El texto impreso viaja con el id: el id de un renglón muere cuando el
+      // papel se vuelve a leer, y el texto no.
+      textoCrudo: fila.textoCrudo ?? null,
       pedidoDetalleId: fila.pedidoDetalleId,
       cantidadRecibida: bultos === "" ? null : Number(bultos),
       unidadesSueltas: vaPorPack && sueltas !== "" ? Number(sueltas) : null,

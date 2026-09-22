@@ -433,7 +433,17 @@ export default function DetallePedidoProveedorPage({ params }) {
   // La cantidad, las sueltas y el motivo se juntan y se escriben todos al
   // recibir, porque recibir es una sola transacción que mueve stock. La marca
   // no mueve stock: su riesgo es perderse, y por eso va sola y en el momento.
-  const marcarRevisada = useCallback(async (lineaId, revisada = true) => {
+  //
+  // ── Y VIAJA EL RENGLÓN, NO SOLO SU ID ──────────────────────────────────
+  //
+  // El id de un renglón del papel MUERE cuando el papel se vuelve a leer: la
+  // lectura borra los renglones del comprobante y los crea de nuevo. Un
+  // teléfono con la pantalla abierta desde antes manda un id que ya no existe
+  // y el servidor contestaba "No existe esa línea.". Con el texto impreso y el
+  // pedido, el servidor lo vuelve a encontrar solo.
+  const marcarRevisada = useCallback(async (renglon, revisada = true) => {
+    const lineaId = typeof renglon === "object" ? renglon?.lineaId : renglon;
+    const textoCrudo = typeof renglon === "object" ? renglon?.textoCrudo ?? null : null;
     if (!lineaId) return { ok: false, error: "Falta la línea." };
     setRevisadas((prev) => ({ ...prev, [lineaId]: revisada }));
     try {
@@ -441,7 +451,7 @@ export default function DetallePedidoProveedorPage({ params }) {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lineaId, revisada }),
+        body: JSON.stringify({ lineaId, revisada, pedidoId: Number(id), textoCrudo }),
       });
       const d = await r.json().catch(() => null);
       if (!d?.ok) {
@@ -462,7 +472,7 @@ export default function DetallePedidoProveedorPage({ params }) {
       });
       return { ok: false, error: e?.message || "No se pudo guardar la marca." };
     }
-  }, []);
+  }, [id]);
 
   // ── LAS DOS DECISIONES DE PRECIO VAN ACÁ ARRIBA ────────────────────────
   //
@@ -478,6 +488,9 @@ export default function DetallePedidoProveedorPage({ params }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           lineaId: fila?.lineaId,
+          // Con qué volver a encontrar el renglón si el papel se releyó.
+          pedidoId: Number(id),
+          textoCrudo: fila?.textoCrudo ?? null,
           unidad: fila?.unidad?.elegida,
           decision: DECISION_DE_PRECIO.ACEPTA_FACTURA,
         }),
@@ -491,7 +504,7 @@ export default function DetallePedidoProveedorPage({ params }) {
     } catch (e) {
       return { ok: false, error: e?.message || "No se pudo aceptar." };
     }
-  }, []);
+  }, [id]);
 
   // ── DEJAR EL PROPIO TAMBIÉN SE GUARDA ──────────────────────────────────
   //
@@ -507,6 +520,8 @@ export default function DetallePedidoProveedorPage({ params }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           lineaId: fila?.lineaId,
+          pedidoId: Number(id),
+          textoCrudo: fila?.textoCrudo ?? null,
           unidad: fila?.unidad?.elegida,
           decision: DECISION_DE_PRECIO.DEJA_EL_MIO,
         }),
@@ -520,7 +535,7 @@ export default function DetallePedidoProveedorPage({ params }) {
     } catch (e) {
       return { ok: false, error: e?.message || "No se pudo guardar." };
     }
-  }, []);
+  }, [id]);
 
   // El caso feliz en un toque: lo que la factura dice es lo que llegó. Mismo
   // gesto que "✓ Coincide" en la recepción de una transferencia.
@@ -543,7 +558,7 @@ export default function DetallePedidoProveedorPage({ params }) {
     // llegó. Es el mismo número convertido que muestra la tarjeta.
     const enEscala = cantidadEnEscalaDelPedido(fila);
     setRecibidos((prev) => ({ ...prev, [fila.pedidoDetalleId]: Number(enEscala) || 0 }));
-    await marcarRevisada(fila.lineaId, true);
+    await marcarRevisada(fila, true);
   }, [aceptarPrecioDeLinea, marcarRevisada]);
 
   const guardarCorreccion = useCallback((datos) => {
@@ -571,7 +586,7 @@ export default function DetallePedidoProveedorPage({ params }) {
     // Guardar la hoja también es controlar el renglón: alguien lo miró, contó y
     // decidió. Es el otro camino por el que una línea queda revisada — y se
     // guarda por el mismo lugar, no por uno parecido.
-    marcarRevisada(datos?.lineaId, true);
+    marcarRevisada(datos, true);
     setLineaACorregir(null);
   }, [marcarRevisada]);
 
@@ -580,7 +595,7 @@ export default function DetallePedidoProveedorPage({ params }) {
   // también quién y cuándo — si nadie la controló, un autor colgado diría
   // que sí.
   const desmarcarLinea = useCallback((fila) => {
-    marcarRevisada(fila?.lineaId, false);
+    marcarRevisada(fila, false);
     setLineaACorregir(null);
   }, [marcarRevisada]);
 
@@ -598,6 +613,8 @@ export default function DetallePedidoProveedorPage({ params }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           lineaId: fila?.lineaId,
+          pedidoId: Number(id),
+          textoCrudo: fila?.textoCrudo ?? null,
           productoBaseId,
           codigoProveedor: fila?.codigoProveedor ?? null,
         }),
@@ -610,7 +627,7 @@ export default function DetallePedidoProveedorPage({ params }) {
     } catch (e) {
       return { ok: false, error: e?.message || "No se pudo vincular." };
     }
-  }, []);
+  }, [id]);
 
   // BORRADOR (PENDIENTE) se edita SOLO en /nueva. Si el pedido está en borrador,
   // redirigir al editor único en vez de mantener un editor duplicado acá.

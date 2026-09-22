@@ -102,8 +102,22 @@ test("LA RUTA ESCRIBE LAS TRES COLUMNAS, Y DESMARCAR LAS BORRA", () => {
   assert.match(ruta, /revisadoEnRecepcion: revisada/);
   assert.match(ruta, /revisadoEnRecepcionPorId: revisada \? session\?\.id \?\? null : null/);
   assert.match(ruta, /revisadoEnRecepcionAt: revisada \? new Date\(\) : null/);
-  // El alcance por grupo no se negocia: una línea de otro grupo no existe.
-  assert.match(ruta, /comprobante: \{ grupoId \}/);
+  // ── EL ALCANCE POR GRUPO NO SE NEGOCIA, Y AHORA VIVE UN PISO MÁS ABAJO ──
+  //
+  // Acá se afirmaba el `comprobante: { grupoId }` escrito en esta ruta. La
+  // búsqueda del renglón se mudó a `resolverLineaDelPapel` —las tres rutas del
+  // control la comparten desde que un id muerto por una relectura contestaba
+  // "No existe esa línea."— así que el literal ya no está en este archivo.
+  //
+  // El alcance SIGUE, y se afirma donde ahora vive: la ruta le pasa el grupo, y
+  // el módulo lo mete en las dos consultas. Sin esta segunda mitad, esto sería
+  // un candado que dejó de mirar donde ocurre el problema.
+  assert.match(ruta, /resolverLineaDelPapel\(prisma, \{\s*grupoId,/);
+  const resolutor = sinComentarios(
+    leer("lib/compras-proveedor/comprobante/resolverLineaDelPapel.js")
+  );
+  assert.match(resolutor, /where: \{ id, comprobante: \{ grupoId,/);
+  assert.match(resolutor, /where: \{ comprobante: \{ grupoId, pedidoId: pedido \} \}/);
   assert.match(ruta, /checkPerm\(session, "compras\.recibir"\)/);
 });
 

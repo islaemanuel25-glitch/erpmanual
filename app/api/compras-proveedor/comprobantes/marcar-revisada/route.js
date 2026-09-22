@@ -34,6 +34,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
+import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
 
 export async function POST(req) {
   try {
@@ -53,12 +54,24 @@ export async function POST(req) {
     // llega explícito.
     const revisada = body?.revisada !== false;
 
-    // El alcance va en el WHERE: una línea de otro grupo no existe.
-    const linea = await prisma.comprobanteLinea.findFirst({
-      where: { id: lineaId, comprobante: { grupoId } },
+    // El alcance va adentro de la resolución: una línea de otro grupo no
+    // existe. Y el renglón se encuentra aunque el papel se haya vuelto a leer
+    // —eso borra los renglones y los recrea con ids nuevos—, que es como esta
+    // ruta llegaba a contestar "No existe esa línea." sobre un renglón que
+    // estaba ahí.
+    const { linea, motivo: motivoDeLaLinea } = await resolverLineaDelPapel(prisma, {
+      grupoId,
+      lineaId,
+      pedidoId: body?.pedidoId,
+      textoCrudo: body?.textoCrudo,
       select: { id: true, comprobante: { select: { id: true, confirmadoEn: true } } },
     });
-    if (!linea) return NextResponse.json({ ok: false, error: "No existe esa línea." }, { status: 404 });
+    if (!linea) {
+      return NextResponse.json(
+        { ok: false, error: motivoDeLaLinea, queHacer: motivoDeLaLinea },
+        { status: 409 }
+      );
+    }
 
     // Un comprobante ya confirmado en una recepción no se sigue controlando: lo
     // que se revisó quedó como quedó. Es la misma guarda que tiene aceptar un

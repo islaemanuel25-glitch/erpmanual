@@ -56,6 +56,7 @@ import {
   mismoPrecio,
 } from "@/lib/compras-proveedor/decisionDePrecio";
 import { motivoSinComparacion } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
+import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
 
 export async function POST(req) {
   try {
@@ -83,8 +84,18 @@ export async function POST(req) {
       );
     }
 
-    const linea = await prisma.comprobanteLinea.findFirst({
-      where: { id: lineaId, comprobante: { grupoId } },
+    // ── EL RENGLÓN, AUNQUE EL PAPEL SE HAYA VUELTO A LEER ───────────────
+    //
+    // Una relectura borra los renglones del comprobante y los vuelve a crear
+    // con ids nuevos, así que un teléfono con la pantalla abierta desde antes
+    // manda un id muerto. Acá se resolvía con un `findFirst` por ese id y se
+    // contestaba "No existe esa línea." — un 404 con un número que la persona
+    // no eligió ni ve.
+    const { linea, motivo: motivoDeLaLinea } = await resolverLineaDelPapel(prisma, {
+      grupoId,
+      lineaId,
+      pedidoId: body?.pedidoId,
+      textoCrudo: body?.textoCrudo,
       select: {
         id: true, cantidad: true, netoUnitario: true, internoUnitario: true,
         // EL TEXTO DEL PAPEL Y EL CÓDIGO DEL PROVEEDOR son lo que la cascada de
@@ -122,7 +133,12 @@ export async function POST(req) {
         },
       },
     });
-    if (!linea) return NextResponse.json({ ok: false, error: "No existe esa línea." }, { status: 404 });
+    if (!linea) {
+      return NextResponse.json(
+        { ok: false, error: motivoDeLaLinea, queHacer: motivoDeLaLinea },
+        { status: 409 }
+      );
+    }
 
     const receta = linea.comprobante.recetaUsada ?? { ...RECETA_POR_DEFECTO };
 

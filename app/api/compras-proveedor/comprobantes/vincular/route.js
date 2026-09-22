@@ -27,6 +27,7 @@ import {
   textoDeLaAsociacion,
   yaEsDelProveedor,
 } from "@/lib/compras-proveedor/comprobante/asociarAlProveedor";
+import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
 
 export async function POST(req) {
   try {
@@ -49,9 +50,15 @@ export async function POST(req) {
       );
     }
 
-    // El alcance por relación: una línea de otro grupo no existe.
-    const linea = await prisma.comprobanteLinea.findFirst({
-      where: { id: lineaId, comprobante: { grupoId } },
+    // El alcance por relación: una línea de otro grupo no existe. Y el
+    // renglón se encuentra aunque el papel se haya vuelto a leer, que es lo
+    // que dejaba a esta ruta contestando "No existe esa línea." sobre un
+    // renglón que la pantalla estaba mostrando.
+    const { linea, motivo: motivoDeLaLinea } = await resolverLineaDelPapel(prisma, {
+      grupoId,
+      lineaId,
+      pedidoId: body?.pedidoId,
+      textoCrudo: body?.textoCrudo,
       select: {
         id: true, textoCrudo: true,
         // Lo que colgaba del vínculo ANTERIOR. Si el producto cambia, esto hay
@@ -66,7 +73,10 @@ export async function POST(req) {
       },
     });
     if (!linea) {
-      return NextResponse.json({ ok: false, error: "No existe esa línea." }, { status: 404 });
+      return NextResponse.json(
+        { ok: false, error: motivoDeLaLinea, queHacer: motivoDeLaLinea },
+        { status: 409 }
+      );
     }
     if (linea.comprobante.estado === "ANULADO") {
       return NextResponse.json(
