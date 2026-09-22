@@ -20,6 +20,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { gananciaDelDeposito } from "@/lib/compras-proveedor/gananciaDelDeposito";
+import { filasDeConciliacion } from "@/lib/compras-proveedor/comprobante/filasDeConciliacion";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const codigoDe = (rel) =>
@@ -69,7 +70,7 @@ test("Y LA GANANCIA DICE SOBRE CUÁNTOS SE CALCULÓ, EN EL RÓTULO", () => {
 
 test("EL TOTAL DEL PAPEL VIAJA DESDE EL COMPROBANTE, NO SE SUMA", () => {
   const filas = codigoDe("lib/compras-proveedor/comprobante/filasDeConciliacion.js");
-  assert.match(filas, /totalDelPapel: num\(c\.totalLeido\)/);
+  assert.match(filas, /totalDelPapel: c\.totalLeido == null \? null : num\(c\.totalLeido\)/);
   const ruta = codigoDe("app/api/compras-proveedor/conciliacion/[pedidoId]/route.js");
   assert.match(ruta, /totalLeido: true/);
   const pagina = codigoDe("app/modulos/compras-proveedor/[id]/page.jsx");
@@ -81,6 +82,32 @@ test("SIN TOTAL IMPRESO NO SE INVENTA UNO", () => {
   // comparable, que es lo único que hay, y no a un cero ni a un guion.
   const lista = codigoDe("components/compras-proveedor/ListaDeLaFactura.jsx");
   assert.match(lista, /totalDelPapel != null \? totalDelPapel : cuenta\.facturado/);
+});
+
+test("Y NULL NO ES CERO: EL QUE NO TRAE TOTAL LLEGA EN NULL A LA PANTALLA", () => {
+  // ── ESTE CANDADO SE ESCRIBIÓ DESPUÉS DE DESPLEGAR, Y POR ESO ────────────
+  //
+  // El de arriba mira el fuente y estaba VERDE mientras producción mostraba
+  // "Te facturó Mauro $0,00" en el pedido 232. La rama del `!= null` no se
+  // alcanzaba nunca: `num(null)` devuelve 0, así que `totalDelPapel` llegaba
+  // en cero y el guardia lo dejaba pasar como si fuera un total impreso.
+  //
+  // Es el defecto que más se repite en este repo —una defensa escrita e
+  // inalcanzable— y solo lo ve un candado que EJERZA el caso en vez de leerlo.
+  // Medido en producción: 2 de los 5 comprobantes tienen `totalLeido` en NULL.
+  //
+  // La forma de los dos comprobantes es la real: el 5 del pedido 232, estado
+  // SIN_TOTAL y la columna vacía; el 17 del pedido 245, con su total impreso.
+  const r = filasDeConciliacion({
+    comprobantes: [
+      { id: 5, estado: "SIN_TOTAL", totalLeido: null, lineas: [] },
+      { id: 17, estado: "CARGADO", totalLeido: 511968.28, lineas: [] },
+    ],
+    detalles: [],
+  });
+  const porId = new Map(r.grupos.map((g) => [g.comprobante.id, g.comprobante.totalDelPapel]));
+  assert.equal(porId.get(5), null, "el papel sin total impreso llegó como un número");
+  assert.equal(porId.get(17), 511968.28);
 });
 
 test("Y LA PANTALLA DE RECIBIDO DICE LO MISMO, POR EL MISMO CAMINO", () => {
