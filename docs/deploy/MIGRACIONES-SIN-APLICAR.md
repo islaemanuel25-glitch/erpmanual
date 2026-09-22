@@ -16,36 +16,30 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **26 migraciones** y el árbol en **27**. Hay **una**
-pendiente.
-
-- `20260922040000_recepcion_sobrevive_al_refresco`
-
-**Qué hace:** agrega **tres columnas nullables**, ninguna con default y ninguna
-con backfill.
-
-- `ComprobanteLinea.unidadElegida` (texto): por unidad o por bulto, cuando el
-  papel no lo deja deducir y alguien elige. Vivía solo en la memoria del
-  navegador y un refresco la borraba.
-- `LlamadaLector.origen` (texto): qué disparó la llamada. Sin esto hubo que
-  deducir, cruzando `intentosLectura` contra la cantidad de filas, por qué el
-  comprobante 13 del pedido 242 tenía diez lecturas.
-- `PedidoProveedorDetalle.unidadesFisicas` (decimal 12,3): cuántas unidades dijo
-  la hoja que entran al stock. El cierre ya la prefiere sobre su propia
-  deducción; el número vivía en la memoria del navegador.
-
-**Aditiva: sin DROP, sin backfill y sin cambio de tipo.** Ninguna fila existente
-se toca y las tres quedan en `NULL`, que es la verdad: nadie eligió unidad, no
-se declaró ningún origen y nadie cargó unidades físicas todavía.
-
-**La ventana entre migrar y recrear no rompe nada.** El código viejo no conoce
-ninguna de las tres y no las lee: las lecturas, la conciliación y la recepción
-siguen funcionando igual mientras la versión anterior atiende.
-
-**El quinto chequeo del backup NO aplica:** no se borra ni se transforma ningún
-dato, así que no hay ningún valor que comprobar dentro del dump.
+**Ninguna.** Producción y el árbol están los dos en **27 migraciones**, y el
+despliegue siguiente es solo de código.
 
 ---
+
+`20260922040000_recepcion_sobrevive_al_refresco` salió de esta lista con el
+despliegue de `a8561e0f`: el contenedor descartable informó las **27** del
+árbol, imprimió "Applying migration" y `migrate status` cerró con "Database
+schema is up to date!".
+
+**Y dejó una lección que vale más que la migración.** Las tres columnas eran
+aditivas y la migración salió perfecta; lo que estaba mal era el ESQUEMA:
+`unidadElegida` había quedado escrita en el modelo `TransferenciaDetalle` en
+vez de `ComprobanteLinea`. El SQL creaba la columna en la tabla correcta y el
+cliente de Prisma se la pedía a otra, así que todo lo que leyera una
+transferencia se habría caído con un P2022 — y **los cinco valores del
+despliegue habrían coincidido igual**, porque miran el SHA del código y no el
+esquema.
+
+Lo atrapó ejercer las consultas contra Postgres **entre migrar y recrear**, que
+es la única ventana en la que se puede: producción siguió atendiendo con la
+imagen anterior mientras se arreglaba. El candado que la daba por buena
+preguntaba si la palabra estaba en el esquema, no en qué tabla; ahora pregunta
+de a un par y cruza cada `ALTER TABLE "T" ADD COLUMN "C"` contra el modelo T.
 
 `20260922010000_giro_de_la_foto` salió de esta lista con el despliegue de
 `6787934d`, y la línea se quedó acá **tres tandas de más** — que es exactamente
