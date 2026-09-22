@@ -1004,6 +1004,10 @@ export default function DetallePedidoProveedorPage({ params }) {
           pedido={pedido}
           sinPedidoPrevio={sinPedidoPrevio}
           comprobante={comprobanteActivo}
+          // Lo mismo que se le pasa a la recepción, desde el mismo lugar: el
+          // total impreso del papel. Dos pantallas que dicen "te facturó" no
+          // pueden sacar ese número de dos lados distintos.
+          totalDelPapel={comprobanteActivo?.totalDelPapel ?? null}
           filas={filasDeFactura}
           sinComprobante={conciliacion?.sinComprobante || []}
           // La respuesta entera, y no solo lo que se dibuja: es de donde sale

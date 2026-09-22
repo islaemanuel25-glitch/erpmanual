@@ -98,6 +98,8 @@ function RenglonDePlata({ rotulo, valor, fuerte = false, porcentaje = null }) {
 
 export default function PedidoRecibido({
   pedido,
+  /** El total IMPRESO del papel. Es lo que muestra el rótulo "Te facturó". */
+  totalDelPapel = null,
   comprobante = null,
   filas = [],
   sinComprobante = [],
@@ -185,7 +187,21 @@ export default function PedidoRecibido({
           chico, qué significa. */}
       {hayPapel && (
       <SunmiCard className="p-3 space-y-dato">
-        <RenglonDePlata rotulo={`Te facturó ${proveedor}`} valor={cuenta.facturado} />
+        {/* ── "TE FACTURÓ" ES LO QUE FACTURA EL PAPEL ─────────────────────
+            El mismo defecto que se arregló en la recepción con `b02d7ae7`, del
+            otro lado de la pantalla: `cuenta.facturado` es la suma de los
+            renglones COMPARABLES valuados a su precio final, y eso no es lo que
+            factura el proveedor. Medido sobre el pedido 245: decía $499.581,75
+            contra los $511.968,28 impresos, y la diferencia eran exactamente
+            los $12.386,53 de la percepción de IVA.
+
+            Sale del comprobante y no de sumar renglones: sumar solo puede dar
+            el total de los que se pudieron comparar. Sin total impreso —el
+            papel de Mauro— cae a esa suma, que es lo único que hay. */}
+        <RenglonDePlata
+          rotulo={`Te facturó ${proveedor}`}
+          valor={totalDelPapel != null ? totalDelPapel : cuenta.facturado}
+        />
         <RenglonDePlata rotulo="A tus precios vale" valor={cuenta.interno} />
         <SunmiSeparator />
         <RenglonDePlata rotulo="Ganás" valor={cuenta.ganancia} fuerte />

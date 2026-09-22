@@ -83,11 +83,24 @@ test("SIN TOTAL IMPRESO NO SE INVENTA UNO", () => {
   assert.match(lista, /totalDelPapel != null \? totalDelPapel : cuenta\.facturado/);
 });
 
-test("Y LA PANTALLA DE RECIBIDO NO SE TOCÓ: USA LA MISMA FUNCIÓN", () => {
-  // Lo de 121c06d2 sigue igual. Las dos pantallas preguntan lo mismo al mismo
-  // lugar; lo que cambió es cómo se rotula en la recepción.
+test("Y LA PANTALLA DE RECIBIDO DICE LO MISMO, POR EL MISMO CAMINO", () => {
+  // El pedido ya recibido tenía el MISMO defecto del otro lado: "Te facturó"
+  // era la suma de los renglones comparables. Medido sobre el pedido 245: decía
+  // $499.581,75 contra los $511.968,28 impresos, y la diferencia eran los
+  // $12.386,53 de la percepción de IVA.
   const recibido = codigoDe("components/compras-proveedor/PedidoRecibido.jsx");
+  assert.match(recibido, /valor=\{totalDelPapel != null \? totalDelPapel : cuenta\.facturado\}/);
+  // Y la cuenta sigue siendo la misma función en las dos pantallas: lo que
+  // cambió es qué se rotula con qué, no cómo se calcula.
   assert.match(recibido, /gananciaDelDeposito\(filas\)/);
   const lista = codigoDe("components/compras-proveedor/ListaDeLaFactura.jsx");
   assert.match(lista, /gananciaDelDeposito\(filas\)/);
+  // Las dos sacan el total del MISMO lugar: el comprobante activo. Dos
+  // pantallas que dicen "te facturó" no pueden tomar ese número de dos lados.
+  const pagina = codigoDe("app/modulos/compras-proveedor/[id]/page.jsx");
+  assert.equal(
+    (pagina.match(/totalDelPapel=\{comprobanteActivo\?\.totalDelPapel \?\? null\}/g) || []).length,
+    2,
+    "una de las dos pantallas dejó de recibir el total del papel"
+  );
 });
