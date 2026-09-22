@@ -96,6 +96,7 @@ import {
   laCantidadCuadraConElPrecio,
   textoDeLaEscalaQueNoCuadra,
 } from "@/lib/compras-proveedor/laCantidadCuadraConElPrecio";
+import { contenidoDelBulto, textoDelContenido } from "@/lib/compras-proveedor/contenidoDelBulto";
 import {
   DECISION_DE_PRECIO,
   decisionVencida,
@@ -477,10 +478,38 @@ export default function HojaCorregirLinea({
       cantidad: fila?.cantidad,
       fisicas: ofrecidas,
       porKilo: fila?.porKilo === true,
+      // ── EL MISMO FACTOR QUE USA EL CIERRE ──────────────────────────────
+      //
+      // Sin esto, la hoja valuaba lo que entra al stock al precio del BULTO y
+      // acusaba un renglón perfecto. El caso: MOGUL MORAS del pedido 245, bolsa
+      // de 83. Entran 996 unidades y el papel cobra $5.759,12 la BOLSA, así que
+      // la hoja calculaba 996 × 5.759,12 = **$5.736.083,52** contra los
+      // $69.109,44 impresos — cuando 12 bolsas × $5.759,12 da exactamente eso.
+      //
+      // El arreglo del cierre —66cc426e, mirar la igualdad en las DOS escalas
+      // posibles— ya estaba; lo que faltaba era que la hoja le pasara el factor.
+      // Es la misma función para las dos, que es el punto: una sola respuesta a
+      // "¿la escala cuadra?".
+      factorPack: fila?.factorPack,
     });
   }, [cantidadDeLaFactura, vaPorPack, fila?.factorPack, fila?.subtotal, fila?.cantidad, fila?.porKilo]);
 
   const avisoDeEscala = textoDeLaEscalaQueNoCuadra(escalaOfrecida, { moneda: formatearMoneda });
+
+  // ── ¿EL PAPEL Y EL PRODUCTO DICEN LO MISMO DEL BULTO? ──────────────────
+  //
+  // La descripción impresa suele traer el contenido —"(83u)", "12X30G"— y
+  // cuando no coincide con el `factor_pack` cargado, uno de los dos está mal.
+  // Se dice en una línea y NO se cambia nada solo: el stock y el costo siguen
+  // saliendo del factor del producto, que es el dato que alguien cargó mirando
+  // la mercadería. Corregirlo es una decisión sobre el producto y va por
+  // editar producto.
+  //
+  // Medido sobre el pedido 245: de sus veinte renglones, doce traen el
+  // contenido y dos no coinciden.
+  const avisoDelContenido = textoDelContenido(
+    contenidoDelBulto({ texto: fila?.textoCrudo, factorPack: fila?.factorPack })
+  );
 
   const cantidadDifiere = useMemo(() => {
     // ── LAS DOS EN UNIDADES FÍSICAS ──────────────────────────────────────
@@ -810,6 +839,12 @@ export default function HojaCorregirLinea({
                 Justo arriba del número que va a entrar al stock, que es el que
                 estaría mal. Con los dos importes a la vista para poder
                 comprobarlo contra el papel que se tiene en la mano. */}
+            {avisoDelContenido && (
+              <p className="text-sm2 sunmi-text-muted break-words" aria-live="polite">
+                {avisoDelContenido}
+              </p>
+            )}
+
             {avisoDeEscala && (
               <p className="text-sm2 sunmi-text-warning break-words" aria-live="polite">
                 {avisoDeEscala}
