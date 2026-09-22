@@ -115,6 +115,10 @@ export async function GET(req, { params }) {
           select: {
             id: true, orden: true, textoCrudo: true, codigoProveedor: true, cantidad: true,
             netoUnitario: true, subtotalImpreso: true, internoUnitario: true,
+            // El subtotal corregido, que manda sobre el leído: sin esto la
+            // conciliación sigue valorizando el renglón con el dígito mal leído
+            // aunque el comprobante ya haya cerrado.
+            subtotalCorregido: true,
             // Los kilos y el descuento del papel: el costo real de un renglón
             // con peso sale de dividir por ellos, no por las piezas.
             pesoKg: true, bonificacionPct: true,

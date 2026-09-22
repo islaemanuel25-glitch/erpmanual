@@ -150,6 +150,27 @@ try {
     `(document.querySelector("[data-linea-factura]").innerText || "").slice(0, 400)`
   );
 
+  // ── LO QUE DICE LA PANTALLA ARRIBA DE LAS TARJETAS ────────────────────
+  //
+  // Ahí vive el bloque del papel que no cerró. Si después de corregir vuelve a
+  // pedir lo mismo, se ve acá y en ningún otro lado.
+  const arriba = await evaluar(`(() => {
+    const t = document.querySelector("[data-linea-factura]");
+    // OJO: esto es el CUERPO DE UN TEMPLATE LITERAL. Nada de backticks acá
+    // adentro, ni siquiera en un comentario: cierran la cadena y el archivo
+    // deja de parsear. Ya pasó escribiendo este mismo bloque.
+    // El contenido, no el menú lateral: el body arrastra las treinta entradas
+    // del sidebar y tapa lo único que se quiere leer.
+    const todo = (document.querySelector("main") || document.body).innerText || "";
+    if (!t) return todo.slice(0, 900);
+    const primeraLinea = (t.innerText || "").split(String.fromCharCode(10))[0];
+    const corte = todo.indexOf(primeraLinea);
+    return corte > 0 ? todo.slice(0, corte) : todo.slice(0, 900);
+  })()`);
+  console.log("");
+  console.log("  ── LO QUE DICE LA PANTALLA ARRIBA DE LAS TARJETAS ──────────");
+  for (const l of String(arriba).split("\n").filter((x) => x.trim())) console.log(`     │ ${l}`);
+
   console.log("");
   console.log("  ── LO QUE DICE LA PRIMERA TARJETA ──────────────────────────");
   for (const l of String(primera).split("\n")) console.log(`     │ ${l}`);

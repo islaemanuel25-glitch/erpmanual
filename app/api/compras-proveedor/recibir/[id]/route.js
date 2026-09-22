@@ -315,7 +315,7 @@ export async function POST(req, { params }) {
         comprobante: { pedidoId, grupoId, estado: { not: "ANULADO" } },
         pedidoDetalleId: { not: null },
       },
-      select: { pedidoDetalleId: true, cantidad: true, subtotalImpreso: true },
+      select: { pedidoDetalleId: true, cantidad: true, subtotalImpreso: true, subtotalCorregido: true },
     });
     const lineaDelPapelPorDetalle = new Map();
     const repetidos = new Set();
@@ -457,7 +457,9 @@ export async function POST(req, { params }) {
           const motivoDeclarado = motivosMap[det.id]?.principal;
           if (delPapel && !motivoDeclarado) {
             const r = laCantidadCuadraConElPrecio({
-              subtotal: delPapel.subtotalImpreso,
+              // Lo corregido manda: el control de escala tiene que mirar el
+              // importe que el papel cobra de verdad, no el dígito mal leído.
+              subtotal: delPapel.subtotalCorregido ?? delPapel.subtotalImpreso,
               cantidad: delPapel.cantidad,
               fisicas: incremento,
             });
