@@ -73,6 +73,12 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import { BuscadorProducto } from "@/components/comprobantes/PiezasConciliacion";
 import { formatearMoneda, formatearKgExacto } from "@/lib/moneda";
+import {
+  decisionDeCostoSugerida,
+  textoDeLaDiferencia,
+  MARCA,
+  VARIACION_POR_DEFECTO,
+} from "@/lib/compras-proveedor/decisionDeCostoSugerida";
 import { aceptarEstaBloqueado } from "@/lib/compras-proveedor/comprobante/aceptarPrecio";
 import { ORIGEN_VINCULO } from "@/lib/compras-proveedor/comprobante/vinculo";
 import {
@@ -277,6 +283,8 @@ export default function HojaCorregirLinea({
   onDesmarcar,
   revisada = false,
   guardando = false,
+  /** Cuánto se le mueve el precio a ESTE proveedor sin que sea raro, en %. */
+  variacionNormalPct = VARIACION_POR_DEFECTO,
 }) {
   const cambio = precioCambio(fila);
   const porcentaje = porcentajeDelPrecio(fila);
@@ -297,6 +305,28 @@ export default function HojaCorregirLinea({
   // aplica sola y un salto brusco no es un precio nuevo. La respuesta que queda
   // es dejar el propio, que es la única que corresponde.
   const noSePuedeAceptar = aceptarEstaBloqueado(fila?.precio?.decision);
+
+  // ── LA REGLA DEL PROVEEDOR, SOBRE LOS DOS PRECIOS DE ESTE RENGLÓN ─────
+  //
+  // Los dos ya vienen en la unidad del depósito, que es como los compara la
+  // tarjeta. Acá no se convierte nada: convertir sería el segundo criterio de
+  // escala de siempre.
+  const sugerida = useMemo(
+    () =>
+      decisionDeCostoSugerida({
+        papel: fila?.costoFactura,
+        tuyo: fila?.costoCatalogo,
+        variacionPct: variacionNormalPct,
+        factorPack: fila?.factorPack,
+      }),
+    [fila?.costoFactura, fila?.costoCatalogo, fila?.factorPack, variacionNormalPct]
+  );
+  const avisoDeLaDiferencia = textoDeLaDiferencia(sugerida, {
+    proveedor: proveedorNombre || "Este proveedor",
+    moneda: formatearMoneda,
+    papel: fila?.costoFactura,
+    tuyo: fila?.costoCatalogo,
+  });
   // ── LA ESCALA SALE DEL MISMO LUGAR QUE LA DE LA TARJETA ───────────────
   //
   // Acá se preguntaba por `unidadPedido` y la tarjeta pregunta por
@@ -314,7 +344,15 @@ export default function HojaCorregirLinea({
   const [sueltas, setSueltas] = useState("");
   const [motivo, setMotivo] = useState(null);
   const [detalleMotivo, setDetalleMotivo] = useState("");
-  const [aceptaPrecio, setAceptaPrecio] = useState(true);
+  // ── QUÉ VIENE MARCADO, Y CUÁNDO NO VIENE NADA ────────────────────────
+  //
+  // `null` significa "todavía no eligió nadie", y es distinto de las dos
+  // opciones: cuando la diferencia no es normal para este proveedor no viene
+  // marcada ninguna y guardar no avanza hasta que la persona elija. Hasta esta
+  // tanda arrancaba en `true` —"aceptar el precio nuevo"— siempre, así que
+  // sobre las papas del 242, con el papel 14 % MÁS BARATO, el que tocaba
+  // "Revisado y seguir" sin mirar se bajaba el costo solo.
+  const [aceptaPrecio, setAceptaPrecio] = useState(null);
   // Con una decisión vigente la hoja no pregunta: dice qué se decidió y ofrece
   // cambiarlo. Esto es el toque de "Cambiar", no una segunda decisión.
   const [cambiandoPrecio, setCambiandoPrecio] = useState(false);
@@ -373,15 +411,31 @@ export default function HojaCorregirLinea({
     // valiendo. Sin esto, "Cambiar" mostraría "Aceptar el precio nuevo"
     // seleccionado sobre una línea donde se había dicho lo contrario, y un
     // toque en Guardar daría vuelta la decisión sin que nadie lo pidiera.
+    // ── Y SI NO SE DECIDIÓ NUNCA, LO DECIDE LA REGLA DEL PROVEEDOR ────
+    //
+    // Antes venía marcado "aceptar el precio nuevo" SIEMPRE. Sobre las papas
+    // del 242, con el papel 14 % más barato que tu costo, eso significaba que
+    // el que tocaba "Revisado y seguir" sin mirar se bajaba el costo solo.
+    //
+    // Ahora: dentro de la variación normal del proveedor viene marcado EL MÁS
+    // ALTO de los dos; fuera de ella, o si la diferencia es el factor del
+    // bulto, NO VIENE MARCADO NADA y guardar no avanza hasta que alguien
+    // elija.
     const decidida = decisionVigente(fila);
     const bloqueada = aceptarEstaBloqueado(fila?.precio?.decision);
+    const porLaRegla =
+      sugerida.marcado === MARCA.ACEPTA ? true : sugerida.marcado === MARCA.DEJA ? false : null;
     setAceptaPrecio(
-      bloqueada ? false : decidida ? decidida.decision === DECISION_DE_PRECIO.ACEPTA_FACTURA : true
+      bloqueada
+        ? false
+        : decidida
+          ? decidida.decision === DECISION_DE_PRECIO.ACEPTA_FACTURA
+          : porLaRegla
     );
     setCambiandoPrecio(false);
     setError("");
     setCambiandoProducto(false);
-  }, [abierta, fila]);
+  }, [abierta, fila, sugerida.marcado]);
 
   // ── ¿ESTE PRODUCTO ENTRA AL STOCK EN KILOS? ───────────────────────────
   //
@@ -487,6 +541,15 @@ export default function HojaCorregirLinea({
     }
     if (cantidadDifiere && motivo === "Otro" && !detalleMotivo.trim()) {
       setError("Contá qué pasó.");
+      return;
+    }
+    // ── SIN ELEGIR EL PRECIO NO SE AVANZA ──────────────────────────────
+    //
+    // Solo cuando la regla del proveedor dice que hay que mirar: una
+    // diferencia fuera de lo normal, o una que es el factor del bulto. Adentro
+    // de la variación viene marcado el más alto y esto no molesta a nadie.
+    if (cambio && sugerida.exigeElegir && aceptaPrecio === null) {
+      setError(avisoDeLaDiferencia || "Elegí qué precio queda antes de seguir.");
       return;
     }
     // El precio primero: si falla, no se guarda un conteo que la persona iba a
@@ -867,6 +930,15 @@ export default function HojaCorregirLinea({
                   <span className="text-sm3 sunmi-text-muted break-words">
                     {fila.precio.decision.detalle}
                   </span>
+                )}
+
+                {/* ── CUANDO LA DIFERENCIA NO ES NORMAL PARA ESTE PROVEEDOR ──
+                    No viene marcado nada y guardar no avanza: el que mira el
+                    papel decide, y si decide se respeta. */}
+                {avisoDeLaDiferencia && (
+                  <p className="text-sm3 sunmi-text-warning break-words" aria-live="polite">
+                    {avisoDeLaDiferencia}
+                  </p>
                 )}
 
                 <div className="flex flex-col gap-0.5">

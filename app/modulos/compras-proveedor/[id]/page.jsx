@@ -1292,6 +1292,9 @@ export default function DetallePedidoProveedorPage({ params }) {
               revisada={
                 revisadas[lineaACorregir?.lineaId] ?? lineaACorregir?.revisada === true
               }
+              // Cuánto se le mueve el precio a ESTE proveedor sin que sea raro.
+              // Decide qué viene marcado y cuándo la hoja frena.
+              variacionNormalPct={conciliacion?.proveedor?.variacionNormalPct}
             />
 
             <HojaCerrarRecepcion

@@ -85,6 +85,9 @@ export const BAJADA =
  * @param onGuardado     qué hacer después de guardar. La recepción vuelve sola.
  */
 export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null, onGuardado = null }) {
+  // La variación normal del proveedor, en %. Texto y no número: se está
+  // escribiendo, y un `0` intermedio no tiene que volverse un valor guardado.
+  const [variacion, setVariacion] = useState("");
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [proveedor, setProveedor] = useState(null);
@@ -122,6 +125,9 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
         setProveedor(d.proveedor);
         setPapel(d.papel);
         setExplicacion(d.explicacion || "");
+        // Lo que ya está guardado. Sin esto el campo arranca vacío y guardar
+        // la explicación borraría una variación cargada antes.
+        if (d.variacionNormalPct != null) setVariacion(String(d.variacionNormalPct));
       } catch {
         if (vigente) setError("No se pudo abrir la explicación: se cortó la conexión.");
       } finally {
@@ -240,7 +246,12 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ proveedorId, explicacion }),
+        body: JSON.stringify({
+          proveedorId,
+          explicacion,
+          // Vacío significa "no la toques": el default lo pone la base.
+          variacionNormalPct: variacion.trim() === "" ? undefined : Number(variacion.replace(",", ".")),
+        }),
       });
       const d = await r.json().catch(() => null);
       setMensaje(
@@ -319,6 +330,30 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
           </p>
         </SunmiCard>
       )}
+
+      {/* ── CUÁNTO SE LE MUEVE EL PRECIO A ESTE PROVEEDOR ───────────────
+          Un 9 % es normal en uno que actualiza todos los meses y es una señal
+          de lectura mal hecha en uno que no movió un precio en medio año. El
+          mismo número no significa lo mismo en los dos, así que lo decide cada
+          proveedor. Decide qué viene marcado en la hoja de Corregir y cuándo el
+          cierre frena. Se guarda con el botón de abajo, como la explicación. */}
+      <SunmiCard className="p-3">
+        <div className="flex items-center justify-between gap-renglon">
+          <span className="text-sm3 font-medium sunmi-text-strong">
+            Variación normal de precios
+          </span>
+          <div className="shrink-0 flex items-center gap-dato">
+            <SunmiInput
+              inputMode="decimal"
+              value={variacion}
+              onChange={(e) => setVariacion(e.target.value)}
+              aria-label="Variación normal de precios, en por ciento"
+              className="w-20 min-h-toque px-filtro text-lg2 tabular-nums text-right"
+            />
+            <span className="text-sm3 sunmi-text-muted">%</span>
+          </div>
+        </div>
+      </SunmiCard>
 
       {mensaje && (
         <p

@@ -50,6 +50,7 @@ import { usadasHoy } from "@/lib/ia/contadorDeIa";
 import { hayCuota, limiteDiario, MOTIVO_LIMITE, TEXTO_LIMITE } from "@/lib/ia/limiteDiario";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { ORIGEN_DE_LECTURA } from "@/lib/compras-proveedor/comprobante/origenDeLectura";
+import { VARIACION_POR_DEFECTO } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
 
 /**
  * El papel con el que se prueba.
@@ -132,7 +133,7 @@ export async function GET(req) {
 
     const fila = await prisma.recetaProveedor.findUnique({
       where: { grupoId_proveedorId: { grupoId, proveedorId } },
-      select: { explicacion: true, explicacionActualizadaEn: true },
+      select: { explicacion: true, explicacionActualizadaEn: true, variacionNormalPct: true },
     });
     const papel = await papelDePrueba({ grupoId, proveedorId, comprobanteId });
 
@@ -141,6 +142,10 @@ export async function GET(req) {
       proveedor,
       explicacion: fila?.explicacion ?? "",
       actualizadaEn: fila?.explicacionActualizadaEn ?? null,
+      // Cuánto se le mueve el precio a este proveedor sin que sea raro. Sin
+      // receta cargada, el 10 % que decide el default del modelo.
+      variacionNormalPct:
+        fila?.variacionNormalPct != null ? Number(fila.variacionNormalPct) : VARIACION_POR_DEFECTO,
       papel: papel
         ? {
             comprobanteId: papel.id,
@@ -241,6 +246,29 @@ export async function POST(req) {
     }
 
     // ── GUARDAR: SOLO LA EXPLICACIÓN ────────────────────────────────────
+    // ── LA VARIACIÓN NORMAL DEL PROVEEDOR ───────────────────────────────
+    //
+    // Se guarda con el mismo botón que la explicación, porque es lo mismo:
+    // cómo se lee el papel de este proveedor. Un valor ausente NO la borra —el
+    // formulario puede mandar la explicación sola— y uno fuera de rango se
+    // rechaza en castellano en vez de guardarse y sorprender después.
+    const variacionCruda = body?.variacionNormalPct;
+    let variacion;
+    if (variacionCruda !== undefined && variacionCruda !== null && variacionCruda !== "") {
+      const v = Number(variacionCruda);
+      if (!Number.isFinite(v) || v < 0 || v > 100) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "La variación normal de precios va de 0 a 100 por ciento.",
+            queHacer: "La variación normal de precios va de 0 a 100 por ciento.",
+          },
+          { status: 400 }
+        );
+      }
+      variacion = v;
+    }
+
     const guardada = await prisma.recetaProveedor.upsert({
       where: { grupoId_proveedorId: { grupoId, proveedorId } },
       // Sin receta previa se crea con los defaults del modelo —los de la
@@ -253,19 +281,22 @@ export async function POST(req) {
         explicacionActualizadaEn: new Date(),
         explicacionActualizadaPor: session.id,
         version: 1,
+        ...(variacion !== undefined ? { variacionNormalPct: variacion } : {}),
       },
       update: {
         explicacion,
         explicacionActualizadaEn: new Date(),
         explicacionActualizadaPor: session.id,
+        ...(variacion !== undefined ? { variacionNormalPct: variacion } : {}),
       },
-      select: { id: true, explicacionActualizadaEn: true },
+      select: { id: true, explicacionActualizadaEn: true, variacionNormalPct: true },
     });
 
     return NextResponse.json({
       ok: true,
       guardada: true,
       actualizadaEn: guardada.explicacionActualizadaEn,
+      variacionNormalPct: Number(guardada.variacionNormalPct),
       queHacer:
         "Guardada. Desde ahora, cada factura de este proveedor se lee con esta explicación.",
     });

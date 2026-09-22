@@ -17,17 +17,13 @@ import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { ErrorParaLaPersona, esParaLaPersona } from "@/lib/compras-proveedor/errorParaLaPersona";
 import { formatearMoneda } from "@/lib/moneda";
+import {
+  decisionDeCostoSugerida,
+  textoDeLaDiferencia,
+  VARIACION_POR_DEFECTO,
+} from "@/lib/compras-proveedor/decisionDeCostoSugerida";
 
-/**
- * CUÁNTAS VECES PUEDE SALTAR UN COSTO SIN QUE ALGUIEN LO HAYA DECIDIDO.
- *
- * Tres. No es un número de gusto: un error de escala se produce multiplicando o
- * dividiendo por el factor del bulto, y el factor más chico que existe en el
- * catálogo es 2 — pero un bulto de 2 con un aumento fuerte podría rozar el 2,
- * así que se deja margen. Los aumentos reales de este proveedor viven abajo del
- * 20 %.
- */
-const SALTO_DE_COSTO_QUE_FRENA = 3;
+
 
 // Resuelve el ProductoLocal DESTINO (de la ubicación dueña del pedido) para una
 // línea. Para el depósito es el mismo que ya trae la línea. Para un local, busca
@@ -84,6 +80,9 @@ export async function POST(req, { params }) {
     const pedido = await prisma.pedidoProveedor.findUnique({
       where: { id: pedidoId },
       include: {
+        // Para poder nombrarlo cuando el cierre frena por una diferencia de
+        // precio: "Paty cobra X y tu precio es Y" dice más que "el proveedor".
+        proveedor: { select: { id: true, nombre: true } },
         detalles: {
           include: {
             producto: {
@@ -335,6 +334,24 @@ export async function POST(req, { params }) {
       },
       select: { pedidoDetalleId: true, cantidad: true, subtotalImpreso: true, subtotalCorregido: true },
     });
+    // ── CUÁNTO SE LE MUEVE EL PRECIO A ESTE PROVEEDOR ───────────────────
+    //
+    // La misma pregunta que hace la hoja de Corregir, contestada con la misma
+    // receta: un costo que cae fuera de esa variación no se escribe si la
+    // persona no lo eligió en esta recepción. Reemplaza al freno de "más de
+    // tres veces", que era un número del sistema y no del proveedor.
+    const recetaDelProveedor = pedido.proveedorId
+      ? await prisma.recetaProveedor.findFirst({
+          where: { grupoId, proveedorId: pedido.proveedorId },
+          select: { variacionNormalPct: true },
+        })
+      : null;
+    const variacionNormalPct =
+      recetaDelProveedor?.variacionNormalPct != null
+        ? Number(recetaDelProveedor.variacionNormalPct)
+        : VARIACION_POR_DEFECTO;
+    const nombreDelProveedor = pedido.proveedor?.nombre || "Este proveedor";
+
     const lineaDelPapelPorDetalle = new Map();
     const repetidos = new Set();
     for (const l of lineasDelPapel) {
@@ -590,18 +607,22 @@ export async function POST(req, { params }) {
         // misma recepción. La mercadería no entra a medias — el cierre es una
         // transacción, así que no entra nada y se vuelve a intentar.
         const anterior = Number(base?.precio_costo ?? 0);
-        if (
-          Number.isFinite(costoMaestro) && costoMaestro > 0 && anterior > 0 &&
-          !costosAceptados.has(det.id) &&
-          (costoMaestro > anterior * SALTO_DE_COSTO_QUE_FRENA ||
-            costoMaestro < anterior / SALTO_DE_COSTO_QUE_FRENA)
-        ) {
+        const sugerida = decisionDeCostoSugerida({
+          papel: costoMaestro,
+          tuyo: anterior,
+          variacionPct: variacionNormalPct,
+          factorPack: base?.factor_pack,
+        });
+        if (sugerida.exigeElegir && !costosAceptados.has(det.id)) {
+          const aviso = textoDeLaDiferencia(sugerida, {
+            proveedor: nombreDelProveedor,
+            moneda: formatearMoneda,
+            papel: costoMaestro,
+            tuyo: anterior,
+          });
           throw new ErrorParaLaPersona(
-            `${base?.nombre || "Un producto"}: el costo pasaría de ${formatearMoneda(anterior)} a ` +
-              `${formatearMoneda(costoMaestro)}, que es más de ${SALTO_DE_COSTO_QUE_FRENA} veces. ` +
-              `Eso no es un aumento, es una escala equivocada. Abrí Corregir, mirá el precio del ` +
-              `papel y decidí el costo vos; si de verdad es ése, aceptalo ahí y volvé a cerrar. ` +
-              `No entró nada.`
+            `${base?.nombre || "Un producto"}: ${aviso} Abrí Corregir, elegí qué precio queda y ` +
+              `volvé a cerrar. No entró nada.`
           );
         }
 

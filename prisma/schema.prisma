@@ -3582,6 +3582,17 @@ model RecetaProveedor {
   /// 2026-08-11, con lo que gana y lo que resigna escrito en impuestos.js.
   percepcionesEnCosto Boolean @default(true)
 
+  /// CUÁNTO SE LE MUEVE EL PRECIO A ESTE PROVEEDOR SIN QUE SEA RARO, EN %.
+  ///
+  /// Un 9 % de diferencia entre el papel y tu costo es normal en un proveedor
+  /// que actualiza todos los meses, y es una señal de que algo se leyó mal en
+  /// uno que no movió un precio en medio año. El mismo número no significa lo
+  /// mismo en los dos, así que lo decide cada proveedor.
+  ///
+  /// Decide qué viene marcado en la hoja de Corregir y frena el cierre cuando
+  /// el costo cae afuera sin que nadie lo haya elegido en esa recepción.
+  variacionNormalPct Decimal @default(10) @db.Decimal(5, 2)
+
   facturaPor FacturaPor @default(UNIDAD)
 
   /// ── LA RECETA, EXPLICADA EN PALABRAS ──────────────────────────────────

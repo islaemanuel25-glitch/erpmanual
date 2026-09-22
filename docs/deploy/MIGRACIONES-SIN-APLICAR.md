@@ -16,8 +16,25 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **29 migraciones** y el árbol también. **Ninguna** pendiente:
-el despliegue siguiente es solo de código.
+Producción está en **29 migraciones** y el árbol en **30**. Hay **una**
+pendiente.
+
+- `20260922150000_variacion_normal_de_precios`
+
+**Qué hace:** agrega a `RecetaProveedor` la columna `variacionNormalPct`
+(decimal 5,2, **NOT NULL con DEFAULT 10**): cuánto se le mueve el precio a ese
+proveedor sin que sea raro. Un 9 % es normal en uno que actualiza todos los
+meses y es una señal de lectura mal hecha en uno que no movió un precio en medio
+año — el mismo número no significa lo mismo en los dos.
+
+**Aditiva: sin DROP, sin backfill y sin cambio de tipo.** Las filas que ya están
+toman el 10 % por el DEFAULT, que es exactamente lo que se quiere; no hay ningún
+`UPDATE`.
+
+**La ventana entre migrar y recrear no rompe nada:** el código viejo no conoce
+la columna.
+
+**El quinto chequeo del backup NO aplica:** no se borra ni se transforma nada.
 
 ---
 

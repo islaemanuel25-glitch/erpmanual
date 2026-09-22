@@ -33,6 +33,7 @@ import {
 import { filasDeConciliacion } from "@/lib/compras-proveedor/comprobante/filasDeConciliacion";
 import { coberturaDelPedido, textoDeCobertura } from "@/lib/compras-proveedor/comprobante/cobertura";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
+import { VARIACION_POR_DEFECTO } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
 
 export async function GET(req, { params }) {
   try {
@@ -172,9 +173,31 @@ export async function GET(req, { params }) {
     });
     const sinLeer = comprobantes.filter((c) => !c.leidoEn).length;
 
+    // ── CUÁNTO SE LE MUEVE EL PRECIO A ESTE PROVEEDOR ────────────────────
+    //
+    // Sale de la receta VIGENTE del proveedor, no del snapshot que quedó
+    // guardado con la lectura: es una decisión de hoy sobre cómo leer una
+    // diferencia, y si alguien la cambia tiene que valer para lo que está
+    // recibiendo ahora. Sin receta cargada, el 10 % por defecto.
+    const proveedorId = comprobantes[0]?.proveedor?.id ?? pedido.proveedorId ?? null;
+    const recetaVigente = proveedorId
+      ? await prisma.recetaProveedor.findFirst({
+          where: { grupoId, proveedorId },
+          select: { variacionNormalPct: true },
+        })
+      : null;
+
     return NextResponse.json({
       ok: true,
       pedido: { id: pedido.id, estado: pedido.estado },
+      proveedor: {
+        id: proveedorId,
+        nombre: comprobantes[0]?.proveedor?.nombre ?? null,
+        variacionNormalPct:
+          recetaVigente?.variacionNormalPct != null
+            ? Number(recetaVigente.variacionNormalPct)
+            : VARIACION_POR_DEFECTO,
+      },
       grupos,
       sinComprobante,
       hayFaltantes,
