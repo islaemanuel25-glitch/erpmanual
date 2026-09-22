@@ -5,7 +5,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { subtotalLinea } from "@/lib/compras-proveedor/calculoPedido";
 import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
-import { esFiambreFijoEnUbicacion } from "@/lib/conversiones/stock";
+import { esFiambreFijoEnUbicacion, elDepositoCuentaPorKilo } from "@/lib/conversiones/stock";
 import {
   clasificarDiferenciaCosto,
   decidirEscrituraDeCosto,
@@ -367,7 +367,28 @@ export async function POST(req, { params }) {
         let incremento;
         let kgReales = null;
 
-        if (modoCompra === "UNIDAD") {
+        // ── LOS KILOS QUE LA HOJA MOSTRÓ ENTRAN COMO KILOS ─────────────────
+        //
+        // La hoja de Corregir pide kilos cuando `elDepositoCuentaPorKilo` dice
+        // que el depósito guarda ese producto por peso, y ése NO es el mismo
+        // conjunto que `modoCompraProveedor === "UNIDAD"`. Medido contra
+        // producción: de los 60 productos activos que el depósito cuenta por
+        // kilo, **36 se compran por bulto** —Trozado, Pechuga, pan, Cebolla—.
+        // En esos, la hoja mostraba "Entra al stock 12,5 kg" y esta cuenta
+        // escribía 12 unidades: el mismo renglón en dos unidades distintas.
+        //
+        // Se agrega la condición en vez de cambiarla para no tocar lo que pasa
+        // cuando NADIE pesó: ahí los 36 siguen entrando como hasta hoy. Lo que
+        // cambia es solo que unos kilos cargados a mano dejan de perderse.
+        const kilosDeLaHoja = kgRecibidosMap[det.id];
+        const hayKilosDeLaHoja =
+          kilosDeLaHoja !== undefined &&
+          kilosDeLaHoja !== null &&
+          kilosDeLaHoja !== "" &&
+          Number.isFinite(Number(kilosDeLaHoja)) &&
+          Number(kilosDeLaHoja) > 0;
+
+        if (modoCompra === "UNIDAD" || (elDepositoCuentaPorKilo(base) && hayKilosDeLaHoja)) {
           // FIAMBRE: stock incrementa por kg reales, no por unidades
           kgReales = kgRecibidosMap[det.id] !== undefined
             ? Number(kgRecibidosMap[det.id])

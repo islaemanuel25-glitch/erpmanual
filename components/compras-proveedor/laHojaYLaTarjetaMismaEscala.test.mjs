@@ -155,8 +155,10 @@ test("LA HOJA NO TIENE SU PROPIA LECTURA DE LA ESCALA", () => {
   // Y avisa cuando lo que ofrece no cuadra con el precio del papel.
   assert.match(hoja, /laCantidadCuadraConElPrecio\(/);
   assert.match(hoja, /avisoDeEscala/);
-  // Y la diferencia se mide en físicas de los dos lados.
-  assert.match(hoja, /pedidaFisica !== entraAlStock/);
+  // Y la diferencia se mide en PIEZAS de los dos lados. No contra lo que entra
+  // al stock: en un producto por peso eso son kilos, y comparar kilos contra
+  // piezas pediría el motivo de una diferencia que no existe en cada fiambre.
+  assert.match(hoja, /pedidaFisica !== unidadesContadas/);
 });
 
 test("Y EL CIERRE USA LO QUE LA HOJA DIJO, NO SU PROPIA CUENTA", () => {
@@ -172,4 +174,116 @@ test("Y EL CIERRE USA LO QUE LA HOJA DIJO, NO SU PROPIA CUENTA", () => {
   assert.match(cierre, /det\.unidad === "UNIDAD" \? 1 : factorPack/);
   // Y no se acusa a quien declaró una diferencia a propósito.
   assert.match(cierre, /motivoDeclarado/);
+});
+
+// ── LOS KILOS DEL PAPEL, EN LA HOJA Y EN LA TARJETA ───────────────────────
+
+/** El salamín picado fino del papel de Paty: 3 piezas y 2,100 kg impresos. */
+const SALAMIN = {
+  producto: "Salamin Fox Picado Fino",
+  cantidad: 3,
+  cantidadPedida: 3,
+  unidadPedido: "UNIDAD",
+  factorPack: null,
+  porKilo: true,
+  faltanKilos: false,
+  peso: 2.1,
+  kgRecibidos: null,
+  subtotal: 37633.23,
+  costoFactura: 17920.59,
+  costoCatalogo: 18000,
+};
+
+test("LA TARJETA DICE LAS PIEZAS Y LOS KILOS DEL PAPEL", () => {
+  // Decía "3 u" y quien la miraba no tenía cómo saber que el papel traía el
+  // peso impreso — que es lo que de verdad entra al stock.
+  assert.equal(textoDeLaCantidad(SALAMIN), "3 u · 2.1 kg");
+  // Los otros dos del mismo papel.
+  assert.equal(textoDeLaCantidad({ ...SALAMIN, cantidad: 2, cantidadPedida: 2, peso: 2.9 }), "2 u · 2.9 kg");
+  assert.equal(textoDeLaCantidad({ ...SALAMIN, cantidadPedida: 3, peso: 11.685 }), "3 u · 11.685 kg");
+});
+
+test("Y LAS PAPAS NO, AUNQUE EL PAPEL TRAIGA SU PESO", () => {
+  // El depósito las cuenta por bolsa: sus kilos no significan nada para el
+  // stock, y ponerlos al lado invitaría a cargarlos.
+  const papas = { ...SALAMIN, producto: "Papas Congeladas", porKilo: false, peso: 30, cantidad: 12, cantidadPedida: 12 };
+  assert.equal(textoDeLaCantidad(papas), "12 u");
+});
+
+test("LA HOJA PIDE KILOS, PRECARGADOS CON LOS DEL PAPEL", () => {
+  const hoja = codigoDe(HOJA);
+  // El campo existe y solo para los que el depósito cuenta por peso.
+  assert.match(hoja, /const entraEnKilos = fila\?\.porKilo === true;/);
+  assert.match(hoja, /\{entraEnKilos && \(/);
+  // Precargado con lo pesado antes, y si no con lo que dice el papel. NUNCA
+  // con el peso de referencia del producto, que es una estimación.
+  assert.match(hoja, /fila\.kgRecibidos != null/);
+  assert.match(hoja, /: fila\.peso != null/);
+  assert.ok(!/pesoRefKg|pesoReferenciaKg/.test(hoja), "la hoja se llenó con una estimación");
+  // Lo que entra al stock son esos kilos, y la franja lo dice en kg.
+  assert.match(hoja, /entraEnKilos \? Number\(kilos\) \|\| 0 : unidadesContadas/);
+  assert.match(hoja, /entraEnKilos \? "kg"/);
+  // Y viajan al servidor.
+  assert.match(hoja, /kgRecibidos: entraEnKilos && kilos !== "" \? Number\(kilos\) : null/);
+});
+
+test("EL CIERRE ESCRIBE AL STOCK LOS KILOS QUE MOSTRÓ LA HOJA", () => {
+  // La rama de peso del cierre ya prefería `kgRecibidos` sobre el peso de
+  // referencia; lo que faltaba era que alguien se lo mandara.
+  const cierre = codigoDe(CIERRE);
+  assert.match(cierre, /kgRecibidosMap\[det\.id\] !== undefined/);
+  assert.match(cierre, /incremento = esFiambreFijoEnUbicacion\(base, destinoEsDeposito\)/);
+  // El respaldo por peso de referencia queda para cuando nadie pesó, y se ve
+  // que es un respaldo.
+  assert.match(cierre, /kgReales = cantRecibida \* pesoRef/);
+});
+
+test("Y ENTRA POR EL MISMO PREDICADO QUE USA LA HOJA, NO POR OTRO", () => {
+  // ── LA DIVERGENCIA MEDIDA ───────────────────────────────────────────
+  //
+  // La hoja pide kilos con `elDepositoCuentaPorKilo`; el cierre entraba a la
+  // rama de peso solo con `modoCompraProveedor === "UNIDAD"`. No son el mismo
+  // conjunto: contra producción, de los 60 productos activos que el depósito
+  // cuenta por kilo, 36 se compran por bulto —Trozado, Pechuga, pan, Cebolla—.
+  // En esos la hoja mostraba kilos y el cierre escribía unidades.
+  const cierre = codigoDe(CIERRE);
+  assert.match(cierre, /elDepositoCuentaPorKilo\(base\) && hayKilosDeLaHoja/);
+  assert.match(cierre, /import \{[^}]*elDepositoCuentaPorKilo[^}]*\} from "@\/lib\/conversiones\/stock"/);
+  // Y solo cuando la hoja mandó kilos de verdad: sin eso, los 36 tienen que
+  // seguir entrando como hasta hoy, no caer en un peso de referencia que no
+  // tienen cargado.
+  assert.match(cierre, /Number\(kilosDeLaHoja\) > 0/);
+});
+
+test("EL CARTEL DE PESAR SOLO SALE SI EL PAPEL NO TRAE LOS KILOS", () => {
+  // ── LA CAUSA, MEDIDA CONTRA PRODUCCIÓN ──────────────────────────────
+  //
+  // `netoQueFacturaElProveedor` lee los kilos de `linea.peso ?? linea.pesoKg`.
+  // El select de `aceptar-precio` no pedía `pesoKg`, así que llegaba undefined
+  // y contestaba `faltanKilos` en TODOS los fiambres — incluidos los tres del
+  // 242, que tienen 2,100 / 2,900 / 11,685 kg guardados desde la lectura. De
+  // ahí salía el cartel "Pesá la mercadería y cargá los kilos al recibir".
+  //
+  // Contraprueba corrida contra Postgres de producción el 2026-09-22: con el
+  // campo, `faltanKilos` es false en los tres; sacándolo del objeto, true.
+  const ruta = codigoDe("app/api/compras-proveedor/comprobantes/aceptar-precio/route.js");
+  assert.match(ruta, /pesoKg: true/, "el select volvió a quedarse sin los kilos del papel");
+  // Y el cartel sigue existiendo para el caso que sí lo merece.
+  const cruda = fs.readFileSync(
+    path.join(RAIZ, "app/api/compras-proveedor/comprobantes/aceptar-precio/route.js"),
+    "utf8"
+  );
+  assert.match(cruda, /Pesá la mercadería y cargá los kilos al recibir/);
+  assert.match(ruta, /analisis\?\.faltanKilos/);
+});
+
+test("Y LA CUENTA DE LOS KILOS ES LA DEL PAPEL, NO LA DEL PESO DE REFERENCIA", () => {
+  // El salamín del 242: 3 piezas, 2,100 kg impresos y peso de referencia 0,55.
+  // Sin los kilos del papel el cierre habría escrito 3 × 0,55 = 1,65 kg.
+  const delPapel = 2.1;
+  const porReferencia = 3 * 0.55;
+  assert.equal(Math.round(porReferencia * 100) / 100, 1.65);
+  assert.notEqual(delPapel, porReferencia);
+  // Y el precio por kilo que sale de esos kilos es el medido en producción.
+  assert.equal(Math.round((37633.23 / delPapel) * 100) / 100, 17920.59);
 });

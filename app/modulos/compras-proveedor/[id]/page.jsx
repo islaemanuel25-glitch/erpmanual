@@ -556,6 +556,12 @@ export default function DetallePedidoProveedorPage({ params }) {
     // Las unidades que la hoja dijo que entran, tal cual. El servidor las usa
     // en vez de deducir la escala, que es donde los tres lugares se separaban.
     setFisicas((prev) => ({ ...prev, [id]: datos.unidadesFisicas ?? null }));
+    // Los kilos que la hoja mostró, para los productos que el depósito cuenta
+    // por peso. Van al mismo estado que ya usa la columna de kilos de la lista:
+    // dos lugares que escriben el mismo dato tienen que escribir en uno solo.
+    if (datos.kgRecibidos != null) {
+      setKgRecibidos((prev) => ({ ...prev, [id]: datos.kgRecibidos }));
+    }
     setMotivos((prev) => ({
       ...prev,
       [id]: datos.motivoPrincipal

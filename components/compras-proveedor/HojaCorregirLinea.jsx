@@ -327,6 +327,13 @@ export default function HojaCorregirLinea({
   // proveedor machea sola contra el producto equivocado, y el error no se ve
   // porque el producto que queda al lado es plausible.
   const [cambiandoProducto, setCambiandoProducto] = useState(false);
+  // ── LOS KILOS, PARA LOS PRODUCTOS QUE EL DEPÓSITO CUENTA POR PESO ──────
+  //
+  // El papel de Paty los trae impresos —el salamín picado son 3 piezas y 2,100
+  // kg— y la hoja no los pedía ni los mostraba: ofrecía "3 unidades" y el
+  // cierre terminaba calculando 3 × el peso de referencia, 1,65 kg, en vez de
+  // los 2,100 que el proveedor facturó.
+  const [kilos, setKilos] = useState("");
 
   // Al abrir se arranca de lo que ya hay: lo contado antes si lo hubo, y si no
   // lo que dice la factura, que es la propuesta razonable —el papel ya afirma
@@ -351,6 +358,15 @@ export default function HojaCorregirLinea({
         : String(cantidadEnEscalaDelPedido(fila) ?? "")
     );
     setSueltas(fila.unidadesSueltas != null ? String(fila.unidadesSueltas) : "");
+    // Lo pesado antes si lo hubo; si no, LO QUE DICE EL PAPEL. Nunca el peso de
+    // referencia del producto: ése es una estimación y el papel es un dato.
+    setKilos(
+      fila.kgRecibidos != null
+        ? String(fila.kgRecibidos)
+        : fila.peso != null
+          ? String(fila.peso)
+          : ""
+    );
     setMotivo(fila.motivoPrincipal ?? null);
     setDetalleMotivo(fila.motivoDetalle ?? "");
     // La opción marcada arranca en lo que se decidió la vez pasada, si sigue
@@ -367,12 +383,28 @@ export default function HojaCorregirLinea({
     setCambiandoProducto(false);
   }, [abierta, fila]);
 
-  const entraAlStock = useMemo(() => {
+  // ── ¿ESTE PRODUCTO ENTRA AL STOCK EN KILOS? ───────────────────────────
+  //
+  // Lo dice el DEPÓSITO, con el mismo predicado que usan la tarjeta y el costo.
+  // El salamín picado y el danbo van por peso; las papas, por pieza, aunque el
+  // papel imprima su peso.
+  const entraEnKilos = fila?.porKilo === true;
+
+  // Las PIEZAS contadas, siempre. Es lo que se coteja contra el pedido, y no
+  // cambia porque el stock de este producto se lleve en kilos.
+  const unidadesContadas = useMemo(() => {
     const b = Number(bultos) || 0;
     const s = Number(sueltas) || 0;
     const factor = vaPorPack ? Number(fila?.factorPack) || 1 : 1;
     return b * factor + s;
   }, [bultos, sueltas, vaPorPack, fila?.factorPack]);
+
+  // Y lo que entra al stock: kilos si el depósito lo cuenta por peso, y las
+  // piezas si no. Son dos preguntas distintas sobre el mismo renglón.
+  const entraAlStock = useMemo(
+    () => (entraEnKilos ? Number(kilos) || 0 : unidadesContadas),
+    [entraEnKilos, kilos, unidadesContadas]
+  );
 
   // ── EL PRECIO DELATA LA ESCALA ────────────────────────────────────────
   //
@@ -413,8 +445,11 @@ export default function HojaCorregirLinea({
       (fila?.unidadPedido ?? "BULTO") === "BULTO" ? Number(fila?.factorPack) || 1 : 1;
     const pedidaFisica = pedida * factorDelPedido;
     if (bultos === "" || !Number.isFinite(Number(bultos))) return false;
-    return pedidaFisica !== entraAlStock;
-  }, [fila?.cantidadPedida, fila?.unidadPedido, fila?.factorPack, bultos, entraAlStock]);
+    // Contra las PIEZAS contadas, no contra lo que entra al stock: en un
+    // producto por peso eso son kilos, y comparar kilos contra piezas pediría
+    // el motivo de una diferencia que no existe en cada fiambre.
+    return pedidaFisica !== unidadesContadas;
+  }, [fila?.cantidadPedida, fila?.unidadPedido, fila?.factorPack, bultos, unidadesContadas]);
 
   if (!fila) return null;
 
@@ -492,6 +527,9 @@ export default function HojaCorregirLinea({
       // Lo que se ve es lo que entra. Y el servidor lo comprueba contra el
       // precio del papel antes de escribirlo.
       unidadesFisicas: bultos === "" ? null : entraAlStock,
+      // Los kilos, cuando el depósito cuenta por peso. Es lo que la franja
+      // mostró y lo que el cierre va a escribir al stock.
+      kgRecibidos: entraEnKilos && kilos !== "" ? Number(kilos) : null,
       motivoPrincipal: cantidadDifiere ? motivo : null,
       motivoDetalle: cantidadDifiere && motivo === "Otro" ? detalleMotivo.trim() : null,
     });
@@ -673,6 +711,35 @@ export default function HojaCorregirLinea({
               )}
             </div>
 
+            {/* ── LOS KILOS DEL PAPEL, YA CARGADOS Y EDITABLES ────────────
+                Para un producto que el depósito cuenta por peso, lo que entra
+                al stock son KILOS. El papel los trae impresos y se ofrecen
+                puestos: si al pesar da distinto, se corrige acá, que es para lo
+                que esta hoja existe.
+
+                El peso de referencia del producto NO se usa para llenarlo: es
+                una estimación, y el papel es un dato. Sin este campo el cierre
+                calculaba 3 piezas × 0,55 kg = 1,65 kg sobre un renglón que el
+                proveedor facturó por 2,100. */}
+            {entraEnKilos && (
+              <div className="w-full">
+                <div className="text-sm2 sunmi-text-muted truncate">
+                  Kilos{fila?.peso != null ? ` · el papel dice ${limpio(fila.peso)} kg` : ""}
+                </div>
+                <SunmiCampoCantidad
+                  valor={kilos}
+                  onCambiar={setKilos}
+                  etiqueta="Kilos"
+                  minimo={0}
+                  paso={0.1}
+                  decimales={3}
+                  tipo="number"
+                  claseMarco="flex-1"
+                  claseInput="text-lg"
+                />
+              </div>
+            )}
+
             {/* ── SI LA ESCALA NO CUADRA CON EL PRECIO, SE DICE ACÁ ───────
                 Justo arriba del número que va a entrar al stock, que es el que
                 estaría mal. Con los dos importes a la vista para poder
@@ -688,7 +755,8 @@ export default function HojaCorregirLinea({
             <div className="min-h-barraStock sunmi-control rounded-control px-filtro py-entreFiltros flex items-center justify-between gap-renglon">
               <span className="text-sm3 sunmi-text-muted">Entra al stock</span>
               <span className="text-sm3 font-bold tabular-nums">
-                {limpio(entraAlStock)} {entraAlStock === 1 ? "unidad" : "unidades"}
+                {limpio(entraAlStock)}{" "}
+                {entraEnKilos ? "kg" : entraAlStock === 1 ? "unidad" : "unidades"}
               </span>
             </div>
           </Bloque>

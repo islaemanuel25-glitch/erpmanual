@@ -96,6 +96,19 @@ export async function POST(req) {
         // línea cierra. Con un papel sin total impreso es lo único que queda
         // para verificar el precio, así que sin él la guarda no puede decidir.
         subtotalImpreso: true,
+        // ── LOS KILOS DEL PAPEL, QUE FALTABAN Y NADIE ECHABA DE MENOS ────
+        //
+        // En un producto que el depósito cuenta por peso, `netoQueFacturaElProveedor`
+        // divide por los kilos y, si no los tiene, contesta `faltanKilos` — que
+        // acá se convierte en un 409 con el cartel "Pesá la mercadería y cargá
+        // los kilos al recibir". Sin este campo en el select llegaba
+        // `undefined`, así que el cartel salía en TODOS los fiambres, incluso
+        // en los que el papel trae el peso impreso: el salamín picado del 242
+        // tiene 2,100 kg guardados desde la lectura.
+        //
+        // El nombre del campo es el del esquema. La conciliación ya lo pedía
+        // así; era esta ruta la que se había quedado corta.
+        pesoKg: true,
         // El escalar, no una relación: `productoLocal` no existe en el esquema y
         // pedirla acá rompía la ruta contra Postgres. El producto se trae aparte.
         productoLocalId: true, pedidoDetalleId: true,
