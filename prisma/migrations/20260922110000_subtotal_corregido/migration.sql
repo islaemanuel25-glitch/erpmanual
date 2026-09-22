@@ -1,0 +1,22 @@
+-- EL SUBTOTAL QUE ALGUIEN —O LA CUENTA— DIJO QUE DICE EL PAPEL.
+--
+-- ── POR QUÉ UNA COLUMNA NUEVA Y NO PISAR `subtotalImpreso` ────────────────
+--
+-- Hasta hoy, corregir un renglón SOBREESCRIBÍA `subtotalImpreso`, que es lo que
+-- el lector creyó leer. Eso tiene dos consecuencias y las dos se vieron:
+--
+--   1. Se pierde qué se había leído, así que después no se puede decir "leyó
+--      $46.896,56, corregido a $46.886,55" — que es toda la explicación.
+--   2. Una relectura vuelve a escribir `subtotalImpreso` con lo que el lector
+--      lea esta vez, y la corrección desaparece sin dejar rastro.
+--
+-- Con la corrección en su propia columna, lo leído y lo decidido son dos hechos
+-- distintos —la regla 3 de CLAUDE.md— y la corrección puede heredarse a la
+-- lectura siguiente igual que el vínculo y la marca de revisado.
+--
+-- ADITIVA. Una columna nullable, sin default y sin backfill. Ninguna fila
+-- existente se toca: todas quedan en NULL, que es la verdad —ninguna se
+-- corrigió con este mecanismo—. El código viejo no la lee, así que la ventana
+-- entre migrar y recrear no cambia nada.
+
+ALTER TABLE "ComprobanteLinea" ADD COLUMN "subtotalCorregido" DECIMAL(12,2);

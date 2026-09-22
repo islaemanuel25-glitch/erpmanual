@@ -16,8 +16,30 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-**Ninguna.** Producción y el árbol están los dos en **27 migraciones**, y el
-despliegue siguiente es solo de código.
+Producción está en **27 migraciones** y el árbol en **28**. Hay **una**
+pendiente.
+
+- `20260922110000_subtotal_corregido`
+
+**Qué hace:** agrega **una columna nullable** a `ComprobanteLinea`,
+`subtotalCorregido`: el subtotal que alguien —o la cuenta del papel— dijo que
+dice ese renglón, cuando el lector leyó mal un dígito.
+
+**Por qué no pisa `subtotalImpreso`**, que es lo que se hacía hasta hoy: ése es
+lo que el lector CREYÓ leer, y pisarlo tiene dos costos que ya se pagaron —se
+pierde la explicación "leyó $46.896,56, corregido a $46.886,55", y la relectura
+siguiente borra la corrección sin dejar rastro—. Con los dos hechos separados,
+la corrección se hereda a la lectura nueva igual que el vínculo y la marca de
+revisado.
+
+**Aditiva: sin DROP, sin backfill y sin cambio de tipo.** Todas las filas quedan
+en `NULL`, que es la verdad: ninguna se corrigió con este mecanismo.
+
+**La ventana entre migrar y recrear no rompe nada:** el código viejo no conoce
+la columna y sigue leyendo `subtotalImpreso` como hasta hoy.
+
+**El quinto chequeo del backup NO aplica:** no se borra ni se transforma ningún
+dato.
 
 ---
 

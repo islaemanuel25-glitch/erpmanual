@@ -4104,6 +4104,17 @@ model ComprobanteLinea {
   ///
   /// Texto y no enum: los valores son los de `UNIDAD` en `precioDeLinea.js`, y
   /// el contrato lo define ese módulo.
+  /// EL SUBTOTAL QUE ALGUIEN —O LA CUENTA— DIJO QUE DICE EL PAPEL.
+  ///
+  /// `subtotalImpreso` es lo que el lector CREYÓ leer y no se toca: son dos
+  /// hechos distintos y pisar uno con el otro pierde la explicación —"leyó
+  /// $46.896,56, corregido a $46.886,55"— y hace que una relectura borre la
+  /// corrección sin dejar rastro.
+  ///
+  /// Se hereda a la lectura siguiente igual que el vínculo y la marca de
+  /// revisado: es una decisión sobre el renglón, no un número del papel.
+  subtotalCorregido Decimal? @db.Decimal(12, 2)
+
   unidadElegida String?
 
   revisadoEnRecepcion      Boolean   @default(false)

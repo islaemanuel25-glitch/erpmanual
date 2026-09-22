@@ -313,6 +313,9 @@ export async function POST(req, { params }) {
         where: { comprobanteId: comprobante.id },
         select: {
           orden: true, textoCrudo: true,
+          // La corrección de un dígito mal leído es una decisión sobre el
+          // renglón, no un número de la lectura: se hereda como el resto.
+          subtotalCorregido: true,
           productoLocalId: true, pedidoDetalleId: true, unidadElegida: true,
           revisadoEnRecepcion: true, revisadoEnRecepcionPorId: true, revisadoEnRecepcionAt: true,
           costoEscrito: true, costoFinalUnitario: true, costoPrevioAplicacion: true,

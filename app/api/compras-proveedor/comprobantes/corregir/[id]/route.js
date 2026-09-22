@@ -40,6 +40,7 @@ import {
   ordenesQueNoExisten,
 } from "@/lib/compras-proveedor/comprobante/lecturaGuardada";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
+import { correccionAutomatica } from "@/lib/compras-proveedor/comprobante/correccionAutomatica";
 
 const aNumero = (v) => {
   if (v === null || v === undefined) return null;
@@ -69,6 +70,7 @@ const SELECT_COMPROBANTE = {
       cantidad: true,
       netoUnitario: true,
       subtotalImpreso: true,
+      subtotalCorregido: true,
       internoUnitario: true,
       pesoKg: true,
       bonificacionPct: true,
@@ -101,11 +103,28 @@ export async function GET(req, { params }) {
     const c = await traerComprobante({ grupoId, id: comprobanteId });
     if (!c) return NextResponse.json({ ok: false, error: "No existe ese comprobante." }, { status: 404 });
 
+    const lecturaGuardada = lecturaDesdeLoGuardado(c);
     return NextResponse.json({
       ok: true,
       comprobante: { id: c.id, estado: c.estado, pedidoId: c.pedidoId, proveedorId: c.proveedorId },
-      lectura: lecturaDesdeLoGuardado(c),
+      lectura: lecturaGuardada,
       receta: c.recetaUsada ?? null,
+      // ── SI EL NÚMERO SE DEDUCE, NO HAY QUE PREGUNTAR NADA ─────────────
+      //
+      // Se calcula acá y no del otro lado de la pantalla: el número que se va a
+      // escribir no puede venir del navegador. La pantalla lo aplica pidiendo
+      // `automatica: true`, y el servidor lo vuelve a calcular antes de guardar.
+      automatica: correccionAutomatica(lecturaGuardada),
+      // Lo que YA quedó corregido, para poder decirlo en una línea aunque la
+      // pantalla se haya refrescado.
+      yaCorregidas: (c.lineas || [])
+        .filter((l) => l.subtotalCorregido !== null && l.subtotalCorregido !== undefined)
+        .map((l) => ({
+          orden: l.orden,
+          nombre: l.textoCrudo,
+          leido: Number(l.subtotalImpreso),
+          valor: Number(l.subtotalCorregido),
+        })),
     });
   } catch (err) {
     console.error("Error comprobantes/corregir GET:", err);
@@ -138,19 +157,39 @@ export async function POST(req, { params }) {
     }
 
     const body = await req.json().catch(() => ({}));
+    const pideLaAutomatica = body?.automatica === true;
+
+    const c = await traerComprobante({ grupoId, id: comprobanteId });
+    if (!c) return NextResponse.json({ ok: false, error: "No existe ese comprobante." }, { status: 404 });
+
+    // ── LA AUTOMÁTICA SE RECALCULA ACÁ, NO LLEGA HECHA ──────────────────
+    //
+    // La pantalla pide "aplicá la que corresponda"; el número sale del papel
+    // guardado. Si viniera en el cuerpo, cualquiera podría escribir el subtotal
+    // que quisiera diciendo que lo dedujo la cuenta.
+    let auto = null;
+    if (pideLaAutomatica) {
+      auto = correccionAutomatica(lecturaDesdeLoGuardado(c));
+      if (!auto.aplica) {
+        return NextResponse.json(
+          { ok: false, error: auto.porque, queHacer: auto.porque },
+          { status: 409 }
+        );
+      }
+    }
+
     const crudas = body?.correcciones && typeof body.correcciones === "object" ? body.correcciones : {};
-    const correcciones = Object.entries(crudas)
-      .map(([orden, valor]) => ({ orden: Number(orden), valor: aNumero(valor) }))
-      .filter((c) => Number.isFinite(c.orden) && c.valor !== null);
+    const correcciones = auto
+      ? [{ orden: auto.orden, valor: auto.valor }]
+      : Object.entries(crudas)
+          .map(([orden, valor]) => ({ orden: Number(orden), valor: aNumero(valor) }))
+          .filter((x) => Number.isFinite(x.orden) && x.valor !== null);
     if (!correcciones.length) {
       return NextResponse.json(
         { ok: false, error: "No llegó ninguna corrección." },
         { status: 400 }
       );
     }
-
-    const c = await traerComprobante({ grupoId, id: comprobanteId });
-    if (!c) return NextResponse.json({ ok: false, error: "No existe ese comprobante." }, { status: 404 });
 
     // SOLO SE CORRIGE LO QUE NO CERRÓ. Un comprobante CARGADO ya pasó la
     // verificación y sus costos pueden estar propuestos: cambiarle un subtotal
@@ -184,9 +223,14 @@ export async function POST(req, { params }) {
 
     const guardado = await prisma.$transaction(async (tx) => {
       for (const { orden, valor } of correcciones) {
+        // ── EN SU PROPIA COLUMNA, NO PISANDO LO LEÍDO ─────────────────
+        //
+        // `subtotalImpreso` es lo que el lector creyó leer y es un hecho de la
+        // lectura. Pisarlo perdía la explicación —"leyó X, corregido a Y"— y
+        // hacía que la relectura siguiente borrara la corrección sin rastro.
         await tx.comprobanteLinea.updateMany({
           where: { comprobanteId: c.id, orden },
-          data: { subtotalImpreso: valor },
+          data: { subtotalCorregido: valor },
         });
       }
       // SOLO EL VEREDICTO, NO TODO `aGuardar`. Los campos de la lectura —modelo,
@@ -211,6 +255,7 @@ export async function POST(req, { params }) {
       porque: puerta.porque,
       diferenciaCentavos: puerta.diferenciaCentavos,
       corregidas: correcciones.length,
+      automatica: auto ? { orden: auto.orden, nombre: auto.nombre, leido: auto.leido, valor: auto.valor } : null,
       queHacer: puerta.cierra
         ? "El papel cierra. Ya se puede conciliar contra el pedido."
         : "Sigue sin cerrar: mirá la foto contra la lista.",
