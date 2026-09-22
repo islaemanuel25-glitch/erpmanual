@@ -16,27 +16,17 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **30 migraciones** y el árbol en **31**. Hay **una**
-pendiente.
-
-- `20260922170000_conceptos_del_pie`
-
-**Qué hace:** agrega a `ComprobanteProveedor` la columna JSON
-`conceptosDelPieLeidos`: todo lo que el papel imprime entre el subtotal y el
-total —percepción de IVA, percepción de IIBB, retenciones, descuentos,
-redondeos—, con el nombre tal cual. Hasta hoy solo había cuatro números fijos y
-lo demás no tenía dónde ir.
-
-**Aditiva: nullable, sin default y sin backfill.** Las lecturas que ya están
-quedan en NULL —que es la verdad, no se les preguntó— y el control cae al
-respaldo de las alícuotas de la receta, que es lo que hacía hasta hoy.
-
-**La ventana entre migrar y recrear no rompe nada:** el código viejo no conoce
-la columna.
-
-**El quinto chequeo del backup NO aplica:** no se borra ni se transforma nada.
+Producción está en **31 migraciones** y el árbol también. **Ninguna** pendiente:
+el despliegue siguiente es solo de código.
 
 ---
+
+`20260922170000_conceptos_del_pie` salió de esta lista con el despliegue de
+`8972abae`: el contenedor descartable informó las **31** del árbol, imprimió
+"Applying migration" y `migrate status` cerró con "Database schema is up to
+date!". Comprobada contra la base releyendo el comprobante 17 del pedido 245: la
+columna guardó los tres conceptos que el papel de Arcor imprime, con la
+percepción de IVA de **$12.386,34**, y el comprobante pasó a CARGADO.
 
 `20260922150000_variacion_normal_de_precios` salió de esta lista con el
 despliegue de `75b41311`: el contenedor descartable informó las **30** del
