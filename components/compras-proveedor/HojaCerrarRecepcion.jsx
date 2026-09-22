@@ -63,6 +63,14 @@ export default function HojaCerrarRecepcion({
   sinComprobante = [],
   contados = {},
   guardando = false,
+  // ── EL MOTIVO POR EL QUE EL CIERRE NO ENTRÓ ──────────────────────────
+  //
+  // Va acá, donde se tocó el botón, y no en un cartel del navegador: el
+  // `alert` sale de la pantalla, no se puede copiar, y en un teléfono tapa
+  // justo lo que hay que mirar. El 2026-09-22 la regla que frenaba el cierre
+  // del 242 llegó como "Error interno al recibir pedido" y el motivo —que
+  // nombraba el producto y decía qué tocar— se quedó en el log del servidor.
+  motivoDelFallo = null,
 }) {
   // ── LA RESPUESTA POR OMISIÓN ES "NO LLEGÓ" ─────────────────────────────
   //
@@ -104,6 +112,11 @@ export default function HojaCerrarRecepcion({
       espacioCuerpo="gap-renglon"
       footer={
         <div className="w-full flex flex-col gap-renglon">
+          {motivoDelFallo && (
+            <p className="text-sm3 sunmi-text-danger break-words" aria-live="polite">
+              {motivoDelFallo}
+            </p>
+          )}
           <SunmiButton
             color="primary"
             type="button"

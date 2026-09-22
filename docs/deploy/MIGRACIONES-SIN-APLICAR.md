@@ -16,8 +16,8 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-**Ninguna.** Producción y el árbol están los dos en **28 migraciones**, y el
-despliegue siguiente es solo de código.
+Producción está en **28 migraciones** y el árbol también. **Ninguna** pendiente:
+el despliegue siguiente es solo de código.
 
 ---
 

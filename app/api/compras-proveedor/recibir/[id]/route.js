@@ -14,6 +14,8 @@ import {
 import { esComboBase } from "@/lib/combos/guards";
 import { laCantidadCuadraConElPrecio } from "@/lib/compras-proveedor/laCantidadCuadraConElPrecio";
 import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
+import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
+import { ErrorParaLaPersona, esParaLaPersona } from "@/lib/compras-proveedor/errorParaLaPersona";
 
 // Resuelve el ProductoLocal DESTINO (de la ubicación dueña del pedido) para una
 // línea. Para el depósito es el mismo que ya trae la línea. Para un local, busca
@@ -77,6 +79,10 @@ export async function POST(req, { params }) {
                 base: {
                   select: {
                     id: true,
+                    // El NOMBRE no es decoración: sin él, el mensaje que frena
+                    // el cierre dice "Un producto" y no hay forma de saber cuál
+                    // abrir. Fue exactamente lo que pasó el 2026-09-22.
+                    nombre: true,
                     es_combo: true,
                     factor_pack: true,
                     modoCompraProveedor: true,
@@ -462,9 +468,13 @@ export async function POST(req, { params }) {
               subtotal: delPapel.subtotalCorregido ?? delPapel.subtotalImpreso,
               cantidad: delPapel.cantidad,
               fisicas: incremento,
+              // Cuántas unidades trae un bulto: sin esto, un papel que factura
+              // POR BULTO —el Queso Rallado del 242 dice 6 y entran 120— se
+              // acusa como error de escala siendo perfecto.
+              factorPack,
             });
             if (r.aplica && !r.cuadra) {
-              throw new Error(
+              throw new ErrorParaLaPersona(
                 `${base?.nombre || "Un producto"}: entrarían ${incremento} unidades al stock y el ` +
                   `papel factura ${r.esperado}. La cantidad está en otra unidad — abrí Corregir y ` +
                   `revisá si son bultos o unidades sueltas.`
@@ -671,9 +681,31 @@ export async function POST(req, { params }) {
     // silencioso como escribirlo mal.
     return NextResponse.json({ ok: true, item: updated, decisionesDeCosto });
   } catch (err) {
+    // ── UNA REGLA QUE FRENA NO ES UNA FALLA DEL SISTEMA ─────────────────
+    //
+    // El cierre frena a propósito cuando algo no cuadra, y ese motivo está
+    // escrito en castellano para quien está recibiendo. Caía en este catch y
+    // salía como "Error interno al recibir pedido": el motivo quedaba solo en
+    // el log del servidor y la persona veía un cartel que no dice nada y que
+    // encima es falso —la aplicación contestó perfecto—.
+    //
+    // Pasó el 2026-09-22 a las 10:22 y a las 10:23 cerrando el pedido 242.
+    if (esParaLaPersona(err)) {
+      return NextResponse.json(
+        { ok: false, error: err.message, queHacer: err.message },
+        { status: 409 }
+      );
+    }
     console.error("Error compras-proveedor/recibir:", err);
     return NextResponse.json(
-      { ok: false, error: "Error interno al recibir pedido" },
+      {
+        ok: false,
+        error: errorInesperado({
+          operacion: "recibir la mercadería de este pedido",
+          quedo:
+            "No entró nada: el cierre corre entero en una transacción, así que o entra todo o no entra nada.",
+        }),
+      },
       { status: 500 }
     );
   }

@@ -129,6 +129,9 @@ export default function DetallePedidoProveedorPage({ params }) {
   // La hoja que se abre antes de cerrar: pregunta por las líneas que ningún
   // comprobante trajo y dice qué queda a medias.
   const [cerrandoRecepcion, setCerrandoRecepcion] = useState(false);
+  // Por qué no entró el cierre, en castellano y a la vista. Se limpia al volver
+  // a intentar: un motivo viejo al lado de un botón que acaba de andar miente.
+  const [motivoDelFallo, setMotivoDelFallo] = useState(null);
 
   // El primer comprobante con líneas leídas. Con varios, se muestra el primero:
   // el caso de dos facturas en un mismo pedido existe y se resuelve en la tanda
@@ -725,6 +728,7 @@ export default function DetallePedidoProveedorPage({ params }) {
         };
       }
 
+      setMotivoDelFallo(null);
       const res = await fetch(url, {
         method: "POST",
         credentials: "include",
@@ -750,7 +754,14 @@ export default function DetallePedidoProveedorPage({ params }) {
         }
         cargar();
       } else {
-        alert(data.error || "Error al ejecutar acción");
+        // ── EL MOTIVO SE DICE EN LA PANTALLA, NO EN UN CARTEL DEL NAVEGADOR ─
+        //
+        // Un `alert` sale de la aplicación, no se puede copiar, y en un
+        // teléfono tapa justo lo que hay que mirar. Cuando el cierre frena por
+        // una regla, el servidor manda el motivo en castellano diciendo qué
+        // producto y qué hacer: eso va donde se tocó el botón.
+        setMotivoDelFallo(data.queHacer || data.error || "No se pudo completar la acción.");
+        if (accion === "recibir") setCerrandoRecepcion(true);
       }
     } finally {
       setActing(false);
@@ -1295,6 +1306,7 @@ export default function DetallePedidoProveedorPage({ params }) {
               sinComprobante={sinPedidoPrevio ? [] : conciliacion?.sinComprobante || []}
               contados={recibidos}
               guardando={acting}
+              motivoDelFallo={motivoDelFallo}
               onConfirmar={(recibidosDelCierre) => {
                 setCerrandoRecepcion(false);
                 ejecutarAccion("recibir", { recibidos: recibidosDelCierre });
