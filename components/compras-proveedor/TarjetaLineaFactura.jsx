@@ -181,27 +181,29 @@ export default function TarjetaLineaFactura({
             <p className="text-xs sunmi-text-muted break-words">
               Todavía no se sabe qué producto es. Tocá Corregir para elegirlo.
             </p>
-          ) : sinPedidoPrevio ? (
-            /* Sin pedido previo se muestra LO QUE DICE EL PAPEL y nada más. No
-               hay comparación posible y tampoco hace falta: lo que importa de
-               esta línea —el precio contra el interno del ERP— está a la
-               derecha, igual que siempre. */
-            <p className="flex items-baseline gap-x-2 flex-wrap break-words">
-              <span className="text-xs sunmi-text-muted shrink-0">Factura</span>
-              <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-accent">
-                {fmtCant(cantidad)}
-              </span>
-              {convertida && (
-                <span className="text-xs tabular-nums sunmi-text-muted shrink-0">
-                  el papel dice {fmtCant(fila?.cantidad)} u
-                </span>
-              )}
-            </p>
-          ) : esNoPedida ? (
+          ) : esNoPedida && !sinPedidoPrevio ? (
             <p className="text-xs sunmi-text-muted break-words">
               El proveedor lo facturó y no estaba en el pedido.
             </p>
           ) : (
+            /* ── UNA SOLA RAMA PARA LAS TRES LÍNEAS ──────────────────────
+               Acá había una rama aparte para `sinPedidoPrevio` —un pedido que
+               NACIÓ de la factura— que dibujaba "Factura 12" y nada más. Su
+               comentario decía que el precio "está a la derecha, igual que
+               siempre", y eso dejó de ser cierto cuando ese bloque de la
+               esquina se fue: el pedido 242 quedó mostrando la cantidad y el
+               total, y
+               ningún precio.
+
+               Se vio abriendo la pantalla de verdad a 390 px, no en los
+               candados: los números salían bien de `renglonesDeLaTarjeta` y la
+               rama que los dibuja nunca corría. Son 5 los pedidos nacidos de
+               factura en producción.
+
+               Papel y ERP valen igual sin pedido previo —son el papel contra el
+               precio interno, que no dependen de haber pedido nada—. Lo único
+               que se calla en ese caso es la comparación contra lo pedido, que
+               es lo de abajo. */
             <>
               {/* ── LÍNEA 1 · FACTURA ────────────────────────────────────
                   Cuánto vino, en la escala del PEDIDO. Misma forma que el
@@ -221,7 +223,10 @@ export default function TarjetaLineaFactura({
                     el papel dice {fmtCant(fila?.cantidad)} u
                   </span>
                 )}
-                {faltan != null && faltan !== 0 && (
+                {/* "falta" y "sobra" comparan contra el pedido, así que no se
+                    dicen cuando no hubo ninguno: serían afirmaciones falsas
+                    sobre la mercadería que se está recibiendo. */}
+                {!sinPedidoPrevio && faltan != null && faltan !== 0 && (
                   <span className="text-xs tabular-nums sunmi-text-muted shrink-0">
                     {faltan > 0 ? `falta ${fmtCant(faltan)}` : `sobra ${fmtCant(-faltan)}`}
                   </span>

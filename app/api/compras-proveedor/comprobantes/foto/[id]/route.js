@@ -24,12 +24,13 @@
 // es la ventana funcionando, y se contesta 410 con eso dicho.
 
 import { NextResponse } from "next/server";
-import { readFile } from "node:fs/promises";
+import { readFile, open } from "node:fs/promises";
 
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
+import { giroDeLaFoto, giroTotal } from "@/lib/imagen/orientacionExif";
 
 export async function GET(req, { params }) {
   try {
@@ -51,7 +52,7 @@ export async function GET(req, { params }) {
 
     const archivo = await prisma.comprobanteArchivo.findFirst({
       where: { comprobante: { id: comprobanteId, grupoId }, orden },
-      select: { ubicacion: true, mime: true, nombre: true },
+      select: { id: true, ubicacion: true, mime: true, nombre: true, giroGrados: true },
     });
     if (!archivo?.ubicacion) {
       return NextResponse.json(
@@ -62,6 +63,43 @@ export async function GET(req, { params }) {
         },
         { status: 410 }
       );
+    }
+
+    // ── ¿CÓMO HAY QUE GIRARLA? ─────────────────────────────────────────
+    //
+    // Con `?meta=1` se contesta eso y nada más: el visor lo pregunta ANTES de
+    // bajar la foto, que pesa cinco megas, para poder dibujarla derecha desde
+    // el primer cuadro en vez de mostrarla mal y corregirla después.
+    //
+    // Se leen solo los primeros 64 KB del archivo: el EXIF vive al principio y
+    // cargar la foto entera para sacar un número sería traer cinco megas a la
+    // memoria del proceso que atiende a los cinco locales.
+    const soloMeta = new URL(req.url).searchParams.get("meta") === "1";
+    if (soloMeta) {
+      let exif = 0;
+      try {
+        const fd = await open(archivo.ubicacion, "r");
+        try {
+          const buf = Buffer.alloc(64 * 1024);
+          const { bytesRead } = await fd.read(buf, 0, buf.length, 0);
+          exif = giroDeLaFoto(buf.subarray(0, bytesRead));
+        } finally {
+          await fd.close();
+        }
+      } catch {
+        // Sin poder leer la cabecera se contesta cero, que es lo que se venía
+        // haciendo. Una foto que no se puede mirar no es un error de esta
+        // pregunta: la ruta de la imagen lo dirá cuando la pidan.
+        exif = 0;
+      }
+      const elegido = Number(archivo.giroGrados) || 0;
+      return NextResponse.json({
+        ok: true,
+        giroExif: exif,
+        giroElegido: elegido,
+        giro: giroTotal({ exif, elegido }),
+        mime: archivo.mime || "image/jpeg",
+      });
     }
 
     let bytes;
@@ -93,6 +131,72 @@ export async function GET(req, { params }) {
         error: errorInesperado({
           operacion: "traer la foto del comprobante",
           quedo: "No se tocó nada: esto solo muestra una imagen que ya estaba guardada.",
+        }),
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * GUARDAR EL GIRO QUE ELIGIÓ LA PERSONA.
+ *
+ * ── POR QUÉ SE GUARDA ─────────────────────────────────────────────────────
+ *
+ * Porque una foto mal orientada se mira muchas veces: al probar la explicación,
+ * al corregir un renglón, al controlar contra el papel. Girarla en cada vuelta
+ * es trabajo repetido sobre algo que ya se resolvió una vez.
+ *
+ * Se guarda el giro RELATIVO a lo que la persona ve —o sea, sobre la foto ya
+ * enderezada por el EXIF— porque es lo que ella tocó. Sumarlos al mostrar es lo
+ * que hace que tocar «Girar» cuatro veces devuelva la foto a donde estaba.
+ *
+ * NO TOCA LA FOTO: escribe un número en una columna. El archivo es el documento
+ * y queda exactamente como salió del celular.
+ */
+export async function POST(req, { params }) {
+  try {
+    const ctx = await resolveLocalAndGrupo(req);
+    if (ctx.error) return NextResponse.json({ ok: false, error: ctx.error }, { status: ctx.status });
+    const { grupoId, session } = ctx;
+
+    const perm = checkPerm(session, ["compras.ver", "compras.recibir"]);
+    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+
+    const { id } = await params;
+    const comprobanteId = Number(id);
+    if (!Number.isFinite(comprobanteId)) {
+      return NextResponse.json({ ok: false, error: "id requerido" }, { status: 400 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const orden = Number(body?.orden || 1);
+    // Solo las cuatro posiciones que el botón puede producir. Un ángulo
+    // cualquiera no lo genera la pantalla y guardarlo dejaría la foto torcida
+    // sin que nadie sepa cómo volver.
+    const giro = ((Math.round(Number(body?.giro) / 90) * 90) % 360 + 360) % 360;
+    if (!Number.isFinite(giro)) {
+      return NextResponse.json({ ok: false, error: "El giro tiene que ser un número." }, { status: 400 });
+    }
+
+    // El alcance va en el WHERE, igual que al servir la imagen: una foto de
+    // otro grupo no existe, en vez de existir y estar prohibida.
+    const actualizadas = await prisma.comprobanteArchivo.updateMany({
+      where: { comprobante: { id: comprobanteId, grupoId }, orden },
+      data: { giroGrados: giro },
+    });
+    if (!actualizadas.count) {
+      return NextResponse.json({ ok: false, error: "No existe esa foto." }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true, giroElegido: giro });
+  } catch (err) {
+    console.error("Error comprobantes/foto POST:", err);
+    return NextResponse.json(
+      {
+        ok: false,
+        error: errorInesperado({
+          operacion: "guardar cómo se ve la foto",
+          quedo: "La foto no se tocó: esto solo anota en qué posición mirarla.",
         }),
       },
       { status: 500 }

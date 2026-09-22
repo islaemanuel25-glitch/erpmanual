@@ -33,7 +33,8 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiTextarea from "@/components/sunmi/SunmiTextarea";
-import AsiLoEntendio, { fotoDelComprobante } from "@/components/compras-proveedor/AsiLoEntendio";
+import AsiLoEntendio from "@/components/compras-proveedor/AsiLoEntendio";
+import VisorDeFoto from "@/components/compras-proveedor/VisorDeFoto";
 import { comoLoEntendio } from "@/lib/compras-proveedor/comprobante/pruebaDeExplicacion";
 import {
   OPERACION,
@@ -101,6 +102,7 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
   // MISMOS datos: si no, corregir un número haría cambiar la unidad sola.
   const [productos, setProductos] = useState(null);
   const [correcciones, setCorrecciones] = useState({});
+  const [mirandoLaFoto, setMirandoLaFoto] = useState(false);
 
   useEffect(() => {
     let vigente = true;
@@ -259,6 +261,13 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
 
   return (
     <section className="space-y-3">
+      {papel && (
+        <VisorDeFoto
+          comprobanteId={papel.comprobanteId}
+          abierto={mirandoLaFoto}
+          onCerrar={() => setMirandoLaFoto(false)}
+        />
+      )}
       <SunmiCard className="p-3 space-y-1">
         <span className="block font-semibold sunmi-text-strong break-words">
           El papel de {proveedor?.nombre}
@@ -289,14 +298,17 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
               Pedido #{papel.pedidoId} · {papel.productos}{" "}
               {papel.productos === 1 ? "producto" : "productos"}
             </span>
-            <a
-              href={fotoDelComprobante(papel.comprobanteId)}
-              target="_blank"
-              rel="noreferrer"
-              className="shrink-0 text-sm3 sunmi-text-accent"
+            {/* El MISMO visor que usa el bloque de abajo: respeta el EXIF,
+                gira y se agranda con dos dedos. Era un enlace a la imagen
+                cruda, que el navegador abría dada vuelta. */}
+            <SunmiButton
+              color="ghost"
+              type="button"
+              onClick={() => setMirandoLaFoto(true)}
+              className="shrink-0 min-h-toque text-sm3 sunmi-text-accent"
             >
               Ver foto
-            </a>
+            </SunmiButton>
           </div>
         </SunmiCard>
       ) : (

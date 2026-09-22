@@ -16,15 +16,28 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **25 migraciones** y el árbol en **25**. No hay ninguna
-pendiente: el próximo despliegue es solo de código.
+Producción está en **25 migraciones** y el árbol en **26**. Hay **una**
+pendiente.
 
-`20260921180000_receta_explicada_y_kilos` salió de esta lista con el despliegue
-de `6787934d`: el contenedor descartable informó las 25 del árbol, aplicó la que
-faltaba, y `migrate status` cerró con "Database schema is up to date!". Las cinco
-columnas son nullables y aditivas, así que no hubo ningún dato que comprobar
-después — lo que había que verificar era que la migración CORRIERA, y el conteo
-del contenedor es lo que lo dice.
+- `20260922010000_giro_de_la_foto`
+
+**Qué hace:** agrega **una columna entera nullable** a `ComprobanteArchivo`,
+`giroGrados`: los grados que alguien eligió tocando «Girar» en el visor para ver
+derecha la foto de un comprobante. Se suman al giro que dice el EXIF del
+archivo, que se lee al vuelo y no se guarda.
+
+**Aditiva: sin DROP, sin backfill y sin cambio de tipo.** Ninguna fila existente
+se toca. La columna queda en `NULL` para todas las fotos que ya están, que es la
+verdad: nadie giró ninguna todavía.
+
+**La ventana entre migrar y recrear no rompe nada.** El código viejo no conoce
+la columna y no la lee; las fotos se siguen abriendo como hasta hoy.
+
+**El quinto chequeo del backup NO aplica:** no se borra ni se transforma ningún
+dato, así que no hay ningún valor que comprobar dentro del dump.
+
+**Y la foto original no se toca:** es el documento contra el que se controla un
+número. Lo que se guarda es cómo mirarla.
 
 **Y queda anotada la desprolijidad, porque es la que este archivo existe para
 evitar:** esa fila se quedó acá una tanda de más. El despliegue de `6787934d`

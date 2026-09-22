@@ -59,6 +59,7 @@ const PANEL = "components/comprobantes/PanelComprobantes.jsx";
 const RECEPCION = "app/modulos/compras-proveedor/[id]/page.jsx";
 const RUTA = "app/api/compras-proveedor/recetas/explicacion/route.js";
 const RUTA_CORREGIR = "app/api/compras-proveedor/comprobantes/corregir/[id]/route.js";
+const VISOR = "components/compras-proveedor/VisorDeFoto.jsx";
 
 const aLaVista = (html) => html.replace(/<[^>]*>/g, " ");
 
@@ -301,9 +302,20 @@ test("EN PANTALLA SE DICE PRODUCTOS, NUNCA RENGLONES NI LÍNEAS", () => {
 });
 
 test("LA FOTO SE SIRVE POR LA RUTA NUEVA, CON EL MISMO PERMISO", () => {
-  // Una sola función arma la dirección, para las dos pantallas.
-  assert.match(codigoDe(BLOQUE), /\/api\/compras-proveedor\/comprobantes\/foto\//);
-  assert.match(codigoDe(EXPLICACION), /fotoDelComprobante\(papel\?\.comprobanteId\)|fotoDelComprobante\(/);
+  // ── LA FOTO SE ABRE EN EL VISOR, NO EN OTRA PESTAÑA ─────────────────
+  //
+  // Las dos pantallas montan el MISMO `VisorDeFoto`, que respeta la orientación
+  // del archivo, gira y se agranda con dos dedos. Antes cada una abría la
+  // imagen cruda con `window.open` o con un enlace, y el navegador la mostraba
+  // como quería: el papel de Paty se veía dado vuelta y en una franja.
+  for (const pantalla of [BLOQUE, EXPLICACION]) {
+    assert.match(codigoDe(pantalla), /<VisorDeFoto/, `${pantalla} no monta el visor`);
+    assert.ok(
+      !/window\.open\(/.test(codigoDe(pantalla)),
+      `${pantalla} volvió a abrir la foto en otra pestaña`
+    );
+  }
+  assert.match(codigoDe(VISOR), /\/api\/compras-proveedor\/comprobantes\/foto\//);
   const foto = codigoDe("app/api/compras-proveedor/comprobantes/foto/[id]/route.js");
   // El alcance va en el WHERE: un comprobante de otro grupo no existe.
   assert.match(foto, /comprobante: \{ id: comprobanteId, grupoId \}/);

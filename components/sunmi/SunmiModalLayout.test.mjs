@@ -699,6 +699,11 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     "components/productos/ModalVerComposicion.jsx": false,
     "components/proveedores/ModalCodigosProveedor.jsx": false,
     "components/compras-proveedor/ModalEnviarPedido.jsx": false,
+    // El visor de la foto del comprobante: adentro no hay nada escrito. Lo
+    // único que se puede "perder" es el giro, y ése se guarda en la foto apenas
+    // se toca, así que cerrarlo de un toque al costado no cuesta nada. Es el
+    // gesto que se espera de algo que se abrió para mirar.
+    "components/compras-proveedor/VisorDeFoto.jsx": false,
     "components/comprobantes/PanelComprobantes.jsx": false,
     // Estos dos lo declaran por el criterio VIEJO —la acción es peligrosa— y
     // quedan así a propósito. Se revisan al cerrar la fase 2, junto con el

@@ -3959,6 +3959,22 @@ model ComprobanteArchivo {
 
   createdAt DateTime @default(now())
 
+  /// ── CÓMO HAY QUE GIRAR ESTA FOTO PARA VERLA DERECHA ───────────────────────
+  ///
+  /// Los grados que ELIGIÓ una persona tocando «Girar» en el visor, sobre lo que
+  /// ya se ve. Se suma al giro que dice el EXIF del archivo, que se lee al vuelo
+  /// y no se guarda: ése es un dato del archivo y no cambia nunca.
+  ///
+  /// NULL significa "nadie la giró todavía", que no es lo mismo que cero —cero
+  /// es "la miré y está bien así"—. La diferencia no la usa nada hoy y por eso
+  /// la columna es nullable en vez de tener default: el día que haga falta saber
+  /// si alguien ya la revisó, el dato está.
+  ///
+  /// La foto ORIGINAL no se toca: es el documento contra el que se controla un
+  /// número, y volver a comprimirla para dejarla derecha le bajaría calidad
+  /// justo en los dígitos chicos.
+  giroGrados Int?
+
   comprobante ComprobanteProveedor @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
 
   @@unique([comprobanteId, orden])

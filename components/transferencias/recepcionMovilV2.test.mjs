@@ -458,7 +458,12 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // `ComprobanteLinea` para los kilos y el descuento del renglón—. Aditiva, sin
   // DROP y sin backfill, y de otro módulo: se declara porque eso es lo que este
   // conteo obliga.
-  assert.equal(migraciones.length, 25, "aparecio una migracion que nadie declaro aca");
+  // 26 desde el 2026-09-22: entra `20260922010000_giro_de_la_foto`, una columna
+  // entera nullable en `ComprobanteArchivo` con los grados que alguien eligió
+  // para ver derecha la foto de un comprobante. Aditiva, sin DROP y sin
+  // backfill, y de otro módulo: se declara porque eso es lo que este conteo
+  // obliga.
+  assert.equal(migraciones.length, 26, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

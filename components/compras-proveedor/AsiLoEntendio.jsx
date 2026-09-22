@@ -36,6 +36,7 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import { formatearMoneda } from "@/lib/moneda";
 import { textoDelResultado } from "@/lib/compras-proveedor/comprobante/pruebaDeExplicacion";
+import VisorDeFoto from "@/components/compras-proveedor/VisorDeFoto";
 
 /** Cuántos productos se ven antes de pedir el resto. */
 export const PRODUCTOS_A_LA_VISTA = 3;
@@ -139,15 +140,27 @@ export function ProductoSospechoso({ p, onElegir, onVerFoto }) {
  */
 export default function AsiLoEntendio({ resultado, comprobanteId, onElegir }) {
   const [verTodos, setVerTodos] = useState(false);
+  // ── LA FOTO SE ABRE ACÁ ADENTRO, NO EN OTRA PESTAÑA ─────────────────
+  //
+  // `window.open` la dejaba en manos del navegador: sin respetar el EXIF, sin
+  // forma de girarla y al tamaño que él eligiera. El papel de Paty se veía
+  // dado vuelta y en una franja.
+  const [mirandoLaFoto, setMirandoLaFoto] = useState(false);
   if (!resultado) return null;
   const texto = textoDelResultado(resultado, { moneda: formatearMoneda });
   if (!texto) return null;
 
   const visibles = verTodos ? resultado.productos : resultado.productos.slice(0, PRODUCTOS_A_LA_VISTA);
-  const verFoto = () => window.open(fotoDelComprobante(comprobanteId), "_blank");
+  const verFoto = () => setMirandoLaFoto(true);
 
   return (
     <>
+      <VisorDeFoto
+        comprobanteId={comprobanteId}
+        abierto={mirandoLaFoto}
+        onCerrar={() => setMirandoLaFoto(false)}
+      />
+
       <SunmiCard
         className={`p-3 ${
           texto.tono === "ok"
