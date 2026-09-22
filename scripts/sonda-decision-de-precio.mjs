@@ -56,6 +56,11 @@ const DECIDIR = arg("decidir", "");
 const POR_PANTALLA = arg("por-pantalla", "");
 // Un id de renglón que ya no existe, para ejercer el caso de la pantalla vieja.
 const ID_MUERTO = arg("id-muerto", "");
+// Mandar el id muerto SIN el texto del papel: es lo que manda una pantalla
+// vieja, la que no sabe que hay con qué reencontrar el renglón. Sirve para
+// comprobar que cuando de verdad no se puede resolver, lo que llega es una
+// explicación en castellano y no un mensaje de adentro.
+const SIN_TEXTO = process.argv.includes("--sin-texto");
 
 if (!USUARIO || !CLAVE) {
   console.error("Faltan --usuario y --clave. Sin sesión esto mide la pantalla de login.");
@@ -208,7 +213,7 @@ try {
          body: JSON.stringify({
            lineaId: ${idQueSeManda},
            pedidoId: ${Number(PEDIDO)},
-           textoCrudo: ${JSON.stringify(objetivo.textoCrudo ?? null)},
+           textoCrudo: ${SIN_TEXTO ? "null" : JSON.stringify(objetivo.textoCrudo ?? null)},
            decision: "DEJA_EL_MIO",
          }),
        }).then(async (r) => JSON.stringify({ status: r.status, cuerpo: await r.json().catch(() => null) }))`,
@@ -216,6 +221,24 @@ try {
     );
     const res = JSON.parse(r);
     console.log(`  respuesta: ${res.status} · ${JSON.stringify(res.cuerpo)}`);
+    if (SIN_TEXTO) {
+      // Acá se espera que NO se guarde: lo que se mide es qué se dice.
+      const texto = `${res.cuerpo?.error ?? ""} ${res.cuerpo?.queHacer ?? ""}`;
+      afirmar(res.cuerpo?.ok !== true, "sin con qué reencontrarlo, no se guarda nada");
+      afirmar(
+        !/No existe esa línea|undefined|null|\b404\b/.test(texto) && texto.trim().length > 40,
+        "lo que llega es una explicación, no un mensaje de adentro",
+        texto
+      );
+      afirmar(/Actualizá|Volvé/.test(texto), "y dice qué hacer", texto);
+      console.log("");
+      if (fallas.length) {
+        console.error(`ROJO · ${fallas.length} de las afirmaciones no se cumplen.`);
+        process.exit(1);
+      }
+      console.log("VERDE · cuando no se puede resolver, se dice en castellano qué pasó.");
+      process.exit(0);
+    }
     afirmar(res.status === 200 && res.cuerpo?.ok === true, "el servidor guardó la decisión",
       res.cuerpo?.queHacer || res.cuerpo?.error || `status ${res.status}`);
 
