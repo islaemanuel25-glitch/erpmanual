@@ -1,0 +1,26 @@
+-- TODOS LOS CONCEPTOS QUE EL PAPEL IMPRIME ENTRE EL SUBTOTAL Y EL TOTAL.
+--
+-- ── POR QUÉ ───────────────────────────────────────────────────────────────
+--
+-- El comprobante guardaba `netoLeido`, `ivaLeido`, `internoLeido` y
+-- `totalLeido`: cuatro números fijos. Un papel real trae más —percepción de
+-- IVA, percepción de IIBB por provincia, retenciones, descuentos generales,
+-- redondeos— y esos no tenían dónde ir.
+--
+-- Medido sobre el comprobante 17 del pedido 245 (Arcor): neto $412.877,64, IVA
+-- $86.704,30, total $511.968,28. Los **$12.386,34** que faltaban son la
+-- percepción de IVA impresa al pie, que el lector ni siquiera tenía cómo
+-- devolver porque el esquema solo la pedía si la receta estructurada del
+-- proveedor la tenía cargada — y la de Arcor la tiene vacía.
+--
+-- JSON y no columnas nuevas por concepto: no hay forma de conocerlos todos, y
+-- una columna por impuesto es una migración cada vez que aparece uno. Se guarda
+-- lo que el papel imprime, con su nombre tal cual.
+--
+-- ADITIVA: una columna nullable, sin default y sin backfill. Las lecturas que
+-- ya están quedan en NULL —que es la verdad: no se les preguntó— y el control
+-- cae al respaldo de las alícuotas de la receta, que es lo que hacía hasta hoy.
+-- El código viejo no la lee, así que la ventana entre migrar y recrear no
+-- cambia nada.
+
+ALTER TABLE "ComprobanteProveedor" ADD COLUMN "conceptosDelPieLeidos" JSONB;

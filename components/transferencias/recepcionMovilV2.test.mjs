@@ -476,7 +476,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // Sube a 30 el 2026-09-22: entró `20260922150000_variacion_normal_de_precios`,
   // la columna donde cada proveedor dice cuánto se le mueve el precio sin que
   // sea raro. Aditiva, con default 10 y sin backfill.
-  assert.equal(migraciones.length, 30, "aparecio una migracion que nadie declaro aca");
+  // Sube a 31 el 2026-09-22: entró `20260922170000_conceptos_del_pie`, la
+  // columna JSON con todo lo que el papel imprime entre el subtotal y el
+  // total. Aditiva, nullable, sin backfill.
+  assert.equal(migraciones.length, 31, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

@@ -3819,6 +3819,17 @@ model ComprobanteProveedor {
   ivaLeido          Decimal? @db.Decimal(12, 2)
   internoLeido      Decimal? @db.Decimal(12, 2)
   percepcionesLeido Decimal? @db.Decimal(12, 2)
+
+  /// TODOS LOS CONCEPTOS IMPRESOS ENTRE EL SUBTOTAL Y EL TOTAL.
+  ///
+  /// `[{ nombre, importe, resta }]`, con el nombre TAL CUAL lo imprime el papel.
+  /// Los cuatro campos de arriba son los que siempre están; esto es el resto:
+  /// percepción de IVA, percepción de IIBB, retenciones, descuentos generales.
+  ///
+  /// El control del total usa ESTO cuando viene, y las alícuotas de la receta
+  /// solo como respaldo. Un papel sin el pie desglosado queda en NULL y sigue
+  /// verificándose como antes.
+  conceptosDelPieLeidos Json?
   totalLeido        Decimal? @db.Decimal(12, 2)
 
   /// Diferencia en CENTAVOS ENTEROS entre lo calculado y lo leído. Enteros
