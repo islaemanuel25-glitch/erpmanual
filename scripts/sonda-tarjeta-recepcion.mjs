@@ -36,6 +36,9 @@ const CLAVE = arg("clave");
 const PUERTO = Number(arg("puerto-cdp", "9347"));
 const EDGE = arg("edge", "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe");
 const PERFIL = arg("perfil", path.join(os.tmpdir(), "sonda-tarjeta-recepcion"));
+// Qué renglón abrir en la hoja de Corregir, por un trozo de su nombre. Vacío
+// significa medir solo las tarjetas, que es como venía.
+const CORREGIR = arg("corregir", "");
 
 if (!USUARIO || !CLAVE) {
   console.error("Faltan --usuario y --clave. Sin sesión esto mide la pantalla de login.");
@@ -159,6 +162,47 @@ try {
   afirmar(/[+−]\d+,\d\s*%/.test(texto), "se ve el porcentaje contra el ERP");
   // Lo que se fue.
   afirmar(!/Ya decidido/.test(texto), "no volvió «Ya decidido»");
+
+  // ── Y SI SE PIDE, LA HOJA DE CORREGIR DE UN RENGLÓN ───────────────────
+  //
+  // La tarjeta y la hoja son dos pantallas distintas sobre el mismo renglón, y
+  // los defectos de este módulo vivieron siempre en el espacio entre las dos:
+  // la tarjeta decía "3 PACK x30" y la hoja ofrecía 3 unidades sueltas. Medir
+  // solo la tarjeta deja ese espacio sin mirar.
+  //
+  // Abre la hoja y LEE. No guarda: tocar "Guardar" recibiría mercadería.
+  if (CORREGIR) {
+    const abrio = await evaluar(`(() => {
+      const tarjetas = Array.from(document.querySelectorAll("[data-linea-factura]"));
+      const t = tarjetas.find((n) => (n.innerText || "").toLowerCase().includes(${JSON.stringify(
+        CORREGIR.toLowerCase()
+      )}));
+      if (!t) return "no-esta-la-tarjeta";
+      const b = Array.from(t.querySelectorAll("button")).find((x) => /corregir/i.test(x.innerText || ""));
+      if (!b) return "no-esta-el-boton";
+      b.click();
+      return "ok";
+    })()`);
+    afirmar(abrio === "ok", `se pudo abrir Corregir de «${CORREGIR}»`, String(abrio));
+    if (abrio !== "ok") morir(`no se pudo abrir la hoja: ${abrio}`);
+
+    let hoja = "";
+    for (let i = 0; i < 30; i++) {
+      await sleep(500);
+      hoja = String(
+        await evaluar(
+          `(() => { const m = document.querySelector("[data-sunmi-modal]"); return m ? m.innerText : ""; })()`
+        ) || ""
+      );
+      if (/Entra al stock/i.test(hoja)) break;
+    }
+    if (!/Entra al stock/i.test(hoja)) morir("la hoja no llegó a dibujar «Entra al stock»");
+
+    console.log("");
+    console.log("  ── LO QUE DICE LA HOJA DE CORREGIR ─────────────────────────");
+    for (const l of hoja.split("\n")) console.log(`     │ ${l}`);
+    console.log("");
+  }
 
   console.log("");
   if (fallas.length) {

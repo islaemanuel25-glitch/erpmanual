@@ -197,10 +197,10 @@ const SALAMIN = {
 test("LA TARJETA DICE LAS PIEZAS Y LOS KILOS DEL PAPEL", () => {
   // Decía "3 u" y quien la miraba no tenía cómo saber que el papel traía el
   // peso impreso — que es lo que de verdad entra al stock.
-  assert.equal(textoDeLaCantidad(SALAMIN), "3 u · 2.1 kg");
+  assert.equal(textoDeLaCantidad(SALAMIN), "3 u · 2,1 kg");
   // Los otros dos del mismo papel.
-  assert.equal(textoDeLaCantidad({ ...SALAMIN, cantidad: 2, cantidadPedida: 2, peso: 2.9 }), "2 u · 2.9 kg");
-  assert.equal(textoDeLaCantidad({ ...SALAMIN, cantidadPedida: 3, peso: 11.685 }), "3 u · 11.685 kg");
+  assert.equal(textoDeLaCantidad({ ...SALAMIN, cantidad: 2, cantidadPedida: 2, peso: 2.9 }), "2 u · 2,9 kg");
+  assert.equal(textoDeLaCantidad({ ...SALAMIN, cantidadPedida: 3, peso: 11.685 }), "3 u · 11,685 kg");
 });
 
 test("Y LAS PAPAS NO, AUNQUE EL PAPEL TRAIGA SU PESO", () => {
@@ -222,7 +222,10 @@ test("LA HOJA PIDE KILOS, PRECARGADOS CON LOS DEL PAPEL", () => {
   assert.ok(!/pesoRefKg|pesoReferenciaKg/.test(hoja), "la hoja se llenó con una estimación");
   // Lo que entra al stock son esos kilos, y la franja lo dice en kg.
   assert.match(hoja, /entraEnKilos \? Number\(kilos\) \|\| 0 : unidadesContadas/);
-  assert.match(hoja, /entraEnKilos \? "kg"/);
+  assert.match(hoja, /formatearKgExacto\(entraAlStock\)/);
+  // Y con el formateador del sistema, no con uno escrito al lado: "2,1 kg", con
+  // coma, como el resto de los números de la pantalla.
+  assert.match(hoja, /import \{ formatearMoneda, formatearKgExacto \} from "@\/lib\/moneda"/);
   // Y viajan al servidor.
   assert.match(hoja, /kgRecibidos: entraEnKilos && kilos !== "" \? Number\(kilos\) : null/);
 });

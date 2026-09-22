@@ -72,7 +72,7 @@ import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import { BuscadorProducto } from "@/components/comprobantes/PiezasConciliacion";
-import { formatearMoneda } from "@/lib/moneda";
+import { formatearMoneda, formatearKgExacto } from "@/lib/moneda";
 import { aceptarEstaBloqueado } from "@/lib/compras-proveedor/comprobante/aceptarPrecio";
 import { ORIGEN_VINCULO } from "@/lib/compras-proveedor/comprobante/vinculo";
 import {
@@ -724,7 +724,7 @@ export default function HojaCorregirLinea({
             {entraEnKilos && (
               <div className="w-full">
                 <div className="text-sm2 sunmi-text-muted truncate">
-                  Kilos{fila?.peso != null ? ` · el papel dice ${limpio(fila.peso)} kg` : ""}
+                  Kilos{fila?.peso != null ? ` · el papel dice ${formatearKgExacto(fila.peso)}` : ""}
                 </div>
                 <SunmiCampoCantidad
                   valor={kilos}
@@ -755,8 +755,14 @@ export default function HojaCorregirLinea({
             <div className="min-h-barraStock sunmi-control rounded-control px-filtro py-entreFiltros flex items-center justify-between gap-renglon">
               <span className="text-sm3 sunmi-text-muted">Entra al stock</span>
               <span className="text-sm3 font-bold tabular-nums">
-                {limpio(entraAlStock)}{" "}
-                {entraEnKilos ? "kg" : entraAlStock === 1 ? "unidad" : "unidades"}
+                {entraEnKilos ? (
+                  formatearKgExacto(entraAlStock)
+                ) : (
+                  <>
+                    {limpio(entraAlStock)}{" "}
+                    {entraAlStock === 1 ? "unidad" : "unidades"}
+                  </>
+                )}
               </span>
             </div>
           </Bloque>
