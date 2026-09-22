@@ -35,6 +35,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
+import { aliasAEscribir } from "@/lib/compras-proveedor/comprobante/vinculo";
 
 export async function POST(req) {
   try {
@@ -64,7 +65,15 @@ export async function POST(req) {
       lineaId,
       pedidoId: body?.pedidoId,
       textoCrudo: body?.textoCrudo,
-      select: { id: true, comprobante: { select: { id: true, confirmadoEn: true } } },
+      select: {
+        id: true,
+        // Con qué escribir el código exacto al confirmar: lo que el papel
+        // imprime, a qué producto quedó vinculado, y de qué proveedor es.
+        codigoProveedor: true,
+        textoCrudo: true,
+        productoLocalId: true,
+        comprobante: { select: { id: true, confirmadoEn: true, grupoId: true, proveedorId: true } },
+      },
     });
     if (!linea) {
       return NextResponse.json(
@@ -96,8 +105,67 @@ export async function POST(req) {
       select: { id: true, revisadoEnRecepcion: true, revisadoEnRecepcionAt: true },
     });
 
+    // ── CONFIRMAR UN RENGLÓN DEJA EL CÓDIGO EXACTO PARA LA PRÓXIMA VEZ ───
+    //
+    // Cuando alguien toca "✓ Coincide" o "Revisado y seguir" sobre un renglón
+    // que se vinculó POR TERMINACIÓN, está diciendo que ese producto es el que
+    // el papel nombra. Guardar el código TAL CUAL LO IMPRIME EL PAPEL hace que
+    // la próxima factura entre por macheo exacto y no vuelva a depender de la
+    // escalera.
+    //
+    // El caso: Arcor guarda 1001999 en su lista y la factura dice 1999. Sin
+    // esto, cada factura vuelve a resolverlo por terminación; con esto, la
+    // segunda ya entra derecho.
+    //
+    // Es el MISMO camino que usa vincular a mano —`aliasAEscribir` y el mismo
+    // upsert—, así que un código que ya apunta a otro producto se REAPUNTA y no
+    // se pisa en silencio. Y va después de marcar: que falle esto no puede
+    // impedir que el tilde quede puesto, que es lo que la persona pidió.
+    let codigoGuardado = null;
+    if (revisada && linea.productoLocalId && linea.codigoProveedor) {
+      try {
+        const pl = await prisma.productoLocal.findUnique({
+          where: { id: linea.productoLocalId },
+          select: { baseId: true },
+        });
+        const alias = pl?.baseId
+          ? aliasAEscribir({
+              linea: { codigoProveedor: linea.codigoProveedor, descripcion: linea.textoCrudo },
+              productoBaseId: pl.baseId,
+              grupoId: linea.comprobante.grupoId,
+              proveedorId: linea.comprobante.proveedorId,
+            })
+          : null;
+        if (alias) {
+          const guardado = await prisma.productoCodigoProveedor.upsert({
+            where: {
+              codigo_interno_unico_por_proveedor: {
+                grupoId: alias.grupoId,
+                proveedorId: alias.proveedorId,
+                codigoInterno: alias.codigoInterno,
+              },
+            },
+            update: {
+              productoBaseId: alias.productoBaseId,
+              descripcionProveedor: alias.descripcionProveedor,
+              activo: true,
+            },
+            create: alias,
+            select: { id: true, codigoInterno: true },
+          });
+          codigoGuardado = guardado.codigoInterno;
+        }
+      } catch (e) {
+        // No se grita: el tilde ya quedó. Lo que se pierde es que la próxima
+        // factura vuelva a resolverlo por terminación, que es lo que hacía
+        // hasta hoy.
+        console.error("No se pudo guardar el código del proveedor al confirmar:", e?.message);
+      }
+    }
+
     return NextResponse.json({
       ok: true,
+      codigoGuardado,
       lineaId: actualizada.id,
       revisada: actualizada.revisadoEnRecepcion,
       revisadaEn: actualizada.revisadoEnRecepcionAt,
