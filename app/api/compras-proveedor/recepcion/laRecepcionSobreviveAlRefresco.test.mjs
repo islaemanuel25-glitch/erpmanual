@@ -196,13 +196,19 @@ test("UNA LECTURA DICE QUIÉN LA PIDIÓ, Y NINGUNA ARRANCA SOLA", () => {
   assert.match(lectura, /origenDeLectura\(/);
 });
 
-test("LOS TRES CAMINOS QUE LLAMAN AL LECTOR ESTÁN CONTADOS", () => {
-  // Enumerado sobre el repo entero, con lo sin commitear incluido: si aparece
-  // un cuarto lugar que llame a leer, este candado se pone rojo y hay que
-  // decidir qué origen declara. Sin esto, el próximo camino entra sin declarar
-  // nada y la columna vuelve a no contestar nada.
+test("LOS CAMINOS QUE LLAMAN AL LECTOR ESTÁN CONTADOS", () => {
+  // ── EL CENSO CAMBIÓ DE PALABRA, NO DE CRITERIO ────────────────────────
+  //
+  // Buscaba la URL `comprobantes/leer/` escrita en las pantallas. Ya no está
+  // escrita ahí: la espera del turno se mudó a `leerConTurno.js`, porque las
+  // dos pantallas la necesitaban igual y dos copias se separan.
+  //
+  // Si el candado se hubiera dejado buscando la URL, habría quedado en VERDE
+  // encontrando cero archivos y afirmando nada — que es el defecto que este
+  // repo ya vio varias veces. Se busca lo que hoy señala el camino: quién
+  // importa `pedirLaLectura`.
   const salida = execSync(
-    'git grep -l --untracked "comprobantes/leer/" -- "app/**/*.jsx" "components/**/*.jsx" || true',
+    'git grep -l --untracked "pedirLaLectura" -- "app/**/*.jsx" "components/**/*.jsx" || true',
     { cwd: RAIZ, encoding: "utf8" }
   );
   const archivos = salida.split("\n").map((s) => s.trim()).filter(Boolean).sort();
@@ -210,4 +216,14 @@ test("LOS TRES CAMINOS QUE LLAMAN AL LECTOR ESTÁN CONTADOS", () => {
     "app/modulos/proveedores/recetas/page.jsx",
     "components/comprobantes/PanelComprobantes.jsx",
   ]);
+
+  // Y NADIE LLAMA A LA RUTA POR AFUERA. Un `fetch` suelto a la URL saltearía
+  // la espera del turno: el POST contesta enseguida, así que quien no espere
+  // va a creer que leyó cuando la lectura recién arrancó, y en un bucle
+  // dispararía todas las lecturas a la vez contra la cuota del día.
+  const porAfuera = execSync(
+    'git grep -l --untracked "comprobantes/leer/" -- "app/**/*.jsx" "components/**/*.jsx" || true',
+    { cwd: RAIZ, encoding: "utf8" }
+  );
+  assert.equal(porAfuera.trim(), "", "una pantalla llama a la ruta de leer sin esperar el turno");
 });

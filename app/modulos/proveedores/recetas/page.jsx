@@ -32,6 +32,7 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
 import { preguntasVisibles } from "@/lib/compras-proveedor/comprobante/recetaEnCriollo";
 import { ORIGEN_DE_LECTURA } from "@/lib/compras-proveedor/comprobante/origenDeLectura";
+import { pedirLaLectura } from "@/lib/compras-proveedor/comprobante/leerConTurno";
 
 export default function RecetasPage() {
   const router = useRouter();
@@ -141,15 +142,23 @@ export default function RecetasPage() {
     let cortado = null;
     for (const [i, id] of ids.entries()) {
       try {
-        const r = await fetch(`/api/compras-proveedor/comprobantes/leer/${id}`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
+        // ── SE ESPERA EL TURNO, Y ESO ACÁ NO ES UN DETALLE ────────────
+        //
+        // El POST contesta enseguida con un número de turno. Sin esperarlo,
+        // este `for` dispararía las cinco relecturas en paralelo contra una
+        // cuota de veinte por día, y las contaría todas como buenas antes de
+        // que ninguna hubiera terminado.
+        //
+        // La espera es la MISMA función que usa la tarjeta de comprobantes: dos
+        // copias del «pedí, esperá, volvé a preguntar» se separan el día que
+        // una cambia.
+        const { cuerpo: json } = await pedirLaLectura({
+          comprobanteId: id,
           // Quién la pidió: la relectura que se ofrece después de escribir la
           // receta. Queda guardado con la llamada.
-          body: JSON.stringify({ origen: ORIGEN_DE_LECTURA.RECETA }),
+          origen: ORIGEN_DE_LECTURA.RECETA,
+          fetchImpl: fetch,
         });
-        const json = await r.json().catch(() => ({}));
         if (json?.ok) bien++;
         // Si se acabó la cuota en el medio, se frena: seguir gasta llamadas que
         // van a fallar todas y demora el aviso.

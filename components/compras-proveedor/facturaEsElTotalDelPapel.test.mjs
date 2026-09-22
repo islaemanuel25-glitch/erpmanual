@@ -73,8 +73,13 @@ test("EL TOTAL DEL PAPEL VIAJA DESDE EL COMPROBANTE, NO SE SUMA", () => {
   assert.match(filas, /totalDelPapel: c\.totalLeido == null \? null : num\(c\.totalLeido\)/);
   const ruta = codigoDe("app/api/compras-proveedor/conciliacion/[pedidoId]/route.js");
   assert.match(ruta, /totalLeido: true/);
+  // ── Y DESDE QUE UN PEDIDO PUEDE TENER VARIAS FACTURAS, ES LA SUMA ────
+  //
+  // Era `comprobanteActivo?.totalDelPapel`, o sea el total de UNA: con cuatro
+  // facturas de Arcor eso mostraba lo que facturó una sola. La suma vive en
+  // `totalImpresoDeLasFacturas`, que se ejerce en `variasFacturasEnUnPedido`.
   const pagina = codigoDe("app/modulos/compras-proveedor/[id]/page.jsx");
-  assert.match(pagina, /totalDelPapel=\{comprobanteActivo\?\.totalDelPapel \?\? null\}/);
+  assert.match(pagina, /totalImpresoDeLasFacturas\(conciliacion\?\.grupos\)/);
 });
 
 test("SIN TOTAL IMPRESO NO SE INVENTA UNO", () => {
@@ -126,7 +131,7 @@ test("Y LA PANTALLA DE RECIBIDO DICE LO MISMO, POR EL MISMO CAMINO", () => {
   // pantallas que dicen "te facturó" no pueden tomar ese número de dos lados.
   const pagina = codigoDe("app/modulos/compras-proveedor/[id]/page.jsx");
   assert.equal(
-    (pagina.match(/totalDelPapel=\{comprobanteActivo\?\.totalDelPapel \?\? null\}/g) || []).length,
+    (pagina.match(/totalDelPapel=\{totalDeLasFacturas\}/g) || []).length,
     2,
     "una de las dos pantallas dejó de recibir el total del papel"
   );

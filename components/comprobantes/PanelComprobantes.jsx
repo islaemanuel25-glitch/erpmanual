@@ -28,24 +28,29 @@ import { useRouter } from "next/navigation";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiActionCard from "@/components/sunmi/SunmiActionCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import VisorDeFoto from "@/components/compras-proveedor/VisorDeFoto";
 
 import {
-  debePreguntarPorAgrupar,
-  comprobantesQuePuedenRecibirHojas,
+  chipDeFactura,
   comoSeDice,
   resumenDeLista,
 } from "@/lib/compras-proveedor/comprobante/pantalla";
 import { sePuedeBorrar, textoDeBorrado } from "@/lib/compras-proveedor/comprobante/borrado";
+import { pedirLaLectura } from "@/lib/compras-proveedor/comprobante/leerConTurno";
 import { ORIGEN_DE_LECTURA } from "@/lib/compras-proveedor/comprobante/origenDeLectura";
 import {
+  LIMITES_COMPROBANTE,
   OPERACION,
+  demasiadasFotos,
   queHacerHttp,
+  tandasParaSubir,
   SIN_RESPUESTA,
   SIN_RESPUESTA_LECTURA,
 } from "@/lib/compras-proveedor/comprobante/subida";
@@ -208,17 +213,19 @@ export default function PanelComprobantes({
   const [subiendo, setSubiendo] = useState(false);
   const [leyendo, setLeyendo] = useState(null);
   const [mensaje, setMensaje] = useState(null);
-  const [pregunta, setPregunta] = useState(null); // { archivos, opciones, candidatos }
+  // Qué factura está abierta en la hoja de detalle. Es el id y no el objeto:
+  // después de leer o borrar, la lista se recarga y el objeto viejo quedaría
+  // congelado mostrando el estado de antes.
+  const [abierta, setAbierta] = useState(null);
+  // Qué hoja se está mirando: `{ comprobanteId, orden }`. El visor ya existe y
+  // se le pide una hoja por vez, que es como se mira un papel.
+  const [mirandoFoto, setMirandoFoto] = useState(null);
   const [seleccion, setSeleccion] = useState([]);
   const [borrando, setBorrando] = useState(null); // el comprobante que se está por borrar
   const [trabajandoBorrar, setTrabajandoBorrar] = useState(false);
   const inputRef = useRef(null);
 
   const resumen = useMemo(() => resumenDeLista(items), [items]);
-  const abiertos = useMemo(
-    () => comprobantesQuePuedenRecibirHojas(items, proveedorId),
-    [items, proveedorId]
-  );
 
   async function recargar() {
     setCargando(true);
@@ -252,54 +259,70 @@ export default function PanelComprobantes({
   // subida.
   const inputCamaraRef = useRef(null);
 
+  // ── ACÁ SE PREGUNTABA «¿ES UNA FACTURA NUEVA O UNA HOJA?» ──────────────
+  //
+  // Ya no. Lo contesta el papel: una foto con total impreso cierra su factura y
+  // una sin total es una hoja intermedia. La agrupación corre en el servidor,
+  // después de leer cada foto, y está en `agruparHojas.js` con sus candados.
+  //
+  // Lo único que se le pide a quien saca las fotos es el ORDEN, que es lo que
+  // hace naturalmente: hoja 1, hoja 2, hoja 3.
   function alElegirArchivos(e) {
     const archivos = Array.from(e.target.files || []);
     if (!archivos.length) return;
-
-    const decision = debePreguntarPorAgrupar({
-      cantidadFotos: archivos.length,
-      comprobantesAbiertos: abiertos,
-    });
-
-    // Si no hace falta preguntar, se sube directo. Es la recepción normal, que
-    // es la mayoría: un toque de más ahí se paga en todas.
-    if (!decision.preguntar) {
-      subir(archivos, { agruparEnUno: false });
-      return;
-    }
-    setPregunta({ archivos, ...decision });
+    const aviso = demasiadasFotos(archivos.length);
+    if (aviso) setMensaje({ tipo: "aviso", texto: aviso });
+    subir(archivos.slice(0, LIMITES_COMPROBANTE.fotosPorEleccion));
   }
 
-  async function subir(archivos, { agruparEnUno = false, comprobanteId = null } = {}) {
-    setPregunta(null);
+  async function subir(archivos) {
     setSubiendo(true);
     setMensaje(null);
     try {
-      const fd = new FormData();
-      fd.append("proveedorId", String(proveedorId));
-      if (pedidoId) fd.append("pedidoId", String(pedidoId));
-      if (agruparEnUno) fd.append("agruparEnUno", "true");
-      if (comprobanteId) fd.append("comprobanteId", String(comprobanteId));
-      for (const a of archivos) fd.append("archivos", a);
+      // ── LAS DIEZ FOTOS NO VIAJAN EN UN SOLO PEDIDO ───────────────────
+      //
+      // El proxy corta en 60 MB y diez fotos de celular los pasan. Van en
+      // envíos de tres, EN SERIE y en orden: el orden de subida es el orden de
+      // las hojas, y en paralelo dos envíos pueden escribirse al revés en la
+      // base, que le daría vuelta las páginas a una factura.
+      //
+      // Los resultados se juntan y se informan una sola vez al final: tres
+      // mensajes seguidos por una sola elección de fotos no se leen.
+      const resultados = [];
+      let subidos = 0;
+      for (const tanda of tandasParaSubir(archivos)) {
+        const fd = new FormData();
+        fd.append("proveedorId", String(proveedorId));
+        if (pedidoId) fd.append("pedidoId", String(pedidoId));
+        for (const a of tanda) fd.append("archivos", a);
 
-      const r = await fetch("/api/compras-proveedor/comprobantes/subir", { method: "POST", body: fd });
-      const fallo = await mensajeDeRespuesta(r);
-      if (fallo) {
-        setMensaje(fallo);
-        await recargar();
-        return;
+        const r = await fetch("/api/compras-proveedor/comprobantes/subir", { method: "POST", body: fd });
+        const fallo = await mensajeDeRespuesta(r);
+        if (fallo) {
+          setMensaje(fallo);
+          await recargar();
+          return;
+        }
+        const parcial = await r.json();
+        if (!parcial.ok && parcial.error) {
+          setMensaje({ tipo: "error", texto: parcial.queHacer || parcial.error });
+          await recargar();
+          return;
+        }
+        resultados.push(...(parcial.resultados || []));
+        subidos += parcial.subidos || 0;
       }
-      const d = await r.json();
+      const d = { ok: true, resultados, subidos };
 
-      if (!d.ok && d.error) {
-        setMensaje({ tipo: "error", texto: d.queHacer || d.error });
-      } else {
+      {
         // Los fallos POR ARCHIVO se muestran todos juntos: quien subió cinco
         // fotos tiene que ver de una cuáles entraron y qué pasó con las otras.
         const fallados = (d.resultados || []).filter((x) => !x.ok);
         setMensaje({
           tipo: fallados.length ? "aviso" : "ok",
-          texto: `${d.subidos} subida(s).`,
+          texto:
+            `${d.subidos} ${d.subidos === 1 ? "foto subida" : "fotos subidas"}. ` +
+            "Se agrupan en facturas al leerlas: cada una cierra donde está su total impreso.",
           detalles: fallados.map((f) => `${f.nombre}: ${f.queHacer || f.error}`),
         });
 
@@ -375,22 +398,33 @@ export default function PanelComprobantes({
           `/modulos/proveedores/recetas/${proveedorId}?comprobante=${id}` +
             `&volverA=${encodeURIComponent(volverA)}`
         );
-        return;
+        return false;
       }
-      const r = await fetch(`/api/compras-proveedor/comprobantes/leer/${id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ origen }),
+      // ── LA LECTURA YA NO SE ESPERA ADENTRO DEL PEDIDO ───────────────
+      //
+      // El POST contesta un número de turno enseguida y `pedirLaLectura`
+      // pregunta por él hasta que termina. Antes la respuesta tardaba hasta 45
+      // segundos y nginx corta a los 60: con una lectura por hoja y cuatro
+      // facturas, alguna se iba a pasar.
+      //
+      // La espera vive en el lib y no acá porque hay DOS pantallas que piden
+      // lecturas —ésta y la relectura de la receta—, y dos copias se separan.
+      const { respuesta: r, cuerpo: d } = await pedirLaLectura({
+        comprobanteId: id,
+        origen,
+        fetchImpl: fetch,
+        alAvisar: (texto) => setMensaje({ tipo: "ok", texto }),
       });
       const fallo = await mensajeDeRespuesta(r, OPERACION.LECTURA);
       if (fallo) {
         setMensaje(fallo);
         await recargar();
-        return;
+        return false;
       }
-      const d = await r.json();
       if (!d.ok) {
-        setMensaje({ tipo: "error", texto: d.error || d.queHacer });
+        // «Esta factura ya está cargada» viene por acá, con su número y con qué
+        // hacer. Es un 409 y no un error del sistema: no se reintenta.
+        setMensaje({ tipo: "error", texto: [d.error, d.queHacer].filter(Boolean).join(" ") });
       } else {
         // ── ACÁ SALÍA EL CARTEL NARANJA LARGO ───────────────────────────
         //
@@ -401,19 +435,56 @@ export default function PanelComprobantes({
         //
         // Acá queda el resultado en una línea, que es lo que hace falta saber
         // justo después de tocar «Leer».
+        // Si la foto resultó ser una hoja de la factura anterior, hay que
+        // decirlo: la fila que se tocó desaparece de la lista, y sin una
+        // palabra eso se lee como que se borró algo.
+        const juntadas = (d.agrupacion || []).reduce((n, f) => n + (f.absorbidos?.length || 0), 0);
         setMensaje({
           tipo: d.cierra ? "ok" : "aviso",
           texto: d.cierra
             ? `Leído y verificado: ${d.lineas} ${d.lineas === 1 ? "producto" : "productos"}.`
             : "Leído, pero la cuenta no cierra. Está señalado abajo, con la foto al lado.",
-          detalles: d.usoRespaldo ? ["Lo leyó el lector de respaldo."] : [],
+          detalles: [
+            ...(juntadas
+              ? [
+                  `Esta foto no traía total: se juntó con ${juntadas === 1 ? "la hoja" : "las hojas"} ` +
+                    "anterior" + (juntadas === 1 ? "" : "es") + " como una sola factura.",
+                ]
+              : []),
+            ...(d.usoRespaldo ? ["Lo leyó el lector de respaldo."] : []),
+          ],
         });
       }
       await recargar();
+      return d.ok === true;
     } catch {
       setMensaje({ tipo: "error", texto: SIN_RESPUESTA_LECTURA.texto });
+      return false;
     } finally {
       setLeyendo(null);
+    }
+  }
+
+  /**
+   * LEER LAS QUE TODAVÍA NO SE LEYERON, EN ORDEN Y DE A UNA.
+   *
+   * ── EN SERIE, Y NO ES POR PRUDENCIA ────────────────────────────────────
+   *
+   * Cada lectura corre en su propio turno del lado del servidor, y la
+   * agrupación en facturas depende de que las hojas se hayan leído: una hoja
+   * sin leer en el medio corta la corrida. En paralelo, tres lecturas terminan
+   * en cualquier orden y la agrupación se completa a saltos; en serie, cada
+   * lectura encuentra decidido todo lo que vino antes.
+   *
+   * Y se corta al primer fallo. Si la cuota se agotó en la cuarta, insistir con
+   * las seis que quedan gasta seis llamadas para conseguir seis veces el mismo
+   * error.
+   */
+  async function leerLasQueFaltan() {
+    const pendientes = items.filter((c) => !c.leidoEn && c.fotos > 0).map((c) => c.id);
+    for (const id of pendientes) {
+      const r = await leer(id);
+      if (r === false) break;
     }
   }
 
@@ -465,11 +536,21 @@ export default function PanelComprobantes({
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div>
           <h3 className="text-sm font-bold sunmi-text-strong">Comprobantes</h3>
+          {/* ── QUÉ CUENTA ESTE RENGLÓN, Y POR QUÉ CAMBIÓ ──────────────────
+              Decía "3 en total · 1 sin leer", que cuenta FOTOS y las llama
+              comprobantes. Con una factura por pedido daba lo mismo; con cuatro
+              facturas de tres hojas diría "12 en total" sobre cuatro papeles.
+              Ahora cuenta facturas —una factura es un comprobante, sus hojas
+              viven adentro— y al lado el tamaño del pedido, que es contra lo
+              que se están comparando. */}
           <p className="text-sm2 sunmi-text-muted">
             {resumen.total === 0
-              ? "Sacá una foto de la factura. Si es larga, sacá una por hoja."
-              : `${resumen.total} en total · ${resumen.sinLeer} sin leer` +
-                (resumen.malLeidos ? ` · ${resumen.malLeidos} sin poder leer` : "")}
+              ? "Sacá una foto de la factura. Si es larga, sacá una por hoja, en orden."
+              : `${resumen.total} ${resumen.total === 1 ? "factura" : "facturas"}` +
+                (cobertura?.totalPedido
+                  ? ` · ${cobertura.totalPedido} productos del pedido`
+                  : "") +
+                (resumen.sinLeer ? ` · ${resumen.sinLeer} sin leer` : "")}
           </p>
         </div>
         {/* ── EL BOTÓN PROPIO DEL PANEL SE CALLA CUANDO LA PANTALLA PONE
@@ -491,14 +572,34 @@ export default function PanelComprobantes({
                 se apunta sin errarle. Y a lo ancho en el celular, donde no hay
                 nada que compita por ese espacio: el blanco alrededor de un
                 botón chico es lo que lo hacía parecer una etiqueta. */}
+            {/* ── LEER LAS QUE FALTAN, DE UN TOQUE ─────────────────────
+                Cada foto se lee por separado, así que diez fotos son diez
+                lecturas. Tocarlas de a una es el trabajo que esta tanda vino a
+                sacar. No se leen SOLAS al subir a propósito: son diez consultas
+                de IA de las veinte que hay por día, y gastarlas es una decisión
+                de quien recibe, no un efecto de haber elegido fotos. */}
+            {resumen.sinLeer > 0 && (
+              <SunmiButton
+                color="slate"
+                type="button"
+                disabled={leyendo != null || subiendo}
+                onClick={leerLasQueFaltan}
+                className="py-3 justify-center"
+              >
+                {leyendo != null ? "Leyendo…" : `Leer las ${resumen.sinLeer} sin leer`}
+              </SunmiButton>
+            )}
+            {/* LA ACCIÓN PRINCIPAL. Dice FACTURA y no "fotos": lo que se agrega
+                es una factura, y que sean una o tres fotos es un detalle de
+                cómo se saca. */}
             <SunmiButton
-              color="primary"
+              color="amber"
               type="button"
               disabled={subiendo}
               onClick={() => inputRef.current?.click()}
               className="py-3 px-5 text-sm font-bold w-full sm:w-auto justify-center"
             >
-              {subiendo ? "Subiendo…" : "Subir fotos"}
+              {subiendo ? "Subiendo…" : "+ Agregar factura"}
             </SunmiButton>
           </div>
         )}
@@ -660,68 +761,80 @@ export default function PanelComprobantes({
             </SunmiTable>
           </div>
 
-          {/* ── Móvil: tarjetas ──────────────────────────────────────── */}
-          <div className="md:hidden flex flex-col gap-2">
+          {/* ── UNA FILA POR FACTURA ─────────────────────────────────
+              Antes era una tarjeta por COMPROBANTE con su estado explicado en
+              tres renglones, su modelo de lectura y sus botones. Con una
+              factura por pedido entraba; con cuatro o cinco, la tarjeta de
+              comprobantes pasaba a ser la pantalla entera y había que bajar
+              para llegar a los productos.
+
+              Ahora cada factura es un renglón que dice lo único que se mira de
+              un vistazo —cuántas hojas, cuántos productos, si cierra— y todo lo
+              demás vive un toque más adentro. */}
+          <div className="md:hidden flex flex-col gap-1">
             {items.length === 0 && (
               <p className="text-xs sunmi-text-muted py-4 text-center">
-                Todavía no hay comprobantes
+                Todavía no hay facturas
               </p>
             )}
-            {items.map((c) => (
-              <div key={c.id} className="rounded border sunmi-border p-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold sunmi-text-strong truncate">{identidad(c)}</p>
-                    <p className="text-sm2 sunmi-text-muted truncate">{c.proveedor?.nombre}</p>
-                  </div>
-                  <SunmiInput
-                    type="checkbox"
-                    className="w-4"
-                    checked={seleccion.includes(c.id)}
-                    onChange={() => alternar(c.id)}
-                    aria-label={`Elegir comprobante ${c.id}`}
-                  />
-                </div>
-                <div className="mt-2">
-                  <Aviso estado={c.estado} />
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  {/* ── ACÁ DECÍA "1 foto(s) · 11 líneas · gemini-3.6-flash" ──
-                      Tres cosas que no son del mostrador: el paréntesis de
-                      plural, la palabra "líneas" —son PRODUCTOS— y el nombre
-                      del modelo, que no le dice nada a quien recibe la
-                      mercadería y ocupa el lugar de algo que sí. El modelo se
-                      sigue guardando: se mira en la base cuando hay que medir
-                      cuál lee mejor, que es para lo que existe. */}
-                  <p className="text-sm2 sunmi-text-muted">
-                    {c.fotos === 0
-                      ? "fotos vencidas"
-                      : `${c.fotos} ${c.fotos === 1 ? "foto" : "fotos"}`}
-                    {c._count?.lineas
-                      ? ` · ${c._count.lineas} ${c._count.lineas === 1 ? "producto" : "productos"}`
-                      : ""}
-                  </p>
-                  <div className="flex gap-1">
-                    {puedeRecibir && c.fotos > 0 && (
-                      <SunmiButton
-                        color="primary"
-                        type="button"
-                        disabled={leyendo === c.id}
-                        onClick={() => leer(c.id)}
-                      >
-                        {leyendo === c.id ? "Leyendo…" : c.leidoEn ? TEXTO_LEER_DE_NUEVO : "Leer"}
-                      </SunmiButton>
-                    )}
-                    {puedeRecibir && sePuedeBorrar(c).ok && (
-                      <SunmiButton color="slate" type="button" onClick={() => setBorrando(c)}>
-                        Borrar
-                      </SunmiButton>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+            {items.map((c, i) => {
+              const chip = chipDeFactura(c.estado, { leyendo: leyendo === c.id });
+              return (
+                // La tarjeta entera es la acción, y para eso está la pieza del
+                // kit: un `<button>` de ancho completo con la superficie del
+                // tema. Escrito a mano acá sería un elemento crudo con
+                // reemplazo, que es lo que cuenta el trinquete.
+                //
+                // Apila en columna, así que el renglón va adentro: pedirle
+                // `flex-row` por `className` pondría dos clases de la misma
+                // familia y ganaría cualquiera — la pieza concatena.
+                <SunmiActionCard key={c.id} onClick={() => setAbierta(c.id)} className="min-h-toque">
+                  <span className="flex items-center justify-between gap-2 w-full">
+                  <span className="min-w-0">
+                    <span className="block text-xs font-bold sunmi-text-strong truncate">
+                      {`Factura ${i + 1}`}
+                    </span>
+                    {/* ── HOJAS Y PRODUCTOS, QUE ES LO QUE SE CONTROLA ──
+                        No dice el modelo que la leyó ni la hora: eso no le
+                        sirve a quien tiene la mercadería adelante, y ocupa el
+                        lugar de lo que sí. Sigue guardado y se mira en la base
+                        cuando hay que medir qué lector lee mejor. */}
+                    <span className="block text-sm2 sunmi-text-muted truncate">
+                      {c.fotos === 0
+                        ? "fotos vencidas"
+                        : `${c.fotos} ${c.fotos === 1 ? "hoja" : "hojas"}`}
+                      {c._count?.lineas
+                        ? ` · ${c._count.lineas} ${c._count.lineas === 1 ? "producto" : "productos"}`
+                        : ""}
+                    </span>
+                  </span>
+                  <span className={`text-xs font-bold shrink-0 ${TONOS[chip.tono] || TONOS.neutro}`}>
+                    {chip.texto}
+                  </span>
+                  </span>
+                </SunmiActionCard>
+              );
+            })}
           </div>
+
+          {/* ── EL PEDIDO CONTRA TODAS LAS FACTURAS ──────────────────────
+              Es la última línea de la tarjeta a propósito: se lee después de
+              las facturas, que es el orden en que se piensa —«tengo estas
+              cuatro, ¿alcanzan?»—. El número sale de `coberturaDelPedido`, que
+              ya cruzaba el pedido contra TODOS los comprobantes; lo que
+              faltaba era decirlo acá. */}
+          {cobertura?.totalPedido > 0 && (
+            <div className="md:hidden mt-2 pt-2 border-t sunmi-border flex items-center justify-between gap-2">
+              <span className="text-xs sunmi-text-strong">Pedido contra facturas</span>
+              <span
+                className={`text-xs font-bold shrink-0 ${
+                  cobertura.sinCubrir === 0 ? TONOS.ok : TONOS.neutro
+                }`}
+              >
+                {`${cobertura.cubiertas} de ${cobertura.totalPedido} llegaron`}
+              </span>
+            </div>
+          )}
         </>
       )}
 
@@ -784,66 +897,97 @@ export default function PanelComprobantes({
         </SunmiModalLayout>
       )}
 
-      {/* ── La pregunta al subir ──────────────────────────────────────── */}
-      {pregunta && (
-        <SunmiModalLayout
-          open
-          title="¿Es una factura nueva o otra hoja?"
-          subtitle="Contestá ahora, con el papel en la mano"
-          color="cyan"
-          onClose={() => setPregunta(null)}
-          espacioCuerpo="mt-2 gap-3"
-          // El valor efectivo que esta pantalla ya tenía. El kit dejó de tener
-          // default de `z`.
-          z={9999}
-        >
-          <p className="text-xs sunmi-text-muted mb-3">{pregunta.porque}</p>
+      {/* ── LO QUE HOY MUESTRA UN COMPROBANTE, UN TOQUE MÁS ADENTRO ────
+          Nada de esto es nuevo: es lo que la tarjeta de cada comprobante ya
+          decía y ofrecía —el estado explicado, leer de nuevo, borrar— más la
+          foto, que hasta ahora solo se podía ver desde la explicación del
+          papel. Lo que cambió es dónde vive: en la lista quedan las cuatro
+          facturas, y el detalle se abre cuando se lo pide.
 
-          <div className="flex flex-col gap-2">
-            {pregunta.opciones.includes("UNA_POR_FOTO") && (
-              <SunmiButton
-                color="slate"
-                type="button"
-                onClick={() => subir(pregunta.archivos, { agruparEnUno: false })}
-              >
-                Son {pregunta.archivos.length} facturas distintas
-              </SunmiButton>
-            )}
-            {pregunta.opciones.includes("TODAS_UNA_SOLA") && (
-              <SunmiButton
-                color="primary"
-                type="button"
-                onClick={() => subir(pregunta.archivos, { agruparEnUno: true })}
-              >
-                Son {pregunta.archivos.length} hojas de UNA factura
-              </SunmiButton>
-            )}
-            {pregunta.opciones.includes("NUEVO") && (
-              <SunmiButton
-                color="slate"
-                type="button"
-                onClick={() => subir(pregunta.archivos, { agruparEnUno: false })}
-              >
-                Es una factura nueva
-              </SunmiButton>
-            )}
-            {pregunta.opciones.includes("SUMAR_A_EXISTENTE") &&
-              (pregunta.candidatos || []).map((c) => (
+          Se busca por id en `items` y no se guarda el objeto: después de leer
+          o de borrar, la lista se recarga y un objeto congelado seguiría
+          mostrando el estado de antes. */}
+      {abierta != null && (() => {
+        const c = items.find((x) => x.id === abierta);
+        if (!c) return null;
+        const i = items.findIndex((x) => x.id === abierta);
+        return (
+          <SunmiModalLayout
+            open
+            forma="hoja"
+            title={`Factura ${i + 1}`}
+            subtitle={c.numero ? identidad(c) : "Todavía sin número: se lee del papel"}
+            color="cyan"
+            onClose={() => setAbierta(null)}
+            espacioCuerpo="mt-2 gap-3"
+            z={9999}
+          >
+            <p className="text-sm2 sunmi-text-muted">
+              {c.fotos === 0
+                ? "Las fotos ya vencieron."
+                : `${c.fotos} ${c.fotos === 1 ? "hoja" : "hojas"}`}
+              {c._count?.lineas
+                ? ` · ${c._count.lineas} ${c._count.lineas === 1 ? "producto" : "productos"}`
+                : ""}
+              {c.proveedor?.nombre ? ` · ${c.proveedor.nombre}` : ""}
+            </p>
+
+            {/* El estado dicho entero, que en la fila entra en dos palabras. */}
+            <div className="mt-2">
+              <Aviso estado={c.estado} />
+            </div>
+
+            <div className="flex flex-col gap-2 mt-4">
+              {c.fotos > 0 && (
                 <SunmiButton
-                  key={c.id}
+                  color="slate"
+                  type="button"
+                  className="py-3 justify-center"
+                  onClick={() => setMirandoFoto({ comprobanteId: c.id, orden: 1 })}
+                >
+                  {c.fotos === 1 ? "Ver la foto" : `Ver las ${c.fotos} hojas`}
+                </SunmiButton>
+              )}
+              {puedeRecibir && c.fotos > 0 && (
+                <SunmiButton
                   color="primary"
                   type="button"
-                  onClick={() => subir(pregunta.archivos, { comprobanteId: c.id })}
+                  disabled={leyendo === c.id}
+                  className="py-3 justify-center"
+                  onClick={async () => {
+                    await leer(c.id);
+                    setAbierta(null);
+                  }}
                 >
-                  Es otra hoja de {identidad(c)}
+                  {leyendo === c.id ? "Leyendo…" : c.leidoEn ? TEXTO_LEER_DE_NUEVO : "Leer"}
                 </SunmiButton>
-              ))}
-          </div>
+              )}
+              {puedeRecibir && sePuedeBorrar(c).ok && (
+                <SunmiButton
+                  color="red"
+                  type="button"
+                  className="py-3 justify-center"
+                  onClick={() => {
+                    setAbierta(null);
+                    setBorrando(c);
+                  }}
+                >
+                  Borrar esta factura
+                </SunmiButton>
+              )}
+            </div>
+          </SunmiModalLayout>
+        );
+      })()}
 
-          <p className="text-sm2 sunmi-text-muted mt-3">
-            Si te equivocás, después se pueden unir con el botón «Unir».
-          </p>
-        </SunmiModalLayout>
+      {/* Una hoja por vez, con el visor que ya existe. */}
+      {mirandoFoto && (
+        <VisorDeFoto
+          comprobanteId={mirandoFoto.comprobanteId}
+          orden={mirandoFoto.orden}
+          abierto
+          onCerrar={() => setMirandoFoto(null)}
+        />
       )}
     </SunmiCard>
   );

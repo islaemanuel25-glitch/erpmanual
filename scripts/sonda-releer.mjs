@@ -116,12 +116,33 @@ try {
   await prepararSesion({ navegar, evaluar, base: BASE, usuario: USUARIO, clave: CLAVE, log: () => {} });
 
   console.log("  leyendo… (una llamada a la IA, puede tardar hasta 45 s)");
+
+  // ── LA LECTURA CONTESTA UN TURNO, NO EL RESULTADO ────────────────────────
+  //
+  // Desde que cada lectura corre en su propio turno, el POST vuelve enseguida
+  // con un número y el resultado se pide después. Sin esperarlo, esta sonda
+  // informaría "ok" sobre una lectura que recién arrancó — o sea, verde sobre
+  // nada.
   const r = await evaluar(
-    `fetch("/api/compras-proveedor/comprobantes/leer/${COMPROBANTE}", {
-       method: "POST", credentials: "same-origin",
-       headers: { "Content-Type": "application/json" },
-       body: JSON.stringify({ origen: "BOTON" }),
-     }).then(async (r) => JSON.stringify({ status: r.status, cuerpo: await r.json().catch(() => null) }))`,
+    `(async () => {
+       const url = "/api/compras-proveedor/comprobantes/leer/${COMPROBANTE}";
+       const a = await fetch(url, {
+         method: "POST", credentials: "same-origin",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({ origen: "BOTON" }),
+       });
+       let res = { status: a.status, cuerpo: await a.json().catch(() => null) };
+       const turno = res.cuerpo && res.cuerpo.turno;
+       if (res.cuerpo && res.cuerpo.leyendo && turno) {
+         for (;;) {
+           await new Promise((r) => setTimeout(r, 2000));
+           const g = await fetch(url + "?turno=" + encodeURIComponent(turno), { cache: "no-store" });
+           res = { status: g.status, cuerpo: await g.json().catch(() => null) };
+           if (!res.cuerpo || !res.cuerpo.leyendo) break;
+         }
+       }
+       return JSON.stringify(res);
+     })()`,
     true
   );
   const res = JSON.parse(r);

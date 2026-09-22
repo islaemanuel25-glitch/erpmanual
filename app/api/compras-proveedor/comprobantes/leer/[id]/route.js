@@ -24,6 +24,7 @@
 
 import { NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
@@ -35,6 +36,15 @@ import {
   fechaLeidaONull,
 } from "@/lib/compras-proveedor/comprobante/lector/recetaDelProveedor";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
+import {
+  achicarTodas,
+  resumenDelAchicado,
+} from "@/lib/compras-proveedor/comprobante/lector/achicarFoto";
+import {
+  comprobanteConLaMismaIdentidad,
+  textoDeDuplicado,
+} from "@/lib/compras-proveedor/comprobante/facturaRepetida";
+import { agruparLasHojasDelPapel } from "@/lib/compras-proveedor/comprobante/fusionarHojas";
 import { sembrarPedidoDesdeFactura } from "@/lib/compras-proveedor/sembrarPedidoDesdeFactura";
 import {
   estadoDeLaFalla,
@@ -45,6 +55,13 @@ import { usadasHoy } from "@/lib/ia/contadorDeIa";
 import { hayCuota, limiteDiario, MOTIVO_LIMITE, TEXTO_LIMITE } from "@/lib/ia/limiteDiario";
 import { herenciaDeLosRenglones } from "@/lib/compras-proveedor/comprobante/herenciaDelRenglon";
 import { origenDeLectura } from "@/lib/compras-proveedor/comprobante/origenDeLectura";
+import {
+  arrancarTurno,
+  mirarTurno,
+  olvidarTurno,
+  ESTADO_TURNO,
+  TEXTO_TURNO,
+} from "@/lib/compras-proveedor/comprobante/lector/lecturasEnCurso";
 
 export async function POST(req, { params }) {
   // ── QUIÉN PIDIÓ ESTA LECTURA ─────────────────────────────────────────
@@ -185,257 +202,371 @@ export async function POST(req, { params }) {
       );
     }
 
-    // ── La receta del proveedor: es lo que guía qué buscar ───────────────
-    const recetaFila = await prisma.recetaProveedor.findUnique({
-      where: { grupoId_proveedorId: { grupoId, proveedorId: comprobante.proveedorId } },
-    });
-    const { receta, version: recetaVersion, esGenerica } = recetaDelProveedor(recetaFila);
-
-    // Se leen TODAS antes de mandar: si falta una, no se manda media factura.
-    // Media factura leída daría una cuenta que no cierra por el motivo
-    // equivocado, y la puerta la marcaría como mal leída culpando al modelo.
-    let archivosLeidos;
-    try {
-      archivosLeidos = await Promise.all(
-        fotos.map(async (f) => ({ bytes: await readFile(f.ubicacion), mime: f.mime, orden: f.orden }))
-      );
-    } catch {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "No se pudo abrir el archivo del comprobante.",
-          queHacer: "Puede que el almacén no esté montado. Avisá.",
-        },
-        { status: 503 }
-      );
-    }
-
-    // ── La lectura ───────────────────────────────────────────────────────
-    const resultado = await leerConCadena({
-      cadena,
-      archivos: archivosLeidos,
-      receta,
-      proveedorNombre: comprobante.proveedor?.nombre ?? null,
-    });
-
-    // ── CADA LLAMADA QUEDA REGISTRADA, HAYA SALIDO BIEN O MAL ────────────
+    // ── DE ACÁ EN ADELANTE NO SE ESPERA: SE CONTESTA UN TURNO ────────────
     //
-    // La cadena informa cuántas hubo: pasar al respaldo son DOS, y la del
-    // titular gastó cuota aunque haya devuelto 429. De acá sale el número de
-    // lecturas que quedan en el día, y contar solo las que salieron bien lo
-    // mostraría más alto de lo que es.
+    // Leer un papel tarda hasta 45 segundos y nginx corta a los 60 sin declarar
+    // `proxy_read_timeout`. Con UNA factura eso iba justo; con cuatro o cinco
+    // por pedido, y una lectura por hoja, es cuestión de tiempo que alguna se
+    // pase y la pantalla muestre un 504 que ni siquiera es JSON.
     //
-    // Best-effort: si esto falla, la lectura NO se pierde. Es un contador, no
-    // un dato del comprobante, y hacerlo bloqueante convertiría un problema de
-    // estadística en un problema de operación.
-    try {
-      const intentos = Array.isArray(resultado.intentos) ? resultado.intentos : [];
-      if (intentos.length) {
-        await prisma.llamadaLector.createMany({
-          data: intentos.map((i) => ({
-            modelo: i.lector,
-            ok: i.ok === true,
-            motivo: i.ok ? null : i.motivo ?? null,
-            // ── LO QUE DIJO EL SERVICIO, TAL CUAL ─────────────────────
-            //
-            // Sin esto, la bitácora contesta "SERVICIO_CAIDO" y nada más. El
-            // 2026-09-21 hubo que volver a llamar a la API a mano para poder
-            // contestar por qué no leía: la respuesta estaba en el cuerpo del
-            // error y se tiraba. Ahora queda guardada.
-            detalle: i.ok ? null : i.detalle ?? null,
-            // QUIÉN LA PIDIÓ. Sin esto no se puede contestar por qué un
-            // comprobante tiene diez lecturas, y hubo que deducirlo cruzando
-            // `intentosLectura` contra la cantidad de filas.
-            origen: origenPedido,
-            comprobanteId: comprobante.id,
-          })),
-        });
-      }
-    } catch (e) {
-      console.error("No se pudo registrar la llamada al lector:", e?.message);
-    }
-
-    if (!resultado.ok) {
-      // Acá SÍ se cuenta el intento: hubo una lectura y salió mal. Se suma, no se
-      // pisa, para que se vea que hubo que insistir.
-      await prisma.comprobanteProveedor.update({
-        where: { id: comprobante.id },
-        // Se guarda QUIÉN intentó último: si se pasó al respaldo, es el
-        // respaldo el que falló, y anotar el titular contaría otra historia.
-        data: {
-          intentosLectura: { increment: 1 },
-          modeloLectura: resultado.lector ?? eleccion.lector.nombre,
-          usoRespaldo: resultado.usoRespaldo === true,
-          motivoPaseRespaldo: resultado.porQuePaso ?? null,
-        },
+    // El mecanismo ya existía y lo usaba «Probar» en la receta: se arranca el
+    // trabajo, se contesta enseguida con un número de turno, y la pantalla
+    // pregunta por él. Ningún pedido HTTP dura más que una consulta a la base,
+    // así que ningún proxy puede cortarlo — ni éste, ni el que venga.
+    //
+    // Lo que el trabajo devuelve es la MISMA respuesta que antes se devolvía
+    // acá: no hay un segundo formato que pueda quedar desfasado del primero.
+    const hacerLaLectura = async () => {
+      // ── La receta del proveedor: es lo que guía qué buscar ───────────────
+      const recetaFila = await prisma.recetaProveedor.findUnique({
+        where: { grupoId_proveedorId: { grupoId, proveedorId: comprobante.proveedorId } },
       });
-      return NextResponse.json(
-        {
-          ok: false,
-          motivo: resultado.motivo,
-          error: queHacerLectura(resultado.motivo),
-          // Se dice explícitamente que no reintenta sola, para que nadie se quede
-          // esperando que se resuelva.
-          reintentaSola: false,
-          usoRespaldo: resultado.usoRespaldo === true,
-          porQuePaso: resultado.porQuePaso ?? null,
-          intentos: comprobante.intentosLectura + 1,
-          // El detalle crudo también viaja a la pantalla: es lo que deja
-          // avisar con precisión en vez de "probá de nuevo".
-          detalle: (resultado.intentos || []).find((i) => !i.ok)?.detalle ?? null,
-        },
-        // ── EL ESTADO TAMBIÉN TIENE QUE DECIR LO QUE ES ──────────────────
-        //
-        // Acá todo fallo de lectura contestaba 502, y 502 significa "la
-        // aplicación no responde". Con la cuota agotada eso es falso dos veces:
-        // la aplicación contestó perfecto, y lo que pasó no se arregla
-        // reintentando. Además el 502 es el estado que el proxy reemplaza por
-        // su propia página, y ahí se pierde el cuerpo con el motivo.
-        { status: estadoDeLaFalla(resultado.motivo) }
-      );
-    }
+      const { receta, version: recetaVersion, esGenerica } = recetaDelProveedor(recetaFila);
 
-    // ── LA PUERTA. Toda lectura pasa por acá antes de guardarse ──────────
-    const puerta = pasarPorLaPuerta({ lectura: resultado.lectura, receta, recetaVersion });
-
-    const guardado = await prisma.$transaction(async (tx) => {
-      // ── LO QUE YA SE HABÍA HECHO SOBRE ESTOS RENGLONES ────────────────
-      //
-      // Releer borra los renglones y los crea de nuevo, y con ellos se iba todo
-      // lo que una persona había decidido: a qué producto se vinculó cada uno,
-      // que estaba controlado, por unidad o por bulto. Sobre el pedido 242 eso
-      // fueron cuatro lecturas y cuatro veces volver a controlar once renglones.
-      //
-      // Se fotografían ANTES de borrar y se vuelven a poner sobre el renglón
-      // que ocupa el mismo número y dice el mismo texto. El que cambió de
-      // número o de texto no hereda y queda para revisar.
-      const renglonesDeAntes = await tx.comprobanteLinea.findMany({
-        where: { comprobanteId: comprobante.id },
-        select: {
-          orden: true, textoCrudo: true,
-          // La corrección de un dígito mal leído es una decisión sobre el
-          // renglón, no un número de la lectura: se hereda como el resto.
-          subtotalCorregido: true,
-          productoLocalId: true, pedidoDetalleId: true, unidadElegida: true,
-          revisadoEnRecepcion: true, revisadoEnRecepcionPorId: true, revisadoEnRecepcionAt: true,
-          costoEscrito: true, costoFinalUnitario: true, costoPrevioAplicacion: true,
-          precioPedidoPrevio: true,
-        },
-      });
-
-      // Releer reemplaza las líneas anteriores: si quedaran, una lectura vieja y
-      // una nueva convivirían y la suma daría cualquier cosa.
-      await tx.comprobanteLinea.deleteMany({ where: { comprobanteId: comprobante.id } });
-
-      const actualizado = await tx.comprobanteProveedor.update({
-        where: { id: comprobante.id },
-        data: {
-          ...puerta.aGuardar,
-          leidoEn: new Date(),
-          intentosLectura: { increment: 1 },
-          usoRespaldo: resultado.usoRespaldo === true,
-          motivoPaseRespaldo: resultado.porQuePaso ?? null,
-          // EN QUÉ INTENTO CERRÓ POR PRIMERA VEZ. Solo se escribe la primera
-          // vez que cierra: releer uno que ya había cerrado no puede reescribir
-          // su historia, o el número de "cerró a la primera" se iría inflando
-          // solo. Sin esto, después de veinte facturas reales no habría número.
-          ...(puerta.cierra && comprobante.cerroEnIntento == null
-            ? { cerroEnIntento: comprobante.intentosLectura + 1 }
-            : {}),
-          // La fecha viene del papel como texto: se convierte acá, y si no se
-          // entiende queda en null en vez de en una fecha inventada.
-          fecha: fechaLeidaONull(puerta.aGuardar.fecha),
-        },
-        select: { id: true, estado: true, diferenciaCentavos: true, intentosLectura: true },
-      });
-
-      // Las líneas se guardan SIEMPRE, cierre o no. Son lo que alguien va a
-      // mirar para entender por qué no cerró: sin ellas, un MAL_LEIDO sería un
-      // cartel sin nada detrás.
-      const lineas = resultado.lectura.lineas.filter((l) => l.cantidad !== null && l.netoUnitario !== null);
-      let herencia = { conHerencia: [], heredados: [], sinHeredar: [] };
-      if (lineas.length) {
-        herencia = herenciaDeLosRenglones({
-          viejos: renglonesDeAntes,
-          nuevos: lineas.map((l, i) => ({ orden: i + 1, textoCrudo: l.descripcion ?? "(sin descripción)" })),
-        });
-        await tx.comprobanteLinea.createMany({
-          data: lineas.map((l, i) => ({
-            // Lo que decidió una persona sobre el renglón que ocupaba este
-            // número y decía esto mismo. Vacío si no hay a quién heredarle.
-            ...herencia.conHerencia[i],
-            comprobanteId: comprobante.id,
-            orden: i + 1,
-            textoCrudo: l.descripcion ?? "(sin descripción)",
-            // El código del proveedor es el primer escalón de la cascada de
-            // vínculo, y el único que no interpreta nada. Se guardaba nada:
-            // el lector lo leía y esta ruta lo tiraba.
-            codigoProveedor: l.codigoProveedor ?? null,
-            cantidad: l.cantidad,
-            netoUnitario: l.netoUnitario,
-            subtotalImpreso: l.subtotalImpreso ?? l.netoUnitario * l.cantidad,
-            internoUnitario: l.internoUnitario ?? null,
-            // Los kilos del papel y el descuento del renglón. Con kilos, el
-            // costo real sale de dividir el subtotal por ellos y no por las
-            // piezas; el descuento no se aplica a nada —el subtotal ya lo
-            // tiene— y sirve para señalar un renglón mal leído.
-            pesoKg: l.peso ?? null,
-            bonificacionPct: l.bonificacion ?? null,
-          })),
-        });
-      }
-      return { actualizado, cuantasLineas: lineas.length };
-    });
-
-    // ── SI EL PEDIDO NACIÓ DE ESTA FACTURA, SUS LÍNEAS SALEN DE ACÁ ──────
-    //
-    // Es el único momento en que existe todo lo que hace falta: las líneas
-    // leídas, el proveedor y el pedido vacío esperándolas. Va DESPUÉS de la
-    // transacción de la lectura y no adentro: la cascada de vínculo lee el
-    // catálogo entero, y tener eso abierto dentro de la transacción que guarda
-    // el papel alargaría un bloqueo por algo que se puede repetir.
-    //
-    // Best-effort a propósito: si esto falla, la lectura NO se pierde —ya costó
-    // una llamada de IA— y volver a leer vuelve a intentarlo, porque sembrar es
-    // idempotente. Lo que sí se dice es que no se pudo, para que la pantalla no
-    // muestre un pedido vacío sin explicación.
-    let siembra = null;
-    if (comprobante.pedidoId) {
+      // Se leen TODAS antes de mandar: si falta una, no se manda media factura.
+      // Media factura leída daría una cuenta que no cierra por el motivo
+      // equivocado, y la puerta la marcaría como mal leída culpando al modelo.
+      let archivosLeidos;
       try {
-        siembra = await sembrarPedidoDesdeFactura(prisma, {
-          pedidoId: comprobante.pedidoId,
+        archivosLeidos = await Promise.all(
+          fotos.map(async (f) => ({ bytes: await readFile(f.ubicacion), mime: f.mime, orden: f.orden }))
+        );
+      } catch {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "No se pudo abrir el archivo del comprobante.",
+            queHacer: "Puede que el almacén no esté montado. Avisá.",
+          },
+          { status: 503 }
+        );
+      }
+
+      // ── ACHICAR ANTES DE MANDAR ──────────────────────────────────────────
+      //
+      // Lo que viaja a la IA se achica; lo que queda en el volumen no se toca.
+      // `sharp` entra por import dinámico a propósito: si algún día no estuviera,
+      // esto devuelve las fotos intactas y la lectura sigue — un problema de
+      // redimensionado no puede convertirse en "no se pudo leer la factura".
+      let paraLeer = archivosLeidos;
+      try {
+        const { default: sharp } = await import("sharp");
+        paraLeer = await achicarTodas(archivosLeidos, sharp);
+      } catch {
+        paraLeer = archivosLeidos;
+      }
+      const ahorro = resumenDelAchicado(paraLeer);
+      if (ahorro) {
+        console.log(
+          `[comprobante ${comprobante.id}] achicado: ${ahorro.achicadas}/${ahorro.archivos} fotos, ` +
+            `${Math.round(ahorro.antes / 1024)} KB → ${Math.round(ahorro.despues / 1024)} KB`
+        );
+      }
+
+      // ── La lectura ───────────────────────────────────────────────────────
+      const resultado = await leerConCadena({
+        cadena,
+        archivos: paraLeer,
+        receta,
+        proveedorNombre: comprobante.proveedor?.nombre ?? null,
+      });
+
+      // ── CADA LLAMADA QUEDA REGISTRADA, HAYA SALIDO BIEN O MAL ────────────
+      //
+      // La cadena informa cuántas hubo: pasar al respaldo son DOS, y la del
+      // titular gastó cuota aunque haya devuelto 429. De acá sale el número de
+      // lecturas que quedan en el día, y contar solo las que salieron bien lo
+      // mostraría más alto de lo que es.
+      //
+      // Best-effort: si esto falla, la lectura NO se pierde. Es un contador, no
+      // un dato del comprobante, y hacerlo bloqueante convertiría un problema de
+      // estadística en un problema de operación.
+      try {
+        const intentos = Array.isArray(resultado.intentos) ? resultado.intentos : [];
+        if (intentos.length) {
+          await prisma.llamadaLector.createMany({
+            data: intentos.map((i) => ({
+              modelo: i.lector,
+              ok: i.ok === true,
+              motivo: i.ok ? null : i.motivo ?? null,
+              // ── LO QUE DIJO EL SERVICIO, TAL CUAL ─────────────────────
+              //
+              // Sin esto, la bitácora contesta "SERVICIO_CAIDO" y nada más. El
+              // 2026-09-21 hubo que volver a llamar a la API a mano para poder
+              // contestar por qué no leía: la respuesta estaba en el cuerpo del
+              // error y se tiraba. Ahora queda guardada.
+              detalle: i.ok ? null : i.detalle ?? null,
+              // QUIÉN LA PIDIÓ. Sin esto no se puede contestar por qué un
+              // comprobante tiene diez lecturas, y hubo que deducirlo cruzando
+              // `intentosLectura` contra la cantidad de filas.
+              origen: origenPedido,
+              comprobanteId: comprobante.id,
+            })),
+          });
+        }
+      } catch (e) {
+        console.error("No se pudo registrar la llamada al lector:", e?.message);
+      }
+
+      if (!resultado.ok) {
+        // Acá SÍ se cuenta el intento: hubo una lectura y salió mal. Se suma, no se
+        // pisa, para que se vea que hubo que insistir.
+        await prisma.comprobanteProveedor.update({
+          where: { id: comprobante.id },
+          // Se guarda QUIÉN intentó último: si se pasó al respaldo, es el
+          // respaldo el que falló, y anotar el titular contaría otra historia.
+          data: {
+            intentosLectura: { increment: 1 },
+            modeloLectura: resultado.lector ?? eleccion.lector.nombre,
+            usoRespaldo: resultado.usoRespaldo === true,
+            motivoPaseRespaldo: resultado.porQuePaso ?? null,
+          },
+        });
+        return NextResponse.json(
+          {
+            ok: false,
+            motivo: resultado.motivo,
+            error: queHacerLectura(resultado.motivo),
+            // Se dice explícitamente que no reintenta sola, para que nadie se quede
+            // esperando que se resuelva.
+            reintentaSola: false,
+            usoRespaldo: resultado.usoRespaldo === true,
+            porQuePaso: resultado.porQuePaso ?? null,
+            intentos: comprobante.intentosLectura + 1,
+            // El detalle crudo también viaja a la pantalla: es lo que deja
+            // avisar con precisión en vez de "probá de nuevo".
+            detalle: (resultado.intentos || []).find((i) => !i.ok)?.detalle ?? null,
+          },
+          // ── EL ESTADO TAMBIÉN TIENE QUE DECIR LO QUE ES ──────────────────
+          //
+          // Acá todo fallo de lectura contestaba 502, y 502 significa "la
+          // aplicación no responde". Con la cuota agotada eso es falso dos veces:
+          // la aplicación contestó perfecto, y lo que pasó no se arregla
+          // reintentando. Además el 502 es el estado que el proxy reemplaza por
+          // su propia página, y ahí se pierde el cuerpo con el motivo.
+          { status: estadoDeLaFalla(resultado.motivo) }
+        );
+      }
+
+      // ── LA PUERTA. Toda lectura pasa por acá antes de guardarse ──────────
+      const puerta = pasarPorLaPuerta({ lectura: resultado.lectura, receta, recetaVersion });
+
+      // ── ¿ESTA MISMA FACTURA YA ESTÁ CARGADA? ─────────────────────────────
+      //
+      // Con cuatro o cinco facturas por pedido y doce fotos seguidas, subir dos
+      // veces la misma es cuestión de tiempo. La identidad —proveedor, tipo,
+      // punto de venta y número— ya tiene un índice único PARCIAL en la base, así
+      // que la segunda reventaba con un P2002 y la pantalla mostraba "Error
+      // interno al leer": un mensaje que no dice nada sobre lo único que pasó, y
+      // que además manda a reintentar algo que va a fallar igual.
+      //
+      // Se pregunta ANTES de escribir. Así la lectura no se pierde —está pagada—
+      // y lo que se informa es el hecho: esta factura ya está, con cuál es.
+      const yaEsta = await comprobanteConLaMismaIdentidad(prisma, {
+        grupoId,
+        proveedorId: comprobante.proveedorId,
+        identidad: puerta.aGuardar,
+        exceptoId: comprobante.id,
+      });
+      if (yaEsta) {
+        return NextResponse.json(
+          {
+            ok: false,
+            motivo: "YA_ESTA_CARGADA",
+            duplicadoDe: yaEsta.id,
+            error: textoDeDuplicado(yaEsta),
+            // El mensaje completo va TAMBIÉN en `queHacer` porque es el campo
+            // que la pantalla prefiere. Con el hecho en `error` y la acción en
+            // `queHacer`, lo que se leía era "No se agregó dos veces" a secas,
+            // sin decir cuál factura ni contra cuál chocó.
+            queHacer:
+              textoDeDuplicado(yaEsta) +
+              " No se agregó dos veces. Si era la misma, borrá esta foto; si es otra factura, " +
+              "revisá el número impreso.",
+            reintentaSola: false,
+          },
+          { status: 409 }
+        );
+      }
+
+      const guardado = await prisma.$transaction(async (tx) => {
+        // ── LO QUE YA SE HABÍA HECHO SOBRE ESTOS RENGLONES ────────────────
+        //
+        // Releer borra los renglones y los crea de nuevo, y con ellos se iba todo
+        // lo que una persona había decidido: a qué producto se vinculó cada uno,
+        // que estaba controlado, por unidad o por bulto. Sobre el pedido 242 eso
+        // fueron cuatro lecturas y cuatro veces volver a controlar once renglones.
+        //
+        // Se fotografían ANTES de borrar y se vuelven a poner sobre el renglón
+        // que ocupa el mismo número y dice el mismo texto. El que cambió de
+        // número o de texto no hereda y queda para revisar.
+        const renglonesDeAntes = await tx.comprobanteLinea.findMany({
+          where: { comprobanteId: comprobante.id },
+          select: {
+            orden: true, textoCrudo: true,
+            // La corrección de un dígito mal leído es una decisión sobre el
+            // renglón, no un número de la lectura: se hereda como el resto.
+            subtotalCorregido: true,
+            productoLocalId: true, pedidoDetalleId: true, unidadElegida: true,
+            revisadoEnRecepcion: true, revisadoEnRecepcionPorId: true, revisadoEnRecepcionAt: true,
+            costoEscrito: true, costoFinalUnitario: true, costoPrevioAplicacion: true,
+            precioPedidoPrevio: true,
+          },
+        });
+
+        // Releer reemplaza las líneas anteriores: si quedaran, una lectura vieja y
+        // una nueva convivirían y la suma daría cualquier cosa.
+        await tx.comprobanteLinea.deleteMany({ where: { comprobanteId: comprobante.id } });
+
+        const actualizado = await tx.comprobanteProveedor.update({
+          where: { id: comprobante.id },
+          data: {
+            ...puerta.aGuardar,
+            leidoEn: new Date(),
+            intentosLectura: { increment: 1 },
+            usoRespaldo: resultado.usoRespaldo === true,
+            motivoPaseRespaldo: resultado.porQuePaso ?? null,
+            // EN QUÉ INTENTO CERRÓ POR PRIMERA VEZ. Solo se escribe la primera
+            // vez que cierra: releer uno que ya había cerrado no puede reescribir
+            // su historia, o el número de "cerró a la primera" se iría inflando
+            // solo. Sin esto, después de veinte facturas reales no habría número.
+            ...(puerta.cierra && comprobante.cerroEnIntento == null
+              ? { cerroEnIntento: comprobante.intentosLectura + 1 }
+              : {}),
+            // La fecha viene del papel como texto: se convierte acá, y si no se
+            // entiende queda en null en vez de en una fecha inventada.
+            fecha: fechaLeidaONull(puerta.aGuardar.fecha),
+          },
+          select: { id: true, estado: true, diferenciaCentavos: true, intentosLectura: true },
+        });
+
+        // Las líneas se guardan SIEMPRE, cierre o no. Son lo que alguien va a
+        // mirar para entender por qué no cerró: sin ellas, un MAL_LEIDO sería un
+        // cartel sin nada detrás.
+        const lineas = resultado.lectura.lineas.filter((l) => l.cantidad !== null && l.netoUnitario !== null);
+        let herencia = { conHerencia: [], heredados: [], sinHeredar: [] };
+        if (lineas.length) {
+          herencia = herenciaDeLosRenglones({
+            viejos: renglonesDeAntes,
+            nuevos: lineas.map((l, i) => ({ orden: i + 1, textoCrudo: l.descripcion ?? "(sin descripción)" })),
+          });
+          await tx.comprobanteLinea.createMany({
+            data: lineas.map((l, i) => ({
+              // Lo que decidió una persona sobre el renglón que ocupaba este
+              // número y decía esto mismo. Vacío si no hay a quién heredarle.
+              ...herencia.conHerencia[i],
+              comprobanteId: comprobante.id,
+              orden: i + 1,
+              textoCrudo: l.descripcion ?? "(sin descripción)",
+              // El código del proveedor es el primer escalón de la cascada de
+              // vínculo, y el único que no interpreta nada. Se guardaba nada:
+              // el lector lo leía y esta ruta lo tiraba.
+              codigoProveedor: l.codigoProveedor ?? null,
+              cantidad: l.cantidad,
+              netoUnitario: l.netoUnitario,
+              subtotalImpreso: l.subtotalImpreso ?? l.netoUnitario * l.cantidad,
+              internoUnitario: l.internoUnitario ?? null,
+              // Los kilos del papel y el descuento del renglón. Con kilos, el
+              // costo real sale de dividir el subtotal por ellos y no por las
+              // piezas; el descuento no se aplica a nada —el subtotal ya lo
+              // tiene— y sirve para señalar un renglón mal leído.
+              pesoKg: l.peso ?? null,
+              bonificacionPct: l.bonificacion ?? null,
+            })),
+          });
+        }
+        return { actualizado, cuantasLineas: lineas.length };
+      });
+
+      // ── SI EL PEDIDO NACIÓ DE ESTA FACTURA, SUS LÍNEAS SALEN DE ACÁ ──────
+      //
+      // Es el único momento en que existe todo lo que hace falta: las líneas
+      // leídas, el proveedor y el pedido vacío esperándolas. Va DESPUÉS de la
+      // transacción de la lectura y no adentro: la cascada de vínculo lee el
+      // catálogo entero, y tener eso abierto dentro de la transacción que guarda
+      // el papel alargaría un bloqueo por algo que se puede repetir.
+      //
+      // Best-effort a propósito: si esto falla, la lectura NO se pierde —ya costó
+      // una llamada de IA— y volver a leer vuelve a intentarlo, porque sembrar es
+      // idempotente. Lo que sí se dice es que no se pudo, para que la pantalla no
+      // muestre un pedido vacío sin explicación.
+      // ── ¿ESTA FOTO ERA UNA HOJA DE LA FACTURA ANTERIOR? ──────────────────
+      //
+      // Recién ahora se puede contestar: la respuesta es si el papel traía su
+      // total impreso o no, y eso lo dice la lectura que acaba de terminar.
+      //
+      // Se agrupa sobre TODOS los comprobantes del mismo pedido —o del mismo
+      // proveedor sin pedido—, no solo sobre el que se leyó: si alguien leyó las
+      // hojas en desorden, cada lectura vuelve a preguntar por el conjunto y la
+      // agrupación se completa sola en cuanto no quedan agujeros.
+      //
+      // Best-effort, y a propósito: la lectura ya está guardada y pagada. Si esto
+      // falla, lo que queda son dos comprobantes separados —que es exactamente lo
+      // que había antes de esta tanda— y no una lectura perdida.
+      let agrupacion = null;
+      try {
+        agrupacion = await agruparLasHojasDelPapel(prisma, {
           grupoId,
-          localId: ctx.localId,
+          pedidoId: comprobante.pedidoId,
+          proveedorId: comprobante.proveedorId,
         });
       } catch (e) {
-        console.error("No se pudieron armar las líneas del pedido desde la factura:", e?.message);
-        siembra = { ok: false, motivo: "NO_SE_PUDO" };
+        console.error("No se pudieron agrupar las hojas del comprobante:", e?.message);
       }
-    }
+
+      let siembra = null;
+      if (comprobante.pedidoId) {
+        try {
+          siembra = await sembrarPedidoDesdeFactura(prisma, {
+            pedidoId: comprobante.pedidoId,
+            grupoId,
+            localId: ctx.localId,
+          });
+        } catch (e) {
+          console.error("No se pudieron armar las líneas del pedido desde la factura:", e?.message);
+          siembra = { ok: false, motivo: "NO_SE_PUDO" };
+        }
+      }
+
+      return NextResponse.json({
+        ok: true,
+        comprobanteId: comprobante.id,
+        estado: guardado.actualizado.estado,
+        // Null cuando el pedido no nació de una factura, que es el caso normal.
+        siembra: siembra?.ok === true ? siembra : siembra?.motivo === "NO_NACIO_DE_FACTURA" ? null : siembra,
+        // Si esta foto resultó ser una hoja de la factura anterior, acá se dice
+        // en qué comprobante quedó: la pantalla tiene que poder señalar la
+        // factura entera y no la foto suelta que ya no existe.
+        agrupacion: agrupacion?.fusiones?.length ? agrupacion.fusiones : null,
+        cierra: puerta.cierra,
+        // La única puerta hacia una propuesta de costo.
+        proponeCostos: puerta.proponeCostos,
+        porque: puerta.porque,
+        diferenciaCentavos: puerta.diferenciaCentavos,
+        lineasIncoherentes: puerta.lineasIncoherentes ?? [],
+        lineas: guardado.cuantasLineas,
+        fotos: fotos.length,
+        modelo: resultado.lectura.modelo,
+        recetaGenerica: esGenerica,
+        // Cuál leyó y si hubo que ir al respaldo. El nombre del modelo ya los
+        // distingue, pero contar cuántas veces el titular se quedó sin cuota no
+        // tiene que depender de deducirlo.
+        usoRespaldo: resultado.usoRespaldo === true,
+        porQuePaso: resultado.porQuePaso ?? null,
+        intentos: guardado.actualizado.intentosLectura,
+        consumo: resultado.lectura.consumo,
+      });
+    };
+
+    const turno = randomUUID();
+    arrancarTurno({ id: turno, dueño: session?.id ?? null, trabajo: hacerLaLectura });
 
     return NextResponse.json({
       ok: true,
+      leyendo: true,
+      turno,
       comprobanteId: comprobante.id,
-      estado: guardado.actualizado.estado,
-      // Null cuando el pedido no nació de una factura, que es el caso normal.
-      siembra: siembra?.ok === true ? siembra : siembra?.motivo === "NO_NACIO_DE_FACTURA" ? null : siembra,
-      cierra: puerta.cierra,
-      // La única puerta hacia una propuesta de costo.
-      proponeCostos: puerta.proponeCostos,
-      porque: puerta.porque,
-      diferenciaCentavos: puerta.diferenciaCentavos,
-      lineasIncoherentes: puerta.lineasIncoherentes ?? [],
-      lineas: guardado.cuantasLineas,
-      fotos: fotos.length,
-      modelo: resultado.lectura.modelo,
-      recetaGenerica: esGenerica,
-      // Cuál leyó y si hubo que ir al respaldo. El nombre del modelo ya los
-      // distingue, pero contar cuántas veces el titular se quedó sin cuota no
-      // tiene que depender de deducirlo.
-      usoRespaldo: resultado.usoRespaldo === true,
-      porQuePaso: resultado.porQuePaso ?? null,
-      intentos: guardado.actualizado.intentosLectura,
-      consumo: resultado.lectura.consumo,
+      texto: TEXTO_TURNO[ESTADO_TURNO.LEYENDO],
     });
   } catch (err) {
     console.error("Error compras-proveedor/comprobantes/leer:", err);
@@ -446,3 +577,81 @@ export async function POST(req, { params }) {
   }
 }
 
+
+/**
+ * GET /api/compras-proveedor/comprobantes/leer/[id]?turno=…
+ *
+ * CÓMO VA LA LECTURA QUE ARRANCÓ EL POST.
+ *
+ * ── POR QUÉ DEVUELVE LA MISMA RESPUESTA Y NO UNA TRADUCIDA ────────────────
+ *
+ * Lo que el trabajo guardó como resultado es la `Response` que el POST devolvía
+ * antes, tal cual. Acá se la clona y se la devuelve: así no hay un segundo
+ * formato de respuesta que pueda quedar desfasado del primero el día que uno de
+ * los dos cambie. Se clona porque el cuerpo de una `Response` se puede leer una
+ * sola vez, y el turno puede consultarse dos veces seguidas.
+ */
+export async function GET(req, { params }) {
+  try {
+    const ctx = await resolveLocalAndGrupo(req);
+    if (ctx.error) {
+      return NextResponse.json({ ok: false, error: ctx.error }, { status: ctx.status });
+    }
+    const { session } = ctx;
+
+    const perm = checkPerm(session, "compras.recibir");
+    if (!perm.ok) {
+      return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+    }
+
+    const turno = new URL(req.url).searchParams.get("turno");
+    if (!turno) {
+      return NextResponse.json(
+        { ok: false, error: "Falta el número de turno de la lectura." },
+        { status: 400 }
+      );
+    }
+
+    // El dueño va en la consulta: preguntar por un turno ajeno es como
+    // preguntar por uno que no existe.
+    const t = mirarTurno(turno, { dueño: session?.id ?? null });
+
+    if (t.estado === ESTADO_TURNO.LEYENDO) {
+      return NextResponse.json({ ok: true, leyendo: true, texto: t.texto, esperandoMs: t.esperandoMs });
+    }
+
+    if (t.estado === ESTADO_TURNO.LISTO && t.resultado) {
+      const copia = t.resultado.clone();
+      olvidarTurno(turno);
+      return copia;
+    }
+
+    if (t.estado === ESTADO_TURNO.FALLO) {
+      olvidarTurno(turno);
+      console.error("Falló la lectura del comprobante en su turno:", t.error);
+      return NextResponse.json(
+        {
+          ok: false,
+          error: errorInesperado({
+            operacion: "leer el comprobante",
+            quedo: "El comprobante y su foto quedaron guardados, así que no hay que volver a subirlo.",
+          }),
+        },
+        { status: 500 }
+      );
+    }
+
+    // NO_ESTA: se venció, es de otra persona, o el contenedor se recreó en el
+    // medio. Lo dice en castellano en vez de dejar a la pantalla girando.
+    return NextResponse.json(
+      { ok: false, error: TEXTO_TURNO[ESTADO_TURNO.NO_ESTA], turnoPerdido: true },
+      { status: 410 }
+    );
+  } catch (err) {
+    console.error("Error compras-proveedor/comprobantes/leer (turno):", err);
+    return NextResponse.json(
+      { ok: false, error: errorInesperado({ operacion: "consultar cómo va la lectura", quedo: "Nada se perdió." }) },
+      { status: 500 }
+    );
+  }
+}

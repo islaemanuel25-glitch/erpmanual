@@ -30,6 +30,10 @@ import { armarCadena, leerConCadena } from "@/lib/compras-proveedor/comprobante/
 import { recetaDelProveedor } from "@/lib/compras-proveedor/comprobante/lector/recetaDelProveedor";
 import { queHacerLectura } from "@/lib/compras-proveedor/comprobante/lector";
 import {
+  achicarTodas,
+  resumenDelAchicado,
+} from "@/lib/compras-proveedor/comprobante/lector/achicarFoto";
+import {
   estadoDeLaFalla,
   MOTIVO_LECTURA,
 } from "@/lib/compras-proveedor/comprobante/lector/contrato";
@@ -345,13 +349,33 @@ async function leerElPapel({ papel, receta, proveedorId, grupoId, localId }) {
     };
   }
 
+  // ── LA PRUEBA MANDA LO MISMO QUE MANDA LA RECEPCIÓN ─────────────────
+  //
+  // Achicado incluido. Si la prueba mandara la foto entera y la recepción una
+  // achicada, probar la explicación no estaría probando lo que después va a
+  // pasar: sería una medición de otra cosa, que es peor que no medir.
+  let paraLeer = archivos;
+  try {
+    const { default: sharp } = await import("sharp");
+    paraLeer = await achicarTodas(archivos, sharp);
+  } catch {
+    paraLeer = archivos;
+  }
+  const ahorro = resumenDelAchicado(paraLeer);
+  if (ahorro) {
+    console.log(
+      `[prueba de receta ${proveedorId}] achicado: ${ahorro.achicadas}/${ahorro.archivos} fotos, ` +
+        `${Math.round(ahorro.antes / 1024)} KB → ${Math.round(ahorro.despues / 1024)} KB`
+    );
+  }
+
   const proveedor = await prisma.proveedor.findUnique({
     where: { id: proveedorId },
     select: { nombre: true },
   });
   const resultado = await leerConCadena({
     cadena,
-    archivos,
+    archivos: paraLeer,
     receta,
     proveedorNombre: proveedor?.nombre ?? null,
   });

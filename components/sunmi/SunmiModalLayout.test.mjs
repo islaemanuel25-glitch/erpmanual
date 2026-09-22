@@ -911,11 +911,23 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
   }
 });
 
-test("los cuatro usos de hoy NO pasan forma: el default es el de siempre", () => {
-  // Si alguno pasara una forma, esta tanda habría migrado algo, y no es lo que
-  // se acordó: la pieza cambia, las pantallas no.
+test("los modales que ya existían NO pasan forma: el default es el de siempre", () => {
+  // ── QUÉ DEFIENDE ESTO, Y POR QUÉ CAMBIÓ DE REDACCIÓN ──────────────────
+  //
+  // Decía "los cuatro usos de hoy" y listaba cuatro ARCHIVOS, afirmando que
+  // ninguno pasaba `forma`. Lo que defiende de verdad es que los modales que ya
+  // estaban dibujados no cambiaron de aspecto al entrar la prop: la pieza
+  // cambia, las pantallas no.
+  //
+  // Un modal NUEVO que elige su forma no viola eso — no había nada que
+  // conservar—, pero sí rompía la redacción vieja, que miraba el archivo
+  // entero. `PanelComprobantes` tiene desde 2026-09-22 la hoja de detalle de
+  // una factura, que es `forma="hoja"` a propósito: se abre desde una fila de
+  // la lista, en el celular, y una tarjeta centrada ahí tapa lo que se estaba
+  // mirando.
+  //
+  // Así que se afirma lo mismo, por modal y no por archivo.
   const usos = [
-    "components/comprobantes/PanelComprobantes.jsx",
     "components/productos/ModalVerComposicion.jsx",
     "components/proveedores/listas/ModalRevertir.jsx",
     "components/proveedores/listas/ModalTerminar.jsx",
@@ -925,4 +937,18 @@ test("los cuatro usos de hoy NO pasan forma: el default es el de siempre", () =>
     assert.match(texto, /SunmiModalLayout/, `${ruta} dejó de usar el modal`);
     assert.doesNotMatch(texto, /forma=/, `${ruta} ya está migrado y esta tanda no migraba nada`);
   }
+
+  // El de borrar un comprobante es el que ya existía en el panel: sigue sin
+  // declarar forma, o sea que se sigue dibujando centrado como siempre.
+  const panel = fs.readFileSync(
+    path.join(RAIZ, "components/comprobantes/PanelComprobantes.jsx"),
+    "utf8"
+  );
+  const borrar = panel.slice(panel.indexOf("¿Borrar este comprobante?"));
+  const hastaElCierre = borrar.slice(0, borrar.indexOf("</SunmiModalLayout>"));
+  assert.doesNotMatch(hastaElCierre, /forma=/, "el modal de borrar cambió de forma");
+
+  // Y la hoja nueva sí la declara: si dejara de hacerlo se dibujaría centrada
+  // sin que nadie lo decidiera.
+  assert.match(panel, /forma="hoja"/);
 });

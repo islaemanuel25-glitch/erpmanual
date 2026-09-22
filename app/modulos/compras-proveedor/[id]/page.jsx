@@ -28,6 +28,7 @@ import {
   decisionVigente,
 } from "@/lib/compras-proveedor/decisionDePrecio";
 import { hayQuePedirLaConciliacion } from "@/lib/compras-proveedor/papelDelPedido";
+import { totalImpresoDeLasFacturas } from "@/lib/compras-proveedor/comprobante/filasDeConciliacion";
 import TarjetaContextoDelPedido from "@/components/compras-proveedor/TarjetaContextoDelPedido";
 import BloqueDeLaFactura from "@/components/compras-proveedor/BloqueDeLaFactura";
 
@@ -145,12 +146,42 @@ export default function DetallePedidoProveedorPage({ params }) {
   // síntoma se leía como "SIN_TOTAL no deja conciliar", que era una causa
   // equivocada para un defecto real. Medido sobre el pedido 232: el endpoint ya
   // devolvía sus 15 filas.
-  const grupoActivo = useMemo(
-    () => (conciliacion?.grupos || []).find((g) => (g.filas || []).length > 0) || null,
+  // ── Y CON VARIAS FACTURAS SE MUESTRAN TODAS, QUE ERA LA DEUDA ──────────
+  //
+  // Acá se tomaba el PRIMER grupo con líneas y se ignoraban los demás, con el
+  // caso de las varias facturas anotado como pendiente. Un pedido de Arcor de
+  // 50 productos llega con cuatro o cinco facturas, así que esa pantalla
+  // mostraba los renglones de una sola y comparaba el pedido entero contra
+  // ella: todo lo que venía en las otras aparecía como no llegado.
+  //
+  // La conciliación es del PEDIDO contra TODAS las facturas juntas —un producto
+  // puede venir en una sola o repartido entre varias—, así que los renglones se
+  // concatenan en orden de factura. El endpoint ya devolvía todos los grupos.
+  const gruposConFilas = useMemo(
+    () => (conciliacion?.grupos || []).filter((g) => (g.filas || []).length > 0),
     [conciliacion]
   );
+  const grupoActivo = gruposConFilas[0] || null;
   const comprobanteActivo = grupoActivo?.comprobante || null;
-  const filasDeFactura = useMemo(() => grupoActivo?.filas || [], [grupoActivo]);
+  const filasDeFactura = useMemo(
+    () => gruposConFilas.flatMap((g) => g.filas || []),
+    [gruposConFilas]
+  );
+
+  // ── EL TOTAL IMPRESO, SUMADO SOBRE TODAS LAS FACTURAS ──────────────────
+  //
+  // "Te facturó Arcor" tiene que decir lo que facturó Arcor por este pedido, y
+  // eso son las cuatro facturas sumadas. Se suman SOLO las que traen total
+  // impreso; si ninguna lo trae —remitos— queda en null y las dos pantallas
+  // caen a la suma de lo comparable, que es lo que ya hacían.
+  //
+  // Una factura sin total impreso entre otras que sí lo tienen deja la suma
+  // corta, y eso es correcto: es lo que hay impreso. Decir lo contrario sería
+  // mezclar un total leído con una suma calculada en el mismo número.
+  const totalDeLasFacturas = useMemo(
+    () => totalImpresoDeLasFacturas(conciliacion?.grupos),
+    [conciliacion]
+  );
 
   // ── RECIBIENDO, EL TÍTULO Y EL VOLVER LOS PONE EL SHELL ────────────────
   //
@@ -1007,7 +1038,7 @@ export default function DetallePedidoProveedorPage({ params }) {
           // Lo mismo que se le pasa a la recepción, desde el mismo lugar: el
           // total impreso del papel. Dos pantallas que dicen "te facturó" no
           // pueden sacar ese número de dos lados distintos.
-          totalDelPapel={comprobanteActivo?.totalDelPapel ?? null}
+          totalDelPapel={totalDeLasFacturas}
           filas={filasDeFactura}
           sinComprobante={conciliacion?.sinComprobante || []}
           // La respuesta entera, y no solo lo que se dibuja: es de donde sale
@@ -1251,7 +1282,7 @@ export default function DetallePedidoProveedorPage({ params }) {
               // Lo que factura el papel, para el rótulo "Factura". Sale del
               // comprobante activo y no de sumar renglones: sumar solo puede
               // dar el total de los que se pudieron comparar.
-              totalDelPapel={comprobanteActivo?.totalDelPapel ?? null}
+              totalDelPapel={totalDeLasFacturas}
               filas={filasDeFactura}
               onCorregir={setLineaACorregir}
               onCoincide={aceptarLoQueDiceLaFactura}
