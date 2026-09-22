@@ -172,6 +172,17 @@ try {
   //
   // Abre la hoja y LEE. No guarda: tocar "Guardar" recibiría mercadería.
   if (CORREGIR) {
+    // Primero la TARJETA de ese renglón, que es la otra mitad del par: si la
+    // tarjeta y la hoja dicen cosas distintas sobre el mismo renglón, se ve acá.
+    const tarjeta = await evaluar(`(() => {
+      const t = Array.from(document.querySelectorAll("[data-linea-factura]"))
+        .find((n) => (n.innerText || "").toLowerCase().includes(${JSON.stringify(CORREGIR.toLowerCase())}));
+      return t ? t.innerText : "";
+    })()`);
+    console.log("");
+    console.log(`  ── LO QUE DICE LA TARJETA DE «${CORREGIR}» ─────────────────`);
+    for (const l of String(tarjeta).split("\n")) console.log(`     │ ${l}`);
+
     const abrio = await evaluar(`(() => {
       const tarjetas = Array.from(document.querySelectorAll("[data-linea-factura]"));
       const t = tarjetas.find((n) => (n.innerText || "").toLowerCase().includes(${JSON.stringify(
