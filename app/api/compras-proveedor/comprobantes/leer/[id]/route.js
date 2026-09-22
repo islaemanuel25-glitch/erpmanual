@@ -43,8 +43,23 @@ import {
 // El MISMO contador que usa el importador: la cuota es una sola.
 import { usadasHoy } from "@/lib/ia/contadorDeIa";
 import { hayCuota, limiteDiario, MOTIVO_LIMITE, TEXTO_LIMITE } from "@/lib/ia/limiteDiario";
+import { herenciaDeLosRenglones } from "@/lib/compras-proveedor/comprobante/herenciaDelRenglon";
+import { origenDeLectura } from "@/lib/compras-proveedor/comprobante/origenDeLectura";
 
 export async function POST(req, { params }) {
+  // ── QUIÉN PIDIÓ ESTA LECTURA ─────────────────────────────────────────
+  //
+  // Una lectura REESCRIBE los renglones del comprobante, así que solo corre
+  // cuando una persona la pide: el botón, subir una foto, o la relectura de la
+  // receta. Nunca al abrir ni al refrescar una pantalla. Lo que llega sin
+  // declararlo queda como SIN_DECLARAR, que es la verdad y se puede contar.
+  const origenPedido = origenDeLectura(
+    await req
+      .clone()
+      .json()
+      .then((b) => b?.origen)
+      .catch(() => null)
+  );
   try {
     const ctx = await resolveLocalAndGrupo(req);
     if (ctx.error) {
@@ -228,6 +243,10 @@ export async function POST(req, { params }) {
             // contestar por qué no leía: la respuesta estaba en el cuerpo del
             // error y se tiraba. Ahora queda guardada.
             detalle: i.ok ? null : i.detalle ?? null,
+            // QUIÉN LA PIDIÓ. Sin esto no se puede contestar por qué un
+            // comprobante tiene diez lecturas, y hubo que deducirlo cruzando
+            // `intentosLectura` contra la cantidad de filas.
+            origen: origenPedido,
             comprobanteId: comprobante.id,
           })),
         });
@@ -280,6 +299,27 @@ export async function POST(req, { params }) {
     const puerta = pasarPorLaPuerta({ lectura: resultado.lectura, receta, recetaVersion });
 
     const guardado = await prisma.$transaction(async (tx) => {
+      // ── LO QUE YA SE HABÍA HECHO SOBRE ESTOS RENGLONES ────────────────
+      //
+      // Releer borra los renglones y los crea de nuevo, y con ellos se iba todo
+      // lo que una persona había decidido: a qué producto se vinculó cada uno,
+      // que estaba controlado, por unidad o por bulto. Sobre el pedido 242 eso
+      // fueron cuatro lecturas y cuatro veces volver a controlar once renglones.
+      //
+      // Se fotografían ANTES de borrar y se vuelven a poner sobre el renglón
+      // que ocupa el mismo número y dice el mismo texto. El que cambió de
+      // número o de texto no hereda y queda para revisar.
+      const renglonesDeAntes = await tx.comprobanteLinea.findMany({
+        where: { comprobanteId: comprobante.id },
+        select: {
+          orden: true, textoCrudo: true,
+          productoLocalId: true, pedidoDetalleId: true, unidadElegida: true,
+          revisadoEnRecepcion: true, revisadoEnRecepcionPorId: true, revisadoEnRecepcionAt: true,
+          costoEscrito: true, costoFinalUnitario: true, costoPrevioAplicacion: true,
+          precioPedidoPrevio: true,
+        },
+      });
+
       // Releer reemplaza las líneas anteriores: si quedaran, una lectura vieja y
       // una nueva convivirían y la suma daría cualquier cosa.
       await tx.comprobanteLinea.deleteMany({ where: { comprobanteId: comprobante.id } });
@@ -310,9 +350,17 @@ export async function POST(req, { params }) {
       // mirar para entender por qué no cerró: sin ellas, un MAL_LEIDO sería un
       // cartel sin nada detrás.
       const lineas = resultado.lectura.lineas.filter((l) => l.cantidad !== null && l.netoUnitario !== null);
+      let herencia = { conHerencia: [], heredados: [], sinHeredar: [] };
       if (lineas.length) {
+        herencia = herenciaDeLosRenglones({
+          viejos: renglonesDeAntes,
+          nuevos: lineas.map((l, i) => ({ orden: i + 1, textoCrudo: l.descripcion ?? "(sin descripción)" })),
+        });
         await tx.comprobanteLinea.createMany({
           data: lineas.map((l, i) => ({
+            // Lo que decidió una persona sobre el renglón que ocupaba este
+            // número y decía esto mismo. Vacío si no hay a quién heredarle.
+            ...herencia.conHerencia[i],
             comprobanteId: comprobante.id,
             orden: i + 1,
             textoCrudo: l.descripcion ?? "(sin descripción)",

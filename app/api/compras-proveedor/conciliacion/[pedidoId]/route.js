@@ -123,6 +123,10 @@ export async function GET(req, { params }) {
             // estado de React: sin esto la pantalla vuelve a 0 revisadas en
             // cada refresco.
             revisadoEnRecepcion: true, revisadoEnRecepcionAt: true,
+            // Por unidad o por bulto, cuando alguien ya lo eligió. Sin esto la
+            // elección se pierde en cada refresco y el renglón vuelve a
+            // preguntar lo mismo: el yogur del 242 preguntaba siempre.
+            unidadElegida: true,
           },
         },
       },

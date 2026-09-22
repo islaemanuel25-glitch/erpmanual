@@ -1169,6 +1169,16 @@ model TransferenciaDetalle {
   // Default `false` y las otras dos nulables: las transferencias históricas
   // quedan exactamente como estaban. Ninguna se revisó con este mecanismo porque
   // no existía, y no se inventa quién ni cuándo.
+  /// POR UNIDAD O POR BULTO, CUANDO EL PAPEL NO LO DEJA DEDUCIR Y ALGUIEN ELIGE.
+  ///
+  /// Vivía solo en la memoria del navegador: refrescar la pantalla borraba la
+  /// elección y el renglón volvía a preguntar lo mismo. Es una decisión de una
+  /// persona sobre ESTE renglón, así que vive en el renglón.
+  ///
+  /// Texto y no enum: los valores son los de `UNIDAD` en `precioDeLinea.js`, y
+  /// el contrato lo define ese módulo.
+  unidadElegida String?
+
   revisadoEnRecepcion      Boolean   @default(false)
   revisadoEnRecepcionPorId Int?
   revisadoEnRecepcionAt    DateTime?
@@ -2768,6 +2778,14 @@ model PedidoProveedorDetalle {
   /// tiene sentido en los productos que van por pack: 6 cajas y 5 unidades no
   /// es "6,2 bultos". NULL = no se preguntó, que es distinto de 0.
   unidadesSueltas  Int?
+  /// CUÁNTAS UNIDADES DIJO LA HOJA QUE ENTRAN AL STOCK.
+  ///
+  /// No se deduce de `cantidadRecibida` a propósito: la deducción fue durante
+  /// meses un TERCER criterio de escala —además de la tarjeta y de la hoja— y
+  /// sobre la hamburguesa del pedido 242 los tres no coincidían. Lo que se ve
+  /// es lo que entra, y para que siga siendo cierto después de un refresco el
+  /// número tiene que estar acá y no en la memoria del navegador.
+  unidadesFisicas  Decimal?   @db.Decimal(12, 3)
   /// Por qué la cantidad recibida no coincide con la pedida. Los MISMOS valores
   /// canónicos que usa la recepción de una transferencia —"Faltante",
   /// "Producto dañado", "Otro"— para que un reporte por motivo no vea dos
@@ -4142,6 +4160,20 @@ model LlamadaLector {
   /// Contra qué comprobante fue, cuando lo hubo. Nullable porque la cuota es del
   /// proyecto entero y una llamada vale igual sin comprobante detrás.
   comprobanteId Int?
+
+  /// QUÉ DISPARÓ ESTA LLAMADA.
+  ///
+  /// El 2026-09-22 hubo que contestar por qué el comprobante 13 tenía diez
+  /// lecturas y la tabla no podía: decía cuándo y con qué modelo, no quién la
+  /// pidió. Se dedujo cruzando `intentosLectura` —que estaba en cuatro— contra
+  /// las diez filas, y así se supo que seis eran pruebas de la receta y no
+  /// habían reescrito ningún renglón. Con esta columna se lee en vez de
+  /// deducirse.
+  ///
+  /// Los valores están en `ORIGEN_DE_LECTURA`, en
+  /// `lib/compras-proveedor/comprobante/origenDeLectura.js`. Texto y no enum
+  /// por el mismo motivo que `motivo`: los define la pantalla.
+  origen String?
 
   creadoEn DateTime @default(now())
 

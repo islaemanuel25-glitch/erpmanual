@@ -290,6 +290,25 @@ export default function DetallePedidoProveedorPage({ params }) {
         setRecibidos(rec);
         setKgRecibidos(kgRec);
 
+        // ── LO CORREGIDO VUELVE DE LA BASE ──────────────────────────────
+        //
+        // Las sueltas, las unidades que entran al stock y el motivo se
+        // escriben al guardar la hoja, así que existen antes de recibir. Sin
+        // leerlos acá, la pantalla vuelve vacía después de un refresco y el
+        // trabajo hecho parece no haber ocurrido — y peor: el cierre vuelve a
+        // DEDUCIR la escala, que es el defecto de la hamburguesa del 242.
+        const sue = {};
+        const fis = {};
+        const mot = {};
+        for (const d of data.item.detalles || []) {
+          if (d.unidadesSueltas != null) sue[d.id] = Number(d.unidadesSueltas);
+          if (d.unidadesFisicas != null) fis[d.id] = Number(d.unidadesFisicas);
+          if (d.motivoPrincipal) mot[d.id] = { principal: d.motivoPrincipal, detalle: d.motivoDetalle ?? "" };
+        }
+        setSueltas(sue);
+        setFisicas(fis);
+        setMotivos(mot);
+
         // Costos editables (recepción Y borrador)
         const costosInit = {};
         let totalEst = 0;
@@ -561,9 +580,47 @@ export default function DetallePedidoProveedorPage({ params }) {
     await marcarRevisada(fila, true);
   }, [aceptarPrecioDeLinea, marcarRevisada]);
 
+  // ── CORREGIR ES ESCRIBIR, Y SE ESCRIBE APENAS OCURRE ───────────────────
+  //
+  // El mismo criterio que la marca de revisado, y por el mismo motivo: lo que
+  // alguien contó no mueve stock hasta recibir, pero se puede PERDER. Vivía en
+  // la memoria del navegador y un refresco lo borraba; la cantidad y los kilos
+  // tenían medio remedio en el `sessionStorage`, que se muere al cerrar la
+  // pestaña, y las sueltas, las unidades que entran y el motivo no tenían nada.
+  const guardarEnLaBase = useCallback(async (datos) => {
+    try {
+      const r = await fetch("/api/compras-proveedor/recepcion/correccion", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pedidoId: Number(id),
+          pedidoDetalleId: datos?.pedidoDetalleId ?? null,
+          lineaId: datos?.lineaId ?? null,
+          textoCrudo: datos?.textoCrudo ?? null,
+          cantidadRecibida: datos?.cantidadRecibida ?? null,
+          unidadesSueltas: datos?.unidadesSueltas ?? null,
+          unidadesFisicas: datos?.unidadesFisicas ?? null,
+          kgRecibidos: datos?.kgRecibidos ?? null,
+          motivoPrincipal: datos?.motivoPrincipal ?? null,
+          motivoDetalle: datos?.motivoDetalle ?? null,
+        }),
+      });
+      const d = await r.json().catch(() => null);
+      if (!d?.ok) return { ok: false, error: d?.queHacer || d?.error || "No se pudo guardar." };
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e?.message || "No se pudo guardar." };
+    }
+  }, [id]);
+
   const guardarCorreccion = useCallback((datos) => {
     const id = datos?.pedidoDetalleId;
     if (!id) return;
+    // Se escribe sin esperar: el eco de abajo ya dejó la pantalla como quedó, y
+    // frenar la hoja por un viaje de red en un depósito con mala señal es peor
+    // que guardar un instante después.
+    guardarEnLaBase(datos);
     if (datos.cantidadRecibida != null) {
       setRecibidos((prev) => ({ ...prev, [id]: datos.cantidadRecibida }));
     }
@@ -588,7 +645,7 @@ export default function DetallePedidoProveedorPage({ params }) {
     // guarda por el mismo lugar, no por uno parecido.
     marcarRevisada(datos, true);
     setLineaACorregir(null);
-  }, [marcarRevisada]);
+  }, [marcarRevisada, guardarEnLaBase]);
 
   // Volver una línea a pendiente. El mismo gesto que "Desmarcar" en la ficha
   // de recepción de una transferencia: devuelve la línea y nada más. Borra

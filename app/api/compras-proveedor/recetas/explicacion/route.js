@@ -49,6 +49,7 @@ import { randomUUID } from "node:crypto";
 import { usadasHoy } from "@/lib/ia/contadorDeIa";
 import { hayCuota, limiteDiario, MOTIVO_LIMITE, TEXTO_LIMITE } from "@/lib/ia/limiteDiario";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
+import { ORIGEN_DE_LECTURA } from "@/lib/compras-proveedor/comprobante/origenDeLectura";
 
 /**
  * El papel con el que se prueba.
@@ -337,6 +338,10 @@ async function leerElPapel({ papel, receta, proveedorId, grupoId, localId }) {
           motivo: i.ok ? null : i.motivo ?? null,
           detalle: i.ok ? null : i.detalle ?? null,
           comprobanteId: papel.id,
+          // Fijo y no declarado: probar la receta es lo único que esta ruta
+          // hace con el lector. Es el origen que explica las seis llamadas del
+          // comprobante 13 que no reescribieron ningún renglón.
+          origen: ORIGEN_DE_LECTURA.PRUEBA_DE_RECETA,
         })),
       });
     }

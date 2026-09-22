@@ -42,6 +42,7 @@ import {
   resumenDeLista,
 } from "@/lib/compras-proveedor/comprobante/pantalla";
 import { sePuedeBorrar, textoDeBorrado } from "@/lib/compras-proveedor/comprobante/borrado";
+import { ORIGEN_DE_LECTURA } from "@/lib/compras-proveedor/comprobante/origenDeLectura";
 import {
   OPERACION,
   queHacerHttp,
@@ -313,7 +314,7 @@ export default function PanelComprobantes({
         ];
         if (leerAlSubir && nuevos.length === 1) {
           setSubiendo(false);
-          await leer(nuevos[0]);
+          await leer(nuevos[0], ORIGEN_DE_LECTURA.AL_SUBIR);
           return;
         }
       }
@@ -360,7 +361,11 @@ export default function PanelComprobantes({
     }
   }
 
-  async function leer(id) {
+  // `origen` no es decoración: una lectura reescribe los renglones del
+  // comprobante, así que la tabla tiene que poder decir quién la pidió. Sin
+  // esto hubo que deducirlo cruzando dos números para contestar por qué el
+  // comprobante del pedido 242 tenía diez lecturas.
+  async function leer(id, origen = ORIGEN_DE_LECTURA.BOTON) {
     setLeyendo(id);
     setMensaje(null);
     try {
@@ -372,7 +377,11 @@ export default function PanelComprobantes({
         );
         return;
       }
-      const r = await fetch(`/api/compras-proveedor/comprobantes/leer/${id}`, { method: "POST" });
+      const r = await fetch(`/api/compras-proveedor/comprobantes/leer/${id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ origen }),
+      });
       const fallo = await mensajeDeRespuesta(r, OPERACION.LECTURA);
       if (fallo) {
         setMensaje(fallo);

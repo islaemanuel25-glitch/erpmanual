@@ -144,5 +144,5 @@ test("LA FOTO SE LEE SOLA CUANDO EL PEDIDO NACE DE ELLA", () => {
   assert.match(codigoDe(PAGINA), /leerAlSubir=\{sinPedidoPrevio\}/);
   const panel = codigoDe("components/comprobantes/PanelComprobantes.jsx");
   assert.match(panel, /if \(leerAlSubir && nuevos\.length === 1\)/);
-  assert.match(panel, /await leer\(nuevos\[0\]\)/);
+  assert.match(panel, /await leer\(nuevos\[0\], ORIGEN_DE_LECTURA\.AL_SUBIR\)/);
 });

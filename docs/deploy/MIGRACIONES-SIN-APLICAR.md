@@ -16,36 +16,42 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **25 migraciones** y el árbol en **26**. Hay **una**
+Producción está en **26 migraciones** y el árbol en **27**. Hay **una**
 pendiente.
 
-- `20260922010000_giro_de_la_foto`
+- `20260922040000_recepcion_sobrevive_al_refresco`
 
-**Qué hace:** agrega **una columna entera nullable** a `ComprobanteArchivo`,
-`giroGrados`: los grados que alguien eligió tocando «Girar» en el visor para ver
-derecha la foto de un comprobante. Se suman al giro que dice el EXIF del
-archivo, que se lee al vuelo y no se guarda.
+**Qué hace:** agrega **tres columnas nullables**, ninguna con default y ninguna
+con backfill.
+
+- `ComprobanteLinea.unidadElegida` (texto): por unidad o por bulto, cuando el
+  papel no lo deja deducir y alguien elige. Vivía solo en la memoria del
+  navegador y un refresco la borraba.
+- `LlamadaLector.origen` (texto): qué disparó la llamada. Sin esto hubo que
+  deducir, cruzando `intentosLectura` contra la cantidad de filas, por qué el
+  comprobante 13 del pedido 242 tenía diez lecturas.
+- `PedidoProveedorDetalle.unidadesFisicas` (decimal 12,3): cuántas unidades dijo
+  la hoja que entran al stock. El cierre ya la prefiere sobre su propia
+  deducción; el número vivía en la memoria del navegador.
 
 **Aditiva: sin DROP, sin backfill y sin cambio de tipo.** Ninguna fila existente
-se toca. La columna queda en `NULL` para todas las fotos que ya están, que es la
-verdad: nadie giró ninguna todavía.
+se toca y las tres quedan en `NULL`, que es la verdad: nadie eligió unidad, no
+se declaró ningún origen y nadie cargó unidades físicas todavía.
 
 **La ventana entre migrar y recrear no rompe nada.** El código viejo no conoce
-la columna y no la lee; las fotos se siguen abriendo como hasta hoy.
+ninguna de las tres y no las lee: las lecturas, la conciliación y la recepción
+siguen funcionando igual mientras la versión anterior atiende.
 
 **El quinto chequeo del backup NO aplica:** no se borra ni se transforma ningún
 dato, así que no hay ningún valor que comprobar dentro del dump.
 
-**Y la foto original no se toca:** es el documento contra el que se controla un
-número. Lo que se guarda es cómo mirarla.
+---
 
-**Y queda anotada la desprolijidad, porque es la que este archivo existe para
-evitar:** esa fila se quedó acá una tanda de más. El despliegue de `6787934d`
-aplicó la migración y no borró la línea en el mismo commit, así que el paso 0
-del despliegue siguiente leyó "hay una pendiente" sobre una que ya estaba
-aplicada. No hizo daño porque el clasificador y el conteo del contenedor
-contestan por su cuenta, pero es exactamente cómo este archivo deja de decir qué
-falta: acumulando filas viejas.
+`20260922010000_giro_de_la_foto` salió de esta lista con el despliegue de
+`6787934d`, y la línea se quedó acá **tres tandas de más** — que es exactamente
+la desprolijidad que este archivo existe para evitar y que ya estaba anotada
+abajo. Comprobado el 2026-09-22: el contenedor descartable informa **26
+migraciones** y "No pending migrations to apply", o sea que estaba aplicada.
 
 `20260921160000_llamada_lector_detalle` salió de esta lista con el despliegue de
 `7c6c73b9`: el contenedor descartable informó las 24 del árbol, la aplicó, y

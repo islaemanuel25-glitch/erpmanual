@@ -463,7 +463,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // para ver derecha la foto de un comprobante. Aditiva, sin DROP y sin
   // backfill, y de otro módulo: se declara porque eso es lo que este conteo
   // obliga.
-  assert.equal(migraciones.length, 26, "aparecio una migracion que nadie declaro aca");
+  // Sube a 27 el 2026-09-22: entró `20260922040000_recepcion_sobrevive_al_refresco`,
+  // tres columnas nullables para que lo corregido en la recepción no se
+  // pierda al refrescar. De otra tanda y declarada acá a propósito.
+  assert.equal(migraciones.length, 27, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

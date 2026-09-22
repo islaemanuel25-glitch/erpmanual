@@ -122,7 +122,7 @@ export async function POST(req) {
         pesoKg: true,
         // El escalar, no una relación: `productoLocal` no existe en el esquema y
         // pedirla acá rompía la ruta contra Postgres. El producto se trae aparte.
-        productoLocalId: true, pedidoDetalleId: true,
+        productoLocalId: true, pedidoDetalleId: true, unidadElegida: true,
         comprobante: {
           select: {
             // `pedidoId` para poder resolver a qué línea del pedido pertenece
@@ -197,12 +197,27 @@ export async function POST(req) {
     // la misma receta da lo mismo que muestra la hoja; lo único que agrega es
     // la unidad que una persona haya elegido mirando la factura, que la
     // pantalla no puede saber de antemano.
+    // ── LA ELECCIÓN DE UNIDAD SE GUARDA, NO SE USA Y SE TIRA ────────────
+    //
+    // Llegaba en el cuerpo, se usaba para calcular el precio de esta llamada y
+    // se perdía. Refrescar la pantalla la borraba y el renglón volvía a
+    // preguntar por unidad o por bulto sobre algo que alguien ya había
+    // contestado. Es una decisión de una persona sobre ESTE renglón.
+    if (body?.unidad && linea.unidadElegida !== body.unidad) {
+      await prisma.comprobanteLinea.update({
+        where: { id: linea.id },
+        data: { unidadElegida: String(body.unidad) },
+      });
+    }
+
     const analisis = analizarPrecioDeLinea({
       linea,
       producto: base,
       receta,
       proveedor: linea.comprobante.proveedor,
-      unidadElegida: body?.unidad,
+      // Lo que llegó ahora, o lo que alguien eligió antes: una decisión vieja
+      // sigue valiendo si nadie la cambió.
+      unidadElegida: body?.unidad ?? linea.unidadElegida ?? undefined,
     });
 
     // ── SIN LOS KILOS NO HAY PRECIO QUE ACEPTAR, Y SE DICE CUÁL FALTA ────

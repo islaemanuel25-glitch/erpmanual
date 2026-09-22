@@ -31,6 +31,7 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
 import { preguntasVisibles } from "@/lib/compras-proveedor/comprobante/recetaEnCriollo";
+import { ORIGEN_DE_LECTURA } from "@/lib/compras-proveedor/comprobante/origenDeLectura";
 
 export default function RecetasPage() {
   const router = useRouter();
@@ -143,6 +144,10 @@ export default function RecetasPage() {
         const r = await fetch(`/api/compras-proveedor/comprobantes/leer/${id}`, {
           method: "POST",
           credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          // Quién la pidió: la relectura que se ofrece después de escribir la
+          // receta. Queda guardado con la llamada.
+          body: JSON.stringify({ origen: ORIGEN_DE_LECTURA.RECETA }),
         });
         const json = await r.json().catch(() => ({}));
         if (json?.ok) bien++;
