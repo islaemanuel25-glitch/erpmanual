@@ -16,8 +16,36 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **28 migraciones** y el árbol también. **Ninguna** pendiente:
-el despliegue siguiente es solo de código.
+Producción está en **28 migraciones** y el árbol en **29**. Hay **una**
+pendiente.
+
+- `20260922143000_restaurar_costo_hamburguesa`
+
+**Qué hace:** devuelve el costo y el precio de venta de "Hamburguesa Paty
+Clasica x2" (ProductoBase 298 y sus cinco `ProductoLocal`) a lo que tenían antes
+del cierre del pedido 242: costo **$61.703,00** y venta **$80.300,00**. El
+cierre, el 2026-09-22 a las 13:42:03 UTC, había escrito **$1.851.090** —los
+$61.703 del bulto de 30 multiplicados otra vez por 30— y el precio de venta se
+recalculó solo a **$2.406.500**.
+
+**Es una migración de DATOS**, la primera en varias tandas, así que conviene
+leerla entera antes de aplicarla. Toca DOS COLUMNAS de SEIS filas nombradas.
+
+**Los valores no se deducen de una fórmula**: se leyeron del backup
+`pre-66cc426e_20260922_133516.sql.gz`, sacado siete minutos antes del cierre.
+
+**No puede pisar una corrección posterior:** cada `UPDATE` lleva en el `WHERE` el
+valor que está corrigiendo. Si alguien ya lo arregló, no toca nada.
+
+**El quinto chequeo del backup SÍ aplica** y está hecho al revés de lo habitual:
+lo que se va a reemplazar es el valor MALO, y el valor BUENO ya se comprobó que
+está dentro del dump del 2026-09-22 13:35:16 —de ahí salió—.
+
+**La ventana entre migrar y recrear no rompe nada:** las dos columnas ya existen
+y el código viejo las lee igual.
+
+**Medido antes de escribir nada: CERO ventas** de ese producto desde las
+13:42:03 UTC, así que no hay ninguna línea de venta con el precio inflado.
 
 ---
 

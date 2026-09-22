@@ -16,6 +16,18 @@ import { laCantidadCuadraConElPrecio } from "@/lib/compras-proveedor/laCantidadC
 import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { ErrorParaLaPersona, esParaLaPersona } from "@/lib/compras-proveedor/errorParaLaPersona";
+import { formatearMoneda } from "@/lib/moneda";
+
+/**
+ * CUÁNTAS VECES PUEDE SALTAR UN COSTO SIN QUE ALGUIEN LO HAYA DECIDIDO.
+ *
+ * Tres. No es un número de gusto: un error de escala se produce multiplicando o
+ * dividiendo por el factor del bulto, y el factor más chico que existe en el
+ * catálogo es 2 — pero un bulto de 2 con un aumento fuerte podría rozar el 2,
+ * así que se deja margen. Los aumentos reales de este proveedor viven abajo del
+ * 20 %.
+ */
+const SALTO_DE_COSTO_QUE_FRENA = 3;
 
 // Resuelve el ProductoLocal DESTINO (de la ubicación dueña del pedido) para una
 // línea. Para el depósito es el mismo que ya trae la línea. Para un local, busca
@@ -559,7 +571,39 @@ export async function POST(req, { params }) {
           factorPack: base?.factor_pack,
           modoCompraProveedor: base?.modoCompraProveedor,
           unidadMedida: base?.unidad_medida,
+          // Con qué comparar para saber en qué escala está el costo de la
+          // línea. Sin esto, un costo ya guardado POR BULTO en una línea en
+          // escala UNIDAD se vuelve a multiplicar por el factor.
+          costoActual: base?.precio_costo ?? null,
         });
+
+        // ── UN COSTO NO SE MULTIPLICA NI SE DIVIDE POR TRES SIN QUE ALGUIEN LO DIGA ──
+        //
+        // El 2026-09-22 el cierre del pedido 242 escribió el costo de la
+        // Hamburguesa Paty en $1.851.090 contra los $61.703 que tenía —treinta
+        // veces— y arrastró el precio de venta de $80.300 a $2.406.500 en las
+        // cinco ubicaciones. Nadie lo decidió: Emanuel había elegido justamente
+        // "dejo el mío" sobre ese renglón.
+        //
+        // Un salto así no es un aumento: es una escala equivocada. Así que el
+        // cierre FRENA, y solo pasa si la persona aceptó ese costo en esta
+        // misma recepción. La mercadería no entra a medias — el cierre es una
+        // transacción, así que no entra nada y se vuelve a intentar.
+        const anterior = Number(base?.precio_costo ?? 0);
+        if (
+          Number.isFinite(costoMaestro) && costoMaestro > 0 && anterior > 0 &&
+          !costosAceptados.has(det.id) &&
+          (costoMaestro > anterior * SALTO_DE_COSTO_QUE_FRENA ||
+            costoMaestro < anterior / SALTO_DE_COSTO_QUE_FRENA)
+        ) {
+          throw new ErrorParaLaPersona(
+            `${base?.nombre || "Un producto"}: el costo pasaría de ${formatearMoneda(anterior)} a ` +
+              `${formatearMoneda(costoMaestro)}, que es más de ${SALTO_DE_COSTO_QUE_FRENA} veces. ` +
+              `Eso no es un aumento, es una escala equivocada. Abrí Corregir, mirá el precio del ` +
+              `papel y decidí el costo vos; si de verdad es ése, aceptalo ahí y volvé a cerrar. ` +
+              `No entró nada.`
+          );
+        }
 
         // ── LA FRONTERA ─────────────────────────────────────────────────
         //
