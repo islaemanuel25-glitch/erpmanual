@@ -403,6 +403,13 @@ export default function DetallePedidoProveedorPage({ params }) {
   // stock, y guardar cada línea aparte dejaría media recepción escrita si algo
   // fallara en el medio.
   const [sueltas, setSueltas] = useState({});
+  // ── LAS UNIDADES QUE LA HOJA DIJO QUE ENTRAN, POR LÍNEA ─────────────────
+  //
+  // Es lo que la franja "Entra al stock" mostró antes de guardar. Viaja al
+  // servidor para que no tenga que deducir la escala por su cuenta: la deducía
+  // de `det.unidad`, un TERCER lugar además de la tarjeta y de la hoja, y sobre
+  // la Hamburguesa del pedido 242 los tres no coincidían.
+  const [fisicas, setFisicas] = useState({});
   const [motivos, setMotivos] = useState({});
   // ── QUÉ LÍNEAS CONTROLÓ LA PERSONA ──────────────────────────────────────
   //
@@ -546,6 +553,9 @@ export default function DetallePedidoProveedorPage({ params }) {
       setRecibidos((prev) => ({ ...prev, [id]: datos.cantidadRecibida }));
     }
     setSueltas((prev) => ({ ...prev, [id]: datos.unidadesSueltas }));
+    // Las unidades que la hoja dijo que entran, tal cual. El servidor las usa
+    // en vez de deducir la escala, que es donde los tres lugares se separaban.
+    setFisicas((prev) => ({ ...prev, [id]: datos.unidadesFisicas ?? null }));
     setMotivos((prev) => ({
       ...prev,
       [id]: datos.motivoPrincipal
@@ -626,6 +636,7 @@ export default function DetallePedidoProveedorPage({ params }) {
           recibidos: extra?.recibidos ?? recibidos,
           kgRecibidos,
           sueltas,
+          fisicas,
           motivos,
           costos,
           totalReal: totalReal || null,

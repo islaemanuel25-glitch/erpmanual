@@ -12,6 +12,7 @@ import {
   cantidadesNegativas,
 } from "@/lib/compras-proveedor/fronteraCosto";
 import { esComboBase } from "@/lib/combos/guards";
+import { laCantidadCuadraConElPrecio } from "@/lib/compras-proveedor/laCantidadCuadraConElPrecio";
 import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
 
 // Resuelve el ProductoLocal DESTINO (de la ubicación dueña del pedido) para una
@@ -131,6 +132,10 @@ export async function POST(req, { params }) {
     // parte del mismo conteo y separarlos dejaría una recepción guardada a
     // medias si una de las dos escrituras fallara.
     const sueltasMap = body.sueltas || {}; // { detalleId: unidadesSueltas }
+    // Las unidades que la hoja mostró en "Entra al stock", por línea. Gana
+    // sobre deducir la escala acá: ver el comentario en el cálculo del
+    // incremento.
+    const fisicasMap = body.fisicas || {}; // { detalleId: unidadesFisicas }
     const motivosMap = body.motivos || {}; // { detalleId: { principal, detalle } }
 
     // ── LA FRONTERA ENTRE RECIBIR Y ESCRIBIR EL COSTO ────────────────────
@@ -293,6 +298,33 @@ export async function POST(req, { params }) {
     });
     const destinoEsDeposito = ubicacionDestino?.es_deposito === true;
 
+    // ── LO QUE EL PAPEL FACTURÓ DE CADA LÍNEA, PARA COMPROBAR LA ESCALA ──
+    //
+    // El precio delata la escala: lo que entra al stock, valuado al precio que
+    // el papel cobra por unidad, tiene que dar su subtotal. Para preguntarlo
+    // hacen falta los dos números del renglón, y viven en el comprobante.
+    //
+    // Una consulta sola para todo el pedido, antes de abrir la transacción: lo
+    // que se lee no tiene por qué estar adentro, y tener el bloqueo abierto
+    // mientras se consulta alarga la transacción que escribe stock.
+    //
+    // Si una línea del pedido tiene DOS renglones del papel, no se mira: ahí lo
+    // que entra es la suma de los dos y la igualdad no aplica renglón a renglón.
+    const lineasDelPapel = await prisma.comprobanteLinea.findMany({
+      where: {
+        comprobante: { pedidoId, grupoId, estado: { not: "ANULADO" } },
+        pedidoDetalleId: { not: null },
+      },
+      select: { pedidoDetalleId: true, cantidad: true, subtotalImpreso: true },
+    });
+    const lineaDelPapelPorDetalle = new Map();
+    const repetidos = new Set();
+    for (const l of lineasDelPapel) {
+      if (lineaDelPapelPorDetalle.has(l.pedidoDetalleId)) repetidos.add(l.pedidoDetalleId);
+      lineaDelPapelPorDetalle.set(l.pedidoDetalleId, l);
+    }
+    for (const d of repetidos) lineaDelPapelPorDetalle.delete(d);
+
     // Transacción: incrementar stock + marcar recibido
     await prisma.$transaction(async (tx) => {
       let totalFacturaComputed = 0;
@@ -367,11 +399,55 @@ export async function POST(req, { params }) {
           }
         } else {
           // No-fiambre: el StockLocal del depósito SIEMPRE se guarda en UNIDADES.
-          // Respeta la unidad de la línea (Opción A): BULTO entra ×factor_pack,
-          // UNIDAD entra ×1. factor_pack solo afecta la ENTRADA de stock, no el dinero.
+          //
+          // ── LO QUE LA HOJA DIJO QUE ENTRA, GANA ─────────────────────────
+          //
+          // La pantalla manda `fisicas`: el número que la franja "Entra al
+          // stock" mostró antes de guardar. Acá se deducía con `det.unidad`, y
+          // ése es un TERCER lugar donde se decide la escala —los otros dos son
+          // la tarjeta y la hoja—. Sobre la Hamburguesa Paty del pedido 242 los
+          // tres no coincidían: la hoja mostraba 3 bultos de 30 y esta cuenta
+          // los entraba como 3 unidades sueltas.
+          //
+          // Lo que se ve es lo que entra. Sin ese dato —una pantalla vieja, o
+          // una línea que nadie abrió— se sigue deduciendo como antes.
           const factorPack = Math.max(1, Number(base?.factor_pack || 1));
-          const multiplicador = det.unidad === "UNIDAD" ? 1 : factorPack;
-          incremento = cantRecibida * multiplicador;
+          const declaradasFisicas = fisicasMap[det.id];
+          const hayFisicas =
+            declaradasFisicas !== undefined &&
+            declaradasFisicas !== null &&
+            declaradasFisicas !== "" &&
+            Number.isFinite(Number(declaradasFisicas)) &&
+            Number(declaradasFisicas) > 0;
+          incremento = hayFisicas
+            ? Number(declaradasFisicas)
+            : cantRecibida * (det.unidad === "UNIDAD" ? 1 : factorPack);
+
+          // ── EL PRECIO DELATA LA ESCALA ─────────────────────────────────
+          //
+          // Antes de escribir stock: lo que va a entrar, valuado al precio que
+          // el papel cobra por unidad, tiene que dar el subtotal del papel. Si
+          // no da, la cantidad está en otra unidad y entraría mal.
+          //
+          // NO se mira cuando la persona declaró una diferencia: ahí está
+          // diciendo a propósito que llegó otra cosa que la facturada, y eso es
+          // exactamente lo que la recepción existe para registrar.
+          const delPapel = lineaDelPapelPorDetalle.get(det.id);
+          const motivoDeclarado = motivosMap[det.id]?.principal;
+          if (delPapel && !motivoDeclarado) {
+            const r = laCantidadCuadraConElPrecio({
+              subtotal: delPapel.subtotalImpreso,
+              cantidad: delPapel.cantidad,
+              fisicas: incremento,
+            });
+            if (r.aplica && !r.cuadra) {
+              throw new Error(
+                `${base?.nombre || "Un producto"}: entrarían ${incremento} unidades al stock y el ` +
+                  `papel factura ${r.esperado}. La cantidad está en otra unidad — abrí Corregir y ` +
+                  `revisá si son bultos o unidades sueltas.`
+              );
+            }
+          }
         }
 
         // ProductoLocal de la ubicación DESTINO (dueña del pedido).

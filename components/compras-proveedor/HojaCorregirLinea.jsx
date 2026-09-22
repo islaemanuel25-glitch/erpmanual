@@ -84,6 +84,12 @@ import {
   porcentajeDelPrecio,
   precioCambio,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
+// LA ESCALA SALE DE LA MISMA FUNCIÓN QUE USA LA TARJETA, no de una parecida.
+import { quedoEnBultos } from "@/lib/compras-proveedor/tarjetaDeRecepcion";
+import {
+  laCantidadCuadraConElPrecio,
+  textoDeLaEscalaQueNoCuadra,
+} from "@/lib/compras-proveedor/laCantidadCuadraConElPrecio";
 import {
   DECISION_DE_PRECIO,
   decisionVencida,
@@ -291,8 +297,18 @@ export default function HojaCorregirLinea({
   // aplica sola y un salto brusco no es un precio nuevo. La respuesta que queda
   // es dejar el propio, que es la única que corresponde.
   const noSePuedeAceptar = aceptarEstaBloqueado(fila?.precio?.decision);
-  // Va por pack cuando el pedido se hizo en bultos y el bulto trae más de uno.
-  const vaPorPack = (fila?.unidadPedido ?? "BULTO") === "BULTO" && Number(fila?.factorPack) > 1;
+  // ── LA ESCALA SALE DEL MISMO LUGAR QUE LA DE LA TARJETA ───────────────
+  //
+  // Acá se preguntaba por `unidadPedido` y la tarjeta pregunta por
+  // `quedoEnBultos`, que mira el veredicto de la factura —el que convirtió el
+  // número—. Sobre una línea donde los dos no coinciden, la hoja contradecía a
+  // la tarjeta que la abrió.
+  //
+  // Pasó con la Hamburguesa Paty del pedido 242: la tarjeta decía "3 PACK x30 ·
+  // el papel dice 90 u" y la hoja decía "Unidades 3 · Entra al stock 3
+  // unidades". Tres hamburguesas en vez de noventa. Medido sobre los pedidos
+  // abiertos, es el único renglón en esa situación de los once que hay.
+  const vaPorPack = quedoEnBultos(fila) && Number(fila?.factorPack) > 1;
 
   const [bultos, setBultos] = useState("");
   const [sueltas, setSueltas] = useState("");
@@ -358,6 +374,28 @@ export default function HojaCorregirLinea({
     return b * factor + s;
   }, [bultos, sueltas, vaPorPack, fila?.factorPack]);
 
+  // ── EL PRECIO DELATA LA ESCALA ────────────────────────────────────────
+  //
+  // Se mira sobre lo que la hoja OFRECE —la cantidad de la factura, ya
+  // convertida— y no sobre lo que la persona cuenta: que lleguen 2 cajones en
+  // vez de 3 es justo lo que esta hoja registra, y ahí no tiene que dar el
+  // subtotal del papel.
+  //
+  // Si lo ofrecido no cuadra, la escala está mal y la hoja lo dice en vez de
+  // ofrecer el número como bueno.
+  const escalaOfrecida = useMemo(() => {
+    const factor = vaPorPack ? Number(fila?.factorPack) || 1 : 1;
+    const ofrecidas = (Number(cantidadDeLaFactura) || 0) * factor;
+    return laCantidadCuadraConElPrecio({
+      subtotal: fila?.subtotal,
+      cantidad: fila?.cantidad,
+      fisicas: ofrecidas,
+      porKilo: fila?.porKilo === true,
+    });
+  }, [cantidadDeLaFactura, vaPorPack, fila?.factorPack, fila?.subtotal, fila?.cantidad, fila?.porKilo]);
+
+  const avisoDeEscala = textoDeLaEscalaQueNoCuadra(escalaOfrecida, { moneda: formatearMoneda });
+
   const cantidadDifiere = useMemo(() => {
     // Las dos en bultos: `cantidadPedida` ya lo está y `bultos` es lo que el
     // campo muestra, que ahora arranca convertido.
@@ -391,9 +429,9 @@ export default function HojaCorregirLinea({
   /** El rótulo del campo dice en qué escala está el número: no es opcional. */
   const rotuloDeCompletos = vaPorPack
     ? `Bultos de ${limpio(fila.factorPack)}`
-    : (fila.unidadPedido ?? "BULTO") === "UNIDAD"
-      ? "Unidades"
-      : "Bultos";
+    : quedoEnBultos(fila)
+      ? "Bultos"
+      : "Unidades";
 
   const guardar = async () => {
     setError("");
@@ -431,6 +469,18 @@ export default function HojaCorregirLinea({
       pedidoDetalleId: fila.pedidoDetalleId,
       cantidadRecibida: bultos === "" ? null : Number(bultos),
       unidadesSueltas: vaPorPack && sueltas !== "" ? Number(sueltas) : null,
+      // ── CUÁNTAS UNIDADES ENTRAN AL STOCK, DICHO Y NO DEDUCIDO ─────────
+      //
+      // Es el número que la franja de arriba muestra, el mismo que la persona
+      // acaba de leer antes de guardar. Viaja explícito porque el servidor
+      // deducía la escala por su cuenta —`det.unidad`, un TERCER lugar además
+      // de la tarjeta y de esta hoja— y sobre la Hamburguesa del pedido 242 los
+      // tres no coincidían: la hoja iba a mandar 3 bultos y el servidor los
+      // iba a entrar como 3 unidades.
+      //
+      // Lo que se ve es lo que entra. Y el servidor lo comprueba contra el
+      // precio del papel antes de escribirlo.
+      unidadesFisicas: bultos === "" ? null : entraAlStock,
       motivoPrincipal: cantidadDifiere ? motivo : null,
       motivoDetalle: cantidadDifiere && motivo === "Otro" ? detalleMotivo.trim() : null,
     });
@@ -611,6 +661,16 @@ export default function HojaCorregirLinea({
                 </div>
               )}
             </div>
+
+            {/* ── SI LA ESCALA NO CUADRA CON EL PRECIO, SE DICE ACÁ ───────
+                Justo arriba del número que va a entrar al stock, que es el que
+                estaría mal. Con los dos importes a la vista para poder
+                comprobarlo contra el papel que se tiene en la mano. */}
+            {avisoDeEscala && (
+              <p className="text-sm2 sunmi-text-warning break-words" aria-live="polite">
+                {avisoDeEscala}
+              </p>
+            )}
 
             {/* La franja SÍ lleva fondo: es el resultado de los dos campos de
                 arriba, no un bloque. */}
