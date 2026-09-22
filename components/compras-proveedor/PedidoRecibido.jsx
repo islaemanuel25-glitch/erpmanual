@@ -49,7 +49,12 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import { diaMesAR, horaAR } from "@/lib/fechas/formatearFechaHora";
 import { formatearMoneda } from "@/lib/moneda";
 import { gananciaDelDeposito } from "@/lib/compras-proveedor/gananciaDelDeposito";
-import { cuantosProductos, loQueEntro, textoDeCantidad } from "@/lib/compras-proveedor/loQueEntro";
+import {
+  cuantosProductos,
+  loQueEntro,
+  textoDeCantidad,
+  textoDelPrecioPorUnidad,
+} from "@/lib/compras-proveedor/loQueEntro";
 import { PAPEL, papelDelPedido } from "@/lib/compras-proveedor/papelDelPedido";
 
 /** Un renglón de producto: nombre arriba, cuenta abajo, total a la derecha. */
@@ -60,7 +65,7 @@ function RenglonDeProducto({ r }) {
         <span className="text-sm3 sunmi-text-strong break-words">{r.producto}</span>
         <span className="text-sm2 sunmi-text-muted tabular-nums">
           {textoDeCantidad(r)}
-          {r.costo != null ? ` · ${formatearMoneda(r.costo)} cada uno` : ""}
+          {r.costo != null ? ` · ${formatearMoneda(r.costo)} ${textoDelPrecioPorUnidad(r)}` : ""}
         </span>
       </span>
       <span className="shrink-0 whitespace-nowrap tabular-nums text-sm2 font-semibold sunmi-text-strong">

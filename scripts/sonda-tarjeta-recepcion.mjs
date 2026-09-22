@@ -39,6 +39,10 @@ const PERFIL = arg("perfil", path.join(os.tmpdir(), "sonda-tarjeta-recepcion"));
 // Qué renglón abrir en la hoja de Corregir, por un trozo de su nombre. Vacío
 // significa medir solo las tarjetas, que es como venía.
 const CORREGIR = arg("corregir", "");
+// Solo leer lo que la pantalla dice, sin exigir tarjetas de producto. Un pedido
+// ya RECIBIDO dibuja otra pantalla —sin tarjetas— y ahí la sonda moría antes de
+// poder mostrar nada.
+const SOLO_TEXTO = process.argv.includes("--solo-texto");
 
 if (!USUARIO || !CLAVE) {
   console.error("Faltan --usuario y --clave. Sin sesión esto mide la pantalla de login.");
@@ -139,6 +143,14 @@ try {
   }
 
   const cuantas = await evaluar(`document.querySelectorAll("[data-linea-factura]").length`);
+  if (SOLO_TEXTO) {
+    const todo = await evaluar(
+      `((document.querySelector("main") || document.body).innerText || "").slice(0, 2600)`
+    );
+    console.log("  ── LO QUE DICE LA PANTALLA ─────────────────────────────────");
+    for (const l of String(todo).split("\n").filter((x) => x.trim())) console.log(`     │ ${l}`);
+    process.exit(0);
+  }
   afirmar(cuantas > 0, `la pantalla dibuja tarjetas de producto (${cuantas})`,
     "sin tarjetas no hay nada que medir: ¿la pantalla cargó? ¿el pedido tiene comprobante leído?");
   if (!cuantas) morir("no se dibujó ninguna tarjeta de producto");
