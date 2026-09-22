@@ -397,13 +397,24 @@ export default function HojaCorregirLinea({
   const avisoDeEscala = textoDeLaEscalaQueNoCuadra(escalaOfrecida, { moneda: formatearMoneda });
 
   const cantidadDifiere = useMemo(() => {
-    // Las dos en bultos: `cantidadPedida` ya lo está y `bultos` es lo que el
-    // campo muestra, que ahora arranca convertido.
+    // ── LAS DOS EN UNIDADES FÍSICAS ──────────────────────────────────────
+    //
+    // Acá se comparaba `cantidadPedida` contra el número del campo dando por
+    // hecho que las dos estaban en bultos, y no siempre lo están: en la
+    // Hamburguesa Paty del pedido 242 la línea del pedido son 90 UNIDADES y el
+    // campo muestra 3 BULTOS de 30. Noventa contra tres da "difiere", así que
+    // la hoja pedía el motivo de una diferencia que no existe.
+    //
+    // En físicas la pregunta tiene una sola respuesta: 90 pedidas contra 90 que
+    // entran es lo mismo, se hayan escrito como 3 bultos o como 90 sueltas.
     const pedida = Number(fila?.cantidadPedida);
-    const contada = Number(bultos);
-    if (!Number.isFinite(pedida) || !Number.isFinite(contada)) return false;
-    return pedida !== contada;
-  }, [fila?.cantidadPedida, bultos]);
+    if (!Number.isFinite(pedida)) return false;
+    const factorDelPedido =
+      (fila?.unidadPedido ?? "BULTO") === "BULTO" ? Number(fila?.factorPack) || 1 : 1;
+    const pedidaFisica = pedida * factorDelPedido;
+    if (bultos === "" || !Number.isFinite(Number(bultos))) return false;
+    return pedidaFisica !== entraAlStock;
+  }, [fila?.cantidadPedida, fila?.unidadPedido, fila?.factorPack, bultos, entraAlStock]);
 
   if (!fila) return null;
 
