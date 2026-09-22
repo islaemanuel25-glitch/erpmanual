@@ -1169,16 +1169,6 @@ model TransferenciaDetalle {
   // Default `false` y las otras dos nulables: las transferencias históricas
   // quedan exactamente como estaban. Ninguna se revisó con este mecanismo porque
   // no existía, y no se inventa quién ni cuándo.
-  /// POR UNIDAD O POR BULTO, CUANDO EL PAPEL NO LO DEJA DEDUCIR Y ALGUIEN ELIGE.
-  ///
-  /// Vivía solo en la memoria del navegador: refrescar la pantalla borraba la
-  /// elección y el renglón volvía a preguntar lo mismo. Es una decisión de una
-  /// persona sobre ESTE renglón, así que vive en el renglón.
-  ///
-  /// Texto y no enum: los valores son los de `UNIDAD` en `precioDeLinea.js`, y
-  /// el contrato lo define ese módulo.
-  unidadElegida String?
-
   revisadoEnRecepcion      Boolean   @default(false)
   revisadoEnRecepcionPorId Int?
   revisadoEnRecepcionAt    DateTime?
@@ -4106,6 +4096,16 @@ model ComprobanteLinea {
   /// `DecisionDePrecioProveedor.decididaPorUsuarioId`: hoy no se muestra el
   /// nombre en ninguna pantalla. El día que se muestre se agrega la relación,
   /// que es otra migración y otra decisión.
+  /// POR UNIDAD O POR BULTO, CUANDO EL PAPEL NO LO DEJA DEDUCIR Y ALGUIEN ELIGE.
+  ///
+  /// Vivía solo en la memoria del navegador: refrescar la pantalla borraba la
+  /// elección y el renglón volvía a preguntar lo mismo. Es una decisión de una
+  /// persona sobre ESTE renglón, así que vive en el renglón.
+  ///
+  /// Texto y no enum: los valores son los de `UNIDAD` en `precioDeLinea.js`, y
+  /// el contrato lo define ese módulo.
+  unidadElegida String?
+
   revisadoEnRecepcion      Boolean   @default(false)
   revisadoEnRecepcionPorId Int?
   revisadoEnRecepcionAt    DateTime?

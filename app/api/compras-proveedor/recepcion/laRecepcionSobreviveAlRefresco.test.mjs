@@ -42,18 +42,64 @@ const RUTA = "app/api/compras-proveedor/recepcion/correccion/route.js";
 const PAGINA = "app/modulos/compras-proveedor/[id]/page.jsx";
 const ESQUEMA = "prisma/schema.prisma";
 
-test("LAS COLUMNAS EXISTEN, Y LA QUE FALTABA TAMBIÉN", () => {
-  const esquema = leer(ESQUEMA);
-  for (const columna of ["cantidadRecibida", "unidadesSueltas", "kgRecibidos", "motivoPrincipal", "motivoDetalle"]) {
-    assert.match(esquema, new RegExp(`\\n\\s+${columna}\\s`), `falta ${columna} en el detalle del pedido`);
+/**
+ * ¿ESTE MODELO TIENE ESTA COLUMNA?
+ *
+ * ── POR QUÉ ESTO Y NO UN `assert.match` SOBRE EL ARCHIVO ────────────────
+ *
+ * Porque un `match` contesta "la palabra está en alguna parte", y eso dio
+ * VERDE el 2026-09-22 sobre una columna escrita en el modelo EQUIVOCADO:
+ * `unidadElegida` había quedado en `TransferenciaDetalle` en vez de
+ * `ComprobanteLinea`. El candado pasó, el build pasó, la migración creó la
+ * columna en la tabla correcta, y el cliente de Prisma quedó pidiéndosela a
+ * otra tabla — o sea que todo lo que leyera una transferencia se habría caído
+ * en producción con un P2022. Lo atrapó ejercer la consulta contra la base,
+ * ya con la migración aplicada y antes de recrear la aplicación.
+ *
+ * Y no sirve preguntar "en qué modelo está": `cantidadRecibida`, `origen` y
+ * `motivoPrincipal` están en varios. Una columna tiene TABLA, y la pregunta se
+ * hace de a un par.
+ */
+function tieneColumna(modelo, columna) {
+  const texto = leer(ESQUEMA);
+  const i = texto.indexOf(`\nmodel ${modelo} {`);
+  if (i < 0) return false;
+  const cuerpo = texto.slice(i, texto.indexOf("\n}", i));
+  return new RegExp(`\\n\\s+${columna}\\s`).test(cuerpo);
+}
+
+test("LAS COLUMNAS EXISTEN, EN SU TABLA, Y LA QUE FALTABA TAMBIÉN", () => {
+  for (const columna of [
+    "cantidadRecibida", "unidadesSueltas", "kgRecibidos", "motivoPrincipal", "motivoDetalle",
+    // La que no existía: las unidades que la hoja dijo que entran al stock. Sin
+    // ella, después de un refresco el cierre vuelve a DEDUCIR la escala, que
+    // sobre la hamburguesa del 242 daba 3 en vez de 90.
+    "unidadesFisicas",
+  ]) {
+    assert.ok(tieneColumna("PedidoProveedorDetalle", columna), `falta ${columna} en la línea del pedido`);
   }
-  // La que no existía: las unidades que la hoja dijo que entran al stock. Sin
-  // ella, después de un refresco el cierre vuelve a DEDUCIR la escala, que
-  // sobre la hamburguesa del 242 daba 3 en vez de 90.
-  assert.match(esquema, /unidadesFisicas\s+Decimal\?\s+@db\.Decimal\(12, 3\)/);
-  // Y la elección de unidad, que es del renglón del papel y no de la línea del
-  // pedido: dos renglones pueden apuntar a la misma línea.
-  assert.match(esquema, /unidadElegida String\?/);
+  assert.match(leer(ESQUEMA), /unidadesFisicas\s+Decimal\?\s+@db\.Decimal\(12, 3\)/);
+
+  // La elección de unidad es del renglón del PAPEL y no de la línea del pedido:
+  // dos renglones pueden apuntar a la misma línea.
+  assert.ok(tieneColumna("ComprobanteLinea", "unidadElegida"), "la elección de unidad quedó en otra tabla");
+  assert.ok(!tieneColumna("TransferenciaDetalle", "unidadElegida"), "quedó una copia en la tabla equivocada");
+
+  // Y el origen de una lectura es de la llamada al lector.
+  assert.ok(tieneColumna("LlamadaLector", "origen"));
+});
+
+test("Y CADA COLUMNA DE LA MIGRACIÓN CAE EN LA TABLA QUE DICE EL ESQUEMA", () => {
+  // La contraprueba del caso de arriba, del otro lado: el SQL nombra la tabla y
+  // el esquema nombra el modelo, y los dos tienen que decir lo mismo. Con una
+  // columna en el modelo equivocado esto se pone rojo, que es lo único que
+  // separa "la columna está" de "la columna está donde va".
+  const sql = leer("prisma/migrations/20260922040000_recepcion_sobrevive_al_refresco/migration.sql");
+  const pares = [...sql.matchAll(/ALTER TABLE "(\w+)" ADD COLUMN "(\w+)"/g)];
+  assert.equal(pares.length, 3, "la migración dejó de crear tres columnas");
+  for (const [, tabla, columna] of pares) {
+    assert.ok(tieneColumna(tabla, columna), `la migración crea ${columna} en ${tabla} y el esquema no la tiene ahí`);
+  }
 });
 
 test("LA RUTA GUARDA LAS SEIS COSAS, Y NINGUNA MUEVE STOCK", () => {
