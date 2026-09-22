@@ -81,6 +81,8 @@ export default function ListaDeLaFactura({
   sinPedidoPrevio = false,
   comprobante,
   filas = [],
+  /** El total IMPRESO del papel. Es lo que muestra el rótulo "Factura". */
+  totalDelPapel = null,
   onCorregir,
   onCoincide,
   /** Qué líneas marcó la persona como controladas. `{ pedidoDetalleId: true }` */
@@ -226,14 +228,31 @@ export default function ListaDeLaFactura({
               Acá están donde ya está el resumen del pedido, no se mueven con el
               scroll de la lista, y el pie queda con una sola cosa adentro. */}
           <div className="border-t sunmi-divider pt-renglon flex flex-col gap-dato">
-            <RenglonDeImporte rotulo="Factura" valor={cuenta.facturado} />
-            <RenglonDeImporte rotulo="Al precio del ERP" valor={cuenta.interno} />
+            {/* ── "FACTURA" ES LO QUE FACTURA EL PAPEL, SIEMPRE ──────────
+                Decía $294.249,80 sobre un papel de $348.711,61, y ese número no
+                estaba impreso en ninguna parte: era la suma de los renglones
+                COMPARABLES —7 de 9— valuados al precio final, con IVA y
+                percepción adentro. Quien lee "Factura" busca ese número en el
+                papel y no lo encuentra, porque no puede estar. */}
             <RenglonDeImporte
-              rotulo="Ganancia"
+              rotulo="Factura"
+              valor={totalDelPapel != null ? totalDelPapel : cuenta.facturado}
+            />
+
+            {/* ── Y LA GANANCIA DICE SOBRE CUÁNTOS SE CALCULÓ ────────────
+                Un renglón sin producto vinculado no tiene contra qué compararse,
+                así que la ganancia siempre es de un subconjunto. Antes eso
+                estaba en una línea chica abajo y los tres importes se leían como
+                si hablaran del papel entero. Ahora el rótulo lo dice. */}
+            <RenglonDeImporte
+              rotulo={`Ganancia sobre ${cuenta.enLaCuenta} de ${cuenta.total} productos`}
               valor={cuenta.ganancia}
               porcentaje={cuenta.porcentaje}
               fuerte
             />
+            <span className="text-xs2 sunmi-text-muted break-words tabular-nums">
+              {`Factura de esos ${cuenta.enLaCuenta}: ${formatearMoneda(cuenta.facturado)} · A tus precios: ${formatearMoneda(cuenta.interno)}`}
+            </span>
             {/* CUÁNTAS LÍNEAS RESPALDAN EL NÚMERO. Sin esto, una factura con la
                 mitad de las líneas sin vincular muestra una ganancia a media
                 asta que se lee como el total. */}

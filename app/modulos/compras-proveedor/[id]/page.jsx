@@ -1244,6 +1244,10 @@ export default function DetallePedidoProveedorPage({ params }) {
               // pedido normal se ve igual.
               sinPedidoPrevio={sinPedidoPrevio}
               comprobante={comprobanteActivo}
+              // Lo que factura el papel, para el rótulo "Factura". Sale del
+              // comprobante activo y no de sumar renglones: sumar solo puede
+              // dar el total de los que se pudieron comparar.
+              totalDelPapel={comprobanteActivo?.totalDelPapel ?? null}
               filas={filasDeFactura}
               onCorregir={setLineaACorregir}
               onCoincide={aceptarLoQueDiceLaFactura}

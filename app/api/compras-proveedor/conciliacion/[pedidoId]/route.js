@@ -110,6 +110,10 @@ export async function GET(req, { params }) {
       select: {
         id: true, estado: true, tipo: true, puntoVenta: true, numero: true, fecha: true,
         confirmadoEn: true, imagenBorradaEn: true, leidoEn: true, recetaUsada: true,
+        // El total IMPRESO del papel, para que el rótulo "Factura" muestre lo
+        // que factura el papel y no una suma parcial de los renglones que se
+        // pudieron comparar.
+        totalLeido: true,
         proveedor: { select: { id: true, nombre: true, umbralRevisarPct: true, umbralSospechaBajaPct: true } },
         lineas: {
           orderBy: { orden: "asc" },
