@@ -23,6 +23,8 @@
 import { useEffect, useMemo, useState } from "react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { ORIGEN_DE_LECTURA } from "@/lib/compras-proveedor/comprobante/origenDeLectura";
+import { pedirLaLectura } from "@/lib/compras-proveedor/comprobante/leerConTurno";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import AsiLoEntendio from "@/components/compras-proveedor/AsiLoEntendio";
@@ -69,6 +71,7 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
   const [automatica, setAutomatica] = useState(null);
   const [yaCorregidas, setYaCorregidas] = useState([]);
   const [aplicando, setAplicando] = useState(false);
+  const [releyendo, setReleyendo] = useState(false);
 
   useEffect(() => {
     let vigente = true;
@@ -142,6 +145,64 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [automatica?.aplica, comprobanteId]);
 
+  /**
+   * VOLVER A LEER EL PAPEL con la receta que haya ahora.
+   *
+   * Es la salida del callejón: cuando no hay ningún número para elegir, lo que
+   * falta no es una corrección sino la lectura de los renglones. Llama a la
+   * MISMA ruta que usa la recepción al subir el papel —no hay un segundo camino
+   * de lectura— y cuando vuelve, la pantalla se recarga sola.
+   */
+  const releer = async () => {
+    if (releyendo) return;
+    setReleyendo(true);
+    setMensaje(null);
+    try {
+      // SE ESPERA EL TURNO. El POST contesta enseguida con un número de turno y
+      // la lectura sigue en segundo plano: llamar la ruta por afuera haría
+      // creer que ya leyó cuando recién arrancó. Es la misma puerta que usan
+      // las otras dos pantallas, y el censo de
+      // `laRecepcionSobreviveAlRefresco` se pone rojo si alguien agrega un
+      // camino que la saltee — se puso rojo con la primera versión de esto.
+      const { cuerpo: d } = await pedirLaLectura({
+        comprobanteId,
+        origen: ORIGEN_DE_LECTURA.BOTON,
+        fetchImpl: fetch,
+      });
+      // ── EL BOTÓN NUNCA TERMINA EN SILENCIO ─────────────────────────
+      //
+      // El 2026-09-23 Emanuel lo tocó tres veces en dos minutos: el botón
+      // pasaba a "Leyendo el papel…", volvía, y la pantalla quedaba EXACTAMENTE
+      // igual. La lectura había corrido —quedó en la bitácora— pero había
+      // vuelto a traer un renglón de doce, y nada lo decía. Sin una frase, un
+      // botón que funciona y un botón que no hace nada se ven iguales.
+      //
+      // Los tres desenlaces se nombran: la que no arrancó, la que volvió corta,
+      // y la que salió bien.
+      if (!d?.ok) {
+        setMensaje({ tipo: "error", texto: d?.error || "No se pudo volver a leer el papel." });
+        return;
+      }
+      const dice = Number(d?.lineasEnElPapel);
+      const trajo = Number(d?.lineasTranscriptas);
+      if (Number.isFinite(dice) && Number.isFinite(trajo) && dice > trajo) {
+        setMensaje({
+          tipo: "aviso",
+          texto:
+            `Se volvió a leer: el lector dice ver ${dice} renglones y transcribió ${trajo}. ` +
+            "Probá otra vez; si vuelve a salir corta, revisá la explicación del proveedor.",
+        });
+      } else {
+        setMensaje({ tipo: "ok", texto: "Se volvió a leer el papel." });
+      }
+      onCorregido?.(d);
+    } catch (e) {
+      setMensaje({ tipo: "error", texto: `No se pudo volver a leer el papel: ${e.message}` });
+    } finally {
+      setReleyendo(false);
+    }
+  };
+
   // La misma función que usa el servidor al verificar. Si acá se rehiciera la
   // cuenta por otro lado, la pantalla podría decir "cierra" sobre algo que el
   // servidor después rechaza.
@@ -200,6 +261,14 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
 
   if (cargando) return <SunmiLoader />;
   if (error) return <p className="text-sm3 sunmi-text-danger break-words">{error}</p>;
+  // ── HAY ALGO QUE ELEGIR? ──────────────────────────────────────────────
+  //
+  // Los candidatos son los renglones que el control marcó como sospechosos: los
+  // únicos que ofrecen dos números para que una persona decida. Sin renglones
+  // —o con renglones que dan su cuenta— no hay nada que elegir, y pedirlo es
+  // mandar a alguien a un callejón sin salida.
+  const hayCandidatos = (resultado?.sospechosos?.length ?? 0) > 0;
+
   if (!resultado) return null;
 
   return (
@@ -246,25 +315,48 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
         </p>
       )}
 
-      {/* Mientras la automática se está aplicando no se ofrece nada: el
-          bloque de preguntar aparece solo si el número NO se deduce. */}
+      {/* ── SIN NÚMEROS PARA ELEGIR NO SE PIDE ELEGIR UNO ────────────────
+          Es el callejón sin salida que se vio en el #247: la pantalla decía
+          "Elegí el número que dice el papel para poder guardar" sobre una lista
+          VACÍA, con el botón deshabilitado y sin nada que tocar. Cuando no hay
+          candidatos el problema no es una corrección que falta: es que no se
+          leyeron los productos, y lo que corresponde ofrecer es volver a leer
+          el papel con la receta que haya ahora. */}
       {!automatica?.aplica && !aplicando && (
-      <div className="flex flex-col gap-dato">
-        <SunmiButton
-          color="primary"
-          type="button"
-          disabled={guardando || !hayCambios}
-          onClick={guardar}
-          className="w-full min-h-botonFoto justify-center text-sm3 font-bold"
-        >
-          {guardando ? "Guardando…" : "Guardar la corrección"}
-        </SunmiButton>
-        {!hayCambios && (
-          <span className="text-sm3 sunmi-text-muted text-center">
-            Elegí el número que dice el papel para poder guardar.
-          </span>
-        )}
-      </div>
+        hayCandidatos ? (
+          <div className="flex flex-col gap-dato">
+            <SunmiButton
+              color="primary"
+              type="button"
+              disabled={guardando || !hayCambios}
+              onClick={guardar}
+              className="w-full min-h-botonFoto justify-center text-sm3 font-bold"
+            >
+              {guardando ? "Guardando…" : "Guardar la corrección"}
+            </SunmiButton>
+            {!hayCambios && (
+              <span className="text-sm3 sunmi-text-muted text-center">
+                Elegí el número que dice el papel para poder guardar.
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-dato">
+            <SunmiButton
+              color="primary"
+              type="button"
+              disabled={releyendo}
+              onClick={releer}
+              className="w-full min-h-botonFoto justify-center text-sm3 font-bold"
+            >
+              {releyendo ? "Leyendo el papel…" : "Volver a leer el papel"}
+            </SunmiButton>
+            <span className="text-sm3 sunmi-text-muted text-center">
+              No hay ningún número para elegir. Si corregiste la explicación del
+              proveedor, volvé a leer el papel con la receta nueva.
+            </span>
+          </div>
+        )
       )}
     </section>
   );

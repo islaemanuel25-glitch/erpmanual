@@ -264,12 +264,63 @@ export async function POST(req, { params }) {
       }
 
       // ── La lectura ───────────────────────────────────────────────────────
-      const resultado = await leerConCadena({
-        cadena,
-        archivos: paraLeer,
-        receta,
-        proveedorNombre: comprobante.proveedor?.nombre ?? null,
-      });
+      const pedirle = () =>
+        leerConCadena({
+          cadena,
+          archivos: paraLeer,
+          receta,
+          proveedorNombre: comprobante.proveedor?.nombre ?? null,
+        });
+
+      let resultado = await pedirle();
+
+      // ── SI EL MODELO DICE HABER TRANSCRIPTO DE MENOS, SE LE PIDE OTRA VEZ ─
+      //
+      // El comprobante 20 —pyg #247— lo dejó a la vista el 2026-09-23: la misma
+      // foto, el mismo prompt y el mismo modelo devolvieron 12 renglones en una
+      // corrida y UNO en otra. No es un defecto del camino —los dos achican
+      // igual, 0 de 1 fotos porque la foto ya pesa 149 KB, y mandan la misma
+      // receta con la misma explicación—: es variabilidad del modelo.
+      //
+      // El sistema YA lo detectaba —`lineasEnElPapel` 12 contra
+      // `lineasTranscriptas` 1— y marcaba MAL_LEIDO. Lo que no hacía era
+      // insistir, así que la salida era que Emanuel tocara el botón hasta que
+      // saliera bien. Lo hizo TRES veces en dos minutos, a ciegas.
+      //
+      // ── POR QUÉ ESTO NO GASTA MÁS, Y PROBABLEMENTE GASTE MENOS ──────────
+      //
+      // El reintento corre SOLO cuando el propio modelo declara que vio más
+      // renglones de los que transcribió. En ese caso la lectura ya está
+      // perdida y hoy se reintentaba igual, a mano. Acá se reintenta UNA vez:
+      // si la segunda tampoco alcanza, se guarda la MEJOR de las dos y la
+      // pantalla dice el conteo, que es lo que permite decidir con un dato.
+      //
+      // La cuota la sigue cuidando la cadena, que la consulta en cada llamada:
+      // si no queda, el reintento devuelve su error y se conserva la primera.
+      const cuantasTrajo = (r) => (Array.isArray(r?.lectura?.lineas) ? r.lectura.lineas.length : 0);
+      const cuantasDice = (r) => {
+        const n = Number(r?.lectura?.lineasEnElPapel);
+        return Number.isFinite(n) ? n : null;
+      };
+      const quedoCorta = (r) => {
+        const dice = cuantasDice(r);
+        return r?.ok === true && dice !== null && dice > cuantasTrajo(r);
+      };
+
+      let reintento = null;
+      if (quedoCorta(resultado)) {
+        console.log(
+          `[comprobante ${comprobante.id}] transcribió ${cuantasTrajo(resultado)} de ` +
+            `${cuantasDice(resultado)} renglones: se le pide otra vez`
+        );
+        reintento = await pedirle();
+        // Se queda la que trajo MÁS renglones. Si el reintento falló o trajo
+        // menos, manda la primera: una lectura peor no puede pisar a una mejor
+        // solo por ser la última.
+        if (reintento?.ok === true && cuantasTrajo(reintento) > cuantasTrajo(resultado)) {
+          resultado = reintento;
+        }
+      }
 
       // ── CADA LLAMADA QUEDA REGISTRADA, HAYA SALIDO BIEN O MAL ────────────
       //
@@ -282,7 +333,16 @@ export async function POST(req, { params }) {
       // un dato del comprobante, y hacerlo bloqueante convertiría un problema de
       // estadística en un problema de operación.
       try {
-        const intentos = Array.isArray(resultado.intentos) ? resultado.intentos : [];
+        // LAS DOS TANDAS DE INTENTOS, no solo la que ganó. El reintento gastó
+        // cuota igual, y el contador existe para que nadie se entere de que no
+        // quedan con el camión en la puerta. Se desduplica por si el reintento
+        // ES el resultado que quedó.
+        const intentos = [
+          ...(Array.isArray(resultado.intentos) ? resultado.intentos : []),
+          ...(reintento && reintento !== resultado && Array.isArray(reintento.intentos)
+            ? reintento.intentos
+            : []),
+        ];
         if (intentos.length) {
           await prisma.llamadaLector.createMany({
             data: intentos.map((i) => ({
@@ -443,7 +503,25 @@ export async function POST(req, { params }) {
         // Las líneas se guardan SIEMPRE, cierre o no. Son lo que alguien va a
         // mirar para entender por qué no cerró: sin ellas, un MAL_LEIDO sería un
         // cartel sin nada detrás.
-        const lineas = resultado.lectura.lineas.filter((l) => l.cantidad !== null && l.netoUnitario !== null);
+        // ── NINGÚN RENGLÓN DESAPARECE EN SILENCIO ──────────────────────
+        //
+        // Acá había un `.filter(l => l.cantidad !== null && l.netoUnitario !== null)`
+        // justo debajo del comentario de arriba, que promete que las líneas se
+        // guardan siempre. Con el papel de TDC —que imprime el neto del RENGLÓN
+        // y no el de una unidad— el modelo dejaba `netoUnitario` vacío, que es
+        // lo correcto, y los DOCE renglones se borraban sin dejar rastro: el
+        // comprobante 20 quedó con `lineasTranscriptas` 12 y cero filas, y la
+        // pantalla decía "los productos suman $0,00" con el total del papel al
+        // lado y sin un número para elegir.
+        //
+        // Ahora el unitario lo despeja `completarElRenglon` —el sistema hace la
+        // cuenta, no el modelo— y lo único que queda afuera es el renglón al
+        // que le faltan los DOS números y la cantidad. Ése tampoco se pierde:
+        // se cuenta y el motivo se informa, porque la base exige esas columnas
+        // y guardarlo con ceros afirmaría que vale cero.
+        const transcriptas = resultado.lectura.lineas ?? [];
+        const lineas = transcriptas.filter((l) => l.cantidad !== null && l.netoUnitario !== null);
+        const renglonesIlegibles = transcriptas.length - lineas.length;
         let herencia = { conHerencia: [], heredados: [], sinHeredar: [] };
         if (lineas.length) {
           herencia = herenciaDeLosRenglones({
@@ -539,6 +617,14 @@ export async function POST(req, { params }) {
         // factura entera y no la foto suelta que ya no existe.
         agrupacion: agrupacion?.fusiones?.length ? agrupacion.fusiones : null,
         cierra: puerta.cierra,
+        // ── EL CONTEO VIAJA, PARA QUE EL BOTÓN NO TERMINE EN SILENCIO ────
+        //
+        // Sin esto la pantalla no puede distinguir "se leyó bien" de "volvió a
+        // traer un renglón de doce": las dos respuestas son `ok: true` y la
+        // pantalla queda igual que antes. Le pasó al #247 el 2026-09-23, tres
+        // veces seguidas.
+        lineasEnElPapel: puerta.aGuardar?.lineasEnElPapel ?? null,
+        lineasTranscriptas: puerta.aGuardar?.lineasTranscriptas ?? null,
         // La única puerta hacia una propuesta de costo.
         proponeCostos: puerta.proponeCostos,
         porque: puerta.porque,

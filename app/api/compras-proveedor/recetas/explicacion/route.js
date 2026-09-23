@@ -28,6 +28,8 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { armarCadena, leerConCadena } from "@/lib/compras-proveedor/comprobante/lector/cadena";
 import { recetaDelProveedor } from "@/lib/compras-proveedor/comprobante/lector/recetaDelProveedor";
+import { ofrecerRelectura } from "@/lib/compras-proveedor/comprobante/relecturaTrasReceta";
+import { cuotaDelDia } from "@/lib/compras-proveedor/comprobante/lector/cuota";
 import { queHacerLectura } from "@/lib/compras-proveedor/comprobante/lector";
 import {
   achicarTodas,
@@ -296,11 +298,47 @@ export async function POST(req) {
       select: { id: true, explicacionActualizadaEn: true, variacionNormalPct: true },
     });
 
+    // ── LOS PAPELES SIN RECIBIR SE PUEDEN RELEER CON LA RECETA NUEVA ────
+    //
+    // Cambiar la explicación cambia cómo se entiende el papel, así que un
+    // comprobante subido ANTES quedó leído con la vieja. Le pasó al #247: la
+    // receta se guardó a las 15:10 y el comprobante seguía con la lectura de
+    // antes, con cero renglones.
+    //
+    // ESTO NO ES UN MECANISMO NUEVO. `recetas/guardar` —la otra pantalla de
+    // receta, la de las respuestas estructuradas— ya ofrecía exactamente esto
+    // con `ofrecerRelectura`, que además calcula cuántas entran en la cuota del
+    // día. Lo que faltaba era conectarlo a ESTE camino, que es por el que
+    // Emanuel guarda la explicación en castellano. Escribir acá una búsqueda
+    // parecida al lado habría sido la regla 1 otra vez.
+    const comprobantes = await prisma.comprobanteProveedor.findMany({
+      where: { grupoId, proveedorId },
+      select: { id: true, estado: true, confirmadoEn: true, imagenBorradaEn: true },
+    });
+
+    let cuota = null;
+    try {
+      const cadena = armarCadena();
+      const modelos = [cadena.titular?.lector?.nombre, cadena.respaldo?.lector?.nombre].filter(Boolean);
+      if (modelos.length) {
+        const llamadas = await prisma.llamadaLector.findMany({
+          where: { creadoEn: { gte: new Date(Date.now() - 48 * 3600 * 1000) } },
+          select: { modelo: true, creadoEn: true, ok: true, motivo: true },
+        });
+        cuota = cuotaDelDia({ llamadas, modelos, huso: process.env.COMPROBANTE_CUOTA_HUSO || undefined });
+      }
+    } catch (e) {
+      console.error("No se pudo calcular la cuota al guardar la explicación:", e?.message);
+    }
+
     return NextResponse.json({
       ok: true,
       guardada: true,
       actualizadaEn: guardada.explicacionActualizadaEn,
       variacionNormalPct: Number(guardada.variacionNormalPct),
+      // El costo en lecturas viaja con la respuesta para que el aviso aparezca
+      // ANTES de que apriete, no después. Misma forma que `recetas/guardar`.
+      relectura: ofrecerRelectura({ comprobantes, cuota }),
       queHacer:
         "Guardada. Desde ahora, cada factura de este proveedor se lee con esta explicación.",
     });
