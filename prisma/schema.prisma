@@ -737,7 +737,7 @@ model DecisionDePrecioProveedor {
   decididaEn           DateTime @default(now())
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
+  updatedAt DateTime @updatedAt
 
   grupo        Grupo        @relation(fields: [grupoId], references: [id], onDelete: Cascade)
   proveedor    Proveedor    @relation(fields: [proveedorId], references: [id])
@@ -3769,7 +3769,7 @@ model LecturaProductoProveedor {
   confirmadaEn           DateTime @default(now())
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   grupo        Grupo        @relation(fields: [grupoId], references: [id], onDelete: Cascade)
   proveedor    Proveedor    @relation(fields: [proveedorId], references: [id])
