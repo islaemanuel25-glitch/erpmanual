@@ -33,6 +33,24 @@ import { TriangleAlert } from "lucide-react";
 
 import TarjetaDeLocal from "./TarjetaDeLocal";
 
+/**
+ * ── `textoVacio` y `rotulo` ──────────────────────────────────────────────
+ *
+ * Los dos textos que eran de Transferencias y estaban escritos adentro. Los
+ * defaults son EXACTAMENTE los de siempre, así que la pantalla de
+ * transferencias —que ahora los pasa explícitos— dibuja lo mismo que dibujaba.
+ *
+ * Existen porque Finanzas muestra la misma lista y las dos frases serían
+ * falsas ahí: su lista no son "los locales que operan por transferencia con
+ * este depósito" —incluye al depósito, que no se transfiere a sí mismo— y su
+ * vacío no significa lo mismo. Un texto de dominio escrito adentro de una pieza
+ * compartida es lo que hace que la segunda pantalla tenga que mentir o copiar
+ * el componente.
+ *
+ * El aviso de corte de semana NO se parametrizó: ya se dibuja solo cuando
+ * `sinConfigurar > 0`, y Finanzas no manda ese dato porque no tiene corte
+ * acordado. Queda apagado sin tocar nada.
+ */
 export default function EntradaDeLocales({
   locales = [],
   cargando = false,
@@ -41,6 +59,14 @@ export default function EntradaDeLocales({
   puedeConfigurar = false,
   onConfigurar,
   onEntrar,
+  rotulo = "LOCALES",
+  textoVacio = "Ningún local opera por transferencia con este depósito.",
+  // Qué insignia le toca a cada local, si alguna. Por defecto ninguna, así que
+  // transferencias dibuja exactamente lo de siempre. La usa Finanzas, cuya lista
+  // incluye al depósito y a los locales dados de baja. Es una FUNCIÓN y no un
+  // campo de la fila para que la pieza no tenga que conocer los nombres de los
+  // campos de cada consumidor.
+  insigniaDe = null,
 }) {
   return (
     <div className="space-y-3.5">
@@ -68,9 +94,7 @@ export default function EntradaDeLocales({
       )}
 
       {!cargando && !error && locales.length === 0 && (
-        <div className="text-center py-12 sunmi-text-muted text-xs">
-          Ningún local opera por transferencia con este depósito.
-        </div>
+        <div className="text-center py-12 sunmi-text-muted text-xs">{textoVacio}</div>
       )}
 
       {/* ── EL RÓTULO DE LA LISTA ──────────────────────────────────────────
@@ -91,12 +115,19 @@ export default function EntradaDeLocales({
           No se dibuja si la lista está vacía: un rótulo arriba de nada es un
           encabezado que promete contenido que no está. */}
       {!cargando && !error && locales.length > 0 && (
-        <h2 className="text-xs2 font-semibold sunmi-text-muted tracking-wider">LOCALES</h2>
+        <h2 className="text-xs2 font-semibold sunmi-text-muted tracking-wider">{rotulo}</h2>
       )}
 
       {!cargando &&
         !error &&
-        locales.map((l) => <TarjetaDeLocal key={l.localId} local={l} onEntrar={onEntrar} />)}
+        locales.map((l) => (
+          <TarjetaDeLocal
+            key={l.localId}
+            local={l}
+            onEntrar={onEntrar}
+            insignia={insigniaDe ? insigniaDe(l) : null}
+          />
+        ))}
     </div>
   );
 }
