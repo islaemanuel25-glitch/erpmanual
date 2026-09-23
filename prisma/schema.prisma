@@ -50,7 +50,7 @@ model GrupoDeposito {
   /// Nunca se aplica en los locales.
   listaPrecioDefaultId Int?
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
   grupo     Grupo    @relation(fields: [grupoId], references: [id], onDelete: Cascade)
   local     Local    @relation(fields: [localId], references: [id], onDelete: Cascade)
   listaPrecioDefault ListaPrecio? @relation(fields: [listaPrecioDefaultId], references: [id], onDelete: SetNull)
@@ -124,7 +124,7 @@ model AcuerdoDepositoLocal {
   deposito Local @relation("acuerdo_deposito", fields: [depositoLocalId], references: [id], onDelete: Cascade)
   local    Local @relation("acuerdo_local", fields: [localId], references: [id], onDelete: Cascade)
 
-  @@unique([depositoLocalId, localId], name: "acuerdo_deposito_local_unique")
+  @@unique([depositoLocalId, localId], name: "acuerdo_deposito_local_unique", map: "acuerdo_deposito_local_unique")
   @@index([grupoId])
 }
 
