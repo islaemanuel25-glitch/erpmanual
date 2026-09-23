@@ -272,12 +272,6 @@ jobs:
           else
             echo "No hay scripts/pruebas-db/recepcionTransferencias.mjs en esta rama: nada que correr."
           fi
-          if [ -f scripts/pruebas-db/finanzas.mjs ]; then
-            echo ""
-            node --import ./scripts/alias-loader.mjs scripts/pruebas-db/finanzas.mjs
-          else
-            echo "No hay scripts/pruebas-db/finanzas.mjs en esta rama: nada que correr."
-          fi
 
       # ── LA PREGUNTA QUE DECIDE EL DESPLIEGUE ──────────────────────────────
       #
@@ -338,3 +332,54 @@ jobs:
             echo ""
             echo "Sin secretos y sin contacto con producción."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # Finanzas tiene su propio job porque la validación que importa acá es que los
+  # handlers REALES lleguen a PostgreSQL. No depende de las contrapruebas
+  # históricas de Recepción: si una de aquéllas tiene un ancla vieja, este job
+  # igual debe decir si las consultas nuevas de Finanzas existen de verdad.
+  finanzas_postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: erpazul
+          POSTGRES_PASSWORD: erpazul_ci
+          POSTGRES_DB: erpazul_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U erpazul -d erpazul_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://erpazul:erpazul_ci@127.0.0.1:5432/erpazul_ci
+      NODE_ENV: test
+      AUTH_SECRET: secreto-de-ci-sin-valor-fuera-del-runner
+
+    steps:
+      - name: Traer esta rama
+        uses: actions/checkout@v4
+
+      - name: Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Generar cliente Prisma
+        run: npx prisma generate
+
+      - name: Aplicar migraciones desde cero
+        run: npx prisma migrate deploy
+
+      - name: Ejercer Finanzas contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/finanzas.mjs
+
