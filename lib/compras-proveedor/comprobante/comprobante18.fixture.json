@@ -1,0 +1,110 @@
+{
+  "_comentario": [
+    "EL COMPROBANTE 18 DE PRODUCCION, VOLCADO TAL CUAL EL 2026-09-23.",
+    "Arcor, pedido 246, 9 renglones. Neto sumado 281219.00, IVA 59056 y",
+    "PERC. IVA 5329 de 8436.58; total impreso 348711.61. Se volco de la base:",
+    "es la factura real contra la que se afirma que la suma de los totales de",
+    "las tarjetas da el total del papel."
+  ],
+  "netoLeido": 281219.03,
+  "ivaLeido": 59056,
+  "internoLeido": null,
+  "totalLeido": 348711.61,
+  "conceptosDelPieLeidos": [
+    {
+      "resta": false,
+      "nombre": "DESCUENTO",
+      "importe": 0
+    },
+    {
+      "resta": false,
+      "nombre": "IVA",
+      "importe": 59056
+    },
+    {
+      "resta": false,
+      "nombre": "PERC. IVA 5329",
+      "importe": 8436.58
+    },
+    {
+      "resta": false,
+      "nombre": "PER.IIBB",
+      "importe": 0
+    }
+  ],
+  "recetaUsada": {
+    "facturaPor": "UNIDAD",
+    "explicacion": "Columna 1 (ARTICULO) es el código del proveedor.\nColumna 2 (CANTIDAD) son las unidades sueltas que manda. \"UN\" quiere decir unidades.\nColumna 3 (DESCRIPCION) es el nombre del producto.\nColumna 4 (DTO.) es el descuento en porcentaje. Casi siempre viene vacía.\nColumna 5 (PRECIO UNIT.) es el precio de una unidad, SIN IVA, con tres decimales.\nColumna 6 (IMPORTE) es cantidad por precio unitario, SIN IVA, ya con el descuento.\nColumna 7 (SUGERIDO) no se usa.\nAbajo de todo: SUBTOTAL es la suma de los importes, sin IVA. Después vienen DESCUENTO, IVA 21 %, PERC. IVA 5329 y PER. IIBB, que se suman al subtotal. TOTAL es lo que se paga.\nEl IVA no está en cada producto: está todo junto abajo. Mi costo es con IVA y percepciones adentro.",
+    "ivaPorLinea": false,
+    "percepciones": [],
+    "alicuotaIvaPct": 21,
+    "percepcionesEnCosto": true,
+    "tieneImpuestoInterno": false,
+    "ivaIncluyeInternoEnLaBase": false
+  },
+  "lineas": [
+    {
+      "orden": 1,
+      "texto": "SERRANAS SANDWICH 3 x 108g",
+      "cantidad": 16,
+      "netoUnitario": 1098.334,
+      "subtotalImpreso": 17573.34
+    },
+    {
+      "orden": 2,
+      "texto": "SURTIDO BAGLEY x 400GRS.",
+      "cantidad": 21,
+      "netoUnitario": 1909.96,
+      "subtotalImpreso": 40109.16
+    },
+    {
+      "orden": 3,
+      "texto": "NUEVA DIVERSION x 400g",
+      "cantidad": 21,
+      "netoUnitario": 1551.843,
+      "subtotalImpreso": 32588.7
+    },
+    {
+      "orden": 4,
+      "texto": "ESTUCHE BATATA C/CHOC. 500g",
+      "cantidad": 12,
+      "netoUnitario": 1705.35,
+      "subtotalImpreso": 20464.2
+    },
+    {
+      "orden": 5,
+      "texto": "SERRANITAS OFERTA X315G",
+      "cantidad": 14,
+      "netoUnitario": 1264.16,
+      "subtotalImpreso": 17698.24
+    },
+    {
+      "orden": 6,
+      "texto": "TRAVIATA CRACK KESITAS X96G",
+      "cantidad": 5,
+      "netoUnitario": 602.584,
+      "subtotalImpreso": 3012.92
+    },
+    {
+      "orden": 7,
+      "texto": "TRAVIATA 3x108g",
+      "cantidad": 64,
+      "netoUnitario": 1444.75,
+      "subtotalImpreso": 92464
+    },
+    {
+      "orden": 8,
+      "texto": "OPERA SIMPLE X 92G",
+      "cantidad": 28,
+      "netoUnitario": 842.77,
+      "subtotalImpreso": 23597.56
+    },
+    {
+      "orden": 9,
+      "texto": "OPERA X 55 GRS.",
+      "cantidad": 56,
+      "netoUnitario": 601.98,
+      "subtotalImpreso": 33710.88
+    }
+  ]
+}

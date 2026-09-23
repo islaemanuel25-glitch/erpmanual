@@ -142,8 +142,12 @@ export default function TarjetaLineaFactura({
           <span className="min-w-0 flex-auto truncate text-sm2 sunmi-text-strong text-left">
             {fila?.producto || fila?.textoCrudo || "Sin nombre"}
           </span>
+          {/* El MISMO número que el pie de la tarjeta abierta: es la misma
+              tarjeta, y decir el neto acá y el total con impuestos allá haría
+              que el renglón cambiara de valor al tocarlo. */}
           <span className="shrink-0 whitespace-nowrap tabular-nums text-sm2 sunmi-text-strong">
-            {fmtCant(cantidad)} · {formatearMoneda(fila?.subtotal ?? 0)}
+            {fmtCant(cantidad)}
+            {renglones.total === null ? "" : ` · ${formatearMoneda(renglones.total)}`}
           </span>
         </div>
         </SunmiLinkButton>
@@ -315,9 +319,19 @@ export default function TarjetaLineaFactura({
       <SunmiSeparator />
 
       {/* ── EL PIE: LA ACCIÓN A LA IZQUIERDA, EL TOTAL A LA DERECHA ──────
-          Las dos esquinas fijas de la tarjeta de transferencias, copiadas. Sin
-          rótulo al lado del importe: en una tarjeta de un producto, el número
-          grande de abajo a la derecha ya es el total de ese producto. */}
+          Las dos esquinas fijas de la tarjeta de transferencias, copiadas.
+
+          ── Y AHORA CON RÓTULO, PORQUE EL NÚMERO CAMBIÓ DE BASE ──────────
+          Acá decía `fila.subtotal` —el subtotal IMPRESO, o sea el neto— sin
+          rótulo, y arriba el renglón "Papel" muestra el costo CON los
+          impuestos del pie adentro. Dos bases en la misma tarjeta: sobre el
+          pedido 246 se leía "Papel $21.790,88 / pack" y abajo "$17.573,34",
+          que es el mismo importe dividido por 1,24.
+
+          El número pasa a ser el total en la base del "Papel" y lleva su
+          nombre al lado, con el mismo rótulo chico que ya usan "Factura",
+          "Papel" y "ERP". El cálculo vive en `tarjetaDeRecepcion.js` con sus
+          candados. */}
       <div className="flex items-center justify-between gap-3">
         <SunmiButton
           type="button"
@@ -328,9 +342,14 @@ export default function TarjetaLineaFactura({
           {TEXTO_CORREGIR}
         </SunmiButton>
 
-        <span className="shrink-0 whitespace-nowrap tabular-nums text-lg2 font-semibold sunmi-text-strong">
-          {formatearMoneda(fila?.subtotal ?? 0)}
-        </span>
+        {renglones.total !== null && (
+          <span className="shrink-0 flex items-baseline gap-2">
+            <span className="text-xs sunmi-text-muted shrink-0">Total</span>
+            <span className="whitespace-nowrap tabular-nums text-lg2 font-semibold sunmi-text-strong">
+              {formatearMoneda(renglones.total)}
+            </span>
+          </span>
+        )}
       </div>
     </SunmiCard>
   );
