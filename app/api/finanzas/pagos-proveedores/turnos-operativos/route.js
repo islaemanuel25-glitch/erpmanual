@@ -21,7 +21,7 @@ import { checkPerm } from "@/lib/authorize";
 import { WHERE_TURNO_OPERATIVO } from "@/lib/caja/cierreRelevo";
 import { resolverLocalPedido } from "@/lib/finanzas/alcanceFinanciero";
 import { aCargoDelTurno } from "@/lib/finanzas/actividadFinanciera";
-import { PERMISO_REGISTRAR_PAGOS, PERMISO_VER_FINANZAS } from "@/lib/finanzas/pagosProveedores";
+import { PERMISO_REGISTRAR_PAGOS } from "@/lib/finanzas/pagosProveedores";
 import { alcanceDePagos } from "@/lib/finanzas/pagosProveedoresServer";
 
 export async function GET(req) {
@@ -30,12 +30,14 @@ export async function GET(req) {
     if (!session) {
       return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
     }
-    // Es parte del formulario de pago: sin permiso de registrar no hay para qué.
-    for (const p of [PERMISO_VER_FINANZAS, PERMISO_REGISTRAR_PAGOS]) {
-      const perm = checkPerm(session, p);
-      if (!perm.ok) {
-        return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
-      }
+    // Es parte del formulario de pago, y el permiso es el de REGISTRAR pagos y
+    // nada más. No se exige además `finanzas.ver` porque el formulario también
+    // vive en el cierre de una compra, que exige solo ése para pagar: quien
+    // puede sacar plata para pagarle a un proveedor tiene que poder elegir de
+    // qué caja sale, aunque no mire el resto de Finanzas.
+    const perm = checkPerm(session, PERMISO_REGISTRAR_PAGOS);
+    if (!perm.ok) {
+      return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
 
     const alcance = await alcanceDePagos(req, session);

@@ -39,6 +39,7 @@ import {
   alcanceDePagos,
   cambiarFechaPrevistaPago,
   cuentaEnAlcance,
+  origenesDePago,
   serializarCuenta,
   serializarPago,
 } from "@/lib/finanzas/pagosProveedoresServer";
@@ -91,11 +92,7 @@ export async function GET(req, { params }) {
     // DE DÓNDE PUEDE SALIR LA PLATA, para el formulario. Las mismas ubicaciones
     // que quien pregunta puede ver, sin las dadas de baja: una ubicación cerrada
     // no tiene caja de la cual sacar nada. Solo viaja si puede escribir.
-    const origenes = alcance.puedeEscribir
-      ? alcance.locales
-          .filter((l) => alcance.visibles.includes(l.localId) && !l.inactivo)
-          .map((l) => ({ localId: l.localId, nombre: l.nombre, esDeposito: l.esDeposito }))
-      : [];
+    const origenes = alcance.puedeEscribir ? origenesDePago(alcance) : [];
 
     return NextResponse.json({
       ok: true,
