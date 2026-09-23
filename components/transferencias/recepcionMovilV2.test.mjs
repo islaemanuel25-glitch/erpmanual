@@ -479,7 +479,13 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // Sube a 31 el 2026-09-22: entró `20260922170000_conceptos_del_pie`, la
   // columna JSON con todo lo que el papel imprime entre el subtotal y el
   // total. Aditiva, nullable, sin backfill.
-  assert.equal(migraciones.length, 31, "aparecio una migracion que nadie declaro aca");
+  // Sube a 32 el 2026-09-23: entró `20260923120000_costo_con_el_pie_del_245`,
+  // una migración de DATOS —no de schema— que corrige el costo de los cuatro
+  // productos del pedido 245 que se cerraron con "Aceptar el precio nuevo"
+  // antes de que el precio llevara los conceptos del pie adentro. No agrega ni
+  // borra columnas: son UPDATE con el valor viejo en el WHERE. Se declara acá
+  // porque eso es lo que este conteo existe para obligar.
+  assert.equal(migraciones.length, 32, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

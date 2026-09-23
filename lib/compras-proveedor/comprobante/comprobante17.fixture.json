@@ -1,0 +1,162 @@
+{
+  "_comentario": [
+    "EL COMPROBANTE 17 DE PRODUCCION, VOLCADO TAL CUAL EL 2026-09-23.",
+    "Arcor, pedido 245, 20 renglones. Neto sumado 412877.48 y PERC. IVA 5329 de",
+    "12386.34, o sea 3.0000 %. Se volco de la base y no se escribio de memoria:",
+    "es el fixture con el que dos candados afirman que el costo de cada producto",
+    "lleva los conceptos del pie adentro. Si hay que actualizarlo, se vuelve a",
+    "volcar, no se edita a mano."
+  ],
+  "netoLeido": 412877.64,
+  "ivaLeido": 86704.3,
+  "internoLeido": null,
+  "totalLeido": 511968.28,
+  "conceptosDelPieLeidos": [
+    {
+      "resta": true,
+      "nombre": "DESCUENTO",
+      "importe": 0
+    },
+    {
+      "resta": false,
+      "nombre": "PERC. IVA 5329",
+      "importe": 12386.34
+    },
+    {
+      "resta": false,
+      "nombre": "PER.IIBB",
+      "importe": 0
+    }
+  ],
+  "recetaUsada": {
+    "facturaPor": "UNIDAD",
+    "ivaPorLinea": false,
+    "percepciones": [],
+    "alicuotaIvaPct": 21,
+    "percepcionesEnCosto": true,
+    "tieneImpuestoInterno": false,
+    "ivaIncluyeInternoEnLaBase": false
+  },
+  "lineas": [
+    {
+      "orden": 1,
+      "cantidad": 1.0,
+      "netoUnitario": 5067.623,
+      "subtotalImpreso": 5067.62
+    },
+    {
+      "orden": 2,
+      "cantidad": 3.0,
+      "netoUnitario": 5067.623,
+      "subtotalImpreso": 15202.87
+    },
+    {
+      "orden": 3,
+      "cantidad": 12.0,
+      "netoUnitario": 5759.12,
+      "subtotalImpreso": 69109.44
+    },
+    {
+      "orden": 4,
+      "cantidad": 6.0,
+      "netoUnitario": 9131.73,
+      "subtotalImpreso": 54790.38
+    },
+    {
+      "orden": 5,
+      "cantidad": 2.0,
+      "netoUnitario": 5067.623,
+      "subtotalImpreso": 10135.25
+    },
+    {
+      "orden": 6,
+      "cantidad": 1.0,
+      "netoUnitario": 5067.623,
+      "subtotalImpreso": 5067.62
+    },
+    {
+      "orden": 7,
+      "cantidad": 3.0,
+      "netoUnitario": 4685.79,
+      "subtotalImpreso": 14057.37
+    },
+    {
+      "orden": 8,
+      "cantidad": 1.0,
+      "netoUnitario": 8454.93,
+      "subtotalImpreso": 8454.93
+    },
+    {
+      "orden": 9,
+      "cantidad": 3.0,
+      "netoUnitario": 8454.93,
+      "subtotalImpreso": 25364.79
+    },
+    {
+      "orden": 10,
+      "cantidad": 2.0,
+      "netoUnitario": 8454.93,
+      "subtotalImpreso": 16909.86
+    },
+    {
+      "orden": 11,
+      "cantidad": 4.0,
+      "netoUnitario": 8128.78,
+      "subtotalImpreso": 32515.12
+    },
+    {
+      "orden": 12,
+      "cantidad": 6.0,
+      "netoUnitario": 5801.07,
+      "subtotalImpreso": 34806.42
+    },
+    {
+      "orden": 13,
+      "cantidad": 6.0,
+      "netoUnitario": 5759.12,
+      "subtotalImpreso": 34554.72
+    },
+    {
+      "orden": 14,
+      "cantidad": 1.0,
+      "netoUnitario": 5067.623,
+      "subtotalImpreso": 5067.62
+    },
+    {
+      "orden": 15,
+      "cantidad": 1.0,
+      "netoUnitario": 5759.12,
+      "subtotalImpreso": 5759.12
+    },
+    {
+      "orden": 16,
+      "cantidad": 3.0,
+      "netoUnitario": 5067.623,
+      "subtotalImpreso": 15202.87
+    },
+    {
+      "orden": 17,
+      "cantidad": 3.0,
+      "netoUnitario": 5067.623,
+      "subtotalImpreso": 15202.87
+    },
+    {
+      "orden": 18,
+      "cantidad": 3.0,
+      "netoUnitario": 5067.623,
+      "subtotalImpreso": 15202.87
+    },
+    {
+      "orden": 19,
+      "cantidad": 3.0,
+      "netoUnitario": 5067.623,
+      "subtotalImpreso": 15202.87
+    },
+    {
+      "orden": 20,
+      "cantidad": 3.0,
+      "netoUnitario": 5067.623,
+      "subtotalImpreso": 15202.87
+    }
+  ]
+}

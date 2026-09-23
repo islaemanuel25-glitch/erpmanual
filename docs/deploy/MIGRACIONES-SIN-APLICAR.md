@@ -16,8 +16,21 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **31 migraciones** y el árbol también. **Ninguna** pendiente:
-el despliegue siguiente es solo de código.
+Producción está en **31 migraciones** y el árbol en **32**. Falta aplicar:
+
+- `20260923120000_costo_con_el_pie_del_245` — **migración de DATOS**. Corrige el
+  costo de los CUATRO productos del pedido 245 que se cerraron con "Aceptar el
+  precio nuevo" antes de `9af324bf`, o sea con el precio sin los conceptos del
+  pie: bases 1715, 1716, 1111 (de $6.131,82 a $6.283,85) y 2029 (de $6.968,54 a
+  $7.141,31), más el precio de venta de cada ubicación recalculado con SU margen,
+  que es lo que hace el camino normal del costo. Los quince renglones cerrados
+  con "Dejar el que tenía" NO se tocan. Cada UPDATE lleva en el WHERE el costo y
+  la venta que corrige, así que es idempotente y no puede pisar una corrección
+  posterior.
+
+  **El quinto chequeo del backup SÍ aplica**: hay valores que se sobrescriben.
+  Comprobar que el dump traiga los costos viejos —$6.131,82 y $6.968,54— antes
+  de aplicarla.
 
 ---
 
