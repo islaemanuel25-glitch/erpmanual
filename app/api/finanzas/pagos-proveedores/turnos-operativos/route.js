@@ -1,17 +1,13 @@
 // app/api/finanzas/pagos-proveedores/turnos-operativos/route.js
 //
 // DE QUÉ CAJA PUEDE SALIR UN PAGO EN EFECTIVO: los turnos operativos de la
-// ubicación de origen.
+// ubicación que opera la sesión, que es la única que puede pagar.
 //
 // "Operativo" es `WHERE_TURNO_OPERATIVO` —la condición con la que el POS decide
 // si un turno puede vender— más `anuladoEn: null`, igual que al abrir. No se
 // escribe una segunda definición: `registrarPagoProveedor` vuelve a pedir la
 // misma al escribir, bajo el lock del turno, así que lo que muestra esta lista
 // es una ayuda para elegir y no la garantía.
-//
-// La ubicación viaja como `origen` y no como `localId`, por lo mismo que el
-// tablero usa `destino`: `localId` está reservado para el alcance y a una
-// sesión que no es admin se le exige que sea el suyo.
 
 import { NextResponse } from "next/server";
 
@@ -19,10 +15,12 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { WHERE_TURNO_OPERATIVO } from "@/lib/caja/cierreRelevo";
-import { resolverLocalPedido } from "@/lib/finanzas/alcanceFinanciero";
 import { aCargoDelTurno } from "@/lib/finanzas/actividadFinanciera";
 import { PERMISO_REGISTRAR_PAGOS } from "@/lib/finanzas/pagosProveedores";
-import { alcanceDePagos } from "@/lib/finanzas/pagosProveedoresServer";
+import {
+  ERROR_TURNO_DE_OTRA_UBICACION,
+  alcanceDePagos,
+} from "@/lib/finanzas/pagosProveedoresServer";
 
 export async function GET(req) {
   try {
@@ -48,20 +46,26 @@ export async function GET(req) {
       );
     }
 
+    // ── SOLO LOS TURNOS DE LA UBICACIÓN QUE OPERA LA SESIÓN ──────────────
+    //
+    // Una deuda la paga la ubicación que la debe y la registra quien opera esa
+    // ubicación, así que el único cajón del que puede salir un efectivo es uno
+    // de la ubicación que opera la sesión. Un admin en vista global no opera
+    // ninguna: no hay turnos que ofrecerle.
+    //
+    // `origen`, si viene, tiene que ser esa misma ubicación. Pedir los turnos
+    // de otra es 403 y no una lista vacía: es un intento de cruce y se tiene
+    // que ver.
+    const propia = Number(alcance.vista.localId) || null;
     const { searchParams } = new URL(req.url);
-    const origen = resolverLocalPedido({
-      esDeposito: alcance.esDeposito,
-      localDeLaSesion: alcance.vista.localId,
-      destinoPedido: searchParams.get("origen"),
-      localesDelGrupo: alcance.locales,
-    });
-    if (origen.error) {
-      return NextResponse.json({ ok: false, error: origen.error }, { status: 403 });
+    const pedido = searchParams.get("origen");
+    if (pedido && Number(pedido) !== propia) {
+      return NextResponse.json({ ok: false, error: ERROR_TURNO_DE_OTRA_UBICACION }, { status: 403 });
     }
-    if (!origen.localId) return NextResponse.json({ ok: true, turnos: [] });
+    if (!propia) return NextResponse.json({ ok: true, turnos: [] });
 
     const turnos = await prisma.turno.findMany({
-      where: { localId: origen.localId, anuladoEn: null, ...WHERE_TURNO_OPERATIVO },
+      where: { localId: propia, anuladoEn: null, ...WHERE_TURNO_OPERATIVO },
       orderBy: { apertura: "desc" },
       select: {
         id: true,

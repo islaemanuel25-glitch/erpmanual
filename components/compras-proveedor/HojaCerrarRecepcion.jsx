@@ -62,7 +62,6 @@ const PAGO_INICIAL = Object.freeze({
   totalConfirmado: false,
   montoAhora: "",
   medio: MEDIO_PAGO_PROVEEDOR.TRANSFERENCIA,
-  origen: "",
   turnoId: "",
   vencimiento: "",
 });
@@ -107,41 +106,15 @@ export default function HojaCerrarRecepcion({
   proveedor = "el proveedor",
   totalesDeFacturas = [],
   puedeRegistrarPago = false,
+  // La ubicación dueña del pedido, `{ id, nombre }`: la que debe y la única de
+  // la que puede salir el pago inicial. Se muestra fija.
+  ubicacionDuena = null,
 }) {
   // El pago NO se reinicia al reabrir la hoja: la pantalla la cierra al
   // confirmar y la vuelve a abrir si el servidor frena, y ahí lo cargado —el
   // total escrito, el monto, el turno— tiene que seguir estando. Después de un
   // cierre que entró, el pedido pasa a RECIBIDO y esta hoja deja de existir.
   const [pago, setPago] = useState(PAGO_INICIAL);
-  const [origenes, setOrigenes] = useState([]);
-
-  // De dónde puede salir la plata: lo pregunta al servidor, que es el que sabe
-  // qué ubicaciones son de quien cierra. Solo con permiso de registrar pagos:
-  // sin él no hay nada que elegir.
-  useEffect(() => {
-    if (!abierta || !puedeRegistrarPago) return;
-    let vigente = true;
-    (async () => {
-      try {
-        const res = await fetch("/api/finanzas/pagos-proveedores/origenes", {
-          cache: "no-store",
-          credentials: "include",
-        });
-        const j = await res.json().catch(() => ({}));
-        if (!vigente || !res.ok || !j.ok) return;
-        const lista = j.origenes || [];
-        setOrigenes(lista);
-        // Con una sola ubicación posible queda elegida: no hay nada que elegir.
-        if (lista.length === 1) setPago((p) => ({ ...p, origen: p.origen || String(lista[0].localId) }));
-      } catch {
-        // Sin la lista, el selector queda vacío y el botón no deja confirmar un
-        // pago: el cierre como PENDIENTE sigue disponible.
-      }
-    })();
-    return () => {
-      vigente = false;
-    };
-  }, [abierta, puedeRegistrarPago]);
 
   const facturas = useMemo(() => totalDeLasFacturasDelCierre(totalesDeFacturas), [totalesDeFacturas]);
   const enPantalla = pagoDelCierreEnPantalla({
@@ -152,7 +125,8 @@ export default function HojaCerrarRecepcion({
     pago: {
       monto: pago.estado === ESTADO_PAGO_CIERRE.PARCIAL ? pago.montoAhora : undefined,
       medio: pago.medio,
-      localOrigenId: pago.origen,
+      // El origen no se elige: es la ubicación dueña del pedido.
+      localOrigenId: ubicacionDuena?.id ?? null,
       turnoId: pago.turnoId,
     },
   });
@@ -197,7 +171,7 @@ export default function HojaCerrarRecepcion({
         ? {
             monto: pago.estado === ESTADO_PAGO_CIERRE.PARCIAL ? pago.montoAhora : undefined,
             medio: pago.medio,
-            localOrigenId: pago.origen ? Number(pago.origen) : null,
+            localOrigenId: ubicacionDuena?.id ?? null,
             turnoId: pago.turnoId ? Number(pago.turnoId) : null,
           }
         : null,
@@ -323,7 +297,7 @@ export default function HojaCerrarRecepcion({
           onCambiar={setPago}
           puedeRegistrarPago={puedeRegistrarPago}
           medios={MEDIOS}
-          origenes={origenes}
+          ubicacionDuena={ubicacionDuena}
           deshabilitado={guardando}
         />
       </Bloque>

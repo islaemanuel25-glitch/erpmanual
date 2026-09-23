@@ -39,7 +39,7 @@ import {
   alcanceDePagos,
   cambiarFechaPrevistaPago,
   cuentaEnAlcance,
-  origenesDePago,
+  puedePagarLaCuenta,
   serializarCuenta,
   serializarPago,
 } from "@/lib/finanzas/pagosProveedoresServer";
@@ -89,17 +89,17 @@ export async function GET(req, { params }) {
       select: SELECT_PAGO,
     });
 
-    // DE DÓNDE PUEDE SALIR LA PLATA, para el formulario. Las mismas ubicaciones
-    // que quien pregunta puede ver, sin las dadas de baja: una ubicación cerrada
-    // no tiene caja de la cual sacar nada. Solo viaja si puede escribir.
-    const origenes = alcance.puedeEscribir ? origenesDePago(alcance) : [];
-
     return NextResponse.json({
       ok: true,
       cuenta: serializarCuenta(cuenta),
       pagos: pagos.map(serializarPago),
+      // Dos respuestas distintas, a propósito. `puedeEscribir` es el permiso, y
+      // habilita la fecha prevista de una cuenta que se ve. `puedePagar` además
+      // exige operar la ubicación que debe: VER una cuenta no es poder PAGARLA.
+      // El origen no viaja como lista: es siempre la ubicación de la deuda,
+      // que ya va en `cuenta.localGasto`.
       puedeEscribir: alcance.puedeEscribir,
-      origenes,
+      puedePagar: puedePagarLaCuenta(cuenta, alcance),
       medios: MEDIOS_PAGO_PROVEEDOR.map((m) => ({ valor: m, texto: ROTULO_MEDIO_PAGO[m] })),
     });
   } catch (e) {

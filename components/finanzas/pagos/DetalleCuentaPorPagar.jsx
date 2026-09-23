@@ -124,7 +124,9 @@ function RenglonDePago({ pago }) {
 
 export default function DetalleCuentaPorPagar({ datos, onCambio }) {
   const [modalAbierto, setModalAbierto] = useState(false);
-  const { cuenta, pagos = [], puedeEscribir, origenes = [], medios = [] } = datos;
+  // `puedeEscribir` es el permiso (fecha prevista); `puedePagar` además exige
+  // operar la ubicación que debe. Ver la cuenta no es poder pagarla.
+  const { cuenta, pagos = [], puedeEscribir, puedePagar = false, medios = [] } = datos;
   const saldada = cuenta.estado === ESTADO_CUENTA.PAGADA;
 
   return (
@@ -158,10 +160,18 @@ export default function DetalleCuentaPorPagar({ datos, onCambio }) {
           onGuardada={() => onCambio?.()}
         />
 
-        {puedeEscribir && !saldada && (
+        {puedePagar && !saldada && (
           <SunmiButton color="primary" className="w-full" onClick={() => setModalAbierto(true)}>
             Registrar pago
           </SunmiButton>
+        )}
+        {/* Con permiso pero mirando desde otra ubicación: se dice por qué no
+            hay botón, en vez de que parezca que falta. */}
+        {puedeEscribir && !puedePagar && !saldada && (
+          <p className="text-xs sunmi-text-muted break-words">
+            Esta deuda la paga {cuenta.localGasto?.nombre || "la ubicación que la debe"}: para
+            registrar un pago hay que estar operando en esa ubicación.
+          </p>
         )}
       </SunmiCard>
 
@@ -179,11 +189,10 @@ export default function DetalleCuentaPorPagar({ datos, onCambio }) {
         </SunmiCard>
       )}
 
-      {puedeEscribir && (
+      {puedePagar && (
         <ModalRegistrarPago
           abierto={modalAbierto}
           cuenta={cuenta}
-          origenes={origenes}
           medios={medios}
           onCerrar={() => setModalAbierto(false)}
           onRegistrado={() => {

@@ -279,6 +279,9 @@ export default function DetallePedidoProveedorPage({ params }) {
   const [nroFactura, setNroFactura] = useState("");
   // La cuenta por pagar que nació al cerrar, ya resuelta por el servidor.
   const [cuentaPorPagar, setCuentaPorPagar] = useState(null);
+  // La ubicación dueña del pedido: la que debe la compra y de la que sale el
+  // pago inicial. La resuelve el servidor con `ownerLocalIdDePedido`.
+  const [ubicacionDuena, setUbicacionDuena] = useState(null);
   const [fechaFactura, setFechaFactura] = useState("");
 
   const cargar = async () => {
@@ -291,6 +294,7 @@ export default function DetallePedidoProveedorPage({ params }) {
       if (data.ok) {
         setPedido(data.item);
         setCuentaPorPagar(data.cuentaPorPagar || null);
+        setUbicacionDuena(data.ubicacionDuena || null);
         // Inicializar recibidos con la cantidad pedida
         const rec = {};
         const kgRec = {};
@@ -1374,6 +1378,7 @@ export default function DetallePedidoProveedorPage({ params }) {
                 (g) => g?.comprobante?.totalDelPapel ?? null
               )}
               puedeRegistrarPago={puedeRegistrarPago}
+              ubicacionDuena={ubicacionDuena}
               onConfirmar={(recibidosDelCierre, pagoAlProveedor) => {
                 setCerrandoRecepcion(false);
                 ejecutarAccion("recibir", { recibidos: recibidosDelCierre, pagoAlProveedor });

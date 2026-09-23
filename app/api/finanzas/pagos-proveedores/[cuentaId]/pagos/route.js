@@ -2,17 +2,16 @@
 //
 // REGISTRAR UN PAGO sobre una cuenta por pagar.
 //
-// La regla vive en `registrarPagoProveedor` —la misma función que va a usar el
+// La regla vive en `registrarPagoProveedor` —la misma función que usa el
 // cierre de la compra para el pago inicial—; acá solo queda lo que es de la
-// ruta: permisos, alcance y de qué ubicación puede salir la plata.
+// ruta: permisos, ver la cuenta, y rechazar temprano lo que aquélla rechazaría.
 //
-// ── DE DÓNDE SALE LA PLATA, Y QUIÉN PUEDE ELEGIRLO ───────────────────────
+// ── CADA UBICACIÓN PAGA SUS DEUDAS ───────────────────────────────────────
 //
-// Con `resolverLocalPedido`, la misma regla que el tablero usa para abrir un
-// local: quien no es depósito solo puede pagar desde SU local —pedir otro es
-// 403, no un silencioso "te lo pago del tuyo"— y el depósito elige cualquiera
-// de su grupo. El número que manda el cliente se comprueba contra la lista del
-// grupo, no se cree.
+// La plata sale de la ubicación que debe y la registra quien opera esa
+// ubicación. El origen no se elige: se deriva de la cuenta. Antes se elegía con
+// `resolverLocalPedido`, que le dejaba al depósito cualquier ubicación del grupo
+// —y con eso pagar lo de Casiano con su caja—. Esa regla es de VER, no de pagar.
 
 import { NextResponse } from "next/server";
 
@@ -20,18 +19,19 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { OPCIONES_TX } from "@/lib/caja/cierreRelevoServer";
-import { ERROR_FUERA_DE_ALCANCE, resolverLocalPedido } from "@/lib/finanzas/alcanceFinanciero";
+import { ERROR_FUERA_DE_ALCANCE } from "@/lib/finanzas/alcanceFinanciero";
 import { PERMISO_REGISTRAR_PAGOS, PERMISO_VER_FINANZAS } from "@/lib/finanzas/pagosProveedores";
 import {
   ERROR_CUENTA_NO_ENCONTRADA,
+  ERROR_OPERAR_EN_LA_UBICACION_DE_LA_DEUDA,
+  ERROR_ORIGEN_DE_OTRA_UBICACION,
   ErrorPagoProveedor,
   alcanceDePagos,
   cuentaEnAlcance,
   pagoYaRegistrado,
+  puedePagarLaCuenta,
   registrarPagoProveedor,
 } from "@/lib/finanzas/pagosProveedoresServer";
-
-const ERROR_FALTA_ORIGEN ="Elegí de qué ubicación sale el dinero.";
 
 export async function POST(req, { params }) {
   // Lo que hace falta para contestar un P2002 desde el `catch`.
@@ -78,17 +78,25 @@ export async function POST(req, { params }) {
     cuentaIdLeida = cuentaId;
     claveLeida = body?.idempotencyKey ?? null;
 
-    const origen = resolverLocalPedido({
-      esDeposito: alcance.esDeposito,
-      localDeLaSesion: alcance.vista.localId,
-      destinoPedido: body?.localOrigenId,
-      localesDelGrupo: alcance.locales,
-    });
-    if (origen.error) {
-      return NextResponse.json({ ok: false, error: origen.error }, { status: 403 });
+    // ── VER LA CUENTA NO ES PODER PAGARLA ─────────────────────────────────
+    //
+    // Hasta acá llegó porque la ve. Para pagarla hay que estar OPERANDO la
+    // ubicación que la debe: el depósito ve las de Casiano y no las paga, y un
+    // admin en vista global no opera ninguna. Se rechaza antes de abrir la
+    // transacción; `registrarPagoProveedor` lo vuelve a exigir al escribir.
+    if (!puedePagarLaCuenta(cuenta, alcance)) {
+      return NextResponse.json(
+        { ok: false, error: ERROR_OPERAR_EN_LA_UBICACION_DE_LA_DEUDA },
+        { status: 403 }
+      );
     }
-    if (!origen.localId) {
-      return NextResponse.json({ ok: false, error: ERROR_FALTA_ORIGEN }, { status: 400 });
+
+    // EL ORIGEN NO SE ELIGE: es la ubicación de la deuda. Si el cliente manda
+    // otro, se rechaza —no se corrige en silencio—, porque un pedido que dice
+    // "pagá con la plata del depósito" es un intento de cruce y tiene que verse.
+    const pedido = body?.localOrigenId;
+    if (pedido !== undefined && pedido !== null && pedido !== "" && Number(pedido) !== cuenta.localGastoId) {
+      return NextResponse.json({ ok: false, error: ERROR_ORIGEN_DE_OTRA_UBICACION }, { status: 403 });
     }
 
     const resultado = await prisma.$transaction(
@@ -97,7 +105,8 @@ export async function POST(req, { params }) {
           cuentaId,
           monto: body?.monto,
           medio: body?.medio,
-          localOrigenId: origen.localId,
+          localOrigenId: cuenta.localGastoId,
+          localOperativoId: alcance.vista.localId,
           turnoId: body?.turnoId,
           fecha: body?.fecha,
           nota: body?.nota,

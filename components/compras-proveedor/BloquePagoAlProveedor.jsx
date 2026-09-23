@@ -55,12 +55,14 @@ export default function BloquePagoAlProveedor({
   onCambiar,
   puedeRegistrarPago = false,
   medios = [],
-  origenes = [],
+  /** La ubicación dueña del pedido, `{ id, nombre }`: de ahí sale la plata. */
+  ubicacionDuena = null,
   deshabilitado = false,
 }) {
-  const { estado, totalEscrito, totalConfirmado, montoAhora, medio, origen, turnoId, vencimiento } =
-    valor;
-  const cambiar = (parcial) => onCambiar?.({ ...valor, ...parcial });
+  const { estado, totalEscrito, totalConfirmado, montoAhora, medio, turnoId, vencimiento } = valor;
+  // Por función y no sobre `valor`: la búsqueda de turnos contesta tarde, y
+  // mezclar su respuesta con un `valor` viejo pisaría lo que se cargó mientras.
+  const cambiar = (parcial) => onCambiar?.((previo) => ({ ...previo, ...parcial }));
   const sacaPlata = estadoSacaPlata(estado);
   const { pideTotal, total, saldo } = estadoEnPantalla;
 
@@ -160,11 +162,9 @@ export default function BloquePagoAlProveedor({
           <CamposDeOrigenDelPago
             activo={sacaPlata && !deshabilitado}
             medios={medios}
-            origenes={origenes}
             medio={medio}
             onMedio={(v) => cambiar({ medio: v })}
-            origen={origen}
-            onOrigen={(v) => cambiar({ origen: v })}
+            origen={ubicacionDuena}
             turnoId={turnoId}
             onTurno={(v) => cambiar({ turnoId: v })}
           />

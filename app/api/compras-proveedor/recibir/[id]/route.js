@@ -27,12 +27,12 @@ import {
   resolverTotalDelCierre,
   estadoSacaPlata,
 } from "@/lib/compras-proveedor/pagoDelCierre";
-import { resolverLocalPedido } from "@/lib/finanzas/alcanceFinanciero";
 import { PERMISO_REGISTRAR_PAGOS, leerFechaOpcional } from "@/lib/finanzas/pagosProveedores";
 import {
+  ERROR_OPERAR_EN_LA_UBICACION_DE_LA_DEUDA,
+  ERROR_ORIGEN_DE_OTRA_UBICACION,
   ErrorPagoProveedor,
   SELECT_CUENTA,
-  alcanceDePagos,
   crearCuentaPorPagarDesdeCompra,
   serializarCuenta,
 } from "@/lib/finanzas/pagosProveedoresServer";
@@ -416,31 +416,34 @@ export async function POST(req, { params }) {
       return NextResponse.json({ ok: false, error: vencimiento.error }, { status: 400 });
     }
 
-    // DE DÓNDE SALE LA PLATA, con la misma regla que Pagos a proveedores: un
-    // local paga desde su ubicación; el depósito elige dentro del grupo. El
-    // número del cliente se comprueba contra la lista del grupo, no se cree.
+    // ── DE DÓNDE SALE LA PLATA: DE LA UBICACIÓN QUE COMPRA ───────────────
+    //
+    // No se elige. La deuda es de la ubicación dueña del pedido y la paga esa
+    // ubicación, con su plata, registrada por quien la opera. Acá solo se
+    // deriva y se rechaza temprano; la regla y la última defensa viven en
+    // `registrarPagoProveedor`, que vuelve a exigir las dos igualdades.
+    //
+    // Un origen distinto en el cuerpo es 403 y no se corrige en silencio: el
+    // depósito cerrando su compra "con la plata de Casiano" es un cruce y se
+    // tiene que ver. Pendiente no pasa por acá: no hay pago.
     let pagoInicial = null;
     if (plan.pagoInicial) {
-      const alcancePago = await alcanceDePagos(req, session);
-      if (alcancePago.error) {
-        return NextResponse.json({ ok: false, error: alcancePago.error }, { status: alcancePago.status });
-      }
-      const origen = resolverLocalPedido({
-        esDeposito: alcancePago.esDeposito,
-        localDeLaSesion: alcancePago.vista.localId,
-        destinoPedido: pagoAlProveedor.pago?.localOrigenId,
-        localesDelGrupo: alcancePago.locales,
-      });
-      if (origen.error) {
-        return NextResponse.json({ ok: false, error: origen.error }, { status: 403 });
-      }
-      if (!origen.localId) {
+      if (Number(localId) !== Number(ownerLocalId)) {
         return NextResponse.json(
-          { ok: false, error: "Elegí de qué ubicación sale el dinero." },
-          { status: 400 }
+          { ok: false, error: ERROR_OPERAR_EN_LA_UBICACION_DE_LA_DEUDA },
+          { status: 403 }
         );
       }
-      pagoInicial = { ...plan.pagoInicial, localOrigenId: origen.localId };
+      const pedidoOrigen = pagoAlProveedor.pago?.localOrigenId;
+      if (
+        pedidoOrigen !== undefined &&
+        pedidoOrigen !== null &&
+        pedidoOrigen !== "" &&
+        Number(pedidoOrigen) !== Number(ownerLocalId)
+      ) {
+        return NextResponse.json({ ok: false, error: ERROR_ORIGEN_DE_OTRA_UBICACION }, { status: 403 });
+      }
+      pagoInicial = { ...plan.pagoInicial, localOrigenId: ownerLocalId };
     }
 
     // La ubicación decide la UNIDAD en la que entra el fiambre de pieza fija:
@@ -894,6 +897,9 @@ export async function POST(req, { params }) {
         fechaPrevistaPago: null,
         usuarioId: session.id,
         pagoInicial,
+        // La ubicación que opera quien cierra. Con pago inicial, Finanzas
+        // exige que sea la del gasto.
+        localOperativoId: localId,
       });
     });
 

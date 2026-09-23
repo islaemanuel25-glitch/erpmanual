@@ -14,6 +14,12 @@
 //
 // Los valores los guarda quien la usa (controlada); lo único propio es la lista
 // de turnos, que depende del origen y del medio elegidos.
+//
+// ── EL ORIGEN NO SE ELIGE ────────────────────────────────────────────────
+//
+// Es la ubicación que debe, y se muestra fija: "Sale de: Casiano Casas". Cada
+// ubicación paga sus deudas con su plata. Los turnos que se ofrecen son solo
+// los de esa ubicación, y el servidor lo vuelve a exigir al escribir.
 
 import { useEffect, useState } from "react";
 
@@ -36,11 +42,10 @@ export default function CamposDeOrigenDelPago({
   /** Mientras es false no se buscan turnos: el formulario no está a la vista. */
   activo = true,
   medios = [],
-  origenes = [],
+  /** La ubicación que debe: `{ id, nombre }`. De ahí sale la plata, sin elegir. */
+  origen = null,
   medio,
   onMedio,
-  origen,
-  onOrigen,
   turnoId,
   onTurno,
   onError,
@@ -49,10 +54,11 @@ export default function CamposDeOrigenDelPago({
   const [cargandoTurnos, setCargandoTurnos] = useState(false);
 
   const efectivo = medioTocaLaCaja(medio);
+  const origenId = origen?.id ?? null;
 
   // Los turnos abiertos del origen, solo cuando hacen falta.
   useEffect(() => {
-    if (!activo || !efectivo || !origen) {
+    if (!activo || !efectivo || !origenId) {
       setTurnos([]);
       return;
     }
@@ -65,7 +71,7 @@ export default function CamposDeOrigenDelPago({
           "/api/finanzas/pagos-proveedores/turnos-operativos",
           window.location.origin
         );
-        url.searchParams.set("origen", origen);
+        url.searchParams.set("origen", String(origenId));
         const res = await fetch(url.toString(), { cache: "no-store", credentials: "include" });
         const j = await res.json().catch(() => ({}));
         if (!res.ok || !j.ok) throw new Error(j?.error || "No se pudieron leer los turnos abiertos.");
@@ -87,7 +93,7 @@ export default function CamposDeOrigenDelPago({
     // `onTurno` y `onError` son del padre y cambian de identidad en cada render:
     // meterlos acá volvería a buscar los turnos sin que nada haya cambiado.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activo, efectivo, origen]);
+  }, [activo, efectivo, origenId]);
 
   return (
     <>
@@ -101,21 +107,14 @@ export default function CamposDeOrigenDelPago({
         </SunmiSelectAdv>
       </Campo>
 
+      {/* El origen es un dato, no una elección: la ubicación que debe. */}
       <Campo rotulo="De dónde sale el dinero">
-        <SunmiSelectAdv
-          value={origen}
-          onChange={(v) => onOrigen?.(v)}
-          placeholder="Elegí la ubicación"
-        >
-          {origenes.map((o) => (
-            <SunmiSelectOption key={o.localId} value={String(o.localId)}>
-              {o.nombre}
-            </SunmiSelectOption>
-          ))}
-        </SunmiSelectAdv>
+        <div className="text-sm3 sunmi-text-strong break-words">
+          Sale de: {origen?.nombre || "—"}
+        </div>
       </Campo>
 
-      {efectivo && origen && (
+      {efectivo && origenId && (
         <Campo rotulo="Turno de caja">
           {cargandoTurnos ? (
             <div className="text-xs sunmi-text-muted">Buscando turnos abiertos…</div>

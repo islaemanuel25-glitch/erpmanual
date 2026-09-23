@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
-import { pedidoEnAlcance } from "@/lib/compras/scope";
+import { ownerLocalIdDePedido, pedidoEnAlcance } from "@/lib/compras/scope";
 import { SELECT_CUENTA, serializarCuenta } from "@/lib/finanzas/pagosProveedoresServer";
 
 export async function GET(req) {
@@ -79,9 +79,17 @@ export async function GET(req) {
     }
 
     const { cuentaPorPagar, ...item } = pedido;
+    // La ubicación DUEÑA, con nombre: es la que debe la compra y la única de
+    // la que puede salir el pago inicial. La hoja de cierre la muestra fija
+    // ("Sale de: …") en vez de ofrecer un selector.
+    const duenaId = ownerLocalIdDePedido(pedido);
+    const ubicacionDuena = duenaId
+      ? await prisma.local.findUnique({ where: { id: duenaId }, select: { id: true, nombre: true } })
+      : null;
     return NextResponse.json({
       ok: true,
       item,
+      ubicacionDuena,
       cuentaPorPagar: cuentaPorPagar ? serializarCuenta(cuentaPorPagar) : null,
     });
   } catch (err) {
