@@ -295,7 +295,12 @@ async function correr(f) {
 
 const ESCRITURA_FIN = ["finanzas.ver", PERMISO_REGISTRAR_PAGOS];
 
-async function pagar(cuentaId, sesion, cuerpo) {
+// Cada envío es un intento nuevo salvo que el caso traiga su clave: así los
+// casos de arriba no dependen de la idempotencia y los de reintento la nombran.
+let intento = 0;
+async function pagar(cuentaId, sesion, datos) {
+  intento += 1;
+  const cuerpo = { idempotencyKey: `${marca}-intento-${intento}`, ...datos };
   return leer(
     rutaPagos.POST(
       conCuerpo(`http://ci/api/finanzas/pagos-proveedores/${cuentaId}/pagos`, sesion, "POST", cuerpo),
@@ -511,6 +516,107 @@ async function correrPagos(f) {
     )
   );
   ok("el local ve su turno abierto para pagar en efectivo", turnosLocal.turnos?.some((t) => t.id === f.turno.id), turnosLocal.error);
+
+  console.log("\n── Pagos: idempotencia del intento");
+  // Una cuenta propia para estos casos, así los números de arriba no se mueven.
+  const pedidoReintento = await prisma.pedidoProveedor.create({
+    data: {
+      grupoId: f.grupo.id,
+      depositoId: f.deposito.id,
+      proveedorId: creado.proveedorId,
+      estado: "RECIBIDO",
+    },
+  });
+  creado.pedidoIds.push(pedidoReintento.id);
+  const { cuenta: cuentaR } = await prisma.$transaction((tx) =>
+    crearCuentaPorPagarDesdeCompra(tx, {
+      pedidoProveedorId: pedidoReintento.id,
+      localGastoId: f.local.id,
+      total: 1000,
+      usuarioId: f.usuarioDeposito.id,
+    })
+  );
+  const pagosDe = (cuentaId) => prisma.pagoProveedor.count({ where: { cuentaId } });
+
+  const sinClave = await pagar(cuentaR.id, localEscribe, {
+    monto: 10,
+    medio: "TRANSFERENCIA",
+    idempotencyKey: undefined,
+  });
+  ok("un pago sin clave de intento se rechaza", sinClave.status === 400, sinClave.error);
+
+  const tr = { monto: 100, medio: "TRANSFERENCIA", idempotencyKey: `${marca}-reintento-tr` };
+  const tr1 = await pagar(cuentaR.id, localEscribe, tr);
+  const tr2 = await pagar(cuentaR.id, localEscribe, tr);
+  ok("el primer envío de la transferencia registra", tr1.status === 200 && tr1.repetido === false, tr1.error);
+  ok("el reintento contesta 200 y repetido", tr2.status === 200 && tr2.repetido === true, tr2.error);
+  ok("el reintento devuelve EL MISMO pago", tr2.pago?.id === tr1.pago?.id);
+  ok("retry de transferencia → un solo PagoProveedor", (await pagosDe(cuentaR.id)) === 1);
+  ok("y el saldo bajó una sola vez", tr2.cuenta?.saldo === 900);
+
+  const ef = {
+    monto: 200,
+    medio: "EFECTIVO",
+    turnoId: f.turno.id,
+    idempotencyKey: `${marca}-reintento-ef`,
+  };
+  const movsAntesR = await movimientosDe(f.turno.id);
+  // Los dos a la vez, que es el doble clic de verdad: el lock de la cuenta los
+  // pone en fila y el segundo encuentra al primero.
+  const [ef1, ef2] = await Promise.all([
+    pagar(cuentaR.id, localEscribe, ef),
+    pagar(cuentaR.id, localEscribe, ef),
+  ]);
+  const ef3 = await pagar(cuentaR.id, localEscribe, ef);
+  ok(
+    "los dos envíos simultáneos del efectivo contestan 200",
+    ef1.status === 200 && ef2.status === 200,
+    `${ef1.status} ${ef1.error || ""} / ${ef2.status} ${ef2.error || ""}`
+  );
+  ok(
+    "uno solo de los dos registró; el otro es repetido",
+    [ef1.repetido, ef2.repetido].filter((x) => x === true).length === 1
+  );
+  ok("los tres envíos devuelven el mismo pago", ef1.pago?.id === ef2.pago?.id && ef2.pago?.id === ef3.pago?.id);
+  ok("retry de efectivo → un solo PagoProveedor más", (await pagosDe(cuentaR.id)) === 2);
+  ok("retry de efectivo → un solo CajaMovimiento", (await movimientosDe(f.turno.id)) === movsAntesR + 1);
+  ok("el saldo bajó una sola vez por el efectivo", ef3.cuenta?.saldo === 700);
+
+  const otra1 = await pagar(cuentaR.id, localEscribe, {
+    monto: 300,
+    medio: "OTRO",
+    idempotencyKey: `${marca}-clave-a`,
+  });
+  const otra2 = await pagar(cuentaR.id, localEscribe, {
+    monto: 300,
+    medio: "OTRO",
+    idempotencyKey: `${marca}-clave-b`,
+  });
+  ok(
+    "dos claves distintas son dos pagos válidos",
+    otra1.status === 200 && otra2.status === 200 && otra1.pago?.id !== otra2.pago?.id,
+    `${otra1.error || ""} ${otra2.error || ""}`
+  );
+  ok("con el saldo que alcanza", otra2.cuenta?.saldo === 100 && (await pagosDe(cuentaR.id)) === 4);
+  const otra3 = await pagar(cuentaR.id, localEscribe, {
+    monto: 300,
+    medio: "OTRO",
+    idempotencyKey: `${marca}-clave-c`,
+  });
+  ok("una tercera clave ya no entra si no alcanza el saldo", otra3.status === 400, otra3.error);
+
+  // El reintento del pago que SALDÓ la cuenta. Es el caso que el UNIQUE solo no
+  // cubre: sin la relectura por clave, el segundo envío chocaría antes con
+  // "esta cuenta ya está pagada" y quien reintenta creería que falló.
+  const queSalda = { monto: 100, medio: "TRANSFERENCIA", idempotencyKey: `${marca}-salda` };
+  const salda1 = await pagar(cuentaR.id, localEscribe, queSalda);
+  const salda2 = await pagar(cuentaR.id, localEscribe, queSalda);
+  ok("el pago que salda registra", salda1.status === 200 && salda1.cuenta?.estado === "PAGADA", salda1.error);
+  ok(
+    "su reintento devuelve ese pago, no 'ya está pagada'",
+    salda2.status === 200 && salda2.repetido === true && salda2.pago?.id === salda1.pago?.id,
+    `${salda2.status} ${salda2.error || ""}`
+  );
 
   console.log("\n── Pagos: Admin por *");
   const pagadas = await leer(

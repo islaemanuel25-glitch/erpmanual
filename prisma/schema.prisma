@@ -2857,6 +2857,13 @@ model PagoProveedor {
   turnoId          Int?
   cajaMovimientoId Int?               @unique
   nota             String?
+  /// Clave de idempotencia del INTENTO de pago, que genera el cliente al abrir
+  /// el formulario y conserva en cada reintento. Misma regla que el retiro de
+  /// Caja: un envío que mueve plata la EXIGE —por eso no es nullable; en
+  /// Postgres dos NULL no chocan en un UNIQUE y el pago sin clave quedaría sin
+  /// protección— y el mismo intento repetido devuelve el pago ya registrado en
+  /// vez de crear otro, con su movimiento de caja si era efectivo.
+  idempotencyKey   String
   createdAt        DateTime           @default(now())
 
   cuenta         CuentaPorPagarProveedor @relation(fields: [cuentaId], references: [id])
@@ -2865,7 +2872,10 @@ model PagoProveedor {
   turno          Turno?                  @relation(fields: [turnoId], references: [id])
   cajaMovimiento CajaMovimiento?         @relation(fields: [cajaMovimientoId], references: [id])
 
-  @@index([cuentaId])
+  /// Por cuenta, como `ArqueoCaja` la tiene por turno: la clave identifica un
+  /// intento sobre ESTA deuda. Reemplaza al índice simple de `cuentaId`, que
+  /// queda cubierto por ser la primera columna.
+  @@unique([cuentaId, idempotencyKey])
   @@index([localOrigenId])
   @@index([turnoId])
 }

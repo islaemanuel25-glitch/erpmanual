@@ -27,12 +27,16 @@ import {
   ErrorPagoProveedor,
   alcanceDePagos,
   cuentaEnAlcance,
+  pagoYaRegistrado,
   registrarPagoProveedor,
 } from "@/lib/finanzas/pagosProveedoresServer";
 
 const ERROR_FALTA_ORIGEN ="Elegí de qué ubicación sale el dinero.";
 
 export async function POST(req, { params }) {
+  // Lo que hace falta para contestar un P2002 desde el `catch`.
+  let cuentaIdLeida = null;
+  let claveLeida = null;
   try {
     const session = getUsuarioSession(req);
     if (!session) {
@@ -71,6 +75,8 @@ export async function POST(req, { params }) {
     }
 
     const body = await req.json().catch(() => ({}));
+    cuentaIdLeida = cuentaId;
+    claveLeida = body?.idempotencyKey ?? null;
 
     const origen = resolverLocalPedido({
       esDeposito: alcance.esDeposito,
@@ -95,13 +101,27 @@ export async function POST(req, { params }) {
           turnoId: body?.turnoId,
           fecha: body?.fecha,
           nota: body?.nota,
+          idempotencyKey: body?.idempotencyKey,
           usuarioId: session.id,
         }),
       OPCIONES_TX
     );
 
+    // Un reintento del mismo intento contesta 200 con el pago de antes y
+    // `repetido: true`: para quien reintenta, el pago está hecho, que es la
+    // verdad. Es la respuesta del arqueo de Caja.
     return NextResponse.json({ ok: true, ...resultado });
   } catch (e) {
+    // Choque contra el UNIQUE (cuentaId, idempotencyKey): otro envío del mismo
+    // intento ganó la carrera. No es un error para quien paga: se devuelve el
+    // pago que quedó.
+    if (e?.code === "P2002" && cuentaIdLeida && claveLeida) {
+      const ganador = await pagoYaRegistrado(prisma, {
+        cuentaId: cuentaIdLeida,
+        idempotencyKey: claveLeida,
+      }).catch(() => null);
+      if (ganador) return NextResponse.json({ ok: true, ...ganador });
+    }
     if (e instanceof ErrorPagoProveedor) {
       return NextResponse.json({ ok: false, error: e.message }, { status: e.status });
     }

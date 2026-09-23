@@ -47,6 +47,7 @@ CREATE TABLE "PagoProveedor" (
     "turnoId" INTEGER,
     "cajaMovimientoId" INTEGER,
     "nota" TEXT,
+    "idempotencyKey" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "PagoProveedor_pkey" PRIMARY KEY ("id")
@@ -68,7 +69,8 @@ CREATE INDEX "CuentaPorPagarProveedor_proveedorId_idx" ON "CuentaPorPagarProveed
 CREATE UNIQUE INDEX "PagoProveedor_cajaMovimientoId_key" ON "PagoProveedor"("cajaMovimientoId");
 
 -- CreateIndex
-CREATE INDEX "PagoProveedor_cuentaId_idx" ON "PagoProveedor"("cuentaId");
+-- El mismo intento de pago no puede entrar dos veces en la misma cuenta.
+CREATE UNIQUE INDEX "PagoProveedor_cuentaId_idempotencyKey_key" ON "PagoProveedor"("cuentaId", "idempotencyKey");
 
 -- CreateIndex
 CREATE INDEX "PagoProveedor_localOrigenId_idx" ON "PagoProveedor"("localOrigenId");

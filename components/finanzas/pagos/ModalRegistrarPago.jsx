@@ -18,7 +18,7 @@
 // Arcor una compra de Casiano. Si quien paga tiene una sola ubicación posible
 // —un local—, ésa queda elegida porque no hay otra; si tiene varias, se elige.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import SunmiButton from "@/components/sunmi/SunmiButton";
@@ -28,7 +28,11 @@ import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import { formatearMoneda } from "@/lib/moneda";
 import { horaAR, fechaAR } from "@/lib/fechas/formatearFechaHora";
 import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
-import { MEDIO_PAGO_PROVEEDOR, medioTocaLaCaja } from "@/lib/finanzas/pagosProveedores";
+import {
+  MEDIO_PAGO_PROVEEDOR,
+  medioTocaLaCaja,
+  nuevaClaveDePago,
+} from "@/lib/finanzas/pagosProveedores";
 
 /** Un campo con su rótulo arriba. */
 function Campo({ rotulo, children }) {
@@ -61,8 +65,16 @@ export default function ModalRegistrarPago({
 
   // Cada vez que se abre, arranca limpio. Con una sola ubicación posible queda
   // elegida: no hay nada que elegir.
+  // LA CLAVE DEL INTENTO. Nace al abrir y se conserva en cada reintento de este
+  // mismo formulario: si la respuesta se pierde y se vuelve a tocar "Registrar",
+  // el servidor reconoce el intento y devuelve el pago que ya hizo en vez de
+  // hacer otro. Es la misma idea que el arqueo de Caja (`claveRef`). Abrir el
+  // formulario otra vez es otro intento, y lleva otra clave.
+  const claveRef = useRef(null);
+
   useEffect(() => {
     if (!abierto) return;
+    claveRef.current = cuenta ? nuevaClaveDePago(cuenta.id) : null;
     setMonto("");
     setMedio(MEDIO_PAGO_PROVEEDOR.TRANSFERENCIA);
     setOrigen(origenes.length === 1 ? String(origenes[0].localId) : "");
@@ -70,6 +82,10 @@ export default function ModalRegistrarPago({
     setFecha(hoyArgentinaISO());
     setNota("");
     setError("");
+    // `cuenta` NO va en las dependencias a propósito: la pantalla la recarga, y
+    // cambiarla no es abrir otro intento. Rehacer la clave con el formulario
+    // abierto convertiría el reintento en un pago nuevo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [abierto, origenes]);
 
   const efectivo = medioTocaLaCaja(medio);
@@ -127,6 +143,7 @@ export default function ModalRegistrarPago({
           turnoId: efectivo && turnoId ? Number(turnoId) : null,
           fecha: efectivo ? null : fecha,
           nota,
+          idempotencyKey: claveRef.current,
         }),
       });
       const j = await res.json().catch(() => ({}));
