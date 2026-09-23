@@ -38,6 +38,34 @@ import {
   resumenDelCierre,
   textoDeLoQueQueda,
 } from "@/lib/compras-proveedor/cierreDeRecepcion";
+import {
+  ESTADO_PAGO_CIERRE,
+  estadoSacaPlata,
+  pagoDelCierreEnPantalla,
+  totalDeLasFacturasDelCierre,
+} from "@/lib/compras-proveedor/pagoDelCierre";
+import {
+  MEDIO_PAGO_PROVEEDOR,
+  MEDIOS_PAGO_PROVEEDOR,
+  ROTULO_MEDIO_PAGO,
+} from "@/lib/finanzas/pagosProveedores";
+
+import BloquePagoAlProveedor from "./BloquePagoAlProveedor";
+
+/** Los medios con que se le paga a un proveedor, como los ofrece Finanzas. */
+const MEDIOS = MEDIOS_PAGO_PROVEEDOR.map((m) => ({ valor: m, texto: ROTULO_MEDIO_PAGO[m] }));
+
+/** El pago arranca sin decidir: nadie elige "pendiente" por no haber mirado. */
+const PAGO_INICIAL = Object.freeze({
+  estado: null,
+  totalEscrito: "",
+  totalConfirmado: false,
+  montoAhora: "",
+  medio: MEDIO_PAGO_PROVEEDOR.TRANSFERENCIA,
+  origen: "",
+  turnoId: "",
+  vencimiento: "",
+});
 
 const limpio = (n) => {
   const v = Number(n);
@@ -71,7 +99,64 @@ export default function HojaCerrarRecepcion({
   // del 242 llegó como "Error interno al recibir pedido" y el motivo —que
   // nombraba el producto y decía qué tocar— se quedó en el log del servidor.
   motivoDelFallo = null,
+  // ── EL PAGO AL PROVEEDOR ─────────────────────────────────────────────
+  //
+  // `totalesDeFacturas` es el total impreso de cada comprobante del pedido
+  // —null donde el papel no lo trae—, de la misma conciliación que dibuja la
+  // pantalla. Con él se decide si el total se conoce o hay que escribirlo.
+  proveedor = "el proveedor",
+  totalesDeFacturas = [],
+  puedeRegistrarPago = false,
 }) {
+  // El pago NO se reinicia al reabrir la hoja: la pantalla la cierra al
+  // confirmar y la vuelve a abrir si el servidor frena, y ahí lo cargado —el
+  // total escrito, el monto, el turno— tiene que seguir estando. Después de un
+  // cierre que entró, el pedido pasa a RECIBIDO y esta hoja deja de existir.
+  const [pago, setPago] = useState(PAGO_INICIAL);
+  const [origenes, setOrigenes] = useState([]);
+
+  // De dónde puede salir la plata: lo pregunta al servidor, que es el que sabe
+  // qué ubicaciones son de quien cierra. Solo con permiso de registrar pagos:
+  // sin él no hay nada que elegir.
+  useEffect(() => {
+    if (!abierta || !puedeRegistrarPago) return;
+    let vigente = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/finanzas/pagos-proveedores/origenes", {
+          cache: "no-store",
+          credentials: "include",
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!vigente || !res.ok || !j.ok) return;
+        const lista = j.origenes || [];
+        setOrigenes(lista);
+        // Con una sola ubicación posible queda elegida: no hay nada que elegir.
+        if (lista.length === 1) setPago((p) => ({ ...p, origen: p.origen || String(lista[0].localId) }));
+      } catch {
+        // Sin la lista, el selector queda vacío y el botón no deja confirmar un
+        // pago: el cierre como PENDIENTE sigue disponible.
+      }
+    })();
+    return () => {
+      vigente = false;
+    };
+  }, [abierta, puedeRegistrarPago]);
+
+  const facturas = useMemo(() => totalDeLasFacturasDelCierre(totalesDeFacturas), [totalesDeFacturas]);
+  const enPantalla = pagoDelCierreEnPantalla({
+    totales: totalesDeFacturas,
+    totalEscrito: pago.totalEscrito,
+    totalConfirmado: pago.totalConfirmado,
+    estado: pago.estado,
+    pago: {
+      monto: pago.estado === ESTADO_PAGO_CIERRE.PARCIAL ? pago.montoAhora : undefined,
+      medio: pago.medio,
+      localOrigenId: pago.origen,
+      turnoId: pago.turnoId,
+    },
+  });
+
   // ── LA RESPUESTA POR OMISIÓN ES "NO LLEGÓ" ─────────────────────────────
   //
   // No es pesimismo: es la única que no escribe nada. Si alguien cierra sin
@@ -98,7 +183,26 @@ export default function HojaCerrarRecepcion({
   if (!abierta) return null;
 
   const confirmar = () => {
-    onConfirmar?.(recibidosDelCierre({ filas, sinComprobante, llegadas, contados }));
+    if (!enPantalla.listo) return;
+    const sacaPlata = estadoSacaPlata(pago.estado);
+    // Lo que viaja es lo que la persona decidió, sin convertir: el total y el
+    // monto tal cual se escribieron los interpreta el servidor con la misma
+    // regla que usó esta hoja para dejar confirmar.
+    const pagoAlProveedor = {
+      estado: pago.estado,
+      totalAPagar: enPantalla.pideTotal ? pago.totalEscrito : undefined,
+      totalConfirmado: enPantalla.pideTotal ? pago.totalConfirmado : undefined,
+      vencimientoProveedor: pago.estado === ESTADO_PAGO_CIERRE.PAGADA ? null : pago.vencimiento || null,
+      pago: sacaPlata
+        ? {
+            monto: pago.estado === ESTADO_PAGO_CIERRE.PARCIAL ? pago.montoAhora : undefined,
+            medio: pago.medio,
+            localOrigenId: pago.origen ? Number(pago.origen) : null,
+            turnoId: pago.turnoId ? Number(pago.turnoId) : null,
+          }
+        : null,
+    };
+    onConfirmar?.(recibidosDelCierre({ filas, sinComprobante, llegadas, contados }), pagoAlProveedor);
   };
 
   return (
@@ -117,14 +221,19 @@ export default function HojaCerrarRecepcion({
               {motivoDelFallo}
             </p>
           )}
+          {/* Lo que falta para poder confirmar, dicho: un botón apagado sin
+              motivo se lee como que la aplicación se trabó. */}
+          {!enPantalla.listo && enPantalla.error && (
+            <p className="text-sm3 sunmi-text-muted break-words">{enPantalla.error}</p>
+          )}
           <SunmiButton
             color="primary"
             type="button"
-            disabled={guardando}
+            disabled={guardando || !enPantalla.listo}
             onClick={confirmar}
             className="w-full min-h-botonFoto justify-center text-sm3 font-bold"
           >
-            {guardando ? "Cerrando…" : "Cerrar la recepción"}
+            {guardando ? "Cerrando…" : "Confirmar cierre de compra"}
           </SunmiButton>
         </div>
       }
@@ -202,11 +311,29 @@ export default function HojaCerrarRecepcion({
         </Bloque>
       )}
 
-      {/* ── 3 · QUÉ VA A PASAR, EN UNA LÍNEA ────────────────────────────── */}
-      <Bloque titulo="Al cerrar">
+      {/* ── 3 · EL PAGO AL PROVEEDOR ─────────────────────────────────────
+          Antes del botón final, a propósito: cerrar la compra es también
+          decidir cómo queda la deuda, y se confirman juntas. */}
+      <Bloque titulo="Pago al proveedor">
+        <BloquePagoAlProveedor
+          proveedor={proveedor}
+          estadoEnPantalla={enPantalla}
+          sumaConocida={facturas.sumaConocida}
+          valor={pago}
+          onCambiar={setPago}
+          puedeRegistrarPago={puedeRegistrarPago}
+          medios={MEDIOS}
+          origenes={origenes}
+          deshabilitado={guardando}
+        />
+      </Bloque>
+
+      {/* ── 4 · QUÉ VA A PASAR, EN UNA LÍNEA ────────────────────────────── */}
+      <Bloque titulo="Al confirmar">
         <span className="text-sm3 sunmi-text-muted break-words">
           Entra al stock lo contado y lo que declara el papel, el pedido queda RECIBIDO y no se
-          puede seguir controlando.
+          puede seguir controlando, y nace la deuda con el proveedor con el pago que elegiste.
+          Todo junto: si algo falla, no queda nada a medias.
         </span>
       </Bloque>
     </SunmiModalLayout>

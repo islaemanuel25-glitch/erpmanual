@@ -43,6 +43,8 @@
 // pudo saber" no se pueden dibujar como "no hay".
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
+import { COLOR_ESTADO_CUENTA } from "@/components/finanzas/pagos/TarjetaCuentaPorPagar";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
@@ -108,6 +110,13 @@ export default function PedidoRecibido({
   // El pedido nació de esta factura: todo lo que entró salió del papel, así que
   // el bloque de "los que no venían en el papel" no tiene de qué hablar.
   sinPedidoPrevio = false,
+  // La deuda con el proveedor que nació al cerrar, con total, pagado, saldo y
+  // estado ya resueltos por `serializarCuenta`. Null en las compras cerradas
+  // antes de que el cierre la creara: ahí el bloque no se dibuja.
+  cuentaPorPagar = null,
+  // Navegar lo decide la página, que tiene el router: esta pantalla se dibuja
+  // también en los candados, donde no hay ninguno montado.
+  onVerEnFinanzas = null,
 }) {
   const proveedor = pedido?.proveedor?.nombre || "el proveedor";
 
@@ -147,6 +156,30 @@ export default function PedidoRecibido({
           {horaAR(pedido?.fechaRecibido)}
         </p>
       </SunmiCard>
+
+      {/* ── EL PAGO AL PROVEEDOR ──────────────────────────────────────────
+          Cuatro datos y un acceso: cuánto facturó, cuánto se pagó, cuánto
+          falta y cómo quedó. El historial de pagos vive en Finanzas y no se
+          copia acá: una segunda lista de pagos sería una segunda fuente. */}
+      {cuentaPorPagar && (
+        <SunmiCard className="p-3 space-y-dato">
+          <div className="flex items-center justify-between gap-renglon">
+            <span className="text-sm3 sunmi-text-strong">Pago al proveedor</span>
+            <SunmiPill color={COLOR_ESTADO_CUENTA[cuentaPorPagar.estado] || "slate"}>
+              {cuentaPorPagar.rotuloEstado}
+            </SunmiPill>
+          </div>
+          <RenglonDePlata rotulo="Total factura" valor={cuentaPorPagar.total} />
+          <RenglonDePlata rotulo="Pagado" valor={cuentaPorPagar.pagado} />
+          <SunmiSeparator />
+          <RenglonDePlata rotulo="Saldo" valor={cuentaPorPagar.saldo} fuerte />
+          {onVerEnFinanzas && (
+            <SunmiLinkButton onClick={() => onVerEnFinanzas(cuentaPorPagar.id)}>
+              Ver en Finanzas
+            </SunmiLinkButton>
+          )}
+        </SunmiCard>
+      )}
 
       {/* ── MIENTRAS NO SE SABE, NO SE AFIRMA ────────────────────────────
           Cada estado dice lo suyo. Lo que no puede pasar —y es de donde salió

@@ -33,6 +33,8 @@ import TarjetaContextoDelPedido from "@/components/compras-proveedor/TarjetaCont
 import BloqueDeLaFactura from "@/components/compras-proveedor/BloqueDeLaFactura";
 
 import { useUser } from "@/app/context/UserContext";
+import { PERMISO_REGISTRAR_PAGOS } from "@/lib/finanzas/pagosProveedores";
+import { urlDeCuentaPorPagar } from "@/lib/finanzas/contextoFinanzas";
 import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
 // Esta pantalla ya no importa `avisoCostoLinea`: el contador que lo usaba
@@ -272,9 +274,11 @@ export default function DetallePedidoProveedorPage({ params }) {
   const [extraLoading, setExtraLoading] = useState(false);
   const [extraAdding, setExtraAdding] = useState(null);
 
-  // Factura / ganancia (totalFactura es computed, no editable)
-  const [totalReal, setTotalReal] = useState("");
+  // Factura (totalFactura es computed, no editable). El total real ya no se
+  // guarda acá: es la deuda con el proveedor y la resuelve el cierre.
   const [nroFactura, setNroFactura] = useState("");
+  // La cuenta por pagar que nació al cerrar, ya resuelta por el servidor.
+  const [cuentaPorPagar, setCuentaPorPagar] = useState(null);
   const [fechaFactura, setFechaFactura] = useState("");
 
   const cargar = async () => {
@@ -286,6 +290,7 @@ export default function DetallePedidoProveedorPage({ params }) {
       const data = await res.json();
       if (data.ok) {
         setPedido(data.item);
+        setCuentaPorPagar(data.cuentaPorPagar || null);
         // Inicializar recibidos con la cantidad pedida
         const rec = {};
         const kgRec = {};
@@ -364,7 +369,6 @@ export default function DetallePedidoProveedorPage({ params }) {
         setUnidadesEdit(uniInit);
 
         // Factura
-        setTotalReal(data.item.totalReal != null ? String(Number(data.item.totalReal)) : "");
         setNroFactura(data.item.nroFactura || "");
         setFechaFactura(data.item.fechaFactura ? data.item.fechaFactura.slice(0, 10) : "");
       }
@@ -753,7 +757,10 @@ export default function DetallePedidoProveedorPage({ params }) {
           fisicas,
           motivos,
           costos,
-          totalReal: totalReal || null,
+          // La deuda y el pago inicial, como los decidió la hoja. `totalReal`
+          // ya no viaja suelto: es el total de esa deuda y lo resuelve el
+          // servidor con las facturas del pedido.
+          pagoAlProveedor: extra?.pagoAlProveedor ?? null,
           nroFactura: nroFactura || null,
           fechaFactura: fechaFactura || null,
         };
@@ -910,6 +917,10 @@ export default function DetallePedidoProveedorPage({ params }) {
   const permisosP = perfil?.permisos || [];
   const esAdminP = Array.isArray(permisosP) && permisosP.includes("*");
   if (!esAdminP && !permisosP.includes("compras.ver")) return <SinPermisos />;
+  // Pagar al cerrar —pagada o parcial— saca plata y pide el permiso de
+  // Finanzas. El que manda es el servidor; esto es para no ofrecer un botón que
+  // va a rechazar.
+  const puedeRegistrarPago = esAdminP || permisosP.includes(PERMISO_REGISTRAR_PAGOS);
 
   // ── EL LÁPIZ DE EDITAR PRODUCTO SE FUE CON LA TABLA ───────────────────────
   //
@@ -1046,6 +1057,11 @@ export default function DetallePedidoProveedorPage({ params }) {
           // pantalla estaba contestando por su cuenta y mal.
           conciliacion={conciliacion}
           falloElPapel={falloLaConciliacion}
+          // La deuda que nació al cerrar, con total, pagado y saldo resueltos
+          // por el servidor. Null en las compras cerradas antes de que el
+          // cierre la creara.
+          cuentaPorPagar={cuentaPorPagar}
+          onVerEnFinanzas={(cuentaId) => router.push(urlDeCuentaPorPagar(cuentaId))}
         />
       </div>
     );
@@ -1349,9 +1365,18 @@ export default function DetallePedidoProveedorPage({ params }) {
               contados={recibidos}
               guardando={acting}
               motivoDelFallo={motivoDelFallo}
-              onConfirmar={(recibidosDelCierre) => {
+              // ── EL PAGO AL PROVEEDOR ──────────────────────────────────────
+              // El total impreso de CADA comprobante —null donde el papel no
+              // lo trae—, de la misma conciliación: la hoja decide con eso si
+              // el total se conoce o hay que escribirlo, igual que el servidor.
+              proveedor={pedido?.proveedor?.nombre || "el proveedor"}
+              totalesDeFacturas={(conciliacion?.grupos || []).map(
+                (g) => g?.comprobante?.totalDelPapel ?? null
+              )}
+              puedeRegistrarPago={puedeRegistrarPago}
+              onConfirmar={(recibidosDelCierre, pagoAlProveedor) => {
                 setCerrandoRecepcion(false);
-                ejecutarAccion("recibir", { recibidos: recibidosDelCierre });
+                ejecutarAccion("recibir", { recibidos: recibidosDelCierre, pagoAlProveedor });
               }}
             />
           </>
