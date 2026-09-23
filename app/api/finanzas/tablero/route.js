@@ -15,9 +15,11 @@
 //
 // ── LO QUE ESTA RUTA NO HACE ES INVENTAR ──────────────────────────────────
 //
-// No hay gastos, ni pagos a proveedores, ni sueldos, ni resultado del negocio.
-// Esas cuatro viajan en `noDisponible` con su motivo, y NO como ceros. Un cero
-// se lee como "no hubo"; lo que pasa es que el sistema no los conoce.
+// No hay gastos, ni sueldos, ni resultado del negocio: viajan en `noDisponible`
+// con su motivo, y NO como ceros. Un cero se lee como "no hubo"; lo que pasa es
+// que el sistema no los conoce. Los pagos a proveedores van en la misma lista
+// por otro motivo: se registran en su submódulo, pero este resumen todavía no
+// los suma al período.
 //
 // ── DOS VISTAS, UNA SOLA LLAMADA ──────────────────────────────────────────
 //
