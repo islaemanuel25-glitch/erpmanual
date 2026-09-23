@@ -56,8 +56,17 @@ export function ProductoLeido({ p }) {
           {p.neto != null ? ` · ${formatearMoneda(p.neto)} ${p.textoPrecio}` : ""}
         </span>
       </span>
+      {/* ── EL IMPORTE FINAL DEL RENGLÓN, NO EL NETO ────────────────────
+          Con IVA e impuesto interno adentro: es el que después se convierte en
+          costo. Antes acá iba `p.subtotal` —la columna NETO— así que el
+          renglón decía un número y el costo salía 21 % más arriba sin que nada
+          lo explicara. Se cae al neto solo si el final no se pudo resolver. */}
       <span className="shrink-0 whitespace-nowrap tabular-nums text-sm2 font-semibold sunmi-text-strong">
-        {p.subtotal == null ? "—" : formatearMoneda(p.subtotal)}
+        {p.importeFinal != null
+          ? formatearMoneda(p.importeFinal)
+          : p.subtotal == null
+            ? "—"
+            : formatearMoneda(p.subtotal)}
       </span>
     </div>
   );
