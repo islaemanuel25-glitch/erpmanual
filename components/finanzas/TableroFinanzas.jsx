@@ -27,7 +27,13 @@ import { useRouter } from "next/navigation";
 
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import EntradaDeLocales from "@/components/transferencias/EntradaDeLocales";
-import { urlDelLocal, urlDelTurno } from "@/lib/finanzas/contextoFinanzas";
+import SunmiNavCard from "@/components/sunmi/SunmiNavCard";
+import { HandCoins } from "lucide-react";
+import {
+  RUTA_PAGOS_PROVEEDORES,
+  urlDelLocal,
+  urlDelTurno,
+} from "@/lib/finanzas/contextoFinanzas";
 
 import CuentaFinancieraDeUnLocal from "./CuentaFinancieraDeUnLocal";
 import { useFinanzasDelLocal } from "./useFinanzasDelLocal";
@@ -70,6 +76,16 @@ export default function TableroFinanzas() {
     // teléfono: en móvil el tope no llega a aplicarse y el armado queda
     // exactamente igual al de transferencias.
     <div className="w-full min-h-full mx-auto max-w-4xl px-4 pt-4 pb-4 space-y-3.5">
+      {/* LA ENTRADA A PAGOS A PROVEEDORES. Arriba de todo y para las dos vistas
+          —depósito y local—: cada uno ve ahí las cuentas de su alcance, que
+          decide el servidor. Es una función de Finanzas y no un grupo del menú. */}
+      <SunmiNavCard
+        icon={HandCoins}
+        label="Pagos a proveedores"
+        descripcion="Lo que se le debe a cada proveedor por compra, y lo que ya se pagó."
+        href={RUTA_PAGOS_PROVEEDORES}
+      />
+
       {cuenta.cargando && !cuenta.datos && (
         <div className="py-12">
           <SunmiLoader />
