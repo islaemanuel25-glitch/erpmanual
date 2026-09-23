@@ -169,8 +169,33 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
         origen: ORIGEN_DE_LECTURA.BOTON,
         fetchImpl: fetch,
       });
-      if (d?.ok) onCorregido?.(d);
-      else setMensaje({ tipo: "error", texto: d?.error || "No se pudo volver a leer el papel." });
+      // ── EL BOTÓN NUNCA TERMINA EN SILENCIO ─────────────────────────
+      //
+      // El 2026-09-23 Emanuel lo tocó tres veces en dos minutos: el botón
+      // pasaba a "Leyendo el papel…", volvía, y la pantalla quedaba EXACTAMENTE
+      // igual. La lectura había corrido —quedó en la bitácora— pero había
+      // vuelto a traer un renglón de doce, y nada lo decía. Sin una frase, un
+      // botón que funciona y un botón que no hace nada se ven iguales.
+      //
+      // Los tres desenlaces se nombran: la que no arrancó, la que volvió corta,
+      // y la que salió bien.
+      if (!d?.ok) {
+        setMensaje({ tipo: "error", texto: d?.error || "No se pudo volver a leer el papel." });
+        return;
+      }
+      const dice = Number(d?.lineasEnElPapel);
+      const trajo = Number(d?.lineasTranscriptas);
+      if (Number.isFinite(dice) && Number.isFinite(trajo) && dice > trajo) {
+        setMensaje({
+          tipo: "aviso",
+          texto:
+            `Se volvió a leer: el lector dice ver ${dice} renglones y transcribió ${trajo}. ` +
+            "Probá otra vez; si vuelve a salir corta, revisá la explicación del proveedor.",
+        });
+      } else {
+        setMensaje({ tipo: "ok", texto: "Se volvió a leer el papel." });
+      }
+      onCorregido?.(d);
     } catch (e) {
       setMensaje({ tipo: "error", texto: `No se pudo volver a leer el papel: ${e.message}` });
     } finally {
