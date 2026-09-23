@@ -40,7 +40,23 @@
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import FachadaDelLocal from "./FachadaDelLocal";
 
-export default function TarjetaDeLocal({ local, onEntrar }) {
+/**
+ * ── `insignia` ───────────────────────────────────────────────────────────
+ *
+ * Una palabra al lado del nombre. `null` por defecto, y sin ella el marcado es
+ * exactamente el de siempre: el nodo no se dibuja, así que la pantalla de
+ * transferencias no cambia ni un píxel.
+ *
+ * Existe porque la lista de Finanzas incluye locales DADOS DE BAJA —cerrar un
+ * local no borra lo que vendió, y mirar el mes en que cerró es justamente lo que
+ * se va a querer hacer— y un local cerrado dibujado igual que uno abierto es una
+ * afirmación falsa sobre el negocio. Transferencias los excluye de su lista, así
+ * que allá esta pregunta no existe.
+ *
+ * Es texto y no un color: el estado de un local tiene que poder leerse, y un
+ * tono distinto no se distingue en los catorce temas.
+ */
+export default function TarjetaDeLocal({ local, onEntrar, insignia = null }) {
   return (
     <SunmiButton
       type="button"
@@ -58,6 +74,9 @@ export default function TarjetaDeLocal({ local, onEntrar }) {
         <span className="flex-1 min-w-0 text-lg2 font-semibold sunmi-text-strong truncate">
           {local?.nombre || "—"}
         </span>
+        {insignia ? (
+          <span className="shrink-0 text-xs2 font-medium sunmi-text-muted">{insignia}</span>
+        ) : null}
         <span className="shrink-0 text-lg3 sunmi-text-muted" aria-hidden="true">
           ›
         </span>

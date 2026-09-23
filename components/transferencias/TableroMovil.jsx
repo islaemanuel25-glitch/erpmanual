@@ -108,6 +108,13 @@ export default function TableroMovil({ onAbrirReporte = null }) {
       {esEntrada && (
         <EntradaDeLocales
           locales={cuenta.datos.locales || []}
+          // Los dos textos viajan desde acá desde que Finanzas usa la misma
+          // pieza: son de ESTE dominio —"operar por transferencia" no significa
+          // nada en Finanzas— y escritos adentro del componente obligaban a la
+          // segunda pantalla a mentir o a copiarlo. Los valores son los mismos
+          // que estaban, así que esta pantalla no cambia.
+          rotulo="LOCALES"
+          textoVacio="Ningún local opera por transferencia con este depósito."
           sinConfigurar={(cuenta.datos.locales || []).filter((l) => l.sinConfigurar).length}
           puedeConfigurar={puedeConfigurar}
           onConfigurar={() => router.push(RUTA_CORTE_DE_SEMANA)}

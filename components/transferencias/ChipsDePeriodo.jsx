@@ -39,7 +39,33 @@ export const OPCIONES_DE_PERIODO = Object.freeze([
   { clave: CLAVE_OTRO, texto: "Otro" },
 ]);
 
-export default function ChipsDePeriodo({ valor = UNIDADES.SEMANA, onCambiar, className = "" }) {
+/**
+ * ── `deshabilitadas` ─────────────────────────────────────────────────────
+ *
+ * Qué chips se dibujan APAGADOS. Vacío por defecto, así que las dos pantallas
+ * que ya usaban esta pieza —la cuenta de transferencias y la recepción de
+ * mercadería— no cambian ni un píxel: sin la prop, ningún chip queda
+ * deshabilitado y el `disabled` no llega al botón.
+ *
+ * Lo pidió Finanzas, que calcula Día, Semana y Mes y todavía NO tiene un
+ * selector de rango para "Otro". Las dos salidas que había eran peores:
+ *
+ *   · no dibujar el chip — los cuatro se reparten el ancho con `flex-1 basis-0`,
+ *     así que con tres cambia el ancho de los otros y la pantalla se ve distinta
+ *     de la de transferencias sin que eso signifique nada;
+ *   · dejarlo tocable y que caiga a Semana — es lo que hacen hoy las otras dos
+ *     pantallas, y es justamente lo que no se quiere repetir: el chip se ve
+ *     elegido y el período que se muestra es otro.
+ *
+ * Apagado dice la verdad: existe, y todavía no.
+ */
+export default function ChipsDePeriodo({
+  valor = UNIDADES.SEMANA,
+  onCambiar,
+  className = "",
+  deshabilitadas = [],
+}) {
+  const apagadas = new Set(deshabilitadas || []);
   return (
     // `gap-1.5` son 5,25 px: el 6 de la especificación ajustado a la escala del
     // proyecto, donde 1rem = 14 px. Por qué se ajusta en vez de entrar al
@@ -47,13 +73,21 @@ export default function ChipsDePeriodo({ valor = UNIDADES.SEMANA, onCambiar, cla
     <div role="group" aria-label="Período" className={`flex gap-1.5 ${className}`}>
       {OPCIONES_DE_PERIODO.map((o) => {
         const activo = o.clave === valor;
+        const apagado = apagadas.has(o.clave);
         return (
           <SunmiButton
             key={o.clave}
             type="button"
             color={activo ? "primary" : "slate"}
             aria-pressed={activo}
-            onClick={() => onCambiar?.(o.clave)}
+            // `disabled` solo cuando la pantalla lo pidió. Sin la prop, esto es
+            // `false` y el atributo no se emite: el marcado queda idéntico al
+            // que las dos pantallas de hoy ya dibujan.
+            disabled={apagado || undefined}
+            // El motivo, para quien pase el dedo por encima y para el lector de
+            // pantalla. Un control apagado sin explicación se lee como roto.
+            title={apagado ? "Todavía no disponible" : undefined}
+            onClick={apagado ? undefined : () => onCambiar?.(o.clave)}
             // `flex-1 basis-0` y no solo `flex-1`: sin base cero los cuatro se
             // reparten el sobrante y no el ancho, así que "Semana" quedaría más
             // ancho que "Día" por tener más letras. La especificación pide FILL,

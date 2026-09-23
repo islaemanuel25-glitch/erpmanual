@@ -40,6 +40,7 @@
 // que esté.
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import DiaConBanda from "@/components/periodo/DiaConBanda";
 import { rotuloDelDia } from "@/lib/transferencias/diasDeTransferencias";
 import {
   estadoEnPalabras,
@@ -48,24 +49,24 @@ import {
 } from "@/lib/transferencias/rotulosDeTransferencia";
 import { horaAR } from "@/lib/fechas/formatearFechaHora";
 
+// ── EL MARCO Y LA BANDA SE MUDARON, Y ESTA PANTALLA NO CAMBIÓ ────────────
+//
+// Viven en `components/periodo/DiaConBanda.jsx` desde que la actividad por día
+// de Finanzas necesitó exactamente lo mismo. Los nodos se movieron enteros y
+// ninguna pareja de hijos se juntó en una cadena —eso mueve píxeles, y ya
+// costó 44 una vez—, así que el marcado que sale de acá es el de antes.
+// `components/periodo/diaConBanda.test.mjs` lo compara renderizado.
 export default function DiaDeTransferencias({ dia, onRecibir, onVer, money }) {
   return (
-    <div className="sunmi-bg-card rounded-xl2 border sunmi-border overflow-hidden">
-      {/* LA BANDA. Único nodo con fondo; sus hijos no declaran ninguno. */}
-      <div className="sunmi-surface-soft px-4 py-2.5 flex items-center justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="text-base2 font-semibold sunmi-text-strong truncate">{dia?.titulo}</div>
-          <div className="text-sm2 sunmi-text-muted">{rotuloDelDia(dia)}</div>
-        </div>
-        <div className="shrink-0 text-base2 font-semibold sunmi-text-strong tabular-nums">
-          {money ? money(dia?.importe) : dia?.importe}
-        </div>
-      </div>
-
+    <DiaConBanda
+      titulo={dia?.titulo}
+      subtitulo={rotuloDelDia(dia)}
+      importe={money ? money(dia?.importe) : dia?.importe}
+    >
       {(dia?.transferencias || []).map((t) => (
         <FilaDelDia key={t.id} t={t} onRecibir={onRecibir} onVer={onVer} money={money} />
       ))}
-    </div>
+    </DiaConBanda>
   );
 }
 
