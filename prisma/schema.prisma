@@ -50,7 +50,7 @@ model GrupoDeposito {
   /// Nunca se aplica en los locales.
   listaPrecioDefaultId Int?
   createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
+  updatedAt DateTime @updatedAt
   grupo     Grupo    @relation(fields: [grupoId], references: [id], onDelete: Cascade)
   local     Local    @relation(fields: [localId], references: [id], onDelete: Cascade)
   listaPrecioDefault ListaPrecio? @relation(fields: [listaPrecioDefaultId], references: [id], onDelete: SetNull)
@@ -737,7 +737,7 @@ model DecisionDePrecioProveedor {
   decididaEn           DateTime @default(now())
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   grupo        Grupo        @relation(fields: [grupoId], references: [id], onDelete: Cascade)
   proveedor    Proveedor    @relation(fields: [proveedorId], references: [id])
