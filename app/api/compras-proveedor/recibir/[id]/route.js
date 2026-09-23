@@ -22,8 +22,65 @@ import {
   textoDeLaDiferencia,
   VARIACION_POR_DEFECTO,
 } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
+import {
+  planDelPagoInicial,
+  resolverTotalDelCierre,
+  estadoSacaPlata,
+} from "@/lib/compras-proveedor/pagoDelCierre";
+import { PERMISO_REGISTRAR_PAGOS, leerFechaOpcional } from "@/lib/finanzas/pagosProveedores";
+import {
+  ERROR_OPERAR_EN_LA_UBICACION_DE_LA_DEUDA,
+  ERROR_ORIGEN_DE_OTRA_UBICACION,
+  ErrorPagoProveedor,
+  SELECT_CUENTA,
+  crearCuentaPorPagarDesdeCompra,
+  serializarCuenta,
+} from "@/lib/finanzas/pagosProveedoresServer";
 
+/** Otro envío ya cerró este pedido mientras éste esperaba el lock. */
+class CierreYaHecho extends Error {}
 
+/**
+ * LO QUE CONTESTA EL CIERRE, haya escrito o no.
+ *
+ * Es la misma forma para el cierre nuevo y para el reintento: el pedido como
+ * quedó y su cuenta por pagar con total, pagado, saldo y estado —de
+ * `serializarCuenta`, la misma de Finanzas—. Si el pedido no terminó RECIBIDO
+ * —lo anularon mientras tanto—, no es un reintento y se dice.
+ */
+async function respuestaDelCierre(pedidoId, { repetido = false, decisionesDeCosto = [] } = {}) {
+  const updated = await prisma.pedidoProveedor.findUnique({
+    where: { id: pedidoId },
+    include: {
+      proveedor: { select: { id: true, nombre: true } },
+      deposito: { select: { id: true, nombre: true } },
+      cuentaPorPagar: { select: SELECT_CUENTA },
+      detalles: {
+        include: {
+          producto: {
+            include: {
+              base: { select: { id: true, nombre: true, sku: true, modoCompraProveedor: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+  if (updated?.estado !== "RECIBIDO") {
+    return NextResponse.json(
+      { ok: false, error: `El pedido no se pudo cerrar: está ${updated?.estado || "sin estado"}.` },
+      { status: 409 }
+    );
+  }
+  const { cuentaPorPagar, ...item } = updated;
+  return NextResponse.json({
+    ok: true,
+    repetido,
+    item,
+    cuentaPorPagar: cuentaPorPagar ? serializarCuenta(cuentaPorPagar) : null,
+    decisionesDeCosto,
+  });
+}
 
 // Resuelve el ProductoLocal DESTINO (de la ubicación dueña del pedido) para una
 // línea. Para el depósito es el mismo que ya trae la línea. Para un local, busca
@@ -126,6 +183,16 @@ export async function POST(req, { params }) {
       );
     }
 
+    // ── EL MISMO CIERRE, OTRA VEZ ─────────────────────────────────────────
+    //
+    // Doble toque, reintento o respuesta perdida: el pedido ya está RECIBIDO
+    // porque el primer envío terminó. No se vuelve a cerrar nada —ni stock, ni
+    // cuenta, ni pago—: se devuelve lo que quedó, marcado `repetido`. Quien
+    // reintenta necesita saber cómo terminó, no un "estado inválido".
+    if (pedido.estado === "RECIBIDO") {
+      return respuestaDelCierre(pedidoId, { repetido: true });
+    }
+
     // Solo ENVIADO → RECIBIDO
     if (pedido.estado !== "ENVIADO") {
       return NextResponse.json(
@@ -216,22 +283,12 @@ export async function POST(req, { params }) {
       );
     }
 
-    // --- Factura / ganancia (opcionales) ---
-    // totalFactura se computa en la transacción desde cantRecibida * precioCosto
-    let totalReal = null;
+    // --- Factura (opcionales) ---
+    // totalFactura se computa en la transacción desde cantRecibida * precioCosto,
+    // y es un CONTROL interno. `totalReal` ya no viene suelto del cliente: es la
+    // deuda con el proveedor y se resuelve abajo, con el pago.
     let nroFactura = null;
     let fechaFactura = null;
-
-    if (body.totalReal !== undefined && body.totalReal !== "" && body.totalReal !== null) {
-      const tr = Number(body.totalReal);
-      if (!Number.isFinite(tr) || tr < 0) {
-        return NextResponse.json(
-          { ok: false, error: "totalReal debe ser un número >= 0" },
-          { status: 400 }
-        );
-      }
-      totalReal = tr;
-    }
 
     if (body.nroFactura !== undefined && body.nroFactura !== null) {
       const nf = String(body.nroFactura).trim();
@@ -299,7 +356,95 @@ export async function POST(req, { params }) {
     // El stock entra en la UBICACIÓN DUEÑA del pedido (creadoEnLocalId), fijada
     // desde el contexto al crear — NO se toma del body ni cambia en la recepción.
     // Para el depósito coincide con depositoId (caso normal).
+    //
+    // Y ES TAMBIÉN DE QUIÉN ES EL GASTO: la deuda con el proveedor nace a nombre
+    // de esta misma ubicación, sin que el cliente la mande.
     const ownerLocalId = ownerLocalIdDePedido(pedido);
+
+    // ── EL PAGO AL PROVEEDOR: TODO SE DECIDE ANTES DE ESCRIBIR NADA ─────────
+    //
+    // La deuda, el pago inicial, el permiso y el origen del dinero se validan
+    // acá, antes de abrir la transacción. Lo que solo se puede comprobar
+    // escribiendo —que el turno siga abierto al tomar su lock— lo comprueba
+    // `registrarPagoProveedor` adentro, y si falla la transacción entera vuelve
+    // atrás: no queda stock, ni compra cerrada, ni cuenta, ni retiro.
+    const pagoAlProveedor = body.pagoAlProveedor || {};
+    const estadoDelPago = pagoAlProveedor.estado;
+
+    // Sacar plata es escritura financiera y pide su permiso; dejarla PENDIENTE
+    // no saca nada —solo nace la obligación que la compra ya generó— y alcanza
+    // con el de Compras. Se chequea antes que todo lo demás del pago: sin
+    // permiso no hace falta ni leer las facturas.
+    if (estadoSacaPlata(estadoDelPago)) {
+      const permPago = checkPerm(session, PERMISO_REGISTRAR_PAGOS);
+      if (!permPago.ok) {
+        return NextResponse.json({ ok: false, error: permPago.error }, { status: permPago.status });
+      }
+    }
+
+    // LA DEUDA ES LO QUE FACTURA EL PROVEEDOR. Los comprobantes son los mismos
+    // que muestra la conciliación: los de este pedido y este grupo, sin los
+    // anulados.
+    const facturasDelPedido = await prisma.comprobanteProveedor.findMany({
+      where: { grupoId, pedidoId, estado: { not: "ANULADO" } },
+      select: { totalLeido: true },
+    });
+    const deuda = resolverTotalDelCierre({
+      totales: facturasDelPedido.map((c) => c.totalLeido),
+      totalConfirmado: pagoAlProveedor.totalAPagar,
+      confirmado: pagoAlProveedor.totalConfirmado === true,
+    });
+    if (deuda.error) {
+      return NextResponse.json(
+        { ok: false, error: deuda.error, queHacer: deuda.error, pideTotal: deuda.pideTotal },
+        { status: 400 }
+      );
+    }
+    const totalDeLaDeuda = deuda.centavos / 100;
+
+    const plan = planDelPagoInicial({
+      estado: estadoDelPago,
+      totalCentavos: deuda.centavos,
+      pago: pagoAlProveedor.pago,
+    });
+    if (plan.error) {
+      return NextResponse.json({ ok: false, error: plan.error, queHacer: plan.error }, { status: 400 });
+    }
+
+    const vencimiento = leerFechaOpcional(pagoAlProveedor.vencimientoProveedor);
+    if (vencimiento.error) {
+      return NextResponse.json({ ok: false, error: vencimiento.error }, { status: 400 });
+    }
+
+    // ── DE DÓNDE SALE LA PLATA: DE LA UBICACIÓN QUE COMPRA ───────────────
+    //
+    // No se elige. La deuda es de la ubicación dueña del pedido y la paga esa
+    // ubicación, con su plata, registrada por quien la opera. Acá solo se
+    // deriva y se rechaza temprano; la regla y la última defensa viven en
+    // `registrarPagoProveedor`, que vuelve a exigir las dos igualdades.
+    //
+    // Un origen distinto en el cuerpo es 403 y no se corrige en silencio: el
+    // depósito cerrando su compra "con la plata de Casiano" es un cruce y se
+    // tiene que ver. Pendiente no pasa por acá: no hay pago.
+    let pagoInicial = null;
+    if (plan.pagoInicial) {
+      if (Number(localId) !== Number(ownerLocalId)) {
+        return NextResponse.json(
+          { ok: false, error: ERROR_OPERAR_EN_LA_UBICACION_DE_LA_DEUDA },
+          { status: 403 }
+        );
+      }
+      const pedidoOrigen = pagoAlProveedor.pago?.localOrigenId;
+      if (
+        pedidoOrigen !== undefined &&
+        pedidoOrigen !== null &&
+        pedidoOrigen !== "" &&
+        Number(pedidoOrigen) !== Number(ownerLocalId)
+      ) {
+        return NextResponse.json({ ok: false, error: ERROR_ORIGEN_DE_OTRA_UBICACION }, { status: 403 });
+      }
+      pagoInicial = { ...plan.pagoInicial, localOrigenId: ownerLocalId };
+    }
 
     // La ubicación decide la UNIDAD en la que entra el fiambre de pieza fija:
     // piezas en el depósito, kilos en un local. El pedido no trae este dato —su
@@ -362,6 +507,21 @@ export async function POST(req, { params }) {
 
     // Transacción: incrementar stock + marcar recibido
     await prisma.$transaction(async (tx) => {
+      // ── UN SOLO CIERRE POR PEDIDO, AUNQUE LLEGUEN DOS A LA VEZ ───────────
+      //
+      // El chequeo de ENVIADO de arriba se hizo sin lock: dos envíos
+      // simultáneos lo pasan los dos. Acá se toma el lock de la fila y se
+      // vuelve a preguntar; el segundo espera al primero, lo encuentra
+      // RECIBIDO y sale sin escribir nada —ni stock, ni cuenta, ni pago—.
+      // Detrás quedan dos redes en la base: el UNIQUE de la cuenta por pedido
+      // y el de la clave del pago inicial.
+      await tx.$queryRaw`SELECT id FROM "PedidoProveedor" WHERE id = ${pedidoId} FOR UPDATE`;
+      const vigente = await tx.pedidoProveedor.findUnique({
+        where: { id: pedidoId },
+        select: { estado: true },
+      });
+      if (vigente?.estado !== "ENVIADO") throw new CierreYaHecho();
+
       let totalFacturaComputed = 0;
 
       for (const det of pedido.detalles) {
@@ -692,60 +852,76 @@ export async function POST(req, { params }) {
       // líneas es exactamente el agujero que el lector ya tiene documentado.
       let nroFinal = nroFactura;
       let fechaFinal = fechaFactura;
-      let totalFinal = totalReal;
-      if (nroFinal == null || fechaFinal == null || totalFinal == null) {
+      if (nroFinal == null || fechaFinal == null) {
         const delPapel = await tx.comprobanteProveedor.findFirst({
           where: { pedidoId, grupoId },
           orderBy: { id: "asc" },
-          select: { numero: true, fecha: true, totalLeido: true },
+          select: { numero: true, fecha: true },
         });
         if (delPapel) {
           if (nroFinal == null && delPapel.numero) nroFinal = delPapel.numero;
           if (fechaFinal == null && delPapel.fecha) fechaFinal = delPapel.fecha;
-          if (totalFinal == null && delPapel.totalLeido != null) {
-            totalFinal = Number(delPapel.totalLeido);
-          }
         }
       }
 
-      // Marcar pedido como RECIBIDO + guardar factura/ganancia
+      // Marcar pedido como RECIBIDO + guardar factura.
+      //
+      // `totalReal` es LA DEUDA: el total de las facturas, o el que la persona
+      // confirmó cuando alguna no lo trae. Es el mismo número con el que nace
+      // la cuenta por pagar, así que la compra y Finanzas no pueden discrepar.
       await tx.pedidoProveedor.update({
         where: { id: pedidoId },
         data: {
           estado: "RECIBIDO",
           fechaRecibido: new Date(),
           totalFactura: totalFacturaComputed,
-          totalReal: totalFinal,
+          totalReal: totalDeLaDeuda,
           nroFactura: nroFinal,
           fechaFactura: fechaFinal,
         },
       });
-    });
 
-    // Devolver pedido actualizado
-    const updated = await prisma.pedidoProveedor.findUnique({
-      where: { id: pedidoId },
-      include: {
-        proveedor: { select: { id: true, nombre: true } },
-        deposito: { select: { id: true, nombre: true } },
-        detalles: {
-          include: {
-            producto: {
-              include: {
-                base: { select: { id: true, nombre: true, sku: true, modoCompraProveedor: true } },
-              },
-            },
-          },
-        },
-      },
+      // ── Y EN LA MISMA TRANSACCIÓN, LA DEUDA Y EL PRIMER PAGO ─────────────
+      //
+      // Por la puerta canónica de Finanzas, sin una línea de lógica de pagos
+      // acá: la cuenta nace a nombre de la ubicación dueña del pedido, y el
+      // pago inicial —si hay— pasa por `registrarPagoProveedor`, con su clave
+      // `compra-<pedido>-pago-inicial`, su turno operativo y su RETIRO si es
+      // efectivo. Si algo de eso falla, vuelve atrás también el stock.
+      await crearCuentaPorPagarDesdeCompra(tx, {
+        pedidoProveedorId: pedidoId,
+        localGastoId: ownerLocalId,
+        total: totalDeLaDeuda,
+        vencimientoProveedor: vencimiento.valor,
+        // La fecha prevista es planificación interna: se decide en Finanzas.
+        fechaPrevistaPago: null,
+        usuarioId: session.id,
+        pagoInicial,
+        // La ubicación que opera quien cierra. Con pago inicial, Finanzas
+        // exige que sea la del gasto.
+        localOperativoId: localId,
+      });
     });
 
     // `decisionesDeCosto` viaja siempre, esté la frontera encendida o no: quien
     // recibe tiene derecho a saber qué costos se escribieron y cuáles no, y con
     // qué diferencia porcentual. Sin esto, no escribir un costo sería tan
     // silencioso como escribirlo mal.
-    return NextResponse.json({ ok: true, item: updated, decisionesDeCosto });
+    return respuestaDelCierre(pedidoId, { repetido: false, decisionesDeCosto });
   } catch (err) {
+    // Otro envío del mismo cierre terminó primero: se devuelve cómo quedó. El
+    // P2002 es la red de abajo del lock —el UNIQUE de la cuenta por pedido o
+    // el de la clave del pago inicial—, y dice lo mismo.
+    if (err instanceof CierreYaHecho || err?.code === "P2002") {
+      const id = Number((await params)?.id);
+      if (id) return respuestaDelCierre(id, { repetido: true });
+    }
+    // Una regla de Finanzas que frena —el turno ya no está abierto, el origen
+    // no es del grupo— vuelve con su status y su texto: no entró nada.
+    if (err instanceof ErrorPagoProveedor) {
+      const texto = `${err.message} No entró nada: ni la mercadería, ni la deuda, ni el pago.`;
+      return NextResponse.json({ ok: false, error: texto, queHacer: texto }, { status: err.status });
+    }
     // ── UNA REGLA QUE FRENA NO ES UNA FALLA DEL SISTEMA ─────────────────
     //
     // El cierre frena a propósito cuando algo no cuadra, y ese motivo está
