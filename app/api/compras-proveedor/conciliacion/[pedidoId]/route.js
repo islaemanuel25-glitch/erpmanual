@@ -114,6 +114,17 @@ export async function GET(req, { params }) {
         // que factura el papel y no una suma parcial de los renglones que se
         // pudieron comparar.
         totalLeido: true,
+        // ── Y EL RESTO DEL PIE, QUE ES PARTE DEL COSTO ─────────────────
+        //
+        // El costo de cada producto lleva adentro los conceptos que el papel
+        // imprime entre el subtotal y el total —percepción de IVA, IIBB,
+        // internos—, repartidos en proporción al neto de su renglón. Sin estos
+        // campos el reparto se hace sobre un pie vacío y el precio vuelve a ser
+        // neto + IVA, que es lo que pasaba hasta el 2026-09-23.
+        netoLeido: true,
+        ivaLeido: true,
+        internoLeido: true,
+        conceptosDelPieLeidos: true,
         proveedor: { select: { id: true, nombre: true, umbralRevisarPct: true, umbralSospechaBajaPct: true } },
         lineas: {
           orderBy: { orden: "asc" },

@@ -128,6 +128,27 @@ export async function POST(req) {
             // `pedidoId` para poder resolver a qué línea del pedido pertenece
             // esta línea, con el mismo criterio que usa la pantalla.
             id: true, pedidoId: true, estado: true, confirmadoEn: true, recetaUsada: true,
+            // ── EL PIE DE LA FACTURA, PARA PODER REPARTIRLO ────────────
+            //
+            // El costo que esta ruta ESCRIBE lleva adentro los conceptos del
+            // pie. Sin ellos, aceptar un precio guardaría neto + IVA mientras
+            // la pantalla muestra el final: dos números para la misma cosa, y
+            // el que queda en la base es el malo.
+            netoLeido: true, ivaLeido: true, internoLeido: true,
+            totalLeido: true, conceptosDelPieLeidos: true,
+            // ── Y TODAS SUS LÍNEAS, AUNQUE SE ANALICE UNA ──────────────
+            //
+            // El reparto es proporcional al neto de cada renglón sobre el neto
+            // de la factura: con una sola línea, el pie entero le caería a ella.
+            // Se piden los campos que el reparto necesita y nada más.
+            lineas: {
+              orderBy: { orden: "asc" },
+              select: {
+                orden: true, cantidad: true, netoUnitario: true,
+                subtotalImpreso: true, subtotalCorregido: true, internoUnitario: true,
+                textoCrudo: true, codigoProveedor: true, pesoKg: true, bonificacionPct: true,
+              },
+            },
             proveedor: { select: { id: true, umbralRevisarPct: true, umbralSospechaBajaPct: true } },
           },
         },
@@ -185,6 +206,9 @@ export async function POST(req) {
       contexto,
       detallesPlanos: detallesDelPedido,
       porProductoLocal,
+      // Se analiza UNA línea pero el pie se reparte entre TODAS: es proporcional
+      // al neto de cada renglón sobre el neto de la factura.
+      todasLasLineas: linea.comprobante.lineas,
     });
 
     // El producto es el que resolvió esa cascada, tomado del MISMO catálogo que
