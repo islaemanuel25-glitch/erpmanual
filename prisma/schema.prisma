@@ -124,7 +124,7 @@ model AcuerdoDepositoLocal {
   deposito Local @relation("acuerdo_deposito", fields: [depositoLocalId], references: [id], onDelete: Cascade)
   local    Local @relation("acuerdo_local", fields: [localId], references: [id], onDelete: Cascade)
 
-  @@unique([depositoLocalId, localId], name: "acuerdo_deposito_local_unique")
+  @@unique([depositoLocalId, localId], name: "acuerdo_deposito_local_unique", map: "acuerdo_deposito_local_unique")
   @@index([grupoId])
 }
 
@@ -3769,7 +3769,7 @@ model LecturaProductoProveedor {
   confirmadaEn           DateTime @default(now())
 
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt DateTime @default(now()) @updatedAt
 
   grupo        Grupo        @relation(fields: [grupoId], references: [id], onDelete: Cascade)
   proveedor    Proveedor    @relation(fields: [proveedorId], references: [id])
