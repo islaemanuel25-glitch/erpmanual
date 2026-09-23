@@ -686,7 +686,7 @@ async function correr(f) {
   igualPlata("VentaDetalle.precio = lo cobrado", ventaGuardada.detalles[0].precio, 900);
   igualPlata("VentaDetalle.precioNormal = el precio sin oferta", ventaGuardada.detalles[0].precioNormal, 1000);
   igual("VentaDetalle.ofertaId apunta a la oferta", ventaGuardada.detalles[0].ofertaId, ofertaId);
-  igual("VentaDetalle.ofertaNombre quedó congelado", ventaGuardada.detalles[0].ofertaNombre, "Oferta de prueba");
+  igual("VentaDetalle.ofertaNombre quedó congelado", ventaGuardada.detalles[0].ofertaNombre, "Nueve de Oro");
   igualPlata("VentaDetalle.descuentoPromocional", ventaGuardada.detalles[0].descuentoPromocional, 900);
   igualPlata(
     "la ganancia de MERCADERÍA se calcula contra el precio vendido, no el normal",
@@ -920,7 +920,7 @@ async function correr(f) {
   });
   igualPlata("la línea vendida sigue diciendo el precio cobrado", detalleHistorico.precio, 900);
   igualPlata("y el precio normal de aquel día", detalleHistorico.precioNormal, 1000);
-  igual("y el nombre de la oferta, congelado", detalleHistorico.ofertaNombre, "Oferta de prueba");
+  igual("y el nombre de la oferta, congelado", detalleHistorico.ofertaNombre, "Nueve de Oro");
 
   const cuadra =
     Math.round(Number(detalleHistorico.precio) * Number(detalleHistorico.cantidad) * 100) ===
