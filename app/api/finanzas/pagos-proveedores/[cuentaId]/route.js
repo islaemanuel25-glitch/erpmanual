@@ -5,9 +5,10 @@
 //
 // ── EL HISTORIAL DICE DE DÓNDE SALIÓ LA PLATA ────────────────────────────
 //
-// Cada pago viaja con su ubicación de ORIGEN, que puede no ser la del gasto: el
-// depósito le paga a Arcor una compra de Casiano. La cuenta dice de quién es el
-// gasto; el pago, de qué caja salió.
+// Cada pago viaja con su ubicación de ORIGEN y, cuando fue en efectivo, con el
+// turno de cuyo cajón salió. Esa ubicación es siempre la de la deuda: una deuda
+// se paga operando la ubicación que la debe y con fondos de esa misma
+// ubicación. Ver la cuenta desde otra ubicación no habilita a pagarla.
 //
 // ── UNA CUENTA AJENA ES 403, NO 404 ──────────────────────────────────────
 //

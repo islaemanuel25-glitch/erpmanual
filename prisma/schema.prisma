@@ -2814,8 +2814,9 @@ model CuentaPorPagarProveedor {
   grupoId              Int
   pedidoProveedorId    Int       @unique
   proveedorId          Int
-  /// A QUIÉN PERTENECE EL GASTO. No es de dónde sale la plata: eso lo dice cada
-  /// pago en `PagoProveedor.localOrigenId`, y pueden ser ubicaciones distintas.
+  /// A QUIÉN PERTENECE LA DEUDA. Es también la única ubicación que la paga: cada
+  /// pago sale de ella (`PagoProveedor.localOrigenId` igual a ésta) y lo
+  /// registra quien la opera. Lo impone `registrarPagoProveedor`.
   localGastoId         Int
   total                Decimal   @db.Decimal(12, 2)
   vencimientoProveedor DateTime? @db.Date
@@ -2851,7 +2852,8 @@ model PagoProveedor {
   /// El día del pago. En efectivo es el instante en que salió del cajón.
   fecha            DateTime           @default(now())
   medio            MedioPagoProveedor
-  /// DE DÓNDE SALIÓ EL DINERO. Puede no ser la ubicación del gasto.
+  /// DE DÓNDE SALIÓ EL DINERO. Siempre la ubicación de la deuda
+  /// (`CuentaPorPagarProveedor.localGastoId`): ninguna ubicación paga deudas de otra.
   localOrigenId    Int
   usuarioId        Int
   turnoId          Int?
