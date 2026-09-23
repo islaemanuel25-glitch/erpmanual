@@ -16,23 +16,23 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **31 migraciones** y el árbol en **32**. Falta aplicar:
-
-- `20260923120000_costo_con_el_pie_del_245` — **migración de DATOS**. Corrige el
-  costo de los CUATRO productos del pedido 245 que se cerraron con "Aceptar el
-  precio nuevo" antes de `9af324bf`, o sea con el precio sin los conceptos del
-  pie: bases 1715, 1716, 1111 (de $6.131,82 a $6.283,85) y 2029 (de $6.968,54 a
-  $7.141,31), más el precio de venta de cada ubicación recalculado con SU margen,
-  que es lo que hace el camino normal del costo. Los quince renglones cerrados
-  con "Dejar el que tenía" NO se tocan. Cada UPDATE lleva en el WHERE el costo y
-  la venta que corrige, así que es idempotente y no puede pisar una corrección
-  posterior.
-
-  **El quinto chequeo del backup SÍ aplica**: hay valores que se sobrescriben.
-  Comprobar que el dump traiga los costos viejos —$6.131,82 y $6.968,54— antes
-  de aplicarla.
+Producción está en **32 migraciones** y el árbol también. **Ninguna** pendiente:
+el despliegue siguiente es solo de código.
 
 ---
+
+`20260923120000_costo_con_el_pie_del_245` salió de esta lista con el despliegue
+de `d75a9a11`. El clasificador la marcó —`UPDATE "ProductoBase"`, línea 47— y
+**Emanuel la autorizó expresamente** después de que se le informara qué escribe;
+se aplicó con `DEPLOY_MIGRACION_AUTORIZADA=1`. El contenedor descartable informó
+las **32** del árbol e imprimió "Applying migration".
+
+Comprobada contra la base después de aplicarla: las cuatro fichas quedaron en
+$6.283,85 (bases 1111, 1715, 1716) y $7.141,31 (base 2029), sus **veinte**
+ubicaciones con el costo nuevo y el precio de venta recalculado con el margen de
+cada una —8.900, 8.800, 8.200 y 10.000—, **cero** ubicaciones con el costo
+viejo, y las cuatro líneas del comprobante 17 con su `costoFinalUnitario`
+corregido.
 
 `20260922170000_conceptos_del_pie` salió de esta lista con el despliegue de
 `8972abae`: el contenedor descartable informó las **31** del árbol, imprimió
