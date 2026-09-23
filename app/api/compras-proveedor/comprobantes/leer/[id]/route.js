@@ -443,7 +443,25 @@ export async function POST(req, { params }) {
         // Las líneas se guardan SIEMPRE, cierre o no. Son lo que alguien va a
         // mirar para entender por qué no cerró: sin ellas, un MAL_LEIDO sería un
         // cartel sin nada detrás.
-        const lineas = resultado.lectura.lineas.filter((l) => l.cantidad !== null && l.netoUnitario !== null);
+        // ── NINGÚN RENGLÓN DESAPARECE EN SILENCIO ──────────────────────
+        //
+        // Acá había un `.filter(l => l.cantidad !== null && l.netoUnitario !== null)`
+        // justo debajo del comentario de arriba, que promete que las líneas se
+        // guardan siempre. Con el papel de TDC —que imprime el neto del RENGLÓN
+        // y no el de una unidad— el modelo dejaba `netoUnitario` vacío, que es
+        // lo correcto, y los DOCE renglones se borraban sin dejar rastro: el
+        // comprobante 20 quedó con `lineasTranscriptas` 12 y cero filas, y la
+        // pantalla decía "los productos suman $0,00" con el total del papel al
+        // lado y sin un número para elegir.
+        //
+        // Ahora el unitario lo despeja `completarElRenglon` —el sistema hace la
+        // cuenta, no el modelo— y lo único que queda afuera es el renglón al
+        // que le faltan los DOS números y la cantidad. Ése tampoco se pierde:
+        // se cuenta y el motivo se informa, porque la base exige esas columnas
+        // y guardarlo con ceros afirmaría que vale cero.
+        const transcriptas = resultado.lectura.lineas ?? [];
+        const lineas = transcriptas.filter((l) => l.cantidad !== null && l.netoUnitario !== null);
+        const renglonesIlegibles = transcriptas.length - lineas.length;
         let herencia = { conHerencia: [], heredados: [], sinHeredar: [] };
         if (lineas.length) {
           herencia = herenciaDeLosRenglones({

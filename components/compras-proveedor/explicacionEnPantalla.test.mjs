@@ -117,8 +117,31 @@ test("Y PROBAR NO ESCRIBE: LA RUTA LO GARANTIZA DEL LADO DEL SERVIDOR", () => {
 test("GUARDAR GUARDA SOLO LA EXPLICACIÓN", () => {
   const ramaGuardar = trozosDeLaRuta().guardar;
   assert.match(ramaGuardar, /recetaProveedor\.upsert/);
-  // Ni relee, ni toca comprobantes, ni pisa los impuestos de la receta.
-  assert.ok(!/leerConCadena|comprobante/i.test(ramaGuardar), "guardar hace algo más que guardar");
+
+  // ── EL CONTRATO CAMBIÓ EL 2026-09-23, Y SE ESCRIBE LA DIFERENCIA ─────
+  //
+  // Decía "ni relee, ni toca comprobantes". Lo primero sigue firme y es lo que
+  // importa: guardar NO llama al lector, así que no gasta una sola llamada
+  // paga por sí mismo.
+  //
+  // Lo segundo dejó de valer a propósito. Guardar ahora MIRA qué comprobantes
+  // sin recibir se podrían releer con la receta nueva, y devuelve la lista con
+  // el costo en lecturas. Quien decide releer es la pantalla, y quien paga es
+  // el usuario al apretar. Sin eso, cambiar la explicación dejaba los papeles
+  // ya subidos leídos con la vieja: le pasó al #247, cuya receta se guardó a
+  // las 15:10 y cuyo comprobante siguió con la lectura de antes.
+  //
+  // Es el MISMO mecanismo que `recetas/guardar` ya tenía para la otra pantalla
+  // de receta —`ofrecerRelectura`— conectado a este camino, no uno nuevo.
+  assert.ok(
+    !/leerConCadena/.test(ramaGuardar),
+    "guardar la explicación volvió a llamar al lector: eso gasta cuota sin que nadie lo pida"
+  );
+  assert.match(ramaGuardar, /ofrecerRelectura/, "guardar dejó de ofrecer releer los pendientes");
+  assert.ok(
+    !/comprobanteLinea|\.update\(/.test(ramaGuardar),
+    "guardar la explicación escribe en un comprobante"
+  );
   for (const campoDeImpuestos of ["ivaPorLinea", "alicuotaIvaPct", "percepciones", "facturaPor"]) {
     assert.ok(
       !ramaGuardar.includes(`${campoDeImpuestos}:`),
@@ -130,9 +153,12 @@ test("GUARDAR GUARDA SOLO LA EXPLICACIÓN", () => {
 test("NO SE PUEDE GUARDAR SI EL PAPEL NO CIERRA", () => {
   const c = codigoDe(EXPLICACION);
   assert.match(c, /sePuedeGuardar/, "se perdió la condición de guardado");
+  // El botón mira DOS cosas: que el papel cierre, y que no haya una relectura
+  // de los pendientes en curso —apretar en el medio dispararía dos tandas de
+  // llamadas pagas—. La condición de cierre es la que este candado defiende.
   assert.match(
     c,
-    /disabled=\{guardando \|\| !sePuedeGuardar\}/,
+    /disabled=\{guardando \|\| Boolean\(releyendo\) \|\| !sePuedeGuardar\}/,
     "el botón de guardar dejó de mirar si el papel cierra"
   );
   assert.match(

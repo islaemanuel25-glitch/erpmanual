@@ -30,6 +30,8 @@
 import { useEffect, useMemo, useState } from "react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { ORIGEN_DE_LECTURA } from "@/lib/compras-proveedor/comprobante/origenDeLectura";
+import { pedirLaLectura } from "@/lib/compras-proveedor/comprobante/leerConTurno";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
@@ -101,6 +103,8 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
   const [mensaje, setMensaje] = useState(null);
   const [lectura, setLectura] = useState(null);
   const [receta, setReceta] = useState(null);
+  /** `{hechas, total}` mientras se releen las facturas sin recibir. `null` = ninguna. */
+  const [releyendo, setReleyendo] = useState(null);
   // Qué producto resultó ser cada renglón, cuando se pudo saber por su alias.
   // Lo resuelve el servidor y viaja para que la cuenta se rehaga acá con los
   // MISMOS datos: si no, corregir un número haría cambiar la unidad sola.
@@ -239,6 +243,65 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
     }
   }
 
+  /**
+   * LOS PAPELES SIN RECIBIR SE VUELVEN A LEER CON LA RECETA NUEVA.
+   *
+   * Cambiar la explicación cambia cómo se entiende el papel, así que un
+   * comprobante subido antes quedó leído con la vieja. Le pasó al #247: la
+   * receta se guardó a las 15:10 y el comprobante seguía con la lectura de
+   * antes, con cero renglones y sin salida en la pantalla.
+   *
+   * ── ESTO NO ES UN CAMINO NUEVO ───────────────────────────────────────
+   *
+   * Es el MISMO que ya tiene `app/modulos/proveedores/recetas/page.jsx` para
+   * la otra pantalla de receta, y se copia su forma entera a propósito: de a
+   * uno, esperando el turno con `pedirLaLectura`, y cortando si se acaba la
+   * cuota. Lo que faltaba era conectarlo a este camino, no inventarle otro.
+   *
+   * ── LA ESPERA DEL TURNO NO ES UN DETALLE ─────────────────────────────
+   *
+   * El POST contesta enseguida con un número de turno. Sin esperarlo, este
+   * `for` dispararía todas las relecturas en paralelo contra una cuota de
+   * veinte por día, y las contaría como buenas antes de que ninguna hubiera
+   * terminado. El censo de `laRecepcionSobreviveAlRefresco` existe para que
+   * nadie agregue un camino que llame a la ruta por afuera — y se puso rojo
+   * con la primera versión de esto, que hacía exactamente eso.
+   */
+  async function releerLosPendientes(relectura) {
+    const ids = (relectura?.ids ?? []).slice(0, relectura?.entran ?? 0);
+    if (!ids.length) return;
+    setReleyendo({ hechas: 0, total: ids.length });
+    let bien = 0;
+    let cortado = null;
+    for (const [i, id] of ids.entries()) {
+      try {
+        const { cuerpo: json } = await pedirLaLectura({
+          comprobanteId: id,
+          origen: ORIGEN_DE_LECTURA.RECETA,
+          fetchImpl: fetch,
+        });
+        if (json?.ok) bien++;
+        // Si se acabó la cuota en el medio se frena: seguir gasta llamadas que
+        // van a fallar todas y demora el aviso.
+        else if (json?.motivo === "CUOTA_AGOTADA") {
+          cortado = json?.error;
+          break;
+        }
+      } catch {
+        cortado = "Se cortó la conexión.";
+        break;
+      }
+      setReleyendo({ hechas: i + 1, total: ids.length });
+    }
+    setReleyendo(null);
+    setMensaje({
+      tipo: cortado ? "aviso" : "ok",
+      texto: cortado
+        ? `Se releyeron ${bien} de ${ids.length}. ${cortado}`
+        : `Guardada. Se volvieron a leer ${bien} ${bien === 1 ? "factura" : "facturas"} de este proveedor que todavía no se recibieron.`,
+    });
+  }
+
   async function guardar() {
     setGuardando(true);
     setMensaje(null);
@@ -260,7 +323,10 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
           ? { tipo: "ok", texto: d.queHacer }
           : { tipo: "error", texto: textoDeFallo(d, r.status) }
       );
-      if (d?.ok) onGuardado?.();
+      if (d?.ok) {
+        onGuardado?.();
+        if (d.relectura?.hayQueOfrecer) await releerLosPendientes(d.relectura);
+      }
     } catch {
       setMensaje({ tipo: "error", texto: "Se cortó la conexión: no se guardó." });
     } finally {
@@ -398,11 +464,15 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
             <SunmiButton
               color="primary"
               type="button"
-              disabled={guardando || !sePuedeGuardar}
+              disabled={guardando || Boolean(releyendo) || !sePuedeGuardar}
               onClick={guardar}
               className="w-full min-h-botonFoto justify-center text-sm3 font-bold"
             >
-              {guardando ? "Guardando…" : "Está bien, guardar"}
+              {releyendo
+              ? `Releyendo ${releyendo.hechas} de ${releyendo.total}…`
+              : guardando
+                ? "Guardando…"
+                : "Está bien, guardar"}
             </SunmiButton>
             {!sePuedeGuardar && (
               <span className="text-sm3 sunmi-text-muted text-center">

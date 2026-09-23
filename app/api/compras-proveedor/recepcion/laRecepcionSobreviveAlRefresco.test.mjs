@@ -212,8 +212,27 @@ test("LOS CAMINOS QUE LLAMAN AL LECTOR ESTÁN CONTADOS", () => {
     { cwd: RAIZ, encoding: "utf8" }
   );
   const archivos = salida.split("\n").map((s) => s.trim()).filter(Boolean).sort();
+  // ── CRECIÓ A DOS MÁS, 2026-09-23, Y ES PARA LO QUE ESTÁ ──────────────
+  //
+  // `ExplicacionDelPapel` es la OTRA pantalla de receta —la de la explicación
+  // en castellano— y hasta hoy era la única de las dos que no ofrecía releer
+  // los papeles sin recibir. Ésa es la puerta por la que Emanuel guardó la
+  // receta de TDC, y por eso el comprobante del #247 se quedó con la lectura
+  // vieja: la receta cambió a las 15:10 y el papel seguía leído con la de
+  // antes.
+  //
+  // `CorregirComprobante` entra por el callejón sin salida: cuando no hay
+  // ningún número para elegir, lo que falta no es una corrección sino la
+  // lectura, y la pantalla ofrece volver a leer el papel.
+  //
+  // Las dos usan `pedirLaLectura` —la puerta con espera de turno— y no un
+  // `fetch` suelto. Este censo se puso ROJO con la primera versión de las dos,
+  // que llamaban la URL por afuera, que es exactamente lo que el segundo
+  // `assert` de abajo prohíbe.
   assert.deepEqual(archivos, [
     "app/modulos/proveedores/recetas/page.jsx",
+    "components/compras-proveedor/CorregirComprobante.jsx",
+    "components/compras-proveedor/ExplicacionDelPapel.jsx",
     "components/comprobantes/PanelComprobantes.jsx",
   ]);
 
