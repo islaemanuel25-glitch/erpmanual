@@ -106,7 +106,7 @@ const CASOS = [
     n: "6",
     defecto: "la tabla histórica vuelve a restar en la escala del pack",
     archivo: "components/transferencias/TablaDetalleTransferencia.jsx",
-    de: "    const diff = envFis == null || recFis == null ? null : diferenciaDeLinea({ enviada: envFis, recibida: recFis });",
+    de: "    const diff = envFis == null ? null : diferenciaDeLinea({ enviada: envFis, recibida: recFis });",
     a: "    const diff = recibido == null ? null : recibido - enviada;",
     candado: "6. la tabla histórica mide la diferencia en FÍSICO",
     suite: "lib/transferencias/revisionSueltas.test.mjs",
