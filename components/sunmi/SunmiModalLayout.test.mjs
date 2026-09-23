@@ -756,6 +756,12 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // Que la acción sea grave no entra en la cuenta: lo grave lo sostiene el
     // botón "Sí, cancelar", que hay que ir a buscar.
     "components/proveedores/listas/ModalCancelarImportacion.jsx": false,
+    // ── REGISTRAR UN PAGO A UN PROVEEDOR ─────────────────────────────────
+    //
+    // Carga: adentro hay un importe escrito, un medio, la ubicación de la que
+    // sale la plata, el turno y una nota. Un toque al costado tira las cinco, y
+    // en el teléfono es una hoja con el pulgar justo en el borde.
+    "components/finanzas/pagos/ModalRegistrarPago.jsx": true,
     // ── LA PREGUNTA DE "ESTE AUMENTO NO SE PARECE A LOS DE ESTE PROVEEDOR" ──
     //
     // Vive adentro de la pantalla de revisar de a uno. Mismo caso que la hoja de

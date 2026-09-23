@@ -8,9 +8,12 @@
 //
 // Es la regla de esta pantalla y la que más fácil se rompe sin querer. "Gastos
 // operativos $0,00" se lee como que no hubo gastos, y lo que pasa es que el ERP
-// no los conoce: no hay sueldos, ni alquiler, ni servicios, ni pagos a
-// proveedores registrados en ninguna tabla. Un cero ahí es una afirmación falsa
-// sobre la plata del negocio.
+// no los conoce: no hay sueldos, ni alquiler, ni servicios registrados en
+// ninguna tabla. Un cero ahí es una afirmación falsa sobre la plata del negocio.
+//
+// Los pagos a proveedores SÍ se registran, en su submódulo, pero este resumen
+// todavía no los suma: también van como "Todavía no disponible", y su motivo
+// —que viene del servidor— dice exactamente eso.
 //
 // Las tres que faltan viajan desde el servidor en `resumen.noDisponible`, con su
 // motivo, y se dibujan con la frase "Todavía no disponible". No están escritas
@@ -26,8 +29,10 @@
 // ── NI "GASTO" A UN RETIRO DE CAJA ───────────────────────────────────────
 //
 // Un retiro es plata que salió del cajón. Puede ser un pago a un proveedor, un
-// adelanto o el cambio que alguien fue a buscar: el sistema registra el motivo
-// como texto libre y nada más. Y los de recaudación ni siquiera salen del
+// adelanto o el cambio que alguien fue a buscar: acá se lee el motivo como
+// texto libre y nada más. Un pago a proveedor en efectivo registrado en su
+// submódulo también deja un RETIRO, y este resumen todavía no lo distingue de
+// uno manual: queda para cuando los pagos se incorporen al período. Y los de recaudación ni siquiera salen del
 // negocio —es la venta que ya se contó, cambiando de lugar—, por eso van en su
 // propio renglón.
 

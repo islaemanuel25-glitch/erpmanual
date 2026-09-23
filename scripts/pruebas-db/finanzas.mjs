@@ -13,6 +13,16 @@ const jwt = (await import("jsonwebtoken")).default;
 
 const rutaTablero = await import("../../app/api/finanzas/tablero/route.js");
 const rutaTurno = await import("../../app/api/finanzas/turno/[turnoId]/route.js");
+const rutaCuentas = await import("../../app/api/finanzas/pagos-proveedores/route.js");
+const rutaCuenta = await import("../../app/api/finanzas/pagos-proveedores/[cuentaId]/route.js");
+const rutaPagos = await import("../../app/api/finanzas/pagos-proveedores/[cuentaId]/pagos/route.js");
+const rutaTurnosOperativos = await import(
+  "../../app/api/finanzas/pagos-proveedores/turnos-operativos/route.js"
+);
+const { crearCuentaPorPagarDesdeCompra, ErrorPagoProveedor } = await import(
+  "../../lib/finanzas/pagosProveedoresServer.js"
+);
+const { PERMISO_REGISTRAR_PAGOS } = await import("../../lib/finanzas/pagosProveedores.js");
 
 let pasadas = 0;
 const fallas = [];
@@ -45,6 +55,14 @@ const leer = async (respuesta) => {
 };
 
 const paramsTurno = (turnoId) => ({ params: Promise.resolve({ turnoId: String(turnoId) }) });
+const paramsCuenta = (cuentaId) => ({ params: Promise.resolve({ cuentaId: String(cuentaId) }) });
+
+const conCuerpo = (url, sesion, metodo, cuerpo) =>
+  new Request(url, {
+    method: metodo,
+    headers: { cookie: `erpazul_sesion=${sesion}`, "content-type": "application/json" },
+    body: JSON.stringify(cuerpo),
+  });
 
 const marca = `ci-finanzas-${Date.now()}`;
 const creado = {
@@ -55,6 +73,11 @@ const creado = {
   usuarioDepositoId: null,
   usuarioLocalId: null,
   turnoId: null,
+  // Pagos a proveedores
+  otroLocalId: null,
+  turnoOtroId: null,
+  proveedorId: null,
+  pedidoIds: [],
 };
 
 async function montar() {
@@ -121,10 +144,67 @@ async function montar() {
     },
   });
 
-  return { deposito, local, usuarioDeposito, usuarioLocal, turno };
+  // ── PAGOS A PROVEEDORES ─────────────────────────────────────────────────
+  //
+  // Un segundo local del grupo, con su turno, para probar que un local no ve ni
+  // paga lo ajeno y que un efectivo no puede salir del cajón de otro.
+  const otroLocal = await prisma.local.create({ data: { nombre: `${marca}-otro` } });
+  creado.otroLocalId = otroLocal.id;
+  await prisma.grupoLocal.create({ data: { grupoId: grupo.id, localId: otroLocal.id } });
+  const turnoOtro = await prisma.turno.create({
+    data: { localId: otroLocal.id, vendedorId: usuarioDeposito.id, montoInicial: 0, apertura: new Date() },
+  });
+  creado.turnoOtroId = turnoOtro.id;
+
+  const proveedor = await prisma.proveedor.create({ data: { nombre: `${marca}-Arcor` } });
+  creado.proveedorId = proveedor.id;
+  const nuevoPedido = async () => {
+    const p = await prisma.pedidoProveedor.create({
+      data: {
+        grupoId: grupo.id,
+        depositoId: deposito.id,
+        proveedorId: proveedor.id,
+        estado: "RECIBIDO",
+        nroFactura: "0001-00012345",
+      },
+    });
+    creado.pedidoIds.push(p.id);
+    return p;
+  };
+  const pedidoDelLocal = await nuevoPedido();
+  const pedidoDelOtro = await nuevoPedido();
+
+  return {
+    grupo,
+    deposito,
+    local,
+    otroLocal,
+    usuarioDeposito,
+    usuarioLocal,
+    turno,
+    turnoOtro,
+    pedidoDelLocal,
+    pedidoDelOtro,
+  };
 }
 
 async function desmontar() {
+  // Primero los pagos: apuntan al turno y al movimiento de caja, y el CHECK de
+  // la migración no deja desvincular un efectivo.
+  if (creado.pedidoIds.length) {
+    await prisma.pagoProveedor.deleteMany({
+      where: { cuenta: { pedidoProveedorId: { in: creado.pedidoIds } } },
+    });
+    await prisma.cuentaPorPagarProveedor.deleteMany({
+      where: { pedidoProveedorId: { in: creado.pedidoIds } },
+    });
+    await prisma.pedidoProveedor.deleteMany({ where: { id: { in: creado.pedidoIds } } });
+  }
+  if (creado.proveedorId) await prisma.proveedor.deleteMany({ where: { id: creado.proveedorId } });
+  if (creado.turnoOtroId) {
+    await prisma.cajaMovimiento.deleteMany({ where: { turnoId: creado.turnoOtroId } });
+    await prisma.turno.deleteMany({ where: { id: creado.turnoOtroId } });
+  }
   if (creado.localId) {
     await prisma.arqueoCaja.deleteMany({ where: { localId: creado.localId } });
     await prisma.venta.deleteMany({ where: { localId: creado.localId } });
@@ -139,7 +219,7 @@ async function desmontar() {
     await prisma.grupoLocal.deleteMany({ where: { grupoId: creado.grupoId } });
     await prisma.grupoDeposito.deleteMany({ where: { grupoId: creado.grupoId } });
   }
-  const locales = [creado.depositoId, creado.localId].filter(Boolean);
+  const locales = [creado.depositoId, creado.localId, creado.otroLocalId].filter(Boolean);
   if (locales.length) await prisma.local.deleteMany({ where: { id: { in: locales } } });
   if (creado.grupoId) await prisma.grupo.deleteMany({ where: { id: creado.grupoId } });
   if (creado.rolId) await prisma.rol.deleteMany({ where: { id: creado.rolId } });
@@ -208,10 +288,355 @@ async function correr(f) {
   );
 }
 
+// ── PAGOS A PROVEEDORES ───────────────────────────────────────────────────
+//
+// La cuenta nace por la capa canónica —la misma que va a llamar "Cerrar
+// compra"— y todo lo demás pasa por los handlers reales.
+
+const ESCRITURA_FIN = ["finanzas.ver", PERMISO_REGISTRAR_PAGOS];
+
+// Cada envío es un intento nuevo salvo que el caso traiga su clave: así los
+// casos de arriba no dependen de la idempotencia y los de reintento la nombran.
+let intento = 0;
+async function pagar(cuentaId, sesion, datos) {
+  intento += 1;
+  const cuerpo = { idempotencyKey: `${marca}-intento-${intento}`, ...datos };
+  return leer(
+    rutaPagos.POST(
+      conCuerpo(`http://ci/api/finanzas/pagos-proveedores/${cuentaId}/pagos`, sesion, "POST", cuerpo),
+      paramsCuenta(cuentaId)
+    )
+  );
+}
+
+async function abrir(cuentaId, sesion) {
+  return leer(
+    rutaCuenta.GET(
+      pedido(`http://ci/api/finanzas/pagos-proveedores/${cuentaId}`, sesion),
+      paramsCuenta(cuentaId)
+    )
+  );
+}
+
+const movimientosDe = (turnoId) => prisma.cajaMovimiento.count({ where: { turnoId } });
+
+async function esperadoDelTurno(turnoId, sesion) {
+  const r = await leer(
+    rutaTurno.GET(pedido(`http://ci/api/finanzas/turno/${turnoId}`, sesion), paramsTurno(turnoId))
+  );
+  return r.esperado?.efectivoEsperado;
+}
+
+async function correrPagos(f) {
+  const localEscribe = token(f.usuarioLocal.id, f.local.id, ESCRITURA_FIN);
+  const localSoloVe = token(f.usuarioLocal.id, f.local.id, ["finanzas.ver"]);
+  const depositoEscribe = token(f.usuarioDeposito.id, f.deposito.id, ESCRITURA_FIN);
+  const admin = token(f.usuarioDeposito.id, f.deposito.id, ["*"]);
+
+  console.log("\n── Pagos: la cuenta nace por la capa canónica");
+  const { cuenta: cuentaA } = await prisma.$transaction((tx) =>
+    crearCuentaPorPagarDesdeCompra(tx, {
+      pedidoProveedorId: f.pedidoDelLocal.id,
+      localGastoId: f.local.id,
+      total: 485300,
+      vencimientoProveedor: "2026-10-15",
+      fechaPrevistaPago: null,
+      usuarioId: f.usuarioDeposito.id,
+    })
+  );
+  ok("compra $485.300 sin pagos → saldo $485.300", cuentaA.saldo === 485300, JSON.stringify(cuentaA));
+  ok("sin pagos está PENDIENTE", cuentaA.estado === "PENDIENTE");
+  ok("el vencimiento vuelve como el mismo día", cuentaA.vencimientoProveedor === "2026-10-15");
+  ok("sin fecha prevista es null", cuentaA.fechaPrevistaPago === null);
+
+  const { cuenta: cuentaB } = await prisma.$transaction((tx) =>
+    crearCuentaPorPagarDesdeCompra(tx, {
+      pedidoProveedorId: f.pedidoDelOtro.id,
+      localGastoId: f.otroLocal.id,
+      total: 1000,
+      usuarioId: f.usuarioDeposito.id,
+    })
+  );
+
+  let duplicada = null;
+  try {
+    await prisma.$transaction((tx) =>
+      crearCuentaPorPagarDesdeCompra(tx, {
+        pedidoProveedorId: f.pedidoDelLocal.id,
+        localGastoId: f.local.id,
+        total: 1,
+        usuarioId: f.usuarioDeposito.id,
+      })
+    );
+  } catch (e) {
+    duplicada = e;
+  }
+  ok(
+    "una compra no genera dos cuentas",
+    duplicada instanceof ErrorPagoProveedor && duplicada.status === 409,
+    String(duplicada?.message)
+  );
+
+  console.log("\n── Pagos: alcance del local");
+  const listaLocal = await leer(
+    rutaCuentas.GET(pedido("http://ci/api/finanzas/pagos-proveedores?estado=TODAS", localEscribe))
+  );
+  ok("la lista del local responde 200", listaLocal.status === 200 && listaLocal.ok, listaLocal.error);
+  ok("el local ve su cuenta", listaLocal.cuentas?.some((c) => c.id === cuentaA.id));
+  ok("el local NO ve la cuenta de otro local", !listaLocal.cuentas?.some((c) => c.id === cuentaB.id));
+  const ajenaLeida = await abrir(cuentaB.id, localEscribe);
+  ok("el local no puede leer la deuda de otro local", ajenaLeida.status === 403, `status ${ajenaLeida.status}`);
+  const ajenaPagada = await pagar(cuentaB.id, localEscribe, { monto: 10, medio: "TRANSFERENCIA" });
+  ok("el local no puede pagar la deuda de otro local", ajenaPagada.status === 403, `status ${ajenaPagada.status}`);
+
+  console.log("\n── Pagos: finanzas.ver lee pero no escribe");
+  const soloVe = await abrir(cuentaA.id, localSoloVe);
+  ok("finanzas.ver abre la cuenta", soloVe.status === 200 && soloVe.ok, soloVe.error);
+  ok("y la pantalla sabe que no puede escribir", soloVe.puedeEscribir === false);
+  const soloVePaga = await pagar(cuentaA.id, localSoloVe, { monto: 10, medio: "TRANSFERENCIA" });
+  ok("finanzas.ver NO registra pagos", soloVePaga.status === 403, `status ${soloVePaga.status}`);
+  const soloVeFecha = await leer(
+    rutaCuenta.PATCH(
+      conCuerpo(`http://ci/api/finanzas/pagos-proveedores/${cuentaA.id}`, localSoloVe, "PATCH", {
+        fechaPrevistaPago: "2026-11-01",
+      }),
+      paramsCuenta(cuentaA.id)
+    )
+  );
+  ok("finanzas.ver NO mueve la fecha prevista", soloVeFecha.status === 403, `status ${soloVeFecha.status}`);
+
+  console.log("\n── Pagos: validaciones");
+  for (const monto of [0, -5, "abc"]) {
+    const r = await pagar(cuentaA.id, localEscribe, { monto, medio: "TRANSFERENCIA" });
+    ok(`monto ${JSON.stringify(monto)} se rechaza`, r.status === 400, `status ${r.status} ${r.error}`);
+  }
+  const deMas = await pagar(cuentaA.id, localEscribe, { monto: 485300.01, medio: "TRANSFERENCIA" });
+  ok("un pago mayor al saldo se rechaza", deMas.status === 400, `status ${deMas.status} ${deMas.error}`);
+  const origenAjeno = await pagar(cuentaA.id, localEscribe, {
+    monto: 10,
+    medio: "TRANSFERENCIA",
+    localOrigenId: f.deposito.id,
+  });
+  ok("un local no puede pagar con plata de otra ubicación", origenAjeno.status === 403);
+
+  console.log("\n── Pagos: transferencia $300.000");
+  const movsAntes = await movimientosDe(f.turno.id);
+  const p1 = await pagar(cuentaA.id, localEscribe, { monto: 300000, medio: "TRANSFERENCIA" });
+  ok("el pago parcial responde 200", p1.status === 200 && p1.ok, p1.error);
+  ok("saldo $185.300", p1.cuenta?.saldo === 185300, JSON.stringify(p1.cuenta));
+  ok("queda PARCIAL", p1.cuenta?.estado === "PARCIAL");
+  ok("transferencia NO crea CajaMovimiento", (await movimientosDe(f.turno.id)) === movsAntes);
+  ok("transferencia no tiene turno ni movimiento", p1.pago?.turnoId === null && p1.pago?.cajaMovimientoId === null);
+
+  const lectura = await abrir(cuentaA.id, localEscribe);
+  ok("la lectura posterior da saldo $185.300", lectura.cuenta?.saldo === 185300);
+  ok("el historial tiene el pago", lectura.pagos?.length === 1);
+
+  console.log("\n── Pagos: efectivo $100.000 desde el turno del local");
+  const sinTurno = await pagar(cuentaA.id, localEscribe, { monto: 100000, medio: "EFECTIVO" });
+  ok("efectivo sin turno se rechaza", sinTurno.status === 400, sinTurno.error);
+  const turnoAjeno = await pagar(cuentaA.id, localEscribe, {
+    monto: 100000,
+    medio: "EFECTIVO",
+    turnoId: f.turnoOtro.id,
+  });
+  ok("efectivo desde el turno de otra ubicación se rechaza", turnoAjeno.status === 409, turnoAjeno.error);
+
+  const esperadoAntes = await esperadoDelTurno(f.turno.id, localEscribe);
+  const movsAntesEf = await movimientosDe(f.turno.id);
+  const p2 = await pagar(cuentaA.id, localEscribe, {
+    monto: 100000,
+    medio: "EFECTIVO",
+    turnoId: f.turno.id,
+  });
+  ok("el pago en efectivo responde 200", p2.status === 200 && p2.ok, p2.error);
+  ok("segundo pago → saldo $85.300", p2.cuenta?.saldo === 85300);
+  ok("efectivo crea exactamente UN movimiento", (await movimientosDe(f.turno.id)) === movsAntesEf + 1);
+  const mov = p2.pago?.cajaMovimientoId
+    ? await prisma.cajaMovimiento.findUnique({ where: { id: p2.pago.cajaMovimientoId } })
+    : null;
+  ok("el movimiento es un RETIRO por el mismo importe", mov?.tipo === "RETIRO" && Number(mov?.monto) === 100000);
+  ok("pago y movimiento quedan vinculados por id", mov?.turnoId === f.turno.id && p2.pago?.turnoId === f.turno.id);
+  const esperadoDespues = await esperadoDelTurno(f.turno.id, localEscribe);
+  ok(
+    "el efectivo esperado baja exactamente una vez",
+    Math.round((esperadoAntes - esperadoDespues) * 100) === 10000000,
+    `${esperadoAntes} → ${esperadoDespues}`
+  );
+
+  console.log("\n── Pagos: el depósito paga lo de Casiano por transferencia");
+  const p3 = await pagar(cuentaA.id, depositoEscribe, {
+    monto: 85300,
+    medio: "TRANSFERENCIA",
+    localOrigenId: f.deposito.id,
+  });
+  ok("el depósito puede pagar la cuenta del local", p3.status === 200 && p3.ok, p3.error);
+  ok("pago final → saldo $0", p3.cuenta?.saldo === 0);
+  ok("pago final → PAGADA", p3.cuenta?.estado === "PAGADA");
+  ok("el dinero salió del depósito", p3.pago?.origen?.id === f.deposito.id);
+  ok("el gasto sigue siendo del local", p3.cuenta?.localGasto?.id === f.local.id);
+  const saldada = await pagar(cuentaA.id, depositoEscribe, {
+    monto: 1,
+    medio: "TRANSFERENCIA",
+    localOrigenId: f.deposito.id,
+  });
+  ok("una cuenta pagada no admite más pagos", saldada.status === 400);
+
+  console.log("\n── Pagos: las dos fechas son independientes");
+  const conFecha = await leer(
+    rutaCuenta.PATCH(
+      conCuerpo(`http://ci/api/finanzas/pagos-proveedores/${cuentaA.id}`, localEscribe, "PATCH", {
+        fechaPrevistaPago: "2026-11-01",
+        vencimientoProveedor: "2030-01-01",
+      }),
+      paramsCuenta(cuentaA.id)
+    )
+  );
+  ok("la fecha prevista se guarda", conFecha.cuenta?.fechaPrevistaPago === "2026-11-01", conFecha.error);
+  ok("el vencimiento del proveedor no se toca", conFecha.cuenta?.vencimientoProveedor === "2026-10-15");
+
+  console.log("\n── Pagos: lecturas del historial y de la lista");
+  const final = await abrir(cuentaA.id, depositoEscribe);
+  ok("el depósito ve los tres pagos", final.pagos?.length === 3);
+  ok(
+    "el historial dice de dónde salió cada pago",
+    final.pagos?.every((p) => p.origen?.id) &&
+      final.pagos.some((p) => p.origen.id === f.deposito.id) &&
+      final.pagos.some((p) => p.origen.id === f.local.id)
+  );
+  const pendientes = await leer(
+    rutaCuentas.GET(pedido("http://ci/api/finanzas/pagos-proveedores", depositoEscribe))
+  );
+  ok("la cuenta pagada no está en Pendientes", !pendientes.cuentas?.some((c) => c.id === cuentaA.id));
+  ok("la del otro local sí, para el depósito", pendientes.cuentas?.some((c) => c.id === cuentaB.id));
+
+  const turnosLocal = await leer(
+    rutaTurnosOperativos.GET(
+      pedido(`http://ci/api/finanzas/pagos-proveedores/turnos-operativos`, localEscribe)
+    )
+  );
+  ok("el local ve su turno abierto para pagar en efectivo", turnosLocal.turnos?.some((t) => t.id === f.turno.id), turnosLocal.error);
+
+  console.log("\n── Pagos: idempotencia del intento");
+  // Una cuenta propia para estos casos, así los números de arriba no se mueven.
+  const pedidoReintento = await prisma.pedidoProveedor.create({
+    data: {
+      grupoId: f.grupo.id,
+      depositoId: f.deposito.id,
+      proveedorId: creado.proveedorId,
+      estado: "RECIBIDO",
+    },
+  });
+  creado.pedidoIds.push(pedidoReintento.id);
+  const { cuenta: cuentaR } = await prisma.$transaction((tx) =>
+    crearCuentaPorPagarDesdeCompra(tx, {
+      pedidoProveedorId: pedidoReintento.id,
+      localGastoId: f.local.id,
+      total: 1000,
+      usuarioId: f.usuarioDeposito.id,
+    })
+  );
+  const pagosDe = (cuentaId) => prisma.pagoProveedor.count({ where: { cuentaId } });
+
+  const sinClave = await pagar(cuentaR.id, localEscribe, {
+    monto: 10,
+    medio: "TRANSFERENCIA",
+    idempotencyKey: undefined,
+  });
+  ok("un pago sin clave de intento se rechaza", sinClave.status === 400, sinClave.error);
+
+  const tr = { monto: 100, medio: "TRANSFERENCIA", idempotencyKey: `${marca}-reintento-tr` };
+  const tr1 = await pagar(cuentaR.id, localEscribe, tr);
+  const tr2 = await pagar(cuentaR.id, localEscribe, tr);
+  ok("el primer envío de la transferencia registra", tr1.status === 200 && tr1.repetido === false, tr1.error);
+  ok("el reintento contesta 200 y repetido", tr2.status === 200 && tr2.repetido === true, tr2.error);
+  ok("el reintento devuelve EL MISMO pago", tr2.pago?.id === tr1.pago?.id);
+  ok("retry de transferencia → un solo PagoProveedor", (await pagosDe(cuentaR.id)) === 1);
+  ok("y el saldo bajó una sola vez", tr2.cuenta?.saldo === 900);
+
+  const ef = {
+    monto: 200,
+    medio: "EFECTIVO",
+    turnoId: f.turno.id,
+    idempotencyKey: `${marca}-reintento-ef`,
+  };
+  const movsAntesR = await movimientosDe(f.turno.id);
+  // Los dos a la vez, que es el doble clic de verdad: el lock de la cuenta los
+  // pone en fila y el segundo encuentra al primero.
+  const [ef1, ef2] = await Promise.all([
+    pagar(cuentaR.id, localEscribe, ef),
+    pagar(cuentaR.id, localEscribe, ef),
+  ]);
+  const ef3 = await pagar(cuentaR.id, localEscribe, ef);
+  ok(
+    "los dos envíos simultáneos del efectivo contestan 200",
+    ef1.status === 200 && ef2.status === 200,
+    `${ef1.status} ${ef1.error || ""} / ${ef2.status} ${ef2.error || ""}`
+  );
+  ok(
+    "uno solo de los dos registró; el otro es repetido",
+    [ef1.repetido, ef2.repetido].filter((x) => x === true).length === 1
+  );
+  ok("los tres envíos devuelven el mismo pago", ef1.pago?.id === ef2.pago?.id && ef2.pago?.id === ef3.pago?.id);
+  ok("retry de efectivo → un solo PagoProveedor más", (await pagosDe(cuentaR.id)) === 2);
+  ok("retry de efectivo → un solo CajaMovimiento", (await movimientosDe(f.turno.id)) === movsAntesR + 1);
+  ok("el saldo bajó una sola vez por el efectivo", ef3.cuenta?.saldo === 700);
+
+  const otra1 = await pagar(cuentaR.id, localEscribe, {
+    monto: 300,
+    medio: "OTRO",
+    idempotencyKey: `${marca}-clave-a`,
+  });
+  const otra2 = await pagar(cuentaR.id, localEscribe, {
+    monto: 300,
+    medio: "OTRO",
+    idempotencyKey: `${marca}-clave-b`,
+  });
+  ok(
+    "dos claves distintas son dos pagos válidos",
+    otra1.status === 200 && otra2.status === 200 && otra1.pago?.id !== otra2.pago?.id,
+    `${otra1.error || ""} ${otra2.error || ""}`
+  );
+  ok("con el saldo que alcanza", otra2.cuenta?.saldo === 100 && (await pagosDe(cuentaR.id)) === 4);
+  const otra3 = await pagar(cuentaR.id, localEscribe, {
+    monto: 300,
+    medio: "OTRO",
+    idempotencyKey: `${marca}-clave-c`,
+  });
+  ok("una tercera clave ya no entra si no alcanza el saldo", otra3.status === 400, otra3.error);
+
+  // El reintento del pago que SALDÓ la cuenta. Es el caso que el UNIQUE solo no
+  // cubre: sin la relectura por clave, el segundo envío chocaría antes con
+  // "esta cuenta ya está pagada" y quien reintenta creería que falló.
+  const queSalda = { monto: 100, medio: "TRANSFERENCIA", idempotencyKey: `${marca}-salda` };
+  const salda1 = await pagar(cuentaR.id, localEscribe, queSalda);
+  const salda2 = await pagar(cuentaR.id, localEscribe, queSalda);
+  ok("el pago que salda registra", salda1.status === 200 && salda1.cuenta?.estado === "PAGADA", salda1.error);
+  ok(
+    "su reintento devuelve ese pago, no 'ya está pagada'",
+    salda2.status === 200 && salda2.repetido === true && salda2.pago?.id === salda1.pago?.id,
+    `${salda2.status} ${salda2.error || ""}`
+  );
+
+  console.log("\n── Pagos: Admin por *");
+  const pagadas = await leer(
+    rutaCuentas.GET(pedido("http://ci/api/finanzas/pagos-proveedores?estado=PAGADAS", admin))
+  );
+  ok("admin lee la lista", pagadas.status === 200 && pagadas.ok, pagadas.error);
+  ok("admin ve la cuenta pagada", pagadas.cuentas?.some((c) => c.id === cuentaA.id));
+  const pAdmin = await pagar(cuentaB.id, admin, {
+    monto: 500,
+    medio: "MERCADO_PAGO",
+    localOrigenId: f.deposito.id,
+  });
+  ok("admin registra un pago", pAdmin.status === 200 && pAdmin.cuenta?.saldo === 500, pAdmin.error);
+}
+
 let fixture;
 try {
   fixture = await montar();
   await correr(fixture);
+  await correrPagos(fixture);
 } finally {
   await desmontar();
   await prisma.$disconnect();

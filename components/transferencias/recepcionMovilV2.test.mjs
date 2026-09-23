@@ -485,7 +485,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // antes de que el precio llevara los conceptos del pie adentro. No agrega ni
   // borra columnas: son UPDATE con el valor viejo en el WHERE. Se declara acá
   // porque eso es lo que este conteo existe para obligar.
-  assert.equal(migraciones.length, 32, "aparecio una migracion que nadie declaro aca");
+  // Sube a 33 el 2026-09-23: entró `20260923205422_pagos_a_proveedores`, las
+  // dos tablas de Finanzas —cuenta por pagar de una compra y sus pagos— con su
+  // enum. Aditiva y sin backfill: no toca ninguna tabla de recepción.
+  assert.equal(migraciones.length, 33, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

@@ -16,8 +16,13 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **32 migraciones** y el árbol también. **Ninguna** pendiente:
-el despliegue siguiente es solo de código.
+Producción está en **32 migraciones**. Falta:
+
+- `20260923205422_pagos_a_proveedores` — aditiva: el enum `MedioPagoProveedor`,
+  las tablas `CuentaPorPagarProveedor` y `PagoProveedor`, sus índices, claves
+  foráneas y tres CHECK sobre esas mismas tablas nuevas. No toca filas ni
+  columnas existentes y no hace backfill: las dos tablas nacen vacías. Viene de
+  la rama `feat/finanzas-pagos-proveedores`, todavía sin mergear.
 
 ---
 
