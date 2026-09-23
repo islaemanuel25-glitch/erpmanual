@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { pedidoEnAlcance } from "@/lib/compras/scope";
+import { SELECT_CUENTA, serializarCuenta } from "@/lib/finanzas/pagosProveedoresServer";
 
 export async function GET(req) {
   try {
@@ -35,6 +36,10 @@ export async function GET(req) {
       include: {
         proveedor: { select: { id: true, nombre: true, telefono: true, email: true, direccion: true } },
         deposito: { select: { id: true, nombre: true } },
+        // La deuda que nació al cerrar, para el resumen del pedido recibido.
+        // Viaja ya resuelta por `serializarCuenta` —la misma de Finanzas—, así
+        // que la pantalla no suma pagos.
+        cuentaPorPagar: { select: SELECT_CUENTA },
         detalles: {
           include: {
             producto: {
@@ -73,7 +78,12 @@ export async function GET(req) {
       );
     }
 
-    return NextResponse.json({ ok: true, item: pedido });
+    const { cuentaPorPagar, ...item } = pedido;
+    return NextResponse.json({
+      ok: true,
+      item,
+      cuentaPorPagar: cuentaPorPagar ? serializarCuenta(cuentaPorPagar) : null,
+    });
   } catch (err) {
     console.error("Error compras-proveedor/obtener:", err);
     return NextResponse.json(

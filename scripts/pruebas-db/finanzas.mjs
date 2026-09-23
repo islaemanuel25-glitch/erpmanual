@@ -23,6 +23,8 @@ const { crearCuentaPorPagarDesdeCompra, ErrorPagoProveedor } = await import(
   "../../lib/finanzas/pagosProveedoresServer.js"
 );
 const { PERMISO_REGISTRAR_PAGOS } = await import("../../lib/finanzas/pagosProveedores.js");
+const rutaRecibir = await import("../../app/api/compras-proveedor/recibir/[id]/route.js");
+const rutaObtener = await import("../../app/api/compras-proveedor/obtener/route.js");
 
 let pasadas = 0;
 const fallas = [];
@@ -78,6 +80,9 @@ const creado = {
   turnoOtroId: null,
   proveedorId: null,
   pedidoIds: [],
+  // Cierre de compra
+  baseId: null,
+  turnoDepositoId: null,
 };
 
 async function montar() {
@@ -174,7 +179,35 @@ async function montar() {
   const pedidoDelLocal = await nuevoPedido();
   const pedidoDelOtro = await nuevoPedido();
 
+  // ── CIERRE DE COMPRA ────────────────────────────────────────────────────
+  //
+  // Un producto del depósito, para que un pedido tenga algo que entre al
+  // stock, y un turno abierto del depósito para pagar en efectivo desde su
+  // cajón. El costo del pedido es el mismo del catálogo: acá no se prueba la
+  // frontera de costos, que tiene sus propios candados.
+  const base = await prisma.productoBase.create({
+    data: {
+      grupoId: grupo.id,
+      nombre: `${marca}-producto`,
+      unidad_medida: "unidad",
+      precio_costo: 240000,
+      precio_venta: 300000,
+    },
+  });
+  creado.baseId = base.id;
+  const plDeposito = await prisma.productoLocal.create({
+    data: { localId: deposito.id, baseId: base.id, precio_costo: 240000, precio_venta: 300000 },
+  });
+  const turnoDeposito = await prisma.turno.create({
+    data: { localId: deposito.id, vendedorId: usuarioDeposito.id, montoInicial: 0, apertura: new Date() },
+  });
+  creado.turnoDepositoId = turnoDeposito.id;
+
   return {
+    base,
+    plDeposito,
+    turnoDeposito,
+    proveedor,
     grupo,
     deposito,
     local,
@@ -198,7 +231,19 @@ async function desmontar() {
     await prisma.cuentaPorPagarProveedor.deleteMany({
       where: { pedidoProveedorId: { in: creado.pedidoIds } },
     });
+    await prisma.comprobanteProveedor.deleteMany({ where: { pedidoId: { in: creado.pedidoIds } } });
     await prisma.pedidoProveedor.deleteMany({ where: { id: { in: creado.pedidoIds } } });
+  }
+  if (creado.baseId) {
+    const pls = await prisma.productoLocal.findMany({ where: { baseId: creado.baseId }, select: { id: true } });
+    const idsPl = pls.map((p) => p.id);
+    if (idsPl.length) await prisma.stockLocal.deleteMany({ where: { productoId: { in: idsPl } } });
+    await prisma.productoLocal.deleteMany({ where: { baseId: creado.baseId } });
+    await prisma.productoBase.deleteMany({ where: { id: creado.baseId } });
+  }
+  if (creado.turnoDepositoId) {
+    await prisma.cajaMovimiento.deleteMany({ where: { turnoId: creado.turnoDepositoId } });
+    await prisma.turno.deleteMany({ where: { id: creado.turnoDepositoId } });
   }
   if (creado.proveedorId) await prisma.proveedor.deleteMany({ where: { id: creado.proveedorId } });
   if (creado.turnoOtroId) {
@@ -632,11 +677,242 @@ async function correrPagos(f) {
   ok("admin registra un pago", pAdmin.status === 200 && pAdmin.cuenta?.saldo === 500, pAdmin.error);
 }
 
+// ── CIERRE DE COMPRA CON PAGO AL PROVEEDOR ─────────────────────────────────
+//
+// Por el handler REAL de `recibir/[id]`: la mercadería, la compra, la cuenta y
+// el pago inicial en una sola transacción.
+
+const COMPRAS = ["compras.ver", "compras.crear"];
+
+async function pedidoParaCerrar(f, { owner, totales = [], cantidad = 2 }) {
+  const pedido = await prisma.pedidoProveedor.create({
+    data: {
+      grupoId: f.grupo.id,
+      depositoId: f.deposito.id,
+      creadoEnLocalId: owner,
+      proveedorId: f.proveedor.id,
+      estado: "ENVIADO",
+      detalles: {
+        create: [{ productoLocalId: f.plDeposito.id, cantidad, unidad: "UNIDAD", precioCosto: 240000 }],
+      },
+    },
+    include: { detalles: { select: { id: true } } },
+  });
+  creado.pedidoIds.push(pedido.id);
+  for (const t of totales) {
+    await prisma.comprobanteProveedor.create({
+      data: {
+        grupoId: f.grupo.id,
+        proveedorId: f.proveedor.id,
+        pedidoId: pedido.id,
+        localOperativoId: owner,
+        estado: t == null ? "SIN_TOTAL" : "CARGADO",
+        totalLeido: t,
+      },
+    });
+  }
+  return { pedidoId: pedido.id, detId: pedido.detalles[0].id, cantidad };
+}
+
+async function cerrar(sesion, p, pagoAlProveedor) {
+  return leer(
+    rutaRecibir.POST(
+      conCuerpo(`http://ci/api/compras-proveedor/recibir/${p.pedidoId}`, sesion, "POST", {
+        recibidos: { [p.detId]: p.cantidad },
+        fisicas: { [p.detId]: p.cantidad },
+        pagoAlProveedor,
+      }),
+      { params: Promise.resolve({ id: String(p.pedidoId) }) }
+    )
+  );
+}
+
+async function stockDe(localId, baseId) {
+  const pl = await prisma.productoLocal.findUnique({
+    where: { localId_baseId: { localId, baseId } },
+    select: { id: true },
+  });
+  if (!pl) return 0;
+  const s = await prisma.stockLocal.findUnique({
+    where: { localId_productoId: { localId, productoId: pl.id } },
+    select: { cantidad: true },
+  });
+  return Number(s?.cantidad || 0);
+}
+
+async function estadoDelCierre(pedidoId) {
+  const [pedido, cuenta] = await Promise.all([
+    prisma.pedidoProveedor.findUnique({ where: { id: pedidoId }, select: { estado: true, totalReal: true, totalFactura: true } }),
+    prisma.cuentaPorPagarProveedor.findUnique({
+      where: { pedidoProveedorId: pedidoId },
+      select: { id: true, total: true, localGastoId: true, pagos: { select: { id: true, monto: true, localOrigenId: true, cajaMovimientoId: true } } },
+    }),
+  ]);
+  return { pedido, cuenta };
+}
+
+async function correrCierre(f) {
+  const deposito = token(f.usuarioDeposito.id, f.deposito.id, [...COMPRAS, PERMISO_REGISTRAR_PAGOS]);
+  const localConPago = token(f.usuarioLocal.id, f.local.id, [...COMPRAS, PERMISO_REGISTRAR_PAGOS]);
+  const localSinPago = token(f.usuarioLocal.id, f.local.id, COMPRAS);
+  const baseId = f.base.id;
+
+  console.log("\n── Cierre: 1 · factura $485.300, PENDIENTE");
+  const p1 = await pedidoParaCerrar(f, { owner: f.deposito.id, totales: [485300] });
+  const stockAntes1 = await stockDe(f.deposito.id, baseId);
+  const r1 = await cerrar(deposito, p1, { estado: "PENDIENTE", vencimientoProveedor: "2026-10-15" });
+  const e1 = await estadoDelCierre(p1.pedidoId);
+  ok("el cierre responde 200", r1.status === 200 && r1.ok, r1.error);
+  ok("la compra queda RECIBIDA", e1.pedido.estado === "RECIBIDO");
+  ok("entró la mercadería", (await stockDe(f.deposito.id, baseId)) === stockAntes1 + 2);
+  ok("la cuenta es de $485.300", Number(e1.cuenta?.total) === 485300);
+  ok("sin pagos", e1.cuenta?.pagos.length === 0);
+  ok("saldo $485.300 y PENDIENTE", r1.cuentaPorPagar?.saldo === 485300 && r1.cuentaPorPagar?.estado === "PENDIENTE");
+  ok("el gasto es de la ubicación dueña del pedido", e1.cuenta?.localGastoId === f.deposito.id);
+  ok("totalReal de la compra es la deuda", Number(e1.pedido.totalReal) === 485300);
+  ok("el vencimiento del proveedor viajó", r1.cuentaPorPagar?.vencimientoProveedor === "2026-10-15");
+
+  console.log("\n── Cierre: 2 · PARCIAL $300.000 por transferencia");
+  const p2 = await pedidoParaCerrar(f, { owner: f.deposito.id, totales: [485300] });
+  const r2 = await cerrar(deposito, p2, {
+    estado: "PARCIAL",
+    pago: { monto: "300000", medio: "TRANSFERENCIA", localOrigenId: f.deposito.id },
+  });
+  ok("el cierre parcial responde 200", r2.status === 200 && r2.ok, r2.error);
+  ok("cuenta $485.300, saldo $185.300, PARCIAL",
+    r2.cuentaPorPagar?.total === 485300 && r2.cuentaPorPagar?.saldo === 185300 && r2.cuentaPorPagar?.estado === "PARCIAL");
+  const e2 = await estadoDelCierre(p2.pedidoId);
+  ok("un pago de $300.000", e2.cuenta?.pagos.length === 1 && Number(e2.cuenta.pagos[0].monto) === 300000);
+
+  console.log("\n── Cierre: 3 · PAGADA");
+  const p3 = await pedidoParaCerrar(f, { owner: f.deposito.id, totales: [485300] });
+  const r3 = await cerrar(deposito, p3, {
+    estado: "PAGADA",
+    pago: { medio: "MERCADO_PAGO", localOrigenId: f.deposito.id },
+  });
+  ok("el cierre pagado responde 200", r3.status === 200 && r3.ok, r3.error);
+  ok("pago $485.300, saldo $0, PAGADA",
+    r3.cuentaPorPagar?.pagado === 485300 && r3.cuentaPorPagar?.saldo === 0 && r3.cuentaPorPagar?.estado === "PAGADA");
+
+  console.log("\n── Cierre: 4 · productos $480.000, factura $511.968,28");
+  const p4 = await pedidoParaCerrar(f, { owner: f.deposito.id, totales: [511968.28] });
+  const r4 = await cerrar(deposito, p4, { estado: "PENDIENTE" });
+  const e4 = await estadoDelCierre(p4.pedidoId);
+  ok("el control interno sigue siendo $480.000", Number(e4.pedido.totalFactura) === 480000, String(e4.pedido.totalFactura));
+  ok("la deuda es EXACTA la factura: $511.968,28", Number(e4.cuenta?.total) === 511968.28 && r4.cuentaPorPagar?.total === 511968.28);
+
+  console.log("\n── Cierre: 5 · varias facturas");
+  const p5 = await pedidoParaCerrar(f, { owner: f.deposito.id, totales: [300000.1, 211968.18] });
+  const r5 = await cerrar(deposito, p5, { estado: "PENDIENTE" });
+  ok("la deuda es la suma de las facturas", r5.cuentaPorPagar?.total === 511968.28, JSON.stringify(r5.cuentaPorPagar));
+
+  console.log("\n── Cierre: 6 · una factura sin total impreso");
+  const p6 = await pedidoParaCerrar(f, { owner: f.deposito.id, totales: [300000, null] });
+  const stockAntes6 = await stockDe(f.deposito.id, baseId);
+  const sinTotal = await cerrar(deposito, p6, { estado: "PENDIENTE" });
+  ok("sin total confirmado no cierra", sinTotal.status === 400 && sinTotal.pideTotal === true, sinTotal.error);
+  const escritoSinConfirmar = await cerrar(deposito, p6, { estado: "PENDIENTE", totalAPagar: "511.968,28" });
+  ok("escrito pero sin confirmar tampoco", escritoSinConfirmar.status === 400);
+  ok("y no quedó nada a medias",
+    (await estadoDelCierre(p6.pedidoId)).pedido.estado === "ENVIADO" && (await stockDe(f.deposito.id, baseId)) === stockAntes6);
+  const conTotal = await cerrar(deposito, p6, {
+    estado: "PENDIENTE",
+    totalAPagar: "511.968,28",
+    totalConfirmado: true,
+  });
+  const e6 = await estadoDelCierre(p6.pedidoId);
+  ok("confirmado, cierra", conTotal.status === 200 && conTotal.ok, conTotal.error);
+  ok("con la deuda confirmada, no la suma de las que traían total",
+    Number(e6.cuenta?.total) === 511968.28 && Number(e6.pedido.totalReal) === 511968.28);
+
+  console.log("\n── Cierre: 7 · gasto del local, dinero del depósito");
+  const p7 = await pedidoParaCerrar(f, { owner: f.local.id, totales: [50000] });
+  const r7 = await cerrar(localConPago, p7, { estado: "PENDIENTE" });
+  ok("el local cierra su compra", r7.status === 200 && r7.ok, r7.error);
+  ok("entró al stock del local", (await stockDe(f.local.id, baseId)) === 2);
+  const origenAjenoAlCerrar = await cerrar(localConPago, await pedidoParaCerrar(f, { owner: f.local.id, totales: [1000] }), {
+    estado: "PAGADA",
+    pago: { medio: "TRANSFERENCIA", localOrigenId: f.deposito.id },
+  });
+  ok("al cerrar, un local no puede pagar con plata del depósito", origenAjenoAlCerrar.status === 403, origenAjenoAlCerrar.error);
+  const depositoPaga = await pagar(r7.cuentaPorPagar.id, token(f.usuarioDeposito.id, f.deposito.id, ESCRITURA_FIN), {
+    monto: 50000,
+    medio: "TRANSFERENCIA",
+    localOrigenId: f.deposito.id,
+  });
+  const e7 = await estadoDelCierre(p7.pedidoId);
+  ok("el depósito la paga desde Finanzas", depositoPaga.status === 200, depositoPaga.error);
+  ok("localGastoId = el local", e7.cuenta?.localGastoId === f.local.id);
+  ok("localOrigenId = el depósito", e7.cuenta?.pagos[0]?.localOrigenId === f.deposito.id);
+
+  console.log("\n── Cierre: 8 y 10 · efectivo, con doble envío y reintento");
+  const p8 = await pedidoParaCerrar(f, { owner: f.deposito.id, totales: [485300] });
+  const stockAntes8 = await stockDe(f.deposito.id, baseId);
+  const movsAntes8 = await movimientosDe(f.turnoDeposito.id);
+  const pagadaEfectivo = {
+    estado: "PAGADA",
+    pago: { medio: "EFECTIVO", localOrigenId: f.deposito.id, turnoId: f.turnoDeposito.id },
+  };
+  const [a8, b8] = await Promise.all([cerrar(deposito, p8, pagadaEfectivo), cerrar(deposito, p8, pagadaEfectivo)]);
+  const c8 = await cerrar(deposito, p8, pagadaEfectivo);
+  const e8 = await estadoDelCierre(p8.pedidoId);
+  ok("los dos envíos simultáneos contestan 200", a8.status === 200 && b8.status === 200, `${a8.error || ""} ${b8.error || ""}`);
+  ok("uno solo cerró; el otro es repetido", [a8.repetido, b8.repetido].filter(Boolean).length === 1);
+  ok("el reintento contesta repetido", c8.status === 200 && c8.repetido === true);
+  ok("no duplica stock", (await stockDe(f.deposito.id, baseId)) === stockAntes8 + 2);
+  ok("no duplica cuenta", (await prisma.cuentaPorPagarProveedor.count({ where: { pedidoProveedorId: p8.pedidoId } })) === 1);
+  ok("un solo PagoProveedor", e8.cuenta?.pagos.length === 1);
+  ok("un solo CajaMovimiento RETIRO", (await movimientosDe(f.turnoDeposito.id)) === movsAntes8 + 1);
+  const mov8 = await prisma.cajaMovimiento.findUnique({ where: { id: e8.cuenta.pagos[0].cajaMovimientoId } });
+  ok("el retiro es por el mismo monto y está vinculado", mov8?.tipo === "RETIRO" && Number(mov8.monto) === 485300);
+  ok("todos devuelven la misma cuenta", a8.cuentaPorPagar?.id === c8.cuentaPorPagar?.id && b8.cuentaPorPagar?.id === c8.cuentaPorPagar?.id);
+
+  console.log("\n── Cierre: 9 · falla el pago → no queda nada");
+  const p9 = await pedidoParaCerrar(f, { owner: f.deposito.id, totales: [485300] });
+  const stockAntes9 = await stockDe(f.deposito.id, baseId);
+  const movsOtroAntes = await movimientosDe(f.turnoOtro.id);
+  const r9 = await cerrar(deposito, p9, {
+    estado: "PAGADA",
+    // Un turno de OTRA ubicación: lo detecta `registrarPagoProveedor` adentro
+    // de la transacción, después de que el stock ya se escribió.
+    pago: { medio: "EFECTIVO", localOrigenId: f.deposito.id, turnoId: f.turnoOtro.id },
+  });
+  const e9 = await estadoDelCierre(p9.pedidoId);
+  ok("el cierre se rechaza", r9.status === 409, `${r9.status} ${r9.error}`);
+  ok("rollback: la compra sigue ENVIADA", e9.pedido.estado === "ENVIADO");
+  ok("rollback: sin cuenta", e9.cuenta === null);
+  ok("rollback: el stock no se movió", (await stockDe(f.deposito.id, baseId)) === stockAntes9);
+  ok("rollback: ningún retiro", (await movimientosDe(f.turnoOtro.id)) === movsOtroAntes);
+
+  console.log("\n── Cierre: 11 y 12 · permisos");
+  const p11 = await pedidoParaCerrar(f, { owner: f.local.id, totales: [1000] });
+  const r11 = await cerrar(localSinPago, p11, { estado: "PENDIENTE" });
+  ok("PENDIENTE sin permiso financiero cierra", r11.status === 200 && r11.ok, r11.error);
+  const p12 = await pedidoParaCerrar(f, { owner: f.local.id, totales: [1000] });
+  const stockAntes12 = await stockDe(f.local.id, baseId);
+  for (const estado of ["PARCIAL", "PAGADA"]) {
+    const r12 = await cerrar(localSinPago, p12, {
+      estado,
+      pago: { monto: estado === "PARCIAL" ? 500 : undefined, medio: "TRANSFERENCIA", localOrigenId: f.local.id },
+    });
+    ok(`${estado} sin permiso financiero → 403`, r12.status === 403, `${r12.status} ${r12.error}`);
+  }
+  const e12 = await estadoDelCierre(p12.pedidoId);
+  ok("y no se cerró nada", e12.pedido.estado === "ENVIADO" && e12.cuenta === null && (await stockDe(f.local.id, baseId)) === stockAntes12);
+
+  console.log("\n── Cierre: la pantalla de recibido lee la cuenta");
+  const leido = await leer(
+    rutaObtener.GET(pedido(`http://ci/api/compras-proveedor/obtener?id=${p2.pedidoId}`, deposito))
+  );
+  ok("obtener trae la cuenta resuelta", leido.cuentaPorPagar?.saldo === 185300 && leido.cuentaPorPagar?.estado === "PARCIAL", leido.error);
+}
+
 let fixture;
 try {
   fixture = await montar();
   await correr(fixture);
   await correrPagos(fixture);
+  await correrCierre(fixture);
 } finally {
   await desmontar();
   await prisma.$disconnect();
