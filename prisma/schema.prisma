@@ -187,6 +187,11 @@ model Local {
   ofertas              Oferta[]
   recargosPago         RecargoPagoLocal[]
   mediosCobro          MedioCobroLocal[]
+  /// Las compras cuyo GASTO es de esta ubicación.
+  cuentasPorPagarDelGasto CuentaPorPagarProveedor[] @relation("cuenta_gasto")
+  /// Los pagos cuyo DINERO salió de esta ubicación. Son dos listas distintas a
+  /// propósito: ver `CuentaPorPagarProveedor`.
+  pagosProveedorOrigen    PagoProveedor[]           @relation("pago_origen")
 }
 
 // Configuración de comportamiento POR LOCAL. Reemplaza (con herencia) a los
@@ -338,6 +343,8 @@ model Usuario {
   movimientosCC     MovimientoCuenta[]
   auditoriaStock    AuditoriaStock[]
   importacionesLista ImportacionListaProveedor[]
+  cuentasPorPagarCreadas CuentaPorPagarProveedor[] @relation("cuenta_creada_por")
+  pagosProveedorRegistrados PagoProveedor[]        @relation("pago_registrado_por")
 
   @@map("Usuario")
 }
@@ -453,6 +460,7 @@ model Proveedor {
   lecturasDeProducto LecturaProductoProveedor[]
   productosQueNoSeCambian ProductoQueNoSeCambia[]
   comprobantes ComprobanteProveedor[]
+  cuentasPorPagar CuentaPorPagarProveedor[]
 
   dias_pedido DiaPedido[] @default([])
 
@@ -2042,6 +2050,8 @@ model Turno {
   cambiosDejados    CambioPendiente[]  @relation("cambioTurnoOrigen")
   /// Cambio que ESTE turno recibió al abrirse, si abrió tomando uno pendiente.
   cambioRecibido    CambioPendiente?   @relation("cambioTurnoDestino")
+  /// Pagos a proveedor en EFECTIVO que salieron del cajón de ESTE turno.
+  pagosProveedor    PagoProveedor[]
 
   @@index([localId])
   @@index([vendedorId])
@@ -2634,6 +2644,10 @@ model CajaMovimiento {
   /// Inverso 1:1 del retiro que lo originó. Sin lista: un movimiento pertenece
   /// a lo sumo a UN retiro.
   arqueoRetiro ArqueoCaja? @relation("retiroDeArqueo")
+  /// Inverso 1:1 del pago a proveedor en efectivo que lo originó. El vínculo es
+  /// `PagoProveedor.cajaMovimientoId`, con UNIQUE: el motivo del movimiento es
+  /// texto para un humano y nunca decide de qué pago es.
+  pagoProveedor PagoProveedor?
 
   @@index([turnoId])
 }
@@ -2747,6 +2761,9 @@ model PedidoProveedor {
   deposito   Local     @relation(fields: [depositoId], references: [id])
   proveedor  Proveedor @relation(fields: [proveedorId], references: [id])
   detalles   PedidoProveedorDetalle[]
+  /// La obligación con el proveedor que nació de esta compra. A lo sumo UNA:
+  /// el UNIQUE está en `CuentaPorPagarProveedor.pedidoProveedorId`.
+  cuentaPorPagar CuentaPorPagarProveedor?
 
   @@index([grupoId])
   @@index([depositoId])
@@ -2754,6 +2771,103 @@ model PedidoProveedor {
   @@index([proveedorId])
   @@index([estado])
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// PAGOS A PROVEEDORES (Finanzas)
+// ---------------------------------------------------------------------------
+
+/// CON QUÉ SE LE PAGÓ AL PROVEEDOR.
+///
+/// NO es `MedioPago` ni los medios de cobro del POS: aquéllos dicen cómo ENTRA
+/// la plata de un cliente —débito, crédito, fiado— y éste dice cómo SALE hacia
+/// un proveedor. Compartir el enum habría ofrecido "Fiado" para pagarle a Arcor.
+enum MedioPagoProveedor {
+  EFECTIVO
+  TRANSFERENCIA
+  MERCADO_PAGO
+  OTRO
+}
+
+/// LO QUE SE LE DEBE AL PROVEEDOR POR UNA COMPRA.
+///
+/// Nace de una compra —`PedidoProveedor`— por UNA sola puerta,
+/// `crearCuentaPorPagarDesdeCompra` (lib/finanzas/pagosProveedoresServer.js).
+/// Finanzas no la origina a mano: no hay endpoint para crear deuda.
+///
+/// ── LO QUE NO SE GUARDA ─────────────────────────────────────────────────
+///
+/// Ni "pagado", ni "saldo", ni "PENDIENTE / PARCIAL / PAGADA". Los tres se
+/// derivan de `total` y de la suma de `pagos` con `estadoDeCuenta`
+/// (lib/finanzas/pagosProveedores.js). Una columna de saldo sería una segunda
+/// verdad que un pago cargado por otro camino dejaría vieja sin que nada falle.
+///
+/// ── DOS FECHAS, Y NO SON LA MISMA ───────────────────────────────────────
+///
+/// `vencimientoProveedor` es la condición que dio el PROVEEDOR; `fechaPrevistaPago`
+/// es una decisión NUESTRA y se cambia desde Finanzas. Las dos pueden faltar:
+/// null es "sin fecha / pasa a cobrar", no un día por defecto. Son `DATE` y no
+/// `TIMESTAMP`: un vencimiento es un día, y con hora el mismo día se leería
+/// distinto según la zona del proceso.
+model CuentaPorPagarProveedor {
+  id                   Int       @id @default(autoincrement())
+  grupoId              Int
+  pedidoProveedorId    Int       @unique
+  proveedorId          Int
+  /// A QUIÉN PERTENECE EL GASTO. No es de dónde sale la plata: eso lo dice cada
+  /// pago en `PagoProveedor.localOrigenId`, y pueden ser ubicaciones distintas.
+  localGastoId         Int
+  total                Decimal   @db.Decimal(12, 2)
+  vencimientoProveedor DateTime? @db.Date
+  fechaPrevistaPago    DateTime? @db.Date
+  creadoPorId          Int
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  pedido     PedidoProveedor @relation(fields: [pedidoProveedorId], references: [id])
+  proveedor  Proveedor       @relation(fields: [proveedorId], references: [id])
+  localGasto Local           @relation("cuenta_gasto", fields: [localGastoId], references: [id])
+  creadoPor  Usuario         @relation("cuenta_creada_por", fields: [creadoPorId], references: [id])
+  pagos      PagoProveedor[]
+
+  @@index([grupoId])
+  @@index([localGastoId])
+  @@index([proveedorId])
+}
+
+/// UN PAGO A UN PROVEEDOR: el hecho financiero.
+///
+/// No es un `CajaMovimiento`. Aquél es plata física saliendo de un cajón; éste
+/// es la deuda bajando. Solo el EFECTIVO tiene las dos cosas, y entonces el pago
+/// apunta a su movimiento por `cajaMovimientoId` —UNIQUE, un movimiento es de a
+/// lo sumo un pago— y al turno de cuyo cajón salió. Transferencia, Mercado Pago
+/// y Otro no tocan la caja y dejan las dos columnas en null. La migración lo
+/// exige con un CHECK: la base no acepta un efectivo sin movimiento ni un
+/// movimiento en un pago que no es efectivo.
+model PagoProveedor {
+  id               Int                @id @default(autoincrement())
+  cuentaId         Int
+  monto            Decimal            @db.Decimal(12, 2)
+  /// El día del pago. En efectivo es el instante en que salió del cajón.
+  fecha            DateTime           @default(now())
+  medio            MedioPagoProveedor
+  /// DE DÓNDE SALIÓ EL DINERO. Puede no ser la ubicación del gasto.
+  localOrigenId    Int
+  usuarioId        Int
+  turnoId          Int?
+  cajaMovimientoId Int?               @unique
+  nota             String?
+  createdAt        DateTime           @default(now())
+
+  cuenta         CuentaPorPagarProveedor @relation(fields: [cuentaId], references: [id])
+  localOrigen    Local                   @relation("pago_origen", fields: [localOrigenId], references: [id])
+  usuario        Usuario                 @relation("pago_registrado_por", fields: [usuarioId], references: [id])
+  turno          Turno?                  @relation(fields: [turnoId], references: [id])
+  cajaMovimiento CajaMovimiento?         @relation(fields: [cajaMovimientoId], references: [id])
+
+  @@index([cuentaId])
+  @@index([localOrigenId])
+  @@index([turnoId])
 }
 
 model PedidoProveedorDetalle {
