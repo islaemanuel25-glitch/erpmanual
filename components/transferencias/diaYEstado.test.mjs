@@ -110,11 +110,17 @@ test("D4 · LA BANDA SE PINTA ENTERA: ningún hijo suyo declara fondo propio", (
   // la lista se lee como "ninguno". Si en vez de agregarla se hubiera bajado el
   // número esperado de 2 a 1, el candado habría quedado sin ver la tarjeta —
   // verde y sin cubrir nada.
-  const soft = salida.match(/sunmi-surface-soft/g) || [];
+  //
+  // Y el 2026-09-24 entró `sunmi-control`: la banda dejó `sunmi-surface-soft`
+  // —que en doce de los catorce temas vale lo mismo que la tarjeta y no se
+  // veía— por el fondo de los botones secundarios, el de Recibir mercadería. Se
+  // agregó a la lista por el mismo motivo que `sunmi-bg-card`: una clase que
+  // pinta y no está acá se cuenta como ninguna.
+  const banda = salida.match(/sunmi-control\b/g) || [];
   const todas =
-    salida.match(/sunmi-surface\b|sunmi-surface-soft|sunmi-bg-card\b|sunmi-card\b|\bbg-\[/g) || [];
+    salida.match(/sunmi-surface\b|sunmi-surface-soft|sunmi-control\b|sunmi-bg-card\b|sunmi-card\b|\bbg-\[/g) || [];
 
-  assert.equal(soft.length, 1, "la banda tiene que ser el ÚNICO nodo con el fondo tenue");
+  assert.equal(banda.length, 1, "la banda tiene que ser el ÚNICO nodo con el fondo de la franja");
   assert.equal(
     todas.length,
     2,
@@ -135,7 +141,7 @@ test("D4 · LA BANDA SE PINTA ENTERA: ningún hijo suyo declara fondo propio", (
   // —`sunmi-surface-soft` CONTIENE `sunmi-surface`— y comparaba la banda contra
   // sí misma. No se rompió: se quedó sin nada que afirmar.
   assert.ok(
-    salida.indexOf("sunmi-bg-card") < salida.indexOf("sunmi-surface-soft"),
+    salida.indexOf("sunmi-control") > -1 && salida.indexOf("sunmi-bg-card") < salida.indexOf("sunmi-control"),
     "el marco tiene que envolver a la banda, no ir después"
   );
   // Y el marco recorta, o la banda se come las esquinas redondeadas.

@@ -41,6 +41,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -80,37 +81,116 @@ const DIA = {
   transferencias: [TRANSFERENCIA],
 };
 
-/** El marco y la banda, tal como los dibujaba `DiaDeTransferencias` antes. */
-const BANDA_ESPERADA =
-  '<div class="sunmi-bg-card rounded-xl2 border sunmi-border overflow-hidden">' +
-  '<div class="sunmi-surface-soft px-4 py-2.5 flex items-center justify-between gap-3">' +
-  '<div class="min-w-0 flex-1">' +
-  '<div class="text-base2 font-semibold sunmi-text-strong truncate">Sábado 12</div>' +
-  '<div class="text-sm2 sunmi-text-muted">3 transferencias · 1 sin recibir</div>' +
-  "</div>" +
-  '<div class="shrink-0 text-base2 font-semibold sunmi-text-strong tabular-nums">$ 144086.40</div>' +
-  "</div>";
-
 // ══════════════════════════════════════════════════════════════════════════
-// LA PIEZA EXTRAÍDA DIBUJA LO QUE DIBUJABA
+// LA BANDA DEL DÍA ES UNA SOLA, Y ES LA DE RECIBIR MERCADERÍA
 // ══════════════════════════════════════════════════════════════════════════
+//
+// El contrato cambió a propósito el 2026-09-24. Antes este candado exigía que
+// la banda siguiera siendo la de Transferencias —`sunmi-surface-soft`, dos
+// renglones, 15 px—, y esa banda no se veía: en doce de los catorce temas
+// `--app-input-bg` vale lo mismo que `--card-bg`. La referencia pasó a ser la
+// de Recibir mercadería (`DiaDePedidos`), la única que se veía, y las cuatro
+// pantallas que agrupan por día la usan desde `DiaConBanda`.
+//
+// El marcado de abajo está ESCRITO A MANO, por lo mismo que el de antes: si
+// alguien lo cambia, esto se pone rojo, y mover una banda que usan cuatro
+// pantallas tiene que ser una decisión.
+//
+// Lo que el marcado no puede probar —que no desborda a 360 px— se midió en un
+// navegador con los textos más largos de cada pantalla, y está en el commit.
+// Acá queda el contrato que lo hace posible (D1d).
 
-test("D1 · `DiaConBanda` sola produce EXACTAMENTE el marco y la banda de antes", () => {
-  const salida = h(DiaConBanda, {
-    titulo: "Sábado 12",
-    subtitulo: "3 transferencias · 1 sin recibir",
-    importe: "$ 144086.40",
-  });
-  assert.equal(salida, `${BANDA_ESPERADA}</div>`);
+/** La caja y la banda, abiertas. Falta cerrar la banda y la caja. */
+const ABRE_BANDA =
+  '<div class="rounded-xl border sunmi-divider sunmi-bg-card overflow-hidden">' +
+  '<div class="sunmi-control px-4 py-renglon flex flex-wrap items-baseline gap-x-renglon gap-y-dato">';
+
+/** La banda completa de Recibir con un solo pedido: día y cantidad, sin importe. */
+const BANDA_UN_PEDIDO =
+  ABRE_BANDA +
+  '<div class="grow text-sm3 font-bold sunmi-text-strong">Miércoles 23</div>' +
+  '<div class="ml-auto flex flex-wrap items-baseline justify-end gap-x-renglon gap-y-dato">' +
+  '<div class="text-sm3 sunmi-text-muted">1 pedido</div>' +
+  "</div></div>";
+
+const BANDA_TRANSFERENCIAS =
+  ABRE_BANDA +
+  '<div class="grow text-sm3 font-bold sunmi-text-strong">Sábado 12</div>' +
+  '<div class="ml-auto flex flex-wrap items-baseline justify-end gap-x-renglon gap-y-dato">' +
+  '<div class="text-sm3 sunmi-text-muted">3 transferencias · 1 sin recibir</div>' +
+  '<div class="text-sm3 font-bold sunmi-text-strong tabular-nums">$ 144086.40</div>' +
+  "</div></div>";
+
+// La forma que manda la ruta de pedidos, agrupada por la función real.
+const PEDIDO = (id, iso, extra = {}) => ({
+  id,
+  proveedorNombre: "Als",
+  fechaEnviado: iso,
+  createdAt: iso,
+  cantItems: 12,
+  totalEstimado: 45300.5,
+  totalFacturado: null,
+  estado: "ENVIADO",
+  ...extra,
 });
 
-test("D2 · y `DiaDeTransferencias` sigue abriendo con ese mismo marcado", () => {
+test("D1 · `DiaConBanda` dibuja la banda de Recibir: `sunmi-control`, una línea, día · dato · importe", () => {
+  const salida = h(DiaConBanda, {
+    titulo: "Sábado 12",
+    dato: "3 transferencias · 1 sin recibir",
+    importe: "$ 144086.40",
+  });
+  assert.equal(salida, `${BANDA_TRANSFERENCIAS}</div>`);
+});
+
+test("D1b · sin importe no se dibuja el nodo del importe", () => {
+  for (const importe of [null, undefined, false, ""]) {
+    const salida = h(DiaConBanda, { titulo: "Miércoles 23", dato: "1 pedido", importe });
+    assert.equal(salida, `${BANDA_UN_PEDIDO}</div>`, `con importe ${JSON.stringify(importe)}`);
+  }
+});
+
+test("D1c · Recibir mercadería abre con esa misma banda, y sus renglones siguen siendo los suyos", async () => {
+  const { default: DiaDePedidos } = await import("@/components/compras-proveedor/DiaDePedidos.jsx");
+  const { agruparPedidosPorDia } = await import("@/lib/compras-proveedor/diasDePedidos");
+  const [uno] = agruparPedidosPorDia([PEDIDO(1, "2026-09-23T10:00:00-03:00")]);
+  const salida = h(DiaDePedidos, { dia: uno, onRecibir: () => {} });
+  assert.ok(salida.startsWith(BANDA_UN_PEDIDO), `la banda de Recibir cambió:\n${salida.slice(0, 600)}`);
+  // El renglón de siempre, con su botón y sin línea arriba del primero.
+  assert.match(salida, /min-h-filaPedido px-4 py-filtro flex items-center justify-between gap-renglon "/);
+  assert.match(salida, />Recibir</);
+
+  // Con dos pedidos, el subtotal aparece: la regla de Recibir sigue en Recibir.
+  const [dos] = agruparPedidosPorDia([
+    PEDIDO(1, "2026-09-22T10:00:00-03:00"),
+    PEDIDO(2, "2026-09-22T11:00:00-03:00", { totalEstimado: 45300.5 }),
+  ]);
+  const conDos = h(DiaDePedidos, { dia: dos, onRecibir: () => {} });
+  assert.match(conDos, /<div class="text-sm3 sunmi-text-muted">2 pedidos<\/div><div class="text-sm3 font-bold sunmi-text-strong tabular-nums">\$90\.601,00<\/div>/);
+  // Y con uno no: la banda de arriba ya se comparó entera y no tiene nodo de importe.
+});
+
+test("D1d · el contrato que evita el desborde: salta por espacio, el día no se corta", () => {
+  const salida = h(DiaConBanda, { titulo: "Sin fecha de vencimiento", dato: "12 cuentas", importe: "$1" });
+  const banda = salida.match(/<div class="sunmi-control[^"]*"/)[0];
+  assert.match(banda, /\bflex-wrap\b/, "sin flex-wrap la banda desborda a 360 px");
+  const dia = salida.match(/<div class="([^"]*)">Sin fecha de vencimiento</)[1];
+  // Ni recorte ni renglón forzado: el día se ve entero y, si no entra con el
+  // resto, lo que baja es el dato.
+  assert.doesNotMatch(dia, /truncate|whitespace-nowrap|overflow-hidden|min-w-0/, `el día se puede cortar: ${dia}`);
+  const grupo = salida.match(/<div class="(ml-auto[^"]*)">/)[1];
+  assert.match(grupo, /\bflex-wrap\b/, "si dato e importe no entran juntos, el importe tiene que poder bajar");
+  assert.match(grupo, /\bjustify-end\b/, "lo que baja va alineado a la derecha");
+  assert.doesNotMatch(salida, /shrink-0/, "un bloque que no se encoge ni baja es el que se sale de la tarjeta");
+});
+
+test("D2 · y `DiaDeTransferencias` abre con esa misma banda", () => {
   // Con una fila adentro: sin ella no se probaría que las filas siguen colgando
   // del mismo contenedor.
   const salida = h(DiaDeTransferencias, { dia: DIA, money });
   assert.ok(
-    salida.startsWith(BANDA_ESPERADA),
-    `la banda de transferencias cambió.\nEsperado al inicio:\n${BANDA_ESPERADA}\nSalió:\n${salida.slice(0, BANDA_ESPERADA.length)}`
+    salida.startsWith(BANDA_TRANSFERENCIAS),
+    `la banda de transferencias cambió.\nEsperado al inicio:\n${BANDA_TRANSFERENCIAS}\nSalió:\n${salida.slice(0, BANDA_TRANSFERENCIAS.length)}`
   );
   // Y la fila sigue ahí, con su separador arriba.
   assert.match(salida, /border-t sunmi-divider/);
@@ -122,7 +202,7 @@ test("D3 · el total del día lo formatea el CONSUMIDOR, no la pieza", () => {
   // `DiaConBanda` recibe el importe ya escrito. Si formateara por su cuenta
   // sería el treintaiseisavo formateador del repo, y Finanzas y Transferencias
   // escribirían la plata distinto.
-  const conOtroFormato = h(DiaConBanda, { titulo: "x", subtitulo: "y", importe: "USD 10" });
+  const conOtroFormato = h(DiaConBanda, { titulo: "x", dato: "y", importe: "USD 10" });
   assert.match(conOtroFormato, />USD 10</);
 });
 
@@ -130,7 +210,26 @@ test("D4 · un día SIN filas no deja una línea colgando", () => {
   // El separador va arriba de cada fila justamente para esto: sin filas, la
   // tarjeta termina en la banda.
   const salida = h(DiaDeTransferencias, { dia: { ...DIA, transferencias: [] }, money });
-  assert.equal(salida, `${BANDA_ESPERADA}</div>`);
+  assert.equal(salida, `${BANDA_TRANSFERENCIAS}</div>`);
+});
+
+test("D4b · las cuatro pantallas que agrupan por día usan `DiaConBanda`, y ninguna dibuja la suya", () => {
+  const sinComentarios = (ruta) =>
+    fs
+      .readFileSync(new URL(`../../${ruta}`, import.meta.url), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/[^\n]*/g, "");
+  for (const ruta of [
+    "components/compras-proveedor/DiaDePedidos.jsx",
+    "components/transferencias/DiaDeTransferencias.jsx",
+    "components/finanzas/pagos/ListaCuentasPorPagar.jsx",
+    "components/finanzas/DiaDeActividad.jsx",
+  ]) {
+    const src = sinComentarios(ruta);
+    assert.ok(src.includes("<DiaConBanda"), `${ruta} no usa DiaConBanda`);
+    // Una banda paralela se reconoce por su fondo: nadie más que la pieza lo pone.
+    assert.doesNotMatch(src, /sunmi-control|sunmi-surface-soft/, `${ruta} volvió a pintar su propia banda`);
+  }
 });
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -226,10 +325,15 @@ test("D11 · el aviso de corte NO se dibuja cuando nadie manda `sinConfigurar`",
 // ══════════════════════════════════════════════════════════════════════════
 
 test("D12 · `DiaConBanda` no escribe un solo color fijo ni una medida arbitraria", () => {
-  const salida = h(DiaConBanda, { titulo: "x", subtitulo: "y", importe: "z" });
+  const salida = h(DiaConBanda, { titulo: "x", dato: "y", importe: "z" });
   assert.doesNotMatch(salida, /#[0-9a-fA-F]{3,8}\b/, "un color literal en la pieza compartida");
   assert.doesNotMatch(salida, /\[[0-9.]+px\]/, "una medida arbitraria en la pieza compartida");
-  // Los colores salen del tema, que es lo que la hace verse bien en los catorce.
+  assert.doesNotMatch(salida, /\b(bg|text|border)-(slate|gray|zinc|neutral|stone|amber|cyan|red|green|blue|white|black)\b/, "un color de Tailwind fijo");
+  // Los colores salen del tema, que es lo que la hace verse bien en los catorce:
+  // la caja con el de tarjeta y la banda con el de los botones secundarios.
   assert.match(salida, /sunmi-bg-card/);
-  assert.match(salida, /sunmi-surface-soft/);
+  assert.match(salida, /class="sunmi-control /);
+  // Y NO con el de los campos: en doce de los catorce temas vale lo mismo que la
+  // tarjeta y la banda no se ve. Es el defecto que cerró esta pieza.
+  assert.doesNotMatch(salida, /sunmi-surface-soft/);
 });

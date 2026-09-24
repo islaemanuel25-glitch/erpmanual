@@ -193,7 +193,7 @@ export default function ListaCuentasPorPagar() {
                 <DiaConBanda
                   key={g.clave}
                   titulo={g.titulo}
-                  subtitulo={rotuloDeCuentas(g.cantidad)}
+                  dato={rotuloDeCuentas(g.cantidad)}
                   importe={formatearMoneda(g.importe)}
                 >
                   {g.cuentas.map((c) => (

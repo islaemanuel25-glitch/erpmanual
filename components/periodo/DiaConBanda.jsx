@@ -2,64 +2,80 @@
 
 // components/periodo/DiaConBanda.jsx
 //
-// UN DÍA DE ACTIVIDAD: el marco, la banda con su título y su total, y adentro
-// las filas de ese día.
+// UN DÍA: la caja, la banda pintada con el día y su dato, y adentro las filas.
 //
-// ── DE DÓNDE SALIÓ ────────────────────────────────────────────────────────
+// ES LA ÚNICA. La usan las cuatro pantallas que agrupan por día —Recibir
+// mercadería, Transferencias, Pagos a proveedores y la actividad de Finanzas—
+// y ninguna dibuja su propia banda. Qué dice cada una lo decide la pantalla;
+// cómo se ve, esta pieza.
 //
-// De `components/transferencias/DiaDeTransferencias.jsx`, tal cual estaba. No
-// se escribió adivinando: se sacó de una pantalla que HOY funciona, cuando
-// apareció la segunda que necesitaba lo mismo —la actividad por día de
-// Finanzas—. Aquélla la sigue usando y dibuja el MISMO marcado: los nodos se
-// movieron enteros, ningún par de hijos se juntó en una cadena, y
-// `diaConBanda.test.mjs` compara el HTML renderizado por las dos partes.
+// ── DE DÓNDE SALIÓ SU ASPECTO ─────────────────────────────────────────────
 //
-// El tercer consumidor no agrupa por día: Pagos a proveedores agrupa las
-// cuentas por PROVEEDOR con el mismo marco y la misma banda —título, subtítulo,
-// importe—, que es justo lo que esta pieza recibe sin saber qué es. Se reusa
-// tal cual en vez de escribir una parecida al lado.
+// De `components/compras-proveedor/DiaDePedidos.jsx`, que era la única de las
+// cuatro con la banda visible. Las otras tres pintaban la franja con
+// `sunmi-surface-soft`, que lee `--app-input-bg`, y en doce de los catorce
+// temas ese token vale lo mismo que `--card-bg`: la banda salía del color de la
+// tarjeta y dos días seguidos se leían como una lista continua. Ésta usa
+// `sunmi-control` —`--pos-control-bg`, el fondo de los botones secundarios—,
+// que es distinto de la tarjeta en los catorce. Mismo token que Recibir, así
+// que no se escribe ningún color.
 //
-// ── POR QUÉ ACÁ Y NO EN EL KIT ────────────────────────────────────────────
+// `sunmi-control` trae un `:hover` que acá no significa nada —la banda no se
+// toca—; en un teléfono no hay hover, y usar la clase que existe es preferible a
+// escribir una variante nueva para ahorrarse una regla que nunca se activa.
 //
-// Por lo mismo que `ChipsDePeriodo`: esta carpeta es de piezas que saben de
-// PERÍODOS, que es vocabulario del negocio. El kit no conoce días ni semanas. Lo
-// que sí sale del kit es de lo que está hecha —nada de colores ni medidas
-// propias: `sunmi-bg-card`, `sunmi-border` y `sunmi-surface-soft` son tokens del
-// tema, así que se ve bien en los catorce—.
+// ── UNA LÍNEA CUANDO ENTRA, Y SE ACOMODA CUANDO NO ────────────────────────
 //
-// ── LA BANDA SE PINTA PAREJA DE LADO A LADO ──────────────────────────────
+// Con lugar: el día a la izquierda, y a la derecha el dato en gris y el importe
+// en negrita, en una sola línea —el aspecto compacto de Recibir—.
 //
-// Es el defecto que hay que no repetir, y viene anotado de la pieza original. El
-// fondo va en UN solo nodo —el de la banda— y ninguno de sus hijos declara fondo
-// propio. Un contenedor interno con su propio `bg` tapa la franja y deja un
-// rectángulo del color de la tarjeta en el medio, que se lee como un bloque en
-// blanco.
+// Sin lugar, se reacomoda DENTRO de la misma banda, por el espacio REAL del
+// contenedor y no por un corte de pantalla: `flex-wrap` decide el salto con el
+// ancho natural de cada bloque, así que funciona igual en un teléfono que en
+// una columna angosta de escritorio.
 //
-// Y el `overflow-hidden` del marco no es adorno: sin él la banda —que se pinta
-// de lado a lado— se come las esquinas redondeadas.
+//   · El día nunca se corta: no lleva `truncate`, y como el salto se decide con
+//     su ancho completo, el bloque de la derecha baja ANTES de que el día tenga
+//     que achicarse. Solo si el día solo no entra en la banda, se parte en dos
+//     renglones — nunca queda en cero.
+//   · El bloque de la derecha baja entero y se alinea a la derecha (`ml-auto`).
+//     Si ni así entran el dato y el importe juntos, el importe baja debajo del
+//     dato, también a la derecha. Ninguno sale de la tarjeta.
+//
+// Medido a 360 px con los textos más largos de cada pantalla; los números están
+// en el mensaje del commit que trajo esto.
+//
+// ── LA CAJA ───────────────────────────────────────────────────────────────
+//
+// La banda es lo PRIMERO de la caja, así que el redondeo de arriba se lo recorta
+// el `overflow-hidden`. Sin ese recorte la banda saldría cuadrada por encima del
+// borde redondeado. El fondo va en UN solo nodo —el de la banda— y ninguno de
+// sus hijos declara fondo propio: un hijo con `bg` tapa la franja.
 
 /**
  * @param {object} props
- * @param {string} props.titulo      "Sábado 12".
- * @param {string} props.subtitulo   "3 transferencias · 1 sin recibir".
- * @param {React.ReactNode} props.importe  el total del día, YA FORMATEADO.
+ * @param {React.ReactNode} props.titulo   "Miércoles 23", "Vencidas".
+ * @param {React.ReactNode} props.dato     "1 pedido", "3 transferencias · 1 sin recibir".
+ * @param {React.ReactNode} [props.importe] YA FORMATEADO. Sin él no se dibuja el nodo:
+ *                                          Recibir lo omite con un solo pedido.
  * @param {React.ReactNode} props.children las filas del día.
  *
  * `importe` llega formateado y no como número: quién sabe cómo se escribe la
- * plata es la pantalla, no esta pieza. Recibir el número y formatearlo acá la
- * obligaría a conocer un formateador y sería el treintaiseisavo del repo.
+ * plata es la pantalla, no esta pieza.
  */
-export default function DiaConBanda({ titulo, subtitulo, importe, children }) {
+export default function DiaConBanda({ titulo, dato, importe = null, children }) {
+  const conImporte = importe !== null && importe !== undefined && importe !== false && importe !== "";
   return (
-    <div className="sunmi-bg-card rounded-xl2 border sunmi-border overflow-hidden">
-      {/* LA BANDA. Único nodo con fondo; sus hijos no declaran ninguno. */}
-      <div className="sunmi-surface-soft px-4 py-2.5 flex items-center justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="text-base2 font-semibold sunmi-text-strong truncate">{titulo}</div>
-          <div className="text-sm2 sunmi-text-muted">{subtitulo}</div>
-        </div>
-        <div className="shrink-0 text-base2 font-semibold sunmi-text-strong tabular-nums">
-          {importe}
+    <div className="rounded-xl border sunmi-divider sunmi-bg-card overflow-hidden">
+      <div className="sunmi-control px-4 py-renglon flex flex-wrap items-baseline gap-x-renglon gap-y-dato">
+        <div className="grow text-sm3 font-bold sunmi-text-strong">{titulo}</div>
+
+        <div className="ml-auto flex flex-wrap items-baseline justify-end gap-x-renglon gap-y-dato">
+          {/* El dato, en gris: dice cuántos hay sin competir con el día. */}
+          <div className="text-sm3 sunmi-text-muted">{dato}</div>
+          {conImporte && (
+            <div className="text-sm3 font-bold sunmi-text-strong tabular-nums">{importe}</div>
+          )}
         </div>
       </div>
 
