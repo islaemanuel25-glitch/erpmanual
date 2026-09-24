@@ -151,16 +151,29 @@ export async function GET(req, { params }) {
       }),
     ]);
 
-    const arqueosConRetiro = await prisma.arqueoCaja.findMany({
-      where: { turnoId, cajaMovimientoRetiroId: { not: null } },
-      select: { cajaMovimientoRetiroId: true },
-    });
+    // El pago a proveedor en efectivo se reconoce por su vínculo,
+    // `PagoProveedor.cajaMovimientoId` (UNIQUE), y no por el texto del motivo.
+    // Se pregunta por los ids de ESTOS movimientos, que es el vínculo que decide.
+    const idsDeMovimiento = movimientos.map((m) => m.id);
+    const [arqueosConRetiro, pagosConRetiro] = await Promise.all([
+      prisma.arqueoCaja.findMany({
+        where: { turnoId, cajaMovimientoRetiroId: { not: null } },
+        select: { cajaMovimientoRetiroId: true },
+      }),
+      idsDeMovimiento.length
+        ? prisma.pagoProveedor.findMany({
+            where: { cajaMovimientoId: { in: idsDeMovimiento } },
+            select: { cajaMovimientoId: true },
+          })
+        : [],
+    ]);
 
     const clasificados = clasificarMovimientos(movimientos, {
       idsDeRecaudacion: new Set(arqueosConRetiro.map((a) => a.cajaMovimientoRetiroId)),
       idsDeCierre: new Set(
         turno.retiroCierreMovimientoId ? [turno.retiroCierreMovimientoId] : []
       ),
+      idsDePagoProveedor: new Set(pagosConRetiro.map((p) => p.cajaMovimientoId)),
     });
 
     // LA FÓRMULA ÚNICA. Sin el retiro de cierre, por lo de arriba.

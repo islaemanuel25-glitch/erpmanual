@@ -372,6 +372,13 @@ async function esperadoDelTurno(turnoId, sesion) {
   return r.esperado?.efectivoEsperado;
 }
 
+// El detalle entero del turno y el resumen del tablero del local: los dos
+// lugares donde `clasificarMovimientos` decide si un retiro es manual.
+const detalleDelTurno = (turnoId, sesion) =>
+  leer(rutaTurno.GET(pedido(`http://ci/api/finanzas/turno/${turnoId}`, sesion), paramsTurno(turnoId)));
+const tableroDelLocal = (sesion) =>
+  leer(rutaTablero.GET(pedido("http://ci/api/finanzas/tablero?entrada=1", sesion)));
+
 async function correrPagos(f) {
   const localEscribe = token(f.usuarioLocal.id, f.local.id, ESCRITURA_FIN);
   const localSoloVe = token(f.usuarioLocal.id, f.local.id, ["finanzas.ver"]);
@@ -492,6 +499,8 @@ async function correrPagos(f) {
   ok("y cero retiro en ese turno", (await movimientosDe(f.turnoOtro.id)) === movsOtroAntesCruce);
 
   const esperadoAntes = await esperadoDelTurno(f.turno.id, localEscribe);
+  const detalleAntesEf = await detalleDelTurno(f.turno.id, localEscribe);
+  const tableroAntesEf = await tableroDelLocal(localEscribe);
   const movsAntesEf = await movimientosDe(f.turno.id);
   const p2 = await pagar(cuentaA.id, localEscribe, {
     monto: 100000,
@@ -511,6 +520,37 @@ async function correrPagos(f) {
     "el efectivo esperado baja exactamente una vez",
     Math.round((esperadoAntes - esperadoDespues) * 100) === 10000000,
     `${esperadoAntes} → ${esperadoDespues}`
+  );
+
+  // ── EL RETIRO DEL PAGO ES UN PAGO, NO UN RETIRO MANUAL ──────────────────
+  //
+  // Las dos rutas preguntan por `PagoProveedor.cajaMovimientoId` con la forma
+  // exacta que usan en producción. El motivo no interviene: lo que se afirma es
+  // la clase que sale del vínculo.
+  const detalleDespuesEf = await detalleDelTurno(f.turno.id, localEscribe);
+  const tableroDespuesEf = await tableroDelLocal(localEscribe);
+  const movEnDetalle = (detalleDespuesEf.movimientos || []).find((m) => m.id === mov?.id);
+  ok(
+    "el detalle del turno lo clasifica PAGO_PROVEEDOR",
+    movEnDetalle?.clase === "PAGO_PROVEEDOR",
+    `clase ${movEnDetalle?.clase}`
+  );
+  ok(
+    "el turno no lo suma a los retiros manuales",
+    Math.round(detalleDespuesEf.caja?.retiros * 100) === Math.round(detalleAntesEf.caja?.retiros * 100),
+    `${detalleAntesEf.caja?.retiros} → ${detalleDespuesEf.caja?.retiros}`
+  );
+  ok(
+    "pero el esperado del turno lo resta una sola vez",
+    Math.round((detalleDespuesEf.esperado?.retiros - detalleAntesEf.esperado?.retiros) * 100) === 10000000,
+    `${detalleAntesEf.esperado?.retiros} → ${detalleDespuesEf.esperado?.retiros}`
+  );
+  ok(
+    "el resumen del tablero no lo suma a los retiros manuales",
+    tableroDespuesEf.status === 200 &&
+      Math.round(tableroDespuesEf.resumen?.caja?.retiros * 100) ===
+        Math.round(tableroAntesEf.resumen?.caja?.retiros * 100),
+    `${tableroDespuesEf.status} ${tableroAntesEf.resumen?.caja?.retiros} → ${tableroDespuesEf.resumen?.caja?.retiros}`
   );
 
   // ── CADA UBICACIÓN PAGA SUS DEUDAS ─────────────────────────────────────
