@@ -1,16 +1,14 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-19 11:56
+**Fecha:** 2026-09-24 15:46
 
 ## Módulos modificados recientemente
 
-### proveedores
-- fix: el cartel dice en cuánto difiere en vez de afirmar que el precio cambió, feat: el resultado dice cuáles no se van a actualizar y por qué, feat: el resultado revalida lo mismo que aplicar, y ofrece volver a leer
-- Archivos: 1 nuevos, 4 modificados (5 total)
+### transferencias
+- refactor(periodo): una sola banda del día, la de Recibir mercadería, y se acomoda cuando no entra — SIN VERIFICAR en teléfono con datos reales, refactor(periodo): ResumenConImporte y FilaConImporte, sacados de Transferencias, refactor: SunmiSelectorDeOpciones, sacado de ChipsDePeriodo
+- Archivos: 4 modificados (4 total)
 
 
-## Archivos nuevos desde última sincronización
-- app/api/proveedores/listas/[id]/releer-propuestas/route.js
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai
