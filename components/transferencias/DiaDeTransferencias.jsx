@@ -61,7 +61,7 @@ export default function DiaDeTransferencias({ dia, onRecibir, onVer, money }) {
   return (
     <DiaConBanda
       titulo={dia?.titulo}
-      subtitulo={rotuloDelDia(dia)}
+      dato={rotuloDelDia(dia)}
       importe={money ? money(dia?.importe) : dia?.importe}
     >
       {(dia?.transferencias || []).map((t) => (

@@ -34,7 +34,7 @@ export default function DiaDeActividad({ dia, onAbrirTurno }) {
   return (
     <DiaConBanda
       titulo={dia?.titulo}
-      subtitulo={rotuloDelDiaFinanciero(dia)}
+      dato={rotuloDelDiaFinanciero(dia)}
       importe={formatearMoneda(dia?.ventas)}
     >
       {(dia?.hechos || []).map((h) => (
