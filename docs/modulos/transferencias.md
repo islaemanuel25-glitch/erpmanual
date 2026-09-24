@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-09-24 15:46
+**Última actualización:** 2026-09-24 22:14
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -194,6 +194,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-09-24: feat(semana): la semana operativa es de la ubicación, con su historia
 - 2026-09-24: refactor(periodo): una sola banda del día, la de Recibir mercadería, y se acomoda cuando no entra — SIN VERIFICAR en teléfono con datos reales
 - 2026-09-24: refactor(periodo): ResumenConImporte y FilaConImporte, sacados de Transferencias
 - 2026-09-24: refactor: SunmiSelectorDeOpciones, sacado de ChipsDePeriodo
