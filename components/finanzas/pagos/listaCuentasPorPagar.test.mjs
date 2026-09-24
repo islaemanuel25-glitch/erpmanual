@@ -81,32 +81,43 @@ test("en Pagados y en Todos la cifra es el total", () => {
   assert.ok(fila(parcial, FILTRO_CUENTAS.TODAS).includes(">$1.000,00<"));
 });
 
-// ── EN PAGADOS, UNA CUENTA SALDADA DICE "PAGADA" Y NADA MÁS ──────────────
+// ── UNA CUENTA SALDADA DICE "PAGADA" Y NADA MÁS ──────────────────────────
 //
 // Antes este candado afirmaba "Pagada · Vence Sin fecha": un vencimiento sobre
-// una deuda que ya no existe. Se cambió a propósito el 2026-09-24, y solo en
-// Pagados: Pendientes y Todos siguen mostrando el vencimiento.
+// una deuda que ya no existe. Se cambió a propósito el 2026-09-24: una cuenta
+// PAGADA dice solo "Pagada", en Pagados y en Todos. Pendientes no cambia.
 
 /** La línea de abajo de la fila, entera: la que va después del número de compra. */
 const lineaDeEstado = (html) => html.match(/<div class="text-sm2 sunmi-text-(?:muted|warning)">([^<]*)<\/div>/)[1];
 
-test("en Pagados, una cuenta saldada dice solo «Pagada», tenga o no vencimiento", () => {
+test("una cuenta saldada dice solo «Pagada», en Pagados y en Todos, tenga o no vencimiento", () => {
   const pagos = [{ id: 1, monto: 30500, fecha: new Date("2026-09-15T10:00:00-03:00") }];
-  for (const vence of [null, "2026-09-10", "2026-10-15"]) {
-    const s = fila(cuenta({ total: 30500, pagos, vence }), FILTRO_CUENTAS.PAGADAS);
-    assert.equal(lineaDeEstado(s), "Pagada", `con vencimiento ${vence}`);
-    assert.doesNotMatch(s, /Vence|Venció|Sin fecha|Sin vencimiento/, `con vencimiento ${vence}`);
+  // Sin vencimiento, con uno ya pasado respecto de HOY (16/09) y con uno futuro.
+  for (const filtro of [FILTRO_CUENTAS.PAGADAS, FILTRO_CUENTAS.TODAS]) {
+    for (const vence of [null, "2026-09-10", "2026-10-15"]) {
+      const s = fila(cuenta({ total: 30500, pagos, vence }), filtro);
+      assert.equal(lineaDeEstado(s), "Pagada", `${filtro} con vencimiento ${vence}`);
+      assert.doesNotMatch(s, /Vence|Venció|Sin fecha|Sin vencimiento/, `${filtro} con vencimiento ${vence}`);
+    }
   }
 });
 
-test("Pendientes y Todos siguen diciendo el vencimiento, como antes", () => {
-  const pendiente = cuenta({ total: 100, vence: "2026-09-18" });
-  assert.equal(lineaDeEstado(fila(pendiente, FILTRO_CUENTAS.PENDIENTES)), "Pendiente · Vence 18/09/2026");
-  const sinFecha = cuenta({ total: 100 });
-  assert.equal(lineaDeEstado(fila(sinFecha, FILTRO_CUENTAS.PENDIENTES)), "Pendiente · Vence Sin fecha");
-  // En Todos no se tocó nada, tampoco para una pagada.
-  const pagada = cuenta({ total: 100, pagos: [{ id: 1, monto: 100, fecha: new Date("2026-09-15T10:00:00-03:00") }] });
-  assert.equal(lineaDeEstado(fila(pagada, FILTRO_CUENTAS.TODAS)), "Pagada · Vence Sin fecha");
+test("Pendientes conserva su vencimiento, y una no pagada en Todos también", () => {
+  assert.equal(
+    lineaDeEstado(fila(cuenta({ total: 100, vence: "2026-09-18" }), FILTRO_CUENTAS.PENDIENTES)),
+    "Pendiente · Vence 18/09/2026"
+  );
+  assert.equal(
+    lineaDeEstado(fila(cuenta({ total: 100 }), FILTRO_CUENTAS.PENDIENTES)),
+    "Pendiente · Vence Sin fecha"
+  );
+  assert.equal(
+    lineaDeEstado(fila(cuenta({ total: 100, vence: "2026-09-10" }), FILTRO_CUENTAS.PENDIENTES)),
+    "Pendiente · Venció 10/09/2026"
+  );
+  const parcial = cuenta({ total: 1000, pagos: [{ id: 1, monto: 400, fecha: new Date() }], vence: "2026-09-18" });
+  assert.equal(lineaDeEstado(fila(parcial, FILTRO_CUENTAS.PENDIENTES)), "Parcial · Vence 18/09/2026");
+  assert.equal(lineaDeEstado(fila(parcial, FILTRO_CUENTAS.TODAS)), "Parcial · Vence 18/09/2026");
 });
 
 test("una vencida lo dice en tono de aviso", () => {

@@ -9,8 +9,8 @@
 // Acá queda lo que dice una cuenta, en el mismo orden que una transferencia:
 //
 //   arriba   → "Compra #248 · Als", el número fuerte y el proveedor apagado;
-//   abajo    → el estado y el vencimiento, en aviso si ya venció; en Pagados,
-//              una cuenta saldada dice solo "Pagada";
+//   abajo    → el estado y el vencimiento, en aviso si ya venció; una cuenta
+//              saldada dice solo "Pagada";
 //   derecha  → UNA sola cifra, la de la pestaña (`importeDeLaCuenta`).
 //
 // El proveedor es de la fila y no del grupo: los grupos son días. Total, pagado,
@@ -21,7 +21,7 @@
 
 import FilaConImporte from "@/components/periodo/FilaConImporte";
 import { formatearMoneda } from "@/lib/moneda";
-import { ESTADO_CUENTA, FILTRO_CUENTAS, diaLegible, filtroDeCuentas } from "@/lib/finanzas/pagosProveedores";
+import { ESTADO_CUENTA, diaLegible } from "@/lib/finanzas/pagosProveedores";
 import { cuentaVencida, importeDeLaCuenta } from "@/lib/finanzas/calendarioDePagos";
 
 export default function FilaCuentaPorPagar({ cuenta, filtro, hoy, variasUbicaciones = false, onAbrir }) {
@@ -31,12 +31,10 @@ export default function FilaCuentaPorPagar({ cuenta, filtro, hoy, variasUbicacio
   const vence = vencida
     ? `Venció ${diaLegible(cuenta?.vencimientoProveedor)}`
     : `Vence ${diaLegible(cuenta?.vencimientoProveedor)}`;
-  // En Pagados, una cuenta saldada dice "Pagada" y nada más: un vencimiento —o
-  // un "Sin fecha"— sobre una deuda que ya no existe no informa nada. Pendientes
-  // y Todos siguen diciendo el vencimiento como antes.
-  const conVencimiento = !(
-    filtroDeCuentas(filtro) === FILTRO_CUENTAS.PAGADAS && cuenta?.estado === ESTADO_CUENTA.PAGADA
-  );
+  // Una cuenta saldada dice "Pagada" y nada más, en Pagados y en Todos: un
+  // vencimiento —o un "Sin fecha"— sobre una deuda que ya no existe no informa
+  // nada. Pendientes nunca tiene una pagada, así que ahí no cambia nada.
+  const conVencimiento = cuenta?.estado !== ESTADO_CUENTA.PAGADA;
 
   return (
     <FilaConImporte
