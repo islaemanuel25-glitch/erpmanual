@@ -63,31 +63,32 @@
 // Uso:
 //   node scripts/sonda-cascada.mjs --base http://localhost:3000
 //
+// Windows con Edge, el de siempre: sin más flags. En otro entorno se le dice qué
+// navegador usar con `--edge <ruta>` —cualquier Chromium sirve, el nombre del
+// flag quedó de cuando solo era Edge—. Si el proceso corre como root, como en un
+// contenedor, Chromium no arranca sin `--no-sandbox`, y hay que pedirlo:
+//   node scripts/sonda-cascada.mjs --base https://operix.cloud \
+//     --edge /opt/pw-browsers/chromium --no-sandbox
+//
 // Sale con 0 si las cuatro dan lo esperado y 1 si alguna no. No necesita sesión:
 // la hoja la sirve el layout raíz, así que mide sobre `/login`.
 
 import { spawn } from "node:child_process";
-import os from "node:os";
-import path from "node:path";
 
-const arg = (n, d = null) => {
-  const i = process.argv.indexOf(`--${n}`);
-  return i > -1 && process.argv[i + 1] && !process.argv[i + 1].startsWith("--")
-    ? process.argv[i + 1]
-    : process.argv.includes(`--${n}`)
-      ? true
-      : d;
-};
+import { argumentosDelNavegador, opcionesDeLaSonda, resolverWebSocket } from "./lib/sondaNavegador.mjs";
 
-const BASE = arg("base", "http://localhost:3000");
-const RUTA = arg("url", "/login");
-const PUERTO = Number(arg("puerto-cdp", "9226"));
-// EL PERFIL VA ATADO AL PUERTO. Con un perfil fijo, correr la sonda en otro
-// puerto —para medir producción sin matar la corrida local— encuentra el perfil
-// tomado por el Edge anterior, el nuevo se muere solo y lo único que se ve es
-// "Edge no respondió al puerto de depuración". El síntoma no nombra al perfil.
-const PERFIL = arg("perfil", path.join(os.tmpdir(), `sonda-cascada-edge-${PUERTO}`));
-const EDGE = arg("edge", "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe");
+// ── EL RUNNER, NO LA MEDICIÓN ──────────────────────────────────────────────
+//
+// Con qué navegador se corre, con qué argumentos y cómo se le habla viven en
+// `lib/sondaNavegador.mjs`: es lo que cambia entre Edge en Windows, Chromium
+// como root en un contenedor y un Node 18 sin WebSocket global. Lo que se mide y
+// qué es rojo o verde sigue acá, sin cambios.
+const OPCIONES = opcionesDeLaSonda(process.argv);
+const BASE = OPCIONES.base;
+const RUTA = OPCIONES.ruta;
+const PUERTO = OPCIONES.puerto;
+const PERFIL = OPCIONES.perfil;
+const EDGE = OPCIONES.navegador;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -142,7 +143,7 @@ async function urlDepurador() {
     } catch {}
     await sleep(250);
   }
-  throw new Error(`Edge no respondió al puerto de depuración ${PUERTO}`);
+  throw new Error(`El navegador (${EDGE}) no respondió al puerto de depuración ${PUERTO}`);
 }
 
 async function evaluar(expresion) {
@@ -153,23 +154,24 @@ async function evaluar(expresion) {
   return r.result.value;
 }
 
+// Antes de lanzar nada: sin con qué hablarle al navegador no se mide, y no
+// poder medir es ROJO, no "no se pudo comprobar".
+const conexion = await resolverWebSocket();
+if (conexion.error) {
+  console.log("");
+  console.log(`ROJO · NO SE PUEDE MEDIR: ${conexion.error}`);
+  process.exit(1);
+}
+
 const edge = spawn(
   EDGE,
-  [
-    "--headless=new",
-    `--remote-debugging-port=${PUERTO}`,
-    `--user-data-dir=${PERFIL}`,
-    "--window-size=1366,900",
-    "--no-first-run",
-    "--no-default-browser-check",
-    "--disable-gpu",
-  ],
+  argumentosDelNavegador({ puerto: PUERTO, perfil: PERFIL, sinSandbox: OPCIONES.sinSandbox }),
   { stdio: "ignore" }
 );
 const cerrar = () => { try { edge.kill(); } catch {} };
 process.on("exit", cerrar);
 
-ws = new WebSocket(await urlDepurador());
+ws = new conexion.WebSocket(await urlDepurador());
 await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
 ws.onmessage = (ev) => {
   const m = JSON.parse(ev.data);
