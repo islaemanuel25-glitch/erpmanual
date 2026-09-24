@@ -110,11 +110,16 @@ const comoLaManda = (t, extra = {}) => ({
 
 const bloqueListo = (b) => ({ ...b, transferencias: b.transferencias.map((t) => comoLaManda(t)) });
 
-// mini el 7 corta DOMINGO; Casiano corta LUNES.
-const ACUERDOS = [
-  { localId: 2, diaDeCorte: 0 },
-  { localId: 4, diaDeCorte: 1 },
-];
+// mini el 7 corta DOMINGO; Casiano corta LUNES. Con la forma que produce
+// `vigenciasDeUbicaciones`: un `Map` de localId a filas de
+// `SemanaOperativaVigencia`, "desde siempre" como las deja la migración.
+const SEMANAS = new Map([
+  [2, [{ id: 1, localId: 2, diaDeCorte: 0, vigenteDesde: null }]],
+  [4, [{ id: 2, localId: 4, diaDeCorte: 1, vigenteDesde: null }]],
+]);
+
+// Un local sin ninguna fila: el cargador igual devuelve su entrada, vacía.
+const SIN_SEMANAS = new Map();
 
 // ── 1 · LO QUE EMANUEL PIDIÓ VERIFICAR ─────────────────────────────────────
 
@@ -124,7 +129,7 @@ test("E1 · dos locales con cortes distintos muestran RANGOS DISTINTOS en la mis
       transferencia(1, 2, "mini el 7", "Recibida", "2026-09-14", 4),
       transferencia(2, 4, "Casiano casas", "Recibida", "2026-09-14", 4),
     ],
-    acuerdos: ACUERDOS,
+    semanas: SEMANAS,
     unidad: UNIDADES.SEMANA,
     hoy: MIERCOLES,
   });
@@ -160,7 +165,7 @@ test("E2 · un local SIN MOVIMIENTO en su período aparece igual, en cero y en v
       transferencia(1, 2, "mini el 7", "Recibida", "2026-09-13", 4),
       transferencia(2, 4, "Casiano casas", "Recibida", "2026-09-13", 4),
     ],
-    acuerdos: ACUERDOS,
+    semanas: SEMANAS,
     unidad: UNIDADES.SEMANA,
     hoy: MIERCOLES,
     locales: LOCALES,
@@ -228,7 +233,7 @@ test("E2c · EL DEFECTO QUE ESTO CIERRA · el aviso contaba UNO de cuatro sin co
 
   const viejo = bloquesPorLocal({
     transferencias: soloUnoConMovimiento,
-    acuerdos: [],
+    semanas: SIN_SEMANAS,
     unidad: UNIDADES.SEMANA,
     hoy: MIERCOLES,
   });
@@ -240,7 +245,7 @@ test("E2c · EL DEFECTO QUE ESTO CIERRA · el aviso contaba UNO de cuatro sin co
 
   const ahora = bloquesPorLocal({
     transferencias: soloUnoConMovimiento,
-    acuerdos: [],
+    semanas: SIN_SEMANAS,
     unidad: UNIDADES.SEMANA,
     hoy: MIERCOLES,
     locales: cuatro,
@@ -272,7 +277,7 @@ test("E2c · EL DEFECTO QUE ESTO CIERRA · el aviso contaba UNO de cuatro sin co
 test("E2e · un local INACTIVO con movimiento aparece, y MARCADO", () => {
   const bs = bloquesPorLocal({
     transferencias: [transferencia(1, 4, "Casiano casas", "Recibida", "2026-09-15", 4)],
-    acuerdos: ACUERDOS,
+    semanas: SEMANAS,
     unidad: UNIDADES.SEMANA,
     hoy: MIERCOLES,
     locales: [
@@ -296,7 +301,7 @@ test("E2e · un local INACTIVO con movimiento aparece, y MARCADO", () => {
 test("E2f · un local INACTIVO sin movimiento NO aparece", () => {
   const bs = bloquesPorLocal({
     transferencias: [transferencia(1, 2, "mini el 7", "Recibida", "2026-09-15", 4)],
-    acuerdos: ACUERDOS,
+    semanas: SEMANAS,
     unidad: UNIDADES.SEMANA,
     hoy: MIERCOLES,
     locales: [
@@ -318,7 +323,7 @@ test("E2g · un local ACTIVO nunca se marca como dado de baja", () => {
   // pasaría igual y no estaría afirmando nada.
   const bs = bloquesPorLocal({
     transferencias: [transferencia(1, 2, "mini el 7", "Recibida", "2026-09-15", 4)],
-    acuerdos: ACUERDOS,
+    semanas: SEMANAS,
     unidad: UNIDADES.SEMANA,
     hoy: MIERCOLES,
     locales: [{ id: 2, nombre: "mini el 7", activo: true }],
@@ -339,7 +344,7 @@ test("E2h · UN LOCAL SIN CLIENTE VINCULADO NO APARECE EN EL TABLERO", () => {
   // están vinculados— y por eso el candado es lo único que lo cubre.
   const bs = bloquesPorLocal({
     transferencias: [transferencia(1, 2, "mini el 7", "Recibida", "2026-09-15", 4)],
-    acuerdos: ACUERDOS,
+    semanas: SEMANAS,
     unidad: UNIDADES.SEMANA,
     hoy: MIERCOLES,
     locales: destinosDeTransferencia(
@@ -371,7 +376,7 @@ test("E2d · el orden es por importe, y los que están en cero van al final", ()
       transferencia(2, 4, "Casiano casas", "Recibida", "2026-09-15", 4),
       transferencia(3, 2, "mini el 7", "Recibida", "2026-09-15", 4),
     ],
-    acuerdos: ACUERDOS,
+    semanas: SEMANAS,
     unidad: UNIDADES.SEMANA,
     hoy: MIERCOLES,
     locales: [
@@ -399,7 +404,7 @@ test("E3 · una relación SIN ACUERDO se ve marcada, y no cae al domingo en sile
   const bs = bloquesPorLocal({
     // Sin acuerdos: las dos relaciones quedan sin configurar.
     transferencias: [transferencia(1, 9, "Local nuevo", "Recibida", "2026-09-14", 4)],
-    acuerdos: [],
+    semanas: SIN_SEMANAS,
     unidad: UNIDADES.SEMANA,
     hoy: MIERCOLES,
   });
@@ -433,7 +438,7 @@ test("E4 · con pendientes: borde warning, 'Recibir' y la cuenta en warning", ()
       transferencia(1, 2, "mini el 7", "Recibida", "2026-09-14", 4),
       transferencia(2, 2, "mini el 7", "Enviada", "2026-09-15", null),
     ],
-    acuerdos: ACUERDOS,
+    semanas: SEMANAS,
     unidad: UNIDADES.SEMANA,
     hoy: MIERCOLES,
   });
@@ -451,7 +456,7 @@ test("E4 · con pendientes: borde warning, 'Recibir' y la cuenta en warning", ()
 test("E5 · todo recibido: borde neutro, importe en la fila y NUNCA '0 sin recibir'", () => {
   const bs = bloquesPorLocal({
     transferencias: [transferencia(1, 2, "mini el 7", "Recibida", "2026-09-14", 4)],
-    acuerdos: ACUERDOS,
+    semanas: SEMANAS,
     unidad: UNIDADES.SEMANA,
     hoy: MIERCOLES,
   });
@@ -474,7 +479,7 @@ test("E6 · el aviso de total abierto aparece SOLO con pendientes", () => {
       transferencia(1, 2, "mini el 7", "Recibida", "2026-09-14", 4),
       transferencia(2, 2, "mini el 7", "Recibiendo", "2026-09-15", 2),
     ],
-    acuerdos: ACUERDOS,
+    semanas: SEMANAS,
     localId: 2,
     unidad: UNIDADES.SEMANA,
     hoy: MIERCOLES,
@@ -491,7 +496,7 @@ test("E6 · el aviso de total abierto aparece SOLO con pendientes", () => {
 
   const cerrada = cuentaDelLocal({
     transferencias: [transferencia(1, 2, "mini el 7", "Recibida", "2026-09-14", 4)],
-    acuerdos: ACUERDOS,
+    semanas: SEMANAS,
     localId: 2,
     unidad: UNIDADES.SEMANA,
     hoy: MIERCOLES,
@@ -508,7 +513,7 @@ test("E6 · el aviso de total abierto aparece SOLO con pendientes", () => {
 test("E7 · el rótulo del importe sigue al chip, no dice siempre 'esta semana'", () => {
   const cuenta = cuentaDelLocal({
     transferencias: [transferencia(1, 2, "mini el 7", "Recibida", "2026-09-16", 4)],
-    acuerdos: ACUERDOS,
+    semanas: SEMANAS,
     localId: 2,
     unidad: UNIDADES.DIA,
     hoy: MIERCOLES,

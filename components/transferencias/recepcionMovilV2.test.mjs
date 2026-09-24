@@ -488,7 +488,12 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // Sube a 33 el 2026-09-23: entró `20260923205422_pagos_a_proveedores`, las
   // dos tablas de Finanzas —cuenta por pagar de una compra y sus pagos— con su
   // enum. Aditiva y sin backfill: no toca ninguna tabla de recepción.
-  assert.equal(migraciones.length, 33, "aparecio una migracion que nadie declaro aca");
+  // Sube a 34 el 2026-09-24: entró `20260924230000_semana_operativa_ubicacion`,
+  // la tabla de vigencias de la semana operativa de cada ubicación con su enum,
+  // un CHECK y un único parcial. Aditiva, sin DROP; SÍ tiene backfill, pero solo
+  // INSERTA en la tabla nueva leyendo `AcuerdoDepositoLocal`, que no se modifica.
+  // No toca ninguna tabla de recepción.
+  assert.equal(migraciones.length, 34, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

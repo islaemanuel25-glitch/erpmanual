@@ -16,8 +16,20 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **33 migraciones** y el árbol también. **Ninguna** pendiente:
-el despliegue siguiente es solo de código.
+Producción está en **33 migraciones**. Falta:
+
+- `20260924230000_semana_operativa_ubicacion` — aditiva en estructura: el enum
+  `OrigenSemanaOperativa`, la tabla `SemanaOperativaVigencia`, su único por
+  (ubicación, fecha), su clave foránea a `Local`, un CHECK del día 0..6 y un
+  único parcial de "desde siempre", los dos últimos escritos a mano. SÍ trae
+  backfill: INSERTA en la tabla nueva una vigencia "desde siempre" por cada
+  local cuyos acuerdos de `AcuerdoDepositoLocal`, en su grupo actual, dicen un
+  solo día. No modifica ni borra ninguna fila existente; los locales en
+  conflicto, sin acuerdo y el depósito quedan sin configurar, y la migración no
+  falla por ellos. Cuáles son lo dice `scripts/diagnostico-semana-operativa.mjs`,
+  de solo lectura, que necesita la tabla nueva y por eso sirve recién después
+  de aplicarla. Viene de la rama `feat/semana-operativa-canonica`, todavía sin
+  mergear.
 
 ---
 

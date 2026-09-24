@@ -279,7 +279,7 @@ test("D10 · «3 con diferencias» en la cabecera es lo mismo que dicen las fila
       origen: { id: 1, nombre: "depo", es_deposito: true },
       detalle: [],
     })),
-    acuerdos: [{ localId: 2, diaDeCorte: 0 }],
+    semanas: new Map([[2, [{ id: 1, localId: 2, diaDeCorte: 0, vigenteDesde: null }]]]),
     hoy: "2026-09-12",
     locales: [{ id: 2, nombre: "mini el 7", activo: true, tieneClienteVinculado: true }],
   });
