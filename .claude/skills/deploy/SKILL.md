@@ -269,6 +269,24 @@ filas viejas deja de contestar qué falta.
   Corre igual contra producción con `--base https://operix.cloud`, que sirve para
   sacar el "antes" y para volver a preguntar después de recrear.
 
+  **Con qué navegador.** En Windows con Edge, el comando de arriba, sin más. En
+  otro entorno se le da el navegador con `--edge <ruta>` —cualquier Chromium—, y
+  si el proceso corre como root, como en la sesión de nube, se agrega
+  `--no-sandbox`, que la sonda pide explícito y nunca pone sola:
+
+      node scripts/sonda-cascada.mjs --base https://operix.cloud \
+        --edge <ruta-del-chromium> --no-sandbox
+
+  En un Node sin `WebSocket` global (Node 18) usa el paquete `ws` que el repo
+  ya instala. Si no encuentra ninguno de los dos, sale en ROJO diciéndolo.
+
+  **Y que corra no alcanza: tiene que haber mirado la página de verdad.** Un
+  navegador que no confía en el certificado —como el Chromium de la sesión de
+  nube detrás de su proxy— carga su propia página de error, y la sonda da ROJO
+  diciendo que a la hoja le falta `.sunmi-btn-base`. Es rojo y frena igual, pero
+  el motivo es el entorno, no la cascada: antes de diagnosticar, comprobar que el
+  navegador abre la URL.
+
   **Qué afirma:** que una utilidad de Tailwind le sigue ganando a la clase del
   kit. De eso cuelgan **535 declaraciones medidas** de `SunmiButton` y
   `SunmiInput`. Si se dan vuelta no rompen el build ni ponen la suite en rojo:
