@@ -41,6 +41,7 @@
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import DiaConBanda from "@/components/periodo/DiaConBanda";
+import FilaConImporte from "@/components/periodo/FilaConImporte";
 import { rotuloDelDia } from "@/lib/transferencias/diasDeTransferencias";
 import {
   estadoEnPalabras,
@@ -98,35 +99,15 @@ function FilaDelDia({ t, onRecibir, onVer, money }) {
   const estado = estadoEnPalabras(t);
   const pendiente = !t?.recibida;
 
-  const contenido = (
-    <>
-      <div className="min-w-0 flex-1 text-left">
-        <div className="flex items-baseline gap-1.5 flex-wrap">
-          {/* El número, sin almohadilla. `tabular-nums` para que dos filas
-              seguidas no bailen de ancho. */}
-          <span className="text-base font-semibold sunmi-text-strong tabular-nums">{t?.id}</span>
-          <span className="text-sm3 sunmi-text-muted">
-            · {horaAR(fechaMostrada(t), { vacio: "—" })}
-          </span>
-          <span className="text-sm3 sunmi-text-muted">· {rotuloDeItems(t?.cantidadItems)}</span>
-        </div>
-        <div
-          className={`text-sm2 ${
-            estado.tono === "warning" ? "sunmi-text-warning" : "sunmi-text-muted"
-          }`}
-        >
-          {estado.texto}
-        </div>
-      </div>
-
-      {/* LA COLUMNA DE LA DERECHA: el importe arriba y la acción abajo, las dos
-          alineadas al borde. `items-end` y no `text-right`: el botón es un
-          bloque y `text-right` no lo mueve. */}
-      <div className="shrink-0 flex flex-col items-end gap-1">
-        <div className="text-base2 font-semibold sunmi-text-strong tabular-nums">
-          {money ? money(t?.importe) : t?.importe}
-        </div>
-        {pendiente ? (
+  // El marco —la fila, su columna derecha, el separador de arriba y las dos
+  // formas, tocable o con su control— es `FilaConImporte`, sacado de acá tal
+  // cual. Acá queda lo que dice una transferencia.
+  return (
+    <FilaConImporte
+      importe={money ? money(t?.importe) : t?.importe}
+      onAbrir={pendiente ? undefined : () => onVer?.(t)}
+      accion={
+        pendiente ? (
           <SunmiButton
             type="button"
             color="primary"
@@ -135,37 +116,25 @@ function FilaDelDia({ t, onRecibir, onVer, money }) {
           >
             Recibir
           </SunmiButton>
-        ) : (
-          <div className="text-sm2 font-medium sunmi-text-accent">Ver ›</div>
-        )}
-      </div>
-    </>
-  );
-
-  // El separador va ARRIBA de cada fila. La banda queda encima de la primera,
-  // así que la línea también la separa de ella y la tarjeta no termina en una
-  // línea colgando.
-  const separador = "border-t sunmi-divider";
-
-  if (pendiente) {
-    return (
-      <div className={`px-4 py-3.5 flex items-center justify-between gap-3 ${separador}`}>
-        {contenido}
-      </div>
-    );
-  }
-
-  // Recibida: la fila entera abre el detalle. Va como `ghost` —la variante sin
-  // relleno del kit— con las clases que cancelan los ejes que el botón cede,
-  // para que se vea como una fila y se comporte como un control.
-  return (
-    <SunmiButton
-      type="button"
-      color="ghost"
-      onClick={() => onVer?.(t)}
-      className={`flex w-full items-center justify-between gap-3 px-4 py-3.5 min-h-0 rounded-none text-left ${separador}`}
+        ) : null
+      }
     >
-      {contenido}
-    </SunmiButton>
+      <div className="flex items-baseline gap-1.5 flex-wrap">
+        {/* El número, sin almohadilla. `tabular-nums` para que dos filas
+            seguidas no bailen de ancho. */}
+        <span className="text-base font-semibold sunmi-text-strong tabular-nums">{t?.id}</span>
+        <span className="text-sm3 sunmi-text-muted">
+          · {horaAR(fechaMostrada(t), { vacio: "—" })}
+        </span>
+        <span className="text-sm3 sunmi-text-muted">· {rotuloDeItems(t?.cantidadItems)}</span>
+      </div>
+      <div
+        className={`text-sm2 ${
+          estado.tono === "warning" ? "sunmi-text-warning" : "sunmi-text-muted"
+        }`}
+      >
+        {estado.texto}
+      </div>
+    </FilaConImporte>
   );
 }

@@ -2,86 +2,51 @@
 
 // components/finanzas/pagos/FilaCuentaPorPagar.jsx
 //
-// UNA CUENTA POR PAGAR, COMO FILA ADENTRO DEL GRUPO DE SU PROVEEDOR.
+// UNA CUENTA POR PAGAR, COMO FILA ADENTRO DE SU DÍA.
 //
-// ── EL PATRÓN ES EL DE LA FILA DE TRANSFERENCIAS ─────────────────────────
+// El marco es `FilaConImporte`, el mismo de una transferencia: la fila entera
+// abre la cuenta y el "Ver ›" de la derecha es la señal de que se puede tocar.
+// Acá queda lo que dice una cuenta, en el mismo orden que una transferencia:
 //
-// `FilaDelDia` de `components/transferencias/DiaDeTransferencias.jsx`, la
-// versión tocable: la fila ENTERA abre el detalle, y el "Ver ›" de la derecha es
-// la señal de que se puede tocar, no el objetivo. Las mismas clases —alto,
-// padding, separador arriba, columna derecha con el importe y la acción— para
-// que las dos pantallas se lean igual en el teléfono.
+//   arriba   → "Compra #248 · Als", el número fuerte y el proveedor apagado;
+//   abajo    → el estado y el vencimiento, en aviso si ya venció;
+//   derecha  → UNA sola cifra, la de la pestaña (`importeDeLaCuenta`).
 //
-// No se sacó una pieza común con aquélla: comparten el marco, pero adentro no
-// hay nada igual —allá un número de transferencia, una hora y un estado de
-// recepción; acá una compra, una ubicación, tres importes y un vencimiento—. Una
-// pieza que recibiera "lo de la izquierda" y "lo de la derecha" sería un `div`
-// con otro nombre.
+// El proveedor es de la fila y no del grupo: los grupos son días. Total, pagado,
+// saldo, factura y fecha prevista quedan en el detalle.
 //
-// ── EL PROVEEDOR NO ESTÁ EN LA FILA ──────────────────────────────────────
-//
-// Lo dice la banda del grupo, arriba. Repetirlo en cada fila es leerlo dos veces.
-//
-// ── LOS IMPORTES Y EL ESTADO LLEGAN RESUELTOS ────────────────────────────
-//
-// Del servidor, por `estadoDeCuenta`. Acá no se suma ni se resta nada.
+// La ubicación del gasto aparece solo cuando se miran varias —la ruta lo dice
+// con `variasUbicaciones`—: con una sola, repetirla en cada fila no informa.
 
-import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiPill from "@/components/sunmi/SunmiPill";
+import FilaConImporte from "@/components/periodo/FilaConImporte";
 import { formatearMoneda } from "@/lib/moneda";
 import { diaLegible } from "@/lib/finanzas/pagosProveedores";
+import { cuentaVencida, importeDeLaCuenta } from "@/lib/finanzas/calendarioDePagos";
 
-import { COLOR_ESTADO_CUENTA } from "./TarjetaCuentaPorPagar";
-
-export default function FilaCuentaPorPagar({ cuenta, onAbrir }) {
+export default function FilaCuentaPorPagar({ cuenta, filtro, hoy, variasUbicaciones = false, onAbrir }) {
   const compra = cuenta?.pedidoProveedorId ? `Compra #${cuenta.pedidoProveedorId}` : "Compra";
-  const proveedor = cuenta?.proveedor?.nombre || "el proveedor";
+  const proveedor = cuenta?.proveedor?.nombre || "Sin proveedor";
+  const vencida = cuentaVencida(cuenta, hoy);
+  const vence = vencida
+    ? `Venció ${diaLegible(cuenta?.vencimientoProveedor)}`
+    : `Vence ${diaLegible(cuenta?.vencimientoProveedor)}`;
 
   return (
-    <SunmiButton
-      type="button"
-      color="ghost"
-      onClick={() => onAbrir?.(cuenta)}
-      aria-label={`Abrir la cuenta de ${proveedor}, ${compra.toLowerCase()}`}
-      // Las mismas clases que la fila tocable de transferencias: `ghost` sin
-      // relleno, y los ejes que el botón cede puestos para que se vea como fila.
-      className="flex w-full items-center justify-between gap-3 px-4 py-3.5 min-h-0 rounded-none text-left border-t sunmi-divider"
+    <FilaConImporte
+      importe={formatearMoneda(importeDeLaCuenta(cuenta, filtro))}
+      onAbrir={() => onAbrir?.(cuenta)}
+      etiqueta={`Abrir la cuenta de ${proveedor}, ${compra.toLowerCase()}`}
     >
-      <div className="min-w-0 flex-1 text-left space-y-0.5">
-        <div className="flex items-baseline gap-1.5 flex-wrap">
-          <span className="text-base font-semibold sunmi-text-strong tabular-nums">{compra}</span>
-          {cuenta?.factura && (
-            <span className="text-sm3 sunmi-text-muted">· Factura {cuenta.factura}</span>
-          )}
-        </div>
-
-        {/* El estado en palabras —la pastilla dice "Pendiente", "Parcial" o
-            "Pagada"— y el vencimiento, que es lo que decide el orden del día. */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <SunmiPill color={COLOR_ESTADO_CUENTA[cuenta?.estado] || "slate"}>
-            {cuenta?.rotuloEstado || cuenta?.estado}
-          </SunmiPill>
-          <span className="text-sm2 sunmi-text-muted">Vence {diaLegible(cuenta?.vencimientoProveedor)}</span>
-        </div>
-
-        <div className="text-sm2 sunmi-text-muted break-words">
-          Gasto de <span className="sunmi-text-strong">{cuenta?.localGasto?.nombre || "—"}</span>
-        </div>
-        <div className="text-sm2 sunmi-text-muted tabular-nums">
-          Total {formatearMoneda(cuenta?.total)} · Pagado {formatearMoneda(cuenta?.pagado)}
-        </div>
+      <div className="flex items-baseline gap-1.5 flex-wrap">
+        <span className="text-base font-semibold sunmi-text-strong tabular-nums">{compra}</span>
+        <span className="text-sm3 sunmi-text-muted">· {proveedor}</span>
+        {variasUbicaciones && cuenta?.localGasto?.nombre && (
+          <span className="text-sm3 sunmi-text-muted">· {cuenta.localGasto.nombre}</span>
+        )}
       </div>
-
-      {/* LA COLUMNA DE LA DERECHA: el saldo arriba y la acción abajo, como el
-          importe y el "Ver ›" de transferencias. Con rótulo, porque acá hay tres
-          importes y el de la derecha tiene que decir cuál es. */}
-      <div className="shrink-0 flex flex-col items-end gap-1">
-        <div className="text-xs2 sunmi-text-muted">Saldo</div>
-        <div className="text-base2 font-semibold sunmi-text-strong tabular-nums">
-          {formatearMoneda(cuenta?.saldo)}
-        </div>
-        <div className="text-sm2 font-medium sunmi-text-accent">Ver ›</div>
+      <div className={`text-sm2 ${vencida ? "sunmi-text-warning" : "sunmi-text-muted"}`}>
+        {cuenta?.rotuloEstado || cuenta?.estado} · {vence}
       </div>
-    </SunmiButton>
+    </FilaConImporte>
   );
 }

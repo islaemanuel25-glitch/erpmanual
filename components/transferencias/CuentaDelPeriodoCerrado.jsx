@@ -27,6 +27,7 @@
 // de comportamiento; queda anotado.
 
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
+import ResumenConImporte from "@/components/periodo/ResumenConImporte";
 import { avisoDelPeriodo } from "@/lib/transferencias/descripcionDelPeriodo";
 
 export default function CuentaDelPeriodoCerrado({
@@ -41,59 +42,43 @@ export default function CuentaDelPeriodoCerrado({
     enCurso: d.enCurso,
     unidad: d.unidad,
   });
-  // El borde de aviso se enciende por lo mismo que el aviso de abajo: el total
-  // todavía se puede mover. Así el marco y la frase no pueden discrepar.
-  const abierta = Boolean(aviso);
   const vacio = Number(periodo?.cantidad || 0) === 0;
 
+  // El dibujo es `ResumenConImporte`, sacado de acá tal cual. El borde de aviso
+  // se enciende allá por lo mismo que el aviso de abajo: el total todavía se
+  // puede mover. Así el marco y la frase no pueden discrepar.
   return (
-    <section
-      className={`sunmi-bg-card rounded-xl2 p-4 space-y-3 ${
-        abierta ? "border-1.5 sunmi-border-warning" : "border sunmi-border"
-      }`}
-    >
-      <div>
-        <div className="text-xs sunmi-text-muted">{d.rotuloDelImporte || "Para cobrar"}</div>
-        <div className="text-xl2 font-semibold sunmi-text-strong tabular-nums">
-          {money ? money(periodo?.aPagar) : periodo?.aPagar}
-        </div>
-        <div className="text-sm2 sunmi-text-muted">
+    <ResumenConImporte
+      rotulo={d.rotuloDelImporte || "Para cobrar"}
+      importe={money ? money(periodo?.aPagar) : periodo?.aPagar}
+      // Dos nodos de texto, como estaban: juntarlos en una cadena mueve píxeles.
+      subtitulo={
+        <>
           {d.titulo}
           {d.subtitulo ? ` · ${d.subtitulo}` : ""}
-        </div>
-      </div>
-
-      {/* ── EL PERÍODO SIN MOVIMIENTO ─────────────────────────────────────
-          Pasa con un local recién vinculado, con una semana en la que no se le
-          mandó nada, y ahora también al caminar hacia atrás con las flechas. El
-          rango EXISTE igual —es una cuenta de calendario, no de datos— así que
-          se muestra con su importe en cero y una frase que dice qué pasó. Decir
-          "no hay período" sería falso: lo hay, y está vacío, que es una
-          respuesta distinta y es la verdadera. */}
-      {vacio && (
-        <div className="text-sm2 sunmi-text-muted">No se le envió nada en ese período.</div>
-      )}
-
-      {(aviso || puedeConfigurarCorte) && (
-        <>
-          <div className="border-t sunmi-divider opacity-70" aria-hidden="true" />
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0 text-sm2 font-medium sunmi-text-warning">{aviso}</div>
-            {/* ── EL ATAJO AL CORTE VIVE ACÁ Y SOLO CON SEMANA ──────────────
-                Es donde la pregunta surge: el rango de una semana depende del
-                corte, y el del mes no. Ofrecerlo con el chip en Mes llevaría a
-                una pantalla que no cambia nada de lo que se está mirando.
-
-                Y solo a quien puede usarlo: un atajo a una pantalla donde no se
-                puede configurar nada es peor que no ofrecerlo. */}
-            {puedeConfigurarCorte && (
-              <div className="shrink-0">
-                <SunmiLinkButton onClick={onConfigurarCorte}>Corte de semana ›</SunmiLinkButton>
-              </div>
-            )}
-          </div>
         </>
-      )}
-    </section>
+      }
+      // ── EL PERÍODO SIN MOVIMIENTO ─────────────────────────────────────
+      // Pasa con un local recién vinculado, con una semana en la que no se le
+      // mandó nada, y ahora también al caminar hacia atrás con las flechas. El
+      // rango EXISTE igual —es una cuenta de calendario, no de datos— así que
+      // se muestra con su importe en cero y una frase que dice qué pasó. Decir
+      // "no hay período" sería falso: lo hay, y está vacío, que es una
+      // respuesta distinta y es la verdadera.
+      nota={vacio ? "No se le envió nada en ese período." : null}
+      aviso={aviso}
+      // ── EL ATAJO AL CORTE VIVE ACÁ Y SOLO CON SEMANA ──────────────────
+      // Es donde la pregunta surge: el rango de una semana depende del corte, y
+      // el del mes no. Ofrecerlo con el chip en Mes llevaría a una pantalla que
+      // no cambia nada de lo que se está mirando.
+      //
+      // Y solo a quien puede usarlo: un atajo a una pantalla donde no se puede
+      // configurar nada es peor que no ofrecerlo.
+      accion={
+        puedeConfigurarCorte ? (
+          <SunmiLinkButton onClick={onConfigurarCorte}>Corte de semana ›</SunmiLinkButton>
+        ) : null
+      }
+    />
   );
 }

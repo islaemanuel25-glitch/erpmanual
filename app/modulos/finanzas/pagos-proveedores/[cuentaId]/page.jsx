@@ -3,8 +3,8 @@
 // UNA CUENTA POR PAGAR ABIERTA.
 //
 // El título es el NOMBRE DEL PROVEEDOR, que no está en la ruta: lo trae el dato.
-// "Volver" lleva a la lista en la solapa de la que se vino, que viaja en
-// `?estado=`.
+// "Volver" lleva a la lista en la pestaña y el período de los que se vino, que
+// viajan en la URL (`parseContextoPagos`).
 "use client";
 
 import { Suspense, useCallback, useEffect, useState } from "react";
@@ -18,8 +18,8 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import AccionDePantalla from "@/components/transferencias/AccionDePantalla";
 import DetalleCuentaPorPagar from "@/components/finanzas/pagos/DetalleCuentaPorPagar";
-import { urlDePagosProveedores } from "@/lib/finanzas/contextoFinanzas";
-import { PERMISO_VER_FINANZAS, filtroDeCuentas } from "@/lib/finanzas/pagosProveedores";
+import { parseContextoPagos, urlDePagosProveedores } from "@/lib/finanzas/contextoFinanzas";
+import { PERMISO_VER_FINANZAS } from "@/lib/finanzas/pagosProveedores";
 
 export default function CuentaPorPagarPage() {
   return (
@@ -38,7 +38,8 @@ export default function CuentaPorPagarPage() {
 function CuentaPorPagar() {
   const { cuentaId } = useParams();
   const params = useSearchParams();
-  const filtro = filtroDeCuentas(params.get("estado"));
+  // La pestaña y el período de la lista: "Volver" cae en el mismo lugar.
+  const vuelta = urlDePagosProveedores(parseContextoPagos(params));
   const { perfil, cargando: cargandoUsuario } = useUser();
   const permisos = perfil?.permisos || [];
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
@@ -72,8 +73,8 @@ function CuentaPorPagar() {
 
   useTituloDePagina(datos?.cuenta?.proveedor?.nombre || "Cuenta por pagar");
   const volver = useAccionDePagina(
-    () => <SunmiBackButton href={urlDePagosProveedores(filtro)} />,
-    [filtro]
+    () => <SunmiBackButton href={vuelta} />,
+    [vuelta]
   );
 
   if (cargandoUsuario) return null;
