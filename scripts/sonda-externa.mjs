@@ -52,6 +52,17 @@ export const INTERVALO_POR_DEFECTO = 10;
 /** Segundos que se busca la corrida por su título, si GitHub no devolvió su id. */
 export const ESPERA_PARA_ENCONTRARLA = 120;
 
+/**
+ * El `name:` del workflow. Es el título PROVISORIO que GitHub le da a una corrida
+ * recién disparada, antes de calcular el `run-name`: medido en la corrida
+ * 36026741530, la primera PRE real, que dio ROJO por eso siendo la corrida
+ * correcta —mismo id, `workflow_dispatch`, SHA correcto— y terminó en success
+ * con su título definitivo segundos después. Un candado lo compara con el `.yml`.
+ */
+export const NOMBRE_DEL_WORKFLOW = "Sonda de cascada externa";
+/** Segundos que se espera a que el título provisorio pase a ser el definitivo. */
+export const ESPERA_PARA_EL_TITULO = 60;
+
 /** Las líneas que el workflow imprime y que el veredicto exige. El candado las busca en el `.yml`. */
 export const MARCAS = {
   fase: "SONDA-EXTERNA FASE",
@@ -306,11 +317,27 @@ export async function correrSondaExterna({
     // 2. Esperar a que termine.
     let run = null;
     let estadoAnterior = null;
+    let tituloProvisorioDesde = null;
     while (true) {
       const r = await pedir("GET", `${base}/runs/${id}`);
       if (r.ok) {
         run = await r.json();
         url = run.html_url || url;
+        // El título provisorio NO prueba nada, ni a favor ni en contra: se
+        // vuelve a preguntar por el MISMO id hasta que aparezca el definitivo,
+        // con tope propio. Cualquier otro título es ROJO, como siempre.
+        if (run.display_title === NOMBRE_DEL_WORKFLOW) {
+          tituloProvisorioDesde ??= ahora();
+          if (ahora() - tituloProvisorioDesde >= ESPERA_PARA_EL_TITULO * 1000 || !quedaTiempo()) {
+            return {
+              verde: false,
+              motivo: `la corrida ${id} siguió con el título provisorio «${NOMBRE_DEL_WORKFLOW}» y nunca mostró «${titulo}»`,
+              url,
+            };
+          }
+          await dormir(intervalo * 1000);
+          continue;
+        }
         if (run.display_title !== titulo) {
           return { verde: false, motivo: `la corrida ${id} no es la que se disparó: se llama «${run.display_title}»`, url };
         }

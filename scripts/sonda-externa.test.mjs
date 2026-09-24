@@ -28,7 +28,9 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 
 import {
+  ESPERA_PARA_EL_TITULO,
   MARCAS,
+  NOMBRE_DEL_WORKFLOW,
   WORKFLOW,
   leerOpciones,
   leerToken,
@@ -240,7 +242,11 @@ function githubDeMentira(config) {
         consultas++;
         const estados = config.estados || ["queued", "in_progress", "completed"];
         const status = estados[Math.min(consultas - 1, estados.length - 1)];
-        return json(200, { id: 77, status, conclusion: status === "completed" ? config.conclusion : null, display_title: titulo(), html_url: "https://github.test/runs/77" });
+        // `titulos`: lo que GitHub devuelve como título en cada consulta al
+        // MISMO id; el último se repite. `DEFINITIVO` es el que se disparó.
+        const t = config.titulos ? config.titulos[Math.min(consultas - 1, config.titulos.length - 1)] : DEFINITIVO;
+        const display_title = t === DEFINITIVO ? titulo() : t;
+        return json(200, { id: 77, status, conclusion: status === "completed" ? config.conclusion : null, display_title, html_url: "https://github.test/runs/77" });
       }
       if (u.includes("/actions/runs/77/jobs")) return json(200, { jobs: [{ id: 900, name: "sonda" }] });
       if (u.endsWith("/actions/jobs/900/logs")) {
@@ -259,16 +265,29 @@ function githubDeMentira(config) {
   );
 }
 
+const DEFINITIVO = Symbol("el título que se disparó");
+
 async function correr(config, { fase = "pre", sha = SHA, extra = [], env = {} } = {}) {
   const g = await githubDeMentira({ disparo: 200, conclusion: "success", log: logDeFase(fase), ...config });
   const salida = [];
+  // Reloj de mentira: cada espera lo adelanta lo que se pidió, así un tope de
+  // 60 s se ejerce entero sin esperar 60 s.
+  let reloj = 0;
   try {
     const codigo = await principal(
-      ["node", "sonda-externa.mjs", "--fase", fase, "--sha-esperado", sha, "--intervalo", "0.001", ...extra],
+      // `extra` va ANTES del intervalo por defecto: el lector toma la primera aparición.
+      ["node", "sonda-externa.mjs", "--fase", fase, "--sha-esperado", sha, ...extra, "--intervalo", "0.001"],
       { SONDA_GITHUB_API: g.api, SONDA_GITHUB_TOKEN: TOKEN, ...env },
-      { escribir: (l) => salida.push(l), dormir: async () => {}, correlacion: "sonda-pre-abc123def456" }
+      {
+        escribir: (l) => salida.push(l),
+        dormir: async (ms) => {
+          reloj += ms;
+        },
+        ahora: () => reloj,
+        correlacion: "sonda-pre-abc123def456",
+      }
     );
-    return { codigo, texto: salida.join("\n"), pedidos: g.pedidos };
+    return { codigo, texto: salida.join("\n"), pedidos: g.pedidos, consultasAlRun: g.pedidos.filter((p) => p.url.endsWith("/actions/runs/77")).length };
   } finally {
     g.servidor.close();
   }
@@ -329,6 +348,46 @@ test("ROJO si la corrida que aparece no es la que se disparó", async () => {
   const r = await correr({ tituloDeLaCorrida: "sonda pre otra-cosa" });
   assert.equal(r.codigo, 1);
   assert.match(r.texto, /no es la que se disparó/);
+});
+
+// ── EL TÍTULO PROVISORIO: LA CARRERA DE LA PRIMERA PRE REAL ───────────────
+//
+// Corrida 36026741530, 2026-09-24: GitHub devolvió el id con
+// `return_run_details`, la primera consulta a ese id trajo como título el
+// `name:` del workflow —«Sonda de cascada externa»— y segundos después el mismo
+// id tenía el título definitivo y terminó en success. El cliente dio ROJO.
+
+test("el título provisorio es el name: del workflow, tal cual", () => {
+  assert.match(workflow(), new RegExp(`^name: ${NOMBRE_DEL_WORKFLOW}$`, "m"));
+});
+
+test("regresión 36026741530: provisorio primero, definitivo después, mismo id → VERDE", async () => {
+  const r = await correr({ titulos: [NOMBRE_DEL_WORKFLOW, DEFINITIVO] });
+  assert.equal(r.codigo, 0, r.texto);
+  assert.match(r.texto, /^VERDE · sonda externa PRE/m);
+  assert.ok(r.consultasAlRun >= 2, "no volvió a preguntar por el mismo id");
+  assert.ok(!r.pedidos.some((p) => p.url.includes("/runs?event=")), "se puso a buscar otra corrida");
+});
+
+test("provisorio y después un título definitivo DISTINTO → ROJO", async () => {
+  const r = await correr({ titulos: [NOMBRE_DEL_WORKFLOW, "sonda pre otra-cosa"] });
+  assert.equal(r.codigo, 1);
+  assert.match(r.texto, /no es la que se disparó: se llama «sonda pre otra-cosa»/);
+});
+
+test("provisorio que nunca se materializa → ROJO al vencer su tope, no al de 15 min", async () => {
+  const r = await correr({ titulos: [NOMBRE_DEL_WORKFLOW] }, { extra: ["--intervalo", "5"] });
+  assert.equal(r.codigo, 1);
+  assert.match(r.texto, /siguió con el título provisorio «Sonda de cascada externa» y nunca mostró «sonda pre 47d07bbc/);
+  // Con consultas cada 5 s, el tope de 60 s son 13: la primera y doce más.
+  assert.equal(r.consultasAlRun, ESPERA_PARA_EL_TITULO / 5 + 1);
+});
+
+test("el título provisorio no cuenta como terminada aunque diga completed", async () => {
+  const r = await correr({ titulos: [NOMBRE_DEL_WORKFLOW], estados: ["completed"] }, { extra: ["--intervalo", "5"] });
+  assert.equal(r.codigo, 1);
+  assert.match(r.texto, /título provisorio/);
+  assert.ok(!r.pedidos.some((p) => p.url.includes("/jobs")), "leyó el log de una corrida sin identificar");
 });
 
 test("ROJO con el motivo si GitHub rechaza el token, y el token no se imprime", async () => {
