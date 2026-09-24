@@ -14,19 +14,23 @@
 // `textoTodas={null}` y un valor que nunca puede ser nulo — tres excepciones
 // para que una pieza haga lo contrario de lo que la hizo existir.
 //
-// ── Y POR QUÉ NO VA AL KIT ────────────────────────────────────────────────
+// ── Y POR QUÉ ESTE ARCHIVO NO VA AL KIT, PERO SU DIBUJO SÍ ────────────────
 //
 // Porque sabe de dominio: importa `UNIDADES` de `periodoDePago`, que es el
 // vocabulario con el que este negocio paga. Una pieza del kit que conociera
-// "SEMANA" dejaría de ser del kit. Lo que sí sale del kit es de lo que está
-// hecho: `SunmiButton`, con su negociación de clases.
+// "SEMANA" dejaría de ser del kit.
+//
+// Lo que NO sabe de dominio —los botones que se reparten el ancho, uno elegido—
+// se sacó al kit como `SunmiSelectorDeOpciones` cuando Pagos a proveedores
+// necesitó lo mismo para Pendientes / Pagados / Todos. Acá quedan las cuatro
+// opciones de período y la etiqueta; el marcado es el mismo que antes.
 //
 // ── LO QUE NO DECIDE ──────────────────────────────────────────────────────
 //
 // Qué hace "Otro". Avisa que lo eligieron y nada más; el calendario lo abre la
 // pantalla, con `SunmiDateRangePicker`, que ya está en el kit y no se rediseña.
 
-import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiSelectorDeOpciones from "@/components/sunmi/SunmiSelectorDeOpciones";
 import { UNIDADES } from "@/lib/transferencias/periodoDePago";
 
 /** No es una unidad de `periodoDePago`: es "elegí vos las fechas". */
@@ -59,50 +63,16 @@ export const OPCIONES_DE_PERIODO = Object.freeze([
  *
  * Apagado dice la verdad: existe, y todavía no.
  */
-export default function ChipsDePeriodo({
-  valor = UNIDADES.SEMANA,
-  onCambiar,
-  className = "",
-  deshabilitadas = [],
-}) {
-  const apagadas = new Set(deshabilitadas || []);
+export default function ChipsDePeriodo({ valor = UNIDADES.SEMANA, onCambiar, deshabilitadas = [] }) {
+  // El `className` que aceptaba antes no lo pasaba ninguna de las tres pantallas
+  // que lo usan, y concatenado no negociaba: se fue con el marcado al kit.
   return (
-    // `gap-1.5` son 5,25 px: el 6 de la especificación ajustado a la escala del
-    // proyecto, donde 1rem = 14 px. Por qué se ajusta en vez de entrar al
-    // config está en docs/roadmap/rediseno-transferencias-movil.md.
-    <div role="group" aria-label="Período" className={`flex gap-1.5 ${className}`}>
-      {OPCIONES_DE_PERIODO.map((o) => {
-        const activo = o.clave === valor;
-        const apagado = apagadas.has(o.clave);
-        return (
-          <SunmiButton
-            key={o.clave}
-            type="button"
-            color={activo ? "primary" : "slate"}
-            aria-pressed={activo}
-            // `disabled` solo cuando la pantalla lo pidió. Sin la prop, esto es
-            // `false` y el atributo no se emite: el marcado queda idéntico al
-            // que las dos pantallas de hoy ya dibujan.
-            disabled={apagado || undefined}
-            // El motivo, para quien pase el dedo por encima y para el lector de
-            // pantalla. Un control apagado sin explicación se lee como roto.
-            title={apagado ? "Todavía no disponible" : undefined}
-            onClick={apagado ? undefined : () => onCambiar?.(o.clave)}
-            // `flex-1 basis-0` y no solo `flex-1`: sin base cero los cuatro se
-            // reparten el sobrante y no el ancho, así que "Semana" quedaría más
-            // ancho que "Día" por tener más letras. La especificación pide FILL,
-            // que son cuatro iguales.
-            //
-            // El resto son los ejes que `SunmiButton` cede cuando la pantalla
-            // los declara: alto, padding, radio, tamaño y peso de letra.
-            className={`flex-1 basis-0 justify-center py-2.5 px-1 rounded-lg text-sm3 ${
-              activo ? "font-semibold" : "font-medium"
-            }`}
-          >
-            {o.texto}
-          </SunmiButton>
-        );
-      })}
-    </div>
+    <SunmiSelectorDeOpciones
+      opciones={OPCIONES_DE_PERIODO}
+      valor={valor}
+      onCambiar={onCambiar}
+      etiqueta="Período"
+      deshabilitadas={deshabilitadas}
+    />
   );
 }
