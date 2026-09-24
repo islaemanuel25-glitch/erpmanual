@@ -1,10 +1,38 @@
 // app/api/transferencias/acuerdos/route.js
 //
-// EL CORTE DE SEMANA DE CADA RELACIÓN DEPÓSITO–LOCAL.
+// EL CORTE DE SEMANA QUE VE LA PANTALLA "CORTE DE SEMANA" DE TRANSFERENCIAS.
 //
-// GET  → todas las relaciones del grupo, con su día de arranque y su rango en
-//        curso. Las que NO tienen acuerdo vienen marcadas, nunca en silencio.
-// PUT  → fija el día de una relación.
+// GET  → los locales del grupo que operan por transferencia, con el día en que
+//        arranca SU semana, su rango en curso y el cambio programado si hay uno.
+//        Los que no tienen semana configurada vienen marcados, nunca en silencio.
+// PUT  → configura o programa la semana de UN local.
+//
+// ── LA SEMANA ES DEL LOCAL, NO DE ESTE ACUERDO ────────────────────────────
+//
+// Desde la tanda de la semana operativa canónica esta ruta NO lee ni escribe
+// `AcuerdoDepositoLocal`: la fuente es `SemanaOperativaVigencia`, y la única
+// puerta que la escribe es `programarSemanaOperativa`. La tabla vieja quedó
+// congelada con lo que tenía; la migración la volcó a la nueva y un candado
+// (`lib/semanaOperativa/unaSolaFuente.test.mjs`) impide que se vuelva a leer.
+//
+// El PUT conserva su forma para que la pantalla actual siga funcionando, pero su
+// efecto es el de la regla nueva:
+//
+//   · un local SIN semana configurada la recibe "desde siempre", que es lo que
+//     esta pantalla ya hacía con un local sin acuerdo;
+//   · un local CON semana no cambia de golpe: el cambio se programa desde el
+//     primer día de la semana siguiente —nunca parte la semana abierta ni toca
+//     las anteriores— y, si ya había uno programado, lo reemplaza, porque esta
+//     pantalla solo sabe decir "este es el día".
+//
+// Y exige `config_local.semana_operativa`. `transferencias.crear` solo ya no
+// alcanza: cambiar la semana ya no es un acuerdo de despacho, es la semana de
+// toda la ubicación.
+//
+// Con el alcance de ese permiso: la lista es de todo el grupo —lectura
+// compatible—, pero solo se escribe la ubicación en la que se opera, igual que
+// cualquier `config_local.*`. Cada fila dice `configurable` para que la pantalla
+// ofrezca "Cambiar" solo donde el PUT lo va a aceptar.
 //
 // ── POR QUÉ DEVUELVE TAMBIÉN LAS QUE NO TIENEN FILA ───────────────────────
 //
@@ -12,42 +40,54 @@
 // configurar, y lo que falta no está en la tabla — por definición. Si esta ruta
 // devolviera las filas de `AcuerdoDepositoLocal`, un local sin acuerdo no
 // aparecería en la lista y no habría forma de configurarlo desde ahí. La lista
-// sale de los LOCALES del grupo, y el acuerdo se le pega al lado cuando existe.
-//
-// ── EL PERMISO DEL PUT ────────────────────────────────────────────────────
-//
-// `transferencias.crear`, que es el del depósito: el que despacha es el que
-// acuerda con cada local cuándo se corta la semana. No se inventó un permiso
-// nuevo para esto —sería una fila más que sembrar y asignar en cada rol— y
-// queda anotado como decisión revisable: si mañana la configuración la hace un
-// administrativo que no despacha, va a necesitar el suyo.
+// sale de los LOCALES del grupo, y la semana se le pega al lado cuando existe.
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { resolveVistaOperativa } from "@/lib/grupos";
-import { acuerdoDeLocal } from "@/lib/transferencias/bloquesPorLocal";
+import { resolveLocalAndGrupo, resolveVistaOperativa } from "@/lib/grupos";
 import { relacionesDelDeposito } from "@/lib/transferencias/relacionesDelDeposito";
 import { destinosDeTransferencia } from "@/lib/transferencias/destinosDeTransferencia";
+import { esDiaDeCorteValido } from "@/lib/transferencias/periodoDePago";
 import {
-  UNIDADES,
-  esDiaDeCorteValido,
-  rangoDelPeriodo,
-} from "@/lib/transferencias/periodoDePago";
+  PERMISO_SEMANA_OPERATIVA,
+  semanaQueContiene,
+  vigenciaPendiente,
+} from "@/lib/semanaOperativa/semanaOperativa";
+import {
+  ErrorSemanaOperativa,
+  programarSemanaOperativa,
+  vigenciasDeUbicaciones,
+} from "@/lib/semanaOperativa/semanaOperativaServer";
 
-/** Las relaciones del grupo, con acuerdo o con la marca de que falta. */
-async function relacionesDelGrupo(grupoId) {
+/**
+ * LA UBICACIÓN CUYA SEMANA PUEDE CAMBIAR QUIEN PIDE, o `null`.
+ *
+ * Es la misma que usa toda la configuración por local (`config_local.*`):
+ * `resolveLocalAndGrupo`, que para un no-admin es la ubicación de su sesión y
+ * para el administrador la de su contexto activo. Nunca la del cuerpo del
+ * pedido. Pertenecer al grupo no alcanza: esta pantalla lista los locales del
+ * grupo, pero solo deja cambiar la semana de la ubicación en la que se opera.
+ */
+async function ubicacionQueConfigura(req, session) {
+  if (!checkPerm(session, PERMISO_SEMANA_OPERATIVA).ok) return null;
+  const scope = await resolveLocalAndGrupo(req);
+  return scope.error ? null : scope.localId;
+}
+
+/** Los locales del grupo, con su semana o con la marca de que falta. */
+async function relacionesDelGrupo(grupoId, ubicacionConfigurable = null) {
   // La lista de locales sale de la MISMA puerta que usa la lista de trabajo. Si
   // cada pantalla armara la suya, un local podría aparecer en una y no en la
   // otra sin que nada lo explique.
   const { deposito, locales } = await relacionesDelDeposito(grupoId);
   if (!deposito) return { deposito: null, relaciones: [] };
 
-  const acuerdos = await prisma.acuerdoDepositoLocal.findMany({
-    where: { grupoId },
-    select: { localId: true, diaDeCorte: true },
-  });
+  const semanas = await vigenciasDeUbicaciones(
+    prisma,
+    (locales || []).map((l) => l.id)
+  );
 
   // ── LA MISMA PUERTA, TAMBIÉN ACÁ ────────────────────────────────────────
   //
@@ -63,14 +103,23 @@ async function relacionesDelGrupo(grupoId) {
     .map((l) => {
       // La misma puerta que usa la lista de trabajo, para que las dos pantallas
       // no puedan decir días distintos del mismo local.
-      const { diaDeCorte, sinConfigurar } = acuerdoDeLocal(acuerdos, l.id);
+      const vigencias = semanas.get(l.id) || [];
+      const semana = semanaQueContiene({ vigencias });
+      const programado = vigenciaPendiente(vigencias);
       return {
         localId: l.id,
         localNombre: l.nombre,
         depositoNombre: deposito.nombre,
-        diaDeCorte,
-        sinConfigurar,
-        rango: rangoDelPeriodo({ unidad: UNIDADES.SEMANA, diaDeCorte }),
+        diaDeCorte: semana.diaDeCorte,
+        sinConfigurar: semana.sinConfigurar,
+        rango: { desde: semana.desde, hasta: semana.hasta },
+        // El cambio que ya se programó y todavía no empezó. La pantalla de hoy no
+        // lo dibuja; viaja para que la de configuración de la semana lo muestre.
+        programado: programado ? { diaDeCorte: programado.diaDeCorte, desde: programado.desde } : null,
+        // Si quien mira puede cambiar ESTA fila. Lo decide el servidor con la
+        // misma regla que aplica el PUT, así la pantalla no ofrece un "Cambiar"
+        // que termina en 403.
+        configurable: ubicacionConfigurable !== null && l.id === ubicacionConfigurable,
       };
     });
 
@@ -84,7 +133,13 @@ export async function GET(req) {
       return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
     }
 
-    const perm = checkPerm(session, "transferencias.ver");
+    // Cualquiera de los dos alcanza: el que mira Transferencias, o el que
+    // configura la semana, que no tiene por qué tener permisos de Transferencias.
+    // Lo que esta ruta devuelve —locales, día, rango y cambio programado— no trae
+    // importes ni transferencias. Es la misma lista que
+    // `PERMISOS_PARA_VER_EL_CORTE` (`components/transferencias/corteDeSemana.js`),
+    // y un candado compara las dos.
+    const perm = checkPerm(session, ["transferencias.ver", PERMISO_SEMANA_OPERATIVA]);
     if (!perm.ok) {
       return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
@@ -97,7 +152,10 @@ export async function GET(req) {
       );
     }
 
-    const { deposito, relaciones } = await relacionesDelGrupo(vista.grupoId);
+    const { deposito, relaciones } = await relacionesDelGrupo(
+      vista.grupoId,
+      await ubicacionQueConfigura(req, session)
+    );
     if (!deposito) {
       return NextResponse.json(
         { ok: false, error: "Este grupo no tiene un depósito asignado." },
@@ -122,7 +180,11 @@ export async function PUT(req) {
       return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
     }
 
-    const perm = checkPerm(session, "transferencias.crear");
+    // Cambiar la semana es cambiar la semana de TODA la ubicación, así que el
+    // permiso es el suyo y no el de despachar. La pantalla usa la misma constante
+    // (`components/transferencias/corteDeSemana.js`) para no ofrecer el botón a
+    // quien el servidor va a rechazar.
+    const perm = checkPerm(session, PERMISO_SEMANA_OPERATIVA);
     if (!perm.ok) {
       return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
@@ -167,9 +229,52 @@ export async function PUT(req) {
       );
     }
 
-    // El local tiene que ser DE ESTE GRUPO. Sin este control, un id ajeno
-    // escrito a mano crearía un acuerdo entre el depósito de un grupo y el local
-    // de otro, y la unicidad del par no lo impediría porque el par sería nuevo.
+    // El depósito TIENE semana propia, pero no se configura desde esta pantalla,
+    // que es la de sus locales: se configura como ubicación, en
+    // `/api/config/semana-operativa`.
+    //
+    // Va ANTES del control de grupo, y no es un detalle: el depósito no está en
+    // `GrupoLocal`, así que ese control lo rechazaba primero con un 403 que decía
+    // "no pertenece a este grupo" y esta rama no corría nunca. Lo encontró el
+    // candado de base.
+    if (localId === deposito.localId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "La semana del depósito se configura como la de cualquier ubicación, no desde el corte de sus locales.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // ── SOLO LA UBICACIÓN EN LA QUE SE OPERA ───────────────────────────────
+    //
+    // `config_local.semana_operativa` es de la familia `config_local.*`, y ahí el
+    // alcance es la ubicación que resuelve `resolveLocalAndGrupo`: la de la
+    // sesión, o el contexto activo del administrador. Pertenecer al mismo grupo
+    // no alcanza para cambiarle la semana a otro local: esa capacidad
+    // transversal era de `transferencias.crear` y no se hereda.
+    const scope = await resolveLocalAndGrupo(req);
+    if (scope.error) {
+      return NextResponse.json(
+        { ok: false, error: scope.error, needsContexto: scope.needsContexto },
+        { status: scope.status }
+      );
+    }
+    if (localId !== scope.localId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Solo se puede cambiar la semana de la ubicación en la que estás operando. La de otro local la configura quien opera ese local.",
+        },
+        { status: 403 }
+      );
+    }
+
+    // El local tiene que ser DE ESTE GRUPO. Sin este control, un id ajeno escrito
+    // a mano le cambiaría la semana a una ubicación de otro grupo.
     const vinculo = await prisma.grupoLocal.findFirst({
       where: { grupoId: vista.grupoId, localId },
       select: { id: true },
@@ -180,28 +285,42 @@ export async function PUT(req) {
         { status: 403 }
       );
     }
-    if (localId === deposito.localId) {
-      return NextResponse.json(
-        { ok: false, error: "El depósito no acuerda un corte consigo mismo." },
-        { status: 400 }
+
+    // La ÚNICA escritura: la fuente canónica. `AcuerdoDepositoLocal` no se toca.
+    let resultado;
+    try {
+      resultado = await prisma.$transaction((tx) =>
+        programarSemanaOperativa(tx, {
+          localId,
+          diaDeCorte,
+          usuarioId: session.id ?? null,
+          // Esta pantalla solo sabe decir "este es el día": el último pedido manda
+          // sobre un cambio que se había programado y todavía no empezó.
+          reemplazarPendiente: true,
+        })
       );
+    } catch (err) {
+      if (err instanceof ErrorSemanaOperativa) {
+        return NextResponse.json(
+          { ok: false, error: err.message, codigo: err.codigo, ...err.extra },
+          { status: err.status }
+        );
+      }
+      throw err;
     }
 
-    await prisma.acuerdoDepositoLocal.upsert({
-      where: {
-        acuerdo_deposito_local_unique: { depositoLocalId: deposito.localId, localId },
+    const { relaciones } = await relacionesDelGrupo(vista.grupoId, scope.localId);
+    return NextResponse.json({
+      ok: true,
+      relaciones,
+      // "PRIMERA" = rige desde siempre. "PROGRAMAR" = rige desde `desde`, y hasta
+      // ese día la semana sigue siendo la de antes.
+      cambio: {
+        accion: resultado.accion,
+        desde: resultado.desde,
+        transicion: resultado.transicion,
       },
-      create: {
-        grupoId: vista.grupoId,
-        depositoLocalId: deposito.localId,
-        localId,
-        diaDeCorte,
-      },
-      update: { diaDeCorte },
     });
-
-    const { relaciones } = await relacionesDelGrupo(vista.grupoId);
-    return NextResponse.json({ ok: true, relaciones });
   } catch (e) {
     console.error("[transferencias/acuerdos PUT]", e);
     return NextResponse.json(

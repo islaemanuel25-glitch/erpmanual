@@ -383,3 +383,10 @@ jobs:
       - name: Ejercer Finanzas contra PostgreSQL
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/finanzas.mjs
 
+      # La semana operativa de la ubicación: el backfill de su migración —el mismo
+      # SQL del archivo—, las restricciones que Prisma no ve, las dos rutas que la
+      # escriben y la paridad de Transferencias. Va en este job porque es la base
+      # de los períodos de Finanzas y no depende de las contrapruebas de Recepción.
+      - name: Ejercer la semana operativa contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/semanaOperativa.mjs
+

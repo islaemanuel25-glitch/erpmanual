@@ -49,6 +49,7 @@ import FilaCorteDeSemana from "@/components/transferencias/FilaCorteDeSemana";
 import {
   RUTA_TRANSFERENCIAS,
   puedeConfigurarElCorte,
+  puedeVerElCorte,
 } from "@/components/transferencias/corteDeSemana";
 
 import { UNIDADES, rangoDelPeriodo } from "@/lib/transferencias/periodoDePago";
@@ -60,7 +61,6 @@ export default function CorteDeSemanaPage() {
   // `undefined`, que se comporta como "sin permisos" sin decir por qué.
   const { perfil, cargando: cargandoUsuario } = useUser();
   const permisos = perfil?.permisos || [];
-  const esAdmin = Array.isArray(permisos) && permisos.includes("*");
   const puedeEditar = puedeConfigurarElCorte(permisos);
 
   useTituloDePagina("Corte de semana");
@@ -122,7 +122,9 @@ export default function CorteDeSemanaPage() {
   };
 
   if (cargandoUsuario) return null;
-  if (!esAdmin && !permisos.includes("transferencias.ver")) return <SinPermisos />;
+  // `transferencias.ver` O el permiso de la semana: configurar la semana de la
+  // ubicación no exige mirar Transferencias. Ver `puedeVerElCorte`.
+  if (!puedeVerElCorte(permisos)) return <SinPermisos />;
 
   return (
     <div className="w-full min-h-full px-4 pt-4 pb-4 space-y-3.5">
@@ -169,7 +171,10 @@ export default function CorteDeSemanaPage() {
               editando={esta}
               diaElegido={diaElegido}
               guardando={guardando && esta}
-              puedeEditar={puedeEditar}
+              // La fila solo ofrece "Cambiar" si es la ubicación en la que se
+              // opera: el servidor lo decide (`configurable`) con la misma regla
+              // que aplica al guardar.
+              puedeEditar={puedeEditar && r.configurable === true}
               onElegirDia={setDiaElegido}
               onEditar={() => empezarAEditar(r)}
               onGuardar={(dia) => guardar(r.localId, dia)}

@@ -128,6 +128,72 @@ model AcuerdoDepositoLocal {
   @@index([grupoId])
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// LA SEMANA OPERATIVA ES DE LA UBICACIÓN
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// ── ESTA ES LA FUENTE, Y `AcuerdoDepositoLocal.diaDeCorte` DEJA DE SERLO ─────
+//
+// La semana no es de Transferencias ni de Finanzas ni de un acuerdo entre dos
+// ubicaciones: es de cada ubicación —cada local y también el depósito— y todo el
+// ERP la consume. El acuerdo la tenía por PAR depósito–local, así que un local
+// podía tener dos cortes y el depósito ninguno. Desde esta tabla nadie lee el
+// acuerdo: quedó congelado y se retira cuando un candado demuestre cero lectores.
+//
+// ── POR QUÉ UNA FILA POR VIGENCIA Y NO UNA COLUMNA EN `ConfiguracionLocal` ────
+//
+// Porque la semana tiene HISTORIA. Cambiarla no puede reinterpretar semanas que
+// ya pasaron, y una columna que se pisa las reinterpretaría todas. Acá cada cambio
+// es una fila nueva que rige desde una fecha; la anterior no se toca.
+//
+// No hay "hasta": sale de la vigencia siguiente. Guardarlo sería una segunda
+// verdad que un cambio mal escrito dejaría desalineada.
+//
+// ── `vigenteDesde` EN NULL ES "DESDE SIEMPRE" ───────────────────────────────
+//
+// Es la primera configuración de la ubicación: la que vino del acuerdo en la
+// migración, o la primera que alguien carga. Las demás son cambios programados,
+// y un cambio SIEMPRE rige desde el primer día de una semana futura
+// (`lib/semanaOperativa/semanaOperativa.js`): nunca parte la semana abierta ni
+// toca una anterior.
+//
+// ── LO QUE LA BASE GARANTIZA Y PRISMA NO EXPRESA ────────────────────────────
+//
+// Escrito a mano en la migración `20260924230000_semana_operativa_ubicacion`:
+//
+//   · CHECK "SemanaOperativaVigencia_dia_valido": el día es de 0 a 6.
+//   · UNIQUE parcial "SemanaOperativaVigencia_desde_siempre_key": a lo sumo UNA
+//     vigencia "desde siempre" por ubicación. El único de abajo no lo impide,
+//     porque en PostgreSQL dos NULL nunca son iguales.
+//
+// `creadoPorId` es un sello de autoría sin relación Prisma, igual que
+// `CierrePreparacion.iniciadoPorUsuarioId`: nadie navega del usuario hacia acá.
+// En las filas de la migración queda en null, y `origen` dice por qué.
+model SemanaOperativaVigencia {
+  id           Int                   @id @default(autoincrement())
+  localId      Int
+  /// 0 = domingo … 6 = sábado. Es el día en que ARRANCA la semana, con la misma
+  /// numeración que `Date.getUTCDay()` y que `AcuerdoDepositoLocal.diaDeCorte`.
+  diaDeCorte   Int
+  /// Día argentino desde el que rige. NULL = desde siempre.
+  vigenteDesde DateTime?             @db.Date
+  origen       OrigenSemanaOperativa
+  creadoPorId  Int?
+  createdAt    DateTime              @default(now())
+
+  local Local @relation(fields: [localId], references: [id], onDelete: Cascade)
+
+  @@unique([localId, vigenteDesde])
+}
+
+/// De dónde salió una vigencia de semana operativa.
+enum OrigenSemanaOperativa {
+  /// Cargada por la migración desde `AcuerdoDepositoLocal.diaDeCorte`.
+  MIGRACION
+  /// Cargada o programada por una persona.
+  MANUAL
+}
+
 model Local {
   id                    Int      @id @default(autoincrement())
   nombre                String
@@ -162,6 +228,8 @@ model Local {
   /// Los acuerdos de corte de período, por los dos lados de la relación.
   acuerdosComoDeposito AcuerdoDepositoLocal[] @relation("acuerdo_deposito")
   acuerdosComoLocal    AcuerdoDepositoLocal[] @relation("acuerdo_local")
+  /// La semana operativa de esta ubicación, con su historia de vigencias.
+  semanasOperativas    SemanaOperativaVigencia[]
 
   ventas            Venta[]
   turnos            Turno[]

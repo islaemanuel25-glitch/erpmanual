@@ -603,6 +603,110 @@ const CASOS = [
     candado: "las dos variantes que usa la tarjeta de recepción existen",
     suite: "components/sunmi/variantesDeAccion.test.mjs",
   },
+  // ── LA SEMANA OPERATIVA DE LA UBICACIÓN ─────────────────────────────────
+  //
+  // Los candados de `lib/semanaOperativa` salieron verdes en la primera corrida,
+  // y un verde que nunca se vio rojo no afirma nada. Cada uno se rompe acá por
+  // la regla que defiende.
+  {
+    n: "S-1",
+    defecto: "el empalme de un cambio vuelve a ser una mini-semana en vez de la semana larga",
+    archivo: "lib/semanaOperativa/semanaOperativa.js",
+    de: "    if (inicioNuevo !== D && f <= finDeLaLarga) {",
+    a: "    if (false && inicioNuevo !== D && f <= finDeLaLarga) {",
+    candado: "las 42 combinaciones de corte viejo → nuevo: la primera semana nueva mide entre 8 y 13 días y está marcada",
+    suite: "lib/semanaOperativa/semanaOperativa.test.mjs",
+  },
+  {
+    n: "S-2",
+    defecto: "una vigencia a mitad de semana deja días en dos semanas",
+    archivo: "lib/semanaOperativa/semanaOperativa.js",
+    de: "  if (siguiente?.desde && hasta >= siguiente.desde) hasta = sumarDias(siguiente.desde, -1);",
+    a: "  if (false) hasta = sumarDias(siguiente.desde, -1);",
+    candado: "una fila escrita por OTRO camino a mitad de semana igual no deja días en dos semanas",
+    suite: "lib/semanaOperativa/semanaOperativa.test.mjs",
+  },
+  {
+    n: "S-3",
+    defecto: "un cambio puede partir una semana",
+    archivo: "lib/semanaOperativa/semanaOperativa.js",
+    de: "  if (previa.hasta !== sumarDias(d, -1)) return",
+    a: "  if (false) return",
+    candado: "cada rechazo, con su código",
+    suite: "lib/semanaOperativa/semanaOperativa.test.mjs",
+  },
+  {
+    n: "S-4",
+    defecto: "un cambio puede empezar hoy, dentro de la semana abierta",
+    archivo: "lib/semanaOperativa/semanaOperativa.js",
+    de: "  if (d <= h) return falla(ERROR_SEMANA.NO_FUTURA",
+    a: "  if (d < h) return falla(ERROR_SEMANA.NO_FUTURA",
+    candado: "cada rechazo, con su código",
+    suite: "lib/semanaOperativa/semanaOperativa.test.mjs",
+  },
+  {
+    n: "S-5",
+    defecto: "un segundo cambio pisa al pendiente sin que nadie lo pida",
+    archivo: "lib/semanaOperativa/semanaOperativa.js",
+    de: "  if (pendientes.length > 0 && !reemplazarPendiente) return",
+    a: "  if (false) return",
+    candado: "el cambio pendiente se REEMPLAZA solo pidiéndolo, y lo que ya empezó no entra en el reemplazo",
+    suite: "lib/semanaOperativa/semanaOperativa.test.mjs",
+  },
+  {
+    n: "S-6",
+    defecto: "Transferencias deja de mirar la semana de cada local",
+    archivo: "lib/transferencias/bloquesPorLocal.js",
+    de: "      rango: rangoFijo || rangoDeUbicacion({ vigencias, unidad, fecha: hoy }),",
+    a: "      rango: rangoFijo || rangoDeUbicacion({ vigencias: [], unidad, fecha: hoy }),",
+    candado: "PARIDAD: `bloquesPorLocal` da los mismos rangos, transferencias e importes que con el acuerdo",
+    suite: "lib/semanaOperativa/semanaOperativa.test.mjs",
+  },
+  // ── LA SEMANA NO EXIGE PERMISOS DE TRANSFERENCIAS ───────────────────────
+  //
+  // Los tres lugares donde `transferencias.ver` había quedado arrastrado de la
+  // pantalla vieja. Cada uno se repone y el candado de permisos tiene que verlo.
+  {
+    n: "P-1",
+    defecto: "el grupo del menú vuelve a cerrarse para quien solo configura la semana",
+    archivo: "lib/menu/registry.js",
+    de: 'requiredAnyPerms: ["transferencias.ver", "pos_transferencias.ver", PERMISO_SEMANA_OPERATIVA],',
+    a: 'requiredAnyPerms: ["transferencias.ver", "pos_transferencias.ver"],',
+    candado: "semana sí, transferencias no: entra sí, cambia sí",
+    suite: "lib/semanaOperativa/permisos.test.mjs",
+  },
+  {
+    n: "P-2",
+    defecto: "la pantalla vuelve a abrirse solo con `transferencias.ver`",
+    archivo: "components/transferencias/corteDeSemana.js",
+    de: 'export const PERMISOS_PARA_VER_EL_CORTE = Object.freeze(["transferencias.ver", PERMISO_SEMANA_OPERATIVA]);',
+    a: 'export const PERMISOS_PARA_VER_EL_CORTE = Object.freeze(["transferencias.ver"]);',
+    candado: "semana sí, transferencias no: entra sí, cambia sí",
+    suite: "lib/semanaOperativa/permisos.test.mjs",
+  },
+  {
+    n: "P-3",
+    defecto: "el GET de la ruta vuelve a exigir `transferencias.ver`",
+    archivo: "app/api/transferencias/acuerdos/route.js",
+    de: '    const perm = checkPerm(session, ["transferencias.ver", PERMISO_SEMANA_OPERATIVA]);',
+    a: '    const perm = checkPerm(session, ["transferencias.ver"]);',
+    candado: "la ruta pide EXACTAMENTE los permisos con los que la pantalla se abre, y el PUT solo el de la semana",
+    suite: "lib/semanaOperativa/permisos.test.mjs",
+  },
+  {
+    n: "P-4",
+    defecto: "el PUT viejo vuelve a dejar cambiar cualquier local del grupo",
+    archivo: "app/api/transferencias/acuerdos/route.js",
+    de: "    if (localId !== scope.localId) {",
+    a: "    if (false) {",
+    candado: "el PUT solo escribe la ubicación que resuelve `resolveLocalAndGrupo`, como todo `config_local.*`",
+    suite: "lib/semanaOperativa/permisos.test.mjs",
+  },
+  // `lib/semanaOperativa/unaSolaFuente.test.mjs` NO está acá, y no por olvido:
+  // enumera con `git ls-files`, y la copia descartable de este script no lleva
+  // `.git`, así que ahí el archivo entero explota antes de llegar al candado y el
+  // rojo no valdría. Sus contrapruebas se hicieron a mano sobre el árbol y están
+  // en el cuerpo del commit que lo trajo.
 ];
 
 // `node_modules` se ENLAZA en vez de copiarse: son doce copias y nada de lo que

@@ -50,20 +50,28 @@ import {
   DIA_DE_CORTE_POR_DEFECTO,
   UNIDADES,
   caeEnElPeriodo,
-  esDiaDeCorteValido,
   rangoDelPeriodo,
   rangoDesplazado,
 } from "@/lib/transferencias/periodoDePago";
 import { descripcionDelPeriodo } from "@/lib/transferencias/descripcionDelPeriodo";
 import { fechaArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import {
-  acuerdoDeLocal,
   bloquesPorLocal,
   cuentaDelLocal,
   entraEnLaVistaPrincipal,
   estaRecibida,
   fechaDeCorte,
+  vigenciasDelLocal,
 } from "@/lib/transferencias/bloquesPorLocal";
+// LA SEMANA DE CADA LOCAL ES SUYA, no de un acuerdo con el depósito: sale de
+// `SemanaOperativaVigencia` por el cargador canónico. `AcuerdoDepositoLocal` ya no
+// se lee en ningún lado del runtime.
+import {
+  corteDeUbicacion,
+  rangoDeUbicacion,
+  rangoSemanalDeUbicacion,
+} from "@/lib/semanaOperativa/semanaOperativa";
+import { vigenciasDeUbicaciones } from "@/lib/semanaOperativa/semanaOperativaServer";
 import { relacionesDelDeposito } from "@/lib/transferencias/relacionesDelDeposito";
 import { destinosDeTransferencia } from "@/lib/transferencias/destinosDeTransferencia";
 
@@ -121,17 +129,17 @@ function contarLineasConDiferencia(detalle = []) {
  * Pedir un mes fijo "por las dudas" sería traer de más sin saber cuánto de más;
  * esto trae exactamente lo que algún local puede llegar a contar.
  */
-function ventanaDeConsulta({ unidad, acuerdos, hoy }) {
-  const dias = new Set([DIA_DE_CORTE_POR_DEFECTO]);
-  for (const a of acuerdos) {
-    const d = Number(a?.diaDeCorte);
-    if (esDiaDeCorteValido(d)) dias.add(d);
+function ventanaDeConsulta({ unidad, semanas, localIds = [], hoy }) {
+  // El rango por defecto sigue entrando, como antes: es el de cualquier local que
+  // aparezca en una transferencia sin estar en la lista.
+  const rangos = [rangoDelPeriodo({ unidad, diaDeCorte: DIA_DE_CORTE_POR_DEFECTO, hoy })];
+  for (const id of localIds) {
+    rangos.push(rangoDeUbicacion({ vigencias: vigenciasDelLocal(semanas, id), unidad, fecha: hoy }));
   }
 
   let desde = null;
   let hasta = null;
-  for (const diaDeCorte of dias) {
-    const r = rangoDelPeriodo({ unidad, diaDeCorte, hoy });
+  for (const r of rangos) {
     if (!desde || r.desde < desde) desde = r.desde;
     if (!hasta || r.hasta > hasta) hasta = r.hasta;
   }
@@ -206,10 +214,15 @@ export async function GET(req) {
     // lista, así que de cuatro relaciones sin configurar informaba una.
     const { deposito, locales } = await relacionesDelDeposito(vista.grupoId);
 
-    const acuerdos = await prisma.acuerdoDepositoLocal.findMany({
-      where: { grupoId: vista.grupoId },
-      select: { localId: true, depositoLocalId: true, diaDeCorte: true },
-    });
+    // La semana de cada local del grupo, en una sola consulta. El destino pedido y
+    // el local de la sesión entran aunque no estén en la lista: su semana es suya.
+    const destinoConSemana = Number(searchParams.get("destino") || 0) || null;
+    const idsConSemana = [
+      ...(locales || []).map((l) => l.id),
+      ...(destinoConSemana ? [destinoConSemana] : []),
+      ...(vista.localId ? [vista.localId] : []),
+    ];
+    const semanas = await vigenciasDeUbicaciones(prisma, idsConSemana);
 
     // ── LA ENTRADA DEL DEPÓSITO: SOLO LA LISTA DE LOCALES ─────────────────
     //
@@ -227,7 +240,7 @@ export async function GET(req) {
         depositoNombre: deposito?.nombre || localPropio?.nombre || null,
         locales: destinosDeTransferencia(locales, { depositoLocalId: deposito?.localId }).map(
           (l) => {
-            const { sinConfigurar } = acuerdoDeLocal(acuerdos, l.id);
+            const { sinConfigurar } = corteDeUbicacion(vigenciasDelLocal(semanas, l.id));
             return { localId: l.id, nombre: l.nombre, sinConfigurar };
           }
         ),
@@ -277,9 +290,14 @@ export async function GET(req) {
     const destinoPedido = Number(searchParams.get("destino") || 0) || null;
     const localPedido = destinoPedido || (!esDeposito ? vista.localId : null);
 
+    const vigenciasDelPedido = localPedido ? vigenciasDelLocal(semanas, localPedido) : [];
     const { diaDeCorte: corteDelLocal, sinConfigurar: localSinCorte } = localPedido
-      ? acuerdoDeLocal(acuerdos, localPedido)
+      ? corteDeUbicacion(vigenciasDelPedido, hoy)
       : { diaDeCorte: DIA_DE_CORTE_POR_DEFECTO, sinConfigurar: true };
+    // Caminar de a una semana tiene que preguntarle a cada fecha qué semana regía:
+    // si el local cambió de corte, las semanas de antes del cambio son las de antes.
+    const rangoDeFecha =
+      localPedido && unidad === UNIDADES.SEMANA ? rangoSemanalDeUbicacion(vigenciasDelPedido) : null;
 
     // ── EL DESPLAZAMIENTO: CUÁNTOS PERÍODOS ATRÁS SE ESTÁ MIRANDO ─────────
     //
@@ -297,12 +315,12 @@ export async function GET(req) {
     const desplazamiento = Math.min(0, desplazamientoPedido);
 
     const periodoMirado = localPedido
-      ? rangoDesplazado({ unidad, diaDeCorte: corteDelLocal, hoy, desplazamiento })
+      ? rangoDesplazado({ unidad, diaDeCorte: corteDelLocal, hoy, desplazamiento, rangoDeFecha })
       : null;
     // El período en curso se sigue calculando: es el borde superior de la
     // ventana de consulta y lo que decide si se puede avanzar.
     const periodoEnCurso = localPedido
-      ? rangoDelPeriodo({ unidad, diaDeCorte: corteDelLocal, hoy })
+      ? rangoDeUbicacion({ vigencias: vigenciasDelPedido, unidad, fecha: hoy })
       : null;
 
     // La ventana cubre los DOS períodos de una sola consulta: del inicio del
@@ -313,7 +331,7 @@ export async function GET(req) {
     // fin del período en curso.
     const ventana = localPedido
       ? { desde: periodoMirado.desde, hasta: periodoEnCurso.hasta }
-      : rangoFijo || ventanaDeConsulta({ unidad, acuerdos, hoy });
+      : rangoFijo || ventanaDeConsulta({ unidad, semanas, localIds: idsConSemana, hoy });
 
     // ── EL FILTRO DE FECHA SIGUE A `fechaDeCorte`, NO A UNA COLUMNA ────────
     //
@@ -536,6 +554,7 @@ export async function GET(req) {
             diaDeCorte: corteDelLocal,
             hoy,
             desplazamiento,
+            rangoDeFecha,
           }),
         },
         // Hacia adelante solo se puede si NO se está ya en el período en curso.
@@ -567,7 +586,7 @@ export async function GET(req) {
           ...t,
           lineasConDiferencia: contarLineasConDiferencia(t.detalle || []),
         })),
-        acuerdos,
+        semanas,
         unidad,
         rangoFijo,
         // ── LA MISMA PUERTA QUE OFRECE LOS DESTINOS ─────────────────────
