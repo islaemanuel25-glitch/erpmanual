@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-09-24] - Actualización: compras-proveedor
+
+### Modificado
+- **compras-proveedor**: fix: un pedido que llega sin factura se recibe en la misma recepción (antes no se podía recibir)
+- **compras-proveedor**: se borra la pantalla vieja de "Llegó sin factura" (ListaConciliacion y sus piezas)
+
 ## [2026-09-19] - Actualización: proveedores, productos
 
 ### Modificado
