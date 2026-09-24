@@ -246,6 +246,40 @@ que nadie lo esté esperando.
 ese archivo en el mismo commit que confirma el despliegue. Si el archivo acumula
 filas viejas deja de contestar qué falta.
 
+### Y LA SONDA PRE, CORRIDA AFUERA — FRENA SI NO ES VERDE
+
+```bash
+git show origin/main:scripts/sonda-externa.mjs | \
+  node --input-type=module - --fase pre --sha-esperado "$DESPLEGADO"
+echo "sonda PRE: $?"
+```
+
+**Cualquier código distinto de 0 FRENA, y no hay excepción:**
+
+> FRENO: la sonda PRE no dio VERDE. Motivo: <la línea ROJO que imprimió>. No se
+> saca backup ni se toca nada hasta tenerla en verde.
+
+Dispara `.github/workflows/sonda-cascada.yml` en GitHub Actions, espera y lee el
+veredicto: el VPS no tiene navegador y no se le instala uno. La sonda es la misma
+de "Antes de empezar", con el Chrome del runner; el workflow además comprueba que
+producción sirva `$DESPLEGADO` antes y después de medir. El detalle, y el token
+que hay que crear UNA vez en esta máquina, en
+[`docs/deploy/SONDA-EXTERNA.md`](../../../docs/deploy/SONDA-EXTERNA.md).
+
+**Por qué `git show origin/main:` y no el archivo del árbol:** el árbol del VPS
+sigue en el SHA viejo hasta el paso 4, que es donde se mueve a propósito. Así
+corre la versión de `main` del cliente —la misma del workflow— sin tocar el
+árbol de producción ni crear ningún archivo. Por eso va después del
+`git fetch` del chequeo de arriba, nunca antes.
+
+**Si falla por el token** —falta, venció, no tiene permiso—, el mensaje lo dice y
+es ROJO igual: se arregla el token y se vuelve a correr este paso. No se
+reemplaza por una medición a mano ni por "la corrí ayer".
+
+**Qué contesta la PRE:** que producción, ANTES de tocarla, tiene la cascada
+bien. Es el "antes" contra el que se compara la POST: si la POST da rojo, se sabe
+que lo trajo este despliegue.
+
 ## Antes de empezar
 
 - Árbol limpio y todo commiteado. `git status` de la máquina local.
@@ -266,8 +300,10 @@ filas viejas deja de contestar qué falta.
   Necesita un servidor sirviendo la aplicación —el `--base` va al que esté
   levantado— y **no necesita sesión ni credenciales**: la hoja la sirve el layout
   raíz, así que mide sobre `/login` y no gasta intentos del límite de login.
-  Corre igual contra producción con `--base https://operix.cloud`, que sirve para
-  sacar el "antes" y para volver a preguntar después de recrear.
+  Corre igual contra producción con `--base https://operix.cloud`. **Contra
+  producción, el "antes" y el "después" del despliegue ya no se sacan a mano**:
+  son la sonda PRE del paso 0 y la POST del paso 5, que la corren en GitHub
+  Actions con `scripts/sonda-externa.mjs`.
 
   **Con qué navegador.** En Windows con Edge, el comando de arriba, sin más. En
   otro entorno se le da el navegador con `--edge <ruta>` —cualquier Chromium—, y
@@ -938,6 +974,34 @@ ssh vps-erp 'cd /srv/produccion/erpazul && git status --porcelain'    # vacío
 PostgreSQL healthy, 0 reinicios, logs sin errores, migraciones al día, `/login`
 en 200 y el árbol del VPS limpio. Si algo de esto no da, se informa — no se
 maquilla.
+
+### Y LA SONDA POST, CORRIDA AFUERA — SIN VERDE NO SE CIERRA
+
+Con los cinco valores ya coincidiendo, y con el SHA COMPLETO que se desplegó:
+
+```bash
+git show origin/main:scripts/sonda-externa.mjs | \
+  node --input-type=module - --fase post --sha-esperado <SHA_COMPLETO>
+echo "sonda POST: $?"
+```
+
+**Solo con 0 el despliegue se da por cerrado.** Es el mismo mecanismo que la PRE
+del paso 0 —mismo workflow, misma sonda— y comprueba además que producción sirva
+`<SHA_COMPLETO>` antes y después de medir.
+
+**Si da ROJO, el despliegue NO está cerrado**, y el informe lo dice con la línea
+ROJO y el enlace de la corrida:
+
+- Si el rojo es de la cascada o de la versión servida, es un defecto de lo que se
+  desplegó: la PRE estaba en verde, así que lo trajo este despliegue. Se decide
+  con las reglas de "Rollback sin compilar", no se deja corriendo "a ver".
+- Si el rojo es de la medición —el token, GitHub que no contesta, una corrida que
+  no terminó—, se arregla la causa y se vuelve a correr ESTE comando. Mientras
+  no dé VERDE, el despliegue sigue sin cerrar: no se reemplaza por una medición
+  a mano ni se da por bueno porque los cinco valores coinciden.
+
+Los cinco valores prueban que corre lo que se quiso desplegar; la POST prueba que
+lo que corre se ve como tiene que verse. Ninguna tapa a la otra.
 
 ### CÓMO SE ELIGE UN MARCADOR PARA MIRAR ADENTRO DE LA IMAGEN
 

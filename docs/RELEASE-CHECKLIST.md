@@ -30,6 +30,9 @@
       las encuentra igual, pero para entonces el backup ya está sacado y la imagen
       construida — que es el peor momento para enterarse de que hay algo que
       decidir. Cuando una se aplica, se borra de esa lista.
+- [ ] Sonda PRE en VERDE antes del backup, y sonda POST en VERDE para cerrar.
+      Las dos corren en GitHub Actions, disparadas por `/deploy` con
+      `scripts/sonda-externa.mjs`: ver [deploy/SONDA-EXTERNA.md](deploy/SONDA-EXTERNA.md).
 - [ ] Backup de PostgreSQL validado **antes** de cualquier cosa (ver §3.bis)
 - [ ] Migraciones aplicadas con un container one-off de la **imagen nueva**, ANTES de
       recrear la app — no con `docker exec` sobre el container viejo:
