@@ -333,15 +333,20 @@ async function correrTablero(f) {
 async function correrPutViejo(f) {
   console.log("\n── El PUT de «Corte de semana»");
   const url = "http://ci/api/transferencias/acuerdos";
-  const soloCrear = token(900002, f.d1.id, ["transferencias.ver", "transferencias.crear"]);
-  const conPermiso = token(900003, f.d1.id, ["transferencias.ver", PERMISO_SEMANA_OPERATIVA]);
+  // Cada pedido sale de una sesión EN el local que cambia: con el alcance de
+  // `config_local.*`, esa es la única ubicación que se puede escribir.
+  const permisos = ["transferencias.ver", PERMISO_SEMANA_OPERATIVA];
+  const soloCrear = token(900002, f.L.sin.id, ["transferencias.ver", "transferencias.crear"]);
+  const enSin = token(900003, f.L.sin.id, permisos);
+  const enUno = token(900005, f.L.uno.id, permisos);
+  const enDeposito = token(900006, f.d1.id, permisos);
   const acuerdosAntes = await prisma.acuerdoDepositoLocal.count({ where: { localId: { in: creado.localIds } } });
 
   const r1 = await leer(rutaAcuerdos.PUT(conCuerpo(url, soloCrear, "PUT", { localId: f.L.sin.id, diaDeCorte: 3 })));
   ok("con `transferencias.crear` solo → 403", r1.status === 403, `${r1.status} ${r1.error}`);
   ok("y no escribió nada", (await vigenciasDe(f.L.sin.id)).length === 0);
 
-  const r2 = await leer(rutaAcuerdos.PUT(conCuerpo(url, conPermiso, "PUT", { localId: f.L.sin.id, diaDeCorte: 3 })));
+  const r2 = await leer(rutaAcuerdos.PUT(conCuerpo(url, enSin, "PUT", { localId: f.L.sin.id, diaDeCorte: 3 })));
   const sin = await vigenciasDe(f.L.sin.id);
   ok("con el permiso nuevo, un local sin semana la recibe DESDE SIEMPRE", r2.status === 200 && r2.cambio?.accion === "PRIMERA", `${r2.status} ${r2.error}`);
   ok(
@@ -352,7 +357,7 @@ async function correrPutViejo(f) {
 
   const hoy = hoyArgentinaISO();
   const frontera = sumarDias(semanaQueContiene({ vigencias: [{ diaDeCorte: 2, desde: null }], fecha: hoy }).hasta, 1);
-  const r3 = await leer(rutaAcuerdos.PUT(conCuerpo(url, conPermiso, "PUT", { localId: f.L.uno.id, diaDeCorte: 5 })));
+  const r3 = await leer(rutaAcuerdos.PUT(conCuerpo(url, enUno, "PUT", { localId: f.L.uno.id, diaDeCorte: 5 })));
   const uno = await vigenciasDe(f.L.uno.id);
   ok(
     "un local CON semana: el cambio se PROGRAMA desde la próxima frontera",
@@ -366,8 +371,13 @@ async function correrPutViejo(f) {
     relUno?.diaDeCorte === 2 && relUno?.programado?.diaDeCorte === 5 && relUno?.programado?.desde === frontera,
     JSON.stringify(relUno)
   );
+  ok(
+    "y solo la fila de la ubicación en la que se opera es `configurable`",
+    relUno?.configurable === true && (r3.relaciones || []).filter((x) => x.configurable).length === 1,
+    JSON.stringify((r3.relaciones || []).map((x) => [x.localId, x.configurable]))
+  );
 
-  const r4 = await leer(rutaAcuerdos.PUT(conCuerpo(url, conPermiso, "PUT", { localId: f.L.uno.id, diaDeCorte: 6 })));
+  const r4 = await leer(rutaAcuerdos.PUT(conCuerpo(url, enUno, "PUT", { localId: f.L.uno.id, diaDeCorte: 6 })));
   const uno4 = await vigenciasDe(f.L.uno.id);
   ok(
     "un segundo pedido REEMPLAZA el pendiente: sigue habiendo uno solo",
@@ -375,14 +385,22 @@ async function correrPutViejo(f) {
     `${r4.status} ${r4.error} ${JSON.stringify(uno4)}`
   );
 
-  const r5 = await leer(rutaAcuerdos.PUT(conCuerpo(url, conPermiso, "PUT", { localId: f.L.uno.id, diaDeCorte: 2 })));
+  const r5 = await leer(rutaAcuerdos.PUT(conCuerpo(url, enUno, "PUT", { localId: f.L.uno.id, diaDeCorte: 2 })));
   ok("pedir el corte que ya rige → 409 MISMO_CORTE", r5.status === 409 && r5.codigo === "MISMO_CORTE", `${r5.status} ${r5.codigo}`);
 
-  const r6 = await leer(rutaAcuerdos.PUT(conCuerpo(url, conPermiso, "PUT", { localId: f.L.ajeno.id, diaDeCorte: 1 })));
+  const r6 = await leer(rutaAcuerdos.PUT(conCuerpo(url, enUno, "PUT", { localId: f.L.ajeno.id, diaDeCorte: 1 })));
   ok("un local de OTRO grupo → 403", r6.status === 403, `${r6.status} ${r6.error}`);
   ok("y no escribió nada", (await vigenciasDe(f.L.ajeno.id)).length === 0);
 
-  const r7 = await leer(rutaAcuerdos.PUT(conCuerpo(url, conPermiso, "PUT", { localId: f.d1.id, diaDeCorte: 1 })));
+  // LA REGLA DE ESTA CORRECCIÓN: el mismo grupo no alcanza.
+  const sinAntes = await vigenciasDe(f.L.sin.id);
+  const r6b = await leer(rutaAcuerdos.PUT(conCuerpo(url, enUno, "PUT", { localId: f.L.sin.id, diaDeCorte: 5 })));
+  ok("desde Local «uno», cambiar otro local DEL MISMO GRUPO → 403", r6b.status === 403, `${r6b.status} ${r6b.error}`);
+  ok("y no escribió nada", JSON.stringify(await vigenciasDe(f.L.sin.id)) === JSON.stringify(sinAntes));
+  const r6c = await leer(rutaAcuerdos.PUT(conCuerpo(url, enDeposito, "PUT", { localId: f.L.sin.id, diaDeCorte: 5 })));
+  ok("el depósito tampoco le cambia la semana a un local → 403", r6c.status === 403, `${r6c.status} ${r6c.error}`);
+
+  const r7 = await leer(rutaAcuerdos.PUT(conCuerpo(url, enDeposito, "PUT", { localId: f.d1.id, diaDeCorte: 1 })));
   ok("el depósito no se configura desde acá → 400", r7.status === 400 && /depósito/.test(r7.error || ""), `${r7.status} ${r7.error}`);
 
   ok(
@@ -409,7 +427,9 @@ async function correrPermisos(f) {
   const urlAcuerdos = "http://ci/api/transferencias/acuerdos";
   const urlConfig = "http://ci/api/config/semana-operativa";
   const id = f.L.permisos.id;
-  const CAMPOS = ["depositoNombre", "diaDeCorte", "localId", "localNombre", "programado", "rango", "sinConfigurar"];
+  // Lo único que viaja por fila: la semana y si se la puede cambiar. Nada de
+  // importes ni transferencias.
+  const CAMPOS = ["configurable", "depositoNombre", "diaDeCorte", "localId", "localNombre", "programado", "rango", "sinConfigurar"];
 
   const casos = [
     { nombre: "semana sí / transferencias no", permisos: [PERMISO_SEMANA_OPERATIVA], lee: true, cambia: true, tablero: false },
@@ -422,7 +442,10 @@ async function correrPermisos(f) {
   const dias = [2, 4];
   let n = 900100;
   for (const c of casos) {
-    const sesion = token(n++, f.d1.id, c.permisos);
+    // La sesión opera EN el local que se prueba; el tablero se mira desde el
+    // depósito, que es donde tiene sentido.
+    const sesion = token(n++, id, c.permisos);
+    const sesionDeposito = token(n++, f.d1.id, c.permisos);
     const antes = (await vigenciasDe(id)).length;
 
     const g = await leer(rutaAcuerdos.GET(pedido(urlAcuerdos, sesion)));
@@ -434,6 +457,11 @@ async function correrPermisos(f) {
         `${c.nombre}: lo leído es la semana y nada comercial`,
         JSON.stringify(campos) === JSON.stringify(CAMPOS),
         JSON.stringify(campos)
+      );
+      ok(
+        `${c.nombre}: la fila propia es configurable ${c.cambia ? "sí" : "no"}, y ninguna ajena`,
+        rel?.configurable === c.cambia && !(g.relaciones || []).some((x) => x.localId !== id && x.configurable),
+        JSON.stringify((g.relaciones || []).map((x) => [x.localId, x.configurable]))
       );
     }
 
@@ -447,7 +475,7 @@ async function correrPermisos(f) {
     );
 
     // El permiso de la semana NO abre el tablero, que sí trae importes.
-    const t = await leer(rutaTablero.GET(pedido("http://ci/api/transferencias/tablero?unidad=SEMANA", sesion)));
+    const t = await leer(rutaTablero.GET(pedido("http://ci/api/transferencias/tablero?unidad=SEMANA", sesionDeposito)));
     ok(`${c.nombre}: el tablero de Transferencias → ${c.tablero ? 200 : 403}`, t.status === (c.tablero ? 200 : 403), `${t.status}`);
 
     // Y la ruta de la ubicación, con la sesión en ese local.
@@ -478,6 +506,51 @@ async function correrPermisos(f) {
   ok("sin ubicación en la sesión → 403", sinLocal.status === 403, `${sinLocal.status}`);
   const cfgAjena = await leer(rutaConfig.PUT(conCuerpo(`${urlConfig}?localId=${id}`, token(n++, f.L.uno.id, soloSemana), "PUT", { diaDeCorte: 1 })));
   ok("la ruta de la ubicación, con otra ubicación por la query → 403", cfgAjena.status === 403, `${cfgAjena.status}`);
+
+  console.log("\n── Permisos: el administrador, por el mecanismo general");
+  // Sin rol por nombre: el comodín `*` y el contexto activo, que es como
+  // `resolveLocalAndGrupo` decide la ubicación de un administrador sin local fijo.
+  const admin = token(n++, null, ["*"]);
+  const conContexto = (url, metodo, cuerpo, localId) =>
+    new Request(url, {
+      method: metodo,
+      headers: {
+        cookie: [
+          `erpazul_sesion=${admin}`,
+          `erpazul_grupo_activo=${f.g1.id}`,
+          ...(localId ? [`erpazul_contexto_activo=${encodeURIComponent(JSON.stringify({ localId }))}`] : []),
+        ].join("; "),
+        "content-type": "application/json",
+      },
+      ...(cuerpo ? { body: JSON.stringify(cuerpo) } : {}),
+    });
+
+  const ga = await leer(rutaAcuerdos.GET(conContexto(urlAcuerdos, "GET", null, id)));
+  ok(
+    "con contexto en el local, solo esa fila es configurable",
+    ga.status === 200 && ga.relaciones?.find((x) => x.localId === id)?.configurable === true &&
+      !(ga.relaciones || []).some((x) => x.localId !== id && x.configurable),
+    `${ga.status} ${ga.error ?? ""} ${JSON.stringify((ga.relaciones || []).map((x) => [x.localId, x.configurable]))}`
+  );
+  const actual = semanaQueContiene({ vigencias: await vigenciasDe(id) }).diaDeCorte;
+  const otroDia = (actual + 3) % 7;
+  const pa = await leer(
+    rutaAcuerdos.PUT(conContexto(urlAcuerdos, "PUT", { localId: id, diaDeCorte: otroDia }, id))
+  );
+  ok("cambia la semana de la ubicación de su contexto", pa.status === 200, `${pa.status} ${pa.error ?? ""}`);
+  const unoAntes = await vigenciasDe(f.L.uno.id);
+  const pb = await leer(
+    rutaAcuerdos.PUT(conContexto(urlAcuerdos, "PUT", { localId: f.L.uno.id, diaDeCorte: otroDia }, id))
+  );
+  ok(
+    "pero no la de otro local mientras opera en éste → 403",
+    pb.status === 403 && JSON.stringify(await vigenciasDe(f.L.uno.id)) === JSON.stringify(unoAntes),
+    `${pb.status} ${pb.error ?? ""}`
+  );
+  const pc = await leer(
+    rutaAcuerdos.PUT(conContexto(urlAcuerdos, "PUT", { localId: id, diaDeCorte: otroDia }, null))
+  );
+  ok("sin contexto elegido, no escribe nada → 409", pc.status === 409, `${pc.status} ${pc.error ?? ""}`);
 }
 
 async function correrConfig(f) {

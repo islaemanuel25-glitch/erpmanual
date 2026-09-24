@@ -29,6 +29,11 @@
 // alcanza: cambiar la semana ya no es un acuerdo de despacho, es la semana de
 // toda la ubicación.
 //
+// Con el alcance de ese permiso: la lista es de todo el grupo —lectura
+// compatible—, pero solo se escribe la ubicación en la que se opera, igual que
+// cualquier `config_local.*`. Cada fila dice `configurable` para que la pantalla
+// ofrezca "Cambiar" solo donde el PUT lo va a aceptar.
+//
 // ── POR QUÉ DEVUELVE TAMBIÉN LAS QUE NO TIENEN FILA ───────────────────────
 //
 // Porque la pantalla de configuración tiene que mostrar lo que FALTA
@@ -41,7 +46,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { resolveVistaOperativa } from "@/lib/grupos";
+import { resolveLocalAndGrupo, resolveVistaOperativa } from "@/lib/grupos";
 import { relacionesDelDeposito } from "@/lib/transferencias/relacionesDelDeposito";
 import { destinosDeTransferencia } from "@/lib/transferencias/destinosDeTransferencia";
 import { esDiaDeCorteValido } from "@/lib/transferencias/periodoDePago";
@@ -56,8 +61,23 @@ import {
   vigenciasDeUbicaciones,
 } from "@/lib/semanaOperativa/semanaOperativaServer";
 
+/**
+ * LA UBICACIÓN CUYA SEMANA PUEDE CAMBIAR QUIEN PIDE, o `null`.
+ *
+ * Es la misma que usa toda la configuración por local (`config_local.*`):
+ * `resolveLocalAndGrupo`, que para un no-admin es la ubicación de su sesión y
+ * para el administrador la de su contexto activo. Nunca la del cuerpo del
+ * pedido. Pertenecer al grupo no alcanza: esta pantalla lista los locales del
+ * grupo, pero solo deja cambiar la semana de la ubicación en la que se opera.
+ */
+async function ubicacionQueConfigura(req, session) {
+  if (!checkPerm(session, PERMISO_SEMANA_OPERATIVA).ok) return null;
+  const scope = await resolveLocalAndGrupo(req);
+  return scope.error ? null : scope.localId;
+}
+
 /** Los locales del grupo, con su semana o con la marca de que falta. */
-async function relacionesDelGrupo(grupoId) {
+async function relacionesDelGrupo(grupoId, ubicacionConfigurable = null) {
   // La lista de locales sale de la MISMA puerta que usa la lista de trabajo. Si
   // cada pantalla armara la suya, un local podría aparecer en una y no en la
   // otra sin que nada lo explique.
@@ -96,6 +116,10 @@ async function relacionesDelGrupo(grupoId) {
         // El cambio que ya se programó y todavía no empezó. La pantalla de hoy no
         // lo dibuja; viaja para que la de configuración de la semana lo muestre.
         programado: programado ? { diaDeCorte: programado.diaDeCorte, desde: programado.desde } : null,
+        // Si quien mira puede cambiar ESTA fila. Lo decide el servidor con la
+        // misma regla que aplica el PUT, así la pantalla no ofrece un "Cambiar"
+        // que termina en 403.
+        configurable: ubicacionConfigurable !== null && l.id === ubicacionConfigurable,
       };
     });
 
@@ -128,7 +152,10 @@ export async function GET(req) {
       );
     }
 
-    const { deposito, relaciones } = await relacionesDelGrupo(vista.grupoId);
+    const { deposito, relaciones } = await relacionesDelGrupo(
+      vista.grupoId,
+      await ubicacionQueConfigura(req, session)
+    );
     if (!deposito) {
       return NextResponse.json(
         { ok: false, error: "Este grupo no tiene un depósito asignado." },
@@ -221,6 +248,31 @@ export async function PUT(req) {
       );
     }
 
+    // ── SOLO LA UBICACIÓN EN LA QUE SE OPERA ───────────────────────────────
+    //
+    // `config_local.semana_operativa` es de la familia `config_local.*`, y ahí el
+    // alcance es la ubicación que resuelve `resolveLocalAndGrupo`: la de la
+    // sesión, o el contexto activo del administrador. Pertenecer al mismo grupo
+    // no alcanza para cambiarle la semana a otro local: esa capacidad
+    // transversal era de `transferencias.crear` y no se hereda.
+    const scope = await resolveLocalAndGrupo(req);
+    if (scope.error) {
+      return NextResponse.json(
+        { ok: false, error: scope.error, needsContexto: scope.needsContexto },
+        { status: scope.status }
+      );
+    }
+    if (localId !== scope.localId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Solo se puede cambiar la semana de la ubicación en la que estás operando. La de otro local la configura quien opera ese local.",
+        },
+        { status: 403 }
+      );
+    }
+
     // El local tiene que ser DE ESTE GRUPO. Sin este control, un id ajeno escrito
     // a mano le cambiaría la semana a una ubicación de otro grupo.
     const vinculo = await prisma.grupoLocal.findFirst({
@@ -257,7 +309,7 @@ export async function PUT(req) {
       throw err;
     }
 
-    const { relaciones } = await relacionesDelGrupo(vista.grupoId);
+    const { relaciones } = await relacionesDelGrupo(vista.grupoId, scope.localId);
     return NextResponse.json({
       ok: true,
       relaciones,

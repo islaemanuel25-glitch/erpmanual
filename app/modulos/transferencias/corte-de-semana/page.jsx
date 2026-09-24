@@ -171,7 +171,10 @@ export default function CorteDeSemanaPage() {
               editando={esta}
               diaElegido={diaElegido}
               guardando={guardando && esta}
-              puedeEditar={puedeEditar}
+              // La fila solo ofrece "Cambiar" si es la ubicación en la que se
+              // opera: el servidor lo decide (`configurable`) con la misma regla
+              // que aplica al guardar.
+              puedeEditar={puedeEditar && r.configurable === true}
               onElegirDia={setDiaElegido}
               onEditar={() => empezarAEditar(r)}
               onGuardar={(dia) => guardar(r.localId, dia)}

@@ -693,6 +693,15 @@ const CASOS = [
     candado: "la ruta pide EXACTAMENTE los permisos con los que la pantalla se abre, y el PUT solo el de la semana",
     suite: "lib/semanaOperativa/permisos.test.mjs",
   },
+  {
+    n: "P-4",
+    defecto: "el PUT viejo vuelve a dejar cambiar cualquier local del grupo",
+    archivo: "app/api/transferencias/acuerdos/route.js",
+    de: "    if (localId !== scope.localId) {",
+    a: "    if (false) {",
+    candado: "el PUT solo escribe la ubicación que resuelve `resolveLocalAndGrupo`, como todo `config_local.*`",
+    suite: "lib/semanaOperativa/permisos.test.mjs",
+  },
   // `lib/semanaOperativa/unaSolaFuente.test.mjs` NO está acá, y no por olvido:
   // enumera con `git ls-files`, y la copia descartable de este script no lleva
   // `.git`, así que ahí el archivo entero explota antes de llegar al candado y el
