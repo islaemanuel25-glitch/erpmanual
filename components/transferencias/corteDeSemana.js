@@ -40,3 +40,20 @@ export function puedeConfigurarElCorte(permisos = []) {
   const lista = Array.isArray(permisos) ? permisos : [];
   return lista.includes("*") || lista.includes(PERMISO_PARA_CONFIGURAR_EL_CORTE);
 }
+
+/**
+ * QUIÉN PUEDE ABRIR LA PANTALLA: el que mira Transferencias, o el que configura
+ * la semana. Cualquiera de los dos alcanza.
+ *
+ * La semana es de la ubicación, así que configurarla no puede exigir permisos de
+ * Transferencias. Y lo que la pantalla lee —locales del grupo, su día, su rango y
+ * el cambio programado— no trae importes ni transferencias, así que abrirla con
+ * el permiso de la semana no deja ver nada comercial. `GET
+ * /api/transferencias/acuerdos` pide la misma lista, y un candado compara las dos.
+ */
+export const PERMISOS_PARA_VER_EL_CORTE = Object.freeze(["transferencias.ver", PERMISO_SEMANA_OPERATIVA]);
+
+export function puedeVerElCorte(permisos = []) {
+  const lista = Array.isArray(permisos) ? permisos : [];
+  return lista.includes("*") || PERMISOS_PARA_VER_EL_CORTE.some((p) => lista.includes(p));
+}

@@ -109,7 +109,13 @@ export async function GET(req) {
       return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
     }
 
-    const perm = checkPerm(session, "transferencias.ver");
+    // Cualquiera de los dos alcanza: el que mira Transferencias, o el que
+    // configura la semana, que no tiene por qué tener permisos de Transferencias.
+    // Lo que esta ruta devuelve —locales, día, rango y cambio programado— no trae
+    // importes ni transferencias. Es la misma lista que
+    // `PERMISOS_PARA_VER_EL_CORTE` (`components/transferencias/corteDeSemana.js`),
+    // y un candado compara las dos.
+    const perm = checkPerm(session, ["transferencias.ver", PERMISO_SEMANA_OPERATIVA]);
     if (!perm.ok) {
       return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }

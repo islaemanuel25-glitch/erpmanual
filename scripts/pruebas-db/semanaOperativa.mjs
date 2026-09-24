@@ -117,7 +117,7 @@ async function montar() {
   await prisma.grupoDeposito.create({ data: { grupoId: g2.id, localId: dAjeno.id } });
 
   const L = {};
-  for (const n of ["uno", "iguales", "distintos", "sin", "obsoleto", "invalido", "concurrente"]) {
+  for (const n of ["uno", "iguales", "distintos", "sin", "obsoleto", "invalido", "concurrente", "permisos"]) {
     L[n] = await crearLocal(n);
     await prisma.grupoLocal.create({ data: { grupoId: g1.id, localId: L[n].id } });
   }
@@ -125,7 +125,7 @@ async function montar() {
   await prisma.grupoLocal.create({ data: { grupoId: g2.id, localId: L.ajeno.id } });
 
   // Operan por transferencia: sin cliente vinculado no aparecen en las listas.
-  for (const n of ["uno", "iguales", "distintos", "sin"]) {
+  for (const n of ["uno", "iguales", "distintos", "sin", "permisos"]) {
     const c = await prisma.cliente.create({
       data: { grupoId: g1.id, nombre: `${marca}-cliente-${n}`, localVinculadoId: L[n].id },
     });
@@ -399,6 +399,87 @@ async function correrPutViejo(f) {
   );
 }
 
+// ── LA MATRIZ DE PERMISOS ──────────────────────────────────────────────────
+//
+// La semana es de la ubicación: configurarla no puede exigir `transferencias.ver`,
+// y el permiso de la semana no puede abrir los datos comerciales de
+// Transferencias. Los cuatro casos, contra los handlers reales.
+async function correrPermisos(f) {
+  console.log("\n── Permisos: la semana no depende de Transferencias");
+  const urlAcuerdos = "http://ci/api/transferencias/acuerdos";
+  const urlConfig = "http://ci/api/config/semana-operativa";
+  const id = f.L.permisos.id;
+  const CAMPOS = ["depositoNombre", "diaDeCorte", "localId", "localNombre", "programado", "rango", "sinConfigurar"];
+
+  const casos = [
+    { nombre: "semana sí / transferencias no", permisos: [PERMISO_SEMANA_OPERATIVA], lee: true, cambia: true, tablero: false },
+    { nombre: "semana no / transferencias sí", permisos: ["transferencias.ver"], lee: true, cambia: false, tablero: true },
+    { nombre: "los dos", permisos: [PERMISO_SEMANA_OPERATIVA, "transferencias.ver"], lee: true, cambia: true, tablero: true },
+    { nombre: "ninguno", permisos: [], lee: false, cambia: false, tablero: false },
+  ];
+  // Cada caso que cambia pide un día distinto del que ya rige, así un rechazo por
+  // "mismo corte" no se confunde con uno de permiso.
+  const dias = [2, 4];
+  let n = 900100;
+  for (const c of casos) {
+    const sesion = token(n++, f.d1.id, c.permisos);
+    const antes = (await vigenciasDe(id)).length;
+
+    const g = await leer(rutaAcuerdos.GET(pedido(urlAcuerdos, sesion)));
+    ok(`${c.nombre}: leer el corte → ${c.lee ? 200 : 403}`, g.status === (c.lee ? 200 : 403), `${g.status} ${g.error ?? ""}`);
+    if (c.lee) {
+      const rel = g.relaciones?.find((x) => x.localId === id);
+      const campos = rel ? Object.keys(rel).sort() : [];
+      ok(
+        `${c.nombre}: lo leído es la semana y nada comercial`,
+        JSON.stringify(campos) === JSON.stringify(CAMPOS),
+        JSON.stringify(campos)
+      );
+    }
+
+    const dia = c.cambia ? dias.shift() : 6;
+    const p = await leer(rutaAcuerdos.PUT(conCuerpo(urlAcuerdos, sesion, "PUT", { localId: id, diaDeCorte: dia })));
+    const despues = (await vigenciasDe(id)).length;
+    ok(
+      `${c.nombre}: cambiar la semana → ${c.cambia ? 200 : 403}`,
+      p.status === (c.cambia ? 200 : 403) && despues === antes + (c.cambia ? 1 : 0),
+      `${p.status} ${p.error ?? ""} filas ${antes}→${despues}`
+    );
+
+    // El permiso de la semana NO abre el tablero, que sí trae importes.
+    const t = await leer(rutaTablero.GET(pedido("http://ci/api/transferencias/tablero?unidad=SEMANA", sesion)));
+    ok(`${c.nombre}: el tablero de Transferencias → ${c.tablero ? 200 : 403}`, t.status === (c.tablero ? 200 : 403), `${t.status}`);
+
+    // Y la ruta de la ubicación, con la sesión en ese local.
+    const sesionLocal = token(n++, id, c.permisos);
+    const gc = await leer(rutaConfig.GET(pedido(urlConfig, sesionLocal)));
+    ok(
+      `${c.nombre}: la configuración de la ubicación → ${c.cambia ? 200 : 403}`,
+      gc.status === (c.cambia ? 200 : 403),
+      `${gc.status}`
+    );
+  }
+
+  console.log("\n── Permisos: el alcance se sigue respetando");
+  const soloSemana = [PERMISO_SEMANA_OPERATIVA];
+  const deOtroGrupo = token(n++, f.L.ajeno.id, soloSemana);
+  const antes = (await vigenciasDe(id)).length;
+  const pAjeno = await leer(rutaAcuerdos.PUT(conCuerpo(urlAcuerdos, deOtroGrupo, "PUT", { localId: id, diaDeCorte: 1 })));
+  ok("otro grupo no le cambia la semana a este local → 403", pAjeno.status === 403 && (await vigenciasDe(id)).length === antes, `${pAjeno.status}`);
+  const gAjeno = await leer(rutaAcuerdos.GET(pedido(urlAcuerdos, deOtroGrupo)));
+  ok(
+    "y su lista no trae locales de este grupo",
+    !(gAjeno.relaciones || []).some((x) => creado.localIds.includes(x.localId) && x.localId !== f.L.ajeno.id),
+    `${gAjeno.status} ${JSON.stringify(gAjeno.relaciones)}`
+  );
+  const conQuery = await leer(rutaAcuerdos.GET(pedido(`${urlAcuerdos}?localId=${f.L.ajeno.id}`, token(n++, f.d1.id, soloSemana))));
+  ok("una ubicación ajena por la query → 403", conQuery.status === 403, `${conQuery.status}`);
+  const sinLocal = await leer(rutaAcuerdos.GET(pedido(urlAcuerdos, token(n++, null, soloSemana))));
+  ok("sin ubicación en la sesión → 403", sinLocal.status === 403, `${sinLocal.status}`);
+  const cfgAjena = await leer(rutaConfig.PUT(conCuerpo(`${urlConfig}?localId=${id}`, token(n++, f.L.uno.id, soloSemana), "PUT", { diaDeCorte: 1 })));
+  ok("la ruta de la ubicación, con otra ubicación por la query → 403", cfgAjena.status === 403, `${cfgAjena.status}`);
+}
+
 async function correrConfig(f) {
   console.log("\n── La ruta de la ubicación: /api/config/semana-operativa");
   const url = "http://ci/api/config/semana-operativa";
@@ -551,6 +632,7 @@ try {
   await correrRestricciones(fixture);
   await correrTablero(fixture);
   await correrPutViejo(fixture);
+  await correrPermisos(fixture);
   await correrConfig(fixture);
 } finally {
   await desmontar();

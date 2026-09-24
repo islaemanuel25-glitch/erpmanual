@@ -662,6 +662,37 @@ const CASOS = [
     candado: "PARIDAD: `bloquesPorLocal` da los mismos rangos, transferencias e importes que con el acuerdo",
     suite: "lib/semanaOperativa/semanaOperativa.test.mjs",
   },
+  // ── LA SEMANA NO EXIGE PERMISOS DE TRANSFERENCIAS ───────────────────────
+  //
+  // Los tres lugares donde `transferencias.ver` había quedado arrastrado de la
+  // pantalla vieja. Cada uno se repone y el candado de permisos tiene que verlo.
+  {
+    n: "P-1",
+    defecto: "el grupo del menú vuelve a cerrarse para quien solo configura la semana",
+    archivo: "lib/menu/registry.js",
+    de: 'requiredAnyPerms: ["transferencias.ver", "pos_transferencias.ver", PERMISO_SEMANA_OPERATIVA],',
+    a: 'requiredAnyPerms: ["transferencias.ver", "pos_transferencias.ver"],',
+    candado: "semana sí, transferencias no: entra sí, cambia sí",
+    suite: "lib/semanaOperativa/permisos.test.mjs",
+  },
+  {
+    n: "P-2",
+    defecto: "la pantalla vuelve a abrirse solo con `transferencias.ver`",
+    archivo: "components/transferencias/corteDeSemana.js",
+    de: 'export const PERMISOS_PARA_VER_EL_CORTE = Object.freeze(["transferencias.ver", PERMISO_SEMANA_OPERATIVA]);',
+    a: 'export const PERMISOS_PARA_VER_EL_CORTE = Object.freeze(["transferencias.ver"]);',
+    candado: "semana sí, transferencias no: entra sí, cambia sí",
+    suite: "lib/semanaOperativa/permisos.test.mjs",
+  },
+  {
+    n: "P-3",
+    defecto: "el GET de la ruta vuelve a exigir `transferencias.ver`",
+    archivo: "app/api/transferencias/acuerdos/route.js",
+    de: '    const perm = checkPerm(session, ["transferencias.ver", PERMISO_SEMANA_OPERATIVA]);',
+    a: '    const perm = checkPerm(session, ["transferencias.ver"]);',
+    candado: "la ruta pide EXACTAMENTE los permisos con los que la pantalla se abre, y el PUT solo el de la semana",
+    suite: "lib/semanaOperativa/permisos.test.mjs",
+  },
   // `lib/semanaOperativa/unaSolaFuente.test.mjs` NO está acá, y no por olvido:
   // enumera con `git ls-files`, y la copia descartable de este script no lleva
   // `.git`, así que ahí el archivo entero explota antes de llegar al candado y el
