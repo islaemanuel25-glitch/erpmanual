@@ -16,15 +16,31 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **32 migraciones**. Falta:
-
-- `20260923205422_pagos_a_proveedores` — aditiva: el enum `MedioPagoProveedor`,
-  las tablas `CuentaPorPagarProveedor` y `PagoProveedor`, sus índices, claves
-  foráneas y tres CHECK sobre esas mismas tablas nuevas. No toca filas ni
-  columnas existentes y no hace backfill: las dos tablas nacen vacías. Viene de
-  la rama `feat/finanzas-pagos-proveedores`, todavía sin mergear.
+Producción está en **33 migraciones** y el árbol también. **Ninguna** pendiente:
+el despliegue siguiente es solo de código.
 
 ---
+
+`20260923205422_pagos_a_proveedores` salió de esta lista con el despliegue de
+`0a688b5d`, que llevó a producción los merges #65 (Pagos a proveedores) y #66
+(cierre de compras con deuda y pago al proveedor) desde `5f85056c`. Es aditiva:
+el enum `MedioPagoProveedor`, las tablas `CuentaPorPagarProveedor` y
+`PagoProveedor`, sus índices, claves foráneas y tres CHECK sobre esas mismas
+tablas nuevas, sin tocar filas ni columnas existentes y sin backfill. El
+clasificador, corrido sobre el rango `5f85056c..0a688b5d`, la marcó **aditiva**
+y sin coincidencias, y fue la única migración nueva del rango.
+
+**Lo que se comprobó desde fuera del VPS:** `https://operix.cloud/api/version`
+contesta 200 con `buildId` `0a688b5db711a3710ed68dc53b7ada68cf4daa1c`, el mismo
+SHA que `origin/main`.
+
+**Lo que informó el despliegue**, corrido desde el acceso al VPS y no desde la
+sesión que escribe esta nota: producción quedó con **33** migraciones,
+`prisma migrate status` cerró con "Database schema is up to date!", y las dos
+tablas nuevas existen y **nacieron vacías**. Esto último es lo que cierra la
+pregunta de si había pagos históricos con un origen distinto de la ubicación de
+la deuda: antes de este despliegue las tablas no existían en producción, así
+que no hay ninguno.
 
 `20260923120000_costo_con_el_pie_del_245` salió de esta lista con el despliegue
 de `d75a9a11`. El clasificador la marcó —`UPDATE "ProductoBase"`, línea 47— y
