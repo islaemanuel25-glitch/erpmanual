@@ -324,6 +324,10 @@ kit?**
 
     MSYS_NO_PATHCONV=1 node scripts/sonda-cascada.mjs --base http://localhost:3000
 
+Fuera de Windows con Edge: `--edge <ruta-del-chromium>`, y `--no-sandbox` si el
+proceso corre como root. El detalle, y la trampa del navegador que no confía en
+el certificado, están en `/deploy`.
+
 No necesita sesión ni credenciales —la hoja la sirve el layout raíz, así que mide
 sobre `/login`— y sale con **0** o **1**. Mide cuatro números:
 `.sunmi-btn-base` solo da 3,5 px y con `py-3` encima 10,5; `.sunmi-input` solo da
