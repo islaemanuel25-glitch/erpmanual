@@ -3,6 +3,21 @@
 **Estado:** contrato funcional, segunda revisión. No hay implementación nueva detrás de este archivo.
 **Relevado:** 2026-09-24 sobre `main` en `1af04216b67bba5776a7506309519745d706ab7d`, el mismo commit que producción ese día.
 **Revisión 2 (2026-09-24):** incorpora las correcciones funcionales aprobadas por Emanuel sobre la primera versión (`df80b82`) y la auditoría del stock histórico valorizado (sección D).
+**Revisión 4 (2026-09-24):** sobre `0d65650`, con `main` todavía en `1af0421`. Incorpora las decisiones **definitivas** que corrigen parte de la revisión 3:
+- la semana operativa es de la **ubicación**, no de un módulo (G.2);
+- el permiso y la vigencia de la semana (G.3);
+- mes calendario frente a semana (G.3 bis);
+- los hechos sin turno van por su timestamp real (G.4);
+- las operaciones que cruzan el corte (G.5);
+- los estados de la semana (G.6);
+- la foto en la frontera lógica con ajustes y respaldo (G.7);
+- el tránsito (G.8);
+- el stock negativo;
+- la revalorización explicativa con diferencia no explicada (C.4);
+- el orden técnico (J).
+
+Donde la revisión 3 decía otra cosa, el texto viejo quedó tachado o marcado como corregido.
+
 **Revisión 3 (2026-09-24):** sobre `49d7e37`, con `main` todavía en `1af0421`. Incorpora:
 - el método de valuación semanal y la revalorización;
 - la reutilización de la semana de Transferencias;
@@ -549,12 +564,24 @@ Mientras falten, "lo que quedó" solo se puede mostrar **parcial y rotulado como
   - semana A: 20 × 1.500 = 30.000;
   - semana B: 20 × 1.700 = 34.000;
   - variación +4.000, por revalorización.
-- **[DECISIÓN PENDIENTE] Convención cuando además hubo movimiento físico.** Se propone, por producto:
-  - **revalorización = cantidad de la foto anterior × (costo nuevo − costo anterior);**
-  - **variación por cantidad = (cantidad nueva − cantidad anterior) × costo nuevo.**
+- **[DECISIÓN APROBADA, revisión 4] Las fotos son la verdad primaria. La revalorización es EXPLICATIVA.**
+  - **Variación real = foto final − foto inicial.** Ejemplo: 100 × 1.000 = 100.000 y después 120 × 1.200 = 144.000, así que la variación es **+44.000**.
+  - **Revalorización = cantidad anterior × (costo nuevo − costo anterior).** En el ejemplo: 100 × 200 = **+20.000**.
+  - **El resto (+24.000) se explica con los hechos disponibles:**
+    - costo de lo vendido;
+    - compras y transferencias recibidas;
+    - envíos;
+    - ajustes y mermas;
+    - la variación del tránsito.
+  - **Lo que los hechos no alcanzan a explicar se informa como DIFERENCIA NO EXPLICADA.** Nunca se fabrica una causa.
+  - **No es una contabilidad paralela**, y **no se fuerza que cierre**. La diferencia no explicada no es un error de cálculo: es el lugar donde aparecen las mermas no cargadas, los escritores sin rastro (D.1) y los errores de carga. **Es información.**
+  - Un producto sin costo en la foto anterior tiene revalorización 0. Un producto que aparece o desaparece tiene cantidad 0 del otro lado.
+  - **[PROBLEMA]** Los hechos explicativos no usan el mismo costo que la foto:
+    - las ventas usan su costo congelado al vender;
+    - las transferencias, el del origen al enviar;
+    - las compras, el de la factura.
 
-  Las dos suman exactamente la variación total y no dejan residuo. Otra convención válida invierte los costos; lo que importa es fijar una y no cambiarla.
-- Un producto que aparece o desaparece entre dos fotos tiene cantidad 0 del otro lado, y la convención sigue valiendo. Si no tenía costo en la foto anterior, su revalorización es 0.
+    Parte de la diferencia no explicada va a ser **diferencia de costo entre el momento del hecho y el corte**. Se puede separar en una línea propia **solo si los datos alcanzan**; si no, queda dentro de la no explicada, y se dice.
 
 ### C.5 Posición: dónde está la plata
 
@@ -763,7 +790,7 @@ Alternativas, con su costo:
 
 1. **Foto al corte, sin libro de movimientos.** Es el cambio más chico: no toca a ninguno de los escritores de stock.
    - **[VERIFICADO]** Hoy la aplicación no tiene un mecanismo programado. `instrumentation.js` solo chequea al arrancar, y el único cron del proyecto es el del backup (`ops/backup/vps-backup-erpazul.sh`).
-   - **Revisión 3:** la foto ya **no** se toma a las 00:00. Se toma en la **consolidación operativa** de la semana (G.4), así que no necesita un reloj.
+   - ~~Revisión 3: la foto se toma en la consolidación operativa, sin reloj.~~ **Corregido en la revisión 4:** la foto representa el estado lógico **en la frontera**, así que sí necesita un disparo en el corte, con un respaldo reconstruido y marcado (G.7). Qué la dispara es una decisión abierta (I.3).
 2. **Libro de movimientos de stock.** Cada uno de los escritores de D.1 registra un movimiento con fecha, cantidad y costo.
    - La cantidad a cualquier fecha se deriva, y la foto puede tomarse en cualquier momento restando lo posterior.
    - Es un cambio **grande**: toca venta, compra, transferencia, recepción, cancelación, corrección, ajuste e importación.
@@ -779,11 +806,17 @@ Alternativas, con su costo:
 **Cerrado en la revisión 3:**
 
 - el método es el costo vigente al corte (D.3);
-- la foto representa el **cierre operativo** de la semana, no las 00:00 (G.4).
+- ~~la foto representa el cierre operativo de la semana, no las 00:00~~ **corregido en la revisión 4.**
 
-**Recomendado:** la alternativa 1, foto sin libro, con la frontera y la reversión de la semana siguiente que define G.5. Solo necesita revertir hechos que **sí** tienen rastro exacto.
+**Revisión 4:** la foto representa el **estado lógico en la frontera** de la semana: por turno para lo que tiene turno, y por timestamp real para lo que no. Se toma **en** la frontera y recibe ajustes hacia adelante, con un respaldo reconstruido y marcado si no se pudo tomar a tiempo (G.7, alternativa D). El libro de movimientos (alternativa 2 de esta lista) queda como evolución posible. No es requisito.
 
-El libro de movimientos (alternativa 2) queda como evolución posible. No es requisito.
+**Datos a persistir antes de la primera foto, para no perder historia:**
+
+- **Ninguno es imprescindible** para que la primera foto sea válida: la foto misma es el primer dato, y lo anterior queda NO RECONSTRUIBLE.
+- **Conviene tener antes:**
+  - **la semana operativa del local, incluido el depósito** (G.2). Sin ella, la primera foto se tomaría con el domingo por defecto y quedaría congelada con una semana que nadie eligió;
+  - **el incremento físico exacto de la compra recibida, y su `ProductoLocal` destino**. Sin él, una compra cerca de la frontera o una foto reconstruida dejan diferencia no explicada.
+- **Cada semana que pasa sin foto** es una semana más sin stock inicial.
 
 ---
 
@@ -883,7 +916,7 @@ Todos son **[IDEA]**. **No se elige schema** ni se implementa nada, tampoco el "
 
 ---
 
-## G. Semana financiera
+## G. Semana operativa, consolidación y foto de stock
 
 ### G.1 Qué hay hoy
 
@@ -902,35 +935,77 @@ Todos son **[IDEA]**. **No se elige schema** ni se implementa nada, tampoco el "
 - **La aritmética:** `rangoDelPeriodo({ unidad, diaDeCorte, hoy })` y `caeEnElPeriodo` (`lib/transferencias/periodoDePago.js`), puras y ya compartidas con Finanzas.
 - **Sin historial:** el propio schema (líneas 90-112) avisa que, cuando existan pagos, el período tiene que quedar congelado en el pago y el corte necesita historial.
 
-### G.2 Reutilizar la semana de Transferencias
+### G.2 La semana operativa es del LOCAL, no de un módulo
 
-**[DECISIÓN APROBADA]** No se crea una segunda configuración semanal: se reusa la de Transferencias. **No se asume domingo como hardcode.**
+**[DECISIÓN APROBADA, revisión 4 — corrige la revisión 3]** La semana operativa **pertenece a la ubicación**: a cada local, y también al depósito.
 
-**Qué se reusa exactamente:**
+- Cada ubicación tiene **una única** definición de semana operativa.
+- Todos los módulos la consumen: Finanzas, Transferencias, reportes semanales, stock y fotos, cajas y turnos, compras, pagos, y lo que venga.
+- **Es inválido** que un mismo local tenga Transferencias de domingo a sábado y Finanzas de lunes a domingo.
+- **El depósito tiene su propia semana**, sin necesidad de un acuerdo consigo mismo.
+- **No se asume domingo como hardcode.**
 
-- el **dato**, `AcuerdoDepositoLocal.diaDeCorte` del local;
-- la **lectura con su marca**, `acuerdoDeLocal`;
-- la **aritmética**, `rangoDelPeriodo` y `caeEnElPeriodo`.
+**`AcuerdoDepositoLocal.diaDeCorte` es la ubicación arquitectónica incorrecta de un dato del local.**
 
-`periodoFinanciero` deja de usar su constante y pide el corte del local por la misma puerta. **[PROBLEMA, contradicción con el código]** Hoy `periodoFinanciero.js` dice lo contrario a propósito: **ese comentario y esa constante son los que cambian.**
+- Hoy vive en el dominio de Transferencias, y por PAR depósito–local.
+- Eso permite, sin que nada lo impida, que un local tenga dos cortes (uno con cada depósito) y que el depósito no tenga ninguno.
+- **No se migra todavía.**
 
-**Lo que el ámbito actual cubre y lo que no:**
+**Cómo llevarlo a una fuente canónica del local, sin romper nada** **[IDEA, sin schema]**:
 
-- **Cubre** que distintos locales tengan semanas distintas: el acuerdo es por local.
-- **No cubre** tres casos, que hay que decidir sin crear otra tabla:
-  1. **El depósito**, que vende y tiene caja, **no tiene acuerdo consigo mismo**: cae al default. **[DECISIÓN PENDIENTE]** ¿Su semana es el default, o se toma de otro lado?
-  2. **Un local sin depósito** o sin acuerdo cargado cae al default, con la marca "sin configurar". Una instalación nueva hereda el domingo del código.
-     - **[DECISIÓN PENDIENTE]** Si hace falta un default por grupo o por instalación, el lugar natural es la configuración de grupo que ya existe (`ConfiguracionGrupo`). **No se crea hasta que se decida.**
-  3. **Un local con acuerdo con dos depósitos** (el único es por par) tendría dos cortes. **[INFERIDO]** El modelo lo permite; `acuerdoDeLocal` se queda con el primero que encuentra.
+1. **Una fuente canónica por ubicación**, con vigencia (G.3).
+   - El lugar natural es la configuración del local, que ya existe: `ConfiguracionLocal`, un registro por local (`prisma/schema.prisma:201`).
+   - Como el dato necesita **historial**, no alcanza con una columna que se pisa: hace falta "desde qué semana rige qué corte".
+2. **Una sola puerta de lectura**, por ejemplo "semana operativa del local a una fecha".
+   - La usan todos los consumidores.
+   - Transferencias pasa a leerla en lugar de `acuerdoDeLocal`, y **no cambia su comportamiento visible**. La aritmética sigue siendo `rangoDelPeriodo`.
+3. **Carga inicial desde los acuerdos existentes.**
+   - Un local toma el `diaDeCorte` de su acuerdo.
+   - Si un local tiene dos acuerdos con cortes **distintos**, la migración **se frena y lo informa**, no elige. **[NO MEDIDO]** si existe ese caso en producción.
+   - El depósito y los locales sin acuerdo **quedan sin configurar**, como hoy, con la misma marca visible. No se inventa un domingo como si alguien lo hubiera decidido.
+4. **Qué pasa con el acuerdo.**
+   - Deja de ser fuente de la semana.
+   - Si no le queda otro dato de la relación (hoy solo tiene `diaDeCorte`), se retira en una tanda posterior, después de que nadie lo lea.
+5. **Los períodos históricos no se rompen.**
+   - Hoy el período de Transferencias es **solo de presentación**, como dice el propio schema: no hay pagos registrados que dependan de él.
+   - Lo que exista congelado cuando se migre —fotos o pagos al depósito— guarda **su propio rango** y no se recalcula.
+6. **Finanzas.**
+   - `CORTE_SEMANAL_FINANCIERO = 0` y su comentario "desacoplado a propósito" (`lib/finanzas/periodoFinanciero.js`) se retiran.
+   - Finanzas lee la misma puerta. **[PROBLEMA, contradicción con el código vigente]**
 
-**Dos consecuencias que cambian de peso al reusar:**
+**Qué semana rige una operación entre dos ubicaciones.** Una transferencia de depósito → Casiano: la **obligación** es de Casiano, así que su período es la **semana de Casiano**. Los reportes semanales del depósito usan la semana del depósito. No hay contradicción: cada ubicación mira sus hechos con su semana.
 
-- **Permiso:** hoy mover el corte exige `transferencias.crear`. Con la reutilización, eso también mueve la semana financiera y la foto de stock. **[DECISIÓN PENDIENTE]** ¿Hace falta un permiso propio para cambiar el corte?
-- **Historial:** una foto ya tomada congela su rango, y cambiar el corte no la mueve. Pero las semanas siguientes quedarían desalineadas si el corte se recalcula hacia atrás.
-  - **El historial del corte, que el schema ya pedía para los pagos al depósito, ahora también lo pide la foto.** Es un solo historial para las dos cosas.
-  - Hasta que exista, cada foto tiene que guardar **su propio rango** (desde y hasta) y no derivarlo después.
+### G.3 Permiso y vigencia de la semana
 
-### G.3 A qué semana pertenece un turno
+- **[DECISIÓN APROBADA]** Cambiar la semana operativa exige un **permiso específico**, del sistema de permisos existente (`lib/rbac/registry.js`).
+  - **No** se ata a ADMIN, ENCARGADO, DUEÑO_LOCAL ni a ningún rol.
+  - **[PROBLEMA]** Hoy el corte lo cambia cualquiera con `transferencias.crear` (`app/api/transferencias/acuerdos/route.js`).
+  - **[PROBLEMA, antecedente]** El repo **ya tiene** reglas atadas a nombres de rol: el comentario de `ConfiguracionLocal.exigirOperador` dice que "Admin y DUEÑO_LOCAL siguen exentos por rol". **No se copia ese patrón.**
+- **[DECISIÓN APROBADA]** Un cambio **no reescribe semanas ya consolidadas**.
+- **Vigencia mínima necesaria** **[IDEA, sin schema]**:
+  - cada cambio registra **desde qué semana rige**, siempre desde una semana **futura** o la que empieza;
+  - nunca con efecto retroactivo;
+  - con autor y fecha, como el resto de los hechos auditados del repo.
+- **[DECISIÓN PENDIENTE] La semana de transición.** Si se cambia de domingo a lunes, la semana que queda en el medio dura 8 días, o 6 en el cambio inverso. Hay que decidir si se acepta una semana irregular o si el cambio espera al corte natural.
+
+### G.3 bis Semana operativa y mes calendario
+
+**[DECISIÓN APROBADA]** Son **dos dimensiones distintas**:
+
+- **Mes calendario:** del día 1 al último día del mes, siempre.
+- **Semana operativa:** según la configuración de la ubicación.
+- **El cambio de mes no parte una semana.** La semana del domingo 27/09 al sábado 03/10 es **una sola**.
+- Una operación del 02/10 es a la vez de **octubre** (mes) y de la **semana 27/09 → 03/10**. No hay contradicción.
+
+Consecuencias:
+
+- Los reportes **mensuales** agrupan por fecha calendario. `rangoDelPeriodo` con la unidad MES ya calcula el mes calendario **[VERIFICADO]**.
+- Los reportes **semanales** usan la semana operativa.
+- **Un mes no se calcula sumando semanas completas.**
+- **No se genera una foto extra** porque empezó un mes. La variación de stock **mensual** es NO DISPONIBLE: no hay foto en el borde del mes, y no se estima.
+- **[DECISIÓN PENDIENTE]** A qué mes va un hecho atado a un turno que cruzó la medianoche de fin de mes. El texto aprobado dice "por fecha calendario", o sea por el timestamp del hecho y no por la apertura del turno. Se deja escrito para que nadie lo "arregle" en silencio.
+
+### G.4 A qué semana pertenece un turno
 
 **[DECISIÓN APROBADA]** Las 00:00 cambian el día y la semana del **calendario**, pero **no parten un turno**. **Un turno pertenece COMPLETO a la semana en la que abrió.**
 
@@ -954,7 +1029,13 @@ Ejemplo: un turno de sábado que abre a las 16:00 y cierra el domingo a las 00:3
 - **[PROBLEMA]** Hoy el resumen de Finanzas corta las ventas por `Venta.fecha` (C.1). Hay que pasarlo a la semana del turno.
   - Una venta sin `turnoId` —el campo es nullable— sigue yendo por su fecha.
   - Cuántas hay es **[NO MEDIDO]**.
-- **Hechos sin turno** (compras recibidas, transferencias, ajustes de stock, pagos no efectivo, cobros de cuenta corriente) van por su fecha, con una excepción para el stock que define G.5.
+- **[DECISIÓN APROBADA, revisión 4 — corrige la revisión 3] Los hechos sin turno** (compras recibidas, recepciones y envíos de transferencias, ajustes de stock, pagos no efectivo, cobros de cuenta corriente) **van a la semana de su fecha y hora reales**, según la semana de la ubicación.
+  - **No** se arrastran a la semana anterior porque todavía haya un turno viejo abierto.
+  - Ejemplo, con semana de domingo a sábado:
+    - una recepción el sábado a las 23:55 es de la semana anterior;
+    - una recepción el domingo a las 00:10 es de la semana nueva;
+    - y eso vale aunque el último turno del sábado cierre el domingo a las 00:30.
+  - La revisión 3 recomendaba lo contrario "para no revertir compras". **Una limitación técnica no deforma la regla del negocio:** queda retirado.
 
 **[PROBLEMA, contradicción con el código] El POS hoy no deja vender a las 00:10 en el turno del sábado.**
 
@@ -962,91 +1043,233 @@ Ejemplo: un turno de sábado que abre a las 16:00 y cierra el domingo a las 00:3
 - `app/api/pos-ventas/turnos/actual/route.js:89-100` marca el turno como `requiereCierre`, y `app/modulos/pos-ventas/page.jsx:1786` muestra una pantalla que bloquea.
 - Después de las 00:00, un turno del día anterior **solo puede cerrar**, y quizás retirar o registrar movimientos (no verificado ruta por ruta).
 - La regla aprobada se cumple igual: lo que ese turno haga después de las 00:00 es de su semana. Pero **el ejemplo de una venta a las 00:10 hoy no puede ocurrir.**
-- **[DECISIÓN PENDIENTE]** Mantener esta regla del POS, que es diaria y no semanal, o relajarla para que el turno siga vendiendo pasada la medianoche. Es una decisión del POS, no de Finanzas. **Finanzas funciona con cualquiera de las dos.**
+- **[DECISIÓN APROBADA, revisión 4]** La regla del POS **no se cambia ahora**.
+  - Finanzas tiene que ser compatible con ella y con una posible relajación futura.
+  - La pertenencia se decide **por la apertura**, nunca partiendo el turno por timestamps, así que las dos variantes dan el mismo resultado conceptual.
 
-### G.4 Cuándo se consolida una semana
+### G.5 Operaciones que cruzan el corte
 
-**[DECISIÓN APROBADA]** La semana cambia en el calendario a las 00:00, pero su **cierre financiero se consolida cuando ya no queda ningún turno de esa semana operando**. La foto de stock representa ese cierre operativo real.
+**[DECISIÓN APROBADA]** "Después del corte **no nacen** operaciones nuevas en la semana finalizada. Las operaciones **ya originadas** en ella pueden seguir cambiando de estado hasta resolverse."
 
-**Contrato propuesto: la semana W del local L es consolidable cuando se cumplen las dos:**
+**Inventario de lo que existe hoy** **[VERIFICADO salvo donde se indica]**. Se enumeró recorriendo los modelos con estado de `prisma/schema.prisma` y sus rutas. No se inventan categorías.
 
-1. terminó en el calendario (ya pasó el inicio de W+1);
-2. **ningún turno de L con apertura en W está operativo.**
+1. **Turno de la semana todavía operativo** (abierto o sin corte).
+   - Origen: `Turno.apertura`.
+   - Estado: `cierre` y `cierreEnPreparacionEn` en null.
+   - Resolución: el corte (`cierres/iniciar`), el cierre clásico (`turnos/cerrar`) o la anulación técnica.
+   - **Stock:** mientras está operativo, sus ventas y correcciones descuentan o devuelven stock de **su** semana.
+   - **Financiero:** sus cobros, movimientos y pagos en efectivo son de su semana.
+   - **Semántica:** la semana todavía está produciendo hechos. **IMPIDE consolidar.**
+2. **Cierre con corte tomado y sin confirmar** (`CierrePreparacion` PREPARANDO o VENCIDO).
+   - Origen: el corte, con el esperado ya congelado.
+   - Resolución: la confirmación, o la cancelación, que devuelve el turno a operativo.
+   - **Stock:** ninguno. El turno ya no vende desde el corte.
+   - **Financiero:** falta el **contado**. La diferencia de caja y el retiro final todavía no existen.
+   - **Semántica:** la plata que entró ya se sabe; lo que falta es el conteo y el retiro.
+   - **[DECISIÓN PENDIENTE]** Recomendado: **impide consolidar**. Un cierre en preparación es corto y ya tiene su marca de atraso (VENCIDO). Consolidar sin el contado dejaría a la semana sin su diferencia de caja ni su retiro de cierre.
+3. **Transferencia enviada y no recibida** (`Transferencia.estado` "Enviada", o "Recibiendo" mientras se cuenta).
+   - Origen: `fechaEnvio`.
+   - Resolución: "Llegó" (`confirmar-recepcion`, que pasa a "Recibida" con `fechaRecepcion` por línea) o la cancelación (`transferencias/cancelar`, **solo desde "Enviada"**, que pasa a "Cancelada" con `canceladaEn`).
+   - **Stock:** el origen ya bajó; el destino todavía no subió (G.8).
+   - **Financiero:** el importe que el local debe se calcula por lo **recibido**, y sin recepción se toma lo enviado (`importeRecibidoDeLinea`). **La deuda de la semana de origen todavía puede cambiar**, por faltantes, excedentes o cancelación.
+   - **Semántica:** **IMPIDE consolidar** la obligación de esa semana con el depósito: su importe no es definitivo. Se muestra como "FINALIZADA — CON PENDIENTES".
+4. **Pedido a proveedor no recibido** (`PedidoProveedor` BORRADOR, CONFIRMADO o ENVIADO).
+   - Origen: `createdAt`, `fechaConfirmado` y `fechaEnviado`.
+   - Resolución: recibir (`recibir/[id]`, que pasa a RECIBIDO con `fechaRecibido`) o anular (ANULADO con `fechaAnulado`).
+   - **Stock y financiero: ninguno hasta recibir.** Un pedido es un encargo: no mueve mercadería ni plata, y la deuda nace al recibir (B.8, B.9).
+   - **Semántica:** no es un hecho económico de la semana en que se pidió. **Su recepción es un hecho NUEVO de la semana en que ocurre**, no la resolución de un hecho anterior.
+   - **No impide consolidar.** Se puede listar como "encargado, sin recibir", como información.
+5. **Deuda con proveedor pendiente o parcial** (`CuentaPorPagarProveedor` con saldo).
+   - Origen: `createdAt`, en `recibir`.
+   - Resolución: los `PagoProveedor`.
+   - **Stock:** ninguno. **Financiero:** los pagos son hechos de la semana en que se pagan.
+   - **Semántica:** una obligación vive por naturaleza más allá de su semana. **No impide consolidar.** Se declara como obligación pendiente al cierre.
+6. **Facturas de un pedido ya recibido que siguen editables** (`ComprobanteProveedor`; nadie escribe `confirmadoEn`, B.23).
+   - Pueden cambiar la suma de `totalLeido`, pero **no** la deuda, que ya quedó congelada.
+   - **No impide consolidar.** Es un riesgo declarado, no un pendiente.
+7. **Venta fiada no cobrada** (saldo en `MovimientoCuenta`).
+   - Como la deuda con proveedor: una cuenta a cobrar que vive entre semanas.
+   - **No impide consolidar.**
+8. **Sobre de cambio dejado para el turno siguiente** (`CambioPendiente` DISPONIBLE o RESERVADO).
+   - Existe **por diseño** para cruzar de un turno a otro, y por lo tanto de una semana a la siguiente.
+   - **Stock:** ninguno. **Financiero:** es un traspaso de efectivo dentro del local, no una entrada ni una salida.
+   - **No impide consolidar.** Se declara en la posición al cierre.
+9. **Retiro sin rendición** (`ArqueoCaja.estadoEntrega` PENDIENTE_ENTREGA).
+   - **Nada escribe ENTREGADO en el código** (B.15). Si esto bloqueara, **ninguna semana se consolidaría nunca**.
+   - **No impide consolidar.**
+10. **Pedido de mercadería entre ubicaciones sin enviar** (`PosTransferencia` Borrador, Solicitado o Enviando).
+    - Es un documento de preparación sin precios. El stock recién se mueve al enviar (`pos-transferencias/enviar` → `crearTransferencia`).
+    - **No impide consolidar.** El envío es un hecho nuevo de su semana.
+11. **Venta offline encolada en el navegador.** **[INFERIDO]**
+    - **No existe en la base** hasta que se sincroniza.
+    - Al sincronizar, `crear` exige que el turno siga operativo y que haya abierto el mismo día. Si se sincroniza, es de la semana de **su turno**.
+    - **No puede impedir consolidar**, porque el servidor no la conoce. Si llega tarde y es rechazada, no entra a ninguna semana. Qué pasa con ella después es del POS.
 
-"Operativo" es la condición que ya existe: `WHERE_TURNO_OPERATIVO`, o sea `cierre = null` y `cierreEnPreparacionEn = null` (`lib/caja/cierreRelevo.js:88`).
+**Lo que NO cruza semanas, aunque tenga estado:**
 
-**Por qué alcanza el corte y no hace falta la confirmación del cierre:**
+- `RetiroPreparacion` PREPARANDO vive adentro de un turno operativo, así que lo cubre el punto 1.
+- Las correcciones completas de venta solo se permiten con el turno original abierto (`estadoTurnoCorreccion`), así que también las cubre el punto 1.
+- `EstadoComprobante` de facturas de pedidos todavía no recibidos va con el punto 4.
 
-- El **corte** del cierre con relevo ya congela el universo del turno. Desde ese momento el turno no vende, no mueve caja y no retira (`prisma/schema.prisma`, comentario de `Turno.cierreEnPreparacionEn`).
-- El stock deja de moverse por ese turno en el corte. Contar el efectivo después no cambia el stock.
-- Un turno **anulado técnicamente** (`anuladoEn`) no cuenta como operativo.
+**Resumen: impiden consolidar** los puntos 1, 2 (recomendado) y 3, porque su resolución **todavía cambia cifras de la semana**. **No impiden:** 4 a 11, que son obligaciones o saldos que viven entre semanas, encargos sin efecto económico, o datos que el sistema no resuelve.
 
-**Qué dispara la consolidación:** no hace falta un reloj.
+### G.6 Estados de la semana
 
-- Se consolida **en el mismo acto que deja a la semana sin turnos operativos**: el corte, el cierre clásico o la anulación técnica del último turno de W.
-- O **en el primer acceso posterior**, si ese acto falló. Es idempotente (G.6).
-- Es la misma idea que el corte con relevo: el hecho que cambia el estado es el que deja constancia.
+**[DECISIÓN APROBADA]**
 
-### G.5 Qué representa la foto: la frontera
+- **ABIERTA.** La semana operativa de la ubicación todavía transcurre.
+- **FINALIZADA — CON PENDIENTES.** Pasó el corte temporal.
+  - No acepta operaciones nuevas originadas retroactivamente.
+  - Tiene operaciones nacidas en ella que todavía necesitan resolución (los que impiden en G.5).
+  - Puede quedar así el tiempo que haga falta, **mostrando qué la traba**.
+- **CONSOLIDADA.** Terminó y se resolvió lo necesario. **No se modifica normalmente.**
+- **No hay "forzar consolidación"** y **no hay un botón común "Reabrir semana"**.
+  - Corregir una semana consolidada sería una **operación extraordinaria**: auditada, con permiso específico y con contrato propio. **No se implementa ahora.**
+- **Dónde hay que vigilar "no nace nada retroactivo":**
+  - **No es retroactivo:** una venta de un turno de la semana finalizada que todavía opera. El turno nació en esa semana y le pertenece entero.
+  - **No puede serlo:** un ajuste de stock o una recepción. Van por su timestamp real y nunca caen en una semana ya finalizada.
+  - **Hoy sí puede serlo — [PROBLEMA]:** la **fecha elegida a mano** de un pago no efectivo. `leerDiaDePago` (`lib/finanzas/pagosProveedores.js:286`) rechaza solo el futuro y acepta cualquier fecha pasada.
+    - Cuando existan semanas finalizadas, un pago con fecha de una de ellas es una operación que nace retroactivamente.
+    - **[DECISIÓN PENDIENTE]** ¿Se rechaza, o entra a la semana abierta con su fecha declarada como dato?
 
-**El problema.** Cuando el último turno de W corta, el stock ya puede incluir hechos de W+1:
+### G.7 La foto semanal: qué se congela y cuándo
 
-- las ventas de un turno que abrió después de las 00:00 en otra caja del mismo local (un turno es único por usuario y local, así que puede haber varias cajas);
-- hechos sin turno ocurridos después de las 00:00.
+**La pregunta, con las reglas de la revisión 4.** La foto de la semana W tiene que representar el stock **lógico** en la frontera de W:
 
-Una foto "del stock en ese instante" los mezclaría.
+- **incluye** todo lo que pertenece a W, aunque ocurra después de las 00:00: lo de un turno de W que sigue abierto;
+- **excluye** todo lo que pertenece a W+1, aunque ocurra antes de que la foto se materialice: una recepción a las 00:10 o una venta de un turno abierto después de las 00:00;
+- las **operaciones pendientes** de W (G.5) no cambian la foto: cambian cómo se explica.
 
-**Contrato propuesto:**
+Son dos criterios de pertenencia distintos:
 
-- **foto de W = stock leído en el instante T de la consolidación + reversión de los hechos de W+1 ocurridos antes de T.**
-- **Qué se revierte, y con qué rastro exacto:**
-  - **ventas de turnos de W+1**, con su consumo congelado: `VentaDetalle.productoLocalId` + `cantidadStock`, o `VentaDetalleComponente`. Las ventas nuevas no son legacy, así que el rastro es **exacto**.
-  - **anulaciones y correcciones de W+1**, con `VentaCorreccion.impactoStock`.
-- **Hechos sin turno entre las 00:00 y T** (compras recibidas, recepciones y envíos de transferencias, ajustes):
-  - **[DECISIÓN PENDIENTE]**, con una recomendación.
-  - **Recomendado: "la semana W sigue abierta para el stock hasta que se consolida".** Un hecho de stock sin turno ocurrido antes de la consolidación de W pertenece a W. No hace falta revertirlo.
-    - Es coherente con la regla del turno completo: la operación del local sigue en W hasta que W termina de verdad.
-    - Evita revertir compras, cuyo incremento **no** se guarda exacto (D.1, punto 4).
-    - Costo: una compra recibida a las 00:20 cuenta en el stock de W, aunque su deuda se vea por su fecha.
-  - **Alternativa:** asignar esos hechos por calendario (W+1) y revertirlos. Exige guardar antes el incremento exacto de la compra (D.6).
-- **La frontera va por id, no por timestamp**, igual que `CierrePreparacion.ultimaVentaId` (`lib/caja/cierreRelevoServer.js:93-107`): "dos filas creadas en el mismo milisegundo son indistinguibles por fecha".
-  - La foto guarda los ids máximos que vio: de `Venta`, de `VentaCorreccion` y de lo que corresponda.
-  - Así la reversión se puede reproducir y auditar.
-- **Dos decisiones más sobre qué entra en la foto [DECISIÓN PENDIENTE]:**
-  - **Stock negativo** (el grupo puede permitirlo): ¿se valoriza negativo tal cual, o se informa aparte?
-  - **Mercadería en tránsito** (`StockLocal.enTransito` del origen): ya salió del depósito y todavía no entró al local, pero la deuda del local ya corre por fecha de envío. Se recomienda **una línea aparte, "en tránsito"**, para que su valor no desaparezca entre dos fotos.
+- **por turno**, para lo que está atado a un turno;
+- **por timestamp**, para lo que no.
 
-### G.6 Carreras e idempotencia
+Ninguna foto física tomada en un solo instante los cumple a los dos.
 
-- **El último turno corta mientras otra caja vende.**
-  - La venta toma `pg_advisory_xact_lock(localId)` en su transacción (`app/api/pos-ventas/crear/route.js:1074`).
-  - La consolidación toma **el mismo bloqueo del local** y lee el stock **en esa misma transacción**. Con eso ninguna venta del local cambia el stock mientras se toma la foto.
-  - Las ventas de W+1 que ya se registraron se revierten por la frontera (G.5).
-- **Una venta de W que valida su turno antes del corte y se registra después.**
+**Alternativas, evaluadas contra las reglas y no contra la comodidad:**
+
+- **A. Foto física exactamente en la frontera temporal (a las 00:00 de la ubicación), más un ajuste hacia adelante.**
+  - Todo lo sin turno anterior al corte queda adentro, y todo lo posterior queda afuera, **sin revertir nada**.
+  - Después se **suman** a la foto los hechos atados a turnos de W que ocurren después de las 00:00. Todos tienen **rastro exacto**:
+    - las ventas, con `VentaDetalle.productoLocalId` + `cantidadStock` o `VentaDetalleComponente`;
+    - las correcciones y anulaciones, con `VentaCorreccion.impactoStock`.
+  - La foto **captura la realidad del instante**, incluidos los escritores de stock que **no** dejan rastro (importación, borrados, scripts; D.1). Ninguna reconstrucción puede hacer eso.
+  - **Costo:** necesita que algo la dispare **en** el corte. Hoy no hay un mecanismo programado (D.6).
+- **B. Foto lógica reconstruida más tarde.** Se lee el stock en cualquier momento y se revierten los hechos de W+1.
+  - Exige rastro exacto de **todos** los escritores de stock.
+  - Hoy **no lo hay**: la compra no guarda su incremento exacto, y la importación, los borrados y los scripts no dejan nada (D.1).
+  - Un solo escritor sin rastro en la ventana contamina la foto **sin que se note**.
+- **C. Libro de movimientos de stock desde ahora, con fotos como puntos de control.**
+  - Cada escritor registra su movimiento, con su turno si lo tiene y su timestamp.
+  - Cualquier frontera lógica se calcula exacta, cuando sea.
+  - Es la más robusta frente al reloj.
+  - Toca los doce caminos de D.1, y un escritor nuevo que se olvide de registrar corrompe en silencio. Es el patrón que el repo ya vio repetirse.
+- **D. (recomendada) A como regla, con B restringida como respaldo declarado.**
+  - La foto se toma en la frontera, y los hechos de turnos de W posteriores se suman con su rastro exacto.
+  - Si la foto **no** se pudo tomar a tiempo (servidor caído, disparo que falló), se reconstruye con B **solo para esa semana**.
+  - Lo que la ventana no permita reconstruir con rastro exacto se informa como **DIFERENCIA NO EXPLICADA**, y la foto queda **marcada como reconstruida**. Nunca se presenta como exacta.
+
+**Por qué D.** Cumple las dos reglas de pertenencia **exactamente** en el camino normal. Nunca revierte hechos sin rastro. Captura lo que ningún rastro registra. Y cuando algo falla, lo dice en vez de inventar. C queda como evolución si algún día se quiere prescindir del disparo en el corte.
+
+**Qué se congela en la foto** — por ubicación y producto, salvo la última línea, que va por transferencia:
+
+- **stock físico confirmado:**
+  - cantidad, **incluida la negativa, tal cual**;
+  - costo unitario vigente;
+  - valor;
+  - método;
+- **una marca** en las cantidades negativas: son una anomalía real y se señalan, **no se llevan a cero** (**[DECISIÓN APROBADA]**);
+- **el rango** de la semana (desde y hasta) y la **frontera**:
+  - el instante;
+  - los ids máximos vistos de `Venta` y de `VentaCorreccion`, con el mismo criterio que `CierrePreparacion.ultimaVentaId` (`lib/caja/cierreRelevoServer.js:93-107`);
+  - si fue tomada en el corte o reconstruida;
+- **las transferencias pendientes de recepción**, por transferencia y no por producto agregado (G.8).
+
+**Cuándo se consolida, separado de cuándo se toma la foto:**
+
+- **La foto se toma en la frontera** (o se reconstruye). Desde ahí la semana está **FINALIZADA**.
+- Mientras un turno de W siga operativo, la foto **recibe** sus ajustes hacia adelante: son hechos de W, no nacimientos retroactivos.
+- **La semana se consolida** cuando no queda ningún pendiente que impida (G.5, puntos 1 a 3).
+  - Ahí se cierran los ajustes, y la foto queda **definitiva e inmutable**.
+  - Si una transferencia de W se recibe después, eso **no** cambia la foto de W: la mercadería estaba en tránsito en la frontera. Cambia la explicación de W (la obligación con el depósito) y el stock físico de W+1.
+
+### G.8 Mercadería en tránsito
+
+**[VERIFICADO] Qué pasa hoy con el stock durante una transferencia:**
+
+1. **Al enviar**, con `crearTransferencia` (`lib/transferencias/crearTransferencia.js:141`):
+   - en la fila de stock del **origen** se aplica `movimientoStockOrigen` (`lib/transferencias/politicasStock.js`):
+     - **DESCONTAR_Y_TRANSITO** (envío manual desde `pos-transferencias/enviar`): `cantidad` baja y `enTransito` sube, en unidades físicas;
+     - **SOLO_TRANSITO** (venta interna): `cantidad` **ya bajó en la venta** (`aplicarConsumoStock`) y ahora solo sube `enTransito`;
+   - la transferencia queda en "Enviada", con `fechaEnvio`;
+   - **el destino no cambia.**
+2. **Al confirmar "Llegó"**, con `app/api/transferencias/confirmar-recepcion/route.js`, **en una sola transacción**:
+   - el destino **sube** `cantidad` por lo recibido físico;
+   - el origen **baja** `enTransito` por lo enviado, y ajusta `cantidad` por la diferencia: devuelve el faltante o descuenta el excedente o lo agregado, con rastro en `AuditoriaStock`;
+   - la línea guarda `recibido` y `fechaRecepcion`, y la transferencia pasa a "Recibida".
+3. **Al cancelar**, solo desde "Enviada", con `transferencias/cancelar`: `reversionStockOrigen` devuelve `cantidad` y baja `enTransito` en el origen, y si hubo venta interna, la revierte.
+
+**Cómo está representado hoy el tránsito:**
+
+- `StockLocal.enTransito` vive **en la fila del ORIGEN**, sumado por producto para **todos** los destinos.
+- **No dice a qué destino ni a qué transferencia pertenece.**
+- El detalle por destino existe en las transferencias en estado "Enviada" o "Recibiendo" y en sus líneas.
+
+**Contrato:**
+
+- **El destino no tiene esa mercadería como stock físico** hasta que se confirma "Llegó", aunque en la realidad ya esté en la góndola. ERP Azul no afirma lo que no se confirmó (**[DECISIÓN APROBADA]**).
+- En la foto del **destino**, el tránsito va **aparte**, como "transferencias pendientes de recepción", **por transferencia**. Sale de las transferencias pendientes, **no** de `enTransito`, que no sabe de destinos.
+  - Ejemplo: stock físico confirmado de Casiano, $10.000.000; transferencias pendientes de recepción, $300.000.
+- En la foto del **origen**, `cantidad` ya excluye lo enviado. **El tránsito no se valoriza otra vez ahí**: se informa como "enviado sin confirmar", sin sumar al stock del depósito.
+- **Así no hay doble valorización:** cada unidad está en un solo lugar de cada foto. En la frontera está como tránsito del destino; después de la recepción, como físico del destino.
+- **[DECISIÓN PENDIENTE] Con qué costo se valoriza el tránsito.** Recomendado: el **congelado de la transferencia** (`TransferenciaDetalle.precioCosto`), que es el mismo con el que se calcula la obligación del local (`importeRecibidoDeLinea`). La alternativa, el costo vigente al corte, seguiría la regla general de la foto pero haría que el tránsito y la deuda no coincidan.
+- **Al confirmar la recepción más tarde:**
+  - la foto de W no cambia;
+  - en la foto de W+1 la mercadería aparece como físico del destino;
+  - la obligación de W con el depósito se vuelve definitiva, y W puede pasar a CONSOLIDADA si no le queda otro pendiente.
+  - Si hubo faltante, el origen recupera stock en W+1, con fecha y rastro en `AuditoriaStock`.
+
+### G.9 Carreras e idempotencia
+
+- **El disparo en la frontera.**
+  - **[VERIFICADO]** Hoy no hay ningún mecanismo programado en la aplicación (D.6), y **cada ubicación puede cortar un día distinto** (G.2).
+  - Hace falta un disparo **por ubicación**. Sus opciones van en la sección I.
+  - Si llega tarde, la foto de esa semana sale por el respaldo (D de G.7): **marcada** como reconstruida y **con su diferencia no explicada a la vista**.
+- **Una venta que se registra alrededor de las 00:00.**
+  - Su pertenencia **no** depende del instante: la decide su turno.
+  - Si es de un turno de W y se registró después de la foto, entra en los ajustes hacia adelante. Si es de un turno de W+1, la foto no la vio.
+  - La frontera por **id** (`Venta`, `VentaCorreccion`) hace que ninguna venta quede de los dos lados ni de ninguno.
+- **Una venta que valida su turno antes del corte de caja y se registra después.**
   - **[INFERIDO]** Es posible: `crear` valida el turno **fuera** de su transacción (`prisma.turno.findFirst`, línea 128), mientras el corte bloquea la fila del turno (`bloquearTurno`, `lib/caja/cierreRelevoServer.js:163`).
-  - Esa venta queda con el `turnoId` de W y un id posterior a la frontera del corte.
-  - **El contrato:** una venta de un turno de W que llega después de la foto se informa como **hecho tardío de W** (abajo). No se pierde.
-- **Otros escritores de stock** (recepciones, ajustes, compras) no toman el bloqueo del local.
-  - La lectura de la foto tiene que ser **un solo snapshot consistente**: una transacción `REPEATABLE READ`, o una sola sentencia. Hoy **nada** en el repo usa `isolationLevel`, así que el nivel es el de Postgres por defecto, `READ COMMITTED`.
-  - El costo vigente se lee **en el mismo snapshot** que la cantidad.
-- **Idempotencia:** una sola consolidación por local y semana, protegida con un **único** de base (local + inicio de semana), por el mismo patrón que `CierrePreparacion` y `PagoProveedor`. Un reintento devuelve la foto existente.
+  - Para el stock no cambia nada: la venta es del turno de W, así que es un ajuste hacia adelante de W.
+  - Para la caja es el caso que la frontera `ultimaVentaId` del corte ya resuelve.
+- **Un escritor sin turno que registra justo en la frontera**, como una recepción con timestamp 23:59:59 que se confirma después de la foto.
+  - Por timestamp es de W, y la foto no la vio.
+  - Recepciones, envíos, cancelaciones y ajustes tienen **rastro exacto**, así que se suman como ajuste.
+  - **La compra recibida no lo tiene:** su incremento no se guarda (D.1, punto 4). Mientras no se guarde, una compra en esa franja es **DIFERENCIA NO EXPLICADA**.
+- **La lectura.**
+  - La foto se lee en **un solo snapshot consistente**: una transacción `REPEATABLE READ`, o una sola sentencia. **Nada** en el repo usa hoy `isolationLevel`, así que el nivel es el de Postgres por defecto, `READ COMMITTED`.
+  - Cantidad y costo vigente se leen en el mismo snapshot.
+  - Las ventas del local se serializan con `pg_advisory_xact_lock(localId)` (`app/api/pos-ventas/crear/route.js:1074`). Tomar ese mismo bloqueo durante la foto evita que una venta la cruce.
+- **Idempotencia:** una foto por ubicación y semana, con un **único** de base, por el mismo patrón que `CierrePreparacion` y `PagoProveedor`. Un reintento, o dos instancias disparando a la vez, devuelve la foto existente.
 - **Espacio de bloqueos.** **[PROBLEMA]** `pg_advisory_xact_lock` se usa hoy con **un solo entero** para cosas distintas:
   - `localId` en ventas y ofertas;
   - `ventaId` en la corrección (`venta/[id]/corregir/route.js:98`).
 
   Un local y una venta con el mismo número se bloquean entre sí sin motivo. Un bloqueo nuevo de consolidación tiene que usar la forma de dos enteros (espacio + id), o reusar exactamente el de ventas **a propósito**.
 - **Un turno de W queda abierto horas o días.**
-  - W **no se consolida**: no se toma la foto "a medias". El estado **"semana sin consolidar"** se ve en Finanzas con el turno que la traba, igual que `EstadoCierrePreparacion.VENCIDO` marca un atraso sin liberar nada.
-  - Mientras tanto, W+1 sigue operando, y su reversión crece pero sigue siendo exacta.
-  - Salidas que ya existen: cerrar el turno, o **anularlo técnicamente** si fue un error (`Turno.anuladoEn`).
-  - **[DECISIÓN PENDIENTE]** ¿Hace falta además "forzar la consolidación" con un permiso propio, dejando el turno marcado?
-  - La regla del POS de G.3 ya empuja a cerrar antes de vender al día siguiente.
-- **Hechos tardíos**, como una venta de W después de la foto o un gasto de W cargado más tarde:
-  - **la foto no se recalcula**;
-  - el hecho se informa en W como **tardío**, y su efecto en stock aparece en la **variación de W+1**, rotulado.
-  - **[DECISIÓN PENDIENTE]** Si además se permite "reabrir" una semana consolidada.
+  - W queda **FINALIZADA — CON PENDIENTES**, mostrando el turno que la traba, igual que `EstadoCierrePreparacion.VENCIDO` marca un atraso sin liberar nada.
+  - La foto ya está tomada, y los ajustes de ese turno se le siguen sumando.
+  - Las salidas son las que ya existen: cerrar el turno, o anularlo técnicamente si fue un error (`Turno.anuladoEn`).
+  - **No hay forzar consolidación** (G.6).
+  - La regla del POS (G.4) ya impide que ese turno venda al día siguiente, así que en la práctica su ajuste se limita a lo que haga antes de cerrar.
+- **Una transferencia de W que nunca se recibe.**
+  - W queda con pendiente hasta que alguien confirme "Llegó" o la cancele.
+  - Es una traba **visible y resoluble**, no un bloqueo técnico.
+- **Después de consolidada**, la foto y los números de W no se tocan. Una corrección sería la operación extraordinaria de G.6.
 
-### G.7 ¿Cierre persistido o derivado?
+### G.10 ¿Cierre persistido o derivado?
 
 **Lo que se deriva bien:**
 
@@ -1068,7 +1291,7 @@ Una foto "del stock en ese instante" los mezclaría.
 2. **Cierre liviano** que congele solo lo no derivable: la foto de stock, la deuda con el depósito del período, los saldos declarados y el reparto.
 3. Cierre completo. Duplica fuentes que ya están congeladas: no conviene.
 
-**Recomendado: la 2**, cuyo primer contenido es la foto de stock con su frontera (G.4 a G.6).
+**Recomendado: la 2**, cuyo primer contenido es la foto de stock con su frontera (G.7 a G.9).
 
 **Hechos tardíos:** ver G.6.
 
@@ -1111,12 +1334,16 @@ Una foto "del stock en ese instante" los mezclaría.
 33. **Un valor de stock anterior a la primera foto es NO RECONSTRUIBLE.** No se estima para llenar el hueco.
 34. **"Compras − costo de lo vendido" no se presenta como variación del stock.**
 35. El resultado operativo no se calcula mientras no existan los gastos. El margen de mercadería se muestra con su nombre.
-36. **El stock semanal se valoriza como cantidad al corte × costo vigente al corte.** Una foto tomada no se recalcula nunca.
+36. **El stock semanal se valoriza como cantidad al corte × costo vigente al corte.** Una foto tomada no se recalcula nunca. **Una foto consolidada no se modifica**; mientras la semana está finalizada, solo recibe los ajustes de sus propios turnos.
 37. **La revalorización se informa aparte.** No es venta, recaudación, compra ni ganancia por venta.
 38. **Un turno pertenece completo a la semana en que abrió.** Sus hechos no se reparten entre dos semanas por timestamp.
-39. **Una semana no se consolida mientras tenga un turno operativo**, y la foto de stock representa esa consolidación, no las 00:00.
-40. **La frontera de una foto va por id, no por timestamp.** Lo de la semana siguiente que ya ocurrió se revierte con rastro exacto.
-41. **Hay una sola configuración semanal**: la de Transferencias. Finanzas no crea otra.
+39. **Una semana no se consolida mientras tenga pendientes que cambian sus cifras** (G.5): un turno operativo, un cierre sin contar, una transferencia sin recibir. No hay forzar consolidación ni reabrir común.
+40. **La foto representa el estado lógico en la frontera:** por turno para lo que tiene turno, por timestamp real para lo que no. Las ventas se separan por id. Lo que no se puede reconstruir con rastro exacto es DIFERENCIA NO EXPLICADA, y la foto queda marcada.
+41. **La semana operativa es de la ubicación, una sola por ubicación**, y todos los módulos la consumen. El depósito tiene la suya. Cambiarla exige permiso específico y nunca reescribe semanas consolidadas.
+41 bis. **El mes calendario y la semana operativa son dimensiones distintas.** Un mes no se calcula sumando semanas, y no hay foto extra por cambio de mes.
+41 ter. **Después del corte no nacen operaciones en la semana finalizada**; las nacidas en ella pueden resolverse después.
+41 quater. **El stock negativo se congela tal cual y se señala.** El tránsito se informa aparte en el destino y no se valoriza dos veces.
+41 quinquies. **Las fotos son la verdad primaria; la revalorización explica.** Lo que no se explica se dice, no se fabrica.
 42. **La recaudación se informa bruta y neta, con la comisión en el medio.** El flujo neto parte del neto, y un neto con comisión sin configurar no se presenta como medido.
 43. **Hay una sola regla de valuación del stock** para la foto y para el reporte valorizado, en una función compartida.
 
@@ -1168,28 +1395,55 @@ Una foto "del stock en ese instante" los mezclaría.
 - el método de valuación es cantidad × costo vigente al corte;
 - la revalorización se muestra aparte;
 - las fotos no se recalculan;
-- se reusa la semana de Transferencias;
+- ~~se reusa la semana de Transferencias~~ (corregido en la revisión 4);
 - un turno pertenece a la semana en que abrió;
-- la semana se consolida sin turnos operativos, y ahí va la foto;
+- ~~la semana se consolida sin turnos operativos, y ahí va la foto~~ (corregido en la revisión 4);
 - la recaudación se informa bruta y neta;
 - el flujo neto usa el neto y los pagos realmente realizados.
 
+**Revisión 4 (definitivas):**
+
+- **La semana operativa es de la ubicación.** Hay una sola por ubicación; el depósito tiene la suya; todos los módulos la consumen. `AcuerdoDepositoLocal.diaDeCorte` es su ubicación incorrecta, y no se migra todavía.
+- **Cambiar la semana** exige un permiso específico y no reescribe semanas consolidadas.
+- **Mes calendario y semana operativa son dimensiones distintas.**
+- **La regla del POS de medianoche no se cambia ahora.**
+- **Los hechos sin turno van por su fecha y hora reales.**
+- **Después del corte no nacen operaciones; las nacidas pueden resolverse.**
+- **La semana tiene tres estados:** ABIERTA, FINALIZADA — CON PENDIENTES y CONSOLIDADA. No hay forzar ni reabrir común.
+- **Stock negativo:** se conserva y se señala.
+- **Tránsito:** se distingue, y no se afirma recibido.
+- **Revalorización:** cantidad anterior × diferencia de costo, y DIFERENCIA NO EXPLICADA cuando corresponda.
+
 ### I.3 Lo que sigue abierto
 
-Ordenado por cuánto bloquea el primer bloque estructural (la foto).
+**Estado de las seis que bloqueaban la foto en la revisión 3:**
 
-**Bloquean la foto y la consolidación (G):**
+- **Hechos sin turno:** **CERRADA** (van por timestamp real).
+- **Stock negativo y tránsito:** **CERRADA** en lo funcional. Queda abierta **solo** la valuación del tránsito (abajo).
+- **Convención de revalorización:** **CERRADA.**
+- **Semana del depósito y de los locales sin acuerdo:** **CERRADA** en lo conceptual (semana de la ubicación). Queda abierto qué semana rige **mientras** no se configuró (abajo).
+- **Permiso para cambiar el corte:** **CERRADA.** Queda solo el nombre del permiso.
+- **Forzar o reabrir:** **CERRADA** (no hay ninguno de los dos).
 
-1. **Hechos de stock sin turno entre las 00:00 y la consolidación** (G.5). Recomendado: pertenecen a la semana todavía no consolidada. La alternativa exige guardar antes el incremento exacto de las compras.
-2. **Stock negativo y mercadería en tránsito en la foto** (G.5). Recomendado: el tránsito en una línea aparte.
-3. **Convención de revalorización cuando hubo movimiento** (C.4). Recomendado: cantidad anterior × diferencia de costo.
-4. **La semana del depósito y de un local sin acuerdo** (G.2). El default de hoy es el domingo del código.
-5. **Permiso para cambiar el corte semanal**, que hoy es `transferencias.crear` y ahora también mueve Finanzas (G.2).
-6. **¿Hace falta "forzar la consolidación" de una semana trabada por un turno abierto?** ¿Se puede reabrir una semana consolidada? (G.6)
+**Abiertas específicamente para la FOTO:**
 
-**No bloquean la foto, pero sí piezas posteriores:**
+1. **Qué dispara la foto en la frontera de cada ubicación** (G.7, G.9).
+   - Opciones:
+     - un proceso programado del servidor que llame a la aplicación, fuera de ella, como el backup;
+     - un proceso dentro de la aplicación, sin tumbarla (`instrumentation.js` avisa y no tumba);
+     - "tomarla en el primer contacto con el stock después del corte", que exige tocar a todos los escritores.
+   - Define la infraestructura y cuán seguido se cae al respaldo reconstruido.
+2. **Con qué costo se valoriza el tránsito** (G.8). Recomendado: el congelado de la transferencia, para que coincida con la deuda.
+3. **Qué semana rige mientras una ubicación no tiene la suya configurada**, incluido el depósito hoy.
+   - Opciones: el domingo del código, marcado como "sin configurar" (lo que pasa hoy en Transferencias), o no tomar fotos hasta que se configure.
+   - Define si la historia arranca ya o espera.
+4. **Si el cierre en preparación sin confirmar impide consolidar** (G.5, punto 2). Recomendado: sí.
+5. **La semana de transición al cambiar el corte** (G.3): ¿se acepta una semana irregular o el cambio espera?
+6. **A qué mes va un hecho de un turno que cruzó la medianoche de fin de mes** (G.3 bis). El texto aprobado dice "por fecha calendario".
 
-7. **La regla del POS "caja de un día anterior no vende"** (G.3). ¿Se mantiene o se relaja para vender pasada la medianoche? Es una decisión del POS.
+**Abiertas para piezas posteriores:**
+
+7. **Un pago no efectivo con fecha de una semana ya finalizada:** ¿se rechaza, o entra a la semana abierta? (G.6)
 8. **La deuda canónica con el depósito cuando la entrega fue una venta interna** (B.13). Bloquea el Pagar al depósito.
 9. **Los gastos: ¿van a la semana en que se generan o en que se pagan?** Bloquea gastos (F.4 / F.5).
 10. **Comisión estimada o liquidación real.** ¿Alcanza el neto estimado de `VentaPago`, o el rendimiento real exige conciliación con el procesador? (C.1 bis)
@@ -1240,24 +1494,39 @@ Son independientes entre sí y no dependen de decisiones abiertas.
   - Sacar la valuación a costo vigente, hoy escrita **adentro** de `app/api/reportes-stock/valorizado/route.js`, a una función compartida.
   - El reporte tiene que quedar idéntico.
   - Es el insumo de la foto (invariante 43).
-- **0.4 — La semana del local.**
-  - Una función pura que diga la semana de un local (el corte con `acuerdoDeLocal` + `rangoDelPeriodo`) y la semana de un turno (por `apertura`).
-  - Sin tocar todavía el tablero.
+- **0.4 — Una sola puerta de "semana operativa de una ubicación".**
+  - Una función que diga la semana de una ubicación a una fecha y la semana de un turno (por `apertura`).
+  - **Hoy** lee el corte por `acuerdoDeLocal`, con su marca de "sin configurar". Cuando exista la fuente canónica, cambia **solo por dentro**.
+  - Transferencias y Finanzas pasan a pedirla por ahí. Así, el día de la migración, se cambia un lugar y no cinco.
+  - No cambia ningún número visible, salvo Finanzas, que hoy fija domingo. Si algún local tiene otro corte, cambia su semana en Finanzas, **a propósito** y dicho en el commit.
 
-### J.3 Etapa 1 — primera pieza estructural: consolidación semanal con foto de stock
+### J.3 Etapa 1 — piezas estructurales, en este orden
 
-- **Por qué esta primero:** es la única que pierde historia cada semana que se posterga. No depende de gastos, del depósito ni del lugar del dinero.
-- **Qué incluye, y nada más:**
-  - la condición de consolidación (G.4);
-  - la foto con frontera y reversión (G.5);
-  - la idempotencia y los bloqueos (G.6);
-  - el rango congelado en la foto;
+La foto es la pieza que pierde historia cada semana que se posterga. Pero la foto **congela una semana**, y la semana tiene que ser la **correcta y definitiva** antes de congelar nada. Por eso el orden, por dependencia funcional, es:
+
+- **1.a — La semana operativa canónica de cada ubicación** (G.2, G.3). **Primer PR estructural.**
+  - La configuración por ubicación, **incluido el depósito**, con vigencia (desde qué semana rige) y autoría.
+  - Un permiso específico para cambiarla.
+  - Carga inicial desde `AcuerdoDepositoLocal`: si un local tiene dos cortes distintos, se detiene y lo informa.
+  - La puerta de 0.4 pasa a leerla. Transferencias queda idéntico.
+  - **Por qué antes que la foto:** una foto tomada con un domingo que nadie eligió queda congelada para siempre con esa semana. Y la foto del depósito no tiene hoy ninguna semana que usar.
+- **1.b — El incremento físico exacto de la compra recibida.**
+  - En `recibir`, guardar el incremento que entró al stock y el `ProductoLocal` destino.
+  - Es un solo escritor. Sin esto, una compra en la franja de la frontera o una foto reconstruida dejan diferencia no explicada (G.9).
+  - Es independiente de 1.a.
+- **1.c — Consolidación semanal con foto de stock** (G.5 a G.9):
+  - los estados de la semana;
+  - la foto en la frontera;
+  - los ajustes hacia adelante de los turnos de la semana;
+  - el tránsito por transferencia;
+  - la frontera por id;
+  - el respaldo reconstruido y marcado;
+  - la idempotencia;
   - la valuación de 0.3.
-- **No incluye** saldos, reparto ni resultado: el cierre semanal completo viene al final (J.5).
-- **Depende de:**
-  - 0.3 y 0.4;
-  - las decisiones abiertas 1 a 6 de I.3.
-- **Consecuencia:** la primera variación de stock aparece recién **entre la primera y la segunda foto**. Lo anterior es NO RECONSTRUIBLE.
+
+  Depende de 0.3, 0.4, 1.a, idealmente de 1.b, y de las decisiones 1 a 4 de "Abiertas para la FOTO" (I.3).
+  - **No incluye** saldos, reparto ni resultado: el cierre semanal completo viene al final (J.5).
+  - **Consecuencia:** la primera variación de stock aparece recién **entre la primera y la segunda foto**. Lo anterior es NO RECONSTRUIBLE.
 
 ### J.4 Etapa 2 — piezas independientes entre sí
 
@@ -1267,7 +1536,8 @@ Se pueden hacer en cualquier orden después de la etapa 0, en paralelo con la et
   - Depende de 0.1 y 0.2.
   - Además hay que mover la atribución de ventas a la semana del turno (G.3), que depende de 0.4.
 - **2.b — Obligación con el depósito por período, con su Pagar** (F.6).
-  - Depende de la decisión 8 y del historial del corte (G.2).
+  - Depende de la decisión 8 y de la semana canónica con vigencia (1.a).
+  - Una transferencia sin recibir deja su semana FINALIZADA CON PENDIENTES (G.5).
   - Sigue el patrón de Pagos a proveedores.
 - **2.c — Gasto con categoría configurable, y su pago** (F.4 / F.5).
   - Depende de la decisión 9.
@@ -1284,28 +1554,35 @@ Se pueden hacer en cualquier orden después de la etapa 0, en paralelo con la et
 
 ### J.6 Mapa de dependencias
 
-- **Independientes ya:** 0.1, 0.2, 0.3 y 0.4.
-- **La etapa 1** depende de 0.3 y 0.4, más las decisiones 1 a 6.
+- **Independientes ya:** 0.1, 0.2, 0.3 y 0.4, y también 1.b.
+- **1.a** depende de 0.4 y del nombre del permiso.
+- **1.c** depende de 0.3, 0.4 y 1.a, idealmente de 1.b, y de las decisiones 1 a 4 de la FOTO.
 - **2.a** depende de 0.1, 0.2 y 0.4.
-- **2.b, 2.c y 2.d** no dependen entre sí.
-- **3.b** depende de 1, 2.a, 2.b y 2.c.
+- **2.b** depende de 1.a y de la decisión 8.
+- **2.c y 2.d** no dependen de nada estructural.
+- **3.b** depende de 1.c, 2.a, 2.b y 2.c.
 - **3.c** depende de 3.a y 3.b.
 
-### J.7 El PR número 1
+### J.7 El PR número 1 y el primer estructural
 
-**0.1 — PAGO_PROVEEDOR en `clasificarMovimientos`.**
+**PR 1: sigue siendo 0.1, PAGO_PROVEEDOR en `clasificarMovimientos`.**
 
-- Es una corrección de algo que el tablero muestra mal **hoy**.
+- Corrige algo que el tablero muestra mal **hoy**.
 - No necesita ninguna decisión abierta ni schema, y es una sola unidad revertible.
-- Todo lo que sume pagos después depende de él.
+- Todo lo que sume pagos depende de él.
+- Nada de la revisión 4 lo cambia.
 
-La etapa 1 es la **primera pieza estructural**, y conviene empezarla apenas se cierren sus seis decisiones, porque cada semana sin foto se pierde.
+**Primer PR estructural: 1.a, la semana operativa canónica de cada ubicación.**
+
+- La revisión 4 la vuelve prerrequisito de la foto: la foto congela una semana, y esa semana tiene que ser la de la ubicación, con vigencia, antes de congelar la primera.
+- Inmediatamente después, 1.c. 1.b se puede hacer en paralelo.
 
 ### J.8 Lo que no se toca todavía
 
 - la semántica de `CajaMovimiento` y de `calcularEfectivoEsperado`;
 - `VentaPago` y la creación de ventas, incluido el costo que se congela en ellas;
-- la regla del POS de "caja de un día anterior", hasta que se decida (I.3, decisión 7);
+- la regla del POS de "caja de un día anterior" (decidido en la revisión 4: no se cambia ahora);
+- `AcuerdoDepositoLocal`, que no se toca hasta 1.a;
 - el contrato de `CuentaPorPagarProveedor` / `PagoProveedor`;
 - las rutas de `auditoria-pos-ventas`;
 - las correcciones de venta;
@@ -1337,7 +1614,12 @@ Los problemas de B.23, B.24, D.1 (la importación sin rastro) y K.2 se arreglan 
 
 ### K.3 Contradicciones entre las reglas y el código actual
 
-1. **La semana es configurable y reusa la de Transferencias**, pero `lib/finanzas/periodoFinanciero.js` fija `CORTE_SEMANAL_FINANCIERO = 0`, global y desacoplado a propósito (G.2).
+1. **La semana operativa es una sola por ubicación y la comparten todos los módulos.** Pero:
+   - `lib/finanzas/periodoFinanciero.js` fija `CORTE_SEMANAL_FINANCIERO = 0`, global y desacoplado a propósito;
+   - Transferencias la guarda por par depósito–local, en `AcuerdoDepositoLocal.diaDeCorte`;
+   - el depósito no tiene ninguna;
+   - la cambia cualquiera con `transferencias.crear` (G.2, G.3).
+1. bis-a. **Los pagos no nacen retroactivamente en una semana finalizada**, pero `leerDiaDePago` acepta cualquier fecha pasada (G.6).
 1. bis. **Un turno pertenece completo a la semana en que abrió**, pero:
    - el resumen de Finanzas corta las ventas por `Venta.fecha`;
    - el POS no deja vender pasadas las 00:00 en un turno del día anterior (`app/api/pos-ventas/crear/route.js:157-169`), así que el ejemplo aprobado de una venta a las 00:10 hoy no puede ocurrir (G.3).
