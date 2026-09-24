@@ -3,6 +3,12 @@
 **Estado:** contrato funcional, segunda revisión. No hay implementación nueva detrás de este archivo.
 **Relevado:** 2026-09-24 sobre `main` en `1af04216b67bba5776a7506309519745d706ab7d`, el mismo commit que producción ese día.
 **Revisión 2 (2026-09-24):** incorpora las correcciones funcionales aprobadas por Emanuel sobre la primera versión (`df80b82`) y la auditoría del stock histórico valorizado (sección D).
+**Revisión 5 (2026-09-24):** cierra cuatro decisiones de la semana operativa, tomadas al implementar su fuente canónica (rama `feat/semana-operativa-canonica`, PR-1, todavía sin mergear):
+- la transición al cambiar el corte es una **semana larga** de 8 a 13 días (G.3);
+- el PUT viejo de "Corte de semana" sigue vivo y escribe **solo la fuente nueva** (G.3);
+- un local con acuerdos en **conflicto** queda **sin configurar** (G.3);
+- el permiso se llama **`config_local.semana_operativa`** (G.3).
+
 **Revisión 4 (2026-09-24):** sobre `0d65650`, con `main` todavía en `1af0421`. Incorpora las decisiones **definitivas** que corrigen parte de la revisión 3:
 - la semana operativa es de la **ubicación**, no de un módulo (G.2);
 - el permiso y la vigencia de la semana (G.3);
@@ -979,14 +985,32 @@ Todos son **[IDEA]**. **No se elige schema** ni se implementa nada, tampoco el "
 
 - **[DECISIÓN APROBADA]** Cambiar la semana operativa exige un **permiso específico**, del sistema de permisos existente (`lib/rbac/registry.js`).
   - **No** se ata a ADMIN, ENCARGADO, DUEÑO_LOCAL ni a ningún rol.
-  - **[PROBLEMA]** Hoy el corte lo cambia cualquiera con `transferencias.crear` (`app/api/transferencias/acuerdos/route.js`).
+  - **[PROBLEMA]** Hoy el corte lo cambia cualquiera con `transferencias.crear` (`app/api/transferencias/acuerdos/route.js`). Lo resuelve el PR-1 de la semana operativa (revisión 5, abajo).
   - **[PROBLEMA, antecedente]** El repo **ya tiene** reglas atadas a nombres de rol: el comentario de `ConfiguracionLocal.exigirOperador` dice que "Admin y DUEÑO_LOCAL siguen exentos por rol". **No se copia ese patrón.**
 - **[DECISIÓN APROBADA]** Un cambio **no reescribe semanas ya consolidadas**.
 - **Vigencia mínima necesaria** **[IDEA, sin schema]**:
   - cada cambio registra **desde qué semana rige**, siempre desde una semana **futura** o la que empieza;
   - nunca con efecto retroactivo;
   - con autor y fecha, como el resto de los hechos auditados del repo.
-- **[DECISIÓN PENDIENTE] La semana de transición.** Si se cambia de domingo a lunes, la semana que queda en el medio dura 8 días, o 6 en el cambio inverso. Hay que decidir si se acepta una semana irregular o si el cambio espera al corte natural.
+- ~~**[DECISIÓN PENDIENTE] La semana de transición.**~~ **Cerrada en la revisión 5**, abajo.
+
+**Revisión 5: las cuatro decisiones cerradas.** Implementadas en la rama `feat/semana-operativa-canonica` (PR-1), que al escribir esto no está mergeada ni desplegada. Mientras no lo esté, son **[DOCUMENTADO]** y no **[VERIFICADO]** contra `main`.
+
+- **[DECISIÓN APROBADA] SEMANA LARGA en la transición.**
+  - Un cambio de corte rige desde una fecha D que es el **primer día de una semana del corte anterior**, siempre **futura** en Argentina. Nunca parte la semana abierta ni toca las anteriores: la semana que contiene D − 1 termina en D − 1, igual que antes del cambio.
+  - Como D es un día del corte viejo y el corte nuevo es otro, el primer día del corte nuevo nunca es D. Los días del empalme —de uno a seis— **no** forman una mini-semana: se suman a la primera semana nueva, que mide **entre 8 y 13 días** y queda marcada como **transición**.
+  - Garantías, con candados: sin huecos, sin superposiciones, las semanas anteriores a D idénticas a las de antes, y la transición identificable.
+  - Un solo cambio pendiente por ubicación. Uno que todavía no empezó se puede reemplazar pidiéndolo; una vigencia que ya empezó no se borra ni se modifica.
+  - El ejemplo que la documenta: domingo → miércoles desde el domingo 2026-10-04 da la semana larga del domingo 4 al martes 13 (10 días), y desde el miércoles 14 semanas regulares.
+- **[DECISIÓN APROBADA] El PUT viejo escribe SOLO la fuente nueva.** `PUT /api/transferencias/acuerdos` sigue activo para que la pantalla "Corte de semana" funcione, pero escribe únicamente `SemanaOperativaVigencia` por la puerta canónica (`programarSemanaOperativa`); `AcuerdoDepositoLocal` queda congelado y nadie lo lee en runtime. Nunca las dos.
+  - Un local sin semana la recibe "desde siempre".
+  - Un local con semana no cambia de golpe: el cambio se programa desde la próxima frontera y reemplaza al pendiente, porque esa pantalla solo sabe decir "este es el día".
+  - El depósito no se configura desde ahí: se configura como ubicación, en `/api/config/semana-operativa`.
+- **[DECISIÓN APROBADA] Conflicto = sin configurar.** La migración vuelca a la tabla nueva los acuerdos del local **en su grupo actual**. Un solo día → rige desde siempre. Días distintos, sin acuerdo, o el depósito → **sin configurar**, sin elegir ni deducir nada, y la migración no falla por eso. Un diagnóstico de solo lectura (`scripts/diagnostico-semana-operativa.mjs`) los nombra.
+  - Los consumidores actuales resuelven "sin configurar" con el domingo de siempre y la marca `sinConfigurar`. **Lo que congele historia —la foto, la consolidación, pagar al depósito por período— tiene que exigir la semana configurada.**
+- **[DECISIÓN APROBADA] El permiso es `config_local.semana_operativa`** ("Configurar la semana operativa de la ubicación"), en `lib/rbac/registry.js`.
+  - No se asigna a ningún rol por nombre: el administrador lo tiene por el comodín `*`, y a los demás se les da a mano.
+  - `transferencias.crear` solo ya **no** alcanza para cambiar el corte. El menú y el botón preguntan por el mismo permiso, así la pantalla no ofrece algo que el servidor rechaza.
 
 ### G.3 bis Semana operativa y mes calendario
 
@@ -1422,7 +1446,7 @@ Ninguna foto física tomada en un solo instante los cumple a los dos.
 - **Stock negativo y tránsito:** **CERRADA** en lo funcional. Queda abierta **solo** la valuación del tránsito (abajo).
 - **Convención de revalorización:** **CERRADA.**
 - **Semana del depósito y de los locales sin acuerdo:** **CERRADA** en lo conceptual (semana de la ubicación). Queda abierto qué semana rige **mientras** no se configuró (abajo).
-- **Permiso para cambiar el corte:** **CERRADA.** Queda solo el nombre del permiso.
+- **Permiso para cambiar el corte:** **CERRADA**, con nombre desde la revisión 5: `config_local.semana_operativa` (G.3).
 - **Forzar o reabrir:** **CERRADA** (no hay ninguno de los dos).
 
 **Abiertas específicamente para la FOTO:**
@@ -1434,11 +1458,9 @@ Ninguna foto física tomada en un solo instante los cumple a los dos.
      - "tomarla en el primer contacto con el stock después del corte", que exige tocar a todos los escritores.
    - Define la infraestructura y cuán seguido se cae al respaldo reconstruido.
 2. **Con qué costo se valoriza el tránsito** (G.8). Recomendado: el congelado de la transferencia, para que coincida con la deuda.
-3. **Qué semana rige mientras una ubicación no tiene la suya configurada**, incluido el depósito hoy.
-   - Opciones: el domingo del código, marcado como "sin configurar" (lo que pasa hoy en Transferencias), o no tomar fotos hasta que se configure.
-   - Define si la historia arranca ya o espera.
+3. ~~**Qué semana rige mientras una ubicación no tiene la suya configurada**, incluido el depósito hoy.~~ **CERRADA en la revisión 5:** los consumidores actuales usan el domingo marcado "sin configurar"; lo que congele historia —la foto incluida— exige la semana configurada, así que la historia de una ubicación arranca cuando se la configura (G.3).
 4. **Si el cierre en preparación sin confirmar impide consolidar** (G.5, punto 2). Recomendado: sí.
-5. **La semana de transición al cambiar el corte** (G.3): ¿se acepta una semana irregular o el cambio espera?
+5. ~~**La semana de transición al cambiar el corte** (G.3): ¿se acepta una semana irregular o el cambio espera?~~ **CERRADA en la revisión 5:** semana larga de 8 a 13 días, marcada como transición (G.3).
 6. **A qué mes va un hecho de un turno que cruzó la medianoche de fin de mes** (G.3 bis). El texto aprobado dice "por fecha calendario".
 
 **Abiertas para piezas posteriores:**
