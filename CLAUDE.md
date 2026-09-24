@@ -641,6 +641,24 @@ dónde se está**: `hostname`, que exista la base `erpazul_al` y que exista la
 carpeta `erpazul-fixtures-dev`. Si falta alguna de las tres, se frena y se dice
 —no se sigue en otra máquina "mientras tanto"—.
 
+**La sesión en la nube de Claude Code también es máquina de desarrollo**
+(decidido por Emanuel el 2026-09-24, cuando no podía usar su notebook). Ahí
+`erpazul_al` y `erpazul-fixtures-dev` no vienen puestos y **se arman en la misma
+sesión**, y recién armados cuentan como presentes:
+
+- un PostgreSQL local del contenedor, con `erpazul_al` creada vacía y las
+  migraciones del repo aplicadas (`prisma migrate dev`; `migrate deploy` es el
+  de producción y la guardia lo frena), más `node prisma/seed.js`;
+- los datos mínimos del caso cargados con el código de la app o con un script
+  que pida el cliente a `scripts/lib/clientePrisma.mjs` —nunca SQL suelto a
+  mano—, y lo que sea una acción de la app, por sus rutas;
+- `erpazul-fixtures-dev` como carpeta hermana del repo, con ese script y sin
+  commitear.
+
+**Prohibido** traer datos o dumps de producción a ese entorno y conectarse al
+servidor `srv1431538`. La sesión de nube no despliega: termina con la rama
+juntada en `main` y empujada, y el despliegue lo hace la sesión del servidor.
+
 ## Procedimientos que viven en skills
 
 Son recetas de varios pasos, con sus trampas y su verificación de cierre. No se
