@@ -239,8 +239,12 @@ export async function GET(req) {
     // Se pregunta por los ids de los movimientos y no por los turnos del
     // período: un movimiento traído acá puede pertenecer a un turno que abrió
     // antes del rango, y buscándolo por turno quedaría sin clasificar.
+    //
+    // El pago a proveedor en efectivo se reconoce por `PagoProveedor.cajaMovimientoId`
+    // (UNIQUE). Sin esto caería en los retiros manuales del resumen, y el día que
+    // se sumen los pagos al período ese mismo peso contaría dos veces.
     const idsDeMovimiento = movimientos.map((m) => m.id);
-    const [arqueosConRetiro, turnosConRetiroDeCierre] = idsDeMovimiento.length
+    const [arqueosConRetiro, turnosConRetiroDeCierre, pagosConRetiro] = idsDeMovimiento.length
       ? await Promise.all([
           prisma.arqueoCaja.findMany({
             where: { cajaMovimientoRetiroId: { in: idsDeMovimiento } },
@@ -250,12 +254,17 @@ export async function GET(req) {
             where: { retiroCierreMovimientoId: { in: idsDeMovimiento } },
             select: { retiroCierreMovimientoId: true },
           }),
+          prisma.pagoProveedor.findMany({
+            where: { cajaMovimientoId: { in: idsDeMovimiento } },
+            select: { cajaMovimientoId: true },
+          }),
         ])
-      : [[], []];
+      : [[], [], []];
 
     const clasificados = clasificarMovimientos(movimientos, {
       idsDeRecaudacion: new Set(arqueosConRetiro.map((a) => a.cajaMovimientoRetiroId)),
       idsDeCierre: new Set(turnosConRetiroDeCierre.map((t) => t.retiroCierreMovimientoId)),
+      idsDePagoProveedor: new Set(pagosConRetiro.map((p) => p.cajaMovimientoId)),
     });
 
     const resumen = resumenDelPeriodo({
