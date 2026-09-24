@@ -2,62 +2,65 @@
 
 // components/finanzas/pagos/ResumenDeCuentasPorPagar.jsx
 //
-// EL BLOQUE GRANDE DE ARRIBA: cuánto se debe en lo que se está mirando.
+// EL BLOQUE DE ARRIBA: la cifra de la pestaña en el período que se mira.
 //
-// ── EL PATRÓN ES EL DE LA CUENTA DEL PERÍODO DE TRANSFERENCIAS ──────────
+// El dibujo es `ResumenConImporte`, el mismo del período de Transferencias:
+// rótulo chico, importe grande y, debajo, de qué período habla. Acá queda qué
+// dice en cada pestaña, que es la pregunta de cada una:
 //
-// `CuentaDelPeriodoCerrado`: el rótulo chico, el importe grande y debajo de qué
-// habla. Mismo marco, mismas clases. No se reusa aquélla porque sabe de
-// períodos —su rótulo, su aviso y el atajo al corte salen de
-// `descripcionDelPeriodo`— y acá no hay período.
+//   · Pendientes → lo que vence en el período, sumando saldos;
+//   · Pagados    → lo que se terminó de pagar en el período, sumando totales;
+//   · Todos      → la deuda que nació en el período, sumando totales.
 //
-// ── QUÉ NÚMERO VA GRANDE ─────────────────────────────────────────────────
+// ── LAS VENCIDAS VAN EN EL AVISO, NO EN EL NÚMERO ────────────────────────
 //
-// El saldo, que es la pregunta por la que se abre la pantalla: cuánto falta
-// pagar. En "Pagados" el saldo es siempre cero, así que ahí va lo pagado.
-//
-// Las sumas salen de `resumenDeCuentas`, en centavos. No es una métrica nueva:
-// es sumar los saldos que la lista ya muestra fila por fila.
+// No son del período —vencieron antes— así que sumarlas al número grande lo
+// haría mentir sobre el período que dice. Pero son deuda viva, y el aviso
+// enciende el borde igual que en Transferencias cuando el total puede moverse.
 
+import ResumenConImporte from "@/components/periodo/ResumenConImporte";
 import { formatearMoneda } from "@/lib/moneda";
-import { FILTRO_CUENTAS } from "@/lib/finanzas/pagosProveedores";
+import { FILTRO_CUENTAS, filtroDeCuentas } from "@/lib/finanzas/pagosProveedores";
+import { rotuloDeCuentas, totalDelPeriodo } from "@/lib/finanzas/calendarioDePagos";
 
-/** "1 cuenta", "3 cuentas". */
-function cantidad(n, singular, plural) {
-  return `${n} ${n === 1 ? singular : plural}`;
-}
+export const TEXTOS_DEL_RESUMEN = Object.freeze({
+  [FILTRO_CUENTAS.PENDIENTES]: {
+    rotulo: "Vence en el período",
+    vacio: "No vence ninguna cuenta en este período.",
+  },
+  [FILTRO_CUENTAS.PAGADAS]: {
+    rotulo: "Pagado en el período",
+    vacio: "No se terminó de pagar ninguna cuenta en este período.",
+  },
+  [FILTRO_CUENTAS.TODAS]: {
+    rotulo: "Deuda generada en el período",
+    vacio: "No se generó ninguna deuda en este período.",
+  },
+});
 
-export default function ResumenDeCuentasPorPagar({ filtro, resumen, textoVacio }) {
-  const pagados = filtro === FILTRO_CUENTAS.PAGADAS;
-  const r = resumen || {};
+export default function ResumenDeCuentasPorPagar({ filtro, descripcion, calendario }) {
+  const textos = TEXTOS_DEL_RESUMEN[filtroDeCuentas(filtro)];
+  const d = descripcion || {};
+  const { cantidad, importe } = totalDelPeriodo(calendario);
+  const vencidas = calendario?.vencidas;
 
   return (
-    <section className="sunmi-bg-card rounded-xl2 p-4 space-y-3 border sunmi-border">
-      <div>
-        <div className="text-xs sunmi-text-muted">{pagados ? "Pagado" : "Saldo pendiente"}</div>
-        <div className="text-xl2 font-semibold sunmi-text-strong tabular-nums">
-          {formatearMoneda(pagados ? r.pagado : r.saldo)}
-        </div>
-        <div className="text-sm2 sunmi-text-muted">
-          {cantidad(r.cantidad || 0, "cuenta", "cuentas")}
-          {r.cantidad ? ` · ${cantidad(r.proveedores || 0, "proveedor", "proveedores")}` : ""}
-        </div>
-      </div>
-
-      {/* Sin cuentas, el bloque dice por qué está en cero —como el período vacío
-          de transferencias— en vez de dejar un cero solo. */}
-      {!r.cantidad && textoVacio && <div className="text-sm2 sunmi-text-muted">{textoVacio}</div>}
-
-      {/* Los otros dos importes, para que el grande tenga contexto. En "Pagados"
-          no: ahí total y pagado son el mismo número. */}
-      {r.cantidad > 0 && !pagados && (
+    <ResumenConImporte
+      rotulo={textos.rotulo}
+      importe={formatearMoneda(importe)}
+      // Dos nodos, como en Transferencias.
+      subtitulo={
         <>
-          <div className="border-t sunmi-divider opacity-70" aria-hidden="true" />
-          <div className="text-sm2 sunmi-text-muted tabular-nums">
-            Total {formatearMoneda(r.total)} · Pagado {formatearMoneda(r.pagado)}
-          </div>
+          {d.titulo}
+          {d.subtitulo ? ` · ${d.subtitulo}` : ""}
         </>
-      )}
-    </section>
+      }
+      nota={cantidad === 0 ? textos.vacio : null}
+      aviso={
+        vencidas
+          ? `${rotuloDeCuentas(vencidas.cantidad)} ${vencidas.cantidad === 1 ? "vencida" : "vencidas"} por ${formatearMoneda(vencidas.importe)}.`
+          : null
+      }
+    />
   );
 }
