@@ -14,6 +14,11 @@
 // movieron enteros, ningún par de hijos se juntó en una cadena, y
 // `diaConBanda.test.mjs` compara el HTML renderizado por las dos partes.
 //
+// El tercer consumidor no agrupa por día: Pagos a proveedores agrupa las
+// cuentas por PROVEEDOR con el mismo marco y la misma banda —título, subtítulo,
+// importe—, que es justo lo que esta pieza recibe sin saber qué es. Se reusa
+// tal cual en vez de escribir una parecida al lado.
+//
 // ── POR QUÉ ACÁ Y NO EN EL KIT ────────────────────────────────────────────
 //
 // Por lo mismo que `ChipsDePeriodo`: esta carpeta es de piezas que saben de
