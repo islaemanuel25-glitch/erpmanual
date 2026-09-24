@@ -2,34 +2,52 @@
 
 // components/finanzas/pagos/ListaCuentasPorPagar.jsx
 //
-// PAGOS A PROVEEDORES: las cuentas por pagar, en tres solapas.
+// PAGOS A PROVEEDORES: las cuentas por pagar, con el patrón de Transferencias.
 //
-// ── LA SOLAPA VIVE EN LA URL ─────────────────────────────────────────────
+// ── EL MISMO ORDEN QUE LA CUENTA DE UN LOCAL ─────────────────────────────
 //
-// Desde acá se entra a una cuenta y se vuelve. Con la solapa en `useState`,
+// `components/transferencias/CuentaDeUnLocal.jsx`, de arriba hacia abajo: el
+// selector que reparte el ancho, el bloque grande con el importe, el buscador
+// —solo si hay filas— y los grupos con banda. Allá los grupos son días; acá son
+// proveedores, porque la pregunta de esta pantalla es a quién se le debe.
+//
+// ── EL FILTRO VIVE EN LA URL ─────────────────────────────────────────────
+//
+// Desde acá se entra a una cuenta y se vuelve. Con el filtro en `useState`,
 // volver de una cuenta de "Pagados" caería siempre en "Pendientes". Es la misma
 // regla que el período del tablero (`lib/finanzas/contextoFinanzas.js`).
 //
 // ── LA PANTALLA NO DECIDE QUÉ ES PENDIENTE ───────────────────────────────
 //
-// Manda la solapa y recibe las cuentas ya filtradas por el servidor con
+// Manda el filtro y recibe las cuentas ya filtradas por el servidor con
 // `cuentaPasaFiltro`. Si filtrara acá, habría dos definiciones de "pendiente".
+// Lo único que filtra en el navegador es el buscador, sobre lo que ya llegó.
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
-import SunmiSolapas from "@/components/sunmi/SunmiSolapas";
+import SunmiSelectorDeOpciones from "@/components/sunmi/SunmiSelectorDeOpciones";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
-import { FILTRO_CUENTAS, filtroDeCuentas } from "@/lib/finanzas/pagosProveedores";
+import DiaConBanda from "@/components/periodo/DiaConBanda";
+import { formatearMoneda } from "@/lib/moneda";
+import {
+  FILTRO_CUENTAS,
+  cuentaCoincideConBusqueda,
+  cuentasPorProveedor,
+  filtroDeCuentas,
+  resumenDeCuentas,
+} from "@/lib/finanzas/pagosProveedores";
 import { urlDeCuentaPorPagar, urlDePagosProveedores } from "@/lib/finanzas/contextoFinanzas";
 
-import TarjetaCuentaPorPagar from "./TarjetaCuentaPorPagar";
+import FilaCuentaPorPagar from "./FilaCuentaPorPagar";
+import ResumenDeCuentasPorPagar from "./ResumenDeCuentasPorPagar";
 
-export const SOLAPAS_CUENTAS = Object.freeze([
-  { valor: FILTRO_CUENTAS.PENDIENTES, texto: "Pendientes" },
-  { valor: FILTRO_CUENTAS.PAGADAS, texto: "Pagados" },
-  { valor: FILTRO_CUENTAS.TODAS, texto: "Todos" },
+export const OPCIONES_FILTRO_CUENTAS = Object.freeze([
+  { clave: FILTRO_CUENTAS.PENDIENTES, texto: "Pendientes" },
+  { clave: FILTRO_CUENTAS.PAGADAS, texto: "Pagados" },
+  { clave: FILTRO_CUENTAS.TODAS, texto: "Todos" },
 ]);
 
 const TEXTO_VACIO = Object.freeze({
@@ -37,6 +55,11 @@ const TEXTO_VACIO = Object.freeze({
   [FILTRO_CUENTAS.PAGADAS]: "Todavía no hay cuentas pagadas.",
   [FILTRO_CUENTAS.TODAS]: "Todavía no hay cuentas por pagar.",
 });
+
+/** "1 cuenta", "3 cuentas": el subtítulo de la banda del proveedor. */
+function rotuloDeCuentas(n) {
+  return `${n} ${n === 1 ? "cuenta" : "cuentas"}`;
+}
 
 export default function ListaCuentasPorPagar() {
   const router = useRouter();
@@ -46,6 +69,7 @@ export default function ListaCuentasPorPagar() {
   const [cuentas, setCuentas] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
+  const [busqueda, setBusqueda] = useState("");
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -71,10 +95,18 @@ export default function ListaCuentasPorPagar() {
     cargar();
   }, [cargar]);
 
+  // Sin `useMemo`, por lo mismo que el buscador de transferencias: es un filtro
+  // sobre decenas de filas que ya están en memoria.
+  const visibles = cuentas.filter((c) => cuentaCoincideConBusqueda(c, busqueda));
+  const buscando = busqueda.trim() !== "";
+  // En "Pagados" el saldo de cada grupo es cero: ahí la banda dice lo pagado,
+  // igual que el bloque de arriba.
+  const importeDelGrupo = (g) => formatearMoneda(filtro === FILTRO_CUENTAS.PAGADAS ? g.pagado : g.saldo);
+
   return (
     <>
-      <SunmiSolapas
-        opciones={SOLAPAS_CUENTAS}
+      <SunmiSelectorDeOpciones
+        opciones={OPCIONES_FILTRO_CUENTAS}
         valor={filtro}
         onCambiar={(v) => router.replace(urlDePagosProveedores(v), { scroll: false })}
         etiqueta="Estado de las cuentas"
@@ -92,20 +124,50 @@ export default function ListaCuentasPorPagar() {
         </SunmiAviso>
       )}
 
-      {!cargando && !error && cuentas.length === 0 && (
-        <div className="text-center py-12 sunmi-text-muted text-xs">{TEXTO_VACIO[filtro]}</div>
-      )}
+      {!cargando && !error && (
+        <>
+          <ResumenDeCuentasPorPagar
+            filtro={filtro}
+            resumen={resumenDeCuentas(cuentas)}
+            textoVacio={TEXTO_VACIO[filtro]}
+          />
 
-      {!cargando && !error && cuentas.length > 0 && (
-        <div className="space-y-2.5">
-          {cuentas.map((c) => (
-            <TarjetaCuentaPorPagar
-              key={c.id}
-              cuenta={c}
-              onAbrir={() => router.push(urlDeCuentaPorPagar(c.id, filtro))}
+          {/* El buscador no se dibuja si no hay filas: un campo para buscar en
+              una lista vacía no puede encontrar nada, y el vacío ya lo dice el
+              bloque de arriba. Es la regla de transferencias. */}
+          {cuentas.length > 0 && (
+            <SunmiInput
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar proveedor, compra o factura"
+              aria-label="Buscar proveedor, compra o factura"
+              className="w-full rounded-xl text-sm3"
             />
-          ))}
-        </div>
+          )}
+
+          {visibles.length === 0
+            ? buscando && (
+                <div className="text-center py-12 sunmi-text-muted text-xs">
+                  Ninguna cuenta coincide con la búsqueda.
+                </div>
+              )
+            : cuentasPorProveedor(visibles).map((g) => (
+                <DiaConBanda
+                  key={g.clave}
+                  titulo={g.proveedor?.nombre || "Sin proveedor"}
+                  subtitulo={rotuloDeCuentas(g.cuentas.length)}
+                  importe={importeDelGrupo(g)}
+                >
+                  {g.cuentas.map((c) => (
+                    <FilaCuentaPorPagar
+                      key={c.id}
+                      cuenta={c}
+                      onAbrir={() => router.push(urlDeCuentaPorPagar(c.id, filtro))}
+                    />
+                  ))}
+                </DiaConBanda>
+              ))}
+        </>
       )}
     </>
   );
