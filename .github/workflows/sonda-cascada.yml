@@ -1,0 +1,163 @@
+# La sonda de cascada contra producción, corrida AFUERA de producción.
+#
+# ── POR QUÉ EXISTE ──────────────────────────────────────────────────────────
+#
+# `/deploy` corre en el VPS, y el VPS no tiene navegador ni puede tenerlo: en
+# producción no se instala Chromium ni `node_modules`. La sonda necesita un
+# navegador de verdad —mide lo que la hoja PRODUCE, no lo que el archivo dice—,
+# así que hasta hoy la PRE y la POST se corrían a mano desde otra máquina y el
+# despliegue iba y volvía entre dos sesiones.
+#
+# Este workflow es esa otra máquina. `/deploy` lo dispara con
+# `scripts/sonda-externa.mjs`, espera el resultado y lee el veredicto del log.
+# La sonda es la MISMA de siempre —`scripts/sonda-cascada.mjs`, sin tocar—, con
+# el Chrome que el runner trae instalado.
+#
+# ── LO QUE AFIRMA, ADEMÁS DE LA CASCADA ─────────────────────────────────────
+#
+# Que midió la versión que se le pidió. Antes y después de la sonda pregunta a
+# `/api/version` y lo compara contra `sha_esperado`: si producción cambió en el
+# medio, o no es la que el despliegue cree, es ROJO. Una medición verde de otra
+# versión no le sirve a nadie.
+#
+# ── LO QUE NO TIENE, Y ES A PROPÓSITO ───────────────────────────────────────
+#
+# NO usa ningún secreto: `/login` y `/api/version` son públicos. NO apaga el
+# sandbox del navegador —el runner no corre como root— y NO toca la validación
+# de certificados: si el certificado de producción no valida, eso es ROJO.
+# NO instala dependencias: con Node 22 la sonda solo usa lo que trae Node.
+#
+# Los `inputs` NO se escriben adentro de los `run:`. Entran por `env:` y se
+# validan contra un patrón antes de usarse: interpolar texto de afuera en un
+# script de shell es la forma clásica de inyectarle comandos.
+#
+# ── LA AUTOPRUEBA ───────────────────────────────────────────────────────────
+#
+# `workflow_dispatch` solo se puede disparar si el archivo ya está en `main`
+# —lo mismo que anota `visual-configuracion-pos.yml`—. Para que un cambio a
+# este archivo o a la sonda se pruebe ANTES de juntarlo, corre también en los PR
+# que los tocan, sin SHA esperado: mide producción tal como esté.
+
+name: Sonda de cascada externa
+
+# El cliente encuentra SU corrida por este título, con la correlación que él
+# mismo generó. El formato lo arma `tituloDeLaCorrida` en
+# `scripts/sonda-externa.mjs`, y un candado comprueba que los dos coincidan.
+run-name: sonda ${{ inputs.fase || 'autoprueba' }} ${{ inputs.sha_esperado || 'sin-sha' }} ${{ inputs.correlacion || github.run_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      fase:
+        description: "pre (antes de desplegar) o post (después)"
+        required: true
+        type: choice
+        options: [pre, post]
+      sha_esperado:
+        description: "SHA completo que tiene que estar sirviendo producción"
+        required: true
+        type: string
+      correlacion:
+        description: "Identificador que genera scripts/sonda-externa.mjs para encontrar esta corrida"
+        required: true
+        type: string
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/sonda-cascada.yml
+      - scripts/sonda-cascada.mjs
+      - scripts/lib/sondaNavegador.mjs
+      - scripts/sonda-externa.mjs
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    # Con `shell: bash` explícito, Actions agrega `-o pipefail`: sin eso, el
+    # `| tee` de la sonda se tragaría su código de salida y un ROJO pasaría.
+    shell: bash
+
+jobs:
+  sonda:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE: https://operix.cloud
+      EVENTO: ${{ github.event_name }}
+      FASE: ${{ inputs.fase }}
+      SHA_ESPERADO: ${{ inputs.sha_esperado }}
+      CORRELACION: ${{ inputs.correlacion }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Node 22 (la sonda necesita el WebSocket global)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Validar lo que llegó
+        run: |
+          if [ "$EVENTO" = "workflow_dispatch" ]; then
+            [[ "$FASE" =~ ^(pre|post)$ ]] || { echo "fase inválida"; exit 1; }
+            [[ "$SHA_ESPERADO" =~ ^[0-9a-f]{40}$ ]] || { echo "sha_esperado no es un SHA completo de 40 caracteres"; exit 1; }
+            [[ "$CORRELACION" =~ ^[a-z0-9-]{8,64}$ ]] || { echo "correlacion inválida"; exit 1; }
+            echo "SONDA-EXTERNA FASE $FASE"
+          else
+            echo "autoprueba: se mide producción tal como esté, sin SHA esperado"
+            echo "SONDA-EXTERNA FASE autoprueba"
+          fi
+
+      - name: Ubicar el navegador del runner
+        id: navegador
+        run: |
+          for b in google-chrome chromium-browser chromium; do
+            ruta=$(command -v "$b" || true)
+            if [ -n "$ruta" ]; then echo "ruta=$ruta" >> "$GITHUB_OUTPUT"; echo "navegador: $ruta"; exit 0; fi
+          done
+          echo "No hay ningún navegador Chromium en el runner."
+          exit 1
+
+      - name: Qué versión sirve producción, ANTES de medir
+        run: |
+          sha=$(curl -fsS -m 15 "$BASE/api/version" | grep -o '[0-9a-f]\{40\}' | head -1 || true)
+          echo "SONDA-EXTERNA SHA-ANTES ${sha:-ninguno}"
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$sha" != "$SHA_ESPERADO" ]; then
+            echo "ROJO · producción sirve ${sha:-nada}, y se esperaba $SHA_ESPERADO."
+            exit 1
+          fi
+
+      - name: Sonda de cascada contra producción
+        env:
+          NAVEGADOR: ${{ steps.navegador.outputs.ruta }}
+        run: node scripts/sonda-cascada.mjs --base "$BASE" --edge "$NAVEGADOR" | tee "$RUNNER_TEMP/sonda.txt"
+
+      - name: Qué versión sirve producción, DESPUÉS de medir
+        run: |
+          sha=$(curl -fsS -m 15 "$BASE/api/version" | grep -o '[0-9a-f]\{40\}' | head -1 || true)
+          echo "SONDA-EXTERNA SHA-DESPUES ${sha:-ninguno}"
+          if [ "$EVENTO" = "workflow_dispatch" ] && [ "$sha" != "$SHA_ESPERADO" ]; then
+            echo "ROJO · producción cambió mientras se medía: sirve ${sha:-nada}, y se esperaba $SHA_ESPERADO."
+            exit 1
+          fi
+
+      # Solo se llega acá si todo lo anterior salió bien. El cliente exige esta
+      # línea además del "success" del job y del VERDE de la sonda.
+      - name: Veredicto
+        run: echo "SONDA-EXTERNA RESULTADO VERDE"
+
+      - name: Resumen
+        if: always()
+        run: |
+          {
+            echo "### Sonda de cascada — ${FASE:-autoprueba}"
+            echo
+            echo "Esperado: \`${SHA_ESPERADO:-sin SHA}\`"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/sonda.txt" 2>/dev/null || echo "(la sonda no llegó a correr)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
