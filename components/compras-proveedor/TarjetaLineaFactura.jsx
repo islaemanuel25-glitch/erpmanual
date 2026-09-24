@@ -119,6 +119,12 @@ export default function TarjetaLineaFactura({
   // cuando se convirtió, para que se pueda cotejar con el papel sin dudar.
   const cantidad = cantidadEnEscalaDelPedido(fila);
   const convertida = cantidadFueConvertida(fila);
+  // ── LLEGÓ SIN FACTURA: LA MISMA TARJETA, OTRO RÓTULO ─────────────────────
+  //
+  // La fila la arma `filaSinPapel` y su cantidad es LO CONTADO, no lo que dice
+  // un papel. Por eso el primer renglón dice "Llegó" y no "Factura", y en vez
+  // de Papel contra ERP va el costo del pedido solo: no hay dos precios.
+  const sinPapel = fila?.sinPapel === true;
 
   // ── LA TARJETA COLAPSADA, PARA LO QUE YA SE CONTROLÓ ───────────────────
   //
@@ -215,7 +221,7 @@ export default function TarjetaLineaFactura({
                   gris y el número en acento, que es el dato que se cotejа
                   contra el papel. */}
               <p className="flex items-baseline gap-x-2 flex-wrap break-words">
-                <span className="text-xs sunmi-text-muted shrink-0">Factura</span>
+                <span className="text-xs sunmi-text-muted shrink-0">{sinPapel ? "Llegó" : "Factura"}</span>
                 <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-accent">
                   {renglones.cantidad ?? "—"}
                 </span>
@@ -243,6 +249,20 @@ export default function TarjetaLineaFactura({
                   escribe: es el mismo "/ pack" de la tarjeta de transferencias
                   y por el mismo motivo — un importe sin unidad al lado de otro
                   importe no se puede comparar. */}
+              {/* El costo del pedido, con la misma forma que el renglón Papel:
+                  es el único precio que hay cuando llegó sin factura. */}
+              {renglones.costo && (
+                <p className="flex items-baseline gap-x-2 flex-wrap break-words">
+                  <span className="text-xs sunmi-text-muted shrink-0">Costo</span>
+                  <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-strong">
+                    {formatearMoneda(renglones.costo.importe)}
+                    <span className="text-xs font-normal sunmi-text-muted">
+                      {" "}/ {renglones.costo.unidad}
+                    </span>
+                  </span>
+                </p>
+              )}
+
               {renglones.papel && (
                 <p className="flex items-baseline gap-x-2 flex-wrap break-words">
                   <span className="text-xs sunmi-text-muted shrink-0">Papel</span>
@@ -308,7 +328,11 @@ export default function TarjetaLineaFactura({
           <SunmiLinkButton
             onClick={() => onCoincide?.(fila)}
             disabled={guardando}
-            aria-label={`Aceptar lo que dice la factura para ${fila?.producto || "este producto"}`}
+            aria-label={
+              sinPapel
+                ? `Llegó lo pedido de ${fila?.producto || "este producto"}`
+                : `Aceptar lo que dice la factura para ${fila?.producto || "este producto"}`
+            }
             className={`shrink-0 no-underline ${CLASE_COINCIDE}`}
           >
             {TEXTO_COINCIDE}

@@ -117,6 +117,12 @@ export default function HojaCerrarRecepcion({
   const [pago, setPago] = useState(PAGO_INICIAL);
 
   const facturas = useMemo(() => totalDeLasFacturasDelCierre(totalesDeFacturas), [totalesDeFacturas]);
+  // ── LLEGÓ SIN FACTURA ────────────────────────────────────────────────────
+  //
+  // Sale de la misma lista que decide la deuda: cero comprobantes. No es una
+  // prop aparte porque serían dos formas de saber lo mismo, y el día que no
+  // coincidan la hoja diría "sin factura" mientras pide el total de una.
+  const sinPapel = facturas.cantidad === 0;
   const enPantalla = pagoDelCierreEnPantalla({
     totales: totalesDeFacturas,
     totalEscrito: pago.totalEscrito,
@@ -152,7 +158,7 @@ export default function HojaCerrarRecepcion({
     () => resumenDelCierre({ filas, sinComprobante, llegadas }),
     [filas, sinComprobante, llegadas]
   );
-  const loQueQueda = textoDeLoQueQueda(resumen);
+  const loQueQueda = textoDeLoQueQueda(resumen, { sinPapel });
 
   if (!abierta) return null;
 
@@ -269,6 +275,10 @@ export default function HojaCerrarRecepcion({
             {resumen.unidadesQueEntran === 1 ? "bulto" : "bultos"} de lo pedido.
           </span>
         </div>
+      ) : sinPapel ? (
+        <span className="text-sm3 sunmi-text-muted break-words">
+          Llegó sin factura: entra lo que contaste en cada producto.
+        </span>
       ) : (
         <span className="text-sm3 sunmi-text-muted break-words">
           Todos los productos del pedido tienen un comprobante que los respalda.
@@ -280,7 +290,9 @@ export default function HojaCerrarRecepcion({
         <Bloque titulo="Lo que queda a medias">
           <span className="text-sm3 sunmi-text-muted break-words">{loQueQueda}</span>
           <span className="text-sm3 sunmi-text-muted break-words">
-            Se puede cerrar igual: lo que entra es lo que dice el papel y lo que contaste.
+            {sinPapel
+              ? "Se puede cerrar igual: lo que entra es lo que contaste."
+              : "Se puede cerrar igual: lo que entra es lo que dice el papel y lo que contaste."}
           </span>
         </Bloque>
       )}
@@ -293,6 +305,7 @@ export default function HojaCerrarRecepcion({
           proveedor={proveedor}
           estadoEnPantalla={enPantalla}
           sumaConocida={facturas.sumaConocida}
+          sinPapel={sinPapel}
           valor={pago}
           onCambiar={setPago}
           puedeRegistrarPago={puedeRegistrarPago}
@@ -305,9 +318,12 @@ export default function HojaCerrarRecepcion({
       {/* ── 4 · QUÉ VA A PASAR, EN UNA LÍNEA ────────────────────────────── */}
       <Bloque titulo="Al confirmar">
         <span className="text-sm3 sunmi-text-muted break-words">
-          Entra al stock lo contado y lo que declara el papel, el pedido queda RECIBIDO y no se
-          puede seguir controlando, y nace la deuda con el proveedor con el pago que elegiste.
-          Todo junto: si algo falla, no queda nada a medias.
+          {/* Una sola cadena por rama y no el pedazo que cambia pegado al
+              resto: dos nodos de texto no se moldean igual que uno, y la hoja
+              con papel tiene que quedar idéntica. */}
+          {sinPapel
+            ? "Entra al stock lo contado, el pedido queda RECIBIDO y no se puede seguir controlando, y nace la deuda con el proveedor con el pago que elegiste. Todo junto: si algo falla, no queda nada a medias."
+            : "Entra al stock lo contado y lo que declara el papel, el pedido queda RECIBIDO y no se puede seguir controlando, y nace la deuda con el proveedor con el pago que elegiste. Todo junto: si algo falla, no queda nada a medias."}
         </span>
       </Bloque>
     </SunmiModalLayout>

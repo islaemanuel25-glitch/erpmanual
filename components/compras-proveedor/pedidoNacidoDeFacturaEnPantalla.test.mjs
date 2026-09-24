@@ -93,7 +93,11 @@ test("CONTRAPRUEBA: un pedido normal sigue diciendo lo de siempre", () => {
       })
     )
   );
-  assert.ok(html.includes("24 ítems"));
+  // "productos" y no "ítems" desde el 2026-09-24: la tarjeta es de la
+  // recepción, y ahí se habla como habla quien recibe. Lo que este candado
+  // defiende no cambió: que el pedido normal siga contando y estimando.
+  assert.ok(html.includes("24 productos"));
+  assert.ok(!html.includes("ítems"), "volvió la palabra del sistema");
   assert.ok(html.includes("estimado al pedir"));
 });
 
@@ -121,10 +125,29 @@ test("CONTRAPRUEBA: en un pedido normal la salida secundaria sigue estando", () 
 
 test("LA RAMA VIEJA DE ENVIADO NO SE DIBUJA PARA UN PEDIDO NACIDO DE FACTURA", () => {
   const pagina = codigoDe(PAGINA);
+  // ── REESCRITO EL 2026-09-24, CUANDO LA RAMA VIEJA DEJÓ DE EXISTIR RECIBIENDO
+  //
+  // Afirmaba el texto `(!esRecepcion || sinFactura) && !sinPedidoPrevio`: la
+  // rama vieja se abría con "Llegó sin factura" y había que cerrarle la puerta
+  // al pedido nacido de factura. Esa rama ya no se dibuja en ENVIADO —sin
+  // factura es la misma recepción, sin papel—, así que lo que defiende ahora
+  // son las dos puertas de hoy: la rama vieja, solo fuera de la recepción y
+  // nunca para un nacido de factura; y el camino sin papel, que tampoco se abre
+  // para él.
   assert.match(
     pagina,
-    /\{\(!esRecepcion \|\| sinFactura\) && !sinPedidoPrevio && \(/,
-    "volvió a poder dibujarse el Detalle, el Agregar producto extra y la tabla vieja"
+    /\{!esRecepcion && !sinPedidoPrevio && \(/,
+    "volvió a poder dibujarse el Detalle viejo recibiendo, o para un pedido nacido de factura"
+  );
+  assert.doesNotMatch(
+    pagina,
+    /!esRecepcion \|\| sinFactura/,
+    "volvió la rama vieja de 'Llegó sin factura'"
+  );
+  assert.match(
+    pagina,
+    /const sinPapel = esRecepcion && sinFactura && !sinPedidoPrevio && hayComprobantes === 0;/,
+    "el camino sin papel se abre para un pedido nacido de factura, o con papel subido"
   );
   assert.match(
     pagina,

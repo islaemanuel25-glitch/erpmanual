@@ -261,8 +261,12 @@ test("LA CORRECCIÓN SE GUARDA, Y EL PAPEL VUELVE A PASAR POR LA MISMA PUERTA", 
 test("EL BLOQUE DE CORRECCIÓN SE DIBUJA, Y NO ADENTRO DE UNA RAMA MUERTA", () => {
   const p = codigoDe(RECEPCION);
   const corregir = p.indexOf("<CorregirComprobante");
-  const lista = p.indexOf("<ListaConciliacion");
+  // La conciliación que se dibuja recibiendo es `ListaDeLaFactura`, con papel
+  // o sin él. `ListaConciliacion` se borró el 2026-09-24 con la pantalla vieja
+  // de "Llegó sin factura", que era el único lugar donde se dibujaba.
+  const lista = p.indexOf("<ListaDeLaFactura");
   assert.ok(corregir > 0, "la recepción no dibuja el bloque de corrección");
+  assert.ok(lista > 0, "la recepción no dibuja la conciliación; revisá este candado");
   assert.ok(corregir < lista, "el bloque de corrección quedó debajo de la conciliación");
 
   // ── Y ACÁ ESTÁ LO QUE ESTE CANDADO NO MIRABA ────────────────────────
@@ -275,12 +279,17 @@ test("EL BLOQUE DE CORRECCIÓN SE DIBUJA, Y NO ADENTRO DE UNA RAMA MUERTA", () =
   //
   // Es el defecto que CLAUDE.md llama "un candado montado sobre algo que nunca
   // ocurre": no falla, no avisa, y cierra la pregunta.
-  const ramaSinPapel = p.indexOf("(!esRecepcion || sinFactura)");
-  assert.ok(ramaSinPapel > 0, "se perdió la rama del pedido sin papel; revisá este candado");
+  //
+  // La rama vieja ya no corre recibiendo: quedó para los estados de consulta,
+  // con `!esRecepcion`. El bloque tiene que seguir afuera de ella —adentro no
+  // se dibujaría nunca durante una recepción— y colgado de `esRecepcion`.
+  const ramaVieja = p.indexOf("{!esRecepcion && !sinPedidoPrevio && (");
+  assert.ok(ramaVieja > 0, "se perdió la rama de los estados de consulta; revisá este candado");
   assert.ok(
-    corregir < ramaSinPapel,
-    "el bloque para arreglar un papel volvió a quedar adentro de la rama que solo corre SIN papel"
+    corregir < ramaVieja,
+    "el bloque para arreglar un papel volvió a quedar adentro de la rama que no corre recibiendo"
   );
+  assert.match(p, /\{esRecepcion &&\s*malLeidos\.map\(/, "el bloque dejó de colgar de la recepción");
   // Y la lista de los que no cerraron sale del panel, que ya la tiene: pedirla
   // por segunda vez son dos consultas de lo mismo.
   assert.match(p, /onMalLeidos=\{setMalLeidos\}/);
@@ -359,7 +368,8 @@ test("NADIE ESCRIBE UN NÚMERO DE HTTP EN PANTALLA", () => {
     EXPLICACION,
     CORRECCION,
     BLOQUE,
-    "components/comprobantes/ListaConciliacion.jsx",
+    // `ListaConciliacion.jsx` estaba acá y se borró el 2026-09-24 con la
+    // pantalla vieja de "Llegó sin factura".
     "components/comprobantes/PiezasConciliacion.jsx",
     "components/comprobantes/PanelComprobantes.jsx",
   ];
@@ -381,10 +391,11 @@ test("EL TEXTO DE UN FALLO SALE DEL CATÁLOGO QUE YA EXISTE", () => {
   assert.match(c, /queHacerHttp\(status, \{ operacion: OPERACION\.LECTURA \}\)/);
   // Y lo que el servidor haya mandado gana, porque sabe más que la tabla.
   assert.match(c, /if \(cuerpo\?\.queHacer\) return cuerpo\.queHacer;/);
-  // Las otras tres pantallas lo usan en vez de tener su propia frase.
+  // Las otras pantallas lo usan en vez de tener su propia frase. Eran tres:
+  // `ListaConciliacion.jsx` se borró el 2026-09-24 con la pantalla vieja de
+  // "Llegó sin factura".
   for (const pantalla of [
     CORRECCION,
-    "components/comprobantes/ListaConciliacion.jsx",
     "components/comprobantes/PiezasConciliacion.jsx",
   ]) {
     assert.match(codigoDe(pantalla), /textoDeFallo\(d, r\.status\)/, pantalla);

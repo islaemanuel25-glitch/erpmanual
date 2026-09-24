@@ -66,6 +66,7 @@
 // el producto vinculado.
 
 import { useEffect, useMemo, useState } from "react";
+import { Pencil } from "lucide-react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
@@ -286,7 +287,23 @@ export default function HojaCorregirLinea({
   guardando = false,
   /** Cuánto se le mueve el precio a ESTE proveedor sin que sea raro, en %. */
   variacionNormalPct = VARIACION_POR_DEFECTO,
+  /**
+   * ── EL LÁPIZ A EDITAR PRODUCTO ─────────────────────────────────────────
+   *
+   * Solo sin papel. Sin factura no hay precio contra el cual decidir, así que
+   * el costo que está mal no se corrige en esta hoja: se corrige en el
+   * PRODUCTO, que es el único lugar donde se cambia un costo del catálogo
+   * —ninguna ruta de pedido lo escribe desde `ed52991`—, y se vuelve acá.
+   *
+   * Null cuando quien recibe no tiene permiso de editar productos: el botón no
+   * aparece, en vez de aparecer y rebotar.
+   */
+  onEditarProducto = null,
 }) {
+  // La fila la armó `filaSinPapel`: es una línea del pedido que llegó sin
+  // factura. Lo que habla del papel —lo que dice, el vínculo, la decisión de
+  // precio— no tiene de qué hablar.
+  const sinPapel = fila?.sinPapel === true;
   const cambio = precioCambio(fila);
   const porcentaje = porcentajeDelPrecio(fila);
   // Lo que ya se contestó sobre estos dos precios, y lo que se había contestado
@@ -608,6 +625,9 @@ export default function HojaCorregirLinea({
       // papel se vuelve a leer, y el texto no.
       textoCrudo: fila.textoCrudo ?? null,
       pedidoDetalleId: fila.pedidoDetalleId,
+      // Sin papel no hay renglón que marcar: la página marca la línea del
+      // pedido en su eco en vez de pedírselo al servidor.
+      sinPapel,
       cantidadRecibida: bultos === "" ? null : Number(bultos),
       unidadesSueltas: vaPorPack && sueltas !== "" ? Number(sueltas) : null,
       // ── CUÁNTAS UNIDADES ENTRAN AL STOCK, DICHO Y NO DEDUCIDO ─────────
@@ -718,7 +738,34 @@ export default function HojaCorregirLinea({
               dice que sea una ELECCIÓN que se puede cambiar. Acá se dice, y al
               lado está cómo — el papel dice una cosa y el producto del ERP es
               otra, y la única forma de notar un vínculo equivocado es verlos
-              juntos. */}
+              juntos.
+
+              SIN PAPEL no hay elección: el producto es el de la línea del
+              pedido. Lo que se ofrece al lado es el lápiz, que lleva a
+              corregir el producto y vuelve. */}
+          {sinPapel ? (
+          <div className="flex items-center justify-between gap-renglon">
+            <span className="min-w-0">
+              <span className="block text-sm3 sunmi-text-muted">Producto del pedido</span>
+              <span className="block text-sm3 font-medium sunmi-text-strong truncate">
+                {fila.producto || "Sin producto"}
+              </span>
+            </span>
+            {onEditarProducto && (
+              <SunmiButton
+                color="slate"
+                type="button"
+                disabled={guardando}
+                aria-label={`Editar ${fila.producto || "el producto"}`}
+                onClick={() => onEditarProducto(fila)}
+                className="shrink-0 min-h-toque rounded-control px-4 text-sm3"
+              >
+                <Pencil size={14} aria-hidden="true" />
+                Editar producto
+              </SunmiButton>
+            )}
+          </div>
+          ) : (
           <div className="flex flex-col gap-dato">
             <span className="text-sm3 sunmi-text-muted break-words">
               El papel dice “{fila.textoCrudo || "—"}”.
@@ -745,6 +792,7 @@ export default function HojaCorregirLinea({
               </SunmiButton>
             </div>
           </div>
+          )}
 
           {/* ── 2 · CUÁNTO ENTRÓ ─────────────────────────────────────────── */}
           <Bloque titulo="Cuánto entró">
@@ -758,10 +806,14 @@ export default function HojaCorregirLinea({
             {/* Sin pedido previo no hay "Pediste": el pedido nació de esta
                 misma factura, y comparar contra él sería comparar el papel
                 consigo mismo. Queda lo único que hay: lo que dice la factura. */}
+            {/* Sin papel queda solo lo pedido: lo contado está en el campo de
+                abajo, y no hay un tercer número que decir. */}
             <span className="text-sm3 sunmi-text-muted">
-              {sinPedidoPrevio
-                ? `La factura dice ${limpio(cantidadDeLaFactura)}`
-                : `Pediste ${limpio(fila.cantidadPedida)} · la factura dice ${limpio(cantidadDeLaFactura)}`}
+              {sinPapel
+                ? `Pediste ${limpio(fila.cantidadPedida)}`
+                : sinPedidoPrevio
+                  ? `La factura dice ${limpio(cantidadDeLaFactura)}`
+                  : `Pediste ${limpio(fila.cantidadPedida)} · la factura dice ${limpio(cantidadDeLaFactura)}`}
               {convertida ? ` · el papel dice ${limpio(fila.cantidad)} u` : ""}
             </span>
 
@@ -902,7 +954,25 @@ export default function HojaCorregirLinea({
 
           {/* ── 4 · EL PRECIO, SIEMPRE ────────────────────────────────────
               Los cuatro casos viven en el mismo bloque y en el mismo lugar de
-              la hoja. Lo único que cambia es el título y qué se ofrece. */}
+              la hoja. Lo único que cambia es el título y qué se ofrece.
+
+              SIN PAPEL el bloque sigue estando, en el mismo lugar, y dice el
+              costo del pedido y nada que elegir: no hay factura que traiga
+              otro precio, así que no se ofrece aceptar ningún aumento. */}
+          {sinPapel ? (
+            <Bloque titulo="Costo del pedido">
+              <span className="text-sm3 sunmi-text-strong tabular-nums">
+                {formatearMoneda(fila.costoCatalogo)}
+              </span>
+              {/* Nombra el botón solo si el botón está: sin permiso de editar
+                  productos, mandar a "Editar producto" es mandar a ningún lado. */}
+              <span className="text-sm3 sunmi-text-muted break-words">
+                {onEditarProducto
+                  ? "Sin factura no hay precio para comparar: entra con el costo del pedido y el costo del producto no se toca. Si está mal, corregilo en Editar producto."
+                  : "Sin factura no hay precio para comparar: entra con el costo del pedido y el costo del producto no se toca."}
+              </span>
+            </Bloque>
+          ) : (
           <Bloque
             titulo={tituloDelPrecio}
             accion={
@@ -999,6 +1069,7 @@ export default function HojaCorregirLinea({
               losDosPrecios
             )}
           </Bloque>
+          )}
 
           {error && <span className="text-sm3 sunmi-text-danger">{error}</span>}
         </>

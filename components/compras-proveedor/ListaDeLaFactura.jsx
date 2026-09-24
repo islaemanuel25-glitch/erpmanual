@@ -40,6 +40,7 @@ import {
   gananciaDelDeposito,
   textoDeLaCuenta,
 } from "@/lib/compras-proveedor/gananciaDelDeposito";
+import { claveDeFila } from "@/lib/compras-proveedor/comprobante/filasDeConciliacion";
 
 /**
  * Un renglón de importe: rótulo a la izquierda, número a la derecha.
@@ -92,6 +93,22 @@ export default function ListaDeLaFactura({
    *  mismo nombre y distinto significado es cómo un candado empieza a mirar el
    *  archivo equivocado. */
   accionDelPie = null,
+  /**
+   * ── LLEGÓ SIN FACTURA ───────────────────────────────────────────────────
+   *
+   * Es ESTA misma lista, con las líneas del pedido como filas —las arma
+   * `filaSinPapel`— y sin papel del cual hablar: la cabecera no nombra un
+   * comprobante ni dice cuánto facturó, porque no hay nada impreso.
+   */
+  sinPapel = false,
+  /**
+   * Lo que va entre la lista y el pie. Sin papel es el "Agregar producto" de
+   * la recepción, para lo que vino sin pedirse.
+   *
+   * ESTA PROP YA ESTUVO Y SE SACÓ, porque nadie la pasaba (abajo está por qué).
+   * Vuelve con un consumidor: el camino sin factura.
+   */
+  despuesDeLista = null,
   // ── ACÁ ESTABAN `soloLectura` Y `despuesDeLista` ────────────────────────
   //
   // Los trajo el primer intento de mostrar un pedido ya recibido con esta misma
@@ -168,7 +185,10 @@ export default function ListaDeLaFactura({
   // pueden apuntar a la misma línea del pedido —las 120 y 121 del comprobante 5
   // van las dos al detalle 2565— y con la clave vieja marcar uno marcaba el
   // otro, y el contador de arriba contaba dos.
-  const yaRevisada = (f) => revisadas?.[f?.lineaId] ?? f?.revisada === true;
+  // La clave sale de `claveDeFila`: el renglón del papel cuando hay papel, y la
+  // línea del pedido cuando llegó sin factura. Es la misma que usa la página
+  // para escribir el eco, así que no pueden mirar dos lugares distintos.
+  const yaRevisada = (f) => revisadas?.[claveDeFila(f)] ?? f?.revisada === true;
   const resumen = useMemo(
     () => ({
       revisadas: (filas || []).filter(yaRevisada).length,
@@ -190,6 +210,37 @@ export default function ListaDeLaFactura({
   return (
     <SunmiPantallaDeTrabajo
       contexto={
+        sinPapel ? (
+          // ── SIN PAPEL: LA MISMA TARJETA, SIN LO QUE HABLA DEL PAPEL ────────
+          //
+          // Queda el nombre del caso, qué se hace, y el contador de revisados,
+          // que es el mismo. Los tres importes se van: "Factura" y "Ganancia"
+          // comparan contra un papel que no llegó.
+          <>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-semibold sunmi-text-strong truncate">Llegó sin factura</span>
+              <SunmiPill color="amber">Sin papel</SunmiPill>
+            </div>
+            <p className="text-sm2 sunmi-text-muted break-words">
+              Contá lo que llegó. El costo es el del pedido.
+            </p>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-sm2 sunmi-text-muted">
+                <span className="tabular-nums sunmi-text-strong font-semibold">
+                  {resumen.revisadas} / {filas.length}
+                </span>{" "}
+                revisados
+              </span>
+              <span
+                className={`text-sm2 ${
+                  resumen.pendientes > 0 ? "sunmi-text-accent" : "sunmi-text-success"
+                }`}
+              >
+                {resumen.pendientes > 0 ? `${resumen.pendientes} sin revisar` : "Todo revisado"}
+              </span>
+            </div>
+          </>
+        ) : (
         <>
           <div className="flex items-center gap-2 min-w-0">
             <span className="font-semibold sunmi-text-strong truncate">
@@ -259,13 +310,14 @@ export default function ListaDeLaFactura({
             <span className="text-xs2 sunmi-text-muted break-words">{textoDeLaCuenta(cuenta)}</span>
           </div>
         </>
+        )
       }
       filtros={
         <SunmiFiltroEstado
           opciones={opciones}
           valor={filtro}
           onCambiar={setFiltro}
-          ariaLabel="Filtrar productos de la factura"
+          ariaLabel={sinPapel ? "Filtrar productos del pedido" : "Filtrar productos de la factura"}
         />
       }
       lista={
@@ -278,7 +330,7 @@ export default function ListaDeLaFactura({
           {visibles.map((f) => (
             <TarjetaLineaFactura
               sinPedidoPrevio={sinPedidoPrevio}
-              key={f.lineaId}
+              key={claveDeFila(f)}
               fila={f}
               revisada={yaRevisada(f)}
               onCorregir={onCorregir}
@@ -293,6 +345,7 @@ export default function ListaDeLaFactura({
       // todo lo que se meta ahí es alto que la lista pierde. Con los tres
       // importes adentro medía cuatro renglones y el botón se les montaba
       // encima. Ahora lleva una sola cosa y el alto es el del botón.
+      despuesDeLista={despuesDeLista}
       pieDePantalla={accionDelPie}
     />
   );

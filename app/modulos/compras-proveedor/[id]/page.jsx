@@ -13,7 +13,6 @@ import SunmiPanel from "@/components/sunmi/SunmiPanel";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import PanelComprobantes from "@/components/comprobantes/PanelComprobantes";
-import ListaConciliacion from "@/components/comprobantes/ListaConciliacion";
 import ListaDeLaFactura from "@/components/compras-proveedor/ListaDeLaFactura";
 import CorregirComprobante from "@/components/compras-proveedor/CorregirComprobante";
 import HojaCorregirLinea from "@/components/compras-proveedor/HojaCorregirLinea";
@@ -28,7 +27,12 @@ import {
   decisionVigente,
 } from "@/lib/compras-proveedor/decisionDePrecio";
 import { hayQuePedirLaConciliacion } from "@/lib/compras-proveedor/papelDelPedido";
-import { totalImpresoDeLasFacturas } from "@/lib/compras-proveedor/comprobante/filasDeConciliacion";
+import {
+  totalImpresoDeLasFacturas,
+  filaSinPapel,
+  claveDeFila,
+} from "@/lib/compras-proveedor/comprobante/filasDeConciliacion";
+import { costosQueNoSeTocan } from "@/lib/compras-proveedor/cierreDeRecepcion";
 import TarjetaContextoDelPedido from "@/components/compras-proveedor/TarjetaContextoDelPedido";
 import BloqueDeLaFactura from "@/components/compras-proveedor/BloqueDeLaFactura";
 
@@ -50,6 +54,8 @@ import {
   CLAVE_RECEPCION_EN_CURSO,
   serializarRecepcionEnCurso,
   deserializarRecepcionEnCurso,
+  linkEditarProducto,
+  ORIGENES,
 } from "@/lib/compras-proveedor/retornoPedido";
 
 const ESTADO_BADGE = {
@@ -71,10 +77,10 @@ export default function DetallePedidoProveedorPage({ params }) {
   const router = useRouter();
 
   const { perfil } = useUser();
-  // Ya no se saca `contexto`: su único uso era el link a editar producto, que se
-  // fue con la tabla que nunca se dibujaba. Los otros dos SÍ siguen haciendo
-  // falta, para el corte de "elegí una ubicación" de más abajo.
-  const { loading: loadingCtx, needsContexto } = useContextoActivo();
+  // `contexto` vuelve: el lápiz a editar producto de la recepción sin factura
+  // necesita la ubicación para armar el link que sabe volver. Los otros dos son
+  // para el corte de "elegí una ubicación" de más abajo.
+  const { contexto, loading: loadingCtx, needsContexto } = useContextoActivo();
 
   const [pedido, setPedido] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -83,9 +89,16 @@ export default function DetallePedidoProveedorPage({ params }) {
   // ── "LLEGÓ SIN FACTURA": LA SALIDA SECUNDARIA DEL ESTADO 1 ──────────────
   //
   // Mientras no hay ningún comprobante, la pantalla ofrece sacarle una foto a
-  // la factura. Si no hay factura, esto destapa el conteo a mano, que es lo que
-  // esta pantalla ya sabía hacer. No es un modo nuevo: es dejar ver lo que ya
-  // estaba, cuando corresponde.
+  // la factura. Si no hay factura, esto abre LA MISMA recepción que con papel
+  // —la lista, la tarjeta y las dos hojas— con las líneas del pedido como
+  // filas. La recepción es una sola para todo caso: sin factura es la misma
+  // pantalla sin papel, no otra.
+  //
+  // Antes destapaba una pantalla vieja y aparte —"Detalle (N productos)" con
+  // tarjetas escritas a mano y un botón con `confirm()`— que NO PODÍA RECIBIR:
+  // ese botón mandaba el cierre sin el total a pagar, la ruta contestaba 400
+  // pidiéndolo, y el motivo iba a parar a una hoja que en esa rama no estaba
+  // montada. El botón parecía no hacer nada.
   const [sinFactura, setSinFactura] = useState(false);
   // Cuántos comprobantes tiene el pedido. Lo avisa `PanelComprobantes`, que es
   // el que los carga: la pantalla no pide la misma lista por su cuenta.
@@ -225,9 +238,14 @@ export default function DetallePedidoProveedorPage({ params }) {
   // Es el mismo defecto que tenía el pedido en armado y se arregla con el mismo
   // mecanismo: el serializador vive en `retornoPedido.js`, al lado del otro, y
   // acá hay un solo par guardar/limpiar que usan todos los caminos.
-  const guardarRecepcion = useCallback((pid, rec, kg) => {
+  const guardarRecepcion = useCallback((pid, rec, kg, sinFac = false) => {
     try {
-      const enCurso = serializarRecepcionEnCurso({ pedidoId: pid, recibidos: rec, kgRecibidos: kg });
+      const enCurso = serializarRecepcionEnCurso({
+        pedidoId: pid,
+        recibidos: rec,
+        kgRecibidos: kg,
+        sinFactura: sinFac,
+      });
       if (enCurso) sessionStorage.setItem(CLAVE_RECEPCION_EN_CURSO, JSON.stringify(enCurso));
       else sessionStorage.removeItem(CLAVE_RECEPCION_EN_CURSO);
     } catch {
@@ -328,6 +346,9 @@ export default function DetallePedidoProveedorPage({ params }) {
           for (const [detId, valor] of Object.entries(guardadaEnCurso.kgRecibidos || {})) {
             if (detId in kgRec) kgRec[detId] = valor;
           }
+          // Se había elegido "Llegó sin factura": se vuelve ahí y no a la foto.
+          // Es la vuelta del lápiz a editar producto.
+          if (guardadaEnCurso.sinFactura === true) setSinFactura(true);
         }
 
         setRecibidos(rec);
@@ -392,8 +413,8 @@ export default function DetallePedidoProveedorPage({ params }) {
   // clave que nadie va a restaurar.
   useEffect(() => {
     if (!pedido?.id || pedido.estado !== "ENVIADO") return;
-    guardarRecepcion(pedido.id, recibidos, kgRecibidos);
-  }, [pedido?.id, pedido?.estado, recibidos, kgRecibidos, guardarRecepcion]);
+    guardarRecepcion(pedido.id, recibidos, kgRecibidos, sinFactura);
+  }, [pedido?.id, pedido?.estado, recibidos, kgRecibidos, sinFactura, guardarRecepcion]);
 
   // ── TRAER LA FACTURA LEÍDA ──────────────────────────────────────────────
   //
@@ -421,8 +442,14 @@ export default function DetallePedidoProveedorPage({ params }) {
   // La condición vive en `hayQuePedirLaConciliacion` para que sea una sola y se
   // pueda ejercer: el candado la corre con un RECIBIDO y cero avisos, que es
   // exactamente el caso que fallaba.
+  // Sin factura también se pide: las filas de la recepción sin papel son las
+  // líneas del pedido, y las trae este mismo endpoint en `sinComprobante`.
+  const pidioSinFactura = sinFactura && pedido?.nacidoDeFactura !== true;
   useEffect(() => {
-    if (!pedido?.id || !hayQuePedirLaConciliacion({ estado: pedido.estado, hayComprobantes })) {
+    if (
+      !pedido?.id ||
+      !hayQuePedirLaConciliacion({ estado: pedido.estado, hayComprobantes, sinFactura: pidioSinFactura })
+    ) {
       setConciliacion(null);
       setFalloLaConciliacion(false);
       return;
@@ -454,7 +481,7 @@ export default function DetallePedidoProveedorPage({ params }) {
     return () => {
       vigente = false;
     };
-  }, [pedido?.id, pedido?.estado, hayComprobantes, recargarConciliacion]);
+  }, [pedido?.id, pedido?.estado, hayComprobantes, pidioSinFactura, recargarConciliacion]);
 
   // ── LO QUE LA HOJA GUARDA ───────────────────────────────────────────────
   //
@@ -503,6 +530,17 @@ export default function DetallePedidoProveedorPage({ params }) {
   // y el servidor contestaba "No existe esa línea.". Con el texto impreso y el
   // pedido, el servidor lo vuelve a encontrar solo.
   const marcarRevisada = useCallback(async (renglon, revisada = true) => {
+    // ── SIN PAPEL, LA MARCA VIVE SOLO EN LA PANTALLA ──────────────────────
+    //
+    // La marca guardada es de un RENGLÓN DEL PAPEL —`ComprobanteLinea`— y un
+    // pedido que llegó sin factura no tiene ninguno. Lo que sí se guarda es lo
+    // contado: la hoja lo escribe en la línea del pedido. El tilde queda como
+    // eco, con la clave de la línea del pedido.
+    if (typeof renglon === "object" && renglon?.sinPapel === true) {
+      const clave = claveDeFila(renglon);
+      if (clave != null) setRevisadas((prev) => ({ ...prev, [clave]: revisada }));
+      return { ok: true };
+    }
     const lineaId = typeof renglon === "object" ? renglon?.lineaId : renglon;
     const textoCrudo = typeof renglon === "object" ? renglon?.textoCrudo ?? null : null;
     if (!lineaId) return { ok: false, error: "Falta la línea." };
@@ -768,6 +806,10 @@ export default function DetallePedidoProveedorPage({ params }) {
           nroFactura: nroFactura || null,
           fechaFactura: fechaFactura || null,
         };
+        // Sin papel, el cierre no toca el costo del catálogo: ver
+        // `costosQueNoSeTocan`. Con papel no viaja, y el cuerpo queda igual
+        // que siempre.
+        if (extra?.costosExcluidos?.length) bodyData.costosExcluidos = extra.costosExcluidos;
       }
 
       setMotivoDelFallo(null);
@@ -873,6 +915,9 @@ export default function DetallePedidoProveedorPage({ params }) {
         setExtraSearch("");
         setExtraResults([]);
         await cargar();
+        // Sin factura, las filas salen de la conciliación: sin volver a
+        // pedirla, lo agregado no aparecería en la lista.
+        setRecargarConciliacion((n) => n + 1);
       } else {
         alert(data.error || "Error al agregar producto");
       }
@@ -926,21 +971,31 @@ export default function DetallePedidoProveedorPage({ params }) {
   // va a rechazar.
   const puedeRegistrarPago = esAdminP || permisosP.includes(PERMISO_REGISTRAR_PAGOS);
 
-  // ── EL LÁPIZ DE EDITAR PRODUCTO SE FUE CON LA TABLA ───────────────────────
+  // ── EL LÁPIZ DE EDITAR PRODUCTO VOLVIÓ, EN LA RECEPCIÓN SIN FACTURA ───────
   //
-  // Acá vivían `puedeEditarProductoP` y `irAEditarProducto`, que armaban el link
-  // a la ficha del producto con `ORIGENES.PEDIDO_DETALLE` para poder volver. Su
-  // ÚNICO consumidor era `TablaDetallePedido`, que nunca se dibujó, así que el
-  // botón no se veía desde acá ni una vez. Se borraron con ella el 2026-08-17.
+  // Acá vivían `puedeEditarProductoP` y `irAEditarProducto` para una tabla que
+  // nunca se dibujó, y se borraron con ella el 2026-08-17. Vuelven con un
+  // consumidor que sí se dibuja: la hoja de corregir de un pedido que llegó sin
+  // factura. Sin papel no hay precio con qué comparar, así que un costo que
+  // está mal se corrige en el PRODUCTO —la única puerta que escribe un costo
+  // del catálogo fuera de recibir, desde `ed52991`— y se vuelve acá.
   //
-  // NO ES UNA FUNCIÓN QUE SE PIERDA HOY: es una que ya estaba perdida y que el
-  // código hacía parecer viva. Desde el detalle de un pedido enviado o recibido
-  // no se puede ir a editar un producto, y no se podía antes tampoco.
+  // El link lo arma `linkEditarProducto` con `ORIGENES.PEDIDO_DETALLE`, que
+  // vuelve a este pedido. Lo contado y la elección de "sin factura" ya están
+  // guardados en la pestaña por el efecto de la recepción en curso.
   //
-  // `linkEditarProducto` y `ORIGENES.PEDIDO_DETALLE` siguen existiendo en
-  // `lib/compras-proveedor/retornoPedido.js` con sus candados: lo que ya no hay
-  // es nadie en la aplicación que produzca ese origen. Si el lápiz tiene que
-  // volver, el lugar es la lista de conciliación, que es lo que sí se dibuja.
+  // Solo con permiso de editar productos: son dos permisos distintos, y un
+  // botón incondicional rebotaría en la cara de quien no lo tiene.
+  const puedeEditarProductoP = esAdminP || permisosP.includes("productos.editar");
+  const irAEditarProducto = (fila) => {
+    const url = linkEditarProducto({
+      baseId: fila?.productoBaseId,
+      localId: contexto?.localId,
+      origen: ORIGENES.PEDIDO_DETALLE,
+      pedidoId: pedido?.id,
+    });
+    if (url) router.push(url);
+  };
 
   if (loading) {
     return (
@@ -970,6 +1025,99 @@ export default function DetallePedidoProveedorPage({ params }) {
 
   const esRecepcion = pedido.estado === "ENVIADO";
   const esBorrador = pedido.estado === "BORRADOR";
+
+  // ── RECIBIENDO SIN PAPEL ──────────────────────────────────────────────────
+  //
+  // Se eligió "Llegó sin factura" y el pedido sigue sin ningún comprobante. Si
+  // después aparece uno, esto se apaga solo y la pantalla vuelve a la recepción
+  // con papel: no hay dos pantallas para el mismo pedido según el orden en que
+  // se tocaron los botones.
+  const sinPapel = esRecepcion && sinFactura && !sinPedidoPrevio && hayComprobantes === 0;
+  // Las filas son las líneas del pedido, con la forma de una fila de la
+  // conciliación, y con lo que se lleva contado: la tarjeta compara eso contra
+  // lo pedido para decir si falta o sobra.
+  const filasSinPapel = sinPapel
+    ? (conciliacion?.sinComprobante || []).map((d) =>
+        filaSinPapel(d, {
+          contada: recibidos[d.pedidoDetalleId],
+          kilos: kgRecibidos[d.pedidoDetalleId],
+        })
+      )
+    : [];
+  const filasDeLaRecepcion = sinPapel ? filasSinPapel : filasDeFactura;
+  // La hoja de cierre cuenta las que faltan mirar con `revisada`. Con papel la
+  // trae la base; sin papel vive en el eco de la pantalla.
+  const filasDelCierre = sinPapel
+    ? filasSinPapel.map((f) => ({ ...f, revisada: revisadas[claveDeFila(f)] === true }))
+    : filasDeFactura;
+
+  // ── LO QUE VINO SIN PEDIRSE: EL "AGREGAR PRODUCTO" QUE YA EXISTÍA ─────────
+  //
+  // Se mudó TAL CUAL desde la rama vieja —la búsqueda en el universo del
+  // proveedor, la tabla de resultados y `agregar-item`—, sin rediseñar nada: lo
+  // único que cambió es dónde se dibuja. El título ya no pregunta por
+  // `esBorrador`, que acá no puede ser cierto.
+  const panelAgregarProducto = (
+    <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm">
+      <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
+        <h3 className="text-[13px] font-semibold sunmi-text-strong">Agregar producto extra</h3>
+      </div>
+
+      <SunmiInput
+        type="text"
+        placeholder="Buscar producto extra (nombre / SKU / código de barra)"
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="none"
+        spellCheck={false}
+        value={extraSearch}
+        onChange={(e) => buscarExtra(e.target.value)}
+        className="mb-3"
+      />
+
+      {extraLoading && (
+        <p className="text-xs sunmi-text-muted">Buscando...</p>
+      )}
+
+      {!extraLoading && extraSearch.trim() && extraResults.length === 0 && (
+        <p className="text-xs sunmi-text-muted">Sin resultados</p>
+      )}
+
+      {extraResults.length > 0 && (
+        <div className="overflow-x-auto rounded border sunmi-border">
+          <SunmiTable headers={["Producto", "SKU", "Cód. barra", "Modo", "Costo", ""]}>
+            {extraResults.map((p) => (
+              <SunmiTableRow key={p.productoLocalId}>
+                <td className="px-3 py-1.5 text-sm">{p.nombre}</td>
+                <td className="px-3 py-1.5 text-xs sunmi-text-muted">{p.sku || "-"}</td>
+                <td className="px-3 py-1.5 text-xs sunmi-text-muted">{p.codigo_barra || "-"}</td>
+                <td className="px-3 py-1.5 text-xs">
+                  {p.modoCompra === "UNIDAD" ? (
+                    <span className="sunmi-text-link">FIAMBRE</span>
+                  ) : (
+                    "BULTO"
+                  )}
+                </td>
+                <td className="px-3 py-1.5 text-xs">
+                  {p.precio_costo ? `$${Number(p.precio_costo).toFixed(2)}` : "-"}
+                </td>
+                <td className="px-3 py-1.5">
+                  <SunmiButton
+                    color="cyan"
+                    size="xs"
+                    disabled={extraAdding === p.productoLocalId}
+                    onClick={() => agregarExtra(p)}
+                  >
+                    {extraAdding === p.productoLocalId ? "..." : "Agregar"}
+                  </SunmiButton>
+                </td>
+              </SunmiTableRow>
+            ))}
+          </SunmiTable>
+        </div>
+      )}
+    </SunmiPanel>
+  );
   const tieneFiambre = (pedido?.detalles || []).some(
     (d) => d.producto?.base?.modoCompraProveedor === "UNIDAD"
   );
@@ -1204,8 +1352,8 @@ export default function DetallePedidoProveedorPage({ params }) {
             // nueva u otra hoja?"—. Lo único que cambia es la cara del estado
             // vacío, y los dos disparadores salen de él.
             //
-            // "Llegó sin factura" destapa lo que esta pantalla ya sabía hacer:
-            // el conteo a mano contra el pedido.
+            // "Llegó sin factura" abre la misma recepción de abajo, sin papel:
+            // las líneas del pedido como filas.
             // ── UN SOLO BLOQUE DE COMPROBANTES, NO DOS QUE SE TURNAN ──────
             //
             // Antes en una pantalla se veía "Sacar foto" y en otra "Subir
@@ -1244,20 +1392,18 @@ export default function DetallePedidoProveedorPage({ params }) {
             hacía falta scrollear para encontrarlo.
 
             Aparece cuando hay un comprobante —porque entonces hay algo que
-            conciliar— o cuando se eligió "Llegó sin factura", que es el conteo
-            a mano. En los otros estados del pedido se dibuja siempre, como
-            antes.
+            conciliar— o cuando se eligió "Llegó sin factura", que es la misma
+            lista con las líneas del pedido.
 
             El rediseño de estas líneas y de la hoja de corregir es la tanda
             siguiente: necesita dos columnas que hoy no existen —el motivo de la
             diferencia y las unidades sueltas— y eso es una migración. */}
-        {/* ── RECIBIENDO CON LA FACTURA LEÍDA: LA LISTA NUEVA ────────────
+        {/* ── RECIBIENDO: LA LISTA NUEVA, CON PAPEL O SIN ÉL ─────────────
             En el orden del papel, con los cuatro filtros y la hoja de corregir.
             Reemplaza al detalle viejo, que dibujaba una tarjeta por línea del
             PEDIDO con una oración adentro —"Pediste 1 bulto a $30780.00. Ningún
             comprobante la trajo."— y los tres marcos anidados que desbordaban.
-            Si se eligió "Llegó sin factura" no hay papel que mostrar y se cae
-            al conteo viejo, que es lo que esa salida ofrece. */}
+            Si se eligió "Llegó sin factura" es esta misma lista, sin papel. */}
         {/* ── ACÁ ESTABA LA LISTA DEL PEDIDO YA RECIBIDO ────────────────
             Se fue entera: un pedido RECIBIDO devuelve otra pantalla mucho más
             arriba, y esto quedaba inalcanzable. Una rama muerta que se lee como
@@ -1289,9 +1435,30 @@ export default function DetallePedidoProveedorPage({ params }) {
             <CorregirComprobante key={id} comprobanteId={id} onCorregido={cargar} />
           ))}
 
-        {esRecepcion && !sinFactura && filasDeFactura.length > 0 && (
+        {/* ── SIN PAPEL, MIENTRAS LLEGAN LAS LÍNEAS DEL PEDIDO ───────────
+            Las trae el endpoint de conciliación. Si no se pudo, se dice: una
+            lista vacía se leería como un pedido sin nada que recibir. */}
+        {sinPapel && !conciliacion && (
+          <p
+            className={`text-sm2 text-center py-6 ${
+              falloLaConciliacion ? "sunmi-text-danger" : "sunmi-text-muted"
+            }`}
+          >
+            {falloLaConciliacion
+              ? "No se pudieron cargar los productos del pedido. Volvé a abrir la pantalla."
+              : "Cargando los productos del pedido…"}
+          </p>
+        )}
+
+        {/* ── LA RECEPCIÓN, UNA SOLA ──────────────────────────────────────
+            Con papel, las filas son los renglones leídos. Sin factura, las
+            líneas del pedido con la misma forma —`filaSinPapel`—. La lista, la
+            tarjeta, las dos hojas y el botón son los mismos. */}
+        {esRecepcion &&
+          (sinPapel ? conciliacion != null : filasDeFactura.length > 0) && (
           <>
             <ListaDeLaFactura
+              sinPapel={sinPapel}
               // NACIÓ DE UNA FACTURA: no hubo pedido, así que la tarjeta no
               // puede decir "Pediste". Viaja desde acá porque es un hecho del
               // PEDIDO, y deducirlo en la tarjeta —"no tiene cantidad pedida"—
@@ -1303,10 +1470,14 @@ export default function DetallePedidoProveedorPage({ params }) {
               // comprobante activo y no de sumar renglones: sumar solo puede
               // dar el total de los que se pudieron comparar.
               totalDelPapel={totalDeLasFacturas}
-              filas={filasDeFactura}
+              filas={filasDeLaRecepcion}
               onCorregir={setLineaACorregir}
               onCoincide={aceptarLoQueDiceLaFactura}
               revisadas={revisadas}
+              // Lo que vino sin pedirse, sin papel: el "Agregar producto" de la
+              // recepción, que ya existía y se muda acá con su búsqueda y su
+              // ruta. Con papel lo que no se pidió lo trae el papel.
+              despuesDeLista={sinPapel ? panelAgregarProducto : null}
               accionDelPie={
                 <SunmiButton
                   color="amber"
@@ -1345,11 +1516,12 @@ export default function DetallePedidoProveedorPage({ params }) {
               onGuardar={guardarCorreccion}
               onVincular={vincularLinea}
               onDesmarcar={desmarcarLinea}
+              onEditarProducto={sinPapel && puedeEditarProductoP ? irAEditarProducto : null}
               // El eco optimista manda mientras exista; si no, lo que dice la
               // base. La misma regla que usa la lista, y por eso el botón
               // "Desmarcar" aparece justo cuando el tilde está puesto.
               revisada={
-                revisadas[lineaACorregir?.lineaId] ?? lineaACorregir?.revisada === true
+                revisadas[claveDeFila(lineaACorregir)] ?? lineaACorregir?.revisada === true
               }
               // Cuánto se le mueve el precio a ESTE proveedor sin que sea raro.
               // Decide qué viene marcado y cuándo la hoja frena.
@@ -1359,13 +1531,19 @@ export default function DetallePedidoProveedorPage({ params }) {
             <HojaCerrarRecepcion
               abierta={cerrandoRecepcion}
               onCerrar={() => setCerrandoRecepcion(false)}
-              filas={filasDeFactura}
+              filas={filasDelCierre}
               // Sin pedido previo NO HAY "productos que el papel no trajo":
               // todo sale del papel. Se le pasa vacío en vez de esconder el
               // bloque adentro de la hoja, para que la hoja siga contestando
               // una sola pregunta —qué llegó de lo que nadie facturó— y no
               // tenga que saber de dónde nació el pedido.
-              sinComprobante={sinPedidoPrevio ? [] : conciliacion?.sinComprobante || []}
+              //
+              // Sin papel tampoco: esas líneas YA son las filas, contadas una
+              // por una. Pasarlas de nuevo las haría preguntar "¿llegó?" sobre
+              // lo que se acaba de contar, y su "no llegó" las pondría en cero.
+              sinComprobante={
+                sinPedidoPrevio || sinPapel ? [] : conciliacion?.sinComprobante || []
+              }
               contados={recibidos}
               guardando={acting}
               motivoDelFallo={motivoDelFallo}
@@ -1381,27 +1559,29 @@ export default function DetallePedidoProveedorPage({ params }) {
               ubicacionDuena={ubicacionDuena}
               onConfirmar={(recibidosDelCierre, pagoAlProveedor) => {
                 setCerrandoRecepcion(false);
-                ejecutarAccion("recibir", { recibidos: recibidosDelCierre, pagoAlProveedor });
+                ejecutarAccion("recibir", {
+                  recibidos: recibidosDelCierre,
+                  pagoAlProveedor,
+                  costosExcluidos: costosQueNoSeTocan(filasDelCierre),
+                });
               }}
             />
           </>
         )}
 
-        {/* ── LA RAMA VIEJA NO EXISTE PARA UN PEDIDO NACIDO DE FACTURA ────
-            Acá cae "Detalle (N productos)", "Agregar producto extra", la tabla
-            de conciliación vieja —la que dice "Todavía no hay comprobantes ni
-            líneas del pedido"— y los dos botones de abajo.
+        {/* ── LA RAMA VIEJA YA NO EXISTE RECIBIENDO ───────────────────────
+            Acá caía "Llegó sin factura": "Detalle (N productos)" con las
+            líneas del pedido en tarjetas escritas a mano, "Agregar producto
+            extra" y un "Recibir mercadería" con `confirm()` que no podía
+            cerrar —mandaba el cierre sin total a pagar y el rechazo iba a una
+            hoja que acá no estaba montada—. Se borró: sin factura es la misma
+            recepción de arriba, sin papel.
 
-            Un pedido nacido de una factura SIN LEER tiene cero líneas, y con
-            `sinFactura` en true esta rama se dibujaba igual: el pedido 240 de
-            Paty mostró "Detalle (0 productos)" y "Todavía no hay comprobantes
-            ni líneas del pedido" con un comprobante subido y visible dos
-            centímetros más arriba. Las dos frases eran falsas.
-
-            No hay nada acá que sirva para este caso: los productos los pone el
-            papel, no se agregan a mano, y hasta que se lea no hay nada que
-            mostrar más que la foto y en qué anda la lectura. */}
-        {(!esRecepcion || sinFactura) && !sinPedidoPrevio && (
+            Queda para los estados de consulta —CONFIRMADO y ANULADO—, que
+            esta tanda no toca. Nunca para un pedido nacido de factura: el
+            pedido 240 de Paty mostró acá "Detalle (0 productos)" con un
+            comprobante subido dos centímetros más arriba. */}
+        {!esRecepcion && !sinPedidoPrevio && (
           <>
           {/* ── ACÁ ESTABA "FACTURA Y GANANCIA" ────────────────────────────
               Cuatro campos para teclear a mano: total factura (calculado),
@@ -1442,114 +1622,12 @@ export default function DetallePedidoProveedorPage({ params }) {
                 se pidió para que coincida con lo que llegó, y así la diferencia
                 —que es el dato— desaparece.
 
-                En recepción y en recibido va la lista única, abajo. */}
-
-            {/* ── LA LISTA ÚNICA ────────────────────────────────────────────────
-                Cada línea de la factura con lo que le corresponde del pedido al
-                lado, agrupada por comprobante, y las del pedido que ningún
-                comprobante trajo aparte y al final. Reemplaza a las DOS listas que
-                había —las líneas de la factura arriba y el detalle del pedido
-                abajo— que obligaban a cruzarlas de memoria.
-
-                OJO CON EL NOMBRE: `esRecepcion` es el estado ENVIADO. Es
-                justamente el estado en el que se suben y se leen las facturas, así
-                que la conciliación SÍ está disponible ahí. El nombre engaña y ya
-                hizo dudar una vez si faltaba un estado; no falta.
-
-                El estado de lo recibido y su guardado siguen viviendo en esta
-                página: la lista solo dibuja los campos. Cambiar cómo se ve y cómo
-                se guarda en la misma tanda junta dos fuentes de error en la misma
-                ventana. */}
-            {/* ── Y CON EL PEDIDO CERRADO YA NO SE DIBUJA ──────────────────
-                La tabla densa se quedó para la recepción, donde todavía se
-                edita. Un pedido RECIBIDO se lee arriba, con las tarjetas y la
-                conversión de la recepción: dos vistas de lo mismo, una de ellas
-                sin convertir las cantidades, es cómo la pantalla terminó
-                diciendo "Factura 80" sobre 8 bultos. */}
-            {esRecepcion && (
-              <ListaConciliacion
-                pedidoId={pedido.id}
-                proveedorIdDelPedido={pedido.proveedor?.id ?? pedido.proveedorId ?? null}
-                estadoPedido={pedido.estado}
-                esRecepcion={esRecepcion}
-                puedeRecibir={esRecepcion}
-                recibidos={recibidos}
-                setRecibidos={setRecibidos}
-                kgRecibidos={kgRecibidos}
-                setKgRecibidos={setKgRecibidos}
-                onCambio={cargar}
-              />
-            )}
+                La recepción, con papel o sin él, es la lista de más arriba. */}
           </SunmiPanel>
-
-          {/* Agregar productos al pedido — visible en BORRADOR y ENVIADO */}
-          {(esRecepcion || esBorrador) && (
-            <SunmiPanel className="ring-2 ring-inset sunmi-ring shadow-sm mb-4">
-              <div className="flex items-center pb-2 mb-3 border-b sunmi-divider">
-                <h3 className="text-[13px] font-semibold sunmi-text-strong">
-                  {esBorrador ? "Agregar productos al pedido" : "Agregar producto extra"}
-                </h3>
-              </div>
-
-              <SunmiInput
-                type="text"
-                placeholder="Buscar producto extra (nombre / SKU / código de barra)"
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="none"
-                spellCheck={false}
-                value={extraSearch}
-                onChange={(e) => buscarExtra(e.target.value)}
-                className="mb-3"
-              />
-
-              {extraLoading && (
-                <p className="text-xs sunmi-text-muted">Buscando...</p>
-              )}
-
-              {!extraLoading && extraSearch.trim() && extraResults.length === 0 && (
-                <p className="text-xs sunmi-text-muted">Sin resultados</p>
-              )}
-
-              {extraResults.length > 0 && (
-                <div className="overflow-x-auto rounded border sunmi-border">
-                  <SunmiTable headers={["Producto", "SKU", "Cód. barra", "Modo", "Costo", ""]}>
-                    {extraResults.map((p) => (
-                      <SunmiTableRow key={p.productoLocalId}>
-                        <td className="px-3 py-1.5 text-sm">{p.nombre}</td>
-                        <td className="px-3 py-1.5 text-xs sunmi-text-muted">{p.sku || "-"}</td>
-                        <td className="px-3 py-1.5 text-xs sunmi-text-muted">{p.codigo_barra || "-"}</td>
-                        <td className="px-3 py-1.5 text-xs">
-                          {p.modoCompra === "UNIDAD" ? (
-                            <span className="sunmi-text-link">FIAMBRE</span>
-                          ) : (
-                            "BULTO"
-                          )}
-                        </td>
-                        <td className="px-3 py-1.5 text-xs">
-                          {p.precio_costo ? `$${Number(p.precio_costo).toFixed(2)}` : "-"}
-                        </td>
-                        <td className="px-3 py-1.5">
-                          <SunmiButton
-                            color="cyan"
-                            size="xs"
-                            disabled={extraAdding === p.productoLocalId}
-                            onClick={() => agregarExtra(p)}
-                          >
-                            {extraAdding === p.productoLocalId ? "..." : "Agregar"}
-                          </SunmiButton>
-                        </td>
-                      </SunmiTableRow>
-                    ))}
-                  </SunmiTable>
-                </div>
-              )}
-            </SunmiPanel>
-          )}
 
           {/* Acciones */}
           <div className="flex justify-end gap-3">
-            {["BORRADOR", "CONFIRMADO", "ENVIADO"].includes(pedido.estado) && (
+            {["BORRADOR", "CONFIRMADO"].includes(pedido.estado) && (
               <SunmiButton
                 color="red"
                 disabled={acting}
@@ -1603,19 +1681,11 @@ export default function DetallePedidoProveedorPage({ params }) {
               </>
             )}
 
-            {pedido.estado === "ENVIADO" && (
-              <SunmiButton
-                color="amber"
-                disabled={acting}
-                title="Solo continuar si la mercadería llegó físicamente al depósito"
-                onClick={() => {
-                  if (!confirm("Solo continuar si la mercadería llegó físicamente.\n\n¿Confirmás la recepción de este pedido?")) return;
-                  ejecutarAccion("recibir");
-                }}
-              >
-                {acting ? "Procesando..." : "Recibir mercadería"}
-              </SunmiButton>
-            )}
+            {/* ── ACÁ ESTABA EL "RECIBIR MERCADERÍA" DE LA RAMA VIEJA ─────────
+                Con un `confirm()` del navegador y sin pasar por la hoja de
+                cierre, así que el cierre viajaba sin el total a pagar y la ruta
+                lo rechazaba. Recibir es siempre el botón de la lista de arriba,
+                que abre la hoja. */}
           </div>
           </>
         )}

@@ -1,14 +1,10 @@
 "use client";
 
-// Las piezas de una fila de conciliación: el estado del vínculo, la unidad, el
-// precio y el buscador a mano.
+// El buscador a mano de un producto, dentro de la conciliación.
 //
-// Viven acá y no adentro de la lista porque la lista ya es larga y estas cuatro
-// no dependen de ella: reciben lo que muestran y avisan lo que se tocó.
-//
-// Vienen de `LineasComprobante.jsx`, que se reemplazó por la lista única. No se
-// reescribieron: se movieron, porque cada una tiene adentro el motivo por el que
-// está como está.
+// Viene de `LineasComprobante.jsx`, que se reemplazó por la lista única. No se
+// reescribió: se movió, porque tiene adentro el motivo por el que está como
+// está.
 
 import { useEffect, useRef, useState } from "react";
 
@@ -16,152 +12,13 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import { textoDeFallo } from "@/components/compras-proveedor/ExplicacionDelPapel";
 
-/**
- * El estado del vínculo, con PALABRA propia.
- *
- * Los textos largos vienen del servidor; acá va la etiqueta corta, que es lo que
- * se lee de un vistazo.
- */
-export function estadoDeVinculo(l) {
-  if (l.productoLocalId) return { etiqueta: "Vinculado", tono: "sunmi-text-success", pideAccion: false };
-  if (l.vinculadaSola) return { etiqueta: "Vinculado solo", tono: "sunmi-text-success", pideAccion: false };
-  if (l.origen === "SIN_CANDIDATOS") return { etiqueta: "Sin encontrar", tono: "sunmi-text-danger", pideAccion: true };
-  // DEL PEDIDO se dice distinto y no solo con otro tono: "está en tu pedido" es
-  // una afirmación mucho más fuerte que "existe en el catálogo".
-  if (l.origen === "LINEA_DEL_PEDIDO") {
-    return { etiqueta: "Está en el pedido", tono: "sunmi-text-warning", pideAccion: true };
-  }
-  return { etiqueta: "¿Es este?", tono: "sunmi-text-warning", pideAccion: true };
-}
-
-/** La tira de aviso: barra del mismo color que el texto, palabra corta, detalle. */
-export function Revisar({ linea, children }) {
-  const e = estadoDeVinculo(linea);
-  return (
-    <div className={`flex gap-2 ${e.tono}`}>
-      <div className="w-1 rounded shrink-0 bg-current" aria-hidden />
-      <div className="min-w-0 w-full">
-        <p className="text-xs font-bold">{e.etiqueta}</p>
-        {(linea.problema || linea.textoOrigen) && (
-          <p className="text-sm2 sunmi-text-muted leading-snug">{linea.problema || linea.textoOrigen}</p>
-        )}
-        {linea.textoMotivoPedido && (
-          <p className="text-sm2 sunmi-text-warning leading-snug">{linea.textoMotivoPedido}</p>
-        )}
-        {children}
-      </div>
-    </div>
-  );
-}
-
-/**
- * La unidad, EN CRIOLLO.
- *
- * El cociente no le dice nada a nadie: "3,08" no es una respuesta. La respuesta
- * es "36 ÷ 12 = 3 bultos, y el bulto sale 37.464". Y cuando no se puede decidir,
- * la pregunta va entre DOS RESULTADOS CONCRETOS con su cantidad y su costo.
- */
-export function Unidad({ u, onElegir, puedeElegir, elegida }) {
-  if (!u) return null;
-
-  if (elegida && u.lecturas) {
-    const op = elegida === "POR_UNIDAD" ? u.lecturas.porUnidad : u.lecturas.porBulto;
-    return (
-      <div className="mt-1">
-        <p className="text-sm2 sunmi-text-strong">{op.texto}</p>
-        <p className="text-sm2 sunmi-text-muted">{op.cuenta}</p>
-        <div className="mt-1">
-          <SunmiButton color="slate" type="button" onClick={() => onElegir?.(null)}>
-            Cambiar
-          </SunmiButton>
-        </div>
-      </div>
-    );
-  }
-
-  if (u.requiereDecision && u.lecturas) {
-    return (
-      <div className="mt-1">
-        <p className="text-sm2 sunmi-text-warning font-bold">¿Por unidad o por bulto?</p>
-        <p className="text-sm2 sunmi-text-muted leading-snug">{u.porque}</p>
-        <div className="mt-1 flex flex-col gap-1">
-          {[u.lecturas.porUnidad, u.lecturas.porBulto].map((op) => (
-            <SunmiButton
-              key={op.unidad}
-              color="cyan"
-              type="button"
-              className="justify-start text-left"
-              disabled={!puedeElegir}
-              onClick={() => onElegir?.(op.unidad)}
-            >
-              {op.texto}
-            </SunmiButton>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (u.explicacion) {
-    return (
-      <div className="mt-1">
-        <p className="text-sm2 sunmi-text-strong">{u.explicacion.frase}</p>
-        <p className="text-sm2 sunmi-text-muted">{u.explicacion.detalle}</p>
-        {u.explicacion.avisoDivision && (
-          <p className="text-sm2 sunmi-text-warning leading-snug">{u.explicacion.avisoDivision}</p>
-        )}
-      </div>
-    );
-  }
-
-  return <p className="text-sm2 sunmi-text-muted mt-1">{u.texto}</p>;
-}
-
-/**
- * EL PRECIO: qué cambió y qué se puede hacer.
- *
- *   · Subió más del umbral → el porcentaje y los dos botones.
- *   · Bajó → el porcentaje SIN botón. El costo no se baja solo.
- *   · Salto brusco → en rojo y sin botón: es sospecha de mala lectura.
- *
- * El texto viene armado del servidor. Acá no se recalcula ningún porcentaje: si
- * la pantalla dijera un número y el servidor escribiera otro, sería peor que no
- * mostrarlo.
- */
-export function Precio({ p, onAceptar, onNo, puede, aceptando, decidida }) {
-  const d = p?.decision;
-  if (!d || d.accion === "NINGUNA") return null;
-
-  const tono =
-    d.accion === "FRENA" ? "sunmi-text-danger"
-    : d.accion === "OFRECER" ? "sunmi-text-warning"
-    : "sunmi-text-muted";
-
-  return (
-    <div className={`mt-1 flex gap-2 ${tono}`}>
-      <div className="w-1 rounded shrink-0 bg-current" aria-hidden />
-      <div className="min-w-0 w-full">
-        <p className="text-xs font-bold">{d.titulo}</p>
-        <p className="text-sm2 sunmi-text-muted leading-snug">{d.detalle}</p>
-        {d.ofreceAceptar && puede && !decidida && (
-          <div className="mt-1 flex flex-wrap gap-1">
-            <SunmiButton color="cyan" type="button" disabled={aceptando} onClick={onAceptar}>
-              {aceptando ? "Aceptando…" : "Aceptar"}
-            </SunmiButton>
-            <SunmiButton color="slate" type="button" disabled={aceptando} onClick={onNo}>
-              No
-            </SunmiButton>
-          </div>
-        )}
-        {decidida === "NO" && (
-          <p className="text-sm2 sunmi-text-muted mt-1">
-            Queda con el precio que tenía. No se escribió nada.
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
+// ── ACÁ ESTABAN `estadoDeVinculo`, `Revisar`, `Unidad` y `Precio` ──────────
+//
+// Las piezas de la fila de `ListaConciliacion`, la tabla que dibujaba la
+// recepción vieja de "Llegó sin factura". Esa pantalla se borró el 2026-09-24:
+// sin factura es la misma recepción que con papel. `Unidad` y `Precio` no
+// tenían otro consumidor, y `Revisar` con `estadoDeVinculo` ya no tenían
+// ninguno. Queda el buscador, que usa la hoja de corregir.
 
 /**
  * Buscar un producto a mano, sin salir de la pantalla.

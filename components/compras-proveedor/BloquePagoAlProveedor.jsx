@@ -51,6 +51,8 @@ export default function BloquePagoAlProveedor({
   estadoEnPantalla,
   /** Lo que suman las facturas que sí traen total, para ayudar a escribirlo. */
   sumaConocida = null,
+  /** Llegó sin factura: no hay "alguna factura sin total", no hay ninguna. */
+  sinPapel = false,
   valor,
   onCambiar,
   puedeRegistrarPago = false,
@@ -89,6 +91,11 @@ export default function BloquePagoAlProveedor({
               disabled={deshabilitado}
             />
           </Campo>
+          {sinPapel ? (
+            <span className="text-sm2 sunmi-text-muted break-words">
+              Llegó sin factura. Escribí lo que le vas a pagar al proveedor por esta mercadería.
+            </span>
+          ) : (
           <span className="text-sm2 sunmi-text-muted break-words">
             Alguna factura no trae total impreso. Escribí el total del papel, con IVA y
             percepciones.
@@ -96,6 +103,7 @@ export default function BloquePagoAlProveedor({
               ? ` Las que sí lo traen suman ${formatearMoneda(sumaConocida)}.`
               : ""}
           </span>
+          )}
           <SunmiButton
             color={totalConfirmado ? "primary" : "slate"}
             type="button"

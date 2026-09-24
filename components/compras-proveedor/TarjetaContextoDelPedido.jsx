@@ -64,7 +64,9 @@ export default function TarjetaContextoDelPedido({
           ? cantItems > 0
             ? `Nació de una factura · ${cantItems} ${cantItems === 1 ? "producto" : "productos"} del papel`
             : "Nació de una factura · los productos los pone el papel"
-          : `${cantItems} ${cantItems === 1 ? "ítem" : "ítems"} · ${formatearMoneda(
+          : // "productos" y no "ítems": es la palabra de quien recibe, la misma
+            // que ya usa la rama de arriba.
+            `${cantItems} ${cantItems === 1 ? "producto" : "productos"} · ${formatearMoneda(
               totalEstimado
             )} estimado al pedir`}
       </span>

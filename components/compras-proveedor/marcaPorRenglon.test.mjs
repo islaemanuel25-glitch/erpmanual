@@ -23,7 +23,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { filasDeConciliacion } from "@/lib/compras-proveedor/comprobante/filasDeConciliacion";
+import {
+  filasDeConciliacion,
+  claveDeFila,
+} from "@/lib/compras-proveedor/comprobante/filasDeConciliacion";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const leer = (rel) => fs.readFileSync(path.join(RAIZ, rel), "utf8");
@@ -85,12 +88,24 @@ test("LA LISTA INDEXA POR RENGLÓN, no por línea de pedido", () => {
   const lista = sinComentarios(leer("components/compras-proveedor/ListaDeLaFactura.jsx"));
   const criterio = lista.match(/const yaRevisada = [^;]+;/);
   assert.ok(criterio, "se fue el criterio de qué línea está revisada");
-  assert.match(criterio[0], /lineaId/, "volvió a indexarse por otra cosa");
+  // ── LA CLAVE SE MUDÓ A `claveDeFila` EL 2026-09-24 ──────────────────────
+  //
+  // Afirmaba `lineaId` escrito en el criterio. Desde que la recepción sin
+  // factura usa esta misma lista —con filas que NO tienen renglón del papel—,
+  // la clave la decide `claveDeFila`, y la pregunta de este candado se hace
+  // ahí: con papel, la clave es el RENGLÓN, y dos renglones de la misma línea
+  // del pedido no comparten marca. El caso es el de producción: 120 y 121
+  // apuntan los dos al detalle 2565.
+  assert.match(criterio[0], /claveDeFila\(f\)/, "volvió a indexarse por otra cosa");
   assert.doesNotMatch(
     criterio[0],
     /pedidoDetalleId/,
     "con la línea del pedido como clave, marcar un renglón marca el otro"
   );
+  const a = claveDeFila({ lineaId: 120, pedidoDetalleId: 2565 });
+  const b = claveDeFila({ lineaId: 121, pedidoDetalleId: 2565 });
+  assert.equal(a, 120, "con papel la clave dejó de ser el renglón");
+  assert.notEqual(a, b, "dos renglones de la misma línea del pedido comparten la marca");
   // Y la verdad sale de la fila, no solo del estado de la pantalla.
   assert.match(criterio[0], /revisada/, "el eco de la pantalla tapó lo que dice la base");
 });
