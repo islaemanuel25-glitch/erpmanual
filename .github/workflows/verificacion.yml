@@ -390,3 +390,16 @@ jobs:
       - name: Ejercer la semana operativa contra PostgreSQL
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/semanaOperativa.mjs
 
+      # Lo que una compra suma al stock al recibirla, congelado en la línea: se
+      # compara, caso por caso, el delta real de `StockLocal` contra
+      # `stockIngresado`. Va en este job porque es el dato que Finanzas va a
+      # leer para la variación de stock.
+      - name: Ejercer la recepción de compras contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/recepcionCompras.mjs
+
+      # Y que esa prueba MIRA: se rompe el cierre sobre una copia, tres veces, y
+      # cada vez tienen que gritar las afirmaciones que nombra el caso. Solo los
+      # casos `SI-`: los de transferencias tardan minutos y se corren a mano.
+      - name: Contrapruebas de la recepción de compras
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs SI-
+
