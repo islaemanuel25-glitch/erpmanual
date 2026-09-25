@@ -99,12 +99,22 @@ Estados: enum `EstadoPedidoProveedor` (`prisma/schema.prisma:648`) — `BORRADOR
   2026-09-25): `PedidoProveedorDetalle.stockIngresado` es la misma variable que
   `recibir/[id]` pasa al `increment` de `StockLocal`, y `stockIngresadoUnidad`
   (`UNIDAD` / `KG` / `PIEZA`) sale de la rama que lo decidió
-  (`lib/compras-proveedor/stockIngresado.js`). Un 0 con unidad es "se cerró y no
-  entró nada"; NULL es un combo o una compra recibida antes de esa fecha, y **no
-  se reconstruye** con el producto de hoy. Solo el cierre lo escribe — censo en
+  (`lib/compras-proveedor/stockIngresado.js`). Un 0 con unidad es "este cierre
+  le sumó 0 al stock", tanto para la línea declarada en 0 como para la que no
+  vino en el cuerpo del cierre; NULL es "no hay hecho de stock congelado
+  utilizable": un combo o una compra recibida antes de esa fecha, y **no se
+  reconstruye** con el producto de hoy. Solo el cierre lo escribe — censo en
   `lib/compras-proveedor/stockIngresado.test.mjs` — y
   `scripts/pruebas-db/recepcionCompras.mjs` lo compara contra el delta real del
   stock. **[VERIFICADO]**
+
+  **Definición canónica:** `stockIngresado` es el delta que esa línea aplicó a
+  `StockLocal` durante la recepción — el movimiento que registró el ERP. **NO**
+  es la cantidad que físicamente llegó del proveedor: ninguna declaración lo
+  prueba, porque una línea que nadie tocó se declara con lo pedido o con lo que
+  dice el papel, y "no llegó" viene marcado de entrada. Finanzas y el snapshot
+  lo leen como "esta recepción agregó X al stock", no como una comprobación
+  física independiente. **[DECIDIDO 2026-09-25]**
 
 ## Dependencias
 

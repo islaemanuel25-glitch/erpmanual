@@ -581,10 +581,13 @@ export async function POST(req, { params }) {
           // porque es distinto de `null` —nunca se contó— y esa diferencia es
           // la que deja saber después si alguien miró la línea.
           const detCero = seDeclaro ? { cantidadRecibida: 0 } : {};
-          // Y lo que sumó al stock también es un dato, contada o no: este
-          // cierre no sumó nada. Un 0 con su unidad es un hecho; el NULL queda
-          // para lo que no hay, que es el combo —no mueve stock— y la compra
-          // recibida antes de que esto se guardara.
+          // Y lo que este cierre sumó a `StockLocal` por la línea también es un
+          // dato, declarada o no: sumó 0, y eso se sabe con certeza. OJO: es el
+          // movimiento que registró el ERP, NO que se haya comprobado que
+          // físicamente llegaron cero —una línea ausente del cuerpo no la contó
+          // nadie—. El NULL queda para lo que no tiene un hecho de stock: el
+          // combo —no mueve stock— y la compra recibida antes de que esto se
+          // guardara.
           if (!esComboBase(base)) {
             detCero.stockIngresado = 0;
             detCero.stockIngresadoUnidad = unidadIngreso;
@@ -722,10 +725,13 @@ export async function POST(req, { params }) {
           kgRecibidos: kgReales,
           // ── EL HECHO, CONGELADO ─────────────────────────────────────────
           //
-          // La MISMA variable que acaba de ir al `increment` de arriba, en la
-          // misma transacción: si una de las dos escrituras falla, no queda
-          // ninguna. No se recalcula acá con `cantRecibida × factor_pack` ni
-          // con nada del producto — eso es exactamente lo que cambia después.
+          // `stockIngresado` es el delta que ESTA línea aplicó a `StockLocal`
+          // en esta recepción: lo que el ERP registró, no una comprobación
+          // física de lo que mandó el proveedor. Es la MISMA variable que acaba
+          // de ir al `increment` de arriba, en la misma transacción: si una de
+          // las dos escrituras falla, no queda ninguna. No se recalcula acá con
+          // `cantRecibida × factor_pack` ni con nada del producto — eso es
+          // exactamente lo que cambia después.
           stockIngresado: incremento,
           stockIngresadoUnidad: unidadIngreso,
         };
