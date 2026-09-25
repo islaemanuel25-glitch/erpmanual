@@ -165,6 +165,68 @@ const CASOS = [
       "sin declarar: 0 UNIDAD, y cantidadRecibida sigue en null (nadie contó)",
     ],
   },
+  // ── EL FRENO DE COSTO DE LA RECEPCIÓN ──────────────────────────────────
+  //
+  // Corren contra `frenoDeCosto.mjs`, que cierra por la ruta real con un costo
+  // maestro distinto de cero y mira qué quedó escrito. El defecto que las trajo
+  // no lo veía ningún candado de texto: el cierre LEÍA `base?.precio_costo`,
+  // pero el `select` no lo traía.
+  //
+  // El piso es 20 y no más: la suite tiene 60 afirmaciones y sacar el costo
+  // maestro apaga el freno entero, así que en FC-1 caen 23 a la vez y quedan
+  // 37 en verde. El piso está para distinguir "abortó al montar" —cero— de
+  // "corrió y gritó", no para contar cuánto grita.
+  {
+    n: "FC-1",
+    defecto: "el select de la base vuelve a no traer precio_costo",
+    archivo: "app/api/compras-proveedor/recibir/[id]/route.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "                    precio_costo: true,\n", a: "" }],
+    esperadas: [
+      "A: frena con 409",
+      "F costo del bulto en línea UNIDAD: el costo maestro queda en 61703",
+    ],
+  },
+  {
+    n: "FC-2",
+    defecto: "el cierre ignora la aceptación que la hoja de Corregir dejó guardada",
+    archivo: "app/api/compras-proveedor/recibir/[id]/route.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [
+      {
+        de: "const aceptada = costosAceptados.has(det.id) || aceptadoEnElPapel(det.id, costoFinal);",
+        a: "const aceptada = costosAceptados.has(det.id);",
+      },
+    ],
+    esperadas: ["C: cierra", "C: el costo maestro queda en 1150"],
+  },
+  {
+    n: "FC-3",
+    defecto: "el freno vuelve a correr sobre una línea excluida del costo",
+    archivo: "app/api/compras-proveedor/recibir/[id]/route.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [
+      {
+        de: "if (escribeCosto && sugerida.exigeElegir && !aceptada) {",
+        a: "if (sugerida.exigeElegir && !aceptada) {",
+      },
+    ],
+    esperadas: ["I: cierra"],
+  },
+  {
+    n: "FC-4",
+    defecto: "la conversión vuelve a multiplicar por 30 el costo del bulto de la hamburguesa",
+    archivo: "app/api/compras-proveedor/recibir/[id]/route.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "          costoActual: base?.precio_costo ?? null,", a: "          costoActual: null," }],
+    // Sin el costo actual, la línea UNIDAD se multiplica por 30 y el freno la
+    // para como error de escala: el cierre legítimo deja de cerrar.
+    esperadas: ["F costo del bulto en línea UNIDAD: cierra"],
+  },
 ];
 
 // Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número
