@@ -1,6 +1,6 @@
 // LA LISTA DE TRABAJO DE TRANSFERENCIAS, ABIERTA EN UN NAVEGADOR DE VERDAD.
 //
-//   node scripts/capturas-tablero-movil.mjs --base http://localhost:3210 \
+//   node --import ./scripts/alias-loader.mjs scripts/capturas-tablero-movil.mjs --base http://localhost:3210 \
 //     --chrome /usr/bin/chromium --salida /tmp/capturas-tablero \
 //     --usuario 4 --deposito 3 --local 4 --recibida-cerrada 12
 //
@@ -29,20 +29,28 @@
 //
 // ── Y ACÁ ADEMÁS SE ESCRIBE ─────────────────────────────────────────────
 //
-// El paso del corte de semana toca "Cambiar", elige un día y guarda. Eso
-// persiste en `AcuerdoDepositoLocal`, así que este arnés corre SOLO contra la
-// base descartable `erpazul_v15`. Nunca contra producción.
+// El paso de la semana entra como el LOCAL a Configuración → Semana operativa,
+// elige el miércoles y confirma. Eso persiste en `SemanaOperativaVigencia`, así
+// que este arnés corre SOLO contra la base descartable `erpazul_v15`, en la
+// máquina de desarrollo. Nunca contra producción.
 //
 // Y por eso mismo: **se corre UNA vez por siembra.** La segunda corrida sobre la
-// misma base encuentra el acuerdo ya guardado y falla en la primera afirmación
-// —"la relación sin acuerdo se ve MARCADA"—, que es exactamente lo que tiene que
-// hacer: la relación ya está configurada y la marca sería falsa. Volver a
-// sembrar borra los dos locales y el acuerdo se va con ellos en cascada.
+// misma base encuentra la semana ya configurada y falla en la primera afirmación
+// del paso —"el local llega sin semana configurada"—, que es exactamente lo que
+// tiene que hacer: la marca sería falsa. Volver a sembrar borra los locales y la
+// vigencia se va con ellos en cascada.
 
 import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import jwt from "jsonwebtoken";
+// La semana de la ubicación, su permiso y la ruta vieja que redirige a ella: los
+// de la app, no escritos de nuevo acá. Por eso el arnés corre con el cargador.
+import { PERMISO_SEMANA_OPERATIVA } from "../lib/semanaOperativa/semanaOperativa.js";
+import {
+  RUTA_SEMANA_OPERATIVA as RUTA_SEMANA,
+  RUTA_VIEJA_CORTE_DE_SEMANA as RUTA_VIEJA_CORTE,
+} from "../lib/semanaOperativa/rutas.js";
 
 const arg = (n, def) => {
   const i = process.argv.indexOf(`--${n}`);
@@ -88,6 +96,8 @@ const PERMISOS = [
   "transferencias.crear",
   "productos.ver",
   "stock.ver",
+  // Para configurar la semana de la ubicación de la sesión, en el paso 2.
+  PERMISO_SEMANA_OPERATIVA,
 ];
 
 fs.mkdirSync(SALIDA, { recursive: true });
@@ -162,11 +172,23 @@ const filaDelShell = () =>
     return n ? n.innerText.replace(/\\s+/g, ' ').trim() : null;
   })()`);
 
-/** Cuántas relaciones están marcadas como sin configurar, AHORA y en pantalla. */
-const marcasSinConfigurar = () =>
-  evaluar(
-    `(document.body.innerText.match(/Sin configurar/g) || []).length`
-  );
+/** El renglón del aviso de semanas sin configurar, o "" si no está. */
+const avisoDeSemana = () =>
+  evaluar(`(() => {
+    const l = document.body.innerText.split("\\n").find((x) => x.includes("semana configurada"));
+    return l || "";
+  })()`);
+
+/**
+ * Cuántos locales nombra el aviso como sin semana configurada, AHORA y en
+ * pantalla. La lista de la entrada no marca a cada local: la marca es el aviso,
+ * que los nombra separados por coma ("A, B no tienen su semana configurada").
+ */
+async function marcasSinConfigurar() {
+  const aviso = await avisoDeSemana();
+  const nombres = aviso.split(/ no tienen? su semana configurada/)[0];
+  return aviso ? nombres.split(", ").filter(Boolean).length : 0;
+}
 
 const hayTexto = (fragmento) =>
   evaluar(`document.body ? document.body.innerText.includes(${JSON.stringify(fragmento)}) : false`);
@@ -539,12 +561,14 @@ await afirmar(
   `el renglón del shell lleva el título y la acción (dice: ${JSON.stringify(await filaDelShell())})`
 );
 
-// LA ENTRADA PERMANENTE, en el menú y no solo en el aviso.
+// EL MENÚ YA NO OFRECE «CORTE DE SEMANA». La semana es de la ubicación y vive
+// en Configuración → Semana operativa; la ruta vieja solo redirige, y un enlace a
+// ella sería un paso de más que además dice un nombre que ya no existe.
 await afirmar(
   await evaluar(
-    `!!document.querySelector('a[href="/modulos/transferencias/corte-de-semana"]')`
+    `!document.querySelector('a[href="${RUTA_VIEJA_CORTE}"]')`
   ),
-  "el menú ofrece «Corte de semana» aunque no falte configurar nada"
+  "el menú ya no ofrece la ruta vieja de «Corte de semana»"
 );
 
 // ── TODOS LOS LOCALES, TENGAN O NO MOVIMIENTO ───────────────────────────
@@ -583,35 +607,28 @@ await afirmar(
     JSON.stringify(["Abrir Local V15", "Abrir Local V15 sin movimiento"]),
   `y el orden es el alfabético (${JSON.stringify(orden1)})`
 );
-// ── EL AVISO CUENTA AL QUE NO TUVO MOVIMIENTO, Y ESO ES LO QUE AFIRMA ───
+// ── EL AVISO NOMBRA AL QUE NO TUVO MOVIMIENTO, Y ESO ES LO QUE AFIRMA ───
 //
-// Decía "Hay 2 locales sin corte configurado", con el número escrito. El
-// sembrado pasó a configurarle el corte a "Local V15" —hay un acuerdo suyo en
-// `AcuerdoDepositoLocal`— así que hoy el aviso cuenta UNO.
+// Decía "Hay 2 locales sin corte configurado", con el número escrito. Desde
+// PR-2 nombra a los locales —"X no tiene su semana configurada"—, y la semana
+// es de la ubicación (`SemanaOperativaVigencia`), no de un acuerdo: la siembra
+// no configura ninguna, así que hoy nombra a los dos.
 //
-// El número era incidental: lo que este chequeo defiende es que el aviso NO mire
-// solo a los locales que movieron algo. Con el sembrado de hoy se ve MEJOR que
-// antes, porque el único que cuenta es justamente el que no tuvo movimiento.
+// Lo que este chequeo defiende es que el aviso NO mire solo a los locales que
+// movieron algo: el que no tuvo movimiento tiene que estar nombrado.
 //
 // El paso de arriba RECARGA la lista dos veces, así que primero hay que esperar
 // a que vuelva a dibujarse: sin eso se mide una pantalla a medio montar.
 await esperarTexto("LOCALES", 20000);
-const textoDelAviso = await evaluar(`(() => {
-  const l = document.body.innerText.split("\\n").find((x) => x.includes("sin corte configurado"));
-  return l || "";
-})()`);
-await afirmar(Boolean(textoDelAviso), `el aviso de corte está (${textoDelAviso})`);
-const sinCorte = Number(textoDelAviso.replace(/[^0-9]/g, "").slice(0, 2)) || 0;
-const localesListados = await evaluar(
-  `document.querySelectorAll('[aria-label^="Abrir Local"]').length`
-);
+const textoDelAviso = await avisoDeSemana();
+await afirmar(Boolean(textoDelAviso), `el aviso de semana sin configurar está (${textoDelAviso})`);
 await afirmar(
-  sinCorte >= 1 && sinCorte <= localesListados,
-  `el aviso cuenta entre 1 y los ${localesListados} locales listados (dice ${sinCorte})`
+  textoDelAviso.includes("Local V15 sin movimiento"),
+  `el aviso nombra al local SIN MOVIMIENTO: no mira solo a los que movieron (dice: ${textoDelAviso})`
 );
 await afirmar(
   await hayTexto("Local V15 sin movimiento"),
-  "y el local SIN MOVIMIENTO está listado: el aviso no mira solo a los que movieron"
+  "y el local SIN MOVIMIENTO está listado"
 );
 
 // ── EL QUE NO OPERA POR TRANSFERENCIA NO ESTÁ ───────────────────────────
@@ -627,9 +644,11 @@ await afirmar(
 // EL ORDEN YA NO ES POR IMPORTE, y no puede serlo: no hay importe en esta
 // pantalla. Lo que se afirma es que los dos están y que el que no opera por
 // transferencia no.
+// El camino para arreglarlo es el de CADA local, no un botón del depósito: el
+// depósito no puede configurar la semana de otra ubicación.
 await afirmar(
-  await hayTexto("sin corte configurado"),
-  "el aviso de arriba dice cuántas faltan, con el camino para arreglarlo"
+  await hayTexto("Configuración → Semana operativa"),
+  "el aviso de arriba dice dónde se configura la semana"
 );
 await foto(`v40-sin-configurar-${ANCHO}`);
 await afirmarSuperficies("entrada");
@@ -999,7 +1018,8 @@ await afirmar(
 // transparentes.
 const banda = await evaluar(`(() => {
   const b = [...document.querySelectorAll("div")]
-    .filter((e) => e.offsetParent !== null && e.className.includes("sunmi-surface-soft"))
+    // La banda es la de DiaConBanda, pintada con sunmi-control desde 785b953.
+    .filter((e) => e.offsetParent !== null && e.className.includes("sunmi-control"))
     .find((e) => /(Lunes|Martes|Miércoles|Jueves|Viernes|Sábado|Domingo) \\d+/.test(e.innerText));
   if (!b) return null;
   const fondo = getComputedStyle(b).backgroundColor;
@@ -1113,79 +1133,76 @@ await afirmar(
   "y la lista sigue entera al volver"
 );
 
-// ── 2 · EL CORTE DE SEMANA: SE VE, SE CAMBIA Y SE GUARDA ─────────────────
-await abrir("/modulos/transferencias/corte-de-semana", "Corte de semana");
-await afirmar(await hayTexto("Sin configurar"), "la relación sin acuerdo llega marcada");
-await afirmar(await hayTexto("Arranca"), "se ve qué día arranca hoy");
-await afirmar(
-  await hayTexto("Local V15 sin movimiento"),
-  "la pantalla de corte también lista al local que no recibió nada: el acuerdo es de la RELACIÓN, no del movimiento"
-);
-// Pero NO al que no opera por transferencia: un local al que se le vende no
-// tiene ningún corte de pago que acordar.
-await afirmar(
-  !(await hayTexto("Local V15 sin vínculo")),
-  "la pantalla de corte ofrece configurar un local que no opera por transferencia"
-);
-const marcasAntes = await marcasSinConfigurar();
-await afirmar(marcasAntes === 2, `las dos relaciones arrancan sin configurar (son ${marcasAntes})`);
-await foto(`v29-corte-${ANCHO}`);
-await afirmarSuperficies("corte de semana");
-
-// La barra del shell tiene que decir DÓNDE ESTÁS. Por ruta diría
-// "Transferencias" —el módulo—, así que la pantalla registra el suyo.
-await afirmar(
-  (await filaDelShell())?.includes("Corte de semana"),
-  `la barra de arriba dice «Corte de semana» y no el nombre del módulo (dice: ${JSON.stringify(await filaDelShell())})`
-);
-
-await tocar("Cambiar");
-await afirmar(await hayTexto("Guardar"), "editando aparece el botón de guardar");
-await afirmar(await hayTexto("Mié"), "y los siete chips de día");
-
-// ── LA SEÑAL DE EDICIÓN, MEDIDA EN EL NAVEGADOR ─────────────────────────
+// ── 2 · LA SEMANA OPERATIVA: CADA UBICACIÓN CONFIGURA LA SUYA ────────────
 //
-// El candado afirma las CLASES; esto afirma lo que el navegador realmente
-// computa. Son preguntas distintas: una clase puede estar y no llegar a
-// `border-style` si otra regla de la misma familia le gana por orden de hoja.
-const bordeEditando = await evaluar(`(() => {
-  const fila = [...document.querySelectorAll('section')]
-    .find((s) => s.className.includes('border-dashed'));
-  if (!fila) return null;
-  const cs = getComputedStyle(fila);
-  return { estilo: cs.borderTopStyle, ancho: cs.borderTopWidth };
-})()`);
+// Hasta PR-2 esto era "Corte de semana": una pantalla de Transferencias donde
+// el depósito elegía el día de cada local. Hoy la semana es de la UBICACIÓN, se
+// configura en Configuración → Semana operativa y cada una configura solo la
+// suya. La ruta vieja redirige.
+//
+// Las marcas se cuentan en la lista de trabajo ANTES de configurar, para poder
+// afirmar después que bajaron exactamente en uno.
+await abrir(RUTA_CUENTA_MOVIL, "Transferencias");
+await esperarTexto("LOCALES", 20000);
+const marcasAntes = await marcasSinConfigurar();
+await afirmar(marcasAntes === 2, `los dos locales arrancan sin semana configurada (son ${marcasAntes})`);
+
+// LA RUTA VIEJA NO DIBUJA NADA: redirige, en el servidor, a la de la ubicación.
+await abrir(RUTA_VIEJA_CORTE, "Semana operativa");
+const rutaFinal = await evaluar("location.pathname");
+await afirmar(rutaFinal === RUTA_SEMANA, `la ruta vieja lleva a la semana operativa (quedó en ${rutaFinal})`);
 await afirmar(
-  bordeEditando && bordeEditando.estilo === "dashed",
-  `la fila en edición se dibuja punteada (computado: ${JSON.stringify(bordeEditando)})`
+  (await filaDelShell())?.includes("Semana operativa"),
+  `la barra de arriba dice «Semana operativa» (dice: ${JSON.stringify(await filaDelShell())})`
 );
+// El depósito ve SU semana, no la de sus locales: no hay selector de ubicación.
+await afirmar(
+  !(await hayTexto("Local V15")),
+  "la semana del depósito muestra a sus locales: la pantalla eligió otra ubicación"
+);
+await afirmarSuperficies("semana operativa del depósito");
 
-await foto(`v29-editando-${ANCHO}`);
-
+// EL LOCAL CONFIGURA LA SUYA: elige el miércoles y confirma. La primera vez rige
+// desde siempre, así que no hay semana de transición que esperar.
+await entrarComo(LOCAL, "LOCAL (su semana)");
+await abrir(RUTA_SEMANA, "Semana operativa");
+await afirmar(
+  await hayTexto("Todavía no está configurada"),
+  "el local llega sin semana configurada (¿se corrió dos veces sobre la misma siembra?)"
+);
+await tocar("Configurar semana");
+await esperarTexto("¿Qué día empieza tu semana?", 10000);
 await tocar("Mié", { exacto: true });
-await tocar("Guardar");
-await esperar(1500);
+await afirmar(
+  await hayTexto("Tu semana iría de miércoles a martes"),
+  "la vista previa dice la semana del día tocado"
+);
+await foto(`semana-elegir-${ANCHO}`);
+await afirmarSuperficies("semana operativa, eligiendo");
+await tocar("Continuar");
+await tocar("Confirmar cambio", { exacto: true });
+await esperarTexto("Semana actual", 15000);
+await afirmar(await hayTexto("Miércoles a martes"), "guardada, la semana actual es la del día tocado");
+await foto(`semana-guardada-${ANCHO}`);
 
 // ── SE CUENTAN LAS MARCAS, NO SE PREGUNTA SI QUEDA ALGUNA ───────────────
 //
-// Con dos relaciones y una sola configurada, "¿queda algún 'Sin configurar'?"
-// contesta que sí y eso es CORRECTO — la otra sigue sin configurar. Lo que
-// prueba que el guardado funcionó es que la cuenta BAJÓ en uno. Preguntar por
-// la ausencia total habría obligado a configurar las dos para que el candado
-// pasara, o —peor— a aflojarlo.
+// Con dos locales y uno solo configurado, "¿queda alguna marca?" contesta que
+// sí y eso es CORRECTO — el otro sigue sin configurar. Lo que prueba que el
+// guardado funcionó es que la cuenta BAJÓ en uno. Preguntar por la ausencia
+// total habría obligado a configurar los dos para que el candado pasara, o
+// —peor— a aflojarlo.
+await entrarComo(DEPOSITO, "DEPÓSITO (después de la semana del local)");
+await abrir(RUTA_CUENTA_MOVIL, "Transferencias");
+await esperarTexto("LOCALES", 20000);
 await afirmar(
   (await marcasSinConfigurar()) === marcasAntes - 1,
-  `guardado el acuerdo, queda UNA marca menos (antes ${marcasAntes}, ahora ${await marcasSinConfigurar()})`
+  `configurada la semana, queda UNA marca menos (antes ${marcasAntes}, ahora ${await marcasSinConfigurar()})`
 );
-await afirmar(await hayTexto("Mié."), "y el día guardado es el que se tocó");
-await foto(`v29-guardado-${ANCHO}`);
-
-// Y el cambio se ve del otro lado: el local que se configuró deja de estar
-// marcado en la lista de trabajo, y el que no se tocó sigue marcado.
-await abrir(RUTA_CUENTA_MOVIL, "Transferencias");
+const avisoDespues = await avisoDeSemana();
 await afirmar(
-  await hayTexto("Hay 1 local sin corte configurado"),
-  "el aviso baja a uno: el que se configuró salió de la cuenta y el otro sigue"
+  avisoDespues.includes("Local V15 sin movimiento") && !avisoDespues.startsWith("Local V15 no"),
+  `el aviso nombra solo al que sigue sin configurar (dice: ${avisoDespues})`
 );
 await foto(`v40-ya-configurado-${ANCHO}`);
 
