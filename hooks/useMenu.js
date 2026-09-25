@@ -39,13 +39,9 @@ import { useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { useUser } from "@/app/context/UserContext";
 import { useLayoutSettings } from "@/app/context/LayoutSettingsContext";
-import { MENU_CONFIG } from "@/lib/menu/registry";
 import { getDefaultRoute } from "@/lib/getDefaultRoute";
 import { getGrupoConfig } from "@/lib/empresa-config";
-import {
-  canAccessMenuGroup,
-  canAccessMenuItem,
-} from "@/lib/menu/canAccess";
+import { construirMenuVisible } from "@/lib/menu/menuVisible";
 
 export function useMenu() {
   const pathname = usePathname() || "";
@@ -56,39 +52,9 @@ export function useMenu() {
   const isLoading = userCtx?.cargando === true;
   const menuMode = layoutCtx?.menuMode ?? null;
 
-  const menu = useMemo(() => {
-    // Sin perfil no se construye el menú: misma semántica que Etapa 3.
-    // La UI ya tolera `[]` durante el loading.
-    if (!perfil) return [];
-
-    const grupoConfig = getGrupoConfig();
-    const result = [];
-
-    for (const group of MENU_CONFIG) {
-      const groupCheck = canAccessMenuGroup(
-        perfil,
-        grupoConfig,
-        group,
-        MENU_CONFIG
-      );
-      if (!groupCheck.visible) continue;
-
-      const items = Array.isArray(group.items) ? group.items : [];
-      const visibleItems = items.filter(
-        (item) =>
-          canAccessMenuItem(perfil, grupoConfig, item, MENU_CONFIG).visible
-      );
-
-      // Descartar grupos sin items visibles, salvo los `core`
-      // (ej. Inicio) que son siempre alcanzables vía group.href.
-      if (visibleItems.length === 0 && group.type !== "core") continue;
-
-      // Copia superficial: no mutamos MENU_CONFIG.
-      result.push({ ...group, items: visibleItems });
-    }
-
-    return result;
-  }, [perfil]);
+  // El cálculo vive en `lib/menu/menuVisible.js`, puro, para que los candados
+  // ejerciten el mismo que dibuja la app.
+  const menu = useMemo(() => construirMenuVisible(perfil, getGrupoConfig()), [perfil]);
 
   const homeRoute = useMemo(() => getDefaultRoute(menuMode), [menuMode]);
 

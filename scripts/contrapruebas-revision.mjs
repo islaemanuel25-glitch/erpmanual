@@ -739,6 +739,34 @@ const CASOS = [
     candado: "el selector es el del kit, con los siete días, y FUERA de una tarjeta",
     suite: "lib/semanaOperativa/pantalla.test.mjs",
   },
+  // ── LOS ACCESOS RÁPIDOS DEL PANEL ──────────────────────────────────────
+  {
+    n: "D-1",
+    defecto: "el Panel vuelve a ofrecer un acceso a sí mismo (Inicio) y Configuración queda afuera",
+    archivo: "lib/dashboard/accesosRapidos.js",
+    de: "      if (!href || href === rutaActual) return null;",
+    a: "      if (!href) return null;",
+    candado: "Inicio no aparece entre los accesos rápidos del Panel",
+    suite: "lib/dashboard/accesosRapidos.test.mjs",
+  },
+  {
+    n: "D-2",
+    defecto: "el tope se aplica ANTES de descartar la pantalla actual: queda un lugar vacío",
+    archivo: "lib/dashboard/accesosRapidos.js",
+    de: "    .filter(Boolean)\n    .slice(0, MAX_ACCESOS);",
+    a: "    .slice(0, MAX_ACCESOS)\n    .filter(Boolean);",
+    candado: "un administrador con * ve Configuración, en el orden del menú",
+    suite: "lib/dashboard/accesosRapidos.test.mjs",
+  },
+  {
+    n: "D-3",
+    defecto: "la regla del Panel se aplica al menú general y Inicio sale de la navegación",
+    archivo: "lib/menu/menuVisible.js",
+    de: "    result.push({ ...group, items: visibleItems });",
+    a: '    if (group.key !== "inicio") result.push({ ...group, items: visibleItems });',
+    candado: "la navegación general conserva Inicio: el menú visible lo sigue teniendo",
+    suite: "lib/dashboard/accesosRapidos.test.mjs",
+  },
   // ── CANCELAR SOLO LO QUE NO EMPEZÓ ─────────────────────────────────────
   {
     n: "S-7",

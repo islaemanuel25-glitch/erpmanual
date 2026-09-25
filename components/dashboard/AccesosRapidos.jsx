@@ -18,47 +18,23 @@
 //     visible (evita linkear a una ruta sin permiso); si no,
 //     se usa el primer item visible del grupo.
 //   - Máximo 8 accesos.
+//   - Sin acceso a la pantalla en la que ya se está (el Panel es
+//     Inicio): la tarjeta "Inicio" ocupaba un lugar para no ir a
+//     ningún lado. La regla vive en `lib/dashboard/accesosRapidos.js`.
 //   - Empty state si no hay accesos.
 // ============================================================
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useMenu } from "@/hooks/useMenu";
-
-const MAX_ACCESOS = 8;
-
-/**
- * Determina la ruta destino para un grupo del menú visible.
- * Devuelve null si no hay ningún item visible al que apuntar.
- *
- * @param {{ href?: string, items?: Array<{ href?: string }> }} group
- * @returns {string|null}
- */
-function resolveHref(group) {
-  const items = Array.isArray(group?.items) ? group.items : [];
-  if (group?.href && items.some((it) => it.href === group.href)) {
-    return group.href;
-  }
-  return items[0]?.href ?? null;
-}
+import { accesosDelPanel } from "@/lib/dashboard/accesosRapidos";
 
 export default function AccesosRapidos({ variant = "mobile" }) {
   const { menu } = useMenu();
+  const rutaActual = usePathname() || "";
   const isDesktop = variant === "desktop";
 
-  const accesos = (Array.isArray(menu) ? menu : [])
-    .map((group) => {
-      const href = resolveHref(group);
-      if (!href) return null;
-      return {
-        key: group.key,
-        label: group.label,
-        href,
-        Icon: group.icon,
-        color: group.color || "gray",
-      };
-    })
-    .filter(Boolean)
-    .slice(0, MAX_ACCESOS);
+  const accesos = accesosDelPanel(menu, rutaActual);
 
   if (accesos.length === 0) {
     return (
