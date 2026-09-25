@@ -1,6 +1,10 @@
 // app/api/transferencias/acuerdos/route.js
 //
-// EL CORTE DE SEMANA QUE VE LA PANTALLA "CORTE DE SEMANA" DE TRANSFERENCIAS.
+// EL ENDPOINT VIEJO DE "CORTE DE SEMANA", QUE YA NO TIENE PANTALLA.
+//
+// La pantalla `/modulos/transferencias/corte-de-semana` hoy solo redirige a
+// Configuración → Semana operativa, que usa `/api/config/semana-operativa`. Esta
+// ruta sigue viva hasta que se decida sacarla; nada nuevo tiene que llamarla.
 //
 // GET  → los locales del grupo que operan por transferencia, con el día en que
 //        arranca SU semana, su rango en curso y el cambio programado si hay uno.

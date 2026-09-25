@@ -44,7 +44,7 @@ export default function CabeceraDeCuenta({ cuenta, unidad, money }) {
 
       {cuenta?.sinConfigurar && (
         <div className="text-sm2 sunmi-text-warning">
-          El corte de semana de este local no está configurado: se está usando el domingo.
+          La semana de este local no está configurada: se está usando el domingo.
         </div>
       )}
 
