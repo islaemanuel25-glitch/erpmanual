@@ -25,7 +25,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 
-import { textoDelPrecioDeVenta } from "@/components/proveedores/listas/HojaConfirmarAplicar";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
+import HojaConfirmarAplicar, { textoDelPrecioDeVenta } from "@/components/proveedores/listas/HojaConfirmarAplicar";
 import { MODO_PRECIO_VENTA } from "@/lib/proveedores/listas/aplicacion";
 
 const RAIZ = path.resolve(import.meta.dirname, "../../..");
@@ -99,8 +102,23 @@ test("NINGÚN camino para aplicar esconde el botón detrás de una casilla", () 
 });
 
 test("los dos botones de la hoja llegan a los 44 px", () => {
-  const fuente = leer("components/proveedores/listas/HojaConfirmarAplicar.jsx");
-  const botones = fuente.match(/<SunmiButton[\s\S]*?>/g) ?? [];
+  // Se mira lo que la hoja DIBUJA, no su fuente. Los botones se mudaron al kit
+  // (`SunmiHojaDeConfirmacion`) cuando la semana operativa necesitó la misma
+  // hoja, y un candado que buscaba `<SunmiButton` en este archivo habría dado
+  // rojo por la mudanza —o, peor, verde mirando un archivo que ya no los tiene—.
+  const html = renderToStaticMarkup(
+    React.createElement(HojaConfirmarAplicar, {
+      cantidad: 3,
+      proveedor: "Proveedor",
+      onAplicar() {},
+      onVolver() {},
+    })
+  );
+  const botones = [...html.matchAll(/<button[^>]*class="([^"]*)"[^>]*>([\s\S]*?)<\/button>/g)].filter(
+    (m) => /Sí, aplicar|Volver/.test(m[2])
+  );
   assert.equal(botones.length, 2, "la hoja tiene dos botones y nada más");
-  for (const b of botones) assert.match(b, /min-h-toque/, `un botón de la hoja mide menos de 44: ${b}`);
+  for (const b of botones) {
+    assert.ok(b[1].split(/\s+/).includes("min-h-toque"), `un botón de la hoja mide menos de 44: ${b[2]}`);
+  }
 });

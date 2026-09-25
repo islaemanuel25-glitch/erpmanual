@@ -1,14 +1,20 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-24 22:14
+**Fecha:** 2026-09-25 10:13
 
 ## Módulos modificados recientemente
 
 ### transferencias
-- feat(semana): la semana operativa es de la ubicación, con su historia, refactor(periodo): una sola banda del día, la de Recibir mercadería, y se acomoda cuando no entra — SIN VERIFICAR en teléfono con datos reales, refactor(periodo): ResumenConImporte y FilaConImporte, sacados de Transferencias
-- Archivos: 9 modificados (9 total)
+- fix(semana): «corte de semana» deja de ser un nombre de la app, con candado sobre el repo entero, feat(semana): pantalla de Semana operativa en Configuración, con cancelar el cambio programado
+- Archivos: 12 modificados (12 total)
+
+### configuracion
+- fix(kit): cada opción del selector se toca en 44 px aunque la caja mida menos, feat(semana): pantalla de Semana operativa en Configuración, con cancelar el cambio programado
+- Archivos: 1 nuevos, 1 modificados (2 total)
 
 
+## Archivos nuevos desde última sincronización
+- app/modulos/configuracion/semana-operativa/page.jsx
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai

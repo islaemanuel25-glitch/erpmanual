@@ -40,16 +40,18 @@ import { money, useCuentaDeLocal } from "./useCuentaDeLocal";
 
 import { useUser } from "@/app/context/UserContext";
 import { useAccionDePagina } from "@/app/context/AccionDePaginaContext";
-import { RUTA_CORTE_DE_SEMANA, puedeConfigurarElCorte } from "./corteDeSemana";
+import { RUTA_SEMANA_OPERATIVA, puedeConfigurarLaSemana } from "@/lib/semanaOperativa/rutas";
 import { urlDelDetalle } from "@/lib/transferencias/contextoDelTablero";
 
 export default function TableroMovil({ onAbrirReporte = null }) {
   const router = useRouter();
   const { perfil } = useUser();
-  // El atajo solo se ofrece a quien puede usarlo. Un "Configurar" que lleva a
-  // una pantalla donde no se puede configurar nada es peor que no ofrecerlo: el
-  // aviso igual explica por qué ese local está cayendo al domingo.
-  const puedeConfigurar = puedeConfigurarElCorte(perfil?.permisos);
+  // El atajo a la semana solo se ofrece a quien puede usarlo, y solo en la
+  // cuenta PROPIA del local: la pantalla de semana operativa configura la
+  // ubicación en la que se opera. Desde la entrada del depósito no se ofrece
+  // —llevaría al depósito a cambiar SU semana creyendo que cambia la de un local—:
+  // ahí el aviso solo informa qué locales faltan.
+  const puedeConfigurar = puedeConfigurarLaSemana(perfil?.permisos);
 
   // ── LAS DOS CONSULTAS, Y SOLO UNA SE USA ────────────────────────────────
   //
@@ -115,9 +117,7 @@ export default function TableroMovil({ onAbrirReporte = null }) {
           // que estaban, así que esta pantalla no cambia.
           rotulo="LOCALES"
           textoVacio="Ningún local opera por transferencia con este depósito."
-          sinConfigurar={(cuenta.datos.locales || []).filter((l) => l.sinConfigurar).length}
-          puedeConfigurar={puedeConfigurar}
-          onConfigurar={() => router.push(RUTA_CORTE_DE_SEMANA)}
+          localesSinSemana={(cuenta.datos.locales || []).filter((l) => l.sinConfigurar).map((l) => l.nombre)}
           onEntrar={(l) => router.push(`/modulos/transferencias/local/${l.localId}`)}
         />
       )}
@@ -128,7 +128,7 @@ export default function TableroMovil({ onAbrirReporte = null }) {
           {...cuenta}
           money={money}
           puedeConfigurarCorte={puedeConfigurar}
-          onConfigurarCorte={() => router.push(RUTA_CORTE_DE_SEMANA)}
+          onConfigurarCorte={() => router.push(RUTA_SEMANA_OPERATIVA)}
           // EL CONTEXTO VIAJA CON EL LINK. Sin esto, volver del detalle caía en
           // el período de hoy: la pantalla se remonta y el estado arranca en su
           // valor por defecto. Es un `push` —el detalle SÍ es otro lugar— y las

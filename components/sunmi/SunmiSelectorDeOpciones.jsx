@@ -78,7 +78,28 @@ export default function SunmiSelectorDeOpciones({
             //
             // El resto son los ejes que `SunmiButton` cede cuando la pantalla
             // los declara: alto, padding, radio, tamaño y peso de letra.
-            className={`flex-1 basis-0 justify-center py-2.5 px-1 rounded-lg text-sm3 ${
+            //
+            // `min-h-toque` es el mínimo táctil del proyecto, 44 px. Sin él la
+            // tecla heredaba los 36 de `sunmi-btn-parte-alto`, que para un dedo
+            // en un Sunmi es un blanco que se falla. Va ACÁ, en la pieza, y no en
+            // cada pantalla: el toque es una propiedad del selector.
+            //
+            // ── EL ANCHO TÁCTIL NO ES EL ANCHO QUE SE VE ─────────────────────
+            //
+            // Con siete opciones en un teléfono de 360 no entran siete cajas de
+            // 44 px VISIBLES con su separación. Lo que sí entra es que cada una
+            // se TOQUE en todo su tramo: el `::after` transparente se extiende
+            // 3,5 px a cada lado —`-inset-x-1`— y cubre los 5,25 del gap, así que
+            // el área táctil de cada tecla es su paso completo (ancho + gap) y no
+            // queda franja muerta entre dos. Donde se pisan, gana la de la
+            // derecha, que pinta encima; ninguna queda por debajo del paso.
+            //
+            // No cambia nada de lo que se ve: el pseudo-elemento no tiene fondo,
+            // borde ni contenido, y el botón no recorta lo que sale de su caja.
+            // Lo sostiene `components/sunmi/selectorDeOpcionesToque.test.mjs`; la
+            // medición en un navegador real, a 360, 390 y 412, está en el commit
+            // que lo trajo.
+            className={`relative after:absolute after:inset-y-0 after:-inset-x-1 flex-1 basis-0 justify-center min-h-toque py-2.5 px-1 rounded-lg text-sm3 ${
               activo ? "font-semibold" : "font-medium"
             }`}
           >

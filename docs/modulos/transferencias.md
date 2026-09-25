@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-09-24 22:14
+**Última actualización:** 2026-09-25 02:51
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -194,6 +194,8 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-09-25: fix(semana): «corte de semana» deja de ser un nombre de la app, con candado sobre el repo entero
+- 2026-09-25: feat(semana): pantalla de Semana operativa en Configuración, con cancelar el cambio programado
 - 2026-09-24: feat(semana): la semana operativa es de la ubicación, con su historia
 - 2026-09-24: refactor(periodo): una sola banda del día, la de Recibir mercadería, y se acomoda cuando no entra — SIN VERIFICAR en teléfono con datos reales
 - 2026-09-24: refactor(periodo): ResumenConImporte y FilaConImporte, sacados de Transferencias

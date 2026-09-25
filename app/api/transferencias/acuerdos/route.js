@@ -1,6 +1,10 @@
 // app/api/transferencias/acuerdos/route.js
 //
-// EL CORTE DE SEMANA QUE VE LA PANTALLA "CORTE DE SEMANA" DE TRANSFERENCIAS.
+// EL ENDPOINT VIEJO DE "CORTE DE SEMANA", QUE YA NO TIENE PANTALLA.
+//
+// La pantalla `/modulos/transferencias/corte-de-semana` hoy solo redirige a
+// Configuración → Semana operativa, que usa `/api/config/semana-operativa`. Esta
+// ruta sigue viva hasta que se decida sacarla; nada nuevo tiene que llamarla.
 //
 // GET  → los locales del grupo que operan por transferencia, con el día en que
 //        arranca SU semana, su rango en curso y el cambio programado si hay uno.
@@ -136,9 +140,9 @@ export async function GET(req) {
     // Cualquiera de los dos alcanza: el que mira Transferencias, o el que
     // configura la semana, que no tiene por qué tener permisos de Transferencias.
     // Lo que esta ruta devuelve —locales, día, rango y cambio programado— no trae
-    // importes ni transferencias. Es la misma lista que
-    // `PERMISOS_PARA_VER_EL_CORTE` (`components/transferencias/corteDeSemana.js`),
-    // y un candado compara las dos.
+    // importes ni transferencias. La pantalla que la llamaba ("Corte de semana")
+    // hoy redirige a Configuración → Semana operativa, que usa su propia ruta;
+    // ésta queda viva hasta una limpieza posterior.
     const perm = checkPerm(session, ["transferencias.ver", PERMISO_SEMANA_OPERATIVA]);
     if (!perm.ok) {
       return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
@@ -181,9 +185,7 @@ export async function PUT(req) {
     }
 
     // Cambiar la semana es cambiar la semana de TODA la ubicación, así que el
-    // permiso es el suyo y no el de despachar. La pantalla usa la misma constante
-    // (`components/transferencias/corteDeSemana.js`) para no ofrecer el botón a
-    // quien el servidor va a rechazar.
+    // permiso es el suyo y no el de despachar.
     const perm = checkPerm(session, PERMISO_SEMANA_OPERATIVA);
     if (!perm.ok) {
       return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });

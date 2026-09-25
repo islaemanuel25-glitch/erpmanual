@@ -313,11 +313,37 @@ test("D10 · `insigniaDe` se aplica local por local, no a todos", () => {
   assert.equal((salida.match(/sunmi-text-muted">Depósito</g) || []).length, 1);
 });
 
-test("D11 · el aviso de corte NO se dibuja cuando nadie manda `sinConfigurar`", () => {
+test("D11 · el aviso de la semana NO se dibuja cuando nadie manda `localesSinSemana`", () => {
   // Es lo que permite que Finanzas use la misma pieza sin heredar un aviso que
-  // allá no significa nada: su período no depende de ningún acuerdo.
-  const salida = h(EntradaDeLocales, { locales: [{ localId: 2, nombre: "mini el 7" }] });
-  assert.doesNotMatch(salida, /Corte de semana sin configurar/);
+  // allá no significa nada. Se afirma con la contraparte POSITIVA al lado: si el
+  // texto del aviso cambiara, un `doesNotMatch` solo seguiría verde sin mirar.
+  const locales = [{ localId: 2, nombre: "mini el 7" }];
+  const sin = h(EntradaDeLocales, { locales });
+  const con = h(EntradaDeLocales, { locales, localesSinSemana: ["mini el 7"] });
+  assert.match(con, /Semana sin configurar/, "con locales sin semana, el aviso tiene que dibujarse");
+  assert.doesNotMatch(sin, /Semana sin configurar/);
+});
+
+test("D12 · el aviso del depósito INFORMA cuáles faltan y no ofrece configurarlos", () => {
+  // La semana se configura sobre la ubicación en la que se opera. Un botón acá
+  // llevaría al depósito a cambiar SU semana creyendo que cambia la del local.
+  const salida = h(EntradaDeLocales, {
+    locales: [
+      { localId: 2, nombre: "mini el 7" },
+      { localId: 4, nombre: "Casiano casas" },
+    ],
+    localesSinSemana: ["mini el 7", "Casiano casas"],
+  });
+  assert.match(salida, /mini el 7, Casiano casas no tienen su semana configurada/);
+  assert.match(salida, /Cada local la configura desde su ubicación/);
+  // Solo el aviso: del título al cierre de su párrafo. Las tarjetas de los
+  // locales que vienen después SÍ son botones —para entrar a cada uno— y no
+  // cuentan.
+  const inicio = salida.indexOf("Semana sin configurar");
+  const aviso = salida.slice(inicio, salida.indexOf("</p>", salida.indexOf("Cada local la configura")));
+  assert.ok(inicio >= 0 && aviso.length > 0, "no se encontró el aviso");
+  assert.doesNotMatch(aviso, /<button|<a /, "el aviso volvió a ofrecer un botón para configurar otro local");
+  assert.doesNotMatch(aviso, />Configurar</);
 });
 
 // ══════════════════════════════════════════════════════════════════════════

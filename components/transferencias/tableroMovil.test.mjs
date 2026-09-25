@@ -36,7 +36,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import BloqueLocal from "./BloqueLocal.jsx";
 import CabeceraDeCuenta from "./CabeceraDeCuenta.jsx";
 import FilaTransferenciaLocal from "./FilaTransferenciaLocal.jsx";
-import FilaCorteDeSemana from "./FilaCorteDeSemana.jsx";
 import ChipsDePeriodo from "./ChipsDePeriodo.jsx";
 
 import { bloquesPorLocal, cuentaDelLocal } from "@/lib/transferencias/bloquesPorLocal";
@@ -413,21 +412,9 @@ test("E3 · una relación SIN ACUERDO se ve marcada, y no cae al domingo en sile
   const salida = html(React.createElement(BloqueLocal, { bloque: bloqueListo(bs[0]), money }));
   assert.ok(salida.includes("Sin corte"), "la píldora de 'sin configurar' no se dibujó");
   assert.ok(salida.includes("sunmi-border-warning"), "la marca no lleva el borde de advertencia del kit");
-
-  // Y en la pantalla de configuración, la misma relación con su propia marca.
-  const fila = html(
-    React.createElement(FilaCorteDeSemana, {
-      relacion: {
-        localId: 9,
-        localNombre: "Local nuevo",
-        depositoNombre: "depo",
-        diaDeCorte: 0,
-        sinConfigurar: true,
-        rango: { desde: "2026-09-13", hasta: "2026-09-19" },
-      },
-    })
-  );
-  assert.ok(fila.includes("Sin configurar"), "la fila del corte no marca la relación sin acuerdo");
+  // La pantalla de configuración ya no es una lista de relaciones: es la de la
+  // ubicación en la que se opera, y su estado "Todavía no está configurada" lo
+  // afirma `lib/semanaOperativa/pantalla.test.mjs`.
 });
 
 // ── 2 · EL BORDE EN WARNING SIGNIFICA QUE EL TOTAL ESTÁ ABIERTO ────────────
@@ -552,43 +539,8 @@ test("E8 · el avance NO cuenta las líneas agregadas en la recepción", () => {
 
 // ── 4 · LA PANTALLA DE CORTE ───────────────────────────────────────────────
 
-test("E9 · la fila del corte: sin editar muestra el día, editando muestra los siete", () => {
-  const relacion = {
-    localId: 2,
-    localNombre: "mini el 7",
-    depositoNombre: "depo",
-    diaDeCorte: 1,
-    sinConfigurar: false,
-    rango: { desde: "2026-09-14", hasta: "2026-09-20" },
-  };
-
-  const quieto = html(React.createElement(FilaCorteDeSemana, { relacion }));
-  assert.ok(quieto.includes("Arranca"), "falta el rótulo del día de arranque");
-  assert.ok(quieto.includes("Lun."), "no dice qué día arranca");
-  assert.ok(quieto.includes("Cambiar"), "no ofrece cambiarlo");
-  assert.ok(quieto.includes("14/09 al 20/09"), "no muestra la semana en curso");
-  assert.ok(!quieto.includes("Guardar"), "sin editar no hay nada que guardar");
-
-  const editando = html(
-    React.createElement(FilaCorteDeSemana, {
-      relacion: { ...relacion, rangoPropuesto: { desde: "2026-09-15", hasta: "2026-09-21" } },
-      editando: true,
-      diaElegido: 2,
-    })
-  );
-  for (const d of ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]) {
-    assert.ok(editando.includes(d), `falta el chip de ${d}`);
-  }
-  assert.ok(editando.includes("Guardar"), "editando tiene que poder guardar");
-  assert.ok(
-    editando.includes("15/09 al 21/09"),
-    "el pie tiene que mostrar el rango que produce el día TOCADO, no el guardado"
-  );
-  // La fila en edición se distingue por el borde PUNTEADO y no por un color:
-  // en sunmiSand `--pos-accent` y `--pos-warning` son el mismo hexadecimal. El
-  // porqué, medido sobre los catorce temas, está en `senalDeEdicion.test.mjs`.
-  assert.ok(editando.includes("border-dashed"), "la fila en edición no se distingue");
-});
+// E9 afirmaba la fila de la pantalla vieja de corte, que se retiró con la
+// pantalla: la ruta vieja redirige a Configuración → Semana operativa.
 
 test("E10 · los cuatro chips de período, uno solo activo", () => {
   const salida = html(React.createElement(ChipsDePeriodo, { valor: UNIDADES.SEMANA }));

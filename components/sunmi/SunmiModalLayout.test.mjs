@@ -720,7 +720,13 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // es lo que espera quien la abrió sin querer.
     //
     // Lo grave lo sostiene el botón "Sí, aplicar", que hay que ir a buscar.
-    "components/proveedores/listas/HojaConfirmarAplicar.jsx": false,
+    //
+    // Desde la tanda de la semana operativa el modal de esta hoja lo dibuja
+    // `components/sunmi/SunmiHojaDeConfirmacion.jsx`, que salió de acá tal cual,
+    // así que este archivo ya no nombra a `SunmiModalLayout` y deja de estar en
+    // este censo. La decisión es la misma y la sostiene la pieza, que NO declara
+    // `destructivo`: vale para esta hoja y para la confirmación de la semana.
+    "components/sunmi/SunmiHojaDeConfirmacion.jsx": false,
     // ── PASAR UN CONTROL A ACTUALIZAR: `true`, Y ES SU HERMANA LA QUE LO
     //    EXPLICA ───────────────────────────────────────────────────────────
     //

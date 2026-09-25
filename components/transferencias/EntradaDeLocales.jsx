@@ -28,7 +28,6 @@
 
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
-import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import { TriangleAlert } from "lucide-react";
 
 import TarjetaDeLocal from "./TarjetaDeLocal";
@@ -47,17 +46,22 @@ import TarjetaDeLocal from "./TarjetaDeLocal";
  * compartida es lo que hace que la segunda pantalla tenga que mentir o copiar
  * el componente.
  *
- * El aviso de corte de semana NO se parametrizó: ya se dibuja solo cuando
- * `sinConfigurar > 0`, y Finanzas no manda ese dato porque no tiene corte
- * acordado. Queda apagado sin tocar nada.
+ * El aviso de la semana NO se parametrizó: se dibuja solo cuando llegan
+ * `localesSinSemana`, y Finanzas no los manda. Queda apagado sin tocar nada.
+ *
+ * ── `localesSinSemana`: SOLO INFORMA ─────────────────────────────────────
+ *
+ * Los nombres de los locales que todavía no tienen su semana operativa. El aviso
+ * dice cuáles son y NO ofrece configurarlos: la semana se configura en
+ * Configuración → Semana operativa, sobre la ubicación en la que se opera, así
+ * que un botón desde el depósito llevaría a cambiar la semana del depósito
+ * creyendo que se cambia la de un local. Cada local configura la suya.
  */
 export default function EntradaDeLocales({
   locales = [],
   cargando = false,
   error = "",
-  sinConfigurar = 0,
-  puedeConfigurar = false,
-  onConfigurar,
+  localesSinSemana = [],
   onEntrar,
   rotulo = "LOCALES",
   textoVacio = "Ningún local opera por transferencia con este depósito.",
@@ -70,14 +74,12 @@ export default function EntradaDeLocales({
 }) {
   return (
     <div className="space-y-3.5">
-      {sinConfigurar > 0 && (
-        <SunmiAviso tono="warning" icon={TriangleAlert} titulo="Corte de semana sin configurar">
-          {sinConfigurar === 1
-            ? "Hay 1 local sin corte configurado: se le está aplicando el domingo."
-            : `Hay ${sinConfigurar} locales sin corte configurado: se les está aplicando el domingo.`}{" "}
-          {puedeConfigurar && (
-            <SunmiLinkButton onClick={onConfigurar}>Configurar</SunmiLinkButton>
-          )}
+      {localesSinSemana.length > 0 && (
+        <SunmiAviso tono="warning" icon={TriangleAlert} titulo="Semana sin configurar">
+          {localesSinSemana.length === 1
+            ? `${localesSinSemana[0]} no tiene su semana configurada: se le está aplicando el domingo.`
+            : `${localesSinSemana.join(", ")} no tienen su semana configurada: se les está aplicando el domingo.`}{" "}
+          Cada local la configura desde su ubicación, en Configuración → Semana operativa.
         </SunmiAviso>
       )}
 

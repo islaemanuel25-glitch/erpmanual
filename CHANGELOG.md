@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-09-25] - Actualización: transferencias, configuracion
+
+### Modificado
+- **transferencias**: feat(semana): pantalla de Semana operativa en Configuración, con cancelar el cambio programado
+- **configuracion**: feat(semana): pantalla de Semana operativa en Configuración, con cancelar el cambio programado
+
+
 ## [2026-09-24] - Actualización: compras-proveedor
 
 ### Modificado
