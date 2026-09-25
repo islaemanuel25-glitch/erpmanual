@@ -1,15 +1,15 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-25 02:15
+**Fecha:** 2026-09-25 02:51
 
 ## Módulos modificados recientemente
 
 ### transferencias
-- feat(semana): pantalla de Semana operativa en Configuración, con cancelar el cambio programado
-- Archivos: 11 modificados (11 total)
+- fix(semana): «corte de semana» deja de ser un nombre de la app, con candado sobre el repo entero, feat(semana): pantalla de Semana operativa en Configuración, con cancelar el cambio programado
+- Archivos: 12 modificados (12 total)
 
 ### configuracion
-- feat(semana): pantalla de Semana operativa en Configuración, con cancelar el cambio programado
+- fix(kit): cada opción del selector se toca en 44 px aunque la caja mida menos, feat(semana): pantalla de Semana operativa en Configuración, con cancelar el cambio programado
 - Archivos: 1 nuevos, 1 modificados (2 total)
 
 
