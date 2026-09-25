@@ -789,38 +789,6 @@ export async function POST(req, { params }) {
           costoActual: base?.precio_costo ?? null,
         });
 
-        // ── UN COSTO NO SE MULTIPLICA NI SE DIVIDE POR TRES SIN QUE ALGUIEN LO DIGA ──
-        //
-        // El 2026-09-22 el cierre del pedido 242 escribió el costo de la
-        // Hamburguesa Paty en $1.851.090 contra los $61.703 que tenía —treinta
-        // veces— y arrastró el precio de venta de $80.300 a $2.406.500 en las
-        // cinco ubicaciones. Nadie lo decidió: Emanuel había elegido justamente
-        // "dejo el mío" sobre ese renglón.
-        //
-        // Un salto así no es un aumento: es una escala equivocada. Así que el
-        // cierre FRENA, y solo pasa si la persona aceptó ese costo en esta
-        // misma recepción. La mercadería no entra a medias — el cierre es una
-        // transacción, así que no entra nada y se vuelve a intentar.
-        const anterior = Number(base?.precio_costo ?? 0);
-        const sugerida = decisionDeCostoSugerida({
-          papel: costoMaestro,
-          tuyo: anterior,
-          variacionPct: variacionNormalPct,
-          factorPack: base?.factor_pack,
-        });
-        if (sugerida.exigeElegir && !costosAceptados.has(det.id)) {
-          const aviso = textoDeLaDiferencia(sugerida, {
-            proveedor: nombreDelProveedor,
-            moneda: formatearMoneda,
-            papel: costoMaestro,
-            tuyo: anterior,
-          });
-          throw new ErrorParaLaPersona(
-            `${base?.nombre || "Un producto"}: ${aviso} Abrí Corregir, elegí qué precio queda y ` +
-              `volvé a cerrar. No entró nada.`
-          );
-        }
-
         // ── LA FRONTERA ─────────────────────────────────────────────────
         //
         // Todo lo de arriba —el stock, el detalle del pedido, el total de la
@@ -849,6 +817,46 @@ export async function POST(req, { params }) {
         const escribeCosto = fronteraCostoActiva
           ? decision.escribe
           : !costosExcluidos.has(det.id);
+
+        // ── UN COSTO NO SE MULTIPLICA NI SE DIVIDE POR TRES SIN QUE ALGUIEN LO DIGA ──
+        //
+        // El 2026-09-22 el cierre del pedido 242 escribió el costo de la
+        // Hamburguesa Paty en $1.851.090 contra los $61.703 que tenía —treinta
+        // veces— y arrastró el precio de venta de $80.300 a $2.406.500 en las
+        // cinco ubicaciones. Nadie lo decidió: Emanuel había elegido justamente
+        // "dejo el mío" sobre ese renglón.
+        //
+        // Un salto así no es un aumento: es una escala equivocada. Así que el
+        // cierre FRENA, y solo pasa si la persona aceptó ese costo en esta
+        // misma recepción. La mercadería no entra a medias — el cierre es una
+        // transacción, así que no entra nada y se vuelve a intentar.
+        //
+        // ── Y SOLO FRENA LO QUE SE VA A ESCRIBIR ─────────────────────────
+        //
+        // Va DESPUÉS de `escribeCosto` y pregunta por él: el freno existe para
+        // que un costo que nadie decidió no llegue al catálogo, y una línea
+        // excluida —la que llegó sin papel— no escribe ninguno. Frenarla dejaba
+        // la recepción trabada por una diferencia que después no se iba a
+        // persistir, sin nada que la persona pudiera elegir para destrabarla.
+        const anterior = Number(base?.precio_costo ?? 0);
+        const sugerida = decisionDeCostoSugerida({
+          papel: costoMaestro,
+          tuyo: anterior,
+          variacionPct: variacionNormalPct,
+          factorPack: base?.factor_pack,
+        });
+        if (escribeCosto && sugerida.exigeElegir && !costosAceptados.has(det.id)) {
+          const aviso = textoDeLaDiferencia(sugerida, {
+            proveedor: nombreDelProveedor,
+            moneda: formatearMoneda,
+            papel: costoMaestro,
+            tuyo: anterior,
+          });
+          throw new ErrorParaLaPersona(
+            `${base?.nombre || "Un producto"}: ${aviso} Abrí Corregir, elegí qué precio queda y ` +
+              `volvé a cerrar. No entró nada.`
+          );
+        }
 
         decisionesDeCosto.push({
           detalleId: det.id,
