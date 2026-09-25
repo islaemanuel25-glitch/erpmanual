@@ -721,6 +721,24 @@ const CASOS = [
     candado: "cada tecla pide el mínimo táctil y el botón le cede su alto de 36 px",
     suite: "components/sunmi/selectorDeOpcionesToque.test.mjs",
   },
+  {
+    n: "K-2",
+    defecto: "el área táctil vuelve a ser la caja: queda una franja muerta en cada gap",
+    archivo: "components/sunmi/SunmiSelectorDeOpciones.jsx",
+    de: "relative after:absolute after:inset-y-0 after:-inset-x-1 flex-1",
+    a: "relative after:absolute after:inset-y-0 flex-1",
+    candado: "cada tecla extiende su área táctil sobre el gap, sin franja muerta",
+    suite: "components/sunmi/selectorDeOpcionesToque.test.mjs",
+  },
+  {
+    n: "K-3",
+    defecto: "el selector de días vuelve adentro de una tarjeta, donde a 360 px no llega a 44",
+    archivo: "app/modulos/configuracion/semana-operativa/page.jsx",
+    de: '          {modo === "elegir" && (\n            <div className="space-y-3">',
+    a: '          {modo === "elegir" && (\n            <SunmiCard className="p-4 space-y-3">',
+    candado: "el selector es el del kit, con los siete días, y FUERA de una tarjeta",
+    suite: "lib/semanaOperativa/pantalla.test.mjs",
+  },
   // ── CANCELAR SOLO LO QUE NO EMPEZÓ ─────────────────────────────────────
   {
     n: "S-7",

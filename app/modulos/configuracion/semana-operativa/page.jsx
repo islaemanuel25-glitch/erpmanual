@@ -27,7 +27,6 @@ import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiSelectorDeOpciones from "@/components/sunmi/SunmiSelectorDeOpciones";
 import SunmiHojaDeConfirmacion from "@/components/sunmi/SunmiHojaDeConfirmacion";
 import AccionDePantalla from "@/components/transferencias/AccionDePantalla";
@@ -230,8 +229,12 @@ export default function SemanaOperativaPage() {
 
           {/* 04 · ELEGIR DÍA. Con un cambio programado, el que se elige lo
               REEMPLAZA, y se dice acá y otra vez en la confirmación. */}
+          {/* Sin tarjeta a propósito: adentro de una, a 360 px, las siete
+              teclas no llegan a 44 px de área táctil ni aun cubriendo el gap
+              (quedan 274 px para 308). En la columna de la página hay 304, y el
+              paso de cada tecla da 44,2. */}
           {modo === "elegir" && (
-            <SunmiCard className="p-4 space-y-3">
+            <div className="space-y-3">
               <p className="text-lg2 font-bold sunmi-text-strong">¿Qué día empieza tu semana?</p>
               <SunmiSelectorDeOpciones
                 opciones={OPCIONES_DE_DIA}
@@ -276,7 +279,7 @@ export default function SemanaOperativaPage() {
                   Cancelar
                 </SunmiButton>
               </div>
-            </SunmiCard>
+            </div>
           )}
         </>
       )}
