@@ -193,11 +193,19 @@ escribe costos en producción.** Está en el roadmap como deuda 2.
   con importaciones aplicadas **hoy pasa el chequeo**. **[DUDA]** — no se leyó el
   `onDelete` de esas tres relaciones.
 - **Relevado al congelar `stockIngresado` (2026-09-25), sin corregir a propósito:**
-  - **El freno de costo del pedido 242 no puede saltar.** `recibir/[id]` compara
-    contra `base?.precio_costo`, pero el `select` de la base no trae
-    `precio_costo`: `anterior` vale siempre 0, `decisionDeCostoSugerida`
-    contesta `SIN_DATOS` y no exige elegir. Medido contra Postgres: un costo 30
-    veces el del catálogo cerró y se escribió. **[VERIFICADO]**
+  - ~~**El freno de costo del pedido 242 no puede saltar.**~~ **Corregido el
+    2026-09-25.** El `select` de la base en `recibir/[id]` no traía
+    `precio_costo`, así que las tres defensas del costo comparaban contra cero
+    desde el 2026-08-11. Ahora lo trae; el cierre reconoce como aceptado el
+    costo que `aceptar-precio` dejó en `costoFinalUnitario` del renglón —la
+    pantalla no manda `costosAceptados`—, y el freno solo corre sobre líneas
+    que van a escribir costo. Lo ejerce `scripts/pruebas-db/frenoDeCosto.mjs`
+    contra Postgres, con sus contrapruebas FC-1 a FC-4. **[VERIFICADO]**
+  - **La pantalla manda en `costos` el costo de cada línea tal como estaba al
+    cargar el pedido**, y aceptar un precio en Corregir no la recarga. Si se
+    cierra sin recargar, el cierre escribe el costo viejo en la línea y el
+    precio aceptado no llega al catálogo, sin frenar. Recargar la pantalla lo
+    evita. **[VERIFICADO en código, no ejercido en pantalla]**
   - Sin `fisicas`, las `unidadesSueltas` no suman al stock: entra
     `cantidadRecibida × factor`. **[VERIFICADO en código]**
   - `precioCosto` de la línea se reescribe sobre un pedido RECIBIDO desde
