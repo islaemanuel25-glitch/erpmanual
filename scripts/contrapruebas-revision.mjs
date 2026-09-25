@@ -849,6 +849,42 @@ const CASOS = [
     candado: "la vista previa sale de la función del servidor, no de un calendario propio",
     suite: "lib/semanaOperativa/pantalla.test.mjs",
   },
+  // ── LO QUE UNA COMPRA SUMÓ AL STOCK, CONGELADO (Finanzas 1.b) ─────────────
+  //
+  // El censo de escritores y la migración aditiva del mismo archivo enumeran
+  // con git y acá no hay `.git`: sus contrapruebas se hicieron a mano sobre el
+  // árbol y están en el cuerpo del commit. Los números —que lo congelado sea el
+  // delta real del stock— los rompe `scripts/pruebas-db/contrapruebasRevision.mjs`
+  // contra Postgres.
+  {
+    n: "SI-1",
+    defecto: "el cierre congela `cantidadRecibida × factor_pack` en vez de lo que sumó al stock",
+    archivo: "app/api/compras-proveedor/recibir/[id]/route.js",
+    de: "          stockIngresado: incremento,",
+    a: "          stockIngresado: cantRecibida * Math.max(1, Number(base?.factor_pack || 1)),",
+    candado: "EL CIERRE CONGELA LA MISMA VARIABLE QUE PASA AL INCREMENT DEL STOCK",
+    suite: "lib/compras-proveedor/stockIngresado.test.mjs",
+  },
+  {
+    n: "SI-2",
+    defecto: "la hoja de Corregir empieza a aceptar lo congelado en el cuerpo",
+    archivo: "app/api/compras-proveedor/recepcion/correccion/route.js",
+    de: '    if ("kgRecibidos" in body) aGuardar.kgRecibidos = numeroONull(body.kgRecibidos);',
+    a:
+      '    if ("kgRecibidos" in body) aGuardar.kgRecibidos = numeroONull(body.kgRecibidos);\n' +
+      '    if ("stockIngresado" in body) aGuardar.stockIngresado = numeroONull(body.stockIngresado);',
+    candado: "SOLO EL CIERRE NOMBRA LO CONGELADO; NINGÚN OTRO ESCRITOR LO TOCA",
+    suite: "lib/compras-proveedor/stockIngresado.test.mjs",
+  },
+  {
+    n: "SI-3",
+    defecto: "un combo en cero congela un 0, como si hubiera movido stock",
+    archivo: "app/api/compras-proveedor/recibir/[id]/route.js",
+    de: "          if (!esComboBase(base)) {\n            detCero.stockIngresado = 0;",
+    a: "          if (true) {\n            detCero.stockIngresado = 0;",
+    candado: "EL COMBO NO LLEVA NADA, Y EL CERO SÍ LLEVA SU UNIDAD",
+    suite: "lib/compras-proveedor/stockIngresado.test.mjs",
+  },
   // `lib/semanaOperativa/unaSolaFuente.test.mjs` NO está acá, y no por olvido:
   // enumera con `git ls-files`, y la copia descartable de este script no lleva
   // `.git`, así que ahí el archivo entero explota antes de llegar al candado y el

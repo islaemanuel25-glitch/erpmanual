@@ -16,8 +16,14 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **34 migraciones** y el árbol también. **Ninguna** pendiente:
-el despliegue siguiente es solo de código.
+Producción está en **34 migraciones**. Falta:
+
+- `20260925195156_stock_ingresado_congelado` — aditiva: el enum
+  `UnidadFisicaStock` (`UNIDAD`, `KG`, `PIEZA`) y dos columnas NULLABLE sin
+  default en `PedidoProveedorDetalle`, `stockIngresado` Decimal(12,3) y
+  `stockIngresadoUnidad`. Sin UPDATE ni backfill: las compras ya recibidas
+  quedan en NULL. La versión anterior no lee las columnas. Viene de la rama
+  `claude/erp-azul-audit-purchase-receipt-squch3`, todavía sin mergear.
 
 ---
 

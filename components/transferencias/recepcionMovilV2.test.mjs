@@ -493,7 +493,11 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // un CHECK y un único parcial. Aditiva, sin DROP; SÍ tiene backfill, pero solo
   // INSERTA en la tabla nueva leyendo `AcuerdoDepositoLocal`, que no se modifica.
   // No toca ninguna tabla de recepción.
-  assert.equal(migraciones.length, 34, "aparecio una migracion que nadie declaro aca");
+  // Sube a 35 el 2026-09-25: entró `20260925195156_stock_ingresado_congelado`,
+  // un enum y dos columnas nullable sin default en `PedidoProveedorDetalle`
+  // —lo que una línea de COMPRA sumó al stock—. Aditiva, sin backfill. No toca
+  // ninguna tabla de recepción de transferencias.
+  assert.equal(migraciones.length, 35, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

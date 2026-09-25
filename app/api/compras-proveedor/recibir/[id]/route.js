@@ -12,6 +12,7 @@ import {
   cantidadesNegativas,
 } from "@/lib/compras-proveedor/fronteraCosto";
 import { esComboBase } from "@/lib/combos/guards";
+import { unidadFisicaDelIngreso } from "@/lib/compras-proveedor/stockIngresado";
 import { laCantidadCuadraConElPrecio } from "@/lib/compras-proveedor/laCantidadCuadraConElPrecio";
 import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
@@ -541,26 +542,8 @@ export async function POST(req, { params }) {
         const seDeclaro = declarada !== undefined && declarada !== null && declarada !== "";
         const cantRecibida = seDeclaro ? Number(declarada) : 0;
 
-        if (cantRecibida <= 0) {
-          // UN CERO DECLARADO ES UN DATO: "se contó y no llegó". Se guarda,
-          // porque es distinto de `null` —nunca se contó— y esa diferencia es
-          // la que deja saber después si alguien miró la línea.
-          if (seDeclaro) {
-            await tx.pedidoProveedorDetalle.update({
-              where: { id: det.id },
-              data: { cantidadRecibida: 0 },
-            });
-          }
-          continue;
-        }
-
         const base = det.producto?.base;
-        // Los combos no reciben StockLocal ni actualizan costo físico.
-        if (esComboBase(base)) continue;
         const modoCompra = base?.modoCompraProveedor || "BULTO";
-
-        let incremento;
-        let kgReales = null;
 
         // ── LOS KILOS QUE LA HOJA MOSTRÓ ENTRAN COMO KILOS ─────────────────
         //
@@ -582,8 +565,49 @@ export async function POST(req, { params }) {
           kilosDeLaHoja !== "" &&
           Number.isFinite(Number(kilosDeLaHoja)) &&
           Number(kilosDeLaHoja) > 0;
+        const vaPorPeso = modoCompra === "UNIDAD" || (elDepositoCuentaPorKilo(base) && hayKilosDeLaHoja);
 
-        if (modoCompra === "UNIDAD" || (elDepositoCuentaPorKilo(base) && hayKilosDeLaHoja)) {
+        // ── EN QUÉ QUEDA CONTADO LO QUE ENTRA ──────────────────────────────
+        //
+        // Sale de `vaPorPeso` —la misma variable que elige la rama de abajo— y
+        // de `esFiambreFijoEnUbicacion`, que es con lo que la rama de peso
+        // elige piezas o kilos. Se congela junto con el número: es lo que
+        // permite leer "3" como tres piezas y no como tres kilos cuando el
+        // producto ya cambió de modo.
+        const unidadIngreso = unidadFisicaDelIngreso({ vaPorPeso, base, destinoEsDeposito });
+
+        if (cantRecibida <= 0) {
+          // UN CERO DECLARADO ES UN DATO: "se contó y no llegó". Se guarda,
+          // porque es distinto de `null` —nunca se contó— y esa diferencia es
+          // la que deja saber después si alguien miró la línea.
+          const detCero = seDeclaro ? { cantidadRecibida: 0 } : {};
+          // Y lo que este cierre sumó a `StockLocal` por la línea también es un
+          // dato, declarada o no: sumó 0, y eso se sabe con certeza. OJO: es el
+          // movimiento que registró el ERP, NO que se haya comprobado que
+          // físicamente llegaron cero —una línea ausente del cuerpo no la contó
+          // nadie—. El NULL queda para lo que no tiene un hecho de stock: el
+          // combo —no mueve stock— y la compra recibida antes de que esto se
+          // guardara.
+          if (!esComboBase(base)) {
+            detCero.stockIngresado = 0;
+            detCero.stockIngresadoUnidad = unidadIngreso;
+          }
+          if (Object.keys(detCero).length) {
+            await tx.pedidoProveedorDetalle.update({
+              where: { id: det.id },
+              data: detCero,
+            });
+          }
+          continue;
+        }
+
+        // Los combos no reciben StockLocal ni actualizan costo físico.
+        if (esComboBase(base)) continue;
+
+        let incremento;
+        let kgReales = null;
+
+        if (vaPorPeso) {
           // FIAMBRE: stock incrementa por kg reales, no por unidades
           kgReales = kgRecibidosMap[det.id] !== undefined
             ? Number(kgRecibidosMap[det.id])
@@ -699,6 +723,17 @@ export async function POST(req, { params }) {
         const detData = {
           cantidadRecibida: cantRecibida,
           kgRecibidos: kgReales,
+          // ── EL HECHO, CONGELADO ─────────────────────────────────────────
+          //
+          // `stockIngresado` es el delta que ESTA línea aplicó a `StockLocal`
+          // en esta recepción: lo que el ERP registró, no una comprobación
+          // física de lo que mandó el proveedor. Es la MISMA variable que acaba
+          // de ir al `increment` de arriba, en la misma transacción: si una de
+          // las dos escrituras falla, no queda ninguna. No se recalcula acá con
+          // `cantRecibida × factor_pack` ni con nada del producto — eso es
+          // exactamente lo que cambia después.
+          stockIngresado: incremento,
+          stockIngresadoUnidad: unidadIngreso,
         };
 
         // Las sueltas y el motivo solo se escriben si vinieron: un `undefined`

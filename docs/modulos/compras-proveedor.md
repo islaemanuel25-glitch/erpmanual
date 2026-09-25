@@ -95,6 +95,26 @@ Estados: enum `EstadoPedidoProveedor` (`prisma/schema.prisma:648`) — `BORRADOR
   `costoMaestro.js:105-112`, vía `puedeEditarCosto`. Es DEC-0002 aplicada acá.
 - **Alcance por grupo Y por ubicación dueña** — `lib/compras/scope.js`,
   `ownerLocalIdDePedido` (6) y `pedidoEnAlcance` (13).
+- **Lo que una línea sumó al stock queda congelado en la línea** (desde
+  2026-09-25): `PedidoProveedorDetalle.stockIngresado` es la misma variable que
+  `recibir/[id]` pasa al `increment` de `StockLocal`, y `stockIngresadoUnidad`
+  (`UNIDAD` / `KG` / `PIEZA`) sale de la rama que lo decidió
+  (`lib/compras-proveedor/stockIngresado.js`). Un 0 con unidad es "este cierre
+  le sumó 0 al stock", tanto para la línea declarada en 0 como para la que no
+  vino en el cuerpo del cierre; NULL es "no hay hecho de stock congelado
+  utilizable": un combo o una compra recibida antes de esa fecha, y **no se
+  reconstruye** con el producto de hoy. Solo el cierre lo escribe — censo en
+  `lib/compras-proveedor/stockIngresado.test.mjs` — y
+  `scripts/pruebas-db/recepcionCompras.mjs` lo compara contra el delta real del
+  stock. **[VERIFICADO]**
+
+  **Definición canónica:** `stockIngresado` es el delta que esa línea aplicó a
+  `StockLocal` durante la recepción — el movimiento que registró el ERP. **NO**
+  es la cantidad que físicamente llegó del proveedor: ninguna declaración lo
+  prueba, porque una línea que nadie tocó se declara con lo pedido o con lo que
+  dice el papel, y "no llegó" viene marcado de entrada. Finanzas y el snapshot
+  lo leen como "esta recepción agregó X al stock", no como una comprobación
+  física independiente. **[DECIDIDO 2026-09-25]**
 
 ## Dependencias
 
@@ -172,6 +192,23 @@ escribe costos en producción.** Está en el roadmap como deuda 2.
   (`prisma/schema.prisma:251-253`). Un proveedor sin productos pero con pedidos o
   con importaciones aplicadas **hoy pasa el chequeo**. **[DUDA]** — no se leyó el
   `onDelete` de esas tres relaciones.
+- **Relevado al congelar `stockIngresado` (2026-09-25), sin corregir a propósito:**
+  - **El freno de costo del pedido 242 no puede saltar.** `recibir/[id]` compara
+    contra `base?.precio_costo`, pero el `select` de la base no trae
+    `precio_costo`: `anterior` vale siempre 0, `decisionDeCostoSugerida`
+    contesta `SIN_DATOS` y no exige elegir. Medido contra Postgres: un costo 30
+    veces el del catálogo cerró y se escribió. **[VERIFICADO]**
+  - Sin `fisicas`, las `unidadesSueltas` no suman al stock: entra
+    `cantidadRecibida × factor`. **[VERIFICADO en código]**
+  - `precioCosto` de la línea se reescribe sobre un pedido RECIBIDO desde
+    `comprobantes/aceptar-precio` y `comprobantes/vincular`: su guarda es
+    `comprobante.confirmadoEn`, y ninguna ruta de compras la escribe.
+    **[VERIFICADO en código]**
+  - Un combo con cantidad no guarda `cantidadRecibida`: sale del bucle antes.
+    **[VERIFICADO]**
+  - Un producto por kilo comprado por bulto y cerrado sin pesar entra por la rama
+    de unidades en una fila que el depósito cuenta en kilos; hoy se congela como
+    `UNIDAD`, que es lo que pasó. **[VERIFICADO]**
 
 ## Fuentes
 

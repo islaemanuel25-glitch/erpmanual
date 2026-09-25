@@ -106,7 +106,76 @@ const CASOS = [
       "L · una sola coincidencia por nombre abre",
     ],
   },
+  // ── LO QUE UNA COMPRA SUMÓ AL STOCK, CONGELADO (Finanzas 1.b) ─────────────
+  //
+  // Corren contra `recepcionCompras.mjs`, que compara en cada caso el delta
+  // real de `StockLocal` contra lo congelado. Por eso rompen DATOS y no texto:
+  // la contraprueba de texto del mismo defecto está en
+  // `scripts/contrapruebas-revision.mjs` (SI-1 a SI-3).
+  {
+    n: "SI-1",
+    defecto: "el cierre vuelve a congelar `cantidadRecibida × factor_pack` en vez de lo que sumó",
+    archivo: "app/api/compras-proveedor/recibir/[id]/route.js",
+    suite: "scripts/pruebas-db/recepcionCompras.mjs",
+    minimo: 60,
+    inyecciones: [
+      {
+        de: "          stockIngresado: incremento,",
+        a: "          stockIngresado: cantRecibida * Math.max(1, Number(base?.factor_pack || 1)),",
+      },
+    ],
+    // Donde esa cuenta no es lo que entró: el pack con sueltas (72 contra 77),
+    // los kilos y el fiambre del local. Donde coincide —10 bultos de 12— no
+    // grita, y está bien: ahí la cuenta vieja todavía no miente.
+    esperadas: [
+      "PACK con sueltas: stockIngresado es lo que sumó el stock",
+      "KG pesado: stockIngresado es lo que sumó el stock",
+      "PIEZA en local: stockIngresado es lo que sumó el stock",
+    ],
+  },
+  {
+    n: "SI-2",
+    defecto: "la unidad deja de salir del destino real y se toma como si todo fuera el depósito",
+    archivo: "app/api/compras-proveedor/recibir/[id]/route.js",
+    suite: "scripts/pruebas-db/recepcionCompras.mjs",
+    minimo: 60,
+    inyecciones: [
+      {
+        de: "unidadFisicaDelIngreso({ vaPorPeso, base, destinoEsDeposito });",
+        a: "unidadFisicaDelIngreso({ vaPorPeso, base, destinoEsDeposito: true });",
+      },
+    ],
+    esperadas: [
+      "PIEZA en local: la unidad es KG",
+      "el mismo producto congeló dos unidades distintas, porque entró distinto",
+    ],
+  },
+  {
+    n: "SI-3",
+    defecto: "una línea que no sumó nada queda en NULL en vez de 0 con su unidad",
+    archivo: "app/api/compras-proveedor/recibir/[id]/route.js",
+    suite: "scripts/pruebas-db/recepcionCompras.mjs",
+    minimo: 60,
+    inyecciones: [
+      { de: "            detCero.stockIngresado = 0;\n", a: "" },
+      { de: "            detCero.stockIngresadoUnidad = unidadIngreso;\n", a: "" },
+    ],
+    esperadas: [
+      "cero declarado: 0 UNIDAD y cantidadRecibida 0",
+      "sin declarar: 0 UNIDAD, y cantidadRecibida sigue en null (nadie contó)",
+    ],
+  },
 ];
+
+// Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número
+// empieza así: es lo que usa el CI, que no tiene por qué pagar los minutos de
+// la suite de transferencias para probar la de compras.
+const PREFIJO = process.argv[2] || "";
+const ELEGIDOS = CASOS.filter((c) => String(c.n).startsWith(PREFIJO));
+if (ELEGIDOS.length === 0) {
+  console.log(`✗ ningún caso empieza con «${PREFIJO}»: no se probó nada`);
+  process.exit(1);
+}
 
 // `node_modules` se ENLAZA, no se copia. Copiarlo entero daba un árbol a medias
 // —`next/server` dejaba de resolver, con un mensaje que apuntaba a otro lado— y
@@ -140,7 +209,7 @@ const entornoHijo = () => {
 };
 
 let fallas = 0;
-for (const c of CASOS) {
+for (const c of ELEGIDOS) {
   const raiz = copiar();
   const archivo = path.join(raiz, c.archivo);
   let texto = fs.readFileSync(archivo, "utf8");
@@ -169,7 +238,7 @@ for (const c of CASOS) {
   try {
     salida = execFileSync(
       "node",
-      ["--import", "./scripts/alias-loader.mjs", "scripts/pruebas-db/recepcionTransferencias.mjs"],
+      ["--import", "./scripts/alias-loader.mjs", c.suite || "scripts/pruebas-db/recepcionTransferencias.mjs"],
       { cwd: raiz, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: entornoHijo() }
     );
   } catch (e) {
@@ -179,7 +248,9 @@ for (const c of CASOS) {
   // Que la suite haya CORRIDO: si abortó al montar, el rojo no prueba nada.
   const corrio = /Afirmaciones que pasaron: (\d+)/.exec(salida);
   const pasadas = corrio ? Number(corrio[1]) : 0;
-  if (pasadas < 100) {
+  // El piso es de cada suite: la de compras tiene menos afirmaciones que la de
+  // transferencias, y un piso de 100 la daría siempre por no corrida.
+  if (pasadas < (c.minimo ?? 100)) {
     console.log(`✗ ${c.n}  la suite no llegó a correr (${pasadas} afirmaciones): el rojo no vale`);
     console.log(salida.split("\n").slice(0, 12).map((l) => `     | ${l}`).join("\n"));
     fallas++;
@@ -198,6 +269,6 @@ for (const c of CASOS) {
 }
 
 console.log(fallas === 0
-  ? `\n${CASOS.length}/${CASOS.length} contrapruebas de base en rojo, como corresponde`
+  ? `\n${ELEGIDOS.length}/${ELEGIDOS.length} contrapruebas de base en rojo, como corresponde`
   : `\n${fallas} contrapruebas de base NO probaron nada`);
 process.exit(fallas === 0 ? 0 : 1);
