@@ -199,8 +199,15 @@ escribe costos en producción.** Está en el roadmap como deuda 2.
     desde el 2026-08-11. Ahora lo trae; el cierre reconoce como aceptado el
     costo que `aceptar-precio` dejó en `costoFinalUnitario` del renglón —la
     pantalla no manda `costosAceptados`—, y el freno solo corre sobre líneas
-    que van a escribir costo. Lo ejerce `scripts/pruebas-db/frenoDeCosto.mjs`
-    contra Postgres, con sus contrapruebas FC-1 a FC-4. **[VERIFICADO]**
+    que van a escribir costo. "Dejar el que tenía" VIGENTE —leído con
+    `decisionVigente`, no con la última decisión del producto— excluye esa
+    línea de escribir costo por `costosQueNoSeTocan`, así que tampoco frena.
+    Lo ejerce `scripts/pruebas-db/frenoDeCosto.mjs` contra Postgres, con sus
+    contrapruebas FC-1 a FC-6. **[VERIFICADO]**
+  - **Queda sin salida un caso:** el papel coincide con la línea del pedido
+    (1.000 y 1.000) y el catálogo se movió después (1.300). La hoja compara
+    papel contra línea, ve "sin diferencia" y no ofrece decidir; el cierre
+    compara contra el catálogo y frena. **[VERIFICADO contra Postgres]**
   - **La pantalla manda en `costos` el costo de cada línea tal como estaba al
     cargar el pedido**, y aceptar un precio en Corregir no la recarga. Si se
     cierra sin recargar, el cierre escribe el costo viejo en la línea y el
