@@ -112,6 +112,8 @@ export async function PUT(req) {
           localId: scope.localId,
           diaDeCorte: body?.diaDeCorte,
           usuarioId: scope.session?.id ?? null,
+          // Para la evidencia del reemplazo, si lo hay.
+          grupoId: scope.grupoId ?? null,
           desde,
           // Acá reemplazar un cambio programado se pide EXPLÍCITAMENTE: sin la
           // bandera, un segundo cambio pendiente es un 409 que lo nombra.

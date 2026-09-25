@@ -31,7 +31,7 @@ const rutaConfig = await import("../../app/api/config/semana-operativa/route.js"
 const { semanaQueContiene, previsualizarCambio, PERMISO_SEMANA_OPERATIVA } = await import(
   "../../lib/semanaOperativa/semanaOperativa.js"
 );
-const { programarSemanaOperativa, ACCION_CANCELAR_SEMANA } = await import(
+const { programarSemanaOperativa, ACCION_CANCELAR_SEMANA, ACCION_REEMPLAZAR_SEMANA } = await import(
   "../../lib/semanaOperativa/semanaOperativaServer.js"
 );
 const { diaDeLaSemana, rangoDelPeriodo, rangoDesplazado, sumarDias, UNIDADES } = await import(
@@ -121,7 +121,7 @@ async function montar() {
   await prisma.grupoDeposito.create({ data: { grupoId: g2.id, localId: dAjeno.id } });
 
   const L = {};
-  for (const n of ["uno", "iguales", "distintos", "sin", "obsoleto", "invalido", "concurrente", "permisos", "cancela", "vecino"]) {
+  for (const n of ["uno", "iguales", "distintos", "sin", "obsoleto", "invalido", "concurrente", "permisos", "cancela", "vecino", "reemplaza", "reemplazaVecino"]) {
     L[n] = await crearLocal(n);
     await prisma.grupoLocal.create({ data: { grupoId: g1.id, localId: L[n].id } });
   }
@@ -1015,6 +1015,176 @@ const evidenciaDe = (localId) =>
   });
 let ejemploDeEvidencia = null;
 
+// ── REEMPLAZAR UN CAMBIO PROGRAMADO DEJA EVIDENCIA ─────────────────────────
+//
+// El reemplazo borra la vigencia futura A y crea B. A no se conserva —el
+// resolver no tiene que saltear nada—, así que lo que prueba que existió, quién
+// la reemplazó y por cuál es la fila de la bitácora, escrita en la misma
+// transacción.
+const reemplazosDe = (localId) =>
+  prisma.auditoriaBitacora.findMany({
+    where: { accion: ACCION_REEMPLAZAR_SEMANA, localId },
+    orderBy: { id: "asc" },
+  });
+let ejemploDeReemplazo = null;
+
+async function correrReemplazo(f) {
+  console.log("\n── Reemplazar el cambio programado deja evidencia");
+  const url = "http://ci/api/config/semana-operativa";
+  const hoy = hoyArgentinaISO();
+  const permiso = [PERMISO_SEMANA_OPERATIVA];
+  const x = f.L.reemplaza.id;
+  const y = f.L.reemplazaVecino.id;
+  const enX = token(900300, x, permiso);
+  const enY = token(900301, y, permiso);
+  const put = (sesion, cuerpo) =>
+    leer(rutaConfig.PUT(conCuerpo(url, sesion, "PUT", cuerpo)));
+  const existe = async (id) => Boolean(await prisma.semanaOperativaVigencia.findUnique({ where: { id } }));
+
+  // X: domingo desde siempre y el miércoles programado (A). Y: lo mismo, con
+  // otros días, para ver que el reemplazo de X no lo alcanza.
+  await put(enX, { diaDeCorte: 0 });
+  const pa = await put(enX, { diaDeCorte: 3 });
+  await put(enY, { diaDeCorte: 1 });
+  await put(enY, { diaDeCorte: 4 });
+  const A = (await vigenciasDe(x)).find((v) => iso(v.vigenteDesde) > hoy);
+  ok("A quedó programado en X", pa.status === 200 && A?.diaDeCorte === 3, `${pa.status} ${pa.error ?? ""}`);
+  const yAntes = JSON.stringify(await vigenciasDe(y));
+
+  // Reemplazar A por B.
+  const t0 = new Date();
+  const pb = await put(enX, { diaDeCorte: 5, reemplazarPendiente: true });
+  const t1 = new Date();
+  const B = (await vigenciasDe(x)).find((v) => iso(v.vigenteDesde) > hoy);
+  ok(
+    "reemplazar A por B → 200, y el GET devuelve B como programado",
+    pb.status === 200 && pb.programado?.diaDeCorte === 5 && pb.programado?.desde === iso(B?.vigenteDesde),
+    `${pb.status} ${pb.error ?? ""} ${JSON.stringify(pb.programado)}`
+  );
+  ok("A ya no existe como vigencia", A && !(await existe(A.id)));
+  ok("B sí existe, y es el único pendiente", B && (await existe(B.id)) && B.id !== A.id &&
+    (await vigenciasDe(x)).filter((v) => iso(v.vigenteDesde) > hoy).length === 1);
+
+  const ev = await reemplazosDe(x);
+  const e = ev[0];
+  const c = e?.cambios?.[0];
+  ok("existe EXACTAMENTE una evidencia de reemplazo", ev.length === 1, `${ev.length}`);
+  ok(
+    "…que identifica A: id, día de corte y desde",
+    e?.entidad === "SemanaOperativa" && e?.entidadId === String(A.id) &&
+      JSON.stringify(c?.reemplazada) === JSON.stringify({ id: A.id, localId: x, diaDeCorte: 3, vigenteDesde: iso(A.vigenteDesde) }),
+    JSON.stringify({ entidadId: e?.entidadId, reemplazada: c?.reemplazada })
+  );
+  ok(
+    "…que identifica B: id, día de corte y desde",
+    JSON.stringify(c?.nueva) === JSON.stringify({ id: B.id, localId: x, diaDeCorte: 5, vigenteDesde: iso(B.vigenteDesde) }),
+    JSON.stringify(c?.nueva)
+  );
+  ok("…con el usuario que reemplazó", e?.usuarioId === 900300, `${e?.usuarioId}`);
+  ok("…en la ubicación correcta", e?.localId === x, `${e?.localId}`);
+  ok("…y en su grupo", e?.grupoId === f.g1.id, `${e?.grupoId}`);
+  ok(
+    "…con la hora de la operación",
+    e?.createdAt instanceof Date && e.createdAt.getTime() >= t0.getTime() - 1000 && e.createdAt.getTime() <= t1.getTime() + 1000,
+    `${e?.createdAt?.toISOString?.()} fuera de ${t0.toISOString()}–${t1.toISOString()}`
+  );
+  ok(
+    "…y legible para la pantalla de Auditoría: antes → después",
+    c?.entidad === "Semana operativa" &&
+      JSON.stringify(c?.campos?.map((k) => [k.campo, k.antes, k.despues])) ===
+        JSON.stringify([
+          ["diaDeCorte", "Miércoles a martes", "Viernes a jueves"],
+          ["vigenteDesde", c?.campos?.[1]?.antes, c?.campos?.[1]?.despues],
+        ]) &&
+      /^\d{2}\/\d{2}\/\d{4}$/.test(c?.campos?.[1]?.antes ?? "") && /^\d{2}\/\d{2}\/\d{4}$/.test(c?.campos?.[1]?.despues ?? ""),
+    JSON.stringify(c?.campos)
+  );
+  ok(
+    "reemplazar en X no toca a Y: sus vigencias iguales y ninguna evidencia suya",
+    JSON.stringify(await vigenciasDe(y)) === yAntes && (await reemplazosDe(y)).length === 0
+  );
+  if (e) ejemploDeReemplazo = e;
+
+  // UNA OPERACIÓN QUE FALLA NO DEJA EVIDENCIA. El reemplazo corre entero —borra
+  // B, crea C, escribe la evidencia— y después la transacción aborta.
+  const antesDelRollback = JSON.stringify(await vigenciasDe(x));
+  let abortada = false;
+  try {
+    await prisma.$transaction(async (tx) => {
+      const r = await programarSemanaOperativa(tx, { localId: x, diaDeCorte: 2, usuarioId: 900302, grupoId: f.g1.id, reemplazarPendiente: true });
+      if (!(r.evidencia?.length === 1)) throw new Error("el reemplazo no llegó a escribir su evidencia");
+      throw new Error("ROLLBACK A PROPÓSITO");
+    });
+  } catch (err) {
+    abortada = err.message === "ROLLBACK A PROPÓSITO";
+  }
+  ok("la operación llegó a escribir y después abortó", abortada);
+  ok(
+    "…y con el rollback no queda evidencia, B sigue siendo el programado y C no existe",
+    (await reemplazosDe(x)).length === 1 && JSON.stringify(await vigenciasDe(x)) === antesDelRollback
+  );
+  // Una que la regla rechaza, tampoco.
+  const pRechazo = await put(enX, { diaDeCorte: 6, desde: hoy, reemplazarPendiente: true });
+  ok(
+    "un reemplazo que la regla rechaza → 400 y ninguna evidencia",
+    pRechazo.status === 400 && (await reemplazosDe(x)).length === 1,
+    `${pRechazo.status} ${pRechazo.codigo}`
+  );
+
+  // LA CARRERA. T1 reemplaza B por C con la función real y, antes de confirmar,
+  // se queda quieta con la ubicación bloqueada. T2 reemplaza por la ruta. T2
+  // tiene que esperar a T1 y reemplazar C —lo que HAY al entrar—, no B, que es lo
+  // que había cuando salió el pedido.
+  const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
+  let soltar;
+  const espera = new Promise((r) => (soltar = r));
+  const t1tx = prisma.$transaction(
+    async (tx) => {
+      const r = await programarSemanaOperativa(tx, { localId: x, diaDeCorte: 2, usuarioId: 900302, grupoId: f.g1.id, reemplazarPendiente: true });
+      await espera;
+      return r;
+    },
+    { timeout: 20000 }
+  );
+  await pausa(300);
+  let termino2 = false;
+  const t2 = put(enX, { diaDeCorte: 6, reemplazarPendiente: true }).finally(() => (termino2 = true));
+  await pausa(800);
+  const t2Espero = !termino2;
+  soltar();
+  const r1 = await t1tx;
+  const r2 = await t2;
+  const C = r1.vigencia;
+  const trasCarrera = await reemplazosDe(x);
+  const ultima = trasCarrera.at(-1)?.cambios?.[0];
+  const pendientes = (await vigenciasDe(x)).filter((v) => iso(v.vigenteDesde) > hoy);
+  ok("la carrera ocurrió: el segundo reemplazo esperó al primero", t2Espero);
+  ok(
+    "el segundo reemplazó lo que HABÍA al entrar (C), no lo que había al salir (B)",
+    r2.status === 200 && trasCarrera.length === 3 && ultima?.reemplazada?.id === C.id && ultima?.reemplazada?.id !== B.id &&
+      ultima?.nueva?.diaDeCorte === 6 && pendientes.length === 1 && pendientes[0].id === ultima?.nueva?.id,
+    `${r2.status} ${r2.codigo ?? ""} evidencias=${trasCarrera.length} reemplazada=${ultima?.reemplazada?.id} C=${C.id} B=${B.id} pendientes=${pendientes.length}`
+  );
+  ok(
+    "la cadena de evidencias es A→B, B→C, C→D, sin huecos ni repetidos",
+    JSON.stringify(trasCarrera.map((t) => [t.cambios[0].reemplazada.id, t.cambios[0].nueva.id])) ===
+      JSON.stringify([[A.id, B.id], [B.id, C.id], [C.id, ultima?.nueva?.id]]),
+    JSON.stringify(trasCarrera.map((t) => [t.cambios[0].reemplazada.id, t.cambios[0].nueva.id]))
+  );
+
+  // NINGÚN ESTADO IMPOSIBLE: ninguna vigencia reemplazada sigue existiendo, en
+  // ninguna ubicación de la prueba.
+  const todas = await prisma.auditoriaBitacora.findMany({
+    where: { accion: ACCION_REEMPLAZAR_SEMANA, localId: { in: creado.localIds } },
+    select: { entidadId: true },
+  });
+  const vivas = await prisma.semanaOperativaVigencia.findMany({
+    where: { id: { in: todas.map((t) => Number(t.entidadId)) } },
+    select: { id: true },
+  });
+  ok(`ninguna de las ${todas.length} vigencias reemplazadas sigue existiendo`, todas.length > 0 && vivas.length === 0, JSON.stringify(vivas));
+}
+
 let fixture;
 try {
   fixture = await montar();
@@ -1025,6 +1195,7 @@ try {
   await correrPermisos(fixture);
   await correrConfig(fixture);
   await correrCancelacion(fixture);
+  await correrReemplazo(fixture);
 } finally {
   await desmontar();
   await prisma.$disconnect();
@@ -1033,6 +1204,10 @@ try {
 if (ejemploDeEvidencia) {
   const { id: _id, ...sinId } = ejemploDeEvidencia;
   console.log(`\nEjemplo de la evidencia de una cancelación:\n${JSON.stringify(sinId, null, 2)}`);
+}
+if (ejemploDeReemplazo) {
+  const { id: _id, ...sinId } = ejemploDeReemplazo;
+  console.log(`\nEjemplo de la evidencia de un reemplazo:\n${JSON.stringify(sinId, null, 2)}`);
 }
 console.log(`\n${pasadas} comprobaciones pasaron.`);
 if (fallas.length) {
