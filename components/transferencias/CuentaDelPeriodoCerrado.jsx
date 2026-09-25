@@ -76,7 +76,7 @@ export default function CuentaDelPeriodoCerrado({
       // configurar nada es peor que no ofrecerlo.
       accion={
         puedeConfigurarCorte ? (
-          <SunmiLinkButton onClick={onConfigurarCorte}>Corte de semana ›</SunmiLinkButton>
+          <SunmiLinkButton onClick={onConfigurarCorte}>Semana operativa ›</SunmiLinkButton>
         ) : null
       }
     />

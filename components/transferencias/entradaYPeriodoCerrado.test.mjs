@@ -309,7 +309,11 @@ test("V12 · un período SIN movimiento: el rango existe y se dice que está vac
   assert.ok(!salida.includes("no est"), "sin pendientes el total SÍ está cerrado");
 });
 
-test("V12b · el atajo al corte SOLO lo dibuja quien se lo pasa", () => {
+// El atajo se llamaba "Corte de semana ›" y llevaba a la pantalla de
+// Transferencias. Desde la tanda de la pantalla de Semana operativa dice
+// "Semana operativa ›" y lleva a Configuración; lo que se afirma no cambió:
+// solo lo dibuja quien se lo pasa.
+test("V12b · el atajo a la semana SOLO lo dibuja quien se lo pasa", () => {
   const base = {
     periodo: {
       aPagar: 0, cantidad: 0, sinRecibir: 2,
@@ -323,8 +327,8 @@ test("V12b · el atajo al corte SOLO lo dibuja quien se lo pasa", () => {
   const con = html(
     React.createElement(CuentaDelPeriodoCerrado, { ...base, puedeConfigurarCorte: true })
   );
-  assert.ok(!sin.includes("Corte de semana"), "ofreció el atajo a quien no puede usarlo");
-  assert.ok(con.includes("Corte de semana"), "falta el atajo para quien sí puede");
+  assert.ok(!sin.includes("Semana operativa"), "ofreció el atajo a quien no puede usarlo");
+  assert.ok(con.includes("Semana operativa"), "falta el atajo para quien sí puede");
 });
 
 // ── 5 · EL CIERRE: LA RUTA MANDA LO QUE ESTO LEE ──────────────────────────

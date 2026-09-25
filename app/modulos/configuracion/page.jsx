@@ -6,7 +6,9 @@ import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
 import { puedeVerConfigLocal, puedeVerSeccion, PERMISOS_CONFIG_POS } from "@/lib/config/acceso";
-import { Palette, PackageOpen, Receipt, Wrench, Tags, ShoppingCart, BellRing } from "lucide-react";
+import { Palette, PackageOpen, Receipt, Wrench, Tags, ShoppingCart, BellRing, CalendarClock } from "lucide-react";
+import { PERMISO_SEMANA_OPERATIVA } from "@/lib/semanaOperativa/semanaOperativa";
+import { RUTA_SEMANA_OPERATIVA } from "@/lib/semanaOperativa/rutas";
 
 // Cada tarjeta declara su gating igual que el menú (lib/menu/registry.js):
 //  - `permiso`: el config_local.* (o listas_precios.ver) que la habilita.
@@ -52,6 +54,13 @@ const SECCIONES = [
     icon: Tags,
     descripcion: "Administrá listas de precios comerciales del grupo (minorista, mayorista, costos).",
     permiso: "listas_precios.ver",
+  },
+  {
+    label: "Semana operativa",
+    href: RUTA_SEMANA_OPERATIVA,
+    icon: CalendarClock,
+    descripcion: "Qué día empieza la semana de esta ubicación, y sus cambios programados.",
+    permiso: PERMISO_SEMANA_OPERATIVA,
   },
   {
     label: "Alertas del dispositivo",

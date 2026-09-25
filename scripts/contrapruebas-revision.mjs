@@ -664,33 +664,33 @@ const CASOS = [
   },
   // ── LA SEMANA NO EXIGE PERMISOS DE TRANSFERENCIAS ───────────────────────
   //
-  // Los tres lugares donde `transferencias.ver` había quedado arrastrado de la
-  // pantalla vieja. Cada uno se repone y el candado de permisos tiene que verlo.
+  // Desde el PR-2 la semana se configura en Configuración. Cada contraprueba
+  // repone el defecto de un lugar que decide el acceso.
   {
     n: "P-1",
-    defecto: "el grupo del menú vuelve a cerrarse para quien solo configura la semana",
+    defecto: "el ítem de Configuración vuelve a pedir otro permiso: quien solo configura la semana no llega",
     archivo: "lib/menu/registry.js",
-    de: 'requiredAnyPerms: ["transferencias.ver", "pos_transferencias.ver", PERMISO_SEMANA_OPERATIVA],',
-    a: 'requiredAnyPerms: ["transferencias.ver", "pos_transferencias.ver"],',
-    candado: "semana sí, transferencias no: entra sí, cambia sí",
+    de: "        permiso: PERMISO_SEMANA_OPERATIVA,",
+    a: '        permiso: "config_local.alertas",',
+    candado: "semana sí, transferencias no: semana sí, transferencias no",
     suite: "lib/semanaOperativa/permisos.test.mjs",
   },
   {
     n: "P-2",
-    defecto: "la pantalla vuelve a abrirse solo con `transferencias.ver`",
-    archivo: "components/transferencias/corteDeSemana.js",
-    de: 'export const PERMISOS_PARA_VER_EL_CORTE = Object.freeze(["transferencias.ver", PERMISO_SEMANA_OPERATIVA]);',
-    a: 'export const PERMISOS_PARA_VER_EL_CORTE = Object.freeze(["transferencias.ver"]);',
-    candado: "semana sí, transferencias no: entra sí, cambia sí",
+    defecto: "la guarda de la pantalla deja afuera a quien tiene el permiso",
+    archivo: "lib/semanaOperativa/rutas.js",
+    de: '  return lista.includes("*") || lista.includes(PERMISO_SEMANA_OPERATIVA);',
+    a: '  return lista.includes("*");',
+    candado: "semana sí, transferencias no: semana sí, transferencias no",
     suite: "lib/semanaOperativa/permisos.test.mjs",
   },
   {
     n: "P-3",
-    defecto: "el GET de la ruta vuelve a exigir `transferencias.ver`",
+    defecto: "el GET de la API vieja vuelve a exigir `transferencias.ver`",
     archivo: "app/api/transferencias/acuerdos/route.js",
     de: '    const perm = checkPerm(session, ["transferencias.ver", PERMISO_SEMANA_OPERATIVA]);',
     a: '    const perm = checkPerm(session, ["transferencias.ver"]);',
-    candado: "la ruta pide EXACTAMENTE los permisos con los que la pantalla se abre, y el PUT solo el de la semana",
+    candado: "la API vieja sigue viva, pide lo mismo que en PR-1 y respeta el alcance",
     suite: "lib/semanaOperativa/permisos.test.mjs",
   },
   {
@@ -699,8 +699,55 @@ const CASOS = [
     archivo: "app/api/transferencias/acuerdos/route.js",
     de: "    if (localId !== scope.localId) {",
     a: "    if (false) {",
-    candado: "el PUT solo escribe la ubicación que resuelve `resolveLocalAndGrupo`, como todo `config_local.*`",
+    candado: "la API vieja sigue viva, pide lo mismo que en PR-1 y respeta el alcance",
     suite: "lib/semanaOperativa/permisos.test.mjs",
+  },
+  {
+    n: "P-5",
+    defecto: "el atajo del tablero vuelve a la ruta vieja de Transferencias",
+    archivo: "components/transferencias/TableroMovil.jsx",
+    de: "          onConfigurarCorte={() => router.push(RUTA_SEMANA_OPERATIVA)}",
+    a: '          onConfigurarCorte={() => router.push("/modulos/transferencias/corte-de-semana")}',
+    candado: "los atajos llevan a la pantalla nueva, y solo desde la ubicación propia",
+    suite: "lib/semanaOperativa/permisos.test.mjs",
+  },
+  // ── EL KIT: EL SELECTOR SE TOCA CON EL DEDO ────────────────────────────
+  {
+    n: "K-1",
+    defecto: "las teclas del selector vuelven a los 36 px del botón",
+    archivo: "components/sunmi/SunmiSelectorDeOpciones.jsx",
+    de: "justify-center min-h-toque py-2.5",
+    a: "justify-center py-2.5",
+    candado: "cada tecla pide el mínimo táctil y el botón le cede su alto de 36 px",
+    suite: "components/sunmi/selectorDeOpcionesToque.test.mjs",
+  },
+  // ── CANCELAR SOLO LO QUE NO EMPEZÓ ─────────────────────────────────────
+  {
+    n: "S-7",
+    defecto: "cancelar alcanza a la vigencia que empieza hoy, que ya es historia",
+    archivo: "lib/semanaOperativa/semanaOperativa.js",
+    de: "  const pendientes = normalizarVigencias(vigencias).filter((v) => v.desde !== null && v.desde > h);\n  if (pendientes.length === 0) return falla(ERROR_SEMANA.SIN_PENDIENTE);",
+    a: "  const pendientes = normalizarVigencias(vigencias).filter((v) => v.desde !== null && v.desde >= h);\n  if (pendientes.length === 0) return falla(ERROR_SEMANA.SIN_PENDIENTE);",
+    candado: "una vigencia que EMPIEZA HOY ya es historia: no se cancela",
+    suite: "lib/semanaOperativa/cancelarYPrevisualizar.test.mjs",
+  },
+  {
+    n: "S-8",
+    defecto: "la vista previa deja de mirar la semana regular que sigue a la transición",
+    archivo: "lib/semanaOperativa/semanaOperativa.js",
+    de: "  const primeraRegular = plan.transicion ? sumarDias(plan.transicion.hasta, 1) : plan.desde;",
+    a: "  const primeraRegular = plan.desde;",
+    candado: "las 42 combinaciones: la previsualización dice lo mismo que `planificarCambio`",
+    suite: "lib/semanaOperativa/cancelarYPrevisualizar.test.mjs",
+  },
+  {
+    n: "S-9",
+    defecto: "la pantalla calcula la vista previa con un calendario propio",
+    archivo: "app/modulos/configuracion/semana-operativa/page.jsx",
+    de: "    return previsualizarCambio({ vigencias: datos.vigencias, diaDeCorte: Number(dia), hoy: datos.hoy });",
+    a: "    return previsualizarCambio({ vigencias: datos.vigencias, diaDeCorte: Number(dia), hoy: new Date().toISOString().slice(0, 10) });",
+    candado: "la vista previa sale de la función del servidor, no de un calendario propio",
+    suite: "lib/semanaOperativa/pantalla.test.mjs",
   },
   // `lib/semanaOperativa/unaSolaFuente.test.mjs` NO está acá, y no por olvido:
   // enumera con `git ls-files`, y la copia descartable de este script no lleva

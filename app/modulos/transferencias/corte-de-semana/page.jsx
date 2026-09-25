@@ -1,193 +1,20 @@
 // app/modulos/transferencias/corte-de-semana/page.jsx
 //
-// DÓNDE SE ACUERDA QUÉ DÍA ARRANCA LA SEMANA DE CADA LOCAL (V29).
+// LA PANTALLA VIEJA DE "CORTE DE SEMANA": HOY SOLO REDIRIGE.
 //
-// ── POR QUÉ ES UNA PANTALLA APARTE ────────────────────────────────────────
+// La semana dejó de ser un acuerdo de Transferencias: es de la ubicación, y se
+// configura en Configuración → Semana operativa, sobre la ubicación en la que se
+// opera. La ruta se conserva para que un enlace guardado, un historial o un
+// atajo viejo no caigan en un 404: llevan a la pantalla nueva.
 //
-// Porque se configura una vez y se mira casi nunca, y la lista de trabajo se
-// mira todos los días. Meterla como un panel adentro de Transferencias sería
-// poner una decisión anual en el camino de una tarea diaria.
-//
-// ── POR QUÉ VIVE BAJO `/modulos/transferencias/` ──────────────────────────
-//
-// Porque es configuración DE transferencias y así se encuentra sola. Convive
-// con `[id]` sin ambigüedad: Next resuelve primero el segmento estático, así
-// que `/modulos/transferencias/corte-de-semana` nunca cae en la ficha de una
-// transferencia con ese id — que además no puede existir, porque los ids son
-// enteros.
-//
-// ── EL CAMINO PARA LLEGAR: EL MENÚ, SIEMPRE ───────────────────────────────
-//
-// "Corte de semana", adentro del grupo Transferencias, al lado de la pantalla
-// que configura. Está ahí SIEMPRE, esté todo configurado o no: una pantalla a
-// la que solo se llega cuando algo está mal no existe el día que hay que
-// cambiar un corte ya configurado, que es justamente cuando se la busca.
-//
-// El aviso de "sin configurar" de la lista de trabajo se queda igual, y es otra
-// cosa: un atajo para cuando falta algo, no la puerta.
-//
-// ── Y EL TÍTULO SE REGISTRA EN EL SHELL ──────────────────────────────────
-//
-// La barra de arriba la dibuja el shell, y por ruta diría "Transferencias" —el
-// módulo—, que acá sería mentira. `useTituloDePagina` es la puerta que ya
-// existe para que una pantalla titule su propia fila, y se usa en vez de
-// escribir un título adentro del cuerpo: si el título viviera abajo, la barra
-// de arriba seguiría diciendo mal dónde estás.
-"use client";
+// `redirect` corre en el servidor antes de dibujar nada, así que no hay un
+// parpadeo de la pantalla vieja. La API vieja (`/api/transferencias/acuerdos`)
+// sigue viva hasta una limpieza posterior; esta pantalla ya no la llama.
 
-import { useCallback, useEffect, useState } from "react";
+import { redirect } from "next/navigation";
 
-import { useUser } from "@/app/context/UserContext";
-import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
-import SinPermisos from "@/components/auth/SinPermisos";
-import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
-import SunmiLoader from "@/components/sunmi/SunmiLoader";
-import SunmiAviso from "@/components/sunmi/SunmiAviso";
+import { RUTA_SEMANA_OPERATIVA } from "@/lib/semanaOperativa/rutas";
 
-import AccionDePantalla from "@/components/transferencias/AccionDePantalla";
-import FilaCorteDeSemana from "@/components/transferencias/FilaCorteDeSemana";
-import {
-  RUTA_TRANSFERENCIAS,
-  puedeConfigurarElCorte,
-  puedeVerElCorte,
-} from "@/components/transferencias/corteDeSemana";
-
-import { UNIDADES, rangoDelPeriodo } from "@/lib/transferencias/periodoDePago";
-
-export default function CorteDeSemanaPage() {
-  // El contexto entrega `perfil.permisos`, y el administrador es el que tiene
-  // el comodín. Se lee igual que en la pantalla de al lado, que es de donde sale
-  // esta forma: inventarle otra acá sería leer `permisos` de la raíz y recibir
-  // `undefined`, que se comporta como "sin permisos" sin decir por qué.
-  const { perfil, cargando: cargandoUsuario } = useUser();
-  const permisos = perfil?.permisos || [];
-  const puedeEditar = puedeConfigurarElCorte(permisos);
-
-  useTituloDePagina("Corte de semana");
-  const volver = useAccionDePagina(
-    () => <SunmiBackButton href={RUTA_TRANSFERENCIAS} />,
-    []
-  );
-
-  const [relaciones, setRelaciones] = useState([]);
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState("");
-  const [editando, setEditando] = useState(null);
-  const [diaElegido, setDiaElegido] = useState(null);
-  const [guardando, setGuardando] = useState(false);
-
-  const cargar = useCallback(async () => {
-    setCargando(true);
-    setError("");
-    try {
-      const res = await fetch("/api/transferencias/acuerdos", { cache: "no-store" });
-      const j = await res.json();
-      if (!res.ok || !j.ok) throw new Error(j?.error || "No se pudieron leer los cortes.");
-      setRelaciones(j.relaciones || []);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setCargando(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    cargar();
-  }, [cargar]);
-
-  const empezarAEditar = (r) => {
-    setEditando(r.localId);
-    setDiaElegido(r.diaDeCorte);
-  };
-
-  const guardar = async (localId, dia) => {
-    setGuardando(true);
-    setError("");
-    try {
-      const res = await fetch("/api/transferencias/acuerdos", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ localId, diaDeCorte: dia }),
-      });
-      const j = await res.json();
-      if (!res.ok || !j.ok) throw new Error(j?.error || "No se pudo guardar el corte.");
-      setRelaciones(j.relaciones || []);
-      setEditando(null);
-      setDiaElegido(null);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setGuardando(false);
-    }
-  };
-
-  if (cargandoUsuario) return null;
-  // `transferencias.ver` O el permiso de la semana: configurar la semana de la
-  // ubicación no exige mirar Transferencias. Ver `puedeVerElCorte`.
-  if (!puedeVerElCorte(permisos)) return <SinPermisos />;
-
-  return (
-    <div className="w-full min-h-full px-4 pt-4 pb-4 space-y-3.5">
-      <AccionDePantalla>{volver}</AccionDePantalla>
-
-      <p className="text-xs sunmi-text-muted">
-        Definí qué día arranca la semana para cada local. Cambia el rango que toma el chip Semana
-        y, con él, qué transferencias entran en cada pago.
-      </p>
-
-      {cargando && (
-        <div className="py-12">
-          <SunmiLoader />
-        </div>
-      )}
-
-      {error && !cargando && (
-        <div className="rounded-xl border sunmi-border-danger px-4 py-3 text-xs sunmi-text-danger">
-          {error}
-        </div>
-      )}
-
-      {!cargando && relaciones.length === 0 && !error && (
-        <div className="text-center py-12 sunmi-text-muted text-xs">
-          Este grupo no tiene locales además del depósito.
-        </div>
-      )}
-
-      {!cargando &&
-        relaciones.map((r) => {
-          const esta = editando === r.localId;
-          return (
-            <FilaCorteDeSemana
-              key={r.localId}
-              relacion={{
-                ...r,
-                // El rango que produciría el día que se está tocando, para que
-                // elegir "Mar" no sea elegir a ciegas. Se calcula acá porque es
-                // una función pura y el servidor no tiene nada que agregarle.
-                rangoPropuesto: esta
-                  ? rangoDelPeriodo({ unidad: UNIDADES.SEMANA, diaDeCorte: diaElegido })
-                  : r.rango,
-              }}
-              editando={esta}
-              diaElegido={diaElegido}
-              guardando={guardando && esta}
-              // La fila solo ofrece "Cambiar" si es la ubicación en la que se
-              // opera: el servidor lo decide (`configurable`) con la misma regla
-              // que aplica al guardar.
-              puedeEditar={puedeEditar && r.configurable === true}
-              onElegirDia={setDiaElegido}
-              onEditar={() => empezarAEditar(r)}
-              onGuardar={(dia) => guardar(r.localId, dia)}
-            />
-          );
-        })}
-
-      {!cargando && relaciones.length > 0 && (
-        <SunmiAviso tono="warning" titulo="Sobre lo ya pagado">
-          Cambiar el corte no mueve transferencias ya pagadas. Solo cambia qué entra en el período
-          que se está armando.
-        </SunmiAviso>
-      )}
-    </div>
-  );
+export default function CorteDeSemanaRedirige() {
+  redirect(RUTA_SEMANA_OPERATIVA);
 }

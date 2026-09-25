@@ -28,9 +28,11 @@ const jwt = (await import("jsonwebtoken")).default;
 const rutaAcuerdos = await import("../../app/api/transferencias/acuerdos/route.js");
 const rutaTablero = await import("../../app/api/transferencias/tablero/route.js");
 const rutaConfig = await import("../../app/api/config/semana-operativa/route.js");
-const { semanaQueContiene, PERMISO_SEMANA_OPERATIVA } = await import("../../lib/semanaOperativa/semanaOperativa.js");
+const { semanaQueContiene, previsualizarCambio, PERMISO_SEMANA_OPERATIVA } = await import(
+  "../../lib/semanaOperativa/semanaOperativa.js"
+);
 const { programarSemanaOperativa } = await import("../../lib/semanaOperativa/semanaOperativaServer.js");
-const { rangoDelPeriodo, rangoDesplazado, sumarDias, UNIDADES } = await import(
+const { diaDeLaSemana, rangoDelPeriodo, rangoDesplazado, sumarDias, UNIDADES } = await import(
   "../../lib/transferencias/periodoDePago.js"
 );
 const { hoyArgentinaISO } = await import("../../lib/fechas/rangoArgentina.js");
@@ -117,7 +119,7 @@ async function montar() {
   await prisma.grupoDeposito.create({ data: { grupoId: g2.id, localId: dAjeno.id } });
 
   const L = {};
-  for (const n of ["uno", "iguales", "distintos", "sin", "obsoleto", "invalido", "concurrente", "permisos"]) {
+  for (const n of ["uno", "iguales", "distintos", "sin", "obsoleto", "invalido", "concurrente", "permisos", "cancela", "vecino"]) {
     L[n] = await crearLocal(n);
     await prisma.grupoLocal.create({ data: { grupoId: g1.id, localId: L[n].id } });
   }
@@ -698,6 +700,191 @@ async function correrConfig(f) {
   ok("pero el PUT de Transferencias lo sigue rechazando", d3.status === 400, `${d3.status}`);
 }
 
+// ── PR-2: LA PANTALLA DE LA UBICACIÓN Y CANCELAR EL CAMBIO PROGRAMADO ────────
+//
+// Contra la ruta real `/api/config/semana-operativa`, que es la de la pantalla
+// nueva. Lo que se afirma de la cancelación:
+//
+//   · cancela SOLO lo que no empezó, y deja la vigencia que rige tal cual;
+//   · sin nada pendiente contesta 409 SIN_PENDIENTE, sin tocar nada;
+//   · nunca alcanza una vigencia que ya empezó, ni siquiera la que empieza HOY;
+//   · cada ubicación cancela lo suyo: la de al lado, del mismo grupo, no se toca;
+//   · la ubicación sale del alcance, nunca del pedido.
+async function correrCancelacion(f) {
+  console.log("\n── PR-2: la ruta de la ubicación y cancelar el cambio programado");
+  const url = "http://ci/api/config/semana-operativa";
+  const hoy = hoyArgentinaISO();
+  const permiso = [PERMISO_SEMANA_OPERATIVA];
+  const id = f.L.cancela.id;
+  const vecino = f.L.vecino.id;
+  const enCancela = token(900200, id, permiso);
+  const enVecino = token(900201, vecino, permiso);
+  const pedidoConCuerpo = (sesion, metodo, cuerpo = null) =>
+    new Request(url, {
+      method: metodo,
+      headers: { cookie: `erpazul_sesion=${sesion}`, "content-type": "application/json" },
+      ...(cuerpo ? { body: JSON.stringify(cuerpo) } : {}),
+    });
+
+  // Primera configuración: domingo, desde siempre.
+  const p0 = await leer(rutaConfig.PUT(pedidoConCuerpo(enCancela, "PUT", { diaDeCorte: 0 })));
+  ok("primera configuración de la ubicación → PRIMERA", p0.status === 200 && p0.cambio?.accion === "PRIMERA", `${p0.status} ${p0.error ?? ""}`);
+  ok(
+    "el GET trae la ubicación, el día de hoy y ningún cambio programado",
+    p0.ubicacion?.id === id && p0.ubicacion?.nombre?.endsWith("-cancela") && p0.hoy === hoy && p0.programado === null,
+    JSON.stringify({ u: p0.ubicacion, hoy: p0.hoy, prog: p0.programado })
+  );
+
+  // Sin nada pendiente: 409 y nada tocado.
+  const d0 = await leer(rutaConfig.DELETE(pedidoConCuerpo(enCancela, "DELETE")));
+  ok("cancelar sin cambio programado → 409 SIN_PENDIENTE", d0.status === 409 && d0.codigo === "SIN_PENDIENTE", `${d0.status} ${d0.codigo}`);
+
+  // Programar miércoles, y la transición llega contada en el GET.
+  const p1 = await leer(rutaConfig.PUT(pedidoConCuerpo(enCancela, "PUT", { diaDeCorte: 3 })));
+  const esperado = previsualizarCambio({ vigencias: [{ diaDeCorte: 0, desde: null }], diaDeCorte: 3, hoy });
+  ok(
+    "programar: el programado del GET es EL MISMO que prometió la vista previa",
+    p1.status === 200 && p1.programado?.desde === esperado.desde &&
+      JSON.stringify(p1.programado?.transicion) === JSON.stringify(esperado.transicion) &&
+      JSON.stringify(p1.programado?.despues) === JSON.stringify(esperado.despues),
+    `${p1.status} ${JSON.stringify(p1.programado)} vs ${JSON.stringify(esperado)}`
+  );
+
+  // Reemplazo explícito, como lo pide la pantalla.
+  const p2 = await leer(rutaConfig.PUT(pedidoConCuerpo(enCancela, "PUT", { diaDeCorte: 5, reemplazarPendiente: true })));
+  const filas2 = await vigenciasDe(id);
+  ok(
+    "reemplazar: sigue habiendo UN pendiente, el nuevo",
+    p2.status === 200 && p2.programado?.diaDeCorte === 5 && filas2.length === 2,
+    `${p2.status} ${JSON.stringify(filas2.map((v) => [v.diaDeCorte, iso(v.vigenteDesde)]))}`
+  );
+
+  // AISLAMIENTO: el vecino del mismo grupo tiene su semana y su propio pendiente.
+  await leer(rutaConfig.PUT(pedidoConCuerpo(enVecino, "PUT", { diaDeCorte: 1 })));
+  await leer(rutaConfig.PUT(pedidoConCuerpo(enVecino, "PUT", { diaDeCorte: 4 })));
+  ok("el vecino tiene su propio cambio programado", (await vigenciasDe(vecino)).length === 2);
+
+  // Un localId en el cuerpo NO cambia de quién es lo que se cancela.
+  const dAjeno = await leer(
+    rutaConfig.DELETE(new Request(url, {
+      method: "DELETE",
+      headers: { cookie: `erpazul_sesion=${enVecino}`, "content-type": "application/json" },
+      body: JSON.stringify({ localId: id }),
+    }))
+  );
+  ok(
+    "un `localId` en el cuerpo no cuenta: el vecino cancela SU cambio, no el de al lado",
+    dAjeno.status === 200 && dAjeno.localId === vecino && (await vigenciasDe(id)).length === 2,
+    `${dAjeno.status} ${dAjeno.localId} ${dAjeno.error ?? ""}`
+  );
+  // Se deja al vecino como estaba para lo que sigue.
+  await leer(rutaConfig.PUT(pedidoConCuerpo(enVecino, "PUT", { diaDeCorte: 4 })));
+  const vecinoConPendiente = JSON.stringify((await vigenciasDe(vecino)).map((v) => [v.diaDeCorte, iso(v.vigenteDesde)]));
+
+  const cfgAjena = await leer(rutaConfig.DELETE(new Request(`${url}?localId=${vecino}`, {
+    method: "DELETE",
+    headers: { cookie: `erpazul_sesion=${enCancela}` },
+  })));
+  ok("otra ubicación por la query al cancelar → 403", cfgAjena.status === 403, `${cfgAjena.status}`);
+
+  // CANCELAR el propio.
+  const antesDeCancelar = await vigenciasDe(id);
+  const vigente = antesDeCancelar.find((v) => v.vigenteDesde === null);
+  const d1 = await leer(rutaConfig.DELETE(pedidoConCuerpo(enCancela, "DELETE")));
+  const despues = await vigenciasDe(id);
+  ok(
+    "cancelar el propio → 200, y el GET vuelve con `programado: null`",
+    d1.status === 200 && d1.programado === null && d1.cancelado?.[0]?.diaDeCorte === 5,
+    `${d1.status} ${d1.error ?? ""} ${JSON.stringify(d1.programado)}`
+  );
+  ok(
+    "la vigencia que rige quedó IGUAL: misma fila, mismo día",
+    despues.length === 1 && despues[0].id === vigente.id && despues[0].diaDeCorte === 0 && despues[0].vigenteDesde === null,
+    JSON.stringify(despues)
+  );
+  ok("y la semana de hoy es la de siempre", d1.semana?.diaDeCorte === 0 && d1.semana?.configurada === true);
+  ok(
+    "el pendiente del vecino, del mismo grupo, sigue ahí",
+    JSON.stringify((await vigenciasDe(vecino)).map((v) => [v.diaDeCorte, iso(v.vigenteDesde)])) === vecinoConPendiente
+  );
+
+  const d2 = await leer(rutaConfig.DELETE(pedidoConCuerpo(enCancela, "DELETE")));
+  ok("cancelar dos veces → la segunda es 409 SIN_PENDIENTE", d2.status === 409 && d2.codigo === "SIN_PENDIENTE", `${d2.status}`);
+
+  // HISTORIA: una vigencia que ya empezó —la de hoy, y una del pasado— no se
+  // cancela nunca. Se siembra así porque la regla no deja programar hacia atrás.
+  const deHoy = await prisma.semanaOperativaVigencia.create({
+    data: { localId: id, diaDeCorte: diaDeLaSemana(hoy), vigenteDesde: new Date(`${hoy}T00:00:00.000Z`), origen: "MANUAL" },
+  });
+  const historiaAntes = JSON.stringify(await vigenciasDe(id));
+  const d3 = await leer(rutaConfig.DELETE(pedidoConCuerpo(enCancela, "DELETE")));
+  // Dos afirmaciones y no una: la regla pura contesta el 409, y el WHERE de la
+  // base es la que garantiza que la fila quede. Separadas, una contraprueba que
+  // rompe solo la regla muestra que la base igual la protege.
+  ok(
+    "una vigencia que empieza HOY ya es historia: cancelar → 409 SIN_PENDIENTE",
+    d3.status === 409 && d3.codigo === "SIN_PENDIENTE",
+    `${d3.status} ${d3.codigo}`
+  );
+  ok("…y la fila de hoy no se borra", JSON.stringify(await vigenciasDe(id)) === historiaAntes);
+
+  // Las dos barreras —la regla pura y el WHERE de la base— se prueban por
+  // contraprueba, rompiéndolas de a una: están en el cuerpo del commit.
+  // Se saca la fila sembrada para que lo que sigue parta de la historia de antes.
+  // `deleteMany` y no `delete`: si una contraprueba ya la borró, la limpieza no
+  // tiene que tapar el rojo de arriba con una excepción.
+  await prisma.semanaOperativaVigencia.deleteMany({ where: { id: deHoy.id } });
+
+  console.log("\n── PR-2: depósito, administrador y permisos en la ruta de la ubicación");
+  // `dAjeno` es depósito de su grupo (`g2`): la ruta resuelve su grupo por ahí.
+  const enDeposito = token(900202, f.dAjeno.id, permiso);
+  const dep0 = await leer(rutaConfig.PUT(pedidoConCuerpo(enDeposito, "PUT", { diaDeCorte: 2 })));
+  const dep1 = await leer(rutaConfig.PUT(pedidoConCuerpo(enDeposito, "PUT", { diaDeCorte: 6 })));
+  const dep2 = await leer(rutaConfig.DELETE(pedidoConCuerpo(enDeposito, "DELETE")));
+  ok(
+    "el depósito configura, programa y cancela SU semana",
+    dep0.status === 200 && dep0.ubicacion?.esDeposito === true && dep1.status === 200 && dep2.status === 200 &&
+      dep2.programado === null && dep2.semana?.diaDeCorte === 2,
+    `${dep0.status}/${dep1.status}/${dep2.status} ${dep0.error ?? ""} ${dep2.error ?? ""}`
+  );
+
+  const admin = token(900203, null, ["*"]);
+  const conContexto = (metodo, localId, cuerpo = null) =>
+    new Request(url, {
+      method: metodo,
+      headers: {
+        cookie: [
+          `erpazul_sesion=${admin}`,
+          `erpazul_grupo_activo=${f.g1.id}`,
+          ...(localId ? [`erpazul_contexto_activo=${encodeURIComponent(JSON.stringify({ localId }))}`] : []),
+        ].join("; "),
+        "content-type": "application/json",
+      },
+      ...(cuerpo ? { body: JSON.stringify(cuerpo) } : {}),
+    });
+  const sinCtx = await leer(rutaConfig.GET(conContexto("GET", null)));
+  ok("administrador sin contexto → 409 con `needsContexto`", sinCtx.status === 409 && sinCtx.needsContexto === true, `${sinCtx.status}`);
+  const a1 = await leer(rutaConfig.PUT(conContexto("PUT", id, { diaDeCorte: 6 })));
+  ok("administrador con contexto programa en ESA ubicación", a1.status === 200 && a1.localId === id && a1.programado?.diaDeCorte === 6, `${a1.status} ${a1.error ?? ""}`);
+  const a2 = await leer(rutaConfig.DELETE(conContexto("DELETE", id)));
+  ok(
+    "y cancela en ESA ubicación, sin tocar al vecino",
+    a2.status === 200 && a2.programado === null &&
+      JSON.stringify((await vigenciasDe(vecino)).map((v) => [v.diaDeCorte, iso(v.vigenteDesde)])) === vecinoConPendiente,
+    `${a2.status}`
+  );
+
+  const sinPermiso = token(900204, id, ["transferencias.ver", "transferencias.crear"]);
+  const antesSinPermiso = JSON.stringify(await vigenciasDe(vecino));
+  const s1 = await leer(rutaConfig.GET(pedido(url, sinPermiso)));
+  const s2 = await leer(rutaConfig.DELETE(pedidoConCuerpo(token(900205, vecino, ["transferencias.ver"]), "DELETE")));
+  ok(
+    "sin el permiso: ni leer ni cancelar, y nada cambia",
+    s1.status === 403 && s2.status === 403 && JSON.stringify(await vigenciasDe(vecino)) === antesSinPermiso,
+    `${s1.status}/${s2.status}`
+  );
+}
+
 let fixture;
 try {
   fixture = await montar();
@@ -707,6 +894,7 @@ try {
   await correrPutViejo(fixture);
   await correrPermisos(fixture);
   await correrConfig(fixture);
+  await correrCancelacion(fixture);
 } finally {
   await desmontar();
   await prisma.$disconnect();

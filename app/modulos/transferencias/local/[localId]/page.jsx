@@ -23,7 +23,8 @@
 //
 // `/modulos/transferencias/local/7` no choca con `/modulos/transferencias/7`
 // porque `local` es un segmento estático y Next lo resuelve antes que el
-// dinámico. Es el mismo criterio que ya usa `corte-de-semana`.
+// dinámico. Es el mismo criterio que usa la ruta vieja `corte-de-semana`, que
+// hoy solo redirige a Configuración → Semana operativa.
 "use client";
 
 import { Suspense } from "react";
@@ -38,13 +39,8 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
 import AccionDePantalla from "@/components/transferencias/AccionDePantalla";
 import CuentaDeUnLocal from "@/components/transferencias/CuentaDeUnLocal";
-import {
-  RUTA_CORTE_DE_SEMANA,
-  RUTA_TRANSFERENCIAS,
-  puedeConfigurarElCorte,
-} from "@/components/transferencias/corteDeSemana";
 import { money, useCuentaDeLocal } from "@/components/transferencias/useCuentaDeLocal";
-import { urlDelDetalle } from "@/lib/transferencias/contextoDelTablero";
+import { RUTA_TRANSFERENCIAS, urlDelDetalle } from "@/lib/transferencias/contextoDelTablero";
 
 // ── EL LÍMITE DE SUSPENSE, Y POR QUÉ NO ES BUROCRACIA ───────────────────
 //
@@ -92,8 +88,10 @@ function CuentaDelLocal() {
       <CuentaDeUnLocal
         {...cuenta}
         money={money}
-        puedeConfigurarCorte={puedeConfigurarElCorte(perfil?.permisos)}
-        onConfigurarCorte={() => router.push(RUTA_CORTE_DE_SEMANA)}
+        // SIN atajo a la semana. Esta es la cuenta de un local vista DESDE EL
+        // DEPÓSITO, y la pantalla de semana operativa configura la ubicación en
+        // la que se opera: el atajo llevaría al depósito a cambiar SU semana
+        // creyendo que cambia la del local. Cada local configura la suya.
         // Igual que en el tablero: el contexto viaja para poder volver acá, a
         // este local y a este período.
         onAbrirTransferencia={(t) => router.push(urlDelDetalle(t.id, cuenta.contexto))}
