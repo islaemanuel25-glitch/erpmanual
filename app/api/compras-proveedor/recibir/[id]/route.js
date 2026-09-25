@@ -162,6 +162,14 @@ export async function POST(req, { params }) {
                     pesoEsFijo: true,
                     pesoPromedioKg: true,
                     actualizaPromedioPorRecepcion: true,
+                    // EL COSTO MAESTRO DE HOY. Lo leen tres defensas del cierre
+                    // —la escala de `costoLineaAMaestro`, el freno por la
+                    // variación del proveedor y la frontera— y faltaba acá:
+                    // las tres recibían `undefined`, comparaban contra cero y
+                    // no frenaban nunca. Medido contra Postgres el 2026-09-25:
+                    // 1.000 → 30.000 cerraba y se escribía, y la Hamburguesa
+                    // x30 volvía a pasar de $61.703 a $1.851.090.
+                    precio_costo: true,
                   },
                 },
               },
