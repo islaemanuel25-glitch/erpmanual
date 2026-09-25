@@ -4,8 +4,7 @@ import { LayoutGrid } from "lucide-react";
 import { useSunmiTheme } from "@/components/sunmi/SunmiThemeProvider";
 import { useMenu } from "@/hooks/useMenu";
 import AppLauncherTile from "./AppLauncherTile";
-
-const MAX_TILES = 8;
+import { gruposDelPanel } from "@/lib/dashboard/accesosRapidos";
 
 const TXT = "text-[color:var(--app-fg)]";
 const DIVIDER = "border-[color:var(--card-border)]";
@@ -16,7 +15,11 @@ export default function AppLauncher({ hideTitle = false }) {
 
   if (isLoading || !perfil) return null;
 
-  const menu = visibleMenu.slice(0, MAX_TILES);
+  // El lanzador ES el Panel del modo lanzador (`/modulos/inicio`): ofrece los
+  // mismos grupos que los accesos rápidos del otro Panel, con la misma regla
+  // —todos los grupos accesibles menos el Inicio, sin tope—. Una sola
+  // implementación para los dos.
+  const menu = gruposDelPanel(visibleMenu);
 
   return (
     <section className="w-full max-w-6xl mx-auto mt-8 mb-6" aria-label="App Launcher">
