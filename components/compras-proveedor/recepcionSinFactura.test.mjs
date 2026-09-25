@@ -238,7 +238,10 @@ test("AL CERRAR SIN PAPEL ENTRA LO CONTADO, LÍNEA POR LÍNEA", () => {
   });
 });
 
-test("SIN PAPEL EL CIERRE NO TOCA EL COSTO DEL CATÁLOGO; CON PAPEL NO SE EXCLUYE NADA", () => {
+// Con papel se excluye además la línea con "Dejar el que tenía" vigente; eso se
+// ejerce contra Postgres en `scripts/pruebas-db/frenoDeCosto.mjs`. Acá, sin
+// ninguna decisión, no se excluye nada.
+test("SIN PAPEL EL CIERRE NO TOCA EL COSTO DEL CATÁLOGO; CON PAPEL Y SIN DECISIÓN NO SE EXCLUYE NADA", () => {
   // Medido contra `erpazul_al`: con la exclusión, un costo corregido con el
   // lápiz (38.000 → 45.000) sobrevivió al cierre; sacándola, el mismo recorrido
   // lo pisó de vuelta con el de la línea (60.000 → 38.000).
