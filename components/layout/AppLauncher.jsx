@@ -17,7 +17,8 @@ export default function AppLauncher({ hideTitle = false }) {
 
   // El lanzador ES el Panel del modo lanzador (`/modulos/inicio`): ofrece los
   // mismos grupos que los accesos rápidos del otro Panel, con la misma regla
-  // —sin el Inicio y como mucho ocho—. Una sola implementación para los dos.
+  // —todos los grupos accesibles menos el Inicio, sin tope—. Una sola
+  // implementación para los dos.
   const menu = gruposDelPanel(visibleMenu);
 
   return (

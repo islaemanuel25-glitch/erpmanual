@@ -17,7 +17,8 @@
 //   - Se prefiere `group.href` cuando coincide con algún item
 //     visible (evita linkear a una ruta sin permiso); si no,
 //     se usa el primer item visible del grupo.
-//   - Máximo 8 accesos.
+//   - Sin tope: todos los grupos accesibles menos Inicio; la
+//     grilla crece hacia abajo.
 //   - Sin acceso al Inicio: el Panel ES el Inicio. La regla es la
 //     misma que la del lanzador y vive en
 //     `lib/dashboard/accesosRapidos.js`.
