@@ -31,7 +31,9 @@ const rutaConfig = await import("../../app/api/config/semana-operativa/route.js"
 const { semanaQueContiene, previsualizarCambio, PERMISO_SEMANA_OPERATIVA } = await import(
   "../../lib/semanaOperativa/semanaOperativa.js"
 );
-const { programarSemanaOperativa } = await import("../../lib/semanaOperativa/semanaOperativaServer.js");
+const { programarSemanaOperativa, ACCION_CANCELAR_SEMANA } = await import(
+  "../../lib/semanaOperativa/semanaOperativaServer.js"
+);
 const { diaDeLaSemana, rangoDelPeriodo, rangoDesplazado, sumarDias, UNIDADES } = await import(
   "../../lib/transferencias/periodoDePago.js"
 );
@@ -162,6 +164,8 @@ async function desmontar() {
       where: { OR: [{ localId: { in: ids } }, { depositoLocalId: { in: ids } }] },
     });
     await prisma.semanaOperativaVigencia.deleteMany({ where: { localId: { in: ids } } });
+    // La evidencia de las cancelaciones: solo la de las ubicaciones de la prueba.
+    await prisma.auditoriaBitacora.deleteMany({ where: { localId: { in: ids } } });
   }
   if (creado.clienteIds.length) await prisma.cliente.deleteMany({ where: { id: { in: creado.clienteIds } } });
   if (creado.grupoIds.length) {
@@ -790,7 +794,11 @@ async function correrCancelacion(f) {
   // CANCELAR el propio.
   const antesDeCancelar = await vigenciasDe(id);
   const vigente = antesDeCancelar.find((v) => v.vigenteDesde === null);
+  const pendiente = antesDeCancelar.find((v) => v.vigenteDesde !== null);
+  const evidenciaAntes = await evidenciaDe(id);
+  const t0 = new Date();
   const d1 = await leer(rutaConfig.DELETE(pedidoConCuerpo(enCancela, "DELETE")));
+  const t1 = new Date();
   const despues = await vigenciasDe(id);
   ok(
     "cancelar el propio → 200, y el GET vuelve con `programado: null`",
@@ -808,8 +816,53 @@ async function correrCancelacion(f) {
     JSON.stringify((await vigenciasDe(vecino)).map((v) => [v.diaDeCorte, iso(v.vigenteDesde)])) === vecinoConPendiente
   );
 
+  // LA EVIDENCIA: la vigencia se borró, así que lo único que prueba qué se
+  // canceló, de quién y cuándo es la fila de la bitácora.
+  const nuevas = (await evidenciaDe(id)).filter((e) => !evidenciaAntes.some((a) => a.id === e.id));
+  const ev = nuevas[0];
+  const registro = ev?.cambios?.[0]?.vigencia;
+  ok("la cancelación dejó UNA fila de evidencia en la bitácora", nuevas.length === 1, `${nuevas.length}`);
+  ok(
+    "…de ESTA ubicación y de su grupo",
+    ev?.localId === id && ev?.grupoId === f.g1.id && registro?.localId === id,
+    JSON.stringify({ localId: ev?.localId, grupoId: ev?.grupoId, registro })
+  );
+  ok(
+    "…que nombra la vigencia cancelada y su día de corte",
+    ev?.entidad === "SemanaOperativa" && ev?.entidadId === String(pendiente.id) && registro?.id === pendiente.id &&
+      registro?.diaDeCorte === 5 && pendiente.diaDeCorte === 5,
+    JSON.stringify({ entidadId: ev?.entidadId, registro })
+  );
+  ok(
+    "…con la fecha desde la que iba a regir",
+    registro?.vigenteDesde === iso(pendiente.vigenteDesde) && registro?.vigenteDesde > hoy,
+    `${registro?.vigenteDesde} vs ${iso(pendiente.vigenteDesde)}`
+  );
+  ok("…con quién la canceló", ev?.usuarioId === 900200, `${ev?.usuarioId}`);
+  ok(
+    "…y cuándo, que es el momento del pedido",
+    ev?.createdAt instanceof Date && ev.createdAt.getTime() >= t0.getTime() - 1000 && ev.createdAt.getTime() <= t1.getTime() + 1000,
+    `${ev?.createdAt?.toISOString?.()} fuera de ${t0.toISOString()}–${t1.toISOString()}`
+  );
+  ok(
+    "…y lo cuenta en castellano para la pantalla de auditoría",
+    JSON.stringify(ev?.cambios?.[0]?.campos?.map((c) => [c.campo, c.antes, c.despues])) ===
+      JSON.stringify([["diaDeCorte", "Viernes a jueves", null], ["vigenteDesde", ev?.cambios?.[0]?.campos?.[1]?.antes, null]]) &&
+      /^\d{2}\/\d{2}\/\d{4}$/.test(ev?.cambios?.[0]?.campos?.[1]?.antes ?? ""),
+    JSON.stringify(ev?.cambios?.[0]?.campos)
+  );
+  const evVecino = await evidenciaDe(vecino);
+  ok(
+    "la cancelación del vecino quedó a SU nombre, con SU vigencia, y ninguna de esta ubicación",
+    evVecino.length === 1 && evVecino[0].usuarioId === 900201 && evVecino[0].cambios?.[0]?.vigencia?.localId === vecino &&
+      evidenciaAntes.length === 0,
+    JSON.stringify(evVecino.map((e) => [e.localId, e.usuarioId, e.entidadId]))
+  );
+  if (ev) ejemploDeEvidencia = ev;
+
   const d2 = await leer(rutaConfig.DELETE(pedidoConCuerpo(enCancela, "DELETE")));
   ok("cancelar dos veces → la segunda es 409 SIN_PENDIENTE", d2.status === 409 && d2.codigo === "SIN_PENDIENTE", `${d2.status}`);
+  ok("…y no deja una segunda evidencia", (await evidenciaDe(id)).length === 1);
 
   // HISTORIA: una vigencia que ya empezó —la de hoy, y una del pasado— no se
   // cancela nunca. Se siembra así porque la regla no deja programar hacia atrás.
@@ -827,6 +880,7 @@ async function correrCancelacion(f) {
     `${d3.status} ${d3.codigo}`
   );
   ok("…y la fila de hoy no se borra", JSON.stringify(await vigenciasDe(id)) === historiaAntes);
+  ok("…ni queda evidencia de una cancelación que no ocurrió", (await evidenciaDe(id)).length === 1);
 
   // Las dos barreras —la regla pura y el WHERE de la base— se prueban por
   // contraprueba, rompiéndolas de a una: están en el cuerpo del commit.
@@ -846,6 +900,13 @@ async function correrCancelacion(f) {
     dep0.status === 200 && dep0.ubicacion?.esDeposito === true && dep1.status === 200 && dep2.status === 200 &&
       dep2.programado === null && dep2.semana?.diaDeCorte === 2,
     `${dep0.status}/${dep1.status}/${dep2.status} ${dep0.error ?? ""} ${dep2.error ?? ""}`
+  );
+  const evDepo = await evidenciaDe(f.dAjeno.id);
+  ok(
+    "…y su evidencia queda en el depósito y en SU grupo",
+    evDepo.length === 1 && evDepo[0].grupoId === f.g2.id && evDepo[0].usuarioId === 900202 &&
+      evDepo[0].cambios?.[0]?.vigencia?.diaDeCorte === 6,
+    JSON.stringify(evDepo.map((e) => [e.localId, e.grupoId, e.usuarioId]))
   );
 
   const admin = token(900203, null, ["*"]);
@@ -873,6 +934,13 @@ async function correrCancelacion(f) {
       JSON.stringify((await vigenciasDe(vecino)).map((v) => [v.diaDeCorte, iso(v.vigenteDesde)])) === vecinoConPendiente,
     `${a2.status}`
   );
+  const evAdmin = (await evidenciaDe(id)).at(-1);
+  ok(
+    "la cancelación del administrador queda a SU nombre, en la ubicación del contexto",
+    (await evidenciaDe(id)).length === 2 && evAdmin?.usuarioId === 900203 && evAdmin?.localId === id &&
+      evAdmin?.grupoId === f.g1.id && evAdmin?.cambios?.[0]?.vigencia?.diaDeCorte === 6,
+    JSON.stringify(evAdmin)
+  );
 
   const sinPermiso = token(900204, id, ["transferencias.ver", "transferencias.crear"]);
   const antesSinPermiso = JSON.stringify(await vigenciasDe(vecino));
@@ -883,7 +951,69 @@ async function correrCancelacion(f) {
     s1.status === 403 && s2.status === 403 && JSON.stringify(await vigenciasDe(vecino)) === antesSinPermiso,
     `${s1.status}/${s2.status}`
   );
+  ok("…ni evidencia", (await evidenciaDe(vecino)).length === 1);
+
+  console.log("\n── PR-2: programar y cancelar a la vez sobre la misma ubicación");
+  // A programa con la función real y, ANTES de confirmar, se queda quieta con la
+  // ubicación bloqueada. B cancela por la ruta. B tiene que esperar a A y
+  // cancelar lo que A escribió, con su evidencia. Sin el `FOR UPDATE` de la
+  // cancelación, B lee antes de que A confirme, no ve nada pendiente y contesta
+  // 409: queda un cambio programado que el usuario creyó cancelado.
+  const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
+  let soltarA;
+  const esperaA = new Promise((r) => (soltarA = r));
+  const a = prisma.$transaction(
+    async (tx) => {
+      const r = await programarSemanaOperativa(tx, { localId: id, diaDeCorte: 2, usuarioId: 900206 });
+      await esperaA;
+      return r;
+    },
+    { timeout: 20000 }
+  );
+  await pausa(300);
+  let terminoB = false;
+  const b = leer(rutaConfig.DELETE(pedidoConCuerpo(enCancela, "DELETE"))).finally(() => (terminoB = true));
+  await pausa(800);
+  const bEspero = !terminoB;
+  soltarA();
+  const ra = await a;
+  const rb = await b;
+  const evCarrera = (await evidenciaDe(id)).at(-1);
+  const pendientesCarrera = (await vigenciasDe(id)).filter((v) => iso(v.vigenteDesde) > hoy);
+  ok("la carrera ocurrió: la cancelación esperó a la programación", bEspero);
+  ok(
+    "y canceló EXACTAMENTE lo que A programó, con su evidencia",
+    rb.status === 200 && pendientesCarrera.length === 0 && evCarrera?.entidadId === String(ra.vigencia.id) &&
+      evCarrera?.cambios?.[0]?.vigencia?.diaDeCorte === 2,
+    `${rb.status} ${rb.codigo ?? ""} pendientes=${pendientesCarrera.length} ev=${evCarrera?.entidadId} a=${ra.vigencia.id}`
+  );
+
+  // NINGÚN ESTADO IMPOSIBLE, sobre todas las ubicaciones de la prueba: cada
+  // evidencia nombra una vigencia que ya no existe, y ninguna vigencia que rige
+  // tiene evidencia de cancelada.
+  const todas = await prisma.auditoriaBitacora.findMany({
+    where: { accion: ACCION_CANCELAR_SEMANA, localId: { in: creado.localIds } },
+    select: { entidadId: true },
+  });
+  const vivas = await prisma.semanaOperativaVigencia.findMany({
+    where: { id: { in: todas.map((e) => Number(e.entidadId)) } },
+    select: { id: true },
+  });
+  ok(
+    `ninguna de las ${todas.length} evidencias nombra una vigencia que siga existiendo`,
+    // El vecino, esta ubicación, el depósito, el administrador y la carrera.
+    todas.length === 5 && vivas.length === 0,
+    `evidencias=${todas.length} vivas=${JSON.stringify(vivas)}`
+  );
 }
+
+/** La evidencia de cancelaciones de una ubicación, en orden. */
+const evidenciaDe = (localId) =>
+  prisma.auditoriaBitacora.findMany({
+    where: { accion: ACCION_CANCELAR_SEMANA, localId },
+    orderBy: { id: "asc" },
+  });
+let ejemploDeEvidencia = null;
 
 let fixture;
 try {
@@ -900,6 +1030,10 @@ try {
   await prisma.$disconnect();
 }
 
+if (ejemploDeEvidencia) {
+  const { id: _id, ...sinId } = ejemploDeEvidencia;
+  console.log(`\nEjemplo de la evidencia de una cancelación:\n${JSON.stringify(sinId, null, 2)}`);
+}
 console.log(`\n${pasadas} comprobaciones pasaron.`);
 if (fallas.length) {
   console.error("\nFallaron:");

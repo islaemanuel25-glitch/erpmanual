@@ -147,7 +147,9 @@ export async function PUT(req) {
 // Sin cuerpo: la ubicación es la del alcance —nunca un `localId` del pedido— y lo
 // que se cancela es lo único que se puede cancelar, el cambio que todavía no
 // empezó. Una vigencia que ya rige no se toca. Sin cambio pendiente: 409
-// SIN_PENDIENTE, igual que MISMO_CORTE cuando no hay nada que cambiar.
+// SIN_PENDIENTE, igual que MISMO_CORTE cuando no hay nada que cambiar. Lo
+// cancelado queda en `AuditoriaBitacora` con la acción `semana_operativa.cancelar`,
+// escrito en la misma transacción que el borrado.
 export async function DELETE(req) {
   try {
     const auth = requirePerm(req, PERMISO_SEMANA_OPERATIVA);
@@ -163,7 +165,14 @@ export async function DELETE(req) {
 
     let resultado;
     try {
-      resultado = await prisma.$transaction((tx) => cancelarSemanaPendiente(tx, { localId: scope.localId }));
+      // Quién y en qué grupo, para la evidencia que queda en la bitácora.
+      resultado = await prisma.$transaction((tx) =>
+        cancelarSemanaPendiente(tx, {
+          localId: scope.localId,
+          usuarioId: scope.session?.id ?? null,
+          grupoId: scope.grupoId ?? null,
+        })
+      );
     } catch (err) {
       if (err instanceof ErrorSemanaOperativa) return respuestaDeError(err);
       throw err;
