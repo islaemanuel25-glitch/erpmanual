@@ -18,6 +18,7 @@ import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { ErrorParaLaPersona, esParaLaPersona } from "@/lib/compras-proveedor/errorParaLaPersona";
 import { formatearMoneda } from "@/lib/moneda";
+import { aCentavos } from "@/lib/compras-proveedor/comprobante/impuestos";
 import {
   decisionDeCostoSugerida,
   textoDeLaDiferencia,
@@ -478,8 +479,39 @@ export async function POST(req, { params }) {
         comprobante: { pedidoId, grupoId, estado: { not: "ANULADO" } },
         pedidoDetalleId: { not: null },
       },
-      select: { pedidoDetalleId: true, cantidad: true, subtotalImpreso: true, subtotalCorregido: true },
+      select: {
+        pedidoDetalleId: true,
+        cantidad: true,
+        subtotalImpreso: true,
+        subtotalCorregido: true,
+        // El precio que alguien ACEPTÓ para este renglón. Lo escribe
+        // `aceptar-precio` y solo cuando la respuesta es "aceptar el precio
+        // nuevo" —"dejar el que tenía" no lo toca—, y `vincular` lo borra si el
+        // renglón cambia de producto. Ver `aceptadoEnElPapel`, abajo.
+        costoFinalUnitario: true,
+      },
     });
+    // ── LO QUE YA SE ACEPTÓ EN ESTA RECEPCIÓN, POR LÍNEA DEL PEDIDO ──────
+    //
+    // El freno de abajo deja pasar un costo fuera de la variación si "la
+    // persona aceptó ese costo en esta misma recepción". Esa aceptación ya
+    // está guardada: "Aceptar el precio nuevo" en la hoja de Corregir escribe
+    // el mismo número en la línea del pedido y en `costoFinalUnitario` de su
+    // renglón. La pantalla no la manda en `costosAceptados`, así que sin leerla
+    // acá un aumento aceptado volvía a frenar el cierre cada vez, sin salida.
+    //
+    // Se guardan en centavos —la escala del costo de la línea que manda la
+    // pantalla— y se compara contra el costo que va a escribir el cierre:
+    // aceptar 1.150 no autoriza a escribir 30.000.
+    const aceptadosEnElPapel = new Map();
+    for (const l of lineasDelPapel) {
+      if (l.costoFinalUnitario == null) continue;
+      const aceptados = aceptadosEnElPapel.get(l.pedidoDetalleId) ?? new Set();
+      aceptados.add(aCentavos(l.costoFinalUnitario));
+      aceptadosEnElPapel.set(l.pedidoDetalleId, aceptados);
+    }
+    const aceptadoEnElPapel = (detalleId, costo) =>
+      aceptadosEnElPapel.get(detalleId)?.has(aCentavos(costo)) === true;
     // ── CUÁNTO SE LE MUEVE EL PRECIO A ESTE PROVEEDOR ───────────────────
     //
     // La misma pregunta que hace la hoja de Corregir, contestada con la misma
@@ -804,10 +836,13 @@ export async function POST(req, { params }) {
           costoNuevo: costoMaestro,
           umbrales: umbralesDeCosto,
         });
+        // Aceptado en esta recepción: lo que mandó quien llama, o lo que la
+        // hoja de Corregir ya dejó guardado para ESTE costo.
+        const aceptada = costosAceptados.has(det.id) || aceptadoEnElPapel(det.id, costoFinal);
         const decision = decidirEscrituraDeCosto({
           clasificacion,
           excluidaAMano: costosExcluidos.has(det.id),
-          aceptada: costosAceptados.has(det.id),
+          aceptada,
           hayCosto: Number.isFinite(costoMaestro) && costoMaestro > 0,
         });
         // Con la frontera apagada se conserva el comportamiento de siempre
@@ -845,7 +880,7 @@ export async function POST(req, { params }) {
           variacionPct: variacionNormalPct,
           factorPack: base?.factor_pack,
         });
-        if (escribeCosto && sugerida.exigeElegir && !costosAceptados.has(det.id)) {
+        if (escribeCosto && sugerida.exigeElegir && !aceptada) {
           const aviso = textoDeLaDiferencia(sugerida, {
             proveedor: nombreDelProveedor,
             moneda: formatearMoneda,
