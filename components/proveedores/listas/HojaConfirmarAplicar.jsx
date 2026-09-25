@@ -29,8 +29,7 @@
 // un usuario que espera un precio de venta nuevo y encuentra el viejo. Por eso el
 // renglón dice las dos cosas.
 
-import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
-import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiHojaDeConfirmacion from "@/components/sunmi/SunmiHojaDeConfirmacion";
 import { MODO_PRECIO_VENTA } from "@/lib/proveedores/listas/aplicacion";
 
 /**
@@ -64,51 +63,18 @@ export default function HojaConfirmarAplicar({
     "Si te equivocaste, lo podés deshacer.",
   ];
 
+  // El marcado —modal, renglones y dos botones— es del kit desde que la semana
+  // operativa necesitó lo mismo: `SunmiHojaDeConfirmacion` salió de acá tal cual.
   return (
-    <SunmiModalLayout
-      open
-      title={`¿Aplicar los ${cantidad} precios?`}
-      color="amber"
-      onClose={trabajando ? undefined : onVolver}
-      // Los dos que el kit ya NO tiene default: los declara cada consumidor y
-      // hay un censo que lo exige. Estos son los mismos valores que traían
-      // `ModalRevertir` y `ModalTerminar`, que son sus hermanos de esta pantalla.
-      espacioCuerpo="mt-2 gap-3"
-      z={9999}
-      // NO lleva `destructivo`: acá no hay nada escrito que se pueda perder
-      // —son cuatro renglones de lectura y dos botones—, así que tocar el velo
-      // cierra, que es lo que espera quien abre una hoja por error con el pulgar.
-      // El criterio es qué se pierde al cerrar sin querer, no qué tan grave es
-      // la acción; lo grave lo sostiene el botón, que hay que ir a buscar.
-      footer={
-        <div className="space-y-2 w-full">
-          <SunmiButton
-            color="cyan"
-            onClick={onAplicar}
-            disabled={trabajando}
-            className="w-full min-h-toque text-base font-bold"
-          >
-            {trabajando ? "Aplicando…" : "Sí, aplicar"}
-          </SunmiButton>
-          <SunmiButton
-            color="slate"
-            onClick={onVolver}
-            disabled={trabajando}
-            className="w-full min-h-toque text-sm3"
-          >
-            Volver
-          </SunmiButton>
-        </div>
-      }
-    >
-      <ul className="space-y-2">
-        {puntos.map((p, i) => (
-          <li key={i} className="flex gap-2 text-sm3 sunmi-text-strong leading-snug">
-            <span aria-hidden="true" className="sunmi-text-muted">•</span>
-            <span>{p}</span>
-          </li>
-        ))}
-      </ul>
-    </SunmiModalLayout>
+    <SunmiHojaDeConfirmacion
+      titulo={`¿Aplicar los ${cantidad} precios?`}
+      puntos={puntos}
+      textoConfirmar="Sí, aplicar"
+      textoTrabajando="Aplicando…"
+      colorConfirmar="cyan"
+      trabajando={trabajando}
+      onConfirmar={onAplicar}
+      onVolver={onVolver}
+    />
   );
 }
