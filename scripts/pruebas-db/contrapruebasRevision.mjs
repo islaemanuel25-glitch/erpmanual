@@ -227,6 +227,29 @@ const CASOS = [
     // para como error de escala: el cierre legítimo deja de cerrar.
     esperadas: ["F costo del bulto en línea UNIDAD: cierra"],
   },
+  {
+    n: "FC-5",
+    defecto: "\"Dejar el que tenía\" vuelve a pasar por el freno como candidata a escribir costo",
+    archivo: "lib/compras-proveedor/cierreDeRecepcion.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [
+      {
+        de: "(f) => f?.sinPapel === true || decisionVigente(f)?.decision === DECISION_DE_PRECIO.DEJA_EL_MIO",
+        a: "(f) => f?.sinPapel === true",
+      },
+    ],
+    esperadas: ["L1: la pantalla excluye ESA línea del costo", "L1: cierra"],
+  },
+  {
+    n: "FC-6",
+    defecto: "se excluye por la última decisión del producto aunque sus precios no sean los de la fila",
+    archivo: "lib/compras-proveedor/cierreDeRecepcion.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "decisionVigente(f)?.decision", a: "f?.decisionPrecio?.decision" }],
+    esperadas: ["L3: con otros números no está vigente y no se excluye", "L3: frena con 409"],
+  },
 ];
 
 // Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número
