@@ -86,10 +86,11 @@ import {
   ESTADO_LINEA,
   cantidadEnEscalaDelPedido,
   cantidadFueConvertida,
+  costoPropioParaDecidir,
   estadoDeLinea,
+  hayDiferenciaDePrecio,
   motivoSinComparacion,
   porcentajeDelPrecio,
-  precioCambio,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 // LA ESCALA SALE DE LA MISMA FUNCIÓN QUE USA LA TARJETA, no de una parecida.
 import { quedoEnBultos } from "@/lib/compras-proveedor/tarjetaDeRecepcion";
@@ -304,7 +305,11 @@ export default function HojaCorregirLinea({
   // factura. Lo que habla del papel —lo que dice, el vínculo, la decisión de
   // precio— no tiene de qué hablar.
   const sinPapel = fila?.sinPapel === true;
-  const cambio = precioCambio(fila);
+  // La diferencia de siempre —papel contra línea del pedido— o la del catálogo
+  // que se movió después del pedido. En la segunda, "tu precio" es el costo
+  // maestro de hoy, que es contra el que compara el cierre.
+  const cambio = hayDiferenciaDePrecio(fila);
+  const tuPrecio = costoPropioParaDecidir(fila);
   const porcentaje = porcentajeDelPrecio(fila);
   // Lo que ya se contestó sobre estos dos precios, y lo que se había contestado
   // cuando eran otros. La segunda no decide nada: se muestra, para que volver a
@@ -333,17 +338,17 @@ export default function HojaCorregirLinea({
     () =>
       decisionDeCostoSugerida({
         papel: fila?.costoFactura,
-        tuyo: fila?.costoCatalogo,
+        tuyo: tuPrecio,
         variacionPct: variacionNormalPct,
         factorPack: fila?.factorPack,
       }),
-    [fila?.costoFactura, fila?.costoCatalogo, fila?.factorPack, variacionNormalPct]
+    [fila?.costoFactura, tuPrecio, fila?.factorPack, variacionNormalPct]
   );
   const avisoDeLaDiferencia = textoDeLaDiferencia(sugerida, {
     proveedor: proveedorNombre || "Este proveedor",
     moneda: formatearMoneda,
     papel: fila?.costoFactura,
-    tuyo: fila?.costoCatalogo,
+    tuyo: tuPrecio,
   });
   // ── LA ESCALA SALE DEL MISMO LUGAR QUE LA DE LA TARJETA ───────────────
   //
@@ -664,7 +669,7 @@ export default function HojaCorregirLinea({
   /** Los dos números, en una línea. Es lo que se compara, en los cuatro casos. */
   const losDosPrecios = (
     <span className="text-sm3 sunmi-text-muted">
-      Tenías {formatearMoneda(fila.costoCatalogo)} · la factura trae{" "}
+      Tenías {formatearMoneda(tuPrecio)} · la factura trae{" "}
       {formatearMoneda(fila.costoFactura)}
     </span>
   );
@@ -1007,7 +1012,7 @@ export default function HojaCorregirLinea({
                 {textoDeDecision(yaDecidido.decision)} ·{" "}
                 {formatearMoneda(
                   yaDecidido.decision === DECISION_DE_PRECIO.DEJA_EL_MIO
-                    ? fila.costoCatalogo
+                    ? tuPrecio
                     : fila.costoFactura
                 )}
               </span>

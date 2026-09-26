@@ -193,11 +193,53 @@ escribe costos en producción.** Está en el roadmap como deuda 2.
   con importaciones aplicadas **hoy pasa el chequeo**. **[DUDA]** — no se leyó el
   `onDelete` de esas tres relaciones.
 - **Relevado al congelar `stockIngresado` (2026-09-25), sin corregir a propósito:**
-  - **El freno de costo del pedido 242 no puede saltar.** `recibir/[id]` compara
-    contra `base?.precio_costo`, pero el `select` de la base no trae
-    `precio_costo`: `anterior` vale siempre 0, `decisionDeCostoSugerida`
-    contesta `SIN_DATOS` y no exige elegir. Medido contra Postgres: un costo 30
-    veces el del catálogo cerró y se escribió. **[VERIFICADO]**
+  - ~~**El freno de costo del pedido 242 no puede saltar.**~~ **Corregido el
+    2026-09-25.** El `select` de la base en `recibir/[id]` no traía
+    `precio_costo`, así que las tres defensas del costo comparaban contra cero
+    desde el 2026-08-11. Ahora lo trae; el cierre reconoce como aceptado el
+    costo que `aceptar-precio` dejó en `costoFinalUnitario` del renglón —la
+    pantalla no manda `costosAceptados`—, y el freno solo corre sobre líneas
+    que van a escribir costo. "Dejar el que tenía" VIGENTE —leído con
+    `decisionVigente`, no con la última decisión del producto— excluye esa
+    línea de escribir costo por `costosQueNoSeTocan`, así que tampoco frena.
+    Lo ejerce `scripts/pruebas-db/frenoDeCosto.mjs` contra Postgres, con sus
+    contrapruebas FC-1 a FC-8. **[VERIFICADO]**
+  - ~~**Queda sin salida un caso:** papel igual a la línea y catálogo movido
+    después.~~ **Corregido el 2026-09-26.** La conciliación marca la fila con
+    `catalogoMovido` —`elCatalogoSeMovio`, la misma `decisionDeCostoSugerida`
+    del cierre con la variación vigente del proveedor, comparando el papel
+    contra el costo maestro de hoy (`costoMaestroHoy`)—, y la hoja pregunta con
+    las dos opciones de siempre mostrando ese costo como "Tenías". Dejar el que
+    tenía excluye la línea; aceptar guarda la decisión también en este caso
+    (antes no la guardaba porque papel y línea eran el mismo número) y el
+    cierre escribe lo aceptado. Una baja grande contra el catálogo sigue sin
+    poder aceptarse de un clic, como siempre. Casos M-A a M-E de
+    `frenoDeCosto.mjs`, contrapruebas FC-7 y FC-8. **[VERIFICADO contra Postgres]**
+  - ~~**La carrera entre decidir y cerrar.**~~ **Corregida el 2026-09-26.**
+    `DecisionDePrecioProveedor.costoMaestroObservado` —Decimal(12,2), la escala
+    de `ProductoBase.precio_costo`— guarda el costo maestro crudo que
+    `aceptar-precio` leyó del catálogo al decidir, en las dos respuestas. No es
+    `precioPropio`, que sigue siendo el costo de la línea. Una decisión vale
+    solo si el catálogo sigue en ese número, al centavo y sin tolerancia
+    (`mismoCatalogoQueAlDecidir`): la hoja la da por vencida y vuelve a
+    preguntar contra el catálogo de hoy, y el cierre no toma como autorizada
+    una aceptación cuya decisión es de otro catálogo. Las decisiones
+    anteriores a la columna quedan en NULL, no se rellenan y no valen: la hoja
+    vuelve a preguntar. Casos N1 a N8 de `frenoDeCosto.mjs`, contrapruebas FC-9
+    a FC-13. **[VERIFICADO contra Postgres]**
+  - **Lo que la protección no cubre:** una pantalla abierta ANTES de que el
+    catálogo cambie todavía manda en `costosExcluidos` la exclusión de un
+    "dejar el que tenía" vencido, y el servidor no la distingue de una
+    exclusión a mano. Excluir no escribe, así que el catálogo nuevo queda
+    intacto (N5). Y una aceptación vencida cuyo costo cae dentro de la
+    variación del nuevo catálogo se escribe por la regla normal, que no
+    necesita autorización. **[VERIFICADO contra Postgres el primero; en código
+    el segundo]**
+  - **La pantalla manda en `costos` el costo de cada línea tal como estaba al
+    cargar el pedido**, y aceptar un precio en Corregir no la recarga. Si se
+    cierra sin recargar, el cierre escribe el costo viejo en la línea y el
+    precio aceptado no llega al catálogo, sin frenar. Recargar la pantalla lo
+    evita. **[VERIFICADO en código, no ejercido en pantalla]**
   - Sin `fisicas`, las `unidadesSueltas` no suman al stock: entra
     `cantidadRecibida × factor`. **[VERIFICADO en código]**
   - `precioCosto` de la línea se reescribe sobre un pedido RECIBIDO desde

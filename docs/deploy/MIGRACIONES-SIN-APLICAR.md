@@ -22,8 +22,14 @@ Producción está en **34 migraciones**. Falta:
   `UnidadFisicaStock` (`UNIDAD`, `KG`, `PIEZA`) y dos columnas NULLABLE sin
   default en `PedidoProveedorDetalle`, `stockIngresado` Decimal(12,3) y
   `stockIngresadoUnidad`. Sin UPDATE ni backfill: las compras ya recibidas
-  quedan en NULL. La versión anterior no lee las columnas. Viene de la rama
-  `claude/erp-azul-audit-purchase-receipt-squch3`, todavía sin mergear.
+  quedan en NULL. La versión anterior no lee las columnas. Llegó a `main` con
+  el merge del PR #79 (`bf7a12a`).
+- `20260926020000_decision_precio_costo_observado` — aditiva: una columna
+  NULLABLE sin default en `DecisionDePrecioProveedor`, `costoMaestroObservado`
+  Decimal(12,2), el costo del catálogo que se miró al decidir un precio. Sin
+  UPDATE ni backfill: las decisiones existentes quedan en NULL y la hoja las
+  vuelve a preguntar. La versión anterior no lee la columna. Viene del PR #80,
+  todavía sin mergear.
 
 ---
 

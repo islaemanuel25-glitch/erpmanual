@@ -497,7 +497,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // un enum y dos columnas nullable sin default en `PedidoProveedorDetalle`
   // —lo que una línea de COMPRA sumó al stock—. Aditiva, sin backfill. No toca
   // ninguna tabla de recepción de transferencias.
-  assert.equal(migraciones.length, 35, "aparecio una migracion que nadie declaro aca");
+  // Sube a 36 el 2026-09-26: entró `20260926020000_decision_precio_costo_observado`,
+  // una columna nullable sin default en `DecisionDePrecioProveedor`. Aditiva,
+  // sin backfill. No toca ninguna tabla de recepción de transferencias.
+  assert.equal(migraciones.length, 36, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

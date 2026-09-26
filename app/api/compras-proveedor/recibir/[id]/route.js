@@ -18,6 +18,12 @@ import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { ErrorParaLaPersona, esParaLaPersona } from "@/lib/compras-proveedor/errorParaLaPersona";
 import { formatearMoneda } from "@/lib/moneda";
+import { aCentavos } from "@/lib/compras-proveedor/comprobante/impuestos";
+import {
+  DECISION_DE_PRECIO,
+  mismoCatalogoQueAlDecidir,
+  mismoPrecio,
+} from "@/lib/compras-proveedor/decisionDePrecio";
 import {
   decisionDeCostoSugerida,
   textoDeLaDiferencia,
@@ -161,6 +167,14 @@ export async function POST(req, { params }) {
                     pesoEsFijo: true,
                     pesoPromedioKg: true,
                     actualizaPromedioPorRecepcion: true,
+                    // EL COSTO MAESTRO DE HOY. Lo leen tres defensas del cierre
+                    // —la escala de `costoLineaAMaestro`, el freno por la
+                    // variación del proveedor y la frontera— y faltaba acá:
+                    // las tres recibían `undefined`, comparaban contra cero y
+                    // no frenaban nunca. Medido contra Postgres el 2026-09-25:
+                    // 1.000 → 30.000 cerraba y se escribía, y la Hamburguesa
+                    // x30 volvía a pasar de $61.703 a $1.851.090.
+                    precio_costo: true,
                   },
                 },
               },
@@ -478,8 +492,63 @@ export async function POST(req, { params }) {
         comprobante: { pedidoId, grupoId, estado: { not: "ANULADO" } },
         pedidoDetalleId: { not: null },
       },
-      select: { pedidoDetalleId: true, cantidad: true, subtotalImpreso: true, subtotalCorregido: true },
+      select: {
+        pedidoDetalleId: true,
+        cantidad: true,
+        subtotalImpreso: true,
+        subtotalCorregido: true,
+        // El precio que alguien ACEPTÓ para este renglón. Lo escribe
+        // `aceptar-precio` y solo cuando la respuesta es "aceptar el precio
+        // nuevo" —"dejar el que tenía" no lo toca—, y `vincular` lo borra si el
+        // renglón cambia de producto. Ver `aceptadoEnElPapel`, abajo.
+        costoFinalUnitario: true,
+      },
     });
+    // ── LO QUE YA SE ACEPTÓ EN ESTA RECEPCIÓN, POR LÍNEA DEL PEDIDO ──────
+    //
+    // El freno de abajo deja pasar un costo fuera de la variación si "la
+    // persona aceptó ese costo en esta misma recepción". Esa aceptación ya
+    // está guardada: "Aceptar el precio nuevo" en la hoja de Corregir escribe
+    // el mismo número en la línea del pedido y en `costoFinalUnitario` de su
+    // renglón. La pantalla no la manda en `costosAceptados`, así que sin leerla
+    // acá un aumento aceptado volvía a frenar el cierre cada vez, sin salida.
+    //
+    // Se guardan en centavos —la escala del costo de la línea que manda la
+    // pantalla— y se compara contra el costo que va a escribir el cierre:
+    // aceptar 1.150 no autoriza a escribir 30.000.
+    const aceptadosEnElPapel = new Map();
+    for (const l of lineasDelPapel) {
+      if (l.costoFinalUnitario == null) continue;
+      const aceptados = aceptadosEnElPapel.get(l.pedidoDetalleId) ?? new Set();
+      aceptados.add(aCentavos(l.costoFinalUnitario));
+      aceptadosEnElPapel.set(l.pedidoDetalleId, aceptados);
+    }
+    // ── Y ESA ACEPTACIÓN VALE SOLO CONTRA EL CATÁLOGO QUE SE MIRÓ ────────
+    //
+    // Aceptar 1.000 mirando el catálogo en 1.300 no autoriza escribir 1.000
+    // si al cerrar el catálogo está en 1.500: es otra comparación, que nadie
+    // vio. La decisión ACEPTA_FACTURA de ese producto guarda el catálogo que
+    // se observó; la aceptación del papel autoriza solo si esa decisión es de
+    // este mismo precio y el catálogo sigue en ese número, con la misma regla
+    // que usa la hoja —`mismoCatalogoQueAlDecidir`—. Una decisión sin lo
+    // observado —anterior a la columna— no autoriza: el freno pide decidir de
+    // nuevo y la hoja lo vuelve a preguntar.
+    const decisionesDelProveedor = pedido.proveedorId
+      ? await prisma.decisionDePrecioProveedor.findMany({
+          where: { grupoId, proveedorId: pedido.proveedorId },
+          select: { productoBaseId: true, decision: true, precioFacturado: true, costoMaestroObservado: true },
+        })
+      : [];
+    const decisionPorBase = new Map(decisionesDelProveedor.map((d) => [d.productoBaseId, d]));
+    const aceptadoEnElPapel = (detalleId, costo, base) => {
+      if (aceptadosEnElPapel.get(detalleId)?.has(aCentavos(costo)) !== true) return false;
+      const d = base?.id != null ? decisionPorBase.get(base.id) : null;
+      return (
+        d?.decision === DECISION_DE_PRECIO.ACEPTA_FACTURA &&
+        mismoPrecio(d.precioFacturado, costo) &&
+        mismoCatalogoQueAlDecidir(d, base?.precio_costo)
+      );
+    };
     // ── CUÁNTO SE LE MUEVE EL PRECIO A ESTE PROVEEDOR ───────────────────
     //
     // La misma pregunta que hace la hoja de Corregir, contestada con la misma
@@ -789,38 +858,6 @@ export async function POST(req, { params }) {
           costoActual: base?.precio_costo ?? null,
         });
 
-        // ── UN COSTO NO SE MULTIPLICA NI SE DIVIDE POR TRES SIN QUE ALGUIEN LO DIGA ──
-        //
-        // El 2026-09-22 el cierre del pedido 242 escribió el costo de la
-        // Hamburguesa Paty en $1.851.090 contra los $61.703 que tenía —treinta
-        // veces— y arrastró el precio de venta de $80.300 a $2.406.500 en las
-        // cinco ubicaciones. Nadie lo decidió: Emanuel había elegido justamente
-        // "dejo el mío" sobre ese renglón.
-        //
-        // Un salto así no es un aumento: es una escala equivocada. Así que el
-        // cierre FRENA, y solo pasa si la persona aceptó ese costo en esta
-        // misma recepción. La mercadería no entra a medias — el cierre es una
-        // transacción, así que no entra nada y se vuelve a intentar.
-        const anterior = Number(base?.precio_costo ?? 0);
-        const sugerida = decisionDeCostoSugerida({
-          papel: costoMaestro,
-          tuyo: anterior,
-          variacionPct: variacionNormalPct,
-          factorPack: base?.factor_pack,
-        });
-        if (sugerida.exigeElegir && !costosAceptados.has(det.id)) {
-          const aviso = textoDeLaDiferencia(sugerida, {
-            proveedor: nombreDelProveedor,
-            moneda: formatearMoneda,
-            papel: costoMaestro,
-            tuyo: anterior,
-          });
-          throw new ErrorParaLaPersona(
-            `${base?.nombre || "Un producto"}: ${aviso} Abrí Corregir, elegí qué precio queda y ` +
-              `volvé a cerrar. No entró nada.`
-          );
-        }
-
         // ── LA FRONTERA ─────────────────────────────────────────────────
         //
         // Todo lo de arriba —el stock, el detalle del pedido, el total de la
@@ -836,10 +873,13 @@ export async function POST(req, { params }) {
           costoNuevo: costoMaestro,
           umbrales: umbralesDeCosto,
         });
+        // Aceptado en esta recepción: lo que mandó quien llama, o lo que la
+        // hoja de Corregir ya dejó guardado para ESTE costo.
+        const aceptada = costosAceptados.has(det.id) || aceptadoEnElPapel(det.id, costoFinal, base);
         const decision = decidirEscrituraDeCosto({
           clasificacion,
           excluidaAMano: costosExcluidos.has(det.id),
-          aceptada: costosAceptados.has(det.id),
+          aceptada,
           hayCosto: Number.isFinite(costoMaestro) && costoMaestro > 0,
         });
         // Con la frontera apagada se conserva el comportamiento de siempre
@@ -849,6 +889,46 @@ export async function POST(req, { params }) {
         const escribeCosto = fronteraCostoActiva
           ? decision.escribe
           : !costosExcluidos.has(det.id);
+
+        // ── UN COSTO NO SE MULTIPLICA NI SE DIVIDE POR TRES SIN QUE ALGUIEN LO DIGA ──
+        //
+        // El 2026-09-22 el cierre del pedido 242 escribió el costo de la
+        // Hamburguesa Paty en $1.851.090 contra los $61.703 que tenía —treinta
+        // veces— y arrastró el precio de venta de $80.300 a $2.406.500 en las
+        // cinco ubicaciones. Nadie lo decidió: Emanuel había elegido justamente
+        // "dejo el mío" sobre ese renglón.
+        //
+        // Un salto así no es un aumento: es una escala equivocada. Así que el
+        // cierre FRENA, y solo pasa si la persona aceptó ese costo en esta
+        // misma recepción. La mercadería no entra a medias — el cierre es una
+        // transacción, así que no entra nada y se vuelve a intentar.
+        //
+        // ── Y SOLO FRENA LO QUE SE VA A ESCRIBIR ─────────────────────────
+        //
+        // Va DESPUÉS de `escribeCosto` y pregunta por él: el freno existe para
+        // que un costo que nadie decidió no llegue al catálogo, y una línea
+        // excluida —la que llegó sin papel— no escribe ninguno. Frenarla dejaba
+        // la recepción trabada por una diferencia que después no se iba a
+        // persistir, sin nada que la persona pudiera elegir para destrabarla.
+        const anterior = Number(base?.precio_costo ?? 0);
+        const sugerida = decisionDeCostoSugerida({
+          papel: costoMaestro,
+          tuyo: anterior,
+          variacionPct: variacionNormalPct,
+          factorPack: base?.factor_pack,
+        });
+        if (escribeCosto && sugerida.exigeElegir && !aceptada) {
+          const aviso = textoDeLaDiferencia(sugerida, {
+            proveedor: nombreDelProveedor,
+            moneda: formatearMoneda,
+            papel: costoMaestro,
+            tuyo: anterior,
+          });
+          throw new ErrorParaLaPersona(
+            `${base?.nombre || "Un producto"}: ${aviso} Abrí Corregir, elegí qué precio queda y ` +
+              `volvé a cerrar. No entró nada.`
+          );
+        }
 
         decisionesDeCosto.push({
           detalleId: det.id,

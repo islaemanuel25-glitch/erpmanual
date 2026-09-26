@@ -165,6 +165,174 @@ const CASOS = [
       "sin declarar: 0 UNIDAD, y cantidadRecibida sigue en null (nadie contó)",
     ],
   },
+  // ── EL FRENO DE COSTO DE LA RECEPCIÓN ──────────────────────────────────
+  //
+  // Corren contra `frenoDeCosto.mjs`, que cierra por la ruta real con un costo
+  // maestro distinto de cero y mira qué quedó escrito. El defecto que las trajo
+  // no lo veía ningún candado de texto: el cierre LEÍA `base?.precio_costo`,
+  // pero el `select` no lo traía.
+  //
+  // El piso es 20 y no más: la suite tiene 60 afirmaciones y sacar el costo
+  // maestro apaga el freno entero, así que en FC-1 caen 23 a la vez y quedan
+  // 37 en verde. El piso está para distinguir "abortó al montar" —cero— de
+  // "corrió y gritó", no para contar cuánto grita.
+  {
+    n: "FC-1",
+    defecto: "el select de la base vuelve a no traer precio_costo",
+    archivo: "app/api/compras-proveedor/recibir/[id]/route.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "                    precio_costo: true,\n", a: "" }],
+    esperadas: [
+      "A: frena con 409",
+      "F costo del bulto en línea UNIDAD: el costo maestro queda en 61703",
+    ],
+  },
+  {
+    n: "FC-2",
+    defecto: "el cierre ignora la aceptación que la hoja de Corregir dejó guardada",
+    archivo: "app/api/compras-proveedor/recibir/[id]/route.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [
+      {
+        de: "const aceptada = costosAceptados.has(det.id) || aceptadoEnElPapel(det.id, costoFinal, base);",
+        a: "const aceptada = costosAceptados.has(det.id);",
+      },
+    ],
+    esperadas: ["C: cierra", "C: el costo maestro queda en 1150"],
+  },
+  {
+    n: "FC-3",
+    defecto: "el freno vuelve a correr sobre una línea excluida del costo",
+    archivo: "app/api/compras-proveedor/recibir/[id]/route.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [
+      {
+        de: "if (escribeCosto && sugerida.exigeElegir && !aceptada) {",
+        a: "if (sugerida.exigeElegir && !aceptada) {",
+      },
+    ],
+    esperadas: ["I: cierra"],
+  },
+  {
+    n: "FC-4",
+    defecto: "la conversión vuelve a multiplicar por 30 el costo del bulto de la hamburguesa",
+    archivo: "app/api/compras-proveedor/recibir/[id]/route.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "          costoActual: base?.precio_costo ?? null,", a: "          costoActual: null," }],
+    // Sin el costo actual, la línea UNIDAD se multiplica por 30 y el freno la
+    // para como error de escala: el cierre legítimo deja de cerrar.
+    esperadas: ["F costo del bulto en línea UNIDAD: cierra"],
+  },
+  {
+    n: "FC-5",
+    defecto: "\"Dejar el que tenía\" vuelve a pasar por el freno como candidata a escribir costo",
+    archivo: "lib/compras-proveedor/cierreDeRecepcion.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [
+      {
+        de: "(f) => f?.sinPapel === true || decisionVigente(f)?.decision === DECISION_DE_PRECIO.DEJA_EL_MIO",
+        a: "(f) => f?.sinPapel === true",
+      },
+    ],
+    esperadas: ["L1: la pantalla excluye ESA línea del costo", "L1: cierra"],
+  },
+  {
+    n: "FC-6",
+    defecto: "se excluye por la última decisión del producto aunque sus precios no sean los de la fila",
+    archivo: "lib/compras-proveedor/cierreDeRecepcion.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "decisionVigente(f)?.decision", a: "f?.decisionPrecio?.decision" }],
+    esperadas: ["L3: con otros números no está vigente y no se excluye", "L3: frena con 409"],
+  },
+  {
+    n: "FC-7",
+    defecto: "la hoja ignora el catálogo movido y dice 'sin diferencia' con papel igual a la línea",
+    archivo: "lib/compras-proveedor/estadoDeLineaFacturada.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "precioCambio(fila) || fila?.catalogoMovido === true", a: "precioCambio(fila)" }],
+    esperadas: ["M-A: hay que decidir el precio", "M-A: no dice 'sin diferencia': queda con precio distinto"],
+  },
+  {
+    n: "FC-8",
+    defecto: "aceptar con el catálogo movido no guarda la decisión y la hoja vuelve a preguntar",
+    archivo: "app/api/compras-proveedor/comprobantes/aceptar-precio/route.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "precioAEscribir) || catalogoMovido) {", a: "precioAEscribir)) {" }],
+    esperadas: ["M-C: la hoja ya no vuelve a preguntar"],
+  },
+  {
+    n: "FC-9",
+    defecto: "una decisión nueva deja de guardar el catálogo que se miró al tomarla",
+    archivo: "lib/compras-proveedor/comprobante/guardarDecisionDePrecio.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [
+      {
+        de: "      costoMaestroObservado,\n      comprobanteLineaId,\n      decididaPorUsuarioId: usuarioId,\n      decididaEn: cuando,\n    },\n    // LA DE AHORA",
+        a: "      costoMaestroObservado: null,\n      comprobanteLineaId,\n      decididaPorUsuarioId: usuarioId,\n      decididaEn: cuando,\n    },\n    // LA DE AHORA",
+      },
+    ],
+    esperadas: ["N1: la decisión guarda el catálogo observado, 800", "N1: vigente, la hoja no pregunta"],
+  },
+  {
+    n: "FC-10",
+    defecto: "una aceptación sigue autorizando el costo después de que el catálogo cambió",
+    archivo: "app/api/compras-proveedor/recibir/[id]/route.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [
+      {
+        de: "        mismoPrecio(d.precioFacturado, costo) &&\n        mismoCatalogoQueAlDecidir(d, base?.precio_costo)",
+        a: "        mismoPrecio(d.precioFacturado, costo)",
+      },
+    ],
+    esperadas: ["N2 aceptación vieja: frena con 409", "N2: el catálogo sigue en 1.500"],
+  },
+  {
+    n: "FC-11",
+    defecto: "'dejar el que tenía' sigue vigente después de que el catálogo cambió",
+    archivo: "lib/compras-proveedor/decisionDePrecio.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "  if (!mismoCatalogoQueAlDecidir(d, fila?.costoMaestroCatalogo)) return null;\n", a: "" }],
+    esperadas: ["N5: la hoja vuelve a preguntar", "N5: recargada, la pantalla ya no la excluye"],
+  },
+  {
+    n: "FC-12",
+    defecto: "una decisión histórica sin lo observado se rellena con el catálogo de hoy",
+    archivo: "lib/compras-proveedor/comprobante/analisisDeComprobante.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [
+      {
+        de: "d.costoMaestroObservado == null ? null : Number(d.costoMaestroObservado)",
+        a: "Number(d.costoMaestroObservado ?? catalogo.find((p) => p.id === d.productoBaseId)?.precio_costo)",
+      },
+    ],
+    esperadas: ["N7: una ACEPTA histórica no vale", "N7: una DEJA histórica no excluye"],
+  },
+  {
+    n: "FC-13",
+    defecto: "volver a decidir no actualiza lo observado y la decisión vencida no tiene salida",
+    archivo: "lib/compras-proveedor/comprobante/guardarDecisionDePrecio.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [
+      {
+        de: "    update: {\n      decision,\n      precioFacturado,\n      precioPropio,\n      costoMaestroObservado,\n",
+        a: "    update: {\n      decision,\n      precioFacturado,\n      precioPropio,\n",
+      },
+    ],
+    esperadas: ["N3: la decisión nueva guarda 1.500", "N3: cierra"],
+  },
 ];
 
 // Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número

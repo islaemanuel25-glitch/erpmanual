@@ -403,3 +403,13 @@ jobs:
       - name: Contrapruebas de la recepción de compras
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs SI-
 
+      # El freno de costo del cierre, con un costo maestro real distinto de
+      # cero: qué frena, qué acepta y qué queda escrito. Estuvo apagado desde
+      # el 2026-08-11 porque el `select` no traía `precio_costo`, y ningún
+      # candado lo veía: miraban funciones puras o el texto del fuente.
+      - name: Ejercer el freno de costo de la recepción contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/frenoDeCosto.mjs
+
+      - name: Contrapruebas del freno de costo
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs FC-
+
