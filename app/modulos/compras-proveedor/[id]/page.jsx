@@ -20,7 +20,7 @@ import HojaCerrarRecepcion from "@/components/compras-proveedor/HojaCerrarRecepc
 import PedidoRecibido from "@/components/compras-proveedor/PedidoRecibido";
 import {
   cantidadEnEscalaDelPedido,
-  precioCambio,
+  hayDiferenciaDePrecio,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 import {
   DECISION_DE_PRECIO,
@@ -648,7 +648,7 @@ export default function DetallePedidoProveedorPage({ params }) {
     // en verde y la mercadería entraría al costo viejo en silencio, que es peor
     // que preguntar de más.
     const decidida = decisionVigente(fila);
-    if (precioCambio(fila) && decidida?.decision === DECISION_DE_PRECIO.ACEPTA_FACTURA) {
+    if (hayDiferenciaDePrecio(fila) && decidida?.decision === DECISION_DE_PRECIO.ACEPTA_FACTURA) {
       const r = await aceptarPrecioDeLinea(fila);
       if (r && r.ok === false) return;
     }

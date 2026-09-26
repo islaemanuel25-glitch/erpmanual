@@ -55,7 +55,9 @@ import {
   esDecisionConocida,
   mismoPrecio,
 } from "@/lib/compras-proveedor/decisionDePrecio";
-import { motivoSinComparacion } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
+import { elCatalogoSeMovio, motivoSinComparacion } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
+import { VARIACION_POR_DEFECTO } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
+import { costoDelCatalogoEnLaUnidadDelDeposito } from "@/lib/conversiones/stock";
 import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
 
 export async function POST(req) {
@@ -332,6 +334,35 @@ export async function POST(req) {
     const precioAEscribir = analisis.precioAEscribir;
     const clasificacion = analisis.clasificacion;
 
+    // ── LA PREGUNTA TAMBIÉN EXISTE CUANDO SE MOVIÓ EL CATÁLOGO ──────────
+    //
+    // El papel puede coincidir con la línea y la hoja igual preguntar, porque
+    // el costo maestro se movió después del pedido. Es la misma regla que usa
+    // la conciliación —`elCatalogoSeMovio`, con la variación vigente del
+    // proveedor—, así que se guarda la decisión exactamente cuando la hoja la
+    // pidió. Sin esto, aceptar no dejaría rastro y la hoja volvería a
+    // preguntar sobre algo ya contestado. El costo maestro sale de `base`, el
+    // producto que resolvió la cascada, que ya trae el costo y los campos de la
+    // unidad del depósito.
+    const recetaVigente = await prisma.recetaProveedor.findFirst({
+      where: { grupoId, proveedorId: linea.comprobante.proveedor.id },
+      select: { variacionNormalPct: true },
+    });
+    const catalogoMovido = elCatalogoSeMovio(
+      {
+        costoFactura: precioAEscribir,
+        costoCatalogo: delPedido.detalle?.precioCosto ?? null,
+        costoMaestroHoy: costoDelCatalogoEnLaUnidadDelDeposito({ base, costo: base?.precio_costo }),
+        factorPack: delPedido.detalle?.factorPack ?? null,
+      },
+      {
+        variacionPct:
+          recetaVigente?.variacionNormalPct != null
+            ? Number(recetaVigente.variacionNormalPct)
+            : VARIACION_POR_DEFECTO,
+      }
+    );
+
     const resultado = await prisma.$transaction(async (tx) => {
       const detalle = await tx.pedidoProveedorDetalle.findUnique({
         where: { id: delPedido.detalle.id },
@@ -370,8 +401,9 @@ export async function POST(req) {
       //
       // Y no se guarda nada si los dos números ya eran el mismo: ahí no hubo
       // ninguna pregunta que contestar, y la fila quedaría diciendo "antes
-      // decidiste" sobre una comparación que nunca existió.
-      if (!mismoPrecio(detalle.precioCosto, precioAEscribir)) {
+      // decidiste" sobre una comparación que nunca existió — salvo que la
+      // pregunta haya sido por el catálogo movido, que sí existió.
+      if (!mismoPrecio(detalle.precioCosto, precioAEscribir) || catalogoMovido) {
         await guardarDecisionDePrecio(tx, {
           grupoId,
           proveedorId: linea.comprobante.proveedor.id,

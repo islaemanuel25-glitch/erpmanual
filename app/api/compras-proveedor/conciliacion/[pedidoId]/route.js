@@ -34,6 +34,7 @@ import { filasDeConciliacion } from "@/lib/compras-proveedor/comprobante/filasDe
 import { coberturaDelPedido, textoDeCobertura } from "@/lib/compras-proveedor/comprobante/cobertura";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { VARIACION_POR_DEFECTO } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
+import { elCatalogoSeMovio } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 
 export async function GET(req, { params }) {
   try {
@@ -95,6 +96,10 @@ export async function GET(req, { params }) {
                 modoVentaDeposito: true,
                 pesoEsFijo: true,
                 pesoReferenciaKg: true,
+                // El costo maestro de HOY: el cierre compara contra éste, y la
+                // hoja tiene que poder preguntar cuando se movió después del
+                // pedido aunque el papel coincida con la línea.
+                precio_costo: true,
               },
             },
           },
@@ -202,18 +207,33 @@ export async function GET(req, { params }) {
         })
       : null;
 
+    const variacionNormalPct =
+      recetaVigente?.variacionNormalPct != null
+        ? Number(recetaVigente.variacionNormalPct)
+        : VARIACION_POR_DEFECTO;
+
+    // ── EL CATÁLOGO QUE SE MOVIÓ DESPUÉS DEL PEDIDO ─────────────────────
+    //
+    // Se marca acá y no en `filasDeConciliacion`, que no clasifica precios: la
+    // pregunta necesita la variación del proveedor, y ésta es la ruta que la
+    // conoce. Es la misma regla con la que frena el cierre.
+    const gruposConCatalogo = grupos.map((g) => ({
+      ...g,
+      filas: (g.filas ?? []).map((f) => ({
+        ...f,
+        catalogoMovido: elCatalogoSeMovio(f, { variacionPct: variacionNormalPct }),
+      })),
+    }));
+
     return NextResponse.json({
       ok: true,
       pedido: { id: pedido.id, estado: pedido.estado },
       proveedor: {
         id: proveedorId,
         nombre: comprobantes[0]?.proveedor?.nombre ?? null,
-        variacionNormalPct:
-          recetaVigente?.variacionNormalPct != null
-            ? Number(recetaVigente.variacionNormalPct)
-            : VARIACION_POR_DEFECTO,
+        variacionNormalPct,
       },
-      grupos,
+      grupos: gruposConCatalogo,
       sinComprobante,
       hayFaltantes,
       totales,
