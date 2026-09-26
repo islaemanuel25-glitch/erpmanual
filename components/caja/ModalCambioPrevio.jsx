@@ -53,6 +53,11 @@ export default function ModalCambioPrevio({
   error = "",
   onCancelar,
   onConfirmar,
+  /**
+   * La referencia y el total escrito en pesos para el aviso de desproporción
+   * del cambio. Ver `TablaDenominaciones`.
+   */
+  controlTotal,
 }) {
   // Escape CIERRA, nunca confirma. Es la salida que la gente busca por reflejo,
   // y en una pantalla que congela una caja no puede ser un atajo al alta.
@@ -133,6 +138,7 @@ export default function ModalCambioPrevio({
             onCambiar={onDesglose}
             idPrefijo="cambio-previo"
             titulo="Cantidad que se deja"
+            {...controlTotal}
           />
 
           <div className="sunmi-surface-soft sunmi-border rounded-lg p-3 space-y-1">

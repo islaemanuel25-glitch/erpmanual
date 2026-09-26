@@ -920,6 +920,40 @@ const CASOS = [
     candado: "el circuito no presenta como cierto lo que salió del local si no se contó",
     suite: "lib/caja/cierreSinConteo.test.mjs",
   },
+  // ── El error ×1000: la cantidad de billetes escrita como monto ────────────
+  // Los candados de texto de `desgloseDesproporcionado.test.mjs`. Lo que las
+  // rutas escriben se contraprueba contra Postgres en CC-13 a CC-18. Los dos
+  // candados que enumeran con `git grep` no van acá por lo mismo que el de la
+  // semana operativa: la copia descartable no lleva `.git`.
+  {
+    // Con un factor de 10, un solo billete de $1.000 escrito como "1000" sobre
+    // una caja de $200.000 da ×6 y pasa callado.
+    n: "DD-factor",
+    defecto: "el factor sube a 10 y el error de una sola fila deja de verse",
+    archivo: "lib/caja/desgloseServidor.js",
+    de: "export const FACTOR_DESPROPORCION = 2;",
+    a: "export const FACTOR_DESPROPORCION = 10;",
+    candado: "C. el error de UNA fila entre varias también se activa (×6 sobre $200.000)",
+    suite: "lib/caja/desgloseDesproporcionado.test.mjs",
+  },
+  {
+    n: "DD-grilla",
+    defecto: "la grilla deja de mostrar el aviso y el campo del total en pesos",
+    archivo: "components/caja/TablaDenominaciones.jsx",
+    de: "      {proporcion.desproporcionado && (",
+    a: "      {false && (",
+    candado: "la grilla de conteo evalúa con la función del servidor, no con una propia",
+    suite: "lib/caja/desgloseDesproporcionado.test.mjs",
+  },
+  {
+    n: "DD-referencia",
+    defecto: "la recepción compara contra un número que no es lo que dice el sobre",
+    archivo: "app/api/pos-ventas/turnos/abrir-con-cambio/route.js",
+    de: "        referencia: Number(sobre.total),",
+    a: "        referencia: 0,",
+    candado: "las referencias son las del contexto, no un número inventado",
+    suite: "lib/caja/desgloseDesproporcionado.test.mjs",
+  },
   // `lib/semanaOperativa/unaSolaFuente.test.mjs` NO está acá, y no por olvido:
   // enumera con `git ls-files`, y la copia descartable de este script no lleva
   // `.git`, así que ahí el archivo entero explota antes de llegar al candado y el

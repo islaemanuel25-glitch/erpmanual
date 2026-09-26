@@ -31,7 +31,11 @@ import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import prisma from "@/lib/prisma";
 import { requireOperadorSegunConfig } from "@/lib/operador";
-import { validarDesgloseServidor } from "@/lib/caja/desgloseServidor";
+import {
+  validarDesgloseServidor,
+  evaluarDesproporcionDesglose,
+  respuestaDesproporcion,
+} from "@/lib/caja/desgloseServidor";
 import {
   ESTADO_TURNO,
   ESTADO_CIERRE,
@@ -190,6 +194,22 @@ export async function POST(req) {
       const corte = await calcularCorte(turno, tx);
       const ahora = new Date();
 
+      // El error ×1000 en el cambio que queda: se compara contra el esperado
+      // recién calculado, que es la única referencia que hay en este punto. Ver
+      // `evaluarDesproporcionDesglose`.
+      const proporcion = evaluarDesproporcionDesglose({
+        desglose: cambio.desglose,
+        referencia: corte.efectivoEsperadoCorte,
+        etiquetaReferencia: "el efectivo que el sistema espera en la caja",
+        totalConfirmado: body?.totalConfirmado,
+      });
+      if (!proporcion.valido) {
+        const e = new Error(proporcion.error);
+        e.codigo = "desproporcionado";
+        e.proporcion = proporcion;
+        throw e;
+      }
+
       // El retiro esperado se congela junto con el esperado. Puede dar negativo
       // si se deja como cambio más plata de la que el sistema esperaba: no se
       // recorta, porque recortarlo rompería la identidad que hace visible el
@@ -285,6 +305,9 @@ export async function POST(req) {
         : null,
     });
   } catch (error) {
+    if (error?.codigo === "desproporcionado") {
+      return NextResponse.json(respuestaDesproporcion(error.proporcion), { status: 400 });
+    }
     if (error?.codigo === "no_encontrado") {
       return NextResponse.json({ ok: false, error: error.message }, { status: 404 });
     }

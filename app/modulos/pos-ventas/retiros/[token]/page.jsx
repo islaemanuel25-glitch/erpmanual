@@ -42,6 +42,7 @@ import {
 import { AvisoCorteHecho, AVISO_POSTERIORES_RETIRO, hora } from "@/components/caja/PanelesCierre";
 
 import { totalDesglose, desgloseVacio } from "@/lib/caja/conteoBilletes";
+import { evaluarDesproporcionDesglose } from "@/lib/caja/desgloseServidor";
 import { calcularDiferencia } from "@/lib/caja/efectivoEsperado";
 import { TITULO_RETIRO, AVISO_CONTAR_SOLO_RETIRO, AVISO_ACTIVIDAD_POSTERIOR } from "@/lib/caja/retiroRelevo";
 import {
@@ -72,6 +73,9 @@ export default function RetiroPorTokenPage() {
 
   const [desgloseRetiro, setDesgloseRetiro] = useState({});
   const [observacion, setObservacion] = useState("");
+  // El total en pesos que se escribe solo si lo contado está fuera de proporción
+  // con el retiro esperado. Ver `evaluarDesproporcionDesglose`.
+  const [totalConfirmado, setTotalConfirmado] = useState("");
   const [conteoIniciadoEn, setConteoIniciadoEn] = useState(null);
 
   const [guardando, setGuardando] = useState(false);
@@ -151,7 +155,17 @@ export default function RetiroPorTokenPage() {
     [retiroContado, retiroEsperado]
   );
 
-  const puedeConfirmar = hayContado && !guardando;
+  // El error ×1000: cantidad de billetes escrita como monto. MISMA función que
+  // el servidor, contra el mismo retiro esperado congelado.
+  const controlTotal = {
+    referencia: retiroEsperado,
+    etiquetaReferencia: "el retiro que el sistema espera",
+    totalConfirmado,
+    onTotalConfirmado: setTotalConfirmado,
+  };
+  const proporcion = evaluarDesproporcionDesglose({ desglose: desgloseRetiro, ...controlTotal });
+
+  const puedeConfirmar = hayContado && proporcion.valido && !guardando;
 
   const actualizarConteo = (nuevo) => {
     setDesgloseRetiro(nuevo);
@@ -200,6 +214,7 @@ export default function RetiroPorTokenPage() {
         body: JSON.stringify({
           desgloseRetiroContado: desgloseRetiro,
           observacion: observacion.trim() || null,
+          totalConfirmado: totalConfirmado === "" ? null : totalConfirmado,
         }),
       });
       const json = await res.json();
@@ -352,6 +367,7 @@ export default function RetiroPorTokenPage() {
           onDesglose={actualizarConteo}
           horaConteo={conteoIniciadoEn ? hora(conteoIniciadoEn) : null}
           aviso={AVISO_CONTAR_SOLO_RETIRO}
+          controlTotal={controlTotal}
         />
 
         <PanelCambioSeparado

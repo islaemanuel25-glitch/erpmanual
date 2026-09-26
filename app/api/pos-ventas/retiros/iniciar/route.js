@@ -26,7 +26,11 @@ import { randomBytes } from "node:crypto";
 import prisma from "@/lib/prisma";
 import { requireOperadorSegunConfig } from "@/lib/operador";
 import { contextoArqueo } from "@/lib/caja/arqueoServer";
-import { validarDesgloseServidor } from "@/lib/caja/desgloseServidor";
+import {
+  validarDesgloseServidor,
+  evaluarDesproporcionDesglose,
+  respuestaDesproporcion,
+} from "@/lib/caja/desgloseServidor";
 import { generarToken, WHERE_TURNO_OPERATIVO, ERROR_RETIRO_YA_EN_PREPARACION } from "@/lib/caja/cierreRelevo";
 import {
   ESTADO_RETIRO,
@@ -150,6 +154,21 @@ export async function POST(req) {
       const corte = await calcularCorteRetiro(vigente, tx);
       const ahora = new Date();
 
+      // El error ×1000 en el cambio que queda, contra el esperado recién
+      // calculado. Misma regla que el corte de cierre: `evaluarDesproporcionDesglose`.
+      const proporcion = evaluarDesproporcionDesglose({
+        desglose: cambio.desglose,
+        referencia: corte.efectivoEsperadoCorte,
+        etiquetaReferencia: "el efectivo que el sistema espera en la caja",
+        totalConfirmado: body?.totalConfirmado,
+      });
+      if (!proporcion.valido) {
+        const e = new Error(proporcion.error);
+        e.codigo = "desproporcionado";
+        e.proporcion = proporcion;
+        throw e;
+      }
+
       // Puede dar negativo si se deja como cambio más plata de la que el sistema
       // esperaba encontrar. No se recorta: recortarlo rompería la identidad que
       // hace visible el sobrante. Ver `calcularRetiroEsperado`.
@@ -215,6 +234,9 @@ export async function POST(req) {
         : null,
     });
   } catch (error) {
+    if (error?.codigo === "desproporcionado") {
+      return NextResponse.json(respuestaDesproporcion(error.proporcion), { status: 400 });
+    }
     if (error?.codigo === "conflicto") {
       return NextResponse.json({ ok: false, error: error.message }, { status: 409 });
     }
