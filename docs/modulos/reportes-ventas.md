@@ -1,6 +1,6 @@
 # Módulo: Reportes de Ventas
 
-**Última actualización:** 2026-09-06 20:39
+**Última actualización:** 2026-09-26 11:13
 **Archivos principales:** `app/modulos/reportes-ventas/*`, `components/reportes-ventas/*`, `app/api/reportes-ventas/*`, `lib/reportes-ventas/*`
 
 ## Descripción
@@ -110,6 +110,7 @@ Flujo migrado a páginas reales y desplegado en producción. El detalle muestra 
 - El descriptor `deposito` devuelve `modo: null` para líneas legacy sin `cantidadStock`; evaluar si vale reconstruirlo o dejarlo neutro de forma definitiva
 
 ## Cambios recientes
+- 2026-09-26: fix(ventas): la corrección completa exige el turno ABIERTO, no solo sin cierre
 - 2026-09-06: fix(pos): comisionEsExacta falla cerrado y todos los consumidores quedan cubiertos
 - 2026-09-06: feat(pos): la comision sin configurar deja de ser un 7 inventado
 - 2026-07-29: fix(reportes): paginar comprobantes y ampliar corrección de ventas

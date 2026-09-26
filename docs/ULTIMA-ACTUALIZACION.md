@@ -1,20 +1,24 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-25 20:05
+**Fecha:** 2026-09-26 11:13
 
 ## Módulos modificados recientemente
 
-### transferencias
-- fix(semana): «corte de semana» deja de ser un nombre de la app, con candado sobre el repo entero, feat(semana): pantalla de Semana operativa en Configuración, con cancelar el cambio programado
-- Archivos: 12 modificados (12 total)
+### pos-ventas
+- fix(ventas): la corrección completa exige el turno ABIERTO, no solo sin cierre, fix(caja): el cierre clásico ya no cierra un turno con el corte tomado en el medio, fix(caja): un corte vencido no se cancela aunque nadie lo haya marcado
+- Archivos: 1 nuevos, 6 modificados (7 total)
 
-### configuracion
-- fix(kit): cada opción del selector se toca en 44 px aunque la caja mida menos, feat(semana): pantalla de Semana operativa en Configuración, con cancelar el cambio programado
-- Archivos: 1 nuevos, 1 modificados (2 total)
+### reportes-ventas
+- fix(ventas): la corrección completa exige el turno ABIERTO, no solo sin cierre
+- Archivos: 3 modificados (3 total)
+
+### transferencias
+- feat(compras): columna para el catálogo que se miró al decidir un precio
+- Archivos: 1 modificados (1 total)
 
 
 ## Archivos nuevos desde última sincronización
-- app/modulos/configuracion/semana-operativa/page.jsx
+- lib/pos-ventas/estadoTurnoCorreccion.test.mjs
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai
