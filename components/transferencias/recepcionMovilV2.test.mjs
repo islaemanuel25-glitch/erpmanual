@@ -504,7 +504,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // de enum en `EstadoCierrePreparacion` y tres columnas nullable sin default en
   // `CierrePreparacion` —la resolución administrativa de un corte vencido—.
   // Aditiva, sin backfill. No toca ninguna tabla de recepción de transferencias.
-  assert.equal(migraciones.length, 37, "aparecio una migracion que nadie declaro aca");
+  // Sube a 38 el 2026-09-26: entró `20260926195732_correccion_caja`, una tabla
+  // nueva y vacía para las correcciones históricas de caja. Aditiva, sin
+  // backfill. No toca ninguna tabla de recepción de transferencias.
+  assert.equal(migraciones.length, 38, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));
