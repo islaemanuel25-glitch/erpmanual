@@ -954,6 +954,25 @@ const CASOS = [
     candado: "las referencias son las del contexto, no un número inventado",
     suite: "lib/caja/desgloseDesproporcionado.test.mjs",
   },
+  {
+    // Un umbral tan alto que el ×1000 típico (23.000 billetes) pasa callado.
+    n: "DD-umbral",
+    defecto: "el umbral por fila sube a 50.000 y la apertura sin sobre deja de ver el ×1000",
+    archivo: "lib/caja/desgloseServidor.js",
+    de: "export const UMBRAL_CANTIDAD_EXTRAORDINARIA = 500;",
+    a: "export const UMBRAL_CANTIDAD_EXTRAORDINARIA = 50000;",
+    candado: "sin sobre · A. {1000: 23000} sin total confirmado: no pasa",
+    suite: "lib/caja/desgloseDesproporcionado.test.mjs",
+  },
+  {
+    n: "DD-sin-sobre",
+    defecto: "la pantalla sin sobre deja de pasarle el umbral a la grilla",
+    archivo: "app/modulos/pos-ventas/aperturas/sin-cambio/page.jsx",
+    de: "    umbralCantidadPorFila: UMBRAL_CANTIDAD_EXTRAORDINARIA,",
+    a: "    umbralCantidadPorFila: null,",
+    candado: "la pantalla sin sobre le pasa el umbral medido a la grilla, sin inventar referencia",
+    suite: "lib/caja/desgloseDesproporcionado.test.mjs",
+  },
   // `lib/semanaOperativa/unaSolaFuente.test.mjs` NO está acá, y no por olvido:
   // enumera con `git ls-files`, y la copia descartable de este script no lleva
   // `.git`, así que ahí el archivo entero explota antes de llegar al candado y el

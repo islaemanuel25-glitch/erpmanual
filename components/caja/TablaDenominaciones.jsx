@@ -50,6 +50,9 @@ export default function TablaDenominaciones({
   // proporción. Lo guarda la página, que es la que lo manda al servidor.
   totalConfirmado = "",
   onTotalConfirmado,
+  // Sin referencia monetaria, la señal es una fila con más billetes que
+  // cualquier conteo real. La pasa la apertura sin sobre.
+  umbralCantidadPorFila = null,
 }) {
   const total = totalDesglose(desglose);
   const proporcion = evaluarDesproporcionDesglose({
@@ -57,6 +60,7 @@ export default function TablaDenominaciones({
     referencia,
     etiquetaReferencia,
     totalConfirmado,
+    umbralCantidadPorFila,
   });
 
   const setCantidad = (clave, valor) => {

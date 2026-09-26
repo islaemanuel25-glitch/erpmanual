@@ -38,6 +38,10 @@ import {
 } from "@/components/caja/PanelesApertura";
 
 import { totalDesglose, desgloseVacio } from "@/lib/caja/conteoBilletes";
+import {
+  evaluarDesproporcionDesglose,
+  UMBRAL_CANTIDAD_EXTRAORDINARIA,
+} from "@/lib/caja/desgloseServidor";
 
 export default function AperturaSinCambioPage() {
   const router = useRouter();
@@ -49,6 +53,9 @@ export default function AperturaSinCambioPage() {
 
   const [desgloseContado, setDesgloseContado] = useState({});
   const [motivo, setMotivo] = useState("");
+  // El total en pesos que se escribe solo si una fila supera lo creíble. Ver
+  // `evaluarDesproporcionDesglose`.
+  const [totalConfirmado, setTotalConfirmado] = useState("");
   const [pendientes, setPendientes] = useState(0);
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -78,8 +85,24 @@ export default function AperturaSinCambioPage() {
   const totalContado = totalDesglose(desgloseContado);
   const hayConteo = !desgloseVacio(desgloseContado);
 
+  // El error ×1000 sin referencia: acá no hay sobre, así que la señal es una
+  // fila con más billetes que cualquier conteo real. MISMA función y MISMO
+  // umbral que el servidor.
+  const controlTotal = {
+    umbralCantidadPorFila: UMBRAL_CANTIDAD_EXTRAORDINARIA,
+    totalConfirmado,
+    onTotalConfirmado: setTotalConfirmado,
+  };
+  const proporcion = evaluarDesproporcionDesglose({ desglose: desgloseContado, ...controlTotal });
+
   const confirmar = async () => {
     if (guardando || !hayConteo || !motivo.trim()) return;
+    // Fuera de lo creíble y sin el total en pesos que coincida: el aviso ya está
+    // en la grilla, acá se repite junto al botón.
+    if (!proporcion.valido) {
+      setError(proporcion.error);
+      return;
+    }
     setError("");
     setGuardando(true);
     try {
@@ -87,7 +110,11 @@ export default function AperturaSinCambioPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ desgloseContado, motivo: motivo.trim() }),
+        body: JSON.stringify({
+          desgloseContado,
+          motivo: motivo.trim(),
+          totalConfirmado: totalConfirmado === "" ? null : totalConfirmado,
+        }),
       });
       const json = await res.json();
       if (!res.ok || !json?.ok) {
@@ -180,6 +207,7 @@ export default function AperturaSinCambioPage() {
             desglose={desgloseContado}
             onCambiar={setDesgloseContado}
             idPrefijo="apertura"
+            {...controlTotal}
           />
         </SunmiCard>
 
