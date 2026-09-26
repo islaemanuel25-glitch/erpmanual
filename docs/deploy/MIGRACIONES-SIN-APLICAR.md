@@ -16,20 +16,24 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **34 migraciones**. Falta:
+Producción está en **36 migraciones** y el árbol también. **Ninguna** pendiente:
+el despliegue siguiente es solo de código.
 
-- `20260925195156_stock_ingresado_congelado` — aditiva: el enum
-  `UnidadFisicaStock` (`UNIDAD`, `KG`, `PIEZA`) y dos columnas NULLABLE sin
-  default en `PedidoProveedorDetalle`, `stockIngresado` Decimal(12,3) y
-  `stockIngresadoUnidad`. Sin UPDATE ni backfill: las compras ya recibidas
-  quedan en NULL. La versión anterior no lee las columnas. Llegó a `main` con
-  el merge del PR #79 (`bf7a12a`).
-- `20260926020000_decision_precio_costo_observado` — aditiva: una columna
-  NULLABLE sin default en `DecisionDePrecioProveedor`, `costoMaestroObservado`
-  Decimal(12,2), el costo del catálogo que se miró al decidir un precio. Sin
-  UPDATE ni backfill: las decisiones existentes quedan en NULL y la hoja las
-  vuelve a preguntar. La versión anterior no lee la columna. Llegó a `main` con
-  el merge del PR #80 (`7c8875b`).
+---
+
+`20260925195156_stock_ingresado_congelado` (PR #79) y
+`20260926020000_decision_precio_costo_observado` (PR #80) salieron de esta lista
+con el despliegue de `9f18267d` del 2026-09-26. Las dos son aditivas y el
+clasificador las marcó **aditivas**: la primera, el enum `UnidadFisicaStock` y
+dos columnas NULLABLE sin default en `PedidoProveedorDetalle`; la segunda, una
+columna NULLABLE sin default en `DecisionDePrecioProveedor`. Ninguna trae UPDATE
+ni backfill.
+
+**Lo que informó el despliegue**, corrido desde el acceso al VPS y no desde la
+sesión que escribe esta nota: el contenedor descartable informó las **36** del
+árbol y aplicó las dos, y `migrate status` cerró con "Database schema is up to
+date!". Backup previo `pre-9f18267d_20260926_095724.sql.gz`; sonda PRE en verde
+(corrida 36234263719) y sonda POST en verde (corrida 36234366185).
 
 ---
 
