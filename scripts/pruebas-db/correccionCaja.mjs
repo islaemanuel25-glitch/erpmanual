@@ -260,10 +260,18 @@ async function correr(f) {
     const a = await leer(await rutaAplicar.POST(pedido("http://ci/api/caja/correcciones/aplicar", f.sesion, { codigo: "X", confirmacion: "X" })));
     igual("1: aplicar sin permiso es 403", a.status, 403);
     const g2 = await leer(await rutaListar.GET(pedidoGet("http://ci/api/caja/correcciones", f.sesionCorrector)));
-    ok("1: con permiso lista, y el repo no trae ningún manifiesto", g2.ok === true && Array.isArray(g2.items) && g2.items.length === 0,
-      JSON.stringify(g2).slice(0, 200));
-    const e2 = await leer(await rutaEnsayo.POST(pedido("http://ci/api/caja/correcciones/ensayo", f.sesionCorrector, { codigo: "I4" })));
-    igual("1: I4 no existe todavía como manifiesto", e2.status, 404);
+    // Desde 2026-09-26 el repo trae I4 e I6, los dos PROPUESTO. Sus ids son de
+    // producción: acá no se ensayan —en esta base no existen, o son de otra
+    // prueba—, solo se afirma cómo los expone la ruta.
+    igual("1: con permiso lista I4 e I6, los dos PROPUESTO y sin huella autorizada",
+      (g2.items ?? []).map((i) => [i.codigo, i.estado, i.hashAutorizado, i.aplicada]),
+      [["I4", "PROPUESTO", null, null], ["I6", "PROPUESTO", null, null]]);
+    for (const c of ["I4", "I6"]) {
+      const a = await leer(await rutaAplicar.POST(pedido("http://ci/api/caja/correcciones/aplicar", f.sesionCorrector, { codigo: c, confirmacion: c })));
+      ok(`1: ${c} no se puede aplicar por la ruta: es PROPUESTO`, a.status === 409 && /PROPUESTO/.test(a.error ?? ""), `${a.status} ${a.error}`);
+    }
+    const e2 = await leer(await rutaEnsayo.POST(pedido("http://ci/api/caja/correcciones/ensayo", f.sesionCorrector, { codigo: "I5" })));
+    igual("1: I5 no existe como manifiesto", e2.status, 404);
   }
 
   // ═════════════════════════════════════════════════════════════════════════
