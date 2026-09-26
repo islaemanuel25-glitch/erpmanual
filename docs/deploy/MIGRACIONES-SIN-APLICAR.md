@@ -16,16 +16,25 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **36 migraciones**. El árbol trae **37**: una pendiente.
+Producción está en **37 migraciones** y el árbol también. **Ninguna** pendiente:
+el despliegue siguiente es solo de código.
 
-- `20260926122404_cierre_sin_conteo` (PR "cerrar sin conteo"): un valor de enum
-  nuevo, `CERRADO_SIN_CONTEO`, en `EstadoCierrePreparacion`, y tres columnas
-  NULLABLE sin default en `CierrePreparacion` —`cerradoSinConteoEn`,
-  `cerradoSinConteoPorUsuarioId`, `motivoCierreSinConteo`—. **Aditiva**: sin
-  UPDATE, sin backfill, sin DROP. No toca ninguna fila existente: los cortes
-  vencidos de producción quedan exactamente como están. La versión anterior no
-  escribe el valor nuevo ni lee las columnas, así que la ventana entre migrar y
-  recrear no cambia nada.
+---
+
+`20260926122404_cierre_sin_conteo` (PR #82) salió de esta lista con el
+despliegue de `ad7c8109` del 2026-09-26, que llevó a producción los merges #81
+(candados del ciclo de cierre, `c1000c8c`, sin migraciones) y #82 (cerrar sin
+conteo un corte vencido, `ad7c8109`). Es aditiva: el valor `CERRADO_SIN_CONTEO`
+en el enum `EstadoCierrePreparacion` y tres columnas NULLABLE sin default en
+`CierrePreparacion` —`cerradoSinConteoEn`, `cerradoSinConteoPorUsuarioId`,
+`motivoCierreSinConteo`—. Sin UPDATE, sin backfill, sin DROP.
+
+**Lo que informó el despliegue**, corrido desde el acceso al VPS y no desde la
+sesión que escribe esta nota: producción quedó en `ad7c81097e3f0e12c87d28e3f122466049ae7c89`
+con **37** migraciones aplicadas, ninguna pendiente ni fallida, la
+`20260926122404_cierre_sin_conteo` aplicada, y `migrate status` cerró con
+"Database schema is up to date!". Cortes en `CERRADO_SIN_CONTEO`: **cero**, que
+es lo esperado: la migración no escribe filas y la acción todavía no se usó.
 
 ---
 
