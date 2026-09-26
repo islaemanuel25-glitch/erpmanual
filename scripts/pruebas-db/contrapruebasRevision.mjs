@@ -398,6 +398,101 @@ const CASOS = [
       "C vencido sin marcar: el turno no vuelve a operar",
     ],
   },
+  // ── CERRAR SIN CONTEO ────────────────────────────────────────────────────
+  //
+  // Cada una rompe una de las reglas que hacen honesta la resolución: que solo
+  // aplique a un corte vencido por tiempo, que lo desconocido quede en NULL, que
+  // haya permiso y evidencia, que no se resuelva dos veces, y que las pantallas
+  // lo lean.
+  {
+    n: "CC-5",
+    defecto: "cerrar sin conteo deja de exigir que el corte haya vencido por tiempo",
+    archivo: "lib/caja/cierreRelevo.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 20,
+    inyecciones: [
+      {
+        de: "  return cierreConfirmable(cierre) && cierreAtrasado(cierre, ahora);",
+        a: "  return cierreConfirmable(cierre);",
+      },
+    ],
+    esperadas: ["D1 vigente: rechaza con 409", "D1: el turno sigue en preparación"],
+  },
+  {
+    n: "CC-6",
+    defecto: "el contado se vuelve a inventar con el esperado",
+    archivo: "app/api/pos-ventas/cierres/[token]/cerrar-sin-conteo/route.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "          montoRealEfectivo: null,", a: "          montoRealEfectivo: fila.efectivoEsperadoCorte," }],
+    esperadas: ["D10 el contado queda NULL, no 0 ni el esperado"],
+  },
+  {
+    n: "CC-7",
+    defecto: "la diferencia desconocida se vuelve a escribir como cero",
+    archivo: "app/api/pos-ventas/cierres/[token]/cerrar-sin-conteo/route.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "          diferenciaEfectivo: null,", a: "          diferenciaEfectivo: 0," }],
+    esperadas: ["D11 la diferencia queda NULL, no 0"],
+  },
+  {
+    n: "CC-8",
+    defecto: "la segunda llamada deja de reconocer que ya estaba resuelto",
+    archivo: "app/api/pos-ventas/cierres/[token]/cerrar-sin-conteo/route.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 20,
+    inyecciones: [
+      {
+        de: "      if (fila.estado === ESTADO_CIERRE.CERRADO_SIN_CONTEO) return { yaEstaba: fila, repetido: true };\n",
+        a: "",
+      },
+    ],
+    esperadas: ["D16 la segunda llamada no vuelve a resolver", "D16b las dos contestan bien"],
+  },
+  {
+    n: "CC-9",
+    defecto: "cerrar sin conteo deja de pedir el permiso excepcional",
+    archivo: "app/api/pos-ventas/cierres/[token]/cerrar-sin-conteo/route.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 20,
+    inyecciones: [
+      { de: "    const perm = checkPerm(session, PERMISO_CERRAR_SIN_CONTEO);", a: "    const perm = { ok: true };" },
+    ],
+    esperadas: ["D7 sin permiso: rechaza con 403", "D7: sin bitácora"],
+  },
+  {
+    n: "CC-10",
+    defecto: "la resolución deja de escribir su evidencia en la bitácora",
+    archivo: "app/api/pos-ventas/cierres/[token]/cerrar-sin-conteo/route.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "      await tx.auditoriaBitacora.create({", a: "      await (async () => ({}))({" }],
+    esperadas: ["D15 hay UNA fila de bitácora"],
+  },
+  {
+    n: "CC-11",
+    defecto: "el resumen del turno vuelve a no traer el corte resuelto sin conteo",
+    archivo: "app/api/pos-ventas/turnos/resumen/route.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 20,
+    inyecciones: [
+      {
+        de: 'estado: { in: ["PREPARANDO", "CONFIRMADO", "VENCIDO", "CERRADO_SIN_CONTEO"] }',
+        a: 'estado: { in: ["PREPARANDO", "CONFIRMADO", "VENCIDO"] }',
+      },
+    ],
+    esperadas: ["D19 el resumen trae el corte resuelto sin conteo"],
+  },
+  {
+    n: "CC-12",
+    defecto: "Finanzas vuelve a leer un cerrado sin contado como 'turno abierto'",
+    archivo: "app/api/finanzas/turno/[turnoId]/route.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "        cerrado: estadoDelTurno(turno) === ESTADO_TURNO.CERRADO,\n", a: "" }],
+    esperadas: ["D19 Finanzas dice 'cerrado sin conteo', no 'turno abierto'", "D19 sin diferencia inventada"],
+  },
 ];
 
 // Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número
