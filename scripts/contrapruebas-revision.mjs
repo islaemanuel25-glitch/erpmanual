@@ -898,6 +898,28 @@ const CASOS = [
     candado: "25b. un cierre con el plazo vencido no se ofrece cancelable, diga lo que diga `estado`",
     suite: "lib/caja/procesoPendiente.test.mjs",
   },
+  {
+    // Un turno cerrado sin conteo leído como "turno abierto": la pantalla le
+    // diría a quien lo mira que la caja todavía no cerró.
+    n: "SC-resultado",
+    defecto: "el resultado de un cerrado sin contado vuelve a ser 'turno abierto'",
+    archivo: "lib/caja/vistaTurno.js",
+    de: "  if ((contado === null || contado === undefined) && cerrado === true) {",
+    a: "  if (false) {",
+    candado: "el resultado de un cerrado sin contado NO es 'turno abierto' ni un cero",
+    suite: "lib/caja/cierreSinConteo.test.mjs",
+  },
+  {
+    // Sin el retiro final, sumar los otros dos y mostrarlo como el total de lo
+    // que salió del local es presentar un número menor como cierto.
+    n: "SC-circuito",
+    defecto: "'dinero que salió del local' vuelve a sumar sin el retiro final desconocido",
+    archivo: "lib/caja/circuitoDinero.js",
+    de: "  const salioDelLocal = sinConteo\n    ? null\n    : retirosManuales",
+    a: "  const salioDelLocal = false\n    ? null\n    : retirosManuales",
+    candado: "el circuito no presenta como cierto lo que salió del local si no se contó",
+    suite: "lib/caja/cierreSinConteo.test.mjs",
+  },
   // `lib/semanaOperativa/unaSolaFuente.test.mjs` NO está acá, y no por olvido:
   // enumera con `git ls-files`, y la copia descartable de este script no lleva
   // `.git`, así que ahí el archivo entero explota antes de llegar al candado y el

@@ -633,6 +633,11 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     "components/compras-proveedor/HojaCerrarRecepcion.jsx": true,
     "components/listas-precios/ModalListaPrecio.jsx": true,
     "components/caja/ModalCambioPrevio.jsx": true,
+    // Cerrar sin conteo: adentro está el MOTIVO escrito, que es la única
+    // explicación que va a quedar de por qué una caja se cerró sin contar.
+    // Tocar afuera y perderlo obliga a escribirlo de nuevo, y un motivo reescrito
+    // de apuro es peor evidencia que el primero.
+    "components/caja/ModalCerrarSinConteo.jsx": true,
     // Agregar un producto que llegó y el remito no menciona. Se pierde lo
     // ARMADO, que es el criterio: el producto buscado y elegido, la unidad en la
     // que se contó y la cantidad. Y las tres cuestan distinto de rehacer — la

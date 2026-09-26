@@ -16,8 +16,16 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **36 migraciones** y el árbol también. **Ninguna** pendiente:
-el despliegue siguiente es solo de código.
+Producción está en **36 migraciones**. El árbol trae **37**: una pendiente.
+
+- `20260926122404_cierre_sin_conteo` (PR "cerrar sin conteo"): un valor de enum
+  nuevo, `CERRADO_SIN_CONTEO`, en `EstadoCierrePreparacion`, y tres columnas
+  NULLABLE sin default en `CierrePreparacion` —`cerradoSinConteoEn`,
+  `cerradoSinConteoPorUsuarioId`, `motivoCierreSinConteo`—. **Aditiva**: sin
+  UPDATE, sin backfill, sin DROP. No toca ninguna fila existente: los cortes
+  vencidos de producción quedan exactamente como están. La versión anterior no
+  escribe el valor nuevo ni lee las columnas, así que la ventana entre migrar y
+  recrear no cambia nada.
 
 ---
 

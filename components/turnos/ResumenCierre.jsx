@@ -13,7 +13,19 @@
 // horizontal. Escritorio: la misma jerarquía, con las cifras en fila.
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import { resultadoCierre, pistaFondoOmitido, CAJA_CORRECTA, CAJA_SOBRANTE } from "@/lib/caja/vistaTurno";
+import {
+  resultadoCierre,
+  pistaFondoOmitido,
+  CAJA_CORRECTA,
+  CAJA_SOBRANTE,
+  CAJA_SIN_CONTEO,
+} from "@/lib/caja/vistaTurno";
+import {
+  estadoDelTurno,
+  ESTADO_TURNO,
+  TEXTO_SIN_CONTAR,
+  TEXTO_DIFERENCIA_NO_DISPONIBLE,
+} from "@/lib/caja/cierreRelevo";
 
 const fmt = (n) =>
   Number(n ?? 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -26,6 +38,18 @@ function Cifra({ etiqueta, valor, clase = "", grande = false, signo = false }) {
       <div className="text-[11px] sunmi-text-muted leading-tight">{etiqueta}</div>
       <div className={`font-bold tabular-nums ${grande ? "text-2xl sm:text-3xl" : "text-lg sm:text-xl"} ${clase}`}>
         {prefijo}${fmt(valor)}
+      </div>
+    </div>
+  );
+}
+
+/** Una cifra que NO es un número: lo que no se contó se dice, no se pone en cero. */
+function CifraSinDato({ etiqueta, texto, grande = false }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-sm2 sunmi-text-muted leading-tight">{etiqueta}</div>
+      <div className={`font-bold sunmi-text-muted ${grande ? "text-2xl sm:text-3xl" : "text-lg sm:text-xl"}`}>
+        {texto}
       </div>
     </div>
   );
@@ -55,7 +79,24 @@ export function ResultadoCierre({ turno }) {
     );
   }
 
-  const r = resultadoCierre({ esperado, contado });
+  const r = resultadoCierre({ esperado, contado, cerrado: estadoDelTurno(turno) === ESTADO_TURNO.CERRADO });
+
+  // CERRADO SIN CONTEO: el esperado se conoce —quedó congelado en el corte—; lo
+  // contado y la diferencia no. Se dicen con palabras, nunca con un $0.
+  if (r.estado === CAJA_SIN_CONTEO) {
+    return (
+      <SunmiCard>
+        <h2 className="text-base font-bold mb-3">Resultado del cierre</h2>
+        <div className="text-2xl sm:text-3xl font-bold mb-3 sunmi-text-warning">{r.titulo}</div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <Cifra etiqueta="Había que tener" valor={esperado} />
+          <CifraSinDato etiqueta="Se contó" texto={TEXTO_SIN_CONTAR} />
+          <CifraSinDato etiqueta="Diferencia" texto={TEXTO_DIFERENCIA_NO_DISPONIBLE} grande />
+        </div>
+        <p className="text-sm2 sunmi-text-muted mt-3 leading-snug">{r.explicacion}</p>
+      </SunmiCard>
+    );
+  }
 
   if (!r.cerrado) {
     return (

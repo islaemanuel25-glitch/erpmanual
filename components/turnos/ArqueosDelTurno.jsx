@@ -16,6 +16,7 @@ import { useEffect, useState } from "react";
 import { horaAR } from "@/lib/fechas/formatearFechaHora";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import { TEXTO_DIFERENCIA_NO_DISPONIBLE } from "@/lib/caja/cierreRelevo";
 import {
   desglosarEntreArqueos,
   resumenArqueosVista,
@@ -44,7 +45,9 @@ function signo(dif) {
 }
 
 
-export default function ArqueosDelTurno({ turnoId, movimientos = [], montoInicial = 0 }) {
+// `sinConteo`: el turno se cerró sin contar, así que no tiene arqueo FINAL y no
+// es un dato que falte: nadie contó. La "diferencia final" lo dice.
+export default function ArqueosDelTurno({ turnoId, movimientos = [], montoInicial = 0, sinConteo = false }) {
   const [arqueos, setArqueos] = useState(null);
   const [abierto, setAbierto] = useState(false);
 
@@ -78,7 +81,11 @@ export default function ArqueosDelTurno({ turnoId, movimientos = [], montoInicia
     return (
       <SunmiCard>
         <h2 className="text-base font-bold mb-1">Retiros y conteos</h2>
-        <p className="text-sm sunmi-text-muted">No hubo retiros ni conteos en este turno.</p>
+        <p className="text-sm sunmi-text-muted">
+          {sinConteo
+            ? "No hubo retiros ni conteos en este turno: se cerró sin contar."
+            : "No hubo retiros ni conteos en este turno."}
+        </p>
       </SunmiCard>
     );
   }
@@ -108,7 +115,7 @@ export default function ArqueosDelTurno({ turnoId, movimientos = [], montoInicia
         <div>
           <div className="text-[11px] sunmi-text-muted leading-tight">Diferencia final</div>
           <div className={`text-lg font-bold tabular-nums ${r.hayFinal ? tono(r.diferenciaFinal) : "sunmi-text-muted"}`}>
-            {r.hayFinal ? signo(r.diferenciaFinal) : "—"}
+            {r.hayFinal ? signo(r.diferenciaFinal) : sinConteo ? TEXTO_DIFERENCIA_NO_DISPONIBLE : "—"}
           </div>
         </div>
       </div>

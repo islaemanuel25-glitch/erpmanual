@@ -23,6 +23,8 @@
 
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import { formatearMoneda } from "@/lib/moneda";
+import { CAJA_SIN_CONTEO } from "@/lib/caja/vistaTurno";
+import { TEXTO_SIN_CONTAR, TEXTO_DIFERENCIA_NO_DISPONIBLE } from "@/lib/caja/cierreRelevo";
 import { horaAR } from "@/lib/fechas/formatearFechaHora";
 import { CLASE_MOVIMIENTO } from "@/lib/finanzas/movimientosDeCaja";
 
@@ -144,6 +146,19 @@ export default function DetalleDeTurno({ datos, cargando = false, error = "" }) 
             {resultado?.explicacion && (
               <div className="text-xs2 sunmi-text-muted">{resultado.explicacion}</div>
             )}
+          </>
+        ) : resultado?.estado === CAJA_SIN_CONTEO ? (
+          // CERRADO SIN CONTEO: el turno se cerró sin contar. El esperado que vale
+          // es el congelado en el corte; lo contado y la diferencia no se conocen.
+          <>
+            <Renglon
+              rotulo="Esperado al corte"
+              valor={formatearMoneda(persistido.montoEsperadoEfectivo)}
+            />
+            <Renglon rotulo="Efectivo contado" valor={TEXTO_SIN_CONTAR} />
+            <Renglon rotulo="Diferencia" valor={TEXTO_DIFERENCIA_NO_DISPONIBLE} />
+            <div className="text-sm2 sunmi-text-muted">{resultado.titulo}</div>
+            <div className="text-xs2 sunmi-text-muted">{resultado.explicacion}</div>
           </>
         ) : (
           // Ver el encabezado: NULL es "no se contó", no "contó cero".

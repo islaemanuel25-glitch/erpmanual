@@ -79,7 +79,9 @@ export async function POST(req, context) {
             ? "Este cierre ya se confirmó: no se puede cancelar."
             : fila.estado === ESTADO_CIERRE.CANCELADO
               ? "Este cierre ya estaba cancelado."
-              : "Este cierre está vencido y necesita resolución administrativa. No se cancela desde acá."
+              : fila.estado === ESTADO_CIERRE.CERRADO_SIN_CONTEO
+                ? "Este cierre ya se resolvió sin conteo: no se puede cancelar."
+                : "Este cierre está vencido y necesita resolución administrativa. No se cancela desde acá."
         );
         e.codigo = "conflicto";
         throw e;

@@ -59,6 +59,29 @@ const USUARIO = arg("usuario");
 const CLAVE = arg("clave");
 const APLICAR = arg("aplicar") === true;
 
+// ── --aplicar ESTÁ BLOQUEADO, A PROPÓSITO ────────────────────────────────────
+//
+// Este script cierra mandando EL ESPERADO como contado. Eso escribe una
+// diferencia de cero, un arqueo FINAL con un conteo que nadie hizo y un retiro
+// que nadie vio: un dato falso con forma de dato cierto. La regla que lo
+// prohíbe, decidida el 2026-09-26, es que un dato desconocido no es cero.
+//
+// Para un corte de cierre VENCIDO, la salida canónica es "cerrar sin conteo"
+// (`POST /api/pos-ventas/cierres/[token]/cerrar-sin-conteo`), que deja lo
+// contado y la diferencia en NULL. Para un turno ABIERTO de un día anterior —que
+// nunca tomó su corte— todavía no hay una salida honesta, y se decide aparte.
+//
+// La simulación sigue andando: es de solo lectura y sirve para ver qué esperado
+// tiene un turno sin tocar nada.
+if (APLICAR) {
+  console.error(
+    "--aplicar está bloqueado: cerrar mandando el esperado como contado fabrica una diferencia de cero.\n" +
+      "Para un cierre vencido, usá \"Cerrar sin conteo\" en Cierres pendientes. Para un turno abierto viejo,\n" +
+      "la salida todavía no está decidida."
+  );
+  process.exit(2);
+}
+
 if (!Number.isInteger(TURNO_ID)) {
   console.error("Falta --turno <id>.");
   process.exit(2);

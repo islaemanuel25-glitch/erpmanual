@@ -24,6 +24,8 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
 import { FilaCierrePendiente } from "@/components/caja/PanelesCierre";
+import ModalCerrarSinConteo from "@/components/caja/ModalCerrarSinConteo";
+import { PERMISO_CERRAR_SIN_CONTEO } from "@/lib/caja/cierreRelevo";
 
 export default function CierresPendientesPage() {
   const router = useRouter();
@@ -38,6 +40,13 @@ export default function CierresPendientesPage() {
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const puedeUsar = permisos.includes("*") || permisos.includes("pos.usar");
+  // La resolución excepcional. El servidor la vuelve a exigir: esto solo decide si
+  // el botón se ofrece.
+  const puedeCerrarSinConteo = permisos.includes("*") || permisos.includes(PERMISO_CERRAR_SIN_CONTEO);
+
+  const [sinConteo, setSinConteo] = useState(null);
+  const [resolviendo, setResolviendo] = useState(false);
+  const [errorSinConteo, setErrorSinConteo] = useState("");
 
   const cargar = useCallback(async () => {
     setError("");
@@ -63,6 +72,40 @@ export default function CierresPendientesPage() {
     if (cargandoUser || cargandoCtx || !puedeUsar || needsContexto) return;
     cargar();
   }, [cargar, cargandoUser, cargandoCtx, puedeUsar, needsContexto]);
+
+  const abrirSinConteo = (item) => {
+    setErrorSinConteo("");
+    setSinConteo(item);
+  };
+
+  const cerrarSinConteo = async (motivo) => {
+    if (!sinConteo) return;
+    setResolviendo(true);
+    setErrorSinConteo("");
+    try {
+      const r = await fetch(
+        `/api/pos-ventas/cierres/${encodeURIComponent(sinConteo.token)}/cerrar-sin-conteo`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ motivo }),
+        }
+      ).then((x) => x.json().catch(() => ({ ok: false, error: "Respuesta inválida del servidor." })));
+      // El rechazo se muestra: un 409 que no dice nada se ve igual que un botón
+      // que no hace nada.
+      if (!r?.ok) {
+        setErrorSinConteo(r?.error || "No se pudo cerrar sin conteo.");
+        return;
+      }
+      setSinConteo(null);
+      await cargar();
+    } catch {
+      setErrorSinConteo("Error de conexión.");
+    } finally {
+      setResolviendo(false);
+    }
+  };
 
   if (cargandoUser || cargandoCtx) return null;
   if (!puedeUsar) return <SinPermisos />;
@@ -131,10 +174,19 @@ export default function CierresPendientesPage() {
               onContinuar={(i) =>
                 router.push(`/modulos/pos-ventas/cierres/${encodeURIComponent(i.token)}`)
               }
+              onCerrarSinConteo={puedeCerrarSinConteo ? abrirSinConteo : undefined}
             />
           ))}
         </div>
       )}
+
+      <ModalCerrarSinConteo
+        item={sinConteo}
+        trabajando={resolviendo}
+        error={errorSinConteo}
+        onCerrar={() => setSinConteo(null)}
+        onConfirmar={cerrarSinConteo}
+      />
     </div>
   );
 }

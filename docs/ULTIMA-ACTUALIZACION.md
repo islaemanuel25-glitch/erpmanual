@@ -1,23 +1,24 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-26 11:13
+**Fecha:** 2026-09-26 12:54
 
 ## Módulos modificados recientemente
 
 ### pos-ventas
-- fix(ventas): la corrección completa exige el turno ABIERTO, no solo sin cierre, fix(caja): el cierre clásico ya no cierra un turno con el corte tomado en el medio, fix(caja): un corte vencido no se cancela aunque nadie lo haya marcado
-- Archivos: 1 nuevos, 6 modificados (7 total)
+- feat(caja): cerrar sin conteo un corte vencido, y las pantallas que lo leen, fix(ventas): la corrección completa exige el turno ABIERTO, no solo sin cierre, fix(caja): el cierre clásico ya no cierra un turno con el corte tomado en el medio
+- Archivos: 2 nuevos, 13 modificados (15 total)
+
+### transferencias
+- feat(caja): estado CERRADO_SIN_CONTEO y la autoría de la resolución, feat(compras): columna para el catálogo que se miró al decidir un precio
+- Archivos: 1 modificados (1 total)
 
 ### reportes-ventas
 - fix(ventas): la corrección completa exige el turno ABIERTO, no solo sin cierre
 - Archivos: 3 modificados (3 total)
 
-### transferencias
-- feat(compras): columna para el catálogo que se miró al decidir un precio
-- Archivos: 1 modificados (1 total)
-
 
 ## Archivos nuevos desde última sincronización
+- app/api/pos-ventas/cierres/[token]/cerrar-sin-conteo/route.js
 - lib/pos-ventas/estadoTurnoCorreccion.test.mjs
 
 ## Acción recomendada

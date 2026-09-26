@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuditoriaScope, parseRangoFechas } from "@/lib/auditoria-pos-ventas/scope";
 import { comisionEsExacta, estadoFinanciero } from "@/lib/pos-ventas/comisionPendiente";
+import { turnoSinConteo } from "@/lib/caja/cierreRelevo";
 
 /**
  * GET /api/auditoria-pos-ventas/cajas?fechaDesde=YYYY-MM-DD&fechaHasta=YYYY-MM-DD
@@ -180,6 +181,9 @@ export async function GET(req) {
         estado: esAnulado ? "anulado" : esCerrado ? "cerrado" : "abierto",
         anulado: esAnulado,
         motivoAnulacion: t.motivoAnulacion ?? null,
+        // Cerrado sin contar: `real` y `diferencia` vienen en null porque no se
+        // conocen, no porque falten. La pantalla lo dice con palabras.
+        sinConteo: turnoSinConteo(t),
         apertura: t.apertura,
         cierre: t.cierre,
         responsable: t.vendedor,

@@ -31,7 +31,7 @@ import { checkPerm } from "@/lib/authorize";
 import { resolveVistaOperativa } from "@/lib/grupos";
 import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 import { calcularEfectivoEsperado } from "@/lib/caja/efectivoEsperado";
-import { estadoDelTurno } from "@/lib/caja/cierreRelevo";
+import { estadoDelTurno, ESTADO_TURNO } from "@/lib/caja/cierreRelevo";
 import { resultadoCierre } from "@/lib/caja/vistaTurno";
 
 import { esVistaDeDeposito, resolverLocalPedido } from "@/lib/finanzas/alcanceFinanciero";
@@ -262,6 +262,8 @@ export async function GET(req, { params }) {
       resultado: resultadoCierre({
         esperado: turno.montoEsperadoEfectivo ?? calculo.efectivoEsperado,
         contado: turno.montoRealEfectivo,
+        // Cerrado y sin contado es "cerrado sin conteo", no "turno abierto".
+        cerrado: estadoDelTurno(turno) === ESTADO_TURNO.CERRADO,
       }),
       arqueos,
     });

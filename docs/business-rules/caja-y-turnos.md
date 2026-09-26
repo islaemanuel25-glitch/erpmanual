@@ -69,6 +69,40 @@ error propios (`cierreRelevo.js:102-111`).
 - Reserva de sobre: **20 minutos** (`MINUTOS_RESERVA_CAMBIO`, `:135`). Esta sí se
   libera.
 
+### Vencido se decide por `venceEn`, no por la etiqueta · **[CÓDIGO]** · *desde 2026-09-26*
+
+La etiqueta `VENCIDO` la escribe `marcarCortesVencidos` recién cuando alguien abre
+la bandeja de pendientes. Las reglas no la leen: preguntan a `cierreAtrasado`, que
+mira `venceEn`. Cancelar exige un corte **vigente** (`cierreCancelable`); cerrar sin
+conteo exige uno **vencido** (`cierreCerrableSinConteo`). Confirmar acepta los dos.
+
+### Cerrar sin conteo · **[CÓDIGO]** · *desde 2026-09-26*
+
+La resolución administrativa de un corte vencido cuyo conteo ya no existe
+(`app/api/pos-ventas/cierres/[token]/cerrar-sin-conteo/route.js`). **Un dato
+desconocido no es cero.**
+
+- Solo para un corte vencido por tiempo, con motivo obligatorio y el permiso
+  `pos.cerrar_sin_conteo`, que no va a ningún rol de sistema.
+- El turno queda CERRADO con el **esperado congelado** del corte, la cantidad de
+  ventas congelada y el cambio separado antes del corte. **Lo contado, la
+  diferencia y el retiro final quedan en NULL.**
+- **No** crea arqueo FINAL, **no** crea el movimiento de retiro y **no** toca el sobre
+  de cambio.
+- El corte queda `CERRADO_SIN_CONTEO`, con `cerradoSinConteoEn`,
+  `cerradoSinConteoPorUsuarioId` y `motivoCierreSinConteo`. Nada de lo que congeló se
+  pisa.
+- La evidencia va a `AuditoriaBitacora` (`caja.cerrar_sin_conteo`) en la misma
+  transacción.
+- Las pantallas muestran **"Sin contar"** y **"No disponible"**, nunca un cero:
+  `turnoSinConteo` y `TEXTO_SIN_CONTAR` en `lib/caja/cierreRelevo.js`.
+
+`scripts/cerrar-turno-vencido.mjs` tiene `--aplicar` **bloqueado**: cerraba
+mandando el esperado como contado, que fabrica una diferencia de cero.
+
+**Pendiente:** los turnos ABIERTOS de un día anterior —que nunca tomaron su
+corte— no tienen todavía una salida honesta; esta resolución no los cubre.
+
 ---
 
 ## RN-35 — La reserva es propia por usuario Y por operario · **[CÓDIGO]**

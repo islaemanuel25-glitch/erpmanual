@@ -31,6 +31,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import Link from "next/link";
 import { horaAR } from "@/lib/fechas/formatearFechaHora";
 import { armarCircuito, verificarCircuito, etiquetaEstadoCambio } from "@/lib/caja/circuitoDinero";
+import { TEXTO_SIN_CONTAR, TEXTO_DIFERENCIA_NO_DISPONIBLE } from "@/lib/caja/cierreRelevo";
 import { DesgloseResumido } from "@/components/caja/PanelesApertura";
 
 const fmt = (n) =>
@@ -46,9 +47,14 @@ const hhmm = (iso) => {
     : horaAR(d);
 };
 
-/** Importe que distingue ausencia de cero. */
-function Monto({ valor, clase = "" }) {
+/**
+ * Importe que distingue ausencia de cero. `sinDato` es la palabra que explica la
+ * ausencia cuando se sabe por qué —"Sin contar" en un cierre sin conteo—; sin
+ * ella, la raya de siempre, que es la de los turnos anteriores al circuito.
+ */
+function Monto({ valor, clase = "", sinDato = null }) {
   if (valor === null || valor === undefined) {
+    if (sinDato) return <span className="sunmi-text-muted font-normal">{sinDato}</span>;
     return <span className="sunmi-text-muted" title="Este turno no registra este dato">—</span>;
   }
   return <span className={clase}>${fmt(valor)}</span>;
@@ -88,6 +94,10 @@ export default function CircuitoDelDinero({ turno, resumen = null }) {
     corte: relevo?.corte ?? null,
   });
   const verificacion = verificarCircuito(c);
+  // Solo un cierre SIN CONTEO explica sus vacíos con palabras; los históricos
+  // conservan la raya, que ya dice "este turno no registra el dato".
+  const sinContar = c.cierre.sinConteo ? TEXTO_SIN_CONTAR : null;
+  const noDisponible = c.cierre.sinConteo ? TEXTO_DIFERENCIA_NO_DISPONIBLE : null;
 
   // Compatibilidad: turnos que usaron la cadena vieja de fondo, hoy desactivada.
   const hayViejo =
@@ -229,7 +239,7 @@ export default function CircuitoDelDinero({ turno, resumen = null }) {
                 <Monto valor={c.cierre.retiroEsperado} />
               </Dato>
               <Dato etiqueta="Retiro contado" ayuda="La única pila que se contó después del corte">
-                <Monto valor={c.cierre.retiroContado} clase="sunmi-text-accent" />
+                <Monto valor={c.cierre.retiroContado} clase="sunmi-text-accent" sinDato={sinContar} />
               </Dato>
             </>
           )}
@@ -242,13 +252,13 @@ export default function CircuitoDelDinero({ turno, resumen = null }) {
                 : undefined
             }
           >
-            <Monto valor={c.cierre.efectivoContado} />
+            <Monto valor={c.cierre.efectivoContado} sinDato={sinContar} />
           </Dato>
           <Dato etiqueta="Diferencia">
-            <Monto valor={c.cierre.diferencia} clase={tono(c.cierre.diferencia)} />
+            <Monto valor={c.cierre.diferencia} clase={tono(c.cierre.diferencia)} sinDato={noDisponible} />
           </Dato>
           <Dato etiqueta="Retiro final" ayuda="Salió del local">
-            <Monto valor={c.cierre.retiroFinal} clase="sunmi-text-warning" />
+            <Monto valor={c.cierre.retiroFinal} clase="sunmi-text-warning" sinDato={sinContar} />
           </Dato>
           {c.cierre.destino && <Dato etiqueta="Destino del retiro">{c.cierre.destino}</Dato>}
           {c.cierre.recibidoPor && <Dato etiqueta="Lo recibió">{c.cierre.recibidoPor}</Dato>}
@@ -294,7 +304,7 @@ export default function CircuitoDelDinero({ turno, resumen = null }) {
           etiqueta="Dinero que salió del local"
           ayuda="Retiros manuales + retiros de recaudación + retiro final"
         >
-          <Monto valor={c.totales.salioDelLocal} clase="sunmi-text-warning" />
+          <Monto valor={c.totales.salioDelLocal} clase="sunmi-text-warning" sinDato={noDisponible} />
         </Dato>
         <Dato
           etiqueta="Dinero transferido al turno siguiente"
@@ -317,7 +327,14 @@ export default function CircuitoDelDinero({ turno, resumen = null }) {
                 : "sunmi-state-danger sunmi-text-danger"
             }`}
           >
-            {verificacion.cierra ? (
+            {verificacion.cierra && c.cierre.sinConteo ? (
+              // Sin conteo, el reparto de lo contado no se pudo comprobar: afirmar
+              // que "se reparte sin resto" sería certificar un conteo que no hubo.
+              <>
+                El esperado sale de la apertura y los movimientos. Lo contado no se conoce: el
+                turno se cerró sin conteo.
+              </>
+            ) : verificacion.cierra ? (
               <>
                 Las cuentas cierran: el esperado sale de la apertura y los movimientos, y lo contado
                 se reparte sin resto entre lo retirado y el cambio.
