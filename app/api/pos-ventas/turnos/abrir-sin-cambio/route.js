@@ -20,7 +20,12 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireOperadorSegunConfig } from "@/lib/operador";
-import { validarDesgloseServidor } from "@/lib/caja/desgloseServidor";
+import {
+  validarDesgloseServidor,
+  evaluarDesproporcionDesglose,
+  respuestaDesproporcion,
+  UMBRAL_CANTIDAD_EXTRAORDINARIA,
+} from "@/lib/caja/desgloseServidor";
 import {
   ESTADO_CAMBIO,
   WHERE_TURNO_OPERATIVO,
@@ -57,6 +62,18 @@ export async function POST(req) {
     });
     if (!contado.valido) {
       return NextResponse.json({ ok: false, error: contado.error }, { status: 400 });
+    }
+
+    // El error ×1000: una cantidad de billetes escrita como monto. Acá no hay
+    // sobre ni esperado contra qué comparar, así que la señal es la cantidad
+    // por fila. Antes de crear nada. Ver `evaluarDesproporcionDesglose`.
+    const proporcion = evaluarDesproporcionDesglose({
+      desglose: contado.desglose,
+      umbralCantidadPorFila: UMBRAL_CANTIDAD_EXTRAORDINARIA,
+      totalConfirmado: body?.totalConfirmado,
+    });
+    if (!proporcion.valido) {
+      return NextResponse.json(respuestaDesproporcion(proporcion), { status: 400 });
     }
 
     const apertura = evaluarAperturaSinCambio({

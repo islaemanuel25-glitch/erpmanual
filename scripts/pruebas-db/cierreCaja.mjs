@@ -39,6 +39,7 @@ const rutaResumen = await import("../../app/api/pos-ventas/turnos/resumen/route.
 const rutaFinanzasTurno = await import("../../app/api/finanzas/turno/[turnoId]/route.js");
 const rutaReservar = await import("../../app/api/pos-ventas/cambios-pendientes/reservar/route.js");
 const rutaAbrirConCambio = await import("../../app/api/pos-ventas/turnos/abrir-con-cambio/route.js");
+const rutaAbrirSinCambio = await import("../../app/api/pos-ventas/turnos/abrir-sin-cambio/route.js");
 const rutaRetiroIniciar = await import("../../app/api/pos-ventas/retiros/iniciar/route.js");
 const rutaRetiroConfirmar = await import("../../app/api/pos-ventas/retiros/[token]/confirmar/route.js");
 
@@ -893,6 +894,71 @@ async function correr(f) {
     const ok2 = await confirmarRetiro({ 1000: 43 });
     ok("E9 D: con {1000: 43} el retiro confirma", ok2.ok === true, ok2.error);
   }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("F. Apertura sin sobre: sin referencia, la señal es la cantidad por fila");
+  // Llamadas directas al endpoint, sin pantalla (caso G). Antes de cada una se
+  // cierran los abiertos que dejó la prueba: la ruta no deja abrir dos.
+  const cerrarAbiertos = () =>
+    prisma.turno.updateMany({
+      where: { localId: local.id, vendedorId: f.usuario.id, cierre: null, cierreEnPreparacionEn: null },
+      data: { cierre: new Date() },
+    });
+  const turnosDelLocal = () => prisma.turno.count({ where: { localId: local.id } });
+  const abrirSinSobre = async (desgloseContado, extra = {}) => {
+    await cerrarAbiertos();
+    return leer(
+      await rutaAbrirSinCambio.POST(
+        pedido(`${BASE}/turnos/abrir-sin-cambio`, sesion, { desgloseContado, motivo: "fondo propio", ...extra })
+      )
+    );
+  };
+  const abrioCon = async (r) =>
+    r.ok === true ? Number((await prisma.turno.findUnique({ where: { id: r.turno?.id } }))?.montoInicial) : null;
+
+  {
+    const antes = await turnosDelLocal();
+    const r = await abrirSinSobre({ 1000: 23000 });
+    ok("F1 A: {1000: 23000} sin total confirmado NO abre",
+      r.status === 400 && r.codigo === DESPROPORCION, `status ${r.status} ${r.codigo ?? ""} ${r.error ?? ""}`);
+    ok("F1 A: el mensaje dice fila, cantidad, subtotal y total",
+      /23\.000 × \$1\.000 = \$23\.000\.000,00/.test(r.error ?? "") && /con más de 500 billetes/.test(r.error ?? ""), r.error);
+    igual("F1 H: no se creó ningún turno", await turnosDelLocal(), antes);
+  }
+  {
+    const antes = await turnosDelLocal();
+    const r = await abrirSinSobre({ 1000: 23000 }, { totalConfirmado: "23000" });
+    ok("F2 B: confirmar $23.000 NO abre", r.status === 400 && r.codigo === DESPROPORCION, `status ${r.status} ${r.error ?? ""}`);
+    igual("F2 H: no se creó ningún turno", await turnosDelLocal(), antes);
+  }
+  {
+    const r = await abrirSinSobre({ 1000: 23000 }, { totalConfirmado: "23000000" });
+    ok("F3 C: confirmar $23.000.000 abre", r.ok === true, `${r.status} ${r.error ?? ""}`);
+    igual("F3 C: abre con lo confirmado, sin corregir", await abrioCon(r), 23000000);
+  }
+  {
+    const r = await abrirSinSobre({ 1000: 23 });
+    ok("F4 D: {1000: 23} abre sin pedir nada", r.ok === true, `${r.status} ${r.error ?? ""}`);
+    igual("F4 D: con $23.000", await abrioCon(r), 23000);
+  }
+  {
+    const r = await abrirSinSobre({ 1000: 500 });
+    ok("F5 E: {1000: 500} no activa por cantidad", r.ok === true, `${r.status} ${r.error ?? ""}`);
+  }
+  {
+    const antes = await turnosDelLocal();
+    const r = await abrirSinSobre({ 1000: 501 });
+    ok("F6 F: {1000: 501} exige confirmación", r.status === 400 && r.codigo === DESPROPORCION, `status ${r.status} ${r.error ?? ""}`);
+    igual("F6 H: no se creó ningún turno", await turnosDelLocal(), antes);
+  }
+  {
+    const antes = await turnosDelLocal();
+    const r = await abrirSinSobre({ 1000: 100001 }, { totalConfirmado: "100001000" });
+    ok("F7 I: el tope duro de 100.000 sigue rechazando, aunque se confirme",
+      r.status === 400 && r.codigo !== DESPROPORCION && /demasiado grande/.test(r.error ?? ""), `status ${r.status} ${r.error ?? ""}`);
+    igual("F7 H: no se creó ningún turno", await turnosDelLocal(), antes);
+  }
+  await cerrarAbiertos();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

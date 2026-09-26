@@ -564,6 +564,30 @@ const CASOS = [
     ],
     esperadas: ["E2 A: escribir $23.000 —lo que se creía contar— no lo destraba"],
   },
+  {
+    n: "CC-19",
+    defecto: "la apertura sin sobre vuelve a aceptar {1000: 23000} sin pedir nada",
+    archivo: "app/api/pos-ventas/turnos/abrir-sin-cambio/route.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 100,
+    inyecciones: [{ de: "    if (!proporcion.valido) {", a: "    if (false) {" }],
+    esperadas: ["F1 A: {1000: 23000} sin total confirmado NO abre", "F1 H: no se creó ningún turno"],
+  },
+  {
+    // El borde medido: 500 billetes es un conteo posible, 501 ya no.
+    n: "CC-20",
+    defecto: "el umbral por fila se corre uno y 500 billetes pasa a pedir confirmación",
+    archivo: "lib/caja/desgloseServidor.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 100,
+    inyecciones: [
+      {
+        de: "    if (!Number.isFinite(cantidad) || cantidad <= tope) continue;",
+        a: "    if (!Number.isFinite(cantidad) || cantidad < tope) continue;",
+      },
+    ],
+    esperadas: ["F5 E: {1000: 500} no activa por cantidad"],
+  },
 ];
 
 // Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número

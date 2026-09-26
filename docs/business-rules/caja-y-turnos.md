@@ -142,8 +142,19 @@ Las referencias por ruta:
 - los dos cortes, de cierre y de retiro, usan el efectivo esperado recalculado adentro de la transacción;
 - las dos confirmaciones usan el retiro esperado congelado (el cierre del orden anterior usa el efectivo esperado congelado).
 
-**Sin cubrir, a propósito:** `turnos/abrir-sin-cambio` no tiene ninguna
-referencia. Está exento con su motivo en `lib/caja/desgloseDesproporcionado.test.mjs`.
+**La apertura sin sobre** (`turnos/abrir-sin-cambio`) no tiene ninguna
+referencia monetaria, así que se protege por **cantidad por fila**: más de
+**500 billetes** en una denominación (`UMBRAL_CANTIDAD_EXTRAORDINARIA`) pide la
+misma confirmación en pesos. *Desde 2026-09-26.* El 500 sale del relevamiento
+de producción: ninguna fila legítima pasa de 387 y las 25 filas por encima de
+500 son todas incidentes. El tope duro de 100.000 sigue igual. Las rutas con
+referencia no usan este umbral.
+
+Se descartó usar "el último cambio dejado en el local" como referencia:
+- un sobre de $0 se publica a propósito;
+- no hay límite de antigüedad;
+- los sobres contaminados por este mismo error siguen siendo "el último", y un sobre inflado dejaría pasar un error en silencio;
+- cuando no hay sobre, no hay referencia.
 
 Probado contra Postgres en `scripts/pruebas-db/cierreCaja.mjs`, sección E, y
 contraprobado en CC-13 a CC-18.
