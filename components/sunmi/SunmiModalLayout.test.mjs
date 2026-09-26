@@ -710,6 +710,11 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // gesto que se espera de algo que se abrió para mirar.
     "components/compras-proveedor/VisorDeFoto.jsx": false,
     "components/comprobantes/PanelComprobantes.jsx": false,
+    // Aplicar una corrección histórica de caja: es una CONFIRMACIÓN, aunque la
+    // acción sea la más delicada de la caja. Lo único escrito adentro es el
+    // código repetido, y cerrar sin querer deja todo sin aplicar, que es la
+    // salida segura. Por el criterio de qué se pierde, `false`.
+    "app/modulos/auditoria-pos-ventas/correcciones/page.jsx": false,
     // Estos dos lo declaran por el criterio VIEJO —la acción es peligrosa— y
     // quedan así a propósito. Se revisan al cerrar la fase 2, junto con el
     // renombre de `destructivo`.

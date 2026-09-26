@@ -8,7 +8,10 @@ import {
   Landmark,
   TrendingUp,
   Package,
+  Wrench,
 } from "lucide-react";
+import SunmiNavCard from "@/components/sunmi/SunmiNavCard";
+import { PERMISO_CORREGIR_HISTORICO } from "@/lib/caja/correcciones/permisos";
 
 const SECCIONES = [
   {
@@ -59,6 +62,7 @@ export default function AuditoriaPosVentasHub() {
   }
 
   const localNombre = contexto?.nombre || "—";
+  const puedeCorregir = esAdmin || permisos.includes(PERMISO_CORREGIR_HISTORICO);
 
   return (
     <>
@@ -132,6 +136,19 @@ export default function AuditoriaPosVentasHub() {
               </div>
             ))}
           </div>
+
+          {/* Acción excepcional, fuera de la grilla de secciones: solo la ve quien
+              tiene el permiso, que no va a ningún rol. */}
+          {puedeCorregir && (
+            <div className="mt-4">
+              <SunmiNavCard
+                icon={Wrench}
+                label="Correcciones históricas de caja"
+                descripcion="Ensayar y aplicar correcciones autorizadas"
+                href="/modulos/auditoria-pos-ventas/correcciones"
+              />
+            </div>
+          )}
         </div>
       </div>
     </>

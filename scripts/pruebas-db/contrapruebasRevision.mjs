@@ -588,6 +588,59 @@ const CASOS = [
     ],
     esperadas: ["F5 E: {1000: 500} no activa por cantidad"],
   },
+  // ── La corrección histórica de caja ────────────────────────────────────────
+  {
+    n: "CH-1",
+    // El defecto peligroso no es "el ensayo sigue hasta aplicar" —eso explota sin
+    // autorización y se deshace igual; fue la primera versión de esta
+    // contraprueba y no probó nada—. Es que el ensayo DEVUELVA en vez de tirar:
+    // devolver confirma la transacción con los UPDATE adentro.
+    defecto: "el ensayo en seco devuelve en vez de deshacer y deja escritos los UPDATE",
+    archivo: "lib/caja/correcciones/motor.js",
+    suite: "scripts/pruebas-db/correccionCaja.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "      if (!aplicar) throw new Deshacer(", a: "      if (!aplicar) return (" }],
+    esperadas: ["2: después del ensayo, NADA cambió en la base (ni registro, ni bitácora)"],
+  },
+  {
+    n: "CH-2",
+    defecto: "la aplicación deja de exigir la huella autorizada",
+    archivo: "lib/caja/correcciones/motor.js",
+    suite: "scripts/pruebas-db/correccionCaja.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "      if (aplicar && hash !== manifiesto.autorizacion.hash) {", a: "      if (false) {" }],
+    esperadas: [
+      "3: huella distinta a la del plan de hoy: no se aplica",
+      "5: la huella autorizada ya no es la de hoy: no se aplica",
+    ],
+  },
+  {
+    n: "CH-3",
+    defecto: "un PROPUESTO se puede aplicar",
+    archivo: "lib/caja/correcciones/motor.js",
+    suite: "scripts/pruebas-db/correccionCaja.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "  if (aplicar && manifiesto.estado !== ESTADO_MANIFIESTO.AUTORIZADO) {", a: "  if (false) {" }],
+    esperadas: ["3: un PROPUESTO no se aplica"],
+  },
+  {
+    n: "CH-4",
+    defecto: "la segunda aplicación del mismo código deja de reconocer la primera",
+    archivo: "lib/caja/correcciones/motor.js",
+    suite: "scripts/pruebas-db/correccionCaja.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "      if (previa) {", a: "      if (false) {" }],
+    esperadas: ["9: YA_APLICADA"],
+  },
+  {
+    n: "CH-5",
+    defecto: "el plan deja de comparar el valor anterior que declara el manifiesto",
+    archivo: "lib/caja/correcciones/plan.js",
+    suite: "scripts/pruebas-db/correccionCaja.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "      if (!mismoValor(corte[campo], c.antes[campo])) {", a: "      if (false) {" }],
+    esperadas: ["4: el ensayo lo rechaza nombrando el campo"],
+  },
 ];
 
 // Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número
