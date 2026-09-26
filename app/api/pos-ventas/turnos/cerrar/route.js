@@ -17,6 +17,10 @@ import {
   validarRepartoCierre,
   motivoRetiroCierre,
 } from "@/lib/caja/cierreCaja";
+import { WHERE_TURNO_OPERATIVO, estadoDelTurno, ESTADO_TURNO } from "@/lib/caja/cierreRelevo";
+
+const MSG_TURNO_EN_PREPARACION =
+  "Esta caja tiene un cierre en preparación. Terminá el conteo desde la pantalla de cierre.";
 
 export async function POST(req) {
   try {
@@ -75,8 +79,7 @@ export async function POST(req) {
       return NextResponse.json(
         {
           ok: false,
-          error:
-            "Esta caja tiene un cierre en preparación. Terminá el conteo desde la pantalla de cierre.",
+          error: MSG_TURNO_EN_PREPARACION,
           turnoEnPreparacionDeCierre: true,
         },
         { status: 409 }
@@ -178,12 +181,20 @@ export async function POST(req) {
     // Transacción: si la creación del arqueo fallara, el turno no puede quedar
     // cerrado sin su corte final.
     const { turnoCerrado } = await prisma.$transaction(async (tx) => {
-      // Cierre ATÓMICO: el `cierre: null` en el WHERE es el candado. Dos pedidos
-      // simultáneos leyeron el turno abierto antes de entrar acá; solo el primero
-      // encuentra la fila y el segundo sale con count 0 en vez de cerrar dos veces
-      // y crear dos retiros. La clave única del arqueo FINAL es la segunda red.
+      // Cierre ATÓMICO: el WHERE es el candado. Dos pedidos simultáneos leyeron el
+      // turno abierto antes de entrar acá; solo el primero encuentra la fila y el
+      // segundo sale con count 0 en vez de cerrar dos veces y crear dos retiros.
+      // La clave única del arqueo FINAL es la segunda red.
+      //
+      // El WHERE es el del turno OPERATIVO, no solo `cierre: null`. El rechazo de
+      // `cierreEnPreparacionEn` de arriba mira una lectura hecha fuera de esta
+      // transacción: si `cierres/iniciar` toma el corte entre esa lectura y esta
+      // escritura, con `cierre: null` solo el turno se cerraba igual, con un
+      // esperado recalculado, y dejaba el corte vivo y su sobre ofrecido. Postgres
+      // vuelve a evaluar el WHERE sobre la fila que dejó el corte, así que acá la
+      // escritura pierde.
       const { count } = await tx.turno.updateMany({
-        where: { id: turnoId, cierre: null },
+        where: { id: turnoId, ...WHERE_TURNO_OPERATIVO },
         data: {
           cierre: ahora,
           cerradoPorId: session.id,
@@ -202,6 +213,16 @@ export async function POST(req) {
         },
       });
       if (count === 0) {
+        // Se relee para decir cuál de los dos ganó: el corte o otro cierre.
+        const actual = await tx.turno.findUnique({
+          where: { id: turnoId },
+          select: { cierre: true, cierreEnPreparacionEn: true, anuladoEn: true },
+        });
+        if (estadoDelTurno(actual) === ESTADO_TURNO.CIERRE_EN_PREPARACION) {
+          const e = new Error(MSG_TURNO_EN_PREPARACION);
+          e.codigo = "turno_en_preparacion";
+          throw e;
+        }
         const e = new Error("El turno ya fue cerrado.");
         e.codigo = "turno_ya_cerrado";
         throw e;
@@ -272,6 +293,12 @@ export async function POST(req) {
   } catch (error) {
     if (error?.codigo === "turno_ya_cerrado") {
       return NextResponse.json({ ok: false, error: error.message }, { status: 409 });
+    }
+    if (error?.codigo === "turno_en_preparacion") {
+      return NextResponse.json(
+        { ok: false, error: error.message, turnoEnPreparacionDeCierre: true },
+        { status: 409 }
+      );
     }
     // Choque contra la clave única del arqueo FINAL (`cierre-<turnoId>`): otro
     // pedido cerró este turno mientras este estaba en vuelo.

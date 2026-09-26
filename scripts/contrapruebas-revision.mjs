@@ -885,6 +885,19 @@ const CASOS = [
     candado: "EL COMBO NO LLEVA NADA, Y EL CERO SÍ LLEVA SU UNIDAD",
     suite: "lib/compras-proveedor/stockIngresado.test.mjs",
   },
+  {
+    // El aviso de proceso pendiente tiene que decir lo mismo que el endpoint de
+    // cancelar. Lo que el endpoint hace se ejerce contra Postgres —CC-4 en
+    // `scripts/pruebas-db/contrapruebasRevision.mjs`—; lo que el aviso OFRECE es
+    // una función pura y se rompe acá.
+    n: "CC-aviso",
+    defecto: "el aviso vuelve a ofrecer 'Cancelar' sobre un cierre con el plazo vencido",
+    archivo: "lib/caja/procesoPendiente.js",
+    de: "  const vigente = cierreCancelable(cierre, ahora);",
+    a: "  const vigente = true;",
+    candado: "25b. un cierre con el plazo vencido no se ofrece cancelable, diga lo que diga `estado`",
+    suite: "lib/caja/procesoPendiente.test.mjs",
+  },
   // `lib/semanaOperativa/unaSolaFuente.test.mjs` NO está acá, y no por olvido:
   // enumera con `git ls-files`, y la copia descartable de este script no lleva
   // `.git`, así que ahí el archivo entero explota antes de llegar al candado y el

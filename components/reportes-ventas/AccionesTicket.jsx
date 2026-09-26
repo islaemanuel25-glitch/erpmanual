@@ -224,6 +224,8 @@ export default function AccionesTicket({ venta, onCorregido, onCorregirCompleta 
             title={
               c.motivoCompletaDeshabilitada === "turno_cerrado_no_corregible"
                 ? "El turno original ya está cerrado"
+                : c.motivoCompletaDeshabilitada === "turno_en_cierre_no_corregible"
+                  ? "El turno original ya tomó el corte de cierre"
                 : c.motivoCompletaDeshabilitada === "fuera_de_ventana"
                   ? "Pasó la ventana de 30 días"
                   : c.motivoCompletaDeshabilitada === "sin_permiso"

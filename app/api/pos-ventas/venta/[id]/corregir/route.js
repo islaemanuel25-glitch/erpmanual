@@ -29,7 +29,7 @@ import {
   cargarVentaOriginal, estadoTurnoCorreccion, detallesParaMotor, resolverLineasCorregidas,
   lockStockActual, aplicarDeltaStock, ajustarCuentaCorriente, ajustarPuntosCorreccion,
   subtotalElegiblePuntos, cargarMapsProductos, enriquecerReconstruccion,
-  COD_TURNO_CERRADO, MSG_TURNO_CERRADO,
+  mensajeBloqueoTurno,
 } from "@/lib/pos-ventas/correccionCompletaServer";
 import { reconstruirConsumoOriginal } from "@/lib/pos-ventas/motorCorreccion";
 
@@ -99,7 +99,7 @@ export async function POST(req, { params }) {
 
       const venta = await cargarVentaOriginal(tx, ventaId);
       const turno = estadoTurnoCorreccion(venta);
-      if (!turno.turnoAbierto) { const e = new Error(turno.motivoBloqueo === COD_TURNO_CERRADO ? MSG_TURNO_CERRADO : "El turno original no puede verificarse."); e.status = 409; e.code = turno.motivoBloqueo; throw e; }
+      if (!turno.turnoAbierto) { const e = new Error(mensajeBloqueoTurno(turno.motivoBloqueo) ?? "El turno original no puede verificarse."); e.status = 409; e.code = turno.motivoBloqueo; throw e; }
       if ((venta.version ?? 0) !== expectedVersion) { const e = new Error("La venta cambió desde que la abriste."); e.status = 409; e.code = "conflicto_version"; throw e; }
       const ventana = estadoVentanaCorreccion(venta);
       if (ventana.fueraDeVentana) { const e = new Error(`Fuera de la ventana de corrección (${ventana.diasTranscurridos} días).`); e.status = 409; e.code = "fuera_de_ventana"; throw e; }

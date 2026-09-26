@@ -333,6 +333,71 @@ const CASOS = [
     ],
     esperadas: ["N3: la decisión nueva guarda 1.500", "N3: cierra"],
   },
+  // ── LOS CANDADOS DEL CICLO DE CIERRE DE CAJA ────────────────────────────
+  //
+  // Corren contra `cierreCaja.mjs`, que ejerce las rutas reales. La carrera se
+  // fuerza con una transacción que retiene la fila del turno, así que el rojo
+  // de CC-1 no depende del azar: con el WHERE viejo, el cierre clásico escribe
+  // siempre después del corte.
+  {
+    n: "CC-1",
+    defecto: "el cierre clásico vuelve a cerrar un turno con el corte tomado en el medio",
+    archivo: "app/api/pos-ventas/turnos/cerrar/route.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 20,
+    inyecciones: [
+      { de: "where: { id: turnoId, ...WHERE_TURNO_OPERATIVO },", a: "where: { id: turnoId, cierre: null }," },
+    ],
+    esperadas: [
+      "A1: el cierre clásico pierde con 409",
+      "A1: nunca queda un turno CERRADO con un corte vivo",
+    ],
+  },
+  {
+    n: "CC-2",
+    defecto: "la corrección completa vuelve a decidir 'abierto' mirando solo `cierre`",
+    archivo: "lib/pos-ventas/correccionCompletaServer.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 20,
+    inyecciones: [
+      {
+        de: "  const estado = estadoDelTurno(venta.turno);\n",
+        a: "  const estado = venta.turno.cierre == null ? ESTADO_TURNO.ABIERTO : ESTADO_TURNO.CERRADO;\n",
+      },
+    ],
+    esperadas: ["B EN CIERRE: rechaza con 409", "B EN CIERRE: los pagos no se reescriben"],
+  },
+  {
+    // La regla puede estar bien y ser inalcanzable: si la consulta no trae la
+    // columna, `cierreEnPreparacionEn` llega `undefined` y el turno con el corte
+    // tomado se lee ABIERTO.
+    n: "CC-3",
+    defecto: "la venta a corregir se vuelve a cargar sin `cierreEnPreparacionEn`",
+    archivo: "lib/pos-ventas/correccionCompletaServer.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 20,
+    inyecciones: [
+      {
+        de: "turno: { select: { id: true, cierre: true, cierreEnPreparacionEn: true, anuladoEn: true } },",
+        a: "turno: { select: { id: true, cierre: true, anuladoEn: true } },",
+      },
+    ],
+    esperadas: ["B EN CIERRE: rechaza con 409"],
+  },
+  {
+    n: "CC-4",
+    defecto: "cancelar vuelve a confiar en la etiqueta y deshace un corte con el plazo vencido",
+    archivo: "app/api/pos-ventas/cierres/[token]/cancelar/route.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 20,
+    inyecciones: [
+      { de: "if (!cierreCancelable(fila, ahora)) {", a: "if (fila.estado !== ESTADO_CIERRE.PREPARANDO) {" },
+    ],
+    esperadas: [
+      "C vencido sin marcar: cancelar rechaza con 409",
+      "C vencido sin marcar: el turno no vuelve a operar",
+    ],
+  },
 ];
 
 // Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número

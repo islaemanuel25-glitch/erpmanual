@@ -20,7 +20,13 @@
 // política. Se informa como pendiente y se deja para quien la defina.
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { ESTADO_CIERRE, ESTADO_CAMBIO, ESTADO_TURNO, estadoDelTurno } from "@/lib/caja/cierreRelevo";
+import {
+  ESTADO_CIERRE,
+  ESTADO_CAMBIO,
+  ESTADO_TURNO,
+  estadoDelTurno,
+  cierreCancelable,
+} from "@/lib/caja/cierreRelevo";
 import {
   cargarCierrePorToken,
   bloquearTurno,
@@ -59,15 +65,21 @@ export async function POST(req, context) {
 
       const fila = await tx.cierrePreparacion.findUnique({ where: { id: cierre.id } });
 
-      // Solo PREPARANDO. Confirmado ya movió plata; cancelado ya está; vencido
-      // necesita una resolución que no está definida.
-      if (fila.estado !== ESTADO_CIERRE.PREPARANDO) {
+      // "Ahora" se decide acá, con los locks tomados: es el mismo instante con el
+      // que se juzga el vencimiento y el que queda escrito como `canceladoEn`.
+      const ahora = new Date();
+
+      // Solo el corte VIGENTE. Confirmado ya movió plata; cancelado ya está;
+      // vencido necesita una resolución que no está definida. Y vencido se decide
+      // por `venceEn`, no por la etiqueta: un corte que pasó su plazo sigue
+      // diciendo PREPARANDO hasta que alguien abre la bandeja de pendientes.
+      if (!cierreCancelable(fila, ahora)) {
         const e = new Error(
           fila.estado === ESTADO_CIERRE.CONFIRMADO
             ? "Este cierre ya se confirmó: no se puede cancelar."
-            : fila.estado === ESTADO_CIERRE.VENCIDO
-              ? "Este cierre está vencido y necesita resolución administrativa. No se cancela desde acá."
-              : "Este cierre ya estaba cancelado."
+            : fila.estado === ESTADO_CIERRE.CANCELADO
+              ? "Este cierre ya estaba cancelado."
+              : "Este cierre está vencido y necesita resolución administrativa. No se cancela desde acá."
         );
         e.codigo = "conflicto";
         throw e;
@@ -118,7 +130,6 @@ export async function POST(req, context) {
         throw e;
       }
 
-      const ahora = new Date();
       const actualizado = await tx.cierrePreparacion.update({
         where: { id: cierre.id },
         data: {

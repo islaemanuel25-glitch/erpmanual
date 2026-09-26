@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-09-26] - Actualización: pos-ventas, reportes-ventas, transferencias
+
+### Modificado
+- **pos-ventas**: fix(ventas): la corrección completa exige el turno ABIERTO, no solo sin cierre
+- **pos-ventas**: fix(caja): el cierre clásico ya no cierra un turno con el corte tomado en el medio
+- **pos-ventas**: fix(caja): un corte vencido no se cancela aunque nadie lo haya marcado
+- **reportes-ventas**: fix(ventas): la corrección completa exige el turno ABIERTO, no solo sin cierre
+- **transferencias**: feat(compras): columna para el catálogo que se miró al decidir un precio
+
+
 ## [2026-09-25] - Actualización: transferencias, configuracion
 
 ### Modificado
