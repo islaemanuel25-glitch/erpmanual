@@ -574,6 +574,7 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
               <div className="sunmi-state-warning sunmi-text-accent rounded p-3 text-sm">
                 No se puede corregir esta venta.{" "}
                 {c.motivoBloqueo === "turno_cerrado_no_corregible" ? "El turno original ya está cerrado."
+                  : c.motivoBloqueo === "turno_en_cierre_no_corregible" ? "El turno original ya tomó el corte de cierre."
                   : c.motivoBloqueo === "fuera_de_ventana" ? "Pasó la ventana de 30 días."
                   : c.motivoBloqueo === "flag_no_habilitado" ? "Función en beta: no habilitada para tu usuario."
                   : c.motivoBloqueo === "sin_permiso" ? "No tenés permiso." : "Turno no disponible."}

@@ -16,7 +16,7 @@ import { enBetaCorreccionCompleta, COD_FLAG_OFF, MSG_FLAG_OFF } from "@/lib/pos-
 import {
   cargarVentaOriginal, estadoTurnoCorreccion, detallesParaMotor,
   cargarMapsProductos, enriquecerReconstruccion, estadoReconstruccionUI,
-  COD_TURNO_CERRADO, MSG_TURNO_CERRADO,
+  COD_TURNO_CERRADO, mensajeBloqueoTurno,
 } from "@/lib/pos-ventas/correccionCompletaServer";
 
 const j = (b, s = 200) => NextResponse.json(b, { status: s });
@@ -119,7 +119,7 @@ export async function GET(req, { params }) {
       correccion: {
         puedeCorregirCompleta,
         motivoBloqueo,
-        mensajeBloqueo: motivoBloqueo === COD_TURNO_CERRADO ? MSG_TURNO_CERRADO : null,
+        mensajeBloqueo: mensajeBloqueoTurno(motivoBloqueo),
         dentroDeVentana: ventana.dentroDeVentana,
         hayLineasLegacyAmbiguas: lineas.some((l) => l.legacyAmbiguo),
       },

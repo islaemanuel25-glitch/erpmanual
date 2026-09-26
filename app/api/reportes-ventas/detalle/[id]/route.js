@@ -5,6 +5,7 @@ import { checkPerm } from "@/lib/authorize";
 import { lineasPagoTicket, esPagoDividido } from "@/lib/pos-ventas/pagos";
 import { esVentaFiada, estadoVentanaCorreccion } from "@/lib/pos-ventas/correccion";
 import { enBetaCorreccionCompleta } from "@/lib/pos-ventas/correccionBeta";
+import { estadoTurnoCorreccion } from "@/lib/pos-ventas/correccionCompletaServer";
 import { descriptorDeposito } from "@/lib/reportes-ventas/modoLineaDeposito";
 
 const num = (v) => (v == null ? 0 : Number(v));
@@ -71,7 +72,7 @@ export async function GET(req, { params }) {
         observaciones: true,
         referenciaInterna: true,
         turnoId: true,
-        turno: { select: { cierre: true } },
+        turno: { select: { cierre: true, cierreEnPreparacionEn: true, anuladoEn: true } },
         cliente: { select: { id: true, nombre: true, documento: true, telefono: true, direccion: true } },
         vendedor: { select: { id: true, nombre: true } },
         // es_deposito: necesario para saber si la línea se vendió en un depósito
@@ -195,12 +196,15 @@ export async function GET(req, { params }) {
 
     // Corrección COMPLETA (Fase B): feature flag beta + permiso + turno ABIERTO.
     const enBeta = enBetaCorreccionCompleta(session);
-    const turnoAbierto = !!venta.turnoId && venta.turno != null && venta.turno.cierre == null;
+    // La MISMA regla que aplica la corrección al guardar: si el botón la leyera de
+    // otro lado, ofrecería una corrección que el servidor después rechaza.
+    const turno = estadoTurnoCorreccion(venta);
+    const turnoAbierto = turno.turnoAbierto;
     let motivoCompleta = null;
     if (!permiteCompleta) motivoCompleta = "sin_permiso";
     else if (!enBeta) motivoCompleta = "flag_no_habilitado";
     else if (!venta.turnoId) motivoCompleta = "sin_turno_original";
-    else if (!turnoAbierto) motivoCompleta = "turno_cerrado_no_corregible";
+    else if (!turnoAbierto) motivoCompleta = turno.motivoBloqueo;
     else if (ventana.fueraDeVentana) motivoCompleta = "fuera_de_ventana";
 
     // Última corrección aplicada (para el bloque "Venta corregida" del ticket:

@@ -20,7 +20,7 @@ import { bloqueoCorreccion } from "@/lib/ventas-internas/integracionVenta";
 import {
   cargarVentaOriginal, estadoTurnoCorreccion, detallesParaMotor,
   resolverLineasCorregidas, leerStockActual, enriquecerReconstruccion,
-  COD_TURNO_CERRADO, MSG_TURNO_CERRADO,
+  mensajeBloqueoTurno,
 } from "@/lib/pos-ventas/correccionCompletaServer";
 import { normalizarMedio } from "@/lib/pos-ventas/pagos";
 
@@ -69,8 +69,7 @@ export async function POST(req, { params }) {
     // REGLA CENTRAL: turno original abierto (fail-closed).
     const turno = estadoTurnoCorreccion(venta);
     if (!turno.turnoAbierto) {
-      const esCerrado = turno.motivoBloqueo === COD_TURNO_CERRADO;
-      return j({ ok: false, code: turno.motivoBloqueo, error: esCerrado ? MSG_TURNO_CERRADO : "El turno original no puede verificarse: la corrección completa está bloqueada." }, 409);
+      return j({ ok: false, code: turno.motivoBloqueo, error: mensajeBloqueoTurno(turno.motivoBloqueo) ?? "El turno original no puede verificarse: la corrección completa está bloqueada." }, 409);
     }
 
     // Bloqueo optimista.
