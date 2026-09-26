@@ -215,13 +215,26 @@ escribe costos en producción.** Está en el roadmap como deuda 2.
     cierre escribe lo aceptado. Una baja grande contra el catálogo sigue sin
     poder aceptarse de un clic, como siempre. Casos M-A a M-E de
     `frenoDeCosto.mjs`, contrapruebas FC-7 y FC-8. **[VERIFICADO contra Postgres]**
-  - **La carrera entre decidir y cerrar sigue abierta.** La decisión guarda el
-    costo de la LÍNEA (`precioPropio`) y no el costo maestro que se vio al
-    decidir, así que si el catálogo se mueve entre la decisión y el cierre
-    nada lo detecta: dejar el que tenía es inocuo (no escribe), pero aceptar
-    escribe lo aceptado sobre un catálogo que ya no es el que se miró. Cerrarla
-    pide congelar ese costo al decidir, que es una columna nueva.
-    **[VERIFICADO en código, sin corregir a propósito]**
+  - ~~**La carrera entre decidir y cerrar.**~~ **Corregida el 2026-09-26.**
+    `DecisionDePrecioProveedor.costoMaestroObservado` —Decimal(12,2), la escala
+    de `ProductoBase.precio_costo`— guarda el costo maestro crudo que
+    `aceptar-precio` leyó del catálogo al decidir, en las dos respuestas. No es
+    `precioPropio`, que sigue siendo el costo de la línea. Una decisión vale
+    solo si el catálogo sigue en ese número, al centavo y sin tolerancia
+    (`mismoCatalogoQueAlDecidir`): la hoja la da por vencida y vuelve a
+    preguntar contra el catálogo de hoy, y el cierre no toma como autorizada
+    una aceptación cuya decisión es de otro catálogo. Las decisiones
+    anteriores a la columna quedan en NULL, no se rellenan y no valen: la hoja
+    vuelve a preguntar. Casos N1 a N8 de `frenoDeCosto.mjs`, contrapruebas FC-9
+    a FC-13. **[VERIFICADO contra Postgres]**
+  - **Lo que la protección no cubre:** una pantalla abierta ANTES de que el
+    catálogo cambie todavía manda en `costosExcluidos` la exclusión de un
+    "dejar el que tenía" vencido, y el servidor no la distingue de una
+    exclusión a mano. Excluir no escribe, así que el catálogo nuevo queda
+    intacto (N5). Y una aceptación vencida cuyo costo cae dentro de la
+    variación del nuevo catálogo se escribe por la regla normal, que no
+    necesita autorización. **[VERIFICADO contra Postgres el primero; en código
+    el segundo]**
   - **La pantalla manda en `costos` el costo de cada línea tal como estaba al
     cargar el pedido**, y aceptar un precio en Corregir no la recarga. Si se
     cierra sin recargar, el cierre escribe el costo viejo en la línea y el
