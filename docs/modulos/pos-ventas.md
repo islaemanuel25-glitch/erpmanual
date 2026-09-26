@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-09-26 11:13
+**Última actualización:** 2026-09-26 12:54
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-09-26: feat(caja): cerrar sin conteo un corte vencido, y las pantallas que lo leen
 - 2026-09-26: fix(ventas): la corrección completa exige el turno ABIERTO, no solo sin cierre
 - 2026-09-26: fix(caja): el cierre clásico ya no cierra un turno con el corte tomado en el medio
 - 2026-09-26: fix(caja): un corte vencido no se cancela aunque nadie lo haya marcado

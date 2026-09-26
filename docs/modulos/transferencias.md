@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-09-26 11:13
+**Última actualización:** 2026-09-26 12:54
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -194,6 +194,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-09-26: feat(caja): estado CERRADO_SIN_CONTEO y la autoría de la resolución
 - 2026-09-26: feat(compras): columna para el catálogo que se miró al decidir un precio
 - 2026-09-25: fix(semana): «corte de semana» deja de ser un nombre de la app, con candado sobre el repo entero
 - 2026-09-25: feat(semana): pantalla de Semana operativa en Configuración, con cancelar el cambio programado
