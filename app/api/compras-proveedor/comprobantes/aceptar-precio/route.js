@@ -279,6 +279,23 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: sinComparacion, queHacer: sinComparacion }, { status: 409 });
     }
 
+    // ── EL CATÁLOGO QUE SE MIRÓ AL DECIDIR ──────────────────────────────
+    //
+    // Es `precio_costo` de `base`: el producto que resolvió la cascada, leído
+    // del catálogo en ESTE pedido al servidor —no del cliente—, y el mismo
+    // contra el que `analizarPrecioDeLinea` acaba de clasificar el precio. Se
+    // guarda crudo, en la escala de la columna del catálogo, para que el cierre
+    // y la hoja lo comparen contra el catálogo de su momento sin conversiones.
+    // Sin ese número no hay contra qué fechar la decisión, y no se inventa.
+    const costoMaestroObservado =
+      base?.precio_costo != null && Number.isFinite(Number(base.precio_costo))
+        ? Number(base.precio_costo)
+        : null;
+    if (costoMaestroObservado == null) {
+      const sinCatalogo = "El producto no tiene costo en el catálogo, así que no hay contra qué decidir.";
+      return NextResponse.json({ ok: false, error: sinCatalogo, queHacer: sinCatalogo }, { status: 409 });
+    }
+
     // ── DEJAR EL PROPIO NO ESCRIBE NINGÚN COSTO ─────────────────────────
     //
     // Solo registra que sobre estos dos precios ya se contestó, y por eso no
@@ -300,6 +317,7 @@ export async function POST(req) {
         decision: DECISION_DE_PRECIO.DEJA_EL_MIO,
         precioFacturado: analisis.precioAEscribir,
         precioPropio: Number(delPedido.detalle.precioCosto),
+        costoMaestroObservado,
         comprobanteLineaId: linea.id,
         usuarioId: session?.id ?? null,
       });
@@ -411,6 +429,7 @@ export async function POST(req) {
           decision: DECISION_DE_PRECIO.ACEPTA_FACTURA,
           precioFacturado: precioAEscribir,
           precioPropio: Number(detalle.precioCosto),
+          costoMaestroObservado,
           comprobanteLineaId: linea.id,
           usuarioId: session?.id ?? null,
         });

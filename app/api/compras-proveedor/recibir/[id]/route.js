@@ -20,6 +20,11 @@ import { ErrorParaLaPersona, esParaLaPersona } from "@/lib/compras-proveedor/err
 import { formatearMoneda } from "@/lib/moneda";
 import { aCentavos } from "@/lib/compras-proveedor/comprobante/impuestos";
 import {
+  DECISION_DE_PRECIO,
+  mismoCatalogoQueAlDecidir,
+  mismoPrecio,
+} from "@/lib/compras-proveedor/decisionDePrecio";
+import {
   decisionDeCostoSugerida,
   textoDeLaDiferencia,
   VARIACION_POR_DEFECTO,
@@ -518,8 +523,32 @@ export async function POST(req, { params }) {
       aceptados.add(aCentavos(l.costoFinalUnitario));
       aceptadosEnElPapel.set(l.pedidoDetalleId, aceptados);
     }
-    const aceptadoEnElPapel = (detalleId, costo) =>
-      aceptadosEnElPapel.get(detalleId)?.has(aCentavos(costo)) === true;
+    // ── Y ESA ACEPTACIÓN VALE SOLO CONTRA EL CATÁLOGO QUE SE MIRÓ ────────
+    //
+    // Aceptar 1.000 mirando el catálogo en 1.300 no autoriza escribir 1.000
+    // si al cerrar el catálogo está en 1.500: es otra comparación, que nadie
+    // vio. La decisión ACEPTA_FACTURA de ese producto guarda el catálogo que
+    // se observó; la aceptación del papel autoriza solo si esa decisión es de
+    // este mismo precio y el catálogo sigue en ese número, con la misma regla
+    // que usa la hoja —`mismoCatalogoQueAlDecidir`—. Una decisión sin lo
+    // observado —anterior a la columna— no autoriza: el freno pide decidir de
+    // nuevo y la hoja lo vuelve a preguntar.
+    const decisionesDelProveedor = pedido.proveedorId
+      ? await prisma.decisionDePrecioProveedor.findMany({
+          where: { grupoId, proveedorId: pedido.proveedorId },
+          select: { productoBaseId: true, decision: true, precioFacturado: true, costoMaestroObservado: true },
+        })
+      : [];
+    const decisionPorBase = new Map(decisionesDelProveedor.map((d) => [d.productoBaseId, d]));
+    const aceptadoEnElPapel = (detalleId, costo, base) => {
+      if (aceptadosEnElPapel.get(detalleId)?.has(aCentavos(costo)) !== true) return false;
+      const d = base?.id != null ? decisionPorBase.get(base.id) : null;
+      return (
+        d?.decision === DECISION_DE_PRECIO.ACEPTA_FACTURA &&
+        mismoPrecio(d.precioFacturado, costo) &&
+        mismoCatalogoQueAlDecidir(d, base?.precio_costo)
+      );
+    };
     // ── CUÁNTO SE LE MUEVE EL PRECIO A ESTE PROVEEDOR ───────────────────
     //
     // La misma pregunta que hace la hoja de Corregir, contestada con la misma
@@ -846,7 +875,7 @@ export async function POST(req, { params }) {
         });
         // Aceptado en esta recepción: lo que mandó quien llama, o lo que la
         // hoja de Corregir ya dejó guardado para ESTE costo.
-        const aceptada = costosAceptados.has(det.id) || aceptadoEnElPapel(det.id, costoFinal);
+        const aceptada = costosAceptados.has(det.id) || aceptadoEnElPapel(det.id, costoFinal, base);
         const decision = decidirEscrituraDeCosto({
           clasificacion,
           excluidaAMano: costosExcluidos.has(det.id),
