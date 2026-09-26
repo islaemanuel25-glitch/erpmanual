@@ -2335,6 +2335,12 @@ enum EstadoCierrePreparacion {
   /// congelado, el turno sigue sin operar y el cierre todavía puede confirmarse.
   /// Es una marca de ATRASO para que alguien lo resuelva, nada más.
   VENCIDO
+  /// Resuelto ADMINISTRATIVAMENTE sin conteo: el corte venció y el conteo físico
+  /// ya no existe. El turno queda cerrado con el esperado congelado y con lo
+  /// contado y la diferencia DESCONOCIDOS —NULL, no cero—. No hay arqueo FINAL
+  /// ni movimiento de retiro, porque nadie observó esa plata. Es final. No es
+  /// CONFIRMADO: confirmado significa que alguien contó.
+  CERRADO_SIN_CONTEO
 }
 
 /// Estado de un RETIRO DE RECAUDACIÓN en preparación.
@@ -2504,6 +2510,15 @@ model CierrePreparacion {
   canceladoEn           DateTime?
   canceladoPorUsuarioId Int?
   motivoCancelacion     String?
+
+  /// La resolución CERRADO_SIN_CONTEO: cuándo, quién y por qué. Los tres van
+  /// juntos, igual que los de la cancelación de arriba: una resolución sin autor
+  /// ni motivo es indistinguible dentro de un mes de un error de datos. Son
+  /// columnas propias y no se reusan las de cancelar porque son hechos
+  /// distintos: cancelar devuelve el turno a operar; esto lo cierra.
+  cerradoSinConteoEn           DateTime?
+  cerradoSinConteoPorUsuarioId Int?
+  motivoCierreSinConteo        String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
