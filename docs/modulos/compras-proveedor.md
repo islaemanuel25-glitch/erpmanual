@@ -203,11 +203,25 @@ escribe costos en producción.** Está en el roadmap como deuda 2.
     `decisionVigente`, no con la última decisión del producto— excluye esa
     línea de escribir costo por `costosQueNoSeTocan`, así que tampoco frena.
     Lo ejerce `scripts/pruebas-db/frenoDeCosto.mjs` contra Postgres, con sus
-    contrapruebas FC-1 a FC-6. **[VERIFICADO]**
-  - **Queda sin salida un caso:** el papel coincide con la línea del pedido
-    (1.000 y 1.000) y el catálogo se movió después (1.300). La hoja compara
-    papel contra línea, ve "sin diferencia" y no ofrece decidir; el cierre
-    compara contra el catálogo y frena. **[VERIFICADO contra Postgres]**
+    contrapruebas FC-1 a FC-8. **[VERIFICADO]**
+  - ~~**Queda sin salida un caso:** papel igual a la línea y catálogo movido
+    después.~~ **Corregido el 2026-09-26.** La conciliación marca la fila con
+    `catalogoMovido` —`elCatalogoSeMovio`, la misma `decisionDeCostoSugerida`
+    del cierre con la variación vigente del proveedor, comparando el papel
+    contra el costo maestro de hoy (`costoMaestroHoy`)—, y la hoja pregunta con
+    las dos opciones de siempre mostrando ese costo como "Tenías". Dejar el que
+    tenía excluye la línea; aceptar guarda la decisión también en este caso
+    (antes no la guardaba porque papel y línea eran el mismo número) y el
+    cierre escribe lo aceptado. Una baja grande contra el catálogo sigue sin
+    poder aceptarse de un clic, como siempre. Casos M-A a M-E de
+    `frenoDeCosto.mjs`, contrapruebas FC-7 y FC-8. **[VERIFICADO contra Postgres]**
+  - **La carrera entre decidir y cerrar sigue abierta.** La decisión guarda el
+    costo de la LÍNEA (`precioPropio`) y no el costo maestro que se vio al
+    decidir, así que si el catálogo se mueve entre la decisión y el cierre
+    nada lo detecta: dejar el que tenía es inocuo (no escribe), pero aceptar
+    escribe lo aceptado sobre un catálogo que ya no es el que se miró. Cerrarla
+    pide congelar ese costo al decidir, que es una columna nueva.
+    **[VERIFICADO en código, sin corregir a propósito]**
   - **La pantalla manda en `costos` el costo de cada línea tal como estaba al
     cargar el pedido**, y aceptar un precio en Corregir no la recarga. Si se
     cierra sin recargar, el cierre escribe el costo viejo en la línea y el
