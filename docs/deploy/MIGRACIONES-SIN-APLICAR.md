@@ -28,8 +28,8 @@ Producción está en **34 migraciones**. Falta:
   NULLABLE sin default en `DecisionDePrecioProveedor`, `costoMaestroObservado`
   Decimal(12,2), el costo del catálogo que se miró al decidir un precio. Sin
   UPDATE ni backfill: las decisiones existentes quedan en NULL y la hoja las
-  vuelve a preguntar. La versión anterior no lee la columna. Viene del PR #80,
-  todavía sin mergear.
+  vuelve a preguntar. La versión anterior no lee la columna. Llegó a `main` con
+  el merge del PR #80 (`7c8875b`).
 
 ---
 
