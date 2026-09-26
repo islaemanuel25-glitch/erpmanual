@@ -48,6 +48,7 @@ import {
   ACCION_INICIAR_CIERRE,
 } from "@/components/caja/PanelesCierre";
 import { totalDesglose } from "@/lib/caja/conteoBilletes";
+import { evaluarDesproporcionDesglose } from "@/lib/caja/desgloseServidor";
 import { calcularRetiroEsperado } from "@/lib/caja/cierreRelevo";
 import { emitirCorteIniciado } from "@/lib/caja/senalCierre";
 
@@ -80,9 +81,22 @@ export default function IniciarCierrePage() {
   // guardar un cambio a medio contar invitaría a retomarlo horas después contra
   // un efectivo esperado que ya no es el mismo.
   const [desgloseCambio, setDesgloseCambio] = useState({});
+  // El total en pesos que se escribe solo si el cambio está fuera de proporción
+  // con el esperado. Ver `evaluarDesproporcionDesglose`.
+  const [totalConfirmado, setTotalConfirmado] = useState("");
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const puedeUsar = permisos.includes("*") || permisos.includes("pos.usar");
+
+  // El error ×1000 en el cambio que queda. MISMA función que el servidor, contra
+  // el esperado que muestra la pantalla; el servidor usa el suyo, recalculado.
+  const controlTotal = {
+    referencia: esperado,
+    etiquetaReferencia: "el efectivo que el sistema espera en la caja",
+    totalConfirmado,
+    onTotalConfirmado: setTotalConfirmado,
+  };
+  const proporcion = evaluarDesproporcionDesglose({ desglose: desgloseCambio, ...controlTotal });
 
   const totalCambio = totalDesglose(desgloseCambio);
   const retiroEstimado = useMemo(
@@ -212,15 +226,35 @@ export default function IniciarCierrePage() {
         return;
       }
 
+      // Lo cargado está fuera de proporción y el total en pesos no se escribió o
+      // no coincide: el aviso ya está en la grilla, acá se repite junto al botón.
+      if (!proporcion.valido) {
+        setError(proporcion.error);
+        return;
+      }
+
       const res = await fetch("/api/pos-ventas/cierres/iniciar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         // Solo el desglose. Los totales los calcula el servidor: mandarlos sería
         // ofrecerle números que no tiene por qué creer.
-        body: JSON.stringify({ turnoId: turno.id, desgloseCambio }),
+        body: JSON.stringify({
+          turnoId: turno.id,
+          desgloseCambio,
+          totalConfirmado: totalConfirmado === "" ? null : totalConfirmado,
+        }),
       });
       const json = await res.json();
+
+      // El servidor frenó el cambio por desproporcionado contra SU esperado, que
+      // puede no ser el que tenía la pantalla. Se adopta el suyo para que el
+      // campo del total en pesos aparezca con la misma referencia.
+      if (json?.desgloseDesproporcionado) {
+        if (json.referencia != null) setEsperado(Number(json.referencia));
+        setError(json.error);
+        return;
+      }
 
       // Un proceso pendiente no es un error a mostrar en letra chica adentro del
       // modal: es un cartel con salidas. Llega tanto en el 409 de exclusión mutua
@@ -351,6 +385,7 @@ export default function IniciarCierrePage() {
         esperado={esperado}
         desglose={desgloseCambio}
         onDesglose={setDesgloseCambio}
+        controlTotal={controlTotal}
         totalCambio={totalCambio}
         retiroEstimado={retiroEstimado}
         textoConfirmar={ACCION_INICIAR_CIERRE}

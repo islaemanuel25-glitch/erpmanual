@@ -26,7 +26,12 @@
 // desde el corte y NO se vuelve a crear.
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { validarDesgloseServidor, validarCambioContraConteo } from "@/lib/caja/desgloseServidor";
+import {
+  validarDesgloseServidor,
+  validarCambioContraConteo,
+  evaluarDesproporcionDesglose,
+  respuestaDesproporcion,
+} from "@/lib/caja/desgloseServidor";
 import { clasificarDiferencia } from "@/lib/caja/efectivoEsperado";
 import {
   ESTADO_CIERRE,
@@ -106,6 +111,18 @@ export async function POST(req, context) {
         return NextResponse.json({ ok: false, error: retiro.error }, { status: 400 });
       }
 
+      // El error ×1000 en lo retirado, contra el retiro esperado congelado en el
+      // corte. Ver `evaluarDesproporcionDesglose`.
+      const proporcion = evaluarDesproporcionDesglose({
+        desglose: retiro.desglose,
+        referencia: Number(cierre.efectivoRetiradoEsperado),
+        etiquetaReferencia: "el retiro que el sistema espera",
+        totalConfirmado: body?.totalConfirmado,
+      });
+      if (!proporcion.valido) {
+        return NextResponse.json(respuestaDesproporcion(proporcion), { status: 400 });
+      }
+
       desgloseCambio = cierre.desgloseCambio ?? {};
       totalCambio = Number(cierre.totalCambio ?? 0);
       desgloseRetiro = retiro.desglose;
@@ -128,6 +145,18 @@ export async function POST(req, context) {
       });
       if (!conteo.valido) {
         return NextResponse.json({ ok: false, error: conteo.error }, { status: 400 });
+      }
+      // El error ×1000 en el conteo del cajón, contra el esperado congelado. El
+      // cambio de abajo no necesita su propio chequeo: no puede superar lo
+      // contado fila por fila.
+      const proporcion = evaluarDesproporcionDesglose({
+        desglose: conteo.desglose,
+        referencia: Number(cierre.efectivoEsperadoCorte),
+        etiquetaReferencia: "el efectivo que el sistema espera en la caja",
+        totalConfirmado: body?.totalConfirmado,
+      });
+      if (!proporcion.valido) {
+        return NextResponse.json(respuestaDesproporcion(proporcion), { status: 400 });
       }
       const cambio = validarDesgloseServidor(body?.desgloseCambio, {
         etiqueta: "cambio que queda",

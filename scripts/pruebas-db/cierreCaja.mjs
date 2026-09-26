@@ -37,6 +37,10 @@ const rutaSinConteo = await import("../../app/api/pos-ventas/cierres/[token]/cer
 const rutaPendientes = await import("../../app/api/pos-ventas/cierres/pendientes/route.js");
 const rutaResumen = await import("../../app/api/pos-ventas/turnos/resumen/route.js");
 const rutaFinanzasTurno = await import("../../app/api/finanzas/turno/[turnoId]/route.js");
+const rutaReservar = await import("../../app/api/pos-ventas/cambios-pendientes/reservar/route.js");
+const rutaAbrirConCambio = await import("../../app/api/pos-ventas/turnos/abrir-con-cambio/route.js");
+const rutaRetiroIniciar = await import("../../app/api/pos-ventas/retiros/iniciar/route.js");
+const rutaRetiroConfirmar = await import("../../app/api/pos-ventas/retiros/[token]/confirmar/route.js");
 
 const { ESTADO_TURNO, ESTADO_CIERRE, estadoDelTurno, PERMISO_CERRAR_SIN_CONTEO, ACCION_CERRAR_SIN_CONTEO } =
   await import("../../lib/caja/cierreRelevo.js");
@@ -150,6 +154,7 @@ async function desmontar() {
   await prisma.venta.deleteMany({ where: { localId } });
   await prisma.cambioPendiente.deleteMany({ where: { localId } });
   await prisma.cierrePreparacion.deleteMany({ where: { localId } });
+  await prisma.retiroPreparacion.deleteMany({ where: { localId } });
   await prisma.arqueoCaja.deleteMany({ where: { turnoId: { in: turnos } } });
   await prisma.cajaMovimiento.deleteMany({ where: { turnoId: { in: turnos } } });
   await prisma.turno.deleteMany({ where: { localId } });
@@ -726,6 +731,167 @@ async function correr(f) {
     const r = await sinConteo(tercero.tok);
     ok("D20 se resuelve uno", r.ok === true, r.error);
     await intacto("D20 el otro vencido", otro);
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("E. El error ×1000: una cantidad de billetes escrita como monto");
+  // Todo por los handlers reales y sin pantalla: es lo que manda un cliente que
+  // se saltea la UI (caso F). Los datos sembrados son los de un circuito real:
+  // el sobre sale de un corte de verdad, no de una fila escrita a mano.
+  const DESPROPORCION = "DESGLOSE_DESPROPORCIONADO";
+
+  const abiertosDelCajero = () =>
+    prisma.turno.count({
+      where: { localId: local.id, vendedorId: f.usuario.id, cierre: null, cierreEnPreparacionEn: null, anuladoEn: null },
+    });
+
+  /** Un sobre de $23.000 en 23 billetes de $1.000, dejado por un corte y reservado. */
+  async function sobreDe23000() {
+    const t = await turnoNuevo(f, 50000);
+    const r = await leer(
+      await rutaIniciar.POST(pedido(`${BASE}/cierres/iniciar`, sesion, { turnoId: t.id, desgloseCambio: { 1000: 23 } }))
+    );
+    const sobre = await prisma.cambioPendiente.findFirst({
+      where: { turnoOrigenId: t.id, estado: { not: "CANCELADO" } },
+    });
+    const reserva = await leer(
+      await rutaReservar.POST(pedido(`${BASE}/cambios-pendientes/reservar`, sesion, { cambioPendienteId: sobre?.id }))
+    );
+    return { t, corte: r, sobre, reserva };
+  }
+  const recibir = async (cambioPendienteId, desgloseRecibido, extra = {}) =>
+    leer(
+      await rutaAbrirConCambio.POST(
+        pedido(`${BASE}/turnos/abrir-con-cambio`, sesion, { cambioPendienteId, desgloseRecibido, ...extra })
+      )
+    );
+
+  // ── A. Recepción de sobre: $23.000 declarados, {1000: 23000} recibidos ──
+  const s = await sobreDe23000();
+  ok("E0 el sobre sale de un corte real, con $23.000", s.corte.ok === true && Number(s.sobre?.total) === 23000,
+    `${s.corte.error ?? ""} total ${s.sobre?.total}`);
+  ok("E0 y queda reservado por el cajero", s.reserva.ok === true, s.reserva.error);
+  {
+    // Con motivo: la defensa vieja —explicar el sobrante— es justo la que dejó
+    // pasar los casos de producción.
+    const r = await recibir(s.sobre.id, { 1000: 23000 }, { motivoDiferencia: "sobra plata" });
+    ok("E1 A: {1000: 23000} contra un sobre de $23.000 NO pasa, aunque traiga motivo",
+      r.status === 400 && r.codigo === DESPROPORCION, `status ${r.status} ${r.codigo ?? ""} ${r.error ?? ""}`);
+    ok("E1 A: el mensaje nombra la fila y el ×1000",
+      /23\.000 billetes/.test(r.error ?? "") && /1\.000 veces lo que dice el sobre/.test(r.error ?? ""), r.error);
+    const fila = await prisma.cambioPendiente.findUnique({ where: { id: s.sobre.id } });
+    ok("E1 A: el sobre sigue reservado y sin destino", fila.estado === "RESERVADO" && fila.turnoDestinoId === null,
+      `${fila.estado} ${fila.turnoDestinoId}`);
+    igual("E1 A: no se abrió ningún turno", await abiertosDelCajero(), 0);
+  }
+  {
+    const r = await recibir(s.sobre.id, { 1000: 23000 }, { motivoDiferencia: "sobra", totalConfirmado: 23000 });
+    ok("E2 A: escribir $23.000 —lo que se creía contar— no lo destraba",
+      r.status === 400 && r.codigo === DESPROPORCION, `status ${r.status} ${r.error ?? ""}`);
+    igual("E2 A: sigue sin abrirse ningún turno", await abiertosDelCajero(), 0);
+  }
+  // ── B. El mismo sobre, contado bien ──
+  {
+    const r = await recibir(s.sobre.id, { 1000: 23 });
+    ok("E3 B: {1000: 23} contra el sobre de $23.000 abre el turno", r.ok === true, `${r.status} ${r.error ?? ""}`);
+    const fila = await prisma.cambioPendiente.findUnique({ where: { id: s.sobre.id } });
+    igual("E3 B: el sobre queda recibido", fila.estado, "RECIBIDO");
+    const turno = fila.turnoDestinoId ? await prisma.turno.findUnique({ where: { id: fila.turnoDestinoId } }) : null;
+    igual("E3 B: el turno abre con $23.000", Number(turno?.montoInicial), 23000);
+    igual("E3 B: sin diferencia", Number(fila.diferencia), 0);
+  }
+
+  // ── C. El cambio que queda, con el esperado en decenas de miles ──
+  {
+    const t = await turnoNuevo(f, 45000);
+    const r = await leer(
+      await rutaIniciar.POST(pedido(`${BASE}/cierres/iniciar`, sesion, { turnoId: t.id, desgloseCambio: { 1000: 23000 } }))
+    );
+    ok("E4 C: dejar {1000: 23000} de cambio con $45.000 esperados NO pasa",
+      r.status === 400 && r.codigo === DESPROPORCION, `status ${r.status} ${r.error ?? ""}`);
+    igual("E4 C: no se tomó el corte", await prisma.cierrePreparacion.count({ where: { turnoId: t.id } }), 0);
+    igual("E4 C: no se publicó ningún sobre", await prisma.cambioPendiente.count({ where: { turnoOrigenId: t.id } }), 0);
+    igual("E4 C: el turno sigue abierto", await estadoDe(t.id), ESTADO_TURNO.ABIERTO);
+
+    const bien = await leer(
+      await rutaIniciar.POST(pedido(`${BASE}/cierres/iniciar`, sesion, { turnoId: t.id, desgloseCambio: { 1000: 23 } }))
+    );
+    ok("E4 D: el mismo turno deja {1000: 23} sin problema", bien.ok === true, bien.error);
+  }
+
+  // ── C. El conteo del cierre: retiro esperado de $8.000 ──
+  const conCorteDe8000 = async () => {
+    const t = await turnoNuevo(f, 10000);
+    const r = await iniciar(t.id);
+    return { t, tok: r.cierre?.token };
+  };
+  const confirmarCon = async (tok, desgloseRetiroContado, extra = {}) =>
+    leer(
+      await rutaConfirmar.POST(
+        pedido(`${BASE}/cierres/${tok}/confirmar`, sesion, { desgloseRetiroContado, ...extra }),
+        conToken(tok)
+      )
+    );
+  {
+    const c = await conCorteDe8000();
+    const r = await confirmarCon(c.tok, { 1000: 8000 });
+    ok("E5 C: contar {1000: 8000} de retiro con $8.000 esperados NO cierra",
+      r.status === 400 && r.codigo === DESPROPORCION, `status ${r.status} ${r.error ?? ""}`);
+    igual("E5 C: el turno sigue en preparación de cierre", await estadoDe(c.t.id), ESTADO_TURNO.CIERRE_EN_PREPARACION);
+    igual("E5 C: no hay arqueo final", await prisma.arqueoCaja.count({ where: { turnoId: c.t.id } }), 0);
+    igual("E5 C: no hay movimiento de retiro", await prisma.cajaMovimiento.count({ where: { turnoId: c.t.id } }), 0);
+
+    // D. El mismo corte, contado bien.
+    const bien = await confirmarCon(c.tok, { 1000: 8 });
+    ok("E5 D: el mismo corte con {1000: 8} cierra", bien.ok === true, bien.error);
+    const turno = await prisma.turno.findUnique({ where: { id: c.t.id } });
+    igual("E5 D: el cajón es $10.000", Number(turno.montoRealEfectivo), 10000);
+    igual("E5 D: sin diferencia", Number(turno.diferenciaEfectivo), 0);
+  }
+  {
+    // E. Una diferencia real: sobran $1.000 sobre $8.000. No es este error.
+    const c = await conCorteDe8000();
+    const r = await confirmarCon(c.tok, { 1000: 9 });
+    ok("E6 E: un sobrante real de $1.000 sigue cerrando", r.ok === true, r.error);
+    igual("E6 E: la diferencia es la real",
+      Number((await prisma.turno.findUnique({ where: { id: c.t.id } })).diferenciaEfectivo), 1000);
+  }
+  {
+    // Un conteo grande de verdad pasa si se confirma en pesos, y queda TAL CUAL:
+    // nada se divide ni se corrige.
+    const c = await conCorteDe8000();
+    const r = await confirmarCon(c.tok, { 1000: 8000 }, { totalConfirmado: "8000000" });
+    ok("E7 confirmado en pesos, el conteo grande cierra", r.ok === true, r.error);
+    const turno = await prisma.turno.findUnique({ where: { id: c.t.id } });
+    igual("E7 y queda escrito tal cual se contó, sin corregir", Number(turno.montoRealEfectivo), 8002000);
+  }
+
+  // ── C. El retiro parcial: el cambio y el conteo, por las mismas reglas ──
+  {
+    const t = await turnoNuevo(f, 45000);
+    const iniciarRetiro = async (desgloseCambio) =>
+      leer(await rutaRetiroIniciar.POST(pedido(`${BASE}/retiros/iniciar`, sesion, { turnoId: t.id, desgloseCambio })));
+    const r = await iniciarRetiro({ 1000: 23000 });
+    ok("E8 C: el retiro con {1000: 23000} de cambio y $45.000 esperados NO arranca",
+      r.status === 400 && r.codigo === DESPROPORCION, `status ${r.status} ${r.error ?? ""}`);
+    igual("E8 C: no se tomó el corte del retiro", await prisma.retiroPreparacion.count({ where: { turnoId: t.id } }), 0);
+
+    const bien = await iniciarRetiro({ 2000: 1 });
+    ok("E8 D: con {2000: 1} el retiro arranca", bien.ok === true, bien.error);
+    const tokR = bien.retiro?.token;
+    const confirmarRetiro = async (desgloseRetiroContado) =>
+      leer(
+        await rutaRetiroConfirmar.POST(
+          pedido(`${BASE}/retiros/${tokR}/confirmar`, sesion, { desgloseRetiroContado }),
+          conToken(tokR)
+        )
+      );
+    const mal = await confirmarRetiro({ 1000: 43000 });
+    ok("E9 C: contar {1000: 43000} con $43.000 de retiro esperado NO confirma",
+      mal.status === 400 && mal.codigo === DESPROPORCION, `status ${mal.status} ${mal.error ?? ""}`);
+    igual("E9 C: no hay movimiento", await prisma.cajaMovimiento.count({ where: { turnoId: t.id } }), 0);
+    const ok2 = await confirmarRetiro({ 1000: 43 });
+    ok("E9 D: con {1000: 43} el retiro confirma", ok2.ok === true, ok2.error);
   }
 }
 

@@ -65,6 +65,7 @@ import {
 } from "@/lib/caja/conteoBilletes";
 import { calcularDiferencia } from "@/lib/caja/efectivoEsperado";
 import { ESTADO_CIERRE } from "@/lib/caja/cierreRelevo";
+import { evaluarDesproporcionDesglose } from "@/lib/caja/desgloseServidor";
 import {
   armarBorradorCierre,
   armarBorradorCierreLegado,
@@ -116,6 +117,9 @@ export default function CierrePorTokenPage() {
   const [desgloseCambio, setDesgloseCambio] = useState({});
 
   const [observacion, setObservacion] = useState("");
+  // El total en pesos que se escribe solo si lo contado está fuera de proporción
+  // con la referencia congelada. Ver `evaluarDesproporcionDesglose`.
+  const [totalConfirmado, setTotalConfirmado] = useState("");
   const [conteoIniciadoEn, setConteoIniciadoEn] = useState(null);
 
   const [guardando, setGuardando] = useState(false);
@@ -238,11 +242,32 @@ export default function CierrePorTokenPage() {
     totalContado,
   });
 
+  // El error ×1000: cantidad de billetes escrita como monto. MISMA función que
+  // el servidor, con la misma referencia congelada que va a usar él: el retiro
+  // esperado en el orden nuevo, el efectivo esperado en el anterior.
+  const controlTotal = conCorteNuevo
+    ? {
+        referencia: retiroEsperado,
+        etiquetaReferencia: "el retiro que el sistema espera",
+        totalConfirmado,
+        onTotalConfirmado: setTotalConfirmado,
+      }
+    : {
+        referencia: esperado,
+        etiquetaReferencia: "el efectivo que el sistema espera en la caja",
+        totalConfirmado,
+        onTotalConfirmado: setTotalConfirmado,
+      };
+  const proporcion = evaluarDesproporcionDesglose({
+    desglose: conCorteNuevo ? desgloseRetiro : desgloseContado,
+    ...controlTotal,
+  });
+
   // Se puede cerrar con retiro $0 —todo el efectivo quedó como cambio—, que en un
   // cierre es un caso legítimo: el turno siguiente se lleva el cajón entero.
   const puedeConfirmar = conCorteNuevo
-    ? hayRetiroContado && !guardando
-    : hayContado && validacionCambio.valido && !guardando;
+    ? hayRetiroContado && proporcion.valido && !guardando
+    : hayContado && validacionCambio.valido && proporcion.valido && !guardando;
 
   const marcarInicioConteo = () => {
     if (!conteoIniciadoEn) setConteoIniciadoEn(new Date().toISOString());
@@ -312,9 +337,19 @@ export default function CierrePorTokenPage() {
     try {
       // Solo el desglose. Los totales los calcula el servidor: mandarlos sería
       // ofrecerle al backend un número que no tiene por qué creer.
+      const confirmado = totalConfirmado === "" ? null : totalConfirmado;
       const cuerpo = conCorteNuevo
-        ? { desgloseRetiroContado: desgloseRetiro, observacion: observacion.trim() || null }
-        : { desgloseContado, desgloseCambio, observacion: observacion.trim() || null };
+        ? {
+            desgloseRetiroContado: desgloseRetiro,
+            observacion: observacion.trim() || null,
+            totalConfirmado: confirmado,
+          }
+        : {
+            desgloseContado,
+            desgloseCambio,
+            observacion: observacion.trim() || null,
+            totalConfirmado: confirmado,
+          };
 
       const res = await fetch(`/api/pos-ventas/cierres/${encodeURIComponent(token)}/confirmar`, {
         method: "POST",
@@ -469,6 +504,7 @@ export default function CierrePorTokenPage() {
               onDesglose={actualizarRetiro}
               horaConteo={conteoIniciadoEn ? hora(conteoIniciadoEn) : null}
               aviso={AVISO_CONTAR_SOLO_RETIRO_CIERRE}
+              controlTotal={controlTotal}
             />
 
             <PanelCambioSeparado
@@ -535,6 +571,7 @@ export default function CierrePorTokenPage() {
               desglose={desgloseContado}
               onDesglose={actualizarConteo}
               horaConteo={conteoIniciadoEn ? hora(conteoIniciadoEn) : null}
+              controlTotal={controlTotal}
             />
 
             <PanelCambio

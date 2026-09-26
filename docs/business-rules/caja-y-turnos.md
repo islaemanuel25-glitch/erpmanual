@@ -122,6 +122,32 @@ Y el caso fino: **mismo importe con otros billetes exige confirmación explícit
 (`RECEPCION.COINCIDE_TOTAL`, `:479-488`). Cuadrar en total no prueba que el
 desglose esté bien.
 
+### El error ×1000: un monto escrito donde va una cantidad · **[CÓDIGO]** · *desde 2026-09-26*
+
+La grilla pide **cuántos billetes** hay de cada denominación. En producción se
+escribió varias veces el monto en la fila: 23000 en la de $1.000 para dejar
+$23.000, y quedó guardado $23.000.000. El motivo obligatorio de RN-36 no lo
+frenó: el sobrante se explicó con cualquier texto y entró.
+
+`evaluarDesproporcionDesglose` (`lib/caja/desgloseServidor.js`) compara el
+total cargado contra la referencia que el sistema tiene en ese punto. Con
+**2 veces o más** (`FACTOR_DESPROPORCION`), pide **escribir el total contado en
+pesos** y solo sigue si coincide al centavo con lo cargado. No corrige nunca el
+número, no bloquea un conteo confirmado y no mira hacia abajo, porque una
+referencia contaminada por este mismo error no debe impedir registrar la verdad.
+
+La misma función la usan la grilla (`TablaDenominaciones`) y las cinco rutas.
+Las referencias por ruta:
+- la recepción usa lo que dice el sobre;
+- los dos cortes, de cierre y de retiro, usan el efectivo esperado recalculado adentro de la transacción;
+- las dos confirmaciones usan el retiro esperado congelado (el cierre del orden anterior usa el efectivo esperado congelado).
+
+**Sin cubrir, a propósito:** `turnos/abrir-sin-cambio` no tiene ninguna
+referencia. Está exento con su motivo en `lib/caja/desgloseDesproporcionado.test.mjs`.
+
+Probado contra Postgres en `scripts/pruebas-db/cierreCaja.mjs`, sección E, y
+contraprobado en CC-13 a CC-18.
+
 ---
 
 ## RN-37 — El arqueo se ancla al turno, no al calendario · **[CÓDIGO]**

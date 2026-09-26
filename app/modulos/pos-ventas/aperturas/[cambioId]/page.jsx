@@ -44,6 +44,7 @@ import {
 } from "@/components/caja/PanelesApertura";
 
 import { totalDesglose, desgloseVacio } from "@/lib/caja/conteoBilletes";
+import { evaluarDesproporcionDesglose } from "@/lib/caja/desgloseServidor";
 import { calcularDiferencia } from "@/lib/caja/efectivoEsperado";
 import {
   evaluarRecepcionCambio,
@@ -79,6 +80,9 @@ export default function AperturaConCambioPage() {
   const [desgloseRecibido, setDesgloseRecibido] = useState({});
   const [motivo, setMotivo] = useState("");
   const [confirmaComposicion, setConfirmaComposicion] = useState(false);
+  // El total en pesos que se escribe solo si lo contado está fuera de proporción
+  // con el sobre. Ver `evaluarDesproporcionDesglose`.
+  const [totalConfirmado, setTotalConfirmado] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [resultado, setResultado] = useState(null);
 
@@ -161,9 +165,19 @@ export default function AperturaConCambioPage() {
     [totalEsperado, totalRecibido, motivo, cambio?.desglose, desgloseRecibido, confirmaComposicion]
   );
 
+  // El error ×1000: cantidad de billetes escrita como monto. MISMA función que
+  // el servidor, con lo que dice el sobre como referencia.
+  const controlTotal = {
+    referencia: totalEsperado,
+    etiquetaReferencia: "lo que dice el sobre",
+    totalConfirmado,
+    onTotalConfirmado: setTotalConfirmado,
+  };
+  const proporcion = evaluarDesproporcionDesglose({ desglose: desgloseRecibido, ...controlTotal });
+
   const clase = evaluacion.clase ?? RECEPCION.COINCIDE;
   const filasComposicion = evaluacion.composicion?.filas ?? [];
-  const puedeConfirmar = hayConteo && evaluacion.valido;
+  const puedeConfirmar = hayConteo && evaluacion.valido && proporcion.valido;
 
   // ── Borrador ─────────────────────────────────────────────────────────────
   const persistir = useCallback(() => {
@@ -216,6 +230,7 @@ export default function AperturaConCambioPage() {
           desgloseRecibido,
           motivoDiferencia: motivo.trim() || null,
           confirmaComposicion,
+          totalConfirmado: totalConfirmado === "" ? null : totalConfirmado,
         }),
       });
       const json = await res.json();
@@ -362,6 +377,7 @@ export default function AperturaConCambioPage() {
             desglose={desgloseRecibido}
             onCambiar={setDesgloseRecibido}
             idPrefijo="recibido"
+            {...controlTotal}
           />
         </SunmiCard>
 

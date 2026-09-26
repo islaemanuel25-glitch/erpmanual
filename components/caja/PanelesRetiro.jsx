@@ -78,18 +78,21 @@ function Bloque({ titulo, ayuda, children, className = "", alineado = false }) {
  *
  * El total es SOLO LECTURA: es la suma de las filas, no un dato que se ingrese.
  */
-export function PanelConteo({ desglose, onDesglose, horaConteo }) {
+export function PanelConteo({ desglose, onDesglose, horaConteo, controlTotal }) {
   return (
     <Bloque
       titulo="Contar todo el efectivo del cajón"
       ayuda="Ingresá la cantidad de billetes de cada denominación. El total se calcula automáticamente."
       alineado
     >
+      {/* `controlTotal`: la referencia y el total escrito en pesos para el aviso
+          de desproporción. Ver `TablaDenominaciones`. */}
       <TablaDenominaciones
         desglose={desglose}
         onCambiar={onDesglose}
         idPrefijo="conteo"
         titulo="Cantidad en el cajón"
+        {...controlTotal}
       />
 
       {/* El problema operativo real: si el mismo cajón sigue recibiendo plata
@@ -310,7 +313,7 @@ export function PanelCambioSeparado({ desglose = {}, total = 0, nota = null, cla
  * pide a la persona: una sola pila, la que se lleva, sin volver a tocar lo que
  * ya apartó.
  */
-export function PanelConteoRetiro({ desglose, onDesglose, horaConteo, aviso }) {
+export function PanelConteoRetiro({ desglose, onDesglose, horaConteo, aviso, controlTotal }) {
   return (
     <Bloque
       titulo="Contar el dinero retirado"
@@ -322,6 +325,7 @@ export function PanelConteoRetiro({ desglose, onDesglose, horaConteo, aviso }) {
         onCambiar={onDesglose}
         idPrefijo="retiro"
         titulo="Cantidad retirada"
+        {...controlTotal}
       />
       {aviso && <Aviso tono="info">{aviso}</Aviso>}
       {horaConteo && (

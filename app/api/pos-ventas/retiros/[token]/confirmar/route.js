@@ -20,7 +20,11 @@
 // de la preparación. O pasan las tres cosas o no pasa ninguna.
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { validarDesgloseServidor } from "@/lib/caja/desgloseServidor";
+import {
+  validarDesgloseServidor,
+  evaluarDesproporcionDesglose,
+  respuestaDesproporcion,
+} from "@/lib/caja/desgloseServidor";
 import { clasificarDiferencia } from "@/lib/caja/efectivoEsperado";
 import { TIPO_PARCIAL } from "@/lib/caja/arqueo";
 import { WHERE_TURNO_OPERATIVO } from "@/lib/caja/cierreRelevo";
@@ -79,6 +83,18 @@ export async function POST(req, context) {
     });
     if (!conteo.valido) {
       return NextResponse.json({ ok: false, error: conteo.error }, { status: 400 });
+    }
+
+    // El error ×1000 en lo retirado, contra el retiro esperado congelado en el
+    // corte. Ver `evaluarDesproporcionDesglose`.
+    const proporcion = evaluarDesproporcionDesglose({
+      desglose: conteo.desglose,
+      referencia: Number(retiro.efectivoRetiradoEsperado),
+      etiquetaReferencia: "el retiro que el sistema espera",
+      totalConfirmado: body?.totalConfirmado,
+    });
+    if (!proporcion.valido) {
+      return NextResponse.json(respuestaDesproporcion(proporcion), { status: 400 });
     }
 
     const cuentas = calcularRetiroDesdeConteo({

@@ -493,6 +493,77 @@ const CASOS = [
     inyecciones: [{ de: "        cerrado: estadoDelTurno(turno) === ESTADO_TURNO.CERRADO,\n", a: "" }],
     esperadas: ["D19 Finanzas dice 'cerrado sin conteo', no 'turno abierto'", "D19 sin diferencia inventada"],
   },
+  // ── El error ×1000: la cantidad de billetes escrita como monto ────────────
+  // Una por cada camino donde ya ocurrió en producción, más la confirmación.
+  {
+    n: "CC-13",
+    defecto: "la recepción de sobre vuelve a aceptar {1000: 23000} contra un sobre de $23.000",
+    archivo: "app/api/pos-ventas/turnos/abrir-con-cambio/route.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 100,
+    inyecciones: [{ de: "      if (!proporcion.valido) {", a: "      if (false) {" }],
+    esperadas: [
+      "E1 A: {1000: 23000} contra un sobre de $23.000 NO pasa, aunque traiga motivo",
+      "E1 A: el sobre sigue reservado y sin destino",
+    ],
+  },
+  {
+    n: "CC-14",
+    defecto: "el corte de cierre vuelve a aceptar {1000: 23000} de cambio con $45.000 esperados",
+    archivo: "app/api/pos-ventas/cierres/iniciar/route.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 100,
+    inyecciones: [{ de: "      if (!proporcion.valido) {", a: "      if (false) {" }],
+    esperadas: [
+      "E4 C: dejar {1000: 23000} de cambio con $45.000 esperados NO pasa",
+      "E4 C: no se tomó el corte",
+    ],
+  },
+  {
+    n: "CC-15",
+    defecto: "el conteo del cierre pierde su referencia y acepta {1000: 8000} contra $8.000",
+    archivo: "app/api/pos-ventas/cierres/[token]/confirmar/route.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 100,
+    inyecciones: [
+      { de: "        referencia: Number(cierre.efectivoRetiradoEsperado),", a: "        referencia: 0," },
+    ],
+    esperadas: [
+      "E5 C: contar {1000: 8000} de retiro con $8.000 esperados NO cierra",
+      "E5 C: no hay arqueo final",
+    ],
+  },
+  {
+    n: "CC-16",
+    defecto: "el retiro parcial vuelve a aceptar el ×1000 en el cambio y en el conteo",
+    archivo: "app/api/pos-ventas/retiros/iniciar/route.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 100,
+    inyecciones: [{ de: "      if (!proporcion.valido) {", a: "      if (false) {" }],
+    esperadas: ["E8 C: el retiro con {1000: 23000} de cambio y $45.000 esperados NO arranca"],
+  },
+  {
+    n: "CC-17",
+    defecto: "la confirmación del retiro pierde su referencia",
+    archivo: "app/api/pos-ventas/retiros/[token]/confirmar/route.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 100,
+    inyecciones: [
+      { de: "      referencia: Number(retiro.efectivoRetiradoEsperado),", a: "      referencia: 0," },
+    ],
+    esperadas: ["E9 C: contar {1000: 43000} con $43.000 de retiro esperado NO confirma", "E9 C: no hay movimiento"],
+  },
+  {
+    n: "CC-18",
+    defecto: "cualquier total escrito en pesos destraba, coincida o no con lo cargado",
+    archivo: "lib/caja/desgloseServidor.js",
+    suite: "scripts/pruebas-db/cierreCaja.mjs",
+    minimo: 100,
+    inyecciones: [
+      { de: "  if (escrito !== null && aCentavos(escrito) === aCentavos(total)) {", a: "  if (escrito !== null) {" },
+    ],
+    esperadas: ["E2 A: escribir $23.000 —lo que se creía contar— no lo destraba"],
+  },
 ];
 
 // Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número

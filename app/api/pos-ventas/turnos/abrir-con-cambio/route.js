@@ -15,7 +15,11 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireOperadorSegunConfig } from "@/lib/operador";
-import { validarDesgloseServidor } from "@/lib/caja/desgloseServidor";
+import {
+  validarDesgloseServidor,
+  evaluarDesproporcionDesglose,
+  respuestaDesproporcion,
+} from "@/lib/caja/desgloseServidor";
 import {
   ESTADO_CAMBIO,
   WHERE_TURNO_OPERATIVO,
@@ -95,6 +99,22 @@ export async function POST(req) {
       if (!esReservaPropia(sobre, { usuarioId: session.id, operadorId: gateOp.operadorId ?? null })) {
         const e = new Error("Este cambio está reservado por otro operador.");
         e.codigo = "conflicto";
+        throw e;
+      }
+
+      // El error ×1000: la cantidad de billetes escrita como monto. Va ANTES de
+      // la comparación, porque la comparación lo tomaba como un sobrante más y
+      // lo dejaba pasar con cualquier motivo. Ver `evaluarDesproporcionDesglose`.
+      const proporcion = evaluarDesproporcionDesglose({
+        desglose: recibido.desglose,
+        referencia: Number(sobre.total),
+        etiquetaReferencia: "lo que dice el sobre",
+        totalConfirmado: body?.totalConfirmado,
+      });
+      if (!proporcion.valido) {
+        const e = new Error(proporcion.error);
+        e.codigo = "desproporcionado";
+        e.proporcion = proporcion;
         throw e;
       }
 
@@ -225,6 +245,9 @@ export async function POST(req) {
     }
     if (error?.codigo === "conflicto") {
       return NextResponse.json({ ok: false, error: error.message }, { status: 409 });
+    }
+    if (error?.codigo === "desproporcionado") {
+      return NextResponse.json(respuestaDesproporcion(error.proporcion), { status: 400 });
     }
     if (error?.codigo === "recepcion_invalida") {
       return NextResponse.json(

@@ -9,7 +9,10 @@
 //
 // Las denominaciones tampoco se declaran acá: vienen de lib/caja/conteoBilletes.
 
+import { TriangleAlert } from "lucide-react";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import SunmiAviso from "@/components/sunmi/SunmiAviso";
+import { evaluarDesproporcionDesglose } from "@/lib/caja/desgloseServidor";
 import {
   DENOMINACIONES,
   CLAVE_MONEDAS,
@@ -38,8 +41,23 @@ export default function TablaDenominaciones({
   topes = null,
   idPrefijo = "den",
   titulo,
+  // Lo que el sistema tiene como esperable en este punto —lo que dice el sobre,
+  // el efectivo o el retiro esperado— y cómo se llama. Sin referencia no hay
+  // aviso de desproporción: no hay contra qué comparar.
+  referencia = null,
+  etiquetaReferencia,
+  // El total que la persona escribe en pesos cuando lo cargado está fuera de
+  // proporción. Lo guarda la página, que es la que lo manda al servidor.
+  totalConfirmado = "",
+  onTotalConfirmado,
 }) {
   const total = totalDesglose(desglose);
+  const proporcion = evaluarDesproporcionDesglose({
+    desglose,
+    referencia,
+    etiquetaReferencia,
+    totalConfirmado,
+  });
 
   const setCantidad = (clave, valor) => {
     onCambiar?.({ ...desglose, [clave]: valor });
@@ -146,6 +164,52 @@ export default function TablaDenominaciones({
         <span className="text-sm font-semibold sunmi-text-muted">Total</span>
         <span className="text-lg font-bold font-mono tabular-nums sunmi-text-accent">{money(total)}</span>
       </div>
+
+      {proporcion.desproporcionado && (
+        <ConfirmarTotalEnPesos
+          proporcion={proporcion}
+          idPrefijo={idPrefijo}
+          totalConfirmado={totalConfirmado}
+          onTotalConfirmado={onTotalConfirmado}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * El total fuera de proporción con la referencia: casi seguro, un monto escrito
+ * donde va una cantidad. No se corrige nada; se pide escribir el total en pesos.
+ * Quien confundió las columnas escribe lo que cree haber contado, no coincide, y
+ * el error queda a la vista. La regla es la del servidor, no una propia.
+ */
+function ConfirmarTotalEnPesos({ proporcion, idPrefijo, totalConfirmado, onTotalConfirmado }) {
+  const id = `${idPrefijo}-total-pesos`;
+  return (
+    <div className="space-y-2" data-desglose-desproporcionado>
+      <SunmiAviso
+        icon={TriangleAlert}
+        tono={proporcion.confirmado ? "warning" : "danger"}
+        titulo={proporcion.confirmado ? "Total confirmado en pesos" : "¿Cantidad o monto?"}
+      >
+        {proporcion.confirmado
+          ? `Confirmaste que contaste ${money(proporcion.total)}.`
+          : proporcion.error}
+      </SunmiAviso>
+      <label htmlFor={id} className="block text-sm2 font-semibold sunmi-text-strong">
+        Total contado, en pesos
+      </label>
+      <SunmiInput
+        id={id}
+        type="number"
+        min="0"
+        step="0.01"
+        inputMode="decimal"
+        value={totalConfirmado ?? ""}
+        onChange={(e) => onTotalConfirmado?.(e.target.value)}
+        placeholder="0.00"
+        className="tabular-nums"
+      />
     </div>
   );
 }
