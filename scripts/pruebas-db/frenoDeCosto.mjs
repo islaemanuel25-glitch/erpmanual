@@ -36,7 +36,7 @@ const { ESTADO_LINEA, costoPropioParaDecidir, estadoDeLinea, hayQueDecidirElPrec
   "../../lib/compras-proveedor/estadoDeLineaFacturada.js"
 );
 const { PERMISO_REGISTRAR_PAGOS } = await import("../../lib/finanzas/pagosProveedores.js");
-const { DECISION_DE_PRECIO } = await import("../../lib/compras-proveedor/decisionDePrecio.js");
+const { DECISION_DE_PRECIO, decisionVigente } = await import("../../lib/compras-proveedor/decisionDePrecio.js");
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ARNÉS — el formato que lee `contrapruebasRevision.mjs`.
@@ -605,6 +605,185 @@ async function correr(f) {
   const excluidosME = await excluidosDeLaPantalla(f, me);
   igual("M-E: no se excluye", excluidosME, []);
   await frenaSinDejarNada(f, me, "M-E", { costosExcluidos: excluidosME });
+
+  // ── LA CARRERA: EL CATÁLOGO SE MUEVE ENTRE DECIDIR Y CERRAR ────────────
+  //
+  // La decisión guarda el catálogo que el servidor vio al tomarla. Si al
+  // cerrar el catálogo ya es otro, la decisión no autoriza nada y la hoja
+  // vuelve a preguntar contra el número de hoy.
+  //
+  // Aceptar 1.000 con el catálogo en 1.300 lo frena la regla de siempre —una
+  // baja del 23 % no se acepta de un clic, ver M-B—, así que los casos de
+  // aceptar parten del catálogo en 800.
+
+  seccion("N1. Aceptar sin carrera: la decisión guarda el catálogo y vale");
+  const n1 = await pedidoCon(f, { nombre: "N1", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
+  await moverCatalogo(n1, 800);
+  const renglonN1 = await papelCon(f, n1, { cantidad: 2, netoUnitario: 826.45 }); // 1.000 final
+  const aceptaN1 = await aceptarPrecio(f, n1, renglonN1);
+  ok("N1: aceptar contesta 200", aceptaN1.status === 200 && aceptaN1.ok, `${aceptaN1.status} ${aceptaN1.error || ""}`);
+  igual("N1: la decisión guarda el catálogo observado, 800", (await decisionDe(n1))?.observado, 800);
+  const [filaN1] = await filasDeLaPantalla(f, n1);
+  ok("N1: vigente, la hoja no pregunta", hayQueDecidirElPrecio(filaN1) === false);
+  await cierraYEscribe(f, n1, "N1", 1000, { costosExcluidos: await excluidosDeLaPantalla(f, n1) });
+
+  seccion("N2. Aceptar con carrera: el catálogo pasa a 1.500 antes de cerrar");
+  const n2 = await pedidoCon(f, { nombre: "N2", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
+  await moverCatalogo(n2, 800);
+  const renglonN2 = await papelCon(f, n2, { cantidad: 2, netoUnitario: 826.45 });
+  const aceptaN2 = await aceptarPrecio(f, n2, renglonN2);
+  ok("N2: aceptar contra 800 contesta 200", aceptaN2.status === 200 && aceptaN2.ok, `${aceptaN2.status} ${aceptaN2.error || ""}`);
+  await moverCatalogo(n2, 1500);
+  const [filaN2] = await filasDeLaPantalla(f, n2);
+  ok("N2: la decisión ya no está vigente", decisionVigente(filaN2) === null);
+  ok("N2: la hoja vuelve a preguntar", hayQueDecidirElPrecio(filaN2) === true);
+  igual("N2: y muestra el catálogo de hoy", costoPropioParaDecidir(filaN2), 1500);
+  const excluidosN2 = await excluidosDeLaPantalla(f, n2);
+  igual("N2: no se excluye", excluidosN2, []);
+  await frenaSinDejarNada(f, n2, "N2 aceptación vieja", { costosExcluidos: excluidosN2 });
+  igual("N2: el catálogo sigue en 1.500", (await foto(f, n2)).costo, 1500);
+  await frenaSinDejarNada(f, n2, "N2 reintento con la aceptación vieja", { costosExcluidos: excluidosN2 });
+
+  seccion("N3. Volver a decidir contra el catálogo nuevo");
+  // Contra 1.500 aceptar 1.000 es una baja de 33 %: la hoja ofrece dejar.
+  const reAceptaN2 = await aceptarPrecio(f, n2, renglonN2);
+  ok("N3: aceptar contra 1.500 lo frena la regla de siempre", reAceptaN2.status === 409, `${reAceptaN2.status}`);
+  const dejaN2 = await aceptarPrecio(f, n2, renglonN2, DECISION_DE_PRECIO.DEJA_EL_MIO);
+  ok("N3: dejar el que tenía contesta 200", dejaN2.status === 200 && dejaN2.ok, `${dejaN2.status} ${dejaN2.error || ""}`);
+  igual("N3: la decisión nueva guarda 1.500", (await decisionDe(n2))?.observado, 1500);
+  const [filaN3] = await filasDeLaPantalla(f, n2);
+  ok("N3: ya no pregunta", hayQueDecidirElPrecio(filaN3) === false);
+  const excluidosN3 = await excluidosDeLaPantalla(f, n2);
+  igual("N3: se excluye esa línea", excluidosN3, [n2.detId]);
+  const cierreN3 = await cierraYEscribe(f, n2, "N3", 1500, { costosExcluidos: excluidosN3 });
+  igualStock("N3: el stock sumó 2", cierreN3.despues.stock - cierreN3.antes.stock, 2);
+
+  // Y la otra salida: el catálogo se mueve poco, se vuelve a aceptar y se
+  // escribe lo aceptado con la decisión nueva.
+  const n3b = await pedidoCon(f, { nombre: "N3b", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
+  await moverCatalogo(n3b, 800);
+  const renglonN3b = await papelCon(f, n3b, { cantidad: 2, netoUnitario: 826.45 });
+  await aceptarPrecio(f, n3b, renglonN3b);
+  await moverCatalogo(n3b, 850);
+  await frenaSinDejarNada(f, n3b, "N3b aceptada contra 800, catálogo en 850");
+  const [filaN3b] = await filasDeLaPantalla(f, n3b);
+  ok("N3b: la hoja vuelve a preguntar", hayQueDecidirElPrecio(filaN3b) === true);
+  const reAceptaN3b = await aceptarPrecio(f, n3b, renglonN3b);
+  ok("N3b: volver a aceptar contesta 200", reAceptaN3b.status === 200 && reAceptaN3b.ok, `${reAceptaN3b.status} ${reAceptaN3b.error || ""}`);
+  igual("N3b: la decisión nueva guarda 850", (await decisionDe(n3b))?.observado, 850);
+  await cierraYEscribe(f, n3b, "N3b", 1000, { costosExcluidos: await excluidosDeLaPantalla(f, n3b) });
+
+  seccion("N4. Dejar sin carrera: igual que siempre");
+  const n4 = await pedidoCon(f, { nombre: "N4", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
+  await moverCatalogo(n4, 1300);
+  const renglonN4 = await papelCon(f, n4, { cantidad: 2, netoUnitario: 826.45 });
+  await aceptarPrecio(f, n4, renglonN4, DECISION_DE_PRECIO.DEJA_EL_MIO);
+  igual("N4: la decisión guarda 1.300", (await decisionDe(n4))?.observado, 1300);
+  const excluidosN4 = await excluidosDeLaPantalla(f, n4);
+  igual("N4: se excluye", excluidosN4, [n4.detId]);
+  await cierraYEscribe(f, n4, "N4", 1300, { costosExcluidos: excluidosN4 });
+
+  seccion("N5. Dejar con carrera: 1.300 → 1.500 vuelve a preguntar");
+  const n5 = await pedidoCon(f, { nombre: "N5", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
+  await moverCatalogo(n5, 1300);
+  const renglonN5 = await papelCon(f, n5, { cantidad: 2, netoUnitario: 826.45 });
+  await aceptarPrecio(f, n5, renglonN5, DECISION_DE_PRECIO.DEJA_EL_MIO);
+  const excluidosViejosN5 = await excluidosDeLaPantalla(f, n5); // pantalla abierta antes del cambio
+  await moverCatalogo(n5, 1500);
+  const [filaN5] = await filasDeLaPantalla(f, n5);
+  ok("N5: la decisión ya no está vigente", decisionVigente(filaN5) === null);
+  ok("N5: la hoja vuelve a preguntar", hayQueDecidirElPrecio(filaN5) === true);
+  igual("N5: mostrando 1.500", costoPropioParaDecidir(filaN5), 1500);
+  const excluidosN5 = await excluidosDeLaPantalla(f, n5);
+  igual("N5: recargada, la pantalla ya no la excluye", excluidosN5, []);
+  await frenaSinDejarNada(f, n5, "N5", { costosExcluidos: excluidosN5 });
+  // Una pantalla abierta ANTES del cambio todavía manda la exclusión vieja. El
+  // servidor no puede distinguirla de una exclusión a mano, pero excluir no
+  // escribe: el 1.500 queda intacto.
+  igual("N5: la pantalla vieja mandaba la exclusión", excluidosViejosN5, [n5.detId]);
+  await cierraYEscribe(f, n5, "N5 pantalla vieja: no pisa el catálogo", 1500, { costosExcluidos: excluidosViejosN5 });
+
+  seccion("N6. Dos líneas: una decisión vigente, otra vieja");
+  const n6a = await pedidoCon(f, { nombre: "N6a", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
+  const n6b = await pedidoCon(f, { nombre: "N6b", base: UNIDAD, catalogo: 1000, linea: { cantidad: 3, unidad: "UNIDAD", precioCosto: 1000 } });
+  await prisma.pedidoProveedorDetalle.update({ where: { id: n6b.detId }, data: { pedidoId: n6a.pedidoId } });
+  const n6bEnA = { ...n6b, pedidoId: n6a.pedidoId };
+  await moverCatalogo(n6a, 1300);
+  await moverCatalogo(n6b, 800);
+  const renglonN6a = await papelCon(f, n6a, { cantidad: 2, netoUnitario: 826.45 });
+  const renglonN6b = await papelCon(f, n6bEnA, { cantidad: 3, netoUnitario: 826.45 });
+  await aceptarPrecio(f, n6a, renglonN6a, DECISION_DE_PRECIO.DEJA_EL_MIO);
+  const aceptaN6b = await aceptarPrecio(f, n6bEnA, renglonN6b);
+  ok("N6: B aceptada contra 800", aceptaN6b.status === 200 && aceptaN6b.ok, `${aceptaN6b.status} ${aceptaN6b.error || ""}`);
+  await moverCatalogo(n6b, 1500);
+  const excluidosN6 = await excluidosDeLaPantalla(f, n6a);
+  igual("N6: se excluye A y solo A", excluidosN6, [n6a.detId]);
+  const antesN6 = [await foto(f, n6a), await foto(f, n6bEnA)];
+  const r6 = await cerrar(f, n6a, { recibidos: { [n6a.detId]: 2, [n6b.detId]: 3 }, costosExcluidos: excluidosN6 });
+  ok("N6: la aceptación vieja de B frena el pedido entero (409)", r6.status === 409, `${r6.status} ${r6.error || ""}`);
+  ok("N6: y el aviso nombra a B", (r6.error || "").includes("N6b"), r6.error);
+  igual(
+    "N6: rollback total: nada de A ni de B, catálogos intactos",
+    [await foto(f, n6a), await foto(f, n6bEnA)],
+    antesN6.map((x) => ({ ...x, estado: "ENVIADO", cuentas: 0, pagos: 0 }))
+  );
+
+  seccion("N7. Decisiones históricas con lo observado en NULL");
+  // Son las anteriores a la columna: la migración no las rellena. La única
+  // forma de tener una en esta base es la de producción —una fila vieja—, así
+  // que se toma una decisión real y se le borra lo observado, como quedó toda
+  // decisión previa a la migración.
+  const n7 = await pedidoCon(f, { nombre: "N7", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
+  await moverCatalogo(n7, 800);
+  const renglonN7 = await papelCon(f, n7, { cantidad: 2, netoUnitario: 826.45 });
+  await aceptarPrecio(f, n7, renglonN7);
+  await prisma.decisionDePrecioProveedor.updateMany({ where: { productoBaseId: n7.baseId }, data: { costoMaestroObservado: null } });
+  const [filaN7] = await filasDeLaPantalla(f, n7);
+  ok("N7: una ACEPTA histórica no vale", decisionVigente(filaN7) === null);
+  ok("N7: la hoja pregunta", hayQueDecidirElPrecio(filaN7) === true);
+  await frenaSinDejarNada(f, n7, "N7 ACEPTA histórica, pedido ENVIADO");
+  igual("N7: ni la conciliación ni el cierre la rellenaron", (await decisionDe(n7))?.observado, null);
+  const reAceptaN7 = await aceptarPrecio(f, n7, renglonN7);
+  ok("N7: se vuelve a aceptar", reAceptaN7.status === 200 && reAceptaN7.ok, `${reAceptaN7.status} ${reAceptaN7.error || ""}`);
+  igual("N7: ahora con lo observado", (await decisionDe(n7))?.observado, 800);
+  await cierraYEscribe(f, n7, "N7 después de volver a aceptar", 1000, { costosExcluidos: await excluidosDeLaPantalla(f, n7) });
+
+  const n7d = await pedidoCon(f, { nombre: "N7d", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
+  await moverCatalogo(n7d, 1300);
+  const renglonN7d = await papelCon(f, n7d, { cantidad: 2, netoUnitario: 826.45 });
+  await aceptarPrecio(f, n7d, renglonN7d, DECISION_DE_PRECIO.DEJA_EL_MIO);
+  await prisma.decisionDePrecioProveedor.updateMany({ where: { productoBaseId: n7d.baseId }, data: { costoMaestroObservado: null } });
+  const excluidosN7d = await excluidosDeLaPantalla(f, n7d);
+  igual("N7: una DEJA histórica no excluye", excluidosN7d, []);
+  await frenaSinDejarNada(f, n7d, "N7 DEJA histórica", { costosExcluidos: excluidosN7d });
+  await aceptarPrecio(f, n7d, renglonN7d, DECISION_DE_PRECIO.DEJA_EL_MIO);
+  await cierraYEscribe(f, n7d, "N7 DEJA confirmada de nuevo", 1300, { costosExcluidos: await excluidosDeLaPantalla(f, n7d) });
+
+  seccion("N8. Reintento y dos cierres a la vez");
+  const antesN8 = await foto(f, n1);
+  const r8 = await cerrar(f, n1);
+  ok("N8: el reintento de N1 contesta repetido", r8.status === 200 && r8.repetido === true, `${r8.status} ${r8.error || ""}`);
+  igual("N8: sin cambios", await foto(f, n1), antesN8);
+  const n8 = await pedidoCon(f, { nombre: "N8", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
+  await moverCatalogo(n8, 800);
+  const renglonN8 = await papelCon(f, n8, { cantidad: 2, netoUnitario: 826.45 });
+  await aceptarPrecio(f, n8, renglonN8);
+  const antesN8b = await foto(f, n8);
+  const dos = await Promise.all([cerrar(f, n8), cerrar(f, n8)]);
+  ok("N8: de dos cierres simultáneos, uno solo cierra de verdad", dos.filter((r) => r.status === 200 && !r.repetido).length === 1, JSON.stringify(dos.map((r) => [r.status, r.repetido ?? null, r.error ?? null])));
+  const despuesN8 = await foto(f, n8);
+  igualStock("N8: el stock sumó 2 una sola vez", despuesN8.stock - antesN8b.stock, 2);
+  igual("N8: una cuenta y un pago", [despuesN8.cuentas, despuesN8.pagos, despuesN8.costo], [1, 1, 1000]);
+}
+
+/** Lo que quedó guardado de la decisión del producto, con lo observado en número o null. */
+async function decisionDe(p) {
+  const d = await prisma.decisionDePrecioProveedor.findFirst({
+    where: { productoBaseId: p.baseId },
+    select: { decision: true, costoMaestroObservado: true },
+  });
+  if (!d) return null;
+  return { decision: d.decision, observado: d.costoMaestroObservado == null ? null : Number(d.costoMaestroObservado) };
 }
 
 /** El stock en milésimas, como el resto del repo. */
