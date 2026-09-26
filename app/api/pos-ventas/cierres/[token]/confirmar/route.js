@@ -32,6 +32,7 @@ import {
   ESTADO_CIERRE,
   ESTADO_CAMBIO,
   cierreConfirmable,
+  motivoNoConfirmable,
   calcularCierreDesdeConteo,
   calcularCierreDesdeRetiro,
   unirDesgloses,
@@ -73,7 +74,7 @@ export async function POST(req, context) {
     }
     if (!cierreConfirmable(cierre)) {
       return NextResponse.json(
-        { ok: false, error: "Este cierre fue cancelado y no se puede confirmar." },
+        { ok: false, error: motivoNoConfirmable(cierre) },
         { status: 409 }
       );
     }
@@ -184,7 +185,7 @@ export async function POST(req, context) {
         return { yaEstaba: filaCierre, repetido: true };
       }
       if (!cierreConfirmable(filaCierre)) {
-        const e = new Error("Este cierre fue cancelado y no se puede confirmar.");
+        const e = new Error(motivoNoConfirmable(filaCierre));
         e.codigo = "conflicto";
         throw e;
       }

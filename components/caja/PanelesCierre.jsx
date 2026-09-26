@@ -211,7 +211,11 @@ export function FilasResumenCierre({ corteEn, operadorNombre }) {
  * Existe porque el corte ya congeló un turno: si nadie encuentra ese cierre, esa
  * caja queda trabada sin que se sepa por qué.
  */
-export function FilaCierrePendiente({ item, onContinuar }) {
+// `onCerrarSinConteo` lo pasa la pantalla SOLO si el usuario tiene el permiso, y
+// el botón aparece SOLO si el corte ya venció: `atrasado` lo calcula el servidor
+// con `venceEn`, el mismo criterio que la ruta aplica al resolver.
+export function FilaCierrePendiente({ item, onContinuar, onCerrarSinConteo }) {
+  const ofreceSinConteo = Boolean(onCerrarSinConteo) && item.atrasado === true;
   return (
     <div className="sunmi-surface sunmi-border rounded-lg p-3 flex items-start justify-between gap-3">
       <div className="min-w-0 space-y-0.5">
@@ -229,13 +233,20 @@ export function FilaCierrePendiente({ item, onContinuar }) {
           )}
         </div>
       </div>
-      <SunmiButton
-        color="amber"
-        onClick={() => onContinuar?.(item)}
-        className="shrink-0 py-2 px-3 text-xs font-bold"
-      >
-        Continuar cierre
-      </SunmiButton>
+      <div className="shrink-0 flex flex-col items-stretch gap-2">
+        <SunmiButton
+          color="amber"
+          onClick={() => onContinuar?.(item)}
+          className="py-2 px-3 text-xs font-bold"
+        >
+          Continuar cierre
+        </SunmiButton>
+        {ofreceSinConteo && (
+          <SunmiButton color="slate" onClick={() => onCerrarSinConteo(item)} className="py-2 px-3 text-xs">
+            Cerrar sin conteo
+          </SunmiButton>
+        )}
+      </div>
     </div>
   );
 }

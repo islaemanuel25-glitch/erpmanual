@@ -64,6 +64,7 @@ import {
   calcularRetiroDesdeCambio,
 } from "@/lib/caja/conteoBilletes";
 import { calcularDiferencia } from "@/lib/caja/efectivoEsperado";
+import { ESTADO_CIERRE } from "@/lib/caja/cierreRelevo";
 import {
   armarBorradorCierre,
   armarBorradorCierreLegado,
@@ -147,6 +148,17 @@ export default function CierrePorTokenPage() {
           setErrorFatal(r?.error || "No se encontró este cierre.");
           return;
         }
+        // Resuelto sin conteo: no queda nada que contar, y el formulario de
+        // conteo sería una invitación a confirmar algo que ya se cerró.
+        if (r.cierre?.estado === ESTADO_CIERRE.CERRADO_SIN_CONTEO) {
+          setErrorFatal(
+            `Este cierre ya se resolvió sin conteo${
+              r.cierre.motivoCierreSinConteo ? `: ${r.cierre.motivoCierreSinConteo}` : "."
+            }`
+          );
+          return;
+        }
+
         setDatos(r);
 
         if (r.cierre?.estado === "CONFIRMADO") {

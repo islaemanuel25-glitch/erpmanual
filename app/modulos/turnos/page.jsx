@@ -15,7 +15,13 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
-import { estadoDelTurno, ESTADO_TURNO } from "@/lib/caja/cierreRelevo";
+import {
+  estadoDelTurno,
+  ESTADO_TURNO,
+  turnoSinConteo,
+  TEXTO_SIN_CONTAR,
+  TEXTO_DIFERENCIA_NO_DISPONIBLE,
+} from "@/lib/caja/cierreRelevo";
 
 const fmt = (n) =>
   n != null
@@ -388,7 +394,13 @@ export default function TurnosPage() {
                       </td>
                       <td className="px-3 py-2 text-sm text-right">{fmt(t.montoInicial)}</td>
                       <td className="px-3 py-2 text-sm text-right">{fmt(t.montoEsperadoEfectivo)}</td>
-                      <td className="px-3 py-2 text-sm text-right">{fmt(t.montoRealEfectivo)}</td>
+                      <td className="px-3 py-2 text-sm text-right">
+                        {turnoSinConteo(t) ? (
+                          <span className="sunmi-text-muted">{TEXTO_SIN_CONTAR}</span>
+                        ) : (
+                          fmt(t.montoRealEfectivo)
+                        )}
+                      </td>
                       <td
                         className={`px-3 py-2 text-sm text-right font-semibold ${
                           t.diferenciaEfectivo != null && t.diferenciaEfectivo < 0
@@ -398,7 +410,11 @@ export default function TurnosPage() {
                             : ""
                         }`}
                       >
-                        {fmt(t.diferenciaEfectivo)}
+                        {turnoSinConteo(t) ? (
+                          <span className="sunmi-text-muted font-normal">{TEXTO_DIFERENCIA_NO_DISPONIBLE}</span>
+                        ) : (
+                          fmt(t.diferenciaEfectivo)
+                        )}
                       </td>
                       {/* "—" cuando el turno es ANTERIOR al circuito del dinero:
                           mostrar 0 haría creer que no se retiró nada, cuando en
@@ -407,7 +423,7 @@ export default function TurnosPage() {
                         {t.efectivoRetiradoCierre != null ? (
                           fmt(t.efectivoRetiradoCierre)
                         ) : (
-                          <span className="sunmi-text-muted">—</span>
+                          <span className="sunmi-text-muted">{turnoSinConteo(t) ? TEXTO_SIN_CONTAR : "—"}</span>
                         )}
                       </td>
                       <td className="px-3 py-2 text-sm text-right sunmi-text-link">
@@ -471,10 +487,10 @@ export default function TurnosPage() {
                       />
                       <Dato k="M. inicial" v={fmt(t.montoInicial)} />
                       <Dato k="Esperado" v={fmt(t.montoEsperadoEfectivo)} />
-                      <Dato k="Real" v={fmt(t.montoRealEfectivo)} />
+                      <Dato k="Real" v={turnoSinConteo(t) ? TEXTO_SIN_CONTAR : fmt(t.montoRealEfectivo)} />
                       <Dato
                         k="Diferencia"
-                        v={fmt(t.diferenciaEfectivo)}
+                        v={turnoSinConteo(t) ? TEXTO_DIFERENCIA_NO_DISPONIBLE : fmt(t.diferenciaEfectivo)}
                         clase={
                           t.diferenciaEfectivo != null && t.diferenciaEfectivo < 0
                             ? "sunmi-text-danger font-semibold"
@@ -485,7 +501,13 @@ export default function TurnosPage() {
                       />
                       <Dato
                         k="Se retiró"
-                        v={t.efectivoRetiradoCierre != null ? fmt(t.efectivoRetiradoCierre) : "—"}
+                        v={
+                          t.efectivoRetiradoCierre != null
+                            ? fmt(t.efectivoRetiradoCierre)
+                            : turnoSinConteo(t)
+                              ? TEXTO_SIN_CONTAR
+                              : "—"
+                        }
                       />
                       <Dato
                         k="Cambio dejado"

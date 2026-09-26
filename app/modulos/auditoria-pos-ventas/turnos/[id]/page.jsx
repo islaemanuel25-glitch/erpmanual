@@ -8,6 +8,7 @@ import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
 import { Printer, AlertTriangle, CheckCircle, MessageSquare } from "lucide-react";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
+import { turnoSinConteo, TEXTO_SIN_CONTAR, TEXTO_DIFERENCIA_NO_DISPONIBLE } from "@/lib/caja/cierreRelevo";
 
 function fmt(n) {
   return Number(n ?? 0).toLocaleString("es-AR", {
@@ -93,6 +94,9 @@ export default function DetalleTurnoPage() {
   if (!esAdmin && !permisos.includes("reportes.ver")) return <SinPermisos />;
 
   const franjaLabel = turno ? getFranjaLabel(turno.apertura) : "Turno";
+  // Cerrado sin contar: lo contado y la diferencia no se conocen. Se dicen, no se
+  // esconden: una casilla que falta se lee como un dato que se perdió.
+  const sinConteo = turno ? turnoSinConteo(turno) : false;
   const vendedorNombre = turno?.vendedor?.nombre || "Sin nombre";
 
   return (
@@ -246,17 +250,19 @@ export default function DetalleTurnoPage() {
                     <div className="font-bold tabular-nums">${fmt(turno.montoEsperadoEfectivo)}</div>
                   </div>
                 )}
-                {turno.montoRealEfectivo != null && (
+                {(turno.montoRealEfectivo != null || sinConteo) && (
                   <div>
                     <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-0.5">Real efectivo</div>
-                    <div className="font-bold tabular-nums">${fmt(turno.montoRealEfectivo)}</div>
+                    <div className="font-bold tabular-nums">
+                      {sinConteo ? TEXTO_SIN_CONTAR : <>${fmt(turno.montoRealEfectivo)}</>}
+                    </div>
                   </div>
                 )}
               </div>
             )}
 
             {/* Resultado arqueo */}
-            {turno.diferenciaEfectivo != null && (() => {
+            {(turno.diferenciaEfectivo != null || sinConteo) && (() => {
               const dif = turno.diferenciaEfectivo;
               if (dif === 0) return (
                 <div className="flex items-center gap-4 px-5 py-4 rounded-xl border border-green-200 bg-green-50 mb-6">
@@ -278,14 +284,23 @@ export default function DetalleTurnoPage() {
                   <div className="text-[18px] font-bold tabular-nums text-red-700">${fmt(Math.abs(dif))}</div>
                 </div>
               );
+              // El mismo cartel de advertencia que el sobrante, con sus palabras:
+              // un cierre sin conteo no es "caja cuadrada" ni un faltante, es una
+              // diferencia que no se conoce.
               return (
                 <div className="flex items-center gap-4 px-5 py-4 rounded-xl border border-amber-200 bg-amber-50 mb-6">
                   <AlertTriangle size={20} className="text-amber-600 flex-shrink-0" />
                   <div className="flex-1">
-                    <div className="text-[16px] font-bold text-amber-800">Sobrante de efectivo</div>
-                    <div className="text-[12px] text-amber-700">El cajero contó más de lo esperado</div>
+                    <div className="text-[16px] font-bold text-amber-800">
+                      {sinConteo ? "Cerrado sin conteo" : "Sobrante de efectivo"}
+                    </div>
+                    <div className="text-[12px] text-amber-700">
+                      {sinConteo ? "Nadie contó la caja: la diferencia no se conoce" : "El cajero contó más de lo esperado"}
+                    </div>
                   </div>
-                  <div className="text-[18px] font-bold tabular-nums text-amber-700">+${fmt(dif)}</div>
+                  <div className="text-[18px] font-bold tabular-nums text-amber-700">
+                    {sinConteo ? TEXTO_DIFERENCIA_NO_DISPONIBLE : <>+${fmt(dif)}</>}
+                  </div>
                 </div>
               );
             })()}

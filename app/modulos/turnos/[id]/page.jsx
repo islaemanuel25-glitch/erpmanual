@@ -9,7 +9,13 @@ import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import CircuitoDelDinero from "@/components/turnos/CircuitoDelDinero";
-import { estadoDelTurno, ESTADO_TURNO } from "@/lib/caja/cierreRelevo";
+import {
+  estadoDelTurno,
+  ESTADO_TURNO,
+  turnoSinConteo,
+  TEXTO_SIN_CONTAR,
+  TEXTO_DIFERENCIA_NO_DISPONIBLE,
+} from "@/lib/caja/cierreRelevo";
 import ArqueosDelTurno from "@/components/turnos/ArqueosDelTurno";
 import { ResultadoCierre, ComoSeCalculo, PagosNoEfectivo } from "@/components/turnos/ResumenCierre";
 import SunmiButton from "@/components/sunmi/SunmiButton";
@@ -40,6 +46,10 @@ const FORMA_PAGO_LABELS = {
   credito: "Credito",
   fiado: "Fiado",
 };
+
+// Un importe, o la palabra que dice por qué no hay. En el papel, "$-" se lee como
+// un cero; un turno cerrado sin conteo tiene que decir "Sin contar".
+const plataOTexto = (n, texto) => (n != null ? `$${fmt(n)}` : texto);
 
 function imprimirZReport(turno, resumen, movimientos) {
   const totalVentas =
@@ -77,7 +87,7 @@ function imprimirZReport(turno, resumen, movimientos) {
     ? `
 <div class="line"></div>
 <div class="center bold">ENTREGA DEL EFECTIVO</div>
-<div class="row"><span>Se retira:</span><span>$${fmt(turno.efectivoRetiradoCierre)}</span></div>
+<div class="row"><span>Se retira:</span><span>${plataOTexto(turno.efectivoRetiradoCierre, TEXTO_SIN_CONTAR)}</span></div>
 <div class="row bold"><span>Queda de cambio:</span><span>${fmt(turno.fondoDejadoCierre)}</span></div>
 ${turno.destinoRetiroCierre ? `<div class="row"><span>Destino:</span><span>${turno.destinoRetiroCierre}</span></div>` : ""}
 ${turno.recibidoPorCierre ? `<div class="row"><span>Recibe:</span><span>${turno.recibidoPorCierre}</span></div>` : ""}
@@ -130,8 +140,8 @@ ${movHtml}
 ${totalIngresos > 0 ? `<div class="row"><span>+ Ingresos:</span><span>$${fmt(totalIngresos)}</span></div>` : ""}
 ${totalRetiros > 0 ? `<div class="row"><span>- Retiros:</span><span>$${fmt(totalRetiros)}</span></div>` : ""}
 <div class="row bold"><span>Efectivo esperado:</span><span>$${fmt(esperado)}</span></div>
-<div class="row"><span>Efectivo contado:</span><span>$${fmt(turno.montoRealEfectivo)}</span></div>
-<div class="row bold"><span>Diferencia:</span><span>$${fmt(turno.diferenciaEfectivo)}</span></div>
+<div class="row"><span>Efectivo contado:</span><span>${plataOTexto(turno.montoRealEfectivo, TEXTO_SIN_CONTAR)}</span></div>
+<div class="row bold"><span>Diferencia:</span><span>${plataOTexto(turno.diferenciaEfectivo, TEXTO_DIFERENCIA_NO_DISPONIBLE)}</span></div>
 ${entregaHtml}
 ${obsHtml}
 <div class="line"></div>
@@ -430,6 +440,7 @@ export default function TurnoDetallePage() {
         turnoId={turno?.id}
         movimientos={movimientos}
         montoInicial={turno?.montoInicial}
+        sinConteo={turno ? turnoSinConteo(turno) : false}
       />
 
       {/* 7 · MOVIMIENTOS — una línea si no hay; tabla solo si el usuario la pide.

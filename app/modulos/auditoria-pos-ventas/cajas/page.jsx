@@ -14,6 +14,7 @@ import { useAuditoriaCajas } from "@/hooks/useAuditoriaCajas";
 import SinPermisos from "@/components/auth/SinPermisos";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
+import { TEXTO_SIN_CONTAR, TEXTO_DIFERENCIA_NO_DISPONIBLE } from "@/lib/caja/cierreRelevo";
 
 function fmt(n) {
   return Number(n ?? 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -27,8 +28,10 @@ function fmtFecha(d) {
   } catch { return "—"; }
 }
 
-function BadgeDiferencia({ diferencia }) {
-  if (diferencia == null) return <span className="text-[10px] sunmi-text-muted">—</span>;
+function BadgeDiferencia({ diferencia, sinConteo = false }) {
+  if (diferencia == null) {
+    return <span className="text-[10px] sunmi-text-muted">{sinConteo ? TEXTO_DIFERENCIA_NO_DISPONIBLE : "—"}</span>;
+  }
   const v = Number(diferencia);
   if (v === 0) return <span className="text-[10px] font-semibold sunmi-text-success">Cuadra</span>;
   const cls = v > 0 ? "sunmi-badge-success" : "sunmi-badge-danger";
@@ -59,7 +62,7 @@ function CajaCard({ caja }) {
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-xs font-semibold">#{caja.turnoId}</span>
             <BadgeEstado estado={caja.estado} />
-            <BadgeDiferencia diferencia={caja.diferencia} />
+            <BadgeDiferencia diferencia={caja.diferencia} sinConteo={caja.sinConteo === true} />
           </div>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-0 mt-0.5">
             <span className="text-[10px] sunmi-text-muted">{fmtFecha(caja.apertura)}</span>
@@ -109,7 +112,11 @@ function CajaCard({ caja }) {
               { label: "Costo", value: `$${fmt(v.costo)}`, cls: "sunmi-text-muted" },
               { label: "Descuento", value: `$${fmt(v.descuento)}` },
               { label: "Esperado", value: caja.esperado != null ? `$${fmt(caja.esperado)}` : "—", cls: "font-semibold" },
-              { label: "Real", value: caja.real != null ? `$${fmt(caja.real)}` : "—", cls: "font-semibold" },
+              {
+                label: "Real",
+                value: caja.real != null ? `$${fmt(caja.real)}` : caja.sinConteo ? TEXTO_SIN_CONTAR : "—",
+                cls: "font-semibold",
+              },
             ].map((k) => (
               <div key={k.label} className="sunmi-surface px-2 py-1.5 rounded-lg text-center">
                 <div className="text-[9px] sunmi-text-muted leading-tight">{k.label}</div>

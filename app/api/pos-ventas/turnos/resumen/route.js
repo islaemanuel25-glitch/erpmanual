@@ -146,7 +146,10 @@ export async function GET(req) {
         include: { turnoDestino: { select: { id: true, vendedor: { select: { nombre: true } } } } },
       }),
       prisma.cierrePreparacion.findFirst({
-        where: { turnoId, estado: { in: ["PREPARANDO", "CONFIRMADO", "VENCIDO"] } },
+        // CERRADO_SIN_CONTEO también: es un corte que existió y cerró el turno,
+        // con su esperado congelado. Sin él, el circuito de un turno cerrado sin
+        // conteo se leía como anterior al circuito y escondía todo.
+        where: { turnoId, estado: { in: ["PREPARANDO", "CONFIRMADO", "VENCIDO", "CERRADO_SIN_CONTEO"] } },
         select: {
           id: true, corteEn: true, estado: true, efectivoEsperadoCorte: true,
           cantidadVentasCorte: true,
