@@ -3146,6 +3146,45 @@ model AuditoriaStock {
   @@index([transferenciaDetalleId])
 }
 
+// CORRECCIÓN HISTÓRICA DE CAJA
+// ---------------------------------------------------------------------------
+// Una fila por incidente de caja corregido: el error ×1000 de un desglose y todo
+// lo que el sistema copió de él. Es el registro AUTORITATIVO de la corrección —se
+// escribe en la misma transacción que los cambios—, a diferencia de la bitácora
+// central, que la llena un interceptor best-effort después del request.
+//
+// `codigo` es UNIQUE: es la idempotencia. El mismo incidente no se aplica dos
+// veces, y una reversión futura es OTRA corrección con otro código. Las filas
+// nunca se borran.
+//
+// Sin FK duras a Usuario, por el mismo motivo que la bitácora: el registro es
+// inmutable y no tiene que bloquear el borrado de un usuario.
+//
+// Motor, manifiestos y reglas en lib/caja/correcciones/.
+model CorreccionCaja {
+  id     Int    @id @default(autoincrement())
+  /// Código del incidente en el manifiesto, por ejemplo "I4".
+  codigo String @unique
+  /// Huella del plan exacto que se autorizó: valores antes y después de cada
+  /// campo, más el alcance leído. Si algo cambió entre el ensayo y la
+  /// aplicación, la huella no coincide y no se aplica.
+  manifiestoHash String
+  motivo         String
+  evidencia      String
+
+  autorizadoPorUsuarioId Int
+  ejecutadoPorUsuarioId  Int
+  ejecutadoEn            DateTime @default(now())
+
+  /// [{ entidad, id, campo, antes, despues }], uno por campo tocado.
+  cambios         Json
+  /// Todas las filas del alcance, tocadas y no tocadas, antes y después.
+  snapshotAntes   Json
+  snapshotDespues Json
+
+  @@index([ejecutadoEn])
+}
+
 // BITÁCORA DE AUDITORÍA CENTRAL
 // ---------------------------------------------------------------------------
 // Log central de escrituras sensibles, poblado por el interceptor de Prisma

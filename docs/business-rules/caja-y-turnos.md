@@ -159,6 +159,38 @@ Se descartó usar "el último cambio dejado en el local" como referencia:
 Probado contra Postgres en `scripts/pruebas-db/cierreCaja.mjs`, sección E, y
 contraprobado en CC-13 a CC-18.
 
+### Corrección histórica de un incidente de caja · **[CÓDIGO]** · *desde 2026-09-26*
+
+Un incidente ×1000 que ya quedó escrito no se arregla con SQL suelto ni con una
+compensación. Se corrige desde la app, con el permiso `caja.corregir_historico`
+(que no va a ningún rol) y un **manifiesto versionado** en
+`lib/caja/correcciones/manifiestos.js`.
+
+- **El manifiesto declara la fuente**, con el valor anterior que tiene que
+  encontrar y el valor corregido. Hay dos tipos: lo contado al recibir un sobre,
+  y el cambio o el retiro contado de un corte.
+- **El motor deriva todas las copias** con las funciones del circuito: el fondo
+  del turno que recibió, los esperados congelados, las diferencias, el arqueo
+  final, el sobre y el retiro de cierre (`CajaMovimiento.monto`). No crea ni
+  borra filas, y no toca ventas.
+- **El ensayo en seco** corre el mismo motor, escribe los UPDATE, relee y deshace
+  todo. Devuelve el plan con su **huella**.
+- **Se autoriza esa huella exacta.** La aplicación la vuelve a calcular y, si algo
+  cambió desde el ensayo, no aplica nada.
+- **Se aplica en una transacción:**
+  - bloquea las filas en orden fijo y condiciona cada UPDATE por el valor anterior;
+  - comprueba las identidades del circuito;
+  - guarda `CorreccionCaja` (código único, huella, cambios, foto antes y después) y la bitácora `caja.correccion_historica`.
+- **El mismo código con la misma huella** responde "ya aplicada"; con otra huella, es error. Una reversión es otra corrección.
+- **No entran:**
+  - turnos abiertos o anulados;
+  - cortes vencidos, en preparación o cerrados sin conteo;
+  - cortes del orden anterior;
+  - el turno 277 y el corte 85, que corresponden a la venta KG 9152.
+
+Probado contra Postgres en `scripts/pruebas-db/correccionCaja.mjs` y
+contraprobado en CH-1 a CH-5.
+
 ---
 
 ## RN-37 — El arqueo se ancla al turno, no al calendario · **[CÓDIGO]**

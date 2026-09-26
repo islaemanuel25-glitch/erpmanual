@@ -16,8 +16,15 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **37 migraciones** y el árbol también. **Ninguna** pendiente:
-el despliegue siguiente es solo de código.
+Producción está en **37 migraciones**. El árbol trae **38**: una pendiente.
+
+- `20260926195732_correccion_caja` (PR "infraestructura de corrección histórica
+  de caja"): una tabla NUEVA, `CorreccionCaja`, vacía, con su único por
+  `codigo` y un índice por `ejecutadoEn`. **Aditiva**: no toca ninguna tabla
+  existente, sin UPDATE, sin backfill, sin DROP. No corrige ningún dato: las
+  correcciones se aplican después desde la app, una por una, con permiso propio
+  y un plan autorizado. La versión anterior no lee la tabla, así que la ventana
+  entre migrar y recrear no cambia nada.
 
 ---
 

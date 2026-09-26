@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-09-26 16:51
+**Última actualización:** 2026-09-26 20:31
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-09-26: feat(caja): motor auditado de corrección histórica, con ensayo en seco
 - 2026-09-26: feat(caja): la apertura sin sobre también frena el error ×1000
 - 2026-09-26: feat(caja): frenar el error ×1000 del desglose de billetes
 - 2026-09-26: feat(caja): cerrar sin conteo un corte vencido, y las pantallas que lo leen

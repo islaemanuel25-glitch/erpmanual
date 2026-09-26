@@ -964,6 +964,25 @@ const CASOS = [
     candado: "sin sobre · A. {1000: 23000} sin total confirmado: no pasa",
     suite: "lib/caja/desgloseDesproporcionado.test.mjs",
   },
+  // ── La corrección histórica de caja (lo de la base está en CH-1 a CH-5) ──
+  {
+    n: "CH-exclusion",
+    defecto: "el turno 277 de la venta KG deja de estar excluido",
+    archivo: "lib/caja/correcciones/plan.js",
+    de: "  { entidad: \"Turno\", id: 277,",
+    a: "  { entidad: \"Turno\", id: -277,",
+    candado: "el turno 277 y el corte 85 (venta KG 9152) están excluidos aunque alguien los agregue",
+    suite: "lib/caja/correcciones/plan.test.mjs",
+  },
+  {
+    n: "CH-permiso",
+    defecto: "la ruta de aplicar deja de pedir el permiso",
+    archivo: "app/api/caja/correcciones/aplicar/route.js",
+    de: "  const perm = requirePerm(req, PERMISO_CORREGIR_HISTORICO);",
+    a: "  const perm = { ok: true, session: { id: 1 } };",
+    candado: "las tres rutas exigen el permiso antes de hacer nada",
+    suite: "lib/caja/correcciones/plan.test.mjs",
+  },
   {
     n: "DD-sin-sobre",
     defecto: "la pantalla sin sobre deja de pasarle el umbral a la grilla",

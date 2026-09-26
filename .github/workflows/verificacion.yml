@@ -424,3 +424,12 @@ jobs:
       - name: Contrapruebas del ciclo de cierre de caja
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs CC-
 
+      # La corrección histórica de caja: el ensayo en seco que escribe y deshace,
+      # la aplicación con huella autorizada, la idempotencia y el fallo a mitad.
+      # Se arma el incidente ×1000 con las rutas reales del circuito.
+      - name: Ejercer la corrección histórica de caja contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/correccionCaja.mjs
+
+      - name: Contrapruebas de la corrección histórica de caja
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs CH-
+
