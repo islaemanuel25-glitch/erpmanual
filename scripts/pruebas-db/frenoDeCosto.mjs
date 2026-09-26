@@ -32,6 +32,9 @@ const rutaRecibir = await import("../../app/api/compras-proveedor/recibir/[id]/r
 const rutaAceptar = await import("../../app/api/compras-proveedor/comprobantes/aceptar-precio/route.js");
 const rutaConciliacion = await import("../../app/api/compras-proveedor/conciliacion/[pedidoId]/route.js");
 const { costosQueNoSeTocan } = await import("../../lib/compras-proveedor/cierreDeRecepcion.js");
+const { ESTADO_LINEA, costoPropioParaDecidir, estadoDeLinea, hayQueDecidirElPrecio } = await import(
+  "../../lib/compras-proveedor/estadoDeLineaFacturada.js"
+);
 const { PERMISO_REGISTRAR_PAGOS } = await import("../../lib/finanzas/pagosProveedores.js");
 const { DECISION_DE_PRECIO } = await import("../../lib/compras-proveedor/decisionDePrecio.js");
 
@@ -289,6 +292,11 @@ async function aceptarPrecio(f, p, lineaId, decision = DECISION_DE_PRECIO.ACEPTA
  * a `decisionVigente` es la del endpoint, no una escrita a mano.
  */
 async function excluidosDeLaPantalla(f, p) {
+  return costosQueNoSeTocan(await filasDeLaPantalla(f, p));
+}
+
+/** Las filas del papel tal como las recibe la pantalla: `grupos[].filas`. */
+async function filasDeLaPantalla(f, p) {
   const c = await leer(
     rutaConciliacion.GET(
       new Request(`http://ci/api/compras-proveedor/conciliacion/${p.pedidoId}`, {
@@ -298,8 +306,7 @@ async function excluidosDeLaPantalla(f, p) {
     )
   );
   if (c.status !== 200) throw new Error(`la conciliación contestó ${c.status}: ${c.error}`);
-  const filas = (c.grupos || []).filter((g) => (g.filas || []).length > 0).flatMap((g) => g.filas);
-  return costosQueNoSeTocan(filas);
+  return (c.grupos || []).filter((g) => (g.filas || []).length > 0).flatMap((g) => g.filas);
 }
 
 /** El catálogo se mueve DESPUÉS de armar el pedido, como lo haría una lista. */
@@ -485,6 +492,119 @@ async function correr(f) {
     [await foto(f, l4a), await foto(f, { ...l4b, pedidoId: l4a.pedidoId })],
     antesL4.map((x) => ({ ...x, estado: "ENVIADO", cuentas: 0, pagos: 0 }))
   );
+
+  // ── EL PAPEL COINCIDE CON LA LÍNEA, PERO EL CATÁLOGO SE MOVIÓ ──────────
+  //
+  // Pedido a 1.000, papel a 1.000, y después del pedido una lista subió el
+  // catálogo a 1.300. El cierre compara la línea contra el catálogo y frena;
+  // antes la hoja decía "sin diferencia" y no había dónde contestar. Todo lo
+  // que se afirma de la hoja sale de las filas de la conciliación real.
+
+  seccion("M-A. Papel = línea, catálogo movido: la hoja pregunta");
+  const ma = await pedidoCon(f, { nombre: "MA", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
+  await moverCatalogo(ma, 1300);
+  await papelCon(f, ma, { cantidad: 2, netoUnitario: 826.45 }); // 1.000 final
+  const [filaMA] = await filasDeLaPantalla(f, ma);
+  igual("M-A: el papel y la línea coinciden", [filaMA?.costoFactura, filaMA?.costoCatalogo], [1000, 1000]);
+  ok("M-A: la fila viene marcada con el catálogo movido", filaMA?.catalogoMovido === true, JSON.stringify(filaMA?.catalogoMovido));
+  ok("M-A: hay que decidir el precio", hayQueDecidirElPrecio(filaMA) === true);
+  igual("M-A: no dice 'sin diferencia': queda con precio distinto", estadoDeLinea(filaMA), ESTADO_LINEA.PRECIO_DISTINTO);
+  igual("M-A: el precio propio que muestra es el catálogo de hoy", costoPropioParaDecidir(filaMA), 1300);
+  const excluidosMA = await excluidosDeLaPantalla(f, ma);
+  igual("M-A: sin decidir no se excluye", excluidosMA, []);
+  await frenaSinDejarNada(f, ma, "M-A", { costosExcluidos: excluidosMA });
+
+  seccion("M-B. Dejar el que tenía: cierra sin escribir 1.000");
+  const mb = await pedidoCon(f, { nombre: "MB", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
+  await moverCatalogo(mb, 1300);
+  const renglonMB = await papelCon(f, mb, { cantidad: 2, netoUnitario: 826.45 });
+  const aceptaMB = await aceptarPrecio(f, mb, renglonMB, DECISION_DE_PRECIO.ACEPTA_FACTURA);
+  ok("M-B: aceptar una baja de 23 % lo frena la regla de siempre", aceptaMB.status === 409, `${aceptaMB.status} ${aceptaMB.error || ""}`);
+  const dejaMB = await aceptarPrecio(f, mb, renglonMB, DECISION_DE_PRECIO.DEJA_EL_MIO);
+  ok("M-B: dejar el que tenía contesta 200", dejaMB.status === 200 && dejaMB.ok, `${dejaMB.status} ${dejaMB.error || ""}`);
+  const [filaMB] = await filasDeLaPantalla(f, mb);
+  ok("M-B: ya no hay que decidir", hayQueDecidirElPrecio(filaMB) === false);
+  const excluidosMB = await excluidosDeLaPantalla(f, mb);
+  igual("M-B: la pantalla excluye ESA línea", excluidosMB, [mb.detId]);
+  const cierreMB = await cierraYEscribe(f, mb, "M-B", 1300, { costosExcluidos: excluidosMB });
+  igualStock("M-B: el stock sumó 2", cierreMB.despues.stock - cierreMB.antes.stock, 2);
+  const lineaMB = await prisma.pedidoProveedorDetalle.findUnique({ where: { id: mb.detId }, select: { precioCosto: true } });
+  igual("M-B: la línea sigue en 1.000 y el catálogo no la tomó", [Number(lineaMB.precioCosto), cierreMB.despues.costo], [1000, 1300]);
+
+  seccion("M-C. Aceptar la factura: escribe lo aceptado");
+  // Catálogo movido hacia ABAJO: la factura sube 25 % sobre él y se puede
+  // aceptar de un clic. Hacia arriba (M-B) la regla de siempre no deja.
+  const mc = await pedidoCon(f, { nombre: "MC", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
+  await moverCatalogo(mc, 800);
+  const renglonMC = await papelCon(f, mc, { cantidad: 2, netoUnitario: 826.45 });
+  const [filaMC0] = await filasDeLaPantalla(f, mc);
+  ok("M-C: antes de decidir, hay que decidir", hayQueDecidirElPrecio(filaMC0) === true);
+  const aceptaMC = await aceptarPrecio(f, mc, renglonMC, DECISION_DE_PRECIO.ACEPTA_FACTURA);
+  ok("M-C: aceptar contesta 200", aceptaMC.status === 200 && aceptaMC.ok, `${aceptaMC.status} ${aceptaMC.error || ""}`);
+  const decisionMC = await prisma.decisionDePrecioProveedor.findFirst({
+    where: { productoBaseId: mc.baseId },
+    select: { decision: true, precioFacturado: true, precioPropio: true },
+  });
+  igual(
+    "M-C: queda la decisión ACEPTA_FACTURA sobre 1.000 contra 1.000",
+    [decisionMC?.decision, Number(decisionMC?.precioFacturado), Number(decisionMC?.precioPropio)],
+    [DECISION_DE_PRECIO.ACEPTA_FACTURA, 1000, 1000]
+  );
+  const [filaMC] = await filasDeLaPantalla(f, mc);
+  ok("M-C: la hoja ya no vuelve a preguntar", hayQueDecidirElPrecio(filaMC) === false);
+  const excluidosMC = await excluidosDeLaPantalla(f, mc);
+  igual("M-C: la pantalla NO la excluye", excluidosMC, []);
+  const cierreMC = await cierraYEscribe(f, mc, "M-C", 1000, { costosExcluidos: excluidosMC });
+  igualStock("M-C: el stock sumó 2", cierreMC.despues.stock - cierreMC.antes.stock, 2);
+
+  seccion("M-D. Catálogo movido dentro de la variación: no se pregunta");
+  const md = await pedidoCon(f, { nombre: "MD", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
+  await moverCatalogo(md, 1050);
+  await papelCon(f, md, { cantidad: 2, netoUnitario: 826.45 });
+  const [filaMD] = await filasDeLaPantalla(f, md);
+  ok("M-D: la fila no viene marcada", filaMD?.catalogoMovido === false, JSON.stringify(filaMD?.catalogoMovido));
+  ok("M-D: no hay que decidir", hayQueDecidirElPrecio(filaMD) === false);
+  const decisionesMD = await prisma.decisionDePrecioProveedor.count({ where: { productoBaseId: md.baseId } });
+  igual("M-D: no se creó ninguna decisión", decisionesMD, 0);
+  await cierraYEscribe(f, md, "M-D", 1000, { costosExcluidos: await excluidosDeLaPantalla(f, md) });
+
+  seccion("M-E. Una decisión vieja con otros precios no vale");
+  // El mismo producto: primero se dejó el propio sobre un papel de 1.150.
+  // La compra nueva trae papel 1.000 igual a la línea, con el catálogo en
+  // 1.300. La decisión vieja no es de estos números.
+  const mea = await pedidoCon(f, { nombre: "ME", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
+  const renglonMEa = await papelCon(f, mea, { cantidad: 2, netoUnitario: 950.41 }); // 1.150 final
+  const dejaME = await aceptarPrecio(f, mea, renglonMEa, DECISION_DE_PRECIO.DEJA_EL_MIO);
+  ok("M-E: la decisión vieja quedó guardada", dejaME.status === 200 && dejaME.ok, `${dejaME.status} ${dejaME.error || ""}`);
+  await moverCatalogo(mea, 1300);
+  const pME = await prisma.pedidoProveedor.create({
+    data: {
+      grupoId: f.grupo.id,
+      depositoId: f.deposito.id,
+      creadoEnLocalId: f.deposito.id,
+      proveedorId: f.proveedor.id,
+      estado: "ENVIADO",
+      detalles: { create: [{ productoLocalId: mea.plId, cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 }] },
+    },
+    include: { detalles: { select: { id: true } } },
+  });
+  creado.pedidoIds.push(pME.id);
+  const me = { ...mea, pedidoId: pME.id, detId: pME.detalles[0].id };
+  await papelCon(f, me, { cantidad: 2, netoUnitario: 826.45 }); // 1.000 final
+  const decisionME = await prisma.decisionDePrecioProveedor.findFirst({
+    where: { productoBaseId: me.baseId },
+    select: { decision: true, precioFacturado: true },
+  });
+  igual(
+    "M-E: la decisión del producto es DEJA_EL_MIO sobre 1.150",
+    [decisionME?.decision, Number(decisionME?.precioFacturado)],
+    [DECISION_DE_PRECIO.DEJA_EL_MIO, 1150]
+  );
+  const [filaME] = await filasDeLaPantalla(f, me);
+  ok("M-E: no está vigente: hay que decidir de nuevo", hayQueDecidirElPrecio(filaME) === true);
+  const excluidosME = await excluidosDeLaPantalla(f, me);
+  igual("M-E: no se excluye", excluidosME, []);
+  await frenaSinDejarNada(f, me, "M-E", { costosExcluidos: excluidosME });
 }
 
 /** El stock en milésimas, como el resto del repo. */

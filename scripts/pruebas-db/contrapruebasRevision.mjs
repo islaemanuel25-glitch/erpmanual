@@ -250,6 +250,24 @@ const CASOS = [
     inyecciones: [{ de: "decisionVigente(f)?.decision", a: "f?.decisionPrecio?.decision" }],
     esperadas: ["L3: con otros números no está vigente y no se excluye", "L3: frena con 409"],
   },
+  {
+    n: "FC-7",
+    defecto: "la hoja ignora el catálogo movido y dice 'sin diferencia' con papel igual a la línea",
+    archivo: "lib/compras-proveedor/estadoDeLineaFacturada.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "precioCambio(fila) || fila?.catalogoMovido === true", a: "precioCambio(fila)" }],
+    esperadas: ["M-A: hay que decidir el precio", "M-A: no dice 'sin diferencia': queda con precio distinto"],
+  },
+  {
+    n: "FC-8",
+    defecto: "aceptar con el catálogo movido no guarda la decisión y la hoja vuelve a preguntar",
+    archivo: "app/api/compras-proveedor/comprobantes/aceptar-precio/route.js",
+    suite: "scripts/pruebas-db/frenoDeCosto.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "precioAEscribir) || catalogoMovido) {", a: "precioAEscribir)) {" }],
+    esperadas: ["M-C: la hoja ya no vuelve a preguntar"],
+  },
 ];
 
 // Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número
