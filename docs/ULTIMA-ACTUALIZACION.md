@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-26 12:54
+**Fecha:** 2026-09-26 14:37
 
 ## Módulos modificados recientemente
 
 ### pos-ventas
-- feat(caja): cerrar sin conteo un corte vencido, y las pantallas que lo leen, fix(ventas): la corrección completa exige el turno ABIERTO, no solo sin cierre, fix(caja): el cierre clásico ya no cierra un turno con el corte tomado en el medio
-- Archivos: 2 nuevos, 13 modificados (15 total)
+- feat(caja): frenar el error ×1000 del desglose de billetes, feat(caja): cerrar sin conteo un corte vencido, y las pantallas que lo leen, fix(ventas): la corrección completa exige el turno ABIERTO, no solo sin cierre
+- Archivos: 2 nuevos, 21 modificados (23 total)
 
 ### transferencias
 - feat(caja): estado CERRADO_SIN_CONTEO y la autoría de la resolución, feat(compras): columna para el catálogo que se miró al decidir un precio
