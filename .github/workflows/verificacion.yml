@@ -413,3 +413,14 @@ jobs:
       - name: Contrapruebas del freno de costo
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs FC-
 
+      # El ciclo de cierre de caja: la carrera entre el cierre clásico y el corte
+      # —forzada con un lock retenido, no librada al azar—, la corrección de una
+      # venta según el estado de su turno y el vencimiento de un corte por
+      # `venceEn`. Va en este job porque una semana no se puede consolidar con un
+      # turno sin resolver, y estos son los candados de ese ciclo.
+      - name: Ejercer el ciclo de cierre de caja contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/cierreCaja.mjs
+
+      - name: Contrapruebas del ciclo de cierre de caja
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs CC-
+
