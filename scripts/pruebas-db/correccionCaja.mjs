@@ -260,15 +260,19 @@ async function correr(f) {
     const a = await leer(await rutaAplicar.POST(pedido("http://ci/api/caja/correcciones/aplicar", f.sesion, { codigo: "X", confirmacion: "X" })));
     igual("1: aplicar sin permiso es 403", a.status, 403);
     const g2 = await leer(await rutaListar.GET(pedidoGet("http://ci/api/caja/correcciones", f.sesionCorrector)));
-    // Desde 2026-09-26 el repo trae I4 e I6, los dos PROPUESTO. Sus ids son de
-    // producción: acá no se ensayan —en esta base no existen, o son de otra
-    // prueba—, solo se afirma cómo los expone la ruta.
-    igual("1: con permiso lista I4 e I6, los dos PROPUESTO y sin huella autorizada",
+    // Desde 2026-09-26 el repo trae I4 e I6, los dos AUTORIZADOS. Sus ids son
+    // de producción: acá no se ensayan ni se aplican —en esta base no existen,
+    // o son de otra prueba—, solo se afirma cómo los expone la ruta y que
+    // aplicar sigue pidiendo la confirmación escrita antes de llegar al motor.
+    igual("1: con permiso lista I4 e I6, los dos AUTORIZADOS con su huella exacta",
       (g2.items ?? []).map((i) => [i.codigo, i.estado, i.hashAutorizado, i.aplicada]),
-      [["I4", "PROPUESTO", null, null], ["I6", "PROPUESTO", null, null]]);
+      [
+        ["I4", "AUTORIZADO", "8792f5faade1461e21c920dd0c5f1940d6717529717e4d643fefdcf358df6381", null],
+        ["I6", "AUTORIZADO", "00442ff61b587b3b93b1e1c70a845d424f7b2fead0aa0c2edf07cc85b8f7b72f", null],
+      ]);
     for (const c of ["I4", "I6"]) {
-      const a = await leer(await rutaAplicar.POST(pedido("http://ci/api/caja/correcciones/aplicar", f.sesionCorrector, { codigo: c, confirmacion: c })));
-      ok(`1: ${c} no se puede aplicar por la ruta: es PROPUESTO`, a.status === 409 && /PROPUESTO/.test(a.error ?? ""), `${a.status} ${a.error}`);
+      const a = await leer(await rutaAplicar.POST(pedido("http://ci/api/caja/correcciones/aplicar", f.sesionCorrector, { codigo: c, confirmacion: "otro" })));
+      ok(`1: ${c} no se aplica por la ruta sin escribir su código como confirmación`, a.status === 400 && a.error?.includes(c), `${a.status} ${a.error}`);
     }
     const e2 = await leer(await rutaEnsayo.POST(pedido("http://ci/api/caja/correcciones/ensayo", f.sesionCorrector, { codigo: "I5" })));
     igual("1: I5 no existe como manifiesto", e2.status, 404);
