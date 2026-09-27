@@ -260,22 +260,25 @@ async function correr(f) {
     const a = await leer(await rutaAplicar.POST(pedido("http://ci/api/caja/correcciones/aplicar", f.sesion, { codigo: "X", confirmacion: "X" })));
     igual("1: aplicar sin permiso es 403", a.status, 403);
     const g2 = await leer(await rutaListar.GET(pedidoGet("http://ci/api/caja/correcciones", f.sesionCorrector)));
-    // Desde 2026-09-26 el repo trae I4 e I6, los dos AUTORIZADOS. Sus ids son
-    // de producción: acá no se ensayan ni se aplican —en esta base no existen,
+    // El repo trae I4 e I6 AUTORIZADOS e I5 PROPUESTO. Sus ids son de
+    // producción: acá no se ensayan ni se aplican —en esta base no existen,
     // o son de otra prueba—, solo se afirma cómo los expone la ruta y que
     // aplicar sigue pidiendo la confirmación escrita antes de llegar al motor.
-    igual("1: con permiso lista I4 e I6, los dos AUTORIZADOS con su huella exacta",
+    igual("1: con permiso lista I4 e I6 AUTORIZADOS con su huella exacta, e I5 PROPUESTO",
       (g2.items ?? []).map((i) => [i.codigo, i.estado, i.hashAutorizado, i.aplicada]),
       [
         ["I4", "AUTORIZADO", "8792f5faade1461e21c920dd0c5f1940d6717529717e4d643fefdcf358df6381", null],
         ["I6", "AUTORIZADO", "00442ff61b587b3b93b1e1c70a845d424f7b2fead0aa0c2edf07cc85b8f7b72f", null],
+        ["I5", "PROPUESTO", null, null],
       ]);
     for (const c of ["I4", "I6"]) {
       const a = await leer(await rutaAplicar.POST(pedido("http://ci/api/caja/correcciones/aplicar", f.sesionCorrector, { codigo: c, confirmacion: "otro" })));
       ok(`1: ${c} no se aplica por la ruta sin escribir su código como confirmación`, a.status === 400 && a.error?.includes(c), `${a.status} ${a.error}`);
     }
-    const e2 = await leer(await rutaEnsayo.POST(pedido("http://ci/api/caja/correcciones/ensayo", f.sesionCorrector, { codigo: "I5" })));
-    igual("1: I5 no existe como manifiesto", e2.status, 404);
+    const a5 = await leer(await rutaAplicar.POST(pedido("http://ci/api/caja/correcciones/aplicar", f.sesionCorrector, { codigo: "I5", confirmacion: "I5" })));
+    ok("1: I5 no se puede aplicar por la ruta: es PROPUESTO", a5.status === 409 && /PROPUESTO/.test(a5.error ?? ""), `${a5.status} ${a5.error}`);
+    const e2 = await leer(await rutaEnsayo.POST(pedido("http://ci/api/caja/correcciones/ensayo", f.sesionCorrector, { codigo: "I3" })));
+    igual("1: I3 no existe como manifiesto", e2.status, 404);
   }
 
   // ═════════════════════════════════════════════════════════════════════════
@@ -453,6 +456,113 @@ async function correr(f) {
     const e4 = await aplicar(autorizado({ ...mV, codigo: codigo(`CI-NOAUT-${Date.now()}`) }, "a".repeat(64)));
     ok("11: nada de esto se aplica", e4.resultado === RESULTADO.RECHAZADA, e4.resultado);
     igual("11: y la base no cambió", await fotoDelLocal(f.local.id), antes);
+  }
+
+  seccion("12. Corte vencido sin conteo (la forma de I5): solo el cambio y el sobre");
+  {
+    // La cadena de I5 armada por el circuito: el turno V toma el corte con el
+    // cambio ×1000 confirmado en pesos y nunca lo cuenta; el corte vence; el
+    // turno R recibe el sobre y cuenta lo que había de verdad.
+    const tV = await turnoNuevo(f, 23000);
+    const rv = await leer(
+      await rutaIniciar.POST(pedido(`${BASE}/cierres/iniciar`, f.sesion, { turnoId: tV.id, desgloseCambio: { 1000: 23000 }, totalConfirmado: "23000000" }))
+    );
+    if (!rv.ok) throw new Error(`iniciar corte vencido: ${rv.error}`);
+    await prisma.cierrePreparacion.update({ where: { id: rv.cierre.id }, data: { venceEn: new Date(Date.now() - 60_000), estado: "VENCIDO" } });
+    const sobreV = await prisma.cambioPendiente.findFirst({ where: { cierrePreparacionId: rv.cierre.id } });
+    const tR = await recibirSobre(f, sobreV.id, { 1000: 23 }, { motivoDiferencia: "El sobre dice 23000 billetes y hay 23" });
+    await cerrarAbiertos(f);
+
+    const leerCadena = async () => ({
+      turno: await prisma.turno.findUnique({ where: { id: tV.id } }),
+      receptor: await prisma.turno.findUnique({ where: { id: tR.id } }),
+      corte: await prisma.cierrePreparacion.findUnique({ where: { id: rv.cierre.id } }),
+      sobre: await prisma.cambioPendiente.findUnique({ where: { id: sobreV.id } }),
+      arqueos: await prisma.arqueoCaja.count({ where: { turnoId: tV.id } }),
+      movimientos: await prisma.cajaMovimiento.count({ where: { turnoId: { in: [tV.id, tR.id] } } }),
+    });
+    const inicio = await leerCadena();
+    igual("12: (armado) corte VENCIDO con cambio de $23.000.000, sin conteo",
+      [inicio.corte.estado, Number(inicio.corte.totalCambio), inicio.corte.totalContado, inicio.corte.totalRetiroContado, inicio.corte.arqueoFinalId],
+      ["VENCIDO", 23000000, null, null, null]);
+    igual("12: (armado) el turno sigue en preparación y sin contar",
+      [inicio.turno.cierre, inicio.turno.cierreEnPreparacionEn !== null, inicio.turno.montoRealEfectivo, inicio.turno.diferenciaEfectivo],
+      [null, true, null, null]);
+    igual("12: (armado) el receptor contó $23.000 y abrió con eso",
+      [inicio.sobre.estado, Number(inicio.sobre.totalRecibido), Number(inicio.receptor.montoInicial), Number(inicio.sobre.diferencia)],
+      ["RECIBIDO", 23000, 23000, -22977000]);
+
+    const mI5 = {
+      codigo: codigo(`CI-VENCIDO-SIN-CONTEO-${Date.now()}`), estado: "PROPUESTO",
+      motivo: "Cambio ×1000 en un corte vencido que nunca se contó", evidencia: "Lo que contó el receptor",
+      correcciones: [{ tipo: "CAMBIO_CORTE_VENCIDO", cierrePreparacionId: rv.cierre.id, antes: { desgloseCambio: { 1000: 23000 } }, despues: { desgloseCambio: { 1000: 23 } } }],
+    };
+    const esperado = Number(inicio.corte.efectivoEsperadoCorte);
+
+    let foto = await fotoDelLocal(f.local.id);
+    const e = await ensayar(mI5);
+    igual("12: ensayo sin errores", e.errores, []);
+    igual("12: resultado ENSAYO", e.resultado, RESULTADO.ENSAYO);
+    const clave = (c) => `${c.entidad}.${c.campo}`;
+    igual("12: el plan cambia SOLO el cambio, el retiro esperado y el sobre",
+      e.cambios.map(clave).sort(),
+      ["CambioPendiente.desglose", "CambioPendiente.diferencia", "CambioPendiente.total",
+        "CierrePreparacion.desgloseCambio", "CierrePreparacion.efectivoRetiradoEsperado", "CierrePreparacion.totalCambio"]);
+    ok("12: el alcance lee el turno receptor", e.filasSinCambio.includes(`Turno#${tR.id}`), JSON.stringify(e.filasSinCambio));
+    ok("12: todas las invariantes, leídas de lo escrito, se cumplen", e.invariantes.length > 0 && e.invariantes.every((i) => i.ok),
+      JSON.stringify(e.invariantes.filter((i) => !i.ok)));
+    igual("12: el ensayo no dejó nada", await fotoDelLocal(f.local.id), foto);
+
+    const r0 = await aplicar(mI5);
+    ok("12: PROPUESTO no se aplica", r0.resultado === RESULTADO.RECHAZADA && /PROPUESTO/.test(r0.errores.join(" ")), r0.errores.join(" "));
+    const r1 = await aplicar(autorizado(mI5, "0".repeat(64)));
+    ok("12: con otra huella no se aplica", r1.resultado === RESULTADO.RECHAZADA && /no es el autorizado/.test(r1.errores.join(" ")), r1.errores.join(" "));
+    igual("12: la base sigue igual", await fotoDelLocal(f.local.id), foto);
+
+    // Deriva: el fondo del receptor cambió desde el ensayo.
+    await prisma.turno.update({ where: { id: tR.id }, data: { montoInicial: 23500 } });
+    foto = await fotoDelLocal(f.local.id);
+    const r2 = await aplicar(autorizado(mI5, e.hash));
+    ok("12: si el fondo del receptor cambió, no se aplica", r2.resultado === RESULTADO.RECHAZADA && /fondo del turno/.test(r2.errores.join(" ")), r2.errores.join(" "));
+    igual("12: y no escribió nada", await fotoDelLocal(f.local.id), foto);
+    await prisma.turno.update({ where: { id: tR.id }, data: { montoInicial: 23000 } });
+
+    // Deriva: el corte se contó entre el ensayo y la aplicación.
+    await prisma.cierrePreparacion.update({ where: { id: rv.cierre.id }, data: { totalContado: 41100 } });
+    foto = await fotoDelLocal(f.local.id);
+    const r3 = await aplicar(autorizado(mI5, e.hash));
+    ok("12: si el corte tiene conteo, no se aplica", r3.resultado === RESULTADO.RECHAZADA && /conteo del cajón/.test(r3.errores.join(" ")), r3.errores.join(" "));
+    igual("12: y no escribió nada", await fotoDelLocal(f.local.id), foto);
+    await prisma.cierrePreparacion.update({ where: { id: rv.cierre.id }, data: { totalContado: null } });
+
+    // Un fallo a mitad de camino deshace todo.
+    foto = await fotoDelLocal(f.local.id);
+    const r4 = await aplicar(autorizado(mI5, e.hash), { despuesDeEscribirFila: ({ escritas }) => { if (escritas === 1) throw new Error("se cortó la luz"); } });
+    ok("12: un fallo a mitad no aplica", r4.resultado === RESULTADO.RECHAZADA && /se cortó la luz/.test(r4.errores.join(" ")), r4.errores.join(" "));
+    igual("12: y deshizo lo que llegó a escribir", await fotoDelLocal(f.local.id), foto);
+
+    const antesDeAplicar = await leerCadena();
+    const r5 = await aplicar(autorizado(mI5, e.hash));
+    igual("12: con la huella exacta, APLICADA", [r5.resultado, r5.errores], [RESULTADO.APLICADA, []]);
+    const d = await leerCadena();
+    igual("12: corte: cambio {1000: 23}, $23.000, retiro esperado = esperado − cambio",
+      [d.corte.desgloseCambio, Number(d.corte.totalCambio), Number(d.corte.efectivoRetiradoEsperado)], [{ 1000: 23 }, 23000, esperado - 23000]);
+    igual("12: sobre: {1000: 23}, $23.000, diferencia 0", [d.sobre.desglose, Number(d.sobre.total), Number(d.sobre.diferencia)], [{ 1000: 23 }, 23000, 0]);
+    igual("12: lo recibido no se tocó", [d.sobre.desgloseRecibido, Number(d.sobre.totalRecibido)], [{ 1000: 23 }, 23000]);
+    igual("12: los estados no cambiaron", [d.corte.estado, d.sobre.estado], ["VENCIDO", "RECIBIDO"]);
+    igual("12: el turno origen quedó idéntico", d.turno, antesDeAplicar.turno);
+    igual("12: el receptor quedó idéntico", d.receptor, antesDeAplicar.receptor);
+    igual("12: la diferencia del turno sigue desconocida, no cero", [d.turno.montoRealEfectivo, d.turno.diferenciaEfectivo, d.corte.diferencia, d.corte.totalContado], [null, null, null, null]);
+    igual("12: no se creó arqueo ni movimiento", [d.arqueos, d.movimientos], [antesDeAplicar.arqueos, antesDeAplicar.movimientos]);
+    const reg = await prisma.correccionCaja.findUnique({ where: { codigo: mI5.codigo } });
+    igual("12: el registro guarda huella, autorizante y las dos fotos", [reg?.manifiestoHash, reg?.autorizadoPorUsuarioId, Boolean(reg?.snapshotAntes), Boolean(reg?.snapshotDespues)], [e.hash, u, true, true]);
+    const bit = await prisma.auditoriaBitacora.count({ where: { accion: ACCION_CORRECCION_HISTORICA, entidadId: mI5.codigo } });
+    igual("12: y queda en la bitácora", bit, 1);
+
+    foto = await fotoDelLocal(f.local.id);
+    const r6 = await aplicar(autorizado(mI5, e.hash));
+    igual("12: la segunda aplicación es YA_APLICADA", r6.resultado, RESULTADO.YA_APLICADA);
+    igual("12: y no escribió nada", await fotoDelLocal(f.local.id), foto);
   }
 }
 
