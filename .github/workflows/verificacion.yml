@@ -273,6 +273,21 @@ jobs:
             echo "No hay scripts/pruebas-db/recepcionTransferencias.mjs en esta rama: nada que correr."
           fi
 
+      # ── EL LIBRO DE STOCK ─────────────────────────────────────────────────
+      #
+      # Va DESPUÉS de las otras pruebas de base a propósito: esas escriben stock
+      # con el libro ya instalado por `migrate deploy`, y el verificador que corre
+      # al final de ésta mira también lo que dejaron. Si alguna escribiera
+      # StockLocal por un camino que el trigger no ve, se pone rojo acá.
+      #
+      # Además arma bases descartables al lado —la activación sobre una base SIN
+      # libro, la carrera, la contraprueba y un dump restaurado— y las borra.
+      - name: Libro de stock (activación, carrera, captura, restore)
+        run: |
+          set -euo pipefail
+          pg_dump --version
+          node --import ./scripts/alias-loader.mjs scripts/pruebas-db/libroStock.mjs
+
       # ── LA PREGUNTA QUE DECIDE EL DESPLIEGUE ──────────────────────────────
       #
       # Producción conserva sus 105 migraciones viejas en `_prisma_migrations` y

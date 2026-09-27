@@ -963,6 +963,124 @@ model StockLocal {
 }
 
 // ---------------------------------------------------------------------------
+// LIBRO HISTÓRICO FÍSICO DE STOCK
+// ---------------------------------------------------------------------------
+//
+// `StockLocal` es el estado VIVO: dice cuánto hay ahora y nada más. Este libro
+// dice cómo se llegó ahí. Cada cambio real de `cantidad` o de `enTransito` deja
+// una fila, y esa fila la escribe POSTGRESQL, no la aplicación: un trigger sobre
+// `StockLocal` que corre dentro de la misma transacción que el cambio. Si la
+// transacción se revierte, se van los dos; si confirma, quedan los dos. No hay
+// forma de que `StockLocal` diga 18 y el libro 19.
+//
+// Es un trigger y no una puerta de la aplicación porque los relevamientos de
+// escritores de stock se saltearon caminos tres veces, y un escritor que se
+// olvida de la puerta deja un hueco sin avisar. El trigger no depende de que
+// nadie se acuerde: captura rutas, scripts y SQL crudo por igual.
+//
+// La aplicación sólo DECLARA el origen —`lib/stock/libro/libroStock.js`— con una
+// configuración local a la transacción. El que no lo declara queda como
+// SIN_ORIGEN: la cantidad es igual de verdadera, lo que falta es la causa.
+//
+// Las funciones, los triggers y el punto cero viven en la migración
+// `20260927120000_libro_stock`: Prisma no sabe expresarlos. El verificador es
+// `scripts/verificar-libro-stock.mjs`.
+//
+// ── POR QUÉ NINGUNA COLUMNA TIENE CLAVE FORÁNEA ─────────────────────────────
+//
+// Porque el libro tiene que sobrevivir a lo que describe. `productos/eliminar`
+// borra el producto físicamente, y una clave foránea obligaría a elegir entre
+// impedir el borrado o borrar la historia con él. Es el mismo criterio que ya
+// sigue `AuditoriaStock.productoLocalId`.
+//
+// ── CÓMO SE LEE ─────────────────────────────────────────────────────────────
+//
+// La cadena de un producto en una ubicación es `(localId, productoLocalId)`
+// ordenada por `id`. El cierre de un día es el `...Posterior` del último
+// movimiento con `dia` menor o igual; no hace falta sumar nada. Semana, mes y año
+// son rangos de `dia`, y no reescriben ninguna fila si cambia la Semana
+// Operativa.
+enum TipoMovimientoStock {
+  // El primer estado que el libro conoce de una fila, observado al activarse.
+  // Sus `...Anterior` van en NULL: no dicen "había cero", dicen "no se sabe".
+  ESTADO_INICIAL
+  // La fila de StockLocal nace. Anteriores en NULL, incluso si nace en cero.
+  ALTA
+  // Cambió la cantidad, el tránsito o los dos.
+  CAMBIO
+  // La fila de StockLocal se borra. Posteriores en NULL y la identidad del
+  // producto congelada, porque el producto puede desaparecer después.
+  BAJA
+}
+
+model MovimientoStock {
+  id              Int                 @id @default(autoincrement())
+  // La fila de StockLocal que cambió. Distingue una fila recreada de la vieja
+  // con el mismo producto y ubicación.
+  stockLocalId    Int
+  localId         Int
+  productoLocalId Int
+  // No se puede derivar después de un borrado, y es la clave con la que las
+  // ventas nombran al producto (`VentaDetalle.productoBaseId`).
+  productoBaseId  Int
+  tipo            TipoMovimientoStock
+
+  // La MISMA escala que StockLocal: son copias de sus valores.
+  cantidadAnterior    Decimal? @db.Decimal(12, 3)
+  cantidadPosterior   Decimal? @db.Decimal(12, 3)
+  enTransitoAnterior  Decimal? @db.Decimal(12, 3)
+  enTransitoPosterior Decimal? @db.Decimal(12, 3)
+
+  // El reloj de POSTGRESQL, leído con el candado de fila tomado. En UTC y sin
+  // zona, como todo el resto de la base.
+  instante DateTime @db.Timestamp(3)
+  // El día argentino de `instante`, calculado en la base con la zona explícita.
+  // Se guarda y no se deriva: es un hecho del momento del cambio.
+  dia      DateTime @db.Date
+
+  // Lo que la aplicación declaró. SIN_ORIGEN si no declaró nada.
+  origen    String
+  origenRef String?
+
+  // Solo en BAJA: lo mínimo para que el movimiento se entienda cuando el
+  // producto ya no exista.
+  nombreCongelado       String?
+  codigoBarraCongelado  String?
+  unidadMedidaCongelada String?
+
+  @@index([localId, productoLocalId, id])
+  @@index([localId, dia])
+}
+
+// Lo que el trigger de StockLocal NO puede ver: un campo del producto o de la
+// ubicación que cambia QUÉ SIGNIFICA la cantidad sin cambiar el número. Ayer
+// `cantidad = 10` eran piezas y hoy son kilos.
+//
+// Acá no se convierte nada ni se decide nada: se deja constancia, con el valor
+// anterior y el nuevo, de que la lectura de la cantidad cambió. Qué campos
+// cuentan está en la migración y en `lib/stock/libro/libroStock.js`.
+model ReinterpretacionDeStock {
+  id             Int      @id @default(autoincrement())
+  // "ProductoBase" o "Local".
+  entidad        String
+  entidadId      Int
+  campo          String
+  valorAnterior  String?
+  valorPosterior String?
+  // Cuántas filas de StockLocal tenían cantidad o tránsito distinto de cero en
+  // ese momento. Cero: el cambio no reinterpretó nada. Es un hecho del momento y
+  // no se puede reconstruir después.
+  filasConStock  Int
+  instante       DateTime @db.Timestamp(3)
+  dia            DateTime @db.Date
+  origen         String
+  origenRef      String?
+
+  @@index([entidad, entidadId])
+  @@index([dia])
+}
+
+// ---------------------------------------------------------------------------
 // COMBOS EXCLUSIVOS POR LOCAL (E1)
 // ---------------------------------------------------------------------------
 // Composición de un combo (ProductoBase.es_combo = true) atada a UNA ubicación.
