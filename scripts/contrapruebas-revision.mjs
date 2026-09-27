@@ -1201,6 +1201,52 @@ const CASOS = [
     candado: "la pantalla sin sobre le pasa el umbral medido a la grilla, sin inventar referencia",
     suite: "lib/caja/desgloseDesproporcionado.test.mjs",
   },
+  // ── Finanzas 1.c.1: la semana es la Semana Operativa de la ubicación ─────
+  {
+    n: "FIN-semana-rango",
+    defecto: "el rango de Finanzas vuelve al domingo fijo e ignora la semana de la ubicación",
+    archivo: "lib/finanzas/periodoFinanciero.js",
+    de: "  return rangoDesplazado({\n    unidad: u,\n    hoy,\n    desplazamiento: desplazamientoFinanciero(desplazamiento),\n    rangoDeFecha: semanaDeLaUbicacion(u, vigencias),",
+    a: "  return rangoDesplazado({\n    unidad: u,\n    hoy,\n    desplazamiento: desplazamientoFinanciero(desplazamiento),\n    rangoDeFecha: null,",
+    candado: "F4 · una ubicación que corta MIÉRCOLES ve de miércoles a martes",
+    suite: "lib/finanzas/periodoFinanciero.test.mjs",
+  },
+  {
+    n: "FIN-semana-descripcion",
+    defecto: "el título del período se arma con otra semana que el rango",
+    archivo: "lib/finanzas/periodoFinanciero.js",
+    de: "  return descripcionDelPeriodo({\n    unidad: u,\n    hoy,\n    desplazamiento: desplazamientoFinanciero(desplazamiento),\n    rangoDeFecha: semanaDeLaUbicacion(u, vigencias),",
+    a: "  return descripcionDelPeriodo({\n    unidad: u,\n    hoy,\n    desplazamiento: desplazamientoFinanciero(desplazamiento),\n    rangoDeFecha: null,",
+    candado: "F4d · caminar hacia atrás cruza el cambio de corte semana por semana",
+    suite: "lib/finanzas/periodoFinanciero.test.mjs",
+  },
+  {
+    n: "FIN-dia-mes",
+    defecto: "DIA y MES pasan a depender de la semana de la ubicación",
+    archivo: "lib/finanzas/periodoFinanciero.js",
+    de: "  return unidad === UNIDADES.SEMANA ? rangoSemanalDeUbicacion(vigencias || []) : null;",
+    a: "  return rangoSemanalDeUbicacion(vigencias || []);",
+    candado: "F4e · DIA y MES no dependen de la semana de la ubicación",
+    suite: "lib/finanzas/periodoFinanciero.test.mjs",
+  },
+  {
+    n: "FIN-tablero-vigencias",
+    defecto: "el tablero de Finanzas deja de pasarle la semana de la ubicación al rango",
+    archivo: "app/api/finanzas/tablero/route.js",
+    de: "    const rango = rangoFinanciero({ unidad, desplazamiento, vigencias });",
+    a: "    const rango = rangoFinanciero({ unidad, desplazamiento });",
+    candado: "F5 · Finanzas no define su semana: la ruta la pide al cargador canónico y la pasa entera",
+    suite: "lib/finanzas/periodoFinanciero.test.mjs",
+  },
+  {
+    n: "FIN-sin-configurar",
+    defecto: "una ubicación sin configurar se presenta como un domingo configurado",
+    archivo: "app/api/finanzas/tablero/route.js",
+    de: "        sinConfigurar: semanaDelLocal.sinConfigurar,",
+    a: "        sinConfigurar: false,",
+    candado: "F5 · Finanzas no define su semana: la ruta la pide al cargador canónico y la pasa entera",
+    suite: "lib/finanzas/periodoFinanciero.test.mjs",
+  },
   // `lib/semanaOperativa/unaSolaFuente.test.mjs` NO está acá, y no por olvido:
   // enumera con `git ls-files`, y la copia descartable de este script no lleva
   // `.git`, así que ahí el archivo entero explota antes de llegar al candado y el

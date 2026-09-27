@@ -24,6 +24,14 @@ const { crearCuentaPorPagarDesdeCompra, registrarPagoProveedor, ErrorPagoProveed
 );
 const { PERMISO_REGISTRAR_PAGOS } = await import("../../lib/finanzas/pagosProveedores.js");
 const rutaRecibir = await import("../../app/api/compras-proveedor/recibir/[id]/route.js");
+// La semana se siembra por la ÚNICA puerta que escribe vigencias; las filas se
+// van con el local, por la cascada.
+const { programarSemanaOperativa, vigenciasDeUbicaciones } = await import(
+  "../../lib/semanaOperativa/semanaOperativaServer.js"
+);
+const { semanaQueContiene } = await import("../../lib/semanaOperativa/semanaOperativa.js");
+const { rangoDelPeriodo, sumarDias, diaDeLaSemana } = await import("../../lib/transferencias/periodoDePago.js");
+const { hoyArgentinaISO } = await import("../../lib/fechas/rangoArgentina.js");
 const rutaObtener = await import("../../app/api/compras-proveedor/obtener/route.js");
 
 let pasadas = 0;
@@ -331,6 +339,88 @@ async function correr(f) {
     detalleDeposito.status === 200 && detalleDeposito.ok === true,
     detalleDeposito.error
   );
+}
+
+// ── LA SEMANA DE FINANZAS ES LA SEMANA OPERATIVA DE LA UBICACIÓN ──────────
+//
+// Por el handler real: la ruta lee las vigencias de PostgreSQL y el rango que
+// devuelve tiene que ser exactamente el que contesta la fuente canónica con esas
+// mismas filas, para el local consultado y no para otro.
+
+const periodoDe = async (sesion, destino, unidad, desplazamiento = 0) =>
+  leer(
+    rutaTablero.GET(
+      pedido(`http://ci/api/finanzas/tablero?destino=${destino}&unidad=${unidad}&desplazamiento=${desplazamiento}`, sesion)
+    )
+  );
+
+async function correrSemana(f) {
+  const sesionDeposito = token(f.usuarioDeposito.id, f.deposito.id);
+  const hoy = hoyArgentinaISO();
+
+  console.log("\n── Semana: ubicación SIN CONFIGURAR");
+  const sinConfig = await periodoDe(sesionDeposito, f.local.id, "SEMANA");
+  ok("responde 200", sinConfig.status === 200 && sinConfig.ok === true, sinConfig.error);
+  ok("queda marcada sinConfigurar, con el domingo de la fuente canónica", sinConfig.local?.sinConfigurar === true && sinConfig.local?.diaDeCorte === 0,
+    JSON.stringify(sinConfig.local));
+  const canonicaSin = semanaQueContiene({ vigencias: [], fecha: hoy });
+  ok("el rango es el de la fuente canónica sin vigencias", sinConfig.periodo?.rango?.desde === canonicaSin.desde && sinConfig.periodo?.rango?.hasta === canonicaSin.hasta,
+    JSON.stringify(sinConfig.periodo?.rango));
+
+  console.log("\n── Semana: el local corta MIÉRCOLES");
+  await prisma.$transaction((tx) => programarSemanaOperativa(tx, { localId: f.local.id, diaDeCorte: 3, usuarioId: f.usuarioDeposito.id }));
+  const miercoles = await periodoDe(sesionDeposito, f.local.id, "SEMANA");
+  ok("ya no está sinConfigurar, y corta miércoles", miercoles.local?.sinConfigurar === false && miercoles.local?.diaDeCorte === 3, JSON.stringify(miercoles.local));
+  ok("su semana arranca un miércoles", diaDeLaSemana(miercoles.periodo?.rango?.desde) === 3, JSON.stringify(miercoles.periodo?.rango));
+  const canonicaMie = semanaQueContiene({ vigencias: [{ diaDeCorte: 3, vigenteDesde: null }], fecha: hoy });
+  ok("es exactamente la semana canónica del local", miercoles.periodo?.rango?.desde === canonicaMie.desde && miercoles.periodo?.rango?.hasta === canonicaMie.hasta);
+  ok("la descripción viaja con el mismo rango", JSON.stringify(miercoles.periodo?.descripcion?.rango) === JSON.stringify(miercoles.periodo?.rango));
+
+  console.log("\n── Semana: dos ubicaciones, el mismo día, semanas distintas");
+  const delDeposito = await periodoDe(sesionDeposito, f.deposito.id, "SEMANA");
+  ok("el depósito, sin configurar, sigue en domingo", delDeposito.status === 200 && delDeposito.local?.sinConfigurar === true && diaDeLaSemana(delDeposito.periodo?.rango?.desde) === 0,
+    `${delDeposito.status} ${delDeposito.error} ${JSON.stringify(delDeposito.periodo?.rango)}`);
+  ok("y su semana no es la del local", delDeposito.periodo?.rango?.desde !== miercoles.periodo?.rango?.desde);
+
+  console.log("\n── Semana: DIA y MES no cambian con la semana del local");
+  for (const unidad of ["DIA", "MES"]) {
+    for (const desplazamiento of [0, -1]) {
+      const r = await periodoDe(sesionDeposito, f.local.id, unidad, desplazamiento);
+      let esperado = rangoDelPeriodo({ unidad, hoy });
+      for (let i = 0; i < -desplazamiento; i++) esperado = rangoDelPeriodo({ unidad, hoy: sumarDias(esperado.desde, -1) });
+      ok(`${unidad} ${desplazamiento}: el mismo rango de siempre`, JSON.stringify(r.periodo?.rango) === JSON.stringify(esperado),
+        `${JSON.stringify(r.periodo?.rango)} ≠ ${JSON.stringify(esperado)}`);
+    }
+  }
+
+  console.log("\n── Semana: un cambio de corte en el pasado, con su semana larga");
+  // El cambio se programó hace un mes —`hoy` inyectado en la puerta canónica— y
+  // rige desde un miércoles de hace tres semanas: pasa a viernes, así que del
+  // miércoles D al jueves D+8 es UNA semana de nueve días.
+  const inicioActual = canonicaMie.desde;
+  const D = sumarDias(inicioActual, -21);
+  await prisma.$transaction((tx) =>
+    programarSemanaOperativa(tx, { localId: f.local.id, diaDeCorte: 5, desde: D, hoy: sumarDias(D, -10), usuarioId: f.usuarioDeposito.id })
+  );
+  const vigencias = (await vigenciasDeUbicaciones(prisma, [f.local.id])).get(f.local.id) || [];
+  ok("el local tiene las dos vigencias", vigencias.length === 2, JSON.stringify(vigencias));
+
+  // Hacia atrás, semana por semana: cada rango de la ruta es el que la fuente
+  // canónica dice que contiene el día anterior al inicio del que le sigue.
+  let esperado = semanaQueContiene({ vigencias, fecha: hoy });
+  let vioLaLarga = false;
+  for (let desplazamiento = 0; desplazamiento >= -6; desplazamiento--) {
+    const r = await periodoDe(sesionDeposito, f.local.id, "SEMANA", desplazamiento);
+    ok(`semana ${desplazamiento}: es la canónica ${esperado.desde} → ${esperado.hasta}`,
+      r.periodo?.rango?.desde === esperado.desde && r.periodo?.rango?.hasta === esperado.hasta,
+      JSON.stringify(r.periodo?.rango));
+    if (esperado.transicion) {
+      vioLaLarga = true;
+      ok("la semana larga mide nueve días, del miércoles D al jueves D+8", esperado.desde === D && esperado.hasta === sumarDias(D, 8));
+    }
+    esperado = semanaQueContiene({ vigencias, fecha: sumarDias(esperado.desde, -1) });
+  }
+  ok("el recorrido pasó por la semana larga", vioLaLarga);
 }
 
 // ── PAGOS A PROVEEDORES ───────────────────────────────────────────────────
@@ -1138,6 +1228,7 @@ let fixture;
 try {
   fixture = await montar();
   await correr(fixture);
+  await correrSemana(fixture);
   await correrPagos(fixture);
   await correrCierre(fixture);
 } finally {

@@ -53,6 +53,8 @@ import {
   rangoFinanciero,
   unidadFinanciera,
 } from "@/lib/finanzas/periodoFinanciero";
+import { corteDeUbicacion } from "@/lib/semanaOperativa/semanaOperativa";
+import { vigenciasDeUbicaciones } from "@/lib/semanaOperativa/semanaOperativaServer";
 import { resumenDelPeriodo } from "@/lib/finanzas/resumenFinanciero";
 import { actividadPorDia } from "@/lib/finanzas/actividadFinanciera";
 import {
@@ -157,7 +159,16 @@ export async function GET(req) {
     }
     const localId = alcance.localId;
 
-    const rango = rangoFinanciero({ unidad, desplazamiento });
+    // ── LA SEMANA ES LA DE ESTA UBICACIÓN ─────────────────────────────────
+    //
+    // La Semana Operativa del local consultado, del cargador canónico: la misma
+    // que ve Transferencias para ese local. DIA y MES no la miran. Sin vigencias,
+    // la fuente canónica contesta con el domingo de siempre y lo marca
+    // `sinConfigurar`, y eso viaja tal cual en `local`, igual que allá.
+    const vigencias = (await vigenciasDeUbicaciones(prisma, [localId])).get(localId) || [];
+    const semanaDelLocal = corteDeUbicacion(vigencias);
+
+    const rango = rangoFinanciero({ unidad, desplazamiento, vigencias });
     const { fechaInicio, fechaFin } = getRangoArgentina(rango.desde, rango.hasta);
 
     // ── LAS VENTAS DEL PERÍODO ────────────────────────────────────────────
@@ -323,6 +334,8 @@ export async function GET(req) {
         nombre: locales.find((l) => l.localId === localId)?.nombre || localPropio?.nombre || "—",
         esDeposito: Boolean(locales.find((l) => l.localId === localId)?.esDeposito),
         inactivo: Boolean(locales.find((l) => l.localId === localId)?.inactivo),
+        diaDeCorte: semanaDelLocal.diaDeCorte,
+        sinConfigurar: semanaDelLocal.sinConfigurar,
       },
       periodo: {
         rango,
@@ -330,7 +343,7 @@ export async function GET(req) {
         // el mismo motivo por el que viaja el rango: quien sabe qué período se
         // consultó es el que lo consultó. Es lo que evita que el título diga
         // "Semana" con el chip en Mes.
-        descripcion: descripcionFinanciera({ unidad, desplazamiento }),
+        descripcion: descripcionFinanciera({ unidad, desplazamiento, vigencias }),
       },
       resumen,
       actividad,
