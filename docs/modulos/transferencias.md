@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-09-26 20:31
+**Última actualización:** 2026-09-27 22:42
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -194,6 +194,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-09-27: docs(deploy): libro_stock pendiente, y los candados que cuentan migraciones la declaran
 - 2026-09-26: feat(caja): tabla CorreccionCaja para las correcciones históricas
 - 2026-09-26: feat(caja): estado CERRADO_SIN_CONTEO y la autoría de la resolución
 - 2026-09-26: feat(compras): columna para el catálogo que se miró al decidir un precio

@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-09-27] - Actualización: transferencias
+
+### Modificado
+- **transferencias**: docs(deploy): libro_stock pendiente, y los candados que cuentan migraciones la declaran
+
+
 ## [2026-09-26] - Actualización: pos-ventas, reportes-ventas, transferencias
 
 ### Modificado

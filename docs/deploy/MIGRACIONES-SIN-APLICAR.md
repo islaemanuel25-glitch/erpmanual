@@ -16,7 +16,7 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **37 migraciones**. El árbol trae **38**: una pendiente.
+Producción está en **37 migraciones**. El árbol trae **39**: dos pendientes.
 
 - `20260926195732_correccion_caja` (PR "infraestructura de corrección histórica
   de caja"): una tabla NUEVA, `CorreccionCaja`, vacía, con su único por
@@ -25,6 +25,33 @@ Producción está en **37 migraciones**. El árbol trae **38**: una pendiente.
   correcciones se aplican después desde la app, una por una, con permiso propio
   y un plan autorizado. La versión anterior no lee la tabla, así que la ventana
   entre migrar y recrear no cambia nada.
+- `20260927120000_libro_stock` (PR "libro histórico físico de stock — punto
+  cero"): dos tablas NUEVAS, `MovimientoStock` y `ReinterpretacionDeStock`, el
+  enum `TipoMovimientoStock`, nueve funciones y cinco triggers: uno sobre
+  `StockLocal` que registra cada cambio de cantidad o tránsito, dos sobre
+  `ProductoBase` y `Local` que dejan constancia de los cambios de unidad, y dos
+  que hacen inmutable el libro. **Sin UPDATE, sin DROP, sin tocar columnas
+  existentes.** SÍ inserta: una fila `ESTADO_INICIAL` por cada fila de
+  `StockLocal`, que es el punto cero del libro. El clasificador la marca
+  **aditiva**, pero avisa que no lee adentro de un bloque `DO`, y la activación
+  ES un bloque `DO`. Lo que hay que saber antes de desplegarla:
+  - **Toma un candado.** `SHARE ROW EXCLUSIVE` sobre `StockLocal`,
+    `ProductoBase` y `Local` mientras copia el punto cero: las ventas y los
+    ajustes ESPERAN (no fallan) hasta que confirma. Medido en la sesión de
+    desarrollo: 28 ms con 4.000 filas, 64 ms con 10.000, 283 ms con 50.000,
+    764 ms con 100.000. Conviene desplegar fuera del horario de venta.
+  - **Tope de espera de 3 s.** Si hay una transacción larga escribiendo stock
+    —una importación—, la migración FALLA en vez de trabar el POS. No deja nada
+    a medias (probado), pero Prisma la registra como fallida, y reintentarla
+    pide `prisma migrate resolve --rolled-back 20260927120000_libro_stock`, que
+    la guardia de migraciones rechaza siempre. Si pasa, frenar y avisar a
+    Emanuel: no hay un camino ya autorizado para reintentarla.
+  - **La app vieja sigue andando.** Nada de su código cambia; sus escrituras
+    quedan en el libro como `SIN_ORIGEN`, que es lo esperado.
+  - **Después de aplicarla**, `node --import ./scripts/alias-loader.mjs
+    scripts/verificar-libro-stock.mjs` (solo lectura) tiene que dar la
+    integridad física en VERDE, y el punto cero tiene que tener tantas filas
+    como `StockLocal`.
 
 ---
 

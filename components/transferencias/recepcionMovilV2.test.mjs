@@ -507,7 +507,12 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // Sube a 38 el 2026-09-26: entró `20260926195732_correccion_caja`, una tabla
   // nueva y vacía para las correcciones históricas de caja. Aditiva, sin
   // backfill. No toca ninguna tabla de recepción de transferencias.
-  assert.equal(migraciones.length, 38, "aparecio una migracion que nadie declaro aca");
+  // Sube a 39 el 2026-09-27: entró `20260927120000_libro_stock`, el libro
+  // histórico físico de stock. Dos tablas nuevas y un trigger sobre StockLocal que
+  // registra cada cambio; no cambia ninguna columna, y la recepción escribe
+  // StockLocal igual que antes —probado con `pruebas-db/recepcionTransferencias`
+  // con el trigger activo—.
+  assert.equal(migraciones.length, 39, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

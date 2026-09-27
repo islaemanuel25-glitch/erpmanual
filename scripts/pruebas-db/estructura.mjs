@@ -241,6 +241,74 @@ for (const [tipo, esperado] of Object.entries(ESPERADOS)) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// EL LIBRO DE STOCK: TRIGGERS Y FUNCIONES QUE PRISMA NO VE
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Son objetos de la misma familia que los de arriba: viven en SQL escrito a mano
+// —la migración `20260927120000_libro_stock`— y `migrate diff` no los ve, así
+// que una base construida sin ellos pasaría el chequeo de deriva en verde. Sin el
+// trigger de StockLocal el libro deja de capturar y nada se queja; sin los de
+// inmutabilidad, la historia se puede reescribir.
+//
+// Se comprueba la existencia, que estén HABILITADOS y sobre qué eventos: un
+// trigger que ve solo UPDATE se lee igual en una lista de nombres.
+
+seccion("El libro de stock: triggers y funciones");
+
+const { TRIGGERS_OBLIGATORIOS } = await import("../../lib/stock/libro/libroStock.js");
+
+// tgtype es una máscara: 1 fila, 2 BEFORE, 4 INSERT, 8 DELETE, 16 UPDATE.
+const EVENTOS_ESPERADOS = {
+  StockLocal_libro: { fila: true, antes: false, eventos: ["INSERT", "DELETE", "UPDATE"] },
+  ProductoBase_libro_reinterpretacion: { fila: true, antes: false, eventos: ["UPDATE"] },
+  Local_libro_reinterpretacion: { fila: true, antes: false, eventos: ["UPDATE"] },
+  MovimientoStock_inmutable: { fila: true, antes: true, eventos: ["DELETE", "UPDATE"] },
+  ReinterpretacionDeStock_inmutable: { fila: true, antes: true, eventos: ["DELETE", "UPDATE"] },
+};
+
+for (const { tabla, nombre } of TRIGGERS_OBLIGATORIOS) {
+  const filas = await prisma.$queryRaw`
+    SELECT t.tgtype::int AS tipo, t.tgenabled AS estado
+    FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
+    WHERE c.relname = ${tabla} AND t.tgname = ${nombre} AND NOT t.tgisinternal
+  `;
+  const t = filas[0];
+  const esperado = EVENTOS_ESPERADOS[nombre];
+  const eventos = t
+    ? [["INSERT", 4], ["DELETE", 8], ["UPDATE", 16]].filter(([, bit]) => t.tipo & bit).map(([e]) => e)
+    : [];
+  ok(
+    `"${nombre}" sobre "${tabla}": habilitado, ${esperado.antes ? "BEFORE" : "AFTER"} de fila, en ${esperado.eventos.join("/")}`,
+    Boolean(t) &&
+      t.estado !== "D" &&
+      Boolean(t.tipo & 1) === esperado.fila &&
+      Boolean(t.tipo & 2) === esperado.antes &&
+      JSON.stringify(eventos) === JSON.stringify(esperado.eventos),
+    t ? `tipo ${t.tipo}, estado ${t.estado}, eventos ${eventos.join("/")}` : "no existe"
+  );
+}
+
+const funcionesDelLibro = [
+  "libro_stock_instante",
+  "libro_stock_dia",
+  "libro_stock_origen",
+  "libro_stock_origen_ref",
+  "libro_stock_registrar",
+  "libro_stock_reinterpretacion",
+  "libro_stock_reinterpretacion_producto",
+  "libro_stock_reinterpretacion_local",
+  "libro_stock_inmutable",
+];
+const presentes = (
+  await prisma.$queryRaw`SELECT proname FROM pg_proc WHERE proname LIKE 'libro_stock%'`
+).map((f) => f.proname);
+ok(
+  `las ${funcionesDelLibro.length} funciones del libro existen`,
+  funcionesDelLibro.every((f) => presentes.includes(f)),
+  `faltan: ${funcionesDelLibro.filter((f) => !presentes.includes(f)).join(", ")}`
+);
+
+// ═══════════════════════════════════════════════════════════════════════════
 // LA FORMA GENERAL
 // ═══════════════════════════════════════════════════════════════════════════
 
