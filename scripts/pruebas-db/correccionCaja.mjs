@@ -260,23 +260,21 @@ async function correr(f) {
     const a = await leer(await rutaAplicar.POST(pedido("http://ci/api/caja/correcciones/aplicar", f.sesion, { codigo: "X", confirmacion: "X" })));
     igual("1: aplicar sin permiso es 403", a.status, 403);
     const g2 = await leer(await rutaListar.GET(pedidoGet("http://ci/api/caja/correcciones", f.sesionCorrector)));
-    // El repo trae I4 e I6 AUTORIZADOS e I5 PROPUESTO. Sus ids son de
-    // producción: acá no se ensayan ni se aplican —en esta base no existen,
-    // o son de otra prueba—, solo se afirma cómo los expone la ruta y que
-    // aplicar sigue pidiendo la confirmación escrita antes de llegar al motor.
-    igual("1: con permiso lista I4 e I6 AUTORIZADOS con su huella exacta, e I5 PROPUESTO",
+    // El repo trae I4, I6 e I5 AUTORIZADOS. Sus ids son de producción: acá no
+    // se ensayan ni se aplican —en esta base no existen, o son de otra
+    // prueba—, solo se afirma cómo los expone la ruta y que aplicar sigue
+    // pidiendo la confirmación escrita antes de llegar al motor.
+    igual("1: con permiso lista I4, I6 e I5 AUTORIZADOS con su huella exacta",
       (g2.items ?? []).map((i) => [i.codigo, i.estado, i.hashAutorizado, i.aplicada]),
       [
         ["I4", "AUTORIZADO", "8792f5faade1461e21c920dd0c5f1940d6717529717e4d643fefdcf358df6381", null],
         ["I6", "AUTORIZADO", "00442ff61b587b3b93b1e1c70a845d424f7b2fead0aa0c2edf07cc85b8f7b72f", null],
-        ["I5", "PROPUESTO", null, null],
+        ["I5", "AUTORIZADO", "4194020447db32cb7a723324ca1dece5fe218b594c9dc66d56f2c4e4f534704d", null],
       ]);
-    for (const c of ["I4", "I6"]) {
+    for (const c of ["I4", "I6", "I5"]) {
       const a = await leer(await rutaAplicar.POST(pedido("http://ci/api/caja/correcciones/aplicar", f.sesionCorrector, { codigo: c, confirmacion: "otro" })));
       ok(`1: ${c} no se aplica por la ruta sin escribir su código como confirmación`, a.status === 400 && a.error?.includes(c), `${a.status} ${a.error}`);
     }
-    const a5 = await leer(await rutaAplicar.POST(pedido("http://ci/api/caja/correcciones/aplicar", f.sesionCorrector, { codigo: "I5", confirmacion: "I5" })));
-    ok("1: I5 no se puede aplicar por la ruta: es PROPUESTO", a5.status === 409 && /PROPUESTO/.test(a5.error ?? ""), `${a5.status} ${a5.error}`);
     const e2 = await leer(await rutaEnsayo.POST(pedido("http://ci/api/caja/correcciones/ensayo", f.sesionCorrector, { codigo: "I3" })));
     igual("1: I3 no existe como manifiesto", e2.status, 404);
   }
