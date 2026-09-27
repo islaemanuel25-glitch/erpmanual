@@ -641,6 +641,34 @@ const CASOS = [
     inyecciones: [{ de: "      if (!mismoValor(corte[campo], c.antes[campo])) {", a: "      if (false) {" }],
     esperadas: ["4: el ensayo lo rechaza nombrando el campo"],
   },
+  // ── El corte vencido sin conteo (I5) ──
+  {
+    n: "CH-6",
+    defecto: "el corte vencido deja de proteger el fondo del turno receptor",
+    archivo: "lib/caja/correcciones/plan.js",
+    suite: "scripts/pruebas-db/correccionCaja.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "      else if (!mismoValor(receptor.montoInicial, sobre.totalRecibido)) {", a: "      else if (false) {" }],
+    esperadas: ["12: si el fondo del receptor cambió, no se aplica"],
+  },
+  {
+    n: "CH-7",
+    defecto: "el corte vencido se corrige aunque ya tenga conteo del cajón",
+    archivo: "lib/caja/correcciones/plan.js",
+    suite: "scripts/pruebas-db/correccionCaja.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "  if (corte.desgloseContado != null || corte.totalContado != null) errores.push(", a: "  if (false) errores.push(" }],
+    esperadas: ["12: si el corte tiene conteo, no se aplica"],
+  },
+  {
+    n: "CH-8",
+    defecto: "el motor deja de leer el turno que recibió el sobre del corte vencido",
+    archivo: "lib/caja/correcciones/motor.js",
+    suite: "scripts/pruebas-db/correccionCaja.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "      if (s?.turnoDestinoId) protegidos.add(s.turnoDestinoId);", a: "" }],
+    esperadas: ["12: ensayo sin errores"],
+  },
 ];
 
 // Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número
