@@ -97,11 +97,11 @@ const BITACORA = path.join(ROOT, ".claude", "migraciones-autorizadas.log");
  * Si escribir falla, no se frena nada: el rastro es para el informe, no para la
  * decisión. Perder una línea de bitácora no puede costar un despliegue.
  */
-function dejarRastro(comando) {
+function dejarRastro(comando, etiqueta = "AUTORIZACIÓN MANUAL") {
   try {
     fs.mkdirSync(path.dirname(BITACORA), { recursive: true });
     const cuando = new Date().toISOString().slice(0, 16).replace("T", " ");
-    fs.appendFileSync(BITACORA, `${cuando}  AUTORIZACIÓN MANUAL  ${comando}\n`, "utf8");
+    fs.appendFileSync(BITACORA, `${cuando}  ${etiqueta}  ${comando}\n`, "utf8");
   } catch {
     // a propósito en silencio
   }
@@ -189,10 +189,11 @@ process.stdin.on("end", async () => {
 
   const previa = decidirPorComando(comando);
   if (previa.accion !== "clasificar") {
-    // Solo la autorización manual deja rastro: es la única que pasa sin que
-    // nadie haya mirado qué entra. El rechazo del db push no hace falta
-    // anotarlo, porque frena y por lo tanto se ve.
-    if (previa.accion === "allow" && previa.aviso) dejarRastro(comando);
+    // Dejan rastro los que pasan avisando: la autorización manual, que pasa sin
+    // que nadie haya mirado qué entra, y la recuperación tipada de libro_stock,
+    // que escribe en _prisma_migrations. Cada una con su nombre. El rechazo del
+    // db push no hace falta anotarlo, porque frena y por lo tanto se ve.
+    if (previa.accion === "allow" && previa.aviso) dejarRastro(comando, previa.rastro);
     responder(previa.accion, previa.razon, previa.aviso);
   }
 

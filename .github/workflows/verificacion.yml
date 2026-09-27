@@ -288,6 +288,17 @@ jobs:
           pg_dump --version
           node --import ./scripts/alias-loader.mjs scripts/pruebas-db/libroStock.mjs
 
+      # ── LA RECUPERACIÓN DEL LIBRO ─────────────────────────────────────────
+      #
+      # El procedimiento del runbook de /deploy si la activación del libro no
+      # consigue su candado: una base como producción, `migrate deploy` real con
+      # una transacción reteniendo StockLocal, P3018/55P03, el diagnóstico, la
+      # cadena `diagnóstico && resolve --rolled-back` y el reintento. Y las
+      # contrapruebas: cada estado que no es el caso recuperable frena y la cadena
+      # no resuelve. Bases descartables, borradas al terminar.
+      - name: Recuperación del libro de stock (lock timeout → resolve --rolled-back)
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/recuperacionLibroStock.mjs
+
       # ── LA PREGUNTA QUE DECIDE EL DESPLIEGUE ──────────────────────────────
       #
       # Producción conserva sus 105 migraciones viejas en `_prisma_migrations` y

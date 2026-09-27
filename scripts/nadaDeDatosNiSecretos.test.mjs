@@ -86,6 +86,11 @@ const PROHIBIDO = [
       // nombrados uno por uno y no por carpeta, para que agregar otro obligue a
       // mirarlo.
       (p) => p === "scripts/limpieza-turnos-abandonados.sql",
+      // El diagnóstico y el precheck de la recuperación de libro_stock: SQL de
+      // SOLO LECTURA (transacción READ ONLY que termina en ROLLBACK) que lee
+      // catálogos y `_prisma_migrations`. No trae una sola fila de datos.
+      (p) => p === "scripts/deploy/diagnostico-recuperacion-libro-stock.sql",
+      (p) => p === "scripts/deploy/precheck-libro-stock.sql",
     ],
   },
   {

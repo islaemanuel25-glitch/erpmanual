@@ -40,18 +40,29 @@ Producción está en **37 migraciones**. El árbol trae **39**: dos pendientes.
     ajustes ESPERAN (no fallan) hasta que confirma. Medido en la sesión de
     desarrollo: 28 ms con 4.000 filas, 64 ms con 10.000, 283 ms con 50.000,
     764 ms con 100.000. Conviene desplegar fuera del horario de venta.
+  - **Precheck antes de migrar.** `scripts/deploy/precheck-libro-stock.sql`, de
+    solo lectura: si da ROJO —migración fallida sin resolver, transacción de más
+    de 2 s, candado sobre las tres tablas— NO se inicia ninguna migración.
   - **Tope de espera de 3 s.** Si hay una transacción larga escribiendo stock
     —una importación—, la migración FALLA en vez de trabar el POS. No deja nada
-    a medias (probado), pero Prisma la registra como fallida, y reintentarla
-    pide `prisma migrate resolve --rolled-back 20260927120000_libro_stock`, que
-    la guardia de migraciones rechaza siempre. Si pasa, frenar y avisar a
-    Emanuel: no hay un camino ya autorizado para reintentarla.
+    a medias (probado): `correccion_caja` queda aplicada y del libro no queda
+    nada. Prisma la registra como fallida y todo deploy posterior da P3009.
+    **Desde la PR #93 hay un camino autorizado y probado**, solo para este caso:
+    el diagnóstico de solo lectura y, si da `CASO_1_RECUPERABLE`, la
+    recuperación tipada `resolve --rolled-back` —el único `migrate resolve` que
+    la guardia deja pasar, por texto exacto—. Máximo DOS intentos de aplicar el
+    libro por ventana; nunca un tercero. **No se restaura el backup por esto.**
+    El runbook completo, con los comandos exactos, está en el skill `/deploy`:
+    "La única excepción ya autorizada".
   - **La app vieja sigue andando.** Nada de su código cambia; sus escrituras
     quedan en el libro como `SIN_ORIGEN`, que es lo esperado.
-  - **Después de aplicarla**, `node --import ./scripts/alias-loader.mjs
-    scripts/verificar-libro-stock.mjs` (solo lectura) tiene que dar la
-    integridad física en VERDE, y el punto cero tiene que tener tantas filas
-    como `StockLocal`.
+  - **Después de aplicarla**, `migrate status` NO alcanza —medido: dice "up to
+    date" después de un `--rolled-back` con el libro sin aplicar—. Hay que
+    contar las 39 por nombre, correr `DATABASE_URL="<la de producción>" node
+    --import ./scripts/alias-loader.mjs scripts/verificar-libro-stock.mjs`
+    (solo lectura) con la integridad física en VERDE, y comprobar que el punto
+    cero tiene tantas filas como `StockLocal` con un único instante. La lista
+    completa está en el POST del runbook.
 
 ---
 
