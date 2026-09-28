@@ -1,16 +1,24 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-28 10:19
+**Fecha:** 2026-09-28 16:09
 
 ## Módulos modificados recientemente
 
+### productos
+- feat: declarar el origen de las escrituras de costo para el Libro de Costos
+- Archivos: 4 modificados (4 total)
+
+### proveedores
+- feat: declarar el origen de las escrituras de costo para el Libro de Costos
+- Archivos: 2 modificados (2 total)
+
 ### stock
-- feat(stock): API de solo lectura del Stock Diario
-- Archivos: 4 nuevos (4 total)
+- feat: declarar el origen de las escrituras de costo para el Libro de Costos, feat(stock): API de solo lectura del Stock Diario
+- Archivos: 4 nuevos, 2 modificados (6 total)
 
 ### transferencias
-- fix(transferencias): el depósito solo pide destinos de su grupo en el tablero, fix(transferencias): un destino en la URL no amplía el alcance de un local en el tablero, fix(libro): la BAJA no depende del orden de las sentencias, feat(stock): Stock Diario derivado del libro, con el índice que lo hace posible
-- Archivos: 2 modificados (2 total)
+- feat: declarar el origen de las escrituras de costo para el Libro de Costos, fix(transferencias): el depósito solo pide destinos de su grupo en el tablero, fix(transferencias): un destino en la URL no amplía el alcance de un local en el tablero
+- Archivos: 3 modificados (3 total)
 
 
 ## Archivos nuevos desde última sincronización

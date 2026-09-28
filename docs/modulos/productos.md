@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-09-18 22:25
+**Última actualización:** 2026-09-28 16:09
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,7 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-09-28: feat: declarar el origen de las escrituras de costo para el Libro de Costos
 - 2026-09-18: fix: el carrusel pagina por grupo, así ninguna página mezcla temas
 - 2026-09-18: feat: el aviso del código de caja, con su confirmación y su botón
 - 2026-09-14: test: las enumeraciones de los candados ven lo que todavía no se commiteó

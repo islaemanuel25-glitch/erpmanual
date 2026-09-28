@@ -11,6 +11,7 @@ import {
 } from "@/lib/productos/validarCodigosBarra";
 import { esComboBase } from "@/lib/combos/guards";
 import { puedeEditarCosto, puedeEditarBaseProducto } from "@/lib/productos/propiedadCosto";
+import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
 
 const CHUNK_SIZE = 50;
 
@@ -108,6 +109,8 @@ export async function POST(req) {
       for (const p of chunk) {
         try {
           await prisma.$transaction(async (tx) => {
+            // Metadata para el Libro de Costos: no cambia qué costo se escribe.
+            await declararOrigenDeCosto(tx, { origen: ORIGEN_COSTO.IMPORTACION_PRODUCTOS });
             const unidadMedida = p.unidad_medida || "unidad";
             const esPack = unidadMedida === "pack" || unidadMedida === "cajon";
             const fp = p.factor_pack && p.factor_pack > 1 ? p.factor_pack : null;
@@ -204,6 +207,8 @@ export async function POST(req) {
           }
 
           const costoSaltadoRow = await prisma.$transaction(async (tx) => {
+            // Metadata para el Libro de Costos: no cambia qué costo se escribe.
+            await declararOrigenDeCosto(tx, { origen: ORIGEN_COSTO.IMPORTACION_PRODUCTOS });
             // Los combos no tienen stock físico: no se materializa ProductoLocal/StockLocal.
             const baseActual = await tx.productoBase.findUnique({
               where: { id: p.productoBaseId },

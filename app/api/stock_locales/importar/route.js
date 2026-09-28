@@ -11,6 +11,7 @@ import {
   validarUnicidadCodigos,
 } from "@/lib/productos/validarCodigosBarra";
 import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
+import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
 
 export async function POST(req) {
   try {
@@ -113,6 +114,10 @@ export async function POST(req) {
     // aplicar, sin decir qué filas entraron, es peor que uno rechazado.
     const depositoLocalId = await getDepositoIdDeGrupo(ctx.grupoId, prisma);
     await prisma.$transaction(async (tx) => {
+      // Metadata para el Libro de Costos: no cambia qué costo se escribe. Cubre
+      // solo las bases: los ProductoLocal se crean más abajo, fuera de esta
+      // transacción, y quedan SIN_ORIGEN (anotado en lib/precios/origenDeCosto.js).
+      await declararOrigenDeCosto(tx, { origen: ORIGEN_COSTO.IMPORTACION_STOCK });
       await bloquearCodigosDelGrupo(tx, ctx.grupoId);
 
       for (let i = 0; i < productosBaseData.length; i++) {

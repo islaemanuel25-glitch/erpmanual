@@ -11,6 +11,7 @@ import {
   validarUnicidadCodigos,
 } from "@/lib/productos/validarCodigosBarra";
 import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
+import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
 
 export async function POST(req) {
   try {
@@ -151,6 +152,8 @@ export async function POST(req) {
     // 4. Crear productoBase + productoLocal + stockLocal
     // --------------------------------------------
     const base = await prisma.$transaction(async (tx) => {
+      // Metadata para el Libro de Costos: no cambia qué costo se escribe.
+      await declararOrigenDeCosto(tx, { origen: ORIGEN_COSTO.ALTA_PRODUCTO_DESDE_STOCK });
       await bloquearCodigosDelGrupo(tx, data.grupoId);
       const vUnic = await validarUnicidadCodigos({
         prisma: tx,

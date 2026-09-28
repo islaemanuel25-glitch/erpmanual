@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-09-28 10:19
+**Última actualización:** 2026-09-28 16:09
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-09-28: feat: declarar el origen de las escrituras de costo para el Libro de Costos
 - 2026-09-28: fix(transferencias): el depósito solo pide destinos de su grupo en el tablero
 - 2026-09-28: fix(transferencias): un destino en la URL no amplía el alcance de un local en el tablero
 - 2026-09-28: fix(libro): la BAJA no depende del orden de las sentencias

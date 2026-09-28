@@ -37,6 +37,7 @@ import { requireAdmin } from "@/lib/authorize";
 import { OPCIONES_TX, esImportacionRevertible } from "@/lib/proveedores/listas/persistencia";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { planDeReversion, TEXTO_OMISION } from "@/lib/proveedores/listas/reversion";
+import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
 
 /** Los campos de la fila que el plan necesita, y ninguno más. */
 const CAMPOS_FILA = {
@@ -245,6 +246,9 @@ export async function POST(req, context) {
     const esperado = body?.confirmacion ?? null;
 
     const resultado = await prisma.$transaction(async (tx) => {
+      // Metadata para el Libro de Costos: no cambia qué costo se escribe.
+      await declararOrigenDeCosto(tx, { origen: ORIGEN_COSTO.LISTA_PROVEEDOR_REVERTIR, referencia: importacionId });
+
       const productos = await cargarProductos(tx, {
         importacionId,
         grupoId: scope.grupoId,
