@@ -52,9 +52,8 @@ import { crearClientePrisma, ESCRITURA, LECTURA } from "../lib/clientePrisma.mjs
 
 const MODO_HIJO = process.argv[2] === "--solo-calculo";
 
-const fs = await import("node:fs");
 const path = await import("node:path");
-const { spawnSync, execFileSync } = await import("node:child_process");
+const { spawnSync } = await import("node:child_process");
 const { fileURLToPath } = await import("node:url");
 
 const {
@@ -72,13 +71,13 @@ const {
   diasDelRango,
 } = await import("../../lib/stock/libro/stockDiario.js");
 const server = await import("../../lib/stock/libro/stockDiarioServer.js");
+const { Prisma } = await import("@prisma/client");
 const porUnidad = await import("../../lib/stock/libro/stockDiarioPorUnidadServer.js");
 const { sumarDias } = await import("../../lib/transferencias/periodoDePago.js");
 const { programarSemanaOperativa } = await import("../../lib/semanaOperativa/semanaOperativaServer.js");
+const { MIGRACION_LIBRO, MIGRACIONES, aplicarMigraciones, AR, uno, guion } = await import("./lib/libroEnElTiempo.mjs");
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const DIR_MIGRACIONES = path.join(RAIZ, "prisma", "migrations");
-const MIGRACION_LIBRO = "20260927120000_libro_stock";
 const MIGRACION_INDICE = "20260928150000_stock_diario_indice";
 const INDICE = "MovimientoStock_localId_productoLocalId_dia_id_idx";
 const PREFIJO = "erpazul_sd_prueba_";
@@ -176,78 +175,12 @@ async function clienteDe(url) {
   return c;
 }
 
-const MIGRACIONES = fs
-  .readdirSync(DIR_MIGRACIONES, { withFileTypes: true })
-  .filter((e) => e.isDirectory())
-  .map((e) => e.name)
-  .sort();
-
-/** Aplica los migration.sql del repo en orden, cada uno en su transacción, como Prisma. */
-function aplicarMigraciones(url, { hasta = null, solo = null } = {}) {
-  const lista = solo ?? MIGRACIONES.filter((m) => hasta === null || m < hasta);
-  for (const m of lista) {
-    execFileSync("psql", [url, "-X", "-q", "-v", "ON_ERROR_STOP=1", "-1", "-f", path.join(DIR_MIGRACIONES, m, "migration.sql")], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-  }
-  return lista.length;
-}
-
-// Un momento del guion en hora ARGENTINA, pasado a UTC por PostgreSQL con la zona
-// explícita: Node no convierte ninguna hora en esta prueba.
-const AR = (texto) => `(timestamp '${texto}' AT TIME ZONE 'America/Argentina/Cordoba') AT TIME ZONE 'UTC'`;
-
 // ════════════════════════════════════════════════════════════════════════════
 // La base del guion
 // ════════════════════════════════════════════════════════════════════════════
-
-/**
- * El guion: cada paso escribe de verdad y anota qué ids del libro produjo y en
- * qué momento argentino tienen que quedar. `reubicar` los mueve al final.
- */
-function guion(c) {
-  const pasos = [];
-  const maximo = async () => {
-    const [r] = await c.$queryRaw`
-      SELECT coalesce((SELECT max("id") FROM "MovimientoStock"), 0)::int AS "m",
-             coalesce((SELECT max("id") FROM "ReinterpretacionDeStock"), 0)::int AS "r"`;
-    return r;
-  };
-  return {
-    /** El punto cero: todo lo que el libro ya tiene al empezar el guion. */
-    async puntoCero(momento) {
-      pasos.push({ momento, antes: { m: 0, r: 0 }, despues: await maximo() });
-    },
-    async paso(momento, fn) {
-      const antes = await maximo();
-      await fn();
-      const despues = await maximo();
-      pasos.push({ momento, antes, despues });
-      return despues.m - antes.m;
-    },
-    async reubicar() {
-      await c.$executeRawUnsafe(`ALTER TABLE "MovimientoStock" DISABLE TRIGGER "MovimientoStock_inmutable"`);
-      await c.$executeRawUnsafe(`ALTER TABLE "ReinterpretacionDeStock" DISABLE TRIGGER "ReinterpretacionDeStock_inmutable"`);
-      for (const p of pasos) {
-        const t = AR(p.momento);
-        await c.$executeRawUnsafe(
-          `UPDATE "MovimientoStock" SET "instante" = (${t})::timestamp(3), "dia" = "libro_stock_dia"((${t})::timestamp(3)) WHERE "id" > ${p.antes.m} AND "id" <= ${p.despues.m}`
-        );
-        await c.$executeRawUnsafe(
-          `UPDATE "ReinterpretacionDeStock" SET "instante" = (${t})::timestamp(3), "dia" = "libro_stock_dia"((${t})::timestamp(3)) WHERE "id" > ${p.antes.r} AND "id" <= ${p.despues.r}`
-        );
-      }
-      await c.$executeRawUnsafe(`ALTER TABLE "MovimientoStock" ENABLE TRIGGER "MovimientoStock_inmutable"`);
-      await c.$executeRawUnsafe(`ALTER TABLE "ReinterpretacionDeStock" ENABLE TRIGGER "ReinterpretacionDeStock_inmutable"`);
-    },
-  };
-}
-
-async function uno(c, sql) {
-  const filas = await c.$queryRawUnsafe(sql);
-  return filas[0];
-}
+//
+// Aplicar migraciones, reubicar en el tiempo y leer una fila viven en
+// `lib/libroEnElTiempo.mjs`, que comparte la prueba de la API.
 
 /** Siembra una base SIN libro: locales, productos y el stock que el punto cero va a copiar. */
 async function sembrarGuion(c) {
@@ -990,6 +923,42 @@ try {
       WHERE m."localId" = 1 AND m."productoLocalId" = 1 AND m."dia" < ${DIA}::date ORDER BY m."dia" DESC, m."id" DESC LIMIT 1`;
     const nodos1 = nodosDelPlan(unaCadena[0]["QUERY PLAN"][0].Plan);
     ok("la apertura de UNA cadena es un Limit sobre un Index Scan Backward del índice nuevo", nodos1.some((n) => n["Index Name"] === INDICE && n["Scan Direction"] === "Backward"), json(nodos1.map((n) => n["Node Type"])));
+
+    // ── La página de movimientos de la API, la MISMA consulta que corre ──────
+    //
+    // Un año entero del local, la página 21 de 50. Lo que se exige es que la
+    // página lea sus días y no el año: hasta la fila 1.050, más el día en que
+    // cae el corte. La contraprueba es la consulta escrita como dice el contrato
+    // —(instante, id), sin el día adelante—: da el mismo orden y lee el año.
+    {
+      const ANIO = { desde: "2026-09-27", hasta: "2027-09-30" };
+      const pagina = server.sqlMovimientosPagina({ localId: 1, ...ANIO, limite: 50, desplazamiento: 1000 });
+      const [masDia] = await v.$queryRaw`
+        SELECT max(n)::int AS n, sum(n)::int AS total FROM (
+          SELECT count(*) AS n FROM "MovimientoStock" WHERE "localId" = 1 GROUP BY "dia") s`;
+      const TOPE_PAGINA = 2 * (1050 + masDia.n);
+      const p = await explicar(v, pagina);
+      ok(
+        `la página 21 de un año del local lee ${p.filasLeidas.toLocaleString("es-AR")} filas del libro, de ${masDia.total.toLocaleString("es-AR")} (tope ${TOPE_PAGINA.toLocaleString("es-AR")}) — ${p.ms.toFixed(1)} ms`,
+        p.filasLeidas <= TOPE_PAGINA && p.nodos.some((n) => n["Node Type"] === "Incremental Sort"),
+        json(p.nodos.map((n) => n["Node Type"]))
+      );
+      const ingenua = Prisma.sql`
+        SELECT m."id" FROM "MovimientoStock" m
+        WHERE m."localId" = 1 AND m."dia" BETWEEN ${ANIO.desde}::date AND ${ANIO.hasta}::date
+        ORDER BY m."instante", m."id" LIMIT 50 OFFSET 1000`;
+      const x = await explicar(v, ingenua);
+      ok(`CONTRAPRUEBA: ordenada solo por (instante, id) lee ${x.filasLeidas.toLocaleString("es-AR")} filas (más que el tope)`, x.filasLeidas > TOPE_PAGINA);
+      const ids = (filas) => filas.map((f) => Number(f.id)).join(",");
+      ok("y las dos devuelven exactamente las mismas filas, en el mismo orden", ids(await v.$queryRaw`${pagina}`) === ids(await v.$queryRaw`${ingenua}`));
+
+      const cadena = await explicar(v, server.sqlMovimientosPagina({ localId: 1, productoLocalId: 1, ...ANIO, limite: 50, desplazamiento: 0 }));
+      ok(
+        `la página de UNA cadena baja por el índice nuevo y lee ${cadena.filasLeidas} filas`,
+        cadena.indices.includes(INDICE) && cadena.filasLeidas <= 50,
+        json(cadena.indices)
+      );
+    }
 
     // Los resultados con y sin el índice tienen que ser IGUALES: el índice cambia
     // la velocidad, no la respuesta.
