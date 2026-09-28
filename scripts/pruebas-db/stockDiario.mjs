@@ -72,6 +72,7 @@ const {
   diasDelRango,
 } = await import("../../lib/stock/libro/stockDiario.js");
 const server = await import("../../lib/stock/libro/stockDiarioServer.js");
+const porUnidad = await import("../../lib/stock/libro/stockDiarioPorUnidadServer.js");
 const { sumarDias } = await import("../../lib/transferencias/periodoDePago.js");
 const { programarSemanaOperativa } = await import("../../lib/semanaOperativa/semanaOperativaServer.js");
 
@@ -801,9 +802,9 @@ try {
     const v = de(q, P.uno.pl);
     ok("del 28 al 30: COMPLETO, abre 18 y cierra 13", q.periodo.estado === ESTADO_DEL_DIA.COMPLETO && v.apertura.cantidad === 18 && v.cierre.cantidad === 13 && v.cuadra.cantidad);
     ok("en el período lista también los que murieron adentro, y no los que murieron antes", !!de(q, P.muere.pl) && !!de(q, P.eliminado.pl));
-    const mes = await server.stockDeUnidad(c, { localId: L.A, unidad: UNIDAD_DE_PERIODO.MES, fecha: "2026-09-30", hoy: HOY });
+    const mes = await porUnidad.stockDeUnidad(c, { localId: L.A, unidad: UNIDAD_DE_PERIODO.MES, fecha: "2026-09-30", hoy: HOY });
     ok("el mes de septiembre: 1 al 30, PARCIAL, con historia desde el 27", mes.periodo.desde === "2026-09-01" && mes.periodo.hasta === "2026-09-30" && mes.periodo.estado === ESTADO_DEL_DIA.PARCIAL_PUNTO_CERO && mes.periodo.desdeEfectivo === "2026-09-27");
-    const anio = await server.stockDeUnidad(c, { localId: L.A, unidad: UNIDAD_DE_PERIODO.ANIO, fecha: "2026-09-30", hoy: HOY });
+    const anio = await porUnidad.stockDeUnidad(c, { localId: L.A, unidad: UNIDAD_DE_PERIODO.ANIO, fecha: "2026-09-30", hoy: HOY });
     ok("el año: recortado a hoy, sin inventar el futuro", anio.periodo.desde === "2026-01-01" && anio.periodo.hastaEfectivo === HOY && anio.periodo.recortadoAHoy);
   }
 
@@ -882,7 +883,7 @@ try {
     // Las vigencias se escriben por la puerta canónica, con sus reglas: la
     // primera carga rige desde siempre, y un cambio solo puede ser futuro.
     await c.$transaction((tx) => programarSemanaOperativa(tx, { localId: L.A, diaDeCorte: 1, hoy: HOY }));
-    const antes = await server.stockDeUnidad(c, { localId: L.A, unidad: UNIDAD_DE_PERIODO.SEMANA, fecha: "2026-09-30", hoy: HOY });
+    const antes = await porUnidad.stockDeUnidad(c, { localId: L.A, unidad: UNIDAD_DE_PERIODO.SEMANA, fecha: "2026-09-30", hoy: HOY });
     ok(
       "con corte lunes, la semana del 30/09 va del lunes 28 al domingo 4, configurada",
       antes.periodo.desde === "2026-09-28" && antes.periodo.hasta === "2026-10-04" && antes.semana.configurada && !antes.semana.transicion && antes.periodo.estado === ESTADO_DEL_DIA.COMPLETO,
@@ -892,10 +893,10 @@ try {
     // Un cambio de corte FUTURO: rige desde el lunes 12/10, con corte miércoles.
     const cambio = await c.$transaction((tx) => programarSemanaOperativa(tx, { localId: L.A, diaDeCorte: 3, desde: "2026-10-12", hoy: HOY }));
     ok("el cambio quedó programado para el 12/10, por la puerta canónica", cambio.desde === "2026-10-12", json(cambio));
-    const despues = await server.stockDeUnidad(c, { localId: L.A, unidad: UNIDAD_DE_PERIODO.SEMANA, fecha: "2026-09-30", hoy: HOY });
+    const despues = await porUnidad.stockDeUnidad(c, { localId: L.A, unidad: UNIDAD_DE_PERIODO.SEMANA, fecha: "2026-09-30", hoy: HOY });
     ok("el cambio de corte futuro no mueve la semana vieja ni su stock", json({ ...despues, semana: null }) === json({ ...antes, semana: null }) && json(despues.semana) === json(antes.semana));
     ok("ni ningún día: el Stock Diario no mira la semana", json(await calcularTodo(c, { locales: [L.A], dias: DIAS, hoy: HOY })) === diariosAntes);
-    const sinConf = await server.stockDeUnidad(c, { localId: L.B, unidad: UNIDAD_DE_PERIODO.SEMANA, fecha: "2026-09-30", hoy: HOY });
+    const sinConf = await porUnidad.stockDeUnidad(c, { localId: L.B, unidad: UNIDAD_DE_PERIODO.SEMANA, fecha: "2026-09-30", hoy: HOY });
     ok("una ubicación sin semana configurada usa el domingo y lo dice", sinConf.semana.sinConfigurar && sinConf.periodo.desde === "2026-09-27");
   }
 
