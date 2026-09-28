@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-09-19 03:17
+**Última actualización:** 2026-09-28 16:09
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-09-28: feat: declarar el origen de las escrituras de costo para el Libro de Costos
 - 2026-09-19: fix: el cartel dice en cuánto difiere en vez de afirmar que el precio cambió
 - 2026-09-19: feat: el resultado dice cuáles no se van a actualizar y por qué
 - 2026-09-19: feat: el resultado revalida lo mismo que aplicar, y ofrece volver a leer

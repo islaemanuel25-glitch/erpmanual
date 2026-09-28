@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-09-28 04:26
+**Última actualización:** 2026-09-28 16:09
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -232,6 +232,7 @@ la API del Stock Diario y no se tocó; hay que confirmarlo ejerciéndolo antes d
 corregirlo.
 
 ## Cambios recientes
+- 2026-09-28: feat: declarar el origen de las escrituras de costo para el Libro de Costos
 - 2026-09-28: feat(stock): API de solo lectura del Stock Diario
 - 2026-08-25: fix(stock): mostrar packs y unidades en movil (#12)
 - 2026-07-28: feat(productos): codigo de barras propio por ubicacion
