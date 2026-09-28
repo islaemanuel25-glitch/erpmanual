@@ -38,6 +38,7 @@ import {
   interpretarLimite,
   valorAGuardar,
 } from "@/lib/stock/limites";
+import { motivoCantidadNoAdmitida, unidadFisicaDeStock } from "@/lib/stock/escalaFisica";
 
 const TEXTO_SIN_AUDITORIA =
   "No se puede registrar el ajuste porque no se pudo determinar el grupo de la " +
@@ -165,7 +166,21 @@ export async function POST(req) {
     // ======================================================
     const prodLocal = await prisma.productoLocal.findUnique({
       where: { id: productoLocalId },
-      select: { id: true, localId: true, base: { select: { es_combo: true } } },
+      select: {
+        id: true,
+        localId: true,
+        base: {
+          select: {
+            es_combo: true,
+            // Lo que pide `unidadFisicaDeStock` para saber si la fila va en piezas.
+            unidad_medida: true,
+            modoCompraProveedor: true,
+            pesoReferenciaKg: true,
+            modoVentaDeposito: true,
+            pesoEsFijo: true,
+          },
+        },
+      },
     });
 
     if (!prodLocal || prodLocal.localId !== localId) {
@@ -215,6 +230,19 @@ export async function POST(req) {
           { ok: false, error: "Cantidad inválida" },
           { status: 400 }
         );
+      }
+
+      // ── LA CANTIDAD YA LLEGA EN LA UNIDAD DE LA FILA ─────────────────────
+      //
+      // No se convierte nada: se suma, se resta o se fija tal cual. Lo único
+      // que se agrega es que una fila contada en PIEZAS —el peso fijo en el
+      // depósito— no acepte media pieza. Los kilos siguen admitiendo decimales.
+      const noAdmitida = motivoCantidadNoAdmitida(
+        cantidad,
+        unidadFisicaDeStock(prodLocal.base, esDeposito)
+      );
+      if (noAdmitida) {
+        return NextResponse.json({ ok: false, error: noAdmitida }, { status: 400 });
       }
 
       const actual = Number(stock.cantidad || 0);

@@ -483,6 +483,12 @@ jobs:
       - name: Conformidad del costo por unidad física con el POS
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/costoPorUnidadFisica.mjs
 
+      # El ajuste de stock del peso fijo por la ruta real: piezas enteras en el
+      # depósito, kilos con decimales en el local, y media pieza rechazada sin
+      # mover el stock ni dejar auditoría.
+      - name: Ajuste de stock del peso fijo contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/ajusteStockPieza.mjs
+
       # El ciclo de cierre de caja: la carrera entre el cierre clásico y el corte
       # —forzada con un lock retenido, no librada al azar—, la corrección de una
       # venta según el estado de su turno y el vencimiento de un corte por
