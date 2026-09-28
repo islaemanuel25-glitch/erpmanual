@@ -16,9 +16,25 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **39 migraciones**. El árbol trae **39**: ninguna pendiente.
+Producción está en **39 migraciones**. El árbol trae **40**. Falta:
 
-Ninguna.
+- `20260928180000_libro_stock_baja_atomica` — corrección preventiva del libro de
+  stock. Reemplaza con `CREATE OR REPLACE` la función `libro_stock_registrar`
+  (el trigger `StockLocal_libro` sigue apuntando a ella) y agrega dos funciones y
+  dos triggers `BEFORE DELETE` sobre `ProductoLocal` y `ProductoBase` que
+  recuerdan la identidad, local a la transacción. No toca ninguna tabla, columna
+  ni fila del libro, no crea `ESTADO_INICIAL` y no mueve el punto cero; la
+  migración `20260927120000_libro_stock` no se modifica. El clasificador la marca
+  **aditiva, sin coincidencias** —no lee lo que cambia una función: esto SÍ
+  cambia comportamiento, a propósito—: una sola sentencia que borra un
+  StockLocal y su ProductoLocal ahora deja su BAJA, y un movimiento que no puede
+  escribirse aborta la sentencia en vez de perderse. Sin tope de espera: el
+  `CREATE TRIGGER` frena solo las escrituras sobre `ProductoLocal` y
+  `ProductoBase` mientras confirma, no las lecturas ni `StockLocal`. Qué
+  comprobar después de aplicarla: los triggers `ProductoLocal_libro_identidad` y
+  `ProductoBase_libro_identidad` presentes, `libro_stock_identidad_de_baja`
+  presente, el mismo conteo de `MovimientoStock` que antes, y el verificador del
+  libro en verde.
 
 ---
 

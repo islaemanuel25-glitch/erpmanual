@@ -88,6 +88,12 @@ function dirPrisma(excluir) {
   fs.mkdirSync(path.join(d, "migrations"), { recursive: true });
   fs.copyFileSync(path.join(RAIZ, "prisma/schema.prisma"), path.join(d, "schema.prisma"));
   for (const e of fs.readdirSync(path.join(RAIZ, "prisma/migrations"), { withFileTypes: true })) {
+    // El árbol de AQUEL despliegue: hasta el libro inclusive. Las migraciones
+    // posteriores cuelgan del libro y no existían cuando se escribió el
+    // runbook; con ellas, la base "como producción antes del libro" recibiría
+    // objetos sobre tablas que no tiene, y "aplica SOLO libro_stock" dejaría de
+    // ser la pregunta.
+    if (e.isDirectory() && e.name > LIBRO) continue;
     if (excluir.includes(e.name)) continue;
     fs.cpSync(path.join(RAIZ, "prisma/migrations", e.name), path.join(d, "migrations", e.name), { recursive: true });
   }
