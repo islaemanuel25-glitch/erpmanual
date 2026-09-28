@@ -74,6 +74,7 @@ import {
 import { vigenciasDeUbicaciones } from "@/lib/semanaOperativa/semanaOperativaServer";
 import { relacionesDelDeposito } from "@/lib/transferencias/relacionesDelDeposito";
 import { destinosDeTransferencia } from "@/lib/transferencias/destinosDeTransferencia";
+import { resolverLocalPedido } from "@/lib/finanzas/alcanceFinanciero";
 
 /** `YYYY-MM-DD`, que es la forma en la que `periodoDePago` compara. */
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -202,6 +203,30 @@ export async function GET(req) {
         })
       : null;
     const esDeposito = vista.modo === "GLOBAL" || localPropio?.es_deposito === true;
+
+    // ── UN `destino` NO AMPLÍA EL ALCANCE DE UN LOCAL ─────────────────────
+    //
+    // `resolveVistaOperativa` rechaza un `?localId=` ajeno, pero este endpoint
+    // pide el local con otro nombre, así que esa protección no lo cubre. Hasta el
+    // 2026-09-28, para un local el `destino` pedido REEMPLAZABA su `destinoId`
+    // en el filtro de abajo: con `?destino=<otro>` leía las transferencias que
+    // recibía otra ubicación —de su grupo o de otro—, con importes y a pagar.
+    // Reproducido en `scripts/pruebas-db/transferenciasAlcance.mjs`.
+    //
+    // La regla es la de Finanzas, que tiene el mismo parámetro por el mismo
+    // motivo: quien no es depósito solo pide el suyo, y otro es 403 y no un
+    // silencioso "te doy el tuyo". Se decide ACÁ, antes de leer nada del local
+    // pedido. El depósito y la vista global siguen eligiendo destino como antes.
+    if (!esDeposito) {
+      const propio = resolverLocalPedido({
+        esDeposito: false,
+        localDeLaSesion: vista.localId,
+        destinoPedido: searchParams.get("destino"),
+      });
+      if (propio.error) {
+        return NextResponse.json({ ok: false, error: propio.error }, { status: 403 });
+      }
+    }
 
     // ── TODOS LOS LOCALES, TENGAN O NO MOVIMIENTO ─────────────────────────
     //

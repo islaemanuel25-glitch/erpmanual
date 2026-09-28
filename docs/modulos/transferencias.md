@@ -100,6 +100,24 @@ Diferencias deliberadas, y por que:
 - `transferencias.crear`
 - `transferencias.recibir`
 
+### El alcance del tablero y el parámetro `destino`
+
+*(Verificado contra PostgreSQL por `scripts/pruebas-db/transferenciasAlcance.mjs`.)*
+`GET /api/transferencias/tablero` exige `transferencias.ver` y toma el alcance
+de `resolveVistaOperativa`. El `?destino=` sirve para que el DEPÓSITO —o el admin
+en vista global— abra la cuenta de uno de sus locales.
+
+Un local no lo manda, porque su cuenta es la suya. Si lo manda, tiene que ser su
+propio local; otro, uno que no existe o algo que no es un número da 403 "Local
+fuera de tu alcance." o "Local inválido.". La regla es `resolverLocalPedido`, de
+`lib/finanzas/alcanceFinanciero.js`, la misma que usa Finanzas para el mismo
+parámetro.
+
+Hasta el 2026-09-28 no era así: para un local, el `destino` reemplazaba su propio
+`destinoId` en el filtro. Con `?destino=<otro>` leía las transferencias que
+recibía otra ubicación, del grupo o de otro grupo: ids, estados, fechas, importes
+y el "a pagar" del período.
+
 ## Modelo de datos
 
 ```prisma
