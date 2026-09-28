@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-09-28] - Actualización: transferencias
+
+### Modificado
+- **transferencias**: fix(transferencias): un destino en la URL no amplía el alcance de un local en el tablero
+- **transferencias**: fix(libro): la BAJA no depende del orden de las sentencias
+- **transferencias**: feat(stock): Stock Diario derivado del libro, con el índice que lo hace posible
+
+
 ## [2026-09-27] - Actualización: transferencias
 
 ### Modificado
