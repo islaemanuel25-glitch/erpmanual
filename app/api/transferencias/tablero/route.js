@@ -74,6 +74,7 @@ import {
 import { vigenciasDeUbicaciones } from "@/lib/semanaOperativa/semanaOperativaServer";
 import { relacionesDelDeposito } from "@/lib/transferencias/relacionesDelDeposito";
 import { destinosDeTransferencia } from "@/lib/transferencias/destinosDeTransferencia";
+import { resolverLocalPedido } from "@/lib/finanzas/alcanceFinanciero";
 
 /** `YYYY-MM-DD`, que es la forma en la que `periodoDePago` compara. */
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -214,12 +215,41 @@ export async function GET(req) {
     // lista, así que de cuatro relaciones sin configurar informaba una.
     const { deposito, locales } = await relacionesDelDeposito(vista.grupoId);
 
-    // La semana de cada local del grupo, en una sola consulta. El destino pedido y
-    // el local de la sesión entran aunque no estén en la lista: su semana es suya.
-    const destinoConSemana = Number(searchParams.get("destino") || 0) || null;
+    // ── UN `destino` NO AMPLÍA EL ALCANCE ─────────────────────────────────
+    //
+    // `resolveVistaOperativa` rechaza un `?localId=` ajeno, pero este endpoint
+    // pide el local con otro nombre, así que esa protección no lo cubre. Hasta el
+    // 2026-09-28 el `destino` pedido se usaba tal cual. Para un LOCAL,
+    // reemplazaba su propio `destinoId`, y con `?destino=<otro>` leía las
+    // transferencias que recibía otra ubicación, de su grupo o de otro, con
+    // importes y a pagar. Para el DEPÓSITO, un destino de otro grupo no traía
+    // transferencias, pero sí el corte de la Semana Operativa de ese local.
+    // Reproducido en `scripts/pruebas-db/transferenciasAlcance.mjs`.
+    //
+    // La regla es la de Finanzas, que tiene el mismo parámetro por el mismo
+    // motivo:
+    //   · quien no es depósito solo pide el suyo, y otro es 403, no un
+    //     silencioso "te doy el tuyo";
+    //   · el depósito —o el admin en vista global— pide uno de los locales de
+    //     SU grupo, que salen de la lista de arriba y no del número de la URL.
+    //
+    // Se decide ACÁ, antes de leer nada del local pedido, y de acá en adelante
+    // se usa el local RESUELTO, nunca el parámetro.
+    const elegido = resolverLocalPedido({
+      esDeposito,
+      localDeLaSesion: vista.localId,
+      destinoPedido: searchParams.get("destino"),
+      localesDelGrupo: (locales || []).map((l) => ({ localId: l.id })),
+    });
+    if (elegido.error) {
+      return NextResponse.json({ ok: false, error: elegido.error }, { status: 403 });
+    }
+
+    // La semana de cada local del grupo, en una sola consulta, más el local de la
+    // sesión aunque no esté en la lista: su semana es suya.
     const idsConSemana = [
       ...(locales || []).map((l) => l.id),
-      ...(destinoConSemana ? [destinoConSemana] : []),
+      ...(elegido.localId ? [elegido.localId] : []),
       ...(vista.localId ? [vista.localId] : []),
     ];
     const semanas = await vigenciasDeUbicaciones(prisma, idsConSemana);
@@ -286,9 +316,9 @@ export async function GET(req) {
     //
     // El local no manda `destino` porque no elige: su cuenta es la suya. Se
     // resuelve acá y no en la pantalla, para que el alcance lo siga decidiendo
-    // el servidor.
-    const destinoPedido = Number(searchParams.get("destino") || 0) || null;
-    const localPedido = destinoPedido || (!esDeposito ? vista.localId : null);
+    // el servidor. Es el local que resolvió la regla de alcance de arriba: el
+    // propio para un local, y para el depósito el pedido, si lo pidió.
+    const localPedido = elegido.localId;
 
     const vigenciasDelPedido = localPedido ? vigenciasDelLocal(semanas, localPedido) : [];
     const { diaDeCorte: corteDelLocal, sinConfigurar: localSinCorte } = localPedido

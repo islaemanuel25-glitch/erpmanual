@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-27 23:52
+**Fecha:** 2026-09-28 10:19
 
 ## Módulos modificados recientemente
 
 ### transferencias
-- docs(deploy): libro_stock pendiente, y los candados que cuentan migraciones la declaran
-- Archivos: 1 modificados (1 total)
+- fix(transferencias): el depósito solo pide destinos de su grupo en el tablero, fix(transferencias): un destino en la URL no amplía el alcance de un local en el tablero, fix(libro): la BAJA no depende del orden de las sentencias
+- Archivos: 2 modificados (2 total)
 
 
 

@@ -272,6 +272,10 @@ jobs:
           else
             echo "No hay scripts/pruebas-db/recepcionTransferencias.mjs en esta rama: nada que correr."
           fi
+          # Un `?destino=` en la URL no amplía el alcance de un local en el
+          # tablero de Transferencias: el handler real, con sesiones firmadas.
+          echo ""
+          node --import ./scripts/alias-loader.mjs scripts/pruebas-db/transferenciasAlcance.mjs
 
       # ── EL LIBRO DE STOCK ─────────────────────────────────────────────────
       #

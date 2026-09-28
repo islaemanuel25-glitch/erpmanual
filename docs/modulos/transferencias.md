@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-09-27 22:42
+**Última actualización:** 2026-09-28 10:19
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -100,6 +100,35 @@ Diferencias deliberadas, y por que:
 - `transferencias.crear`
 - `transferencias.recibir`
 
+### El alcance del tablero y el parámetro `destino`
+
+*(Verificado contra PostgreSQL por `scripts/pruebas-db/transferenciasAlcance.mjs`.)*
+`GET /api/transferencias/tablero` exige `transferencias.ver` y toma el alcance
+de `resolveVistaOperativa`. El `?destino=` sirve para que el DEPÓSITO —o el admin
+en vista global— abra la cuenta de uno de sus locales.
+
+La regla es `resolverLocalPedido`, de `lib/finanzas/alcanceFinanciero.js`, la
+misma que usa Finanzas para el mismo parámetro. Se decide antes de leer nada del
+local pedido, y el resto del endpoint usa el local resuelto, no el parámetro:
+
+- **Un local** no lo manda, porque su cuenta es la suya. Si lo manda, tiene que
+  ser su propio local.
+- **El depósito, o el admin en vista global**, pide uno de los locales de SU grupo
+  (activo), según la lista `GrupoLocal` que ya lee el tablero. Sin `destino` sigue
+  viendo su entrada o sus bloques como antes.
+- Cualquier otro destino da 403 "Local fuera de tu alcance.": otro local, uno de
+  otro grupo, uno que no existe, o el propio depósito para sí mismo. Algo que no
+  es un número da 403 "Local inválido.". La respuesta trae solo `ok` y `error`.
+
+Hasta el 2026-09-28 no era así, porque el `destino` se usaba tal cual:
+
+- Para un local, reemplazaba su propio `destinoId` en el filtro. Con
+  `?destino=<otro>` leía las transferencias que recibía otra ubicación, del grupo
+  o de otro grupo: ids, estados, fechas, importes y el "a pagar" del período.
+- Para el depósito, un local de otro grupo no traía las transferencias de otros
+  orígenes. Sí traía el corte de su Semana Operativa, el rango de su semana y lo
+  que ese mismo depósito le hubiera despachado.
+
 ## Modelo de datos
 
 ```prisma
@@ -194,6 +223,10 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-09-28: fix(transferencias): el depósito solo pide destinos de su grupo en el tablero
+- 2026-09-28: fix(transferencias): un destino en la URL no amplía el alcance de un local en el tablero
+- 2026-09-28: fix(libro): la BAJA no depende del orden de las sentencias
+- 2026-09-28: feat(stock): Stock Diario derivado del libro, con el índice que lo hace posible
 - 2026-09-27: docs(deploy): libro_stock pendiente, y los candados que cuentan migraciones la declaran
 - 2026-09-26: feat(caja): tabla CorreccionCaja para las correcciones históricas
 - 2026-09-26: feat(caja): estado CERRADO_SIN_CONTEO y la autoría de la resolución
