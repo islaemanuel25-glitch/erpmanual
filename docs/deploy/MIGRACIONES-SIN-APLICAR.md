@@ -16,8 +16,27 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **39 migraciones**. El árbol trae **40**. Falta:
+Producción está en **39 migraciones**. El árbol trae **41**. Faltan dos, y Prisma
+las aplica en este orden, que es el de sus nombres. Son independientes entre sí
+—el índice no toca funciones ni triggers, y la corrección no toca índices—: se
+comprobó aplicándolas juntas con Prisma sobre una base como la de producción.
+`20260928180000_libro_stock_baja_atomica` ya está en `main` (PR #96), pero
+mergeada no es desplegada: producción sigue en 39 hasta el próximo despliegue.
 
+- `20260928150000_stock_diario_indice` — **aditiva**: un solo `CREATE INDEX`
+  sobre `MovimientoStock` con las columnas `("localId", "productoLocalId", "dia", "id")`.
+  No toca filas, columnas, funciones ni triggers del libro, y la migración del
+  libro no se modifica. Es la que permite el Stock Diario de un local entero sin
+  recorrer la historia de cada cadena (PR de Stock Diario, `lib/stock/libro/stockDiarioServer.js`).
+  El clasificador la marca **aditiva, sin coincidencias**. Va sin `CONCURRENTLY`
+  porque Prisma aplica cada migración dentro de una transacción: mientras se
+  construye, bloquea las escrituras de `MovimientoStock` —y con ellas las de
+  `StockLocal`, porque el trigger escribe en la misma transacción—. Con el libro
+  del tamaño de hoy (del orden de doce mil filas y lo que se movió desde el punto
+  cero) eso es una fracción de segundo; si el despliegue se demorara semanas,
+  conviene medir las filas antes. Lo que hay que comprobar después de aplicarla:
+  que `pg_indexes` muestre `MovimientoStock_localId_productoLocalId_dia_id_idx`
+  con esas cuatro columnas, y que el verificador del libro siga en verde.
 - `20260928180000_libro_stock_baja_atomica` — corrección preventiva del libro de
   stock. Reemplaza con `CREATE OR REPLACE` la función `libro_stock_registrar`
   (el trigger `StockLocal_libro` sigue apuntando a ella) y agrega dos funciones y

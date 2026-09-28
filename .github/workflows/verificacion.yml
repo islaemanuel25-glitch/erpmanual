@@ -288,6 +288,17 @@ jobs:
           pg_dump --version
           node --import ./scripts/alias-loader.mjs scripts/pruebas-db/libroStock.mjs
 
+      # ── EL STOCK DIARIO ───────────────────────────────────────────────────
+      #
+      # Apertura, movimientos y cierre derivados del libro: los casos del día con
+      # su valor esperado, todas las cadenas y todos los días contra una fuerza
+      # bruta, la misma respuesta con otra zona en la sesión y en Node, y el
+      # EXPLAIN de un local entero con un millón de movimientos sintéticos —con
+      # el índice nuevo y la contraprueba sin él—. Bases descartables, borradas
+      # al terminar.
+      - name: Stock Diario (semántica, fuerza bruta, zonas, plan con volumen)
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/stockDiario.mjs
+
       # ── LA RECUPERACIÓN DEL LIBRO ─────────────────────────────────────────
       #
       # El procedimiento del runbook de /deploy si la activación del libro no

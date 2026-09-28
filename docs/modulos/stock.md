@@ -83,7 +83,9 @@ stockUnidades = stockBultos * factor_pack
 (2026-09-27 21:19:13.587 Argentina).**
 
 La BAJA no depende del orden de las sentencias
-(`20260928180000_libro_stock_baja_atomica`): una sola sentencia que borra un
+(`20260928180000_libro_stock_baja_atomica`, en `main`; en producción rige recién
+desde el despliegue que la aplique —ver `docs/deploy/MIGRACIONES-SIN-APLICAR.md`—):
+una sola sentencia que borra un
 StockLocal y su ProductoLocal —o re-vincula la fila— deja su BAJA con la identidad
 completa, porque la identidad se recuerda en el momento en que el producto se
 borra. Y el libro falla cerrado: si un movimiento no puede escribirse, la
@@ -99,8 +101,38 @@ fila de `StockLocal`, con un único instante— y la evidencia del despliegue es
 es `scripts/verificar-libro-stock.mjs`.
 
 Los escritores todavía no declaran origen, así que sus movimientos quedan como
-`SIN_ORIGEN`. Eso no vuelve dudosa la cantidad. La apertura, los movimientos y el
-cierre por día sobre este libro todavía no están construidos.
+`SIN_ORIGEN`. Eso no vuelve dudosa la cantidad.
+
+## Stock Diario
+
+Con cuánto empezó, qué movimientos tuvo y con cuánto terminó cada producto en
+cada ubicación, un día o un período. **Se deriva del libro al consultar**: no hay
+foto diaria, ni cron, ni tabla de saldos. La semántica está en
+`lib/stock/libro/stockDiario.js` (puro) y las consultas en
+`lib/stock/libro/stockDiarioServer.js`. Todavía no hay ruta de API ni pantalla;
+para mirar un local desde la terminal está `scripts/stock-diario.mjs`, de solo
+lectura.
+
+- **El día** es el argentino, la columna `dia` que la base calculó al escribir el
+  movimiento. Viaja como texto `YYYY-MM-DD` y "hoy" lo decide PostgreSQL.
+- **Apertura** de D: el último movimiento de la cadena con `dia < D`, por
+  `(dia, id)`. **Cierre**: lo mismo con `dia <= D`. Un día sin movimientos abre y
+  cierra con el último saldo anterior.
+- **Estados**: `FUERA_DE_HISTORIA` antes del 27/09/2026; `PARCIAL_PUNTO_CERO` el
+  27/09 (apertura desconocida, `SIN_APERTURA_HISTORICA`; se parte del
+  `ESTADO_INICIAL`); `COMPLETO`; `EN_CURSO` hoy, con el cierre provisional.
+- **Existencia** aparte del número: `EXISTE`, `NO_EXISTE` y `DESCONOCIDA`. Un ALTA
+  abre en "no existe" y un BAJA cierra en "no existe"; ninguno de los dos es cero.
+- **Cantidad y tránsito** siempre por separado. Delta solo en los CAMBIO; ALTA y
+  BAJA se muestran como "aparece con" y "desaparece con".
+- **Identidad**: el nombre y la categoría son los de hoy; de un producto eliminado,
+  lo que congeló su BAJA. La categoría no tiene historia. Una reinterpretación de
+  unidad marca el día, sin convertir nada.
+- **Semana, mes, año, rango**: agrupan días. La semana usa la Semana Operativa con
+  la vigencia que regía ese día.
+
+Lo prueba contra PostgreSQL `scripts/pruebas-db/stockDiario.mjs`, con una fuerza
+bruta y con el plan de un local entero sobre un millón de movimientos.
 
 ## Cambios recientes
 - 2026-08-25: fix(stock): mostrar packs y unidades en movil (#12)

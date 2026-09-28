@@ -1048,8 +1048,14 @@ model MovimientoStock {
   codigoBarraCongelado  String?
   unidadMedidaCongelada String?
 
+  // El verificador recorre cada cadena por `id`.
   @@index([localId, productoLocalId, id])
   @@index([localId, dia])
+  // El Stock Diario: el último estado de una cadena ANTES de un día (apertura)
+  // o HASTA un día (cierre) es un solo descenso de este índice, ordenando por
+  // (dia, id). Sin él, un local entero recorre toda la historia de cada cadena
+  // (`lib/stock/libro/stockDiarioServer.js`).
+  @@index([localId, productoLocalId, dia, id])
 }
 
 // Lo que el trigger de StockLocal NO puede ver: un campo del producto o de la

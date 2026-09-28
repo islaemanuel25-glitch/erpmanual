@@ -159,7 +159,8 @@ function dirPrisma(conLibro, { soloHastaElLibro = false } = {}) {
   const origen = path.join(RAIZ, "prisma", "migrations");
   for (const e of fs.readdirSync(origen, { withFileTypes: true })) {
     // Sin el libro es SIN el libro ni lo que cuelga de él: las migraciones
-    // posteriores crean objetos sobre sus tablas y sus funciones.
+    // posteriores (el índice del Stock Diario, la BAJA atómica) crean objetos
+    // sobre sus tablas y sus funciones.
     if (!conLibro && e.isDirectory() && e.name >= NOMBRE_MIGRACION) continue;
     // El libro tal como se desplegó el 2026-09-28, sin las correcciones
     // posteriores: es la base donde la contraprueba de la K reproduce el defecto.
@@ -167,6 +168,24 @@ function dirPrisma(conLibro, { soloHastaElLibro = false } = {}) {
     fs.cpSync(path.join(origen, e.name), path.join(destino, "migrations", e.name), { recursive: true });
   }
   return path.join(destino, "schema.prisma");
+}
+
+/**
+ * Aplica las migraciones PENDIENTES sin comparar contra el schema, que es lo que
+ * hace el despliegue. Hace falta para el libro "tal como se desplegó": su árbol
+ * termina en el libro, pero `schema.prisma` ya trae lo posterior (el índice del
+ * Stock Diario), y `migrate dev` vería esa diferencia como una migración por
+ * crear y se quedaría esperando un nombre. `recuperacionLibroStock.mjs` lo usa
+ * igual, sobre bases descartables.
+ */
+function aplicarPendientes(schema, url) {
+  const r = spawnSync("npx", ["prisma", "migrate", "deploy", "--schema", schema], {
+    cwd: RAIZ,
+    env: { ...process.env, DATABASE_URL: url },
+    encoding: "utf8",
+    timeout: 240_000,
+  });
+  return { codigo: r.status, salida: `${r.stdout || ""}${r.stderr || ""}` };
 }
 
 /** `prisma migrate dev` sin generar ni sembrar, asincrónico: la carrera corre mientras. */
@@ -944,7 +963,7 @@ try {
     // ── K.0 El defecto, sobre el libro tal como se desplegó ─────────────────
     {
       const url = await crearBase(`${PREFIJO}k0`, PLANTILLA);
-      const r = await migrateDev(dirPrisma(true, { soloHastaElLibro: true }), url);
+      const r = aplicarPendientes(dirPrisma(true, { soloHastaElLibro: true }), url);
       ok("K.0 una base con el libro SIN la corrección", r.codigo === 0, r.salida.slice(-300));
       const c = await clienteDe(url);
       const p = await productoK(c, "defecto", 5, 0);
@@ -965,7 +984,8 @@ try {
     // después la migración nueva. No puede tocar ni una fila del libro.
     {
       const url = await crearBase(`${PREFIJO}k1`, PLANTILLA);
-      await migrateDev(dirPrisma(true, { soloHastaElLibro: true }), url);
+      const hastaElLibro = aplicarPendientes(dirPrisma(true, { soloHastaElLibro: true }), url);
+      ok("K.0b una base con el libro tal como se desplegó", hastaElLibro.codigo === 0, hastaElLibro.salida.slice(-300));
       const c = await clienteDe(url);
       await c.$executeRawUnsafe(`UPDATE "StockLocal" SET "cantidad" = "cantidad" + 1 WHERE "id" % 3 = 0`);
       await c.$executeRawUnsafe(`UPDATE "StockLocal" SET "enTransito" = 1.5 WHERE "id" % 5 = 0`);
@@ -975,9 +995,30 @@ try {
       const antes = await huella();
       const [cero] = await c.$queryRawUnsafe(`SELECT min("instante")::text AS "i", count(*)::int AS "n" FROM "MovimientoStock" WHERE "tipo" = 'ESTADO_INICIAL'`);
       await soltarClientes(url);
-      const r = await migrateDev(dirPrisma(true), url);
+      // Lo pendiente, como en el despliegue: `migrate deploy` sobre el árbol entero.
+      const r = aplicarPendientes(dirPrisma(true), url);
       ok("K.0b la migración de la corrección se aplica sobre un libro con movimientos", r.codigo === 0 && /20260928180000_libro_stock_baja_atomica/.test(r.salida), r.salida.slice(-300));
+      // Las pendientes posteriores al libro se aplican juntas y en el orden de sus
+      // nombres: el índice del Stock Diario antes que la corrección. Son
+      // independientes; esto comprueba que Prisma las aplica las dos, en ese orden.
+      const posteriores = fs
+        .readdirSync(path.join(RAIZ, "prisma", "migrations"), { withFileTypes: true })
+        .filter((e) => e.isDirectory() && e.name > NOMBRE_MIGRACION)
+        .map((e) => e.name)
+        .sort();
+      const posiciones = posteriores.map((n) => r.salida.indexOf(n));
+      ok(
+        `K.0b Prisma aplica las ${posteriores.length} posteriores al libro, en orden: ${posteriores.join(", ")}`,
+        posteriores.length >= 1 && posiciones.every((p) => p >= 0) && posiciones.every((p, i) => i === 0 || p > posiciones[i - 1]),
+        JSON.stringify(posiciones)
+      );
       const c2 = await clienteDe(url);
+      const registradas = (
+        await c2.$queryRawUnsafe(
+          `SELECT migration_name AS "n" FROM "_prisma_migrations" WHERE migration_name > '${NOMBRE_MIGRACION}' AND finished_at IS NOT NULL ORDER BY finished_at, started_at`
+        )
+      ).map((f) => f.n);
+      ok("K.0b y _prisma_migrations las registra terminadas en ese mismo orden", JSON.stringify(registradas) === JSON.stringify(posteriores), JSON.stringify(registradas));
       const despues = (await c2.$queryRawUnsafe(`SELECT count(*)::int AS "n", max("id") AS "m", md5(string_agg(t::text, '|' ORDER BY "id")) AS "h" FROM "MovimientoStock" t`))[0];
       const [cero2] = await c2.$queryRawUnsafe(`SELECT min("instante")::text AS "i", count(*)::int AS "n" FROM "MovimientoStock" WHERE "tipo" = 'ESTADO_INICIAL'`);
       ok(
