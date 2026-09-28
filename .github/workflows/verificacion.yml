@@ -303,6 +303,17 @@ jobs:
       - name: Stock Diario (semántica, fuerza bruta, zonas, plan con volumen)
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/stockDiario.mjs
 
+      # ── LA API DEL STOCK DIARIO ───────────────────────────────────────────
+      #
+      # Los handlers reales de `app/api/stock_locales/diario/` con sesiones
+      # firmadas como las firma el login: quién ve qué ubicación —encargado,
+      # cajero, depósito, admin en vista global dentro y fuera de su grupo—, los
+      # estados del período con el reloj real de PostgreSQL, la paginación, los
+      # filtros, los 400, y que ninguna llamada escriba una fila. Base
+      # descartable, borrada al terminar.
+      - name: API del Stock Diario (aislamiento, períodos, paginación, solo lectura)
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/stockDiarioApi.mjs
+
       # ── LA RECUPERACIÓN DEL LIBRO ─────────────────────────────────────────
       #
       # El procedimiento del runbook de /deploy si la activación del libro no

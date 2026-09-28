@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-08-25 12:23
+**Última actualización:** 2026-09-28 04:26
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -40,6 +40,8 @@ Gestion de inventario por local. Permite ver stock actual, ajustar cantidades y 
 - `POST /api/stock_locales/ajustar` — modo: "ajuste"|"limites", tipo: "sumar"|"restar"
 - `POST /api/stock_locales/importar`
 - `POST /api/stock_locales/limites`
+- `GET /api/stock_locales/diario/resumen`, `/productos`, `/producto`, `/movimientos` —
+  el Stock Diario, de solo lectura; ver "La API del Stock Diario" más abajo.
 
 ## Componentes principales
 - `TablaStock`: Tabla de stock con paginacion
@@ -109,9 +111,9 @@ Con cuánto empezó, qué movimientos tuvo y con cuánto terminó cada producto 
 cada ubicación, un día o un período. **Se deriva del libro al consultar**: no hay
 foto diaria, ni cron, ni tabla de saldos. La semántica está en
 `lib/stock/libro/stockDiario.js` (puro) y las consultas en
-`lib/stock/libro/stockDiarioServer.js`. Todavía no hay ruta de API ni pantalla;
-para mirar un local desde la terminal está `scripts/stock-diario.mjs`, de solo
-lectura.
+`lib/stock/libro/stockDiarioServer.js`. Se consulta por la API de solo lectura
+de más abajo; todavía no hay pantalla. Para mirar un local desde la terminal está
+`scripts/stock-diario.mjs`, de solo lectura.
 
 - **El día** es el argentino, la columna `dia` que la base calculó al escribir el
   movimiento. Viaja como texto `YYYY-MM-DD` y "hoy" lo decide PostgreSQL.
@@ -134,7 +136,103 @@ lectura.
 Lo prueba contra PostgreSQL `scripts/pruebas-db/stockDiario.mjs`, con una fuerza
 bruta y con el plan de un local entero sobre un millón de movimientos.
 
+### La API del Stock Diario
+
+Cuatro rutas GET en `app/api/stock_locales/diario/`. Cada una exige la sesión y
+`stock.ver` a la vista y delega el resto en `lib/stock/libro/stockDiarioRutas.js`.
+El contrato, la parte pura, vive en `lib/stock/libro/stockDiarioApi.js`.
+*(Verificado en código y contra PostgreSQL por `scripts/pruebas-db/stockDiarioApi.mjs`.)*
+
+- `resumen`: el estado del período y los totales de cantidad y de tránsito por
+  separado. Los totales son apertura, cierre, entradas, salidas, cambio neto,
+  "aparece con" y "desaparece con". Trae además los conteos de productos, con
+  movimientos, que aparecen, que desaparecen, reinterpretados y sin clasificar.
+  Fuera de historia, totales y conteos van en `null`.
+- `productos`: una fila por cadena física que existió en el período, con
+  identidad, apertura, cierre y lo que se movió. Se pagina con `page` y
+  `pageSize` —50 por defecto, 200 como tope, más es 400— y se filtra con
+  `filtro`, `q` y `categoriaId`. Los valores de `filtro` son `todos`,
+  `con_movimientos`, `aparecen`, `desaparecen`, `reinterpretados` y
+  `sin_clasificar`. `q` busca en el nombre y el código, sin distinguir tildes.
+  `categoriaId` es la categoría ACTUAL. El orden es por nombre y después por id,
+  estable entre páginas.
+- `producto?productoLocalId=`: una cadena, con las reinterpretaciones una por una
+  y sus movimientos paginados. Trae el total de movimientos, así que no hay un
+  límite callado.
+- `movimientos`: los del local, o los de una cadena con `productoLocalId`. Se
+  paginan EN LA BASE, en orden `(instante, id)`.
+
+**El período**: `unidad=DIA|SEMANA|MES|ANIO` con `fecha`, o `desde` y `hasta`.
+Sin fecha, es hoy según PostgreSQL. Las dos formas juntas son 400. Lo que pasa de
+hoy se recorta, y la respuesta lo dice en `recortadoAHoy`. Un período entero en el
+futuro es 400.
+
+**El alcance** se copia del de `stock_locales` y sale de `resolveVistaOperativa`:
+
+- Un usuario con local ve el suyo, y un `localId` distinto es 403 "Local fuera de
+  tu alcance."; no se ignora en silencio.
+- El depósito es un local más: ve solo su propio Stock Diario, no el de los
+  locales de su grupo.
+- El admin en vista global tiene que elegir `localId`. Sin él es 400, y uno fuera
+  de su grupo activo es 403. Nunca se suman ubicaciones: sumar mezclaría los
+  bultos del depósito con las unidades de los locales.
+- Una cadena de otra ubicación pedida desde la propia no se encuentra: todo se
+  busca dentro del libro del local del alcance, así que no aparece ni el nombre
+  congelado de un producto eliminado ajeno.
+
+**Los errores**: los de la pregunta —día, unidad, rango, página, filtro, id— son
+400, con el texto del motor y un `codigo`. Los demás son 500 con un texto propio
+("No se pudo armar el Stock Diario…") y, si Prisma lo dio, su código P####. El
+mensaje crudo nunca sale, porque el de Prisma puede traer el SQL, el host o el
+nombre de la base: queda en el log del servidor.
+
+**El plan**: la página del local se ordena como `(dia, instante, id)`. Así
+PostgreSQL recorre `(localId, dia)` y ordena dentro de cada día. Medido en
+`stockDiario.mjs` sobre un millón de movimientos, la página 21 de un año lee 2.501
+filas; ordenada solo por `(instante, id)`, lee el año entero.
+
+**Por qué es el mismo orden que el contrato**, `(instante, id)`. *(Verificado
+contra PostgreSQL, sección H de `scripts/pruebas-db/stockDiario.mjs`.)* Dos
+hechos:
+
+1. En cada fila, `dia` es la fecha argentina de su `instante`. Lo escribe el
+   trigger con `libro_stock_dia`, el libro no admite UPDATE y el verificador lo
+   exige fila por fila.
+2. La fecha argentina no retrocede cuando el instante avanza. Se comprobó para la
+   zona tal como la conoce PostgreSQL, de 1920 a 2040 cada 15 minutos: cero
+   retrocesos.
+
+Con esos dos hechos, un instante menor nunca tiene un día mayor. Si los días
+difieren, los dos órdenes coinciden; si son iguales, decide `(instante, id)` en
+los dos. A igual instante hay igual día, y decide el id.
+
+La prueba ejerce los bordes del día:
+
+- 21:00 argentinas, que ya es otra fecha UTC con el mismo día argentino;
+- la medianoche argentina;
+- cuatro y quince movimientos en un mismo instante;
+- un id mayor con un instante anterior del día previo;
+- páginas de 1 a 200 que atraviesan el cambio de día.
+
+En todos esos casos, las páginas pegadas son exactamente `ORDER BY instante, id`.
+
+La contraprueba: con UNA fila cuyo día no es el de su instante, el orden se rompe,
+y el verificador del libro lo marca en rojo. **La equivalencia depende de que el
+verificador esté verde.** Si alguna vez una actualización de tzdata cambiara
+retroactivamente la regla de la zona, el verificador lo vería antes que la API.
+
+### Un posible hueco de alcance en Transferencias (sin corregir)
+
+*(Leído en código, no ejercido.)* En `app/api/transferencias/tablero/route.js`,
+para un local que no es depósito el alcance base es `{ destinoId: vista.localId }`,
+pero un `?destino=` en la URL lo pisa: `localPedido = destinoPedido || …`, y
+después `{ ...alcanceBase, destinoId: localPedido }`. Si es así, un local podría
+leer las transferencias hacia otro local pasando su id. Está fuera del alcance de
+la API del Stock Diario y no se tocó; hay que confirmarlo ejerciéndolo antes de
+corregirlo.
+
 ## Cambios recientes
+- 2026-09-28: feat(stock): API de solo lectura del Stock Diario
 - 2026-08-25: fix(stock): mostrar packs y unidades en movil (#12)
 - 2026-07-28: feat(productos): codigo de barras propio por ubicacion
 - 2026-07-26: fix(security): cerrar fugas operativas entre ubicaciones

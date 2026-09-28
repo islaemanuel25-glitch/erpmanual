@@ -22,7 +22,11 @@
 //   F. la Semana Operativa solo agrupa: un cambio de corte futuro no mueve nada;
 //   G. el volumen: EXPLAIN de la consulta de un local entero con el índice, y la
 //      contraprueba sin él. Lo que se exige es la FORMA —un descenso por cadena—,
-//      no los milisegundos.
+//      no los milisegundos;
+//   H. que la página de movimientos, escrita (dia, instante, id), da EXACTAMENTE
+//      el orden del contrato (instante, id): los bordes de la medianoche
+//      argentina, el mismo instante con varios ids, páginas que cruzan el día, y
+//      la contraprueba con una fila fuera de su día.
 //
 // ── CÓMO SE CONSIGUEN DÍAS DISTINTOS ───────────────────────────────────────
 //
@@ -52,9 +56,8 @@ import { crearClientePrisma, ESCRITURA, LECTURA } from "../lib/clientePrisma.mjs
 
 const MODO_HIJO = process.argv[2] === "--solo-calculo";
 
-const fs = await import("node:fs");
 const path = await import("node:path");
-const { spawnSync, execFileSync } = await import("node:child_process");
+const { spawnSync } = await import("node:child_process");
 const { fileURLToPath } = await import("node:url");
 
 const {
@@ -72,12 +75,13 @@ const {
   diasDelRango,
 } = await import("../../lib/stock/libro/stockDiario.js");
 const server = await import("../../lib/stock/libro/stockDiarioServer.js");
+const { Prisma } = await import("@prisma/client");
+const porUnidad = await import("../../lib/stock/libro/stockDiarioPorUnidadServer.js");
 const { sumarDias } = await import("../../lib/transferencias/periodoDePago.js");
 const { programarSemanaOperativa } = await import("../../lib/semanaOperativa/semanaOperativaServer.js");
+const { MIGRACION_LIBRO, MIGRACIONES, aplicarMigraciones, AR, uno, guion } = await import("./lib/libroEnElTiempo.mjs");
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const DIR_MIGRACIONES = path.join(RAIZ, "prisma", "migrations");
-const MIGRACION_LIBRO = "20260927120000_libro_stock";
 const MIGRACION_INDICE = "20260928150000_stock_diario_indice";
 const INDICE = "MovimientoStock_localId_productoLocalId_dia_id_idx";
 const PREFIJO = "erpazul_sd_prueba_";
@@ -175,78 +179,12 @@ async function clienteDe(url) {
   return c;
 }
 
-const MIGRACIONES = fs
-  .readdirSync(DIR_MIGRACIONES, { withFileTypes: true })
-  .filter((e) => e.isDirectory())
-  .map((e) => e.name)
-  .sort();
-
-/** Aplica los migration.sql del repo en orden, cada uno en su transacción, como Prisma. */
-function aplicarMigraciones(url, { hasta = null, solo = null } = {}) {
-  const lista = solo ?? MIGRACIONES.filter((m) => hasta === null || m < hasta);
-  for (const m of lista) {
-    execFileSync("psql", [url, "-X", "-q", "-v", "ON_ERROR_STOP=1", "-1", "-f", path.join(DIR_MIGRACIONES, m, "migration.sql")], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-  }
-  return lista.length;
-}
-
-// Un momento del guion en hora ARGENTINA, pasado a UTC por PostgreSQL con la zona
-// explícita: Node no convierte ninguna hora en esta prueba.
-const AR = (texto) => `(timestamp '${texto}' AT TIME ZONE 'America/Argentina/Cordoba') AT TIME ZONE 'UTC'`;
-
 // ════════════════════════════════════════════════════════════════════════════
 // La base del guion
 // ════════════════════════════════════════════════════════════════════════════
-
-/**
- * El guion: cada paso escribe de verdad y anota qué ids del libro produjo y en
- * qué momento argentino tienen que quedar. `reubicar` los mueve al final.
- */
-function guion(c) {
-  const pasos = [];
-  const maximo = async () => {
-    const [r] = await c.$queryRaw`
-      SELECT coalesce((SELECT max("id") FROM "MovimientoStock"), 0)::int AS "m",
-             coalesce((SELECT max("id") FROM "ReinterpretacionDeStock"), 0)::int AS "r"`;
-    return r;
-  };
-  return {
-    /** El punto cero: todo lo que el libro ya tiene al empezar el guion. */
-    async puntoCero(momento) {
-      pasos.push({ momento, antes: { m: 0, r: 0 }, despues: await maximo() });
-    },
-    async paso(momento, fn) {
-      const antes = await maximo();
-      await fn();
-      const despues = await maximo();
-      pasos.push({ momento, antes, despues });
-      return despues.m - antes.m;
-    },
-    async reubicar() {
-      await c.$executeRawUnsafe(`ALTER TABLE "MovimientoStock" DISABLE TRIGGER "MovimientoStock_inmutable"`);
-      await c.$executeRawUnsafe(`ALTER TABLE "ReinterpretacionDeStock" DISABLE TRIGGER "ReinterpretacionDeStock_inmutable"`);
-      for (const p of pasos) {
-        const t = AR(p.momento);
-        await c.$executeRawUnsafe(
-          `UPDATE "MovimientoStock" SET "instante" = (${t})::timestamp(3), "dia" = "libro_stock_dia"((${t})::timestamp(3)) WHERE "id" > ${p.antes.m} AND "id" <= ${p.despues.m}`
-        );
-        await c.$executeRawUnsafe(
-          `UPDATE "ReinterpretacionDeStock" SET "instante" = (${t})::timestamp(3), "dia" = "libro_stock_dia"((${t})::timestamp(3)) WHERE "id" > ${p.antes.r} AND "id" <= ${p.despues.r}`
-        );
-      }
-      await c.$executeRawUnsafe(`ALTER TABLE "MovimientoStock" ENABLE TRIGGER "MovimientoStock_inmutable"`);
-      await c.$executeRawUnsafe(`ALTER TABLE "ReinterpretacionDeStock" ENABLE TRIGGER "ReinterpretacionDeStock_inmutable"`);
-    },
-  };
-}
-
-async function uno(c, sql) {
-  const filas = await c.$queryRawUnsafe(sql);
-  return filas[0];
-}
+//
+// Aplicar migraciones, reubicar en el tiempo y leer una fila viven en
+// `lib/libroEnElTiempo.mjs`, que comparte la prueba de la API.
 
 /** Siembra una base SIN libro: locales, productos y el stock que el punto cero va a copiar. */
 async function sembrarGuion(c) {
@@ -801,9 +739,9 @@ try {
     const v = de(q, P.uno.pl);
     ok("del 28 al 30: COMPLETO, abre 18 y cierra 13", q.periodo.estado === ESTADO_DEL_DIA.COMPLETO && v.apertura.cantidad === 18 && v.cierre.cantidad === 13 && v.cuadra.cantidad);
     ok("en el período lista también los que murieron adentro, y no los que murieron antes", !!de(q, P.muere.pl) && !!de(q, P.eliminado.pl));
-    const mes = await server.stockDeUnidad(c, { localId: L.A, unidad: UNIDAD_DE_PERIODO.MES, fecha: "2026-09-30", hoy: HOY });
+    const mes = await porUnidad.stockDeUnidad(c, { localId: L.A, unidad: UNIDAD_DE_PERIODO.MES, fecha: "2026-09-30", hoy: HOY });
     ok("el mes de septiembre: 1 al 30, PARCIAL, con historia desde el 27", mes.periodo.desde === "2026-09-01" && mes.periodo.hasta === "2026-09-30" && mes.periodo.estado === ESTADO_DEL_DIA.PARCIAL_PUNTO_CERO && mes.periodo.desdeEfectivo === "2026-09-27");
-    const anio = await server.stockDeUnidad(c, { localId: L.A, unidad: UNIDAD_DE_PERIODO.ANIO, fecha: "2026-09-30", hoy: HOY });
+    const anio = await porUnidad.stockDeUnidad(c, { localId: L.A, unidad: UNIDAD_DE_PERIODO.ANIO, fecha: "2026-09-30", hoy: HOY });
     ok("el año: recortado a hoy, sin inventar el futuro", anio.periodo.desde === "2026-01-01" && anio.periodo.hastaEfectivo === HOY && anio.periodo.recortadoAHoy);
   }
 
@@ -882,7 +820,7 @@ try {
     // Las vigencias se escriben por la puerta canónica, con sus reglas: la
     // primera carga rige desde siempre, y un cambio solo puede ser futuro.
     await c.$transaction((tx) => programarSemanaOperativa(tx, { localId: L.A, diaDeCorte: 1, hoy: HOY }));
-    const antes = await server.stockDeUnidad(c, { localId: L.A, unidad: UNIDAD_DE_PERIODO.SEMANA, fecha: "2026-09-30", hoy: HOY });
+    const antes = await porUnidad.stockDeUnidad(c, { localId: L.A, unidad: UNIDAD_DE_PERIODO.SEMANA, fecha: "2026-09-30", hoy: HOY });
     ok(
       "con corte lunes, la semana del 30/09 va del lunes 28 al domingo 4, configurada",
       antes.periodo.desde === "2026-09-28" && antes.periodo.hasta === "2026-10-04" && antes.semana.configurada && !antes.semana.transicion && antes.periodo.estado === ESTADO_DEL_DIA.COMPLETO,
@@ -892,10 +830,10 @@ try {
     // Un cambio de corte FUTURO: rige desde el lunes 12/10, con corte miércoles.
     const cambio = await c.$transaction((tx) => programarSemanaOperativa(tx, { localId: L.A, diaDeCorte: 3, desde: "2026-10-12", hoy: HOY }));
     ok("el cambio quedó programado para el 12/10, por la puerta canónica", cambio.desde === "2026-10-12", json(cambio));
-    const despues = await server.stockDeUnidad(c, { localId: L.A, unidad: UNIDAD_DE_PERIODO.SEMANA, fecha: "2026-09-30", hoy: HOY });
+    const despues = await porUnidad.stockDeUnidad(c, { localId: L.A, unidad: UNIDAD_DE_PERIODO.SEMANA, fecha: "2026-09-30", hoy: HOY });
     ok("el cambio de corte futuro no mueve la semana vieja ni su stock", json({ ...despues, semana: null }) === json({ ...antes, semana: null }) && json(despues.semana) === json(antes.semana));
     ok("ni ningún día: el Stock Diario no mira la semana", json(await calcularTodo(c, { locales: [L.A], dias: DIAS, hoy: HOY })) === diariosAntes);
-    const sinConf = await server.stockDeUnidad(c, { localId: L.B, unidad: UNIDAD_DE_PERIODO.SEMANA, fecha: "2026-09-30", hoy: HOY });
+    const sinConf = await porUnidad.stockDeUnidad(c, { localId: L.B, unidad: UNIDAD_DE_PERIODO.SEMANA, fecha: "2026-09-30", hoy: HOY });
     ok("una ubicación sin semana configurada usa el domingo y lo dice", sinConf.semana.sinConfigurar && sinConf.periodo.desde === "2026-09-27");
   }
 
@@ -931,6 +869,183 @@ try {
     ok("el día siguiente, según el mismo reloj, es futuro", await rechaza(() => server.stockDiarioDelLocal(r, { localId: s.L.A, dia: sumarDias(hoyReal, 1) }), "DIA_FUTURO"));
     const ayer = await server.stockDiarioDelLocal(r, { localId: s.L.A, dia: sumarDias(hoyReal, -1) });
     ok("ayer, con el mismo reloj, está COMPLETO", ayer.periodo.estado === ESTADO_DEL_DIA.COMPLETO);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // H. EL ORDEN DE LA PÁGINA: (dia, instante, id) ES (instante, id)
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // El contrato de la API ordena los movimientos del local por (instante, id); la
+  // consulta los ordena por (dia, instante, id) para que PostgreSQL recorra el
+  // índice (localId, dia). Son el mismo orden si y solo si, entre dos filas, un
+  // instante menor nunca tiene un día mayor. Eso sale de dos hechos:
+  //
+  //   1. `dia` es la fecha argentina del `instante` en CADA fila: lo escribe el
+  //      trigger con `libro_stock_dia`, el libro no admite UPDATE, y el
+  //      verificador lo exige fila por fila;
+  //   2. la fecha argentina no retrocede cuando el instante avanza.
+  //
+  // Con (1) y (2): si instante(a) < instante(b), dia(a) <= dia(b); si los días
+  // difieren, los dos órdenes coinciden; si son iguales, decide (instante, id) en
+  // los dos. Y a igual instante, igual día, y decide el id. Acá se prueban los dos
+  // hechos, los bordes del día, las páginas, y la contraprueba: con UNA fila cuyo
+  // día no es el de su instante, el orden se rompe.
+  seccion("H. El orden de la página: (dia, instante, id) contra (instante, id)");
+  {
+    // (2), para la zona como la conoce ESTE PostgreSQL: de 1920 a 2040, cada 15
+    // minutos, la fecha argentina nunca retrocede.
+    const [zona] = await principal.$queryRaw`
+      SELECT count(*)::int AS "retrocesos", (SELECT count(*)::int FROM generate_series(timestamptz '1920-01-01 00:00+00', timestamptz '2040-01-01 00:00+00', interval '15 minutes')) AS "puntos"
+      FROM (
+        SELECT (t AT TIME ZONE 'America/Argentina/Cordoba')::date AS d,
+               lag((t AT TIME ZONE 'America/Argentina/Cordoba')::date) OVER (ORDER BY t) AS previo
+        FROM generate_series(timestamptz '1920-01-01 00:00+00', timestamptz '2040-01-01 00:00+00', interval '15 minutes') t
+      ) s WHERE d < previo`;
+    ok(
+      `la fecha argentina no retrocede nunca: ${zona.puntos.toLocaleString("es-AR")} instantes de 1920 a 2040, cada 15 minutos, ${zona.retrocesos} retrocesos`,
+      zona.retrocesos === 0 && zona.puntos > 4_000_000
+    );
+
+    const url = await crearBase(`${PREFIJO}orden`);
+    aplicarMigraciones(url, { hasta: MIGRACION_LIBRO });
+    const o = await clienteDe(url);
+    const { L, azar } = await sembrarGuion(o);
+    aplicarMigraciones(url, { solo: MIGRACIONES.filter((m) => m >= MIGRACION_LIBRO) });
+    // Siete cadenas de C con stock al punto cero: x[0]..x[6].
+    const x = azar.filter((a) => a.sl !== null).slice(0, 7);
+    const g = guion(o);
+    await g.puntoCero(PUNTO_CERO_PRODUCCION.instanteArgentina);
+    const upd = (a, v) => o.$executeRawUnsafe(`UPDATE "StockLocal" SET "cantidad" = ${v} WHERE "id" = ${a.sl}`);
+    const pasos = {};
+    const paso = async (nombre, momento, fn) => {
+      const antes = await uno(o, `SELECT coalesce(max("id"), 0)::int AS m FROM "MovimientoStock"`);
+      await g.paso(momento, fn);
+      const despues = await uno(o, `SELECT coalesce(max("id"), 0)::int AS m FROM "MovimientoStock"`);
+      pasos[nombre] = { desde: antes.m + 1, hasta: despues.m };
+    };
+    await paso("ultimoMsUtcDel28", "2026-09-28 20:59:59.999", () => upd(x[0], 1));
+    await paso("primeroUtcDel29", "2026-09-28 21:00:00.000", () => upd(x[1], 1));
+    await paso("tresAlFinalDel28", "2026-09-28 23:59:59.999", async () => {
+      await upd(x[0], 2);
+      await upd(x[1], 2);
+      await upd(x[2], 2);
+    });
+    await paso("medianoche29", "2026-09-29 00:00:00.000", () => upd(x[3], 1));
+    await paso("medianoche29otra", "2026-09-29 00:00:00.000", () => upd(x[4], 1));
+    // Ids MAYORES que los de medianoche y un instante ANTERIOR, del día anterior:
+    // la concurrencia puede dejar el id y el instante en órdenes distintos.
+    await paso("tardioDel28", "2026-09-28 23:59:59.998", () => upd(x[5], 1));
+    await paso("unMsDespues", "2026-09-29 00:00:00.001", async () => {
+      await upd(x[3], 2);
+      await upd(x[5], 2);
+    });
+    await paso("finUtcDel29", "2026-09-29 02:59:59.999", () => upd(x[0], 3));
+    await paso("primeroUtcDel30", "2026-09-29 21:00:00.000", () => upd(x[1], 3));
+    await paso("cuatroMedianoche30", "2026-09-30 00:00:00.000", async () => {
+      for (const a of x.slice(0, 4)) await upd(a, 9);
+    });
+    await paso("tardioDel29", "2026-09-29 23:59:59.999", () => upd(x[6], 1));
+    await g.reubicar();
+
+    const v = await verificarLibroStock(o);
+    ok("el verificador del libro, con los bordes del día: integridad VERDE (1: cada día es el de su instante)", v.integridad.ok, informeDelLibro(v).split("\n").filter((l) => l.includes("✗")).join(" | "));
+
+    const fila = (id) => uno(o, `SELECT to_char("dia", 'YYYY-MM-DD') AS "dia", to_char("instante", 'YYYY-MM-DD HH24:MI:SS.MS') AS "utc" FROM "MovimientoStock" WHERE "id" = ${id}`);
+    const b1 = await fila(pasos.ultimoMsUtcDel28.desde);
+    const b2 = await fila(pasos.primeroUtcDel29.desde);
+    const b3 = await fila(pasos.medianoche29.desde);
+    const b4 = await fila(pasos.tardioDel28.desde);
+    ok("20:59:59.999 argentinas del 28: UTC del 28, día 28", b1.utc === "2026-09-28 23:59:59.999" && b1.dia === "2026-09-28", json(b1));
+    ok("21:00 argentinas del 28: UTC ya del 29, día 28 (misma fecha UTC que la madrugada del 29, otro día argentino)", b2.utc === "2026-09-29 00:00:00.000" && b2.dia === "2026-09-28", json(b2));
+    ok("00:00 argentinas del 29: UTC 03:00 del 29, día 29", b3.utc === "2026-09-29 03:00:00.000" && b3.dia === "2026-09-29", json(b3));
+    ok("un id mayor con un instante anterior cae en el día anterior", pasos.tardioDel28.desde > pasos.medianoche29otra.hasta && b4.dia === "2026-09-28", json(b4));
+
+    const DESDE = "2026-09-27";
+    const HASTA = "2026-09-30";
+    const HOY_O = "2026-10-05";
+    const contrato = async (desde, hasta) =>
+      (
+        await o.$queryRawUnsafe(
+          `SELECT "id" FROM "MovimientoStock" WHERE "localId" = ${L.C} AND "dia" BETWEEN '${desde}'::date AND '${hasta}'::date ORDER BY "instante", "id"`
+        )
+      ).map((f) => Number(f.id));
+    const paginas = async (desde, hasta, pageSize, productoLocalId = null) => {
+      const ids = [];
+      const cortes = [];
+      let total = null;
+      for (let page = 1; ; page++) {
+        const r = await server.movimientosDelPeriodo(o, { localId: L.C, desde, hasta, productoLocalId, page, pageSize, hoy: HOY_O });
+        total = r.movimientos.total;
+        if (r.movimientos.items.length === 0) break;
+        ids.push(...r.movimientos.items.map((m) => m.id));
+        cortes.push(new Set(r.movimientos.items.map((m) => m.dia)).size);
+        if (page > 1000) break;
+      }
+      return { ids, total, cruzanDia: cortes.filter((n) => n > 1).length };
+    };
+
+    const esperado = await contrato(DESDE, HASTA);
+    const [delMismoInstante] = await o.$queryRaw`
+      SELECT max(n)::int AS n FROM (SELECT count(*) AS n FROM "MovimientoStock" WHERE "localId" = ${L.C} GROUP BY "instante") s`;
+    ok(`${esperado.length} movimientos de C en el período, hasta ${delMismoInstante.n} en el mismo instante`, esperado.length > 25 && delMismoInstante.n >= 4);
+    const difs = [];
+    let cruces = 0;
+    for (const tam of [1, 2, 3, 4, 5, 7, 11, 50, 200]) {
+      const p = await paginas(DESDE, HASTA, tam);
+      cruces += p.cruzanDia;
+      if (json(p.ids) !== json(esperado)) difs.push(`pageSize ${tam}: ${p.ids.length} ids, distintos del contrato`);
+      if (new Set(p.ids).size !== p.ids.length) difs.push(`pageSize ${tam}: repetidos`);
+      if (p.total !== esperado.length) difs.push(`pageSize ${tam}: total ${p.total}`);
+    }
+    ok(
+      "con 1, 2, 3, 4, 5, 7, 11, 50 y 200 por página, las páginas pegadas son EXACTAMENTE ORDER BY (instante, id): sin repetir ni saltear",
+      difs.length === 0,
+      difs.join(" | ")
+    );
+    ok(`y hay páginas que atraviesan el cambio de día argentino (${cruces})`, cruces > 5);
+    const sinInstante = (
+      await o.$queryRawUnsafe(`SELECT "id" FROM "MovimientoStock" WHERE "localId" = ${L.C} AND "dia" BETWEEN '${DESDE}' AND '${HASTA}' ORDER BY "dia", "id"`)
+    ).map((f) => Number(f.id));
+    ok("CONTRAPRUEBA: sin el instante —(dia, id)— el orden ya NO es el del contrato: los datos ejercen un id que no sigue al instante", json(sinInstante) !== json(esperado));
+
+    const porDia = [];
+    for (const d of ["2026-09-27", "2026-09-28", "2026-09-29", "2026-09-30"]) {
+      const p = await paginas(d, d, 2);
+      if (json(p.ids) !== json(await contrato(d, d))) porDia.push(d);
+    }
+    ok("y lo mismo pidiendo un día solo, cada uno de los cuatro", porDia.length === 0, porDia.join(", "));
+
+    const cadenaDifs = [];
+    for (const a of x) {
+      const p = await paginas(DESDE, HASTA, 2, a.pl);
+      const c = (
+        await o.$queryRawUnsafe(`SELECT "id" FROM "MovimientoStock" WHERE "localId" = ${L.C} AND "productoLocalId" = ${a.pl} AND "dia" BETWEEN '${DESDE}' AND '${HASTA}' ORDER BY "instante", "id"`)
+      ).map((f) => Number(f.id));
+      if (json(p.ids) !== json(c)) cadenaDifs.push(a.pl);
+    }
+    ok("las páginas de UNA cadena, en (dia, id), también son su (instante, id)", cadenaDifs.length === 0, cadenaDifs.join(", "));
+
+    const invariante = () =>
+      o.$queryRawUnsafe(`
+        SELECT count(*)::int AS "n" FROM (
+          SELECT "dia", lag("dia") OVER (PARTITION BY "localId" ORDER BY "instante", "id") AS "previo" FROM "MovimientoStock"
+        ) s WHERE "dia" < "previo"`);
+    ok("en todo el libro, ordenado por (instante, id), el día nunca retrocede", (await invariante())[0].n === 0);
+
+    // ── LA CONTRAPRUEBA: una sola fila con un día que no es el de su instante ──
+    await o.$executeRawUnsafe(`ALTER TABLE "MovimientoStock" DISABLE TRIGGER "MovimientoStock_inmutable"`);
+    await o.$executeRawUnsafe(`UPDATE "MovimientoStock" SET "dia" = '2026-09-29' WHERE "id" = ${pasos.tardioDel28.desde}`);
+    const roto = await paginas(DESDE, HASTA, 3);
+    const vRoto = await verificarLibroStock(o);
+    const invRoto = (await invariante())[0].n;
+    await o.$executeRawUnsafe(`UPDATE "MovimientoStock" SET "dia" = "libro_stock_dia"("instante") WHERE "id" = ${pasos.tardioDel28.desde}`);
+    await o.$executeRawUnsafe(`ALTER TABLE "MovimientoStock" ENABLE TRIGGER "MovimientoStock_inmutable"`);
+    ok(
+      "CONTRAPRUEBA: con UNA fila fuera de su día, las páginas ya no son (instante, id), y el verificador y el invariante lo ven",
+      json(roto.ids) !== json(esperado) && !vRoto.integridad.ok && invRoto > 0,
+      json({ igual: json(roto.ids) === json(esperado), verificador: vRoto.integridad.ok, invariante: invRoto })
+    );
+    ok("restaurada la fila, vuelven a coincidir", json((await paginas(DESDE, HASTA, 3)).ids) === json(esperado) && (await verificarLibroStock(o)).integridad.ok);
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -989,6 +1104,42 @@ try {
       WHERE m."localId" = 1 AND m."productoLocalId" = 1 AND m."dia" < ${DIA}::date ORDER BY m."dia" DESC, m."id" DESC LIMIT 1`;
     const nodos1 = nodosDelPlan(unaCadena[0]["QUERY PLAN"][0].Plan);
     ok("la apertura de UNA cadena es un Limit sobre un Index Scan Backward del índice nuevo", nodos1.some((n) => n["Index Name"] === INDICE && n["Scan Direction"] === "Backward"), json(nodos1.map((n) => n["Node Type"])));
+
+    // ── La página de movimientos de la API, la MISMA consulta que corre ──────
+    //
+    // Un año entero del local, la página 21 de 50. Lo que se exige es que la
+    // página lea sus días y no el año: hasta la fila 1.050, más el día en que
+    // cae el corte. La contraprueba es la consulta escrita como dice el contrato
+    // —(instante, id), sin el día adelante—: da el mismo orden y lee el año.
+    {
+      const ANIO = { desde: "2026-09-27", hasta: "2027-09-30" };
+      const pagina = server.sqlMovimientosPagina({ localId: 1, ...ANIO, limite: 50, desplazamiento: 1000 });
+      const [masDia] = await v.$queryRaw`
+        SELECT max(n)::int AS n, sum(n)::int AS total FROM (
+          SELECT count(*) AS n FROM "MovimientoStock" WHERE "localId" = 1 GROUP BY "dia") s`;
+      const TOPE_PAGINA = 2 * (1050 + masDia.n);
+      const p = await explicar(v, pagina);
+      ok(
+        `la página 21 de un año del local lee ${p.filasLeidas.toLocaleString("es-AR")} filas del libro, de ${masDia.total.toLocaleString("es-AR")} (tope ${TOPE_PAGINA.toLocaleString("es-AR")}) — ${p.ms.toFixed(1)} ms`,
+        p.filasLeidas <= TOPE_PAGINA && p.nodos.some((n) => n["Node Type"] === "Incremental Sort"),
+        json(p.nodos.map((n) => n["Node Type"]))
+      );
+      const ingenua = Prisma.sql`
+        SELECT m."id" FROM "MovimientoStock" m
+        WHERE m."localId" = 1 AND m."dia" BETWEEN ${ANIO.desde}::date AND ${ANIO.hasta}::date
+        ORDER BY m."instante", m."id" LIMIT 50 OFFSET 1000`;
+      const x = await explicar(v, ingenua);
+      ok(`CONTRAPRUEBA: ordenada solo por (instante, id) lee ${x.filasLeidas.toLocaleString("es-AR")} filas (más que el tope)`, x.filasLeidas > TOPE_PAGINA);
+      const ids = (filas) => filas.map((f) => Number(f.id)).join(",");
+      ok("y las dos devuelven exactamente las mismas filas, en el mismo orden", ids(await v.$queryRaw`${pagina}`) === ids(await v.$queryRaw`${ingenua}`));
+
+      const cadena = await explicar(v, server.sqlMovimientosPagina({ localId: 1, productoLocalId: 1, ...ANIO, limite: 50, desplazamiento: 0 }));
+      ok(
+        `la página de UNA cadena baja por el índice nuevo y lee ${cadena.filasLeidas} filas`,
+        cadena.indices.includes(INDICE) && cadena.filasLeidas <= 50,
+        json(cadena.indices)
+      );
+    }
 
     // Los resultados con y sin el índice tienen que ser IGUALES: el índice cambia
     // la velocidad, no la respuesta.
