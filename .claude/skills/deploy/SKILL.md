@@ -45,7 +45,9 @@ dominio `https://operix.cloud`, backups en `/srv/produccion/backups/`.
    `migrate resolve`. No es un olvido ni una regla que se afloje cuando aprieta.
    La lista, el criterio por el que es esa y no otra, y lo que se miró y NO se
    tapó están en `lib/deploy/guardiaMigraciones.mjs`. Ver "Los cuatro comandos
-   bloqueados" en el paso 4 antes de tocarlos.
+   bloqueados" en el paso 4 antes de tocarlos. **Una sola excepción, por texto
+   exacto**: la recuperación tipada de `20260927120000_libro_stock` por lock
+   timeout —ver "La única excepción ya autorizada"—.
 
 ## EL TOPE DE CORTE: 30 SEGUNDOS
 
@@ -1392,6 +1394,136 @@ es marcar la migración, eso significa sacarla de la lista de rechazo de
 `lib/deploy/guardiaMigraciones.mjs` a propósito y con su confirmación — no
 inventarle un flag, no correrla por otro camino, no hacerla desde el VPS para
 esquivar la guardia. Ese trámite cuesta a propósito, y el día que cuesta es este.
+
+### La única excepción ya autorizada: `libro_stock` por lock timeout
+
+Ese trámite se hizo UNA vez, para UN caso, el 2026-09-27: Emanuel autorizó una
+recuperación tipada para `20260927120000_libro_stock` cuando falla porque no
+consiguió su candado en 3 s. **Es el único caso en que este runbook permite un
+`migrate resolve`, y es solo `--rolled-back`.** `--applied` sigue prohibido
+siempre: medido, deja el registro diciendo que el libro existe cuando no existe,
+y `migrate deploy` ya no lo vuelve a correr nunca. Cualquier otra migración que
+falle, o esta por cualquier otra causa, va por lo de arriba: FRENAR e informar.
+
+**Por qué es seguro en este caso y no en general.** La activación del libro es un
+único bloque atómico: si no consigue el candado, PostgreSQL la revierte entera
+—ni tablas, ni triggers, ni una fila del punto cero—. Probado contra PostgreSQL
+por el camino real de Prisma en `scripts/pruebas-db/recuperacionLibroStock.mjs`.
+El `--rolled-back` escribe en `_prisma_migrations` exactamente eso: que el intento
+se revirtió. No falsea nada. Lo que la hace segura es que un diagnóstico de solo
+lectura LO DEMUESTRA antes, y la guardia solo deja pasar el comando que encadena
+el diagnóstico con el resolve.
+
+**NO restaurar el backup por esto.** Un CASO 1 confirmado dejó la base como estaba
+más `correccion_caja` —medido: los mismos objetos más los de `CorreccionCaja`, y
+`StockLocal` idéntica fila por fila—. `correccion_caja` queda aplicada: NO se
+revierte porque la siguiente haya fallado. El backup y el rollback general quedan
+para lo que NO se pueda demostrar como CASO 1.
+
+**`migrate status` NO prueba nada acá.** Medido: después del `--rolled-back`
+dice "Database schema is up to date!" con el libro SIN aplicar. Lo que prueba es
+el diagnóstico, y después del reintento, la verificación POST de abajo.
+
+#### PRE — antes del paso 4 del despliegue
+
+1. Backup validado, como siempre (paso 0).
+2. Después del paso 3 (pull de la imagen) y justo antes de migrar, el precheck de
+   solo lectura. Si da ROJO, **NO se inicia ninguna migración**: se espera a que
+   termine lo que retiene el stock, o se reprograma la ventana.
+
+```bash
+ssh vps-erp 'cd /srv/produccion/erpazul && docker exec -i erpazul_db psql -U erpazul -d erpazul -X -q -v ON_ERROR_STOP=1 -f - < scripts/deploy/precheck-libro-stock.sql'
+```
+
+   Frena si hay una migración fallida sin resolver, una transacción abierta hace
+   más de 2 s, o un candado sobre `StockLocal`, `ProductoBase` o `Local` que choque
+   con el de la activación. Informa las filas de `StockLocal` —la activación tarda
+   del orden de 28 ms con 4k, 283 ms con 50k, 764 ms con 100k— y la salud de
+   PostgreSQL. Reduce el riesgo; no reemplaza la recuperación.
+3. Clasificación y autorización del paso 4 como siempre. Ventana fuera del
+   horario de venta.
+
+#### INTENTO
+
+El paso 4 normal: `migrate deploy`. Trae `correccion_caja` y después `libro_stock`.
+
+- **Si falla `correccion_caja`:** FRENAR. Prisma se detiene ahí y el libro ni se
+  intenta. No hay diagnóstico ni resolve para esto: va por la sección de arriba.
+- **Si pasan las dos:** verificación POST.
+- **Si `correccion_caja` pasa y `libro_stock` falla:** diagnóstico, SIN resolver
+  nada todavía.
+
+```bash
+ssh vps-erp 'cd /srv/produccion/erpazul && docker exec -i erpazul_db psql -U erpazul -d erpazul -X -q -v ON_ERROR_STOP=1 -v modo=recuperar -f - < scripts/deploy/diagnostico-recuperacion-libro-stock.sql'
+```
+
+Imprime cada condición con ✓ o ✗ y termina en `RESULTADO: CASO_1_RECUPERABLE` o en
+`RESULTADO: FRENAR`. CASO 1 es, TODAS juntas: la única migración fallida sin
+resolver es `libro_stock`; su último intento no aplicó ningún paso; los logs
+traen SQLSTATE 55P03 y el "lock timeout" del LOCK TABLE de la activación; las 38
+migraciones anteriores están aplicadas, `correccion_caja` incluida; y no existe
+ningún objeto del libro —tablas, secuencias, índices, el enum, las funciones
+`libro_stock_*`, los triggers, las restricciones—.
+
+- **`RESULTADO: FRENAR`:** FRENAR. Sin resolve, sin reintento, sin `up -d`. La app
+  vieja sigue atendiendo. Informar a Emanuel con la salida entera del diagnóstico.
+- **`RESULTADO: CASO_1_RECUPERABLE`:** la recuperación tipada. Es el ÚNICO
+  `migrate resolve` que la guardia deja pasar, y solo con este texto EXACTO —un
+  espacio de más y se rechaza—:
+
+```bash
+ssh vps-erp 'cd /srv/produccion/erpazul && docker exec -i erpazul_db psql -U erpazul -d erpazul -X -q -v ON_ERROR_STOP=1 -v modo=recuperar -f - < scripts/deploy/diagnostico-recuperacion-libro-stock.sql && docker compose -f docker-compose.prod.yml run --rm -T --no-deps app prisma migrate resolve --rolled-back 20260927120000_libro_stock'
+```
+
+  Vuelve a correr el diagnóstico adentro, y el `&&` hace que el resolve solo
+  corra si dio CASO 1: si entre el diagnóstico de arriba y éste cambió algo, frena
+  solo. La guardia lo deja pasar AVISANDO y deja rastro. Y enseguida, confirmar:
+
+```bash
+ssh vps-erp 'cd /srv/produccion/erpazul && docker exec -i erpazul_db psql -U erpazul -d erpazul -X -q -v ON_ERROR_STOP=1 -v modo=revertida -f - < scripts/deploy/diagnostico-recuperacion-libro-stock.sql'
+```
+
+  Tiene que dar `RESULTADO: REVERTIDA_LIMPIA`: nada sin resolver, el último intento
+  revertido y sin pasos, ningún objeto del libro. Si no, FRENAR.
+
+#### REINTENTO — el segundo, y el último
+
+Con el precheck en VERDE otra vez, el paso 4 de nuevo. Aplica solo `libro_stock`.
+
+- **Si pasa:** verificación POST.
+- **Si vuelve a fallar:** el diagnóstico de nuevo. Va a avisar
+  `ESTE ES UN SEGUNDO FALLO`.
+  - Si es CASO 1: la recuperación tipada y la confirmación `revertida`, para no
+    dejar a Prisma trabado en P3009 —que bloquea CUALQUIER despliegue posterior,
+    incluso uno sin migraciones—. Y después **FRENAR LA VENTANA**: NUNCA un tercer
+    intento, NO el `up -d`, la app vieja sigue atendiendo, informar.
+  - Si NO es CASO 1: FRENAR sin resolver.
+
+El límite es de **DOS intentos de aplicar el libro por ventana**. Es una regla de
+este runbook, no una garantía del código: el diagnóstico cuenta los intentos
+revertidos de toda la historia y avisa desde el segundo, pero no sabe dónde
+empieza una ventana. El que despliega la cumple.
+
+#### POST — para declarar el libro activo
+
+`migrate status` no alcanza. Hace falta todo esto:
+
+- las 39 migraciones del árbol aplicadas, **contadas por nombre** entre las filas
+  terminadas y no revertidas de `_prisma_migrations`: los intentos revertidos del
+  libro quedan como filas aparte y no cuentan;
+- `libro_stock` con UN intento terminado; `correccion_caja` aplicada;
+- el verificador del libro, de solo lectura, con la integridad física en VERDE:
+
+```bash
+DATABASE_URL="<la de producción>" node --import ./scripts/alias-loader.mjs \
+  scripts/verificar-libro-stock.mjs
+```
+
+- tantas filas `ESTADO_INICIAL` como filas tenía `StockLocal`, con un único
+  instante;
+- los 5 triggers una vez cada uno, y las 9 funciones `libro_stock_*`;
+- después del `up -d` y de las sondas PRE/POST de siempre, una escritura
+  productiva real de stock capturada en `MovimientoStock`, y la app sana.
 
 ### Rollback de una migración: NUNCA SE EJECUTÓ
 
