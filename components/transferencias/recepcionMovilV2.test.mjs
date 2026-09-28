@@ -512,7 +512,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // registra cada cambio; no cambia ninguna columna, y la recepción escribe
   // StockLocal igual que antes —probado con `pruebas-db/recepcionTransferencias`
   // con el trigger activo—.
-  assert.equal(migraciones.length, 39, "aparecio una migracion que nadie declaro aca");
+  // Sube a 40 el 2026-09-28: entró `20260928150000_stock_diario_indice`, un solo
+  // índice sobre `MovimientoStock` para el Stock Diario. Aditiva, sin tocar
+  // ninguna tabla de transferencias ni rellenar nada.
+  assert.equal(migraciones.length, 40, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

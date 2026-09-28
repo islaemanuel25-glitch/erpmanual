@@ -154,7 +154,9 @@ function dirPrisma(conLibro) {
   fs.writeFileSync(path.join(destino, "schema.prisma"), conLibro ? SCHEMA_REAL : schemaSinLibro());
   const origen = path.join(RAIZ, "prisma", "migrations");
   for (const e of fs.readdirSync(origen, { withFileTypes: true })) {
-    if (!conLibro && e.name === NOMBRE_MIGRACION) continue;
+    // Sin el libro es SIN el libro ni lo que cuelga de él: las migraciones
+    // posteriores (el índice del Stock Diario) crean objetos sobre sus tablas.
+    if (!conLibro && e.isDirectory() && e.name >= NOMBRE_MIGRACION) continue;
     fs.cpSync(path.join(origen, e.name), path.join(destino, "migrations", e.name), { recursive: true });
   }
   return path.join(destino, "schema.prisma");
