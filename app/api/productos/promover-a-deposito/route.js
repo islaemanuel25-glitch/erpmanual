@@ -12,6 +12,7 @@ import {
   bloquearCodigosDelGrupo,
   validarUnicidadCodigos,
 } from "@/lib/productos/validarCodigosBarra";
+import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
 
 export async function POST(req) {
   try {
@@ -56,6 +57,8 @@ export async function POST(req) {
     const yaEsDeposito = base.creadoEnLocalId == null || base.creadoEnLocal?.es_deposito === true;
 
     await prisma.$transaction(async (tx) => {
+      // Metadata para el Libro de Costos: no cambia qué costo se escribe.
+      await declararOrigenDeCosto(tx, { origen: ORIGEN_COSTO.PROMOCION_A_DEPOSITO, referencia: id });
       await bloquearCodigosDelGrupo(tx, grupoId);
 
       // ── SUBIR AL DEPÓSITO PUEDE FABRICAR UNA AMBIGÜEDAD, Y ANTES NO SE

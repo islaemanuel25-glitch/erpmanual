@@ -18,6 +18,7 @@ import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { ErrorParaLaPersona, esParaLaPersona } from "@/lib/compras-proveedor/errorParaLaPersona";
 import { formatearMoneda } from "@/lib/moneda";
+import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
 import { aCentavos } from "@/lib/compras-proveedor/comprobante/impuestos";
 import {
   DECISION_DE_PRECIO,
@@ -577,6 +578,9 @@ export async function POST(req, { params }) {
 
     // Transacción: incrementar stock + marcar recibido
     await prisma.$transaction(async (tx) => {
+      // Metadata para el Libro de Costos: no cambia qué costo se escribe.
+      await declararOrigenDeCosto(tx, { origen: ORIGEN_COSTO.COMPRA_PROVEEDOR, referencia: pedidoId });
+
       // ── UN SOLO CIERRE POR PEDIDO, AUNQUE LLEGUEN DOS A LA VEZ ───────────
       //
       // El chequeo de ENVIADO de arriba se hizo sin lock: dos envíos

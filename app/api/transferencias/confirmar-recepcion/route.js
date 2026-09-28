@@ -27,6 +27,7 @@ import {
 import { rotuloConSueltas } from "@/lib/transferencias/presentacionEnvio";
 import { aplicarCorreccionEconomica } from "@/lib/transferencias/aplicarCorreccionEconomica";
 import { getConfigLocalEfectiva } from "@/lib/config/local";
+import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
 
 /** Cantidades siempre con la escala física de StockLocal (3 decimales). */
 const fmt = (n) => Number(n || 0).toFixed(3);
@@ -338,6 +339,13 @@ export async function POST(req) {
       // bloquea acá y después vuelve a evaluar su WHERE contra lo que dejamos:
       // ve "Confirmando" y empareja cero.
       await reclamarOFallar(tx, transferenciaId, "Confirmando");
+
+      // Metadata para el Libro de Costos: más abajo se puede crear el
+      // ProductoLocal del destino con un costo. No cambia qué costo se escribe.
+      await declararOrigenDeCosto(tx, {
+        origen: ORIGEN_COSTO.ALTA_POR_TRANSFERENCIA_RECEPCION,
+        referencia: transferenciaId,
+      });
 
       // ── 2. RECIÉN AHORA SE LEE QUÉ HAY QUE PROCESAR ─────────────────────
       //

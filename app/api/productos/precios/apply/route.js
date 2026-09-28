@@ -6,6 +6,7 @@ import { resolveScope } from "@/lib/grupos";
 import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { alcanceEdicionProducto } from "@/lib/productos/propiedadCosto";
 import { cambioElPrecioEfectivo } from "@/lib/productos/revisionDePrecio";
+import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
 
 function toNumber(value) {
   const n = Number(value);
@@ -71,6 +72,9 @@ export async function POST(req) {
       : proveedorId;
 
     const result = await prisma.$transaction(async (tx) => {
+      // Metadata para el Libro de Costos: no cambia qué costo se escribe.
+      await declararOrigenDeCosto(tx, { origen: ORIGEN_COSTO.ACTUALIZACION_MASIVA_PRECIOS });
+
       const update = await tx.precioUpdate.create({
         data: {
           grupoId,

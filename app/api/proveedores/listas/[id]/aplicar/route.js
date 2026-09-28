@@ -67,6 +67,7 @@ import {
 import { vinculoAPersistirAlAplicar, ORIGEN_ALTA_VINCULO } from "@/lib/proveedores/listas/vinculacion";
 // PARA QUÉ SE SUBIÓ LA LISTA. Una de control no escribe costos.
 import { MODO_LISTA, modoDeImportacion } from "@/lib/proveedores/listas/modoDeLaLista";
+import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
 
 /** Un Decimal de Prisma como número, o null. Null no es cero: es "sin cargar". */
 function numeroONull(v) {
@@ -374,6 +375,9 @@ export async function POST(req, context) {
 
     // ── La transacción ───────────────────────────────────────────────────
     const salida = await prisma.$transaction(async (tx) => {
+      // Metadata para el Libro de Costos: no cambia qué costo se escribe.
+      await declararOrigenDeCosto(tx, { origen: ORIGEN_COSTO.LISTA_PROVEEDOR_APLICAR, referencia: importacionId });
+
       // Idempotencia dentro de la transacción: dos pedidos simultáneos que
       // hayan pasado el chequeo de afuera no pueden escribir los dos.
       const cab = await tx.importacionListaProveedor.findUnique({
