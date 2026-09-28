@@ -77,6 +77,23 @@ precioUnitario = precioCosto / factor_pack
 stockUnidades = stockBultos * factor_pack
 ```
 
+## Libro histórico físico
+
+**Historia física de stock confiable desde 2026-09-28 00:19:13.587 UTC
+(2026-09-27 21:19:13.587 Argentina).**
+
+Desde ese instante, cada cambio de `StockLocal.cantidad` o `StockLocal.enTransito`
+queda en `MovimientoStock`, escrito por un trigger de PostgreSQL en la misma
+transacción que el cambio. El punto cero —12.278 filas `ESTADO_INICIAL`, una por
+fila de `StockLocal`, con un único instante— y la evidencia del despliegue están en
+`docs/deploy/MIGRACIONES-SIN-APLICAR.md`. El porqué de cada columna, en
+`prisma/schema.prisma` junto a `MovimientoStock`. El verificador de solo lectura
+es `scripts/verificar-libro-stock.mjs`.
+
+Los escritores todavía no declaran origen, así que sus movimientos quedan como
+`SIN_ORIGEN`. Eso no vuelve dudosa la cantidad. La apertura, los movimientos y el
+cierre por día sobre este libro todavía no están construidos.
+
 ## Cambios recientes
 - 2026-08-25: fix(stock): mostrar packs y unidades en movil (#12)
 - 2026-07-28: feat(productos): codigo de barras propio por ubicacion
