@@ -6,7 +6,9 @@
 // cuenta de uno de sus locales. Un LOCAL no lo manda —su cuenta es la suya—, pero
 // la URL se puede escribir a mano. Hasta esta prueba, para un local el destino
 // pedido REEMPLAZABA su propio `destinoId` en el filtro, y con eso un local leía
-// las transferencias que otra ubicación recibía, de su grupo o de otro.
+// las transferencias que otra ubicación recibía, de su grupo o de otro. Y un
+// DEPÓSITO que pedía un local de otro grupo no traía transferencias, pero sí el
+// corte de la Semana Operativa de ese local.
 //
 // Llama al handler real con sesiones firmadas como las firma el login, contra
 // PostgreSQL:
@@ -15,6 +17,8 @@
 //   2. el local pidiendo otro local de su grupo, uno de otro grupo, uno que no
 //      existe y uno que no es un número: 403, sin datos;
 //   3. el depósito: su entrada, y la cuenta de cualquiera de sus locales;
+//      3.bis, fuera de su grupo, inexistente o inválido: 403 con solo `ok` y
+//      `error`, sin el corte de semana, el nombre ni el primer movimiento;
 //   4. el admin en vista global: lo mismo que el depósito del grupo activo;
 //   5. el admin en vista LOCAL sobre un local: como ese local.
 //
@@ -26,6 +30,9 @@ const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const jwt = (await import("jsonwebtoken")).default;
 const rutaTablero = await import("../../app/api/transferencias/tablero/route.js");
 const { DEFAULT_PERMISOS_SISTEMA, ENCARGADO } = await import("../../lib/rbac/systemRoles.js");
+// La semana de X se programa por la ÚNICA puerta que escribe vigencias; las filas
+// se van con el local, por la cascada.
+const { programarSemanaOperativa } = await import("../../lib/semanaOperativa/semanaOperativaServer.js");
 
 let pasadas = 0;
 const fallas = [];
@@ -117,7 +124,15 @@ async function montar() {
     aB: await transferencia(L.D.id, L.B.id, pD, 7, 333),
     aB2: await transferencia(L.D.id, L.B.id, pD, 1, 333),
     aX: await transferencia(L.D2.id, L.X.id, pD2, 5, 777),
+    // Una que el depósito D despachó a X, de OTRO grupo. Hoy crear una así se
+    // rechaza —`pos-transferencias/crear` exige el mismo grupo—, pero queda en la
+    // historia si X se cambia de grupo después. Si el filtro por origen fuera la
+    // única barrera, D la vería con `?destino=X`.
+    dX: await transferencia(L.D.id, L.X.id, pD, 4, 555),
   };
+  // X tiene su semana configurada, con corte MIÉRCOLES (3): distinto del
+  // domingo por defecto, así una fuga del corte se distingue de un default.
+  await prisma.$transaction((tx) => programarSemanaOperativa(tx, { localId: L.X.id, diaDeCorte: 3 }));
   return { G, L, T };
 }
 
@@ -192,8 +207,39 @@ try {
     );
     const b = await pedir({ destino: String(L.B.id) }, S.deposito);
     ok("la cuenta de B: sus dos transferencias", b.status === 200 && b.local?.id === L.B.id && json(idsDe(b)) === json([T.aB, T.aB2].sort((x, y) => x - y)), json({ s: b.status, ids: idsDe(b) }));
+    ok(
+      "y trae el corte de B y su primer movimiento, que son de su grupo",
+      b.local?.nombre?.endsWith("-B") && typeof b.local?.diaDeCorte === "number" && b.primerMovimiento !== undefined
+    );
+  }
+
+  console.log("\n── 3.bis El depósito pidiendo fuera de su grupo: 403, sin NADA del local pedido");
+  // La forma exacta de un rechazo: solo `ok` y `error`. Cualquier otra clave
+  // —local, periodo, diaDeCorte, sinConfigurar, primerMovimiento— sería algo
+  // derivado del local pedido.
+  const soloElRechazo = (r, error) => r.status === 403 && r.ok === false && r.error === error && json(Object.keys(r).sort()) === json(["error", "ok", "status"]);
+  for (const [nombre, destino, error] of [
+    ["un local de OTRO grupo (X), con semana configurada y una transferencia de este depósito", String(L.X.id), "Local fuera de tu alcance."],
+    ["un local que no existe", "999999999", "Local fuera de tu alcance."],
+    ["el propio depósito, que no es uno de sus locales", String(L.D.id), "Local fuera de tu alcance."],
+    ["un número negativo", "-3", "Local inválido."],
+    ["algo que no es un número", "abc", "Local inválido."],
+  ]) {
+    const r = await pedir({ destino }, S.deposito);
+    ok(
+      `destino = ${nombre}: 403 "${error}" y nada más`,
+      soloElRechazo(r, error),
+      json({ s: r.status, claves: Object.keys(r), local: r.local, ids: idsDe(r), corte: r.local?.diaDeCorte, primer: r.primerMovimiento })
+    );
+  }
+  {
     const x = await pedir({ destino: String(L.X.id) }, S.deposito);
-    ok("la cuenta de X, de otro grupo: nada de lo que X recibió de OTRO depósito", !idsDe(x).includes(T.aX), json({ s: x.status, ids: idsDe(x) }));
+    const texto = json(x);
+    ok(
+      "ni el corte miércoles de X, ni su transferencia, ni su nombre, ni la fecha del primer movimiento",
+      !/diaDeCorte|sinConfigurar|primerMovimiento|aPagar|X-otro-grupo/.test(texto) && !texto.includes(String(T.dX)),
+      texto
+    );
   }
 
   console.log("\n── 4. El admin en vista global");
@@ -201,7 +247,11 @@ try {
     const b = await pedir({ destino: String(L.B.id) }, adminGlobal);
     ok("la cuenta de B, como el depósito del grupo", b.status === 200 && b.local?.id === L.B.id && json(idsDe(b)) === json([T.aB, T.aB2].sort((x, y) => x - y)), json({ s: b.status, ids: idsDe(b) }));
     const x = await pedir({ destino: String(L.X.id) }, adminGlobal);
-    ok("X, de otro grupo: nada de lo que X recibió de otro depósito", !idsDe(x).includes(T.aX), json({ s: x.status, ids: idsDe(x) }));
+    ok("X, de otro grupo que el activo: 403 y nada más, como el depósito del grupo", soloElRechazo(x, "Local fuera de tu alcance."), json({ s: x.status, claves: Object.keys(x), corte: x.local?.diaDeCorte }));
+    const sin = await pedir({}, adminGlobal);
+    // Sin destino no se pide ningún local: es la lista de lo que el depósito
+    // despachó, y esa lista no cambia con este arreglo.
+    ok("sin destino: la vista del depósito, con el bloque de B", sin.status === 200 && sin.vista === "DEPOSITO" && (sin.bloques || []).some((b) => b.localId === L.B.id), json({ s: sin.status, v: sin.vista }));
   }
 
   console.log("\n── 5. El admin en vista LOCAL sobre A");

@@ -107,16 +107,27 @@ Diferencias deliberadas, y por que:
 de `resolveVistaOperativa`. El `?destino=` sirve para que el DEPÓSITO —o el admin
 en vista global— abra la cuenta de uno de sus locales.
 
-Un local no lo manda, porque su cuenta es la suya. Si lo manda, tiene que ser su
-propio local; otro, uno que no existe o algo que no es un número da 403 "Local
-fuera de tu alcance." o "Local inválido.". La regla es `resolverLocalPedido`, de
-`lib/finanzas/alcanceFinanciero.js`, la misma que usa Finanzas para el mismo
-parámetro.
+La regla es `resolverLocalPedido`, de `lib/finanzas/alcanceFinanciero.js`, la
+misma que usa Finanzas para el mismo parámetro. Se decide antes de leer nada del
+local pedido, y el resto del endpoint usa el local resuelto, no el parámetro:
 
-Hasta el 2026-09-28 no era así: para un local, el `destino` reemplazaba su propio
-`destinoId` en el filtro. Con `?destino=<otro>` leía las transferencias que
-recibía otra ubicación, del grupo o de otro grupo: ids, estados, fechas, importes
-y el "a pagar" del período.
+- **Un local** no lo manda, porque su cuenta es la suya. Si lo manda, tiene que
+  ser su propio local.
+- **El depósito, o el admin en vista global**, pide uno de los locales de SU grupo
+  (activo), según la lista `GrupoLocal` que ya lee el tablero. Sin `destino` sigue
+  viendo su entrada o sus bloques como antes.
+- Cualquier otro destino da 403 "Local fuera de tu alcance.": otro local, uno de
+  otro grupo, uno que no existe, o el propio depósito para sí mismo. Algo que no
+  es un número da 403 "Local inválido.". La respuesta trae solo `ok` y `error`.
+
+Hasta el 2026-09-28 no era así, porque el `destino` se usaba tal cual:
+
+- Para un local, reemplazaba su propio `destinoId` en el filtro. Con
+  `?destino=<otro>` leía las transferencias que recibía otra ubicación, del grupo
+  o de otro grupo: ids, estados, fechas, importes y el "a pagar" del período.
+- Para el depósito, un local de otro grupo no traía las transferencias de otros
+  orígenes. Sí traía el corte de su Semana Operativa, el rango de su semana y lo
+  que ese mismo depósito le hubiera despachado.
 
 ## Modelo de datos
 
