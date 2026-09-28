@@ -16,7 +16,12 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **39 migraciones**. El árbol trae **40**. Falta:
+Producción está en **39 migraciones**. El árbol trae **41**. Faltan dos, y Prisma
+las aplica en este orden, que es el de sus nombres. Son independientes entre sí
+—el índice no toca funciones ni triggers, y la corrección no toca índices—: se
+comprobó aplicándolas juntas con Prisma sobre una base como la de producción.
+`20260928180000_libro_stock_baja_atomica` ya está en `main` (PR #96), pero
+mergeada no es desplegada: producción sigue en 39 hasta el próximo despliegue.
 
 - `20260928150000_stock_diario_indice` — **aditiva**: un solo `CREATE INDEX`
   sobre `MovimientoStock` con las columnas `("localId", "productoLocalId", "dia", "id")`.
@@ -32,6 +37,23 @@ Producción está en **39 migraciones**. El árbol trae **40**. Falta:
   conviene medir las filas antes. Lo que hay que comprobar después de aplicarla:
   que `pg_indexes` muestre `MovimientoStock_localId_productoLocalId_dia_id_idx`
   con esas cuatro columnas, y que el verificador del libro siga en verde.
+- `20260928180000_libro_stock_baja_atomica` — corrección preventiva del libro de
+  stock. Reemplaza con `CREATE OR REPLACE` la función `libro_stock_registrar`
+  (el trigger `StockLocal_libro` sigue apuntando a ella) y agrega dos funciones y
+  dos triggers `BEFORE DELETE` sobre `ProductoLocal` y `ProductoBase` que
+  recuerdan la identidad, local a la transacción. No toca ninguna tabla, columna
+  ni fila del libro, no crea `ESTADO_INICIAL` y no mueve el punto cero; la
+  migración `20260927120000_libro_stock` no se modifica. El clasificador la marca
+  **aditiva, sin coincidencias** —no lee lo que cambia una función: esto SÍ
+  cambia comportamiento, a propósito—: una sola sentencia que borra un
+  StockLocal y su ProductoLocal ahora deja su BAJA, y un movimiento que no puede
+  escribirse aborta la sentencia en vez de perderse. Sin tope de espera: el
+  `CREATE TRIGGER` frena solo las escrituras sobre `ProductoLocal` y
+  `ProductoBase` mientras confirma, no las lecturas ni `StockLocal`. Qué
+  comprobar después de aplicarla: los triggers `ProductoLocal_libro_identidad` y
+  `ProductoBase_libro_identidad` presentes, `libro_stock_identidad_de_baja`
+  presente, el mismo conteo de `MovimientoStock` que antes, y el verificador del
+  libro en verde.
 
 ---
 

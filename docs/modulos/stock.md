@@ -82,6 +82,16 @@ stockUnidades = stockBultos * factor_pack
 **Historia física de stock confiable desde 2026-09-28 00:19:13.587 UTC
 (2026-09-27 21:19:13.587 Argentina).**
 
+La BAJA no depende del orden de las sentencias
+(`20260928180000_libro_stock_baja_atomica`, en `main`; en producción rige recién
+desde el despliegue que la aplique —ver `docs/deploy/MIGRACIONES-SIN-APLICAR.md`—):
+una sola sentencia que borra un
+StockLocal y su ProductoLocal —o re-vincula la fila— deja su BAJA con la identidad
+completa, porque la identidad se recuerda en el momento en que el producto se
+borra. Y el libro falla cerrado: si un movimiento no puede escribirse, la
+sentencia aborta y la fila de stock no cambia. No es una frontera nueva: el punto
+cero es el mismo, y ningún camino de la aplicación había usado ese hueco.
+
 Desde ese instante, cada cambio de `StockLocal.cantidad` o `StockLocal.enTransito`
 queda en `MovimientoStock`, escrito por un trigger de PostgreSQL en la misma
 transacción que el cambio. El punto cero —12.278 filas `ESTADO_INICIAL`, una por

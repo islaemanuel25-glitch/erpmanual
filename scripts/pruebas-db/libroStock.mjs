@@ -18,7 +18,11 @@
 //   H. la REINTERPRETACIÓN de unidad deja evidencia y no toca el stock;
 //   I. la CONTRAPRUEBA: con el trigger apagado, el verificador se pone rojo;
 //   J. un DUMP plano restaurado conserva tabla, datos, funciones y triggers sin
-//      inventar movimientos.
+//      inventar movimientos;
+//   K. la BAJA no depende del orden de las sentencias
+//      (`20260928180000_libro_stock_baja_atomica`): una sola sentencia que borra
+//      el StockLocal y su ProductoLocal, o re-vincula la fila, deja su BAJA
+//      completa; y si no puede, la sentencia falla en vez de perder la fila.
 //
 // ── DÓNDE CORRE CADA COSA ──────────────────────────────────────────────────
 //
@@ -147,7 +151,7 @@ function schemaSinLibro() {
   return recortado;
 }
 
-function dirPrisma(conLibro) {
+function dirPrisma(conLibro, { soloHastaElLibro = false } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "erpazul-libro-"));
   const destino = path.join(dir, "prisma");
   fs.mkdirSync(path.join(destino, "migrations"), { recursive: true });
@@ -155,8 +159,12 @@ function dirPrisma(conLibro) {
   const origen = path.join(RAIZ, "prisma", "migrations");
   for (const e of fs.readdirSync(origen, { withFileTypes: true })) {
     // Sin el libro es SIN el libro ni lo que cuelga de él: las migraciones
-    // posteriores (el índice del Stock Diario) crean objetos sobre sus tablas.
+    // posteriores (el índice del Stock Diario, la BAJA atómica) crean objetos
+    // sobre sus tablas y sus funciones.
     if (!conLibro && e.isDirectory() && e.name >= NOMBRE_MIGRACION) continue;
+    // El libro tal como se desplegó el 2026-09-28, sin las correcciones
+    // posteriores: es la base donde la contraprueba de la K reproduce el defecto.
+    if (soloHastaElLibro && e.isDirectory() && e.name > NOMBRE_MIGRACION) continue;
     fs.cpSync(path.join(origen, e.name), path.join(destino, "migrations", e.name), { recursive: true });
   }
   return path.join(destino, "schema.prisma");
@@ -885,6 +893,296 @@ try {
     const [f] = await destino.$queryRaw`SELECT "id" FROM "StockLocal" ORDER BY "id" LIMIT 1`;
     await destino.$executeRaw`UPDATE "StockLocal" SET "cantidad" = "cantidad" + 1 WHERE "id" = ${f.id}`;
     ok("y el trigger restaurado captura la escritura siguiente", (await contar(destino)) === b.n + 1);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // K. LA BAJA NO DEPENDE DEL ORDEN DE LAS SENTENCIAS
+  // ══════════════════════════════════════════════════════════════════════════
+  //
+  // `20260928180000_libro_stock_baja_atomica`. Una sola sentencia que borra el
+  // StockLocal y su ProductoLocal —o re-vincula la fila y borra el producto
+  // viejo— perdía la BAJA: el trigger AFTER corre al final de la sentencia y el
+  // producto ya no estaba. Primero se reproduce el defecto sobre el libro tal
+  // como se desplegó, para saber que estas afirmaciones lo ven; después, cada
+  // caso sobre el libro corregido.
+  seccion("K. La BAJA no depende del orden de las sentencias");
+  {
+    const CTE_ATOMICO = (pl) =>
+      `WITH s AS (DELETE FROM "StockLocal" WHERE "productoId" = ${pl} RETURNING "id") DELETE FROM "ProductoLocal" WHERE "id" = ${pl}`;
+
+    /** Un producto con su fila de stock en la primera ubicación que no es depósito. */
+    async function productoK(c, sufijo, cantidad, transito, { conStock = true } = {}) {
+      const [b] = await c.$queryRawUnsafe(
+        `INSERT INTO "ProductoBase" ("grupoId","nombre","codigo_barra","unidad_medida","precio_costo","precio_venta","updatedAt")
+         VALUES ((SELECT min("id") FROM "Grupo"), 'K ${sufijo}', 'K-${sufijo}', 'kg', 1, 2, now()) RETURNING "id"`
+      );
+      const [l] = await c.$queryRawUnsafe(`SELECT min("id") AS "id" FROM "Local" WHERE NOT "es_deposito"`);
+      const [pl] = await c.$queryRawUnsafe(`INSERT INTO "ProductoLocal" ("localId","baseId","updatedAt") VALUES (${l.id}, ${b.id}, now()) RETURNING "id"`);
+      let sl = null;
+      if (conStock) {
+        [sl] = await c.$queryRawUnsafe(
+          `INSERT INTO "StockLocal" ("localId","productoId","cantidad","enTransito","updatedAt") VALUES (${l.id}, ${pl.id}, ${cantidad}, ${transito}, now()) RETURNING "id"`
+        );
+      }
+      return { base: b.id, pl: pl.id, sl: sl?.id ?? null, local: l.id, nombre: `K ${sufijo}`, codigo: `K-${sufijo}` };
+    }
+
+    const cadena = (c, pl) => c.$queryRaw`
+      SELECT "id", "tipo"::text AS "tipo", "stockLocalId", "localId", "productoLocalId", "productoBaseId",
+             "cantidadAnterior"::float8 AS "ca", "cantidadPosterior"::float8 AS "cp",
+             "enTransitoAnterior"::float8 AS "ta", "enTransitoPosterior"::float8 AS "tp",
+             "nombreCongelado", "codigoBarraCongelado", "unidadMedidaCongelada"
+      FROM "MovimientoStock" WHERE "productoLocalId" = ${pl} ORDER BY "id"`;
+
+    /** La BAJA con TODO el contrato: ubicación, cadena, base, fila, saldos e identidad. */
+    const bajaCompleta = (b, p, cantidad, transito) =>
+      !!b && b.tipo === "BAJA" && b.localId === p.local && b.productoLocalId === p.pl && b.productoBaseId === p.base &&
+      b.stockLocalId === p.sl && b.ca === cantidad && b.ta === transito && b.cp === null && b.tp === null &&
+      b.nombreCongelado === p.nombre && b.codigoBarraCongelado === p.codigo && b.unidadMedidaCongelada === "kg";
+
+    const rojasDe = async (c) => (await verificarLibroStock(c)).integridad.reglas.filter((r) => r.cantidad > 0).map((r) => r.clave);
+
+    // ── K.0 El defecto, sobre el libro tal como se desplegó ─────────────────
+    {
+      const url = await crearBase(`${PREFIJO}k0`, PLANTILLA);
+      const r = await migrateDev(dirPrisma(true, { soloHastaElLibro: true }), url);
+      ok("K.0 una base con el libro SIN la corrección", r.codigo === 0, r.salida.slice(-300));
+      const c = await clienteDe(url);
+      const p = await productoK(c, "defecto", 5, 0);
+      await c.$executeRawUnsafe(CTE_ATOMICO(p.pl));
+      const movs = await cadena(c, p.pl);
+      ok(
+        "K.0 CONTRAPRUEBA: sin la corrección, el DELETE atómico borra la fila y NO deja BAJA",
+        movs.length === 1 && movs[0].tipo === "ALTA",
+        JSON.stringify(movs.map((m) => m.tipo))
+      );
+      ok("K.0 y el verificador se pone ROJO por cadena abierta sin fila", (await rojasDe(c)).includes("cadena-abierta-sin-fila"));
+      await soltarClientes(url);
+    }
+
+    // ── K.0b La corrección sobre un libro que ya tiene movimientos ─────────
+    //
+    // Como producción: el libro activado, movimientos reales encima, y recién
+    // después la migración nueva. No puede tocar ni una fila del libro.
+    {
+      const url = await crearBase(`${PREFIJO}k1`, PLANTILLA);
+      await migrateDev(dirPrisma(true, { soloHastaElLibro: true }), url);
+      const c = await clienteDe(url);
+      await c.$executeRawUnsafe(`UPDATE "StockLocal" SET "cantidad" = "cantidad" + 1 WHERE "id" % 3 = 0`);
+      await c.$executeRawUnsafe(`UPDATE "StockLocal" SET "enTransito" = 1.5 WHERE "id" % 5 = 0`);
+      await c.$executeRawUnsafe(`DELETE FROM "StockLocal" WHERE "id" % 7 = 0`);
+      const huella = async () =>
+        (await c.$queryRawUnsafe(`SELECT count(*)::int AS "n", max("id") AS "m", md5(string_agg(t::text, '|' ORDER BY "id")) AS "h" FROM "MovimientoStock" t`))[0];
+      const antes = await huella();
+      const [cero] = await c.$queryRawUnsafe(`SELECT min("instante")::text AS "i", count(*)::int AS "n" FROM "MovimientoStock" WHERE "tipo" = 'ESTADO_INICIAL'`);
+      await soltarClientes(url);
+      const r = await migrateDev(dirPrisma(true), url);
+      ok("K.0b la migración de la corrección se aplica sobre un libro con movimientos", r.codigo === 0 && /20260928180000_libro_stock_baja_atomica/.test(r.salida), r.salida.slice(-300));
+      const c2 = await clienteDe(url);
+      const despues = (await c2.$queryRawUnsafe(`SELECT count(*)::int AS "n", max("id") AS "m", md5(string_agg(t::text, '|' ORDER BY "id")) AS "h" FROM "MovimientoStock" t`))[0];
+      const [cero2] = await c2.$queryRawUnsafe(`SELECT min("instante")::text AS "i", count(*)::int AS "n" FROM "MovimientoStock" WHERE "tipo" = 'ESTADO_INICIAL'`);
+      ok(
+        `K.0b el libro queda idéntico, fila por fila (${antes.n} movimientos), y el punto cero no se mueve`,
+        antes.n > 0 && antes.n === despues.n && antes.m === despues.m && antes.h === despues.h && cero.i === cero2.i && cero.n === cero2.n,
+        JSON.stringify({ antes, despues })
+      );
+      ok("K.0b verificador en VERDE después de aplicarla", (await rojasDe(c2)).length === 0);
+      const p = await productoK(c2, "despues-de-migrar", 5, 0);
+      await c2.$executeRawUnsafe(CTE_ATOMICO(p.pl));
+      ok("K.0b y desde ahí el DELETE atómico deja su BAJA", (await cadena(c2, p.pl)).filter((m) => m.tipo === "BAJA").length === 1);
+      await soltarClientes(url);
+    }
+
+    await soltarClientes(urlCarrera);
+    const url = await crearBase(`${PREFIJO}k`, BASE_CARRERA);
+    const c = await clienteDe(url);
+    ok("K parte en VERDE, con la corrección aplicada", (await rojasDe(c)).length === 0);
+
+    // ── 1. DELETE normal ──────────────────────────────────────────────────
+    {
+      const p = await productoK(c, "normal", 5, 0);
+      await c.$executeRawUnsafe(`DELETE FROM "StockLocal" WHERE "id" = ${p.sl}`);
+      const bajas = (await cadena(c, p.pl)).filter((m) => m.tipo === "BAJA");
+      ok("K.1 DELETE normal: exactamente UNA BAJA, con todo el contrato", bajas.length === 1 && bajaCompleta(bajas[0], p, 5, 0), JSON.stringify(bajas));
+    }
+
+    // ── 2. El camino de la aplicación: dos sentencias, una transacción ─────
+    {
+      const p = await productoK(c, "dos-sentencias", 0, 2.5);
+      await c.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`DELETE FROM "StockLocal" WHERE "productoId" = ${p.pl}`);
+        await tx.$executeRawUnsafe(`DELETE FROM "ProductoLocal" WHERE "id" = ${p.pl}`);
+      });
+      const bajas = (await cadena(c, p.pl)).filter((m) => m.tipo === "BAJA");
+      ok("K.2 dos sentencias en una transacción: exactamente UNA BAJA", bajas.length === 1 && bajaCompleta(bajas[0], p, 0, 2.5), JSON.stringify(bajas));
+    }
+
+    // ── 3, 5, 6, 7. Una sola sentencia, con los tres estados de saldo ──────
+    for (const [nombre, cantidad, transito] of [["atomico-5-0", 5, 0], ["atomico-0-2.5", 0, 2.5], ["atomico-0-0", 0, 0]]) {
+      const p = await productoK(c, nombre, cantidad, transito);
+      await c.$executeRawUnsafe(CTE_ATOMICO(p.pl));
+      const movs = await cadena(c, p.pl);
+      const bajas = movs.filter((m) => m.tipo === "BAJA");
+      const [quedan] = await c.$queryRawUnsafe(
+        `SELECT (SELECT count(*) FROM "StockLocal" WHERE "id" = ${p.sl})::int AS "sl", (SELECT count(*) FROM "ProductoLocal" WHERE "id" = ${p.pl})::int AS "pl"`
+      );
+      ok(
+        `K.3 UNA sentencia borra StockLocal y ProductoLocal (cantidad ${cantidad}, tránsito ${transito}): las dos filas se van y queda exactamente UNA BAJA completa`,
+        quedan.sl === 0 && quedan.pl === 0 && bajas.length === 1 && bajaCompleta(bajas[0], p, cantidad, transito) && movs[movs.length - 1].tipo === "BAJA",
+        JSON.stringify({ quedan, bajas })
+      );
+    }
+
+    // El orden de las dos mitades dentro de la sentencia no es parte del
+    // contrato de PostgreSQL: se prueba al revés, y con el producto base también.
+    {
+      const p = await productoK(c, "atomico-al-reves", 3, 1);
+      await c.$executeRawUnsafe(
+        `WITH x AS (DELETE FROM "ProductoLocal" WHERE "id" = ${p.pl} RETURNING "id") DELETE FROM "StockLocal" WHERE "productoId" = ${p.pl}`
+      );
+      const bajas = (await cadena(c, p.pl)).filter((m) => m.tipo === "BAJA");
+      ok("K.3 las dos mitades al revés dentro de la sentencia: UNA BAJA completa", bajas.length === 1 && bajaCompleta(bajas[0], p, 3, 1), JSON.stringify(bajas));
+
+      const q = await productoK(c, "atomico-tres-tablas", 7, 1.25);
+      await c.$executeRawUnsafe(
+        `WITH s AS (DELETE FROM "StockLocal" WHERE "productoId" = ${q.pl} RETURNING "id"),
+              p AS (DELETE FROM "ProductoLocal" WHERE "id" = ${q.pl} RETURNING "id")
+         DELETE FROM "ProductoBase" WHERE "id" = ${q.base}`
+      );
+      const bajasQ = (await cadena(c, q.pl)).filter((m) => m.tipo === "BAJA");
+      ok(
+        "K.3 UNA sentencia que borra también el ProductoBase: la identidad sale de lo recordado al borrarlo",
+        bajasQ.length === 1 && bajaCompleta(bajasQ[0], q, 7, 1.25),
+        JSON.stringify(bajasQ)
+      );
+    }
+
+    // ── 4. La re-vinculación atómica ─────────────────────────────────────
+    {
+      const vieja = await productoK(c, "revinculo-viejo", 4, 0.5);
+      const nueva = await productoK(c, "revinculo-nuevo", 0, 0, { conStock: false });
+      await c.$executeRawUnsafe(
+        `WITH s AS (UPDATE "StockLocal" SET "productoId" = ${nueva.pl} WHERE "id" = ${vieja.sl} RETURNING 1)
+         DELETE FROM "ProductoLocal" WHERE "id" = ${vieja.pl}`
+      );
+      const movVieja = await cadena(c, vieja.pl);
+      const movNueva = await cadena(c, nueva.pl);
+      ok(
+        "K.4 re-vinculación atómica: la cadena vieja CERRADA con su BAJA completa",
+        movVieja.filter((m) => m.tipo === "BAJA").length === 1 && bajaCompleta(movVieja[movVieja.length - 1], vieja, 4, 0.5),
+        JSON.stringify(movVieja.map((m) => m.tipo))
+      );
+      const alta = movNueva[movNueva.length - 1];
+      ok(
+        "K.4 y la nueva ABIERTA con un ALTA de los mismos saldos y la misma fila, como siempre",
+        movNueva.length === 1 && alta.tipo === "ALTA" && alta.cp === 4 && alta.tp === 0.5 && alta.stockLocalId === vieja.sl && alta.productoBaseId === nueva.base && alta.id > movVieja[movVieja.length - 1].id,
+        JSON.stringify(movNueva)
+      );
+    }
+
+    // ── 8. Rollback ───────────────────────────────────────────────────────
+    {
+      const p = await productoK(c, "rollback", 9, 0);
+      const antes = (await cadena(c, p.pl)).length;
+      let adentro = null;
+      await c
+        .$transaction(async (tx) => {
+          await tx.$executeRawUnsafe(CTE_ATOMICO(p.pl));
+          adentro = (await tx.$queryRawUnsafe(`SELECT count(*)::int AS "n" FROM "MovimientoStock" WHERE "productoLocalId" = ${p.pl} AND "tipo" = 'BAJA'`))[0].n;
+          throw new Error("rollback a propósito");
+        })
+        .catch(() => {});
+      const [quedan] = await c.$queryRawUnsafe(
+        `SELECT (SELECT count(*) FROM "StockLocal" WHERE "id" = ${p.sl})::int AS "sl", (SELECT count(*) FROM "ProductoLocal" WHERE "id" = ${p.pl})::int AS "pl"`
+      );
+      ok(
+        "K.8 rollback: la BAJA existió adentro y se fue con la transacción; StockLocal y ProductoLocal vuelven",
+        adentro === 1 && quedan.sl === 1 && quedan.pl === 1 && (await cadena(c, p.pl)).length === antes,
+        JSON.stringify({ adentro, quedan })
+      );
+    }
+
+    // ── 9. Una falla al escribir el movimiento: la fila no desaparece ──────
+    {
+      const p = await productoK(c, "sin-identidad", 6, 0);
+      await c.$executeRawUnsafe(`ALTER TABLE "ProductoLocal" DISABLE TRIGGER "ProductoLocal_libro_identidad"`);
+      let error = "";
+      try {
+        await c.$executeRawUnsafe(CTE_ATOMICO(p.pl));
+      } catch (err) {
+        error = String(err?.message || err);
+      }
+      await c.$executeRawUnsafe(`ALTER TABLE "ProductoLocal" ENABLE TRIGGER "ProductoLocal_libro_identidad"`);
+      const [quedan] = await c.$queryRawUnsafe(
+        `SELECT (SELECT count(*) FROM "StockLocal" WHERE "id" = ${p.sl})::int AS "sl", (SELECT count(*) FROM "ProductoLocal" WHERE "id" = ${p.pl})::int AS "pl"`
+      );
+      ok(
+        "K.9 sin la identidad recordada, la sentencia FALLA: el stock y el producto siguen ahí, sin BAJA a medias",
+        /no se puede registrar la BAJA/.test(error) && quedan.sl === 1 && quedan.pl === 1 && !(await cadena(c, p.pl)).some((m) => m.tipo === "BAJA"),
+        error.slice(0, 200)
+      );
+
+      // Una falla provocada DENTRO del INSERT del movimiento, con un DELETE normal.
+      const q = await productoK(c, "insert-fallido", 2, 0);
+      await c.$executeRawUnsafe(`ALTER TABLE "MovimientoStock" ADD CONSTRAINT "prueba_falla_k" CHECK ("origen" <> 'FALLA_PROVOCADA') NOT VALID`);
+      let error2 = "";
+      try {
+        await c.$transaction(async (tx) => {
+          await declararOrigenDeStock(tx, { origen: "FALLA_PROVOCADA" });
+          await tx.$executeRawUnsafe(`DELETE FROM "StockLocal" WHERE "id" = ${q.sl}`);
+        });
+      } catch (err) {
+        error2 = String(err?.message || err);
+      }
+      await c.$executeRawUnsafe(`ALTER TABLE "MovimientoStock" DROP CONSTRAINT "prueba_falla_k"`);
+      const [sigue] = await c.$queryRawUnsafe(`SELECT count(*)::int AS "n" FROM "StockLocal" WHERE "id" = ${q.sl}`);
+      ok("K.9 si el INSERT del movimiento falla, el DELETE de StockLocal se revierte con él", /prueba_falla_k/.test(error2) && sigue.n === 1, error2.slice(0, 200));
+    }
+
+    // ── 10. Concurrencia ─────────────────────────────────────────────────
+    {
+      const p = await productoK(c, "concurrencia", 10, 0);
+      const otra = await clienteDe(url);
+      let soltar;
+      const suelto = new Promise((r) => (soltar = r));
+      const tenedor = otra.$transaction(
+        async (tx) => {
+          await tx.$executeRawUnsafe(`UPDATE "StockLocal" SET "cantidad" = 11 WHERE "id" = ${p.sl}`);
+          await suelto;
+        },
+        { timeout: 60_000 }
+      );
+      await esperar(300);
+      const borrado = c.$executeRawUnsafe(CTE_ATOMICO(p.pl));
+      await esperar(500);
+      soltar();
+      await tenedor;
+      await borrado;
+      const movs = await cadena(c, p.pl);
+      ok(
+        "K.10 un DELETE atómico que espera a otra transacción sobre la misma fila: CAMBIO y después BAJA, en orden, con el saldo que dejó la otra",
+        movs.map((m) => m.tipo).join() === "ALTA,CAMBIO,BAJA" && movs[1].cp === 11 && bajaCompleta(movs[2], p, 11, 0) && movs[1].id < movs[2].id,
+        JSON.stringify(movs.map((m) => [m.id, m.tipo, m.ca, m.cp]))
+      );
+    }
+
+    const v = await verificarLibroStock(c);
+    ok("K con todos los casos escritos: verificador en VERDE", v.integridad.ok, informeDelLibro(v).split("\n").filter((l) => l.includes("✗")).join(" | "));
+
+    // ── Y la corrección sobrevive al backup ──────────────────────────────
+    const fp = path.join(os.tmpdir(), `libro-k-dump-${process.pid}.sql`);
+    await soltarClientes(url);
+    execFileSync("pg_dump", ["--no-owner", "--no-acl", "-f", fp, url], { stdio: "pipe" });
+    const urlR = await crearBase(`${PREFIJO}kr`);
+    const restore = spawnSync("psql", [urlR, "-X", "-q", "-f", fp], { encoding: "utf8" });
+    fs.rmSync(fp, { force: true });
+    const r = await clienteDe(urlR);
+    ok("K dump y restore sin errores", !/ERROR/.test(restore.stderr || ""), (restore.stderr || "").slice(0, 300));
+    const p = await productoK(r, "restaurado", 5, 0);
+    await r.$executeRawUnsafe(CTE_ATOMICO(p.pl));
+    const bajas = (await cadena(r, p.pl)).filter((m) => m.tipo === "BAJA");
+    ok("K sobre la base restaurada, el DELETE atómico deja su BAJA completa", bajas.length === 1 && bajaCompleta(bajas[0], p, 5, 0), JSON.stringify(bajas));
+    ok("K y el verificador sigue en VERDE sobre la restaurada", (await rojasDe(r)).length === 0);
   }
 
   // ── Cierre sobre la base principal ────────────────────────────────────────
