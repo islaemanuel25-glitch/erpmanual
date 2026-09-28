@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-09-28] - Actualización: stock, transferencias
+
+### Modificado
+- **stock**: feat(stock): API de solo lectura del Stock Diario
+- **transferencias**: fix(libro): la BAJA no depende del orden de las sentencias
+- **transferencias**: feat(stock): Stock Diario derivado del libro, con el índice que lo hace posible
+
+
 ## [2026-09-27] - Actualización: transferencias
 
 ### Modificado
