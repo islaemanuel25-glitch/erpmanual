@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-28 17:05
+**Fecha:** 2026-09-28 20:24
 
 ## Módulos modificados recientemente
 
 ### productos
-- feat: origen de las bajas y censo ampliado a todo lo que versiona el Libro de Costos, feat: declarar el origen de las escrituras de costo para el Libro de Costos
-- Archivos: 5 modificados (5 total)
+- feat: función canónica de costo por unidad física de stock, feat: origen de las bajas y censo ampliado a todo lo que versiona el Libro de Costos, feat: declarar el origen de las escrituras de costo para el Libro de Costos
+- Archivos: 2 nuevos, 5 modificados (7 total)
 
 ### proveedores
 - feat: declarar el origen de las escrituras de costo para el Libro de Costos
@@ -22,6 +22,8 @@
 
 
 ## Archivos nuevos desde última sincronización
+- lib/conversiones/costoPorUnidadFisica.js
+- lib/conversiones/costoPorUnidadFisica.test.mjs
 - app/api/stock_locales/diario/movimientos/route.js
 - app/api/stock_locales/diario/producto/route.js
 - app/api/stock_locales/diario/productos/route.js

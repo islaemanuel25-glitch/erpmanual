@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-09-28 17:05
+**Última actualización:** 2026-09-28 20:24
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,7 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-09-28: feat: función canónica de costo por unidad física de stock
 - 2026-09-28: feat: origen de las bajas y censo ampliado a todo lo que versiona el Libro de Costos
 - 2026-09-28: feat: declarar el origen de las escrituras de costo para el Libro de Costos
 - 2026-09-18: fix: el carrusel pagina por grupo, así ninguna página mezcla temas
