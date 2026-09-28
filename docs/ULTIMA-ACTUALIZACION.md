@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-28 20:24
+**Fecha:** 2026-09-28 21:16
 
 ## Módulos modificados recientemente
 
 ### productos
-- feat: función canónica de costo por unidad física de stock, feat: origen de las bajas y censo ampliado a todo lo que versiona el Libro de Costos, feat: declarar el origen de las escrituras de costo para el Libro de Costos
+- fix: separar compra por bulto de la divergencia con los escritores, feat: función canónica de costo por unidad física de stock, feat: origen de las bajas y censo ampliado a todo lo que versiona el Libro de Costos
 - Archivos: 2 nuevos, 5 modificados (7 total)
 
 ### proveedores
