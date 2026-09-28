@@ -233,6 +233,17 @@ Quedan estas tres:
    en el campo secundario**— está en
    [../business-rules/codigos-de-barra.md](../business-rules/codigos-de-barra.md).
    **Ningún dato se tocó.**
+
+4. **¿Debe el contexto LOCAL de un admin estar limitado a los locales de su
+   grupo activo?** Anotado el 2026-09-28, auditando la API del Stock Diario.
+   *(Verificado en código.)* En `resolveVistaOperativa` (`lib/grupos.js`), un
+   admin con la cookie `erpazul_contexto_activo` en `{ localId: X }` entra en
+   modo LOCAL sobre X sin que nadie compruebe que X sea de su grupo activo. La
+   vista GLOBAL sí queda acotada al grupo.
+
+   Se resuelve para TODO el ERP y no dentro de un módulo, porque cambia el
+   comportamiento de cada ruta que usa esa función. Hasta entonces, ninguna tanda
+   lo cambia por su cuenta.
 ---
 
 ## Qué documentar en la próxima tanda

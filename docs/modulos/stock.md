@@ -186,11 +186,40 @@ futuro es 400.
 mensaje crudo nunca sale, porque el de Prisma puede traer el SQL, el host o el
 nombre de la base: queda en el log del servidor.
 
-**El plan**: la página del local se ordena como `(dia, instante, id)`, que es el
-mismo orden que `(instante, id)` porque `dia` es `libro_stock_dia(instante)`. Así
+**El plan**: la página del local se ordena como `(dia, instante, id)`. Así
 PostgreSQL recorre `(localId, dia)` y ordena dentro de cada día. Medido en
 `stockDiario.mjs` sobre un millón de movimientos, la página 21 de un año lee 2.501
 filas; ordenada solo por `(instante, id)`, lee el año entero.
+
+**Por qué es el mismo orden que el contrato**, `(instante, id)`. *(Verificado
+contra PostgreSQL, sección H de `scripts/pruebas-db/stockDiario.mjs`.)* Dos
+hechos:
+
+1. En cada fila, `dia` es la fecha argentina de su `instante`. Lo escribe el
+   trigger con `libro_stock_dia`, el libro no admite UPDATE y el verificador lo
+   exige fila por fila.
+2. La fecha argentina no retrocede cuando el instante avanza. Se comprobó para la
+   zona tal como la conoce PostgreSQL, de 1920 a 2040 cada 15 minutos: cero
+   retrocesos.
+
+Con esos dos hechos, un instante menor nunca tiene un día mayor. Si los días
+difieren, los dos órdenes coinciden; si son iguales, decide `(instante, id)` en
+los dos. A igual instante hay igual día, y decide el id.
+
+La prueba ejerce los bordes del día:
+
+- 21:00 argentinas, que ya es otra fecha UTC con el mismo día argentino;
+- la medianoche argentina;
+- cuatro y quince movimientos en un mismo instante;
+- un id mayor con un instante anterior del día previo;
+- páginas de 1 a 200 que atraviesan el cambio de día.
+
+En todos esos casos, las páginas pegadas son exactamente `ORDER BY instante, id`.
+
+La contraprueba: con UNA fila cuyo día no es el de su instante, el orden se rompe,
+y el verificador del libro lo marca en rojo. **La equivalencia depende de que el
+verificador esté verde.** Si alguna vez una actualización de tzdata cambiara
+retroactivamente la regla de la zona, el verificador lo vería antes que la API.
 
 ### Un posible hueco de alcance en Transferencias (sin corregir)
 
