@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-28 16:09
+**Fecha:** 2026-09-28 17:05
 
 ## Módulos modificados recientemente
 
 ### productos
-- feat: declarar el origen de las escrituras de costo para el Libro de Costos
-- Archivos: 4 modificados (4 total)
+- feat: origen de las bajas y censo ampliado a todo lo que versiona el Libro de Costos, feat: declarar el origen de las escrituras de costo para el Libro de Costos
+- Archivos: 5 modificados (5 total)
 
 ### proveedores
 - feat: declarar el origen de las escrituras de costo para el Libro de Costos
