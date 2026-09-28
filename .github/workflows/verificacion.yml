@@ -471,6 +471,8 @@ jobs:
       # que una declaración mala no frena la escritura, que declarar no cambia la
       # fila, y que el cierre de compra, la herencia del depósito y el envío de
       # una transferencia declaran lo suyo sin tocar costos ni el libro físico.
+      # Y las bajas por sus handlers: eliminar producto y el reset operativo
+      # declaran su origen en la misma transacción y borran lo mismo que sin él.
       - name: Ejercer el origen de las escrituras de costo contra PostgreSQL
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/origenDeCosto.mjs
 

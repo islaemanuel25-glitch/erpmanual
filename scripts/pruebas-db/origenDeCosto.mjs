@@ -23,7 +23,15 @@
 //      costos quedan como siempre —la propagación intacta— y la operación
 //      siguiente llega SIN_ORIGEN;
 //   D. el libro físico no cambió: el movimiento de stock del cierre sigue
-//      SIN_ORIGEN, porque declarar el costo no declara el stock.
+//      SIN_ORIGEN, porque declarar el costo no declara el stock;
+//   E. las BAJAS de eliminar producto, por su handler: las filas y la base
+//      llegan con ELIMINACION_PRODUCTO en una sola transacción, se borra
+//      exactamente lo mismo que la misma baja hecha sin declarar —que sigue
+//      siendo posible y queda SIN_ORIGEN—, un producto con historial se sigue
+//      rechazando, y la operación siguiente llega sin origen;
+//   F. el RESET OPERATIVO, por su handler: todas las bajas de ProductoLocal y
+//      ProductoBase llegan con RESET_OPERATIVO en una sola transacción, y lo
+//      que se crea después, sin origen.
 //
 // Nivel ESCRITURA: host local y NODE_ENV distinto de production.
 
@@ -80,24 +88,31 @@ const CAPTURA = [
   `CREATE TABLE "PruebaCapturaOrigenCosto" (
     "id" serial PRIMARY KEY,
     "tabla" text NOT NULL,
+    "op" text NOT NULL,
     "fila" integer NOT NULL,
     "costo" numeric,
     "origen" text NOT NULL,
-    "referencia" text NOT NULL
+    "referencia" text NOT NULL,
+    "txid" bigint NOT NULL
   )`,
+  // En una BAJA la fila que queda es la vieja: `OLD`, como la va a leer el Libro.
   `CREATE FUNCTION prueba_captura_origen_costo() RETURNS trigger LANGUAGE plpgsql AS $$
+  DECLARE
+    fila record;
   BEGIN
-    INSERT INTO "PruebaCapturaOrigenCosto" ("tabla","fila","costo","origen","referencia")
+    IF TG_OP = 'DELETE' THEN fila := OLD; ELSE fila := NEW; END IF;
+    INSERT INTO "PruebaCapturaOrigenCosto" ("tabla","op","fila","costo","origen","referencia","txid")
     VALUES (
-      TG_TABLE_NAME, NEW."id", NEW."precio_costo",
+      TG_TABLE_NAME, TG_OP, fila."id", fila."precio_costo",
       coalesce(nullif(current_setting('${CONFIG_COSTO_ORIGEN}', true), ''), '${SIN_ORIGEN_COSTO}'),
-      coalesce(current_setting('${CONFIG_COSTO_ORIGEN_REF}', true), '')
+      coalesce(current_setting('${CONFIG_COSTO_ORIGEN_REF}', true), ''),
+      txid_current()
     );
     RETURN NULL;
   END $$`,
-  `CREATE TRIGGER "ProductoBase_prueba_captura" AFTER INSERT OR UPDATE OF "precio_costo" ON "ProductoBase"
+  `CREATE TRIGGER "ProductoBase_prueba_captura" AFTER INSERT OR UPDATE OF "precio_costo" OR DELETE ON "ProductoBase"
     FOR EACH ROW EXECUTE FUNCTION prueba_captura_origen_costo()`,
-  `CREATE TRIGGER "ProductoLocal_prueba_captura" AFTER INSERT OR UPDATE OF "precio_costo" ON "ProductoLocal"
+  `CREATE TRIGGER "ProductoLocal_prueba_captura" AFTER INSERT OR UPDATE OF "precio_costo" OR DELETE ON "ProductoLocal"
     FOR EACH ROW EXECUTE FUNCTION prueba_captura_origen_costo()`,
 ];
 
@@ -127,7 +142,8 @@ try {
   for (const sentencia of CAPTURA) await c.$executeRawUnsafe(sentencia);
   const capturas = (desde) =>
     c.$queryRawUnsafe(
-      `SELECT "tabla","fila","costo"::float AS "costo","origen","referencia" FROM "PruebaCapturaOrigenCosto" WHERE "id" > $1 ORDER BY "id"`,
+      `SELECT "tabla","op","fila","costo"::float AS "costo","origen","referencia","txid"::text AS "txid"
+       FROM "PruebaCapturaOrigenCosto" WHERE "id" > $1 ORDER BY "id"`,
       desde
     );
   const marcaDeCaptura = async () =>
@@ -430,6 +446,180 @@ try {
   m0 = await marcaDeCaptura();
   await app.productoLocal.update({ where: { id: plEnviadoA.id }, data: { precio_costo: 710 } });
   igual("C4: y la siguiente vuelve a llegar SIN_ORIGEN", (await capturas(m0)).map((x) => x.origen), [SIN_ORIGEN_COSTO]);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  seccion("E. Bajas: eliminar producto");
+  // ══════════════════════════════════════════════════════════════════════════
+  const rutaEliminar = await import("../../app/api/productos/eliminar/[id]/route.js");
+  const sesionEliminar = jwt.sign(
+    { id: usuario.id, nombre: "CI Origen", email: `${marca}@ci.local`, localId: deposito.id, permisos: ["productos.eliminar"] },
+    process.env.AUTH_SECRET,
+    { expiresIn: "1h" }
+  );
+  const eliminar = async (baseId) => {
+    const res = await rutaEliminar.DELETE(
+      new Request(`http://ci/api/productos/eliminar/${baseId}`, {
+        method: "DELETE",
+        headers: { cookie: `erpazul_sesion=${sesionEliminar}` },
+      }),
+      { params: Promise.resolve({ id: String(baseId) }) }
+    );
+    return { status: res.status, ...(await res.json().catch(() => ({}))) };
+  };
+  // Un producto en el depósito y en A, con stock, sin historial: se puede borrar.
+  const conFilas = async (nombre) => {
+    const b = await baseDelDeposito(nombre, 300);
+    const pls = [];
+    for (const localId of [deposito.id, localA.id]) {
+      const pl = await c.productoLocal.create({ data: { localId, baseId: b.id, precio_costo: 300, precio_venta: 600 } });
+      await c.stockLocal.create({ data: { localId, productoId: pl.id, cantidad: 4 } });
+      pls.push(pl.id);
+    }
+    return { baseId: b.id, pls };
+  };
+  const totales = async () => ({ bases: await c.productoBase.count(), filas: await c.productoLocal.count() });
+  const bajas = (filas) => filas.filter((x) => x.op === "DELETE");
+
+  const declarado = await conFilas("eliminado-declarado");
+  const antesE = await totales();
+  m0 = await marcaDeCaptura();
+  const rE = await eliminar(declarado.baseId);
+  ok("E: la ruta contesta 200", rE.status === 200 && rE.ok, `${rE.status} ${rE.error || ""}`);
+  const capE = bajas(await capturas(m0));
+  igual(
+    "E: las dos filas y la base llegan con ELIMINACION_PRODUCTO y el id de la base",
+    capE.map((x) => [x.tabla, x.fila, x.origen, x.referencia]),
+    [
+      ["ProductoLocal", declarado.pls[0], ORIGEN_COSTO.ELIMINACION_PRODUCTO, String(declarado.baseId)],
+      ["ProductoLocal", declarado.pls[1], ORIGEN_COSTO.ELIMINACION_PRODUCTO, String(declarado.baseId)],
+      ["ProductoBase", declarado.baseId, ORIGEN_COSTO.ELIMINACION_PRODUCTO, String(declarado.baseId)],
+    ]
+  );
+  ok("E: las tres bajas son de la MISMA transacción", new Set(capE.map((x) => x.txid)).size === 1, json(capE.map((x) => x.txid)));
+  const despuesE = await totales();
+  igual("E: se borraron exactamente esas dos filas y esa base, nada más", [antesE.bases - despuesE.bases, antesE.filas - despuesE.filas], [1, 2]);
+
+  // La misma baja, con las mismas sentencias y sin declarar: sigue siendo
+  // posible, queda SIN_ORIGEN y borra lo mismo.
+  const sinDeclarar = await conFilas("eliminado-sin-declarar");
+  const antesSD = await totales();
+  m0 = await marcaDeCaptura();
+  await app.$transaction(async (tx) => {
+    await tx.stockLocal.deleteMany({ where: { productoId: { in: sinDeclarar.pls } } });
+    await tx.productoLocal.deleteMany({ where: { baseId: sinDeclarar.baseId } });
+    await tx.productoBase.delete({ where: { id: sinDeclarar.baseId } });
+  });
+  const capSD = bajas(await capturas(m0));
+  igual(
+    "E: sin declarar, la baja pasa igual y queda SIN_ORIGEN",
+    capSD.map((x) => [x.tabla, x.origen]),
+    [
+      ["ProductoLocal", SIN_ORIGEN_COSTO],
+      ["ProductoLocal", SIN_ORIGEN_COSTO],
+      ["ProductoBase", SIN_ORIGEN_COSTO],
+    ]
+  );
+  const despuesSD = await totales();
+  igual(
+    "E: declarar no cambia qué se borra: la misma forma con y sin origen",
+    [antesSD.bases - despuesSD.bases, antesSD.filas - despuesSD.filas],
+    [antesE.bases - despuesE.bases, antesE.filas - despuesE.filas]
+  );
+
+  // Las reglas de siempre: un producto con historial de transferencias no se borra.
+  m0 = await marcaDeCaptura();
+  const rHist = await eliminar(enviado.id);
+  ok("E: un producto con historial sigue rechazándose con 400", rHist.status === 400, `${rHist.status} ${rHist.error || ""}`);
+  ok(
+    "E: y no se borra ni se captura nada",
+    (await capturas(m0)).length === 0 && (await c.productoBase.count({ where: { id: enviado.id } })) === 1
+  );
+
+  m0 = await marcaDeCaptura();
+  await app.productoBase.update({ where: { id: compra.id }, data: { precio_costo: 1070 } });
+  igual("E: la operación siguiente llega SIN_ORIGEN", (await capturas(m0)).map((x) => x.origen), [SIN_ORIGEN_COSTO]);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  seccion("F. Bajas: reset operativo");
+  // ══════════════════════════════════════════════════════════════════════════
+  // Va último: borra todos los productos de la base descartable.
+  const bcrypt = (await import("bcrypt")).default;
+  const clave = `clave-${marca}`;
+  const admin = await c.usuario.create({
+    data: { nombre: "CI Admin", email: `${marca}-admin@ci.local`, passwordHash: await bcrypt.hash(clave, 4), rolId: rol.id },
+  });
+  const sesionAdmin = jwt.sign(
+    { id: admin.id, nombre: "CI Admin", email: `${marca}-admin@ci.local`, permisos: ["*"] },
+    process.env.AUTH_SECRET,
+    { expiresIn: "1h" }
+  );
+  const rutaReset = await import("../../app/api/admin/reset-operativo/route.js");
+  const antesF = await totales();
+  ok("F: hay productos y filas para borrar", antesF.bases > 0 && antesF.filas > 0, json(antesF));
+
+  // El reset escribe su respaldo en `backups/` bajo el directorio de trabajo:
+  // se lo corre desde un directorio temporal para no dejarlo en el repo.
+  const fs = await import("node:fs/promises");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const resetear = async () => {
+    const cwd = process.cwd();
+    const temporal = await fs.mkdtemp(path.join(os.tmpdir(), "reset-operativo-"));
+    process.chdir(temporal);
+    try {
+      const res = await rutaReset.POST(
+        new Request("http://ci/api/admin/reset-operativo", {
+          method: "POST",
+          headers: { cookie: `erpazul_sesion=${sesionAdmin}`, "content-type": "application/json" },
+          body: JSON.stringify({ password: clave, frase: "REINICIAR TODO", confirmado: true }),
+        })
+      );
+      return { status: res.status, ...(await res.json().catch(() => ({}))) };
+    } finally {
+      process.chdir(cwd);
+      await fs.rm(temporal, { recursive: true, force: true });
+    }
+  };
+
+  // ── LO QUE YA HACÍA, Y SIGUE HACIENDO ──────────────────────────────────
+  //
+  // El cierre de C1 dejó una cuenta por pagar y un pago. El plan del reset
+  // borra PedidoProveedor pero no CuentaPorPagarProveedor, así que la clave lo
+  // rechaza y la transacción entera se revierte: 500, nada borrado. Es previo a
+  // esta PR —el plan no cambió— y se afirma para ver que, con el origen
+  // declarado, un reset que falla sigue sin dejar nada.
+  m0 = await marcaDeCaptura();
+  const rFalla = await resetear();
+  ok("F: con una cuenta por pagar el reset se sigue rechazando, como antes (500)", rFalla.status === 500, `${rFalla.status}`);
+  igual("F: y no borra ni captura nada: la transacción se revierte entera", [await totales(), (await capturas(m0)).length], [antesF, 0]);
+
+  // Sin las filas de finanzas que dejó el fixture —fuera del plan del reset—,
+  // el reset corre.
+  await c.pagoProveedor.deleteMany({ where: { cuenta: { pedidoProveedorId: pedido.id } } });
+  await c.cuentaPorPagarProveedor.deleteMany({ where: { pedidoProveedorId: pedido.id } });
+
+  m0 = await marcaDeCaptura();
+  const rF = await resetear();
+  ok("F: el reset contesta 200", rF.status === 200 && rF.ok, `${rF.status} ${rF.error || ""}`);
+  const capF = bajas(await capturas(m0));
+  igual(
+    "F: una baja capturada por cada fila y cada base que había",
+    [capF.filter((x) => x.tabla === "ProductoBase").length, capF.filter((x) => x.tabla === "ProductoLocal").length],
+    [antesF.bases, antesF.filas]
+  );
+  ok(
+    "F: todas llegan con RESET_OPERATIVO y el id del administrador",
+    capF.length > 0 && capF.every((x) => x.origen === ORIGEN_COSTO.RESET_OPERATIVO && x.referencia === String(admin.id)),
+    json([...new Set(capF.map((x) => `${x.origen}/${x.referencia}`))])
+  );
+  ok("F: todas en la MISMA transacción", new Set(capF.map((x) => x.txid)).size === 1, json([...new Set(capF.map((x) => x.txid))]));
+  igual("F: no quedó ningún producto", await totales(), { bases: 0, filas: 0 });
+
+  m0 = await marcaDeCaptura();
+  await app.productoBase.create({
+    data: { grupoId: grupo.id, nombre: `${marca}-despues-del-reset`, precio_costo: 50, precio_venta: 100, unidad_medida: "unidad" },
+  });
+  igual("F: lo que se crea después llega SIN_ORIGEN", (await capturas(m0)).map((x) => [x.op, x.origen]), [["INSERT", SIN_ORIGEN_COSTO]]);
   await app.$disconnect();
 } catch (e) {
   fallas.push(`la prueba se cayó: ${e?.stack || e}`);
