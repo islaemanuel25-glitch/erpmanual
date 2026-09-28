@@ -61,6 +61,13 @@ const ESCRITURAS = [
   "deleteMany",
   "executeRaw",
   "executeRawUnsafe",
+  // Con el `$`, que es como los llama Prisma. Sin estas dos, un
+  // `db.$executeRawUnsafe("UPDATE …")` pasaba en verde: las de arriba buscan
+  // `.executeRaw(` y el `$` en el medio hacía que no coincidieran nunca. Lo
+  // encontró la contraprueba de `scripts/pruebas-db/auditoriaKgPorPieza.mjs`,
+  // donde la huella de las tablas sí vio la escritura.
+  "$executeRaw",
+  "$executeRawUnsafe",
   "$transaction",
 ];
 
@@ -111,6 +118,11 @@ test("CONTRAPRUEBA: el analizador ve las escrituras y no ve los comentarios", ()
   const malo = "await db.productoBase.update({ where: { id } });";
   assert.ok(/\.\s*update\s*\(/.test(sinComentarios(malo)));
   assert.ok(/\.\s*\$transaction\s*\(/.test(sinComentarios("await db.$transaction([])")));
+  // Y las escrituras crudas con su nombre real, que es el agujero que tuvo.
+  for (const metodo of ["$executeRaw", "$executeRawUnsafe"]) {
+    const re = new RegExp(`\\.\\s*${metodo.replace("$", "\\$")}\\s*\\(`);
+    assert.ok(re.test(`await db.${metodo}('UPDATE "Local" SET "nombre" = "nombre"');`), `no ve ${metodo}`);
+  }
   // ...y que la prosa NO cuenta, que es la trampa de este repo: los tres
   // archivos de auditoría explican en comentarios que no hacen un `update`.
   assert.equal(sinComentarios("// no hace ningún update(\nconst x = 1;").includes("update("), false);
