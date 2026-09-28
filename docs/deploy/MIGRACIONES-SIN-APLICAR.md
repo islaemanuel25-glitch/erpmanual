@@ -16,53 +16,74 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **37 migraciones**. El árbol trae **39**: dos pendientes.
+Producción está en **39 migraciones**. El árbol trae **39**: ninguna pendiente.
 
-- `20260926195732_correccion_caja` (PR "infraestructura de corrección histórica
-  de caja"): una tabla NUEVA, `CorreccionCaja`, vacía, con su único por
-  `codigo` y un índice por `ejecutadoEn`. **Aditiva**: no toca ninguna tabla
-  existente, sin UPDATE, sin backfill, sin DROP. No corrige ningún dato: las
-  correcciones se aplican después desde la app, una por una, con permiso propio
-  y un plan autorizado. La versión anterior no lee la tabla, así que la ventana
-  entre migrar y recrear no cambia nada.
-- `20260927120000_libro_stock` (PR "libro histórico físico de stock — punto
-  cero"): dos tablas NUEVAS, `MovimientoStock` y `ReinterpretacionDeStock`, el
-  enum `TipoMovimientoStock`, nueve funciones y cinco triggers: uno sobre
-  `StockLocal` que registra cada cambio de cantidad o tránsito, dos sobre
-  `ProductoBase` y `Local` que dejan constancia de los cambios de unidad, y dos
-  que hacen inmutable el libro. **Sin UPDATE, sin DROP, sin tocar columnas
-  existentes.** SÍ inserta: una fila `ESTADO_INICIAL` por cada fila de
-  `StockLocal`, que es el punto cero del libro. El clasificador la marca
-  **aditiva**, pero avisa que no lee adentro de un bloque `DO`, y la activación
-  ES un bloque `DO`. Lo que hay que saber antes de desplegarla:
-  - **Toma un candado.** `SHARE ROW EXCLUSIVE` sobre `StockLocal`,
-    `ProductoBase` y `Local` mientras copia el punto cero: las ventas y los
-    ajustes ESPERAN (no fallan) hasta que confirma. Medido en la sesión de
-    desarrollo: 28 ms con 4.000 filas, 64 ms con 10.000, 283 ms con 50.000,
-    764 ms con 100.000. Conviene desplegar fuera del horario de venta.
-  - **Precheck antes de migrar.** `scripts/deploy/precheck-libro-stock.sql`, de
-    solo lectura: si da ROJO —migración fallida sin resolver, transacción de más
-    de 2 s, candado sobre las tres tablas— NO se inicia ninguna migración.
-  - **Tope de espera de 3 s.** Si hay una transacción larga escribiendo stock
-    —una importación—, la migración FALLA en vez de trabar el POS. No deja nada
-    a medias (probado): `correccion_caja` queda aplicada y del libro no queda
-    nada. Prisma la registra como fallida y todo deploy posterior da P3009.
-    **Desde la PR #93 hay un camino autorizado y probado**, solo para este caso:
-    el diagnóstico de solo lectura y, si da `CASO_1_RECUPERABLE`, la
-    recuperación tipada `resolve --rolled-back` —el único `migrate resolve` que
-    la guardia deja pasar, por texto exacto—. Máximo DOS intentos de aplicar el
-    libro por ventana; nunca un tercero. **No se restaura el backup por esto.**
-    El runbook completo, con los comandos exactos, está en el skill `/deploy`:
-    "La única excepción ya autorizada".
-  - **La app vieja sigue andando.** Nada de su código cambia; sus escrituras
-    quedan en el libro como `SIN_ORIGEN`, que es lo esperado.
-  - **Después de aplicarla**, `migrate status` NO alcanza —medido: dice "up to
-    date" después de un `--rolled-back` con el libro sin aplicar—. Hay que
-    contar las 39 por nombre, correr `DATABASE_URL="<la de producción>" node
-    --import ./scripts/alias-loader.mjs scripts/verificar-libro-stock.mjs`
-    (solo lectura) con la integridad física en VERDE, y comprobar que el punto
-    cero tiene tantas filas como `StockLocal` con un único instante. La lista
-    completa está en el POST del runbook.
+Ninguna.
+
+---
+
+## `20260927120000_libro_stock`: aplicada el 2026-09-28. Punto cero del libro de stock
+
+**Historia física de stock confiable desde 2026-09-28 00:19:13.587 UTC
+(2026-09-27 21:19:13.587 Argentina).**
+
+Salió de esta lista con el despliegue de `8d393aa0615a0955ed20d972e16f6acd1f730792`
+(merge de la PR #93, que lleva también la #92), desde
+`7717064821426cbfb988ae72061c0af955fdddf0`. **Lo que sigue es lo que informó el
+despliegue**, corrido desde el acceso al VPS y no desde la sesión que escribe
+esta nota: son datos de producción que esta sesión no puede ni debe mirar.
+
+**Una corrección a lo que decía esta lista.** Decía que producción estaba en 37 y
+que `20260926195732_correccion_caja` estaba pendiente. Era falso:
+`correccion_caja` ya estaba aplicada desde el **2026-09-26 20:53:12 UTC** y NO se
+aplicó en esta tanda. La lista quedó desfasada porque la nota de aquel despliegue
+no llegó a escribirse. En este despliegue entró UNA sola migración, la del libro.
+
+**Migraciones.** 39 en el árbol, **39/39 aplicadas contadas por nombre**, ninguna
+pendiente y ninguna fallida sin resolver. `libro_stock` se aplicó **al primer
+intento**: la recuperación tipada de la PR #93 **no hizo falta**.
+
+**El punto cero.**
+
+- `StockLocal` al activar: **12.278** filas.
+- `ESTADO_INICIAL`: **12.278** filas, exactamente una por fila de `StockLocal`,
+  sin huérfanos y sin duplicados, todas con origen `ACTIVACION_DEL_LIBRO`.
+- Un único instante: **2026-09-28 00:19:13.587 UTC** = 2026-09-27 21:19:13.587
+  Argentina. Día argentino persistido: **2026-09-27**.
+- Los **5 triggers** activos y las **9 funciones** `libro_stock_*` presentes.
+- El verificador, inmediatamente después: integridad física **VERDE**.
+- Al correr el verificador aparece el aviso de Node `MODULE_TYPELESS_PACKAGE_JSON`.
+  Es cosmético —Node reparsea el módulo como ES— y no afectó el resultado. No se
+  corrige en esta nota.
+
+**El primer movimiento real**, registrado como evidencia y no como dato de prueba:
+una venta que ocurrió naturalmente, no generada para probar el libro.
+
+- Venta **29040**, local **4**, productoLocal **7440**.
+- `MovimientoStock` **12279**, tipo `CAMBIO`, cantidad **15 → 14**.
+- Instante del movimiento **2026-09-28 00:19:55.571 UTC**; la venta se creó a las
+  00:19:55.573 UTC.
+- Origen `SIN_ORIGEN`. **No es una falla de integridad**: los escritores
+  productivos todavía no declaran origen. La cantidad es verdadera; lo que falta
+  clasificar es la causa.
+- La procesó **la aplicación anterior**, que seguía atendiendo entre migrar y
+  recrear, y la capturó el trigger de PostgreSQL. Queda demostrado en producción
+  que la captura física no depende de que la app nueva esté levantada.
+
+**El despliegue.**
+
+- Backup PRE: `/srv/produccion/backups/pre-8d393aa0_20260928_001748.sql.gz`,
+  SHA-256 `26b31570805b91883b7375b6adca6f4b94e992ac93cbacdda1b92b14bf5f0cb6`.
+- Sonda PRE en verde (corrida 36361707501) y sonda POST en verde (corrida
+  36361832011).
+- Corte real de la aplicación: **3 segundos**.
+- PostgreSQL siguió healthy y no se reinició.
+
+**Lo que queda del procedimiento de esta migración**, para leer si algún día
+hubiera que restaurar un backup anterior a este punto y volver a aplicarla: el
+runbook completo —precheck, candado de la activación, recuperación tipada, máximo
+dos intentos y verificación POST— sigue en el skill `/deploy`, "La única
+excepción ya autorizada".
 
 ---
 
