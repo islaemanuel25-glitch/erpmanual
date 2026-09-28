@@ -483,6 +483,14 @@ jobs:
       - name: Conformidad del costo por unidad física con el POS
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/costoPorUnidadFisica.mjs
 
+      # La auditoría de kg manejados por pieza, corrida de verdad sobre una base
+      # descartable: el universo de la regla con y sin factor, el resultado de
+      # costoPorUnidadFisica sin recalcular, la ausencia de fila como null, la
+      # huella de todas las tablas igual antes y después, y la contraprueba de
+      # que el filtro de la #99 (factor > 1) pierde los de pieza sin factor.
+      - name: Auditoría de kg por pieza (solo lectura) contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/auditoriaKgPorPieza.mjs
+
       # El ciclo de cierre de caja: la carrera entre el cierre clásico y el corte
       # —forzada con un lock retenido, no librada al azar—, la corrección de una
       # venta según el estado de su turno y el vencimiento de un corte por
