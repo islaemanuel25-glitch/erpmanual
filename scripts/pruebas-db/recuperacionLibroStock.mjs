@@ -151,6 +151,30 @@ function retener(db, segundos) {
   });
 }
 
+/** Una sesión que toma un candado de tabla sobre StockLocal y lo retiene. */
+function tomarCandado(db, modo, segundos) {
+  return new Promise((resolve) => {
+    const h = spawn("psql", [urlDe(db), "-X", "-q", "-c",
+      `BEGIN; LOCK TABLE "StockLocal" IN ${modo} MODE; SELECT pg_sleep(${segundos}); ROLLBACK;`]);
+    h.on("close", resolve);
+  });
+}
+
+/** Espera a que OTRA sesión tenga concedido ese modo sobre StockLocal. */
+async function esperarCandado(db, modo) {
+  for (let i = 0; i < 50; i += 1) {
+    const n = sql(db, `SELECT count(*) FROM pg_locks l JOIN pg_class c ON c.oid = l.relation
+      WHERE l.database = (SELECT oid FROM pg_database WHERE datname = current_database())
+        AND c.relname = 'StockLocal' AND l.mode = '${modo}' AND l.granted AND l.pid <> pg_backend_pid()`);
+    if (n !== "0") return;
+    await esperar(100);
+  }
+  throw new Error(`nadie tomó ${modo} sobre StockLocal en 5 s`);
+}
+
+/** Las condiciones que el precheck marcó en rojo, para que una falla diga cuál. */
+const lineasEnRojo = (salida) => salida.split("\n").filter((l) => l.includes("✗") || l.includes("PRECHECK:")).join(" | ");
+
 function filasLibro(db) {
   return JSON.parse(sql(db, `SELECT coalesce(json_agg(json_build_object('terminada', finished_at IS NOT NULL,
     'revertida', rolled_back_at IS NOT NULL, 'pasos', applied_steps_count) ORDER BY started_at), '[]')
@@ -204,6 +228,24 @@ try {
     INSERT INTO "ProductoLocal"("localId","baseId","updatedAt") SELECT l.id,pb.id,now() FROM "Local" l CROSS JOIN "ProductoBase" pb;
     INSERT INTO "StockLocal"("localId","productoId",cantidad,"enTransito","updatedAt")
       SELECT "localId",id,id%9,CASE WHEN id%13=0 THEN 1.5 ELSE 0 END,now() FROM "ProductoLocal";`);
+  // ── LA CARGA SE DEJA ASENTADA, COMO ESTÁ EN PRODUCCIÓN ──────────────────
+  //
+  // Tres mil filas recién insertadas superan los umbrales de autovacuum, y el
+  // autovacuum de una base recién creada llega en segundos: medido con
+  // `log_autovacuum_min_duration = 0`, en seis corridas de seis procesó
+  // ProductoBase y StockLocal en el mismo segundo del primer precheck. Mientras
+  // lo hace tiene ShareUpdateExclusiveLock, que choca con el LOCK TABLE de la
+  // activación, y el precheck lo informa —con razón— como
+  // `candado-sobre-tablas-del-libro`. Así falló la corrida #453 de CI y la #451:
+  // no era el libro, era una carrera de milisegundos con el autovacuum.
+  //
+  // Un VACUUM ANALYZE explícito espera a cualquier autovacuum en curso sobre
+  // estas tablas y deja sus contadores en cero, así que ninguno vuelve a
+  // dispararse: el precheck mira una base quieta, que es lo que la afirmación
+  // "sin nada que lo impida" pregunta. Que el precheck SÍ ve ese candado lo
+  // afirma la contraprueba de abajo, con un ShareUpdateExclusiveLock tomado a
+  // propósito.
+  sql(PROD, `VACUUM ANALYZE "Grupo", "Local", "ProductoBase", "ProductoLocal", "StockLocal"`);
   const filasStock = sql(PROD, `SELECT count(*) FROM "StockLocal"`);
   ok(`con ${filasStock} filas de StockLocal`, Number(filasStock) === 3000);
   const catalogoPrevio = catalogo(PROD);
@@ -211,7 +253,19 @@ try {
 
   seccion("Precheck de solo lectura");
   let pc = precheck(PROD);
-  ok("sin nada que lo impida: VERDE", pc.codigo === 0 && /PRECHECK: VERDE/.test(pc.salida), pc.salida.slice(-300));
+  ok("sin nada que lo impida: VERDE", pc.codigo === 0 && /PRECHECK: VERDE/.test(pc.salida), lineasEnRojo(pc.salida));
+  {
+    // El candado que toma un VACUUM o un ANALYZE —el del autovacuum— sigue
+    // frenando el precheck. Se toma a propósito y se espera a que esté
+    // concedido: sin eso, la afirmación dependería del reloj.
+    const ret = tomarCandado(PROD, "SHARE UPDATE EXCLUSIVE", 6);
+    await esperarCandado(PROD, "ShareUpdateExclusiveLock");
+    pc = precheck(PROD);
+    await ret;
+    ok("con un ShareUpdateExclusiveLock sobre StockLocal (el del autovacuum): ROJO por candado",
+      pc.codigo !== 0 && /candado-sobre-tablas-del-libro/.test(pc.salida) && /ShareUpdateExclusiveLock sobre StockLocal/.test(pc.salida),
+      pc.salida.slice(-400));
+  }
   {
     const ret = retener(PROD, 6);
     await esperar(3000);
