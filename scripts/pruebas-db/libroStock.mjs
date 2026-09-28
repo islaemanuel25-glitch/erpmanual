@@ -170,6 +170,24 @@ function dirPrisma(conLibro, { soloHastaElLibro = false } = {}) {
   return path.join(destino, "schema.prisma");
 }
 
+/**
+ * Aplica las migraciones PENDIENTES sin comparar contra el schema, que es lo que
+ * hace el despliegue. Hace falta para el libro "tal como se desplegó": su árbol
+ * termina en el libro, pero `schema.prisma` ya trae lo posterior (el índice del
+ * Stock Diario), y `migrate dev` vería esa diferencia como una migración por
+ * crear y se quedaría esperando un nombre. `recuperacionLibroStock.mjs` lo usa
+ * igual, sobre bases descartables.
+ */
+function aplicarPendientes(schema, url) {
+  const r = spawnSync("npx", ["prisma", "migrate", "deploy", "--schema", schema], {
+    cwd: RAIZ,
+    env: { ...process.env, DATABASE_URL: url },
+    encoding: "utf8",
+    timeout: 240_000,
+  });
+  return { codigo: r.status, salida: `${r.stdout || ""}${r.stderr || ""}` };
+}
+
 /** `prisma migrate dev` sin generar ni sembrar, asincrónico: la carrera corre mientras. */
 function migrateDev(schema, url) {
   return new Promise((resolve) => {
@@ -945,7 +963,7 @@ try {
     // ── K.0 El defecto, sobre el libro tal como se desplegó ─────────────────
     {
       const url = await crearBase(`${PREFIJO}k0`, PLANTILLA);
-      const r = await migrateDev(dirPrisma(true, { soloHastaElLibro: true }), url);
+      const r = aplicarPendientes(dirPrisma(true, { soloHastaElLibro: true }), url);
       ok("K.0 una base con el libro SIN la corrección", r.codigo === 0, r.salida.slice(-300));
       const c = await clienteDe(url);
       const p = await productoK(c, "defecto", 5, 0);
@@ -966,7 +984,8 @@ try {
     // después la migración nueva. No puede tocar ni una fila del libro.
     {
       const url = await crearBase(`${PREFIJO}k1`, PLANTILLA);
-      await migrateDev(dirPrisma(true, { soloHastaElLibro: true }), url);
+      const hastaElLibro = aplicarPendientes(dirPrisma(true, { soloHastaElLibro: true }), url);
+      ok("K.0b una base con el libro tal como se desplegó", hastaElLibro.codigo === 0, hastaElLibro.salida.slice(-300));
       const c = await clienteDe(url);
       await c.$executeRawUnsafe(`UPDATE "StockLocal" SET "cantidad" = "cantidad" + 1 WHERE "id" % 3 = 0`);
       await c.$executeRawUnsafe(`UPDATE "StockLocal" SET "enTransito" = 1.5 WHERE "id" % 5 = 0`);
@@ -976,7 +995,8 @@ try {
       const antes = await huella();
       const [cero] = await c.$queryRawUnsafe(`SELECT min("instante")::text AS "i", count(*)::int AS "n" FROM "MovimientoStock" WHERE "tipo" = 'ESTADO_INICIAL'`);
       await soltarClientes(url);
-      const r = await migrateDev(dirPrisma(true), url);
+      // Lo pendiente, como en el despliegue: `migrate deploy` sobre el árbol entero.
+      const r = aplicarPendientes(dirPrisma(true), url);
       ok("K.0b la migración de la corrección se aplica sobre un libro con movimientos", r.codigo === 0 && /20260928180000_libro_stock_baja_atomica/.test(r.salida), r.salida.slice(-300));
       // Las pendientes posteriores al libro se aplican juntas y en el orden de sus
       // nombres: el índice del Stock Diario antes que la corrección. Son
