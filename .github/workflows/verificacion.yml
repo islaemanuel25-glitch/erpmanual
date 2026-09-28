@@ -476,6 +476,13 @@ jobs:
       - name: Ejercer el origen de las escrituras de costo contra PostgreSQL
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/origenDeCosto.mjs
 
+      # La función canónica de costo por unidad física contra el POS real: para
+      # cada familia en la que el POS y la regla coinciden, el mismo costo por
+      # unidad física en el depósito y en un local. Y la divergencia conocida
+      # —kg + pieza + compra por bulto— escrita como afirmación.
+      - name: Conformidad del costo por unidad física con el POS
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/costoPorUnidadFisica.mjs
+
       # El ciclo de cierre de caja: la carrera entre el cierre clásico y el corte
       # —forzada con un lock retenido, no librada al azar—, la corrección de una
       # venta según el estado de su turno y el vencimiento de un corte por
