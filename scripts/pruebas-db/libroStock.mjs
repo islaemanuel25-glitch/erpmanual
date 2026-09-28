@@ -978,7 +978,27 @@ try {
       await soltarClientes(url);
       const r = await migrateDev(dirPrisma(true), url);
       ok("K.0b la migración de la corrección se aplica sobre un libro con movimientos", r.codigo === 0 && /20260928180000_libro_stock_baja_atomica/.test(r.salida), r.salida.slice(-300));
+      // Las pendientes posteriores al libro se aplican juntas y en el orden de sus
+      // nombres: el índice del Stock Diario antes que la corrección. Son
+      // independientes; esto comprueba que Prisma las aplica las dos, en ese orden.
+      const posteriores = fs
+        .readdirSync(path.join(RAIZ, "prisma", "migrations"), { withFileTypes: true })
+        .filter((e) => e.isDirectory() && e.name > NOMBRE_MIGRACION)
+        .map((e) => e.name)
+        .sort();
+      const posiciones = posteriores.map((n) => r.salida.indexOf(n));
+      ok(
+        `K.0b Prisma aplica las ${posteriores.length} posteriores al libro, en orden: ${posteriores.join(", ")}`,
+        posteriores.length >= 1 && posiciones.every((p) => p >= 0) && posiciones.every((p, i) => i === 0 || p > posiciones[i - 1]),
+        JSON.stringify(posiciones)
+      );
       const c2 = await clienteDe(url);
+      const registradas = (
+        await c2.$queryRawUnsafe(
+          `SELECT migration_name AS "n" FROM "_prisma_migrations" WHERE migration_name > '${NOMBRE_MIGRACION}' AND finished_at IS NOT NULL ORDER BY finished_at, started_at`
+        )
+      ).map((f) => f.n);
+      ok("K.0b y _prisma_migrations las registra terminadas en ese mismo orden", JSON.stringify(registradas) === JSON.stringify(posteriores), JSON.stringify(registradas));
       const despues = (await c2.$queryRawUnsafe(`SELECT count(*)::int AS "n", max("id") AS "m", md5(string_agg(t::text, '|' ORDER BY "id")) AS "h" FROM "MovimientoStock" t`))[0];
       const [cero2] = await c2.$queryRawUnsafe(`SELECT min("instante")::text AS "i", count(*)::int AS "n" FROM "MovimientoStock" WHERE "tipo" = 'ESTADO_INICIAL'`);
       ok(

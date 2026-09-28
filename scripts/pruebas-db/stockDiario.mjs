@@ -284,6 +284,12 @@ async function sembrarGuion(c) {
   P.origen = await enLocal(L.A, await base("Origen"), 50);
   P.muchos = await enLocal(L.A, await base("Muchos"), 100);
   P.tarde = await enLocal(L.B, await base("Tarde"));
+  // Los dos caminos atómicos que corrige `20260928180000_libro_stock_baja_atomica`:
+  // una sola sentencia que borra el stock y su producto, y otra que re-vincula
+  // la fila y borra el producto viejo.
+  P.atomico = await enLocal(L.A, await base("Atomico"), 4, 1);
+  P.revViejo = await enLocal(L.A, await base("RevViejo"), 3);
+  P.revNuevo = await enLocal(L.A, await base("RevNuevo"));
 
   // Local C: treinta cadenas al azar, la mitad con stock al punto cero.
   const azar = [];
@@ -501,6 +507,11 @@ try {
       await tx.$executeRawUnsafe(`DELETE FROM "ProductoBase" WHERE "id" = ${P.eliminado.base}`);
     })
   );
+  await g.paso("2026-09-28 17:00:00", () =>
+    c.$executeRawUnsafe(
+      `WITH s AS (DELETE FROM "StockLocal" WHERE "id" = ${sl(P.atomico)} RETURNING "id") DELETE FROM "ProductoLocal" WHERE "id" = ${P.atomico.pl}`
+    )
+  );
   await g.paso("2026-09-28 20:00:00", async () => {
     await upd(sl(P.transito), `"cantidad" = 5.5, "enTransito" = 0`);
     await upd(sl(P.muchos), `"cantidad" = 80`);
@@ -512,6 +523,11 @@ try {
   });
   await g.paso("2026-09-29 13:00:00", () =>
     c.$executeRawUnsafe(`UPDATE "ProductoBase" SET "unidad_medida" = 'kg', "pesoReferenciaKg" = 2.5 WHERE "id" = ${P.reinterpreta.base}`)
+  );
+  await g.paso("2026-09-29 14:00:00", () =>
+    c.$executeRawUnsafe(
+      `WITH s AS (UPDATE "StockLocal" SET "productoId" = ${P.revNuevo.pl} WHERE "id" = ${sl(P.revViejo)} RETURNING 1) DELETE FROM "ProductoLocal" WHERE "id" = ${P.revViejo.pl}`
+    )
   );
   await g.paso("2026-09-29 18:00:00", () => upd(sl(P.renace), `"cantidad" = 6`));
   const dosEnElMismoMs = await g.paso("2026-09-30 09:00:00.123", async () => {
@@ -607,11 +623,11 @@ try {
     ok("y cuadra desde el punto de partida, cantidad y tránsito", k.cuadra.cantidad && k.cuadra.enTransito);
     const l = await server.stockDiarioDelLocal(c, { localId: L.A, dia: "2026-09-27", hoy: HOY });
     ok(
-      "el local lista las nueve cadenas que el punto cero copió, y no el producto que nace el 28",
-      l.cadenas.length === 9 && !l.cadenas.some((q) => q.productoLocalId === P.nace.pl) && l.cadenas.every((q) => q.apertura.existencia === EXISTENCIA.DESCONOCIDA),
+      "el local lista las once cadenas que el punto cero copió, y no el producto que nace el 28",
+      l.cadenas.length === 11 && !l.cadenas.some((q) => q.productoLocalId === P.nace.pl) && l.cadenas.every((q) => q.apertura.existencia === EXISTENCIA.DESCONOCIDA),
       `${l.cadenas.length}`
     );
-    ok("los totales de apertura del día parcial quedan en null, no en cero", l.totales.cantidad.apertura.total === null && l.totales.cantidad.apertura.desconocidas === 9);
+    ok("los totales de apertura del día parcial quedan en null, no en cero", l.totales.cantidad.apertura.total === null && l.totales.cantidad.apertura.desconocidas === 11);
   }
 
   seccion("B.3 El primer día completo: 28/09");
@@ -659,11 +675,25 @@ try {
     const mu = de(dia28, P.muchos.pl);
     ok("varios CAMBIO: 100 → 90 → 95 → 80: entra 5, sale 25, tres movimientos", mu.apertura.cantidad === 100 && mu.cantidad.entradas === 5 && mu.cantidad.salidas === 25 && mu.cierre.cantidad === 80 && mu.movimientos === 3);
     ok("todas las cadenas del 28 cuadran, cantidad y tránsito", dia28.cadenas.every((q) => q.cuadra.cantidad && q.cuadra.enTransito));
+    const at = de(dia28, P.atomico.pl);
+    ok(
+      "BAJA ATÓMICA (una sola sentencia borra el stock y el producto): abre 4/1, desaparece con 4/1, cierra NO_EXISTE, con la identidad congelada",
+      at && at.apertura.cantidad === 4 && at.apertura.enTransito === 1 && at.cantidad.desapareceCon === 4 && at.enTransito.desapareceCon === 1 &&
+        at.cierre.existencia === EXISTENCIA.NO_EXISTE && at.cierre.cantidad === null && at.identidad.fuente === FUENTE_IDENTIDAD.ACTUAL &&
+        at.identidad.productoEliminado && at.cuadra.cantidad && at.cuadra.enTransito,
+      json(at)
+    );
+    const movAt = await server.movimientosDelDia(c, { localId: L.A, dia: "2026-09-28", productoLocalId: P.atomico.pl });
+    ok(
+      "y su movimiento es un DESAPARECE con la identidad que la BAJA congeló",
+      movAt.length === 1 && movAt[0].efecto === EFECTO.DESAPARECE && movAt[0].identidadCongelada?.nombre === "Atomico" && movAt[0].stockLocalId === P.atomico.sl,
+      json(movAt)
+    );
     const t = dia28.totales.cantidad;
     const m = (v) => Math.round(v * 1000);
     ok(
       "los totales del local cuadran con columnas propias de aparece y desaparece",
-      m(t.apertura.total) + m(t.cambioNeto) + m(t.apareceCon) - m(t.desapareceCon) === m(t.cierre.total) && t.apertura.noExisten === 1 && t.cierre.noExisten === 2,
+      m(t.apertura.total) + m(t.cambioNeto) + m(t.apareceCon) - m(t.desapareceCon) === m(t.cierre.total) && t.apertura.noExisten === 1 && t.cierre.noExisten === 3,
       json(t)
     );
     const grupos = agruparCadenas(dia28.cadenas, claveDeCategoriaActual);
@@ -700,6 +730,15 @@ try {
       mov.map((m) => m.efecto).join() === [EFECTO.DESAPARECE, EFECTO.APARECE, EFECTO.CAMBIO].join() &&
         mov[0].cantidad.delta === null && mov[1].cantidad.delta === null && mov[2].cantidad.delta === 2 && mov[0].identidadCongelada?.nombre === "Renace",
       json(mov.map((m) => [m.efecto, m.cantidad]))
+    );
+    const rv = de(x, P.revViejo.pl);
+    const rn = de(x, P.revNuevo.pl);
+    ok(
+      "RE-VINCULACIÓN ATÓMICA: la cadena vieja abre 3 y desaparece con 3; la nueva aparece con 3 en la misma fila",
+      rv && rn && rv.apertura.cantidad === 3 && rv.cantidad.desapareceCon === 3 && rv.cierre.existencia === EXISTENCIA.NO_EXISTE &&
+        rn.apertura.existencia === EXISTENCIA.NO_EXISTE && rn.cantidad.apareceCon === 3 && rn.cierre.cantidad === 3 &&
+        rn.cierre.stockLocalId === rv.apertura.stockLocalId && rv.cuadra.cantidad && rn.cuadra.cantidad,
+      json({ rv, rn })
     );
     const re = de(x, P.reinterpreta.pl);
     ok(
