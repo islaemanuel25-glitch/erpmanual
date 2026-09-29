@@ -523,7 +523,11 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // Costos INERTE —tres tablas nuevas, sus funciones y la inmutabilidad—. No
   // crea triggers sobre ninguna tabla existente hasta que se lo active, así que
   // la recepción escribe igual que antes.
-  assert.equal(migraciones.length, 42, "aparecio una migracion que nadie declaro aca");
+  // Y a 43 el mismo día: entró `20260929200000_libro_costo_activacion`, que
+  // enciende ese libro. Desde ahí cada escritura de costo de `ProductoBase` y
+  // `ProductoLocal` deja además una versión, por triggers AFTER que no cambian
+  // la fila: la recepción escribe los mismos valores que antes.
+  assert.equal(migraciones.length, 43, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

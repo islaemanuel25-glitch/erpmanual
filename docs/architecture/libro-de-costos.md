@@ -131,14 +131,19 @@ NO_ACTIVADO y se puede reintentar [probado].
 - INTENTO_FALLIDO: la migración de activación figura fallida y sin resolver.
 - INCONSISTENTE: cualquier otra combinación. Nunca debería verse.
 
-## Cómo se activará en producción [pendiente]
+## Cómo se activa en producción [pendiente de desplegar]
 
 Con autorización expresa y por el camino de `/deploy`, nunca a mano:
 
-1. Una migración propia, `<fecha>_libro_costo_activacion`, cuyo único contenido
-   es `SELECT "libro_costo_activar"();`. Un paso de datos en producción es una
-   migración (CLAUDE.md, "Scripts que tocan la base"). El candado
-   `libroCostos.test.mjs` exige que hoy no exista ninguna.
+1. La migración propia `20260929200000_libro_costo_activacion`, cuyo único
+   contenido es `SELECT "libro_costo_activar"();` [código]. Un paso de datos en
+   producción es una migración (CLAUDE.md, "Scripts que tocan la base"). El
+   candado `libroCostos.test.mjs` exige que sea la ÚNICA que llama a la función,
+   que no tenga otra sentencia, que vaya después de la instalación y que la
+   instalación siga byte por byte como se mergeó en #107 [código]. Desde que
+   existe, toda base nueva construida con las migraciones —CI, desarrollo—
+   nace ACTIVADA con un punto cero vacío, y el TRUNCATE de la base entera que
+   hacen los scripts de desarrollo se rechaza [probado].
 2. Si el deploy falla por el candado (P3018 con 55P03), hay que comprobar el
    estado: `SELECT * FROM libro_costo_estado()` tiene que decir INTENTO_FALLIDO,
    sin restos.
@@ -146,8 +151,10 @@ Con autorización expresa y por el camino de `/deploy`, nunca a mano:
    vuelve a NO_ACTIVADO y cuenta el intento revertido.
 4. Reintentar el deploy fuera de hora pico.
 
-La prueba ejerce los cuatro pasos con `migrate deploy` real, sobre una base
-descartable [probado].
+La prueba ejerce los cuatro pasos con `migrate deploy` real y la migración real
+del árbol, sobre una base descartable [probado]. También aplica ese mismo
+archivo dos veces: la segunda falla con `LIBRO_COSTO_YA_ACTIVADO` y no deja
+nada [probado].
 
 ## El día de activación y lo que el Stock Diario va a leer [pendiente]
 

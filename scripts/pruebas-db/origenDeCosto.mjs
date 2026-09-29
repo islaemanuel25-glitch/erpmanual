@@ -133,20 +133,28 @@ try {
   // ══════════════════════════════════════════════════════════════════════════
   // Antes de instalar la captura de esta prueba. Lo único que lee la
   // configuración son las dos funciones del Libro de Costos
-  // (`20260929120000_libro_costos`), que solo la copian a la historia. Y con el
-  // libro sin activar, ningún trigger de las tablas de costo las llama: declarar
-  // no cambia ni un valor ni una escritura.
+  // (`20260929120000_libro_costos`), que solo la copian a la historia. Desde la
+  // activación (`20260929200000_libro_costo_activacion`) las llaman los tres
+  // triggers de captura, y NADA MÁS; los tres son AFTER, así que no pueden
+  // cambiar la fila que se escribe: declarar no cambia ni un valor ni una
+  // escritura. Hasta el 2026-09-29 esto afirmaba cero triggers, con el libro
+  // sin activar.
   const lectores = await c.$queryRawUnsafe(
     `SELECT coalesce(array_agg(proname::text ORDER BY proname), '{}') AS n FROM pg_proc WHERE prosrc LIKE '%' || $1 || '%'`,
     CONFIG_COSTO_ORIGEN
   );
   igual("solo las funciones de origen del Libro de Costos leen la configuración", lectores[0].n, ["libro_costo_origen", "libro_costo_origen_ref"]);
+  // tgtype es una máscara: el bit 2 es BEFORE.
   const triggersDeCosto = await c.$queryRawUnsafe(
-    `SELECT count(*)::int AS n FROM pg_trigger t JOIN pg_class k ON k.oid = t.tgrelid
+    `SELECT coalesce(array_agg(t.tgname::text ORDER BY t.tgname), '{}') AS n,
+            coalesce(bool_and((t.tgtype::int & 2) = 0), true) AS "todosAfter"
+     FROM pg_trigger t JOIN pg_class k ON k.oid = t.tgrelid
      WHERE NOT t.tgisinternal AND k.relname IN ('ProductoBase', 'ProductoLocal', 'Local')
        AND t.tgfoid IN (SELECT oid FROM pg_proc WHERE proname LIKE 'libro\\_costo\\_%')`
   );
-  igual("y con el libro sin activar, ningún trigger de ProductoBase, ProductoLocal ni Local las usa", triggersDeCosto[0].n, 0);
+  igual("con el libro activado, los únicos triggers de ProductoBase, ProductoLocal y Local que las usan son los tres de captura",
+    triggersDeCosto[0].n, ["Local_costo_version", "ProductoBase_costo_version", "ProductoLocal_costo_version"]);
+  ok("y los tres son AFTER: no pueden cambiar la fila que se escribe", triggersDeCosto[0].todosAfter === true);
 
   for (const sentencia of CAPTURA) await c.$executeRawUnsafe(sentencia);
   const capturas = (desde) =>

@@ -1,0 +1,24 @@
+-- LA ACTIVACIÓN DEL LIBRO DE COSTOS.
+--
+-- Una sola sentencia, a propósito: toda la lógica vive en `libro_costo_activar()`,
+-- que instaló `20260929120000_libro_costos` y que esta migración no toca ni
+-- reescribe. La función, en la transacción en la que Prisma aplica este archivo:
+--
+--   · pone un tope de espera de 3 s y toma los candados de ProductoBase,
+--     ProductoLocal y Local (y de las tablas del libro);
+--   · exige el libro vacío y sin activar: una segunda activación falla con
+--     LIBRO_COSTO_YA_ACTIVADO;
+--   · crea los tres triggers de captura y los tres que rechazan TRUNCATE;
+--   · escribe el PUNTO_CERO de cada ProductoBase y cada ProductoLocal, con un
+--     solo instante y una sola transacción;
+--   · compara cantidades y huellas contra las tablas vivas, y escribe la única
+--     fila de LibroCostoActivacion.
+--
+-- Si cualquier paso falla, la transacción revierte entera y el libro sigue
+-- NO_ACTIVADO. El nombre termina en `_libro_costo_activacion` porque así la
+-- busca `libro_costo_estado()` en `_prisma_migrations` para nombrar un intento
+-- fallido. Qué hacer si falla al desplegar: `docs/architecture/libro-de-costos.md`.
+--
+-- No borra ni modifica ninguna fila existente: agrega versiones y triggers.
+
+SELECT "libro_costo_activar"();

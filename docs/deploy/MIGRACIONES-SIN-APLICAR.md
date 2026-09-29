@@ -16,8 +16,15 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **39 migraciones**. El árbol trae **42**. Faltan tres, y Prisma
-las aplica en este orden, que es el de sus nombres. Las dos primeras son independientes entre sí
+Producción está en **39 migraciones**. El árbol trae **43**. Faltan cuatro, y Prisma
+las aplica en este orden, que es el de sus nombres.
+
+**Desfasaje informado y sin corregir acá** (2026-09-29): Emanuel informó que
+producción ya está en `e7161e1b`, con el Libro de Costos instalado y NO activado
+—o sea, con las tres primeras de esta lista aplicadas—. La nota de ese
+despliegue no llegó a esta lista. La sesión de nube que agrega la activación no
+puede comprobar el estado de producción y no lo inventa: el número y las tres
+primeras las corrige la sesión del servidor al confirmar su despliegue. Las dos primeras son independientes entre sí
 —el índice no toca funciones ni triggers, y la corrección no toca índices—: se
 comprobó aplicándolas juntas con Prisma sobre una base como la de producción.
 `20260928180000_libro_stock_baja_atomica` ya está en `main` (PR #96), pero
@@ -66,6 +73,24 @@ mergeada no es desplegada: producción sigue en 39 hasta el próximo despliegue.
   las tres tablas están vacías. **La activación NO va en este despliegue**: será
   una migración propia `<fecha>_libro_costo_activacion`, con autorización
   expresa y el procedimiento de `docs/architecture/libro-de-costos.md`.
+- `20260929200000_libro_costo_activacion` — **ENCIENDE el Libro de Costos.**
+  Una sola sentencia, `SELECT "libro_costo_activar"();`: toda la lógica es de la
+  función que instaló la anterior, que no se modifica. En una transacción, con
+  tope de espera de 3 s: toma SHARE ROW EXCLUSIVE sobre `ProductoBase`,
+  `ProductoLocal` y `Local` (frena sus escrituras, no sus lecturas, hasta
+  confirmar), crea los tres triggers de captura y los tres que rechazan
+  TRUNCATE sobre las tablas del libro, escribe el PUNTO_CERO de cada fila de
+  `ProductoBase` y `ProductoLocal`, comprueba cantidades y huellas, y escribe la
+  única fila de `LibroCostoActivacion`. **No borra ni modifica ninguna fila
+  existente.** Desde que se aplica, TODA escritura de costo o escala en esas
+  tres tablas deja una versión. Si no consigue el candado falla con P3018 /
+  55P03 y revierte entera: `SELECT * FROM libro_costo_estado()` dice
+  INTENTO_FALLIDO, se resuelve con `migrate resolve --rolled-back
+  20260929200000_libro_costo_activacion` y se reintenta fuera de hora pico
+  (procedimiento en `docs/architecture/libro-de-costos.md`). Lo que hay que
+  comprobar después: `libro_costo_estado()` dice **ACTIVADO**, las cantidades
+  de `LibroCostoActivacion` son las filas de `ProductoBase` y `ProductoLocal`,
+  y los seis triggers están. Va **con autorización expresa** y por `/deploy`.
 
 ---
 
