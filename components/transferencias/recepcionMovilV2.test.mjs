@@ -527,7 +527,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // enciende ese libro. Desde ahí cada escritura de costo de `ProductoBase` y
   // `ProductoLocal` deja además una versión, por triggers AFTER que no cambian
   // la fila: la recepción escribe los mismos valores que antes.
-  assert.equal(migraciones.length, 43, "aparecio una migracion que nadie declaro aca");
+  // Y a 44 el mismo día: entró `20260929230000_gastos`, tres tablas nuevas de
+  // Finanzas —gasto, su pago y las categorías—. No toca transferencias ni
+  // ninguna tabla que la recepción escriba.
+  assert.equal(migraciones.length, 44, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

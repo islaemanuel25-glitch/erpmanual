@@ -1925,14 +1925,16 @@ export default function PosVentasPage() {
                 {state.puntosCanje > 0 ? `Puntos: -${state.puntosCanje}` : `Puntos: ${state.saldoPuntos}`}
               </button>
             )}
-            {/* Egresos manuales: gastos y salidas extraordinarias. La
+            {/* Movimientos manuales de efectivo: cambio, adelantos. La
                 recaudación NO se retira por acá — para eso está "Retirar
-                recaudación", que además crea el movimiento solo. */}
+                recaudación", que además crea el movimiento solo — y los pagos
+                a proveedores y de gastos tienen su propia puerta en Finanzas,
+                que deja el retiro vinculado a su pago. */}
             {turnoActual && (
               <button
                 onClick={() => setMostrarCajaMovimiento(true)}
                 className="text-[11px] sunmi-pos-btn-secondary px-2 py-1 rounded transition-colors sunmi-pos-text-accent"
-                title="Ingreso o egreso puntual de caja (gastos, cambio)"
+                title="Ingreso o egreso puntual de efectivo (cambio, adelantos)"
               >
                 Caja +/-
               </button>

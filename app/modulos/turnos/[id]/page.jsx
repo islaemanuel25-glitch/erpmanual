@@ -618,7 +618,7 @@ export default function TurnoDetallePage() {
               <div>
                 <label className="text-xs sunmi-text-muted">Motivo (opcional)</label>
                 <SunmiInput
-                  placeholder="Ej: cambio, pago proveedor..."
+                  placeholder="Ej: cambio, adelanto..."
                   value={movMotivo}
                   onChange={(e) => setMovMotivo(e.target.value)}
                 />

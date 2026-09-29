@@ -455,6 +455,14 @@ jobs:
       - name: Ejercer Finanzas contra PostgreSQL
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/finanzas.mjs
 
+      # Gastos: las dos puertas que escriben —crear y pagar— contra una base
+      # descartable con todas las migraciones. La ubicación dueña, el efectivo
+      # con su RETIRO vinculado, la idempotencia bajo carrera, la atomicidad del
+      # pago inicial, los CHECK, y que Finanzas clasifique ese retiro por el
+      # vínculo y no lo cuente como retiro manual.
+      - name: Ejercer Gastos contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/gastos.mjs
+
       # La semana operativa de la ubicación: el backfill de su migración —el mismo
       # SQL del archivo—, las restricciones que Prisma no ve, las dos rutas que la
       # escriben y la paridad de Transferencias. Va en este job porque es la base

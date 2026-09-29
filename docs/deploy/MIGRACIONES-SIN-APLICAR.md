@@ -16,12 +16,22 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **43 migraciones** y el árbol también. **Ninguna** pendiente:
-el despliegue siguiente es solo de código.
+Producción está en **43 migraciones**. El árbol trae **44**. Falta una.
 
 Producción corre `406cfb05ef35fb9496f831d5b10a975e05e90d06` (despliegue del
 2026-09-29, nota abajo). Un commit posterior a ese que solo cambie
-documentación —como el que escribe esta nota— **no se despliega por eso**.
+documentación **no se despliega por eso**.
+
+- `20260929230000_gastos` — **aditiva**: el núcleo de Gastos de Finanzas. Tres
+  tablas nuevas (`CategoriaGasto`, `Gasto`, `PagoGasto`), el enum
+  `MedioPagoGasto`, sus índices, claves foráneas y CHECK —total y monto
+  positivos, concepto no vacío, efectivo ⇔ turno y movimiento de caja—, y las
+  siete categorías iniciales como filas del catálogo nuevo. **No toca ninguna
+  tabla, columna ni fila existente**: no convierte ningún RETIRO histórico en
+  gasto y no crea ningún trigger. El clasificador la marca **aditiva, sin
+  coincidencias**. Lo que hay que comprobar después: las tres tablas existen,
+  `CategoriaGasto` tiene las siete categorías, y `Gasto` y `PagoGasto` están
+  vacías.
 
 ---
 
