@@ -463,6 +463,13 @@ jobs:
       - name: Ejercer Gastos contra PostgreSQL
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/gastos.mjs
 
+      # Las rutas de Gastos, con sesiones firmadas como las del login: el alcance
+      # por ubicación, los permisos, el listado filtrado y paginado en la base,
+      # el mapeo de errores a HTTP, y que el cliente no elija la ubicación ni el
+      # movimiento de caja.
+      - name: Ejercer las rutas de Gastos contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/gastosApi.mjs
+
       # La semana operativa de la ubicación: el backfill de su migración —el mismo
       # SQL del archivo—, las restricciones que Prisma no ve, las dos rutas que la
       # escriben y la paridad de Transferencias. Va en este job porque es la base

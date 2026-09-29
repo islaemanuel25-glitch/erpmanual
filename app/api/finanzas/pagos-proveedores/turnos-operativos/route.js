@@ -16,6 +16,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { WHERE_TURNO_OPERATIVO } from "@/lib/caja/cierreRelevo";
 import { aCargoDelTurno } from "@/lib/finanzas/actividadFinanciera";
+import { PERMISO_REGISTRAR_GASTOS } from "@/lib/finanzas/gastos";
 import { PERMISO_REGISTRAR_PAGOS } from "@/lib/finanzas/pagosProveedores";
 import {
   ERROR_TURNO_DE_OTRA_UBICACION,
@@ -33,8 +34,13 @@ export async function GET(req) {
     // vive en el cierre de una compra, que exige solo ése para pagar: quien
     // puede sacar plata para pagarle a un proveedor tiene que poder elegir de
     // qué caja sale, aunque no mire el resto de Finanzas.
+    //
+    // El pago de un gasto sale del cajón con la MISMA regla —`resolverSalidaDelPago`—
+    // y su formulario necesita la misma lista, así que el permiso de registrar
+    // gastos también la abre. No es otra lista: son los mismos turnos, los de la
+    // ubicación que opera la sesión.
     const perm = checkPerm(session, PERMISO_REGISTRAR_PAGOS);
-    if (!perm.ok) {
+    if (!perm.ok && !checkPerm(session, PERMISO_REGISTRAR_GASTOS).ok) {
       return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
 
