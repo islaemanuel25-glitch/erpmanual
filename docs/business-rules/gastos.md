@@ -1,8 +1,8 @@
 # Gastos
 
 Qué es un gasto en ERP Azul, de quién es y cómo se paga. Hay núcleo —el modelo y
-las dos puertas que escriben— y rutas para listar, abrir, crear y pagar. Todavía
-**no hay pantalla** que las use.
+las dos puertas que escriben—, rutas para listar, abrir, crear y pagar, y la
+pantalla móvil de Finanzas → Gastos que las usa.
 
 ## Qué es, y qué no
 
@@ -108,5 +108,25 @@ La lista de turnos para pagar en efectivo es la de Pagos a proveedores
 (`/api/finanzas/pagos-proveedores/turnos-operativos`), que también abre el
 permiso de gastos.
 
-Todavía **no hay** pantalla de Gastos, ni cuentas bancarias o de Mercado Pago, ni
-lugar para los gastos en el resumen del período.
+El listado devuelve además `ubicacionOperada` —`{ id, nombre }` de la ubicación
+que se opera, o `null` en vista global—: es donde se registraría un gasto nuevo,
+y la pantalla la muestra fija en vez de ofrecer elegirla [CÓDIGO].
+
+## La pantalla
+
+`app/modulos/finanzas/gastos/`, armada con las piezas de Pagos a proveedores
+[CÓDIGO] (`components/finanzas/gastos/`):
+
+- El período filtra por la **fecha del gasto**. En Pendientes se pide aparte lo
+  pendiente de antes del período, que va en la banda "Anteriores con saldo" y no
+  suma en el número del resumen (`lib/finanzas/calendarioDeGastos.js`).
+- Pestaña, período y categoría viven en la URL (`parseContextoGastos`): entrar a
+  un gasto y volver cae en el mismo lugar.
+- Se piden hasta 200 por consulta —el máximo de la API—; si hay más, la lista lo
+  avisa en vez de cortar callada.
+- "Nuevo gasto" aparece con `puedeCrear` y "Registrar pago" con `puedePagar`,
+  que decide el servidor. El pago inicial va dentro del mismo POST del alta.
+- No hay editar, eliminar ni anular.
+
+Todavía **no hay** cuentas bancarias o de Mercado Pago, ni lugar para los gastos
+en el resumen del período.

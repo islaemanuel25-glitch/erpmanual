@@ -407,11 +407,15 @@ try {
   ok("Casiano ve sus gastos y solo los suyos", todosCasiano.status === 200 && todosCasiano.paginacion.total === deCasiano &&
     todosCasiano.gastos.every((g) => g.localId === casiano.id), JSON.stringify(todosCasiano.paginacion));
   ok("con finanzas.ver solo, la lista no ofrece crear", todosCasiano.puedeCrear === false && todosCasiano.puedeEscribir === false);
+  ok("la lista dice en qué ubicación se registraría un gasto nuevo: la que se opera",
+    JSON.stringify(todosCasiano.ubicacionOperada) === JSON.stringify({ id: casiano.id, nombre: "Casiano Casas" }), JSON.stringify(todosCasiano.ubicacionOperada));
   r = await listar(otroEscribe, "estado=TODAS&pageSize=200");
   ok("el otro local ve solo el suyo", r.paginacion.total === 1 && r.gastos[0].id === gOtro.id && r.puedeCrear === true, JSON.stringify(r.paginacion));
   const todosDeposito = await listar(depositoEscribe, "estado=TODAS&pageSize=200");
   ok("el depósito ve los de todo el grupo", todosDeposito.paginacion.total === (await c.gasto.count()) && todosDeposito.variasUbicaciones === true,
     JSON.stringify(todosDeposito.paginacion));
+  ok("y el depósito, aunque vea todo, registra en el depósito", todosDeposito.ubicacionOperada?.id === deposito.id && todosDeposito.ubicacionOperada?.nombre === "Depósito",
+    JSON.stringify(todosDeposito.ubicacionOperada));
   r = await listar(depositoEscribe, `estado=TODAS&pageSize=200&destino=${casiano.id}`);
   ok("el depósito puede pedir UNA ubicación con destino", r.status === 200 && r.paginacion.total === deCasiano && r.gastos.every((g) => g.localId === casiano.id) && r.filtros.destino === casiano.id);
   r = await listar(casianoVe, `destino=${otro.id}`);
@@ -419,7 +423,8 @@ try {
   r = await listar(casianoVe, "destino=abc");
   ok("un destino que no es un local: 400", r.status === 400 && r.error === ERROR_DESTINO_INVALIDO, r.error);
   r = await listar(adminGlobal, "estado=TODAS&pageSize=200");
-  ok("un admin en vista global ve todo el grupo y no se le ofrece crear", r.status === 200 && r.paginacion.total === (await c.gasto.count()) && r.puedeCrear === false,
+  ok("un admin en vista global ve todo el grupo y no se le ofrece crear, ni hay ubicación donde registrar",
+    r.status === 200 && r.paginacion.total === (await c.gasto.count()) && r.puedeCrear === false && r.ubicacionOperada === null,
     JSON.stringify([r.status, r.paginacion, r.error]));
 
   // ══════════════════════════════════════════════════════════════════════

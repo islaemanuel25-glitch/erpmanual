@@ -41,6 +41,12 @@ import {
 } from "@/lib/finanzas/gastosServer";
 import { PERMISO_VER_FINANZAS } from "@/lib/finanzas/pagosProveedores";
 
+function ubicacionDe(alcance) {
+  const id = Number(alcance.vista.localId) || null;
+  const local = id ? alcance.locales.find((l) => l.localId === id) : null;
+  return local ? { id, nombre: local.nombre } : null;
+}
+
 export async function GET(req) {
   try {
     const session = getUsuarioSession(req);
@@ -97,6 +103,11 @@ export async function GET(req) {
       // Crear exige además operar una ubicación: un admin en vista global ve
       // todo y no crea nada, igual que no paga.
       puedeCrear: alcance.puedeEscribir && Number(alcance.vista.localId) > 0,
+      // DÓNDE SE REGISTRA un gasto nuevo: la ubicación que se opera, con su
+      // nombre, para que el formulario la muestre fija. Sale de la lista del
+      // grupo que el servidor ya leyó, no de algo que diga el cliente; sin
+      // ubicación operada —un admin en vista global— es null.
+      ubicacionOperada: ubicacionDe(alcance),
       variasUbicaciones: localIds.length > 1,
       gastos,
       paginacion,
