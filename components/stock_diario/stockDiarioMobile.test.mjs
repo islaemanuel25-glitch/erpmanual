@@ -1,0 +1,153 @@
+// CANDADO: STOCK DIARIO MÓVIL, LO QUE DIBUJA.
+//
+//   node --import ./scripts/alias-loader.mjs --test components/stock_diario/stockDiarioMobile.test.mjs
+//
+// Qué se le pide a la API y qué dice cada renglón está en
+// `lib/stock/libro/stockDiarioPantalla.test.mjs`; lo que la API cuenta, en
+// `scripts/pruebas-db/stockDiarioApi.mjs`. Acá se renderizan las piezas de
+// verdad. Todo lo que lee código lo lee SIN COMENTARIOS (regla 5).
+
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import { execFileSync } from "node:child_process";
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
+import FilaStockDiario from "./FilaStockDiario.jsx";
+import ResumenStockDiario from "./ResumenStockDiario.jsx";
+import ResumenConImporte from "../periodo/ResumenConImporte.jsx";
+import { PUNTO_CERO_PRODUCCION, estadoDelPeriodo, movidoDesdeAgregado, stockDeCadena } from "@/lib/stock/libro/stockDiario";
+import { cadenaApi, periodoApi } from "@/lib/stock/libro/stockDiarioApi";
+import { RUTA_STOCK_DIARIO } from "@/lib/stock/libro/rutasStockDiario";
+import { MENU_CONFIG } from "@/lib/menu/registry";
+
+const h = (el) => renderToStaticMarkup(el);
+const PC = { dia: PUNTO_CERO_PRODUCCION.dia, instante: PUNTO_CERO_PRODUCCION.instanteUTC };
+const HOY = "2026-10-05";
+const codigo = (ruta) =>
+  fs.readFileSync(ruta, "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\s*\}/g, "").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+
+function respuesta(dia) {
+  const periodo = estadoDelPeriodo({ desde: dia, hasta: dia, puntoCero: PC, hoy: HOY });
+  return periodoApi({ periodo, puntoCero: PC, hoy: HOY }, { unidad: "DIA", fecha: dia });
+}
+function item(r, { antes, hasta, identidad = {} }) {
+  const periodo = estadoDelPeriodo({ desde: r.periodo.desde, hasta: r.periodo.hasta, puntoCero: PC, hoy: HOY });
+  const u = (x) => (x ? { tipo: x.tipo ?? "CAMBIO", cantidadPosterior: x.cantidad, cantidadAnterior: x.cantidad, enTransitoPosterior: x.enTransito ?? "0", enTransitoAnterior: x.enTransito ?? "0" } : null);
+  return cadenaApi(
+    stockDeCadena({
+      localId: 1,
+      productoLocalId: 9,
+      periodo,
+      ultimoAntes: periodo.aperturaConocida ? u(antes) : null,
+      ultimoHasta: u(hasta),
+      movido: movidoDesdeAgregado({}),
+      identidad: { productoBaseId: 3, nombre: "Galletitas Terrabusi 170 g", unidadMedida: "unidad", fuente: "ACTUAL", productoEliminado: false, ...identidad },
+    })
+  );
+}
+
+// ── LA FILA ─────────────────────────────────────────────────────────────
+
+test("la fila: nombre, Apertura → Ahora, y la variación con su unidad", () => {
+  const r = respuesta(HOY);
+  const s = h(React.createElement(FilaStockDiario, { item: item(r, { antes: { cantidad: "18" }, hasta: { cantidad: "22" } }), respuesta: r }));
+  assert.ok(s.includes(">Galletitas Terrabusi 170 g<"));
+  assert.ok(s.includes(">Apertura 18 UNIDAD → Ahora 22 UNIDAD<"), s);
+  assert.ok(s.includes(">+4<") && s.includes(" UNIDAD</span>"), s);
+});
+
+test("'Ver' no se dibuja ni es un botón: el detalle todavía no está diseñado", () => {
+  const r = respuesta(HOY);
+  const s = h(React.createElement(FilaStockDiario, { item: item(r, { antes: { cantidad: "18" }, hasta: { cantidad: "22" } }), respuesta: r }));
+  assert.ok(!s.includes("Ver ›"), "un 'Ver' sin destino es un botón roto");
+  assert.ok(!/<button|<a /.test(s), "la fila no es tocable");
+  assert.doesNotMatch(codigo("components/stock_diario/FilaStockDiario.jsx"), /onAbrir=/);
+});
+
+test("PRODUCTO ELIMINADO dibujado: 'Ahora No existe', sin cifra a la derecha, nunca 'Ahora 0'", () => {
+  const r = respuesta(HOY);
+  const s = h(
+    React.createElement(FilaStockDiario, {
+      item: item(r, { antes: { cantidad: "5" }, hasta: { tipo: "BAJA", cantidad: "5" }, identidad: { productoEliminado: true } }),
+      respuesta: r,
+    })
+  );
+  assert.ok(s.includes(">Apertura 5 UNIDAD → Ahora No existe<"), s);
+  assert.ok(s.includes(">Producto eliminado<"));
+  assert.ok(!s.includes("Ahora 0") && !s.includes("−5") && !s.includes("−5"), s);
+});
+
+test("APERTURA DESCONOCIDA dibujada: 'No disponible', sin variación ni cero", () => {
+  const r = respuesta(PC.dia);
+  const s = h(React.createElement(FilaStockDiario, { item: item(r, { antes: { cantidad: "99" }, hasta: { cantidad: "18" } }), respuesta: r }));
+  assert.ok(s.includes(">Apertura No disponible → Cierre 18 UNIDAD<"), s);
+  assert.ok(s.includes("Sin variación: falta la apertura"));
+  assert.ok(!s.includes("99") && !s.includes(">0<"), s);
+});
+
+// ── EL RESUMEN ──────────────────────────────────────────────────────────
+
+test("el resumen: productos con movimientos y tres columnas de CONTEOS, con el aviso del día en curso", () => {
+  const r = {
+    ...respuesta(HOY),
+    conteos: { conMovimientos: 214, conTransitoAlCierre: 12 },
+    totales: { cantidad: { entradas: 931.5, salidas: 1203.25, movimientosDeEntrada: 38, movimientosDeSalida: 43 } },
+  };
+  const s = h(React.createElement(ResumenStockDiario, { respuesta: r }));
+  assert.ok(s.includes(">Actividad de hoy<"));
+  assert.ok(s.includes("214") && s.includes(">productos con movimientos<"));
+  for (const t of [">Entradas<", ">38<", ">Salidas<", ">43<", ">En tránsito<", ">12<", ">productos<"]) assert.ok(s.includes(t), t);
+  assert.ok(!s.includes("931") && !s.includes("1203"), "las cantidades sumadas no se muestran");
+  assert.ok(s.includes("Día en curso · cada producto muestra Apertura → Ahora, no el cierre"));
+  assert.ok(s.includes("sunmi-border-warning"), "el aviso enciende el borde");
+});
+
+test("ResumenConImporte sin `detalle` dibuja lo mismo que antes: ninguna divisoria nueva", () => {
+  const props = { rotulo: "Para cobrar", importe: "$1", subtitulo: "Semana" };
+  const sin = h(React.createElement(ResumenConImporte, props));
+  assert.ok(!sin.includes("sunmi-divider"), sin);
+  const con = h(React.createElement(ResumenConImporte, { ...props, detalle: React.createElement("div", null, "x") }));
+  assert.equal((con.match(/sunmi-divider/g) || []).length, 1);
+});
+
+// ── LA PANTALLA ─────────────────────────────────────────────────────────
+
+const PANTALLA = execFileSync(
+  "git",
+  ["ls-files", "--cached", "--others", "--exclude-standard", "components/stock_diario", "app/modulos/stock_locales/diario"],
+  { encoding: "utf8" }
+)
+  .split("\n")
+  .filter((f) => f.endsWith(".jsx"));
+
+test("la pantalla solo consume las rutas del Stock Diario que ya existen", () => {
+  const fuente = PANTALLA.map(codigo).join("\n");
+  const rutas = [...fuente.matchAll(/`\/api\/([^`?$]+)/g)].map((m) => m[1]);
+  assert.deepEqual([...new Set(rutas)], ["stock_locales/diario/"]);
+  assert.match(fuente, /pedir\("resumen", consultaResumen\)/);
+  assert.match(fuente, /pedir\("productos", consultaLista\)/);
+  for (const r of ["resumen", "productos"]) assert.ok(fs.existsSync(`app/api/stock_locales/diario/${r}/route.js`), r);
+});
+
+test("la página exige stock.ver, y el menú la pone en Stock AL LADO de Stock Locales", () => {
+  assert.match(codigo("app/modulos/stock_locales/diario/page.jsx"), /permisos\.includes\(PERMISO_STOCK_DIARIO\)/);
+  const stock = MENU_CONFIG.find((g) => g.key === "stock");
+  const labels = stock.items.map((i) => i.label);
+  assert.ok(labels.includes("Stock Locales"), "Stock Locales sigue");
+  const diario = stock.items.find((i) => i.label === "Stock Diario");
+  assert.equal(diario.href, RUTA_STOCK_DIARIO);
+  assert.equal(diario.permiso, "stock.ver");
+  assert.ok(fs.existsSync("app/modulos/stock_locales/diario/page.jsx"));
+});
+
+test("la pantalla no escribe colores ni medidas mágicas", () => {
+  assert.ok(PANTALLA.length >= 4, `la enumeración trajo ${PANTALLA.length} piezas`);
+  for (const f of PANTALLA) {
+    const fuente = codigo(f);
+    assert.doesNotMatch(fuente, /#[0-9a-fA-F]{3,8}\b|rgba?\(|hsl\(|style=\{\{/, f);
+    assert.doesNotMatch(fuente, /\b(text|bg|border)-(red|amber|green|slate|cyan|blue|yellow|orange|gray|zinc)-\d{2,3}\b/, f);
+    assert.doesNotMatch(fuente, /\b[a-z-]+-\[[^\]]+\]/, `${f} tiene una medida entre corchetes`);
+  }
+});

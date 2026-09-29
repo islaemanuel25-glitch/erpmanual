@@ -29,10 +29,13 @@
  * @param {React.ReactNode} props.importe    YA FORMATEADO: la plata la escribe la pantalla.
  * @param {React.ReactNode} props.subtitulo  de qué período habla.
  * @param {React.ReactNode} [props.nota]     una frase suelta debajo, p. ej. el período vacío.
+ * @param {React.ReactNode} [props.detalle]  un bloque entre la cifra y el aviso, con su
+ *                                           divisoria arriba: las columnas de Stock Diario.
+ *                                           Sin él no se dibuja nada, ni la divisoria.
  * @param {React.ReactNode} [props.aviso]    la frase en tono de aviso; enciende el borde.
  * @param {React.ReactNode} [props.accion]   a la derecha del aviso.
  */
-export default function ResumenConImporte({ rotulo, importe, subtitulo, nota = null, aviso = null, accion = null }) {
+export default function ResumenConImporte({ rotulo, importe, subtitulo, nota = null, detalle = null, aviso = null, accion = null }) {
   return (
     <section
       className={`sunmi-bg-card rounded-xl2 p-4 space-y-3 ${
@@ -46,6 +49,13 @@ export default function ResumenConImporte({ rotulo, importe, subtitulo, nota = n
       </div>
 
       {nota && <div className="text-sm2 sunmi-text-muted">{nota}</div>}
+
+      {detalle && (
+        <>
+          <div className="border-t sunmi-divider opacity-70" aria-hidden="true" />
+          {detalle}
+        </>
+      )}
 
       {(aviso || accion) && (
         <>
