@@ -4,9 +4,11 @@
 //
 // Ejerce, sobre bases descartables construidas con las migraciones del árbol:
 //
-//   A. antes de activar: el libro está inerte y no registra nada;
+//   A. antes de activar —todas las migraciones MENOS la de activación—: el
+//      libro está inerte y no registra nada;
 //   B. la activación que no consigue el candado: falla entera, sin restos;
-//   C. el reintento: punto cero completo, cantidades y huella;
+//   C. el reintento, aplicando el archivo REAL de la migración de activación:
+//      punto cero completo, cantidades y huella; y aplicarlo de nuevo falla;
 //   D. la captura por cada escritor —Prisma create, createMany, update,
 //      updateMany, upsert, SQL directo, la ruta real de eliminar producto—;
 //   E. ProductoLocal y Local.es_deposito;
@@ -14,8 +16,11 @@
 //   G. la historia no se modifica ni se escribe a mano;
 //   H. la escala: el libro alcanza para que `costoPorUnidadFisica` —la función
 //      canónica, sin adaptador— dé lo mismo que sobre las tablas vivas;
-//   I. la activación por migración: el camino de producción, con el candado
-//      tomado, P3018/55P03, INTENTO_FALLIDO, `resolve --rolled-back` y reintento.
+//   J. la activación por migración: el camino de producción, con la migración
+//      real, el candado tomado, P3018/55P03, INTENTO_FALLIDO,
+//      `resolve --rolled-back` y reintento;
+//   K. una base nueva con TODAS las migraciones: nace ACTIVADA, con un punto
+//      cero vacío, y el TRUNCATE de la base entera ya no pasa.
 //
 // Nivel ESCRITURA: host local y NODE_ENV distinto de production. Las bases se
 // borran al terminar.
@@ -33,7 +38,7 @@ const jwt = (await import("jsonwebtoken")).default;
 const { aplicarMigraciones, MIGRACIONES } = await import("./lib/libroEnElTiempo.mjs");
 const { declararOrigenDeCosto, ORIGEN_COSTO } = await import("../../lib/precios/origenDeCosto.js");
 const { costoPorUnidadFisica } = await import("../../lib/conversiones/costoPorUnidadFisica.js");
-const { TRIGGERS_DE_ACTIVACION, ORIGEN_ACTIVACION_COSTOS, SUFIJO_MIGRACION_ACTIVACION } = await import("../../lib/libros/libroCostos.js");
+const { TRIGGERS_DE_ACTIVACION, ORIGEN_ACTIVACION_COSTOS, MIGRACION_ACTIVACION_COSTOS } = await import("../../lib/libros/libroCostos.js");
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PREFIJO = "erpazul_libro_costos_prueba";
@@ -145,7 +150,9 @@ try {
   seccion("A. Antes de activar: inerte");
   // ══════════════════════════════════════════════════════════════════════════
   const DB = await crearBase(PREFIJO);
-  aplicarMigraciones(sinParametros(urlDe(DB)));
+  const SIN_ACTIVACION = MIGRACIONES.filter((m) => m !== MIGRACION_ACTIVACION_COSTOS);
+  ok("la migración de activación está en el árbol y es una sola", MIGRACIONES.length === SIN_ACTIVACION.length + 1);
+  aplicarMigraciones(sinParametros(urlDe(DB)), { solo: SIN_ACTIVACION });
   c = await crearClientePrisma({ nivel: ESCRITURA, url: urlDe(DB) });
 
   const grupo = await c.grupo.create({ data: { nombre: "Libro de costos" } });
@@ -216,8 +223,12 @@ try {
   seccion("C. El reintento: punto cero (1, 2, 17, 22)");
   // ══════════════════════════════════════════════════════════════════════════
   const [huellaAntes] = await c.$queryRawUnsafe(`SELECT * FROM "libro_costo_huella_fuente"()`);
-  const [{ r: activacionTexto }] = await c.$queryRawUnsafe(`SELECT "libro_costo_activar"()::text AS r`);
-  const act = JSON.parse(activacionTexto);
+  // El reintento es el archivo REAL de la migración de activación, aplicado en
+  // una transacción como lo aplica Prisma: lo que se prueba es lo que se despliega.
+  aplicarMigraciones(sinParametros(urlDe(DB)), { solo: [MIGRACION_ACTIVACION_COSTOS] });
+  const [filaActivacion] = await c.$queryRawUnsafe(`SELECT * FROM "LibroCostoActivacion"`);
+  ok("la migración de activación deja la fila de LibroCostoActivacion", Boolean(filaActivacion));
+  const act = Object.fromEntries(Object.entries(filaActivacion ?? {}).map(([k, v]) => [k, typeof v === "bigint" ? Number(v) : v]));
   const nBases = await c.productoBase.count();
   const nUbicaciones = await c.productoLocal.count();
   est = await estadoDe(c);
@@ -245,9 +256,15 @@ try {
   const [aCero] = await versionesUbicacion(c, pls.PACK.A.id);
   ok("cada PUNTO_CERO de ubicación congela su costo crudo y si es depósito",
     depCero.esDeposito === true && depCero.precioCosto === null && aCero.esDeposito === false && num(aCero.precioCosto) === 13000);
+  ok("la fila de activación es una sola, con id 1, y su día es el del instante",
+    act.id === 1 && (await c.$queryRawUnsafe(`SELECT "dia" = "libro_stock_dia"("instante") AS ok FROM "LibroCostoActivacion"`))[0].ok === true);
   ok("activar dos veces se rechaza y no duplica el punto cero",
     /LIBRO_COSTO_YA_ACTIVADO/.test((await error(() => c.$queryRawUnsafe(`SELECT "libro_costo_activar"()::text`))) ?? "") &&
       (await fotoDelLibro(c)).base === nBases);
+  const segundaMigracion = await error(async () => aplicarMigraciones(sinParametros(urlDe(DB)), { solo: [MIGRACION_ACTIVACION_COSTOS] }));
+  igual("aplicar OTRA VEZ la migración de activación falla con LIBRO_COSTO_YA_ACTIVADO y no deja nada",
+    [/LIBRO_COSTO_YA_ACTIVADO/.test(segundaMigracion ?? ""), await fotoDelLibro(c), (await estadoDe(c)).estado],
+    [true, { base: nBases, ubicacion: nUbicaciones, activacion: 1, triggers: 6 }, "ACTIVADO"]);
 
   // ══════════════════════════════════════════════════════════════════════════
   seccion("D. La captura, por cada escritor (3, 4, 5, 6, 7, 15, 23)");
@@ -470,22 +487,20 @@ try {
   // ══════════════════════════════════════════════════════════════════════════
   seccion("J. La activación por migración: el camino de producción (21, 22)");
   // ══════════════════════════════════════════════════════════════════════════
-  // La activación de producción va a ser una migración que solo llama a la
-  // función. Se arma acá con un nombre de ejemplo, sobre una base con las
-  // migraciones reales aplicadas por `migrate deploy`, y se ejerce el caso
-  // malo: una transacción reteniendo ProductoBase.
+  // La activación de producción es la migración del árbol, copiada tal cual. Se
+  // despliega primero todo lo anterior —el estado de producción antes de
+  // activar—, y después la activación sola, con `migrate deploy` real, empezando
+  // por el caso malo: una transacción reteniendo ProductoBase.
   const DBM = await crearBase(`${PREFIJO}_migracion`);
-  const ACTIVACION = `20991231000000${SUFIJO_MIGRACION_ACTIVACION}`;
+  const ACTIVACION = MIGRACION_ACTIVACION_COSTOS;
   const armarDir = (conActivacion) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "libro-costos-"));
     const d = path.join(dir, "prisma");
     fs.mkdirSync(path.join(d, "migrations"), { recursive: true });
     fs.copyFileSync(path.join(RAIZ, "prisma/schema.prisma"), path.join(d, "schema.prisma"));
     fs.copyFileSync(path.join(RAIZ, "prisma/migrations/migration_lock.toml"), path.join(d, "migrations", "migration_lock.toml"));
-    for (const m of MIGRACIONES) fs.cpSync(path.join(RAIZ, "prisma/migrations", m), path.join(d, "migrations", m), { recursive: true });
-    if (conActivacion) {
-      fs.mkdirSync(path.join(d, "migrations", ACTIVACION));
-      fs.writeFileSync(path.join(d, "migrations", ACTIVACION, "migration.sql"), `SELECT "libro_costo_activar"();\n`);
+    for (const m of MIGRACIONES.filter((x) => conActivacion || x !== ACTIVACION)) {
+      fs.cpSync(path.join(RAIZ, "prisma/migrations", m), path.join(d, "migrations", m), { recursive: true });
     }
     return path.join(d, "schema.prisma");
   };
@@ -530,6 +545,35 @@ try {
   est = await estadoDe(cMig);
   ok("ACTIVADO, con 50 bases y 50 ubicaciones en el punto cero", est.estado === "ACTIVADO" && /50 bases y 50 ubicaciones/.test(est.detalle), json(est));
   ok("y la historia del intento revertido sigue a la vista", est.intentos_revertidos === 1);
+  r = prisma(["migrate", "status"], schemaConActivacion);
+  ok("migrate status: todas aplicadas, ninguna pendiente", r.codigo === 0 && /up to date/i.test(r.salida), r.salida.slice(-300));
+
+  // ══════════════════════════════════════════════════════════════════════════
+  seccion("K. Una base nueva, con todas las migraciones desde cero");
+  // ══════════════════════════════════════════════════════════════════════════
+  // Es lo que pasa en CI y con cada base de desarrollo nueva: la activación
+  // corre sobre tablas vacías. El punto cero queda vacío y el libro captura
+  // desde la primera fila.
+  const DBK = await crearBase(`${PREFIJO}_desde_cero`);
+  aplicarMigraciones(sinParametros(urlDe(DBK)));
+  const cK = await crearClientePrisma({ nivel: ESCRITURA, url: urlDe(DBK) });
+  try {
+    est = await estadoDe(cK);
+    ok("nace ACTIVADO, con 0 bases y 0 ubicaciones en el punto cero", est.estado === "ACTIVADO" && /0 bases y 0 ubicaciones/.test(est.detalle), json(est));
+    igual("seis triggers y la fila de activación, sin versiones", await fotoDelLibro(cK), { base: 0, ubicacion: 0, activacion: 1, triggers: 6 });
+    const gK = await cK.grupo.create({ data: { nombre: "g" } });
+    const bK = await cK.productoBase.create({ data: { grupoId: gK.id, nombre: "primero", codigo_barra: "k1", unidad_medida: "unidad", precio_costo: 5, precio_venta: 1 } });
+    ok("el primer producto ya deja su ALTA", (await versionesBase(cK, bK.id)).map((v) => v.tipo).join() === "ALTA");
+    // Los scripts de desarrollo que vacían la base entera (`TRUNCATE … RESTART
+    // IDENTITY CASCADE` de todas las tablas de public) dejan de poder hacerlo:
+    // es la protección contra TRUNCATE que instala la activación.
+    const tablas = (await cK.$queryRawUnsafe(`SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename <> '_prisma_migrations'`))
+      .map((x) => `"${x.tablename}"`).join(", ");
+    ok("el TRUNCATE de la base entera se rechaza por el libro",
+      /no se modifica: TRUNCATE/.test((await error(() => cK.$executeRawUnsafe(`TRUNCATE ${tablas} RESTART IDENTITY CASCADE`))) ?? ""));
+  } finally {
+    await cK.$disconnect().catch(() => {});
+  }
 } catch (e) {
   fallas.push(`la prueba se cayó: ${e?.stack || e}`);
   console.log(`  ✗ la prueba se cayó: ${e?.stack || e}`);
