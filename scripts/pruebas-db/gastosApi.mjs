@@ -493,6 +493,55 @@ try {
   r = await listar(otroEscribe, "estado=TODAS");
   ok("una ubicación sin gastos: 200, vacía, total 0 y una página", r.status === 200 && r.gastos.length === 0 && r.paginacion.total === 0 && r.paginacion.totalPaginas === 1,
     JSON.stringify(r));
+
+  // ══════════════════════════════════════════════════════════════════════
+  seccion("El listado, más amplio: estado resuelto en la base, página por página");
+  // ══════════════════════════════════════════════════════════════════════
+  // Quince gastos del otro local, de a tres por día en cinco días: uno sin
+  // pagar, uno a medias y uno saldado. Se recorre cada pestaña de a cuatro y se
+  // compara contra lo que dice `estadoDeCuenta` —la definición del dominio—
+  // sobre lo que quedó en la base, no contra una cuenta escrita acá.
+  const dias = [0, 1, 2, 3, 4].map((d) => sumarDias("2026-09-20", d));
+  const indiceDe = new Map();
+  for (let i = 0; i < 15; i++) {
+    const g = (await crear(otroEscribe, base({ concepto: `Lote ${i}`, total: 1000 + i, fecha: dias[Math.floor(i / 3)], categoriaId: cat(i % 2 ? "Servicios" : "Otros") }))).gasto;
+    indiceDe.set(g.id, i);
+    if (i % 3 === 1) await pagar(otroEscribe, g.id, { monto: 500, medio: "TRANSFERENCIA", idempotencyKey: clave() });
+    if (i % 3 === 2) await pagar(otroEscribe, g.id, { monto: 1000 + i, medio: "OTRO", idempotencyKey: clave() });
+  }
+  const { estadoDeCuenta } = await import("../../lib/finanzas/pagosProveedores.js");
+  const enLaBase = (await c.gasto.findMany({ where: { localId: otro.id }, select: { id: true, fecha: true, total: true, pagos: { select: { monto: true } } } }))
+    .map((g) => ({ id: g.id, fecha: g.fecha.toISOString().slice(0, 10), estado: estadoDeCuenta({ total: g.total, pagos: g.pagos }).estado }));
+  const esperado = {
+    TODAS: enLaBase,
+    PAGADAS: enLaBase.filter((g) => g.estado === "PAGADA"),
+    PENDIENTES: enLaBase.filter((g) => g.estado !== "PAGADA"),
+  };
+  const ordenar = (lista) => [...lista].sort((a, b) => (a.fecha === b.fecha ? b.id - a.id : a.fecha < b.fecha ? 1 : -1)).map((g) => g.id);
+  ok("la siembra tiene los tres estados, cinco de cada uno", ["PENDIENTE", "PARCIAL", "PAGADA"].every((e) => enLaBase.filter((g) => g.estado === e).length === 5));
+  for (const [estado, lista] of Object.entries(esperado)) {
+    const paginasDe = [];
+    const primera = await listar(otroEscribe, `estado=${estado}&pageSize=4&page=1`);
+    for (let p = 1; p <= primera.paginacion.totalPaginas; p++) paginasDe.push(p === 1 ? primera : await listar(otroEscribe, `estado=${estado}&pageSize=4&page=${p}`));
+    const idsDe = paginasDe.flatMap((x) => x.gastos.map((g) => g.id));
+    ok(`${estado}: el total y las páginas son las del conjunto filtrado (${lista.length} → ${Math.ceil(lista.length / 4)} páginas)`,
+      primera.paginacion.total === lista.length && primera.paginacion.totalPaginas === Math.ceil(lista.length / 4), JSON.stringify(primera.paginacion));
+    ok(`${estado}: cada página viene llena salvo la última, sin filas de menos`,
+      paginasDe.every((x, i) => x.gastos.length === (i < paginasDe.length - 1 ? 4 : lista.length - 4 * (paginasDe.length - 1))),
+      JSON.stringify(paginasDe.map((x) => x.gastos.length)));
+    ok(`${estado}: juntas son exactamente el conjunto, en el orden de siempre`, JSON.stringify(idsDe) === JSON.stringify(ordenar(lista)),
+      JSON.stringify([idsDe, ordenar(lista)]));
+    ok(`${estado}: cada fila trae el estado que le da el dominio`,
+      paginasDe.flatMap((x) => x.gastos).every((g) => g.estado === lista.find((e) => e.id === g.id)?.estado));
+  }
+  // Todos los filtros juntos, en la base: Pendientes, Servicios, tres días y
+  // una búsqueda. Contra el mismo cálculo hecho a mano sobre la siembra.
+  r = await listar(otroEscribe, `estado=PENDIENTES&categoriaId=${cat("Servicios")}&fechaDesde=${dias[1]}&fechaHasta=${dias[3]}&q=lote&pageSize=2`);
+  // Servicios son los de índice impar.
+  const combinados = enLaBase.filter((g) => g.estado !== "PAGADA" && g.fecha >= dias[1] && g.fecha <= dias[3] && indiceDe.get(g.id) % 2 === 1);
+  ok("estado, categoría, fechas y búsqueda combinados: el total es el del cruce, paginado de a dos",
+    r.status === 200 && r.paginacion.total === combinados.length && r.gastos.length === Math.min(2, combinados.length) &&
+    r.gastos.every((g) => combinados.some((x) => x.id === g.id)), JSON.stringify([r.paginacion, combinados.map((g) => g.id)]));
 } catch (err) {
   fallas.push(`la prueba se cayó: ${err?.stack || err}`);
   console.log(`  ✗ la prueba se cayó: ${err?.stack || err}`);
