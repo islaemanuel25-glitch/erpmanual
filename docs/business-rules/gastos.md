@@ -124,6 +124,13 @@ y la pantalla la muestra fija en vez de ofrecer elegirla [CÓDIGO].
   un gasto y volver cae en el mismo lugar.
 - Se piden hasta 200 por consulta —el máximo de la API—; si hay más, la lista lo
   avisa en vez de cortar callada.
+- La búsqueda es sobre el conjunto, no sobre lo cargado: si las dos consultas
+  vinieron enteras se filtra en la pantalla; si alguna vino cortada, se le pide
+  a la misma ruta con `q`, período y anteriores juntos, para no decir "ningún
+  gasto coincide" de uno que quedó fuera de los 200 [VERIFICADO:
+  `scripts/pruebas-db/gastosApi.mjs`].
+- Un período sin gastos lo dice la nota del resumen; "Ningún gasto coincide con
+  la búsqueda." queda para cuando hay gastos y ninguno coincide.
 - "Nuevo gasto" aparece con `puedeCrear` y "Registrar pago" con `puedePagar`,
   que decide el servidor. El pago inicial va dentro del mismo POST del alta.
 - No hay editar, eliminar ni anular.

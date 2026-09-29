@@ -30,6 +30,21 @@
 // con `useState` se volvería siempre a Pendientes, a la semana en curso y a
 // Todas. La búsqueda no viaja: es de este vistazo, como en Pagos.
 //
+// ── LA BÚSQUEDA, SOBRE EL CONJUNTO Y NO SOBRE LO CARGADO ─────────────────
+//
+// Si lo cargado es todo, se filtra acá, como en Pagos. Si la API dijo que hay
+// más de los 200 que manda, buscar acá podría decir "ninguno coincide" sobre un
+// gasto que existe, así que se le pregunta a la misma ruta con `q`, período y
+// anteriores juntos, un momento después de la última tecla. El porqué está en
+// `lib/finanzas/calendarioDeGastos.js`.
+//
+// ── LOS DOS VACÍOS ───────────────────────────────────────────────────────
+//
+// Un período sin gastos lo dice el resumen, con su nota —"No hay gastos con
+// saldo en este período."—: es el estado "Período sin gastos" del diseño y el
+// patrón de Pagos, y por eso el buscador ni se dibuja. Una búsqueda sin
+// coincidencias sobre un período que SÍ tiene gastos lo dice la lista.
+//
 // ── QUIÉN PUEDE CREAR LO DICE EL SERVIDOR ────────────────────────────────
 //
 // El botón "Nuevo gasto" aparece con `puedeCrear` de la respuesta, que exige el
@@ -54,12 +69,17 @@ import { formatearMoneda } from "@/lib/moneda";
 import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { descripcionDePagos, puedeAvanzarPagos, puedeRetrocederPagos } from "@/lib/finanzas/calendarioDePagos";
 import {
+  ESPERA_BUSQUEDA_MS,
+  VACIO_DE_LA_LISTA,
+  busquedaEnElServidor,
   calendarioDeGastos,
+  claveDeBusqueda,
   consultaDeAnteriores,
   consultaDelPeriodo,
-  gastoCoincideConBusqueda,
-  respuestaIncompleta,
+  gastosDeLaLista,
   rotuloDeGastos,
+  textoDeBusqueda,
+  vacioDeLaLista,
 } from "@/lib/finanzas/calendarioDeGastos";
 import { parseContextoGastos, urlDeGasto, urlDeGastos } from "@/lib/finanzas/contextoFinanzas";
 
@@ -92,6 +112,7 @@ export default function ListaGastos() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [busqueda, setBusqueda] = useState("");
+  const [resultado, setResultado] = useState(null);
   const [nuevoAbierto, setNuevoAbierto] = useState(false);
 
   // Las categorías, una vez: salen de la tabla y no de una lista escrita acá.
@@ -139,21 +160,48 @@ export default function ListaGastos() {
     cargar();
   }, [cargar]);
 
+  const termino = textoDeBusqueda(busqueda);
+  const contexto = { filtro, rango: { desde, hasta }, categoriaId: cat };
+  const clave = claveDeBusqueda(contexto, termino);
+  const alServidor = Boolean(termino) && busquedaEnElServidor({ periodo: datos, anteriores });
+
+  // La búsqueda en el servidor: solo cuando lo cargado no alcanza, un momento
+  // después de la última tecla, y la respuesta queda marcada con su consulta
+  // para que una vieja no se muestre como la de ahora. Depende de `datos`
+  // para volver a buscar después de un alta.
+  useEffect(() => {
+    if (!alServidor) return undefined;
+    let vigente = true;
+    const espera = setTimeout(async () => {
+      try {
+        const rango = { desde, hasta };
+        const deAntes = consultaDeAnteriores({ filtro, rango, categoriaId: cat, q: termino });
+        const [periodo, previos] = await Promise.all([
+          pedirGastos(consultaDelPeriodo({ filtro, rango, categoriaId: cat, q: termino })),
+          deAntes ? pedirGastos(deAntes) : Promise.resolve(null),
+        ]);
+        if (vigente) setResultado({ clave, periodo, anteriores: previos });
+      } catch (e) {
+        if (vigente) setResultado({ clave, error: e.message });
+      }
+    }, ESPERA_BUSQUEDA_MS);
+    return () => {
+      vigente = false;
+      clearTimeout(espera);
+    };
+  }, [alServidor, clave, termino, filtro, desde, hasta, cat, datos]);
+
   // `scroll: false`: lo que cambió es el período, la pestaña o la categoría.
   const ir = (siguiente) => router.replace(urlDeGastos({ ...ctx, ...siguiente }), { scroll: false });
 
-  const gastos = datos?.gastos || [];
-  const previos = anteriores?.gastos || [];
   // El resumen mira TODO lo del período; el buscador solo achica lo que se lista.
-  const calendario = calendarioDeGastos({ gastos, anteriores: previos, filtro });
-  const visibles = calendarioDeGastos({
-    gastos: gastos.filter((g) => gastoCoincideConBusqueda(g, busqueda)),
-    anteriores: previos.filter((g) => gastoCoincideConBusqueda(g, busqueda)),
-    filtro,
-  });
+  const calendario = calendarioDeGastos({ gastos: datos?.gastos || [], anteriores: anteriores?.gastos || [], filtro });
+  const lista = gastosDeLaLista({ periodo: datos, anteriores, busqueda, contexto, resultado });
+  const visibles = calendarioDeGastos({ gastos: lista.gastos, anteriores: lista.anteriores, filtro });
   const grupos = [visibles.anteriores, ...visibles.dias].filter(Boolean);
   const hayFilas = Boolean(calendario.anteriores || calendario.dias.length);
-  const incompleta = respuestaIncompleta(datos) || respuestaIncompleta(anteriores);
+  const errorDeBusqueda = lista.enElServidor && resultado?.clave === clave ? resultado.error : "";
+  const vacio = vacioDeLaLista({ busqueda, hayFilas, grupos, esperando: lista.esperando, error: errorDeBusqueda });
 
   return (
     <>
@@ -197,7 +245,7 @@ export default function ListaGastos() {
         <>
           <ResumenDeGastos filtro={filtro} descripcion={descripcion} calendario={calendario} />
 
-          {incompleta && (
+          {lista.incompleta && (
             <SunmiAviso tono="warning" titulo="Lista incompleta">
               Hay más gastos de los que se pueden mostrar juntos. Elegí un período más corto o una categoría
               para ver todos.
@@ -220,24 +268,38 @@ export default function ListaGastos() {
             />
           )}
 
-          {grupos.length === 0
-            ? busqueda.trim() && (
-                <div className="text-center py-12 sunmi-text-muted text-xs">Ningún gasto coincide con la búsqueda.</div>
-              )
-            : grupos.map((g) => (
-                <DiaConBanda key={g.clave} titulo={g.titulo} dato={rotuloDeGastos(g.cantidad)} importe={formatearMoneda(g.importe)}>
-                  {g.gastos.map((gasto) => (
-                    <FilaGasto
-                      key={gasto.id}
-                      gasto={gasto}
-                      filtro={filtro}
-                      hoy={hoy}
-                      variasUbicaciones={Boolean(datos.variasUbicaciones)}
-                      onAbrir={() => router.push(urlDeGasto(gasto.id, ctx))}
-                    />
-                  ))}
-                </DiaConBanda>
-              ))}
+          {lista.esperando && (
+            <div className="py-12">
+              <SunmiLoader />
+            </div>
+          )}
+
+          {errorDeBusqueda && (
+            <SunmiAviso tono="danger" titulo="No se pudo buscar">
+              {errorDeBusqueda}
+            </SunmiAviso>
+          )}
+
+          {vacio === VACIO_DE_LA_LISTA.BUSQUEDA && (
+            <div className="text-center py-12 sunmi-text-muted text-xs">Ningún gasto coincide con la búsqueda.</div>
+          )}
+
+          {!lista.esperando &&
+            !errorDeBusqueda &&
+            grupos.map((g) => (
+              <DiaConBanda key={g.clave} titulo={g.titulo} dato={rotuloDeGastos(g.cantidad)} importe={formatearMoneda(g.importe)}>
+                {g.gastos.map((gasto) => (
+                  <FilaGasto
+                    key={gasto.id}
+                    gasto={gasto}
+                    filtro={filtro}
+                    hoy={hoy}
+                    variasUbicaciones={Boolean(datos.variasUbicaciones)}
+                    onAbrir={() => router.push(urlDeGasto(gasto.id, ctx))}
+                  />
+                ))}
+              </DiaConBanda>
+            ))}
         </>
       )}
 

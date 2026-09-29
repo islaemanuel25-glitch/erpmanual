@@ -94,6 +94,17 @@ test("un período vacío lo dice, sin aviso", () => {
   assert.ok(s.includes(">$0,00<") && s.includes("No hay gastos con saldo en este período."));
 });
 
+test("el vacío del período, en las tres pestañas, es el del diseño", () => {
+  // Frame "Gastos — Estados", bloque "PERÍODO SIN GASTOS": el resumen con su nota.
+  for (const [filtro, frase] of [
+    [FILTRO_CUENTAS.PENDIENTES, "No hay gastos con saldo en este período."],
+    [FILTRO_CUENTAS.PAGADAS, "No hay gastos pagados en este período."],
+    [FILTRO_CUENTAS.TODAS, "No hay gastos en este período."],
+  ]) {
+    assert.ok(resumen(filtro, calendarioDeGastos({ filtro })).includes(frase), filtro);
+  }
+});
+
 // ── EL DETALLE ──────────────────────────────────────────────────────────
 
 const pago = { id: 7, monto: 20000, fecha: "2026-09-29T13:42:00.000Z", medio: "EFECTIVO", rotuloMedio: "Efectivo", origen: { id: 2, nombre: "Casiano Casas" }, usuario: { id: 1, nombre: "Emanuel" }, turnoId: 633, nota: null };
@@ -181,6 +192,42 @@ test("solo usa las rutas de Gastos que existen —y la de turnos a través de Ca
   const rutas = PANTALLA.flatMap((f) => [...codigo(f).matchAll(/["`](\/api\/[^"`?$]+)/g)].map((m) => m[1]));
   assert.deepEqual([...new Set(rutas)].sort(), ["/api/finanzas/gastos", "/api/finanzas/gastos/", "/api/finanzas/gastos/categorias"]);
   assert.ok(fs.existsSync("app/api/finanzas/gastos/route.js") && fs.existsSync("app/api/finanzas/gastos/categorias/route.js"));
+});
+
+test("no se agregó ningún endpoint: las rutas de Gastos son las cuatro de la API", () => {
+  const rutas = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "app/api/finanzas/gastos"], { encoding: "utf8" })
+    .split("\n")
+    .filter(Boolean)
+    .sort();
+  assert.deepEqual(rutas, [
+    "app/api/finanzas/gastos/[gastoId]/pagos/route.js",
+    "app/api/finanzas/gastos/[gastoId]/route.js",
+    "app/api/finanzas/gastos/categorias/route.js",
+    "app/api/finanzas/gastos/route.js",
+  ]);
+});
+
+test("la lista: el resumen siempre, y 'ninguno coincide' solo con el vacío de la búsqueda", () => {
+  const lista = codigo("components/finanzas/gastos/ListaGastos.jsx");
+  // El resumen —que lleva el vacío del período— no depende de que haya filas.
+  assert.match(lista, /\{!cargando && !error && datos && \(\s*<>\s*<ResumenDeGastos /);
+  assert.match(lista, /\{vacio === VACIO_DE_LA_LISTA\.BUSQUEDA && \(\s*<div[^>]*>Ningún gasto coincide con la búsqueda\.<\/div>/);
+  assert.equal((lista.match(/Ningún gasto coincide/g) || []).length, 1);
+  assert.match(lista, /vacioDeLaLista\(\{ busqueda, hayFilas, grupos, esperando: lista\.esperando, error: errorDeBusqueda \}\)/);
+});
+
+test("la búsqueda en el servidor: con q en las dos consultas, esperando la última tecla, y no en cada render", () => {
+  const lista = codigo("components/finanzas/gastos/ListaGastos.jsx");
+  assert.match(lista, /gastosDeLaLista\(\{ periodo: datos, anteriores, busqueda, contexto, resultado \}\)/);
+  assert.match(lista, /busquedaEnElServidor\(\{ periodo: datos, anteriores \}\)/);
+  assert.match(lista, /consultaDelPeriodo\(\{ filtro, rango, categoriaId: cat, q: termino \}\)/);
+  assert.match(lista, /consultaDeAnteriores\(\{ filtro, rango, categoriaId: cat, q: termino \}\)/);
+  assert.match(lista, /if \(!alServidor\) return undefined;/);
+  assert.match(lista, /setTimeout\(async \(\) => \{[\s\S]*?\}, ESPERA_BUSQUEDA_MS\)/);
+  assert.match(lista, /clearTimeout\(espera\)/);
+  assert.match(lista, /setResultado\(\{ clave, periodo, anteriores: previos \}\)/);
+  // Los pedidos salen solo de `pedirGastos`, que se llama adentro de efectos.
+  assert.equal((lista.match(/pedirGastos\(/g) || []).length, 5, "una definición, dos de la carga y dos de la búsqueda");
 });
 
 test("las categorías salen de la API: ninguna pieza de la pantalla las escribe", () => {
