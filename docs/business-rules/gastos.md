@@ -50,6 +50,13 @@ y las dos puertas que escriben. Todavía **no hay pantalla** ni rutas que lo use
   apuntando por `PagoGasto.cajaMovimientoId` (UNIQUE). Todo en la transacción de
   quien llama: si algo falla, no queda ni pago ni retiro [CÓDIGO]. La regla es
   la de `lib/finanzas/salidaDelPago.js`, compartida con los pagos a proveedores.
+- **Un RETIRO es de a lo sumo UN pago, de cualquiera de los dos tipos.** La
+  base rechaza que un mismo `CajaMovimiento` sea de un `PagoProveedor` y de un
+  `PagoGasto` a la vez. Lo arbitra la clave primaria de `CajaMovimientoDePago`,
+  que es el movimiento; la llena un trigger de cada pago al insertarse, y un
+  pago no puede cambiar de movimiento. Es un índice único y no un chequeo, así
+  que dos transacciones concurrentes no pueden confirmar las dos, en READ
+  COMMITTED ni en REPEATABLE READ [VERIFICADO: `scripts/pruebas-db/gastos.mjs`].
 - **Transferencia, Mercado Pago, Otro:** registran el medio y el día. **Todavía
   no hay cuenta financiera de origen** (banco, Mercado Pago con saldo). Cuando
   exista, es una columna de `PagoGasto`, no del gasto [CÓDIGO].

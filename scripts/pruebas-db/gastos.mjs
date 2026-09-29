@@ -17,7 +17,8 @@ import { crearClientePrisma, ESCRITURA } from "../lib/clientePrisma.mjs";
 
 const principal = await crearClientePrisma({ nivel: ESCRITURA });
 
-const { aplicarMigraciones } = await import("./lib/libroEnElTiempo.mjs");
+const { aplicarMigraciones, MIGRACIONES } = await import("./lib/libroEnElTiempo.mjs");
+const MIGRACION_GASTOS = "20260929230000_gastos";
 
 const DB = "erpazul_gastos_prueba";
 const urlDe = (db) => {
@@ -35,8 +36,40 @@ const sinParametros = (url) => {
 // que lee DATABASE_URL al cargarse: se apunta a la base descartable ANTES.
 await principal.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${DB}" WITH (FORCE)`);
 await principal.$executeRawUnsafe(`CREATE DATABASE "${DB}"`);
-aplicarMigraciones(sinParametros(urlDe(DB)));
+// En dos pasos, como producción: hasta antes de Gastos, un pago a proveedor en
+// efectivo que ya existía, y recién después la migración de Gastos, que tiene
+// que registrar el dueño de ese movimiento sin que nadie lo vuelva a pagar.
+aplicarMigraciones(sinParametros(urlDe(DB)), { hasta: MIGRACION_GASTOS });
+const previo = await sembrarPagoPrevio(urlDe(DB));
+aplicarMigraciones(sinParametros(urlDe(DB)), { solo: MIGRACIONES.filter((m) => m >= MIGRACION_GASTOS) });
 process.env.DATABASE_URL = urlDe(DB);
+
+/** Un pago a proveedor en efectivo con su RETIRO, anterior a Gastos. */
+async function sembrarPagoPrevio(url) {
+  const p = await crearClientePrisma({ nivel: ESCRITURA, url });
+  try {
+    const grupo = await p.grupo.create({ data: { nombre: "Previo a Gastos" } });
+    const deposito = await p.local.create({ data: { nombre: "Depósito previo", es_deposito: true } });
+    const local = await p.local.create({ data: { nombre: "Local previo" } });
+    await p.grupoDeposito.create({ data: { grupoId: grupo.id, localId: deposito.id } });
+    await p.grupoLocal.create({ data: { grupoId: grupo.id, localId: local.id } });
+    const rol = await p.rol.create({ data: { nombre: "CI previo", permisos: [] } });
+    const u = await p.usuario.create({ data: { nombre: "Previo", email: "previo@ci.local", passwordHash: "x", rolId: rol.id, localId: local.id } });
+    const turno = await p.turno.create({ data: { localId: local.id, vendedorId: u.id, montoInicial: 0, apertura: new Date() } });
+    const proveedor = await p.proveedor.create({ data: { nombre: "Proveedor previo" } });
+    const pedido = await p.pedidoProveedor.create({ data: { grupoId: grupo.id, depositoId: deposito.id, proveedorId: proveedor.id, estado: "RECIBIDO" } });
+    const cuenta = await p.cuentaPorPagarProveedor.create({
+      data: { grupoId: grupo.id, pedidoProveedorId: pedido.id, proveedorId: proveedor.id, localGastoId: local.id, total: 1000, creadoPorId: u.id },
+    });
+    const mov = await p.cajaMovimiento.create({ data: { turnoId: turno.id, usuarioId: u.id, tipo: "RETIRO", monto: 1000, motivo: "Pago previo" } });
+    return await p.pagoProveedor.create({
+      data: { cuentaId: cuenta.id, monto: 1000, medio: "EFECTIVO", localOrigenId: local.id, usuarioId: u.id, turnoId: turno.id, cajaMovimientoId: mov.id, idempotencyKey: "previo" },
+      select: { id: true, cajaMovimientoId: true },
+    });
+  } finally {
+    await p.$disconnect();
+  }
+}
 
 const jwt = (await import("jsonwebtoken")).default;
 const {
@@ -54,6 +87,8 @@ const { ERROR_FALTA_TURNO, ERROR_TURNO_DE_OTRA_UBICACION, ERROR_TURNO_NO_OPERATI
 const { ERROR_GASTO_PAGADO, ERROR_MONTO_MAYOR_AL_SALDO_GASTO, CATEGORIAS_INICIALES, PERMISO_REGISTRAR_GASTOS } =
   await import("../../lib/finanzas/gastos.js");
 const { ERROR_MONTO_INVALIDO } = await import("../../lib/finanzas/pagosProveedores.js");
+const { registrarPagoProveedor } = await import("../../lib/finanzas/pagosProveedoresServer.js");
+const { Prisma } = await import("@prisma/client");
 const { CLASE_MOVIMIENTO } = await import("../../lib/finanzas/movimientosDeCaja.js");
 const rutaTablero = await import("../../app/api/finanzas/tablero/route.js");
 const rutaTurno = await import("../../app/api/finanzas/turno/[turnoId]/route.js");
@@ -345,6 +380,128 @@ try {
   ok("el tablero contesta 200", resTablero.status === 200, JSON.stringify(tablero).slice(0, 300));
   ok("en el resumen, los retiros manuales son SOLO el impostor: ningún pago de gasto se cuenta como retiro manual",
     tablero?.resumen?.caja?.retiros === 777 && tablero?.resumen?.caja?.cantidadRetiros === 1, JSON.stringify(tablero?.resumen?.caja));
+
+  // ══════════════════════════════════════════════════════════════════════
+  seccion("Un movimiento de caja es de a lo sumo UN pago, de cualquier tipo");
+  // ══════════════════════════════════════════════════════════════════════
+  // La deuda con un proveedor, de Casiano, para tener un PagoProveedor real.
+  // La forma de la cuenta es la de `crearCuentaPorPagarDesdeCompra`.
+  const proveedor = await c.proveedor.create({ data: { nombre: "Proveedor CI gastos" } });
+  const pedido = await c.pedidoProveedor.create({
+    data: { grupoId: grupo.id, depositoId: deposito.id, proveedorId: proveedor.id, estado: "RECIBIDO", nroFactura: "0001-00000001" },
+  });
+  const cuenta = await c.cuentaPorPagarProveedor.create({
+    data: { grupoId: grupo.id, pedidoProveedorId: pedido.id, proveedorId: proveedor.id, localGastoId: casiano.id, total: 500000, creadoPorId: uCasiano.id },
+  });
+  const pagarProveedor = (extra = {}) => tx((t) => registrarPagoProveedor(t, {
+    cuentaId: cuenta.id, monto: 1000, medio: "EFECTIVO", turnoId: turnoCasiano.id, localOrigenId: casiano.id, localOperativoId: casiano.id,
+    usuarioId: uCasiano.id, idempotencyKey: clave(), ...extra,
+  }));
+  const dueñoDe = (cajaMovimientoId) => c.cajaMovimientoDePago.findUnique({ where: { cajaMovimientoId } });
+  const insertarPagoGasto = (db, movId, k = clave()) => db.$executeRawUnsafe(
+    `INSERT INTO "PagoGasto" ("gastoId","monto","medio","localOrigenId","usuarioId","turnoId","cajaMovimientoId","idempotencyKey") VALUES ($1, 1, 'EFECTIVO', $2, $3, $4, $5, $6)`,
+    g1.id, casiano.id, uCasiano.id, turnoCasiano.id, movId, k);
+  const insertarPagoProveedor = (db, movId, k = clave()) => db.$executeRawUnsafe(
+    `INSERT INTO "PagoProveedor" ("cuentaId","monto","medio","localOrigenId","usuarioId","turnoId","cajaMovimientoId","idempotencyKey") VALUES ($1, 1, 'EFECTIVO', $2, $3, $4, $5, $6)`,
+    cuenta.id, casiano.id, uCasiano.id, turnoCasiano.id, movId, k);
+  const pagosDe = async (cajaMovimientoId) =>
+    (await c.pagoProveedor.count({ where: { cajaMovimientoId } })) + (await c.pagoGasto.count({ where: { cajaMovimientoId } }));
+  const esElChoque = (err, movId) =>
+    err?.mensaje?.includes(`El movimiento de caja ${movId} ya es de otro pago`) === true;
+
+  const dueñoPrevio = await dueñoDe(previo.cajaMovimientoId);
+  ok("el pago a proveedor en efectivo de ANTES de la migración queda registrado como dueño de su movimiento",
+    dueñoPrevio?.pagoProveedorId === previo.id && dueñoPrevio.pagoGastoId === null, JSON.stringify(dueñoPrevio));
+  e = await error(() => insertarPagoGasto(c, previo.cajaMovimientoId));
+  ok("y ese movimiento viejo tampoco se puede usar para un pago de gasto", esElChoque(e, previo.cajaMovimientoId), JSON.stringify(e));
+
+  // D. Los caminos normales siguen andando, y cada uno deja su dueño registrado.
+  const pp = await pagarProveedor();
+  ok("D: un pago a proveedor en efectivo sigue andando, con su RETIRO", pp.pago.cajaMovimientoId > 0 && pp.repetido === false, JSON.stringify(pp.pago));
+  const dueñoPP = await dueñoDe(pp.pago.cajaMovimientoId);
+  ok("D: y su movimiento queda registrado como del PagoProveedor, y de nadie más",
+    dueñoPP?.pagoProveedorId === pp.pago.id && dueñoPP.pagoGastoId === null, JSON.stringify(dueñoPP));
+  const dueñoPG = await dueñoDe(pe.pago.cajaMovimientoId);
+  ok("D: el de un pago de gasto en efectivo, como del PagoGasto",
+    dueñoPG?.pagoGastoId === pe.pago.id && dueñoPG.pagoProveedorId === null, JSON.stringify(dueñoPG));
+  const manual = await c.cajaMovimiento.create({ data: { turnoId: turnoCasiano.id, usuarioId: uCasiano.id, tipo: "RETIRO", monto: 300, motivo: "Cambio" } });
+  ok("D: un RETIRO manual se sigue creando, y no es de ningún pago", (await dueñoDe(manual.id)) === null);
+  const ppT = await tx((t) => registrarPagoProveedor(t, {
+    cuentaId: cuenta.id, monto: 500, medio: "TRANSFERENCIA", localOrigenId: casiano.id, localOperativoId: casiano.id, usuarioId: uCasiano.id, idempotencyKey: clave(),
+  }));
+  ok("D: un pago a proveedor por transferencia no registra ningún movimiento", ppT.pago.cajaMovimientoId === null);
+  const conMovimiento = (await c.pagoProveedor.count({ where: { cajaMovimientoId: { not: null } } })) + (await c.pagoGasto.count({ where: { cajaMovimientoId: { not: null } } }));
+  ok("D: hay exactamente una fila de dueño por cada pago con movimiento", (await c.cajaMovimientoDePago.count()) === conMovimiento,
+    `${await c.cajaMovimientoDePago.count()} contra ${conMovimiento}`);
+
+  // A. El movimiento de un PagoProveedor no puede ser además de un PagoGasto.
+  const antesA = await totales();
+  e = await error(() => insertarPagoGasto(c, pp.pago.cajaMovimientoId));
+  ok("A: un PagoGasto sobre el movimiento de un PagoProveedor se rechaza", esElChoque(e, pp.pago.cajaMovimientoId), JSON.stringify(e));
+  ok("A: y no queda nada: ni el pago, ni otro dueño", JSON.stringify(await totales()) === JSON.stringify(antesA) &&
+    (await pagosDe(pp.pago.cajaMovimientoId)) === 1 && (await dueñoDe(pp.pago.cajaMovimientoId))?.pagoProveedorId === pp.pago.id);
+
+  // B. Y al revés.
+  const antesB = await c.pagoProveedor.count();
+  e = await error(() => insertarPagoProveedor(c, pe.pago.cajaMovimientoId));
+  ok("B: un PagoProveedor sobre el movimiento de un PagoGasto se rechaza", esElChoque(e, pe.pago.cajaMovimientoId), JSON.stringify(e));
+  ok("B: y no queda nada", (await c.pagoProveedor.count()) === antesB && (await pagosDe(pe.pago.cajaMovimientoId)) === 1 &&
+    (await dueñoDe(pe.pago.cajaMovimientoId))?.pagoGastoId === pe.pago.id);
+
+  // Un pago no se muda de movimiento: su fila de dueño apuntaría al anterior.
+  e = await error(() => c.$executeRawUnsafe(`UPDATE "PagoProveedor" SET "cajaMovimientoId" = $1 WHERE "id" = $2`, manual.id, pp.pago.id));
+  ok("un pago no puede cambiar de movimiento", /no cambia de movimiento de caja/.test(e?.mensaje ?? ""), JSON.stringify(e));
+  e = await error(() => c.$executeRawUnsafe(`UPDATE "PagoGasto" SET "cajaMovimientoId" = $1 WHERE "id" = $2`, manual.id, pe.pago.id));
+  ok("ni un pago de gasto", /no cambia de movimiento de caja/.test(e?.mensaje ?? ""), JSON.stringify(e));
+  ok("y un cambio que no toca el movimiento sigue permitido", (await c.pagoGasto.update({ where: { id: pe.pago.id }, data: { nota: "nota" } })).nota === "nota");
+
+  // C. Concurrencia: dos transacciones reclaman el MISMO movimiento, una por
+  // cada tipo. La primera inserta y se queda abierta; la segunda inserta
+  // mientras tanto. Con un chequeo "miro y después inserto", la segunda no vería
+  // a la primera y las dos confirmarían. Con el índice, la segunda espera a la
+  // primera y, cuando la primera confirma, falla. En los dos niveles de
+  // aislamiento y en los dos órdenes.
+  const carreraDeDueños = async (nivel, primero, segundo) => {
+    const libre = await c.cajaMovimiento.create({ data: { turnoId: turnoCasiano.id, usuarioId: uCasiano.id, tipo: "RETIRO", monto: 1, motivo: "Carrera" } });
+    let soltar;
+    const suelta = new Promise((r) => (soltar = r));
+    let insertoElPrimero;
+    const yaInserto = new Promise((r) => (insertoElPrimero = r));
+    const opciones = { isolationLevel: nivel, timeout: 20000, maxWait: 5000 };
+    const t1 = c.$transaction(async (t) => {
+      await primero(t, libre.id);
+      insertoElPrimero();
+      await suelta;
+    }, opciones);
+    await yaInserto;
+    const t2 = c.$transaction(async (t) => {
+      // Una lectura primero: fija la foto de REPEATABLE READ ANTES de que la
+      // primera confirme, que es justo el caso donde un chequeo no alcanza.
+      await t.$queryRawUnsafe(`SELECT count(*) FROM "PagoProveedor"`);
+      await segundo(t, libre.id);
+    }, opciones);
+    // El segundo no puede terminar mientras el primero está abierto.
+    const corta = await Promise.race([t2.then(() => "confirmó", () => "falló"), new Promise((r) => setTimeout(() => r("esperando"), 400))]);
+    soltar();
+    const [r1, r2] = await Promise.allSettled([t1, t2]);
+    return { libre, corta, r1, r2, pagos: await pagosDe(libre.id), dueño: await dueñoDe(libre.id) };
+  };
+  const NIVELES = [["READ COMMITTED", Prisma.TransactionIsolationLevel.ReadCommitted], ["REPEATABLE READ", Prisma.TransactionIsolationLevel.RepeatableRead]];
+  const ORDENES = [
+    ["proveedor primero, gasto después", insertarPagoProveedor, insertarPagoGasto, "pagoProveedorId"],
+    ["gasto primero, proveedor después", insertarPagoGasto, insertarPagoProveedor, "pagoGastoId"],
+  ];
+  for (const [nombreNivel, nivel] of NIVELES) {
+    for (const [nombreOrden, primero, segundo, columnaDelPrimero] of ORDENES) {
+      const r = await carreraDeDueños(nivel, primero, segundo);
+      ok(`C (${nombreNivel}, ${nombreOrden}): el segundo espera al primero en vez de pasar`, r.corta === "esperando", r.corta);
+      ok(`C (${nombreNivel}, ${nombreOrden}): el primero confirma y el segundo se rechaza`,
+        r.r1.status === "fulfilled" && r.r2.status === "rejected" && /ya es de otro pago|could not serialize/.test(r.r2.reason?.message ?? ""),
+        `${r.r1.status} / ${r.r2.status}: ${r.r2.reason?.message ?? ""}`);
+      ok(`C (${nombreNivel}, ${nombreOrden}): el movimiento queda con UN pago, el del primero`,
+        r.pagos === 1 && r.dueño?.[columnaDelPrimero] > 0, JSON.stringify([r.pagos, r.dueño]));
+    }
+  }
 } catch (err) {
   fallas.push(`la prueba se cayó: ${err?.stack || err}`);
   console.log(`  ✗ la prueba se cayó: ${err?.stack || err}`);

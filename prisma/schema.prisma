@@ -3040,6 +3040,9 @@ model CajaMovimiento {
   /// Inverso 1:1 del pago de un gasto en efectivo que lo originó, por
   /// `PagoGasto.cajaMovimientoId` con UNIQUE. Misma regla: el motivo no decide.
   pagoGasto PagoGasto?
+  /// Qué pago lo tiene, de los dos tipos. Es lo que impide que sea de un
+  /// `PagoProveedor` y de un `PagoGasto` a la vez: ver `CajaMovimientoDePago`.
+  dePago CajaMovimientoDePago?
 
   @@index([turnoId])
 }
@@ -3265,6 +3268,7 @@ model PagoProveedor {
   usuario        Usuario                 @relation("pago_registrado_por", fields: [usuarioId], references: [id])
   turno          Turno?                  @relation(fields: [turnoId], references: [id])
   cajaMovimiento CajaMovimiento?         @relation(fields: [cajaMovimientoId], references: [id])
+  movimientoExclusivo CajaMovimientoDePago?
 
   /// Por cuenta, como `ArqueoCaja` la tiene por turno: la clave identifica un
   /// intento sobre ESTA deuda. Reemplaza al índice simple de `cuentaId`, que
@@ -3410,10 +3414,34 @@ model PagoGasto {
   usuario        Usuario         @relation("pago_gasto_registrado_por", fields: [usuarioId], references: [id])
   turno          Turno?          @relation(fields: [turnoId], references: [id])
   cajaMovimiento CajaMovimiento? @relation(fields: [cajaMovimientoId], references: [id])
+  movimientoExclusivo CajaMovimientoDePago?
 
   @@unique([gastoId, idempotencyKey])
   @@index([localOrigenId])
   @@index([turnoId])
+}
+
+/// UN MOVIMIENTO DE CAJA ES DE A LO SUMO UN PAGO, DE CUALQUIERA DE LOS DOS TIPOS.
+///
+/// El UNIQUE de `PagoProveedor.cajaMovimientoId` y el de `PagoGasto` impiden
+/// dos pagos del MISMO tipo sobre un retiro, pero no uno de cada tipo: son dos
+/// índices en dos tablas. Esta tabla es el índice común. Su clave primaria es el
+/// movimiento, así que el segundo pago que lo reclame choca contra ella, sea del
+/// tipo que sea y en la transacción que sea: dos intentos concurrentes no pueden
+/// confirmarse los dos, porque el índice único lo arbitra la base.
+///
+/// NO SE ESCRIBE DESDE EL CÓDIGO. La llena un trigger AFTER INSERT de los dos
+/// pagos —migración 20260929230000_gastos—, y cada fila se va con su pago por
+/// `onDelete: Cascade`. Un pago no puede cambiar de movimiento: otro trigger lo
+/// rechaza, porque esta fila quedaría apuntando al anterior.
+model CajaMovimientoDePago {
+  cajaMovimientoId Int  @id
+  pagoProveedorId  Int? @unique
+  pagoGastoId      Int? @unique
+
+  cajaMovimiento CajaMovimiento @relation(fields: [cajaMovimientoId], references: [id])
+  pagoProveedor  PagoProveedor? @relation(fields: [pagoProveedorId], references: [id], onDelete: Cascade)
+  pagoGasto      PagoGasto?     @relation(fields: [pagoGastoId], references: [id], onDelete: Cascade)
 }
 
 model PedidoProveedorDetalle {
