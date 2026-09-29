@@ -1,7 +1,8 @@
 # Gastos
 
-Qué es un gasto en ERP Azul, de quién es y cómo se paga. Es el núcleo: el modelo
-y las dos puertas que escriben. Todavía **no hay pantalla** ni rutas que lo usen.
+Qué es un gasto en ERP Azul, de quién es y cómo se paga. Hay núcleo —el modelo y
+las dos puertas que escriben— y rutas para listar, abrir, crear y pagar. Todavía
+**no hay pantalla** que las use.
 
 ## Qué es, y qué no
 
@@ -78,3 +79,34 @@ y las dos puertas que escriben. Todavía **no hay pantalla** ni rutas que lo use
 - Ver: `finanzas.ver`. Crear y pagar: además `finanzas.gastos.registrar`, que
   **chequea la propia capa que escribe**. No va a ningún rol de sistema; Admin lo
   tiene por `*` [CÓDIGO] (`lib/rbac/registry.js`).
+
+## Las rutas
+
+Bajo `app/api/finanzas/gastos/`, con la forma de las de Pagos a proveedores y
+el mismo alcance —`alcanceDePagos`, con el permiso de gastos para
+`puedeEscribir`— [CÓDIGO]:
+
+- `GET /api/finanzas/gastos` — el listado de lo que se ve. Filtros `estado`
+  (Pendientes —con saldo, incluye parciales—, Pagadas, Todas; por defecto
+  Pendientes), `categoriaId`, `fechaDesde`/`fechaHasta` (días, sobre la fecha
+  del gasto), `q` (concepto, beneficiario y número de comprobante) y `destino`
+  (una ubicación, por `resolverLocalPedido`). Filtra y pagina **en la base**:
+  `page`/`pageSize` con `normalizarPaginacion` [VERIFICADO:
+  `scripts/pruebas-db/gastosApi.mjs`].
+- `GET /api/finanzas/gastos/categorias` — las activas, por su orden, leídas de
+  la tabla. Un gasto con una categoría dada de baja la sigue mostrando.
+- `GET /api/finanzas/gastos/[gastoId]` — el gasto y sus pagos, por el día en que
+  salió la plata. Uno de otra ubicación es 403, uno que no existe es 404.
+- `POST /api/finanzas/gastos` — crea el gasto en la ubicación **que se opera**,
+  con pago inicial opcional en la misma transacción. Un `localId` distinto en el
+  cuerpo es 403.
+- `POST /api/finanzas/gastos/[gastoId]/pagos` — un pago sobre un gasto de la
+  ubicación que se opera. El movimiento de caja no se elige: en efectivo lo crea
+  el pago.
+
+La lista de turnos para pagar en efectivo es la de Pagos a proveedores
+(`/api/finanzas/pagos-proveedores/turnos-operativos`), que también abre el
+permiso de gastos.
+
+Todavía **no hay** pantalla de Gastos, ni cuentas bancarias o de Mercado Pago, ni
+lugar para los gastos en el resumen del período.
