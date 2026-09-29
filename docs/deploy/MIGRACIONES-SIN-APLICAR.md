@@ -16,35 +16,80 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **43 migraciones**. El árbol trae **44**. Falta una.
+Producción está en **44 migraciones** y el árbol también. **Ninguna** pendiente:
+el despliegue siguiente es solo de código.
 
-Producción corre `406cfb05ef35fb9496f831d5b10a975e05e90d06` (despliegue del
+Producción corre `0e50ce5b14f886d4b6624352117cf564d75efd42` (despliegue del
 2026-09-29, nota abajo). Un commit posterior a ese que solo cambie
-documentación **no se despliega por eso**.
+documentación —como el que escribe esta nota— **no se despliega por eso**.
 
-- `20260929230000_gastos` — **aditiva**: el núcleo de Gastos de Finanzas. Tres
-  tablas nuevas (`CategoriaGasto`, `Gasto`, `PagoGasto`), el enum
-  `MedioPagoGasto`, sus índices, claves foráneas y CHECK —total y monto
-  positivos, concepto no vacío, efectivo ⇔ turno y movimiento de caja—, y las
-  siete categorías iniciales como filas del catálogo nuevo. Y una cuarta tabla,
-  `CajaMovimientoDePago`, que impide que un movimiento de caja sea de un pago a
-  proveedor y de un pago de gasto a la vez. **Es lo único que toca algo
-  existente, y sin cambiarlo**:
-  - le agrega dos triggers a `PagoProveedor`. Uno registra el dueño del
-    movimiento al insertar un pago en efectivo; el otro rechaza que un pago
-    cambie de movimiento. La versión vieja crea un retiro nuevo por cada pago
-    en efectivo y nunca cambia el movimiento de un pago, así que durante la
-    ventana sus pagos entran igual;
-  - copia a la tabla nueva los `PagoProveedor` en efectivo que ya existen, uno
-    por fila, sin modificar ninguno.
+---
 
-  No convierte ningún RETIRO histórico en gasto. El clasificador la marca
-  **aditiva, sin coincidencias**. Lo que hay que comprobar después:
-  - las cuatro tablas existen;
-  - `CategoriaGasto` tiene las siete categorías;
-  - `Gasto` y `PagoGasto` están vacías;
-  - `CajaMovimientoDePago` tiene tantas filas como `PagoProveedor` con
-    `cajaMovimientoId` no nulo.
+## `20260929230000_gastos`: aplicada el 2026-09-29. El núcleo de Gastos
+
+Salió de esta lista con el despliegue de `0e50ce5b14f886d4b6624352117cf564d75efd42`
+(merge de la PR #110), desde `406cfb05ef35fb9496f831d5b10a975e05e90d06`. **Lo
+que sigue es lo que informó el despliegue**, corrido desde el acceso al VPS y no
+desde la sesión que escribe esta nota.
+
+**Identidad.** El mismo SHA en `origin/main`, el HEAD del VPS, la imagen,
+`APP_BUILD_ID`, `APP_IMAGE` y `/api/version`. Image ID final `sha256:4b5c3949…`
+y digest del registro `sha256:8a3c0dd3…`: de los dos la evidencia trae solo el
+prefijo, y no se completan.
+
+**Migraciones.** 44 en el árbol, **44 aplicadas**, ninguna pendiente ni
+fallida, y `migrate status` cerró con "Database schema is up to date!". El
+clasificador la marcó **aditiva, "Sin coincidencias"**, y salió con 0: sin
+autorización manual. Se aplicó **una sola vez**, con un paso, alrededor del
+**2026-09-29 12:03:46 UTC**. La migración duró aproximadamente 347 ms y el
+`migrate deploy` completo unos 6 s. En las 8 muestras tomadas mientras corría
+no hubo ninguna espera de locks. Sin `migrate resolve`, sin recuperación, sin
+rollback y sin SQL de escritura a mano.
+
+**Lo que instaló.**
+
+- Las tablas `CategoriaGasto`, `Gasto`, `PagoGasto` y `CajaMovimientoDePago`, y
+  el enum `MedioPagoGasto` —`EFECTIVO`, `TRANSFERENCIA`, `MERCADO_PAGO`, `OTRO`—.
+- 15 índices, 20 constraints, 2 funciones y **4 triggers** nuevos, los cuatro
+  habilitados. Después del despliegue la base tiene 23 triggers no internos en
+  total.
+- La exclusividad del movimiento de caja: un `CajaMovimiento` no puede ser a la
+  vez de un `PagoProveedor` y de un `PagoGasto`. La regla y su porqué están en
+  [`docs/business-rules/gastos.md`](../business-rules/gastos.md).
+
+**La copia de los pagos a proveedores.** Antes de migrar había **2**
+`PagoProveedor` con `cajaMovimientoId`. Después, `CajaMovimientoDePago` tiene
+exactamente **2** filas: el movimiento 772 del `PagoProveedor` 1 y el 1030 del
+`PagoProveedor` 2. Ningún pago con movimiento quedó sin su fila, y no hay filas
+huérfanas, ni movimientos inexistentes, ni duplicados.
+
+**Los datos.** `CategoriaGasto` quedó con las **7** categorías iniciales,
+activas: Servicios (10), Alquiler (20), Sueldos (30), Mantenimiento (40),
+Insumos y limpieza (50), Impuestos (60) y Otros (100). `Gasto` y `PagoGasto`
+quedaron con **0** filas: **el despliegue no creó ningún dato de negocio**.
+
+**Los libros, sin cambios.**
+
+- Libro de Costos: **ACTIVADO**, con su Punto Cero intacto —**15.664**
+  versiones PUNTO_CERO—, la fila de activación intacta, los **6** triggers de la
+  activación y las huellas sin cambios.
+- Libro de Stock: integridad física en verde y Punto Cero intacto, con
+  **12.278** filas de Punto Cero y **15.386** movimientos al momento de la
+  verificación.
+
+**El despliegue.**
+
+- Backup PRE: `/srv/produccion/backups/pre-0e50ce5b_20260929_120206.sql.gz`,
+  7.418.913 bytes, SHA-256
+  `beeacd89ac8a208b5f7230b56572a49e7e17bbdbc909994198ff366944b22211`. `pg_dump`
+  salió con 0 bajo `pipefail`, `gzip -t` limpio, la marca de dump completo
+  presente y 81 tablas.
+- Referencia de rollback: la imagen `sha256:7097efc8…`, de `406cfb05`.
+- Sonda PRE en verde (corrida 36565494839) y sonda POST en verde (corrida
+  36565746222), que confirmó `0e50ce5b14f886d4b6624352117cf564d75efd42`.
+- Salud después: la app arriba y sin reinicios, PostgreSQL healthy y `/login`
+  con 200. Sin errores de Prisma ni excepciones, sin transacciones largas, sin
+  sesiones `idle in transaction` y sin esperas de locks.
 
 ---
 
