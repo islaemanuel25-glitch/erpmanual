@@ -31,8 +31,8 @@ import { ESTADO_CUENTA, diaLegible, medioTocaLaCaja } from "@/lib/finanzas/pagos
 import ModalRegistrarPago from "./ModalRegistrarPago";
 import { COLOR_ESTADO_CUENTA, ImporteConRotulo, rotuloDeCompra } from "./TarjetaCuentaPorPagar";
 
-/** Un renglón rótulo / valor, a lo ancho. */
-function Renglon({ rotulo, children }) {
+/** Un renglón rótulo / valor, a lo ancho. Lo usa también el detalle de un gasto. */
+export function Renglon({ rotulo, children }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
       <div className="text-sm3 sunmi-text-muted">{rotulo}</div>
@@ -99,7 +99,12 @@ function FechaPrevista({ cuenta, puedeEscribir, onGuardada }) {
   );
 }
 
-function RenglonDePago({ pago }) {
+/**
+ * Un pago del historial. Lo usa también el detalle de un gasto: un `PagoGasto`
+ * llega de la API con la misma forma —medio y su rótulo, monto, fecha, origen,
+ * turno, quién lo registró y nota—.
+ */
+export function RenglonDePago({ pago }) {
   return (
     <div className="py-2 space-y-0.5">
       <div className="flex items-baseline justify-between gap-3">

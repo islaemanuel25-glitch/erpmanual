@@ -34,12 +34,28 @@ import {
 
 import CamposDeOrigenDelPago, { Campo } from "./CamposDeOrigenDelPago";
 
+// ── LO MISMO PARA UN GASTO ───────────────────────────────────────────────
+//
+// Un gasto se paga con el mismo formulario: mismos medios, mismo origen fijo,
+// mismo turno para el efectivo y la misma clave del intento. Lo único que
+// cambia es A DÓNDE se manda, qué dice el subtítulo y de qué ubicación sale la
+// plata. Van como props opcionales; sin ellas, todo es lo de una cuenta por
+// pagar, tal cual estaba. La clave del intento es la de siempre,
+// `nuevaClaveDePago(id)`: el servidor la guarda junto con el gasto o la cuenta,
+// así que no choca entre los dos.
+
 export default function ModalRegistrarPago({
   abierto,
   cuenta,
   medios = [],
   onCerrar,
   onRegistrado,
+  /** A dónde se manda el pago. Por defecto, el de la cuenta por pagar. */
+  urlPago = null,
+  /** El subtítulo. Por defecto, el proveedor y el saldo de la cuenta. */
+  subtitulo = null,
+  /** `{ id, nombre }` de donde sale la plata. Por defecto, la ubicación de la cuenta. */
+  origen = null,
 }) {
   const [monto, setMonto] = useState("");
   const [medio, setMedio] = useState(MEDIO_PAGO_PROVEEDOR.TRANSFERENCIA);
@@ -78,7 +94,7 @@ export default function ModalRegistrarPago({
     setEnviando(true);
     setError("");
     try {
-      const res = await fetch(`/api/finanzas/pagos-proveedores/${cuenta.id}/pagos`, {
+      const res = await fetch(urlPago || `/api/finanzas/pagos-proveedores/${cuenta.id}/pagos`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -110,9 +126,8 @@ export default function ModalRegistrarPago({
       open={abierto}
       title="Registrar pago"
       subtitle={
-        cuenta
-          ? `${cuenta.proveedor?.nombre || "Proveedor"} · saldo ${formatearMoneda(cuenta.saldo)}`
-          : ""
+        subtitulo ??
+        (cuenta ? `${cuenta.proveedor?.nombre || "Proveedor"} · saldo ${formatearMoneda(cuenta.saldo)}` : "")
       }
       onClose={onCerrar}
       z={NIVEL_MODAL_GLOBAL}
@@ -150,7 +165,7 @@ export default function ModalRegistrarPago({
         medio={medio}
         onMedio={setMedio}
         // La ubicación que debe, de la cuenta misma.
-        origen={cuenta?.localGasto || null}
+        origen={origen || cuenta?.localGasto || null}
         turnoId={turnoId}
         onTurno={setTurnoId}
         onError={setError}

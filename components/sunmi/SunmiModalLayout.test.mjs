@@ -778,6 +778,13 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // sale la plata, el turno y una nota. Un toque al costado tira las cinco, y
     // en el teléfono es una hoja con el pulgar justo en el borde.
     "components/finanzas/pagos/ModalRegistrarPago.jsx": true,
+    // ── EL ALTA DE UN GASTO ──────────────────────────────────────────────
+    //
+    // Carga, y la más larga de Finanzas: categoría, concepto, importe, fecha,
+    // beneficiario, comprobante, vencimiento y, si se paga ahora, el importe, el
+    // medio y el turno. Un toque al costado lo tira todo, y en el teléfono es la
+    // misma hoja con el pulgar en el borde que el registrar pago de al lado.
+    "components/finanzas/gastos/ModalNuevoGasto.jsx": true,
     // ── LA PREGUNTA DE "ESTE AUMENTO NO SE PARECE A LOS DE ESTE PROVEEDOR" ──
     //
     // Vive adentro de la pantalla de revisar de a uno. Mismo caso que la hoja de

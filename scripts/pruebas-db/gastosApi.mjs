@@ -407,11 +407,15 @@ try {
   ok("Casiano ve sus gastos y solo los suyos", todosCasiano.status === 200 && todosCasiano.paginacion.total === deCasiano &&
     todosCasiano.gastos.every((g) => g.localId === casiano.id), JSON.stringify(todosCasiano.paginacion));
   ok("con finanzas.ver solo, la lista no ofrece crear", todosCasiano.puedeCrear === false && todosCasiano.puedeEscribir === false);
+  ok("la lista dice en qué ubicación se registraría un gasto nuevo: la que se opera",
+    JSON.stringify(todosCasiano.ubicacionOperada) === JSON.stringify({ id: casiano.id, nombre: "Casiano Casas" }), JSON.stringify(todosCasiano.ubicacionOperada));
   r = await listar(otroEscribe, "estado=TODAS&pageSize=200");
   ok("el otro local ve solo el suyo", r.paginacion.total === 1 && r.gastos[0].id === gOtro.id && r.puedeCrear === true, JSON.stringify(r.paginacion));
   const todosDeposito = await listar(depositoEscribe, "estado=TODAS&pageSize=200");
   ok("el depósito ve los de todo el grupo", todosDeposito.paginacion.total === (await c.gasto.count()) && todosDeposito.variasUbicaciones === true,
     JSON.stringify(todosDeposito.paginacion));
+  ok("y el depósito, aunque vea todo, registra en el depósito", todosDeposito.ubicacionOperada?.id === deposito.id && todosDeposito.ubicacionOperada?.nombre === "Depósito",
+    JSON.stringify(todosDeposito.ubicacionOperada));
   r = await listar(depositoEscribe, `estado=TODAS&pageSize=200&destino=${casiano.id}`);
   ok("el depósito puede pedir UNA ubicación con destino", r.status === 200 && r.paginacion.total === deCasiano && r.gastos.every((g) => g.localId === casiano.id) && r.filtros.destino === casiano.id);
   r = await listar(casianoVe, `destino=${otro.id}`);
@@ -419,7 +423,8 @@ try {
   r = await listar(casianoVe, "destino=abc");
   ok("un destino que no es un local: 400", r.status === 400 && r.error === ERROR_DESTINO_INVALIDO, r.error);
   r = await listar(adminGlobal, "estado=TODAS&pageSize=200");
-  ok("un admin en vista global ve todo el grupo y no se le ofrece crear", r.status === 200 && r.paginacion.total === (await c.gasto.count()) && r.puedeCrear === false,
+  ok("un admin en vista global ve todo el grupo y no se le ofrece crear, ni hay ubicación donde registrar",
+    r.status === 200 && r.paginacion.total === (await c.gasto.count()) && r.puedeCrear === false && r.ubicacionOperada === null,
     JSON.stringify([r.status, r.paginacion, r.error]));
 
   // ══════════════════════════════════════════════════════════════════════
@@ -542,6 +547,48 @@ try {
   ok("estado, categoría, fechas y búsqueda combinados: el total es el del cruce, paginado de a dos",
     r.status === 200 && r.paginacion.total === combinados.length && r.gastos.length === Math.min(2, combinados.length) &&
     r.gastos.every((g) => combinados.some((x) => x.id === g.id)), JSON.stringify([r.paginacion, combinados.map((g) => g.id)]));
+
+  // ══════════════════════════════════════════════════════════════════════
+  seccion("La búsqueda de la pantalla, con más de 200 gastos en el período");
+  // ══════════════════════════════════════════════════════════════════════
+  // 201 gastos pendientes del otro local en un mismo día. El que se busca se
+  // crea PRIMERO, así que en el orden de la API —fecha y id descendentes— es el
+  // 201 y no entra en la página de 200. Y uno anterior al período, pendiente,
+  // que tiene que aparecer en "Anteriores con saldo" también al buscar.
+  // Las consultas son las que arma la pantalla, con sus funciones.
+  const { claveDeBusqueda, consultaDeAnteriores, consultaDelPeriodo, gastoCoincideConBusqueda, gastosDeLaLista } =
+    await import("../../lib/finanzas/calendarioDeGastos.js");
+  const DIA = "2026-08-10";
+  const contexto = { filtro: "PENDIENTES", rango: { desde: DIA, hasta: DIA }, categoriaId: null };
+  const buscado = (await crear(otroEscribe, base({ concepto: "Arreglo de persiana", total: 7000, fecha: DIA }))).gasto;
+  for (let i = 0; i < 200; i++) await crear(otroEscribe, base({ concepto: `Insumo ${i}`, total: 100 + i, fecha: DIA }));
+  const viejo = (await crear(otroEscribe, base({ concepto: "Persiana del frente", total: 3000, fecha: "2026-08-03" }))).gasto;
+  await crear(otroEscribe, base({ concepto: "Luz de julio", total: 2000, fecha: "2026-08-02" }));
+
+  const periodo = await listar(otroEscribe, consultaDelPeriodo(contexto));
+  const anteriores = await listar(otroEscribe, consultaDeAnteriores(contexto));
+  ok("la página del período trae 200 de 201, y el buscado no está", periodo.gastos.length === 200 && periodo.paginacion.total === 201 &&
+    !periodo.gastos.some((g) => g.id === buscado.id), JSON.stringify(periodo.paginacion));
+  ok("EL FALSO NEGATIVO: buscar 'persiana' en lo cargado del período no lo encuentra",
+    periodo.gastos.filter((g) => gastoCoincideConBusqueda(g, "persiana")).length === 0);
+
+  const sinRespuesta = gastosDeLaLista({ periodo, anteriores, busqueda: "persiana", contexto });
+  ok("la pantalla, con lo cargado cortado, manda la búsqueda al servidor y espera",
+    sinRespuesta.enElServidor && sinRespuesta.esperando && sinRespuesta.gastos.length === 0);
+
+  const conQ = await listar(otroEscribe, consultaDelPeriodo({ ...contexto, q: "persiana" }));
+  const anterioresConQ = await listar(otroEscribe, consultaDeAnteriores({ ...contexto, q: "persiana" }));
+  const lista = gastosDeLaLista({
+    periodo, anteriores, busqueda: "persiana", contexto,
+    resultado: { clave: claveDeBusqueda(contexto, "persiana"), periodo: conQ, anteriores: anterioresConQ },
+  });
+  ok("con q, el período trae al buscado —el que estaba fuera de los 200—",
+    JSON.stringify(lista.gastos.map((g) => g.id)) === JSON.stringify([buscado.id]) && conQ.paginacion.total === 1, JSON.stringify(conQ.paginacion));
+  ok("con q, Anteriores con saldo trae el viejo que coincide y no el que no",
+    JSON.stringify(lista.anteriores.map((g) => g.id)) === JSON.stringify([viejo.id]), JSON.stringify(anterioresConQ.gastos.map((g) => g.concepto)));
+  ok("con q se conservan la pestaña y el rango: todos pendientes y del día, y los anteriores antes del día",
+    conQ.gastos.every((g) => g.estado !== "PAGADA" && g.fecha === DIA) && anterioresConQ.gastos.every((g) => g.estado !== "PAGADA" && g.fecha < DIA));
+  ok("el resultado de la búsqueda está entero y la lista no lo marca como cortado", lista.incompleta === false && !lista.esperando);
 } catch (err) {
   fallas.push(`la prueba se cayó: ${err?.stack || err}`);
   console.log(`  ✗ la prueba se cayó: ${err?.stack || err}`);
