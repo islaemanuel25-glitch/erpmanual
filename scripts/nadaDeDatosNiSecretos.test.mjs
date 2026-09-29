@@ -91,6 +91,10 @@ const PROHIBIDO = [
       // catálogos y `_prisma_migrations`. No trae una sola fila de datos.
       (p) => p === "scripts/deploy/diagnostico-recuperacion-libro-stock.sql",
       (p) => p === "scripts/deploy/precheck-libro-stock.sql",
+      // El diagnóstico de la recuperación de la activación del Libro de Costos:
+      // igual, SOLO LECTURA, lee catálogos, `_prisma_migrations`, cuenta las
+      // tablas del libro y llama a `libro_costo_estado()`. Sin filas.
+      (p) => p === "scripts/deploy/diagnostico-recuperacion-libro-costos.sql",
     ],
   },
   {

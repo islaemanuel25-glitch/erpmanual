@@ -45,9 +45,11 @@ dominio `https://operix.cloud`, backups en `/srv/produccion/backups/`.
    `migrate resolve`. No es un olvido ni una regla que se afloje cuando aprieta.
    La lista, el criterio por el que es esa y no otra, y lo que se miró y NO se
    tapó están en `lib/deploy/guardiaMigraciones.mjs`. Ver "Los cuatro comandos
-   bloqueados" en el paso 4 antes de tocarlos. **Una sola excepción, por texto
-   exacto**: la recuperación tipada de `20260927120000_libro_stock` por lock
-   timeout —ver "La única excepción ya autorizada"—.
+   bloqueados" en el paso 4 antes de tocarlos. **Dos excepciones, cada una por
+   texto exacto y solo `--rolled-back`**: la recuperación tipada de
+   `20260927120000_libro_stock` por lock timeout —ver "La excepción de
+   `libro_stock`"— y la de `20260929200000_libro_costo_activacion` por lock
+   timeout —ver "La excepción de la activación del Libro de Costos"—.
 
 ## EL TOPE DE CORTE: 30 SEGUNDOS
 
@@ -1395,12 +1397,13 @@ es marcar la migración, eso significa sacarla de la lista de rechazo de
 inventarle un flag, no correrla por otro camino, no hacerla desde el VPS para
 esquivar la guardia. Ese trámite cuesta a propósito, y el día que cuesta es este.
 
-### La única excepción ya autorizada: `libro_stock` por lock timeout
+### La excepción de `libro_stock` por lock timeout
 
-Ese trámite se hizo UNA vez, para UN caso, el 2026-09-27: Emanuel autorizó una
+Ese trámite se hizo por primera vez el 2026-09-27: Emanuel autorizó una
 recuperación tipada para `20260927120000_libro_stock` cuando falla porque no
-consiguió su candado en 3 s. **Es el único caso en que este runbook permite un
-`migrate resolve`, y es solo `--rolled-back`.** `--applied` sigue prohibido
+consiguió su candado en 3 s. **Es uno de los dos casos en que este runbook
+permite un `migrate resolve` —el otro es la activación del Libro de Costos, más
+abajo—, y es solo `--rolled-back`.** `--applied` sigue prohibido
 siempre: medido, deja el registro diciendo que el libro existe cuando no existe,
 y `migrate deploy` ya no lo vuelve a correr nunca. Cualquier otra migración que
 falle, o esta por cualquier otra causa, va por lo de arriba: FRENAR e informar.
@@ -1524,6 +1527,120 @@ DATABASE_URL="<la de producción>" node --import ./scripts/alias-loader.mjs \
 - los 5 triggers una vez cada uno, y las 9 funciones `libro_stock_*`;
 - después del `up -d` y de las sondas PRE/POST de siempre, una escritura
   productiva real de stock capturada en `MovimientoStock`, y la app sana.
+
+### La excepción de la activación del Libro de Costos por lock timeout
+
+El mismo trámite, para el segundo caso, el 2026-09-29: una recuperación tipada
+para `20260929200000_libro_costo_activacion` cuando falla porque
+`libro_costo_activar()` no consiguió sus candados en 3 s. Solo `--rolled-back`.
+**No activa el libro**: deja el intento anotado como revertido para que el
+camino normal —`migrate deploy`— pueda volver a intentarlo. Cualquier otra causa
+de fallo, o cualquier otra migración, va por "Si una migración falla": FRENAR e
+informar.
+
+**Por qué es seguro en este caso.** La migración es una sola sentencia,
+`SELECT "libro_costo_activar"();`, y la función toma sus dos `LOCK TABLE` —sobre
+`ProductoBase`, `ProductoLocal` y `Local`, y sobre las tablas del libro— ANTES
+de su primera escritura. Si no los consigue, PostgreSQL revierte la transacción
+entera: ni triggers, ni versiones, ni fila de activación. Las tablas y funciones
+del libro quedan como las dejó la instalación, que es otra migración. Probado por
+el camino real de Prisma en `scripts/pruebas-db/recuperacionLibroCostos.mjs`.
+
+**En qué se diferencia de `libro_stock`.** Allá "no quedó nada" es "no existe
+ningún objeto del libro". Acá el libro ya existe —vacío, lo creó la
+instalación—, y lo que no tiene que existir es lo que la activación escribe. Por
+eso el diagnóstico es otro archivo, con otras condiciones, y no el de
+`libro_stock` con otro nombre.
+
+**NO restaurar el backup por esto.** Un CASO 1 confirmado dejó la base como
+estaba: medido, el mismo catálogo de objetos y la misma huella de `ProductoBase`
+y `ProductoLocal`.
+
+#### PRE — antes del paso 4 del despliegue
+
+1. Backup validado, como siempre (paso 0).
+2. Comprobar en el VPS, de solo lectura, que el punto de partida es el esperado:
+   la instalación `20260929120000_libro_costos` aplicada, la activación
+   pendiente, `SELECT * FROM libro_costo_estado()` en NO_ACTIVADO, y sin
+   transacciones largas ni candados sobre `ProductoBase`, `ProductoLocal` o
+   `Local`. **No hay un precheck en archivo para esto todavía**: el de
+   `libro_stock` no mira `ProductoLocal`, así que no sirve tal cual.
+3. Clasificación y autorización del paso 4 como siempre. Ventana fuera del
+   horario de venta.
+
+#### INTENTO
+
+El paso 4 normal: `migrate deploy`, que aplica la activación.
+
+- **Si pasa:** verificación POST.
+- **Si falla:** el diagnóstico, SIN resolver nada todavía.
+
+```bash
+ssh vps-erp 'cd /srv/produccion/erpazul && docker exec -i erpazul_db psql -U erpazul -d erpazul -X -q -v ON_ERROR_STOP=1 -v modo=recuperar -f - < scripts/deploy/diagnostico-recuperacion-libro-costos.sql'
+```
+
+Imprime cada condición con ✓ o ✗ y termina en `RESULTADO: CASO_1_RECUPERABLE` o
+en `RESULTADO: FRENAR`. CASO 1 es, TODAS juntas:
+
+1. la única migración fallida sin resolver es la activación;
+2. su último intento no aplicó ningún paso;
+3. los logs traen SQLSTATE 55P03;
+4. los logs traen el "lock timeout" de un `LOCK TABLE` de
+   `libro_costo_activar()`;
+5. el intento es del archivo exacto de la activación, por su checksum;
+6. las 42 migraciones anteriores están aplicadas, y la instalación con su
+   checksum;
+7. el libro está vacío: ni versiones, ni punto cero, ni fila de activación, ni
+   triggers de captura —por nombre ni por la función a la que apuntan—;
+8. `libro_costo_estado()` dice INTENTO_FALLIDO.
+
+Sobre la condición 8: el estado del libro NO alcanza solo, porque no mira la
+causa. Medido: con una falla SQL distinta a mitad de la activación también dice
+INTENTO_FALLIDO. Por eso el diagnóstico exige además las condiciones 3 y 4.
+
+- **`RESULTADO: FRENAR`:** FRENAR. Sin resolve, sin reintento, sin `up -d`. La app
+  vieja sigue atendiendo. Informar a Emanuel con la salida entera del diagnóstico.
+- **`RESULTADO: CASO_1_RECUPERABLE`:** la recuperación tipada, con este texto
+  EXACTO —un espacio de más y la guardia lo rechaza—:
+
+```bash
+ssh vps-erp 'cd /srv/produccion/erpazul && docker exec -i erpazul_db psql -U erpazul -d erpazul -X -q -v ON_ERROR_STOP=1 -v modo=recuperar -f - < scripts/deploy/diagnostico-recuperacion-libro-costos.sql && docker compose -f docker-compose.prod.yml run --rm -T --no-deps app prisma migrate resolve --rolled-back 20260929200000_libro_costo_activacion'
+```
+
+  Vuelve a correr el diagnóstico adentro, y el `&&` hace que el resolve solo
+  corra si dio CASO 1. La guardia lo deja pasar AVISANDO y deja rastro. Y
+  enseguida, confirmar:
+
+```bash
+ssh vps-erp 'cd /srv/produccion/erpazul && docker exec -i erpazul_db psql -U erpazul -d erpazul -X -q -v ON_ERROR_STOP=1 -v modo=revertida -f - < scripts/deploy/diagnostico-recuperacion-libro-costos.sql'
+```
+
+  Tiene que dar `RESULTADO: REVERTIDA_LIMPIA`: nada sin resolver, el último
+  intento revertido y sin pasos, el libro vacío y `libro_costo_estado()` en
+  NO_ACTIVADO. Si no, FRENAR.
+
+#### REINTENTO — el segundo, y el último
+
+Con el punto de partida comprobado otra vez, el paso 4 de nuevo.
+
+- **Si pasa:** verificación POST.
+- **Si vuelve a fallar:** el diagnóstico de nuevo. Va a avisar
+  `ESTE ES UN SEGUNDO FALLO`. Si es CASO 1: la recuperación tipada y la
+  confirmación `revertida`, para no dejar a Prisma trabado en P3009. Y después
+  **FRENAR LA VENTANA**: NUNCA un tercer intento, NO el `up -d`. Si NO es CASO
+  1: FRENAR sin resolver.
+
+El límite es de **DOS intentos de activar el libro por ventana**, como en
+`libro_stock`: el diagnóstico cuenta los intentos revertidos de toda la historia
+y avisa desde el segundo, pero no sabe dónde empieza una ventana.
+
+#### POST — para declarar el libro activo
+
+- `SELECT * FROM libro_costo_estado()` dice **ACTIVADO**;
+- `LibroCostoActivacion` tiene una fila, y sus cantidades son las filas de
+  `ProductoBase` y `ProductoLocal` al activar;
+- la activación con UN intento terminado, contada por nombre: los intentos
+  revertidos quedan como filas aparte.
 
 ### Rollback de una migración: NUNCA SE EJECUTÓ
 

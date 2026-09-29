@@ -336,6 +336,15 @@ jobs:
       - name: Libro de costos (activación, captura, inmutabilidad, escala)
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/libroCostos.mjs
 
+      # El procedimiento del runbook de /deploy si la activación del Libro de
+      # Costos no consigue su candado: una base como producción antes de
+      # activar, `migrate deploy` real con una transacción reteniendo
+      # ProductoBase, el diagnóstico de solo lectura, la cadena con la forma
+      # exacta del comando que acepta la guardia, el reintento, y cada estado en
+      # que el diagnóstico tiene que frenar sin resolver.
+      - name: Recuperación de la activación del Libro de Costos (lock timeout → resolve --rolled-back)
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/recuperacionLibroCostos.mjs
+
       # ── LA PREGUNTA QUE DECIDE EL DESPLIEGUE ──────────────────────────────
       #
       # Producción conserva sus 105 migraciones viejas en `_prisma_migrations` y
