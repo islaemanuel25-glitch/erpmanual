@@ -346,8 +346,15 @@ try {
   seccion("A. Base de partida SIN libro, como producción hoy");
   const PLANTILLA = `${PREFIJO}plantilla`;
   const urlPlantilla = await crearBase(PLANTILLA);
-  const pre = await migrateDev(dirPrisma(false), urlPlantilla);
-  ok("migrate dev construye la base sin el libro", pre.codigo === 0, pre.salida.slice(-400));
+  // Con `migrate deploy` y no `migrate dev`: el schema recortado solo le saca el
+  // bloque del libro, y todo lo que entró DESPUÉS fuera de ese bloque —los
+  // gastos, 2026-09-29— sigue ahí sin su migración. `migrate dev` lo vería como
+  // una migración por crear y se quedaría esperando un nombre, que es el caso
+  // que `aplicarPendientes` ya resuelve más abajo. Lo que la base tiene que ser
+  // —las migraciones previas, ningún objeto del libro— lo afirma el bloque de
+  // abajo, no el comando.
+  const pre = aplicarPendientes(dirPrisma(false), urlPlantilla);
+  ok("migrate deploy construye la base sin el libro", pre.codigo === 0, pre.salida.slice(-400));
   {
     const c = await crearClientePrisma({ nivel: ESCRITURA, url: urlPlantilla });
     await sembrar(c, FILAS_CARRERA);
