@@ -19,9 +19,51 @@ Si la lista está vacía, el despliegue es solo de código.
 Producción está en **44 migraciones** y el árbol también. **Ninguna** pendiente:
 el despliegue siguiente es solo de código.
 
-Producción corre `4b9ac04d4c5a691041749b8281ccacc9254df794` (despliegue del
+Producción corre `0a8fde8b219402ee060913e1de9035a9ff27a660` (despliegue del
 2026-09-29, nota abajo). Un commit posterior a ese que solo cambie
 documentación —como el que escribe esta nota— **no se despliega por eso**.
+
+---
+
+## `0a8fde8b`: desplegado el 2026-09-29. Gastos móvil, sin migraciones
+
+Despliegue **solo de código**: el merge de la PR #112, con la cabeza
+`eecf2ccf464a83cad12d160174a3eac46069a996` validada por el CI (corrida
+36627906705, #474, en verde), desde `4b9ac04d4c5a691041749b8281ccacc9254df794`.
+La PR no trae ninguna migración, y el despliegue **no aplicó ninguna**. **Lo que
+sigue es lo que informó el despliegue**, corrido desde el acceso al VPS y no
+desde la sesión que escribe esta nota.
+
+**Identidad.** `0a8fde8b219402ee060913e1de9035a9ff27a660` en `origin/main`, el
+HEAD del VPS, la imagen, `APP_BUILD_ID`, `APP_IMAGE` y `/api/version`. La imagen
+la construyó la corrida 36629563965 (#559, en verde), con digest
+`sha256:ed394b38440beec850a5721628da1ef05f0629e49fa106e60baaa47be1fadff4`.
+
+**Migraciones.** 44 en el árbol y 44 aplicadas antes; **0 aplicadas** por este
+despliegue; 44 en el árbol y **44 aplicadas** después, ninguna pendiente, y
+`migrate status` cerró con "Database schema is up to date". Ninguna pendiente
+atribuible a la PR #112. Sin rollback y sin SQL de escritura a mano.
+
+**Lo que llegó.** La pantalla `/modulos/finanzas/gastos`, incluida en el build,
+y el menú de Finanzas con sus tres herramientas: Resumen financiero, Pagos a
+proveedores y Gastos. Las rutas de Gastos sin sesión contestan 401. No se hizo
+una prueba autenticada en producción porque no hay una sonda autenticada
+documentada; la conducta con sesión la cubre el CI de la PR #112 (#474).
+
+**Los datos, sin cambios.** No se crearon datos de prueba. `CategoriaGasto` con
+sus **7** categorías; `Gasto` y `PagoGasto` con **0** filas.
+
+**Lo demás, intacto.** Pagos a proveedores intacto, Libro de Costos intacto y
+Libro de Stock íntegro.
+
+**El despliegue.**
+
+- Backup PRE: `/srv/produccion/backups/pre-0a8fde8b_20260929_205843.sql.gz`,
+  7.509.589 bytes, SHA-256
+  `1f73f798ca71a3021350706abe3be8fda5b77d1297e78d8bb7b3941f44b95849`.
+- Sonda PRE en verde (corrida 36630143861, sobre `4b9ac04d`) y sonda POST en
+  verde (corrida 36630444291, sobre `0a8fde8b`).
+- Salud después: la app sana, PostgreSQL healthy y `/login` con 200.
 
 ---
 
