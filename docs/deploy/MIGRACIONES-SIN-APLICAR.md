@@ -16,81 +16,108 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **39 migraciones**. El árbol trae **43**. Faltan cuatro, y Prisma
-las aplica en este orden, que es el de sus nombres.
+Producción está en **43 migraciones** y el árbol también. **Ninguna** pendiente:
+el despliegue siguiente es solo de código.
 
-**Desfasaje informado y sin corregir acá** (2026-09-29): Emanuel informó que
-producción ya está en `e7161e1b`, con el Libro de Costos instalado y NO activado
-—o sea, con las tres primeras de esta lista aplicadas—. La nota de ese
-despliegue no llegó a esta lista. La sesión de nube que agrega la activación no
-puede comprobar el estado de producción y no lo inventa: el número y las tres
-primeras las corrige la sesión del servidor al confirmar su despliegue. Las dos primeras son independientes entre sí
-—el índice no toca funciones ni triggers, y la corrección no toca índices—: se
-comprobó aplicándolas juntas con Prisma sobre una base como la de producción.
-`20260928180000_libro_stock_baja_atomica` ya está en `main` (PR #96), pero
-mergeada no es desplegada: producción sigue en 39 hasta el próximo despliegue.
+Producción corre `406cfb05ef35fb9496f831d5b10a975e05e90d06` (despliegue del
+2026-09-29, nota abajo). Un commit posterior a ese que solo cambie
+documentación —como el que escribe esta nota— **no se despliega por eso**.
 
-- `20260928150000_stock_diario_indice` — **aditiva**: un solo `CREATE INDEX`
-  sobre `MovimientoStock` con las columnas `("localId", "productoLocalId", "dia", "id")`.
-  No toca filas, columnas, funciones ni triggers del libro, y la migración del
-  libro no se modifica. Es la que permite el Stock Diario de un local entero sin
-  recorrer la historia de cada cadena (PR de Stock Diario, `lib/stock/libro/stockDiarioServer.js`).
-  El clasificador la marca **aditiva, sin coincidencias**. Va sin `CONCURRENTLY`
-  porque Prisma aplica cada migración dentro de una transacción: mientras se
-  construye, bloquea las escrituras de `MovimientoStock` —y con ellas las de
-  `StockLocal`, porque el trigger escribe en la misma transacción—. Con el libro
-  del tamaño de hoy (del orden de doce mil filas y lo que se movió desde el punto
-  cero) eso es una fracción de segundo; si el despliegue se demorara semanas,
-  conviene medir las filas antes. Lo que hay que comprobar después de aplicarla:
-  que `pg_indexes` muestre `MovimientoStock_localId_productoLocalId_dia_id_idx`
-  con esas cuatro columnas, y que el verificador del libro siga en verde.
-- `20260928180000_libro_stock_baja_atomica` — corrección preventiva del libro de
-  stock. Reemplaza con `CREATE OR REPLACE` la función `libro_stock_registrar`
-  (el trigger `StockLocal_libro` sigue apuntando a ella) y agrega dos funciones y
-  dos triggers `BEFORE DELETE` sobre `ProductoLocal` y `ProductoBase` que
-  recuerdan la identidad, local a la transacción. No toca ninguna tabla, columna
-  ni fila del libro, no crea `ESTADO_INICIAL` y no mueve el punto cero; la
-  migración `20260927120000_libro_stock` no se modifica. El clasificador la marca
-  **aditiva, sin coincidencias** —no lee lo que cambia una función: esto SÍ
-  cambia comportamiento, a propósito—: una sola sentencia que borra un
-  StockLocal y su ProductoLocal ahora deja su BAJA, y un movimiento que no puede
-  escribirse aborta la sentencia en vez de perderse. Sin tope de espera: el
-  `CREATE TRIGGER` frena solo las escrituras sobre `ProductoLocal` y
-  `ProductoBase` mientras confirma, no las lecturas ni `StockLocal`. Qué
-  comprobar después de aplicarla: los triggers `ProductoLocal_libro_identidad` y
-  `ProductoBase_libro_identidad` presentes, `libro_stock_identidad_de_baja`
-  presente, el mismo conteo de `MovimientoStock` que antes, y el verificador del
-  libro en verde.
-- `20260929120000_libro_costos` — el Libro de Costos, **INERTE**: tres tablas
-  nuevas (`CostoBaseVersion`, `CostoUbicacionVersion`, `LibroCostoActivacion`),
-  el enum `TipoVersionCosto`, la secuencia `libro_costo_seq`, funciones
-  `libro_costo_*` y seis triggers sobre esas mismas tablas nuevas (inmutabilidad
-  y "solo escribe el libro"). **No crea ningún trigger sobre `ProductoBase`,
-  `ProductoLocal` ni `Local`, no escribe punto cero y no toca ninguna fila,
-  columna ni función existente**: aplicarla no cambia ninguna escritura. Sin
-  tope de espera y sin candado sobre tablas existentes. Lo que hay que
-  comprobar después: `SELECT * FROM libro_costo_estado()` dice **NO_ACTIVADO**, y
-  las tres tablas están vacías. **La activación NO va en este despliegue**: será
-  una migración propia `<fecha>_libro_costo_activacion`, con autorización
-  expresa y el procedimiento de `docs/architecture/libro-de-costos.md`.
-- `20260929200000_libro_costo_activacion` — **ENCIENDE el Libro de Costos.**
-  Una sola sentencia, `SELECT "libro_costo_activar"();`: toda la lógica es de la
-  función que instaló la anterior, que no se modifica. En una transacción, con
-  tope de espera de 3 s: toma SHARE ROW EXCLUSIVE sobre `ProductoBase`,
-  `ProductoLocal` y `Local` (frena sus escrituras, no sus lecturas, hasta
-  confirmar), crea los tres triggers de captura y los tres que rechazan
-  TRUNCATE sobre las tablas del libro, escribe el PUNTO_CERO de cada fila de
-  `ProductoBase` y `ProductoLocal`, comprueba cantidades y huellas, y escribe la
-  única fila de `LibroCostoActivacion`. **No borra ni modifica ninguna fila
-  existente.** Desde que se aplica, TODA escritura de costo o escala en esas
-  tres tablas deja una versión. Si no consigue el candado falla con P3018 /
-  55P03 y revierte entera: `SELECT * FROM libro_costo_estado()` dice
-  INTENTO_FALLIDO, se resuelve con `migrate resolve --rolled-back
-  20260929200000_libro_costo_activacion` y se reintenta fuera de hora pico
-  (procedimiento en `docs/architecture/libro-de-costos.md`). Lo que hay que
-  comprobar después: `libro_costo_estado()` dice **ACTIVADO**, las cantidades
-  de `LibroCostoActivacion` son las filas de `ProductoBase` y `ProductoLocal`,
-  y los seis triggers están. Va **con autorización expresa** y por `/deploy`.
+---
+
+## `20260929200000_libro_costo_activacion`: aplicada el 2026-09-29. Punto Cero del Libro de Costos
+
+**Historia de costos confiable desde 2026-09-29 03:17:54.566 UTC
+(2026-09-29 00:17:54 Argentina).**
+
+Salió de esta lista con el despliegue de `406cfb05ef35fb9496f831d5b10a975e05e90d06`
+(merge de la PR #109, que lleva también la #108), desde `e7161e1b`. **Lo que
+sigue es lo que informó el despliegue**, corrido desde el acceso al VPS y no
+desde la sesión que escribe esta nota.
+
+**Identidad.** El mismo SHA en el HEAD del VPS, la imagen, `APP_BUILD_ID`,
+`APP_IMAGE` y `/api/version`.
+
+**Migraciones.** 43 en el árbol, **43 aplicadas**, ninguna fallida, y `migrate
+status` cerró con "Database schema is up to date!". El clasificador marcó la
+activación **aditiva** y salió con 0. Se aplicó el **2026-09-29 03:17:55 UTC,
+al primer intento**, con un paso: sin recuperación tipada, sin `migrate
+resolve` y sin ejecutar `libro_costo_activar()` a mano.
+
+**El Punto Cero.**
+
+- `libro_costo_estado()`: **ACTIVADO**.
+- Un único instante, **2026-09-29 03:17:54.566 UTC**, y una única transacción,
+  txid **120115**.
+- `ProductoBase`: **3.131** filas → `CostoBaseVersion`: **3.131** versiones.
+- `ProductoLocal`: **12.533** filas → `CostoUbicacionVersion`: **12.533**
+  versiones.
+- **15.664** versiones PUNTO_CERO en total, todas con origen
+  `ACTIVACION_DEL_LIBRO_DE_COSTOS`, sin duplicados y sin huérfanos, y ninguna
+  versión posterior al cutover al terminar la verificación.
+- Huella base `1b3f562cf086ee0df5a96f220e8bb861`; huella ubicación
+  `857c9bac43138f38364b1f4b3aedafd9`.
+- `LibroCostoActivacion`: exactamente **1** fila —id 1, txid 120115,
+  `versionDesde` 1, `versionHasta` 15666, 3.131 bases y 12.533 ubicaciones—.
+- Los **6** triggers de la activación presentes una vez cada uno y habilitados:
+  los de captura `ProductoBase_costo_version`, `ProductoLocal_costo_version` y
+  `Local_costo_version`, y los tres `*_sin_truncate` de las tablas del libro.
+
+**El despliegue.**
+
+- Backup PRE: `/srv/produccion/backups/pre-406cfb05_20260929_031608.sql.gz`,
+  7.218.125 bytes, SHA-256
+  `64e8304bd958017ea7af197187f868bbca1c8c22680c0404c7b53a0115f8a646`.
+- Sonda PRE en verde (corrida 36516395228) y sonda POST en verde (corrida
+  36516568096).
+
+**Lo que queda del procedimiento**, para leer si algún día hubiera que
+restaurar un backup anterior a este punto y volver a aplicarla: el runbook —PRE,
+diagnóstico, recuperación tipada, máximo dos intentos y POST— sigue en el skill
+`/deploy`, "La excepción de la activación del Libro de Costos".
+
+---
+
+## `20260929120000_libro_costos`: aplicada el 2026-09-29. El Libro de Costos, instalado e inerte
+
+Salió de esta lista con el despliegue de `e7161e1b` (merge de la PR #107). Lo
+que sigue es lo que informó el despliegue desde el acceso al VPS. **Esta nota
+llega tarde**: se escribe junto con la de la activación, porque la de aquel
+despliegue no llegó a esta lista.
+
+- Aplicada el **2026-09-29 01:17:04 UTC**.
+- **El clasificador la marcó NO ADITIVA** por `BEFORE TRUNCATE ON` en la línea
+  456. Era un falso positivo: esa línea está dentro del cuerpo de
+  `libro_costo_activar()`, que la instalación define y no ejecuta. Se aplicó con
+  `DEPLOY_MIGRACION_AUTORIZADA=1`, y la autorización quedó en la bitácora de la
+  guardia alrededor de las 01:16 UTC.
+- Después de aplicarla, `libro_costo_estado()` dijo **NO_ACTIVADO** y las tablas
+  del libro quedaron vacías.
+- Backup PRE: `pre-e7161e1b_20260929_011528.sql.gz`. De su SHA-256 esta nota
+  solo tiene el prefijo, `ab9f6325…`: el resto no llegó a la evidencia y no se
+  completa.
+- Sonda PRE en verde (corrida 36507045916) y sonda POST en verde (corrida
+  36507215578).
+
+---
+
+## `20260928150000_stock_diario_indice` y `20260928180000_libro_stock_baja_atomica`: aplicadas el 2026-09-28
+
+Salieron de esta lista con el despliegue de `65162c8e` (merge de la PR #95). Lo
+que sigue es lo que informó el despliegue desde el acceso al VPS. **Esta nota
+también llega tarde**, por el mismo motivo.
+
+- Las dos aplicadas el **2026-09-28 03:31:47 UTC**, en ese orden. Duraron
+  aproximadamente 90 ms y 29 ms, respectivamente.
+- El índice `MovimientoStock_localId_productoLocalId_dia_id_idx` quedó válido.
+- El libro de stock quedó con **12** funciones `libro_stock_*` y **7**
+  triggers —las 9 y los 5 de la instalación, más las 3 y los 2 de la
+  corrección—, y su Punto Cero intacto.
+- Backup PRE: `pre-65162c8e_20260928_033005.sql.gz`. De su SHA-256 esta nota
+  solo tiene el prefijo, `f1ef145d…`: el resto no llegó a la evidencia y no se
+  completa.
+- Sonda PRE en verde (corrida 36373968696) y sonda POST en verde (corrida
+  36374133508).
 
 ---
 
@@ -154,8 +181,8 @@ una venta que ocurrió naturalmente, no generada para probar el libro.
 **Lo que queda del procedimiento de esta migración**, para leer si algún día
 hubiera que restaurar un backup anterior a este punto y volver a aplicarla: el
 runbook completo —precheck, candado de la activación, recuperación tipada, máximo
-dos intentos y verificación POST— sigue en el skill `/deploy`, "La única
-excepción ya autorizada".
+dos intentos y verificación POST— sigue en el skill `/deploy`, "La excepción de
+`libro_stock` por lock timeout".
 
 ---
 

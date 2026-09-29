@@ -2,13 +2,15 @@
 
 La historia inmutable de lo que costaba cada producto en cada ubicación. Existe
 para que el Stock Diario pueda valorizar un día con el costo vigente a las 00:00
-(hora Argentina) aunque el costo cambie durante el día. Hoy la base solo guarda
-el costo actual.
+(hora Argentina) aunque el costo cambie durante el día. Hasta la activación, la
+base solo guardaba el costo actual. **En producción está ACTIVADO desde el
+2026-09-29 03:17:54.566 UTC** [producción].
 
 Relevado sobre la rama `claude/libro-costos`. Etiquetas: **[código]** verificado
 leyendo el código, **[probado]** ejercido contra PostgreSQL en
 `scripts/pruebas-db/libroCostos.mjs`, **[decisión]** decidido por el negocio,
-**[pendiente]** fuera de esta etapa.
+**[pendiente]** fuera de esta etapa, **[producción]** informado por el
+despliegue desde el acceso al VPS, no medido por la sesión que escribe.
 
 ## Qué hay y dónde
 
@@ -131,9 +133,32 @@ NO_ACTIVADO y se puede reintentar [probado].
 - INTENTO_FALLIDO: la migración de activación figura fallida y sin resolver.
 - INCONSISTENTE: cualquier otra combinación. Nunca debería verse.
 
-## Cómo se activa en producción [pendiente de desplegar]
+## La activación en producción: hecha el 2026-09-29
 
-Con autorización expresa y por el camino de `/deploy`, nunca a mano:
+Se activó con el despliegue de `406cfb05ef35fb9496f831d5b10a975e05e90d06`. La
+migración `20260929200000_libro_costo_activacion` se aplicó el 2026-09-29
+03:17:55 UTC, **al primer intento**, sin recuperación y sin ejecutar la función
+a mano [producción]. El Punto Cero real [producción]:
+
+- Instante **2026-09-29 03:17:54.566 UTC** (00:17:54 Argentina), txid
+  **120115**.
+- **3.131** bases y **12.533** ubicaciones: **15.664** versiones PUNTO_CERO,
+  con origen `ACTIVACION_DEL_LIBRO_DE_COSTOS`, sin duplicados ni huérfanos.
+- Huella base `1b3f562cf086ee0df5a96f220e8bb861`; huella ubicación
+  `857c9bac43138f38364b1f4b3aedafd9`.
+- `LibroCostoActivacion`: una fila, `versionDesde` 1 y `versionHasta` 15666.
+- `libro_costo_estado()`: ACTIVADO, con los seis triggers una vez cada uno y
+  habilitados.
+
+El detalle del despliegue —backup, sondas, identidad del SHA— está en
+`docs/deploy/MIGRACIONES-SIN-APLICAR.md`.
+
+## Cómo se activa, y cómo se recupera si falla
+
+Lo que sigue es el procedimiento con el que se activó, y el que vale si alguna
+vez hay que volver a aplicar la activación —restaurar un backup anterior al
+Punto Cero, reconstruir una base—. Con autorización expresa y por el camino de
+`/deploy`, nunca a mano:
 
 1. La migración propia `20260929200000_libro_costo_activacion`, cuyo único
    contenido es `SELECT "libro_costo_activar"();` [código]. Un paso de datos en
