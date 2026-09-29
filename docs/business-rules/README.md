@@ -27,6 +27,8 @@ está claro cuál de las dos es, va como **[ACCIDENTE POSIBLE]** y no como regla
   tocarla.
 - [caja-y-turnos.md](caja-y-turnos.md) — cuándo se puede vender, qué es un turno
   abierto, cómo se cierra una caja.
+- [gastos.md](gastos.md) — qué es un gasto y qué no (ni retiro, ni compra, ni
+  costo), de qué ubicación es, quién lo paga y cómo sale el dinero.
 - [contradicciones.md](contradicciones.md) — **empezá por acá si vas a tocar
   algo.** Los lugares donde el repo se contradice a sí mismo.
 

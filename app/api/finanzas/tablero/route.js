@@ -255,7 +255,9 @@ export async function GET(req) {
     // (UNIQUE). Sin esto caería en los retiros manuales del resumen, y el día que
     // se sumen los pagos al período ese mismo peso contaría dos veces.
     const idsDeMovimiento = movimientos.map((m) => m.id);
-    const [arqueosConRetiro, turnosConRetiroDeCierre, pagosConRetiro] = idsDeMovimiento.length
+    //
+    // El pago de un gasto en efectivo, igual, por `PagoGasto.cajaMovimientoId`.
+    const [arqueosConRetiro, turnosConRetiroDeCierre, pagosConRetiro, pagosDeGastoConRetiro] = idsDeMovimiento.length
       ? await Promise.all([
           prisma.arqueoCaja.findMany({
             where: { cajaMovimientoRetiroId: { in: idsDeMovimiento } },
@@ -269,13 +271,18 @@ export async function GET(req) {
             where: { cajaMovimientoId: { in: idsDeMovimiento } },
             select: { cajaMovimientoId: true },
           }),
+          prisma.pagoGasto.findMany({
+            where: { cajaMovimientoId: { in: idsDeMovimiento } },
+            select: { cajaMovimientoId: true },
+          }),
         ])
-      : [[], [], []];
+      : [[], [], [], []];
 
     const clasificados = clasificarMovimientos(movimientos, {
       idsDeRecaudacion: new Set(arqueosConRetiro.map((a) => a.cajaMovimientoRetiroId)),
       idsDeCierre: new Set(turnosConRetiroDeCierre.map((t) => t.retiroCierreMovimientoId)),
       idsDePagoProveedor: new Set(pagosConRetiro.map((p) => p.cajaMovimientoId)),
+      idsDePagoGasto: new Set(pagosDeGastoConRetiro.map((p) => p.cajaMovimientoId)),
     });
 
     const resumen = resumenDelPeriodo({

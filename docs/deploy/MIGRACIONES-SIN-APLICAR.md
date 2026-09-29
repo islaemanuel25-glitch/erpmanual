@@ -16,12 +16,35 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **43 migraciones** y el árbol también. **Ninguna** pendiente:
-el despliegue siguiente es solo de código.
+Producción está en **43 migraciones**. El árbol trae **44**. Falta una.
 
 Producción corre `406cfb05ef35fb9496f831d5b10a975e05e90d06` (despliegue del
 2026-09-29, nota abajo). Un commit posterior a ese que solo cambie
-documentación —como el que escribe esta nota— **no se despliega por eso**.
+documentación **no se despliega por eso**.
+
+- `20260929230000_gastos` — **aditiva**: el núcleo de Gastos de Finanzas. Tres
+  tablas nuevas (`CategoriaGasto`, `Gasto`, `PagoGasto`), el enum
+  `MedioPagoGasto`, sus índices, claves foráneas y CHECK —total y monto
+  positivos, concepto no vacío, efectivo ⇔ turno y movimiento de caja—, y las
+  siete categorías iniciales como filas del catálogo nuevo. Y una cuarta tabla,
+  `CajaMovimientoDePago`, que impide que un movimiento de caja sea de un pago a
+  proveedor y de un pago de gasto a la vez. **Es lo único que toca algo
+  existente, y sin cambiarlo**:
+  - le agrega dos triggers a `PagoProveedor`. Uno registra el dueño del
+    movimiento al insertar un pago en efectivo; el otro rechaza que un pago
+    cambie de movimiento. La versión vieja crea un retiro nuevo por cada pago
+    en efectivo y nunca cambia el movimiento de un pago, así que durante la
+    ventana sus pagos entran igual;
+  - copia a la tabla nueva los `PagoProveedor` en efectivo que ya existen, uno
+    por fila, sin modificar ninguno.
+
+  No convierte ningún RETIRO histórico en gasto. El clasificador la marca
+  **aditiva, sin coincidencias**. Lo que hay que comprobar después:
+  - las cuatro tablas existen;
+  - `CategoriaGasto` tiene las siete categorías;
+  - `Gasto` y `PagoGasto` están vacías;
+  - `CajaMovimientoDePago` tiene tantas filas como `PagoProveedor` con
+    `cajaMovimientoId` no nulo.
 
 ---
 

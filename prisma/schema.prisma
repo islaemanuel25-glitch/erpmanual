@@ -260,6 +260,10 @@ model Local {
   /// Los pagos cuyo DINERO salió de esta ubicación. Son dos listas distintas a
   /// propósito: ver `CuentaPorPagarProveedor`.
   pagosProveedorOrigen    PagoProveedor[]           @relation("pago_origen")
+  /// Los gastos de ESTA ubicación: la única que los paga.
+  gastos                  Gasto[]                   @relation("gasto_del_local")
+  /// Los pagos de gastos cuyo dinero salió de esta ubicación.
+  pagosGastoOrigen        PagoGasto[]               @relation("pago_gasto_origen")
 }
 
 // Configuración de comportamiento POR LOCAL. Reemplaza (con herencia) a los
@@ -413,6 +417,8 @@ model Usuario {
   importacionesLista ImportacionListaProveedor[]
   cuentasPorPagarCreadas CuentaPorPagarProveedor[] @relation("cuenta_creada_por")
   pagosProveedorRegistrados PagoProveedor[]        @relation("pago_registrado_por")
+  gastosCreados          Gasto[]                   @relation("gasto_creado_por")
+  pagosGastoRegistrados  PagoGasto[]               @relation("pago_gasto_registrado_por")
 
   @@map("Usuario")
 }
@@ -2418,6 +2424,8 @@ model Turno {
   cambioRecibido    CambioPendiente?   @relation("cambioTurnoDestino")
   /// Pagos a proveedor en EFECTIVO que salieron del cajón de ESTE turno.
   pagosProveedor    PagoProveedor[]
+  /// Pagos de gastos en EFECTIVO que salieron del cajón de ESTE turno.
+  pagosGasto        PagoGasto[]
 
   @@index([localId])
   @@index([vendedorId])
@@ -3029,6 +3037,12 @@ model CajaMovimiento {
   /// `PagoProveedor.cajaMovimientoId`, con UNIQUE: el motivo del movimiento es
   /// texto para un humano y nunca decide de qué pago es.
   pagoProveedor PagoProveedor?
+  /// Inverso 1:1 del pago de un gasto en efectivo que lo originó, por
+  /// `PagoGasto.cajaMovimientoId` con UNIQUE. Misma regla: el motivo no decide.
+  pagoGasto PagoGasto?
+  /// Qué pago lo tiene, de los dos tipos. Es lo que impide que sea de un
+  /// `PagoProveedor` y de un `PagoGasto` a la vez: ver `CajaMovimientoDePago`.
+  dePago CajaMovimientoDePago?
 
   @@index([turnoId])
 }
@@ -3254,6 +3268,7 @@ model PagoProveedor {
   usuario        Usuario                 @relation("pago_registrado_por", fields: [usuarioId], references: [id])
   turno          Turno?                  @relation(fields: [turnoId], references: [id])
   cajaMovimiento CajaMovimiento?         @relation(fields: [cajaMovimientoId], references: [id])
+  movimientoExclusivo CajaMovimientoDePago?
 
   /// Por cuenta, como `ArqueoCaja` la tiene por turno: la clave identifica un
   /// intento sobre ESTA deuda. Reemplaza al índice simple de `cuentaId`, que
@@ -3261,6 +3276,172 @@ model PagoProveedor {
   @@unique([cuentaId, idempotencyKey])
   @@index([localOrigenId])
   @@index([turnoId])
+}
+
+// ---------------------------------------------------------------------------
+// GASTOS (Finanzas)
+// ---------------------------------------------------------------------------
+//
+// Un GASTO es lo que una ubicación consumió y no es mercadería: la luz, el
+// alquiler, un sueldo, la reparación de una heladera. No es una compra —la
+// compra mueve stock y su deuda es `CuentaPorPagarProveedor`— y no es un
+// RETIRO de caja: un retiro es plata saliendo de un cajón, que puede ser el
+// pago de un gasto o no. Tampoco es costo de mercadería: el Libro de Costos no
+// lo registra ni lo tiene que registrar.
+//
+// Son DOS hechos, en dos tablas: el gasto —qué se consumió, de qué ubicación,
+// a qué día corresponde, cuánto— y sus pagos —cuándo y cómo salió el dinero—.
+// Un gasto puede no tener ningún pago todavía. El saldo y el estado no se
+// guardan: se derivan con `estadoDeCuenta` (lib/finanzas/pagosProveedores.js),
+// la misma aritmética de las deudas con proveedores.
+//
+// Las dos únicas puertas que escriben están en `lib/finanzas/gastosServer.js`.
+
+/// LAS CATEGORÍAS DE UN GASTO. Un catálogo, no un enum: se edita sin migración.
+///
+/// Global, como `Categoria` de productos —el catálogo equivalente del repo—: no
+/// cuelga de un grupo. Las siete iniciales entran con la migración que crea la
+/// tabla; `orden` es el orden en que se ofrecen, con "Otros" al final.
+model CategoriaGasto {
+  id        Int      @id @default(autoincrement())
+  nombre    String   @unique
+  orden     Int      @default(0)
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  gastos Gasto[]
+}
+
+/// CON QUÉ SE PAGÓ UN GASTO.
+///
+/// Los mismos cuatro valores que `MedioPagoProveedor`, pero un tipo propio: un
+/// gasto no es un pago a un proveedor de mercadería y los dos pueden dejar de
+/// coincidir. Solo EFECTIVO toca la caja. Los demás registran el medio y nada
+/// más: todavía no existen cuentas financieras de origen (banco, Mercado Pago).
+enum MedioPagoGasto {
+  EFECTIVO
+  TRANSFERENCIA
+  MERCADO_PAGO
+  OTRO
+}
+
+/// UN GASTO DE UNA UBICACIÓN: el hecho económico.
+///
+/// ── A QUIÉN PERTENECE ────────────────────────────────────────────────────
+///
+/// `localId` es la ubicación que consumió el gasto, y es también la ÚNICA que
+/// lo paga: cada pago sale de ella (`PagoGasto.localOrigenId` igual a ésta) y
+/// lo registra quien la opera. Lo imponen `crearGasto` y `registrarPagoGasto`.
+/// El depósito no paga gastos de un local, ni un local los del depósito.
+///
+/// ── TRES FECHAS, Y NINGUNA ES LA DEL PAGO ────────────────────────────────
+///
+/// `fecha` es el día al que el gasto CORRESPONDE económicamente —la luz de
+/// septiembre, cargada en octubre—; `createdAt` es cuándo se registró. El
+/// vencimiento es la condición de quien cobra; la fecha prevista, una decisión
+/// nuestra. Todas `DATE`: son días, y con hora se leerían distinto según la
+/// zona del proceso. Cuándo salió la plata lo dice cada `PagoGasto`.
+///
+/// ── LO QUE NO SE GUARDA ─────────────────────────────────────────────────
+///
+/// Ni saldo, ni pagado, ni PENDIENTE / PARCIAL / PAGADO: salen de `total` y la
+/// suma de `pagos`. Una columna de saldo sería una segunda verdad.
+model Gasto {
+  id                Int       @id @default(autoincrement())
+  grupoId           Int
+  localId           Int
+  categoriaId       Int
+  concepto          String
+  total             Decimal   @db.Decimal(12, 2)
+  fecha             DateTime  @db.Date
+  /// A quién se le paga, en texto libre: EPEC, el dueño del local, el técnico.
+  /// No es un `Proveedor`: aquéllos son de mercadería.
+  beneficiario      String?
+  comprobanteNumero String?
+  comprobanteFecha  DateTime? @db.Date
+  vencimiento       DateTime? @db.Date
+  fechaPrevistaPago DateTime? @db.Date
+  creadoPorId       Int
+  /// Clave de idempotencia del INTENTO de alta, que genera el cliente al abrir
+  /// el formulario. Obligatoria, por la misma razón que la del pago: un alta
+  /// repetida —doble clic, respuesta perdida— con un pago inicial en efectivo
+  /// sacaría dos veces la plata del cajón.
+  idempotencyKey    String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  local     Local          @relation("gasto_del_local", fields: [localId], references: [id])
+  categoria CategoriaGasto @relation(fields: [categoriaId], references: [id])
+  creadoPor Usuario        @relation("gasto_creado_por", fields: [creadoPorId], references: [id])
+  pagos     PagoGasto[]
+
+  /// El mismo intento no crea dos gastos en la misma ubicación.
+  @@unique([localId, idempotencyKey])
+  @@index([grupoId])
+  @@index([categoriaId])
+  @@index([localId, fecha])
+}
+
+/// UN PAGO DE UN GASTO: el hecho financiero. La forma de `PagoProveedor`.
+///
+/// Solo el EFECTIVO sale de un cajón: apunta a su `CajaMovimiento` RETIRO por
+/// `cajaMovimientoId` —UNIQUE, un movimiento es de a lo sumo un pago— y al
+/// turno. Los demás medios dejan las dos columnas en null. Lo exige un CHECK.
+///
+/// Cuando existan cuentas financieras, la cuenta de ORIGEN del dinero es una
+/// columna de ESTA tabla, no del gasto: el gasto no cambia.
+model PagoGasto {
+  id               Int            @id @default(autoincrement())
+  gastoId          Int
+  monto            Decimal        @db.Decimal(12, 2)
+  /// El día del pago. En efectivo es el instante en que salió del cajón.
+  fecha            DateTime       @default(now())
+  medio            MedioPagoGasto
+  /// DE DÓNDE SALIÓ EL DINERO. Siempre la ubicación del gasto.
+  localOrigenId    Int
+  usuarioId        Int
+  turnoId          Int?
+  cajaMovimientoId Int?           @unique
+  nota             String?
+  /// Clave de idempotencia del INTENTO de pago. Obligatoria: el mismo intento
+  /// repetido devuelve el pago ya registrado, con su RETIRO si era efectivo.
+  idempotencyKey   String
+  createdAt        DateTime       @default(now())
+
+  gasto          Gasto           @relation(fields: [gastoId], references: [id])
+  localOrigen    Local           @relation("pago_gasto_origen", fields: [localOrigenId], references: [id])
+  usuario        Usuario         @relation("pago_gasto_registrado_por", fields: [usuarioId], references: [id])
+  turno          Turno?          @relation(fields: [turnoId], references: [id])
+  cajaMovimiento CajaMovimiento? @relation(fields: [cajaMovimientoId], references: [id])
+  movimientoExclusivo CajaMovimientoDePago?
+
+  @@unique([gastoId, idempotencyKey])
+  @@index([localOrigenId])
+  @@index([turnoId])
+}
+
+/// UN MOVIMIENTO DE CAJA ES DE A LO SUMO UN PAGO, DE CUALQUIERA DE LOS DOS TIPOS.
+///
+/// El UNIQUE de `PagoProveedor.cajaMovimientoId` y el de `PagoGasto` impiden
+/// dos pagos del MISMO tipo sobre un retiro, pero no uno de cada tipo: son dos
+/// índices en dos tablas. Esta tabla es el índice común. Su clave primaria es el
+/// movimiento, así que el segundo pago que lo reclame choca contra ella, sea del
+/// tipo que sea y en la transacción que sea: dos intentos concurrentes no pueden
+/// confirmarse los dos, porque el índice único lo arbitra la base.
+///
+/// NO SE ESCRIBE DESDE EL CÓDIGO. La llena un trigger AFTER INSERT de los dos
+/// pagos —migración 20260929230000_gastos—, y cada fila se va con su pago por
+/// `onDelete: Cascade`. Un pago no puede cambiar de movimiento: otro trigger lo
+/// rechaza, porque esta fila quedaría apuntando al anterior.
+model CajaMovimientoDePago {
+  cajaMovimientoId Int  @id
+  pagoProveedorId  Int? @unique
+  pagoGastoId      Int? @unique
+
+  cajaMovimiento CajaMovimiento @relation(fields: [cajaMovimientoId], references: [id])
+  pagoProveedor  PagoProveedor? @relation(fields: [pagoProveedorId], references: [id], onDelete: Cascade)
+  pagoGasto      PagoGasto?     @relation(fields: [pagoGastoId], references: [id], onDelete: Cascade)
 }
 
 model PedidoProveedorDetalle {

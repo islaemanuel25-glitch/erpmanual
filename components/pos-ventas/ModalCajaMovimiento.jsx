@@ -63,7 +63,7 @@ export default function ModalCajaMovimiento({ turnoId, onClose, onSuccess }) {
             Otro movimiento de caja
           </h2>
           <p className="text-[12px] sunmi-pos-muted mt-0.5">
-            Gastos y salidas puntuales: pago a proveedor, cambio, adelantos.
+            Entradas y salidas puntuales de efectivo: cambio, adelantos. Los pagos a proveedores se registran en Finanzas.
           </p>
         </div>
 
@@ -126,7 +126,7 @@ export default function ModalCajaMovimiento({ turnoId, onClose, onSuccess }) {
           <SunmiInput
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
-            placeholder="Ej: cambio, pago proveedor..."
+            placeholder="Ej: cambio, adelanto..."
           />
         </div>
 
