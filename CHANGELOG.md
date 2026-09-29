@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-09-29] - Actualización: 
+
+### Modificado
+
+
 ## [2026-09-28] - Actualización: transferencias
 
 ### Modificado
