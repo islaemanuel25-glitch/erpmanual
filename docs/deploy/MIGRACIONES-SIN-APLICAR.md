@@ -16,8 +16,8 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **39 migraciones**. El árbol trae **41**. Faltan dos, y Prisma
-las aplica en este orden, que es el de sus nombres. Son independientes entre sí
+Producción está en **39 migraciones**. El árbol trae **42**. Faltan tres, y Prisma
+las aplica en este orden, que es el de sus nombres. Las dos primeras son independientes entre sí
 —el índice no toca funciones ni triggers, y la corrección no toca índices—: se
 comprobó aplicándolas juntas con Prisma sobre una base como la de producción.
 `20260928180000_libro_stock_baja_atomica` ya está en `main` (PR #96), pero
@@ -54,6 +54,18 @@ mergeada no es desplegada: producción sigue en 39 hasta el próximo despliegue.
   `ProductoBase_libro_identidad` presentes, `libro_stock_identidad_de_baja`
   presente, el mismo conteo de `MovimientoStock` que antes, y el verificador del
   libro en verde.
+- `20260929120000_libro_costos` — el Libro de Costos, **INERTE**: tres tablas
+  nuevas (`CostoBaseVersion`, `CostoUbicacionVersion`, `LibroCostoActivacion`),
+  el enum `TipoVersionCosto`, la secuencia `libro_costo_seq`, funciones
+  `libro_costo_*` y seis triggers sobre esas mismas tablas nuevas (inmutabilidad
+  y "solo escribe el libro"). **No crea ningún trigger sobre `ProductoBase`,
+  `ProductoLocal` ni `Local`, no escribe punto cero y no toca ninguna fila,
+  columna ni función existente**: aplicarla no cambia ninguna escritura. Sin
+  tope de espera y sin candado sobre tablas existentes. Lo que hay que
+  comprobar después: `SELECT * FROM libro_costo_estado()` dice **NO_ACTIVADO**, y
+  las tres tablas están vacías. **La activación NO va en este despliegue**: será
+  una migración propia `<fecha>_libro_costo_activacion`, con autorización
+  expresa y el procedimiento de `docs/architecture/libro-de-costos.md`.
 
 ---
 

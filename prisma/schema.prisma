@@ -1087,6 +1087,160 @@ model ReinterpretacionDeStock {
 }
 
 // ---------------------------------------------------------------------------
+// EL LIBRO DE COSTOS: LA HISTORIA INMUTABLE DE LO QUE COSTABA CADA COSA
+// ---------------------------------------------------------------------------
+//
+// El Stock Diario valoriza cada día con el costo vigente a las 00:00, hora
+// Argentina, y lo congela todo el día aunque a las 14:00 cambie. Para eso hace
+// falta saber qué costo había a una hora dada, y la base solo guarda el de
+// ahora. Estas tablas guardan cada estado, escritas por triggers de PostgreSQL
+// dentro de la misma transacción que el cambio: los ven Prisma, `createMany`,
+// SQL directo y los scripts por igual.
+//
+// ── DOS HISTORIAS, UNA SOLA SECUENCIA ───────────────────────────────────────
+//
+// `CostoBaseVersion` guarda el estado de ProductoBase que decide el costo y su
+// escala; `CostoUbicacionVersion`, el de ProductoLocal. Las dos toman su
+// `version` de la MISMA secuencia, `libro_costo_seq`: el orden entre cualquier
+// par de versiones es total aunque compartan instante o transacción. `txid` es
+// la transacción que las produjo, para juntar lo que hizo una misma operación
+// (la base y la propagación a sus locales, por ejemplo).
+//
+// ── CADA VERSIÓN ES EL ESTADO COMPLETO ──────────────────────────────────────
+//
+// No es un parche: se lee sola, sin recorrer las anteriores. `camposCambiados`
+// dice qué movió un CAMBIO, y un UPDATE que no mueve nada de esto no deja fila.
+// La BAJA lleva el último estado conocido y la identidad congelada: desde su
+// instante, la fila ya no existe.
+//
+// ── LO QUE NO SE GUARDA, A PROPÓSITO ────────────────────────────────────────
+//
+// El costo EFECTIVO de una ubicación no se guarda: se reconstruye con la regla
+// que ya existe, `precioDeLaUbicacion(base, local)`, sobre la versión de la base
+// y la de la ubicación vigentes al mismo instante. Guardarlo sería una segunda
+// verdad. Tampoco se convierte nada: la escala se guarda cruda —unidad, factor,
+// peso, modos, combo, depósito— y la conversión es la de
+// `lib/conversiones/costoPorUnidadFisica.js`.
+//
+// ── POR QUÉ NINGUNA COLUMNA TIENE CLAVE FORÁNEA ─────────────────────────────
+//
+// Porque el libro tiene que sobrevivir a lo que describe: un producto borrado
+// sigue teniendo su historia. Mismo criterio que MovimientoStock.
+//
+// ── CUÁNDO EMPIEZA ──────────────────────────────────────────────────────────
+//
+// Esta estructura está inerte hasta que alguien llama a
+// `libro_costo_activar()`: ahí se instalan los triggers de captura y se escribe
+// el PUNTO_CERO, en una sola transacción. Antes del punto cero el libro no sabe
+// nada y no inventa nada. Las funciones, los triggers y la activación viven en la
+// migración `20260929120000_libro_costos`; el procedimiento, en
+// `docs/architecture/libro-de-costos.md`.
+enum TipoVersionCosto {
+  // El estado observado al activarse el libro. No dice "desde cuándo": dice
+  // "esto había cuando el libro empezó a mirar".
+  PUNTO_CERO
+  // La fila nace después del punto cero.
+  ALTA
+  // Cambió al menos un campo de los que el libro guarda. `camposCambiados` dice
+  // cuáles; el resto de la fila es el estado completo.
+  CAMBIO
+  // La fila se borra, o deja de ser esta fila (otro local, otra base). Lleva el
+  // último estado conocido.
+  BAJA
+}
+
+model CostoBaseVersion {
+  // De `libro_costo_seq`, compartida con CostoUbicacionVersion. La asigna el
+  // trigger: nadie más escribe esta tabla.
+  version        BigInt           @id
+  productoBaseId Int
+  grupoId        Int
+  tipo           TipoVersionCosto
+  instante       DateTime         @db.Timestamp(3)
+  // El día argentino del instante (America/Argentina/Cordoba), el mismo reloj
+  // que el libro de stock.
+  dia            DateTime         @db.Date
+
+  // El costo tal como está cargado: $/kg para lo que se mide en kilos, del
+  // bulto para pack y cajón. Cero se guarda como cero: que no sea un costo
+  // válido lo decide la regla de precios, no el libro.
+  precioCosto         Decimal  @db.Decimal(12, 2)
+  // La escala. En texto y no con los enums de ProductoBase: la historia tiene
+  // que poder leerse aunque mañana cambien los valores de esos enums.
+  unidadMedida        String
+  factorPack          Int?
+  pesoReferenciaKg    Decimal? @db.Decimal(10, 3)
+  pesoEsFijo          Boolean
+  modoCompraProveedor String
+  modoVentaDeposito   String
+  esCombo             Boolean
+
+  camposCambiados String[]
+  origen          String
+  origenRef       String?
+  txid            BigInt
+
+  // Solo en la BAJA: quién era, porque el producto puede no existir más.
+  nombreCongelado      String?
+  codigoBarraCongelado String?
+
+  // El estado de un producto a un instante: la versión con mayor `instante`
+  // menor o igual —el candado de la fila hace que, dentro de un producto,
+  // `instante` y `version` crezcan juntos—. Y su historia ordenada.
+  @@index([productoBaseId, instante, version])
+  @@index([txid])
+}
+
+model CostoUbicacionVersion {
+  version         BigInt           @id
+  productoLocalId Int
+  productoBaseId  Int
+  localId         Int
+  tipo            TipoVersionCosto
+  instante        DateTime         @db.Timestamp(3)
+  dia             DateTime         @db.Date
+
+  // CRUDO: el costo propio de la ubicación, o NULL si hereda el de la base. El
+  // efectivo es `precioDeLaUbicacion(base, esto)`.
+  precioCosto Decimal? @db.Decimal(12, 2)
+  // Congelado: si la ubicación era depósito en ese momento. Decide si el stock
+  // de peso fijo se cuenta en piezas o en kilos.
+  esDeposito  Boolean
+
+  camposCambiados String[]
+  origen          String
+  origenRef       String?
+  txid            BigInt
+
+  // El estado de todas las ubicaciones de un local a un instante —lo que pide
+  // el Stock Diario de ese local— y la historia de una sola.
+  @@index([localId, productoLocalId, instante, version])
+  @@index([txid])
+}
+
+// La activación del libro: una sola fila, escrita por `libro_costo_activar()`
+// en la misma transacción que el punto cero. Si no existe, el libro no está
+// activo; si la activación falló, no existe ni ella ni nada del punto cero.
+model LibroCostoActivacion {
+  id                Int      @id
+  instante          DateTime @db.Timestamp(3)
+  // El día de la activación es PARCIAL: el primer día completo es el siguiente.
+  dia               DateTime @db.Date
+  txid              BigInt
+  // Cotas EXCLUSIVAS: todas las versiones del punto cero están estrictamente
+  // entre las dos, y todo lo posterior es mayor que `versionHasta`.
+  versionDesde      BigInt
+  versionHasta      BigInt
+  cantidadBase      Int
+  cantidadUbicacion Int
+  // md5 del estado de las fuentes en el instante del punto cero, con el mismo
+  // formato que `libro_costo_huella_punto_cero()` calcula sobre las versiones:
+  // se puede volver a comprobar en cualquier momento.
+  huellaBase        String
+  huellaUbicacion   String
+}
+
+// ---------------------------------------------------------------------------
 // COMBOS EXCLUSIVOS POR LOCAL (E1)
 // ---------------------------------------------------------------------------
 // Composición de un combo (ProductoBase.es_combo = true) atada a UNA ubicación.

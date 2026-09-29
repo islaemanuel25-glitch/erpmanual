@@ -129,15 +129,24 @@ try {
   c = await crearClientePrisma({ nivel: ESCRITURA, url: urlPrueba });
 
   // ══════════════════════════════════════════════════════════════════════════
-  seccion("B. Hoy nadie lee el origen de costo");
+  seccion("B. Declarar el origen no puede cambiar un valor");
   // ══════════════════════════════════════════════════════════════════════════
-  // Antes de instalar la captura: ninguna función de la base menciona la
-  // configuración. Si la leyera un trigger, declarar podría cambiar un valor.
+  // Antes de instalar la captura de esta prueba. Lo único que lee la
+  // configuración son las dos funciones del Libro de Costos
+  // (`20260929120000_libro_costos`), que solo la copian a la historia. Y con el
+  // libro sin activar, ningún trigger de las tablas de costo las llama: declarar
+  // no cambia ni un valor ni una escritura.
   const lectores = await c.$queryRawUnsafe(
-    `SELECT count(*)::int AS n FROM pg_proc WHERE prosrc LIKE '%' || $1 || '%'`,
+    `SELECT coalesce(array_agg(proname::text ORDER BY proname), '{}') AS n FROM pg_proc WHERE prosrc LIKE '%' || $1 || '%'`,
     CONFIG_COSTO_ORIGEN
   );
-  igual("ninguna función de PostgreSQL lee la configuración de origen de costo", lectores[0].n, 0);
+  igual("solo las funciones de origen del Libro de Costos leen la configuración", lectores[0].n, ["libro_costo_origen", "libro_costo_origen_ref"]);
+  const triggersDeCosto = await c.$queryRawUnsafe(
+    `SELECT count(*)::int AS n FROM pg_trigger t JOIN pg_class k ON k.oid = t.tgrelid
+     WHERE NOT t.tgisinternal AND k.relname IN ('ProductoBase', 'ProductoLocal', 'Local')
+       AND t.tgfoid IN (SELECT oid FROM pg_proc WHERE proname LIKE 'libro\\_costo\\_%')`
+  );
+  igual("y con el libro sin activar, ningún trigger de ProductoBase, ProductoLocal ni Local las usa", triggersDeCosto[0].n, 0);
 
   for (const sentencia of CAPTURA) await c.$executeRawUnsafe(sentencia);
   const capturas = (desde) =>
