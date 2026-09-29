@@ -144,15 +144,30 @@ Con autorización expresa y por el camino de `/deploy`, nunca a mano:
    existe, toda base nueva construida con las migraciones —CI, desarrollo—
    nace ACTIVADA con un punto cero vacío, y el TRUNCATE de la base entera que
    hacen los scripts de desarrollo se rechaza [probado].
-2. Si el deploy falla por el candado (P3018 con 55P03), hay que comprobar el
-   estado: `SELECT * FROM libro_costo_estado()` tiene que decir INTENTO_FALLIDO,
-   sin restos.
-3. Después, `prisma migrate resolve --rolled-back <esa migración>`. El estado
-   vuelve a NO_ACTIVADO y cuenta el intento revertido.
-4. Reintentar el deploy fuera de hora pico.
+2. Si el deploy falla, se corre el diagnóstico de solo lectura
+   `scripts/deploy/diagnostico-recuperacion-libro-costos.sql`. Dice
+   CASO_1_RECUPERABLE solo si el fallo es el lock timeout de
+   `libro_costo_activar()` y no dejó nada: la activación es la única fallida,
+   del archivo exacto y sin pasos; el libro está vacío; y
+   `libro_costo_estado()` dice INTENTO_FALLIDO [probado]. El estado solo no
+   alcanza: ante una falla SQL distinta también dice INTENTO_FALLIDO [probado].
+3. Con CASO 1, la recuperación tipada. La guardia de migraciones rechaza
+   cualquier otro `resolve`, y deja pasar solo este texto exacto
+   (`lib/deploy/recuperacionLibroCostos.mjs`) [código]:
+
+   `ssh vps-erp 'cd /srv/produccion/erpazul && docker exec -i erpazul_db psql -U erpazul -d erpazul -X -q -v ON_ERROR_STOP=1 -v modo=recuperar -f - < scripts/deploy/diagnostico-recuperacion-libro-costos.sql && docker compose -f docker-compose.prod.yml run --rm -T --no-deps app prisma migrate resolve --rolled-back 20260929200000_libro_costo_activacion'`
+
+   El estado vuelve a NO_ACTIVADO y cuenta el intento revertido. Nunca
+   `--applied`: dejaría el libro sin activar y a Prisma creyendo que sí.
+4. Reintentar el deploy fuera de hora pico. Son dos intentos por ventana como
+   máximo. El procedimiento completo está en el skill `/deploy`, en "La
+   excepción de la activación del Libro de Costos".
 
 La prueba ejerce los cuatro pasos con `migrate deploy` real y la migración real
-del árbol, sobre una base descartable [probado]. También aplica ese mismo
+del árbol, sobre una base descartable [probado]. La recuperación tipada —el
+diagnóstico, la cadena con la forma exacta del comando y cada estado en que
+tiene que frenar— la ejerce `scripts/pruebas-db/recuperacionLibroCostos.mjs`
+[probado]. También aplica ese mismo
 archivo dos veces: la segunda falla con `LIBRO_COSTO_YA_ACTIVADO` y no deja
 nada [probado].
 

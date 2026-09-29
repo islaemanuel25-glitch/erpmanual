@@ -190,8 +190,9 @@ process.stdin.on("end", async () => {
   const previa = decidirPorComando(comando);
   if (previa.accion !== "clasificar") {
     // Dejan rastro los que pasan avisando: la autorización manual, que pasa sin
-    // que nadie haya mirado qué entra, y la recuperación tipada de libro_stock,
-    // que escribe en _prisma_migrations. Cada una con su nombre. El rechazo del
+    // que nadie haya mirado qué entra, y las recuperaciones tipadas —libro_stock
+    // y la activación del Libro de Costos—, que escriben en _prisma_migrations.
+    // Cada una con su nombre. El rechazo del
     // db push no hace falta anotarlo, porque frena y por lo tanto se ve.
     if (previa.accion === "allow" && previa.aviso) dejarRastro(comando, previa.rastro);
     responder(previa.accion, previa.razon, previa.aviso);
