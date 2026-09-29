@@ -19,9 +19,57 @@ Si la lista está vacía, el despliegue es solo de código.
 Producción está en **44 migraciones** y el árbol también. **Ninguna** pendiente:
 el despliegue siguiente es solo de código.
 
-Producción corre `0e50ce5b14f886d4b6624352117cf564d75efd42` (despliegue del
+Producción corre `4b9ac04d4c5a691041749b8281ccacc9254df794` (despliegue del
 2026-09-29, nota abajo). Un commit posterior a ese que solo cambie
 documentación —como el que escribe esta nota— **no se despliega por eso**.
+
+---
+
+## `4b9ac04d`: desplegado el 2026-09-29. La API de Gastos, sin migraciones
+
+Despliegue **solo de código**: el merge de la PR #111, desde
+`0e50ce5b14f886d4b6624352117cf564d75efd42`. No aplicó ninguna migración:
+`20260929230000_gastos` ya estaba aplicada desde el despliegue anterior (nota de
+abajo). **Lo que sigue es lo que informó el despliegue**, corrido desde el acceso
+al VPS y no desde la sesión que escribe esta nota.
+
+**Identidad.** `4b9ac04d4c5a691041749b8281ccacc9254df794` en `origin/main`, el
+HEAD del VPS, la imagen, `APP_BUILD_ID`, `APP_IMAGE` y `/api/version`.
+
+**Migraciones.** 44 en el árbol, **44 aplicadas**, ninguna pendiente ni
+fallida, y `migrate status` cerró con "Database schema is up to date!". Sin
+`migrate resolve`, sin recuperación, sin rollback y sin SQL de escritura a mano.
+
+**Lo que llegó.** Las rutas `GET` y `POST /api/finanzas/gastos`,
+`GET /api/finanzas/gastos/categorias`, `GET /api/finanzas/gastos/[gastoId]` y
+`POST /api/finanzas/gastos/[gastoId]/pagos`, y `turnos-operativos` abriendo
+también con el permiso de gastos. Sin sesión contestan 401. No se hizo una
+sonda autenticada en producción porque no hay una documentada; la conducta con
+sesión la cubren las pruebas contra PostgreSQL del CI de la PR #111
+(`scripts/pruebas-db/gastosApi.mjs`).
+
+**Los datos, sin cambios.** `CategoriaGasto` con sus **7** categorías; `Gasto` y
+`PagoGasto` con **0** filas; `CajaMovimientoDePago` con **2**, las de la copia:
+el movimiento 772 del `PagoProveedor` 1 y el 1030 del `PagoProveedor` 2.
+
+**Los libros, intactos.**
+
+- Libro de Costos: **ACTIVADO**, con la activación id 1 y su Punto Cero —3.131
+  bases, 12.533 ubicaciones, **15.664** versiones PUNTO_CERO—, las huellas y los
+  **6** triggers sin cambios.
+- Libro de Stock: integridad física en verde, con el Punto Cero de **12.278**
+  filas del 2026-09-28 00:19:13.587 UTC. Al control tenía 16.117 movimientos, de
+  los cuales 3.839 SIN_ORIGEN: es el libro registrando la operación normal.
+
+**El despliegue.**
+
+- Backup PRE: `/srv/produccion/backups/pre-4b9ac04d_20260929_151334.sql.gz`,
+  7.458.559 bytes, SHA-256
+  `5a4f47ab157e4ded901007aa5c33e0a35090aa677c42498dcfa087229480955f`.
+- Sonda PRE en verde (corrida 36588465366) y sonda POST en verde (corrida
+  36588727965).
+- Salud después: la app arriba y sin reinicios, PostgreSQL healthy y `/login`
+  con 200. Sin errores nuevos, sin esperas de locks y sin transacciones largas.
 
 ---
 
