@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-09-28 22:25
+**Última actualización:** 2026-09-29 22:14
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -112,7 +112,7 @@ cada ubicación, un día o un período. **Se deriva del libro al consultar**: no
 foto diaria, ni cron, ni tabla de saldos. La semántica está en
 `lib/stock/libro/stockDiario.js` (puro) y las consultas en
 `lib/stock/libro/stockDiarioServer.js`. Se consulta por la API de solo lectura
-de más abajo; todavía no hay pantalla. Para mirar un local desde la terminal está
+de más abajo y por la pantalla móvil —"La pantalla del Stock Diario", más abajo—. Para mirar un local desde la terminal está
 `scripts/stock-diario.mjs`, de solo lectura.
 
 - **El día** es el argentino, la columna `dia` que la base calculó al escribir el
@@ -148,6 +148,16 @@ El contrato, la parte pura, vive en `lib/stock/libro/stockDiarioApi.js`.
   "aparece con" y "desaparece con". Trae además los conteos de productos, con
   movimientos, que aparecen, que desaparecen, reinterpretados y sin clasificar.
   Fuera de historia, totales y conteos van en `null`.
+  Desde la pantalla móvil trae también **conteos, no cantidades**, para no sumar
+  UNIDAD con KG *(verificado contra PostgreSQL, sección B.bis)*:
+  - `totales.cantidad.movimientosDeEntrada` y `movimientosDeSalida`, y lo mismo
+    en `totales.enTransito`. Son los mismos CAMBIO que suman `entradas` y
+    `salidas`, con el mismo filtro de la consulta, contados. ALTA, BAJA y el
+    punto de partida no son entrada ni salida; un SIN_ORIGEN tiene dirección y
+    además cuenta como sin clasificar.
+  - `conteos.conTransitoAlCierre`: los productos que TERMINAN el período con
+    tránsito, mirando el cierre —en curso, el ahora—. No los que movieron
+    tránsito: uno que lo abrió y lo cerró en el período no cuenta.
 - `productos`: una fila por cadena física que existió en el período, con
   identidad, apertura, cierre y lo que se movió. Se pagina con `page` y
   `pageSize` —50 por defecto, 200 como tope, más es 400— y se filtra con
@@ -221,6 +231,26 @@ y el verificador del libro lo marca en rojo. **La equivalencia depende de que el
 verificador esté verde.** Si alguna vez una actualización de tzdata cambiara
 retroactivamente la regla de la zona, el verificador lo vería antes que la API.
 
+### La pantalla del Stock Diario
+
+`/modulos/stock_locales/diario`, en el menú Stock al lado de Stock Locales —sin
+reemplazarlo— y con `stock.ver`, el permiso de las rutas. Es el diseño móvil de
+Figma (`EVJ2KvVCrY0oVSowfboymQ`, nodos 300:478 y 300:676), armado con las piezas
+de las pantallas por período *(verificado en código,
+`components/stock_diario/` y `lib/stock/libro/stockDiarioPantalla.js`)*:
+
+- Día, Semana y Mes se piden con `unidad` y `fecha`; **Otro** es el rango
+  `desde`/`hasta` de la API, con `SunmiDateRangePicker`. Las flechas navegan con
+  las puntas que devuelve el servidor, así que la semana es siempre la de Semana
+  Operativa y la pantalla no calcula ninguna.
+- Cada producto dice "Apertura X → Ahora Y" en curso y "→ Cierre Y" completo. Lo
+  desconocido dice "No disponible" y lo que no existe "No existe" —un producto
+  eliminado, uno que apareció—; en los dos casos no hay variación.
+- La lista es la de `con_movimientos`, paginada de a 50, y la búsqueda va al
+  servidor.
+- **Pendiente de diseño:** el detalle del producto. El "Ver ›" del diseño no se
+  dibuja, y la fila no es tocable, hasta que el detalle exista en Figma.
+
 ### Un posible hueco de alcance en Transferencias (sin corregir)
 
 *(Leído en código, no ejercido.)* En `app/api/transferencias/tablero/route.js`,
@@ -232,6 +262,7 @@ la API del Stock Diario y no se tocó; hay que confirmarlo ejerciéndolo antes d
 corregirlo.
 
 ## Cambios recientes
+- 2026-09-29: feat(stock): Stock Diario móvil — la pantalla del diseño, sobre la API que ya existía
 - 2026-09-28: fix(stock): el ajuste y los límites del peso fijo en el depósito van en piezas
 - 2026-09-28: feat: declarar el origen de las escrituras de costo para el Libro de Costos
 - 2026-09-28: feat(stock): API de solo lectura del Stock Diario

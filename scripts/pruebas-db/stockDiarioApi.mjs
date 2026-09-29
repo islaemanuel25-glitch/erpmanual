@@ -223,10 +223,24 @@ try {
     });
     await upd(P.origen.sl, `"cantidad" = 45`);
   });
+  // Un tránsito que se abre y QUEDA abierto: el conteo de productos en tránsito
+  // mira el final del período, y sin una cadena así sería cero siempre. Con
+  // origen declarado, para no sumarle un "sin clasificar" al día del Origen.
+  await g.paso(`${D(-3)} 12:00:00`, () =>
+    c.$transaction(async (tx) => {
+      await declararOrigenDeStock(tx, { origen: "VENTA", referencia: 124 });
+      await tx.$executeRawUnsafe(`UPDATE "StockLocal" SET "enTransito" = 3, "updatedAt" = now() WHERE "id" = ${P.relleno[2].sl}`);
+    })
+  );
   // D(-2) y D(-1): ningún movimiento en A.
   await g.reubicar();
   // Y uno en vivo, con el reloj real: el día en curso.
   await upd(P.uno.sl, `"cantidad" = 13`);
+  // Y un tránsito en vivo: al AHORA del día en curso hay dos productos en tránsito.
+  await c.$transaction(async (tx) => {
+    await declararOrigenDeStock(tx, { origen: "VENTA", referencia: 125 });
+    await tx.$executeRawUnsafe(`UPDATE "StockLocal" SET "enTransito" = 4, "updatedAt" = now() WHERE "id" = ${P.relleno[1].sl}`);
+  });
 
   await c.$transaction((tx) => programarSemanaOperativa(tx, { localId: L.A, diaDeCorte: 1, hoy: H }));
 
@@ -411,6 +425,83 @@ try {
         sin.totales.cantidad.apertura === sin.totales.cantidad.cierre && sin.totales.cantidad.cambioNeto === 0,
       json({ c: sin.conteos, t: sin.totales?.cantidad })
     );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  seccion("B.bis Lo que pide la pantalla: movimientos de entrada y salida, productos en tránsito");
+  // ══════════════════════════════════════════════════════════════════════════
+  {
+    // Contado en la base, aparte del motor: CAMBIO por la dirección, en A.
+    const enLaBase = async (desde, hasta, col) =>
+      (
+        await c.$queryRawUnsafe(
+          `SELECT count(*) FILTER (WHERE "${col}Posterior" > "${col}Anterior")::int AS "e", count(*) FILTER (WHERE "${col}Posterior" < "${col}Anterior")::int AS "s"
+             FROM "MovimientoStock" WHERE "localId" = ${L.A} AND "tipo"::text = 'CAMBIO' AND "dia" BETWEEN '${desde}'::date AND '${hasta}'::date`
+        )
+      )[0];
+    const listaDe = async (params) => (await productosDe(params)).items;
+    const sumaDe = (items, lado, campo) => items.reduce((n, i) => n + (i[lado]?.[campo] ?? 0), 0);
+
+    const d5 = await resumenDe({ fecha: D(-5) });
+    const b5 = await enLaBase(D(-5), D(-5), "cantidad");
+    const bt5 = await enLaBase(D(-5), D(-5), "enTransito");
+    ok(
+      "COMPLETO: 1 movimiento de entrada y 3 de salida de cantidad —conteos, no cantidades—, los mismos que cuenta la base",
+      d5.totales.cantidad.movimientosDeEntrada === 1 && d5.totales.cantidad.movimientosDeSalida === 3 &&
+        b5.e === 1 && b5.s === 3 && d5.totales.cantidad.entradas === 2.5,
+      json({ t: d5.totales.cantidad, base: b5 })
+    );
+    ok(
+      "y el tránsito se cuenta aparte: entró una vez y salió una vez",
+      d5.totales.enTransito.movimientosDeEntrada === bt5.e && d5.totales.enTransito.movimientosDeSalida === bt5.s && bt5.e === 1 && bt5.s === 1,
+      json({ t: d5.totales.enTransito, base: bt5 })
+    );
+    const items5 = await listaDe({ fecha: D(-5) });
+    ok(
+      "el resumen y el listado cuentan igual: la suma de las filas es el total",
+      sumaDe(items5, "cantidad", "movimientosDeEntrada") === 1 && sumaDe(items5, "cantidad", "movimientosDeSalida") === 3,
+      json(items5.map((i) => [i.productoLocalId, i.cantidad?.movimientosDeEntrada, i.cantidad?.movimientosDeSalida]))
+    );
+    const det = await llamar("producto", { productoLocalId: P.gemelo.pl, fecha: D(-5) }, como(S.encargadoA));
+    ok("y el detalle de una cadena cuenta igual que su fila: Gemelo, dos salidas", det.producto.cantidad.movimientosDeSalida === 2 && item({ items: items5 }, P.gemelo).cantidad.movimientosDeSalida === 2);
+    ok(
+      "movió tránsito y lo cerró en cero: NO es un producto en tránsito",
+      d5.conteos.conTransitoAlCierre === 0,
+      json(d5.conteos)
+    );
+
+    const d3 = await resumenDe({ fecha: D(-3) });
+    ok(
+      "el sin clasificar no se inventa entrada ni salida: el día del Origen tiene 2 salidas (una VENTA, una sin origen) y 1 sin clasificar",
+      d3.totales.cantidad.movimientosDeEntrada === 0 && d3.totales.cantidad.movimientosDeSalida === 2 && d3.totales.movimientosSinClasificar === 1,
+      json({ t: d3.totales.cantidad, s: d3.totales.movimientosSinClasificar })
+    );
+    ok("COMPLETO: el tránsito que se abrió ese día y quedó abierto cuenta al cierre", d3.conteos.conTransitoAlCierre === 1, json(d3.conteos));
+    const d2 = await resumenDe({ fecha: D(-2) });
+    ok("un día sin movimientos que TERMINA con tránsito lo cuenta: es el estado al final, no lo que se movió", d2.conteos.conTransitoAlCierre === 1 && d2.totales.movimientos === 0, json(d2.conteos));
+
+    const ahora = await resumenDe({});
+    ok(
+      "EN_CURSO: los productos en tránsito AHORA son dos, y la salida en vivo se cuenta",
+      ahora.estado === ESTADO_DEL_DIA.EN_CURSO && ahora.conteos.conTransitoAlCierre === 2 && ahora.totales.cantidad.movimientosDeSalida >= 1,
+      json({ c: ahora.conteos, t: ahora.totales.cantidad })
+    );
+    const itemsAhora = await listaDe({});
+    ok(
+      "y son los mismos que el listado muestra con tránsito en su 'Ahora'",
+      itemsAhora.filter((i) => i.cierre.existencia === EXISTENCIA.EXISTE && i.cierre.enTransito > 0).length === 2,
+      json(itemsAhora.filter((i) => i.cierre.enTransito > 0).map((i) => i.nombre))
+    );
+
+    const parcial = await resumenDe({ fecha: PC });
+    ok(
+      "PARCIAL: el cierre se conoce, así que los conteos también; la apertura sigue siendo null",
+      parcial.estado === ESTADO_DEL_DIA.PARCIAL_PUNTO_CERO && parcial.conteos.conTransitoAlCierre === 0 &&
+        typeof parcial.totales.cantidad.movimientosDeEntrada === "number" && parcial.totales.cantidad.apertura === null,
+      json({ c: parcial.conteos, t: parcial.totales.cantidad })
+    );
+    const fuera = await resumenDe({ fecha: D(-7) });
+    ok("FUERA_DE_HISTORIA: ni conteos ni totales, null y no cero", fuera.conteos === null && fuera.totales === null, json(fuera));
   }
 
   // ══════════════════════════════════════════════════════════════════════════
