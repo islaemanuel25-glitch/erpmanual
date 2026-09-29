@@ -325,6 +325,17 @@ jobs:
       - name: Recuperación del libro de stock (lock timeout → resolve --rolled-back)
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/recuperacionLibroStock.mjs
 
+      # ── EL LIBRO DE COSTOS ────────────────────────────────────────────────
+      #
+      # Inerte hasta la activación; la activación que no consigue su candado no
+      # deja nada; el punto cero con su huella; la captura por Prisma, SQL
+      # directo y la ruta real de eliminar producto; la historia que no se toca;
+      # la escala que alcanza para `costoPorUnidadFisica`; y la activación por
+      # migración con P3018/55P03, `resolve --rolled-back` y reintento. Bases
+      # descartables, borradas al terminar.
+      - name: Libro de costos (activación, captura, inmutabilidad, escala)
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/libroCostos.mjs
+
       # ── LA PREGUNTA QUE DECIDE EL DESPLIEGUE ──────────────────────────────
       #
       # Producción conserva sus 105 migraciones viejas en `_prisma_migrations` y

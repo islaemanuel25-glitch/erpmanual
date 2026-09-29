@@ -519,7 +519,11 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // Y a 41 el mismo día: entró `20260928150000_stock_diario_indice`, un solo
   // índice sobre `MovimientoStock` para el Stock Diario. Aditiva, sin tocar
   // ninguna tabla de transferencias ni rellenar nada.
-  assert.equal(migraciones.length, 41, "aparecio una migracion que nadie declaro aca");
+  // Sube a 42 el 2026-09-29: entró `20260929120000_libro_costos`, el Libro de
+  // Costos INERTE —tres tablas nuevas, sus funciones y la inmutabilidad—. No
+  // crea triggers sobre ninguna tabla existente hasta que se lo active, así que
+  // la recepción escribe igual que antes.
+  assert.equal(migraciones.length, 42, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

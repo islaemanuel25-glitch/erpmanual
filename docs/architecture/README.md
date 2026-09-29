@@ -17,6 +17,8 @@ así.
   escrituras y qué NO cubre.
 - [themes.md](themes.md) — tres capas de tema apiladas y quién gana.
 - [despliegue.md](despliegue.md) — por qué el VPS no construye.
+- [libro-de-costos.md](libro-de-costos.md) — la historia inmutable de costos:
+  qué captura, cómo se activa sin huecos y qué hacer si la activación falla.
 - [base-de-pruebas-v15.md](base-de-pruebas-v15.md) — la base descartable
   `erpazul_v15`, cómo se recrea y las trampas del arnés.
 - [permisos-y-directorios-del-vps.md](permisos-y-directorios-del-vps.md) — qué
