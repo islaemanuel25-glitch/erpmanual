@@ -4,7 +4,9 @@ import { useState, useEffect, useRef } from "react";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
-import { toUnidades, fromUnidades } from "@/lib/conversiones/stock";
+import { toUnidades, fromUnidades, piezasToKg } from "@/lib/conversiones/stock";
+import { presentacionCantidadStock, unidadFisicaDeItem } from "@/lib/stock/presentacion";
+import { UNIDAD_FISICA_STOCK, motivoCantidadNoAdmitida } from "@/lib/stock/escalaFisica";
 import { useNumberInputHandlers } from "@/hooks/useNumberInputHandlers";
 
 export default function ModalAjuste({ open, onClose, producto, local }) {
@@ -40,6 +42,17 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
   const esDeposito = local?.esDeposito || local?.es_deposito || false;
   const usarBultos = esDeposito && factorPack > 1 && (unidadMedida === "pack" || unidadMedida === "cajon");
 
+  // ── LA UNIDAD DE LA FILA, NO LA DEL CATÁLOGO ─────────────────────────────
+  //
+  // Acá se decidía "kg" mirando solo `unidadMedida`, y un producto de peso fijo
+  // en el depósito —guardado en PIEZAS— se mostraba "6.000 kg" y pedía kilos,
+  // mientras la tabla y la tarjeta decían "6 pzs". La cantidad que se manda
+  // sigue siendo la de la fila: piezas en el depósito, kilos en un local. Lo
+  // único que cambia es que el rótulo dice la verdad.
+  const unidadFisica = unidadFisicaDeItem(producto, esDeposito);
+  const esPieza = unidadFisica === UNIDAD_FISICA_STOCK.PIEZA;
+  const esKg = unidadFisica === UNIDAD_FISICA_STOCK.KG;
+
   // Calcular total en unidades
   const totalUnidades = usarBultos
     ? toUnidades({
@@ -58,6 +71,11 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
           ? "La cantidad no puede ser negativa"
           : "La cantidad debe ser mayor a 0"
       );
+      return;
+    }
+    const noAdmitida = motivoCantidadNoAdmitida(totalUnidades, unidadFisica);
+    if (noAdmitida) {
+      alert(noAdmitida);
       return;
     }
 
@@ -168,10 +186,15 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
               <p className="text-[13px] mt-2 px-3 py-2 rounded sunmi-surface-soft">
                 Stock actual:{" "}
                 <strong className="sunmi-text-strong">
-                  {unidadMedida === "kg"
-                    ? `${stockNum.toFixed(3)} kg`
+                  {esPieza || esKg
+                    ? presentacionCantidadStock(producto, esDeposito).texto
                     : `${Math.round(stockNum)} unidades`}
                 </strong>
+                {esPieza && stockNum > 0 && (
+                  <span className="sunmi-text-muted">
+                    {` · equivale a ${piezasToKg(stockNum, producto.pesoReferenciaKg).toFixed(3)} kg`}
+                  </span>
+                )}
               </p>
             );
           })()}
@@ -231,18 +254,21 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
                 {/* Solo unidades / kg */}
                 <div>
                   <label className="text-[11px] sunmi-label mb-1 block">
-                    {unidadMedida === "kg" ? "Cantidad (kg)" : "Cantidad (unidades)"}
+                    {esPieza ? "Cantidad (pzs)" : esKg ? "Cantidad (kg)" : "Cantidad (unidades)"}
                   </label>
                   <SunmiInput
                     ref={cantidadRef}
                     type="number"
                     placeholder="0"
                     min={0}
-                    step={unidadMedida === "kg" ? 0.001 : 1}
+                    step={esKg ? 0.001 : 1}
                     value={sueltas || bultos}
                     onChange={(e) => {
                       const raw = e.target.value;
-                      if (unidadMedida !== "kg") {
+                      // La pieza queda como se escribió: si trae decimales, el
+                      // guardado la RECHAZA diciendo por qué, en vez de
+                      // truncarla en silencio a otra cantidad.
+                      if (!esKg && !esPieza) {
                         const entero = raw === "" ? "" : String(parseInt(raw, 10) || 0);
                         setSueltas(entero);
                       } else {

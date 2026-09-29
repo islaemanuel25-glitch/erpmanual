@@ -5,6 +5,8 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import { toUnidades, fromUnidades } from "@/lib/conversiones/stock";
+import { unidadFisicaDeItem } from "@/lib/stock/presentacion";
+import { UNIDAD_FISICA_STOCK, motivoCantidadNoAdmitida } from "@/lib/stock/escalaFisica";
 import { useNumberInputHandlers } from "@/hooks/useNumberInputHandlers";
 
 export default function ModalLimites({ open, onClose, producto, local }) {
@@ -16,6 +18,23 @@ export default function ModalLimites({ open, onClose, producto, local }) {
   const unidadMedida = producto?.unidadMedida || producto?.unidad_medida || "unidad";
   const esDeposito = local?.esDeposito || local?.es_deposito || false;
   const usarBultos = esDeposito && factorPack > 1 && (unidadMedida === "pack" || unidadMedida === "cajon");
+
+  // Los límites se comparan contra `StockLocal.cantidad`, así que van en la
+  // unidad de la fila: piezas para el peso fijo en el depósito, no kilos. La
+  // misma decisión que el modal de ajuste, la tabla y la tarjeta.
+  const unidadFisica = producto ? unidadFisicaDeItem(producto, esDeposito) : null;
+  const esPieza = unidadFisica === UNIDAD_FISICA_STOCK.PIEZA;
+  const esKg = unidadFisica === UNIDAD_FISICA_STOCK.KG;
+  const sufijo = usarBultos ? " (bultos)" : esPieza ? " (pzs)" : "";
+  const alEscribir = (set) => (e) => {
+    const raw = e.target.value;
+    // La pieza queda como se escribió y el guardado rechaza los decimales.
+    if (!esKg && !esPieza) {
+      set(raw === "" ? "" : String(parseInt(raw, 10) || 0));
+    } else {
+      set(raw);
+    }
+  };
 
   useEffect(() => {
     if (open && producto) {
@@ -60,6 +79,14 @@ export default function ModalLimites({ open, onClose, producto, local }) {
       // Si depósito pack, convertir bultos → unidades antes de enviar
       const minVal = minimo === "" ? null : Number(minimo);
       const maxVal = maximo === "" ? null : Number(maximo);
+      const noAdmitido = [minVal, maxVal]
+        .filter((v) => v !== null)
+        .map((v) => motivoCantidadNoAdmitida(v, unidadFisica))
+        .find(Boolean);
+      if (noAdmitido) {
+        alert(noAdmitido);
+        return;
+      }
 
       const body = {
         modo: "limites",
@@ -145,23 +172,16 @@ export default function ModalLimites({ open, onClose, producto, local }) {
             {/* Min */}
             <div>
               <label className="text-[11px] sunmi-label mb-1 block">
-                {usarBultos ? "Stock mínimo (bultos)" : "Stock mínimo"}
+                {`Stock mínimo${sufijo}`}
               </label>
               <SunmiInput
                 ref={minimoRef}
                 type="number"
                 placeholder={usarBultos ? "0 bultos" : "0"}
                 min={0}
-                step={unidadMedida === "kg" ? 0.001 : 1}
+                step={esKg ? 0.001 : 1}
                 value={minimo}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  if (unidadMedida !== "kg") {
-                    setMinimo(raw === "" ? "" : String(parseInt(raw, 10) || 0));
-                  } else {
-                    setMinimo(raw);
-                  }
-                }}
+                onChange={alEscribir(setMinimo)}
                 onKeyDown={(e) => e.key === "Enter" && guardar()}
                 onWheel={handleWheel}
                 onFocus={handleFocus}
@@ -172,22 +192,15 @@ export default function ModalLimites({ open, onClose, producto, local }) {
             {/* Max */}
             <div>
               <label className="text-[11px] sunmi-label mb-1 block">
-                {usarBultos ? "Stock máximo (bultos)" : "Stock máximo"}
+                {`Stock máximo${sufijo}`}
               </label>
               <SunmiInput
                 type="number"
                 placeholder={usarBultos ? "0 bultos" : "0"}
                 min={0}
-                step={unidadMedida === "kg" ? 0.001 : 1}
+                step={esKg ? 0.001 : 1}
                 value={maximo}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  if (unidadMedida !== "kg") {
-                    setMaximo(raw === "" ? "" : String(parseInt(raw, 10) || 0));
-                  } else {
-                    setMaximo(raw);
-                  }
-                }}
+                onChange={alEscribir(setMaximo)}
                 onKeyDown={(e) => e.key === "Enter" && guardar()}
                 onWheel={handleWheel}
                 onFocus={handleFocus}
