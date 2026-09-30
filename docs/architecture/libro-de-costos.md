@@ -206,10 +206,12 @@ estado a las 00:00—, combinadas con `precioDeLaUbicacion`; el primer día
 valorizable es el siguiente a `LibroCostoActivacion.dia`; un costo que falta
 deja la cadena fuera del total y nombrada, nunca en cero; y el cruce con el
 punto cero del libro de stock está hecho: el primer día es el mayor de los dos.
-Lo que sigue abajo era el plan; lo que NO se hizo de él: el tipo
-`NACIÓ_DURANTE_DÍA` y la separación entre REVALORIZACION_POR_COSTO y
-REEXPRESION_POR_ESCALA por `camposCambiados`. Hoy un cambio de escala entre
-días entra entero en "revalorización" [código].
+Lo que sigue abajo era el plan. Desde el 2026-10-01 también está hecho:
+un producto que nace durante el día vale ese día con el costo de su ALTA, y la
+diferencia de costo entre días se separa en revalorización por costo y
+reexpresión por escala. La separación NO lee `camposCambiados`: compara las
+dos versiones vigentes y usa un costo intermedio —el costo comercial nuevo con
+la escala vieja— [código] [probado]. El detalle, en `docs/modulos/stock.md`.
 
 - **Antes del punto cero:** sin historia económica confiable. El libro no
   inventa nada.

@@ -246,8 +246,13 @@ pack x6 se leían "36 PACK". **El libro estaba bien; mentía el rótulo.** Desde
 entonces la cantidad se lee con `presentacionCantidadStock`
 (`lib/stock/presentacion.js`), la misma que la tabla y la tarjeta de Stock
 Locales: en el depósito un pack o cajón con factor se desglosa en bultos +
-sueltas ("4 bultos", "1 bultos + 2 uds"), en un local va en unidades, el kilo
-en kilos y la pieza del depósito en piezas.
+sueltas ("4 bultos", "1 bulto + 2 uds"), en un local va en unidades, el kilo
+en kilos y la pieza del depósito en piezas. Desde el 2026-10-01 el singular es
+"1 bulto" (también "-1 bulto"): la regla es `textoDeBultos` /
+`palabraDeBultos` de ese mismo archivo, y la usan también la tabla y el modal
+de ajuste de Stock Locales, que escribían "bultos" por su cuenta. Cambia solo la
+palabra: número, signo y desglose son los de antes *(candado
+`lib/stock/presentacionBultos.test.mjs`)*.
 
 ## Valor del Stock
 
@@ -271,11 +276,26 @@ cantidades.
 - **Valor inicial:** cantidad al abrir el primer día × su costo congelado.
   **Valor final:** cantidad al cerrar el último día (o ahora) × el costo
   congelado de ese día.
+- **Producto que nace durante el día:** si a las 00:00 la ubicación no existía
+  en el Libro de Costos y ese día tiene su ALTA, ese primer día se valoriza con
+  el costo efectivo del ALTA (la versión de la ubicación y la de su base vigente
+  en ese momento, por la secuencia única del libro), congelado el resto del día.
+  Antes del alta no hay stock que valorizar. Desde el día siguiente, la regla de
+  las 00:00. Si nace sin costo válido, falta. No cambia la regla intradía de un
+  producto que ya existía.
 - **Movimiento físico** de un día: (cierre − apertura) × costo del día.
-  **Revalorización**: apertura del día × (costo del día − costo del anterior).
+  La diferencia de costo entre días, sobre la cantidad al abrir, se parte en
+  dos con un costo intermedio —el costo comercial nuevo leído con la escala
+  vieja, por `costoPorUnidadFisica`—:
+  - **Revalorización** (por costo): Q × C(costo nuevo, escala vieja) − Q × C(viejo).
+  - **Reexpresión por escala**: Q × C(nuevo) − Q × C(costo nuevo, escala vieja).
+    Escala es todo lo que no es el costo comercial: unidad de medida, factor,
+    peso de referencia, modos, combo y si la ubicación es depósito. Un pack de
+    x12 a $1.200 que pasa a x24 a $1.200: 96 unidades pasan de $100 a $50, y los
+    −$4.800 son reexpresión, no revalorización ni movimiento.
   Como el cierre de un día es la apertura del siguiente, `final − inicial =
-  físico + revalorización` es exacta en centavos; la cuenta la verifica y la
-  informa en `cuadra`.
+  físico + revalorización + reexpresión` es exacta en centavos; la cuenta la
+  verifica y la informa en `cuadra`.
 - **La evolución** es el valor al cierre de cada día: fotografías, no se suman.
 - **Costo faltante:** una cadena con cantidad y sin costo válido ese día (sin
   versión, costo cero, combo, unidad desconocida) queda FUERA de los totales,
@@ -294,6 +314,13 @@ cantidades.
 - **Rendimiento:** nueve consultas agrupadas por local, sean un día o un año. El
   candado `valorDelStock.test.mjs` las cuenta con un cliente falso.
 - **SIN_ORIGEN** no se reclasifica: la valorización no lee el origen.
+- **Qué ubicación:** un usuario con local mira la suya y un `localId` ajeno es
+  403. Un admin en vista global elige entre las ubicaciones del grupo activo
+  que ya le da `resolveVistaOperativa`: sin elegir, las rutas contestan 400 con
+  `codigo: "FALTA_UBICACION"` y la lista en `ubicaciones`; con una elegida, 200
+  con la misma lista para cambiar. La pantalla la ofrece con `SunmiSelectAdv` y
+  la guarda en la URL (`localId`). No se suman ubicaciones ni se cambia el
+  contexto de toda la app *(verificado contra PostgreSQL, sección I)*.
 
 ### La pantalla: Valor del Stock
 
