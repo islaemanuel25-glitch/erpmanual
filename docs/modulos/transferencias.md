@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-09-30 11:55
+**Última actualización:** 2026-09-30 17:58
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-09-30: feat(finanzas): Stock Diario pasa a llamarse Valor del Stock y muestra la plata primero
 - 2026-09-30: feat(stock): cada movimiento del Libro de Stock nombra su documento
 - 2026-09-30: refactor(stock): un solo vocabulario para las causas de una diferencia
 - 2026-09-29: fix(finanzas): un movimiento de caja es de a lo sumo un pago, de cualquier tipo

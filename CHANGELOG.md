@@ -8,6 +8,9 @@
 - **stock**: feat(stock): cada movimiento del Libro de Stock nombra su documento
 - **transferencias**: feat(stock): cada movimiento del Libro de Stock nombra su documento
 - **transferencias**: refactor(stock): un solo vocabulario para las causas de una diferencia
+- **stock**: fix(stock): el Stock Diario lee la cantidad del libro con la presentación de Stock Locales
+- **stock**: feat(finanzas): el Valor del Stock — capital en mercadería al abrir y al cerrar un período
+- **stock**: feat(finanzas): Stock Diario pasa a llamarse Valor del Stock y muestra la plata primero
 
 
 ## [2026-09-29] - Actualización: 

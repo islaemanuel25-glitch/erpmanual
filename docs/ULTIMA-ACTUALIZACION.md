@@ -1,12 +1,16 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-30 16:03
+**Fecha:** 2026-09-30 17:58
 
 ## Módulos modificados recientemente
 
 ### stock
-- fix(finanzas): Stock Diario en Finanzas se autoriza con stock.ver, no con finanzas.ver, feat(finanzas): Stock Diario se muda de Stock a Finanzas, feat(stock): cada movimiento del Libro de Stock nombra su documento
-- Archivos: 1 nuevos, 8 modificados (9 total)
+- feat(finanzas): Stock Diario pasa a llamarse Valor del Stock y muestra la plata primero, fix(stock): el Stock Diario lee la cantidad del libro con la presentación de Stock Locales, fix(finanzas): Stock Diario en Finanzas se autoriza con stock.ver, no con finanzas.ver
+- Archivos: 2 nuevos, 10 modificados (12 total)
+
+### transferencias
+- feat(finanzas): Stock Diario pasa a llamarse Valor del Stock y muestra la plata primero, feat(stock): cada movimiento del Libro de Stock nombra su documento, refactor(stock): un solo vocabulario para las causas de una diferencia
+- Archivos: 7 modificados (7 total)
 
 ### pos-ventas
 - feat(stock): cada movimiento del Libro de Stock nombra su documento
@@ -16,12 +20,9 @@
 - feat(stock): cada movimiento del Libro de Stock nombra su documento
 - Archivos: 4 modificados (4 total)
 
-### transferencias
-- feat(stock): cada movimiento del Libro de Stock nombra su documento, refactor(stock): un solo vocabulario para las causas de una diferencia
-- Archivos: 6 modificados (6 total)
-
 
 ## Archivos nuevos desde última sincronización
+- components/stock_diario/ResumenValorDelStock.jsx
 - components/stock_locales/modalAjusteCausa.test.mjs
 
 ## Acción recomendada
