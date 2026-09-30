@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
 import { productoVisibleWhere } from "@/lib/visibilidad";
 import { mapStockItemLocal, mapStockItemDeposito } from "@/lib/stock/mapItem";
 import {
@@ -310,14 +311,19 @@ export async function GET(req) {
           select: { id: true },
         });
         if (nuevos.length) {
-          await prisma.stockLocal.createMany({
-            // stockMin/stockMax en NULL y no en 0: esta fila la está creando el
-            // listado al abrirse, no un encargado configurando límites. Con 0,
-            // "nunca configurado" y "ajustado en cero" quedaban idénticos — y
-            // como acá se crean filas por el solo hecho de MIRAR la pantalla,
-            // ésta era la vía que más contaminaba el dato.
-            data: nuevos.map((pl) => ({ localId, productoId: pl.id, cantidad: 0, stockMin: null, stockMax: null })),
-            skipDuplicates: true,
+          // Una sola sentencia, envuelta solo para decirle al Libro de Stock de
+          // dónde vienen estas filas en cero. No cambia qué se escribe.
+          await prisma.$transaction(async (tx) => {
+            await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.ALTA_AL_LISTAR_STOCK, referencia: String(localId) });
+            await tx.stockLocal.createMany({
+              // stockMin/stockMax en NULL y no en 0: esta fila la está creando el
+              // listado al abrirse, no un encargado configurando límites. Con 0,
+              // "nunca configurado" y "ajustado en cero" quedaban idénticos — y
+              // como acá se crean filas por el solo hecho de MIRAR la pantalla,
+              // ésta era la vía que más contaminaba el dato.
+              data: nuevos.map((pl) => ({ localId, productoId: pl.id, cantidad: 0, stockMin: null, stockMax: null })),
+              skipDuplicates: true,
+            });
           });
         }
       }

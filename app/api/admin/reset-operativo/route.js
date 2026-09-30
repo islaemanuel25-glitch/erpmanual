@@ -5,6 +5,7 @@ import bcrypt from "bcrypt";
 import fs from "fs/promises";
 import path from "path";
 import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
+import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
 
 const TABLAS_PROTEGIDAS_NO_TOCADAS = [
   "Usuario",
@@ -230,6 +231,7 @@ export async function POST(req) {
       deleted = await prisma.$transaction(async (tx) => {
         // Metadata para el Libro de Costos: no cambia qué se borra ni en qué orden.
         await declararOrigenDeCosto(tx, { origen: ORIGEN_COSTO.RESET_OPERATIVO, referencia: session.id });
+        await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.RESET_OPERATIVO, referencia: String(session.id) });
 
         // Dependencias de Venta
         const ventaDetalle = await tx.ventaDetalle.deleteMany({});

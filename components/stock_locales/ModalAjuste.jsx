@@ -4,7 +4,15 @@ import { useState, useEffect, useRef } from "react";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
+import SunmiTextarea from "@/components/sunmi/SunmiTextarea";
 import { toUnidades, fromUnidades, piezasToKg } from "@/lib/conversiones/stock";
+import {
+  DIRECCION_DIFERENCIA,
+  ETIQUETA_MOTIVO,
+  direccionDeDiferencia,
+  motivoExigeDetalle,
+  motivosParaDireccion,
+} from "@/lib/stock/motivosDeDiferencia";
 import { presentacionCantidadStock, unidadFisicaDeItem } from "@/lib/stock/presentacion";
 import { UNIDAD_FISICA_STOCK, motivoCantidadNoAdmitida } from "@/lib/stock/escalaFisica";
 import { useNumberInputHandlers } from "@/hooks/useNumberInputHandlers";
@@ -15,7 +23,34 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
   const [sueltas, setSueltas] = useState("");
   const [tipo, setTipo] = useState("sumar");
   const [motivo, setMotivo] = useState("");
+  // La causa, de la lista compartida con transferencias y compras. `motivo`
+  // queda como el detalle en texto libre.
+  const [causa, setCausa] = useState(null);
+  // Si el grupo exige la causa. `null` mientras no se sabe: la pantalla no
+  // afirma "opcional" antes de preguntarle al servidor.
+  const [causaObligatoria, setCausaObligatoria] = useState(null);
   const cantidadRef = useRef(null);
+
+  // ── LA REGLA LA DICE EL SERVIDOR, CON LA MISMA FUNCIÓN QUE LA APLICA ──────
+  //
+  // Antes el campo decía "Motivo (opcional)" siempre, aunque el grupo lo
+  // tuviera obligatorio: el usuario se enteraba por el error al guardar. El GET
+  // de la ruta de ajuste resuelve la regla igual que su POST.
+  const localId = local?.id;
+  useEffect(() => {
+    if (!open) return;
+    let vigente = true;
+    setCausaObligatoria(null);
+    fetch(`/api/stock_locales/ajustar?localId=${encodeURIComponent(localId ?? "")}`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (vigente && j?.ok) setCausaObligatoria(j.requireMotivoAjusteStock === true);
+      })
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+  }, [open, localId]);
 
   useEffect(() => {
     if (open) {
@@ -23,6 +58,7 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
       setSueltas("");
       setTipo("sumar");
       setMotivo("");
+      setCausa(null);
       // Autofocus y seleccionar al abrir
       setTimeout(() => {
         cantidadRef.current?.focus();
@@ -62,6 +98,28 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
       }) + Number(sueltas || 0)
     : Number(sueltas || bultos || 0);
 
+  // ── HACIA DÓNDE VA EL STOCK, PARA SABER QUÉ CAUSAS OFRECER ───────────────
+  //
+  // Sumar sube y restar baja. Fijar depende de lo que se escribe contra el
+  // stock que se muestra: 7 sobre 9 es una baja, 7 sobre 5 una suba, y 7 sobre
+  // 7 no tiene nada que explicar. El servidor vuelve a decidirlo contra el
+  // stock REAL bloqueado, que puede haber cambiado desde que se abrió esto.
+  const cantidadEscrita = sueltas !== "" || bultos !== "";
+  const direccion =
+    tipo === "sumar"
+      ? DIRECCION_DIFERENCIA.AUMENTO
+      : tipo === "restar"
+      ? DIRECCION_DIFERENCIA.DISMINUCION
+      : cantidadEscrita
+      ? direccionDeDiferencia(Number(producto.stock || 0), totalUnidades)
+      : null;
+  const causasOfrecidas = motivosParaDireccion(direccion);
+  // Una causa elegida que deja de tener sentido —se cambió de Restar a Sumar,
+  // o el número fijado pasó al otro lado del stock— no viaja: se ignora y el
+  // usuario la vuelve a elegir entre las que corresponden.
+  const causaVigente = causa && causasOfrecidas.includes(causa) ? causa : null;
+  const pideDetalle = motivoExigeDetalle(causaVigente);
+
   const guardar = async () => {
     const cantidadInvalida =
       tipo === "fijar" ? totalUnidades < 0 : totalUnidades <= 0;
@@ -78,6 +136,14 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
       alert(noAdmitida);
       return;
     }
+    if (causaObligatoria && causasOfrecidas.length > 0 && !causaVigente) {
+      alert("Elegí la causa del ajuste.");
+      return;
+    }
+    if (pideDetalle && !motivo.trim()) {
+      alert(`Con la causa "${ETIQUETA_MOTIVO[causaVigente]}" contá qué pasó en el detalle.`);
+      return;
+    }
 
     try {
       const body = {
@@ -86,6 +152,7 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
         productoLocalId: producto.id,
         cantidad: totalUnidades, // Siempre en unidades para el backend
         tipo,
+        motivoPrincipal: causaVigente,
         motivo,
       };
 
@@ -322,10 +389,45 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
               </label>
             </div>
 
-            {/* Motivo */}
-            <textarea
-              className="sunmi-input h-20"
-              placeholder="Motivo (opcional)"
+            {/* La causa: los mismos botones que la hoja de corrección de
+                compras, con los valores del vocabulario compartido. Sin
+                diferencia —fijar el mismo número que se muestra— no hay
+                ninguna que ofrecer. Tocar la elegida la suelta, salvo que sea
+                obligatoria. */}
+            {causasOfrecidas.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <span className="text-sm2 sunmi-label">
+                  {causaObligatoria === null
+                    ? "Causa"
+                    : causaObligatoria
+                    ? "Causa (obligatoria)"
+                    : "Causa (opcional)"}
+                </span>
+                <div className="flex flex-wrap gap-dentroFiltro">
+                  {causasOfrecidas.map((valor) => (
+                    <SunmiButton
+                      key={valor}
+                      color={causaVigente === valor ? "primary" : "slate"}
+                      type="button"
+                      aria-pressed={causaVigente === valor}
+                      onClick={() =>
+                        setCausa(causaVigente === valor && !causaObligatoria ? null : valor)
+                      }
+                      className="flex-1 min-h-toque justify-center rounded-control text-sm3"
+                    >
+                      {ETIQUETA_MOTIVO[valor]}
+                    </SunmiButton>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* El detalle, en texto libre. Con "Otro" es lo único que dice
+                qué pasó, y por eso ahí es obligatorio. */}
+            <SunmiTextarea
+              className="h-20"
+              placeholder={pideDetalle ? "Detalle: contá qué pasó (obligatorio)" : "Detalle (opcional)"}
+              aria-label="Detalle del ajuste"
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
             />

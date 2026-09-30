@@ -12,6 +12,7 @@ import {
 } from "@/lib/productos/validarCodigosBarra";
 import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
+import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
 
 export async function POST(req) {
   try {
@@ -204,9 +205,15 @@ export async function POST(req) {
       stockMax: null,
     }));
 
-    await prisma.stockLocal.createMany({
-      data: stockData,
-      skipDuplicates: true,
+    // Una sola sentencia, envuelta solo para poder decirle al Libro de Stock de
+    // dónde vienen estas filas en cero. No cambia qué se escribe ni su
+    // atomicidad: el `createMany` ya era todo o nada.
+    await prisma.$transaction(async (tx) => {
+      await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.IMPORTACION_STOCK });
+      await tx.stockLocal.createMany({
+        data: stockData,
+        skipDuplicates: true,
+      });
     });
 
     return NextResponse.json({ ok: true });

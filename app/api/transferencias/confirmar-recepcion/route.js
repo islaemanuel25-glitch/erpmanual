@@ -28,6 +28,7 @@ import { rotuloConSueltas } from "@/lib/transferencias/presentacionEnvio";
 import { aplicarCorreccionEconomica } from "@/lib/transferencias/aplicarCorreccionEconomica";
 import { getConfigLocalEfectiva } from "@/lib/config/local";
 import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
+import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
 
 /** Cantidades siempre con la escala física de StockLocal (3 decimales). */
 const fmt = (n) => Number(n || 0).toFixed(3);
@@ -345,6 +346,15 @@ export async function POST(req) {
       await declararOrigenDeCosto(tx, {
         origen: ORIGEN_COSTO.ALTA_POR_TRANSFERENCIA_RECEPCION,
         referencia: transferenciaId,
+      });
+
+      // Para el Libro de Stock: todo lo que esta transacción mueve —la fila del
+      // destino, el tránsito que se libera y la diferencia que vuelve al origen,
+      // "Producto dañado" incluido— es de esta recepción. La causa de cada
+      // diferencia sigue en `TransferenciaDetalle.motivoPrincipal`.
+      await declararOrigenDeStock(tx, {
+        origen: ORIGEN_STOCK.TRANSFERENCIA_RECEPCION,
+        referencia: String(transferenciaId),
       });
 
       // ── 2. RECIÉN AHORA SE LEE QUÉ HAY QUE PROCESAR ─────────────────────

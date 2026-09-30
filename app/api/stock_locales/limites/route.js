@@ -7,6 +7,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
 import {
   esConfiguracion,
   interpretarLimite,
@@ -130,7 +131,12 @@ export async function POST(req) {
     });
 
     if (!registro) {
-      registro = await prisma.stockLocal.create({
+      // La fila nace en cero: el Libro de Stock anota su ALTA, y la transacción
+      // existe solo para poder decirle de dónde vino. Es una sola sentencia,
+      // así que envolverla no cambia qué se escribe ni su atomicidad.
+      registro = await prisma.$transaction(async (tx) => {
+        await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.LIMITES_STOCK });
+        return tx.stockLocal.create({
         data: {
           localId,
           productoId: productoLocalId,
@@ -148,6 +154,7 @@ export async function POST(req) {
           // ruta que sella esta marca.
           limitesConfiguradosAt: new Date(),
         },
+        });
       });
 
       // Auditoría para creación

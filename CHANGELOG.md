@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-09-30] - Actualización: pos-ventas, productos, stock, transferencias
+
+### Modificado
+- **pos-ventas**: feat(stock): cada movimiento del Libro de Stock nombra su documento
+- **productos**: feat(stock): cada movimiento del Libro de Stock nombra su documento
+- **stock**: feat(stock): cada movimiento del Libro de Stock nombra su documento
+- **transferencias**: feat(stock): cada movimiento del Libro de Stock nombra su documento
+- **transferencias**: refactor(stock): un solo vocabulario para las causas de una diferencia
+
+
 ## [2026-09-29] - Actualización: 
 
 ### Modificado

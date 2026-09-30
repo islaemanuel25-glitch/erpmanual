@@ -22,8 +22,9 @@
 //      del depósito y el envío de una transferencia declaran lo esperado, los
 //      costos quedan como siempre —la propagación intacta— y la operación
 //      siguiente llega SIN_ORIGEN;
-//   D. el libro físico no cambió: el movimiento de stock del cierre sigue
-//      SIN_ORIGEN, porque declarar el costo no declara el stock;
+//   D. el libro físico: el movimiento de stock del cierre llega con el origen
+//      de STOCK que la compra declara aparte —declarar el costo no declara el
+//      stock, y eso lo prueba A—;
 //   E. las BAJAS de eliminar producto, por su handler: las filas y la base
 //      llegan con ELIMINACION_PRODUCTO en una sola transacción, se borra
 //      exactamente lo mismo que la misma baja hecha sin declarar —que sigue
@@ -386,18 +387,22 @@ try {
     ]
   );
 
-  // D. El libro físico: el stock que movió el cierre no tiene origen de stock
-  // —ningún escritor lo declara todavía— y el de costo no se le pegó.
+  // D. El libro físico: desde que los escritores de stock declaran su origen,
+  // el cierre de la compra declara el SUYO —COMPRA_PROVEEDOR con el id del
+  // pedido— en la configuración del stock, que es otra que la del costo. Que
+  // declarar el costo NO declara el stock lo sigue probando la sección A; acá
+  // se afirma que el movimiento llega con la declaración de stock de la compra.
   const movs = await c.$queryRawUnsafe(
-    `SELECT "origen" FROM "MovimientoStock" WHERE "id" > $1 AND "productoLocalId" = $2`,
+    `SELECT "origen", "origenRef" FROM "MovimientoStock" WHERE "id" > $1 AND "productoLocalId" = $2`,
     movAntes,
     plDeposito.id
   );
   ok(
-    "D: el cierre movió stock y el libro físico lo registra SIN_ORIGEN, como antes",
-    movs.length > 0 && movs.every((x) => x.origen === SIN_ORIGEN_STOCK),
+    "D: el cierre movió stock y el libro físico lo registra COMPRA_PROVEEDOR con el id del pedido",
+    movs.length > 0 && movs.every((x) => x.origen === "COMPRA_PROVEEDOR" && x.origenRef === String(pedido.id)),
     json(movs)
   );
+  ok("D: y nunca SIN_ORIGEN", movs.every((x) => x.origen !== SIN_ORIGEN_STOCK), json(movs));
 
   // C2. La operación siguiente, por el mismo cliente de la app —una conexión—,
   // no hereda el origen de la compra.

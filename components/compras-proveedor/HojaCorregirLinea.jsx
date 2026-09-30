@@ -100,6 +100,12 @@ import {
 } from "@/lib/compras-proveedor/laCantidadCuadraConElPrecio";
 import { contenidoDelBulto, textoDelContenido } from "@/lib/compras-proveedor/contenidoDelBulto";
 import {
+  DIRECCION_DIFERENCIA,
+  MOTIVO_DIFERENCIA,
+  motivoExigeDetalle,
+  motivosParaDireccion,
+} from "@/lib/stock/motivosDeDiferencia";
+import {
   DECISION_DE_PRECIO,
   decisionVencida,
   decisionVigente,
@@ -108,12 +114,24 @@ import {
 } from "@/lib/compras-proveedor/decisionDePrecio";
 
 /** Los MISMOS motivos que la recepción de una transferencia, con sus valores
- *  canónicos: un reporte por motivo no puede ver dos vocabularios. */
-export const MOTIVOS = Object.freeze([
-  { valor: "Faltante", texto: "Faltante" },
-  { valor: "Producto dañado", texto: "Dañado" },
-  { valor: "Otro", texto: "Otro" },
-]);
+ *  canónicos: un reporte por motivo no puede ver dos vocabularios.
+ *
+ *  Los valores salen de `lib/stock/motivosDeDiferencia.js`; lo único propio de
+ *  compras es el texto corto de los botones. Y compras ofrece SIEMPRE los de
+ *  una disminución, también cuando llegó de más: es la regla que ya tenía, y
+ *  compartir el vocabulario no la cambia. */
+const TEXTO_BOTON_MOTIVO = Object.freeze({
+  [MOTIVO_DIFERENCIA.FALTANTE]: "Faltante",
+  [MOTIVO_DIFERENCIA.PRODUCTO_DANADO]: "Dañado",
+  [MOTIVO_DIFERENCIA.OTRO]: "Otro",
+});
+
+export const MOTIVOS = Object.freeze(
+  motivosParaDireccion(DIRECCION_DIFERENCIA.DISMINUCION).map((valor) => ({
+    valor,
+    texto: TEXTO_BOTON_MOTIVO[valor],
+  }))
+);
 
 const limpio = (n) => {
   const v = Number(n);
@@ -590,7 +608,7 @@ export default function HojaCorregirLinea({
       setError("Elegí por qué la cantidad no coincide.");
       return;
     }
-    if (cantidadDifiere && motivo === "Otro" && !detalleMotivo.trim()) {
+    if (cantidadDifiere && motivoExigeDetalle(motivo) && !detalleMotivo.trim()) {
       setError("Contá qué pasó.");
       return;
     }
@@ -651,7 +669,7 @@ export default function HojaCorregirLinea({
       // mostró y lo que el cierre va a escribir al stock.
       kgRecibidos: entraEnKilos && kilos !== "" ? Number(kilos) : null,
       motivoPrincipal: cantidadDifiere ? motivo : null,
-      motivoDetalle: cantidadDifiere && motivo === "Otro" ? detalleMotivo.trim() : null,
+      motivoDetalle: cantidadDifiere && motivoExigeDetalle(motivo) ? detalleMotivo.trim() : null,
     });
   };
 
@@ -944,7 +962,7 @@ export default function HojaCorregirLinea({
                   </SunmiButton>
                 ))}
               </div>
-              {motivo === "Otro" && (
+              {motivoExigeDetalle(motivo) && (
                 <SunmiInput
                   type="text"
                   aria-label="Qué pasó"

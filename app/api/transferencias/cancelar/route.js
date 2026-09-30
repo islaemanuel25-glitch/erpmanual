@@ -47,6 +47,7 @@ import {
   CODIGOS_CANCELAR,
 } from "@/lib/transferencias/cancelarTransferencia";
 import { revertirVenta } from "@/lib/pos-ventas/reversionVenta";
+import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
 
 const j = (body, status = 200) => NextResponse.json(body, { status });
 
@@ -228,6 +229,9 @@ export async function POST(req) {
       // Si las dos devolvieran, el origen recuperaría la mercadería dos veces.
       const politica = politicaDeLaTransferencia(t);
       const impactoTransito = [];
+      // A nombre de esta transferencia. Si nació de una venta, la reversión de
+      // abajo declara ANULACION_VENTA para lo suyo: cada tramo con su documento.
+      await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.TRANSFERENCIA_CANCELACION, referencia: String(t.id) });
       for (const d of t.detalle) {
         const enviada = Number(d.cantidad || 0);
         if (enviada <= 0) continue;
