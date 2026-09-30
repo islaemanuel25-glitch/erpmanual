@@ -14,6 +14,7 @@
 - **stock**: fix(stock): "1 bulto" y no "1 bultos", con una sola regla para Stock Locales y el Valor del Stock
 - **stock**: feat(finanzas): Valor del Stock — nacidos en el día, reexpresión por escala y ubicación del admin
 - **stock**: feat(finanzas): Valor del Stock — "¿Por qué cambió?", el movimiento físico por origen real
+- **stock**: fix(stock): el detalle de "¿Por qué cambió?" cuadra al centavo y lee cada movimiento con la escala de su momento
 
 
 ## [2026-09-29] - Actualización: 
