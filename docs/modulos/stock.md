@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-09-30 14:20
+**Última actualización:** 2026-09-30 16:03
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -271,6 +271,7 @@ la API del Stock Diario y no se tocó; hay que confirmarlo ejerciéndolo antes d
 corregirlo.
 
 ## Cambios recientes
+- 2026-09-30: fix(finanzas): Stock Diario en Finanzas se autoriza con stock.ver, no con finanzas.ver
 - 2026-09-30: feat(finanzas): Stock Diario se muda de Stock a Finanzas
 - 2026-09-30: feat(stock): cada movimiento del Libro de Stock nombra su documento
 - 2026-09-29: feat(stock): Stock Diario móvil — la pantalla del diseño, sobre la API que ya existía
