@@ -19,9 +19,72 @@ Si la lista está vacía, el despliegue es solo de código.
 Producción está en **44 migraciones** y el árbol también. **Ninguna** pendiente:
 el despliegue siguiente es solo de código.
 
-Producción corre `0a8fde8b219402ee060913e1de9035a9ff27a660` (despliegue del
+Producción corre `9700a59530534e920ae3ab59b5c5780bd3b79071` (despliegue del
 2026-09-29, nota abajo). Un commit posterior a ese que solo cambie
 documentación —como el que escribe esta nota— **no se despliega por eso**.
+
+---
+
+## `9700a595`: desplegado el 2026-09-29. Stock Diario móvil, sin migraciones
+
+Despliegue **solo de código**: el merge de la PR #113, con la cabeza
+`30093474120be704f162580a4678eb0edc1b97cd`, desde
+`0a8fde8b219402ee060913e1de9035a9ff27a660`, a las 20:37 hora argentina (23:37
+UTC). **Lo que sigue es lo que informó el despliegue**, corrido desde el acceso
+al VPS y no desde la sesión que escribe esta nota.
+
+**Identidad.** `9700a59530534e920ae3ab59b5c5780bd3b79071` en `origin/main`, el
+HEAD del VPS, la imagen `ghcr.io/islaemanuel25-glitch/erpmanual:9700a595…`
+(digest del registro
+`sha256:e1765020bf9a11f1164c0a25d5d5421f8bad9a352fa598b5bfcc495c0a9e1843`),
+`APP_BUILD_ID` y `/api/version`.
+
+**Migraciones.** 44 en el árbol y 44 aplicadas antes, y 44 en el objetivo; el
+clasificador no encontró ningún archivo, y `migrate deploy` contestó "No pending
+migrations to apply". Después, **44/44**, ninguna fallida, y "Database schema is
+up to date!". **0 aplicadas** por este despliegue.
+
+**Lo que llegó.** La pantalla `/modulos/stock_locales/diario`, en el menú
+**Stock → Stock Diario**, con `stock.ver`. Las cuatro rutas —
+`/api/stock_locales/diario/resumen`, `/productos`, `/producto` y
+`/movimientos`— están y sin sesión contestan 401 "Sesión no encontrada o
+vencida". **Ese 401 prueba que están protegidas, no que funcionan**: no hubo
+prueba funcional autenticada en producción, porque no hay una sonda autenticada
+documentada y no se inventó una sesión. La conducta con sesión la cubre el CI
+de la PR #113 (`scripts/pruebas-db/stockDiarioApi.mjs`). No se crearon datos de
+prueba.
+
+**El Libro de Stock, sin pérdida ni reinicio.**
+
+- Antes: 17.054 movimientos, ids 1 a 17.054, de los cuales 12.278
+  ESTADO_INICIAL; el punto cero en 2026-09-28 00:19:13.587 UTC, huella
+  `2ebcf8cc4ca5bc27b6b833fea0e24ef6`; el verificador en verde.
+- Después: 17.066 movimientos. Los 17.054 ids anteriores siguen; los 12 nuevos
+  son actividad real de los locales. El punto cero con la misma huella y el
+  verificador en verde.
+
+**El Libro de Costos**, ACTIVADO. Los triggers no internos, 23 antes y 23
+después.
+
+**El despliegue.**
+
+- Backup PRE: `/srv/produccion/backups/pre-9700a595_20260929_233631.sql.gz`,
+  7.539.813 bytes, SHA-256
+  `2875859262ee9a826553d5cccbdb7f1e607500a6ac37b02381f7914a971e4327`.
+  `pg_dump` salió 0 con `pipefail`, `gzip -t` en verde, con la marca de dump
+  completo, 85 tablas y 17.061 movimientos de stock adentro.
+- Sonda PRE en verde (corrida 36646050287).
+- **Sonda POST: la primera corrida dio ROJO** (36646249759). Falló el Chrome
+  del runner de GitHub, en el puerto de depuración 9226, **antes de medir
+  nada**. El paso ANTES ya había confirmado que producción servía `9700a595`,
+  y no hubo ninguna evidencia de una falla de producción. No hubo rollback ni
+  se tocó producción para corregir nada. La segunda corrida, el relanzamiento
+  que permite el procedimiento, dio **VERDE** (36646351202) sobre
+  `9700a59530534e920ae3ab59b5c5780bd3b79071`.
+- Salud después: la app sana y sin reinicios, PostgreSQL healthy y `/login` con
+  200. Sin errores, excepciones ni errores de Prisma en los logs desde el
+  despliegue; sin transacciones largas, sin `idle in transaction` y sin esperas
+  de locks.
 
 ---
 
