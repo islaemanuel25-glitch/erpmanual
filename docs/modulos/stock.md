@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-09-30 17:58
+**Última actualización:** 2026-09-30 18:15
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -247,7 +247,7 @@ entonces la cantidad se lee con `presentacionCantidadStock`
 (`lib/stock/presentacion.js`), la misma que la tabla y la tarjeta de Stock
 Locales: en el depósito un pack o cajón con factor se desglosa en bultos +
 sueltas ("4 bultos", "1 bulto + 2 uds"), en un local va en unidades, el kilo
-en kilos y la pieza del depósito en piezas. Desde el 2026-10-01 el singular es
+en kilos y la pieza del depósito en piezas. Desde el 2026-09-30 el singular es
 "1 bulto" (también "-1 bulto"): la regla es `textoDeBultos` /
 `palabraDeBultos` de ese mismo archivo, y la usan también la tabla y el modal
 de ajuste de Stock Locales, que escribían "bultos" por su cuenta. Cambia solo la
@@ -377,6 +377,8 @@ la API del Stock Diario y no se tocó; hay que confirmarlo ejerciéndolo antes d
 corregirlo.
 
 ## Cambios recientes
+- 2026-09-30: feat(finanzas): Valor del Stock — nacidos en el día, reexpresión por escala y ubicación del admin
+- 2026-09-30: fix(stock): "1 bulto" y no "1 bultos", con una sola regla para Stock Locales y el Valor del Stock
 - 2026-09-30: feat(finanzas): Stock Diario pasa a llamarse Valor del Stock y muestra la plata primero
 - 2026-09-30: fix(stock): el Stock Diario lee la cantidad del libro con la presentación de Stock Locales
 - 2026-09-30: fix(finanzas): Stock Diario en Finanzas se autoriza con stock.ver, no con finanzas.ver

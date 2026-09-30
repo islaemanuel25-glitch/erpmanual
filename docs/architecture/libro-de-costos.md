@@ -206,7 +206,7 @@ estado a las 00:00—, combinadas con `precioDeLaUbicacion`; el primer día
 valorizable es el siguiente a `LibroCostoActivacion.dia`; un costo que falta
 deja la cadena fuera del total y nombrada, nunca en cero; y el cruce con el
 punto cero del libro de stock está hecho: el primer día es el mayor de los dos.
-Lo que sigue abajo era el plan. Desde el 2026-10-01 también está hecho:
+Lo que sigue abajo era el plan. Desde la segunda tanda del 2026-09-30 también está hecho:
 un producto que nace durante el día vale ese día con el costo de su ALTA, y la
 diferencia de costo entre días se separa en revalorización por costo y
 reexpresión por escala. La separación NO lee `camposCambiados`: compara las
