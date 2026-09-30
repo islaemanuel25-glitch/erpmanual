@@ -131,11 +131,12 @@ test("la pantalla solo consume las rutas del Stock Diario que ya existen", () =>
   for (const r of ["resumen", "productos"]) assert.ok(fs.existsSync(`app/api/stock_locales/diario/${r}/route.js`), r);
 });
 
-test("la página es de Finanzas: pide finanzas.ver y stock.ver, y el menú la pone en Finanzas y NO en Stock", () => {
-  // Se mudó el 2026-09-30. Pide los dos permisos: `finanzas.ver` por ser una
-  // herramienta de Finanzas, `stock.ver` porque lo piden sus rutas de datos.
+test("la página está en Finanzas pero pide stock.ver, y el menú la pone en Finanzas y NO en Stock", () => {
+  // Se mudó el 2026-09-30. La ubicación no cambió quién la puede leer: pide
+  // `stock.ver`, como sus rutas de datos, y no `finanzas.ver`.
   const pagina = codigo("app/modulos/finanzas/stock-diario/page.jsx");
-  assert.match(pagina, /PERMISOS_PANTALLA_STOCK_DIARIO\.every\(\(p\) => permisos\.includes\(p\)\)/);
+  assert.match(pagina, /!permisos\.includes\(PERMISO_STOCK_DIARIO\)/);
+  assert.doesNotMatch(pagina, /finanzas\.ver|PERMISO_VER_FINANZAS/);
   assert.match(pagina, /<SunmiBackButton href=\{RUTA_FINANZAS\} \/>/, "Volver tiene que llevar a la puerta de Finanzas");
   const stock = MENU_CONFIG.find((g) => g.key === "stock");
   assert.ok(stock.items.some((i) => i.label === "Stock Locales"), "Stock Locales sigue en Stock");
@@ -143,8 +144,7 @@ test("la página es de Finanzas: pide finanzas.ver y stock.ver, y el menú la po
   const finanzas = MENU_CONFIG.find((g) => g.key === "finanzas");
   const diario = finanzas.items.find((i) => i.label === "Stock Diario");
   assert.equal(diario.href, RUTA_STOCK_DIARIO);
-  assert.equal(diario.permiso, "finanzas.ver");
-  assert.deepEqual([...diario.requiredAllPerms], ["finanzas.ver", "stock.ver"]);
+  assert.equal(diario.permiso, "stock.ver");
   assert.ok(fs.existsSync("app/modulos/finanzas/stock-diario/page.jsx"));
 });
 

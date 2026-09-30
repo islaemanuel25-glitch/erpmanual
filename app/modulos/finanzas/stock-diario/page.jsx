@@ -8,11 +8,11 @@
 // Finanzas y se vuelve ahí, así que registra acción y título en el shell. El
 // `Suspense` es por `useSearchParams`.
 //
-// Pide `finanzas.ver` Y `stock.ver`: el primero porque es una herramienta de
-// Finanzas; el segundo porque sus rutas de datos, en `/api/stock_locales/diario/`,
-// siguen pidiéndolo. Ver `lib/stock/libro/rutasStockDiario.js`. El que manda es
-// el chequeo de las rutas; éste es para no dibujar algo que el servidor va a
-// rechazar. Es de SOLO LECTURA: nada de acá escribe stock.
+// Pide `stock.ver` y NADA MÁS, el mismo permiso de sus rutas de datos en
+// `/api/stock_locales/diario/`: estar en Finanzas no la vuelve información
+// financiera, y no pide `finanzas.ver`. Ver `lib/stock/libro/rutasStockDiario.js`.
+// El que manda es el chequeo de las rutas; éste es para no dibujar algo que el
+// servidor va a rechazar. Es de SOLO LECTURA: nada de acá escribe stock.
 "use client";
 
 import { Suspense } from "react";
@@ -25,7 +25,7 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import AccionDePantalla from "@/components/transferencias/AccionDePantalla";
 import PantallaStockDiario from "@/components/stock_diario/PantallaStockDiario";
 import { RUTA_FINANZAS } from "@/lib/finanzas/contextoFinanzas";
-import { PERMISOS_PANTALLA_STOCK_DIARIO } from "@/lib/stock/libro/stockDiarioPantalla";
+import { PERMISO_STOCK_DIARIO } from "@/lib/stock/libro/stockDiarioPantalla";
 
 export default function StockDiarioPage() {
   return (
@@ -50,7 +50,7 @@ function StockDiario() {
   const volver = useAccionDePagina(() => <SunmiBackButton href={RUTA_FINANZAS} />, []);
 
   if (cargando) return null;
-  if (!esAdmin && !PERMISOS_PANTALLA_STOCK_DIARIO.every((p) => permisos.includes(p))) return <SinPermisos />;
+  if (!esAdmin && !permisos.includes(PERMISO_STOCK_DIARIO)) return <SinPermisos />;
 
   return (
     // Mismo tope y mismos espacios que Gastos y Pagos a proveedores.
