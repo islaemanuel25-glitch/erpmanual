@@ -368,9 +368,26 @@ no están en el movimiento físico del total y tampoco en su explicación.
 **El detalle** de cada categoría es `/api/stock_locales/diario/movimientos` con
 `categoria=`: paginado, cada movimiento con fecha, producto, delta, efecto con el
 costo de su día y el documento (`origen` + `origenRef`, sin consultar la
-operación). El efecto de un movimiento suelto se redondea solo; el total de la
-categoría es el del resumen. La cantidad se lee con la escala ACTUAL del
-producto, como en Stock Locales.
+operación). *(verificado en código y en PostgreSQL, 2026-09-30)*:
+
+- **Σ filas = total de la categoría, al centavo.** El detalle corre la MISMA
+  valorización que el resumen y toma, para cada (producto, día, origen,
+  dirección), el importe ya repartido de esa parte; ese importe se reparte entre
+  TODOS los movimientos de la parte (`repartirParteEntreMovimientos`: cada uno
+  redondeado, y los centavos que faltan de a uno a los que el redondeo dejó más
+  lejos de su valor exacto, a igual distancia al de `id` menor). Por eso el
+  efecto de una fila no cambia según la página ni el orden en que se pide, y no
+  hay fila de "ajuste de redondeo". La respuesta trae `totalDeLaCategoria`.
+- **La cantidad se lee con la escala de SU momento**, no con la de hoy: la
+  versión del Libro de Costos vigente en el instante del movimiento
+  (`escalaDelMomento`) da unidad, factor, peso, modos y si la ubicación era
+  depósito, y se escribe con el mismo `presentacionCantidadStock` de Stock
+  Locales. Un pack x6 de ayer se sigue leyendo x6 aunque hoy sea x12. Sin
+  versión del libro en ese instante, cae a la escala actual
+  (`esDepositoDelMomento` en null).
+- El pedido del detalle cuesta las 13 consultas del resumen más la página, una
+  consulta con todos los movimientos de las partes que toca la página, y —solo
+  en OTROS— la de orígenes presentes.
 
 **No es plata que entró o salió:** una compra recibida aumenta el capital en
 mercadería aunque no esté pagada. La conciliación con pagos, gastos, cobros y

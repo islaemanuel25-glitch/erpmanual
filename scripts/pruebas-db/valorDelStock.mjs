@@ -37,6 +37,8 @@ const { PUNTO_CERO_PRODUCCION } = await import("../../lib/stock/libro/stockDiari
 const { valorDelPeriodo, activacionDelLibroDeCostos, movimientosDeCategoria } = await import("../../lib/stock/libro/valorDelStockServer.js");
 const { ESTADO_VALOR, MOTIVO_COSTO_FALTANTE } = await import("../../lib/stock/libro/valorDelStock.js");
 const { declararOrigenDeStock, ORIGEN_STOCK } = await import("../../lib/stock/libro/libroStock.js");
+const { movimientoDeCategoriaApi } = await import("../../lib/stock/libro/stockDiarioApi.js");
+const { renglonDeMovimiento } = await import("../../lib/stock/libro/stockDiarioPantalla.js");
 const { crearTransferencia } = await import("../../lib/transferencias/crearTransferencia.js");
 const { DEFAULT_PERMISOS_SISTEMA, CAJERO, ENCARGADO } = await import("../../lib/rbac/systemRoles.js");
 
@@ -277,14 +279,52 @@ try {
     ok("J. la recepción que solo libera el tránsito no mueve stock disponible: Transferencias $0 hoy", pesos(catHoy.TRANSFERENCIAS.neto) === 0 && catHoy.TRANSFERENCIAS.movimientos === 0, json(catHoy.TRANSFERENCIAS));
     ok("J. el nacido hoy sin origen declarado es 'Sin clasificar' +$5.000, y cuadra", pesos(catHoy.SIN_CLASIFICAR.neto) === 5000 && hoyTransito.totales.explicacion.cuadra, json(catHoy.SIN_CLASIFICAR));
 
-    const detalle = await movimientosDeCategoria(c, { localId: L.D, desde: "2026-09-30", hasta: "2026-10-02", categoria: "AJUSTES", hoy: HOY, page: 1, pageSize: 50 });
+    const detalle = await movimientosDeCategoria(c, { localId: L.D, desde: "2026-09-30", hasta: "2026-10-02", categoria: "AJUSTES", esDeposito: true, hoy: HOY, page: 1, pageSize: 50 });
     ok(
       "J. el detalle de Ajustes: dos movimientos, con su delta, su efecto con el costo de ese día y su referencia",
       json(detalle.movimientos.items.map((m) => [m.delta, pesos(m.efecto), m.origenRef, m.identidad?.nombre])) === json([[2000, 20000, "501", "Pieza"], [-1000, -10000, "502", "Pieza"]]),
       json(detalle.movimientos.items.map((m) => [m.delta, m.efecto, m.origenRef]))
     );
-    const detVentas = await movimientosDeCategoria(c, { localId: L.L, desde: "2026-09-30", hasta: "2026-09-30", categoria: "VENTAS", hoy: HOY, page: 1, pageSize: 50 });
+    const detVentas = await movimientosDeCategoria(c, { localId: L.L, desde: "2026-09-30", hasta: "2026-09-30", categoria: "VENTAS", esDeposito: false, hoy: HOY, page: 1, pageSize: 50 });
     ok("J. el detalle de Ventas del local: la venta #1, −3 u a $50", detVentas.movimientos.total === 1 && detVentas.movimientos.items[0].origenRef === "1" && pesos(detVentas.movimientos.items[0].efecto) === -150, json(detVentas.movimientos));
+
+    // La escala de SU momento: el −24 u del 30/09 se leía x12; el factor pasó a
+    // 24 el 01/10. Por el camino real: servidor → API → renglón de la pantalla.
+    const detSin = await movimientosDeCategoria(c, { localId: L.D, desde: "2026-09-30", hasta: "2026-10-02", categoria: "SIN_CLASIFICAR", esDeposito: true, hoy: HOY, page: 1, pageSize: 50 });
+    const filaPack = detSin.movimientos.items.find((m) => m.productoLocalId === P.pack12.pl);
+    const renglonPack = filaPack && renglonDeMovimiento(movimientoDeCategoriaApi(filaPack), { local: { esDeposito: true } });
+    ok(
+      "J. HISTÓRICO: el −24 u del 30/09 se lee con el x12 de ese día (−2 bultos), no con el x24 de hoy (−1 bulto)",
+      filaPack?.escalaDelMomento?.escala?.factorPack === 12 && filaPack?.identidad?.escala?.factorPack === 24 && renglonPack?.cantidad === "−2 bultos",
+      json({ escalaDelMomento: filaPack?.escalaDelMomento, hoy: filaPack?.identidad?.escala, renglon: renglonPack })
+    );
+
+    // Σ filas = categoría = su parte del físico, al centavo; y no depende de la página.
+    const todasLasFilas = async (categoria, pageSize) => {
+      const filas = [];
+      let d;
+      for (let page = 1; !d || page <= d.movimientos.totalPages; page++) {
+        d = await movimientosDeCategoria(c, { localId: L.D, desde: "2026-09-30", hasta: "2026-10-02", categoria, esDeposito: true, hoy: HOY, page, pageSize });
+        filas.push(...d.movimientos.items);
+      }
+      return { filas, total: d.totalDeLaCategoria };
+    };
+    let sumaDeCategorias = 0;
+    const cuadres = [];
+    for (const x of ex.categorias) {
+      const deAUno = await todasLasFilas(x.categoria, 1);
+      const deAMuchos = await todasLasFilas(x.categoria, 50);
+      const suma = deAUno.filas.reduce((s, m) => s + (m.efecto ?? 0), 0);
+      const mismaFila = json(deAUno.filas.map((m) => [m.id, m.efecto])) === json(deAMuchos.filas.map((m) => [m.id, m.efecto]));
+      sumaDeCategorias += suma;
+      cuadres.push({ categoria: x.categoria, suma, total: deAUno.total, neto: x.neto, filas: deAUno.filas.length, mismaFila });
+    }
+    ok(
+      "J. DETALLE AL CENTAVO: en cada categoría Σ filas = total de la categoría = su neto del resumen, igual de a 1 por página que de a 50",
+      cuadres.every((q) => q.suma === q.total && q.total === q.neto && q.mismaFila),
+      json(cuadres)
+    );
+    ok("J. y Σ de todas las filas de todas las categorías = movimiento físico", sumaDeCategorias === tp.fisico, json({ sumaDeCategorias, fisico: tp.fisico }));
     ok("O. el tránsito conserva el costo congelado: 12 u × $100 = $1.200, no 12 × $120", pesos(p.transito.alCerrar.valor) === 1200, json(p.transito.alCerrar));
 
     const hoyD = await valor(L.D, HOY);
