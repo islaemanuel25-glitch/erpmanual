@@ -322,6 +322,60 @@ cantidades.
   la guarda en la URL (`localId`). No se suman ubicaciones ni se cambia el
   contexto de toda la app *(verificado contra PostgreSQL, sección I)*.
 
+### ¿Por qué cambió? — el movimiento físico por origen
+
+*(Verificado contra PostgreSQL, sección J de `scripts/pruebas-db/valorDelStock.mjs`;
+la cuenta en `lib/stock/libro/explicacionDelValor.test.mjs`.)* El movimiento
+físico se parte por el ORIGEN que declaró cada operación en el Libro de Stock
+(`declararOrigenDeStock`, dentro de su transacción). La tabla vive en
+`lib/stock/libro/explicacionDelValor.js` y un candado exige que cada valor de
+`ORIGEN_STOCK` esté clasificado. La auditoría del 2026-09-30 leyó cada
+escritor [código]:
+
+- **Compras a proveedor** ← `COMPRA_PROVEEDOR`: la recepción de un pedido
+  (`compras-proveedor/recibir/[id]`), declarado al abrir la transacción que suma
+  el stock. Referencia: `PedidoProveedor.id`.
+- **Ventas** ← `VENTA` (`pos-ventas/crear`), `CORRECCION_VENTA`,
+  `ANULACION_VENTA` (pueden devolver stock). Referencia: `Venta.id` o
+  `VentaCorreccion.id`.
+- **Transferencias** ← `TRANSFERENCIA_ENVIO` (`crearTransferencia`: descuenta el
+  origen), `TRANSFERENCIA_RECEPCION` (`confirmar-recepcion`: suma al destino y en
+  el origen devuelve —o descuenta— la diferencia), `TRANSFERENCIA_CANCELACION`.
+  Referencia: `Transferencia.id`.
+- **Ajustes de stock** ← `AJUSTE_MANUAL`. Referencia: `AuditoriaStock.id`.
+- **Altas, importaciones y bajas** ← `ALTA_PRODUCTO`, `ALTA_PRODUCTO_DESDE_STOCK`,
+  `ALTA_AL_LISTAR_STOCK`, `IMPORTACION_PRODUCTOS`, `IMPORTACION_STOCK`,
+  `PROMOCION_A_DEPOSITO`, `HERENCIA_DEL_DEPOSITO`, `ELIMINACION_PRODUCTO`,
+  `LIMITES_STOCK` (estos dos últimos casi nunca mueven cantidad).
+- **Otros** ← `RESET_OPERATIVO`, `ACTIVACION_DEL_LIBRO`, y cualquier origen que
+  aparezca en el libro sin estar en la tabla (se muestra su nombre).
+- **Sin clasificar** ← `SIN_ORIGEN`. No se reclasifica ni se infiere.
+
+La **dirección** no sale del origen sino del delta físico de cada movimiento
+(`posterior − anterior`, con la inexistencia en cero): una misma categoría puede
+tener entradas y salidas, y se muestran por separado. Un movimiento que solo
+cambia `enTransito` tiene delta cero y no entra: el tránsito sigue aparte.
+
+**La plata:** una consulta agrupada por (producto, día, origen, dirección) trae
+el delta exacto; cada grupo vale delta × el costo congelado de ese día —el
+mismo de la valorización—. El redondeo se reparte dentro de cada producto y día
+(al grupo de mayor valor) para que `Σ categorías = movimiento físico` cierre al
+centavo. La API lo verifica en `explicacion.cuadra` e informa el mayor ajuste
+en `desvioMaximoDeRedondeo`: con un libro continuo es de centavos; más que eso
+delata una cadena que no suma, y la pantalla lo avisa. Los productos sin costo
+no están en el movimiento físico del total y tampoco en su explicación.
+
+**El detalle** de cada categoría es `/api/stock_locales/diario/movimientos` con
+`categoria=`: paginado, cada movimiento con fecha, producto, delta, efecto con el
+costo de su día y el documento (`origen` + `origenRef`, sin consultar la
+operación). El efecto de un movimiento suelto se redondea solo; el total de la
+categoría es el del resumen. La cantidad se lee con la escala ACTUAL del
+producto, como en Stock Locales.
+
+**No es plata que entró o salió:** una compra recibida aumenta el capital en
+mercadería aunque no esté pagada. La conciliación con pagos, gastos, cobros y
+caja es otra etapa [pendiente].
+
 ### La pantalla: Valor del Stock
 
 **Desde el 2026-09-30 vive en Finanzas y se llama Valor del Stock**:
