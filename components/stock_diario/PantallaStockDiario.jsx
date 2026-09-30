@@ -8,6 +8,9 @@
 //
 // ── LA MISMA ESTRUCTURA QUE LAS PANTALLAS POR PERÍODO ────────────────────
 //
+//   0. SOLO un admin en vista global: la ubicación → `SunmiSelectAdv`, con las
+//      ubicaciones que manda el servidor (las del grupo activo). Queda en la URL
+//      como `localId`. Un usuario con local no lo ve: mira la suya.
 //   1. Día / Semana / Mes / Año / Otro → `ChipsDePeriodo` con `conAnio`.
 //   2. Otro: desde y hasta            → `SunmiDateRangePicker`, como dice la pieza.
 //   3. el período, con sus flechas    → `NavegadorDePeriodo`.
@@ -45,6 +48,8 @@ import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import SunmiDateRangePicker from "@/components/sunmi/SunmiDateRangePicker";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
+import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
+import { CODIGO_FALTA_UBICACION } from "@/lib/stock/libro/stockDiarioApi";
 import DiaConBanda from "@/components/periodo/DiaConBanda";
 import FilaConImporte from "@/components/periodo/FilaConImporte";
 import ResumenConImporte from "@/components/periodo/ResumenConImporte";
@@ -61,6 +66,7 @@ import {
   datoDeLaEvolucion,
   datoDeLaLista,
   filasDeEvolucion,
+  opcionesDeUbicacion,
   parseContextoStockDiario,
   puedeAvanzar,
   puedeRetroceder,
@@ -79,7 +85,14 @@ async function pedir(ruta, consulta) {
   const res = await fetch(`/api/stock_locales/diario/${ruta}?${consulta}`, { cache: "no-store", credentials: "include" });
   const j = await res.json().catch(() => ({}));
   // El caso malo tiene rama propia: un error no se dibuja como un período vacío.
-  if (!res.ok || !j.ok) throw new Error(j?.error || "No se pudo leer el Valor del Stock.");
+  // Lleva el código y la lista de ubicaciones: el 400 FALTA_UBICACION del admin
+  // en vista global no es un error que mostrar sino una pregunta que hacer.
+  if (!res.ok || !j.ok) {
+    const e = new Error(j?.error || "No se pudo leer el Valor del Stock.");
+    e.codigo = j?.codigo ?? null;
+    e.ubicaciones = j?.ubicaciones ?? null;
+    throw e;
+  }
   return j;
 }
 
@@ -92,6 +105,8 @@ export default function PantallaStockDiario() {
   const [respuesta, setRespuesta] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState("");
+  // Admin en vista global sin ubicación elegida: las que puede elegir, o null.
+  const [faltaUbicacion, setFaltaUbicacion] = useState(null);
   const [busqueda, setBusqueda] = useState("");
   const [termino, setTermino] = useState("");
   const [pagina, setPagina] = useState(1);
@@ -110,11 +125,13 @@ export default function PantallaStockDiario() {
     let vigente = true;
     setCargando(true);
     setError("");
+    setFaltaUbicacion(null);
     pedir("resumen", consultaResumen)
       .then((r) => vigente && setRespuesta(r))
       .catch((e) => {
         if (!vigente) return;
-        setError(e.message);
+        if (e.codigo === CODIGO_FALTA_UBICACION) setFaltaUbicacion(e.ubicaciones ?? []);
+        else setError(e.message);
         setRespuesta(null);
       })
       .finally(() => vigente && setCargando(false));
@@ -159,9 +176,33 @@ export default function PantallaStockDiario() {
 
   const navegador = respuesta ? textosDelNavegador(respuesta) : null;
   const hoy = respuesta?.hoy || hoyArgentinaISO();
+  const opcionesUbicacion = opcionesDeUbicacion(respuesta?.ubicaciones ?? faltaUbicacion);
 
   return (
     <>
+      {opcionesUbicacion && (
+        <SunmiSelectAdv
+          value={ctx.localId ? String(ctx.localId) : ""}
+          onChange={(v) => ir({ localId: v ? Number(v) : null })}
+          placeholder="Elegí la ubicación"
+          aria-label="Ubicación"
+        >
+          {opcionesUbicacion.map((o) => (
+            <SunmiSelectOption key={o.valor} value={o.valor}>
+              {o.texto}
+            </SunmiSelectOption>
+          ))}
+        </SunmiSelectAdv>
+      )}
+
+      {faltaUbicacion && !cargando && (
+        <SunmiAviso tono="neutral" titulo="Elegí la ubicación">
+          {faltaUbicacion.length
+            ? "Estás en la vista global: el valor del stock es de una ubicación. Elegila arriba."
+            : "Estás en la vista global y no hay ubicaciones en el grupo activo."}
+        </SunmiAviso>
+      )}
+
       <ChipsDePeriodo
         conAnio
         valor={ctx.unidad}

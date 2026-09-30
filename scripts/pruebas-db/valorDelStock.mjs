@@ -76,6 +76,10 @@ async function sembrar() {
   const L = { D: await local("VS Depósito", true), L: await local("VS Local", false) };
   await c.$executeRawUnsafe(`INSERT INTO "GrupoLocal" ("grupoId","localId","updatedAt") VALUES (${G}, ${L.L}, now())`);
   await c.$executeRawUnsafe(`INSERT INTO "GrupoDeposito" ("grupoId","localId","updatedAt") VALUES (${G}, ${L.D}, now())`);
+  // Otro grupo, con una ubicación que ningún usuario del primero tiene que poder elegir.
+  const G2 = (await uno(c, `INSERT INTO "Grupo" ("nombre","updatedAt") VALUES ('Valor del stock, otro grupo', now()) RETURNING "id"`)).id;
+  L.X = await local("VS Ajeno", false);
+  await c.$executeRawUnsafe(`INSERT INTO "GrupoLocal" ("grupoId","localId","updatedAt") VALUES (${G2}, ${L.X}, now())`);
 
   const base = async (nombre, { um = "unidad", factor = null, costo, compra = "BULTO", venta = "PESO", peso = null }) =>
     (
@@ -123,7 +127,7 @@ try {
   await principal.$executeRawUnsafe(`CREATE DATABASE "${NOMBRE}"`);
   aplicarMigraciones(urlPrueba, { hasta: MIGRACION_LIBRO });
   c = await crearClientePrisma({ nivel: ESCRITURA, url: urlPrueba });
-  const { L, P } = await sembrar();
+  const { G, L, P } = await sembrar();
   aplicarLibroEnAdelante(urlPrueba);
   const [estadoCostos] = await c.$queryRaw`SELECT estado FROM "libro_costo_estado"()`;
   ok("el Libro de Costos quedó ACTIVADO con un punto cero de la siembra", estadoCostos.estado === "ACTIVADO", json(estadoCostos));
@@ -168,7 +172,20 @@ try {
   await paso("2026-10-01 09:00:00", () => costo(P.pack6, 720)); // el costo de hoy NO toca el tránsito
   await paso("2026-10-01 11:00:00", () => costo(P.unidad, 60));
   await paso("2026-10-01 12:00:00", () => stock(P.unidad, 10));
+  await paso("2026-10-01 12:00:00", () =>
+    // REEXPRESIÓN: el pack de 12 pasa a 24 con el mismo costo del bulto ($1.200).
+    // Desde el 02/10 cada unidad vale $50 y no $100, sin compra ni venta.
+    c.$executeRawUnsafe(`UPDATE "ProductoBase" SET "factor_pack" = 24, "updatedAt" = now() WHERE "id" = ${P.pack12.base}`)
+  );
   await paso("2026-10-03 10:00:00", () => costo(P.revaloriza, 1500)); // HOY: "Ahora" no lo usa
+  // NACE HOY en el depósito, a las 15:00, a $500 con 10 unidades: base,
+  // ubicación y fila de stock, en el orden en que los escribe la app.
+  await paso("2026-10-03 15:00:00", async () => {
+    const b = (await uno(c, `INSERT INTO "ProductoBase" ("grupoId","nombre","codigo_barra","unidad_medida","precio_costo","precio_venta","updatedAt") VALUES (${G}, 'NaceHoy', 'VS-NaceHoy', 'unidad', 500, 900, now()) RETURNING "id"`)).id;
+    const pl = (await uno(c, `INSERT INTO "ProductoLocal" ("localId","baseId","updatedAt") VALUES (${L.D}, ${b}, now()) RETURNING "id"`)).id;
+    P.naceHoy = { base: b, pl, sl: (await uno(c, `INSERT INTO "StockLocal" ("localId","productoId","cantidad","updatedAt") VALUES (${L.D}, ${pl}, 10, now()) RETURNING "id"`)).id };
+  });
+  await paso("2026-10-03 16:00:00", () => costo(P.naceHoy, 650)); // después del alta: hoy no cuenta
 
   await g.reubicar();
   for (const t of ["CostoBaseVersion", "CostoUbicacionVersion", "LibroCostoActivacion"]) {
@@ -218,8 +235,22 @@ try {
       pesos(cadena(p, P.pack6).revalorizacion) === 960 && pesos(cadena(p, P.pack6).final) === 5760,
       json(cadena(p, P.pack6))
     );
-    ok("inicial $48.000, final $45.360, variación −$2.640 = físico −$3.600 + revalorización $960", [tp.inicial, tp.final, tp.variacion, tp.fisico, tp.revalorizacion].map(pesos).join() === "48000,45360,-2640,-3600,960" && tp.cuadra, json(tp));
+    ok(
+      "REEXPRESIÓN: el pack pasa de x12 a x24 con el mismo bulto de $1.200 → 96 u de $100 a $50: −$4.800, sin físico ni revalorización",
+      pesos(cadena(p, P.pack12).reexpresion) === -4800 && pesos(cadena(p, P.pack12).revalorizacion) === 0 && pesos(cadena(p, P.pack12).final) === 4800,
+      json(cadena(p, P.pack12))
+    );
+    ok(
+      "inicial $48.000, final $40.560: variación −$7.440 = físico −$3.600 + revalorización $960 + reexpresión −$4.800, al centavo",
+      [tp.inicial, tp.final, tp.variacion, tp.fisico, tp.revalorizacion, tp.reexpresion].map(pesos).join() === "48000,40560,-7440,-3600,960,-4800" && tp.cuadra,
+      json(tp)
+    );
     ok("O. el tránsito conserva el costo congelado: 12 u × $100 = $1.200, no 12 × $120", pesos(p.transito.alCerrar.valor) === 1200, json(p.transito.alCerrar));
+
+    const hoyD = await valor(L.D, HOY);
+    const nace = cadena(hoyD, P.naceHoy);
+    ok("NACE HOY: 10 u con el costo de su alta ($500) → $5.000, aunque a las 16:00 pase a $650", nace?.completa === true && pesos(nace.final) === 5000 && nace.nacioEnElPeriodo === true, json(nace));
+    ok("y 'Ahora' del depósito NO queda incompleto por él", hoyD.totales.completo === true && hoyD.totales.faltantes.length === 0 && hoyD.totales.cuadra, json(hoyD.totales.faltantes));
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -299,6 +330,39 @@ try {
     );
     const sc = (lista.items || []).find((i) => i.nombre === "SinCosto");
     ok("el faltante en la lista: importes en null, nunca $0", sc?.valor?.completo === false && sc.valor.inicial === null && sc.valor.final === null, json(sc?.valor));
+
+    // ════════════════════════════════════════════════════════════════════════
+    seccion("I. La ubicación: local normal, admin en vista global, y nada más");
+    // ════════════════════════════════════════════════════════════════════════
+    const conCookie = async (ruta, params, cookie) => {
+      const qs = new URLSearchParams(params).toString();
+      const r = await rutas[ruta](new Request(`http://ci.local/api/stock_locales/diario/${ruta}?${qs}`, { headers: { cookie } }));
+      return { status: r.status, ...(await r.json().catch(() => ({}))) };
+    };
+    const admin = sesion({ id: 204, localId: null, permisos: ["*"] });
+    const global = (g) => `erpazul_sesion=${admin}; erpazul_grupo_activo=${g}; erpazul_contexto_activo=${encodeURIComponent(JSON.stringify({ global: true }))}`;
+
+    const propio = await llamar("resumen", DIA, encargado);
+    ok("local normal: su ubicación, sin lista de ubicaciones", propio.status === 200 && propio.local?.id === L.L && propio.ubicaciones === undefined, json({ local: propio.local, u: propio.ubicaciones }));
+    const ajeno = await llamar("resumen", { ...DIA, localId: L.D }, encargado);
+    ok("local normal pidiendo otra ubicación de su grupo: 403", ajeno.status === 403 && ajeno.valor === undefined, json(ajeno));
+
+    const sinElegir = await conCookie("resumen", DIA, global(G));
+    ok(
+      "admin global sin localId: 400 FALTA_UBICACION con las ubicaciones del grupo activo (depósito primero), sin datos",
+      sinElegir.status === 400 && sinElegir.codigo === "FALTA_UBICACION" && json((sinElegir.ubicaciones || []).map((u) => u.nombre)) === json(["VS Depósito", "VS Local"]) && sinElegir.valor === undefined,
+      json(sinElegir)
+    );
+    const eligeLocal = await conCookie("resumen", { ...DIA, localId: L.L }, global(G));
+    ok("admin global elige el local: 200, su valor, y la lista para cambiar", eligeLocal.status === 200 && eligeLocal.local?.id === L.L && eligeLocal.valor?.inicial === 23370 && eligeLocal.ubicaciones?.length === 2, json(eligeLocal.local));
+    const cambia = await conCookie("resumen", { ...DIA, localId: L.D }, global(G));
+    ok("cambio de ubicación: el depósito, con SU valor ($48.000)", cambia.status === 200 && cambia.local?.id === L.D && cambia.valor?.inicial === 48000, json(cambia.valor?.inicial));
+    const deOtroGrupo = await conCookie("resumen", { ...DIA, localId: L.X }, global(G));
+    ok("admin global pidiendo una ubicación de otro grupo: 403", deOtroGrupo.status === 403 && deOtroGrupo.valor === undefined, json(deOtroGrupo));
+    const listaGlobal = await conCookie("productos", { ...DIA, filtro: "con_valor" }, global(G));
+    ok("también /productos pide elegir, con la lista", listaGlobal.status === 400 && listaGlobal.codigo === "FALTA_UBICACION" && listaGlobal.ubicaciones?.length === 2, json(listaGlobal));
+    const cajeroGlobal = await llamar("resumen", { ...DIA, localId: L.L }, cajero);
+    ok("las rutas siguen protegidas por stock.ver aunque venga localId", cajeroGlobal.status === 403, json(cajeroGlobal));
   }
 } catch (err) {
   fallas.push(`EXCEPCIÓN: ${err?.stack || err}`);
