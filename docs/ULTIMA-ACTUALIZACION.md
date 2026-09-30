@@ -1,8 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-30 11:55
+**Fecha:** 2026-09-30 16:03
 
 ## Módulos modificados recientemente
+
+### stock
+- fix(finanzas): Stock Diario en Finanzas se autoriza con stock.ver, no con finanzas.ver, feat(finanzas): Stock Diario se muda de Stock a Finanzas, feat(stock): cada movimiento del Libro de Stock nombra su documento
+- Archivos: 1 nuevos, 8 modificados (9 total)
 
 ### pos-ventas
 - feat(stock): cada movimiento del Libro de Stock nombra su documento
@@ -11,10 +15,6 @@
 ### productos
 - feat(stock): cada movimiento del Libro de Stock nombra su documento
 - Archivos: 4 modificados (4 total)
-
-### stock
-- feat(stock): cada movimiento del Libro de Stock nombra su documento
-- Archivos: 1 nuevos, 6 modificados (7 total)
 
 ### transferencias
 - feat(stock): cada movimiento del Libro de Stock nombra su documento, refactor(stock): un solo vocabulario para las causas de una diferencia

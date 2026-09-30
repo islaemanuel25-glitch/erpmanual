@@ -1,55 +1,28 @@
 // app/modulos/stock_locales/diario/page.jsx
 //
-// STOCK DIARIO, adentro del grupo Stock y al lado de Stock Locales, sin
-// reemplazarlo: aquélla dice cuánto hay; ésta, qué pasó en un período.
+// DONDE VIVÍA EL STOCK DIARIO: HOY SOLO REDIRIGE.
 //
-// Mismo permiso que las rutas de `/api/stock_locales/diario/`, `stock.ver`: es
-// la historia de la misma existencia física que muestra el stock por local. El
-// que manda es el chequeo de la ruta; éste es para no dibujar algo que el
-// servidor va a rechazar. El `Suspense` es por `useSearchParams`.
-"use client";
+// La pantalla se mudó a Finanzas —`/modulos/finanzas/stock-diario`— y dejó de
+// aparecer en el grupo Stock. La ruta vieja se conserva para que un enlace
+// guardado, un historial o un atajo no caigan en un 404: llevan a la nueva, con
+// el mismo local, período y búsqueda que traían en la dirección.
+//
+// No dibuja nada propio: una segunda copia de la pantalla es lo que este
+// archivo existe para evitar. `redirect` corre en el servidor antes de dibujar,
+// así que no hay parpadeo. Mismo patrón que `transferencias/corte-de-semana`.
 
-import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
-import { useUser } from "@/app/context/UserContext";
-import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
-import SinPermisos from "@/components/auth/SinPermisos";
-import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
-import SunmiLoader from "@/components/sunmi/SunmiLoader";
-import AccionDePantalla from "@/components/transferencias/AccionDePantalla";
-import PantallaStockDiario from "@/components/stock_diario/PantallaStockDiario";
-import { PERMISO_STOCK_DIARIO, RUTA_STOCK } from "@/lib/stock/libro/stockDiarioPantalla";
+import { RUTA_STOCK_DIARIO } from "@/lib/stock/libro/rutasStockDiario";
 
-export default function StockDiarioPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="py-12">
-          <SunmiLoader />
-        </div>
-      }
-    >
-      <StockDiario />
-    </Suspense>
-  );
-}
-
-function StockDiario() {
-  const { perfil, cargando } = useUser();
-  const permisos = perfil?.permisos || [];
-  const esAdmin = Array.isArray(permisos) && permisos.includes("*");
-
-  useTituloDePagina("Stock Diario");
-  const volver = useAccionDePagina(() => <SunmiBackButton href={RUTA_STOCK} />, []);
-
-  if (cargando) return null;
-  if (!esAdmin && !permisos.includes(PERMISO_STOCK_DIARIO)) return <SinPermisos />;
-
-  return (
-    // Mismo tope y mismos espacios que Gastos y Pagos a proveedores.
-    <div className="w-full min-h-full mx-auto max-w-4xl px-4 pt-4 pb-4 space-y-3.5">
-      <AccionDePantalla>{volver}</AccionDePantalla>
-      <PantallaStockDiario />
-    </div>
-  );
+export default async function StockDiarioAnteriorRedirige({ searchParams }) {
+  const sp = (await searchParams) || {};
+  const qs = new URLSearchParams();
+  for (const [clave, valor] of Object.entries(sp)) {
+    for (const v of Array.isArray(valor) ? valor : [valor]) {
+      if (v != null) qs.append(clave, String(v));
+    }
+  }
+  const s = qs.toString();
+  redirect(s ? `${RUTA_STOCK_DIARIO}?${s}` : RUTA_STOCK_DIARIO);
 }

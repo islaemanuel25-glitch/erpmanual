@@ -116,7 +116,7 @@ test("ResumenConImporte sin `detalle` dibuja lo mismo que antes: ninguna divisor
 
 const PANTALLA = execFileSync(
   "git",
-  ["ls-files", "--cached", "--others", "--exclude-standard", "components/stock_diario", "app/modulos/stock_locales/diario"],
+  ["ls-files", "--cached", "--others", "--exclude-standard", "components/stock_diario", "app/modulos/finanzas/stock-diario"],
   { encoding: "utf8" }
 )
   .split("\n")
@@ -131,15 +131,21 @@ test("la pantalla solo consume las rutas del Stock Diario que ya existen", () =>
   for (const r of ["resumen", "productos"]) assert.ok(fs.existsSync(`app/api/stock_locales/diario/${r}/route.js`), r);
 });
 
-test("la página exige stock.ver, y el menú la pone en Stock AL LADO de Stock Locales", () => {
-  assert.match(codigo("app/modulos/stock_locales/diario/page.jsx"), /permisos\.includes\(PERMISO_STOCK_DIARIO\)/);
+test("la página está en Finanzas pero pide stock.ver, y el menú la pone en Finanzas y NO en Stock", () => {
+  // Se mudó el 2026-09-30. La ubicación no cambió quién la puede leer: pide
+  // `stock.ver`, como sus rutas de datos, y no `finanzas.ver`.
+  const pagina = codigo("app/modulos/finanzas/stock-diario/page.jsx");
+  assert.match(pagina, /!permisos\.includes\(PERMISO_STOCK_DIARIO\)/);
+  assert.doesNotMatch(pagina, /finanzas\.ver|PERMISO_VER_FINANZAS/);
+  assert.match(pagina, /<SunmiBackButton href=\{RUTA_FINANZAS\} \/>/, "Volver tiene que llevar a la puerta de Finanzas");
   const stock = MENU_CONFIG.find((g) => g.key === "stock");
-  const labels = stock.items.map((i) => i.label);
-  assert.ok(labels.includes("Stock Locales"), "Stock Locales sigue");
-  const diario = stock.items.find((i) => i.label === "Stock Diario");
+  assert.ok(stock.items.some((i) => i.label === "Stock Locales"), "Stock Locales sigue en Stock");
+  assert.ok(!stock.items.some((i) => i.label === "Stock Diario" || i.href === RUTA_STOCK_DIARIO), "Stock Diario volvió a Stock");
+  const finanzas = MENU_CONFIG.find((g) => g.key === "finanzas");
+  const diario = finanzas.items.find((i) => i.label === "Stock Diario");
   assert.equal(diario.href, RUTA_STOCK_DIARIO);
   assert.equal(diario.permiso, "stock.ver");
-  assert.ok(fs.existsSync("app/modulos/stock_locales/diario/page.jsx"));
+  assert.ok(fs.existsSync("app/modulos/finanzas/stock-diario/page.jsx"));
 });
 
 test("la pantalla no escribe colores ni medidas mágicas", () => {

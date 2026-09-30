@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-09-30 11:55
+**Última actualización:** 2026-09-30 16:03
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -233,8 +233,17 @@ retroactivamente la regla de la zona, el verificador lo vería antes que la API.
 
 ### La pantalla del Stock Diario
 
-`/modulos/stock_locales/diario`, en el menú Stock al lado de Stock Locales —sin
-reemplazarlo— y con `stock.ver`, el permiso de las rutas. Es el diseño móvil de
+**Desde el 2026-09-30 vive en Finanzas**: `/modulos/finanzas/stock-diario`, en
+el menú Finanzas → Stock Diario, y ya no aparece en el grupo Stock *(verificado
+en código, `lib/menu/registry.js` y `lib/menu/stockDiarioEnFinanzas.test.mjs`)*.
+La ubicación no cambió la autorización: la pantalla y su ítem piden `stock.ver`,
+**no** `finanzas.ver`, igual que sus rutas de datos —que no se movieron, siguen
+en `/api/stock_locales/diario/` con `stock.ver` y solo GET—. El grupo Finanzas
+se ve con `finanzas.ver` o con `stock.ver`; quien tiene solo `stock.ver`
+—ENCARGADO y DUEÑO_LOCAL por defecto— ve Finanzas con Stock Diario como única
+herramienta y ninguna de las de plata, que siguen pidiendo `finanzas.ver` en el
+menú, en su pantalla y en su ruta. `/modulos/stock_locales/diario`, donde vivía
+antes, solo redirige a la nueva con su dirección completa. Es el diseño móvil de
 Figma (`EVJ2KvVCrY0oVSowfboymQ`, nodos 300:478 y 300:676), armado con las piezas
 de las pantallas por período *(verificado en código,
 `components/stock_diario/` y `lib/stock/libro/stockDiarioPantalla.js`)*:
@@ -262,6 +271,8 @@ la API del Stock Diario y no se tocó; hay que confirmarlo ejerciéndolo antes d
 corregirlo.
 
 ## Cambios recientes
+- 2026-09-30: fix(finanzas): Stock Diario en Finanzas se autoriza con stock.ver, no con finanzas.ver
+- 2026-09-30: feat(finanzas): Stock Diario se muda de Stock a Finanzas
 - 2026-09-30: feat(stock): cada movimiento del Libro de Stock nombra su documento
 - 2026-09-29: feat(stock): Stock Diario móvil — la pantalla del diseño, sobre la API que ya existía
 - 2026-09-28: fix(stock): el ajuste y los límites del peso fijo en el depósito van en piezas
