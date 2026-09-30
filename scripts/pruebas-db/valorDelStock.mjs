@@ -34,9 +34,11 @@ import { crearClientePrisma, ESCRITURA } from "../lib/clientePrisma.mjs";
 const jwt = (await import("jsonwebtoken")).default;
 const { MIGRACION_LIBRO, aplicarMigraciones, aplicarLibroEnAdelante, AR, uno, guion } = await import("./lib/libroEnElTiempo.mjs");
 const { PUNTO_CERO_PRODUCCION } = await import("../../lib/stock/libro/stockDiario.js");
-const { valorDelPeriodo, activacionDelLibroDeCostos } = await import("../../lib/stock/libro/valorDelStockServer.js");
+const { valorDelPeriodo, activacionDelLibroDeCostos, movimientosDeCategoria } = await import("../../lib/stock/libro/valorDelStockServer.js");
 const { ESTADO_VALOR, MOTIVO_COSTO_FALTANTE } = await import("../../lib/stock/libro/valorDelStock.js");
 const { declararOrigenDeStock, ORIGEN_STOCK } = await import("../../lib/stock/libro/libroStock.js");
+const { movimientoDeCategoriaApi } = await import("../../lib/stock/libro/stockDiarioApi.js");
+const { renglonDeMovimiento } = await import("../../lib/stock/libro/stockDiarioPantalla.js");
 const { crearTransferencia } = await import("../../lib/transferencias/crearTransferencia.js");
 const { DEFAULT_PERMISOS_SISTEMA, CAJERO, ENCARGADO } = await import("../../lib/rbac/systemRoles.js");
 
@@ -177,7 +179,18 @@ try {
     // Desde el 02/10 cada unidad vale $50 y no $100, sin compra ni venta.
     c.$executeRawUnsafe(`UPDATE "ProductoBase" SET "factor_pack" = 24, "updatedAt" = now() WHERE "id" = ${P.pack12.base}`)
   );
+  // ¿POR QUÉ CAMBIÓ? Operaciones con su origen declarado, como lo hacen las rutas.
+  await paso("2026-10-02 10:00:00", () => stock(P.pack12, 120, { origen: ORIGEN_STOCK.COMPRA_PROVEEDOR, referencia: "77" })); // +24 u a $50
+  await paso("2026-10-02 11:00:00", () => stock(P.pieza, 5, { origen: ORIGEN_STOCK.AJUSTE_MANUAL, referencia: "501" })); // +2 piezas
+  await paso("2026-10-02 12:00:00", () => stock(P.pieza, 4, { origen: ORIGEN_STOCK.AJUSTE_MANUAL, referencia: "502" })); // −1 pieza
   await paso("2026-10-03 10:00:00", () => costo(P.revaloriza, 1500)); // HOY: "Ahora" no lo usa
+  await paso("2026-10-03 09:30:00", () =>
+    // La recepción en el ORIGEN que solo libera el tránsito: delta físico cero.
+    c.$transaction(async (tx) => {
+      await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.TRANSFERENCIA_RECEPCION, referencia: String(transferencias[0].id) });
+      await tx.$executeRawUnsafe(`UPDATE "StockLocal" SET "enTransito" = 0, "updatedAt" = now() WHERE "id" = ${P.pack6.sl}`);
+    })
+  );
   // NACE HOY en el depósito, a las 15:00, a $500 con 10 unidades: base,
   // ubicación y fila de stock, en el orden en que los escribe la app.
   await paso("2026-10-03 15:00:00", async () => {
@@ -237,14 +250,81 @@ try {
     );
     ok(
       "REEXPRESIÓN: el pack pasa de x12 a x24 con el mismo bulto de $1.200 → 96 u de $100 a $50: −$4.800, sin físico ni revalorización",
-      pesos(cadena(p, P.pack12).reexpresion) === -4800 && pesos(cadena(p, P.pack12).revalorizacion) === 0 && pesos(cadena(p, P.pack12).final) === 4800,
+      // Final 120 u × $50: después de la reexpresión entra la compra del 02/10 (+24 u a $50).
+      pesos(cadena(p, P.pack12).reexpresion) === -4800 && pesos(cadena(p, P.pack12).revalorizacion) === 0 && pesos(cadena(p, P.pack12).final) === 6000,
       json(cadena(p, P.pack12))
     );
     ok(
-      "inicial $48.000, final $40.560: variación −$7.440 = físico −$3.600 + revalorización $960 + reexpresión −$4.800, al centavo",
-      [tp.inicial, tp.final, tp.variacion, tp.fisico, tp.revalorizacion, tp.reexpresion].map(pesos).join() === "48000,40560,-7440,-3600,960,-4800" && tp.cuadra,
+      "inicial $48.000, final $51.760: variación +$3.760 = físico +$7.600 + revalorización $960 + reexpresión −$4.800, al centavo",
+      [tp.inicial, tp.final, tp.variacion, tp.fisico, tp.revalorizacion, tp.reexpresion].map(pesos).join() === "48000,51760,3760,7600,960,-4800" && tp.cuadra,
       json(tp)
     );
+
+    // ── J. ¿POR QUÉ CAMBIÓ? ──────────────────────────────────────────────
+    const ex = tp.explicacion;
+    const cat = Object.fromEntries(ex.categorias.map((x) => [x.categoria, x]));
+    ok("J. la explicación suma EXACTAMENTE el movimiento físico ($7.600)", ex.cuadra === true && ex.total === tp.fisico, json({ total: ex.total, fisico: tp.fisico }));
+    ok("J. compra (COMPRA_PROVEEDOR): +$1.200 = 24 u a $50, 1 movimiento", pesos(cat.COMPRAS.neto) === 1200 && cat.COMPRAS.movimientosDeEntrada === 1, json(cat.COMPRAS));
+    ok("J. transferencia enviada: −$1.200 = 12 u a $100", pesos(cat.TRANSFERENCIAS.neto) === -1200 && pesos(cat.TRANSFERENCIAS.salidas) === -1200, json(cat.TRANSFERENCIAS));
+    ok(
+      "J. ajustes: la dirección sale del delta, no del origen — +2 piezas ($20.000) y −1 pieza (−$10.000)",
+      pesos(cat.AJUSTES.entradas) === 20000 && pesos(cat.AJUSTES.salidas) === -10000 && pesos(cat.AJUSTES.neto) === 10000,
+      json(cat.AJUSTES)
+    );
+    ok("J. SIN_ORIGEN no se reclasifica: 'Sin clasificar' −$2.400, 1 movimiento", pesos(ex.sinClasificar.efecto) === -2400 && ex.sinClasificar.movimientos === 1 && pesos(cat.SIN_CLASIFICAR.neto) === -2400, json(ex.sinClasificar));
+    ok("J. la revalorización ($960) y la reexpresión (−$4.800) no aparecen como compra, venta ni ningún origen", pesos(cat.VENTAS.neto) === 0 && pesos(cat.OTROS.neto) === 0 && pesos(cat.ALTAS_Y_BAJAS.neto) === 0);
+
+    const hoyTransito = await valor(L.D, HOY);
+    const catHoy = Object.fromEntries(hoyTransito.totales.explicacion.categorias.map((x) => [x.categoria, x]));
+    ok("J. la recepción que solo libera el tránsito no mueve stock disponible: Transferencias $0 hoy", pesos(catHoy.TRANSFERENCIAS.neto) === 0 && catHoy.TRANSFERENCIAS.movimientos === 0, json(catHoy.TRANSFERENCIAS));
+    ok("J. el nacido hoy sin origen declarado es 'Sin clasificar' +$5.000, y cuadra", pesos(catHoy.SIN_CLASIFICAR.neto) === 5000 && hoyTransito.totales.explicacion.cuadra, json(catHoy.SIN_CLASIFICAR));
+
+    const detalle = await movimientosDeCategoria(c, { localId: L.D, desde: "2026-09-30", hasta: "2026-10-02", categoria: "AJUSTES", esDeposito: true, hoy: HOY, page: 1, pageSize: 50 });
+    ok(
+      "J. el detalle de Ajustes: dos movimientos, con su delta, su efecto con el costo de ese día y su referencia",
+      json(detalle.movimientos.items.map((m) => [m.delta, pesos(m.efecto), m.origenRef, m.identidad?.nombre])) === json([[2000, 20000, "501", "Pieza"], [-1000, -10000, "502", "Pieza"]]),
+      json(detalle.movimientos.items.map((m) => [m.delta, m.efecto, m.origenRef]))
+    );
+    const detVentas = await movimientosDeCategoria(c, { localId: L.L, desde: "2026-09-30", hasta: "2026-09-30", categoria: "VENTAS", esDeposito: false, hoy: HOY, page: 1, pageSize: 50 });
+    ok("J. el detalle de Ventas del local: la venta #1, −3 u a $50", detVentas.movimientos.total === 1 && detVentas.movimientos.items[0].origenRef === "1" && pesos(detVentas.movimientos.items[0].efecto) === -150, json(detVentas.movimientos));
+
+    // La escala de SU momento: el −24 u del 30/09 se leía x12; el factor pasó a
+    // 24 el 01/10. Por el camino real: servidor → API → renglón de la pantalla.
+    const detSin = await movimientosDeCategoria(c, { localId: L.D, desde: "2026-09-30", hasta: "2026-10-02", categoria: "SIN_CLASIFICAR", esDeposito: true, hoy: HOY, page: 1, pageSize: 50 });
+    const filaPack = detSin.movimientos.items.find((m) => m.productoLocalId === P.pack12.pl);
+    const renglonPack = filaPack && renglonDeMovimiento(movimientoDeCategoriaApi(filaPack), { local: { esDeposito: true } });
+    ok(
+      "J. HISTÓRICO: el −24 u del 30/09 se lee con el x12 de ese día (−2 bultos), no con el x24 de hoy (−1 bulto)",
+      filaPack?.escalaDelMomento?.escala?.factorPack === 12 && filaPack?.identidad?.escala?.factorPack === 24 && renglonPack?.cantidad === "−2 bultos",
+      json({ escalaDelMomento: filaPack?.escalaDelMomento, hoy: filaPack?.identidad?.escala, renglon: renglonPack })
+    );
+
+    // Σ filas = categoría = su parte del físico, al centavo; y no depende de la página.
+    const todasLasFilas = async (categoria, pageSize) => {
+      const filas = [];
+      let d;
+      for (let page = 1; !d || page <= d.movimientos.totalPages; page++) {
+        d = await movimientosDeCategoria(c, { localId: L.D, desde: "2026-09-30", hasta: "2026-10-02", categoria, esDeposito: true, hoy: HOY, page, pageSize });
+        filas.push(...d.movimientos.items);
+      }
+      return { filas, total: d.totalDeLaCategoria };
+    };
+    let sumaDeCategorias = 0;
+    const cuadres = [];
+    for (const x of ex.categorias) {
+      const deAUno = await todasLasFilas(x.categoria, 1);
+      const deAMuchos = await todasLasFilas(x.categoria, 50);
+      const suma = deAUno.filas.reduce((s, m) => s + (m.efecto ?? 0), 0);
+      const mismaFila = json(deAUno.filas.map((m) => [m.id, m.efecto])) === json(deAMuchos.filas.map((m) => [m.id, m.efecto]));
+      sumaDeCategorias += suma;
+      cuadres.push({ categoria: x.categoria, suma, total: deAUno.total, neto: x.neto, filas: deAUno.filas.length, mismaFila });
+    }
+    ok(
+      "J. DETALLE AL CENTAVO: en cada categoría Σ filas = total de la categoría = su neto del resumen, igual de a 1 por página que de a 50",
+      cuadres.every((q) => q.suma === q.total && q.total === q.neto && q.mismaFila),
+      json(cuadres)
+    );
+    ok("J. y Σ de todas las filas de todas las categorías = movimiento físico", sumaDeCategorias === tp.fisico, json({ sumaDeCategorias, fisico: tp.fisico }));
     ok("O. el tránsito conserva el costo congelado: 12 u × $100 = $1.200, no 12 × $120", pesos(p.transito.alCerrar.valor) === 1200, json(p.transito.alCerrar));
 
     const hoyD = await valor(L.D, HOY);
@@ -369,7 +449,10 @@ try {
   console.log(`  ✗ EXCEPCIÓN: ${err?.stack || err}`);
 } finally {
   await c?.$disconnect().catch(() => {});
-  await principal.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${NOMBRE}" WITH (FORCE)`).catch(() => {});
+  // `VALOR_DEL_STOCK_CONSERVAR_BASE=1` la deja, para abrir la pantalla contra
+  // esta historia con `next dev` en la máquina de desarrollo. En CI se borra.
+  if (process.env.VALOR_DEL_STOCK_CONSERVAR_BASE === "1") console.log(`\nBase conservada: ${NOMBRE}`);
+  else await principal.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${NOMBRE}" WITH (FORCE)`).catch(() => {});
   await principal.$disconnect();
 }
 

@@ -136,11 +136,13 @@ const PANTALLA = execFileSync(
 
 test("la pantalla solo consume las rutas del Stock Diario que ya existen", () => {
   const fuente = PANTALLA.map(codigo).join("\n");
-  const rutas = [...fuente.matchAll(/`\/api\/([^`?$]+)/g)].map((m) => m[1]);
-  assert.deepEqual([...new Set(rutas)], ["stock_locales/diario/"]);
+  const rutas = [...new Set([...fuente.matchAll(/`\/api\/([^`?$]+)/g)].map((m) => m[1]))];
+  // Solo rutas del diario: el prefijo que arma `pedir(...)` y, desde "¿Por qué
+  // cambió?", el detalle por categoría sobre `movimientos`, que ya existía.
+  assert.deepEqual(rutas.sort(), ["stock_locales/diario/", "stock_locales/diario/movimientos"]);
   assert.match(fuente, /pedir\("resumen", consultaResumen\)/);
   assert.match(fuente, /pedir\("productos", consultaLista\)/);
-  for (const r of ["resumen", "productos"]) assert.ok(fs.existsSync(`app/api/stock_locales/diario/${r}/route.js`), r);
+  for (const r of ["resumen", "productos", "movimientos"]) assert.ok(fs.existsSync(`app/api/stock_locales/diario/${r}/route.js`), r);
 });
 
 test("la página está en Finanzas pero pide stock.ver, y el menú la pone en Finanzas y NO en Stock", () => {

@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-09-30 18:15
+**Última actualización:** 2026-09-30 22:21
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -322,6 +322,77 @@ cantidades.
   la guarda en la URL (`localId`). No se suman ubicaciones ni se cambia el
   contexto de toda la app *(verificado contra PostgreSQL, sección I)*.
 
+### ¿Por qué cambió? — el movimiento físico por origen
+
+*(Verificado contra PostgreSQL, sección J de `scripts/pruebas-db/valorDelStock.mjs`;
+la cuenta en `lib/stock/libro/explicacionDelValor.test.mjs`.)* El movimiento
+físico se parte por el ORIGEN que declaró cada operación en el Libro de Stock
+(`declararOrigenDeStock`, dentro de su transacción). La tabla vive en
+`lib/stock/libro/explicacionDelValor.js` y un candado exige que cada valor de
+`ORIGEN_STOCK` esté clasificado. La auditoría del 2026-09-30 leyó cada
+escritor [código]:
+
+- **Compras a proveedor** ← `COMPRA_PROVEEDOR`: la recepción de un pedido
+  (`compras-proveedor/recibir/[id]`), declarado al abrir la transacción que suma
+  el stock. Referencia: `PedidoProveedor.id`.
+- **Ventas** ← `VENTA` (`pos-ventas/crear`), `CORRECCION_VENTA`,
+  `ANULACION_VENTA` (pueden devolver stock). Referencia: `Venta.id` o
+  `VentaCorreccion.id`.
+- **Transferencias** ← `TRANSFERENCIA_ENVIO` (`crearTransferencia`: descuenta el
+  origen), `TRANSFERENCIA_RECEPCION` (`confirmar-recepcion`: suma al destino y en
+  el origen devuelve —o descuenta— la diferencia), `TRANSFERENCIA_CANCELACION`.
+  Referencia: `Transferencia.id`.
+- **Ajustes de stock** ← `AJUSTE_MANUAL`. Referencia: `AuditoriaStock.id`.
+- **Altas, importaciones y bajas** ← `ALTA_PRODUCTO`, `ALTA_PRODUCTO_DESDE_STOCK`,
+  `ALTA_AL_LISTAR_STOCK`, `IMPORTACION_PRODUCTOS`, `IMPORTACION_STOCK`,
+  `PROMOCION_A_DEPOSITO`, `HERENCIA_DEL_DEPOSITO`, `ELIMINACION_PRODUCTO`,
+  `LIMITES_STOCK` (estos dos últimos casi nunca mueven cantidad).
+- **Otros** ← `RESET_OPERATIVO`, `ACTIVACION_DEL_LIBRO`, y cualquier origen que
+  aparezca en el libro sin estar en la tabla (se muestra su nombre).
+- **Sin clasificar** ← `SIN_ORIGEN`. No se reclasifica ni se infiere.
+
+La **dirección** no sale del origen sino del delta físico de cada movimiento
+(`posterior − anterior`, con la inexistencia en cero): una misma categoría puede
+tener entradas y salidas, y se muestran por separado. Un movimiento que solo
+cambia `enTransito` tiene delta cero y no entra: el tránsito sigue aparte.
+
+**La plata:** una consulta agrupada por (producto, día, origen, dirección) trae
+el delta exacto; cada grupo vale delta × el costo congelado de ese día —el
+mismo de la valorización—. El redondeo se reparte dentro de cada producto y día
+(al grupo de mayor valor) para que `Σ categorías = movimiento físico` cierre al
+centavo. La API lo verifica en `explicacion.cuadra` e informa el mayor ajuste
+en `desvioMaximoDeRedondeo`: con un libro continuo es de centavos; más que eso
+delata una cadena que no suma, y la pantalla lo avisa. Los productos sin costo
+no están en el movimiento físico del total y tampoco en su explicación.
+
+**El detalle** de cada categoría es `/api/stock_locales/diario/movimientos` con
+`categoria=`: paginado, cada movimiento con fecha, producto, delta, efecto con el
+costo de su día y el documento (`origen` + `origenRef`, sin consultar la
+operación). *(verificado en código y en PostgreSQL, 2026-09-30)*:
+
+- **Σ filas = total de la categoría, al centavo.** El detalle corre la MISMA
+  valorización que el resumen y toma, para cada (producto, día, origen,
+  dirección), el importe ya repartido de esa parte; ese importe se reparte entre
+  TODOS los movimientos de la parte (`repartirParteEntreMovimientos`: cada uno
+  redondeado, y los centavos que faltan de a uno a los que el redondeo dejó más
+  lejos de su valor exacto, a igual distancia al de `id` menor). Por eso el
+  efecto de una fila no cambia según la página ni el orden en que se pide, y no
+  hay fila de "ajuste de redondeo". La respuesta trae `totalDeLaCategoria`.
+- **La cantidad se lee con la escala de SU momento**, no con la de hoy: la
+  versión del Libro de Costos vigente en el instante del movimiento
+  (`escalaDelMomento`) da unidad, factor, peso, modos y si la ubicación era
+  depósito, y se escribe con el mismo `presentacionCantidadStock` de Stock
+  Locales. Un pack x6 de ayer se sigue leyendo x6 aunque hoy sea x12. Sin
+  versión del libro en ese instante, cae a la escala actual
+  (`esDepositoDelMomento` en null).
+- El pedido del detalle cuesta las 13 consultas del resumen más la página, una
+  consulta con todos los movimientos de las partes que toca la página, y —solo
+  en OTROS— la de orígenes presentes.
+
+**No es plata que entró o salió:** una compra recibida aumenta el capital en
+mercadería aunque no esté pagada. La conciliación con pagos, gastos, cobros y
+caja es otra etapa [pendiente].
+
 ### La pantalla: Valor del Stock
 
 **Desde el 2026-09-30 vive en Finanzas y se llama Valor del Stock**:
@@ -377,6 +448,7 @@ la API del Stock Diario y no se tocó; hay que confirmarlo ejerciéndolo antes d
 corregirlo.
 
 ## Cambios recientes
+- 2026-09-30: feat(finanzas): Valor del Stock — "¿Por qué cambió?", el movimiento físico por origen real
 - 2026-09-30: feat(finanzas): Valor del Stock — nacidos en el día, reexpresión por escala y ubicación del admin
 - 2026-09-30: fix(stock): "1 bulto" y no "1 bultos", con una sola regla para Stock Locales y el Valor del Stock
 - 2026-09-30: feat(finanzas): Stock Diario pasa a llamarse Valor del Stock y muestra la plata primero

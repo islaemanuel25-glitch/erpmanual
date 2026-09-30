@@ -15,6 +15,8 @@
 //   2. Otro: desde y hasta            → `SunmiDateRangePicker`, como dice la pieza.
 //   3. el período, con sus flechas    → `NavegadorDePeriodo`.
 //   4. el valor                       → `ResumenValorDelStock` (`ResumenConImporte`).
+//   4.bis ¿Por qué cambió?            → `PorQueCambio`: el movimiento físico por
+//      origen real, cada categoría con sus movimientos debajo.
 //   5. la evolución día por día       → `DiaConBanda` con `FilaConImporte`.
 //   6. el buscador                    → `SunmiCampoBusquedaVoz`.
 //   7. los productos que explican el cambio → `DiaConBanda` con `FilaStockDiario`,
@@ -80,6 +82,7 @@ import {
 import FilaStockDiario from "./FilaStockDiario";
 import ResumenStockDiario from "./ResumenStockDiario";
 import ResumenValorDelStock from "./ResumenValorDelStock";
+import PorQueCambio from "./PorQueCambio";
 
 async function pedir(ruta, consulta) {
   const res = await fetch(`/api/stock_locales/diario/${ruta}?${consulta}`, { cache: "no-store", credentials: "include" });
@@ -257,6 +260,7 @@ export default function PantallaStockDiario() {
           {textosDelValor(respuesta) ? (
             <>
               <ResumenValorDelStock respuesta={respuesta} />
+              <PorQueCambio respuesta={respuesta} ctx={ctx} />
               <DiaConBanda titulo="Evolución" dato={datoDeLaEvolucion(respuesta)}>
                 {filasDeEvolucion(respuesta).map((f) => (
                   <FilaConImporte key={f.clave} importe={f.importe}>
