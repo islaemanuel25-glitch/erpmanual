@@ -15,6 +15,7 @@ import {
   esFiambreFijoItem,
   presentacionCantidadStock,
   formatLimiteStock,
+  palabraDeBultos,
 } from "@/lib/stock/presentacion";
 
 // ── Componente ──────────────────────────────────────────────────────────
@@ -127,7 +128,7 @@ export default function TablaStock({
       // mostrado el par roto que devolvía fromUnidades con negativos.
       return (
         <span>
-          {bultos !== 0 && <strong>{bultos} bultos</strong>}
+          {bultos !== 0 && <strong>{bultos}{` ${palabraDeBultos(bultos)}`}</strong>}
           {bultos !== 0 && sueltas !== 0 && " + "}
           {sueltas !== 0 && `${sueltas} uds`}
         </span>

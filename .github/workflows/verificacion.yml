@@ -314,6 +314,16 @@ jobs:
       - name: API del Stock Diario (aislamiento, períodos, paginación, solo lectura)
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/stockDiarioApi.mjs
 
+      # ── EL VALOR DEL STOCK ────────────────────────────────────────────────
+      #
+      # Los dos libros juntos, con escrituras reales reubicadas en el tiempo: el
+      # costo congelado a las 00:00, el pack y la pieza en unidades físicas, el
+      # faltante que no es cero, el negativo, el tránsito con su costo congelado,
+      # la identidad final − inicial = físico + revalorización, y las rutas con
+      # stock.ver y sin él. Base descartable, borrada al terminar.
+      - name: Valor del Stock (costo congelado, revalorización, tránsito, permisos)
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/valorDelStock.mjs
+
       # ── LA RECUPERACIÓN DEL LIBRO ─────────────────────────────────────────
       #
       # El procedimiento del runbook de /deploy si la activación del libro no

@@ -1,28 +1,14 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-30 16:03
+**Fecha:** 2026-09-30 18:15
 
 ## Módulos modificados recientemente
 
 ### stock
-- fix(finanzas): Stock Diario en Finanzas se autoriza con stock.ver, no con finanzas.ver, feat(finanzas): Stock Diario se muda de Stock a Finanzas, feat(stock): cada movimiento del Libro de Stock nombra su documento
-- Archivos: 1 nuevos, 8 modificados (9 total)
-
-### pos-ventas
-- feat(stock): cada movimiento del Libro de Stock nombra su documento
+- feat(finanzas): Valor del Stock — nacidos en el día, reexpresión por escala y ubicación del admin, fix(stock): "1 bulto" y no "1 bultos", con una sola regla para Stock Locales y el Valor del Stock
 - Archivos: 3 modificados (3 total)
 
-### productos
-- feat(stock): cada movimiento del Libro de Stock nombra su documento
-- Archivos: 4 modificados (4 total)
 
-### transferencias
-- feat(stock): cada movimiento del Libro de Stock nombra su documento, refactor(stock): un solo vocabulario para las causas de una diferencia
-- Archivos: 6 modificados (6 total)
-
-
-## Archivos nuevos desde última sincronización
-- components/stock_locales/modalAjusteCausa.test.mjs
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai

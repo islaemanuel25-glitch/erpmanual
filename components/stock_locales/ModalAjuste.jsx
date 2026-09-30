@@ -13,7 +13,7 @@ import {
   motivoExigeDetalle,
   motivosParaDireccion,
 } from "@/lib/stock/motivosDeDiferencia";
-import { presentacionCantidadStock, unidadFisicaDeItem } from "@/lib/stock/presentacion";
+import { presentacionCantidadStock, textoDeBultos, unidadFisicaDeItem } from "@/lib/stock/presentacion";
 import { UNIDAD_FISICA_STOCK, motivoCantidadNoAdmitida } from "@/lib/stock/escalaFisica";
 import { useNumberInputHandlers } from "@/hooks/useNumberInputHandlers";
 
@@ -226,9 +226,9 @@ export default function ModalAjuste({ open, onClose, producto, local }) {
                   factorPack,
                 });
                 if (bultos > 0 && sueltas > 0) {
-                  stockActualLabel = `${bultos} bultos + ${sueltas} uds`;
+                  stockActualLabel = `${textoDeBultos(bultos)} + ${sueltas} uds`;
                 } else if (bultos > 0) {
-                  stockActualLabel = `${bultos} bultos`;
+                  stockActualLabel = textoDeBultos(bultos);
                 } else {
                   stockActualLabel = `${sueltas} uds`;
                 }

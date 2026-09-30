@@ -1,8 +1,9 @@
 // app/modulos/finanzas/stock-diario/page.jsx
 //
-// STOCK DIARIO, adentro de Finanzas: qué pasó con el stock físico de una
-// ubicación en un período. Es la base de lo que después se va a valorizar; por
-// ahora muestra cantidades, igual que cuando vivía en el grupo Stock.
+// VALOR DEL STOCK, adentro de Finanzas: cuánto capital había en mercadería en
+// una ubicación al empezar un período y cuánto al terminarlo, y si la diferencia
+// fue mercadería que se movió o costo que cambió. Nació como "Stock Diario"
+// —solo cantidades— y la ruta conserva ese nombre: cambiarla no arreglaba nada.
 //
 // El mismo armado que Pagos a proveedores y Gastos: se entra desde la puerta de
 // Finanzas y se vuelve ahí, así que registra acción y título en el shell. El
@@ -25,7 +26,7 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import AccionDePantalla from "@/components/transferencias/AccionDePantalla";
 import PantallaStockDiario from "@/components/stock_diario/PantallaStockDiario";
 import { RUTA_FINANZAS } from "@/lib/finanzas/contextoFinanzas";
-import { PERMISO_STOCK_DIARIO } from "@/lib/stock/libro/stockDiarioPantalla";
+import { NOMBRE_VALOR_DEL_STOCK, PERMISO_STOCK_DIARIO } from "@/lib/stock/libro/stockDiarioPantalla";
 
 export default function StockDiarioPage() {
   return (
@@ -46,7 +47,7 @@ function StockDiario() {
   const permisos = perfil?.permisos || [];
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
 
-  useTituloDePagina("Stock Diario");
+  useTituloDePagina(NOMBRE_VALOR_DEL_STOCK);
   const volver = useAccionDePagina(() => <SunmiBackButton href={RUTA_FINANZAS} />, []);
 
   if (cargando) return null;
