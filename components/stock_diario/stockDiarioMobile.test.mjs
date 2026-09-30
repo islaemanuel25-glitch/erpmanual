@@ -58,12 +58,24 @@ test("la fila: nombre, Apertura → Ahora, y la variación en la presentación d
   assert.ok(s.includes(">+4 uds<"), s);
 });
 
-test("'Ver' no se dibuja ni es un botón: el detalle todavía no está diseñado", () => {
+test("sin valor que explicar, la fila no es tocable: un 'Ver' sin detalle sería un botón roto", () => {
   const r = respuesta(HOY);
   const s = h(React.createElement(FilaStockDiario, { item: item(r, { antes: { cantidad: "18" }, hasta: { cantidad: "22" } }), respuesta: r }));
-  assert.ok(!s.includes("Ver ›"), "un 'Ver' sin destino es un botón roto");
+  assert.ok(!s.includes("Ver ›"), s);
   assert.ok(!/<button|<a /.test(s), "la fila no es tocable");
-  assert.doesNotMatch(codigo("components/stock_diario/FilaStockDiario.jsx"), /onAbrir=/);
+});
+
+test("con su valor, la fila muestra la variación en pesos y se abre para ver el detalle, sin navegar", () => {
+  const r = respuesta(HOY);
+  const conValor = {
+    ...item(r, { antes: { cantidad: "20" }, hasta: { cantidad: "20" } }),
+    valor: { completo: true, faltante: null, stockNegativo: false, cantidadInicial: 20, cantidadFinal: 20, costoInicial: 1000, costoFinal: 1200, unidadFisica: "UNIDAD", anomaliasDeCosto: [], inicial: 20000, final: 24000, variacion: 4000, fisico: 0, revalorizacion: 4000 },
+  };
+  const s = h(React.createElement(FilaStockDiario, { item: conValor, respuesta: r }));
+  assert.ok(s.includes(">+$4.000,00<"), s);
+  assert.ok(s.includes("Ver ›") && /<button/.test(s), "la fila con detalle es tocable");
+  assert.ok(!s.includes("data-detalle-valor"), "el detalle arranca cerrado");
+  assert.doesNotMatch(codigo("components/stock_diario/FilaStockDiario.jsx"), /href=|router\.|fetch\(/, "abrir el detalle no navega ni pide nada");
 });
 
 test("PRODUCTO ELIMINADO dibujado: 'Ahora No existe', sin cifra a la derecha, nunca 'Ahora 0'", () => {
@@ -140,9 +152,9 @@ test("la página está en Finanzas pero pide stock.ver, y el menú la pone en Fi
   assert.match(pagina, /<SunmiBackButton href=\{RUTA_FINANZAS\} \/>/, "Volver tiene que llevar a la puerta de Finanzas");
   const stock = MENU_CONFIG.find((g) => g.key === "stock");
   assert.ok(stock.items.some((i) => i.label === "Stock Locales"), "Stock Locales sigue en Stock");
-  assert.ok(!stock.items.some((i) => i.label === "Stock Diario" || i.href === RUTA_STOCK_DIARIO), "Stock Diario volvió a Stock");
+  assert.ok(!stock.items.some((i) => i.label === "Stock Diario" || i.label === "Valor del Stock" || i.href === RUTA_STOCK_DIARIO), "volvió a Stock");
   const finanzas = MENU_CONFIG.find((g) => g.key === "finanzas");
-  const diario = finanzas.items.find((i) => i.label === "Stock Diario");
+  const diario = finanzas.items.find((i) => i.label === "Valor del Stock");
   assert.equal(diario.href, RUTA_STOCK_DIARIO);
   assert.equal(diario.permiso, "stock.ver");
   assert.ok(fs.existsSync("app/modulos/finanzas/stock-diario/page.jsx"));

@@ -2,20 +2,29 @@
 
 // components/stock_diario/PantallaStockDiario.jsx
 //
-// STOCK DIARIO, MÓVIL (Figma 300:478 y sus estados, 300:676).
+// VALOR DEL STOCK, MÓVIL. Es la pantalla del Stock Diario (Figma 300:478 y sus
+// estados, 300:676) con el dinero adelante: la pregunta que contesta es cuánto
+// capital había en mercadería al empezar el período y cuánto al terminar.
 //
 // ── LA MISMA ESTRUCTURA QUE LAS PANTALLAS POR PERÍODO ────────────────────
 //
-//   1. Día / Semana / Mes / Otro      → `ChipsDePeriodo`.
+//   1. Día / Semana / Mes / Año / Otro → `ChipsDePeriodo` con `conAnio`.
 //   2. Otro: desde y hasta            → `SunmiDateRangePicker`, como dice la pieza.
 //   3. el período, con sus flechas    → `NavegadorDePeriodo`.
-//   4. la actividad                   → `ResumenStockDiario` (`ResumenConImporte`).
-//   5. el buscador                    → `SunmiCampoBusquedaVoz`.
-//   6. los productos que se movieron  → `DiaConBanda` con `FilaStockDiario`.
-//   7. más de una página              → `SunmiPaginador`.
+//   4. el valor                       → `ResumenValorDelStock` (`ResumenConImporte`).
+//   5. la evolución día por día       → `DiaConBanda` con `FilaConImporte`.
+//   6. el buscador                    → `SunmiCampoBusquedaVoz`.
+//   7. los productos que explican el cambio → `DiaConBanda` con `FilaStockDiario`,
+//      que se abre y muestra su detalle.
+//   8. más de una página              → `SunmiPaginador`.
+//   9. la actividad física, secundaria → `ResumenStockDiario`: conteos.
 //
-// Fuera de historia no hay 4 a 7: hay un bloque que dice desde cuándo existe el
-// registro, y que antes no hay datos —no que el stock era cero—.
+// Fuera de historia no hay 4 a 9: hay un bloque que dice desde cuándo existe el
+// registro, y que antes no hay datos —no que el stock era cero—. Sin costos
+// históricos (antes del 30/09 en producción) no hay 4 ni 5: se dice por qué, y
+// la lista y la actividad física siguen, porque las cantidades sí se conocen.
+//
+// Es de SOLO LECTURA: ningún control de esta pantalla escribe nada.
 //
 // ── EL SERVIDOR DECIDE EL PERÍODO ────────────────────────────────────────
 //
@@ -37,6 +46,7 @@ import SunmiDateRangePicker from "@/components/sunmi/SunmiDateRangePicker";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 import DiaConBanda from "@/components/periodo/DiaConBanda";
+import FilaConImporte from "@/components/periodo/FilaConImporte";
 import ResumenConImporte from "@/components/periodo/ResumenConImporte";
 import ChipsDePeriodo, { CLAVE_OTRO } from "@/components/transferencias/ChipsDePeriodo";
 import NavegadorDePeriodo from "@/components/transferencias/NavegadorDePeriodo";
@@ -48,23 +58,28 @@ import {
   consultaDelResumen,
   contextoAnterior,
   contextoSiguiente,
+  datoDeLaEvolucion,
   datoDeLaLista,
+  filasDeEvolucion,
   parseContextoStockDiario,
   puedeAvanzar,
   puedeRetroceder,
   textoFueraDeHistoria,
+  textoSinValor,
   textosDelNavegador,
+  textosDelValor,
   urlDeStockDiario,
 } from "@/lib/stock/libro/stockDiarioPantalla";
 
 import FilaStockDiario from "./FilaStockDiario";
 import ResumenStockDiario from "./ResumenStockDiario";
+import ResumenValorDelStock from "./ResumenValorDelStock";
 
 async function pedir(ruta, consulta) {
   const res = await fetch(`/api/stock_locales/diario/${ruta}?${consulta}`, { cache: "no-store", credentials: "include" });
   const j = await res.json().catch(() => ({}));
   // El caso malo tiene rama propia: un error no se dibuja como un período vacío.
-  if (!res.ok || !j.ok) throw new Error(j?.error || "No se pudo leer el Stock Diario.");
+  if (!res.ok || !j.ok) throw new Error(j?.error || "No se pudo leer el Valor del Stock.");
   return j;
 }
 
@@ -148,6 +163,7 @@ export default function PantallaStockDiario() {
   return (
     <>
       <ChipsDePeriodo
+        conAnio
         valor={ctx.unidad}
         onCambiar={(u) => (u === CLAVE_OTRO ? ir({ unidad: u, desde: null, hasta: null }) : ir({ unidad: u }))}
       />
@@ -177,7 +193,7 @@ export default function PantallaStockDiario() {
 
       {!consultaResumen && (
         <SunmiAviso tono="neutral" titulo="Elegí el período">
-          Marcá desde y hasta en el calendario para ver el Stock Diario de esos días.
+          Marcá desde y hasta en el calendario para ver el valor del stock de esos días.
         </SunmiAviso>
       )}
 
@@ -197,7 +213,20 @@ export default function PantallaStockDiario() {
 
       {respuesta && !cargando && !fuera && (
         <>
-          <ResumenStockDiario respuesta={respuesta} />
+          {textosDelValor(respuesta) ? (
+            <>
+              <ResumenValorDelStock respuesta={respuesta} />
+              <DiaConBanda titulo="Evolución" dato={datoDeLaEvolucion(respuesta)}>
+                {filasDeEvolucion(respuesta).map((f) => (
+                  <FilaConImporte key={f.clave} importe={f.importe}>
+                    <div className="text-sm3 sunmi-text-strong">{f.rotulo}</div>
+                  </FilaConImporte>
+                ))}
+              </DiaConBanda>
+            </>
+          ) : (
+            <SinValor respuesta={respuesta} />
+          )}
 
           <SunmiCampoBusquedaVoz
             value={busqueda}
@@ -219,10 +248,10 @@ export default function PantallaStockDiario() {
           )}
 
           {lista && (
-            <DiaConBanda titulo="Productos" dato={datoDeLaLista(lista.total, respuesta)}>
+            <DiaConBanda titulo="Productos" dato={datoDeLaLista(lista.total)}>
               {lista.items.length === 0 ? (
                 <div className="text-center py-12 sunmi-text-muted text-xs">
-                  {termino ? "Ningún producto coincide con la búsqueda." : "Ningún producto se movió en este período."}
+                  {termino ? "Ningún producto coincide con la búsqueda." : "Ningún producto cambió de valor en este período."}
                 </div>
               ) : (
                 lista.items.map((item) => <FilaStockDiario key={item.productoLocalId} item={item} respuesta={respuesta} />)
@@ -241,10 +270,18 @@ export default function PantallaStockDiario() {
               onGoToPage={(p) => setPagina(p)}
             />
           )}
+
+          <ResumenStockDiario respuesta={respuesta} />
         </>
       )}
     </>
   );
+}
+
+/** Sin costos históricos para el período: se dice por qué, en vez de mostrar $0. */
+function SinValor({ respuesta }) {
+  const t = textoSinValor(respuesta);
+  return <ResumenConImporte rotulo="Valor del stock" importe={<span className="text-base2">{t.titulo}</span>} subtitulo={null} nota={t.detalle} />;
 }
 
 /** Antes del punto cero: no hay números, y se dice por qué en vez de mostrar ceros. */

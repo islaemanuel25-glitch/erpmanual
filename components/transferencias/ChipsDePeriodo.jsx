@@ -44,6 +44,19 @@ export const OPCIONES_DE_PERIODO = Object.freeze([
 ]);
 
 /**
+ * EL AÑO, SOLO DONDE SE PIDE. No es una unidad de `periodoDePago` —nadie paga
+ * por año—, pero el Valor del Stock sí se mira por año, y su API ya lo acepta
+ * (`UNIDAD_DE_PERIODO.ANIO`). Va entre Mes y Otro, y solo con `conAnio`: las
+ * pantallas que ya usan esta pieza siguen con sus cuatro chips, del mismo ancho.
+ */
+export const CLAVE_ANIO = "ANIO";
+export const OPCIONES_DE_PERIODO_CON_ANIO = Object.freeze([
+  ...OPCIONES_DE_PERIODO.slice(0, 3),
+  { clave: CLAVE_ANIO, texto: "Año" },
+  OPCIONES_DE_PERIODO[3],
+]);
+
+/**
  * ── `deshabilitadas` ─────────────────────────────────────────────────────
  *
  * Qué chips se dibujan APAGADOS. Vacío por defecto, así que las dos pantallas
@@ -63,12 +76,12 @@ export const OPCIONES_DE_PERIODO = Object.freeze([
  *
  * Apagado dice la verdad: existe, y todavía no.
  */
-export default function ChipsDePeriodo({ valor = UNIDADES.SEMANA, onCambiar, deshabilitadas = [] }) {
+export default function ChipsDePeriodo({ valor = UNIDADES.SEMANA, onCambiar, deshabilitadas = [], conAnio = false }) {
   // El `className` que aceptaba antes no lo pasaba ninguna de las tres pantallas
   // que lo usan, y concatenado no negociaba: se fue con el marcado al kit.
   return (
     <SunmiSelectorDeOpciones
-      opciones={OPCIONES_DE_PERIODO}
+      opciones={conAnio ? OPCIONES_DE_PERIODO_CON_ANIO : OPCIONES_DE_PERIODO}
       valor={valor}
       onCambiar={onCambiar}
       etiqueta="Período"
