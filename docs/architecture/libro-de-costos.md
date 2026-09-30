@@ -196,7 +196,20 @@ tiene que frenar— la ejerce `scripts/pruebas-db/recuperacionLibroCostos.mjs`
 archivo dos veces: la segunda falla con `LIBRO_COSTO_YA_ACTIVADO` y no deja
 nada [probado].
 
-## El día de activación y lo que el Stock Diario va a leer [pendiente]
+## El día de activación y lo que el Stock Diario va a leer
+
+**Desde el 2026-09-30 lo lee el Valor del Stock** (`lib/stock/libro/valorDelStock.js`
+y `valorDelStockServer.js`, descrito en `docs/modulos/stock.md`) [código]
+[probado en `scripts/pruebas-db/valorDelStock.mjs`]. Lo que quedó hecho: el
+costo de un día es la versión base y la de ubicación con `dia` anterior —el
+estado a las 00:00—, combinadas con `precioDeLaUbicacion`; el primer día
+valorizable es el siguiente a `LibroCostoActivacion.dia`; un costo que falta
+deja la cadena fuera del total y nombrada, nunca en cero; y el cruce con el
+punto cero del libro de stock está hecho: el primer día es el mayor de los dos.
+Lo que sigue abajo era el plan; lo que NO se hizo de él: el tipo
+`NACIÓ_DURANTE_DÍA` y la separación entre REVALORIZACION_POR_COSTO y
+REEXPRESION_POR_ESCALA por `camposCambiados`. Hoy un cambio de escala entre
+días entra entero en "revalorización" [código].
 
 - **Antes del punto cero:** sin historia económica confiable. El libro no
   inventa nada.

@@ -162,10 +162,15 @@ El contrato, la parte pura, vive en `lib/stock/libro/stockDiarioApi.js`.
   identidad, apertura, cierre y lo que se movió. Se pagina con `page` y
   `pageSize` —50 por defecto, 200 como tope, más es 400— y se filtra con
   `filtro`, `q` y `categoriaId`. Los valores de `filtro` son `todos`,
-  `con_movimientos`, `aparecen`, `desaparecen`, `reinterpretados` y
+  `con_movimientos`, `con_valor`, `aparecen`, `desaparecen`, `reinterpretados` y
   `sin_clasificar`. `q` busca en el nombre y el código, sin distinguir tildes.
   `categoriaId` es la categoría ACTUAL. El orden es por nombre y después por id,
-  estable entre páginas.
+  estable entre páginas; con `con_valor`, primero los que no tienen costo y
+  después por el tamaño de su variación en pesos.
+  Desde el 2026-09-30 cada fila trae `escala` —factor, peso de referencia y
+  modos ACTUALES del producto— y `valor`, su valorización en el período (ver
+  "Valor del Stock" más abajo) *(verificado contra PostgreSQL,
+  `scripts/pruebas-db/valorDelStock.mjs`)*.
 - `producto?productoLocalId=`: una cadena, con las reinterpretaciones una por una
   y sus movimientos paginados. Trae el total de movimientos, así que no hay un
   límite callado.
@@ -231,34 +236,108 @@ y el verificador del libro lo marca en rojo. **La equivalencia depende de que el
 verificador esté verde.** Si alguna vez una actualización de tzdata cambiara
 retroactivamente la regla de la zona, el verificador lo vería antes que la API.
 
-### La pantalla del Stock Diario
+### Las cantidades del libro se leen con la presentación de Stock Locales
 
-**Desde el 2026-09-30 vive en Finanzas**: `/modulos/finanzas/stock-diario`, en
-el menú Finanzas → Stock Diario, y ya no aparece en el grupo Stock *(verificado
-en código, `lib/menu/registry.js` y `lib/menu/stockDiarioEnFinanzas.test.mjs`)*.
+*(Verificado en código y con candado, `lib/stock/libro/cantidadesDelLibro.test.mjs`.)*
+El libro copia `StockLocal.cantidad`, que está **siempre en unidades físicas**:
+unidades, kilos o piezas, nunca bultos. Hasta el 2026-09-30 la pantalla le
+pegaba al número la `unidad_medida` en mayúsculas, así que 36 botellas de un
+pack x6 se leían "36 PACK". **El libro estaba bien; mentía el rótulo.** Desde
+entonces la cantidad se lee con `presentacionCantidadStock`
+(`lib/stock/presentacion.js`), la misma que la tabla y la tarjeta de Stock
+Locales: en el depósito un pack o cajón con factor se desglosa en bultos +
+sueltas ("4 bultos", "1 bultos + 2 uds"), en un local va en unidades, el kilo
+en kilos y la pieza del depósito en piezas.
+
+## Valor del Stock
+
+*(Verificado contra PostgreSQL con escrituras reales reubicadas en el tiempo,
+`scripts/pruebas-db/valorDelStock.mjs`; la cuenta en
+`lib/stock/libro/valorDelStock.test.mjs`.)* Cuánto capital había en mercadería
+en una ubicación al empezar un período y cuánto al terminarlo, y de dónde salió
+la diferencia. La cuenta está en `lib/stock/libro/valorDelStock.js` (pura) y las
+consultas en `lib/stock/libro/valorDelStockServer.js`. Viaja en el `valor` de
+`/resumen` y de cada fila de `/productos`, en la misma instantánea que las
+cantidades.
+
+- **La cantidad** sale del Libro de Stock. **El costo** sale del Libro de
+  Costos: la última `CostoBaseVersion` y la última `CostoUbicacionVersion` con
+  `dia` ANTERIOR al día —el costo de las 00:00 argentinas—, combinadas con
+  `precioDeLaUbicacion` y llevadas a la unidad física con
+  `costoPorUnidadFisica`. No hay otra conversión.
+- **Corte diario:** cada día se valoriza con su costo de las 00:00, congelado.
+  Un cambio de costo durante el día aparece recién en el corte siguiente, como
+  revalorización. "Ahora" usa el costo de hoy a las 00:00.
+- **Valor inicial:** cantidad al abrir el primer día × su costo congelado.
+  **Valor final:** cantidad al cerrar el último día (o ahora) × el costo
+  congelado de ese día.
+- **Movimiento físico** de un día: (cierre − apertura) × costo del día.
+  **Revalorización**: apertura del día × (costo del día − costo del anterior).
+  Como el cierre de un día es la apertura del siguiente, `final − inicial =
+  físico + revalorización` es exacta en centavos; la cuenta la verifica y la
+  informa en `cuadra`.
+- **La evolución** es el valor al cierre de cada día: fotografías, no se suman.
+- **Costo faltante:** una cadena con cantidad y sin costo válido ese día (sin
+  versión, costo cero, combo, unidad desconocida) queda FUERA de los totales,
+  se nombra en `faltantes` y el total dice `completo: false`. Nunca vale cero.
+- **Stock negativo:** se valoriza negativo y se cuenta en
+  `productosConStockNegativo`.
+- **En tránsito** no entra en el stock disponible. Se valoriza aparte, al abrir y
+  al cerrar, con las líneas de transferencia que salieron del local y no se
+  recibieron ni cancelaron, al costo que CONGELÓ la línea
+  (`valorizarLineaDelRemito`), y se concilia con el `enTransito` del libro. Una
+  línea sin costo congelado no toma el de hoy: se cuenta como sin valor.
+- **Desde cuándo:** el primer día valorizable es el siguiente a la activación
+  del Libro de Costos y al punto cero del de Stock. En producción, el
+  **2026-09-30**. Un período que empieza antes se valoriza desde ahí y lo dice
+  (`PARCIAL`); uno que termina antes no tiene valor (`NO_DISPONIBLE`), no ceros.
+- **Rendimiento:** nueve consultas agrupadas por local, sean un día o un año. El
+  candado `valorDelStock.test.mjs` las cuenta con un cliente falso.
+- **SIN_ORIGEN** no se reclasifica: la valorización no lee el origen.
+
+### La pantalla: Valor del Stock
+
+**Desde el 2026-09-30 vive en Finanzas y se llama Valor del Stock**:
+`/modulos/finanzas/stock-diario` —la ruta conserva el nombre viejo a
+propósito—, en el menú Finanzas → Valor del Stock, y ya no aparece en el grupo
+Stock *(verificado en código, `lib/menu/registry.js` y
+`lib/menu/stockDiarioEnFinanzas.test.mjs`)*. El ítem lleva
+`requiredFeature: "stockPorLocal"`, igual que Stock Locales.
 La ubicación no cambió la autorización: la pantalla y su ítem piden `stock.ver`,
 **no** `finanzas.ver`, igual que sus rutas de datos —que no se movieron, siguen
 en `/api/stock_locales/diario/` con `stock.ver` y solo GET—. El grupo Finanzas
 se ve con `finanzas.ver` o con `stock.ver`; quien tiene solo `stock.ver`
-—ENCARGADO y DUEÑO_LOCAL por defecto— ve Finanzas con Stock Diario como única
-herramienta y ninguna de las de plata, que siguen pidiendo `finanzas.ver` en el
-menú, en su pantalla y en su ruta. `/modulos/stock_locales/diario`, donde vivía
+—ENCARGADO y DUEÑO_LOCAL por defecto— ve Finanzas con Valor del Stock como
+única herramienta y ninguna de las de ventas, pagos o gastos, que siguen pidiendo
+`finanzas.ver` en el menú, en su pantalla y en su ruta. Los importes que muestra
+son cantidades por costos, que `stock.ver` ya ve producto por producto en la
+columna Costo de Stock Locales. `/modulos/stock_locales/diario`, donde vivía
 antes, solo redirige a la nueva con su dirección completa. Es el diseño móvil de
 Figma (`EVJ2KvVCrY0oVSowfboymQ`, nodos 300:478 y 300:676), armado con las piezas
 de las pantallas por período *(verificado en código,
 `components/stock_diario/` y `lib/stock/libro/stockDiarioPantalla.js`)*:
 
-- Día, Semana y Mes se piden con `unidad` y `fecha`; **Otro** es el rango
-  `desde`/`hasta` de la API, con `SunmiDateRangePicker`. Las flechas navegan con
-  las puntas que devuelve el servidor, así que la semana es siempre la de Semana
-  Operativa y la pantalla no calcula ninguna.
-- Cada producto dice "Apertura X → Ahora Y" en curso y "→ Cierre Y" completo. Lo
-  desconocido dice "No disponible" y lo que no existe "No existe" —un producto
-  eliminado, uno que apareció—; en los dos casos no hay variación.
-- La lista es la de `con_movimientos`, paginada de a 50, y la búsqueda va al
-  servidor.
-- **Pendiente de diseño:** el detalle del producto. El "Ver ›" del diseño no se
-  dibuja, y la fila no es tocable, hasta que el detalle exista en Figma.
+- Día, Semana, Mes y **Año** se piden con `unidad` y `fecha`; **Otro** es el
+  rango `desde`/`hasta` de la API, con `SunmiDateRangePicker`. Año es un chip
+  opcional de `ChipsDePeriodo` (`conAnio`): las otras pantallas siguen con
+  cuatro. Las flechas navegan con las puntas que devuelve el servidor, así que la
+  semana es siempre la de Semana Operativa y la pantalla no calcula ninguna.
+- **Arriba, la plata:** cuánto aumentó o disminuyó el valor, con el valor
+  inicial, el final ("Ahora" en curso), el movimiento físico y la
+  revalorización; el tránsito debajo, aparte. El aviso enciende el borde con
+  costos faltantes, stock negativo o un período parcial. No se habla de
+  ganancia ni de pérdida. Sin costos históricos se dice por qué, sin ceros.
+- **La evolución**, un renglón por día (por mes en el año).
+- Cada producto dice "Apertura X → Ahora Y" en curso y "→ Cierre Y" completo,
+  en la presentación de Stock Locales, con su variación en pesos a la derecha o
+  "Sin costo". Tocarlo despliega el detalle —cantidades, costos congelados,
+  valores, físico, revalorización— sin navegar. Lo desconocido dice "No
+  disponible" y lo que no existe "No existe".
+- La lista es la de `con_valor`, paginada de a 50, y la búsqueda va al servidor.
+- La actividad física de antes —conteos de entradas, salidas y tránsito— queda
+  como bloque secundario al final.
+- **SIN VERIFICAR contra Figma:** el estado con plata y el detalle desplegable
+  no tienen nodo en el archivo de diseño; se armaron con las piezas existentes.
 
 ### Un posible hueco de alcance en Transferencias (sin corregir)
 
