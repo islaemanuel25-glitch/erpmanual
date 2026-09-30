@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { requirePerm } from "@/lib/authorize";
+import { MOTIVO_DIFERENCIA } from "@/lib/stock/motivosDeDiferencia";
 import { valorizarDetalle, origenEsDepositoDe } from "@/lib/transferencias/costoTransferencia";
 
 // El remito de recepción lleva los mismos costos que el de envío, más el motivo
@@ -193,8 +194,8 @@ export async function GET(req) {
       );
 
       const motivo =
-        d.motivoPrincipal === "Otro"
-          ? d.motivoDetalle || "Otro"
+        d.motivoPrincipal === MOTIVO_DIFERENCIA.OTRO
+          ? d.motivoDetalle || MOTIVO_DIFERENCIA.OTRO
           : d.motivoPrincipal || "-";
 
       total += subtotal;

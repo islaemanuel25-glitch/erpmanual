@@ -34,6 +34,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { motivoExigeDetalle } from "@/lib/stock/motivosDeDiferencia";
 import {
   mensajeRecepcion,
   statusRecepcion,
@@ -229,7 +230,7 @@ export async function POST(req) {
           recibidoUnidadesSueltas: plan.recibidaSueltas,
           motivoPrincipal: plan.hayDiferencia ? motivoElegido || null : null,
           motivoDetalle:
-            plan.hayDiferencia && motivoElegido === "Otro" ? detalleElegido || null : null,
+            plan.hayDiferencia && motivoExigeDetalle(motivoElegido) ? detalleElegido || null : null,
           revisadoEnRecepcion: true,
           // Autoría y hora del SERVIDOR.
           revisadoEnRecepcionPorId: usuarioId,

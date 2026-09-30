@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { motivoExigeDetalle } from "@/lib/stock/motivosDeDiferencia";
 import {
   validarDetalleRecepcion,
   mensajeRecepcion,
@@ -157,7 +158,7 @@ export async function POST(req) {
             motivoPrincipal: plan.hayDiferencia ? it.motivoPrincipal || null : null,
 
             motivoDetalle:
-              plan.hayDiferencia && it.motivoPrincipal === "Otro"
+              plan.hayDiferencia && motivoExigeDetalle(it.motivoPrincipal)
                 ? it.motivoDetalle || null
                 : null,
 
