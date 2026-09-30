@@ -402,6 +402,51 @@ async function correr(f) {
   }
 
   // ═════════════════════════════════════════════════════════════════════════
+  seccion("3b. Producto dañado: 10 / 8 vuelve al origen, a nombre de la recepción");
+  // ═════════════════════════════════════════════════════════════════════════
+  //
+  // Lo que la trazabilidad del Libro de Stock NO cambia, y por eso se prueba:
+  // "Producto dañado" en una recepción es una diferencia de conteo que VUELVE al
+  // stock del origen. No es una baja. Si el depósito decide darlas de baja, eso
+  // es un ajuste manual aparte. Lo único nuevo es que los movimientos llegan al
+  // Libro con TRANSFERENCIA_RECEPCION y el id de la transferencia, y que la
+  // causa sigue viviendo en `TransferenciaDetalle.motivoPrincipal`.
+  {
+    const p = await armarProducto({ nombre: `danado-${n++}` });
+    const t = await armarTransferencia([{ producto: p, cantidad: 10 }]);
+    const det = await prisma.transferenciaDetalle.findFirst({ where: { transferenciaId: t.id } });
+    const movAntes = (await prisma.$queryRawUnsafe(`SELECT coalesce(max("id"),0)::int AS m FROM "MovimientoStock"`))[0].m;
+
+    const g = await guardar(t.id, [{ id: det.id, recibido: 8, motivoPrincipal: "Producto dañado" }]);
+    ok("dañado: se guarda la recepción", g.ok === true, g.error);
+    await revisarTodo(t.id);
+    const conf = await confirmar(t.id);
+    ok("dañado: se confirma", conf.ok === true, conf.error);
+
+    const so = await stockDe(origen.id, p.productoLocalId);
+    const sd = await stockDestinoDe(p.baseId);
+    igualStock("dañado: el origen recupera las 2 —queda en 92—", so.cantidad, 92);
+    igualStock("dañado: el tránsito del origen baja los 10", so.enTransito, 0);
+    igualStock("dañado: el destino suma 8", sd.cantidad, 8);
+
+    const guardado = await prisma.transferenciaDetalle.findUnique({ where: { id: det.id } });
+    igual("dañado: la causa queda en la línea de la transferencia", guardado.motivoPrincipal, "Producto dañado");
+    const aud = await prisma.auditoriaStock.findFirst({ where: { transferenciaDetalleId: det.id } });
+    igual("dañado: la auditoría del origen es la de siempre, sin causa estructurada",
+      [aud?.accion, aud?.motivoPrincipal], [ACCIONES_RECEPCION.FALTANTE, null]);
+
+    const movs = await prisma.$queryRawUnsafe(
+      `SELECT "localId", "origen", "origenRef" FROM "MovimientoStock" WHERE "id" > $1 ORDER BY "id"`,
+      movAntes
+    );
+    ok("dañado: la recepción movió stock en el origen y en el destino",
+      movs.some((m) => m.localId === origen.id) && movs.some((m) => m.localId === destino.id), JSON.stringify(movs));
+    ok("dañado: TODOS sus movimientos son TRANSFERENCIA_RECEPCION con el id de la transferencia",
+      movs.length > 0 && movs.every((m) => m.origen === "TRANSFERENCIA_RECEPCION" && m.origenRef === String(t.id)),
+      JSON.stringify(movs));
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
   seccion("4. BULTO x20: 2 enviados / 3 recibidos");
   // ═════════════════════════════════════════════════════════════════════════
 

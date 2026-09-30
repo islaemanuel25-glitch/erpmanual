@@ -4,6 +4,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
+import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
 
 export async function DELETE(req, context) {
   try {
@@ -86,6 +87,7 @@ export async function DELETE(req, context) {
     await prisma.$transaction(async (tx) => {
       // Metadata para el Libro de Costos: no cambia qué se elimina ni en qué orden.
       await declararOrigenDeCosto(tx, { origen: ORIGEN_COSTO.ELIMINACION_PRODUCTO, referencia: numId });
+      await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.ELIMINACION_PRODUCTO, referencia: String(numId) });
 
       // Eliminar StockLocal de todos los ProductoLocal de este base
       await tx.stockLocal.deleteMany({

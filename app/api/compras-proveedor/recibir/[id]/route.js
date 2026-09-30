@@ -19,6 +19,7 @@ import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta
 import { ErrorParaLaPersona, esParaLaPersona } from "@/lib/compras-proveedor/errorParaLaPersona";
 import { formatearMoneda } from "@/lib/moneda";
 import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
+import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
 import { aCentavos } from "@/lib/compras-proveedor/comprobante/impuestos";
 import {
   DECISION_DE_PRECIO,
@@ -580,6 +581,8 @@ export async function POST(req, { params }) {
     await prisma.$transaction(async (tx) => {
       // Metadata para el Libro de Costos: no cambia qué costo se escribe.
       await declararOrigenDeCosto(tx, { origen: ORIGEN_COSTO.COMPRA_PROVEEDOR, referencia: pedidoId });
+      // Y para el Libro de Stock: lo que entra al stock es de este pedido.
+      await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.COMPRA_PROVEEDOR, referencia: String(pedidoId) });
 
       // ── UN SOLO CIERRE POR PEDIDO, AUNQUE LLEGUEN DOS A LA VEZ ───────────
       //

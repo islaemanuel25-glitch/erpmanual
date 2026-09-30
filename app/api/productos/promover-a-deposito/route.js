@@ -13,6 +13,7 @@ import {
   validarUnicidadCodigos,
 } from "@/lib/productos/validarCodigosBarra";
 import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
+import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
 
 export async function POST(req) {
   try {
@@ -59,6 +60,7 @@ export async function POST(req) {
     await prisma.$transaction(async (tx) => {
       // Metadata para el Libro de Costos: no cambia qué costo se escribe.
       await declararOrigenDeCosto(tx, { origen: ORIGEN_COSTO.PROMOCION_A_DEPOSITO, referencia: id });
+      await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.PROMOCION_A_DEPOSITO, referencia: String(id) });
       await bloquearCodigosDelGrupo(tx, grupoId);
 
       // ── SUBIR AL DEPÓSITO PUEDE FABRICAR UNA AMBIGÜEDAD, Y ANTES NO SE

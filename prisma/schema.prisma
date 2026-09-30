@@ -3575,6 +3575,21 @@ model AuditoriaStock {
   stockMinNuevo    Decimal? @db.Decimal(12, 2)
   stockMaxAnterior Decimal? @db.Decimal(12, 2)
   stockMaxNuevo    Decimal? @db.Decimal(12, 2)
+  // ── LA CAUSA, Y APARTE EL DETALLE ────────────────────────────────────────
+  //
+  // `motivoPrincipal` es la causa elegida de una lista, con los MISMOS valores
+  // que `TransferenciaDetalle.motivoPrincipal` y `PedidoProveedorDetalle.
+  // motivoPrincipal` —"Faltante", "Producto dañado", "Sobrante", "Otro"—, que
+  // viven en `lib/stock/motivosDeDiferencia.js`. Un CHECK de la migración no
+  // deja guardar otro.
+  //
+  // `motivo` sigue siendo texto libre: el detalle de un ajuste manual, o el
+  // texto que arma la recepción de una transferencia con sus números.
+  //
+  // Las filas anteriores quedan con la causa en NULL aunque `motivo` tenga
+  // texto. No se deduce una causa leyendo castellano: "se rompió" puede ser un
+  // producto dañado o un error de carga, y adivinarlo sería inventar el dato.
+  motivoPrincipal  String?
   motivo           String?
 
   // ── DE QUÉ RECEPCIÓN SALIÓ ESTE MOVIMIENTO ────────────────────────────────

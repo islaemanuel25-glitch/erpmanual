@@ -524,6 +524,14 @@ jobs:
       - name: Ajuste de stock del peso fijo contra PostgreSQL
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/ajusteStockPieza.mjs
 
+      # La trazabilidad del Libro de Stock por las rutas reales: el ajuste
+      # manual a nombre de su AuditoriaStock, la causa contra el stock real, la
+      # venta concurrente que no se pierde —forzada con un bloqueo retenido—,
+      # la declaración que no se filtra, la venta y su corrección, y las
+      # transacciones mixtas con cada tramo a nombre de su documento.
+      - name: Trazabilidad del Libro de Stock contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/ajusteStockTrazable.mjs
+
       # El ciclo de cierre de caja: la carrera entre el cierre clásico y el corte
       # —forzada con un lock retenido, no librada al azar—, la corrección de una
       # venta según el estado de su turno y el vencimiento de un corte por

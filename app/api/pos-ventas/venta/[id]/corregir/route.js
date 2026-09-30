@@ -32,6 +32,7 @@ import {
   mensajeBloqueoTurno,
 } from "@/lib/pos-ventas/correccionCompletaServer";
 import { reconstruirConsumoOriginal } from "@/lib/pos-ventas/motorCorreccion";
+import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
 
 const j = (b, s = 200) => NextResponse.json(b, { status: s });
 
@@ -213,7 +214,9 @@ export async function POST(req, { params }) {
       });
       const correccionId = correccion.id;
 
-      // Aplicar delta de stock (una escritura por productoLocalId).
+      // Aplicar delta de stock (una escritura por productoLocalId), a nombre de
+      // la corrección: es su documento, y ya existe.
+      await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.CORRECCION_VENTA, referencia: String(correccionId) });
       await aplicarDeltaStock(tx, localId, evalr.deltaStock);
 
       // Reemplazar líneas y pagos.

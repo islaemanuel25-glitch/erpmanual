@@ -11,6 +11,7 @@ import {
 import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { esModalidadServicio, validarRecargoServicioPct } from "@/lib/pos-ventas/servicios";
 import { declararOrigenDeCosto, ORIGEN_COSTO } from "@/lib/precios/origenDeCosto";
+import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
 
 // Validar modo_pedido según unidad_medida y factor_pack
 function validarModoPedido(modoPedido, unidadMedida, factorPack) {
@@ -185,6 +186,7 @@ export async function POST(req) {
     const result = await prisma.$transaction(async (tx) => {
       // Metadata para el Libro de Costos: no cambia qué costo se escribe.
       await declararOrigenDeCosto(tx, { origen: ORIGEN_COSTO.ALTA_PRODUCTO });
+      await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.ALTA_PRODUCTO });
 
       // El bloqueo va PRIMERO: preguntar por el código después de escribir ya
       // sería tarde, y preguntar sin bloquear deja pasar la segunda alta.

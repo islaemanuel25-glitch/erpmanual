@@ -45,6 +45,7 @@ import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { construirLineasComerciales, aplicarConsumoStock } from "@/lib/combos/ventaConsumo";
 import { getConfigLocalEfectiva } from "@/lib/config/local";
+import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
 
 // Mapea lista.tipoBase a VentaDetalle.tipoPrecioAplicado.
 // MANUAL_AUTORIZADO y casos desconocidos caen a PRECIO_VENTA (fallback).
@@ -1135,16 +1136,14 @@ export async function POST(req) {
       const gananciaBruta = totalAntesRecargo - costoTotal;
       const gananciaNeta = netoRecibido - costoTotal;
 
-      // Bloqueo determinístico (FOR UPDATE por productoLocalId asc) + validación +
-      // descuento consolidado. Insuficiencia respeta ALLOW_NEGATIVE_STOCK; la
-      // invalidez ESTRUCTURAL del combo ya abortó antes (en construirLineasComerciales).
-      const { allowNegativeStockUsed } = await aplicarConsumoStock(tx, {
-        localId,
-        consumoFisicoConsolidado,
-        allowNegativeStock: ALLOW_NEGATIVE_STOCK,
-      });
-
-      // Crear venta (header)
+      // ── LA VENTA SE CREA ANTES DEL CONSUMO ─────────────────────────────────
+      //
+      // El Libro de Stock anota el descuento con el documento que lo explica, y
+      // ese documento es esta venta: necesita su id ANTES de tocar el stock.
+      // Antes se descontaba primero y la venta nacía después. El orden no le
+      // importa a nada más —el consumo no le pasa ningún dato a la cabecera—, y
+      // los dos siguen en la misma transacción: un stock insuficiente revierte
+      // también la venta, como antes.
       const nuevaVenta = await tx.venta.create({
         data: {
           localId,
@@ -1193,6 +1192,20 @@ export async function POST(req) {
           recargoPagoModalidadId: comercial.recargoPagoModalidadId,
           recargoPagoModalidadNombre: comercial.recargoPagoModalidadNombre,
         },
+      });
+
+      // Bloqueo determinístico (FOR UPDATE por productoLocalId asc) + validación +
+      // descuento consolidado. Insuficiencia respeta ALLOW_NEGATIVE_STOCK; la
+      // invalidez ESTRUCTURAL del combo ya abortó antes (en construirLineasComerciales).
+      //
+      // Se declara el origen justo antes: si esta venta es interna, más abajo
+      // `crearTransferencia` declara el suyo para el tránsito, y cada tramo
+      // queda con su documento.
+      await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.VENTA, referencia: String(nuevaVenta.id) });
+      const { allowNegativeStockUsed } = await aplicarConsumoStock(tx, {
+        localId,
+        consumoFisicoConsolidado,
+        allowNegativeStock: ALLOW_NEGATIVE_STOCK,
       });
 
       // Pagos (tenders) — fuente de verdad de la distribución del cobro.

@@ -531,7 +531,11 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // Finanzas —gasto, su pago, las categorías y el dueño de un movimiento de
   // caja—. No toca transferencias ni
   // ninguna tabla que la recepción escriba.
-  assert.equal(migraciones.length, 44, "aparecio una migracion que nadie declaro aca");
+  // Sube a 45 el 2026-09-30: entró `20260930120000_auditoria_stock_motivo_principal`,
+  // una columna nullable en `AuditoriaStock` con un CHECK. La recepción escribe
+  // AuditoriaStock y la deja en NULL, como toda fila que no la informa: no
+  // cambia lo que la recepción escribe.
+  assert.equal(migraciones.length, 45, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));
