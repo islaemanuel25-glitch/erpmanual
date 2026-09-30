@@ -50,12 +50,12 @@ function item(r, { antes, hasta, identidad = {} }) {
 
 // ── LA FILA ─────────────────────────────────────────────────────────────
 
-test("la fila: nombre, Apertura → Ahora, y la variación con su unidad", () => {
+test("la fila: nombre, Apertura → Ahora, y la variación en la presentación de Stock Locales", () => {
   const r = respuesta(HOY);
   const s = h(React.createElement(FilaStockDiario, { item: item(r, { antes: { cantidad: "18" }, hasta: { cantidad: "22" } }), respuesta: r }));
   assert.ok(s.includes(">Galletitas Terrabusi 170 g<"));
-  assert.ok(s.includes(">Apertura 18 UNIDAD → Ahora 22 UNIDAD<"), s);
-  assert.ok(s.includes(">+4<") && s.includes(" UNIDAD</span>"), s);
+  assert.ok(s.includes(">Apertura 18 uds → Ahora 22 uds<"), s);
+  assert.ok(s.includes(">+4 uds<"), s);
 });
 
 test("'Ver' no se dibuja ni es un botón: el detalle todavía no está diseñado", () => {
@@ -74,7 +74,7 @@ test("PRODUCTO ELIMINADO dibujado: 'Ahora No existe', sin cifra a la derecha, nu
       respuesta: r,
     })
   );
-  assert.ok(s.includes(">Apertura 5 UNIDAD → Ahora No existe<"), s);
+  assert.ok(s.includes(">Apertura 5 uds → Ahora No existe<"), s);
   assert.ok(s.includes(">Producto eliminado<"));
   assert.ok(!s.includes("Ahora 0") && !s.includes("−5") && !s.includes("−5"), s);
 });
@@ -82,7 +82,7 @@ test("PRODUCTO ELIMINADO dibujado: 'Ahora No existe', sin cifra a la derecha, nu
 test("APERTURA DESCONOCIDA dibujada: 'No disponible', sin variación ni cero", () => {
   const r = respuesta(PC.dia);
   const s = h(React.createElement(FilaStockDiario, { item: item(r, { antes: { cantidad: "99" }, hasta: { cantidad: "18" } }), respuesta: r }));
-  assert.ok(s.includes(">Apertura No disponible → Cierre 18 UNIDAD<"), s);
+  assert.ok(s.includes(">Apertura No disponible → Cierre 18 uds<"), s);
   assert.ok(s.includes("Sin variación: falta la apertura"));
   assert.ok(!s.includes("99") && !s.includes(">0<"), s);
 });

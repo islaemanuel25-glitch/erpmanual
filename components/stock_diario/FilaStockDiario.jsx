@@ -19,16 +19,7 @@ import { renglonDeProducto } from "@/lib/stock/libro/stockDiarioPantalla";
 export default function FilaStockDiario({ item, respuesta }) {
   const r = renglonDeProducto(item, respuesta);
   return (
-    <FilaConImporte
-      importe={
-        r.variacion === null ? null : (
-          <>
-            {r.variacion}
-            {r.unidad ? <span className="text-sm2 font-medium sunmi-text-muted"> {r.unidad}</span> : null}
-          </>
-        )
-      }
-    >
+    <FilaConImporte importe={r.variacion}>
       <div className="text-base font-semibold sunmi-text-strong">{r.nombre}</div>
       <div className="text-sm2 sunmi-text-muted">{r.linea}</div>
       {r.avisos.length > 0 && <div className="text-sm2 font-medium sunmi-text-muted">{r.avisos.join(" · ")}</div>}
