@@ -11,6 +11,8 @@
 - **stock**: fix(stock): el Stock Diario lee la cantidad del libro con la presentación de Stock Locales
 - **stock**: feat(finanzas): el Valor del Stock — capital en mercadería al abrir y al cerrar un período
 - **stock**: feat(finanzas): Stock Diario pasa a llamarse Valor del Stock y muestra la plata primero
+- **stock**: fix(stock): "1 bulto" y no "1 bultos", con una sola regla para Stock Locales y el Valor del Stock
+- **stock**: feat(finanzas): Valor del Stock — nacidos en el día, reexpresión por escala y ubicación del admin
 
 
 ## [2026-09-29] - Actualización: 
