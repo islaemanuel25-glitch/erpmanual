@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-09-29 17:38
+**Última actualización:** 2026-09-30 11:55
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-09-30: feat(stock): cada movimiento del Libro de Stock nombra su documento
 - 2026-09-29: feat(finanzas): núcleo de Gastos — el gasto de una ubicación y sus pagos
 - 2026-09-26: feat(caja): motor auditado de corrección histórica, con ensayo en seco
 - 2026-09-26: feat(caja): la apertura sin sobre también frena el error ×1000

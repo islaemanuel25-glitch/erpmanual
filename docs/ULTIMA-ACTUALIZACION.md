@@ -1,28 +1,28 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-09-29 22:14
+**Fecha:** 2026-09-30 11:55
 
 ## Módulos modificados recientemente
 
+### pos-ventas
+- feat(stock): cada movimiento del Libro de Stock nombra su documento
+- Archivos: 3 modificados (3 total)
+
+### productos
+- feat(stock): cada movimiento del Libro de Stock nombra su documento
+- Archivos: 4 modificados (4 total)
+
 ### stock
-- feat(stock): Stock Diario móvil — la pantalla del diseño, sobre la API que ya existía
-- Archivos: 5 nuevos (5 total)
+- feat(stock): cada movimiento del Libro de Stock nombra su documento
+- Archivos: 1 nuevos, 6 modificados (7 total)
 
 ### transferencias
-- fix(finanzas): un movimiento de caja es de a lo sumo un pago, de cualquier tipo, feat(finanzas): núcleo de Gastos — el gasto de una ubicación y sus pagos, feat(costos): la migración que activa el Libro de Costos
-- Archivos: 1 modificados (1 total)
-
-### pos-ventas
-- feat(finanzas): núcleo de Gastos — el gasto de una ubicación y sus pagos
-- Archivos: 2 modificados (2 total)
+- feat(stock): cada movimiento del Libro de Stock nombra su documento, refactor(stock): un solo vocabulario para las causas de una diferencia
+- Archivos: 6 modificados (6 total)
 
 
 ## Archivos nuevos desde última sincronización
-- app/modulos/stock_locales/diario/page.jsx
-- components/stock_diario/FilaStockDiario.jsx
-- components/stock_diario/PantallaStockDiario.jsx
-- components/stock_diario/ResumenStockDiario.jsx
-- components/stock_diario/stockDiarioMobile.test.mjs
+- components/stock_locales/modalAjusteCausa.test.mjs
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai

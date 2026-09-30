@@ -16,8 +16,22 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **44 migraciones** y el árbol también. **Ninguna** pendiente:
-el despliegue siguiente es solo de código.
+Producción está en **44 migraciones**. Cuando se mergee la rama
+`claude/libro-costos-activation-migration-nmej1m` (la trazabilidad del Libro de
+Stock) el árbol pasa a **45**, con **una** pendiente:
+
+- `20260930120000_auditoria_stock_motivo_principal` — **aditiva**. Una columna
+  nullable `motivoPrincipal` en `AuditoriaStock` y un CHECK que solo admite
+  "Faltante", "Producto dañado", "Sobrante" y "Otro". **No toca ninguna fila**:
+  todas las existentes quedan en NULL, y el CHECK las acepta así. Sin DROP, sin
+  backfill, sin bloqueo largo —agregar una columna nullable sin default es
+  instantáneo en PostgreSQL, y el CHECK valida una tabla cuya columna nueva está
+  toda en NULL—.
+
+Lo que llega con ella **no es solo esquema**: desde ese despliegue cada
+escritor de `StockLocal` declara su origen en el Libro de Stock. Los
+movimientos anteriores quedan `SIN_ORIGEN` para siempre —el libro es
+inmutable— y no se les deduce ninguno.
 
 Producción corre `9700a59530534e920ae3ab59b5c5780bd3b79071` (despliegue del
 2026-09-29, nota abajo). Un commit posterior a ese que solo cambie

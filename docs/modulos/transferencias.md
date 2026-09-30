@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-09-29 17:38
+**Última actualización:** 2026-09-30 11:55
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,8 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-09-30: feat(stock): cada movimiento del Libro de Stock nombra su documento
+- 2026-09-30: refactor(stock): un solo vocabulario para las causas de una diferencia
 - 2026-09-29: fix(finanzas): un movimiento de caja es de a lo sumo un pago, de cualquier tipo
 - 2026-09-29: feat(finanzas): núcleo de Gastos — el gasto de una ubicación y sus pagos
 - 2026-09-29: feat(costos): la migración que activa el Libro de Costos
