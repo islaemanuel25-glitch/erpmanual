@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-10-01 01:25
+**Última actualización:** 2026-10-01 03:25
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -498,6 +498,7 @@ la API del Stock Diario y no se tocó; hay que confirmarlo ejerciéndolo antes d
 corregirlo.
 
 ## Cambios recientes
+- 2026-10-01: feat(finanzas): Valor del Stock como tablero móvil, sin lista de productos
 - 2026-10-01: feat(finanzas): "¿Por qué cambió?" explica el capital y deriva a cada módulo
 - 2026-09-30: feat(finanzas): Valor del Stock — "¿Por qué cambió?", el movimiento físico por origen real
 - 2026-09-30: feat(finanzas): Valor del Stock — nacidos en el día, reexpresión por escala y ubicación del admin

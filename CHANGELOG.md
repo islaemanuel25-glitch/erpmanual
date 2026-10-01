@@ -4,6 +4,7 @@
 
 ### Modificado
 - **stock**: feat(finanzas): "¿Por qué cambió?" explica el capital y deriva a cada módulo
+- **stock**: feat(finanzas): Valor del Stock como tablero móvil, sin lista de productos
 
 
 ## [2026-09-30] - Actualización: pos-ventas, productos, stock, transferencias

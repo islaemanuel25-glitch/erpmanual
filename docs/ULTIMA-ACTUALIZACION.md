@@ -1,15 +1,19 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-01 01:25
+**Fecha:** 2026-10-01 03:25
 
 ## Módulos modificados recientemente
 
 ### stock
-- feat(finanzas): "¿Por qué cambió?" explica el capital y deriva a cada módulo
-- Archivos: 1 nuevos, 2 modificados (3 total)
+- feat(finanzas): Valor del Stock como tablero móvil, sin lista de productos, feat(finanzas): "¿Por qué cambió?" explica el capital y deriva a cada módulo
+- Archivos: 5 nuevos, 6 modificados (11 total)
 
 
 ## Archivos nuevos desde última sincronización
+- components/stock_diario/AtencionDelValor.jsx
+- components/stock_diario/CapitalEnMercaderia.jsx
+- components/stock_diario/EnlaceAlModulo.jsx
+- components/stock_diario/GraficoDeEvolucion.jsx
 - app/api/stock_locales/diario/transferencias/route.js
 
 ## Acción recomendada
