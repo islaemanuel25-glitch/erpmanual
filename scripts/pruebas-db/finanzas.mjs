@@ -1224,6 +1224,238 @@ async function correrCierre(f) {
   ok("obtener trae la cuenta resuelta", leido.cuentaPorPagar?.saldo === 185300 && leido.cuentaPorPagar?.estado === "PARCIAL", leido.error);
 }
 
+// ── EL RESUMEN DEL PERÍODO: GASTOS, PAGOS, DEUDAS AL CIERRE Y COBROS ──────
+//
+// Por el handler real del tablero, sobre AYER (`unidad=DIA&desplazamiento=-1`):
+// cada hecho se siembra antes, durante y después de ese día, en un local nuevo
+// y en el depósito. Lo que se prueba es lo que solo Postgres puede decir: que
+// los `where` y los `select` de las cinco consultas nuevas existen, que cortan
+// por la fecha y por la ubicación dueña, y que un pago de HOY no achica la
+// deuda que había al cierre de ayer.
+//
+// Los pagos en efectivo se siembran con su RETIRO y su turno, como los deja
+// `resolverSalidaDelPago`: la base exige las dos cosas por CHECK y el trigger
+// llena `CajaMovimientoDePago`.
+async function correrResumenDelPeriodo(f) {
+  console.log("\n── Resumen del período: gastos, pagos, deudas al cierre y cobros");
+  const hoy = hoyArgentinaISO();
+  const ayer = sumarDias(hoy, -1);
+  const anteayer = sumarDias(hoy, -2);
+  const a = (diaIso, hora) => new Date(`${diaIso}T${hora}.000-03:00`);
+  const diaDeBase = (diaIso) => new Date(`${diaIso}T00:00:00.000Z`);
+
+  const sembrado = { localId: null, usuarioId: null, turnoId: null, gastoIds: [], pedidoIds: [], clienteId: null, ventaId: null };
+  try {
+    const local = await prisma.local.create({ data: { nombre: `${marca}-plata` } });
+    sembrado.localId = local.id;
+    await prisma.grupoLocal.create({ data: { grupoId: f.grupo.id, localId: local.id } });
+    const usuario = await prisma.usuario.create({
+      data: { nombre: "CI Plata", email: `${marca}-plata@ci.local`, passwordHash: "x", rolId: creado.rolId, localId: local.id },
+    });
+    sembrado.usuarioId = usuario.id;
+    const turno = await prisma.turno.create({
+      data: { localId: local.id, vendedorId: usuario.id, montoInicial: 0, apertura: a(ayer, "08:00:00") },
+    });
+    sembrado.turnoId = turno.id;
+    const categoria = await prisma.categoriaGasto.findFirst({ select: { id: true } });
+
+    const retiro = (monto, motivo, cuando) =>
+      prisma.cajaMovimiento.create({
+        data: { turnoId: turno.id, usuarioId: usuario.id, tipo: "RETIRO", monto, motivo, createdAt: cuando },
+      });
+    const nuevoGasto = async (localId, total, fecha) => {
+      const g = await prisma.gasto.create({
+        data: {
+          grupoId: f.grupo.id,
+          localId,
+          categoriaId: categoria.id,
+          concepto: `${marca} gasto`,
+          total,
+          fecha: diaDeBase(fecha),
+          creadoPorId: usuario.id,
+          idempotencyKey: `${marca}-g-${Math.random()}`,
+        },
+      });
+      sembrado.gastoIds.push(g.id);
+      return g;
+    };
+    const pagarGasto = async (g, monto, medio, fecha, extra = {}) =>
+      prisma.pagoGasto.create({
+        data: {
+          gastoId: g.id,
+          monto,
+          medio,
+          fecha,
+          localOrigenId: g.localId,
+          usuarioId: usuario.id,
+          idempotencyKey: `${marca}-pg-${Math.random()}`,
+          ...extra,
+        },
+      });
+    const nuevaCuenta = async (localGastoId, total, createdAt) => {
+      const p = await prisma.pedidoProveedor.create({
+        data: { grupoId: f.grupo.id, depositoId: f.deposito.id, proveedorId: f.proveedor.id, estado: "RECIBIDO" },
+      });
+      sembrado.pedidoIds.push(p.id);
+      return prisma.cuentaPorPagarProveedor.create({
+        data: { grupoId: f.grupo.id, pedidoProveedorId: p.id, proveedorId: f.proveedor.id, localGastoId, total, creadoPorId: usuario.id, createdAt },
+      });
+    };
+    const pagarCuenta = (c, monto, medio, fecha, extra = {}) =>
+      prisma.pagoProveedor.create({
+        data: {
+          cuentaId: c.id,
+          monto,
+          medio,
+          fecha,
+          localOrigenId: c.localGastoId,
+          usuarioId: usuario.id,
+          idempotencyKey: `${marca}-pp-${Math.random()}`,
+          ...extra,
+        },
+      });
+
+    // ── GASTOS DEL LOCAL ─────────────────────────────────────────────────
+    // Ayer, 8.000: 3.000 por transferencia y 400 en efectivo AYER, 4.600 HOY.
+    const gAyer = await nuevoGasto(local.id, 8000, ayer);
+    await pagarGasto(gAyer, 3000, "TRANSFERENCIA", a(ayer, "12:00:00"));
+    const retGasto = await retiro(400, "Pago de gasto CI", a(ayer, "13:00:00"));
+    await pagarGasto(gAyer, 400, "EFECTIVO", retGasto.createdAt, { turnoId: turno.id, cajaMovimientoId: retGasto.id });
+    await pagarGasto(gAyer, 4600, "TRANSFERENCIA", a(hoy, "00:05:00"));
+    // Anteayer, 1.500 sin pagar: no es devengado de ayer, pero se debía.
+    await nuevoGasto(local.id, 1500, anteayer);
+    // Hoy, 900: corresponde a después del cierre.
+    await nuevoGasto(local.id, 900, hoy);
+    // Del DEPÓSITO, ayer: no es del local.
+    await nuevoGasto(f.deposito.id, 7777, ayer);
+
+    // ── DEUDAS CON PROVEEDORES ───────────────────────────────────────────
+    // Del local, nacida anteayer, 40.000: 25.000 en efectivo ayer, 15.000 hoy.
+    const cuentaLocal = await nuevaCuenta(local.id, 40000, a(anteayer, "10:00:00"));
+    const retProv = await retiro(25000, "Pago a proveedor CI", a(ayer, "15:00:00"));
+    await pagarCuenta(cuentaLocal, 25000, "EFECTIVO", retProv.createdAt, { turnoId: turno.id, cajaMovimientoId: retProv.id });
+    await pagarCuenta(cuentaLocal, 15000, "TRANSFERENCIA", a(hoy, "00:10:00"));
+    // Del local, nacida HOY: después del cierre de ayer.
+    await nuevaCuenta(local.id, 500, a(hoy, "00:20:00"));
+    // Del DEPÓSITO, nacida anteayer: no es del local.
+    await nuevaCuenta(f.deposito.id, 99999, a(anteayer, "10:00:00"));
+
+    // ── CAJA, CUENTA CORRIENTE Y UNA VENTA CON COMISIÓN PENDIENTE ────────
+    await retiro(2000, "Flete", a(ayer, "16:00:00"));
+    const cliente = await prisma.cliente.create({ data: { grupoId: f.grupo.id, localId: local.id, nombre: `${marca}-cliente` } });
+    sembrado.clienteId = cliente.id;
+    const mc = (tipo, monto, cuando) =>
+      prisma.movimientoCuenta.create({
+        data: { grupoId: f.grupo.id, localId: local.id, clienteId: cliente.id, tipo, direccion: "CREDITO", monto, createdAt: cuando },
+      });
+    await mc("PAGO", 5000, a(ayer, "17:00:00"));
+    await mc("AJUSTE", 999, a(ayer, "17:30:00"));
+    await mc("PAGO", 111, a(hoy, "00:30:00"));
+    const venta = await prisma.venta.create({
+      data: {
+        localId: local.id,
+        vendedorId: usuario.id,
+        turnoId: turno.id,
+        numero: 1,
+        fecha: a(ayer, "11:00:00"),
+        subtotal: 1000,
+        total: 1000,
+        costoTotal: 600,
+        gananciaBruta: 400,
+        formaPago: "CREDITO",
+        comisionPendiente: true,
+        pagos: { create: [{ medio: "CREDITO", monto: 1000, comision: 0, neto: 1000 }] },
+      },
+    });
+    sembrado.ventaId = venta.id;
+
+    // ── EL LOCAL MIRA AYER ───────────────────────────────────────────────
+    const sesionLocal = token(usuario.id, local.id);
+    const r = await leer(rutaTablero.GET(pedido("http://ci/api/finanzas/tablero?unidad=DIA&desplazamiento=-1", sesionLocal)));
+    const s = r.resumen || {};
+    ok("el tablero de ayer responde 200", r.status === 200 && r.ok === true, r.error);
+    ok("el período es ayer", r.periodo?.rango?.desde === ayer && r.periodo?.rango?.hasta === ayer, JSON.stringify(r.periodo?.rango));
+
+    ok("gastos devengados de ayer: solo el de ayer del local (8.000)", s.gastos?.devengados === 8000 && s.gastos?.cantidad === 1, JSON.stringify(s.gastos));
+    ok("pagos de gastos de ayer: 3.400, sin el de hoy", s.pagosDeGastos?.total === 3400, JSON.stringify(s.pagosDeGastos));
+    ok(
+      "pagos de gastos por medio: efectivo 400, transferencia 3.000",
+      JSON.stringify(s.pagosDeGastos?.porMedio?.map((m) => [m.medio, m.monto])) === JSON.stringify([["EFECTIVO", 400], ["TRANSFERENCIA", 3000]]),
+      JSON.stringify(s.pagosDeGastos?.porMedio)
+    );
+    ok("pagos a proveedores de ayer: 25.000 en efectivo", s.pagosAProveedores?.total === 25000 && s.pagosAProveedores?.porMedio?.[0]?.medio === "EFECTIVO", JSON.stringify(s.pagosAProveedores));
+    ok("los dos RETIROS de pago NO son retiros manuales: solo el flete", s.caja?.retiros === 2000 && s.caja?.cantidadRetiros === 1, JSON.stringify(s.caja));
+    ok("salidas = 25.000 + 3.400: cada pago una vez", s.salidas?.total === 28400, JSON.stringify(s.salidas));
+
+    ok("deuda con proveedores AL CIERRE de ayer: 15.000 (el pago de hoy no la achica)", s.obligaciones?.proveedores?.saldo === 15000 && s.obligaciones?.proveedores?.cantidad === 1, JSON.stringify(s.obligaciones));
+    ok("gastos pendientes al cierre: 4.600 + 1.500 = 6.100, en dos gastos", s.obligaciones?.gastos?.saldo === 6100 && s.obligaciones?.gastos?.cantidad === 2, JSON.stringify(s.obligaciones?.gastos));
+    ok("el corte es ayer", s.obligaciones?.corte === ayer);
+
+    ok("cobro de cuenta corriente de ayer: 5.000, sin el ajuste ni el de hoy", s.cobrosCuentaCorriente?.total === 5000 && s.cobrosCuentaCorriente?.cantidad === 1, JSON.stringify(s.cobrosCuentaCorriente));
+    ok("y sin medio ni destino", s.cobrosCuentaCorriente?.medioConocido === false && s.cobrosCuentaCorriente?.destinoConocido === false);
+    ok("el cobro no se atribuye al efectivo", s.cobros?.efectivo === 0, JSON.stringify(s.cobros));
+
+    ok("la comisión pendiente llega desde la base y se marca", s.comisiones?.exacta === false && s.comisiones?.ventasConComisionPendiente === 1, JSON.stringify(s.comisiones));
+    ok("resultado = 1.000 − 600 − 8.000 − 0 = −7.600", s.resultadoEconomico?.resultado === -7600, JSON.stringify(s.resultadoEconomico));
+    ok(
+      "el resultado dice lo que le falta",
+      ["GASTOS_REGISTRADOS", "COMISIONES_PENDIENTES", "RETIROS_SIN_CLASIFICAR"].every((c) => s.resultadoEconomico?.limitaciones?.some((l) => l.clave === c)),
+      JSON.stringify(s.resultadoEconomico?.limitaciones?.map((l) => l.clave))
+    );
+    ok("lo único no disponible es el dinero que quedó", JSON.stringify(s.noDisponible?.map((m) => m.clave)) === JSON.stringify(["dineroQueQuedo"]));
+
+    // ── EL DEPÓSITO MIRA EL LOCAL: VE LO MISMO, NO LO SUYO ───────────────
+    const sesionDeposito = token(f.usuarioDeposito.id, f.deposito.id);
+    const desdeDeposito = await leer(
+      rutaTablero.GET(pedido(`http://ci/api/finanzas/tablero?destino=${local.id}&unidad=DIA&desplazamiento=-1`, sesionDeposito))
+    );
+    ok(
+      "el depósito mirando el local ve las cifras del local",
+      desdeDeposito.status === 200 && JSON.stringify(desdeDeposito.resumen?.obligaciones) === JSON.stringify(s.obligaciones) && desdeDeposito.resumen?.gastos?.devengados === 8000,
+      desdeDeposito.error
+    );
+
+    // ── Y EL DEPÓSITO MIRÁNDOSE A SÍ MISMO: SOLO LO SUYO ─────────────────
+    const propio = await leer(
+      rutaTablero.GET(pedido(`http://ci/api/finanzas/tablero?destino=${f.deposito.id}&unidad=DIA&desplazamiento=-1`, sesionDeposito))
+    );
+    const sp = propio.resumen || {};
+    ok("el depósito responde 200 sobre sí mismo", propio.status === 200 && propio.ok === true, propio.error);
+    ok("sus gastos devengados son los suyos (7.777), no los del local", sp.gastos?.devengados === 7777, JSON.stringify(sp.gastos));
+    // El resto de las cuentas del depósito que siembra este script nacen HOY,
+    // por las rutas: al cierre de ayer la única deuda suya es la de 99.999.
+    ok("su deuda al cierre de ayer es la suya (99.999) y no incluye la del local", sp.obligaciones?.proveedores?.saldo === 99999 && sp.obligaciones?.proveedores?.cantidad === 1, JSON.stringify(sp.obligaciones));
+    ok("no ve los pagos del local", (sp.pagosAProveedores?.total ?? 0) !== 25000 && (sp.pagosDeGastos?.total ?? 0) !== 3400, JSON.stringify([sp.pagosAProveedores, sp.pagosDeGastos]));
+    ok("no ve los cobros de cuenta corriente del local", sp.cobrosCuentaCorriente?.total === 0, JSON.stringify(sp.cobrosCuentaCorriente));
+  } finally {
+    // En orden de dependencias. Los pagos se llevan su fila de
+    // `CajaMovimientoDePago` por la cascada.
+    if (sembrado.gastoIds.length) {
+      await prisma.pagoGasto.deleteMany({ where: { gastoId: { in: sembrado.gastoIds } } });
+      await prisma.gasto.deleteMany({ where: { id: { in: sembrado.gastoIds } } });
+    }
+    if (sembrado.pedidoIds.length) {
+      await prisma.pagoProveedor.deleteMany({ where: { cuenta: { pedidoProveedorId: { in: sembrado.pedidoIds } } } });
+      await prisma.cuentaPorPagarProveedor.deleteMany({ where: { pedidoProveedorId: { in: sembrado.pedidoIds } } });
+      await prisma.pedidoProveedor.deleteMany({ where: { id: { in: sembrado.pedidoIds } } });
+    }
+    if (sembrado.clienteId) {
+      await prisma.movimientoCuenta.deleteMany({ where: { clienteId: sembrado.clienteId } });
+      await prisma.cliente.deleteMany({ where: { id: sembrado.clienteId } });
+    }
+    if (sembrado.ventaId) await prisma.venta.deleteMany({ where: { id: sembrado.ventaId } });
+    if (sembrado.turnoId) {
+      await prisma.cajaMovimiento.deleteMany({ where: { turnoId: sembrado.turnoId } });
+      await prisma.turno.deleteMany({ where: { id: sembrado.turnoId } });
+    }
+    if (sembrado.usuarioId) await prisma.usuario.deleteMany({ where: { id: sembrado.usuarioId } });
+    if (sembrado.localId) {
+      await prisma.grupoLocal.deleteMany({ where: { localId: sembrado.localId } });
+      await prisma.local.deleteMany({ where: { id: sembrado.localId } });
+    }
+  }
+}
+
 let fixture;
 try {
   fixture = await montar();
@@ -1231,6 +1463,7 @@ try {
   await correrSemana(fixture);
   await correrPagos(fixture);
   await correrCierre(fixture);
+  await correrResumenDelPeriodo(fixture);
 } finally {
   await desmontar();
   await prisma.$disconnect();
