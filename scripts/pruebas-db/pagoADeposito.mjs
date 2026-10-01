@@ -29,6 +29,7 @@ const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const jwt = (await import("jsonwebtoken")).default;
 const rutaFinanzas = await import("../../app/api/finanzas/tablero/route.js");
 const rutaTransferencias = await import("../../app/api/transferencias/tablero/route.js");
+const rutaPagoDeposito = await import("../../app/api/finanzas/pago-a-deposito/route.js");
 const { rangoFinanciero } = await import("../../lib/finanzas/periodoFinanciero.js");
 const { UNIDADES } = await import("../../lib/transferencias/periodoDePago.js");
 
@@ -69,6 +70,14 @@ const transferencias = (params, cookie) =>
   leer(
     rutaTransferencias.GET(
       new Request(`http://ci.local/api/transferencias/tablero?${new URLSearchParams({ unidad: "SEMANA", ...params })}`, {
+        headers: { cookie },
+      })
+    )
+  );
+const pagoDeposito = (params, cookie) =>
+  leer(
+    rutaPagoDeposito.GET(
+      new Request(`http://ci.local/api/finanzas/pago-a-deposito?${new URLSearchParams({ unidad: "SEMANA", ...params })}`, {
         headers: { cookie },
       })
     )
@@ -288,6 +297,51 @@ try {
     ok("las de esta semana por fecha de envío", json(idsDe(r)) === json([T.conFaltante, T.enviada].sort((a, b) => a - b)), json(idsDe(r)));
     ok("el total incluye lo que falta recibir", r.periodo?.aPagar === vale(3, 4), json({ aPagar: r.periodo?.aPagar }));
     ok("y avisa que falta recibir", r.periodo?.sinRecibir === 1, json({ sinRecibir: r.periodo?.sinRecibir }));
+  }
+  console.log("\n── 7. La sección propia: /api/finanzas/pago-a-deposito");
+  {
+    const r = await pagoDeposito({ desplazamiento: "0" }, S.localA);
+    ok("local A: 200, UN_LOCAL, aplica", r.status === 200 && r.vista === "UN_LOCAL" && r.pagoADeposito?.aplica === true, json({ s: r.status, e: r.error }));
+    ok("el total es el MISMO pago reconocido que el Resumen", r.pagoADeposito?.total === esperado.esta.total, json(r.pagoADeposito));
+    ok(
+      "lista las reconocidas, con id, fecha e importe",
+      json((r.recibidas || []).map((x) => x.id).sort((a, b) => a - b)) === json([...esperado.esta.ids].sort((a, b) => a - b)) &&
+        (r.recibidas || []).every((x) => x.id && x.fechaRecepcion && typeof x.importe === "number"),
+      json(r.recibidas)
+    );
+    ok(
+      "las pendientes van agregadas y NO en el listado",
+      r.pagoADeposito?.pendientes?.cantidadTransferencias === esperado.esta.pendientes.cantidad &&
+        !(r.recibidas || []).some((x) => x.id === T.enviada || x.id === T.recibiendo),
+      json({ p: r.pagoADeposito?.pendientes, ids: (r.recibidas || []).map((x) => x.id) })
+    );
+    ok(
+      "con transferencias.ver: el Ver agregado lleva a la cuenta propia por recepción",
+      r.pagoADeposito?.verDetalle === "/modulos/transferencias/cuenta?desp=0&criterio=RECEPCION",
+      r.pagoADeposito?.verDetalle
+    );
+
+    const sinVer = await pagoDeposito({ desplazamiento: "0" }, S.localSinVer);
+    ok(
+      "sin transferencias.ver: importe sí, Ver no",
+      sinVer.pagoADeposito?.total === esperado.esta.total && sinVer.pagoADeposito?.verDetalle === null && sinVer.puedeVerTransferencias === false,
+      json(sinVer.pagoADeposito)
+    );
+
+    const lista = await pagoDeposito({ entrada: "1" }, S.deposito);
+    ok("depósito: vista ENTRADA con la lista de pagadores", lista.status === 200 && lista.vista === "ENTRADA" && Array.isArray(lista.locales), json({ s: lista.status, v: lista.vista }));
+    ok("la lista NO incluye al depósito", !(lista.locales || []).some((l) => l.esDeposito === true || l.localId === L.D.id), json(lista.locales));
+
+    const desdeDep = await pagoDeposito({ destino: String(L.A.id), desplazamiento: "-1" }, S.deposito);
+    ok(
+      "depósito→A: el total de la semana cerrada y el Ver a /local/A",
+      desdeDep.pagoADeposito?.total === esperado.anterior.total &&
+        desdeDep.pagoADeposito?.verDetalle === `/modulos/transferencias/local/${L.A.id}?criterio=RECEPCION`,
+      json(desdeDep.pagoADeposito)
+    );
+
+    const cruzado = await pagoDeposito({ destino: String(L.B.id), desplazamiento: "0" }, S.localA);
+    ok("local A pidiendo B: 403", cruzado.status === 403, json({ s: cruzado.status, e: cruzado.error }));
   }
 } catch (err) {
   fallas.push(`EXCEPCIÓN: ${err?.stack || err}`);
