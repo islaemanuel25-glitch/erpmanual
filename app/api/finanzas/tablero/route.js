@@ -56,6 +56,8 @@ import {
 import { corteDeUbicacion } from "@/lib/semanaOperativa/semanaOperativa";
 import { vigenciasDeUbicaciones } from "@/lib/semanaOperativa/semanaOperativaServer";
 import { resumenDelPeriodo } from "@/lib/finanzas/resumenFinanciero";
+import { totalEconomicoDeGastos } from "@/lib/finanzas/gastosServer";
+import { urlDeGastosDelResumen } from "@/lib/finanzas/contextoFinanzas";
 import { actividadPorDia } from "@/lib/finanzas/actividadFinanciera";
 import {
   CLASE_MOVIMIENTO,
@@ -94,6 +96,9 @@ const SELECT_VENTA = {
   esFiado: true,
   formaPago: true,
   comisionBancaria: true,
+  // La marca de que la comisión de esa venta no se pudo determinar: el total de
+  // comisiones queda subestimado y el Resultado lo advierte sin estimar nada.
+  comisionPendiente: true,
   netoRecibido: true,
   pagos: { select: { medio: true, monto: true, comision: true, neto: true } },
 };
@@ -186,13 +191,19 @@ export async function GET(req) {
     // usa el reporte de ventas— y pasadas por el filtro comercial. NO se usa
     // Auditoría POS como fuente: aquélla es la vista TÉCNICA y a propósito NO
     // filtra internas ni anuladas, porque un auditor tiene que verlas.
-    const ventas = await prisma.venta.findMany({
-      where: whereVentaComercial({
-        localId,
-        fecha: { gte: fechaInicio, lte: fechaFin },
+    // Las ventas y el total económico de gastos del período, en paralelo: son
+    // consultas independientes. Los gastos se suman por `Gasto.fecha` (hecho
+    // económico, todos los estados de pago) con el MISMO filtro que el listado.
+    const [ventas, gastosEconomicos] = await Promise.all([
+      prisma.venta.findMany({
+        where: whereVentaComercial({
+          localId,
+          fecha: { gte: fechaInicio, lte: fechaFin },
+        }),
+        select: SELECT_VENTA,
       }),
-      select: SELECT_VENTA,
-    });
+      totalEconomicoDeGastos(prisma, { grupoId: vista.grupoId, localIds: [localId], rango }),
+    ]);
 
     // ── LOS TURNOS DEL PERÍODO ────────────────────────────────────────────
     //
@@ -332,6 +343,11 @@ export async function GET(req) {
       manuales: soloManuales(clasificados),
       recaudacion: soloRecaudacion(clasificados),
       pagoADeposito,
+      gastos: gastosEconomicos.total,
+      // El "Ver gastos" abre el módulo de Gastos en el MISMO conjunto: pestaña
+      // Todos, mismo período, y el local cuando mira el depósito/admin. Es el
+      // mismo permiso de Finanzas, así que no se gatea aparte.
+      verGastos: urlDeGastosDelResumen({ localId, unidad, desp: desplazamiento, esDeposito }),
     });
 
     const actividad = actividadPorDia({

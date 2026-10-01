@@ -100,7 +100,7 @@ export default function ListaGastos() {
   const router = useRouter();
   const params = useSearchParams();
   const ctx = parseContextoGastos(params);
-  const { estado: filtro, unidad, desp, cat } = ctx;
+  const { estado: filtro, unidad, desp, cat, destino } = ctx;
 
   const hoy = hoyArgentinaISO();
   const descripcion = descripcionDePagos({ unidad, desplazamiento: desp, filtro, hoy });
@@ -138,11 +138,11 @@ export default function ListaGastos() {
     setError("");
     try {
       const rango = { desde, hasta };
-      const deAntes = consultaDeAnteriores({ filtro, rango, categoriaId: cat });
+      const deAntes = consultaDeAnteriores({ filtro, rango, categoriaId: cat, destino });
       // Dos consultas a la MISMA ruta, en paralelo: el período, y lo pendiente
       // de antes. Ninguna por fila.
       const [periodo, previos] = await Promise.all([
-        pedirGastos(consultaDelPeriodo({ filtro, rango, categoriaId: cat })),
+        pedirGastos(consultaDelPeriodo({ filtro, rango, categoriaId: cat, destino })),
         deAntes ? pedirGastos(deAntes) : Promise.resolve(null),
       ]);
       setDatos(periodo);
@@ -154,7 +154,7 @@ export default function ListaGastos() {
     } finally {
       setCargando(false);
     }
-  }, [filtro, desde, hasta, cat]);
+  }, [filtro, desde, hasta, cat, destino]);
 
   useEffect(() => {
     cargar();
@@ -175,9 +175,9 @@ export default function ListaGastos() {
     const espera = setTimeout(async () => {
       try {
         const rango = { desde, hasta };
-        const deAntes = consultaDeAnteriores({ filtro, rango, categoriaId: cat, q: termino });
+        const deAntes = consultaDeAnteriores({ filtro, rango, categoriaId: cat, q: termino, destino });
         const [periodo, previos] = await Promise.all([
-          pedirGastos(consultaDelPeriodo({ filtro, rango, categoriaId: cat, q: termino })),
+          pedirGastos(consultaDelPeriodo({ filtro, rango, categoriaId: cat, q: termino, destino })),
           deAntes ? pedirGastos(deAntes) : Promise.resolve(null),
         ]);
         if (vigente) setResultado({ clave, periodo, anteriores: previos });
@@ -189,7 +189,7 @@ export default function ListaGastos() {
       vigente = false;
       clearTimeout(espera);
     };
-  }, [alServidor, clave, termino, filtro, desde, hasta, cat, datos]);
+  }, [alServidor, clave, termino, filtro, desde, hasta, cat, datos, destino]);
 
   // `scroll: false`: lo que cambió es el período, la pestaña o la categoría.
   const ir = (siguiente) => router.replace(urlDeGastos({ ...ctx, ...siguiente }), { scroll: false });
