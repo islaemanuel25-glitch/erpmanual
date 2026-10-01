@@ -2,11 +2,13 @@
 
 // components/stock_diario/PantallaStockDiario.jsx
 //
-// VALOR DEL STOCK, MÓVIL. Es la pantalla del Stock Diario (Figma 300:478 y sus
-// estados, 300:676) con el dinero adelante: la pregunta que contesta es cuánto
-// capital había en mercadería al empezar el período y cuánto al terminar.
+// VALOR DEL STOCK, MÓVIL, COMO TABLERO (Figma EVJ2KvVCrY0oVSowfboymQ, página
+// "Finanzas · Valor del Stock · Dashboard móvil", 329-624 y 329-802). Contesta
+// cuánto capital hay en mercadería, a costo, cuánto cambió y por qué.
 //
-// ── LA MISMA ESTRUCTURA QUE LAS PANTALLAS POR PERÍODO ────────────────────
+// "Valor del Stock informa; los otros módulos muestran el detalle" (Emanuel,
+// 2026-10-01): la pantalla NO muestra productos. Para investigar, cada causa
+// lleva al módulo dueño. La API de la lista de productos sigue existiendo.
 //
 //   0. SOLO un admin en vista global: la ubicación → `SunmiSelectAdv`, con las
 //      ubicaciones que manda el servidor (las del grupo activo). Queda en la URL
@@ -14,20 +16,15 @@
 //   1. Día / Semana / Mes / Año / Otro → `ChipsDePeriodo` con `conAnio`.
 //   2. Otro: desde y hasta            → `SunmiDateRangePicker`, como dice la pieza.
 //   3. el período, con sus flechas    → `NavegadorDePeriodo`.
-//   4. el valor                       → `ResumenValorDelStock` (`ResumenConImporte`).
-//   4.bis ¿Por qué cambió?            → `PorQueCambio`: el movimiento físico por
-//      origen real, cada categoría con sus movimientos debajo.
-//   5. la evolución día por día       → `DiaConBanda` con `FilaConImporte`.
-//   6. el buscador                    → `SunmiCampoBusquedaVoz`.
-//   7. los productos que explican el cambio → `DiaConBanda` con `FilaStockDiario`,
-//      que se abre y muestra su detalle.
-//   8. más de una página              → `SunmiPaginador`.
-//   9. la actividad física, secundaria → `ResumenStockDiario`: conteos.
+//   4. el capital                     → `CapitalEnMercaderia`, con el gráfico de
+//      la evolución adentro.
+//   5. ¿Por qué cambió?               → `PorQueCambio`: una fila por causa, con
+//      su barra, que juntas suman el cambio.
+//   6. lo que hay que mirar           → `AtencionDelValor`, solo si hay algo.
 //
-// Fuera de historia no hay 4 a 9: hay un bloque que dice desde cuándo existe el
+// Fuera de historia no hay 4 a 6: hay un bloque que dice desde cuándo existe el
 // registro, y que antes no hay datos —no que el stock era cero—. Sin costos
-// históricos (antes del 30/09 en producción) no hay 4 ni 5: se dice por qué, y
-// la lista y la actividad física siguen, porque las cantidades sí se conocen.
+// históricos (antes del 30/09 en producción) tampoco: se dice por qué.
 //
 // Es de SOLO LECTURA: ningún control de esta pantalla escribe nada.
 //
@@ -46,42 +43,32 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
-import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import SunmiDateRangePicker from "@/components/sunmi/SunmiDateRangePicker";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
-import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import { CODIGO_FALTA_UBICACION } from "@/lib/stock/libro/stockDiarioApi";
-import DiaConBanda from "@/components/periodo/DiaConBanda";
-import FilaConImporte from "@/components/periodo/FilaConImporte";
 import ResumenConImporte from "@/components/periodo/ResumenConImporte";
 import ChipsDePeriodo, { CLAVE_OTRO } from "@/components/transferencias/ChipsDePeriodo";
 import NavegadorDePeriodo from "@/components/transferencias/NavegadorDePeriodo";
 import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { ESTADO_DEL_DIA } from "@/lib/stock/libro/stockDiario";
 import {
-  ESPERA_BUSQUEDA_MS,
-  consultaDeProductos,
   consultaDelResumen,
   contextoAnterior,
   contextoSiguiente,
-  datoDeLaEvolucion,
-  datoDeLaLista,
-  filasDeEvolucion,
   opcionesDeUbicacion,
   parseContextoStockDiario,
   puedeAvanzar,
   puedeRetroceder,
   textoFueraDeHistoria,
   textoSinValor,
+  textosDelCapital,
   textosDelNavegador,
-  textosDelValor,
   urlDeStockDiario,
 } from "@/lib/stock/libro/stockDiarioPantalla";
 
-import FilaStockDiario from "./FilaStockDiario";
-import ResumenStockDiario from "./ResumenStockDiario";
-import ResumenValorDelStock from "./ResumenValorDelStock";
+import AtencionDelValor from "./AtencionDelValor";
+import CapitalEnMercaderia from "./CapitalEnMercaderia";
 import PorQueCambio from "./PorQueCambio";
 
 async function pedir(ruta, consulta) {
@@ -110,11 +97,6 @@ export default function PantallaStockDiario() {
   const [error, setError] = useState("");
   // Admin en vista global sin ubicación elegida: las que puede elegir, o null.
   const [faltaUbicacion, setFaltaUbicacion] = useState(null);
-  const [busqueda, setBusqueda] = useState("");
-  const [termino, setTermino] = useState("");
-  const [pagina, setPagina] = useState(1);
-  const [lista, setLista] = useState(null);
-  const [errorLista, setErrorLista] = useState("");
   const [rango, setRango] = useState({ desde: ctx.desde || "", hasta: ctx.hasta || "" });
 
   const ir = (siguiente) => router.replace(urlDeStockDiario({ ...ctx, ...siguiente }), { scroll: false });
@@ -143,40 +125,7 @@ export default function PantallaStockDiario() {
     };
   }, [consultaResumen]);
 
-  // Lo escrito pasa a buscarse un momento después de la última tecla.
-  useEffect(() => {
-    const espera = setTimeout(() => setTermino(busqueda.trim()), ESPERA_BUSQUEDA_MS);
-    return () => clearTimeout(espera);
-  }, [busqueda]);
-
-  // Otro período u otra búsqueda: de vuelta a la primera página.
-  useEffect(() => setPagina(1), [consultaResumen, termino]);
-
-  const consultaLista = consultaDeProductos(ctx, { q: termino, page: pagina });
   const fuera = respuesta?.estado === ESTADO_DEL_DIA.FUERA_DE_HISTORIA;
-
-  // La lista: la página pedida, con la búsqueda hecha en el servidor.
-  useEffect(() => {
-    if (!consultaLista || !respuesta || fuera) {
-      setLista(null);
-      return undefined;
-    }
-    let vigente = true;
-    // Una página de otro período no se muestra mientras llega la de éste.
-    setLista(null);
-    setErrorLista("");
-    pedir("productos", consultaLista)
-      .then((r) => vigente && setLista(r))
-      .catch((e) => {
-        if (!vigente) return;
-        setErrorLista(e.message);
-        setLista(null);
-      });
-    return () => {
-      vigente = false;
-    };
-  }, [consultaLista, respuesta, fuera]);
-
   const navegador = respuesta ? textosDelNavegador(respuesta) : null;
   const hoy = respuesta?.hoy || hoyArgentinaISO();
   const opcionesUbicacion = opcionesDeUbicacion(respuesta?.ubicaciones ?? faltaUbicacion);
@@ -255,70 +204,16 @@ export default function PantallaStockDiario() {
 
       {respuesta && !cargando && fuera && <FueraDeHistoria respuesta={respuesta} />}
 
-      {respuesta && !cargando && !fuera && (
-        <>
-          {textosDelValor(respuesta) ? (
-            <>
-              <ResumenValorDelStock respuesta={respuesta} />
-              <PorQueCambio respuesta={respuesta} ctx={ctx} />
-              <DiaConBanda titulo="Evolución" dato={datoDeLaEvolucion(respuesta)}>
-                {filasDeEvolucion(respuesta).map((f) => (
-                  <FilaConImporte key={f.clave} importe={f.importe}>
-                    <div className="text-sm3 sunmi-text-strong">{f.rotulo}</div>
-                  </FilaConImporte>
-                ))}
-              </DiaConBanda>
-            </>
-          ) : (
-            <SinValor respuesta={respuesta} />
-          )}
-
-          <SunmiCampoBusquedaVoz
-            value={busqueda}
-            onChange={setBusqueda}
-            placeholder="Buscar producto o código"
-            ariaLabel="Buscar producto o código"
-          />
-
-          {errorLista && (
-            <SunmiAviso tono="danger" titulo="No se pudo cargar la lista">
-              {errorLista}
-            </SunmiAviso>
-          )}
-
-          {!lista && !errorLista && (
-            <div className="py-12">
-              <SunmiLoader />
-            </div>
-          )}
-
-          {lista && (
-            <DiaConBanda titulo="Productos" dato={datoDeLaLista(lista.total)}>
-              {lista.items.length === 0 ? (
-                <div className="text-center py-12 sunmi-text-muted text-xs">
-                  {termino ? "Ningún producto coincide con la búsqueda." : "Ningún producto cambió de valor en este período."}
-                </div>
-              ) : (
-                lista.items.map((item) => <FilaStockDiario key={item.productoLocalId} item={item} respuesta={respuesta} />)
-              )}
-            </DiaConBanda>
-          )}
-
-          {lista && lista.totalPages > 1 && (
-            <SunmiPaginador
-              page={lista.page}
-              pageSize={lista.pageSize}
-              totalPages={lista.totalPages}
-              totalItems={lista.total}
-              onPrev={() => setPagina((p) => Math.max(1, p - 1))}
-              onNext={() => setPagina((p) => Math.min(lista.totalPages, p + 1))}
-              onGoToPage={(p) => setPagina(p)}
-            />
-          )}
-
-          <ResumenStockDiario respuesta={respuesta} />
-        </>
-      )}
+      {respuesta && !cargando && !fuera &&
+        (textosDelCapital(respuesta) ? (
+          <>
+            <CapitalEnMercaderia respuesta={respuesta} />
+            <PorQueCambio respuesta={respuesta} ctx={ctx} />
+            <AtencionDelValor respuesta={respuesta} />
+          </>
+        ) : (
+          <SinValor respuesta={respuesta} />
+        ))}
     </>
   );
 }

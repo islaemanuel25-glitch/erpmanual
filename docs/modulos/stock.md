@@ -452,22 +452,40 @@ de las pantallas por período *(verificado en código,
   opcional de `ChipsDePeriodo` (`conAnio`): las otras pantallas siguen con
   cuatro. Las flechas navegan con las puntas que devuelve el servidor, así que la
   semana es siempre la de Semana Operativa y la pantalla no calcula ninguna.
-- **Arriba, la plata:** cuánto aumentó o disminuyó el valor, con el valor
-  inicial, el final ("Ahora" en curso), el movimiento físico y la
-  revalorización; el tránsito debajo, aparte. El aviso enciende el borde con
-  costos faltantes, stock negativo o un período parcial. No se habla de
-  ganancia ni de pérdida. Sin costos históricos se dice por qué, sin ceros.
-- **La evolución**, un renglón por día (por mes en el año).
-- Cada producto dice "Apertura X → Ahora Y" en curso y "→ Cierre Y" completo,
-  en la presentación de Stock Locales, con su variación en pesos a la derecha o
-  "Sin costo". Tocarlo despliega el detalle —cantidades, costos congelados,
-  valores, físico, revalorización— sin navegar. Lo desconocido dice "No
-  disponible" y lo que no existe "No existe".
-- La lista es la de `con_valor`, paginada de a 50, y la búsqueda va al servidor.
-- La actividad física de antes —conteos de entradas, salidas y tránsito— queda
-  como bloque secundario al final.
-- **SIN VERIFICAR contra Figma:** el estado con plata y el detalle desplegable
-  no tienen nodo en el archivo de diseño; se armaron con las piezas existentes.
+**Desde el 2026-10-01 es un tablero y NO muestra productos** (Figma
+`EVJ2KvVCrY0oVSowfboymQ`, página "Finanzas · Valor del Stock · Dashboard móvil",
+329-624 y 329-802). Regla de Emanuel: "Valor del Stock informa; los otros
+módulos muestran el detalle". Se sacaron el buscador, la lista de productos con
+su paginador, la evolución en renglones y el bloque de actividad física; sus
+piezas (`FilaStockDiario`, `ResumenStockDiario`, `ResumenValorDelStock`) se
+borraron. La API de la lista (`/productos`, `/producto`, `/movimientos`) sigue
+existiendo *(verificado en código y con candado en
+`components/stock_diario/stockDiarioMobile.test.mjs`)*. De arriba abajo:
+
+- **La tarjeta del capital** (`CapitalEnMercaderia`): "Capital en mercadería" con
+  la píldora A COSTO, el valor de ahora o el final, el cambio (final − inicial)
+  con su % sobre la apertura —solo si la apertura es positiva—, la apertura, el
+  **gráfico de evolución** y el tránsito aparte. El gráfico (`GraficoDeEvolucion`,
+  SVG sin librerías) va de la apertura al cierre de cada día —de cada mes en el
+  año— y su eje cubre como mínimo ±3 % de la apertura más un 10 % de aire, así
+  un stock estable se ve plano.
+- **¿Por qué cambió?** (`PorQueCambio`): una fila por causa —las categorías del
+  movimiento físico, la revalorización y la reexpresión si hubo—, de mayor a
+  menor |importe|, que juntas suman final − inicial al centavo. Cada una con una
+  barra divergente desde el cero (a la derecha suma, en acento; a la izquierda
+  resta, en gris; sin rojo ni verde) y el enlace a su módulo: Ventas, Compras,
+  Stock (ajustes). Todas las filas reservan el mismo lugar para la acción, así
+  las pistas miden lo mismo y las barras se comparan. Transferencias se abre con
+  Ver/Ocultar y muestra sus transferencias. El pie dice cuándo cuenta una
+  operación.
+- **Atención** (`AtencionDelValor`), solo si hay algo: stock negativo (con
+  enlace a Stock), productos sin costo (sin enlace: no hay una pantalla que lleve
+  directo a corregir el costo de esos productos), período recortado y una cuenta
+  que no cierra.
+- No se habla de ganancia ni de pérdida. Sin costos históricos se dice por qué,
+  sin ceros.
+- Revisado a 360 px en tema claro sobre la app construida: sin desborde, sin
+  errores de página, pistas de 208 px iguales en todas las filas.
 
 ### Un posible hueco de alcance en Transferencias (sin corregir)
 
