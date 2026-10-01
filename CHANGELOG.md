@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-10-01] - Actualización: stock
+
+### Modificado
+- **stock**: feat(finanzas): "¿Por qué cambió?" explica el capital y deriva a cada módulo
+
+
 ## [2026-09-30] - Actualización: pos-ventas, productos, stock, transferencias
 
 ### Modificado
