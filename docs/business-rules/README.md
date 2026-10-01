@@ -29,6 +29,9 @@ está claro cuál de las dos es, va como **[ACCIDENTE POSIBLE]** y no como regla
   abierto, cómo se cierra una caja.
 - [gastos.md](gastos.md) — qué es un gasto y qué no (ni retiro, ni compra, ni
   costo), de qué ubicación es, quién lo paga y cómo sale el dinero.
+- [pago-a-deposito.md](pago-a-deposito.md) — la mercadería recibida del depósito
+  se reconoce como pagada el día que el local confirma la recepción; el número
+  es de Transferencias y la caja no lo vuelve a pagar.
 - [contradicciones.md](contradicciones.md) — **empezá por acá si vas a tocar
   algo.** Los lugares donde el repo se contradice a sí mismo.
 

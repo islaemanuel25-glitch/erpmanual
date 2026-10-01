@@ -1,8 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-01 03:25
+**Fecha:** 2026-10-01 14:40
 
 ## Módulos modificados recientemente
+
+### transferencias
+- feat(finanzas): Pago a depósito en el Resumen, consumido de Transferencias
+- Archivos: 1 nuevos, 4 modificados (5 total)
 
 ### stock
 - feat(finanzas): Valor del Stock como tablero móvil, sin lista de productos, feat(finanzas): "¿Por qué cambió?" explica el capital y deriva a cada módulo
@@ -10,6 +14,7 @@
 
 
 ## Archivos nuevos desde última sincronización
+- components/transferencias/cuentaPorRecepcion.test.mjs
 - components/stock_diario/AtencionDelValor.jsx
 - components/stock_diario/CapitalEnMercaderia.jsx
 - components/stock_diario/EnlaceAlModulo.jsx
