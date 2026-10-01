@@ -44,7 +44,11 @@ Cómo Finanzas lee la mercadería que un local recibe del depósito. Desde
   o lo enviado si no se contó nada—. **No suman al pago y no se descuentan de
   nada** [CÓDIGO].
 - Es el estado de hoy, no una foto del período: una que se confirmó después ya no
-  está pendiente, y cuenta en el día en que se confirmó [CÓDIGO].
+  está pendiente, y cuenta en el día en que se confirmó [CÓDIGO]. Las dos
+  pantallas lo dicen en la nota del renglón —"Salieron hasta el cierre del
+  período y hoy siguen sin confirmar"— para que mirando una semana pasada no se
+  lea como lo que faltaba confirmar aquella semana [CÓDIGO] (`NOTA_PENDIENTES`,
+  `lib/transferencias/criterioDeCuenta.js`).
 
 ## La caja no vuelve a pagar la mercadería
 

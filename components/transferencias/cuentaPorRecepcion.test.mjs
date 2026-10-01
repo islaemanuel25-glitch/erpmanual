@@ -68,7 +68,12 @@ test("R1 · por recepción: el rótulo es Pago a depósito, el importe es lo rec
   // Las pendientes, atenuadas y con su nota.
   assert.match(salida, /sunmi-text-muted">Pendiente de recepción/);
   assert.match(salida, /tabular-nums sunmi-text-muted">\$ 126400\.00/);
-  assert.ok(salida.includes("3 transferencias · Todavía sin confirmar por el local. Se informa y no se descuenta."));
+  // La nota dice de CUÁNDO es el dato: estado de hoy, no foto del período.
+  assert.ok(
+    salida.includes(
+      "3 transferencias · Salieron hasta el cierre del período y hoy siguen sin confirmar. Se informa y no se descuenta."
+    )
+  );
 });
 
 test("R2 · por recepción sin movimiento: la frase dice que no se confirmó nada, no que no se envió", () => {
@@ -87,7 +92,7 @@ test("R2 · por recepción sin movimiento: la frase dice que no se confirmó nad
   );
   assert.ok(salida.includes("No confirmó ninguna recepción en ese período."));
   assert.ok(!salida.includes("No se le envió nada"));
-  assert.ok(salida.includes("2 transferencias · Todavía sin confirmar"));
+  assert.ok(salida.includes("2 transferencias · Salieron hasta el cierre del período y hoy siguen sin confirmar"));
 });
 
 test("R3 · la cuenta de siempre no cambió: sin criterio no hay pendientes ni rótulo nuevo", () => {
