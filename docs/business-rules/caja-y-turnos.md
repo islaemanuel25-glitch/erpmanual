@@ -231,12 +231,23 @@ reescribe stock, pagos y cuenta corriente, y no tienen un solo test.
 de los montos sea **exactamente** el total, en centavos, y que FIADO sea tender
 único.
 
-Las comisiones y los campos legacy se derivan con `aplicarComisiones` (`:142`) y
-`derivarCamposVenta` (`:233`). El porcentaje sale de `ConfiguracionGrupo`, con
-default 7 (`app/api/pos-ventas/crear/route.js:525-535`).
+Las comisiones y los campos legacy se derivan con `aplicarComisionesResueltas` y
+`derivarCamposVenta` (`lib/pos-ventas/pagos.js`). El porcentaje sale del medio de
+cobro o de la modalidad del local, y si no tiene override, de
+`ConfiguracionGrupo`.
+
+**NO hay default de 7 %** *(corregido el 2026-10-01; verificado en código)*. Las
+columnas `comisionDebito`, `comisionCredito` y `comisionMercadopago` de
+`ConfiguracionGrupo` son nulables y sin default, y `comisionesDeMedios`
+(`lib/pos-ventas/mediosCobro.js`) no convierte un `null` en cero. Un tender que
+cobra comisión sin porcentaje configurado se guarda con `comisionPct` en null y
+comisión cero ESTRUCTURAL, y la venta queda con `Venta.comisionPendiente = true`.
+La venta no se rechaza. Cómo se interpreta esa bandera vive en
+`lib/pos-ventas/comisionPendiente.js`, que falla cerrado.
 
 **[CONTRADICCIÓN]** — `docs/modulos/pos-ventas.md:41` dice "7% para pagos con
-tarjeta/MP" como si fuera fijo. Es configurable por grupo; 7 es solo el default.
+tarjeta/MP" como si fuera fijo. No es fijo ni tiene default: es configurable y
+puede faltar.
 
 ---
 
