@@ -13,13 +13,17 @@
 // Por eso el título del período, el rango, los topes de las flechas, las
 // métricas y la actividad ya agrupada viajan resueltos.
 //
-// ── LO QUE ESTA RUTA NO HACE ES INVENTAR ──────────────────────────────────
+// ── QUÉ JUNTA, Y LO QUE NO INVENTA ────────────────────────────────────────
 //
-// No hay gastos, ni sueldos, ni resultado del negocio: viajan en `noDisponible`
-// con su motivo, y NO como ceros. Un cero se lee como "no hubo"; lo que pasa es
-// que el sistema no los conoce. Los pagos a proveedores van en la misma lista
-// por otro motivo: se registran en su submódulo, pero este resumen todavía no
-// los suma al período.
+// Ventas y cobros, movimientos de caja, gastos devengados, pagos a proveedores
+// y de gastos, cobros de cuenta corriente y las deudas abiertas al cierre del
+// período. Cada consulta corta por la columna de PROPIEDAD de su hecho —la
+// ubicación que vendió, la que debe, la de donde salió la plata— y la cuenta la
+// hace `resumenDelPeriodo`.
+//
+// Lo que NO hay es dónde quedó la plata: no existen cuentas de banco ni de
+// Mercado Pago con saldo. Eso viaja en `noDisponible` con su motivo, y NO como
+// un cero ni como una resta aproximada.
 //
 // ── DOS VISTAS, UNA SOLA LLAMADA ──────────────────────────────────────────
 //
@@ -56,6 +60,7 @@ import {
 import { corteDeUbicacion } from "@/lib/semanaOperativa/semanaOperativa";
 import { vigenciasDeUbicaciones } from "@/lib/semanaOperativa/semanaOperativaServer";
 import { resumenDelPeriodo } from "@/lib/finanzas/resumenFinanciero";
+import { aFechaDeBase } from "@/lib/finanzas/pagosProveedores";
 import { actividadPorDia } from "@/lib/finanzas/actividadFinanciera";
 import {
   CLASE_MOVIMIENTO,
@@ -86,6 +91,9 @@ const SELECT_VENTA = {
   formaPago: true,
   comisionBancaria: true,
   netoRecibido: true,
+  // Si la comisión de la venta es un cero estructural. Sin el campo,
+  // `resumirExactitud` la cuenta como pendiente: falla cerrado.
+  comisionPendiente: true,
   pagos: { select: { medio: true, monto: true, comision: true, neto: true } },
 };
 
@@ -252,8 +260,8 @@ export async function GET(req) {
     // antes del rango, y buscándolo por turno quedaría sin clasificar.
     //
     // El pago a proveedor en efectivo se reconoce por `PagoProveedor.cajaMovimientoId`
-    // (UNIQUE). Sin esto caería en los retiros manuales del resumen, y el día que
-    // se sumen los pagos al período ese mismo peso contaría dos veces.
+    // (UNIQUE). Sin esto caería en los retiros manuales del resumen, y como el
+    // pago también se suma al período, ese mismo peso contaría dos veces.
     const idsDeMovimiento = movimientos.map((m) => m.id);
     //
     // El pago de un gasto en efectivo, igual, por `PagoGasto.cajaMovimientoId`.
@@ -285,10 +293,65 @@ export async function GET(req) {
       idsDePagoGasto: new Set(pagosDeGastoConRetiro.map((p) => p.cajaMovimientoId)),
     });
 
+    // ── LO QUE SALIÓ, LO QUE SE DEVENGÓ Y LO QUE SE DEBE ──────────────────
+    //
+    // Cada hecho con SU fecha y SU columna de propiedad:
+    //
+    //   · Pagos (a proveedores y de gastos): por `fecha`, el día en que salió
+    //     la plata, y por `localOrigenId`, de dónde salió. En efectivo, el
+    //     mismo peso es un RETIRO de arriba, que ya quedó fuera de los manuales
+    //     por su vínculo: acá se cuenta el pago y nada más.
+    //   · Gastos: por `Gasto.fecha` —un DÍA, comparado como día— y por
+    //     `localId`, la ubicación que lo consumió. Se traen los de hasta el
+    //     cierre, con sus pagos de hasta el cierre: de la misma lista salen los
+    //     devengados del período y los que seguían abiertos al cierre.
+    //   · Deudas con proveedores: por `localGastoId`, la ubicación DUEÑA de la
+    //     deuda, nacidas hasta el cierre y con sus pagos de hasta el cierre. Un
+    //     pago posterior no achica la deuda de un período anterior.
+    //   · Cobros de cuenta corriente: `MovimientoCuenta` PAGO del local, por
+    //     `createdAt`. Sin medio ni destino: el modelo no los guarda.
+    const corteDia = aFechaDeBase(rango.hasta);
+    const pagosHastaElCorte = { where: { fecha: { lte: fechaFin } }, select: { monto: true, fecha: true } };
+    const [pagosAProveedores, pagosDeGastos, gastos, cuentasProveedor, cobrosCuentaCorriente] =
+      await Promise.all([
+        prisma.pagoProveedor.findMany({
+          where: { localOrigenId: localId, fecha: { gte: fechaInicio, lte: fechaFin } },
+          select: { medio: true, monto: true },
+        }),
+        prisma.pagoGasto.findMany({
+          where: { localOrigenId: localId, fecha: { gte: fechaInicio, lte: fechaFin } },
+          select: { medio: true, monto: true },
+        }),
+        prisma.gasto.findMany({
+          where: { grupoId: vista.grupoId, localId, fecha: { lte: corteDia } },
+          select: { total: true, fecha: true, pagos: pagosHastaElCorte },
+        }),
+        prisma.cuentaPorPagarProveedor.findMany({
+          where: { grupoId: vista.grupoId, localGastoId: localId, createdAt: { lte: fechaFin } },
+          select: { total: true, createdAt: true, pagos: pagosHastaElCorte },
+        }),
+        prisma.movimientoCuenta.findMany({
+          where: {
+            grupoId: vista.grupoId,
+            localId,
+            tipo: "PAGO",
+            direccion: "CREDITO",
+            createdAt: { gte: fechaInicio, lte: fechaFin },
+          },
+          select: { tipo: true, direccion: true, monto: true },
+        }),
+      ]);
+
     const resumen = resumenDelPeriodo({
       ventas,
       manuales: soloManuales(clasificados),
       recaudacion: soloRecaudacion(clasificados),
+      pagosAProveedores,
+      pagosDeGastos,
+      gastos,
+      cuentasProveedor,
+      cobrosCuentaCorriente,
+      periodo: { desde: rango.desde, hasta: rango.hasta, instanteFin: fechaFin },
     });
 
     const actividad = actividadPorDia({

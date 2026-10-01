@@ -71,8 +71,19 @@ pantalla móvil de Finanzas → Gastos que las usa.
 - El RETIRO de un pago de gasto se clasifica **PAGO_GASTO por su vínculo**,
   nunca por el texto del motivo, y no entra en los "retiros manuales"
   [CÓDIGO] (`lib/finanzas/movimientosDeCaja.js`).
-- Los gastos **todavía no entran en el resumen del período**: siguen en
-  `METRICAS_NO_DISPONIBLES` [CÓDIGO].
+- **Desde el 2026-10-01 el resumen del período los suma** [CÓDIGO]
+  (`resumenDelPeriodo`, `lib/finanzas/resumenFinanciero.js`, y
+  `/api/finanzas/tablero`) [VERIFICADO: `scripts/pruebas-db/finanzas.mjs`]:
+  - **devengados** por `Gasto.fecha`, de la ubicación que lo consumió;
+  - **pagos de gastos** por `PagoGasto.fecha` y `localOrigenId`, por medio. En
+    efectivo el pago y su RETIRO son UN hecho: se cuenta el pago y el retiro
+    queda fuera de los retiros manuales por su vínculo;
+  - **pendientes al cierre**: gastos con fecha hasta el último día del período,
+    menos sus pagos hasta el final de ese día. Un pago posterior no achica lo
+    que se debía;
+  - y el **resultado económico** resta los devengados, no los pagados.
+- Lo que **no** se sabe y no se inventa: si están cargados todos los gastos.
+  El resultado lo dice como limitación (`GASTOS_REGISTRADOS`).
 
 ## Permiso
 
@@ -135,5 +146,5 @@ y la pantalla la muestra fija en vez de ofrecer elegirla [CÓDIGO].
   que decide el servidor. El pago inicial va dentro del mismo POST del alta.
 - No hay editar, eliminar ni anular.
 
-Todavía **no hay** cuentas bancarias o de Mercado Pago, ni lugar para los gastos
-en el resumen del período.
+Todavía **no hay** cuentas bancarias o de Mercado Pago: un pago por
+transferencia o Mercado Pago dice el medio, no de qué cuenta salió.
