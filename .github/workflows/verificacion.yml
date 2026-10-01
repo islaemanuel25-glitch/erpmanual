@@ -465,6 +465,14 @@ jobs:
       - name: Ejercer Finanzas contra PostgreSQL
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/finanzas.mjs
 
+      # El Pago a depósito: los dos handlers —el tablero de Finanzas y el de
+      # Transferencias con `criterio=RECEPCION`— sobre las mismas transferencias,
+      # con `Decimal` de verdad. Solo lo `Recibida` por `fechaRecepcion`, las
+      # pendientes aparte, el Ver con su permiso, el mismo total en los dos
+      # módulos y la cuenta por envío sin cambios.
+      - name: Ejercer el Pago a depósito contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/pagoADeposito.mjs
+
       # Gastos: las dos puertas que escriben —crear y pagar— contra una base
       # descartable con todas las migraciones. La ubicación dueña, el efectivo
       # con su RETIRO vinculado, la idempotencia bajo carrera, la atomicidad del

@@ -36,7 +36,25 @@
 // negocio —es la venta que ya se contó, cambiando de lugar—, por eso van en su
 // propio renglón.
 
+//
+// ── EL PAGO A DEPÓSITO ES UN NÚMERO DE TRANSFERENCIAS ────────────────────
+//
+// Lo que el local recibió del depósito y confirmó en el período. Viaja armado
+// desde el servidor —`resumen.pagoADeposito`— y acá solo se dibuja: ni se suma
+// ni se resta de nada, porque todavía no hay un "resto" que calcular con un
+// solo uso. Las pendientes van atenuadas y con su nota: no son plata que ya se
+// descontó. El detalle es de Transferencias, y se abre con "Ver" solo si quien
+// mira puede entrar ahí.
+
 import { formatearMoneda } from "@/lib/moneda";
+import EnlaceAlModulo from "@/components/stock_diario/EnlaceAlModulo";
+import {
+  NOTA_PENDIENTES,
+  NOTA_RECONOCIMIENTO,
+  ROTULO_PAGO_A_DEPOSITO,
+  ROTULO_PENDIENTE_DE_RECEPCION,
+  rotuloDeTransferencias,
+} from "@/lib/transferencias/criterioDeCuenta";
 
 /** El número grande del bloque principal. */
 function Metrica({ rotulo, valor, detalle = null }) {
@@ -90,6 +108,44 @@ function NoDisponible({ rotulo, motivo }) {
       <div className="text-sm3 font-medium sunmi-text-muted">Todavía no disponible</div>
       <div className="text-xs2 sunmi-text-muted">{motivo}</div>
     </div>
+  );
+}
+
+/**
+ * EL PAGO A DEPÓSITO DEL PERÍODO, con las pendientes de recepción aparte.
+ *
+ * El importe es lo recibido y confirmado; las pendientes se informan con el
+ * renglón atenuado —el mismo trato que el fiado en Cobros— para que no se lean
+ * como plata que ya salió.
+ */
+function PagoADeposito({ pago }) {
+  const pendientes = pago.pendientes || { total: 0, cantidadTransferencias: 0 };
+  const hayPendientes = Number(pendientes.cantidadTransferencias || 0) > 0;
+  return (
+    <Bloque titulo="PAGO A DEPÓSITO">
+      <Renglon
+        rotulo={ROTULO_PAGO_A_DEPOSITO}
+        nota={`${rotuloDeTransferencias(pago.cantidadTransferencias)} recibidas en el período`}
+        valor={formatearMoneda(pago.total)}
+      />
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="min-w-0 text-xs2 sunmi-text-muted">{NOTA_RECONOCIMIENTO}</div>
+        {pago.verDetalle ? <EnlaceAlModulo href={pago.verDetalle} texto="Ver" /> : null}
+      </div>
+
+      <div className="border-t sunmi-divider opacity-70" aria-hidden="true" />
+
+      <Renglon
+        rotulo={ROTULO_PENDIENTE_DE_RECEPCION}
+        nota={
+          hayPendientes
+            ? `${rotuloDeTransferencias(pendientes.cantidadTransferencias)} · ${NOTA_PENDIENTES}`
+            : "Ninguna sin confirmar."
+        }
+        valor={formatearMoneda(pendientes.total)}
+        atenuado
+      />
+    </Bloque>
   );
 }
 
@@ -193,6 +249,11 @@ export default function ResumenDelPeriodo({ resumen, descripcion }) {
           </>
         )}
       </Bloque>
+
+      {/* ── PAGO A DEPÓSITO ───────────────────────────────────────────────
+          Solo donde aplica: el depósito no se paga a sí mismo, y para él el
+          bloque no existe —no se dibuja en cero—. */}
+      {resumen.pagoADeposito?.aplica ? <PagoADeposito pago={resumen.pagoADeposito} /> : null}
 
       {/* ── MOVIMIENTOS DE CAJA ───────────────────────────────────────────── */}
       <Bloque titulo="MOVIMIENTOS DE CAJA">

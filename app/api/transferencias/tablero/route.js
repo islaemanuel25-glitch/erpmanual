@@ -19,16 +19,20 @@
 // del lado del cliente, que el día que cambie una regla queda vieja. Va el
 // resultado, no los insumos.
 //
-// ── EL SELECT ESTÁ ESCRITO ACÁ Y NO IMPORTADO, A PROPÓSITO ────────────────
+// ── EL SELECT SE MUDÓ, Y EL CANDADO SE MUDÓ CON ÉL (2026-10-01) ──────────
 //
-// `lib/transferencias/formaDelSelect.test.mjs` LEE EL TEXTO de cada ruta que
+// `lib/transferencias/formaDelSelect.test.mjs` LEE EL TEXTO de cada archivo que
 // valoriza y exige que nombre los campos del fiambre de pieza fija, el
 // `es_deposito` del origen y el snapshot de presentación. Es el candado que
 // nació de la #97, que mostraba 144.086,40 en una pantalla y 155.486,40 en otra
-// con todos los demás candados en verde. Si este `select` viviera en un módulo
-// compartido, esta ruta dejaría de nombrar esos campos y el candado quedaría
-// verde sin mirar nada — que es exactamente el defecto que este repo tiene
-// anotado como el que más se repite. Esta ruta está agregada a su lista.
+// con todos los demás candados en verde.
+//
+// El `select` vivía acá a propósito, para que el candado lo leyera en esta
+// ruta. Desde que Finanzas consume la misma cuenta como "Pago a depósito" son
+// dos lectores, y dos copias del `select` es el defecto de la #97 esperando a
+// pasar de un solo lado. Ahora es UNO, `SELECT_TRANSFERENCIA_DE_LA_CUENTA` en
+// `lib/transferencias/cuentaDelPeriodoServer.js`: el candado lee ESE archivo, y
+// otro candado exige que esta ruta consulte con él y con ningún otro.
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
@@ -36,11 +40,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { resolveVistaOperativa } from "@/lib/grupos";
 import { origenEsDepositoDe } from "@/lib/transferencias/costoTransferencia";
-import {
-  desdeCentavos,
-  importeRecibidoDeDetalle,
-  importeRecibidoDeDetalleCentavos,
-} from "@/lib/transferencias/agregadosPeriodo";
+import { importeRecibidoDeDetalle } from "@/lib/transferencias/agregadosPeriodo";
 import {
   diferenciaDeLinea,
   fisicasEnviadasDe,
@@ -49,7 +49,6 @@ import {
 import {
   DIA_DE_CORTE_POR_DEFECTO,
   UNIDADES,
-  caeEnElPeriodo,
   rangoDelPeriodo,
   rangoDesplazado,
 } from "@/lib/transferencias/periodoDePago";
@@ -57,12 +56,17 @@ import { descripcionDelPeriodo } from "@/lib/transferencias/descripcionDelPeriod
 import { fechaArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import {
   bloquesPorLocal,
-  cuentaDelLocal,
+  cuentaDelPeriodo,
   entraEnLaVistaPrincipal,
   estaRecibida,
-  fechaDeCorte,
   vigenciasDelLocal,
 } from "@/lib/transferencias/bloquesPorLocal";
+import { CRITERIO_CUENTA, criterioDeCuenta } from "@/lib/transferencias/criterioDeCuenta";
+import {
+  SELECT_TRANSFERENCIA_DE_LA_CUENTA,
+  leerCuentaPorRecepcion,
+  primeraRecepcion,
+} from "@/lib/transferencias/cuentaDelPeriodoServer";
 // LA SEMANA DE CADA LOCAL ES SUYA, no de un acuerdo con el depósito: sale de
 // `SemanaOperativaVigencia` por el cargador canónico. `AcuerdoDepositoLocal` ya no
 // se lee en ningún lado del runtime.
@@ -114,6 +118,55 @@ function contarLineasConDiferencia(detalle = []) {
     if (dif != null && Math.abs(dif) > 0.0005) n += 1;
   }
   return n;
+}
+
+/**
+ * LO QUE VIAJA DE CADA TRANSFERENCIA.
+ *
+ * El importe y el avance se calculan acá, una vez, con las mismas puertas que
+ * usa la cuenta para sumar. El teléfono recibe números, no líneas.
+ *
+ * Vivía adentro del handler; salió al nivel del módulo cuando el criterio de
+ * recepción pasó a necesitarla antes de la consulta de siempre. No cambió nada
+ * de lo que calcula: se agregó `fechaRecepcion`, que es con la que ese criterio
+ * agrupa los días.
+ */
+function resumir(t) {
+  const detalle = t.detalle || [];
+  const revisables = detalle.filter((d) => !d.agregadoEnRecepcion);
+  return {
+    id: t.id,
+    estado: t.estado,
+    fechaEnvio: t.fechaEnvio,
+    fechaRecepcion: t.fechaRecepcion ?? null,
+    createdAt: t.createdAt,
+    recibida: estaRecibida(t),
+    cantidadItems: detalle.length,
+    itemsRevisables: revisables.length,
+    itemsRevisados: revisables.filter((d) => d.revisadoEnRecepcion).length,
+    // ── CUÁNTAS LÍNEAS DIFIEREN, Y POR QUÉ NO SALE DE LA COLUMNA ──────────
+    //
+    // `Transferencia.tieneDiferencias` existe y se llama parecido, y NO se usa.
+    // Dos motivos, medidos sobre producción el 2026-09-13:
+    //
+    //   · es un BOOLEANO, y la pantalla dice el número —"2 diferencias"—;
+    //   · solo se escribe al CONFIRMAR. De las 15 transferencias en
+    //     `Recibiendo`, la columna dice `false` en las 15 y las líneas dicen que
+    //     7 ya tienen diferencia. Mientras se cuenta, la columna miente por
+    //     omisión.
+    //
+    // Sobre las 62 recibidas la columna sí coincide exactamente con las líneas.
+    // Aun así se descarta: una sola fuente para los dos casos es mejor que dos
+    // que coinciden en uno.
+    //
+    // La cuenta NO se escribe a mano —el candado de repo entero lo prohíbe—:
+    // sale de `diferenciaDeLinea`, que es `recibida − enviada` en unidades
+    // físicas, sobre las puertas canónicas de la escala.
+    lineasConDiferencia: contarLineasConDiferencia(detalle),
+    importe: importeRecibidoDeDetalle(detalle, {
+      origenEsDeposito: origenEsDepositoDe(t, "tablero"),
+    }),
+  };
 }
 
 /**
@@ -353,6 +406,68 @@ export async function GET(req) {
       ? rangoDeUbicacion({ vigencias: vigenciasDelPedido, unidad, fecha: hoy })
       : null;
 
+    // ── EL CRITERIO DE RECEPCIÓN: LO QUE ABRE EL "VER" DE FINANZAS ────────
+    //
+    // Finanzas reconoce el "Pago a depósito" el día que el local CONFIRMA la
+    // recepción, y solo por lo recibido. La cuenta de siempre de esta pantalla
+    // cae por fecha de envío y suma también lo que falta recibir: si el "Ver"
+    // abriera esa, Finanzas diría un número y esta pantalla otro.
+    //
+    // Con `criterio=RECEPCION` esta misma pantalla —el mismo período, la misma
+    // navegación— muestra las transferencias que forman el número de Finanzas,
+    // calculadas por la MISMA función (`leerCuentaPorRecepcion`), y las
+    // pendientes aparte. Sin el parámetro, todo sigue como estaba: la vista del
+    // depósito y la cuenta de envío no cambian.
+    //
+    // Sale antes de la consulta de siempre, que en este criterio no se usa.
+    const criterio = criterioDeCuenta(searchParams.get("criterio"));
+    if (localPedido && criterio === CRITERIO_CUENTA.RECEPCION) {
+      const [cuenta, primerMovimiento] = await Promise.all([
+        leerCuentaPorRecepcion(prisma, { destinoId: localPedido, rango: periodoMirado }),
+        primeraRecepcion(prisma, { destinoId: localPedido }),
+      ]);
+      const transferencias = cuenta.transferencias.map(resumir);
+
+      return NextResponse.json({
+        ok: true,
+        vista: "UN_LOCAL",
+        criterio,
+        unidad,
+        desplazamiento,
+        local: {
+          id: localPedido,
+          nombre: locales.find((l) => l.id === localPedido)?.nombre || "—",
+          diaDeCorte: corteDelLocal,
+          sinConfigurar: localSinCorte,
+        },
+        periodo: {
+          rango: periodoMirado,
+          criterio,
+          transferencias,
+          cantidad: cuenta.cantidad,
+          sinRecibir: cuenta.sinRecibir,
+          conDiferencias: transferencias.filter((t) => t.lineasConDiferencia > 0).length,
+          aPagar: cuenta.aPagar,
+          // Lo que todavía no se confirmó. Se informa y NO está en `aPagar`.
+          pendientes: {
+            cantidad: cuenta.pendientes.cantidad,
+            importe: cuenta.pendientes.importe,
+          },
+          totalCerrado: true,
+          descripcion: descripcionDelPeriodo({
+            unidad,
+            diaDeCorte: corteDelLocal,
+            hoy,
+            desplazamiento,
+            rangoDeFecha,
+          }),
+        },
+        puedeAvanzar: desplazamiento < 0,
+        puedeRetroceder: Boolean(primerMovimiento && periodoMirado.desde > primerMovimiento),
+        primerMovimiento,
+      });
+    }
+
     // La ventana cubre los DOS períodos de una sola consulta: del inicio del
     // cerrado al fin del en curso. Dos consultas traerían lo mismo y abrirían la
     // puerta a que una use un rango y la otra otro.
@@ -403,131 +518,39 @@ export async function GET(req) {
     const filas = await prisma.transferencia.findMany({
       where: { AND: [alcance, enVentana, { estado: { not: "Cancelada" } }] },
       orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        estado: true,
-        fechaEnvio: true,
-        createdAt: true,
-        destinoId: true,
-        origen: { select: { id: true, nombre: true, es_deposito: true } },
-        destino: { select: { id: true, nombre: true } },
-        detalle: {
-          select: {
-            cantidad: true,
-            recibido: true,
-            recibidoUnidadesSueltas: true,
-            precioCosto: true,
-            unidadEnviada: true,
-            // El snapshot de presentación: la cuenta parte de la presentación
-            // REGISTRADA y no de una reconstrucción que hoy coincide.
-            presentacionEnvio: true,
-            cantidadPresentada: true,
-            factorPresentacion: true,
-            sueltasEnviadas: true,
-            pesoPiezaKg: true,
-            // Los dos del avance de revisión, que son de esta pantalla y de
-            // ninguna otra: cuántas líneas hay que revisar y cuántas van.
-            agregadoEnRecepcion: true,
-            revisadoEnRecepcion: true,
-            productoId: true,
-            producto: {
-              select: {
-                precio_costo: true,
-                nombre: true,
-                base: {
-                  select: {
-                    precio_costo: true,
-                    unidad_medida: true,
-                    factor_pack: true,
-                    nombre: true,
-                    // Los cuatro del fiambre de pieza fija. Sin ellos el
-                    // predicado contesta "no es fiambre" y el importe sale mal
-                    // sin quejarse: es el defecto de la #97.
-                    pesoEsFijo: true,
-                    pesoReferenciaKg: true,
-                    modoVentaDeposito: true,
-                    modoCompraProveedor: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
+      // El mismo `select` que el criterio de recepción y que Finanzas: uno solo.
+      select: SELECT_TRANSFERENCIA_DE_LA_CUENTA,
     });
-
-    // ── LO QUE VIAJA DE CADA TRANSFERENCIA ────────────────────────────────
-    //
-    // El importe y el avance se calculan acá, una vez, con las mismas puertas
-    // que usa el bloque para sumar. El teléfono recibe números, no líneas.
-    const resumir = (t) => {
-      const detalle = t.detalle || [];
-      const revisables = detalle.filter((d) => !d.agregadoEnRecepcion);
-      return {
-        id: t.id,
-        estado: t.estado,
-        fechaEnvio: t.fechaEnvio,
-        createdAt: t.createdAt,
-        recibida: estaRecibida(t),
-        cantidadItems: detalle.length,
-        itemsRevisables: revisables.length,
-        itemsRevisados: revisables.filter((d) => d.revisadoEnRecepcion).length,
-        // ── CUÁNTAS LÍNEAS DIFIEREN, Y POR QUÉ NO SALE DE LA COLUMNA ──────
-        //
-        // `Transferencia.tieneDiferencias` existe y se llama parecido, y NO se
-        // usa. Dos motivos, medidos sobre producción el 2026-09-13:
-        //
-        //   · es un BOOLEANO, y la pantalla dice el número —"2 diferencias"—;
-        //   · solo se escribe al CONFIRMAR. De las 15 transferencias en
-        //     `Recibiendo`, la columna dice `false` en las 15 y las líneas dicen
-        //     que 7 ya tienen diferencia. Mientras se cuenta, la columna miente
-        //     por omisión.
-        //
-        // Sobre las 62 recibidas la columna sí coincide exactamente con las
-        // líneas. Aun así se descarta: una sola fuente para los dos casos es
-        // mejor que dos que coinciden en uno.
-        //
-        // La cuenta NO se escribe a mano —el candado de repo entero lo prohíbe—:
-        // sale de `diferenciaDeLinea`, que es `recibida − enviada` en unidades
-        // físicas, sobre las puertas canónicas de la escala.
-        lineasConDiferencia: contarLineasConDiferencia(detalle),
-        importe: importeRecibidoDeDetalle(detalle, {
-          origenEsDeposito: origenEsDepositoDe(t, "tablero"),
-        }),
-      };
-    };
 
     // ── LA PANTALLA DE ADENTRO DE UN LOCAL ────────────────────────────────
     if (localPedido) {
-      const conConteo = filas.map((t) => ({
-        ...t,
-        lineasConDiferencia: contarLineasConDiferencia(t.detalle || []),
-      }));
-      const deEsteLocal = conConteo.filter(entraEnLaVistaPrincipal);
+      const deEsteLocal = filas.filter(entraEnLaVistaPrincipal);
 
-      /** Las de un rango, ya resumidas y con su cuenta. */
+      /**
+       * Las de un rango, ya resumidas y con su cuenta.
+       *
+       * Qué entra y cuánto vale lo decide `cuentaDelPeriodo`, la misma función
+       * que usa el criterio de recepción y el "Pago a depósito" de Finanzas.
+       * Acá queda solo lo que es de esta pantalla: resumir cada fila y contar
+       * las que cerraron con diferencia.
+       */
       const armar = (rango) => {
-        const dentro = deEsteLocal.filter((t) => caeEnElPeriodo(fechaDeCorte(t), rango));
-        const transferencias = dentro.map(resumir);
+        const cuenta = cuentaDelPeriodo({
+          transferencias: deEsteLocal,
+          rango,
+          criterio: CRITERIO_CUENTA.ENVIO,
+        });
+        const transferencias = cuenta.transferencias.map(resumir);
         return {
           rango,
           transferencias,
-          cantidad: transferencias.length,
-          sinRecibir: transferencias.filter((t) => !t.recibida).length,
+          cantidad: cuenta.cantidad,
+          sinRecibir: cuenta.sinRecibir,
           // Solo las RECIBIDAS informan diferencias: lo que falta contar todavía
           // puede cambiar. Es la misma regla que la cabecera del bloque.
           conDiferencias: transferencias.filter((t) => t.recibida && t.lineasConDiferencia > 0)
             .length,
-          aPagar: desdeCentavos(
-            dentro.reduce(
-              (acc, t) =>
-                acc +
-                importeRecibidoDeDetalleCentavos(t.detalle || [], {
-                  origenEsDeposito: origenEsDepositoDe(t, "tablero/local"),
-                }),
-              0
-            )
-          ),
+          aPagar: cuenta.aPagar,
         };
       };
 

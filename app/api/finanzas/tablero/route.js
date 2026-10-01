@@ -63,6 +63,15 @@ import {
   soloManuales,
   soloRecaudacion,
 } from "@/lib/finanzas/movimientosDeCaja";
+// EL PAGO A DEPÓSITO ES DE TRANSFERENCIAS. Finanzas no consulta `Transferencia`
+// ni valoriza líneas: pide la cuenta del local en el criterio de recepción a la
+// función de ese módulo, la misma que dibuja la pantalla que abre el "Ver".
+import { resumenDePagoADeposito } from "@/lib/transferencias/cuentaDelPeriodoServer";
+import {
+  PERMISO_VER_TRANSFERENCIAS,
+  armarPagoADeposito,
+  enlaceDePagoADeposito,
+} from "@/lib/finanzas/pagoADeposito";
 
 /**
  * LO QUE HAY QUE PEDIR DE CADA VENTA, Y POR QUÉ CADA CAMPO.
@@ -285,10 +294,44 @@ export async function GET(req) {
       idsDePagoGasto: new Set(pagosDeGastoConRetiro.map((p) => p.cajaMovimientoId)),
     });
 
+    // ── EL PAGO A DEPÓSITO ────────────────────────────────────────────────
+    //
+    // Lo que el local recibió del depósito y CONFIRMÓ en el período, por
+    // `fechaRecepcion`, valuado como lo valúa Transferencias. Las que faltan
+    // confirmar vienen aparte y no suman.
+    //
+    // No aplica a la ubicación consultada si es el depósito: no se paga a sí
+    // mismo. Se decide por `Local.es_deposito` del local CONSULTADO —el de la
+    // lista del grupo—, no por quién mira.
+    //
+    // No sale de ninguna de las consultas de arriba, y es a propósito: ni de las
+    // ventas —la venta interna ya está afuera por `whereVentaComercial`—, ni de
+    // los movimientos de caja. Una entrega de efectivo al depósito NO vuelve a
+    // pagar la mercadería que ya se reconoció al recibirla.
+    const consultadoEsDeposito = Boolean(locales.find((l) => l.localId === localId)?.esDeposito);
+    const cuentaDeRecepcion = consultadoEsDeposito
+      ? null
+      : await resumenDePagoADeposito(prisma, { destinoId: localId, rango });
+    const pagoADeposito = armarPagoADeposito({
+      esDeposito: consultadoEsDeposito,
+      cuenta: cuentaDeRecepcion,
+      // El "Ver" abre Transferencias en el mismo período y criterio. Desde el
+      // depósito, la cuenta de ESE local; desde el local, la propia. Solo con
+      // `transferencias.ver`: el importe es del resumen y lo ve `finanzas.ver`,
+      // pero la puerta al módulo no puede saltearse su permiso.
+      verDetalle: enlaceDePagoADeposito({
+        puedeVerTransferencias: checkPerm(session, PERMISO_VER_TRANSFERENCIAS).ok,
+        unidad,
+        desplazamiento,
+        localDelEnlace: esDeposito ? localId : null,
+      }),
+    });
+
     const resumen = resumenDelPeriodo({
       ventas,
       manuales: soloManuales(clasificados),
       recaudacion: soloRecaudacion(clasificados),
+      pagoADeposito,
     });
 
     const actividad = actividadPorDia({

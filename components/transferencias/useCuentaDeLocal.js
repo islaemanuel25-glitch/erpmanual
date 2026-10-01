@@ -33,6 +33,7 @@ import {
   parseContextoDelTablero,
   serializarContextoDelTablero,
 } from "@/lib/transferencias/contextoDelTablero";
+import { CRITERIO_POR_DEFECTO } from "@/lib/transferencias/criterioDeCuenta";
 
 /** El mismo formato de importe que el resto del módulo. */
 export function money(n) {
@@ -81,6 +82,7 @@ export function useCuentaDeLocal({ destino = null } = {}) {
   const ctx = useMemo(() => parseContextoDelTablero(params), [params]);
   const unidad = ctx.unidad;
   const desplazamiento = ctx.desp;
+  const criterio = ctx.criterio;
 
   const escribirUrl = useCallback(
     (siguiente) => {
@@ -119,6 +121,10 @@ export function useCuentaDeLocal({ destino = null } = {}) {
       }
       url.searchParams.set("unidad", unidad === CLAVE_OTRO ? UNIDADES.SEMANA : unidad);
       url.searchParams.set("desplazamiento", String(desplazamiento));
+      // El criterio viaja solo cuando no es el de siempre: es el que abre el
+      // "Ver" del Pago a depósito de Finanzas, y le pide a la ruta la cuenta
+      // por recepción para que el número coincida con el de allá.
+      if (criterio !== CRITERIO_POR_DEFECTO) url.searchParams.set("criterio", criterio);
       const res = await fetch(url.toString(), { cache: "no-store" });
       const j = await res.json();
       if (!res.ok || !j.ok) throw new Error(j?.error || "No se pudo cargar la cuenta del local.");
@@ -129,7 +135,7 @@ export function useCuentaDeLocal({ destino = null } = {}) {
     } finally {
       setCargando(false);
     }
-  }, [destino, unidad, desplazamiento]);
+  }, [destino, unidad, desplazamiento, criterio]);
 
   useEffect(() => {
     cargar();
@@ -165,6 +171,8 @@ export function useCuentaDeLocal({ destino = null } = {}) {
     // El contexto, para que la pantalla pueda armar la URL del detalle con él.
     // Lleva el `destino` adentro: es el local cuya cuenta se está mirando, y es
     // lo que decide a dónde vuelve el botón.
-    contexto: { unidad, desp: desplazamiento, local: destino ? Number(destino) : null },
+    // Y el criterio, para que entrar a una transferencia y volver no pierda la
+    // cuenta por recepción que abrió el "Ver" de Finanzas.
+    contexto: { unidad, desp: desplazamiento, local: destino ? Number(destino) : null, criterio },
   };
 }

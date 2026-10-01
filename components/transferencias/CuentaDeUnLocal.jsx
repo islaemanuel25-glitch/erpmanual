@@ -43,6 +43,7 @@ import ChipsDePeriodo, { CLAVE_OTRO } from "./ChipsDePeriodo";
 import CuentaDelPeriodoCerrado from "./CuentaDelPeriodoCerrado";
 import DiaDeTransferencias from "./DiaDeTransferencias";
 import NavegadorDePeriodo from "./NavegadorDePeriodo";
+import { CRITERIO_CUENTA, fechaDeRecepcion } from "@/lib/transferencias/criterioDeCuenta";
 import { diasDeTransferencias } from "@/lib/transferencias/diasDeTransferencias";
 import { UNIDADES } from "@/lib/transferencias/periodoDePago";
 
@@ -139,7 +140,12 @@ export default function CuentaDeUnLocal({
                   Ninguna transferencia de este período tiene ese número.
                 </div>
               )
-            : diasDeTransferencias(visibles).map((dia) => (
+            : // En la cuenta por recepción los días son los de la confirmación:
+              // es la fecha con la que cada una cae en el período.
+              diasDeTransferencias(
+                visibles,
+                periodo?.criterio === CRITERIO_CUENTA.RECEPCION ? { fechaDe: fechaDeRecepcion } : undefined
+              ).map((dia) => (
                 <DiaDeTransferencias
                   key={dia.clave}
                   dia={dia}
