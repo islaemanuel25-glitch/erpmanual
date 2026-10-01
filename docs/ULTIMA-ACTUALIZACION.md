@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-01 14:40
+**Fecha:** 2026-10-01 18:31
 
 ## Módulos modificados recientemente
 
 ### transferencias
-- feat(finanzas): Pago a depósito en el Resumen, consumido de Transferencias
+- fix(finanzas): la nota de pendientes dice que es el estado de hoy, feat(finanzas): Pago a depósito en el Resumen, consumido de Transferencias
 - Archivos: 1 nuevos, 4 modificados (5 total)
 
 ### stock
