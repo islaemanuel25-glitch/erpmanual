@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-01 18:31
+**Última actualización:** 2026-10-01 21:03
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-01: feat(finanzas): "Ver pendientes" abre en Transferencias el conjunto exacto de pendientes
 - 2026-10-01: fix(finanzas): la nota de pendientes dice que es el estado de hoy
 - 2026-10-01: feat(finanzas): Pago a depósito en el Resumen, consumido de Transferencias
 - 2026-09-30: feat(finanzas): Stock Diario pasa a llamarse Valor del Stock y muestra la plata primero

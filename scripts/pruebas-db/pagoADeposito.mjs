@@ -214,10 +214,17 @@ try {
   };
 
   const esperado = {
-    esta: { total: vale(2, 3), cantidad: 2, ids: [T.cruzada, T.conFaltante], pendientes: { total: vale(4, 2), cantidad: 2 } },
+    // Pendientes de ésta: las dos que ya salieron y hoy no se confirmaron
+    // —`enviada` (salió en ésta) y `recibiendo` (salió antes y sigue abierta)—.
+    esta: {
+      total: vale(2, 3),
+      cantidad: 2,
+      ids: [T.cruzada, T.conFaltante],
+      pendientes: { total: vale(4, 2), cantidad: 2, ids: [T.enviada, T.recibiendo] },
+    },
     // La anterior: solo `anterior`. Pendiente, la que ya había salido entonces y
     // sigue sin confirmar (`recibiendo`); `enviada` salió en ésta.
-    anterior: { total: vale(4), cantidad: 1, ids: [T.anterior], pendientes: { total: vale(2), cantidad: 1 } },
+    anterior: { total: vale(4), cantidad: 1, ids: [T.anterior], pendientes: { total: vale(2), cantidad: 1, ids: [T.recibiendo] } },
   };
 
   console.log("\n── 1–3. Finanzas, el local A, esta semana y la anterior");
@@ -279,6 +286,14 @@ try {
       r.periodo?.pendientes?.importe === e.pendientes.total && r.periodo?.pendientes?.cantidad === e.pendientes.cantidad,
       json(r.periodo?.pendientes)
     );
+    // El conjunto EXACTO de pendientes que abre "Ver pendientes": las filas que
+    // manda el tablero son las mismas que Finanzas contó, de la misma cuenta.
+    const idsPend = (r.periodo?.pendientes?.transferencias || []).map((t) => t.id).sort((a, b) => a - b);
+    ok(
+      `${nombre}: el tablero lista EXACTAMENTE las pendientes contadas`,
+      json(idsPend) === json([...e.pendientes.ids].sort((a, b) => a - b)),
+      json(idsPend)
+    );
     const desdeDeposito = await transferencias({ destino: String(L.A.id), desplazamiento, criterio: "RECEPCION" }, S.deposito);
     ok(`${nombre}: el depósito abriendo A ve el mismo total`, desdeDeposito.periodo?.aPagar === e.total, json({ s: desdeDeposito.status, aPagar: desdeDeposito.periodo?.aPagar }));
   }
@@ -320,12 +335,22 @@ try {
       r.pagoADeposito?.verDetalle === "/modulos/transferencias/cuenta?desp=0&criterio=RECEPCION",
       r.pagoADeposito?.verDetalle
     );
+    ok(
+      "con transferencias.ver y pendientes: el Ver pendientes lleva a la misma cuenta con vista=pendientes",
+      r.pagoADeposito?.pendientes?.verPendientes === "/modulos/transferencias/cuenta?desp=0&criterio=RECEPCION&vista=pendientes",
+      r.pagoADeposito?.pendientes?.verPendientes
+    );
 
     const sinVer = await pagoDeposito({ desplazamiento: "0" }, S.localSinVer);
     ok(
       "sin transferencias.ver: importe sí, Ver no",
       sinVer.pagoADeposito?.total === esperado.esta.total && sinVer.pagoADeposito?.verDetalle === null && sinVer.puedeVerTransferencias === false,
       json(sinVer.pagoADeposito)
+    );
+    ok(
+      "sin transferencias.ver: tampoco el enlace de pendientes",
+      sinVer.pagoADeposito?.pendientes?.verPendientes === null,
+      json(sinVer.pagoADeposito?.pendientes)
     );
 
     const lista = await pagoDeposito({ entrada: "1" }, S.deposito);

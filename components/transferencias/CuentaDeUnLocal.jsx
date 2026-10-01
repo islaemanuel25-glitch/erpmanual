@@ -39,13 +39,22 @@ import { useState } from "react";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
+import ResumenConImporte from "@/components/periodo/ResumenConImporte";
+
 import ChipsDePeriodo, { CLAVE_OTRO } from "./ChipsDePeriodo";
 import CuentaDelPeriodoCerrado from "./CuentaDelPeriodoCerrado";
 import DiaDeTransferencias from "./DiaDeTransferencias";
 import NavegadorDePeriodo from "./NavegadorDePeriodo";
-import { CRITERIO_CUENTA, fechaDeRecepcion } from "@/lib/transferencias/criterioDeCuenta";
+import {
+  CRITERIO_CUENTA,
+  fechaDeRecepcion,
+  NOTA_PENDIENTES,
+  ROTULO_PENDIENTE_DE_RECEPCION,
+  rotuloDeTransferencias,
+} from "@/lib/transferencias/criterioDeCuenta";
 import { diasDeTransferencias } from "@/lib/transferencias/diasDeTransferencias";
 import { UNIDADES } from "@/lib/transferencias/periodoDePago";
+import { VISTA_PENDIENTES } from "@/lib/transferencias/contextoDelTablero";
 
 export default function CuentaDeUnLocal({
   datos,
@@ -59,11 +68,21 @@ export default function CuentaDeUnLocal({
   onConfigurarCorte,
   money,
   onAbrirTransferencia,
+  // "pendientes" lista SOLO las que salieron hasta el cierre y hoy siguen sin
+  // confirmar —lo que abre el "Ver pendientes" de Finanzas—; "cuenta" (default)
+  // es la lista de siempre. Las dos salen de la misma cuenta por recepción.
+  vista = "cuenta",
 }) {
   const [numero, setNumero] = useState("");
 
   const periodo = datos?.periodo;
-  const delPeriodo = periodo?.transferencias || [];
+  // El bloque de pendientes solo existe en la cuenta por recepción; en la de
+  // envío `vista=pendientes` no tiene qué mostrar y cae a la lista de siempre.
+  const esPendientes =
+    vista === VISTA_PENDIENTES && periodo?.criterio === CRITERIO_CUENTA.RECEPCION;
+  const delPeriodo = esPendientes
+    ? periodo?.pendientes?.transferencias || []
+    : periodo?.transferencias || [];
 
   // Filtra sobre lo que YA se trajo, sin volver a consultar: el período completo
   // está en memoria y una transferencia de otro período no se encontraría igual.
@@ -110,15 +129,34 @@ export default function CuentaDeUnLocal({
 
       {!cargando && !error && periodo && (
         <>
-          <CuentaDelPeriodoCerrado
-            periodo={periodo}
-            money={money}
-            // El atajo al corte SOLO con el chip en Semana: es donde la pregunta
-            // surge, porque el rango de una semana depende del corte y el del
-            // mes no. Y solo a quien puede usarlo.
-            puedeConfigurarCorte={puedeConfigurarCorte && unidad === UNIDADES.SEMANA}
-            onConfigurarCorte={onConfigurarCorte}
-          />
+          {esPendientes ? (
+            // La vista de solo pendientes: el mismo número informativo que ya
+            // mostraba la cuenta, ahora como encabezado de su propia lista. No
+            // es plata que salió —se informa y no se descuenta—, así que no
+            // lleva el peso del "Para cobrar".
+            <ResumenConImporte
+              rotulo={ROTULO_PENDIENTE_DE_RECEPCION}
+              importe={money ? money(periodo?.pendientes?.importe) : periodo?.pendientes?.importe}
+              subtitulo={
+                Number(periodo?.pendientes?.cantidad || 0) > 0
+                  ? `${rotuloDeTransferencias(periodo?.pendientes?.cantidad)}${
+                      periodo?.descripcion?.titulo ? ` · ${periodo.descripcion.titulo}` : ""
+                    }`
+                  : periodo?.descripcion?.titulo || ""
+              }
+              nota={Number(periodo?.pendientes?.cantidad || 0) > 0 ? NOTA_PENDIENTES : null}
+            />
+          ) : (
+            <CuentaDelPeriodoCerrado
+              periodo={periodo}
+              money={money}
+              // El atajo al corte SOLO con el chip en Semana: es donde la pregunta
+              // surge, porque el rango de una semana depende del corte y el del
+              // mes no. Y solo a quien puede usarlo.
+              puedeConfigurarCorte={puedeConfigurarCorte && unidad === UNIDADES.SEMANA}
+              onConfigurarCorte={onConfigurarCorte}
+            />
+          )}
 
           {/* El buscador no se dibuja si no hay filas: un campo para buscar en
               una lista vacía no puede encontrar nada, y el vacío ya lo dice la
@@ -135,16 +173,25 @@ export default function CuentaDeUnLocal({
           )}
 
           {visibles.length === 0
-            ? buscado && (
+            ? buscado
+              ? (
                 <div className="text-center py-12 sunmi-text-muted text-xs">
                   Ninguna transferencia de este período tiene ese número.
                 </div>
               )
-            : // En la cuenta por recepción los días son los de la confirmación:
-              // es la fecha con la que cada una cae en el período.
+              : esPendientes && (
+                <div className="text-center py-12 sunmi-text-muted text-xs">
+                  No hay transferencias sin confirmar en este período.
+                </div>
+              )
+            : // En la cuenta por recepción los días son los de la confirmación.
+              // Las pendientes no se confirmaron: se agrupan por el día en que
+              // SALIERON —la fecha de envío, el default de `diasDeTransferencias`—.
               diasDeTransferencias(
                 visibles,
-                periodo?.criterio === CRITERIO_CUENTA.RECEPCION ? { fechaDe: fechaDeRecepcion } : undefined
+                !esPendientes && periodo?.criterio === CRITERIO_CUENTA.RECEPCION
+                  ? { fechaDe: fechaDeRecepcion }
+                  : undefined
               ).map((dia) => (
                 <DiaDeTransferencias
                   key={dia.clave}

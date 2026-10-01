@@ -83,6 +83,10 @@ export function useCuentaDeLocal({ destino = null } = {}) {
   const unidad = ctx.unidad;
   const desplazamiento = ctx.desp;
   const criterio = ctx.criterio;
+  // Qué lista mostrar —la de siempre o solo las pendientes—. No viaja a la API:
+  // el tablero por recepción ya devuelve las dos listas, así que la vista solo
+  // elige cuál se dibuja. No se incluye en `cargar` por eso.
+  const vista = ctx.vista;
 
   const escribirUrl = useCallback(
     (siguiente) => {
@@ -164,6 +168,7 @@ export function useCuentaDeLocal({ destino = null } = {}) {
     cargando,
     error,
     unidad,
+    vista,
     onCambiarUnidad,
     onAtras,
     onAdelante,
@@ -173,6 +178,6 @@ export function useCuentaDeLocal({ destino = null } = {}) {
     // lo que decide a dónde vuelve el botón.
     // Y el criterio, para que entrar a una transferencia y volver no pierda la
     // cuenta por recepción que abrió el "Ver" de Finanzas.
-    contexto: { unidad, desp: desplazamiento, local: destino ? Number(destino) : null, criterio },
+    contexto: { unidad, desp: desplazamiento, local: destino ? Number(destino) : null, criterio, vista },
   };
 }

@@ -33,6 +33,14 @@ import {
 } from "@/lib/transferencias/cuentaDelPeriodoServer";
 import { importeDeLaTransferenciaCentavos } from "@/lib/transferencias/bloquesPorLocal";
 import { desdeCentavos } from "@/lib/transferencias/agregadosPeriodo";
+import { parseContextoFinanzas } from "@/lib/finanzas/contextoFinanzas";
+import { UNIDAD_FINANCIERA_POR_DEFECTO } from "@/lib/finanzas/periodoFinanciero";
+import { VISTA_PENDIENTES } from "@/lib/transferencias/contextoDelTablero";
+import {
+  armarPagoADeposito,
+  enlaceDePagoADeposito,
+  enlacePendientesDePagoADeposito,
+} from "@/lib/finanzas/pagoADeposito";
 
 const RAIZ = path.resolve(import.meta.dirname, "../../..");
 /** El fuente sin comentarios: un candado que busca texto no afirma sobre prosa. */
@@ -261,4 +269,102 @@ test("S12 · el Ver por transferencia abre la transferencia real, con el períod
   const desdeDeposito = urlDelDetalle(123, { unidad: UNIDADES.MES, desp: -1, local: 4, criterio: CRITERIO_CUENTA.RECEPCION });
   assert.match(desdeDeposito, /local=4/);
   assert.match(desdeDeposito, /criterio=RECEPCION/);
+});
+
+// ── 6 · EL PERÍODO INICIAL: DÍA (2026-10-01) ───────────────────────────────
+
+test("S13 · Pago a depósito abre en DÍA, y SEMANA/MES siguen andando cuando se piden", () => {
+  // El default lo da la MISMA función que usa el hook de la pantalla. No es
+  // propio de Pago a depósito: es el de todas las pantallas de Finanzas.
+  assert.equal(UNIDAD_FINANCIERA_POR_DEFECTO, "DIA");
+  assert.equal(parseContextoFinanzas({}).unidad, "DIA", "abre en Semana en vez de Día");
+  assert.equal(parseContextoFinanzas(new URLSearchParams("")).unidad, "DIA");
+  // Elegir otra unidad sigue valiendo: no se fuerza Día sobre lo pedido.
+  assert.equal(parseContextoFinanzas({ unidad: "SEMANA" }).unidad, "SEMANA");
+  assert.equal(parseContextoFinanzas({ unidad: "MES" }).unidad, "MES");
+});
+
+test("S14 · el desplazamiento se conserva, sea cual sea la unidad", () => {
+  for (const unidad of ["DIA", "SEMANA", "MES"]) {
+    assert.equal(parseContextoFinanzas({ unidad, desp: -3 }).desp, -3, unidad);
+  }
+  // Y una unidad basura cae en el default sin pisar el desplazamiento.
+  assert.deepEqual(parseContextoFinanzas({ unidad: "QUINCENA", desp: -2 }), { unidad: "DIA", desp: -2 });
+});
+
+// ── 7 · "VER PENDIENTES" ───────────────────────────────────────────────────
+
+test("S15 · «Ver pendientes» lleva al tablero real con el local, el período y SOLO las pendientes", () => {
+  // Desde el depósito mirando el local 4: el local viaja en la ruta.
+  const url = enlacePendientesDePagoADeposito({
+    puedeVerTransferencias: true,
+    unidad: UNIDADES.MES,
+    desplazamiento: -2,
+    localDelEnlace: 4,
+  });
+  assert.match(url, /^\/modulos\/transferencias\/local\/4\?/, url);
+  assert.match(url, /criterio=RECEPCION/);
+  assert.match(url, /vista=pendientes/);
+  assert.match(url, /unidad=MES/);
+  assert.match(url, /desp=-2/);
+  // Es el MISMO destino que "Ver transferencias", con la vista puesta en
+  // pendientes: ni otro local, ni otro período, ni otro criterio.
+  const verCuenta = enlaceDePagoADeposito({
+    puedeVerTransferencias: true,
+    unidad: UNIDADES.MES,
+    desplazamiento: -2,
+    localDelEnlace: 4,
+  });
+  assert.equal(url, `${verCuenta}${verCuenta.includes("?") ? "&" : "?"}vista=${VISTA_PENDIENTES}`);
+});
+
+test("S16 · sin transferencias.ver no hay enlace de pendientes; con permiso, sí", () => {
+  assert.equal(
+    enlacePendientesDePagoADeposito({ puedeVerTransferencias: false, unidad: UNIDADES.DIA, desplazamiento: 0, localDelEnlace: null }),
+    null,
+    "sin permiso no se ofrece la puerta"
+  );
+  assert.ok(
+    enlacePendientesDePagoADeposito({ puedeVerTransferencias: true, unidad: UNIDADES.DIA, desplazamiento: 0, localDelEnlace: null })
+  );
+});
+
+test("S17 · el contrato solo trae «Ver pendientes» cuando hay pendientes", () => {
+  const conPend = armarPagoADeposito({
+    esDeposito: false,
+    cuenta: { total: 100, cantidadTransferencias: 1, pendientes: { total: 50, cantidadTransferencias: 2 } },
+    verPendientes: "/p",
+  });
+  assert.equal(conPend.pendientes.verPendientes, "/p");
+  const sinPend = armarPagoADeposito({
+    esDeposito: false,
+    cuenta: { total: 100, cantidadTransferencias: 1, pendientes: { total: 0, cantidadTransferencias: 0 } },
+    verPendientes: "/p",
+  });
+  assert.equal(sinPend.pendientes.verPendientes, null, "un enlace a cero pendientes no lleva a ningún lado");
+  // Y las pendientes siguen SIN sumar al total reconocido.
+  assert.equal(conPend.total, 100);
+});
+
+test("S18 · la pantalla dibuja «Ver pendientes» gated por el enlace, sin recalcular", () => {
+  const src = codigo(CUENTA);
+  // El enlace sale del contrato —no se arma en el componente— y se dibuja solo
+  // cuando hay pendientes y viene el enlace.
+  assert.match(src, /p\.verPendientes/);
+  assert.match(src, /EnlaceAlModulo href=\{p\.verPendientes\}/);
+  assert.match(src, /hay && p\.verPendientes/);
+  // Sigue sin listar las pendientes de a una ni valorizar.
+  assert.doesNotMatch(src, /importeDeLaTransferencia|valorizar/);
+});
+
+test("S19 · la cuenta de Transferencias lista las pendientes solo en la vista pendientes", () => {
+  const src = codigo("components/transferencias/CuentaDeUnLocal.jsx");
+  // La vista elige la fuente: las pendientes ya vienen de la cuenta, no se
+  // recalculan; la de siempre no las mira.
+  assert.match(src, /VISTA_PENDIENTES/);
+  assert.match(src, /pendientes\?\.transferencias/);
+  // El endpoint del tablero manda las filas pendientes resumidas, de la MISMA
+  // cuenta, sin otra consulta.
+  const apiSrc = codigo("app/api/transferencias/tablero/route.js");
+  assert.match(apiSrc, /pendientes\.transferencias\.map\(resumir\)/);
 });

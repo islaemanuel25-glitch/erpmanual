@@ -449,9 +449,13 @@ export async function GET(req) {
           conDiferencias: transferencias.filter((t) => t.lineasConDiferencia > 0).length,
           aPagar: cuenta.aPagar,
           // Lo que todavía no se confirmó. Se informa y NO está en `aPagar`.
+          // Las filas viajan resumidas igual que las reconocidas —de la MISMA
+          // cuenta y sin otra consulta— para que la vista "solo pendientes" las
+          // pueda listar; la cuenta de siempre no las mira.
           pendientes: {
             cantidad: cuenta.pendientes.cantidad,
             importe: cuenta.pendientes.importe,
+            transferencias: cuenta.pendientes.transferencias.map(resumir),
           },
           totalCerrado: true,
           descripcion: descripcionDelPeriodo({

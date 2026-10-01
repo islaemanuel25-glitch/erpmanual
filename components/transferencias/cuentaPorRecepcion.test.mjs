@@ -123,7 +123,12 @@ test("R5 · la ruta manda lo que esta pantalla lee en el criterio de recepción"
   for (const campo of ["criterio", "pendientes", "fechaRecepcion", "aPagar", "cantidad", "sinRecibir", "descripcion"]) {
     assert.ok(new RegExp(`\\b${campo}\\b`).test(ruta), `la ruta no manda '${campo}'`);
   }
-  // Y la pantalla agrupa por recepción solo en ese criterio.
-  const pantalla = readFileSync("components/transferencias/CuentaDeUnLocal.jsx", "utf8").replace(/\/\/[^\n]*/g, "");
-  assert.match(pantalla, /periodo\?\.criterio === CRITERIO_CUENTA\.RECEPCION \? \{ fechaDe: fechaDeRecepcion \} : undefined/);
+  // Y la pantalla agrupa las RECONOCIDAS por recepción solo en ese criterio. Las
+  // pendientes no se confirmaron, así que se agrupan por envío —el default— y por
+  // eso la condición pide además que NO sea la vista de pendientes.
+  const pantalla = readFileSync("components/transferencias/CuentaDeUnLocal.jsx", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/\/\/[^\n]*/g, " ");
+  assert.match(pantalla, /!esPendientes && periodo\?\.criterio === CRITERIO_CUENTA\.RECEPCION/);
+  assert.match(pantalla, /\{ fechaDe: fechaDeRecepcion \}/);
 });
