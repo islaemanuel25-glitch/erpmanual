@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-09-30 22:21
+**Última actualización:** 2026-10-01 01:25
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -389,6 +389,38 @@ operación). *(verificado en código y en PostgreSQL, 2026-09-30)*:
   consulta con todos los movimientos de las partes que toca la página, y —solo
   en OTROS— la de orígenes presentes.
 
+**Desde el 2026-10-01 la pantalla ya no usa ese detalle** *(verificado en
+código)*. La ruta sigue existiendo para auditar, pero Valor del Stock explica el
+capital y no copia los módulos: el detalle de cada operación es de su módulo.
+
+- Arriba de las categorías dice que todo es **a costo** —"No son precios de
+  venta"— y que cada operación cuenta el día en que cambió el stock de la
+  ubicación, así que puede no coincidir con los reportes de cada módulo.
+- **Transferencias** se abre y muestra UNA fila por transferencia, con su
+  impacto a costo en la ubicación mirada, de dónde vino o hacia dónde fue, y
+  cuándo se envió y se recibió o canceló. Sale de
+  `/api/stock_locales/diario/transferencias` (`transferenciasDelValor`): los
+  movimientos del libro que entraron en la valorización, agrupados por su
+  documento (`agruparPorDocumento`), con el mismo efecto por movimiento que el
+  detalle (`efectosDeLasPartes`). Por eso una transferencia enviada el 29 y
+  recibida el 30 está el 30 en el destino, el signo es el del cambio físico de
+  la ubicación —un envío resta, una diferencia devuelta suma— y la suma de las
+  filas es la categoría al centavo (`cuadra`). Cuesta las 13 consultas del
+  resumen, los movimientos de la categoría y las cabeceras de todas sus
+  transferencias en una consulta. Cada fila lleva "Ir a transferencia" al
+  detalle real (`/modulos/transferencias/[id]`) solo si el usuario tiene
+  `transferencias.ver`.
+- **Ventas** lleva al reporte de ventas con la ubicación y los días valorizados
+  (`reportes.ver`); **Compras**, al historial de pedidos (`compras.ver`), que no
+  recibe período. El importe es costo de la mercadería, no lo facturado ni lo
+  pagado. **Ajustes, altas y bajas y otros** no tienen una pantalla que liste sus
+  operaciones: quedan como resumen.
+- **SIN_ORIGEN** se muestra como "Movimientos anteriores a la trazabilidad": el
+  stock cambió antes de que el ERP registrara el origen. En el libro sigue
+  siendo SIN_ORIGEN y la categoría de la API sigue siendo `SIN_CLASIFICAR`; no se
+  reclasifica. No lleva fecha de inicio: no hay en la base una fuente que diga
+  desde cuándo se registra el origen.
+
 **No es plata que entró o salió:** una compra recibida aumenta el capital en
 mercadería aunque no esté pagada. La conciliación con pagos, gastos, cobros y
 caja es otra etapa [pendiente].
@@ -448,6 +480,7 @@ la API del Stock Diario y no se tocó; hay que confirmarlo ejerciéndolo antes d
 corregirlo.
 
 ## Cambios recientes
+- 2026-10-01: feat(finanzas): "¿Por qué cambió?" explica el capital y deriva a cada módulo
 - 2026-09-30: feat(finanzas): Valor del Stock — "¿Por qué cambió?", el movimiento físico por origen real
 - 2026-09-30: feat(finanzas): Valor del Stock — nacidos en el día, reexpresión por escala y ubicación del admin
 - 2026-09-30: fix(stock): "1 bulto" y no "1 bultos", con una sola regla para Stock Locales y el Valor del Stock

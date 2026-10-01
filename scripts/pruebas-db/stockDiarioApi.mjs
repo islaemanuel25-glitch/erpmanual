@@ -175,6 +175,7 @@ try {
     productos: (await import("../../app/api/stock_locales/diario/productos/route.js")).GET,
     producto: (await import("../../app/api/stock_locales/diario/producto/route.js")).GET,
     movimientos: (await import("../../app/api/stock_locales/diario/movimientos/route.js")).GET,
+    transferencias: (await import("../../app/api/stock_locales/diario/transferencias/route.js")).GET,
   };
 
   // Hoy según PostgreSQL, y el guion hacia atrás.
@@ -269,7 +270,7 @@ try {
     return { status: r.status, ...(await r.json().catch(() => ({}))) };
   };
   const como = (s) => `erpazul_sesion=${s}`;
-  const RUTAS = ["resumen", "productos", "producto", "movimientos"];
+  const RUTAS = ["resumen", "productos", "producto", "movimientos", "transferencias"];
   // `producto` exige la cadena: se le pasa una de A en todas las llamadas de alcance.
   const conCadena = (ruta, params) => (ruta === "producto" ? { productoLocalId: P.uno.pl, ...params } : params);
 
