@@ -49,6 +49,7 @@ import {
   PERMISO_VER_TRANSFERENCIAS,
   armarPagoADeposito,
   enlaceDePagoADeposito,
+  enlacePendientesDePagoADeposito,
 } from "@/lib/finanzas/pagoADeposito";
 
 export async function GET(req) {
@@ -156,6 +157,14 @@ export async function GET(req) {
       // y criterio. Desde el depósito, la de ese local; desde el local, la
       // propia. Solo con `transferencias.ver`.
       verDetalle: enlaceDePagoADeposito({
+        puedeVerTransferencias,
+        unidad,
+        desplazamiento,
+        localDelEnlace: esDeposito ? localId : null,
+      }),
+      // El "Ver pendientes": el mismo local y período, con la vista en solo las
+      // pendientes. `armarPagoADeposito` lo deja en `null` si no hay ninguna.
+      verPendientes: enlacePendientesDePagoADeposito({
         puedeVerTransferencias,
         unidad,
         desplazamiento,

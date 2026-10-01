@@ -63,6 +63,15 @@ function Pendiente({ pendientes }) {
       <div className="text-xs2 sunmi-text-muted">
         {hay ? `${rotuloDeTransferencias(p.cantidadTransferencias)} · ${NOTA_PENDIENTES}` : "Ninguna sin confirmar."}
       </div>
+      {/* El enlace al detalle operativo de esas mismas pendientes en
+          Transferencias. Solo si hay pendientes Y el usuario puede verlas: el
+          endpoint ya pone `verPendientes` en `null` cuando falta alguna de las
+          dos condiciones, así que acá alcanza con preguntar por el enlace. */}
+      {hay && p.verPendientes && (
+        <div className="pt-0.5">
+          <EnlaceAlModulo href={p.verPendientes} texto="Ver pendientes" />
+        </div>
+      )}
     </section>
   );
 }
