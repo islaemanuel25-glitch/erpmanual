@@ -34,7 +34,7 @@ import { crearClientePrisma, ESCRITURA } from "../lib/clientePrisma.mjs";
 const jwt = (await import("jsonwebtoken")).default;
 const { MIGRACION_LIBRO, aplicarMigraciones, aplicarLibroEnAdelante, AR, uno, guion } = await import("./lib/libroEnElTiempo.mjs");
 const { PUNTO_CERO_PRODUCCION } = await import("../../lib/stock/libro/stockDiario.js");
-const { valorDelPeriodo, activacionDelLibroDeCostos, movimientosDeCategoria } = await import("../../lib/stock/libro/valorDelStockServer.js");
+const { valorDelPeriodo, activacionDelLibroDeCostos, movimientosDeCategoria, transferenciasDelValor } = await import("../../lib/stock/libro/valorDelStockServer.js");
 const { ESTADO_VALOR, MOTIVO_COSTO_FALTANTE } = await import("../../lib/stock/libro/valorDelStock.js");
 const { declararOrigenDeStock, ORIGEN_STOCK } = await import("../../lib/stock/libro/libroStock.js");
 const { movimientoDeCategoriaApi } = await import("../../lib/stock/libro/stockDiarioApi.js");
@@ -287,6 +287,22 @@ try {
     );
     const detVentas = await movimientosDeCategoria(c, { localId: L.L, desde: "2026-09-30", hasta: "2026-09-30", categoria: "VENTAS", esDeposito: false, hoy: HOY, page: 1, pageSize: 50 });
     ok("J. el detalle de Ventas del local: la venta #1, −3 u a $50", detVentas.movimientos.total === 1 && detVentas.movimientos.items[0].origenRef === "1" && pesos(detVentas.movimientos.items[0].efecto) === -150, json(detVentas.movimientos));
+
+    // #118 · Transferencias por transferencia: la del 30/09, que el depósito ENVIÓ.
+    const tdv = await transferenciasDelValor(c, { localId: L.D, desde: "2026-09-30", hasta: "2026-10-02", esDeposito: true, hoy: HOY });
+    const [t0] = tdv.transferencias;
+    ok(
+      "J. POR TRANSFERENCIA: una fila, la #enviada, −$1.200, y la suma ES la categoría del resumen",
+      tdv.transferencias.length === 1 && t0.id === transferencias[0].id && t0.existe && t0.neto === cat.TRANSFERENCIAS.neto && tdv.totalDeLaCategoria === cat.TRANSFERENCIAS.neto && tdv.cuadra,
+      json(tdv.transferencias)
+    );
+    ok(
+      "J. y la cabecera con el reloj del libro: enviada el 30/09, sin recibir, hacia el local, solo el envío",
+      t0.diaEnvio === "2026-09-30" && t0.diaRecepcion === null && t0.destino?.id === L.L && t0.origen?.id === L.D && json(t0.origenes) === json(["TRANSFERENCIA_ENVIO"]),
+      json(t0)
+    );
+    const tdvHoy = await transferenciasDelValor(c, { localId: L.D, desde: HOY, hasta: HOY, esDeposito: true, hoy: HOY });
+    ok("J. la recepción que solo libera el tránsito no es una fila: hoy no hay transferencias con impacto", tdvHoy.transferencias.length === 0 && tdvHoy.totalDeLaCategoria === 0 && tdvHoy.cuadra, json(tdvHoy));
 
     // La escala de SU momento: el −24 u del 30/09 se leía x12; el factor pasó a
     // 24 el 01/10. Por el camino real: servidor → API → renglón de la pantalla.
