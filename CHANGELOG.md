@@ -1,10 +1,12 @@
 # Changelog
 
-## [2026-10-01] - Actualización: stock
+## [2026-10-01] - Actualización: stock, finanzas
 
 ### Modificado
 - **stock**: feat(finanzas): "¿Por qué cambió?" explica el capital y deriva a cada módulo
 - **stock**: feat(finanzas): Valor del Stock como tablero móvil, sin lista de productos
+- **finanzas**: feat(finanzas): el resumen del período suma gastos, pagos, deudas al cierre, cobros de cuenta corriente, comisiones y resultado
+- **finanzas**: docs(caja): RN-40 sin default de 7 % — la comisión sin configurar es null y marca comisionPendiente
 
 
 ## [2026-09-30] - Actualización: pos-ventas, productos, stock, transferencias
