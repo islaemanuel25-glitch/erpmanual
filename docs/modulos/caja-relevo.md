@@ -41,12 +41,31 @@ Un turno en preparación de cierre **no vende, no admite Caja +/−, no admite
 retiros y no se puede cerrar por el flujo clásico**. Tampoco figura como caja
 abierta en listados ni en auditoría.
 
-### El índice que lo hace posible
+### Los índices que lo hacen posible
 
-`Turno_local_vendedor_abierto_key` es un índice parcial de Postgres que impide
-dos turnos operativos del mismo usuario en el mismo local. Su condición incluye
-`cierreEnPreparacionEn IS NULL`: sin eso, la base rechazaría la apertura del
-relevo, porque un turno cortado sigue con `cierre IS NULL`.
+**La cuenta ERP autentica el acceso. El operador identifica al responsable de
+la caja física.** Desde la migración `20261002120000_caja_por_operador`
+(DEC-0012) hay dos índices parciales únicos en lugar de uno:
+
+- `Turno_local_operador_abierto_key` — una caja operativa por **operador** y
+  local, con la cuenta que sea. Dos operadores con la misma cuenta del local
+  tienen una cada uno; el mismo operador no puede tener dos.
+- `Turno_local_cuenta_sin_operador_abierto_key` — para los turnos **sin
+  operador** (locales sin operario, Admin o Dueño sin PIN, turnos históricos):
+  una caja operativa por cuenta y local, como siempre.
+
+Reemplazan a `Turno_local_vendedor_abierto_key`, que era por cuenta y local y
+obligaba a dos operadores de la misma cuenta a compartir un cajón. Los dos
+nuevos conservan la condición `cierreEnPreparacionEn IS NULL`: sin eso, la base
+rechazaría la apertura del relevo, porque un turno cortado sigue con
+`cierre IS NULL`.
+
+La regla en código es una sola, en `lib/caja/cierreRelevo.js`:
+`whereCajaPropia` y `esCajaPropia` (de quién es una caja) y
+`whereCajaAccesible` y `puedeActuarSobreCaja` (quién puede operarla: su
+responsable, o Admin y el Dueño en su local, con su autoría). La identidad se
+arma en `lib/caja/identidadCajaServer.js` con la sesión y la cookie del PIN
+validada en el local; nunca con un id que mande el cliente.
 
 ---
 
