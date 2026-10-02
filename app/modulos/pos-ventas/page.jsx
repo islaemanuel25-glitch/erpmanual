@@ -13,9 +13,10 @@ import { showError, showSuccess } from "@/components/sunmi/SunmiToast";
 import { posVentaReducer, initialState, ActionTypes } from "./reducer/posVentaReducer";
 import { loadQueue, saveQueue, enqueue, dequeueById, getQueueLength, clearQueue } from "./helpers/offlineQueue";
 import {
-  duenoDelCarrito,
   carritoCobrable,
-  borradorRestaurable,
+  claveBorrador,
+  cargarCarritoDeIdentidad,
+  guardarCarritoDeCaja,
   ERROR_CARRITO_DE_OTRA_CAJA,
 } from "@/lib/pos-ventas/carritoPorCaja";
 import { turnoDeReplay } from "@/lib/pos-ventas/replayOffline";
@@ -98,11 +99,13 @@ export default function PosVentasPage() {
   } = useOperadorContext();
 
   // LA CAJA SIGUE AL OPERADOR. El turno se pide por el operador del PIN, y el
-  // carrito recuerda con qué operador se empezó a armar: un cambio de PIN no
-  // recarga la pantalla, y sin esto B cobraría en SU caja el carrito de A.
-  // Ver lib/pos-ventas/carritoPorCaja.js.
+  // carrito en pantalla es el de UNA identidad de caja (`cajaCarrito`): un
+  // cambio de PIN no recarga la pantalla, y sin esto B cobraría en SU caja el
+  // carrito de A. Es estado y no un ref a propósito: cambia en el MISMO render
+  // que el carrito que se carga, así la persistencia nunca guarda el carrito de
+  // una caja con la clave de otra. Ver lib/pos-ventas/carritoPorCaja.js.
   const operadorActivoId = operadorActivo?.operadorId ?? null;
-  const duenoCarritoRef = useRef(null);
+  const [cajaCarrito, setCajaCarrito] = useState(null);
 
   // Estado del POS con reducer
   const [state, dispatch] = useReducer(posVentaReducer, initialState);
@@ -564,61 +567,59 @@ export default function PosVentasPage() {
   }, [router]);
 
   // ---------------------------------------------------------------------------
-  // Restaurar carrito persistido desde localStorage
+  // El carrito de la identidad de caja activa
   // ---------------------------------------------------------------------------
-  // Solo con el mismo local, la misma cuenta y el MISMO operador: un borrador de
-  // A no aparece en la pantalla de B. Se espera a saber quién es el operador.
+  // Al entrar, al cambiar de PIN o de local, la pantalla carga el borrador de
+  // ESA identidad —local, cuenta y operador— y deja el anterior en su propia
+  // clave. A arma, B entra: B ve el suyo; A vuelve: A encuentra el suyo. Se
+  // espera a saber quién es el operador: antes de eso no se carga ni se guarda
+  // nada (ver la persistencia, abajo).
   useEffect(() => {
     if (!localActual || !me || cargandoOperador) return;
+    const identidad = { localId: localActual, userId: me.id, operadorId: operadorActivoId };
+    let caja;
     try {
-      const raw = localStorage.getItem("posVentasCarritoEnCurso_v1");
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (borradorRestaurable(parsed, { localId: localActual, userId: me.id, operadorId: operadorActivoId })) {
-        duenoCarritoRef.current = duenoDelCarrito(parsed.operadorId);
-        dispatch({ type: ActionTypes.RESTORE_CART, payload: parsed });
-      }
-    } catch (e) {
-      // Si el dato está corrupto, ignorar
+      caja = cargarCarritoDeIdentidad(localStorage, identidad);
+    } catch {
+      // Sin almacenamiento disponible: la identidad igual queda fijada, sin borrador.
+      caja = { clave: claveBorrador(identidad), operadorId: operadorActivoId, borrador: null };
     }
-    // Se restaura UNA vez por pantalla: un cambio de PIN después no trae el
-    // borrador de nadie, solo cambia quién puede cobrar el que está.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localActual, me, cargandoOperador]);
-
-  // El dueño del carrito se fija cuando el carrito deja de estar vacío, con el
-  // operador activo en ese momento, y se suelta cuando se vacía.
-  useEffect(() => {
-    if (state.carrito.length === 0) {
-      duenoCarritoRef.current = null;
-    } else if (duenoCarritoRef.current === null) {
-      duenoCarritoRef.current = duenoDelCarrito(operadorActivoId);
+    if (cajaCarrito?.clave === caja.clave) return;
+    if (caja.borrador) {
+      dispatch({ type: ActionTypes.RESTORE_CART, payload: caja.borrador });
+    } else {
+      dispatch({ type: ActionTypes.CLEAR_CART });
     }
+    setCajaCarrito({ clave: caja.clave, operadorId: caja.operadorId });
+    // `cajaCarrito` no va en las dependencias: lo escribe este mismo efecto.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.carrito.length]);
+  }, [localActual, me, cargandoOperador, operadorActivoId]);
 
   // ---------------------------------------------------------------------------
   // Persistir carrito en localStorage
   // ---------------------------------------------------------------------------
+  // En la clave de SU caja y en ninguna otra. Hasta que `cajaCarrito` existe —la
+  // pantalla todavía no sabe de quién es el carrito— no se escribe nada: era lo
+  // que pisaba el borrador de A con un carrito vacío antes de restaurarlo.
   useEffect(() => {
-    if (!localActual || !me) return;
-    const draft = {
-      localId: localActual,
-      userId: me.id,
-      // El operador DUEÑO del carrito, no el activo: si B hace PIN con el
-      // carrito de A a la vista, el borrador sigue siendo de A.
-      operadorId: duenoCarritoRef.current,
-      carrito: state.carrito,
-      clienteSeleccionado: state.clienteSeleccionado,
-      descuento: state.descuento,
-      descuentoInfo: state.descuentoInfo,
-      formaPago: state.formaPago,
-      puntosCanje: state.puntosCanje,
-      descuentoPorPuntos: state.descuentoPorPuntos,
-    };
-    localStorage.setItem("posVentasCarritoEnCurso_v1", JSON.stringify(draft));
+    if (!localActual || !me || !cajaCarrito) return;
+    try {
+      guardarCarritoDeCaja(localStorage, cajaCarrito, {
+        localId: localActual,
+        userId: me.id,
+        carrito: state.carrito,
+        clienteSeleccionado: state.clienteSeleccionado,
+        descuento: state.descuento,
+        descuentoInfo: state.descuentoInfo,
+        formaPago: state.formaPago,
+        puntosCanje: state.puntosCanje,
+        descuentoPorPuntos: state.descuentoPorPuntos,
+      });
+    } catch {
+      // Sin almacenamiento disponible: el carrito vive solo en memoria.
+    }
   }, [
-    localActual, me,
+    localActual, me, cajaCarrito,
     state.carrito, state.clienteSeleccionado, state.descuento,
     state.formaPago, state.puntosCanje, state.descuentoPorPuntos,
   ]);
@@ -789,8 +790,9 @@ export default function PosVentasPage() {
   // Limpiar carrito
   // ---------------------------------------------------------------------------
   const handleLimpiar = useCallback(() => {
+    // El borrador de esta caja se borra solo: la persistencia quita la clave
+    // cuando el carrito queda vacío. Las de otras cajas no se tocan.
     dispatch({ type: ActionTypes.CLEAR_CART });
-    localStorage.removeItem("posVentasCarritoEnCurso_v1");
     setCreditoInfo(null);
     setUltimoBreakdown(null);
     setPuntosActivo(false);
@@ -1008,9 +1010,10 @@ export default function PosVentasPage() {
       return;
     }
 
-    // El carrito de otro operador no se encola a nombre de éste: la venta
-    // quedaría en la caja de quien la sincroniza, no de quien la armó.
-    if (!carritoCobrable({ carritoVacio: false, duenoOperadorId: duenoCarritoRef.current }, operadorActivoId)) {
+    // El carrito de otra caja no se encola a nombre de ésta. Al cambiar de PIN
+    // la pantalla ya carga el carrito del operador nuevo; esto ataja el
+    // instante intermedio, y el carrito cuya caja todavía no se sabe.
+    if (!cajaCarrito || !carritoCobrable({ carritoVacio: false, duenoOperadorId: cajaCarrito.operadorId }, operadorActivoId)) {
       setErrorMsg(ERROR_CARRITO_DE_OTRA_CAJA);
       showError(ERROR_CARRITO_DE_OTRA_CAJA);
       return;
@@ -1103,16 +1106,15 @@ export default function PosVentasPage() {
     localStorage.setItem("posUltimoTicket_v1", JSON.stringify(ticketOffline));
     setUltimoTicketOffline(ticketOffline);
 
-    // Limpiar carrito
+    // Limpiar carrito (su borrador lo borra la persistencia, en la clave de su caja)
     dispatch({ type: ActionTypes.CLEAR_CART });
-    localStorage.removeItem("posVentasCarritoEnCurso_v1");
     dispatch({ type: ActionTypes.SET_FORMA_PAGO, payload: "efectivo" });
     setDatosPagoEfectivo(null);
     dispatch({ type: ActionTypes.SET_SALDO_PUNTOS, payload: 0 });
 
     showSuccess("Venta guardada offline. Ticket generado.");
     setSuccessMsg(`Venta guardada pendiente. Total en cola: ${nuevaLongitud}`);
-  }, [localActual, grupoId, me, state.carrito, state.descuento, state.descuentoPorPuntos, state.clienteSeleccionado, subtotal, localNombre, operadorActivo, operadorActivoId, operadorVoucherActivo, turnoActual]);
+  }, [localActual, grupoId, me, state.carrito, state.descuento, state.descuentoPorPuntos, state.clienteSeleccionado, subtotal, localNombre, operadorActivo, operadorActivoId, operadorVoucherActivo, turnoActual, cajaCarrito]);
 
   // ---------------------------------------------------------------------------
   // Procesar cola offline
@@ -1568,10 +1570,12 @@ export default function PosVentasPage() {
       return;
     }
 
-    // UN CARRITO NO CRUZA DE CAJA. Si se armó con otro operador —A armó, B
-    // hizo PIN—, cobrarlo acá lo cargaría en la caja de B. No se descarta: si A
-    // vuelve, lo cobra él; si B quiere vender, lo vacía con el botón de siempre.
-    if (!carritoCobrable({ carritoVacio: false, duenoOperadorId: duenoCarritoRef.current }, operadorActivoId)) {
+    // UN CARRITO NO CRUZA DE CAJA. Al cambiar de PIN la pantalla deja el
+    // carrito de A en la clave de A y carga el de B; esto ataja el instante
+    // intermedio —B ya hizo PIN y el carrito en pantalla sigue siendo el de A— y
+    // el carrito cuya caja todavía no se sabe. El de A no se pierde: lo
+    // encuentra A cuando vuelve.
+    if (!cajaCarrito || !carritoCobrable({ carritoVacio: false, duenoOperadorId: cajaCarrito.operadorId }, operadorActivoId)) {
       setErrorMsg(ERROR_CARRITO_DE_OTRA_CAJA);
       showError(ERROR_CARRITO_DE_OTRA_CAJA);
       return;
@@ -1761,9 +1765,8 @@ export default function PosVentasPage() {
           setSuccessMsg("Advertencia: esta venta se registró con stock negativo (carga inicial).");
         }
 
-        // Limpiar carrito
+        // Limpiar carrito (su borrador lo borra la persistencia, en la clave de su caja)
         dispatch({ type: ActionTypes.CLEAR_CART });
-        localStorage.removeItem("posVentasCarritoEnCurso_v1");
         dispatch({ type: ActionTypes.SET_FORMA_PAGO, payload: "efectivo" });
         setDatosPagoEfectivo(null);
         dispatch({ type: ActionTypes.SET_SALDO_PUNTOS, payload: 0 });
