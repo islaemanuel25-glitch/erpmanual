@@ -2375,25 +2375,40 @@ model Turno {
   anuladoPorId    Int?
   motivoAnulacion String?
 
-  /// ÍNDICE PARCIAL QUE VIVE SOLO EN SQL — no se puede declarar acá.
+  /// DOS ÍNDICES PARCIALES QUE VIVEN SOLO EN SQL — no se pueden declarar acá.
   ///
-  ///   CREATE UNIQUE INDEX "Turno_local_vendedor_abierto_key"
+  /// LA CAJA ES DEL OPERADOR. La cuenta ERP (`vendedorId`) autentica el acceso y
+  /// queda como auditoría de quién abrió; el operador del PIN (`operadorId`)
+  /// responde por el cajón. Varios operadores comparten la cuenta del local y
+  /// cada uno tiene su propia caja.
+  ///
+  ///   CREATE UNIQUE INDEX "Turno_local_operador_abierto_key"
+  ///       ON "Turno" ("localId", "operadorId")
+  ///    WHERE "cierre" IS NULL AND "cierreEnPreparacionEn" IS NULL
+  ///      AND "operadorId" IS NOT NULL;
+  ///
+  ///   CREATE UNIQUE INDEX "Turno_local_cuenta_sin_operador_abierto_key"
   ///       ON "Turno" ("localId", "vendedorId")
-  ///    WHERE "cierre" IS NULL AND "cierreEnPreparacionEn" IS NULL;
+  ///    WHERE "cierre" IS NULL AND "cierreEnPreparacionEn" IS NULL
+  ///      AND "operadorId" IS NULL;
   ///
-  /// Garantiza "un turno OPERATIVO por usuario y local" incluso ante dos
+  /// Con operador: a lo sumo una caja OPERATIVA por operador y local, con la
+  /// cuenta que sea. Sin operador —locales sin operario, Admin y Dueño sin PIN,
+  /// turnos históricos—: a lo sumo una por cuenta y local, como siempre. La
+  /// regla en código es `whereCajaPropia` / `esCajaPropia` en
+  /// lib/caja/cierreRelevo.js, y estos índices son su garantía ante dos
   /// aperturas simultáneas. Prisma no soporta `WHERE` en @@unique, y un @@unique
-  /// común romperia todo: impediría que un usuario tenga dos turnos CERRADOS en
-  /// el mismo local, que es lo normal.
+  /// común impediría tener dos turnos CERRADOS, que es lo normal.
   ///
   /// La condición sobre `cierreEnPreparacionEn` NO es un detalle: un turno con el
   /// corte de cierre tomado sigue con `cierre IS NULL`, así que sin esa cláusula
   /// la base rechazaría la apertura del relevo y el cierre en dos tiempos sería
-  /// imposible. Se redefinió en 20260804200000_cierre_relevo_operador.
+  /// imposible.
   ///
-  /// Nació en la migración 20260803010000_un_turno_abierto_por_usuario. Si alguna
-  /// vez se corre `prisma migrate dev`, revisar que no lo proponga como drift y
-  /// lo elimine.
+  /// Reemplazan a "Turno_local_vendedor_abierto_key" (localId, vendedorId), que
+  /// obligaba a dos operadores de la misma cuenta a compartir un cajón. El
+  /// cambio es la migración 20261002120000_caja_por_operador. Prisma no ve estos
+  /// índices; los cuida scripts/pruebas-db/estructura.mjs con su predicado.
 
   observaciones String?
   createdAt     DateTime @default(now())
@@ -2693,7 +2708,7 @@ model CierrePreparacion {
   /// operar — tiene que poder tomar otro. Con un @unique común, cancelar por
   /// error quemaba el turno para siempre y no había forma de volver a cerrarlo.
   ///
-  /// Mismo patrón que "Turno_local_vendedor_abierto_key": Prisma no soporta
+  /// Mismo patrón que "Turno_local_operador_abierto_key": Prisma no soporta
   /// `WHERE` en @@unique. Vive en la migración 20260804200000_cierre_relevo_operador.
   turnoId Int
   localId Int

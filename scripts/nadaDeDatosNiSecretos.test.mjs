@@ -95,6 +95,10 @@ const PROHIBIDO = [
       // igual, SOLO LECTURA, lee catálogos, `_prisma_migrations`, cuenta las
       // tablas del libro y llama a `libro_costo_estado()`. Sin filas.
       (p) => p === "scripts/deploy/diagnostico-recuperacion-libro-costos.sql",
+      // El precheck de la caja por operador: SOLO LECTURA, cuenta turnos
+      // operativos por operador y por cuenta y lee `_prisma_migrations`. Imprime
+      // ids, ningún importe ni nombre.
+      (p) => p === "scripts/deploy/precheck-caja-por-operador.sql",
     ],
   },
   {

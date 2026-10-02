@@ -63,11 +63,24 @@ async function defDeIndice(nombre) {
 // generador en las dos bases, así que una diferencia real se ve.
 
 const PARCIALES = [
+  // La caja abierta es del OPERADOR cuando lo tiene, y de la cuenta cuando no.
+  // Reemplazaron a "Turno_local_vendedor_abierto_key" en
+  // 20261002120000_caja_por_operador. Las COLUMNAS también se comparan: un
+  // índice por (localId, vendedorId) con el predicado del de operador volvería a
+  // juntar en un cajón a dos operadores de la misma cuenta.
   {
-    nombre: "Turno_local_vendedor_abierto_key",
+    nombre: "Turno_local_operador_abierto_key",
     unico: true,
-    predicado: `WHERE ((cierre IS NULL) AND ("cierreEnPreparacionEn" IS NULL))`,
-    regla: "un solo turno abierto por cajero y local",
+    sobre: `"Turno" USING btree ("localId", "operadorId")`,
+    predicado: `WHERE ((cierre IS NULL) AND ("cierreEnPreparacionEn" IS NULL) AND ("operadorId" IS NOT NULL))`,
+    regla: "una sola caja operativa por operador y local, con la cuenta que sea",
+  },
+  {
+    nombre: "Turno_local_cuenta_sin_operador_abierto_key",
+    unico: true,
+    sobre: `"Turno" USING btree ("localId", "vendedorId")`,
+    predicado: `WHERE ((cierre IS NULL) AND ("cierreEnPreparacionEn" IS NULL) AND ("operadorId" IS NULL))`,
+    regla: "una sola caja operativa sin operador por cuenta y local",
   },
   {
     nombre: "CierrePreparacion_turno_vigente_key",
@@ -113,7 +126,7 @@ const PARCIALES = [
   },
 ];
 
-seccion("Los ocho índices parciales que Prisma no expresa");
+seccion("Los índices parciales que Prisma no expresa");
 
 for (const idx of PARCIALES) {
   const def = await defDeIndice(idx.nombre);
@@ -121,6 +134,9 @@ for (const idx of PARCIALES) {
   if (!def) continue;
 
   const normal = def.replace(/\s+/g, " ").trim();
+  if (idx.sobre) {
+    ok(`  y está sobre las columnas correctas`, normal.includes(idx.sobre), `definición encontrada: ${normal}`);
+  }
   ok(
     `  y su predicado es el de producción`,
     normal.includes(idx.predicado.replace(/\s+/g, " ").trim()),
@@ -131,6 +147,15 @@ for (const idx of PARCIALES) {
     normal.startsWith("CREATE UNIQUE INDEX") === idx.unico
   );
 }
+
+// El índice viejo por (localId, vendedorId) tiene que haberse ido: si quedara
+// conviviendo con los nuevos, dos operadores de la misma cuenta seguirían sin
+// poder abrir cada uno su caja, y todo lo de arriba estaría en verde.
+ok(
+  `ya no existe "Turno_local_vendedor_abierto_key" (la caja no es de la cuenta)`,
+  (await defDeIndice("Turno_local_vendedor_abierto_key")) == null,
+  "sigue en la base"
+);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // EL CHECK

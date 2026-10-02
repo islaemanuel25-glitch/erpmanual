@@ -33,6 +33,47 @@ escritor de `StockLocal` declara su origen en el Libro de Stock. Los
 movimientos anteriores quedan `SIN_ORIGEN` para siempre —el libro es
 inmutable— y no se les deduce ninguno.
 
+Con la rama `claude/caja-por-operador` el árbol pasa a **46**, con una segunda
+pendiente, **que tiene precheck obligatorio**:
+
+- `20261002120000_caja_por_operador` — **solo índices, ningún dato**, y con
+  PRECHECK obligatorio antes de migrar (abajo).
+
+Reemplaza el índice único parcial
+`Turno_local_vendedor_abierto_key` (una caja operativa por **cuenta** y local)
+por dos —`Turno_local_operador_abierto_key` (una por **operador** y local) y
+`Turno_local_cuenta_sin_operador_abierto_key` (una por cuenta y local cuando el
+turno no tiene operador)—. Sin backfill, sin DROP de columnas, sin tocar una
+fila. Crear dos índices sobre `Turno` es breve; el DROP del viejo, inmediato.
+
+**Puede abortar, y eso es lo que hay que saber antes.** Si en producción hay un
+operador con dos cajas operativas en el mismo local —el índice viejo lo
+permitía con dos cuentas distintas—, la guardia de la migración aborta
+nombrando los turnos, **sin elegir ni cerrar ninguno**. Abortada queda como
+migración FALLIDA, y esta migración **no tiene autorizado `migrate resolve`**
+en `/deploy`: el despliegue se frenaría con la imagen nueva esperando.
+
+Por eso, **antes del backup y de cualquier migración**, se corre el precheck de
+solo lectura, con el mismo comando que `precheck-libro-stock.sql`:
+
+    ssh vps-erp 'cd /srv/produccion/erpazul && docker exec -i erpazul_db psql -U erpazul -d erpazul -X -q -v ON_ERROR_STOP=1 -f - < scripts/deploy/precheck-caja-por-operador.sql'
+
+- **VERDE** (sale 0, "PRECHECK: VERDE"): se sigue con el despliegue.
+- **ROJO** (sale distinto de 0): **FRENAR, no desplegar.** Imprime los ids de
+  los turnos en conflicto. Resolverlo es cerrar la caja que sobra **desde la
+  aplicación** —decide una persona cuál—, nunca con SQL. Después se vuelve a
+  correr el precheck desde cero.
+
+Es transacción READ ONLY que termina en ROLLBACK; imprime ids, ningún importe ni
+nombre. Probado en desarrollo: VERDE sobre una base sin conflicto y ROJO sobre
+una con el mismo operador en dos turnos abiertos con dos cuentas, sin escribir
+nada.
+
+Lo que llega con ella **no es solo esquema**: desde ese despliegue la caja es del
+operador. Dos operadores con la misma cuenta del local abren cada uno su turno;
+`turnos/actual` devuelve la caja del operador del PIN; y un cajero común ya no
+puede operar la caja de otro.
+
 Producción corre `9700a59530534e920ae3ab59b5c5780bd3b79071` (despliegue del
 2026-09-29, nota abajo). Un commit posterior a ese que solo cambie
 documentación —como el que escribe esta nota— **no se despliega por eso**.
