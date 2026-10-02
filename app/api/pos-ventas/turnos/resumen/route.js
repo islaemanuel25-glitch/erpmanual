@@ -7,6 +7,7 @@ import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 import { calcularEfectivoEsperado, desglosarMovimientos, desdeCentavos } from "@/lib/caja/efectivoEsperado";
 import { resumirExactitud } from "@/lib/pos-ventas/comisionPendiente";
 import { estadoDelTurno } from "@/lib/caja/cierreRelevo";
+import { identidadParaMirar, puedeVerCaja } from "@/lib/caja/identidadCajaServer";
 
 export async function GET(req) {
   try {
@@ -33,6 +34,8 @@ export async function GET(req) {
       where: { id: turnoId },
       select: {
         localId: true,
+        vendedorId: true,
+        operadorId: true,
         montoInicial: true,
         // El retiro del CIERRE se crea DESPUÉS del corte final, justamente para
         // que el cierre no se reste a sí mismo. Pero queda en CajaMovimiento, así
@@ -56,6 +59,18 @@ export async function GET(req) {
     }
 
     if (!session.esAdmin && Number(session.localId) !== Number(turno.localId)) {
+      return NextResponse.json(
+        { ok: false, error: "No autorizado para este turno" },
+        { status: 403 }
+      );
+    }
+
+    // Y la caja: el resumen de otra caja del local es de quien la mira con
+    // `turnos.ver_todos`, o de Admin/Dueño en su local. La misma regla que las
+    // ventas y los movimientos del turno, que la pantalla de detalle pide junto
+    // con éste. Con una cuenta compartida, "del local" era "de todos".
+    const identidad = await identidadParaMirar(req, session, { localId: turno.localId });
+    if (!puedeVerCaja(turno, identidad)) {
       return NextResponse.json(
         { ok: false, error: "No autorizado para este turno" },
         { status: 403 }

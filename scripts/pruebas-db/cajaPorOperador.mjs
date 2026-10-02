@@ -419,6 +419,10 @@ async function correr() {
     [resA.montoInicial, resA.totalEfectivo, resA.totalRetirosCaja, resA.efectivoEsperado], [1000, 100000, 80000, 21000]);
   igual("B: inicial, efectivo, retiros, esperado",
     [resB.montoInicial, resB.totalEfectivo, resB.totalRetirosCaja, resB.efectivoEsperado], [1000, 100000, 80000, 21000]);
+  const resCruzado = await p.resumen(f.B, turnoA.id);
+  igual("B no lee el resumen de la caja de A", resCruzado.status, 403);
+  const resDueno = await p.resumen(f.dueno_, turnoA.id);
+  igual("el Dueño sí", resDueno.efectivoEsperado, 21000);
 
   // ═════════════════════════════════════════════════════════════════════════
   seccion("7. Cierre: nadie corta ni cierra la caja de otro");
