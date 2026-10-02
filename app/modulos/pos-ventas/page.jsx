@@ -12,6 +12,12 @@ import { useOperadorContext } from "@/app/context/OperadorContext";
 import { showError, showSuccess } from "@/components/sunmi/SunmiToast";
 import { posVentaReducer, initialState, ActionTypes } from "./reducer/posVentaReducer";
 import { loadQueue, saveQueue, enqueue, dequeueById, getQueueLength, clearQueue } from "./helpers/offlineQueue";
+import {
+  duenoDelCarrito,
+  carritoCobrable,
+  borradorRestaurable,
+  ERROR_CARRITO_DE_OTRA_CAJA,
+} from "@/lib/pos-ventas/carritoPorCaja";
 
 import BuscadorProductos from "@/components/pos-ventas/BuscadorProductos";
 import CarritoVenta from "@/components/pos-ventas/CarritoVenta";
@@ -85,9 +91,17 @@ export default function PosVentasPage() {
   const {
     operador: operadorActivo,
     voucher: operadorVoucherActivo,
+    loading: cargandoOperador,
     requerirOperador,
     logout: logoutOperador,
   } = useOperadorContext();
+
+  // LA CAJA SIGUE AL OPERADOR. El turno se pide por el operador del PIN, y el
+  // carrito recuerda con qué operador se empezó a armar: un cambio de PIN no
+  // recarga la pantalla, y sin esto B cobraría en SU caja el carrito de A.
+  // Ver lib/pos-ventas/carritoPorCaja.js.
+  const operadorActivoId = operadorActivo?.operadorId ?? null;
+  const duenoCarritoRef = useRef(null);
 
   // Estado del POS con reducer
   const [state, dispatch] = useReducer(posVentaReducer, initialState);
@@ -551,19 +565,36 @@ export default function PosVentasPage() {
   // ---------------------------------------------------------------------------
   // Restaurar carrito persistido desde localStorage
   // ---------------------------------------------------------------------------
+  // Solo con el mismo local, la misma cuenta y el MISMO operador: un borrador de
+  // A no aparece en la pantalla de B. Se espera a saber quién es el operador.
   useEffect(() => {
-    if (!localActual || !me) return;
+    if (!localActual || !me || cargandoOperador) return;
     try {
       const raw = localStorage.getItem("posVentasCarritoEnCurso_v1");
       if (!raw) return;
       const parsed = JSON.parse(raw);
-      if (parsed.localId === localActual && parsed.userId === me.id) {
+      if (borradorRestaurable(parsed, { localId: localActual, userId: me.id, operadorId: operadorActivoId })) {
+        duenoCarritoRef.current = duenoDelCarrito(parsed.operadorId);
         dispatch({ type: ActionTypes.RESTORE_CART, payload: parsed });
       }
     } catch (e) {
       // Si el dato está corrupto, ignorar
     }
-  }, [localActual, me]);
+    // Se restaura UNA vez por pantalla: un cambio de PIN después no trae el
+    // borrador de nadie, solo cambia quién puede cobrar el que está.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localActual, me, cargandoOperador]);
+
+  // El dueño del carrito se fija cuando el carrito deja de estar vacío, con el
+  // operador activo en ese momento, y se suelta cuando se vacía.
+  useEffect(() => {
+    if (state.carrito.length === 0) {
+      duenoCarritoRef.current = null;
+    } else if (duenoCarritoRef.current === null) {
+      duenoCarritoRef.current = duenoDelCarrito(operadorActivoId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.carrito.length]);
 
   // ---------------------------------------------------------------------------
   // Persistir carrito en localStorage
@@ -573,6 +604,9 @@ export default function PosVentasPage() {
     const draft = {
       localId: localActual,
       userId: me.id,
+      // El operador DUEÑO del carrito, no el activo: si B hace PIN con el
+      // carrito de A a la vista, el borrador sigue siendo de A.
+      operadorId: duenoCarritoRef.current,
       carrito: state.carrito,
       clienteSeleccionado: state.clienteSeleccionado,
       descuento: state.descuento,
@@ -610,7 +644,10 @@ export default function PosVentasPage() {
       }
     };
     verificarTurno();
-  }, [localActual, me]);
+    // El operador va en las dependencias: la caja es suya, y cambiar de PIN es
+    // cambiar de caja. Sin esto la pantalla seguía mostrando —y cobrando en— el
+    // turno del operador anterior.
+  }, [localActual, me, operadorActivoId]);
 
   // ---------------------------------------------------------------------------
   // Cargar info crédito cuando hay cliente + fiado
@@ -970,6 +1007,14 @@ export default function PosVentasPage() {
       return;
     }
 
+    // El carrito de otro operador no se encola a nombre de éste: la venta
+    // quedaría en la caja de quien la sincroniza, no de quien la armó.
+    if (!carritoCobrable({ carritoVacio: false, duenoOperadorId: duenoCarritoRef.current }, operadorActivoId)) {
+      setErrorMsg(ERROR_CARRITO_DE_OTRA_CAJA);
+      showError(ERROR_CARRITO_DE_OTRA_CAJA);
+      return;
+    }
+
     // Validar cantidades antes de guardar
     const itemInvalidoOffline = state.carrito.find(
       (item) => item.cantidad === "" || item.cantidad === null || isNaN(Number(item.cantidad)) || Number(item.cantidad) <= 0
@@ -1061,7 +1106,7 @@ export default function PosVentasPage() {
 
     showSuccess("Venta guardada offline. Ticket generado.");
     setSuccessMsg(`Venta guardada pendiente. Total en cola: ${nuevaLongitud}`);
-  }, [localActual, grupoId, me, state.carrito, state.descuento, state.descuentoPorPuntos, state.clienteSeleccionado, subtotal, localNombre, operadorActivo, operadorVoucherActivo]);
+  }, [localActual, grupoId, me, state.carrito, state.descuento, state.descuentoPorPuntos, state.clienteSeleccionado, subtotal, localNombre, operadorActivo, operadorActivoId, operadorVoucherActivo]);
 
   // ---------------------------------------------------------------------------
   // Procesar cola offline
@@ -1493,6 +1538,15 @@ export default function PosVentasPage() {
       const msg = "El carrito esta vacio.";
       setErrorMsg(msg);
       showError(msg);
+      return;
+    }
+
+    // UN CARRITO NO CRUZA DE CAJA. Si se armó con otro operador —A armó, B
+    // hizo PIN—, cobrarlo acá lo cargaría en la caja de B. No se descarta: si A
+    // vuelve, lo cobra él; si B quiere vender, lo vacía con el botón de siempre.
+    if (!carritoCobrable({ carritoVacio: false, duenoOperadorId: duenoCarritoRef.current }, operadorActivoId)) {
+      setErrorMsg(ERROR_CARRITO_DE_OTRA_CAJA);
+      showError(ERROR_CARRITO_DE_OTRA_CAJA);
       return;
     }
 
