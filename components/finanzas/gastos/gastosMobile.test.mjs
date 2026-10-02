@@ -220,8 +220,8 @@ test("la búsqueda en el servidor: con q en las dos consultas, esperando la últ
   const lista = codigo("components/finanzas/gastos/ListaGastos.jsx");
   assert.match(lista, /gastosDeLaLista\(\{ periodo: datos, anteriores, busqueda, contexto, resultado \}\)/);
   assert.match(lista, /busquedaEnElServidor\(\{ periodo: datos, anteriores \}\)/);
-  assert.match(lista, /consultaDelPeriodo\(\{ filtro, rango, categoriaId: cat, q: termino \}\)/);
-  assert.match(lista, /consultaDeAnteriores\(\{ filtro, rango, categoriaId: cat, q: termino \}\)/);
+  assert.match(lista, /consultaDelPeriodo\(\{ filtro, rango, categoriaId: cat, q: termino, destino \}\)/);
+  assert.match(lista, /consultaDeAnteriores\(\{ filtro, rango, categoriaId: cat, q: termino, destino \}\)/);
   assert.match(lista, /if \(!alServidor\) return undefined;/);
   assert.match(lista, /setTimeout\(async \(\) => \{[\s\S]*?\}, ESPERA_BUSQUEDA_MS\)/);
   assert.match(lista, /clearTimeout\(espera\)/);

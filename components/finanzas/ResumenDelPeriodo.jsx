@@ -4,27 +4,28 @@
 //
 // LAS MÉTRICAS DEL PERÍODO, Y LAS QUE TODAVÍA NO EXISTEN.
 //
+// ── EL BLOQUE ECONÓMICO: VENTAS, CMV, MARGEN, GASTOS, COMISIONES, RESULTADO ─
+//
+// Responde cuánto generó económicamente el local en el período:
+//
+//   Ventas − CMV = Margen bruto − Gastos económicos − Comisiones de cobro
+//   = Resultado del período.
+//
+// Es el nombre exacto —"Resultado del período", no "ganancia real"— porque
+// todavía NO incorpora impuestos ni el circuito completo del dinero. Los gastos
+// entran por su fecha ECONÓMICA (`Gasto.fecha`), estén pagados o no; las
+// comisiones son las de Cobros, el mismo número, no una segunda suma. Nada de
+// esto resta pagos a proveedores, pago a depósito, retiros ni recaudación: eso
+// es movimiento de dinero, no costo económico, y va en el futuro bloque.
+//
 // ── LO QUE NO SE PUEDE CALCULAR NO SE DIBUJA EN CERO ─────────────────────
 //
-// Es la regla de esta pantalla y la que más fácil se rompe sin querer. "Gastos
-// operativos $0,00" se lee como que no hubo gastos, y lo que pasa es que el ERP
-// no los conoce: no hay sueldos, ni alquiler, ni servicios registrados en
-// ninguna tabla. Un cero ahí es una afirmación falsa sobre la plata del negocio.
-//
-// Los pagos a proveedores SÍ se registran, en su submódulo, pero este resumen
-// todavía no los suma: también van como "Todavía no disponible", y su motivo
-// —que viene del servidor— dice exactamente eso.
-//
-// Las tres que faltan viajan desde el servidor en `resumen.noDisponible`, con su
-// motivo, y se dibujan con la frase "Todavía no disponible". No están escritas
-// en este archivo a propósito: el día que exista el modelo de gastos, la lista
-// se acorta sola desde donde se sabe.
-//
-// ── Y NO SE DICE "GANANCIA REAL" ─────────────────────────────────────────
-//
-// El margen bruto es ventas menos el costo de la mercadería vendida. La ganancia
-// real es eso MENOS los gastos, y los gastos no existen. Llamarle ganancia al
-// margen sería el mismo error que el cero, con otra palabra.
+// Lo que el ERP todavía no sabe viaja en `resumen.noDisponible` con su motivo y
+// se dibuja "Todavía no disponible", nunca en cero. Hoy queda ahí solo "Pagos a
+// proveedores": se registran, pero no se suman al período, y además no van en el
+// Resultado. El Resultado SÍ se muestra siempre; cuando puede estar sobre o
+// subestimado —comisiones pendientes, ventas con costo cero— se avisa con el
+// mismo patrón de advertencia que el margen, sin inventar un número.
 //
 // ── NI "GASTO" A UN RETIRO DE CAJA ───────────────────────────────────────
 //
@@ -187,11 +188,11 @@ export default function ResumenDelPeriodo({ resumen, descripcion }) {
 
         <Renglon
           rotulo="Costo de la mercadería vendida"
-          valor={formatearMoneda(resumen.costoVendido)}
+          valor={`− ${formatearMoneda(resumen.costoVendido)}`}
         />
         <Renglon
           rotulo="Margen bruto"
-          nota="Ventas menos el costo de lo vendido. No es la ganancia del negocio."
+          nota="Ventas menos el costo de lo vendido."
           valor={formatearMoneda(resumen.margenBruto)}
         />
 
@@ -200,6 +201,49 @@ export default function ResumenDelPeriodo({ resumen, descripcion }) {
             El margen guardado en cada venta suma {formatearMoneda(control.sumaGananciaBrutaPersistida)}.
             La diferencia es el recargo por medio de pago, que el POS deja fuera del margen de
             mercadería.
+          </div>
+        )}
+
+        <div className="border-t sunmi-divider opacity-70" aria-hidden="true" />
+
+        {/* ── GASTOS Y COMISIONES, LOS DOS QUE BAJAN DEL MARGEN ──────────────
+            Gastos por fecha económica (impagos incluidos); "Ver gastos" abre el
+            MISMO conjunto en el módulo. Comisiones son las de Cobros, el mismo
+            número que se muestra abajo. */}
+        <Renglon
+          rotulo="Gastos"
+          nota="Del período por su fecha, estén pagados o no."
+          valor={`− ${formatearMoneda(resumen.gastos)}`}
+        />
+        {resumen.verGastos && (
+          <div className="flex justify-end">
+            <EnlaceAlModulo href={resumen.verGastos} texto="Ver gastos" />
+          </div>
+        )}
+        <Renglon
+          rotulo="Comisiones de cobro"
+          nota="Lo que cobran los medios por cobrar una venta."
+          valor={`− ${formatearMoneda(resumen.comisionesDeCobro)}`}
+        />
+
+        <div className="border-t sunmi-divider opacity-70" aria-hidden="true" />
+
+        <Metrica rotulo="Resultado del período" valor={formatearMoneda(resumen.resultado)} />
+
+        {/* Advertencias: el Resultado se muestra igual; estas dicen cuándo puede
+            estar sobre/subestimado, sin estimar ni esconder nada. */}
+        {resumen.comisionesPendientes && (
+          <div className="text-xs2 sunmi-text-warning">
+            Hay comisiones pendientes de determinar en este período. El resultado puede estar
+            sobreestimado hasta que se calculen.
+          </div>
+        )}
+        {resumen.ventasSinCosto > 0 && (
+          <div className="text-xs2 sunmi-text-warning">
+            {resumen.ventasSinCosto === 1
+              ? "Hay 1 venta con costo $0 en este período"
+              : `Hay ${resumen.ventasSinCosto} ventas con costo $0 en este período`}
+            ; el margen y el resultado pueden estar sobreestimados.
           </div>
         )}
 

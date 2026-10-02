@@ -186,7 +186,11 @@ test("V8 · el corte es por `Venta.fecha`, no por `createdAt`", () => {
   // Es la fecha con la que el reporte de ventas ya corta. Usar `createdAt`
   // pondría una venta corregida en el período de la corrección.
   const tablero = sinComentarios("app/api/finanzas/tablero/route.js");
-  const consulta = tablero.match(/const ventas = await prisma\.venta\.findMany\(\{[\s\S]*?\n {4}\}\);/);
+  // La consulta de ventas del período: hoy vive dentro del `Promise.all` que la
+  // corre en paralelo con el total de gastos, así que se la ubica por la llamada
+  // misma —`prisma.venta.findMany({ ... select: SELECT_VENTA })`— y no por la
+  // forma de su asignación.
+  const consulta = tablero.match(/prisma\.venta\.findMany\(\{[\s\S]*?select:\s*SELECT_VENTA,\s*\}\)/);
   assert.ok(consulta, "no se encontró la consulta de ventas del período");
   assert.match(consulta[0], /fecha:\s*\{\s*gte:\s*fechaInicio,\s*lte:\s*fechaFin\s*\}/);
   assert.doesNotMatch(consulta[0], /createdAt/);

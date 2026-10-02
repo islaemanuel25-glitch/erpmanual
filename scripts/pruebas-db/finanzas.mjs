@@ -91,6 +91,9 @@ const creado = {
   // Cierre de compra
   baseId: null,
   turnoDepositoId: null,
+  // Gastos económicos (para el Resultado del período)
+  categoriaGastoId: null,
+  gastoIds: [],
 };
 
 async function montar() {
@@ -211,6 +214,49 @@ async function montar() {
   });
   creado.turnoDepositoId = turnoDeposito.id;
 
+  // ── GASTOS ECONÓMICOS DEL PERÍODO EN CURSO ──────────────────────────────
+  //
+  // Fecha económica = HOY, que cae en el período por defecto (Día, en curso).
+  // Tres estados de pago; el total económico suma los tres COMPLETOS. Un gasto
+  // de OTRO local no tiene que contar en el resultado de `local`.
+  const hoyGasto = new Date();
+  const categoriaGasto = await prisma.categoriaGasto.create({ data: { nombre: `${marca}-cat`, orden: 1 } });
+  creado.categoriaGastoId = categoriaGasto.id;
+  const crearGastoCrudo = async (concepto, total, pagos = [], localDelGasto = local.id) => {
+    const g = await prisma.gasto.create({
+      data: {
+        grupoId: grupo.id,
+        localId: localDelGasto,
+        categoriaId: categoriaGasto.id,
+        concepto: `${marca}-${concepto}`,
+        total,
+        fecha: hoyGasto,
+        creadoPorId: usuarioLocal.id,
+        idempotencyKey: `${marca}-${concepto}`,
+      },
+    });
+    creado.gastoIds.push(g.id);
+    for (const [i, monto] of pagos.entries()) {
+      // Medio no-efectivo: registra el pago sin tocar caja (no hace falta cajón).
+      await prisma.pagoGasto.create({
+        data: {
+          gastoId: g.id,
+          monto,
+          fecha: hoyGasto,
+          medio: "TRANSFERENCIA",
+          localOrigenId: localDelGasto,
+          usuarioId: usuarioLocal.id,
+          idempotencyKey: `${marca}-${concepto}-pago-${i}`,
+        },
+      });
+    }
+    return g;
+  };
+  await crearGastoCrudo("gasto-impago", 100); // impago → cuenta 100
+  await crearGastoCrudo("gasto-parcial", 200, [50]); // parcial (pagó 50) → cuenta 200
+  await crearGastoCrudo("gasto-pagado", 300, [300]); // pagado → cuenta 300
+  await crearGastoCrudo("gasto-ajeno", 999, [], otroLocal.id); // de OTRO local → NO cuenta
+
   return {
     base,
     plDeposito,
@@ -257,6 +303,13 @@ async function desmontar() {
   if (creado.turnoOtroId) {
     await prisma.cajaMovimiento.deleteMany({ where: { turnoId: creado.turnoOtroId } });
     await prisma.turno.deleteMany({ where: { id: creado.turnoOtroId } });
+  }
+  if (creado.gastoIds.length) {
+    await prisma.pagoGasto.deleteMany({ where: { gastoId: { in: creado.gastoIds } } });
+    await prisma.gasto.deleteMany({ where: { id: { in: creado.gastoIds } } });
+  }
+  if (creado.categoriaGastoId) {
+    await prisma.categoriaGasto.deleteMany({ where: { id: creado.categoriaGastoId } });
   }
   if (creado.localId) {
     await prisma.arqueoCaja.deleteMany({ where: { localId: creado.localId } });
@@ -314,6 +367,38 @@ async function correr(f) {
   ok("el tablero conserva su local", tableroLocal.local?.id === f.local.id);
   ok("el resumen existe", tableroLocal.resumen && typeof tableroLocal.resumen === "object");
   ok("la actividad existe", Array.isArray(tableroLocal.actividad));
+
+  // ── EL RESULTADO DEL PERÍODO · margen − gastos − comisiones ──────────────
+  console.log("\n── Resultado del período: gastos económicos");
+  const resumen = tableroLocal.resumen || {};
+  // Los tres estados cuentan COMPLETOS: 100 + 200 + 300 = 600. El gasto de otro
+  // local (999) NO entra.
+  ok("gastos del período suman 600 (impago + parcial + pagado, sin el de otro local)", resumen.gastos === 600,
+    JSON.stringify({ gastos: resumen.gastos }));
+  ok("resultado = margen bruto − gastos − comisiones", Math.round((resumen.resultado) * 100) ===
+    Math.round((resumen.margenBruto - resumen.gastos - resumen.comisionesDeCobro) * 100),
+    JSON.stringify({ resultado: resumen.resultado, margen: resumen.margenBruto, gastos: resumen.gastos, comis: resumen.comisionesDeCobro }));
+  ok("'Ver gastos' abre el módulo en la pestaña Todos y el período", typeof resumen.verGastos === "string" &&
+    /\/modulos\/finanzas\/gastos\?/.test(resumen.verGastos) && /estado=TODAS/.test(resumen.verGastos),
+    resumen.verGastos);
+  ok("gastos y resultado ya no figuran como 'no disponible'",
+    !(resumen.noDisponible || []).some((m) => m.clave === "gastosOperativos" || m.clave === "resultadoReal"),
+    JSON.stringify((resumen.noDisponible || []).map((m) => m.clave)));
+
+  // §18 · el conjunto que suma el Resumen coincide con el de la lista TODAS.
+  const { totalEconomicoDeGastos, listarGastos } = await import("../../lib/finanzas/gastosServer.js");
+  const rangoGastos = { desde: tableroLocal.periodo.rango.desde, hasta: tableroLocal.periodo.rango.hasta };
+  const sumaDominio = await totalEconomicoDeGastos(prisma, { grupoId: f.grupo.id, localIds: [f.local.id], rango: rangoGastos });
+  ok("totalEconomicoDeGastos coincide con el resumen", sumaDominio.total === resumen.gastos,
+    JSON.stringify({ dominio: sumaDominio.total, resumen: resumen.gastos }));
+  const listaTodas = await listarGastos(prisma, {
+    grupoId: f.grupo.id,
+    localIds: [f.local.id],
+    filtros: { estado: "TODAS", fechaDesde: rangoGastos.desde, fechaHasta: rangoGastos.hasta, page: 1, pageSize: 100, skip: 0, take: 100 },
+  });
+  const sumaLista = listaTodas.gastos.reduce((a, g) => a + Math.round(Number(g.total) * 100), 0);
+  ok("la lista 'Todos' del mismo período suma exactamente lo mismo", sumaLista === Math.round(resumen.gastos * 100),
+    JSON.stringify({ lista: sumaLista, resumen: Math.round(resumen.gastos * 100) }));
 
   console.log("\n── Turno: abierto por el local");
   const detalleLocal = await leer(
