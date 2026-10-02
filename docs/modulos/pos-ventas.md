@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-09-30 11:55
+**Última actualización:** 2026-10-02 23:05
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,12 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-10-02: fix(caja): el resumen de un turno es de su caja, como sus ventas y movimientos
+- 2026-10-02: fix(caja): la bandeja de cierres pendientes no reparte el token de otra caja
+- 2026-10-02: fix(auditoria-pos): la pantalla de Cajas no netea las diferencias
+- 2026-10-02: feat(pos): el POS sigue la caja del operador y el carrito no cruza de caja
+- 2026-10-02: feat(caja): cada operador opera solo su caja, aunque compartan la cuenta
+- 2026-10-02: feat(caja): la caja abierta se identifica por operador — migración con guardia
 - 2026-09-30: feat(stock): cada movimiento del Libro de Stock nombra su documento
 - 2026-09-29: feat(finanzas): núcleo de Gastos — el gasto de una ubicación y sus pagos
 - 2026-09-26: feat(caja): motor auditado de corrección histórica, con ensayo en seco
