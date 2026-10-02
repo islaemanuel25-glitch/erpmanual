@@ -18,6 +18,7 @@ import {
   borradorRestaurable,
   ERROR_CARRITO_DE_OTRA_CAJA,
 } from "@/lib/pos-ventas/carritoPorCaja";
+import { turnoDeReplay } from "@/lib/pos-ventas/replayOffline";
 
 import BuscadorProductos from "@/components/pos-ventas/BuscadorProductos";
 import CarritoVenta from "@/components/pos-ventas/CarritoVenta";
@@ -1048,6 +1049,11 @@ export default function PosVentasPage() {
       // operadorId queda solo para referencia/legibilidad de la cola.
       operadorId: operadorActivo?.operadorId ?? null,
       operadorVoucher: operadorVoucherActivo ?? null,
+      // LA CAJA DONDE SE COBRÓ. Se sincroniza contra ESTE turno y no contra el de
+      // quien sincronice: offline solo significa que llega tarde, no que cambie
+      // de caja. Puede ser null si la pantalla nunca supo su turno (se abrió sin
+      // conexión): ver lib/pos-ventas/replayOffline.js.
+      turnoId: turnoActual?.id ?? null,
       // Payload canónico (mismo helper que el path online).
       items: itemsCrearPayload(state.carrito),
     };
@@ -1106,23 +1112,19 @@ export default function PosVentasPage() {
 
     showSuccess("Venta guardada offline. Ticket generado.");
     setSuccessMsg(`Venta guardada pendiente. Total en cola: ${nuevaLongitud}`);
-  }, [localActual, grupoId, me, state.carrito, state.descuento, state.descuentoPorPuntos, state.clienteSeleccionado, subtotal, localNombre, operadorActivo, operadorActivoId, operadorVoucherActivo]);
+  }, [localActual, grupoId, me, state.carrito, state.descuento, state.descuentoPorPuntos, state.clienteSeleccionado, subtotal, localNombre, operadorActivo, operadorActivoId, operadorVoucherActivo, turnoActual]);
 
   // ---------------------------------------------------------------------------
   // Procesar cola offline
   // ---------------------------------------------------------------------------
+  //
+  // Cada venta va a la caja donde se cobró (`turnoDeReplay`), no a la de quien
+  // sincroniza. Por eso ya no se exige un turno abierto ni que no esté vencido
+  // ANTES de empezar: una venta de una caja vencida vuelve a SU caja, que todavía
+  // no se contó, y exigir cerrarla primero la dejaba sin dónde quedar. La que no
+  // se puede atribuir se frena y queda en pendientes.
   const procesarCola = useCallback(async () => {
     if (offlineMode || procesandoCola) return;
-
-    if (!turnoActual?.id) {
-      showError("Abrí turno para procesar ventas pendientes");
-      return;
-    }
-
-    if (turnoVencido) {
-      showError("Caja vencida: cerrala antes de procesar ventas pendientes");
-      return;
-    }
 
     const queue = loadQueue();
     if (queue.length === 0) {
@@ -1136,8 +1138,18 @@ export default function PosVentasPage() {
 
     let procesadas = 0;
     let errores = 0;
+    let frenadas = 0;
+    let motivoFrenada = "";
 
     for (const ventaPendiente of queue) {
+      // A qué caja va: la del turno donde se cobró. La que no se puede atribuir
+      // no se manda ni se borra: queda en pendientes.
+      const destino = turnoDeReplay(ventaPendiente, turnoActual);
+      if (destino.frenada) {
+        frenadas++;
+        motivoFrenada = destino.motivo;
+        continue;
+      }
       try {
         const res = await fetch("/api/pos-ventas/crear", {
           method: "POST",
@@ -1147,20 +1159,29 @@ export default function PosVentasPage() {
             clientTxnId: ventaPendiente.clientVentaId,
             localId: ventaPendiente.localId,
             clienteId: ventaPendiente.clienteId,
-            turnoId: turnoActual?.id || null,
+            turnoId: destino.turnoId,
             formaPago: ventaPendiente.formaPago,
             esFiado: ventaPendiente.formaPago === "fiado",
             descuento: ventaPendiente.descuento,
             descuentoPorPuntos: ventaPendiente.descuentoPorPuntos,
             puntosCanje: 0, // No guardamos puntos en cola offline
-            // Replay offline: nunca se rechaza por operario vencido. La atribución
-            // la resuelve el server con el voucher firmado (no con un id crudo).
-            // Legacy sin voucher → el server graba con operador null.
+            // Replay offline: con voucher, el voucher firmado es la identidad
+            // —no se rechaza por operario vencido ni por quién sincroniza—; sin
+            // voucher, la identidad es el PIN activo. En los dos casos la venta
+            // solo entra en la caja de esa identidad.
             origenOffline: true,
             operadorVoucher: ventaPendiente.operadorVoucher ?? null,
             items: ventaPendiente.items,
           }),
         });
+
+        // Sin voucher hace falta un PIN: se pide encima, como al cobrar, y se
+        // corta la cola —seguir solo juntaría más 428—.
+        if (res.status === 428) {
+          errores++;
+          requerirOperador();
+          break;
+        }
 
         const data = await res.json();
 
@@ -1173,12 +1194,14 @@ export default function PosVentasPage() {
             setSuccessMsg((prev) => (prev ? `${prev} — ` : "") + "Advertencia: venta con stock negativo (carga inicial).");
           }
         } else {
-          // Error → cortar procesamiento
+          // Rechazada por el servidor (no es su caja, la caja ya cerró, stock,
+          // etc.) → queda en la cola y se sigue con las demás. Antes se cortaba
+          // todo: con la caja por operador, una venta de A en el navegador de B
+          // frenaba las de B, que sí entran.
           errores++;
           const msg = mensajeErrorVenta(data, "Error al procesar venta pendiente", mostrarStockPos);
           showError(msg);
           setErrorMsg(`Error procesando cola: ${msg}`);
-          break; // Cortar y dejar el resto
         }
       } catch (err) {
         console.error("Error procesando venta pendiente:", err);
@@ -1197,7 +1220,11 @@ export default function PosVentasPage() {
       showSuccess(`${procesadas} venta(s) procesada(s) correctamente`);
       setSuccessMsg(`${procesadas} venta(s) procesada(s). ${nuevaLongitud} pendiente(s)`);
     }
-  }, [offlineMode, procesandoCola, turnoActual, turnoVencido, mostrarStockPos]);
+    if (frenadas > 0) {
+      showError(motivoFrenada);
+      setErrorMsg(motivoFrenada);
+    }
+  }, [offlineMode, procesandoCola, turnoActual, mostrarStockPos, requerirOperador]);
 
   // ---------------------------------------------------------------------------
   // Gestión de pendientes offline (modal)

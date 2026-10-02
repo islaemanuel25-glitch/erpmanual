@@ -79,26 +79,30 @@ export async function POST(req) {
     const body = await req.json();
     const { clientTxnId, clientVentaId, clienteId, turnoId, formaPago, descuento, items, descuentoPorPuntos: descuentoPorPuntosBody, puntosCanje, origenOffline, operadorVoucher } = body;
 
-    // Resolver operador de la venta.
-    // - Venta online: se exige operador activo salvo dueño (permiso "*").
-    // - Replay de cola offline (origenOffline): la venta YA se cobró con un
-    //   operador identificado en su momento. NUNCA se rechaza por operario
-    //   vencido. La atribución NO se toma de un id crudo del cliente (sería
-    //   falsificable: el mismo agujero por otra puerta) sino de un VOUCHER
-    //   firmado por el server al identificarse el operador. Sin voucher válido
-    //   (ítems legacy, o venta genuinamente sin operador) se persiste con null
-    //   antes que perder una venta cobrada — queda logueado para auditoría.
-    let operadorId = null;
-    if (origenOffline === true) {
-      operadorId = verificarVoucherOperador(operadorVoucher, localId);
-      if (!operadorId) {
-        console.warn(
-          "[pos-ventas/crear] replay offline sin operador verificable (voucher ausente/inválido) — se graba con operador null. localId=%s clientTxnId=%s",
-          localId,
-          clientTxnId || clientVentaId || "?"
-        );
-      }
-    } else {
+    // QUIÉN COBRÓ: la identidad de caja de esta venta.
+    //
+    // `origenOffline` lo manda el cliente y NO PRUEBA NADA. Offline solo
+    // significa que la venta llega tarde al servidor; no concede ninguna
+    // excepción de propiedad de caja. La identidad sale siempre de algo que el
+    // servidor firmó:
+    //
+    //   · Replay offline CON voucher válido: el voucher es la identidad. Lo firmó
+    //     el servidor cuando ese operador hizo PIN en este local, y la cola lo
+    //     guardó junto con la venta. Por eso un replay no se rechaza por
+    //     operario vencido ni por quién esté sincronizando: la cola vive en el
+    //     navegador y la procesa quien esté en el mostrador. Pero la venta queda
+    //     atada a ESA caja: voucher de A, solo caja de A.
+    //   · Todo lo demás —online, o replay sin voucher válido—: el PIN activo,
+    //     validado en el local, como cualquier venta. Sin PIN donde el local lo
+    //     exige, 428: no hay a nombre de quién cobrar.
+    //
+    // Antes el replay sin voucher se grababa con operador null y se aceptaba en
+    // cualquier turno de la cuenta: con una cuenta compartida eso dejaba a A
+    // —o a nadie— meter ventas en la caja de B declarando `origenOffline`.
+    const operadorDelVoucher =
+      origenOffline === true ? verificarVoucherOperador(operadorVoucher, localId) : null;
+    let operadorId = operadorDelVoucher;
+    if (operadorDelVoucher == null) {
       const gateOp = await requireOperadorSegunConfig(req, session, { localId });
       if (!gateOp.ok) {
         return NextResponse.json(
@@ -122,15 +126,10 @@ export async function POST(req) {
     //
     // LA CAJA ES DEL OPERADOR. Con una cuenta compartida por el mostrador, el
     // turno de B es del mismo local, de la misma cuenta y está abierto: nada de
-    // eso lo hace de A. `whereCajaPropia` decide con el operador ya validado
-    // arriba por la cookie del PIN —nunca con un id del cuerpo—, y con la cuenta
-    // cuando no hay operador.
-    //
-    // EL REPLAY OFFLINE NO SE MUDA DE CAJA. La venta se cobró con el turno que
-    // tenía la pantalla en ese momento, y la plata entró a ESE cajón: se acepta
-    // si ese turno es de la cuenta que la encoló —la cola vive en su navegador—
-    // o es la caja del operador del voucher. Nunca se reasigna a otra caja, y una
-    // venta cobrada no se pierde por la identidad de quien sincroniza.
+    // eso lo hace de A. `whereCajaPropia` decide con la identidad de arriba
+    // —voucher firmado o PIN validado, nunca un id del cuerpo—, y con la cuenta
+    // cuando no hay operador. Es la MISMA condición para online y offline: no
+    // hay una rama que acepte "cualquier turno de la cuenta".
     //
     // "Abierto" ya no es solo `cierre: null`. Un turno que tomó el corte de cierre
     // sigue con `cierre` en null —el cajero todavía está contando en otra
@@ -139,43 +138,28 @@ export async function POST(req) {
     // se está confirmando ni ningún otro. `WHERE_TURNO_OPERATIVO` es la condición
     // única, y va en el WHERE y no en un chequeo posterior para que no se pueda
     // olvidar en una rama.
-    const cajaDeQuienVende = whereCajaPropia({ usuarioId: session.id, operadorId });
     const turnoValido = await prisma.turno.findFirst({
       where: {
         id: turnoId,
         localId,
-        ...(origenOffline === true
-          ? { OR: [{ vendedorId: session.id }, cajaDeQuienVende] }
-          : cajaDeQuienVende),
+        ...whereCajaPropia({ usuarioId: session.id, operadorId }),
         ...WHERE_TURNO_OPERATIVO,
       },
-      select: { id: true, apertura: true, operadorId: true },
+      select: { id: true, apertura: true },
     });
-
-    // La anomalía del replay queda a la vista sin modelo nuevo: la venta guarda
-    // el operador del voucher y el turno guarda el suyo, y la diferencia entre
-    // los dos ES el registro. Se loguea igual que el replay sin voucher.
-    if (
-      origenOffline === true &&
-      turnoValido?.operadorId != null &&
-      operadorId != null &&
-      turnoValido.operadorId !== operadorId
-    ) {
-      console.warn(
-        "[pos-ventas/crear] replay offline cobrado por el operador %s en la caja del operador %s — se conserva en la caja donde se cobró. localId=%s turnoId=%s clientTxnId=%s",
-        operadorId,
-        turnoValido.operadorId,
-        localId,
-        turnoValido.id,
-        clientTxnId || clientVentaId || "?"
-      );
-    }
 
     if (!turnoValido) {
       // Se distingue el corte del resto: "turno inválido" no le dice nada a quien
       // acaba de iniciar un cierre y no entiende por qué no puede vender.
+      // Solo sobre la caja PROPIA: el estado de la caja de otro no se informa.
       const enPreparacion = await prisma.turno.findFirst({
-        where: { id: turnoId, localId, cierre: null, cierreEnPreparacionEn: { not: null } },
+        where: {
+          id: turnoId,
+          localId,
+          ...whereCajaPropia({ usuarioId: session.id, operadorId }),
+          cierre: null,
+          cierreEnPreparacionEn: { not: null },
+        },
         select: { id: true },
       });
       return NextResponse.json(
@@ -192,9 +176,15 @@ export async function POST(req) {
 
     // Bloquear si el turno fue abierto un día anterior (calendario AR).
     // El cajero debe cerrar caja antes de seguir vendiendo.
+    //
+    // Un REPLAY no es seguir vendiendo: la venta ya ocurrió, en esa caja, y la
+    // plata está en ese cajón todavía sin contar. Si se rechazara, la cola
+    // obligaría a cerrar la caja primero, y cerrada la venta ya no tendría dónde
+    // quedar. Igual tiene que ser la caja propia de la identidad de arriba: el
+    // atajo solo vale para la caja de quien la cobró.
     const diaAperturaAR = fechaArgentinaISO(turnoValido.apertura);
     const hoyAR = hoyArgentinaISO();
-    if (diaAperturaAR && diaAperturaAR !== hoyAR) {
+    if (origenOffline !== true && diaAperturaAR && diaAperturaAR !== hoyAR) {
       return NextResponse.json(
         {
           ok: false,
