@@ -50,6 +50,7 @@ const rutaRetiroIniciar = await import("../../app/api/pos-ventas/retiros/iniciar
 const rutaRetiroConfirmar = await import("../../app/api/pos-ventas/retiros/[token]/confirmar/route.js");
 const rutaCierreIniciar = await import("../../app/api/pos-ventas/cierres/iniciar/route.js");
 const rutaCierreConfirmar = await import("../../app/api/pos-ventas/cierres/[token]/confirmar/route.js");
+const rutaCierresPendientes = await import("../../app/api/pos-ventas/cierres/pendientes/route.js");
 const rutaAuditoriaOperadores = await import("../../app/api/auditoria-pos-ventas/operadores/route.js");
 const rutaAuditoriaCajas = await import("../../app/api/auditoria-pos-ventas/cajas/route.js");
 
@@ -434,6 +435,15 @@ async function correr() {
   // A deja $1.000 de cambio y cuenta $15.000 de retiro: el cajón tenía $16.000.
   const corteA = await p.iniciarCierre(f.A, turnoA.id, { 1000: 1 });
   requerir("A toma el corte de su caja", corteA.ok === true, `${corteA.status} ${corteA.error ?? ""}`);
+
+  // El token del corte es la llave del conteo. La bandeja de pendientes lo
+  // reparte: tiene que repartirlo solo a quien podría confirmar ese cierre.
+  const tokensPendientes = async (quien) =>
+    ((await leer(await rutaCierresPendientes.GET(pedidoGet(`${BASE}/cierres/pendientes`, quien)))).items || [])
+      .map((i) => i.token);
+  ok("B no recibe el token del corte de A", !(await tokensPendientes(f.B)).includes(corteA.cierre.token));
+  ok("A sí lo recibe, para recuperar su conteo", (await tokensPendientes(f.A)).includes(corteA.cierre.token));
+  ok("el Dueño también, para resolverlo", (await tokensPendientes(f.dueno_)).includes(corteA.cierre.token));
   const finA = await p.confirmarCierre(f.A, corteA.cierre.token, { 10000: 1, 1000: 5 });
   requerir("A confirma: contó $16.000", finA.ok === true, `${finA.status} ${finA.error ?? ""}`);
   // B deja $1.000 de cambio y cuenta $25.000: el cajón tenía $26.000.

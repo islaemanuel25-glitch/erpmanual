@@ -12,16 +12,27 @@
 // Acá SÍ viaja, y es la única lista donde eso pasa. El token es lo único que
 // permite continuar el cierre —no se acepta turnoId como sustituto, justamente
 // para que no exista un identificador adivinable— así que una bandeja de
-// recuperación sin token no serviría para recuperar nada. El acceso ya está
-// acotado por sesión, permiso `pos.usar` y local del contexto activo: quien lee
-// esta lista es alguien que podría iniciar y confirmar ese mismo cierre.
+// recuperación sin token no serviría para recuperar nada. El acceso está
+// acotado por sesión, permiso `pos.usar`, local del contexto activo Y CAJA:
+// quien lee esta lista es alguien que podría iniciar y confirmar ese mismo
+// cierre. Antes alcanzaba con el local, porque la caja era de la cuenta; desde
+// que es del operador, con una cuenta compartida eso le daba a B el token del
+// conteo de A. Ahora cada uno ve los cortes de su caja; Admin y el Dueño en su
+// local —la intervención— y quien tiene `pos.cerrar_sin_conteo` —el que
+// resuelve los cierres trabados— ven todos.
 //
 // Los listados generales de cajas (turnos/listar, turnos/resumen, auditoría) NO
 // lo incluyen.
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { ESTADO_CIERRE, cierreAtrasado } from "@/lib/caja/cierreRelevo";
+import {
+  ESTADO_CIERRE,
+  cierreAtrasado,
+  puedeActuarSobreCaja,
+  PERMISO_CERRAR_SIN_CONTEO,
+} from "@/lib/caja/cierreRelevo";
 import { contextoRelevo, marcarCortesVencidos } from "@/lib/caja/cierreRelevoServer";
+import { identidadParaMirar } from "@/lib/caja/identidadCajaServer";
 
 /** Los dos estados que todavía esperan a alguien. */
 const ABIERTOS = [ESTADO_CIERRE.PREPARANDO, ESTADO_CIERRE.VENCIDO];
@@ -35,26 +46,32 @@ export async function GET(req) {
         { status: ctx.status }
       );
     }
-    const { localId } = ctx;
+    const { localId, session } = ctx;
     const ahora = new Date();
+
+    const identidad = await identidadParaMirar(req, session, { localId });
+    const veTodos =
+      identidad.puedeIntervenir === true ||
+      (Array.isArray(session.permisos) && session.permisos.includes(PERMISO_CERRAR_SIN_CONTEO));
 
     // Marca de ATRASO. No libera el turno ni toca el corte: ver
     // EstadoCierrePreparacion en el schema.
     await marcarCortesVencidos(localId, ahora);
 
-    const filas = await prisma.cierrePreparacion.findMany({
+    const todas = await prisma.cierrePreparacion.findMany({
       where: { localId, estado: { in: ABIERTOS } },
       orderBy: { corteEn: "asc" },
       take: 50,
       include: {
         turno: {
           select: {
-            id: true, apertura: true, vendedorId: true,
+            id: true, apertura: true, vendedorId: true, operadorId: true,
             vendedor: { select: { nombre: true } },
           },
         },
       },
     });
+    const filas = veTodos ? todas : todas.filter((f) => puedeActuarSobreCaja(f.turno, identidad));
 
     // Los operarios son Int planos (mismo patrón que Turno.anuladoPorId), así que
     // los nombres se resuelven en una consulta aparte en vez de con un include.
