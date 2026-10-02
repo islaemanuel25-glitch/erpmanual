@@ -20,9 +20,13 @@
 // cambia el ancho de los otros tres, y dejarlo caer a Semana muestra un período
 // distinto del que se eligió—. Apagado dice la verdad.
 
+import { useState } from "react";
+
 import ChipsDePeriodo, { CLAVE_OTRO } from "@/components/transferencias/ChipsDePeriodo";
 import NavegadorDePeriodo from "@/components/transferencias/NavegadorDePeriodo";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
+import { recortarActividad } from "@/lib/finanzas/presentacionResumen";
 
 import DiaDeActividad from "./DiaDeActividad";
 import ResumenDelPeriodo from "./ResumenDelPeriodo";
@@ -33,6 +37,59 @@ import ResumenDelPeriodo from "./ResumenDelPeriodo";
  * todo, el día que "Otro" se implemente se borra de UN lugar.
  */
 export const CHIPS_APAGADOS = Object.freeze([CLAVE_OTRO]);
+
+/** Cuántos hechos muestra el Resumen de celular antes de "Ver toda la actividad". */
+export const HECHOS_EN_EL_RESUMEN = 3;
+
+/**
+ * LA LISTA COMPLETA DE LA ACTIVIDAD, como siempre: es la de escritorio y la
+ * misma que abre "Ver toda la actividad" en celular. Una sola, para que las dos
+ * no puedan derivar.
+ */
+function ActividadCompleta({ actividad, onAbrirTurno }) {
+  if (!actividad.length) {
+    // EL PERÍODO VACÍO EXISTE. El rango es una cuenta de calendario, no de
+    // datos: decir "no hay período" sería falso. Lo hay, y no pasó nada, que es
+    // una respuesta distinta y es la verdadera.
+    return (
+      <div className="text-center py-12 sunmi-text-muted text-xs">
+        No hubo turnos ni movimientos de caja en este período.
+      </div>
+    );
+  }
+  return actividad.map((dia) => <DiaDeActividad key={dia.clave} dia={dia} onAbrirTurno={onAbrirTurno} />);
+}
+
+/**
+ * LA ACTIVIDAD EN EL RESUMEN DE CELULAR: los primeros hechos y una puerta al
+ * resto.
+ *
+ * La actividad acompaña, no compite con el Resultado: se muestran los primeros
+ * HECHOS del período —en el orden canónico que ya arma el servidor, día por
+ * día— y "Ver toda la actividad" dibuja en el lugar `ActividadCompleta`, la
+ * misma lista de escritorio. El recorte es SOLO de presentación: no cambia la
+ * fuente, no reordena y no crea una segunda lógica —vive en
+ * `recortarActividad`, con su candado—.
+ */
+function ActividadDelResumen({ actividad, onAbrirTurno }) {
+  const [verTodo, setVerTodo] = useState(false);
+  const { dias, hayMas } = recortarActividad(actividad, HECHOS_EN_EL_RESUMEN);
+
+  if (verTodo || !hayMas) {
+    return <ActividadCompleta actividad={actividad} onAbrirTurno={onAbrirTurno} />;
+  }
+
+  return (
+    <>
+      {dias.map((dia) => (
+        <DiaDeActividad key={dia.clave} dia={dia} onAbrirTurno={onAbrirTurno} />
+      ))}
+      <div className="flex justify-end py-2">
+        <SunmiLinkButton onClick={() => setVerTodo(true)}>Ver toda la actividad ›</SunmiLinkButton>
+      </div>
+    </>
+  );
+}
 
 export default function CuentaFinancieraDeUnLocal({
   datos,
@@ -84,18 +141,14 @@ export default function CuentaFinancieraDeUnLocal({
 
           <h2 className="text-xs2 font-semibold sunmi-text-muted tracking-wider">ACTIVIDAD</h2>
 
-          {actividad.length === 0 ? (
-            // EL PERÍODO VACÍO EXISTE. El rango es una cuenta de calendario, no
-            // de datos: decir "no hay período" sería falso. Lo hay, y no pasó
-            // nada, que es una respuesta distinta y es la verdadera.
-            <div className="text-center py-12 sunmi-text-muted text-xs">
-              No hubo turnos ni movimientos de caja en este período.
-            </div>
-          ) : (
-            actividad.map((dia) => (
-              <DiaDeActividad key={dia.clave} dia={dia} onAbrirTurno={onAbrirTurno} />
-            ))
-          )}
+          {/* Celular recorta; escritorio conserva la lista completa de antes. El
+              mismo patrón y la misma frontera `md` que el Resumen de arriba. */}
+          <div data-actividad="celular" className="md:hidden space-y-3.5">
+            <ActividadDelResumen actividad={actividad} onAbrirTurno={onAbrirTurno} />
+          </div>
+          <div data-actividad="escritorio" className="hidden md:block space-y-3.5">
+            <ActividadCompleta actividad={actividad} onAbrirTurno={onAbrirTurno} />
+          </div>
         </>
       )}
     </>

@@ -219,7 +219,14 @@ async function montar() {
   // Fecha económica = HOY, que cae en el período por defecto (Día, en curso).
   // Tres estados de pago; el total económico suma los tres COMPLETOS. Un gasto
   // de OTRO local no tiene que contar en el resultado de `local`.
-  const hoyGasto = new Date();
+  //
+  // El "hoy" es el DÍA ARGENTINO, no `new Date()` crudo: el período del tablero
+  // es el día argentino (`rangoFinanciero`), y cerca de la medianoche UTC —entre
+  // las 00 y las 03 UTC, que es la tarde-noche argentina— la fecha UTC ya es el
+  // día siguiente. Sembrar con `new Date()` dejaría el gasto un día después del
+  // rango y el total daría cero: el candado pasaba de día y fallaba de noche. Se
+  // ancla al mismo día que el rango con el helper que ya existe.
+  const hoyGasto = new Date(`${hoyArgentinaISO()}T12:00:00Z`);
   const categoriaGasto = await prisma.categoriaGasto.create({ data: { nombre: `${marca}-cat`, orden: 1 } });
   creado.categoriaGastoId = categoriaGasto.id;
   const crearGastoCrudo = async (concepto, total, pagos = [], localDelGasto = local.id) => {
