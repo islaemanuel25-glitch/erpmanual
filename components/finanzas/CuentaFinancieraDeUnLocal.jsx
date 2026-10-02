@@ -20,9 +20,13 @@
 // cambia el ancho de los otros tres, y dejarlo caer a Semana muestra un período
 // distinto del que se eligió—. Apagado dice la verdad.
 
+import { useState } from "react";
+
 import ChipsDePeriodo, { CLAVE_OTRO } from "@/components/transferencias/ChipsDePeriodo";
 import NavegadorDePeriodo from "@/components/transferencias/NavegadorDePeriodo";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
+import { recortarActividad } from "@/lib/finanzas/presentacionResumen";
 
 import DiaDeActividad from "./DiaDeActividad";
 import ResumenDelPeriodo from "./ResumenDelPeriodo";
@@ -33,6 +37,46 @@ import ResumenDelPeriodo from "./ResumenDelPeriodo";
  * todo, el día que "Otro" se implemente se borra de UN lugar.
  */
 export const CHIPS_APAGADOS = Object.freeze([CLAVE_OTRO]);
+
+/**
+ * LA ACTIVIDAD EN EL RESUMEN: los primeros tres hechos, y una puerta al resto.
+ *
+ * En el Resumen la actividad acompaña, no compite con el Resultado: se muestran
+ * los tres primeros HECHOS del período —en el orden canónico que ya arma el
+ * servidor, día por día— y "Ver toda la actividad" expande en el lugar el resto,
+ * que es la lista completa de siempre. El recorte es SOLO de presentación: no
+ * cambia la fuente, no reordena y no crea una segunda lógica de actividad —vive
+ * en `recortarActividad`, con su candado—.
+ */
+function ActividadDelResumen({ actividad, onAbrirTurno }) {
+  const [verTodo, setVerTodo] = useState(false);
+
+  if (!actividad.length) {
+    // EL PERÍODO VACÍO EXISTE. El rango es una cuenta de calendario, no de
+    // datos: decir "no hay período" sería falso. Lo hay, y no pasó nada, que es
+    // una respuesta distinta y es la verdadera.
+    return (
+      <div className="text-center py-12 sunmi-text-muted text-xs">
+        No hubo turnos ni movimientos de caja en este período.
+      </div>
+    );
+  }
+
+  const { dias, hayMas } = recortarActividad(actividad, verTodo ? null : 3);
+
+  return (
+    <>
+      {dias.map((dia) => (
+        <DiaDeActividad key={dia.clave} dia={dia} onAbrirTurno={onAbrirTurno} />
+      ))}
+      {hayMas && !verTodo && (
+        <div className="flex justify-end py-2">
+          <SunmiLinkButton onClick={() => setVerTodo(true)}>Ver toda la actividad ›</SunmiLinkButton>
+        </div>
+      )}
+    </>
+  );
+}
 
 export default function CuentaFinancieraDeUnLocal({
   datos,
@@ -84,18 +128,7 @@ export default function CuentaFinancieraDeUnLocal({
 
           <h2 className="text-xs2 font-semibold sunmi-text-muted tracking-wider">ACTIVIDAD</h2>
 
-          {actividad.length === 0 ? (
-            // EL PERÍODO VACÍO EXISTE. El rango es una cuenta de calendario, no
-            // de datos: decir "no hay período" sería falso. Lo hay, y no pasó
-            // nada, que es una respuesta distinta y es la verdadera.
-            <div className="text-center py-12 sunmi-text-muted text-xs">
-              No hubo turnos ni movimientos de caja en este período.
-            </div>
-          ) : (
-            actividad.map((dia) => (
-              <DiaDeActividad key={dia.clave} dia={dia} onAbrirTurno={onAbrirTurno} />
-            ))
-          )}
+          <ActividadDelResumen actividad={actividad} onAbrirTurno={onAbrirTurno} />
         </>
       )}
     </>
