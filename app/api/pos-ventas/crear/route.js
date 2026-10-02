@@ -15,7 +15,7 @@ import { mapearVentaATransferencia } from "@/lib/ventas-internas/mapearVentaATra
 import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
 import { SOLO_TRANSITO } from "@/lib/transferencias/politicasStock";
 import { requireOperadorSegunConfig, verificarVoucherOperador } from "@/lib/operador";
-import { WHERE_TURNO_OPERATIVO, ERROR_TURNO_EN_PREPARACION } from "@/lib/caja/cierreRelevo";
+import { WHERE_TURNO_OPERATIVO, ERROR_TURNO_EN_PREPARACION, whereCajaPropia } from "@/lib/caja/cierreRelevo";
 import { consolidarTenders, aplicarComisionesResueltas, derivarCamposVenta, normalizarMedio, MEDIOS_CON_COMISION } from "@/lib/pos-ventas/pagos";
 import { mediosDelLocal } from "@/lib/pos-ventas/mediosCobroServidor";
 import { comisionesDeMedios } from "@/lib/pos-ventas/mediosCobro";
@@ -117,7 +117,20 @@ export async function POST(req) {
       );
     }
 
-    // Validar que el turno existe, pertenece al local, al vendedor, y está abierto.
+    // Validar que el turno existe, pertenece al local, es LA CAJA de quien vende,
+    // y está abierto.
+    //
+    // LA CAJA ES DEL OPERADOR. Con una cuenta compartida por el mostrador, el
+    // turno de B es del mismo local, de la misma cuenta y está abierto: nada de
+    // eso lo hace de A. `whereCajaPropia` decide con el operador ya validado
+    // arriba por la cookie del PIN —nunca con un id del cuerpo—, y con la cuenta
+    // cuando no hay operador.
+    //
+    // EL REPLAY OFFLINE NO SE MUDA DE CAJA. La venta se cobró con el turno que
+    // tenía la pantalla en ese momento, y la plata entró a ESE cajón: se acepta
+    // si ese turno es de la cuenta que la encoló —la cola vive en su navegador—
+    // o es la caja del operador del voucher. Nunca se reasigna a otra caja, y una
+    // venta cobrada no se pierde por la identidad de quien sincroniza.
     //
     // "Abierto" ya no es solo `cierre: null`. Un turno que tomó el corte de cierre
     // sigue con `cierre` en null —el cajero todavía está contando en otra
@@ -126,15 +139,37 @@ export async function POST(req) {
     // se está confirmando ni ningún otro. `WHERE_TURNO_OPERATIVO` es la condición
     // única, y va en el WHERE y no en un chequeo posterior para que no se pueda
     // olvidar en una rama.
+    const cajaDeQuienVende = whereCajaPropia({ usuarioId: session.id, operadorId });
     const turnoValido = await prisma.turno.findFirst({
       where: {
         id: turnoId,
         localId,
-        vendedorId: session.id,
+        ...(origenOffline === true
+          ? { OR: [{ vendedorId: session.id }, cajaDeQuienVende] }
+          : cajaDeQuienVende),
         ...WHERE_TURNO_OPERATIVO,
       },
-      select: { id: true, apertura: true },
+      select: { id: true, apertura: true, operadorId: true },
     });
+
+    // La anomalía del replay queda a la vista sin modelo nuevo: la venta guarda
+    // el operador del voucher y el turno guarda el suyo, y la diferencia entre
+    // los dos ES el registro. Se loguea igual que el replay sin voucher.
+    if (
+      origenOffline === true &&
+      turnoValido?.operadorId != null &&
+      operadorId != null &&
+      turnoValido.operadorId !== operadorId
+    ) {
+      console.warn(
+        "[pos-ventas/crear] replay offline cobrado por el operador %s en la caja del operador %s — se conserva en la caja donde se cobró. localId=%s turnoId=%s clientTxnId=%s",
+        operadorId,
+        turnoValido.operadorId,
+        localId,
+        turnoValido.id,
+        clientTxnId || clientVentaId || "?"
+      );
+    }
 
     if (!turnoValido) {
       // Se distingue el corte del resto: "turno inválido" no le dice nada a quien
@@ -148,7 +183,7 @@ export async function POST(req) {
           ok: false,
           error: enPreparacion
             ? ERROR_TURNO_EN_PREPARACION
-            : "Turno inválido, cerrado, o no pertenece a este usuario/local",
+            : "Turno inválido, cerrado, o no es tu caja en este local",
           turnoEnPreparacionDeCierre: Boolean(enPreparacion),
         },
         { status: 403 }

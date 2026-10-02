@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
+import { identidadParaMirar, puedeVerCaja } from "@/lib/caja/identidadCajaServer";
 
 export async function GET(req) {
   try {
@@ -33,7 +34,7 @@ export async function GET(req) {
     // Validar turno pertenece al local
     const turno = await prisma.turno.findUnique({
       where: { id: turnoId },
-      select: { localId: true, vendedorId: true },
+      select: { localId: true, vendedorId: true, operadorId: true },
     });
 
     if (!turno || turno.localId !== localId) {
@@ -43,16 +44,16 @@ export async function GET(req) {
       );
     }
 
-    // Si no es su turno, necesita turnos.ver_todos o ser admin
-    if (turno.vendedorId !== session.id) {
-      const puedeVerTodos =
-        session.esAdmin || session.permisos.includes("turnos.ver_todos");
-      if (!puedeVerTodos) {
-        return NextResponse.json(
-          { ok: false, error: "No tenes permiso para ver este turno" },
-          { status: 403 }
-        );
-      }
+    // Si no es SU CAJA —la del operador del PIN, o la de la cuenta sin
+    // operador—, necesita turnos.ver_todos, ser admin o el Dueño de su local.
+    // Antes "su turno" era "de su cuenta", y con una cuenta compartida cada
+    // operador veía los movimientos de todos.
+    const identidad = await identidadParaMirar(req, session, { localId });
+    if (!puedeVerCaja(turno, identidad)) {
+      return NextResponse.json(
+        { ok: false, error: "No tenes permiso para ver este turno" },
+        { status: 403 }
+      );
     }
 
     const movimientos = await prisma.cajaMovimiento.findMany({

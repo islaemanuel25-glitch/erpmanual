@@ -561,6 +561,14 @@ jobs:
       - name: Contrapruebas del ciclo de cierre de caja
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs CC-
 
+      # La caja es del OPERADOR: mismo local, misma cuenta ERP, dos operadores y
+      # dos cajas simultáneas. A −$5.000 y B +$5.000 tienen que llegar así hasta
+      # la auditoría, sin compensarse. Y las contrapruebas: nadie vende, mueve,
+      # arquea, retira, corta ni cierra la caja de otro; el Dueño interviene con
+      # su autoría; un local sin operario sigue con la caja de la cuenta.
+      - name: Caja por operador contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/cajaPorOperador.mjs
+
       # La corrección histórica de caja: el ensayo en seco que escribe y deshace,
       # la aplicación con huella autorizada, la idempotencia y el fallo a mitad.
       # Se arma el incidente ×1000 con las rutas reales del circuito.

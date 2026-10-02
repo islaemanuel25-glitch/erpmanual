@@ -4,15 +4,27 @@ import { fechaHoraAR, horaAR } from "@/lib/fechas/formatearFechaHora";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { resolveScope } from "@/lib/grupos";
-import { requireOperadorSegunConfig } from "@/lib/operador";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { validarFondoManual } from "@/lib/caja/cierreCaja";
-import { WHERE_TURNO_OPERATIVO } from "@/lib/caja/cierreRelevo";
+import { WHERE_TURNO_OPERATIVO, esCajaPropia, whereCajaPropia } from "@/lib/caja/cierreRelevo";
+import { identidadParaOperar } from "@/lib/caja/identidadCajaServer";
+import { aCargoDelTurno } from "@/lib/finanzas/actividadFinanciera";
+
+// Quién está a cargo de un turno ajeno, para el aviso: el operador si lo tiene,
+// la cuenta si no. La MISMA función que rotula los turnos en Finanzas.
+const SELECT_AVISO = {
+  id: true, apertura: true, vendedorId: true, operadorId: true,
+  vendedor: { select: { nombre: true } },
+  operador: { select: { nombre: true } },
+};
+const aCargo = (t) =>
+  aCargoDelTurno({ operadorNombre: t.operador?.nombre, vendedorNombre: t.vendedor?.nombre }) || "otro usuario";
 
 /**
  * Estado de la caja ANTES de abrir. Lo consulta la pantalla de apertura para
- * saber si ESTE usuario ya tiene un turno abierto —lo unico que bloquea— y para
- * avisar, sin bloquear, que hay otros cajeros trabajando en el mismo local.
+ * saber si ESTA caja —la del operador del PIN, o la de la cuenta si no hay
+ * operador— ya tiene un turno abierto, que es lo único que bloquea, y para
+ * avisar, sin bloquear, que hay otras cajas trabajando en el mismo local.
  */
 export async function GET(req) {
   try {
@@ -31,16 +43,28 @@ export async function GET(req) {
     }
     const localId = scope.localId;
 
+    // La caja de quién se está por abrir: el operador del PIN validado en este
+    // local, o la cuenta si no hay operador. Sin PIN donde el local lo exige no
+    // hay a quién abrirle caja, igual que en el POST.
+    const id = await identidadParaOperar(req, session, { localId });
+    if (!id.ok) {
+      return NextResponse.json(
+        { ok: false, error: id.error, needsOperador: true },
+        { status: id.status }
+      );
+    }
+    const { identidad } = id;
+
     // Todos los turnos abiertos del local. El PROPIO bloquea; los AJENOS solo
     // informan: un local puede tener varios dispositivos y varios cajeros
-    // trabajando al mismo tiempo.
+    // trabajando al mismo tiempo, con la misma cuenta o con otras.
     // Solo los OPERATIVOS. Un turno con el corte tomado no está abierto: no
     // vende, no bloquea, y presentarlo acá como "abierto" haría que el relevo
     // crea que no puede empezar.
     const abiertos = await prisma.turno.findMany({
       where: { localId, ...WHERE_TURNO_OPERATIVO, anuladoEn: null },
       orderBy: { apertura: "asc" },
-      select: { id: true, apertura: true, vendedorId: true, vendedor: { select: { nombre: true } } },
+      select: SELECT_AVISO,
     });
 
     // Los congelados van aparte, informativos: son cajas a medio cerrar que
@@ -48,14 +72,11 @@ export async function GET(req) {
     const enPreparacion = await prisma.turno.findMany({
       where: { localId, cierre: null, cierreEnPreparacionEn: { not: null }, anuladoEn: null },
       orderBy: { apertura: "asc" },
-      select: {
-        id: true, apertura: true, cierreEnPreparacionEn: true, vendedorId: true,
-        vendedor: { select: { nombre: true } },
-      },
+      select: { ...SELECT_AVISO, cierreEnPreparacionEn: true },
     });
 
-    const propio = abiertos.find((t) => t.vendedorId === session.id) || null;
-    const ajenos = abiertos.filter((t) => t.vendedorId !== session.id);
+    const propio = abiertos.find((t) => esCajaPropia(t, identidad)) || null;
+    const ajenos = abiertos.filter((t) => !esCajaPropia(t, identidad));
 
     return NextResponse.json({
       ok: true,
@@ -64,23 +85,24 @@ export async function GET(req) {
       // fondo de cualquier cierre anterior sería adivinar. Vuelve cuando exista
       // CajaFisica. Las columnas y los datos históricos quedan intactos.
       herenciaFondoActiva: false,
-      // Solo el turno del MISMO usuario impide abrir.
+      // Solo la caja PROPIA impide abrir.
       turnoPropioAbierto: propio
         ? { turnoId: propio.id, apertura: propio.apertura }
         : null,
-      // Informativo, NO bloqueante.
+      // Informativo, NO bloqueante. `vendedorNombre` conserva el nombre del
+      // campo que lee la pantalla, pero dice quién está a cargo de esa caja.
       otrosTurnosAbiertos: ajenos.map((t) => ({
         turnoId: t.id,
         apertura: t.apertura,
-        vendedorNombre: t.vendedor?.nombre || "otro usuario",
+        vendedorNombre: aCargo(t),
       })),
       // Cajas cortadas esperando conteo. Tampoco bloquean.
       turnosEnPreparacionDeCierre: enPreparacion.map((t) => ({
         turnoId: t.id,
         apertura: t.apertura,
         iniciadoEn: t.cierreEnPreparacionEn,
-        vendedorNombre: t.vendedor?.nombre || "otro usuario",
-        esPropio: t.vendedorId === session.id,
+        vendedorNombre: aCargo(t),
+        esPropio: esCajaPropia(t, identidad),
       })),
     });
   } catch (error) {
@@ -116,20 +138,34 @@ export async function POST(req) {
     }
     const localId = scope.localId;
 
-    // UN TURNO ABIERTO POR USUARIO, NO POR LOCAL.
+    // LA CAJA ES DEL OPERADOR, NO DE LA CUENTA NI DEL LOCAL.
     //
     // Un local puede tener varios dispositivos y varios cajeros trabajando a la
-    // vez, así que bloquear todo el local por existir otro turno abierto dejaba
-    // sin poder operar a gente que no tenía nada que ver. Lo que sí no tiene
-    // sentido es que UNA persona lleve dos cajas suyas al mismo tiempo.
+    // vez, y en el mostrador real comparten UNA cuenta: cada operador tiene su
+    // propio cajón. Lo que no tiene sentido es que UNA persona lleve dos cajas
+    // suyas al mismo tiempo — ni con la misma cuenta ni con otra.
+    //
+    // La identidad sale de la sesión y de la cookie del PIN validada en este
+    // local; nunca del cuerpo. Sin operador (local sin operario, o Admin/Dueño
+    // sin PIN) la caja es de la cuenta, como siempre. Los índices únicos
+    // parciales de `Turno` son la garantía ante dos aperturas simultáneas.
     //
     // Los turnos ajenos no bloquean: se informan y listo.
     //
     // EL TURNO CONGELADO NO BLOQUEA. Un turno que ya tomó su corte de cierre no
     // está operando: el cajero lo está contando en otra pestaña. Si bloqueara,
     // el relevo no podría abrir mientras tanto y todo el flujo perdería sentido.
+    const id = await identidadParaOperar(req, session, { localId });
+    if (!id.ok) {
+      return NextResponse.json(
+        { ok: false, error: id.error, needsOperador: true },
+        { status: id.status }
+      );
+    }
+    const { identidad } = id;
+
     const turnoPropio = await prisma.turno.findFirst({
-      where: { localId, vendedorId: session.id, ...WHERE_TURNO_OPERATIVO, anuladoEn: null },
+      where: { localId, ...whereCajaPropia(identidad), ...WHERE_TURNO_OPERATIVO, anuladoEn: null },
       orderBy: { apertura: "asc" },
       select: { id: true, apertura: true },
     });
@@ -168,19 +204,13 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: ap.error }, { status: 400 });
     }
 
-    const gateOp = await requireOperadorSegunConfig(req, session, { localId });
-    if (!gateOp.ok) {
-      return NextResponse.json(
-        { ok: false, error: gateOp.error, needsOperador: true },
-        { status: gateOp.status }
-      );
-    }
-
     const turno = await prisma.turno.create({
       data: {
         localId,
+        // La cuenta que abrió: auditoría de acceso, no la dueña de la caja.
         vendedorId: session.id,
-        operadorId: gateOp.operadorId,
+        // El responsable del cajón. Se escribe acá y no se reescribe nunca.
+        operadorId: identidad.operadorId,
         // Lo que el cajero declara haber recibido. Sin monto sugerido no hay
         // diferencia de recepcion que calcular, asi que fondoSugeridoApertura y
         // diferenciaFondoApertura quedan en NULL: significa "no aplica", no cero.
@@ -193,7 +223,7 @@ export async function POST(req) {
     // Otros turnos abiertos del local: informativo, no bloquea.
     const otrosAbiertos = await prisma.turno.findMany({
       where: { localId, ...WHERE_TURNO_OPERATIVO, anuladoEn: null, id: { not: turno.id } },
-      select: { id: true, vendedor: { select: { nombre: true } } },
+      select: SELECT_AVISO,
     });
 
     return NextResponse.json({
@@ -202,12 +232,13 @@ export async function POST(req) {
       herenciaFondoActiva: false,
       otrosTurnosAbiertos: otrosAbiertos.map((t) => ({
         turnoId: t.id,
-        vendedorNombre: t.vendedor?.nombre || "otro usuario",
+        vendedorNombre: aCargo(t),
       })),
     });
   } catch (error) {
-    // Choque contra el indice unico parcial (localId, vendedorId) WHERE cierre IS
-    // NULL: dos aperturas simultaneas del MISMO usuario. Solo una puede ganar.
+    // Choque contra uno de los índices únicos parciales de la caja operativa
+    // —por operador, o por cuenta sin operador—: dos aperturas simultáneas de
+    // la MISMA caja. Solo una puede ganar.
     if (error?.code === "P2002") {
       return NextResponse.json(
         { ok: false, error: "Ya tenés un turno abierto en este local. Actualizá y volvé a intentar." },

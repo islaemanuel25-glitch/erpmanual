@@ -30,6 +30,7 @@ import {
   ESTADO_CAMBIO,
   WHERE_TURNO_OPERATIVO,
   evaluarAperturaSinCambio,
+  whereCajaPropia,
 } from "@/lib/caja/cierreRelevo";
 import { contextoRelevo, OPCIONES_TX } from "@/lib/caja/cierreRelevoServer";
 
@@ -88,10 +89,16 @@ export async function POST(req) {
     }
 
     const turno = await prisma.$transaction(async (tx) => {
-      // Un turno del mismo usuario que ya tomó su corte NO bloquea: ese es el
-      // caso del relevo.
+      // Una caja operativa por operador —o por cuenta sin operador— y local.
+      // Un turno propio que ya tomó su corte NO bloquea: ese es el caso del
+      // relevo.
       const propio = await tx.turno.findFirst({
-        where: { localId, vendedorId: session.id, ...WHERE_TURNO_OPERATIVO, anuladoEn: null },
+        where: {
+          localId,
+          ...whereCajaPropia({ usuarioId: session.id, operadorId: gateOp.operadorId ?? null }),
+          ...WHERE_TURNO_OPERATIVO,
+          anuladoEn: null,
+        },
         select: { id: true },
       });
       if (propio) {

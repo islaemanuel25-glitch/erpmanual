@@ -30,7 +30,7 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import prisma from "@/lib/prisma";
-import { requireOperadorSegunConfig } from "@/lib/operador";
+import { requireOperadorSegunConfig, puedeOperarSinOperador } from "@/lib/operador";
 import {
   validarDesgloseServidor,
   evaluarDesproporcionDesglose,
@@ -46,6 +46,8 @@ import {
   vencimientoCierre,
   calcularRetiroEsperado,
   ERROR_RETIRO_EN_PREPARACION_PARA_CIERRE,
+  ERROR_CAJA_AJENA,
+  puedeActuarSobreCaja,
 } from "@/lib/caja/cierreRelevo";
 import { ESTADO_RETIRO } from "@/lib/caja/retiroRelevo";
 import {
@@ -132,6 +134,23 @@ export async function POST(req) {
       if (!turno) {
         const e = new Error("Turno no encontrado en este local");
         e.codigo = "no_encontrado";
+        throw e;
+      }
+
+      // EL CORTE ES DE LA CAJA DE QUIEN LO TOMA. Antes alcanzaba con que el
+      // turno fuera del local: cualquier sesión con `pos.usar` podía cortar la
+      // caja de otro operador y dejarla congelada. Un cajero común corta solo
+      // la suya; Admin y el Dueño en su local, la de cualquiera, y quedan
+      // grabados como quien lo inició.
+      if (
+        !puedeActuarSobreCaja(turno, {
+          usuarioId: session.id,
+          operadorId: gateOp.operadorId ?? null,
+          puedeIntervenir: puedeOperarSinOperador(session, { localId }),
+        })
+      ) {
+        const e = new Error(ERROR_CAJA_AJENA);
+        e.codigo = "caja_ajena";
         throw e;
       }
 
@@ -310,6 +329,9 @@ export async function POST(req) {
     }
     if (error?.codigo === "no_encontrado") {
       return NextResponse.json({ ok: false, error: error.message }, { status: 404 });
+    }
+    if (error?.codigo === "caja_ajena") {
+      return NextResponse.json({ ok: false, error: error.message, cajaAjena: true }, { status: 403 });
     }
     if (error?.codigo === "conflicto") {
       return NextResponse.json(
