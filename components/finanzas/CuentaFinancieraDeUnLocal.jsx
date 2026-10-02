@@ -38,19 +38,15 @@ import ResumenDelPeriodo from "./ResumenDelPeriodo";
  */
 export const CHIPS_APAGADOS = Object.freeze([CLAVE_OTRO]);
 
-/**
- * LA ACTIVIDAD EN EL RESUMEN: los primeros tres hechos, y una puerta al resto.
- *
- * En el Resumen la actividad acompaña, no compite con el Resultado: se muestran
- * los tres primeros HECHOS del período —en el orden canónico que ya arma el
- * servidor, día por día— y "Ver toda la actividad" expande en el lugar el resto,
- * que es la lista completa de siempre. El recorte es SOLO de presentación: no
- * cambia la fuente, no reordena y no crea una segunda lógica de actividad —vive
- * en `recortarActividad`, con su candado—.
- */
-function ActividadDelResumen({ actividad, onAbrirTurno }) {
-  const [verTodo, setVerTodo] = useState(false);
+/** Cuántos hechos muestra el Resumen de celular antes de "Ver toda la actividad". */
+export const HECHOS_EN_EL_RESUMEN = 3;
 
+/**
+ * LA LISTA COMPLETA DE LA ACTIVIDAD, como siempre: es la de escritorio y la
+ * misma que abre "Ver toda la actividad" en celular. Una sola, para que las dos
+ * no puedan derivar.
+ */
+function ActividadCompleta({ actividad, onAbrirTurno }) {
   if (!actividad.length) {
     // EL PERÍODO VACÍO EXISTE. El rango es una cuenta de calendario, no de
     // datos: decir "no hay período" sería falso. Lo hay, y no pasó nada, que es
@@ -61,19 +57,36 @@ function ActividadDelResumen({ actividad, onAbrirTurno }) {
       </div>
     );
   }
+  return actividad.map((dia) => <DiaDeActividad key={dia.clave} dia={dia} onAbrirTurno={onAbrirTurno} />);
+}
 
-  const { dias, hayMas } = recortarActividad(actividad, verTodo ? null : 3);
+/**
+ * LA ACTIVIDAD EN EL RESUMEN DE CELULAR: los primeros hechos y una puerta al
+ * resto.
+ *
+ * La actividad acompaña, no compite con el Resultado: se muestran los primeros
+ * HECHOS del período —en el orden canónico que ya arma el servidor, día por
+ * día— y "Ver toda la actividad" dibuja en el lugar `ActividadCompleta`, la
+ * misma lista de escritorio. El recorte es SOLO de presentación: no cambia la
+ * fuente, no reordena y no crea una segunda lógica —vive en
+ * `recortarActividad`, con su candado—.
+ */
+function ActividadDelResumen({ actividad, onAbrirTurno }) {
+  const [verTodo, setVerTodo] = useState(false);
+  const { dias, hayMas } = recortarActividad(actividad, HECHOS_EN_EL_RESUMEN);
+
+  if (verTodo || !hayMas) {
+    return <ActividadCompleta actividad={actividad} onAbrirTurno={onAbrirTurno} />;
+  }
 
   return (
     <>
       {dias.map((dia) => (
         <DiaDeActividad key={dia.clave} dia={dia} onAbrirTurno={onAbrirTurno} />
       ))}
-      {hayMas && !verTodo && (
-        <div className="flex justify-end py-2">
-          <SunmiLinkButton onClick={() => setVerTodo(true)}>Ver toda la actividad ›</SunmiLinkButton>
-        </div>
-      )}
+      <div className="flex justify-end py-2">
+        <SunmiLinkButton onClick={() => setVerTodo(true)}>Ver toda la actividad ›</SunmiLinkButton>
+      </div>
     </>
   );
 }
@@ -128,7 +141,14 @@ export default function CuentaFinancieraDeUnLocal({
 
           <h2 className="text-xs2 font-semibold sunmi-text-muted tracking-wider">ACTIVIDAD</h2>
 
-          <ActividadDelResumen actividad={actividad} onAbrirTurno={onAbrirTurno} />
+          {/* Celular recorta; escritorio conserva la lista completa de antes. El
+              mismo patrón y la misma frontera `md` que el Resumen de arriba. */}
+          <div data-actividad="celular" className="md:hidden space-y-3.5">
+            <ActividadDelResumen actividad={actividad} onAbrirTurno={onAbrirTurno} />
+          </div>
+          <div data-actividad="escritorio" className="hidden md:block space-y-3.5">
+            <ActividadCompleta actividad={actividad} onAbrirTurno={onAbrirTurno} />
+          </div>
         </>
       )}
     </>
