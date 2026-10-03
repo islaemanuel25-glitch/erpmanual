@@ -577,6 +577,13 @@ jobs:
       - name: Caja por operador contra PostgreSQL
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/cajaPorOperador.mjs
 
+      # Un mismo cobro, una sola venta: reintentos con el mismo clientTxnId,
+      # reintentos simultáneos que chocan contra el índice único, un P2002 de
+      # otra restricción que no se toma por reintento, y que la idempotencia no
+      # abre la caja de otro operador.
+      - name: Cobro idempotente contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/cobroIdempotente.mjs
+
       # La corrección histórica de caja: el ensayo en seco que escribe y deshace,
       # la aplicación con huella autorizada, la idempotencia y el fallo a mitad.
       # Se arma el incidente ×1000 con las rutas reales del circuito.

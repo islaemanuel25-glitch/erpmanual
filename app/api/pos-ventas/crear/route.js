@@ -17,6 +17,7 @@ import { SOLO_TRANSITO } from "@/lib/transferencias/politicasStock";
 import { requireOperadorSegunConfig, verificarVoucherOperador } from "@/lib/operador";
 import { WHERE_TURNO_OPERATIVO, ERROR_TURNO_EN_PREPARACION, whereCajaPropia } from "@/lib/caja/cierreRelevo";
 import { ERROR_VENTA_DE_OTRO_OPERADOR } from "@/lib/pos-ventas/replayOffline";
+import { esMismoDestino, esChoqueDeClientTxnId } from "@/lib/pos-ventas/idempotenciaVenta";
 import { consolidarTenders, aplicarComisionesResueltas, derivarCamposVenta, normalizarMedio, MEDIOS_CON_COMISION } from "@/lib/pos-ventas/pagos";
 import { mediosDelLocal } from "@/lib/pos-ventas/mediosCobroServidor";
 import { comisionesDeMedios } from "@/lib/pos-ventas/mediosCobro";
@@ -62,7 +63,70 @@ function mapTipoPrecioAplicado(lista) {
   return "PRECIO_VENTA";
 }
 
+/** La venta de un `clientTxnId`, con lo que hace falta para responder un reintento. */
+function buscarVentaPorTxn(txnId) {
+  return prisma.venta.findUnique({
+    where: { clientTxnId: txnId },
+    select: {
+      id: true,
+      numero: true,
+      total: true,
+      fecha: true,
+      subtotal: true,
+      descuento: true,
+      localId: true,
+      turnoId: true,
+      // Venta interna: el reintento no puede devolver "ok, duplicada" si la
+      // transferencia falta. Ver bloqueoReintentoHuerfana.
+      cliente: { select: { localVinculadoId: true } },
+      transferencia: { select: { id: true } },
+      detalles: { select: { cantidadStock: true } },
+    },
+  });
+}
+
+/** La respuesta canónica de un reintento: la venta que ya existe, sin escribir nada. */
+function responderDuplicada(ventaExistente) {
+  // Segunda barrera de idempotencia: Transferencia.ventaId @unique. Si la
+  // venta interna ya tiene su transferencia, este reintento no crea nada.
+  const huerfana = bloqueoReintentoHuerfana({
+    esInterna: ventaExistente.cliente?.localVinculadoId != null,
+    tieneFisico: ventaExistente.detalles.some((d) => d.cantidadStock != null),
+    tieneTransferencia: ventaExistente.transferencia != null,
+  });
+  if (huerfana) {
+    return NextResponse.json(
+      { ok: false, error: huerfana.error, code: huerfana.code },
+      { status: huerfana.status }
+    );
+  }
+
+  // Calcular breakdown desde venta existente
+  const descuentoAutomatico = 0; // No lo tenemos guardado, usar 0
+  const descuentoManual = Number(ventaExistente.descuento) || 0;
+  const descuentoPorPuntosVal = 0; // No lo tenemos guardado, usar 0
+
+  return NextResponse.json({
+    ok: true,
+    ventaId: ventaExistente.id,
+    numero: ventaExistente.numero,
+    message: `Venta #${ventaExistente.numero} ya registrada (idempotencia)`,
+    isDuplicate: true,
+    breakdown: {
+      subtotal: Number(ventaExistente.subtotal),
+      descuentoAutomatico,
+      descuentoManual,
+      descuentoPorPuntos: descuentoPorPuntosVal,
+      descuentoTotal: Number(ventaExistente.descuento),
+      total: Number(ventaExistente.total),
+    },
+  });
+}
+
 export async function POST(req) {
+  // El id de idempotencia y el destino de este pedido, cuando ya se conocen.
+  // Vive afuera del `try` porque lo lee el `catch`.
+  let pedidoIdempotente = null;
   try {
     const perm = requirePerm(req, "pos.usar");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
@@ -137,70 +201,14 @@ export async function POST(req) {
     // estando escrita, y resolverla a mano la duplicaría. Se reconoce solo si
     // apunta al MISMO local y turno que la venta guardada; cualquier otra cosa
     // sigue por las validaciones de siempre.
-    const ventaExistente = txnId
-      ? await prisma.venta.findUnique({
-          where: { clientTxnId: txnId },
-          select: {
-            id: true,
-            numero: true,
-            total: true,
-            fecha: true,
-            subtotal: true,
-            descuento: true,
-            localId: true,
-            turnoId: true,
-            // Venta interna: el reintento no puede devolver "ok, duplicada" si la
-            // transferencia falta. Ver bloqueoReintentoHuerfana.
-            cliente: { select: { localVinculadoId: true } },
-            transferencia: { select: { id: true } },
-            detalles: { select: { cantidadStock: true } },
-          },
-        })
-      : null;
+    const ventaExistente = txnId ? await buscarVentaPorTxn(txnId) : null;
 
-    const responderDuplicada = () => {
-      // Segunda barrera de idempotencia: Transferencia.ventaId @unique. Si la
-      // venta interna ya tiene su transferencia, este reintento no crea nada.
-      const huerfana = bloqueoReintentoHuerfana({
-        esInterna: ventaExistente.cliente?.localVinculadoId != null,
-        tieneFisico: ventaExistente.detalles.some((d) => d.cantidadStock != null),
-        tieneTransferencia: ventaExistente.transferencia != null,
-      });
-      if (huerfana) {
-        return NextResponse.json(
-          { ok: false, error: huerfana.error, code: huerfana.code },
-          { status: huerfana.status }
-        );
-      }
+    // Lo que el `catch` necesita para reconocer el choque de dos reintentos
+    // simultáneos contra el índice único (ver más abajo).
+    pedidoIdempotente = txnId ? { txnId, localId, turnoId } : null;
 
-      // Calcular breakdown desde venta existente
-      const descuentoAutomatico = 0; // No lo tenemos guardado, usar 0
-      const descuentoManual = Number(ventaExistente.descuento) || 0;
-      const descuentoPorPuntosVal = 0; // No lo tenemos guardado, usar 0
-
-      return NextResponse.json({
-        ok: true,
-        ventaId: ventaExistente.id,
-        numero: ventaExistente.numero,
-        message: `Venta #${ventaExistente.numero} ya registrada (idempotencia)`,
-        isDuplicate: true,
-        breakdown: {
-          subtotal: Number(ventaExistente.subtotal),
-          descuentoAutomatico,
-          descuentoManual,
-          descuentoPorPuntos: descuentoPorPuntosVal,
-          descuentoTotal: Number(ventaExistente.descuento),
-          total: Number(ventaExistente.total),
-        },
-      });
-    };
-
-    if (
-      ventaExistente &&
-      ventaExistente.localId === localId &&
-      ventaExistente.turnoId === Number(turnoId)
-    ) {
-      return responderDuplicada();
+    if (esMismoDestino(ventaExistente, { localId, turnoId })) {
+      return responderDuplicada(ventaExistente);
     }
 
     // Validar que el turno existe, pertenece al local, es LA CAJA de quien vende,
@@ -277,7 +285,7 @@ export async function POST(req) {
     // Idempotencia por clientTxnId/clientVentaId para un id ya usado en otro
     // destino: con el turno validado, la respuesta de siempre.
     if (ventaExistente) {
-      return responderDuplicada();
+      return responderDuplicada(ventaExistente);
     }
 
     // Validaciones
@@ -1677,6 +1685,24 @@ export async function POST(req) {
       );
     }
     
+    // DOS REINTENTOS SIMULTÁNEOS DE LA MISMA VENTA. Los dos pasaron la consulta
+    // de idempotencia de arriba antes de que el otro creara la venta, y éste
+    // chocó contra el índice único de `clientTxnId` al crearla. Su transacción
+    // ya se revirtió entera —venta, pagos, stock, movimientos, libros—: no
+    // escribió nada. Si la venta que ganó es del MISMO local y turno, esto es un
+    // reintento y recibe esa venta, como en la consulta de arriba. Cualquier
+    // otro P2002 —el número de venta, otra tabla— sigue siendo un conflicto.
+    if (esChoqueDeClientTxnId(err) && pedidoIdempotente) {
+      try {
+        const ganadora = await buscarVentaPorTxn(pedidoIdempotente.txnId);
+        if (esMismoDestino(ganadora, pedidoIdempotente)) {
+          return responderDuplicada(ganadora);
+        }
+      } catch (errBusqueda) {
+        console.error("Error buscando la venta del reintento simultáneo:", errBusqueda);
+      }
+    }
+
     // Error de unique constraint (clientTxnId duplicado o número duplicado)
     if (err.code === 'P2002') {
       return NextResponse.json(
