@@ -13,10 +13,17 @@
 //   5. la reconciliación con una venta que ya existía;
 //   6. la sincronización atómica con `crear` y su reversión;
 //   7. las carreras registro/crear y crear/crear, FORZADAS con el candado real
-//      del local (scripts/pruebas-db/carreraForzada.mjs);
+//      del local (scripts/pruebas-db/carreraForzada.mjs), incluida la ventana
+//      con la venta escrita y sin confirmar, cuando confirma (7c) y cuando se
+//      revierte (7e);
 //   8. que un cobro descartado no se convierte en venta;
 //   9. los topes del pedido;
-//  10. que la caja por operador (DEC-0012) sigue mandando.
+//  10. que la caja por operador (DEC-0012) sigue mandando;
+//  11. que el registro espera una venta larga sin vencer (más de 5 s);
+//  12. que un valor que la columna no puede guardar rechaza ESE cobro y no el
+//      pedido;
+//  13. dos locales registrando el mismo id a la vez, forzado;
+//  14. que el aislamiento por local no depende del hash.
 //
 // Los cuerpos son los que arma la pantalla: el ítem de la cola de
 // `guardarVentaPendiente` y el pedido de `procesarCola`.
@@ -32,7 +39,7 @@ const { crearProductoVendible } = await import("./fixturePos.mjs");
 const { retenerCandadoDelLocal, retenerFilaDeStock, esperarEnCandadoDelLocal, esperarEnFila } = await import("./carreraForzada.mjs");
 const { firmarTokenOperador, firmarVoucherOperador, OperadorCookie } = await import("../../lib/operador.js");
 const { itemCrearPayload } = await import("../../lib/pos-ventas/payloadVenta.js");
-const { LIMITES_REGISTRO } = await import("../../lib/pos-ventas/cobroOffline.js");
+const { LIMITES_REGISTRO, MAXIMO_INT32, sanearCobro, hashDePayload } = await import("../../lib/pos-ventas/cobroOffline.js");
 
 const rutaAbrir = await import("../../app/api/pos-ventas/turnos/abrir/route.js");
 const rutaCrearVenta = await import("../../app/api/pos-ventas/crear/route.js");
@@ -388,6 +395,14 @@ async function correr() {
   // ═════════════════════════════════════════════════════════════════════════
   seccion("7. Carreras forzadas con el candado real del local");
 
+  // QUÉ CASO PRUEBA EL CANDADO DEL REGISTRO: el 7c. Sin el candado, 7a y 7b se
+  // ponen rojos por el ORDEN de llegada, que es incidental (el estado final es
+  // coherente igual); el 7c muestra el daño real —una venta confirmada con su
+  // cobro PENDIENTE y sin vínculo—. Para que esa contraprueba llegue al 7c, la
+  // espera del orden en 7a y 7b tiene un tope corto: sin candado, el registro
+  // nunca se detiene, y con el tope de 30 s la retención vencía antes.
+  const TOPE_ORDEN = 5_000;
+
   // 7a. crear primero, después el registro: los dos quedan detenidos en el
   // candado, en ese orden. Al soltar, crear crea; el registro ve la venta.
   {
@@ -397,9 +412,9 @@ async function correr() {
     let pVenta; let pRegistro; let enFila1 = 0; let enFila2 = 0;
     try {
       pVenta = replay(f.A, c);
-      enFila1 = await esperarEnCandadoDelLocal(prisma, f.local.id, 1);
+      enFila1 = await esperarEnCandadoDelLocal(prisma, f.local.id, 1, TOPE_ORDEN);
       pRegistro = registrarUno(f.A, c);
-      enFila2 = await esperarEnCandadoDelLocal(prisma, f.local.id, 2);
+      enFila2 = await esperarEnCandadoDelLocal(prisma, f.local.id, 2, TOPE_ORDEN);
     } finally {
       await candado.soltar();
     }
@@ -419,9 +434,9 @@ async function correr() {
     let pVenta; let pRegistro; let enFila1 = 0; let enFila2 = 0;
     try {
       pRegistro = registrarUno(f.A, c);
-      enFila1 = await esperarEnCandadoDelLocal(prisma, f.local.id, 1);
+      enFila1 = await esperarEnCandadoDelLocal(prisma, f.local.id, 1, TOPE_ORDEN);
       pVenta = replay(f.A, c);
-      enFila2 = await esperarEnCandadoDelLocal(prisma, f.local.id, 2);
+      enFila2 = await esperarEnCandadoDelLocal(prisma, f.local.id, 2, TOPE_ORDEN);
     } finally {
       await candado.soltar();
     }
@@ -453,8 +468,40 @@ async function correr() {
     ok("crear quedó detenido con la venta escrita y sin confirmar", enFila >= 1, `${enFila}`);
     ok("el registro esperó el candado del local", enCandado === 1, `${enCandado}`);
     const cobro = await cobroDe(id);
-    ok("nunca una venta con su cobro PENDIENTE: RECONCILIADO y SINCRONIZADA", rvv.ok === true && rrg.resultado === "RECONCILIADO"
+    const venta = await ventaDe(id);
+    // La afirmación que pone rojo sacar el candado del registro.
+    ok("ninguna venta confirmada con su cobro PENDIENTE y sin vínculo", !(venta && cobro?.estado === "PENDIENTE" && cobro.ventaId === null),
+      `venta ${venta?.id} cobro ${cobro?.estado} ${cobro?.ventaId}`);
+    ok("el registro entra después de la venta: RECONCILIADO y SINCRONIZADA", rvv.ok === true && rrg.resultado === "RECONCILIADO"
       && cobro.estado === "SINCRONIZADA" && cobro.ventaId === rvv.ventaId, `${JSON.stringify(rrg)} ${cobro?.estado}`);
+  }
+
+  // 7e. LA MISMA VENTANA, PERO crear FALLA: con la venta ya escrita y detenido
+  // en la fila de stock, el pedido supera el stock (el local no vende en
+  // negativo) y la transacción se revierte. El registro, que esperaba el
+  // candado, entra después y no encuentra venta: queda PENDIENTE, sin vínculo.
+  {
+    const id = nuevoId("ventana-revertida");
+    const c = cobroCola(id, { turnoId: turnoA, cantidad: 5000 });
+    const antes = await huella();
+    const fila = await retenerFilaDeStock(prisma, { localId: f.local.id, productoLocalId: f.producto.productoLocalId });
+    let pVenta; let pRegistro; let enFila = 0; let enCandado = 0;
+    try {
+      pVenta = replay(f.A, c);
+      enFila = await esperarEnFila(prisma, 1);
+      pRegistro = registrarUno(f.A, c);
+      enCandado = await esperarEnCandadoDelLocal(prisma, f.local.id, 1, 5_000);
+    } finally {
+      await fila.soltar();
+    }
+    const [rvv, rrg] = await Promise.all([pVenta, pRegistro]);
+    ok("crear detenido con la venta escrita, y el registro esperando el candado", enFila >= 1 && enCandado === 1, `${enFila} ${enCandado}`);
+    ok("crear se revierte por stock: 409", rvv.status === 409 && rvv.ok !== true, `${rvv.status} ${rvv.error ?? ""}`);
+    ok("la venta revertida no existe", !(await ventaDe(id)));
+    const cobro = await cobroDe(id);
+    ok("el registro entra después: CREADO, PENDIENTE, sin ventaId", rrg.resultado === "CREADO" && cobro?.estado === "PENDIENTE"
+      && cobro.ventaId === null && cobro.sincronizadaEn === null, `${JSON.stringify(rrg)} ${cobro?.estado}`);
+    igual("sin escrituras económicas parciales", await huella(), antes);
   }
 
   // 7d. dos replays del mismo cobro registrado a la vez: una venta.
@@ -531,6 +578,168 @@ async function correr() {
   ok("registrarlo no le dio autoridad: el cobro sigue PENDIENTE", cWb.estado === "PENDIENTE" && cWb.ventaId === null);
   const rA = await replay(f.A, cW);
   ok("A, con su PIN, en su caja: la venta se crea y el cobro se sincroniza", rA.ok === true && (await cobroDe(idW)).estado === "SINCRONIZADA", `${rA.status} ${rA.error ?? ""}`);
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("11. El registro espera una venta larga sin vencer");
+
+  // `crear` puede tener el candado hasta 30 s. El registro lo espera con los
+  // mismos límites (LIMITES_TRANSACCION_DEL_LOCAL); con el default de Prisma
+  // vencía a los 5 s con P2028 y el pedido entero respondía 500. El candado se
+  // retiene apenas más que esos 5 s, contados desde que el registro empezó.
+  {
+    const VIEJO_LIMITE_MS = 5_000;
+    const id = nuevoId("espera-larga");
+    const retencion = await retenerCandadoDelLocal(prisma, f.local.id);
+    let pRegistro; let enCandado = 0; let siguiaEsperando = 0; let t0 = 0;
+    try {
+      t0 = Date.now();
+      pRegistro = registrarUno(f.A, cobroCola(id, { turnoId: turnoA }));
+      enCandado = await esperarEnCandadoDelLocal(prisma, f.local.id, 1, 5_000);
+      await new Promise((r) => setTimeout(r, Math.max(0, VIEJO_LIMITE_MS + 750 - (Date.now() - t0))));
+      siguiaEsperando = await esperarEnCandadoDelLocal(prisma, f.local.id, 1, 1_000);
+    } finally {
+      await retencion.soltar();
+    }
+    const r = await pRegistro;
+    const espera = Date.now() - t0;
+    ok("el registro quedó esperando el candado durante más que el viejo límite", enCandado === 1 && siguiaEsperando === 1 && espera > VIEJO_LIMITE_MS,
+      `${enCandado} ${siguiaEsperando} ${espera} ms`);
+    ok("terminó 200 CREADO, no 500", r.status === 200 && r.resultado === "CREADO", `${r.status} ${r.resultado ?? ""} ${r.error ?? ""}`);
+    const filas = await prisma.cobroOffline.findMany({ where: { clientTxnId: id } });
+    ok("exactamente un cobro, PENDIENTE, de su local y su turno", filas.length === 1 && filas[0].estado === "PENDIENTE"
+      && filas[0].localId === f.local.id && filas[0].turnoId === turnoA, JSON.stringify(filas.map((x) => x.estado)));
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("12. Un valor que la columna no puede guardar no tumba el pedido");
+
+  {
+    const antes = await huella();
+    const ids = {
+      turno: nuevoId("turno-fuera-int4"),
+      cuenta: nuevoId("cuenta-fuera-int4"),
+      total: nuevoId("total-fuera-decimal"),
+      totalRedondeado: nuevoId("total-redondeado-fuera"),
+      borde: nuevoId("total-borde"),
+      vecino: nuevoId("vecino-valido"),
+    };
+    const r = await registrar(f.A, [
+      cobroCola(ids.turno, { turnoId: MAXIMO_INT32 + 1 }),
+      cobroCola(ids.cuenta, { turnoId: turnoA, extra: { userId: MAXIMO_INT32 + 1 } }),
+      cobroCola(ids.total, { turnoId: turnoA, extra: { total: 10_000_000_000 } }),
+      cobroCola(ids.totalRedondeado, { turnoId: turnoA, extra: { total: 9_999_999_999.999 } }),
+      cobroCola(ids.borde, { turnoId: turnoA, extra: { total: 9_999_999_999.99 } }),
+      cobroCola(ids.vecino, { turnoId: turnoA }),
+    ]);
+    ok("el pedido responde 200, no 500", r.status === 200 && r.ok === true, `${r.status} ${r.error ?? ""}`);
+    const [rTurno, rCuenta, rTotal, rRedondeado, rBorde, rVecino] = r.resultados ?? [];
+    for (const [nombre, res, id] of [
+      ["turno fuera del int4", rTurno, ids.turno],
+      ["cuenta fuera del int4", rCuenta, ids.cuenta],
+      ["total de once enteros", rTotal, ids.total],
+      ["total que redondeado no entra (9999999999.999)", rRedondeado, ids.totalRedondeado],
+    ]) {
+      ok(`${nombre}: RECHAZADO INVALIDO, sin fila`, res?.resultado === "RECHAZADO" && res.codigo === "INVALIDO" && !(await cobroDe(id)), JSON.stringify(res));
+    }
+    const borde = await cobroDe(ids.borde);
+    ok("el máximo exacto del Decimal(12,2) se guarda tal cual", rBorde?.resultado === "CREADO" && borde?.totalDeclarado.toString() === "9999999999.99",
+      `${JSON.stringify(rBorde)} ${borde?.totalDeclarado}`);
+    ok("el vecino válido se registra", rVecino?.resultado === "CREADO" && (await cobroDe(ids.vecino))?.estado === "PENDIENTE", JSON.stringify(rVecino));
+    igual("sin escrituras económicas", await huella(), antes);
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("13. Dos locales registran el mismo id a la vez: decide el índice único");
+
+  // Los candados son por local, así que A y B no se ordenan entre sí. Para que
+  // la carrera OCURRA, un disparador que existe solo durante esta sección
+  // detiene al primero DESPUÉS de insertar y antes de confirmar: el segundo no
+  // ve la fila, inserta, y queda esperando en el índice único (se observa en
+  // pg_locks). Al soltar, el primero confirma y el segundo recibe el P2002.
+  // El disparador se borra en el `finally`, y solo actúa sobre los ids de esta
+  // corrida.
+  {
+    const CLAVE_DETENER = 2_000_000_128;
+    const prefijo = `${marca}-entre-locales-`;
+    const ladoA = (id) => registrar(f.A, [cobroCola(id, { turnoId: turnoA })]);
+    const ladoB = (id) => registrar(f.otro, [cobroCola(id, { turnoId: turnoOtro, localId: f.otroLocal.id, producto: f.productoOtro, operador: null })]);
+    await prisma.$executeRawUnsafe(`CREATE OR REPLACE FUNCTION ci_cobros_offline_detener() RETURNS trigger AS $$
+      BEGIN
+        IF NEW."clientTxnId" LIKE '${prefijo}%' THEN PERFORM pg_advisory_xact_lock(${CLAVE_DETENER}); END IF;
+        RETURN NEW;
+      END $$ LANGUAGE plpgsql`);
+    await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS ci_cobros_offline_detener ON "CobroOffline"`);
+    try {
+      await prisma.$executeRawUnsafe(`CREATE TRIGGER ci_cobros_offline_detener AFTER INSERT ON "CobroOffline" FOR EACH ROW EXECUTE FUNCTION ci_cobros_offline_detener()`);
+      for (const [orden, primero, segundo, ganador] of [
+        ["A primero", ladoA, ladoB, f.local.id],
+        ["B primero", ladoB, ladoA, f.otroLocal.id],
+      ]) {
+        const id = `${prefijo}${orden.replace(" ", "-")}`;
+        const antes = await huella();
+        const retencion = await retenerCandadoDelLocal(prisma, CLAVE_DETENER);
+        let p1; let p2; let detenido = 0; let enIndice = 0;
+        try {
+          p1 = primero(id);
+          detenido = await esperarEnCandadoDelLocal(prisma, CLAVE_DETENER, 1, 10_000);
+          p2 = segundo(id);
+          enIndice = await esperarEnFila(prisma, 1, 10_000);
+        } finally {
+          await retencion.soltar();
+        }
+        const [r1, r2] = await Promise.all([p1, p2]);
+        ok(`${orden}: el primero, detenido después de insertar; el segundo, esperando en el índice`, detenido === 1 && enIndice >= 1, `${detenido} ${enIndice}`);
+        ok(`${orden}: ningún 500`, r1.status === 200 && r2.status === 200, `${r1.status} ${r2.status}`);
+        const filas = await prisma.cobroOffline.findMany({ where: { clientTxnId: id } });
+        ok(`${orden}: una sola fila, del local que confirmó primero`, filas.length === 1 && filas[0].localId === ganador, JSON.stringify(filas.map((x) => x.localId)));
+        const res1 = r1.resultados?.[0];
+        const res2 = r2.resultados?.[0];
+        ok(`${orden}: el primero, CREADO`, res1?.resultado === "CREADO", JSON.stringify(res1));
+        ok(`${orden}: el perdedor, RECHAZADO ID_DE_OTRO_LOCAL y nada más (ni estado, ni ventaId, ni turno, ni payload)`,
+          res2?.resultado === "RECHAZADO" && res2.codigo === "ID_DE_OTRO_LOCAL"
+          && JSON.stringify(Object.keys(res2).sort()) === JSON.stringify(["clientTxnId", "codigo", "resultado"]), JSON.stringify(res2));
+        const fila = filas[0];
+        const delGanador = ganador === f.local.id
+          ? cobroCola(id, { turnoId: turnoA, extra: { createdAt: fila?.payload?.createdAt } })
+          : cobroCola(id, { turnoId: turnoOtro, localId: f.otroLocal.id, producto: f.productoOtro, operador: null, extra: { createdAt: fila?.payload?.createdAt } });
+        const registrador = ganador === f.local.id ? f.cuenta.id : f.cuentaOtroLocal.id;
+        ok(`${orden}: contenido y registrador del ganador intactos`, fila?.payloadHash === hashDePayload(sanearCobro(delGanador).payload)
+          && fila.registradoPorUsuarioId === registrador && fila.ultimoRegistroEn.getTime() === fila.registradoEn.getTime());
+        igual(`${orden}: sin escrituras económicas`, await huella(), antes);
+      }
+    } finally {
+      await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS ci_cobros_offline_detener ON "CobroOffline"`);
+      await prisma.$executeRawUnsafe(`DROP FUNCTION IF EXISTS ci_cobros_offline_detener()`);
+    }
+    const quedo = await prisma.$queryRaw`SELECT count(*)::int AS n FROM pg_trigger WHERE tgname = 'ci_cobros_offline_detener'`;
+    igual("el disparador de la prueba no quedó instalado", quedo[0].n, 0);
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("14. El ámbito no depende del hash");
+
+  // El hash protege que el contenido no cambie; el local protege de quién es.
+  // En la práctica el contenido de otro local nunca da el mismo hash (el local
+  // va adentro), así que la sección 2 no distingue las dos defensas. Acá se
+  // fuerza el caso que el hash no puede ver: la fila de A con EXACTAMENTE el
+  // hash que va a mandar B. Lo único que queda en pie es el chequeo de ámbito.
+  {
+    const id = nuevoId("hash-forzado");
+    await registrarUno(f.A, cobroCola(id, { turnoId: turnoA }));
+    const deB = cobroCola(id, { turnoId: turnoOtro, localId: f.otroLocal.id, producto: f.productoOtro, operador: null });
+    await prisma.cobroOffline.update({ where: { clientTxnId: id }, data: { payloadHash: hashDePayload(sanearCobro(deB).payload) } });
+    const antes = await cobroDe(id);
+    const r = await registrar(f.otro, [deB]);
+    const res = r.resultados?.[0];
+    ok("B, con el mismo hash: RECHAZADO ID_DE_OTRO_LOCAL y nada más", r.status === 200 && res?.resultado === "RECHAZADO" && res.codigo === "ID_DE_OTRO_LOCAL"
+      && JSON.stringify(Object.keys(res).sort()) === JSON.stringify(["clientTxnId", "codigo", "resultado"]), JSON.stringify(res));
+    const despues = await cobroDe(id);
+    ok("la fila de A intacta: local, registrador, contenido, estado y ultimoRegistroEn",
+      despues.localId === f.local.id && despues.registradoPorUsuarioId === antes.registradoPorUsuarioId
+      && despues.payloadHash === antes.payloadHash && JSON.stringify(despues.payload) === JSON.stringify(antes.payload)
+      && despues.estado === antes.estado && despues.ultimoRegistroEn.getTime() === antes.ultimoRegistroEn.getTime()
+      && despues.updatedAt.getTime() === antes.updatedAt.getTime());
+  }
 }
 
 let fallo = null;
