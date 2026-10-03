@@ -4,7 +4,8 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { resolveScope } from "@/lib/grupos";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
-import { WHERE_TURNO_OPERATIVO, ESTADO_CIERRE } from "@/lib/caja/cierreRelevo";
+import { WHERE_TURNO_OPERATIVO, ESTADO_CIERRE, whereCajaPropia } from "@/lib/caja/cierreRelevo";
+import { identidadParaOperar } from "@/lib/caja/identidadCajaServer";
 import { ESTADO_RETIRO } from "@/lib/caja/retiroRelevo";
 import {
   retiroPendienteDeTurno,
@@ -36,6 +37,33 @@ export async function GET(req) {
     }
     const localId = scope.localId;
 
+    // LA CAJA DEL OPERADOR DEL PIN, no "la de esta cuenta".
+    //
+    // En el mostrador varios operadores comparten la cuenta del local, cada uno
+    // con su cajón. Preguntar por la cuenta devolvía el turno de cualquiera de
+    // ellos; se pregunta por el operador que hizo PIN en este navegador,
+    // validado en este local por el servidor —el cliente no declara a nadie—.
+    // Sin operador (local sin operario, Admin/Dueño sin PIN) la caja es la de la
+    // cuenta, como siempre.
+    //
+    // Sin un PIN válido donde el local lo exige no hay caja que devolver: se
+    // contesta "sin turno" con `needsOperador`, y no un 428, porque las
+    // pantallas que preguntan esto ya saben dibujar "no hay caja" y el
+    // OperadorProvider pide el PIN por su lado.
+    const id = await identidadParaOperar(req, session, { localId });
+    if (!id.ok) {
+      return NextResponse.json({
+        ok: true,
+        turno: null,
+        requiereCierre: false,
+        mensaje: null,
+        needsOperador: true,
+        cierreEnPreparacion: null,
+        retiroEnPreparacion: null,
+      });
+    }
+    const dondeCajaPropia = { localId, ...whereCajaPropia(id.identidad) };
+
     // EL TURNO OPERATIVO, no "el que no está cerrado".
     //
     // Un turno que tomó el corte de cierre sigue con `cierre` en null, pero ya no
@@ -43,7 +71,7 @@ export async function GET(req) {
     // acá, el POS creería tener caja abierta y no dejaría abrir la del relevo —que
     // es justo lo que este flujo viene a permitir—.
     const turno = await prisma.turno.findFirst({
-      where: { localId, vendedorId: session.id, ...WHERE_TURNO_OPERATIVO },
+      where: { ...dondeCajaPropia, ...WHERE_TURNO_OPERATIVO },
       orderBy: { apertura: "desc" },
     });
 
@@ -52,7 +80,7 @@ export async function GET(req) {
     const enPreparacion = turno
       ? null
       : await prisma.turno.findFirst({
-          where: { localId, vendedorId: session.id, cierre: null, cierreEnPreparacionEn: { not: null } },
+          where: { ...dondeCajaPropia, cierre: null, cierreEnPreparacionEn: { not: null } },
           orderBy: { apertura: "desc" },
           select: {
             id: true, apertura: true, cierreEnPreparacionEn: true,

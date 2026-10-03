@@ -196,12 +196,19 @@ export default function AuditoriaCajasPage() {
   const rangoLabel = fechaDesde && fechaHasta && cajas ? `${fechaDesde} → ${fechaHasta}` : "";
 
   // Resumen rápido
+  //
+  // LAS DIFERENCIAS NO SE NETEAN. Antes había una "Dif. acumulada" que sumaba
+  // las de todas las cajas y se ocultaba si daba cero: un −$5.000 de una caja y
+  // un +$5.000 de otra dejaban el resumen sin ninguna diferencia. Faltantes y
+  // sobrantes son hechos distintos, de cajas distintas, y van por separado; el
+  // detalle por caja sigue abajo, tarjeta por tarjeta.
   const resumen = cajas ? {
     total: cajas.length,
     abiertas: cajas.filter((c) => c.estado === "abierto").length,
     conDiferencia: cajas.filter((c) => c.diferencia != null && c.diferencia !== 0).length,
     totalBruto: cajas.reduce((acc, c) => acc + (c.ventas?.bruto || 0), 0),
-    diferenciaTotal: cajas.reduce((acc, c) => acc + (c.diferencia || 0), 0),
+    faltante: -cajas.reduce((acc, c) => acc + Math.min(c.diferencia || 0, 0), 0),
+    sobrante: cajas.reduce((acc, c) => acc + Math.max(c.diferencia || 0, 0), 0),
   } : null;
 
   return (
@@ -265,14 +272,17 @@ export default function AuditoriaCajasPage() {
                 <div className="text-[9px] sunmi-text-muted">Bruto total</div>
                 <div className="text-sm font-bold">${fmt(resumen.totalBruto)}</div>
               </div>
-              {resumen.diferenciaTotal !== 0 && (
-                <div className="sunmi-surface px-2.5 py-1.5 rounded-lg text-center">
-                  <div className="text-[9px] sunmi-text-muted">Dif. acumulada</div>
-                  <div className={`text-sm font-bold ${resumen.diferenciaTotal < 0 ? "sunmi-text-danger" : "sunmi-text-success"}`}>
-                    ${fmt(resumen.diferenciaTotal)}
+              {[
+                { rotulo: "Faltantes", monto: resumen.faltante, signo: "−", tono: "sunmi-text-danger" },
+                { rotulo: "Sobrantes", monto: resumen.sobrante, signo: "+", tono: "sunmi-text-success" },
+              ].filter((d) => d.monto > 0).map((d) => (
+                <div key={d.rotulo} className="sunmi-surface px-2.5 py-1.5 rounded-lg text-center">
+                  <div className="text-[9px] sunmi-text-muted">{d.rotulo}</div>
+                  <div className={`text-sm font-bold ${d.tono}`}>
+                    {d.signo}${fmt(d.monto)}
                   </div>
                 </div>
-              )}
+              ))}
             </div>
           )}
 

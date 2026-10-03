@@ -5,6 +5,7 @@ import { requirePerm } from "@/lib/authorize";
 import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 import { estadoDelTurno } from "@/lib/caja/cierreRelevo";
 import { resumirExactitud } from "@/lib/pos-ventas/comisionPendiente";
+import { identidadParaMirar, puedeVerCaja } from "@/lib/caja/identidadCajaServer";
 
 export async function GET(req) {
   try {
@@ -40,6 +41,7 @@ export async function GET(req) {
         id: true,
         localId: true,
         vendedorId: true,
+        operadorId: true,
         apertura: true,
         cierre: true,
         // El tercer estado del turno: un turno cortado tiene `cierre` en null y
@@ -83,16 +85,15 @@ export async function GET(req) {
       );
     }
 
-    // Si no es su turno, necesita turnos.ver_todos o ser admin
-    if (turno.vendedorId !== session.id) {
-      const puedeVerTodos =
-        session.esAdmin || session.permisos.includes("turnos.ver_todos");
-      if (!puedeVerTodos) {
-        return NextResponse.json(
-          { ok: false, error: "No tenés permiso para ver este turno" },
-          { status: 403 }
-        );
-      }
+    // Si no es SU CAJA —la del operador del PIN, o la de la cuenta sin
+    // operador—, necesita turnos.ver_todos, ser admin o el Dueño de su local.
+    // Con una cuenta compartida, "de su cuenta" eran las cajas de todos.
+    const identidad = await identidadParaMirar(req, session, { localId });
+    if (!puedeVerCaja(turno, identidad)) {
+      return NextResponse.json(
+        { ok: false, error: "No tenés permiso para ver este turno" },
+        { status: 403 }
+      );
     }
 
     // Obtener ventas del turno

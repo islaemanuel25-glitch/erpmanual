@@ -20,6 +20,10 @@ const STORAGE_KEY = "posVentasOfflineQueue_v1";
  *   // (infalsificable), no con operadorId. Ítems legacy sin voucher → operador null.
  *   operadorId: number | null,
  *   operadorVoucher: string | null,
+ *   // El turno donde se cobró (2026-10-02). La venta se sincroniza contra ESTE
+ *   // turno y no contra el de quien sincroniza. null en ítems anteriores o si la
+ *   // pantalla nunca supo su turno: ver lib/pos-ventas/replayOffline.js.
+ *   turnoId: number | null,
  *   items: Array<{
  *     productoBaseId, nombre, precio, cantidad,
  *     // Modo de venta de la línea (depósito + pack). "NORMAL" | "UNIDAD_REMANENTE".

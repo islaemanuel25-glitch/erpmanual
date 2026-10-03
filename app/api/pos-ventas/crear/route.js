@@ -15,7 +15,8 @@ import { mapearVentaATransferencia } from "@/lib/ventas-internas/mapearVentaATra
 import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
 import { SOLO_TRANSITO } from "@/lib/transferencias/politicasStock";
 import { requireOperadorSegunConfig, verificarVoucherOperador } from "@/lib/operador";
-import { WHERE_TURNO_OPERATIVO, ERROR_TURNO_EN_PREPARACION } from "@/lib/caja/cierreRelevo";
+import { WHERE_TURNO_OPERATIVO, ERROR_TURNO_EN_PREPARACION, whereCajaPropia } from "@/lib/caja/cierreRelevo";
+import { ERROR_VENTA_DE_OTRO_OPERADOR } from "@/lib/pos-ventas/replayOffline";
 import { consolidarTenders, aplicarComisionesResueltas, derivarCamposVenta, normalizarMedio, MEDIOS_CON_COMISION } from "@/lib/pos-ventas/pagos";
 import { mediosDelLocal } from "@/lib/pos-ventas/mediosCobroServidor";
 import { comisionesDeMedios } from "@/lib/pos-ventas/mediosCobro";
@@ -79,34 +80,44 @@ export async function POST(req) {
     const body = await req.json();
     const { clientTxnId, clientVentaId, clienteId, turnoId, formaPago, descuento, items, descuentoPorPuntos: descuentoPorPuntosBody, puntosCanje, origenOffline, operadorVoucher } = body;
 
-    // Resolver operador de la venta.
-    // - Venta online: se exige operador activo salvo dueño (permiso "*").
-    // - Replay de cola offline (origenOffline): la venta YA se cobró con un
-    //   operador identificado en su momento. NUNCA se rechaza por operario
-    //   vencido. La atribución NO se toma de un id crudo del cliente (sería
-    //   falsificable: el mismo agujero por otra puerta) sino de un VOUCHER
-    //   firmado por el server al identificarse el operador. Sin voucher válido
-    //   (ítems legacy, o venta genuinamente sin operador) se persiste con null
-    //   antes que perder una venta cobrada — queda logueado para auditoría.
-    let operadorId = null;
-    if (origenOffline === true) {
-      operadorId = verificarVoucherOperador(operadorVoucher, localId);
-      if (!operadorId) {
-        console.warn(
-          "[pos-ventas/crear] replay offline sin operador verificable (voucher ausente/inválido) — se graba con operador null. localId=%s clientTxnId=%s",
-          localId,
-          clientTxnId || clientVentaId || "?"
-        );
-      }
-    } else {
-      const gateOp = await requireOperadorSegunConfig(req, session, { localId });
-      if (!gateOp.ok) {
-        return NextResponse.json(
-          { ok: false, error: gateOp.error, needsOperador: true },
-          { status: gateOp.status }
-        );
-      }
-      operadorId = gateOp.operadorId;
+    // QUIÉN COBRA: la identidad de caja de esta venta.
+    //
+    // Es SIEMPRE el PIN activo, validado en el local, como cualquier venta. Sin
+    // PIN donde el local lo exige, 428: no hay a nombre de quién cobrar.
+    //
+    // `origenOffline` lo manda el cliente y no prueba nada: no concede ninguna
+    // excepción de propiedad ni de vigencia. Offline solo significa que la venta
+    // llega tarde; para escribirse sola tiene que poder escribirse como una venta
+    // de ahora, en su turno original. Si no puede, queda en la cola.
+    //
+    // El voucher del operador tampoco autoriza: no está atado a ninguna venta, no
+    // vence y queda guardado en el navegador, así que quien lo lea puede
+    // reusarlo. Se conserva SOLO para negar: si la venta de la cola la cobró otro
+    // operador que el del PIN, no se escribe a nombre de éste.
+    //
+    // Antes el voucher era la identidad del replay y la bandera salteaba la
+    // vigencia del turno: con la cuenta compartida, B podía fabricar ventas en la
+    // caja de A con el voucher de A, y cualquiera vender en su caja vencida.
+    const gateOp = await requireOperadorSegunConfig(req, session, { localId });
+    if (!gateOp.ok) {
+      return NextResponse.json(
+        { ok: false, error: gateOp.error, needsOperador: true },
+        { status: gateOp.status }
+      );
+    }
+    const operadorId = gateOp.operadorId;
+
+    const operadorDelVoucher =
+      origenOffline === true ? verificarVoucherOperador(operadorVoucher, localId) : null;
+    if (operadorDelVoucher != null && operadorDelVoucher !== operadorId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: ERROR_VENTA_DE_OTRO_OPERADOR,
+          code: "VENTA_DE_OTRO_OPERADOR",
+        },
+        { status: 409 }
+      );
     }
 
     // Validar turnoId obligatorio
@@ -117,7 +128,90 @@ export async function POST(req) {
       );
     }
 
-    // Validar que el turno existe, pertenece al local, al vendedor, y está abierto.
+    // clientVentaId es alias de clientTxnId para compatibilidad con cola offline
+    const txnId = clientTxnId || clientVentaId;
+
+    // IDEMPOTENCIA, antes de mirar el turno. Un reintento de una venta que YA se
+    // escribió —la respuesta se perdió— tiene que reconocerse aunque su caja
+    // haya cerrado después: si no, la cola la dejaría pendiente para siempre
+    // estando escrita, y resolverla a mano la duplicaría. Se reconoce solo si
+    // apunta al MISMO local y turno que la venta guardada; cualquier otra cosa
+    // sigue por las validaciones de siempre.
+    const ventaExistente = txnId
+      ? await prisma.venta.findUnique({
+          where: { clientTxnId: txnId },
+          select: {
+            id: true,
+            numero: true,
+            total: true,
+            fecha: true,
+            subtotal: true,
+            descuento: true,
+            localId: true,
+            turnoId: true,
+            // Venta interna: el reintento no puede devolver "ok, duplicada" si la
+            // transferencia falta. Ver bloqueoReintentoHuerfana.
+            cliente: { select: { localVinculadoId: true } },
+            transferencia: { select: { id: true } },
+            detalles: { select: { cantidadStock: true } },
+          },
+        })
+      : null;
+
+    const responderDuplicada = () => {
+      // Segunda barrera de idempotencia: Transferencia.ventaId @unique. Si la
+      // venta interna ya tiene su transferencia, este reintento no crea nada.
+      const huerfana = bloqueoReintentoHuerfana({
+        esInterna: ventaExistente.cliente?.localVinculadoId != null,
+        tieneFisico: ventaExistente.detalles.some((d) => d.cantidadStock != null),
+        tieneTransferencia: ventaExistente.transferencia != null,
+      });
+      if (huerfana) {
+        return NextResponse.json(
+          { ok: false, error: huerfana.error, code: huerfana.code },
+          { status: huerfana.status }
+        );
+      }
+
+      // Calcular breakdown desde venta existente
+      const descuentoAutomatico = 0; // No lo tenemos guardado, usar 0
+      const descuentoManual = Number(ventaExistente.descuento) || 0;
+      const descuentoPorPuntosVal = 0; // No lo tenemos guardado, usar 0
+
+      return NextResponse.json({
+        ok: true,
+        ventaId: ventaExistente.id,
+        numero: ventaExistente.numero,
+        message: `Venta #${ventaExistente.numero} ya registrada (idempotencia)`,
+        isDuplicate: true,
+        breakdown: {
+          subtotal: Number(ventaExistente.subtotal),
+          descuentoAutomatico,
+          descuentoManual,
+          descuentoPorPuntos: descuentoPorPuntosVal,
+          descuentoTotal: Number(ventaExistente.descuento),
+          total: Number(ventaExistente.total),
+        },
+      });
+    };
+
+    if (
+      ventaExistente &&
+      ventaExistente.localId === localId &&
+      ventaExistente.turnoId === Number(turnoId)
+    ) {
+      return responderDuplicada();
+    }
+
+    // Validar que el turno existe, pertenece al local, es LA CAJA de quien vende,
+    // y está abierto.
+    //
+    // LA CAJA ES DEL OPERADOR. Con una cuenta compartida por el mostrador, el
+    // turno de B es del mismo local, de la misma cuenta y está abierto: nada de
+    // eso lo hace de A. `whereCajaPropia` decide con la identidad de arriba
+    // —el PIN validado, nunca un id del cuerpo—, y con la cuenta cuando no hay
+    // operador. Es la MISMA condición para online y offline: no hay una rama
+    // que acepte "cualquier turno de la cuenta".
     //
     // "Abierto" ya no es solo `cierre: null`. Un turno que tomó el corte de cierre
     // sigue con `cierre` en null —el cajero todavía está contando en otra
@@ -130,7 +224,7 @@ export async function POST(req) {
       where: {
         id: turnoId,
         localId,
-        vendedorId: session.id,
+        ...whereCajaPropia({ usuarioId: session.id, operadorId }),
         ...WHERE_TURNO_OPERATIVO,
       },
       select: { id: true, apertura: true },
@@ -139,8 +233,15 @@ export async function POST(req) {
     if (!turnoValido) {
       // Se distingue el corte del resto: "turno inválido" no le dice nada a quien
       // acaba de iniciar un cierre y no entiende por qué no puede vender.
+      // Solo sobre la caja PROPIA: el estado de la caja de otro no se informa.
       const enPreparacion = await prisma.turno.findFirst({
-        where: { id: turnoId, localId, cierre: null, cierreEnPreparacionEn: { not: null } },
+        where: {
+          id: turnoId,
+          localId,
+          ...whereCajaPropia({ usuarioId: session.id, operadorId }),
+          cierre: null,
+          cierreEnPreparacionEn: { not: null },
+        },
         select: { id: true },
       });
       return NextResponse.json(
@@ -148,7 +249,7 @@ export async function POST(req) {
           ok: false,
           error: enPreparacion
             ? ERROR_TURNO_EN_PREPARACION
-            : "Turno inválido, cerrado, o no pertenece a este usuario/local",
+            : "Turno inválido, cerrado, o no es tu caja en este local",
           turnoEnPreparacionDeCierre: Boolean(enPreparacion),
         },
         { status: 403 }
@@ -157,6 +258,10 @@ export async function POST(req) {
 
     // Bloquear si el turno fue abierto un día anterior (calendario AR).
     // El cajero debe cerrar caja antes de seguir vendiendo.
+    //
+    // Vale igual para un replay offline: la bandera la manda el cliente y no
+    // distingue una venta encolada de una fabricada ahora. La venta de una caja
+    // vencida no se escribe sola: queda en la cola para resolverla una persona.
     const diaAperturaAR = fechaArgentinaISO(turnoValido.apertura);
     const hoyAR = hoyArgentinaISO();
     if (diaAperturaAR && diaAperturaAR !== hoyAR) {
@@ -169,64 +274,10 @@ export async function POST(req) {
       );
     }
 
-    // clientVentaId es alias de clientTxnId para compatibilidad con cola offline
-    const txnId = clientTxnId || clientVentaId;
-
-    // Verificar idempotencia por clientTxnId/clientVentaId
-    if (txnId) {
-      const ventaExistente = await prisma.venta.findUnique({
-        where: { clientTxnId: txnId },
-        select: {
-          id: true,
-          numero: true,
-          total: true,
-          fecha: true,
-          subtotal: true,
-          descuento: true,
-          // Venta interna: el reintento no puede devolver "ok, duplicada" si la
-          // transferencia falta. Ver bloqueoReintentoHuerfana.
-          cliente: { select: { localVinculadoId: true } },
-          transferencia: { select: { id: true } },
-          detalles: { select: { cantidadStock: true } },
-        },
-      });
-
-      if (ventaExistente) {
-        // Segunda barrera de idempotencia: Transferencia.ventaId @unique. Si la
-        // venta interna ya tiene su transferencia, este reintento no crea nada.
-        const huerfana = bloqueoReintentoHuerfana({
-          esInterna: ventaExistente.cliente?.localVinculadoId != null,
-          tieneFisico: ventaExistente.detalles.some((d) => d.cantidadStock != null),
-          tieneTransferencia: ventaExistente.transferencia != null,
-        });
-        if (huerfana) {
-          return NextResponse.json(
-            { ok: false, error: huerfana.error, code: huerfana.code },
-            { status: huerfana.status }
-          );
-        }
-
-        // Calcular breakdown desde venta existente
-        const descuentoAutomatico = 0; // No lo tenemos guardado, usar 0
-        const descuentoManual = Number(ventaExistente.descuento) || 0;
-        const descuentoPorPuntosVal = 0; // No lo tenemos guardado, usar 0
-
-        return NextResponse.json({
-          ok: true,
-          ventaId: ventaExistente.id,
-          numero: ventaExistente.numero,
-          message: `Venta #${ventaExistente.numero} ya registrada (idempotencia)`,
-          isDuplicate: true,
-          breakdown: {
-            subtotal: Number(ventaExistente.subtotal),
-            descuentoAutomatico,
-            descuentoManual,
-            descuentoPorPuntos: descuentoPorPuntosVal,
-            descuentoTotal: Number(ventaExistente.descuento),
-            total: Number(ventaExistente.total),
-          },
-        });
-      }
+    // Idempotencia por clientTxnId/clientVentaId para un id ya usado en otro
+    // destino: con el turno validado, la respuesta de siempre.
+    if (ventaExistente) {
+      return responderDuplicada();
     }
 
     // Validaciones

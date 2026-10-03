@@ -1,25 +1,18 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-01 21:03
+**Fecha:** 2026-10-02 23:05
 
 ## Módulos modificados recientemente
 
-### transferencias
-- feat(finanzas): "Ver pendientes" abre en Transferencias el conjunto exacto de pendientes, fix(finanzas): la nota de pendientes dice que es el estado de hoy, feat(finanzas): Pago a depósito en el Resumen, consumido de Transferencias
-- Archivos: 1 nuevos, 4 modificados (5 total)
-
-### stock
-- feat(finanzas): Valor del Stock como tablero móvil, sin lista de productos, feat(finanzas): "¿Por qué cambió?" explica el capital y deriva a cada módulo
-- Archivos: 5 nuevos, 6 modificados (11 total)
+### pos-ventas
+- fix(caja): el resumen de un turno es de su caja, como sus ventas y movimientos, fix(caja): la bandeja de cierres pendientes no reparte el token de otra caja, fix(auditoria-pos): la pantalla de Cajas no netea las diferencias
+- Archivos: 3 nuevos, 17 modificados (20 total)
 
 
 ## Archivos nuevos desde última sincronización
-- components/transferencias/cuentaPorRecepcion.test.mjs
-- components/stock_diario/AtencionDelValor.jsx
-- components/stock_diario/CapitalEnMercaderia.jsx
-- components/stock_diario/EnlaceAlModulo.jsx
-- components/stock_diario/GraficoDeEvolucion.jsx
-- app/api/stock_locales/diario/transferencias/route.js
+- lib/auditoria-pos-ventas/diferenciasSinNetear.test.mjs
+- lib/pos-ventas/carritoPorCaja.js
+- lib/pos-ventas/carritoPorCaja.test.mjs
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai

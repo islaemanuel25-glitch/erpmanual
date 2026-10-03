@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
-import { requireOperadorSegunConfig } from "@/lib/operador";
 import { esMotivoReservado } from "@/lib/caja/retiroDinero";
-import { ERROR_TURNO_EN_PREPARACION } from "@/lib/caja/cierreRelevo";
+import { ERROR_TURNO_EN_PREPARACION, ERROR_CAJA_AJENA, puedeActuarSobreCaja } from "@/lib/caja/cierreRelevo";
+import { identidadParaOperar } from "@/lib/caja/identidadCajaServer";
 
 export async function POST(req) {
   try {
@@ -25,11 +25,14 @@ export async function POST(req) {
 
     const { localId, session } = scope;
 
-    const gateOp = await requireOperadorSegunConfig(req, session, { localId });
-    if (!gateOp.ok) {
+    // Quién mueve: el operador del PIN validado en este local, o la cuenta sin
+    // operador. El movimiento no guarda operador —se deriva de su turno—, así
+    // que lo único que hay que garantizar es que el turno sea el de quien mueve.
+    const id = await identidadParaOperar(req, session, { localId });
+    if (!id.ok) {
       return NextResponse.json(
-        { ok: false, error: gateOp.error, needsOperador: true },
-        { status: gateOp.status }
+        { ok: false, error: id.error, needsOperador: true },
+        { status: id.status }
       );
     }
 
@@ -82,10 +85,19 @@ export async function POST(req) {
       );
     }
 
-    // Validar turno: existe, mismo local, abierto
+    // Validar turno: existe, mismo local, es la caja de quien mueve, abierto.
+    //
+    // Antes se validaba solo el local: cualquier sesión del local con `pos.usar`
+    // podía cargar un Caja +/− en el turno de otro mandando su id. Ahora un
+    // cajero común solo alcanza su caja; Admin y el Dueño en su local, la de
+    // cualquiera —es la intervención que ya tenían—, con su `usuarioId` en el
+    // movimiento.
     const turno = await prisma.turno.findUnique({
       where: { id: turnoId },
-      select: { id: true, localId: true, cierre: true, cierreEnPreparacionEn: true, anuladoEn: true },
+      select: {
+        id: true, localId: true, vendedorId: true, operadorId: true,
+        cierre: true, cierreEnPreparacionEn: true, anuladoEn: true,
+      },
     });
 
     if (!turno || turno.localId !== localId) {
@@ -93,6 +105,10 @@ export async function POST(req) {
         { ok: false, error: "Turno no encontrado en este local" },
         { status: 404 }
       );
+    }
+
+    if (!puedeActuarSobreCaja(turno, id.identidad)) {
+      return NextResponse.json({ ok: false, error: ERROR_CAJA_AJENA, cajaAjena: true }, { status: 403 });
     }
 
     if (turno.cierre !== null) {

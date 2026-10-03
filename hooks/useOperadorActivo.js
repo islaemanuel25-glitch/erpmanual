@@ -1,23 +1,26 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { estadoTrasRevalidar, leerRespuestaOperador, SIN_RESPUESTA } from "@/lib/operador-revalidacion";
+
+const SIN_OPERADOR = { operador: null, voucher: null, sinConexion: false };
 
 export function useOperadorActivo() {
-  const [operador, setOperador] = useState(null);
-  // Voucher firmado del operador activo. Se adjunta a las ventas encoladas
-  // offline para conservar la atribución al sincronizar (ver pos-ventas/crear).
-  const [voucher, setVoucher] = useState(null);
+  // Operador activo, su voucher firmado —se adjunta a las ventas encoladas
+  // offline; el servidor solo lo usa para negar, ver pos-ventas/crear— y si la
+  // última revalidación no pudo preguntar. Un solo estado: los tres cambian
+  // juntos y se calculan con lib/operador-revalidacion.js.
+  const [estado, setEstado] = useState(SIN_OPERADOR);
   const [loading, setLoading] = useState(true);
 
   const refrescar = useCallback(async () => {
     try {
       const res = await fetch("/api/operador/me", { credentials: "include" });
-      const data = await res.json();
-      setOperador(data.ok ? data.operador : null);
-      setVoucher(data.ok ? (data.voucher ?? null) : null);
+      const respuesta = await leerRespuestaOperador(res);
+      setEstado((previo) => estadoTrasRevalidar(previo, respuesta));
     } catch {
-      setOperador(null);
-      setVoucher(null);
+      // Sin red: no se pudo preguntar. NO es "no hay operador".
+      setEstado((previo) => estadoTrasRevalidar(previo, SIN_RESPUESTA));
     } finally {
       setLoading(false);
     }
@@ -62,9 +65,16 @@ export function useOperadorActivo() {
 
   const logout = useCallback(async () => {
     await fetch("/api/operador/logout", { method: "POST", credentials: "include" });
-    setOperador(null);
-    setVoucher(null);
+    setEstado(SIN_OPERADOR);
   }, []);
 
-  return { operador, voucher, loading, login, logout, refrescar };
+  return {
+    operador: estado.operador,
+    voucher: estado.voucher,
+    sinConexion: estado.sinConexion,
+    loading,
+    login,
+    logout,
+    refrescar,
+  };
 }

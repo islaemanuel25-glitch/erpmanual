@@ -355,6 +355,14 @@ jobs:
       - name: Recuperación de la activación del Libro de Costos (lock timeout → resolve --rolled-back)
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/recuperacionLibroCostos.mjs
 
+      # La migración de la caja por operador por el camino real de `migrate
+      # deploy`, sobre bases como producción antes de ella: limpia aplica sin
+      # tocar una fila; con el mismo operador en dos cajas aborta por su guardia;
+      # con una sesión reteniendo Turno falla por el tope de 3 s. Y el precheck
+      # de solo lectura en cada caso. Sin recuperación: una fallida frena.
+      - name: Migración de la caja por operador (guardia, lock timeout y precheck)
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/migracionCajaPorOperador.mjs
+
       # ── LA PREGUNTA QUE DECIDE EL DESPLIEGUE ──────────────────────────────
       #
       # Producción conserva sus 105 migraciones viejas en `_prisma_migrations` y
@@ -560,6 +568,14 @@ jobs:
 
       - name: Contrapruebas del ciclo de cierre de caja
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs CC-
+
+      # La caja es del OPERADOR: mismo local, misma cuenta ERP, dos operadores y
+      # dos cajas simultáneas. A −$5.000 y B +$5.000 tienen que llegar así hasta
+      # la auditoría, sin compensarse. Y las contrapruebas: nadie vende, mueve,
+      # arquea, retira, corta ni cierra la caja de otro; el Dueño interviene con
+      # su autoría; un local sin operario sigue con la caja de la cuenta.
+      - name: Caja por operador contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/cajaPorOperador.mjs
 
       # La corrección histórica de caja: el ensayo en seco que escribe y deshace,
       # la aplicación con huella autorizada, la idempotencia y el fallo a mitad.

@@ -33,6 +33,73 @@ escritor de `StockLocal` declara su origen en el Libro de Stock. Los
 movimientos anteriores quedan `SIN_ORIGEN` para siempre —el libro es
 inmutable— y no se les deduce ninguno.
 
+Con la rama `claude/caja-por-operador` el árbol pasa a **46**, con una segunda
+pendiente, **que tiene precheck obligatorio**:
+
+- `20261002120000_caja_por_operador` — **solo índices, ningún dato**, y con
+  PRECHECK obligatorio antes de migrar (abajo).
+
+Reemplaza el índice único parcial
+`Turno_local_vendedor_abierto_key` (una caja operativa por **cuenta** y local)
+por dos —`Turno_local_operador_abierto_key` (una por **operador** y local) y
+`Turno_local_cuenta_sin_operador_abierto_key` (una por cuenta y local cuando el
+turno no tiene operador)—. Sin backfill, sin DROP de columnas, sin tocar una
+fila. Todo en un único bloque `DO` —una sentencia, todo o nada—, con el patrón
+de `libro_stock`: tope de espera de **3 s** (`lock_timeout`) y `Turno` tomada en
+ACCESS EXCLUSIVE al principio. Mientras se construyen los dos índices, `Turno`
+no se lee ni se escribe: sobre una tabla chica son milisegundos.
+
+**Puede abortar, por dos motivos, y eso es lo que hay que saber antes.**
+
+- Si en producción hay un operador con dos cajas operativas en el mismo local
+  —el índice viejo lo permitía con dos cuentas distintas—, la guardia aborta
+  nombrando los turnos, **sin elegir ni cerrar ninguno**.
+- Si una transacción retiene `Turno` más de 3 s, la migración falla por el tope
+  en vez de quedarse esperando y encolar detrás de ella todo el POS.
+
+En los dos casos la base queda exactamente como estaba, pero la migración queda
+FALLIDA, y esta migración **no tiene autorizado `migrate resolve`** en
+`/deploy`: el despliegue se frenaría con la imagen nueva esperando. Sin
+recuperación automática: FRENAR e informar.
+
+Por eso, **antes del backup y de cualquier migración**, se corre el precheck de
+solo lectura, con el mismo comando que `precheck-libro-stock.sql`:
+
+    ssh vps-erp 'cd /srv/produccion/erpazul && docker exec -i erpazul_db psql -U erpazul -d erpazul -X -q -v ON_ERROR_STOP=1 -f - < scripts/deploy/precheck-caja-por-operador.sql'
+
+- **VERDE** (sale 0, "PRECHECK: VERDE"): se sigue con el despliegue.
+- **ROJO** (sale distinto de 0): **FRENAR, no desplegar.** Dice por qué:
+  - `operador-con-dos-cajas` / `cuenta-con-dos-cajas`: imprime los ids de los
+    turnos. Resolverlo es cerrar la caja que sobra **desde la aplicación**
+    —decide una persona cuál—, nunca con SQL.
+  - `transaccion-larga` / `candado-sobre-turno`: algo retiene la base o `Turno`.
+    Esperar a que termine y volver a correr; no cancelar sesiones del POS.
+  - `migracion-fallida-sin-resolver`: hay otra migración trabada; eso es otro
+    procedimiento.
+
+  Después se vuelve a correr el precheck desde cero.
+- **⚠ REVISAR ANTES DE DESPLEGAR** (no frena): cajas abiertas **sin operador**
+  en un local que **exige operador**. Desde el cambio, un turno sin operador es
+  la caja de la cuenta: un cajero que entra con su PIN ya no la alcanza —no
+  vende, no mueve, no arquea ni la cierra—, y **solo Admin o el Dueño del local
+  pueden administrarla** (arquear, cerrar). Si la cuenta es la del Dueño, él la
+  sigue usando sin PIN. Conviene cerrarlas antes de desplegar o avisarle al
+  Dueño; el despliegue puede seguir.
+
+Es transacción READ ONLY que termina en ROLLBACK; imprime ids, ningún importe ni
+nombre. Probado por `scripts/pruebas-db/migracionCajaPorOperador.mjs` (en CI):
+VERDE sobre una base limpia, con la advertencia de la caja sin operador; ROJO
+con el mismo operador en dos turnos abiertos con dos cuentas; ROJO con una
+sesión reteniendo `Turno`. Y la migración por `migrate deploy`: aplica limpia
+sin tocar una fila, aborta con conflicto, y con el candado retenido falla en
+~4 s por el tope —sin él esperaba los 30 s—; en los dos fallos queda el índice
+viejo y ninguno nuevo.
+
+Lo que llega con ella **no es solo esquema**: desde ese despliegue la caja es del
+operador. Dos operadores con la misma cuenta del local abren cada uno su turno;
+`turnos/actual` devuelve la caja del operador del PIN; y un cajero común ya no
+puede operar la caja de otro.
+
 Producción corre `9700a59530534e920ae3ab59b5c5780bd3b79071` (despliegue del
 2026-09-29, nota abajo). Un commit posterior a ese que solo cambie
 documentación —como el que escribe esta nota— **no se despliega por eso**.

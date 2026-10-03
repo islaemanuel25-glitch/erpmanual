@@ -191,10 +191,31 @@ La cookie es independiente de `erpazul_sesion`. Se puede limpiar sin cerrar sesi
 
 ### `getOperadorActivo(req)`
 Retorna `{ operadorId, nombre, localId }` o `null` si no hay operador activo.
+Lee la cookie y nada más: **no** dice si vale en el local de la operación. Para
+decidir cualquier cosa sobre una caja, usar el de abajo.
 
-### `requireOperador(req)`
+### `getOperadorActivoDelLocal(req, localId)` (2026-10-02)
+El operador activo **validado**: la cookie tiene que ser del `localId` de la
+operación, el operador tiene que seguir asignado a ese local (`OperadorEnLocal`)
+y seguir `activo`. Es lo mismo que exige `/api/operador/login` al firmarla. Si
+algo no se cumple devuelve `null`, como si no hubiera operador. Async.
+
+### `requireOperador(req, { localId })`
 Retorna `{ ok: true, operador }` o `{ ok: false, status: 428, error, needsOperador: true }`.
-Usar en endpoints que requieran operador para operar.
+Usar en endpoints que requieran operador para operar. Desde 2026-10-02 es async
+y valida contra el local (usa `getOperadorActivoDelLocal`). Lo mismo
+`requireOperadorSalvoDueno` y `requireOperadorSegunConfig`.
+
+### La caja es del operador (2026-10-02, DEC-0012)
+**La cuenta ERP autentica el acceso. El operador identifica al responsable de
+la caja física.** Un turno con `operadorId` es la caja de ese operador en ese
+local, con la cuenta que sea; uno sin operador es la caja de la cuenta, como
+siempre. La identidad para operar o mirar una caja se arma en
+`lib/caja/identidadCajaServer.js` (`identidadParaOperar`,
+`identidadParaMirar`) y la regla está en `lib/caja/cierreRelevo.js`
+(`whereCajaPropia`, `esCajaPropia`, `puedeActuarSobreCaja`). Admin y el Dueño
+en su local pueden intervenir la caja de un operador —es la capacidad que ya
+tenían para operar sin PIN—, con su autoría en las columnas de siempre.
 
 ### `resolveContextoAuditoria(req, session, extra)`
 Retorna objeto plano para logs de auditoria:
@@ -258,7 +279,12 @@ Agregar campo `operadorId` (nullable, FK a OperadorLocal) en:
 - `Venta` → quien hizo la venta
 - `Turno` → quien abrio/cerro el turno
 - `AuditoriaStock` → quien hizo el ajuste
-- `CajaMovimiento` → quien registro el movimiento
+- `CajaMovimiento` → quien registro el movimiento. **Decidido NO agregarlo**
+  (2026-10-02, DEC-0012): el responsable de un movimiento es el de su caja y se
+  deriva sin ambigüedad de `CajaMovimiento.turnoId` → `Turno.operadorId`, que no
+  se reescribe nunca. Con la caja por operador, solo su responsable —o Admin y
+  el Dueño interviniendo, que quedan en `usuarioId`— puede mover una caja, así
+  que una columna más sería una segunda copia del mismo dato que podría divergir.
 
 ### Registro de auditoria
 

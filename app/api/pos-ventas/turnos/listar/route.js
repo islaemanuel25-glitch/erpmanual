@@ -3,7 +3,8 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
-import { estadoDelTurno } from "@/lib/caja/cierreRelevo";
+import { estadoDelTurno, whereCajaPropia } from "@/lib/caja/cierreRelevo";
+import { identidadParaMirar } from "@/lib/caja/identidadCajaServer";
 import {
   construirWhereTurnos,
   normalizarEstado,
@@ -68,15 +69,21 @@ export async function GET(req) {
     const puedeVerTodos =
       session.esAdmin || session.permisos.includes("turnos.ver_todos");
     let vendedorId = toPositiveInt(params.get("vendedorId"));
+    let cajaPropia = null;
     if (!puedeVerTodos) {
       // Sin `turnos.ver_todos` el alcance es siempre propio, mande lo que mande.
-      vendedorId = session.id;
+      // "Propio" es la CAJA: la del operador del PIN, o la de la cuenta sin
+      // operador. Con una cuenta compartida, "lo de mi cuenta" eran los turnos
+      // de todos los operadores del mostrador.
+      vendedorId = null;
+      cajaPropia = whereCajaPropia(await identidadParaMirar(req, session, { localId }));
     }
 
     const estado = normalizarEstado(params.get("estado"));
     const { where, rango } = construirWhereTurnos({
       localId,
       vendedorId,
+      cajaPropia,
       estado,
       fechaDesde: params.get("fechaDesde"),
       fechaHasta: params.get("fechaHasta"),

@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-10-02] - Actualización: pos-ventas
+
+### Modificado
+- **pos-ventas**: fix(caja): el resumen de un turno es de su caja, como sus ventas y movimientos
+- **pos-ventas**: fix(caja): la bandeja de cierres pendientes no reparte el token de otra caja
+- **pos-ventas**: fix(auditoria-pos): la pantalla de Cajas no netea las diferencias
+- **pos-ventas**: feat(pos): el POS sigue la caja del operador y el carrito no cruza de caja
+- **pos-ventas**: feat(caja): cada operador opera solo su caja, aunque compartan la cuenta
+- **pos-ventas**: feat(caja): la caja abierta se identifica por operador — migración con guardia
+
+
 ## [2026-10-01] - Actualización: stock
 
 ### Modificado

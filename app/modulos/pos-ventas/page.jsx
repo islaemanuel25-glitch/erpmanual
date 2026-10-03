@@ -12,6 +12,14 @@ import { useOperadorContext } from "@/app/context/OperadorContext";
 import { showError, showSuccess } from "@/components/sunmi/SunmiToast";
 import { posVentaReducer, initialState, ActionTypes } from "./reducer/posVentaReducer";
 import { loadQueue, saveQueue, enqueue, dequeueById, getQueueLength, clearQueue } from "./helpers/offlineQueue";
+import {
+  carritoCobrable,
+  claveBorrador,
+  cargarCarritoDeIdentidad,
+  guardarCarritoDeCaja,
+  ERROR_CARRITO_DE_OTRA_CAJA,
+} from "@/lib/pos-ventas/carritoPorCaja";
+import { turnoDeReplay } from "@/lib/pos-ventas/replayOffline";
 
 import BuscadorProductos from "@/components/pos-ventas/BuscadorProductos";
 import CarritoVenta from "@/components/pos-ventas/CarritoVenta";
@@ -77,7 +85,7 @@ export default function PosVentasPage() {
   const { loading: cargandoContexto, contexto, needsContexto } = useContextoActivo();
 
   // Operador activo + su voucher firmado (adjuntados a las ventas encoladas
-  // offline para conservar la atribución al sincronizar) y requerirOperador
+  // offline: el server no escribe una a nombre de otro operador) y requerirOperador
   // (levanta el modal de PIN encima de la venta ante un 428, sin navegar).
   // `logout` se usa al cortar el turno: el mostrador vuelve al ingreso de
   // operario para que el relevo entre con su PIN. No cambia la autoría de nada
@@ -85,9 +93,19 @@ export default function PosVentasPage() {
   const {
     operador: operadorActivo,
     voucher: operadorVoucherActivo,
+    loading: cargandoOperador,
     requerirOperador,
     logout: logoutOperador,
   } = useOperadorContext();
+
+  // LA CAJA SIGUE AL OPERADOR. El turno se pide por el operador del PIN, y el
+  // carrito en pantalla es el de UNA identidad de caja (`cajaCarrito`): un
+  // cambio de PIN no recarga la pantalla, y sin esto B cobraría en SU caja el
+  // carrito de A. Es estado y no un ref a propósito: cambia en el MISMO render
+  // que el carrito que se carga, así la persistencia nunca guarda el carrito de
+  // una caja con la clave de otra. Ver lib/pos-ventas/carritoPorCaja.js.
+  const operadorActivoId = operadorActivo?.operadorId ?? null;
+  const [cajaCarrito, setCajaCarrito] = useState(null);
 
   // Estado del POS con reducer
   const [state, dispatch] = useReducer(posVentaReducer, initialState);
@@ -549,41 +567,59 @@ export default function PosVentasPage() {
   }, [router]);
 
   // ---------------------------------------------------------------------------
-  // Restaurar carrito persistido desde localStorage
+  // El carrito de la identidad de caja activa
   // ---------------------------------------------------------------------------
+  // Al entrar, al cambiar de PIN o de local, la pantalla carga el borrador de
+  // ESA identidad —local, cuenta y operador— y deja el anterior en su propia
+  // clave. A arma, B entra: B ve el suyo; A vuelve: A encuentra el suyo. Se
+  // espera a saber quién es el operador: antes de eso no se carga ni se guarda
+  // nada (ver la persistencia, abajo).
   useEffect(() => {
-    if (!localActual || !me) return;
+    if (!localActual || !me || cargandoOperador) return;
+    const identidad = { localId: localActual, userId: me.id, operadorId: operadorActivoId };
+    let caja;
     try {
-      const raw = localStorage.getItem("posVentasCarritoEnCurso_v1");
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (parsed.localId === localActual && parsed.userId === me.id) {
-        dispatch({ type: ActionTypes.RESTORE_CART, payload: parsed });
-      }
-    } catch (e) {
-      // Si el dato está corrupto, ignorar
+      caja = cargarCarritoDeIdentidad(localStorage, identidad);
+    } catch {
+      // Sin almacenamiento disponible: la identidad igual queda fijada, sin borrador.
+      caja = { clave: claveBorrador(identidad), operadorId: operadorActivoId, borrador: null };
     }
-  }, [localActual, me]);
+    if (cajaCarrito?.clave === caja.clave) return;
+    if (caja.borrador) {
+      dispatch({ type: ActionTypes.RESTORE_CART, payload: caja.borrador });
+    } else {
+      dispatch({ type: ActionTypes.CLEAR_CART });
+    }
+    setCajaCarrito({ clave: caja.clave, operadorId: caja.operadorId });
+    // `cajaCarrito` no va en las dependencias: lo escribe este mismo efecto.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localActual, me, cargandoOperador, operadorActivoId]);
 
   // ---------------------------------------------------------------------------
   // Persistir carrito en localStorage
   // ---------------------------------------------------------------------------
+  // En la clave de SU caja y en ninguna otra. Hasta que `cajaCarrito` existe —la
+  // pantalla todavía no sabe de quién es el carrito— no se escribe nada: era lo
+  // que pisaba el borrador de A con un carrito vacío antes de restaurarlo.
   useEffect(() => {
-    if (!localActual || !me) return;
-    const draft = {
-      localId: localActual,
-      userId: me.id,
-      carrito: state.carrito,
-      clienteSeleccionado: state.clienteSeleccionado,
-      descuento: state.descuento,
-      descuentoInfo: state.descuentoInfo,
-      formaPago: state.formaPago,
-      puntosCanje: state.puntosCanje,
-      descuentoPorPuntos: state.descuentoPorPuntos,
-    };
-    localStorage.setItem("posVentasCarritoEnCurso_v1", JSON.stringify(draft));
+    if (!localActual || !me || !cajaCarrito) return;
+    try {
+      guardarCarritoDeCaja(localStorage, cajaCarrito, {
+        localId: localActual,
+        userId: me.id,
+        carrito: state.carrito,
+        clienteSeleccionado: state.clienteSeleccionado,
+        descuento: state.descuento,
+        descuentoInfo: state.descuentoInfo,
+        formaPago: state.formaPago,
+        puntosCanje: state.puntosCanje,
+        descuentoPorPuntos: state.descuentoPorPuntos,
+      });
+    } catch {
+      // Sin almacenamiento disponible: el carrito vive solo en memoria.
+    }
   }, [
-    localActual, me,
+    localActual, me, cajaCarrito,
     state.carrito, state.clienteSeleccionado, state.descuento,
     state.formaPago, state.puntosCanje, state.descuentoPorPuntos,
   ]);
@@ -610,7 +646,10 @@ export default function PosVentasPage() {
       }
     };
     verificarTurno();
-  }, [localActual, me]);
+    // El operador va en las dependencias: la caja es suya, y cambiar de PIN es
+    // cambiar de caja. Sin esto la pantalla seguía mostrando —y cobrando en— el
+    // turno del operador anterior.
+  }, [localActual, me, operadorActivoId]);
 
   // ---------------------------------------------------------------------------
   // Cargar info crédito cuando hay cliente + fiado
@@ -751,8 +790,9 @@ export default function PosVentasPage() {
   // Limpiar carrito
   // ---------------------------------------------------------------------------
   const handleLimpiar = useCallback(() => {
+    // El borrador de esta caja se borra solo: la persistencia quita la clave
+    // cuando el carrito queda vacío. Las de otras cajas no se tocan.
     dispatch({ type: ActionTypes.CLEAR_CART });
-    localStorage.removeItem("posVentasCarritoEnCurso_v1");
     setCreditoInfo(null);
     setUltimoBreakdown(null);
     setPuntosActivo(false);
@@ -970,6 +1010,15 @@ export default function PosVentasPage() {
       return;
     }
 
+    // El carrito de otra caja no se encola a nombre de ésta. Al cambiar de PIN
+    // la pantalla ya carga el carrito del operador nuevo; esto ataja el
+    // instante intermedio, y el carrito cuya caja todavía no se sabe.
+    if (!cajaCarrito || !carritoCobrable({ carritoVacio: false, duenoOperadorId: cajaCarrito.operadorId }, operadorActivoId)) {
+      setErrorMsg(ERROR_CARRITO_DE_OTRA_CAJA);
+      showError(ERROR_CARRITO_DE_OTRA_CAJA);
+      return;
+    }
+
     // Validar cantidades antes de guardar
     const itemInvalidoOffline = state.carrito.find(
       (item) => item.cantidad === "" || item.cantidad === null || isNaN(Number(item.cantidad)) || Number(item.cantidad) <= 0
@@ -998,11 +1047,17 @@ export default function PosVentasPage() {
       descuentoPorPuntos: state.descuentoPorPuntos,
       total: datos.total,
       clienteId: state.clienteSeleccionado?.id || null,
-      // Operador identificado al cobrar + su voucher firmado. El voucher es la
-      // prueba infalsificable que el server usa al sincronizar (ver crear); el
-      // operadorId queda solo para referencia/legibilidad de la cola.
+      // Operador identificado al cobrar + su voucher firmado. El voucher no
+      // autoriza nada al sincronizar —manda el PIN activo—: solo le permite al
+      // server negarse a escribirla a nombre de otro operador (ver crear). El
+      // operadorId queda para referencia/legibilidad de la cola.
       operadorId: operadorActivo?.operadorId ?? null,
       operadorVoucher: operadorVoucherActivo ?? null,
+      // LA CAJA DONDE SE COBRÓ. Se sincroniza contra ESTE turno y no contra el de
+      // quien sincronice: offline solo significa que llega tarde, no que cambie
+      // de caja. Puede ser null si la pantalla nunca supo su turno (se abrió sin
+      // conexión): ver lib/pos-ventas/replayOffline.js.
+      turnoId: turnoActual?.id ?? null,
       // Payload canónico (mismo helper que el path online).
       items: itemsCrearPayload(state.carrito),
     };
@@ -1052,32 +1107,27 @@ export default function PosVentasPage() {
     localStorage.setItem("posUltimoTicket_v1", JSON.stringify(ticketOffline));
     setUltimoTicketOffline(ticketOffline);
 
-    // Limpiar carrito
+    // Limpiar carrito (su borrador lo borra la persistencia, en la clave de su caja)
     dispatch({ type: ActionTypes.CLEAR_CART });
-    localStorage.removeItem("posVentasCarritoEnCurso_v1");
     dispatch({ type: ActionTypes.SET_FORMA_PAGO, payload: "efectivo" });
     setDatosPagoEfectivo(null);
     dispatch({ type: ActionTypes.SET_SALDO_PUNTOS, payload: 0 });
 
     showSuccess("Venta guardada offline. Ticket generado.");
     setSuccessMsg(`Venta guardada pendiente. Total en cola: ${nuevaLongitud}`);
-  }, [localActual, grupoId, me, state.carrito, state.descuento, state.descuentoPorPuntos, state.clienteSeleccionado, subtotal, localNombre, operadorActivo, operadorVoucherActivo]);
+  }, [localActual, grupoId, me, state.carrito, state.descuento, state.descuentoPorPuntos, state.clienteSeleccionado, subtotal, localNombre, operadorActivo, operadorActivoId, operadorVoucherActivo, turnoActual, cajaCarrito]);
 
   // ---------------------------------------------------------------------------
   // Procesar cola offline
   // ---------------------------------------------------------------------------
+  //
+  // Cada venta va a la caja donde se cobró (`turnoDeReplay`), no a la de quien
+  // sincroniza, y el servidor la escribe solo si esa caja sigue operativa, es
+  // del día y la sincroniza su dueño con su PIN. Si no, la rechaza y la venta
+  // queda en pendientes tal como estaba: mismo turno, mismo voucher. La que no
+  // se puede atribuir ni se manda.
   const procesarCola = useCallback(async () => {
     if (offlineMode || procesandoCola) return;
-
-    if (!turnoActual?.id) {
-      showError("Abrí turno para procesar ventas pendientes");
-      return;
-    }
-
-    if (turnoVencido) {
-      showError("Caja vencida: cerrala antes de procesar ventas pendientes");
-      return;
-    }
 
     const queue = loadQueue();
     if (queue.length === 0) {
@@ -1091,8 +1141,18 @@ export default function PosVentasPage() {
 
     let procesadas = 0;
     let errores = 0;
+    let frenadas = 0;
+    let motivoFrenada = "";
 
     for (const ventaPendiente of queue) {
+      // A qué caja va: la del turno donde se cobró. La que no se puede atribuir
+      // no se manda ni se borra: queda en pendientes.
+      const destino = turnoDeReplay(ventaPendiente);
+      if (destino.frenada) {
+        frenadas++;
+        motivoFrenada = destino.motivo;
+        continue;
+      }
       try {
         const res = await fetch("/api/pos-ventas/crear", {
           method: "POST",
@@ -1102,20 +1162,29 @@ export default function PosVentasPage() {
             clientTxnId: ventaPendiente.clientVentaId,
             localId: ventaPendiente.localId,
             clienteId: ventaPendiente.clienteId,
-            turnoId: turnoActual?.id || null,
+            turnoId: destino.turnoId,
             formaPago: ventaPendiente.formaPago,
             esFiado: ventaPendiente.formaPago === "fiado",
             descuento: ventaPendiente.descuento,
             descuentoPorPuntos: ventaPendiente.descuentoPorPuntos,
             puntosCanje: 0, // No guardamos puntos en cola offline
-            // Replay offline: nunca se rechaza por operario vencido. La atribución
-            // la resuelve el server con el voucher firmado (no con un id crudo).
-            // Legacy sin voucher → el server graba con operador null.
+            // Replay offline: la identidad es el PIN activo, como cualquier
+            // venta, y la venta solo entra en SU turno si sigue operativo y es
+            // del día. El voucher solo sirve para que el servidor no la escriba
+            // a nombre de otro operador que el que la cobró.
             origenOffline: true,
             operadorVoucher: ventaPendiente.operadorVoucher ?? null,
             items: ventaPendiente.items,
           }),
         });
+
+        // Sin PIN no hay a nombre de quién escribir: se pide encima, como al
+        // cobrar, y se corta la cola —seguir solo juntaría más 428—.
+        if (res.status === 428) {
+          errores++;
+          requerirOperador();
+          break;
+        }
 
         const data = await res.json();
 
@@ -1128,12 +1197,14 @@ export default function PosVentasPage() {
             setSuccessMsg((prev) => (prev ? `${prev} — ` : "") + "Advertencia: venta con stock negativo (carga inicial).");
           }
         } else {
-          // Error → cortar procesamiento
+          // Rechazada por el servidor (no es su caja, la caja ya cerró, stock,
+          // etc.) → queda en la cola y se sigue con las demás. Antes se cortaba
+          // todo: con la caja por operador, una venta de A en el navegador de B
+          // frenaba las de B, que sí entran.
           errores++;
           const msg = mensajeErrorVenta(data, "Error al procesar venta pendiente", mostrarStockPos);
           showError(msg);
           setErrorMsg(`Error procesando cola: ${msg}`);
-          break; // Cortar y dejar el resto
         }
       } catch (err) {
         console.error("Error procesando venta pendiente:", err);
@@ -1152,7 +1223,11 @@ export default function PosVentasPage() {
       showSuccess(`${procesadas} venta(s) procesada(s) correctamente`);
       setSuccessMsg(`${procesadas} venta(s) procesada(s). ${nuevaLongitud} pendiente(s)`);
     }
-  }, [offlineMode, procesandoCola, turnoActual, turnoVencido, mostrarStockPos]);
+    if (frenadas > 0) {
+      showError(motivoFrenada);
+      setErrorMsg(motivoFrenada);
+    }
+  }, [offlineMode, procesandoCola, mostrarStockPos, requerirOperador]);
 
   // ---------------------------------------------------------------------------
   // Gestión de pendientes offline (modal)
@@ -1496,6 +1571,17 @@ export default function PosVentasPage() {
       return;
     }
 
+    // UN CARRITO NO CRUZA DE CAJA. Al cambiar de PIN la pantalla deja el
+    // carrito de A en la clave de A y carga el de B; esto ataja el instante
+    // intermedio —B ya hizo PIN y el carrito en pantalla sigue siendo el de A— y
+    // el carrito cuya caja todavía no se sabe. El de A no se pierde: lo
+    // encuentra A cuando vuelve.
+    if (!cajaCarrito || !carritoCobrable({ carritoVacio: false, duenoOperadorId: cajaCarrito.operadorId }, operadorActivoId)) {
+      setErrorMsg(ERROR_CARRITO_DE_OTRA_CAJA);
+      showError(ERROR_CARRITO_DE_OTRA_CAJA);
+      return;
+    }
+
     // Validar cantidades antes de enviar
     const itemInvalido = state.carrito.find(
       (item) => item.cantidad === "" || item.cantidad === null || isNaN(Number(item.cantidad)) || Number(item.cantidad) <= 0
@@ -1680,9 +1766,8 @@ export default function PosVentasPage() {
           setSuccessMsg("Advertencia: esta venta se registró con stock negativo (carga inicial).");
         }
 
-        // Limpiar carrito
+        // Limpiar carrito (su borrador lo borra la persistencia, en la clave de su caja)
         dispatch({ type: ActionTypes.CLEAR_CART });
-        localStorage.removeItem("posVentasCarritoEnCurso_v1");
         dispatch({ type: ActionTypes.SET_FORMA_PAGO, payload: "efectivo" });
         setDatosPagoEfectivo(null);
         dispatch({ type: ActionTypes.SET_SALDO_PUNTOS, payload: 0 });

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { requireOperadorSegunConfig } from "@/lib/operador";
+import { identidadParaOperar } from "@/lib/caja/identidadCajaServer";
 import { resolveScope } from "@/lib/grupos";
 import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 // Fórmula única del efectivo esperado. Antes vivía duplicada acá, en
@@ -17,7 +17,13 @@ import {
   validarRepartoCierre,
   motivoRetiroCierre,
 } from "@/lib/caja/cierreCaja";
-import { WHERE_TURNO_OPERATIVO, estadoDelTurno, ESTADO_TURNO } from "@/lib/caja/cierreRelevo";
+import {
+  WHERE_TURNO_OPERATIVO,
+  estadoDelTurno,
+  ESTADO_TURNO,
+  ERROR_CAJA_AJENA,
+  puedeActuarSobreCaja,
+} from "@/lib/caja/cierreRelevo";
 
 const MSG_TURNO_EN_PREPARACION =
   "Esta caja tiene un cierre en preparación. Terminá el conteo desde la pantalla de cierre.";
@@ -53,11 +59,46 @@ export async function POST(req) {
       where: { id: turnoId },
     });
 
-    if (!turno || turno.vendedorId !== session.id) {
+    if (!turno) {
       return NextResponse.json(
         { ok: false, error: "Turno no encontrado" },
         { status: 404 }
       );
+    }
+
+    // Aislamiento por local. Antes solo se validaba `vendedorId === session.id`:
+    // el local del turno nunca se contrastaba contra el alcance de la sesión.
+    // Un usuario reasignado a otro local conservaba la llave de un turno ajeno.
+    const scope = await resolveScope(req, { explicitLocalId: turno.localId });
+    if (scope.error) {
+      return NextResponse.json(
+        { ok: false, error: scope.error, needsContexto: scope.needsContexto },
+        { status: scope.status }
+      );
+    }
+    if (scope.localId !== turno.localId) {
+      return NextResponse.json(
+        { ok: false, error: "Turno fuera de tu alcance." },
+        { status: 403 }
+      );
+    }
+
+    // EL CIERRE ES DE LA CAJA DE QUIEN CIERRA, y se decide ANTES de mirar su
+    // estado: el de una caja ajena no se informa. Antes era "de la cuenta", y con
+    // una cuenta compartida un operador cerraba la caja de otro. Un cajero común
+    // cierra solo la suya; Admin y el Dueño en su local, la de cualquiera, y
+    // quedan como `cerradoPorId` y `realizadoPorId`. El local autorizado es el
+    // del turno, ya validado arriba. Para DUEÑO_LOCAL el bypass de operario solo
+    // aplica si ese local es el suyo (puedeOperarSinOperador).
+    const id = await identidadParaOperar(req, session, { localId: turno.localId });
+    if (!id.ok) {
+      return NextResponse.json(
+        { ok: false, error: id.error, needsOperador: true },
+        { status: id.status }
+      );
+    }
+    if (!puedeActuarSobreCaja(turno, id.identidad)) {
+      return NextResponse.json({ ok: false, error: ERROR_CAJA_AJENA, cajaAjena: true }, { status: 403 });
     }
 
     if (turno.cierre) {
@@ -83,34 +124,6 @@ export async function POST(req) {
           turnoEnPreparacionDeCierre: true,
         },
         { status: 409 }
-      );
-    }
-
-    // Aislamiento por local. Antes solo se validaba `vendedorId === session.id`:
-    // el local del turno nunca se contrastaba contra el alcance de la sesión.
-    // Un usuario reasignado a otro local conservaba la llave de un turno ajeno.
-    const scope = await resolveScope(req, { explicitLocalId: turno.localId });
-    if (scope.error) {
-      return NextResponse.json(
-        { ok: false, error: scope.error, needsContexto: scope.needsContexto },
-        { status: scope.status }
-      );
-    }
-    if (scope.localId !== turno.localId) {
-      return NextResponse.json(
-        { ok: false, error: "Turno fuera de tu alcance." },
-        { status: 403 }
-      );
-    }
-
-    // Gate de operario. El local autorizado es el del turno (ya validado por
-    // vendedorId === session.id), no un valor crudo del cliente. Para DUEÑO_LOCAL
-    // el bypass solo aplica si ese local es el suyo (puedeOperarSinOperador).
-    const gateOp = await requireOperadorSegunConfig(req, session, { localId: turno.localId });
-    if (!gateOp.ok) {
-      return NextResponse.json(
-        { ok: false, error: gateOp.error, needsOperador: true },
-        { status: gateOp.status }
       );
     }
 

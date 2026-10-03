@@ -4,6 +4,7 @@ import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { getRangoArgentina, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
+import { identidadParaMirar } from "@/lib/caja/identidadCajaServer";
 
 export async function GET(req) {
   try {
@@ -33,11 +34,17 @@ export async function GET(req) {
       ? Number(params.get("vendedorId"))
       : null;
 
-    // Scope: solo sus ventas si no tiene turnos.ver_todos ni es admin
+    // Scope: solo sus ventas si no tiene turnos.ver_todos ni es admin.
+    //
+    // "Sus" ventas son las del OPERADOR del PIN cuando lo hay: con una cuenta
+    // compartida por el mostrador, "las de mi cuenta" eran las de todos los
+    // operadores. Sin operador, las de la cuenta, como siempre.
     const puedeVerTodos =
       session.esAdmin || session.permisos.includes("turnos.ver_todos");
+    let operadorPropio = null;
     if (!puedeVerTodos) {
       vendedorId = session.id;
+      operadorPropio = (await identidadParaMirar(req, session, { localId })).operadorId;
     }
 
     // Ventas del día en hora Argentina. El contenedor corre en UTC; con
@@ -51,7 +58,9 @@ export async function GET(req) {
       fecha: { gte: fechaInicio, lte: fechaFin },
     };
 
-    if (vendedorId) {
+    if (operadorPropio != null) {
+      where.operadorId = operadorPropio;
+    } else if (vendedorId) {
       where.vendedorId = vendedorId;
     }
 
