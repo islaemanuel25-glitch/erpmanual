@@ -85,8 +85,28 @@ la caja física.**
   red, el POS registra su cola en el servidor antes de intentar las ventas.
   Registrar es guardar **evidencia**, no vender: la venta la sigue decidiendo
   `crear` con todo lo de arriba, y nada de lo registrado le concede nada.
-  Reglas para quien escriba la resolución (descartar o resolver un cobro), que
-  todavía no existe:
+- **Cuando la venta no se puede escribir (PR C, 2026-10-03):** una venta
+  offline **no se incorpora a un turno cerrado** ni se muda a otro turno u
+  operador: el cierre ya congeló esperado, diferencia, arqueo final y frontera
+  del corte, y el fondo y el retiro ya se repartieron. La protección normal es
+  no cerrar una caja con ventas offline sin sincronizar en el dispositivo, y
+  eso llega con la PR B. Si igual llega un cobro que no puede escribirse:
+  - `crear` responde con un `code` estable en cada rechazo que importa (turno,
+    día, lista, cliente, stock, combo, producto, id de otro local) y anota el
+    intento en el cobro, después de su transacción y con el candado del local
+    (`anotarRechazoDeVenta`).
+  - Sigue **PENDIENTE** si un reintento legítimo puede funcionar —red,
+    candado, sesión, falta el PIN, el PIN es de otro operador— mientras la caja
+    ORIGINAL siga operativa y sea de hoy. Pasa a **REQUIERE_REVISION** si la
+    caja original ya no puede recibirla o si el rechazo es del contenido. La
+    regla está en `lib/pos-ventas/rechazoVenta.js` y no lee textos.
+  - Una persona con `ventas.resolver_offline` —que no va a ningún rol de
+    sistema— puede **descartarlo** con motivo. Es la salida excepcional, no el
+    flujo normal: no crea ventas, no mueve dinero ni stock y no toca el turno.
+  - Un id que es una venta de **otro local** ya no se devuelve como duplicada:
+    `crear` responde `ID_DE_OTRO_LOCAL` sin ningún dato de esa venta.
+
+  Reglas de la resolución, que el descarte cumple:
   - `operadorVerificadoId` dice que el voucher del cobro tenía firma válida de
     ese operador, **no que el operador estuviera**: el voucher no vence y queda
     en el navegador. Es evidencia, **nunca autorización**.
@@ -134,9 +154,10 @@ migración.
   en locales que exigen operador, que después solo administran Admin o Dueño.
 - **Ventas offline pendientes:** quedan en la cola sin sincronizarse las de
   antes de este cambio (todas), y las nuevas cuya caja cerró o venció antes de
-  sincronizar, o que intenta sincronizar otro operador. No hay pantalla para
-  resolverlas: es un trabajo pendiente, y resolverlas es una decisión de una
-  persona.
+  sincronizar, o que intenta sincronizar otro operador. Desde la PR C el
+  servidor anota cada rechazo y puede listarlas y descartarlas
+  (`/api/pos-ventas/cobros-offline`); todavía no hay pantalla, y el POS todavía
+  no las registra (PR B).
 - Un censo (`lib/caja/censoCajaPropia.test.mjs`) obliga a que toda ruta del
   POS que toca un turno diga cómo decide de quién es la caja.
 - La base para la futura auditoría de recaudaciones queda armada:
