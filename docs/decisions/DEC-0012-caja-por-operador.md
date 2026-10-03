@@ -56,20 +56,31 @@ la caja física.**
 - **Pagos desde Finanzas, Gastos o Compras: sin cambios.** Quien está
   autorizado elige un cajón operativo y el retiro es de ese turno; no se exige
   que su operador registre el pago.
-- **Venta offline (corregido en la revisión de la PR, 2026-10-03):**
-  `origenOffline: true` lo manda el cliente y no prueba nada ni concede ninguna
-  excepción de propiedad. Una venta pertenece a la caja donde se cobró; offline
-  solo significa que llega tarde. La identidad es el voucher firmado (replay
-  con voucher: voucher de A, solo caja de A, sincronice quien sincronice) o el
-  PIN activo validado (todo lo demás); sin PIN donde el local lo exige, 428. La
-  cola guarda el turno donde se cobró y se sincroniza contra ése, no contra el
-  de quien sincroniza. Un replay entra en su propia caja aunque esté abierta de
-  un día anterior. Las ventas encoladas antes de este cambio sin turno: con
-  voucher, el turno actual (el servidor exige que sea del operador del
-  voucher); sin voucher y caja de cuenta, como siempre; sin voucher y caja de un
-  operador, **se frenan** en pendientes —no hay forma de saber de quién eran—.
-  La primera versión aceptaba "cualquier turno de la cuenta" en el replay: con
-  cuenta compartida, A metía ventas en la caja de B declarando offline.
+- **Venta offline (corregido en dos revisiones de la PR, 2026-10-03):**
+  una venta pertenece a la caja donde se cobró; offline solo significa que
+  llega tarde. **Se escribe sola únicamente si puede escribirse como una venta
+  de ahora**: PIN activo validado del dueño de la caja, en su turno ORIGINAL,
+  operativo y abierto hoy. Si no —sincroniza otra persona, la caja cerró o
+  venció—, el servidor la rechaza sin escribir nada y queda en la cola: no se
+  muda al turno actual, no se borra y no se le inventa dueño. Resolverla es
+  otro trabajo, de una persona.
+  - `origenOffline: true` lo manda el cliente: no concede ninguna excepción, ni
+    de propiedad ni de vigencia.
+  - El **voucher** del operador no autoriza nada: no está atado a una venta, no
+    vence y queda guardado en el navegador, así que quien lo lea puede
+    reusarlo. Se conserva solo para **negar**: si la venta de la cola la cobró
+    otro operador que el del PIN, 409 y queda pendiente.
+  - La cola guarda el turno donde se cobró y se sincroniza contra ése.
+  - Las ventas encoladas antes de este cambio no traen turno: **ninguna se
+    sincroniza sola**, tengan voucher o no. Con el voucher se sabe quién, no en
+    qué caja.
+  - Un reintento de una venta que ya se escribió (se perdió la respuesta) se
+    reconoce por su `clientTxnId` antes de mirar el turno, si apunta al mismo
+    local y turno: así no queda pendiente estando escrita aunque su caja cierre.
+  - Historia: la primera versión aceptaba "cualquier turno de la cuenta" en el
+    replay; la segunda tomaba el voucher como identidad y salteaba la vigencia
+    con la bandera. Con cuenta compartida, las dos dejaban escribir en la caja
+    de otro.
 - **`CajaMovimiento` no lleva `operadorId`**: se deriva de `turnoId →
   Turno.operadorId`, que no se reescribe nunca.
 - **Un carrito no cruza de caja ni se pierde**: cada identidad de caja (local
@@ -77,7 +88,11 @@ la caja física.**
   de A en su clave y carga el de B; A vuelve y lo encuentra. Nada se escribe
   hasta saber de quién es el carrito en pantalla. El borrador anterior a esta
   regla se restaura solo para quien opera sin operador; bajo un PIN no se carga
-  ni se borra.
+  ni se borra. **Un corte de red no es "se fue el operador"**: si
+  `/api/operador/me` no contesta (sin red, 5xx), la pantalla conserva el último
+  operador validado (`lib/operador-revalidacion.js`); solo una respuesta del
+  servidor cambia la identidad. No es autenticación offline: el servidor sigue
+  mirando la cookie en cada operación.
 - **Las diferencias no se netean**: los reportes de responsabilidad separan
   faltante y sobrante por responsable; un neto del local solo existe rotulado
   como agregado estadístico.
@@ -101,9 +116,11 @@ migración.
   (`lock_timeout`, patrón de `libro_stock`). Por eso el precheck de solo lectura
   es requisito del despliegue; también advierte las cajas abiertas sin operador
   en locales que exigen operador, que después solo administran Admin o Dueño.
-- **Ventas offline frenadas:** si al desplegar hay ventas en cola de antes de
-  este cambio, sin voucher, y la caja actual es de un operador, quedan en
-  pendientes sin sincronizarse. Resolverlas es una decisión de una persona.
+- **Ventas offline pendientes:** quedan en la cola sin sincronizarse las de
+  antes de este cambio (todas), y las nuevas cuya caja cerró o venció antes de
+  sincronizar, o que intenta sincronizar otro operador. No hay pantalla para
+  resolverlas: es un trabajo pendiente, y resolverlas es una decisión de una
+  persona.
 - Un censo (`lib/caja/censoCajaPropia.test.mjs`) obliga a que toda ruta del
   POS que toca un turno diga cómo decide de quién es la caja.
 - La base para la futura auditoría de recaudaciones queda armada:

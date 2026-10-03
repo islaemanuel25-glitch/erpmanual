@@ -48,7 +48,7 @@ Archivos principales:
 
 **[VERIFICADO]** La pantalla trabaja sobre el contexto/local activo. El backend de creación exige permiso `pos.usar` y vuelve a resolver local/grupo desde la sesión; el cliente no decide el scope.
 
-**[VERIFICADO]** Si la configuración local exige operario, una venta online requiere un operario válido. Para replays offline se usa un voucher firmado por el servidor; si un registro offline legacy no permite verificar operario, la venta se conserva con `operadorId = null` antes que perder una venta ya cobrada, y se deja log de auditoría operativa.
+**[VERIFICADO]** Si la configuración local exige operario, una venta requiere un operario válido, online o en replay offline (DEC-0012, 2026-10-03). El replay se escribe solo en su turno original, si sigue operativo y es del día, con el PIN de su dueño; si no, queda en la cola sin perderse. El voucher firmado no autoriza: solo permite rechazar una venta que cobró otro operador. Las ventas encoladas antes de la caja por operador no se sincronizan solas.
 
 ### 3.2 Turno
 
@@ -224,7 +224,7 @@ Esto significa que hoy la fuente única del precio cobrado **todavía no está c
 
 - **[DECISIÓN APROBADA]** El backend debe ser autoridad en datos sensibles ya migrados: modalidad de servicio, recargo, puntos, lista válida, composición de combo, stock y comisiones se recalculan/validan server-side.
 - **[DECISIÓN APROBADA]** Una venta no entra en un turno cuyo corte de cierre ya comenzó.
-- **[DECISIÓN APROBADA]** Una venta offline ya cobrada no se pierde solo porque el operario haya vencido al sincronizar; se usa voucher firmado y existe fallback auditable para legacy.
+- **[DECISIÓN APROBADA]** Una venta offline ya cobrada no se pierde: si no puede escribirse en su turno original, operativo y del día, con el PIN de su dueño, queda en la cola (DEC-0012, 2026-10-03; reemplaza al voucher como identidad y al fallback con operador nulo).
 - **[DECISIÓN APROBADA]** Servicios variables: cantidad 1, sin stock, sin descuentos/listas/puntos, cobertura íntegra en efectivo.
 - **[DECISIÓN APROBADA]** Pagos múltiples se congelan por tender en `VentaPago`; FIADO no se mezcla en v1.
 - **[DECISIÓN APROBADA]** Venta interna y transferencia son atómicas y no duplican el descuento físico del depósito.

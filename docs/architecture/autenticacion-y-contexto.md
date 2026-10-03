@@ -114,11 +114,16 @@ Una persona que atiende el mostrador y **no tiene cuenta propia**. Vive en
   (`lib/operador-exencion.test.mjs`).
 - `app/api/operador/login/route.js`.
 
-En el POS se exige con `requireOperadorSegunConfig`. En replay offline la
-atribución sale de un **voucher firmado** y, sin voucher, la venta se graba con
-`operadorId = null` antes que perderse
-(`app/api/pos-ventas/crear/route.js:81-100`). Es deliberado: perder la
-identificación es recuperable, perder la venta no.
+En el POS se exige con `requireOperadorSegunConfig`, **también en el replay
+offline** (DEC-0012, 2026-10-03): la identidad de una venta de la cola es el PIN
+activo, y la venta se escribe sola solo en su turno original, operativo y del
+día. El voucher firmado no autoriza —no está atado a una venta y no vence—:
+solo sirve para negarse a escribir a nombre de otro operador. Lo que no se puede
+escribir así queda en la cola, sin perderse (`app/api/pos-ventas/crear/route.js`).
+
+En la pantalla, `hooks/useOperadorActivo.js` distingue "el servidor dijo que no
+hay operador" de "no se pudo preguntar": ante un corte de red conserva el último
+operador validado (`lib/operador-revalidacion.js`). No es autenticación offline.
 
 ---
 
