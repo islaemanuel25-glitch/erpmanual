@@ -145,6 +145,21 @@ la caja física.**
   - Una cola que no se puede leer no se trata como vacía: se aparta tal cual a
     otra clave, verificada, antes de liberar la principal; si no se puede
     apartar, no se encola ni se sincroniza encima y ese equipo no cierra cajas.
+- **Una venta no entra después del corte (PR #131, R2c, 2026-10-03):** `crear`
+  validaba el turno antes de su transacción y después esperaba el candado del
+  local; si el corte se tomaba en ese rato, la venta se escribía igual en el
+  turno cortado, fuera de la frontera que el corte había congelado. Ahora,
+  dentro de la transacción y con el candado del local, `crear` toma el turno
+  `FOR SHARE` (`compartirTurno`) y lo vuelve a leer con el mismo predicado; si
+  ya no está operativo responde lo mismo que la validación previa
+  (`TURNO_EN_CORTE`, `TURNO_CERRADO`) y no escribe nada. `FOR SHARE` choca con
+  el `FOR UPDATE` del corte y con el UPDATE de `turnos/cerrar`, no con otra
+  venta; `FOR KEY SHARE` no alcanzaba contra `turnos/cerrar`. Orden de locks:
+  candado del local → turno → cobro offline → stock; quien corta, cierra o
+  retira toma solo el turno, así que no hay ciclo.
+  - Queda abierto, y es de esa ruta: `turnos/cerrar` calcula sus totales
+    ANTES de su transacción, así que un cierre directo que espera a una venta
+    cierra con totales que no la ven. Ninguna pantalla usa esa ruta.
 - **`CajaMovimiento` no lleva `operadorId`**: se deriva de `turnoId →
   Turno.operadorId`, que no se reescribe nunca.
 - **Un carrito no cruza de caja ni se pierde**: cada identidad de caja (local
