@@ -24,6 +24,11 @@ import {
   ERROR_CAJA_AJENA,
   puedeActuarSobreCaja,
 } from "@/lib/caja/cierreRelevo";
+import { contarCobrosOfflinePendientesDelTurno } from "@/lib/pos-ventas/cobroOfflineServidor";
+import {
+  CODIGO_COBROS_OFFLINE_PENDIENTES,
+  MENSAJE_CIERRE_CON_PENDIENTES_SERVIDOR,
+} from "@/lib/pos-ventas/sincronizacionOffline";
 
 const MSG_TURNO_EN_PREPARACION =
   "Esta caja tiene un cierre en preparación. Terminá el conteo desde la pantalla de cierre.";
@@ -194,6 +199,17 @@ export async function POST(req) {
     // Transacción: si la creación del arqueo fallara, el turno no puede quedar
     // cerrado sin su corte final.
     const { turnoCerrado } = await prisma.$transaction(async (tx) => {
+      // Las ventas sin conexión de esta caja que el servidor ya conoce y todavía
+      // no entraron: con alguna, la caja no se cierra (mismo criterio que
+      // `cierres/iniciar`). Adentro de la transacción: si falla, no se escribe nada.
+      const cobrosPendientes = await contarCobrosOfflinePendientesDelTurno(tx, turnoId);
+      if (cobrosPendientes > 0) {
+        const e = new Error(MENSAJE_CIERRE_CON_PENDIENTES_SERVIDOR);
+        e.codigo = "cobros_offline_pendientes";
+        e.cantidad = cobrosPendientes;
+        throw e;
+      }
+
       // Cierre ATÓMICO: el WHERE es el candado. Dos pedidos simultáneos leyeron el
       // turno abierto antes de entrar acá; solo el primero encuentra la fila y el
       // segundo sale con count 0 en vez de cerrar dos veces y crear dos retiros.
@@ -306,6 +322,12 @@ export async function POST(req) {
   } catch (error) {
     if (error?.codigo === "turno_ya_cerrado") {
       return NextResponse.json({ ok: false, error: error.message }, { status: 409 });
+    }
+    if (error?.codigo === "cobros_offline_pendientes") {
+      return NextResponse.json(
+        { ok: false, error: error.message, code: CODIGO_COBROS_OFFLINE_PENDIENTES, cantidad: error.cantidad },
+        { status: 409 }
+      );
     }
     if (error?.codigo === "turno_en_preparacion") {
       return NextResponse.json(

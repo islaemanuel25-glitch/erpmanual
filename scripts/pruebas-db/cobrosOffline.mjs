@@ -38,6 +38,14 @@
 //  22. descartar: permiso, local, motivo, evidencia, terminal, crear no revive;
 //  23. descartar contra la venta y contra otro descarte, con el candado real.
 //
+// PR B — el motor de sincronización del POS (lib/pos-ventas/sincronizacionOffline.js),
+// el MISMO que corre la pantalla, contra estos handlers:
+//  24. tres ventas al reconectar, y la respuesta perdida;
+//  25. 428 y varios operadores con sus cajas: nadie sincroniza la de otro;
+//  26. el cierre: una caja con cobros PENDIENTES no se corta ni se cierra;
+//  27. revisión sin reintentos, y el descarte que la saca de la cola;
+//  28. otro local: ni se manda ni se apropia.
+//
 // Los cuerpos son los que arma la pantalla: el ítem de la cola de
 // `guardarVentaPendiente` y el pedido de `procesarCola`.
 //
@@ -61,6 +69,9 @@ const rutaListar = await import("../../app/api/pos-ventas/cobros-offline/route.j
 const rutaDetalle = await import("../../app/api/pos-ventas/cobros-offline/[id]/route.js");
 const rutaDescartar = await import("../../app/api/pos-ventas/cobros-offline/[id]/descartar/route.js");
 const rutaCerrar = await import("../../app/api/pos-ventas/turnos/cerrar/route.js");
+const rutaIniciarCierre = await import("../../app/api/pos-ventas/cierres/iniciar/route.js");
+const rutaContexto = await import("../../app/api/contexto-activo/get/route.js");
+const { sincronizarCola, RESULTADO_SINCRONIZACION, ESTADO_LOCAL, CODIGO_COBROS_OFFLINE_PENDIENTES } = await import("../../lib/pos-ventas/sincronizacionOffline.js");
 const { PERMISO_RESOLVER_COBROS_OFFLINE } = await import("../../lib/pos-ventas/cobroOffline.js");
 const { ACCION_DESCARTAR_COBRO_OFFLINE } = await import("../../lib/pos-ventas/cobroOfflineServidor.js");
 
@@ -913,12 +924,16 @@ async function correr() {
   seccion("18. La caja original cerró o es de otro día: REQUIERE_REVISION, sin tocar el turno");
 
   {
-    // B registra un cobro de su caja, y B cierra su caja por la ruta real.
+    // B cierra su caja por la ruta real, y DESPUÉS llega un cobro de esa caja.
+    // Hasta PR B el cobro se registraba antes del cierre; desde PR B una caja
+    // con un cobro PENDIENTE no se cierra (sección 24), así que la caja cerrada
+    // con un cobro sin venta se produce así: el equipo que lo guardó estaba sin
+    // conexión cuando la caja se cerró, y lo registra al volver.
     const idCerrada = nuevoId("caja-cerrada");
     const cCerrada = cobroCola(idCerrada, { turnoId: turnoB, operador: f.opB });
-    await registrarUno(f.B, cCerrada);
     const cierre = await leer(await rutaCerrar.POST(pedido(`${BASE}/turnos/cerrar`, f.B, { turnoId: turnoB, montoRealEfectivo: 1000 })));
     requerir("B cierra su caja", cierre.ok === true, `${cierre.status} ${cierre.error ?? ""}`);
+    await registrarUno(f.B, cCerrada);
     const turnoAntes = await turnoCompleto(turnoB);
     const antes = await huella();
     const r = await replay(f.B, cCerrada);
@@ -1165,6 +1180,182 @@ async function correr() {
     }
     const rL = await pL;
     ok("el descarte esperó más de 5 s el candado y descartó", esperando === 1 && Date.now() - t0 > 5_000 && rL.ok === true, `${esperando} ${rL.status} ${rL.error ?? ""}`);
+  }
+
+  // ── PR B: el motor del POS contra los handlers reales ─────────────────────
+  //
+  // La cola es la del navegador en memoria (misma forma: leer/marcar/quitar) y
+  // la API llama a los handlers. `llamadas` cuenta cuántas veces se pidió cada
+  // venta, para afirmar que nada se pide dos veces ni se reintenta de más.
+  const colaDePrueba = (items) => {
+    const c = {
+      items: items.map((i) => ({ ...i })),
+      leer: () => ({ ok: true, items: c.items.map((i) => ({ ...i })) }),
+      marcar: (id, sync) => { c.items = c.items.map((i) => (i.clientVentaId === id ? { ...i, sync } : i)); return { ok: true }; },
+      quitar: (id) => { c.items = c.items.filter((i) => i.clientVentaId !== id); return { ok: true }; },
+      ids: () => c.items.map((i) => i.clientVentaId),
+      de: (id) => c.items.find((i) => i.clientVentaId === id),
+    };
+    return c;
+  };
+  const llamadas = [];
+  const apiDe = (quien, { despuesDeCrear = null } = {}) => ({
+    registrar: async (item) => {
+      const r = await registrar(quien, [item]);
+      return { red: true, status: r.status, data: r };
+    },
+    crear: async (cuerpo) => {
+      llamadas.push(cuerpo.clientTxnId);
+      const r = await leer(await rutaCrearVenta.POST(pedido(`${BASE}/crear`, quien, cuerpo)));
+      return despuesDeCrear ? despuesDeCrear(r) : { red: true, status: r.status, data: r };
+    },
+  });
+  const sincronizar = (cola, quien, operador, extra = {}) =>
+    sincronizarCola({ cola, api: apiDe(quien, extra), localId: f.local.id, operadorActivoId: operador?.id ?? null });
+  const vecesPedida = (id) => llamadas.filter((x) => x === id).length;
+  const ventasCon = (id) => prisma.venta.count({ where: { clientTxnId: id } });
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("24. PR B: tres ventas al reconectar, y la respuesta que se pierde");
+
+  {
+    // El grupo con que la pantalla guarda la venta: el del contexto activo, de la
+    // misma función que usa el servidor (`getGrupoIdDeLocal`).
+    const ctx = await leer(await rutaContexto.GET(pedidoGet(`http://ci/api/contexto-activo/get`, f.A)));
+    ok("contexto-activo trae el grupo canónico del local", ctx.ok === true && ctx.localId === f.local.id && ctx.grupoId === f.grupo.id, JSON.stringify(ctx));
+  }
+
+  {
+    const ids = [nuevoId("motor-1"), nuevoId("motor-2"), nuevoId("motor-3")];
+    const cola = colaDePrueba(ids.map((id, i) => cobroCola(id, { turnoId: turnoA, cantidad: i + 1, voucher: f.voucherA })));
+    const r = await sincronizar(cola, f.A, f.opA);
+    ok("COMPLETA, tres sincronizadas, la cola vacía", r.resultado === RESULTADO_SINCRONIZACION.COMPLETA && r.sincronizadas === 3 && cola.ids().length === 0, JSON.stringify(r));
+    const ventas = await prisma.venta.findMany({ where: { clientTxnId: { in: ids } }, select: { clientTxnId: true, turnoId: true, total: true }, orderBy: { id: "asc" } });
+    igual("tres ventas, en la caja de A, con el mismo id de la cola y el total cobrado", ventas.map((v) => [v.clientTxnId, v.turnoId, Number(v.total)]),
+      ids.map((id, i) => [id, turnoA, 1000 * (i + 1)]));
+    const cobros = await prisma.cobroOffline.findMany({ where: { clientTxnId: { in: ids } }, select: { estado: true, ventaId: true } });
+    ok("los tres cobros SINCRONIZADA con su venta", cobros.length === 3 && cobros.every((c) => c.estado === "SINCRONIZADA" && c.ventaId), JSON.stringify(cobros));
+    igual("cada venta se pidió una sola vez", ids.map(vecesPedida), [1, 1, 1]);
+
+    // D: la venta se escribe y la respuesta no llega.
+    const idD = nuevoId("motor-perdida");
+    const colaD = colaDePrueba([cobroCola(idD, { turnoId: turnoA, voucher: f.voucherA })]);
+    const r1 = await sincronizar(colaD, f.A, f.opA, { despuesDeCrear: () => ({ red: false }) });
+    ok("sin respuesta: SIN_RED y la venta sigue en la cola", r1.resultado === RESULTADO_SINCRONIZACION.SIN_RED && colaD.ids().length === 1, JSON.stringify(r1));
+    igual("pero el servidor sí la escribió", await ventasCon(idD), 1);
+    const r2 = await sincronizar(colaD, f.A, f.opA);
+    ok("la siguiente la reconoce y la saca, sin pedirla otra vez", r2.sincronizadas === 1 && colaD.ids().length === 0 && vecesPedida(idD) === 1, `${JSON.stringify(r2)} pedida ${vecesPedida(idD)}`);
+    igual("una sola venta con ese id", await ventasCon(idD), 1);
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("25. PR B: 428 y varios operadores: nadie sincroniza la caja de otro");
+
+  // D abre su caja: la de B quedó cerrada en la sección 18.
+  const opD = await prisma.operadorLocal.create({ data: { nombre: `${marca}-d`, pinHash: "x" } });
+  creado.operadorIds.push(opD.id);
+  await prisma.operadorEnLocal.create({ data: { operadorId: opD.id, localId: f.local.id } });
+  const D = { sesion: f.A.sesion, operador: firmarTokenOperador({ operadorId: opD.id, nombre: opD.nombre, localId: f.local.id }) };
+  const voucherD = firmarVoucherOperador({ operadorId: opD.id, localId: f.local.id });
+  const abreD = await abrir(D);
+  requerir("D abre su caja", abreD.ok === true, `${abreD.status} ${abreD.error ?? ""}`);
+  const turnoD = abreD.turno.id;
+
+  {
+    // La pantalla cree que hay PIN y el servidor no lo tiene: 428.
+    const id428 = nuevoId("motor-428");
+    const cola = colaDePrueba([cobroCola(id428, { turnoId: turnoA, voucher: f.voucherA })]);
+    const r = await sincronizar(cola, f.sinPin, f.opA);
+    ok("428: ESPERA_PIN pidiendo el operador que la cobró", r.resultado === RESULTADO_SINCRONIZACION.ESPERA_PIN && r.operadorRequerido?.operadorId === f.opA.id, JSON.stringify(r));
+    ok("la venta sigue en la cola, esperando, y no hay venta", cola.de(id428)?.sync?.estado === ESTADO_LOCAL.ESPERA_OPERADOR && (await ventasCon(id428)) === 0);
+    igual("el cobro sigue PENDIENTE: un 428 no lo da por perdido", (await cobroDe(id428)).estado, "PENDIENTE");
+    const r2 = await sincronizar(cola, f.A, f.opA);
+    ok("con el PIN, entra en la caja de A con el mismo id", r2.sincronizadas === 1 && cola.ids().length === 0
+      && (await prisma.venta.findUnique({ where: { clientTxnId: id428 }, select: { turnoId: true } }))?.turnoId === turnoA, JSON.stringify(r2));
+
+    // A y D en el mismo equipo, cada uno con su caja.
+    const idA = nuevoId("motor-de-a");
+    const idDd = nuevoId("motor-de-d");
+    const colaK = colaDePrueba([
+      cobroCola(idA, { turnoId: turnoA, voucher: f.voucherA }),
+      cobroCola(idDd, { turnoId: turnoD, voucher: voucherD, operador: opD }),
+    ]);
+    const rA = await sincronizar(colaK, f.A, f.opA);
+    ok("con A: entra la de A; la de D espera", rA.sincronizadas === 1 && rA.esperanOperador === 1 && colaK.ids().join() === idDd, JSON.stringify(rA));
+    ok("la de D no se pidió con el PIN de A, y no hay venta", vecesPedida(idDd) === 0 && (await ventasCon(idDd)) === 0);
+    igual("su cobro: PENDIENTE, en la caja de D", [(await cobroDe(idDd)).estado, (await cobroDe(idDd)).turnoId], ["PENDIENTE", turnoD]);
+    f.idDeD = idDd;
+    f.colaK = colaK;
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("26. PR B: una caja con cobros PENDIENTES no se corta ni se cierra");
+
+  {
+    const turnoAntes = await turnoCompleto(turnoD);
+    const corte = await leer(await rutaIniciarCierre.POST(pedido(`${BASE}/cierres/iniciar`, D, { turnoId: turnoD, desgloseCambio: {} })));
+    ok("iniciar el corte: 409 COBROS_OFFLINE_PENDIENTES", corte.status === 409 && corte.code === CODIGO_COBROS_OFFLINE_PENDIENTES && corte.cantidad === 1, JSON.stringify(corte));
+    const cierre = await leer(await rutaCerrar.POST(pedido(`${BASE}/turnos/cerrar`, D, { turnoId: turnoD, montoRealEfectivo: 1000 })));
+    ok("cerrar el turno: 409 COBROS_OFFLINE_PENDIENTES", cierre.status === 409 && cierre.code === CODIGO_COBROS_OFFLINE_PENDIENTES, JSON.stringify(cierre));
+    igual("el turno no cambió", JSON.stringify(await turnoCompleto(turnoD)), JSON.stringify(turnoAntes));
+    igual("ningún corte ni sobre creado", await prisma.cierrePreparacion.count({ where: { turnoId: turnoD } }), 0);
+
+    // Un cobro de esa caja en revisión NO bloquea: ya no depende de ella.
+    const idRev = nuevoId("motor-revision-d");
+    const cRev = cobroCola(idRev, { turnoId: turnoD, voucher: voucherD, operador: opD, cantidad: 100_000 });
+    const colaRev = colaDePrueba([cRev]);
+
+    // Entra D: la suya entra en SU caja, y la de stock imposible va a revisión.
+    f.colaK.items.push(...colaRev.items);
+    const rD = await sincronizar(f.colaK, D, opD);
+    ok("con D: una sincronizada y una en revisión", rD.sincronizadas === 1 && rD.enRevision === 1 && f.colaK.ids().join() === idRev, JSON.stringify(rD));
+    igual("la venta de D, en la caja de D", (await prisma.venta.findUnique({ where: { clientTxnId: f.idDeD }, select: { turnoId: true } }))?.turnoId, turnoD);
+    igual("el cobro de stock imposible: REQUIERE_REVISION", (await cobroDe(idRev)).estado, "REQUIERE_REVISION");
+    const cierreOk = await leer(await rutaCerrar.POST(pedido(`${BASE}/turnos/cerrar`, D, { turnoId: turnoD, montoRealEfectivo: 1000 })));
+    ok("ya sin PENDIENTES (la de revisión no cuenta), la caja se cierra", cierreOk.ok === true, `${cierreOk.status} ${cierreOk.error ?? ""}`);
+    f.idRevisionD = idRev;
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("27. PR B: revisión sin reintentos, y el descarte que la saca de la cola");
+
+  {
+    // Una venta de la caja de B, que ya cerró, registrada después.
+    const idG = nuevoId("motor-caja-cerrada");
+    const cola = colaDePrueba([cobroCola(idG, { turnoId: turnoB, operador: f.opB })]);
+    const r = await sincronizar(cola, f.B, f.opB);
+    ok("a revisión, marcada con el código del rechazo", r.enRevision === 1 && cola.de(idG)?.sync?.estado === ESTADO_LOCAL.REVISION
+      && cola.de(idG)?.sync?.codigo === "TURNO_CERRADO", JSON.stringify({ r, sync: cola.de(idG)?.sync }));
+    for (let i = 0; i < 3; i++) await sincronizar(cola, f.B, f.opB);
+    igual("la venta se pidió UNA vez en cuatro sincronizaciones", vecesPedida(idG), 1);
+    igual("el cobro: un solo intento anotado", (await cobroDe(idG)).intentos, 1);
+    igual("sigue visible en la cola", cola.ids(), [idG]);
+
+    const des = await descartar(f.resolutor, (await cobroDe(idG)).id, "cobrado en una caja ya cerrada");
+    requerir("el encargado la descarta", des.ok === true, JSON.stringify(des));
+    const h = await huella();
+    const r2 = await sincronizar(cola, f.B, f.opB);
+    ok("la siguiente sincronización la saca de la cola sin pedir la venta", cola.ids().length === 0 && vecesPedida(idG) === 1, JSON.stringify(r2));
+    igual("sin ninguna escritura económica", await huella(), h);
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("28. PR B: otro local: ni se manda ni se apropia");
+
+  {
+    const h = await huella();
+    // Una venta guardada en este equipo mientras estaba en el otro local.
+    const idOtro = nuevoId("motor-otro-local");
+    const deOtro = cobroCola(idOtro, { localId: f.otroLocal.id, turnoId: turnoOtro, producto: f.productoOtro, operador: null });
+    // Un id que ya es de un cobro del otro local.
+    const idAjeno = nuevoId("motor-id-ajeno");
+    await registrarUno(f.otro, cobroCola(idAjeno, { localId: f.otroLocal.id, turnoId: turnoOtro, producto: f.productoOtro, operador: null }));
+    const cola = colaDePrueba([deOtro, cobroCola(idAjeno, { turnoId: turnoA, voucher: f.voucherA })]);
+    const r = await sincronizar(cola, f.A, f.opA);
+    ok("la del otro local ni se registró ni se mandó", (await cobroDe(idOtro)) === null && vecesPedida(idOtro) === 0 && cola.de(idOtro) !== undefined);
+    ok("el id ajeno: RECHAZADA, sin venta, y el cobro del otro local intacto", r.rechazadas === 1 && cola.de(idAjeno)?.sync?.codigo === "ID_DE_OTRO_LOCAL"
+      && vecesPedida(idAjeno) === 0 && (await cobroDe(idAjeno)).localId === f.otroLocal.id, JSON.stringify({ r, sync: cola.de(idAjeno)?.sync }));
+    igual("sin ninguna escritura económica", await huella(), h);
   }
 }
 

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 
 export default function useContextoActivo() {
   const [loading, setLoading] = useState(true);
-  const [contexto, setContexto] = useState(null); // { localId, nombre, esDeposito }
+  const [contexto, setContexto] = useState(null); // { localId, nombre, esDeposito, grupoId }
   const [needsContexto, setNeedsContexto] = useState(false);
 
   useEffect(() => {
@@ -16,7 +16,12 @@ export default function useContextoActivo() {
         });
         const data = await res.json();
         if (data.ok) {
-          setContexto({ localId: data.localId, nombre: data.nombre, esDeposito: data.esDeposito });
+          setContexto({
+            localId: data.localId,
+            nombre: data.nombre,
+            esDeposito: data.esDeposito,
+            grupoId: data.grupoId ?? null,
+          });
           setNeedsContexto(false);
         } else {
           setContexto(null);

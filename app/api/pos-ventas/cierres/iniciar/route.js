@@ -50,6 +50,11 @@ import {
   puedeActuarSobreCaja,
 } from "@/lib/caja/cierreRelevo";
 import { ESTADO_RETIRO } from "@/lib/caja/retiroRelevo";
+import { contarCobrosOfflinePendientesDelTurno } from "@/lib/pos-ventas/cobroOfflineServidor";
+import {
+  CODIGO_COBROS_OFFLINE_PENDIENTES,
+  MENSAJE_CIERRE_CON_PENDIENTES_SERVIDOR,
+} from "@/lib/pos-ventas/sincronizacionOffline";
 import {
   procesoPendienteDeRetiro,
   procesoPendienteDeCierre,
@@ -180,6 +185,19 @@ export async function POST(req) {
         if (vigente) return { cierre: vigente, sobre: vigente.cambioPendiente, repetido: true };
         const e = new Error("El turno quedó marcado en preparación sin un corte vigente.");
         e.codigo = "conflicto";
+        throw e;
+      }
+
+      // ── LAS VENTAS SIN CONEXIÓN DE ESTA CAJA, ANTES DEL CORTE ─────────────
+      // Un cobro offline registrado y PENDIENTE es una venta de esta caja que
+      // todavía no entró. Cortar ahora la dejaría sin caja donde entrar. Se
+      // mira con el turno bloqueado; el POS ya la sincroniza antes de abrir el
+      // cierre, esto es la última red.
+      const cobrosPendientes = await contarCobrosOfflinePendientesDelTurno(tx, turnoId);
+      if (cobrosPendientes > 0) {
+        const e = new Error(MENSAJE_CIERRE_CON_PENDIENTES_SERVIDOR);
+        e.codigo = "cobros_offline_pendientes";
+        e.cantidad = cobrosPendientes;
         throw e;
       }
 
@@ -332,6 +350,12 @@ export async function POST(req) {
     }
     if (error?.codigo === "caja_ajena") {
       return NextResponse.json({ ok: false, error: error.message, cajaAjena: true }, { status: 403 });
+    }
+    if (error?.codigo === "cobros_offline_pendientes") {
+      return NextResponse.json(
+        { ok: false, error: error.message, code: CODIGO_COBROS_OFFLINE_PENDIENTES, cantidad: error.cantidad },
+        { status: 409 }
+      );
     }
     if (error?.codigo === "conflicto") {
       return NextResponse.json(

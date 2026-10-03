@@ -51,6 +51,8 @@ import { totalDesglose } from "@/lib/caja/conteoBilletes";
 import { evaluarDesproporcionDesglose } from "@/lib/caja/desgloseServidor";
 import { calcularRetiroEsperado } from "@/lib/caja/cierreRelevo";
 import { emitirCorteIniciado } from "@/lib/caja/senalCierre";
+import { verificarCierreConCola } from "@/lib/pos-ventas/sincronizacionOffline";
+import { leerCola } from "@/app/modulos/pos-ventas/helpers/offlineQueue";
 
 export default function IniciarCierrePage() {
   const router = useRouter();
@@ -230,6 +232,15 @@ export default function IniciarCierrePage() {
       // no coincide: el aviso ya está en la grilla, acá se repite junto al botón.
       if (!proporcion.valido) {
         setError(proporcion.error);
+        return;
+      }
+
+      // LAS VENTAS SIN CONEXIÓN DE ESTA CAJA, ANTES DEL CORTE. Si este equipo
+      // guarda alguna sin sincronizar, cortar ahora la dejaría afuera de la caja
+      // donde se cobró. Se sincronizan desde el POS; acá solo se mira.
+      const cola = verificarCierreConCola(leerCola(), { localId: contexto?.localId, turnoId: turno.id });
+      if (!cola.permitido) {
+        setError(cola.mensaje);
         return;
       }
 
