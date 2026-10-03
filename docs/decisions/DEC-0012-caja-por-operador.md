@@ -139,6 +139,9 @@ la caja física.**
     caja que ya tomó el corte, y desde el corte `crear` rechaza la venta
     (`TURNO_EN_CORTE`) y el cobro pasa a revisión.
   - Sin caja abierta en la pantalla no se guarda una venta sin conexión.
+  - Cuando el servidor deja de reconocer el PIN, el POS ya no lo toma como "no
+    tenés caja" ni manda a la apertura: espera el PIN con el POS montado, y al
+    validarse vuelve a pedir el turno y la sincronización sigue sola.
   - Una cola que no se puede leer no se trata como vacía: se aparta tal cual a
     otra clave, verificada, antes de liberar la principal; si no se puede
     apartar, no se encola ni se sincroniza encima y ese equipo no cierra cajas.
