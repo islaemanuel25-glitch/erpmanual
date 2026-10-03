@@ -81,6 +81,22 @@ la caja física.**
     replay; la segunda tomaba el voucher como identidad y salteaba la vigencia
     con la bandera. Con cuenta compartida, las dos dejaban escribir en la caja
     de otro.
+- **Cobros offline registrados (PR #128, `CobroOffline`):** cuando vuelve la
+  red, el POS registra su cola en el servidor antes de intentar las ventas.
+  Registrar es guardar **evidencia**, no vender: la venta la sigue decidiendo
+  `crear` con todo lo de arriba, y nada de lo registrado le concede nada.
+  Reglas para quien escriba la resolución (descartar o resolver un cobro), que
+  todavía no existe:
+  - `operadorVerificadoId` dice que el voucher del cobro tenía firma válida de
+    ese operador, **no que el operador estuviera**: el voucher no vence y queda
+    en el navegador. Es evidencia, **nunca autorización**.
+  - Descartar toma el **mismo candado del local** que `crear` y el registro
+    (`tomarCandadoDelLocal`, con `LIMITES_TRANSACCION_DEL_LOCAL`), y solo
+    descarta un cobro `PENDIENTE` o `REQUIERE_REVISION`; uno `SINCRONIZADA` ya
+    es una venta.
+  - Verifica que el cobro sea **del local de quien resuelve**. `crear` niega
+    la venta de un id descartado en cualquier local (el id es único), así que
+    sin ese chequeo un local podría bloquear la venta de otro.
 - **`CajaMovimiento` no lleva `operadorId`**: se deriva de `turnoId →
   Turno.operadorId`, que no se reescribe nunca.
 - **Un carrito no cruza de caja ni se pierde**: cada identidad de caja (local
