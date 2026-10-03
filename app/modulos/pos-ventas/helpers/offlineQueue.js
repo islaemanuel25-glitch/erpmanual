@@ -61,11 +61,31 @@ export function saveQueue(queue) {
   }
 }
 
+/** Lo que ve el cajero cuando la venta offline NO quedó guardada. */
+export const ERROR_VENTA_OFFLINE_NO_GUARDADA =
+  "La venta NO se pudo guardar en este equipo y NO está registrada. El carrito sigue acá: reintentá el cobro. No la des por vendida hasta ver \"Venta guardada offline\".";
+
+/**
+ * Encola una venta y CONFIRMA que quedó guardada.
+ *
+ * El cajero ya recibió el efectivo: la pantalla solo puede decir "guardada",
+ * imprimir el ticket y vaciar el carrito si la venta está de verdad en la cola.
+ * `saveQueue` puede fallar —almacenamiento lleno, bloqueado o en una ventana
+ * privada— y antes ese resultado se ignoraba: el ticket salía igual y la venta
+ * no existía en ningún lado.
+ *
+ * Por eso no alcanza con que `setItem` no tire: se relee la cola y se busca la
+ * venta por su `clientVentaId`.
+ *
+ * @returns {{ ok: true, length: number } | { ok: false }}
+ */
 export function enqueue(ventaData) {
   const queue = loadQueue();
   queue.push(ventaData);
-  saveQueue(queue);
-  return queue.length;
+  if (!saveQueue(queue)) return { ok: false };
+  const guardada = loadQueue();
+  const esta = guardada.some((item) => item?.clientVentaId === ventaData?.clientVentaId);
+  return esta ? { ok: true, length: guardada.length } : { ok: false };
 }
 
 export function dequeueById(clientVentaId) {

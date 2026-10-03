@@ -11,7 +11,7 @@ import useContextoActivo from "@/hooks/useContextoActivo";
 import { useOperadorContext } from "@/app/context/OperadorContext";
 import { showError, showSuccess } from "@/components/sunmi/SunmiToast";
 import { posVentaReducer, initialState, ActionTypes } from "./reducer/posVentaReducer";
-import { loadQueue, saveQueue, enqueue, dequeueById, getQueueLength, clearQueue } from "./helpers/offlineQueue";
+import { loadQueue, saveQueue, enqueue, dequeueById, getQueueLength, clearQueue, ERROR_VENTA_OFFLINE_NO_GUARDADA } from "./helpers/offlineQueue";
 import {
   carritoCobrable,
   claveBorrador,
@@ -20,6 +20,7 @@ import {
   ERROR_CARRITO_DE_OTRA_CAJA,
 } from "@/lib/pos-ventas/carritoPorCaja";
 import { turnoDeReplay } from "@/lib/pos-ventas/replayOffline";
+import { intentoParaCobro, huellaDeCobro, huellaDeCarrito, idParaGuardarOffline, ERROR_CONEXION_AL_COBRAR } from "@/lib/pos-ventas/intentoCobro";
 
 import BuscadorProductos from "@/components/pos-ventas/BuscadorProductos";
 import CarritoVenta from "@/components/pos-ventas/CarritoVenta";
@@ -109,6 +110,14 @@ export default function PosVentasPage() {
 
   // Estado del POS con reducer
   const [state, dispatch] = useReducer(posVentaReducer, initialState);
+
+  // El cobro online en curso: su `clientTxnId` y la huella de lo que se cobra.
+  // Se conserva entre reintentos del MISMO cobro y se libera cuando el servidor
+  // confirma la venta o el carrito queda vacío. Ver lib/pos-ventas/intentoCobro.js.
+  const intentoCobroRef = useRef(null);
+  useEffect(() => {
+    if (state.carrito.length === 0) intentoCobroRef.current = null;
+  }, [state.carrito.length]);
 
   // Estados que NO van al reducer (UI, loading, datos externos)
   const [me, setMe] = useState(null);
@@ -1030,10 +1039,22 @@ export default function PosVentasPage() {
       return;
     }
 
-    // Generar clientVentaId único
-    const clientVentaId = typeof crypto !== "undefined" && crypto.randomUUID 
-      ? crypto.randomUUID() 
-      : `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    // El id de la venta en la cola. Si este mismo carrito tiene un cobro online
+    // sin resolver —salió el pedido y no llegó la respuesta—, guardarlo offline
+    // es reintentar ese cobro y hereda su id: si el servidor ya lo había creado,
+    // la cola recibe esa venta al sincronizar en vez de crear otra.
+    const clientVentaId = idParaGuardarOffline(
+      intentoCobroRef.current,
+      huellaDeCarrito(
+        {
+          localId: localActual,
+          turnoId: turnoActual?.id || null,
+          clienteId: state.clienteSeleccionado?.id || null,
+          items: itemsCrearPayload(state.carrito),
+        },
+        operadorActivoId
+      )
+    );
 
     const ventaPendiente = {
       clientVentaId,
@@ -1062,9 +1083,20 @@ export default function PosVentasPage() {
       items: itemsCrearPayload(state.carrito),
     };
 
-    enqueue(ventaPendiente);
-    const nuevaLongitud = getQueueLength();
+    // NADA IRREVERSIBLE ANTES DE ESTO. El efectivo ya está en el cajón, pero la
+    // venta solo existe si quedó en la cola: hasta confirmarlo no hay ticket, no
+    // hay "guardada" y el carrito no se toca. Si no se pudo guardar, el carrito
+    // queda como estaba para reintentar, y el aviso dice que NO está registrada.
+    const encolada = enqueue(ventaPendiente);
+    if (!encolada.ok) {
+      setErrorMsg(ERROR_VENTA_OFFLINE_NO_GUARDADA);
+      showError(ERROR_VENTA_OFFLINE_NO_GUARDADA);
+      return;
+    }
+    const nuevaLongitud = encolada.length;
     setQueueLength(nuevaLongitud);
+    // El cobro quedó en la cola con su id: deja de ser un cobro online en curso.
+    intentoCobroRef.current = null;
 
     // Preparar datos del ticket offline
     const ticketOffline = {
@@ -1103,8 +1135,15 @@ export default function PosVentasPage() {
       vuelto: pagoEfectivo?.vuelto || null,
     };
 
-    // Guardar ticket offline y mostrarlo
-    localStorage.setItem("posUltimoTicket_v1", JSON.stringify(ticketOffline));
+    // Guardar ticket offline y mostrarlo. La venta YA está en la cola: si
+    // guardar la copia para reimprimir falla, se sigue igual. Cortar acá dejaría
+    // el carrito a la vista de una venta guardada, y cobrarlo otra vez la
+    // duplicaría con otro id.
+    try {
+      localStorage.setItem("posUltimoTicket_v1", JSON.stringify(ticketOffline));
+    } catch (err) {
+      console.error("No se pudo guardar la copia del ticket offline:", err);
+    }
     setUltimoTicketOffline(ticketOffline);
 
     // Limpiar carrito (su borrador lo borra la persistencia, en la clave de su caja)
@@ -1613,37 +1652,45 @@ export default function PosVentasPage() {
     setRefrescoDeTotal(null);
     dispatch({ type: ActionTypes.SET_COBRANDO, payload: true });
 
-    // Generar clientTxnId para idempotencia
-    const clientTxnId = typeof crypto !== "undefined" && crypto.randomUUID 
-      ? crypto.randomUUID() 
-      : `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    // El cuerpo del cobro, sin el id. Su huella decide si esto es reintentar el
+    // MISMO cobro —y conservar el id— o un cobro distinto.
+    const cuerpoCobro = {
+      localId: localActual,
+      clienteId: state.clienteSeleccionado?.id || null,
+      turnoId: turnoActual?.id || null,
+      formaPago: datos.formaPago,
+      // EL NÚMERO QUE VIO EL CAJERO. El backend recalcula el suyo contra la
+      // base y, si no coinciden, RECHAZA la venta en vez de registrar otro
+      // total en silencio. Nunca se usa para cobrar: solo para comparar.
+      totalPantalla: datos.totalPantalla,
+      // Pago dividido: si el panel entrega tenders, el backend los usa y
+      // recalcula todo. Sin `pagos`, cae al compat legacy (1 tender por formaPago).
+      pagos: Array.isArray(datos.pagos) && datos.pagos.length > 0 ? datos.pagos : undefined,
+      esFiado: datos.formaPago === "fiado",
+      descuento: state.descuento,
+      descuentoPorPuntos: state.descuentoPorPuntos,
+      puntosCanje: state.puntosCanje,
+      // Payload canónico (mismo helper que el path offline): incluye
+      // esServicio + importeBaseServicio para los servicios de importe variable.
+      items: itemsCrearPayload(state.carrito),
+    };
+
+    // UN MISMO COBRO, UN MISMO clientTxnId (lib/pos-ventas/intentoCobro.js).
+    // Si el servidor ya creó la venta y la respuesta se perdió, el reintento del
+    // mismo carrito trae el mismo id y recibe esa venta en vez de crear otra.
+    const intento = intentoParaCobro(intentoCobroRef.current, {
+      huella: huellaDeCobro(cuerpoCobro, operadorActivoId),
+      huellaCarrito: huellaDeCarrito(cuerpoCobro, operadorActivoId),
+    });
+    intentoCobroRef.current = intento;
+    const { clientTxnId } = intento;
 
     try {
       const res = await fetch("/api/pos-ventas/crear", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clientTxnId,
-          localId: localActual,
-          clienteId: state.clienteSeleccionado?.id || null,
-          turnoId: turnoActual?.id || null,
-          formaPago: datos.formaPago,
-          // EL NÚMERO QUE VIO EL CAJERO. El backend recalcula el suyo contra la
-          // base y, si no coinciden, RECHAZA la venta en vez de registrar otro
-          // total en silencio. Nunca se usa para cobrar: solo para comparar.
-          totalPantalla: datos.totalPantalla,
-          // Pago dividido: si el panel entrega tenders, el backend los usa y
-          // recalcula todo. Sin `pagos`, cae al compat legacy (1 tender por formaPago).
-          pagos: Array.isArray(datos.pagos) && datos.pagos.length > 0 ? datos.pagos : undefined,
-          esFiado: datos.formaPago === "fiado",
-          descuento: state.descuento,
-          descuentoPorPuntos: state.descuentoPorPuntos,
-          puntosCanje: state.puntosCanje,
-          // Payload canónico (mismo helper que el path offline): incluye
-          // esServicio + importeBaseServicio para los servicios de importe variable.
-          items: itemsCrearPayload(state.carrito),
-        }),
+        body: JSON.stringify({ clientTxnId, ...cuerpoCobro }),
       });
 
       if (res.status === 401) {
@@ -1756,8 +1803,14 @@ export default function PosVentasPage() {
           vuelto: pagoEfectivo?.vuelto || null,
         };
 
-        // Guardar último ticket para reimpresión
-        localStorage.setItem("posUltimoTicket_v1", JSON.stringify(ventaTicket));
+        // Guardar último ticket para reimpresión. La venta YA está registrada:
+        // si guardar la copia falla, se sigue. Antes esto caía en "Error de
+        // conexión al cobrar" con el carrito a la vista de una venta hecha.
+        try {
+          localStorage.setItem("posUltimoTicket_v1", JSON.stringify(ventaTicket));
+        } catch (err) {
+          console.error("No se pudo guardar la copia del ticket:", err);
+        }
 
         // Mostrar modal de ticket
         dispatch({ type: ActionTypes.OPEN_MODAL, payload: { modal: "modalTicket", data: ventaTicket } });
@@ -1771,6 +1824,10 @@ export default function PosVentasPage() {
         dispatch({ type: ActionTypes.SET_FORMA_PAGO, payload: "efectivo" });
         setDatosPagoEfectivo(null);
         dispatch({ type: ActionTypes.SET_SALDO_PUNTOS, payload: 0 });
+
+        // El servidor confirmó la venta (creada o ya existente): este cobro
+        // terminó y su id no se usa más. El próximo carrito nace con otro.
+        intentoCobroRef.current = null;
       } else if (data.code === "TOTAL_DESACTUALIZADO") {
         // ── LA PANTALLA ESTABA VIEJA ────────────────────────────────────────
         //
@@ -1802,7 +1859,10 @@ export default function PosVentasPage() {
       }
     } catch (err) {
       console.error("Error cobrando:", err);
-      const msg = "Error de conexion al cobrar.";
+      // La venta PUEDE haberse registrado: el pedido salió y la respuesta no
+      // llegó. Reintentar el mismo carrito lo confirma sin duplicarla, porque
+      // conserva el id; cambiarlo lo convierte en otro cobro.
+      const msg = ERROR_CONEXION_AL_COBRAR;
       setErrorMsg(msg);
       showError(msg);
     } finally {
