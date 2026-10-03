@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-10-03 13:40
+**Última actualización:** 2026-10-03 14:39
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-10-03: fix: el registro offline espera a crear y rechaza lo que la columna no guarda
 - 2026-10-03: feat: registrar cobros offline y atarlos a su venta en crear
 - 2026-10-03: fix(pos): un mismo cobro conserva su clientTxnId, y la venta offline solo se da por guardada si quedó en la cola
 - 2026-10-03: fix(pos-ventas): dos reintentos simultáneos de la misma venta no devuelven "concurrencia"
