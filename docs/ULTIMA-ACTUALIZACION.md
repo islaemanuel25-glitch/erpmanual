@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-03 22:01
+**Fecha:** 2026-10-03 22:51
 
 ## Módulos modificados recientemente
 
 ### pos-ventas
-- fix: sin PIN el POS espera el PIN en vez de mandar a abrir caja, fix: un fallo inesperado de la sincronización offline se informa como error, fix: el rechazo de una venta offline no revela stock que el local oculta
-- Archivos: 20 nuevos, 11 modificados (31 total)
+- fix: una venta no entra en una caja que ya tomó el corte (R2c), fix: sin PIN el POS espera el PIN en vez de mandar a abrir caja, fix: un fallo inesperado de la sincronización offline se informa como error
+- Archivos: 21 nuevos, 11 modificados (32 total)
 
 ### transferencias
 - feat: modelo CobroOffline y su migración aditiva
@@ -14,6 +14,7 @@
 
 
 ## Archivos nuevos desde última sincronización
+- lib/pos-ventas/ventaDentroDelCorte.test.mjs
 - app/modulos/pos-ventas/helpers/offlineQueue.test.mjs
 - app/modulos/pos-ventas/helpers/useSincronizacionOffline.js
 - lib/pos-ventas/sincronizacionOffline.js

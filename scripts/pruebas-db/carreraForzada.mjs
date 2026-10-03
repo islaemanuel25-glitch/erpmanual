@@ -62,6 +62,31 @@ export async function retenerFilaDeStock(prisma, { localId, productoLocalId }) {
   };
 }
 
+/**
+ * Retiene con FOR UPDATE la fila de un cobro offline, hasta `soltar()`. `crear`
+ * la lee con FOR UPDATE después de tomar el candado del local y el turno, y
+ * ANTES de escribir la venta: retenerla deja a `crear` detenido justo después de
+ * haber comprobado que el turno sigue operativo.
+ */
+export async function retenerCobroOffline(prisma, clientTxnId) {
+  let liberar;
+  const liberado = new Promise((r) => { liberar = r; });
+  let avisarTomado;
+  const tomado = new Promise((r) => { avisarTomado = r; });
+  const retencion = prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "CobroOffline" WHERE "clientTxnId" = ${clientTxnId} FOR UPDATE`;
+    avisarTomado();
+    await liberado;
+  }, { maxWait: 10_000, timeout: 60_000 });
+  await Promise.race([tomado, retencion]);
+  return {
+    soltar: async () => {
+      liberar();
+      await retencion;
+    },
+  };
+}
+
 async function esperar(contar, cantidad, tope) {
   const limite = Date.now() + tope;
   let n = await contar();

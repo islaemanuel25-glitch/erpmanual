@@ -16,6 +16,7 @@ import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
 import { SOLO_TRANSITO } from "@/lib/transferencias/politicasStock";
 import { requireOperadorSegunConfig, verificarVoucherOperador } from "@/lib/operador";
 import { WHERE_TURNO_OPERATIVO, ERROR_TURNO_EN_PREPARACION, whereCajaPropia } from "@/lib/caja/cierreRelevo";
+import { compartirTurno } from "@/lib/caja/cierreRelevoServer";
 import { ERROR_VENTA_DE_OTRO_OPERADOR } from "@/lib/pos-ventas/replayOffline";
 import { esMismoDestino, esChoqueDeClientTxnId } from "@/lib/pos-ventas/idempotenciaVenta";
 import { tomarCandadoDelLocal, LIMITES_TRANSACCION_DEL_LOCAL } from "@/lib/pos-ventas/candadoDelLocal";
@@ -92,6 +93,42 @@ function buscarVentaPorTxn(txnId) {
       detalles: { select: { cantidadStock: true } },
     },
   });
+}
+
+/** El turno dejó de estar operativo entre la validación y la transacción. */
+class ErrorTurnoNoOperativo extends Error {
+  constructor() {
+    super("El turno dejó de estar operativo antes de escribir la venta.");
+    this.esTurnoNoOperativo = true;
+  }
+}
+
+/**
+ * La caja de la venta no está operativa: POR QUÉ, con un código estable
+ * (codigoDeTurnoRechazado). La decisión ya se tomó —en el WHERE de la
+ * validación o, con el turno tomado, adentro de la transacción—; esto solo la
+ * explica. Se distingue el corte del resto en el mensaje: "turno inválido" no
+ * le dice nada a quien acaba de iniciar un cierre. Solo sobre la caja PROPIA:
+ * el estado de la caja de otro no se informa, ni en el mensaje ni en el código.
+ */
+async function responderTurnoNoOperativo({ turnoId, localId, usuarioId, operadorId }) {
+  const turnoPedido = await prisma.turno.findUnique({
+    where: { id: turnoId },
+    select: { localId: true, operadorId: true, vendedorId: true, cierre: true, cierreEnPreparacionEn: true, anuladoEn: true },
+  });
+  const codigoTurno = codigoDeTurnoRechazado(turnoPedido, { localId, usuarioId, operadorId });
+  const enPreparacion = codigoTurno === CODIGO_RECHAZO_VENTA.TURNO_EN_CORTE;
+  return NextResponse.json(
+    {
+      ok: false,
+      error: enPreparacion
+        ? ERROR_TURNO_EN_PREPARACION
+        : "Turno inválido, cerrado, o no es tu caja en este local",
+      code: codigoTurno,
+      turnoEnPreparacionDeCierre: enPreparacion,
+    },
+    { status: 403 }
+  );
 }
 
 /**
@@ -183,6 +220,9 @@ async function procesarCrear(req, intento) {
   // El id de idempotencia y el destino de este pedido, cuando ya se conocen.
   // Vive afuera del `try` porque lo lee el `catch`.
   let pedidoIdempotente = null;
+  // La caja que la venta validó, para explicar el rechazo si deja de estar
+  // operativa adentro de la transacción. También la lee el `catch`.
+  let intentoTurno = null;
   try {
     const perm = requirePerm(req, "pos.usar");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
@@ -297,29 +337,9 @@ async function procesarCrear(req, intento) {
       select: { id: true, apertura: true },
     });
 
+    intentoTurno = { turnoId, localId, usuarioId: session.id, operadorId };
     if (!turnoValido) {
-      // POR QUÉ NO SIRVIÓ, con un código estable (codigoDeTurnoRechazado). La
-      // decisión ya se tomó arriba, en el WHERE; esto solo la explica. Se
-      // distingue el corte del resto en el mensaje: "turno inválido" no le dice
-      // nada a quien acaba de iniciar un cierre. Solo sobre la caja PROPIA: el
-      // estado de la caja de otro no se informa, ni en el mensaje ni en el código.
-      const turnoPedido = await prisma.turno.findUnique({
-        where: { id: turnoId },
-        select: { localId: true, operadorId: true, vendedorId: true, cierre: true, cierreEnPreparacionEn: true, anuladoEn: true },
-      });
-      const codigoTurno = codigoDeTurnoRechazado(turnoPedido, { localId, usuarioId: session.id, operadorId });
-      const enPreparacion = codigoTurno === CODIGO_RECHAZO_VENTA.TURNO_EN_CORTE;
-      return NextResponse.json(
-        {
-          ok: false,
-          error: enPreparacion
-            ? ERROR_TURNO_EN_PREPARACION
-            : "Turno inválido, cerrado, o no es tu caja en este local",
-          code: codigoTurno,
-          turnoEnPreparacionDeCierre: enPreparacion,
-        },
-        { status: 403 }
-      );
+      return responderTurnoNoOperativo(intentoTurno);
     }
 
     // Bloquear si el turno fue abierto un día anterior (calendario AR).
@@ -1206,6 +1226,29 @@ async function procesarCrear(req, intento) {
       // Lock a nivel de transacción para evitar concurrencia en número de venta
       await tomarCandadoDelLocal(tx, localId);
 
+      // EL TURNO SIGUE OPERATIVO, AHORA. La validación de arriba es anterior a
+      // esta transacción, y entre las dos la venta puede esperar el candado del
+      // local varios segundos: si en ese tiempo se tomaba el corte, la venta se
+      // escribía igual en un turno ya cortado, después de la frontera que el
+      // corte acababa de congelar (R2c). Se toma el turno compartido
+      // —`compartirTurno`, que explica por qué FOR SHARE— y se vuelve a leer con
+      // EL MISMO predicado. Desde acá hasta confirmar, nadie lo corta ni lo cierra.
+      //
+      // Orden: candado del local → turno → cobro offline → filas de stock. Quien
+      // corta, cierra o retira toma el turno y no toma el candado del local ni
+      // esas filas, así que no se forma un ciclo.
+      await compartirTurno(tx, turnoId);
+      const sigueOperativo = await tx.turno.findFirst({
+        where: {
+          id: turnoId,
+          localId,
+          ...whereCajaPropia({ usuarioId: session.id, operadorId }),
+          ...WHERE_TURNO_OPERATIVO,
+        },
+        select: { id: true },
+      });
+      if (!sigueOperativo) throw new ErrorTurnoNoOperativo();
+
       // EL COBRO OFFLINE CON ESTE ID, SI LO HAY. Se lee con FOR UPDATE ya con el
       // candado del local tomado —el mismo que toma el registro—: si una persona
       // lo descartó, esta venta no se crea (lib/pos-ventas/cobroOfflineServidor.js).
@@ -1740,6 +1783,14 @@ async function procesarCrear(req, intento) {
     // Venta interna: el vínculo cambió o dejó de ser válido DENTRO de la
     // transacción. Ya hizo rollback de venta, pagos, detalles, stock y
     // transferencia; acá solo se traduce el error tipado a la respuesta HTTP.
+    //
+    // El turno dejó de estar operativo mientras la venta esperaba su candado:
+    // la misma respuesta que si ya lo estuviera al validar, con su código
+    // (TURNO_EN_CORTE, TURNO_CERRADO…). La transacción ya se revirtió sin escribir nada.
+    if (err.esTurnoNoOperativo && intentoTurno) {
+      return responderTurnoNoOperativo(intentoTurno);
+    }
+
     // El cobro offline con este id fue descartado por una persona: esta venta
     // no se crea. La transacción ya se revirtió sin escribir nada.
     if (err.esCobroOfflineDescartado) {
