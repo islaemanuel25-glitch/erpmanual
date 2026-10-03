@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-10-03] - Actualización: pos-ventas, transferencias
+
+### Modificado
+- **pos-ventas**: feat: registrar cobros offline y atarlos a su venta en crear
+- **pos-ventas**: fix(pos): un mismo cobro conserva su clientTxnId, y la venta offline solo se da por guardada si quedó en la cola
+- **pos-ventas**: fix(pos-ventas): dos reintentos simultáneos de la misma venta no devuelven "concurrencia"
+- **pos-ventas**: fix(caja): una venta offline se escribe sola solo en su turno original, vigente y con el PIN de su dueño
+- **transferencias**: feat: modelo CobroOffline y su migración aditiva
+
+
 ## [2026-10-02] - Actualización: pos-ventas
 
 ### Modificado

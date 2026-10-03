@@ -1,18 +1,29 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-02 23:05
+**Fecha:** 2026-10-03 13:40
 
 ## Módulos modificados recientemente
 
 ### pos-ventas
-- fix(caja): el resumen de un turno es de su caja, como sus ventas y movimientos, fix(caja): la bandeja de cierres pendientes no reparte el token de otra caja, fix(auditoria-pos): la pantalla de Cajas no netea las diferencias
-- Archivos: 3 nuevos, 17 modificados (20 total)
+- feat: registrar cobros offline y atarlos a su venta en crear, fix(pos): un mismo cobro conserva su clientTxnId, y la venta offline solo se da por guardada si quedó en la cola, fix(pos-ventas): dos reintentos simultáneos de la misma venta no devuelven "concurrencia"
+- Archivos: 10 nuevos, 5 modificados (15 total)
+
+### transferencias
+- feat: modelo CobroOffline y su migración aditiva
+- Archivos: 1 modificados (1 total)
 
 
 ## Archivos nuevos desde última sincronización
-- lib/auditoria-pos-ventas/diferenciasSinNetear.test.mjs
-- lib/pos-ventas/carritoPorCaja.js
-- lib/pos-ventas/carritoPorCaja.test.mjs
+- app/api/pos-ventas/cobros-offline/registrar/route.js
+- lib/pos-ventas/candadoDelLocal.js
+- lib/pos-ventas/cobroOffline.js
+- lib/pos-ventas/cobroOffline.test.mjs
+- lib/pos-ventas/cobroOfflineServidor.js
+- lib/pos-ventas/idempotenciaVenta.test.mjs
+- lib/pos-ventas/intentoCobro.js
+- app/modulos/pos-ventas/helpers/offlineQueue.test.mjs
+- lib/pos-ventas/intentoCobro.test.mjs
+- lib/pos-ventas/idempotenciaVenta.js
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai
