@@ -122,6 +122,11 @@ export default function useSincronizacionOffline({
         candado,
         textoDeRechazo: vivo.current.textoDeRechazo,
       });
+    } catch (err) {
+      // Un fallo inesperado no puede quedar mudo ni tocar la cola: el motor solo
+      // la modifica con una respuesta del servidor en la mano.
+      console.error("Error sincronizando la cola offline:", err);
+      resumen = { resultado: RESULTADO_SINCRONIZACION.ERROR, mensaje: null };
     } finally {
       setSincronizando(false);
       refrescar();
