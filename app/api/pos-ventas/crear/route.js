@@ -24,7 +24,9 @@ import {
   verificarCobroOfflineNoDescartado,
   sincronizarCobroOfflineEnTransaccion,
   reconciliarCobroOfflineConVenta,
+  anotarRechazoDeVenta,
 } from "@/lib/pos-ventas/cobroOfflineServidor";
+import { CODIGO_RECHAZO_VENTA, codigoDeTurnoRechazado } from "@/lib/pos-ventas/rechazoVenta";
 import { consolidarTenders, aplicarComisionesResueltas, derivarCamposVenta, normalizarMedio, MEDIOS_CON_COMISION } from "@/lib/pos-ventas/pagos";
 import { mediosDelLocal } from "@/lib/pos-ventas/mediosCobroServidor";
 import { comisionesDeMedios } from "@/lib/pos-ventas/mediosCobro";
@@ -150,7 +152,34 @@ async function responderDuplicada(ventaExistente, clientTxnId) {
   });
 }
 
+/**
+ * Si la venta no se escribió y su id es el de un cobro offline registrado en
+ * este local, el intento y su rechazo quedan anotados en el cobro
+ * (anotarRechazoDeVenta). Va DESPUÉS de responder la venta, fuera de su
+ * transacción: el rechazo tiene que sobrevivir al rollback. La respuesta no
+ * cambia nunca por esto.
+ */
 export async function POST(req) {
+  const intento = { txnId: null, localId: null };
+  const respuesta = await procesarCrear(req, intento);
+  if (respuesta.status >= 400 && intento.txnId && intento.localId) {
+    try {
+      const cuerpo = await respuesta.clone().json().catch(() => ({}));
+      await anotarRechazoDeVenta(prisma, {
+        clientTxnId: intento.txnId,
+        localId: intento.localId,
+        status: respuesta.status,
+        codigo: typeof cuerpo?.code === "string" ? cuerpo.code : null,
+        mensaje: typeof cuerpo?.error === "string" ? cuerpo.error : null,
+      });
+    } catch (errAnotar) {
+      console.error("No se pudo anotar el rechazo en el cobro offline:", errAnotar);
+    }
+  }
+  return respuesta;
+}
+
+async function procesarCrear(req, intento) {
   // El id de idempotencia y el destino de este pedido, cuando ya se conocen.
   // Vive afuera del `try` porque lo lee el `catch`.
   let pedidoIdempotente = null;
@@ -170,6 +199,12 @@ export async function POST(req) {
 
     const body = await req.json();
     const { clientTxnId, clientVentaId, clienteId, turnoId, formaPago, descuento, items, descuentoPorPuntos: descuentoPorPuntosBody, puntosCanje, origenOffline, operadorVoucher } = body;
+
+    // clientVentaId es alias de clientTxnId para compatibilidad con cola offline
+    const txnId = clientTxnId || clientVentaId;
+    // Desde acá un rechazo se anota en el cobro offline de este id, si lo hay.
+    intento.txnId = typeof txnId === "string" ? txnId : null;
+    intento.localId = localId;
 
     // QUIÉN COBRA: la identidad de caja de esta venta.
     //
@@ -214,13 +249,10 @@ export async function POST(req) {
     // Validar turnoId obligatorio
     if (!turnoId) {
       return NextResponse.json(
-        { ok: false, error: "Debe haber un turno abierto" },
+        { ok: false, error: "Debe haber un turno abierto", code: CODIGO_RECHAZO_VENTA.TURNO_REQUERIDO },
         { status: 400 }
       );
     }
-
-    // clientVentaId es alias de clientTxnId para compatibilidad con cola offline
-    const txnId = clientTxnId || clientVentaId;
 
     // IDEMPOTENCIA, antes de mirar el turno. Un reintento de una venta que YA se
     // escribió —la respuesta se perdió— tiene que reconocerse aunque su caja
@@ -266,26 +298,25 @@ export async function POST(req) {
     });
 
     if (!turnoValido) {
-      // Se distingue el corte del resto: "turno inválido" no le dice nada a quien
-      // acaba de iniciar un cierre y no entiende por qué no puede vender.
-      // Solo sobre la caja PROPIA: el estado de la caja de otro no se informa.
-      const enPreparacion = await prisma.turno.findFirst({
-        where: {
-          id: turnoId,
-          localId,
-          ...whereCajaPropia({ usuarioId: session.id, operadorId }),
-          cierre: null,
-          cierreEnPreparacionEn: { not: null },
-        },
-        select: { id: true },
+      // POR QUÉ NO SIRVIÓ, con un código estable (codigoDeTurnoRechazado). La
+      // decisión ya se tomó arriba, en el WHERE; esto solo la explica. Se
+      // distingue el corte del resto en el mensaje: "turno inválido" no le dice
+      // nada a quien acaba de iniciar un cierre. Solo sobre la caja PROPIA: el
+      // estado de la caja de otro no se informa, ni en el mensaje ni en el código.
+      const turnoPedido = await prisma.turno.findUnique({
+        where: { id: turnoId },
+        select: { localId: true, operadorId: true, vendedorId: true, cierre: true, cierreEnPreparacionEn: true, anuladoEn: true },
       });
+      const codigoTurno = codigoDeTurnoRechazado(turnoPedido, { localId, usuarioId: session.id, operadorId });
+      const enPreparacion = codigoTurno === CODIGO_RECHAZO_VENTA.TURNO_EN_CORTE;
       return NextResponse.json(
         {
           ok: false,
           error: enPreparacion
             ? ERROR_TURNO_EN_PREPARACION
             : "Turno inválido, cerrado, o no es tu caja en este local",
-          turnoEnPreparacionDeCierre: Boolean(enPreparacion),
+          code: codigoTurno,
+          turnoEnPreparacionDeCierre: enPreparacion,
         },
         { status: 403 }
       );
@@ -304,13 +335,25 @@ export async function POST(req) {
         {
           ok: false,
           error: "Caja abierta de un día anterior. Cerrá caja antes de vender.",
+          code: CODIGO_RECHAZO_VENTA.TURNO_DE_OTRO_DIA,
         },
         { status: 403 }
       );
     }
 
     // Idempotencia por clientTxnId/clientVentaId para un id ya usado en otro
-    // destino: con el turno validado, la respuesta de siempre.
+    // destino: con el turno validado, la respuesta de siempre —dentro del
+    // MISMO local—. Un id que es de una venta de OTRO local no es un reintento
+    // de nada de este local: devolverla como duplicada le daba a este local el
+    // número, el total y el detalle de una venta ajena, y le hacía dar por
+    // sincronizado un cobro que no lo estaba. Se responde con el mismo código
+    // que el registro de cobros offline, sin ningún dato de esa venta.
+    if (ventaExistente && ventaExistente.localId !== localId) {
+      return NextResponse.json(
+        { ok: false, error: "Ese cobro ya existe en otro local.", code: CODIGO_RECHAZO_VENTA.ID_DE_OTRO_LOCAL },
+        { status: 409 }
+      );
+    }
     if (ventaExistente) {
       return responderDuplicada(ventaExistente, txnId);
     }
@@ -342,6 +385,7 @@ export async function POST(req) {
             error: esDeposito
               ? "Este depósito exige cliente para cerrar la venta."
               : "Este local exige cliente para cerrar la venta.",
+            code: CODIGO_RECHAZO_VENTA.CLIENTE_REQUERIDO,
           },
           { status: 400 }
         );
@@ -559,7 +603,7 @@ export async function POST(req) {
       const itemListaId = Number.isInteger(item?.listaPrecioId) ? item.listaPrecioId : null;
       if (itemListaId !== null && itemListaId !== listaResueltaId) {
         return NextResponse.json(
-          { ok: false, error: "La lista de precios cambió. Refrescá el POS y volvé a intentar." },
+          { ok: false, error: "La lista de precios cambió. Refrescá el POS y volvé a intentar.", code: CODIGO_RECHAZO_VENTA.LISTA_PRECIOS_CAMBIADA },
           { status: 409 }
         );
       }
@@ -1717,15 +1761,23 @@ export async function POST(req) {
     // allowNegativeStock.
     if (err.esErrorVentaCombo) {
       return NextResponse.json(
-        { ok: false, error: err.message },
+        { ok: false, error: err.message, code: CODIGO_RECHAZO_VENTA.COMBO_INVALIDO },
         { status: err.status || 400 }
       );
     }
 
     // Stock insuficiente: incluir el producto/componente limitante para el cajero.
+    // El código sale solo del error tipado (`limitante`, que pone
+    // aplicarConsumoStock): la rama por texto se conserva para la respuesta de
+    // siempre, pero un texto no clasifica.
     if ((err.message && err.message.includes("Stock insuficiente")) || err.limitante) {
       return NextResponse.json(
-        { ok: false, error: err.message, limitante: err.limitante || undefined },
+        {
+          ok: false,
+          error: err.message,
+          limitante: err.limitante || undefined,
+          code: err.limitante ? CODIGO_RECHAZO_VENTA.STOCK_INSUFICIENTE : undefined,
+        },
         { status: err.status || 409 }
       );
     }
@@ -1763,8 +1815,15 @@ export async function POST(req) {
       );
     }
     
+    // Un producto que no está en el local responde lo de siempre (500, mismo
+    // mensaje), pero con su código: el cobro offline que lo pide no se arregla
+    // reintentando.
     return NextResponse.json(
-      { ok: false, error: "Error interno al registrar la venta" },
+      {
+        ok: false,
+        error: "Error interno al registrar la venta",
+        code: err.esProductoNoEnLocal ? CODIGO_RECHAZO_VENTA.PRODUCTO_NO_EN_LOCAL : undefined,
+      },
       { status: 500 }
     );
   }
