@@ -23,7 +23,9 @@
 //  12. que un valor que la columna no puede guardar rechaza ESE cobro y no el
 //      pedido;
 //  13. dos locales registrando el mismo id a la vez, forzado;
-//  14. que el aislamiento por local no depende del hash.
+//  14. que el aislamiento por local no depende del hash;
+//  15. que un texto que la base no guarda o un id que no es id rechaza ESE
+//      cobro y no el pedido.
 //
 // Los cuerpos son los que arma la pantalla: el ítem de la cola de
 // `guardarVentaPendiente` y el pedido de `procesarCola`.
@@ -739,6 +741,63 @@ async function correr() {
       && despues.payloadHash === antes.payloadHash && JSON.stringify(despues.payload) === JSON.stringify(antes.payload)
       && despues.estado === antes.estado && despues.ultimoRegistroEn.getTime() === antes.ultimoRegistroEn.getTime()
       && despues.updatedAt.getTime() === antes.updatedAt.getTime());
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("15. Textos que la base no guarda e ids que no son ids: INVALIDO, sin tumbar el pedido");
+
+  // PostgreSQL no guarda un NUL ni un surrogate suelto: llegaban a Prisma y el
+  // pedido entero respondía 500. Y un id declarado se toma solo como entero o
+  // decimal llano: `true` ya no es la cuenta 1, ni "0x7fffffff" un turno.
+  {
+    const ALTO = "\uD83D";
+    const BAJO = "\uDE00";
+    const antes = await huella();
+    const conLinea = (id, cambios) => {
+      const c = cobroCola(id, { turnoId: turnoA });
+      c.items = [{ ...c.items[0], ...cambios }];
+      return c;
+    };
+    const casos = [
+      ["formaPago con NUL", (id) => cobroCola(id, { turnoId: turnoA, extra: { formaPago: "efectivo\u0000" } }), false],
+      ["nombre de línea con NUL", (id) => conLinea(id, { nombre: "Producto\u0000" }), false],
+      ["surrogate alto suelto", (id) => conLinea(id, { nombre: `Producto ${ALTO}` }), false],
+      ["surrogate bajo suelto", (id) => conLinea(id, { nombre: `Producto ${BAJO}` }), false],
+      ["userId true", (id) => cobroCola(id, { turnoId: turnoA, extra: { userId: true } }), false],
+      ['turnoId "0x7fffffff"', (id) => cobroCola(id, { turnoId: "0x7fffffff" }), false],
+      ['operadorId "1e3"', (id) => cobroCola(id, { turnoId: turnoA, extra: { operadorId: "1e3" } }), false],
+      ['clienteId "1.0"', (id) => cobroCola(id, { turnoId: turnoA, extra: { clienteId: "1.0" } }), false],
+      ["userId 1.5", (id) => cobroCola(id, { turnoId: turnoA, extra: { userId: 1.5 } }), false],
+      ["clienteId objeto", (id) => cobroCola(id, { turnoId: turnoA, extra: { clienteId: { id: 1 } } }), false],
+      ["operadorId arreglo", (id) => cobroCola(id, { turnoId: turnoA, extra: { operadorId: [1] } }), false],
+      ["pareja surrogate válida", (id) => conLinea(id, { nombre: `Producto ${ALTO}${BAJO}` }), true],
+      ["Unicode normal", (id) => conLinea(id, { nombre: "Ñandú, café ☕ 日本語" }), true],
+      ["ids en decimal textual", (id) => cobroCola(id, { turnoId: String(turnoA), extra: { userId: String(f.cuenta.id), operadorId: String(MAXIMO_INT32) } }), true],
+      ["vecino válido", (id) => cobroCola(id, { turnoId: turnoA }), true],
+    ].map(([nombre, armar, valido]) => {
+      const id = nuevoId("texto-id");
+      return { nombre, id, cobro: armar(id), valido };
+    });
+    const r = await registrar(f.A, casos.map((c) => c.cobro));
+    ok("el pedido responde 200, no 500", r.status === 200 && r.ok === true, `${r.status} ${r.error ?? ""}`);
+    for (const [i, caso] of casos.entries()) {
+      const res = r.resultados?.[i];
+      const fila = await cobroDe(caso.id);
+      if (caso.valido) {
+        ok(`${caso.nombre}: CREADO, con su fila`, res?.resultado === "CREADO" && fila != null, JSON.stringify(res));
+      } else {
+        ok(`${caso.nombre}: RECHAZADO INVALIDO, sin fila`, res?.resultado === "RECHAZADO" && res.codigo === "INVALIDO" && fila == null, JSON.stringify(res));
+      }
+    }
+    const pareja = await cobroDe(casos.find((c) => c.nombre === "pareja surrogate válida").id);
+    const unicode = await cobroDe(casos.find((c) => c.nombre === "Unicode normal").id);
+    ok("los textos válidos se guardan tal cual", pareja?.payload.items[0].nombre === `Producto ${ALTO}${BAJO}`
+      && unicode?.payload.items[0].nombre === "Ñandú, café ☕ 日本語");
+    const decimal = await cobroDe(casos.find((c) => c.nombre === "ids en decimal textual").id);
+    ok("un id en decimal textual sigue siendo ese id", decimal?.turnoId === turnoA && decimal.cuentaDeclaradaId === f.cuenta.id
+      && decimal.operadorDeclaradoId === MAXIMO_INT32 && decimal.estado === "PENDIENTE",
+      JSON.stringify(decimal && { t: decimal.turnoId, c: decimal.cuentaDeclaradaId, o: decimal.operadorDeclaradoId, e: decimal.estado }));
+    igual("sin escrituras económicas", await huella(), antes);
   }
 }
 
