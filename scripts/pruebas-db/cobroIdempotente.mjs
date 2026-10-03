@@ -20,6 +20,7 @@ const jwt = (await import("jsonwebtoken")).default;
 const { crearProductoVendible } = await import("./fixturePos.mjs");
 const { firmarTokenOperador, OperadorCookie } = await import("../../lib/operador.js");
 const { esChoqueDeClientTxnId } = await import("../../lib/pos-ventas/idempotenciaVenta.js");
+const { retenerCandadoDelLocal, esperarEnCandadoDelLocal } = await import("./carreraForzada.mjs");
 
 const rutaAbrir = await import("../../app/api/pos-ventas/turnos/abrir/route.js");
 const rutaCerrar = await import("../../app/api/pos-ventas/turnos/cerrar/route.js");
@@ -187,35 +188,15 @@ async function correr() {
    * otro camino por el que puedan terminar como duplicado.
    */
   async function conCarreraForzada(esperados, lanzar) {
-    let soltar;
-    const liberado = new Promise((r) => { soltar = r; });
-    let avisarTomado;
-    const tomado = new Promise((r) => { avisarTomado = r; });
-    const retencion = prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${Number(f.local.id)})`;
-      avisarTomado();
-      await liberado;
-    }, { maxWait: 10_000, timeout: 60_000 });
-    await tomado;
-
-    const pedidos = lanzar();
-    const bloqueados = async () => Number((await prisma.$queryRaw`
-      SELECT count(*)::int AS n
-        FROM pg_locks
-       WHERE locktype = 'advisory'
-         AND NOT granted
-         AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
-         AND classid = 0
-         AND objid::bigint = ${Number(f.local.id)}
-         AND objsubid = 1`)[0].n);
-    const limite = Date.now() + 30_000;
-    let esperando = await bloqueados();
-    while (esperando < esperados && Date.now() < limite) {
-      await new Promise((r) => setTimeout(r, 25));
-      esperando = await bloqueados();
+    const candado = await retenerCandadoDelLocal(prisma, f.local.id);
+    let pedidos = [];
+    let esperando = 0;
+    try {
+      pedidos = lanzar();
+      esperando = await esperarEnCandadoDelLocal(prisma, f.local.id, esperados);
+    } finally {
+      await candado.soltar();
     }
-    soltar();
-    await retencion;
     return { esperando, respuestas: await Promise.all(pedidos) };
   }
 
