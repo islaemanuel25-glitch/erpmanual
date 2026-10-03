@@ -14,16 +14,16 @@ export function useOperadorActivo() {
   const [loading, setLoading] = useState(true);
 
   const refrescar = useCallback(async () => {
-    let respuesta = SIN_RESPUESTA;
     try {
       const res = await fetch("/api/operador/me", { credentials: "include" });
-      respuesta = await leerRespuestaOperador(res);
+      const respuesta = await leerRespuestaOperador(res);
+      setEstado((previo) => estadoTrasRevalidar(previo, respuesta));
     } catch {
       // Sin red: no se pudo preguntar. NO es "no hay operador".
-      respuesta = SIN_RESPUESTA;
+      setEstado((previo) => estadoTrasRevalidar(previo, SIN_RESPUESTA));
+    } finally {
+      setLoading(false);
     }
-    setEstado((previo) => estadoTrasRevalidar(previo, respuesta));
-    setLoading(false);
   }, []);
 
   useEffect(() => {
