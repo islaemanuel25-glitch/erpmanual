@@ -511,10 +511,18 @@ export default function PosVentasPage() {
   // ---------------------------------------------------------------------------
   const avisarSincronizacion = useCallback((resumen) => {
     const aviso = mensajeDeSincronizacion(resumen);
-    if (!aviso) return;
-    if (aviso.tono === "exito") showSuccess(aviso.texto);
-    else showError(aviso.texto);
-  }, []);
+    if (aviso?.tono === "exito") showSuccess(aviso.texto);
+    else if (aviso) showError(aviso.texto);
+    if (mostrarStockPos && resumen?.conStockNegativo > 0) {
+      setSuccessMsg("Advertencia: venta sin conexión sincronizada con stock negativo (carga inicial).");
+    }
+  }, [mostrarStockPos]);
+  // El texto de un rechazo queda guardado en Pendientes: pasa por la misma
+  // decisión que el cobro online, para no mostrar existencias que el local oculta.
+  const textoDeRechazoOffline = useCallback(
+    (data) => mensajeErrorVenta(data, "No se pudo sincronizar la venta.", mostrarStockPos),
+    [mostrarStockPos]
+  );
   const {
     cola: colaOffline,
     ilegibles: colasIlegibles,
@@ -529,6 +537,7 @@ export default function PosVentasPage() {
     offlineMode,
     requerirOperador,
     alTerminar: avisarSincronizacion,
+    textoDeRechazo: textoDeRechazoOffline,
   });
   // Las ventas de ESTE local guardadas en este equipo. Las de otro local se ven
   // en Pendientes pero no se cuentan acá: no se sincronizan desde este local.

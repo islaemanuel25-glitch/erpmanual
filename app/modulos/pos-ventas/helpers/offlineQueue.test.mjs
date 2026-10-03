@@ -311,7 +311,10 @@ test("el hook corre el motor al montar/reconectar, tras el PIN esperado y al vol
   assert.match(hookSync, /if \(esperaPinRef\.current\) vivo\.current\.requerirOperador\?\.\(\);/);
   // Con candado entre pestañas.
   assert.match(hookSync, /const candado = candadoEntrePestanas\(\);/);
-  assert.match(hookSync, /sincronizarCola\(\{ cola: COLA, api: API, localId: local, operadorActivoId: operador, candado \}\)/);
+  assert.match(hookSync, /sincronizarCola\(\{\s*cola: COLA,\s*api: API,\s*localId: local,\s*operadorActivoId: operador,\s*candado,\s*textoDeRechazo: vivo\.current\.textoDeRechazo,\s*\}\)/);
+  // Y la pantalla le pasa la traducción con su decisión de stock.
+  assert.match(pantalla, /textoDeRechazo: textoDeRechazoOffline,/);
+  assert.match(pantalla, /mensajeErrorVenta\(data, "No se pudo sincronizar la venta\.", mostrarStockPos\)/);
 });
 
 test("el hook registra primero en /cobros-offline/registrar y la venta va a /pos-ventas/crear", () => {

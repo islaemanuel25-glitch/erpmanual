@@ -80,7 +80,15 @@ function hayQueMirar(leida, localId) {
  * @param {{ localId: number|null, operadorActivoId: number|null, offlineMode: boolean,
  *           requerirOperador: () => void, alTerminar?: (resumen: object) => void }} opciones
  */
-export default function useSincronizacionOffline({ localId, operadorActivoId, cargandoOperador = false, offlineMode, requerirOperador, alTerminar }) {
+export default function useSincronizacionOffline({
+  localId,
+  operadorActivoId,
+  cargandoOperador = false,
+  offlineMode,
+  requerirOperador,
+  alTerminar,
+  textoDeRechazo,
+}) {
   const [cola, setCola] = useState({ ok: true, items: [] });
   const [ilegibles, setIlegibles] = useState([]);
   const [sincronizando, setSincronizando] = useState(false);
@@ -90,7 +98,7 @@ export default function useSincronizacionOffline({ localId, operadorActivoId, ca
   // Los valores vivos, para que `sincronizar` sea estable y los disparadores no
   // se vuelvan a suscribir en cada render.
   const vivo = useRef({});
-  vivo.current = { localId, operadorActivoId, offlineMode, requerirOperador, alTerminar };
+  vivo.current = { localId, operadorActivoId, offlineMode, requerirOperador, alTerminar, textoDeRechazo };
 
   const refrescar = useCallback(() => {
     const leida = leerCola();
@@ -106,7 +114,14 @@ export default function useSincronizacionOffline({ localId, operadorActivoId, ca
     setSincronizando(true);
     let resumen;
     try {
-      resumen = await sincronizarCola({ cola: COLA, api: API, localId: local, operadorActivoId: operador, candado });
+      resumen = await sincronizarCola({
+        cola: COLA,
+        api: API,
+        localId: local,
+        operadorActivoId: operador,
+        candado,
+        textoDeRechazo: vivo.current.textoDeRechazo,
+      });
     } finally {
       setSincronizando(false);
       refrescar();
