@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-03 14:39
+**Fecha:** 2026-10-03 15:10
 
 ## Módulos modificados recientemente
 
 ### pos-ventas
-- fix: el registro offline espera a crear y rechaza lo que la columna no guarda, feat: registrar cobros offline y atarlos a su venta en crear, fix(pos): un mismo cobro conserva su clientTxnId, y la venta offline solo se da por guardada si quedó en la cola
+- fix: el cobro offline rechaza textos que la base no guarda y ids con coerción, fix: el registro offline espera a crear y rechaza lo que la columna no guarda, feat: registrar cobros offline y atarlos a su venta en crear
 - Archivos: 10 nuevos, 5 modificados (15 total)
 
 ### transferencias
@@ -14,9 +14,9 @@
 
 
 ## Archivos nuevos desde última sincronización
-- lib/pos-ventas/candadoDelLocal.js
 - lib/pos-ventas/cobroOffline.js
 - lib/pos-ventas/cobroOffline.test.mjs
+- lib/pos-ventas/candadoDelLocal.js
 - lib/pos-ventas/cobroOfflineServidor.js
 - app/api/pos-ventas/cobros-offline/registrar/route.js
 - lib/pos-ventas/idempotenciaVenta.test.mjs
