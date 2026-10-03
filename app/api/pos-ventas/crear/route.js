@@ -18,7 +18,7 @@ import { requireOperadorSegunConfig, verificarVoucherOperador } from "@/lib/oper
 import { WHERE_TURNO_OPERATIVO, ERROR_TURNO_EN_PREPARACION, whereCajaPropia } from "@/lib/caja/cierreRelevo";
 import { ERROR_VENTA_DE_OTRO_OPERADOR } from "@/lib/pos-ventas/replayOffline";
 import { esMismoDestino, esChoqueDeClientTxnId } from "@/lib/pos-ventas/idempotenciaVenta";
-import { tomarCandadoDelLocal } from "@/lib/pos-ventas/candadoDelLocal";
+import { tomarCandadoDelLocal, LIMITES_TRANSACCION_DEL_LOCAL } from "@/lib/pos-ventas/candadoDelLocal";
 import { CODIGO_COBRO_OFFLINE_DESCARTADO } from "@/lib/pos-ventas/cobroOffline";
 import {
   verificarCobroOfflineNoDescartado,
@@ -1156,6 +1156,8 @@ export async function POST(req) {
     // Treinta segundos no aceleran los viajes seriales, pero dan margen al flujo
     // actual sin sacar la transferencia de esta misma transacción. maxWait limita
     // por separado cuánto puede esperar Prisma antes de conseguir una transacción.
+    // Los dos valores viven en LIMITES_TRANSACCION_DEL_LOCAL porque el registro
+    // de cobros offline espera este mismo candado y tiene que poder esperarlo.
     const txResult = await prisma.$transaction(async (tx) => {
       // Lock a nivel de transacción para evitar concurrencia en número de venta
       await tomarCandadoDelLocal(tx, localId);
@@ -1534,10 +1536,7 @@ export async function POST(req) {
       // VentaDetalle: mismo precio, misma cantidad, mismo subtotal. Es la única
       // forma de que el papel no pueda decir otra cosa que la base.
       return { venta: nuevaVenta, allowNegativeStockUsed, transferenciaVenta, lineasComerciales };
-    }, {
-      maxWait: 10_000,
-      timeout: 30_000,
-    });
+    }, LIMITES_TRANSACCION_DEL_LOCAL);
 
     const venta = txResult.venta;
     const allowNegativeStockUsed = txResult.allowNegativeStockUsed === true;
