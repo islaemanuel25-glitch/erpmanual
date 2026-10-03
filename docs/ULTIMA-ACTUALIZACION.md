@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-03 21:39
+**Fecha:** 2026-10-03 22:01
 
 ## Módulos modificados recientemente
 
 ### pos-ventas
-- feat: POS sin conexión real, con sincronización automática y cierre protegido, feat: revisión y descarte de cobros offline que no pudieron ser venta, fix: el cobro offline rechaza textos que la base no guarda y ids con coerción
+- fix: sin PIN el POS espera el PIN en vez de mandar a abrir caja, fix: un fallo inesperado de la sincronización offline se informa como error, fix: el rechazo de una venta offline no revela stock que el local oculta
 - Archivos: 20 nuevos, 11 modificados (31 total)
 
 ### transferencias
@@ -16,9 +16,9 @@
 ## Archivos nuevos desde última sincronización
 - app/modulos/pos-ventas/helpers/offlineQueue.test.mjs
 - app/modulos/pos-ventas/helpers/useSincronizacionOffline.js
-- lib/pos-ventas/cobroOfflineServidor.js
 - lib/pos-ventas/sincronizacionOffline.js
 - lib/pos-ventas/sincronizacionOffline.test.mjs
+- lib/pos-ventas/cobroOfflineServidor.js
 - lib/pos-ventas/ticketOffline.js
 - app/api/pos-ventas/cobros-offline/[id]/descartar/route.js
 - app/api/pos-ventas/cobros-offline/[id]/route.js
