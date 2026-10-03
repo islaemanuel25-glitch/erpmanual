@@ -1,10 +1,10 @@
 # DEC-0012 — La caja es del operador, no de la cuenta ERP
 
 **Fecha:** 2026-10-02
-**Estado:** VIGENTE en el código de la rama `claude/caja-por-operador` —
-verificado contra PostgreSQL en desarrollo—. **Sin desplegar**: la migración
-`20261002120000_caja_por_operador` está anotada en
-`docs/deploy/MIGRACIONES-SIN-APLICAR.md` con su precheck obligatorio.
+**Estado:** VIGENTE y **desplegada** el 2026-10-03: producción corre
+`ccc106bec29cd91b0663754bd9c5052f3cbaa824` (merge de la PR #126) y la migración
+`20261002120000_caja_por_operador` está aplicada. El resultado del despliegue
+está en `docs/deploy/MIGRACIONES-SIN-APLICAR.md`.
 **Alcance:** de quién es un turno de caja, quién lo puede operar y cómo se
 reportan sus diferencias.
 

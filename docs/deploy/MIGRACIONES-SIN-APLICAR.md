@@ -16,93 +16,63 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **44 migraciones**. Cuando se mergee la rama
-`claude/libro-costos-activation-migration-nmej1m` (la trazabilidad del Libro de
-Stock) el árbol pasa a **45**, con **una** pendiente:
+**Ninguna.** Producción está en **46 migraciones**, las 46 del árbol, ninguna
+pendiente ni fallida. El próximo despliegue, si no trae una migración nueva, es
+solo de código.
 
-- `20260930120000_auditoria_stock_motivo_principal` — **aditiva**. Una columna
-  nullable `motivoPrincipal` en `AuditoriaStock` y un CHECK que solo admite
-  "Faltante", "Producto dañado", "Sobrante" y "Otro". **No toca ninguna fila**:
-  todas las existentes quedan en NULL, y el CHECK las acepta así. Sin DROP, sin
-  backfill, sin bloqueo largo —agregar una columna nullable sin default es
-  instantáneo en PostgreSQL, y el CHECK valida una tabla cuya columna nueva está
-  toda en NULL—.
+Producción corre `ccc106bec29cd91b0663754bd9c5052f3cbaa824` (despliegue del
+2026-10-03, nota abajo). Un commit posterior a ese que solo cambie
+documentación —como el que escribe esta nota— **no se despliega por eso**.
 
-Lo que llega con ella **no es solo esquema**: desde ese despliegue cada
-escritor de `StockLocal` declara su origen en el Libro de Stock. Los
-movimientos anteriores quedan `SIN_ORIGEN` para siempre —el libro es
-inmutable— y no se les deduce ninguno.
+---
 
-Con la rama `claude/caja-por-operador` el árbol pasa a **46**, con una segunda
-pendiente, **que tiene precheck obligatorio**:
+## `20261002120000_caja_por_operador`: aplicada el 2026-10-03. La caja es del operador
 
-- `20261002120000_caja_por_operador` — **solo índices, ningún dato**, y con
-  PRECHECK obligatorio antes de migrar (abajo).
+Salió de esta lista con el despliegue de `ccc106bec29cd91b0663754bd9c5052f3cbaa824`
+(merge de la PR #126, con la cabeza `7442128e7ea6eea86fa684957ed2ab088eaf424c`,
+desde `db225fb78c85781de1a9880043dfb69d58234098`). **Lo que sigue es lo que
+informó el despliegue**, corrido desde el acceso al VPS y no desde la sesión que
+escribe esta nota. La decisión es
+[DEC-0012](../decisions/DEC-0012-caja-por-operador.md).
 
-Reemplaza el índice único parcial
+**Identidad.** `ccc106bec29cd91b0663754bd9c5052f3cbaa824` en producción, la
+imagen, `APP_BUILD_ID`, `APP_IMAGE` y `/api/version`: los cinco convergen.
+
+**Migraciones.** 46 en el árbol, **46 aplicadas**, ninguna pendiente ni
+fallida, y `migrate status` cerró con "Database schema is up to date!". Esta
+migración se aplicó **al primer intento** y duró aproximadamente 36 ms. Sin
+`migrate resolve` y sin recuperación manual. La autorización manual del
+clasificador fue **solo** para el `DROP INDEX` esperado de esta migración.
+
+`20260930120000_auditoria_stock_motivo_principal`, que esta lista también
+tenía como pendiente, figura entre las 46 aplicadas. La evidencia que llegó a
+esta nota no dice en qué despliegue se aplicó, y no se deduce.
+
+**Lo que hizo.** Reemplazó el índice único parcial
 `Turno_local_vendedor_abierto_key` (una caja operativa por **cuenta** y local)
 por dos —`Turno_local_operador_abierto_key` (una por **operador** y local) y
 `Turno_local_cuenta_sin_operador_abierto_key` (una por cuenta y local cuando el
-turno no tiene operador)—. Sin backfill, sin DROP de columnas, sin tocar una
-fila. Todo en un único bloque `DO` —una sentencia, todo o nada—, con el patrón
-de `libro_stock`: tope de espera de **3 s** (`lock_timeout`) y `Turno` tomada en
-ACCESS EXCLUSIVE al principio. Mientras se construyen los dos índices, `Turno`
-no se lee ni se escribe: sobre una tabla chica son milisegundos.
+turno no tiene operador)—, en un único bloque `DO` con tope de espera de 3 s
+sobre `Turno`.
 
-**Puede abortar, por dos motivos, y eso es lo que hay que saber antes.**
+- **Ningún `Turno` modificado**: la migración no escribe datos.
+- Quedaron `Turno_local_operador_abierto_key` y
+  `Turno_local_cuenta_sin_operador_abierto_key`; `Turno_local_vendedor_abierto_key`
+  ya no existe.
+- **0 conflictos** por operador (un operador con dos cajas operativas en el
+  mismo local) y **0** por cuenta sin operador.
 
-- Si en producción hay un operador con dos cajas operativas en el mismo local
-  —el índice viejo lo permitía con dos cuentas distintas—, la guardia aborta
-  nombrando los turnos, **sin elegir ni cerrar ninguno**.
-- Si una transacción retiene `Turno` más de 3 s, la migración falla por el tope
-  en vez de quedarse esperando y encolar detrás de ella todo el POS.
+El precheck de solo lectura sigue en `scripts/deploy/precheck-caja-por-operador.sql`
+y su prueba en `scripts/pruebas-db/migracionCajaPorOperador.mjs`, para leer si
+algún día hubiera que entender cómo se protegió esta migración.
 
-En los dos casos la base queda exactamente como estaba, pero la migración queda
-FALLIDA, y esta migración **no tiene autorizado `migrate resolve`** en
-`/deploy`: el despliegue se frenaría con la imagen nueva esperando. Sin
-recuperación automática: FRENAR e informar.
+**Lo que llegó con ella no es solo esquema**: desde este despliegue la caja es
+del operador. Dos operadores con la misma cuenta del local abren cada uno su
+turno; `turnos/actual` devuelve la caja del operador del PIN; un cajero común ya
+no puede operar la caja de otro; y una venta offline se escribe sola solo en su
+turno original, operativo y del día, con el PIN de su dueño.
 
-Por eso, **antes del backup y de cualquier migración**, se corre el precheck de
-solo lectura, con el mismo comando que `precheck-libro-stock.sql`:
-
-    ssh vps-erp 'cd /srv/produccion/erpazul && docker exec -i erpazul_db psql -U erpazul -d erpazul -X -q -v ON_ERROR_STOP=1 -f - < scripts/deploy/precheck-caja-por-operador.sql'
-
-- **VERDE** (sale 0, "PRECHECK: VERDE"): se sigue con el despliegue.
-- **ROJO** (sale distinto de 0): **FRENAR, no desplegar.** Dice por qué:
-  - `operador-con-dos-cajas` / `cuenta-con-dos-cajas`: imprime los ids de los
-    turnos. Resolverlo es cerrar la caja que sobra **desde la aplicación**
-    —decide una persona cuál—, nunca con SQL.
-  - `transaccion-larga` / `candado-sobre-turno`: algo retiene la base o `Turno`.
-    Esperar a que termine y volver a correr; no cancelar sesiones del POS.
-  - `migracion-fallida-sin-resolver`: hay otra migración trabada; eso es otro
-    procedimiento.
-
-  Después se vuelve a correr el precheck desde cero.
-- **⚠ REVISAR ANTES DE DESPLEGAR** (no frena): cajas abiertas **sin operador**
-  en un local que **exige operador**. Desde el cambio, un turno sin operador es
-  la caja de la cuenta: un cajero que entra con su PIN ya no la alcanza —no
-  vende, no mueve, no arquea ni la cierra—, y **solo Admin o el Dueño del local
-  pueden administrarla** (arquear, cerrar). Si la cuenta es la del Dueño, él la
-  sigue usando sin PIN. Conviene cerrarlas antes de desplegar o avisarle al
-  Dueño; el despliegue puede seguir.
-
-Es transacción READ ONLY que termina en ROLLBACK; imprime ids, ningún importe ni
-nombre. Probado por `scripts/pruebas-db/migracionCajaPorOperador.mjs` (en CI):
-VERDE sobre una base limpia, con la advertencia de la caja sin operador; ROJO
-con el mismo operador en dos turnos abiertos con dos cuentas; ROJO con una
-sesión reteniendo `Turno`. Y la migración por `migrate deploy`: aplica limpia
-sin tocar una fila, aborta con conflicto, y con el candado retenido falla en
-~4 s por el tope —sin él esperaba los 30 s—; en los dos fallos queda el índice
-viejo y ninguno nuevo.
-
-Lo que llega con ella **no es solo esquema**: desde ese despliegue la caja es del
-operador. Dos operadores con la misma cuenta del local abren cada uno su turno;
-`turnos/actual` devuelve la caja del operador del PIN; y un cajero común ya no
-puede operar la caja de otro.
-
-Producción corre `9700a59530534e920ae3ab59b5c5780bd3b79071` (despliegue del
-2026-09-29, nota abajo). Un commit posterior a ese que solo cambie
-documentación —como el que escribe esta nota— **no se despliega por eso**.
+**El despliegue.** Deploy final en **VERDE** y sonda POST en **VERDE**.
 
 ---
 

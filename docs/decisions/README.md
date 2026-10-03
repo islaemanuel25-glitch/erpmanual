@@ -37,7 +37,7 @@ haya sido deliberado.
 | [DEC-0006](DEC-0006-codigos-de-casiano-intocables.md) | Los códigos de CASIANO CASAS no se tocan | Vigente |
 | [DEC-0007](DEC-0007-prisma-mcp-sin-decidir.md) | `prisma mcp` daría la vuelta alrededor de la guardia | **SIN DECIDIR** |
 | [DEC-0008](DEC-0008-imagenes-de-comprobantes-no-se-respaldan.md) | Las imágenes de comprobantes viven siete días y NO se respaldan | Vigente |
-| [DEC-0012](DEC-0012-caja-por-operador.md) | La caja es del operador, no de la cuenta ERP | Vigente (sin desplegar) |
+| [DEC-0012](DEC-0012-caja-por-operador.md) | La caja es del operador, no de la cuenta ERP | Vigente |
 
 ⚠️ **El número 0006 está usado dos veces.** No se renumeró acá porque los dos
 archivos ya están referenciados desde otros documentos y desde commits; queda
