@@ -592,6 +592,14 @@ jobs:
       - name: Cobros offline contra PostgreSQL
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/cobrosOffline.mjs
 
+      # Una venta no entra en una caja que ya tomó el corte (R2c): `crear` vuelve
+      # a mirar el turno adentro de su transacción, con el turno tomado. Las
+      # carreras venta ↔ corte, venta ↔ cierre, dos ventas alrededor de la
+      # frontera, el cobro offline y ventas + corte + retiro a la vez se fuerzan
+      # contra los locks reales.
+      - name: Venta contra corte de caja contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/carreraVentaCorte.mjs
+
       # La corrección histórica de caja: el ensayo en seco que escribe y deshace,
       # la aplicación con huella autorizada, la idempotencia y el fallo a mitad.
       # Se arma el incidente ×1000 con las rutas reales del circuito.
