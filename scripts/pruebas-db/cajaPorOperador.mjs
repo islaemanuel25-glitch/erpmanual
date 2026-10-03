@@ -512,15 +512,19 @@ async function correr() {
     [difPorTurno.get(turnoA.id), difPorTurno.get(turnoB.id)], [-5000, 5000]);
 
   // ═════════════════════════════════════════════════════════════════════════
-  seccion("10. Offline no es una excepción de propiedad de caja");
+  seccion("10. Offline no es una excepción de propiedad ni de vigencia");
 
-  // `origenOffline: true` lo declara el cliente: no prueba nada. Offline solo
-  // significa que la venta llegó tarde al servidor; la caja sigue siendo la de
-  // quien la cobró, demostrado por el voucher firmado o, sin voucher, por el PIN
-  // activo. La revisión de la PR encontró que declarando offline, A metía ventas
-  // en la caja de B —sin voucher, con su voucher y hasta sin PIN—. Son los siete
-  // casos de abajo, y cada rechazo se mide como CERO escrituras: ni Venta, ni
-  // VentaPago, ni stock, ni movimiento de stock, ni movimiento de caja.
+  // `origenOffline: true` lo declara el cliente: no prueba nada. Una venta de la
+  // cola se escribe sola SOLO si puede escribirse como una venta de ahora: PIN
+  // activo del dueño de la caja, en su turno original, operativo y del día. El
+  // voucher del operador no autoriza nada —no está atado a una venta, no vence y
+  // queda en el navegador—: solo permite negarse a escribir a nombre de otro.
+  //
+  // La primera revisión encontró que declarando offline A metía ventas en la caja
+  // de B; la segunda, que con el voucher de A, B fabricaba ventas en la caja de
+  // A, y que la bandera salteaba la vigencia de la caja. Cada rechazo se mide
+  // como CERO escrituras: ni Venta, ni VentaPago, ni stock, ni movimiento de
+  // stock, ni movimiento de caja.
   const abreA2 = await p.abrir(f.A);
   requerir("A abre una caja nueva", abreA2.ok === true, `${abreA2.status} ${abreA2.error ?? ""}`);
   const abreB2 = await p.abrir(f.B);
@@ -542,11 +546,19 @@ async function correr() {
   const rechazada = async (nombre, pedido) => {
     const antes = await huella();
     const r = await pedido();
-    ok(`${nombre}: RECHAZADA`, r.ok !== true && [403, 428].includes(r.status), `${r.status} ${r.error ?? ""}`);
+    ok(`${nombre}: RECHAZADA`, r.ok !== true && [403, 409, 428].includes(r.status), `${r.status} ${r.error ?? ""}`);
     igual(`${nombre}: cero escrituras`, await huella(), antes);
   };
   const venderEn = (quien, turnoId, extra) => p.vender(quien, turnoId, { cantidad: 1, extra });
 
+  // El voucher de A, tal como queda guardado en la cola del navegador, y uno
+  // VIEJO: firmado hace un mes, ya vencido. El servidor ignora el vencimiento
+  // del voucher, así que si autorizara algo, el viejo valdría igual.
+  const { iat: _iat, exp: _exp, ...cuerpoVoucherA } = jwt.decode(f.voucherA);
+  const haceUnMes = Math.floor(Date.now() / 1000) - 30 * 24 * 3600;
+  const voucherAViejo = jwt.sign({ ...cuerpoVoucherA, iat: haceUnMes, exp: haceUnMes + 3600 }, SECRETO);
+
+  // ── Propiedad: los siete casos ──────────────────────────────────────────────
   await rechazada("1. A online → caja de B", () => venderEn(f.A, turnoB2, {}));
   await rechazada("2. A declara offline → caja de B, sin voucher",
     () => venderEn(f.A, turnoB2, { origenOffline: true }));
@@ -555,31 +567,76 @@ async function correr() {
   await rechazada("4. sin PIN, en un local que exige operador, declara offline → caja de B",
     () => venderEn(SIN_PIN, turnoB2, { origenOffline: true }));
 
-  // 5. Sin voucher, el PIN activo es la identidad: A sincroniza en SU caja.
+  // 5. El PIN activo es la identidad: A sincroniza en SU caja, operativa y del día.
   const r5 = await venderEn(f.A, turnoA2, { origenOffline: true });
-  ok("5. A offline legítima → su caja, sin voucher: ACEPTADA", r5.ok === true, `${r5.status} ${r5.error ?? ""}`);
-  // 6. Con voucher, el voucher es la identidad, aunque sincronice otro: la cola
-  //    vive en el navegador y la puede procesar quien esté en el mostrador.
-  const r6 = await venderEn(f.B, turnoA2, { origenOffline: true, operadorVoucher: f.voucherA });
-  ok("6. voucher de A → caja de A, sincronizando B: ACEPTADA", r6.ok === true, `${r6.status} ${r6.error ?? ""}`);
+  ok("5. A offline legítima → su caja, con el PIN de A: ACEPTADA", r5.ok === true, `${r5.status} ${r5.error ?? ""}`);
+  // 6. Con su voucher y su PIN: el voucher coincide con quien sincroniza.
+  const txnLegitima = `${marca}-legitima-A`;
+  const r6 = await venderEn(f.A, turnoA2, { origenOffline: true, operadorVoucher: f.voucherA, clientTxnId: txnLegitima });
+  ok("6. voucher de A → caja de A, sincronizando A con su PIN: ACEPTADA", r6.ok === true, `${r6.status} ${r6.error ?? ""}`);
   await rechazada("7. voucher de A → caja de B, sincronizando B",
     () => venderEn(f.B, turnoB2, { origenOffline: true, operadorVoucher: f.voucherA }));
 
+  // ── El ataque del voucher: B conoce el voucher de A ────────────────────────
+  // Misma cuenta, mismo local, A y B con su caja. A obtuvo su voucher; ahora B
+  // está activo, lo lee de la cola y fabrica una venta NUEVA hacia la caja de A.
+  await rechazada("V1. B activo, con el voucher de A → caja de A",
+    () => venderEn(f.B, turnoA2, { origenOffline: true, operadorVoucher: f.voucherA }));
+  await rechazada("V2. sin PIN, con el voucher de A → caja de A",
+    () => venderEn(SIN_PIN, turnoA2, { origenOffline: true, operadorVoucher: f.voucherA }));
+  await rechazada("V3. B activo, con un voucher VIEJO de A → caja de A",
+    () => venderEn(f.B, turnoA2, { origenOffline: true, operadorVoucher: voucherAViejo }));
+  await rechazada("V4. sin PIN, con un voucher VIEJO de A → caja de A",
+    () => venderEn(SIN_PIN, turnoA2, { origenOffline: true, operadorVoucher: voucherAViejo }));
+  await rechazada("V5. el Dueño sin PIN, con el voucher de A → caja de A",
+    () => venderEn(f.dueno_, turnoA2, { origenOffline: true, operadorVoucher: f.voucherA }));
+
   const ventasA2 = await prisma.venta.findMany({ where: { turnoId: turnoA2 }, select: { operadorId: true } });
-  igual("las dos aceptadas quedan en la caja de A, a nombre de A", ventasA2.map((v) => v.operadorId), [f.opA.id, f.opA.id]);
+  igual("solo las dos legítimas quedan en la caja de A, a nombre de A", ventasA2.map((v) => v.operadorId), [f.opA.id, f.opA.id]);
   igual("la caja de B no recibió ninguna", await prisma.venta.count({ where: { turnoId: turnoB2 } }), 0);
 
-  // La caja de A quedó abierta de un día anterior (su propio dato, sembrado acá).
-  // Un replay no es seguir vendiendo: entra en la caja donde se cobró, que todavía
-  // no se contó. Una venta NUEVA en esa caja sigue rechazada, como siempre.
+  // ── Vigencia: la caja de A quedó abierta de un día anterior ────────────────
+  // (su propio dato, sembrado acá). La bandera no distingue una venta encolada
+  // de una fabricada ahora: ni online ni "offline" se escribe sola. Queda en la
+  // cola para resolverla una persona.
   await prisma.turno.update({ where: { id: turnoA2 }, data: { apertura: new Date(Date.now() - 3 * 24 * 3600 * 1000) } });
-  const rVencidaOnline = await venderEn(f.A, turnoA2, {});
-  ok("caja vencida: una venta nueva sigue rechazada", rVencidaOnline.status === 403, `${rVencidaOnline.status} ${rVencidaOnline.error ?? ""}`);
-  const rVencidaReplay = await venderEn(f.A, turnoA2, { origenOffline: true, operadorVoucher: f.voucherA });
-  ok("caja vencida: el replay de A entra en SU caja", rVencidaReplay.ok === true, `${rVencidaReplay.status} ${rVencidaReplay.error ?? ""}`);
-  await rechazada("caja vencida de A: el replay de B no entra", () =>
-    venderEn(f.B, turnoA2, { origenOffline: true, operadorVoucher: f.voucherB }));
+  await rechazada("caja vencida: A online, con su PIN", () => venderEn(f.A, turnoA2, {}));
+  await rechazada("caja vencida: A declara offline con su PIN, pedido NUEVO sin voucher",
+    () => venderEn(f.A, turnoA2, { origenOffline: true }));
+  await rechazada("caja vencida: A declara offline con su PIN y su voucher",
+    () => venderEn(f.A, turnoA2, { origenOffline: true, operadorVoucher: f.voucherA }));
+  await rechazada("caja vencida: B con el voucher de A",
+    () => venderEn(f.B, turnoA2, { origenOffline: true, operadorVoucher: f.voucherA }));
   await prisma.turno.update({ where: { id: turnoA2 }, data: { apertura: new Date() } });
+
+  // ── Operador A desactivado: ni su PIN ni su voucher escriben ───────────────
+  await prisma.operadorLocal.update({ where: { id: f.opA.id }, data: { activo: false } });
+  await rechazada("A desactivado: su PIN y su voucher → su caja",
+    () => venderEn(f.A, turnoA2, { origenOffline: true, operadorVoucher: f.voucherA }));
+  await rechazada("A desactivado: B con el voucher de A → caja de A",
+    () => venderEn(f.B, turnoA2, { origenOffline: true, operadorVoucher: f.voucherA }));
+  await prisma.operadorLocal.update({ where: { id: f.opA.id }, data: { activo: true } });
+
+  // ── La caja de A cierra con una venta legítima todavía en la cola ──────────
+  const cierreA2 = await p.cerrarClasico(f.A, turnoA2, 1000 + 2 * 1000);
+  requerir("A cierra su caja", cierreA2.ok === true, `${cierreA2.status} ${cierreA2.error ?? ""}`);
+  await rechazada("caja cerrada: la venta legítima de A, con su PIN, no se escribe sola",
+    () => venderEn(f.A, turnoA2, { origenOffline: true, operadorVoucher: f.voucherA }));
+  // Y un reintento de una venta que YA se escribió —la respuesta se perdió— se
+  // reconoce aunque su caja haya cerrado: si no, quedaría pendiente estando
+  // escrita, y resolverla a mano la duplicaría.
+  const antesReintento = await huella();
+  const reintento = await venderEn(f.A, turnoA2, { origenOffline: true, operadorVoucher: f.voucherA, clientTxnId: txnLegitima });
+  ok("caja cerrada: el reintento de una venta ya escrita es duplicado, no error",
+    reintento.ok === true && reintento.isDuplicate === true, `${reintento.status} ${reintento.error ?? ""}`);
+  igual("caja cerrada: el reintento no escribe nada", await huella(), antesReintento);
+  // El mismo id hacia otra caja pasa primero por las reglas de siempre (B, en
+  // su caja operativa) y después por la idempotencia de siempre: no escribe.
+  const antesAjeno = await huella();
+  await venderEn(f.B, turnoB2, { origenOffline: true, clientTxnId: txnLegitima });
+  igual("el mismo id hacia otra caja no escribe otra venta", await huella(), antesAjeno);
+  const abreA3 = await p.abrir(f.A);
+  requerir("A abre otra caja", abreA3.ok === true, `${abreA3.status} ${abreA3.error ?? ""}`);
 
   // Un operador deshabilitado después del PIN deja de identificar a nadie, aunque
   // su cookie siga sin vencer: es lo mismo que exige el login al firmarla.
@@ -587,7 +644,7 @@ async function correr() {
   const actualInactivo = await p.actual(f.A, f.local.id);
   ok("con A deshabilitado, su cookie no encuentra caja y pide operador",
     (actualInactivo.turno ?? null) === null && actualInactivo.needsOperador === true, JSON.stringify(actualInactivo).slice(0, 160));
-  const movInactivo = await p.movimiento(f.A, abreA2.turno.id, "INGRESO", 100);
+  const movInactivo = await p.movimiento(f.A, abreA3.turno.id, "INGRESO", 100);
   ok("ni mueve su caja: 428", movInactivo.status === 428, `${movInactivo.status} ${movInactivo.error ?? ""}`);
   await prisma.operadorLocal.update({ where: { id: f.opA.id }, data: { activo: true } });
 

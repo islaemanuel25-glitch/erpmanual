@@ -85,7 +85,7 @@ export default function PosVentasPage() {
   const { loading: cargandoContexto, contexto, needsContexto } = useContextoActivo();
 
   // Operador activo + su voucher firmado (adjuntados a las ventas encoladas
-  // offline para conservar la atribución al sincronizar) y requerirOperador
+  // offline: el server no escribe una a nombre de otro operador) y requerirOperador
   // (levanta el modal de PIN encima de la venta ante un 428, sin navegar).
   // `logout` se usa al cortar el turno: el mostrador vuelve al ingreso de
   // operario para que el relevo entre con su PIN. No cambia la autoría de nada
@@ -1047,9 +1047,10 @@ export default function PosVentasPage() {
       descuentoPorPuntos: state.descuentoPorPuntos,
       total: datos.total,
       clienteId: state.clienteSeleccionado?.id || null,
-      // Operador identificado al cobrar + su voucher firmado. El voucher es la
-      // prueba infalsificable que el server usa al sincronizar (ver crear); el
-      // operadorId queda solo para referencia/legibilidad de la cola.
+      // Operador identificado al cobrar + su voucher firmado. El voucher no
+      // autoriza nada al sincronizar —manda el PIN activo—: solo le permite al
+      // server negarse a escribirla a nombre de otro operador (ver crear). El
+      // operadorId queda para referencia/legibilidad de la cola.
       operadorId: operadorActivo?.operadorId ?? null,
       operadorVoucher: operadorVoucherActivo ?? null,
       // LA CAJA DONDE SE COBRÓ. Se sincroniza contra ESTE turno y no contra el de
@@ -1121,10 +1122,10 @@ export default function PosVentasPage() {
   // ---------------------------------------------------------------------------
   //
   // Cada venta va a la caja donde se cobró (`turnoDeReplay`), no a la de quien
-  // sincroniza. Por eso ya no se exige un turno abierto ni que no esté vencido
-  // ANTES de empezar: una venta de una caja vencida vuelve a SU caja, que todavía
-  // no se contó, y exigir cerrarla primero la dejaba sin dónde quedar. La que no
-  // se puede atribuir se frena y queda en pendientes.
+  // sincroniza, y el servidor la escribe solo si esa caja sigue operativa, es
+  // del día y la sincroniza su dueño con su PIN. Si no, la rechaza y la venta
+  // queda en pendientes tal como estaba: mismo turno, mismo voucher. La que no
+  // se puede atribuir ni se manda.
   const procesarCola = useCallback(async () => {
     if (offlineMode || procesandoCola) return;
 
@@ -1146,7 +1147,7 @@ export default function PosVentasPage() {
     for (const ventaPendiente of queue) {
       // A qué caja va: la del turno donde se cobró. La que no se puede atribuir
       // no se manda ni se borra: queda en pendientes.
-      const destino = turnoDeReplay(ventaPendiente, turnoActual);
+      const destino = turnoDeReplay(ventaPendiente);
       if (destino.frenada) {
         frenadas++;
         motivoFrenada = destino.motivo;
@@ -1167,18 +1168,18 @@ export default function PosVentasPage() {
             descuento: ventaPendiente.descuento,
             descuentoPorPuntos: ventaPendiente.descuentoPorPuntos,
             puntosCanje: 0, // No guardamos puntos en cola offline
-            // Replay offline: con voucher, el voucher firmado es la identidad
-            // —no se rechaza por operario vencido ni por quién sincroniza—; sin
-            // voucher, la identidad es el PIN activo. En los dos casos la venta
-            // solo entra en la caja de esa identidad.
+            // Replay offline: la identidad es el PIN activo, como cualquier
+            // venta, y la venta solo entra en SU turno si sigue operativo y es
+            // del día. El voucher solo sirve para que el servidor no la escriba
+            // a nombre de otro operador que el que la cobró.
             origenOffline: true,
             operadorVoucher: ventaPendiente.operadorVoucher ?? null,
             items: ventaPendiente.items,
           }),
         });
 
-        // Sin voucher hace falta un PIN: se pide encima, como al cobrar, y se
-        // corta la cola —seguir solo juntaría más 428—.
+        // Sin PIN no hay a nombre de quién escribir: se pide encima, como al
+        // cobrar, y se corta la cola —seguir solo juntaría más 428—.
         if (res.status === 428) {
           errores++;
           requerirOperador();
@@ -1226,7 +1227,7 @@ export default function PosVentasPage() {
       showError(motivoFrenada);
       setErrorMsg(motivoFrenada);
     }
-  }, [offlineMode, procesandoCola, turnoActual, mostrarStockPos, requerirOperador]);
+  }, [offlineMode, procesandoCola, mostrarStockPos, requerirOperador]);
 
   // ---------------------------------------------------------------------------
   // Gestión de pendientes offline (modal)
