@@ -688,6 +688,19 @@ export default function PosVentasPage() {
           { credentials: "include" }
         );
         const data = await res.json();
+        // "Sin turno" porque falta el PIN NO es "no tenés caja": el
+        // OperadorProvider ya lo está pidiendo encima de esta pantalla. Se queda
+        // en "cargando" —sin caja, no se cobra— y al validarse el PIN este
+        // efecto vuelve a correr con el operador. Antes se tomaba como "sin
+        // caja" y redirigía a la apertura: el POS se desmontaba con la
+        // sincronización offline que esperaba ese PIN, y al cajero se le ofrecía
+        // abrir otra caja teniendo una abierta.
+        if (data.ok && !data.turno && data.needsOperador) {
+          setTurnoActual(undefined);
+          setTurnoVencido(false);
+          setMensajeTurnoVencido("");
+          return;
+        }
         setTurnoActual(data.ok && data.turno ? data.turno : null);
         setTurnoVencido(!!(data.ok && data.requiereCierre));
         setMensajeTurnoVencido(data.ok && data.mensaje ? data.mensaje : "");

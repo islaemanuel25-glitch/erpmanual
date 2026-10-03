@@ -322,6 +322,18 @@ test("el hook registra primero en /cobros-offline/registrar y la venta va a /pos
   assert.match(hookSync, /crear: \(cuerpo\) => pedir\("\/api\/pos-ventas\/crear", cuerpo\)/);
 });
 
+test("F: 'sin turno' por falta de PIN no manda a la apertura: el POS sigue montado esperando el PIN", () => {
+  // Medido en la pantalla real: con el corte a la apertura, el POS se desmontaba
+  // y la venta que esperaba el PIN quedaba en ESPERA_OPERADOR para siempre.
+  const efecto = pantalla.slice(pantalla.indexOf("const verificarTurno = async"), pantalla.indexOf("verificarTurno();"));
+  const guarda = efecto.indexOf("if (data.ok && !data.turno && data.needsOperador) {");
+  const nulo = efecto.indexOf("setTurnoActual(data.ok && data.turno ? data.turno : null)");
+  assert.ok(guarda > 0 && nulo > guarda, "el turno nulo se fija antes de mirar needsOperador");
+  assert.match(efecto.slice(guarda, nulo), /setTurnoActual\(undefined\);[\s\S]*return;/);
+  // Y la redirección sigue siendo solo para un turno nulo de verdad.
+  assert.match(pantalla, /if \(localActual && me && turnoActual === null\) \{\s*return <RedirigirAApertura/);
+});
+
 test("el botón Procesar cola llama al mismo motor que la sincronización automática", () => {
   const cuerpo = cuerpoDe("procesarCola");
   assert.match(cuerpo, /await sincronizarCola\(\)/);
