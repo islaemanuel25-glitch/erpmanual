@@ -3128,6 +3128,98 @@ model PosVentaCounter {
   @@index([grupoId])
 }
 
+// COBROS OFFLINE: LA EVIDENCIA DE UN COBRO DECLARADO POR EL POS
+// ---------------------------------------------------------------------------
+//
+// Un cobro hecho sin conexión vive en el navegador hasta que vuelve la red. Al
+// volver, el POS lo REGISTRA acá antes de intentar la venta: así el servidor
+// sabe que existe y conserva su contenido aunque después se pierda el
+// almacenamiento local. Registrarlo NO es una venta: no mueve stock, caja,
+// libros ni Finanzas. La venta la crea, o no, `/api/pos-ventas/crear` con sus
+// reglas de siempre (PIN, caja propia, caja operativa, día — DEC-0012); cuando
+// la crea, este registro pasa a SINCRONIZADA en la misma transacción.
+//
+// SIN CLAVES FORÁNEAS, a propósito: una FK hacia Venta, Local, Usuario u
+// OperadorLocal toma un candado sobre esas tablas al crearse —chocaría con
+// cada venta del POS mientras espera— y obligaría a tocar modelos calientes.
+// Varios de estos ids son DECLARADOS por el navegador y pueden no existir. La
+// integridad que importa la dan los dos únicos (`clientTxnId`, `ventaId`), el
+// candado del local que comparte con `crear` y el código. Mismo criterio que
+// AuditoriaBitacora. Ver lib/pos-ventas/cobroOfflineServidor.js.
+enum EstadoCobroOffline {
+  /// Registrado, con turno de su local: se puede intentar la venta.
+  PENDIENTE
+  /// Registrado, pero algo impide sincronizarlo solo (sin turno, turno ajeno,
+  /// id usado por una venta de otra caja). Lo mira una persona. Igual puede
+  /// sincronizarse si `crear` lo logra con sus reglas.
+  REQUIERE_REVISION
+  /// La venta existe y este registro apunta a ella. Terminal.
+  SINCRONIZADA
+  /// Una persona decidió que no se sincroniza, con motivo. Terminal: bloquea
+  /// cualquier venta posterior con ese id.
+  DESCARTADA
+}
+
+model CobroOffline {
+  id          Int    @id @default(autoincrement())
+  /// El `clientVentaId` de la cola: el mismo id con que se intenta la venta.
+  clientTxnId String @unique
+  /// Del ámbito de la sesión que registra, nunca del cuerpo del pedido.
+  localId     Int
+  grupoId     Int
+
+  // Quién lo registró: verificado por el servidor.
+  registradoPorUsuarioId  Int
+  /// El PIN activo validado en el local al registrar. Registrar no lo exige.
+  registradoPorOperadorId Int?
+
+  // Lo que declara la cola: evidencia, no autorización.
+  cuentaDeclaradaId    Int?
+  operadorDeclaradoId  Int?
+  /// El operador que firma el voucher de la cola, si valida en este local. Se
+  /// guarda el resultado de verificarlo; el voucher en sí NO se guarda.
+  operadorVerificadoId Int?
+  /// Solo si el turno declarado existe y es de este local. El declarado crudo
+  /// queda en `payload`.
+  turnoId              Int?
+
+  // Tiempo. Ninguna hora del dispositivo es fecha contable.
+  cobradoEnDispositivo        DateTime?
+  relojDispositivoAlRegistrar DateTime?
+  registradoEn                DateTime  @default(now())
+  ultimoRegistroEn            DateTime  @default(now())
+
+  // Contenido: el cobro de la cola, saneado por lista blanca.
+  totalDeclarado     Decimal @db.Decimal(12, 2)
+  formaPagoDeclarada String
+  payload            Json
+  /// SHA-256 de la forma canónica de `payload`.
+  payloadHash        String
+
+  estado               EstadoCobroOffline @default(PENDIENTE)
+  intentos             Int                @default(0)
+  ultimoIntentoEn      DateTime?
+  ultimoRechazoStatus  Int?
+  ultimoRechazoCodigo  String?
+  ultimoRechazoMensaje String?
+  /// Por qué entró en revisión: SIN_TURNO | TURNO_AJENO | ID_EN_OTRA_VENTA.
+  revisionMotivo       String?
+
+  ventaId               Int?      @unique
+  sincronizadaEn        DateTime?
+  resueltoPorUsuarioId  Int?
+  resueltoPorOperadorId Int?
+  resueltoEn            DateTime?
+  motivoResolucion      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([localId, estado])
+  @@index([turnoId])
+  @@index([registradoEn])
+}
+
 // ---------------------------------------------------------------------------
 // COMPRAS / PEDIDOS A PROVEEDOR
 // ---------------------------------------------------------------------------

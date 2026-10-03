@@ -584,6 +584,14 @@ jobs:
       - name: Cobro idempotente contra PostgreSQL
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/cobroIdempotente.mjs
 
+      # Un cobro offline registrado es evidencia, no una venta: registrarlo no
+      # escribe nada económico; el mismo id no se apropia de otro local ni de
+      # otro contenido; `crear` lo sincroniza en su transacción, lo reconcilia en
+      # los duplicados y no convierte en venta uno descartado. Las carreras
+      # contra el candado del local se fuerzan, no se esperan.
+      - name: Cobros offline contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/cobrosOffline.mjs
+
       # La corrección histórica de caja: el ensayo en seco que escribe y deshace,
       # la aplicación con huella autorizada, la idempotencia y el fallo a mitad.
       # Se arma el incidente ×1000 con las rutas reales del circuito.

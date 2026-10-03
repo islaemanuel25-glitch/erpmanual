@@ -16,13 +16,49 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-**Ninguna.** Producción está en **46 migraciones**, las 46 del árbol, ninguna
-pendiente ni fallida. El próximo despliegue, si no trae una migración nueva, es
-solo de código.
+Producción está en **46 migraciones**. Con la rama
+`claude/cobros-offline-servidor` el árbol pasa a **47**, con **una** pendiente:
+
+- `20261003120000_cobro_offline` — **aditiva, sin datos, sin claves foráneas.**
+  Crea el enum `EstadoCobroOffline` (PENDIENTE, REQUIERE_REVISION,
+  SINCRONIZADA, DESCARTADA), la tabla `CobroOffline` y cinco índices. No toca
+  ninguna tabla existente: sin `ALTER`, sin `DROP`, sin `UPDATE`, sin backfill.
+  Sin FKs a propósito: una FK hacia `Venta`, `Local`, `Usuario` u
+  `OperadorLocal` tomaría al crearse un candado sobre esas tablas que choca con
+  las ventas del POS. El clasificador la marca **aditiva, "Sin coincidencias"**.
+
+**PRE:** el procedimiento de siempre de `/deploy` (backup, clasificador,
+sondas). No necesita precheck propio: la tabla no existe y no hay datos que
+validar.
+
+**POST**, además de `migrate status` al día y **47 de 47**:
+
+    SELECT enum_range(NULL::"EstadoCobroOffline");
+      -- {PENDIENTE,REQUIERE_REVISION,SINCRONIZADA,DESCARTADA}
+    SELECT count(*) FROM "CobroOffline";
+      -- 0
+    SELECT indexname FROM pg_indexes WHERE tablename = 'CobroOffline' ORDER BY 1;
+      -- CobroOffline_clientTxnId_key, CobroOffline_localId_estado_idx,
+      -- CobroOffline_pkey, CobroOffline_registradoEn_idx,
+      -- CobroOffline_turnoId_idx, CobroOffline_ventaId_key
+    SELECT count(*) FROM pg_constraint
+     WHERE conrelid = '"CobroOffline"'::regclass AND contype = 'f';
+      -- 0 (ninguna clave foránea)
+
+y que la cantidad de ventas no cambió por la migración (la del día antes y
+después de migrar, sin ventas nuevas del POS en el medio, o comparando contra
+el backup PRE).
+
+Lo que llega con ella **no habilita nada en la pantalla**: el POS todavía no
+registra cobros (eso es la PR B, que además es la que habilita el modo offline
+real). En producción la tabla queda vacía. El único cambio vivo es dentro de
+`/api/pos-ventas/crear`: una búsqueda por `clientTxnId` en la tabla nueva, con
+el candado del local ya tomado, para negar la venta de un cobro descartado y
+sincronizar el registrado.
 
 Producción corre `ccc106bec29cd91b0663754bd9c5052f3cbaa824` (despliegue del
 2026-10-03, nota abajo). Un commit posterior a ese que solo cambie
-documentación —como el que escribe esta nota— **no se despliega por eso**.
+documentación **no se despliega por eso**.
 
 ---
 

@@ -18,6 +18,13 @@ import { requireOperadorSegunConfig, verificarVoucherOperador } from "@/lib/oper
 import { WHERE_TURNO_OPERATIVO, ERROR_TURNO_EN_PREPARACION, whereCajaPropia } from "@/lib/caja/cierreRelevo";
 import { ERROR_VENTA_DE_OTRO_OPERADOR } from "@/lib/pos-ventas/replayOffline";
 import { esMismoDestino, esChoqueDeClientTxnId } from "@/lib/pos-ventas/idempotenciaVenta";
+import { tomarCandadoDelLocal, LIMITES_TRANSACCION_DEL_LOCAL } from "@/lib/pos-ventas/candadoDelLocal";
+import { CODIGO_COBRO_OFFLINE_DESCARTADO } from "@/lib/pos-ventas/cobroOffline";
+import {
+  verificarCobroOfflineNoDescartado,
+  sincronizarCobroOfflineEnTransaccion,
+  reconciliarCobroOfflineConVenta,
+} from "@/lib/pos-ventas/cobroOfflineServidor";
 import { consolidarTenders, aplicarComisionesResueltas, derivarCamposVenta, normalizarMedio, MEDIOS_CON_COMISION } from "@/lib/pos-ventas/pagos";
 import { mediosDelLocal } from "@/lib/pos-ventas/mediosCobroServidor";
 import { comisionesDeMedios } from "@/lib/pos-ventas/mediosCobro";
@@ -85,8 +92,28 @@ function buscarVentaPorTxn(txnId) {
   });
 }
 
-/** La respuesta canónica de un reintento: la venta que ya existe, sin escribir nada. */
-function responderDuplicada(ventaExistente) {
+/**
+ * La respuesta canónica de un reintento: la venta que ya existe, sin escribir
+ * nada de la venta.
+ *
+ * Antes de responder, si hay un cobro offline registrado con ese id y es de la
+ * caja de esa venta, se lo deja SINCRONIZADA (reconciliarCobroOfflineConVenta:
+ * una actualización condicional, idempotente y sin efecto económico). Si esa
+ * reconciliación falla, el reintento se responde igual: la garantía de #127 —
+ * un reintento recibe la venta existente— no depende de ella.
+ */
+async function responderDuplicada(ventaExistente, clientTxnId) {
+  try {
+    await reconciliarCobroOfflineConVenta(prisma, {
+      clientTxnId,
+      ventaId: ventaExistente.id,
+      localId: ventaExistente.localId,
+      turnoId: ventaExistente.turnoId,
+    });
+  } catch (errCobro) {
+    console.error("No se pudo reconciliar el cobro offline del reintento:", errCobro);
+  }
+
   // Segunda barrera de idempotencia: Transferencia.ventaId @unique. Si la
   // venta interna ya tiene su transferencia, este reintento no crea nada.
   const huerfana = bloqueoReintentoHuerfana({
@@ -208,7 +235,7 @@ export async function POST(req) {
     pedidoIdempotente = txnId ? { txnId, localId, turnoId } : null;
 
     if (esMismoDestino(ventaExistente, { localId, turnoId })) {
-      return responderDuplicada(ventaExistente);
+      return responderDuplicada(ventaExistente, txnId);
     }
 
     // Validar que el turno existe, pertenece al local, es LA CAJA de quien vende,
@@ -285,7 +312,7 @@ export async function POST(req) {
     // Idempotencia por clientTxnId/clientVentaId para un id ya usado en otro
     // destino: con el turno validado, la respuesta de siempre.
     if (ventaExistente) {
-      return responderDuplicada(ventaExistente);
+      return responderDuplicada(ventaExistente, txnId);
     }
 
     // Validaciones
@@ -1129,9 +1156,16 @@ export async function POST(req) {
     // Treinta segundos no aceleran los viajes seriales, pero dan margen al flujo
     // actual sin sacar la transferencia de esta misma transacción. maxWait limita
     // por separado cuánto puede esperar Prisma antes de conseguir una transacción.
+    // Los dos valores viven en LIMITES_TRANSACCION_DEL_LOCAL porque el registro
+    // de cobros offline espera este mismo candado y tiene que poder esperarlo.
     const txResult = await prisma.$transaction(async (tx) => {
       // Lock a nivel de transacción para evitar concurrencia en número de venta
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${Number(localId)})`;
+      await tomarCandadoDelLocal(tx, localId);
+
+      // EL COBRO OFFLINE CON ESTE ID, SI LO HAY. Se lee con FOR UPDATE ya con el
+      // candado del local tomado —el mismo que toma el registro—: si una persona
+      // lo descartó, esta venta no se crea (lib/pos-ventas/cobroOfflineServidor.js).
+      if (txnId) await verificarCobroOfflineNoDescartado(tx, txnId);
 
       // Calcular número de venta consultando el último número existente
       const ultimaVenta = await tx.venta.findFirst({
@@ -1252,6 +1286,18 @@ export async function POST(req) {
           recargoPagoModalidadNombre: comercial.recargoPagoModalidadNombre,
         },
       });
+
+      // El cobro offline registrado con este id, si es de esta caja, pasa a
+      // SINCRONIZADA apuntando a esta venta, EN ESTA TRANSACCIÓN: si la venta se
+      // revierte (stock, pagos, lo que sea), el cobro también.
+      if (txnId) {
+        await sincronizarCobroOfflineEnTransaccion(tx, {
+          clientTxnId: txnId,
+          ventaId: nuevaVenta.id,
+          localId,
+          turnoId: nuevaVenta.turnoId,
+        });
+      }
 
       // Bloqueo determinístico (FOR UPDATE por productoLocalId asc) + validación +
       // descuento consolidado. Insuficiencia respeta ALLOW_NEGATIVE_STOCK; la
@@ -1490,10 +1536,7 @@ export async function POST(req) {
       // VentaDetalle: mismo precio, misma cantidad, mismo subtotal. Es la única
       // forma de que el papel no pueda decir otra cosa que la base.
       return { venta: nuevaVenta, allowNegativeStockUsed, transferenciaVenta, lineasComerciales };
-    }, {
-      maxWait: 10_000,
-      timeout: 30_000,
-    });
+    }, LIMITES_TRANSACCION_DEL_LOCAL);
 
     const venta = txResult.venta;
     const allowNegativeStockUsed = txResult.allowNegativeStockUsed === true;
@@ -1653,6 +1696,15 @@ export async function POST(req) {
     // Venta interna: el vínculo cambió o dejó de ser válido DENTRO de la
     // transacción. Ya hizo rollback de venta, pagos, detalles, stock y
     // transferencia; acá solo se traduce el error tipado a la respuesta HTTP.
+    // El cobro offline con este id fue descartado por una persona: esta venta
+    // no se crea. La transacción ya se revirtió sin escribir nada.
+    if (err.esCobroOfflineDescartado) {
+      return NextResponse.json(
+        { ok: false, error: err.message, code: CODIGO_COBRO_OFFLINE_DESCARTADO },
+        { status: 409 }
+      );
+    }
+
     if (err.esErrorVentaInterna) {
       return NextResponse.json(
         { ok: false, error: err.message, code: err.code },
@@ -1696,7 +1748,7 @@ export async function POST(req) {
       try {
         const ganadora = await buscarVentaPorTxn(pedidoIdempotente.txnId);
         if (esMismoDestino(ganadora, pedidoIdempotente)) {
-          return responderDuplicada(ganadora);
+          return await responderDuplicada(ganadora, pedidoIdempotente.txnId);
         }
       } catch (errBusqueda) {
         console.error("Error buscando la venta del reintento simultáneo:", errBusqueda);
