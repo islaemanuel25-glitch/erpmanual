@@ -2,11 +2,11 @@
   "_lea_esto": "Línea de base del hardcodeo. La sella scripts/hardcodeo.mjs --linea-base --sellar; sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
   "_commit": "`commit` es el árbol que se ESCANEÓ, no la fecha en que se selló: pueden diferir. Cuando se corrige un falso positivo del contador, la base se REEXPRESA desde el árbol histórico —no desde main— para no perdonar la deuda que entró después.",
   "_inventario": "El trinquete compara el INVENTARIO, no los totales: una ocurrencia es archivo + categoría + texto, con cantidad. Sin número de línea, para que mover código no invente violaciones. Un alta en cualquier clave pone rojo aunque el total baje.",
-  "generada": "2026-09-20 10:11",
-  "commit": "beca600f4e62301bef26361f903d8abc90c5b5ec",
+  "generada": "2026-10-03 21:38",
+  "commit": "e20c9c2995dabcf1fcc0aa8057a4549c513b773e",
   "total": {
     "color": 278,
-    "medida": 1601,
+    "medida": 1598,
     "modal": 34,
     "crudo": 281,
     "celda": 430,
@@ -149,6 +149,15 @@
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
+    "finanzas": {
+      "color": 0,
+      "medida": 0,
+      "modal": 0,
+      "crudo": 0,
+      "celda": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
     "grupos": {
       "color": 15,
       "medida": 21,
@@ -239,6 +248,15 @@
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
+    "periodo": {
+      "color": 0,
+      "medida": 0,
+      "modal": 0,
+      "crudo": 0,
+      "celda": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
     "pos-transferencias": {
       "color": 4,
       "medida": 120,
@@ -250,7 +268,7 @@
     },
     "pos-ventas": {
       "color": 37,
-      "medida": 140,
+      "medida": 137,
       "modal": 17,
       "crudo": 60,
       "celda": 16,
@@ -307,6 +325,15 @@
       "medida": 3,
       "modal": 2,
       "crudo": 3,
+      "celda": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "stock_diario": {
+      "color": 0,
+      "medida": 0,
+      "modal": 0,
+      "crudo": 0,
       "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
@@ -1936,8 +1963,7 @@
         "fixed inset-0": 1
       },
       "medida": {
-        "max-h-[85vh]": 1,
-        "text-[11px]": 3
+        "max-h-[85vh]": 1
       },
       "crudo": {
         "<button>": 3
