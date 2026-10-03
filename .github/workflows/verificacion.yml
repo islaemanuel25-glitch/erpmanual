@@ -355,6 +355,14 @@ jobs:
       - name: Recuperación de la activación del Libro de Costos (lock timeout → resolve --rolled-back)
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/recuperacionLibroCostos.mjs
 
+      # La migración de la caja por operador por el camino real de `migrate
+      # deploy`, sobre bases como producción antes de ella: limpia aplica sin
+      # tocar una fila; con el mismo operador en dos cajas aborta por su guardia;
+      # con una sesión reteniendo Turno falla por el tope de 3 s. Y el precheck
+      # de solo lectura en cada caso. Sin recuperación: una fallida frena.
+      - name: Migración de la caja por operador (guardia, lock timeout y precheck)
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/migracionCajaPorOperador.mjs
+
       # ── LA PREGUNTA QUE DECIDE EL DESPLIEGUE ──────────────────────────────
       #
       # Producción conserva sus 105 migraciones viejas en `_prisma_migrations` y

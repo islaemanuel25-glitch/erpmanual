@@ -26,21 +26,41 @@
 -- nada y no se reinterpreta la historia: un turno sin operador sigue siendo una
 -- caja de cuenta.
 --
--- ORDEN, Y POR QUÉ:
+-- ORDEN, Y POR QUÉ, EN UNA SOLA SENTENCIA:
 --
---   1. La GUARDIA. Si hoy existe un operador con más de una caja operativa en
---      el mismo local —posible con el índice viejo: dos cuentas distintas—, el
---      índice nuevo no se puede crear. En vez de dejar que Postgres falle con un
---      "could not create unique index" que no dice qué turnos son, la guardia
---      aborta nombrándolos. Resolverlo —cerrar uno de los dos— es una decisión
---      de una persona, no de una migración.
---   2. Se crean los índices nuevos.
---   3. Recién entonces se borra el viejo.
+-- Mientras esta migración corre, la app vieja sigue vendiendo, y `Turno` es
+-- una tabla caliente: cada venta la lee, y el retiro, el cierre y los pagos
+-- toman su fila con FOR UPDATE. Es el mismo problema que resolvió
+-- `20260927120000_libro_stock`, y se resuelve igual:
 --
--- Si algo falla, no queda un tramo sin garantía: el archivo corre entero en una
--- transacción. Medido, no supuesto: con el DROP forzado a fallar, los dos
--- índices nuevos tampoco quedaron. Y aun si no fuera así, el viejo se borra
--- último.
+--   1. Tope de espera de 3 s, local a la transacción. Si hay una transacción
+--      larga sobre `Turno`, la migración falla rápido en vez de quedar
+--      esperando —y, mientras espera, encolando detrás de ella todas las
+--      consultas del POS a `Turno`—.
+--   2. `LOCK TABLE "Turno" IN ACCESS EXCLUSIVE MODE`, PRIMERO. Es el modo que
+--      pide el DROP INDEX del final; tomarlo al principio evita pedir un
+--      candado más fuerte a mitad de camino, que es como se arma un deadlock
+--      con una sesión que llegó en el medio. Frena lecturas y escrituras de
+--      `Turno` solo mientras se construyen dos índices sobre una tabla chica.
+--   3. La GUARDIA, ya con el candado: nadie puede abrir un turno entre que se
+--      pregunta y se crea el índice. Si hoy existe un operador con más de una
+--      caja operativa en el mismo local —posible con el índice viejo: dos
+--      cuentas distintas—, aborta nombrándolos en vez de dejar un "could not
+--      create unique index" que no dice qué turnos son. Resolverlo —cerrar uno
+--      de los dos— es una decisión de una persona, no de una migración.
+--   4. Se crean los índices nuevos.
+--   5. Recién entonces se borra el viejo.
+--
+-- Es un bloque DO porque un DO es una sola sentencia y PostgreSQL la ejecuta
+-- entera o nada, la envuelva Prisma en una transacción o no: no existe un
+-- instante sin el índice viejo y sin los nuevos. Si falla —por la guardia o
+-- por el tope de espera—, la base queda exactamente como estaba.
+--
+-- NO HAY RECUPERACIÓN AUTOMÁTICA. Una migración fallida queda registrada como
+-- tal y /deploy no tiene autorizado marcarla para reintentar: FRENAR e
+-- informar. Por eso el precheck pregunta antes por duplicados y por candados.
+-- Probado en scripts/pruebas-db/migracionCajaPorOperador.mjs: con conflicto,
+-- con un candado retenido sobre `Turno`, y limpia.
 --
 -- La sonda de solo lectura que detecta el conflicto ANTES de migrar está en
 -- docs/deploy/MIGRACIONES-SIN-APLICAR.md, que /deploy lee en su paso 0: es
@@ -50,10 +70,14 @@
 -- documentados en el modelo Turno de schema.prisma y comprobados con su
 -- predicado exacto por scripts/pruebas-db/estructura.mjs.
 
-DO $guardia$
+DO $caja_por_operador$
 DECLARE
   conflictos text;
 BEGIN
+  PERFORM set_config('lock_timeout', '3s', true);
+
+  LOCK TABLE "Turno" IN ACCESS EXCLUSIVE MODE;
+
   SELECT string_agg(
            format('local %s, operador %s: turnos %s', g."localId", g."operadorId", g.ids),
            '; ' ORDER BY g."localId", g."operadorId")
@@ -95,19 +119,19 @@ BEGIN
       'caja_por_operador: hay cuentas con más de una caja operativa sin operador en el mismo local (%). La migración no elige ni cierra turnos.',
       conflictos;
   END IF;
+
+  CREATE UNIQUE INDEX "Turno_local_operador_abierto_key"
+      ON "Turno" ("localId", "operadorId")
+   WHERE "cierre" IS NULL
+     AND "cierreEnPreparacionEn" IS NULL
+     AND "operadorId" IS NOT NULL;
+
+  CREATE UNIQUE INDEX "Turno_local_cuenta_sin_operador_abierto_key"
+      ON "Turno" ("localId", "vendedorId")
+   WHERE "cierre" IS NULL
+     AND "cierreEnPreparacionEn" IS NULL
+     AND "operadorId" IS NULL;
+
+  DROP INDEX "Turno_local_vendedor_abierto_key";
 END
-$guardia$;
-
-CREATE UNIQUE INDEX "Turno_local_operador_abierto_key"
-    ON "Turno" ("localId", "operadorId")
- WHERE "cierre" IS NULL
-   AND "cierreEnPreparacionEn" IS NULL
-   AND "operadorId" IS NOT NULL;
-
-CREATE UNIQUE INDEX "Turno_local_cuenta_sin_operador_abierto_key"
-    ON "Turno" ("localId", "vendedorId")
- WHERE "cierre" IS NULL
-   AND "cierreEnPreparacionEn" IS NULL
-   AND "operadorId" IS NULL;
-
-DROP INDEX "Turno_local_vendedor_abierto_key";
+$caja_por_operador$;
