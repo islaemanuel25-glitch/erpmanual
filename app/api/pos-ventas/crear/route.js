@@ -1783,8 +1783,7 @@ async function procesarCrear(req, intento) {
     // Venta interna: el vínculo cambió o dejó de ser válido DENTRO de la
     // transacción. Ya hizo rollback de venta, pagos, detalles, stock y
     // transferencia; acá solo se traduce el error tipado a la respuesta HTTP.
-    // El cobro offline con este id fue descartado por una persona: esta venta
-    // no se crea. La transacción ya se revirtió sin escribir nada.
+    //
     // El turno dejó de estar operativo mientras la venta esperaba su candado:
     // la misma respuesta que si ya lo estuviera al validar, con su código
     // (TURNO_EN_CORTE, TURNO_CERRADO…). La transacción ya se revirtió sin escribir nada.
@@ -1792,6 +1791,8 @@ async function procesarCrear(req, intento) {
       return responderTurnoNoOperativo(intentoTurno);
     }
 
+    // El cobro offline con este id fue descartado por una persona: esta venta
+    // no se crea. La transacción ya se revirtió sin escribir nada.
     if (err.esCobroOfflineDescartado) {
       return NextResponse.json(
         { ok: false, error: err.message, code: CODIGO_COBRO_OFFLINE_DESCARTADO },
