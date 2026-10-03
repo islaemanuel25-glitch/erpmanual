@@ -84,9 +84,15 @@ async function montar() {
   const producto = await crearProductoVendible(prisma, {
     grupoId: grupo.id, localId: local.id, nombre: `${marca}-producto`, precioVenta: 1000, precioCosto: 600, stock: 1000,
   });
+  // Un cliente del local y los puntos activos: la venta de la carrera acredita
+  // puntos DESPUÉS de su transacción, y eso también tiene que pasar una sola vez.
+  const cliente = await prisma.cliente.create({ data: { grupoId: grupo.id, localId: local.id, nombre: `${marca}-cliente` } });
+  await prisma.puntosConfigLocal.create({
+    data: { grupoId: grupo.id, localId: local.id, activo: true, reglasJson: { puntosPorPeso: 0.01 } },
+  });
   const sesion = sesionDe(cuenta, local.id);
   const pin = (op) => firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: local.id });
-  return { local, producto, opA, opB, A: { sesion, operador: pin(opA) }, B: { sesion, operador: pin(opB) } };
+  return { local, producto, cliente, opA, opB, A: { sesion, operador: pin(opA) }, B: { sesion, operador: pin(opB) } };
 }
 
 async function desmontar() {
@@ -95,6 +101,7 @@ async function desmontar() {
   const turnos = (await prisma.turno.findMany({ where: { localId: { in: localIds } }, select: { id: true } })).map((t) => t.id);
   await prisma.auditoriaBitacora.deleteMany({ where: { localId: { in: localIds } } });
   await prisma.ventaDetalleComponente.deleteMany({ where: { ventaDetalle: { venta: { localId: { in: localIds } } } } });
+  await prisma.clientePuntoMovimiento.deleteMany({ where: { localId: { in: localIds } } });
   await prisma.ventaDetalle.deleteMany({ where: { venta: { localId: { in: localIds } } } });
   await prisma.ventaPago.deleteMany({ where: { venta: { localId: { in: localIds } } } });
   await prisma.venta.deleteMany({ where: { localId: { in: localIds } } });
@@ -107,6 +114,8 @@ async function desmontar() {
   await prisma.productoLocal.deleteMany({ where: { localId: { in: localIds } } });
   await prisma.productoBase.deleteMany({ where: { grupoId: creado.grupoId } });
   await prisma.posVentaCounter.deleteMany({ where: { grupoId: creado.grupoId } });
+  await prisma.puntosConfigLocal.deleteMany({ where: { localId: { in: localIds } } });
+  await prisma.cliente.deleteMany({ where: { localId: { in: localIds } } });
   await prisma.configuracionLocal.deleteMany({ where: { localId: { in: localIds } } });
   await prisma.operadorEnLocal.deleteMany({ where: { operadorId: { in: creado.operadorIds } } });
   await prisma.operadorLocal.deleteMany({ where: { id: { in: creado.operadorIds } } });
@@ -121,11 +130,12 @@ async function correr() {
   const f = await montar();
   const abrir = async (quien) => leer(await rutaAbrir.POST(pedido(`${BASE}/turnos/abrir`, quien, { montoInicial: 1000 })));
   /** El pedido que manda la pantalla al cobrar online, con el id del intento. */
-  const cobrar = async (quien, turnoId, clientTxnId, cantidad = 1) =>
+  const cobrar = async (quien, turnoId, clientTxnId, { cantidad = 1, clienteId = null } = {}) =>
     leer(await rutaCrearVenta.POST(pedido(`${BASE}/crear`, quien, {
       clientTxnId,
       localId: f.local.id,
       turnoId,
+      clienteId,
       formaPago: "EFECTIVO",
       items: [{
         productoBaseId: f.producto.baseId, nombre: "Producto de prueba", precio: 1000, cantidad,
@@ -133,16 +143,97 @@ async function correr() {
       }],
       pagos: [{ medio: "EFECTIVO", monto: 1000 * cantidad }],
     })));
-  /** Todo lo que una venta escribe, en el local entero. */
-  const huella = async () => ({
-    ventas: await prisma.venta.count({ where: { localId: f.local.id } }),
-    pagos: await prisma.ventaPago.count({ where: { venta: { localId: f.local.id } } }),
-    stock: Number((await prisma.stockLocal.findFirst({
-      where: { localId: f.local.id, productoId: f.producto.productoLocalId }, select: { cantidad: true },
-    }))?.cantidad ?? NaN),
-    movimientosStock: await prisma.movimientoStock.count({ where: { localId: f.local.id } }),
-    movimientosCaja: await prisma.cajaMovimiento.count({ where: { turno: { localId: f.local.id } } }),
-  });
+  /**
+   * Todo lo que una venta escribe, en el local entero: dentro de su transacción
+   * —venta, líneas, pagos, stock, movimiento del Libro de Stock, comisión,
+   * transferencia de una venta interna, contador de número— y después de ella,
+   * la acreditación de puntos. Más los movimientos de caja, que una venta no crea.
+   */
+  const huella = async () => {
+    const totales = await prisma.venta.aggregate({
+      where: { localId: f.local.id },
+      _sum: { comisionBancaria: true },
+    });
+    const puntos = await prisma.clientePuntoMovimiento.aggregate({
+      where: { localId: f.local.id },
+      _count: { _all: true },
+      _sum: { puntos: true },
+    });
+    return {
+      ventas: await prisma.venta.count({ where: { localId: f.local.id } }),
+      detalles: await prisma.ventaDetalle.count({ where: { venta: { localId: f.local.id } } }),
+      pagos: await prisma.ventaPago.count({ where: { venta: { localId: f.local.id } } }),
+      stock: Number((await prisma.stockLocal.findFirst({
+        where: { localId: f.local.id, productoId: f.producto.productoLocalId }, select: { cantidad: true },
+      }))?.cantidad ?? NaN),
+      movimientosStock: await prisma.movimientoStock.count({ where: { localId: f.local.id } }),
+      movimientosCaja: await prisma.cajaMovimiento.count({ where: { turno: { localId: f.local.id } } }),
+      comisiones: Number(totales._sum.comisionBancaria ?? 0),
+      transferencias: await prisma.transferencia.count({ where: { venta: { localId: f.local.id } } }),
+      contador: (await prisma.posVentaCounter.findUnique({ where: { localId: f.local.id } }))?.ultimoNumero ?? null,
+      movimientosPuntos: puntos._count._all,
+      puntos: Number(puntos._sum.puntos ?? 0),
+    };
+  };
+
+  /**
+   * LA CARRERA, FORZADA. `crear` toma `pg_advisory_xact_lock(localId)` al
+   * empezar su transacción, DESPUÉS de la consulta de idempotencia. Esta prueba
+   * toma ese mismo candado desde otra sesión, lanza los pedidos y espera —
+   * mirando `pg_locks`, no con un tiempo fijo— a que TODOS estén bloqueados ahí.
+   * En ese punto todos ya pasaron la consulta temprana sin encontrar la venta,
+   * porque mientras el candado está tomado nadie puede crearla. Al soltarlo, el
+   * primero la crea y cada uno de los demás choca contra el índice único: no hay
+   * otro camino por el que puedan terminar como duplicado.
+   */
+  async function conCarreraForzada(esperados, lanzar) {
+    let soltar;
+    const liberado = new Promise((r) => { soltar = r; });
+    let avisarTomado;
+    const tomado = new Promise((r) => { avisarTomado = r; });
+    const retencion = prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${Number(f.local.id)})`;
+      avisarTomado();
+      await liberado;
+    }, { maxWait: 10_000, timeout: 60_000 });
+    await tomado;
+
+    const pedidos = lanzar();
+    const bloqueados = async () => Number((await prisma.$queryRaw`
+      SELECT count(*)::int AS n
+        FROM pg_locks
+       WHERE locktype = 'advisory'
+         AND NOT granted
+         AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
+         AND classid = 0
+         AND objid::bigint = ${Number(f.local.id)}
+         AND objsubid = 1`)[0].n);
+    const limite = Date.now() + 30_000;
+    let esperando = await bloqueados();
+    while (esperando < esperados && Date.now() < limite) {
+      await new Promise((r) => setTimeout(r, 25));
+      esperando = await bloqueados();
+    }
+    soltar();
+    await retencion;
+    return { esperando, respuestas: await Promise.all(pedidos) };
+  }
+
+  /** Los choques de `clientTxnId` que el handler registró en su `catch`. */
+  async function contandoChoques(fn) {
+    const original = console.error;
+    let choques = 0;
+    console.error = (...args) => {
+      if (args[0] === "Error crear venta POS:" && esChoqueDeClientTxnId(args[1])) choques += 1;
+      else original(...args);
+    };
+    try {
+      const resultado = await fn();
+      return { ...resultado, choques };
+    } finally {
+      console.error = original;
+    }
+  }
   const ventasDe = (txn) => prisma.venta.count({ where: { clientTxnId: txn } });
 
   const abreA = await abrir(f.A);
@@ -180,41 +271,61 @@ async function correr() {
   // ═════════════════════════════════════════════════════════════════════════
   seccion("2. Reintentos simultáneos con el mismo id");
 
-  // Varios pedidos con el mismo id llegan juntos: todos pasan la consulta de
-  // idempotencia antes de que el primero cree la venta, y los demás chocan
-  // contra el índice único al crearla.
-  const N = 8;
+  // Cuatro pedidos con el mismo id, CON cliente y puntos activos, retenidos en
+  // el candado de `crear` hasta que están todos ahí (conCarreraForzada).
+  const N = 4;
   const antesCarrera = await huella();
   const txnCarrera = `${marca}-carrera`;
-  const respuestas = await Promise.all(Array.from({ length: N }, () => cobrar(f.A, turnoA, txnCarrera)));
+  const carrera = await contandoChoques(() =>
+    conCarreraForzada(N, () => Array.from({ length: N }, () => cobrar(f.A, turnoA, txnCarrera, { clienteId: f.cliente.id }))));
+  requerir(`los ${N} pedidos quedaron bloqueados en el candado de crear, después de la consulta temprana`,
+    carrera.esperando === N, `bloqueados: ${carrera.esperando}`);
+  const { respuestas } = carrera;
   const creadas = respuestas.filter((r) => r.ok === true && r.isDuplicate !== true);
   const duplicadas = respuestas.filter((r) => r.ok === true && r.isDuplicate === true);
   igual("una crea, las demás reciben la misma venta como duplicado", [creadas.length, duplicadas.length], [1, N - 1]);
   ok("todas apuntan a la misma venta", new Set(respuestas.map((r) => r.ventaId)).size === 1,
     JSON.stringify(respuestas.map((r) => [r.status, r.ventaId, r.error])));
+  // La prueba de que se ejerció el camino nuevo: cada duplicado salió de un
+  // choque real contra el índice único, registrado por el `catch` del handler.
+  igual("cada duplicado salió de un choque real de clientTxnId (P2002)", carrera.choques, N - 1);
+
   const despuesCarrera = await huella();
-  igual("efectos de UNA venta: venta, pago, stock, movimiento", {
+  const ventaCarrera = await prisma.venta.findUnique({ where: { clientTxnId: txnCarrera }, select: { numero: true } });
+  igual("efectos de UNA venta, dentro y fuera de su transacción", {
     ventas: despuesCarrera.ventas - antesCarrera.ventas,
+    detalles: despuesCarrera.detalles - antesCarrera.detalles,
     pagos: despuesCarrera.pagos - antesCarrera.pagos,
     stock: antesCarrera.stock - despuesCarrera.stock,
     movimientosStock: despuesCarrera.movimientosStock - antesCarrera.movimientosStock,
     movimientosCaja: despuesCarrera.movimientosCaja - antesCarrera.movimientosCaja,
-  }, { ventas: 1, pagos: 1, stock: 1, movimientosStock: 1, movimientosCaja: 0 });
+    comisiones: despuesCarrera.comisiones - antesCarrera.comisiones,
+    transferencias: despuesCarrera.transferencias - antesCarrera.transferencias,
+    movimientosPuntos: despuesCarrera.movimientosPuntos - antesCarrera.movimientosPuntos,
+    puntos: despuesCarrera.puntos - antesCarrera.puntos,
+  }, {
+    ventas: 1, detalles: 1, pagos: 1, stock: 1, movimientosStock: 1, movimientosCaja: 0,
+    comisiones: 0, transferencias: 0, movimientosPuntos: 1, puntos: 10,
+  });
+  igual("el número de venta avanzó uno, y el contador quedó en ese número", [ventaCarrera?.numero, despuesCarrera.contador],
+    [antesCarrera.contador + 1, antesCarrera.contador + 1]);
   igual("una sola venta con ese id", await ventasDe(txnCarrera), 1);
 
-  // El mismo id hacia DOS cajas a la vez: A en la suya, B en la suya. Una gana.
-  // La otra no es un reintento de esa venta —otro destino—: si choca contra el
-  // índice, el choque NO se convierte en "duplicado" y vuelve como conflicto.
-  // Si llega después de que la otra se escribió, toma el camino de siempre para
-  // un id ya usado (sin escribir). En los dos casos: una sola venta.
+  // El mismo id hacia DOS cajas a la vez, con la carrera forzada: A en la suya,
+  // B en la suya, los dos bloqueados después de la consulta temprana. Uno crea;
+  // el otro choca contra el índice, y como la venta ganadora es de OTRA caja,
+  // el choque NO se convierte en duplicado: vuelve como conflicto, sin escribir.
   const antesCruce = await huella();
   const txnCruce = `${marca}-cruce`;
-  const [rA, rB] = await Promise.all([cobrar(f.A, turnoA, txnCruce), cobrar(f.B, turnoB, txnCruce)]);
+  const cruce = await contandoChoques(() =>
+    conCarreraForzada(2, () => [cobrar(f.A, turnoA, txnCruce), cobrar(f.B, turnoB, txnCruce)]));
+  requerir("los 2 pedidos quedaron bloqueados en el candado", cruce.esperando === 2, `bloqueados: ${cruce.esperando}`);
+  const [rA, rB] = cruce.respuestas;
   const ganadora = await prisma.venta.findUnique({ where: { clientTxnId: txnCruce }, select: { id: true, turnoId: true } });
   const perdedora = ganadora?.turnoId === turnoA ? rB : rA;
   ok("el mismo id en dos cajas: una venta, en la caja de quien ganó", (await ventasDe(txnCruce)) === 1 && [turnoA, turnoB].includes(ganadora?.turnoId));
-  ok("la otra no crea una venta propia: conflicto, o la venta ya escrita sin escribir nada",
-    (perdedora.ok !== true && perdedora.status === 409) || (perdedora.isDuplicate === true && perdedora.ventaId === ganadora?.id),
+  igual("hubo un choque real de clientTxnId", cruce.choques, 1);
+  ok("la otra caja NO recibe la venta ajena: conflicto 409", perdedora.ok !== true && perdedora.status === 409 && perdedora.isDuplicate !== true,
     `${perdedora.status} ${perdedora.error ?? ""} ${perdedora.ventaId ?? ""}`);
   igual("y no escribe nada más que esa venta", (await huella()).ventas - antesCruce.ventas, 1);
 
