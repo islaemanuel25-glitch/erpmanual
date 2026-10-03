@@ -56,15 +56,28 @@ la caja física.**
 - **Pagos desde Finanzas, Gastos o Compras: sin cambios.** Quien está
   autorizado elige un cajón operativo y el retiro es de ese turno; no se exige
   que su operador registre el pago.
-- **Venta offline:** se conserva en el turno donde se cobró si es de la cuenta
-  que la encoló o del operador del voucher; nunca se muda de caja. Si el voucher
-  es de otro operador que el del turno, la venta guarda el suyo y la diferencia
-  entre `Venta.operadorId` y `Turno.operadorId` es el registro (más un log). No
-  se creó un modelo de anomalías.
+- **Venta offline (corregido en la revisión de la PR, 2026-10-03):**
+  `origenOffline: true` lo manda el cliente y no prueba nada ni concede ninguna
+  excepción de propiedad. Una venta pertenece a la caja donde se cobró; offline
+  solo significa que llega tarde. La identidad es el voucher firmado (replay
+  con voucher: voucher de A, solo caja de A, sincronice quien sincronice) o el
+  PIN activo validado (todo lo demás); sin PIN donde el local lo exige, 428. La
+  cola guarda el turno donde se cobró y se sincroniza contra ése, no contra el
+  de quien sincroniza. Un replay entra en su propia caja aunque esté abierta de
+  un día anterior. Las ventas encoladas antes de este cambio sin turno: con
+  voucher, el turno actual (el servidor exige que sea del operador del
+  voucher); sin voucher y caja de cuenta, como siempre; sin voucher y caja de un
+  operador, **se frenan** en pendientes —no hay forma de saber de quién eran—.
+  La primera versión aceptaba "cualquier turno de la cuenta" en el replay: con
+  cuenta compartida, A metía ventas en la caja de B declarando offline.
 - **`CajaMovimiento` no lleva `operadorId`**: se deriva de `turnoId →
   Turno.operadorId`, que no se reescribe nunca.
-- **Un carrito no cruza de caja**: recuerda el operador con el que se empezó a
-  armar y no se cobra ni se encola bajo otro; no se descarta solo.
+- **Un carrito no cruza de caja ni se pierde**: cada identidad de caja (local
+  + cuenta + operador) tiene su borrador. Al cambiar de PIN la pantalla deja el
+  de A en su clave y carga el de B; A vuelve y lo encuentra. Nada se escribe
+  hasta saber de quién es el carrito en pantalla. El borrador anterior a esta
+  regla se restaura solo para quien opera sin operador; bajo un PIN no se carga
+  ni se borra.
 - **Las diferencias no se netean**: los reportes de responsabilidad separan
   faltante y sobrante por responsable; un neto del local solo existe rotulado
   como agregado estadístico.
@@ -84,8 +97,15 @@ migración.
   dos operadores sigue siendo de quien la abrió. Desde el despliegue, el otro ya
   no la encuentra en el POS y abre la suya. No se reparte nada hacia atrás.
 - La migración **aborta** si hay un operador con dos cajas operativas en el
-  mismo local, sin elegir ni cerrar ninguna. Por eso el precheck de solo lectura
-  es requisito del despliegue.
+  mismo local, sin elegir ni cerrar ninguna, o si no consigue `Turno` en 3 s
+  (`lock_timeout`, patrón de `libro_stock`). Por eso el precheck de solo lectura
+  es requisito del despliegue; también advierte las cajas abiertas sin operador
+  en locales que exigen operador, que después solo administran Admin o Dueño.
+- **Ventas offline frenadas:** si al desplegar hay ventas en cola de antes de
+  este cambio, sin voucher, y la caja actual es de un operador, quedan en
+  pendientes sin sincronizarse. Resolverlas es una decisión de una persona.
+- Un censo (`lib/caja/censoCajaPropia.test.mjs`) obliga a que toda ruta del
+  POS que toca un turno diga cómo decide de quién es la caja.
 - La base para la futura auditoría de recaudaciones queda armada:
   operador → `Turno.operadorId` → retiros (`CajaMovimiento` por `turnoId`,
   recaudaciones en `ArqueoCaja`, retiro final en `retiroCierreMovimientoId`) →
