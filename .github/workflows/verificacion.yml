@@ -600,6 +600,12 @@ jobs:
       - name: Venta contra corte de caja contra PostgreSQL
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/carreraVentaCorte.mjs
 
+      # El cierre directo (`turnos/cerrar`) congela lo que de verdad quedó en el
+      # turno: calcula ventas, esperado y diferencia con el turno tomado, así que
+      # la venta que gana entra en la fotografía y la que pierde no entra al turno.
+      - name: Cierre directo atómico contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/cierreDirectoAtomico.mjs
+
       # La corrección histórica de caja: el ensayo en seco que escribe y deshace,
       # la aplicación con huella autorizada, la idempotencia y el fallo a mitad.
       # Se arma el incidente ×1000 con las rutas reales del circuito.
