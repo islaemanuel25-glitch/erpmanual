@@ -4,6 +4,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import { subtotalLinea } from "@/lib/pos-ventas/lineaPorImporte";
+import { nombreClienteDeTicket } from "@/lib/pos-ventas/ticketOffline";
 
 function formatPrecio(n) {
   return Number(n).toLocaleString("es-AR", {
@@ -18,6 +19,7 @@ function formatFecha(timestamp) {
 }
 
 export default function ModalTicketOffline({ ticket, onCerrar }) {
+  const cliente = nombreClienteDeTicket(ticket.cliente);
   const handleImprimir = () => {
     const printWindow = window.open("", "_blank");
     if (printWindow) {
@@ -113,9 +115,9 @@ export default function ModalTicketOffline({ ticket, onCerrar }) {
             <div class="info">
               <strong>Forma de pago:</strong> ${ticket.formaPago.toUpperCase()}
             </div>
-            ${ticket.cliente && ticket.cliente !== "Consumidor Final" ? `
+            ${cliente ? `
             <div class="info">
-              <strong>Cliente:</strong> ${ticket.cliente}
+              <strong>Cliente:</strong> ${cliente}
             </div>
             ` : ''}
 
@@ -201,8 +203,8 @@ export default function ModalTicketOffline({ ticket, onCerrar }) {
           <div className="text-xs space-y-1">
             <div><strong>Usuario:</strong> {ticket.vendedor || "-"}</div>
             <div><strong>Forma de pago:</strong> {ticket.formaPago.toUpperCase()}</div>
-            {ticket.cliente && ticket.cliente !== "Consumidor Final" && (
-              <div><strong>Cliente:</strong> {ticket.cliente}</div>
+            {cliente && (
+              <div><strong>Cliente:</strong> {cliente}</div>
             )}
           </div>
 

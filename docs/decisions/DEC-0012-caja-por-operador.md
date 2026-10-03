@@ -117,6 +117,34 @@ la caja física.**
   - Verifica que el cobro sea **del local de quien resuelve**. `crear` niega
     la venta de un id descartado en cualquier local (el id es único), así que
     sin ese chequeo un local podría bloquear la venta de otro.
+- **El POS sin conexión (PR B, 2026-10-03):** la cola del navegador se
+  sincroniza sola —al volver la red, al abrir el POS con conexión, al validarse
+  el PIN que se esperaba y al volver la pestaña al frente— con UN motor
+  (`lib/pos-ventas/sincronizacionOffline.js`) que también usan el botón y el
+  cierre. Venta por venta: primero se registra; la venta se pide solo si el
+  servidor dice que el cobro está `PENDIENTE`, con el mismo id, en la caja
+  donde se cobró y solo si el PIN activo es el de quien la cobró; y sale de la
+  cola solo cuando el servidor dice `SINCRONIZADA` o `DESCARTADA`. Un 428 frena
+  y pide el PIN del dueño; una venta de otro operador espera a su dueño; una en
+  revisión no se reintenta.
+  - **Una caja con ventas sin conexión sin resolver no se cierra.** En el
+    equipo: el POS intenta sincronizar las de esa caja antes de abrir el cierre
+    y, si queda alguna o no hay conexión, no lo abre; la pantalla del cierre
+    vuelve a mirar antes del corte. En el servidor: `cierres/iniciar` y
+    `turnos/cerrar` responden 409 `COBROS_OFFLINE_PENDIENTES` si la caja tiene
+    cobros registrados en `PENDIENTE`. Los que están en revisión no bloquean:
+    ya no dependen de esa caja. No hay forma administrativa de saltear esto; la
+    salida para un cobro que no puede entrar es el descarte de la PR C.
+  - `cerrar-sin-conteo` y `confirmar` no tienen la guardia: corren sobre una
+    caja que ya tomó el corte, y desde el corte `crear` rechaza la venta
+    (`TURNO_EN_CORTE`) y el cobro pasa a revisión.
+  - Sin caja abierta en la pantalla no se guarda una venta sin conexión.
+  - Cuando el servidor deja de reconocer el PIN, el POS ya no lo toma como "no
+    tenés caja" ni manda a la apertura: espera el PIN con el POS montado, y al
+    validarse vuelve a pedir el turno y la sincronización sigue sola.
+  - Una cola que no se puede leer no se trata como vacía: se aparta tal cual a
+    otra clave, verificada, antes de liberar la principal; si no se puede
+    apartar, no se encola ni se sincroniza encima y ese equipo no cierra cajas.
 - **`CajaMovimiento` no lleva `operadorId`**: se deriva de `turnoId →
   Turno.operadorId`, que no se reescribe nunca.
 - **Un carrito no cruza de caja ni se pierde**: cada identidad de caja (local
@@ -156,8 +184,9 @@ migración.
   antes de este cambio (todas), y las nuevas cuya caja cerró o venció antes de
   sincronizar, o que intenta sincronizar otro operador. Desde la PR C el
   servidor anota cada rechazo y puede listarlas y descartarlas
-  (`/api/pos-ventas/cobros-offline`); todavía no hay pantalla, y el POS todavía
-  no las registra (PR B).
+  (`/api/pos-ventas/cobros-offline`); todavía no hay pantalla. Desde la PR B el
+  POS las registra y sincroniza solo, y una caja con cobros sin resolver no se
+  cierra.
 - Un censo (`lib/caja/censoCajaPropia.test.mjs`) obliga a que toda ruta del
   POS que toca un turno diga cómo decide de quién es la caja.
 - La base para la futura auditoría de recaudaciones queda armada:

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { getContextoActivo } from "@/lib/contexto";
+import { getGrupoIdDeLocal } from "@/lib/grupos";
 
 export async function GET(req) {
   try {
@@ -44,11 +45,16 @@ export async function GET(req) {
       );
     }
 
+    // El grupo sale de la misma función que usa `resolveLocalAndGrupo` en el
+    // servidor. El POS lo necesita para guardar una venta sin conexión, y antes
+    // lo buscaba en /api/locales/[id], que nunca lo devolvía: ninguna venta
+    // offline llegaba a guardarse.
     return NextResponse.json({
       ok: true,
       localId: local.id,
       nombre: local.nombre,
       esDeposito: local.es_deposito === true,
+      grupoId: await getGrupoIdDeLocal(local.id),
     });
   } catch (err) {
     console.error("Error contexto-activo/get:", err);

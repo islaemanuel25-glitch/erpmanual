@@ -655,7 +655,7 @@ function FormaPago({
               {queueLength > 0 && onProcesarCola && (
                 <button type="button" onClick={onProcesarCola} disabled={procesandoCola || offlineMode}
                   className="sunmi-btn sunmi-pos-btn-secondary w-full min-h-12 text-base font-semibold rounded-md">
-                  {procesandoCola ? "Procesando..." : `PROCESAR COLA (${queueLength})`}
+                  {procesandoCola ? "Sincronizando..." : `SINCRONIZAR AHORA (${queueLength})`}
                 </button>
               )}
             </>
