@@ -17,9 +17,6 @@ import {
   AlertTriangle,
   Clock,
   UserCheck,
-  Sun,
-  Sunset,
-  Moon,
   ChevronRight,
   ChevronDown,
   MessageSquare,
@@ -63,25 +60,54 @@ function fmtFechaLargaSecundaria(d) {
   }
 }
 
-// --- Franjas (solo frontend) ---
+// --- Turnos operativos ---
+//
+// La caja se agrupa por el TURNO OPERATIVO que eligió al abrirse —el dato que
+// guarda el sistema y con el que Tesorería verifica—, nunca por la hora de
+// apertura. Antes esta pantalla adivinaba "Mañana/Tarde/Noche" con la hora del
+// navegador (6 a 13, 13 a 20, el resto) y podía contradecir a Tesorería. Las
+// cajas anteriores al turno operativo van a "Sin turno asignado": no se les
+// infiere uno.
 
-function getFranja(apertura) {
-  if (!apertura) return "noche";
-  const h = new Date(apertura).getHours();
-  if (h >= 6 && h < 13) return "manana";
-  if (h >= 13 && h < 20) return "tarde";
-  return "noche";
+const SIN_TURNO = "sin-turno";
+
+function claveDeTurno(t) {
+  return t.turnoOperativo ? `to-${t.turnoOperativo.id}` : SIN_TURNO;
 }
 
-const FRANJAS_CONFIG = {
-  manana: { label: "Mañana", icon: Sun,    cls: "text-amber-500",  borderCls: "border-l-amber-400",  bgIcon: "bg-amber-50",  dotCls: "bg-amber-400"  },
-  tarde:  { label: "Tarde",  icon: Sunset, cls: "text-orange-500", borderCls: "border-l-orange-400", bgIcon: "bg-orange-50", dotCls: "bg-orange-400" },
-  noche:  { label: "Noche",  icon: Moon,   cls: "text-indigo-500", borderCls: "border-l-indigo-400", bgIcon: "bg-indigo-50", dotCls: "bg-indigo-400" },
-};
+// Los estilos de los bloques son los de siempre, asignados por POSICIÓN en el
+// orden del catálogo del local, no por un nombre ni por una hora.
+const ESTILOS_DE_TURNO = [
+  { icon: Clock, cls: "text-amber-500",  borderCls: "border-l-amber-400",  bgIcon: "bg-amber-50",  dotCls: "bg-amber-400",
+    header: { bg: "bg-amber-100",  border: "border-l-amber-500",  text: "text-amber-800"  } },
+  { icon: Clock, cls: "text-orange-500", borderCls: "border-l-orange-400", bgIcon: "bg-orange-50", dotCls: "bg-orange-400",
+    header: { bg: "bg-orange-100", border: "border-l-orange-500", text: "text-orange-800" } },
+  { icon: Clock, cls: "text-indigo-500", borderCls: "border-l-indigo-400", bgIcon: "bg-indigo-50", dotCls: "bg-indigo-400",
+    header: { bg: "bg-indigo-100", border: "border-l-indigo-500", text: "text-indigo-800" } },
+];
 
-const FRANJAS_ORDEN = ["manana", "tarde", "noche"];
+/** Los turnos que aparecen en las cajas, en el orden del catálogo; "Sin turno asignado" al final. */
+function turnosPresentes(turnos) {
+  const vistos = new Map();
+  for (const t of turnos || []) {
+    const clave = claveDeTurno(t);
+    if (vistos.has(clave)) continue;
+    vistos.set(clave, {
+      key: clave,
+      label: t.turnoOperativo?.nombre || "Sin turno asignado",
+      orden: t.turnoOperativo ? t.turnoOperativo.orden ?? 0 : Number.MAX_SAFE_INTEGER,
+    });
+  }
+  return [...vistos.values()]
+    .sort((a, b) => a.orden - b.orden || a.label.localeCompare(b.label, "es"))
+    .map((x, i) => ({ ...x, ...ESTILOS_DE_TURNO[i % ESTILOS_DE_TURNO.length] }));
+}
 
-function getFechaKey(apertura) {
+// La jornada de una caja: su fecha operativa si la tiene —fijada al abrir, no
+// se mueve aunque cruce la medianoche—; si no, el día de su apertura.
+function getFechaKey(t) {
+  if (t?.fechaOperativa) return t.fechaOperativa;
+  const apertura = t?.apertura;
   if (!apertura) return "sin-fecha";
   const d = new Date(apertura);
   if (isNaN(d.getTime())) return "sin-fecha";
@@ -99,12 +125,12 @@ function getFechaKey(apertura) {
   return `${y}-${m}-${day}`;
 }
 
-function agruparTurnos(turnos, franjaFiltro, ordenApertura) {
+function agruparTurnos(turnos, franjaFiltro, ordenApertura, catalogo) {
   if (!turnos || turnos.length === 0) return [];
 
   const porDia = new Map();
   for (const t of turnos) {
-    const diaKey = getFechaKey(t.apertura);
+    const diaKey = getFechaKey(t);
     if (!porDia.has(diaKey)) porDia.set(diaKey, []);
     porDia.get(diaKey).push(t);
   }
@@ -114,13 +140,13 @@ function agruparTurnos(turnos, franjaFiltro, ordenApertura) {
     .map(([diaKey, turnosDia]) => {
       const porFranja = new Map();
       for (const t of turnosDia) {
-        const f = getFranja(t.apertura);
+        const f = claveDeTurno(t);
         if (franjaFiltro !== "todos" && f !== franjaFiltro) continue;
         if (!porFranja.has(f)) porFranja.set(f, []);
         porFranja.get(f).push(t);
       }
 
-      const franjas = FRANJAS_ORDEN.filter((f) => porFranja.has(f)).map((f) => {
+      const franjas = catalogo.map((c) => c.key).filter((f) => porFranja.has(f)).map((f) => {
         let items = [...porFranja.get(f)];
         items.sort((a, b) => {
           const da = new Date(a.apertura).getTime();
@@ -140,7 +166,7 @@ function agruparTurnos(turnos, franjaFiltro, ordenApertura) {
           }),
           { tickets: 0, bruto: 0, neto: 0, costo: 0, ganancia: 0 }
         );
-        return { key: f, items, totales };
+        return { key: f, turno: catalogo.find((c) => c.key === f), items, totales };
       });
 
       return { diaKey, fecha: turnosDia[0].apertura, franjas };
@@ -509,7 +535,7 @@ function TurnoRow({ turno }) {
 }
 
 // --- Total de franja ---
-function FranjaTotalBar({ franjaKey, totales, cantCajas }) {
+function FranjaTotalBar({ turno, totales, cantCajas }) {
   return (
     <div className="bg-[var(--card-bg)] border border-[var(--border)] rounded-xl overflow-hidden mt-2">
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 text-center gap-px bg-[var(--border)]">
@@ -538,7 +564,7 @@ function FranjaTotalBar({ franjaKey, totales, cantCajas }) {
       </div>
       <div className="border-t border-[var(--border)] bg-[color-mix(in_srgb,var(--card-bg)_95%,var(--foreground)_5%)] px-5 py-2.5">
         <span className="text-[13px] font-bold text-[var(--foreground)]">
-          Total {FRANJAS_CONFIG[franjaKey].label}
+          Total {turno.label}
         </span>
         <span className="text-[13px] font-extrabold tabular-nums ml-3">${fmt(totales.bruto)}</span>
       </div>
@@ -547,17 +573,11 @@ function FranjaTotalBar({ franjaKey, totales, cantCajas }) {
 }
 
 // --- Bloque de franja ---
-function BloqueGrupoFranja({ franjaKey, items, totales, fecha }) {
-  const cfg  = FRANJAS_CONFIG[franjaKey];
+function BloqueGrupoFranja({ turno, items, totales, fecha }) {
+  const cfg  = turno;
   const Icon = cfg.icon;
   const [abierto, setAbierto] = useState(false);
-
-  const FRANJA_HEADER_STYLES = {
-    manana: { bg: "bg-amber-100",  border: "border-l-amber-500",  text: "text-amber-800"  },
-    tarde:  { bg: "bg-orange-100", border: "border-l-orange-500", text: "text-orange-800" },
-    noche:  { bg: "bg-indigo-100", border: "border-l-indigo-500", text: "text-indigo-800" },
-  };
-  const hs = FRANJA_HEADER_STYLES[franjaKey];
+  const hs = cfg.header;
 
   return (
     <div>
@@ -632,7 +652,7 @@ function BloqueDia({ fecha, franjas }) {
 
       <div className="space-y-10">
         {franjas.map((f) => (
-          <BloqueGrupoFranja key={f.key} franjaKey={f.key} items={f.items} totales={f.totales} fecha={fecha} />
+          <BloqueGrupoFranja key={f.key} turno={f.turno} items={f.items} totales={f.totales} fecha={fecha} />
         ))}
       </div>
     </div>
@@ -685,9 +705,12 @@ export default function AuditoriaTurnosPage() {
     });
   }, [turnos, busqueda]);
 
+  // Los turnos que existen en estas cajas, del dato persistido: las pestañas y
+  // los bloques salen de acá, no de una lista fija de franjas.
+  const catalogo = useMemo(() => turnosPresentes(turnos), [turnos]);
   const diasAgrupados = useMemo(
-    () => agruparTurnos(turnosFiltrados, franjaFiltro, ordenApertura),
-    [turnosFiltrados, franjaFiltro, ordenApertura]
+    () => agruparTurnos(turnosFiltrados, franjaFiltro, ordenApertura, catalogo),
+    [turnosFiltrados, franjaFiltro, ordenApertura, catalogo]
   );
 
   useEffect(() => {
@@ -743,12 +766,7 @@ export default function AuditoriaTurnosPage() {
 
             {/* Tabs de franja */}
             <div className="inline-flex rounded-xl border border-[var(--border)] bg-[color-mix(in_srgb,var(--app-bg)_100%,transparent)] p-1 gap-1 mt-4">
-              {[
-                { key: "todos",  label: "Todos"   },
-                { key: "manana", label: "Mañana"  },
-                { key: "tarde",  label: "Tarde"   },
-                { key: "noche",  label: "Noche"   },
-              ].map((seg) => (
+              {[{ key: "todos", label: "Todos" }, ...catalogo].map((seg) => (
                 <button
                   key={seg.key}
                   type="button"
@@ -855,7 +873,7 @@ export default function AuditoriaTurnosPage() {
 function filtroActivoTexto(franjaFiltro, busqueda) {
   const parts = [];
   if (busqueda.trim()) parts.push("con el filtro de búsqueda");
-  if (franjaFiltro !== "todos") parts.push(`franja ${franjaFiltro}`);
+  if (franjaFiltro !== "todos") parts.push("en el turno elegido");
   if (parts.length === 0) return "";
   return ` (${parts.join(", ")})`;
 }

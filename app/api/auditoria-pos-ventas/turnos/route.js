@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuditoriaScope, parseRangoFechas } from "@/lib/auditoria-pos-ventas/scope";
 import { estadoFinanciero } from "@/lib/pos-ventas/comisionPendiente";
+import { fechaOperativaISO } from "@/lib/caja/turnoOperativo";
 
 export async function GET(req) {
   try {
@@ -38,6 +39,9 @@ export async function GET(req) {
       include: {
         vendedor: { select: { id: true, nombre: true, email: true } },
         operador: { select: { id: true, nombre: true } },
+        // El turno operativo que la caja eligió al abrirse. La pantalla agrupa
+        // por ESTE dato, no por la hora de apertura.
+        turnoOperativo: { select: { id: true, nombre: true, orden: true } },
         // `include` ya devuelve TODOS los escalares del Turno —`anuladoEn`,
         // `anuladoPorId` y `motivoAnulacion` incluidos—, así que acá solo van
         // relaciones. Listar un escalar en un `include` hace fallar la consulta.
@@ -168,6 +172,9 @@ export async function GET(req) {
         id: t.id,
         apertura: t.apertura,
         cierre: t.cierre,
+        // null = caja anterior al turno operativo: no se le infiere uno.
+        turnoOperativo: t.turnoOperativo ? { id: t.turnoOperativo.id, nombre: t.turnoOperativo.nombre, orden: t.turnoOperativo.orden } : null,
+        fechaOperativa: fechaOperativaISO(t.fechaOperativa),
         montoEsperadoEfectivo:
           t.montoEsperadoEfectivo != null ? Number(t.montoEsperadoEfectivo) : null,
         montoRealEfectivo: t.montoRealEfectivo != null ? Number(t.montoRealEfectivo) : null,
