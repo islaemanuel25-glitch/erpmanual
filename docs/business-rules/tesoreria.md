@@ -68,6 +68,33 @@ es la limitación conocida, y la razón de que exista la frontera. Cuando exista
 configuración de franjas por local, se reemplaza esa función y nada más
 [CÓDIGO; candado 20].
 
+## La API
+
+`GET /api/finanzas/tesoreria` (PR 2, desde 2026-10-04) es una capa fina sobre
+`leerTesoreria`: no reescribe ninguna de las reglas de arriba y no escribe nada
+[CÓDIGO, `app/api/finanzas/tesoreria/route.js`].
+
+- **Permiso:** `tesoreria.ver`, en el grupo finanzas, sin ningún rol de sistema;
+  Admin por el comodín `*`. `finanzas.ver` NO alcanza [CÓDIGO; contraprueba TA-1].
+- **Alcance:** el de Finanzas, con los mismos resolutores (`resolveVistaOperativa`,
+  `esVistaDeDeposito`, `resolverLocalPedido`). Un local solo se lee a sí mismo,
+  pedir otro por `destino` o `localId` es 403; el depósito lee cualquier local de
+  su grupo y, sin elegir, recibe la lista sin importes [CÓDIGO; contraprueba TA-2].
+- **Entrada:** `unidad` (DIA, SEMANA, MES), `desplazamiento` (0 = en curso),
+  `destino` y `entrada=1` para el depósito. El rango es `rangoFinanciero` con la
+  semana operativa de la ubicación.
+- **Salida:** `local`, `periodo` (rango, instantes exactos del filtro y
+  descripción), `puedeAvanzar`, `puedeRetroceder`, `primerMovimiento` y
+  `tesoreria`, que es la lectura tal cual la arma el dominio: `resumen`,
+  `grupos` (con sus instantes, cajas y alertas), `cajas`, `entregas`,
+  `egresosExteriores`, `pagosDesdeCaja` y `alertas`.
+- **Consultas:** la lectura hace un número fijo, 11, con 5 cajas o con 1
+  [medido en `scripts/pruebas-db/tesoreriaApi.mjs`]. La ruta agrega las suyas
+  —el local de la sesión, los locales del grupo, las vigencias de la semana y la
+  primera venta—, que no dependen de cuántas cajas haya [CÓDIGO; no contadas].
+- Un turno anulado conserva sus entregas y lo avisa con `TURNO_ANULADO`, en la
+  caja y en su grupo: el estado posterior del turno no hace desaparecer plata.
+
 ## Evidencia
 
 - Armado puro y candados: `lib/tesoreria/lecturaTesoreria.js` y su `.test.mjs`.

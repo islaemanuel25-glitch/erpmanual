@@ -781,6 +781,29 @@ const CASOS = [
     inyecciones: [{ de: "    if (p.cajaMovimientoId != null && p.turnoId != null) {", a: "    if (false) {" }],
     esperadas: ["el pago no es egreso exterior", "el pago figura desde la caja, una vez"],
   },
+  // ── LA PUERTA DE TESORERÍA: GET /api/finanzas/tesoreria ─────────────────
+  {
+    n: "TA-1",
+    defecto: "la API de Tesorería vuelve a abrirse con finanzas.ver",
+    archivo: "app/api/finanzas/tesoreria/route.js",
+    suite: "scripts/pruebas-db/tesoreriaApi.mjs",
+    // El montaje solo ya son ~33 afirmaciones (cajas, ventas, cierres): con eso
+    // se sabe que la suite corrió aunque la sección D se corte por el defecto.
+    minimo: 30,
+    inyecciones: [{ de: "checkPerm(session, PERMISO_VER_TESORERIA)", a: "checkPerm(session, \"finanzas.ver\")" }],
+    esperadas: ["con finanzas.ver y sin tesoreria.ver: 403"],
+  },
+  {
+    n: "TA-2",
+    defecto: "la API de Tesorería deja de mirar el local pedido",
+    archivo: "app/api/finanzas/tesoreria/route.js",
+    suite: "scripts/pruebas-db/tesoreriaApi.mjs",
+    // El montaje solo ya son ~33 afirmaciones (cajas, ventas, cierres): con eso
+    // se sabe que la suite corrió aunque la sección D se corte por el defecto.
+    minimo: 30,
+    inyecciones: [{ de: "      esDeposito,\n      localDeLaSesion: vista.localId,", a: "      esDeposito: true,\n      localDeLaSesion: vista.localId," }],
+    esperadas: ["A pidiendo B por destino: 403", "B pidiendo A por destino: 403"],
+  },
 ];
 
 // Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número
