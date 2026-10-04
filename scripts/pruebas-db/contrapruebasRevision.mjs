@@ -729,6 +729,58 @@ const CASOS = [
     inyecciones: [{ de: "  if (turno.cierre !== null) {", a: "  if (false) {" }],
     esperadas: ["Caja +/− se rechaza: turno cerrado", "no existe ningún CajaMovimiento manual"],
   },
+  // ── LA LECTURA DE TESORERÍA ──────────────────────────────────────────────
+  //
+  // Cada una saca UNA defensa de la lectura y la prueba de base, que arma las
+  // filas con las rutas reales, tiene que verla.
+  {
+    n: "TE-1",
+    defecto: "Tesorería vuelve a restar el pago hecho desde la caja",
+    archivo: "lib/tesoreria/lecturaTesoreria.js",
+    suite: "scripts/pruebas-db/tesoreriaLectura.mjs",
+    minimo: 40,
+    inyecciones: [{
+      de: "const baseConocidaCentavos = entregaCentavos + t.digital - egresosExterioresCentavos;",
+      a: "const baseConocidaCentavos = entregaCentavos + t.digital - egresosExterioresCentavos - pagosDesdeCajaCentavos;",
+    }],
+    esperadas: ["la base sube exactamente $130.000 (no $110.000)"],
+  },
+  {
+    n: "TE-2",
+    defecto: "el movimiento de un pago vuelve a contarse como manual",
+    archivo: "lib/tesoreria/lecturaTesoreria.js",
+    suite: "scripts/pruebas-db/tesoreriaLectura.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "    } else if (esPagoClase(m)) {", a: "    } else if (false) {" }],
+    esperadas: ["su movimiento no es manual ni entrega"],
+  },
+  {
+    n: "TE-3",
+    defecto: "la lectura deja de clasificar por vínculo y pierde las entregas",
+    archivo: "lib/tesoreria/lecturaTesoreriaServer.js",
+    suite: "scripts/pruebas-db/tesoreriaLectura.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "    await vinculosDeMovimientos(db, movimientos.map((m) => m.id))", a: "    {}" }],
+    esperadas: ["efectivo entregado consolidado $110.000", "caja 1: una RECAUDACION y un CIERRE, cada uno una vez"],
+  },
+  {
+    n: "TE-4",
+    defecto: "un cierre sin conteo vuelve a leerse como $0 entregado",
+    archivo: "lib/tesoreria/lecturaTesoreria.js",
+    suite: "scripts/pruebas-db/tesoreriaLectura.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "c.sinImporteDeclarado && c.entregas.length === 0 ? null :", a: "false ? null :" }],
+    esperadas: ["sin importe declarado: null, no 0"],
+  },
+  {
+    n: "TE-5",
+    defecto: "un pago en efectivo desde la caja vuelve a tomarse como egreso exterior",
+    archivo: "lib/tesoreria/lecturaTesoreria.js",
+    suite: "scripts/pruebas-db/tesoreriaLectura.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "    if (p.cajaMovimientoId != null && p.turnoId != null) {", a: "    if (false) {" }],
+    esperadas: ["el pago no es egreso exterior", "el pago figura desde la caja, una vez"],
+  },
 ];
 
 // Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número

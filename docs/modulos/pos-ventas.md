@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-10-04 00:10
+**Última actualización:** 2026-10-04 04:05
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-10-04: feat: la lectura canónica de Tesorería
 - 2026-10-04: fix: Caja +/− valida y escribe con el turno tomado
 - 2026-10-03: fix: el cierre directo congela lo que de verdad quedó en el turno
 - 2026-10-03: refactor: el comentario del cobro descartado vuelve sobre su rama
