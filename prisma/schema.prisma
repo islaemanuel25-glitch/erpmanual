@@ -264,6 +264,8 @@ model Local {
   gastos                  Gasto[]                   @relation("gasto_del_local")
   /// Los pagos de gastos cuyo dinero salió de esta ubicación.
   pagosGastoOrigen        PagoGasto[]               @relation("pago_gasto_origen")
+  /// Las verificaciones de efectivo de Tesorería de esta ubicación.
+  verificacionesEfectivo  VerificacionEfectivo[]    @relation("verificacion_efectivo_del_local")
 }
 
 // Configuración de comportamiento POR LOCAL. Reemplaza (con herencia) a los
@@ -419,6 +421,8 @@ model Usuario {
   pagosProveedorRegistrados PagoProveedor[]        @relation("pago_registrado_por")
   gastosCreados          Gasto[]                   @relation("gasto_creado_por")
   pagosGastoRegistrados  PagoGasto[]               @relation("pago_gasto_registrado_por")
+  verificacionesEfectivoHechas   VerificacionEfectivo[] @relation("verificacion_efectivo_hecha_por")
+  verificacionesEfectivoAnuladas VerificacionEfectivo[] @relation("verificacion_efectivo_anulada_por")
 
   @@map("Usuario")
 }
@@ -3058,6 +3062,8 @@ model CajaMovimiento {
   /// Qué pago lo tiene, de los dos tipos. Es lo que impide que sea de un
   /// `PagoProveedor` y de un `PagoGasto` a la vez: ver `CajaMovimientoDePago`.
   dePago CajaMovimientoDePago?
+  /// Las verificaciones de Tesorería que cubrieron esta entrega (a lo sumo una vigente).
+  verificacionesEntrega VerificacionEfectivoEntrega[]
 
   @@index([turnoId])
 }
@@ -3549,6 +3555,121 @@ model CajaMovimientoDePago {
   cajaMovimiento CajaMovimiento @relation(fields: [cajaMovimientoId], references: [id])
   pagoProveedor  PagoProveedor? @relation(fields: [pagoProveedorId], references: [id], onDelete: Cascade)
   pagoGasto      PagoGasto?     @relation(fields: [pagoGastoId], references: [id], onDelete: Cascade)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TESORERÍA: LA VERIFICACIÓN DEL EFECTIVO
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Tesorería verifica ENTREGAS de efectivo —los `CajaMovimiento` RECAUDACION y
+// CIERRE de lib/tesoreria/lecturaTesoreria.js— y no toca cajas, ventas ni
+// arqueos. Una verificación es un HECHO: lo que se declaró, lo que contó el
+// responsable, la diferencia, quién y cuándo. No se edita. Se corrige
+// anulándola y haciendo otra; la anulada queda como historia.
+//
+// La base sostiene las reglas sola —migración 20261004120000_verificacion_efectivo—:
+//   · diferencia = verificado − declarado, por CHECK;
+//   · declarado = suma de las fotos de sus entregas, por un trigger diferido al
+//     commit; y al menos una entrega;
+//   · cada foto es la del movimiento AL INSERTARLA: monto, turno, local,
+//     operador e instante se comparan contra la fila real, y la clase contra el
+//     vínculo estructural (arqueo para RECAUDACION, turno para CIERRE);
+//   · una entrega está en a lo sumo UNA verificación VIGENTE: índice único
+//     parcial sobre `vigente`, que es copia del padre mantenida por una FK
+//     compuesta con ON UPDATE CASCADE, así que no puede divergir;
+//   · una verificación no mezcla locales: FK compuesta (verificación, local);
+//   · nada se edita salvo la anulación, y nada se borra: triggers.
+//
+// NO guarda turno comercial, franja ni día comercial: la agrupación es lectura
+// derivada y provisoria, y cambiarla no puede invalidar una verificación.
+
+/// Si una verificación cuenta o ya no. ANULADA es final.
+enum EstadoVerificacionEfectivo {
+  VIGENTE
+  ANULADA
+}
+
+/// Las dos clases de movimiento que son entregas de efectivo.
+enum ClaseEntregaEfectivo {
+  RECAUDACION
+  CIERRE
+}
+
+/// UN ACTO DE VERIFICACIÓN DEL EFECTIVO ENTREGADO.
+///
+/// `importeDeclarado` es la suma congelada de las entregas que cubre;
+/// `importeVerificado` es lo que contó el responsable; `diferencia` es
+/// verificado − declarado y la base no acepta otra cosa. Ninguno se edita.
+///
+/// `vigente` es `estado = VIGENTE`, por CHECK. Existe para que la FK compuesta de
+/// las entregas la copie con ON UPDATE CASCADE y el índice parcial de exclusividad
+/// pueda mirarla: el hijo no puede tener otra vigencia que su padre.
+///
+/// Autoría: `verificadaPorUsuarioId` es la cuenta ERP que ejecutó, y
+/// `verificadaPorOperadorId` el operador del PIN si lo hubo —evidencia, no
+/// autorización (DEC-0012)—; nullable porque hoy ningún flujo lo pide.
+///
+/// Idempotencia como `Gasto`: única por local.
+model VerificacionEfectivo {
+  id                       Int                        @id @default(autoincrement())
+  localId                  Int
+  importeDeclarado         Decimal                    @db.Decimal(12, 2)
+  importeVerificado        Decimal                    @db.Decimal(12, 2)
+  diferencia               Decimal                    @db.Decimal(12, 2)
+  estado                   EstadoVerificacionEfectivo @default(VIGENTE)
+  vigente                  Boolean                    @default(true)
+  verificadaPorUsuarioId   Int
+  verificadaPorOperadorId  Int?
+  verificadaEn             DateTime                   @default(now())
+  observacion              String?
+  idempotencyKey           String
+  anuladaEn                DateTime?
+  anuladaPorUsuarioId      Int?
+  motivoAnulacion          String?
+  createdAt                DateTime                   @default(now())
+
+  local          Local   @relation("verificacion_efectivo_del_local", fields: [localId], references: [id], onDelete: Restrict)
+  verificadaPor  Usuario @relation("verificacion_efectivo_hecha_por", fields: [verificadaPorUsuarioId], references: [id], onDelete: Restrict)
+  anuladaPor     Usuario? @relation("verificacion_efectivo_anulada_por", fields: [anuladaPorUsuarioId], references: [id], onDelete: Restrict)
+
+  entregas         VerificacionEfectivoEntrega[] @relation("entrega_vigencia_del_padre")
+  entregasDelLocal VerificacionEfectivoEntrega[] @relation("entrega_local_del_padre")
+
+  @@unique([localId, idempotencyKey])
+  /// Destinos de las dos FK compuestas de las entregas.
+  @@unique([id, vigente])
+  @@unique([id, localId])
+  @@index([localId, verificadaEn])
+}
+
+/// QUÉ ENTREGA CUBRIÓ UNA VERIFICACIÓN, CON LA FOTO DE CÓMO ERA AL VERIFICARLA.
+///
+/// `cajaMovimientoId` es FK real con RESTRICT: ninguna ruta borra movimientos de
+/// caja, y si alguien lo intentara la base lo frena antes de dejar una
+/// verificación apuntando a la nada. La FOTO no depende de ese vínculo: si mañana
+/// la corrección histórica cambia el monto del movimiento, la foto sigue diciendo
+/// lo que se verificó y la diferencia entre los dos se puede detectar.
+///
+/// Los snapshots son escalares sin FK a propósito: son una foto, no un vínculo
+/// vivo.
+model VerificacionEfectivoEntrega {
+  id                       Int                  @id @default(autoincrement())
+  verificacionEfectivoId   Int
+  cajaMovimientoId         Int
+  vigente                  Boolean              @default(true)
+  montoDeclaradoSnapshot   Decimal              @db.Decimal(12, 2)
+  localIdSnapshot          Int
+  turnoIdSnapshot          Int
+  operadorIdSnapshot       Int?
+  claseSnapshot            ClaseEntregaEfectivo
+  instanteEntregaSnapshot  DateTime
+
+  verificacion        VerificacionEfectivo @relation("entrega_vigencia_del_padre", fields: [verificacionEfectivoId, vigente], references: [id, vigente], onDelete: Restrict, onUpdate: Cascade)
+  verificacionDelLocal VerificacionEfectivo @relation("entrega_local_del_padre", fields: [verificacionEfectivoId, localIdSnapshot], references: [id, localId], onDelete: Restrict, onUpdate: Restrict)
+  cajaMovimiento      CajaMovimiento       @relation(fields: [cajaMovimientoId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([verificacionEfectivoId, cajaMovimientoId])
+  @@index([cajaMovimientoId])
 }
 
 model PedidoProveedorDetalle {

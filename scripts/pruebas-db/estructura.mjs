@@ -119,6 +119,16 @@ const PARCIALES = [
     regla: "una sola lista de precios por defecto y activa por grupo",
   },
   {
+    // Tesorería: una entrega de efectivo está en a lo sumo UNA verificación
+    // vigente. `vigente` es copia del padre por FK compuesta con ON UPDATE
+    // CASCADE (20261004120000_verificacion_efectivo).
+    nombre: "VerificacionEfectivoEntrega_una_vigente_por_movimiento",
+    unico: true,
+    sobre: `"VerificacionEfectivoEntrega" USING btree ("cajaMovimientoId")`,
+    predicado: `WHERE vigente`,
+    regla: "una entrega de efectivo en a lo sumo una verificación vigente",
+  },
+  {
     nombre: "StockLocal_localId_limitesSinAjustar_idx",
     unico: false,
     predicado: `WHERE ("limitesConfiguradosAt" IS NULL)`,
