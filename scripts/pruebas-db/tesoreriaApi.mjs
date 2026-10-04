@@ -457,6 +457,14 @@ async function correr() {
     igual("Otro no salta el alcance: A pidiendo B, 403", (await tesoreria(verA, `unidad=OTRO&desde=${ayer}&hasta=${hoy}&destino=${f.B.local.id}`)).status, 403);
     const verD = sesionDe(f.D.usuario, f.D.local.id, ["tesoreria.ver"]);
     igual("el depósito con Otro lee a un local de su grupo", [(await tesoreria(verD, `unidad=OTRO&desde=${hoy}&hasta=${hoy}&destino=${f.A.local.id}`)).local?.id], [f.A.local.id]);
+    // El mes en curso cuenta HASTA HOY (antes, hasta fin de mes); el anterior no cuenta.
+    const n = Number(hoy.slice(8));
+    const mesActual = await tesoreria(verA, "unidad=MES");
+    igual("Mes en curso: «en curso» y los días que van hasta hoy",
+      [mesActual.periodo?.descripcion?.titulo?.endsWith("· en curso"), mesActual.periodo?.descripcion?.subtitulo?.endsWith(`· van ${n} ${n === 1 ? "día" : "días"}`)], [true, true]);
+    const mesAnterior = await tesoreria(verA, "unidad=MES&desplazamiento=-1");
+    ok("Mes anterior: sin «en curso» ni contador", !/en curso|van \d/.test(`${mesAnterior.periodo?.descripcion?.titulo} ${mesAnterior.periodo?.descripcion?.subtitulo}`),
+      JSON.stringify(mesAnterior.periodo?.descripcion));
     // Los ejemplos reales del contrato, para el informe.
     for (const q of ["unidad=DIA", "unidad=SEMANA", "unidad=MES", `unidad=OTRO&desde=${ayer}&hasta=${hoy}`]) {
       const r = await tesoreria(verA, q);

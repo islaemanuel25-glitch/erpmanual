@@ -482,6 +482,13 @@ async function correrSemana(f) {
       for (let i = 0; i < -desplazamiento; i++) esperado = rangoDelPeriodo({ unidad, hoy: sumarDias(esperado.desde, -1) });
       ok(`${unidad} ${desplazamiento}: el mismo rango de siempre`, JSON.stringify(r.periodo?.rango) === JSON.stringify(esperado),
         `${JSON.stringify(r.periodo?.rango)} ≠ ${JSON.stringify(esperado)}`);
+      if (unidad === "MES") {
+        // El mes en curso cuenta HASTA HOY (antes, hasta fin de mes); el cerrado no cuenta.
+        const n = Number(hoy.slice(8));
+        const sub = r.periodo?.descripcion?.subtitulo ?? "";
+        ok(`MES ${desplazamiento}: la descripción cuenta hasta hoy o no cuenta`,
+          desplazamiento === 0 ? sub.endsWith(`· van ${n} ${n === 1 ? "día" : "días"}`) : !/van \d/.test(sub), sub);
+      }
     }
   }
 

@@ -315,6 +315,12 @@ try {
   }
   console.log("\n── 7. La sección propia: /api/finanzas/pago-a-deposito");
   {
+    // El mes en curso cuenta HASTA HOY: antes decía "van 31 días" el día 4.
+    const { hoyArgentinaISO } = await import("../../lib/fechas/rangoArgentina.js");
+    const n = Number(hoyArgentinaISO().slice(8));
+    const mes = await pagoDeposito({ unidad: "MES", desplazamiento: "0" }, S.localA);
+    ok("el mes en curso dice los días que van hasta hoy", (mes.periodo?.descripcion?.subtitulo ?? "").endsWith(`· van ${n} ${n === 1 ? "día" : "días"}`),
+      json(mes.periodo?.descripcion));
     const r = await pagoDeposito({ desplazamiento: "0" }, S.localA);
     ok("local A: 200, UN_LOCAL, aplica", r.status === 200 && r.vista === "UN_LOCAL" && r.pagoADeposito?.aplica === true, json({ s: r.status, e: r.error }));
     ok("el total es el MISMO pago reconocido que el Resumen", r.pagoADeposito?.total === esperado.esta.total, json(r.pagoADeposito));
