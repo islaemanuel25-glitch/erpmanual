@@ -126,7 +126,7 @@ async function montarLocal(nombre, exigirOperador) {
   return { local, cuenta, producto, sesion, exigirOperador };
 }
 
-async function nuevaCaja(l, fondo = 1000) {
+async function quienAbre(l) {
   let op = null;
   let operador = null;
   if (l.exigirOperador) {
@@ -134,7 +134,25 @@ async function nuevaCaja(l, fondo = 1000) {
     await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: l.local.id } });
     operador = firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: l.local.id });
   }
-  const quien = { sesion: l.sesion, operador };
+  return { op, quien: { sesion: l.sesion, operador } };
+}
+/**
+ * Una caja ANTERIOR al turno operativo: la fila que escribía `turnos/abrir`
+ * antes de 20261005120000 —los mismos campos, sin turno ni fecha operativa—.
+ * Ninguna ruta la crea ya; en producción son todas las cajas viejas.
+ */
+async function nuevaCajaAnterior(l, fondo = 1000) {
+  const { op, quien } = await quienAbre(l);
+  const t = await prisma.turno.create({
+    data: {
+      localId: l.local.id, vendedorId: l.cuenta.id, operadorId: op?.id ?? null,
+      montoInicial: fondo, fondoRecibidoApertura: fondo, observacionFondoApertura: null,
+    },
+  });
+  return { l, op, quien, turnoId: t.id };
+}
+async function nuevaCaja(l, fondo = 1000) {
+  const { op, quien } = await quienAbre(l);
   const r = await leer(await rutaAbrir.POST(pedido(`${BASE}/turnos/abrir`, quien, { montoInicial: fondo, turnoOperativoId: await turnoOperativoDeSesion(prisma, quien) })));
   requerir("abre la caja", r.ok === true, `${r.status} ${r.error ?? ""}`);
   return { l, op, quien, turnoId: r.turno.id };
@@ -230,7 +248,11 @@ async function correr() {
   await mover(c5, "RETIRO", 3000);
   await vender(cb, 8000);
   await cerrar(cb, 1000, 8000); //    CIERRE 8.000, local sin operador
-  const cb2 = await nuevaCaja(B);
+  // Anterior al turno operativo a propósito: en una caja con turno, mezclar
+  // locales lo frena ANTES el trigger de turno (el catálogo es por local), y la
+  // sección I —con su contraprueba TV-5— tiene que seguir probando las dos
+  // defensas propias del local, que son las que cubren las cajas viejas.
+  const cb2 = await nuevaCajaAnterior(B);
   await vender(cb2, 6000);
   await cerrar(cb2, 1000, 6000); //   CIERRE 6.000, nunca verificada: para mezclar locales
 
@@ -451,11 +473,7 @@ async function correr() {
     /no coincide con el movimiento real/);
   rechazado("la foto con el local real B bajo un padre del A: rechazada",
     await intento(() => escribir(prisma, armar([eb2C], 6000), (d) => ({ ...d, entregas: d.entregas.map((e) => ({ ...e, localIdSnapshot: B.local.id })) }))),
-    // Desde el turno operativo la frena antes el trigger de turno (BEFORE INSERT,
-    // corre antes que la FK, que es AFTER): una caja de otro local es siempre
-    // de otro turno operativo, porque el catálogo es por local. La FK sigue
-    // existiendo y la cuenta la sección J.
-    /VerificacionEfectivoEntrega_verificacionEfectivoId_localId_fkey|P2003|de otro turno operativo/);
+    /VerificacionEfectivoEntrega_verificacionEfectivoId_localId_fkey|P2003/);
   igual("la entrega del B sigue sin verificar", await prisma.verificacionEfectivoEntrega.count({ where: { cajaMovimientoId: eb2C.cajaMovimientoId } }), 0);
 
   // ── J. NADA SE BORRA ─────────────────────────────────────────────────────
