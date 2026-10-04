@@ -429,7 +429,8 @@ jobs:
   # igual debe decir si las consultas nuevas de Finanzas existen de verdad.
   finanzas_postgres:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    # Las seis contrapruebas TV- copian el repo y corren la suite seis veces.
+    timeout-minutes: 18
 
     services:
       postgres:
@@ -639,6 +640,18 @@ jobs:
 
       - name: Contrapruebas de la API de Tesorería
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs TA-
+
+      # La persistencia de la verificación de efectivo: lo que la BASE sostiene
+      # sola —exclusividad de la entrega con carrera forzada, foto fiel e
+      # inmutable, declarado = suma, un solo local, idempotencia por local,
+      # anulación sin perder historia, nada se borra—. Las contrapruebas TV-
+      # rompen el texto de la migración y lo aplican en una base aislada, copia
+      # de ésta, que se tira al terminar.
+      - name: Verificación de efectivo contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/verificacionEfectivo.mjs
+
+      - name: Contrapruebas de la verificación de efectivo
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs TV-
 
       # La corrección histórica de caja: el ensayo en seco que escribe y deshace,
       # la aplicación con huella autorizada, la idempotencia y el fallo a mitad.

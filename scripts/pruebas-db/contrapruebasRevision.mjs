@@ -15,8 +15,67 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { execFileSync } from "node:child_process";
+import { crearClientePrisma, ESCRITURA } from "../lib/clientePrisma.mjs";
 
 const ORIGEN = process.cwd();
+
+// ── LAS DEFENSAS QUE VIVEN EN UNA MIGRACIÓN ─────────────────────────────────
+//
+// Romper un .js en la copia alcanza porque la suite lo importa de la copia. Una
+// migración no: la base de la prueba ya la tiene aplicada, y editar el archivo
+// no la cambia. Para esos casos (`migracion`) la suite corre contra una base
+// AISLADA: una copia de la de la prueba (CREATE DATABASE … TEMPLATE), donde se
+// deshacen los objetos de esa migración y se vuelve a correr el archivo YA
+// ROTO. Así lo que se prueba es el texto de la migración, el mismo que va a
+// producción, y la base de la prueba no se toca. La aislada se tira al final.
+//
+// El SQL se aplica con psql y los datos de conexión por variables PG*: la URL
+// lleva la contraseña y un error de execFileSync imprime los argumentos.
+const VERIFICACION_EFECTIVO = "prisma/migrations/20261004120000_verificacion_efectivo/migration.sql";
+const DESHACER_VERIFICACION_EFECTIVO = `
+  DROP TABLE "VerificacionEfectivoEntrega", "VerificacionEfectivo" CASCADE;
+  DROP TYPE "EstadoVerificacionEfectivo", "ClaseEntregaEfectivo";
+  DROP FUNCTION "verificacion_entrega_foto_fiel"(), "verificacion_declarado_es_la_suma"(),
+    "verificacion_solo_se_anula"(), "verificacion_entrega_inmutable"(), "verificacion_efectivo_no_se_borra"();`;
+
+const entornoPg = (url) => ({
+  ...process.env,
+  PGHOST: url.hostname,
+  PGPORT: url.port || "5432",
+  PGUSER: decodeURIComponent(url.username),
+  PGPASSWORD: decodeURIComponent(url.password),
+  PGDATABASE: url.pathname.slice(1),
+});
+const psql = (url, args) =>
+  execFileSync("psql", ["-X", "-q", "-v", "ON_ERROR_STOP=1", ...args], { env: entornoPg(url), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+
+/** Crea la base aislada con la migración rota aplicada. Devuelve su URL y cómo tirarla. */
+async function baseAislada(c, archivoRoto) {
+  const origen = new URL(process.env.DATABASE_URL);
+  const base = origen.pathname.slice(1);
+  const nombre = `${base}_contra_${String(c.n).toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
+  const mantenimiento = new URL(origen);
+  mantenimiento.pathname = "/postgres";
+  // ESCRITURA: la fábrica exige servidor local y NODE_ENV distinto de production.
+  const admin = await crearClientePrisma({ nivel: ESCRITURA, url: mantenimiento.toString() });
+  const tirar = () => admin.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${nombre}" WITH (FORCE)`);
+  const tirarYSoltar = async () => {
+    await tirar();
+    await admin.$disconnect();
+  };
+  const url = new URL(origen);
+  url.pathname = `/${nombre}`;
+  try {
+    await tirar();
+    await admin.$executeRawUnsafe(`CREATE DATABASE "${nombre}" TEMPLATE "${base}"`);
+    psql(url, ["-c", c.migracion.deshacer]);
+    psql(url, ["-f", archivoRoto]);
+  } catch (e) {
+    await tirarYSoltar().catch(() => {});
+    throw e;
+  }
+  return { url: url.toString(), tirar: tirarYSoltar };
+}
 
 const CASOS = [
   {
@@ -804,6 +863,96 @@ const CASOS = [
     inyecciones: [{ de: "      esDeposito,\n      localDeLaSesion: vista.localId,", a: "      esDeposito: true,\n      localDeLaSesion: vista.localId," }],
     esperadas: ["A pidiendo B por destino: 403", "B pidiendo A por destino: 403"],
   },
+  // ── LA VERIFICACIÓN DE EFECTIVO: LAS DEFENSAS ESTÁN EN LA MIGRACIÓN ─────
+  //
+  // Se rompe el TEXTO de la migración y se corre la suite contra una base
+  // aislada donde se aplicó así (ver `baseAislada`). El montaje solo —cajas,
+  // ventas, retiros y cierres por las rutas— ya son ~40 afirmaciones.
+  {
+    n: "TV-1",
+    defecto: "una entrega puede quedar en dos verificaciones vigentes",
+    archivo: VERIFICACION_EFECTIVO,
+    migracion: { deshacer: DESHACER_VERIFICACION_EFECTIVO },
+    suite: "scripts/pruebas-db/verificacionEfectivo.mjs",
+    minimo: 40,
+    inyecciones: [{
+      de: "CREATE UNIQUE INDEX \"VerificacionEfectivoEntrega_una_vigente_por_movimiento\"",
+      a: "CREATE INDEX \"VerificacionEfectivoEntrega_una_vigente_por_movimiento\"",
+    }],
+    esperadas: [
+      "otra verificación vigente sobre la misma entrega: rechazada",
+      "la segunda queda esperando en el índice, no adivina",
+      "la segunda se rechaza al ver confirmada la primera",
+    ],
+  },
+  {
+    n: "TV-2",
+    defecto: "la foto de una entrega verificada se puede editar",
+    archivo: VERIFICACION_EFECTIVO,
+    migracion: { deshacer: DESHACER_VERIFICACION_EFECTIVO },
+    suite: "scripts/pruebas-db/verificacionEfectivo.mjs",
+    minimo: 40,
+    inyecciones: [{
+      de: "CREATE TRIGGER \"VerificacionEfectivoEntrega_inmutable\" BEFORE UPDATE ON \"VerificacionEfectivoEntrega\"\n  FOR EACH ROW EXECUTE FUNCTION \"verificacion_entrega_inmutable\"();",
+      a: "",
+    }],
+    esperadas: ["editar la foto de una entrega: rechazado"],
+  },
+  {
+    n: "TV-3",
+    defecto: "la foto deja de compararse con el importe real del movimiento",
+    archivo: VERIFICACION_EFECTIVO,
+    migracion: { deshacer: DESHACER_VERIFICACION_EFECTIVO },
+    suite: "scripts/pruebas-db/verificacionEfectivo.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "  IF NEW.\"montoDeclaradoSnapshot\" <> mov.\"monto\"\n     OR ", a: "  IF " }],
+    esperadas: ["foto con monto falso: rechazada", "verificar de nuevo con la foto vieja: rechazado"],
+  },
+  {
+    n: "TV-4",
+    defecto: "el declarado puede no ser la suma de las entregas",
+    archivo: VERIFICACION_EFECTIVO,
+    migracion: { deshacer: DESHACER_VERIFICACION_EFECTIVO },
+    suite: "scripts/pruebas-db/verificacionEfectivo.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "  IF suma <> declarado THEN", a: "  IF false THEN" }],
+    esperadas: ["declarado distinto de la suma: rechazado al confirmar"],
+  },
+  {
+    n: "TV-5",
+    defecto: "una verificación mezcla entregas de dos locales",
+    archivo: VERIFICACION_EFECTIVO,
+    migracion: { deshacer: DESHACER_VERIFICACION_EFECTIVO },
+    suite: "scripts/pruebas-db/verificacionEfectivo.mjs",
+    minimo: 40,
+    // Las DOS mitades: el trigger compara la foto con el local real del turno y
+    // la FK compuesta ata la foto al local del padre. Cualquiera de las dos
+    // frena uno de los dos caminos; para que el defecto vuelva hay que sacar ambas.
+    inyecciones: [
+      { de: "     OR NEW.\"localIdSnapshot\" <> tur.\"localId\"\n", a: "" },
+      {
+        de: "ALTER TABLE \"VerificacionEfectivoEntrega\" ADD CONSTRAINT \"VerificacionEfectivoEntrega_verificacionEfectivoId_localId_fkey\" FOREIGN KEY (\"verificacionEfectivoId\", \"localIdSnapshot\") REFERENCES \"VerificacionEfectivo\"(\"id\", \"localId\") ON DELETE RESTRICT ON UPDATE RESTRICT;",
+        a: "",
+      },
+    ],
+    esperadas: [
+      "una entrega del local B en una verificación del A: rechazada",
+      "la foto con el local real B bajo un padre del A: rechazada",
+    ],
+  },
+  {
+    n: "TV-6",
+    defecto: "la clave de idempotencia deja de ser única en el local",
+    archivo: VERIFICACION_EFECTIVO,
+    migracion: { deshacer: DESHACER_VERIFICACION_EFECTIVO },
+    suite: "scripts/pruebas-db/verificacionEfectivo.mjs",
+    minimo: 40,
+    inyecciones: [{
+      de: "CREATE UNIQUE INDEX \"VerificacionEfectivo_localId_idempotencyKey_key\"",
+      a: "CREATE INDEX \"VerificacionEfectivo_localId_idempotencyKey_key\"",
+    }],
+    esperadas: ["misma clave en el mismo local: rechazada"],
+  },
 ];
 
 // Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número
@@ -873,15 +1022,30 @@ for (const c of ELEGIDOS) {
   }
   fs.writeFileSync(archivo, texto);
 
+  let aislada = null;
+  if (c.migracion) {
+    try {
+      aislada = await baseAislada(c, archivo);
+    } catch (e) {
+      // Una migración rota que ni siquiera aplica no prueba nada de la suite.
+      console.log(`✗ ${c.n}  la migración rota no se pudo aplicar en la base aislada: ${`${e.stderr || ""}${e.message}`.split("\n")[0]}`);
+      fallas++;
+      fs.rmSync(raiz, { recursive: true, force: true });
+      continue;
+    }
+  }
+
   let salida = "";
   try {
     salida = execFileSync(
       "node",
       ["--import", "./scripts/alias-loader.mjs", c.suite || "scripts/pruebas-db/recepcionTransferencias.mjs"],
-      { cwd: raiz, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: entornoHijo() }
+      { cwd: raiz, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { ...entornoHijo(), ...(aislada ? { DATABASE_URL: aislada.url } : {}) } }
     );
   } catch (e) {
     salida = `${e.stdout || ""}${e.stderr || ""}`;
+  } finally {
+    if (aislada) await aislada.tirar().catch((e) => console.log(`  (no se pudo tirar la base aislada: ${e.message})`));
   }
 
   // Que la suite haya CORRIDO: si abortó al montar, el rojo no prueba nada.
