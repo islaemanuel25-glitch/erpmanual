@@ -65,6 +65,7 @@ import {
   soloManuales,
   soloRecaudacion,
 } from "@/lib/finanzas/movimientosDeCaja";
+import { vinculosDeMovimientos } from "@/lib/finanzas/movimientosDeCajaServer";
 // EL PAGO A DEPÓSITO ES DE TRANSFERENCIAS. Finanzas no consulta `Transferencia`
 // ni valoriza líneas: pide la cuenta del local en el criterio de recepción a la
 // función de ese módulo, la misma que dibuja la pantalla que abre el "Ver".
@@ -274,36 +275,12 @@ export async function GET(req) {
     // El pago a proveedor en efectivo se reconoce por `PagoProveedor.cajaMovimientoId`
     // (UNIQUE). Sin esto caería en los retiros manuales del resumen, y el día que
     // se sumen los pagos al período ese mismo peso contaría dos veces.
-    const idsDeMovimiento = movimientos.map((m) => m.id);
     //
     // El pago de un gasto en efectivo, igual, por `PagoGasto.cajaMovimientoId`.
-    const [arqueosConRetiro, turnosConRetiroDeCierre, pagosConRetiro, pagosDeGastoConRetiro] = idsDeMovimiento.length
-      ? await Promise.all([
-          prisma.arqueoCaja.findMany({
-            where: { cajaMovimientoRetiroId: { in: idsDeMovimiento } },
-            select: { cajaMovimientoRetiroId: true },
-          }),
-          prisma.turno.findMany({
-            where: { retiroCierreMovimientoId: { in: idsDeMovimiento } },
-            select: { retiroCierreMovimientoId: true },
-          }),
-          prisma.pagoProveedor.findMany({
-            where: { cajaMovimientoId: { in: idsDeMovimiento } },
-            select: { cajaMovimientoId: true },
-          }),
-          prisma.pagoGasto.findMany({
-            where: { cajaMovimientoId: { in: idsDeMovimiento } },
-            select: { cajaMovimientoId: true },
-          }),
-        ])
-      : [[], [], [], []];
-
-    const clasificados = clasificarMovimientos(movimientos, {
-      idsDeRecaudacion: new Set(arqueosConRetiro.map((a) => a.cajaMovimientoRetiroId)),
-      idsDeCierre: new Set(turnosConRetiroDeCierre.map((t) => t.retiroCierreMovimientoId)),
-      idsDePagoProveedor: new Set(pagosConRetiro.map((p) => p.cajaMovimientoId)),
-      idsDePagoGasto: new Set(pagosDeGastoConRetiro.map((p) => p.cajaMovimientoId)),
-    });
+    // Las cuatro consultas viven en `vinculosDeMovimientos`, que también usa
+    // Tesorería: un vínculo nuevo se agrega en un solo lugar.
+    const idsDeMovimiento = movimientos.map((m) => m.id);
+    const clasificados = clasificarMovimientos(movimientos, await vinculosDeMovimientos(prisma, idsDeMovimiento));
 
     // ── EL PAGO A DEPÓSITO ────────────────────────────────────────────────
     //
