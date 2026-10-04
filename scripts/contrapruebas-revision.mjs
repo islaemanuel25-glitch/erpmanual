@@ -1259,6 +1259,56 @@ const CASOS = [
     candado: "F22 · como la llaman las rutas, sin `hoy`: el 4 de octubre el mes dice «van 4 días»",
     suite: "lib/finanzas/periodoFinanciero.test.mjs",
   },
+  // ── LA PANTALLA MÓVIL DE TESORERÍA ─────────────────────────────────────
+  //
+  // Las cinco reglas que la pantalla no puede romper sin que el servidor lo
+  // note tarde o nunca: mandar lo que decide el servidor, cambiar la clave en un
+  // reintento, enviar dos veces, recalcular la base, ofrecer un botón sin permiso.
+  {
+    n: "TES-pedido",
+    defecto: "el pedido de verificación vuelve a mandar el declarado",
+    archivo: "lib/tesoreria/pantallaTesoreria.js",
+    de: "    importeVerificado: desdeCentavos(contadoCentavos),\n",
+    a: "    importeVerificado: desdeCentavos(contadoCentavos),\n    importeDeclarado: 1,\n",
+    candado: "[31] el pedido NO lleva declarado, diferencia, local, clase ni fotos, y el servidor lo acepta tal cual",
+    suite: "components/tesoreria/tesoreriaMovil.test.mjs",
+  },
+  {
+    n: "TES-clave",
+    defecto: "un reintento del mismo intento lleva otra idempotencyKey",
+    archivo: "lib/tesoreria/pantallaTesoreria.js",
+    de: "  if (anterior?.clave && anterior.firma === firma) return { clave: anterior.clave, firma };",
+    a: "",
+    candado: "[32] la idempotencyKey sobrevive al reintento del mismo intento y cambia con otro contenido",
+    suite: "components/tesoreria/tesoreriaMovil.test.mjs",
+  },
+  {
+    n: "TES-doble-toque",
+    defecto: "un doble toque en Confirmar vuelve a enviar",
+    archivo: "components/tesoreria/HojaVerificarEfectivo.jsx",
+    de: "    if (enviandoRef.current) return; // doble toque: el segundo no sale",
+    a: "",
+    candado: "[33] un doble toque no hace dos envíos: guardia por ref y botón apagado mientras viaja",
+    suite: "components/tesoreria/tesoreriaMovil.test.mjs",
+  },
+  {
+    n: "TES-base",
+    defecto: "la pantalla vuelve a restar lo pagado desde caja a la base conocida",
+    archivo: "components/tesoreria/PantallaTesoreria.jsx",
+    de: "{formatearMoneda(r.baseConocida)}",
+    a: "{formatearMoneda(Number(r.baseConocida) - Number(r.pagosDesdeCajaInformativos))}",
+    candado: "[9][45] la base conocida y los totales son los del servidor, tal cual: no se recalculan",
+    suite: "components/tesoreria/tesoreriaMovil.test.mjs",
+  },
+  {
+    n: "TES-permiso",
+    defecto: "la pantalla ofrece Verificar sin el permiso que dijo el servidor",
+    archivo: "components/tesoreria/PantallaTesoreria.jsx",
+    de: "puedeVerificar={Boolean(datos.puedeVerificarEfectivo)}",
+    a: "puedeVerificar={true}",
+    candado: "[26][27] «Verificar efectivo» solo con el permiso que dijo el servidor",
+    suite: "components/tesoreria/tesoreriaMovil.test.mjs",
+  },
   // `lib/semanaOperativa/unaSolaFuente.test.mjs` NO está acá, y no por olvido:
   // enumera con `git ls-files`, y la copia descartable de este script no lleva
   // `.git`, así que ahí el archivo entero explota antes de llegar al candado y el

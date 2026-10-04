@@ -47,6 +47,11 @@ export function Metrica({ rotulo, valor, detalle = null, hero = false, tono = "s
  * Un renglón rótulo/importe. `nota` va debajo del rótulo; `notaValor` debajo
  * del importe —es el "% sobre ventas" del celular, que no empuja el número—.
  * `fuerte` resalta una etapa; `atenuado` baja el tono.
+ *
+ * `colorValor` y `notaColor` los pide Tesorería: un importe que RESTA en el tono
+ * de peligro (el "−" del texto ya lo dice; el color acompaña), lo verificado en
+ * el de éxito, lo pendiente en el de advertencia. Son clases semánticas del
+ * tema, nunca un color. Sin ellos el markup es el de siempre.
  */
 export function Renglon({
   rotulo,
@@ -56,15 +61,17 @@ export function Renglon({
   notaValorColor = "sunmi-text-muted",
   atenuado = false,
   fuerte = false,
+  colorValor = null,
+  notaColor = "sunmi-text-muted",
 }) {
   const tono = atenuado ? "sunmi-text-muted" : "sunmi-text-strong";
   const claseRotulo = fuerte ? `text-sm3 font-semibold ${tono}` : `text-sm3 ${tono}`;
-  const claseValor = `text-sm3 ${fuerte ? "font-semibold" : "font-medium"} tabular-nums ${tono}`;
+  const claseValor = `text-sm3 ${fuerte ? "font-semibold" : "font-medium"} tabular-nums ${colorValor || tono}`;
   return (
     <div className="flex items-baseline justify-between gap-3">
       <div className="min-w-0">
         <div className={claseRotulo}>{rotulo}</div>
-        {nota ? <div className="text-xs2 sunmi-text-muted">{nota}</div> : null}
+        {nota ? <div className={`text-xs2 ${notaColor}`}>{nota}</div> : null}
       </div>
       {notaValor ? (
         <div className="shrink-0 text-right">
