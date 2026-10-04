@@ -16,11 +16,9 @@
 //      queda ningún CajaMovimiento.
 // Nunca "el corte fijó su fotografía y después apareció un movimiento".
 //
-// Lo que NO se afirma: que el esperado de `turnos/cerrar` cuente un movimiento
-// que ganó. Ese cálculo, en main, todavía corre antes de la transacción del
-// cierre —es lo que arregla #132—, y esta prueba no depende de esa PR. Contra el
-// cierre directo se afirma lo de esta: que el movimiento confirma ANTES de que el
-// cierre pueda seguir, y que después del cierre no entra ninguno.
+// Contra el cierre directo se afirman las dos PR juntas: el movimiento confirma
+// ANTES de que el cierre pueda seguir (#133), y el cierre, que calcula con el
+// turno tomado (#132), lo cuenta en su esperado.
 //
 // Siembra sus propios datos con una marca única y los borra al terminar.
 
@@ -272,9 +270,9 @@ async function correr() {
   }
 
   // ── 4. CAJA +/− GANA CONTRA EL CIERRE DIRECTO ────────────────────────────
-  // Lo de esta PR: el movimiento confirma antes de que el cierre pueda seguir.
-  // (Que el esperado del cierre lo cuente depende de #132; ver el encabezado.)
-  for (const [tipo, monto] of [["INGRESO", 500], ["RETIRO", 300]]) {
+  // El movimiento confirma antes de que el cierre pueda seguir, y el cierre lo
+  // cuenta: se cierra contando exactamente lo esperado y la diferencia es 0.
+  for (const [tipo, monto, esperado] of [["INGRESO", 500, 1500], ["RETIRO", 300, 700]]) {
     seccion(`4. Caja +/− gana contra el cierre directo — ${tipo}`);
     const caja = await nuevaCaja();
     const orden = [];
@@ -283,7 +281,7 @@ async function correr() {
     try {
       pMov = conOrden(orden, "movimiento", mover(caja, tipo, monto));
       requerir("Caja +/− queda detenido antes de confirmar", (await esperarEnFila(prisma, 1)) >= 1);
-      pCerrar = conOrden(orden, "cierre", cerrar(caja, 1000));
+      pCerrar = conOrden(orden, "cierre", cerrar(caja, esperado));
       requerir("el cierre queda esperando", (await esperarEnFila(prisma, 2)) >= 2);
     } finally {
       await r.soltar();
@@ -293,8 +291,11 @@ async function correr() {
     igual("el cierre responde 200", cierre.status, 200);
     igual("el movimiento confirma ANTES que el cierre", orden, ["movimiento", "cierre"]);
     igual("el movimiento existe, uno solo", (await manuales(caja.turnoId)).map((m) => [m.tipo, Number(m.monto)]), [[tipo, monto]]);
-    const t = await prisma.turno.findUnique({ where: { id: caja.turnoId }, select: { montoEsperadoEfectivo: true } });
-    console.log(`    (informativo, #132: el cierre persistió esperado $${Number(t.montoEsperadoEfectivo)}; lo real es $${await esperadoReal(caja.turnoId)})`);
+    const t = await prisma.turno.findUnique({ where: { id: caja.turnoId }, select: { montoEsperadoEfectivo: true, diferenciaEfectivo: true } });
+    igual(`el cierre lo cuenta: esperado $${esperado} y diferencia 0`, [Number(t.montoEsperadoEfectivo), Number(t.diferenciaEfectivo)], [esperado, 0]);
+    igual("el esperado del cierre es el de la fórmula sobre lo que hay", Number(t.montoEsperadoEfectivo), await esperadoReal(caja.turnoId));
+    const arqueos = await prisma.arqueoCaja.findMany({ where: { turnoId: caja.turnoId, tipo: "FINAL" } });
+    igual("un solo arqueo FINAL, con el mismo esperado y diferencia 0", arqueos.map((a) => [Number(a.efectivoEsperado), Number(a.diferencia)]), [[esperado, 0]]);
   }
 
   // ── 5. DOS MOVIMIENTOS ALREDEDOR DEL CORTE ───────────────────────────────
