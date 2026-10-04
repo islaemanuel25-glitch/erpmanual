@@ -819,7 +819,9 @@ const CASOS = [
     archivo: "lib/tesoreria/lecturaTesoreriaServer.js",
     suite: "scripts/pruebas-db/tesoreriaLectura.mjs",
     minimo: 30,
-    inyecciones: [{ de: "    await vinculosDeMovimientos(db, movimientos.map((m) => m.id))", a: "    {}" }],
+    // Desde la PR 4 los vínculos se leen junto con las verificaciones y llegan
+    // en `vinculos`: el defecto es el mismo, clasificar sin ellos.
+    inyecciones: [{ de: "clasificarMovimientos(movimientos, vinculos);", a: "clasificarMovimientos(movimientos, {});" }],
     esperadas: ["efectivo entregado consolidado $110.000", "caja 1: una RECAUDACION y un CIERRE, cada uno una vez"],
   },
   {
@@ -952,6 +954,87 @@ const CASOS = [
       a: "CREATE INDEX \"VerificacionEfectivo_localId_idempotencyKey_key\"",
     }],
     esperadas: ["misma clave en el mismo local: rechazada"],
+  },
+  // ── VERIFICAR Y ANULAR: LAS REGLAS DE LAS ACCIONES (PR #137) ────────────
+  //
+  // Rompen el código de las acciones, la lectura y la corrección, y corren
+  // verificacionEfectivoAcciones.mjs, que va siempre por las rutas. El montaje
+  // solo —cajas, ventas, cierres, incidentes— ya pasa las 40 afirmaciones.
+  {
+    n: "VA-1",
+    defecto: "verificar deja de tomar el turno y se cruza con la corrección",
+    archivo: "lib/tesoreria/verificacionEfectivoServer.js",
+    suite: "scripts/pruebas-db/verificacionEfectivoAcciones.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "  for (const turnoId of turnoIds) await bloquearTurno(tx, turnoId);\n\n  // La clave", a: "\n  // La clave" }],
+    esperadas: ["las dos quedaron esperando el turno", "[31] orden 2: la corrección se aplica"],
+  },
+  {
+    n: "VA-2",
+    defecto: "la corrección histórica vuelve a reescribir una entrega verificada",
+    archivo: "lib/caja/correcciones/motor.js",
+    suite: "scripts/pruebas-db/verificacionEfectivoAcciones.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "      if (verificadas.length) {", a: "      if (false) {" }],
+    esperadas: [
+      "[28] el ensayo se rechaza con ENTREGA_VERIFICADA_EN_TESORERIA",
+      "[30] Admin por la ruta de aplicar: 409 ENTREGA_VERIFICADA_EN_TESORERIA",
+      "[31] orden 1: la corrección se rechaza por Tesorería",
+    ],
+  },
+  {
+    n: "VA-3",
+    defecto: "la misma clave con otro contenido devuelve la verificación de antes",
+    archivo: "lib/tesoreria/verificacionEfectivoServer.js",
+    suite: "scripts/pruebas-db/verificacionEfectivoAcciones.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "  if (!mismoContenido(contenidoGuardado(previa), pedido)) {", a: "  if (false) {" }],
+    esperadas: ["[18] misma clave, otro importe: 409"],
+  },
+  {
+    n: "VA-4",
+    defecto: "un local verifica entregas de otro",
+    archivo: "lib/tesoreria/verificacionEfectivoServer.js",
+    suite: "scripts/pruebas-db/verificacionEfectivoAcciones.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "  if (filas.some((f) => !visibles.includes(f.turno.localId))) {", a: "  if (false) {" }],
+    esperadas: ["[5] A no verifica una entrega de B: 403"],
+  },
+  {
+    n: "VA-5",
+    defecto: "el cliente vuelve a poder mandar el declarado",
+    archivo: "lib/tesoreria/verificacionEfectivo.js",
+    suite: "scripts/pruebas-db/verificacionEfectivoAcciones.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "  if (ajenos.length) {", a: "  if (false) {" }],
+    esperadas: ["[13] mandar importeDeclarado: 400"],
+  },
+  {
+    n: "VA-6",
+    defecto: "la lectura deja de avisar una verificación desactualizada",
+    archivo: "lib/tesoreria/lecturaTesoreria.js",
+    suite: "scripts/pruebas-db/verificacionEfectivoAcciones.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "    if (!motivos.length) continue;", a: "    continue;" }],
+    esperadas: ["[35] VERIFICACION_DESACTUALIZADA, con la verificación y el motivo"],
+  },
+  {
+    n: "VA-7",
+    defecto: "verificar vuelve a abrirse con tesoreria.ver",
+    archivo: "app/api/finanzas/tesoreria/verificaciones/route.js",
+    suite: "scripts/pruebas-db/verificacionEfectivoAcciones.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "checkPerm(session, PERMISO_VERIFICAR_EFECTIVO)", a: "checkPerm(session, \"tesoreria.ver\")" }],
+    esperadas: ["[2] tesoreria.ver solo no verifica: 403"],
+  },
+  {
+    n: "VA-8",
+    defecto: "anular dos veces deja de ser seguro",
+    archivo: "lib/tesoreria/verificacionEfectivoServer.js",
+    suite: "scripts/pruebas-db/verificacionEfectivoAcciones.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "  if (actual.estado === ESTADO_VERIFICACION.ANULADA) {", a: "  if (false) {" }],
+    esperadas: ["[24] anular otra vez: 200, ya estaba, sin pisar el motivo", "[26] las dos contestan 200"],
   },
 ];
 

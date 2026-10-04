@@ -429,8 +429,8 @@ jobs:
   # igual debe decir si las consultas nuevas de Finanzas existen de verdad.
   finanzas_postgres:
     runs-on: ubuntu-latest
-    # Las seis contrapruebas TV- copian el repo y corren la suite seis veces.
-    timeout-minutes: 18
+    # Las contrapruebas TV- y VA- copian el repo y corren su suite una vez cada una.
+    timeout-minutes: 24
 
     services:
       postgres:
@@ -652,6 +652,17 @@ jobs:
 
       - name: Contrapruebas de la verificación de efectivo
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs TV-
+
+      # Verificar y anular por las rutas: permisos separados, alcance por local,
+      # declarado del servidor, idempotencia con huella, anulación segura, la
+      # lectura con lo pendiente y lo verificado aparte, la alerta de
+      # desactualizada, el candado de la corrección histórica y las cuatro
+      # carreras forzadas sobre el turno.
+      - name: Acciones de verificación de efectivo contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/verificacionEfectivoAcciones.mjs
+
+      - name: Contrapruebas de las acciones de verificación
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs VA-
 
       # La corrección histórica de caja: el ensayo en seco que escribe y deshace,
       # la aplicación con huella autorizada, la idempotencia y el fallo a mitad.

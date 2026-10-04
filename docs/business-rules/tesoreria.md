@@ -88,8 +88,9 @@ configuración de franjas por local, se reemplaza esa función y nada más
   `tesoreria`, que es la lectura tal cual la arma el dominio: `resumen`,
   `grupos` (con sus instantes, cajas y alertas), `cajas`, `entregas`,
   `egresosExteriores`, `pagosDesdeCaja` y `alertas`.
-- **Consultas:** la lectura hace un número fijo, 11, con 5 cajas o con 1
-  [medido en `scripts/pruebas-db/tesoreriaApi.mjs`]. La ruta agrega las suyas
+- **Consultas:** la lectura hace un número fijo, 12 desde la PR 4 (11 antes de
+  sumar las verificaciones vigentes), con 5 cajas o con 1 [medido en
+  `scripts/pruebas-db/tesoreriaApi.mjs`]. La ruta agrega las suyas
   —el local de la sesión, los locales del grupo, las vigencias de la semana y la
   primera venta—, que no dependen de cuántas cajas haya [CÓDIGO; no contadas].
 - Un turno anulado conserva sus entregas y lo avisa con `TURNO_ANULADO`, en la
@@ -97,9 +98,8 @@ configuración de franjas por local, se reemplaza esa función y nada más
 
 ## La verificación del efectivo: persistencia
 
-PR 3 de Tesorería (2026-10-04): **solo las tablas y sus garantías**. No hay
-ruta, pantalla ni permiso que escriba una verificación todavía; los permisos de
-verificar y anular los registra la PR que agregue las acciones.
+PR 3 de Tesorería (2026-10-04, #136): las tablas y sus garantías. Las acciones
+que escriben son de la PR 4 (sección siguiente).
 **PENDIENTE DE DEPLOY:** la migración `20261004120000_verificacion_efectivo` está
 en el árbol y no en producción [DOCUMENTADO en
 `docs/deploy/MIGRACIONES-SIN-APLICAR.md`].
@@ -160,11 +160,120 @@ corrección histórica reescribe `CajaMovimiento.monto`, la verificación sigue
 diciendo lo que se verificó. El cambio se DETECTA comparando la foto contra el
 movimiento (`entregaDesactualizada`, o la consulta de la prueba H), y la salida es
 anular y verificar de nuevo, que el trigger solo deja hacer con el importe nuevo.
-Esa comparación es el insumo del futuro aviso `VERIFICACION_DESACTUALIZADA`; la
-ruta de corrección histórica no se tocó.
+Esa comparación es la que hace el aviso `VERIFICACION_DESACTUALIZADA` (abajo).
 
 **Sin backfill:** ninguna entrega anterior queda verificada; todas quedan
 pendientes de verificación.
+
+## Verificar y anular: las acciones
+
+PR 4 de Tesorería (2026-10-04): el circuito de backend, sin pantalla. Usa el
+modelo de la PR 3 tal cual: **no agrega migración** [CÓDIGO].
+
+**Permisos** [CÓDIGO, `lib/rbac/registry.js`, `lib/tesoreria/permisos.js`]:
+`tesoreria.verificar_efectivo` y `tesoreria.anular_verificacion`, en el grupo
+finanzas, sin ningún rol de sistema; Admin por el comodín. `tesoreria.ver` no
+autoriza ninguno de los dos, y cada uno no autoriza el otro [contraprueba VA-7].
+
+**`POST /api/finanzas/tesoreria/verificaciones`** — verificar.
+
+- Entrada: `cajaMovimientoIds` (las entregas), `importeVerificado`,
+  `idempotencyKey` y `observacion` opcional. Si el cuerpo trae el declarado, la
+  diferencia, el local, la clase o cualquier dato de la foto, se rechaza con 400:
+  todo eso lo decide el servidor [VA-5].
+- El local es el de las entregas, no uno que mande el cliente. El alcance es el
+  de Finanzas (`alcanceDePagos` → `ubicacionesVisibles`): un local verifica solo
+  lo suyo; el depósito, o un admin en vista global, cualquier local de su grupo.
+  Una entrega fuera de alcance es 403 sin decir cuál, antes de cualquier otro
+  rechazo, para no contar qué movimientos existen afuera [VA-4]. Entregas de dos
+  locales son 400 `LOCALES_MEZCLADOS`.
+- Granularidad libre: una entrega, varias de una caja o de varias cajas, siempre
+  del mismo local. No se exige el turno comercial entero ni se guarda.
+- En una transacción: toma los turnos de las entregas, mira la clave, toma los
+  movimientos FOR SHARE, los clasifica por vínculo (solo `RECAUDACION`/`CIERRE`;
+  otra cosa es 400 `NO_ES_ENTREGA`), rechaza una entrega ya cubierta por una
+  vigente (409 `ENTREGA_YA_VERIFICADA`, nombrando cuál), y arma con
+  `armarVerificacionEfectivo` el declarado —suma de los movimientos tomados— y la
+  diferencia. La base vuelve a comprobarlo todo.
+- **"Correcto" no es otra acción:** es contar lo declarado. La respuesta trae
+  declarado, verificado, diferencia, estado y `correcta` (diferencia cero).
+- **La diferencia es del acto entero.** Caja 1 entrega $100.000 y caja 2
+  $10.000, se cuentan juntas $108.000: una verificación con declarado $110.000,
+  verificado $108.000 y diferencia −$2.000. No se reparte entre cajas ni entregas
+  [CÓDIGO; prueba 5 de `verificacionEfectivoAcciones.mjs`].
+- Autoría: la cuenta ERP que ejecuta. `verificadaPorOperadorId` queda null:
+  ningún flujo de Finanzas valida hoy un PIN, y el operador es evidencia, no
+  permiso (DEC-0012) [CÓDIGO].
+- Respuesta: 201 con la verificación; 200 con `repetida: true` para un reintento.
+
+**Idempotencia** [CÓDIGO; VA-3]. La clave es del local (el único de la base). El
+CONTENIDO de un intento son las entregas ordenadas, el importe en centavos y la
+observación; la misma clave con el mismo contenido devuelve la misma
+verificación —aunque esté anulada—, y con otro contenido es 409
+`IDEMPOTENCIA_CONFLICTO`, con la verificación y las dos huellas (SHA-256 del
+contenido canónico, con `jsonCanonico` del POS). No hace falta columna: lo
+guardado ES el contenido, y se compara contra eso. El orden de los ids no cambia
+el intento. Si dos envíos con la misma clave llegan a la vez, el segundo espera
+el turno y ve el primero; si la carrera llega igual al UNIQUE, la ruta relee y
+contesta igual.
+
+**`POST /api/finanzas/tesoreria/verificaciones/:id/anular`** — anular.
+
+- Entrada: `motivo`, obligatorio y no en blanco. La clave natural es la
+  verificación: no lleva `idempotencyKey`.
+- Única transición: VIGENTE → ANULADA, con cuándo, quién y por qué; lo
+  verificado no se toca y nada se borra. Las entregas quedan libres.
+- Repetirla es seguro: si ya estaba anulada contesta 200 con
+  `yaEstabaAnulada: true` y lo que quedó, sin pisar el motivo ni el autor de la
+  primera [VA-8].
+- Alcance: la verificación tiene que ser de un local visible; si no, 403.
+
+**El orden de los bloqueos** [CÓDIGO, `lib/tesoreria/verificacionEfectivoServer.js`]:
+primero los `Turno` de las entregas, FOR UPDATE, por id ascendente
+(`bloquearTurno`, el candado del POS); después la fila propia —los
+`CajaMovimiento` FOR SHARE al verificar, la `VerificacionEfectivo` FOR UPDATE al
+anular—. La corrección histórica toma también los turnos primero, en el mismo
+orden, y sus movimientos después. Nadie toma un turno teniendo ya otra cosa, así
+que no hay ciclo, y verificar, anular, corregir y el POS sobre esa caja se ponen
+en fila en el turno [VA-1].
+
+**La corrección histórica respeta la verificación** [CÓDIGO,
+`lib/caja/correcciones/motor.js`; VA-2]. Si el plan cambia
+`CajaMovimiento.monto` de un movimiento cubierto por una verificación VIGENTE,
+el ensayo y la aplicación se rechazan con `codigoRechazo:
+ENTREGA_VERIFICADA_EN_TESORERIA`, nombrando la verificación: hay que anularla,
+corregir y volver a verificar. Solo frena ese caso —otra corrección del mismo
+turno pasa— y vale igual para Admin. Se pregunta con los turnos ya tomados: si
+la verificación llegó primero, la corrección la ve; si la corrección llegó
+primero, la verificación espera y fotografía el importe corregido.
+
+**La lectura** (`GET /api/finanzas/tesoreria`) suma, sin cambiar ninguna regla de
+plata:
+
+- cada entrega con `estadoVerificacion` (`PENDIENTE`/`VERIFICADA`),
+  `verificacionId`, `montoDeclaradoVerificado` (la foto), `desactualizada` y sus
+  motivos; ninguna lleva lo contado ni una diferencia;
+- `verificaciones`: los actos vigentes que cubren algo del período, enteros, con
+  qué entregas caen adentro y si está completo;
+- `resumen.verificacion` y `grupo.verificacion`, SEPARADOS de lo declarado: lo
+  entregado pendiente de verificar, lo cubierto por verificaciones (importes
+  declarados), y lo verificado de los actos completos (declarado y contado del
+  acto). Un acto con entregas en otro grupo o fuera del período no se atribuye
+  —repartirlo sería inventar— y se cuenta en `actosQueCruzan`.
+- `baseConocida` sigue siendo la DECLARADA, esté verificada o no. Verificar no la
+  cambia, ni cambia la regla de los pagos desde caja (informativos) ni la de los
+  egresos exteriores (restan una vez) [pruebas 9 de `verificacionEfectivoAcciones.mjs`].
+
+**`VERIFICACION_DESACTUALIZADA`** [CÓDIGO, `lib/tesoreria/desactualizacion.js`;
+VA-6]: para cada entrega del período cubierta por una verificación vigente, la
+foto se compara con el movimiento de hoy —monto, clase por vínculo, turno,
+local, operador e instante—. Si algo difiere, alerta con la verificación, el
+movimiento y los motivos. No se recalcula el declarado, no se tocan las fotos ni
+la diferencia, no se anula sola.
+
+**Lo que esta PR no hace:** no hay pantalla; un cierre sin conteo sigue siendo
+`SIN_IMPORTE_DECLARADO` y no se puede verificar, porque no tiene movimiento de
+entrega y no se fabrica uno; un turno anulado conserva su entrega y su alerta.
 
 ## Evidencia
 
@@ -173,6 +282,11 @@ pendientes de verificación.
   `.test.mjs`; contra PostgreSQL, `scripts/pruebas-db/verificacionEfectivo.mjs` y
   las contrapruebas `TV-`, que rompen el TEXTO de la migración y lo aplican en una
   base aislada copia de la de la prueba.
+- Acciones: `lib/tesoreria/verificacionEfectivoServer.js`, las rutas de
+  `app/api/finanzas/tesoreria/verificaciones`, y el candado en
+  `lib/caja/correcciones/motor.js`. Contra PostgreSQL, por las rutas y con las
+  cuatro carreras forzadas sobre el turno: `scripts/pruebas-db/verificacionEfectivoAcciones.mjs`
+  y las contrapruebas `VA-`.
 - Lector: `lib/tesoreria/lecturaTesoreriaServer.js`. Los vínculos de clase los
   lee `lib/finanzas/movimientosDeCajaServer.js`, el mismo lector que usa el
   tablero de Finanzas.

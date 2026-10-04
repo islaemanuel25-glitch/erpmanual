@@ -21,5 +21,5 @@ export async function POST(req) {
   }
 
   const informe = await ejecutarCorreccion(prisma, manifiesto, { modo: "ensayo", usuarioId: perm.session.id });
-  return NextResponse.json({ ok: informe.errores.length === 0, informe });
+  return NextResponse.json({ ok: informe.errores.length === 0, codigoRechazo: informe.codigoRechazo ?? null, informe });
 }

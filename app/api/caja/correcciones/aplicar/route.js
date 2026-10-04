@@ -33,5 +33,7 @@ export async function POST(req) {
 
   const informe = await ejecutarCorreccion(prisma, manifiesto, { modo: "aplicar", usuarioId: perm.session.id });
   const ok = informe.resultado === RESULTADO.APLICADA || informe.resultado === RESULTADO.YA_APLICADA;
-  return NextResponse.json({ ok, informe }, { status: ok ? 200 : 409 });
+  // `codigoRechazo` arriba, para que una pantalla distinga un rechazo de
+  // Tesorería (ENTREGA_VERIFICADA_EN_TESORERIA) sin leer el texto.
+  return NextResponse.json({ ok, codigoRechazo: informe.codigoRechazo ?? null, informe }, { status: ok ? 200 : 409 });
 }
