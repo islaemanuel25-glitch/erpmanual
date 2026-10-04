@@ -15,7 +15,17 @@
 //      avisa y no inventa $0; el turno anulado conserva su entrega y avisa;
 //   E. sin N+1: la lectura hace la MISMA cantidad de consultas con 1 caja que con
 //      7, y ninguna es una escritura;
-//   F. un GET no escribe nada en la base.
+//   F. un GET no escribe nada en la base;
+//   G. «Otro» (PR #138): un rango elegido de hoy da la MISMA lectura que el Día,
+//      filtra, se describe como «Período elegido», no navega, rechaza con 400
+//      cada forma mal armada y no salta el alcance;
+//   H. cada pago se nombra con su proveedor o su gasto reales, nunca con el
+//      motivo del movimiento, sin cambiar la base, y nada de eso cruza a B.
+//
+// Lo que necesita verificaciones —quién verificó, el agrupado por caja, lo
+// parcial, los actos que cruzan, las capacidades— va en
+// verificacionEfectivoAcciones.mjs: una verificación no se borra, y esta prueba
+// desmonta lo que siembra.
 //
 // Siembra sus propios datos con una marca única y los borra al terminar.
 
@@ -406,6 +416,80 @@ async function correr() {
     for (const unidad of ["DIA", "SEMANA", "MES"]) await tesoreria(verA, `unidad=${unidad}`);
     igual("ninguna tabla cambió de tamaño", await contar(), antes);
     igual("ni se tocó un turno leído", (await prisma.turno.findUnique({ where: { id: c1.turnoId }, select: { updatedAt: true } })).updatedAt.getTime(), marcaTurno.updatedAt.getTime());
+  }
+
+  // ── G. «OTRO»: EL RANGO ELEGIDO (PR #138) ────────────────────────────────
+  seccion("G. Otro: rango elegido, validado, sin navegar");
+  {
+    const hoy = hoyArgentinaISO();
+    const dia = await tesoreria(verA, "unidad=DIA");
+    const otro = await tesoreria(verA, `unidad=OTRO&desde=${hoy}&hasta=${hoy}`);
+    requerir("Otro de hoy a hoy: 200", otro.status === 200, `${otro.status} ${otro.error ?? ""}`);
+    igual("da EXACTAMENTE la misma lectura que el Día", JSON.stringify(otro.tesoreria), JSON.stringify(dia.tesoreria));
+    igual("con los mismos instantes", otro.periodo.instantes, dia.periodo.instantes);
+    igual("se describe como «Período elegido» y no navega",
+      [otro.unidad, otro.desplazamiento, otro.periodo.descripcion.titulo, otro.puedeAvanzar, otro.puedeRetroceder], ["OTRO", null, "Período elegido", false, false]);
+    const ayer = (await tesoreria(verA, "unidad=DIA&desplazamiento=-1")).periodo.rango.desde;
+    // Un rango posterior al primer movimiento es el único en que «retroceder»
+    // daría true si Otro navegara: los de hoy y de ayer no lo distinguen.
+    const manana = new Date(Date.parse(`${hoy}T12:00:00-03:00`) + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const futuro = await tesoreria(verA, `unidad=OTRO&desde=${manana}&hasta=${manana}`);
+    igual("Otro en el futuro: 200, en cero, y tampoco retrocede", [futuro.status, futuro.tesoreria?.entregas.length, futuro.puedeRetroceder, futuro.puedeAvanzar], [200, 0, false, false]);
+    const soloAyer = await tesoreria(verA, `unidad=OTRO&desde=${ayer}&hasta=${ayer}`);
+    igual("Otro solo de ayer filtra: ninguna entrega de hoy", [soloAyer.status, soloAyer.tesoreria?.entregas.length, soloAyer.tesoreria?.resumen.efectivoDeclaradoEntregado], [200, 0, 0]);
+    const amplio = await tesoreria(verA, `unidad=OTRO&desde=${ayer}&hasta=${hoy}`);
+    igual("Otro de ayer a hoy: lo de hoy, sin sumar dos veces", amplio.tesoreria?.resumen.baseConocida, dia.tesoreria.resumen.baseConocida);
+    const { fechaInicio, fechaFin } = getRangoArgentina(ayer, hoy);
+    igual("los instantes son el corte argentino del rango, no UTC", amplio.periodo?.instantes, { desde: fechaInicio.toISOString(), hasta: fechaFin.toISOString() });
+    for (const [que, query] of [
+      ["desde inválido", `unidad=OTRO&desde=2026-02-30&hasta=${hoy}`],
+      ["hasta inválido", `unidad=OTRO&desde=${hoy}&hasta=ayer`],
+      ["desde después de hasta", `unidad=OTRO&desde=${hoy}&hasta=${ayer}`],
+      ["falta hasta", `unidad=OTRO&desde=${hoy}`],
+      ["faltan las dos", "unidad=OTRO"],
+      ["fechas sin Otro", `unidad=DIA&desde=${hoy}&hasta=${hoy}`],
+      ["fechas sin unidad", `desde=${hoy}&hasta=${hoy}`],
+      ["Otro con desplazamiento", `unidad=OTRO&desde=${hoy}&hasta=${hoy}&desplazamiento=-1`],
+    ]) {
+      const r = await tesoreria(verA, query);
+      igual(`${que}: 400 con mensaje, sin lectura`, [r.status, r.ok, typeof r.error, "tesoreria" in r], [400, false, "string", false]);
+    }
+    igual("Otro no salta el alcance: A pidiendo B, 403", (await tesoreria(verA, `unidad=OTRO&desde=${ayer}&hasta=${hoy}&destino=${f.B.local.id}`)).status, 403);
+    const verD = sesionDe(f.D.usuario, f.D.local.id, ["tesoreria.ver"]);
+    igual("el depósito con Otro lee a un local de su grupo", [(await tesoreria(verD, `unidad=OTRO&desde=${hoy}&hasta=${hoy}&destino=${f.A.local.id}`)).local?.id], [f.A.local.id]);
+    // El mes en curso cuenta HASTA HOY (antes, hasta fin de mes); el anterior no cuenta.
+    const n = Number(hoy.slice(8));
+    const mesActual = await tesoreria(verA, "unidad=MES");
+    igual("Mes en curso: «en curso» y los días que van hasta hoy",
+      [mesActual.periodo?.descripcion?.titulo?.endsWith("· en curso"), mesActual.periodo?.descripcion?.subtitulo?.endsWith(`· van ${n} ${n === 1 ? "día" : "días"}`)], [true, true]);
+    const mesAnterior = await tesoreria(verA, "unidad=MES&desplazamiento=-1");
+    ok("Mes anterior: sin «en curso» ni contador", !/en curso|van \d/.test(`${mesAnterior.periodo?.descripcion?.titulo} ${mesAnterior.periodo?.descripcion?.subtitulo}`),
+      JSON.stringify(mesAnterior.periodo?.descripcion));
+    // Los ejemplos reales del contrato, para el informe.
+    for (const q of ["unidad=DIA", "unidad=SEMANA", "unidad=MES", `unidad=OTRO&desde=${ayer}&hasta=${hoy}`]) {
+      const r = await tesoreria(verA, q);
+      console.log(`    · ${q}: ${JSON.stringify({ unidad: r.unidad, desplazamiento: r.desplazamiento, periodo: r.periodo, puedeAvanzar: r.puedeAvanzar, puedeRetroceder: r.puedeRetroceder })}`);
+    }
+  }
+
+  // ── H. CÓMO SE NOMBRA CADA PAGO (PR #138) ────────────────────────────────
+  seccion("H. Pagos con su proveedor o su gasto, de la base");
+  {
+    const t = (await tesoreria(verA, "unidad=DIA")).tesoreria;
+    const pc = t.pagosDesdeCaja.find((p) => p.turnoId === c3.turnoId);
+    igual("pago desde caja: el proveedor real y su pedido",
+      [pc?.beneficiario, pc?.concepto, pc?.categoria, pc?.referencia, pc?.pagadoDesdeCaja], [`${marca}-panadero`, null, null, { tipo: "PEDIDO_PROVEEDOR", id: pedidoPan.id }, true]);
+    const ex = t.egresosExteriores.find((p) => p.origen === "PAGO_GASTO");
+    igual("egreso exterior de un gasto: concepto y categoría reales, sin beneficiario cargado → null",
+      [ex?.concepto, ex?.categoria, ex?.beneficiario, ex?.referencia, ex?.pagadoDesdeCaja], ["Luz", "Servicios", null, { tipo: "GASTO", id: g.gasto.id }, false]);
+    igual("nombrarlos no cambia la base: sigue 280.000", t.resumen.baseConocida, 280000);
+    const motivos = (await prisma.cajaMovimiento.findMany({ where: { turnoId: c3.turnoId, motivo: { not: null } }, select: { motivo: true } })).map((m) => m.motivo);
+    ok("ningún pago se nombra con el motivo libre del movimiento",
+      motivos.every((m) => ![...t.pagosDesdeCaja, ...t.egresosExteriores].some((p) => [p.beneficiario, p.concepto, p.categoria].includes(m))), JSON.stringify(motivos));
+    const tB = JSON.stringify(await tesoreria(verB, "unidad=DIA"));
+    ok("B no ve ni el proveedor ni el gasto de A, ni sus cuentas ni operadores",
+      // Entre comillas: "op1" es prefijo de "op12", que puede ser el de B.
+      !tB.includes(`"${marca}-panadero"`) && !tB.includes("\"Luz\"") && !tB.includes(`"${marca}-A-cuenta"`) && !tB.includes(`"${c1.op.nombre}"`));
   }
 }
 

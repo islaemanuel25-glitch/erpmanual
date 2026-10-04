@@ -626,6 +626,99 @@ async function correr() {
     const final = await prisma.verificacionEfectivo.findUnique({ where: { id: v6.id } });
     igual("[26] queda la anulación de la primera, sin pisar", [final.estado, final.motivoAnulacion], ["ANULADA", "primera"]);
   }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // EL CONTRATO QUE LEE LA PANTALLA MÓVIL (PR #138)
+  // ══════════════════════════════════════════════════════════════════════════
+  const lecturaCon = async (sesion, query) =>
+    leer(await rutaTesoreria.GET(conCookie(`http://ci/api/finanzas/tesoreria?${query}`, `erpazul_sesion=${sesion}`, null, "GET")));
+
+  seccion("18. Quién verificó, y cuántas cajas juntó el acto [#138: 15, 16, 26]");
+  {
+    const l = await lectura(A.todo);
+    const acto = l.tesoreria.verificaciones.find((v) => v.id === entregaEn(l, k1.id)?.verificacionId);
+    requerir("el acto de las cajas 1 y 2 está en la lectura", Boolean(acto));
+    igual("verificó: id y nombre de la cuenta, nada más", acto.verificadaPor, { id: A.usuario.id, nombre: A.usuario.nombre });
+    igual("sin PIN, el operador es null y no se completa con la cuenta", [acto.verificadaPorOperadorId, acto.verificadaPorOperador], [null, null]);
+    igual("\"2 cajas incluidas\", con UNA diferencia del acto", [acto.cantidadDeCajas, typeof acto.diferencia], [2, "number"]);
+    const texto = JSON.stringify(l);
+    ok("ningún email ni hash de clave en la respuesta", !texto.includes(A.usuario.email) && !/passwordHash|"email"/.test(texto));
+  }
+
+  seccion("19. Las entregas se agrupan por caja con su identidad [#138: 17]");
+  {
+    const l = await lectura(A.todo);
+    const e1 = entregaEn(l, k1.id);
+    igual("identidad de la entrega: movimiento, turno, operador, clase, monto, instante y estado",
+      [e1.cajaMovimientoId, e1.turnoId, e1.operadorId, e1.operadorNombre, e1.clase, e1.montoDeclarado, typeof e1.instante, e1.estadoVerificacion],
+      [k1.id, k1.caja.turnoId, k1.caja.op.id, k1.caja.op.nombre, "CIERRE", 100000, "string", "VERIFICADA"]);
+    igual("el rótulo sale del operador, no de un número de caja", e1.etiquetaCaja, `Caja de ${k1.caja.op.nombre}`);
+    ok("cada entrega lleva el rótulo de SU caja", l.tesoreria.entregas.every((e) => e.etiquetaCaja === l.tesoreria.cajas.find((c) => c.turnoId === e.turnoId)?.etiqueta));
+    ok("ningún rótulo inventa \"Caja 1\"", !/"Caja \d/.test(JSON.stringify(l)));
+    const lB = await lectura(B.todo);
+    const eB = lB.tesoreria.entregas.find((e) => e.cajaMovimientoId === kB2.id);
+    igual("sin operador: rótulo neutro del turno, operador null", [eB?.etiquetaCaja, eB?.operadorId, eB?.operadorNombre], [`Caja del turno #${kB2.caja.turnoId}`, null, null]);
+  }
+
+  seccion("20. Lo parcial se deriva, no se guarda [#138: 18]");
+  {
+    const l = await lectura(A.todo);
+    const rv = l.tesoreria.resumen.verificacion;
+    const pendientes = l.tesoreria.entregas.filter((e) => e.estadoVerificacion === ESTADO_ENTREGA.PENDIENTE);
+    igual("declarado = lo entregado del período", rv.entregadoDeclarado, l.tesoreria.resumen.efectivoDeclaradoEntregado);
+    igual("declarado = cubierto + pendiente", Math.round((rv.entregadoCubiertoPorVerificaciones + rv.entregadoPendienteDeVerificar) * 100), Math.round(rv.entregadoDeclarado * 100));
+    igual("los ids pendientes son exactamente los PENDIENTES", [...rv.entregasPendientesIds].sort((a, b) => a - b), pendientes.map((e) => e.cajaMovimientoId).sort((a, b) => a - b));
+    igual("y su suma es \"Verificar lo pendiente · $X\"", Math.round(pendientes.reduce((s, e) => s + e.montoDeclarado, 0) * 100), Math.round(rv.entregadoPendienteDeVerificar * 100));
+    ok("ninguna verificación guarda un estado PARCIAL", !(await prisma.verificacionEfectivo.findFirst({ where: { estado: { notIn: ["VIGENTE", "ANULADA"] } } })));
+  }
+
+  seccion("21. Un acto que cruza el período: entero, aparte, sin sumarse [#138: 19, 20]");
+  {
+    const kAyer = await cajaConCierre(A, 3000);
+    const kHoy = await cajaConCierre(A, 2000);
+    // Ninguna ruta crea una entrega con fecha pasada: se corre el reloj de una,
+    // como el plazo en cierreCaja.mjs, ANTES de verificar —así la foto la toma
+    // tal cual y nada queda desactualizado—. 24 h atrás es siempre el día
+    // argentino anterior.
+    await prisma.cajaMovimiento.update({ where: { id: kAyer.id }, data: { createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000) } });
+    const hoy = await lectura(A.todo);
+    const rX = await verificar(A.todo, { cajaMovimientoIds: [kAyer.id, kHoy.id], importeVerificado: 4900, idempotencyKey: clave("x") });
+    requerir("verifica juntas la de ayer y la de hoy: 201", rX.status === 201, `${rX.status} ${rX.codigo ?? ""} ${rX.error ?? ""}`);
+    const X = rX.verificacion;
+    const dia = await lecturaCon(A.todo, "unidad=DIA");
+    const enDia = dia.tesoreria.verificaciones.find((v) => v.id === X.id);
+    igual("en el Día: el acto va ENTERO —5.000 / 4.900 / −100—, marcado incompleto",
+      [enDia?.importeDeclarado, enDia?.importeVerificado, enDia?.diferencia, enDia?.completaEnElPeriodo, enDia?.entregasEnElPeriodo], [5000, 4900, -100, false, [kHoy.id]]);
+    ok("y se nombra entre los que cruzan", dia.tesoreria.resumen.verificacion.actosQueCruzanIds.includes(X.id));
+    igual("lo verificado del Día no suma ni un pedazo de él", dia.tesoreria.resumen.verificacion.efectivoVerificado, hoy.tesoreria.resumen.verificacion.efectivoVerificado);
+    igual("la entrega de hoy sí figura cubierta", entregaEn(dia, kHoy.id)?.estadoVerificacion, "VERIFICADA");
+    const ayer = await lecturaCon(A.todo, "unidad=DIA&desplazamiento=-1");
+    ok("en el día anterior también cruza", ayer.tesoreria.resumen.verificacion.actosQueCruzanIds.includes(X.id));
+    const { hoyArgentinaISO } = await import("../../lib/fechas/rangoArgentina.js");
+    const fechaHoy = hoyArgentinaISO();
+    const fechaAyer = ayer.periodo.rango.desde;
+    const otro = await lecturaCon(A.todo, `unidad=OTRO&desde=${fechaAyer}&hasta=${fechaHoy}`);
+    const enOtro = otro.tesoreria?.verificaciones.find((v) => v.id === X.id);
+    igual("con «Otro» de ayer a hoy queda completo y deja de cruzar",
+      [otro.status, enOtro?.completaEnElPeriodo, otro.tesoreria?.resumen.verificacion.actosQueCruzanIds.includes(X.id)], [200, true, false]);
+    const rA = await anular(A.todo, X.id, { motivo: "prueba del contrato" });
+    igual("la anulación nombra a quien anuló, sin datos de la cuenta", [rA.verificacion?.anuladaPor, rA.verificacion?.verificadaPor], [{ id: A.usuario.id, nombre: A.usuario.nombre }, { id: A.usuario.id, nombre: A.usuario.nombre }]);
+  }
+
+  seccion("22. Las capacidades salen de los permisos reales [#138: 16]");
+  {
+    const capacidades = async (sesion, query = "unidad=DIA") => {
+      const r = await lecturaCon(sesion, query);
+      return [r.status, r.puedeVerificarEfectivo, r.puedeAnularVerificacion];
+    };
+    igual("solo ver: no ofrece ni verificar ni anular", await capacidades(A.ver), [200, false, false]);
+    igual("ver + verificar", await capacidades(firmar(A.usuario, A.local.id, [PERMISO_VER_TESORERIA, PERMISO_VERIFICAR_EFECTIVO])), [200, true, false]);
+    igual("ver + anular", await capacidades(firmar(A.usuario, A.local.id, [PERMISO_VER_TESORERIA, PERMISO_ANULAR_VERIFICACION])), [200, false, true]);
+    igual("el comodín \"*\"", await capacidades(firmar(A.usuario, A.local.id, ["*"])), [200, true, true]);
+    igual("las capacidades no saltan el alcance: A con todo pidiendo B, 403", (await lecturaCon(A.todo, `destino=${B.local.id}`)).status, 403);
+    igual("ni con «Otro»", (await lecturaCon(A.todo, `unidad=OTRO&desde=2026-01-01&hasta=2026-12-31&destino=${B.local.id}`)).status, 403);
+    igual("el depósito sí, sobre un local de su grupo", await capacidades(D.todo, `destino=${B.local.id}`), [200, true, true]);
+  }
 }
 
 try {

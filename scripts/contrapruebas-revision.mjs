@@ -1247,6 +1247,18 @@ const CASOS = [
     candado: "F5 · Finanzas no define su semana: la ruta la pide al cargador canónico y la pasa entera",
     suite: "lib/finanzas/periodoFinanciero.test.mjs",
   },
+  {
+    n: "FIN-mes-van-dias",
+    // El defecto exacto de antes: sin `hoy`, el contador caía a fin de mes y el
+    // 4 de octubre decía "van 31 días". El candado para el reloj, así que no
+    // depende del día en que corra el CI.
+    defecto: "el mes en curso vuelve a contar hasta fin de mes cuando la ruta no manda hoy",
+    archivo: "lib/transferencias/descripcionDelPeriodo.js",
+    de: "    const corrido = diasEntre(rango.desde, hoy);",
+    a: "    const corrido = diasEntre(rango.desde, hoyPedido || rango.hasta);",
+    candado: "F22 · como la llaman las rutas, sin `hoy`: el 4 de octubre el mes dice «van 4 días»",
+    suite: "lib/finanzas/periodoFinanciero.test.mjs",
+  },
   // `lib/semanaOperativa/unaSolaFuente.test.mjs` NO está acá, y no por olvido:
   // enumera con `git ls-files`, y la copia descartable de este script no lleva
   // `.git`, así que ahí el archivo entero explota antes de llegar al candado y el

@@ -1036,6 +1036,63 @@ const CASOS = [
     inyecciones: [{ de: "  if (actual.estado === ESTADO_VERIFICACION.ANULADA) {", a: "  if (false) {" }],
     esperadas: ["[24] anular otra vez: 200, ya estaba, sin pisar el motivo", "[26] las dos contestan 200"],
   },
+  // ── EL CONTRATO DE LA PANTALLA MÓVIL (PR #138) ───────────────────────────
+  //
+  // Lo que la pantalla no puede comprobar sola: que un período mal pedido no se
+  // convierta en otro, que el botón que se ofrece sea el que el servidor
+  // acepta, que los nombres salgan de la base y que un acto que cruza no se
+  // reparta.
+  {
+    n: "TC-1",
+    defecto: "un rango «Otro» mal armado cae en silencio a otro período",
+    archivo: "app/api/finanzas/tesoreria/route.js",
+    suite: "scripts/pruebas-db/tesoreriaApi.mjs",
+    minimo: 30,
+    inyecciones: [{
+      de: "if (leido.error) return NextResponse.json({ ok: false, error: leido.error }, { status: 400 });\n      rangoFijo = leido.rango;",
+      a: "rangoFijo = leido.rango ?? null;",
+    }],
+    esperadas: ["desde inválido: 400 con mensaje, sin lectura", "desde después de hasta: 400 con mensaje, sin lectura"],
+  },
+  {
+    n: "TC-2",
+    defecto: "un gasto sin beneficiario se nombra con otro dato",
+    archivo: "lib/tesoreria/lecturaTesoreria.js",
+    suite: "scripts/pruebas-db/tesoreriaApi.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "beneficiario: p.gasto?.beneficiario ?? null,", a: "beneficiario: p.gasto?.beneficiario ?? p.gasto?.concepto ?? null," }],
+    esperadas: ["egreso exterior de un gasto: concepto y categoría reales, sin beneficiario cargado → null"],
+  },
+  {
+    n: "TC-3",
+    defecto: "la pantalla ofrece verificar sin el permiso de verificar",
+    archivo: "app/api/finanzas/tesoreria/route.js",
+    suite: "scripts/pruebas-db/verificacionEfectivoAcciones.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "puedeVerificarEfectivo: checkPerm(session, PERMISO_VERIFICAR_EFECTIVO).ok,", a: "puedeVerificarEfectivo: true," }],
+    esperadas: ["solo ver: no ofrece ni verificar ni anular", "ver + anular"],
+  },
+  {
+    n: "TC-4",
+    defecto: "sin operador, el verificador se completa con la cuenta",
+    archivo: "lib/tesoreria/verificacionEfectivoLectura.js",
+    suite: "scripts/pruebas-db/verificacionEfectivoAcciones.mjs",
+    minimo: 40,
+    inyecciones: [{
+      de: "verificadaPorOperador: v.verificadaPorOperadorId == null ? null : { id: v.verificadaPorOperadorId, nombre: null },",
+      a: "verificadaPorOperador: persona(v.verificadaPor),",
+    }],
+    esperadas: ["sin PIN, el operador es null y no se completa con la cuenta"],
+  },
+  {
+    n: "TC-5",
+    defecto: "un acto que cruza el período se da por completo",
+    archivo: "lib/tesoreria/lecturaTesoreria.js",
+    suite: "scripts/pruebas-db/verificacionEfectivoAcciones.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "actosQueCruzanIds: actosDe.filter((a) => !a.completo).map((a) => a.id),", a: "actosQueCruzanIds: []," }],
+    esperadas: ["y se nombra entre los que cruzan", "en el día anterior también cruza"],
+  },
 ];
 
 // Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número
