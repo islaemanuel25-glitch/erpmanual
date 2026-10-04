@@ -212,6 +212,20 @@ migración.
   todavía leen la cookie del operador sin validarla contra el local (son
   reservas de sobres, no propiedad de caja), y `auditoria-pos-ventas/turnos/personas`
   sigue agrupando ventas por cuenta (estadística de ventas, no de caja).
+- **Caja +/− no entra después del corte ni del cierre** (PR #133, verificado en
+  código y contra PostgreSQL). `caja-movimientos/crear` validaba el turno sin
+  lock e insertaba en otra sentencia, sin transacción: un ingreso o egreso que
+  validaba antes de que `cierres/iniciar` o `turnos/cerrar` confirmaran quedaba
+  después adentro del turno cortado o cerrado, fuera de su esperado. Ahora sigue
+  el patrón de `salidaDelPago`: una transacción que toma el turno con
+  `bloquearTurno` (FOR UPDATE), lo relee con la misma regla de siempre
+  (`rechazoDelTurno`, que también responde rápido afuera) y recién entonces
+  inserta. Orden de locks: Turno → CajaMovimiento (más las claves foráneas de
+  `turnoId` y `usuarioId`); no toma el candado del local ni filas de venta o de
+  stock, igual que el corte, el cierre, los retiros y los pagos en efectivo, que
+  toman el turno primero. Prueba: `scripts/pruebas-db/cajaMovimientoAtomico.mjs`
+  (rojo en 14 afirmaciones contra la ruta anterior), contrapruebas `CM-` y el
+  candado `lib/caja/cajaMovimientoAtomico.test.mjs`.
 
 ## Evidencia
 
