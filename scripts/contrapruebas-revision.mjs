@@ -1259,6 +1259,92 @@ const CASOS = [
     candado: "F22 · como la llaman las rutas, sin `hoy`: el 4 de octubre el mes dice «van 4 días»",
     suite: "lib/finanzas/periodoFinanciero.test.mjs",
   },
+  // ── LA PANTALLA MÓVIL DE TESORERÍA ─────────────────────────────────────
+  //
+  // Las cinco reglas que la pantalla no puede romper sin que el servidor lo
+  // note tarde o nunca: mandar lo que decide el servidor, cambiar la clave en un
+  // reintento, enviar dos veces, recalcular la base, ofrecer un botón sin permiso.
+  {
+    n: "TES-pedido",
+    defecto: "el pedido de verificación vuelve a mandar el declarado",
+    archivo: "lib/tesoreria/pantallaTesoreria.js",
+    de: "    importeVerificado: desdeCentavos(contadoCentavos),\n",
+    a: "    importeVerificado: desdeCentavos(contadoCentavos),\n    importeDeclarado: 1,\n",
+    candado: "[31] el pedido NO lleva declarado, diferencia, local, clase ni fotos, y el servidor lo acepta tal cual",
+    suite: "components/tesoreria/tesoreriaMovil.test.mjs",
+  },
+  {
+    n: "TES-clave",
+    defecto: "un reintento del mismo intento lleva otra idempotencyKey",
+    archivo: "lib/tesoreria/pantallaTesoreria.js",
+    de: "  if (anterior?.clave && anterior.firma === firma) return { clave: anterior.clave, firma };",
+    a: "",
+    candado: "[32] la idempotencyKey sobrevive al reintento del mismo intento y cambia con otro contenido",
+    suite: "components/tesoreria/tesoreriaMovil.test.mjs",
+  },
+  {
+    n: "TES-doble-toque",
+    defecto: "un doble toque en Confirmar vuelve a enviar",
+    archivo: "components/tesoreria/HojaVerificarEfectivo.jsx",
+    de: "    if (enviandoRef.current) return; // doble toque: el segundo no sale",
+    a: "",
+    candado: "[33] un doble toque no hace dos envíos: guardia por ref y botón apagado mientras viaja",
+    suite: "components/tesoreria/tesoreriaMovil.test.mjs",
+  },
+  {
+    n: "TES-base",
+    defecto: "la pantalla vuelve a restar lo pagado desde caja a la base conocida",
+    archivo: "components/tesoreria/PantallaTesoreria.jsx",
+    de: "{formatearMoneda(r.baseConocida)}",
+    a: "{formatearMoneda(Number(r.baseConocida) - Number(r.pagosDesdeCajaInformativos))}",
+    candado: "[9][45] la base conocida y los totales son los del servidor, tal cual: no se recalculan",
+    suite: "components/tesoreria/tesoreriaMovil.test.mjs",
+  },
+  {
+    n: "TES-permiso",
+    defecto: "la pantalla ofrece Verificar sin el permiso que dijo el servidor",
+    archivo: "components/tesoreria/PantallaTesoreria.jsx",
+    de: "puedeVerificar={Boolean(datos.puedeVerificarEfectivo)}",
+    a: "puedeVerificar={true}",
+    candado: "[26][27] «Verificar efectivo» solo con el permiso que dijo el servidor",
+    suite: "components/tesoreria/tesoreriaMovil.test.mjs",
+  },
+  {
+    n: "TES-calendario",
+    defecto: "el calendario de «Otro» vuelve a quedarse sin los cambios que el kit llama al aplicar",
+    archivo: "components/tesoreria/PantallaTesoreria.jsx",
+    de: "          onChangeHasta={sinCambio}\n",
+    a: "",
+    candado: "[5b] «Aplicar» del calendario llega: la pantalla pasa todo lo que el kit llama al aplicar",
+    suite: "components/tesoreria/tesoreriaMovil.test.mjs",
+  },
+  {
+    n: "TES-teclado",
+    defecto: "la observación de «Verificar» vuelve a aplastarse con el teclado abierto",
+    archivo: "components/tesoreria/HojaVerificarEfectivo.jsx",
+    de: "        className=\"shrink-0\"\n        rows={2}",
+    a: "        rows={2}",
+    candado: "[41b] con el teclado abierto, los campos de texto de las hojas no se aplastan",
+    suite: "components/tesoreria/tesoreriaMovil.test.mjs",
+  },
+  {
+    n: "TES-cajas",
+    defecto: "la tarjeta del turno vuelve a listar todos los nombres de las cajas que faltan contar",
+    archivo: "components/tesoreria/PiezasTesoreria.jsx",
+    de: "  return cajas.length > MAX_CAJAS_NOMBRADAS ? `${cajas.length} cajas` : cajas.join(\", \");",
+    a: "  return cajas.join(\", \");",
+    candado: "[13b] con más de dos cajas pendientes se dice cuántas son, no se listan los nombres",
+    suite: "components/tesoreria/tesoreriaMovil.test.mjs",
+  },
+  {
+    n: "TES-nombre-largo",
+    defecto: "quien verificó vuelve a ser un valor rígido que tapa el rótulo con un usuario sin espacios",
+    archivo: "components/tesoreria/DetallesTesoreria.jsx",
+    de: "valor={acto.verificadaPor?.nombre || \"Sin dato\"} valorLargo />",
+    a: "valor={acto.verificadaPor?.nombre || \"Sin dato\"} />",
+    candado: "[37b] un nombre de usuario sin espacios corta adentro de su renglón: no tapa el rótulo ni sale de la tarjeta",
+    suite: "components/tesoreria/tesoreriaMovil.test.mjs",
+  },
   // `lib/semanaOperativa/unaSolaFuente.test.mjs` NO está acá, y no por olvido:
   // enumera con `git ls-files`, y la copia descartable de este script no lleva
   // `.git`, así que ahí el archivo entero explota antes de llegar al candado y el

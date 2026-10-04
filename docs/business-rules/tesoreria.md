@@ -367,9 +367,48 @@ local, operador e instante—. Si algo difiere, alerta con la verificación, el
 movimiento y los motivos. No se recalcula el declarado, no se tocan las fotos ni
 la diferencia, no se anula sola.
 
-**Lo que esta PR no hace:** no hay pantalla; un cierre sin conteo sigue siendo
+**Lo que esa PR no hacía:** no había pantalla; un cierre sin conteo sigue siendo
 `SIN_IMPORTE_DECLARADO` y no se puede verificar, porque no tiene movimiento de
 entrega y no se fabrica uno; un turno anulado conserva su entrega y su alerta.
+
+## La pantalla móvil
+
+[CÓDIGO, 2026-10-04] La pantalla vive en `/modulos/finanzas/tesoreria`, como
+sexta herramienta del grupo Finanzas, detrás de `tesoreria.ver`. Sigue el diseño
+de Figma `uptcbzbnV5M4q32kgmupF9`, página `14:2` (pantallas A a I2). Es una
+LECTORA del contrato: no recalcula nada que el servidor ya decidió.
+
+- **Período**: los mismos chips Día / Semana / Mes / Otro y el mismo navegador
+  que Finanzas. «Otro» manda `unidad=OTRO&desde&hasta` y no consulta hasta tener
+  las dos fechas. «Mes» en curso dice «van N días» contados hasta hoy.
+- **Alcance**: la vista de entrada (`entrada=1`) la decide el servidor —un local
+  entra directo a su resumen, el depósito ve la lista de locales—. El local
+  elegido viaja en la ruta `/modulos/finanzas/tesoreria/local/<id>`.
+- **Base conocida**: el número es `baseConocida` tal cual llega, con su
+  composición y su línea de certeza. No dice «saldo».
+- **Turnos**: el rótulo es la `etiqueta` del grupo que manda el servidor (hoy el
+  día operativo, criterio provisorio). Ningún «Mañana/Tarde/Noche» escrito en la
+  pantalla. El estado de la tarjeta sale de la lectura: Requiere revisión manda
+  sobre Sin importe declarado, y ése sobre Parcial, Pendiente, Correcto y Con
+  diferencia.
+- **Verificar**: aparece solo con `puedeVerificarEfectivo` y entregas pendientes.
+  El pedido lleva únicamente `cajaMovimientoIds`, `importeVerificado`,
+  `idempotencyKey` y `observacion`; la clave se conserva al reintentar el mismo
+  intento y cambia si cambian las entregas o el importe. El doble toque no manda
+  dos pedidos, no hay actualización optimista y al terminar se relee.
+- **Anular**: solo en el detalle de la verificación, con
+  `puedeAnularVerificacion` y motivo obligatorio. No existe «editar».
+- **Lo que no se inventa**: un cierre sin conteo dice «Sin importe declarado»,
+  nunca `$0`; un egreso sin beneficiario dice su clase, no un nombre; quien contó
+  es `verificadaPor.nombre`, y el operador solo aparece si el servidor lo manda.
+  Lo digital es «cobrado por POS», no acreditado. Los pagos desde caja se
+  muestran y no restan. Las verificaciones que cruzan el período van aparte.
+
+**Diferencias con el Figma, a propósito**: el título y el «Volver» van en el
+shell, como en el resto del ERP; el selector de local ocupa su propio renglón;
+«Otro» abre el selector de fechas del kit; el encabezado de las hojas es el del
+`SunmiModalLayout`, con su botón de cerrar; la tarjeta principal usa
+`sunmi-bg-card` porque el kit no tiene un token de tarjeta destacada.
 
 ## Evidencia
 
@@ -392,3 +431,8 @@ entrega y no se fabrica uno; un turno anulado conserva su entrega y su alerta.
 - Contra PostgreSQL, con rutas reales: `scripts/pruebas-db/tesoreriaLectura.mjs`
   y las contrapruebas `TE-` en `scripts/pruebas-db/contrapruebasRevision.mjs`,
   en el job `finanzas_postgres`.
+- Pantalla móvil: `components/tesoreria/`, `lib/tesoreria/pantallaTesoreria.js` y
+  `lib/tesoreria/contextoTesoreria.js`; candados [1] a [47] en
+  `components/tesoreria/tesoreriaMovil.test.mjs` sobre una lectura real
+  recortada (`lecturaReal.fixture.json`), y las contrapruebas `TES-` de
+  `scripts/contrapruebas-revision.mjs`.

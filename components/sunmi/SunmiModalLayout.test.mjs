@@ -715,6 +715,12 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // código repetido, y cerrar sin querer deja todo sin aplicar, que es la
     // salida segura. Por el criterio de qué se pierde, `false`.
     "app/modulos/auditoria-pos-ventas/correcciones/page.jsx": false,
+    // Las dos hojas de Tesorería son CARGA, por el criterio de qué se pierde: en
+    // una, el importe contado y la observación —lo contado es lo único que no se
+    // puede rehacer mirando la pantalla—; en la otra, el motivo de anular, que
+    // es la explicación que queda en el historial.
+    "components/tesoreria/HojaVerificarEfectivo.jsx": true,
+    "components/tesoreria/HojaAnularVerificacion.jsx": true,
     // Estos dos lo declaran por el criterio VIEJO —la acción es peligrosa— y
     // quedan así a propósito. Se revisan al cerrar la fase 2, junto con el
     // renombre de `destructivo`.
