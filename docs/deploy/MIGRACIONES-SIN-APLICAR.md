@@ -16,49 +16,93 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **46 migraciones**. Con la rama
-`claude/cobros-offline-servidor` el árbol pasa a **47**, con **una** pendiente:
+**Ninguna.** Producción está en **47 migraciones**, las 47 del árbol, todas
+aplicadas, ninguna fallida, y `migrate status` cierra con "Database schema is
+up to date!".
 
-- `20261003120000_cobro_offline` — **aditiva, sin datos, sin claves foráneas.**
-  Crea el enum `EstadoCobroOffline` (PENDIENTE, REQUIERE_REVISION,
-  SINCRONIZADA, DESCARTADA), la tabla `CobroOffline` y cinco índices. No toca
-  ninguna tabla existente: sin `ALTER`, sin `DROP`, sin `UPDATE`, sin backfill.
-  Sin FKs a propósito: una FK hacia `Venta`, `Local`, `Usuario` u
-  `OperadorLocal` tomaría al crearse un candado sobre esas tablas que choca con
-  las ventas del POS. El clasificador la marca **aditiva, "Sin coincidencias"**.
-
-**PRE:** el procedimiento de siempre de `/deploy` (backup, clasificador,
-sondas). No necesita precheck propio: la tabla no existe y no hay datos que
-validar.
-
-**POST**, además de `migrate status` al día y **47 de 47**:
-
-    SELECT enum_range(NULL::"EstadoCobroOffline");
-      -- {PENDIENTE,REQUIERE_REVISION,SINCRONIZADA,DESCARTADA}
-    SELECT count(*) FROM "CobroOffline";
-      -- 0
-    SELECT indexname FROM pg_indexes WHERE tablename = 'CobroOffline' ORDER BY 1;
-      -- CobroOffline_clientTxnId_key, CobroOffline_localId_estado_idx,
-      -- CobroOffline_pkey, CobroOffline_registradoEn_idx,
-      -- CobroOffline_turnoId_idx, CobroOffline_ventaId_key
-    SELECT count(*) FROM pg_constraint
-     WHERE conrelid = '"CobroOffline"'::regclass AND contype = 'f';
-      -- 0 (ninguna clave foránea)
-
-y que la cantidad de ventas no cambió por la migración (la del día antes y
-después de migrar, sin ventas nuevas del POS en el medio, o comparando contra
-el backup PRE).
-
-Lo que llega con ella **no habilita nada en la pantalla**: el POS todavía no
-registra cobros (eso es la PR B, que además es la que habilita el modo offline
-real). En producción la tabla queda vacía. El único cambio vivo es dentro de
-`/api/pos-ventas/crear`: una búsqueda por `clientTxnId` en la tabla nueva, con
-el candado del local ya tomado, para negar la venta de un cobro descartado y
-sincronizar el registrado.
-
-Producción corre `ccc106bec29cd91b0663754bd9c5052f3cbaa824` (despliegue del
-2026-10-03, nota abajo). Un commit posterior a ese que solo cambie
+Producción corre `bd92ca5d057541befa48589cda5a73cfe6de89b3` (despliegue del
+2026-10-04, nota abajo). Un commit posterior a ese que solo cambie
 documentación **no se despliega por eso**.
+
+---
+
+## `bd92ca5d`: desplegado el 2026-10-04. POS offline real y las fronteras de caja, sin migraciones
+
+Despliegue **solo de código**: el merge de la PR #133, con la cabeza
+`21dc67b0af84066dd8d757f2609a2e49daadb04b`, desde
+`9b1de42b5513989662ef5caa2e50d21816a97435`, alrededor de las 22:22 hora
+argentina (01:22 UTC). **Lo que sigue es lo que informó el despliegue**, corrido
+desde el acceso al VPS y no desde la sesión que escribe esta nota.
+
+El rango trae cinco PR, cada una con su merge y nada más sobre `main`:
+
+- #129 `0d041440` (cabeza `ec161c3a`): revisión y descarte en el servidor de los
+  cobros offline, con códigos de rechazo estables.
+- #130 `9f0d382b` (cabeza `bd8d321b`): el POS sin conexión real — cola durable,
+  registro y sincronización automáticos, y el cierre protegido por cobros
+  pendientes.
+- #131 `6abd8a86` (cabeza `08dcda93`): una venta no entra en una caja que ya
+  tomó el corte o se cerró.
+- #132 `6a7017cd` (cabeza `252266f8`): `turnos/cerrar` calcula y guarda su
+  fotografía con el turno tomado.
+- #133 `bd92ca5d` (cabeza `21dc67b0`): Caja +/− valida y escribe con el turno
+  tomado.
+
+**Identidad.** `bd92ca5d057541befa48589cda5a73cfe6de89b3` en `origin/main`, el
+HEAD del VPS, la imagen
+`ghcr.io/islaemanuel25-glitch/erpmanual:bd92ca5d057541befa48589cda5a73cfe6de89b3`
+(digest del registro
+`sha256:626a7fd33e281c386ec52f5ecbbc4cfb7f8f32622e20bbb35168c9ab119c38fc`),
+`APP_BUILD_ID` y `/api/version`: los cinco convergen.
+
+**Migraciones.** 47 en el árbol y 47 aplicadas antes, y 47 en el objetivo: el
+rango no toca `prisma/`. Después, **47/47**, ninguna fallida, y "Database
+schema is up to date!". **0 aplicadas** por este despliegue.
+
+**La integridad, PRE y POST.** Se conservaron las huellas verificadas del Libro
+de Stock, su punto cero, el Libro de Costos, `Venta`, `CajaMovimiento` y
+`Turno`. `CobroOffline` tenía **0 filas** antes y **0** después. Durante la POST
+entraron 2 ventas reales y 6 movimientos de stock reales: la operación siguió
+normalmente. **No se hicieron pruebas manuales ni destructivas** de ventas, cajas
+ni cobros offline en producción, así que el modo offline queda verificado por el
+CI de las cinco PR y no por un uso en producción.
+
+**El despliegue.**
+
+- Backup PRE: `/srv/produccion/backups/pre-bd92ca5d_20261004_012047.sql.gz`,
+  8,5 MB, SHA-256
+  `adc0c011ea2274f5277fb39c075cb1b9a8bc47e28caabcfefd228f1c8377f90a`.
+  `pg_dump` salió 0 con `pipefail`, `gzip -t` en verde, con la marca de dump
+  completo, 86 `CREATE TABLE` y la tabla `CobroOffline` adentro.
+- Sonda PRE en verde contra `9b1de42b5513989662ef5caa2e50d21816a97435`
+  (corrida 37167621885).
+- Sonda POST en verde contra `bd92ca5d057541befa48589cda5a73cfe6de89b3`
+  (corrida 37167804788).
+- Salud después: la app healthy y sin reinicios, PostgreSQL healthy y sin
+  reinicios.
+
+---
+
+## `20261003120000_cobro_offline`: aplicada el 2026-10-03. La tabla de cobros offline
+
+Esta lista la siguió mostrando como pendiente, con producción en `ccc106be`,
+después de que se aplicó: el despliegue que la llevó no actualizó este archivo.
+Se corrige con el cierre de `bd92ca5d`. **Lo confirmado en producción**, leído
+de `_prisma_migrations`: `finished_at` 2026-10-03 15:58:41 UTC,
+`applied_steps_count` 1, sin fallo. Ese despliegue fue el de
+`9b1de42b5513989662ef5caa2e50d21816a97435` (merge de la PR #128), que es lo que
+`/api/version` servía antes de `bd92ca5d`. Su backup, sus sondas y el resto de
+su informe no llegaron a esta nota, y no se deducen.
+
+**Lo que hizo.** Aditiva, sin datos, sin claves foráneas. Creó el enum
+`EstadoCobroOffline` (PENDIENTE, REQUIERE_REVISION, SINCRONIZADA, DESCARTADA),
+la tabla `CobroOffline` y cinco índices. No tocó ninguna tabla existente: sin
+`ALTER`, sin `DROP`, sin `UPDATE`, sin backfill. Sin FKs a propósito: una FK
+hacia `Venta`, `Local`, `Usuario` u `OperadorLocal` tomaría al crearse un
+candado sobre esas tablas que choca con las ventas del POS.
+
+Hasta `bd92ca5d` la tabla quedó vacía y solo la consultaba `crear`; desde ahí el
+POS registra y sincroniza cobros offline en ella.
 
 ---
 
