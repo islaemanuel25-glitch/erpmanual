@@ -63,6 +63,11 @@ export function Renglon({
   fuerte = false,
   colorValor = null,
   notaColor = "sunmi-text-muted",
+  // Para un valor que es TEXTO (un nombre de usuario, que puede no tener
+  // espacios): puede encogerse y cortar adentro de la palabra, en vez de
+  // empujar por encima del rótulo y salirse de la tarjeta. Sin la prop, igual
+  // que siempre: los importes no se cortan.
+  valorLargo = false,
 }) {
   const tono = atenuado ? "sunmi-text-muted" : "sunmi-text-strong";
   const claseRotulo = fuerte ? `text-sm3 font-semibold ${tono}` : `text-sm3 ${tono}`;
@@ -79,7 +84,7 @@ export function Renglon({
           <div className={`text-xs2 ${notaValorColor}`}>{notaValor}</div>
         </div>
       ) : (
-        <div className={`shrink-0 ${claseValor}`}>{valor}</div>
+        <div className={`${valorLargo ? "min-w-0 break-words text-right" : "shrink-0"} ${claseValor}`}>{valor}</div>
       )}
     </div>
   );

@@ -39,6 +39,9 @@ export function ContenidoAnular({ acto, motivo, onMotivo, onAnular, onCancelar, 
       </label>
       <SunmiTextarea
         id="tesoreria-motivo"
+        // Mismo motivo que la observación de verificar: en la columna flex de la
+        // hoja, con el teclado abierto, un textarea sin `shrink-0` se aplasta.
+        className="shrink-0"
         rows={2}
         maxLength={500}
         required

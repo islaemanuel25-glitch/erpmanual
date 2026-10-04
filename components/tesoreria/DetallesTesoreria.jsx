@@ -388,12 +388,13 @@ export function DetalleDeVerificacion({ datos, lectura, ctx, local, onVolver, on
       )}
 
       <Bloque titulo="QUIÉN Y CUÁNDO">
-        <Renglon rotulo="Verificó" nota="Usuario del ERP" valor={acto.verificadaPor?.nombre || "Sin dato"} />
+        <Renglon rotulo="Verificó" nota="Usuario del ERP" valor={acto.verificadaPor?.nombre || "Sin dato"} valorLargo />
         {acto.verificadaPorOperador ? (
           <Renglon
             rotulo="Operador"
             nota="Operador del PIN"
             valor={acto.verificadaPorOperador.nombre || `#${acto.verificadaPorOperador.id}`}
+            valorLargo
           />
         ) : null}
         <Renglon rotulo="Fecha" valor={cuando} />

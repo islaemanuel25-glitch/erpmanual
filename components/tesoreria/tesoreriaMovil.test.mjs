@@ -229,6 +229,21 @@ test("[5] Otro: el chip está habilitado, hay calendario de rango y el navegador
   assert.match(sinRango, /Elegí el período/);
 });
 
+test("[5b] «Aplicar» del calendario llega: la pantalla pasa todo lo que el kit llama al aplicar", () => {
+  // El kit, al aplicar, llama `onChangeDesde` y `onChangeHasta` SIN `?.` y recién
+  // después `onApply`. Faltando uno, «Aplicar» tira y el rango nunca llega: así
+  // se encontró, en el navegador. La lista sale del kit, no se escribe acá.
+  const kit = fuente("components/sunmi/SunmiDateRangePicker.jsx");
+  const inicio = kit.indexOf("const handleApply");
+  assert.ok(inicio >= 0, "el kit ya no tiene handleApply: releer este candado");
+  const cuerpo = kit.slice(inicio, kit.indexOf("};", inicio));
+  const obligatorios = [...cuerpo.matchAll(/\b(on[A-Z]\w*)\(/g)].map((m) => m[1]);
+  assert.ok(obligatorios.length >= 2, `el kit cambió lo que llama al aplicar: ${obligatorios}`);
+  const uso = fuente("components/tesoreria/PantallaTesoreria.jsx").match(/<SunmiDateRangePicker[\s\S]*?\/>/)?.[0];
+  assert.ok(uso, "la pantalla dejó de usar el calendario del kit");
+  for (const p of [...obligatorios, "onApply"]) assert.match(uso, new RegExp(`\\b${p}=\\{`), `falta ${p}: «Aplicar» no llegaría`);
+});
+
 test("[6] Desde/Hasta llaman el contrato de #138: unidad=OTRO, las dos fechas, sin desplazamiento", () => {
   const ctx = parseContextoTesoreria({ unidad: "OTRO", desde: "2026-09-03", hasta: "2026-10-04" });
   assert.equal(consultaDeTesoreria(ctx), "entrada=1&unidad=OTRO&desde=2026-09-03&hasta=2026-10-04");
@@ -310,6 +325,27 @@ test("[13][36] parcial: «Verificar lo pendiente» con SOLO las entregas pendien
   assert.deepEqual(g.pendientes.map((e) => e.estadoVerificacion), ["PENDIENTE"]);
   // Lo que abre la hoja son esas pendientes, nada más.
   assert.match(fuente("components/tesoreria/TableroTesoreria.jsx"), /setVerificando\(\{ entregas: g\.pendientes,/);
+});
+
+test("[13b] con más de dos cajas pendientes se dice cuántas son, no se listan los nombres", () => {
+  // En el navegador, un turno de 14 cajas listaba diez nombres en «falta contar
+  // el efectivo de…». Con más de dos, la tarjeta dice cuántas; los nombres
+  // quedan en el detalle del turno.
+  const cierre = (id, turnoId, monto) => mov(id, turnoId, CLASE_MOVIMIENTO.CIERRE, monto);
+  const d = datos(base({
+    cajas: [caja(1), caja(2), caja(3), caja(4), caja(5)],
+    movimientos: [cierre(12, 1, 50000), cierre(21, 2, 10000), cierre(31, 3, 7000), cierre(41, 4, 4000), cierre(51, 5, 2000)],
+    pagosProveedor: [],
+    verificaciones: [acto(9, [{ id: 12, monto: 50000, turnoId: 1 }], { importeVerificado: 50000 })],
+  }));
+  const t = texto(pantalla(d));
+  assert.match(t, /Parcial/);
+  assert.match(t, /Pendiente de verificar 4 cajas · 4 entregas/);
+  assert.match(t, /falta contar el efectivo de 4 cajas\./);
+  assert.doesNotMatch(t, /falta contar el efectivo de Caja/, "volvió a listar los nombres de las cajas");
+  // Con una o dos, los nombres sí entran.
+  const dos = texto(pantalla(datos(ESC.parcial())));
+  assert.match(dos, /falta contar el efectivo de Caja/);
 });
 
 test("[14] requiere revisión: aviso, insignia y entrada al detalle; nada se recalcula", () => {
@@ -558,6 +594,24 @@ test("[37][38] el detalle nombra a quien verificó y NO inventa un operador", ()
   assert.match(texto(pantalla(datos(sinNombre), { vista: "verificacion", verificacion: 9 })), /Verificó Usuario del ERP Sin dato/);
 });
 
+test("[37b] un nombre de usuario sin espacios corta adentro de su renglón: no tapa el rótulo ni sale de la tarjeta", () => {
+  // En el navegador a 360 px, «Verificó» con un usuario largo y sin espacios se
+  // encimaba con el rótulo y se salía de la tarjeta: el valor del renglón era
+  // `shrink-0`, pensado para importes. Las filas de nombre lo piden aparte.
+  const largo = "cajero.casianocasas.turnonoche.reemplazo";
+  const esc = base({ verificaciones: [acto(9, [{ id: 21, monto: 10000, turnoId: 2 }], { importeVerificado: 10000, verificadaPor: { id: 1, nombre: largo }, operador: 33 })] });
+  const html = pantalla(datos(esc), { vista: "verificacion", verificacion: 9 });
+  for (const valor of [largo, "#33"]) {
+    const div = html.match(new RegExp(`<div class="([^"]*)">${valor.replace(/\./g, "\\.")}</div>`));
+    assert.ok(div, `no se encontró el valor ${valor}`);
+    assert.match(div[1], /\bmin-w-0\b/, `${valor}: el valor no puede encogerse`);
+    assert.match(div[1], /\bbreak-words\b/, `${valor}: el valor no corta adentro de la palabra`);
+    assert.doesNotMatch(div[1], /\bshrink-0\b/, `${valor}: volvió a ser rígido y tapa el rótulo`);
+  }
+  // Los importes siguen sin cortarse: el renglón por defecto no cambió.
+  assert.match(html, /<div class="shrink-0 text-sm3 [^"]*">\$10\.000,00<\/div>/);
+});
+
 test("[39][40][42] «Anular verificación» solo con el permiso; y no existe «Editar verificación»", () => {
   const con = pantalla(datos(ESC.diferencia(), { puedeAnular: true }), { vista: "verificacion", verificacion: 9 });
   const sin = pantalla(datos(ESC.diferencia(), { puedeAnular: false }), { vista: "verificacion", verificacion: 9 });
@@ -576,6 +630,24 @@ test("[41] el motivo es obligatorio: vacío o en blanco, el botón no sale", () 
   assert.match(boton("   "), /disabled=""/);
   assert.doesNotMatch(boton("El cierre se corrigió"), /disabled=""/);
   assert.match(texto(renderToStaticMarkup(React.createElement(ContenidoAnular, { acto: acto9, motivo: "", onMotivo: nada, onAnular: nada, onCancelar: nada }))), /Las 3 entregas \(\$110\.000,00\) vuelven a quedar pendientes/);
+});
+
+test("[41b] con el teclado abierto, los campos de texto de las hojas no se aplastan", () => {
+  // El cuerpo de la hoja del kit es una columna flex con scroll. Con el teclado
+  // abierto, en el navegador a 360 × 480, la observación de «Verificar» se
+  // aplastó de 48 px a 9: no se veía lo escrito. Cada textarea de una hoja de
+  // Tesorería tiene que llegar a la pantalla con `shrink-0`.
+  const d = datos(ESC.pendiente());
+  const acto9 = datos(ESC.diferencia()).tesoreria.verificaciones[0];
+  const hojas = {
+    observación: renderToStaticMarkup(React.createElement(PasoConfirmar, { entregas: pendientesDe(d), cajas: [], texto: "1", contadoCentavos: 100, observacion: "", onObservacion: nada, onConfirmar: nada, onCambiarImporte: nada })),
+    motivo: renderToStaticMarkup(React.createElement(ContenidoAnular, { acto: acto9, motivo: "", onMotivo: nada, onAnular: nada, onCancelar: nada })),
+  };
+  for (const [campo, html] of Object.entries(hojas)) {
+    const areas = html.match(/<textarea[^>]*>/g) || [];
+    assert.ok(areas.length > 0, `la hoja del ${campo} ya no tiene textarea: releer este candado`);
+    for (const a of areas) assert.match(a, /class="[^"]*\bshrink-0\b/, `el ${campo} se aplasta con el teclado`);
+  }
 });
 
 test("[43] anular relee del servidor, y sin el acto vigente las entregas vuelven a pendientes", async () => {

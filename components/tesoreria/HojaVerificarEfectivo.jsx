@@ -167,6 +167,9 @@ export function PasoConfirmar({
         </p>
       )}
       <SunmiTextarea
+        // El cuerpo de la hoja es una columna flex con scroll: sin `shrink-0`, con
+        // el teclado abierto el campo se aplasta a una raya y no se ve lo escrito.
+        className="shrink-0"
         rows={2}
         maxLength={500}
         value={observacion}

@@ -52,6 +52,8 @@ import {
 } from "./PiezasTesoreria";
 import { DetalleDeCaja, DetalleDeTurno, DetalleDeVerificacion } from "./DetallesTesoreria";
 
+const sinCambio = () => {};
+
 /**
  * @param {object} props
  * @param {object|null} props.datos   la respuesta de la API (vista UN_LOCAL)
@@ -167,6 +169,11 @@ function EncabezadoDePeriodo({ datos, ctx, hoy, onCambiarUnidad, onElegirRango, 
         <SunmiDateRangePicker
           valueDesde={ctx.desde || ""}
           valueHasta={ctx.hasta || ""}
+          // El kit los llama al aplicar, ANTES de `onApply`: sin ellos «Aplicar»
+          // se cae y el rango no llega. El período vive en la URL y solo cambia
+          // al aplicar, así que no hay nada que guardar mientras se elige.
+          onChangeDesde={sinCambio}
+          onChangeHasta={sinCambio}
           onApply={(desde, hasta) => onElegirRango(desde, hasta)}
           placeholder="Elegí desde y hasta"
           maxDate={hoy}

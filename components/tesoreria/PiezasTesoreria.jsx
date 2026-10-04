@@ -293,19 +293,17 @@ export function VerificacionDelTurno({ g, puedeVerificar, onVerificar, onVerVeri
   );
 }
 
-// Con más de dos cajas los nombres no entran en una nota: se dice cuántas son,
-// y los nombres quedan en el detalle del turno.
+// Con más de dos cajas los nombres no entran en una tarjeta: se dice cuántas
+// son, y los nombres quedan en el detalle del turno. Vale para la nota y para
+// el aviso de lo que falta contar.
 const MAX_CAJAS_NOMBRADAS = 2;
-function nombresDeCajas(entregas) {
-  return [...new Set(entregas.map((e) => e.etiquetaCaja).filter(Boolean))];
-}
 function cajasDe(entregas) {
-  return nombresDeCajas(entregas).join(", ");
+  const cajas = [...new Set(entregas.map((e) => e.etiquetaCaja).filter(Boolean))];
+  return cajas.length > MAX_CAJAS_NOMBRADAS ? `${cajas.length} cajas` : cajas.join(", ");
 }
 function notaDeCajas(entregas) {
-  const cajas = nombresDeCajas(entregas);
-  if (!cajas.length) return null;
-  const quienes = cajas.length > MAX_CAJAS_NOMBRADAS ? `${cajas.length} cajas` : cajas.join(", ");
+  const quienes = cajasDe(entregas);
+  if (!quienes) return null;
   return `${quienes} · ${entregas.length === 1 ? "1 entrega" : `${entregas.length} entregas`}`;
 }
 function quienYCuando(acto) {
