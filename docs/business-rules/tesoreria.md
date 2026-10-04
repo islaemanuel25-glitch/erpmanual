@@ -58,15 +58,32 @@ declarado − egresos exteriores. No es un saldo bancario [CÓDIGO].
   completa.
 - Venta digital con comisión pendiente: `COMISION_PENDIENTE`.
 
-## El turno comercial es provisorio
+## Se agrupa por turno operativo (desde `20261005120000_turno_operativo`)
 
-Todo lo que agrupa pasa por `turnoComercialDe(localId, instante)`
-(`lib/tesoreria/turnoComercial.js`). Hoy agrupa por local y día argentino del
-instante del HECHO —venta, entrega, pago—, nunca por `Turno.apertura`, y no
-persiste nada. Con este criterio un turno que cruza la medianoche queda partido:
-es la limitación conocida, y la razón de que exista la frontera. Cuando exista la
-configuración de franjas por local, se reemplaza esa función y nada más
-[CÓDIGO; candado 20].
+Tesorería verifica POR TURNO OPERATIVO, no por día: turno → sus cajas → sus
+entregas → se cuenta → se verifica ESE turno. Las diferencias de cada caja no se
+compensan entre sí [CÓDIGO].
+
+- **Catálogo por local** (`TurnoOperativo`: nombre, orden, activo; sin horas). Se
+  administra en Configuración → POS → Turnos operativos con `config_local.pos`.
+  No se borra: se desactiva [CÓDIGO, `app/api/config/turnos-operativos/`].
+- **Se elige al abrir la caja**, en las tres rutas (`abrir`, `abrir-sin-cambio`,
+  `abrir-con-cambio`), entre los activos del local. El servidor valida que
+  exista, esté activo y sea del local; sin turnos activos la apertura es 409
+  `LOCAL_SIN_TURNOS_OPERATIVOS`. **Nunca se infiere por la hora**
+  [CÓDIGO, `lib/caja/turnoOperativoServer.js`; TO-1].
+- **`fechaOperativa`** la fija el servidor al abrir (día argentino de ese
+  momento) y no se recalcula. Si la pantalla manda otra, 409
+  `FECHA_OPERATIVA_DE_OTRO_DIA`. La base impide cambiar turno o fecha de una
+  caja ya escrita, incluso de NULL a un valor [CÓDIGO; TO-4].
+- **Agrupación**: `grupoDeTesoreria` (`lib/tesoreria/turnoComercial.js`) agrupa
+  por local + fecha operativa + turno DE LA CAJA. Cada hecho hereda el grupo de
+  su caja, así que la medianoche no parte una caja, y una caja con turno entra
+  ENTERA al período de su fecha operativa. Lo que no es de ninguna caja va solo
+  al resumen [CÓDIGO; candados TO-1, TO-2, TO-3, TO-8].
+- **Cajas viejas** (sin turno) no se reinterpretan: van a «Sin turno asignado»,
+  agrupadas por día del hecho como antes, y entran al período por su instante.
+- La matemática de la base conocida no cambió.
 
 ## La API
 
@@ -213,9 +230,11 @@ se verifica de nuevo, y la anulada queda como historia.
   la FOTO al verificar: monto declarado, local, turno, operador (puede ser null),
   clase `RECAUDACION`/`CIERRE` e instante de la entrega, más `vigente`, que es la
   del padre [CÓDIGO].
-- **No se guarda** turno comercial, franja ni fecha comercial: la agrupación es de
-  `turnoComercialDe` y es provisoria; guardarla congelaría un criterio que va a
-  cambiar. Tampoco saldos, cuentas, caja fuerte ni libro [CÓDIGO; prueba K].
+- **Turno operativo y fecha operativa**, congelados al verificar, tomados de la
+  caja de las entregas (NULL en las verificaciones anteriores al turno
+  operativo, que quedan como legado y no se reinterpretan). No se guarda turno
+  comercial, franja, día ni hora inferidos. Tampoco saldos, cuentas, caja fuerte
+  ni libro [CÓDIGO; prueba K].
 
 Lo que la BASE sostiene sola, sin depender de que el código lo haga bien
 [CÓDIGO, en la migración; ejercido en `scripts/pruebas-db/verificacionEfectivo.mjs`]:
@@ -283,8 +302,11 @@ autoriza ninguno de los dos, y cada uno no autoriza el otro [contraprueba VA-7].
   Una entrega fuera de alcance es 403 sin decir cuál, antes de cualquier otro
   rechazo, para no contar qué movimientos existen afuera [VA-4]. Entregas de dos
   locales son 400 `LOCALES_MEZCLADOS`.
-- Granularidad libre: una entrega, varias de una caja o de varias cajas, siempre
-  del mismo local. No se exige el turno comercial entero ni se guarda.
+- Granularidad libre dentro de UN turno operativo y UNA fecha operativa: una
+  entrega, varias de una caja o de varias cajas del mismo turno. Mezclar turnos
+  es 400 `TURNOS_OPERATIVOS_MEZCLADOS` y mezclar fechas 400
+  `FECHAS_OPERATIVAS_MEZCLADAS`; la base lo sostiene con un trigger al insertar
+  la entrega [TO-3, TO-5].
 - En una transacción: toma los turnos de las entregas, mira la clave, toma los
   movimientos FOR SHARE, los clasifica por vínculo (solo `RECAUDACION`/`CIERRE`;
   otra cosa es 400 `NO_ES_ENTREGA`), rechaza una entrega ya cubierta por una
@@ -386,9 +408,10 @@ LECTORA del contrato: no recalcula nada que el servidor ya decidió.
   elegido viaja en la ruta `/modulos/finanzas/tesoreria/local/<id>`.
 - **Base conocida**: el número es `baseConocida` tal cual llega, con su
   composición y su línea de certeza. No dice «saldo».
-- **Turnos**: el rótulo es la `etiqueta` del grupo que manda el servidor (hoy el
-  día operativo, criterio provisorio). Ningún «Mañana/Tarde/Noche» escrito en la
-  pantalla. El estado de la tarjeta sale de la lectura: Requiere revisión manda
+- **Turnos**: una tarjeta por turno operativo, con la `etiqueta` del grupo que
+  manda el servidor (el nombre del catálogo del local, o «Sin turno asignado») y
+  la cantidad de cajas; sin rango horario. Ningún «Mañana/Tarde/Noche» escrito en
+  la pantalla. El estado de la tarjeta sale de la lectura: Requiere revisión manda
   sobre Sin importe declarado, y ése sobre Parcial, Pendiente, Correcto y Con
   diferencia.
 - **Verificar**: aparece solo con `puedeVerificarEfectivo` y entregas pendientes.
