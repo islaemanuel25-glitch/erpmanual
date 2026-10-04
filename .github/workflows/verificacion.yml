@@ -600,6 +600,17 @@ jobs:
       - name: Venta contra corte de caja contra PostgreSQL
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/carreraVentaCorte.mjs
 
+      # Un Caja +/− no entra en una caja que ya tomó el corte o se cerró: valida
+      # y escribe con el turno tomado (bloquearTurno), en una sola transacción.
+      # Las carreras movimiento ↔ corte, movimiento ↔ cierre directo, dos
+      # movimientos alrededor del corte y los pedidos simultáneos se fuerzan
+      # contra los locks reales; las contrapruebas sacan cada defensa.
+      - name: Caja +/− contra corte y cierre contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/cajaMovimientoAtomico.mjs
+
+      - name: Contrapruebas de Caja +/− contra corte y cierre
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs CM-
+
       # La corrección histórica de caja: el ensayo en seco que escribe y deshace,
       # la aplicación con huella autorizada, la idempotencia y el fallo a mitad.
       # Se arma el incidente ×1000 con las rutas reales del circuito.

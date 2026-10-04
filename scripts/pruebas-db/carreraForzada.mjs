@@ -87,6 +87,56 @@ export async function retenerCobroOffline(prisma, clientTxnId) {
   };
 }
 
+/**
+ * Retiene con FOR UPDATE —el mismo lock de `bloquearTurno`— la fila de un
+ * turno, hasta `soltar()`. Pone en fila, en el orden en que llegan, a todos los
+ * que toman el turno: corte, cierre, retiro, Caja +/−. El primero que llegó es
+ * el primero que lo obtiene al soltar.
+ */
+export async function retenerTurno(prisma, turnoId) {
+  let liberar;
+  const liberado = new Promise((r) => { liberar = r; });
+  let avisarTomado;
+  const tomado = new Promise((r) => { avisarTomado = r; });
+  const retencion = prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Turno" WHERE id = ${turnoId} FOR UPDATE`;
+    avisarTomado();
+    await liberado;
+  }, { maxWait: 10_000, timeout: 60_000 });
+  await Promise.race([tomado, retencion]);
+  return {
+    soltar: async () => {
+      liberar();
+      await retencion;
+    },
+  };
+}
+
+/**
+ * Retiene con FOR UPDATE la fila de un usuario, hasta `soltar()`. Insertar un
+ * CajaMovimiento toma FOR KEY SHARE sobre su `usuarioId` por la clave foránea:
+ * retenerla deja a Caja +/− detenido DESPUÉS de haber tomado y releído el
+ * turno, y antes de confirmar.
+ */
+export async function retenerUsuario(prisma, usuarioId) {
+  let liberar;
+  const liberado = new Promise((r) => { liberar = r; });
+  let avisarTomado;
+  const tomado = new Promise((r) => { avisarTomado = r; });
+  const retencion = prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Usuario" WHERE id = ${usuarioId} FOR UPDATE`;
+    avisarTomado();
+    await liberado;
+  }, { maxWait: 10_000, timeout: 60_000 });
+  await Promise.race([tomado, retencion]);
+  return {
+    soltar: async () => {
+      liberar();
+      await retencion;
+    },
+  };
+}
+
 async function esperar(contar, cantidad, tope) {
   const limite = Date.now() + tope;
   let n = await contar();
