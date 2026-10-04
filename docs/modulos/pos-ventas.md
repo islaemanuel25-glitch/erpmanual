@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-10-03 22:51
+**Última actualización:** 2026-10-03 23:36
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,8 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-10-03: fix: el cierre directo congela lo que de verdad quedó en el turno
+- 2026-10-03: refactor: el comentario del cobro descartado vuelve sobre su rama
 - 2026-10-03: fix: una venta no entra en una caja que ya tomó el corte (R2c)
 - 2026-10-03: fix: sin PIN el POS espera el PIN en vez de mandar a abrir caja
 - 2026-10-03: fix: un fallo inesperado de la sincronización offline se informa como error

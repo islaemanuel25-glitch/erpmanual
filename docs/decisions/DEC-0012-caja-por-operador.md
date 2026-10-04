@@ -157,9 +157,20 @@ la caja física.**
   venta; `FOR KEY SHARE` no alcanzaba contra `turnos/cerrar`. Orden de locks:
   candado del local → turno → cobro offline → stock; quien corta, cierra o
   retira toma solo el turno, así que no hay ciclo.
-  - Queda abierto, y es de esa ruta: `turnos/cerrar` calcula sus totales
-    ANTES de su transacción, así que un cierre directo que espera a una venta
-    cierra con totales que no la ven. Ninguna pantalla usa esa ruta.
+  - Cerrado en la PR #132: `turnos/cerrar` calculaba sus totales ANTES de su
+    transacción, y un cierre directo que esperaba a una venta cerraba con
+    totales que no la veían (0 ventas con 1 en el turno, $1.000 de diferencia
+    inventada). Ahora toma el turno con `bloquearTurno` como primera sentencia
+    de su transacción y recién entonces lee ventas y movimientos, calcula
+    esperado y diferencia, fija el instante del cierre y escribe turno, arqueo
+    FINAL y retiro. La venta que tiene el turno termina antes y entra en la
+    fotografía; la que llega después lo encuentra cerrado (#131).
+  - Abierto, fuera de #131 y #132: `caja-movimientos/crear` (el "Caja +/−" del
+    POS) valida el turno sin lock y después inserta en otra sentencia; un
+    ingreso o egreso puede quedar en un turno ya cortado o cerrado, fuera de su
+    esperado. Forzado contra `cierres/iniciar` y contra `turnos/cerrar`. La
+    salida mínima es la misma de `salidaDelPago`: `bloquearTurno`, releer el
+    turno operativo y crear el movimiento en una sola transacción.
 - **`CajaMovimiento` no lleva `operadorId`**: se deriva de `turnoId →
   Turno.operadorId`, que no se reescribe nunca.
 - **Un carrito no cruza de caja ni se pierde**: cada identidad de caja (local
