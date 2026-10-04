@@ -664,6 +664,14 @@ jobs:
       - name: Contrapruebas de las acciones de verificación
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs VA-
 
+      # El contrato que lee la pantalla móvil (PR #138): «Otro» mal armado es 400
+      # y no otro período, los pagos se nombran con datos reales, las
+      # capacidades salen del permiso, el operador no se completa con la cuenta
+      # y un acto que cruza el período no se da por completo. Las suites son las
+      # dos de arriba; esto rompe cada regla y exige el rojo.
+      - name: Contrapruebas del contrato de Tesorería
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs TC-
+
       # La corrección histórica de caja: el ensayo en seco que escribe y deshace,
       # la aplicación con huella autorizada, la idempotencia y el fallo a mitad.
       # Se arma el incidente ×1000 con las rutas reales del circuito.

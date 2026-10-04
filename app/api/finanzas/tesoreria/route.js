@@ -2,10 +2,16 @@
 //
 // GET /api/finanzas/tesoreria — LA LECTURA DE TESORERÍA, SERVER-DRIVEN.
 //
-//   ?unidad=DIA|SEMANA|MES   (por defecto DIA)
-//   &desplazamiento=0|-1|…   (0 = el período en curso)
+//   ?unidad=DIA|SEMANA|MES|OTRO   (por defecto DIA)
+//   &desplazamiento=0|-1|…   (0 = el período en curso; no va con OTRO)
+//   &desde=AAAA-MM-DD&hasta=AAAA-MM-DD   (solo con OTRO, y las dos)
 //   &destino=<localId>       (solo el depósito puede pedir otro local de su grupo)
 //   &entrada=1               (el depósito pide la lista de locales)
+//
+// OTRO es el rango elegido a mano, con los nombres de Transferencias y la
+// validación de Finanzas (`leerRangoElegido`): un rango mal formado, invertido,
+// incompleto, o fechas sin OTRO, son 400 —nunca se cae en silencio a otra
+// unidad—. No navega: `puedeAvanzar` y `puedeRetroceder` van en false.
 //
 // Es una capa FINA: decide quién puede mirar qué local y qué período, y le pide
 // todo lo demás a `leerTesoreria` (lib/tesoreria/lecturaTesoreriaServer.js).
@@ -30,16 +36,25 @@ import { resolveVistaOperativa } from "@/lib/grupos";
 import { esVistaDeDeposito, resolverLocalPedido } from "@/lib/finanzas/alcanceFinanciero";
 import { localesDeFinanzas } from "@/lib/finanzas/localesDelGrupo";
 import {
+  CLAVE_OTRO_FINANZAS,
   DESPLAZAMIENTO_POR_DEFECTO,
+  ERROR_RANGO_SIN_OTRO,
   descripcionFinanciera,
   desplazamientoFinanciero,
+  leerRangoElegido,
   puedeAvanzar,
   unidadFinanciera,
 } from "@/lib/finanzas/periodoFinanciero";
 import { corteDeUbicacion } from "@/lib/semanaOperativa/semanaOperativa";
 import { primerDiaComercialDelLocal } from "@/lib/finanzas/primerDiaComercialServer";
 import { leerTesoreria, rangoDeTesoreria } from "@/lib/tesoreria/lecturaTesoreriaServer";
-import { PERMISO_VER_TESORERIA } from "@/lib/tesoreria/permisos";
+import {
+  PERMISO_ANULAR_VERIFICACION,
+  PERMISO_VER_TESORERIA,
+  PERMISO_VERIFICAR_EFECTIVO,
+} from "@/lib/tesoreria/permisos";
+
+const ERROR_OTRO_SIN_DESPLAZAMIENTO = "Un período elegido con «Otro» no se desplaza: no mandes desplazamiento.";
 
 export async function GET(req) {
   try {
@@ -63,10 +78,24 @@ export async function GET(req) {
     }
 
     const { searchParams } = new URL(req.url);
-    const unidad = unidadFinanciera(searchParams.get("unidad"));
-    const desplazamiento = desplazamientoFinanciero(
-      searchParams.get("desplazamiento") ?? DESPLAZAMIENTO_POR_DEFECTO
-    );
+    const esOtro = String(searchParams.get("unidad") || "").toUpperCase() === CLAVE_OTRO_FINANZAS;
+    const conFechas = searchParams.has("desde") || searchParams.has("hasta");
+    let rangoFijo = null;
+    if (esOtro) {
+      // Un rango elegido no se desplaza: pedir las dos cosas es ambiguo.
+      if (searchParams.has("desplazamiento")) {
+        return NextResponse.json({ ok: false, error: ERROR_OTRO_SIN_DESPLAZAMIENTO }, { status: 400 });
+      }
+      const leido = leerRangoElegido({ desde: searchParams.get("desde"), hasta: searchParams.get("hasta") });
+      if (leido.error) return NextResponse.json({ ok: false, error: leido.error }, { status: 400 });
+      rangoFijo = leido.rango;
+    } else if (conFechas) {
+      return NextResponse.json({ ok: false, error: ERROR_RANGO_SIN_OTRO }, { status: 400 });
+    }
+    const unidad = esOtro ? CLAVE_OTRO_FINANZAS : unidadFinanciera(searchParams.get("unidad"));
+    const desplazamiento = esOtro
+      ? DESPLAZAMIENTO_POR_DEFECTO
+      : desplazamientoFinanciero(searchParams.get("desplazamiento") ?? DESPLAZAMIENTO_POR_DEFECTO);
 
     const localPropio = vista.localId
       ? await prisma.local.findUnique({
@@ -101,7 +130,7 @@ export async function GET(req) {
 
     // El período con la misma semántica que Finanzas: Día, Semana operativa de
     // la ubicación, Mes; cortado en días argentinos.
-    const rango = await rangoDeTesoreria(prisma, { localId, unidad, desplazamiento });
+    const rango = await rangoDeTesoreria(prisma, { localId, unidad, desplazamiento, rangoFijo });
     const [lectura, primerMovimiento] = await Promise.all([
       leerTesoreria(prisma, { localId, fechaInicio: rango.fechaInicio, fechaFin: rango.fechaFin }),
       primerDiaComercialDelLocal(prisma, localId),
@@ -114,7 +143,8 @@ export async function GET(req) {
       ok: true,
       vista: "UN_LOCAL",
       unidad,
-      desplazamiento,
+      // Con OTRO no hay desplazamiento: el período es el elegido.
+      desplazamiento: esOtro ? null : desplazamiento,
       local: {
         id: localId,
         nombre: delGrupo?.nombre || localPropio?.nombre || "—",
@@ -128,12 +158,19 @@ export async function GET(req) {
         // Los instantes exactos con que se filtró la base, para que nadie
         // reconstruya el corte del día en la pantalla.
         instantes: { desde: rango.fechaInicio, hasta: rango.fechaFin },
-        descripcion: descripcionFinanciera({ unidad, desplazamiento, vigencias: rango.vigencias }),
+        descripcion: descripcionFinanciera({ unidad, desplazamiento, vigencias: rango.vigencias, rangoFijo }),
       },
-      puedeAvanzar: puedeAvanzar(desplazamiento),
+      // Un rango elegido no navega con flechas: se elige otro.
+      puedeAvanzar: esOtro ? false : puedeAvanzar(desplazamiento),
       // Hacia atrás, hasta donde haya dato; mismo criterio que el tablero.
-      puedeRetroceder: Boolean(primerMovimiento && rango.desde > primerMovimiento),
+      puedeRetroceder: esOtro ? false : Boolean(primerMovimiento && rango.desde > primerMovimiento),
       primerMovimiento,
+      // Qué puede HACER quien pregunta sobre ESTE local —que ya pasó el alcance
+      // de arriba—, con los permisos reales de la sesión (el comodín "*"
+      // incluido). Las acciones vuelven a chequear todo: esto es para no ofrecer
+      // un botón que el servidor va a rechazar.
+      puedeVerificarEfectivo: checkPerm(session, PERMISO_VERIFICAR_EFECTIVO).ok,
+      puedeAnularVerificacion: checkPerm(session, PERMISO_ANULAR_VERIFICACION).ok,
       // La lectura, tal cual la arma el dominio: resumen, turnos comerciales,
       // cajas, entregas, egresos, pagos desde caja y alertas.
       tesoreria: lectura,

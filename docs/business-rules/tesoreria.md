@@ -80,14 +80,16 @@ configuración de franjas por local, se reemplaza esa función y nada más
   `esVistaDeDeposito`, `resolverLocalPedido`). Un local solo se lee a sí mismo,
   pedir otro por `destino` o `localId` es 403; el depósito lee cualquier local de
   su grupo y, sin elegir, recibe la lista sin importes [CÓDIGO; contraprueba TA-2].
-- **Entrada:** `unidad` (DIA, SEMANA, MES), `desplazamiento` (0 = en curso),
-  `destino` y `entrada=1` para el depósito. El rango es `rangoFinanciero` con la
-  semana operativa de la ubicación.
+- **Entrada:** `unidad` (DIA, SEMANA, MES, OTRO), `desplazamiento` (0 = en
+  curso), `desde`/`hasta` solo con OTRO, `destino` y `entrada=1` para el
+  depósito. El rango es `rangoFinanciero` con la semana operativa de la
+  ubicación, o el elegido con OTRO (sección siguiente).
 - **Salida:** `local`, `periodo` (rango, instantes exactos del filtro y
-  descripción), `puedeAvanzar`, `puedeRetroceder`, `primerMovimiento` y
+  descripción), `puedeAvanzar`, `puedeRetroceder`, `primerMovimiento`, las
+  capacidades `puedeVerificarEfectivo` y `puedeAnularVerificacion`, y
   `tesoreria`, que es la lectura tal cual la arma el dominio: `resumen`,
   `grupos` (con sus instantes, cajas y alertas), `cajas`, `entregas`,
-  `egresosExteriores`, `pagosDesdeCaja` y `alertas`.
+  `egresosExteriores`, `pagosDesdeCaja`, `alertas` y `verificaciones`.
 - **Consultas:** la lectura hace un número fijo, 12 desde la PR 4 (11 antes de
   sumar las verificaciones vigentes), con 5 cajas o con 1 [medido en
   `scripts/pruebas-db/tesoreriaApi.mjs`]. La ruta agrega las suyas
@@ -95,6 +97,100 @@ configuración de franjas por local, se reemplaza esa función y nada más
   primera venta—, que no dependen de cuántas cajas haya [CÓDIGO; no contadas].
 - Un turno anulado conserva sus entregas y lo avisa con `TURNO_ANULADO`, en la
   caja y en su grupo: el estado posterior del turno no hace desaparecer plata.
+
+## El contrato de la pantalla móvil
+
+PR 5 de Tesorería (2026-10-04, #138): lo que le faltaba a la API para el diseño
+móvil de Figma, sin pantalla, sin migración y sin tocar ninguna regla de plata.
+Las cuentas de arriba —base conocida, pagos desde caja informativos, egresos
+exteriores que restan una vez, digital declarado— no cambiaron [CÓDIGO;
+`tesoreriaApi.mjs` sección D sin cambios y sección H].
+
+**El período «Otro»** [CÓDIGO, `leerRangoElegido` en
+`lib/finanzas/periodoFinanciero.js`; contraprueba TC-1]. El selector es el
+canónico de Finanzas —Día, Semana, Mes, Otro— y Tesorería es el primer endpoint
+de Finanzas que acepta OTRO; las otras pantallas lo siguen teniendo apagado.
+
+- Los nombres son los de Transferencias: `desde` y `hasta`, días `AAAA-MM-DD`
+  inclusivos. La validación de cada día es la de Finanzas (`leerFechaOpcional`:
+  el 2026-02-30 se rechaza, no se corre al 2 de marzo) y el rango invertido usa
+  el texto de Gastos.
+- A diferencia de Transferencias, que con un rango malo cae en silencio a la
+  unidad, acá es **400** con `{ ok: false, error }`: una fecha inválida, desde
+  posterior a hasta, falta una de las dos, fechas sin OTRO, u OTRO con
+  `desplazamiento`. Un período ignorado mostraría los números de otro período
+  con el rótulo del pedido.
+- No hay tope de días —ningún módulo lo tiene— ni se corta el futuro: un día
+  sin hechos da cero, como en Transferencias.
+- Los instantes los pone `getRangoArgentina`, el mismo que para las otras
+  unidades: 00:00 del primer día a 23:59:59.999 del último, hora argentina, y se
+  devuelven en `periodo.instantes`.
+- La descripción sale de `descripcionDelPeriodo` con `rangoFijo`: «Período
+  elegido» y el rango en largo. `desplazamiento` va en null y `puedeAvanzar` y
+  `puedeRetroceder` en false: un rango elegido no navega, se elige otro.
+- El alcance se resuelve igual que con las otras unidades y ANTES de leer: OTRO
+  no abre ningún local ajeno.
+- Con el mismo rango que un Día, la lectura es idéntica, byte por byte
+  [`tesoreriaApi.mjs` sección G].
+
+**Las capacidades** [CÓDIGO, la ruta; contraprueba TC-3]. `puedeVerificarEfectivo`
+y `puedeAnularVerificacion` son `checkPerm` con los mismos permisos que exigen las
+acciones, así que el comodín `*` las da. Se calculan después del alcance, sobre
+el local que se está leyendo. Son para no ofrecer un botón que el servidor va a
+rechazar: las acciones vuelven a chequear todo.
+
+**Cómo se nombra un pago** [CÓDIGO, `presentacionDelPago` en
+`lib/tesoreria/lecturaTesoreria.js`; contraprueba TC-2]. Cada fila de
+`egresosExteriores` y de `pagosDesdeCaja` trae `beneficiario`, `concepto`,
+`categoria`, `referencia` y `nota`, leídos de las relaciones reales en la MISMA
+consulta del pago:
+
+- a proveedor: `beneficiario` es el nombre del proveedor de la cuenta y
+  `referencia` es `{ tipo: "PEDIDO_PROVEEDOR", id }`; no hay concepto ni
+  categoría y van en null;
+- de un gasto: `concepto` y `categoria` del gasto, `beneficiario` solo si se
+  cargó, y `referencia` es `{ tipo: "GASTO", id }`.
+
+Lo que el modelo no tiene va en null —no se completa con otro dato— y el motivo
+libre del movimiento de caja no se lee nunca. Los pagos desde caja siguen siendo
+informativos: nombrarlos no los resta.
+
+**Quién verificó** [CÓDIGO, `formatoDeVerificacion` en
+`lib/tesoreria/verificacionEfectivoLectura.js`; contraprueba TC-4]. Cada
+verificación trae `verificadaPor` y `anuladaPor` como `{ id, nombre }` del
+Usuario —nada más de la cuenta—, y conserva los ids sueltos. El operador del PIN
+es otra cosa: `verificadaPorOperador` es null cuando no hubo, y nunca se completa
+con la cuenta. Cuando haya, irá `{ id, nombre: null }`: la columna no tiene
+relación y su nombre no se lee de ningún lado (hoy ningún flujo la llena).
+
+**Las cajas y sus entregas** [CÓDIGO, `etiquetaDeCaja`]. En la base no existe
+«Caja 1»: hay un Turno y, si el local pide PIN, su operador. La identidad estable
+de una caja es `turnoId`; la etiqueta para mostrar es «Caja de {operador}», o
+«Caja del turno #{id}» si no hay operador —se nombra el turno, no una persona—.
+Va en `cajas`, en las cajas de cada grupo y en cada entrega (`etiquetaCaja`),
+junto con `cajaMovimientoId`, `turnoId`, `operadorId`, `operadorNombre`, `clase`,
+`montoDeclarado`, `instante` y el estado de verificación. Agrupar por caja es
+agrupar por `turnoId`.
+
+**Una verificación de varias cajas** sigue teniendo UNA diferencia, la del acto;
+`cantidadDeCajas` dice cuántas juntó («2 cajas incluidas») y ninguna caja ni
+entrega lleva un pedazo.
+
+**Lo parcial se deriva, no se guarda.** `resumen.verificacion` (y el de cada
+grupo) trae `entregadoDeclarado` = `entregadoCubiertoPorVerificaciones` +
+`entregadoPendienteDeVerificar`, y `entregasPendientesIds`: con eso la pantalla
+ofrece «Verificar lo pendiente · $X» sin decidir de nuevo qué está cubierto. No
+existe un estado PARCIAL en ninguna tabla.
+
+**Un acto que cruza el período** [contraprueba TC-5] no se suma, no se reparte y
+no se esconde: va ENTERO en `verificaciones`, con `completaEnElPeriodo` en false
+y `entregasEnElPeriodo` con las de acá, y `actosQueCruzanIds` lo nombra. Si el
+rango se amplía hasta cubrir todas sus entregas —por ejemplo con OTRO—, pasa a
+completo y recién ahí cuenta en lo verificado.
+
+**Consultas:** las mismas 12. Los nombres van como selects anidados en las
+consultas que ya estaban, no como consultas por fila [medido en
+`tesoreriaApi.mjs` sección E].
 
 ## La verificación del efectivo: persistencia
 
@@ -287,6 +383,9 @@ entrega y no se fabrica uno; un turno anulado conserva su entrega y su alerta.
   `lib/caja/correcciones/motor.js`. Contra PostgreSQL, por las rutas y con las
   cuatro carreras forzadas sobre el turno: `scripts/pruebas-db/verificacionEfectivoAcciones.mjs`
   y las contrapruebas `VA-`.
+- Contrato móvil: `scripts/pruebas-db/tesoreriaApi.mjs` secciones G y H,
+  `scripts/pruebas-db/verificacionEfectivoAcciones.mjs` secciones 18 a 22, y las
+  contrapruebas `TC-`.
 - Lector: `lib/tesoreria/lecturaTesoreriaServer.js`. Los vínculos de clase los
   lee `lib/finanzas/movimientosDeCajaServer.js`, el mismo lector que usa el
   tablero de Finanzas.
