@@ -16,9 +16,18 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-**Ninguna.** Producción está en **47 migraciones**, las 47 del árbol, todas
-aplicadas, ninguna fallida, y `migrate status` cierra con "Database schema is
-up to date!".
+Producción está en **47 migraciones**; el árbol tiene 48. Pendiente de deploy:
+
+- `20261004120000_verificacion_efectivo` — Tesorería, persistencia de la
+  verificación del efectivo (PR #136). **Aditiva:** dos tablas nuevas y vacías,
+  dos enums, sus índices, CHECK, FK y triggers; no altera ni recorre ninguna
+  tabla existente (las FK salen de tablas vacías hacia `Local`, `Usuario` y
+  `CajaMovimiento`). Sin backfill. El clasificador la marca `aditiva`, sin
+  coincidencias. Ensayada desde cero (0 → 48, sin drift) y sobre una base con el
+  esquema de 47 y datos de cajas, ventas, retiros y cierres: los conteos y la
+  huella de `CajaMovimiento` quedaron idénticos y las tablas nuevas, vacías. El
+  código de antes no las lee, así que la ventana entre migrar y recrear la app
+  no cambia nada.
 
 Producción corre `bd92ca5d057541befa48589cda5a73cfe6de89b3` (despliegue del
 2026-10-04, nota abajo). Un commit posterior a ese que solo cambie
