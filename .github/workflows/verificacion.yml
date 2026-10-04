@@ -630,6 +630,16 @@ jobs:
       - name: Contrapruebas de la lectura de Tesorería
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs TE-
 
+      # La puerta de Tesorería (GET /api/finanzas/tesoreria): pide tesoreria.ver,
+      # un local no lee a otro, el período es el de Finanzas, la respuesta es la
+      # lectura canónica, la cantidad de consultas no crece con las cajas y un
+      # GET no escribe nada.
+      - name: API de Tesorería contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/tesoreriaApi.mjs
+
+      - name: Contrapruebas de la API de Tesorería
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs TA-
+
       # La corrección histórica de caja: el ensayo en seco que escribe y deshace,
       # la aplicación con huella autorizada, la idempotencia y el fallo a mitad.
       # Se arma el incidente ×1000 con las rutas reales del circuito.
