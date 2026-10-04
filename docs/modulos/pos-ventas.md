@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-10-04 04:05
+**Última actualización:** 2026-10-04 23:16
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,8 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-10-04: fix: Auditoría POS muestra el turno operativo guardado, no una franja por hora
+- 2026-10-04: feat: turno operativo elegido al abrir caja y Tesorería verificada por turno
 - 2026-10-04: feat: la lectura canónica de Tesorería
 - 2026-10-04: fix: Caja +/− valida y escribe con el turno tomado
 - 2026-10-03: fix: el cierre directo congela lo que de verdad quedó en el turno
