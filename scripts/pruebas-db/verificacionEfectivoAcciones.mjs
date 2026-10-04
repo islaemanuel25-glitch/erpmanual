@@ -25,6 +25,7 @@ const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const jwt = (await import("jsonwebtoken")).default;
 
 const { crearProductoVendible } = await import("./fixturePos.mjs");
+const { turnoOperativoDeSesion } = await import("./fixtureTurnoOperativo.mjs");
 const { retenerTurno, esperarEnFila } = await import("./carreraForzada.mjs");
 const { firmarTokenOperador, OperadorCookie } = await import("../../lib/operador.js");
 const { itemCrearPayload } = await import("../../lib/pos-ventas/payloadVenta.js");
@@ -35,6 +36,7 @@ const { PERMISO_CORREGIR_HISTORICO } = await import("../../lib/caja/correcciones
 const { ALERTA, ESTADO_ENTREGA } = await import("../../lib/tesoreria/lecturaTesoreria.js");
 const { MOTIVO_DESACTUALIZADA } = await import("../../lib/tesoreria/desactualizacion.js");
 const { CODIGO_VERIFICACION } = await import("../../lib/tesoreria/verificacionEfectivoServer.js");
+const { armarVerificacionEfectivo } = await import("../../lib/tesoreria/verificacionEfectivo.js");
 const { PERMISO_VER_TESORERIA, PERMISO_VERIFICAR_EFECTIVO, PERMISO_ANULAR_VERIFICACION } = await import("../../lib/tesoreria/permisos.js");
 
 const rutaVerificar = await import("../../app/api/finanzas/tesoreria/verificaciones/route.js");
@@ -154,7 +156,7 @@ async function montar() {
   return { grupo, A, B, D, proveedor };
 }
 
-async function nuevaCaja(u, fondo = 1000) {
+async function quienAbre(u) {
   let operador = null;
   let op = null;
   if (u.exigirOperador) {
@@ -162,8 +164,27 @@ async function nuevaCaja(u, fondo = 1000) {
     await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: u.local.id } });
     operador = firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: u.local.id });
   }
-  const quien = { sesion: u.pos, operador };
-  const r = await leer(await rutaAbrir.POST(pedidoPos(`${BASE}/turnos/abrir`, quien, { montoInicial: fondo })));
+  return { op, quien: { sesion: u.pos, operador } };
+}
+/**
+ * Una caja ANTERIOR al turno operativo: la fila que escribía `turnos/abrir`
+ * antes de 20261005120000 —los mismos campos, sin turno ni fecha operativa—.
+ * Ninguna ruta la crea ya; en producción son todas las cajas viejas. Lo demás
+ * (vender, cerrar) va por las rutas, como siempre.
+ */
+async function nuevaCajaAnterior(u, fondo = 1000) {
+  const { op, quien } = await quienAbre(u);
+  const t = await prisma.turno.create({
+    data: {
+      localId: u.local.id, vendedorId: u.usuario.id, operadorId: op?.id ?? null,
+      montoInicial: fondo, fondoRecibidoApertura: fondo, observacionFondoApertura: null,
+    },
+  });
+  return { u, op, quien, turnoId: t.id };
+}
+async function nuevaCaja(u, fondo = 1000) {
+  const { op, quien } = await quienAbre(u);
+  const r = await leer(await rutaAbrir.POST(pedidoPos(`${BASE}/turnos/abrir`, quien, { montoInicial: fondo, turnoOperativoId: await turnoOperativoDeSesion(prisma, quien) })));
   requerir("abre la caja", r.ok === true, `${r.status} ${r.error ?? ""}`);
   return { u, op, quien, turnoId: r.turno.id };
 }
@@ -672,37 +693,86 @@ async function correr() {
     ok("ninguna verificación guarda un estado PARCIAL", !(await prisma.verificacionEfectivo.findFirst({ where: { estado: { notIn: ["VIGENTE", "ANULADA"] } } })));
   }
 
-  seccion("21. Un acto que cruza el período: entero, aparte, sin sumarse [#138: 19, 20]");
+  // Reescrita a sabiendas con el turno operativo (migración
+  // 20261005120000_turno_operativo). Antes, correr el reloj de una entrega al
+  // día anterior la sacaba del Día y el acto "cruzaba". Ahora una caja con turno
+  // entra ENTERA por su fecha operativa: correr la hora de una de sus entregas
+  // no la mueve de día, y el acto queda completo en su turno. Un acto que cruza
+  // ya no se puede crear —el servidor no deja mezclar fechas operativas—; solo
+  // existe entre las verificaciones anteriores, y cómo se muestra lo cubren los
+  // candados puros de la lectura.
+  seccion("21. Una caja con turno no se parte por la hora de sus entregas [TO-3]");
   {
     const kAyer = await cajaConCierre(A, 3000);
     const kHoy = await cajaConCierre(A, 2000);
     // Ninguna ruta crea una entrega con fecha pasada: se corre el reloj de una,
-    // como el plazo en cierreCaja.mjs, ANTES de verificar —así la foto la toma
-    // tal cual y nada queda desactualizado—. 24 h atrás es siempre el día
-    // argentino anterior.
+    // ANTES de verificar. 24 h atrás es siempre el día argentino anterior.
     await prisma.cajaMovimiento.update({ where: { id: kAyer.id }, data: { createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000) } });
     const hoy = await lectura(A.todo);
     const rX = await verificar(A.todo, { cajaMovimientoIds: [kAyer.id, kHoy.id], importeVerificado: 4900, idempotencyKey: clave("x") });
-    requerir("verifica juntas la de ayer y la de hoy: 201", rX.status === 201, `${rX.status} ${rX.codigo ?? ""} ${rX.error ?? ""}`);
+    requerir("son del mismo turno y la misma fecha operativa: 201", rX.status === 201, `${rX.status} ${rX.codigo ?? ""} ${rX.error ?? ""}`);
     const X = rX.verificacion;
+    ok("la verificación congela el turno de las cajas", X.turnoOperativo?.id != null && X.fechaOperativa === hoy.periodo.rango.desde);
+    const dia = await lecturaCon(A.todo, "unidad=DIA");
+    const enDia = dia.tesoreria.verificaciones.find((v) => v.id === X.id);
+    igual("en el Día: el acto va ENTERO y COMPLETO, con las dos entregas",
+      [enDia?.importeDeclarado, enDia?.importeVerificado, enDia?.diferencia, enDia?.completaEnElPeriodo, [...(enDia?.entregasEnElPeriodo || [])].sort((a, b) => a - b)],
+      [5000, 4900, -100, true, [kAyer.id, kHoy.id].sort((a, b) => a - b)]);
+    ok("y no cruza", !dia.tesoreria.resumen.verificacion.actosQueCruzanIds.includes(X.id));
+    igual("la entrega con la hora corrida sigue en el Día de su caja", entregaEn(dia, kAyer.id)?.estadoVerificacion, "VERIFICADA");
+    const ayer = await lecturaCon(A.todo, "unidad=DIA&desplazamiento=-1");
+    ok("el día anterior no la tiene", !entregaEn(ayer, kAyer.id) && !(ayer.tesoreria?.verificaciones || []).some((v) => v.id === X.id));
+    ok("lo de hoy ya incluía las dos entregas antes de verificar", entregaEn(hoy, kAyer.id) && entregaEn(hoy, kHoy.id));
+    const rA = await anular(A.todo, X.id, { motivo: "prueba del contrato" });
+    igual("la anulación nombra a quien anuló, sin datos de la cuenta", [rA.verificacion?.anuladaPor, rA.verificacion?.verificadaPor], [{ id: A.usuario.id, nombre: A.usuario.nombre }, { id: A.usuario.id, nombre: A.usuario.nombre }]);
+  }
+
+  // Lo que era la sección 21 antes del turno operativo, sobre la única forma
+  // que hoy puede tener: una verificación ANTERIOR (sin turno) de cajas sin
+  // turno, con entregas de dos días. El servidor ya no la deja crear —dos
+  // fechas son 400—, así que se escribe como la escribía la acción entonces:
+  // `armarVerificacionEfectivo` y padre + entregas en una transacción. Las
+  // entregas salen de la lectura real. La lectura la tiene que mostrar entera,
+  // aparte y sin sumarla, como antes.
+  seccion("21.bis. Una verificación anterior que cruza el período: entera, aparte, sin sumarse [#138: 19, 20]");
+  {
+    const cajaVieja = async (monto) => {
+      const c = await nuevaCajaAnterior(A);
+      await vender(c, monto);
+      await cerrar(c, 1000, monto);
+      return entregaDe(c, "CIERRE");
+    };
+    const idAyer = await cajaVieja(3000);
+    const idHoy = await cajaVieja(2000);
+    await prisma.cajaMovimiento.update({ where: { id: idAyer }, data: { createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000) } });
+    const hoy = await lectura(A.todo);
+    const ayer0 = await lecturaCon(A.todo, "unidad=DIA&desplazamiento=-1");
+    const eHoy = entregaEn(hoy, idHoy);
+    const eAyer = entregaEn(ayer0, idAyer);
+    requerir("las dos entregas viejas están en la lectura, cada una en su día", Boolean(eHoy && eAyer));
+    const datos = armarVerificacionEfectivo({
+      localId: A.local.id, entregas: [eAyer, eHoy], importeVerificado: 4900, verificadaPorUsuarioId: A.usuario.id, idempotencyKey: clave("x"),
+    });
+    const X = await prisma.$transaction(async (tx) => {
+      const v = await tx.verificacionEfectivo.create({ data: datos.verificacion });
+      await tx.verificacionEfectivoEntrega.createMany({ data: datos.entregas.map((e) => ({ ...e, verificacionEfectivoId: v.id })) });
+      return v;
+    });
     const dia = await lecturaCon(A.todo, "unidad=DIA");
     const enDia = dia.tesoreria.verificaciones.find((v) => v.id === X.id);
     igual("en el Día: el acto va ENTERO —5.000 / 4.900 / −100—, marcado incompleto",
-      [enDia?.importeDeclarado, enDia?.importeVerificado, enDia?.diferencia, enDia?.completaEnElPeriodo, enDia?.entregasEnElPeriodo], [5000, 4900, -100, false, [kHoy.id]]);
+      [enDia?.importeDeclarado, enDia?.importeVerificado, enDia?.diferencia, enDia?.completaEnElPeriodo, enDia?.entregasEnElPeriodo], [5000, 4900, -100, false, [idHoy]]);
     ok("y se nombra entre los que cruzan", dia.tesoreria.resumen.verificacion.actosQueCruzanIds.includes(X.id));
     igual("lo verificado del Día no suma ni un pedazo de él", dia.tesoreria.resumen.verificacion.efectivoVerificado, hoy.tesoreria.resumen.verificacion.efectivoVerificado);
-    igual("la entrega de hoy sí figura cubierta", entregaEn(dia, kHoy.id)?.estadoVerificacion, "VERIFICADA");
+    igual("la entrega de hoy sí figura cubierta", entregaEn(dia, idHoy)?.estadoVerificacion, "VERIFICADA");
+    igual("se lee como anterior al turno operativo", enDia?.turnoOperativo, null);
     const ayer = await lecturaCon(A.todo, "unidad=DIA&desplazamiento=-1");
     ok("en el día anterior también cruza", ayer.tesoreria.resumen.verificacion.actosQueCruzanIds.includes(X.id));
     const { hoyArgentinaISO } = await import("../../lib/fechas/rangoArgentina.js");
-    const fechaHoy = hoyArgentinaISO();
-    const fechaAyer = ayer.periodo.rango.desde;
-    const otro = await lecturaCon(A.todo, `unidad=OTRO&desde=${fechaAyer}&hasta=${fechaHoy}`);
+    const otro = await lecturaCon(A.todo, `unidad=OTRO&desde=${ayer.periodo.rango.desde}&hasta=${hoyArgentinaISO()}`);
     const enOtro = otro.tesoreria?.verificaciones.find((v) => v.id === X.id);
     igual("con «Otro» de ayer a hoy queda completo y deja de cruzar",
       [otro.status, enOtro?.completaEnElPeriodo, otro.tesoreria?.resumen.verificacion.actosQueCruzanIds.includes(X.id)], [200, true, false]);
-    const rA = await anular(A.todo, X.id, { motivo: "prueba del contrato" });
-    igual("la anulación nombra a quien anuló, sin datos de la cuenta", [rA.verificacion?.anuladaPor, rA.verificacion?.verificadaPor], [{ id: A.usuario.id, nombre: A.usuario.nombre }, { id: A.usuario.id, nombre: A.usuario.nombre }]);
   }
 
   seccion("22. Las capacidades salen de los permisos reales [#138: 16]");

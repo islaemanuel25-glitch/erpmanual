@@ -29,6 +29,7 @@ import {
   whereCajaPropia,
 } from "@/lib/caja/cierreRelevo";
 import { contextoRelevo, serializarCambio, OPCIONES_TX } from "@/lib/caja/cierreRelevoServer";
+import { turnoOperativoDeApertura } from "@/lib/caja/turnoOperativoServer";
 
 export async function POST(req) {
   try {
@@ -68,6 +69,14 @@ export async function POST(req) {
     });
     if (!recibido.valido) {
       return NextResponse.json({ ok: false, error: recibido.error }, { status: 400 });
+    }
+
+    // EL TURNO OPERATIVO: lo elige quien abre, y el servidor lo valida contra
+    // el catálogo de ESTE local. La fecha operativa la fija el servidor. Va
+    // antes de tomar el sobre: un pedido sin turno no reserva nada.
+    const to = await turnoOperativoDeApertura(prisma, { localId, body });
+    if (!to.ok) {
+      return NextResponse.json({ ok: false, error: to.error, codigo: to.codigo }, { status: to.status });
     }
 
     const resultado = await prisma.$transaction(async (tx) => {
@@ -168,6 +177,7 @@ export async function POST(req) {
       const turno = await tx.turno.create({
         data: {
           localId,
+          ...to.datos,
           vendedorId: session.id,
           operadorId: gateOp.operadorId,
           // LO QUE SE CONTÓ DE VERDAD.

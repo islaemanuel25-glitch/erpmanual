@@ -1,0 +1,401 @@
+// EL TURNO OPERATIVO CONTRA POSTGRESQL — migración 20261005120000_turno_operativo.
+//
+//   node --import ./scripts/alias-loader.mjs scripts/pruebas-db/turnoOperativo.mjs
+//
+// Tesorería verifica el efectivo POR TURNO OPERATIVO: la caja elige su turno al
+// abrirse, Tesorería agrupa por (local, fecha operativa, turno) de la caja, y
+// una verificación es de UN turno. Lo que depende de la base —FK compuestas,
+// CHECK, triggers, transacciones— se prueba acá, contra PostgreSQL y por las
+// rutas reales; lo puro está en lib/tesoreria/lecturaTesoreria.test.mjs.
+//
+//   A. El catálogo es de cada local                                   [TO-12]
+//   B. Abrir caja: turno de otro local, inactivo, sin turno, de ayer  [TO-4, TO-5]
+//   C. Las tres rutas de apertura guardan turno y fecha               [TO-11]
+//   D. La base sostiene la caja: CHECK, FK compuesta, inmutable       [TO-4, TO-8]
+//   E. Tesorería agrupa por el turno de la caja                       [TO-1, TO-2, TO-8]
+//   F. No se verifican juntos dos turnos ni dos fechas                [TO-6, TO-7]
+//   G. La verificación congela su turno; la base lo exige y lo cuida  [TO-6, TO-9]
+//
+// No desmonta: una verificación no se borra —la base lo impide— y sus cajas
+// tampoco. Todo lleva una marca única por corrida.
+
+import { crearClientePrisma, ESCRITURA } from "../lib/clientePrisma.mjs";
+
+const prisma = await crearClientePrisma({ nivel: ESCRITURA });
+const jwt = (await import("jsonwebtoken")).default;
+
+const { crearProductoVendible } = await import("./fixturePos.mjs");
+const { firmarTokenOperador, OperadorCookie } = await import("../../lib/operador.js");
+const { itemCrearPayload } = await import("../../lib/pos-ventas/payloadVenta.js");
+const { DENOMINACIONES } = await import("../../lib/caja/conteoBilletes.js");
+const { hoyArgentinaISO } = await import("../../lib/fechas/rangoArgentina.js");
+const { leerTesoreria, rangoDeTesoreria } = await import("../../lib/tesoreria/lecturaTesoreriaServer.js");
+const { CRITERIO_SIN_TURNO, CRITERIO_TURNO_OPERATIVO } = await import("../../lib/tesoreria/turnoComercial.js");
+const { PERMISO_VER_TESORERIA, PERMISO_VERIFICAR_EFECTIVO, PERMISO_ANULAR_VERIFICACION } = await import("../../lib/tesoreria/permisos.js");
+
+const rutaAbrir = await import("../../app/api/pos-ventas/turnos/abrir/route.js");
+const rutaAbrirSinCambio = await import("../../app/api/pos-ventas/turnos/abrir-sin-cambio/route.js");
+const rutaAbrirConCambio = await import("../../app/api/pos-ventas/turnos/abrir-con-cambio/route.js");
+const rutaReservar = await import("../../app/api/pos-ventas/cambios-pendientes/reservar/route.js");
+const rutaCrear = await import("../../app/api/pos-ventas/crear/route.js");
+const rutaCierreIniciar = await import("../../app/api/pos-ventas/cierres/iniciar/route.js");
+const rutaCierreConfirmar = await import("../../app/api/pos-ventas/cierres/[token]/confirmar/route.js");
+const rutaVerificar = await import("../../app/api/finanzas/tesoreria/verificaciones/route.js");
+const rutaCatalogo = await import("../../app/api/config/turnos-operativos/route.js");
+const rutaTurnoDelCatalogo = await import("../../app/api/config/turnos-operativos/[id]/route.js");
+
+let pasadas = 0;
+const fallas = [];
+let seccionActual = "";
+const seccion = (t) => { seccionActual = t; console.log(`\n── ${t} ${"─".repeat(Math.max(0, 64 - t.length))}`); };
+function ok(t, c, d = "") {
+  if (c) { pasadas += 1; console.log(`  ✓ ${t}`); }
+  else { fallas.push(`[${seccionActual}] ${t} — ${d || "falló"}`); console.log(`  ✗ ${t} — ${d || "falló"}`); }
+}
+const igual = (t, o, e) => ok(t, JSON.stringify(o) === JSON.stringify(e), `esperado ${JSON.stringify(e)}, obtenido ${JSON.stringify(o)}`);
+function requerir(t, c, d = "") {
+  ok(t, c, d);
+  if (!c) throw new Error(`requisito: ${t} — ${d}`);
+}
+async function intento(fn) {
+  try {
+    return { ok: true, valor: await fn() };
+  } catch (e) {
+    return { ok: false, codigo: e?.code ?? null, mensaje: `${e?.message ?? e} ${JSON.stringify(e?.meta ?? {})}` };
+  }
+}
+/** Rechazado, y por la defensa que se nombra: un rechazo por otra causa no prueba nada. */
+const rechazado = (t, r, patron) =>
+  ok(t, !r.ok && patron.test(`${r.codigo} ${r.mensaje}`), r.ok ? "se aceptó" : `otro motivo: ${r.codigo} ${r.mensaje.slice(0, 240)}`);
+
+const SECRETO = process.env.AUTH_SECRET;
+const BASE = "http://ci/api/pos-ventas";
+const leer = async (r) => ({ status: r.status, ...(await r.json().catch(() => ({}))) });
+function conCookie(url, cookie, cuerpo, metodo = "POST") {
+  const headers = { "content-type": "application/json" };
+  if (cookie) headers.cookie = cookie;
+  const req = new Request(url, { method: metodo, headers, body: metodo === "GET" ? undefined : JSON.stringify(cuerpo ?? {}) });
+  Object.defineProperty(req, "nextUrl", { value: new URL(url), configurable: true });
+  return req;
+}
+const pedido = (url, quien, cuerpo, metodo = "POST") =>
+  conCookie(url, [`erpazul_sesion=${quien.sesion}`, quien.operador ? `${OperadorCookie.nombre}=${quien.operador}` : null].filter(Boolean).join("; "), cuerpo, metodo);
+const conToken = (t) => ({ params: Promise.resolve({ token: t }) });
+const conId = (id) => ({ params: Promise.resolve({ id: String(id) }) });
+const firmar = (usuario, localId, permisos) =>
+  jwt.sign({ id: usuario.id, nombre: usuario.nombre, email: usuario.email, localId, permisos }, SECRETO, { expiresIn: "1h" });
+
+function desgloseDe(monto) {
+  const d = {};
+  let resto = monto;
+  for (const { valor } of DENOMINACIONES) {
+    const k = Math.floor(resto / valor);
+    if (k > 0) { d[valor] = k; resto -= k * valor; }
+  }
+  if (resto !== 0) throw new Error(`desgloseDe: ${monto} no es múltiplo de 100`);
+  return d;
+}
+
+const marca = `ci-turno-op-${Date.now()}`;
+let n = 0;
+const clave = () => `${marca}-${(n += 1)}`;
+const HOY = hoyArgentinaISO();
+const AYER = new Date(new Date(`${HOY}T12:00:00Z`).getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+const comoFecha = (iso) => new Date(`${iso}T00:00:00.000Z`);
+const isoDe = (d) => (d ? new Date(d).toISOString().slice(0, 10) : null);
+
+/** Un local con operario obligatorio, su cuenta, su producto y sus sesiones. */
+async function montarLocal(nombre) {
+  const permisos = ["pos.usar"];
+  const rol = await prisma.rol.create({ data: { nombre: `${marca}-${nombre}-rol`, permisos } });
+  const grupo = await prisma.grupo.create({ data: { nombre: `${marca}-${nombre}-grupo` } });
+  const local = await prisma.local.create({ data: { nombre: `${marca}-${nombre}`, tipo: "local" } });
+  await prisma.grupoLocal.create({ data: { grupoId: grupo.id, localId: local.id } });
+  await prisma.configuracionLocal.create({ data: { localId: local.id, exigirOperador: true, allowNegativeStock: false } });
+  const cuenta = await prisma.usuario.create({
+    data: { nombre: `${marca}-${nombre}-cuenta`, email: `${marca}-${nombre}@ci.local`, passwordHash: "x", rolId: rol.id, localId: local.id },
+  });
+  const producto = await crearProductoVendible(prisma, {
+    grupoId: grupo.id, localId: local.id, nombre: `${marca}-${nombre}-producto`, precioVenta: 1000, precioCosto: 600, stock: 100000,
+  });
+  return {
+    local, cuenta, producto,
+    sesion: firmar(cuenta, local.id, permisos),
+    config: firmar(cuenta, local.id, ["config_local.pos"]),
+    tesoreria: firmar(cuenta, local.id, [PERMISO_VER_TESORERIA, PERMISO_VERIFICAR_EFECTIVO, PERMISO_ANULAR_VERIFICACION]),
+  };
+}
+async function operador(L) {
+  const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-op${(n += 1)}`, pinHash: "x" } });
+  await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: L.local.id } });
+  return { op, quien: { sesion: L.sesion, operador: firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: L.local.id }) } };
+}
+/** Abre por la ruta clásica con el cuerpo dado. Devuelve la respuesta. */
+async function abrirCon(L, cuerpo) {
+  const { op, quien } = await operador(L);
+  const r = await leer(await rutaAbrir.POST(pedido(`${BASE}/turnos/abrir`, quien, { montoInicial: 1000, ...cuerpo })));
+  return { r, op, quien, L };
+}
+/** Una caja abierta por la ruta con este turno. */
+async function cajaPorRuta(L, turnoOperativoId) {
+  const c = await abrirCon(L, { turnoOperativoId });
+  requerir("abre la caja por la ruta", c.r.ok === true, `${c.r.status} ${c.r.error ?? ""}`);
+  return { ...c, turnoId: c.r.turno.id };
+}
+/**
+ * Una caja escrita directo en la base: la de AYER —ninguna ruta abre con otra
+ * fecha— o una VIEJA, sin turno, como las anteriores a la migración. Se vende
+ * y se cierra por las rutas reales.
+ */
+async function cajaEnLaBase(L, { turnoOperativoId = null, fechaOperativa = null } = {}) {
+  const { op, quien } = await operador(L);
+  const t = await prisma.turno.create({
+    data: { localId: L.local.id, vendedorId: L.cuenta.id, operadorId: op.id, montoInicial: 1000, turnoOperativoId, fechaOperativa },
+  });
+  return { op, quien, L, turnoId: t.id };
+}
+async function vender(caja, monto) {
+  const r = await leer(await rutaCrear.POST(pedido(`${BASE}/crear`, caja.quien, {
+    clientTxnId: clave(), localId: caja.L.local.id, clienteId: null, turnoId: caja.turnoId, formaPago: "EFECTIVO",
+    esFiado: false, descuento: 0, descuentoPorPuntos: 0, puntosCanje: 0,
+    items: [itemCrearPayload({ productoBaseId: caja.L.producto.baseId, nombre: "P", precio: 1000, cantidad: monto / 1000, precioCosto: 600 })],
+  })));
+  requerir(`vende $${monto}`, r.ok === true, `${r.status} ${r.error ?? ""}`);
+}
+async function cerrar(caja, cambio, retiro) {
+  const ini = await leer(await rutaCierreIniciar.POST(pedido(`${BASE}/cierres/iniciar`, caja.quien, { turnoId: caja.turnoId, desgloseCambio: desgloseDe(cambio) })));
+  requerir("inicia el cierre", ini.ok === true, `${ini.status} ${ini.error ?? ""}`);
+  const fin = await leer(await rutaCierreConfirmar.POST(
+    pedido(`${BASE}/cierres/${ini.cierre.token}/confirmar`, caja.quien, { desgloseRetiroContado: desgloseDe(retiro) }),
+    conToken(ini.cierre.token)
+  ));
+  requerir("confirma el cierre", fin.ok === true, `${fin.status} ${fin.error ?? ""}`);
+  return prisma.cierrePreparacion.findFirst({ where: { token: ini.cierre.token } });
+}
+/** Vende, cierra y devuelve el id del movimiento de la entrega de cierre. */
+async function entregaDeCierre(caja, monto) {
+  await vender(caja, monto);
+  await cerrar(caja, 1000, monto);
+  const t = await prisma.turno.findUnique({ where: { id: caja.turnoId }, select: { retiroCierreMovimientoId: true } });
+  return t.retiroCierreMovimientoId;
+}
+const verificar = async (L, cuerpo) =>
+  leer(await rutaVerificar.POST(conCookie("http://ci/api/finanzas/tesoreria/verificaciones", `erpazul_sesion=${L.tesoreria}`, cuerpo)));
+async function lecturaDel(L, desplazamiento = 0) {
+  const rango = await rangoDeTesoreria(prisma, { localId: L.local.id, unidad: "DIA", desplazamiento });
+  return leerTesoreria(prisma, { localId: L.local.id, fechaInicio: rango.fechaInicio, fechaFin: rango.fechaFin });
+}
+const turnoDeCaja = (id) => prisma.turno.findUnique({ where: { id }, select: { turnoOperativoId: true, fechaOperativa: true } });
+
+async function correr() {
+  const A = await montarLocal("A");
+  const B = await montarLocal("B");
+  const [mañana, tarde, vieja] = await Promise.all([
+    prisma.turnoOperativo.create({ data: { localId: A.local.id, nombre: "Mañana", orden: 0 } }),
+    prisma.turnoOperativo.create({ data: { localId: A.local.id, nombre: "Tarde", orden: 1 } }),
+    prisma.turnoOperativo.create({ data: { localId: A.local.id, nombre: "Noche vieja", orden: 2, activo: false } }),
+  ]);
+  const mañanaB = await prisma.turnoOperativo.create({ data: { localId: B.local.id, nombre: "Mañana", orden: 0 } });
+
+  seccion("A. El catálogo es de cada local [TO-12]");
+  {
+    const catalogo = async (sesion, query = "") =>
+      leer(await rutaCatalogo.GET(conCookie(`http://ci/api/config/turnos-operativos${query}`, `erpazul_sesion=${sesion}`, null, "GET")));
+    const deA = await catalogo(A.sesion);
+    igual("A ve los suyos, en su orden, y ninguno de B", deA.turnos?.map((t) => t.nombre), ["Mañana", "Tarde", "Noche vieja"]);
+    ok("ningún id de B en el catálogo de A", !deA.turnos?.some((t) => t.id === mañanaB.id));
+    igual("con ?activos=1, solo los que se ofrecen para abrir", (await catalogo(A.sesion, "?activos=1")).turnos?.map((t) => t.nombre), ["Mañana", "Tarde"]);
+    igual("B ve solo el suyo", (await catalogo(B.sesion)).turnos?.map((t) => t.id), [mañanaB.id]);
+    igual("la fecha operativa que ofrece es la de hoy", deA.fechaOperativa, HOY);
+    const ajeno = await leer(await rutaTurnoDelCatalogo.PATCH(
+      conCookie(`http://ci/api/config/turnos-operativos/${mañanaB.id}`, `erpazul_sesion=${A.config}`, { activo: false }, "PATCH"), conId(mañanaB.id)));
+    igual("A no puede tocar el turno de B: 404, como si no existiera", ajeno.status, 404);
+    igual("y el de B sigue activo", (await prisma.turnoOperativo.findUnique({ where: { id: mañanaB.id } })).activo, true);
+    const reordenAjeno = await leer(await rutaCatalogo.PUT(
+      conCookie("http://ci/api/config/turnos-operativos", `erpazul_sesion=${A.config}`, { orden: [mañanaB.id] }, "PUT")));
+    igual("ni reordenarlo", reordenAjeno.status, 400);
+    const repetido = await leer(await rutaCatalogo.POST(conCookie("http://ci/api/config/turnos-operativos", `erpazul_sesion=${A.config}`, { nombre: "  Mañana " })));
+    igual("un nombre repetido en el mismo local: 409", repetido.status, 409);
+    const sinPermiso = await leer(await rutaCatalogo.POST(conCookie("http://ci/api/config/turnos-operativos", `erpazul_sesion=${A.sesion}`, { nombre: "Siesta" })));
+    igual("dar de alta pide config_local.pos", sinPermiso.status, 403);
+  }
+
+  seccion("B. Abrir caja exige un turno activo de ESTE local [TO-4, TO-5]");
+  {
+    const antes = await prisma.turno.count({ where: { localId: A.local.id } });
+    const deB = await abrirCon(A, { turnoOperativoId: mañanaB.id });
+    igual("con un turno de otro local: 400 y su código", [deB.r.status, deB.r.codigo], [400, "TURNO_OPERATIVO_DE_OTRO_LOCAL"]);
+    const inactivo = await abrirCon(A, { turnoOperativoId: vieja.id });
+    igual("con un turno inactivo: 400 y su código", [inactivo.r.status, inactivo.r.codigo], [400, "TURNO_OPERATIVO_INACTIVO"]);
+    const sin = await abrirCon(A, {});
+    igual("sin turno: 400, pide elegirlo", [sin.r.status, sin.r.codigo], [400, "TURNO_OPERATIVO_REQUERIDO"]);
+    const deAyer = await abrirCon(A, { turnoOperativoId: mañana.id, fechaOperativa: AYER });
+    igual("con la pantalla de ayer: 409, no abre con otra fecha", [deAyer.r.status, deAyer.r.codigo], [409, "FECHA_OPERATIVA_DE_OTRO_DIA"]);
+    igual("ninguno de los rechazos abrió una caja", await prisma.turno.count({ where: { localId: A.local.id } }), antes);
+    const C = await montarLocal("C");
+    const sinCatalogo = await abrirCon(C, {});
+    igual("un local sin turnos activos: 409 que dice qué falta", [sinCatalogo.r.status, sinCatalogo.r.codigo], [409, "LOCAL_SIN_TURNOS_OPERATIVOS"]);
+  }
+
+  seccion("C. Las tres rutas de apertura guardan turno y fecha operativa [TO-11]");
+  {
+    const clasica = await cajaPorRuta(A, mañana.id);
+    igual("abrir: turno y fecha de hoy", [(await turnoDeCaja(clasica.turnoId)).turnoOperativoId, isoDe((await turnoDeCaja(clasica.turnoId)).fechaOperativa)], [mañana.id, HOY]);
+
+    const { quien: qSin } = await operador(A);
+    const rSin = await leer(await rutaAbrirSinCambio.POST(pedido(`${BASE}/turnos/abrir-sin-cambio`, qSin, {
+      desgloseContado: desgloseDe(2000), motivo: "fondo propio", turnoOperativoId: tarde.id, fechaOperativa: HOY,
+    })));
+    requerir("abrir-sin-cambio abre", rSin.ok === true, `${rSin.status} ${rSin.error ?? ""}`);
+    const tSin = await turnoDeCaja(rSin.turno.id);
+    igual("abrir-sin-cambio: turno y fecha de hoy", [tSin.turnoOperativoId, isoDe(tSin.fechaOperativa)], [tarde.id, HOY]);
+
+    // Un sobre de verdad: una caja que cierra dejando cambio.
+    const deja = await cajaPorRuta(A, mañana.id);
+    await vender(deja, 5000);
+    const corte = await cerrar(deja, 3000, 5000);
+    const sobre = await prisma.cambioPendiente.findFirst({ where: { cierrePreparacionId: corte.id } });
+    requerir("el cierre dejó un sobre", Boolean(sobre), "sin sobre");
+    const { quien: qCon } = await operador(A);
+    const reserva = await leer(await rutaReservar.POST(pedido(`${BASE}/cambios-pendientes/reservar`, qCon, { cambioPendienteId: sobre.id })));
+    requerir("reserva el sobre", reserva.ok === true, `${reserva.status} ${reserva.error ?? ""}`);
+    const conTurnoAjeno = await leer(await rutaAbrirConCambio.POST(pedido(`${BASE}/turnos/abrir-con-cambio`, qCon, {
+      cambioPendienteId: sobre.id, desgloseRecibido: desgloseDe(3000), turnoOperativoId: mañanaB.id,
+    })));
+    igual("abrir-con-cambio con un turno de otro local: 400", [conTurnoAjeno.status, conTurnoAjeno.codigo], [400, "TURNO_OPERATIVO_DE_OTRO_LOCAL"]);
+    igual("y el sobre no se consumió", (await prisma.cambioPendiente.findUnique({ where: { id: sobre.id } })).turnoDestinoId, null);
+    const rCon = await leer(await rutaAbrirConCambio.POST(pedido(`${BASE}/turnos/abrir-con-cambio`, qCon, {
+      cambioPendienteId: sobre.id, desgloseRecibido: desgloseDe(3000), turnoOperativoId: tarde.id, fechaOperativa: HOY,
+    })));
+    requerir("abrir-con-cambio abre", rCon.ok === true, `${rCon.status} ${rCon.error ?? ""}`);
+    const tCon = await turnoDeCaja(rCon.turno.id);
+    igual("abrir-con-cambio: turno y fecha de hoy", [tCon.turnoOperativoId, isoDe(tCon.fechaOperativa)], [tarde.id, HOY]);
+  }
+
+  seccion("D. La base sostiene la caja: CHECK, FK compuesta e inmutable [TO-4, TO-8]");
+  {
+    const { op } = await operador(A);
+    rechazado("turno sin fecha: el CHECK lo frena",
+      await intento(() => prisma.turno.create({ data: { localId: A.local.id, vendedorId: A.cuenta.id, operadorId: op.id, montoInicial: 0, turnoOperativoId: mañana.id } })),
+      /Turno_turno_operativo_completo_chk/);
+    rechazado("una caja de A con el turno de B: la FK compuesta la frena",
+      await intento(() => prisma.turno.create({ data: { localId: A.local.id, vendedorId: A.cuenta.id, operadorId: op.id, montoInicial: 0, turnoOperativoId: mañanaB.id, fechaOperativa: comoFecha(HOY) } })),
+      /Turno_turnoOperativoId_localId_fkey|P2003/);
+    const conTurno = await cajaPorRuta(A, mañana.id);
+    rechazado("el turno de una caja no cambia una vez abierta",
+      await intento(() => prisma.turno.update({ where: { id: conTurno.turnoId }, data: { turnoOperativoId: tarde.id } })),
+      /no cambian/);
+    rechazado("ni su fecha operativa",
+      await intento(() => prisma.turno.update({ where: { id: conTurno.turnoId }, data: { fechaOperativa: comoFecha(AYER) } })),
+      /no cambian/);
+    const vieja1 = await cajaEnLaBase(A);
+    rechazado("una caja vieja no recibe turno después: no hay backfill posible",
+      await intento(() => prisma.turno.update({ where: { id: vieja1.turnoId }, data: { turnoOperativoId: mañana.id, fechaOperativa: comoFecha(HOY) } })),
+      /no cambian/);
+    const vivo = await intento(() => prisma.turno.update({ where: { id: conTurno.turnoId }, data: { observaciones: "una escritura de siempre" } }));
+    ok("las escrituras de siempre sobre la caja no se frenan", vivo.ok, vivo.mensaje);
+  }
+
+  // Los datos de E, F y G: Mañana (dos cajas), Tarde (una), Mañana de AYER
+  // (cerrada hoy) y una caja vieja sin turno.
+  const m1 = await cajaPorRuta(A, mañana.id);
+  const m2 = await cajaPorRuta(A, mañana.id);
+  const t1 = await cajaPorRuta(A, tarde.id);
+  const ay = await cajaEnLaBase(A, { turnoOperativoId: mañana.id, fechaOperativa: comoFecha(AYER) });
+  const vj = await cajaEnLaBase(A);
+  const eM1 = await entregaDeCierre(m1, 5000);
+  const eM2 = await entregaDeCierre(m2, 3000);
+  const eT1 = await entregaDeCierre(t1, 4000);
+  const eAy = await entregaDeCierre(ay, 2000);
+  const eVj = await entregaDeCierre(vj, 6000);
+
+  seccion("E. Tesorería agrupa por el turno de la caja [TO-1, TO-2, TO-8]");
+  {
+    const hoy = await lecturaDel(A);
+    const grupoDe = (id) => hoy.entregas.find((e) => e.cajaMovimientoId === id)?.grupo;
+    const g = (clave) => hoy.grupos.find((x) => x.clave === clave);
+    igual("Mañana y Tarde del mismo día: grupos distintos", grupoDe(eM1) !== grupoDe(eT1), true);
+    igual("las dos cajas de Mañana: el mismo grupo", grupoDe(eM1), grupoDe(eM2));
+    const gM = g(grupoDe(eM1));
+    ok("el grupo de Mañana tiene sus dos cajas", gM && [m1.turnoId, m2.turnoId].every((id) => gM.cajas.some((c) => c.turnoId === id)), JSON.stringify(gM?.cajas?.map((c) => c.turnoId)));
+    igual("y se llama por el turno, con su criterio", [gM?.etiqueta, gM?.criterio, gM?.fechaOperativa], ["Mañana", CRITERIO_TURNO_OPERATIVO, HOY]);
+    const gV = g(grupoDe(eVj));
+    igual("la caja vieja va a «Sin turno asignado», aparte", [gV?.etiqueta, gV?.criterio, gV?.sinTurno], ["Sin turno asignado", CRITERIO_SIN_TURNO, true]);
+    igual("y no recibe un turno inventado", hoy.cajas.find((c) => c.turnoId === vj.turnoId)?.turnoOperativo, null);
+    ok("la caja de Mañana de AYER no entra en hoy aunque cerró hoy", !hoy.entregas.some((e) => e.cajaMovimientoId === eAy));
+    const ayer = await lecturaDel(A, -1);
+    const enAyer = ayer.entregas.find((e) => e.cajaMovimientoId === eAy);
+    igual("entra ENTERA en ayer, en su Mañana", [Boolean(enAyer), ayer.grupos.find((x) => x.clave === enAyer?.grupo)?.etiqueta], [true, "Mañana"]);
+  }
+
+  seccion("F. No se verifican juntos dos turnos ni dos fechas [TO-6, TO-7]");
+  {
+    const antes = await prisma.verificacionEfectivo.count({ where: { localId: A.local.id } });
+    const mezcla = await verificar(A, { cajaMovimientoIds: [eM1, eT1], importeVerificado: 9000, idempotencyKey: clave() });
+    igual("Mañana + Tarde: 400 TURNOS_OPERATIVOS_MEZCLADOS", [mezcla.status, mezcla.codigo], [400, "TURNOS_OPERATIVOS_MEZCLADOS"]);
+    const dosFechas = await verificar(A, { cajaMovimientoIds: [eM1, eAy], importeVerificado: 7000, idempotencyKey: clave() });
+    igual("Mañana de hoy + Mañana de ayer: 400 FECHAS_OPERATIVAS_MEZCLADAS", [dosFechas.status, dosFechas.codigo], [400, "FECHAS_OPERATIVAS_MEZCLADAS"]);
+    const conVieja = await verificar(A, { cajaMovimientoIds: [eM1, eVj], importeVerificado: 11000, idempotencyKey: clave() });
+    igual("Mañana + una caja sin turno: también se rechaza", [conVieja.status, conVieja.codigo], [400, "TURNOS_OPERATIVOS_MEZCLADOS"]);
+    igual("ningún rechazo escribió nada", await prisma.verificacionEfectivo.count({ where: { localId: A.local.id } }), antes);
+  }
+
+  seccion("G. La verificación congela su turno; la base lo exige y lo cuida [TO-6, TO-9]");
+  {
+    const turnoM = await verificar(A, { cajaMovimientoIds: [eM1, eM2], importeVerificado: 8000, idempotencyKey: clave() });
+    requerir("las dos cajas de Mañana se verifican juntas: 201", turnoM.status === 201, `${turnoM.status} ${turnoM.codigo ?? ""} ${turnoM.error ?? ""}`);
+    igual("la verificación congela Mañana y la fecha de hoy", [turnoM.verificacion.turnoOperativo, turnoM.verificacion.fechaOperativa], [{ id: mañana.id, nombre: "Mañana" }, HOY]);
+    const fila = await prisma.verificacionEfectivo.findUnique({ where: { id: turnoM.verificacion.id } });
+    igual("y así quedó en la base", [fila.turnoOperativoId, isoDe(fila.fechaOperativa)], [mañana.id, HOY]);
+
+    const vieja = await verificar(A, { cajaMovimientoIds: [eVj], importeVerificado: 5900, idempotencyKey: clave() });
+    requerir("una caja sin turno se sigue pudiendo verificar sola: 201", vieja.status === 201, `${vieja.status} ${vieja.codigo ?? ""}`);
+    igual("sin turno: NULL, no se le asigna uno", [vieja.verificacion.turnoOperativo, vieja.verificacion.fechaOperativa], [null, null]);
+    const hoy = await lecturaDel(A);
+    const leida = hoy.verificaciones.find((v) => v.id === vieja.verificacion.id);
+    igual("se sigue leyendo, con sus importes del acto, sin recalcular", [leida?.importeDeclarado, leida?.importeVerificado, leida?.diferencia, leida?.turnoOperativo], [6000, 5900, -100, null]);
+
+    // La base, aunque la aplicación se equivoque: una entrega de Tarde en una
+    // verificación de Mañana.
+    const foto = await prisma.cajaMovimiento.findUnique({ where: { id: eT1 }, include: { turno: true } });
+    const torcida = await intento(() => prisma.$transaction(async (tx) => {
+      const v = await tx.verificacionEfectivo.create({ data: {
+        localId: A.local.id, importeDeclarado: foto.monto, importeVerificado: foto.monto, diferencia: 0,
+        verificadaPorUsuarioId: A.cuenta.id, idempotencyKey: clave(), turnoOperativoId: mañana.id, fechaOperativa: comoFecha(HOY),
+      } });
+      await tx.verificacionEfectivoEntrega.create({ data: {
+        verificacionEfectivoId: v.id, cajaMovimientoId: eT1, montoDeclaradoSnapshot: foto.monto, localIdSnapshot: A.local.id,
+        turnoIdSnapshot: foto.turnoId, operadorIdSnapshot: foto.turno.operadorId, claseSnapshot: "CIERRE", instanteEntregaSnapshot: foto.createdAt,
+      } });
+    }));
+    rechazado("la base no acepta una entrega de Tarde en una verificación de Mañana", torcida, /otro turno operativo/);
+    rechazado("la verificación no apunta a un turno de otro local",
+      await intento(() => prisma.verificacionEfectivo.create({ data: {
+        localId: A.local.id, importeDeclarado: 1, importeVerificado: 1, diferencia: 0, verificadaPorUsuarioId: A.cuenta.id,
+        idempotencyKey: clave(), turnoOperativoId: mañanaB.id, fechaOperativa: comoFecha(HOY),
+      } })),
+      /VerificacionEfectivo_turnoOperativoId_localId_fkey|P2003/);
+    rechazado("anular no cambia el turno que se verificó",
+      await intento(() => prisma.verificacionEfectivo.update({ where: { id: turnoM.verificacion.id }, data: {
+        estado: "ANULADA", vigente: false, anuladaEn: new Date(), anuladaPorUsuarioId: A.cuenta.id, motivoAnulacion: "prueba", turnoOperativoId: tarde.id,
+      } })),
+      /no cambia lo que se verificó/);
+  }
+}
+
+try {
+  await correr();
+} catch (e) {
+  fallas.push(`[${seccionActual}] excepción: ${e.message}`);
+  if (!String(e.message).startsWith("requisito:")) console.error(e);
+} finally {
+  await prisma.$disconnect();
+}
+
+console.log(`\nAfirmaciones que pasaron: ${pasadas}`);
+console.log(`${pasadas} en verde, ${fallas.length} en rojo`);
+if (fallas.length) {
+  console.log("\nFALLAS:");
+  for (const f of fallas) console.log(`  ✗ ${f}`);
+  process.exit(1);
+}

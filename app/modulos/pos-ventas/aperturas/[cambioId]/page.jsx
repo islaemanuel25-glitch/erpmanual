@@ -34,6 +34,7 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
 import { Cifra, tonoDiferencia, money } from "@/components/caja/CifrasRetiro";
 import TablaDenominaciones from "@/components/caja/TablaDenominaciones";
+import SelectorTurnoOperativo, { useTurnosOperativosActivos } from "@/components/caja/SelectorTurnoOperativo";
 import { CABECERA_BLOQUE, BLOQUE_ALINEADO } from "@/components/caja/geometriaGrilla";
 import {
   PanelCambioEsperado,
@@ -85,6 +86,9 @@ export default function AperturaConCambioPage() {
   const [totalConfirmado, setTotalConfirmado] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [resultado, setResultado] = useState(null);
+  // El turno operativo se elige al abrir; la fecha la fijó el servidor.
+  const catalogo = useTurnosOperativosActivos();
+  const [turno, setTurno] = useState({ id: null, fechaOperativa: null });
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const puedeUsar = permisos.includes("*") || permisos.includes("pos.usar");
@@ -217,6 +221,10 @@ export default function AperturaConCambioPage() {
   // ── Confirmar y abrir ────────────────────────────────────────────────────
   const confirmar = async () => {
     if (!puedeConfirmar || guardando) return;
+    if (!turno.id) {
+      setError("Elegí de qué turno es esta caja.");
+      return;
+    }
     setError("");
     setGuardando(true);
     try {
@@ -231,6 +239,8 @@ export default function AperturaConCambioPage() {
           motivoDiferencia: motivo.trim() || null,
           confirmaComposicion,
           totalConfirmado: totalConfirmado === "" ? null : totalConfirmado,
+          turnoOperativoId: turno.id,
+          fechaOperativa: turno.fechaOperativa,
         }),
       });
       const json = await res.json();
@@ -340,6 +350,17 @@ export default function AperturaConCambioPage() {
             Volver
           </button>
         </div>
+      </SunmiCard>
+
+      <SunmiCard className="p-3">
+        <SelectorTurnoOperativo
+          valor={turno.id}
+          onCambiar={(id, fechaOperativa) => {
+            setTurno({ id, fechaOperativa });
+            setError("");
+          }}
+          catalogo={catalogo}
+        />
       </SunmiCard>
 
       {aviso && (

@@ -37,6 +37,7 @@ const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const jwt = (await import("jsonwebtoken")).default;
 
 const { crearProductoVendible } = await import("./fixturePos.mjs");
+const { turnoOperativoDeSesion } = await import("./fixtureTurnoOperativo.mjs");
 const { esperarEnFila } = await import("./carreraForzada.mjs");
 const { firmarTokenOperador, OperadorCookie } = await import("../../lib/operador.js");
 const { itemCrearPayload } = await import("../../lib/pos-ventas/payloadVenta.js");
@@ -134,7 +135,7 @@ async function nuevaCaja(l, fondo = 1000) {
     operador = firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: l.local.id });
   }
   const quien = { sesion: l.sesion, operador };
-  const r = await leer(await rutaAbrir.POST(pedido(`${BASE}/turnos/abrir`, quien, { montoInicial: fondo })));
+  const r = await leer(await rutaAbrir.POST(pedido(`${BASE}/turnos/abrir`, quien, { montoInicial: fondo, turnoOperativoId: await turnoOperativoDeSesion(prisma, quien) })));
   requerir("abre la caja", r.ok === true, `${r.status} ${r.error ?? ""}`);
   return { l, op, quien, turnoId: r.turno.id };
 }
@@ -179,7 +180,21 @@ async function entregasDe(l) {
 function escribir(db, datos, alterar = (x) => x) {
   const { verificacion, entregas } = alterar(datos);
   const cuerpo = async (tx) => {
-    const v = await tx.verificacionEfectivo.create({ data: verificacion });
+    // Como la acción: la verificación congela el turno operativo y la fecha de
+    // la caja de sus entregas. Se toma de la primera sin validar las demás a
+    // propósito: que la base rechace una mezcla es lo que se prueba en
+    // turnoOperativo.mjs, y acá los datos torcidos tienen que llegar a la base.
+    const primera = entregas[0]
+      ? await tx.turno.findFirst({
+          // Solo de una caja del local de la verificación: la de otro local
+          // tiene que llegar a la base y que la frene el chequeo de local.
+          where: { id: entregas[0].turnoIdSnapshot, localId: verificacion.localId },
+          select: { turnoOperativoId: true, fechaOperativa: true },
+        })
+      : null;
+    const v = await tx.verificacionEfectivo.create({
+      data: { ...verificacion, turnoOperativoId: primera?.turnoOperativoId ?? null, fechaOperativa: primera?.fechaOperativa ?? null },
+    });
     if (entregas.length) {
       await tx.verificacionEfectivoEntrega.createMany({ data: entregas.map((e) => ({ ...e, verificacionEfectivoId: v.id })) });
     }
@@ -436,7 +451,11 @@ async function correr() {
     /no coincide con el movimiento real/);
   rechazado("la foto con el local real B bajo un padre del A: rechazada",
     await intento(() => escribir(prisma, armar([eb2C], 6000), (d) => ({ ...d, entregas: d.entregas.map((e) => ({ ...e, localIdSnapshot: B.local.id })) }))),
-    /VerificacionEfectivoEntrega_verificacionEfectivoId_localId_fkey|P2003/);
+    // Desde el turno operativo la frena antes el trigger de turno (BEFORE INSERT,
+    // corre antes que la FK, que es AFTER): una caja de otro local es siempre
+    // de otro turno operativo, porque el catálogo es por local. La FK sigue
+    // existiendo y la cuenta la sección J.
+    /VerificacionEfectivoEntrega_verificacionEfectivoId_localId_fkey|P2003|de otro turno operativo/);
   igual("la entrega del B sigue sin verificar", await prisma.verificacionEfectivoEntrega.count({ where: { cajaMovimientoId: eb2C.cajaMovimientoId } }), 0);
 
   // ── J. NADA SE BORRA ─────────────────────────────────────────────────────
@@ -446,7 +465,9 @@ async function correr() {
       FROM pg_constraint c JOIN pg_class cl ON cl.oid = c.conrelid
      WHERE c.contype = 'f' AND cl.relname IN ('VerificacionEfectivo', 'VerificacionEfectivoEntrega')
      ORDER BY c.conname`;
-  igual("las seis FK existen", fks.length, 6);
+  // Seis del contrato original más la del turno operativo congelado
+  // (VerificacionEfectivo → TurnoOperativo, compuesta con el local).
+  igual("las siete FK existen", fks.length, 7);
   igual("ninguna borra en cascada ni anula: todas RESTRICT", fks.filter((f) => f.al_borrar !== "r").map((f) => f.conname), []);
   rechazado("borrar una verificación: rechazado",
     await intento(() => prisma.verificacionEfectivo.delete({ where: { id: V1.id } })),
@@ -464,6 +485,9 @@ async function correr() {
     [await prisma.verificacionEfectivo.count({ where: { id: V1.id } }), await prisma.verificacionEfectivoEntrega.count({ where: { verificacionEfectivoId: V1.id } })], [1, 3]);
 
   // ── K. NINGUNA IDENTIDAD DE TURNO COMERCIAL ──────────────────────────────
+  // Reescrito con el turno operativo: la verificación SÍ guarda el turno que se
+  // eligió al abrir las cajas y su fecha operativa, congelados. Lo que sigue
+  // prohibido es lo inferido: turno comercial, franja, día u hora.
   seccion("K. Lo que la base NO guarda");
   const columnas = await prisma.$queryRaw`
     SELECT table_name AS tabla, column_name AS columna FROM information_schema.columns
@@ -471,16 +495,16 @@ async function correr() {
      ORDER BY table_name, ordinal_position`;
   const de_ = (t) => columnas.filter((c) => c.tabla === t).map((c) => c.columna).sort();
   igual("las columnas de la verificación son exactamente estas", de_("VerificacionEfectivo"), [
-    "anuladaEn", "anuladaPorUsuarioId", "createdAt", "diferencia", "estado", "id", "idempotencyKey", "importeDeclarado",
-    "importeVerificado", "localId", "motivoAnulacion", "observacion", "verificadaEn", "verificadaPorOperadorId",
-    "verificadaPorUsuarioId", "vigente",
+    "anuladaEn", "anuladaPorUsuarioId", "createdAt", "diferencia", "estado", "fechaOperativa", "id", "idempotencyKey",
+    "importeDeclarado", "importeVerificado", "localId", "motivoAnulacion", "observacion", "turnoOperativoId",
+    "verificadaEn", "verificadaPorOperadorId", "verificadaPorUsuarioId", "vigente",
   ]);
   igual("las de la entrega, exactamente estas", de_("VerificacionEfectivoEntrega"), [
     "cajaMovimientoId", "claseSnapshot", "id", "instanteEntregaSnapshot", "localIdSnapshot", "montoDeclaradoSnapshot",
     "operadorIdSnapshot", "turnoIdSnapshot", "verificacionEfectivoId", "vigente",
   ]);
-  igual("ninguna es turno comercial, franja ni fecha comercial",
-    columnas.filter((c) => /comercial|franja|fecha|dia/i.test(c.columna)).map((c) => c.columna), []);
+  igual("ninguna es turno comercial, franja, día ni hora; la única fecha es la operativa",
+    columnas.filter((c) => /comercial|franja|fecha|dia|hora/i.test(c.columna)).map((c) => c.columna), ["fechaOperativa"]);
 }
 
 try {

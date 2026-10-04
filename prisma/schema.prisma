@@ -266,6 +266,8 @@ model Local {
   pagosGastoOrigen        PagoGasto[]               @relation("pago_gasto_origen")
   /// Las verificaciones de efectivo de Tesorería de esta ubicación.
   verificacionesEfectivo  VerificacionEfectivo[]    @relation("verificacion_efectivo_del_local")
+  /// El catálogo de turnos operativos de esta ubicación (Mañana, Tarde…).
+  turnosOperativos        TurnoOperativo[]
 }
 
 // Configuración de comportamiento POR LOCAL. Reemplaza (con herencia) a los
@@ -2379,6 +2381,23 @@ model Turno {
   anuladoPorId    Int?
   motivoAnulacion String?
 
+  // ── TURNO OPERATIVO ────────────────────────────────────────────────────────
+  //
+  // ESTE MODELO SIGUE SIENDO UNA CAJA. El turno operativo —Mañana, Tarde…— es
+  // del catálogo del local (`TurnoOperativo`) y la caja lo recibe al abrirse:
+  // lo ELIGE quien abre, en las tres rutas de apertura. La fecha operativa la
+  // fija el servidor en ese momento, en día argentino. Ninguno de los dos se
+  // recalcula después por la hora, ni porque la caja cruce la medianoche: una
+  // caja de la Noche del domingo que cierra a las 00:30 sigue siendo del domingo.
+  //
+  // Los dos van juntos o ninguno, por CHECK; y una vez escritos no cambian, por
+  // trigger. NULL = caja anterior a esto: NO se infiere a qué turno perteneció,
+  // y Tesorería la muestra como "Sin turno asignado". La FK compuesta con
+  // `localId` impide usar el turno de otro local. Migración
+  // 20261005120000_turno_operativo.
+  turnoOperativoId Int?
+  fechaOperativa   DateTime? @db.Date
+
   /// DOS ÍNDICES PARCIALES QUE VIVEN SOLO EN SQL — no se pueden declarar acá.
   ///
   /// LA CAJA ES DEL OPERADOR. La cuenta ERP (`vendedorId`) autentica el acceso y
@@ -2422,6 +2441,7 @@ model Turno {
   vendedor    Usuario        @relation(fields: [vendedorId], references: [id])
   operador    OperadorLocal? @relation(fields: [operadorId], references: [id])
   cerradoPor  Usuario?       @relation("turnoCerradoPor", fields: [cerradoPorId], references: [id])
+  turnoOperativo TurnoOperativo? @relation("caja_del_turno_operativo", fields: [turnoOperativoId, localId], references: [id, localId], onDelete: Restrict, onUpdate: Restrict)
   ventas      Venta[]
   cajaMovimientos CajaMovimiento[]
   arqueos         ArqueoCaja[]
@@ -2453,6 +2473,9 @@ model Turno {
   /// El POS pregunta "¿tengo turno operativo?" en cada carga: localId +
   /// vendedorId + los dos campos de estado, resuelto por índice.
   @@index([localId, vendedorId, cierre, cierreEnPreparacionEn])
+  /// Tesorería toma las cajas de un período por su fecha operativa.
+  @@index([localId, fechaOperativa])
+  @@index([turnoOperativoId])
 }
 
 /// Arqueo de caja: foto contable de un conteo físico en un momento del turno.
@@ -3627,10 +3650,19 @@ model VerificacionEfectivo {
   anuladaPorUsuarioId      Int?
   motivoAnulacion          String?
   createdAt                DateTime                   @default(now())
+  /// EL TURNO OPERATIVO QUE SE VERIFICÓ, congelado al verificar —migración
+  /// 20261005120000_turno_operativo—. Los dos van juntos o ninguno, por CHECK.
+  /// NULL = verificación anterior al turno operativo, o de cajas sin turno: no
+  /// se le asigna uno después. La FK compuesta con `localId` impide que apunte
+  /// al turno de otro local, y un trigger exige que cada entrega sea de una caja
+  /// de ESE turno y ESA fecha operativa.
+  turnoOperativoId         Int?
+  fechaOperativa           DateTime?                  @db.Date
 
   local          Local   @relation("verificacion_efectivo_del_local", fields: [localId], references: [id], onDelete: Restrict)
   verificadaPor  Usuario @relation("verificacion_efectivo_hecha_por", fields: [verificadaPorUsuarioId], references: [id], onDelete: Restrict)
   anuladaPor     Usuario? @relation("verificacion_efectivo_anulada_por", fields: [anuladaPorUsuarioId], references: [id], onDelete: Restrict)
+  turnoOperativo TurnoOperativo? @relation("verificacion_del_turno_operativo", fields: [turnoOperativoId, localId], references: [id, localId], onDelete: Restrict, onUpdate: Restrict)
 
   entregas         VerificacionEfectivoEntrega[] @relation("entrega_vigencia_del_padre")
   entregasDelLocal VerificacionEfectivoEntrega[] @relation("entrega_local_del_padre")
@@ -3640,6 +3672,43 @@ model VerificacionEfectivo {
   @@unique([id, vigente])
   @@unique([id, localId])
   @@index([localId, verificadaEn])
+  @@index([turnoOperativoId, fechaOperativa])
+}
+
+/// UN TURNO OPERATIVO DEL CATÁLOGO DE UN LOCAL: Mañana, Tarde, Noche, o como lo
+/// llame ese local. Migración 20261005120000_turno_operativo.
+///
+/// Es un CATÁLOGO, no una franja horaria: no tiene horas. La caja lo recibe
+/// EXPLÍCITAMENTE al abrirse —lo elige quien abre— y no se infiere nunca por
+/// la hora. Tesorería agrupa y verifica el efectivo por (local, fecha
+/// operativa, turno operativo) de la caja.
+///
+/// Pertenece a un local: cada local da de alta los suyos, y uno que no usa
+/// Noche no la tiene. No se borra —una caja o una verificación pueden
+/// apuntarlo—: se desactiva, y uno inactivo no se ofrece para abrir.
+model TurnoOperativo {
+  id        Int      @id @default(autoincrement())
+  localId   Int
+  nombre    String
+  orden     Int      @default(0)
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Cascade como `ConfiguracionLocal`: es configuración del local. En los
+  /// hechos no borra nada —una caja o una verificación que lo apunten frenan el
+  /// borrado del local por su propia FK—.
+  local          Local                  @relation(fields: [localId], references: [id], onDelete: Cascade)
+  cajas          Turno[]                @relation("caja_del_turno_operativo")
+  verificaciones VerificacionEfectivo[] @relation("verificacion_del_turno_operativo")
+
+  /// Un nombre por local. Dos "Mañana" en el mismo local serían dos grupos que
+  /// se leen igual.
+  @@unique([localId, nombre])
+  /// Destino de las FK compuestas de `Turno` y `VerificacionEfectivo`: la caja
+  /// y la verificación solo pueden apuntar a un turno de SU local.
+  @@unique([id, localId])
+  @@index([localId, activo, orden])
 }
 
 /// QUÉ ENTREGA CUBRIÓ UNA VERIFICACIÓN, CON LA FOTO DE CÓMO ERA AL VERIFICARLA.

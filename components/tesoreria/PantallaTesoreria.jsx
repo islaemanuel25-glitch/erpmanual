@@ -30,7 +30,7 @@ import {
   ESTADO_TESORERIA,
   actosQueCruzan,
   avisosDeRevision,
-  franjaHoraria,
+  contextoDelGrupo,
   lecturaDelGrupo,
   periodoSinMovimientos,
   presentacionDePago,
@@ -244,7 +244,7 @@ function ResumenTesoreria({ datos, lectura, ctx, onIr, onVerificar }) {
             <TarjetaDeTurno
               key={g.grupo.clave}
               g={g}
-              contexto={contextoDeTurno(g)}
+              contexto={contextoDeTurno(g, ctx.unidad)}
               puedeVerificar={Boolean(datos.puedeVerificarEfectivo)}
               onVerificar={() => onVerificar(g)}
               onVerCajas={() => onIr({ vista: VISTA_TESORERIA.TURNO, grupo: g.grupo.clave })}
@@ -259,12 +259,9 @@ function ResumenTesoreria({ datos, lectura, ctx, onIr, onVerificar }) {
   );
 }
 
-/** "2 cajas · 08:02 a 14:10". */
-export function contextoDeTurno(g) {
-  const n = g.cajas.length;
-  const cajas = n === 1 ? "1 caja" : `${n} cajas`;
-  const franja = franjaHoraria(g.grupo.primerHecho, g.grupo.ultimoHecho);
-  return franja ? `${cajas} · ${franja}` : cajas;
+/** "2 cajas", o "Domingo 4 de octubre · 2 cajas" cuando el período tiene varios días. */
+export function contextoDeTurno(g, unidad) {
+  return contextoDelGrupo(g.grupo, unidad, g.cajas.length);
 }
 
 /**

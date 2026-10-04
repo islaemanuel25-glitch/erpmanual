@@ -35,6 +35,7 @@ const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const jwt = (await import("jsonwebtoken")).default;
 
 const { crearProductoVendible } = await import("./fixturePos.mjs");
+const { turnoOperativoDeSesion } = await import("./fixtureTurnoOperativo.mjs");
 const { firmarTokenOperador, OperadorCookie } = await import("../../lib/operador.js");
 const { itemCrearPayload } = await import("../../lib/pos-ventas/payloadVenta.js");
 const { DENOMINACIONES } = await import("../../lib/caja/conteoBilletes.js");
@@ -217,7 +218,7 @@ async function correr() {
     creado.operadorIds.push(op.id);
     await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: L.local.id } });
     const quien = { sesion: sesionPosDe(L), operador: firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: L.local.id }) };
-    const r = await leer(await rutaAbrir.POST(pedidoPos(`${BASE}/turnos/abrir`, quien, { montoInicial: 1000 })));
+    const r = await leer(await rutaAbrir.POST(pedidoPos(`${BASE}/turnos/abrir`, quien, { montoInicial: 1000, turnoOperativoId: await turnoOperativoDeSesion(prisma, quien) })));
     requerir("abre la caja", r.ok === true, `${r.status} ${r.error ?? ""}`);
     return { op, quien, turnoId: r.turno.id, L };
   }
@@ -352,7 +353,11 @@ async function correr() {
   const t = r.tesoreria;
   {
     const g0 = t.grupos[0];
-    igual("un solo turno comercial (provisorio por día)", [t.grupos.length, g0.provisorio], [1, true]);
+    // Antes era «un solo turno comercial, provisorio por día». Las cinco cajas
+    // se abren ahora en el mismo turno operativo elegido, así que siguen siendo
+    // un grupo, pero nombrado por ese turno y no por el día.
+    igual("un solo grupo: el turno operativo con que se abrieron las cinco cajas",
+      [t.grupos.length, g0.criterio, g0.sinTurno], [1, "TURNO_OPERATIVO", false]);
     const g1 = g0.cajas.find((c) => c.turnoId === c1.turnoId);
     const g2 = g0.cajas.find((c) => c.turnoId === c2.turnoId);
     igual("Caja 1 $100.000 + Caja 2 $10.000 = $110.000", [g1.efectivoDeclaradoEntregado, g2.efectivoDeclaradoEntregado, g1.efectivoDeclaradoEntregado + g2.efectivoDeclaradoEntregado], [100000, 10000, 110000]);

@@ -57,6 +57,7 @@ const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const jwt = (await import("jsonwebtoken")).default;
 
 const { crearProductoVendible } = await import("./fixturePos.mjs");
+const { turnoOperativoDeSesion } = await import("./fixtureTurnoOperativo.mjs");
 const { retenerCandadoDelLocal, retenerFilaDeStock, esperarEnCandadoDelLocal, esperarEnFila } = await import("./carreraForzada.mjs");
 const { firmarTokenOperador, firmarVoucherOperador, OperadorCookie } = await import("../../lib/operador.js");
 const { itemCrearPayload } = await import("../../lib/pos-ventas/payloadVenta.js");
@@ -208,7 +209,8 @@ async function correr() {
   let n = 0;
   const nuevoId = (etiqueta) => `${marca}-${etiqueta}-${(n += 1)}`;
 
-  const abrir = async (quien) => leer(await rutaAbrir.POST(pedido(`${BASE}/turnos/abrir`, quien, { montoInicial: 1000 })));
+  const abrir = async (quien) =>
+    leer(await rutaAbrir.POST(pedido(`${BASE}/turnos/abrir`, quien, { montoInicial: 1000, turnoOperativoId: await turnoOperativoDeSesion(prisma, quien) })));
 
   /** El ítem de la cola, como lo arma `guardarVentaPendiente`. */
   const cobroCola = (id, { turnoId, cantidad = 1, localId = f.local.id, producto = f.producto, voucher = null, operador = f.opA, extra = {} } = {}) => ({

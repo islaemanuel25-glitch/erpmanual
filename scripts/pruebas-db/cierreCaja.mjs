@@ -26,6 +26,7 @@ const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const jwt = (await import("jsonwebtoken")).default;
 
 const { crearProductoVendible } = await import("./fixturePos.mjs");
+const { turnoOperativoDeSesion } = await import("./fixtureTurnoOperativo.mjs");
 
 const rutaCerrar = await import("../../app/api/pos-ventas/turnos/cerrar/route.js");
 const rutaIniciar = await import("../../app/api/pos-ventas/cierres/iniciar/route.js");
@@ -763,7 +764,12 @@ async function correr(f) {
   const recibir = async (cambioPendienteId, desgloseRecibido, extra = {}) =>
     leer(
       await rutaAbrirConCambio.POST(
-        pedido(`${BASE}/turnos/abrir-con-cambio`, sesion, { cambioPendienteId, desgloseRecibido, ...extra })
+        pedido(`${BASE}/turnos/abrir-con-cambio`, sesion, {
+          cambioPendienteId,
+          desgloseRecibido,
+          turnoOperativoId: await turnoOperativoDeSesion(prisma, sesion),
+          ...extra,
+        })
       )
     );
 
@@ -909,7 +915,12 @@ async function correr(f) {
     await cerrarAbiertos();
     return leer(
       await rutaAbrirSinCambio.POST(
-        pedido(`${BASE}/turnos/abrir-sin-cambio`, sesion, { desgloseContado, motivo: "fondo propio", ...extra })
+        pedido(`${BASE}/turnos/abrir-sin-cambio`, sesion, {
+          desgloseContado,
+          motivo: "fondo propio",
+          turnoOperativoId: await turnoOperativoDeSesion(prisma, sesion),
+          ...extra,
+        })
       )
     );
   };
