@@ -1,8 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-04 12:30
+**Fecha:** 2026-10-04 13:43
 
 ## Módulos modificados recientemente
+
+### transferencias
+- feat(tesoreria): persistencia inmutable de la verificación de efectivo
+- Archivos: 1 modificados (1 total)
 
 ### pos-ventas
 - feat: la lectura canónica de Tesorería, fix: Caja +/− valida y escribe con el turno tomado
