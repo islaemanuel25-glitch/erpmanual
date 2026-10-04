@@ -1,4 +1,4 @@
-// EL TURNO OPERATIVO CONTRA POSTGRESQL — migración 20261005120000_turno_operativo.
+// EL TURNO OPERATIVO CONTRA POSTGRESQL — migración 20261004200000_turno_operativo.
 //
 //   node --import ./scripts/alias-loader.mjs scripts/pruebas-db/turnoOperativo.mjs
 //

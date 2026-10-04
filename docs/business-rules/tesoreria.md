@@ -58,7 +58,7 @@ declarado − egresos exteriores. No es un saldo bancario [CÓDIGO].
   completa.
 - Venta digital con comisión pendiente: `COMISION_PENDIENTE`.
 
-## Se agrupa por turno operativo (desde `20261005120000_turno_operativo`)
+## Se agrupa por turno operativo (desde `20261004200000_turno_operativo`)
 
 Tesorería verifica POR TURNO OPERATIVO, no por día: turno → sus cajas → sus
 entregas → se cuenta → se verifica ESE turno. Las diferencias de cada caja no se

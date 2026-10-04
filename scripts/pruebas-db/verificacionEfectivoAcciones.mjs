@@ -168,7 +168,7 @@ async function quienAbre(u) {
 }
 /**
  * Una caja ANTERIOR al turno operativo: la fila que escribía `turnos/abrir`
- * antes de 20261005120000 —los mismos campos, sin turno ni fecha operativa—.
+ * antes de 20261004200000 —los mismos campos, sin turno ni fecha operativa—.
  * Ninguna ruta la crea ya; en producción son todas las cajas viejas. Lo demás
  * (vender, cerrar) va por las rutas, como siempre.
  */
@@ -694,7 +694,7 @@ async function correr() {
   }
 
   // Reescrita a sabiendas con el turno operativo (migración
-  // 20261005120000_turno_operativo). Antes, correr el reloj de una entrega al
+  // 20261004200000_turno_operativo). Antes, correr el reloj de una entrega al
   // día anterior la sacaba del Día y el acto "cruzaba". Ahora una caja con turno
   // entra ENTERA por su fecha operativa: correr la hora de una de sus entregas
   // no la mueve de día, y el acto queda completo en su turno. Un acto que cruza

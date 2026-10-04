@@ -18,7 +18,7 @@ Si la lista está vacía, el despliegue es solo de código.
 
 Producción está en **48 migraciones**; el árbol tiene 49. Pendiente de deploy:
 
-- `20261005120000_turno_operativo` — Tesorería verifica por turno operativo
+- `20261004200000_turno_operativo` — Tesorería verifica por turno operativo
   (rama `claude/tesoreria-turno-operativo`). **Aditiva y sin backfill.** Qué
   hace `migrate deploy`: crea la tabla `TurnoOperativo` VACÍA (catálogo por
   local, FK a `Local` en cascada); agrega a `Turno` y a `VerificacionEfectivo`

@@ -1,6 +1,6 @@
 // EL TURNO OPERATIVO QUE UNA PRUEBA NECESITA PARA ABRIR CAJA.
 //
-// Desde la migración 20261005120000_turno_operativo, las tres rutas de apertura
+// Desde la migración 20261004200000_turno_operativo, las tres rutas de apertura
 // exigen elegir un turno del catálogo ACTIVO del local. Las pruebas que abren
 // cajas por las rutas reales le piden acá un turno a su local, una sola vez, y
 // lo mandan en el pedido como lo manda la pantalla.

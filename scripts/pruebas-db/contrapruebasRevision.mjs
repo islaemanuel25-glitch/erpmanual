@@ -40,7 +40,7 @@ const DESHACER_VERIFICACION_EFECTIVO = `
 
 // La del turno operativo deshace solo lo suyo. `verificacion_solo_se_anula` la
 // reemplaza con CREATE OR REPLACE y se vuelve a reemplazar al reaplicar.
-const TURNO_OPERATIVO = "prisma/migrations/20261005120000_turno_operativo/migration.sql";
+const TURNO_OPERATIVO = "prisma/migrations/20261004200000_turno_operativo/migration.sql";
 const DESHACER_TURNO_OPERATIVO = `
   DROP TRIGGER "VerificacionEfectivoEntrega_turno_operativo" ON "VerificacionEfectivoEntrega";
   DROP TRIGGER "Turno_turno_operativo_inmutable" ON "Turno";

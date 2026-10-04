@@ -138,7 +138,7 @@ async function quienAbre(l) {
 }
 /**
  * Una caja ANTERIOR al turno operativo: la fila que escribía `turnos/abrir`
- * antes de 20261005120000 —los mismos campos, sin turno ni fecha operativa—.
+ * antes de 20261004200000 —los mismos campos, sin turno ni fecha operativa—.
  * Ninguna ruta la crea ya; en producción son todas las cajas viejas.
  */
 async function nuevaCajaAnterior(l, fondo = 1000) {

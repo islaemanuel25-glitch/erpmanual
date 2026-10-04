@@ -2394,7 +2394,7 @@ model Turno {
   // trigger. NULL = caja anterior a esto: NO se infiere a qué turno perteneció,
   // y Tesorería la muestra como "Sin turno asignado". La FK compuesta con
   // `localId` impide usar el turno de otro local. Migración
-  // 20261005120000_turno_operativo.
+  // 20261004200000_turno_operativo.
   turnoOperativoId Int?
   fechaOperativa   DateTime? @db.Date
 
@@ -3651,7 +3651,7 @@ model VerificacionEfectivo {
   motivoAnulacion          String?
   createdAt                DateTime                   @default(now())
   /// EL TURNO OPERATIVO QUE SE VERIFICÓ, congelado al verificar —migración
-  /// 20261005120000_turno_operativo—. Los dos van juntos o ninguno, por CHECK.
+  /// 20261004200000_turno_operativo—. Los dos van juntos o ninguno, por CHECK.
   /// NULL = verificación anterior al turno operativo, o de cajas sin turno: no
   /// se le asigna uno después. La FK compuesta con `localId` impide que apunte
   /// al turno de otro local, y un trigger exige que cada entrega sea de una caja
@@ -3676,7 +3676,7 @@ model VerificacionEfectivo {
 }
 
 /// UN TURNO OPERATIVO DEL CATÁLOGO DE UN LOCAL: Mañana, Tarde, Noche, o como lo
-/// llame ese local. Migración 20261005120000_turno_operativo.
+/// llame ese local. Migración 20261004200000_turno_operativo.
 ///
 /// Es un CATÁLOGO, no una franja horaria: no tiene horas. La caja lo recibe
 /// EXPLÍCITAMENTE al abrirse —lo elige quien abre— y no se infiere nunca por

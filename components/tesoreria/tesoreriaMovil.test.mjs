@@ -74,7 +74,7 @@ const caja = (id, extra = {}) => ({
   vendedorId: 1,
   vendedorNombre: "Cuenta",
   diferenciaEfectivo: 0,
-  // Desde la migración 20261005120000_turno_operativo cada caja nueva trae el
+  // Desde la migración 20261004200000_turno_operativo cada caja nueva trae el
   // turno que eligió al abrirse; es la forma que da `leerTesoreria`.
   turnoOperativoId: 31,
   turnoOperativoNombre: "Mañana",
