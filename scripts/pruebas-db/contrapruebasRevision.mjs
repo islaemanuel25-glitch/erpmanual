@@ -38,6 +38,24 @@ const DESHACER_VERIFICACION_EFECTIVO = `
   DROP FUNCTION "verificacion_entrega_foto_fiel"(), "verificacion_declarado_es_la_suma"(),
     "verificacion_solo_se_anula"(), "verificacion_entrega_inmutable"(), "verificacion_efectivo_no_se_borra"();`;
 
+// La del turno operativo deshace solo lo suyo. `verificacion_solo_se_anula` la
+// reemplaza con CREATE OR REPLACE y se vuelve a reemplazar al reaplicar.
+const TURNO_OPERATIVO = "prisma/migrations/20261005120000_turno_operativo/migration.sql";
+const DESHACER_TURNO_OPERATIVO = `
+  DROP TRIGGER "VerificacionEfectivoEntrega_turno_operativo" ON "VerificacionEfectivoEntrega";
+  DROP TRIGGER "Turno_turno_operativo_inmutable" ON "Turno";
+  DROP FUNCTION "verificacion_entrega_del_turno_operativo"(), "turno_operativo_de_caja_inmutable"();
+  ALTER TABLE "VerificacionEfectivo" DROP COLUMN "turnoOperativoId", DROP COLUMN "fechaOperativa";
+  ALTER TABLE "Turno" DROP COLUMN "turnoOperativoId", DROP COLUMN "fechaOperativa";
+  DROP TABLE "TurnoOperativo";`;
+
+// Para romper la de verificación hay que sacar antes la del turno operativo,
+// que le agrega columnas y triggers, y reaplicarla sana después.
+const MIGRACION_VERIFICACION_EFECTIVO = {
+  deshacer: DESHACER_TURNO_OPERATIVO + DESHACER_VERIFICACION_EFECTIVO,
+  despues: [TURNO_OPERATIVO],
+};
+
 const entornoPg = (url) => ({
   ...process.env,
   PGHOST: url.hostname,
@@ -70,6 +88,10 @@ async function baseAislada(c, archivoRoto) {
     await admin.$executeRawUnsafe(`CREATE DATABASE "${nombre}" TEMPLATE "${base}"`);
     psql(url, ["-c", c.migracion.deshacer]);
     psql(url, ["-f", archivoRoto]);
+    // Las migraciones POSTERIORES que tocan lo mismo se reaplican, sanas,
+    // encima de la rota: la suite corre con el código de hoy y necesita el
+    // esquema de hoy. `deshacer` ya las quitó antes.
+    for (const posterior of c.migracion.despues ?? []) psql(url, ["-f", path.join(ORIGEN, posterior)]);
   } catch (e) {
     await tirarYSoltar().catch(() => {});
     throw e;
@@ -874,7 +896,7 @@ const CASOS = [
     n: "TV-1",
     defecto: "una entrega puede quedar en dos verificaciones vigentes",
     archivo: VERIFICACION_EFECTIVO,
-    migracion: { deshacer: DESHACER_VERIFICACION_EFECTIVO },
+    migracion: MIGRACION_VERIFICACION_EFECTIVO,
     suite: "scripts/pruebas-db/verificacionEfectivo.mjs",
     minimo: 40,
     inyecciones: [{
@@ -891,7 +913,7 @@ const CASOS = [
     n: "TV-2",
     defecto: "la foto de una entrega verificada se puede editar",
     archivo: VERIFICACION_EFECTIVO,
-    migracion: { deshacer: DESHACER_VERIFICACION_EFECTIVO },
+    migracion: MIGRACION_VERIFICACION_EFECTIVO,
     suite: "scripts/pruebas-db/verificacionEfectivo.mjs",
     minimo: 40,
     inyecciones: [{
@@ -904,7 +926,7 @@ const CASOS = [
     n: "TV-3",
     defecto: "la foto deja de compararse con el importe real del movimiento",
     archivo: VERIFICACION_EFECTIVO,
-    migracion: { deshacer: DESHACER_VERIFICACION_EFECTIVO },
+    migracion: MIGRACION_VERIFICACION_EFECTIVO,
     suite: "scripts/pruebas-db/verificacionEfectivo.mjs",
     minimo: 40,
     inyecciones: [{ de: "  IF NEW.\"montoDeclaradoSnapshot\" <> mov.\"monto\"\n     OR ", a: "  IF " }],
@@ -914,7 +936,7 @@ const CASOS = [
     n: "TV-4",
     defecto: "el declarado puede no ser la suma de las entregas",
     archivo: VERIFICACION_EFECTIVO,
-    migracion: { deshacer: DESHACER_VERIFICACION_EFECTIVO },
+    migracion: MIGRACION_VERIFICACION_EFECTIVO,
     suite: "scripts/pruebas-db/verificacionEfectivo.mjs",
     minimo: 40,
     inyecciones: [{ de: "  IF suma <> declarado THEN", a: "  IF false THEN" }],
@@ -924,7 +946,7 @@ const CASOS = [
     n: "TV-5",
     defecto: "una verificación mezcla entregas de dos locales",
     archivo: VERIFICACION_EFECTIVO,
-    migracion: { deshacer: DESHACER_VERIFICACION_EFECTIVO },
+    migracion: MIGRACION_VERIFICACION_EFECTIVO,
     suite: "scripts/pruebas-db/verificacionEfectivo.mjs",
     minimo: 40,
     // Las DOS mitades: el trigger compara la foto con el local real del turno y
@@ -946,7 +968,7 @@ const CASOS = [
     n: "TV-6",
     defecto: "la clave de idempotencia deja de ser única en el local",
     archivo: VERIFICACION_EFECTIVO,
-    migracion: { deshacer: DESHACER_VERIFICACION_EFECTIVO },
+    migracion: MIGRACION_VERIFICACION_EFECTIVO,
     suite: "scripts/pruebas-db/verificacionEfectivo.mjs",
     minimo: 40,
     inyecciones: [{
@@ -1035,6 +1057,64 @@ const CASOS = [
     minimo: 40,
     inyecciones: [{ de: "  if (actual.estado === ESTADO_VERIFICACION.ANULADA) {", a: "  if (false) {" }],
     esperadas: ["[24] anular otra vez: 200, ya estaba, sin pisar el motivo", "[26] las dos contestan 200"],
+  },
+  // ── EL TURNO OPERATIVO ───────────────────────────────────────────────────
+  //
+  // Rompen una defensa a la vez —en el código o en el texto de la migración— y
+  // corren turnoOperativo.mjs, que abre las cajas por las rutas. El montaje
+  // solo —catálogo, aperturas, ventas y cierres— ya pasa las 30 afirmaciones.
+  {
+    n: "TO-1",
+    defecto: "abrir caja deja de exigir un turno de este local y activo",
+    archivo: "lib/caja/turnoOperativoServer.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 5,
+    inyecciones: [{ de: "  if (!valido.valido) return { ok: false, status: valido.status", a: "  if (false) return { ok: false, status: valido.status" }],
+    esperadas: ["con un turno de otro local: 400 y su código", "con un turno inactivo: 400 y su código"],
+  },
+  {
+    n: "TO-2",
+    defecto: "Tesorería vuelve a agrupar por el día y no por el turno de la caja",
+    archivo: "lib/tesoreria/turnoComercial.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "  if (caja.turnoOperativoId != null && fecha) {", a: "  if (false) {" }],
+    esperadas: ["Mañana y Tarde del mismo día: grupos distintos", "y se llama por el turno, con su criterio"],
+  },
+  {
+    n: "TO-3",
+    defecto: "una verificación vuelve a poder mezclar turnos o fechas",
+    archivo: "lib/tesoreria/verificacionEfectivoServer.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "  if (claves.length > 1) {\n    const turnos", a: "  if (false) {\n    const turnos" }],
+    esperadas: ["Mañana + Tarde: 400 TURNOS_OPERATIVOS_MEZCLADOS", "Mañana de hoy + Mañana de ayer: 400 FECHAS_OPERATIVAS_MEZCLADAS"],
+  },
+  {
+    n: "TO-4",
+    defecto: "el turno y la fecha de una caja se pueden cambiar después de abrirla",
+    archivo: TURNO_OPERATIVO,
+    migracion: { deshacer: DESHACER_TURNO_OPERATIVO },
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 5,
+    inyecciones: [{
+      de: "CREATE TRIGGER \"Turno_turno_operativo_inmutable\" BEFORE UPDATE OF \"turnoOperativoId\", \"fechaOperativa\" ON \"Turno\"\n  FOR EACH ROW EXECUTE FUNCTION \"turno_operativo_de_caja_inmutable\"();",
+      a: "",
+    }],
+    esperadas: ["el turno de una caja no cambia una vez abierta", "ni su fecha operativa"],
+  },
+  {
+    n: "TO-5",
+    defecto: "la base acepta una entrega de otro turno en una verificación",
+    archivo: TURNO_OPERATIVO,
+    migracion: { deshacer: DESHACER_TURNO_OPERATIVO },
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{
+      de: "CREATE TRIGGER \"VerificacionEfectivoEntrega_turno_operativo\" BEFORE INSERT ON \"VerificacionEfectivoEntrega\"\n  FOR EACH ROW EXECUTE FUNCTION \"verificacion_entrega_del_turno_operativo\"();",
+      a: "",
+    }],
+    esperadas: ["la base no acepta una entrega de Tarde en una verificación de Mañana"],
   },
   // ── EL CONTRATO DE LA PANTALLA MÓVIL (PR #138) ───────────────────────────
   //

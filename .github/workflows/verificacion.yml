@@ -672,6 +672,17 @@ jobs:
       - name: Contrapruebas del contrato de Tesorería
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs TC-
 
+      # El turno operativo: se elige al abrir la caja (activo y del local, por
+      # las tres rutas), la caja lo conserva con su fecha operativa y la base no
+      # deja cambiarlos, Tesorería agrupa por el turno de la caja y no por la
+      # hora, una verificación no mezcla turnos ni fechas y congela el suyo. Las
+      # contrapruebas TO- rompen el código y el texto de la migración.
+      - name: Turno operativo contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/turnoOperativo.mjs
+
+      - name: Contrapruebas del turno operativo
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs TO-
+
       # La corrección histórica de caja: el ensayo en seco que escribe y deshace,
       # la aplicación con huella autorizada, la idempotencia y el fallo a mitad.
       # Se arma el incidente ×1000 con las rutas reales del circuito.
