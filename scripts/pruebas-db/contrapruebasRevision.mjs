@@ -819,7 +819,9 @@ const CASOS = [
     archivo: "lib/tesoreria/lecturaTesoreriaServer.js",
     suite: "scripts/pruebas-db/tesoreriaLectura.mjs",
     minimo: 30,
-    inyecciones: [{ de: "    await vinculosDeMovimientos(db, movimientos.map((m) => m.id))", a: "    {}" }],
+    // Desde la PR 4 los vínculos se leen junto con las verificaciones y llegan
+    // en `vinculos`: el defecto es el mismo, clasificar sin ellos.
+    inyecciones: [{ de: "clasificarMovimientos(movimientos, vinculos);", a: "clasificarMovimientos(movimientos, {});" }],
     esperadas: ["efectivo entregado consolidado $110.000", "caja 1: una RECAUDACION y un CIERRE, cada uno una vez"],
   },
   {
