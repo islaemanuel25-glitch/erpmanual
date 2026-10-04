@@ -345,8 +345,17 @@ const CASOS = [
     archivo: "app/api/pos-ventas/turnos/cerrar/route.js",
     suite: "scripts/pruebas-db/cierreCaja.mjs",
     minimo: 20,
+    // Desde #132 el cierre clásico tiene DOS defensas contra el corte que entra en
+    // el medio: relee el turno con el lock tomado, y el UPDATE sigue con el WHERE
+    // operativo. Cualquiera de las dos sola lo frena, así que el defecto se
+    // inyecta sacando las dos; con una sola, esta contraprueba quedaría en verde
+    // sin decir nada.
     inyecciones: [
       { de: "where: { id: turnoId, ...WHERE_TURNO_OPERATIVO },", a: "where: { id: turnoId, cierre: null }," },
+      {
+        de: "      if (estadoDelTurno(vigente) === ESTADO_TURNO.CIERRE_EN_PREPARACION) {\n",
+        a: "      if (false) {\n",
+      },
     ],
     esperadas: [
       "A1: el cierre clásico pierde con 409",

@@ -25,6 +25,8 @@ import {
   puedeActuarSobreCaja,
 } from "@/lib/caja/cierreRelevo";
 import { contarCobrosOfflinePendientesDelTurno } from "@/lib/pos-ventas/cobroOfflineServidor";
+import { bloquearTurno } from "@/lib/caja/cierreRelevoServer";
+import { LIMITES_TRANSACCION_DEL_LOCAL } from "@/lib/pos-ventas/candadoDelLocal";
 import {
   CODIGO_COBROS_OFFLINE_PENDIENTES,
   MENSAJE_CIERRE_CON_PENDIENTES_SERVIDOR,
@@ -132,41 +134,6 @@ export async function POST(req) {
       );
     }
 
-    // Calcular totales de ventas del turno.
-    // Misma lógica que resumen/route.js: fiado va aparte, no infla digital.
-    // (El modelo Turno no tiene campo totalVentasFiado, así que fiado no se
-    // persiste — sólo se evita que contamine totalVentasDigital).
-    const [ventas, cajaMovimientos] = await Promise.all([
-      prisma.venta.findMany({
-        // Las operaciones internas (venta con remito vinculado) no son cobros:
-        // sumarlas al efectivo esperado produce un faltante de caja que nunca
-        // ocurrió. Mismo criterio que turnos/resumen y turnos/ventas.
-        where: whereVentaComercial({ turnoId }),
-        select: {
-          total: true, formaPago: true, esFiado: true,
-          pagos: { select: { medio: true, monto: true } },
-        },
-      }),
-      prisma.cajaMovimiento.findMany({
-        where: { turnoId },
-        select: { tipo: true, monto: true },
-      }),
-    ]);
-
-    // Agregación POR TENDER: en una venta mixta, solo el tender efectivo cuenta al
-    // efectivo esperado; el resto va a digital. Fiado no aporta plata real.
-    // Toda esa aritmética vive ahora en lib/caja/efectivoEsperado.
-    const calculo = calcularEfectivoEsperado({
-      montoInicial: turno.montoInicial,
-      ventas,
-      movimientos: cajaMovimientos,
-    });
-
-    const totalEfectivo = calculo.ventasEfectivo;
-    const totalDigital = calculo.ventasDigital;
-    const montoEsperado = calculo.efectivoEsperado;
-    const diferencia = calcularDiferencia(montoRealEfectivo, montoEsperado);
-
     // === Reparto del efectivo contado ===
     //
     // El cajero decide cuánto sale del cajón y cuánto queda para el próximo turno.
@@ -188,8 +155,6 @@ export async function POST(req) {
       );
     }
 
-    const ahora = new Date();
-
     // El cierre YA pide el efectivo contado, así que ese mismo conteo se guarda
     // como arqueo FINAL en vez de pedirlo dos veces. Es la MISMA diferencia
     // persistida en dos lugares con el mismo valor —el turno la conserva para no
@@ -199,6 +164,39 @@ export async function POST(req) {
     // Transacción: si la creación del arqueo fallara, el turno no puede quedar
     // cerrado sin su corte final.
     const { turnoCerrado } = await prisma.$transaction(async (tx) => {
+      // ── LA FOTOGRAFÍA SE TOMA CON EL TURNO TOMADO ────────────────────────
+      //
+      // Antes los totales se calculaban ANTES de esta transacción: una venta que
+      // confirmaba entre ese cálculo y el UPDATE quedaba en el turno cerrado sin
+      // estar en sus totales, y la diferencia salía inventada (forzado contra
+      // PostgreSQL: cantidadVentas 0 con 1 venta, $1.000 de diferencia).
+      //
+      // Primero el turno, con el MISMO lock que el corte, el retiro y los pagos
+      // en efectivo (`bloquearTurno`, FOR UPDATE). Una venta que ya lo tiene
+      // (`compartirTurno`, FOR SHARE) termina antes y entra en la fotografía; una
+      // que llega después espera, vuelve a leer el turno ya cerrado y se rechaza.
+      // Recién entonces se leen ventas y movimientos, cada sentencia con lo
+      // confirmado hasta ese momento. Este cierre no toma el candado del local ni
+      // filas de ventas o de stock: no hay ciclo con `crear`.
+      await bloquearTurno(tx, turnoId);
+      const vigente = await tx.turno.findUnique({
+        where: { id: turnoId },
+        select: { montoInicial: true, cierre: true, cierreEnPreparacionEn: true, anuladoEn: true },
+      });
+      if (estadoDelTurno(vigente) === ESTADO_TURNO.CIERRE_EN_PREPARACION) {
+        const e = new Error(MSG_TURNO_EN_PREPARACION);
+        e.codigo = "turno_en_preparacion";
+        throw e;
+      }
+      if (vigente.cierre) {
+        const e = new Error("El turno ya fue cerrado.");
+        e.codigo = "turno_ya_cerrado";
+        throw e;
+      }
+      // El instante del cierre, también con el turno tomado: ninguna venta de
+      // este turno puede quedar con fecha posterior a su cierre.
+      const ahora = new Date();
+
       // Las ventas sin conexión de esta caja que el servidor ya conoce y todavía
       // no entraron: con alguna, la caja no se cierra (mismo criterio que
       // `cierres/iniciar`). Adentro de la transacción: si falla, no se escribe nada.
@@ -209,6 +207,39 @@ export async function POST(req) {
         e.cantidad = cobrosPendientes;
         throw e;
       }
+
+      // Totales del turno. Misma lógica que resumen/route.js: fiado va aparte, no
+      // infla digital. (El modelo Turno no tiene campo totalVentasFiado, así que
+      // fiado no se persiste — sólo se evita que contamine totalVentasDigital).
+      const [ventas, cajaMovimientos] = await Promise.all([
+        tx.venta.findMany({
+          // Las operaciones internas (venta con remito vinculado) no son cobros:
+          // sumarlas al efectivo esperado produce un faltante de caja que nunca
+          // ocurrió. Mismo criterio que turnos/resumen y turnos/ventas.
+          where: whereVentaComercial({ turnoId }),
+          select: {
+            total: true, formaPago: true, esFiado: true,
+            pagos: { select: { medio: true, monto: true } },
+          },
+        }),
+        tx.cajaMovimiento.findMany({
+          where: { turnoId },
+          select: { tipo: true, monto: true },
+        }),
+      ]);
+
+      // Agregación POR TENDER: en una venta mixta, solo el tender efectivo cuenta
+      // al efectivo esperado; el resto va a digital. Fiado no aporta plata real.
+      // Toda esa aritmética vive en lib/caja/efectivoEsperado.
+      const calculo = calcularEfectivoEsperado({
+        montoInicial: vigente.montoInicial,
+        ventas,
+        movimientos: cajaMovimientos,
+      });
+      const totalEfectivo = calculo.ventasEfectivo;
+      const totalDigital = calculo.ventasDigital;
+      const montoEsperado = calculo.efectivoEsperado;
+      const diferencia = calcularDiferencia(montoRealEfectivo, montoEsperado);
 
       // Cierre ATÓMICO: el WHERE es el candado. Dos pedidos simultáneos leyeron el
       // turno abierto antes de entrar acá; solo el primero encuentra la fila y el
@@ -316,7 +347,9 @@ export async function POST(req) {
       });
 
       return { turnoCerrado: actualizado };
-    });
+      // Con los límites de `crear`: este cierre puede esperar a una venta que
+      // tiene el turno tomado, y una venta larga dura más que el default de Prisma.
+    }, LIMITES_TRANSACCION_DEL_LOCAL);
 
     return NextResponse.json({ ok: true, turno: turnoCerrado });
   } catch (error) {
