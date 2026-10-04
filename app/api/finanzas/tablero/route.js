@@ -34,7 +34,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { resolveVistaOperativa } from "@/lib/grupos";
-import { fechaArgentinaISO, getRangoArgentina } from "@/lib/fechas/rangoArgentina";
+import { getRangoArgentina } from "@/lib/fechas/rangoArgentina";
 // EL FILTRO DE VENTA COMERCIAL ES OBLIGATORIO Y NO SE ESCRIBE A MANO. Excluye
 // las anuladas y las que tienen remito —las internas entre el depósito y sus
 // propios locales, que no son ventas sino movimientos entre dos cajas del mismo
@@ -66,6 +66,7 @@ import {
   soloRecaudacion,
 } from "@/lib/finanzas/movimientosDeCaja";
 import { vinculosDeMovimientos } from "@/lib/finanzas/movimientosDeCajaServer";
+import { primerDiaComercialDelLocal } from "@/lib/finanzas/primerDiaComercialServer";
 // EL PAGO A DEPÓSITO ES DE TRANSFERENCIAS. Finanzas no consulta `Transferencia`
 // ni valoriza líneas: pide la cuenta del local en el criterio de recepción a la
 // función de ese módulo, la misma que dibuja la pantalla que abre el "Ver".
@@ -350,22 +351,9 @@ export async function GET(req) {
 
     // ── EL TOPE HACIA ATRÁS SALE DEL DATO, NO DE UN NÚMERO ────────────────
     //
-    // "Hasta N períodos atrás" es inventado: con N chico se tapa historia que
-    // existe y con N grande igual se llega a meses vacíos. Lo único que no es
-    // arbitrario es la PRIMERA venta de este local: antes de esa fecha está
-    // probado que no hubo actividad comercial.
-    //
-    // Es un `findFirst` ordenado y acotado, o sea una fila por el índice de
-    // `localId` + `fecha`.
-    const primera = await prisma.venta.findFirst({
-      where: whereVentaComercial({ localId }),
-      orderBy: { fecha: "asc" },
-      select: { fecha: true },
-    });
-    // ISO ARGENTINO, no `toISOString()`. Aquél es UTC, y una primera venta de
-    // las 22:00 se leería como del día siguiente: la flecha de atrás se apagaría
-    // un día antes de tiempo y esa venta quedaría inalcanzable.
-    const primerMovimiento = primera ? fechaArgentinaISO(primera.fecha) : null;
+    // La primera venta comercial de este local, en día argentino. El porqué
+    // está en `primerDiaComercialDelLocal`, que también usa Tesorería.
+    const primerMovimiento = await primerDiaComercialDelLocal(prisma, localId);
 
     return NextResponse.json({
       ok: true,
