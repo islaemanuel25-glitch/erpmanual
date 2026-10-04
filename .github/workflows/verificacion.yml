@@ -617,6 +617,19 @@ jobs:
       - name: Contrapruebas de Caja +/− contra corte y cierre
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs CM-
 
+      # La lectura de Tesorería: el efectivo declarado sale solo de las entregas
+      # (CajaMovimiento RECAUDACION/CIERRE por vínculo), una vez por id aunque el
+      # mismo retiro esté copiado en Turno, ArqueoCaja y las preparaciones; un
+      # pago en efectivo desde la caja no se resta otra vez; los pagos que no son
+      # efectivo son egresos exteriores; el Caja +/− no tiene semántica; y un
+      # cierre sin conteo no se lee como $0. Las cajas, ventas, retiros, cierres
+      # y pagos se arman con las rutas y funciones reales.
+      - name: Lectura de Tesorería contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/tesoreriaLectura.mjs
+
+      - name: Contrapruebas de la lectura de Tesorería
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs TE-
+
       # La corrección histórica de caja: el ensayo en seco que escribe y deshace,
       # la aplicación con huella autorizada, la idempotencia y el fallo a mitad.
       # Se arma el incidente ×1000 con las rutas reales del circuito.
