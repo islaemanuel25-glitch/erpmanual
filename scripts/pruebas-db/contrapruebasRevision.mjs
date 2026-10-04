@@ -678,6 +678,57 @@ const CASOS = [
     inyecciones: [{ de: "      if (s?.turnoDestinoId) protegidos.add(s.turnoDestinoId);", a: "" }],
     esperadas: ["12: ensayo sin errores"],
   },
+  // ── CAJA +/− CONTRA EL CORTE Y EL CIERRE (#133) ─────────────────────────
+  //
+  // Cada una saca UNA defensa de `caja-movimientos/crear` y la carrera forzada
+  // tiene que mostrar el movimiento entrando después del corte o del cierre.
+  // Insertar con el cliente de afuera no va acá: se traba contra el lock de su
+  // propia transacción hasta el timeout, y lo ataja el candado de texto
+  // lib/caja/cajaMovimientoAtomico.test.mjs.
+  {
+    n: "CM-1",
+    defecto: "Caja +/− vuelve a escribir sin tomar el turno",
+    archivo: "app/api/pos-ventas/caja-movimientos/crear/route.js",
+    suite: "scripts/pruebas-db/cajaMovimientoAtomico.mjs",
+    minimo: 60,
+    inyecciones: [{ de: "      await bloquearTurno(tx, turnoId);\n", a: "" }],
+    esperadas: [
+      "Caja +/− se rechaza: turno en preparación de cierre",
+      "no existe ningún CajaMovimiento",
+      "Caja +/− se rechaza: turno cerrado",
+    ],
+  },
+  {
+    n: "CM-2",
+    defecto: "Caja +/− vuelve a validar el turno solo afuera de la transacción",
+    archivo: "app/api/pos-ventas/caja-movimientos/crear/route.js",
+    suite: "scripts/pruebas-db/cajaMovimientoAtomico.mjs",
+    minimo: 60,
+    inyecciones: [{ de: "      if (rechazoVigente) return { rechazo: rechazoVigente };", a: "      if (false) return { rechazo: rechazoVigente };" }],
+    esperadas: [
+      "Caja +/− se rechaza: turno en preparación de cierre",
+      "Caja +/− se rechaza: turno cerrado",
+      "A 200, corte 200, B 409",
+    ],
+  },
+  {
+    n: "CM-3",
+    defecto: "Caja +/− vuelve a admitir un movimiento después del corte",
+    archivo: "app/api/pos-ventas/caja-movimientos/crear/route.js",
+    suite: "scripts/pruebas-db/cajaMovimientoAtomico.mjs",
+    minimo: 60,
+    inyecciones: [{ de: "  if (turno.cierreEnPreparacionEn !== null) {", a: "  if (false) {" }],
+    esperadas: ["Caja +/− se rechaza: turno en preparación de cierre", "existe A y no existe B, sin duplicados"],
+  },
+  {
+    n: "CM-4",
+    defecto: "Caja +/− vuelve a admitir un movimiento después del cierre",
+    archivo: "app/api/pos-ventas/caja-movimientos/crear/route.js",
+    suite: "scripts/pruebas-db/cajaMovimientoAtomico.mjs",
+    minimo: 60,
+    inyecciones: [{ de: "  if (turno.cierre !== null) {", a: "  if (false) {" }],
+    esperadas: ["Caja +/− se rechaza: turno cerrado", "no existe ningún CajaMovimiento manual"],
+  },
 ];
 
 // Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número

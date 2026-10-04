@@ -165,12 +165,23 @@ la caja física.**
     esperado y diferencia, fija el instante del cierre y escribe turno, arqueo
     FINAL y retiro. La venta que tiene el turno termina antes y entra en la
     fotografía; la que llega después lo encuentra cerrado (#131).
-  - Abierto, fuera de #131 y #132: `caja-movimientos/crear` (el "Caja +/−" del
-    POS) valida el turno sin lock y después inserta en otra sentencia; un
-    ingreso o egreso puede quedar en un turno ya cortado o cerrado, fuera de su
-    esperado. Forzado contra `cierres/iniciar` y contra `turnos/cerrar`. La
-    salida mínima es la misma de `salidaDelPago`: `bloquearTurno`, releer el
-    turno operativo y crear el movimiento en una sola transacción.
+  - Cerrado en la PR #133: `caja-movimientos/crear` (el "Caja +/−" del POS)
+    validaba el turno sin lock e insertaba en otra sentencia, y un ingreso o
+    egreso podía quedar en un turno ya cortado o cerrado, fuera de su
+    esperado. Ahora valida y escribe en una sola transacción con el turno
+    tomado por `bloquearTurno`, como `salidaDelPago`. Con #132 y #133 juntas,
+    el corte, el cierre directo, los retiros, los pagos en efectivo y Caja +/−
+    toman todos el mismo lock del turno; un movimiento que gana entra en el
+    esperado del corte y del cierre, y uno que pierde se rechaza. Detalle en
+    Consecuencias.
+  - Siguen abiertos, sin tocar: (B) un reintento con el mismo `clientTxnId`
+    contra otro turno, cuando la venta todavía no existe, no tiene identidad
+    persistida en el servidor para detectarlo; (C) `WHERE_TURNO_OPERATIVO` no
+    mira la anulación del turno, y no se cambia sin una auditoría de negocio.
+    Tampoco se tocó la diferencia de límites: el corte (`cierres/iniciar`) usa
+    `OPCIONES_TX` (10 s) y `crear`, `turnos/cerrar` y Caja +/− usan
+    `LIMITES_TRANSACCION_DEL_LOCAL` (30 s); un corte que espera a una venta de
+    más de 10 s puede vencer.
 - **`CajaMovimiento` no lleva `operadorId`**: se deriva de `turnoId →
   Turno.operadorId`, que no se reescribe nunca.
 - **Un carrito no cruza de caja ni se pierde**: cada identidad de caja (local
@@ -223,6 +234,20 @@ migración.
   todavía leen la cookie del operador sin validarla contra el local (son
   reservas de sobres, no propiedad de caja), y `auditoria-pos-ventas/turnos/personas`
   sigue agrupando ventas por cuenta (estadística de ventas, no de caja).
+- **Caja +/− no entra después del corte ni del cierre** (PR #133, verificado en
+  código y contra PostgreSQL). `caja-movimientos/crear` validaba el turno sin
+  lock e insertaba en otra sentencia, sin transacción: un ingreso o egreso que
+  validaba antes de que `cierres/iniciar` o `turnos/cerrar` confirmaran quedaba
+  después adentro del turno cortado o cerrado, fuera de su esperado. Ahora sigue
+  el patrón de `salidaDelPago`: una transacción que toma el turno con
+  `bloquearTurno` (FOR UPDATE), lo relee con la misma regla de siempre
+  (`rechazoDelTurno`, que también responde rápido afuera) y recién entonces
+  inserta. Orden de locks: Turno → CajaMovimiento (más las claves foráneas de
+  `turnoId` y `usuarioId`); no toma el candado del local ni filas de venta o de
+  stock, igual que el corte, el cierre, los retiros y los pagos en efectivo, que
+  toman el turno primero. Prueba: `scripts/pruebas-db/cajaMovimientoAtomico.mjs`
+  (rojo en 14 afirmaciones contra la ruta anterior), contrapruebas `CM-` y el
+  candado `lib/caja/cajaMovimientoAtomico.test.mjs`.
 
 ## Evidencia
 

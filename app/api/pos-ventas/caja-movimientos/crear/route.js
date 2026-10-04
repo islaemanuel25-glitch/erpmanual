@@ -5,6 +5,41 @@ import { requirePerm } from "@/lib/authorize";
 import { esMotivoReservado } from "@/lib/caja/retiroDinero";
 import { ERROR_TURNO_EN_PREPARACION, ERROR_CAJA_AJENA, puedeActuarSobreCaja } from "@/lib/caja/cierreRelevo";
 import { identidadParaOperar } from "@/lib/caja/identidadCajaServer";
+import { bloquearTurno } from "@/lib/caja/cierreRelevoServer";
+import { LIMITES_TRANSACCION_DEL_LOCAL } from "@/lib/pos-ventas/candadoDelLocal";
+
+const SELECT_TURNO = {
+  id: true, localId: true, vendedorId: true, operadorId: true,
+  cierre: true, cierreEnPreparacionEn: true, anuladoEn: true,
+};
+
+/**
+ * Por qué este turno no admite un Caja +/−, o null si lo admite. La misma regla
+ * se aplica dos veces —afuera como respuesta rápida, adentro con el turno
+ * tomado— y por eso vive en un solo lugar.
+ */
+function rechazoDelTurno(turno, localId, identidad) {
+  if (!turno || turno.localId !== localId) {
+    return { status: 404, cuerpo: { ok: false, error: "Turno no encontrado en este local" } };
+  }
+  if (!puedeActuarSobreCaja(turno, identidad)) {
+    return { status: 403, cuerpo: { ok: false, error: ERROR_CAJA_AJENA, cajaAjena: true } };
+  }
+  if (turno.cierre !== null) {
+    return { status: 400, cuerpo: { ok: false, error: "El turno ya esta cerrado" } };
+  }
+  // Un turno que tomó el corte de cierre tampoco admite movimientos, aunque
+  // `cierre` siga en null. Su universo quedó congelado: un ingreso o un egreso
+  // cargado ahora caería después de la frontera del corte y no lo vería el
+  // cierre que se está confirmando. Es la misma regla que aplica a las ventas.
+  if (turno.cierreEnPreparacionEn !== null) {
+    return {
+      status: 409,
+      cuerpo: { ok: false, error: ERROR_TURNO_EN_PREPARACION, turnoEnPreparacionDeCierre: true },
+    };
+  }
+  return null;
+}
 
 export async function POST(req) {
   try {
@@ -92,52 +127,52 @@ export async function POST(req) {
     // cajero común solo alcanza su caja; Admin y el Dueño en su local, la de
     // cualquiera —es la intervención que ya tenían—, con su `usuarioId` en el
     // movimiento.
-    const turno = await prisma.turno.findUnique({
-      where: { id: turnoId },
-      select: {
-        id: true, localId: true, vendedorId: true, operadorId: true,
-        cierre: true, cierreEnPreparacionEn: true, anuladoEn: true,
-      },
-    });
+    //
+    // Esta lectura es solo la respuesta rápida: no toma nada y no decide. La
+    // que decide es la de adentro de la transacción, con el turno tomado.
+    const turno = await prisma.turno.findUnique({ where: { id: turnoId }, select: SELECT_TURNO });
+    const rechazo = rechazoDelTurno(turno, localId, id.identidad);
+    if (rechazo) return NextResponse.json(rechazo.cuerpo, { status: rechazo.status });
 
-    if (!turno || turno.localId !== localId) {
-      return NextResponse.json(
-        { ok: false, error: "Turno no encontrado en este local" },
-        { status: 404 }
-      );
+    // LA VALIDACIÓN Y LA ESCRITURA SON UNA SOLA FRONTERA.
+    //
+    // Antes el turno se validaba arriba y el movimiento se insertaba aparte, sin
+    // transacción. Un corte (`cierres/iniciar`) o un cierre (`turnos/cerrar`) que
+    // confirmaba en el medio dejaba el movimiento adentro de un turno ya cortado
+    // o cerrado y FUERA de su efectivo esperado. Forzado contra PostgreSQL.
+    //
+    // Ahora es el patrón de `salidaDelPago`: el turno se toma con `bloquearTurno`
+    // —el mismo FOR UPDATE del corte, el retiro y los pagos en efectivo—, se
+    // vuelve a leer y recién entonces se escribe. Si el movimiento tiene el
+    // turno, el corte espera y lo cuenta; si el corte lo tiene, el movimiento
+    // espera, lo encuentra cortado o cerrado y se rechaza con la misma respuesta
+    // de siempre. Orden: Turno, después CajaMovimiento; no toma el candado del
+    // local ni filas de venta o de stock, así que no hay ciclo con `crear`.
+    //
+    // Los límites son los de `crear` y no `OPCIONES_TX`: puede esperar a un
+    // cierre que a su vez está esperando a una venta.
+    const resultado = await prisma.$transaction(async (tx) => {
+      await bloquearTurno(tx, turnoId);
+      const vigente = await tx.turno.findUnique({ where: { id: turnoId }, select: SELECT_TURNO });
+      const rechazoVigente = rechazoDelTurno(vigente, localId, id.identidad);
+      if (rechazoVigente) return { rechazo: rechazoVigente };
+
+      const creado = await tx.cajaMovimiento.create({
+        data: {
+          turnoId,
+          usuarioId: session.id,
+          tipo,
+          monto: montoNum,
+          motivo: motivo || null,
+        },
+      });
+      return { movimiento: creado };
+    }, LIMITES_TRANSACCION_DEL_LOCAL);
+
+    if (resultado.rechazo) {
+      return NextResponse.json(resultado.rechazo.cuerpo, { status: resultado.rechazo.status });
     }
-
-    if (!puedeActuarSobreCaja(turno, id.identidad)) {
-      return NextResponse.json({ ok: false, error: ERROR_CAJA_AJENA, cajaAjena: true }, { status: 403 });
-    }
-
-    if (turno.cierre !== null) {
-      return NextResponse.json(
-        { ok: false, error: "El turno ya esta cerrado" },
-        { status: 400 }
-      );
-    }
-
-    // Un turno que tomó el corte de cierre tampoco admite movimientos, aunque
-    // `cierre` siga en null. Su universo quedó congelado: un ingreso o un egreso
-    // cargado ahora caería después de la frontera del corte y no lo vería el
-    // cierre que se está confirmando. Es la misma regla que aplica a las ventas.
-    if (turno.cierreEnPreparacionEn !== null) {
-      return NextResponse.json(
-        { ok: false, error: ERROR_TURNO_EN_PREPARACION, turnoEnPreparacionDeCierre: true },
-        { status: 409 }
-      );
-    }
-
-    const movimiento = await prisma.cajaMovimiento.create({
-      data: {
-        turnoId,
-        usuarioId: session.id,
-        tipo,
-        monto: montoNum,
-        motivo: motivo || null,
-      },
-    });
+    const { movimiento } = resultado;
 
     return NextResponse.json({
       ok: true,

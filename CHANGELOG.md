@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-10-04] - Actualización: pos-ventas
+
+### Modificado
+- **pos-ventas**: fix: Caja +/− valida y escribe con el turno tomado
+
+
 ## [2026-10-03] - Actualización: pos-ventas, transferencias
 
 ### Modificado
