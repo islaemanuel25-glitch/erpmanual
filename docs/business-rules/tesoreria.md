@@ -58,15 +58,84 @@ declarado − egresos exteriores. No es un saldo bancario [CÓDIGO].
   completa.
 - Venta digital con comisión pendiente: `COMISION_PENDIENTE`.
 
-## El turno comercial es provisorio
+## Se agrupa por turno operativo (desde `20261004200000_turno_operativo`)
 
-Todo lo que agrupa pasa por `turnoComercialDe(localId, instante)`
-(`lib/tesoreria/turnoComercial.js`). Hoy agrupa por local y día argentino del
-instante del HECHO —venta, entrega, pago—, nunca por `Turno.apertura`, y no
-persiste nada. Con este criterio un turno que cruza la medianoche queda partido:
-es la limitación conocida, y la razón de que exista la frontera. Cuando exista la
-configuración de franjas por local, se reemplaza esa función y nada más
-[CÓDIGO; candado 20].
+Tesorería verifica POR TURNO OPERATIVO, no por día: turno → sus cajas → sus
+entregas → se cuenta → se verifica ESE turno. Las diferencias de cada caja no se
+compensan entre sí [CÓDIGO].
+
+- **Catálogo por local** (`TurnoOperativo`: nombre, orden, activo y una
+  ventana de reconocimiento `horaInicioReconocimiento` →
+  `horaFinReconocimiento`, "HH:MM", que puede cruzar la medianoche). Nombres,
+  cantidad, orden y ventanas los configura cada local: el código no conoce
+  ninguno. Se administra en Configuración → POS → Turnos operativos con
+  `config_local.pos`. No se borra: se desactiva. Las ventanas se pueden
+  solapar; solo se valida la integridad del rango
+  [CÓDIGO, `app/api/config/turnos-operativos/`; TO-H12, TO-H14].
+- **La ventana no es la duración del turno.** Dice dónde empieza el turno en el
+  día y PROPONE: al abrir, si exactamente una ventana activa contiene la hora,
+  se propone ese turno, con «Cambiar turno»; con ninguna o varias, se pregunta
+  entre las opciones del ciclo [CÓDIGO, `lib/caja/turnoOperativo.js`
+  `reconocerTurno`; TO-H1, TO-H2, TO-H3].
+- **El ciclo decide qué se puede abrir.** Los turnos activos, en su `orden`,
+  forman un ciclo (después del último, el primero), y cada uno ocurre una vez
+  por fecha operativa. Una ocurrencia empieza en el inicio de la ventana de su
+  turno. En cada momento se puede abrir solo:
+  - la ocurrencia **actual**: la que empezó más recientemente —aunque ya esté
+    fuera de su ventana: es un turno que se extiende— y las que están dentro de
+    su ventana;
+  - la **siguiente inmediata**: la del turno que sigue a la actual en el
+    `orden`, en su próximo comienzo.
+
+  Un turno que ya pasó y cuyo próximo comienzo exige atravesar otro no se
+  ofrece y el servidor lo rechaza (409 `TURNO_OPERATIVO_FUERA_DE_CICLO`). Sin
+  distancias, sin umbrales, sin nombres [CÓDIGO, `cicloDeTurnos`; TO-C3..TO-C9,
+  TO-C11..TO-C13].
+- **El turno FINAL es el que se guarda**, en las tres rutas (`abrir`,
+  `abrir-sin-cambio`, `abrir-con-cambio`), por una sola función
+  (`turnoOperativoDeApertura`): del local, activo y posible en el ciclo a esa
+  hora. Un local que ya usa turnos y no tiene ninguno activo da 409 `LOCAL_SIN_TURNOS_OPERATIVOS`
+  [CÓDIGO; TO-1, TO-H4, TO-H6, TO-H13, TO-C8].
+- **`fechaOperativa` es la de la ocurrencia del turno final** y la calcula el
+  servidor al abrir; una fecha que mande el cliente se ignora. Ventana normal →
+  el día en que empieza. Ventana que cruza la medianoche (inicio > fin) →
+  empieza el día ANTERIOR a su jornada: con 23:00 → 01:00, el domingo 23:30 y
+  el lunes 00:30 son la ocurrencia del lunes. A las 22:00 del lunes, con un
+  ciclo noche → mañana → tarde, la tarde que se extiende es del lunes, la noche
+  que sigue es del martes y la mañana no se puede abrir [CÓDIGO; TO-C1..TO-C7].
+  No se recalcula, y la base impide cambiar turno o fecha de una caja ya
+  escrita [CÓDIGO; TO-4].
+- **Un solo turno** (o varios que empiezan a la misma hora): la ocurrencia
+  actual se extiende hasta su próximo comienzo; con 08:00 → 12:00, el lunes a
+  las 20:00 y el martes a las 07:59 siguen siendo del lunes [CÓDIGO; TO-V8].
+- **Un turno activo tiene horario, siempre.** El alta lleva nombre y las dos
+  horas —todo turno nace activo, no hay borradores—; activar uno sin horario y
+  sacarle el horario a uno activo se rechazan (400
+  `TURNO_OPERATIVO_HORARIO_REQUERIDO`). Para dejarlo sin horario se lo
+  desactiva antes o en el mismo pedido; nunca se lo desactiva solo. Uno
+  inactivo puede no tener horario. La base lo sostiene con un CHECK
+  (`TurnoOperativo_activo_con_ventana_chk`), además del de las dos horas o
+  ninguna [CÓDIGO, `rechazoPorFaltaDeHorario`; TO-HR1..TO-HR9].
+- **El horario ubica y reconoce; no obliga a cerrar la caja.** Una tarde de
+  15:00 → 18:00 puede seguir trabajando a las 22:00: es la ocurrencia actual
+  que se extiende hasta que empieza otra [CÓDIGO; TO-C3].
+- **Transición por local**: un local que NUNCA tuvo turnos operativos (cero
+  filas en su catálogo) sigue en modo legado y sus cajas nuevas abren sin turno
+  —"Sin turno asignado"—, en las tres rutas. Al dar de alta su primer turno
+  —activo y con horario, o no se crea y el local sigue en legado [TO-HR7]—
+  entra al sistema nuevo y no vuelve: toda caja nueva exige turno, y si después
+  desactiva todos, la apertura es 409 `LOCAL_SIN_TURNOS_OPERATIVOS` en vez de
+  volver al legado. Se distingue por las filas del catálogo, no por las
+  activas: un turno no se borra y nace activo. Las cajas legado no reciben
+  turno nunca: no hay backfill histórico [CÓDIGO, `lib/caja/turnoOperativoServer.js`; TO-T1..TO-T9].
+- **Agrupación**: `grupoDeTesoreria` (`lib/tesoreria/turnoComercial.js`) agrupa
+  por local + fecha operativa + turno DE LA CAJA. Cada hecho hereda el grupo de
+  su caja, así que la medianoche no parte una caja, y una caja con turno entra
+  ENTERA al período de su fecha operativa. Lo que no es de ninguna caja va solo
+  al resumen [CÓDIGO; candados TO-1, TO-2, TO-3, TO-8].
+- **Cajas viejas** (sin turno) no se reinterpretan: van a «Sin turno asignado»,
+  agrupadas por día del hecho como antes, y entran al período por su instante.
+- La matemática de la base conocida no cambió.
 
 ## La API
 
@@ -213,9 +282,11 @@ se verifica de nuevo, y la anulada queda como historia.
   la FOTO al verificar: monto declarado, local, turno, operador (puede ser null),
   clase `RECAUDACION`/`CIERRE` e instante de la entrega, más `vigente`, que es la
   del padre [CÓDIGO].
-- **No se guarda** turno comercial, franja ni fecha comercial: la agrupación es de
-  `turnoComercialDe` y es provisoria; guardarla congelaría un criterio que va a
-  cambiar. Tampoco saldos, cuentas, caja fuerte ni libro [CÓDIGO; prueba K].
+- **Turno operativo y fecha operativa**, congelados al verificar, tomados de la
+  caja de las entregas (NULL en las verificaciones anteriores al turno
+  operativo, que quedan como legado y no se reinterpretan). No se guarda turno
+  comercial, franja, día ni hora inferidos. Tampoco saldos, cuentas, caja fuerte
+  ni libro [CÓDIGO; prueba K].
 
 Lo que la BASE sostiene sola, sin depender de que el código lo haga bien
 [CÓDIGO, en la migración; ejercido en `scripts/pruebas-db/verificacionEfectivo.mjs`]:
@@ -283,8 +354,11 @@ autoriza ninguno de los dos, y cada uno no autoriza el otro [contraprueba VA-7].
   Una entrega fuera de alcance es 403 sin decir cuál, antes de cualquier otro
   rechazo, para no contar qué movimientos existen afuera [VA-4]. Entregas de dos
   locales son 400 `LOCALES_MEZCLADOS`.
-- Granularidad libre: una entrega, varias de una caja o de varias cajas, siempre
-  del mismo local. No se exige el turno comercial entero ni se guarda.
+- Granularidad libre dentro de UN turno operativo y UNA fecha operativa: una
+  entrega, varias de una caja o de varias cajas del mismo turno. Mezclar turnos
+  es 400 `TURNOS_OPERATIVOS_MEZCLADOS` y mezclar fechas 400
+  `FECHAS_OPERATIVAS_MEZCLADAS`; la base lo sostiene con un trigger al insertar
+  la entrega [TO-3, TO-5].
 - En una transacción: toma los turnos de las entregas, mira la clave, toma los
   movimientos FOR SHARE, los clasifica por vínculo (solo `RECAUDACION`/`CIERRE`;
   otra cosa es 400 `NO_ES_ENTREGA`), rechaza una entrega ya cubierta por una
@@ -386,9 +460,10 @@ LECTORA del contrato: no recalcula nada que el servidor ya decidió.
   elegido viaja en la ruta `/modulos/finanzas/tesoreria/local/<id>`.
 - **Base conocida**: el número es `baseConocida` tal cual llega, con su
   composición y su línea de certeza. No dice «saldo».
-- **Turnos**: el rótulo es la `etiqueta` del grupo que manda el servidor (hoy el
-  día operativo, criterio provisorio). Ningún «Mañana/Tarde/Noche» escrito en la
-  pantalla. El estado de la tarjeta sale de la lectura: Requiere revisión manda
+- **Turnos**: una tarjeta por turno operativo, con la `etiqueta` del grupo que
+  manda el servidor (el nombre del catálogo del local, o «Sin turno asignado») y
+  la cantidad de cajas; sin rango horario. Ningún «Mañana/Tarde/Noche» escrito en
+  la pantalla. El estado de la tarjeta sale de la lectura: Requiere revisión manda
   sobre Sin importe declarado, y ése sobre Parcial, Pendiente, Correcto y Con
   diferencia.
 - **Verificar**: aparece solo con `puedeVerificarEfectivo` y entregas pendientes.

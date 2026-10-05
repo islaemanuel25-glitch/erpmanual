@@ -18,6 +18,7 @@ const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const jwt = (await import("jsonwebtoken")).default;
 
 const { crearProductoVendible } = await import("./fixturePos.mjs");
+const { turnoOperativoDeSesion } = await import("./fixtureTurnoOperativo.mjs");
 const { firmarTokenOperador, OperadorCookie } = await import("../../lib/operador.js");
 const { esChoqueDeClientTxnId } = await import("../../lib/pos-ventas/idempotenciaVenta.js");
 const { retenerCandadoDelLocal, esperarEnCandadoDelLocal } = await import("./carreraForzada.mjs");
@@ -129,7 +130,8 @@ async function desmontar() {
 
 async function correr() {
   const f = await montar();
-  const abrir = async (quien) => leer(await rutaAbrir.POST(pedido(`${BASE}/turnos/abrir`, quien, { montoInicial: 1000 })));
+  const abrir = async (quien) =>
+    leer(await rutaAbrir.POST(pedido(`${BASE}/turnos/abrir`, quien, { montoInicial: 1000, turnoOperativoId: await turnoOperativoDeSesion(prisma, quien) })));
   /** El pedido que manda la pantalla al cobrar online, con el id del intento. */
   const cobrar = async (quien, turnoId, clientTxnId, { cantidad = 1, clienteId = null } = {}) =>
     leer(await rutaCrearVenta.POST(pedido(`${BASE}/crear`, quien, {

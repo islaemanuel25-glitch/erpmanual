@@ -13,6 +13,7 @@
 // código con alias @/ (que node no resuelve).
 
 import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
+import { turnoOperativoDePrueba } from "./pruebas-db/fixtureTurnoOperativo.mjs";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 
@@ -150,6 +151,9 @@ async function seed() {
 
   Object.assign(S, {
     gA: gA.id, gB: gB.id, depoA: depoA.id, localA: localA.id, depoB: depoB.id, localB: localB.id,
+    // Desde 20261004200000_turno_operativo abrir caja exige un turno activo del local.
+    toA: await turnoOperativoDePrueba(prisma, localA.id),
+    toB: await turnoOperativoDePrueba(prisma, localB.id),
     rolAdmin: rolAdmin.id, rolOp: rolOp.id,
     userAdmin: { ...userAdmin, permisos: ["*"] },
     userA: { ...userA, permisos: permsOp },
@@ -187,7 +191,7 @@ async function main() {
   await check("6b) userA elimina local → 403", req("DELETE", `/api/locales/${S.localB}`, { cookie: A }), 403);
   await check("7) userSin exporta clientes → 403", req("GET", `/api/clientes/export/excel`, { cookie: SIN }), 403);
   await check("8) userA precios/apply con localId AJENO → 403", req("POST", `/api/productos/precios/apply`, { cookie: A, body: { localId: S.localB, metodo: "MARGEN_MASIVO", pricingMode: "RECALC_BY_MARGIN", items: [{ baseId: S.prodA.baseId }] } }), 403);
-  await check("9) userA abre turno con localId AJENO → 403", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: A, body: { localId: S.localB, montoInicial: 0 } }), 403);
+  await check("9) userA abre turno con localId AJENO → 403", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: A, body: { localId: S.localB, turnoOperativoId: S.toB, montoInicial: 0 } }), 403);
   await check("10a) userA crea proveedor → 403", req("POST", `/api/proveedores/crear`, { cookie: A, body: { nombre: "P" } }), 403);
   await check("10b) userA crea categoría → 403", req("POST", `/api/categorias/crear`, { cookie: A, body: { nombre: "C" } }), 403);
   await check("10c) userA crea área física → 403", req("POST", `/api/areas-fisicas/crear`, { cookie: A, body: { nombre: "AF" } }), 403);
@@ -219,7 +223,7 @@ async function main() {
   await check("admin lee venta de A → 200", req("GET", `/api/pos-ventas/venta/${S.ventaA}`, { cookie: ADM }), 200);
   await check("userA lee su venta → 200", req("GET", `/api/pos-ventas/venta/${S.ventaA}`, { cookie: A }), 200);
   await check("userA lee su producto → 200", req("GET", `/api/productos/obtener?id=${S.prodA.baseId}&localId=${S.localA}`, { cookie: A }), 200);
-  await check("userA abre turno en SU local → NO 401/403 (scope OK)", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: A, body: { localId: S.localA, montoInicial: 0 } }), [200, 400, 428]);
+  await check("userA abre turno en SU local → NO 401/403 (scope OK)", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: A, body: { localId: S.localA, turnoOperativoId: S.toA, montoInicial: 0 } }), [200, 400, 428]);
   await check("admin crea categoría → 200/201", req("POST", `/api/categorias/crear`, { cookie: ADM, body: { nombre: "CatOK" } }), [200, 201]);
   await check("admin crea proveedor → 200/201", req("POST", `/api/proveedores/crear`, { cookie: ADM, body: { nombre: "ProvOK" } }), [200, 201]);
 

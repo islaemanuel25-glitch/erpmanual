@@ -1,0 +1,91 @@
+// app/api/config/turnos-operativos/[id]/route.js
+//
+// Renombrar, activar/desactivar o cambiar la ventana de reconocimiento de UN
+// turno del catálogo del local. Un turno activo tiene ventana siempre: no se
+// activa uno sin ella ni se le saca a uno activo. No hay
+// DELETE: una caja o una verificación pueden apuntarlo. Desactivado, deja de
+// ofrecerse para abrir caja y la historia sigue leyéndose con su nombre.
+
+import { NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { checkPerm } from "@/lib/authorize";
+import { getUsuarioSession } from "@/lib/auth";
+import { resolveLocalAndGrupo } from "@/lib/grupos";
+import {
+  CODIGO_TURNO_OPERATIVO,
+  idDeTurnoOperativo,
+  rechazoPorFaltaDeHorario,
+  validarNombreTurnoOperativo,
+  validarRangoReconocimiento,
+} from "@/lib/caja/turnoOperativo";
+import { SELECT_TURNO_OPERATIVO } from "@/lib/caja/turnoOperativoServer";
+
+export async function PATCH(req, { params }) {
+  try {
+    const session = getUsuarioSession(req);
+    if (!session) return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
+    const scope = await resolveLocalAndGrupo(req);
+    if (scope.error) {
+      return NextResponse.json({ ok: false, error: scope.error, needsContexto: scope.needsContexto }, { status: scope.status });
+    }
+    if (!session.esAdmin && !checkPerm(session, "config_local.pos").ok) {
+      return NextResponse.json({ ok: false, error: "Sin permiso: config_local.pos" }, { status: 403 });
+    }
+
+    const id = idDeTurnoOperativo((await params)?.id);
+    const actual = id ? await prisma.turnoOperativo.findUnique({ where: { id }, select: SELECT_TURNO_OPERATIVO }) : null;
+    // El de otro local se contesta igual que uno que no existe.
+    if (!actual || actual.localId !== scope.localId) {
+      return NextResponse.json({ ok: false, error: "Ese turno operativo no existe en este local.", codigo: CODIGO_TURNO_OPERATIVO.NO_EXISTE }, { status: 404 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const data = {};
+    if (body?.nombre !== undefined) {
+      const nombre = validarNombreTurnoOperativo(body.nombre);
+      if (!nombre.valido) {
+        return NextResponse.json({ ok: false, error: nombre.error, codigo: CODIGO_TURNO_OPERATIVO.NOMBRE_INVALIDO }, { status: 400 });
+      }
+      data.nombre = nombre.nombre;
+    }
+    if (body?.activo !== undefined) {
+      if (typeof body.activo !== "boolean") {
+        return NextResponse.json({ ok: false, error: "«activo» es verdadero o falso." }, { status: 400 });
+      }
+      data.activo = body.activo;
+    }
+    // La ventana va entera: las dos horas, o las dos en null para sacarla.
+    if (body?.horaInicioReconocimiento !== undefined || body?.horaFinReconocimiento !== undefined) {
+      const rango = validarRangoReconocimiento(body?.horaInicioReconocimiento, body?.horaFinReconocimiento);
+      if (!rango.valido) {
+        return NextResponse.json({ ok: false, error: rango.error, codigo: CODIGO_TURNO_OPERATIVO.RANGO_INVALIDO }, { status: 400 });
+      }
+      Object.assign(data, rango.rango);
+    }
+    if (!Object.keys(data).length) {
+      return NextResponse.json(
+        { ok: false, error: "No hay nada para cambiar: se cambia el nombre, si está activo o su ventana de reconocimiento." },
+        { status: 400 }
+      );
+    }
+    // Se mira el turno como QUEDARÍA: activarlo sin horario o sacarle el
+    // horario estando activo se rechaza. Para dejarlo sin horario se lo
+    // desactiva antes o en el mismo pedido; nunca se lo desactiva solo.
+    const sinHorario = rechazoPorFaltaDeHorario({ ...actual, ...data });
+    if (sinHorario) {
+      return NextResponse.json({ ok: false, error: sinHorario.error, codigo: sinHorario.codigo }, { status: sinHorario.status });
+    }
+
+    const turno = await prisma.turnoOperativo.update({ where: { id }, data, select: SELECT_TURNO_OPERATIVO });
+    return NextResponse.json({ ok: true, turno });
+  } catch (error) {
+    if (error?.code === "P2002") {
+      return NextResponse.json(
+        { ok: false, error: "Ya hay un turno con ese nombre en este local.", codigo: CODIGO_TURNO_OPERATIVO.NOMBRE_REPETIDO },
+        { status: 409 }
+      );
+    }
+    console.error("Error actualizando turno operativo:", error);
+    return NextResponse.json({ ok: false, error: "No se pudo guardar el turno operativo." }, { status: 500 });
+  }
+}

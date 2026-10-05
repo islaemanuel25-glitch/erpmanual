@@ -9,6 +9,7 @@ import { validarFondoManual } from "@/lib/caja/cierreCaja";
 import { WHERE_TURNO_OPERATIVO, esCajaPropia, whereCajaPropia } from "@/lib/caja/cierreRelevo";
 import { identidadParaOperar } from "@/lib/caja/identidadCajaServer";
 import { aCargoDelTurno } from "@/lib/finanzas/actividadFinanciera";
+import { turnoOperativoDeApertura } from "@/lib/caja/turnoOperativoServer";
 
 // Quién está a cargo de un turno ajeno, para el aviso: el operador si lo tiene,
 // la cuenta si no. La MISMA función que rotula los turnos en Finanzas.
@@ -204,9 +205,17 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: ap.error }, { status: 400 });
     }
 
+    // EL TURNO OPERATIVO: lo elige quien abre, y el servidor lo valida contra
+    // el catálogo de ESTE local. La fecha operativa la fija el servidor.
+    const to = await turnoOperativoDeApertura(prisma, { localId, body });
+    if (!to.ok) {
+      return NextResponse.json({ ok: false, error: to.error, codigo: to.codigo }, { status: to.status });
+    }
+
     const turno = await prisma.turno.create({
       data: {
         localId,
+        ...to.datos,
         // La cuenta que abrió: auditoría de acceso, no la dueña de la caja.
         vendedorId: session.id,
         // El responsable del cajón. Se escribe acá y no se reescribe nunca.

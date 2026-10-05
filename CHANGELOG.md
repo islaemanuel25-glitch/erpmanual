@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-10-05] - Actualización: configuracion, pos-ventas
+
+### Modificado
+- **configuracion**: feat: el turno operativo se reconoce por la ventana del local y la fecha es la de su jornada
+- **pos-ventas**: feat: el turno operativo se reconoce por la ventana del local y la fecha es la de su jornada
+
+
 ## [2026-10-04] - Actualización: pos-ventas
 
 ### Modificado

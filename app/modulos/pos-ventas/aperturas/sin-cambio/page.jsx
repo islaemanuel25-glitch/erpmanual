@@ -30,6 +30,11 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 
 import { Cifra } from "@/components/caja/CifrasRetiro";
 import TablaDenominaciones from "@/components/caja/TablaDenominaciones";
+import SelectorTurnoOperativo, {
+  aperturaSinTurno,
+  turnoFinalDeApertura,
+  useTurnosOperativosActivos,
+} from "@/components/caja/SelectorTurnoOperativo";
 import { CABECERA_BLOQUE, BLOQUE_ALINEADO } from "@/components/caja/geometriaGrilla";
 import {
   PanelSinCambio,
@@ -60,6 +65,11 @@ export default function AperturaSinCambioPage() {
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [resultado, setResultado] = useState(null);
+  // El turno operativo: el que propone la hora del local, o el que elige la
+  // persona. La fecha operativa la calcula el servidor con el turno final.
+  const catalogo = useTurnosOperativosActivos();
+  const [turnoElegido, setTurnoElegido] = useState(null);
+  const turnoId = turnoFinalDeApertura(turnoElegido, catalogo);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const puedeUsar = permisos.includes("*") || permisos.includes("pos.usar");
@@ -97,6 +107,10 @@ export default function AperturaSinCambioPage() {
 
   const confirmar = async () => {
     if (guardando || !hayConteo || !motivo.trim()) return;
+    if (!turnoId && !aperturaSinTurno(catalogo)) {
+      setError("Elegí de qué turno es esta caja.");
+      return;
+    }
     // Fuera de lo creíble y sin el total en pesos que coincida: el aviso ya está
     // en la grilla, acá se repite junto al botón.
     if (!proporcion.valido) {
@@ -114,6 +128,7 @@ export default function AperturaSinCambioPage() {
           desgloseContado,
           motivo: motivo.trim(),
           totalConfirmado: totalConfirmado === "" ? null : totalConfirmado,
+          turnoOperativoId: turnoId,
         }),
       });
       const json = await res.json();
@@ -186,6 +201,17 @@ export default function AperturaSinCambioPage() {
             Volver
           </button>
         </div>
+      </SunmiCard>
+
+      <SunmiCard className="p-3">
+        <SelectorTurnoOperativo
+          valor={turnoId}
+          onCambiar={(id) => {
+            setTurnoElegido(id);
+            setError("");
+          }}
+          catalogo={catalogo}
+        />
       </SunmiCard>
 
       <div className="grid grid-cols-2 gap-2">

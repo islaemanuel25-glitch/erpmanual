@@ -22,6 +22,7 @@
 // Crea su propio grupo, local y usuarios de prueba. NO toca datos existentes.
 
 import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
+import { turnoOperativoDePrueba } from "./pruebas-db/fixtureTurnoOperativo.mjs";
 import jwt from "jsonwebtoken";
 
 const prisma = await crearClientePrisma({ nivel: ESCRITURA });
@@ -115,6 +116,9 @@ async function main() {
   const local = await prisma.local.create({ data: { nombre: `Local ${SUFIJO}`, tipo: "local" } });
   await prisma.grupoLocal.create({ data: { grupoId: grupo.id, localId: local.id } });
   await prisma.configuracionLocal.create({ data: { localId: local.id, exigirOperador: false } });
+  // Desde 20261004200000_turno_operativo las aperturas exigen un turno activo
+  // del local: el mismo fixture que usan las pruebas de base.
+  const TO_LOCAL = await turnoOperativoDePrueba(prisma, local.id);
 
   const cajero = await prisma.usuario.create({
     data: { nombre: `Cajero ${SUFIJO}`, email: `c-${SUFIJO}@test.local`, passwordHash: "x", rolId: rol.id, localId: local.id },
@@ -353,7 +357,7 @@ async function main() {
   const rReserva = await reservarCambio(pedido(`${BASE}/pos-ventas/cambios-pendientes/reservar`, C, { cambioPendienteId: sobre.id }));
   chequear("30. el relevo puede RESERVARLO mientras el saliente cuenta", rReserva.status === 200, (await json(rReserva)).error ?? "");
 
-  const apertura = await json(await abrirConCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-con-cambio`, C, {
+  const apertura = await json(await abrirConCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-con-cambio`, C, { turnoOperativoId: TO_LOCAL,
     cambioPendienteId: sobre.id, desgloseRecibido: { 1000: 2 },
   })));
   chequear(

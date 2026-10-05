@@ -29,6 +29,7 @@ const rutaConfirmar = await import("../../app/api/pos-ventas/cierres/[token]/con
 const rutaSinConteo = await import("../../app/api/pos-ventas/cierres/[token]/cerrar-sin-conteo/route.js");
 const rutaReservar = await import("../../app/api/pos-ventas/cambios-pendientes/reservar/route.js");
 const rutaAbrirConCambio = await import("../../app/api/pos-ventas/turnos/abrir-con-cambio/route.js");
+const { turnoOperativoDeSesion } = await import("./fixtureTurnoOperativo.mjs");
 const rutaRetiroIniciar = await import("../../app/api/pos-ventas/retiros/iniciar/route.js");
 const rutaRetiroConfirmar = await import("../../app/api/pos-ventas/retiros/[token]/confirmar/route.js");
 const rutaListar = await import("../../app/api/caja/correcciones/route.js");
@@ -172,7 +173,14 @@ async function recibirSobre(f, sobreId, desgloseRecibido, extra = {}) {
   const res = await leer(await rutaReservar.POST(pedido(`${BASE}/cambios-pendientes/reservar`, f.sesion, { cambioPendienteId: sobreId })));
   if (!res.ok) throw new Error(`reservar: ${res.error}`);
   const r = await leer(
-    await rutaAbrirConCambio.POST(pedido(`${BASE}/turnos/abrir-con-cambio`, f.sesion, { cambioPendienteId: sobreId, desgloseRecibido, ...extra }))
+    await rutaAbrirConCambio.POST(
+      pedido(`${BASE}/turnos/abrir-con-cambio`, f.sesion, {
+        cambioPendienteId: sobreId,
+        desgloseRecibido,
+        turnoOperativoId: await turnoOperativoDeSesion(prisma, f.sesion),
+        ...extra,
+      })
+    )
   );
   if (!r.ok) throw new Error(`recibir sobre: ${r.error}`);
   return prisma.turno.findUnique({ where: { id: r.turno.id } });

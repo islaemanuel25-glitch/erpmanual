@@ -74,6 +74,12 @@ const caja = (id, extra = {}) => ({
   vendedorId: 1,
   vendedorNombre: "Cuenta",
   diferenciaEfectivo: 0,
+  // Desde la migración 20261004200000_turno_operativo cada caja nueva trae el
+  // turno que eligió al abrirse; es la forma que da `leerTesoreria`.
+  turnoOperativoId: 31,
+  turnoOperativoNombre: "Mañana",
+  turnoOperativoOrden: 0,
+  fechaOperativa: new Date("2026-10-04T00:00:00.000Z"),
   ...extra,
 });
 const mov = (id, turnoId, clase, monto, extra = {}) => ({
@@ -92,13 +98,19 @@ const pagoProveedor = (id, monto, medio, { turnoId = null, cajaMovimientoId = nu
 });
 const pagoGasto = (id, monto, medio, gasto) => ({ id, fecha: TARDE, monto, medio, turnoId: null, cajaMovimientoId: null, nota: null, gasto });
 // La fila de `SELECT_VERIFICACION`, como la de `lecturaTesoreria.test.mjs`.
-const filaDeVerificacion = (id, fotos, { importeVerificado, verificadaPor = { id: 1, nombre: "Laura Ruiz" }, operador = null, observacion = null } = {}) => {
+// `turno`: el turno operativo congelado en el acto, como lo trae el SELECT real;
+// null = verificación anterior al turno operativo.
+const TURNO_DEL_ACTO = { id: 31, nombre: "Mañana" };
+const filaDeVerificacion = (id, fotos, { importeVerificado, verificadaPor = { id: 1, nombre: "Laura Ruiz" }, operador = null, observacion = null, turno = TURNO_DEL_ACTO } = {}) => {
   const declarado = fotos.reduce((s, f) => s + f.monto, 0);
   return {
     id, localId: LOCAL, importeDeclarado: declarado, importeVerificado, diferencia: importeVerificado - declarado,
     estado: "VIGENTE", vigente: true, verificadaPorUsuarioId: verificadaPor?.id ?? 1, verificadaPorOperadorId: operador,
     verificadaEn: new Date("2026-10-04T14:32:00-03:00"), observacion, idempotencyKey: `k${id}`, anuladaEn: null,
     anuladaPorUsuarioId: null, motivoAnulacion: null, verificadaPor, anuladaPor: null,
+    turnoOperativoId: turno?.id ?? null,
+    fechaOperativa: turno ? new Date("2026-10-04T00:00:00.000Z") : null,
+    turnoOperativo: turno,
     entregas: fotos.map((f) => ({
       cajaMovimientoId: f.id, vigente: true, montoDeclaradoSnapshot: f.monto, localIdSnapshot: LOCAL,
       turnoIdSnapshot: f.turnoId, operadorIdSnapshot: 100 + f.turnoId, claseSnapshot: f.clase || "CIERRE",
@@ -391,7 +403,8 @@ test("[17][18] detalle de caja: retiro y cierre UNA vez cada uno, total sin dupl
   assert.match(t, /Total entregado \$100\.000,00/);
   assert.doesNotMatch(t, /\$200\.000/);
   assert.match(t, /Operador Ana/);
-  assert.match(t, /Ir a Domingo 4 de octubre/);
+  // El enlace vuelve al TURNO de la caja, por su nombre del catálogo.
+  assert.match(t, /Ir a Mañana/);
   // En la tarjeta del turno, la misma composición, una vez.
   const turno = texto(pantalla(d, { vista: "turno", grupo: grupoDe(d) }));
   assert.match(turno, /Efectivo entregado Retiro \$50\.000,00 \+ cierre \$50\.000,00 \$100\.000,00/);
@@ -574,6 +587,34 @@ test("[34][35] solo un éxito del servidor cierra y relee; un error no se muestr
 });
 
 // ── 37-44 · DETALLE Y ANULACIÓN ──────────────────────────────────────────
+
+test("[TO] la tarjeta del turno se llama por el turno y no lleva un rango horario", () => {
+  const d = datos(ESC.pendiente());
+  const html = pantalla(d);
+  const t = texto(html);
+  // "Mañana" con sus dos cajas; nada de "4 cajas · 00:03 a 19:15".
+  assert.match(t, /Mañana 2 cajas/);
+  assert.doesNotMatch(t, /\d+ cajas? · \d{2}:\d{2} a \d{2}:\d{2}/, "volvió el rango horario a la tarjeta del turno");
+  // En Semana, cada turno dice de qué día es.
+  const semana = texto(pantalla(datos(ESC.pendiente(), { unidad: "SEMANA" }), { unidad: "SEMANA" }));
+  assert.match(semana, /Mañana Domingo 4 de octubre · 2 cajas/);
+  // El detalle del turno lleva siempre el día.
+  assert.match(texto(pantalla(d, { vista: "turno", grupo: grupoDe(d) })), /Domingo 4 de octubre · 2 cajas/);
+});
+
+test("[TO-9] una verificación anterior al turno operativo se lee como tal y con sus importes del acto", () => {
+  const vieja = base({
+    verificaciones: [acto(9, [{ id: 21, monto: 10000, turnoId: 2 }], { importeVerificado: 9800, turno: null })],
+  });
+  const t = texto(pantalla(datos(vieja), { vista: "verificacion", verificacion: 9 }));
+  assert.match(t, /Verificación anterior al turno operativo/);
+  // Lo verificado es lo que se congeló: no se recalcula.
+  assert.match(t, /−\$200,00/);
+  assert.match(t, /\$9\.800,00/);
+  // Una con turno nombra el turno y el día que se verificó.
+  const nueva = base({ verificaciones: [acto(9, [{ id: 21, monto: 10000, turnoId: 2 }], { importeVerificado: 10000 })] });
+  assert.match(texto(pantalla(datos(nueva), { vista: "verificacion", verificacion: 9 })), /Mañana · Domingo 4 de octubre/);
+});
 
 test("[37][38] el detalle nombra a quien verificó y NO inventa un operador", () => {
   const d = datos(ESC.diferencia());

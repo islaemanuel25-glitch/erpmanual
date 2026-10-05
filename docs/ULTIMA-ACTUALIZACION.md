@@ -1,16 +1,16 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-04 21:40
+**Fecha:** 2026-10-05 02:58
 
 ## Módulos modificados recientemente
 
-### transferencias
-- feat(tesoreria): persistencia inmutable de la verificación de efectivo
+### configuracion
+- fix: un turno operativo activo tiene horario, siempre, feat: transición por local al turno operativo y turnos sin ventana válidos, feat: el ciclo de turnos del local decide qué se puede abrir y de qué jornada
 - Archivos: 1 modificados (1 total)
 
 ### pos-ventas
-- feat: la lectura canónica de Tesorería, fix: Caja +/− valida y escribe con el turno tomado
-- Archivos: 2 modificados (2 total)
+- feat: transición por local al turno operativo y turnos sin ventana válidos, feat: el turno operativo se reconoce por la ventana del local y la fecha es la de su jornada
+- Archivos: 3 modificados (3 total)
 
 
 

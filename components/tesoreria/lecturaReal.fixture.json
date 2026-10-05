@@ -4,8 +4,8 @@
  "unidad": "DIA",
  "desplazamiento": 0,
  "local": {
-  "id": 138,
-  "nombre": "A",
+  "id": 4,
+  "nombre": "Local A",
   "esDeposito": false,
   "inactivo": false,
   "diaDeCorte": 0,
@@ -62,7 +62,7 @@
     }
    ],
    "efectivoCobradoDeclarado": 226000,
-   "efectivoDeclaradoEntregado": 8236500,
+   "efectivoDeclaradoEntregado": 8239500,
    "digitalCobradoDeclarado": 0,
    "comisionDigitalEstimada": 0,
    "netoDigitalEstimado": 0,
@@ -79,15 +79,16 @@
     "monto": 0,
     "cantidad": 0
    },
-   "baseConocida": 8233500,
+   "baseConocida": 8236500,
    "baseIncompleta": true,
    "verificacion": {
-    "entregadoDeclarado": 8236500,
-    "entregadoPendienteDeVerificar": 9000,
-    "entregasPendientes": 2,
+    "entregadoDeclarado": 8239500,
+    "entregadoPendienteDeVerificar": 12000,
+    "entregasPendientes": 3,
     "entregasPendientesIds": [
-     701,
-     713
+     26,
+     38,
+     37
     ],
     "entregadoCubiertoPorVerificaciones": 8227500,
     "entregasVerificadas": 12,
@@ -101,11 +102,14 @@
   },
   "grupos": [
    {
-    "clave": "138:2026-10-04",
-    "etiqueta": "2026-10-04",
+    "clave": "4:2026-10-04:t3",
+    "etiqueta": "Mañana",
     "dia": "2026-10-04",
-    "criterio": "PROVISORIO_DIA_OPERATIVO",
-    "provisorio": true,
+    "criterio": "TURNO_OPERATIVO",
+    "orden": 0,
+    "turnoOperativoId": 3,
+    "fechaOperativa": "2026-10-04",
+    "sinTurno": false,
     "cobradoPorMedio": [
      {
       "medio": "EFECTIVO",
@@ -127,19 +131,19 @@
       ]
      }
     ],
-    "efectivoDeclaradoEntregado": 8236500,
+    "efectivoDeclaradoEntregado": 8239500,
     "digitalCobradoDeclarado": 0,
-    "egresosExterioresConocidos": 3000,
     "pagosDesdeCajaInformativos": 2000,
-    "primerHecho": "2026-10-04T18:41:28.371Z",
-    "ultimoHecho": "2026-10-04T18:41:32.716Z",
+    "primerHecho": "2026-10-03T22:52:02.790Z",
+    "ultimoHecho": "2026-10-04T22:52:02.778Z",
     "verificacion": {
-     "entregadoDeclarado": 8236500,
-     "entregadoPendienteDeVerificar": 9000,
-     "entregasPendientes": 2,
+     "entregadoDeclarado": 8239500,
+     "entregadoPendienteDeVerificar": 12000,
+     "entregasPendientes": 3,
      "entregasPendientesIds": [
-      701,
-      713
+      26,
+      38,
+      37
      ],
      "entregadoCubiertoPorVerificaciones": 8227500,
      "entregasVerificadas": 12,
@@ -153,10 +157,10 @@
     "alertas": [],
     "cajas": [
      {
-      "turnoId": 1048,
-      "etiqueta": "Caja de op1",
-      "operadorId": 357,
-      "operadorNombre": "op1",
+      "turnoId": 18,
+      "etiqueta": "Caja de Operador 1",
+      "operadorId": 16,
+      "operadorNombre": "Operador 1",
       "cobradoPorMedio": [
        {
         "medio": "EFECTIVO",
@@ -181,10 +185,10 @@
       "efectivoDeclaradoEntregado": 100000
      },
      {
-      "turnoId": 1049,
-      "etiqueta": "Caja de op3",
-      "operadorId": 358,
-      "operadorNombre": "op3",
+      "turnoId": 19,
+      "etiqueta": "Caja de Operador 3",
+      "operadorId": 17,
+      "operadorNombre": "Operador 3",
       "cobradoPorMedio": [
        {
         "medio": "EFECTIVO",
@@ -207,50 +211,27 @@
        }
       ],
       "efectivoDeclaradoEntregado": 10000
-     },
-     {
-      "turnoId": 1050,
-      "etiqueta": "Caja de op5",
-      "operadorId": 359,
-      "operadorNombre": "op5",
-      "cobradoPorMedio": [
-       {
-        "medio": "EFECTIVO",
-        "rotulo": "Efectivo",
-        "esEfectivo": true,
-        "estado": null,
-        "montoDeclarado": 60000,
-        "comisionEstimada": null,
-        "netoEstimado": null,
-        "detalle": [
-         {
-          "procesador": null,
-          "medioNombre": null,
-          "modalidadNombre": null,
-          "montoDeclarado": 60000,
-          "comisionEstimada": null,
-          "netoEstimado": null
-         }
-        ]
-       }
-      ],
-      "efectivoDeclaradoEntregado": 60000
      }
     ]
    }
   ],
   "cajas": [
    {
-    "turnoId": 1048,
-    "etiqueta": "Caja de op1",
-    "localId": 138,
-    "operadorId": 357,
-    "operadorNombre": "op1",
-    "vendedorId": 117,
-    "vendedorNombre": "A-cuenta",
+    "turnoId": 18,
+    "etiqueta": "Caja de Operador 1",
+    "localId": 4,
+    "operadorId": 16,
+    "operadorNombre": "Operador 1",
+    "vendedorId": 4,
+    "vendedorNombre": "Cuenta del local",
     "estado": "CERRADO",
-    "apertura": "2026-10-04T18:41:28.214Z",
-    "cierre": "2026-10-04T18:41:28.477Z",
+    "apertura": "2026-10-04T22:51:59.195Z",
+    "cierre": "2026-10-04T22:51:59.374Z",
+    "turnoOperativo": {
+     "id": 3,
+     "nombre": "Mañana"
+    },
+    "fechaOperativa": "2026-10-04",
     "cobradoPorMedio": [
      {
       "medio": "EFECTIVO",
@@ -276,17 +257,17 @@
     "sinImporteDeclarado": false,
     "entregas": [
      {
-      "cajaMovimientoId": 695,
+      "cajaMovimientoId": 20,
       "clase": "CIERRE",
       "montoDeclarado": 100000,
-      "instante": "2026-10-04T18:41:28.488Z",
-      "turnoId": 1048,
-      "operadorId": 357,
-      "operadorNombre": "op1",
-      "etiquetaCaja": "Caja de op1",
-      "grupo": "138:2026-10-04",
+      "instante": "2026-10-04T22:51:59.381Z",
+      "turnoId": 18,
+      "operadorId": 16,
+      "operadorNombre": "Operador 1",
+      "etiquetaCaja": "Caja de Operador 1",
+      "grupo": "4:2026-10-04:t3",
       "estadoVerificacion": "VERIFICADA",
-      "verificacionId": 182,
+      "verificacionId": 25,
       "montoDeclaradoVerificado": 100000,
       "desactualizada": false,
       "motivosDesactualizacion": []
@@ -298,16 +279,21 @@
     "alertas": []
    },
    {
-    "turnoId": 1049,
-    "etiqueta": "Caja de op3",
-    "localId": 138,
-    "operadorId": 358,
-    "operadorNombre": "op3",
-    "vendedorId": 117,
-    "vendedorNombre": "A-cuenta",
+    "turnoId": 19,
+    "etiqueta": "Caja de Operador 3",
+    "localId": 4,
+    "operadorId": 17,
+    "operadorNombre": "Operador 3",
+    "vendedorId": 4,
+    "vendedorNombre": "Cuenta del local",
     "estado": "CERRADO",
-    "apertura": "2026-10-04T18:41:28.529Z",
-    "cierre": "2026-10-04T18:41:28.660Z",
+    "apertura": "2026-10-04T22:51:59.411Z",
+    "cierre": "2026-10-04T22:51:59.495Z",
+    "turnoOperativo": {
+     "id": 3,
+     "nombre": "Mañana"
+    },
+    "fechaOperativa": "2026-10-04",
     "cobradoPorMedio": [
      {
       "medio": "EFECTIVO",
@@ -333,91 +319,18 @@
     "sinImporteDeclarado": false,
     "entregas": [
      {
-      "cajaMovimientoId": 696,
+      "cajaMovimientoId": 21,
       "clase": "CIERRE",
       "montoDeclarado": 10000,
-      "instante": "2026-10-04T18:41:28.668Z",
-      "turnoId": 1049,
-      "operadorId": 358,
-      "operadorNombre": "op3",
-      "etiquetaCaja": "Caja de op3",
-      "grupo": "138:2026-10-04",
+      "instante": "2026-10-04T22:51:59.501Z",
+      "turnoId": 19,
+      "operadorId": 17,
+      "operadorNombre": "Operador 3",
+      "etiquetaCaja": "Caja de Operador 3",
+      "grupo": "4:2026-10-04:t3",
       "estadoVerificacion": "VERIFICADA",
-      "verificacionId": 182,
+      "verificacionId": 25,
       "montoDeclaradoVerificado": 10000,
-      "desactualizada": false,
-      "motivosDesactualizacion": []
-     }
-    ],
-    "diferenciaCaja": 0,
-    "pagosDesdeCaja": [],
-    "movimientosManuales": [],
-    "alertas": []
-   },
-   {
-    "turnoId": 1050,
-    "etiqueta": "Caja de op5",
-    "localId": 138,
-    "operadorId": 359,
-    "operadorNombre": "op5",
-    "vendedorId": 117,
-    "vendedorNombre": "A-cuenta",
-    "estado": "CERRADO",
-    "apertura": "2026-10-04T18:41:28.698Z",
-    "cierre": "2026-10-04T18:41:28.916Z",
-    "cobradoPorMedio": [
-     {
-      "medio": "EFECTIVO",
-      "rotulo": "Efectivo",
-      "esEfectivo": true,
-      "estado": null,
-      "montoDeclarado": 60000,
-      "comisionEstimada": null,
-      "netoEstimado": null,
-      "detalle": [
-       {
-        "procesador": null,
-        "medioNombre": null,
-        "modalidadNombre": null,
-        "montoDeclarado": 60000,
-        "comisionEstimada": null,
-        "netoEstimado": null
-       }
-      ]
-     }
-    ],
-    "efectivoDeclaradoEntregado": 60000,
-    "sinImporteDeclarado": false,
-    "entregas": [
-     {
-      "cajaMovimientoId": 697,
-      "clase": "RECAUDACION",
-      "montoDeclarado": 30000,
-      "instante": "2026-10-04T18:41:28.852Z",
-      "turnoId": 1050,
-      "operadorId": 359,
-      "operadorNombre": "op5",
-      "etiquetaCaja": "Caja de op5",
-      "grupo": "138:2026-10-04",
-      "estadoVerificacion": "VERIFICADA",
-      "verificacionId": 180,
-      "montoDeclaradoVerificado": 30000,
-      "desactualizada": false,
-      "motivosDesactualizacion": []
-     },
-     {
-      "cajaMovimientoId": 698,
-      "clase": "CIERRE",
-      "montoDeclarado": 30000,
-      "instante": "2026-10-04T18:41:28.928Z",
-      "turnoId": 1050,
-      "operadorId": 359,
-      "operadorNombre": "op5",
-      "etiquetaCaja": "Caja de op5",
-      "grupo": "138:2026-10-04",
-      "estadoVerificacion": "VERIFICADA",
-      "verificacionId": 180,
-      "montoDeclaradoVerificado": 30000,
       "desactualizada": false,
       "motivosDesactualizacion": []
      }
@@ -430,66 +343,50 @@
   ],
   "entregas": [
    {
-    "cajaMovimientoId": 695,
+    "cajaMovimientoId": 27,
+    "clase": "CIERRE",
+    "montoDeclarado": 4000,
+    "instante": "2026-10-04T22:52:00.095Z",
+    "turnoId": 24,
+    "operadorId": 22,
+    "operadorNombre": "Operador 13",
+    "etiquetaCaja": "Caja de Operador 13",
+    "grupo": "4:2026-10-04:t3",
+    "estadoVerificacion": "VERIFICADA",
+    "verificacionId": 22,
+    "montoDeclaradoVerificado": 4000,
+    "desactualizada": false,
+    "motivosDesactualizacion": []
+   },
+   {
+    "cajaMovimientoId": 20,
     "clase": "CIERRE",
     "montoDeclarado": 100000,
-    "instante": "2026-10-04T18:41:28.488Z",
-    "turnoId": 1048,
-    "operadorId": 357,
-    "operadorNombre": "op1",
-    "etiquetaCaja": "Caja de op1",
-    "grupo": "138:2026-10-04",
+    "instante": "2026-10-04T22:51:59.381Z",
+    "turnoId": 18,
+    "operadorId": 16,
+    "operadorNombre": "Operador 1",
+    "etiquetaCaja": "Caja de Operador 1",
+    "grupo": "4:2026-10-04:t3",
     "estadoVerificacion": "VERIFICADA",
-    "verificacionId": 182,
+    "verificacionId": 25,
     "montoDeclaradoVerificado": 100000,
     "desactualizada": false,
     "motivosDesactualizacion": []
    },
    {
-    "cajaMovimientoId": 696,
+    "cajaMovimientoId": 21,
     "clase": "CIERRE",
     "montoDeclarado": 10000,
-    "instante": "2026-10-04T18:41:28.668Z",
-    "turnoId": 1049,
-    "operadorId": 358,
-    "operadorNombre": "op3",
-    "etiquetaCaja": "Caja de op3",
-    "grupo": "138:2026-10-04",
+    "instante": "2026-10-04T22:51:59.501Z",
+    "turnoId": 19,
+    "operadorId": 17,
+    "operadorNombre": "Operador 3",
+    "etiquetaCaja": "Caja de Operador 3",
+    "grupo": "4:2026-10-04:t3",
     "estadoVerificacion": "VERIFICADA",
-    "verificacionId": 182,
+    "verificacionId": 25,
     "montoDeclaradoVerificado": 10000,
-    "desactualizada": false,
-    "motivosDesactualizacion": []
-   },
-   {
-    "cajaMovimientoId": 697,
-    "clase": "RECAUDACION",
-    "montoDeclarado": 30000,
-    "instante": "2026-10-04T18:41:28.852Z",
-    "turnoId": 1050,
-    "operadorId": 359,
-    "operadorNombre": "op5",
-    "etiquetaCaja": "Caja de op5",
-    "grupo": "138:2026-10-04",
-    "estadoVerificacion": "VERIFICADA",
-    "verificacionId": 180,
-    "montoDeclaradoVerificado": 30000,
-    "desactualizada": false,
-    "motivosDesactualizacion": []
-   },
-   {
-    "cajaMovimientoId": 698,
-    "clase": "CIERRE",
-    "montoDeclarado": 30000,
-    "instante": "2026-10-04T18:41:28.928Z",
-    "turnoId": 1050,
-    "operadorId": 359,
-    "operadorNombre": "op5",
-    "etiquetaCaja": "Caja de op5",
-    "grupo": "138:2026-10-04",
-    "estadoVerificacion": "VERIFICADA",
-    "verificacionId": 180,
-    "montoDeclaradoVerificado": 30000,
     "desactualizada": false,
     "motivosDesactualizacion": []
    }
@@ -497,17 +394,17 @@
   "egresosExteriores": [
    {
     "origen": "PAGO_PROVEEDOR",
-    "id": 323,
-    "fecha": "2026-10-04T18:41:30.988Z",
+    "id": 4,
+    "fecha": "2026-10-04T22:52:01.205Z",
     "montoPagado": 3000,
     "medio": "TRANSFERENCIA",
     "pagadoDesdeCaja": false,
-    "beneficiario": "panadero",
+    "beneficiario": "Panadería",
     "concepto": null,
     "categoria": null,
     "referencia": {
      "tipo": "PEDIDO_PROVEEDOR",
-     "id": 620
+     "id": 2
     },
     "nota": null
    }
@@ -515,19 +412,19 @@
   "pagosDesdeCaja": [
    {
     "origen": "PAGO_PROVEEDOR",
-    "id": 322,
-    "fecha": "2026-10-04T18:41:30.090Z",
+    "id": 3,
+    "fecha": "2026-10-04T22:52:00.557Z",
     "montoPagado": 2000,
     "medio": "EFECTIVO",
-    "turnoId": 1059,
-    "cajaMovimientoId": 707,
+    "turnoId": 29,
+    "cajaMovimientoId": 32,
     "pagadoDesdeCaja": true,
-    "beneficiario": "panadero",
+    "beneficiario": "Panadería",
     "concepto": null,
     "categoria": null,
     "referencia": {
      "tipo": "PEDIDO_PROVEEDOR",
-     "id": 620
+     "id": 2
     },
     "nota": null
    }
@@ -535,15 +432,15 @@
   "alertas": [
    {
     "codigo": "VERIFICACION_DESACTUALIZADA",
-    "verificacionId": 185,
-    "cajaMovimientoId": 703,
+    "verificacionId": 28,
+    "cajaMovimientoId": 28,
     "motivos": [
      "MONTO"
     ]
    },
    {
     "codigo": "CAJA_SIN_CERRAR",
-    "turnoId": 1058
+    "turnoId": 28
    },
    {
     "codigo": "MOVIMIENTOS_MANUALES",
@@ -552,113 +449,113 @@
   ],
   "verificaciones": [
    {
-    "id": 180,
-    "localId": 138,
+    "id": 22,
+    "localId": 4,
+    "estado": "VIGENTE",
+    "vigente": true,
+    "importeDeclarado": 4000,
+    "importeVerificado": 4000,
+    "diferencia": 0,
+    "correcta": true,
+    "verificadaEn": "2026-10-04T22:52:01.051Z",
+    "verificadaPorUsuarioId": 4,
+    "verificadaPor": {
+     "id": 4,
+     "nombre": "Cuenta del local"
+    },
+    "verificadaPorOperadorId": null,
+    "verificadaPorOperador": null,
+    "observacion": null,
+    "idempotencyKey": "ci-verif-acc-1791154318906-compartida",
+    "anuladaEn": null,
+    "anuladaPorUsuarioId": null,
+    "anuladaPor": null,
+    "motivoAnulacion": null,
+    "turnoOperativo": {
+     "id": 3,
+     "nombre": "Mañana"
+    },
+    "fechaOperativa": "2026-10-04",
+    "cantidadDeCajas": 1,
+    "entregas": [
+     {
+      "cajaMovimientoId": 27,
+      "clase": "CIERRE",
+      "montoDeclarado": 4000,
+      "turnoId": 24,
+      "localId": 4,
+      "operadorId": 22,
+      "instante": "2026-10-04T22:52:00.095Z"
+     }
+    ],
+    "huella": "0f08cc5eb23627925f20cc81d876f4bab2248954d95e8e3b8952dfb1d2dcd297",
+    "entregasEnElPeriodo": [
+     27
+    ],
+    "completaEnElPeriodo": true,
+    "grupos": [
+     "4:2026-10-04:t3"
+    ],
+    "desactualizada": false,
+    "entregasDesactualizadas": []
+   },
+   {
+    "id": 23,
+    "localId": 4,
     "estado": "VIGENTE",
     "vigente": true,
     "importeDeclarado": 60000,
     "importeVerificado": 60000,
     "diferencia": 0,
     "correcta": true,
-    "verificadaEn": "2026-10-04T18:41:30.857Z",
-    "verificadaPorUsuarioId": 117,
+    "verificadaEn": "2026-10-04T22:52:01.070Z",
+    "verificadaPorUsuarioId": 4,
     "verificadaPor": {
-     "id": 117,
-     "nombre": "A-cuenta"
+     "id": 4,
+     "nombre": "Cuenta del local"
     },
     "verificadaPorOperadorId": null,
     "verificadaPorOperador": null,
     "observacion": null,
-    "idempotencyKey": "36",
+    "idempotencyKey": "ci-verif-acc-1791154318906-36",
     "anuladaEn": null,
     "anuladaPorUsuarioId": null,
     "anuladaPor": null,
     "motivoAnulacion": null,
+    "turnoOperativo": {
+     "id": 3,
+     "nombre": "Mañana"
+    },
+    "fechaOperativa": "2026-10-04",
     "cantidadDeCajas": 1,
     "entregas": [
      {
-      "cajaMovimientoId": 697,
+      "cajaMovimientoId": 22,
       "clase": "RECAUDACION",
       "montoDeclarado": 30000,
-      "turnoId": 1050,
-      "localId": 138,
-      "operadorId": 359,
-      "instante": "2026-10-04T18:41:28.852Z"
+      "turnoId": 20,
+      "localId": 4,
+      "operadorId": 18,
+      "instante": "2026-10-04T22:51:59.603Z"
      },
      {
-      "cajaMovimientoId": 698,
+      "cajaMovimientoId": 23,
       "clase": "CIERRE",
       "montoDeclarado": 30000,
-      "turnoId": 1050,
-      "localId": 138,
-      "operadorId": 359,
-      "instante": "2026-10-04T18:41:28.928Z"
+      "turnoId": 20,
+      "localId": 4,
+      "operadorId": 18,
+      "instante": "2026-10-04T22:51:59.653Z"
      }
     ],
-    "huella": "20d828ff50566c2a49a02c58cf5397fdc9dac22e145fdf746b5606a79ccab793",
+    "huella": "32231d78529d480db28b5601f6f8d95d92b5def328690286816f091333ec5005",
     "entregasEnElPeriodo": [
-     697,
-     698
+     22,
+     23
     ],
     "completaEnElPeriodo": true,
     "grupos": [
-     "138:2026-10-04"
-    ],
-    "desactualizada": false,
-    "entregasDesactualizadas": []
-   },
-   {
-    "id": 182,
-    "localId": 138,
-    "estado": "VIGENTE",
-    "vigente": true,
-    "importeDeclarado": 110000,
-    "importeVerificado": 110000,
-    "diferencia": 0,
-    "correcta": true,
-    "verificadaEn": "2026-10-04T18:41:31.100Z",
-    "verificadaPorUsuarioId": 117,
-    "verificadaPor": {
-     "id": 117,
-     "nombre": "A-cuenta"
-    },
-    "verificadaPorOperadorId": null,
-    "verificadaPorOperador": null,
-    "observacion": null,
-    "idempotencyKey": "40",
-    "anuladaEn": null,
-    "anuladaPorUsuarioId": null,
-    "anuladaPor": null,
-    "motivoAnulacion": null,
-    "cantidadDeCajas": 2,
-    "entregas": [
-     {
-      "cajaMovimientoId": 695,
-      "clase": "CIERRE",
-      "montoDeclarado": 100000,
-      "turnoId": 1048,
-      "localId": 138,
-      "operadorId": 357,
-      "instante": "2026-10-04T18:41:28.488Z"
-     },
-     {
-      "cajaMovimientoId": 696,
-      "clase": "CIERRE",
-      "montoDeclarado": 10000,
-      "turnoId": 1049,
-      "localId": 138,
-      "operadorId": 358,
-      "instante": "2026-10-04T18:41:28.668Z"
-     }
-    ],
-    "huella": "a046b057cce634c17908650f934cac716717667ac47ef4656e508c5c2899b070",
-    "entregasEnElPeriodo": [
-     695,
-     696
-    ],
-    "completaEnElPeriodo": true,
-    "grupos": [
-     "138:2026-10-04"
+     "4:2026-10-04:t3"
     ],
     "desactualizada": false,
     "entregasDesactualizadas": []

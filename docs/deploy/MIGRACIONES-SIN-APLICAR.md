@@ -16,22 +16,37 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **47 migraciones**; el árbol tiene 48. Pendiente de deploy:
+Producción está en **48 migraciones**; el árbol tiene 49. Pendiente de deploy:
 
-- `20261004120000_verificacion_efectivo` — Tesorería, persistencia de la
-  verificación del efectivo (PR #136). **Aditiva:** dos tablas nuevas y vacías,
-  dos enums, sus índices, CHECK, FK y triggers; no altera ni recorre ninguna
-  tabla existente (las FK salen de tablas vacías hacia `Local`, `Usuario` y
-  `CajaMovimiento`). Sin backfill. El clasificador la marca `aditiva`, sin
-  coincidencias. Ensayada desde cero (0 → 48, sin drift) y sobre una base con el
-  esquema de 47 y datos de cajas, ventas, retiros y cierres: los conteos y la
-  huella de `CajaMovimiento` quedaron idénticos y las tablas nuevas, vacías. El
-  código de antes no las lee, así que la ventana entre migrar y recrear la app
-  no cambia nada.
+- `20261004200000_turno_operativo` — Tesorería verifica por turno operativo
+  (rama `claude/tesoreria-turno-operativo`). **Aditiva y sin backfill.** Qué
+  hace `migrate deploy`: crea la tabla `TurnoOperativo` VACÍA (catálogo por
+  local, FK a `Local` en cascada, con la ventana de reconocimiento y sus CHECK
+  de integridad —las dos horas o ninguna, y las dos en todo turno activo—; no
+  siembra ningún turno); agrega a `Turno` y a `VerificacionEfectivo`
+  dos columnas NULL (`turnoOperativoId`, `fechaOperativa`) con su CHECK de
+  "las dos o ninguna", su FK compuesta con el local e índices; crea dos
+  triggers (la caja no cambia su turno ni su fecha; una entrega solo entra en
+  la verificación de su turno y fecha) y reemplaza `verificacion_solo_se_anula`
+  con las dos columnas nuevas. Toma `Turno` y `VerificacionEfectivo` con
+  `lock_timeout` de 3 s: si hay una transacción larga sobre la caja, falla
+  limpia y se reintenta, no espera. **No escribe ningún dato**: las cajas y
+  verificaciones existentes quedan en NULL y se ven como "Sin turno asignado".
+  Ensayada desde cero (0 → 49, sin drift).
+  **No corta aperturas.** Con la app nueva, un local que todavía no tiene
+  turnos operativos sigue abriendo cajas en modo legado, sin turno ("Sin turno
+  asignado"). Cada local entra al sistema nuevo cuando carga su primer turno en
+  Configuración → POS → Turnos operativos (permiso `config_local.pos`): desde
+  ahí sus cajas nuevas exigen turno, y desactivarlos no lo devuelve al legado.
+  Cada turno se carga con su horario de reconocimiento —un turno activo no se
+  guarda sin él— y en el orden del ciclo. El horario ubica la ocurrencia; no
+  obliga a cerrar la caja. Las cajas viejas no reciben turno: no hay backfill.
 
-Producción corre `bd92ca5d057541befa48589cda5a73cfe6de89b3` (despliegue del
-2026-10-04, nota abajo). Un commit posterior a ese que solo cambie
-documentación **no se despliega por eso**.
+`20261004120000_verificacion_efectivo` (PR #136) **ya está aplicada**: lo
+informó Emanuel el 2026-10-04, con producción en 48/48. El commit que corre
+producción después de ese despliegue no está anotado en este archivo; el último
+registrado abajo es `bd92ca5d057541befa48589cda5a73cfe6de89b3`. Un commit
+posterior que solo cambie documentación **no se despliega por eso**.
 
 ---
 

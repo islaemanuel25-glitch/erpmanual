@@ -5,6 +5,11 @@ import { useOperadorContext } from "@/app/context/OperadorContext";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
+import SelectorTurnoOperativo, {
+  aperturaSinTurno,
+  turnoFinalDeApertura,
+  useTurnosOperativosActivos,
+} from "@/components/caja/SelectorTurnoOperativo";
 
 /**
  * Apertura de caja: el cajero declara cuánto efectivo recibió.
@@ -26,6 +31,11 @@ export default function ModalAperturaTurno({ localId, vendedorNombre, onApertura
   const [cargando, setCargando] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // El turno operativo, igual que en las aperturas por cambio: el que propone
+  // la hora del local o el que elige la persona; la fecha la calcula el servidor.
+  const catalogo = useTurnosOperativosActivos();
+  const [turnoElegido, setTurnoElegido] = useState(null);
+  const turnoId = turnoFinalDeApertura(turnoElegido, catalogo);
 
   useEffect(() => {
     let vivo = true;
@@ -56,6 +66,10 @@ export default function ModalAperturaTurno({ localId, vendedorNombre, onApertura
       setError("El monto no puede ser negativo");
       return;
     }
+    if (!turnoId && !aperturaSinTurno(catalogo)) {
+      setError("Elegí de qué turno es esta caja.");
+      return;
+    }
 
     setError("");
     setLoading(true);
@@ -68,6 +82,7 @@ export default function ModalAperturaTurno({ localId, vendedorNombre, onApertura
           localId,
           montoInicial: Number(montoInicial),
           observacionFondo: observacionFondo.trim() || null,
+          turnoOperativoId: turnoId,
         }),
       });
 
@@ -139,6 +154,15 @@ export default function ModalAperturaTurno({ localId, vendedorNombre, onApertura
                 efectivo, los arqueos pueden mostrar diferencias incorrectas.
               </div>
             </div>
+
+            <SelectorTurnoOperativo
+              valor={turnoId}
+              onCambiar={(id) => {
+                setTurnoElegido(id);
+                setError("");
+              }}
+              catalogo={catalogo}
+            />
 
             <div>
               <label className="text-sm sunmi-label mb-1 block font-semibold">

@@ -55,7 +55,10 @@ async function sembrarPagoPrevio(url) {
     await p.grupoLocal.create({ data: { grupoId: grupo.id, localId: local.id } });
     const rol = await p.rol.create({ data: { nombre: "CI previo", permisos: [] } });
     const u = await p.usuario.create({ data: { nombre: "Previo", email: "previo@ci.local", passwordHash: "x", rolId: rol.id, localId: local.id } });
-    const turno = await p.turno.create({ data: { localId: local.id, vendedorId: u.id, montoInicial: 0, apertura: new Date() } });
+    // `select` a propósito: esta base está en el esquema de ANTES de Gastos y el
+    // cliente es el de hoy; sin él, el RETURNING pide columnas de `Turno` que
+    // llegaron después (el turno operativo) y la siembra se cae.
+    const turno = await p.turno.create({ data: { localId: local.id, vendedorId: u.id, montoInicial: 0, apertura: new Date() }, select: { id: true } });
     const proveedor = await p.proveedor.create({ data: { nombre: "Proveedor previo" } });
     const pedido = await p.pedidoProveedor.create({ data: { grupoId: grupo.id, depositoId: deposito.id, proveedorId: proveedor.id, estado: "RECIBIDO" } });
     const cuenta = await p.cuentaPorPagarProveedor.create({

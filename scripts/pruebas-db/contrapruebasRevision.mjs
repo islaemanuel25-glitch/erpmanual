@@ -38,6 +38,24 @@ const DESHACER_VERIFICACION_EFECTIVO = `
   DROP FUNCTION "verificacion_entrega_foto_fiel"(), "verificacion_declarado_es_la_suma"(),
     "verificacion_solo_se_anula"(), "verificacion_entrega_inmutable"(), "verificacion_efectivo_no_se_borra"();`;
 
+// La del turno operativo deshace solo lo suyo. `verificacion_solo_se_anula` la
+// reemplaza con CREATE OR REPLACE y se vuelve a reemplazar al reaplicar.
+const TURNO_OPERATIVO = "prisma/migrations/20261004200000_turno_operativo/migration.sql";
+const DESHACER_TURNO_OPERATIVO = `
+  DROP TRIGGER "VerificacionEfectivoEntrega_turno_operativo" ON "VerificacionEfectivoEntrega";
+  DROP TRIGGER "Turno_turno_operativo_inmutable" ON "Turno";
+  DROP FUNCTION "verificacion_entrega_del_turno_operativo"(), "turno_operativo_de_caja_inmutable"();
+  ALTER TABLE "VerificacionEfectivo" DROP COLUMN "turnoOperativoId", DROP COLUMN "fechaOperativa";
+  ALTER TABLE "Turno" DROP COLUMN "turnoOperativoId", DROP COLUMN "fechaOperativa";
+  DROP TABLE "TurnoOperativo";`;
+
+// Para romper la de verificación hay que sacar antes la del turno operativo,
+// que le agrega columnas y triggers, y reaplicarla sana después.
+const MIGRACION_VERIFICACION_EFECTIVO = {
+  deshacer: DESHACER_TURNO_OPERATIVO + DESHACER_VERIFICACION_EFECTIVO,
+  despues: [TURNO_OPERATIVO],
+};
+
 const entornoPg = (url) => ({
   ...process.env,
   PGHOST: url.hostname,
@@ -70,6 +88,10 @@ async function baseAislada(c, archivoRoto) {
     await admin.$executeRawUnsafe(`CREATE DATABASE "${nombre}" TEMPLATE "${base}"`);
     psql(url, ["-c", c.migracion.deshacer]);
     psql(url, ["-f", archivoRoto]);
+    // Las migraciones POSTERIORES que tocan lo mismo se reaplican, sanas,
+    // encima de la rota: la suite corre con el código de hoy y necesita el
+    // esquema de hoy. `deshacer` ya las quitó antes.
+    for (const posterior of c.migracion.despues ?? []) psql(url, ["-f", path.join(ORIGEN, posterior)]);
   } catch (e) {
     await tirarYSoltar().catch(() => {});
     throw e;
@@ -874,7 +896,7 @@ const CASOS = [
     n: "TV-1",
     defecto: "una entrega puede quedar en dos verificaciones vigentes",
     archivo: VERIFICACION_EFECTIVO,
-    migracion: { deshacer: DESHACER_VERIFICACION_EFECTIVO },
+    migracion: MIGRACION_VERIFICACION_EFECTIVO,
     suite: "scripts/pruebas-db/verificacionEfectivo.mjs",
     minimo: 40,
     inyecciones: [{
@@ -891,7 +913,7 @@ const CASOS = [
     n: "TV-2",
     defecto: "la foto de una entrega verificada se puede editar",
     archivo: VERIFICACION_EFECTIVO,
-    migracion: { deshacer: DESHACER_VERIFICACION_EFECTIVO },
+    migracion: MIGRACION_VERIFICACION_EFECTIVO,
     suite: "scripts/pruebas-db/verificacionEfectivo.mjs",
     minimo: 40,
     inyecciones: [{
@@ -904,7 +926,7 @@ const CASOS = [
     n: "TV-3",
     defecto: "la foto deja de compararse con el importe real del movimiento",
     archivo: VERIFICACION_EFECTIVO,
-    migracion: { deshacer: DESHACER_VERIFICACION_EFECTIVO },
+    migracion: MIGRACION_VERIFICACION_EFECTIVO,
     suite: "scripts/pruebas-db/verificacionEfectivo.mjs",
     minimo: 40,
     inyecciones: [{ de: "  IF NEW.\"montoDeclaradoSnapshot\" <> mov.\"monto\"\n     OR ", a: "  IF " }],
@@ -914,7 +936,7 @@ const CASOS = [
     n: "TV-4",
     defecto: "el declarado puede no ser la suma de las entregas",
     archivo: VERIFICACION_EFECTIVO,
-    migracion: { deshacer: DESHACER_VERIFICACION_EFECTIVO },
+    migracion: MIGRACION_VERIFICACION_EFECTIVO,
     suite: "scripts/pruebas-db/verificacionEfectivo.mjs",
     minimo: 40,
     inyecciones: [{ de: "  IF suma <> declarado THEN", a: "  IF false THEN" }],
@@ -924,7 +946,7 @@ const CASOS = [
     n: "TV-5",
     defecto: "una verificación mezcla entregas de dos locales",
     archivo: VERIFICACION_EFECTIVO,
-    migracion: { deshacer: DESHACER_VERIFICACION_EFECTIVO },
+    migracion: MIGRACION_VERIFICACION_EFECTIVO,
     suite: "scripts/pruebas-db/verificacionEfectivo.mjs",
     minimo: 40,
     // Las DOS mitades: el trigger compara la foto con el local real del turno y
@@ -946,7 +968,7 @@ const CASOS = [
     n: "TV-6",
     defecto: "la clave de idempotencia deja de ser única en el local",
     archivo: VERIFICACION_EFECTIVO,
-    migracion: { deshacer: DESHACER_VERIFICACION_EFECTIVO },
+    migracion: MIGRACION_VERIFICACION_EFECTIVO,
     suite: "scripts/pruebas-db/verificacionEfectivo.mjs",
     minimo: 40,
     inyecciones: [{
@@ -1035,6 +1057,213 @@ const CASOS = [
     minimo: 40,
     inyecciones: [{ de: "  if (actual.estado === ESTADO_VERIFICACION.ANULADA) {", a: "  if (false) {" }],
     esperadas: ["[24] anular otra vez: 200, ya estaba, sin pisar el motivo", "[26] las dos contestan 200"],
+  },
+  // ── EL TURNO OPERATIVO ───────────────────────────────────────────────────
+  //
+  // Rompen una defensa a la vez —en el código o en el texto de la migración— y
+  // corren turnoOperativo.mjs, que abre las cajas por las rutas. El montaje
+  // solo —catálogo, aperturas, ventas y cierres— ya pasa las 30 afirmaciones.
+  {
+    n: "TO-1",
+    defecto: "abrir caja deja de exigir un turno de este local y activo",
+    archivo: "lib/caja/turnoOperativoServer.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 5,
+    inyecciones: [{ de: "  if (!valido.valido) return { ok: false, status: valido.status", a: "  if (false) return { ok: false, status: valido.status" }],
+    esperadas: ["con un turno de otro local: 400 y su código", "con un turno inactivo: 400 y su código"],
+  },
+  {
+    n: "TO-2",
+    defecto: "Tesorería vuelve a agrupar por el día y no por el turno de la caja",
+    archivo: "lib/tesoreria/turnoComercial.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "  if (caja.turnoOperativoId != null && fecha) {", a: "  if (false) {" }],
+    esperadas: ["Mañana y Tarde del mismo día: grupos distintos", "y se llama por el turno, con su criterio"],
+  },
+  {
+    n: "TO-3",
+    defecto: "una verificación vuelve a poder mezclar turnos o fechas",
+    archivo: "lib/tesoreria/verificacionEfectivoServer.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "  if (claves.length > 1) {\n    const turnos", a: "  if (false) {\n    const turnos" }],
+    esperadas: ["Mañana + Tarde: 400 TURNOS_OPERATIVOS_MEZCLADOS", "Mañana de hoy + Mañana de ayer: 400 FECHAS_OPERATIVAS_MEZCLADAS"],
+  },
+  {
+    n: "TO-4",
+    defecto: "el turno y la fecha de una caja se pueden cambiar después de abrirla",
+    archivo: TURNO_OPERATIVO,
+    migracion: { deshacer: DESHACER_TURNO_OPERATIVO },
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 5,
+    inyecciones: [{
+      de: "CREATE TRIGGER \"Turno_turno_operativo_inmutable\" BEFORE UPDATE OF \"turnoOperativoId\", \"fechaOperativa\" ON \"Turno\"\n  FOR EACH ROW EXECUTE FUNCTION \"turno_operativo_de_caja_inmutable\"();",
+      a: "",
+    }],
+    esperadas: ["el turno de una caja no cambia una vez abierta", "ni su fecha operativa"],
+  },
+  {
+    n: "TO-5",
+    defecto: "la base acepta una entrega de otro turno en una verificación",
+    archivo: TURNO_OPERATIVO,
+    migracion: { deshacer: DESHACER_TURNO_OPERATIVO },
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{
+      de: "CREATE TRIGGER \"VerificacionEfectivoEntrega_turno_operativo\" BEFORE INSERT ON \"VerificacionEfectivoEntrega\"\n  FOR EACH ROW EXECUTE FUNCTION \"verificacion_entrega_del_turno_operativo\"();",
+      a: "",
+    }],
+    esperadas: ["la base no acepta una entrega de Tarde en una verificación de Mañana"],
+  },
+  // ── LA VENTANA DE RECONOCIMIENTO DEL TURNO ──────────────────────────────
+  {
+    n: "TO-H3",
+    defecto: "con dos coincidencias la apertura elige la primera en vez de preguntar",
+    archivo: "lib/caja/turnoOperativo.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "  if (candidatosIds.length === 1) return {", a: "  if (candidatosIds.length >= 1) return {" }],
+    esperadas: ["[TO-H3] dos coincidencias: pregunta y no propone ninguno"],
+  },
+  {
+    n: "TO-H8",
+    defecto: "una ventana que cruza la medianoche deja la jornada en el día en que empieza",
+    archivo: "lib/caja/turnoOperativo.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "  return v.inicio > v.fin ? sumarDias(dia, 1) : dia;", a: "  return dia;" }],
+    esperadas: ["[TO-C1] domingo 23:30 + turno 23→01: jornada del LUNES", "[TO-C4] lunes 22:00: el siguiente del ciclo es el que cruza, del MARTES"],
+  },
+  {
+    n: "TO-H10",
+    defecto: "la apertura guarda el día de hoy sin validar el turno final contra el ciclo",
+    archivo: "lib/caja/turnoOperativoServer.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{
+      de: "  const ocurrencia = ocurrenciaDeApertura(activos, turno.id, momentoArgentina(ahora));",
+      a: "  const ocurrencia = { valido: true, fechaOperativa: momentoArgentina(ahora).fecha };",
+    }],
+    esperadas: ["[TO-C4] lunes 22:00: el siguiente del ciclo es el que cruza, del MARTES", "[TO-C5][TO-C8] lunes 22:00: el de la mañana, ya pasado y a dos pasos, se rechaza"],
+  },
+  // ── EL CICLO DE TURNOS ──────────────────────────────────────────────────
+  {
+    n: "TO-C5",
+    defecto: "la apertura deja saltar a un turno lejano del ciclo",
+    archivo: "lib/caja/turnoOperativo.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "    if (d.inicio === masReciente || d.enVentana) {", a: "    if (true) {" }],
+    esperadas: [
+      "[TO-C5][TO-C8] lunes 22:00: el de la mañana, ya pasado y a dos pasos, se rechaza",
+      "[TO-C9] la pantalla recibe el actual y el próximo, y no el pasado",
+      "[TO-C8] abrir por la ruta con el turno pasado: 409, aunque esté activo y sea del local",
+    ],
+  },
+  {
+    n: "TO-C11",
+    defecto: "vuelve la fecha por el extremo horario más cercano para un turno fuera del ciclo",
+    archivo: "lib/caja/turnoOperativo.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    // Las dos mitades del defecto viejo: el turno fuera del ciclo se acepta, y
+    // su fecha sale de qué extremo de la ventana está más cerca.
+    inyecciones: [
+      {
+        de: "const enElDia = (x) => ((x % MINUTOS_DEL_DIA) + MINUTOS_DEL_DIA) % MINUTOS_DEL_DIA;",
+        a: "const enElDia = (x) => ((x % MINUTOS_DEL_DIA) + MINUTOS_DEL_DIA) % MINUTOS_DEL_DIA;\nconst cercano = (ts, id, { fecha, minuto }) => { const t = (ts || []).find((x) => x.id === id); const v = t && ventanaDe(t); if (!v) return null; const mitad = (v.fin + v.inicio) / 2; return { id, nombre: t.nombre, fechaOperativa: v.inicio > v.fin && minuto >= mitad ? sumarDias(fecha, 1) : fecha }; };",
+      },
+      {
+        de: "  const opcion = ciclo.opciones.find((o) => o.id === turnoId);",
+        a: "  const opcion = ciclo.opciones.find((o) => o.id === turnoId) ?? cercano(turnos, turnoId, momento);",
+      },
+    ],
+    esperadas: [
+      "[TO-C5][TO-C8] lunes 22:00: el de la mañana, ya pasado y a dos pasos, se rechaza",
+      "[TO-C8] abrir por la ruta con el turno pasado: 409, aunque esté activo y sea del local",
+    ],
+  },
+  {
+    n: "TO-C13",
+    defecto: "el ciclo ignora el orden configurado y sigue el horario",
+    archivo: "lib/caja/turnoOperativo.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{
+      de: "    .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0) || a.id - b.id);",
+      a: "    .sort((a, b) => (minutosDeHora(a.horaInicioReconocimiento) ?? 0) - (minutosDeHora(b.horaInicioReconocimiento) ?? 0) || a.id - b.id);",
+    }],
+    esperadas: ["[TO-C13] con otro orden, a las 22:00 el siguiente es el de la mañana del martes"],
+  },
+  // ── LA TRANSICIÓN POR LOCAL ─────────────────────────────────────────────
+  {
+    n: "TO-T4",
+    defecto: "un local que ya usa turnos vuelve a abrir cajas sin turno",
+    archivo: "lib/caja/turnoOperativoServer.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{
+      de: "    if (legado) return { ok: true, datos: SIN_TURNO, turno: null, legado: true };",
+      a: "    return { ok: true, datos: SIN_TURNO, turno: null, legado: true };",
+    }],
+    esperadas: ["[TO-T4][TO-T8] una apertura sin turno ya no abre: 400 y su código", "[TO-T4] y no se escribió ninguna caja sin turno"],
+  },
+  {
+    n: "TO-T9",
+    defecto: "desactivar todos los turnos devuelve el local al modo legado",
+    archivo: "lib/caja/turnoOperativoServer.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "  return { activos, legado: filas === 0 };", a: "  return { activos, legado: activos.length === 0 };" }],
+    esperadas: ["[TO-T9] sin turnos activos el local NO vuelve al legado: se dice qué falta", "[TO-T9] y una apertura sin turno no abre: 409"],
+  },
+  // ── UN TURNO ACTIVO TIENE HORARIO ───────────────────────────────────────
+  {
+    n: "TO-HR1",
+    defecto: "la regla deja guardar un turno activo sin horario",
+    archivo: "lib/caja/turnoOperativo.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "  if (horaInicioReconocimiento != null && horaFinReconocimiento != null) return null;", a: "  return null;" }],
+    esperadas: ["[TO-HR1] dar de alta sin horario: 400 y su código"],
+  },
+  {
+    n: "TO-HR2",
+    defecto: "la edición mira el activo que había y deja activar un turno sin horario",
+    archivo: "app/api/config/turnos-operativos/[id]/route.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "rechazoPorFaltaDeHorario({ ...actual, ...data });", a: "rechazoPorFaltaDeHorario({ ...actual, ...data, activo: actual.activo });" }],
+    esperadas: ["[TO-HR2] activarlo sin horario: 400 y su código"],
+  },
+  {
+    n: "TO-HR3",
+    defecto: "la edición mira el horario que había y deja sacárselo a un turno activo",
+    archivo: "app/api/config/turnos-operativos/[id]/route.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "rechazoPorFaltaDeHorario({ ...actual, ...data });", a: "rechazoPorFaltaDeHorario({ ...data, ...actual });" }],
+    esperadas: ["[TO-HR3] sacarle el horario a un turno activo: 400 y su código"],
+  },
+  {
+    n: "TO-HR5",
+    defecto: "la base guarda un turno activo sin horario",
+    archivo: TURNO_OPERATIVO,
+    migracion: { deshacer: DESHACER_TURNO_OPERATIVO },
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "CHECK (\n      NOT \"activo\" OR (", a: "CHECK (\n      true OR (" }],
+    esperadas: ["[TO-HR5] la base no guarda un turno activo sin horario", "[TO-HR5] ni le saca el horario a uno activo"],
+  },
+  {
+    n: "TO-HR7",
+    defecto: "el primer turno de un local se crea sin horario y lo saca del legado",
+    archivo: "app/api/config/turnos-operativos/route.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "  const sinHorario = rechazoPorFaltaDeHorario({ activo: true, ...rango.rango });", a: "  const sinHorario = null;" }],
+    esperadas: ["[TO-HR7] un primer turno sin horario no se crea: 400 y su código"],
   },
   // ── EL CONTRATO DE LA PANTALLA MÓVIL (PR #138) ───────────────────────────
   //

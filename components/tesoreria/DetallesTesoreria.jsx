@@ -21,6 +21,7 @@ import {
   ESTADO_TESORERIA,
   actoPorId,
   estadoDeCaja,
+  contextoDelGrupo,
   etiquetaDe,
   franjaHoraria,
   lecturaDelGrupo,
@@ -28,6 +29,7 @@ import {
   pieDeCaja,
   presentacionDePago,
   rotuloDeEntrega,
+  turnoDeVerificacion,
 } from "@/lib/tesoreria/pantallaTesoreria";
 import { ALERTA, ESTADO_ENTREGA, etiquetaDeCaja } from "@/lib/tesoreria/lecturaTesoreria";
 
@@ -65,10 +67,9 @@ export function DetalleDeTurno({ datos, lectura, ctx, local, onIr, onVolver, onV
 
   const puedeVerificar = Boolean(datos.puedeVerificarEfectivo);
   const verVerificacion = (id) => onIr({ vista: VISTA_TESORERIA.VERIFICACION, verificacion: id, grupo: g.grupo.clave });
-  const n = g.cajas.length;
-  const contexto = [franjaHoraria(g.grupo.primerHecho, g.grupo.ultimoHecho), n === 1 ? "1 caja" : `${n} cajas`]
-    .filter(Boolean)
-    .join(" · ");
+  // El día va siempre en el detalle: el título es el nombre del turno, y sin
+  // el día no se sabe de cuál.
+  const contexto = contextoDelGrupo(g.grupo, null, g.cajas.length);
   // G: un conteo conjunto de varias cajas con diferencia se explica una vez.
   const conjunto = g.completos.find((a) => a.cantidadDeCajas > 1 && Number(a.diferencia) !== 0);
   const pendienteSinContar = !g.estado || g.estado === ESTADO_TESORERIA.PENDIENTE;
@@ -150,7 +151,7 @@ export function DetalleDeTurno({ datos, lectura, ctx, local, onIr, onVolver, onV
         );
       })}
 
-      {n > 1 && (
+      {g.cajas.length > 1 && (
         <NotaPunteada>
           Cada diferencia de caja es de su cajero. Si una caja da −$5.000 y otra +$5.000, no se compensan: Tesorería junta
           la plata del turno, no las responsabilidades.
@@ -340,10 +341,9 @@ export function DetalleDeVerificacion({ datos, lectura, ctx, local, onVolver, on
     : Number(acto.diferencia) === 0
       ? ESTADO_TESORERIA.CORRECTO
       : ESTADO_TESORERIA.CON_DIFERENCIA;
-  const grupos = (acto.grupos || [])
-    .map((clave) => (lectura.grupos || []).find((x) => x.clave === clave))
-    .filter(Boolean)
-    .map(nombreDelGrupo);
+  // El turno es el que quedó CONGELADO en el acto, no el del período que se
+  // está mirando: una verificación sin turno es anterior y se dice así.
+  const turnoVerificado = turnoDeVerificacion(acto);
   const cajasPorId = new Map((lectura.cajas || []).map((c) => [c.turnoId, c]));
   const nombreDeCaja = (turnoId) => {
     const c = cajasPorId.get(turnoId);
@@ -358,7 +358,7 @@ export function DetalleDeVerificacion({ datos, lectura, ctx, local, onVolver, on
       <EncabezadoDeDetalle
         titulo={`Verificación #${acto.id}`}
         local={local}
-        contexto={[grupos.join(", "), acto.cantidadDeCajas === 1 ? "1 caja incluida" : `${acto.cantidadDeCajas} cajas incluidas`]
+        contexto={[turnoVerificado, acto.cantidadDeCajas === 1 ? "1 caja incluida" : `${acto.cantidadDeCajas} cajas incluidas`]
           .filter(Boolean)
           .join(" · ")}
         onVolver={onVolver}

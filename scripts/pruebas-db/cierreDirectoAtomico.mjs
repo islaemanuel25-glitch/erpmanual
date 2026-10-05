@@ -28,6 +28,7 @@ const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const jwt = (await import("jsonwebtoken")).default;
 
 const { crearProductoVendible } = await import("./fixturePos.mjs");
+const { turnoOperativoDeSesion } = await import("./fixtureTurnoOperativo.mjs");
 const { retenerCandadoDelLocal, retenerFilaDeStock, esperarEnCandadoDelLocal, esperarEnFila } = await import("./carreraForzada.mjs");
 const { firmarTokenOperador, firmarVoucherOperador, OperadorCookie } = await import("../../lib/operador.js");
 const { itemCrearPayload } = await import("../../lib/pos-ventas/payloadVenta.js");
@@ -129,7 +130,7 @@ async function correr() {
     creado.operadorIds.push(op.id);
     await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: f.local.id } });
     const quien = { sesion: f.sesion, operador: firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: f.local.id }) };
-    const r = await leer(await rutaAbrir.POST(pedido(`${BASE}/turnos/abrir`, quien, { montoInicial: 1000 })));
+    const r = await leer(await rutaAbrir.POST(pedido(`${BASE}/turnos/abrir`, quien, { montoInicial: 1000, turnoOperativoId: await turnoOperativoDeSesion(prisma, quien) })));
     requerir("abre la caja con $1.000", r.ok === true, `${r.status} ${r.error ?? ""}`);
     return { op, quien, turnoId: r.turno.id, voucher: firmarVoucherOperador({ operadorId: op.id, localId: f.local.id }) };
   }

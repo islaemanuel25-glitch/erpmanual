@@ -36,6 +36,7 @@ const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const jwt = (await import("jsonwebtoken")).default;
 
 const { crearProductoVendible } = await import("./fixturePos.mjs");
+const { turnoOperativoDeSesion } = await import("./fixtureTurnoOperativo.mjs");
 const { firmarTokenOperador, firmarVoucherOperador, OperadorCookie } = await import("../../lib/operador.js");
 const { hoyArgentinaISO } = await import("../../lib/fechas/rangoArgentina.js");
 
@@ -228,7 +229,7 @@ function pasos(f) {
   let nVenta = 0;
   return {
     abrir: async (quien, montoInicial = 1000) =>
-      leer(await rutaAbrir.POST(pedido(`${BASE}/turnos/abrir`, quien, { montoInicial }))),
+      leer(await rutaAbrir.POST(pedido(`${BASE}/turnos/abrir`, quien, { montoInicial, turnoOperativoId: await turnoOperativoDeSesion(prisma, quien) }))),
     actual: async (quien, localId) =>
       leer(await rutaActual.GET(pedidoGet(`${BASE}/turnos/actual?localId=${localId}`, quien))),
     vender: async (quien, turnoId, { localId = f.local.id, producto = f.producto, cantidad = 100, extra = {} } = {}) =>

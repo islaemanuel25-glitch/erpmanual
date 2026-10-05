@@ -36,12 +36,12 @@ function fmtFechaCorta(d) {
   }
 }
 
-function getFranjaLabel(apertura) {
-  if (!apertura) return "Turno";
-  const h = new Date(apertura).getHours();
-  if (h >= 6 && h < 13) return "Turno Ma\u00f1ana";
-  if (h >= 13 && h < 20) return "Turno Tarde";
-  return "Turno Noche";
+// El t\u00edtulo es el TURNO OPERATIVO que la caja eligi\u00f3 al abrirse \u2014el mismo dato
+// con el que Tesorer\u00eda la agrupa\u2014, nunca una franja adivinada por la hora. Una
+// caja anterior al turno operativo no tiene uno y se dice as\u00ed.
+function getFranjaLabel(turno) {
+  if (!turno) return "Turno";
+  return turno.turnoOperativo?.nombre ? `Turno ${turno.turnoOperativo.nombre}` : "Sin turno asignado";
 }
 
 export default function DetalleTurnoPage() {
@@ -93,7 +93,7 @@ export default function DetalleTurnoPage() {
   const esAdmin = Array.isArray(permisos) && permisos.includes("*");
   if (!esAdmin && !permisos.includes("reportes.ver")) return <SinPermisos />;
 
-  const franjaLabel = turno ? getFranjaLabel(turno.apertura) : "Turno";
+  const franjaLabel = getFranjaLabel(turno);
   // Cerrado sin contar: lo contado y la diferencia no se conocen. Se dicen, no se
   // esconden: una casilla que falta se lee como un dato que se perdió.
   const sinConteo = turno ? turnoSinConteo(turno) : false;

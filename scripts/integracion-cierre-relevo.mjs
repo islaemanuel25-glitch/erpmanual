@@ -13,6 +13,7 @@
 // Crea su propio grupo, local y usuarios de prueba. NO toca datos existentes.
 
 import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
+import { turnoOperativoDePrueba } from "./pruebas-db/fixtureTurnoOperativo.mjs";
 import jwt from "jsonwebtoken";
 
 const prisma = await crearClientePrisma({ nivel: ESCRITURA });
@@ -102,6 +103,9 @@ async function main() {
   await prisma.configuracionLocal.create({
     data: { localId: local.id, exigirOperador: false },
   });
+  // Desde 20261004200000_turno_operativo las aperturas exigen un turno activo
+  // del local: el mismo fixture que usan las pruebas de base.
+  const TO_LOCAL = await turnoOperativoDePrueba(prisma, local.id);
 
   const cajeroA = await prisma.usuario.create({
     data: { nombre: `Cajero A ${SUFIJO}`, email: `a-${SUFIJO}@test.local`, passwordHash: "x", rolId: rol.id, localId: local.id },
@@ -199,14 +203,14 @@ async function main() {
   chequear("8. turno congelado no admite retiro", rRet.status === 409, jRet.error);
 
   // ── El relevo puede abrir ────────────────────────────────────────────────
-  const rB = await json(await abrirSinCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-sin-cambio`, B, {
+  const rB = await json(await abrirSinCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-sin-cambio`, B, { turnoOperativoId: TO_LOCAL,
     desgloseContado: { 10000: 2 }, motivo: "Relevo: traigo cambio propio",
   })));
   chequear("9. otro operador puede abrir turno nuevo", rB.ok && money(rB.turno.montoInicial) === 20000, f(rB.montoInicial));
   const turnoB = rB.turno;
 
   // El MISMO usuario A también podría abrir: el índice parcial ya no lo bloquea.
-  const rAotro = await json(await abrirSinCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-sin-cambio`, A, {
+  const rAotro = await json(await abrirSinCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-sin-cambio`, A, { turnoOperativoId: TO_LOCAL,
     desgloseContado: { 1000: 1 }, motivo: "Segundo turno del mismo cajero mientras el primero cuenta",
   })));
   chequear("9b. el índice parcial deja abrir al MISMO usuario con un turno congelado", rAotro.ok === true, rAotro.error || "");
@@ -363,13 +367,13 @@ async function main() {
   chequear("18c. se puede volver a reservar tras la liberación", reservaOk.ok === true);
 
   // Abrir sin motivo con diferencia: rechazado.
-  const sinMotivo = await abrirConCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-con-cambio`, B, {
+  const sinMotivo = await abrirConCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-con-cambio`, B, { turnoOperativoId: TO_LOCAL,
     cambioPendienteId: sobre1.id, desgloseRecibido: { 2000: 1, monedas: 500 },
   }));
   const jSinMotivo = await json(sinMotivo);
   chequear("21a. faltante SIN motivo se rechaza", sinMotivo.status === 400 && jSinMotivo.necesitaMotivo === true, jSinMotivo.error);
 
-  const conFaltante = await json(await abrirConCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-con-cambio`, B, {
+  const conFaltante = await json(await abrirConCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-con-cambio`, B, { turnoOperativoId: TO_LOCAL,
     cambioPendienteId: sobre1.id,
     desgloseRecibido: { 2000: 1, monedas: 500 },
     motivoDiferencia: "Faltaba un billete de $2.000",
@@ -385,7 +389,7 @@ async function main() {
   );
 
   // ── Un cambio no se consume dos veces ────────────────────────────────────
-  const otroIntento = await abrirConCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-con-cambio`, A, {
+  const otroIntento = await abrirConCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-con-cambio`, A, { turnoOperativoId: TO_LOCAL,
     cambioPendienteId: sobre1.id, desgloseRecibido: { 2000: 1 }, motivoDiferencia: "x",
   }));
   chequear("25. un cambio no puede consumirse dos veces", otroIntento.status === 409, (await json(otroIntento)).error);
@@ -395,7 +399,7 @@ async function main() {
   await prisma.turno.update({ where: { id: conFaltante.turno.id }, data: { cierre: new Date() } });
 
   await reservarCambio(pedido(`${BASE}/pos-ventas/cambios-pendientes/reservar`, B, { cambioPendienteId: sobre2.id }));
-  const coincide = await json(await abrirConCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-con-cambio`, B, {
+  const coincide = await json(await abrirConCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-con-cambio`, B, { turnoOperativoId: TO_LOCAL,
     cambioPendienteId: sobre2.id, desgloseRecibido: { 10000: 1 },
   })));
   chequear("20. recepción coincidente: sin motivo y sin diferencia", coincide.ok && coincide.recepcion.clase === "COINCIDE" && coincide.recepcion.diferencia === 0);
@@ -413,17 +417,17 @@ async function main() {
   const sobre3 = await prisma.cambioPendiente.findFirst({ where: { turnoOrigenId: turnoD.id } });
   await prisma.turno.update({ where: { id: coincide.turno.id }, data: { cierre: new Date() } });
   await reservarCambio(pedido(`${BASE}/pos-ventas/cambios-pendientes/reservar`, B, { cambioPendienteId: sobre3.id }));
-  const sobrante = await json(await abrirConCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-con-cambio`, B, {
+  const sobrante = await json(await abrirConCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-con-cambio`, B, { turnoOperativoId: TO_LOCAL,
     cambioPendienteId: sobre3.id, desgloseRecibido: { 1000: 6 }, motivoDiferencia: "Había un billete de más",
   })));
   chequear("22. recepción con sobrante y motivo", sobrante.ok && sobrante.recepcion.clase === "SOBRANTE" && sobrante.recepcion.diferencia === 1000);
   chequear("22b. y el monto inicial vuelve a ser lo contado", money(sobrante.turno.montoInicial) === 6000);
 
   // ── Apertura sin cambio ──────────────────────────────────────────────────
-  const sinMot = await abrirSinCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-sin-cambio`, A, { desgloseContado: { 1000: 3 } }));
+  const sinMot = await abrirSinCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-sin-cambio`, A, { turnoOperativoId: TO_LOCAL, desgloseContado: { 1000: 3 } }));
   chequear("24. apertura sin cambio exige motivo", sinMot.status === 400, (await json(sinMot)).error);
 
-  const sinConteo = await abrirSinCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-sin-cambio`, A, { motivo: "sin conteo" }));
+  const sinConteo = await abrirSinCambio(pedido(`${BASE}/pos-ventas/turnos/abrir-sin-cambio`, A, { turnoOperativoId: TO_LOCAL, motivo: "sin conteo" }));
   chequear("24b. y exige conteo por denominaciones", sinConteo.status === 400, (await json(sinConteo)).error);
 
   // ── Vencimiento del cierre ───────────────────────────────────────────────

@@ -75,6 +75,8 @@ export async function GET(req) {
         },
         // Para el encabezado del comprobante de cierre.
         local: { select: { id: true, nombre: true } },
+        // El turno operativo que eligió al abrirse: el título del detalle.
+        turnoOperativo: { select: { id: true, nombre: true } },
       },
     });
 
@@ -121,6 +123,8 @@ export async function GET(req) {
         id: turno.id,
         apertura: turno.apertura,
         cierre: turno.cierre,
+        // null = caja anterior al turno operativo: no se le infiere uno.
+        turnoOperativo: turno.turnoOperativo ?? null,
         cierreEnPreparacionEn: turno.cierreEnPreparacionEn,
         // Fuente ÚNICA del estado: la pantalla no compara campos a mano.
         // (`anuladoEn` ya se devuelve más abajo.)

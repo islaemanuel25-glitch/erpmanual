@@ -10,6 +10,7 @@
 // Crea su propio local y usuarios de prueba y los borra al terminar.
 
 import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
+import { turnoOperativoDePrueba } from "./pruebas-db/fixtureTurnoOperativo.mjs";
 import jwt from "jsonwebtoken";
 
 const prisma = await crearClientePrisma({ nivel: ESCRITURA });
@@ -56,6 +57,9 @@ async function main() {
   };
   const L4 = await mkLocal("L4");
   const L5 = await mkLocal("L5");
+  // Desde 20261004200000_turno_operativo las aperturas exigen un turno activo
+  // del local: el mismo fixture que usan las pruebas de base.
+  const TO_L4 = await turnoOperativoDePrueba(prisma, L4.id);
   const mkUser = (n, localId) =>
     prisma.usuario.create({
       data: { nombre: `${n} ${SUF}`, email: `${n}.${SUF}@t.local`, passwordHash: "x", rolId: rol.id, localId },
@@ -70,7 +74,7 @@ async function main() {
   console.log(`\n=== Local L4 #${L4.id} · Local L5 #${L5.id} ===\n`);
 
   // ── 1 · A abre ────────────────────────────────────────────────────────────
-  let r = await abrir(req(U_AB, ckA, { localId: L4.id, montoInicial: 10000 }));
+  let r = await abrir(req(U_AB, ckA, { localId: L4.id, turnoOperativoId: TO_L4, montoInicial: 10000 }));
   let d = await r.json();
   chk("1 · usuario A abre turno en el local", d.ok === true && money(d.turno?.montoInicial) === 10000, d.error || "");
   const tA = d.turno;
@@ -78,7 +82,7 @@ async function main() {
   chk("10a · NO hereda fondo: sin origen ni sugerido", tA.fondoOrigenTurnoId === null && tA.fondoSugeridoApertura === null);
 
   // ── 2 y 3 · B abre en el MISMO local ──────────────────────────────────────
-  r = await abrir(req(U_AB, ckB, { localId: L4.id, montoInicial: 5000 }));
+  r = await abrir(req(U_AB, ckB, { localId: L4.id, turnoOperativoId: TO_L4, montoInicial: 5000 }));
   d = await r.json();
   chk("2 · usuario B abre OTRO turno en el mismo local", d.ok === true, d.error || "");
   const tB = d.turno;
@@ -90,7 +94,7 @@ async function main() {
   );
 
   // ── 4 · A intenta un segundo turno ────────────────────────────────────────
-  r = await abrir(req(U_AB, ckA, { localId: L4.id, montoInicial: 1000 }));
+  r = await abrir(req(U_AB, ckA, { localId: L4.id, turnoOperativoId: TO_L4, montoInicial: 1000 }));
   d = await r.json();
   chk("4 · A NO puede abrir un segundo turno", d.ok === false && r.status === 409, `status ${r.status}`);
   chk(
@@ -153,7 +157,7 @@ async function main() {
   chk("10d · nadie consumió el fondo de A", Acer.fondoConsumidoEnTurnoId === null);
 
   // ── 11 · A reabre declarando el fondo a mano ──────────────────────────────
-  r = await abrir(req(U_AB, ckA, { localId: L4.id, montoInicial: 2500, observacionFondo: "arranco con lo mio" }));
+  r = await abrir(req(U_AB, ckA, { localId: L4.id, turnoOperativoId: TO_L4, montoInicial: 2500, observacionFondo: "arranco con lo mio" }));
   d = await r.json();
   chk("11b · A reabre declarando su fondo", d.ok === true && money(d.turno.montoInicial) === 2500, d.error || "");
   chk("11c · la observación es opcional y se guarda", d.turno.observacionFondoApertura === "arranco con lo mio");
@@ -163,8 +167,8 @@ async function main() {
   // ── 13 · Concurrencia del MISMO usuario ───────────────────────────────────
   await cerrar(req(U_CE, ckA, { turnoId: tA2.id, montoRealEfectivo: 2500, efectivoRetirado: 0, fondoDejado: 2500 }));
   const res13 = await Promise.allSettled([
-    abrir(req(U_AB, ckA, { localId: L4.id, montoInicial: 1000 })),
-    abrir(req(U_AB, ckA, { localId: L4.id, montoInicial: 1000 })),
+    abrir(req(U_AB, ckA, { localId: L4.id, turnoOperativoId: TO_L4, montoInicial: 1000 })),
+    abrir(req(U_AB, ckA, { localId: L4.id, turnoOperativoId: TO_L4, montoInicial: 1000 })),
   ]);
   const c13 = await Promise.all(res13.map((x) => (x.status === "fulfilled" ? x.value.json() : { ok: false, error: String(x.reason) })));
   const gan13 = c13.filter((x) => x.ok === true).length;
@@ -176,8 +180,8 @@ async function main() {
   const D = await mkUser("D", L4.id);
   const E = await mkUser("E", L4.id);
   const res14 = await Promise.allSettled([
-    abrir(req(U_AB, ck(D, L4.id), { localId: L4.id, montoInicial: 1000 })),
-    abrir(req(U_AB, ck(E, L4.id), { localId: L4.id, montoInicial: 1000 })),
+    abrir(req(U_AB, ck(D, L4.id), { localId: L4.id, turnoOperativoId: TO_L4, montoInicial: 1000 })),
+    abrir(req(U_AB, ck(E, L4.id), { localId: L4.id, turnoOperativoId: TO_L4, montoInicial: 1000 })),
   ]);
   const c14 = await Promise.all(res14.map((x) => (x.status === "fulfilled" ? x.value.json() : { ok: false, error: String(x.reason) })));
   const gan14 = c14.filter((x) => x.ok === true).length;
