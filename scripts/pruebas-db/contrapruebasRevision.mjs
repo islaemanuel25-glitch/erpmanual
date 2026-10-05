@@ -1126,9 +1126,12 @@ const CASOS = [
     migracion: MIGRACION_CORRECCION_TURNO_OPERATIVO,
     suite: "scripts/pruebas-db/turnoOperativo.mjs",
     minimo: 30,
+    // La condición entera, el antes y el después: la primera versión apagaba
+    // solo el antes y el después la seguía frenando —con la caja ya cerrada,
+    // NEW trae el mismo `cierre`—, así que la contraprueba no probaba nada.
     inyecciones: [{
-      de: "  IF OLD.\"cierre\" IS NOT NULL OR OLD.\"cierreEnPreparacionEn\" IS NOT NULL OR OLD.\"anuladoEn\" IS NOT NULL",
-      a: "  IF false",
+      de: "  IF OLD.\"cierre\" IS NOT NULL OR OLD.\"cierreEnPreparacionEn\" IS NOT NULL OR OLD.\"anuladoEn\" IS NOT NULL\n     OR NEW.\"cierre\" IS NOT NULL OR NEW.\"cierreEnPreparacionEn\" IS NOT NULL OR NEW.\"anuladoEn\" IS NOT NULL THEN",
+      a: "  IF false THEN",
     }],
     esperadas: ["[TO-4] una caja cerrada no cambia su turno", "[TO-4] una caja anulada no cambia su turno"],
   },
