@@ -21,7 +21,8 @@ Producción está en **48 migraciones**; el árbol tiene 49. Pendiente de deploy
 - `20261004200000_turno_operativo` — Tesorería verifica por turno operativo
   (rama `claude/tesoreria-turno-operativo`). **Aditiva y sin backfill.** Qué
   hace `migrate deploy`: crea la tabla `TurnoOperativo` VACÍA (catálogo por
-  local, FK a `Local` en cascada); agrega a `Turno` y a `VerificacionEfectivo`
+  local, FK a `Local` en cascada, con la ventana de reconocimiento opcional y
+  sus CHECK de integridad; no siembra ningún turno); agrega a `Turno` y a `VerificacionEfectivo`
   dos columnas NULL (`turnoOperativoId`, `fechaOperativa`) con su CHECK de
   "las dos o ninguna", su FK compuesta con el local e índices; crea dos
   triggers (la caja no cambia su turno ni su fecha; una entrega solo entra en

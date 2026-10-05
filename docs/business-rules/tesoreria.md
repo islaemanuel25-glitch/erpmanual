@@ -64,18 +64,33 @@ Tesorería verifica POR TURNO OPERATIVO, no por día: turno → sus cajas → su
 entregas → se cuenta → se verifica ESE turno. Las diferencias de cada caja no se
 compensan entre sí [CÓDIGO].
 
-- **Catálogo por local** (`TurnoOperativo`: nombre, orden, activo; sin horas). Se
-  administra en Configuración → POS → Turnos operativos con `config_local.pos`.
-  No se borra: se desactiva [CÓDIGO, `app/api/config/turnos-operativos/`].
-- **Se elige al abrir la caja**, en las tres rutas (`abrir`, `abrir-sin-cambio`,
-  `abrir-con-cambio`), entre los activos del local. El servidor valida que
-  exista, esté activo y sea del local; sin turnos activos la apertura es 409
-  `LOCAL_SIN_TURNOS_OPERATIVOS`. **Nunca se infiere por la hora**
-  [CÓDIGO, `lib/caja/turnoOperativoServer.js`; TO-1].
-- **`fechaOperativa`** la fija el servidor al abrir (día argentino de ese
-  momento) y no se recalcula. Si la pantalla manda otra, 409
-  `FECHA_OPERATIVA_DE_OTRO_DIA`. La base impide cambiar turno o fecha de una
-  caja ya escrita, incluso de NULL a un valor [CÓDIGO; TO-4].
+- **Catálogo por local** (`TurnoOperativo`: nombre, orden, activo y una
+  ventana de reconocimiento opcional `horaInicioReconocimiento` →
+  `horaFinReconocimiento`, "HH:MM", que puede cruzar la medianoche). Nombres,
+  cantidad, orden y ventanas los configura cada local: el código no conoce
+  ninguno. Se administra en Configuración → POS → Turnos operativos con
+  `config_local.pos`. No se borra: se desactiva. Las ventanas se pueden
+  solapar; solo se valida la integridad del rango
+  [CÓDIGO, `app/api/config/turnos-operativos/`; TO-H12, TO-H14].
+- **La ventana no es la duración del turno: solo PROPONE.** Al abrir, el
+  servidor compara su hora con las ventanas de los turnos activos del local:
+  UNA coincidencia → se propone ese turno, con «Cambiar turno»; NINGUNA o
+  VARIAS → se pregunta, sin elegir por cercanía ni por orden
+  [CÓDIGO, `lib/caja/turnoOperativo.js` `reconocerTurno`; TO-H1, TO-H2, TO-H3].
+- **El turno FINAL es el que se guarda**, en las tres rutas (`abrir`,
+  `abrir-sin-cambio`, `abrir-con-cambio`), por una sola función
+  (`turnoOperativoDeApertura`). Tiene que existir, estar activo y ser del local;
+  la ventana no prohíbe elegir otro. Sin turnos activos la apertura es 409
+  `LOCAL_SIN_TURNOS_OPERATIVOS` [CÓDIGO; TO-1, TO-H4, TO-H5, TO-H6, TO-H13].
+- **`fechaOperativa` es la de la JORNADA del turno final** y la calcula el
+  servidor al abrir (`fechaOperativaDeTurno`); una fecha que mande el cliente se
+  ignora. Ventana normal o sin ventana → el día de la apertura. Ventana que
+  cruza la medianoche (inicio > fin) → lo que cae antes de las 00:00 es de la
+  jornada del día SIGUIENTE y lo de después, del día: con 23:00 → 01:00, el
+  domingo 23:30 y el lunes 00:30 son los dos del lunes. Fuera de su ventana se
+  toma la mitad del día más cercana (cerca del inicio, la jornada que viene;
+  cerca del fin, la que pasó) [CÓDIGO; TO-H7..TO-H10]. No se recalcula, y la
+  base impide cambiar turno o fecha de una caja ya escrita [CÓDIGO; TO-4].
 - **Agrupación**: `grupoDeTesoreria` (`lib/tesoreria/turnoComercial.js`) agrupa
   por local + fecha operativa + turno DE LA CAJA. Cada hecho hereda el grupo de
   su caja, así que la medianoche no parte una caja, y una caja con turno entra
