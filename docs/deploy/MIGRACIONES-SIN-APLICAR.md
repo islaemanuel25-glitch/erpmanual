@@ -16,37 +16,95 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **48 migraciones**; el árbol tiene 49. Pendiente de deploy:
+Ninguna. Producción está en **49 migraciones**, las mismas que el árbol: 49/49
+aplicadas, ninguna pendiente y ninguna fallida sin resolver. La última aplicada
+es `20261004200000_turno_operativo`.
 
-- `20261004200000_turno_operativo` — Tesorería verifica por turno operativo
-  (rama `claude/tesoreria-turno-operativo`). **Aditiva y sin backfill.** Qué
-  hace `migrate deploy`: crea la tabla `TurnoOperativo` VACÍA (catálogo por
-  local, FK a `Local` en cascada, con la ventana de reconocimiento y sus CHECK
-  de integridad —las dos horas o ninguna, y las dos en todo turno activo—; no
-  siembra ningún turno); agrega a `Turno` y a `VerificacionEfectivo`
-  dos columnas NULL (`turnoOperativoId`, `fechaOperativa`) con su CHECK de
-  "las dos o ninguna", su FK compuesta con el local e índices; crea dos
-  triggers (la caja no cambia su turno ni su fecha; una entrega solo entra en
-  la verificación de su turno y fecha) y reemplaza `verificacion_solo_se_anula`
-  con las dos columnas nuevas. Toma `Turno` y `VerificacionEfectivo` con
-  `lock_timeout` de 3 s: si hay una transacción larga sobre la caja, falla
-  limpia y se reintenta, no espera. **No escribe ningún dato**: las cajas y
-  verificaciones existentes quedan en NULL y se ven como "Sin turno asignado".
-  Ensayada desde cero (0 → 49, sin drift).
-  **No corta aperturas.** Con la app nueva, un local que todavía no tiene
-  turnos operativos sigue abriendo cajas en modo legado, sin turno ("Sin turno
-  asignado"). Cada local entra al sistema nuevo cuando carga su primer turno en
-  Configuración → POS → Turnos operativos (permiso `config_local.pos`): desde
-  ahí sus cajas nuevas exigen turno, y desactivarlos no lo devuelve al legado.
-  Cada turno se carga con su horario de reconocimiento —un turno activo no se
-  guarda sin él— y en el orden del ciclo. El horario ubica la ocurrencia; no
-  obliga a cerrar la caja. Las cajas viejas no reciben turno: no hay backfill.
+Producción corre `b60527834112c359705b705d12fe0e9149dae341` (merge de la PR
+#140). La secuencia de los últimos despliegues es `bd92ca5d` → `fb864ba5` →
+`b6052783`; cada uno tiene su sección abajo. Un commit posterior que solo
+cambie documentación **no se despliega por eso**.
 
-`20261004120000_verificacion_efectivo` (PR #136) **ya está aplicada**: lo
-informó Emanuel el 2026-10-04, con producción en 48/48. El commit que corre
-producción después de ese despliegue no está anotado en este archivo; el último
-registrado abajo es `bd92ca5d057541befa48589cda5a73cfe6de89b3`. Un commit
-posterior que solo cambie documentación **no se despliega por eso**.
+---
+
+## `b6052783`: desplegado el 2026-10-05. Turnos operativos, con `20261004200000_turno_operativo`
+
+Merge de la PR #140, `b60527834112c359705b705d12fe0e9149dae341`, desde
+`fb864ba5453440a7220c817123ce228cd4254c87`. **Lo que sigue es lo que informó
+el despliegue**, corrido desde el acceso al VPS y no desde la sesión que
+escribe esta nota.
+
+**Migraciones.** Aplicó `20261004200000_turno_operativo`: `finished_at`
+2026-10-05 10:22:52 UTC, 82 ms. Después, **49/49**, ninguna pendiente y
+ninguna fallida sin resolver. Antes de migrar no había transacciones abiertas
+relevantes ni candados sobre `Turno`.
+
+**Lo que hizo.** Aditiva y sin backfill: creó la tabla `TurnoOperativo` VACÍA
+(catálogo por local, con la ventana de reconocimiento y sus CHECK —las dos
+horas o ninguna, y las dos en todo turno activo—); agregó a `Turno` y a
+`VerificacionEfectivo` dos columnas NULL (`turnoOperativoId`,
+`fechaOperativa`) con su CHECK, su FK compuesta con el local e índices; creó
+dos triggers (la caja no cambia su turno ni su fecha; una entrega solo entra en
+la verificación de su turno y fecha) y reemplazó `verificacion_solo_se_anula`.
+
+**Datos después.** `TurnoOperativo` quedó con 0 filas. Las 735 cajas
+existentes conservaron `turnoOperativoId` y `fechaOperativa` en NULL, con la
+huella idéntica antes y después: no hubo backfill. Por eso todos los locales
+siguen en modo legado —abren cajas sin turno, "Sin turno asignado"— hasta que
+cargan su primer turno en Configuración → POS → Turnos operativos; desde ahí
+sus cajas nuevas exigen turno y no vuelven al legado.
+
+**El despliegue.**
+
+- Backup PRE: `/srv/produccion/backups/pre-b6052783_20261005_102126.sql.gz`,
+  SHA-256 `5be830471c8923f39fd8945199724849002f94ca8d4ab144bebd8b1eec99a79b`.
+- Sonda POST en verde contra `b60527834112c359705b705d12fe0e9149dae341`
+  (corrida 37296259054).
+- La app volvió a responder a los 3 segundos. El árbol del VPS quedó limpio.
+
+**SI ESTA MIGRACIÓN FALLA, NO SE REINTENTA.** Su encabezado dice que con una
+transacción larga sobre `Turno` "falla rápido y la base queda como estaba", y
+eso describe la base, no a Prisma: una corrida fallida de `migrate deploy` puede
+quedar registrada como fallida en `_prisma_migrations` y dar P3009, que frena
+todo despliegue posterior. Y `lib/deploy/guardiaMigraciones.mjs` rechaza
+`migrate resolve` fuera de las recuperaciones tipadas, que hoy son solo las de
+`libro_stock` y `libro_costo_activacion`: **no hay una para
+`turno_operativo`.** Ante una falla:
+
+- no se vuelve a correr `migrate deploy`;
+- no se corre `migrate resolve` a mano;
+- no se edita `_prisma_migrations` a mano;
+- se preserva la evidencia —la salida del comando y el backup PRE—;
+- se inspecciona el estado en solo lectura;
+- se frena, y no se sigue hasta tener un procedimiento de recuperación tipado
+  y autorizado explícitamente para esta migración.
+
+Se aplicó sin fallar; la regla queda para quien tenga que repetirla en otra
+base.
+
+---
+
+## `fb864ba5`: desplegado el 2026-10-04. Verificación de efectivo, con `20261004120000_verificacion_efectivo`
+
+Merge de la PR #139, `fb864ba5453440a7220c817123ce228cd4254c87`, desde
+`bd92ca5d057541befa48589cda5a73cfe6de89b3`; trae la migración de la PR #136.
+**Lo que sigue es lo que informó el despliegue**, corrido desde el acceso al
+VPS y no desde la sesión que escribe esta nota.
+
+**Migraciones.** Aplicó `20261004120000_verificacion_efectivo`: `finished_at`
+2026-10-04 22:13:27 UTC. Después, **48/48**.
+
+**Lo que hizo.** Creó las tablas `VerificacionEfectivo` y
+`VerificacionEfectivoEntrega`, que quedaron vacías, y sus triggers: los no
+internos pasaron de 23 a 30.
+
+**El despliegue.**
+
+- Backup PRE: `/srv/produccion/backups/pre-fb864ba5_20261004_221219.sql.gz`,
+  SHA-256 `5ae282b5c0f2c4a88c7e49aa6f74cbcf0aa790c1b327b6ff6ada117f462f8ec6`.
+- Sonda POST en verde contra `fb864ba5453440a7220c817123ce228cd4254c87`
+  (corrida 37239203186).
+- La app volvió a responder a los 2 segundos.
 
 ---
 
