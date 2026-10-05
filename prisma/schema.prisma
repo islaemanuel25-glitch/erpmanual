@@ -2391,7 +2391,10 @@ model Turno {
   // la hora, ni porque la caja cruce la medianoche.
   //
   // Los dos van juntos o ninguno, por CHECK; y una vez escritos no cambian, por
-  // trigger. NULL = caja anterior a esto: NO se infiere a qué turno perteneció,
+  // trigger, salvo la corrección de una caja ABIERTA de un turno a otro, sin
+  // efectivo en una verificación vigente (migración
+  // 20261005100000_correccion_turno_operativo_de_caja; la hace
+  // `corregirTurnoOperativoDeCaja`). NULL = caja anterior a esto: NO se infiere a qué turno perteneció,
   // y Tesorería la muestra como "Sin turno asignado". La FK compuesta con
   // `localId` impide usar el turno de otro local. Migración
   // 20261004200000_turno_operativo.

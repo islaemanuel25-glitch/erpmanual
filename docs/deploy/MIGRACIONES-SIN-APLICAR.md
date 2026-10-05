@@ -16,9 +16,21 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **49 migraciones**, las mismas que el árbol: 49/49
-aplicadas, ninguna pendiente y ninguna fallida sin resolver. La última aplicada
-es `20261004200000_turno_operativo`.
+Producción está en **49 migraciones**; el árbol tiene 50. Pendiente de deploy:
+
+- `20261005100000_correccion_turno_operativo_de_caja` — corregir el turno
+  operativo de una caja abierta desde el POS (rama
+  `claude/pos-corregir-turno-operativo`). Qué hace `migrate deploy`: reemplaza
+  el cuerpo de la función `turno_operativo_de_caja_inmutable`; el trigger es el
+  mismo y no se recrea. **No toca ninguna tabla ni ningún dato** y no toma
+  candados sobre `Turno`. La inmutabilidad del turno de una caja sigue siendo
+  la regla, con una sola excepción: de un turno a otro (nunca desde NULL ni
+  hacia NULL), con la caja abierta y sin efectivo suyo en una verificación
+  vigente. Ensayada desde cero sin drift. Si fallara, vale la misma regla que
+  la anterior: no se reintenta ni se resuelve a mano; se preserva la evidencia
+  y se frena.
+
+La última aplicada es `20261004200000_turno_operativo`.
 
 Producción corre `b60527834112c359705b705d12fe0e9149dae341` (merge de la PR
 #140). La secuencia de los últimos despliegues es `bd92ca5d` → `fb864ba5` →

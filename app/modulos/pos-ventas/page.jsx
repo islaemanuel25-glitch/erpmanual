@@ -62,6 +62,8 @@ import StatsDelDia from "@/components/pos-ventas/StatsDelDia";
 import HistorialDia from "@/components/pos-ventas/HistorialDia";
 import AvisoVentaInterna from "@/components/pos-ventas/AvisoVentaInterna";
 import { ClipboardList, Printer, Undo2 } from "lucide-react";
+import TurnoOperativoDeCaja from "@/components/caja/TurnoOperativoDeCaja";
+import { useBajadaDePagina } from "@/app/context/AccionDePaginaContext";
 import { descuentoPorPuntos } from "@/lib/pos-ventas/puntos";
 
 const MENSAJE_CANTIDAD_NO_DISPONIBLE =
@@ -141,6 +143,27 @@ export default function PosVentasPage() {
   // justo entre la baja y el alta.
   const turnoActualRef = useRef(null);
   turnoActualRef.current = turnoActual;
+
+  // EL TURNO OPERATIVO DE LA CAJA, debajo de "POS Ventas" y no en la barra de
+  // acciones de la caja, que en el teléfono ya no tiene lugar. Tocarlo corrige
+  // la clasificación de la caja; la caja sigue siendo la misma.
+  useBajadaDePagina(
+    () =>
+      turnoActual ? (
+        <TurnoOperativoDeCaja
+          caja={turnoActual}
+          onRequiereOperador={requerirOperador}
+          onCorregido={(c) =>
+            setTurnoActual((t) =>
+              t && t.id === c.id
+                ? { ...t, turnoOperativoId: c.turnoOperativo?.id ?? null, turnoOperativo: c.turnoOperativo, fechaOperativa: c.fechaOperativa }
+                : t
+            )
+          }
+        />
+      ) : null,
+    [turnoActual, requerirOperador]
+  );
   const [mostrarCajaMovimiento, setMostrarCajaMovimiento] = useState(false);
   const [productoKgPendiente, setProductoKgPendiente] = useState(null);
   // Servicio de importe variable pendiente de ingresar importe en el modal.

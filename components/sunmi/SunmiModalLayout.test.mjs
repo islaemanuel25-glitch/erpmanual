@@ -747,6 +747,10 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // cerrarla sin confirmar deja la hora como estaba. No se pierde nada
     // escrito, así que tocar afuera cierra, igual que Cancelar.
     "components/sunmi/SunmiCampoHora.jsx": false,
+    // La hoja de corregir el turno de la caja: adentro hay una elección entre
+    // dos o tres turnos, nada escrito. Cerrarla sin confirmar deja la caja como
+    // estaba, así que tocar afuera cierra, igual que Cancelar.
+    "components/caja/TurnoOperativoDeCaja.jsx": false,
     // ── PASAR UN CONTROL A ACTUALIZAR: `true`, Y ES SU HERMANA LA QUE LO
     //    EXPLICA ───────────────────────────────────────────────────────────
     //

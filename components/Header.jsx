@@ -13,6 +13,7 @@ import { perfilExentoDeOperador } from "@/lib/operador-exencion";
 import OperadorSelector from "@/components/operador/OperadorSelector";
 import { getDefaultRoute } from "@/lib/getDefaultRoute";
 import { usePageTitle } from "@/hooks/usePageTitle";
+import { useBajadaDelShell } from "@/app/context/AccionDePaginaContext";
 import { LEGACY_HEADER_TITLES } from "@/lib/menu/legacyTitles";
 
 export default function Header({ onOpenMobileMenu }) {
@@ -44,6 +45,9 @@ export default function Header({ onOpenMobileMenu }) {
   const rol = perfil?.rol || "-";
 
   const titulo = usePageTitle({ overrides: LEGACY_HEADER_TITLES });
+  // La bajada de la pantalla va pegada al título también en escritorio: en el
+  // teléfono la dibuja la fila de título de `LayoutBase`.
+  const bajada = useBajadaDelShell();
 
   const cargarContexto = useCallback(async () => {
     if (!esAdmin) return;
@@ -107,6 +111,7 @@ export default function Header({ onOpenMobileMenu }) {
         <h1 className={`text-xl font-semibold hidden md:block ${theme.header.text}`}>
           {titulo}
         </h1>
+        {bajada && <div className="hidden md:block min-w-0 text-sm3">{bajada}</div>}
         {showHomeBtn && (
           <Link
             href={homeRoute}

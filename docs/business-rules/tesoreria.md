@@ -104,7 +104,19 @@ compensan entre sí [CÓDIGO].
   ciclo noche → mañana → tarde, la tarde que se extiende es del lunes, la noche
   que sigue es del martes y la mañana no se puede abrir [CÓDIGO; TO-C1..TO-C7].
   No se recalcula, y la base impide cambiar turno o fecha de una caja ya
-  escrita [CÓDIGO; TO-4].
+  escrita, con una sola excepción [CÓDIGO; TO-4].
+- **Corregir el turno de una caja abierta** (desde el 2026-10-05, migración
+  `20261005100000_correccion_turno_operativo_de_caja`): quien abrió eligiendo
+  el turno equivocado lo corrige desde el POS tocando «Turno <nombre> ▾» debajo
+  de "POS Ventas". Es una corrección de CLASIFICACIÓN: la caja entera pasa a
+  otro turno con sus ventas y movimientos, sin dividirse ni tocar importes. Las
+  opciones son las que el ciclo ofrecía en la APERTURA de esa caja, no las de
+  ahora, y la fecha operativa la calcula el servidor
+  (`corregirTurnoOperativoDeCaja`, `POST /api/pos-ventas/turnos/[id]/turno-operativo`,
+  `pos.usar` sobre la caja propia). Solo de un turno a otro, con la caja
+  abierta y sin efectivo suyo en una verificación vigente; la base sostiene
+  las tres cosas. Una caja sin turno no recibe uno: sigue «Sin turno asignado»
+  [CÓDIGO; TO-4, TO-CC1..TO-CC10].
 - **Un solo turno** (o varios que empiezan a la misma hora): la ocurrencia
   actual se extiende hasta su próximo comienzo; con 08:00 → 12:00, el lunes a
   las 20:00 y el martes a las 07:59 siguen siendo del lunes [CÓDIGO; TO-V8].
