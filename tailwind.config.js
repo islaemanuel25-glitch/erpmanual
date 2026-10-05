@@ -238,6 +238,13 @@ module.exports = {
       height: {
         fila: "60px",
 
+        // ── LA RUEDA DE `SunmiCampoHora`: TRES RENGLONES DE TOQUE ─────────
+        //
+        // El anterior, el elegido y el siguiente, cada uno de 44 —`min-h-toque`—,
+        // como el diseño aprobado "Selector hora · propuesta compacta". Va acá
+        // por el mismo motivo que `fila`: 132 no cae en la grilla de 3,5 px.
+        rueda: "132px",
+
         // ── LOS CONTROLES DEL PEDIDO ──────────────────────────────────────
         //
         // 32 el segmentado de tipo de pedido y 30 el chip de filtro, pedidos

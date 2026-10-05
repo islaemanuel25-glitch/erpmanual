@@ -181,9 +181,11 @@ Props: `value?`, `onChange?`
 ### SunmiCampoHora
 Una hora "HH:MM" de 24 horas. Cerrado es un botón que muestra el valor tal
 cual —nunca AM/PM—; al tocarlo abre una hoja del kit (`SunmiModalLayout`,
-`hoja-o-centrado`) con hora 00–23 y minutos 00–59 en dos `SunmiCampoCantidad`,
-y Cancelar / Confirmar. Reemplaza a `<input type="time">`, que en Android
-mostraba "p. m." y abría el reloj del navegador.
+`hoja-o-centrado`) con dos ruedas con scroll-snap —Hora 00–23 y Minutos
+00–59— y Cancelar / Confirmar, según el diseño aprobado en Figma
+(`uptcbzbnV5M4q32kgmupF9`, nodo `22:2`). Cancelar y tocar afuera no cambian el
+valor. Reemplaza a `<input type="time">`, que en Android mostraba "p. m." y
+abría el reloj del navegador.
 ```jsx
 <SunmiCampoHora etiqueta="Desde" value={desde} onChange={setDesde} />
 ```

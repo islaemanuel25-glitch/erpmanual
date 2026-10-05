@@ -743,8 +743,8 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // este censo. La decisión es la misma y la sostiene la pieza, que NO declara
     // `destructivo`: vale para esta hoja y para la confirmación de la semana.
     "components/sunmi/SunmiHojaDeConfirmacion.jsx": false,
-    // La hoja de elegir una hora: adentro hay dos números que se cambian con
-    // −/+, y cerrarla sin confirmar deja la hora como estaba. No se pierde nada
+    // La hoja de elegir una hora: adentro hay dos ruedas que se deslizan, y
+    // cerrarla sin confirmar deja la hora como estaba. No se pierde nada
     // escrito, así que tocar afuera cierra, igual que Cancelar.
     "components/sunmi/SunmiCampoHora.jsx": false,
     // ── PASAR UN CONTROL A ACTUALIZAR: `true`, Y ES SU HERMANA LA QUE LO
