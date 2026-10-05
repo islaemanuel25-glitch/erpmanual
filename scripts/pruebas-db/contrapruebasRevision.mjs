@@ -1218,6 +1218,53 @@ const CASOS = [
     inyecciones: [{ de: "  return { activos, legado: filas === 0 };", a: "  return { activos, legado: activos.length === 0 };" }],
     esperadas: ["[TO-T9] sin turnos activos el local NO vuelve al legado: se dice qué falta", "[TO-T9] y una apertura sin turno no abre: 409"],
   },
+  // ── UN TURNO ACTIVO TIENE HORARIO ───────────────────────────────────────
+  {
+    n: "TO-HR1",
+    defecto: "la regla deja guardar un turno activo sin horario",
+    archivo: "lib/caja/turnoOperativo.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "  if (horaInicioReconocimiento != null && horaFinReconocimiento != null) return null;", a: "  return null;" }],
+    esperadas: ["[TO-HR1] dar de alta sin horario: 400 y su código"],
+  },
+  {
+    n: "TO-HR2",
+    defecto: "la edición mira el activo que había y deja activar un turno sin horario",
+    archivo: "app/api/config/turnos-operativos/[id]/route.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "rechazoPorFaltaDeHorario({ ...actual, ...data });", a: "rechazoPorFaltaDeHorario({ ...actual, ...data, activo: actual.activo });" }],
+    esperadas: ["[TO-HR2] activarlo sin horario: 400 y su código"],
+  },
+  {
+    n: "TO-HR3",
+    defecto: "la edición mira el horario que había y deja sacárselo a un turno activo",
+    archivo: "app/api/config/turnos-operativos/[id]/route.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "rechazoPorFaltaDeHorario({ ...actual, ...data });", a: "rechazoPorFaltaDeHorario({ ...data, ...actual });" }],
+    esperadas: ["[TO-HR3] sacarle el horario a un turno activo: 400 y su código"],
+  },
+  {
+    n: "TO-HR5",
+    defecto: "la base guarda un turno activo sin horario",
+    archivo: TURNO_OPERATIVO,
+    migracion: { deshacer: DESHACER_TURNO_OPERATIVO },
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "CHECK (\n      NOT \"activo\" OR (", a: "CHECK (\n      true OR (" }],
+    esperadas: ["[TO-HR5] la base no guarda un turno activo sin horario", "[TO-HR5] ni le saca el horario a uno activo"],
+  },
+  {
+    n: "TO-HR7",
+    defecto: "el primer turno de un local se crea sin horario y lo saca del legado",
+    archivo: "app/api/config/turnos-operativos/route.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "  const sinHorario = rechazoPorFaltaDeHorario({ activo: true, ...rango.rango });", a: "  const sinHorario = null;" }],
+    esperadas: ["[TO-HR7] un primer turno sin horario no se crea: 400 y su código"],
+  },
   // ── EL CONTRATO DE LA PANTALLA MÓVIL (PR #138) ───────────────────────────
   //
   // Lo que la pantalla no puede comprobar sola: que un período mal pedido no se

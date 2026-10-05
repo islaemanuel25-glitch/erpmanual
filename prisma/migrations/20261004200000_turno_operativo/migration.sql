@@ -9,9 +9,11 @@
 -- Esta migración agrega el dato, y nada más:
 --
 --   · `TurnoOperativo`: el CATÁLOGO de turnos de cada local —nombre, orden,
---     activo y una ventana de reconocimiento opcional, "HH:MM" → "HH:MM", que
---     puede cruzar la medianoche—. La ventana NO es la duración del turno: la
---     apertura la usa para proponer el turno, y quien abre confirma o cambia.
+--     activo y una ventana de reconocimiento, "HH:MM" → "HH:MM", que puede
+--     cruzar la medianoche—. UN TURNO ACTIVO TIENE VENTANA SIEMPRE; uno
+--     inactivo puede no tenerla. La ventana NO es la duración del turno ni
+--     obliga a cerrar la caja: ubica la ocurrencia y la apertura la usa para
+--     proponer el turno, y quien abre confirma o cambia.
 --     Cada local da de alta los suyos; esta migración no siembra ninguno.
 --   · `Turno.turnoOperativoId` + `Turno.fechaOperativa`: la caja (el modelo
 --     `Turno` sigue siendo UNA caja) recibe el turno FINAL elegido al abrirse,
@@ -53,9 +55,9 @@
 -- `20261002120000_caja_por_operador`. Si hay una transacción larga sobre
 -- `Turno`, falla rápido y la base queda como estaba.
 --
--- DESPUÉS DE MIGRAR, cada local necesita al menos un turno activo en su
--- catálogo para que se pueda ABRIR caja: las tres rutas de apertura lo exigen.
--- Las cajas ya abiertas siguen operando y cerrando sin cambio. Ver
+-- DESPUÉS DE MIGRAR, un local que nunca cargó turnos sigue abriendo cajas sin
+-- turno (modo legado); al dar de alta el primero entra al sistema nuevo y no
+-- vuelve. Las cajas ya abiertas siguen operando y cerrando sin cambio. Ver
 -- docs/deploy/MIGRACIONES-SIN-APLICAR.md.
 
 -- ── 1 · El catálogo ─────────────────────────────────────────────────────────
@@ -83,6 +85,14 @@ CREATE TABLE "TurnoOperativo" (
         "horaInicioReconocimiento" ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
         AND "horaFinReconocimiento" ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
         AND "horaInicioReconocimiento" <> "horaFinReconocimiento"
+      )
+    ),
+    -- Un turno ACTIVO tiene ventana: sin ella el ciclo no puede ubicar su
+    -- ocurrencia. Uno inactivo puede no tenerla.
+    CONSTRAINT "TurnoOperativo_activo_con_ventana_chk" CHECK (
+      NOT "activo" OR (
+        "horaInicioReconocimiento" IS NOT NULL
+        AND "horaFinReconocimiento" IS NOT NULL
       )
     )
 );

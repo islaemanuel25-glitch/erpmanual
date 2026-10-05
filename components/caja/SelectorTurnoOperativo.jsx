@@ -13,8 +13,8 @@
 //   · NINGUNO → se pregunta entre las opciones, sin adivinar;
 //   · VARIOS  → se pregunta, diciendo cuáles coinciden, sin elegir ninguno.
 //
-// Si el ciclo no se puede resolver (`bloqueo`), se dice qué falta configurar
-// y no se ofrece nada. Si el local todavía no usa turnos operativos
+// Si el local usa turnos y no tiene ninguno activo (`bloqueo`), se dice qué
+// falta configurar y no se ofrece nada. Si el local todavía no usa turnos operativos
 // (`legado`), se avisa y la caja abre sin turno. Esta pieza no conoce nombres
 // ni horarios, no filtra turnos ni calcula fechas: muestra lo que mandó el
 // servidor, que vuelve a validar y calcular todo con el turno FINAL.
@@ -115,7 +115,7 @@ export default function SelectorTurnoOperativo({ valor, onCambiar, catalogo }) {
   }
   if (bloqueo) {
     return (
-      <SunmiAviso tono="warning" titulo="No se puede saber qué turno abrir">
+      <SunmiAviso tono="warning" titulo="Ningún turno activo">
         {bloqueo.error}
       </SunmiAviso>
     );

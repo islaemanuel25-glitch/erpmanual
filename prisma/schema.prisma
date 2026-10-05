@@ -3678,8 +3678,9 @@ model VerificacionEfectivo {
 /// UN TURNO OPERATIVO DEL CATÁLOGO DE UN LOCAL. Nombre, cantidad, orden y
 /// ventana los configura cada local. Migración 20261004200000_turno_operativo.
 ///
-/// La VENTANA DE RECONOCIMIENTO ("HH:MM" → "HH:MM", opcional, puede cruzar la
-/// medianoche) no es la duración del turno: sirve para que la apertura proponga
+/// La VENTANA DE RECONOCIMIENTO ("HH:MM" → "HH:MM", obligatoria en un turno
+/// activo, puede cruzar la medianoche) no es la duración del turno ni obliga a
+/// cerrar la caja: ubica la ocurrencia y sirve para que la apertura proponga
 /// el turno que probablemente se abre. Quien abre confirma o cambia, y la caja
 /// guarda el turno FINAL con la fecha operativa de su jornada
 /// (`lib/caja/turnoOperativo.js`). Tesorería agrupa y verifica por (local,
@@ -3693,8 +3694,9 @@ model TurnoOperativo {
   nombre    String
   orden     Int      @default(0)
   activo    Boolean  @default(true)
-  /// Ventana de reconocimiento, "HH:MM". Las dos o ninguna, distintas entre sí;
-  /// inicio > fin cruza la medianoche. Se pueden solapar entre turnos.
+  /// Ventana de reconocimiento, "HH:MM". Las dos o ninguna, distintas entre sí,
+  /// y las dos si el turno está activo (CHECK); inicio > fin cruza la
+  /// medianoche. Se pueden solapar entre turnos.
   horaInicioReconocimiento String?
   horaFinReconocimiento    String?
   createdAt DateTime @default(now())

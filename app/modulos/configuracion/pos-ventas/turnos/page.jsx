@@ -5,8 +5,10 @@
 // EL CATÁLOGO DE TURNOS OPERATIVOS DEL LOCAL (config_local.pos).
 //
 // Los turnos que use este local: nombre, orden, activo y una ventana de
-// reconocimiento opcional. La ventana NO es la duración del turno: la apertura
-// la usa para proponer el turno, y quien abre confirma o cambia. Las ventanas
+// reconocimiento, que un turno activo tiene siempre —lo exige el servidor—. La
+// ventana NO es la duración del turno ni obliga a cerrar la caja: ubica la
+// ocurrencia, la apertura la usa para proponer el turno, y quien abre confirma
+// o cambia. Las ventanas
 // de dos turnos se pueden solapar: a esa hora, la apertura pregunta. Tesorería
 // recibe y verifica el efectivo por turno. Un turno no se borra —una caja o
 // una verificación pueden apuntarlo—: se desactiva, y deja de ofrecerse para
@@ -27,6 +29,8 @@ import { LARGO_MAXIMO_NOMBRE_TURNO, descripcionDeVentana } from "@/lib/caja/turn
 
 /** La ventana de un turno como la muestran los dos campos de hora. */
 const ventanaDe = (t) => ({ inicio: t.horaInicioReconocimiento ?? "", fin: t.horaFinReconocimiento ?? "" });
+/** Un turno activo necesita las dos horas: sin ellas no se agrega ni se activa. */
+const tieneHorario = (v) => Boolean(v.inicio && v.fin);
 
 const URL_CATALOGO = "/api/config/turnos-operativos";
 
@@ -91,7 +95,7 @@ export default function ConfigTurnosOperativosPage() {
   };
 
   const agregar = () => {
-    if (!nuevo.trim()) return;
+    if (!nuevo.trim() || !tieneHorario(nuevaVentana)) return;
     const cuerpo = { nombre: nuevo, horaInicioReconocimiento: nuevaVentana.inicio, horaFinReconocimiento: nuevaVentana.fin };
     hacer(() => pedir(URL_CATALOGO, "POST", cuerpo), `Turno «${nuevo.trim()}» agregado`).then(() => {
       setNuevo("");
@@ -102,7 +106,8 @@ export default function ConfigTurnosOperativosPage() {
     const nombre = nombres[t.id];
     hacer(() => pedir(`${URL_CATALOGO}/${t.id}`, "PATCH", { nombre }), "Nombre guardado");
   };
-  // Las dos horas vacías sacan la ventana: el turno deja de proponerse solo.
+  // Las dos horas vacías sacan la ventana, y eso solo se acepta con el turno
+  // desactivado: a uno activo el servidor no le deja sacarla.
   const guardarVentana = (t) => {
     const v = ventanas[t.id];
     hacer(
@@ -138,9 +143,9 @@ export default function ConfigTurnosOperativosPage() {
             El orden de la lista es el ciclo del local: después del último turno viene el primero. El horario de
             reconocimiento dice dónde empieza cada turno en el día; no es su duración. Al abrir una caja se puede elegir el
             turno que está en curso —aunque se haya extendido— o el que sigue en el ciclo, y la fecha operativa sale de
-            esa ocurrencia. Si la hora cae en el horario de un solo turno, se propone ese y se puede cambiar. El horario
-            es opcional, pero un turno sin horario no se puede ubicar en el día: cuando es el que sigue, la apertura pide
-            cargárselo. Un turno desactivado deja de ofrecerse y las cajas que ya lo usaron lo conservan.
+            esa ocurrencia. Si la hora cae en el horario de un solo turno, se propone ese y se puede cambiar. Un turno
+            activo necesita horario; el horario no obliga a cerrar la caja. Un turno desactivado deja de ofrecerse y las
+            cajas que ya lo usaron lo conservan.
           </SunmiAviso>
 
           {turnos.length === 0 && (
@@ -176,7 +181,7 @@ export default function ConfigTurnosOperativosPage() {
                   )}
                 </div>
                 <div className="flex flex-col gap-1">
-                  <span className="text-sm2 sunmi-text-muted">Horario de reconocimiento (opcional)</span>
+                  <span className="text-sm2 sunmi-text-muted">Horario de reconocimiento</span>
                   <div className="flex items-center gap-2">
                     <SunmiInput type="time" aria-label={`Desde, ${t.nombre}`} value={ventana.inicio} onChange={cambiarVentana("inicio")} />
                     <SunmiInput type="time" aria-label={`Hasta, ${t.nombre}`} value={ventana.fin} onChange={cambiarVentana("fin")} />
@@ -204,7 +209,7 @@ export default function ConfigTurnosOperativosPage() {
                     >
                       <ArrowDown size={16} />
                     </SunmiButton>
-                    <SunmiButton color="slate" disabled={ocupado} onClick={() => activar(t)}>
+                    <SunmiButton color="slate" disabled={ocupado || (!t.activo && !tieneHorario(ventanaDe(t)))} onClick={() => activar(t)}>
                       {t.activo ? "Desactivar" : "Activar"}
                     </SunmiButton>
                   </div>
@@ -225,11 +230,11 @@ export default function ConfigTurnosOperativosPage() {
                 maxLength={LARGO_MAXIMO_NOMBRE_TURNO}
                 onChange={(e) => setNuevo(e.target.value)}
               />
-              <SunmiButton color="primary" disabled={ocupado || !nuevo.trim()} onClick={agregar}>
+              <SunmiButton color="primary" disabled={ocupado || !nuevo.trim() || !tieneHorario(nuevaVentana)} onClick={agregar}>
                 Agregar
               </SunmiButton>
             </div>
-            <span className="text-sm2 sunmi-text-muted">Horario de reconocimiento (opcional)</span>
+            <span className="text-sm2 sunmi-text-muted">Horario de reconocimiento: obligatorio, el turno nace activo</span>
             <div className="flex items-center gap-2">
               <SunmiInput
                 type="time"

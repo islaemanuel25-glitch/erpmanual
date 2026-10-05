@@ -1,7 +1,8 @@
 // app/api/config/turnos-operativos/[id]/route.js
 //
 // Renombrar, activar/desactivar o cambiar la ventana de reconocimiento de UN
-// turno del catálogo del local. No hay
+// turno del catálogo del local. Un turno activo tiene ventana siempre: no se
+// activa uno sin ella ni se le saca a uno activo. No hay
 // DELETE: una caja o una verificación pueden apuntarlo. Desactivado, deja de
 // ofrecerse para abrir caja y la historia sigue leyéndose con su nombre.
 
@@ -13,6 +14,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import {
   CODIGO_TURNO_OPERATIVO,
   idDeTurnoOperativo,
+  rechazoPorFaltaDeHorario,
   validarNombreTurnoOperativo,
   validarRangoReconocimiento,
 } from "@/lib/caja/turnoOperativo";
@@ -65,6 +67,13 @@ export async function PATCH(req, { params }) {
         { ok: false, error: "No hay nada para cambiar: se cambia el nombre, si está activo o su ventana de reconocimiento." },
         { status: 400 }
       );
+    }
+    // Se mira el turno como QUEDARÍA: activarlo sin horario o sacarle el
+    // horario estando activo se rechaza. Para dejarlo sin horario se lo
+    // desactiva antes o en el mismo pedido; nunca se lo desactiva solo.
+    const sinHorario = rechazoPorFaltaDeHorario({ ...actual, ...data });
+    if (sinHorario) {
+      return NextResponse.json({ ok: false, error: sinHorario.error, codigo: sinHorario.codigo }, { status: sinHorario.status });
     }
 
     const turno = await prisma.turnoOperativo.update({ where: { id }, data, select: SELECT_TURNO_OPERATIVO });

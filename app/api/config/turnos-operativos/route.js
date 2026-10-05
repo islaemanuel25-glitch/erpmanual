@@ -1,15 +1,16 @@
 // app/api/config/turnos-operativos/route.js
 //
 // EL CATÁLOGO DE TURNOS OPERATIVOS DE UN LOCAL: los que configure el local,
-// cada uno con su ventana de reconocimiento opcional.
+// cada uno con su ventana de reconocimiento, obligatoria mientras esté activo.
 //
 //   GET  — el catálogo del local del alcance. Lo lee la configuración y lo lee
 //          la apertura de caja: con `?activos=1` devuelve solo los turnos que
 //          se pueden abrir a esta hora según el ciclo del local, con la fecha
-//          operativa de cada uno, el que propone la ventana y, si el ciclo no
-//          se puede resolver, el `bloqueo` con lo que falta configurar. Un
-//          local que nunca tuvo turnos devuelve `legado: true`: abre sin turno.
-//   POST — da de alta un turno, con o sin ventana. `config_local.pos`.
+//          operativa de cada uno, el que propone la ventana y, si el local no
+//          tiene ningún turno activo, el `bloqueo` con lo que falta. Un local
+//          que nunca tuvo turnos devuelve `legado: true`: abre sin turno.
+//   POST — da de alta un turno. Nace activo, así que lleva nombre y las dos
+//          horas de su ventana: no hay borradores. `config_local.pos`.
 //   PUT  — reordena: `{ orden: [id, id, …] }`. `config_local.pos`.
 //
 // El local sale SIEMPRE del alcance, nunca del cuerpo, igual que el resto de la
@@ -20,7 +21,12 @@ import prisma from "@/lib/prisma";
 import { requirePerm, checkPerm } from "@/lib/authorize";
 import { getUsuarioSession } from "@/lib/auth";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
-import { CODIGO_TURNO_OPERATIVO, validarNombreTurnoOperativo, validarRangoReconocimiento } from "@/lib/caja/turnoOperativo";
+import {
+  CODIGO_TURNO_OPERATIVO,
+  rechazoPorFaltaDeHorario,
+  validarNombreTurnoOperativo,
+  validarRangoReconocimiento,
+} from "@/lib/caja/turnoOperativo";
 import {
   SELECT_TURNO_OPERATIVO,
   reconocimientoDeApertura,
@@ -81,6 +87,12 @@ export async function POST(req) {
     const rango = validarRangoReconocimiento(body?.horaInicioReconocimiento, body?.horaFinReconocimiento);
     if (!rango.valido) {
       return NextResponse.json({ ok: false, error: rango.error, codigo: CODIGO_TURNO_OPERATIVO.RANGO_INVALIDO }, { status: 400 });
+    }
+    // Nace activo: sin horario no se crea. Tampoco el primero del local, que
+    // es el que lo saca del modo legado.
+    const sinHorario = rechazoPorFaltaDeHorario({ activo: true, ...rango.rango });
+    if (sinHorario) {
+      return NextResponse.json({ ok: false, error: sinHorario.error, codigo: sinHorario.codigo }, { status: sinHorario.status });
     }
     // Al final de la lista: el orden se cambia después, a propósito.
     const ultimo = await prisma.turnoOperativo.aggregate({ where: { localId: ctx.localId }, _max: { orden: true } });

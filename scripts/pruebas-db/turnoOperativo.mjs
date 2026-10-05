@@ -216,7 +216,7 @@ async function correr() {
     ok("ningún id de B en el catálogo de A", !deA.turnos?.some((t) => t.id === mañanaB.id));
     igual("con ?activos=1, solo los que se ofrecen para abrir", (await catalogo(A.sesion, "?activos=1")).turnos?.map((t) => t.nombre), ["Mañana", "Tarde"]);
     igual("B ve solo el suyo", (await catalogo(B.sesion)).turnos?.map((t) => t.id), [mañanaB.id]);
-    igual("sin ventana, la fecha operativa que ofrece cada turno es la de hoy",
+    igual("con la ventana desde las 00:00, la fecha operativa que ofrece cada turno es la de hoy",
       (await catalogo(A.sesion, "?activos=1")).turnos?.map((t) => t.fechaOperativa), [HOY, HOY]);
     const ajeno = await leer(await rutaTurnoDelCatalogo.PATCH(
       conCookie(`http://ci/api/config/turnos-operativos/${mañanaB.id}`, `erpazul_sesion=${A.config}`, { activo: false }, "PATCH"), conId(mañanaB.id)));
@@ -225,9 +225,9 @@ async function correr() {
     const reordenAjeno = await leer(await rutaCatalogo.PUT(
       conCookie("http://ci/api/config/turnos-operativos", `erpazul_sesion=${A.config}`, { orden: [mañanaB.id] }, "PUT")));
     igual("ni reordenarlo", reordenAjeno.status, 400);
-    const repetido = await leer(await rutaCatalogo.POST(conCookie("http://ci/api/config/turnos-operativos", `erpazul_sesion=${A.config}`, { nombre: "  Mañana " })));
+    const repetido = await leer(await rutaCatalogo.POST(conCookie("http://ci/api/config/turnos-operativos", `erpazul_sesion=${A.config}`, { nombre: "  Mañana ", ...todoElDia })));
     igual("un nombre repetido en el mismo local: 409", repetido.status, 409);
-    const sinPermiso = await leer(await rutaCatalogo.POST(conCookie("http://ci/api/config/turnos-operativos", `erpazul_sesion=${A.sesion}`, { nombre: "Siesta" })));
+    const sinPermiso = await leer(await rutaCatalogo.POST(conCookie("http://ci/api/config/turnos-operativos", `erpazul_sesion=${A.sesion}`, { nombre: "Siesta", ...todoElDia })));
     igual("dar de alta pide config_local.pos", sinPermiso.status, 403);
   }
 
@@ -446,25 +446,45 @@ async function correr() {
 
     const rotos = [await alta("Medio", h(0), ""), await alta("Igual", h(0), h(0)), await alta("Raro", "25:00", "01:00")];
     igual("un rango roto: 400 con su código", rotos.map((r) => [r.status, r.codigo]), Array(3).fill([400, "RANGO_DE_RECONOCIMIENTO_INVALIDO"]));
-    rechazado("la base tampoco guarda una ventana a medias",
-      await intento(() => prisma.turnoOperativo.create({ data: { localId: H.local.id, nombre: clave(), horaInicioReconocimiento: "06:00" } })),
-      /ventana_completa_chk|23514/);
+    rechazado("[TO-HR6] la base tampoco guarda una ventana a medias, ni en un turno inactivo",
+      await intento(() => prisma.turnoOperativo.create({ data: { localId: H.local.id, nombre: clave(), activo: false, horaInicioReconocimiento: "06:00" } })),
+      /ventana_completa_chk/);
     rechazado("ni una hora que no es HH:MM",
       await intento(() => prisma.turnoOperativo.create({ data: { localId: H.local.id, nombre: clave(), horaInicioReconocimiento: "6:00", horaFinReconocimiento: "07:00" } })),
       /ventana_formato_chk|23514/);
 
-    // Sacarle la ventana a un turno activo no lo invalida. Acá Dos es el que
-    // SIGUE a la ocurrencia actual (Uno) y sin ventana no se sabe si ya empezó
-    // ni de qué fecha es: no se adivina, y se dice qué turno ubicar.
-    await cambiar(dos.turno.id, { horaInicioReconocimiento: null, horaFinReconocimiento: null });
-    igual("[TO-V1] sacar la ventana la deja vacía y el turno sigue activo",
-      await prisma.turnoOperativo.findUnique({ where: { id: dos.turno.id }, select: { horaInicioReconocimiento: true, activo: true } }),
-      { horaInicioReconocimiento: null, activo: true });
+    // UN TURNO ACTIVO TIENE HORARIO [TO-HR]: el alta, la edición y la
+    // activación lo exigen, y la base lo sostiene.
+    const HORARIO_REQUERIDO = "TURNO_OPERATIVO_HORARIO_REQUERIDO";
+    const fila = (id) => prisma.turnoOperativo.findUnique({ where: { id }, select: { activo: true, horaInicioReconocimiento: true, horaFinReconocimiento: true } });
+    rechazado("[TO-HR5] la base no guarda un turno activo sin horario",
+      await intento(() => prisma.turnoOperativo.create({ data: { localId: H.local.id, nombre: clave() } })),
+      /activo_con_ventana_chk/);
+    rechazado("[TO-HR5] ni le saca el horario a uno activo",
+      await intento(() => prisma.turnoOperativo.update({ where: { id: uno.turno.id }, data: { horaInicioReconocimiento: null, horaFinReconocimiento: null } })),
+      /activo_con_ventana_chk/);
+    const sinHora = await alta("Sin hora", "", "");
+    igual("[TO-HR1] dar de alta sin horario: 400 y su código", [sinHora.status, sinHora.codigo], [400, HORARIO_REQUERIDO]);
+    ok("[TO-HR1] y no se creó", !(await prisma.turnoOperativo.findFirst({ where: { localId: H.local.id, nombre: "Sin hora" } })));
+
+    const quitar = await cambiar(dos.turno.id, { horaInicioReconocimiento: null, horaFinReconocimiento: null });
+    igual("[TO-HR3] sacarle el horario a un turno activo: 400 y su código", [quitar.status, quitar.codigo], [400, HORARIO_REQUERIDO]);
+    igual("[TO-HR3] y el turno sigue activo, con su horario: no se lo desactiva solo", await fila(dos.turno.id),
+      { activo: true, horaInicioReconocimiento: h(400), horaFinReconocimiento: h(460) });
+    const bajaSinHora = await cambiar(dos.turno.id, { activo: false, horaInicioReconocimiento: null, horaFinReconocimiento: null });
+    igual("[TO-HR4] desactivándolo en el mismo pedido, sí: queda inactivo y sin horario", [bajaSinHora.status, await fila(dos.turno.id)],
+      [200, { activo: false, horaInicioReconocimiento: null, horaFinReconocimiento: null }]);
+    const reactivar = await cambiar(dos.turno.id, { activo: true });
+    igual("[TO-HR2] activarlo sin horario: 400 y su código", [reactivar.status, reactivar.codigo], [400, HORARIO_REQUERIDO]);
+    igual("[TO-HR2] y sigue inactivo", (await fila(dos.turno.id)).activo, false);
+    const conHora = await cambiar(dos.turno.id, { activo: true, horaInicioReconocimiento: h(400), horaFinReconocimiento: h(460) });
+    igual("[TO-HR2] con el horario en el mismo pedido, se activa", [conHora.status, (await fila(dos.turno.id)).activo], [200, true]);
+
     o = await oferta(H);
-    igual("[TO-V4] con el siguiente sin ventana no se ofrece nada y se dice cuál ubicar",
-      [o.turnos?.length, o.bloqueo?.codigo, o.bloqueo?.turnos?.map((t) => t.id)], [0, "CICLO_DE_TURNOS_INDETERMINADO", [dos.turno.id]]);
-    const sinUbicar = await abrirCon(H, { turnoOperativoId: uno.turno.id });
-    igual("[TO-V4] y la apertura no adivina: 409", [sinUbicar.r.status, sinUbicar.r.codigo], [409, "CICLO_DE_TURNOS_INDETERMINADO"]);
+    const ofrecidos = await Promise.all((o.turnos ?? []).map((t) => fila(t.id)));
+    ok("[TO-HR8] todo lo que ofrece el ciclo es un turno activo con horario",
+      ofrecidos.length > 0 && ofrecidos.every((t) => t.activo && t.horaInicioReconocimiento && t.horaFinReconocimiento));
+    igual("[TO-HR9] y no hay bloqueo de ciclo", o.bloqueo, null);
   }
 
   seccion("I. El ciclo: la ocurrencia actual y la siguiente, nada más [TO-C]");
@@ -614,8 +634,15 @@ async function correr() {
     requerir("[TO-T3] el relevo con cambio en un local legado: abre", rCon.ok === true, `${rCon.status} ${rCon.codigo ?? ""} ${rCon.error ?? ""}`);
     ok("[TO-T3] y su caja queda sin turno ni fecha operativa", await sinTurno(rCon.turno.id));
 
+    // Un primer turno sin horario no se crea, y el local sigue en legado.
+    const incompleto = await leer(await rutaCatalogo.POST(conCookie(urlCatalogo, `erpazul_sesion=${L0.config}`, {
+      nombre: "Único", horaInicioReconocimiento: "", horaFinReconocimiento: "",
+    })));
+    igual("[TO-HR7] un primer turno sin horario no se crea: 400 y su código", [incompleto.status, incompleto.codigo], [400, "TURNO_OPERATIVO_HORARIO_REQUERIDO"]);
+    igual("[TO-HR7] y no saca al local del legado", [await prisma.turnoOperativo.count({ where: { localId: L0.local.id } }), (await oferta(L0)).legado], [0, true]);
+
     // El local carga su primer turno por la configuración: entra al sistema nuevo.
-    const alta = await leer(await rutaCatalogo.POST(conCookie(urlCatalogo, `erpazul_sesion=${L0.config}`, {
+    const alta =await leer(await rutaCatalogo.POST(conCookie(urlCatalogo, `erpazul_sesion=${L0.config}`, {
       nombre: "Único", horaInicioReconocimiento: "00:00", horaFinReconocimiento: "01:00",
     })));
     requerir("da de alta su primer turno", alta.ok === true, `${alta.status} ${alta.error ?? ""}`);
@@ -649,6 +676,8 @@ async function correr() {
     const corteLegado = await cerrar(cajaQueSigue, 1000, 4000);
     ok("[TO-T6] la caja legado abierta antes de configurar vende y cierra", Boolean(corteLegado?.id));
     ok("[TO-T7] y no recibió turno ni fecha: no hay backfill", await sinTurno(cajaQueSigue.turnoId) && await sinTurno(cajaVieja.turnoId));
+    igual("[TO-HR8] después de todo, ningún turno activo de ningún local quedó sin horario",
+      await prisma.turnoOperativo.count({ where: { activo: true, OR: [{ horaInicioReconocimiento: null }, { horaFinReconocimiento: null }] } }), 0);
   }
 }
 
