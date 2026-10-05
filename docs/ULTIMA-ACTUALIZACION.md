@@ -1,11 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-05 02:58
+**Fecha:** 2026-10-05 12:05
 
 ## Módulos modificados recientemente
 
 ### configuracion
-- fix: un turno operativo activo tiene horario, siempre, feat: transición por local al turno operativo y turnos sin ventana válidos, feat: el ciclo de turnos del local decide qué se puede abrir y de qué jornada
+- fix: Turnos operativos elige la hora con una hoja del kit, en 24 h, fix: un turno operativo activo tiene horario, siempre, feat: transición por local al turno operativo y turnos sin ventana válidos
 - Archivos: 1 modificados (1 total)
 
 ### pos-ventas
