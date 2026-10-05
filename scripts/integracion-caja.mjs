@@ -14,6 +14,7 @@
 // datos existentes: todo lo que escribe cuelga del local de prueba.
 
 import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
+import { turnoOperativoDePrueba } from "./pruebas-db/fixtureTurnoOperativo.mjs";
 import jwt from "jsonwebtoken";
 
 const prisma = await crearClientePrisma({ nivel: ESCRITURA });
@@ -74,6 +75,9 @@ async function main() {
       { localId: localB.id, exigirOperador: false },
     ],
   });
+  // Desde 20261004200000_turno_operativo las aperturas exigen un turno activo
+  // del local: el mismo fixture que usan las pruebas de base.
+  const TO = { [localA.id]: await turnoOperativoDePrueba(prisma, localA.id), [localB.id]: await turnoOperativoDePrueba(prisma, localB.id) };
 
   const mkUser = (n, localId) =>
     prisma.usuario.create({
@@ -98,12 +102,12 @@ async function main() {
   // El PRIMER turno de un local no tiene cierre previo: el sugerido es 0, así que
   // meter $10.000 es una diferencia de recepción y el sistema exige explicarla.
   // Eso es correcto —esa plata entró de algún lado— y se verifica primero.
-  let r = await abrirPOST(pedido(URL_ABRIR, ck1, { localId: localA.id, montoInicial: 10000 }));
+  let r = await abrirPOST(pedido(URL_ABRIR, ck1, { localId: localA.id, turnoOperativoId: TO[localA.id], montoInicial: 10000 }));
   let d = await r.json();
   chequear("A0 · sin cierre previo, poner plata exige explicación", d.ok === false && d.requiereObservacionFondo === true);
 
   r = await abrirPOST(pedido(URL_ABRIR, ck1, {
-    localId: localA.id, montoInicial: 10000, observacionFondo: "fondo inicial entregado por el dueño",
+    localId: localA.id, turnoOperativoId: TO[localA.id], montoInicial: 10000, observacionFondo: "fondo inicial entregado por el dueño",
   }));
   d = await r.json();
   if (!d.ok) { console.log("    respuesta:", r.status, JSON.stringify(d)); }
@@ -192,7 +196,7 @@ async function main() {
   chequear("B2 · identifica el turno que dejó el fondo", d.cierrePrevio?.turnoId === turnoA.id);
   chequear("B3 · la caja figura libre", d.cajaOcupada === null);
 
-  r = await abrirPOST(pedido(URL_ABRIR, ck2, { localId: localA.id, montoInicial: 10000 }));
+  r = await abrirPOST(pedido(URL_ABRIR, ck2, { localId: localA.id, turnoOperativoId: TO[localA.id], montoInicial: 10000 }));
   d = await r.json();
   chequear("B4 · abre confirmando que recibió $10.000", d.ok === true);
   const turnoB = d.turno;
@@ -211,7 +215,7 @@ async function main() {
 
   // ══════════════ UN TURNO POR LOCAL ══════════════
   console.log("\n── UN TURNO ABIERTO POR LOCAL ──");
-  r = await abrirPOST(pedido(URL_ABRIR, ck1, { localId: localA.id, montoInicial: 0 }));
+  r = await abrirPOST(pedido(URL_ABRIR, ck1, { localId: localA.id, turnoOperativoId: TO[localA.id], montoInicial: 0 }));
   d = await r.json();
   chequear("C1 · otro usuario NO puede abrir con la caja ocupada", d.ok === false && r.status === 409);
   chequear("C2 · el mensaje nombra al usuario y el turno", /cajero2/.test(d.error) && d.cajaOcupada?.turnoId === turnoB.id, d.error);
@@ -227,7 +231,7 @@ async function main() {
   chequear("D1 · el local B no ve el fondo del local A", money(d.fondoSugerido) === 0);
   chequear("D2 · el local B ve su caja libre pese al turno abierto en A", d.cajaOcupada === null);
 
-  r = await abrirPOST(pedido(URL_ABRIR, ckB, { localId: localB.id, montoInicial: 0 }));
+  r = await abrirPOST(pedido(URL_ABRIR, ckB, { localId: localB.id, turnoOperativoId: TO[localB.id], montoInicial: 0 }));
   d = await r.json();
   chequear("D3 · el local B abre sin bloqueo del local A", d.ok === true);
   const turnoBLocal = d.turno;
@@ -247,8 +251,8 @@ async function main() {
 
   // Dos aperturas simultáneas peleando por el mismo fondo.
   const res = await Promise.allSettled([
-    abrirPOST(pedido(URL_ABRIR, ck1, { localId: localA.id, montoInicial: 10000 })),
-    abrirPOST(pedido(URL_ABRIR, ck2, { localId: localA.id, montoInicial: 10000 })),
+    abrirPOST(pedido(URL_ABRIR, ck1, { localId: localA.id, turnoOperativoId: TO[localA.id], montoInicial: 10000 })),
+    abrirPOST(pedido(URL_ABRIR, ck2, { localId: localA.id, turnoOperativoId: TO[localA.id], montoInicial: 10000 })),
   ]);
   const cuerpos = await Promise.all(res.map((x) => (x.status === "fulfilled" ? x.value.json() : { ok: false, error: String(x.reason) })));
   const exitosas = cuerpos.filter((c) => c.ok === true).length;
@@ -293,11 +297,11 @@ async function main() {
   chequear("F4 · fondo dejado menor al sugerido queda guardado", money(conFaltante.fondoDejadoCierre) === 7000);
 
   // Apertura con fondo distinto del dejado: exige observación.
-  r = await abrirPOST(pedido(URL_ABRIR, ck1, { localId: localA.id, montoInicial: 5000 }));
+  r = await abrirPOST(pedido(URL_ABRIR, ck1, { localId: localA.id, turnoOperativoId: TO[localA.id], montoInicial: 5000 }));
   d = await r.json();
   chequear("F5 · recibir distinto de lo dejado exige observación", d.ok === false && d.requiereObservacionFondo === true, d.error);
 
-  r = await abrirPOST(pedido(URL_ABRIR, ck1, { localId: localA.id, montoInicial: 5000, observacionFondo: "faltaban 2000 en el sobre" }));
+  r = await abrirPOST(pedido(URL_ABRIR, ck1, { localId: localA.id, turnoOperativoId: TO[localA.id], montoInicial: 5000, observacionFondo: "faltaban 2000 en el sobre" }));
   d = await r.json();
   chequear("F6 · con observación abre y guarda la diferencia", d.ok === true && money(d.turno.diferenciaFondoApertura) === -2000);
   chequear("F7 · el turno arranca con lo RECIBIDO, no con lo sugerido", money(d.turno.montoInicial) === 5000);

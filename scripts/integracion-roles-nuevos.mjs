@@ -8,6 +8,7 @@
 //   node scripts/integracion-roles-nuevos.mjs
 
 import { crearClientePrisma, ESCRITURA } from "./lib/clientePrisma.mjs";
+import { turnoOperativoDePrueba } from "./pruebas-db/fixtureTurnoOperativo.mjs";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { DEFAULT_PERMISOS_SISTEMA, CAJERO, ENCARGADO, DUENO_LOCAL } from "../lib/rbac/systemRoles.js";
@@ -133,6 +134,9 @@ async function seed() {
 
   Object.assign(S, {
     gA: gA.id, gB: gB.id, localA: localA.id, localB: localB.id, depoA: depoA.id,
+    // Desde 20261004200000_turno_operativo abrir caja exige un turno activo del local.
+    toA: await turnoOperativoDePrueba(prisma, localA.id),
+    toB: await turnoOperativoDePrueba(prisma, localB.id),
     rolCajero: rolCajero.id, rolAdmin: rolAdmin.id,
     baseId: base.id, ventaA: ventaA.id,
     userAdmin: { ...adminU, permisos: ["*"] },
@@ -161,7 +165,7 @@ async function main() {
   const ADM = cookieFor(S.userAdmin);
 
   console.log("\n=== CAJERO (POS mínimo, sin admin/costos/config) ===");
-  await check("CAJERO abre turno propio → NO 401/403 (scope+perm OK)", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: CAJ, body: { localId: S.localA, montoInicial: 0 } }), [200, 428, 409, 400], (r) => ![401, 403].includes(r.status));
+  await check("CAJERO abre turno propio → NO 401/403 (scope+perm OK)", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: CAJ, body: { localId: S.localA, turnoOperativoId: S.toA, montoInicial: 0 } }), [200, 428, 409, 400], (r) => ![401, 403].includes(r.status));
   await check("CAJERO NO ve productos (sin productos.ver) → 403", req("GET", `/api/productos/obtener?id=${S.baseId}&localId=${S.localA}`, { cookie: CAJ }), 403);
   await check("CAJERO NO ve reportes de ventas → 403", req("GET", `/api/reportes-ventas/listado?fechaDesde=2020-01-01&fechaHasta=2030-01-01`, { cookie: CAJ }), 403);
   await check("CAJERO NO configura stock del local → 403", req("POST", `/api/config/stock-negativo`, { cookie: CAJ, body: { allowNegativeStock: true } }), 403);
@@ -223,14 +227,14 @@ async function main() {
   });
 
   // CAJERO / ENCARGADO: sin operario → 428 (sigue el flujo normal).
-  await check("CAJERO sin operario abre turno → 428", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: CAJ, body: { localId: S.localA, montoInicial: 0 } }), 428);
-  await check("ENCARGADO sin operario abre turno → 428", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: ENC, body: { localId: S.localA, montoInicial: 0 } }), 428);
+  await check("CAJERO sin operario abre turno → 428", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: CAJ, body: { localId: S.localA, turnoOperativoId: S.toA, montoInicial: 0 } }), 428);
+  await check("ENCARGADO sin operario abre turno → 428", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: ENC, body: { localId: S.localA, turnoOperativoId: S.toA, montoInicial: 0 } }), 428);
 
   // Admin: exención histórica → abre turno sin operario.
-  await check("Admin abre turno sin operario → 200", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: ADM, body: { localId: S.localA, montoInicial: 0 } }), 200);
+  await check("Admin abre turno sin operario → 200", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: ADM, body: { localId: S.localA, turnoOperativoId: S.toA, montoInicial: 0 } }), 200);
 
   // DUEÑO_LOCAL en SU local: bypass → abre turno sin operario.
-  const rDuenoTurno = await check("DUEÑO abre turno en su local sin operario → 200", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: DUE, body: { localId: S.localA, montoInicial: 0 } }), 200);
+  const rDuenoTurno = await check("DUEÑO abre turno en su local sin operario → 200", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: DUE, body: { localId: S.localA, turnoOperativoId: S.toA, montoInicial: 0 } }), 200);
   const turnoDuenoId = rDuenoTurno.json?.turno?.id ?? null;
   const turnoRow = turnoDuenoId ? await prisma.turno.findUnique({ where: { id: turnoDuenoId } }) : null;
   assertOk("Turno del DUEÑO: operadorId === null", !!turnoRow && turnoRow.operadorId === null);
@@ -253,7 +257,7 @@ async function main() {
   await check("DUEÑO cierra turno sin operario → 200", req("POST", `/api/pos-ventas/turnos/cerrar`, { cookie: DUE, body: { turnoId: turnoDuenoId, montoRealEfectivo: 300 } }), 200);
 
   // Scope: DUEÑO A no puede operar en local ajeno ni sin local (el scope corta antes del gate).
-  await check("DUEÑO A abre turno en local AJENO (B) → 403", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: DUE, body: { localId: S.localB, montoInicial: 0 } }), 403);
+  await check("DUEÑO A abre turno en local AJENO (B) → 403", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: DUE, body: { localId: S.localB, turnoOperativoId: S.toB, montoInicial: 0 } }), 403);
   const DUE_SINLOCAL = cookieFor({ id: S.duenoA.id, rolId: S.duenoA.rolId, permisos: S.duenoA.permisos, localId: null, esDuenoLocal: true });
   await check("DUEÑO sin local asignado abre turno → 403", req("POST", `/api/pos-ventas/turnos/abrir`, { cookie: DUE_SINLOCAL, body: { montoInicial: 0 } }), 403);
 
