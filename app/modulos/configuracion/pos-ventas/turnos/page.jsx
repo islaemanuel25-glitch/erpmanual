@@ -21,6 +21,7 @@ import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
+import SunmiCampoHora from "@/components/sunmi/SunmiCampoHora";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SinPermisos from "@/components/auth/SinPermisos";
@@ -164,7 +165,7 @@ export default function ConfigTurnosOperativosPage() {
             const editado = nombres[t.id] !== undefined && nombres[t.id] !== t.nombre;
             const ventana = ventanas[t.id] ?? ventanaDe(t);
             const ventanaEditada = ventanas[t.id] !== undefined && (ventana.inicio !== ventanaDe(t).inicio || ventana.fin !== ventanaDe(t).fin);
-            const cambiarVentana = (campo) => (e) => setVentanas((v) => ({ ...v, [t.id]: { ...ventana, [campo]: e.target.value } }));
+            const cambiarVentana = (campo) => (hora) => setVentanas((v) => ({ ...v, [t.id]: { ...ventana, [campo]: hora } }));
             return (
               <SunmiCard key={t.id} className="flex flex-col gap-3">
                 <div className="flex items-center gap-2">
@@ -183,8 +184,12 @@ export default function ConfigTurnosOperativosPage() {
                 <div className="flex flex-col gap-1">
                   <span className="text-sm2 sunmi-text-muted">Horario de reconocimiento</span>
                   <div className="flex items-center gap-2">
-                    <SunmiInput type="time" aria-label={`Desde, ${t.nombre}`} value={ventana.inicio} onChange={cambiarVentana("inicio")} />
-                    <SunmiInput type="time" aria-label={`Hasta, ${t.nombre}`} value={ventana.fin} onChange={cambiarVentana("fin")} />
+                    <div className="flex-1 min-w-0">
+                      <SunmiCampoHora etiqueta={`Desde, ${t.nombre}`} value={ventana.inicio} onChange={cambiarVentana("inicio")} vaciable />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <SunmiCampoHora etiqueta={`Hasta, ${t.nombre}`} value={ventana.fin} onChange={cambiarVentana("fin")} vaciable />
+                    </div>
                     {ventanaEditada && (
                       <SunmiButton color="primary" disabled={ocupado} onClick={() => guardarVentana(t)}>
                         Guardar
@@ -236,18 +241,20 @@ export default function ConfigTurnosOperativosPage() {
             </div>
             <span className="text-sm2 sunmi-text-muted">Horario de reconocimiento: obligatorio, el turno nace activo</span>
             <div className="flex items-center gap-2">
-              <SunmiInput
-                type="time"
-                aria-label="Desde, turno nuevo"
-                value={nuevaVentana.inicio}
-                onChange={(e) => setNuevaVentana((v) => ({ ...v, inicio: e.target.value }))}
-              />
-              <SunmiInput
-                type="time"
-                aria-label="Hasta, turno nuevo"
-                value={nuevaVentana.fin}
-                onChange={(e) => setNuevaVentana((v) => ({ ...v, fin: e.target.value }))}
-              />
+              <div className="flex-1 min-w-0">
+                <SunmiCampoHora
+                  etiqueta="Desde, turno nuevo"
+                  value={nuevaVentana.inicio}
+                  onChange={(inicio) => setNuevaVentana((v) => ({ ...v, inicio }))}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <SunmiCampoHora
+                  etiqueta="Hasta, turno nuevo"
+                  value={nuevaVentana.fin}
+                  onChange={(fin) => setNuevaVentana((v) => ({ ...v, fin }))}
+                />
+              </div>
             </div>
           </SunmiCard>
 
