@@ -4,9 +4,10 @@
 // cada uno con su ventana de reconocimiento opcional.
 //
 //   GET  — el catálogo del local del alcance. Lo lee la configuración y lo lee
-//          la apertura de caja: con `?activos=1` devuelve solo los activos,
-//          el turno que propone la hora del servidor y la fecha operativa que
-//          tendría la caja con cada uno.
+//          la apertura de caja: con `?activos=1` devuelve solo los turnos que
+//          se pueden abrir a esta hora según el ciclo del local, con la fecha
+//          operativa de cada uno, el que propone la ventana y, si el ciclo no
+//          se puede resolver, el `bloqueo` con lo que falta configurar.
 //   POST — da de alta un turno, con o sin ventana. `config_local.pos`.
 //   PUT  — reordena: `{ orden: [id, id, …] }`. `config_local.pos`.
 //
@@ -53,8 +54,8 @@ export async function GET(req) {
     // Para abrir caja: la propuesta la hace el servidor, con su hora, y no la
     // pantalla con la del celular. La apertura vuelve a validar y a calcular.
     if (new URL(req.url).searchParams.get("activos") === "1") {
-      const { turnos, reconocimiento } = await reconocimientoDeApertura(prisma, { localId: scope.localId });
-      return NextResponse.json({ ok: true, localId: scope.localId, turnos, reconocimiento });
+      const { turnos, reconocimiento, bloqueo } = await reconocimientoDeApertura(prisma, { localId: scope.localId });
+      return NextResponse.json({ ok: true, localId: scope.localId, turnos, reconocimiento, bloqueo });
     }
     const turnos = await turnosOperativosDelLocal(prisma, scope.localId);
     return NextResponse.json({ ok: true, localId: scope.localId, turnos });

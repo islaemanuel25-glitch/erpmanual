@@ -6,9 +6,9 @@
 // lo mandan en el pedido como lo manda la pantalla.
 //
 // Uno solo por armado, a propósito: está acá para que no haya treinta copias
-// de "crear un turno Mañana" que se rompan distinto el día que el catálogo
-// cambie. Las pruebas de turno operativo —las que necesitan Mañana Y Tarde,
-// o uno inactivo— arman los suyos a mano, porque eso es lo que prueban.
+// de "crear un turno" que se rompan distinto el día que el catálogo cambie.
+// Las pruebas de turno operativo —las del ciclo, las ventanas, un inactivo—
+// arman los suyos a mano, porque eso es lo que prueban.
 //
 // SOLO INFRAESTRUCTURA DE PRUEBA: recibe el cliente, no lo crea, y no entra a
 // `prisma/seed.js`. La FK del catálogo a `Local` es ON DELETE CASCADE, así que
@@ -31,8 +31,20 @@ export function turnoOperativoDeSesion(prisma, quien) {
   return turnoOperativoDePrueba(prisma, localId);
 }
 
+// EL CICLO DE PRUEBA. Desde que la apertura valida el ciclo del local, un
+// turno suelto no alcanza: sin ventana el ciclo no se puede ubicar, y uno solo
+// fuera de su ventana es ambiguo. Se arman DOS turnos con la MISMA ventana de
+// casi todo el día: los dos empiezan a las 00:00, así que los dos son siempre
+// la ocurrencia actual, con la fecha de hoy, a cualquier hora en que corra la
+// prueba. Las que prueban el ciclo arman el suyo a mano.
+const CICLO_DE_PRUEBA = [
+  { nombre: "Mañana", orden: 0 },
+  { nombre: "Tarde", orden: 1 },
+].map((t) => ({ ...t, horaInicioReconocimiento: "00:00", horaFinReconocimiento: "23:59" }));
+
 /**
- * El id de un turno operativo activo del local —"Mañana"—, creado si no hay.
+ * El id de un turno operativo activo del local, con el ciclo de prueba armado
+ * si el local no tiene turnos.
  * @returns {Promise<number>}
  */
 export async function turnoOperativoDePrueba(prisma, localId) {
@@ -44,14 +56,18 @@ export async function turnoOperativoDePrueba(prisma, localId) {
     orderBy: [{ orden: "asc" }, { id: "asc" }],
     select: { id: true },
   });
-  const id =
-    existente?.id ??
-    (await prisma.turnoOperativo.upsert({
-      where: { localId_nombre: { localId, nombre: "Mañana" } },
-      update: { activo: true },
-      create: { localId, nombre: "Mañana", orden: 0 },
-      select: { id: true },
-    })).id;
+  let id = existente?.id;
+  if (id == null) {
+    for (const t of CICLO_DE_PRUEBA) {
+      const fila = await prisma.turnoOperativo.upsert({
+        where: { localId_nombre: { localId, nombre: t.nombre } },
+        update: { activo: true, horaInicioReconocimiento: t.horaInicioReconocimiento, horaFinReconocimiento: t.horaFinReconocimiento },
+        create: { localId, ...t },
+        select: { id: true },
+      });
+      id ??= fila.id;
+    }
+  }
   cache.set(localId, id);
   return id;
 }

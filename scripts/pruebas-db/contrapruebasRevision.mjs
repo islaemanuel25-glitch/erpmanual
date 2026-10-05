@@ -1128,23 +1128,73 @@ const CASOS = [
   },
   {
     n: "TO-H8",
-    defecto: "una ventana que cruza la medianoche deja la jornada en el día de la apertura",
+    defecto: "una ventana que cruza la medianoche deja la jornada en el día en que empieza",
     archivo: "lib/caja/turnoOperativo.js",
     suite: "scripts/pruebas-db/turnoOperativo.mjs",
     minimo: 30,
-    inyecciones: [{ de: "    return minuto >= v.inicio ? sumarDias(fecha, 1) : fecha;", a: "    return fecha;" }],
-    esperadas: ["[TO-H8] domingo 23:30 + ventana 23→01: jornada del LUNES"],
+    inyecciones: [{ de: "  return v.inicio > v.fin ? sumarDias(dia, 1) : dia;", a: "  return dia;" }],
+    esperadas: ["[TO-C1] domingo 23:30 + turno 23→01: jornada del LUNES", "[TO-C4] lunes 22:00: el siguiente del ciclo es el que cruza, del MARTES"],
   },
   {
     n: "TO-H10",
-    defecto: "la apertura guarda el día de hoy sin mirar el turno final elegido",
+    defecto: "la apertura guarda el día de hoy sin validar el turno final contra el ciclo",
     archivo: "lib/caja/turnoOperativoServer.js",
     suite: "scripts/pruebas-db/turnoOperativo.mjs",
     minimo: 30,
-    inyecciones: [{ de: "  const fecha = fechaOperativaDeTurno(turno, momentoArgentina(ahora));", a: "  const fecha = momentoArgentina(ahora).fecha;" }],
-    // Solo la de antes de medianoche: a las 00:30 "hoy" ya es el lunes y el
-    // defecto no se ve. El día que no es el de hoy es el que lo delata.
-    esperadas: ["[TO-H8] domingo 23:30 + ventana 23→01: jornada del LUNES"],
+    inyecciones: [{
+      de: "  const ocurrencia = ocurrenciaDeApertura(activos, turno.id, momentoArgentina(ahora));",
+      a: "  const ocurrencia = { valido: true, fechaOperativa: momentoArgentina(ahora).fecha };",
+    }],
+    esperadas: ["[TO-C4] lunes 22:00: el siguiente del ciclo es el que cruza, del MARTES", "[TO-C5][TO-C8] lunes 22:00: el de la mañana, ya pasado y a dos pasos, se rechaza"],
+  },
+  // ── EL CICLO DE TURNOS ──────────────────────────────────────────────────
+  {
+    n: "TO-C5",
+    defecto: "la apertura deja saltar a un turno lejano del ciclo",
+    archivo: "lib/caja/turnoOperativo.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "    if (d.inicio === masReciente || d.enVentana) {", a: "    if (true) {" }],
+    esperadas: [
+      "[TO-C5][TO-C8] lunes 22:00: el de la mañana, ya pasado y a dos pasos, se rechaza",
+      "[TO-C9] la pantalla recibe el actual y el próximo, y no el pasado",
+      "[TO-C8] abrir por la ruta con el turno pasado: 409, aunque esté activo y sea del local",
+    ],
+  },
+  {
+    n: "TO-C11",
+    defecto: "vuelve la fecha por el extremo horario más cercano para un turno fuera del ciclo",
+    archivo: "lib/caja/turnoOperativo.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    // Las dos mitades del defecto viejo: el turno fuera del ciclo se acepta, y
+    // su fecha sale de qué extremo de la ventana está más cerca.
+    inyecciones: [
+      {
+        de: "const enElDia = (x) => ((x % MINUTOS_DEL_DIA) + MINUTOS_DEL_DIA) % MINUTOS_DEL_DIA;",
+        a: "const enElDia = (x) => ((x % MINUTOS_DEL_DIA) + MINUTOS_DEL_DIA) % MINUTOS_DEL_DIA;\nconst cercano = (ts, id, { fecha, minuto }) => { const t = (ts || []).find((x) => x.id === id); const v = t && ventanaDe(t); if (!v) return null; const mitad = (v.fin + v.inicio) / 2; return { id, nombre: t.nombre, fechaOperativa: v.inicio > v.fin && minuto >= mitad ? sumarDias(fecha, 1) : fecha }; };",
+      },
+      {
+        de: "  const opcion = ciclo.opciones.find((o) => o.id === turnoId);",
+        a: "  const opcion = ciclo.opciones.find((o) => o.id === turnoId) ?? cercano(turnos, turnoId, momento);",
+      },
+    ],
+    esperadas: [
+      "[TO-C5][TO-C8] lunes 22:00: el de la mañana, ya pasado y a dos pasos, se rechaza",
+      "[TO-C8] abrir por la ruta con el turno pasado: 409, aunque esté activo y sea del local",
+    ],
+  },
+  {
+    n: "TO-C13",
+    defecto: "el ciclo ignora el orden configurado y sigue el horario",
+    archivo: "lib/caja/turnoOperativo.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{
+      de: "    .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0) || a.id - b.id);",
+      a: "    .sort((a, b) => (minutosDeHora(a.horaInicioReconocimiento) ?? 0) - (minutosDeHora(b.horaInicioReconocimiento) ?? 0) || a.id - b.id);",
+    }],
+    esperadas: ["[TO-C13] con otro orden, a las 22:00 el siguiente es el de la mañana del martes"],
   },
   // ── EL CONTRATO DE LA PANTALLA MÓVIL (PR #138) ───────────────────────────
   //

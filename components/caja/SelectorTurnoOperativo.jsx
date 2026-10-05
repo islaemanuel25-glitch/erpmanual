@@ -4,17 +4,19 @@
 //
 // EL TURNO OPERATIVO AL ABRIR LA CAJA.
 //
-// El servidor manda los turnos ACTIVOS del local y lo que reconoce la hora
-// contra las ventanas que configuró el local (`reconocimiento`):
+// El servidor manda SOLO los turnos que se pueden abrir a esta hora según el
+// ciclo del local —la ocurrencia actual y la siguiente—, y lo que reconoce la
+// hora contra las ventanas (`reconocimiento`):
 //
 //   · UNICO   → el turno queda propuesto, sin pregunta extra, con la acción
 //               «Cambiar turno» a la vista;
-//   · NINGUNO → se pregunta, sin adivinar ni elegir el más cercano;
+//   · NINGUNO → se pregunta entre las opciones, sin adivinar;
 //   · VARIOS  → se pregunta, diciendo cuáles coinciden, sin elegir ninguno.
 //
-// Esta pieza no conoce nombres ni horarios: todo viene del catálogo. Y no
-// calcula la fecha operativa: la muestra como la mandó el servidor para cada
-// turno, y la apertura la vuelve a calcular con el turno FINAL.
+// Si el ciclo no se puede resolver (`bloqueo`), se dice qué falta configurar
+// y no se ofrece nada. Esta pieza no conoce nombres ni horarios, no filtra
+// turnos ni calcula fechas: muestra lo que mandó el servidor, que vuelve a
+// validar y calcular todo con el turno FINAL.
 
 import { useEffect, useState } from "react";
 
@@ -36,9 +38,11 @@ export function opcionesDeTurnos(turnos = []) {
  * no hay turno hasta que la persona elige.
  */
 export function turnoFinalDeApertura(elegidoId, catalogo) {
+  if (catalogo?.bloqueo) return null;
   if (elegidoId != null) return elegidoId;
   const r = catalogo?.reconocimiento;
-  return r?.estado === RECONOCIMIENTO.UNICO ? r.sugeridoId : null;
+  const ofrecido = (catalogo?.turnos || []).some((t) => t.id === r?.sugeridoId);
+  return r?.estado === RECONOCIMIENTO.UNICO && ofrecido ? r.sugeridoId : null;
 }
 
 /** "2026-10-05" → "05/10/2026". */
@@ -47,9 +51,9 @@ export function fechaOperativaLegible(iso) {
   return a && m && d ? `${d}/${m}/${a}` : "";
 }
 
-/** Los turnos activos del local, con el reconocimiento que hizo el servidor. */
+/** Los turnos que se pueden abrir ahora, con el reconocimiento que hizo el servidor. */
 export function useTurnosOperativosActivos() {
-  const [estado, setEstado] = useState({ cargando: true, turnos: [], reconocimiento: null, error: "" });
+  const [estado, setEstado] = useState({ cargando: true, turnos: [], reconocimiento: null, bloqueo: null, error: "" });
   useEffect(() => {
     let vivo = true;
     fetch("/api/config/turnos-operativos?activos=1", { credentials: "include", cache: "no-store" })
@@ -57,15 +61,21 @@ export function useTurnosOperativosActivos() {
       .then(({ r, json }) => {
         if (!vivo) return;
         if (!r.ok || !json?.ok) {
-          setEstado({ cargando: false, turnos: [], reconocimiento: null, error: json?.error || "No se pudieron leer los turnos del local." });
+          setEstado({ cargando: false, turnos: [], reconocimiento: null, bloqueo: null, error: json?.error || "No se pudieron leer los turnos del local." });
           return;
         }
-        setEstado({ cargando: false, turnos: json.turnos || [], reconocimiento: json.reconocimiento ?? null, error: "" });
+        setEstado({
+          cargando: false,
+          turnos: json.turnos || [],
+          reconocimiento: json.reconocimiento ?? null,
+          bloqueo: json.bloqueo ?? null,
+          error: "",
+        });
       })
       .catch(
         () =>
           vivo &&
-          setEstado({ cargando: false, turnos: [], reconocimiento: null, error: "Sin conexión: no se pudieron leer los turnos del local." })
+          setEstado({ cargando: false, turnos: [], reconocimiento: null, bloqueo: null, error: "Sin conexión: no se pudieron leer los turnos del local." })
       );
     return () => {
       vivo = false;
@@ -82,9 +92,16 @@ export function useTurnosOperativosActivos() {
  */
 export default function SelectorTurnoOperativo({ valor, onCambiar, catalogo }) {
   const [cambiando, setCambiando] = useState(false);
-  const { cargando, turnos, reconocimiento, error } = catalogo;
+  const { cargando, turnos, reconocimiento, bloqueo, error } = catalogo;
   if (cargando) return <SunmiLoader />;
   if (error) return <SunmiAviso tono="danger">{error}</SunmiAviso>;
+  if (bloqueo) {
+    return (
+      <SunmiAviso tono="warning" titulo="No se puede saber qué turno abrir">
+        {bloqueo.error}
+      </SunmiAviso>
+    );
+  }
   const opciones = opcionesDeTurnos(turnos);
   if (!opciones.length) {
     return (

@@ -135,10 +135,12 @@ export default function ConfigTurnosOperativosPage() {
       ) : (
         <div className="flex flex-col gap-4">
           <SunmiAviso titulo="Cómo se usan">
-            Al abrir una caja, si la hora cae en el horario de reconocimiento de un solo turno, se propone ese turno y se
-            puede cambiar. Si no cae en ninguno, o cae en más de uno, se pregunta. El horario no es la duración del turno
-            ni impide elegir otro. Tesorería recibe y verifica el efectivo de cada turno por separado. Un turno
-            desactivado deja de ofrecerse al abrir caja y las cajas que ya lo usaron lo conservan.
+            El orden de la lista es el ciclo del local: después del último turno viene el primero. El horario de
+            reconocimiento dice dónde empieza cada turno en el día; no es su duración. Al abrir una caja se puede elegir el
+            turno que está en curso —aunque se haya extendido— o el que sigue en el ciclo, y la fecha operativa sale de
+            esa ocurrencia. Si la hora cae en el horario de un solo turno, se propone ese y se puede cambiar. Para abrir
+            caja, cada turno activo necesita su horario. Un turno desactivado deja de ofrecerse y las cajas que ya lo
+            usaron lo conservan.
           </SunmiAviso>
 
           {turnos.length === 0 && (
