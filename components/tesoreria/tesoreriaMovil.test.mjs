@@ -30,7 +30,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import PantallaTesoreria from "@/components/tesoreria/PantallaTesoreria.jsx";
+import PantallaTesoreria, { SinTurnoConCajas, TurnoConCajas } from "@/components/tesoreria/PantallaTesoreria.jsx";
 import { PasoContar, PasoConfirmar } from "@/components/tesoreria/HojaVerificarEfectivo.jsx";
 import { ContenidoAnular } from "@/components/tesoreria/HojaAnularVerificacion.jsx";
 import { enviarAnulacion, enviarVerificacion, ERROR_SIN_RESPUESTA, URL_VERIFICACIONES } from "@/components/tesoreria/accionesTesoreria.js";
@@ -42,6 +42,7 @@ import { descripcionFinanciera } from "@/lib/finanzas/periodoFinanciero";
 import { parseContextoTesoreria, consultaDeTesoreria, urlDeLocalTesoreria } from "@/lib/tesoreria/contextoTesoreria";
 import {
   ESTADO_TESORERIA,
+  INSIGNIA_TESORERIA,
   claveParaEnvio,
   cuerpoDeVerificacion,
   leerImporteContado,
@@ -293,45 +294,57 @@ test("[8] el local lo decide el servidor: el depósito entra por ruta con destin
 
 // ── 9-15 · LO QUE MUESTRA EL RESUMEN ─────────────────────────────────────
 
-test("[9][45] la base conocida y los totales son los del servidor, tal cual: no se recalculan", () => {
+test("[9][45] los totales de COBRADO POR POS y EFECTIVO ENTREGADO son los del servidor, tal cual: no se recalculan", () => {
+  // Desde el rediseño móvil (Figma EVJ2KvVCrY0oVSowfboymQ) la pantalla ya no
+  // dibuja la "Base conocida": la jerarquía es COBRADO POR POS → EFECTIVO
+  // ENTREGADO → por turno. Lo que este candado defiende sigue igual: cada
+  // número es el del servidor, sin una cuenta del cliente en el medio.
   const d = datos(ESC.pendiente());
   // Centinelas que ninguna cuenta del cliente podría producir.
   Object.assign(d.tesoreria.resumen, {
-    baseConocida: 123457.89, efectivoDeclaradoEntregado: 7777.77, digitalCobradoDeclarado: 6666.66, egresosExterioresConocidos: 5555.55,
+    cobradoPorPosDeclarado: 123457.89, efectivoCobradoDeclarado: 8888.88, digitalCobradoDeclarado: 6666.66, efectivoDeclaradoEntregado: 7777.77,
   });
+  Object.assign(d.tesoreria.resumen.verificacion, { efectivoVerificado: 4444.44, entregadoPendienteDeVerificar: 3333.33 });
   const t = texto(pantalla(d));
-  assert.match(t, /BASE CONOCIDA DE TESORERÍA \$123\.457,89/);
-  assert.match(t, /Efectivo entregado \$7\.777,77 \+ cobrado por POS \$6\.666,66 − egresos exteriores \$5\.555,55/);
-  assert.match(t, /No es saldo bancario/);
+  assert.match(t, /COBRADO POR POS \$123\.457,89 En efectivo \$8\.888,88 Digital \$6\.666,66/);
+  assert.match(t, /EFECTIVO ENTREGADO \$7\.777,77 Verificado \$4\.444,44 Falta verificar \$3\.333,33/);
   assert.doesNotMatch(t, /\bsaldo disponible|patrimonio|caja fuerte/i);
+  for (const f of ["PantallaTesoreria.jsx", "PiezasTesoreria.jsx"]) {
+    assert.doesNotMatch(fuente(`components/tesoreria/${f}`), /cobradoPorPosDeclarado\s*[-+*]|efectivoDeclaradoEntregado\s*[-+*]|digitalCobradoDeclarado\s*[-+*]/, f);
+  }
 });
 
-test("[10] pendiente: insignia Pendiente, «Parcial» en la base con lo que falta contar, y el botón", () => {
+test("[10] pendiente: insignia «Sin verificar», lo que falta contar y el botón", () => {
   const t = texto(pantalla(datos(ESC.pendiente())));
-  assert.match(t, /Parcial \$110\.000,00 del efectivo sin verificar/);
-  assert.match(t, /Pendiente Cobrado declarado/);
-  assert.match(t, /Verificar efectivo/);
+  assert.match(t, /EFECTIVO ENTREGADO \$110\.000,00 Verificado \$0,00 Falta verificar \$110\.000,00/);
+  assert.match(t, /Mañana 2 cajas Sin verificar \$110\.000,00 Efectivo entregado Verificado \$0,00 Falta \$110\.000,00 Verificar efectivo/);
+  assert.doesNotMatch(t, /\bPendiente\b/, "el estado interno PENDIENTE se lee «Sin verificar»");
 });
 
-test("[11] correcto: diferencia de Tesorería $0 y quién contó", () => {
+test("[11] correcto: insignia «Verificado», sin renglón de diferencia vacío", () => {
   const t = texto(pantalla(datos(ESC.correcto())));
-  assert.match(t, /Correcto Cobrado declarado/);
-  assert.match(t, /Diferencia Tesorería \$0,00/);
-  assert.match(t, /Contó: Laura Ruiz/);
-  assert.match(t, /Todo el efectivo declarado está verificado/);
+  assert.match(t, /Mañana 2 cajas Verificado \$110\.000,00 Efectivo entregado Verificado \$110\.000,00 Falta \$0,00/);
+  assert.doesNotMatch(t, /\bCorrecto\b/);
+  assert.doesNotMatch(t, /Diferencia/, "con $0 de diferencia no se dibuja el renglón");
+  assert.equal(botonDe(pantalla(datos(ESC.correcto())), "Verificar efectivo"), null, "ya está todo verificado");
+  assert.match(t, /Ver verificación/);
 });
 
-test("[12] con diferencia: −$2.000, del acto entero", () => {
+test("[12] con diferencia: −$2.000 · Falta, del acto entero, en el turno y en el efectivo entregado", () => {
   const t = texto(pantalla(datos(ESC.diferencia())));
   assert.match(t, /Con diferencia/);
-  assert.match(t, /Diferencia Tesorería −\$2\.000,00 verificado − declarado/);
+  assert.match(t, /EFECTIVO ENTREGADO \$110\.000,00 Verificado \$108\.000,00 Falta verificar \$0,00 Diferencia −\$2\.000,00 · Falta/);
+  assert.match(t, /Falta \$0,00 Diferencia −\$2\.000,00 · Falta/);
+  // Sobra se dice con su palabra, no solo con el color.
+  const sobra = ESC.correcto();
+  sobra.verificaciones = [acto(9, [{ id: 11, monto: 50000, turnoId: 1, clase: "RECAUDACION", instante: MAÑANA }, { id: 12, monto: 50000, turnoId: 1 }, { id: 21, monto: 10000, turnoId: 2 }], { importeVerificado: 110500 })];
+  assert.match(texto(pantalla(datos(sobra))), /Diferencia \+\$500,00 · Sobra/);
 });
 
-test("[13][36] parcial: «Verificar lo pendiente» con SOLO las entregas pendientes", () => {
+test("[13][36] parcial: «Verificar efectivo» con SOLO las entregas pendientes", () => {
   const d = datos(ESC.parcial());
   const t = texto(pantalla(d));
-  assert.match(t, /Parcial/);
-  assert.match(t, /Verificar lo pendiente · \$10\.000,00/);
+  assert.match(t, /Parcial \$110\.000,00 Efectivo entregado Verificado \$100\.000,00 Falta \$10\.000,00 Verificar efectivo/);
   const g = lecturaDelGrupo(d.tesoreria, grupoDe(d));
   assert.deepEqual(g.pendientes.map((e) => e.cajaMovimientoId), [21]);
   assert.deepEqual(g.pendientes.map((e) => e.estadoVerificacion), ["PENDIENTE"]);
@@ -339,10 +352,9 @@ test("[13][36] parcial: «Verificar lo pendiente» con SOLO las entregas pendien
   assert.match(fuente("components/tesoreria/TableroTesoreria.jsx"), /setVerificando\(\{ entregas: g\.pendientes,/);
 });
 
-test("[13b] con más de dos cajas pendientes se dice cuántas son, no se listan los nombres", () => {
-  // En el navegador, un turno de 14 cajas listaba diez nombres en «falta contar
-  // el efectivo de…». Con más de dos, la tarjeta dice cuántas; los nombres
-  // quedan en el detalle del turno.
+test("[13b] la tarjeta del turno cerrada no lista los nombres de sus cajas: dice cuántas", () => {
+  // En el navegador, un turno de 14 cajas listaba diez nombres. La tarjeta dice
+  // cuántas son; los nombres aparecen al abrir «Ver cajas».
   const cierre = (id, turnoId, monto) => mov(id, turnoId, CLASE_MOVIMIENTO.CIERRE, monto);
   const d = datos(base({
     cajas: [caja(1), caja(2), caja(3), caja(4), caja(5)],
@@ -351,13 +363,9 @@ test("[13b] con más de dos cajas pendientes se dice cuántas son, no se listan 
     verificaciones: [acto(9, [{ id: 12, monto: 50000, turnoId: 1 }], { importeVerificado: 50000 })],
   }));
   const t = texto(pantalla(d));
-  assert.match(t, /Parcial/);
-  assert.match(t, /Pendiente de verificar 4 cajas · 4 entregas/);
-  assert.match(t, /falta contar el efectivo de 4 cajas\./);
-  assert.doesNotMatch(t, /falta contar el efectivo de Caja/, "volvió a listar los nombres de las cajas");
-  // Con una o dos, los nombres sí entran.
-  const dos = texto(pantalla(datos(ESC.parcial())));
-  assert.match(dos, /falta contar el efectivo de Caja/);
+  assert.match(t, /Mañana 5 cajas Parcial/);
+  assert.match(t, /Ver cajas \(5\)/);
+  assert.doesNotMatch(t, /\bAna\b|\bPedro\b|Caja #/, "la tarjeta cerrada volvió a nombrar las cajas");
 });
 
 test("[14] requiere revisión: aviso, insignia y entrada al detalle; nada se recalcula", () => {
@@ -366,7 +374,8 @@ test("[14] requiere revisión: aviso, insignia y entrada al detalle; nada se rec
   assert.match(t, /Una verificación requiere revisión/);
   assert.match(t, /Ver verificación #9/);
   assert.match(t, /Requiere revisión/);
-  assert.match(t, /Declarado al verificar Foto histórica, no se recalcula \$10\.000,00/);
+  assert.match(t, /Una entrega cambió después de verificarla\. Lo verificado no se recalculó\./);
+  assert.ok(botonDe(pantalla(d), "Revisar verificación"));
   const det = texto(pantalla(d, { vista: "verificacion", verificacion: 9 }));
   assert.match(det, /cambió después de verificar/);
 });
@@ -375,7 +384,10 @@ test("[15] sin importe declarado: se dice, nunca «$0»", () => {
   const d = datos(ESC.sinImporte());
   const t = texto(pantalla(d));
   assert.match(t, /Sin importe declarado/);
-  assert.match(t, /cerró sin conteo: no hay importe declarado. No se toma como \$0/);
+  assert.match(t, /cerró sin conteo: no hay importe para verificar/);
+  const turno = texto(pantalla(d, { vista: "turno", grupo: grupoDe(d) }));
+  assert.match(turno, /Carla Sin importe declarado Caja #3 · 08:02 a 14:10/);
+  assert.doesNotMatch(turno, /Carla \$0/);
   const det = texto(pantalla(d, { vista: "caja", caja: 3 }));
   assert.match(det, /EFECTIVO ENTREGADO Sin importe declarado/);
   assert.doesNotMatch(det, /EFECTIVO ENTREGADO \$0/);
@@ -383,15 +395,13 @@ test("[15] sin importe declarado: se dice, nunca «$0»", () => {
 
 // ── 16-21 · TURNO Y CAJA ─────────────────────────────────────────────────
 
-test("[16] detalle de turno: cajas del turno con su etiqueta real, sin «Caja 1»", () => {
+test("[16] detalle de turno: la misma tarjeta con sus cajas, cada una con su operador real y su caja, sin «Caja 1»", () => {
   const d = datos(ESC.pendiente());
   const t = texto(pantalla(d, { vista: "turno", grupo: grupoDe(d) }));
-  // Cobrado declarado = efectivo entregado (110.000) + digital del POS (10.000).
-  assert.match(t, /COBRADO DECLARADO DEL TURNO \$120\.000,00/);
-  assert.match(t, /Nadie contó todavía este efectivo/);
-  assert.match(t, /CAJAS DEL TURNO/);
-  assert.match(t, /Caja de Ana/);
-  assert.match(t, /Caja de Pedro/);
+  assert.match(t, /\$110\.000,00 Efectivo entregado/);
+  assert.doesNotMatch(t, /COBRADO DECLARADO|Cobrado declarado/);
+  assert.match(t, /CAJAS DEL TURNO Ana \$100\.000,00 Caja #1 · 08:02 a 14:10/);
+  assert.match(t, /Pedro \$10\.000,00 Caja #2 · 08:02 a 14:10/);
   assert.doesNotMatch(t, /Caja \d/);
 });
 
@@ -405,26 +415,30 @@ test("[17][18] detalle de caja: retiro y cierre UNA vez cada uno, total sin dupl
   assert.match(t, /Operador Ana/);
   // El enlace vuelve al TURNO de la caja, por su nombre del catálogo.
   assert.match(t, /Ir a Mañana/);
-  // En la tarjeta del turno, la misma composición, una vez.
+  // En las cajas del turno, el retiro y el cierre de Ana, juntos y una vez.
   const turno = texto(pantalla(d, { vista: "turno", grupo: grupoDe(d) }));
-  assert.match(turno, /Efectivo entregado Retiro \$50\.000,00 \+ cierre \$50\.000,00 \$100\.000,00/);
+  assert.match(turno, /Ana \$100\.000,00/);
+  assert.doesNotMatch(turno, /\$200\.000/);
 });
 
-test("[19] las diferencias de caja no se compensan: cada una con su signo y ninguna suma de turno", () => {
+test("[19] las diferencias de caja no se compensan: cada una «Diferencia de caja» con su signo y su palabra, y ninguna suma", () => {
   const d = datos(ESC.pendiente());
   const t = texto(pantalla(d, { vista: "turno", grupo: grupoDe(d) }));
-  assert.match(t, /Diferencia de caja Del arqueo de esta caja −\$5\.000,00/);
-  assert.match(t, /Diferencia de caja Del arqueo de esta caja \+\$5\.000,00/);
-  assert.doesNotMatch(t, /Diferencia del turno/i);
-  assert.match(t, /no se compensan/);
+  assert.match(t, /Ana \$100\.000,00 Caja #1 · 08:02 a 14:10 Diferencia de caja −\$5\.000,00 · Falta/);
+  assert.match(t, /Pedro \$10\.000,00 Caja #2 · 08:02 a 14:10 Diferencia de caja \+\$5\.000,00 · Sobra/);
+  // −5.000 y +5.000 no dan un turno "sin diferencia": no hay total de
+  // diferencias de caja, y la diferencia del turno —de Tesorería— no aparece
+  // porque nadie contó todavía.
+  assert.doesNotMatch(t, /Diferencia del turno|Total diferencias|Diferencia −|Diferencia \+|Diferencia \$/i);
+  assert.equal((t.match(/Diferencia de caja/g) || []).length, 2);
 });
 
 test("[20][21] los pagos desde caja se informan como incluidos y NO restan", () => {
   const d = datos(ESC.pendiente());
   const t = texto(pantalla(d));
   assert.match(t, /Pagado desde cajas \$20\.000,00 no resta/);
-  // La resta de la base es la de los exteriores: 30.000 + 12.000, sin los 20.000 de la caja.
-  assert.match(t, /− egresos exteriores \$42\.000,00/);
+  // Lo que sale por fuera son los exteriores: 30.000 + 12.000, sin los 20.000 de la caja.
+  assert.match(t, /Total egresos exteriores −\$42\.000,00/);
   assert.equal(d.tesoreria.resumen.baseConocida, 110000 + 10000 - 42000);
   const det = texto(pantalla(d, { vista: "caja", caja: 1 }));
   assert.match(det, /PAGOS HECHOS DESDE ESTA CAJA Panadería La Espiga Pago a proveedor · Efectivo · 14:10 \$20\.000,00 ya incluido/);
@@ -449,15 +463,13 @@ test("[22][23] egresos exteriores con el proveedor y el gasto reales; lo que vin
   assert.doesNotMatch(t2, /null|undefined/);
 });
 
-test("[24][25] lo digital es «cobrado por POS», con comisión y neto ESTIMADOS; nunca acreditado ni conciliado", () => {
+test("[24][25] lo digital va en «COBRADO POR POS», por medio; nunca acreditado ni conciliado", () => {
   const t = texto(pantalla(datos(ESC.pendiente())));
-  // En el orden canónico de medios (`ORDEN_MEDIO`): crédito antes que Mercado Pago.
-  assert.match(t, /COBRADO POR POS Crédito Comisión est\. \$200,00 · neto est\. \$4\.800,00 \$5\.000,00/);
-  assert.match(t, /Mercado Pago Comisión est\. \$200,00 · neto est\. \$4\.800,00 \$5\.000,00/);
-  assert.match(t, /Total cobrado por POS \$10\.000,00/);
-  // La única aparición de esas palabras es la aclaración que las niega.
-  const sinAclaracion = t.replace("Todavía no es dinero acreditado ni conciliado con Mercado Pago o el banco.", "");
-  assert.doesNotMatch(sinAclaracion, /acreditad|conciliad|saldo (de )?Mercado Pago|saldo banco/i);
+  // Total = efectivo vendido (101.000 + 10.000) + digital (5.000 + 5.000), del
+  // servidor. En el orden canónico de medios (`ORDEN_MEDIO`): crédito antes
+  // que Mercado Pago.
+  assert.match(t, /COBRADO POR POS \$121\.000,00 En efectivo \$111\.000,00 Digital \$10\.000,00 Crédito \$5\.000,00 Mercado Pago \$5\.000,00/);
+  assert.doesNotMatch(t, /acreditad|conciliad|saldo (de )?Mercado Pago|saldo banco/i);
 });
 
 // ── 26-35 · VERIFICAR EFECTIVO ───────────────────────────────────────────
@@ -487,7 +499,9 @@ test("[29][30] Correcto prepara diferencia 0; otro importe la muestra ANTES de c
   const paso = (centavos, txt) =>
     texto(renderToStaticMarkup(React.createElement(PasoConfirmar, { entregas: pendientesDe(d), cajas: d.tesoreria.cajas, texto: txt, contadoCentavos: centavos, observacion: "", onObservacion: nada, onConfirmar: nada, onCambiarImporte: nada })));
   const ok = paso(11000000, "110.000,00");
-  assert.match(ok, /ANTES DE CONFIRMAR Correcto Declarado \$110\.000,00 Contado \$110\.000,00 Diferencia Tesorería \$0,00/);
+  // La insignia CORRECTO se lee «Verificado» desde el rediseño: un solo juego
+  // de textos para el mismo estado.
+  assert.match(ok, /ANTES DE CONFIRMAR Verificado Declarado \$110\.000,00 Contado \$110\.000,00 Diferencia Tesorería \$0,00/);
   const dif = paso(10800000, "108.000");
   assert.match(dif, /ANTES DE CONFIRMAR Con diferencia Declarado \$110\.000,00 Contado \$108\.000,00 Diferencia Tesorería −\$2\.000,00 contado − declarado/);
   assert.match(dif, /No cambia la diferencia de ninguna caja/);
@@ -718,7 +732,7 @@ test("[44] un acto que cruza el período va aparte, entero, y no suma a lo verif
   const t = texto(pantalla(d));
   assert.match(t, /VERIFICACIONES QUE CRUZAN ESTE PERÍODO Verificación #9 1 de 2 entregas en este período · 1 caja −\$100,00 diferencia del acto entero/);
   assert.equal(d.tesoreria.resumen.verificacion.efectivoVerificado, 0);
-  assert.match(t, /Verificado Contado por el responsable \$0,00/);
+  assert.match(t, /EFECTIVO ENTREGADO \$110\.000,00 Verificado \$0,00/);
 });
 
 // ── 46-47 · SOLO LEE, Y FINANZAS SIGUE ENTERA ────────────────────────────
@@ -747,6 +761,174 @@ test("[47] la navegación de Finanzas sigue: la página registra título y Volve
   const hook = fuente("components/tesoreria/useTesoreria.js");
   assert.match(hook, /if \(navegar\) router\.push\(url\);\s*else router\.replace\(url, \{ scroll: false \}\);/);
   assert.match(hook, /\{ navegar: !reemplazar \}/);
+});
+
+// ── A-I · EL REDISEÑO MÓVIL (Figma EVJ2KvVCrY0oVSowfboymQ 351:499 / 351:620 / 351:707) ──
+//
+// La jerarquía es COBRADO POR POS → EFECTIVO ENTREGADO → EFECTIVO ENTREGADO
+// POR TURNO → cajas. Lo que se defiende acá es lo que separa esos bloques:
+// lo digital no baja al turno, lo cobrado no es la cifra del turno, las
+// diferencias de caja no se juntan, y lo que no tiene turno se puede verificar.
+
+const SIN_TO = { turnoOperativoId: null, turnoOperativoNombre: null, turnoOperativoOrden: null, fechaOperativa: null };
+/** Las dos cajas de Mañana y una tercera, legacy, sin turno, con su cierre de $8.000. */
+const conSinTurno = (extra = {}) =>
+  base({
+    cajas: [caja(1, { diferenciaEfectivo: -5000 }), caja(2, { diferenciaEfectivo: 5000 }), caja(3, SIN_TO)],
+    movimientos: [...base().movimientos, mov(31, 3, CLASE_MOVIMIENTO.CIERRE, 8000)],
+    ...extra,
+  });
+const tarjetaDe = (d, clave, extra = {}) =>
+  renderToStaticMarkup(
+    React.createElement(TurnoConCajas, {
+      g: lecturaDelGrupo(d.tesoreria, clave), verificaciones: d.tesoreria.verificaciones,
+      puedeVerificar: true, onVerificar: nada, onIr: nada, unidad: "DIA", ...extra,
+    })
+  );
+const sinTurnoDe = (d, clave, extra = {}) =>
+  renderToStaticMarkup(
+    React.createElement(SinTurnoConCajas, {
+      g: lecturaDelGrupo(d.tesoreria, clave), verificaciones: d.tesoreria.verificaciones,
+      puedeVerificar: true, onVerificar: nada, onIr: nada, unidad: "DIA", ...extra,
+    })
+  );
+const claveSinTurno = (d) => d.tesoreria.grupos.find((g) => g.sinTurno).clave;
+const claveConTurno = (d) => d.tesoreria.grupos.find((g) => !g.sinTurno).clave;
+
+test("[A] COBRADO POR POS: total, efectivo y digital por medio, del servidor; FIADO no es cobro", () => {
+  const esc = ESC.pendiente();
+  esc.ventas = [...esc.ventas, venta(1, "FIADO", 9000, { esFiado: true, formaPago: "fiado" })];
+  const d = datos(esc);
+  const html = pantalla(d);
+  const bloque = texto(html.match(/<section[^>]*data-cobrado-por-pos[\s\S]*?<\/section>/)?.[0] ?? "");
+  assert.match(bloque, /^COBRADO POR POS \$121\.000,00 En efectivo \$111\.000,00 Digital \$10\.000,00 Crédito \$5\.000,00 Mercado Pago \$5\.000,00/);
+  assert.equal(d.tesoreria.resumen.cobradoPorPosDeclarado, 121000, "el fiado entró al total cobrado");
+  assert.doesNotMatch(texto(html), /fiado/i, "el fiado se presentó como dinero");
+  // Es el primer bloque de la pantalla y va antes de lo entregado.
+  assert.ok(html.indexOf("data-cobrado-por-pos") < html.indexOf("data-efectivo-entregado"));
+  assert.ok(html.indexOf("data-efectivo-entregado") < html.indexOf("data-tarjeta-turno"));
+});
+
+test("[B] EFECTIVO ENTREGADO: entregado, verificado y falta verificar del servidor, con su barra", () => {
+  const d = datos(ESC.parcial());
+  const html = pantalla(d);
+  const v = d.tesoreria.resumen.verificacion;
+  assert.equal(d.tesoreria.resumen.efectivoDeclaradoEntregado, 110000);
+  assert.equal(v.efectivoVerificado, 100000);
+  assert.equal(v.entregadoPendienteDeVerificar, 10000);
+  assert.match(texto(html), /EFECTIVO ENTREGADO \$110\.000,00 Verificado \$100\.000,00 Falta verificar \$10\.000,00/);
+  assert.match(html, /data-efectivo-entregado/);
+  assert.match(html, /data-avance/);
+});
+
+test("[C] una tarjeta por turno, con el nombre del catálogo, sus cajas, el efectivo protagonista y el avance", () => {
+  const esc = base({
+    cajas: [caja(1), caja(2), caja(3, { turnoOperativoId: 32, turnoOperativoNombre: "Siesta larga", turnoOperativoOrden: 1 })],
+    movimientos: [...base().movimientos, mov(31, 3, CLASE_MOVIMIENTO.CIERRE, 8000)],
+  });
+  const d = datos(esc);
+  const html = pantalla(d);
+  assert.equal((html.match(/data-tarjeta-turno=/g) || []).length, 2, "una tarjeta por turno operativo");
+  const t = texto(html);
+  assert.match(t, /Mañana 2 cajas Sin verificar \$110\.000,00 Efectivo entregado/);
+  assert.match(t, /Siesta larga 1 caja Sin verificar \$8\.000,00 Efectivo entregado/);
+  // El nombre es el del catálogo del local: la pantalla no conoce ninguno.
+  for (const f of ["PantallaTesoreria.jsx", "PiezasTesoreria.jsx", "DetallesTesoreria.jsx"]) {
+    assert.doesNotMatch(fuente(`components/tesoreria/${f}`), /["'`>](Mañana|Tarde|Noche|Siesta)\b/, f);
+  }
+  // La cifra protagonista de la tarjeta es el efectivo ENTREGADO del turno, en el token grande.
+  const cifra = tarjetaDe(d, claveConTurno(d)).match(/<div[^>]*data-efectivo-del-turno[^>]*>([^<]*)</);
+  assert.ok(cifra, "la tarjeta perdió su cifra protagonista");
+  assert.match(cifra[0], /text-xl3/);
+  assert.equal(cifra[1], "$110.000,00");
+  assert.match(tarjetaDe(d, claveConTurno(d)), /data-avance/);
+});
+
+test("[D] la tarjeta del turno no lleva lo digital ni lo cobrado: solo efectivo entregado", () => {
+  const d = datos(ESC.pendiente());
+  for (const abierto of [false, true]) {
+    const t = texto(tarjetaDe(d, claveConTurno(d), { abiertoInicial: abierto }));
+    assert.doesNotMatch(t, /Mercado ?Pago|Cr[ée]dito|D[ée]bito|Transferencia|Digital|\bQR\b/i, "lo digital bajó a la tarjeta del turno");
+    assert.doesNotMatch(t, /cobrado/i, "lo cobrado volvió a la tarjeta del turno");
+    assert.doesNotMatch(t, /\$121\.000|\$10\.000,00 Digital/, "la cifra del turno salió de lo cobrado");
+  }
+});
+
+test("[E] «Ver cajas (N)» abre las cajas dentro de la misma tarjeta y pasa a «Ocultar cajas»", () => {
+  const d = datos(ESC.pendiente());
+  const cerrada = texto(tarjetaDe(d, claveConTurno(d)));
+  assert.match(cerrada, /Ver cajas \(2\)/);
+  assert.doesNotMatch(cerrada, /CAJAS DEL TURNO|Ocultar cajas/);
+  const html = tarjetaDe(d, claveConTurno(d), { abiertoInicial: true });
+  // Inline: las cajas están adentro de la sección de la tarjeta, no en otra vista.
+  assert.match(html, /<section[^>]*data-tarjeta-turno[\s\S]*data-cajas-del-turno[\s\S]*<\/section>$/);
+  const t = texto(html);
+  assert.match(t, /Ocultar cajas/);
+  assert.match(t, /CAJAS DEL TURNO Ana \$100\.000,00 Caja #1 · 08:02 a 14:10 Diferencia de caja −\$5\.000,00 · Falta/);
+  assert.match(t, /Pedro \$10\.000,00 Caja #2 · 08:02 a 14:10 Diferencia de caja \+\$5\.000,00 · Sobra/);
+  // El estado lo dice el turno: no se repite en cada caja.
+  assert.equal((t.match(/Sin verificar/g) || []).length, 1, "la insignia del turno se repitió en cada caja");
+  // Cada diferencia de caja sola: dos renglones, ninguno junta las dos.
+  assert.equal((html.match(/data-diferencia-de-caja/g) || []).length, 2);
+  assert.doesNotMatch(t, /Diferencia \$0|Diferencia −|Diferencia \+|Total diferencias/i, "las diferencias de caja se compensaron");
+});
+
+test("[F] «Sin turno asignado» va al final, secundario, y se puede verificar mientras falte", () => {
+  const d = datos(conSinTurno());
+  const html = pantalla(d);
+  assert.ok(html.indexOf("data-sin-turno") > html.lastIndexOf("data-tarjeta-turno"), "sin turno no quedó al final");
+  assert.equal((html.match(/data-tarjeta-turno=/g) || []).length, 1, "sin turno se dibujó como un turno más");
+  const seco = sinTurnoDe(d, claveSinTurno(d));
+  const t = texto(seco);
+  assert.match(t, /^Sin turno asignado 1 caja · falta \$8\.000,00 \$8\.000,00 Verificar ›$/);
+  assert.ok(botonDe(seco, "Verificar"), "sin turno perdió la verificación");
+  // Lo que abre la hoja son sus pendientes, como en cualquier turno.
+  assert.deepEqual(lecturaDelGrupo(d.tesoreria, claveSinTurno(d)).pendientes.map((e) => e.cajaMovimientoId), [31]);
+  // Sin permiso, no hay "Verificar": se puede ver.
+  assert.equal(botonDe(sinTurnoDe(d, claveSinTurno(d), { puedeVerificar: false }), "Verificar"), null);
+  assert.match(texto(sinTurnoDe(d, claveSinTurno(d), { puedeVerificar: false })), /\$8\.000,00 Ver ›$/);
+  // Verificada, "Ver" abre sus cajas inline.
+  const hecha = datos(conSinTurno({ verificaciones: [acto(9, [{ id: 31, monto: 8000, turnoId: 3 }], { importeVerificado: 8000, turno: null })] }));
+  assert.equal(botonDe(sinTurnoDe(hecha, claveSinTurno(hecha)), "Verificar"), null);
+  assert.match(texto(sinTurnoDe(hecha, claveSinTurno(hecha), { abiertoInicial: true })), /Ocultar › CAJAS DEL TURNO Carla \$8\.000,00 Caja #3/);
+});
+
+test("[G] los estados se leen «Sin verificar» y «Verificado», del mismo juego de insignias", () => {
+  assert.equal(INSIGNIA_TESORERIA[ESTADO_TESORERIA.PENDIENTE].texto, "Sin verificar");
+  assert.equal(INSIGNIA_TESORERIA[ESTADO_TESORERIA.CORRECTO].texto, "Verificado");
+  const pend = texto(pantalla(datos(ESC.pendiente())));
+  const ok = texto(pantalla(datos(ESC.correcto())));
+  assert.match(pend, /Sin verificar/);
+  assert.match(ok, /Mañana 2 cajas Verificado/);
+  for (const t of [pend, ok]) {
+    assert.doesNotMatch(t, /\bPendiente\b|\bCorrecto\b/);
+    // "Declarado" quedó para lo que de verdad lo es (la caja sin conteo), no como rótulo.
+    assert.doesNotMatch(t, /\bDeclarado\b/);
+  }
+  // Ninguna pieza escribe el estado a mano: la insignia lee el juego único.
+  // ("Verificado" sí aparece literal, como rótulo del IMPORTE contado.)
+  for (const f of ["PantallaTesoreria.jsx", "PiezasTesoreria.jsx", "DetallesTesoreria.jsx"]) {
+    assert.doesNotMatch(fuente(`components/tesoreria/${f}`), /["'`>]Sin verificar["'`<]/, f);
+  }
+  assert.match(fuente("components/tesoreria/PiezasTesoreria.jsx"), /INSIGNIA_TESORERIA\[estado\]/);
+});
+
+test("[H] Día, Semana, Mes y Otro siguen, con el local del servidor", () => {
+  const html = pantalla(datos(ESC.pendiente()));
+  const t = texto(html);
+  for (const chip of ["Día", "Semana", "Mes", "Otro"]) assert.ok(botonDe(html, chip), `falta el chip ${chip}`);
+  assert.match(t, /Casiano Casas/);
+  for (const unidad of ["SEMANA", "MES"]) {
+    assert.match(texto(pantalla(datos(ESC.pendiente(), { unidad }), { unidad })), /COBRADO POR POS[\s\S]*EFECTIVO ENTREGADO[\s\S]*EFECTIVO ENTREGADO POR TURNO/);
+  }
+});
+
+test("[I] el rediseño no trae colores fijos: todo sale de los tokens del tema", () => {
+  for (const f of ["PantallaTesoreria.jsx", "PiezasTesoreria.jsx", "DetallesTesoreria.jsx"]) {
+    const src = fuente(`components/tesoreria/${f}`);
+    assert.doesNotMatch(src, /\b(text|bg|border|from|to|ring)-(amber|red|green|emerald|slate|cyan|sky|rose|yellow|gray|zinc|white|black)(-\d|\b)/, f);
+    assert.doesNotMatch(src, /#[0-9a-fA-F]{3,8}\b|rgb\(/, f);
+  }
 });
 
 test("vacío: un período sin movimientos no dibuja tarjetas en $0", () => {

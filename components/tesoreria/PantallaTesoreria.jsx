@@ -7,14 +7,21 @@
 // recalcula plata. El hook (`useTesoreria`) trae los datos y el tablero
 // (`TableroTesoreria`) abre las hojas.
 //
-// Figma "Tesorería · móvil" (archivo uptcbzbnV5M4q32kgmupF9, página 14:2):
-//   A · Resumen del período ...... `ResumenTesoreria` (16:210, y H 19:1232)
+// El RESUMEN es el rediseño móvil aprobado (Figma EVJ2KvVCrY0oVSowfboymQ):
+//   A · Pantalla principal ........ `ResumenTesoreria` (351:499): COBRADO POR
+//       POS → EFECTIVO ENTREGADO → EFECTIVO ENTREGADO POR TURNO
+//   F · "Ver cajas" abierto ....... `TurnoConCajas` (351:620), sin navegar
+//   B–E y G · estados ............. `TarjetaDeTurno` y `SinTurnoAsignado` (351:707)
+//
+// Los detalles siguen siendo los de "Tesorería · móvil" (uptcbzbnV5M4q32kgmupF9):
 //   B · Turno ...................... `DetalleDeTurno` (17:499, y F 19:975, G 19:1100)
 //   C · Caja ....................... `DetalleDeCaja` (17:622)
 //   I · Verificación ............... `DetalleDeVerificacion` (19:1381)
 //
 // La vista sale de la URL (`ctx.vista`); cambiarla es navegar, así que el
 // "atrás" del teléfono vuelve al resumen.
+
+import { useState } from "react";
 
 import ChipsDePeriodo from "@/components/transferencias/ChipsDePeriodo";
 import NavegadorDePeriodo from "@/components/transferencias/NavegadorDePeriodo";
@@ -27,27 +34,31 @@ import { formatearMoneda } from "@/lib/moneda";
 import { CLAVE_OTRO_FINANZAS } from "@/lib/finanzas/periodoFinanciero";
 import { VISTA_TESORERIA } from "@/lib/tesoreria/contextoTesoreria";
 import {
-  ESTADO_TESORERIA,
   actosQueCruzan,
   avisosDeRevision,
   contextoDelGrupo,
+  diferenciaDelPeriodo,
+  gruposEnOrden,
   lecturaDelGrupo,
   periodoSinMovimientos,
   presentacionDePago,
   proporcionVerificada,
-  rotuloDeTurnos,
+  textoFaltaSobra,
 } from "@/lib/tesoreria/pantallaTesoreria";
 
 import {
   AvisoDeEstado,
+  BarraDeAvance,
   Bloque,
+  CajasDelTurno,
   EnlaceTesoreria,
-  InsigniaDeEstado,
   NotaPunteada,
   Renglon,
   RotuloDeSeccion,
+  SinTurnoAsignado,
   TarjetaDeTurno,
   TarjetaHero,
+  colorDeDiferencia,
   textoDeDiferencia,
 } from "./PiezasTesoreria";
 import { DetalleDeCaja, DetalleDeTurno, DetalleDeVerificacion } from "./DetallesTesoreria";
@@ -197,7 +208,6 @@ function EncabezadoDePeriodo({ datos, ctx, hoy, onCambiarUnidad, onElegirRango, 
 
 function ResumenTesoreria({ datos, lectura, ctx, onIr, onVerificar }) {
   const r = lectura.resumen || {};
-  const v = r.verificacion || {};
 
   if (periodoSinMovimientos(lectura)) {
     return (
@@ -209,8 +219,15 @@ function ResumenTesoreria({ datos, lectura, ctx, onIr, onVerificar }) {
   }
 
   const avisos = avisosDeRevision(lectura);
-  const grupos = (lectura.grupos || []).map((g) => lecturaDelGrupo(lectura, g.clave)).filter(Boolean);
+  const grupos = gruposEnOrden((lectura.grupos || []).map((g) => lecturaDelGrupo(lectura, g.clave)).filter(Boolean));
   const cruzan = actosQueCruzan(lectura);
+  const comunDeTurno = {
+    verificaciones: lectura.verificaciones,
+    puedeVerificar: Boolean(datos.puedeVerificarEfectivo),
+    onVerificar,
+    onIr,
+    unidad: ctx.unidad,
+  };
 
   return (
     <>
@@ -229,33 +246,76 @@ function ResumenTesoreria({ datos, lectura, ctx, onIr, onVerificar }) {
         </AvisoDeEstado>
       ))}
 
-      <BaseConocida resumen={r} />
-
-      {Number(v.entregadoDeclarado || 0) > 0 && <EfectivoDeLasCajas verificacion={v} grupos={grupos} />}
-
       <CobradoPorPos resumen={r} />
 
-      <SalioPorFuera lectura={lectura} resumen={r} />
+      {Number(r.efectivoDeclaradoEntregado || 0) > 0 && <EfectivoEntregado lectura={lectura} resumen={r} />}
 
       {grupos.length > 0 && (
         <>
-          <RotuloDeSeccion cuenta={grupos.length}>{rotuloDeTurnos(ctx.unidad)}</RotuloDeSeccion>
-          {grupos.map((g) => (
-            <TarjetaDeTurno
-              key={g.grupo.clave}
-              g={g}
-              contexto={contextoDeTurno(g, ctx.unidad)}
-              puedeVerificar={Boolean(datos.puedeVerificarEfectivo)}
-              onVerificar={() => onVerificar(g)}
-              onVerCajas={() => onIr({ vista: VISTA_TESORERIA.TURNO, grupo: g.grupo.clave })}
-              onVerVerificacion={(id) => onIr({ vista: VISTA_TESORERIA.VERIFICACION, verificacion: id, grupo: g.grupo.clave })}
-            />
-          ))}
+          <RotuloDeSeccion>EFECTIVO ENTREGADO POR TURNO</RotuloDeSeccion>
+          {grupos.map((g) =>
+            g.grupo.sinTurno ? (
+              <SinTurnoConCajas key={g.grupo.clave} g={g} {...comunDeTurno} />
+            ) : (
+              <TurnoConCajas key={g.grupo.clave} g={g} {...comunDeTurno} />
+            )
+          )}
         </>
       )}
 
+      <SalioPorFuera lectura={lectura} resumen={r} />
+
       {cruzan.length > 0 && <VerificacionesQueCruzan actos={cruzan} onIr={onIr} />}
     </>
+  );
+}
+
+/** Lo que las tarjetas de turno necesitan para abrir lo suyo. */
+function accionesDeTurno(g, { onVerificar, onIr }) {
+  return {
+    onVerificar: () => onVerificar(g),
+    onVerVerificacion: (id) => onIr({ vista: VISTA_TESORERIA.VERIFICACION, verificacion: id, grupo: g.grupo.clave }),
+    onVerCaja: (c) => onIr({ vista: VISTA_TESORERIA.CAJA, caja: c.turnoId, grupo: g.grupo.clave }),
+  };
+}
+
+/**
+ * UN TURNO CON SUS CAJAS. "Ver cajas" las abre debajo de la tarjeta, en el
+ * mismo bloque, sin navegar: el turno queda arriba como contexto.
+ */
+export function TurnoConCajas({ g, verificaciones, puedeVerificar, onVerificar, onIr, unidad, abiertoInicial = false }) {
+  const [abierto, setAbierto] = useState(abiertoInicial);
+  const acciones = accionesDeTurno(g, { onVerificar, onIr });
+  return (
+    <TarjetaDeTurno
+      g={g}
+      contexto={contextoDeTurno(g, unidad)}
+      puedeVerificar={puedeVerificar}
+      onVerificar={acciones.onVerificar}
+      onVerVerificacion={acciones.onVerVerificacion}
+      cajasAbiertas={abierto}
+      onAlternarCajas={() => setAbierto((a) => !a)}
+    >
+      {abierto && <CajasDelTurno g={g} verificaciones={verificaciones} onVerCaja={acciones.onVerCaja} />}
+    </TarjetaDeTurno>
+  );
+}
+
+/** Las cajas sin turno asignado, en su renglón compacto; "Ver" abre sus cajas. */
+export function SinTurnoConCajas({ g, verificaciones, puedeVerificar, onVerificar, onIr, unidad, abiertoInicial = false }) {
+  const [abierto, setAbierto] = useState(abiertoInicial);
+  const acciones = accionesDeTurno(g, { onVerificar, onIr });
+  return (
+    <SinTurnoAsignado
+      g={g}
+      contexto={contextoDeTurno(g, unidad)}
+      puedeVerificar={puedeVerificar}
+      onVerificar={acciones.onVerificar}
+      cajasAbiertas={abierto}
+      onAlternarCajas={() => setAbierto((a) => !a)}
+    >
+      {abierto && <CajasDelTurno g={g} verificaciones={verificaciones} onVerCaja={acciones.onVerCaja} />}
+    </SinTurnoAsignado>
   );
 }
 
@@ -265,127 +325,68 @@ export function contextoDeTurno(g, unidad) {
 }
 
 /**
- * 1 · BASE CONOCIDA. La cifra del servidor y su certeza. No es saldo: es lo que
- * el sistema conoce del período.
+ * COBRADO POR POS (Figma EVJ2KvVCrY0oVSowfboymQ, 351:528). Contesta solo
+ * cuánto cobró comercialmente el POS y por qué medios: el total, el efectivo
+ * VENDIDO y lo digital por medio. Es contexto: no lleva estados, ni cajas, ni
+ * "Verificar". Los importes son los del servidor tal cual —el total también—;
+ * FIADO no está, porque no entró dinero.
  */
-function BaseConocida({ resumen: r }) {
-  const v = r.verificacion || {};
-  const pendiente = Number(v.entregadoPendienteDeVerificar || 0);
-  const declarado = Number(v.entregadoDeclarado || 0);
+function CobradoPorPos({ resumen: r }) {
+  const digitales = (r.cobradoPorMedio || []).filter((m) => !m.esEfectivo);
   const cc = r.cobrosCuentaCorrienteSinUbicar || { cantidad: 0, monto: 0 };
+  if (!Number(r.cobradoPorPosDeclarado || 0)) return null;
   return (
-    <TarjetaHero>
-      <div className="text-xs2 font-semibold sunmi-text-muted tracking-wider">BASE CONOCIDA DE TESORERÍA</div>
-      <div className="text-xl3 font-semibold tabular-nums sunmi-text-strong" data-base-conocida>
-        {formatearMoneda(r.baseConocida)}
+    <section className="sunmi-bg-card rounded-xl2 border sunmi-border px-4 py-3 space-y-1.5" data-cobrado-por-pos>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-xs2 font-semibold sunmi-text-muted tracking-wider">COBRADO POR POS</h2>
+        <span className="text-base2 font-semibold tabular-nums sunmi-text-strong">{formatearMoneda(r.cobradoPorPosDeclarado)}</span>
       </div>
-      <p className="text-sm2 sunmi-text-muted">
-        Efectivo entregado {formatearMoneda(r.efectivoDeclaradoEntregado)} + cobrado por POS{" "}
-        {formatearMoneda(r.digitalCobradoDeclarado)} − egresos exteriores {formatearMoneda(r.egresosExterioresConocidos)}
-      </p>
-      {declarado > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          {pendiente > 0 ? (
-            <>
-              <InsigniaDeEstado estado={ESTADO_TESORERIA.PARCIAL} />
-              <span className="text-sm font-medium sunmi-text-warning">
-                {formatearMoneda(pendiente)} del efectivo sin verificar
-              </span>
-            </>
-          ) : (
-            <>
-              <InsigniaDeEstado estado={ESTADO_TESORERIA.VERIFICADA} />
-              <span className="text-sm font-medium sunmi-text-success">Todo el efectivo declarado está verificado</span>
-            </>
-          )}
-        </div>
-      )}
-      {r.baseIncompleta && (
-        <p className="text-xs2 sunmi-text-warning">
-          Hay cajas sin cerrar o que cerraron sin conteo: su efectivo todavía no está en la base.
-        </p>
+      <Renglon rotulo="En efectivo" valor={formatearMoneda(r.efectivoCobradoDeclarado)} />
+      {digitales.length > 0 && (
+        <>
+          <Renglon rotulo="Digital" valor={formatearMoneda(r.digitalCobradoDeclarado)} />
+          <div className="pl-3.5 space-y-1.5">
+            {digitales.map((m) => (
+              <Renglon key={m.medio} rotulo={m.rotulo} valor={formatearMoneda(m.montoDeclarado)} atenuado />
+            ))}
+          </div>
+        </>
       )}
       {Number(cc.cantidad) > 0 && (
         <p className="text-xs2 sunmi-text-muted">
           {cc.cantidad === 1 ? "1 cobro" : `${cc.cantidad} cobros`} de cuenta corriente ({formatearMoneda(cc.monto)}) sin
-          medio ni caja: no están en la base.
+          medio ni caja: no están acá.
         </p>
       )}
-      <p className="text-xs2 sunmi-text-muted opacity-80">No es saldo bancario: es lo que el sistema conoce del período.</p>
-    </TarjetaHero>
-  );
-}
-
-/** 3 · EFECTIVO DE LAS CAJAS: declarado, verificado y pendiente, separados. */
-function EfectivoDeLasCajas({ verificacion: v, grupos }) {
-  const pct = proporcionVerificada(v);
-  const conPendiente = grupos.filter((g) => g.pendientes.length).map((g) => g.nombre);
-  return (
-    <Bloque titulo="EFECTIVO DE LAS CAJAS">
-      <Renglon
-        rotulo="Declarado entregado"
-        nota="Lo que las cajas dijeron que entregaron"
-        valor={formatearMoneda(v.entregadoDeclarado)}
-        fuerte
-      />
-      <Renglon
-        rotulo="Verificado"
-        nota="Contado por el responsable"
-        valor={formatearMoneda(v.efectivoVerificado)}
-        colorValor={Number(v.efectivoVerificado) > 0 ? "sunmi-text-success" : null}
-        notaValor={Number(v.actosCompletos) > 0 ? `de ${formatearMoneda(v.declaradoDeLosActos)} declarados` : null}
-      />
-      <Renglon
-        rotulo="Pendiente de verificar"
-        nota={conPendiente.length ? conPendiente.join(", ") : null}
-        valor={formatearMoneda(v.entregadoPendienteDeVerificar)}
-        colorValor={Number(v.entregadoPendienteDeVerificar) > 0 ? "sunmi-text-warning" : null}
-      />
-      {pct != null && (
-        <>
-          <div className="flex h-1.5 gap-0.5 overflow-hidden" aria-hidden="true">
-            {/* El color sale del token de texto del tema (`bg-current`): no hay
-                una clase de fondo de éxito/advertencia y no se escribe uno fijo. */}
-            {pct > 0 && <div className="h-full rounded-full bg-current sunmi-text-success" style={{ width: `${pct}%` }} />}
-            {pct < 100 && <div className="h-full flex-1 rounded-full bg-current sunmi-text-warning" />}
-          </div>
-          <p className="text-xs2 sunmi-text-muted">{pct}% del efectivo declarado ya fue contado</p>
-        </>
-      )}
-    </Bloque>
+    </section>
   );
 }
 
 /**
- * 13 · COBRADO POR POS. Declarado por el POS: no es acreditado ni conciliado.
- * Comisión y neto son ESTIMADOS.
+ * EFECTIVO ENTREGADO (Figma EVJ2KvVCrY0oVSowfboymQ, 351:541): la plata física
+ * que las cajas entregaron a Tesorería, cuánto se verificó y cuánto falta. La
+ * diferencia es la de TESORERÍA —lo contado contra lo entregado, la de cada
+ * verificación entera— y aparece solo si hay; nunca es una suma de las
+ * diferencias de caja de los operadores.
  */
-function CobradoPorPos({ resumen: r }) {
-  const digitales = (r.cobradoPorMedio || []).filter((m) => !m.esEfectivo);
-  if (!digitales.length) return null;
+function EfectivoEntregado({ lectura, resumen: r }) {
+  const v = r.verificacion || {};
+  const diferencia = diferenciaDelPeriodo(lectura);
+  const texto = textoFaltaSobra(diferencia);
   return (
-    <Bloque titulo="COBRADO POR POS">
-      {digitales.map((m) => (
-        <Renglon
-          key={m.medio}
-          rotulo={m.rotulo}
-          nota={
-            m.comisionEstimada != null
-              ? `Comisión est. ${formatearMoneda(m.comisionEstimada)} · neto est. ${formatearMoneda(m.netoEstimado)}`
-              : null
-          }
-          valor={formatearMoneda(m.montoDeclarado)}
-        />
-      ))}
-      <div className="border-t sunmi-divider opacity-70" aria-hidden="true" />
-      <Renglon rotulo="Total cobrado por POS" valor={formatearMoneda(r.digitalCobradoDeclarado)} fuerte />
-      {r.comisionEstimadaIncompleta && (
-        <p className="text-xs2 sunmi-text-warning">Hay ventas con comisión pendiente: la comisión estimada está incompleta.</p>
+    <TarjetaHero franja={false}>
+      <div className="text-xs2 font-semibold sunmi-text-muted tracking-wider">EFECTIVO ENTREGADO</div>
+      <div className="text-xl3 font-semibold tabular-nums sunmi-text-strong break-words" data-efectivo-entregado>
+        {formatearMoneda(r.efectivoDeclaradoEntregado)}
+      </div>
+      <BarraDeAvance pct={proporcionVerificada(v)} />
+      <Renglon rotulo="Verificado" valor={formatearMoneda(v.efectivoVerificado)} />
+      <Renglon rotulo="Falta verificar" valor={formatearMoneda(v.entregadoPendienteDeVerificar)} />
+      {texto && <Renglon rotulo="Diferencia" valor={texto} colorValor={colorDeDiferencia(diferencia)} />}
+      {r.baseIncompleta && (
+        <p className="text-xs2 sunmi-text-warning">Hay cajas sin cerrar o que cerraron sin conteo: su efectivo no está acá.</p>
       )}
-      <p className="text-xs2 sunmi-text-muted">
-        Declarado por el POS. Todavía no es dinero acreditado ni conciliado con Mercado Pago o el banco.
-      </p>
-    </Bloque>
+    </TarjetaHero>
   );
 }
 
