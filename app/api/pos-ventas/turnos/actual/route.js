@@ -73,6 +73,9 @@ export async function GET(req) {
     const turno = await prisma.turno.findFirst({
       where: { ...dondeCajaPropia, ...WHERE_TURNO_OPERATIVO },
       orderBy: { apertura: "desc" },
+      // El nombre del turno operativo, para el encabezado del POS. Una caja
+      // sin turno trae `null` y se muestra "Sin turno asignado".
+      include: { turnoOperativo: { select: { id: true, nombre: true } } },
     });
 
     // El congelado se informa aparte. No es "no hay nada": hay una caja a medio

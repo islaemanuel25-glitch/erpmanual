@@ -547,7 +547,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // Sube a 49 el 2026-10-04: entró `20261004200000_turno_operativo`, el catálogo
   // de turnos por local y dos columnas NULL en `Turno` y `VerificacionEfectivo`.
   // No toca transferencias ni ninguna tabla que la recepción escriba.
-  assert.equal(migraciones.length, 49, "aparecio una migracion que nadie declaro aca");
+  // Sube a 50 el 2026-10-05: entró `20261005100000_correccion_turno_operativo_de_caja`,
+  // que solo reemplaza el cuerpo de una función de trigger de `Turno`. No toca
+  // transferencias ni ninguna tabla que la recepción escriba.
+  assert.equal(migraciones.length, 50, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

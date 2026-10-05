@@ -11,7 +11,7 @@ import { useLayoutSettings } from "@/app/context/LayoutSettingsContext";
 import { useUser } from "@/app/context/UserContext";
 import { useMenu } from "@/hooks/useMenu";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { useAccionDelShell } from "@/app/context/AccionDePaginaContext";
+import { useAccionDelShell, useBajadaDelShell } from "@/app/context/AccionDePaginaContext";
 import { LEGACY_LAYOUTBASE_TITLES } from "@/lib/menu/legacyTitles";
 
 export default function LayoutBase({ children }) {
@@ -24,6 +24,7 @@ export default function LayoutBase({ children }) {
 
   const tituloMobile = usePageTitle({ overrides: LEGACY_LAYOUTBASE_TITLES });
   const accionDePagina = useAccionDelShell();
+  const bajada = useBajadaDelShell();
 
   const isSidebar = menuMode === "sidebarLeft";
   const isTopbar = menuMode === "topbar";
@@ -91,6 +92,10 @@ export default function LayoutBase({ children }) {
           ) : (
             tituloMobile
           )}
+          {/* LA BAJADA, debajo del título y asociada a él: identifica la
+              pantalla —el turno de la caja en el POS— sin entrar en la fila de
+              acciones. Sin bajada no se dibuja nada y la fila queda igual. */}
+          {bajada && <div className="min-w-0 text-sm3 font-normal">{bajada}</div>}
         </div>
 
         {/* MAIN CONTENT: pb en mobile para no tapar con BottomNav (solo topbar) */}

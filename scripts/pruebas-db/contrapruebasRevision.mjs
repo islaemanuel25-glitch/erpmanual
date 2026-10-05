@@ -49,11 +49,19 @@ const DESHACER_TURNO_OPERATIVO = `
   ALTER TABLE "Turno" DROP COLUMN "turnoOperativoId", DROP COLUMN "fechaOperativa";
   DROP TABLE "TurnoOperativo";`;
 
+// La corrección del turno de una caja abierta solo reemplaza el cuerpo de la
+// función del trigger. Romperla no necesita deshacer nada: la versión rota la
+// vuelve a reemplazar. Y como pisa a la del turno operativo, se reaplica sana
+// después de cualquier caso que rompa aquélla.
+const CORRECCION_TURNO_OPERATIVO = "prisma/migrations/20261005100000_correccion_turno_operativo_de_caja/migration.sql";
+const MIGRACION_CORRECCION_TURNO_OPERATIVO = { deshacer: "SELECT 1;" };
+const MIGRACION_TURNO_OPERATIVO = { deshacer: DESHACER_TURNO_OPERATIVO, despues: [CORRECCION_TURNO_OPERATIVO] };
+
 // Para romper la de verificación hay que sacar antes la del turno operativo,
 // que le agrega columnas y triggers, y reaplicarla sana después.
 const MIGRACION_VERIFICACION_EFECTIVO = {
   deshacer: DESHACER_TURNO_OPERATIVO + DESHACER_VERIFICACION_EFECTIVO,
-  despues: [TURNO_OPERATIVO],
+  despues: [TURNO_OPERATIVO, CORRECCION_TURNO_OPERATIVO],
 };
 
 const entornoPg = (url) => ({
@@ -1092,22 +1100,114 @@ const CASOS = [
   },
   {
     n: "TO-4",
-    defecto: "el turno y la fecha de una caja se pueden cambiar después de abrirla",
+    // Desde 20261005100000 el turno de una caja ABIERTA se corrige de un
+    // turno a otro. Lo que sigue prohibido es todo lo demás, y sin el trigger
+    // pasa todo: el backfill, perder el turno y cambiar el de una caja cerrada.
+    defecto: "el turno y la fecha de una caja se pueden cambiar sin ninguna condición",
     archivo: TURNO_OPERATIVO,
-    migracion: { deshacer: DESHACER_TURNO_OPERATIVO },
+    migracion: MIGRACION_TURNO_OPERATIVO,
     suite: "scripts/pruebas-db/turnoOperativo.mjs",
     minimo: 5,
     inyecciones: [{
       de: "CREATE TRIGGER \"Turno_turno_operativo_inmutable\" BEFORE UPDATE OF \"turnoOperativoId\", \"fechaOperativa\" ON \"Turno\"\n  FOR EACH ROW EXECUTE FUNCTION \"turno_operativo_de_caja_inmutable\"();",
       a: "",
     }],
-    esperadas: ["el turno de una caja no cambia una vez abierta", "ni su fecha operativa"],
+    esperadas: [
+      "[TO-4] una caja vieja no recibe turno después: no hay backfill posible",
+      "[TO-4] una caja cerrada no cambia su turno",
+      "[TO-4] la base tampoco cambia el turno de una caja con efectivo verificado",
+    ],
+  },
+  // ── LA CORRECCIÓN DEL TURNO DE UNA CAJA ABIERTA ─────────────────────────
+  {
+    n: "TO-4b",
+    defecto: "la base deja corregir el turno de una caja cerrada, en cierre o anulada",
+    archivo: CORRECCION_TURNO_OPERATIVO,
+    migracion: MIGRACION_CORRECCION_TURNO_OPERATIVO,
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    // La condición entera, el antes y el después: la primera versión apagaba
+    // solo el antes y el después la seguía frenando —con la caja ya cerrada,
+    // NEW trae el mismo `cierre`—, así que la contraprueba no probaba nada.
+    inyecciones: [{
+      de: "  IF OLD.\"cierre\" IS NOT NULL OR OLD.\"cierreEnPreparacionEn\" IS NOT NULL OR OLD.\"anuladoEn\" IS NOT NULL\n     OR NEW.\"cierre\" IS NOT NULL OR NEW.\"cierreEnPreparacionEn\" IS NOT NULL OR NEW.\"anuladoEn\" IS NOT NULL THEN",
+      a: "  IF false THEN",
+    }],
+    esperadas: ["[TO-4] una caja cerrada no cambia su turno", "[TO-4] una caja anulada no cambia su turno"],
+  },
+  {
+    n: "TO-4c",
+    defecto: "la base deja corregir el turno de una caja con efectivo en una verificación vigente",
+    archivo: CORRECCION_TURNO_OPERATIVO,
+    migracion: MIGRACION_CORRECCION_TURNO_OPERATIVO,
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "     WHERE m.\"turnoId\" = OLD.\"id\" AND e.\"vigente\"", a: "     WHERE false" }],
+    esperadas: ["[TO-4] la base tampoco cambia el turno de una caja con efectivo verificado"],
+  },
+  {
+    n: "TO-4d",
+    defecto: "la base deja asignarle turno a una caja que se abrió sin turno",
+    archivo: CORRECCION_TURNO_OPERATIVO,
+    migracion: MIGRACION_CORRECCION_TURNO_OPERATIVO,
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "  IF OLD.\"turnoOperativoId\" IS NULL OR OLD.\"fechaOperativa\" IS NULL\n     OR NEW", a: "  IF false\n     AND NEW" }],
+    esperadas: ["[TO-4] una caja vieja no recibe turno después: no hay backfill posible"],
+  },
+  {
+    n: "TO-CC1",
+    defecto: "las opciones de la corrección se calculan con la hora de ahora y no con la apertura de la caja",
+    archivo: "lib/caja/turnoOperativoServer.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [
+      { de: "localId: caja.localId, ahora: caja.apertura });", a: "localId: caja.localId, ahora: new Date() });" },
+      { de: "    ahora: caja.apertura,\n  });", a: "    ahora: new Date(),\n  });" },
+    ],
+    esperadas: [
+      "[TO-CC1] las opciones son las de la APERTURA de la caja: domingo 23:30",
+      "[TO-CC1] y las de otra caja, abierta el lunes 22:00, son otras: la hora de ahora no las cambia",
+    ],
+  },
+  {
+    n: "TO-CC2",
+    defecto: "la corrección acepta cualquier turno activo del local",
+    archivo: "lib/caja/turnoOperativoServer.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{
+      de: "  if (!ocurrencia.valido) return { ok: false, status: ocurrencia.status, codigo: ocurrencia.codigo, error: ocurrencia.error };",
+      a: "  if (false) return null;",
+    }],
+    esperadas: ["[TO-CC3] un turno activo que en la apertura no era posible: 409 y su código"],
+  },
+  {
+    n: "TO-CC3",
+    defecto: "la corrección guarda la fecha operativa que manda el cliente",
+    archivo: "lib/caja/turnoOperativoServer.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{
+      de: "  await tx.turno.update({ where: { id: caja.id }, data: elegido.datos, select: { id: true } });",
+      a: "  await tx.turno.update({ where: { id: caja.id }, data: { ...elegido.datos, ...(body?.fechaOperativa ? { fechaOperativa: new Date(body.fechaOperativa) } : {}) }, select: { id: true } });",
+    }],
+    esperadas: ["[TO-CC2] la fecha que mandó el cliente se ignora: la base tiene la del servidor"],
+  },
+  {
+    n: "TO-CC4",
+    defecto: "la corrección no mira si la caja sigue abierta",
+    archivo: "lib/caja/turnoOperativoServer.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "  if (estadoDelTurno(caja) !== ESTADO_TURNO.ABIERTO) {", a: "  if (false) {" }],
+    esperadas: ["[TO-CC8] una caja cerrada: 409 y su código, sin cambios", "[TO-CC8] una caja anulada: 409 y su código, sin cambios"],
   },
   {
     n: "TO-5",
     defecto: "la base acepta una entrega de otro turno en una verificación",
     archivo: TURNO_OPERATIVO,
-    migracion: { deshacer: DESHACER_TURNO_OPERATIVO },
+    migracion: MIGRACION_TURNO_OPERATIVO,
     suite: "scripts/pruebas-db/turnoOperativo.mjs",
     minimo: 30,
     inyecciones: [{
@@ -1250,7 +1350,7 @@ const CASOS = [
     n: "TO-HR5",
     defecto: "la base guarda un turno activo sin horario",
     archivo: TURNO_OPERATIVO,
-    migracion: { deshacer: DESHACER_TURNO_OPERATIVO },
+    migracion: MIGRACION_TURNO_OPERATIVO,
     suite: "scripts/pruebas-db/turnoOperativo.mjs",
     minimo: 30,
     inyecciones: [{ de: "CHECK (\n      NOT \"activo\" OR (", a: "CHECK (\n      true OR (" }],

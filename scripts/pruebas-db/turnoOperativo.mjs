@@ -49,6 +49,10 @@ const rutaCierreConfirmar = await import("../../app/api/pos-ventas/cierres/[toke
 const rutaVerificar = await import("../../app/api/finanzas/tesoreria/verificaciones/route.js");
 const rutaCatalogo = await import("../../app/api/config/turnos-operativos/route.js");
 const rutaTurnoDelCatalogo = await import("../../app/api/config/turnos-operativos/[id]/route.js");
+const rutaCorregir = await import("../../app/api/pos-ventas/turnos/[id]/turno-operativo/route.js");
+const rutaMovimiento = await import("../../app/api/pos-ventas/caja-movimientos/crear/route.js");
+const rutaRetiroIniciar = await import("../../app/api/pos-ventas/retiros/iniciar/route.js");
+const rutaRetiroConfirmar = await import("../../app/api/pos-ventas/retiros/[token]/confirmar/route.js");
 
 let pasadas = 0;
 const fallas = [];
@@ -178,6 +182,14 @@ async function cerrar(caja, cambio, retiro) {
   requerir("confirma el cierre", fin.ok === true, `${fin.status} ${fin.error ?? ""}`);
   return prisma.cierrePreparacion.findFirst({ where: { token: ini.cierre.token } });
 }
+/** Un retiro de recaudación con la caja abierta, por las rutas reales. */
+async function retirar(caja, cambio, contado) {
+  const ini = await leer(await rutaRetiroIniciar.POST(pedido(`${BASE}/retiros/iniciar`, caja.quien, { turnoId: caja.turnoId, desgloseCambio: desgloseDe(cambio) })));
+  requerir("inicia el retiro", ini.ok === true, `${ini.status} ${ini.error ?? ""}`);
+  const tok = ini.retiro?.token ?? ini.preparacion?.token ?? ini.token;
+  const fin = await leer(await rutaRetiroConfirmar.POST(pedido(`${BASE}/retiros/${tok}/confirmar`, caja.quien, { desgloseRetiroContado: desgloseDe(contado) }), conToken(tok)));
+  requerir("confirma el retiro", fin.ok === true, `${fin.status} ${fin.error ?? ""}`);
+}
 /** Vende, cierra y devuelve el id del movimiento de la entrega de cierre. */
 async function entregaDeCierre(caja, monto) {
   await vender(caja, monto);
@@ -292,17 +304,31 @@ async function correr() {
     rechazado("una caja de A con el turno de B: la FK compuesta la frena",
       await intento(() => prisma.turno.create({ data: { localId: A.local.id, vendedorId: A.cuenta.id, operadorId: op.id, montoInicial: 0, turnoOperativoId: mañanaB.id, fechaOperativa: comoFecha(HOY) } })),
       /Turno_turnoOperativoId_localId_fkey|P2003/);
+    // [TO-4] El turno de una caja es inmutable, con UNA excepción desde
+    // 20261005100000: corregirlo de un turno a otro con la caja abierta y sin
+    // efectivo en una verificación vigente. La última parte, en la sección J.
     const conTurno = await cajaPorRuta(A, mañana.id);
-    rechazado("el turno de una caja no cambia una vez abierta",
-      await intento(() => prisma.turno.update({ where: { id: conTurno.turnoId }, data: { turnoOperativoId: tarde.id } })),
-      /no cambian/);
-    rechazado("ni su fecha operativa",
-      await intento(() => prisma.turno.update({ where: { id: conTurno.turnoId }, data: { fechaOperativa: comoFecha(AYER) } })),
-      /no cambian/);
+    const corregida = await intento(() => prisma.turno.update({ where: { id: conTurno.turnoId }, data: { turnoOperativoId: tarde.id } }));
+    ok("[TO-4] una caja ABIERTA con turno: la base acepta corregirlo de un turno a otro", corregida.ok, corregida.mensaje);
+    await prisma.turno.update({ where: { id: conTurno.turnoId }, data: { turnoOperativoId: mañana.id } });
+    rechazado("[TO-4] una caja con turno no lo pierde",
+      await intento(() => prisma.turno.update({ where: { id: conTurno.turnoId }, data: { turnoOperativoId: null, fechaOperativa: null } })),
+      /una con turno no lo pierde/);
     const vieja1 = await cajaEnLaBase(A);
-    rechazado("una caja vieja no recibe turno después: no hay backfill posible",
+    rechazado("[TO-4] una caja vieja no recibe turno después: no hay backfill posible",
       await intento(() => prisma.turno.update({ where: { id: vieja1.turnoId }, data: { turnoOperativoId: mañana.id, fechaOperativa: comoFecha(HOY) } })),
-      /no cambian/);
+      /una caja sin turno no recibe uno/);
+    for (const [estado, marcaDeEstado] of [
+      ["cerrada", { cierre: new Date() }],
+      ["en cierre", { cierreEnPreparacionEn: new Date() }],
+      ["anulada", { anuladoEn: new Date() }],
+    ]) {
+      const c = await cajaEnLaBase(A, { turnoOperativoId: mañana.id, fechaOperativa: comoFecha(HOY) });
+      await prisma.turno.update({ where: { id: c.turnoId }, data: marcaDeEstado });
+      rechazado(`[TO-4] una caja ${estado} no cambia su turno`,
+        await intento(() => prisma.turno.update({ where: { id: c.turnoId }, data: { turnoOperativoId: tarde.id } })),
+        /solo se corrige con la caja abierta/);
+    }
     const vivo = await intento(() => prisma.turno.update({ where: { id: conTurno.turnoId }, data: { observaciones: "una escritura de siempre" } }));
     ok("las escrituras de siempre sobre la caja no se frenan", vivo.ok, vivo.mensaje);
   }
@@ -597,6 +623,136 @@ async function correr() {
     })));
     requerir("abrir-con-cambio abre", rCon.ok === true, `${rCon.status} ${rCon.error ?? ""}`);
     await comprobar("abrir-con-cambio", rCon.turno.id, previas);
+  }
+
+  seccion("J. Corregir el turno de una caja abierta desde el POS [TO-CC, TO-4]");
+  {
+    // Un ciclo de tres con nombres cualquiera, como en I: el primero cruza la
+    // medianoche y abre la jornada, el segundo es de la mañana, el tercero de
+    // la tarde. Las cajas se escriben con una APERTURA fija —domingo 4 a las
+    // 23:30 y lunes 5 a las 22:00, hora argentina— para probar que las
+    // opciones salen de ESA apertura y no de la hora en que corre la prueba.
+    const J = await montarLocal("J");
+    const [primero, segundo, tercero] = await Promise.all([
+      prisma.turnoOperativo.create({ data: { localId: J.local.id, nombre: "Primero", orden: 0, horaInicioReconocimiento: "23:00", horaFinReconocimiento: "01:00" } }),
+      prisma.turnoOperativo.create({ data: { localId: J.local.id, nombre: "Segundo", orden: 1, horaInicioReconocimiento: "06:00", horaFinReconocimiento: "11:00" } }),
+      prisma.turnoOperativo.create({ data: { localId: J.local.id, nombre: "Tercero", orden: 2, horaInicioReconocimiento: "15:00", horaFinReconocimiento: "18:00" } }),
+    ]);
+    const apagado = await prisma.turnoOperativo.create({
+      data: { localId: J.local.id, nombre: "Apagado", orden: 3, activo: false, horaInicioReconocimiento: "12:00", horaFinReconocimiento: "13:00" },
+    });
+    const DOMINGO_2330 = new Date("2026-10-05T02:30:00Z");
+    const LUNES_2200 = new Date("2026-10-06T01:00:00Z");
+    const cajaAbierta = async (apertura, turnoOperativoId, fecha) => {
+      const c = await cajaEnLaBase(J, { turnoOperativoId, fechaOperativa: fecha ? comoFecha(fecha) : null });
+      await prisma.turno.update({ where: { id: c.turnoId }, data: { apertura } });
+      return c;
+    };
+    const urlDe = (c) => `${BASE}/turnos/${c.turnoId}/turno-operativo`;
+    const opciones = async (c) => leer(await rutaCorregir.GET(pedido(urlDe(c), c.quien, null, "GET"), conId(c.turnoId)));
+    const corregir = async (c, cuerpo, quien = c.quien) => leer(await rutaCorregir.POST(pedido(urlDe(c), quien, cuerpo), conId(c.turnoId)));
+    const clasif = async (c) => {
+      const t = await turnoDeCaja(c.turnoId);
+      return [t.turnoOperativoId, isoDe(t.fechaOperativa)];
+    };
+    const resumen = (o) => (o.opciones ?? []).map((x) => [x.nombre, x.fechaOperativa]).sort();
+
+    // Domingo 23:30: Primero en curso (jornada del lunes) y Segundo, que sigue.
+    const cDom = await cajaAbierta(DOMINGO_2330, primero.id, "2026-10-05");
+    // Lunes 22:00: Tercero extendido (lunes) y Primero, que sigue (martes).
+    const cLun = await cajaAbierta(LUNES_2200, tercero.id, "2026-10-05");
+    const oDom = await opciones(cDom);
+    const oLun = await opciones(cLun);
+    igual("[TO-CC1] las opciones son las de la APERTURA de la caja: domingo 23:30",
+      resumen(oDom), [["Primero", "2026-10-05"], ["Segundo", "2026-10-05"]]);
+    igual("[TO-CC1] y las de otra caja, abierta el lunes 22:00, son otras: la hora de ahora no las cambia",
+      resumen(oLun), [["Primero", "2026-10-06"], ["Tercero", "2026-10-05"]]);
+    igual("[TO-CC1] la pantalla recibe el turno de la caja y que se puede corregir",
+      [oLun.caja?.turnoOperativo?.nombre, oLun.caja?.fechaOperativa, oLun.corregible], ["Tercero", "2026-10-05", true]);
+
+    const antesDeCorregir = await prisma.turno.count({ where: { localId: J.local.id } });
+    const aPrimero = await corregir(cLun, { turnoOperativoId: primero.id, fechaOperativa: "2020-01-01" });
+    igual("[TO-CC2] corregir al siguiente de la apertura: ok, con la fecha que calcula el servidor (martes)",
+      [aPrimero.status, aPrimero.cambio, aPrimero.caja?.turnoOperativo?.nombre, aPrimero.caja?.fechaOperativa],
+      [200, true, "Primero", "2026-10-06"]);
+    igual("[TO-CC2] la fecha que mandó el cliente se ignora: la base tiene la del servidor", await clasif(cLun), [primero.id, "2026-10-06"]);
+    igual("[TO-CC2] es la misma caja: ninguna caja nueva", [aPrimero.caja?.id, await prisma.turno.count({ where: { localId: J.local.id } })], [cLun.turnoId, antesDeCorregir]);
+    const aTercero = await corregir(cLun, { turnoOperativoId: tercero.id });
+    igual("[TO-CC2] y volver al turno extendido de la apertura: ok, del lunes", [aTercero.status, await clasif(cLun)], [200, [tercero.id, "2026-10-05"]]);
+
+    const imposible = await corregir(cLun, { turnoOperativoId: segundo.id });
+    igual("[TO-CC3] un turno activo que en la apertura no era posible: 409 y su código",
+      [imposible.status, imposible.codigo], [409, "TURNO_OPERATIVO_FUERA_DE_CICLO"]);
+    igual("[TO-CC3] y la caja queda como estaba", await clasif(cLun), [tercero.id, "2026-10-05"]);
+
+    const cruce = await corregir(cDom, { turnoOperativoId: segundo.id });
+    igual("[TO-CC4] domingo 23:30 → Segundo: la jornada del lunes", [cruce.status, await clasif(cDom)], [200, [segundo.id, "2026-10-05"]]);
+    const vuelta = await corregir(cDom, { turnoOperativoId: primero.id });
+    igual("[TO-CC4] y de vuelta al que cruza la medianoche: también del lunes", [vuelta.status, await clasif(cDom)], [200, [primero.id, "2026-10-05"]]);
+
+    const antes = await prisma.turno.findUnique({ where: { id: cDom.turnoId }, select: { updatedAt: true } });
+    const mismo = await corregir(cDom, { turnoOperativoId: primero.id });
+    const despues = await prisma.turno.findUnique({ where: { id: cDom.turnoId }, select: { updatedAt: true } });
+    igual("[TO-CC5] elegir el mismo turno no escribe", [mismo.status, mismo.cambio, despues.updatedAt.getTime()], [200, false, antes.updatedAt.getTime()]);
+
+    igual("[TO-CC6] un turno de otro local: 400 y su código",
+      [(await corregir(cDom, { turnoOperativoId: mañanaB.id })).codigo, await clasif(cDom)], ["TURNO_OPERATIVO_DE_OTRO_LOCAL", [primero.id, "2026-10-05"]]);
+    igual("[TO-CC6] un turno inactivo: 400 y su código", (await corregir(cDom, { turnoOperativoId: apagado.id })).codigo, "TURNO_OPERATIVO_INACTIVO");
+    const otro = await operador(J);
+    igual("[TO-CC6] la caja de otro operario: 403", (await corregir(cDom, { turnoOperativoId: segundo.id }, otro.quien)).status, 403);
+
+    const legado = await cajaAbierta(DOMINGO_2330, null, null);
+    const oLeg = await opciones(legado);
+    igual("[TO-CC7] una caja sin turno se informa así y no ofrece opciones",
+      [oLeg.caja?.turnoOperativo, oLeg.corregible, oLeg.motivo?.codigo, oLeg.opciones?.length], [null, false, "CAJA_SIN_TURNO_OPERATIVO", 0]);
+    const aLeg = await corregir(legado, { turnoOperativoId: primero.id });
+    igual("[TO-CC7] y no se le asigna uno: 409, sigue sin turno", [aLeg.status, aLeg.codigo, await clasif(legado)], [409, "CAJA_SIN_TURNO_OPERATIVO", [null, null]]);
+
+    for (const [estado, marcaDeEstado] of [
+      ["cerrada", { cierre: new Date() }],
+      ["en cierre", { cierreEnPreparacionEn: new Date() }],
+      ["anulada", { anuladoEn: new Date() }],
+    ]) {
+      const c = await cajaAbierta(DOMINGO_2330, primero.id, "2026-10-05");
+      await prisma.turno.update({ where: { id: c.turnoId }, data: marcaDeEstado });
+      const r = await corregir(c, { turnoOperativoId: segundo.id });
+      igual(`[TO-CC8] una caja ${estado}: 409 y su código, sin cambios`, [r.status, r.codigo, await clasif(c)], [409, "CAJA_NO_ABIERTA", [primero.id, "2026-10-05"]]);
+    }
+
+    // Una caja abierta HOY por la ruta, con ventas, Caja + y un retiro de
+    // recaudación. Corregirla no toca nada de eso.
+    const catalogo = await leer(await rutaCatalogo.GET(conCookie(`http://ci/api/config/turnos-operativos?activos=1`, `erpazul_sesion=${J.sesion}`, null, "GET")));
+    const deHoy = await cajaPorRuta(J, catalogo.turnos[0].id);
+    await vender(deHoy, 5000);
+    const mas = await leer(await rutaMovimiento.POST(pedido(`${BASE}/caja-movimientos/crear`, deHoy.quien, { turnoId: deHoy.turnoId, tipo: "INGRESO", monto: 700, motivo: "cambio" })));
+    requerir("Caja + en la caja de hoy", mas.ok === true, `${mas.status} ${mas.error ?? ""}`);
+    const huella = async () => {
+      const [ventas, movs] = await Promise.all([
+        prisma.venta.findMany({ where: { turnoId: deHoy.turnoId }, select: { id: true, total: true }, orderBy: { id: "asc" } }),
+        prisma.cajaMovimiento.findMany({ where: { turnoId: deHoy.turnoId }, select: { id: true, tipo: true, monto: true }, orderBy: { id: "asc" } }),
+      ]);
+      return JSON.stringify({ ventas, movs });
+    };
+    const huellaAntes = await huella();
+    const oHoy = await opciones(deHoy);
+    const destino = oHoy.opciones.find((x) => x.id !== catalogo.turnos[0].id);
+    requerir("la caja de hoy tiene otra opción en su apertura", Boolean(destino), JSON.stringify(oHoy.opciones));
+    const rHoy = await corregir(deHoy, { turnoOperativoId: destino.id });
+    igual("[TO-CC9] corregida, con la fecha de su ocurrencia", [rHoy.status, await clasif(deHoy)], [200, [destino.id, destino.fechaOperativa]]);
+    igual("[TO-CC9] ventas, movimientos e importes quedan intactos", await huella(), huellaAntes);
+
+    // El retiro verificado bloquea: ni la ruta ni la base cambian el turno.
+    // 1000 de fondo + 5000 vendidos + 700 de Caja +; queda 1000 de cambio.
+    await retirar(deHoy, 1000, 5700);
+    const retiro = await prisma.cajaMovimiento.findFirst({ where: { turnoId: deHoy.turnoId, tipo: "RETIRO" }, orderBy: { id: "desc" } });
+    const ver = await verificar(J, { cajaMovimientoIds: [retiro.id], importeVerificado: 5700, idempotencyKey: clave() });
+    requerir("verifica el retiro de la caja abierta", ver.ok === true, `${ver.status} ${ver.error ?? ""}`);
+    const conVer = await corregir(deHoy, { turnoOperativoId: catalogo.turnos[0].id });
+    igual("[TO-CC10] con efectivo en una verificación vigente: 409 y su código, sin cambios",
+      [conVer.status, conVer.codigo, await clasif(deHoy)], [409, "CAJA_CON_VERIFICACION_VIGENTE", [destino.id, destino.fechaOperativa]]);
+    rechazado("[TO-4] la base tampoco cambia el turno de una caja con efectivo verificado",
+      await intento(() => prisma.turno.update({ where: { id: deHoy.turnoId }, data: { turnoOperativoId: catalogo.turnos[0].id } })),
+      /verificación vigente/);
   }
 
   seccion("T. La transición: un local sin turnos sigue en legado hasta que carga el primero [TO-T]");

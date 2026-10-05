@@ -77,6 +77,8 @@ const AccionDePaginaContext = createContext({
   registrar: () => () => {},
   titulo: null,
   registrarTitulo: () => () => {},
+  bajada: null,
+  registrarBajada: () => () => {},
 });
 
 /** `useLayoutEffect` en el navegador, `useEffect` en el servidor. */
@@ -85,6 +87,7 @@ const useEfectoAntesDePintar = typeof window === "undefined" ? useEffect : useLa
 export function AccionDePaginaProvider({ children }) {
   const [accion, setAccion] = useState(null);
   const [titulo, setTitulo] = useState(null);
+  const [bajada, setBajada] = useState(null);
 
   const registrar = useCallback((nodo) => {
     setAccion((actual) => registrarAccion(actual, nodo));
@@ -108,9 +111,17 @@ export function AccionDePaginaProvider({ children }) {
     return () => setTitulo((actual) => limpiarAccion(actual, registro));
   }, []);
 
+  // La BAJADA: un renglón debajo del título, para lo que identifica a la
+  // pantalla —el turno de la caja en el POS— y no es una acción. Mismas dos
+  // decisiones que la acción, por los mismos motivos.
+  const registrarBajada = useCallback((nodo) => {
+    setBajada((actual) => registrarAccion(actual, nodo));
+    return () => setBajada((actual) => limpiarAccion(actual, nodo));
+  }, []);
+
   const valor = useMemo(
-    () => ({ accion, registrar, titulo, registrarTitulo }),
-    [accion, registrar, titulo, registrarTitulo]
+    () => ({ accion, registrar, titulo, registrarTitulo, bajada, registrarBajada }),
+    [accion, registrar, titulo, registrarTitulo, bajada, registrarBajada]
   );
 
   return (
@@ -133,6 +144,27 @@ export function useAccionDelShell() {
  */
 export function useTituloDelShell() {
   return useContext(AccionDePaginaContext).titulo?.texto ?? null;
+}
+
+/** Lo que el SHELL dibuja debajo del título. `null` en casi todas las pantallas. */
+export function useBajadaDelShell() {
+  return useContext(AccionDePaginaContext).bajada;
+}
+
+/**
+ * Lo que la PANTALLA usa para poner un renglón debajo de su título, con la
+ * misma forma que `useAccionDePagina`: una fábrica memorizada por sus
+ * dependencias. Devolver `null` deja el renglón vacío.
+ */
+export function useBajadaDePagina(fabrica, deps = []) {
+  const { registrarBajada } = useContext(AccionDePaginaContext);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const nodo = useMemo(fabrica, deps);
+
+  useEfectoAntesDePintar(() => registrarBajada(nodo), [registrarBajada, nodo]);
+
+  return nodo;
 }
 
 /**
