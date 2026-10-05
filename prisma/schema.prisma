@@ -266,7 +266,7 @@ model Local {
   pagosGastoOrigen        PagoGasto[]               @relation("pago_gasto_origen")
   /// Las verificaciones de efectivo de Tesorería de esta ubicación.
   verificacionesEfectivo  VerificacionEfectivo[]    @relation("verificacion_efectivo_del_local")
-  /// El catálogo de turnos operativos de esta ubicación (Mañana, Tarde…).
+  /// El catálogo de turnos operativos de esta ubicación.
   turnosOperativos        TurnoOperativo[]
 }
 
@@ -2383,12 +2383,12 @@ model Turno {
 
   // ── TURNO OPERATIVO ────────────────────────────────────────────────────────
   //
-  // ESTE MODELO SIGUE SIENDO UNA CAJA. El turno operativo —Mañana, Tarde…— es
-  // del catálogo del local (`TurnoOperativo`) y la caja lo recibe al abrirse:
-  // lo ELIGE quien abre, en las tres rutas de apertura. La fecha operativa la
-  // fija el servidor en ese momento, en día argentino. Ninguno de los dos se
-  // recalcula después por la hora, ni porque la caja cruce la medianoche: una
-  // caja de la Noche del domingo que cierra a las 00:30 sigue siendo del domingo.
+  // ESTE MODELO SIGUE SIENDO UNA CAJA. El turno operativo es del catálogo del
+  // local (`TurnoOperativo`) y la caja lo recibe al abrirse: la apertura lo
+  // propone por la ventana de reconocimiento y quien abre confirma o cambia;
+  // se guarda el FINAL. La fecha operativa es la de la jornada de ese turno y
+  // la fija el servidor al abrir. Ninguno de los dos se recalcula después por
+  // la hora, ni porque la caja cruce la medianoche.
   //
   // Los dos van juntos o ninguno, por CHECK; y una vez escritos no cambian, por
   // trigger. NULL = caja anterior a esto: NO se infiere a qué turno perteneció,
@@ -3675,23 +3675,28 @@ model VerificacionEfectivo {
   @@index([turnoOperativoId, fechaOperativa])
 }
 
-/// UN TURNO OPERATIVO DEL CATÁLOGO DE UN LOCAL: Mañana, Tarde, Noche, o como lo
-/// llame ese local. Migración 20261004200000_turno_operativo.
+/// UN TURNO OPERATIVO DEL CATÁLOGO DE UN LOCAL. Nombre, cantidad, orden y
+/// ventana los configura cada local. Migración 20261004200000_turno_operativo.
 ///
-/// Es un CATÁLOGO, no una franja horaria: no tiene horas. La caja lo recibe
-/// EXPLÍCITAMENTE al abrirse —lo elige quien abre— y no se infiere nunca por
-/// la hora. Tesorería agrupa y verifica el efectivo por (local, fecha
-/// operativa, turno operativo) de la caja.
+/// La VENTANA DE RECONOCIMIENTO ("HH:MM" → "HH:MM", opcional, puede cruzar la
+/// medianoche) no es la duración del turno: sirve para que la apertura proponga
+/// el turno que probablemente se abre. Quien abre confirma o cambia, y la caja
+/// guarda el turno FINAL con la fecha operativa de su jornada
+/// (`lib/caja/turnoOperativo.js`). Tesorería agrupa y verifica por (local,
+/// fecha operativa, turno operativo) de la caja, sin volver a mirar la hora.
 ///
-/// Pertenece a un local: cada local da de alta los suyos, y uno que no usa
-/// Noche no la tiene. No se borra —una caja o una verificación pueden
-/// apuntarlo—: se desactiva, y uno inactivo no se ofrece para abrir.
+/// No se borra —una caja o una verificación pueden apuntarlo—: se desactiva, y
+/// uno inactivo no se ofrece para abrir.
 model TurnoOperativo {
   id        Int      @id @default(autoincrement())
   localId   Int
   nombre    String
   orden     Int      @default(0)
   activo    Boolean  @default(true)
+  /// Ventana de reconocimiento, "HH:MM". Las dos o ninguna, distintas entre sí;
+  /// inicio > fin cruza la medianoche. Se pueden solapar entre turnos.
+  horaInicioReconocimiento String?
+  horaFinReconocimiento    String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -3702,8 +3707,8 @@ model TurnoOperativo {
   cajas          Turno[]                @relation("caja_del_turno_operativo")
   verificaciones VerificacionEfectivo[] @relation("verificacion_del_turno_operativo")
 
-  /// Un nombre por local. Dos "Mañana" en el mismo local serían dos grupos que
-  /// se leen igual.
+  /// Un nombre por local. Dos turnos con el mismo nombre en un local serían
+  /// dos grupos que se leen igual.
   @@unique([localId, nombre])
   /// Destino de las FK compuestas de `Turno` y `VerificacionEfectivo`: la caja
   /// y la verificación solo pueden apuntar a un turno de SU local.

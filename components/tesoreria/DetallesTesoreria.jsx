@@ -67,7 +67,7 @@ export function DetalleDeTurno({ datos, lectura, ctx, local, onIr, onVolver, onV
 
   const puedeVerificar = Boolean(datos.puedeVerificarEfectivo);
   const verVerificacion = (id) => onIr({ vista: VISTA_TESORERIA.VERIFICACION, verificacion: id, grupo: g.grupo.clave });
-  // El día va siempre en el detalle: el título es el turno ("Mañana"), y sin
+  // El día va siempre en el detalle: el título es el nombre del turno, y sin
   // el día no se sabe de cuál.
   const contexto = contextoDelGrupo(g.grupo, null, g.cajas.length);
   // G: un conteo conjunto de varias cajas con diferencia se explica una vez.

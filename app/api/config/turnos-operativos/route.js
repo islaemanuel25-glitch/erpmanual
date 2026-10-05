@@ -1,11 +1,13 @@
 // app/api/config/turnos-operativos/route.js
 //
-// EL CATÁLOGO DE TURNOS OPERATIVOS DE UN LOCAL: Mañana, Tarde, Noche, o los que
-// use. Sin horas: es un catálogo, no una franja horaria.
+// EL CATÁLOGO DE TURNOS OPERATIVOS DE UN LOCAL: los que configure el local,
+// cada uno con su ventana de reconocimiento opcional.
 //
 //   GET  — el catálogo del local del alcance. Lo lee la configuración y lo lee
-//          la apertura de caja (con `?activos=1`) para ofrecer los turnos.
-//   POST — da de alta un turno. `config_local.pos`.
+//          la apertura de caja: con `?activos=1` devuelve solo los activos,
+//          el turno que propone la hora del servidor y la fecha operativa que
+//          tendría la caja con cada uno.
+//   POST — da de alta un turno, con o sin ventana. `config_local.pos`.
 //   PUT  — reordena: `{ orden: [id, id, …] }`. `config_local.pos`.
 //
 // El local sale SIEMPRE del alcance, nunca del cuerpo, igual que el resto de la
@@ -16,9 +18,12 @@ import prisma from "@/lib/prisma";
 import { requirePerm, checkPerm } from "@/lib/authorize";
 import { getUsuarioSession } from "@/lib/auth";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
-import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
-import { CODIGO_TURNO_OPERATIVO, validarNombreTurnoOperativo } from "@/lib/caja/turnoOperativo";
-import { SELECT_TURNO_OPERATIVO, turnosOperativosDelLocal } from "@/lib/caja/turnoOperativoServer";
+import { CODIGO_TURNO_OPERATIVO, validarNombreTurnoOperativo, validarRangoReconocimiento } from "@/lib/caja/turnoOperativo";
+import {
+  SELECT_TURNO_OPERATIVO,
+  reconocimientoDeApertura,
+  turnosOperativosDelLocal,
+} from "@/lib/caja/turnoOperativoServer";
 
 // La lectura la hace también la caja para abrir: va el par, como la de las
 // reglas del POS.
@@ -45,12 +50,14 @@ export async function GET(req) {
     if (scope.error) {
       return NextResponse.json({ ok: false, error: scope.error, needsContexto: scope.needsContexto }, { status: scope.status });
     }
-    const soloActivos = new URL(req.url).searchParams.get("activos") === "1";
-    const turnos = await turnosOperativosDelLocal(prisma, scope.localId, { soloActivos });
-    // La fecha operativa que tendría una caja abierta ahora: la apertura la
-    // devuelve, y si el día cambió mientras la pantalla estaba abierta el
-    // servidor lo rechaza en vez de abrir con otra fecha sin avisar.
-    return NextResponse.json({ ok: true, localId: scope.localId, fechaOperativa: hoyArgentinaISO(), turnos });
+    // Para abrir caja: la propuesta la hace el servidor, con su hora, y no la
+    // pantalla con la del celular. La apertura vuelve a validar y a calcular.
+    if (new URL(req.url).searchParams.get("activos") === "1") {
+      const { turnos, reconocimiento } = await reconocimientoDeApertura(prisma, { localId: scope.localId });
+      return NextResponse.json({ ok: true, localId: scope.localId, turnos, reconocimiento });
+    }
+    const turnos = await turnosOperativosDelLocal(prisma, scope.localId);
+    return NextResponse.json({ ok: true, localId: scope.localId, turnos });
   } catch (error) {
     console.error("Error leyendo turnos operativos:", error);
     return NextResponse.json({ ok: false, error: "No se pudieron leer los turnos operativos del local." }, { status: 500 });
@@ -68,10 +75,15 @@ export async function POST(req) {
     if (!nombre.valido) {
       return NextResponse.json({ ok: false, error: nombre.error, codigo: CODIGO_TURNO_OPERATIVO.NOMBRE_INVALIDO }, { status: 400 });
     }
+    // Solo integridad del rango: un solape con otro turno se acepta.
+    const rango = validarRangoReconocimiento(body?.horaInicioReconocimiento, body?.horaFinReconocimiento);
+    if (!rango.valido) {
+      return NextResponse.json({ ok: false, error: rango.error, codigo: CODIGO_TURNO_OPERATIVO.RANGO_INVALIDO }, { status: 400 });
+    }
     // Al final de la lista: el orden se cambia después, a propósito.
     const ultimo = await prisma.turnoOperativo.aggregate({ where: { localId: ctx.localId }, _max: { orden: true } });
     const turno = await prisma.turnoOperativo.create({
-      data: { localId: ctx.localId, nombre: nombre.nombre, orden: (ultimo._max.orden ?? -1) + 1 },
+      data: { localId: ctx.localId, nombre: nombre.nombre, orden: (ultimo._max.orden ?? -1) + 1, ...rango.rango },
       select: SELECT_TURNO_OPERATIVO,
     });
     return NextResponse.json({ ok: true, turno });

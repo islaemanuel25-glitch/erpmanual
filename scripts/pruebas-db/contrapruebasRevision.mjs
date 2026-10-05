@@ -1116,6 +1116,36 @@ const CASOS = [
     }],
     esperadas: ["la base no acepta una entrega de Tarde en una verificación de Mañana"],
   },
+  // ── LA VENTANA DE RECONOCIMIENTO DEL TURNO ──────────────────────────────
+  {
+    n: "TO-H3",
+    defecto: "con dos coincidencias la apertura elige la primera en vez de preguntar",
+    archivo: "lib/caja/turnoOperativo.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "  if (candidatosIds.length === 1) return {", a: "  if (candidatosIds.length >= 1) return {" }],
+    esperadas: ["[TO-H3] dos coincidencias: pregunta y no propone ninguno"],
+  },
+  {
+    n: "TO-H8",
+    defecto: "una ventana que cruza la medianoche deja la jornada en el día de la apertura",
+    archivo: "lib/caja/turnoOperativo.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "    return minuto >= v.inicio ? sumarDias(fecha, 1) : fecha;", a: "    return fecha;" }],
+    esperadas: ["[TO-H8] domingo 23:30 + ventana 23→01: jornada del LUNES"],
+  },
+  {
+    n: "TO-H10",
+    defecto: "la apertura guarda el día de hoy sin mirar el turno final elegido",
+    archivo: "lib/caja/turnoOperativoServer.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "  const fecha = fechaOperativaDeTurno(turno, momentoArgentina(ahora));", a: "  const fecha = momentoArgentina(ahora).fecha;" }],
+    // Solo la de antes de medianoche: a las 00:30 "hoy" ya es el lunes y el
+    // defecto no se ve. El día que no es el de hoy es el que lo delata.
+    esperadas: ["[TO-H8] domingo 23:30 + ventana 23→01: jornada del LUNES"],
+  },
   // ── EL CONTRATO DE LA PANTALLA MÓVIL (PR #138) ───────────────────────────
   //
   // Lo que la pantalla no puede comprobar sola: que un período mal pedido no se

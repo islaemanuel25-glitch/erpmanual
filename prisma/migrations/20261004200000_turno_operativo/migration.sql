@@ -1,6 +1,6 @@
 -- TURNO OPERATIVO: Tesorería verifica el efectivo POR TURNO, no por día.
 --
--- La operación real es: un turno operativo (Mañana, Tarde, Noche…) → sus cajas
+-- La operación real es: un turno operativo del local → sus cajas
 -- → sus entregas → se cuenta → se verifica ESE turno. Hasta acá Tesorería
 -- agrupaba por día calendario del hecho (`PROVISORIO_DIA_OPERATIVO`) y dejaba
 -- verificar juntas cajas de dos turnos. El ERP no tenía el dato: ningún modelo
@@ -9,11 +9,14 @@
 -- Esta migración agrega el dato, y nada más:
 --
 --   · `TurnoOperativo`: el CATÁLOGO de turnos de cada local —nombre, orden,
---     activo—. Sin horas: no es una franja horaria. Cada local da de alta los
---     suyos; uno que no usa Noche no la tiene.
+--     activo y una ventana de reconocimiento opcional, "HH:MM" → "HH:MM", que
+--     puede cruzar la medianoche—. La ventana NO es la duración del turno: la
+--     apertura la usa para proponer el turno, y quien abre confirma o cambia.
+--     Cada local da de alta los suyos; esta migración no siembra ninguno.
 --   · `Turno.turnoOperativoId` + `Turno.fechaOperativa`: la caja (el modelo
---     `Turno` sigue siendo UNA caja) recibe su turno al abrirse, elegido por
---     quien abre, y su fecha operativa la fija el servidor en ese momento.
+--     `Turno` sigue siendo UNA caja) recibe el turno FINAL elegido al abrirse,
+--     y su fecha operativa —la de la jornada de ese turno— la fija el servidor
+--     en ese momento.
 --   · `VerificacionEfectivo.turnoOperativoId` + `fechaOperativa`: qué turno se
 --     verificó, congelado al verificar.
 --
@@ -30,7 +33,7 @@
 --      caja ya no tiene.
 --   4. Cada entrega de una verificación es de una caja de ESE turno y ESA fecha
 --      operativa —o, en una verificación sin turno, de una caja sin turno—: un
---      trigger al insertar la entrega. Mañana y Tarde no se verifican juntas.
+--      trigger al insertar la entrega. Dos turnos no se verifican juntos.
 --   5. Anular una verificación no cambia el turno que se verificó: se extiende
 --      `verificacion_solo_se_anula` con las dos columnas nuevas.
 --
@@ -63,10 +66,25 @@ CREATE TABLE "TurnoOperativo" (
     "nombre" TEXT NOT NULL,
     "orden" INTEGER NOT NULL DEFAULT 0,
     "activo" BOOLEAN NOT NULL DEFAULT true,
+    "horaInicioReconocimiento" TEXT,
+    "horaFinReconocimiento" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "TurnoOperativo_pkey" PRIMARY KEY ("id"),
-    CONSTRAINT "TurnoOperativo_nombre_no_vacio_chk" CHECK (btrim("nombre") <> '')
+    CONSTRAINT "TurnoOperativo_nombre_no_vacio_chk" CHECK (btrim("nombre") <> ''),
+    -- La ventana: las dos horas o ninguna, "HH:MM" de 00:00 a 23:59, distintas.
+    -- Solo integridad: dos turnos con ventanas solapadas se aceptan (al abrir,
+    -- la ambigüedad se pregunta).
+    CONSTRAINT "TurnoOperativo_ventana_completa_chk" CHECK (
+      ("horaInicioReconocimiento" IS NULL) = ("horaFinReconocimiento" IS NULL)
+    ),
+    CONSTRAINT "TurnoOperativo_ventana_formato_chk" CHECK (
+      "horaInicioReconocimiento" IS NULL OR (
+        "horaInicioReconocimiento" ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+        AND "horaFinReconocimiento" ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+        AND "horaInicioReconocimiento" <> "horaFinReconocimiento"
+      )
+    )
 );
 
 CREATE INDEX "TurnoOperativo_localId_activo_orden_idx" ON "TurnoOperativo"("localId", "activo", "orden");

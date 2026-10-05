@@ -30,7 +30,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 
 import { Cifra } from "@/components/caja/CifrasRetiro";
 import TablaDenominaciones from "@/components/caja/TablaDenominaciones";
-import SelectorTurnoOperativo, { useTurnosOperativosActivos } from "@/components/caja/SelectorTurnoOperativo";
+import SelectorTurnoOperativo, { turnoFinalDeApertura, useTurnosOperativosActivos } from "@/components/caja/SelectorTurnoOperativo";
 import { CABECERA_BLOQUE, BLOQUE_ALINEADO } from "@/components/caja/geometriaGrilla";
 import {
   PanelSinCambio,
@@ -61,9 +61,11 @@ export default function AperturaSinCambioPage() {
   const [error, setError] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [resultado, setResultado] = useState(null);
-  // El turno operativo se elige al abrir; la fecha la fijó el servidor.
+  // El turno operativo: el que propone la hora del local, o el que elige la
+  // persona. La fecha operativa la calcula el servidor con el turno final.
   const catalogo = useTurnosOperativosActivos();
-  const [turno, setTurno] = useState({ id: null, fechaOperativa: null });
+  const [turnoElegido, setTurnoElegido] = useState(null);
+  const turnoId = turnoFinalDeApertura(turnoElegido, catalogo);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const puedeUsar = permisos.includes("*") || permisos.includes("pos.usar");
@@ -101,7 +103,7 @@ export default function AperturaSinCambioPage() {
 
   const confirmar = async () => {
     if (guardando || !hayConteo || !motivo.trim()) return;
-    if (!turno.id) {
+    if (!turnoId) {
       setError("Elegí de qué turno es esta caja.");
       return;
     }
@@ -122,8 +124,7 @@ export default function AperturaSinCambioPage() {
           desgloseContado,
           motivo: motivo.trim(),
           totalConfirmado: totalConfirmado === "" ? null : totalConfirmado,
-          turnoOperativoId: turno.id,
-          fechaOperativa: turno.fechaOperativa,
+          turnoOperativoId: turnoId,
         }),
       });
       const json = await res.json();
@@ -200,9 +201,9 @@ export default function AperturaSinCambioPage() {
 
       <SunmiCard className="p-3">
         <SelectorTurnoOperativo
-          valor={turno.id}
-          onCambiar={(id, fechaOperativa) => {
-            setTurno({ id, fechaOperativa });
+          valor={turnoId}
+          onCambiar={(id) => {
+            setTurnoElegido(id);
             setError("");
           }}
           catalogo={catalogo}

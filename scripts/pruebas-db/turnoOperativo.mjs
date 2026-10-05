@@ -9,12 +9,14 @@
 // rutas reales; lo puro está en lib/tesoreria/lecturaTesoreria.test.mjs.
 //
 //   A. El catálogo es de cada local                                   [TO-12]
-//   B. Abrir caja: turno de otro local, inactivo, sin turno, de ayer  [TO-4, TO-5]
+//   B. Abrir caja: turno de otro local, inactivo, sin turno           [TO-4, TO-5]
 //   C. Las tres rutas de apertura guardan turno y fecha               [TO-11]
 //   D. La base sostiene la caja: CHECK, FK compuesta, inmutable       [TO-4, TO-8]
 //   E. Tesorería agrupa por el turno de la caja                       [TO-1, TO-2, TO-8]
 //   F. No se verifican juntos dos turnos ni dos fechas                [TO-6, TO-7]
 //   G. La verificación congela su turno; la base lo exige y lo cuida  [TO-6, TO-9]
+//   H. La ventana de reconocimiento: propone, pregunta, y la fecha
+//      operativa sale del turno FINAL                                 [TO-H1..H13]
 //
 // No desmonta: una verificación no se borra —la base lo impide— y sus cajas
 // tampoco. Todo lleva una marca única por corrida.
@@ -28,7 +30,9 @@ const { crearProductoVendible } = await import("./fixturePos.mjs");
 const { firmarTokenOperador, OperadorCookie } = await import("../../lib/operador.js");
 const { itemCrearPayload } = await import("../../lib/pos-ventas/payloadVenta.js");
 const { DENOMINACIONES } = await import("../../lib/caja/conteoBilletes.js");
-const { hoyArgentinaISO } = await import("../../lib/fechas/rangoArgentina.js");
+const { hoyArgentinaISO, momentoArgentina } = await import("../../lib/fechas/rangoArgentina.js");
+const { fechaOperativaDeTurno, horaDeMinutos, sumarDias } = await import("../../lib/caja/turnoOperativo.js");
+const { reconocimientoDeApertura, turnoOperativoDeApertura } = await import("../../lib/caja/turnoOperativoServer.js");
 const { leerTesoreria, rangoDeTesoreria } = await import("../../lib/tesoreria/lecturaTesoreriaServer.js");
 const { CRITERIO_SIN_TURNO, CRITERIO_TURNO_OPERATIVO } = await import("../../lib/tesoreria/turnoComercial.js");
 const { PERMISO_VER_TESORERIA, PERMISO_VERIFICAR_EFECTIVO, PERMISO_ANULAR_VERIFICACION } = await import("../../lib/tesoreria/permisos.js");
@@ -206,7 +210,8 @@ async function correr() {
     ok("ningún id de B en el catálogo de A", !deA.turnos?.some((t) => t.id === mañanaB.id));
     igual("con ?activos=1, solo los que se ofrecen para abrir", (await catalogo(A.sesion, "?activos=1")).turnos?.map((t) => t.nombre), ["Mañana", "Tarde"]);
     igual("B ve solo el suyo", (await catalogo(B.sesion)).turnos?.map((t) => t.id), [mañanaB.id]);
-    igual("la fecha operativa que ofrece es la de hoy", deA.fechaOperativa, HOY);
+    igual("sin ventana, la fecha operativa que ofrece cada turno es la de hoy",
+      (await catalogo(A.sesion, "?activos=1")).turnos?.map((t) => t.fechaOperativa), [HOY, HOY]);
     const ajeno = await leer(await rutaTurnoDelCatalogo.PATCH(
       conCookie(`http://ci/api/config/turnos-operativos/${mañanaB.id}`, `erpazul_sesion=${A.config}`, { activo: false }, "PATCH"), conId(mañanaB.id)));
     igual("A no puede tocar el turno de B: 404, como si no existiera", ajeno.status, 404);
@@ -229,8 +234,6 @@ async function correr() {
     igual("con un turno inactivo: 400 y su código", [inactivo.r.status, inactivo.r.codigo], [400, "TURNO_OPERATIVO_INACTIVO"]);
     const sin = await abrirCon(A, {});
     igual("sin turno: 400, pide elegirlo", [sin.r.status, sin.r.codigo], [400, "TURNO_OPERATIVO_REQUERIDO"]);
-    const deAyer = await abrirCon(A, { turnoOperativoId: mañana.id, fechaOperativa: AYER });
-    igual("con la pantalla de ayer: 409, no abre con otra fecha", [deAyer.r.status, deAyer.r.codigo], [409, "FECHA_OPERATIVA_DE_OTRO_DIA"]);
     igual("ninguno de los rechazos abrió una caja", await prisma.turno.count({ where: { localId: A.local.id } }), antes);
     const C = await montarLocal("C");
     const sinCatalogo = await abrirCon(C, {});
@@ -241,6 +244,10 @@ async function correr() {
   {
     const clasica = await cajaPorRuta(A, mañana.id);
     igual("abrir: turno y fecha de hoy", [(await turnoDeCaja(clasica.turnoId)).turnoOperativoId, isoDe((await turnoDeCaja(clasica.turnoId)).fechaOperativa)], [mañana.id, HOY]);
+    // La fecha la decide el servidor: una que mande el cliente se ignora.
+    const conFechaAjena = await abrirCon(A, { turnoOperativoId: mañana.id, fechaOperativa: AYER });
+    requerir("con una fecha de ayer en el pedido igual abre", conFechaAjena.r.ok === true, `${conFechaAjena.r.status} ${conFechaAjena.r.error ?? ""}`);
+    igual("y guarda la que calculó el servidor, no la del cliente", isoDe((await turnoDeCaja(conFechaAjena.r.turno.id)).fechaOperativa), HOY);
 
     const { quien: qSin } = await operador(A);
     const rSin = await leer(await rutaAbrirSinCambio.POST(pedido(`${BASE}/turnos/abrir-sin-cambio`, qSin, {
@@ -380,6 +387,125 @@ async function correr() {
         estado: "ANULADA", vigente: false, anuladaEn: new Date(), anuladaPorUsuarioId: A.cuenta.id, motivoAnulacion: "prueba", turnoOperativoId: tarde.id,
       } })),
       /no cambia lo que se verificó/);
+  }
+
+  seccion("H. La ventana: propone o pregunta; la fecha sale del turno FINAL [TO-H]");
+  {
+    const H = await montarLocal("H");
+    const urlCatalogo = "http://ci/api/config/turnos-operativos";
+    const alta = async (nombre, desde, hasta) =>
+      leer(await rutaCatalogo.POST(conCookie(urlCatalogo, `erpazul_sesion=${H.config}`, { nombre, horaInicioReconocimiento: desde, horaFinReconocimiento: hasta })));
+    const cambiar = async (id, cuerpo) =>
+      leer(await rutaTurnoDelCatalogo.PATCH(conCookie(`${urlCatalogo}/${id}`, `erpazul_sesion=${H.config}`, cuerpo, "PATCH"), conId(id)));
+    const oferta = async (L) => leer(await rutaCatalogo.GET(conCookie(`${urlCatalogo}?activos=1`, `erpazul_sesion=${L.sesion}`, null, "GET")));
+    // Ventanas armadas alrededor de la hora del servidor, con horas de margen:
+    // la prueba no depende de a qué hora corre.
+    const base = momentoArgentina().minuto;
+    const h = (delta) => horaDeMinutos((((base + delta) % 1440) + 1440) % 1440);
+
+    const uno = await alta("Uno", h(-60), h(60));
+    const dos = await alta("Dos", h(180), h(240));
+    requerir("se dan de alta con su ventana", uno.ok === true && dos.ok === true, `${uno.error ?? ""} ${dos.error ?? ""}`);
+    igual("la ventana se guarda tal cual", [uno.turno.horaInicioReconocimiento, uno.turno.horaFinReconocimiento], [h(-60), h(60)]);
+
+    let o = await oferta(H);
+    igual("[TO-H1] una coincidencia: el servidor propone ese turno", [o.reconocimiento?.estado, o.reconocimiento?.sugeridoId], ["UNICO", uno.turno.id]);
+
+    const cambiado = await abrirCon(H, { turnoOperativoId: dos.turno.id });
+    requerir("[TO-H5] abre con un turno activo fuera de su ventana", cambiado.r.ok === true, `${cambiado.r.status} ${cambiado.r.error ?? ""}`);
+    igual("[TO-H4] la caja guarda el turno FINAL que eligió la persona, no el propuesto",
+      (await turnoDeCaja(cambiado.r.turno.id)).turnoOperativoId, dos.turno.id);
+
+    const solapa = await cambiar(dos.turno.id, { horaInicioReconocimiento: h(-30), horaFinReconocimiento: h(90) });
+    igual("[TO-H12] una ventana que se solapa con otra se guarda", solapa.status, 200);
+    o = await oferta(H);
+    igual("[TO-H3] dos coincidencias: pregunta y no propone ninguno",
+      [o.reconocimiento?.estado, o.reconocimiento?.sugeridoId, [...(o.reconocimiento?.candidatosIds ?? [])].sort((a, b) => a - b)],
+      ["VARIOS", null, [uno.turno.id, dos.turno.id].sort((a, b) => a - b)]);
+
+    await cambiar(uno.turno.id, { horaInicioReconocimiento: h(300), horaFinReconocimiento: h(360) });
+    await cambiar(dos.turno.id, { horaInicioReconocimiento: null, horaFinReconocimiento: null });
+    o = await oferta(H);
+    igual("[TO-H2] ninguna coincidencia: pregunta y no propone ninguno", [o.reconocimiento?.estado, o.reconocimiento?.sugeridoId], ["NINGUNO", null]);
+    igual("y sacar la ventana la deja vacía", (await prisma.turnoOperativo.findUnique({ where: { id: dos.turno.id } })).horaInicioReconocimiento, null);
+
+    const apagado = await alta("Apagado", h(-60), h(60));
+    await cambiar(apagado.turno.id, { activo: false });
+    o = await oferta(H);
+    ok("[TO-H6] un turno inactivo no se propone ni se ofrece aunque su ventana coincida",
+      !o.reconocimiento?.candidatosIds?.includes(apagado.turno.id) && !o.turnos?.some((t) => t.id === apagado.turno.id));
+    const conApagado = await abrirCon(H, { turnoOperativoId: apagado.turno.id });
+    igual("[TO-H6] abrir con él: 400", [conApagado.r.status, conApagado.r.codigo], [400, "TURNO_OPERATIVO_INACTIVO"]);
+    const conAjeno = await abrirCon(H, { turnoOperativoId: mañana.id });
+    igual("[TO-H6] ni con uno de otro local", [conAjeno.r.status, conAjeno.r.codigo], [400, "TURNO_OPERATIVO_DE_OTRO_LOCAL"]);
+
+    const rotos = [await alta("Medio", h(0), ""), await alta("Igual", h(0), h(0)), await alta("Raro", "25:00", "01:00")];
+    igual("un rango roto: 400 con su código", rotos.map((r) => [r.status, r.codigo]), Array(3).fill([400, "RANGO_DE_RECONOCIMIENTO_INVALIDO"]));
+    rechazado("la base tampoco guarda una ventana a medias",
+      await intento(() => prisma.turnoOperativo.create({ data: { localId: H.local.id, nombre: clave(), horaInicioReconocimiento: "06:00" } })),
+      /ventana_completa_chk|23514/);
+    rechazado("ni una hora que no es HH:MM",
+      await intento(() => prisma.turnoOperativo.create({ data: { localId: H.local.id, nombre: clave(), horaInicioReconocimiento: "6:00", horaFinReconocimiento: "07:00" } })),
+      /ventana_formato_chk|23514/);
+
+    // La jornada, con el reloj FIJADO: la regla compartida recibe el instante.
+    // Domingo 2026-10-04 23:30 y lunes 00:30, hora argentina.
+    const K = await montarLocal("K");
+    const cruza = await prisma.turnoOperativo.create({ data: { localId: K.local.id, nombre: "Cruza", orden: 0, horaInicioReconocimiento: "23:00", horaFinReconocimiento: "01:00" } });
+    const normal = await prisma.turnoOperativo.create({ data: { localId: K.local.id, nombre: "Normal", orden: 1, horaInicioReconocimiento: "06:00", horaFinReconocimiento: "11:00" } });
+    const domingo2330 = new Date("2026-10-05T02:30:00.000Z");
+    const lunes0030 = new Date("2026-10-05T03:30:00.000Z");
+    const jornada = async (t, ahora) =>
+      isoDe((await turnoOperativoDeApertura(prisma, { localId: K.local.id, body: { turnoOperativoId: t.id, fechaOperativa: "2020-01-01" }, ahora })).datos?.fechaOperativa);
+    const r = await reconocimientoDeApertura(prisma, { localId: K.local.id, ahora: domingo2330 });
+    igual("domingo 23:30: propone el turno de la ventana 23→01", [r.reconocimiento.estado, r.reconocimiento.sugeridoId], ["UNICO", cruza.id]);
+    igual("[TO-H8] domingo 23:30 + ventana 23→01: jornada del LUNES", await jornada(cruza, domingo2330), "2026-10-05");
+    igual("[TO-H9] lunes 00:30 + la misma ventana: jornada del LUNES, el mismo turno", await jornada(cruza, lunes0030), "2026-10-05");
+    igual("[TO-H10] cambiado al de ventana normal, a la misma hora: jornada del domingo", await jornada(normal, domingo2330), "2026-10-04");
+    igual("[TO-H10] lo que la pantalla muestra para cada turno sale de la misma regla",
+      r.turnos.map((t) => [t.id, t.fechaOperativa]), [[cruza.id, "2026-10-05"], [normal.id, "2026-10-04"]]);
+    igual("[TO-H7] ventana normal: el día de la apertura", await jornada(normal, new Date("2026-10-04T10:30:00.000Z")), "2026-10-04");
+
+    // [TO-H13] Las tres rutas, con el reloj real: la fecha guardada es la de
+    // la regla para el turno elegido. La ventana termina un minuto antes de
+    // empezar, así que contiene la hora y cruza la medianoche: salvo en la
+    // primera media hora del día, la jornada es la de MAÑANA, no la de hoy.
+    const ahoraMin = momentoArgentina().minuto;
+    const hr = (delta) => horaDeMinutos((((ahoraMin + delta) % 1440) + 1440) % 1440);
+    const W = await prisma.turnoOperativo.create({ data: { localId: K.local.id, nombre: "W", orden: 2, horaInicioReconocimiento: hr(-30), horaFinReconocimiento: hr(-31) } });
+    const esperadas = () => new Set([fechaOperativaDeTurno(W, momentoArgentina())]);
+    const comprobar = async (ruta, turnoId, antes) => {
+      const fecha = isoDe((await turnoDeCaja(turnoId)).fechaOperativa);
+      const despues = esperadas();
+      ok(`[TO-H13] ${ruta}: guarda la fecha de la regla para el turno elegido`, antes.has(fecha) || despues.has(fecha), `guardó ${fecha}`);
+      const m = momentoArgentina();
+      ok(`[TO-H13] ${ruta}: y no es simplemente hoy`, m.minuto < 31 || fecha === sumarDias(m.fecha, 1), `guardó ${fecha}, hoy ${m.fecha}`);
+    };
+    let antes = esperadas();
+    const porAbrir = await cajaPorRuta(K, W.id);
+    await comprobar("abrir", porAbrir.turnoId, antes);
+
+    const { quien: qSin } = await operador(K);
+    antes = esperadas();
+    const rSin = await leer(await rutaAbrirSinCambio.POST(pedido(`${BASE}/turnos/abrir-sin-cambio`, qSin, {
+      desgloseContado: desgloseDe(2000), motivo: "fondo propio", turnoOperativoId: W.id,
+    })));
+    requerir("abrir-sin-cambio abre", rSin.ok === true, `${rSin.status} ${rSin.error ?? ""}`);
+    await comprobar("abrir-sin-cambio", rSin.turno.id, antes);
+
+    await vender(porAbrir, 5000);
+    const corte = await cerrar(porAbrir, 3000, 5000);
+    const sobre = await prisma.cambioPendiente.findFirst({ where: { cierrePreparacionId: corte.id } });
+    requerir("el cierre dejó un sobre", Boolean(sobre), "sin sobre");
+    const { quien: qCon } = await operador(K);
+    const reserva = await leer(await rutaReservar.POST(pedido(`${BASE}/cambios-pendientes/reservar`, qCon, { cambioPendienteId: sobre.id })));
+    requerir("reserva el sobre", reserva.ok === true, `${reserva.status} ${reserva.error ?? ""}`);
+    antes = esperadas();
+    const rCon = await leer(await rutaAbrirConCambio.POST(pedido(`${BASE}/turnos/abrir-con-cambio`, qCon, {
+      cambioPendienteId: sobre.id, desgloseRecibido: desgloseDe(3000), turnoOperativoId: W.id,
+    })));
+    requerir("abrir-con-cambio abre", rCon.ok === true, `${rCon.status} ${rCon.error ?? ""}`);
+    await comprobar("abrir-con-cambio", rCon.turno.id, antes);
   }
 }
 

@@ -1,6 +1,7 @@
 // app/api/config/turnos-operativos/[id]/route.js
 //
-// Renombrar o activar/desactivar UN turno del catálogo del local. No hay
+// Renombrar, activar/desactivar o cambiar la ventana de reconocimiento de UN
+// turno del catálogo del local. No hay
 // DELETE: una caja o una verificación pueden apuntarlo. Desactivado, deja de
 // ofrecerse para abrir caja y la historia sigue leyéndose con su nombre.
 
@@ -9,7 +10,12 @@ import prisma from "@/lib/prisma";
 import { checkPerm } from "@/lib/authorize";
 import { getUsuarioSession } from "@/lib/auth";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
-import { CODIGO_TURNO_OPERATIVO, idDeTurnoOperativo, validarNombreTurnoOperativo } from "@/lib/caja/turnoOperativo";
+import {
+  CODIGO_TURNO_OPERATIVO,
+  idDeTurnoOperativo,
+  validarNombreTurnoOperativo,
+  validarRangoReconocimiento,
+} from "@/lib/caja/turnoOperativo";
 import { SELECT_TURNO_OPERATIVO } from "@/lib/caja/turnoOperativoServer";
 
 export async function PATCH(req, { params }) {
@@ -46,8 +52,19 @@ export async function PATCH(req, { params }) {
       }
       data.activo = body.activo;
     }
+    // La ventana va entera: las dos horas, o las dos en null para sacarla.
+    if (body?.horaInicioReconocimiento !== undefined || body?.horaFinReconocimiento !== undefined) {
+      const rango = validarRangoReconocimiento(body?.horaInicioReconocimiento, body?.horaFinReconocimiento);
+      if (!rango.valido) {
+        return NextResponse.json({ ok: false, error: rango.error, codigo: CODIGO_TURNO_OPERATIVO.RANGO_INVALIDO }, { status: 400 });
+      }
+      Object.assign(data, rango.rango);
+    }
     if (!Object.keys(data).length) {
-      return NextResponse.json({ ok: false, error: "No hay nada para cambiar: se cambia el nombre o si está activo." }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "No hay nada para cambiar: se cambia el nombre, si está activo o su ventana de reconocimiento." },
+        { status: 400 }
+      );
     }
 
     const turno = await prisma.turnoOperativo.update({ where: { id }, data, select: SELECT_TURNO_OPERATIVO });
