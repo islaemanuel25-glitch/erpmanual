@@ -1291,13 +1291,17 @@ const CASOS = [
     candado: "[33] un doble toque no hace dos envíos: guardia por ref y botón apagado mientras viaja",
     suite: "components/tesoreria/tesoreriaMovil.test.mjs",
   },
+  // La "base conocida" salió de la pantalla con el rediseño móvil (Figma
+  // EVJ2KvVCrY0oVSowfboymQ); la regla que defendía —lo pagado desde caja ya
+  // está adentro de lo entregado y no se resta otra vez— sigue, ahora sobre la
+  // cifra de EFECTIVO ENTREGADO.
   {
     n: "TES-base",
-    defecto: "la pantalla vuelve a restar lo pagado desde caja a la base conocida",
+    defecto: "la pantalla vuelve a restar lo pagado desde caja a lo entregado",
     archivo: "components/tesoreria/PantallaTesoreria.jsx",
-    de: "{formatearMoneda(r.baseConocida)}",
-    a: "{formatearMoneda(Number(r.baseConocida) - Number(r.pagosDesdeCajaInformativos))}",
-    candado: "[9][45] la base conocida y los totales son los del servidor, tal cual: no se recalculan",
+    de: "{formatearMoneda(r.efectivoDeclaradoEntregado)}",
+    a: "{formatearMoneda(Number(r.efectivoDeclaradoEntregado) - Number(r.pagosDesdeCajaInformativos))}",
+    candado: "[9][45] los totales de COBRADO POR POS y EFECTIVO ENTREGADO son los del servidor, tal cual: no se recalculan",
     suite: "components/tesoreria/tesoreriaMovil.test.mjs",
   },
   {
@@ -1327,13 +1331,53 @@ const CASOS = [
     candado: "[41b] con el teclado abierto, los campos de texto de las hojas no se aplastan",
     suite: "components/tesoreria/tesoreriaMovil.test.mjs",
   },
+  // Desde el rediseño la tarjeta cerrada ya no nombra cajas: dice cuántas, y
+  // las cajas se abren con "Ver cajas (N)". El defecto es el mismo de antes:
+  // que la tarjeta cerrada vuelva a listarlas.
   {
     n: "TES-cajas",
-    defecto: "la tarjeta del turno vuelve a listar todos los nombres de las cajas que faltan contar",
+    defecto: "la tarjeta del turno cerrada vuelve a listar las cajas",
+    archivo: "components/tesoreria/PantallaTesoreria.jsx",
+    de: "      {abierto && <CajasDelTurno g={g} verificaciones={verificaciones} onVerCaja={acciones.onVerCaja} />}\n    </TarjetaDeTurno>",
+    a: "      <CajasDelTurno g={g} verificaciones={verificaciones} onVerCaja={acciones.onVerCaja} />\n    </TarjetaDeTurno>",
+    candado: "[13b] la tarjeta del turno cerrada no lista los nombres de sus cajas: dice cuántas",
+    suite: "components/tesoreria/tesoreriaMovil.test.mjs",
+  },
+  // ── EL REDISEÑO MÓVIL: lo que separa los bloques ──────────────────────
+  {
+    n: "TES-digital-en-turno",
+    defecto: "Mercado Pago vuelve a aparecer dentro de la tarjeta del turno",
     archivo: "components/tesoreria/PiezasTesoreria.jsx",
-    de: "  return cajas.length > MAX_CAJAS_NOMBRADAS ? `${cajas.length} cajas` : cajas.join(\", \");",
-    a: "  return cajas.join(\", \");",
-    candado: "[13b] con más de dos cajas pendientes se dice cuántas son, no se listan los nombres",
+    de: "        <p className=\"text-sm2 sunmi-text-muted\">Efectivo entregado</p>\n",
+    a: "        <p className=\"text-sm2 sunmi-text-muted\">Efectivo entregado</p>\n        {(g.grupo.cobradoPorMedio || []).filter((m) => !m.esEfectivo).map((m) => <p key={m.medio}>{m.medio} {formatearMoneda(m.montoDeclarado)}</p>)}\n",
+    candado: "[D] la tarjeta del turno no lleva lo digital ni lo cobrado: solo efectivo entregado",
+    suite: "components/tesoreria/tesoreriaMovil.test.mjs",
+  },
+  {
+    n: "TES-cobrado-protagonista",
+    defecto: "«Cobrado por POS» vuelve a ser la cifra protagonista del turno",
+    archivo: "components/tesoreria/PiezasTesoreria.jsx",
+    de: "          {formatearMoneda(g.grupo.efectivoDeclaradoEntregado)}\n        </div>\n        <p className=\"text-sm2 sunmi-text-muted\">Efectivo entregado</p>",
+    a: "          {formatearMoneda(Number(g.grupo.efectivoDeclaradoEntregado) + Number(g.grupo.digitalCobradoDeclarado))}\n        </div>\n        <p className=\"text-sm2 sunmi-text-muted\">Cobrado por POS</p>",
+    candado: "[C] una tarjeta por turno, con el nombre del catálogo, sus cajas, el efectivo protagonista y el avance",
+    suite: "components/tesoreria/tesoreriaMovil.test.mjs",
+  },
+  {
+    n: "TES-compensa",
+    defecto: "las diferencias de caja de un turno se compensan en una sola",
+    archivo: "components/tesoreria/PiezasTesoreria.jsx",
+    de: "      ))}\n    </div>\n  );\n}\n\n/**\n * CAJA DEL TURNO",
+    a: "      ))}\n      <div data-diferencia-de-caja>Diferencia de caja {formatearMoneda(g.cajas.reduce((s, c) => s + Number(c.caja?.diferenciaCaja || 0), 0))}</div>\n    </div>\n  );\n}\n\n/**\n * CAJA DEL TURNO",
+    candado: "[E] «Ver cajas (N)» abre las cajas dentro de la misma tarjeta y pasa a «Ocultar cajas»",
+    suite: "components/tesoreria/tesoreriaMovil.test.mjs",
+  },
+  {
+    n: "TES-sin-turno",
+    defecto: "«Sin turno asignado» pierde la posibilidad de verificar el efectivo pendiente",
+    archivo: "components/tesoreria/PiezasTesoreria.jsx",
+    de: "  const verificar = puedeVerificar && g.pendientes.length > 0;",
+    a: "  const verificar = false;",
+    candado: "[F] «Sin turno asignado» va al final, secundario, y se puede verificar mientras falte",
     suite: "components/tesoreria/tesoreriaMovil.test.mjs",
   },
   {
