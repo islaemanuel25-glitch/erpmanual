@@ -72,25 +72,44 @@ compensan entre sí [CÓDIGO].
   `config_local.pos`. No se borra: se desactiva. Las ventanas se pueden
   solapar; solo se valida la integridad del rango
   [CÓDIGO, `app/api/config/turnos-operativos/`; TO-H12, TO-H14].
-- **La ventana no es la duración del turno: solo PROPONE.** Al abrir, el
-  servidor compara su hora con las ventanas de los turnos activos del local:
-  UNA coincidencia → se propone ese turno, con «Cambiar turno»; NINGUNA o
-  VARIAS → se pregunta, sin elegir por cercanía ni por orden
-  [CÓDIGO, `lib/caja/turnoOperativo.js` `reconocerTurno`; TO-H1, TO-H2, TO-H3].
+- **La ventana no es la duración del turno.** Dice dónde empieza el turno en el
+  día y PROPONE: al abrir, si exactamente una ventana activa contiene la hora,
+  se propone ese turno, con «Cambiar turno»; con ninguna o varias, se pregunta
+  entre las opciones del ciclo [CÓDIGO, `lib/caja/turnoOperativo.js`
+  `reconocerTurno`; TO-H1, TO-H2, TO-H3].
+- **El ciclo decide qué se puede abrir.** Los turnos activos, en su `orden`,
+  forman un ciclo (después del último, el primero), y cada uno ocurre una vez
+  por fecha operativa. Una ocurrencia empieza en el inicio de la ventana de su
+  turno. En cada momento se puede abrir solo:
+  - la ocurrencia **actual**: la que empezó más recientemente —aunque ya esté
+    fuera de su ventana: es un turno que se extiende— y las que están dentro de
+    su ventana;
+  - la **siguiente inmediata**: la del turno que sigue a la actual en el
+    `orden`, en su próximo comienzo.
+
+  Un turno que ya pasó y cuyo próximo comienzo exige atravesar otro no se
+  ofrece y el servidor lo rechaza (409 `TURNO_OPERATIVO_FUERA_DE_CICLO`). Sin
+  distancias, sin umbrales, sin nombres [CÓDIGO, `cicloDeTurnos`; TO-C3..TO-C9,
+  TO-C11..TO-C13].
 - **El turno FINAL es el que se guarda**, en las tres rutas (`abrir`,
   `abrir-sin-cambio`, `abrir-con-cambio`), por una sola función
-  (`turnoOperativoDeApertura`). Tiene que existir, estar activo y ser del local;
-  la ventana no prohíbe elegir otro. Sin turnos activos la apertura es 409
-  `LOCAL_SIN_TURNOS_OPERATIVOS` [CÓDIGO; TO-1, TO-H4, TO-H5, TO-H6, TO-H13].
-- **`fechaOperativa` es la de la JORNADA del turno final** y la calcula el
-  servidor al abrir (`fechaOperativaDeTurno`); una fecha que mande el cliente se
-  ignora. Ventana normal o sin ventana → el día de la apertura. Ventana que
-  cruza la medianoche (inicio > fin) → lo que cae antes de las 00:00 es de la
-  jornada del día SIGUIENTE y lo de después, del día: con 23:00 → 01:00, el
-  domingo 23:30 y el lunes 00:30 son los dos del lunes. Fuera de su ventana se
-  toma la mitad del día más cercana (cerca del inicio, la jornada que viene;
-  cerca del fin, la que pasó) [CÓDIGO; TO-H7..TO-H10]. No se recalcula, y la
-  base impide cambiar turno o fecha de una caja ya escrita [CÓDIGO; TO-4].
+  (`turnoOperativoDeApertura`): del local, activo y posible en el ciclo a esa
+  hora. Sin turnos activos la apertura es 409 `LOCAL_SIN_TURNOS_OPERATIVOS`
+  [CÓDIGO; TO-1, TO-H4, TO-H6, TO-H13, TO-C8].
+- **`fechaOperativa` es la de la ocurrencia del turno final** y la calcula el
+  servidor al abrir; una fecha que mande el cliente se ignora. Ventana normal →
+  el día en que empieza. Ventana que cruza la medianoche (inicio > fin) →
+  empieza el día ANTERIOR a su jornada: con 23:00 → 01:00, el domingo 23:30 y
+  el lunes 00:30 son la ocurrencia del lunes. A las 22:00 del lunes, con un
+  ciclo noche → mañana → tarde, la tarde que se extiende es del lunes, la noche
+  que sigue es del martes y la mañana no se puede abrir [CÓDIGO; TO-C1..TO-C7].
+  No se recalcula, y la base impide cambiar turno o fecha de una caja ya
+  escrita [CÓDIGO; TO-4].
+- **Lo que el ciclo no puede decidir, no lo adivina**: si un turno activo no
+  tiene ventana, o si todos empiezan a la misma hora y ninguno está en su
+  ventana (un solo turno, por ejemplo), la apertura no abre y dice qué falta
+  configurar (409 `CICLO_DE_TURNOS_SIN_VENTANA` / `CICLO_DE_TURNOS_AMBIGUO`)
+  [CÓDIGO; PENDIENTE de decisión de negocio].
 - **Agrupación**: `grupoDeTesoreria` (`lib/tesoreria/turnoComercial.js`) agrupa
   por local + fecha operativa + turno DE LA CAJA. Cada hecho hereda el grupo de
   su caja, así que la medianoche no parte una caja, y una caja con turno entra
