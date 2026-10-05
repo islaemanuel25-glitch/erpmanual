@@ -94,7 +94,7 @@ compensan entre sí [CÓDIGO].
 - **El turno FINAL es el que se guarda**, en las tres rutas (`abrir`,
   `abrir-sin-cambio`, `abrir-con-cambio`), por una sola función
   (`turnoOperativoDeApertura`): del local, activo y posible en el ciclo a esa
-  hora. Sin turnos activos la apertura es 409 `LOCAL_SIN_TURNOS_OPERATIVOS`
+  hora. Un local que ya usa turnos y no tiene ninguno activo da 409 `LOCAL_SIN_TURNOS_OPERATIVOS`
   [CÓDIGO; TO-1, TO-H4, TO-H6, TO-H13, TO-C8].
 - **`fechaOperativa` es la de la ocurrencia del turno final** y la calcula el
   servidor al abrir; una fecha que mande el cliente se ignora. Ventana normal →
@@ -105,11 +105,23 @@ compensan entre sí [CÓDIGO].
   que sigue es del martes y la mañana no se puede abrir [CÓDIGO; TO-C1..TO-C7].
   No se recalcula, y la base impide cambiar turno o fecha de una caja ya
   escrita [CÓDIGO; TO-4].
-- **Lo que el ciclo no puede decidir, no lo adivina**: si un turno activo no
-  tiene ventana, o si todos empiezan a la misma hora y ninguno está en su
-  ventana (un solo turno, por ejemplo), la apertura no abre y dice qué falta
-  configurar (409 `CICLO_DE_TURNOS_SIN_VENTANA` / `CICLO_DE_TURNOS_AMBIGUO`)
-  [CÓDIGO; PENDIENTE de decisión de negocio].
+- **Un solo turno** (o varios que empiezan a la misma hora): la ocurrencia
+  actual se extiende hasta su próximo comienzo; con 08:00 → 12:00, el lunes a
+  las 20:00 y el martes a las 07:59 siguen siendo del lunes [CÓDIGO; TO-V8].
+- **Un turno sin ventana es válido**: ocupa su lugar en el orden y no traba
+  nada mientras no haga falta ubicarlo. Cuando es el que SIGUE a la ocurrencia
+  actual —o ningún turno tiene ventana— no se sabe si ya empezó ni de qué
+  fecha es: la apertura no ofrece nada y dice qué turno necesita horario (409
+  `CICLO_DE_TURNOS_INDETERMINADO`) [CÓDIGO; TO-V1..TO-V4; PENDIENTE de
+  decisión de negocio para ese momento].
+- **Transición por local**: un local que NUNCA tuvo turnos operativos (cero
+  filas en su catálogo) sigue en modo legado y sus cajas nuevas abren sin turno
+  —"Sin turno asignado"—, en las tres rutas. Al dar de alta su primer turno
+  entra al sistema nuevo y no vuelve: toda caja nueva exige turno, y si después
+  desactiva todos, la apertura es 409 `LOCAL_SIN_TURNOS_OPERATIVOS` en vez de
+  volver al legado. Se distingue por las filas del catálogo, no por las
+  activas: un turno no se borra y nace activo. Las cajas legado no reciben
+  turno nunca [CÓDIGO, `lib/caja/turnoOperativoServer.js`; TO-T1..TO-T9].
 - **Agrupación**: `grupoDeTesoreria` (`lib/tesoreria/turnoComercial.js`) agrupa
   por local + fecha operativa + turno DE LA CAJA. Cada hecho hereda el grupo de
   su caja, así que la medianoche no parte una caja, y una caja con turno entra

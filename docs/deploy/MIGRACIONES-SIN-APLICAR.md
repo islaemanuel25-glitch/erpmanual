@@ -32,14 +32,14 @@ Producción está en **48 migraciones**; el árbol tiene 49. Pendiente de deploy
   limpia y se reintenta, no espera. **No escribe ningún dato**: las cajas y
   verificaciones existentes quedan en NULL y se ven como "Sin turno asignado".
   Ensayada desde cero (0 → 49, sin drift).
-  **PASO OBLIGATORIO DESPUÉS DE MIGRAR:** con la app nueva, un local sin
-  turnos operativos activos NO PUEDE ABRIR CAJA (409
-  `LOCAL_SIN_TURNOS_OPERATIVOS`, con el mensaje de dónde se cargan). Antes de
-  que abra el primer turno del día, cada local tiene que tener los suyos en
-  Configuración → POS → Turnos operativos (permiso `config_local.pos`), CADA
-  UNO CON SU HORARIO DE RECONOCIMIENTO y en el orden del ciclo: con un turno
-  activo sin horario la apertura tampoco abre (409
-  `CICLO_DE_TURNOS_SIN_VENTANA`).
+  **No corta aperturas.** Con la app nueva, un local que todavía no tiene
+  turnos operativos sigue abriendo cajas en modo legado, sin turno ("Sin turno
+  asignado"). Cada local entra al sistema nuevo cuando carga su primer turno en
+  Configuración → POS → Turnos operativos (permiso `config_local.pos`): desde
+  ahí sus cajas nuevas exigen turno, y desactivarlos no lo devuelve al legado.
+  Conviene cargar cada turno con su horario de reconocimiento y en el orden del
+  ciclo: un turno sin horario, cuando es el que sigue, deja la apertura sin
+  opciones hasta que se le cargue (409 `CICLO_DE_TURNOS_INDETERMINADO`).
 
 `20261004120000_verificacion_efectivo` (PR #136) **ya está aplicada**: lo
 informó Emanuel el 2026-10-04, con producción en 48/48. El commit que corre
