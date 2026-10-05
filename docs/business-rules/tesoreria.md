@@ -65,7 +65,7 @@ entregas → se cuenta → se verifica ESE turno. Las diferencias de cada caja n
 compensan entre sí [CÓDIGO].
 
 - **Catálogo por local** (`TurnoOperativo`: nombre, orden, activo y una
-  ventana de reconocimiento opcional `horaInicioReconocimiento` →
+  ventana de reconocimiento `horaInicioReconocimiento` →
   `horaFinReconocimiento`, "HH:MM", que puede cruzar la medianoche). Nombres,
   cantidad, orden y ventanas los configura cada local: el código no conoce
   ninguno. Se administra en Configuración → POS → Turnos operativos con
@@ -108,20 +108,26 @@ compensan entre sí [CÓDIGO].
 - **Un solo turno** (o varios que empiezan a la misma hora): la ocurrencia
   actual se extiende hasta su próximo comienzo; con 08:00 → 12:00, el lunes a
   las 20:00 y el martes a las 07:59 siguen siendo del lunes [CÓDIGO; TO-V8].
-- **Un turno sin ventana es válido**: ocupa su lugar en el orden y no traba
-  nada mientras no haga falta ubicarlo. Cuando es el que SIGUE a la ocurrencia
-  actual —o ningún turno tiene ventana— no se sabe si ya empezó ni de qué
-  fecha es: la apertura no ofrece nada y dice qué turno necesita horario (409
-  `CICLO_DE_TURNOS_INDETERMINADO`) [CÓDIGO; TO-V1..TO-V4; PENDIENTE de
-  decisión de negocio para ese momento].
+- **Un turno activo tiene horario, siempre.** El alta lleva nombre y las dos
+  horas —todo turno nace activo, no hay borradores—; activar uno sin horario y
+  sacarle el horario a uno activo se rechazan (400
+  `TURNO_OPERATIVO_HORARIO_REQUERIDO`). Para dejarlo sin horario se lo
+  desactiva antes o en el mismo pedido; nunca se lo desactiva solo. Uno
+  inactivo puede no tener horario. La base lo sostiene con un CHECK
+  (`TurnoOperativo_activo_con_ventana_chk`), además del de las dos horas o
+  ninguna [CÓDIGO, `rechazoPorFaltaDeHorario`; TO-HR1..TO-HR9].
+- **El horario ubica y reconoce; no obliga a cerrar la caja.** Una tarde de
+  15:00 → 18:00 puede seguir trabajando a las 22:00: es la ocurrencia actual
+  que se extiende hasta que empieza otra [CÓDIGO; TO-C3].
 - **Transición por local**: un local que NUNCA tuvo turnos operativos (cero
   filas en su catálogo) sigue en modo legado y sus cajas nuevas abren sin turno
   —"Sin turno asignado"—, en las tres rutas. Al dar de alta su primer turno
+  —activo y con horario, o no se crea y el local sigue en legado [TO-HR7]—
   entra al sistema nuevo y no vuelve: toda caja nueva exige turno, y si después
   desactiva todos, la apertura es 409 `LOCAL_SIN_TURNOS_OPERATIVOS` en vez de
   volver al legado. Se distingue por las filas del catálogo, no por las
   activas: un turno no se borra y nace activo. Las cajas legado no reciben
-  turno nunca [CÓDIGO, `lib/caja/turnoOperativoServer.js`; TO-T1..TO-T9].
+  turno nunca: no hay backfill histórico [CÓDIGO, `lib/caja/turnoOperativoServer.js`; TO-T1..TO-T9].
 - **Agrupación**: `grupoDeTesoreria` (`lib/tesoreria/turnoComercial.js`) agrupa
   por local + fecha operativa + turno DE LA CAJA. Cada hecho hereda el grupo de
   su caja, así que la medianoche no parte una caja, y una caja con turno entra

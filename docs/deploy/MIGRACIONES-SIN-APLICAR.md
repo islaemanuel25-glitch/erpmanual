@@ -21,8 +21,9 @@ Producción está en **48 migraciones**; el árbol tiene 49. Pendiente de deploy
 - `20261004200000_turno_operativo` — Tesorería verifica por turno operativo
   (rama `claude/tesoreria-turno-operativo`). **Aditiva y sin backfill.** Qué
   hace `migrate deploy`: crea la tabla `TurnoOperativo` VACÍA (catálogo por
-  local, FK a `Local` en cascada, con la ventana de reconocimiento opcional y
-  sus CHECK de integridad; no siembra ningún turno); agrega a `Turno` y a `VerificacionEfectivo`
+  local, FK a `Local` en cascada, con la ventana de reconocimiento y sus CHECK
+  de integridad —las dos horas o ninguna, y las dos en todo turno activo—; no
+  siembra ningún turno); agrega a `Turno` y a `VerificacionEfectivo`
   dos columnas NULL (`turnoOperativoId`, `fechaOperativa`) con su CHECK de
   "las dos o ninguna", su FK compuesta con el local e índices; crea dos
   triggers (la caja no cambia su turno ni su fecha; una entrega solo entra en
@@ -37,9 +38,9 @@ Producción está en **48 migraciones**; el árbol tiene 49. Pendiente de deploy
   asignado"). Cada local entra al sistema nuevo cuando carga su primer turno en
   Configuración → POS → Turnos operativos (permiso `config_local.pos`): desde
   ahí sus cajas nuevas exigen turno, y desactivarlos no lo devuelve al legado.
-  Conviene cargar cada turno con su horario de reconocimiento y en el orden del
-  ciclo: un turno sin horario, cuando es el que sigue, deja la apertura sin
-  opciones hasta que se le cargue (409 `CICLO_DE_TURNOS_INDETERMINADO`).
+  Cada turno se carga con su horario de reconocimiento —un turno activo no se
+  guarda sin él— y en el orden del ciclo. El horario ubica la ocurrencia; no
+  obliga a cerrar la caja. Las cajas viejas no reciben turno: no hay backfill.
 
 `20261004120000_verificacion_efectivo` (PR #136) **ya está aplicada**: lo
 informó Emanuel el 2026-10-04, con producción en 48/48. El commit que corre
