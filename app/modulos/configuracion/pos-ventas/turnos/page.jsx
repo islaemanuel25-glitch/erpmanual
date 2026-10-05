@@ -138,14 +138,20 @@ export default function ConfigTurnosOperativosPage() {
             El orden de la lista es el ciclo del local: después del último turno viene el primero. El horario de
             reconocimiento dice dónde empieza cada turno en el día; no es su duración. Al abrir una caja se puede elegir el
             turno que está en curso —aunque se haya extendido— o el que sigue en el ciclo, y la fecha operativa sale de
-            esa ocurrencia. Si la hora cae en el horario de un solo turno, se propone ese y se puede cambiar. Para abrir
-            caja, cada turno activo necesita su horario. Un turno desactivado deja de ofrecerse y las cajas que ya lo
-            usaron lo conservan.
+            esa ocurrencia. Si la hora cae en el horario de un solo turno, se propone ese y se puede cambiar. El horario
+            es opcional, pero un turno sin horario no se puede ubicar en el día: cuando es el que sigue, la apertura pide
+            cargárselo. Un turno desactivado deja de ofrecerse y las cajas que ya lo usaron lo conservan.
           </SunmiAviso>
 
           {turnos.length === 0 && (
-            <SunmiAviso tono="warning" titulo="Este local no tiene turnos">
-              Sin al menos un turno activo no se puede abrir caja en este local.
+            <SunmiAviso tono="warning" titulo="Este local todavía no usa turnos operativos">
+              Mientras no tenga ninguno, las cajas abren sin turno. Al agregar el primero, toda caja nueva va a pedir un
+              turno, y desactivarlos después no vuelve atrás.
+            </SunmiAviso>
+          )}
+          {turnos.length > 0 && !turnos.some((t) => t.activo) && (
+            <SunmiAviso tono="warning" titulo="Ningún turno activo">
+              Este local ya usa turnos operativos: sin uno activo, no se puede abrir caja.
             </SunmiAviso>
           )}
 

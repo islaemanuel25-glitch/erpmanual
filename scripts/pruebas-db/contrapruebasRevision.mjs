@@ -1196,6 +1196,28 @@ const CASOS = [
     }],
     esperadas: ["[TO-C13] con otro orden, a las 22:00 el siguiente es el de la mañana del martes"],
   },
+  // ── LA TRANSICIÓN POR LOCAL ─────────────────────────────────────────────
+  {
+    n: "TO-T4",
+    defecto: "un local que ya usa turnos vuelve a abrir cajas sin turno",
+    archivo: "lib/caja/turnoOperativoServer.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{
+      de: "    if (legado) return { ok: true, datos: SIN_TURNO, turno: null, legado: true };",
+      a: "    return { ok: true, datos: SIN_TURNO, turno: null, legado: true };",
+    }],
+    esperadas: ["[TO-T4][TO-T8] una apertura sin turno ya no abre: 400 y su código", "[TO-T4] y no se escribió ninguna caja sin turno"],
+  },
+  {
+    n: "TO-T9",
+    defecto: "desactivar todos los turnos devuelve el local al modo legado",
+    archivo: "lib/caja/turnoOperativoServer.js",
+    suite: "scripts/pruebas-db/turnoOperativo.mjs",
+    minimo: 30,
+    inyecciones: [{ de: "  return { activos, legado: filas === 0 };", a: "  return { activos, legado: activos.length === 0 };" }],
+    esperadas: ["[TO-T9] sin turnos activos el local NO vuelve al legado: se dice qué falta", "[TO-T9] y una apertura sin turno no abre: 409"],
+  },
   // ── EL CONTRATO DE LA PANTALLA MÓVIL (PR #138) ───────────────────────────
   //
   // Lo que la pantalla no puede comprobar sola: que un período mal pedido no se

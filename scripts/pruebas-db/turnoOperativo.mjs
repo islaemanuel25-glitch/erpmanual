@@ -18,6 +18,7 @@
 //   H. La ventana de reconocimiento: propone, pregunta, y la fecha
 //      operativa sale del turno FINAL                                 [TO-H]
 //   I. El ciclo: actual y siguiente, nada más                         [TO-C]
+//   T. La transición por local: legado hasta el primer turno          [TO-T]
 //
 // No desmonta: una verificación no se borra —la base lo impide— y sus cajas
 // tampoco. Todo lleva una marca única por corrida.
@@ -195,10 +196,10 @@ const turnoDeCaja = (id) => prisma.turno.findUnique({ where: { id }, select: { t
 async function correr() {
   const A = await montarLocal("A");
   const B = await montarLocal("B");
-  // Las secciones A a G no prueban el ciclo: sus dos turnos tienen la MISMA
-  // ventana de casi todo el día, así que los dos son siempre la ocurrencia
-  // actual, con la fecha de hoy, a la hora que corra la prueba.
-  const todoElDia = { horaInicioReconocimiento: "00:00", horaFinReconocimiento: "23:59" };
+  // Las secciones A a G no prueban el ciclo: sus dos turnos empiezan los dos a
+  // las 00:00, así que los dos son siempre la ocurrencia actual —se extiende
+  // hasta su próximo comienzo—, con la fecha de hoy, a cualquier hora.
+  const todoElDia = { horaInicioReconocimiento: "00:00", horaFinReconocimiento: "01:00" };
   const [mañana, tarde, vieja] = await Promise.all([
     prisma.turnoOperativo.create({ data: { localId: A.local.id, nombre: "Mañana", orden: 0, ...todoElDia } }),
     prisma.turnoOperativo.create({ data: { localId: A.local.id, nombre: "Tarde", orden: 1, ...todoElDia } }),
@@ -240,9 +241,7 @@ async function correr() {
     const sin = await abrirCon(A, {});
     igual("sin turno: 400, pide elegirlo", [sin.r.status, sin.r.codigo], [400, "TURNO_OPERATIVO_REQUERIDO"]);
     igual("ninguno de los rechazos abrió una caja", await prisma.turno.count({ where: { localId: A.local.id } }), antes);
-    const C = await montarLocal("C");
-    const sinCatalogo = await abrirCon(C, {});
-    igual("un local sin turnos activos: 409 que dice qué falta", [sinCatalogo.r.status, sinCatalogo.r.codigo], [409, "LOCAL_SIN_TURNOS_OPERATIVOS"]);
+    // Un local que nunca tuvo turnos sigue en modo legado: ver la sección T.
   }
 
   seccion("C. Las tres rutas de apertura guardan turno y fecha operativa [TO-11]");
@@ -454,15 +453,18 @@ async function correr() {
       await intento(() => prisma.turnoOperativo.create({ data: { localId: H.local.id, nombre: clave(), horaInicioReconocimiento: "6:00", horaFinReconocimiento: "07:00" } })),
       /ventana_formato_chk|23514/);
 
-    // Sacarle la ventana a un turno activo deja el ciclo sin ubicar: no se
-    // adivina, la apertura no abre y dice qué falta.
+    // Sacarle la ventana a un turno activo no lo invalida. Acá Dos es el que
+    // SIGUE a la ocurrencia actual (Uno) y sin ventana no se sabe si ya empezó
+    // ni de qué fecha es: no se adivina, y se dice qué turno ubicar.
     await cambiar(dos.turno.id, { horaInicioReconocimiento: null, horaFinReconocimiento: null });
-    igual("sacar la ventana la deja vacía", (await prisma.turnoOperativo.findUnique({ where: { id: dos.turno.id } })).horaInicioReconocimiento, null);
+    igual("[TO-V1] sacar la ventana la deja vacía y el turno sigue activo",
+      await prisma.turnoOperativo.findUnique({ where: { id: dos.turno.id }, select: { horaInicioReconocimiento: true, activo: true } }),
+      { horaInicioReconocimiento: null, activo: true });
     o = await oferta(H);
-    igual("con un turno activo sin ventana no se ofrece nada y se dice por qué",
-      [o.turnos?.length, o.bloqueo?.codigo, o.bloqueo?.turnos?.map((t) => t.id)], [0, "CICLO_DE_TURNOS_SIN_VENTANA", [dos.turno.id]]);
+    igual("[TO-V4] con el siguiente sin ventana no se ofrece nada y se dice cuál ubicar",
+      [o.turnos?.length, o.bloqueo?.codigo, o.bloqueo?.turnos?.map((t) => t.id)], [0, "CICLO_DE_TURNOS_INDETERMINADO", [dos.turno.id]]);
     const sinUbicar = await abrirCon(H, { turnoOperativoId: uno.turno.id });
-    igual("y la apertura no abre: 409", [sinUbicar.r.status, sinUbicar.r.codigo], [409, "CICLO_DE_TURNOS_SIN_VENTANA"]);
+    igual("[TO-V4] y la apertura no adivina: 409", [sinUbicar.r.status, sinUbicar.r.codigo], [409, "CICLO_DE_TURNOS_INDETERMINADO"]);
   }
 
   seccion("I. El ciclo: la ocurrencia actual y la siguiente, nada más [TO-C]");
@@ -575,6 +577,78 @@ async function correr() {
     })));
     requerir("abrir-con-cambio abre", rCon.ok === true, `${rCon.status} ${rCon.error ?? ""}`);
     await comprobar("abrir-con-cambio", rCon.turno.id, previas);
+  }
+
+  seccion("T. La transición: un local sin turnos sigue en legado hasta que carga el primero [TO-T]");
+  {
+    const urlCatalogo = "http://ci/api/config/turnos-operativos";
+    const oferta = async (L) => leer(await rutaCatalogo.GET(conCookie(`${urlCatalogo}?activos=1`, `erpazul_sesion=${L.sesion}`, null, "GET")));
+    const sinTurno = async (turnoId) => {
+      const t = await turnoDeCaja(turnoId);
+      return t.turnoOperativoId === null && t.fechaOperativa === null;
+    };
+    const L0 = await montarLocal("T0");
+    const L1 = await montarLocal("T1");
+    igual("un local que nunca tuvo turnos se informa en legado", (await oferta(L0)).legado, true);
+
+    const porAbrir = await abrirCon(L0, {});
+    requerir("[TO-T1] abrir sin turno en un local legado: abre", porAbrir.r.ok === true, `${porAbrir.r.status} ${porAbrir.r.codigo ?? ""} ${porAbrir.r.error ?? ""}`);
+    ok("[TO-T1] y la caja queda sin turno ni fecha operativa", await sinTurno(porAbrir.r.turno.id));
+    const cajaVieja = { ...porAbrir, turnoId: porAbrir.r.turno.id };
+
+    const { quien: qSin } = await operador(L0);
+    const rSin = await leer(await rutaAbrirSinCambio.POST(pedido(`${BASE}/turnos/abrir-sin-cambio`, qSin, { desgloseContado: desgloseDe(2000), motivo: "fondo propio" })));
+    requerir("[TO-T2] abrir-sin-cambio sin turno en un local legado: abre", rSin.ok === true, `${rSin.status} ${rSin.codigo ?? ""} ${rSin.error ?? ""}`);
+    ok("[TO-T2] y la caja queda sin turno ni fecha operativa", await sinTurno(rSin.turno.id));
+    const cajaQueSigue = { quien: qSin, L: L0, turnoId: rSin.turno.id };
+
+    // El relevo de una caja legado: deja sobre, otro lo reserva y abre con él.
+    await vender(cajaVieja, 5000);
+    const corte = await cerrar(cajaVieja, 3000, 5000);
+    const sobre = await prisma.cambioPendiente.findFirst({ where: { cierrePreparacionId: corte.id } });
+    requerir("la caja legado cerró dejando un sobre", Boolean(sobre), "sin sobre");
+    const { quien: qCon } = await operador(L0);
+    const reserva = await leer(await rutaReservar.POST(pedido(`${BASE}/cambios-pendientes/reservar`, qCon, { cambioPendienteId: sobre.id })));
+    requerir("reserva el sobre", reserva.ok === true, `${reserva.status} ${reserva.error ?? ""}`);
+    const rCon = await leer(await rutaAbrirConCambio.POST(pedido(`${BASE}/turnos/abrir-con-cambio`, qCon, { cambioPendienteId: sobre.id, desgloseRecibido: desgloseDe(3000) })));
+    requerir("[TO-T3] el relevo con cambio en un local legado: abre", rCon.ok === true, `${rCon.status} ${rCon.codigo ?? ""} ${rCon.error ?? ""}`);
+    ok("[TO-T3] y su caja queda sin turno ni fecha operativa", await sinTurno(rCon.turno.id));
+
+    // El local carga su primer turno por la configuración: entra al sistema nuevo.
+    const alta = await leer(await rutaCatalogo.POST(conCookie(urlCatalogo, `erpazul_sesion=${L0.config}`, {
+      nombre: "Único", horaInicioReconocimiento: "00:00", horaFinReconocimiento: "01:00",
+    })));
+    requerir("da de alta su primer turno", alta.ok === true, `${alta.status} ${alta.error ?? ""}`);
+    igual("[TO-T8] desde el primer turno el local deja de estar en legado", (await oferta(L0)).legado, false);
+    const antes = await prisma.turno.count({ where: { localId: L0.local.id } });
+    const sinElegir = await abrirCon(L0, {});
+    igual("[TO-T4][TO-T8] una apertura sin turno ya no abre: 400 y su código", [sinElegir.r.status, sinElegir.r.codigo], [400, "TURNO_OPERATIVO_REQUERIDO"]);
+    igual("[TO-T4] y no se escribió ninguna caja sin turno", await prisma.turno.count({ where: { localId: L0.local.id } }), antes);
+    const conTurno = await abrirCon(L0, { turnoOperativoId: alta.turno.id });
+    requerir("con el turno abre", conTurno.r.ok === true, `${conTurno.r.status} ${conTurno.r.error ?? ""}`);
+    igual("y la caja lleva su turno", (await turnoDeCaja(conTurno.r.turno.id)).turnoOperativoId, alta.turno.id);
+
+    // La transición es POR LOCAL.
+    const otro = await abrirCon(L1, {});
+    ok("[TO-T5] el otro local, sin configurar, sigue abriendo en legado", otro.r.ok === true && (await sinTurno(otro.r.turno.id)), `${otro.r.status} ${otro.r.codigo ?? ""}`);
+
+    // Desactivar todos los turnos NO devuelve el local al legado.
+    const baja = await leer(await rutaTurnoDelCatalogo.PATCH(
+      conCookie(`${urlCatalogo}/${alta.turno.id}`, `erpazul_sesion=${L0.config}`, { activo: false }, "PATCH"), conId(alta.turno.id)));
+    requerir("desactiva su único turno", baja.ok === true, `${baja.status} ${baja.error ?? ""}`);
+    const sinActivos = await oferta(L0);
+    igual("[TO-T9] sin turnos activos el local NO vuelve al legado: se dice qué falta",
+      [sinActivos.legado, sinActivos.bloqueo?.codigo], [false, "LOCAL_SIN_TURNOS_OPERATIVOS"]);
+    const antes2 = await prisma.turno.count({ where: { localId: L0.local.id } });
+    const regresion = await abrirCon(L0, {});
+    igual("[TO-T9] y una apertura sin turno no abre: 409", [regresion.r.status, regresion.r.codigo], [409, "LOCAL_SIN_TURNOS_OPERATIVOS"]);
+    igual("[TO-T9] ni deja una caja sin turno", await prisma.turno.count({ where: { localId: L0.local.id } }), antes2);
+
+    // La caja legado que estaba abierta sigue operando y cierra, sin turno.
+    await vender(cajaQueSigue, 4000);
+    const corteLegado = await cerrar(cajaQueSigue, 1000, 4000);
+    ok("[TO-T6] la caja legado abierta antes de configurar vende y cierra", Boolean(corteLegado?.id));
+    ok("[TO-T7] y no recibió turno ni fecha: no hay backfill", await sinTurno(cajaQueSigue.turnoId) && await sinTurno(cajaVieja.turnoId));
   }
 }
 

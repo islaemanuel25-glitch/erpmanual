@@ -5,7 +5,11 @@ import { useOperadorContext } from "@/app/context/OperadorContext";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
-import SelectorTurnoOperativo, { turnoFinalDeApertura, useTurnosOperativosActivos } from "@/components/caja/SelectorTurnoOperativo";
+import SelectorTurnoOperativo, {
+  aperturaSinTurno,
+  turnoFinalDeApertura,
+  useTurnosOperativosActivos,
+} from "@/components/caja/SelectorTurnoOperativo";
 
 /**
  * Apertura de caja: el cajero declara cuánto efectivo recibió.
@@ -62,7 +66,7 @@ export default function ModalAperturaTurno({ localId, vendedorNombre, onApertura
       setError("El monto no puede ser negativo");
       return;
     }
-    if (!turnoId) {
+    if (!turnoId && !aperturaSinTurno(catalogo)) {
       setError("Elegí de qué turno es esta caja.");
       return;
     }

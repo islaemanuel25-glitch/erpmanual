@@ -14,9 +14,10 @@
 //   · VARIOS  → se pregunta, diciendo cuáles coinciden, sin elegir ninguno.
 //
 // Si el ciclo no se puede resolver (`bloqueo`), se dice qué falta configurar
-// y no se ofrece nada. Esta pieza no conoce nombres ni horarios, no filtra
-// turnos ni calcula fechas: muestra lo que mandó el servidor, que vuelve a
-// validar y calcular todo con el turno FINAL.
+// y no se ofrece nada. Si el local todavía no usa turnos operativos
+// (`legado`), se avisa y la caja abre sin turno. Esta pieza no conoce nombres
+// ni horarios, no filtra turnos ni calcula fechas: muestra lo que mandó el
+// servidor, que vuelve a validar y calcular todo con el turno FINAL.
 
 import { useEffect, useState } from "react";
 
@@ -45,6 +46,14 @@ export function turnoFinalDeApertura(elegidoId, catalogo) {
   return r?.estado === RECONOCIMIENTO.UNICO && ofrecido ? r.sugeridoId : null;
 }
 
+/**
+ * ¿La caja puede abrir sin turno? Solo si el servidor dijo que el local
+ * todavía no usa turnos operativos. El servidor lo vuelve a decidir al abrir.
+ */
+export function aperturaSinTurno(catalogo) {
+  return catalogo?.legado === true && !catalogo?.error;
+}
+
 /** "2026-10-05" → "05/10/2026". */
 export function fechaOperativaLegible(iso) {
   const [a, m, d] = String(iso || "").split("-");
@@ -53,7 +62,7 @@ export function fechaOperativaLegible(iso) {
 
 /** Los turnos que se pueden abrir ahora, con el reconocimiento que hizo el servidor. */
 export function useTurnosOperativosActivos() {
-  const [estado, setEstado] = useState({ cargando: true, turnos: [], reconocimiento: null, bloqueo: null, error: "" });
+  const [estado, setEstado] = useState({ cargando: true, legado: false, turnos: [], reconocimiento: null, bloqueo: null, error: "" });
   useEffect(() => {
     let vivo = true;
     fetch("/api/config/turnos-operativos?activos=1", { credentials: "include", cache: "no-store" })
@@ -61,11 +70,12 @@ export function useTurnosOperativosActivos() {
       .then(({ r, json }) => {
         if (!vivo) return;
         if (!r.ok || !json?.ok) {
-          setEstado({ cargando: false, turnos: [], reconocimiento: null, bloqueo: null, error: json?.error || "No se pudieron leer los turnos del local." });
+          setEstado({ cargando: false, legado: false, turnos: [], reconocimiento: null, bloqueo: null, error: json?.error || "No se pudieron leer los turnos del local." });
           return;
         }
         setEstado({
           cargando: false,
+          legado: json.legado === true,
           turnos: json.turnos || [],
           reconocimiento: json.reconocimiento ?? null,
           bloqueo: json.bloqueo ?? null,
@@ -75,7 +85,7 @@ export function useTurnosOperativosActivos() {
       .catch(
         () =>
           vivo &&
-          setEstado({ cargando: false, turnos: [], reconocimiento: null, bloqueo: null, error: "Sin conexión: no se pudieron leer los turnos del local." })
+          setEstado({ cargando: false, legado: false, turnos: [], reconocimiento: null, bloqueo: null, error: "Sin conexión: no se pudieron leer los turnos del local." })
       );
     return () => {
       vivo = false;
@@ -92,9 +102,17 @@ export function useTurnosOperativosActivos() {
  */
 export default function SelectorTurnoOperativo({ valor, onCambiar, catalogo }) {
   const [cambiando, setCambiando] = useState(false);
-  const { cargando, turnos, reconocimiento, bloqueo, error } = catalogo;
+  const { cargando, legado, turnos, reconocimiento, bloqueo, error } = catalogo;
   if (cargando) return <SunmiLoader />;
   if (error) return <SunmiAviso tono="danger">{error}</SunmiAviso>;
+  if (legado) {
+    return (
+      <SunmiAviso titulo="Este local todavía no usa turnos operativos">
+        La caja abre sin turno y se va a ver como «Sin turno asignado». Cuando el local cargue sus turnos en Configuración → POS
+        → Turnos operativos, las cajas nuevas van a pedir uno.
+      </SunmiAviso>
+    );
+  }
   if (bloqueo) {
     return (
       <SunmiAviso tono="warning" titulo="No se puede saber qué turno abrir">

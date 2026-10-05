@@ -31,16 +31,12 @@ export function turnoOperativoDeSesion(prisma, quien) {
   return turnoOperativoDePrueba(prisma, localId);
 }
 
-// EL CICLO DE PRUEBA. Desde que la apertura valida el ciclo del local, un
-// turno suelto no alcanza: sin ventana el ciclo no se puede ubicar, y uno solo
-// fuera de su ventana es ambiguo. Se arman DOS turnos con la MISMA ventana de
-// casi todo el día: los dos empiezan a las 00:00, así que los dos son siempre
-// la ocurrencia actual, con la fecha de hoy, a cualquier hora en que corra la
-// prueba. Las que prueban el ciclo arman el suyo a mano.
-const CICLO_DE_PRUEBA = [
-  { nombre: "Mañana", orden: 0 },
-  { nombre: "Tarde", orden: 1 },
-].map((t) => ({ ...t, horaInicioReconocimiento: "00:00", horaFinReconocimiento: "23:59" }));
+// EL CICLO DE PRUEBA: UN solo turno que empieza a las 00:00. Con un solo
+// turno, la ocurrencia actual se extiende hasta su próximo comienzo, así que a
+// CUALQUIER hora del día es la ocurrencia de hoy, con la fecha de hoy: la
+// prueba no depende de a qué hora corre. La ventana es una ventana común —su
+// fin no limita nada—. Las pruebas del ciclo arman el suyo a mano.
+const CICLO_DE_PRUEBA = [{ nombre: "Mañana", orden: 0, horaInicioReconocimiento: "00:00", horaFinReconocimiento: "01:00" }];
 
 /**
  * El id de un turno operativo activo del local, con el ciclo de prueba armado

@@ -34,7 +34,11 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
 import { Cifra, tonoDiferencia, money } from "@/components/caja/CifrasRetiro";
 import TablaDenominaciones from "@/components/caja/TablaDenominaciones";
-import SelectorTurnoOperativo, { turnoFinalDeApertura, useTurnosOperativosActivos } from "@/components/caja/SelectorTurnoOperativo";
+import SelectorTurnoOperativo, {
+  aperturaSinTurno,
+  turnoFinalDeApertura,
+  useTurnosOperativosActivos,
+} from "@/components/caja/SelectorTurnoOperativo";
 import { CABECERA_BLOQUE, BLOQUE_ALINEADO } from "@/components/caja/geometriaGrilla";
 import {
   PanelCambioEsperado,
@@ -223,7 +227,7 @@ export default function AperturaConCambioPage() {
   // ── Confirmar y abrir ────────────────────────────────────────────────────
   const confirmar = async () => {
     if (!puedeConfirmar || guardando) return;
-    if (!turnoId) {
+    if (!turnoId && !aperturaSinTurno(catalogo)) {
       setError("Elegí de qué turno es esta caja.");
       return;
     }
