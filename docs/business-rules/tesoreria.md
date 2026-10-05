@@ -265,9 +265,10 @@ consultas que ya estaban, no como consultas por fila [medido en
 
 PR 3 de Tesorería (2026-10-04, #136): las tablas y sus garantías. Las acciones
 que escriben son de la PR 4 (sección siguiente).
-**PENDIENTE DE DEPLOY:** la migración `20261004120000_verificacion_efectivo` está
-en el árbol y no en producción [DOCUMENTADO en
-`docs/deploy/MIGRACIONES-SIN-APLICAR.md`].
+**DESPLEGADA:** la migración `20261004120000_verificacion_efectivo` está
+aplicada en producción desde el 2026-10-04, con `fb864ba5`; la del turno
+operativo, `20261004200000_turno_operativo`, desde el 2026-10-05, con
+`b6052783` [DOCUMENTADO en `docs/deploy/MIGRACIONES-SIN-APLICAR.md`].
 
 Una verificación es un HECHO: el responsable contó el efectivo de un conjunto de
 entregas de un local y dejó lo que contó. No se edita: si estuvo mal, se anula y
