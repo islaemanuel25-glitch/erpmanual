@@ -178,6 +178,18 @@ Toggle de estado activo/inactivo.
 ```
 Props: `value?`, `onChange?`
 
+### SunmiCampoHora
+Una hora "HH:MM" de 24 horas. Cerrado es un botón que muestra el valor tal
+cual —nunca AM/PM—; al tocarlo abre una hoja del kit (`SunmiModalLayout`,
+`hoja-o-centrado`) con hora 00–23 y minutos 00–59 en dos `SunmiCampoCantidad`,
+y Cancelar / Confirmar. Reemplaza a `<input type="time">`, que en Android
+mostraba "p. m." y abría el reloj del navegador.
+```jsx
+<SunmiCampoHora etiqueta="Desde" value={desde} onChange={setDesde} />
+```
+Props: `value` ("HH:MM" o vacío), `onChange` (recibe "HH:MM", o "" si se
+quitó), `etiqueta`, `vaciable?` (muestra «Sin hora»).
+
 ---
 
 ## Componentes de Tabla
