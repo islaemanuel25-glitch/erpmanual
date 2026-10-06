@@ -15,6 +15,8 @@ import { getDefaultRoute } from "@/lib/getDefaultRoute";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useBajadaDelShell } from "@/app/context/AccionDePaginaContext";
 import { LEGACY_HEADER_TITLES } from "@/lib/menu/legacyTitles";
+import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
+import ModalVincularAzulChat from "@/components/integraciones/ModalVincularAzulChat";
 
 export default function Header({ onOpenMobileMenu }) {
   const pathname = usePathname();
@@ -38,6 +40,8 @@ export default function Header({ onOpenMobileMenu }) {
   const esCuentaPropia = perfilExentoDeOperador(perfil);
 
   const [open, setOpen] = useState(false);
+  // Vincular Azul Chat es de la persona, no de un permiso: va en su menú.
+  const [vinculoAzulChatAbierto, setVinculoAzulChatAbierto] = useState(false);
   const [contexto, setContexto] = useState(null);
   const [contextoSinSeleccionar, setContextoSinSeleccionar] = useState(false);
 
@@ -338,6 +342,12 @@ export default function Header({ onOpenMobileMenu }) {
                 </button>
               )}
 
+              <div className="px-4 py-2">
+                <SunmiLinkButton onClick={() => { setOpen(false); setVinculoAzulChatAbierto(true); }}>
+                  Vincular Azul Chat
+                </SunmiLinkButton>
+              </div>
+
               <button
                 onClick={logout}
                 className={`
@@ -354,6 +364,7 @@ export default function Header({ onOpenMobileMenu }) {
           )}
         </div>
       </div>
+      <ModalVincularAzulChat abierto={vinculoAzulChatAbierto} onCerrar={() => setVinculoAzulChatAbierto(false)} />
     </header>
   );
 }
