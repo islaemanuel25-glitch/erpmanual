@@ -16,7 +16,13 @@
 //      permiso quitado EN VIVO, local fuera de alcance, grupo manipulado, local
 //      inexistente, admin con local fijo, capacidad fuera del catálogo;
 //   E. la PUERTA: sin firma no entra aunque traiga una cookie de admin válida, y
-//      con firma la cookie no amplía nada.
+//      con firma la cookie no amplía nada;
+//   F. el VÍNCULO por sus rutas reales del ERP: sin vínculo no entra, el código
+//      de A no sirve como B, revocar corta en la próxima consulta, reautorizar
+//      mata el código viejo, quién puede revocar a otro, y tres autorizaciones
+//      simultáneas dejan uno solo vigente;
+//   G. lo que garantiza la BASE: las columnas, que no se guarda ningún secreto,
+//      el trigger que solo deja revocar, los CHECK, el índice parcial y la FK.
 //
 // Las ventas entran por `/api/pos-ventas/crear`, la corrección por
 // `/api/pos-ventas/venta/[id]/corregir`, la anulación por el motor real
@@ -105,6 +111,8 @@ try {
     encargadoA: await usuario("encargado-a", rolEncargado.id, localA.id),
     inactivoA: await usuario("inactivo-a", rolEncargado.id, localA.id, false),
     sinReportesA: await usuario("sin-reportes-a", rolSinReportes.id, localA.id),
+    sinVinculoA: await usuario("sin-vinculo-a", rolEncargado.id, localA.id),
+    gestorA: await usuario("gestor-a", (await c.rol.create({ data: { nombre: "CI gestor local", permisos: ["usuarios.gestionar_local"] } })).id, localA.id),
   };
   ok("el ENCARGADO tiene reportes.ver: es un rol real que ve el reporte", DEFAULT_PERMISOS_SISTEMA[ENCARGADO].includes("reportes.ver"));
 
@@ -114,6 +122,9 @@ try {
   const rutaCrear = await import("../../app/api/pos-ventas/crear/route.js");
   const rutaCorregir = await import("../../app/api/pos-ventas/venta/[id]/corregir/route.js");
   const rutaReporte = await import("../../app/api/reportes-ventas/general/route.js");
+  const rutaAutorizar = await import("../../app/api/integraciones/azul-chat/vinculo/autorizar/route.js");
+  const rutaRevocar = await import("../../app/api/integraciones/azul-chat/vinculo/revocar/route.js");
+  const { hashCodigoVinculo } = await import("../../lib/integraciones/vinculos/codigoVinculo.js");
   const { revertirVenta } = await import("../../lib/pos-ventas/reversionVenta.js");
   const { atenderSolicitudAzulChat } = await import("../../lib/integraciones/azul-chat/servidor.js");
   const { firmarSolicitud, CABECERAS } = await import("../../lib/integraciones/azul-chat/autenticacionAplicacion.js");
@@ -230,9 +241,38 @@ try {
   ok("el borde de ayer cae a las 02:59:59.999 UTC de hoy: el error de la zona se vería",
     new Date(`${ayer}T23:59:59.999-03:00`).toISOString().slice(0, 10) === hoy);
 
+  // ── El vínculo, por la ruta real del ERP ────────────────────────────────
+  //
+  // Cada persona autoriza a Azul Chat desde SU sesión. El código vuelve una vez
+  // y es lo que Azul Chat manda después. `sinVinculoA` nunca autoriza.
+  // La sesión lleva los permisos del ROL de la persona, como los firma el login.
+  const cookieDe = async (u) => {
+    const { rol } = await c.usuario.findUnique({ where: { id: u.id }, select: { rol: { select: { permisos: true } } } });
+    return { cookie: `erpazul_sesion=${sesion({ id: u.id, localId: u.localId, permisos: rol.permisos })}`, "content-type": "application/json" };
+  };
+  const autorizarPor = async (u) => {
+    const r = await rutaAutorizar.POST(new Request("http://ci/api/integraciones/azul-chat/vinculo/autorizar", { method: "POST", headers: await cookieDe(u) }));
+    return { status: r.status, cacheControl: r.headers.get("cache-control"), ...(await r.json().catch(() => ({}))) };
+  };
+  const revocarPor = async (actor, cuerpo) => {
+    const r = await rutaRevocar.POST(new Request("http://ci/api/integraciones/azul-chat/vinculo/revocar", {
+      method: "POST", headers: await cookieDe(actor), body: cuerpo === undefined ? undefined : json(cuerpo),
+    }));
+    return { status: r.status, ...(await r.json().catch(() => ({}))) };
+  };
+  const CODIGO = {};
+  for (const u of [U.adminGlobal, U.encargadoA, U.sinReportesA, U.adminEnX, U.gestorA]) {
+    const r = await autorizarPor(u);
+    if (r.status !== 200 || !r.codigoVinculo) throw new Error(`autorizar ${u.nombre}: ${r.status} ${json(r)}`);
+    CODIGO[u.id] = r.codigoVinculo;
+  }
+
   // ── La integración y el reporte ─────────────────────────────────────────
-  const pedirIntegracion = async ({ usuarioId, grupoId, localId, periodo, capacidad = "ventas_resumen", extra = {}, cookie = null, firmar = true }) => {
-    const cuerpo = json({ capacidad, delegacion: { usuarioId }, alcance: { grupoId, localId }, parametros: { periodo }, ...extra });
+  //
+  // Por defecto delega con el código del propio `usuarioId`; `vinculo` lo pisa.
+  const pedirIntegracion = async ({ usuarioId, vinculo, grupoId, localId, periodo, capacidad = "ventas_resumen", extra = {}, cookie = null, firmar = true }) => {
+    const delegacion = { usuarioId, vinculo: vinculo === undefined ? CODIGO[usuarioId] : vinculo };
+    const cuerpo = json({ capacidad, delegacion, alcance: { grupoId, localId }, parametros: { periodo }, ...extra });
     const marca = String(Math.floor(ahora / 1000));
     const headers = new Headers({ [CABECERAS.aplicacion]: "azul-chat", [CABECERAS.marca]: marca, "content-type": "application/json" });
     if (firmar) headers.set(CABECERAS.firma, firmarSolicitud({ secreto: SECRETO, aplicacion: "azul-chat", marca, cuerpo }));
@@ -316,9 +356,14 @@ try {
   await rechazo("encargado de A pidiendo B, de su mismo grupo", { usuarioId: U.encargadoA.id, grupoId: grupo.id, localId: localB.id }, "FUERA_DE_ALCANCE");
   await rechazo("encargado de A pidiendo X, de otro grupo", { usuarioId: U.encargadoA.id, grupoId: grupo2.id, localId: localX.id }, "FUERA_DE_ALCANCE");
   await rechazo("encargado de A pidiendo el depósito", { usuarioId: U.encargadoA.id, grupoId: grupo.id, localId: deposito.id }, "FUERA_DE_ALCANCE");
-  await rechazo("usuario inactivo", { usuarioId: U.inactivoA.id, grupoId: grupo.id, localId: localA.id }, "USUARIO_INACTIVO");
-  await rechazo("usuario sin reportes.ver", { usuarioId: U.sinReportesA.id, grupoId: grupo.id, localId: localA.id }, "SIN_PERMISO");
-  await rechazo("usuario que no existe", { usuarioId: 999999, grupoId: grupo.id, localId: localA.id }, "USUARIO_INEXISTENTE");
+  // Desde el vínculo, un inactivo no llega a la pregunta de `activo`: no se
+  // pudo vincular (se prueba en F). El inactivo VINCULADO es el de más abajo,
+  // desactivado después de autorizar.
+  await rechazo("usuario inactivo, que nunca se pudo vincular", { usuarioId: U.inactivoA.id, grupoId: grupo.id, localId: localA.id }, "VINCULO_INEXISTENTE");
+  await rechazo("usuario vinculado sin reportes.ver", { usuarioId: U.sinReportesA.id, grupoId: grupo.id, localId: localA.id }, "SIN_PERMISO");
+  // Un vínculo de un usuario que no existe no puede existir —FK RESTRICT y la
+  // app no borra usuarios—, así que se usa el código de otro: lo frena el vínculo.
+  await rechazo("usuario que no existe, con el código de otro", { usuarioId: 999999, vinculo: CODIGO[U.adminGlobal.id], grupoId: grupo.id, localId: localA.id }, "VINCULO_DE_OTRO_USUARIO");
   await rechazo("grupo manipulado: A con el grupo dos", { usuarioId: U.adminGlobal.id, grupoId: grupo2.id, localId: localA.id }, "GRUPO_LOCAL_INCONSISTENTE");
   await rechazo("local que no existe", { usuarioId: U.adminGlobal.id, grupoId: grupo.id, localId: 999999 }, "LOCAL_SIN_GRUPO");
   await rechazo("admin con local fijo en X pidiendo A, de otro grupo", { usuarioId: U.adminEnX.id, grupoId: grupo.id, localId: localA.id }, "FUERA_DE_ALCANCE");
@@ -334,8 +379,12 @@ try {
   await c.rol.update({ where: { id: rolEncargado.id }, data: { permisos: DEFAULT_PERMISOS_SISTEMA[ENCARGADO].filter((p) => p !== "reportes.ver") } });
   await rechazo("permiso quitado al rol hace un instante", { usuarioId: U.encargadoA.id, grupoId: grupo.id, localId: localA.id }, "SIN_PERMISO");
   await c.rol.update({ where: { id: rolEncargado.id }, data: { permisos: DEFAULT_PERMISOS_SISTEMA[ENCARGADO] } });
+  {
+    const r = await pedirIntegracion({ usuarioId: U.encargadoA.id, grupoId: grupo.id, localId: localA.id, periodo: { tipo: "hoy" } });
+    ok("permiso devuelto: el MISMO vínculo vuelve a servir, sin volver a autorizar", r.status === 200, json(r));
+  }
   await c.usuario.update({ where: { id: U.encargadoA.id }, data: { activo: false } });
-  await rechazo("usuario desactivado hace un instante", { usuarioId: U.encargadoA.id, grupoId: grupo.id, localId: localA.id }, "USUARIO_INACTIVO");
+  await rechazo("usuario VINCULADO desactivado hace un instante", { usuarioId: U.encargadoA.id, grupoId: grupo.id, localId: localA.id }, "USUARIO_INACTIVO");
   await c.usuario.update({ where: { id: U.encargadoA.id }, data: { activo: true } });
 
   seccion("E. La puerta no usa la sesión del ERP");
@@ -345,6 +394,106 @@ try {
   {
     const r = await pedirIntegracion({ usuarioId: U.encargadoA.id, grupoId: grupo.id, localId: localA.id, periodo: { tipo: "hoy" } });
     ok("y sin ninguna cookie, firmado, el encargado de A consulta su local", r.status === 200 && r.cuerpo?.datos?.local?.id === localA.id, json(r));
+  }
+
+  seccion("F. El vínculo: autorizar, delegar, revocar");
+  await rechazo("usuario activo, con reportes.ver, que NUNCA autorizó", { usuarioId: U.sinVinculoA.id, vinculo: null, grupoId: grupo.id, localId: localA.id }, "VINCULO_INEXISTENTE");
+  await rechazo("el mismo, con un código inventado con la forma correcta", { usuarioId: U.sinVinculoA.id, vinculo: `vin1_${"A".repeat(43)}`, grupoId: grupo.id, localId: localA.id }, "VINCULO_INEXISTENTE");
+  {
+    const r = await autorizarPor(U.inactivoA);
+    igual("un usuario inactivo no puede autorizar", [r.status, r.codigo, r.codigoVinculo], [403, "USUARIO_INACTIVO", undefined]);
+    const c1 = await autorizarPor(U.sinVinculoA);
+    ok("la respuesta que trae el código no se guarda en ningún caché", c1.cacheControl === "no-store", String(c1.cacheControl));
+    // Y se revoca enseguida, para que siga siendo "el que nunca autorizó" en lo que sigue.
+    await revocarPor(U.sinVinculoA);
+  }
+  await rechazo("el código del encargado de A, delegando como el admin global", { usuarioId: U.adminGlobal.id, vinculo: CODIGO[U.encargadoA.id], grupoId: grupo.id, localId: localA.id }, "VINCULO_DE_OTRO_USUARIO");
+  await rechazo("el código del admin global, delegando como el encargado de A", { usuarioId: U.encargadoA.id, vinculo: CODIGO[U.adminGlobal.id], grupoId: grupo.id, localId: localB.id }, "VINCULO_DE_OTRO_USUARIO");
+
+  // Revocar el propio: corta en la próxima consulta.
+  {
+    const r = await revocarPor(U.encargadoA);
+    igual("el encargado revoca su propio vínculo", [r.status, r.revocado], [200, true]);
+    await rechazo("vínculo recién revocado: corta de inmediato", { usuarioId: U.encargadoA.id, grupoId: grupo.id, localId: localA.id }, "VINCULO_REVOCADO");
+    const otra = await revocarPor(U.encargadoA);
+    igual("revocar de nuevo no falla: no había vigente", [otra.status, otra.revocado], [200, false]);
+    const viejo = CODIGO[U.encargadoA.id];
+    const nuevo = await autorizarPor(U.encargadoA);
+    ok("volver a autorizar entrega un código NUEVO", nuevo.status === 200 && nuevo.codigoVinculo && nuevo.codigoVinculo !== viejo);
+    CODIGO[U.encargadoA.id] = nuevo.codigoVinculo;
+    const r2 = await pedirIntegracion({ usuarioId: U.encargadoA.id, grupoId: grupo.id, localId: localA.id, periodo: { tipo: "hoy" } });
+    igual("con el código nuevo, consulta", [r2.status, r2.cuerpo?.datos?.totalVendido], [200, "6010.00"]);
+    await rechazo("el código viejo sigue muerto", { usuarioId: U.encargadoA.id, vinculo: viejo, grupoId: grupo.id, localId: localA.id }, "VINCULO_REVOCADO");
+  }
+
+  // Reautorizar con un vínculo vigente revoca el anterior.
+  {
+    const antes = CODIGO[U.adminEnX.id];
+    const r = await autorizarPor(U.adminEnX);
+    CODIGO[U.adminEnX.id] = r.codigoVinculo;
+    await rechazo("reautorizar revoca el código anterior", { usuarioId: U.adminEnX.id, vinculo: antes, grupoId: grupo2.id, localId: localX.id }, "VINCULO_REVOCADO");
+    const vigentes = await c.vinculoIntegracion.count({ where: { usuarioId: U.adminEnX.id, revocadoEn: null } });
+    igual("y queda un solo vínculo vigente", vigentes, 1);
+  }
+
+  // Revocar el de OTRO: la regla de dar de baja.
+  {
+    const sinPermiso = await revocarPor(U.sinReportesA, { usuarioId: U.adminEnX.id });
+    igual("sin gestión de usuarios no se revoca el de otro", [sinPermiso.status, sinPermiso.codigo], [403, "SIN_PERMISO"]);
+    const fuera = await revocarPor(U.gestorA, { usuarioId: U.adminEnX.id });
+    igual("el gestor del local A no revoca a uno del local X", [fuera.status, fuera.codigo], [403, "FUERA_DE_ALCANCE"]);
+    const dentro = await revocarPor(U.gestorA, { usuarioId: U.sinReportesA.id });
+    igual("el gestor del local A revoca a uno de su local", [dentro.status, dentro.revocado], [200, true]);
+    const porAdmin = await revocarPor(U.adminGlobal, { usuarioId: U.adminEnX.id });
+    igual("el admin revoca a uno de otro grupo", [porAdmin.status, porAdmin.revocado], [200, true]);
+    const fila = await c.vinculoIntegracion.findFirst({ where: { usuarioId: U.adminEnX.id }, orderBy: { id: "desc" } });
+    igual("la revocación dice quién la hizo", fila?.revocadoPorId, U.adminGlobal.id);
+    await rechazo("revocado por el admin: Azul Chat ya no puede", { usuarioId: U.adminEnX.id, grupoId: grupo2.id, localId: localX.id }, "VINCULO_REVOCADO");
+    const malo = await revocarPor(U.encargadoA, { usuarioId: U.adminEnX.id, permisos: ["*"] });
+    igual("revocar no acepta claves de más", [malo.status, malo.codigo], [400, "PEDIDO_INVALIDO"]);
+  }
+
+  // Dos autorizaciones simultáneas: una sola queda vigente.
+  {
+    const rs = await Promise.all([autorizarPor(U.gestorA), autorizarPor(U.gestorA), autorizarPor(U.gestorA)]);
+    const vigentes = await c.vinculoIntegracion.count({ where: { usuarioId: U.gestorA.id, revocadoEn: null } });
+    ok(`tres autorizaciones a la vez: un solo vínculo vigente, y ninguna respuesta 500 (${rs.map((r) => r.status).join(", ")})`,
+      vigentes === 1 && rs.every((r) => r.status === 200 || r.status === 409), json({ vigentes, s: rs.map((r) => r.status) }));
+  }
+
+  seccion("G. Lo que garantiza la base");
+  {
+    const columnas = (await c.$queryRawUnsafe(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'VinculoIntegracion' ORDER BY column_name`
+    )).map((x) => x.column_name);
+    igual("las columnas son exactamente éstas: ni código, ni token, ni secreto, ni cookie",
+      columnas, ["aplicacion", "autorizadoEn", "codigoHash", "id", "revocadoEn", "revocadoPorId", "usuarioId"]);
+    const filas = await c.$queryRawUnsafe(`SELECT row_to_json(v)::text AS t FROM "VinculoIntegracion" v`);
+    const todo = filas.map((f) => f.t).join("\n");
+    const secretos = [...Object.values(CODIGO), SECRETO, process.env.AUTH_SECRET, "eyJ", "erpazul_sesion"];
+    ok("ninguna fila contiene un código, un secreto, un JWT ni una cookie", secretos.every((s) => !todo.includes(s)), `${filas.length} filas`);
+    const fila = await c.vinculoIntegracion.findFirst({ where: { usuarioId: U.encargadoA.id, revocadoEn: null } });
+    igual("lo guardado es el SHA-256 del código", fila?.codigoHash, hashCodigoVinculo(CODIGO[U.encargadoA.id]));
+
+    const falla = async (titulo, fn, patron) => {
+      try {
+        await fn();
+        ok(titulo, false, "la base lo aceptó");
+      } catch (e) {
+        ok(titulo, patron.test(String(e?.message || e)), String(e?.message || e).slice(0, 160));
+      }
+    };
+    const id = fila.id;
+    await falla("un vínculo no se borra", () => c.$executeRawUnsafe(`DELETE FROM "VinculoIntegracion" WHERE id = $1`, id), /no se borra/);
+    await falla("no se cambia su código", () => c.$executeRawUnsafe(`UPDATE "VinculoIntegracion" SET "codigoHash" = repeat('0', 64) WHERE id = $1`, id), /solo se revoca/);
+    await falla("no se cambia de dueño", () => c.$executeRawUnsafe(`UPDATE "VinculoIntegracion" SET "usuarioId" = $2, "revocadoEn" = now(), "revocadoPorId" = $2 WHERE id = $1`, id, U.adminGlobal.id), /no cambia lo que se autorizó/);
+    const revocado = await c.vinculoIntegracion.findFirst({ where: { usuarioId: U.adminEnX.id, revocadoEn: { not: null } } });
+    await falla("un revocado no se des-revoca", () => c.$executeRawUnsafe(`UPDATE "VinculoIntegracion" SET "revocadoEn" = NULL, "revocadoPorId" = NULL WHERE id = $1`, revocado.id), /solo se revoca/);
+    await falla("un revocado no se vuelve a revocar", () => c.$executeRawUnsafe(`UPDATE "VinculoIntegracion" SET "revocadoEn" = now() + interval '1 hour' WHERE id = $1`, revocado.id), /solo se revoca/);
+    await falla("el código en claro no entra como hash", () => c.vinculoIntegracion.create({ data: { usuarioId: U.sinVinculoA.id, aplicacion: "AZUL_CHAT", codigoHash: `vin1_${"B".repeat(43)}`, revocadoEn: new Date(), revocadoPorId: U.sinVinculoA.id } }), /codigoHash_check/);
+    await falla("revocado sin quién no entra", () => c.vinculoIntegracion.create({ data: { usuarioId: U.sinVinculoA.id, aplicacion: "AZUL_CHAT", codigoHash: "c".repeat(64), revocadoEn: new Date() } }), /revocacion_check/);
+    await falla("un segundo vínculo vigente para el mismo usuario no entra", () => c.vinculoIntegracion.create({ data: { usuarioId: U.encargadoA.id, aplicacion: "AZUL_CHAT", codigoHash: "d".repeat(64) } }), /Unique constraint|vigente_key/);
+    await falla("un vínculo de un usuario que no existe no entra", () => c.vinculoIntegracion.create({ data: { usuarioId: 999999, aplicacion: "AZUL_CHAT", codigoHash: "e".repeat(64) } }), /Foreign key|usuarioId_fkey/);
   }
 } catch (e) {
   fallas.push(`la prueba se cayó: ${e?.stack || e}`);
