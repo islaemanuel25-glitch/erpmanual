@@ -22,7 +22,12 @@
 //      mata el código viejo, quién puede revocar a otro, y tres autorizaciones
 //      simultáneas dejan uno solo vigente;
 //   G. lo que garantiza la BASE: las columnas, que no se guarda ningún secreto,
-//      el trigger que solo deja revocar, los CHECK, el índice parcial y la FK.
+//      el trigger que solo deja revocar, los CHECK, el índice parcial y la FK;
+//   H. la RUTA HTTP real, POST /api/integraciones/azul-chat/consultar: la firma
+//      sobre los bytes, la configuración que la apaga, el JSON canónico, el
+//      tipo de contenido, el tope, los códigos públicos que no dejan enumerar,
+//      que nada interno sale, que la base queda IDÉNTICA (huella de todas las
+//      tablas) y el cupo.
 //
 // Las ventas entran por `/api/pos-ventas/crear`, la corrección por
 // `/api/pos-ventas/venta/[id]/corregir`, la anulación por el motor real
@@ -125,6 +130,8 @@ try {
   const rutaAutorizar = await import("../../app/api/integraciones/azul-chat/vinculo/autorizar/route.js");
   const rutaRevocar = await import("../../app/api/integraciones/azul-chat/vinculo/revocar/route.js");
   const { hashCodigoVinculo } = await import("../../lib/integraciones/vinculos/codigoVinculo.js");
+  const rutaConsultar = await import("../../app/api/integraciones/azul-chat/consultar/route.js");
+  const { MAX_POR_USUARIO } = await import("../../lib/integraciones/azul-chat/limitador.js");
   const { revertirVenta } = await import("../../lib/pos-ventas/reversionVenta.js");
   const { atenderSolicitudAzulChat } = await import("../../lib/integraciones/azul-chat/servidor.js");
   const { firmarSolicitud, CABECERAS } = await import("../../lib/integraciones/azul-chat/autenticacionAplicacion.js");
@@ -277,7 +284,9 @@ try {
     const headers = new Headers({ [CABECERAS.aplicacion]: "azul-chat", [CABECERAS.marca]: marca, "content-type": "application/json" });
     if (firmar) headers.set(CABECERAS.firma, firmarSolicitud({ secreto: SECRETO, aplicacion: "azul-chat", marca, cuerpo }));
     if (cookie) headers.set("cookie", cookie);
-    return atenderSolicitudAzulChat({ headers, cuerpo }, { entorno: ENTORNO, ahora });
+    // Sin limitador: A–G prueban la puerta, no el cupo. El cupo es el de la
+    // ruta real, que se ejerce en H.
+    return atenderSolicitudAzulChat({ headers, cuerpo }, { entorno: ENTORNO, ahora, limitador: null });
   };
   const cookieAdminGrupo = `erpazul_sesion=${sesion({ id: U.adminGlobal.id, localId: null, permisos: ["*"] })}; erpazul_grupo_activo=${grupo.id}`;
   const pedirReporte = async ({ localId, desde, hasta }) => {
@@ -494,6 +503,159 @@ try {
     await falla("revocado sin quién no entra", () => c.vinculoIntegracion.create({ data: { usuarioId: U.sinVinculoA.id, aplicacion: "AZUL_CHAT", codigoHash: "c".repeat(64), revocadoEn: new Date() } }), /revocacion_check/);
     await falla("un segundo vínculo vigente para el mismo usuario no entra", () => c.vinculoIntegracion.create({ data: { usuarioId: U.encargadoA.id, aplicacion: "AZUL_CHAT", codigoHash: "d".repeat(64) } }), /Unique constraint|vigente_key/);
     await falla("un vínculo de un usuario que no existe no entra", () => c.vinculoIntegracion.create({ data: { usuarioId: 999999, aplicacion: "AZUL_CHAT", codigoHash: "e".repeat(64) } }), /Foreign key|usuarioId_fkey/);
+  }
+
+  seccion("H. La ruta HTTP real: POST /api/integraciones/azul-chat/consultar");
+  // La ruta lee el secreto de `process.env` y la hora del reloj, como en producción.
+  process.env.AZUL_CHAT_INTEGRACION_SECRET = SECRETO;
+  const URL_RUTA = "http://ci/api/integraciones/azul-chat/consultar";
+  const cuerpoDe = ({ usuarioId, vinculo, grupoId = grupo.id, localId = localA.id, periodo = { tipo: "hoy" }, capacidad = "ventas_resumen", extra = {} }) =>
+    json({ capacidad, delegacion: { usuarioId, vinculo: vinculo === undefined ? CODIGO[usuarioId] : vinculo }, alcance: { grupoId, localId }, parametros: { periodo }, ...extra });
+  /**
+   * Un POST a la ruta real. `cuerpo` es lo que viaja; `firmado` es lo que se
+   * firmó (por defecto, lo mismo). Devuelve estado, cabeceras y el TEXTO crudo.
+   */
+  const postear = async ({ cuerpo, firmado = cuerpo, secreto = SECRETO, marca = String(Math.floor(Date.now() / 1000)), tipo = "application/json", sinFirma = false, extraHeaders = {} }) => {
+    const headers = new Headers({ "content-type": tipo, [CABECERAS.aplicacion]: "azul-chat", [CABECERAS.marca]: marca, ...extraHeaders });
+    if (!sinFirma) headers.set(CABECERAS.firma, firmarSolicitud({ secreto, aplicacion: "azul-chat", marca, cuerpo: firmado }));
+    const r = await rutaConsultar.POST(new Request(URL_RUTA, { method: "POST", headers, body: cuerpo }));
+    const texto = await r.text();
+    let cuerpoResp = null;
+    try { cuerpoResp = JSON.parse(texto); } catch { /* lo mira el que llama */ }
+    return { status: r.status, headers: r.headers, texto, cuerpo: cuerpoResp };
+  };
+  const respuestas = [];
+  const esperar = async (titulo, args, status, codigo) => {
+    const r = await postear(args);
+    respuestas.push(r);
+    ok(`${titulo}: ${status}${codigo ? ` ${codigo}` : ""}`, r.status === status && (codigo ? r.cuerpo?.codigo === codigo : true) && r.cuerpo?.datos === undefined, `${r.status} ${r.texto.slice(0, 160)}`);
+    return r;
+  };
+
+  // La huella de TODA la base: si una consulta escribiera algo, cambia.
+  const tablas = (await c.$queryRawUnsafe(
+    `SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations' ORDER BY tablename`
+  )).map((t) => t.tablename);
+  const huella = async () => {
+    const partes = [];
+    for (const t of tablas) {
+      const [f] = await c.$queryRawUnsafe(`SELECT count(*)::int AS n, coalesce(md5(string_agg(x::text, '|' ORDER BY x::text)), '') AS h FROM "${t}" x`);
+      partes.push(`${t}:${f.n}:${f.h}`);
+    }
+    return partes.join("\n");
+  };
+  const huellaAntes = await huella();
+
+  {
+    const cuerpo = cuerpoDe({ usuarioId: U.encargadoA.id });
+    const r = await postear({ cuerpo });
+    respuestas.push(r);
+    igual("1. firmada y válida: 200", [r.status, r.cuerpo?.ok], [200, true]);
+    const servicio = await pedirIntegracion({ usuarioId: U.encargadoA.id, grupoId: grupo.id, localId: localA.id, periodo: { tipo: "hoy" } });
+    igual("2. la ruta devuelve exactamente lo del servicio probado", r.cuerpo?.datos, servicio.cuerpo?.datos);
+    igual("2b. y el éxito es { ok, datos }, nada más", Object.keys(r.cuerpo || {}).sort(), ["datos", "ok"]);
+    igual("las cabeceras: JSON, sin caché, nosniff, sin CORS ni cookies",
+      [r.headers.get("content-type")?.startsWith("application/json"), r.headers.get("cache-control"), r.headers.get("x-content-type-options"), r.headers.get("access-control-allow-origin"), r.headers.get("set-cookie")],
+      [true, "no-store", "nosniff", null, null]);
+  }
+  const valido = cuerpoDe({ usuarioId: U.encargadoA.id });
+  await esperar("3. firmada con otro secreto", { cuerpo: valido, secreto: "otro-secreto-cualquiera-0123456789abcdefgh" }, 401, "SOLICITUD_NO_AUTENTICADA");
+  await esperar("4. el cuerpo cambiado después de firmar (otro local)", { cuerpo: cuerpoDe({ usuarioId: U.encargadoA.id, localId: localB.id }), firmado: valido }, 401, "SOLICITUD_NO_AUTENTICADA");
+  await esperar("4b. un espacio agregado después de firmar", { cuerpo: valido + " ", firmado: valido }, 401, "SOLICITUD_NO_AUTENTICADA");
+  await esperar("5. marca vencida (301 s atrás)", { cuerpo: valido, marca: String(Math.floor(Date.now() / 1000) - 301) }, 401, "SOLICITUD_NO_AUTENTICADA");
+  await esperar("6. marca en el futuro (301 s adelante)", { cuerpo: valido, marca: String(Math.floor(Date.now() / 1000) + 301) }, 401, "SOLICITUD_NO_AUTENTICADA");
+  {
+    const vencida = await postear({ cuerpo: valido, marca: String(Math.floor(Date.now() / 1000) - 301) });
+    const mala = await postear({ cuerpo: valido, secreto: "otro-secreto-cualquiera-0123456789abcdefgh" });
+    igual("firma mala y marca vencida salen idénticas: no se dice en qué falló", vencida.texto, mala.texto);
+  }
+
+  // Fallo seguro de la configuración: se cambia el entorno y se restituye.
+  for (const [titulo, valor] of [["7. sin secreto", undefined], ["8. secreto de 31 caracteres", "x".repeat(31)], ["9. secreto igual a AUTH_SECRET", process.env.AUTH_SECRET]]) {
+    if (valor === undefined) delete process.env.AZUL_CHAT_INTEGRACION_SECRET;
+    else process.env.AZUL_CHAT_INTEGRACION_SECRET = valor;
+    // Firmado con el valor configurado: aun así, apagada.
+    await esperar(`${titulo}, aunque la firma corresponda`, { cuerpo: valido, secreto: valor ?? SECRETO }, 503, "INTEGRACION_NO_DISPONIBLE");
+    process.env.AZUL_CHAT_INTEGRACION_SECRET = SECRETO;
+  }
+
+  const sinVinculo = await esperar("10. código de vínculo que no existe", { cuerpo: cuerpoDe({ usuarioId: U.sinVinculoA.id, vinculo: `vin1_${"Z".repeat(43)}` }) }, 403, "VINCULO_NO_VALIDO");
+  {
+    const inexistente = await postear({ cuerpo: cuerpoDe({ usuarioId: 999999, vinculo: `vin1_${"Z".repeat(43)}` }) });
+    const conCodigoAjeno = await postear({ cuerpo: cuerpoDe({ usuarioId: 999999, vinculo: CODIGO[U.adminGlobal.id] }) });
+    const sinCodigo = await postear({ cuerpo: cuerpoDe({ usuarioId: U.sinVinculoA.id, vinculo: null }) });
+    respuestas.push(inexistente, conCodigoAjeno, sinCodigo);
+    ok("usuario inexistente, usuario sin vínculo y código de otro: respuestas IDÉNTICAS",
+      [inexistente, conCodigoAjeno, sinCodigo].every((r) => r.status === sinVinculo.status && r.texto === sinVinculo.texto),
+      json([inexistente.texto, conCodigoAjeno.texto, sinCodigo.texto]));
+  }
+  await esperar("11. vínculo revocado", { cuerpo: cuerpoDe({ usuarioId: U.sinReportesA.id }) }, 403, "VINCULO_NO_VALIDO");
+  await esperar("14. local de otro grupo con el grupo propio", { cuerpo: cuerpoDe({ usuarioId: U.encargadoA.id, grupoId: grupo.id, localId: localX.id }) }, 403, "NO_AUTORIZADO");
+  await esperar("14b. local fuera de su alcance", { cuerpo: cuerpoDe({ usuarioId: U.encargadoA.id, localId: localB.id }) }, 403, "NO_AUTORIZADO");
+  await esperar("14c. grupo manipulado", { cuerpo: cuerpoDe({ usuarioId: U.adminGlobal.id, grupoId: grupo2.id, localId: localA.id }) }, 403, "NO_AUTORIZADO");
+  await esperar("15. capacidad desconocida", { cuerpo: cuerpoDe({ usuarioId: U.encargadoA.id, capacidad: "ejecutar_sql" }) }, 403, "CAPACIDAD_NO_DISPONIBLE");
+  await esperar("16. una clave de más", { cuerpo: cuerpoDe({ usuarioId: U.encargadoA.id, extra: { where: { localId: { gt: 0 } } } }) }, 400, "SOLICITUD_INVALIDA");
+  await esperar("16b. claves repetidas, firmadas", { cuerpo: valido.replace(`"usuarioId":${U.encargadoA.id}`, `"usuarioId":${U.encargadoA.id},"usuarioId":${U.adminGlobal.id}`) }, 400, "SOLICITUD_INVALIDA");
+  await esperar("16c. JSON con espacios, firmado", { cuerpo: JSON.stringify(JSON.parse(valido), null, 1) }, 400, "SOLICITUD_INVALIDA");
+  await esperar("17. Content-Type text/plain", { cuerpo: valido, tipo: "text/plain" }, 415, "TIPO_DE_CONTENIDO_INVALIDO");
+  await esperar("17b. Content-Type de formulario", { cuerpo: valido, tipo: "application/x-www-form-urlencoded" }, 415, "TIPO_DE_CONTENIDO_INVALIDO");
+  await esperar("18. cuerpo vacío", { cuerpo: "" }, 400, "SOLICITUD_INVALIDA");
+  await esperar("19. cuerpo de 4097 bytes", { cuerpo: "x".repeat(4097) }, 413, "CUERPO_DEMASIADO_GRANDE");
+  await esperar("20. JSON roto, firmado", { cuerpo: valido.slice(0, -1) }, 400, "SOLICITUD_INVALIDA");
+  await esperar("20b. período inválido", { cuerpo: cuerpoDe({ usuarioId: U.encargadoA.id, periodo: { tipo: "semana" } }) }, 400, "PERIODO_INVALIDO");
+
+  const jwtAdmin = sesion({ id: U.adminGlobal.id, localId: null, permisos: ["*"] });
+  await esperar("21. sin firma, con la cookie de sesión de un admin válida", { cuerpo: cuerpoDe({ usuarioId: U.adminGlobal.id }), sinFirma: true, extraHeaders: { cookie: `erpazul_sesion=${jwtAdmin}; erpazul_grupo_activo=${grupo.id}` } }, 401, "SOLICITUD_NO_AUTENTICADA");
+  await esperar("21b. firmada, con cookie de admin, delegando en el encargado de A, pidiendo B", { cuerpo: cuerpoDe({ usuarioId: U.encargadoA.id, localId: localB.id }), extraHeaders: { cookie: `erpazul_sesion=${jwtAdmin}` } }, 403, "NO_AUTORIZADO");
+  await esperar("22. sin firma, con Authorization: Bearer <JWT del ERP>", { cuerpo: cuerpoDe({ usuarioId: U.adminGlobal.id }), sinFirma: true, extraHeaders: { authorization: `Bearer ${jwtAdmin}` } }, 401, "SOLICITUD_NO_AUTENTICADA");
+  await esperar("22b. el JWT del ERP puesto en lugar de la firma", { cuerpo: cuerpoDe({ usuarioId: U.adminGlobal.id }), sinFirma: true, extraHeaders: { [CABECERAS.firma]: jwtAdmin } }, 401, "SOLICITUD_NO_AUTENTICADA");
+  ok("la ruta no exporta otros métodos: Next contesta 405", rutaConsultar.GET === undefined && rutaConsultar.PUT === undefined && rutaConsultar.DELETE === undefined && typeof rutaConsultar.POST === "function");
+
+  // 25. Concurrencia: diez a la vez, todas iguales.
+  {
+    const rs = await Promise.all(Array.from({ length: 10 }, () => postear({ cuerpo: cuerpoDe({ usuarioId: U.adminGlobal.id }) })));
+    respuestas.push(...rs);
+    ok("25. diez consultas válidas a la vez: todas 200 y con los mismos datos",
+      rs.every((r) => r.status === 200 && json(r.cuerpo?.datos) === json(rs[0].cuerpo?.datos)) && rs[0].cuerpo?.datos?.totalVendido === "6010.00",
+      json(rs.map((r) => r.status)));
+  }
+
+  igual("24. la base quedó idéntica después de todas las consultas, válidas y rechazadas", await huella(), huellaAntes);
+
+  // 23. Nada interno sale por la ruta.
+  {
+    const todo = respuestas.map((r) => r.texto).join("\n");
+    const fugas = [SECRETO, process.env.AUTH_SECRET, ...Object.values(CODIGO), jwtAdmin, "prisma", "Prisma", "SELECT", " at ", "stack", "Invalid `", "USUARIO_INEXISTENTE", "VINCULO_REVOCADO", "SIN_PERMISO", "FUERA_DE_ALCANCE", "codigoHash"]
+      .filter((f) => f && todo.includes(f));
+    ok(`23. ninguna de las ${respuestas.length} respuestas trae secretos, códigos de vínculo, JWT, Prisma, SQL, stack ni códigos internos`, fugas.length === 0, json(fugas));
+    ok("ninguna respuesta pone cookies ni abre CORS", respuestas.every((r) => !r.headers.get("set-cookie") && !r.headers.get("access-control-allow-origin")));
+    ok("toda respuesta es JSON y sin caché", respuestas.every((r) => r.cuerpo && r.headers.get("cache-control") === "no-store"));
+  }
+
+  // 12 y 13: cambian la base a propósito, por eso van después de la huella.
+  await c.usuario.update({ where: { id: U.encargadoA.id }, data: { activo: false } });
+  await esperar("12. usuario vinculado y desactivado", { cuerpo: cuerpoDe({ usuarioId: U.encargadoA.id }) }, 403, "NO_AUTORIZADO");
+  await c.usuario.update({ where: { id: U.encargadoA.id }, data: { activo: true } });
+  await c.rol.update({ where: { id: rolEncargado.id }, data: { permisos: DEFAULT_PERMISOS_SISTEMA[ENCARGADO].filter((p) => p !== "reportes.ver") } });
+  await esperar("13. permiso retirado al rol", { cuerpo: cuerpoDe({ usuarioId: U.encargadoA.id }) }, 403, "NO_AUTORIZADO");
+  await c.rol.update({ where: { id: rolEncargado.id }, data: { permisos: DEFAULT_PERMISOS_SISTEMA[ENCARGADO] } });
+  {
+    const r = await postear({ cuerpo: cuerpoDe({ usuarioId: U.encargadoA.id }) });
+    igual("13b. permiso devuelto: vuelve a 200 con el mismo vínculo", r.status, 200);
+  }
+
+  // El cupo de la ruta: el usuario se queda sin lugar, con Retry-After.
+  {
+    let primero429 = null;
+    for (let i = 0; i < MAX_POR_USUARIO + 1 && !primero429; i++) {
+      const r = await postear({ cuerpo: cuerpoDe({ usuarioId: U.adminGlobal.id }) });
+      if (r.status === 429) primero429 = r;
+    }
+    ok("el cupo por usuario corta con 429 y Retry-After",
+      primero429?.cuerpo?.codigo === "LIMITE_EXCEDIDO" && Number(primero429?.headers.get("retry-after")) > 0,
+      primero429 ? primero429.texto : "nunca devolvió 429");
+    const otro = await postear({ cuerpo: cuerpoDe({ usuarioId: U.encargadoA.id }) });
+    igual("y otro usuario sigue teniendo su cupo", otro.status, 200);
   }
 } catch (e) {
   fallas.push(`la prueba se cayó: ${e?.stack || e}`);
