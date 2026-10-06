@@ -38,6 +38,7 @@ haya sido deliberado.
 | [DEC-0007](DEC-0007-prisma-mcp-sin-decidir.md) | `prisma mcp` daría la vuelta alrededor de la guardia | **SIN DECIDIR** |
 | [DEC-0008](DEC-0008-imagenes-de-comprobantes-no-se-respaldan.md) | Las imágenes de comprobantes viven siete días y NO se respaldan | Vigente |
 | [DEC-0012](DEC-0012-caja-por-operador.md) | La caja es del operador, no de la cuenta ERP | Vigente |
+| [DEC-0013](DEC-0013-frontera-azul-chat.md) | Azul Chat entra por una frontera propia, cerrada y de solo lectura | Vigente (sin ruta) |
 
 ⚠️ **El número 0006 está usado dos veces.** No se renumeró acá porque los dos
 archivos ya están referenciados desde otros documentos y desde commits; queda

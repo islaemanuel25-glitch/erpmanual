@@ -425,6 +425,10 @@ model Usuario {
   pagosGastoRegistrados  PagoGasto[]               @relation("pago_gasto_registrado_por")
   verificacionesEfectivoHechas   VerificacionEfectivo[] @relation("verificacion_efectivo_hecha_por")
   verificacionesEfectivoAnuladas VerificacionEfectivo[] @relation("verificacion_efectivo_anulada_por")
+  /// Las aplicaciones externas que este usuario autorizó a consultar en su nombre.
+  vinculosIntegracion            VinculoIntegracion[]   @relation("vinculo_integracion_del_usuario")
+  /// Los vínculos de integración que este usuario revocó (propios o ajenos).
+  vinculosIntegracionRevocados   VinculoIntegracion[]   @relation("vinculo_integracion_revocado_por")
 
   @@map("Usuario")
 }
@@ -3158,6 +3162,50 @@ model PosVentaCounter {
 
   @@index([localId])
   @@index([grupoId])
+}
+
+// VÍNCULOS DE INTEGRACIÓN: UNA PERSONA AUTORIZA A UNA APLICACIÓN EXTERNA
+// ---------------------------------------------------------------------------
+//
+// Azul Chat consulta al ERP EN NOMBRE de una persona. No alcanza con que la
+// aplicación esté autenticada ni con que nombre un `usuarioId`: la persona tuvo
+// que autorizarla antes, desde su propia sesión del ERP. Esta tabla es esa
+// autorización. Ver DEC-0013 y lib/integraciones/vinculos/.
+//
+// El vínculo NO da permisos. Cada consulta relee el usuario, su rol y su
+// alcance; un vínculo activo de alguien que perdió `reportes.ver` no le deja
+// ver ventas.
+//
+// Al autorizar, el ERP genera un CÓDIGO al azar, se lo muestra una sola vez a la
+// persona para que lo pegue en Azul Chat, y guarda solo su SHA-256. Azul Chat
+// manda el código con cada consulta; así el vínculo de A no sirve para hablar
+// en nombre de B. Ni el código, ni secretos, ni JWT, ni cookies se guardan acá.
+//
+// No se borra ni se edita: se REVOCA, una vez, y queda la historia. Lo exigen
+// dos CHECK y un trigger que viven solo en SQL (migración
+// 20261006120000_vinculo_integracion), igual que el índice único PARCIAL "un
+// solo vínculo activo por usuario y aplicación".
+enum AplicacionIntegracion {
+  AZUL_CHAT
+}
+
+model VinculoIntegracion {
+  id            Int                   @id @default(autoincrement())
+  usuarioId     Int
+  aplicacion    AplicacionIntegracion
+  /// SHA-256 (hex) del código que se le mostró a la persona. El código no se guarda.
+  codigoHash    String                @unique
+  autorizadoEn  DateTime              @default(now())
+  /// NULL = vigente. Se escribe una sola vez.
+  revocadoEn    DateTime?
+  /// Quién revocó: la persona misma, o quien hoy puede darla de baja.
+  revocadoPorId Int?
+
+  usuario     Usuario  @relation("vinculo_integracion_del_usuario", fields: [usuarioId], references: [id], onDelete: Restrict)
+  revocadoPor Usuario? @relation("vinculo_integracion_revocado_por", fields: [revocadoPorId], references: [id], onDelete: Restrict)
+
+  @@index([usuarioId, aplicacion])
+  @@index([revocadoPorId])
 }
 
 // COBROS OFFLINE: LA EVIDENCIA DE UN COBRO DECLARADO POR EL POS

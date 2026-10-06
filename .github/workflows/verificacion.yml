@@ -276,6 +276,10 @@ jobs:
           # tablero de Transferencias: el handler real, con sesiones firmadas.
           echo ""
           node --import ./scripts/alias-loader.mjs scripts/pruebas-db/transferenciasAlcance.mjs
+          # Azul Chat · ventas_resumen: los mismos números que el reporte del
+          # ERP, y la autorización contra filas reales. Base propia descartable.
+          echo ""
+          node --import ./scripts/alias-loader.mjs scripts/pruebas-db/azulChatVentasResumen.mjs
 
       # ── EL LIBRO DE STOCK ─────────────────────────────────────────────────
       #
