@@ -26,7 +26,6 @@ import {
   franjaHoraria,
   lecturaDelGrupo,
   nombreDelGrupo,
-  pieDeCaja,
   presentacionDePago,
   rotuloDeEntrega,
   turnoDeVerificacion,
@@ -37,13 +36,12 @@ import {
   AvisoDeEstado,
   Bloque,
   BotonTesoreria,
-  CajaDelTurno,
+  CajasDelTurno,
   CifraHero,
   EncabezadoDeDetalle,
   InsigniaDeEstado,
   NotaPunteada,
   Renglon,
-  RotuloDeSeccion,
   TarjetaDeTurno,
   TarjetaHero,
   colorDeDiferencia,
@@ -72,55 +70,26 @@ export function DetalleDeTurno({ datos, lectura, ctx, local, onIr, onVolver, onV
   const contexto = contextoDelGrupo(g.grupo, null, g.cajas.length);
   // G: un conteo conjunto de varias cajas con diferencia se explica una vez.
   const conjunto = g.completos.find((a) => a.cantidadDeCajas > 1 && Number(a.diferencia) !== 0);
-  const pendienteSinContar = !g.estado || g.estado === ESTADO_TESORERIA.PENDIENTE;
 
+  // La misma tarjeta del resumen, con sus cajas abiertas: el turno arriba, las
+  // cajas abajo, en el mismo bloque.
   return (
     <div className="space-y-3.5">
       <EncabezadoDeDetalle titulo={g.nombre} local={local} contexto={contexto} onVolver={onVolver} />
 
-      {pendienteSinContar ? (
-        <>
-          <TarjetaHero franja={false}>
-            <CifraHero rotulo="COBRADO DECLARADO DEL TURNO" valor={formatearMoneda(g.cobradoDeclarado)} />
-            <Renglon rotulo="Efectivo entregado" valor={formatearMoneda(g.grupo.efectivoDeclaradoEntregado)} />
-            {(g.grupo.cobradoPorMedio || [])
-              .filter((m) => !m.esEfectivo)
-              .map((m) => (
-                <Renglon key={m.medio} rotulo={m.rotulo} nota="Cobrado por POS" valor={formatearMoneda(m.montoDeclarado)} atenuado />
-              ))}
-          </TarjetaHero>
-          <Bloque titulo="VERIFICACIÓN DE EFECTIVO">
-            <div className="flex items-center gap-2">
-              <p className="flex-1 min-w-0 text-sm sunmi-text-muted">
-                {g.estado ? "Nadie contó todavía este efectivo" : "No hubo entregas de efectivo en este turno"}
-              </p>
-              <InsigniaDeEstado estado={g.estado} />
-            </div>
-            {g.estado && (
-              <>
-                <Renglon
-                  rotulo="Declarado"
-                  nota="Lo que las cajas dijeron que entregaron"
-                  valor={formatearMoneda(g.grupo.verificacion?.entregadoDeclarado)}
-                  fuerte
-                />
-                <Renglon rotulo="Verificado" valor="Pendiente" atenuado />
-                {puedeVerificar && g.pendientes.length > 0 && (
-                  <BotonTesoreria onClick={() => onVerificar(g)}>Verificar efectivo</BotonTesoreria>
-                )}
-              </>
-            )}
-          </Bloque>
-        </>
-      ) : (
-        <TarjetaDeTurno
+      <TarjetaDeTurno
+        g={g}
+        contexto={contexto}
+        puedeVerificar={puedeVerificar}
+        onVerificar={() => onVerificar(g)}
+        onVerVerificacion={verVerificacion}
+      >
+        <CajasDelTurno
           g={g}
-          contexto={contexto}
-          puedeVerificar={puedeVerificar}
-          onVerificar={() => onVerificar(g)}
-          onVerVerificacion={verVerificacion}
+          verificaciones={lectura.verificaciones}
+          onVerCaja={(c) => onIr({ vista: VISTA_TESORERIA.CAJA, caja: c.turnoId, grupo: g.grupo.clave })}
         />
-      )}
+      </TarjetaDeTurno>
 
       {conjunto && (
         <NotaPunteada>
@@ -137,26 +106,6 @@ export function DetalleDeTurno({ datos, lectura, ctx, local, onIr, onVolver, onV
         </NotaPunteada>
       )}
 
-      <RotuloDeSeccion>CAJAS DEL TURNO</RotuloDeSeccion>
-      {g.cajas.map((c) => {
-        const estado = estadoDeCaja(c, lectura.verificaciones);
-        return (
-          <CajaDelTurno
-            key={c.turnoId}
-            c={c}
-            estado={estado}
-            leyenda={pieDeCaja(estado, c.entregas)}
-            onVerCaja={() => onIr({ vista: VISTA_TESORERIA.CAJA, caja: c.turnoId, grupo: g.grupo.clave })}
-          />
-        );
-      })}
-
-      {g.cajas.length > 1 && (
-        <NotaPunteada>
-          Cada diferencia de caja es de su cajero. Si una caja da −$5.000 y otra +$5.000, no se compensan: Tesorería junta
-          la plata del turno, no las responsabilidades.
-        </NotaPunteada>
-      )}
     </div>
   );
 }

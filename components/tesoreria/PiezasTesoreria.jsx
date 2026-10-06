@@ -15,11 +15,20 @@
 // `sunmi-border-*`): la insignia pinta su contorno con `border-current`, así que
 // el borde es el mismo token que el texto en los catorce temas.
 
+import SunmiActionCard from "@/components/sunmi/SunmiActionCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import { Bloque, Renglon } from "@/components/finanzas/PiezasDelResumen";
 import { formatearMoneda } from "@/lib/moneda";
-import { INSIGNIA_TESORERIA, ESTADO_TESORERIA, notaDeDigitales, notaDeEntregas, totalDigital } from "@/lib/tesoreria/pantallaTesoreria";
+import {
+  INSIGNIA_TESORERIA,
+  ESTADO_TESORERIA,
+  estadoDeCaja,
+  franjaHoraria,
+  insigniaDeCajaEnElTurno,
+  proporcionVerificada,
+  textoFaltaSobra,
+} from "@/lib/tesoreria/pantallaTesoreria";
 
 export { Bloque, Renglon };
 
@@ -180,233 +189,205 @@ export function EncabezadoDeDetalle({ titulo, local, contexto, onVolver }) {
   );
 }
 
-/** El sub-bloque "VERIFICACIÓN DE EFECTIVO" de una tarjeta, sobre el fondo de la app. */
-export function SubBloque({ titulo, children }) {
+/**
+ * EL AVANCE DE LO VERIFICADO sobre lo entregado (Figma EVJ2KvVCrY0oVSowfboymQ,
+ * "Avance · verificado / entregado"). `pct` es el de `proporcionVerificada`,
+ * truncado: no dice 100 si falta contar. El color sale del token de texto del
+ * tema con `bg-current`: no hay una clase de fondo de éxito o advertencia y no
+ * se escribe uno fijo.
+ */
+export function BarraDeAvance({ pct }) {
+  if (pct == null) return null;
   return (
-    <div className="sunmi-surface rounded-xl border sunmi-border p-3 space-y-2">
-      <div className="text-xs2 font-semibold sunmi-text-muted tracking-wider">{titulo}</div>
-      {children}
+    <div className="flex h-1.5 gap-0.5 overflow-hidden" aria-hidden="true" data-avance={pct}>
+      {pct > 0 && <div className="h-full rounded-full bg-current sunmi-text-success" style={{ width: `${pct}%` }} />}
+      {pct < 100 && <div className="h-full flex-1 rounded-full bg-current sunmi-text-warning" />}
+    </div>
+  );
+}
+
+/** "Verificado $X · Falta $Y" en una fila: los dos importes del servidor. */
+export function VerificadoYFalta({ verificado, falta }) {
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm2">
+      <span className="sunmi-text-muted">
+        Verificado <span className="font-semibold tabular-nums sunmi-text-strong">{formatearMoneda(verificado)}</span>
+      </span>
+      <span className="sunmi-text-muted">
+        Falta <span className="font-semibold tabular-nums sunmi-text-strong">{formatearMoneda(falta)}</span>
+      </span>
     </div>
   );
 }
 
 /**
- * LO QUE DICE LA VERIFICACIÓN DE UN TURNO, en cada estado del Figma (15:325).
- * Recibe la lectura del grupo ya armada (`lecturaDelGrupo`); no calcula plata.
+ * TARJETA DE TURNO (Figma EVJ2KvVCrY0oVSowfboymQ, "Tesorería / Tarjeta de
+ * turno"). La cifra protagonista es el EFECTIVO ENTREGADO del turno: ni lo
+ * cobrado por POS ni lo digital, que van en el bloque "COBRADO POR POS". Debajo,
+ * cuánto se verificó y cuánto falta, la diferencia de Tesorería si hay, la
+ * acción y "Ver cajas", que abre las cajas acá mismo (`children`).
  */
-export function VerificacionDelTurno({ g, puedeVerificar, onVerificar, onVerVerificacion }) {
+export function TarjetaDeTurno({
+  g,
+  contexto,
+  puedeVerificar,
+  onVerificar,
+  onVerVerificacion,
+  cajasAbiertas = false,
+  onAlternarCajas = null,
+  children = null,
+}) {
   const v = g.grupo.verificacion || {};
-  const pendiente = Number(v.entregadoPendienteDeVerificar || 0);
-  const quien = g.completos.length === 1 ? quienYCuando(g.completos[0]) : null;
-  const sinImporteDeCajas = g.cajas.filter((c) => c.sinImporte).map((c) => c.etiqueta);
-  const hayPendientes = g.pendientes.length > 0;
-
-  return (
-    <SubBloque titulo="VERIFICACIÓN DE EFECTIVO">
-      {g.estado === ESTADO_TESORERIA.REQUIERE_REVISION && (
-        <AvisoDeEstado tono="danger">
-          {g.enRevision.length
-            ? "Una entrega cambió después de verificarla. Lo verificado es la foto de ese momento y no se recalculó."
-            : "Una verificación de este turno requiere revisión."}
-        </AvisoDeEstado>
-      )}
-      {sinImporteDeCajas.length > 0 && (
-        <AvisoDeEstado tono="warning">
-          {sinImporteDeCajas.join(", ")} cerró sin conteo: no hay importe declarado. No se toma como $0 y no se puede
-          verificar.
-        </AvisoDeEstado>
-      )}
-
-      {g.estado === ESTADO_TESORERIA.PARCIAL ? (
-        <>
-          <Renglon
-            rotulo="Verificado"
-            nota={notaDeCajas(g.verificadas)}
-            valor={formatearMoneda(v.entregadoCubiertoPorVerificaciones)}
-          />
-          <Renglon
-            rotulo="Pendiente de verificar"
-            nota={notaDeCajas(g.pendientes)}
-            valor={formatearMoneda(pendiente)}
-            colorValor="sunmi-text-warning"
-          />
-          <p className="text-xs2 sunmi-text-warning">
-            Lo verificado no cubre todo el turno: falta contar el efectivo de {cajasDe(g.pendientes)}.
-          </p>
-        </>
-      ) : (
-        <>
-          <Renglon
-            rotulo={g.estado === ESTADO_TESORERIA.REQUIERE_REVISION ? "Declarado al verificar" : "Declarado"}
-            nota={
-              g.estado === ESTADO_TESORERIA.REQUIERE_REVISION
-                ? "Foto histórica, no se recalcula"
-                : "Lo que las cajas dijeron que entregaron"
-            }
-            valor={formatearMoneda(
-              g.estado === ESTADO_TESORERIA.REQUIERE_REVISION || g.completos.length
-                ? v.declaradoDeLosActos || v.entregadoDeclarado
-                : v.entregadoDeclarado
-            )}
-            atenuado={g.estado === ESTADO_TESORERIA.REQUIERE_REVISION}
-          />
-          {g.completos.length || g.estado === ESTADO_TESORERIA.REQUIERE_REVISION ? (
-            <>
-              <Renglon rotulo="Verificado" nota={quien} valor={formatearMoneda(v.efectivoVerificado)} />
-              {g.diferencia != null && (
-                <Renglon
-                  rotulo="Diferencia Tesorería"
-                  valor={textoDeDiferencia(g.diferencia)}
-                  colorValor={colorDeDiferencia(g.diferencia)}
-                  notaValor={g.diferencia ? "verificado − declarado" : null}
-                  fuerte={!g.diferencia}
-                />
-              )}
-            </>
-          ) : (
-            <Renglon rotulo="Verificado" valor="Pendiente" atenuado />
-          )}
-        </>
-      )}
-
-      {g.completos.length > 0 && (
-        <EnlaceTesoreria onClick={() => onVerVerificacion(g.completos[0].id)}>
-          {g.completos.length === 1 ? "Ver verificación" : `Ver verificación #${g.completos[0].id}`}
-        </EnlaceTesoreria>
-      )}
-
-      {puedeVerificar && hayPendientes && (
-        <BotonTesoreria onClick={onVerificar}>
-          {g.estado === ESTADO_TESORERIA.PARCIAL
-            ? `Verificar lo pendiente · ${formatearMoneda(pendiente)}`
-            : g.estado === ESTADO_TESORERIA.SIN_IMPORTE_DECLARADO
-              ? `Verificar lo declarado · ${formatearMoneda(pendiente)}`
-              : "Verificar efectivo"}
-        </BotonTesoreria>
-      )}
-      {g.estado === ESTADO_TESORERIA.REQUIERE_REVISION && g.enRevision.length > 0 && (
-        <BotonTesoreria tipo="secundario" onClick={() => onVerVerificacion(g.enRevision[0].id)}>
-          Revisar verificación
-        </BotonTesoreria>
-      )}
-    </SubBloque>
-  );
-}
-
-// Con más de dos cajas los nombres no entran en una tarjeta: se dice cuántas
-// son, y los nombres quedan en el detalle del turno. Vale para la nota y para
-// el aviso de lo que falta contar.
-const MAX_CAJAS_NOMBRADAS = 2;
-function cajasDe(entregas) {
-  const cajas = [...new Set(entregas.map((e) => e.etiquetaCaja).filter(Boolean))];
-  return cajas.length > MAX_CAJAS_NOMBRADAS ? `${cajas.length} cajas` : cajas.join(", ");
-}
-function notaDeCajas(entregas) {
-  const quienes = cajasDe(entregas);
-  if (!quienes) return null;
-  return `${quienes} · ${entregas.length === 1 ? "1 entrega" : `${entregas.length} entregas`}`;
-}
-function quienYCuando(acto) {
-  const nombre = acto?.verificadaPor?.nombre;
-  return nombre ? `Contó: ${nombre}` : null;
-}
-
-/**
- * TARJETA DE TURNO (Figma 15:325). Lo cobrado declarado, el efectivo entregado,
- * lo digital del POS y el estado de su verificación. No depende de cómo arma el
- * servidor el grupo: nombra lo que llega.
- */
-export function TarjetaDeTurno({ g, contexto, puedeVerificar, onVerificar, onVerCajas, onVerVerificacion }) {
-  const digitales = (g.grupo.cobradoPorMedio || []).filter((m) => !m.esEfectivo);
-  const sinImporte = g.sinImporte.length;
-  const conEntrega = g.cajas.length - sinImporte;
+  const enRevision = g.estado === ESTADO_TESORERIA.REQUIERE_REVISION;
+  const diferencia = textoFaltaSobra(g.diferencia);
+  const sinImporte = g.cajas.filter((c) => c.sinImporte).map((c) => c.etiqueta);
   return (
     <section
       data-tarjeta-turno={g.grupo.clave}
-      className={`sunmi-bg-card rounded-xl2 border p-4 space-y-2.5 ${
-        g.estado === ESTADO_TESORERIA.REQUIERE_REVISION ? "sunmi-border-danger" : "sunmi-divider"
-      }`}
+      className={`sunmi-bg-card rounded-xl2 border p-4 space-y-2.5 ${enRevision ? "sunmi-border-danger" : "sunmi-divider"}`}
     >
       <div className="flex items-start gap-2">
         <div className="flex-1 min-w-0 space-y-0.5">
-          <h3 className="text-base2 font-semibold sunmi-text-strong">{g.nombre}</h3>
+          <h3 className="text-base2 font-semibold sunmi-text-strong break-words">{g.nombre}</h3>
           {contexto ? <p className="text-sm2 sunmi-text-muted">{contexto}</p> : null}
         </div>
         <InsigniaDeEstado estado={g.estado} />
       </div>
-      <div className="flex items-baseline gap-2">
-        <span className="flex-1 min-w-0 text-sm sunmi-text-muted">Cobrado declarado</span>
-        <span className="text-lg3 font-semibold tabular-nums sunmi-text-strong">{formatearMoneda(g.cobradoDeclarado)}</span>
+
+      <div>
+        <div data-efectivo-del-turno className="text-xl3 font-semibold tabular-nums sunmi-text-strong break-words">
+          {formatearMoneda(g.grupo.efectivoDeclaradoEntregado)}
+        </div>
+        <p className="text-sm2 sunmi-text-muted">Efectivo entregado</p>
       </div>
-      <Renglon
-        rotulo="Efectivo entregado"
-        nota={sinImporte ? `${conEntrega} de ${g.cajas.length} cajas` : null}
-        notaValor={sinImporte ? `+ ${sinImporte === 1 ? "1 caja" : `${sinImporte} cajas`} sin importe` : null}
-        valor={formatearMoneda(g.grupo.efectivoDeclaradoEntregado)}
-      />
-      {digitales.map((m) => (
-        <Renglon key={m.medio} rotulo={m.rotulo} valor={formatearMoneda(m.montoDeclarado)} atenuado />
-      ))}
-      <VerificacionDelTurno
-        g={g}
-        puedeVerificar={puedeVerificar}
-        onVerificar={onVerificar}
-        onVerVerificacion={onVerVerificacion}
-      />
-      {onVerCajas ? <EnlaceTesoreria onClick={onVerCajas}>Ver cajas del turno</EnlaceTesoreria> : null}
+      <BarraDeAvance pct={proporcionVerificada(v)} />
+      <VerificadoYFalta verificado={v.efectivoVerificado} falta={v.entregadoPendienteDeVerificar} />
+      {diferencia && <Renglon rotulo="Diferencia" valor={diferencia} colorValor={colorDeDiferencia(g.diferencia)} />}
+
+      {enRevision && (
+        <AvisoDeEstado tono="danger">Una entrega cambió después de verificarla. Lo verificado no se recalculó.</AvisoDeEstado>
+      )}
+      {sinImporte.length > 0 && (
+        <AvisoDeEstado tono="warning">{sinImporte.join(", ")} cerró sin conteo: no hay importe para verificar.</AvisoDeEstado>
+      )}
+
+      {puedeVerificar && g.pendientes.length > 0 && <BotonTesoreria onClick={onVerificar}>Verificar efectivo</BotonTesoreria>}
+      {enRevision && g.enRevision.length > 0 && (
+        <BotonTesoreria tipo="secundario" onClick={() => onVerVerificacion(g.enRevision[0].id)}>
+          Revisar verificación
+        </BotonTesoreria>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        {onAlternarCajas ? (
+          <EnlaceTesoreria onClick={onAlternarCajas}>{cajasAbiertas ? "Ocultar cajas" : `Ver cajas (${g.cajas.length})`}</EnlaceTesoreria>
+        ) : null}
+        {g.completos.length > 0 && (
+          <EnlaceTesoreria onClick={() => onVerVerificacion(g.completos[0].id)}>Ver verificación</EnlaceTesoreria>
+        )}
+      </div>
+      {children}
     </section>
   );
 }
 
 /**
- * CAJA DEL TURNO (Figma 17:498). Lo que entregó, lo que cobró por POS y SU
- * diferencia de caja, que es del cajero y NO se compensa con la de otra caja.
+ * LAS CAJAS DEL TURNO, abiertas debajo de su tarjeta (Figma 351:620, "Turno +
+ * cajas (mismo bloque)"): el turno sigue arriba como contexto.
  */
-export function CajaDelTurno({ c, estado, leyenda, onVerCaja }) {
-  const caja = c.caja || {};
-  const digital = totalDigital(caja.cobradoPorMedio || c.cobradoPorMedio || []);
-  const entregado = caja.efectivoDeclaradoEntregado ?? c.efectivoDeclaradoEntregado;
+export function CajasDelTurno({ g, verificaciones, onVerCaja }) {
   return (
-    <section data-caja-turno={c.turnoId} className="sunmi-bg-card rounded-xl2 border sunmi-border p-4 space-y-2">
-      <div className="flex items-start gap-2">
-        <div className="flex-1 min-w-0 space-y-0.5">
-          <h3 className="text-base font-semibold sunmi-text-strong">{c.etiqueta}</h3>
-          {caja.operadorNombre ? <p className="text-sm2 sunmi-text-muted">Operador: {caja.operadorNombre}</p> : null}
-        </div>
-        <InsigniaDeEstado estado={estado} />
-      </div>
-      <Renglon
-        rotulo="Efectivo entregado"
-        nota={c.entregas?.length ? notaDeEntregas(c.entregas) : null}
-        valor={entregado == null ? "Sin importe declarado" : formatearMoneda(entregado)}
-        atenuado={entregado == null}
-      />
-      {/* Sin cobros por POS no se dibuja un "$0": parecería que hubo actividad. */}
-      {Number(digital) > 0 && (
-        <Renglon
-          rotulo="Cobrado por POS"
-          nota={notaDeDigitales(caja.cobradoPorMedio || c.cobradoPorMedio || []) || null}
-          valor={formatearMoneda(digital)}
-          atenuado
+    <div className="border-t sunmi-divider pt-2.5 space-y-1.5" data-cajas-del-turno={g.grupo.clave}>
+      <div className="text-xs2 font-semibold sunmi-text-muted tracking-wider">CAJAS DEL TURNO</div>
+      {g.cajas.map((c) => (
+        <CajaDelTurno
+          key={c.turnoId}
+          c={c}
+          insignia={insigniaDeCajaEnElTurno(estadoDeCaja(c, verificaciones), g.estado)}
+          onVerCaja={onVerCaja ? () => onVerCaja(c) : null}
         />
-      )}
-      <Renglon
-        rotulo="Diferencia de caja"
-        nota="Del arqueo de esta caja"
-        valor={caja.diferenciaCaja == null ? "Sin arqueo" : textoDeDiferencia(caja.diferenciaCaja)}
-        colorValor={colorDeDiferencia(caja.diferenciaCaja)}
-        atenuado={caja.diferenciaCaja == null}
-      />
-      <div className="flex items-start gap-2 text-sm2">
-        <p
-          className={`flex-1 min-w-0 ${
-            estado === ESTADO_TESORERIA.REQUIERE_REVISION ? "sunmi-text-danger" : "sunmi-text-muted"
-          }`}
-        >
-          {leyenda}
-        </p>
-        {onVerCaja ? <EnlaceTesoreria onClick={onVerCaja}>Ver caja</EnlaceTesoreria> : null}
+      ))}
+    </div>
+  );
+}
+
+/**
+ * CAJA DEL TURNO (Figma EVJ2KvVCrY0oVSowfboymQ, "Tesorería / Caja del turno").
+ * Quién, cuánto efectivo entregó, qué caja y en qué horario, y SU diferencia
+ * de caja si tuvo: es del cajero y NO se compensa con la de otra caja, así que
+ * no hay un total de diferencias en ningún lado. La insignia va solo cuando
+ * dice algo que la del turno no dice. Lo digital no está: no es plata a contar.
+ */
+export function CajaDelTurno({ c, insignia = null, onVerCaja = null }) {
+  const caja = c.caja || {};
+  const entregado = c.sinImporte && !c.entregas?.length ? null : c.efectivoDeclaradoEntregado;
+  const franja = franjaHoraria(caja.apertura, caja.cierre);
+  const diferencia = textoFaltaSobra(caja.diferenciaCaja);
+  const contenido = (
+    <>
+      <div className="flex w-full items-baseline gap-2">
+        <span className="flex-1 min-w-0 truncate text-base font-semibold sunmi-text-strong">
+          {caja.operadorNombre || c.etiqueta}
+        </span>
+        <span className={`shrink-0 tabular-nums font-semibold ${entregado == null ? "sunmi-text-muted" : "sunmi-text-strong"}`}>
+          {entregado == null ? "Sin importe declarado" : formatearMoneda(entregado)}
+        </span>
       </div>
+      <div className="flex w-full items-center gap-2 text-sm2 sunmi-text-muted">
+        <span className="flex-1 min-w-0 truncate">{[`Caja #${c.turnoId}`, franja].filter(Boolean).join(" · ")}</span>
+        <InsigniaDeEstado estado={insignia} />
+      </div>
+      {diferencia && (
+        <div className="flex w-full items-baseline gap-2 text-sm2" data-diferencia-de-caja>
+          <span className="flex-1 min-w-0 sunmi-text-muted">Diferencia de caja</span>
+          <span className={`shrink-0 tabular-nums font-semibold ${colorDeDiferencia(caja.diferenciaCaja)}`}>{diferencia}</span>
+        </div>
+      )}
+    </>
+  );
+  return onVerCaja ? (
+    <SunmiActionCard data-caja-turno={c.turnoId} onClick={onVerCaja} aria-label={`Ver la caja de ${caja.operadorNombre || c.etiqueta}`}>
+      {contenido}
+    </SunmiActionCard>
+  ) : (
+    <div data-caja-turno={c.turnoId} className="flex flex-col gap-1.5 p-3">
+      {contenido}
+    </div>
+  );
+}
+
+/**
+ * LAS CAJAS SIN TURNO ASIGNADO (Figma EVJ2KvVCrY0oVSowfboymQ, "Tesorería / Sin
+ * turno asignado"): las anteriores al turno operativo, al final y en un
+ * renglón compacto, sin competir con los turnos de hoy. Siguen siendo
+ * verificables: con efectivo pendiente, "Verificar" abre el mismo flujo; si
+ * no, "Ver" abre sus cajas acá mismo.
+ */
+export function SinTurnoAsignado({ g, contexto, puedeVerificar, onVerificar, cajasAbiertas = false, onAlternarCajas, children = null }) {
+  const v = g.grupo.verificacion || {};
+  const falta = Number(v.entregadoPendienteDeVerificar || 0) > 0;
+  const verificar = puedeVerificar && g.pendientes.length > 0;
+  const estado = [ESTADO_TESORERIA.REQUIERE_REVISION, ESTADO_TESORERIA.SIN_IMPORTE_DECLARADO].includes(g.estado) ? g.estado : null;
+  return (
+    <section data-sin-turno={g.grupo.clave} className="rounded-xl2 border border-dashed sunmi-divider px-4 py-3 space-y-2">
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-semibold sunmi-text-muted">{g.nombre}</h3>
+          <p className="text-sm2 sunmi-text-muted">
+            {[contexto, falta ? `falta ${formatearMoneda(v.entregadoPendienteDeVerificar)}` : null].filter(Boolean).join(" · ")}
+          </p>
+          {estado ? <InsigniaDeEstado estado={estado} /> : null}
+        </div>
+        <div className="shrink-0 flex flex-col items-end gap-1">
+          <span className="text-sm font-semibold tabular-nums sunmi-text-muted">{formatearMoneda(g.grupo.efectivoDeclaradoEntregado)}</span>
+          {verificar ? (
+            <EnlaceTesoreria onClick={onVerificar}>Verificar</EnlaceTesoreria>
+          ) : (
+            <EnlaceTesoreria onClick={onAlternarCajas}>{cajasAbiertas ? "Ocultar" : "Ver"}</EnlaceTesoreria>
+          )}
+        </div>
+      </div>
+      {children}
     </section>
   );
 }
