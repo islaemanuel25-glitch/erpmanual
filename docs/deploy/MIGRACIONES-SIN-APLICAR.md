@@ -16,7 +16,7 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **49 migraciones**; el árbol tiene 50. Pendiente de deploy:
+Producción está en **49 migraciones**; el árbol tiene 51. Pendientes de deploy:
 
 - `20261005100000_correccion_turno_operativo_de_caja` — corregir el turno
   operativo de una caja abierta desde el POS (rama
@@ -29,6 +29,16 @@ Producción está en **49 migraciones**; el árbol tiene 50. Pendiente de deploy
   vigente. Ensayada desde cero sin drift. Si fallara, vale la misma regla que
   la anterior: no se reintenta ni se resuelve a mano; se preserva la evidencia
   y se frena.
+- `20261006120000_vinculo_integracion` — el vínculo persona ↔ Azul Chat
+  (rama `claude/azul-chat-integracion-tanda-1-8b04du`, DEC-0013; **todavía sin
+  merge a `main`**). Qué hace `migrate deploy`: crea el enum
+  `AplicacionIntegracion` y la tabla `VinculoIntegracion` VACÍA, con dos FK a
+  `Usuario` (ON DELETE RESTRICT), un índice único parcial (un vínculo vigente
+  por usuario y aplicación), dos CHECK y un trigger que solo deja revocar.
+  Aditiva y sin backfill: no altera ninguna tabla existente. Agregar las FK
+  toma un candado SHARE ROW EXCLUSIVE sobre `Usuario` por un instante (frena
+  altas y ediciones de usuarios, no lecturas ni el login). Ensayada desde cero
+  sin drift (`migrate diff` vacío).
 
 La última aplicada es `20261004200000_turno_operativo`.
 
