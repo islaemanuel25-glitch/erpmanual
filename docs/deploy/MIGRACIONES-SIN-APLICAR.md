@@ -16,35 +16,35 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **49 migraciones**; el árbol tiene 51. Pendientes de deploy:
+Producción está en **51 migraciones**; el árbol tiene 52. Pendientes de deploy:
 
-- `20261005100000_correccion_turno_operativo_de_caja` — corregir el turno
-  operativo de una caja abierta desde el POS (rama
-  `claude/pos-corregir-turno-operativo`). Qué hace `migrate deploy`: reemplaza
-  el cuerpo de la función `turno_operativo_de_caja_inmutable`; el trigger es el
-  mismo y no se recrea. **No toca ninguna tabla ni ningún dato** y no toma
-  candados sobre `Turno`. La inmutabilidad del turno de una caja sigue siendo
-  la regla, con una sola excepción: de un turno a otro (nunca desde NULL ni
-  hacia NULL), con la caja abierta y sin efectivo suyo en una verificación
-  vigente. Ensayada desde cero sin drift. Si fallara, vale la misma regla que
-  la anterior: no se reintenta ni se resuelve a mano; se preserva la evidencia
-  y se frena.
-- `20261006120000_vinculo_integracion` — el vínculo persona ↔ Azul Chat
-  (rama `claude/azul-chat-integracion-tanda-1-8b04du`, DEC-0013; **todavía sin
-  merge a `main`**). Qué hace `migrate deploy`: crea el enum
-  `AplicacionIntegracion` y la tabla `VinculoIntegracion` VACÍA, con dos FK a
-  `Usuario` (ON DELETE RESTRICT), un índice único parcial (un vínculo vigente
-  por usuario y aplicación), dos CHECK y un trigger que solo deja revocar.
-  Aditiva y sin backfill: no altera ninguna tabla existente. Agregar las FK
-  toma un candado SHARE ROW EXCLUSIVE sobre `Usuario` por un instante (frena
-  altas y ediciones de usuarios, no lecturas ni el login). Ensayada desde cero
-  sin drift (`migrate diff` vacío).
+- `20261006150000_delegacion_integracion` — el canje del código de Azul Chat
+  por un token de delegación (rama `claude/azul-chat-fundacion-gw3g3z`,
+  DEC-0013 tanda 4; **sin merge a `main`**). Qué hace `migrate deploy`: crea la
+  tabla `DelegacionIntegracion` VACÍA con una FK a `VinculoIntegracion` (ON
+  DELETE RESTRICT), dos índices únicos (`vinculoId`, `tokenHash`), un CHECK y
+  dos triggers (el canje solo de un vínculo vigente y de menos de 10 minutos;
+  una delegación no se edita ni se borra). Aditiva y sin backfill: no altera
+  `VinculoIntegracion` ni su trigger. Agregar la FK toma un candado SHARE ROW
+  EXCLUSIVE sobre `VinculoIntegracion` por un instante (frena autorizar y
+  revocar vínculos, nada más). Ensayada desde cero sin drift y sobre una base
+  con vínculos existentes (sección L de `azulChatVentasResumen.mjs`). **Va
+  junto con su código**: el contrato de `consultar` cambia (`delegacion.token`
+  en lugar de `usuarioId` + `vinculo`), y como la integración todavía no tiene
+  secreto configurado, no hay clientes que romper.
 
-La última aplicada es `20261004200000_turno_operativo`.
+**De dónde sale el 51, y lo que falta escribir.** Lo informó Emanuel el
+2026-10-06: producción corre `06cc9510a1dceb277c77ac0dac41b4bc95e040f0` (merge
+de la PR #147) con 51/51 migraciones, ninguna pendiente. No se verificó desde
+la sesión que escribe esto —en el VPS no se investiga—. Con ese despliegue
+quedaron aplicadas las dos que esta lista tenía pendientes,
+`20261005100000_correccion_turno_operativo_de_caja` y
+`20261006120000_vinculo_integracion`, y por eso salen de acá. **Falta su
+sección en la bitácora de abajo**, con lo que informó el despliegue: la
+escribe la sesión que lo corrió, no ésta, que no lo vio.
 
-Producción corre `b60527834112c359705b705d12fe0e9149dae341` (merge de la PR
-#140). La secuencia de los últimos despliegues es `bd92ca5d` → `fb864ba5` →
-`b6052783`; cada uno tiene su sección abajo. Un commit posterior que solo
+La última aplicada según ese informe es `20261006120000_vinculo_integracion`.
+La bitácora de abajo llega hasta `b6052783`. Un commit posterior que solo
 cambie documentación **no se despliega por eso**.
 
 ---

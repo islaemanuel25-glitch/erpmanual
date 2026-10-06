@@ -553,7 +553,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // Sube a 51 el 2026-10-06: entró `20261006120000_vinculo_integracion`, una
   // tabla nueva (`VinculoIntegracion`) con FK a `Usuario`. No toca
   // transferencias ni ninguna tabla que la recepción escriba.
-  assert.equal(migraciones.length, 51, "aparecio una migracion que nadie declaro aca");
+  // Sube a 52 el 2026-10-06: entró `20261006150000_delegacion_integracion`, una
+  // tabla nueva (`DelegacionIntegracion`) con FK a `VinculoIntegracion`. No toca
+  // transferencias ni ninguna tabla que la recepción escriba.
+  assert.equal(migraciones.length, 52, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));
