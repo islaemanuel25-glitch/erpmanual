@@ -1,8 +1,10 @@
 # DEC-0013 — Azul Chat entra al ERP por una frontera propia, cerrada y de solo lectura
 
 **Fecha:** 2026-10-06
-**Estado:** VIGENTE en código, **sin ruta HTTP**: la frontera está escrita y
-probada, pero ninguna URL la expone todavía. No hay migración.
+**Estado:** VIGENTE en código, **sin ruta HTTP externa**: la frontera está
+escrita y probada, pero ninguna URL la expone todavía. Desde la tanda 2 (mismo
+día) exige un vínculo persona ↔ aplicación, con la migración
+`20261006120000_vinculo_integracion`, sin aplicar en producción.
 **Alcance:** cómo una aplicación externa (Azul Chat) le pide datos al ERP en
 nombre de una persona.
 
@@ -58,20 +60,39 @@ persona puede se mira hoy, no en el login.
 
 - Un permiso quitado o un usuario desactivado dejan de valer en la próxima
   solicitud, sin esperar a que venza ningún token.
-- **Abierto a propósito:** no se guardan las firmas vistas, así que una
-  solicitud capturada se puede repetir dentro de los 300 s. Para lectura repite
-  una consulta; cerrarlo pide una tabla de nonces, o sea una migración, y queda
-  para la primera capacidad que escriba.
-- **Abierto a propósito:** quien tenga el secreto de la aplicación puede
-  delegar en cualquier `usuarioId`, acotado a lo que ese usuario ve hoy y a
-  capacidades de lectura. Cerrarlo pide que el ERP emita un vínculo por usuario
-  (la persona autoriza a Azul Chat una vez), y es la próxima decisión.
-- Falta la ruta HTTP. Cuando exista, le pasa a `atenderSolicitudAzulChat` las
-  cabeceras y el cuerpo crudo y devuelve `status` y `cuerpo` tal cual.
+- **Riesgo aceptado de V1** (decidido por Emanuel el 2026-10-06): no se
+  guardan las firmas vistas, así que una solicitud capturada se puede repetir
+  dentro de los 300 s. Con capacidades de solo lectura eso repite una
+  consulta y nada más. **Cuando exista una capacidad que escriba, esto NO
+  alcanza**: hará falta idempotencia y protección contra repetición antes de
+  habilitarla.
+- **Cerrado en la tanda 2: el vínculo.** Ni el secreto de la aplicación ni un
+  `usuarioId` alcanzan: la persona tiene que haber autorizado a Azul Chat desde
+  su sesión del ERP (`POST /api/integraciones/azul-chat/vinculo/autorizar`), que
+  le muestra una vez un código al azar; el ERP guarda solo su SHA-256 en
+  `VinculoIntegracion`. Azul Chat manda `delegacion: { usuarioId, vinculo }` y
+  la puerta exige un vínculo vigente, de esta aplicación, cuyo dueño sea ese
+  `usuarioId`. El vínculo es una condición MÁS: no reemplaza permiso, actividad
+  ni alcance, que se siguen releyendo en cada consulta.
+- **Quién autoriza y quién revoca.** Autoriza solo la persona, para sí misma:
+  el código se le muestra a quien autoriza, así que autorizar por otro sería
+  quedarse con su identidad. Revoca la persona misma, o quien hoy puede darla
+  de baja (`autorizarGestionUsuarios` + `dentroDeAlcance`, la regla de
+  `/api/usuarios/eliminar/[id]`): revocar corta menos que dar de baja.
+  Revocar es el rollback: el vínculo no se borra ni se edita, lo garantiza un
+  trigger.
+- **Admin global:** sin local fijo consulta cualquier grupo y local que el ERP
+  le deja elegir; con local fijo, el grupo de ese local. Confirmado por
+  Emanuel el 2026-10-06: Azul Chat no tiene un modelo territorial propio.
+- Falta la ruta HTTP externa. Cuando exista, le pasa a
+  `atenderSolicitudAzulChat` las cabeceras y el cuerpo crudo y devuelve
+  `status` y `cuerpo` tal cual.
 
 ## Evidencia
 
-- `lib/integraciones/azul-chat/` y sus candados `*.test.mjs`.
+- `lib/integraciones/azul-chat/` y `lib/integraciones/vinculos/`, con sus
+  candados `*.test.mjs`.
+- `prisma/migrations/20261006120000_vinculo_integracion/migration.sql`.
 - `scripts/pruebas-db/azulChatVentasResumen.mjs`: la integración contra el
   handler real del reporte en PostgreSQL, con ventas creadas por
   `/api/pos-ventas/crear`, una corrección por su ruta y una anulación por
