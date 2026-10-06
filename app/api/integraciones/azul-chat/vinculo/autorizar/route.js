@@ -1,24 +1,29 @@
 // POST /api/integraciones/azul-chat/vinculo/autorizar
 //
 // La persona con sesión en el ERP autoriza a Azul Chat a consultar EN SU NOMBRE.
-// Devuelve el código de vínculo UNA sola vez: el ERP guarda su hash y no lo
-// puede volver a mostrar. Volver a llamar revoca el vínculo anterior y entrega
+// Devuelve el CÓDIGO DE CANJE una sola vez: el ERP guarda su hash y no lo puede
+// volver a mostrar. Vale 10 minutos y un canje (`/vinculo/canjear`, de
+// servidor a servidor); no sirve para consultar. Volver a llamar revoca el
+// vínculo anterior —y la delegación que se hubiera canjeado con él— y entrega
 // un código nuevo.
 //
-// Es una ruta del ERP, para una persona en su navegador. NO es la puerta de
-// Azul Chat: ésa no tiene ruta todavía (DEC-0013).
+// Es una ruta del ERP, para una persona en su navegador. NO es una puerta de
+// Azul Chat: ésas son `consultar` y `canjear` (DEC-0013).
 //
 // El usuario sale de la SESIÓN. El cuerpo no se lee: no hay forma de autorizar
 // en nombre de otro. Ver lib/integraciones/vinculos/vinculos.js.
+//
+// La cookie de sesión del ERP es SameSite=Lax (lib/auth.js), así que un POST
+// desde otro sitio no la lleva y no puede revocar el vínculo vigente de nadie.
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { autorizarVinculo } from "@/lib/integraciones/vinculos/vinculos";
-import { APLICACION_INTEGRACION } from "@/lib/integraciones/vinculos/codigoVinculo";
+import { APLICACION_INTEGRACION, vencimientoDelCodigo } from "@/lib/integraciones/vinculos/codigoVinculo";
 
 // El código es un secreto: ningún intermediario puede guardar la respuesta.
-const SIN_CACHE = { "Cache-Control": "no-store" };
+const SIN_CACHE = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
 
 export async function POST(req) {
   try {
@@ -34,9 +39,10 @@ export async function POST(req) {
     return NextResponse.json(
       {
         ok: true,
-        codigoVinculo: r.codigo,
+        codigoCanje: r.codigo,
         autorizadoEn: r.vinculo.autorizadoEn,
-        aviso: "Copiá este código en Azul Chat ahora: el ERP no lo guarda y no lo puede volver a mostrar.",
+        venceEn: vencimientoDelCodigo(r.vinculo.autorizadoEn),
+        aviso: "Pegá este código en Azul Chat ahora: vence en 10 minutos, sirve una sola vez, y el ERP no lo puede volver a mostrar.",
       },
       { status: 200, headers: SIN_CACHE }
     );

@@ -3176,15 +3176,19 @@ model PosVentaCounter {
 // alcance; un vínculo activo de alguien que perdió `reportes.ver` no le deja
 // ver ventas.
 //
-// Al autorizar, el ERP genera un CÓDIGO al azar, se lo muestra una sola vez a la
-// persona para que lo pegue en Azul Chat, y guarda solo su SHA-256. Azul Chat
-// manda el código con cada consulta; así el vínculo de A no sirve para hablar
-// en nombre de B. Ni el código, ni secretos, ni JWT, ni cookies se guardan acá.
+// Al autorizar, el ERP genera un CÓDIGO DE CANJE al azar, se lo muestra una sola
+// vez a la persona para que lo pegue en Azul Chat, y guarda solo su SHA-256 en
+// `codigoHash`. Desde la migración 20261006150000_delegacion_integracion el
+// código NO viaja en las consultas: vale 10 minutos y UNA vez, para canjearlo
+// por un token de delegación (ver DelegacionIntegracion). Ni el código, ni
+// secretos, ni JWT, ni cookies se guardan acá.
 //
 // No se borra ni se edita: se REVOCA, una vez, y queda la historia. Lo exigen
 // dos CHECK y un trigger que viven solo en SQL (migración
 // 20261006120000_vinculo_integracion), igual que el índice único PARCIAL "un
-// solo vínculo activo por usuario y aplicación".
+// solo vínculo activo por usuario y aplicación". Revocarlo invalida su
+// delegación: la delegación no tiene estado propio, vale mientras su vínculo
+// esté vigente.
 enum AplicacionIntegracion {
   AZUL_CHAT
 }
@@ -3203,9 +3207,42 @@ model VinculoIntegracion {
 
   usuario     Usuario  @relation("vinculo_integracion_del_usuario", fields: [usuarioId], references: [id], onDelete: Restrict)
   revocadoPor Usuario? @relation("vinculo_integracion_revocado_por", fields: [revocadoPorId], references: [id], onDelete: Restrict)
+  delegacion  DelegacionIntegracion?
 
   @@index([usuarioId, aplicacion])
   @@index([revocadoPorId])
+}
+
+// DELEGACIÓN: EL CANJE DEL CÓDIGO POR UNA CREDENCIAL DE MÁQUINA
+// ---------------------------------------------------------------------------
+//
+// El código de canje de un vínculo es una credencial HUMANA: la persona lo ve y
+// lo copia. No sirve para consultar. Azul Chat lo canjea UNA vez, dentro de los
+// 10 minutos de autorizado, por un TOKEN DE DELEGACIÓN que solo conoce el
+// backend de Azul Chat. Esta fila es ese canje; el ERP guarda solo el SHA-256
+// del token. Ver DEC-0013 y lib/integraciones/vinculos/canje.js.
+//
+// Lo que la base garantiza, en SQL (migración 20261006150000_delegacion_integracion):
+//   · `vinculoId` único: un código se canjea una sola vez, también con dos
+//     canjes simultáneos — el segundo choca contra el índice;
+//   · un trigger BEFORE INSERT que bloquea el vínculo (FOR SHARE) y rechaza el
+//     canje de un vínculo revocado o autorizado hace más de 10 minutos, y pone
+//     `canjeadoEn` con el reloj de la base;
+//   · un trigger que impide editar o borrar una delegación;
+//   · `tokenHash` único y con forma de SHA-256 en hex: el token en claro no entra.
+//
+// La delegación NO tiene revocación propia: vale mientras su vínculo esté
+// vigente. Revocar o volver a autorizar el vínculo la invalida en la próxima
+// consulta, sin que Azul Chat tenga que hacer nada.
+model DelegacionIntegracion {
+  id         Int                @id @default(autoincrement())
+  vinculoId  Int                @unique
+  /// SHA-256 (hex) del token de delegación. El token no se guarda.
+  tokenHash  String             @unique
+  /// Cuándo se canjeó el código. Lo pone el trigger con el reloj de la base.
+  canjeadoEn DateTime           @default(now())
+
+  vinculo VinculoIntegracion @relation(fields: [vinculoId], references: [id], onDelete: Restrict)
 }
 
 // COBROS OFFLINE: LA EVIDENCIA DE UN COBRO DECLARADO POR EL POS

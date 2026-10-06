@@ -638,6 +638,16 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // Tocar afuera y perderlo obliga a escribirlo de nuevo, y un motivo reescrito
     // de apuro es peor evidencia que el primero.
     "components/caja/ModalCerrarSinConteo.jsx": true,
+    // Vincular Azul Chat: protege POR PASO, y es el primero que usa la rama de
+    // abajo. En "codigo" lo que se pierde no es algo escrito sino algo que no
+    // se puede volver a ver: el ERP muestra el código de canje una sola vez, y
+    // cerrar sin querer obliga a generar otro — que además revoca el vínculo
+    // vigente. En "inicio" no hay nada que perder y el velo cierra.
+    "components/integraciones/ModalVincularAzulChat.jsx": {
+      expresion: 'destructivo={estado === "codigo"}',
+      protegeSolo: "codigo",
+      sinProteger: ["inicio"],
+    },
     // Agregar un producto que llegó y el remito no menciona. Se pierde lo
     // ARMADO, que es el criterio: el producto buscado y elegido, la unidad en la
     // que se contó y la cantidad. Y las tres cuestan distinto de rehacer — la
