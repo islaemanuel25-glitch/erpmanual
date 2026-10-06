@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-10-06] - Actualización: reportes-ventas
+
+### Modificado
+- **reportes-ventas**: refactor: el resumen de ventas del reporte general pasa a una pieza compartida
+- **integraciones/azul-chat**: feat: frontera de integración de Azul Chat con la capacidad ventas_resumen, sin ruta HTTP (DEC-0013)
+
+
 ## [2026-10-05] - Actualización: configuracion, pos-ventas
 
 ### Modificado
