@@ -629,9 +629,18 @@ async function correr() {
   {
     // Un ciclo de tres con nombres cualquiera, como en I: el primero cruza la
     // medianoche y abre la jornada, el segundo es de la mañana, el tercero de
-    // la tarde. Las cajas se escriben con una APERTURA fija —domingo 4 a las
-    // 23:30 y lunes 5 a las 22:00, hora argentina— para probar que las
-    // opciones salen de ESA apertura y no de la hora en que corre la prueba.
+    // la tarde. Las cajas se escriben con una APERTURA fija —domingo 11 de
+    // enero de 2026 a las 23:30 y lunes 12 a las 22:00, hora argentina— para
+    // probar que las opciones salen de ESA apertura y no de la hora en que
+    // corre la prueba.
+    //
+    // La semana es PASADA a propósito. Antes era la del 4/5 de octubre de
+    // 2026, y el día que la prueba corrió ese mismo lunes entre las 18 y las
+    // 23, "ahora" daba exactamente las opciones de la apertura del lunes
+    // 22:00: la contraprueba TO-CC1 (que cambia la apertura por `new Date()`)
+    // quedaba en verde. Con una semana ya vivida, las opciones de "ahora"
+    // traen otra fecha operativa siempre, sea cual sea el día, la hora o la
+    // zona del runner.
     const J = await montarLocal("J");
     const [primero, segundo, tercero] = await Promise.all([
       prisma.turnoOperativo.create({ data: { localId: J.local.id, nombre: "Primero", orden: 0, horaInicioReconocimiento: "23:00", horaFinReconocimiento: "01:00" } }),
@@ -641,8 +650,10 @@ async function correr() {
     const apagado = await prisma.turnoOperativo.create({
       data: { localId: J.local.id, nombre: "Apagado", orden: 3, activo: false, horaInicioReconocimiento: "12:00", horaFinReconocimiento: "13:00" },
     });
-    const DOMINGO_2330 = new Date("2026-10-05T02:30:00Z");
-    const LUNES_2200 = new Date("2026-10-06T01:00:00Z");
+    const DOMINGO_2330 = new Date("2026-01-12T02:30:00Z");
+    const LUNES_2200 = new Date("2026-01-13T01:00:00Z");
+    const LUNES = "2026-01-12";
+    const MARTES = "2026-01-13";
     const cajaAbierta = async (apertura, turnoOperativoId, fecha) => {
       const c = await cajaEnLaBase(J, { turnoOperativoId, fechaOperativa: fecha ? comoFecha(fecha) : null });
       await prisma.turno.update({ where: { id: c.turnoId }, data: { apertura } });
@@ -658,37 +669,37 @@ async function correr() {
     const resumen = (o) => (o.opciones ?? []).map((x) => [x.nombre, x.fechaOperativa]).sort();
 
     // Domingo 23:30: Primero en curso (jornada del lunes) y Segundo, que sigue.
-    const cDom = await cajaAbierta(DOMINGO_2330, primero.id, "2026-10-05");
+    const cDom = await cajaAbierta(DOMINGO_2330, primero.id, LUNES);
     // Lunes 22:00: Tercero extendido (lunes) y Primero, que sigue (martes).
-    const cLun = await cajaAbierta(LUNES_2200, tercero.id, "2026-10-05");
+    const cLun = await cajaAbierta(LUNES_2200, tercero.id, LUNES);
     const oDom = await opciones(cDom);
     const oLun = await opciones(cLun);
     igual("[TO-CC1] las opciones son las de la APERTURA de la caja: domingo 23:30",
-      resumen(oDom), [["Primero", "2026-10-05"], ["Segundo", "2026-10-05"]]);
+      resumen(oDom), [["Primero", LUNES], ["Segundo", LUNES]]);
     igual("[TO-CC1] y las de otra caja, abierta el lunes 22:00, son otras: la hora de ahora no las cambia",
-      resumen(oLun), [["Primero", "2026-10-06"], ["Tercero", "2026-10-05"]]);
+      resumen(oLun), [["Primero", MARTES], ["Tercero", LUNES]]);
     igual("[TO-CC1] la pantalla recibe el turno de la caja y que se puede corregir",
-      [oLun.caja?.turnoOperativo?.nombre, oLun.caja?.fechaOperativa, oLun.corregible], ["Tercero", "2026-10-05", true]);
+      [oLun.caja?.turnoOperativo?.nombre, oLun.caja?.fechaOperativa, oLun.corregible], ["Tercero", LUNES, true]);
 
     const antesDeCorregir = await prisma.turno.count({ where: { localId: J.local.id } });
     const aPrimero = await corregir(cLun, { turnoOperativoId: primero.id, fechaOperativa: "2020-01-01" });
     igual("[TO-CC2] corregir al siguiente de la apertura: ok, con la fecha que calcula el servidor (martes)",
       [aPrimero.status, aPrimero.cambio, aPrimero.caja?.turnoOperativo?.nombre, aPrimero.caja?.fechaOperativa],
-      [200, true, "Primero", "2026-10-06"]);
-    igual("[TO-CC2] la fecha que mandó el cliente se ignora: la base tiene la del servidor", await clasif(cLun), [primero.id, "2026-10-06"]);
+      [200, true, "Primero", MARTES]);
+    igual("[TO-CC2] la fecha que mandó el cliente se ignora: la base tiene la del servidor", await clasif(cLun), [primero.id, MARTES]);
     igual("[TO-CC2] es la misma caja: ninguna caja nueva", [aPrimero.caja?.id, await prisma.turno.count({ where: { localId: J.local.id } })], [cLun.turnoId, antesDeCorregir]);
     const aTercero = await corregir(cLun, { turnoOperativoId: tercero.id });
-    igual("[TO-CC2] y volver al turno extendido de la apertura: ok, del lunes", [aTercero.status, await clasif(cLun)], [200, [tercero.id, "2026-10-05"]]);
+    igual("[TO-CC2] y volver al turno extendido de la apertura: ok, del lunes", [aTercero.status, await clasif(cLun)], [200, [tercero.id, LUNES]]);
 
     const imposible = await corregir(cLun, { turnoOperativoId: segundo.id });
     igual("[TO-CC3] un turno activo que en la apertura no era posible: 409 y su código",
       [imposible.status, imposible.codigo], [409, "TURNO_OPERATIVO_FUERA_DE_CICLO"]);
-    igual("[TO-CC3] y la caja queda como estaba", await clasif(cLun), [tercero.id, "2026-10-05"]);
+    igual("[TO-CC3] y la caja queda como estaba", await clasif(cLun), [tercero.id, LUNES]);
 
     const cruce = await corregir(cDom, { turnoOperativoId: segundo.id });
-    igual("[TO-CC4] domingo 23:30 → Segundo: la jornada del lunes", [cruce.status, await clasif(cDom)], [200, [segundo.id, "2026-10-05"]]);
+    igual("[TO-CC4] domingo 23:30 → Segundo: la jornada del lunes", [cruce.status, await clasif(cDom)], [200, [segundo.id, LUNES]]);
     const vuelta = await corregir(cDom, { turnoOperativoId: primero.id });
-    igual("[TO-CC4] y de vuelta al que cruza la medianoche: también del lunes", [vuelta.status, await clasif(cDom)], [200, [primero.id, "2026-10-05"]]);
+    igual("[TO-CC4] y de vuelta al que cruza la medianoche: también del lunes", [vuelta.status, await clasif(cDom)], [200, [primero.id, LUNES]]);
 
     const antes = await prisma.turno.findUnique({ where: { id: cDom.turnoId }, select: { updatedAt: true } });
     const mismo = await corregir(cDom, { turnoOperativoId: primero.id });
@@ -696,7 +707,7 @@ async function correr() {
     igual("[TO-CC5] elegir el mismo turno no escribe", [mismo.status, mismo.cambio, despues.updatedAt.getTime()], [200, false, antes.updatedAt.getTime()]);
 
     igual("[TO-CC6] un turno de otro local: 400 y su código",
-      [(await corregir(cDom, { turnoOperativoId: mañanaB.id })).codigo, await clasif(cDom)], ["TURNO_OPERATIVO_DE_OTRO_LOCAL", [primero.id, "2026-10-05"]]);
+      [(await corregir(cDom, { turnoOperativoId: mañanaB.id })).codigo, await clasif(cDom)], ["TURNO_OPERATIVO_DE_OTRO_LOCAL", [primero.id, LUNES]]);
     igual("[TO-CC6] un turno inactivo: 400 y su código", (await corregir(cDom, { turnoOperativoId: apagado.id })).codigo, "TURNO_OPERATIVO_INACTIVO");
     const otro = await operador(J);
     igual("[TO-CC6] la caja de otro operario: 403", (await corregir(cDom, { turnoOperativoId: segundo.id }, otro.quien)).status, 403);
@@ -713,10 +724,10 @@ async function correr() {
       ["en cierre", { cierreEnPreparacionEn: new Date() }],
       ["anulada", { anuladoEn: new Date() }],
     ]) {
-      const c = await cajaAbierta(DOMINGO_2330, primero.id, "2026-10-05");
+      const c = await cajaAbierta(DOMINGO_2330, primero.id, LUNES);
       await prisma.turno.update({ where: { id: c.turnoId }, data: marcaDeEstado });
       const r = await corregir(c, { turnoOperativoId: segundo.id });
-      igual(`[TO-CC8] una caja ${estado}: 409 y su código, sin cambios`, [r.status, r.codigo, await clasif(c)], [409, "CAJA_NO_ABIERTA", [primero.id, "2026-10-05"]]);
+      igual(`[TO-CC8] una caja ${estado}: 409 y su código, sin cambios`, [r.status, r.codigo, await clasif(c)], [409, "CAJA_NO_ABIERTA", [primero.id, LUNES]]);
     }
 
     // Una caja abierta HOY por la ruta, con ventas, Caja + y un retiro de
