@@ -1,10 +1,11 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-06 12:17
+**Fecha:** 2026-10-06 12:40
 
 ## Módulos modificados recientemente
 
 ### integraciones/azul-chat
+- feat: ruta HTTP de Azul Chat, POST /api/integraciones/azul-chat/consultar
 - feat: vínculo persona ↔ aplicación externa, con su migración y las rutas del ERP para autorizar y revocar
 - feat: la puerta de Azul Chat exige un vínculo vigente del usuario delegante
 - Migración nueva sin aplicar en producción: `20261006120000_vinculo_integracion`
