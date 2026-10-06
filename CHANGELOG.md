@@ -5,6 +5,7 @@
 ### Modificado
 - **reportes-ventas**: refactor: el resumen de ventas del reporte general pasa a una pieza compartida
 - **integraciones/azul-chat**: feat: frontera de integración de Azul Chat con la capacidad ventas_resumen, sin ruta HTTP (DEC-0013)
+- **integraciones/azul-chat**: feat: vínculo persona ↔ Azul Chat (migración `20261006120000_vinculo_integracion`, sin aplicar en producción) y la puerta lo exige
 
 
 ## [2026-10-05] - Actualización: configuracion, pos-ventas
