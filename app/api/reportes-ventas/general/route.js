@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
-import { getRangoArgentina } from "@/lib/fechas/rangoArgentina";
 import { resolveVistaOperativa, getGrupoIdDeLocal } from "@/lib/grupos";
 import { getContextoActivo } from "@/lib/contexto";
-import { tendersParaAgregar, normalizarMedio } from "@/lib/pos-ventas/pagos";
-import { resumirExactitud } from "@/lib/pos-ventas/comisionPendiente";
+// Qué ventas entran y cómo se suman vive en una pieza compartida: la consume
+// también la integración con Azul Chat, y los dos tienen que dar lo mismo.
+import {
+  whereVentasDelPeriodo,
+  SELECT_RESUMEN_VENTA,
+  resumirVentas,
+  desglosarPorMedio,
+} from "@/lib/reportes-ventas/resumenVentas";
 
 export async function GET(req) {
   try {
@@ -37,16 +41,9 @@ export async function GET(req) {
       );
     }
 
-    // Rango en hora Argentina (UTC-3) para que las ventas de la noche
-    // no se corran un día cuando el contenedor corre en UTC.
-    const { fechaInicio, fechaFin } = getRangoArgentina(fechaDesde, fechaHasta);
-
-    const where = {
-      fecha: {
-        gte: fechaInicio,
-        lte: fechaFin,
-      },
-    };
+    // El período (en hora Argentina) y la condición comercial los pone
+    // `whereVentasDelPeriodo`; acá solo se decide el local.
+    const where = {};
 
     // Scope estricto por UBICACIÓN. Nunca queda sin filtro (antes: admin sin
     // localId veía TODOS los grupos).
@@ -91,32 +88,16 @@ export async function GET(req) {
       where.localId = vista.modo === "GLOBAL" ? { in: vista.localIds } : vista.localId;
     }
 
-    if (formaPagoParam) {
-      // Filtro por medio: una venta coincide si TIENE al menos un tender de ese medio.
-      const medioNorm = normalizarMedio(formaPagoParam);
-      if (medioNorm) where.pagos = { some: { medio: medioNorm } };
-      else where.formaPago = formaPagoParam; // compat con valores legacy no mapeables
-    }
-
     // Obtener ventas con detalles
     const ventas = await prisma.venta.findMany({
-      where: whereVentaComercial(where),
+      where: whereVentasDelPeriodo({
+        fechaDesde,
+        fechaHasta,
+        localId: where.localId,
+        formaPago: formaPagoParam,
+      }),
       select: {
-        id: true,
-        total: true,
-        subtotal: true,
-        descuento: true,
-        comisionBancaria: true,
-        netoRecibido: true,
-        // Obligatorio: `comisionEsExacta` falla cerrado, así que sin este campo
-        // el reporte contaría todas sus ventas como pendientes.
-        comisionPendiente: true,
-        costoTotal: true,
-        gananciaBruta: true,
-        gananciaNeta: true,
-        formaPago: true,
-        esFiado: true,
-        pagos: { select: { medio: true, monto: true, comision: true, neto: true } },
+        ...SELECT_RESUMEN_VENTA,
         detalles: {
           select: {
             nombre: true,
@@ -130,40 +111,17 @@ export async function GET(req) {
       },
     });
 
-    // Resumen general
-    const cantidadVentas = ventas.length;
-    let totalBruto = 0;
-    let totalDescuentos = 0;
-    let totalComisiones = 0;
-    let totalNeto = 0;
-    let totalCostos = 0;
-    let gananciaNeta = 0;
-
-    ventas.forEach((v) => {
-      totalBruto += Number(v.total);
-      totalDescuentos += Number(v.descuento);
-      totalComisiones += Number(v.comisionBancaria);
-      totalNeto += Number(v.netoRecibido);
-      totalCostos += Number(v.costoTotal);
-      gananciaNeta += Number(v.gananciaNeta);
-    });
-
-    // Desglose por medio de pago — POR TENDER: cada pago aporta SU monto al bucket
-    // de su medio (una venta mixta suma parcialmente en varios). La suma de buckets
-    // coincide con el total de ventas. `cantidad` cuenta tenders de ese medio.
-    const desglosePagoMap = {};
-    ventas.forEach((v) => {
-      for (const t of tendersParaAgregar(v)) {
-        const key = t.medio.toLowerCase();
-        if (!desglosePagoMap[key]) {
-          desglosePagoMap[key] = { formaPago: key, cantidad: 0, total: 0, comision: 0, neto: 0 };
-        }
-        desglosePagoMap[key].cantidad++;
-        desglosePagoMap[key].total += t.monto;
-        desglosePagoMap[key].comision += t.comision;
-        desglosePagoMap[key].neto += t.neto;
-      }
-    });
+    // Resumen general y desglose por medio: la pieza compartida.
+    const {
+      cantidadVentas,
+      totalBruto,
+      totalDescuentos,
+      totalComisiones,
+      totalNeto,
+      totalCostos,
+      gananciaNeta,
+      estadoFinanciero,
+    } = resumirVentas(ventas);
 
     // Top productos
     const productosMap = {};
@@ -205,9 +163,9 @@ export async function GET(req) {
         // `totalComisiones` son las CONOCIDAS —el total real es mayor— y el neto
         // y la ganancia están sobreestimados. El desglose por medio arrastra lo
         // mismo, porque sus tenders traen el cero estructural.
-        estadoFinanciero: resumirExactitud(ventas),
+        estadoFinanciero,
       },
-      desglosePago: Object.values(desglosePagoMap),
+      desglosePago: desglosarPorMedio(ventas),
       topProductos,
     });
   } catch (error) {
