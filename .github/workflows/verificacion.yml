@@ -30,10 +30,14 @@
 name: Verificación (candados + base efímera)
 
 on:
-  push:
-    # En `main` ya corre `build-imagen.yml`. Acá interesan las ramas de trabajo,
-    # que es donde el error todavía se puede arreglar barato.
-    branches-ignore: [main]
+  # La verificación pesada corre una sola vez por cambio:
+  # - en pull_request cuando la rama tiene PR hacia main;
+  # - manualmente con workflow_dispatch cuando hace falta verificar una rama
+  #   antes de abrir el PR.
+  #
+  # Antes también corría en cada push de rama. Con un PR abierto, el mismo SHA
+  # disparaba dos jobs idénticos (push + pull_request), duplicando ~8-9 minutos
+  # de runner sin agregar cobertura.
   pull_request:
     branches: [main]
   workflow_dispatch:
