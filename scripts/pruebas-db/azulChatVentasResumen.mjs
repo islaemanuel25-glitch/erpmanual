@@ -895,7 +895,8 @@ try {
     const antes = await huella();
     const enc = await alcanceDe(U.encargadoA.id);
     igual("20. el encargado de A: su local, con su grupo real y su nombre", [enc.status, enc.datos?.alcance, enc.datos?.usuario, enc.datos?.locales],
-      [200, { modo: "LOCAL" }, { id: U.encargadoA.id, nombre: "encargado-a" }, [{ id: localA.id, nombre: "Local A", grupoId: grupo.id, esDeposito: false, activo: true }]]);
+      // `capacidades` (Tanda 1B): lo que el ENCARGADO real puede consultar en su local.
+      [200, { modo: "LOCAL" }, { id: U.encargadoA.id, nombre: "encargado-a" }, [{ id: localA.id, nombre: "Local A", grupoId: grupo.id, esDeposito: false, activo: true, capacidades: ["ventas_resumen", "transferencias_eventos"] }]]);
     const glob = await alcanceDe(U.adminGlobal.id);
     igual("21. el admin global: todo local y depósito con grupo, como grupo-activo/set", [glob.datos?.alcance, glob.ids], [{ modo: "GLOBAL" }, ordenar([deposito.id, localA.id, localB.id, localX.id])]);
     const deposito1 = glob.datos?.locales.find((l) => l.id === deposito.id);
@@ -905,6 +906,8 @@ try {
     const sinRep = await alcanceDe(U.sinReportesA.id);
     igual("sin reportes.ver, mi_alcance igual responde: no pide permiso propio", [sinRep.status, sinRep.ids], [200, [localA.id]]);
     await rechazo("pero ventas_resumen sigue pidiendo el suyo", { usuarioId: U.sinReportesA.id, grupoId: grupo.id, localId: localA.id }, "SIN_PERMISO");
+    ok("y mi_alcance no le anuncia ventas_resumen: el anuncio dice lo mismo que la puerta",
+      !(sinRep.datos?.locales?.[0]?.capacidades || ["?"]).includes("ventas_resumen"), json(sinRep.datos?.locales));
     // Todo lo que mi_alcance devolvió, la puerta lo deja consultar.
     for (const l of glob.datos?.locales || []) {
       const r = await pedirIntegracion({ usuarioId: U.adminGlobal.id, grupoId: l.grupoId, localId: l.id, periodo: { tipo: "hoy" } });

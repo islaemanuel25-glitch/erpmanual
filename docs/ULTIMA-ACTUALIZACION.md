@@ -1,10 +1,16 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-07 00:16
+**Fecha:** 2026-10-07 02:53
 
 ## Módulos modificados recientemente
 
-### integraciones/azul-chat
+### integraciones/azul-chat (Tanda 1B)
+- feat(azul-chat): mi_alcance anuncia las capacidades de cada local
+- docs(azul-chat): capacidades por local y fallo cerrado con el ERP caído
+- Sin ruta nueva y sin migración. Cambio aditivo del contrato de `mi_alcance`:
+  cada local agrega `capacidades`; la versión sigue en 1.
+
+### integraciones/azul-chat (Tanda 1)
 - feat(azul-chat): capacidad transferencias_eventos (TRANSFERENCIA_RECIBIDA)
 - test(azul-chat): transferencias_eventos contra PostgreSQL
 - docs(azul-chat): contrato de transferencias_eventos en DEC-0013
@@ -20,12 +26,11 @@
 - lib/integraciones/azul-chat/transferenciasEventos.js
 - scripts/pruebas-db/azulChatTransferenciasEventos.mjs
 
-
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai
 ✅ Ejecutar: git push
 
 ---
-*Generado por scripts/update-docs.js y corregido a mano: el script solo vio el
-refactor de `transferencias` y dejó afuera la capacidad de
+*Generado por scripts/update-docs.js y corregido a mano: el script atribuyó la
+sesión al refactor de `transferencias` y dejó afuera los cambios de
 `integraciones/azul-chat`.*
