@@ -376,6 +376,32 @@ export function esRangoDegenerado(shaBase, shaHasta) {
   return String(shaBase).trim() === String(shaHasta).trim();
 }
 
+/**
+ * ¿ESTE ÁRBOL ES EL REPO DEL ERP?
+ *
+ * Los modos `--vps` y `--desde` comparan contra un SHA del ERP —el de la imagen
+ * que atiende `erpazul_app`, o uno dado a mano— y leen `prisma/migrations` del
+ * árbol. Eso solo tiene sentido en el checkout del ERP: en otro repo (Azul Chat,
+ * una copia del script) el SHA no está en el historial o, peor, las migraciones
+ * que se clasifican son de otra base. Por eso se exige la identidad declarada del
+ * paquete (`"name": "erpmanual"`) además del directorio de migraciones, y si no
+ * coincide se sale INDETERMINADO en vez de clasificar algo ajeno.
+ *
+ * No se usa el remoto de git: el clon del VPS no está obligado a tenerlo igual,
+ * y un chequeo que falla en el servidor de despliegue empuja a la autorización
+ * manual, que es lo que no se quiere.
+ */
+export const NOMBRE_DEL_PAQUETE_ERP = "erpmanual";
+
+export function esCheckoutDelErp(raiz) {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(raiz, "package.json"), "utf8"));
+    return pkg?.name === NOMBRE_DEL_PAQUETE_ERP && fs.existsSync(path.join(raiz, "prisma", "migrations"));
+  } catch {
+    return false;
+  }
+}
+
 /** Resuelve una referencia de git a su SHA completo. */
 function resolverSha(ref) {
   return correr("git", ["rev-parse", ref], `no se pudo resolver la referencia ${ref}`);
@@ -398,6 +424,13 @@ function principal() {
     // con 0 — el peor final posible para un candado.
     if (!fs.existsSync(DIR_MIGRACIONES)) {
       throw new Indeterminado(`no existe ${path.relative(ROOT, DIR_MIGRACIONES)}: el repo no está donde el script cree`);
+    }
+    if (!esCheckoutDelErp(ROOT)) {
+      throw new Indeterminado(
+        `este árbol no es el repo del ERP (package.json no se llama "${NOMBRE_DEL_PAQUETE_ERP}").\n\n` +
+          "El rango se calcula contra un SHA del ERP y clasifica las migraciones del ERP: en otro\n" +
+          "repo no dice nada de la base que se está migrando. Cada proyecto se clasifica en el suyo."
+      );
     }
     const base = desde || shaQueAtiende();
 
