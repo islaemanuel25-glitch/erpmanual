@@ -215,7 +215,8 @@ grupoId, esDeposito, activo }] }`. Sale de la MISMA regla que la puerta
 de `getGrupoIdDeLocal`: lo que lista es exactamente lo que `ventas_resumen`
 acepta, incluido un depósito en dos grupos (se informa con su grupo real, el
 que acepta la puerta). Sirve para armar la interfaz; NO reemplaza la
-autorización de cada capacidad.
+autorización de cada capacidad. Desde la Tanda 1B cada local trae además
+`capacidades` (ver "Las capacidades de cada local", abajo).
 
 **El botón del ERP.** "Vincular Azul Chat" en el menú de la persona
 (`components/Header.jsx`), sin permiso: abre `ModalVincularAzulChat`, que llama
@@ -292,6 +293,65 @@ reinicia la secuencia, y un id vuelve a existir con otra recepción.
 `lib/transferencias/lineasConDiferencia.js` sin cambios y el tablero lo
 consume. Son dos datos y no se fuerzan a coincidir en filas históricas.
 
+## Las capacidades de cada local en `mi_alcance` (Tanda 1B)
+
+**Estado:** en código, SIN desplegar. Sin migración. Conviene desplegarla
+junto con `transferencias_eventos`, que tampoco está en producción.
+
+**Por qué.** `mi_alcance` decía QUÉ locales ve la persona, no QUÉ puede hacer
+en ellos: un CAJERO ve su local y no tiene `transferencias.ver`. Para saberlo,
+Azul Chat tenía que adivinar el permiso —copiar una regla del ERP— o probar
+cada capacidad en cada local, que cuesta 1 + N llamadas por pantalla contra un
+cupo de 30 por minuto por delegación.
+
+**Forma.** Aditiva. Cada local de `locales` agrega un campo al final:
+`{ id, nombre, grupoId, esDeposito, activo, capacidades: [...] }`. Los campos
+de antes no cambian de nombre, tipo, orden ni significado, y la versión del
+contrato sigue siendo 1. `capacidades` es la lista de nombres de capacidades
+del catálogo, en el orden del catálogo; hoy puede traer `ventas_resumen` y
+`transferencias_eventos`, o ninguna.
+
+**Cómo se calcula.** En la autorización, no en `mi_alcance`:
+
+- `capacidadPermitida(capacidad, sesionActual)` es LA regla de permiso de la
+  integración —`checkPerm` contra el rol leído ahora— y la usan la puerta (para
+  dejar pasar una consulta) y el anuncio. Hay un solo `checkPerm` en el módulo.
+- `capacidadesSobreUnLocal(sesionActual)` recorre el catálogo cerrado y se
+  queda con las capacidades que tienen `pideLocal` y que `capacidadPermitida`
+  deja pasar. Una capacidad nueva con `pideLocal` se anuncia sola; una que no
+  pide local (como `mi_alcance`) no se anuncia nunca.
+- La capacidad que lo pide lo declara en el catálogo (`anunciaCapacidades`,
+  solo `mi_alcance`), y la autorización se lo entrega decidido y congelado,
+  igual que el alcance. `mi_alcance` no mira permisos ni roles.
+- Los locales que lista ya pasaron por `localEnAlcance` con su grupo real, que
+  es lo que la puerta mira en cada consulta. Ninguna capacidad de hoy agrega
+  una condición por local, así que la lista es la misma para todos los locales
+  del alcance; si alguna la agrega, se resuelve en `capacidadesSobreUnLocal`.
+
+Todo se recalcula en cada `mi_alcance` con el usuario, su estado, su rol, sus
+permisos y su alcance de ese momento: quitar o devolver un permiso, o mover a
+la persona de local, se ve en la llamada siguiente, con la misma delegación.
+Nada del anuncio se puede pedir desde el cuerpo: `mi_alcance` no acepta
+parámetros ni alcance, y cualquier clave de más se rechaza.
+
+**Lo que NO es.** Un anuncio para armar la interfaz, no una autorización. Cada
+consulta vuelve a pasar por `autorizarIntegracion`, que decide todo en el
+momento; la autorización de una consulta ni siquiera lleva el anuncio.
+
+## Política para Azul Chat con el ERP no disponible (decidida, sin código en el ERP)
+
+Decidido el 2026-10-07 al diseñar la Tanda 2 de Azul Chat. La autorización
+para leer historia guardada en Azul Chat sale de `mi_alcance` vivo, con sus
+`capacidades`. Si el ERP no responde y no se puede verificar la autorización
+actual, **fallo cerrado**: Azul Chat no muestra historial operacional. No usa
+una autorización guardada, no tiene ventana de gracia y no cae a nada en
+silencio. Vale para ERP inalcanzable, tiempo agotado, integración no
+disponible y cupo excedido; NO_AUTORIZADO y VINCULO_NO_VALIDO ya cerraban.
+
+El estado de la interfaz es "ERP Azul no responde", con un texto equivalente
+a "Para ver el historial hace falta verificar tu acceso". El texto del diseño
+de Figma "Podés leer historial" contradice esta política y no se usa.
+
 ## Evidencia
 
 - `lib/integraciones/azul-chat/` y `lib/integraciones/vinculos/`, con sus
@@ -308,4 +368,8 @@ consume. Son dos datos y no se fuerzan a coincidir en filas históricas.
   contra PostgreSQL, con recepciones hechas por `revisar-producto` y
   `confirmar-recepcion`, el mismo conteo que devuelve el tablero, el cursor con
   fechas iguales, el margen, un id reutilizado, la autorización en vivo y la
-  base intacta después de consultar.
+  base intacta después de consultar. Desde la Tanda 1B, también las
+  `capacidades` de `mi_alcance` siguiendo en vivo al permiso y al local.
+- `lib/integraciones/azul-chat/autorizacion.test.mjs`, sección "Las
+  capacidades que anuncia mi_alcance": anunciada si y solo si la puerta la deja
+  pasar, para cada rol real del sistema.
