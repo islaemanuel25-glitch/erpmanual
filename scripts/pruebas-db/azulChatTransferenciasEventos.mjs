@@ -21,6 +21,9 @@
 //   H/I. quitar transferencias.ver o mover a la persona de local, EN VIVO, con
 //      la misma delegación, corta la capacidad en la consulta siguiente;
 //   J. un local fuera del alcance se rechaza, no devuelve una lista vacía;
+//   1B. lo que `mi_alcance` anuncia en cada local (`capacidades`) sigue en vivo
+//      al permiso y al local: se apaga y se prende con el rol, y el local sale y
+//      vuelve con el alcance, con la misma delegación;
 //   y además: paginación completa sin duplicados, lineasConDiferencia igual al
 //   tablero, la capacidad no escribe nada (huella de las tablas), y mi_alcance,
 //   ventas_resumen, la firma y el canje siguen andando.
@@ -432,18 +435,35 @@ try {
   seccion("H/I/J. La autorización, en vivo, con la misma delegación");
   // ═════════════════════════════════════════════════════════════════════════
   {
+    // Lo que mi_alcance anuncia, por la puerta real: { localId: capacidades }.
+    const anuncio = async (u) => {
+      const cuerpo = json({ capacidad: "mi_alcance", delegacion: { token: TOKEN[u.id] }, parametros: {} });
+      const r = aRespuestaPublica(await atenderSolicitudAzulChat({ headers: firmadas(cuerpo), cuerpo }, { entorno: ENTORNO, limitador: null }));
+      if (r.status !== 200) throw new Error(`mi_alcance: ${r.status} ${json(r.cuerpo)}`);
+      return Object.fromEntries(r.cuerpo.datos.locales.map((l) => [l.id, l.capacidades]));
+    };
+
     igual("3. sin transferencias.ver: NO_AUTORIZADO", (await eventos({ usuario: U.sinVerA })).cuerpo.codigo, "NO_AUTORIZADO");
+    igual("1B-A. el ENCARGADO ve su local con transferencias_eventos (y ventas_resumen) anunciadas", await anuncio(U.encA), { [localA.id]: ["ventas_resumen", "transferencias_eventos"] });
+    igual("1B-B. sin transferencias.ver ve su local igual, pero sin la capacidad", await anuncio(U.sinVerA), { [localA.id]: [] });
 
     igual("H. con el permiso, antes", (await eventos({ usuario: U.encA })).status, 200);
     await c.rol.update({ where: { id: rolEncargado.id }, data: { permisos: DEFAULT_PERMISOS_SISTEMA[ENCARGADO].filter((p) => p !== "transferencias.ver") } });
     igual("H. sin transferencias.ver, la misma delegación ya no sirve", (await eventos({ usuario: U.encA })).cuerpo.codigo, "NO_AUTORIZADO");
+    igual("1B-C. y la próxima mi_alcance deja de anunciarla, con la misma delegación", await anuncio(U.encA), { [localA.id]: ["ventas_resumen"] });
     await c.rol.update({ where: { id: rolEncargado.id }, data: { permisos: DEFAULT_PERMISOS_SISTEMA[ENCARGADO] } });
     igual("H. y devolverlo la reabre sin volver a vincular", (await eventos({ usuario: U.encA })).status, 200);
+    igual("1B-D. y mi_alcance la vuelve a anunciar sin revincular", await anuncio(U.encA), { [localA.id]: ["ventas_resumen", "transferencias_eventos"] });
 
     igual("I. antes de moverla, la persona ve el local A", (await eventos({ usuario: U.movil })).status, 200);
     await c.usuario.update({ where: { id: U.movil.id }, data: { localId: localB.id } });
     igual("I. movida al B, el A queda afuera en la consulta siguiente", (await eventos({ usuario: U.movil, local: localA })).cuerpo.codigo, "NO_AUTORIZADO");
     igual("I. y el B entra", (await eventos({ usuario: U.movil, local: localB })).status, 200);
+    igual("1B-E. mi_alcance ya no trae A: trae B, con sus capacidades", await anuncio(U.movil), { [localB.id]: ["ventas_resumen", "transferencias_eventos"] });
+    await c.usuario.update({ where: { id: U.movil.id }, data: { localId: localA.id } });
+    igual("1B-F. devuelta a A, A reaparece con las capacidades de hoy", await anuncio(U.movil), { [localA.id]: ["ventas_resumen", "transferencias_eventos"] });
+    igual("1B-F. y la puerta la deja consultar A de nuevo", (await eventos({ usuario: U.movil, local: localA })).status, 200);
+    await c.usuario.update({ where: { id: U.movil.id }, data: { localId: localB.id } });
 
     for (const [titulo, local, grupoId] of [["otro local del grupo", localB, grupo.id], ["otro grupo", localX, grupo2.id]]) {
       const r = await eventos({ usuario: U.encA, local, grupoId });
