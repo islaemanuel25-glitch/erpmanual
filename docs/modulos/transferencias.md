@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-05 17:10
+**Última actualización:** 2026-10-07 00:16
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-07: refactor(transferencias): el conteo de líneas con diferencia sale del tablero a lib
 - 2026-10-05: feat: corregir el turno operativo de la caja abierta desde el POS
 - 2026-10-04: feat(tesoreria): persistencia inmutable de la verificación de efectivo
 - 2026-10-03: feat: modelo CobroOffline y su migración aditiva

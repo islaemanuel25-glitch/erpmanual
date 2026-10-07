@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-10-07] - Actualización: transferencias, integraciones/azul-chat
+
+### Modificado
+- **transferencias**: refactor(transferencias): el conteo de líneas con diferencia sale del tablero a lib
+- **integraciones/azul-chat**: feat(azul-chat): capacidad transferencias_eventos (TRANSFERENCIA_RECIBIDA)
+
+
 ## [2026-10-06] - Actualización: reportes-ventas
 
 ### Modificado
