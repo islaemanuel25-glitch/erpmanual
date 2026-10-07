@@ -789,6 +789,65 @@ La decisión vive en `lib/deploy/guardiaMigraciones.mjs`, que es una función pu
 con sus candados al lado; el hook solo lee la entrada, corre el clasificador
 cuando hace falta y escribe la respuesta.
 
+### Qué proyecto se migra — desde el 2026-10-07
+
+El clasificador calcula el rango **del ERP** —desde la imagen que atiende
+`erpazul_app` hasta el HEAD del checkout del ERP— y lee `prisma/migrations` del
+ERP. Solo dice algo de la base del ERP. Antes de esa fecha, la guardia mandaba al
+clasificador cualquier `migrate deploy`, y el deploy de Azul Chat de ese día —hecho
+desde una sesión de este repo— salió INDETERMINADO por el rango del ERP (25172fe,
+imagen que atendía y HEAD a la vez) y se terminó con la autorización manual. Fue
+un falso positivo: el ERP no tenía nada que ver con esa migración.
+
+Ahora la guardia primero identifica el proyecto del comando
+(`lib/deploy/proyectoDelComando.mjs`) por **dos señales que tienen que coincidir**:
+
+- el directorio de despliegue, como ruta completa: `/srv/produccion/erpazul` o
+  `/srv/produccion/azul-chat` (en un `cd`, en `-f <dir>/docker-compose.prod.yml` o
+  en `--project-directory`). Si el comando no nombra ninguno y no va por `ssh`,
+  vale el directorio de trabajo de la sesión;
+- el servicio de Compose que corre el `prisma migrate deploy`: `app` en el ERP,
+  `azul-chat-app` en Azul Chat.
+
+Con eso:
+
+- **ERP** (sus dos señales): la guardia de siempre, sin cambios. Clasificador, y
+  si no sale con 0 —una migración marcada, o INDETERMINADO— se frena.
+- **Azul Chat** (sus dos señales, ninguna del ERP): la guardia del ERP **no** la
+  clasifica. Pasa avisando y deja una línea `MIGRACIÓN AZUL CHAT` en
+  `.claude/migraciones-autorizadas.log`. No necesita `DEPLOY_MIGRACION_AUTORIZADA`.
+  Rigen los controles de Azul Chat (su `docs/DEPLOY.md`: migraciones validadas
+  desde una base vacía y sin deriva en su CI, backup de su base antes de migrar,
+  migrar antes de levantar la app). Azul Chat no tiene un clasificador de
+  compatibilidad propio; si lo necesita, va en su repo y con su SHA productivo.
+  La forma que la guardia reconoce es la del runbook con su directorio:
+  `cd /srv/produccion/azul-chat && docker compose -f docker-compose.prod.yml run --rm --no-deps azul-chat-app prisma migrate deploy`
+  (o el mismo comando con la sesión parada en ese directorio).
+- **Desconocido** (falta una señal, o el servicio no es de nadie): la guardia del
+  ERP entera, como antes. Lo que no se pudo identificar **no** se toma por Azul
+  Chat.
+- **Ambiguo** (señales de los dos proyectos, que se contradicen, o más de un
+  `migrate deploy` en la línea): se rechaza, y la autorización manual no lo cambia.
+  Un `migrate deploy` por comando, con el directorio y el servicio del mismo
+  proyecto.
+
+Los rechazos (`db push`, `migrate reset`, `db execute`, `migrate resolve`) valen
+para los dos proyectos igual.
+
+`INDETERMINADO` sigue significando lo mismo: el clasificador no pudo establecer
+qué migraciones del ERP entran (sin ssh, contenedor ausente, SHA que no está en el
+historial, rango degenerado, árbol que no es el del ERP). Frena siempre.
+
+`DEPLOY_MIGRACION_AUTORIZADA=1` es la puerta de excepción **del ERP**: Emanuel
+confirmó una migración que el clasificador frenó o no pudo mirar. No es el
+mecanismo para desplegar la migración de otro proyecto. El valor tiene que ser
+exactamente `1` (desde 2026-10-07 `=1.5` o `=1-x` ya no autorizan) y no habilita
+nada de la lista de rechazo ni un comando ambiguo.
+
+El clasificador, además, se niega a clasificar en un árbol que no sea el del ERP
+(`"name": "erpmanual"` en `package.json`): sale INDETERMINADO en vez de comparar
+un SHA del ERP contra un historial ajeno.
+
 ### LA GUARDIA ESTUVO MUERTA Y NADIE SE ENTERÓ — 2026-09-15
 
 **Un control que falla abierto es peor que no tener control**, porque se lee como
