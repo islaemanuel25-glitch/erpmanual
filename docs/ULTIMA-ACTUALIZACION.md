@@ -1,35 +1,31 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-06 15:39
+**Fecha:** 2026-10-07 00:16
 
 ## Módulos modificados recientemente
 
 ### integraciones/azul-chat
-- feat: Azul Chat canjea el código del vínculo por un token de delegación, y mi_alcance
-- feat: botón 'Vincular Azul Chat' en el menú de la persona — SIN VERIFICAR en pantalla
-- docs: DEC-0013 tanda 4, el canje y la delegación
-- Ruta nueva: `POST /api/integraciones/azul-chat/vinculo/canjear` (servidor a servidor).
-  El contrato de `consultar` cambia: `delegacion: { token }` en lugar de
-  `{ usuarioId, vinculo }`.
-- Migración nueva sin aplicar en producción: `20261006150000_delegacion_integracion`
-  (ver docs/deploy/MIGRACIONES-SIN-APLICAR.md)
+- feat(azul-chat): capacidad transferencias_eventos (TRANSFERENCIA_RECIBIDA)
+- test(azul-chat): transferencias_eventos contra PostgreSQL
+- docs(azul-chat): contrato de transferencias_eventos en DEC-0013
+- Sin ruta nueva y sin migración: es una capacidad más de
+  `POST /api/integraciones/azul-chat/consultar`, con `transferencias.ver`.
 
-### reportes-ventas
-- refactor: el resumen de ventas del reporte general pasa a una pieza compartida
-- Archivos: 1 nuevos, 1 modificados (2 total)
-
+### transferencias
+- refactor(transferencias): el conteo de líneas con diferencia sale del tablero a lib
+- Archivos: 2 modificados (2 total)
 
 ## Archivos nuevos desde última sincronización
-- app/api/integraciones/azul-chat/vinculo/canjear/route.js
-- components/integraciones/ModalVincularAzulChat.jsx
-- lib/integraciones/azul-chat/miAlcance.js
-- lib/integraciones/vinculos/canje.js
-- prisma/migrations/20261006150000_delegacion_integracion/migration.sql
+- lib/transferencias/lineasConDiferencia.js
+- lib/integraciones/azul-chat/transferenciasEventos.js
+- scripts/pruebas-db/azulChatTransferenciasEventos.mjs
+
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai
 ✅ Ejecutar: git push
 
 ---
-*Generado por scripts/update-docs.js y corregido a mano: el script atribuyó el
-cambio a `transferencias` porque se tocó un censo de migraciones que vive ahí.*
+*Generado por scripts/update-docs.js y corregido a mano: el script solo vio el
+refactor de `transferencias` y dejó afuera la capacidad de
+`integraciones/azul-chat`.*

@@ -41,7 +41,9 @@ Seis pasos separados, cada uno en su pieza de `lib/integraciones/azul-chat/`:
    poner un endpoint, SQL, una consulta ni un `usuarioId`.
 3. **La capacidad** está en un catálogo congelado (`capacidades.js`). Hoy:
    `ventas_resumen`, que pide `reportes.ver`, el mismo permiso que el reporte
-   del ERP del que sale; y `mi_alcance` (tanda 4), sin permiso propio.
+   del ERP del que sale; `mi_alcance` (tanda 4), sin permiso propio; y
+   `transferencias_eventos`, que pide `transferencias.ver` (ver "Eventos de
+   transferencias", abajo).
 4. **La delegación** (desde la tanda 4): la persona en cuyo nombre se pregunta
    SALE del token de delegación —es el dueño del vínculo que se canjeó—. Hasta
    la tanda 3 viajaba un `usuarioId` que Azul Chat afirmaba y la puerta
@@ -229,6 +231,67 @@ cupo del canje es uno solo por aplicación —quien mande muchos canjes malos
 puede demorar los buenos un minuto—; el límite por persona/IP le toca al
 backend de Azul Chat.
 
+## Eventos de transferencias (`transferencias_eventos`)
+
+**Estado:** en código, SIN desplegar. Sin migración: lee columnas que ya
+existen.
+
+**Qué es el evento.** `TRANSFERENCIA_RECIBIDA` es una transferencia que
+`confirmar-recepcion` cerró: en una sola transacción escribe `estado =
+"Recibida"`, `fechaRecepcion` y `tieneDiferencias`, y ese estado es terminal.
+El evento es del local que RECIBIÓ (`destinoId`); el origen no recibe el mismo
+evento. Enviada, Recibiendo, Confirmando y Cancelada no se publican, y una
+Recibida sin `fechaRecepcion` tampoco. No hay `TRANSFERENCIA_CORREGIDA`.
+
+**Pedido.** La misma ruta, `POST /api/integraciones/azul-chat/consultar`, con
+`capacidad: "transferencias_eventos"`, `delegacion.token`, `alcance: { grupoId,
+localId }` y `parametros` con dos claves opcionales y ninguna más: `limite`
+(entero de 1 a 100, 50 si falta) y `desde` (exactamente `{ fechaRecepcion,
+transferenciaId }`, con la fecha como instante ISO con milisegundos en UTC y el
+id entero positivo). Cualquier otra forma es `SOLICITUD_INVALIDA` y no llega a
+la base. Permiso `transferencias.ver`, el mismo de `listar`, `detalle`,
+`tablero` y `por-destino`; la autorización es la de siempre
+(`autorizarIntegracion`), sin cambios: un local fuera del alcance se RECHAZA
+(`NO_AUTORIZADO`), nunca se filtra a una lista vacía.
+
+**Respuesta.** `{ capacidad, version: 1, local: { id, nombre }, grupoId, hasta,
+eventos, siguiente, hayMas }`. Cada evento: `{ tipo, eventoId,
+transferenciaId, fechaRecepcion, origen: { id, nombre, esDeposito }, destino:
+{ id, nombre }, tieneDiferencias, lineasConDiferencia }`. Sin importes, sin
+líneas, sin personas.
+
+**El cursor.** Orden total `fechaRecepcion` ascendente y, a igual fecha, `id`
+ascendente. `desde` es la posición del último evento leído y la consulta trae
+lo estrictamente posterior —fecha mayor, o fecha igual e id mayor—, así que dos
+recepciones del mismo milisegundo no se pierden ni se repiten. Se leen `limite
++ 1` filas: la de más solo dice `hayMas`. `siguiente` es la posición del
+último evento devuelto; si no vino ninguno, es el mismo `desde` (o `null`): el
+cursor nunca avanza sobre algo no devuelto. Sin `desde`, la historia arranca
+desde el evento más viejo. El ERP no guarda qué leyó Azul Chat: el cursor es
+de Azul Chat.
+
+**El margen de 60 s.** `fechaRecepcion` se escribe con el reloj del proceso
+ANTES del commit, así que dos confirmaciones concurrentes pueden hacerse
+visibles al revés de sus fechas; un cursor que pasara la más vieja antes de su
+commit la perdería para siempre. La transacción usa el timeout por defecto de
+Prisma (5 s), así que la capacidad devuelve solo `fechaRecepcion <= ahora − 60
+s` y lo informa en `hasta`. Supone una sola instancia del ERP (o relojes
+alineados) y que nadie suba ese timeout: lo vigilan `frontera.test.mjs` (el
+margen, el filtro, una sola transacción sin `timeout` en
+`confirmar-recepcion`, ningún otro escritor de `fechaRecepcion`) y
+`transferenciasEventos.test.mjs` (C: a los 30 s no sale; D: a los 60 s sale
+una sola vez).
+
+**La clave del evento.** `TRANSFERENCIA_RECIBIDA:<transferenciaId>:<fechaRecepcion
+ISO>`. El id solo no alcanza: `admin/reset-operativo` borra transferencias y
+reinicia la secuencia, y un id vuelve a existir con otra recepción.
+
+**Las diferencias.** `tieneDiferencias` es la columna de la confirmación;
+`lineasConDiferencia` es el conteo canónico del tablero, que salió de
+`app/api/transferencias/tablero/route.js` a
+`lib/transferencias/lineasConDiferencia.js` sin cambios y el tablero lo
+consume. Son dos datos y no se fuerzan a coincidir en filas históricas.
+
 ## Evidencia
 
 - `lib/integraciones/azul-chat/` y `lib/integraciones/vinculos/`, con sus
@@ -241,3 +304,8 @@ backend de Azul Chat.
   `revertirVenta`.
 - `lib/ventas/filtroVentaComercial.test.mjs`, candado 5-13.bis: el envoltorio
   del filtro tiene que devolver `whereVentaComercial(...)`.
+- `scripts/pruebas-db/azulChatTransferenciasEventos.mjs`: `transferencias_eventos`
+  contra PostgreSQL, con recepciones hechas por `revisar-producto` y
+  `confirmar-recepcion`, el mismo conteo que devuelve el tablero, el cursor con
+  fechas iguales, el margen, un id reutilizado, la autorización en vivo y la
+  base intacta después de consultar.

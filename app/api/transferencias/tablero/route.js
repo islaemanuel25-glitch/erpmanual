@@ -41,11 +41,9 @@ import { checkPerm } from "@/lib/authorize";
 import { resolveVistaOperativa } from "@/lib/grupos";
 import { origenEsDepositoDe } from "@/lib/transferencias/costoTransferencia";
 import { importeRecibidoDeDetalle } from "@/lib/transferencias/agregadosPeriodo";
-import {
-  diferenciaDeLinea,
-  fisicasEnviadasDe,
-  fisicasRecibidasDe,
-} from "@/lib/transferencias/recepcionUI";
+// El conteo de líneas con diferencia vive en lib desde que la integración con
+// Azul Chat lo lee también: una sola definición para los dos lectores.
+import { contarLineasConDiferencia } from "@/lib/transferencias/lineasConDiferencia";
 import {
   DIA_DE_CORTE_POR_DEFECTO,
   UNIDADES,
@@ -82,43 +80,6 @@ import { resolverLocalPedido } from "@/lib/finanzas/alcanceFinanciero";
 
 /** `YYYY-MM-DD`, que es la forma en la que `periodoDePago` compara. */
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
-
-/**
- * Cuántas LÍNEAS de este remito difieren de lo que se envió.
- *
- * Se cuentan líneas, no unidades: la pantalla dice "2 diferencias" y eso son dos
- * productos que no coinciden, sin importar por cuánto.
- *
- * Solo cuentan las que YA SE CONTARON. `fisicasRecibidasDe` devuelve `null`
- * cuando nadie registró recepción de esa línea, y una línea sin contar no es una
- * diferencia: es una pregunta sin responder. Colapsarlas daría "77 diferencias"
- * en una transferencia recién abierta.
- *
- * La línea que la puerta no puede leer —una histórica sin snapshot ni
- * presentación adoptada— se saltea en vez de suponer. Contarla como diferencia
- * sería inventar un faltante; contarla como coincidencia, esconderlo.
- */
-function contarLineasConDiferencia(detalle = []) {
-  let n = 0;
-  for (const d of detalle) {
-    let enviada;
-    let recibida;
-    try {
-      enviada = fisicasEnviadasDe(d);
-      recibida = fisicasRecibidasDe(d);
-    } catch {
-      continue;
-    }
-    if (recibida == null) continue;
-    const dif = diferenciaDeLinea({ enviada, recibida });
-    // El umbral es media milésima: las cantidades son `Decimal(12,3)`, así que
-    // cualquier diferencia real es de al menos una milésima. Comparar contra
-    // cero pelado haría que un residuo binario de una conversión cuente como
-    // faltante.
-    if (dif != null && Math.abs(dif) > 0.0005) n += 1;
-  }
-  return n;
-}
 
 /**
  * LO QUE VIAJA DE CADA TRANSFERENCIA.

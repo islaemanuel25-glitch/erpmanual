@@ -280,6 +280,10 @@ jobs:
           # ERP, y la autorización contra filas reales. Base propia descartable.
           echo ""
           node --import ./scripts/alias-loader.mjs scripts/pruebas-db/azulChatVentasResumen.mjs
+          # Azul Chat · transferencias_eventos: recepciones reales, el cursor,
+          # el margen de 60 s y la autorización en vivo. Base propia descartable.
+          echo ""
+          node --import ./scripts/alias-loader.mjs scripts/pruebas-db/azulChatTransferenciasEventos.mjs
 
       # ── EL LIBRO DE STOCK ─────────────────────────────────────────────────
       #

@@ -308,14 +308,28 @@ test("D11 · sin diferencias, la cabecera no escribe «0 con diferencias»", () 
 
 // ── 5 · EL CIERRE: LA RUTA MANDA LO QUE ESTO LEE ──────────────────────────
 
+// El conteo vivía como función privada de la ruta; desde el 2026-10-07 vive en
+// `lib/transferencias/lineasConDiferencia.js`, porque la integración con Azul
+// Chat lo lee también. Lo que se afirma no cambió: la ruta manda el conteo, lo
+// saca de la función compartida —no de una copia—, y esa función usa la puerta
+// canónica. Mirar solo la ruta dejaría este candado ciego al conteo mudado.
 test("D12 · la ruta manda `lineasConDiferencia` y NO lo saca de `tieneDiferencias`", () => {
-  const src = fs
-    .readFileSync(path.join(RAIZ, "app/api/transferencias/tablero/route.js"), "utf8")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/[^\n]*/g, "");
+  const sinComentarios = (f) =>
+    fs
+      .readFileSync(path.join(RAIZ, f), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/[^\n]*/g, "");
+  const src = sinComentarios("app/api/transferencias/tablero/route.js");
+  const conteo = sinComentarios("lib/transferencias/lineasConDiferencia.js");
 
-  assert.match(src, /lineasConDiferencia:/, "la ruta no manda el conteo de diferencias");
-  assert.match(src, /diferenciaDeLinea/, "el conteo no usa la puerta canónica");
+  assert.match(src, /lineasConDiferencia:\s*contarLineasConDiferencia\(/, "la ruta no manda el conteo de diferencias");
+  assert.match(
+    src,
+    /import \{ contarLineasConDiferencia \} from "@\/lib\/transferencias\/lineasConDiferencia"/,
+    "la ruta no usa el conteo compartido"
+  );
+  assert.doesNotMatch(src, /function contarLineasConDiferencia/, "la ruta volvió a tener su propia copia del conteo");
+  assert.match(conteo, /diferenciaDeLinea\(/, "el conteo no usa la puerta canónica");
   assert.doesNotMatch(
     src,
     /tieneDiferencias/,
