@@ -31,16 +31,26 @@ tiene que volverse un paso del procedimiento.
 
 ## El arreglo
 
-La guardia identifica primero de qué proyecto es el `migrate deploy`, por dos
-señales que tienen que coincidir: el directorio de despliegue
-(`/srv/produccion/erpazul` o `/srv/produccion/azul-chat`, o el directorio de
-trabajo de la sesión si el comando no nombra ninguno y no va por `ssh`) y el
-servicio de Compose que migra (`app` o `azul-chat-app`).
+La guardia identifica primero de qué proyecto es el `migrate deploy`.
 
-- Azul Chat identificado: no se clasifica con el rango del ERP; pasa avisando y
-  deja rastro.
-- ERP, o desconocido: la guardia del ERP entera, igual que antes.
+- Azul Chat: solo si el comando es EXACTAMENTE una de las formas del runbook de
+  Azul Chat (el skill `/deploy` las lista). No se clasifica con el rango del
+  ERP; pasa avisando y deja rastro.
+- Con señales de Azul Chat pero sin ser exactamente la forma: se rechaza,
+  también con autorización manual.
+- ERP, o desconocido sin señales de Azul Chat: la guardia del ERP entera, igual
+  que antes.
 - Ambiguo: se rechaza, también con autorización manual.
+
+**La primera versión del arreglo abría un agujero, y lo encontró la revisión
+del PR antes de juntarlo.** Eximía por dos señales —el directorio y el
+servicio de Azul Chat— y aceptaba cualquier cosa alrededor, así que
+`-v=../erpazul/prisma:/app/prisma`, `--entrypoint=sh`, `-eDATABASE_URL=…`,
+`--schema=…` o `-f ../erpazul/docker-compose.prod.yml` conservaban la exención
+y cambiaban qué se migraba y contra qué base. Las señales sirven para frenar,
+no para eximir: lo que exime tiene que ser una igualdad contra el comando
+completo. **Verificado en código**, con un candado por cada evasión y sus
+contrapruebas.
 
 Además, el clasificador se niega a correr en un árbol que no sea el del ERP, y la
 autorización manual exige exactamente `1`. Los candados y sus contrapruebas están
@@ -51,3 +61,9 @@ en `lib/deploy/proyectoDelComando.test.mjs`; el procedimiento, en el skill
 
 Azul Chat no tiene un clasificador de compatibilidad propio como el del ERP. Si
 lo necesita, va en su repo y con su SHA productivo, no copiando éste.
+
+La guardia sigue leyendo TEXTO. Lo que esconde el `migrate deploy` mismo —un
+script, un alias, `$(echo deploy)`— la esquiva entera, la del ERP incluida, y lo
+que esconde toda mención de Azul Chat cae en la guardia del ERP como antes de
+esta frontera. Es el límite ya escrito en el skill `/deploy`, "Esa guardia NO
+hace obligatorio el chequeo".

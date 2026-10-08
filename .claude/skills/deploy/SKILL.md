@@ -800,36 +800,49 @@ imagen que atendía y HEAD a la vez) y se terminó con la autorización manual. 
 un falso positivo: el ERP no tenía nada que ver con esa migración.
 
 Ahora la guardia primero identifica el proyecto del comando
-(`lib/deploy/proyectoDelComando.mjs`) por **dos señales que tienen que coincidir**:
+(`lib/deploy/proyectoDelComando.mjs`).
 
-- el directorio de despliegue, como ruta completa: `/srv/produccion/erpazul` o
-  `/srv/produccion/azul-chat` (en un `cd`, en `-f <dir>/docker-compose.prod.yml` o
-  en `--project-directory`). Si el comando no nombra ninguno y no va por `ssh`,
-  vale el directorio de trabajo de la sesión;
-- el servicio de Compose que corre el `prisma migrate deploy`: `app` en el ERP,
-  `azul-chat-app` en Azul Chat.
+**Azul Chat se reconoce por el comando ENTERO, no por señales.** La primera
+versión de la frontera eximía todo comando con el directorio y el servicio de
+Azul Chat, y la revisión del PR #151 la rompió con argumentos que conservaban
+las dos señales y cambiaban qué corre: `-v=../erpazul/prisma:/app/prisma`,
+`--entrypoint=sh`, `-eDATABASE_URL=…`, `--schema=…` al final, `-f
+../erpazul/docker-compose.prod.yml`, una variable adelante. Por eso la exención
+es igualdad contra una de estas tres formas, sin nada más:
+
+- `cd /srv/produccion/azul-chat && docker compose -f docker-compose.prod.yml run --rm --no-deps azul-chat-app prisma migrate deploy`
+- la misma línea adentro de `ssh vps-erp '…'`, con comillas simples;
+- la línea sin el `cd`, con la sesión parada exactamente en
+  `/srv/produccion/azul-chat`.
+
+El `-f` es `docker-compose.prod.yml` o
+`/srv/produccion/azul-chat/docker-compose.prod.yml`; las únicas opciones de `run`
+son `--rm`, `--no-deps` y `-T`, cada una a lo sumo una vez y en cualquier orden;
+un espacio entre palabras y **nada después de `deploy`**. No hay parser de shell:
+`$C` sin expandir, comillas de más, `;`, `&&` extra, pipes, redirecciones,
+`$(…)`, `sudo`, `bash -c` o una variable adelante ya no son la forma.
 
 Con eso:
 
-- **ERP** (sus dos señales): la guardia de siempre, sin cambios. Clasificador, y
-  si no sale con 0 —una migración marcada, o INDETERMINADO— se frena.
-- **Azul Chat** (sus dos señales, ninguna del ERP): la guardia del ERP **no** la
-  clasifica. Pasa avisando y deja una línea `MIGRACIÓN AZUL CHAT` en
+- **ERP** (directorio y servicio `app` del ERP, ninguna señal de Azul Chat): la
+  guardia de siempre, sin cambios. Clasificador, y si no sale con 0 —una
+  migración marcada, o INDETERMINADO— se frena.
+- **Azul Chat** (exactamente una de las tres formas): la guardia del ERP **no**
+  la clasifica. Pasa avisando y deja una línea `MIGRACIÓN AZUL CHAT` en
   `.claude/migraciones-autorizadas.log`. No necesita `DEPLOY_MIGRACION_AUTORIZADA`.
   Rigen los controles de Azul Chat (su `docs/DEPLOY.md`: migraciones validadas
   desde una base vacía y sin deriva en su CI, backup de su base antes de migrar,
   migrar antes de levantar la app). Azul Chat no tiene un clasificador de
   compatibilidad propio; si lo necesita, va en su repo y con su SHA productivo.
-  La forma que la guardia reconoce es la del runbook con su directorio:
-  `cd /srv/produccion/azul-chat && docker compose -f docker-compose.prod.yml run --rm --no-deps azul-chat-app prisma migrate deploy`
-  (o el mismo comando con la sesión parada en ese directorio).
-- **Desconocido** (falta una señal, o el servicio no es de nadie): la guardia del
-  ERP entera, como antes. Lo que no se pudo identificar **no** se toma por Azul
-  Chat.
-- **Ambiguo** (señales de los dos proyectos, que se contradicen, o más de un
-  `migrate deploy` en la línea): se rechaza, y la autorización manual no lo cambia.
-  Un `migrate deploy` por comando, con el directorio y el servicio del mismo
-  proyecto.
+- **Parecido a Azul Chat sin ser la forma** (su directorio, su servicio,
+  cualquier mención de `azul-chat` en el comando, o la sesión parada en una
+  carpeta de Azul Chat): **se rechaza**, también con la autorización manual. No
+  se manda al clasificador del ERP, que mira otras migraciones y podría salir
+  con 0. Se corrige el comando hasta que sea la forma, no se autoriza.
+- **Desconocido** (ninguna señal de ningún proyecto, o el servicio no es de
+  nadie): la guardia del ERP entera, como antes.
+- **Ambiguo** (señales de los dos proyectos, o más de un `migrate deploy` en la
+  línea): se rechaza, y la autorización manual no lo cambia.
 
 Los rechazos (`db push`, `migrate reset`, `db execute`, `migrate resolve`) valen
 para los dos proyectos igual.
