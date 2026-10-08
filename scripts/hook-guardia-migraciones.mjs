@@ -48,7 +48,7 @@
 // Desde el 2026-10-07 la decisión mira primero de qué proyecto es el
 // `migrate deploy` (lib/deploy/proyectoDelComando.mjs). El clasificador calcula
 // el rango del ERP y solo vale para la base del ERP: una migración de Azul Chat,
-// identificada por su directorio y su servicio, no se le manda. Lo desconocido
+// reconocida por la forma exacta de su runbook, no se le manda. Lo desconocido
 // sigue yendo al clasificador, y lo ambiguo se rechaza.
 //
 // Salida: JSON con permissionDecision allow/deny. Si la guardia misma falla,
@@ -81,7 +81,26 @@
 // primera arregla el caso conocido; la segunda cubre el próximo, que no va a ser
 // una extensión y no lo vamos a ver venir.
 
-import { spawnSync } from "node:child_process";
+//
+// ── QUÉ COPIA DE ESTE ARCHIVO CORRE — desde el 2026-10-08 ───────────────────
+//
+// Claude Code corre el comando del hook en el directorio ACTUAL de la sesión,
+// que se mueve con cada `cd` (comprobado con Claude Code 2.1.293). Con
+// `node scripts/hook-guardia-migraciones.mjs` a secas, después de un
+// `cd /srv/produccion/erpazul` corría la copia de producción —otra versión—, y
+// después de un `cd` a cualquier otro lado el archivo no existía: node salía
+// con 1, que NO bloquea, y el comando pasaba sin guardia.
+//
+// Por eso `.claude/settings.json` lo llama por `$CLAUDE_PROJECT_DIR` —la raíz
+// del proyecto donde arrancó la sesión, que no se mueve— y lo envuelve en un
+// `sh` que sale con 2 si este archivo no pudo correr y el comando nombra
+// prisma. El 2 es el único código que bloquea un PreToolUse.
+//
+// Y este archivo, al decidir sobre un `migrate deploy`, dice QUÉ copia es: su
+// ruta y el commit de su árbol. Una copia que no es la del proyecto de la
+// sesión frena todo lo que nombra prisma.
+
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -90,6 +109,36 @@ const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(AQUI, "..");
 const CLASIFICADOR = path.join(AQUI, "clasificar-migraciones.mjs");
 const BITACORA = path.join(ROOT, ".claude", "migraciones-autorizadas.log");
+
+/**
+ * ¿Esta copia es la del proyecto de la sesión? Claude Code exporta
+ * `CLAUDE_PROJECT_DIR`; si no está —un test, una corrida a mano— no se puede
+ * comparar y no se inventa una respuesta: devuelve null.
+ */
+function esLaCopiaDelProyecto() {
+  const proyecto = process.env.CLAUDE_PROJECT_DIR;
+  if (!proyecto) return null;
+  try {
+    return fs.realpathSync(proyecto) === fs.realpathSync(ROOT);
+  } catch {
+    return false;
+  }
+}
+
+/** La ruta y el commit de la guardia que está corriendo. Informativo: si git no contesta, lo dice. */
+function identidadDeLaGuardia() {
+  try {
+    const sha = execFileSync("git", ["-C", ROOT, "rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 5_000 }).trim();
+    const cambios = execFileSync(
+      "git",
+      ["-C", ROOT, "status", "--porcelain", "--", "scripts/hook-guardia-migraciones.mjs", "scripts/clasificar-migraciones.mjs", "lib/deploy", ".claude/settings.json"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 5_000 }
+    ).trim();
+    return `Guardia efectiva: ${ROOT} en ${sha.slice(0, 12)}${cambios ? ", CON CAMBIOS SIN COMMITEAR en la guardia" : ""}.`;
+  } catch {
+    return `Guardia efectiva: ${ROOT} (no se pudo leer su commit).`;
+  }
+}
 
 /**
  * Deja el rastro de una autorización manual en un archivo.
@@ -199,6 +248,18 @@ process.stdin.on("end", async () => {
     );
   }
 
+  // Una copia que no es la del proyecto de la sesión es otra versión, vieja o
+  // nueva, que nadie eligió. Para lo que nombra prisma no se la usa.
+  if (MENCIONA_PRISMA.test(comando) && esLaCopiaDelProyecto() === false) {
+    responder(
+      "deny",
+      `FRENADO: la guardia que está corriendo (${ROOT}) no es la del proyecto de esta sesión (CLAUDE_PROJECT_DIR=${process.env.CLAUDE_PROJECT_DIR}).\n\n` +
+        "Es otra copia —otra versión— y no se decide con ella. Revisá que .claude/settings.json llame al hook por " +
+        "\"$CLAUDE_PROJECT_DIR\" y reiniciá la sesión de Claude Code.",
+      "GUARDIA: se frenó un comando de prisma porque corrió una copia de la guardia que no es la del proyecto."
+    );
+  }
+
   const previa = decidirPorComando(comando, { cwd });
   if (previa.accion !== "clasificar") {
     // Dejan rastro los que pasan avisando: la autorización manual, que pasa sin
@@ -210,6 +271,19 @@ process.stdin.on("end", async () => {
     responder(previa.accion, previa.razon, previa.aviso);
   }
 
+  const identidad = identidadDeLaGuardia();
+
+  // El clasificador tiene que estar. Si falta, node sale con 1 —el mismo código
+  // que "migración marcada"— y el motivo impreso sería falso. Se frena diciendo
+  // el motivo real.
+  if (!fs.existsSync(CLASIFICADOR)) {
+    responder(
+      "deny",
+      `FRENADO: no existe el clasificador (${CLASIFICADOR}), así que no se puede mirar qué migraciones entran.\n${previa.nota ?? ""}\n${identidad}`,
+      "GUARDIA: se frenó una migración porque falta el clasificador."
+    );
+  }
+
   const r = spawnSync(process.execPath, [CLASIFICADOR, "--vps"], {
     cwd: ROOT,
     encoding: "utf8",
@@ -218,26 +292,32 @@ process.stdin.on("end", async () => {
 
   const salida = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim();
 
-  if (r.status === 0) {
+  // Solo un 0 de un clasificador que terminó solo deja pasar. Un timeout, una
+  // señal o un error al lanzarlo no son un 0.
+  if (r.status === 0 && !r.error && !r.signal) {
     responder(
       "allow",
-      `Guardia de migraciones: el clasificador no encontró sentencias marcadas.\n${previa.nota ?? ""}\n\n${salida}`
+      `Guardia de migraciones: el clasificador no encontró sentencias marcadas.\n${previa.nota ?? ""}\n${identidad}\n\n${salida}`
     );
   }
 
-  const encabezado =
-    r.status === 1
-      ? "FRENADO: hay al menos una migración que rompería a la versión que está atendiendo tráfico durante la ventana entre migrar y recrear."
-      : "FRENADO: la guardia no pudo determinar qué migraciones entran, así que no puede afirmar que sean compatibles.";
+  // Un 1 es "migración marcada" solo si el clasificador lo dijo (imprime
+  // "FRENO:"); un 1 sin eso es que se cayó antes de clasificar.
+  const marcada = r.status === 1 && /^FRENO:/m.test(String(r.stdout ?? ""));
+  const encabezado = marcada
+    ? "FRENADO: hay al menos una migración que rompería a la versión que está atendiendo tráfico durante la ventana entre migrar y recrear."
+    : r.status === 2
+      ? "FRENADO: la guardia no pudo determinar qué migraciones entran, así que no puede afirmar que sean compatibles."
+      : `FRENADO: el clasificador no terminó bien (código ${r.status ?? "ninguno"}${r.signal ? `, señal ${r.signal}` : ""}${r.error ? `, ${r.error.message}` : ""}), así que no se miró qué migraciones entran.`;
 
   responder(
     "deny",
-    `${encabezado}\n${previa.nota ?? ""}\n\n${salida}\n\n` +
+    `${encabezado}\n${previa.nota ?? ""}\n${identidad}\n\n${salida}\n\n` +
       "NO continuar por criterio propio. Informarle a Emanuel qué migración es, qué " +
       "sentencia la marcó y por qué rompería a la versión vieja, y esperar su " +
       "confirmación explícita. Si él confirma, el comando se repite con " +
       "DEPLOY_MIGRACION_AUTORIZADA=1 adelante.",
-    r.status === 1
+    marcada
       ? "GUARDIA: se frenó una migración que rompería a la versión vieja durante la ventana."
       : "GUARDIA: se frenó una migración porque el clasificador no pudo determinar qué entra."
   );

@@ -1,0 +1,465 @@
+// LA GUARDIA DE MIGRACIONES: QUÉ REPOSITORIO CONSULTA Y QUÉ COPIA CORRE.
+//
+//   node --test scripts/guardiaRutasYEjecucion.test.mjs
+//
+// Dos defectos que aparecieron al querer activar el PR #151 en el VPS, el
+// 2026-10-08, y que ninguno de los candados anteriores podía ver porque los dos
+// viven ENTRE piezas:
+//
+// A · EL CLASIFICADOR CONSULTABA EL CLON EQUIVOCADO. Corría git sobre el árbol
+//     donde vive el script —en el VPS, el clon de trabajo de Claude Code— y no
+//     sobre /srv/produccion/erpazul. Un clon atrasado no tenía el SHA que
+//     atiende: INDETERMINADO con el SHA válido. Y el destino era el HEAD de ese
+//     clon, que no es lo que se despliega.
+//
+// B · EL HOOK SE RESOLVÍA CONTRA EL DIRECTORIO ACTUAL. `node scripts/…` en
+//     settings.json corre en el directorio actual de la sesión, que se mueve con
+//     cada `cd`. Comprobado con Claude Code 2.1.293: después de un `cd`, el hook
+//     corrió en el directorio nuevo; con el archivo ausente, node salió con 1 y
+//     el comando CORRIÓ IGUAL. Un PreToolUse solo bloquea con 2.
+//
+// Los candados de abajo usan repositorios git temporales y el comando LITERAL de
+// .claude/settings.json corrido con `sh -c`, que es como lo corre Claude Code en
+// Linux. No tocan ninguna base, no corren docker y no salen de /tmp.
+
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { planDeResolucion, shaDelAppImage, SALIDA } from "./clasificar-migraciones.mjs";
+
+const AQUI = path.dirname(fileURLToPath(import.meta.url));
+const RAIZ = path.resolve(AQUI, "..");
+const CLASIFICADOR = path.join(AQUI, "clasificar-migraciones.mjs");
+
+const ADITIVA = "ALTER TABLE \"Producto\" ADD COLUMN \"nota\" TEXT;\n";
+const DESTRUCTIVA = "ALTER TABLE \"Producto\" DROP COLUMN \"nota\";\n";
+
+// ── Andamios ───────────────────────────────────────────────────────────────
+
+const temporal = (prefijo) => fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), prefijo)));
+
+function git(repo, ...args) {
+  const r = spawnSync("git", ["-C", repo, "-c", "user.name=prueba", "-c", "user.email=prueba@ejemplo", "-c", "commit.gpgsign=false", ...args], { encoding: "utf8" });
+  assert.equal(r.status, 0, `git ${args.join(" ")}: ${r.stderr}`);
+  return r.stdout.trim();
+}
+
+/** Un repo git nuevo con un primer commit con ese nombre de paquete. */
+function repoNuevo(prefijo, nombre = "erpmanual") {
+  const repo = temporal(prefijo);
+  git(repo, "init", "-q");
+  fs.writeFileSync(path.join(repo, "package.json"), JSON.stringify({ name: nombre }));
+  fs.mkdirSync(path.join(repo, "prisma", "migrations", "20260101000000_base"), { recursive: true });
+  fs.writeFileSync(path.join(repo, "prisma", "migrations", "20260101000000_base", "migration.sql"), "CREATE TABLE \"Producto\" (id INT);\n");
+  git(repo, "add", "-A");
+  // El prefijo en el mensaje hace que dos repos "iguales" no compartan el SHA
+  // del primer commit: con el mismo contenido y el mismo segundo, git les daría
+  // el mismo, y el clon "sin historia común" la tendría.
+  git(repo, "commit", "-q", "-m", `base ${prefijo}`);
+  return repo;
+}
+
+/** Agrega una migración y commitea. Devuelve el SHA. */
+function conMigracion(repo, nombre, sql) {
+  fs.mkdirSync(path.join(repo, "prisma", "migrations", nombre), { recursive: true });
+  fs.writeFileSync(path.join(repo, "prisma", "migrations", nombre, "migration.sql"), sql);
+  git(repo, "add", "-A");
+  git(repo, "commit", "-q", "-m", nombre);
+  return git(repo, "rev-parse", "HEAD");
+}
+
+/**
+ * Producción: A es lo que atiende, B el release nuevo con una migración.
+ * Y un clon de desarrollo con OTRA historia, que no tiene ni A ni B: el clon
+ * atrasado del que corre Claude Code. El clasificador vive en el clon.
+ */
+function escenario(sqlDelRelease = DESTRUCTIVA) {
+  const prod = repoNuevo("prod-erp-");
+  const A = git(prod, "rev-parse", "HEAD");
+  const B = conMigracion(prod, "20261008000000_release", sqlDelRelease);
+  const clon = repoNuevo("clon-dev-");
+  fs.mkdirSync(path.join(clon, "scripts"), { recursive: true });
+  fs.copyFileSync(CLASIFICADOR, path.join(clon, "scripts", "clasificar-migraciones.mjs"));
+  const clasificar = (args, cwd = clon) =>
+    spawnSync(process.execPath, [path.join(clon, "scripts", "clasificar-migraciones.mjs"), ...args], { cwd, encoding: "utf8", timeout: 60_000 });
+  const borrar = () => [prod, clon].forEach((d) => fs.rmSync(d, { recursive: true, force: true }));
+  return { prod, clon, A, B, clasificar, borrar };
+}
+
+// ── PROBLEMA A · El repositorio que se consulta ───────────────────────────
+
+test("CASO 1/3 · desde un clon atrasado, sin decir el repositorio, el SHA de producción no está: INDETERMINADO, nombrando el clon", () => {
+  const e = escenario();
+  try {
+    const r = e.clasificar(["--desde", e.A]);
+    assert.equal(r.status, SALIDA.INDETERMINADO, r.stdout + r.stderr);
+    assert.match(r.stderr, /no existe en/);
+    assert.ok(r.stderr.includes(e.clon), "el motivo no dice en qué repositorio buscó");
+  } finally {
+    e.borrar();
+  }
+});
+
+test("CASO 2/4 · con el repositorio de producción dicho, el SHA que atiende SÍ está y se clasifica ahí, se corra desde donde se corra", () => {
+  const e = escenario();
+  try {
+    for (const cwd of [e.clon, "/", os.tmpdir(), e.prod]) {
+      const r = e.clasificar(["--desde", e.A, "--repo", e.prod], cwd);
+      assert.equal(r.status, SALIDA.MARCADO, `cwd ${cwd}: ${r.stdout}${r.stderr}`);
+      assert.match(r.stdout, /20261008000000_release/);
+      assert.ok(r.stdout.includes(e.prod), "la salida no dice qué repositorio consultó");
+    }
+  } finally {
+    e.borrar();
+  }
+});
+
+test("CASO 5 · el destino nuevo, todavía no desplegado, se lee DEL COMMIT: ni el árbol en otro commit ni un cambio sin commitear lo esconden", () => {
+  const e = escenario(DESTRUCTIVA);
+  try {
+    // El checkout de producción quedó en A (el paso 1 no se hizo, o se volvió):
+    // pidiendo el destino B a mano, la migración de B se ve igual.
+    git(e.prod, "checkout", "-q", e.A);
+    let r = e.clasificar(["--desde", e.A, "--hasta", e.B, "--repo", e.prod]);
+    assert.equal(r.status, SALIDA.MARCADO, r.stdout + r.stderr);
+
+    // Y con el árbol en B pero la migración "arreglada" sin commitear, lo que se
+    // clasifica es lo que trae el commit —lo que trae la imagen—, no el disco.
+    git(e.prod, "checkout", "-q", e.B);
+    fs.writeFileSync(path.join(e.prod, "prisma", "migrations", "20261008000000_release", "migration.sql"), ADITIVA);
+    r = e.clasificar(["--desde", e.A, "--repo", e.prod]);
+    assert.equal(r.status, SALIDA.MARCADO, "clasificó el árbol de trabajo en vez del commit destino");
+  } finally {
+    e.borrar();
+  }
+});
+
+test("CASO 5 bis · un release aditivo sale con 0, y un rango degenerado con 2", () => {
+  const e = escenario(ADITIVA);
+  try {
+    assert.equal(e.clasificar(["--desde", e.A, "--repo", e.prod]).status, SALIDA.LIMPIO);
+    const r = e.clasificar(["--desde", e.B, "--repo", e.prod]);
+    assert.equal(r.status, SALIDA.INDETERMINADO);
+    assert.match(r.stderr, /degenerado/);
+  } finally {
+    e.borrar();
+  }
+});
+
+test("CASO 10 · repositorio inexistente, relativo o que no es la raíz: INDETERMINADO, nunca se busca otro", () => {
+  const e = escenario();
+  try {
+    for (const [repo, motivo] of [
+      ["/no/existe/erpazul", /no existe/],
+      ["prod-relativo", /ruta absoluta/],
+      [path.join(e.prod, "prisma"), /no es la raíz/],
+      [os.tmpdir(), /no es un repositorio git|no es la raíz/],
+    ]) {
+      const r = e.clasificar(["--desde", e.A, "--repo", repo]);
+      assert.equal(r.status, SALIDA.INDETERMINADO, `${repo}: ${r.stdout}${r.stderr}`);
+      assert.match(r.stderr, motivo, repo);
+    }
+  } finally {
+    e.borrar();
+  }
+});
+
+test("CASO 11 · un repositorio que no es el del ERP (Azul Chat) no se clasifica, aunque tenga prisma/migrations", () => {
+  const e = escenario();
+  const azul = repoNuevo("azul-chat-", "azul-chat");
+  try {
+    const sha = git(azul, "rev-parse", "HEAD");
+    const r = e.clasificar(["--desde", sha, "--repo", azul]);
+    assert.equal(r.status, SALIDA.INDETERMINADO, r.stdout + r.stderr);
+    assert.match(r.stderr, /no es del repo del ERP/);
+  } finally {
+    e.borrar();
+    fs.rmSync(azul, { recursive: true, force: true });
+  }
+});
+
+test("CASO 20 · nube y VPS: en el servidor `--vps` consulta /srv/produccion/erpazul y el destino es APP_IMAGE; fuera, este árbol y su HEAD", () => {
+  const base = { raiz: "/home/x/clon", dirDespliegue: "/srv/produccion/erpazul" };
+  assert.deepEqual(planDeResolucion({ ...base, modoVps: true, enVps: true }), {
+    repo: "/srv/produccion/erpazul",
+    origen: { tipo: "imagen-que-atiende" },
+    destino: { tipo: "app-image", dir: "/srv/produccion/erpazul" },
+  });
+  assert.deepEqual(planDeResolucion({ ...base, modoVps: true, enVps: false }), {
+    repo: "/home/x/clon",
+    origen: { tipo: "imagen-que-atiende" },
+    destino: { tipo: "head" },
+  });
+  // Sin --vps, el modo manual no cambia de repositorio por estar en el servidor.
+  assert.equal(planDeResolucion({ ...base, modoVps: false, enVps: true, desde: "a" }).repo, "/home/x/clon");
+  // Lo explícito manda.
+  const explicito = planDeResolucion({ ...base, modoVps: true, enVps: true, repo: "/otro", desde: "a", hasta: "b" });
+  assert.deepEqual(explicito, { repo: "/otro", origen: { tipo: "explicito", valor: "a" }, destino: { tipo: "explicito", valor: "b" } });
+});
+
+test("CASO 5 ter · APP_IMAGE: un SHA de 40, una sola línea, y sin repetir nada más del .env", () => {
+  const dir = temporal("despliegue-");
+  const sha = "3ce5a15c69b140ded2fbeb2f2ce52925a1ad0b38";
+  const escribir = (t) => fs.writeFileSync(path.join(dir, ".env"), t);
+  try {
+    for (const linea of [`APP_IMAGE=ghcr.io/islaemanuel25-glitch/erpmanual:${sha}`, `APP_IMAGE="ghcr.io/x/y:${sha}"`, `export APP_IMAGE = 'ghcr.io/x/y:${sha.toUpperCase()}'`]) {
+      escribir(`POSTGRES_PASSWORD=SECRETO-NO-SE-IMPRIME\n${linea}\nOTRA=1\n`);
+      assert.equal(shaDelAppImage(dir), sha, linea);
+    }
+    for (const malo of [
+      "POSTGRES_PASSWORD=SECRETO-NO-SE-IMPRIME\n",
+      "POSTGRES_PASSWORD=SECRETO-NO-SE-IMPRIME\nAPP_IMAGE=ghcr.io/x/y:latest\n",
+      `POSTGRES_PASSWORD=SECRETO-NO-SE-IMPRIME\nAPP_IMAGE=ghcr.io/x/y:${sha}\nAPP_IMAGE=ghcr.io/x/y:${sha}\n`,
+      "POSTGRES_PASSWORD=SECRETO-NO-SE-IMPRIME\nAPP_IMAGE=SECRETO-NO-SE-IMPRIME\n",
+    ]) {
+      escribir(malo);
+      assert.throws(
+        () => shaDelAppImage(dir),
+        (e) => !String(e.message).includes("SECRETO-NO-SE-IMPRIME"),
+        `con ${JSON.stringify(malo)} no frenó, o repitió el contenido del .env`
+      );
+    }
+    fs.rmSync(path.join(dir, ".env"));
+    assert.throws(() => shaDelAppImage(dir), /no se pudo leer/);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ── PROBLEMA B · Qué copia de la guardia corre ────────────────────────────
+
+/** El comando de la guardia tal como está en .claude/settings.json. */
+function comandoDeLaGuardia(settings = path.join(RAIZ, ".claude", "settings.json")) {
+  const cfg = JSON.parse(fs.readFileSync(settings, "utf8"));
+  const comandos = (cfg.hooks?.PreToolUse ?? [])
+    .filter((g) => g.matcher === "Bash")
+    .flatMap((g) => g.hooks ?? [])
+    .map((h) => String(h.command ?? ""))
+    .filter((c) => c.includes("hook-guardia-migraciones.mjs"));
+  assert.equal(comandos.length, 1, "tiene que haber exactamente un hook de la guardia sobre Bash");
+  return comandos[0];
+}
+
+/**
+ * Un proyecto temporal con la guardia real y un clasificador FALSO que deja
+ * marca y sale con lo que se le pida. `sin` saca archivos para simular una
+ * instalación rota.
+ */
+function proyecto({ sin = [], clasificador = null } = {}) {
+  const dir = temporal("proyecto-guardia-");
+  fs.mkdirSync(path.join(dir, "scripts"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "lib", "deploy"), { recursive: true });
+  fs.mkdirSync(path.join(dir, "sub"), { recursive: true });
+  fs.copyFileSync(path.join(AQUI, "hook-guardia-migraciones.mjs"), path.join(dir, "scripts", "hook-guardia-migraciones.mjs"));
+  for (const f of fs.readdirSync(path.join(RAIZ, "lib", "deploy"))) {
+    if (f.endsWith(".mjs") && !f.endsWith(".test.mjs")) fs.copyFileSync(path.join(RAIZ, "lib", "deploy", f), path.join(dir, "lib", "deploy", f));
+  }
+  const marca = path.join(dir, "clasificador-llamado");
+  fs.writeFileSync(
+    path.join(dir, "scripts", "clasificar-migraciones.mjs"),
+    clasificador ??
+      `import fs from "node:fs";\nfs.writeFileSync(${JSON.stringify(marca)}, "1");\n` +
+        `if (process.env.SALIDA_FALSA === "1") console.log("FRENO: 1 migración(es) marcada(s).");\n` +
+        `process.exit(Number(process.env.SALIDA_FALSA ?? 0));\n`
+  );
+  for (const f of sin) fs.rmSync(path.join(dir, f), { force: true });
+
+  /** Corre el comando de settings.json con `sh -c`, como Claude Code. */
+  const preguntar = (command, { cwd = dir, salida = 0, proyectoDir = dir, comando = comandoDeLaGuardia() } = {}) => {
+    if (fs.existsSync(marca)) fs.rmSync(marca);
+    const env = { ...process.env, SALIDA_FALSA: String(salida) };
+    if (proyectoDir === null) delete env.CLAUDE_PROJECT_DIR;
+    else env.CLAUDE_PROJECT_DIR = proyectoDir;
+    const r = spawnSync("sh", ["-c", comando], {
+      input: JSON.stringify({ tool_name: "Bash", tool_input: { command }, cwd }),
+      encoding: "utf8",
+      cwd,
+      env,
+      timeout: 60_000,
+    });
+    let json = {};
+    try {
+      json = JSON.parse(String(r.stdout || "{}"));
+    } catch {
+      json = {};
+    }
+    const h = json.hookSpecificOutput ?? {};
+    return {
+      codigo: r.status,
+      decision: h.permissionDecision ?? null,
+      razon: h.permissionDecisionReason ?? "",
+      aviso: json.systemMessage ?? "",
+      stderr: String(r.stderr ?? ""),
+      clasifico: fs.existsSync(marca),
+    };
+  };
+  /** ¿Claude Code dejaría correr el comando? Bloquea un `exit 2` o un `deny`. */
+  const bloquea = (r) => r.codigo === 2 || r.decision === "deny";
+  return { dir, preguntar, bloquea, borrar: () => fs.rmSync(dir, { recursive: true, force: true }) };
+}
+
+const ERP = "ssh vps-erp 'cd /srv/produccion/erpazul && docker compose -f docker-compose.prod.yml run --rm -T --no-deps app prisma migrate deploy'";
+const AZUL = "cd /srv/produccion/azul-chat && docker compose -f docker-compose.prod.yml run --rm --no-deps azul-chat-app prisma migrate deploy";
+const DB_PUSH = ["npx prisma db", "push"].join(" ");
+
+test("CASO 6 · el comando de settings.json usa la guardia del PROYECTO, desde cualquier directorio actual", () => {
+  const p = proyecto();
+  // Una copia vieja en otro directorio, que deja pasar todo: lo que pasaba al
+  // hacer `cd` a otro checkout con la ruta relativa.
+  const vieja = temporal("copia-vieja-");
+  fs.mkdirSync(path.join(vieja, "scripts"));
+  fs.writeFileSync(
+    path.join(vieja, "scripts", "hook-guardia-migraciones.mjs"),
+    `process.stdout.write(JSON.stringify({hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"allow",permissionDecisionReason:"COPIA VIEJA"}}));\n`
+  );
+  try {
+    for (const cwd of [p.dir, path.join(p.dir, "sub"), vieja, "/", os.tmpdir()]) {
+      const r = p.preguntar(DB_PUSH, { cwd });
+      assert.equal(r.decision, "deny", `desde ${cwd}: ${JSON.stringify(r)}`);
+      assert.doesNotMatch(r.razon, /COPIA VIEJA/, `desde ${cwd} corrió la copia del directorio actual`);
+    }
+    // La forma vieja del comando, para que se vea el defecto que se cierra:
+    // desde la copia vieja la usa, y desde otro lado no encuentra nada y pasa.
+    const relativo = "node scripts/hook-guardia-migraciones.mjs";
+    const desdeVieja = p.preguntar(DB_PUSH, { cwd: vieja, comando: relativo });
+    assert.equal(desdeVieja.decision, "allow");
+    assert.match(desdeVieja.razon, /COPIA VIEJA/);
+    const desdeOtro = p.preguntar(DB_PUSH, { cwd: "/", comando: relativo });
+    assert.equal(p.bloquea(desdeOtro), false, "con la ruta relativa, desde otro directorio, el comando pasaba");
+  } finally {
+    p.borrar();
+    fs.rmSync(vieja, { recursive: true, force: true });
+  }
+});
+
+test("CASO 7 · sin el archivo del hook (o sin CLAUDE_PROJECT_DIR): lo que nombra prisma se FRENA con 2, lo demás pasa avisando", () => {
+  const p = proyecto({ sin: ["scripts/hook-guardia-migraciones.mjs"] });
+  try {
+    for (const proyectoDir of [p.dir, null]) {
+      for (const cmd of [ERP, AZUL, DB_PUSH, "npx prisma migrate deploy"]) {
+        const r = p.preguntar(cmd, { proyectoDir });
+        assert.equal(r.codigo, 2, `${cmd} con CLAUDE_PROJECT_DIR=${proyectoDir}: ${JSON.stringify(r)}`);
+        assert.match(r.stderr, /FRENADO: la guardia de migraciones no pudo correr/);
+      }
+      const ls = p.preguntar("ls -la", { proyectoDir });
+      assert.equal(ls.codigo, 0);
+      assert.equal(p.bloquea(ls), false);
+      assert.match(ls.aviso, /GUARDIA DE MIGRACIONES ROTA/, "dejó pasar sin decir que la guardia no corrió");
+    }
+  } finally {
+    p.borrar();
+  }
+});
+
+test("CASO 8 · el hook mismo roto (sintaxis) frena con 2; su módulo roto frena con deny", () => {
+  const p = proyecto();
+  try {
+    fs.writeFileSync(path.join(p.dir, "lib", "deploy", "guardiaMigraciones.mjs"), "esto no es válido {{{\n");
+    let r = p.preguntar(ERP);
+    assert.equal(r.decision, "deny");
+    assert.match(r.razon, /NO SE PUDO CARGAR/);
+    assert.equal(r.clasifico, false);
+
+    fs.writeFileSync(path.join(p.dir, "scripts", "hook-guardia-migraciones.mjs"), "import { x } from './no-existe.mjs';\n");
+    r = p.preguntar(ERP);
+    assert.equal(r.codigo, 2, JSON.stringify(r));
+    assert.equal(p.bloquea(p.preguntar("echo hola")), false);
+  } finally {
+    p.borrar();
+  }
+});
+
+test("CASO 9 · sin clasificador, o con uno que se cae, se frena diciendo el motivo real (no 'migración marcada')", () => {
+  const sinArchivo = proyecto({ sin: ["scripts/clasificar-migraciones.mjs"] });
+  const caido = proyecto({ clasificador: "throw new Error('roto');\n" });
+  const muerto = proyecto({ clasificador: "process.kill(process.pid, 'SIGKILL');\n" });
+  try {
+    let r = sinArchivo.preguntar(ERP);
+    assert.equal(r.decision, "deny");
+    assert.match(r.razon, /no existe el clasificador/);
+    for (const p of [caido, muerto]) {
+      r = p.preguntar(ERP);
+      assert.equal(r.decision, "deny", JSON.stringify(r));
+      assert.match(r.razon, /no terminó bien/);
+      assert.doesNotMatch(r.razon, /hay al menos una migración que rompería/);
+    }
+  } finally {
+    [sinArchivo, caido, muerto].forEach((p) => p.borrar());
+  }
+});
+
+test("una copia de la guardia que no es la del proyecto de la sesión no decide sobre prisma", () => {
+  const p = proyecto();
+  const otro = temporal("otro-proyecto-");
+  try {
+    const comando = `node "${path.join(p.dir, "scripts", "hook-guardia-migraciones.mjs")}"`;
+    const r = p.preguntar(ERP, { proyectoDir: otro, comando, salida: 0 });
+    assert.equal(r.decision, "deny");
+    assert.match(r.razon, /no es la del proyecto/);
+    assert.equal(r.clasifico, false);
+    assert.equal(p.preguntar("ls", { proyectoDir: otro, comando }).decision, "allow");
+  } finally {
+    p.borrar();
+    fs.rmSync(otro, { recursive: true, force: true });
+  }
+});
+
+test("CASOS 12 a 17 · por el comando de settings.json, la decisión del PR #151 sigue entera", () => {
+  const p = proyecto();
+  try {
+    // 12: Azul Chat canónico pasa sin preguntarle al clasificador del ERP.
+    let r = p.preguntar(AZUL, { salida: 2 });
+    assert.equal(r.decision, "allow");
+    assert.equal(r.clasifico, false);
+    // 13: parecido y peligroso, frenado aunque el clasificador diga 0, y con autorización.
+    for (const c of [AZUL.replace("--no-deps", "--no-deps -v=../erpazul/prisma:/app/prisma"), `DEPLOY_MIGRACION_AUTORIZADA=1 ${AZUL} --schema=x`]) {
+      r = p.preguntar(c, { salida: 0 });
+      assert.equal(r.decision, "deny", c);
+      assert.equal(r.clasifico, false, c);
+    }
+    // 14: ERP con el clasificador en 0, pasa diciendo qué guardia corrió.
+    r = p.preguntar(ERP, { salida: 0 });
+    assert.equal(r.decision, "allow");
+    assert.equal(r.clasifico, true);
+    assert.match(r.razon, /Guardia efectiva: /);
+    // 15: ERP INDETERMINADO, y marcado: frena.
+    for (const salida of [1, 2]) {
+      r = p.preguntar(ERP, { salida });
+      assert.equal(r.decision, "deny", `salida ${salida}`);
+    }
+    assert.match(p.preguntar(ERP, { salida: 1 }).razon, /rompería/);
+    assert.match(p.preguntar(ERP, { salida: 2 }).razon, /no pudo determinar/);
+    // 16: autorización válida pasa sin clasificar; una inválida no autoriza.
+    r = p.preguntar(`DEPLOY_MIGRACION_AUTORIZADA=1 ${ERP}`, { salida: 2 });
+    assert.equal(r.decision, "allow");
+    assert.equal(r.clasifico, false);
+    r = p.preguntar(`DEPLOY_MIGRACION_AUTORIZADA=1x ${ERP}`, { salida: 2 });
+    assert.equal(r.decision, "deny");
+    // 17: dos proyectos en el mismo comando.
+    r = p.preguntar(`${AZUL} && ${ERP}`, { salida: 0 });
+    assert.equal(r.decision, "deny");
+    assert.equal(r.clasifico, false);
+  } finally {
+    p.borrar();
+  }
+});
+
+test("CASO 18 · LÍMITE CONOCIDO: un `migrate deploy` escondido no lo ve la guardia (texto), y por eso está escrito", () => {
+  // No es un candado de que esto esté bien: es el registro de que NO está
+  // cubierto. Si algún día la guardia lo frena, este candado se pone rojo y hay
+  // que reescribirlo afirmando el freno. Está en el skill `/deploy`, "Esa
+  // guardia NO hace obligatorio el chequeo", punto 5.
+  const p = proyecto();
+  try {
+    const r = p.preguntar("docker compose -f docker-compose.prod.yml run --rm app prisma migrate $(echo deploy)", { salida: 2 });
+    assert.equal(r.decision, "allow");
+    assert.equal(r.clasifico, false);
+  } finally {
+    p.borrar();
+  }
+});
