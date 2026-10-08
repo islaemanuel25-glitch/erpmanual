@@ -65,7 +65,10 @@ function hooksDeclarados() {
   for (const [evento, grupos] of Object.entries(cfg.hooks ?? {})) {
     for (const grupo of grupos ?? []) {
       for (const h of grupo.hooks ?? []) {
-        const m = /(?:^|\s)((?:scripts|\.claude)\/[\w./-]+\.mjs)/.exec(String(h.command ?? ""));
+        // La ruta puede ir suelta (`node scripts/x.mjs`) o colgada de la raíz del
+        // proyecto (`"$CLAUDE_PROJECT_DIR/scripts/x.mjs"`), que es como va la guardia
+        // de migraciones desde el 2026-10-08.
+        const m = /(?:^|\s|["']?\$\{?CLAUDE_PROJECT_DIR\}?\/)((?:scripts|\.claude)\/[\w./-]+\.mjs)/.exec(String(h.command ?? ""));
         if (m) salida.push({ evento, comando: h.command, ruta: m[1] });
       }
     }
@@ -136,6 +139,12 @@ test("H1 · este paquete NO declara type module, así que un .js es CommonJS", (
 test("H2 · ningún hook alcanza un .js con sintaxis de módulo ES", () => {
   const hooks = hooksDeclarados();
   assert.ok(hooks.length > 0, "no se encontró ningún hook declarado: la lectura de settings.json se rompió");
+  // Y la guardia tiene que estar entre los que se leyeron: si el patrón de
+  // arriba deja de reconocer su forma, este candado seguiría verde sin mirarla.
+  assert.ok(
+    hooks.some((h) => h.ruta === "scripts/hook-guardia-migraciones.mjs"),
+    `la guardia de migraciones no está entre los hooks leídos: ${JSON.stringify(hooks.map((h) => h.ruta))}`
+  );
 
   const culpables = [];
   for (const hook of hooks) {

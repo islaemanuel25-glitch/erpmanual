@@ -76,8 +76,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/hook-guardia-migraciones.mjs",
-            "timeout": 120
+            "command": "e=$(cat); o=$(printf '%s' \"$e\" | node \"$CLAUDE_PROJECT_DIR/scripts/hook-guardia-migraciones.mjs\"); s=$?; if [ \"$s\" -eq 0 ]; then case \"$o\" in *'\"permissionDecision\":\"'*) printf '%s' \"$o\"; exit 0;; esac; fi; [ \"$s\" -eq 2 ] && exit 2; printf '%s' \"$e\" | grep -qi prisma || { printf '%s' '{\"systemMessage\":\"GUARDIA DE MIGRACIONES ROTA: el hook no pudo correr. No esta protegiendo nada.\"}'; exit 0; }; echo \"FRENADO: la guardia de migraciones no pudo correr desde $CLAUDE_PROJECT_DIR/scripts/hook-guardia-migraciones.mjs y este comando nombra prisma. Falla cerrada: arreglar la guardia, no esquivarla.\" >&2; exit 2",
+            "timeout": 150
           }
         ]
       }

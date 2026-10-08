@@ -462,6 +462,18 @@ corre desde la máquina local, con el VPS todavía en el SHA viejo:
 node scripts/clasificar-migraciones.mjs --vps
 ```
 
+**Desplegando desde ADENTRO del VPS, ese mismo comando antes del paso 1 sale
+INDETERMINADO, y está bien que salga.** En el servidor, `--vps` toma como destino
+la imagen de `APP_IMAGE`, que antes del paso 2 todavía es la que atiende: rango
+degenerado. Para mirar el release antes de tocar nada, se dice el destino y el
+repositorio que lo tiene —el clon de trabajo, actualizado—:
+
+```bash
+node scripts/clasificar-migraciones.mjs --vps --hasta <SHA_COMPLETO> --repo "$(pwd)"
+```
+
+Ver "Qué repositorio consulta el clasificador y qué copia de la guardia corre".
+
 **Por qué antes:** para leerlo con tiempo y no con el despliegue a medio hacer.
 El orden ya no es lo que decide si el chequeo sirve — eso cambió el 2026-08-13 y
 está abajo.
@@ -860,6 +872,174 @@ nada de la lista de rechazo ni un comando ambiguo.
 El clasificador, además, se niega a clasificar en un árbol que no sea el del ERP
 (`"name": "erpmanual"` en `package.json`): sale INDETERMINADO en vez de comparar
 un SHA del ERP contra un historial ajeno.
+
+### Qué repositorio consulta el clasificador y qué copia de la guardia corre — desde el 2026-10-08
+
+Dos defectos que aparecieron al querer activar en el VPS la corrección del PR
+#151 (INC-0014). Los dos vivían entre piezas que tenían candados verdes.
+
+**A · El clasificador consultaba el clon equivocado.** Corría git sobre el árbol
+donde vive el script. En el VPS ese árbol es el clon de trabajo desde el que
+corre Claude Code, no `/srv/produccion/erpazul`: si el clon estaba atrasado, el
+SHA que atiende no estaba en su historial y salía INDETERMINADO con un SHA
+válido. Y el destino era el HEAD de ese clon, que no es lo que se despliega.
+
+Ahora el directorio desde el que se ejecuta y el repositorio que se consulta son
+dos cosas separadas, y los tres datos del rango se resuelven explícitos:
+
+- **Origen:** la imagen que atiende `erpazul_app` (o `--desde`). Sin cambios.
+- **Destino:** en el VPS con `--vps`, la imagen de `APP_IMAGE` en
+  `/srv/produccion/erpazul/.env` —la que usa el contenedor descartable de
+  `migrate deploy`, que el paso 2 apunta antes de migrar—. Se lee solo esa línea
+  y no se imprime nada más del archivo. Fuera del VPS, el HEAD del repositorio.
+  `--hasta` manda sobre los dos.
+- **Repositorio:** en el VPS con `--vps`, `/srv/produccion/erpazul`, que el
+  paso 1 ya trajo al día con su `git fetch`. Fuera del VPS o sin `--vps`, el
+  árbol del script. `--repo <ruta absoluta>` manda sobre los dos.
+- **Migraciones:** se leen del commit destino con `git show`, no del árbol de
+  trabajo.
+
+El repositorio se valida antes de usarlo: tiene que ser la raíz de un repo git, y
+los dos commits tienen que estar en su historial con un `package.json` que se
+llame `erpmanual` y un `prisma/migrations`. Si no, INDETERMINADO: nunca se
+adivina otro repositorio, y nunca se corre git sobre Azul Chat para clasificar el
+ERP. INDETERMINADO sigue frenando como siempre.
+
+**B · El hook se resolvía contra el directorio actual.** `.claude/settings.json`
+decía `node scripts/hook-guardia-migraciones.mjs`. Claude Code corre el comando
+de un hook en el directorio ACTUAL de la sesión, que se mueve con cada `cd`.
+**Comprobado con Claude Code 2.1.293, con un `claude -p` sobre un proyecto
+descartable:** después de un `cd sub`, el hook corrió en `sub`. Con el archivo
+ausente, node salió con 1 y **el comando corrió igual**. Así que después de un
+`cd /srv/produccion/erpazul` corría la copia de producción, que es otra versión,
+y después de un `cd` a cualquier otro lado no corría ninguna.
+
+Ahora el comando es:
+
+- `$CLAUDE_PROJECT_DIR/scripts/hook-guardia-migraciones.mjs`.
+  `$CLAUDE_PROJECT_DIR` es la raíz del proyecto donde arrancó la sesión y no se
+  mueve con `cd`; también comprobado que llega al hook.
+- Va envuelto en un `sh` que, si el hook no pudo correr (archivo ausente, la
+  variable vacía, node ausente, error de sintaxis), sale con **2 si el comando
+  nombra prisma** y deja pasar el resto con un aviso visible de "GUARDIA ROTA".
+  Comprobado con el `claude` real que el 2 frena el comando.
+
+Y el hook, al decidir sobre un `migrate deploy`:
+
+- dice qué copia es ("Guardia efectiva: <ruta> en <commit>");
+- frena lo que nombra prisma si la copia que corre no es la del proyecto de la
+  sesión;
+- frena si falta el clasificador, o si se cayó (un 1 sin "FRENO:", una señal, un
+  timeout), diciendo el motivo real y no "migración marcada".
+
+**Lo que hace y no hace el PreToolUse, comprobado o documentado:**
+
+- **Solo el código 2 bloquea por sí solo.** Un 1, un 127 (archivo ausente) o un
+  error cualquiera dejan correr el comando: comprobado.
+- **Un hook que se pasa de su `timeout` NO bloquea:** el comando sigue.
+  Comprobado: un hook de 4 s que iba a salir con 2 a los 20 s no frenó nada. Por
+  eso el clasificador tiene 90 s (se corta aunque un ssh hijo siga colgado:
+  comprobado), los `git` de la identidad 5 s cada uno, y el hook 150 s. Un
+  candado compara esos números.
+- **El evento real** (comprobado): JSON de una línea con `tool_name`,
+  `tool_input.command` como string, `cwd` y otros; las comillas y las barras
+  invertidas van escapadas, las letras nunca.
+- **El envoltorio deja pasar solo si el hook salió con 0 Y contestó una
+  decisión** (`permissionDecision`). Un hook que sale con 0 sin decisión —texto,
+  `{}`, vacío— cuenta como caído; un 2 del hook se propaga. Y un evento que el
+  hook no puede interpretar —JSON roto, sin `tool_name`, un `command` que no es
+  texto— no recibe `allow` si nombra prisma: hasta el 2026-10-08 sí lo recibía.
+- **La red del hook caído es `grep -i prisma` sobre el JSON crudo.** No
+  decodifica escapes `\u`: Claude Code no los usa para letras, pero la red no se
+  apoya en un parser. Registrado como límite en un candado.
+- **Un cambio en el ARCHIVO del hook rige en el comando siguiente**, sin
+  reiniciar: comprobado.
+- **Un cambio en `.claude/settings.json`** lo levanta un vigilador de archivos
+  según la documentación, con reiniciar la sesión como remedio si no lo levantó.
+  No comprobado: **después de actualizar `settings.json`, se reinicia la sesión.**
+- **No hay ningún interruptor de "fallar cerrado".** Lo que falla cerrado es el
+  envoltorio de arriba, y solo si `settings.json` es el nuevo: una sesión con el
+  `settings.json` viejo cargado sigue con la ruta relativa.
+
+**Nube y VPS:**
+
+- En la sesión de nube no existe `/srv/produccion/erpazul`. El clasificador va
+  por ssh a `vps-erp`, que no resuelve, y sale INDETERMINADO: la nube no
+  despliega.
+- En el VPS lee la imagen con el docker local y consulta el checkout de
+  producción.
+- El hook es el del proyecto donde arrancó la sesión en los dos casos.
+
+**Activación, después de que el arreglo esté en `main`.** No toca la imagen del
+ERP, no reinicia contenedores, no toca PostgreSQL ni `/srv/produccion/erpazul`:
+
+1. En el VPS, en el clon de trabajo desde el que se lanza Claude Code (no en
+   `/srv/produccion/erpazul`): `git status` limpio —si no, se frena y se
+   pregunta—, después `git fetch origin && git merge --ff-only origin/main`.
+2. Cerrar la sesión de Claude Code y abrir una nueva **desde ese clon**.
+3. Comprobar en la sesión nueva, con un comando que no hace nada:
+   `echo "npx prisma db push"` tiene que salir FRENADO, y lo mismo después de
+   `cd /tmp`. Si pasa, la guardia no está activa y no se despliega.
+
+**No se lanza Claude Code desde `/srv/produccion/erpazul`.** La guardia que
+correría sería la del commit desplegado, no la del clon actualizado, y moverla
+sería un despliegue.
+
+**Riesgos que quedan:**
+
+- Sigue siendo texto: un `migrate deploy` escondido no se ve. Hay un candado que
+  lo registra como límite.
+- Una sesión abierta antes de la activación sigue con la configuración vieja.
+- Un `timeout` del hook deja pasar el comando.
+- El clon de trabajo atrasado corre una guardia atrasada: lo nuevo dice qué copia
+  corre, pero una copia vieja no tiene ese código.
+- En Windows el envoltorio necesita Git Bash.
+- El hook solo mira la herramienta Bash: otra herramienta que ejecute comandos
+  no pasa por él.
+
+**Qué imagen migra de verdad, y qué se puede afirmar.** Son cinco cosas
+distintas y no hay que confundirlas:
+
+- el **commit** de git;
+- la **etiqueta** `erpmanual:<SHA>`;
+- el **digest** de la imagen;
+- la **imagen que el docker del VPS tiene** bajo esa etiqueta;
+- las **migraciones adentro** de esa imagen.
+
+Lo que está garantizado y lo que no:
+
+- El clasificador mira el commit cuyo SHA está en la etiqueta de `APP_IMAGE`.
+- El contenedor de `migrate deploy` corre lo que el docker local tiene bajo esa
+  etiqueta. Con `pull_policy: missing` es lo que ya estaba en caché, y si no
+  estaba, lo baja de GHCR.
+- La CI construye la imagen desde ese commit (`COPY . .`, con `prisma/` adentro),
+  le pone la etiqueta OCI `org.opencontainers.image.revision` y comprueba que
+  `APP_BUILD_ID` viajó adentro. Imprime el digest en el resumen del workflow.
+- **Nada de eso ata la etiqueta al contenido con una garantía criptográfica.**
+  Una etiqueta se puede volver a apuntar en GHCR. El build local de emergencia
+  (`docker compose build app` con `APP_IMAGE` puesto) la pisa con el árbol del
+  VPS, cambios sin commitear incluidos, y no lleva la etiqueta OCI `revision`.
+  Hoy no se comprueba ni el digest ni el contenido de la imagen contra el commit.
+
+Lo que sí se comprueba desde el 2026-10-08: si `APP_IMAGE` está definida en el
+entorno con otro valor que el del `.env` —compose le da prioridad—, el
+clasificador sale INDETERMINADO.
+
+Lo que **no** se comprueba, y queda pedido como decisión porque agrega un
+mecanismo o cambia lo que hoy recibe un comando desconocido:
+
+1. **Comprobar la imagen local antes de clasificar.** Antes de dar el 0, leer con
+   `docker image inspect` la etiqueta OCI `revision` y el `APP_BUILD_ID` de la
+   imagen de `APP_IMAGE`, y exigir que coincidan con el SHA. Ataja el build
+   local de emergencia y una etiqueta reapuntada a otro build. No ataja una
+   imagen fabricada con las dos etiquetas falsas; eso pide comparar el digest
+   con el de la CI.
+2. **La forma exacta del runbook también para el ERP**, como la de Azul Chat del
+   PR #151. Hoy un comando que pone otra imagen en la misma línea
+   (`APP_IMAGE=… docker compose …`), monta otras migraciones (`-v …:/app/prisma`),
+   usa otro `--env-file` o corre `docker run <otra imagen>` sigue yendo al
+   clasificador, que mira la del `.env` y con 0 lo dejaría pasar. Un candado lo
+   registra como límite.
 
 ### LA GUARDIA ESTUVO MUERTA Y NADIE SE ENTERÓ — 2026-09-15
 
