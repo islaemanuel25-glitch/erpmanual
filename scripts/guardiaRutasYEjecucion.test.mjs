@@ -152,6 +152,77 @@ test("CASO 5 bis · un release aditivo sale con 0, y un rango degenerado con 2",
   }
 });
 
+// ── EL REPOSITORIO DE PRODUCCIÓN, SE CORRA DESDE DONDE SE CORRA ────────────
+//
+// Los tres que pidió la tanda del 2026-10-08, con el clasificador corriendo
+// desde un clon atrasado (otra historia, sin ningún SHA de producción) y
+// consultando el repositorio de producción. En el servidor ese repositorio lo
+// elige `planDeResolucion` (CASO 20); acá se dice con `--repo`, que es la misma
+// variable del plan.
+
+test("PRODUCCIÓN · SHA presente: se clasifica en el repo de producción aunque el clon no lo tenga", () => {
+  const e = escenario(ADITIVA);
+  try {
+    // Contraprueba del escenario: el clon de verdad no tiene el SHA.
+    assert.notEqual(spawnSync("git", ["-C", e.clon, "cat-file", "-e", `${e.A}^{commit}`]).status, 0);
+    for (const cwd of [e.clon, "/"]) {
+      const r = e.clasificar(["--desde", e.A, "--hasta", e.B, "--repo", e.prod], cwd);
+      assert.equal(r.status, SALIDA.LIMPIO, `cwd ${cwd}: ${r.stdout}${r.stderr}`);
+      assert.ok(r.stdout.includes(e.prod), "no dice que consultó producción");
+    }
+  } finally {
+    e.borrar();
+  }
+});
+
+test("PRODUCCIÓN · SHA ausente: frena con 2, dice qué pasó y qué hacer, y nunca imprime un rango", () => {
+  const e = escenario(ADITIVA);
+  try {
+    const ausente = "0123456789abcdef0123456789abcdef01234567";
+    const r = e.clasificar(["--desde", ausente, "--hasta", e.B, "--repo", e.prod]);
+    assert.equal(r.status, SALIDA.INDETERMINADO, r.stdout + r.stderr);
+    assert.ok(r.stderr.includes(`(${ausente}) no existe en ${e.prod}`), r.stderr);
+    assert.match(r.stderr, /Qué hacer:/);
+    assert.match(r.stderr, /No se autoriza a mano/);
+    // Lo que nunca puede salir: un rango vacío que se lea como "pasó".
+    assert.doesNotMatch(r.stdout, /Archivos a mirar|Sin coincidencias/);
+  } finally {
+    e.borrar();
+  }
+});
+
+test("PRODUCCIÓN · el texto del SHA ausente, en el servidor, manda al paso 1 y no a la autorización", async () => {
+  const { textoDeShaAusente } = await import("./clasificar-migraciones.mjs");
+  const t = textoDeShaAusente({ repo: "/srv/produccion/erpazul", ref: "25172fe", rol: "origen" });
+  assert.match(t, /git -C \/srv\/produccion\/erpazul fetch origin/);
+  assert.doesNotMatch(t, /DEPLOY_MIGRACION_AUTORIZADA/);
+});
+
+test("PRODUCCIÓN · rango con UNA migración: la lista, la clasifica, y una destructiva frena", () => {
+  for (const [sql, salida, etiqueta] of [
+    [ADITIVA, SALIDA.LIMPIO, "aditiva"],
+    [DESTRUCTIVA, SALIDA.MARCADO, "NO ADITIVA"],
+  ]) {
+    const e = escenario(sql);
+    try {
+      const r = e.clasificar(["--desde", e.A, "--hasta", e.B, "--repo", e.prod]);
+      assert.equal(r.status, salida, r.stdout + r.stderr);
+      assert.match(r.stdout, /Archivos a mirar: 1\n/);
+      assert.match(r.stdout, new RegExp(`${etiqueta}\\s+prisma/migrations/20261008000000_release/migration.sql`));
+    } finally {
+      e.borrar();
+    }
+  }
+});
+
+test("PRODUCCIÓN · la migración que sigue, la receta de Dyssa, no marca nada", async () => {
+  // Es la próxima a desplegar y tiene que pasar sin autorización manual. Su
+  // `DO UPDATE SET` no empieza renglón, así que el patrón de UPDATE no la toca.
+  const { clasificarSql } = await import("./clasificar-migraciones.mjs");
+  const sql = fs.readFileSync(path.join(RAIZ, "prisma", "migrations", "20261008120000_receta_dyssa_iva_por_renglon", "migration.sql"), "utf8");
+  assert.deepEqual(clasificarSql(sql), []);
+});
+
 test("CASO 10 · repositorio inexistente, relativo o que no es la raíz: INDETERMINADO, nunca se busca otro", () => {
   const e = escenario();
   try {
@@ -196,8 +267,16 @@ test("CASO 20 · nube y VPS: en el servidor `--vps` consulta /srv/produccion/erp
     origen: { tipo: "imagen-que-atiende" },
     destino: { tipo: "head" },
   });
-  // Sin --vps, el modo manual no cambia de repositorio por estar en el servidor.
-  assert.equal(planDeResolucion({ ...base, modoVps: false, enVps: true, desde: "a" }).repo, "/home/x/clon");
+  // CAMBIÓ el 2026-10-08, por decisión de Emanuel: en el servidor el repositorio
+  // es SIEMPRE el de producción, también en el modo manual. Antes este renglón
+  // afirmaba lo contrario —con `--desde` se consultaba el clon— y fue lo que
+  // dejó al deploy sin rango con el clon de trabajo atrasado. El destino del
+  // modo manual sigue siendo el HEAD (o `--hasta`), no APP_IMAGE.
+  assert.deepEqual(planDeResolucion({ ...base, modoVps: false, enVps: true, desde: "a" }), {
+    repo: "/srv/produccion/erpazul",
+    origen: { tipo: "explicito", valor: "a" },
+    destino: { tipo: "head" },
+  });
   // Lo explícito manda.
   const explicito = planDeResolucion({ ...base, modoVps: true, enVps: true, repo: "/otro", desde: "a", hasta: "b" });
   assert.deepEqual(explicito, { repo: "/otro", origen: { tipo: "explicito", valor: "a" }, destino: { tipo: "explicito", valor: "b" } });
@@ -722,7 +801,7 @@ test("IMAGEN J/K · el SHA de la imagen no está en el repositorio, o es un comm
   try {
     let r = e.clasificar(["--desde", e.A, "--hasta", "c".repeat(40), "--repo", e.prod]);
     assert.equal(r.status, SALIDA.INDETERMINADO);
-    assert.match(r.stderr, /destino no existe en/);
+    assert.match(r.stderr, /SHA de destino \(c{40}\) no existe en/);
     fs.writeFileSync(path.join(e.prod, "package.json"), JSON.stringify({ name: "otro-proyecto" }));
     git(e.prod, "commit", "-q", "-am", "otro");
     r = e.clasificar(["--desde", e.A, "--repo", e.prod]);
