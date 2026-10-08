@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-10-08] - Actualización: compras-proveedor (comprobantes y recetas)
+
+### Modificado
+- fix: la boleta de DYSSA cierra y el costo lleva todo lo que cobra. Los
+  renglones "Neto" del pie son bases y no se suman; cada IVA se nombra con su
+  alícuota; el costo es neto con descuento + IVA del renglón + percepciones +
+  interno por unidad; el renglón bonificado no escribe costo.
+- Migración `20261008120000_receta_dyssa_iva_por_renglon` (pendiente de deploy).
+
 ## [2026-10-07] - Actualización: transferencias, integraciones/azul-chat
 
 ### Modificado

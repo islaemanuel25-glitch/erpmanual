@@ -41,6 +41,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { puedeAceptarse } from "@/lib/compras-proveedor/comprobante/aceptarPrecio";
 import { analizarPrecioDeLinea } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
+import { repartoDelPie } from "@/lib/compras-proveedor/comprobante/repartoDelPie";
 import { RECETA_POR_DEFECTO } from "@/lib/compras-proveedor/comprobante/impuestos";
 import { productosDeLasFilas } from "@/lib/compras-proveedor/comprobante/productoDeLaFila";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
@@ -100,6 +101,13 @@ export async function POST(req) {
       textoCrudo: body?.textoCrudo,
       select: {
         id: true, cantidad: true, netoUnitario: true, internoUnitario: true,
+        // ── EL ORDEN, LA ALÍCUOTA Y EL DESCUENTO DEL RENGLÓN ──────────────
+        //
+        // `orden` es la llave con la que se busca lo que le toca del pie de su
+        // factura; `ivaPct`, la alícuota que el papel imprime en ESTE renglón
+        // —la harina va al 10,5—; `bonificacionPct`, si vino regalado. Sin
+        // ellos esta ruta escribía un costo distinto del que muestra la hoja.
+        orden: true, ivaPct: true, bonificacionPct: true,
         // EL TEXTO DEL PAPEL Y EL CÓDIGO DEL PROVEEDOR son lo que la cascada de
         // vínculo machea. Sin ellos, una línea que la pantalla resuelve por
         // alias acá quedaría sin producto, que es exactamente el defecto que
@@ -149,6 +157,8 @@ export async function POST(req) {
                 orden: true, cantidad: true, netoUnitario: true,
                 subtotalImpreso: true, subtotalCorregido: true, internoUnitario: true,
                 textoCrudo: true, codigoProveedor: true, pesoKg: true, bonificacionPct: true,
+                // La alícuota de cada renglón: el IVA del pie se reparte con ella.
+                ivaPct: true,
               },
             },
             proveedor: { select: { id: true, umbralRevisarPct: true, umbralSospechaBajaPct: true } },
@@ -240,6 +250,13 @@ export async function POST(req) {
       linea,
       producto: base,
       receta,
+      // ── LO QUE LE TOCA DEL PIE, IGUAL QUE EN LA HOJA ──────────────────
+      //
+      // Faltaba: la hoja proponía el costo con las percepciones adentro y esta
+      // ruta, que es la que lo ESCRIBE, lo recalculaba sin ellas. El reparto
+      // es de la factura entera, por eso se le pasan todas sus líneas.
+      percepcionDeLaLinea:
+        repartoDelPie({ ...linea.comprobante, lineas: linea.comprobante.lineas }).get(linea.orden) ?? null,
       proveedor: linea.comprobante.proveedor,
       // Lo que llegó ahora, o lo que alguien eligió antes: una decisión vieja
       // sigue valiendo si nadie la cambió.
@@ -251,6 +268,15 @@ export async function POST(req) {
     // Un producto que se mide en kilos cuyo papel no los trae no tiene precio
     // todavía: los kilos se pesan al recibir. Sin este aviso, el caso caía en
     // "falta el costo de la factura", que es verdad y no dice qué hacer.
+    // ── UN RENGLÓN BONIFICADO NO TIENE PRECIO QUE ACEPTAR ────────────────
+    //
+    // Descuento del 100 %: entra al stock y el producto conserva su costo. Un
+    // cero escrito acá le rompería el margen.
+    if (analisis?.bonificado) {
+      const bonificado = "Este renglón vino bonificado: entra al stock y el producto conserva su costo.";
+      return NextResponse.json({ ok: false, error: bonificado, queHacer: bonificado }, { status: 409 });
+    }
+
     if (analisis?.faltanKilos) {
       const falta = "Este producto se maneja por kilo y el papel no trae los kilos.";
       return NextResponse.json(

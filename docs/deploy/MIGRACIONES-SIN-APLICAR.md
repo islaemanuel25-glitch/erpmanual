@@ -16,7 +16,20 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Producción está en **51 migraciones**; el árbol tiene 52. Pendientes de deploy:
+Producción está en **51 migraciones**; el árbol tiene 53. Pendientes de deploy:
+
+- `20261008120000_receta_dyssa_iva_por_renglon` — la receta de DYSSA al día
+  con su boleta de dos alícuotas (rama `claude/dyssa-recipe-cost-calc-avhqd1`).
+  Qué hace `migrate deploy`: un `INSERT … ON CONFLICT DO UPDATE` sobre
+  `RecetaProveedor` para el proveedor de nombre EXACTO `'Dyssa'`, en cada
+  grupo. Reemplaza sus percepciones por tres —IVA RG 5329 3 % sobre el grupo
+  del 21, 1,5 % sobre el del 10,5, IIBB 3,5 % sobre el neto— y reafirma IVA por
+  renglón, interno por unidad y percepciones en el costo. Sube `version` en
+  uno. No toca la explicación en palabras, la variación normal ni ninguna
+  otra receta. Sin DDL. Ensayada en `erpazul_al` de la sesión de nube sobre la
+  receta vieja: Dyssa pasó de versión 1 a 2 y Das y Daska quedaron igual.
+  **Va junto con su código**: las percepciones con `alicuotaPct` solo las
+  entiende el motor de esta rama.
 
 - `20261006150000_delegacion_integracion` — el canje del código de Azul Chat
   por un token de delegación (rama `claude/azul-chat-fundacion-gw3g3z`,

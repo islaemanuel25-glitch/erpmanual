@@ -1,36 +1,24 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-07 02:53
+**Fecha:** 2026-10-08 12:04
 
 ## Módulos modificados recientemente
 
-### integraciones/azul-chat (Tanda 1B)
-- feat(azul-chat): mi_alcance anuncia las capacidades de cada local
-- docs(azul-chat): capacidades por local y fallo cerrado con el ERP caído
-- Sin ruta nueva y sin migración. Cambio aditivo del contrato de `mi_alcance`:
-  cada local agrega `capacidades`; la versión sigue en 1.
-
-### integraciones/azul-chat (Tanda 1)
-- feat(azul-chat): capacidad transferencias_eventos (TRANSFERENCIA_RECIBIDA)
-- test(azul-chat): transferencias_eventos contra PostgreSQL
-- docs(azul-chat): contrato de transferencias_eventos en DEC-0013
-- Sin ruta nueva y sin migración: es una capacidad más de
-  `POST /api/integraciones/azul-chat/consultar`, con `transferencias.ver`.
-
-### transferencias
-- refactor(transferencias): el conteo de líneas con diferencia sale del tablero a lib
-- Archivos: 2 modificados (2 total)
+### compras-proveedor (comprobantes, recetas y recepción)
+- fix: la boleta de DYSSA cierra y el costo lleva todo lo que cobra
+- Migración `20261008120000_receta_dyssa_iva_por_renglon`: la receta de
+  'Dyssa' con tres percepciones (IVA RG 5329 por grupo de alícuota e IIBB).
+  Pendiente de deploy; anotada en `docs/deploy/MIGRACIONES-SIN-APLICAR.md`.
 
 ## Archivos nuevos desde última sincronización
-- lib/transferencias/lineasConDiferencia.js
-- lib/integraciones/azul-chat/transferenciasEventos.js
-- scripts/pruebas-db/azulChatTransferenciasEventos.mjs
+- lib/compras-proveedor/comprobante/boletaDyssaCierra.test.mjs
+- lib/compras-proveedor/comprobante/boletaDyssa.fixture.json
+- prisma/migrations/20261008120000_receta_dyssa_iva_por_renglon/migration.sql
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai
 ✅ Ejecutar: git push
 
 ---
-*Generado por scripts/update-docs.js y corregido a mano: el script atribuyó la
-sesión al refactor de `transferencias` y dejó afuera los cambios de
-`integraciones/azul-chat`.*
+*Generado por scripts/update-docs.js y corregido a mano: el script no detectó
+el módulo y dejó la lista vacía.*

@@ -550,6 +550,10 @@ export async function POST(req, { params }) {
               // tiene— y sirve para señalar un renglón mal leído.
               pesoKg: l.peso ?? null,
               bonificacionPct: l.bonificacion ?? null,
+              // La alícuota de IVA que el papel imprime en este renglón. La
+              // columna existía y nadie la escribía; sin ella la harina se
+              // costeaba al 21.
+              ivaPct: l.alicuotaIva ?? null,
             })),
           });
         }

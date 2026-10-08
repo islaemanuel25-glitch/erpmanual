@@ -267,10 +267,12 @@ export default function TarjetaLineaFactura({
                 <p className="flex items-baseline gap-x-2 flex-wrap break-words">
                   <span className="text-xs sunmi-text-muted shrink-0">Papel</span>
                   <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-strong">
-                    {formatearMoneda(renglones.papel.importe)}
-                    <span className="text-xs font-normal sunmi-text-muted">
-                      {" "}/ {renglones.papel.unidad}
-                    </span>
+                    {renglones.papel.bonificado ? "bonificado" : formatearMoneda(renglones.papel.importe)}
+                    {!renglones.papel.bonificado && (
+                      <span className="text-xs font-normal sunmi-text-muted">
+                        {" "}/ {renglones.papel.unidad}
+                      </span>
+                    )}
                   </span>
                 </p>
               )}

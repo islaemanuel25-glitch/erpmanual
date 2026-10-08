@@ -1,0 +1,33 @@
+{
+  "_origen": "Boleta de DYSSA transcripta de la foto por Emanuel el 2026-10-08, con la forma que devuelve el lector (antes de normalizarLectura). Los nombres de los conceptos del pie son los que mostró el cartel de Recetas de facturas; el del IVA al 21 no apareció en el cartel —se nombraba solo el primero— y se escribió con la misma forma que el del 10,5.",
+  "identidad": { "tipo": "A" },
+  "lineasEnElPapel": 9,
+  "hayTotalImpreso": true,
+  "lineas": [
+    { "codigoProveedor": "500010027", "descripcion": "AMARGO OBRERO 19 950MLX12", "alicuotaIva": 21, "bonificacion": 0, "cantidad": 36, "netoUnitario": 2713.71, "internoImpreso": 563.09, "subtotalImpreso": 97693.56 },
+    { "codigoProveedor": "900005688", "descripcion": "SUSSEX RC CLASICO MAS BLANCO 50X3X10", "alicuotaIva": 21, "bonificacion": 0, "cantidad": 30, "netoUnitario": 1364.58, "internoImpreso": 0, "subtotalImpreso": 40937.40 },
+    { "codigoProveedor": "900001618", "descripcion": "HIGIENOL PH HS FRESH 30MTX4X12", "alicuotaIva": 21, "bonificacion": 0, "cantidad": 84, "netoUnitario": 1207.16, "internoImpreso": 0, "subtotalImpreso": 101401.44 },
+    { "codigoProveedor": "500013680", "descripcion": "PRONTO BIT 4.5° 473MLX6X4", "alicuotaIva": 21, "bonificacion": 0, "cantidad": 4, "netoUnitario": 9867.44, "internoImpreso": 609.51, "subtotalImpreso": 39469.76 },
+    { "codigoProveedor": "500014792", "descripcion": "(P) GANCIA CERO 473MLX6X4", "alicuotaIva": 21, "bonificacion": 10, "cantidad": 8, "netoUnitario": 9737.37, "internoImpreso": 601.47, "subtotalImpreso": 70109.06 },
+    { "codigoProveedor": "1000056218", "descripcion": "BLANCAFLOR HARINA LEUDANTE 1000GRX15", "alicuotaIva": 10.5, "bonificacion": 0, "cantidad": 30, "netoUnitario": 1545.32, "internoImpreso": 0, "subtotalImpreso": 46359.60 },
+    { "codigoProveedor": "3110001030", "descripcion": "DURACELL PILA ALC AAA x 12 TIRA - COD NUEVO", "alicuotaIva": 21, "bonificacion": 0, "cantidad": 4, "netoUnitario": 10477.03, "internoImpreso": 0, "subtotalImpreso": 41908.12 },
+    { "codigoProveedor": "3110001028", "descripcion": "DURACELL PILA ALCALINA AA TIRA x 12", "alicuotaIva": 21, "bonificacion": 0, "cantidad": 4, "netoUnitario": 10477.03, "internoImpreso": 0, "subtotalImpreso": 41908.12 },
+    { "codigoProveedor": "500014466", "descripcion": "(P) DR. LEMON VODKA 5% 1000MLX12", "alicuotaIva": 21, "bonificacion": 100, "cantidad": 1, "netoUnitario": 2930.39, "internoImpreso": 0, "subtotalImpreso": 0 }
+  ],
+  "pie": {
+    "neto": 479787.06,
+    "iva": 95887.53,
+    "interno": 27521.04,
+    "total": 633686.40,
+    "conceptos": [
+      { "nombre": "Neto 10,50%", "importe": 46359.60 },
+      { "nombre": "IVA 10.50%", "importe": 4867.76 },
+      { "nombre": "Neto 21,00%", "importe": 433427.46 },
+      { "nombre": "IVA 21.00%", "importe": 91019.77 },
+      { "nombre": "Percepción IIBB", "importe": 16792.55 },
+      { "nombre": "Percepción IVA", "importe": 695.39 },
+      { "nombre": "Percepción IVA", "importe": 13002.82 },
+      { "nombre": "Impuesto Interno", "importe": 27521.04 }
+    ]
+  }
+}
