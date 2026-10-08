@@ -30,7 +30,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { planDeResolucion, shaDelAppImage, SALIDA } from "./clasificar-migraciones.mjs";
+import { planDeResolucion, shaDelAppImage, shaDeLaImagenAMigrar, SALIDA } from "./clasificar-migraciones.mjs";
+import { decidirPorComando } from "../lib/deploy/guardiaMigraciones.mjs";
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const RAIZ = path.resolve(AQUI, "..");
@@ -270,13 +271,14 @@ function proyecto({ sin = [], clasificador = null } = {}) {
   for (const f of sin) fs.rmSync(path.join(dir, f), { force: true });
 
   /** Corre el comando de settings.json con `sh -c`, como Claude Code. */
-  const preguntar = (command, { cwd = dir, salida = 0, proyectoDir = dir, comando = comandoDeLaGuardia() } = {}) => {
+  const preguntar = (command, { cwd = dir, salida = 0, proyectoDir = dir, comando = comandoDeLaGuardia(), crudo = null, entorno = {} } = {}) => {
     if (fs.existsSync(marca)) fs.rmSync(marca);
-    const env = { ...process.env, SALIDA_FALSA: String(salida) };
+    const env = { ...process.env, SALIDA_FALSA: String(salida), ...entorno };
     if (proyectoDir === null) delete env.CLAUDE_PROJECT_DIR;
     else env.CLAUDE_PROJECT_DIR = proyectoDir;
     const r = spawnSync("sh", ["-c", comando], {
-      input: JSON.stringify({ tool_name: "Bash", tool_input: { command }, cwd }),
+      // `crudo` manda el evento tal cual, para probar eventos mal formados.
+      input: crudo ?? JSON.stringify({ tool_name: "Bash", tool_input: { command }, cwd }),
       encoding: "utf8",
       cwd,
       env,
@@ -461,5 +463,289 @@ test("CASO 18 · LÍMITE CONOCIDO: un `migrate deploy` escondido no lo ve la gua
     assert.equal(r.clasifico, false);
   } finally {
     p.borrar();
+  }
+});
+
+// ── LA SEGUNDA REVISIÓN DEL ENVOLTORIO — 2026-10-08 ───────────────────────
+//
+// El evento real de Claude Code 2.1.293 está comprobado: JSON de una línea con
+// `tool_name`, `tool_input.command` (string), `cwd`, `session_id` y otros; las
+// comillas y las barras invertidas van escapadas y las letras nunca. Lo de
+// abajo prueba cada forma de evento y cada forma de fallar del hook, por el
+// comando literal de settings.json. Criterio: lo que no se pudo interpretar no
+// recibe una autorización para algo de prisma, y "frena" es `exit 2` o un
+// `deny`; un aviso no cuenta.
+
+/** Un evento de Bash como lo manda Claude Code. */
+const eventoReal = (command, extra = {}) =>
+  JSON.stringify({ session_id: "s", transcript_path: "/t.jsonl", cwd: "/x", hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command, description: "d" }, tool_use_id: "u", ...extra });
+
+/** Reemplaza el hook del proyecto por otro contenido. */
+const conHook = (p, codigo) => fs.writeFileSync(path.join(p.dir, "scripts", "hook-guardia-migraciones.mjs"), codigo);
+
+test("ENVOLTORIO A/B/C · un comando normal pasa; migrate deploy va al clasificador y db push se frena", () => {
+  const p = proyecto();
+  try {
+    let r = p.preguntar("", { crudo: eventoReal("ls -la") });
+    assert.equal(r.codigo, 0);
+    assert.equal(r.decision, "allow");
+    r = p.preguntar("", { crudo: eventoReal("npx prisma migrate deploy"), salida: 2 });
+    assert.equal(r.decision, "deny");
+    assert.equal(r.clasifico, true);
+    r = p.preguntar("", { crudo: eventoReal(DB_PUSH) });
+    assert.equal(r.decision, "deny");
+  } finally {
+    p.borrar();
+  }
+});
+
+test("ENVOLTORIO D/H/I/J · un evento ininterpretable que nombra prisma se FRENA; si no la nombra, pasa diciendo que no miró", () => {
+  const p = proyecto();
+  try {
+    for (const [nombre, crudo] of [
+      ["D JSON roto", `{"tool_name":"Bash","tool_input":{"command":"npx prisma migrate deploy"`],
+      ["H sin tool_input", `{"tool_name":"Bash","command":"npx prisma migrate deploy"}`],
+      ["I sin command", `{"tool_name":"Bash","tool_input":{"description":"npx prisma db push"}}`],
+      ["J command que no es texto", `{"tool_name":"Bash","tool_input":{"command":["npx","prisma","migrate","deploy"]}}`],
+      ["J command número", `{"tool_name":"Bash","tool_input":{"command":7},"x":"prisma"}`],
+      ["sin tool_name", `{"tool_input":{"command":"npx prisma db push"}}`],
+      ["evento que no es objeto", `"npx prisma migrate deploy"`],
+      ["null", "null prisma"],
+    ]) {
+      const r = p.preguntar("", { crudo, salida: 0 });
+      assert.equal(p.bloquea(r), true, `${nombre}: ${JSON.stringify(r)}`);
+      assert.equal(r.clasifico, false, nombre);
+      assert.match(r.razon, /no pudo interpretar|no se pudo/, nombre);
+    }
+    for (const crudo of [`{"tool_name":"Bash","tool_input":{"command":"ls"`, `{"tool_name":"Bash"}`, "null"]) {
+      const r = p.preguntar("", { crudo });
+      assert.equal(r.decision, "allow", crudo);
+      assert.match(r.razon, /no se comprobó nada/, crudo);
+    }
+  } finally {
+    p.borrar();
+  }
+});
+
+test("ENVOLTORIO E/F/G · escapes, comillas, barras y saltos de línea: el hook decodifica el JSON y frena igual", () => {
+  const p = proyecto();
+  try {
+    for (const crudo of [
+      // E: escapes Unicode. Claude Code no los usa para letras, pero si llegan, JSON.parse los decodifica.
+      `{"tool_name":"Bash","tool_input":{"command":"npx pri\\u0073ma db push"}}`,
+      `{"tool_name":"Bash","tool_input":{"command":"npx \\u0070risma db \\u0070ush"}}`,
+      // F: comillas y barras invertidas alrededor.
+      eventoReal(`echo "a\\b" 'c"d' && ${DB_PUSH}`),
+      // G: saltos de línea, escapados como los manda Claude Code.
+      eventoReal(`ls\n${DB_PUSH}\necho fin`),
+      eventoReal(`ls\r\n  ${DB_PUSH}`),
+    ]) {
+      const r = p.preguntar("", { crudo });
+      assert.equal(r.decision, "deny", crudo);
+    }
+  } finally {
+    p.borrar();
+  }
+});
+
+test("ENVOLTORIO E-LÍMITE · con el hook caído, la red de último recurso busca el TEXTO crudo: un escape \\u la esquiva", () => {
+  // Registrado, no cubierto. Claude Code 2.1.293 no escapa letras (comprobado),
+  // así que hoy el evento real trae "prisma" literal; pero la red no decodifica
+  // JSON —es `grep` sobre lo que llega— y no se va a escribir un parser en sh.
+  const p = proyecto({ sin: ["scripts/hook-guardia-migraciones.mjs"] });
+  try {
+    assert.equal(p.preguntar("", { crudo: eventoReal(DB_PUSH) }).codigo, 2);
+    const escapado = p.preguntar("", { crudo: `{"tool_name":"Bash","tool_input":{"command":"npx pri\\u0073ma db push"}}` });
+    assert.equal(p.bloquea(escapado), false);
+    assert.match(escapado.aviso, /GUARDIA DE MIGRACIONES ROTA/);
+  } finally {
+    p.borrar();
+  }
+});
+
+test("ENVOLTORIO K/L/N/O · hook ausente, que sale con 1, que no importa, o que sale con 0 SIN DECISIÓN: lo de prisma se frena con 2", () => {
+  for (const [nombre, preparar] of [
+    ["K ausente", (p) => fs.rmSync(path.join(p.dir, "scripts", "hook-guardia-migraciones.mjs"))],
+    ["L sale con 1", (p) => conHook(p, "process.exit(1);\n")],
+    ["L se cae", (p) => conHook(p, "throw new Error('roto');\n")],
+    ["N no importa", (p) => conHook(p, "import './no-existe.mjs';\n")],
+    ["O texto que no es JSON", (p) => conHook(p, "process.stdout.write('no es json');\n")],
+    ["O JSON sin decisión", (p) => conHook(p, "process.stdout.write('{}');\n")],
+    ["O decisión con salida 1", (p) => conHook(p, `process.stdout.write(JSON.stringify({hookSpecificOutput:{permissionDecision:"allow"}}));process.exit(1);\n`)],
+    ["O vacío", (p) => conHook(p, "")],
+  ]) {
+    const p = proyecto();
+    try {
+      preparar(p);
+      const r = p.preguntar("", { crudo: eventoReal("npx prisma migrate deploy") });
+      assert.equal(r.codigo, 2, `${nombre}: ${JSON.stringify(r)}`);
+      assert.match(r.stderr, /FRENADO: la guardia de migraciones no pudo correr/, nombre);
+      const ls = p.preguntar("", { crudo: eventoReal("ls") });
+      assert.equal(p.bloquea(ls), false, nombre);
+      assert.match(ls.aviso, /GUARDIA DE MIGRACIONES ROTA/, nombre);
+    } finally {
+      p.borrar();
+    }
+  }
+});
+
+test("ENVOLTORIO M · un hook que sale con 2 frena siempre, nombre o no prisma", () => {
+  const p = proyecto();
+  try {
+    conHook(p, "process.stderr.write('frenado por el hook');\nprocess.exit(2);\n");
+    for (const c of ["ls", "npx prisma migrate deploy"]) {
+      const r = p.preguntar("", { crudo: eventoReal(c) });
+      assert.equal(r.codigo, 2, c);
+      assert.match(r.stderr, /frenado por el hook/);
+    }
+  } finally {
+    p.borrar();
+  }
+});
+
+test("ENVOLTORIO P · un clasificador colgado se corta ANTES del timeout del hook, y frena", () => {
+  const p = proyecto({ clasificador: "setTimeout(() => {}, 60_000);\n" });
+  try {
+    const t = Date.now();
+    const r = p.preguntar("", { crudo: eventoReal(ERP), entorno: { GUARDIA_TIEMPO_CLASIFICADOR_MS: "1500" } });
+    assert.equal(r.decision, "deny", JSON.stringify(r));
+    assert.match(r.razon, /no terminó bien/);
+    assert.ok(Date.now() - t < 20_000, "el corte no respetó el tiempo pedido");
+    // La variable solo puede ACHICAR el tiempo: un valor enorme o basura no lo estira.
+    const fuente = fs.readFileSync(path.join(AQUI, "hook-guardia-migraciones.mjs"), "utf8").replace(/\/\/[^\n]*/g, "");
+    assert.match(fuente, /Math\.min\(pedido, TIEMPO_CLASIFICADOR_MS\)/);
+  } finally {
+    p.borrar();
+  }
+});
+
+test("ENVOLTORIO P · el presupuesto interno entra holgado en el timeout del hook (un timeout DEJA PASAR)", () => {
+  const fuente = fs.readFileSync(path.join(AQUI, "hook-guardia-migraciones.mjs"), "utf8").replace(/\/\/[^\n]*/g, "");
+  const ms = (nombre) => Number(new RegExp(`const ${nombre} = ([\\d_]+);`).exec(fuente)?.[1]?.replace(/_/g, ""));
+  const clasificador = ms("TIEMPO_CLASIFICADOR_MS");
+  const git = ms("TIEMPO_GIT_IDENTIDAD_MS");
+  assert.ok(clasificador > 0 && git > 0, "no se encontraron los tiempos del hook");
+  const cfg = JSON.parse(fs.readFileSync(path.join(RAIZ, ".claude", "settings.json"), "utf8"));
+  const hook = cfg.hooks.PreToolUse.flatMap((g) => g.hooks).find((h) => h.command.includes("hook-guardia-migraciones.mjs"));
+  assert.ok(hook.timeout * 1000 >= clasificador + 2 * git + 30_000, `timeout ${hook.timeout}s contra ${clasificador + 2 * git} ms internos`);
+});
+
+test("ENVOLTORIO Q/R · comandos concatenados y sustituciones que dejan el texto a la vista se frenan", () => {
+  const p = proyecto();
+  try {
+    for (const c of [`ls && ${DB_PUSH}`, `true; ${DB_PUSH}`, `ls | ${DB_PUSH}`, `$(${DB_PUSH})`, `\`${DB_PUSH}\``, `echo $(${DB_PUSH})`]) {
+      assert.equal(p.preguntar("", { crudo: eventoReal(c) }).decision, "deny", c);
+    }
+    for (const c of ["ls && npx prisma migrate deploy", "true; docker compose run --rm app prisma migrate deploy"]) {
+      const r = p.preguntar("", { crudo: eventoReal(c), salida: 2 });
+      assert.equal(r.decision, "deny", c);
+      assert.equal(r.clasifico, true, c);
+    }
+  } finally {
+    p.borrar();
+  }
+});
+
+test("ENVOLTORIO S · LÍMITE: lo que invoca prisma sin que el texto lo diga NO lo ve la guardia, funcione o no", () => {
+  // Registrado, no cubierto: es el límite estructural de un hook que lee el
+  // texto del comando. Está en el skill `/deploy`, "Esa guardia NO hace
+  // obligatorio el chequeo". Si alguno empieza a frenarse, se reescribe esto
+  // afirmando el freno.
+  const p = proyecto();
+  try {
+    for (const c of [
+      // (Con `migrate deploy` a la vista sí frena aunque prisma esté escondido:
+      // el texto que importa es ése. Acá están escondidos los dos.)
+      "npx pri\"\"sma migrate dep\"\"loy",
+      "npx $'\\x70risma' migrate $'\\x64eploy'",
+      "p=pri; npx ${p}sma migrate dep''loy",
+      "sh ./migrar.sh",
+      "npm run migrar",
+    ]) {
+      const r = p.preguntar("", { crudo: eventoReal(c), salida: 2 });
+      assert.equal(p.bloquea(r), false, `${c}: ahora se frena, reescribir este candado`);
+    }
+  } finally {
+    p.borrar();
+  }
+});
+
+// ── LA IMAGEN QUE MIGRA — 2026-10-08 ──────────────────────────────────────
+//
+// Lo que se puede afirmar y lo que no. El clasificador mira el COMMIT cuyo SHA
+// está en la etiqueta de APP_IMAGE. El contenedor de `migrate deploy` corre la
+// IMAGEN que esa etiqueta nombra en el docker del VPS. Que esa imagen se haya
+// construido desde ese commit lo afirma la CI (APP_BUILD_ID y la etiqueta OCI
+// `revision`), pero una etiqueta no es un digest: se puede volver a apuntar, y
+// el build local de emergencia la pisa. Eso no se comprueba acá (no hay docker
+// de producción) y está en el skill `/deploy` como límite.
+
+test("IMAGEN A/C/P · APP_IMAGE con el SHA nuevo: es el destino, sin variable en el entorno", () => {
+  const dir = temporal("despliegue-");
+  const nuevo = "b".repeat(40);
+  try {
+    fs.writeFileSync(path.join(dir, ".env"), `X=1\nAPP_IMAGE=ghcr.io/islaemanuel25-glitch/erpmanual:${nuevo}\n`);
+    assert.equal(shaDeLaImagenAMigrar(dir, {}), nuevo);
+    assert.equal(shaDeLaImagenAMigrar(dir, { APP_IMAGE: `ghcr.io/islaemanuel25-glitch/erpmanual:${nuevo}` }), nuevo, "coincidiendo, el entorno no molesta");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("IMAGEN G · APP_IMAGE del ENTORNO distinta, vacía o sin SHA: INDETERMINADO (compose usaría esa, no la del .env)", () => {
+  const dir = temporal("despliegue-");
+  try {
+    fs.writeFileSync(path.join(dir, ".env"), `APP_IMAGE=ghcr.io/x/y:${"b".repeat(40)}\n`);
+    for (const valor of [`ghcr.io/x/y:${"a".repeat(40)}`, "", "erpazul-app", "ghcr.io/x/y:latest"]) {
+      assert.throws(() => shaDeLaImagenAMigrar(dir, { APP_IMAGE: valor }), /definida en el entorno y no coincide/, JSON.stringify(valor));
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("IMAGEN B/O · APP_IMAGE todavía en el SHA que atiende es rango degenerado: frena; el pre-chequeo dice el destino a mano", () => {
+  const e = escenario();
+  try {
+    const r = e.clasificar(["--desde", e.A, "--hasta", e.A, "--repo", e.prod]);
+    assert.equal(r.status, SALIDA.INDETERMINADO);
+    // O: antes del paso 2, en el servidor, el destino explícito manda sobre APP_IMAGE.
+    const plan = planDeResolucion({ modoVps: true, enVps: true, hasta: e.B, raiz: "/c", dirDespliegue: "/srv/produccion/erpazul" });
+    assert.deepEqual(plan.destino, { tipo: "explicito", valor: e.B });
+  } finally {
+    e.borrar();
+  }
+});
+
+test("IMAGEN J/K · el SHA de la imagen no está en el repositorio, o es un commit que no es del ERP: INDETERMINADO", () => {
+  const e = escenario();
+  try {
+    let r = e.clasificar(["--desde", e.A, "--hasta", "c".repeat(40), "--repo", e.prod]);
+    assert.equal(r.status, SALIDA.INDETERMINADO);
+    assert.match(r.stderr, /destino no existe en/);
+    fs.writeFileSync(path.join(e.prod, "package.json"), JSON.stringify({ name: "otro-proyecto" }));
+    git(e.prod, "commit", "-q", "-am", "otro");
+    r = e.clasificar(["--desde", e.A, "--repo", e.prod]);
+    assert.equal(r.status, SALIDA.INDETERMINADO);
+    assert.match(r.stderr, /destino .* no es del repo del ERP/);
+  } finally {
+    e.borrar();
+  }
+});
+
+test("IMAGEN H · LÍMITE: un comando que cambia la imagen o las migraciones en la misma línea sigue yendo al clasificador", () => {
+  // Registrado, no cubierto. El clasificador mira la imagen del .env; estas
+  // variantes migran con otra imagen u otras migraciones y la guardia las manda
+  // igual a clasificar, que con 0 las dejaría pasar. Cerrarlo exige exigir la
+  // forma exacta del runbook también para el ERP —como el PR #151 hizo con Azul
+  // Chat—, y eso cambia lo que hoy recibe lo DESCONOCIDO: está pedido como
+  // decisión, no implementado.
+  for (const c of [
+    "cd /srv/produccion/erpazul && APP_IMAGE=ghcr.io/x/y:" + "c".repeat(40) + " docker compose -f docker-compose.prod.yml run --rm -T --no-deps app prisma migrate deploy",
+    ERP.replace("--no-deps", "--no-deps -v /tmp/otras:/app/prisma/migrations"),
+    ERP.replace("docker compose", "docker compose --env-file /tmp/otro.env"),
+    "docker run --rm ghcr.io/islaemanuel25-glitch/erpmanual:" + "c".repeat(40) + " prisma migrate deploy",
+  ]) {
+    assert.equal(decidirPorComando(c).accion, "clasificar", `${c}: ahora se decide distinto, reescribir este candado`);
   }
 });

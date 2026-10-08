@@ -353,6 +353,34 @@ export function shaDelAppImage(dirDespliegue) {
 }
 
 /**
+ * LA IMAGEN QUE VA A MIGRAR, y no solo la que dice el .env.
+ *
+ * docker compose interpola `${APP_IMAGE}` con la variable del ENTORNO antes que
+ * con la del .env. Si el entorno la define y no coincide, el contenedor de
+ * `migrate deploy` sale de otra imagen que la que se clasificó: INDETERMINADO.
+ * Definida y vacía también cuenta: el `:-erpazul-app` del compose pasaría a la
+ * imagen del build local de emergencia.
+ *
+ * Lo que esto NO ve está escrito en el skill `/deploy`: una variable que el
+ * shell del comando agrega después (un `export` del perfil, un `APP_IMAGE=`
+ * delante del comando) y que una etiqueta no prueba el contenido de la imagen.
+ */
+export function shaDeLaImagenAMigrar(dirDespliegue, entorno = process.env) {
+  const delArchivo = shaDelAppImage(dirDespliegue);
+  if (Object.prototype.hasOwnProperty.call(entorno, "APP_IMAGE")) {
+    const m = /:([0-9a-f]{40})$/i.exec(String(entorno.APP_IMAGE ?? "").trim());
+    if (!m || m[1].toLowerCase() !== delArchivo) {
+      throw new Indeterminado(
+        "APP_IMAGE está definida en el entorno y no coincide con la del .env de producción.\n" +
+          "docker compose usa la del entorno, así que la imagen que migraría no es la que se\n" +
+          "clasificaría. Sacala del entorno o hacé que coincidan."
+      );
+    }
+  }
+  return delArchivo;
+}
+
+/**
  * QUÉ REPOSITORIO, QUÉ ORIGEN Y QUÉ DESTINO — sin efectos, para poder probarlo.
  *
  * `modoVps` es el modo del despliegue (`--vps`); `enVps`, si esta máquina es el
@@ -560,7 +588,7 @@ function principal() {
       plan.destino.tipo === "explicito"
         ? plan.destino.valor
         : plan.destino.tipo === "app-image"
-          ? shaDelAppImage(plan.destino.dir)
+          ? shaDeLaImagenAMigrar(plan.destino.dir)
           : "HEAD",
       "destino"
     );

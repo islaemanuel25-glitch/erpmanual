@@ -125,14 +125,30 @@ function esLaCopiaDelProyecto() {
   }
 }
 
+/**
+ * EL PRESUPUESTO DE TIEMPO, porque un hook que se pasa del suyo DEJA PASAR el
+ * comando (comprobado con Claude Code 2.1.293: un hook de 4 s que iba a salir
+ * con 2 a los 20 s no frenó nada). El clasificador tiene 90 s, la identidad dos
+ * `git` de 5 s, y el hook 150 s en .claude/settings.json; un candado compara los
+ * números. `GUARDIA_TIEMPO_CLASIFICADOR_MS` solo puede ACHICAR los 90 s —un
+ * clasificador cortado antes frena, no autoriza—: es para que los candados
+ * ejerzan el corte sin esperar minuto y medio.
+ */
+const TIEMPO_CLASIFICADOR_MS = 90_000;
+const TIEMPO_GIT_IDENTIDAD_MS = 5_000;
+function tiempoDelClasificador() {
+  const pedido = Number(process.env.GUARDIA_TIEMPO_CLASIFICADOR_MS);
+  return Number.isFinite(pedido) && pedido > 0 ? Math.min(pedido, TIEMPO_CLASIFICADOR_MS) : TIEMPO_CLASIFICADOR_MS;
+}
+
 /** La ruta y el commit de la guardia que está corriendo. Informativo: si git no contesta, lo dice. */
 function identidadDeLaGuardia() {
   try {
-    const sha = execFileSync("git", ["-C", ROOT, "rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 5_000 }).trim();
+    const sha = execFileSync("git", ["-C", ROOT, "rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: TIEMPO_GIT_IDENTIDAD_MS }).trim();
     const cambios = execFileSync(
       "git",
       ["-C", ROOT, "status", "--porcelain", "--", "scripts/hook-guardia-migraciones.mjs", "scripts/clasificar-migraciones.mjs", "lib/deploy", ".claude/settings.json"],
-      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 5_000 }
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: TIEMPO_GIT_IDENTIDAD_MS }
     ).trim();
     return `Guardia efectiva: ${ROOT} en ${sha.slice(0, 12)}${cambios ? ", CON CAMBIOS SIN COMMITEAR en la guardia" : ""}.`;
   } catch {
@@ -205,17 +221,38 @@ process.stdin.on("end", async () => {
   // El directorio de trabajo de la sesión, que Claude Code manda en el evento:
   // es una de las señales para saber de qué proyecto es un `migrate deploy`.
   let cwd = null;
+
+  // ── UN EVENTO QUE NO SE PUEDE INTERPRETAR NO AUTORIZA NADA DE PRISMA ───────
+  //
+  // Hasta el 2026-10-08 un evento mal formado —JSON roto, sin `tool_name`, con
+  // un `command` que no es texto— recibía `allow`. Claude Code no los manda así
+  // (el formato real está comprobado: `tool_input.command` es un string), pero
+  // la guardia no puede apoyarse en eso: lo que no pudo leer no lo autoriza. Si
+  // el texto crudo nombra prisma, se frena; si no, pasa diciendo que no miró,
+  // con la misma red ancha que se usa cuando el módulo no carga.
+  const ininterpretable = (motivo) => {
+    if (MENCIONA_PRISMA.test(entrada)) {
+      responder(
+        "deny",
+        `FRENADO: la guardia de migraciones no pudo interpretar el evento (${motivo}) y el texto nombra prisma. Lo que no se pudo leer no se autoriza.`,
+        "GUARDIA: se frenó un evento ininterpretable que nombra prisma."
+      );
+    }
+    responder("allow", `guardia de migraciones: no se pudo interpretar el evento (${motivo}); no nombra prisma, no se comprobó nada`);
+  };
+  let evento;
   try {
-    const evento = JSON.parse(entrada || "{}");
-    if (evento.tool_name !== "Bash") responder("allow", "");
-    comando = String(evento.tool_input?.command ?? "");
-    cwd = typeof evento.cwd === "string" ? evento.cwd : null;
+    evento = JSON.parse(entrada || "{}");
   } catch {
-    // No se pudo leer el evento. No se sabe qué comando es, así que no se puede
-    // afirmar que sea inofensivo — pero tampoco se bloquea todo el trabajo del
-    // repo por un evento mal formado. Se deja pasar y se dice.
-    responder("allow", "guardia de migraciones: no se pudo leer el evento, no se comprobó nada");
+    ininterpretable("el JSON no se pudo leer");
   }
+  if (evento === null || typeof evento !== "object" || typeof evento.tool_name !== "string") {
+    ininterpretable("no trae tool_name");
+  }
+  if (evento.tool_name !== "Bash") responder("allow", "");
+  if (typeof evento.tool_input?.command !== "string") ininterpretable("tool_input.command no es texto");
+  comando = evento.tool_input.command;
+  cwd = typeof evento.cwd === "string" ? evento.cwd : null;
 
   // ── SE CARGA ACÁ, Y SI NO CARGA SE DENIEGA ────────────────────────────────
   //
@@ -287,7 +324,7 @@ process.stdin.on("end", async () => {
   const r = spawnSync(process.execPath, [CLASIFICADOR, "--vps"], {
     cwd: ROOT,
     encoding: "utf8",
-    timeout: 90_000,
+    timeout: tiempoDelClasificador(),
   });
 
   const salida = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim();
