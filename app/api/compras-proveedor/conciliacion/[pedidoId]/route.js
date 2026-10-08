@@ -143,6 +143,9 @@ export async function GET(req, { params }) {
             // Los kilos y el descuento del papel: el costo real de un renglón
             // con peso sale de dividir por ellos, no por las piezas.
             pesoKg: true, bonificacionPct: true,
+            // La alícuota de IVA de cada renglón, y con ella su costo: la
+            // harina de DYSSA va al 10,5 y el resto al 21.
+            ivaPct: true,
             productoLocalId: true, pedidoDetalleId: true, precioPedidoPrevio: true,
             // La marca de controlado, que ahora es un hecho guardado y no
             // estado de React: sin esto la pantalla vuelve a 0 revisadas en

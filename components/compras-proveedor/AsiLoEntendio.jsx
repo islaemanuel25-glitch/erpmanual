@@ -67,7 +67,9 @@ export function ProductoLeido({ p }) {
           $0,00, que se lee como "este producto no vale nada" en vez de "no se
           pudo leer". Una raya dice la verdad. */}
       <span className="shrink-0 whitespace-nowrap tabular-nums text-sm2 font-semibold sunmi-text-strong">
-        {p.importeFinal != null
+        {p.bonificado
+          ? "bonificado"
+          : p.importeFinal != null
           ? formatearMoneda(p.importeFinal)
           : p.subtotal != null
             ? formatearMoneda(p.subtotal)

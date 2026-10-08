@@ -60,6 +60,10 @@ const SELECT_COMPROBANTE = {
   ivaLeido: true,
   internoLeido: true,
   totalLeido: true,
+  // Lo que el papel imprime al pie. Faltaba: `lecturaDesdeLoGuardado` lo
+  // espera, y sin él volver a verificar una corrección hacía la cuenta con las
+  // percepciones de la receta en vez de con las impresas.
+  conceptosDelPieLeidos: true,
   lineas: {
     orderBy: { orden: "asc" },
     select: {
@@ -74,6 +78,9 @@ const SELECT_COMPROBANTE = {
       internoUnitario: true,
       pesoKg: true,
       bonificacionPct: true,
+      // La alícuota del renglón: sin ella, volver a verificar le pone a todos
+      // la de la receta.
+      ivaPct: true,
     },
   },
 };
