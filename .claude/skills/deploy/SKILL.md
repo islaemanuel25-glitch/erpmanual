@@ -937,8 +937,21 @@ Y el hook, al decidir sobre un `migrate deploy`:
 - **Solo el código 2 bloquea por sí solo.** Un 1, un 127 (archivo ausente) o un
   error cualquiera dejan correr el comando: comprobado.
 - **Un hook que se pasa de su `timeout` NO bloquea:** el comando sigue.
-  Documentado en el reference de hooks, no comprobado. Por eso el clasificador
-  tiene 90 s, los `git` de la identidad 5 s cada uno, y el hook 150 s.
+  Comprobado: un hook de 4 s que iba a salir con 2 a los 20 s no frenó nada. Por
+  eso el clasificador tiene 90 s (se corta aunque un ssh hijo siga colgado:
+  comprobado), los `git` de la identidad 5 s cada uno, y el hook 150 s. Un
+  candado compara esos números.
+- **El evento real** (comprobado): JSON de una línea con `tool_name`,
+  `tool_input.command` como string, `cwd` y otros; las comillas y las barras
+  invertidas van escapadas, las letras nunca.
+- **El envoltorio deja pasar solo si el hook salió con 0 Y contestó una
+  decisión** (`permissionDecision`). Un hook que sale con 0 sin decisión —texto,
+  `{}`, vacío— cuenta como caído; un 2 del hook se propaga. Y un evento que el
+  hook no puede interpretar —JSON roto, sin `tool_name`, un `command` que no es
+  texto— no recibe `allow` si nombra prisma: hasta el 2026-10-08 sí lo recibía.
+- **La red del hook caído es `grep -i prisma` sobre el JSON crudo.** No
+  decodifica escapes `\u`: Claude Code no los usa para letras, pero la red no se
+  apoya en un parser. Registrado como límite en un candado.
 - **Un cambio en el ARCHIVO del hook rige en el comando siguiente**, sin
   reiniciar: comprobado.
 - **Un cambio en `.claude/settings.json`** lo levanta un vigilador de archivos
@@ -981,6 +994,52 @@ sería un despliegue.
 - El clon de trabajo atrasado corre una guardia atrasada: lo nuevo dice qué copia
   corre, pero una copia vieja no tiene ese código.
 - En Windows el envoltorio necesita Git Bash.
+- El hook solo mira la herramienta Bash: otra herramienta que ejecute comandos
+  no pasa por él.
+
+**Qué imagen migra de verdad, y qué se puede afirmar.** Son cinco cosas
+distintas y no hay que confundirlas:
+
+- el **commit** de git;
+- la **etiqueta** `erpmanual:<SHA>`;
+- el **digest** de la imagen;
+- la **imagen que el docker del VPS tiene** bajo esa etiqueta;
+- las **migraciones adentro** de esa imagen.
+
+Lo que está garantizado y lo que no:
+
+- El clasificador mira el commit cuyo SHA está en la etiqueta de `APP_IMAGE`.
+- El contenedor de `migrate deploy` corre lo que el docker local tiene bajo esa
+  etiqueta. Con `pull_policy: missing` es lo que ya estaba en caché, y si no
+  estaba, lo baja de GHCR.
+- La CI construye la imagen desde ese commit (`COPY . .`, con `prisma/` adentro),
+  le pone la etiqueta OCI `org.opencontainers.image.revision` y comprueba que
+  `APP_BUILD_ID` viajó adentro. Imprime el digest en el resumen del workflow.
+- **Nada de eso ata la etiqueta al contenido con una garantía criptográfica.**
+  Una etiqueta se puede volver a apuntar en GHCR. El build local de emergencia
+  (`docker compose build app` con `APP_IMAGE` puesto) la pisa con el árbol del
+  VPS, cambios sin commitear incluidos, y no lleva la etiqueta OCI `revision`.
+  Hoy no se comprueba ni el digest ni el contenido de la imagen contra el commit.
+
+Lo que sí se comprueba desde el 2026-10-08: si `APP_IMAGE` está definida en el
+entorno con otro valor que el del `.env` —compose le da prioridad—, el
+clasificador sale INDETERMINADO.
+
+Lo que **no** se comprueba, y queda pedido como decisión porque agrega un
+mecanismo o cambia lo que hoy recibe un comando desconocido:
+
+1. **Comprobar la imagen local antes de clasificar.** Antes de dar el 0, leer con
+   `docker image inspect` la etiqueta OCI `revision` y el `APP_BUILD_ID` de la
+   imagen de `APP_IMAGE`, y exigir que coincidan con el SHA. Ataja el build
+   local de emergencia y una etiqueta reapuntada a otro build. No ataja una
+   imagen fabricada con las dos etiquetas falsas; eso pide comparar el digest
+   con el de la CI.
+2. **La forma exacta del runbook también para el ERP**, como la de Azul Chat del
+   PR #151. Hoy un comando que pone otra imagen en la misma línea
+   (`APP_IMAGE=… docker compose …`), monta otras migraciones (`-v …:/app/prisma`),
+   usa otro `--env-file` o corre `docker run <otra imagen>` sigue yendo al
+   clasificador, que mira la del `.env` y con 0 lo dejaría pasar. Un candado lo
+   registra como límite.
 
 ### LA GUARDIA ESTUVO MUERTA Y NADIE SE ENTERÓ — 2026-09-15
 
