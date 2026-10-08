@@ -68,8 +68,9 @@
 //                 contenedor descartable de `migrate deploy` (el paso 2 la
 //                 apunta antes de migrar). Fuera del VPS: el HEAD del
 //                 repositorio. `--hasta` manda sobre los dos.
-//   REPOSITORIO   en el VPS con `--vps`: /srv/produccion/erpazul. Fuera del VPS,
-//                 o sin `--vps`: este árbol. `--repo` manda sobre los dos.
+//   REPOSITORIO   en el VPS: /srv/produccion/erpazul, con `--vps` y con
+//                 `--desde` (ver `planDeResolucion`). Fuera del VPS: este árbol.
+//                 `--repo` manda sobre los dos.
 //
 // Todo git corre con `-C <repositorio>`, nunca sobre el directorio actual, y
 // las migraciones se leen DEL COMMIT DESTINO (`git show`), no del árbol de
@@ -386,10 +387,25 @@ export function shaDeLaImagenAMigrar(dirDespliegue, entorno = process.env) {
  * `modoVps` es el modo del despliegue (`--vps`); `enVps`, si esta máquina es el
  * servidor de producción. Lo explícito (`--repo`, `--desde`, `--hasta`) manda.
  */
+//
+// ── EN EL SERVIDOR, EL REPOSITORIO ES SIEMPRE EL DE PRODUCCIÓN ─────────────
+//
+// Desde el 2026-10-08 (segunda vez en el día). Hasta acá el repositorio de
+// producción se usaba solo con `--vps`; con `--desde` —la salida que el propio
+// script ofrece cuando la imagen no sirve como base— se volvía a consultar el
+// árbol donde vive el script, que en el VPS es el clon de trabajo. Ese clon
+// estaba atrasado y no tenía el SHA de producción (`25172fe`): el rango no se
+// podía calcular, la guardia frenaba y la única salida era la autorización
+// manual. Es la misma puerta que se abre siempre, por otra causa.
+//
+// Ahora, en la máquina donde vive `/srv/produccion/erpazul`, el repositorio es
+// ése con cualquier modo: el SHA desplegado y el rango se leen del checkout que
+// el paso 1 del despliegue trae al día, no del directorio de la sesión. El
+// destino sigue siendo APP_IMAGE solo con `--vps`. `--repo` explícito manda.
 export function planDeResolucion({ modoVps, enVps, repo, desde, hasta, raiz, dirDespliegue }) {
   const enElServidor = Boolean(modoVps && enVps);
   return {
-    repo: repo ?? (enElServidor ? dirDespliegue : raiz),
+    repo: repo ?? (enVps ? dirDespliegue : raiz),
     origen: desde ? { tipo: "explicito", valor: desde } : { tipo: "imagen-que-atiende" },
     destino: hasta
       ? { tipo: "explicito", valor: hasta }
@@ -424,13 +440,40 @@ export function validarRepositorio(repo) {
   }
 }
 
+/**
+ * QUÉ PASÓ Y QUÉ HACER cuando un SHA del rango no está en el repositorio.
+ *
+ * Decía "no existe en <repo>. Si es el clon equivocado o está atrasado, no se
+ * adivina otro", que es verdad y no le dice a nadie qué hacer — y lo que se
+ * hacía era autorizar a mano. Ahora dice qué repositorio miró, qué SHA buscó,
+ * y la salida que corresponde según dónde fue. Nunca ofrece la autorización
+ * manual: un rango que no se pudo calcular no se reemplaza por una firma.
+ */
+export function textoDeShaAusente({ repo, ref, rol, dirDespliegue = DIR_DESPLIEGUE }) {
+  const deProduccion = path.resolve(String(repo)) === path.resolve(dirDespliegue);
+  const queHacer = deProduccion
+    ? `Qué hacer: traer la historia al repositorio de producción —el paso 1 del despliegue,\n` +
+      `\`git -C ${dirDespliegue} fetch origin && git -C ${dirDespliegue} merge --ff-only origin/main\`— y\n` +
+      `volver a intentar. Si después del fetch sigue sin estar, ese SHA no es de este repositorio:\n` +
+      `no se despliega, se le informa a Emanuel.`
+    : `Qué hacer: en el servidor no hace falta nada —se consulta ${dirDespliegue}, se corra desde\n` +
+      `donde se corra—. Fuera del servidor, pasá el repositorio que lo tenga con --repo <ruta\n` +
+      `absoluta>, o traé la historia a éste con \`git -C ${repo} fetch origin\`.`;
+  return (
+    `el SHA de ${rol} (${ref}) no existe en ${repo}: el rango de migraciones no se puede calcular.\n\n` +
+    `${queHacer}\n\n` +
+    "No se autoriza a mano ni se adivina otro repositorio: sin rango no hay nada clasificado."
+  );
+}
+
 /** El commit existe en el repositorio, es del ERP y trae prisma/migrations. Devuelve el SHA completo. */
 function commitDelErp(repo, ref, rol) {
-  const sha = git(
-    repo,
-    ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`],
-    `el SHA de ${rol} no existe en ${repo} (${ref}). Si es el clon equivocado o está atrasado, no se adivina otro`
-  );
+  let sha;
+  try {
+    sha = git(repo, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], "no está");
+  } catch {
+    throw new Indeterminado(textoDeShaAusente({ repo, ref, rol }));
+  }
   let nombre;
   try {
     nombre = JSON.parse(git(repo, ["show", `${sha}:package.json`], "sin package.json"))?.name;

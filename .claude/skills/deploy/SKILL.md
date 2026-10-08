@@ -893,9 +893,13 @@ dos cosas separadas, y los tres datos del rango se resuelven explícitos:
   `migrate deploy`, que el paso 2 apunta antes de migrar—. Se lee solo esa línea
   y no se imprime nada más del archivo. Fuera del VPS, el HEAD del repositorio.
   `--hasta` manda sobre los dos.
-- **Repositorio:** en el VPS con `--vps`, `/srv/produccion/erpazul`, que el
-  paso 1 ya trajo al día con su `git fetch`. Fuera del VPS o sin `--vps`, el
-  árbol del script. `--repo <ruta absoluta>` manda sobre los dos.
+- **Repositorio:** en el VPS, `/srv/produccion/erpazul`, que el paso 1 ya trajo
+  al día con su `git fetch` — **con `--vps` y también con `--desde`**, desde la
+  segunda corrección del 2026-10-08: el modo manual seguía consultando el clon
+  de trabajo, que estaba atrasado y no tenía `25172fe`. Fuera del VPS, el árbol
+  del script. `--repo <ruta absoluta>` manda sobre los dos. Si el SHA no está en
+  el repositorio consultado, sale INDETERMINADO diciendo qué repositorio miró y
+  qué hacer (en el servidor: el paso 1); nunca ofrece la autorización manual.
 - **Migraciones:** se leen del commit destino con `git show`, no del árbol de
   trabajo.
 
