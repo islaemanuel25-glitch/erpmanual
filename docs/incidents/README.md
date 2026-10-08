@@ -38,6 +38,7 @@ un incidente y una anécdota.
 | [INC-0010](INC-0010-la-propuesta-confirmada-a-mano-no-se-podia-aplicar.md) | Con impuesto adicional, ninguna fila confirmada a mano se podía aplicar: 8 de 11 omitidas en silencio en la #12 | Arreglado, sin desplegar (ningún costo quedó mal) |
 | [INC-0011](INC-0011-siete-centavos-frenaban-la-aplicacion.md) | Siete centavos sobre $31.428 frenaban la aplicación, y el cartel afirmaba que el precio había cambiado | Arreglado, sin desplegar (ningún costo quedó mal) |
 | [INC-0012](INC-0012-el-local-no-manda-en-su-propio-producto.md) | Un admin en un local no podía ponerle proveedor a un producto que ese local creó: el rechazo decía que era del depósito | Arreglado, sin desplegar (el dato siempre estuvo bien; migración frenada por falta de rastro) |
+| [INC-0013](INC-0013-la-guardia-del-erp-freno-una-migracion-de-azul-chat.md) | La guardia de migraciones del ERP frenó una migración de Azul Chat calculando el rango del ERP | Arreglado, sin desplegar (falla cerrado; no hubo daño) |
 
 ## Incidentes que existen pero no se documentaron acá
 

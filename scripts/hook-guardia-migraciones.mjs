@@ -43,6 +43,14 @@
 // dentro del VPS o un workflow remoto no lo ven. La lista completa de por dónde
 // se puede saltear está en el skill `/deploy`.
 //
+// ── QUÉ PROYECTO SE MIGRA ───────────────────────────────────────────────────
+//
+// Desde el 2026-10-07 la decisión mira primero de qué proyecto es el
+// `migrate deploy` (lib/deploy/proyectoDelComando.mjs). El clasificador calcula
+// el rango del ERP y solo vale para la base del ERP: una migración de Azul Chat,
+// identificada por su directorio y su servicio, no se le manda. Lo desconocido
+// sigue yendo al clasificador, y lo ambiguo se rechaza.
+//
 // Salida: JSON con permissionDecision allow/deny. Si la guardia misma falla,
 // DENIEGA: no puede distinguir "no hay problema" de "no pude comprobar".
 //
@@ -145,10 +153,14 @@ process.stdin.setEncoding("utf8");
 process.stdin.on("data", (c) => (entrada += c));
 process.stdin.on("end", async () => {
   let comando = "";
+  // El directorio de trabajo de la sesión, que Claude Code manda en el evento:
+  // es una de las señales para saber de qué proyecto es un `migrate deploy`.
+  let cwd = null;
   try {
     const evento = JSON.parse(entrada || "{}");
     if (evento.tool_name !== "Bash") responder("allow", "");
     comando = String(evento.tool_input?.command ?? "");
+    cwd = typeof evento.cwd === "string" ? evento.cwd : null;
   } catch {
     // No se pudo leer el evento. No se sabe qué comando es, así que no se puede
     // afirmar que sea inofensivo — pero tampoco se bloquea todo el trabajo del
@@ -187,7 +199,7 @@ process.stdin.on("end", async () => {
     );
   }
 
-  const previa = decidirPorComando(comando);
+  const previa = decidirPorComando(comando, { cwd });
   if (previa.accion !== "clasificar") {
     // Dejan rastro los que pasan avisando: la autorización manual, que pasa sin
     // que nadie haya mirado qué entra, y las recuperaciones tipadas —libro_stock
@@ -209,7 +221,7 @@ process.stdin.on("end", async () => {
   if (r.status === 0) {
     responder(
       "allow",
-      `Guardia de migraciones: el clasificador no encontró sentencias marcadas.\n\n${salida}`
+      `Guardia de migraciones: el clasificador no encontró sentencias marcadas.\n${previa.nota ?? ""}\n\n${salida}`
     );
   }
 
@@ -220,7 +232,7 @@ process.stdin.on("end", async () => {
 
   responder(
     "deny",
-    `${encabezado}\n\n${salida}\n\n` +
+    `${encabezado}\n${previa.nota ?? ""}\n\n${salida}\n\n` +
       "NO continuar por criterio propio. Informarle a Emanuel qué migración es, qué " +
       "sentencia la marcó y por qué rompería a la versión vieja, y esperar su " +
       "confirmación explícita. Si él confirma, el comando se repite con " +

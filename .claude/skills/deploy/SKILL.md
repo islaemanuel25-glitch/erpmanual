@@ -789,6 +789,78 @@ La decisión vive en `lib/deploy/guardiaMigraciones.mjs`, que es una función pu
 con sus candados al lado; el hook solo lee la entrada, corre el clasificador
 cuando hace falta y escribe la respuesta.
 
+### Qué proyecto se migra — desde el 2026-10-07
+
+El clasificador calcula el rango **del ERP** —desde la imagen que atiende
+`erpazul_app` hasta el HEAD del checkout del ERP— y lee `prisma/migrations` del
+ERP. Solo dice algo de la base del ERP. Antes de esa fecha, la guardia mandaba al
+clasificador cualquier `migrate deploy`, y el deploy de Azul Chat de ese día —hecho
+desde una sesión de este repo— salió INDETERMINADO por el rango del ERP (25172fe,
+imagen que atendía y HEAD a la vez) y se terminó con la autorización manual. Fue
+un falso positivo: el ERP no tenía nada que ver con esa migración.
+
+Ahora la guardia primero identifica el proyecto del comando
+(`lib/deploy/proyectoDelComando.mjs`).
+
+**Azul Chat se reconoce por el comando ENTERO, no por señales.** La primera
+versión de la frontera eximía todo comando con el directorio y el servicio de
+Azul Chat, y la revisión del PR #151 la rompió con argumentos que conservaban
+las dos señales y cambiaban qué corre: `-v=../erpazul/prisma:/app/prisma`,
+`--entrypoint=sh`, `-eDATABASE_URL=…`, `--schema=…` al final, `-f
+../erpazul/docker-compose.prod.yml`, una variable adelante. Por eso la exención
+es igualdad contra una de estas tres formas, sin nada más:
+
+- `cd /srv/produccion/azul-chat && docker compose -f docker-compose.prod.yml run --rm --no-deps azul-chat-app prisma migrate deploy`
+- la misma línea adentro de `ssh vps-erp '…'`, con comillas simples;
+- la línea sin el `cd`, con la sesión parada exactamente en
+  `/srv/produccion/azul-chat`.
+
+El `-f` es `docker-compose.prod.yml` o
+`/srv/produccion/azul-chat/docker-compose.prod.yml`; las únicas opciones de `run`
+son `--rm`, `--no-deps` y `-T`, cada una a lo sumo una vez y en cualquier orden;
+un espacio entre palabras y **nada después de `deploy`**. No hay parser de shell:
+`$C` sin expandir, comillas de más, `;`, `&&` extra, pipes, redirecciones,
+`$(…)`, `sudo`, `bash -c` o una variable adelante ya no son la forma.
+
+Con eso:
+
+- **ERP** (directorio y servicio `app` del ERP, ninguna señal de Azul Chat): la
+  guardia de siempre, sin cambios. Clasificador, y si no sale con 0 —una
+  migración marcada, o INDETERMINADO— se frena.
+- **Azul Chat** (exactamente una de las tres formas): la guardia del ERP **no**
+  la clasifica. Pasa avisando y deja una línea `MIGRACIÓN AZUL CHAT` en
+  `.claude/migraciones-autorizadas.log`. No necesita `DEPLOY_MIGRACION_AUTORIZADA`.
+  Rigen los controles de Azul Chat (su `docs/DEPLOY.md`: migraciones validadas
+  desde una base vacía y sin deriva en su CI, backup de su base antes de migrar,
+  migrar antes de levantar la app). Azul Chat no tiene un clasificador de
+  compatibilidad propio; si lo necesita, va en su repo y con su SHA productivo.
+- **Parecido a Azul Chat sin ser la forma** (su directorio, su servicio,
+  cualquier mención de `azul-chat` en el comando, o la sesión parada en una
+  carpeta de Azul Chat): **se rechaza**, también con la autorización manual. No
+  se manda al clasificador del ERP, que mira otras migraciones y podría salir
+  con 0. Se corrige el comando hasta que sea la forma, no se autoriza.
+- **Desconocido** (ninguna señal de ningún proyecto, o el servicio no es de
+  nadie): la guardia del ERP entera, como antes.
+- **Ambiguo** (señales de los dos proyectos, o más de un `migrate deploy` en la
+  línea): se rechaza, y la autorización manual no lo cambia.
+
+Los rechazos (`db push`, `migrate reset`, `db execute`, `migrate resolve`) valen
+para los dos proyectos igual.
+
+`INDETERMINADO` sigue significando lo mismo: el clasificador no pudo establecer
+qué migraciones del ERP entran (sin ssh, contenedor ausente, SHA que no está en el
+historial, rango degenerado, árbol que no es el del ERP). Frena siempre.
+
+`DEPLOY_MIGRACION_AUTORIZADA=1` es la puerta de excepción **del ERP**: Emanuel
+confirmó una migración que el clasificador frenó o no pudo mirar. No es el
+mecanismo para desplegar la migración de otro proyecto. El valor tiene que ser
+exactamente `1` (desde 2026-10-07 `=1.5` o `=1-x` ya no autorizan) y no habilita
+nada de la lista de rechazo ni un comando ambiguo.
+
+El clasificador, además, se niega a clasificar en un árbol que no sea el del ERP
+(`"name": "erpmanual"` en `package.json`): sale INDETERMINADO en vez de comparar
+un SHA del ERP contra un historial ajeno.
+
 ### LA GUARDIA ESTUVO MUERTA Y NADIE SE ENTERÓ — 2026-09-15
 
 **Un control que falla abierto es peor que no tener control**, porque se lee como
