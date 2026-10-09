@@ -158,7 +158,13 @@ test("LA HOJA NO TIENE SU PROPIA LECTURA DE LA ESCALA", () => {
   // Y la diferencia se mide en PIEZAS de los dos lados. No contra lo que entra
   // al stock: en un producto por peso eso son kilos, y comparar kilos contra
   // piezas pediría el motivo de una diferencia que no existe en cada fiambre.
-  assert.match(hoja, /pedidaFisica !== unidadesContadas/);
+  //
+  // Desde el 2026-10-09 lo esperado no se cuenta acá: sale de
+  // `unidadesFisicasEsperadas`, la misma que usa la tarjeta, que pasa por la
+  // conversión de pack. La cuenta propia de la hoja era la que pedía motivo
+  // sobre el Gancia de la #253.
+  assert.match(hoja, /unidadesFisicasEsperadas\(fila\)/, "la hoja volvió a contar lo esperado por su cuenta");
+  assert.match(hoja, /esperadas !== unidadesContadas/);
 });
 
 test("Y EL CIERRE USA LO QUE LA HOJA DIJO, NO SU PROPIA CUENTA", () => {
