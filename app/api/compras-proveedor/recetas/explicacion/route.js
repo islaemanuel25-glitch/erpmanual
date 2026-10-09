@@ -58,7 +58,7 @@ import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta
 import { ORIGEN_DE_LECTURA } from "@/lib/compras-proveedor/comprobante/origenDeLectura";
 import { VARIACION_POR_DEFECTO } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
 import { aReceta } from "@/lib/compras-proveedor/comprobante/recetaEnCriollo";
-import { crearInterpreteGemini } from "@/lib/compras-proveedor/comprobante/lector/gemini";
+import { armarInterpretes } from "@/lib/compras-proveedor/comprobante/lector/gemini";
 
 /**
  * El papel con el que se prueba.
@@ -170,7 +170,7 @@ export async function GET(req) {
       // Si el modelo grande está disponible, leer sin explicación no es leer a
       // ciegas: interpreta el papel y propone la receta. La recepción lo
       // pregunta para no mandar a escribir lo que el sistema hace solo.
-      interpretaSinExplicacion: crearInterpreteGemini().disponible().ok === true,
+      interpretaSinExplicacion: Object.values(armarInterpretes()).some((i) => i.disponible().ok === true),
       explicacion: fila?.explicacion ?? "",
       actualizadaEn: fila?.explicacionActualizadaEn ?? null,
       // Cuánto se le mueve el precio a este proveedor sin que sea raro. Sin

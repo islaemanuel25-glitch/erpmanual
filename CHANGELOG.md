@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-10-09] - Actualización: compras-proveedor (lector)
+
+### Modificado
+- feat: el modelo grande de la escalada queda fijo: titular
+  `gemini-3.1-pro-preview`, respaldo `gemini-2.5-pro`, medidos contra la API.
+  Pasa al respaldo por cuota agotada, servicio caído, espera vencida, 404 o
+  pedido rechazado; nunca por respuesta ilegible o cortada. La bitácora anota
+  cuál de los dos respondió. El arranque verifica los dos.
+- **SIN VERIFICAR**: que acepten una foto de entrada. Lo confirma la primera
+  lectura real.
+
 ## [2026-10-09] - Actualización: compras-proveedor (lector y recetas)
 
 ### Agregado

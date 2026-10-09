@@ -32,7 +32,7 @@ import { checkPerm } from "@/lib/authorize";
 import { pasarPorLaPuerta, queHacerLectura } from "@/lib/compras-proveedor/comprobante/lector";
 import { armarCadena, leerConCadena } from "@/lib/compras-proveedor/comprobante/lector/cadena";
 import { escalarAlModeloGrande } from "@/lib/compras-proveedor/comprobante/lector/escalada";
-import { crearInterpreteGemini } from "@/lib/compras-proveedor/comprobante/lector/gemini";
+import { armarInterpretes } from "@/lib/compras-proveedor/comprobante/lector/gemini";
 import {
   recetaDelProveedor,
   fechaLeidaONull,
@@ -290,7 +290,7 @@ export async function POST(req, { params }) {
         receta,
         recetaVersion,
         esGenerica,
-        interprete: crearInterpreteGemini(),
+        interpretes: armarInterpretes(),
         archivos: paraLeer,
         proveedorNombre: comprobante.proveedor?.nombre ?? null,
       });
@@ -375,9 +375,10 @@ export async function POST(req, { params }) {
           ...(reintento && reintento !== resultado && Array.isArray(reintento.intentos)
             ? reintento.intentos
             : []),
-          // La del modelo grande, con POR QUÉ se lo llamó. Es la que se cuenta
-          // aparte: su modelo es otro y su `escalada` dice cuál de los tres casos.
-          ...(escalada.llamada ? [escalada.llamada] : []),
+          // Las del modelo grande —el titular, y el respaldo si hubo que
+          // pasar—, con POR QUÉ se lo llamó. Se cuentan aparte: su modelo dice
+          // cuál de los dos respondió y su `escalada`, cuál de los tres casos.
+          ...escalada.llamadas,
         ];
         if (intentos.length) {
           await prisma.llamadaLector.createMany({
@@ -645,7 +646,7 @@ export async function POST(req, { params }) {
             respuestas: escalada.propuesta,
             lectura: escalada.lectura,
             comprobanteId: comprobante.id,
-            modelo: escalada.llamada?.lector ?? "",
+            modelo: escalada.modelo ?? "",
             creadaEn: new Date(),
           };
           await prisma.recetaPropuestaProveedor.upsert({
