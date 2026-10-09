@@ -32,6 +32,8 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { resolverLineaDelPapel } from "@/lib/compras-proveedor/comprobante/resolverLineaDelPapel";
+import { filasDeIdentidad, METODO_DETECCION } from "@/lib/proveedores/identidad/servicioIdentidad";
+import { persistirIdentidad } from "@/lib/proveedores/identidad/persistirIdentidad";
 
 /** Un número que llegó de la pantalla, o null. Vacío es null, no cero. */
 function numeroONull(v) {
@@ -136,11 +138,53 @@ export async function POST(req) {
       }
     }
 
+    // ── Y EL PACK QUE FACTURA EL PROVEEDOR, QUE ES DEL VÍNCULO ───────────
+    //
+    // "DYSSA lo trae por pack de 6": la hoja lo mostró con su cuenta y quien
+    // recibe guardó mirándolo. Eso es una confirmación, y vale para la próxima
+    // boleta, factura o lista de ese proveedor con ese producto: va al vínculo
+    // —`unidadesPorPresentacion`—, el mismo dato que Listas ya escribe. Por el
+    // servicio de identidad y no a mano: una deducción no pisa lo que una
+    // persona confirmó, y las dos claves del renglón —código y texto— quedan
+    // iguales.
+    let presentacionGuardada = null;
+    const unidadesPorFacturada = numeroONull(body?.unidadesPorFacturada);
+    if (Number.isInteger(unidadesPorFacturada) && unidadesPorFacturada > 1) {
+      const { linea } = await resolverLineaDelPapel(prisma, {
+        grupoId,
+        lineaId: body?.lineaId,
+        pedidoId,
+        textoCrudo: body?.textoCrudo,
+        select: {
+          id: true, codigoProveedor: true, textoCrudo: true, productoLocalId: true,
+          comprobante: { select: { proveedorId: true } },
+        },
+      });
+      const productoBaseId = linea?.productoLocalId
+        ? (await prisma.productoLocal.findUnique({ where: { id: linea.productoLocalId }, select: { baseId: true } }))?.baseId
+        : null;
+      if (linea && productoBaseId) {
+        const filas = filasDeIdentidad({
+          grupoId,
+          proveedorId: linea.comprobante.proveedorId,
+          productoBaseId,
+          codigoProveedor: linea.codigoProveedor,
+          descripcionProveedor: linea.textoCrudo,
+          metodoDeteccion: METODO_DETECCION.MANUAL,
+          confirmadaPorUsuarioId: session?.id ?? null,
+          confirmadaEn: new Date(),
+          unidadesPorPresentacion: unidadesPorFacturada,
+        });
+        presentacionGuardada = await prisma.$transaction((tx) => persistirIdentidad(tx, filas));
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       pedidoDetalleId: detalle?.id ?? null,
       guardado: Object.keys(aGuardar),
       unidadGuardadaEn,
+      presentacionGuardada,
       queHacer: "Queda guardado. Si refrescás la pantalla, sigue estando.",
     });
   } catch {

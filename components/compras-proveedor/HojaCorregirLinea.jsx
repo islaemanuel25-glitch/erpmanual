@@ -99,6 +99,7 @@ import {
   textoDeLaEscalaQueNoCuadra,
 } from "@/lib/compras-proveedor/laCantidadCuadraConElPrecio";
 import { contenidoDelBulto, textoDelContenido } from "@/lib/compras-proveedor/contenidoDelBulto";
+import { lecturaElegida } from "@/lib/compras-proveedor/comprobante/unidadPorPrecio";
 import {
   DIRECCION_DIFERENCIA,
   MOTIVO_DIFERENCIA,
@@ -428,6 +429,15 @@ export default function HojaCorregirLinea({
   // acá—, que sale de la lectura que `deducirUnidad` ya eligió.
   const cantidadDeLaFactura = cantidadEnEscalaDelPedido(fila);
   const convertida = cantidadFueConvertida(fila);
+  // ── CUANDO EL PROVEEDOR FACTURA UN PACK DEL BULTO ─────────────────────
+  //
+  // La lectura y su frase salen de la deducción —`explicarVeredicto`—, no se
+  // arman acá: "Dyssa lo trae por pack de 6: 8 packs = 2 bultos de 24". Y si
+  // la deducción no pudo decidir entre packs, la frase dice cada resultado.
+  const viaPack = fila?.unidad?.unidad === "POR_PRESENTACION" ? lecturaElegida(fila.unidad) : null;
+  const explicacionDeLaUnidad = fila?.unidad?.explicacion ?? null;
+  const fraseDeLaUnidad =
+    viaPack || fila?.unidad?.requiereDecision ? explicacionDeLaUnidad?.frase ?? null : null;
 
   useEffect(() => {
     if (!abierta || !fila) return;
@@ -670,6 +680,12 @@ export default function HojaCorregirLinea({
       kgRecibidos: entraEnKilos && kilos !== "" ? Number(kilos) : null,
       motivoPrincipal: cantidadDifiere ? motivo : null,
       motivoDetalle: cantidadDifiere && motivoExigeDetalle(motivo) ? detalleMotivo.trim() : null,
+      // ── EL PACK INTERMEDIO QUE ESTA HOJA MOSTRÓ, CONFIRMADO AL GUARDAR ──
+      //
+      // "Dyssa lo trae por pack de 6: 8 packs = 2 bultos de 24" estaba arriba
+      // con su cuenta. Guardar es decir que sí, y queda en el vínculo del
+      // proveedor para que la próxima boleta no lo vuelva a preguntar.
+      unidadesPorFacturada: viaPack ? viaPack.unidadesPorFacturada : null,
     });
   };
 
@@ -689,6 +705,7 @@ export default function HojaCorregirLinea({
     <span className="text-sm3 sunmi-text-muted">
       Tenías {formatearMoneda(tuPrecio)} · la factura trae{" "}
       {formatearMoneda(fila.costoFactura)}
+      {viaPack ? ` por bulto de ${limpio(fila.factorPack)}` : ""}
     </span>
   );
 
@@ -837,7 +854,11 @@ export default function HojaCorregirLinea({
                 : sinPedidoPrevio
                   ? `La factura dice ${limpio(cantidadDeLaFactura)}`
                   : `Pediste ${limpio(fila.cantidadPedida)} · la factura dice ${limpio(cantidadDeLaFactura)}`}
-              {convertida ? ` · el papel dice ${limpio(fila.cantidad)} u` : ""}
+              {fraseDeLaUnidad
+                ? ` · ${fraseDeLaUnidad}${explicacionDeLaUnidad?.avisoDivision ? `. ${explicacionDeLaUnidad.avisoDivision}` : ""}`
+                : convertida
+                  ? ` · el papel dice ${limpio(fila.cantidad)} u`
+                  : ""}
             </span>
 
             {/* ── LOS DOS CAMPOS, AL 35 % Y CON UN HUECO EN EL MEDIO ──────

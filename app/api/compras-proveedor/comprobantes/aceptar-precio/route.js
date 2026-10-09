@@ -49,6 +49,7 @@ import {
   aplanarDetalles,
   analizarLineas,
   cargarContexto,
+  unidadesGuardadasDeLaLinea,
 } from "@/lib/compras-proveedor/comprobante/analisisDeComprobante";
 import { guardarDecisionDePrecio } from "@/lib/compras-proveedor/comprobante/guardarDecisionDePrecio";
 import {
@@ -257,6 +258,9 @@ export async function POST(req) {
       // es de la factura entera, por eso se le pasan todas sus líneas.
       percepcionDeLaLinea:
         repartoDelPie({ ...linea.comprobante, lineas: linea.comprobante.lineas }).get(linea.orden) ?? null,
+      // El pack ya confirmado en el vínculo, igual que la hoja: sin esto esta
+      // ruta escribiría el precio de un pack de 6 como si fuera el de la plancha.
+      unidadesGuardadas: unidadesGuardadasDeLaLinea({ linea, productoBaseId: base?.id, contexto }),
       proveedor: linea.comprobante.proveedor,
       // Lo que llegó ahora, o lo que alguien eligió antes: una decisión vieja
       // sigue valiendo si nadie la cambió.
