@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-10-09] - Actualización: compras-proveedor (lector y recetas)
+
+### Agregado
+- feat: cuando Flash no alcanza —transcribió de menos, no cierra con la receta,
+  o el proveedor no tiene receta confirmada—, el modelo grande interpreta la
+  boleta y propone la receta. Una llamada por lectura, nunca con un papel sin
+  total. La cuenta la hace el código: la misma puerta y, además, los costos de
+  los renglones tienen que armar el total del papel. La receta que cerró queda
+  para confirmar en Recetas de facturas («Está bien, guardar»), con versión.
+- La explicación del proveedor pasa a ser opcional cuando el modelo grande está
+  disponible.
+- **SIN VERIFICAR contra el modelo real**: el nombre del modelo grande no se
+  pudo medir desde la nube (no hay clave). Sin nombre, no escala y todo sigue
+  como antes.
+- Migración `20261009222956_escalada_a_pro` (pendiente de deploy): columna
+  `LlamadaLector.escalada` y tabla `RecetaPropuestaProveedor`.
+
 ## [2026-10-09] - Actualización: compras-proveedor (recepción)
 
 ### Modificado
