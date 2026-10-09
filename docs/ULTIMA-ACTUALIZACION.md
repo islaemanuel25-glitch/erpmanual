@@ -1,15 +1,16 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-09 16:00
+**Fecha:** 2026-10-09 18:07
 
 ## Módulos modificados recientemente
 
 ### compras-proveedor (recepción)
+- fix: la recepción no pide motivo cuando el pack convertido es lo que llegó
 - fix: la recepción entiende cuando el proveedor factura un pack del bulto
-- Sin migración: la conversión se guarda en
-  `ProductoCodigoProveedor.unidadesPorPresentacion`, que ya existía.
+- Sin migración.
 
 ## Archivos nuevos desde última sincronización
+- lib/compras-proveedor/cantidadEsperadaConPack.test.mjs
 - lib/compras-proveedor/comprobante/packIntermedio.test.mjs
 
 ## Acción recomendada

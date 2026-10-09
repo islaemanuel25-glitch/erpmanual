@@ -7,6 +7,9 @@
   (Gancia de DYSSA: 8 packs de 6 = 2 planchas de 24). La conversión confirmada
   queda en el vínculo del proveedor y la próxima boleta no pregunta. Sin
   migración.
+- fix: la recepción no pide motivo cuando el pack convertido es lo que llegó.
+  Lo esperado pasa por la misma conversión que lo que entra; en un pedido que
+  nació de la factura es el papel convertido (la #253 se ve bien sin rehacerla).
 
 ## [2026-10-08] - Actualización: compras-proveedor (comprobantes y recetas)
 
