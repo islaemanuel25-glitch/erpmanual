@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-10-09] - Actualización: compras-proveedor (recepción)
+
+### Modificado
+- fix: la recepción entiende cuando el proveedor factura un pack del bulto
+  (Gancia de DYSSA: 8 packs de 6 = 2 planchas de 24). La conversión confirmada
+  queda en el vínculo del proveedor y la próxima boleta no pregunta. Sin
+  migración.
+
 ## [2026-10-08] - Actualización: compras-proveedor (comprobantes y recetas)
 
 ### Modificado

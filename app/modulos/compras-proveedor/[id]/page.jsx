@@ -684,6 +684,9 @@ export default function DetallePedidoProveedorPage({ params }) {
           kgRecibidos: datos?.kgRecibidos ?? null,
           motivoPrincipal: datos?.motivoPrincipal ?? null,
           motivoDetalle: datos?.motivoDetalle ?? null,
+          // El pack que la hoja mostró —"lo trae por pack de 6"— y quien
+          // recibe confirmó al guardar. Va al vínculo del proveedor.
+          unidadesPorFacturada: datos?.unidadesPorFacturada ?? null,
         }),
       });
       const d = await r.json().catch(() => null);
