@@ -559,7 +559,11 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // Sube a 53 el 2026-10-08: entró `20261008120000_receta_dyssa_iva_por_renglon`,
   // un paso de datos sobre `RecetaProveedor`, sin DDL. No toca transferencias
   // ni ninguna tabla que la recepción escriba.
-  assert.equal(migraciones.length, 53, "aparecio una migracion que nadie declaro aca");
+  // Sube a 54 el 2026-10-09: entró `20261009222956_escalada_a_pro`, una columna
+  // nullable en `LlamadaLector` y una tabla nueva (`RecetaPropuestaProveedor`)
+  // con FK a `Proveedor`. No toca transferencias ni ninguna tabla que la
+  // recepción escriba.
+  assert.equal(migraciones.length, 54, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

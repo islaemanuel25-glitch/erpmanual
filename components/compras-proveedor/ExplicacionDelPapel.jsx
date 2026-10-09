@@ -77,6 +77,9 @@ export function textoDeFallo(cuerpo, status) {
   if (cuerpo?.error) return cuerpo.error;
   return queHacerHttp(status, { operacion: OPERACION.LECTURA }).texto;
 }
+/** La línea que dice que esto lo armó el sistema y no una persona. */
+export const TEXTO_PROPUESTA =
+  "Esto lo armó el sistema leyendo una factura de este proveedor, y la cuenta cierra. Revisalo: si está bien, se guarda como su receta.";
 export const BAJADA =
   "Explicale cómo se lee, como se lo explicarías a una persona. Se hace una sola vez.";
 
@@ -111,6 +114,9 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
   const [productos, setProductos] = useState(null);
   const [correcciones, setCorrecciones] = useState({});
   const [mirandoLaFoto, setMirandoLaFoto] = useState(false);
+  // La receta que armó el sistema, si hay una esperando: de qué comprobante
+  // salió. Mientras esté, «Está bien, guardar» la confirma.
+  const [propuesta, setPropuesta] = useState(null);
 
   useEffect(() => {
     let vigente = true;
@@ -133,6 +139,16 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
         // Lo que ya está guardado. Sin esto el campo arranca vacío y guardar
         // la explicación borraría una variación cargada antes.
         if (d.variacionNormalPct != null) setVariacion(String(d.variacionNormalPct));
+        // ── LA RECETA QUE ARMÓ EL SISTEMA SE MUESTRA COMO UNA PRUEBA ────
+        //
+        // Ya se leyó y ya cerró: el servidor la manda con su lectura, y acá se
+        // dibuja con el MISMO bloque que deja «Probar», sin gastar otra
+        // consulta. Lo que la persona decide es lo mismo: si está bien.
+        if (d.propuesta?.lectura && d.propuesta?.receta) {
+          setLectura(d.propuesta.lectura);
+          setReceta(d.propuesta.receta);
+          setPropuesta({ comprobanteId: d.propuesta.comprobanteId ?? null });
+        }
       } catch {
         if (vigente) setError("No se pudo abrir la explicación: se cortó la conexión.");
       } finally {
@@ -313,6 +329,8 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
         body: JSON.stringify({
           proveedorId,
           explicacion,
+          // Con una receta propuesta en pantalla, guardar es confirmarla.
+          ...(propuesta ? { confirmarPropuesta: true } : {}),
           // Vacío significa "no la toques": el default lo pone la base.
           variacionNormalPct: variacion.trim() === "" ? undefined : Number(variacion.replace(",", ".")),
         }),
@@ -324,6 +342,7 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
           : { tipo: "error", texto: textoDeFallo(d, r.status) }
       );
       if (d?.ok) {
+        setPropuesta(null);
         onGuardado?.();
         if (d.relectura?.hayQueOfrecer) await releerLosPendientes(d.relectura);
       }
@@ -451,10 +470,13 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
       {resultado && (
         <>
           <span className="block text-sm3 font-medium sunmi-text-strong">Así lo entendió</span>
+          {propuesta && (
+            <p className="text-sm2 sunmi-text-muted break-words">{TEXTO_PROPUESTA}</p>
+          )}
 
           <AsiLoEntendio
             resultado={resultado}
-            comprobanteId={papel?.comprobanteId}
+            comprobanteId={propuesta?.comprobanteId ?? papel?.comprobanteId}
             onElegir={(indice, valor) =>
               setCorrecciones((prev) => ({ ...prev, [indice]: Number(valor) }))
             }
@@ -486,6 +508,9 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
                 setLectura(null);
                 setProductos(null);
                 setCorrecciones({});
+                // Descartada en pantalla: guardar ya no la confirma. Queda en
+                // la base hasta que otra boleta arme una nueva o se guarde.
+                setPropuesta(null);
               }}
               className="w-full min-h-toque justify-center text-sm3"
             >

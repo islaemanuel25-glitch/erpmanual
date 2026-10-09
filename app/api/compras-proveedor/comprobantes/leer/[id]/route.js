@@ -31,6 +31,8 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { pasarPorLaPuerta, queHacerLectura } from "@/lib/compras-proveedor/comprobante/lector";
 import { armarCadena, leerConCadena } from "@/lib/compras-proveedor/comprobante/lector/cadena";
+import { escalarAlModeloGrande } from "@/lib/compras-proveedor/comprobante/lector/escalada";
+import { crearInterpreteGemini } from "@/lib/compras-proveedor/comprobante/lector/gemini";
 import {
   recetaDelProveedor,
   fechaLeidaONull,
@@ -274,6 +276,30 @@ export async function POST(req, { params }) {
 
       let resultado = await pedirle();
 
+      // ── SI FLASH NO ALCANZA, ENTRA EL MODELO GRANDE. UNA SOLA VEZ ────────
+      //
+      // Faltan renglones, no cierra, o el proveedor no tiene receta: ahí y en
+      // ningún otro caso, y nunca con un papel sin total. Lo que devuelve lo
+      // verifica el código con la misma puerta; si cierra, su lectura y su
+      // receta reemplazan a las de Flash, y si no, queda lo de Flash como
+      // estaba. Ver `escalada.js`.
+      let recetaDeLaLectura = receta;
+      let versionDeLaLectura = recetaVersion;
+      const escalada = await escalarAlModeloGrande({
+        resultado,
+        receta,
+        recetaVersion,
+        esGenerica,
+        interprete: crearInterpreteGemini(),
+        archivos: paraLeer,
+        proveedorNombre: comprobante.proveedor?.nombre ?? null,
+      });
+      if (escalada.cerro) {
+        resultado = { ...resultado, lectura: escalada.lectura };
+        recetaDeLaLectura = escalada.receta;
+        versionDeLaLectura = escalada.recetaVersion;
+      }
+
       // ── SI EL MODELO DICE HABER TRANSCRIPTO DE MENOS, SE LE PIDE OTRA VEZ ─
       //
       // El comprobante 20 —pyg #247— lo dejó a la vista el 2026-09-23: la misma
@@ -297,6 +323,13 @@ export async function POST(req, { params }) {
       //
       // La cuota la sigue cuidando la cadena, que la consulta en cada llamada:
       // si no queda, el reintento devuelve su error y se conserva la primera.
+      //
+      // ── Y SOLO SI NO ENTRÓ EL MODELO GRANDE ─────────────────────────────
+      //
+      // Desde el 2026-10-09 una lectura corta es el caso (a) de la escalada:
+      // el que vuelve a mirar el papel es el modelo grande. Pedírselo además
+      // otra vez a Flash serían tres llamadas por una lectura. Este reintento
+      // queda para cuando el modelo grande no está configurado.
       const cuantasTrajo = (r) => (Array.isArray(r?.lectura?.lineas) ? r.lectura.lineas.length : 0);
       const cuantasDice = (r) => {
         const n = Number(r?.lectura?.lineasEnElPapel);
@@ -308,7 +341,7 @@ export async function POST(req, { params }) {
       };
 
       let reintento = null;
-      if (quedoCorta(resultado)) {
+      if (!escalada.llamo && quedoCorta(resultado)) {
         console.log(
           `[comprobante ${comprobante.id}] transcribió ${cuantasTrajo(resultado)} de ` +
             `${cuantasDice(resultado)} renglones: se le pide otra vez`
@@ -342,6 +375,9 @@ export async function POST(req, { params }) {
           ...(reintento && reintento !== resultado && Array.isArray(reintento.intentos)
             ? reintento.intentos
             : []),
+          // La del modelo grande, con POR QUÉ se lo llamó. Es la que se cuenta
+          // aparte: su modelo es otro y su `escalada` dice cuál de los tres casos.
+          ...(escalada.llamada ? [escalada.llamada] : []),
         ];
         if (intentos.length) {
           await prisma.llamadaLector.createMany({
@@ -361,6 +397,7 @@ export async function POST(req, { params }) {
               // `intentosLectura` contra la cantidad de filas.
               origen: origenPedido,
               comprobanteId: comprobante.id,
+              escalada: i.escalada ?? null,
             })),
           });
         }
@@ -409,7 +446,14 @@ export async function POST(req, { params }) {
       }
 
       // ── LA PUERTA. Toda lectura pasa por acá antes de guardarse ──────────
-      const puerta = pasarPorLaPuerta({ lectura: resultado.lectura, receta, recetaVersion });
+      // Con la receta con que se LEYÓ: la del proveedor, o la que propuso el
+      // modelo grande si fue su lectura la que cerró. Queda copiada en
+      // `recetaUsada`, que es de donde sale el costo.
+      const puerta = pasarPorLaPuerta({
+        lectura: resultado.lectura,
+        receta: recetaDeLaLectura,
+        recetaVersion: versionDeLaLectura,
+      });
 
       // ── ¿ESTA MISMA FACTURA YA ESTÁ CARGADA? ─────────────────────────────
       //
@@ -585,6 +629,35 @@ export async function POST(req, { params }) {
       // Best-effort, y a propósito: la lectura ya está guardada y pagada. Si esto
       // falla, lo que queda son dos comprobantes separados —que es exactamente lo
       // que había antes de esta tanda— y no una lectura perdida.
+      // ── LA RECETA QUE PROPUSO EL MODELO GRANDE QUEDA PARA CONFIRMAR ──────
+      //
+      // Solo la que CERRÓ y es distinta de la confirmada: `escalada.propuesta`
+      // viene en null en cualquier otro caso. Va a su propia tabla y no a
+      // `RecetaProveedor`, porque una fila ahí es "este proveedor tiene receta
+      // confirmada" y nadie la confirmó. La confirma una persona en Recetas de
+      // facturas, con «Está bien, guardar».
+      //
+      // Best-effort: la lectura ya está guardada y pagada. Si esto falla, lo
+      // que se pierde es la propuesta, y la próxima boleta la vuelve a armar.
+      if (escalada.cerro && escalada.propuesta) {
+        try {
+          const propuesta = {
+            respuestas: escalada.propuesta,
+            lectura: escalada.lectura,
+            comprobanteId: comprobante.id,
+            modelo: escalada.llamada?.lector ?? "",
+            creadaEn: new Date(),
+          };
+          await prisma.recetaPropuestaProveedor.upsert({
+            where: { grupoId_proveedorId: { grupoId, proveedorId: comprobante.proveedorId } },
+            create: { grupoId, proveedorId: comprobante.proveedorId, ...propuesta },
+            update: propuesta,
+          });
+        } catch (e) {
+          console.error("No se pudo dejar la receta propuesta para confirmar:", e?.message);
+        }
+      }
+
       let agrupacion = null;
       try {
         agrupacion = await agruparLasHojasDelPapel(prisma, {
@@ -645,6 +718,11 @@ export async function POST(req, { params }) {
         porQuePaso: resultado.porQuePaso ?? null,
         intentos: guardado.actualizado.intentosLectura,
         consumo: resultado.lectura.consumo,
+        // Si entró el modelo grande: por qué, si cerró, y la frase para la
+        // persona. Null cuando Flash alcanzó, que es lo de todos los días.
+        escalada: escalada.llamo
+          ? { motivo: escalada.motivo, cerro: escalada.cerro, texto: escalada.texto }
+          : null,
       });
     };
 

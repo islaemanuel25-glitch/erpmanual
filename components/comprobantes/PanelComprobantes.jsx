@@ -366,6 +366,15 @@ export default function PanelComprobantes({
    * No es un bloqueo escondido: la receta muestra la misma foto y termina en
    * «Leer de nuevo». Y es una sola vez por proveedor — con la explicación
    * guardada, este camino no se vuelve a tomar.
+   *
+   * ── CON EL MODELO GRANDE, LA EXPLICACIÓN ES OPCIONAL ───────────────────
+   *
+   * Desde el 2026-10-09, un proveedor sin receta confirmada hace entrar al
+   * modelo grande, que interpreta el papel sin explicación y propone la
+   * receta. Mandar a escribirla antes sería pedirle a la persona lo que el
+   * sistema ya sabe hacer solo. El servidor dice si el modelo grande está
+   * disponible —`interpretaSinExplicacion`—, y solo cuando NO lo está se sigue
+   * yendo a la receta como antes.
    */
   async function faltaLaExplicacion() {
     if (!proveedorId) return false;
@@ -378,6 +387,7 @@ export default function PanelComprobantes({
       // Si no se pudo preguntar, se lee igual. Un problema para consultar la
       // receta no puede convertirse en "no se puede leer la factura".
       if (!d?.ok) return false;
+      if (d.interpretaSinExplicacion === true) return false;
       return !String(d.explicacion || "").trim();
     } catch {
       return false;
@@ -452,6 +462,9 @@ export default function PanelComprobantes({
                 ]
               : []),
             ...(d.usoRespaldo ? ["Lo leyó el lector de respaldo."] : []),
+            // Si entró el modelo grande, qué pasó: cerró, no cerró, o no se
+            // pudo. La frase la arma el servidor, una por desenlace.
+            ...(d.escalada?.texto ? [d.escalada.texto] : []),
           ],
         });
       }
