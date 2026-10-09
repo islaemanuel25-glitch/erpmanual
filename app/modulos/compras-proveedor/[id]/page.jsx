@@ -21,6 +21,7 @@ import PedidoRecibido from "@/components/compras-proveedor/PedidoRecibido";
 import {
   cantidadEnEscalaDelPedido,
   hayDiferenciaDePrecio,
+  unidadesFisicasDeLaFactura,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 import {
   DECISION_DE_PRECIO,
@@ -657,6 +658,14 @@ export default function DetallePedidoProveedorPage({ params }) {
     // llegó. Es el mismo número convertido que muestra la tarjeta.
     const enEscala = cantidadEnEscalaDelPedido(fila);
     setRecibidos((prev) => ({ ...prev, [fila.pedidoDetalleId]: Number(enEscala) || 0 }));
+    // ── Y LAS UNIDADES QUE ENTRAN, DICHAS, IGUAL QUE AL GUARDAR LA HOJA ──
+    //
+    // Sin esto el cierre deducía la escala de la línea del pedido: en la #253
+    // el Gancia se sembró en UNIDAD, así que 2 bultos coincidentes iban a entrar
+    // como 2 latas. Es el mismo número que la franja "Entra al stock" de la
+    // hoja, de la misma función.
+    const entran = unidadesFisicasDeLaFactura(fila);
+    if (entran !== null) setFisicas((prev) => ({ ...prev, [fila.pedidoDetalleId]: entran }));
     await marcarRevisada(fila, true);
   }, [aceptarPrecioDeLinea, marcarRevisada]);
 

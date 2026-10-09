@@ -91,6 +91,7 @@ import {
   hayDiferenciaDePrecio,
   motivoSinComparacion,
   porcentajeDelPrecio,
+  unidadesFisicasEsperadas,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
 // LA ESCALA SALE DE LA MISMA FUNCIÓN QUE USA LA TARJETA, no de una parecida.
 import { quedoEnBultos } from "@/lib/compras-proveedor/tarjetaDeRecepcion";
@@ -572,17 +573,22 @@ export default function HojaCorregirLinea({
     //
     // En físicas la pregunta tiene una sola respuesta: 90 pedidas contra 90 que
     // entran es lo mismo, se hayan escrito como 3 bultos o como 90 sueltas.
-    const pedida = Number(fila?.cantidadPedida);
-    if (!Number.isFinite(pedida)) return false;
-    const factorDelPedido =
-      (fila?.unidadPedido ?? "BULTO") === "BULTO" ? Number(fila?.factorPack) || 1 : 1;
-    const pedidaFisica = pedida * factorDelPedido;
+    //
+    // ── Y LO ESPERADO SALE DEL MISMO LUGAR QUE LA TARJETA ────────────────
+    //
+    // Acá había una cuenta propia —lo pedido por el factor del pedido— y sobre
+    // la #253 de DYSSA, un pedido que nació de la factura, comparaba las 8
+    // UNIDADES con que se sembró el Gancia contra las 48 que entran: pedía el
+    // motivo de una diferencia que no existe. `unidadesFisicasEsperadas` pasa
+    // por la misma conversión de pack que lo que entra.
+    const esperadas = unidadesFisicasEsperadas(fila);
+    if (esperadas === null) return false;
     if (bultos === "" || !Number.isFinite(Number(bultos))) return false;
     // Contra las PIEZAS contadas, no contra lo que entra al stock: en un
     // producto por peso eso son kilos, y comparar kilos contra piezas pediría
     // el motivo de una diferencia que no existe en cada fiambre.
-    return pedidaFisica !== unidadesContadas;
-  }, [fila?.cantidadPedida, fila?.unidadPedido, fila?.factorPack, bultos, unidadesContadas]);
+    return esperadas !== unidadesContadas;
+  }, [fila, bultos, unidadesContadas]);
 
   if (!fila) return null;
 

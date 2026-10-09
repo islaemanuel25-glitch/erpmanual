@@ -53,7 +53,9 @@ export async function GET(req, { params }) {
 
     const pedido = await prisma.pedidoProveedor.findFirst({
       where: { id: pedidoId, grupoId },
-      select: { id: true, estado: true, proveedorId: true },
+      // `nacidoDeFactura`: en ese pedido lo esperado es lo que dice el papel, no
+      // la cantidad con que se sembró cada línea. Ver `unidadesFisicasEsperadas`.
+      select: { id: true, estado: true, proveedorId: true, nacidoDeFactura: true },
     });
     if (!pedido) {
       return NextResponse.json({ ok: false, error: "No existe ese pedido." }, { status: 404 });
@@ -175,6 +177,7 @@ export async function GET(req, { params }) {
     const { grupos, sinComprobante, hayFaltantes, totales } = filasDeConciliacion({
       comprobantes: analizados,
       detalles: detallesPlanos,
+      nacidoDeFactura: pedido.nacidoDeFactura === true,
     });
 
     // La cobertura, con la MISMA regla de siempre: mientras falten comprobantes
