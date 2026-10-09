@@ -10,6 +10,9 @@
 - fix: la recepción no pide motivo cuando el pack convertido es lo que llegó.
   Lo esperado pasa por la misma conversión que lo que entra; en un pedido que
   nació de la factura es el papel convertido (la #253 se ve bien sin rehacerla).
+- fix: una respuesta cortada del lector (finishReason distinto de STOP, JSON
+  que no cierra o sin los campos obligatorios) no se guarda como lectura. "No
+  cierra" y "no trae total impreso" ya no salen juntos.
 
 ## [2026-10-08] - Actualización: compras-proveedor (comprobantes y recetas)
 

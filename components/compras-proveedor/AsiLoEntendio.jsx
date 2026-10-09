@@ -208,6 +208,9 @@ export default function AsiLoEntendio({ resultado, comprobanteId, onElegir }) {
         </span>
       )}
 
+      {/* Sin productos no hay lista: una tarjeta vacía se lee como "algo
+          tendría que estar acá". El cartel de arriba ya dice que no se leyeron. */}
+      {resultado.productos.length > 0 && (
       <SunmiCard className="p-3 space-y-renglon">
         {visibles.map((p, i) => (
           <div key={p.indice} className="space-y-renglon">
@@ -226,6 +229,7 @@ export default function AsiLoEntendio({ resultado, comprobanteId, onElegir }) {
           </SunmiButton>
         )}
       </SunmiCard>
+      )}
     </>
   );
 }

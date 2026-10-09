@@ -273,10 +273,17 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
 
   return (
     <section className="space-y-3 mb-4">
-      <SunmiCard className="p-3 space-y-1">
-        <span className="block font-semibold sunmi-text-strong break-words">{TITULO}</span>
-        <p className="text-sm2 sunmi-text-muted break-words">{BAJADA}</p>
-      </SunmiCard>
+      {/* ── "NO CIERRA" SOLO CUANDO HAY CONTRA QUÉ CERRAR ───────────────
+          Sin total leído, el cartel de abajo dice otra cosa —que no trae total,
+          o que no se leyeron los productos— y "no cierra" al lado afirmaría una
+          cuenta que no se hizo. Salían los dos juntos sobre la relectura de
+          DYSSA que volvió vacía. */}
+      {resultado.hayTotal && (
+        <SunmiCard className="p-3 space-y-1">
+          <span className="block font-semibold sunmi-text-strong break-words">{TITULO}</span>
+          <p className="text-sm2 sunmi-text-muted break-words">{BAJADA}</p>
+        </SunmiCard>
+      )}
 
       {lecturaSinDescuentos && (
         <SunmiCard className="p-3 sunmi-state-warning">
