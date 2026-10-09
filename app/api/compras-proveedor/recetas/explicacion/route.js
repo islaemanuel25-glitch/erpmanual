@@ -57,6 +57,8 @@ import { hayCuota, limiteDiario, MOTIVO_LIMITE, TEXTO_LIMITE } from "@/lib/ia/li
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { ORIGEN_DE_LECTURA } from "@/lib/compras-proveedor/comprobante/origenDeLectura";
 import { VARIACION_POR_DEFECTO } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
+import { aReceta } from "@/lib/compras-proveedor/comprobante/recetaEnCriollo";
+import { crearInterpreteGemini } from "@/lib/compras-proveedor/comprobante/lector/gemini";
 
 /**
  * El papel con el que se prueba.
@@ -143,9 +145,32 @@ export async function GET(req) {
     });
     const papel = await papelDePrueba({ grupoId, proveedorId, comprobanteId });
 
+    // ── LA RECETA QUE ARMÓ EL SISTEMA, SI HAY UNA ESPERANDO ─────────────
+    //
+    // Viaja con la lectura con la que cerró y la receta que sale de sus
+    // respuestas, para que la pantalla dibuje "Así lo entendió" con la MISMA
+    // `comoLoEntendio` y sin gastar una consulta. Confirmarla es el «Está
+    // bien, guardar» de siempre.
+    const pendiente = await prisma.recetaPropuestaProveedor.findUnique({
+      where: { grupoId_proveedorId: { grupoId, proveedorId } },
+      select: { respuestas: true, lectura: true, comprobanteId: true, creadaEn: true },
+    });
+
     return NextResponse.json({
       ok: true,
       proveedor,
+      propuesta: pendiente
+        ? {
+            lectura: pendiente.lectura,
+            receta: aReceta(pendiente.respuestas),
+            comprobanteId: pendiente.comprobanteId,
+            creadaEn: pendiente.creadaEn,
+          }
+        : null,
+      // Si el modelo grande está disponible, leer sin explicación no es leer a
+      // ciegas: interpreta el papel y propone la receta. La recepción lo
+      // pregunta para no mandar a escribir lo que el sistema hace solo.
+      interpretaSinExplicacion: crearInterpreteGemini().disponible().ok === true,
       explicacion: fila?.explicacion ?? "",
       actualizadaEn: fila?.explicacionActualizadaEn ?? null,
       // Cuánto se le mueve el precio a este proveedor sin que sea raro. Sin
@@ -248,6 +273,67 @@ export async function POST(req) {
         leyendo: true,
         turno,
         comprobanteId: papel.id,
+      });
+    }
+
+    // ── CONFIRMAR LA RECETA QUE ARMÓ EL SISTEMA ──────────────────────────
+    //
+    // Es el «Está bien, guardar» sobre una propuesta. La receta se escribe con
+    // la MISMA traducción que la pantalla de preguntas —`aReceta`— y con el
+    // versionado de siempre: sube en uno, o nace en 1. Y la propuesta se
+    // borra en la misma transacción: una receta confirmada y su propuesta
+    // pendiente al mismo tiempo serían dos respuestas a la misma pregunta.
+    //
+    // La explicación y la variación viajan igual que al guardar sin propuesta,
+    // y no se tocan si no cambiaron: confirmar la receta no es reescribir lo
+    // que escribió una persona.
+    if (body?.confirmarPropuesta === true) {
+      const pendiente = await prisma.recetaPropuestaProveedor.findUnique({
+        where: { grupoId_proveedorId: { grupoId, proveedorId } },
+        select: { id: true, respuestas: true },
+      });
+      if (!pendiente) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Esa receta ya no está para confirmar.",
+            queHacer: "Puede que alguien ya la haya guardado. Volvé a abrir la receta y fijate.",
+          },
+          { status: 409 }
+        );
+      }
+      const receta = aReceta(pendiente.respuestas);
+      const previa = await prisma.recetaProveedor.findUnique({
+        where: { grupoId_proveedorId: { grupoId, proveedorId } },
+        select: { explicacion: true },
+      });
+      const cambioLaExplicacion = explicacion !== String(previa?.explicacion ?? "").trim();
+      const explicacionNueva = cambioLaExplicacion
+        ? { explicacion, explicacionActualizadaEn: new Date(), explicacionActualizadaPor: session.id }
+        : {};
+      const variacionPedida = Number(body?.variacionNormalPct);
+      const conVariacion =
+        body?.variacionNormalPct !== undefined && Number.isFinite(variacionPedida) && variacionPedida >= 0 && variacionPedida <= 100
+          ? { variacionNormalPct: variacionPedida }
+          : {};
+
+      const guardada = await prisma.$transaction(async (tx) => {
+        const r = await tx.recetaProveedor.upsert({
+          where: { grupoId_proveedorId: { grupoId, proveedorId } },
+          create: { grupoId, proveedorId, ...receta, ...explicacionNueva, ...conVariacion, version: 1 },
+          update: { ...receta, ...explicacionNueva, ...conVariacion, version: { increment: 1 } },
+          select: { version: true },
+        });
+        await tx.recetaPropuestaProveedor.delete({ where: { id: pendiente.id } });
+        return r;
+      });
+
+      return NextResponse.json({
+        ok: true,
+        guardada: true,
+        version: guardada.version,
+        queHacer:
+          "Guardada. Desde ahora, cada factura de este proveedor se lee y se costea con esta receta.",
       });
     }
 

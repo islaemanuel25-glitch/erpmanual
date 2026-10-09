@@ -529,6 +529,9 @@ model Proveedor {
   /// se ven varias aunque cada grupo tenga una sola. La unicidad real la
   /// garantiza @@unique([grupoId, proveedorId]) en RecetaProveedor.
   recetas      RecetaProveedor[]
+  /// La receta que armó el sistema y nadie confirmó todavía. Va aparte de
+  /// `recetas` a propósito: ver RecetaPropuestaProveedor.
+  recetasPropuestas RecetaPropuestaProveedor[]
   /// Las recetas de LECTURA, que son varias por proveedor: un mismo proveedor
   /// factura con formatos distintos —Consumidor Final, Responsable Inscripto— y
   /// eso no cambia sus impuestos. Por eso son otra tabla y no un campo más de
@@ -4783,6 +4786,47 @@ model RecetaProveedor {
   @@index([proveedorId])
 }
 
+/// LA RECETA QUE ARMÓ EL SISTEMA, ESPERANDO QUE ALGUIEN LA CONFIRME.
+///
+/// Cuando la lectura de todos los días no alcanza, el modelo grande interpreta
+/// la boleta y propone cómo viene armada. Si con esa propuesta la cuenta del
+/// papel CIERRA —la hace el código, no el modelo—, queda acá hasta que una
+/// persona dice "está bien" en Recetas de facturas, y recién ahí pasa a
+/// `RecetaProveedor` con su versión.
+///
+/// ── POR QUÉ NO ES UNA FILA DE RecetaProveedor ──────────────────────────
+///
+/// Porque la existencia de esa fila ES el hecho "el proveedor tiene receta
+/// confirmada": `recetaDelProveedor` la lee así y deja de usar la genérica.
+/// Escribir ahí lo que nadie confirmó convertiría una propuesta en una receta
+/// sin que nadie lo decidiera. Un hecho, una tabla.
+///
+/// Una por proveedor y grupo: la última propuesta que cerró reemplaza a la
+/// anterior, y confirmar la borra.
+model RecetaPropuestaProveedor {
+  id          Int @id @default(autoincrement())
+  grupoId     Int
+  proveedorId Int
+
+  /// Las respuestas, con la forma de `aPreguntas`/`aReceta` de
+  /// `recetaEnCriollo.js`: la misma que guarda la pantalla de recetas.
+  respuestas Json
+  /// La lectura con la que cerró, para que la pantalla muestre "Así lo
+  /// entendió" sin volver a gastar una consulta.
+  lectura    Json
+
+  /// De qué comprobante salió y qué modelo la armó.
+  comprobanteId Int?
+  modelo        String
+
+  creadaEn DateTime @default(now())
+
+  proveedor Proveedor @relation(fields: [proveedorId], references: [id])
+
+  @@unique([grupoId, proveedorId])
+  @@index([proveedorId])
+}
+
 /// CÓMO SE LEE UN FORMATO DE DOCUMENTO DE ESTE PROVEEDOR.
 ///
 /// Es la receta ESTRUCTURAL —qué columna es cuál, cómo se sabe si un renglón fue
@@ -5360,6 +5404,14 @@ model LlamadaLector {
   /// `lib/compras-proveedor/comprobante/origenDeLectura.js`. Texto y no enum
   /// por el mismo motivo que `motivo`: los define la pantalla.
   origen String?
+
+  /// POR QUÉ SE LLAMÓ AL MODELO GRANDE, cuando esta llamada es una escalada.
+  ///
+  /// Null en las lecturas de todos los días. En las del modelo grande dice cuál
+  /// de los tres casos la disparó —FALTAN_RENGLONES, NO_CIERRA o SIN_RECETA,
+  /// en `ESCALADA` de `lector/escalada.js`—, para poder contar cuántas hubo de
+  /// cada una sin deducirlo. Texto y no enum por lo mismo que `motivo`.
+  escalada String?
 
   creadoEn DateTime @default(now())
 

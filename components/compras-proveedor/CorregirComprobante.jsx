@@ -190,10 +190,16 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
           tipo: "aviso",
           texto:
             `Se volvió a leer: el lector dice ver ${dice} renglones y transcribió ${trajo}. ` +
-            "Probá otra vez; si vuelve a salir corta, revisá la explicación del proveedor.",
+            "Probá otra vez; si vuelve a salir corta, revisá la explicación del proveedor." +
+            (d?.escalada?.texto ? ` ${d.escalada.texto}` : ""),
         });
       } else {
-        setMensaje({ tipo: "ok", texto: "Se volvió a leer el papel." });
+        setMensaje({
+          tipo: "ok",
+          // Si entró el modelo grande, su desenlace va pegado: cerró, no
+          // cerró, o no se pudo y releer puede servir.
+          texto: ["Se volvió a leer el papel.", d?.escalada?.texto].filter(Boolean).join(" "),
+        });
       }
       onCorregido?.(d);
     } catch (e) {

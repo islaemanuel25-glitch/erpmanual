@@ -68,4 +68,38 @@ export async function register() {
     // accidente.
     console.error("[comprobantes] el chequeo de arranque falló inesperadamente:", e?.message ?? e);
   }
+
+  // ── Y EL MODELO GRANDE, CON LA MISMA PREGUNTA ────────────────────────────
+  //
+  // El que entra cuando Flash no alcanza. Se le pregunta a la API lo mismo que
+  // al titular; si no hay ninguno con nombre verificado, se dice que la
+  // escalada está apagada, que es la verdad y no un error.
+  try {
+    const { verificarModelo, modeloPro, esAliasMovil } = await import(
+      "./lib/compras-proveedor/comprobante/lector/gemini.js"
+    );
+    const pro = modeloPro();
+    if (!pro) {
+      console.log("[comprobantes] sin modelo grande verificado: la lectura no escala cuando Flash no alcanza.");
+    } else if (esAliasMovil(pro)) {
+      console.error(`[comprobantes] el modelo grande "${pro}" es un alias móvil: no se usa. Fijalo a un nombre medido.`);
+    } else {
+      const v = await verificarModelo({ modelo: pro });
+      if (v.ok) {
+        console.log(`[comprobantes] modelo de lectura verificado: ${v.modelo} (el grande, para cuando Flash no alcanza)`);
+      } else if (v.motivo === "DADO_DE_BAJA") {
+        console.error(
+          `[comprobantes] EL MODELO GRANDE YA NO EXISTE: ${v.modelo}. Las lecturas siguen con Flash, ` +
+            "sin escalar. El resto de la aplicación sigue funcionando normalmente."
+        );
+      } else if (v.motivo !== "NO_CONFIGURADO") {
+        console.log(
+          `[comprobantes] no se pudo verificar el modelo grande ${v.modelo} (${v.motivo}). ` +
+            "Puede ser la red; no quiere decir que no exista."
+        );
+      }
+    }
+  } catch (e) {
+    console.error("[comprobantes] el chequeo de arranque falló inesperadamente:", e?.message ?? e);
+  }
 }

@@ -77,13 +77,19 @@ const ROTULO_GUARDAR = "GUARDAR: SOLO LA EXPLICACIÓN";
 function trozosDeLaRuta() {
   const crudo = textoDe(RUTA);
   const arranqueProbar = crudo.indexOf("body?.probar === true");
+  // Desde el 2026-10-09 entre probar y guardar está la confirmación de la
+  // receta que armó el sistema, que SÍ escribe la receta: es su trabajo. Es un
+  // trozo propio, y probar termina donde ella empieza.
+  const arranqueConfirmar = crudo.indexOf("body?.confirmarPropuesta === true");
   const arranqueGuardar = crudo.indexOf(ROTULO_GUARDAR);
   const arranqueWorker = crudo.indexOf("async function leerElPapel(");
   assert.ok(arranqueProbar > 0, "no se encontró la rama de probar");
-  assert.ok(arranqueGuardar > arranqueProbar, "no se encontró la rama de guardar");
+  assert.ok(arranqueConfirmar > arranqueProbar, "no se encontró la confirmación de la propuesta");
+  assert.ok(arranqueGuardar > arranqueConfirmar, "no se encontró la rama de guardar");
   assert.ok(arranqueWorker > arranqueGuardar, "no se encontró la lectura que corre aparte");
   return {
-    probar: sinComentarios(crudo.slice(arranqueProbar, arranqueGuardar)),
+    probar: sinComentarios(crudo.slice(arranqueProbar, arranqueConfirmar)),
+    confirmar: sinComentarios(crudo.slice(arranqueConfirmar, arranqueGuardar)),
     guardar: sinComentarios(crudo.slice(arranqueGuardar, arranqueWorker)),
     worker: sinComentarios(crudo.slice(arranqueWorker)),
   };
@@ -309,6 +315,15 @@ test("UN PAPEL DE UN PROVEEDOR SIN EXPLICACIÓN VA A LA RECETA ANTES DE LEER", (
   // Que no se pueda consultar la receta NO puede convertirse en "no se puede
   // leer la factura": ante la duda se lee.
   assert.match(c, /if \(!d\?\.ok\) return false;/);
+  // ── SALVO QUE EL MODELO GRANDE PUEDA INTERPRETARLO SIN EXPLICACIÓN ─────
+  //
+  // Desde el 2026-10-09 la explicación es opcional: con el modelo grande
+  // disponible, un proveedor sin receta escala y el sistema propone la receta.
+  // Mandar a escribirla antes sería pedir lo que el sistema hace solo. Va
+  // ANTES de mirar la explicación, o el desvío seguiría ocurriendo.
+  const corte = c.indexOf("if (d.interpretaSinExplicacion === true) return false;");
+  assert.ok(corte > 0, "la recepción manda a escribir la explicación aunque el grande pueda leer sin ella");
+  assert.ok(corte < c.indexOf("return !String(d.explicacion"), "se pregunta después de decidir");
 });
 
 test("«LEER DE NUEVO» EXISTE, Y SOLO MIENTRAS EL PEDIDO SE ESTÁ RECIBIENDO", () => {

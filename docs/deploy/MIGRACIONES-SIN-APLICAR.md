@@ -16,7 +16,13 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **53 migraciones**, las mismas que el árbol.
+Una. Producción está en **53 migraciones**; el árbol tiene 54.
+
+- `20261009222956_escalada_a_pro` — una columna nullable `escalada` en
+  `LlamadaLector` (por qué se llamó al modelo grande) y la tabla nueva
+  `RecetaPropuestaProveedor` (la receta que armó el sistema, esperando que
+  alguien la confirme), con FK a `Proveedor`. Sin datos que mover: columna
+  vacía y tabla vacía. Ninguna fila existente se reescribe.
 
 **De dónde sale el 53.** `20261008120000_receta_dyssa_iva_por_renglon` está
 aplicada en producción desde el 2026-10-08 12:38, con el despliegue de
