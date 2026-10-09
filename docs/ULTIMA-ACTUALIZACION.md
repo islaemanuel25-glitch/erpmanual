@@ -1,19 +1,16 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-08 12:04
+**Fecha:** 2026-10-09 16:00
 
 ## Módulos modificados recientemente
 
-### compras-proveedor (comprobantes, recetas y recepción)
-- fix: la boleta de DYSSA cierra y el costo lleva todo lo que cobra
-- Migración `20261008120000_receta_dyssa_iva_por_renglon`: la receta de
-  'Dyssa' con tres percepciones (IVA RG 5329 por grupo de alícuota e IIBB).
-  Pendiente de deploy; anotada en `docs/deploy/MIGRACIONES-SIN-APLICAR.md`.
+### compras-proveedor (recepción)
+- fix: la recepción entiende cuando el proveedor factura un pack del bulto
+- Sin migración: la conversión se guarda en
+  `ProductoCodigoProveedor.unidadesPorPresentacion`, que ya existía.
 
 ## Archivos nuevos desde última sincronización
-- lib/compras-proveedor/comprobante/boletaDyssaCierra.test.mjs
-- lib/compras-proveedor/comprobante/boletaDyssa.fixture.json
-- prisma/migrations/20261008120000_receta_dyssa_iva_por_renglon/migration.sql
+- lib/compras-proveedor/comprobante/packIntermedio.test.mjs
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai
