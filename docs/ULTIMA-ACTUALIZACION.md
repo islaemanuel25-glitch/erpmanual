@@ -1,20 +1,22 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-09 23:05
+**Fecha:** 2026-10-09 23:48
 
 ## Módulos modificados recientemente
 
-### compras-proveedor (lector)
-- feat: el modelo grande de la escalada es gemini-3.1-pro-preview, con gemini-2.5-pro de respaldo (SIN VERIFICAR con imágenes)
-- Sin migración nueva. Sigue pendiente de deploy `20261009222956_escalada_a_pro`, de PR #158.
+### transferencias
+- fix: una línea no declarada con solo sueltas no traba Confirmar y cuenta como diferencia (#373)
+- Archivos: 1 nuevo, 4 modificados (5 total)
+- Sin migración.
+
 
 ## Archivos nuevos desde última sincronización
-- Ninguno.
+- components/transferencias/agregadaSoloSueltas.test.mjs
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai
 ✅ Ejecutar: git push
 
 ---
-*Generado por scripts/update-docs.js y corregido a mano: el script atribuyó el
-cambio a transferencias.*
+*Generado por scripts/update-docs.js y corregido a mano: el script le sumó a
+transferencias el commit anterior, que es de compras-proveedor.*
