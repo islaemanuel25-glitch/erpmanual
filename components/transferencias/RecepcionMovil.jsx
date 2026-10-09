@@ -87,6 +87,9 @@ export const TITULO_INFO_GENERAL = "Información general";
 export const MENSAJE_NO_FIGURA_CORTO =
   "No figura en esta transferencia. Si llegó igual, tocalo y se agrega.";
 
+/** Lo que dice una línea no declarada que todavía no tiene ni bultos ni sueltas. */
+export const AVISO_FALTA_CANTIDAD = "Falta cargar la cantidad";
+
 /** Los cuatro estados del trabajo. Fijos, y todos a la vista. */
 const TABS = [
   { clave: FILTRO.PENDIENTES, texto: "Pendientes" },
@@ -251,9 +254,16 @@ export default function RecepcionMovil({
   //
   // Una agregada no es "pendiente" ni pide motivo, así que ninguna de las otras
   // dos causas la ve. Ésta sí.
-  const sinCargar = (item?.items || []).filter(
-    (d) => d.agregadoEnRecepcion && !(Number(d.cantidadRecibida) > 0)
-  ).length;
+  //
+  // ── Y "CARGADA" SE MIDE EN FÍSICO, BULTOS Y SUELTAS ─────────────────────
+  //
+  // Miraba solo `cantidadRecibida`, que es el campo de BULTOS. La #373 trabó
+  // así: una agregada PACK x12 con 0 bultos y 1 suelta —llegó una unidad— se
+  // leía "sin cargar" y Confirmar quedaba gris, mientras el renglón, el estado y
+  // el importe de la misma línea ya sumaban la suelta. Ahora sale de
+  // `fisicasRecibidasDe`, la misma cuenta que usa el resto de la pantalla.
+  const faltaCargar = (d) => d.agregadoEnRecepcion === true && !(fisicasRecibidasDe(d) > 0);
+  const sinCargar = (item?.items || []).filter(faltaCargar).length;
 
   // Las tres causas juntas en UNA condición, para que el botón tenga una sola y
   // no puedan decir cosas distintas. El V16 sacó el renglón que las anunciaba
@@ -550,7 +560,13 @@ export default function RecepcionMovil({
                 <div key={d.id} className="flex items-center justify-between gap-2">
                   <span className="min-w-0">
                     <span className="block truncate text-sm2 sunmi-text-strong">{d.nombre}</span>
-                    <span className="block text-sm2 sunmi-text-muted">{detalleDiferencia(d)}</span>
+                    {/* Una agregada en cero es la causa `sinCargar` que traba
+                        Confirmar: se dice acá, pegado a ella, y no en la barra. */}
+                    {faltaCargar(d) ? (
+                      <span className="block text-sm2 sunmi-text-danger">{AVISO_FALTA_CANTIDAD}</span>
+                    ) : (
+                      <span className="block text-sm2 sunmi-text-muted">{detalleDiferencia(d)}</span>
+                    )}
                   </span>
                   <SunmiButton color="slate" onClick={() => onElegir(d)} className="shrink-0">
                     Revisar
