@@ -323,6 +323,14 @@ export default function HojaCorregirLinea({
    * aparece, en vez de aparecer y rebotar.
    */
   onEditarProducto = null,
+  /**
+   * ── CUANDO EL PAPEL NO CIERRA: LO QUE DICE ESTE RENGLÓN, A MANO ────────
+   *
+   * Secco #256. Recibe `{ comprobanteId, orden, cantidad, netoUnitario,
+   * subtotal }` y devuelve `{ ok, cierra?, error? }`. El servidor guarda, deja
+   * registrado quién puso qué, y vuelve a hacer la cuenta del papel.
+   */
+  onCorregirPapel = null,
 }) {
   // La fila la armó `filaSinPapel`: es una línea del pedido que llegó sin
   // factura. Lo que habla del papel —lo que dice, el vínculo, la decisión de
@@ -418,6 +426,11 @@ export default function HojaCorregirLinea({
   // cierre terminaba calculando 3 × el peso de referencia, 1,65 kg, en vez de
   // los 2,100 que el proveedor facturó.
   const [kilos, setKilos] = useState("");
+  // Lo que dice el papel en este renglón, cuando el papel no cierra: arranca en
+  // lo que leyó el lector y la persona lo cambia mirando la foto.
+  const [papelCantidad, setPapelCantidad] = useState("");
+  const [papelPrecio, setPapelPrecio] = useState("");
+  const [papelTotal, setPapelTotal] = useState("");
 
   // Al abrir se arranca de lo que ya hay: lo contado antes si lo hubo, y si no
   // lo que dice la factura, que es la propuesta razonable —el papel ya afirma
@@ -480,6 +493,10 @@ export default function HojaCorregirLinea({
     );
     setMotivo(fila.motivoPrincipal ?? null);
     setDetalleMotivo(fila.motivoDetalle ?? "");
+    const delPapel = fila.correccionDelPapel;
+    setPapelCantidad(delPapel?.cantidad != null ? String(delPapel.cantidad) : "");
+    setPapelPrecio(delPapel?.netoUnitario != null ? String(delPapel.netoUnitario) : "");
+    setPapelTotal(delPapel?.subtotal != null ? String(delPapel.subtotal) : "");
     // La opción marcada arranca en lo que se decidió la vez pasada, si sigue
     // valiendo. Sin esto, "Cambiar" mostraría "Aceptar el precio nuevo"
     // seleccionado sobre una línea donde se había dicho lo contrario, y un
@@ -655,6 +672,30 @@ export default function HojaCorregirLinea({
     if (cantidadDifiere && motivoExigeDetalle(motivo) && !detalleMotivo.trim()) {
       setError("Contá qué pasó.");
       return;
+    }
+    // ── LO QUE DICE EL PAPEL, SI ALGUIEN LO CORRIGIÓ ───────────────────
+    //
+    // Primero, y si falla no se sigue: el renglón corregido es la base de
+    // todo lo demás. Solo viaja lo que cambió respecto de lo leído.
+    const delPapel = fila?.correccionDelPapel;
+    if (delPapel && onCorregirPapel) {
+      const aNumero = (v) => (v === "" || v === null || v === undefined ? null : Number(v));
+      const cambiado = {};
+      for (const [campo, valor] of [
+        ["cantidad", papelCantidad],
+        ["netoUnitario", papelPrecio],
+        ["subtotal", papelTotal],
+      ]) {
+        const puesto = aNumero(valor);
+        if (puesto !== null && Number.isFinite(puesto) && puesto !== aNumero(delPapel[campo])) cambiado[campo] = puesto;
+      }
+      if (Object.keys(cambiado).length) {
+        const r = await onCorregirPapel({ comprobanteId: delPapel.comprobanteId, orden: delPapel.orden, ...cambiado });
+        if (!r?.ok) {
+          setError(r?.error || "No se pudo guardar lo que dice el papel.");
+          return;
+        }
+      }
     }
     // ── SIN ELEGIR EL PRECIO NO SE AVANZA ──────────────────────────────
     //
@@ -866,6 +907,35 @@ export default function HojaCorregirLinea({
               </SunmiButton>
             </div>
           </div>
+          )}
+
+          {/* ── CUANDO EL PAPEL NO CIERRA: LO QUE DICE ESTE RENGLÓN ────────
+              Secco #256. Lo que leyó el lector, para corregirlo a mano mirando
+              la foto. Al guardar se rehace la cuenta del papel; si cierra, el
+              papel pasa a cerrado y vuelve a proponer costos. Los tres campos
+              son el de kilos de abajo, el mismo armado. */}
+          {fila.correccionDelPapel && onCorregirPapel && (
+            <Bloque titulo="Lo que dice el papel">
+              {[
+                ["Cantidad", papelCantidad, setPapelCantidad, 3],
+                ["Precio", papelPrecio, setPapelPrecio, 3],
+                ["Total", papelTotal, setPapelTotal, 2],
+              ].map(([rotulo, valor, onCambiar, decimales]) => (
+                <div key={rotulo} className="w-full">
+                  <div className="text-sm2 sunmi-text-muted truncate">{rotulo}</div>
+                  <SunmiCampoCantidad
+                    valor={valor}
+                    onCambiar={onCambiar}
+                    etiqueta={rotulo}
+                    minimo={0}
+                    decimales={decimales}
+                    tipo="number"
+                    claseMarco="flex-1"
+                    claseInput="text-lg"
+                  />
+                </div>
+              ))}
+            </Bloque>
           )}
 
           {/* ── 2 · CUÁNTO ENTRÓ ─────────────────────────────────────────── */}

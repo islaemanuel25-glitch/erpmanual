@@ -7,7 +7,7 @@ import { subtotalLinea } from "@/lib/compras-proveedor/calculoPedido";
 import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
 import { esFiambreFijoEnUbicacion, elDepositoCuentaPorKilo } from "@/lib/conversiones/stock";
 import { kilosQueFacturaElRenglon } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
-import { fiambreAlCerrar } from "@/lib/compras-proveedor/cierreDeRecepcion";
+import { fiambreAlCerrar, papelQueNoCierra } from "@/lib/compras-proveedor/cierreDeRecepcion";
 import {
   clasificarDiferenciaCosto,
   decidirEscrituraDeCosto,
@@ -407,8 +407,23 @@ export async function POST(req, { params }) {
     // anulados.
     const facturasDelPedido = await prisma.comprobanteProveedor.findMany({
       where: { grupoId, pedidoId, estado: { not: "ANULADO" } },
-      select: { totalLeido: true },
+      select: { totalLeido: true, estado: true, diferenciaCentavos: true, numero: true },
     });
+
+    // ── CON UN PAPEL QUE NO CIERRA SE RECIBE IGUAL, SIN TOCAR COSTOS ──────
+    //
+    // Regla de Emanuel (Secco #256): siempre se tiene que poder recibir. Los
+    // precios salen de una lectura que no se pudo verificar, así que ninguno
+    // llega al catálogo —"dejar el que tenía" en cada renglón, gane lo que
+    // gane lo que mande la pantalla— y el pedido queda marcado para la segunda
+    // revisión. Ver `papelQueNoCierra`.
+    const sinCerrar = papelQueNoCierra(facturasDelPedido);
+    if (sinCerrar.noCierra) {
+      for (const det of pedido.detalles) {
+        costosExcluidos.add(det.id);
+        costosAceptados.delete(det.id);
+      }
+    }
     const deuda = resolverTotalDelCierre({
       totales: facturasDelPedido.map((c) => c.totalLeido),
       totalConfirmado: pagoAlProveedor.totalAPagar,
@@ -1063,6 +1078,9 @@ export async function POST(req, { params }) {
           totalReal: totalDeLaDeuda,
           nroFactura: nroFinal,
           fechaFactura: fechaFinal,
+          // Recibida con un papel que no cerraba: para la segunda revisión.
+          recibidoSinCerrar: sinCerrar.noCierra,
+          motivoSinCerrar: sinCerrar.motivo,
         },
       });
 

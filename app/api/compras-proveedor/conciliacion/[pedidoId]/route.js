@@ -235,9 +235,34 @@ export async function GET(req, { params }) {
       })),
     }));
 
+    // ── LO QUE SE CORRIGIÓ A MANO EN EL PAPEL, PARA LA SEGUNDA REVISIÓN ──
+    //
+    // Secco #256: un papel que no cierra se arregla poniendo a mano lo que dice
+    // un renglón. Lo que se puso reemplaza a lo leído, y quien revisa después
+    // tiene que poder verlo: qué renglón, qué había leído, qué se puso, quién y
+    // cuándo.
+    const correcciones = comprobantes.length
+      ? await prisma.correccionManualRenglon.findMany({
+          where: { grupoId, comprobanteId: { in: comprobantes.map((c) => c.id) } },
+          orderBy: { creadaEn: "asc" },
+          select: {
+            id: true, comprobanteId: true, orden: true, textoCrudo: true, leido: true, puesto: true,
+            cerroDespues: true, usuarioId: true, creadaEn: true,
+          },
+        })
+      : [];
+    const autores = correcciones.length
+      ? await prisma.usuario.findMany({
+          where: { id: { in: [...new Set(correcciones.map((x) => x.usuarioId).filter((x) => x != null))] } },
+          select: { id: true, nombre: true },
+        })
+      : [];
+    const nombreDe = new Map(autores.map((u) => [u.id, u.nombre]));
+
     return NextResponse.json({
       ok: true,
       pedido: { id: pedido.id, estado: pedido.estado },
+      correccionesManuales: correcciones.map((x) => ({ ...x, quien: nombreDe.get(x.usuarioId) ?? null })),
       proveedor: {
         id: proveedorId,
         nombre: comprobantes[0]?.proveedor?.nombre ?? null,

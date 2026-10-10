@@ -52,6 +52,11 @@ export const LECTURA_VIEJA =
   "comprobante de arriba.";
 export const BAJADA =
   "Hasta que cierre no se propone ningún costo. Mirá la foto y decí qué dice el papel.";
+/**
+ * La salida que no depende de arreglar el sistema (Emanuel, Secco #256):
+ * siempre se puede recibir. Va debajo de la bajada, con su mismo estilo.
+ */
+export const RECIBIR_IGUAL = "Podés recibir igual: entra el stock y los costos quedan como estaban.";
 
 export default function CorregirComprobante({ comprobanteId, onCorregido = null }) {
   const [cargando, setCargando] = useState(true);
@@ -288,6 +293,7 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
         <SunmiCard className="p-3 space-y-1">
           <span className="block font-semibold sunmi-text-strong break-words">{TITULO}</span>
           <p className="text-sm2 sunmi-text-muted break-words">{BAJADA}</p>
+          <p className="text-sm2 sunmi-text-muted break-words">{RECIBIR_IGUAL}</p>
         </SunmiCard>
       )}
 

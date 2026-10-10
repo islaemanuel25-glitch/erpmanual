@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-10-10] - Actualización: compras-proveedor (recibir con un papel que no cierra)
+
+### Modificado
+- feat: con un comprobante MAL_LEIDO el cierre recibe igual: entra el stock de
+  lo vinculado y ningún costo se escribe; el pedido queda
+  `recibidoSinCerrar` con `motivoSinCerrar`. Aceptar un precio de ese papel se
+  rechaza (`papelQueNoCierra`).
+- feat: la hoja de Corregir deja poner a mano cantidad, precio y total del
+  renglón del papel; la cuenta se rehace y, si cierra, el papel vuelve a
+  proponer costos. Cada corrección queda en `CorreccionManualRenglon` (quién,
+  cuándo, lo leído y lo puesto) y se ve en el pedido recibido.
+- feat: `LlamadaLector.respuestaCruda`: lo que contestó el modelo, tal cual.
+- Migración `20261010123108_recibir_sin_cerrar` (pendiente de deploy).
+  SIN_TOTAL y los papeles que cierran, sin cambios.
+
 ## [2026-10-10] - Actualización: compras-proveedor (boleta de Secco)
 
 ### Modificado
