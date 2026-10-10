@@ -57,6 +57,7 @@ import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta
 import { ORIGEN_DE_LECTURA } from "@/lib/compras-proveedor/comprobante/origenDeLectura";
 import { VARIACION_POR_DEFECTO } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
 import { aReceta } from "@/lib/compras-proveedor/comprobante/recetaEnCriollo";
+import { medicionDeLaLlamada } from "@/lib/compras-proveedor/comprobante/lector/medicionDeLaLlamada";
 import { armarInterpretes } from "@/lib/compras-proveedor/comprobante/lector/gemini";
 
 /**
@@ -533,7 +534,7 @@ async function leerElPapel({ papel, receta, proveedorId, grupoId, localId }) {
           // hace con el lector. Es el origen que explica las seis llamadas del
           // comprobante 13 que no reescribieron ningún renglón.
           origen: ORIGEN_DE_LECTURA.PRUEBA_DE_RECETA,
-          duracionMs: Number.isFinite(i.duracionMs) ? Math.round(i.duracionMs) : null,
+          ...medicionDeLaLlamada(i),
         })),
       });
     }

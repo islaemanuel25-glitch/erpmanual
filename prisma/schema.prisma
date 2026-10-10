@@ -5432,6 +5432,15 @@ model LlamadaLector {
   /// producción qué espera hace falta para cada modelo, en vez de suponerla.
   duracionMs Int?
 
+  /// LOS TOKENS QUE INFORMA GOOGLE en `usageMetadata`: cuánto escribió
+  /// (`candidatesTokenCount`), cuánto razonó (`thoughtsTokenCount`) y el total.
+  /// Para ver en producción cuánto razona cada modelo y si el techo de Flash
+  /// alcanza. Vacíos cuando la llamada se cortó sin respuesta: no hay nada que
+  /// contar, y un cero diría que contestó sin escribir.
+  tokensSalida       Int?
+  tokensRazonamiento Int?
+  tokensTotal        Int?
+
   creadoEn DateTime @default(now())
 
   /// Se consulta siempre igual: las de las últimas horas, por modelo.

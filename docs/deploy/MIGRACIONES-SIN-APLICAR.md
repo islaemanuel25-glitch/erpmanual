@@ -16,15 +16,21 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Una. Producción está en **54 migraciones**; el árbol tiene 55.
+Una. Producción está en **55 migraciones**; el árbol tiene 56.
 
-- `20261010004408_lectura_en_segundo_plano` — dos columnas nullable en
-  `ComprobanteProveedor` (`lecturaEnCursoDesde`, `ultimaLectura`: la lectura
-  en curso y su resultado, en la base y no en la memoria del proceso) y una en
-  `LlamadaLector` (`duracionMs`). Sin datos que mover: ninguna fila se
-  reescribe.
+- `20261010025546_tokens_de_cada_llamada` — tres columnas nullable en
+  `LlamadaLector`: `tokensSalida`, `tokensRazonamiento` y `tokensTotal` (lo que
+  informa Google en `usageMetadata` de cada llamada). Sin datos que mover:
+  ninguna fila se reescribe.
 
-**De dónde sale el 54.** `20261009222956_escalada_a_pro` sale de esta lista
+**De dónde sale el 55.** `20261010004408_lectura_en_segundo_plano` sale de esta
+lista porque la sesión del VPS midió el 2026-10-10 a las 02:48 UTC una llamada
+con `duracionMs` 90.012 en `LlamadaLector`: esa columna y esa espera son de esa
+migración y de #160, así que producción ya la tiene. Es una inferencia de un
+dato medido, no un `migrate status`; si el próximo `/deploy` informa otra cosa,
+se corrige acá.
+
+**Lo que decía antes, sobre el 54.** `20261009222956_escalada_a_pro` sale de esta lista
 porque Emanuel informó el 2026-10-09 que producción corre `a1331d9a` (PRs #158 y
 #159), desplegado con `/deploy`, que aplica las pendientes. No se verificó
 desde la sesión que escribe esto; si el próximo `/deploy` informa otra cosa en
