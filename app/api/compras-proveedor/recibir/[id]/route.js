@@ -6,6 +6,8 @@ import { checkPerm } from "@/lib/authorize";
 import { subtotalLinea } from "@/lib/compras-proveedor/calculoPedido";
 import { costoLineaAMaestro, actualizarCostoRealProducto } from "@/lib/compras-proveedor/costoMaestro";
 import { esFiambreFijoEnUbicacion, elDepositoCuentaPorKilo } from "@/lib/conversiones/stock";
+import { kilosQueFacturaElRenglon } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
+import { fiambreAlCerrar } from "@/lib/compras-proveedor/cierreDeRecepcion";
 import {
   clasificarDiferenciaCosto,
   decidirEscrituraDeCosto,
@@ -498,6 +500,10 @@ export async function POST(req, { params }) {
       select: {
         pedidoDetalleId: true,
         cantidad: true,
+        // Para saber si la cantidad del papel SON kilos —el fiambre de peso
+        // variable de Das— hace falta saber si el papel trajo su columna de
+        // kilos aparte: `kilosQueFacturaElRenglon`.
+        pesoKg: true,
         subtotalImpreso: true,
         subtotalCorregido: true,
         // El precio que alguien ACEPTÓ para este renglón. Lo escribe
@@ -672,6 +678,20 @@ export async function POST(req, { params }) {
           Number(kilosDeLaHoja) > 0;
         const vaPorPeso = modoCompra === "UNIDAD" || (elDepositoCuentaPorKilo(base) && hayKilosDeLaHoja);
 
+        // ── EL FIAMBRE DE PESO VARIABLE QUE EL PAPEL FACTURA EN KILOS ──────
+        //
+        // Das #255: los 10,94 del Salame son kilos, no piezas. Qué entra y qué
+        // se cuenta lo decide `fiambreAlCerrar`, que tiene el porqué.
+        const { vieneEnKilos, piezasContadas, kilosQueEntran, cantidadRecibidaAGuardar } = fiambreAlCerrar({
+          kilosDelPapel: kilosQueFacturaElRenglon({
+            linea: lineaDelPapelPorDetalle.get(det.id) ?? null,
+            producto: base,
+          }),
+          cantRecibida,
+          seDeclaro,
+          kilosDeLaHoja: hayKilosDeLaHoja ? kilosDeLaHoja : null,
+        });
+
         // ── EN QUÉ QUEDA CONTADO LO QUE ENTRA ──────────────────────────────
         //
         // Sale de `vaPorPeso` —la misma variable que elige la rama de abajo— y
@@ -681,7 +701,10 @@ export async function POST(req, { params }) {
         // producto ya cambió de modo.
         const unidadIngreso = unidadFisicaDelIngreso({ vaPorPeso, base, destinoEsDeposito });
 
-        if (!(contadas > 0)) {
+        // Lo que viene en kilos llega aunque nadie haya contado piezas: lo que
+        // se declaró son los kilos.
+        const llegoPorPeso = vaPorPeso && kilosQueEntran !== null && kilosQueEntran > 0;
+        if (!(contadas > 0) && !llegoPorPeso) {
           // UN CERO DECLARADO ES UN DATO: "se contó y no llegó". Se guarda,
           // porque es distinto de `null` —nunca se contó— y esa diferencia es
           // la que deja saber después si alguien miró la línea.
@@ -714,11 +737,12 @@ export async function POST(req, { params }) {
 
         if (vaPorPeso) {
           // FIAMBRE: stock incrementa por kg reales, no por unidades
-          kgReales = kgRecibidosMap[det.id] !== undefined
-            ? Number(kgRecibidosMap[det.id])
-            : null;
+          kgReales = kilosQueEntran;
 
-          if (kgReales === null || kgReales <= 0) {
+          // Estimar por piezas solo cuando hay piezas: en lo que viene en
+          // kilos, multiplicar "piezas" por el peso de referencia daría 10,94
+          // × 1,8 = 19,7 kg sobre un salame que pesó 10,94.
+          if ((kgReales === null || kgReales <= 0) && !vieneEnKilos) {
             // Fallback: estimar desde pesoReferencia * cantRecibida
             const pesoRef = Number(base.pesoReferenciaKg || 1);
             kgReales = cantRecibida * pesoRef;
@@ -735,8 +759,9 @@ export async function POST(req, { params }) {
             : kgReales;
 
           // Actualizar pesoPromedioKg si está habilitado
-          if (base.actualizaPromedioPorRecepcion && cantRecibida > 0 && kgReales > 0) {
-            const nuevoPesoPromedio = kgReales / cantRecibida;
+          // Solo con piezas CONTADAS: ver `piezasContadas`, arriba.
+          if (base.actualizaPromedioPorRecepcion && piezasContadas > 0 && kgReales > 0) {
+            const nuevoPesoPromedio = kgReales / piezasContadas;
             await tx.productoBase.update({
               where: { id: base.id },
               data: { pesoPromedioKg: nuevoPesoPromedio },
@@ -823,7 +848,10 @@ export async function POST(req, { params }) {
         // Actualizar cantidadRecibida y kgRecibidos en detalle
         // Actualizar detalle: cantRecibida, kg, y costo si fue editado
         const detData = {
-          cantidadRecibida: cantRecibida,
+          // En lo que viene en kilos, las piezas son las contadas o nada: el
+          // número viejo —los kilos leídos como unidades— no se guarda como
+          // si alguien hubiera contado.
+          cantidadRecibida: cantidadRecibidaAGuardar,
           kgRecibidos: kgReales,
           // ── EL HECHO, CONGELADO ─────────────────────────────────────────
           //

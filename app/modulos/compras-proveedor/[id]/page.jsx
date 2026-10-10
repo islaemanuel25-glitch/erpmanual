@@ -33,7 +33,7 @@ import {
   filaSinPapel,
   claveDeFila,
 } from "@/lib/compras-proveedor/comprobante/filasDeConciliacion";
-import { costosQueNoSeTocan } from "@/lib/compras-proveedor/cierreDeRecepcion";
+import { costosQueNoSeTocan, kilosDelCierre } from "@/lib/compras-proveedor/cierreDeRecepcion";
 import TarjetaContextoDelPedido from "@/components/compras-proveedor/TarjetaContextoDelPedido";
 import BloqueDeLaFactura from "@/components/compras-proveedor/BloqueDeLaFactura";
 
@@ -653,6 +653,19 @@ export default function DetallePedidoProveedorPage({ params }) {
       const r = await aceptarPrecioDeLinea(fila);
       if (r && r.ok === false) return;
     }
+    // ── EL FIAMBRE DE PESO VARIABLE QUE VIENE EN KILOS ─────────────────
+    //
+    // Das #255: "10,94 × 9.375,87" son kilos. Lo que el tilde confirma es ese
+    // peso, que es lo que entra al stock; las piezas no las dice el papel y no
+    // se inventan —poner 10,94 como recibidas era leer kilos como unidades—.
+    if (fila.cantidadEnKilos === true) {
+      const kilos = Number(fila.peso);
+      if (Number.isFinite(kilos) && kilos > 0) {
+        setKgRecibidos((prev) => ({ ...prev, [fila.pedidoDetalleId]: kilos }));
+      }
+      await marcarRevisada(fila, true);
+      return;
+    }
     // EN LA ESCALA DEL PEDIDO. `fila.cantidad` es lo crudo del papel —80
     // unidades— y guardarlo como cantidad recibida metería diez veces lo que
     // llegó. Es el mismo número convertido que muestra la tarjeta.
@@ -806,7 +819,7 @@ export default function DetallePedidoProveedorPage({ params }) {
         url = `/api/compras-proveedor/recibir/${id}`;
         bodyData = {
           recibidos: extra?.recibidos ?? recibidos,
-          kgRecibidos,
+          kgRecibidos: extra?.kgRecibidos ?? kgRecibidos,
           sueltas,
           fisicas,
           motivos,
@@ -1573,6 +1586,9 @@ export default function DetallePedidoProveedorPage({ params }) {
                 setCerrandoRecepcion(false);
                 ejecutarAccion("recibir", {
                   recibidos: recibidosDelCierre,
+                  // Lo que el papel dice del fiambre que viene en kilos son
+                  // kilos, y viajan en su mapa: ver `kilosDelCierre`.
+                  kgRecibidos: kilosDelCierre({ filas: filasDelCierre, kgRecibidos }),
                   pagoAlProveedor,
                   costosExcluidos: costosQueNoSeTocan(filasDelCierre),
                 });
