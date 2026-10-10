@@ -1,5 +1,18 @@
 # Changelog
 
+## [2026-10-10] - Actualización: compras-proveedor (Flash con techo de razonamiento)
+
+### Modificado
+- fix: Flash (`gemini-3.6-flash`) razona con techo:
+  `generationConfig.thinkingConfig.thinkingLevel: "low"`, verificado en la
+  documentación de Google. El modelo grande no lo lleva.
+- fix: Flash que vence su espera escala al modelo grande con el caso
+  `FLASH_SIN_RESPUESTA`; si cierra, la lectura se guarda.
+- `LlamadaLector.tokensSalida`, `tokensRazonamiento`, `tokensTotal`.
+- El mensaje de espera vencida dice la espera real (90 segundos).
+- Migración `20261010025546_tokens_de_cada_llamada` (pendiente de deploy).
+- **SIN VERIFICAR** con Gemini real.
+
 ## [2026-10-10] - Actualización: compras-proveedor (lectura de comprobantes)
 
 ### Modificado
