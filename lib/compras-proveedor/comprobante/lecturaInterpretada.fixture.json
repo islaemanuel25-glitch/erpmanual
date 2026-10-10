@@ -24,7 +24,17 @@
     "en el candado leyendo ese archivo, no se copia acá.",
     "",
     "SECCO #256: los diez renglones de la orden, IVA incluido en el precio; los diez Total suman",
-    "922.533,84 exacto. Las dos botellas son envase."
+    "922.533,84 exacto. Las dos botellas son envase.",
+    "",
+    "CCU #257 (factura B, 29/09/26, CAE 86395263000660): los once renglones de la orden, con el",
+    "código, la cantidad, el precio y el Sub Total del papel. Los Sub Total suman 1.180.127,47; más",
+    "Imp. Interno 146.715,77 y Perc. IVA SNC 123.913,39 da el TOTAL impreso, 1.450.756,63 exacto. El",
+    "IVA Contenido (204.815,51) es informativo y no suma. El costo final de cada renglón es su Sub",
+    "Total más su parte del interno y de la percepción EN PROPORCIÓN al Sub Total, al centavo, con",
+    "el resto al renglón mayor: suman el total exacto. NO se usó la columna Pr.Un.Fin, que puede",
+    "traer un dígito mal leído. «Servicio Logístico» es un CARGO: lleva su costo final como cualquier",
+    "renglón y el sistema lo reparte entre la mercadería. La identidad es la de un papel cuyo número",
+    "de comprobante no está a la vista: letra B, CUIT y CAE, sin punto de venta ni número."
   ],
   "dyssa": {
     "lineasEnElPapel": 9,
@@ -81,5 +91,26 @@
     ],
     "explicacionFlash": "Secco no discrimina IVA: el precio de cada renglón ya lo trae, con la bonificación aplicada. El costo final es el Total del renglón. Las botellas a centavos son envases de cambio. El descuento global del pie vino en cero.",
     "explicacionPro": "Remito-factura de Secco sin IVA discriminado: el Total de cada renglón ya es lo que se paga, con la bonificación del 13 % adentro en las gaseosas. Las dos BOTELLA a $0,02 son envases retornables. Descuento global $0,00; el total impreso es la suma de los renglones."
+  },
+  "ccu": {
+    "lineasEnElPapel": 11,
+    "hayTotalImpreso": true,
+    "identidad": { "tipo": "B", "fecha": "2026-09-29", "cuit": "30-50577985-8", "cae": "86395263000660" },
+    "pie": { "total": 1450756.63 },
+    "lineas": [
+      { "codigoProveedor": "11094", "descripcion": "SFE RUB LAT 473 CC NR 1 x 24 LOC", "cantidad": 2, "enQueViene": "cajas", "precioImpreso": 36928.49, "importeImpreso": 53618.53, "costoFinal": 65914.44, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "11210", "descripcion": "SFE BOT 1000CC RET 1X12 LOC VERSION 2", "cantidad": 10, "enQueViene": "cajas", "precioImpreso": 32312.42, "importeImpreso": 234581.05, "costoFinal": 288375.64, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "12551", "descripcion": "COLON SEL-DUL FRE-FRU ROJ-ARG-MI-VNR750x6-TR", "cantidad": 1, "enQueViene": "cajas", "precioImpreso": 34615.39, "importeImpreso": 34615.39, "costoFinal": 42553.46, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "23150", "descripcion": "AMS LAGER LAT 473cc NR 4 x 6 LOC (V1)", "cantidad": 3, "enQueViene": "cajas", "precioImpreso": 40005.85, "importeImpreso": 87130.10, "costoFinal": 107110.95, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "23170", "descripcion": "IMP STOUT LAT 473 CC NR 4x6 LOC - 8 Camadas", "cantidad": 2, "enQueViene": "cajas", "precioImpreso": 46160.60, "importeImpreso": 67023.15, "costoFinal": 82393.03, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "23171", "descripcion": "IMP APA LAT 473 CC NR 4x6 LOC - 8 Camadas", "cantidad": 3, "enQueViene": "cajas", "precioImpreso": 46160.60, "importeImpreso": 100534.73, "costoFinal": 123589.55, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "23172", "descripcion": "IMP IPA LAT 473 CC NR 4x6 LOC - 8 Camadas", "cantidad": 3, "enQueViene": "cajas", "precioImpreso": 46160.60, "importeImpreso": 100534.73, "costoFinal": 123589.55, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "23186", "descripcion": "HNK RUB LAT 710 cc NR 4x6 LOC", "cantidad": 5, "enQueViene": "cajas", "precioImpreso": 92307.62, "importeImpreso": 373467.94, "costoFinal": 459112.34, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "23284", "descripcion": "MGD LAT 473cc NR 1x6 LOC (v2)", "cantidad": 1, "enQueViene": "cajas", "precioImpreso": 12309.50, "importeImpreso": 8936.42, "costoFinal": 10985.74, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "23397", "descripcion": "SCH REMIX POMELO LAT 473 NR 4x6 LOC V1", "cantidad": 4, "enQueViene": "cajas", "precioImpreso": 40720.65, "importeImpreso": 118249.16, "costoFinal": 145366.29, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "300016", "descripcion": "Servicio Logístico", "cantidad": 1, "enQueViene": "unidad", "precioImpreso": 1436.27, "importeImpreso": 1436.27, "costoFinal": 1765.64, "tipo": "CARGO" }
+    ],
+    "explicacionFlash": "Factura B de CCU. Cada renglón trae cantidad en cajas, precio, descuento y Sub Total; la columna Pr.Un.Fin es informativa. Al pie, Imp. Interno y Percepción IVA SNC se reparten entre los renglones en proporción al Sub Total; el IVA Contenido es informativo. El Servicio Logístico es un cargo.",
+    "explicacionPro": "Factura B de CCU: el Sub Total de cada renglón ya trae el IVA. El total suma los Sub Total, el impuesto interno y la percepción de IVA, que repartí en proporción al Sub Total. El IVA Contenido no suma. El renglón 300016 Servicio Logístico es un cargo del proveedor, no mercadería."
   }
 }

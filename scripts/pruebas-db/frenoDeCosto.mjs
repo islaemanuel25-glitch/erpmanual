@@ -260,6 +260,14 @@ async function cierraYEscribe(f, p, titulo, costoEsperado, extra) {
 const NETO_DE_MIL = 826.445;
 
 async function papelCon(f, p, { cantidad, netoUnitario }) {
+  // ── EL RENGLÓN, COMO LO GUARDA LA LECTURA INTERPRETADA (#165) ──────────
+  //
+  // Desde la segunda parte de #165 un renglón sin costo final no se costea:
+  // es una lectura de antes y se pide volver a leerla. El costo final es el
+  // que antes armaba la receta genérica —neto + 21 % de IVA, en centavos—,
+  // así los números de cada caso quedan exactamente donde estaban.
+  const subtotalCentavos = Math.round(cantidad * netoUnitario * 100);
+  const costoFinalRenglon = (subtotalCentavos + Math.round(subtotalCentavos * 0.21)) / 100;
   const c = await prisma.comprobanteProveedor.create({
     data: {
       grupoId: f.grupo.id,
@@ -277,7 +285,9 @@ async function papelCon(f, p, { cantidad, netoUnitario }) {
       textoCrudo: `${marca} renglón`,
       cantidad,
       netoUnitario,
-      subtotalImpreso: Math.round(cantidad * netoUnitario * 100) / 100,
+      subtotalImpreso: subtotalCentavos / 100,
+      costoFinalRenglon,
+      tipoRenglon: "MERCADERIA",
       productoLocalId: p.plId,
       pedidoDetalleId: p.detId,
     },

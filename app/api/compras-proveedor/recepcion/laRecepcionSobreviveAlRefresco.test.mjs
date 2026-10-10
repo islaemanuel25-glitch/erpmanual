@@ -185,7 +185,8 @@ test("UNA LECTURA DICE QUIÉN LA PIDIÓ, Y NINGUNA ARRANCA SOLA", () => {
     !/useEffect\([^)]*\n?[^}]*\bleer\(/.test(panel),
     "hay un efecto que dispara una lectura al montar la pantalla"
   );
-  const recetas = codigoDe("app/modulos/proveedores/recetas/page.jsx");
+  // La relectura después de guardar la explicación de un tipo de papel.
+  const recetas = codigoDe("components/compras-proveedor/ExplicacionDelPapel.jsx");
   assert.match(recetas, /origen: ORIGEN_DE_LECTURA\.RECETA/);
   // La prueba de la receta se declara aparte: es la que NO reescribe renglones.
   const explicacion = codigoDe("app/api/compras-proveedor/recetas/explicacion/route.js");
@@ -229,8 +230,13 @@ test("LOS CAMINOS QUE LLAMAN AL LECTOR ESTÁN CONTADOS", () => {
   // `fetch` suelto. Este censo se puso ROJO con la primera versión de las dos,
   // que llamaban la URL por afuera, que es exactamente lo que el segundo
   // `assert` de abajo prohíbe.
+  //
+  // ── Y BAJÓ A TRES, 2026-10-10 ─────────────────────────────────────────
+  //
+  // La lista de recetas tenía el formulario de impuestos, que al guardarse
+  // ofrecía releer. Se borró con el resto del código de formato (segunda parte
+  // de #165): la relectura después de guardar es la de `ExplicacionDelPapel`.
   assert.deepEqual(archivos, [
-    "app/modulos/proveedores/recetas/page.jsx",
     "components/compras-proveedor/CorregirComprobante.jsx",
     "components/compras-proveedor/ExplicacionDelPapel.jsx",
     "components/comprobantes/PanelComprobantes.jsx",

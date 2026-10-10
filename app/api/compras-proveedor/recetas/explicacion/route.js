@@ -1,9 +1,12 @@
 // LA EXPLICACIÓN DEL PAPEL DE UN PROVEEDOR: leerla, probarla y guardarla.
 //
-//   GET  ?proveedorId=N   la explicación guardada y el papel con el que probar
-//   POST { proveedorId, explicacion, probar: true }   lee la foto con esa
-//        explicación y devuelve cómo la entendió, SIN ESCRIBIR NADA
-//   POST { proveedorId, explicacion }   guarda SOLO la explicación
+//   GET  ?proveedorId=N   las explicaciones confirmadas —una por tipo de
+//        papel—, las propuestas pendientes y el papel con el que probar
+//   POST { proveedorId, tipoComprobante, explicacion, probar: true }   lee la
+//        foto con esa explicación y devuelve cómo la entendió, SIN ESCRIBIR NADA
+//   POST { proveedorId, tipoComprobante, explicacion, confirmarPropuesta? }
+//        guarda la explicación de ESE tipo de papel, y si confirma, borra la
+//        propuesta pendiente de ese tipo. Las de los otros tipos no se tocan.
 //
 // ── POR QUÉ PROBAR NO ESCRIBE ─────────────────────────────────────────────
 //
@@ -27,7 +30,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { armarCadena, leerConCadena } from "@/lib/compras-proveedor/comprobante/lector/cadena";
-import { recetaDelProveedor } from "@/lib/compras-proveedor/comprobante/lector/recetaDelProveedor";
+import { rotuloDelTipo, tipoDePapel } from "@/lib/compras-proveedor/comprobante/explicacionPorTipo";
 import { ofrecerRelectura } from "@/lib/compras-proveedor/comprobante/relecturaTrasReceta";
 import { cuotaDelDia } from "@/lib/compras-proveedor/comprobante/lector/cuota";
 import { queHacerLectura } from "@/lib/compras-proveedor/comprobante/lector";
@@ -56,14 +59,12 @@ import { hayCuota, limiteDiario, MOTIVO_LIMITE, TEXTO_LIMITE } from "@/lib/ia/li
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import { ORIGEN_DE_LECTURA } from "@/lib/compras-proveedor/comprobante/origenDeLectura";
 import { VARIACION_POR_DEFECTO } from "@/lib/compras-proveedor/decisionDeCostoSugerida";
-import { aReceta } from "@/lib/compras-proveedor/comprobante/recetaEnCriollo";
 import { medicionDeLaLlamada } from "@/lib/compras-proveedor/comprobante/lector/medicionDeLaLlamada";
 import { armarInterpretes } from "@/lib/compras-proveedor/comprobante/lector/gemini";
 
 /**
- * La explicación que propuso el modelo grande, si la propuesta es de la
- * lectura interpretada (`lector/escalada.js` guarda `{ explicacion }`). Null en
- * las propuestas de antes, que traen las respuestas estructuradas.
+ * La explicación que propuso el modelo grande (`lector/escalada.js` guarda
+ * `{ explicacion }`), o null.
  */
 function explicacionPropuesta(respuestas) {
   const e = typeof respuestas?.explicacion === "string" ? respuestas.explicacion.trim() : "";
@@ -97,6 +98,7 @@ async function papelDePrueba({ grupoId, proveedorId, comprobanteId = null }) {
       id: true,
       estado: true,
       pedidoId: true,
+      tipo: true,
       _count: { select: { lineas: true } },
       archivos: { orderBy: { orden: "asc" }, select: { ubicacion: true, mime: true, orden: true } },
     },
@@ -151,53 +153,66 @@ export async function GET(req) {
 
     const fila = await prisma.recetaProveedor.findUnique({
       where: { grupoId_proveedorId: { grupoId, proveedorId } },
-      select: { explicacion: true, explicacionActualizadaEn: true, variacionNormalPct: true },
+      select: { variacionNormalPct: true },
     });
     const papel = await papelDePrueba({ grupoId, proveedorId, comprobanteId });
 
-    // ── LA RECETA QUE ARMÓ EL SISTEMA, SI HAY UNA ESPERANDO ─────────────
+    // ── UNA EXPLICACIÓN CONFIRMADA POR TIPO DE PAPEL ────────────────────
     //
-    // Viaja con la lectura con la que cerró y la receta que sale de sus
-    // respuestas, para que la pantalla dibuje "Así lo entendió" con la MISMA
-    // `comoLoEntendio` y sin gastar una consulta. Confirmarla es el «Está
-    // bien, guardar» de siempre.
-    const pendiente = await prisma.recetaPropuestaProveedor.findUnique({
-      where: { grupoId_proveedorId: { grupoId, proveedorId } },
-      select: { respuestas: true, lectura: true, comprobanteId: true, creadaEn: true },
+    // La factura A y la B del mismo proveedor pueden venir armadas distinto, y
+    // la de una no pisa la de la otra (`explicacionPorTipo.js`).
+    const explicaciones = await prisma.explicacionPorTipo.findMany({
+      where: { grupoId, proveedorId },
+      orderBy: { tipoComprobante: "asc" },
+      select: { tipoComprobante: true, explicacion: true, version: true, actualizadaEn: true },
+    });
+
+    // ── LAS QUE ARMÓ EL SISTEMA, SI HAY ALGUNA ESPERANDO ─────────────────
+    //
+    // Una por tipo. Viajan con la lectura con la que cerraron, para que la
+    // pantalla dibuje "Así lo entendió" con la MISMA `comoLoEntendio` y sin
+    // gastar una consulta. Confirmar una es el «Está bien, guardar» de siempre.
+    const pendientes = await prisma.recetaPropuestaProveedor.findMany({
+      where: { grupoId, proveedorId },
+      orderBy: { tipoComprobante: "asc" },
+      select: { tipoComprobante: true, respuestas: true, lectura: true, comprobanteId: true, creadaEn: true },
     });
 
     return NextResponse.json({
       ok: true,
       proveedor,
-      propuesta: pendiente
-        ? {
-            lectura: pendiente.lectura,
-            // ── LA RECETA ES LA EXPLICACIÓN ─────────────────────────────
-            //
-            // Desde la lectura interpretada, lo que propone el modelo grande
-            // es cómo entendió el papel, en castellano. Las propuestas de
-            // antes traen las respuestas estructuradas y se siguen mostrando
-            // como receta hasta que se confirmen o se reemplacen.
-            explicacion: explicacionPropuesta(pendiente.respuestas),
-            receta: explicacionPropuesta(pendiente.respuestas) ? null : aReceta(pendiente.respuestas),
-            comprobanteId: pendiente.comprobanteId,
-            creadaEn: pendiente.creadaEn,
-          }
-        : null,
+      explicaciones: explicaciones.map((e) => ({
+        tipoComprobante: e.tipoComprobante,
+        rotulo: rotuloDelTipo(e.tipoComprobante),
+        explicacion: e.explicacion,
+        version: e.version,
+        actualizadaEn: e.actualizadaEn,
+      })),
+      propuestas: pendientes
+        .filter((p) => explicacionPropuesta(p.respuestas))
+        .map((p) => ({
+          tipoComprobante: p.tipoComprobante,
+          rotulo: rotuloDelTipo(p.tipoComprobante),
+          explicacion: explicacionPropuesta(p.respuestas),
+          lectura: p.lectura,
+          comprobanteId: p.comprobanteId,
+          creadaEn: p.creadaEn,
+        })),
       // Si el modelo grande está disponible, leer sin explicación no es leer a
-      // ciegas: interpreta el papel y propone la receta. La recepción lo
+      // ciegas: interpreta el papel y propone la explicación. La recepción lo
       // pregunta para no mandar a escribir lo que el sistema hace solo.
       interpretaSinExplicacion: Object.values(armarInterpretes()).some((i) => i.disponible().ok === true),
-      explicacion: fila?.explicacion ?? "",
-      actualizadaEn: fila?.explicacionActualizadaEn ?? null,
       // Cuánto se le mueve el precio a este proveedor sin que sea raro. Sin
-      // receta cargada, el 10 % que decide el default del modelo.
+      // fila cargada, el 10 % que decide el default del modelo.
       variacionNormalPct:
         fila?.variacionNormalPct != null ? Number(fila.variacionNormalPct) : VARIACION_POR_DEFECTO,
       papel: papel
         ? {
             comprobanteId: papel.id,
             pedidoId: papel.pedidoId,
+            // De qué tipo es el papel con el que se prueba: la pantalla abre
+            // esa explicación.
+            tipoComprobante: tipoDePapel(papel.tipo),
             productos: papel._count.lineas,
             fotos: papel.archivos.length,
           }
@@ -224,6 +239,9 @@ export async function POST(req) {
     const body = await req.json().catch(() => ({}));
     const proveedorId = Number(body?.proveedorId);
     const explicacion = String(body?.explicacion ?? "").trim();
+    // De qué tipo de papel es esta explicación: la de la A no pisa la de la B
+    // (`explicacionPorTipo.js`). Sin tipo, "sin factura".
+    const tipoComprobante = tipoDePapel(body?.tipoComprobante);
     if (!Number.isFinite(proveedorId)) {
       return NextResponse.json({ ok: false, error: "Falta el proveedor." }, { status: 400 });
     }
@@ -275,13 +293,9 @@ export async function POST(req) {
         );
       }
 
-      // La receta guardada da el IVA y las percepciones; la explicación es la
-      // que está EN PANTALLA, sin guardar, que es justamente lo que se prueba.
-      const fila = await prisma.recetaProveedor.findUnique({
-        where: { grupoId_proveedorId: { grupoId, proveedorId } },
-      });
-      const { receta } = recetaDelProveedor(fila);
-      const recetaProbada = { ...receta, explicacion };
+      // La explicación es la que está EN PANTALLA, sin guardar, que es
+      // justamente lo que se prueba.
+      const recetaProbada = { interpretada: true, explicacion, tipoComprobante };
 
       // ── ACÁ ARRANCA LA LECTURA Y ACÁ MISMO SE CONTESTA ──────────────────
       //
@@ -306,77 +320,10 @@ export async function POST(req) {
       });
     }
 
-    // ── CONFIRMAR LA RECETA QUE ARMÓ EL SISTEMA ──────────────────────────
-    //
-    // Es el «Está bien, guardar» sobre una propuesta. La receta se escribe con
-    // la MISMA traducción que la pantalla de preguntas —`aReceta`— y con el
-    // versionado de siempre: sube en uno, o nace en 1. Y la propuesta se
-    // borra en la misma transacción: una receta confirmada y su propuesta
-    // pendiente al mismo tiempo serían dos respuestas a la misma pregunta.
-    //
-    // La explicación y la variación viajan igual que al guardar sin propuesta,
-    // y no se tocan si no cambiaron: confirmar la receta no es reescribir lo
-    // que escribió una persona.
-    if (body?.confirmarPropuesta === true) {
-      const pendiente = await prisma.recetaPropuestaProveedor.findUnique({
-        where: { grupoId_proveedorId: { grupoId, proveedorId } },
-        select: { id: true, respuestas: true },
-      });
-      if (!pendiente) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error: "Esa receta ya no está para confirmar.",
-            queHacer: "Puede que alguien ya la haya guardado. Volvé a abrir la receta y fijate.",
-          },
-          { status: 409 }
-        );
-      }
-      // La propuesta interpretada ES la explicación: se guarda la que está en
-      // pantalla —la propuesta, o lo que la persona le haya retocado— y no se
-      // toca ningún campo estructurado. La de antes sigue con `aReceta`.
-      const propuestaEnCriollo = explicacionPropuesta(pendiente.respuestas);
-      const receta = propuestaEnCriollo ? {} : aReceta(pendiente.respuestas);
-      const explicacionAGuardar = propuestaEnCriollo ? explicacion || propuestaEnCriollo : explicacion;
-      const previa = await prisma.recetaProveedor.findUnique({
-        where: { grupoId_proveedorId: { grupoId, proveedorId } },
-        select: { explicacion: true },
-      });
-      const cambioLaExplicacion = explicacionAGuardar !== String(previa?.explicacion ?? "").trim();
-      const explicacionNueva = cambioLaExplicacion
-        ? { explicacion: explicacionAGuardar, explicacionActualizadaEn: new Date(), explicacionActualizadaPor: session.id }
-        : {};
-      const variacionPedida = Number(body?.variacionNormalPct);
-      const conVariacion =
-        body?.variacionNormalPct !== undefined && Number.isFinite(variacionPedida) && variacionPedida >= 0 && variacionPedida <= 100
-          ? { variacionNormalPct: variacionPedida }
-          : {};
-
-      const guardada = await prisma.$transaction(async (tx) => {
-        const r = await tx.recetaProveedor.upsert({
-          where: { grupoId_proveedorId: { grupoId, proveedorId } },
-          create: { grupoId, proveedorId, ...receta, ...explicacionNueva, ...conVariacion, version: 1 },
-          update: { ...receta, ...explicacionNueva, ...conVariacion, version: { increment: 1 } },
-          select: { version: true },
-        });
-        await tx.recetaPropuestaProveedor.delete({ where: { id: pendiente.id } });
-        return r;
-      });
-
-      return NextResponse.json({
-        ok: true,
-        guardada: true,
-        version: guardada.version,
-        queHacer:
-          "Guardada. Desde ahora, cada factura de este proveedor se lee y se costea con esta receta.",
-      });
-    }
-
-    // ── GUARDAR: SOLO LA EXPLICACIÓN ────────────────────────────────────
     // ── LA VARIACIÓN NORMAL DEL PROVEEDOR ───────────────────────────────
     //
     // Se guarda con el mismo botón que la explicación, porque es lo mismo:
-    // cómo se lee el papel de este proveedor. Un valor ausente NO la borra —el
+    // cómo se le compra a este proveedor. Un valor ausente NO la borra —el
     // formulario puede mandar la explicación sola— y uno fuera de rango se
     // rechaza en castellano en vez de guardarse y sorprender después.
     const variacionCruda = body?.variacionNormalPct;
@@ -396,27 +343,67 @@ export async function POST(req) {
       variacion = v;
     }
 
-    const guardada = await prisma.recetaProveedor.upsert({
-      where: { grupoId_proveedorId: { grupoId, proveedorId } },
-      // Sin receta previa se crea con los defaults del modelo —los de la
-      // genérica— y la explicación. Los impuestos se siguen cargando en su
-      // pantalla: acá no se inventa ninguno.
-      create: {
-        grupoId,
-        proveedorId,
-        explicacion,
-        explicacionActualizadaEn: new Date(),
-        explicacionActualizadaPor: session.id,
-        version: 1,
-        ...(variacion !== undefined ? { variacionNormalPct: variacion } : {}),
-      },
-      update: {
-        explicacion,
-        explicacionActualizadaEn: new Date(),
-        explicacionActualizadaPor: session.id,
-        ...(variacion !== undefined ? { variacionNormalPct: variacion } : {}),
-      },
-      select: { id: true, explicacionActualizadaEn: true, variacionNormalPct: true },
+    // ── CONFIRMAR LA QUE ARMÓ EL SISTEMA, O GUARDAR LA QUE SE ESCRIBIÓ ───
+    //
+    // Confirmar es el «Está bien, guardar» sobre una propuesta: se guarda la
+    // que está en pantalla —la propuesta, o lo que la persona le haya
+    // retocado— y la propuesta se borra en la misma transacción: una
+    // explicación confirmada y su propuesta pendiente al mismo tiempo serían
+    // dos respuestas a la misma pregunta.
+    //
+    // En los dos casos se escribe SOLO la explicación de ESTE tipo de papel,
+    // con su versión que sube en uno o nace en 1. Las de los otros tipos no se
+    // tocan (`explicacionPorTipo.js`).
+    let pendiente = null;
+    if (body?.confirmarPropuesta === true) {
+      pendiente = await prisma.recetaPropuestaProveedor.findUnique({
+        where: { grupoId_proveedorId_tipoComprobante: { grupoId, proveedorId, tipoComprobante } },
+        select: { id: true, respuestas: true },
+      });
+      if (!pendiente) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Esa explicación ya no está para confirmar.",
+            queHacer: "Puede que alguien ya la haya guardado. Volvé a abrir la receta y fijate.",
+          },
+          { status: 409 }
+        );
+      }
+    }
+    // ── GUARDAR: SOLO LA EXPLICACIÓN DE ESTE TIPO, Y LA VARIACIÓN ────────
+    //
+    // No relee ni toca comprobantes: cuenta cuáles se podrían releer y lo
+    // devuelve, y quien decide es la pantalla.
+    const explicacionAGuardar = explicacion || explicacionPropuesta(pendiente?.respuestas) || "";
+    if (!explicacionAGuardar) {
+      return NextResponse.json(
+        { ok: false, error: "Escribí cómo se lee el papel.", queHacer: "Escribí cómo se lee el papel." },
+        { status: 400 }
+      );
+    }
+
+    const guardada = await prisma.$transaction(async (tx) => {
+      const e = await tx.explicacionPorTipo.upsert({
+        where: { grupoId_proveedorId_tipoComprobante: { grupoId, proveedorId, tipoComprobante } },
+        create: {
+          grupoId, proveedorId, tipoComprobante, explicacion: explicacionAGuardar,
+          version: 1, actualizadaEn: new Date(), actualizadaPor: session.id,
+        },
+        update: {
+          explicacion: explicacionAGuardar, version: { increment: 1 },
+          actualizadaEn: new Date(), actualizadaPor: session.id,
+        },
+        select: { version: true, actualizadaEn: true },
+      });
+      const r = await tx.recetaProveedor.upsert({
+        where: { grupoId_proveedorId: { grupoId, proveedorId } },
+        create: { grupoId, proveedorId, ...(variacion !== undefined ? { variacionNormalPct: variacion } : {}) },
+        update: variacion !== undefined ? { variacionNormalPct: variacion } : {},
+        select: { variacionNormalPct: true },
+      });
+      if (pendiente) await tx.recetaPropuestaProveedor.delete({ where: { id: pendiente.id } });
+      return { ...e, variacionNormalPct: r.variacionNormalPct };
     });
 
     // ── LOS PAPELES SIN RECIBIR SE PUEDEN RELEER CON LA RECETA NUEVA ────
@@ -426,12 +413,10 @@ export async function POST(req) {
     // receta se guardó a las 15:10 y el comprobante seguía con la lectura de
     // antes, con cero renglones.
     //
-    // ESTO NO ES UN MECANISMO NUEVO. `recetas/guardar` —la otra pantalla de
-    // receta, la de las respuestas estructuradas— ya ofrecía exactamente esto
-    // con `ofrecerRelectura`, que además calcula cuántas entran en la cuota del
-    // día. Lo que faltaba era conectarlo a ESTE camino, que es por el que
-    // Emanuel guarda la explicación en castellano. Escribir acá una búsqueda
-    // parecida al lado habría sido la regla 1 otra vez.
+    // ESTO NO ES UN MECANISMO NUEVO: es `ofrecerRelectura`, que además calcula
+    // cuántas entran en la cuota del día. Lo usaba también la receta de
+    // impuestos, que se borró con el código de formato (segunda parte de #165).
+    // Escribir acá una búsqueda parecida al lado habría sido la regla 1 otra vez.
     const comprobantes = await prisma.comprobanteProveedor.findMany({
       where: { grupoId, proveedorId },
       select: { id: true, estado: true, confirmadoEn: true, imagenBorradaEn: true },
@@ -455,13 +440,16 @@ export async function POST(req) {
     return NextResponse.json({
       ok: true,
       guardada: true,
-      actualizadaEn: guardada.explicacionActualizadaEn,
+      tipoComprobante,
+      version: guardada.version,
+      actualizadaEn: guardada.actualizadaEn,
       variacionNormalPct: Number(guardada.variacionNormalPct),
       // El costo en lecturas viaja con la respuesta para que el aviso aparezca
-      // ANTES de que apriete, no después. Misma forma que `recetas/guardar`.
+      // ANTES de que apriete, no después.
       relectura: ofrecerRelectura({ comprobantes, cuota }),
       queHacer:
-        "Guardada. Desde ahora, cada factura de este proveedor se lee con esta explicación.",
+        `Guardada. Desde ahora, los papeles de este proveedor que sean «${rotuloDelTipo(tipoComprobante)}» ` +
+        "se leen con esta explicación.",
     });
   } catch (err) {
     console.error("Error recetas/explicacion POST:", err);

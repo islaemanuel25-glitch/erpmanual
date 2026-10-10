@@ -1,5 +1,34 @@
 # Changelog
 
+## [2026-10-10] - Actualización: compras-proveedor (lectura interpretada, segunda parte)
+
+### Modificado
+- feat: una explicación confirmada por tipo de comprobante (`ExplicacionPorTipo`:
+  A, B, C, M, E o sin factura). Flash lee con todas, rotuladas, y vale la del
+  tipo que trae el papel; si ese tipo no tiene confirmada, el grande deja
+  pendiente la de ESE tipo sin tocar las otras. La pantalla de la explicación
+  tiene una solapa por tipo.
+- feat: la identidad sale solo del número de comprobante rotulado; un número
+  que no tiene esa forma o que está dentro del CUIT o del CAE queda vacío (CCU
+  #257 mostraba el Nro IIBB). El CAE se guarda —también si el papel no
+  cierra— y es la primera defensa contra el duplicado, con índice único.
+- feat: un renglón CARGO no pide producto ni entra al stock; su costo se
+  reparte entre la mercadería en proporción a su costo final (`cargos.js`).
+- fix: un renglón sin importe impreso dividía su costo final por uno; "así lo
+  entendió" redondeaba el costo unitario distinto que el costo; un total en
+  cero vuelve a contar como ausente.
+
+### Borrado
+- El código de formato: `recetaEnCriollo`, `promptDesdeReceta`,
+  `repartoDelPie`, `correccionAutomatica`, `conceptosDelPie`,
+  `internoDelRenglon`, `verificarComprobante` y la coherencia por renglón, con
+  sus candados. Una lectura de antes de la interpretada no se costea: pide
+  volver a leerse. Un papel SIN_TOTAL no se acepta a mano. De la receta
+  quedan la variación normal y "cómo cobra la cantidad".
+- Migración `20261010180000_explicacion_por_tipo` (pendiente de deploy): mueve
+  la explicación de cada proveedor a su tipo más frecuente, agrega el CAE y
+  borra las columnas de formato de `RecetaProveedor`.
+
 ## [2026-10-10] - Actualización: compras-proveedor (lectura interpretada)
 
 ### Modificado

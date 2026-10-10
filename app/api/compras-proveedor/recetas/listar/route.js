@@ -11,7 +11,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
-import { resumenEnCriollo } from "@/lib/compras-proveedor/comprobante/recetaEnCriollo";
+import { resumenDeExplicaciones, rotuloDelTipo } from "@/lib/compras-proveedor/comprobante/explicacionPorTipo";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 
 export async function GET(req) {
@@ -35,10 +35,33 @@ export async function GET(req) {
       orderBy: { nombre: "asc" },
     });
 
-    // El alcance va en el WHERE: la receta es POR GRUPO, aunque el proveedor
-    // sea compartido.
-    const recetas = await prisma.recetaProveedor.findMany({ where: { grupoId } });
-    const porProveedor = new Map(recetas.map((r) => [r.proveedorId, r]));
+    // ── LAS EXPLICACIONES Y LAS PROPUESTAS, POR TIPO DE PAPEL ─────────────
+    //
+    // El alcance va en el WHERE: son POR GRUPO, aunque el proveedor sea
+    // compartido. Una por tipo de papel (`explicacionPorTipo.js`).
+    const explicaciones = await prisma.explicacionPorTipo.findMany({
+      where: { grupoId },
+      select: { proveedorId: true, tipoComprobante: true, version: true, actualizadaEn: true },
+    });
+    const propuestas = await prisma.recetaPropuestaProveedor.findMany({
+      where: { grupoId },
+      select: { proveedorId: true, tipoComprobante: true },
+    });
+    const agrupar = (filas) => {
+      const m = new Map();
+      for (const f of filas) m.set(f.proveedorId, [...(m.get(f.proveedorId) ?? []), f]);
+      return m;
+    };
+    const confirmadasDe = agrupar(explicaciones);
+
+    // Cómo cobra la cantidad cada uno: lo que queda de la receta estructurada,
+    // porque el importador de pedidos lo necesita (`recetas/guardar`).
+    const recetas = await prisma.recetaProveedor.findMany({
+      where: { grupoId },
+      select: { proveedorId: true, facturaPor: true },
+    });
+    const facturaPorDe = new Map(recetas.map((r) => [r.proveedorId, r.facturaPor]));
+    const pendientesDe = agrupar(propuestas);
 
     // Cuántos comprobantes sin confirmar tiene cada uno: es lo que se va a poder
     // releer al guardar, y verlo antes de entrar ayuda a decidir por cuál empezar.
@@ -52,14 +75,21 @@ export async function GET(req) {
     return NextResponse.json({
       ok: true,
       items: proveedores.map((p) => {
-        const receta = porProveedor.get(p.id) ?? null;
+        const confirmadas = confirmadasDe.get(p.id) ?? [];
+        const pendientes = pendientesDe.get(p.id) ?? [];
         return {
           proveedorId: p.id,
           nombre: p.nombre,
-          tieneReceta: !!receta,
-          version: receta?.version ?? null,
-          actualizadaEn: receta?.updatedAt ?? null,
-          resumen: resumenEnCriollo(receta),
+          tieneReceta: confirmadas.length > 0,
+          explicaciones: confirmadas.map((e) => ({
+            tipoComprobante: e.tipoComprobante,
+            rotulo: rotuloDelTipo(e.tipoComprobante),
+            version: e.version,
+            actualizadaEn: e.actualizadaEn,
+          })),
+          pendientes: pendientes.map((x) => ({ tipoComprobante: x.tipoComprobante, rotulo: rotuloDelTipo(x.tipoComprobante) })),
+          resumen: resumenDeExplicaciones({ confirmadas, pendientes }),
+          facturaPor: facturaPorDe.get(p.id) === "BULTO" ? "BULTO" : "UNIDAD",
           comprobantesSinConfirmar: porConfirmar.get(p.id) ?? 0,
         };
       }),

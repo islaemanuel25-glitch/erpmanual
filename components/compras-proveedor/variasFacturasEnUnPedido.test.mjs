@@ -144,14 +144,12 @@ test("EL PROMPT DICE QUE «TRANSPORTE» Y «VIENEN» NO SON PRODUCTOS", () => {
   // impreso en la misma tabla y con importe. Transcripto como producto, el
   // importe queda contado dos veces y la verificación no cierra por un motivo
   // que no existe. Con una sola hoja no aparece nunca.
-  const prompt = codigoDe("lib/compras-proveedor/comprobante/lector/promptDesdeReceta.js");
+  // El prompt es el de la lectura interpretada (#165); el de formato se borró.
+  const prompt = codigoDe("lib/compras-proveedor/comprobante/lector/lecturaInterpretada.js");
   for (const palabra of ["TRANSPORTE", "VAN", "VIENEN", "SUBTOTAL DE LA HOJA"]) {
     assert.match(prompt, new RegExp(`«${palabra}»`), `el prompt no nombra ${palabra}`);
   }
-  assert.match(prompt, /NO son renglones de mercader/);
-  // Y tampoco se cuentan en el control de renglones, o el control avisaría que
-  // faltan líneas que no había que transcribir.
-  assert.match(prompt, /Tampoco los cuentes en `lineasEnElPapel`/);
+  assert.match(prompt, /NO son renglones, aunque estén en la tabla con importe/);
 });
 
 test("LA FOTO VIAJA ACHICADA, Y ESO PASA EN LA RUTA DE LEER", () => {
