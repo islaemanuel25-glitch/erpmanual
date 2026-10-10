@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-10-10] - Actualización: compras-proveedor (fiambre de peso variable en kilos)
+
+### Modificado
+- fix: en un fiambre de peso variable (`esProductoFiambre` y
+  `elDepositoCuentaPorKilo`) cuyo papel no imprime kilos aparte, la cantidad
+  SON los kilos: `kilosQueFacturaElRenglon`. Das #255: Salame Milan Fela
+  10,94 kg × 9.375,87 → 11.626,08 el kilo con IVA 21 % y percepción 3 %,
+  comparado con el costo del ERP.
+- La tarjeta y la hoja dicen "10,94 kg"; contra lo pedido se comparan piezas
+  estimadas (kilos ÷ peso por pieza) con la variación normal del proveedor
+  como tolerancia, o piezas contadas si las hay.
+- Al cerrar entra lo que pesó; el peso promedio se recalcula solo con piezas
+  contadas (`fiambreAlCerrar`). Los kilos del papel viajan en su propio mapa
+  (`kilosDelCierre`): antes iban como piezas y el cierre los rechazaba.
+- Sin migración. Mortadela de peso fijo y productos por unidad, sin cambios.
+
 ## [2026-10-10] - Actualización: compras-proveedor (Flash con techo de razonamiento)
 
 ### Modificado
