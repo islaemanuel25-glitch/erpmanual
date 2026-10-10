@@ -61,6 +61,16 @@ import { medicionDeLaLlamada } from "@/lib/compras-proveedor/comprobante/lector/
 import { armarInterpretes } from "@/lib/compras-proveedor/comprobante/lector/gemini";
 
 /**
+ * La explicación que propuso el modelo grande, si la propuesta es de la
+ * lectura interpretada (`lector/escalada.js` guarda `{ explicacion }`). Null en
+ * las propuestas de antes, que traen las respuestas estructuradas.
+ */
+function explicacionPropuesta(respuestas) {
+  const e = typeof respuestas?.explicacion === "string" ? respuestas.explicacion.trim() : "";
+  return e || null;
+}
+
+/**
  * El papel con el que se prueba.
  *
  * Por defecto, el último del proveedor que todavía tenga su foto. Cuando la
@@ -162,7 +172,14 @@ export async function GET(req) {
       propuesta: pendiente
         ? {
             lectura: pendiente.lectura,
-            receta: aReceta(pendiente.respuestas),
+            // ── LA RECETA ES LA EXPLICACIÓN ─────────────────────────────
+            //
+            // Desde la lectura interpretada, lo que propone el modelo grande
+            // es cómo entendió el papel, en castellano. Las propuestas de
+            // antes traen las respuestas estructuradas y se siguen mostrando
+            // como receta hasta que se confirmen o se reemplacen.
+            explicacion: explicacionPropuesta(pendiente.respuestas),
+            receta: explicacionPropuesta(pendiente.respuestas) ? null : aReceta(pendiente.respuestas),
             comprobanteId: pendiente.comprobanteId,
             creadaEn: pendiente.creadaEn,
           }
@@ -315,14 +332,19 @@ export async function POST(req) {
           { status: 409 }
         );
       }
-      const receta = aReceta(pendiente.respuestas);
+      // La propuesta interpretada ES la explicación: se guarda la que está en
+      // pantalla —la propuesta, o lo que la persona le haya retocado— y no se
+      // toca ningún campo estructurado. La de antes sigue con `aReceta`.
+      const propuestaEnCriollo = explicacionPropuesta(pendiente.respuestas);
+      const receta = propuestaEnCriollo ? {} : aReceta(pendiente.respuestas);
+      const explicacionAGuardar = propuestaEnCriollo ? explicacion || propuestaEnCriollo : explicacion;
       const previa = await prisma.recetaProveedor.findUnique({
         where: { grupoId_proveedorId: { grupoId, proveedorId } },
         select: { explicacion: true },
       });
-      const cambioLaExplicacion = explicacion !== String(previa?.explicacion ?? "").trim();
+      const cambioLaExplicacion = explicacionAGuardar !== String(previa?.explicacion ?? "").trim();
       const explicacionNueva = cambioLaExplicacion
-        ? { explicacion, explicacionActualizadaEn: new Date(), explicacionActualizadaPor: session.id }
+        ? { explicacion: explicacionAGuardar, explicacionActualizadaEn: new Date(), explicacionActualizadaPor: session.id }
         : {};
       const variacionPedida = Number(body?.variacionNormalPct);
       const conVariacion =

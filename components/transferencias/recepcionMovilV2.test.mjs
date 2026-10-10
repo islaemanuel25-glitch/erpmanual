@@ -572,7 +572,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // columnas en `PedidoProveedor`, una nullable en `LlamadaLector` y la tabla
   // nueva `CorreccionManualRenglon`. Aditiva, sin backfill. No toca
   // transferencias.
-  assert.equal(migraciones.length, 57, "aparecio una migracion que nadie declaro aca");
+  // Sube a 58 el 2026-10-10: entró `20261010130441_lectura_interpretada`, tres
+  // columnas nullable en `ComprobanteLinea` y una en `ComprobanteProveedor`,
+  // más la explicación de las recetas de proveedor. No toca transferencias.
+  assert.equal(migraciones.length, 58, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

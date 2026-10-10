@@ -59,6 +59,8 @@ const SELECT_COMPROBANTE = {
   proveedorId: true,
   modeloLectura: true,
   recetaUsada: true,
+  // Cómo leyó el modelo el papel: viaja con la lectura rearmada.
+  explicacionLeida: true,
   lineasEnElPapel: true,
   netoLeido: true,
   ivaLeido: true,
@@ -82,6 +84,10 @@ const SELECT_COMPROBANTE = {
       internoUnitario: true,
       pesoKg: true,
       bonificacionPct: true,
+      // Lo que interpretó el modelo: la cuenta se rehace con el costo final.
+      costoFinalRenglon: true,
+      enQueViene: true,
+      tipoRenglon: true,
       // La alícuota del renglón: sin ella, volver a verificar le pone a todos
       // la de la receta.
       ivaPct: true,
@@ -209,6 +215,9 @@ export async function POST(req, { params }) {
               cantidad: aNumero(r?.cantidad),
               netoUnitario: aNumero(r?.netoUnitario),
               subtotal: aNumero(r?.subtotal),
+              // En la lectura interpretada se corrige el costo final del
+              // renglón, que es con lo que se costea.
+              costoFinal: aNumero(r?.costoFinal),
             },
           })),
         ].filter((x) => Number.isFinite(x.orden) && Object.values(x.puesto).some((v) => v !== null));
@@ -267,6 +276,9 @@ export async function POST(req, { params }) {
         if (puesto.subtotal !== null && puesto.subtotal !== undefined) data.subtotalCorregido = puesto.subtotal;
         if (puesto.cantidad !== null && puesto.cantidad !== undefined) data.cantidad = puesto.cantidad;
         if (puesto.netoUnitario !== null && puesto.netoUnitario !== undefined) data.netoUnitario = puesto.netoUnitario;
+        // El costo final tampoco tiene columna aparte: lo leído queda en la
+        // bitácora de abajo.
+        if (puesto.costoFinal !== null && puesto.costoFinal !== undefined) data.costoFinalRenglon = puesto.costoFinal;
         await tx.comprobanteLinea.updateMany({ where: { comprobanteId: c.id, orden }, data });
 
         // ── Y QUEDA REGISTRADA: QUIÉN, CUÁNDO, QUÉ HABÍA Y QUÉ SE PUSO ──
@@ -286,6 +298,7 @@ export async function POST(req, { params }) {
               cantidad: leida.cantidad ?? null,
               netoUnitario: leida.netoUnitario ?? null,
               subtotal: leida.subtotalImpreso ?? null,
+              ...(leida.costoFinal != null ? { costoFinal: leida.costoFinal } : {}),
             },
             puesto: { ...puesto, ...(automatica ? { automatica: true } : {}) },
             cerroDespues: puerta.cierra === true,

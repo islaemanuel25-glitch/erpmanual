@@ -1,0 +1,85 @@
+{
+  "_origen": [
+    "Los cuatro papeles de la orden del 2026-10-10, con la forma que devuelve el lector interpretado",
+    "(`esquemaInterpretado`, antes de `normalizarLectura`). NO son respuestas medidas de un modelo:",
+    "desde la nube no hay clave para llamarlo. Lo que se prueba es qué hace el código con ellas.",
+    "Cada papel trae dos respuestas: `flash` —el proveedor tiene explicación confirmada— y `pro`",
+    "—sin receta, el que lee es el grande—. Los números de las dos son los del papel; lo que cambia",
+    "es la explicación, que la del grande es la que queda pendiente.",
+    "",
+    "DYSSA: la boleta de #153 (`boletaDyssa.fixture.json`). El costo final de cada renglón es",
+    "neto + IVA a su alícuota + interno + percepciones repartidas, sacado UNA vez con el motor de la",
+    "receta (`verificarComprobante` sobre la receta de la migración 20261008120000) y escrito literal:",
+    "suman 633.686,39, el papel menos su centavo de redondeo, y divididos por la cantidad dan los",
+    "nueve costos que dio Emanuel en #153.",
+    "",
+    "DAS #255: los tres renglones que dio la orden. El pie impreso es SUBTOTAL 1.876.696,49 · IVA",
+    "394.106,26 · PERCEP 56.300,89 · TOTAL 2.327.103,64, o sea el neto por 1,24; la boleta tiene más",
+    "renglones que estos tres y la orden no los dio, así que el TOTAL de acá se ARMA con los tres, con",
+    "la misma proporción del pie. El salame es el de la boleta (10,94 kg × 9.375,87 = 102.572,05); la",
+    "barra La Verona, 54,36 kg con DTOS 5, con el costo de la orden (9.813,42 el kilo) y el neto",
+    "despejado de él; la mortadela, 6 piezas a un precio ILUSTRATIVO de 32.000.",
+    "",
+    "MAURO: la planilla real de 21 renglones de `lector/sinTotal.test.mjs`, que no trae total. Se arma",
+    "en el candado leyendo ese archivo, no se copia acá.",
+    "",
+    "SECCO #256: los diez renglones de la orden, IVA incluido en el precio; los diez Total suman",
+    "922.533,84 exacto. Las dos botellas son envase."
+  ],
+  "dyssa": {
+    "lineasEnElPapel": 9,
+    "hayTotalImpreso": true,
+    "identidad": { "tipo": "A" },
+    "pie": { "total": 633686.40 },
+    "lineas": [
+      { "codigoProveedor": "500010027", "descripcion": "AMARGO OBRERO 19 950MLX12", "cantidad": 36, "enQueViene": "botellas", "precioImpreso": 2713.71, "importeImpreso": 97693.56, "costoFinal": 144830.53, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "900005688", "descripcion": "SUSSEX RC CLASICO MAS BLANCO 50X3X10", "cantidad": 30, "enQueViene": "paquetes", "precioImpreso": 1364.58, "importeImpreso": 40937.40, "costoFinal": 52195.19, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "900001618", "descripcion": "HIGIENOL PH HS FRESH 30MTX4X12", "cantidad": 84, "enQueViene": "paquetes", "precioImpreso": 1207.16, "importeImpreso": 101401.44, "costoFinal": 129286.84, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "500013680", "descripcion": "PRONTO BIT 4.5° 473MLX6X4", "cantidad": 4, "enQueViene": "packs de 6 latas", "precioImpreso": 9867.44, "importeImpreso": 39469.76, "costoFinal": 52761.98, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "500014792", "descripcion": "(P) GANCIA CERO 473MLX6X4", "cantidad": 8, "enQueViene": "packs de 6 latas", "precioImpreso": 9737.37, "importeImpreso": 70109.06, "costoFinal": 94200.81, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "1000056218", "descripcion": "BLANCAFLOR HARINA LEUDANTE 1000GRX15", "cantidad": 30, "enQueViene": "paquetes", "precioImpreso": 1545.32, "importeImpreso": 46359.60, "costoFinal": 53545.34, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "3110001030", "descripcion": "DURACELL PILA ALC AAA x 12 TIRA - COD NUEVO", "cantidad": 4, "enQueViene": "tiras de 12", "precioImpreso": 10477.03, "importeImpreso": 41908.12, "costoFinal": 53432.85, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "3110001028", "descripcion": "DURACELL PILA ALCALINA AA TIRA x 12", "cantidad": 4, "enQueViene": "tiras de 12", "precioImpreso": 10477.03, "importeImpreso": 41908.12, "costoFinal": 53432.85, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "500014466", "descripcion": "(P) DR. LEMON VODKA 5% 1000MLX12", "cantidad": 1, "enQueViene": "botellas", "precioImpreso": 2930.39, "importeImpreso": 0, "costoFinal": 0, "tipo": "MERCADERIA" }
+    ],
+    "explicacionFlash": "Factura A de Dyssa. Cada renglón trae el neto con su descuento; el IVA va por renglón, al 21 % salvo la harina al 10,5 %, más el impuesto interno por unidad sin descuento. Al pie hay tres percepciones (IIBB, IVA 10,5 e IVA 21) que se reparten en los renglones. El Dr. Lemon viene bonificado al 100 %.",
+    "explicacionPro": "Dyssa imprime por renglón cantidad, precio neto, bonificación, interno e importe neto. El IVA se discrimina al pie por alícuota (10,5 % para la harina, 21 % para el resto) y hay tres percepciones al pie. Calculé cada costo final como neto + IVA de su alícuota + interno + su parte de las percepciones en proporción. El Dr. Lemon va sin cargo."
+  },
+  "das": {
+    "lineasEnElPapel": 3,
+    "hayTotalImpreso": true,
+    "identidad": { "tipo": "A" },
+    "pie": { "total": 898726.85 },
+    "lineas": [
+      { "codigoProveedor": "0223", "descripcion": "0223 SALAME MILAN FELA", "cantidad": 10.94, "enQueViene": "kilos", "kilos": 10.94, "precioImpreso": 9375.87, "importeImpreso": 102572.05, "costoFinal": 127189.34, "tipo": "MERCADERIA" },
+      { "codigoProveedor": null, "descripcion": "BARRA LA VERONA", "cantidad": 54.36, "enQueViene": "kilos", "kilos": 54.36, "precioImpreso": 8330.58, "importeImpreso": 430207.67, "costoFinal": 533457.51, "tipo": "MERCADERIA" },
+      { "codigoProveedor": null, "descripcion": "MORTADELA X 4.5 KG", "cantidad": 6, "enQueViene": "piezas", "precioImpreso": 32000, "importeImpreso": 192000, "costoFinal": 238080.00, "tipo": "MERCADERIA" }
+    ],
+    "explicacionFlash": "Das factura con IVA 21 % y percepción de IVA 3 % al pie, sobre el subtotal. Los fiambres vienen por kilo: la cantidad son kilos. El costo de cada renglón es su importe más el 21 % y el 3 %.",
+    "explicacionPro": "Factura A de Das. El subtotal es la suma de los importes netos; al pie IVA 21 % y PERCEP. IVA 3 %. Repartí IVA y percepción en proporción al importe de cada renglón. El salame y la barra se venden por kilo; la mortadela por pieza."
+  },
+  "mauro": {
+    "explicacionFlash": "Planilla de pedido de Mauro, sin total impreso. El precio de cada renglón ya trae el IVA: el costo final es el importe.",
+    "explicacionPro": "Es una planilla sin total. Cada renglón tiene cantidad, precio con IVA incluido e importe; el costo final es el importe del renglón."
+  },
+  "secco": {
+    "lineasEnElPapel": 10,
+    "hayTotalImpreso": true,
+    "identidad": { "tipo": "X" },
+    "pie": { "total": 922533.84 },
+    "lineas": [
+      { "codigoProveedor": "42", "descripcion": "SECCO LIMA LIMON 3 LTS X 6", "cantidad": 10, "enQueViene": "packs de 6", "precioImpreso": 10800.218, "importeImpreso": 93961.90, "costoFinal": 93961.90, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "113", "descripcion": "SECCO COLA 3 LTS X 6 U.", "cantidad": 10, "enQueViene": "packs de 6", "precioImpreso": 10800.218, "importeImpreso": 93961.90, "costoFinal": 93961.90, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "45", "descripcion": "SECCO NARANJA 3 LTS X 6 U", "cantidad": 10, "enQueViene": "packs de 6", "precioImpreso": 10800.218, "importeImpreso": 93961.90, "costoFinal": 93961.90, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "44", "descripcion": "SECCO POMELO 3 LTS X 6 U", "cantidad": 6, "enQueViene": "packs de 6", "precioImpreso": 10800.218, "importeImpreso": 56377.14, "costoFinal": 56377.14, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "795", "descripcion": "BOTELLA SECCO 3000 CAMBIO", "cantidad": 6, "enQueViene": "botellas", "precioImpreso": 0.025, "importeImpreso": 0.15, "costoFinal": 0.15, "tipo": "ENVASE" },
+      { "codigoProveedor": "114", "descripcion": "BOTELLA SECCO COLA S/CARGO 3 LT", "cantidad": 18, "enQueViene": "botellas", "precioImpreso": 0.024, "importeImpreso": 0.44, "costoFinal": 0.44, "tipo": "ENVASE" },
+      { "codigoProveedor": "1096", "descripcion": "JUG.BAGGIO PRONTO MULTI 1 LT (8)", "cantidad": 120, "enQueViene": "unidades", "precioImpreso": 1462.382, "importeImpreso": 175485.82, "costoFinal": 175485.82, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "1365", "descripcion": "CHOCOLATADA BAGGIO LATTE 1 LT (8)", "cantidad": 80, "enQueViene": "unidades", "precioImpreso": 2453.299, "importeImpreso": 196263.94, "costoFinal": 196263.94, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "858", "descripcion": "PURE TOMATE LA HUERTA 530grs X12", "cantidad": 20, "enQueViene": "cajas de 12", "precioImpreso": 8796.023, "importeImpreso": 175920.45, "costoFinal": 175920.45, "tipo": "MERCADERIA" },
+      { "codigoProveedor": "1587", "descripcion": "AGUA MINERAL BIO 1.5 LTS X 6U", "cantidad": 10, "enQueViene": "packs de 6", "precioImpreso": 3660.020, "importeImpreso": 36600.20, "costoFinal": 36600.20, "tipo": "MERCADERIA" }
+    ],
+    "explicacionFlash": "Secco no discrimina IVA: el precio de cada renglón ya lo trae, con la bonificación aplicada. El costo final es el Total del renglón. Las botellas a centavos son envases de cambio. El descuento global del pie vino en cero.",
+    "explicacionPro": "Remito-factura de Secco sin IVA discriminado: el Total de cada renglón ya es lo que se paga, con la bonificación del 13 % adentro en las gaseosas. Las dos BOTELLA a $0,02 son envases retornables. Descuento global $0,00; el total impreso es la suma de los renglones."
+  }
+}

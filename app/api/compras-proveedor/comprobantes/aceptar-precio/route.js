@@ -109,6 +109,8 @@ export async function POST(req) {
         // —la harina va al 10,5—; `bonificacionPct`, si vino regalado. Sin
         // ellos esta ruta escribía un costo distinto del que muestra la hoja.
         orden: true, ivaPct: true, bonificacionPct: true,
+        // El costo que interpretó el modelo: es el que se acepta.
+        costoFinalRenglon: true, enQueViene: true, tipoRenglon: true,
         // EL TEXTO DEL PAPEL Y EL CÓDIGO DEL PROVEEDOR son lo que la cascada de
         // vínculo machea. Sin ellos, una línea que la pantalla resuelve por
         // alias acá quedaría sin producto, que es exactamente el defecto que
@@ -158,6 +160,7 @@ export async function POST(req) {
                 orden: true, cantidad: true, netoUnitario: true,
                 subtotalImpreso: true, subtotalCorregido: true, internoUnitario: true,
                 textoCrudo: true, codigoProveedor: true, pesoKg: true, bonificacionPct: true,
+                costoFinalRenglon: true,
                 // La alícuota de cada renglón: el IVA del pie se reparte con ella.
                 ivaPct: true,
               },

@@ -222,7 +222,12 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
     const conCorrecciones = {
       ...lectura,
       lineas: lectura.lineas.map((l, i) =>
-        correcciones[i] !== undefined ? { ...l, subtotalImpreso: correcciones[i] } : l
+        correcciones[i] === undefined
+          ? l
+          : // En la interpretada lo que se muestra y se suma es el costo final.
+            lectura.interpretada
+            ? { ...l, costoFinal: correcciones[i] }
+            : { ...l, subtotalImpreso: correcciones[i] }
       ),
     };
     return comoLoEntendio({ lectura: conCorrecciones, receta });
@@ -235,7 +240,11 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
   // Si NINGÚN renglón tiene descuento leído, la lectura es de antes de que se
   // pidiera esa columna. No es que el papel no tenga descuentos —eso vendría
   // como cero— es que no se preguntó.
+  //
+  // La interpretada no lo necesita: el descuento ya está adentro del costo
+  // final de cada renglón.
   const lecturaSinDescuentos =
+    lectura?.interpretada !== true &&
     Boolean(lectura?.lineas?.length) &&
     lectura.lineas.every((l) => l?.bonificacion === null || l?.bonificacion === undefined);
 
@@ -254,7 +263,13 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ correcciones: porOrden }),
+        // La interpretada corrige el costo final de cada renglón; las de antes,
+        // el importe.
+        body: JSON.stringify(
+          lectura.interpretada
+            ? { renglones: Object.fromEntries(Object.entries(porOrden).map(([o, v]) => [o, { costoFinal: v }])) }
+            : { correcciones: porOrden }
+        ),
       });
       const d = await r.json().catch(() => null);
       if (!d?.ok) {
