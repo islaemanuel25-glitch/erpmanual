@@ -1,5 +1,25 @@
 # Changelog
 
+## [2026-10-10] - Actualización: compras-proveedor (lectura interpretada)
+
+### Modificado
+- feat: el lector devuelve el papel ya interpretado: por renglón el costo
+  final con todo adentro según ese papel, en qué viene y si es mercadería o
+  envase, más una explicación en criollo (`lecturaInterpretada.js`). El código
+  controla la suma de los costos finales contra el total impreso (un centavo
+  de tolerancia por renglón, nunca menos de $1), la cantidad y el costo de la
+  mercadería y el conteo de renglones. Las reglas de negocio no cambian.
+- feat: con explicación confirmada lee Flash guiado por ella; sin explicación
+  lee el modelo grande; si Flash no cierra, trae de menos o no contesta, el
+  grande una vez. Lo que explicó el grande en una lectura que cierra queda
+  pendiente en Recetas de facturas y confirmarlo guarda la explicación.
+- feat: la corrección a mano de un papel interpretado corrige el costo final
+  del renglón (`costoFinalRenglon`).
+- Migración `20261010130441_lectura_interpretada` (pendiente de deploy): tres
+  columnas en `ComprobanteLinea`, una en `ComprobanteProveedor`, y la
+  traducción de las recetas estructuradas a explicación. Las lecturas
+  guardadas antes se siguen costeando como antes hasta la segunda tanda.
+
 ## [2026-10-10] - Actualización: compras-proveedor (recibir con un papel que no cierra)
 
 ### Modificado
