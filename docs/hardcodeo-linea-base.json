@@ -2,11 +2,11 @@
   "_lea_esto": "Línea de base del hardcodeo. La sella scripts/hardcodeo.mjs --linea-base --sellar; sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
   "_commit": "`commit` es el árbol que se ESCANEÓ, no la fecha en que se selló: pueden diferir. Cuando se corrige un falso positivo del contador, la base se REEXPRESA desde el árbol histórico —no desde main— para no perdonar la deuda que entró después.",
   "_inventario": "El trinquete compara el INVENTARIO, no los totales: una ocurrencia es archivo + categoría + texto, con cantidad. Sin número de línea, para que mover código no invente violaciones. Un alta en cualquier clave pone rojo aunque el total baje.",
-  "generada": "2026-10-10 15:20",
-  "commit": "a3a13f57b386ddb3766f3ba46daad8a7392573d3",
+  "generada": "2026-10-10 18:23",
+  "commit": "e4aca050702c1061ad020f1ff7dcc1699a210ff7",
   "total": {
     "color": 278,
-    "medida": 1597,
+    "medida": 1601,
     "modal": 34,
     "crudo": 281,
     "celda": 430,
@@ -313,7 +313,7 @@
     },
     "reportes-ventas": {
       "color": 0,
-      "medida": 143,
+      "medida": 147,
       "modal": 0,
       "crudo": 12,
       "celda": 34,
@@ -2371,6 +2371,11 @@
       },
       "crudo": {
         "<button>": 2
+      }
+    },
+    "components/reportes-ventas/PanelAnularVenta.jsx": {
+      "medida": {
+        "text-[12px]": 4
       }
     },
     "components/reportes-ventas/ReporteVentasPorCliente.jsx": {
