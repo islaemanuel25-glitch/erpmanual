@@ -32,6 +32,7 @@ import { checkPerm } from "@/lib/authorize";
 import { pasarPorLaPuerta, queHacerLectura } from "@/lib/compras-proveedor/comprobante/lector";
 import { armarCadena, leerConCadena } from "@/lib/compras-proveedor/comprobante/lector/cadena";
 import { escalarAlModeloGrande } from "@/lib/compras-proveedor/comprobante/lector/escalada";
+import { medicionDeLaLlamada } from "@/lib/compras-proveedor/comprobante/lector/medicionDeLaLlamada";
 import { armarInterpretes } from "@/lib/compras-proveedor/comprobante/lector/gemini";
 import {
   recetaDelProveedor,
@@ -319,7 +320,10 @@ export async function POST(req, { params }) {
         proveedorNombre: comprobante.proveedor?.nombre ?? null,
       });
       if (escalada.cerro) {
-        resultado = { ...resultado, lectura: escalada.lectura };
+        // `ok: true` porque puede venir de un Flash que no contestó —el caso
+        // FLASH_SIN_RESPUESTA—: ahí la lectura del grande es la ÚNICA, y es
+        // buena porque la cuenta la verificó el código.
+        resultado = { ...resultado, ok: true, motivo: null, lectura: escalada.lectura };
         recetaDeLaLectura = escalada.receta;
         versionDeLaLectura = escalada.recetaVersion;
       }
@@ -423,8 +427,9 @@ export async function POST(req, { params }) {
               origen: origenPedido,
               comprobanteId: comprobante.id,
               escalada: i.escalada ?? null,
-              // Cuánto tardó: con esto se eligen las esperas con datos.
-              duracionMs: Number.isFinite(i.duracionMs) ? Math.round(i.duracionMs) : null,
+              // Cuánto tardó, cuánto escribió y cuánto razonó: con esto se
+              // eligen las esperas y el techo de razonamiento con datos.
+              ...medicionDeLaLlamada(i),
             })),
           });
         }
@@ -450,7 +455,12 @@ export async function POST(req, { params }) {
           {
             ok: false,
             motivo: resultado.motivo,
-            error: queHacerLectura(resultado.motivo),
+            // Si Flash no contestó y entró el modelo grande sin poder cerrar,
+            // las dos cosas se dicen: qué le pasó a Flash y qué al grande.
+            error: [queHacerLectura(resultado.motivo), escalada.texto].filter(Boolean).join(" "),
+            escalada: escalada.llamo
+              ? { motivo: escalada.motivo, cerro: escalada.cerro, texto: escalada.texto }
+              : null,
             // Se dice explícitamente que no reintenta sola, para que nadie se quede
             // esperando que se resuelva.
             reintentaSola: false,

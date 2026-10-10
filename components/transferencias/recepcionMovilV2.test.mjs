@@ -566,7 +566,9 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // Sube a 55 el 2026-10-10: entró `20261010004408_lectura_en_segundo_plano`,
   // dos columnas nullable en `ComprobanteProveedor` y una en `LlamadaLector`.
   // No toca transferencias ni ninguna tabla que la recepción escriba.
-  assert.equal(migraciones.length, 55, "aparecio una migracion que nadie declaro aca");
+  // Sube a 56 el 2026-10-10: entró `20261010025546_tokens_de_cada_llamada`,
+  // tres columnas nullable en `LlamadaLector`. No toca transferencias.
+  assert.equal(migraciones.length, 56, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));
