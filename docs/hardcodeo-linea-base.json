@@ -2,11 +2,11 @@
   "_lea_esto": "Línea de base del hardcodeo. La sella scripts/hardcodeo.mjs --linea-base --sellar; sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
   "_commit": "`commit` es el árbol que se ESCANEÓ, no la fecha en que se selló: pueden diferir. Cuando se corrige un falso positivo del contador, la base se REEXPRESA desde el árbol histórico —no desde main— para no perdonar la deuda que entró después.",
   "_inventario": "El trinquete compara el INVENTARIO, no los totales: una ocurrencia es archivo + categoría + texto, con cantidad. Sin número de línea, para que mover código no invente violaciones. Un alta en cualquier clave pone rojo aunque el total baje.",
-  "generada": "2026-10-03 21:38",
-  "commit": "e20c9c2995dabcf1fcc0aa8057a4549c513b773e",
+  "generada": "2026-10-10 15:20",
+  "commit": "a3a13f57b386ddb3766f3ba46daad8a7392573d3",
   "total": {
     "color": 278,
-    "medida": 1598,
+    "medida": 1597,
     "modal": 34,
     "crudo": 281,
     "celda": 430,
@@ -176,6 +176,15 @@
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
+    "integraciones": {
+      "color": 0,
+      "medida": 0,
+      "modal": 0,
+      "crudo": 0,
+      "celda": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
     "layout": {
       "color": 10,
       "medida": 28,
@@ -286,7 +295,7 @@
     },
     "proveedores": {
       "color": 1,
-      "medida": 55,
+      "medida": 54,
       "modal": 0,
       "crudo": 9,
       "celda": 8,
@@ -344,6 +353,15 @@
       "modal": 0,
       "crudo": 8,
       "celda": 10,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
+    "tesoreria": {
+      "color": 0,
+      "medida": 0,
+      "modal": 0,
+      "crudo": 0,
+      "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -967,8 +985,7 @@
       "medida": {
         "max-w-[1600px]": 1,
         "text-[11px]": 1,
-        "w-[14px]": 1,
-        "min-w-[8rem]": 1
+        "w-[14px]": 1
       },
       "crudo": {
         "<button>": 1
