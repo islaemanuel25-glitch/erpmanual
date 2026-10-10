@@ -95,6 +95,9 @@ export async function GET(req) {
     const selectValorizacion = {
       cantidad: true,
       recibido: true,
+      // Las sueltas son parte de lo recibido: sin ellas `cantidadesDeDetalle`
+      // las lee como 0 y la fila marca un faltante que no existe.
+      recibidoUnidadesSueltas: true,
       precioCosto: true,
       unidadEnviada: true,
       // ── EL SNAPSHOT DE PRESENTACIÓN ─────────────────────────────────────

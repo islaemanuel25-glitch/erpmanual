@@ -13,6 +13,7 @@ import {
 } from "@/lib/compras-proveedor/fronteraCosto";
 import { esComboBase } from "@/lib/combos/guards";
 import { unidadFisicaDelIngreso } from "@/lib/compras-proveedor/stockIngresado";
+import { unidadesFisicasDe } from "@/lib/transferencias/recepcion";
 import { laCantidadCuadraConElPrecio } from "@/lib/compras-proveedor/laCantidadCuadraConElPrecio";
 import { pedidoEnAlcance, ownerLocalIdDePedido } from "@/lib/compras/scope";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
@@ -621,6 +622,34 @@ export async function POST(req, { params }) {
         const base = det.producto?.base;
         const modoCompra = base?.modoCompraProveedor || "BULTO";
 
+        // ── LO CONTADO, EN UNIDADES FÍSICAS: BULTOS Y SUELTAS ───────────────
+        //
+        // "¿Llegó algo?" se preguntaba con `cantRecibida`, que es SOLO el campo
+        // de bultos. Un renglón con 0 bultos y 3 sueltas —la hoja de Corregir lo
+        // deja cargar y manda las 3 en `fisicas`— se salteaba entero: no entraba
+        // stock, `stockIngresado` quedaba en 0 y las sueltas ni se guardaban. Es
+        // el defecto de la transferencia #373, del lado de compras.
+        //
+        // La cuenta es `unidadesFisicasDe`, la misma que mueve el stock de una
+        // transferencia. Las sueltas solo existen cuando la hoja contó en bultos
+        // (`vaPorPack`), así que con sueltas el renglón está en bultos del
+        // `factor_pack` sea cual sea `det.unidad`; sin sueltas, la cantidad sigue
+        // en la escala de la línea del pedido, como siempre.
+        const factorPack = Math.max(1, Number(base?.factor_pack || 1));
+        const sueltasRecibidas = Number(sueltasMap[det.id]) || 0;
+        const contadas = unidadesFisicasDe({
+          cantidad: cantRecibida,
+          sueltas: sueltasRecibidas,
+          unidad: sueltasRecibidas > 0 || det.unidad !== "UNIDAD" ? "BULTO" : "UNIDAD",
+          factorPack,
+        });
+        if (contadas === null) {
+          throw new ErrorParaLaPersona(
+            `${base?.nombre || "Un producto"}: tiene unidades sueltas pero no viene en bultos. ` +
+              `Abrí Corregir y cargá todo en la cantidad.`
+          );
+        }
+
         // ── LOS KILOS QUE LA HOJA MOSTRÓ ENTRAN COMO KILOS ─────────────────
         //
         // La hoja de Corregir pide kilos cuando `elDepositoCuentaPorKilo` dice
@@ -652,7 +681,7 @@ export async function POST(req, { params }) {
         // producto ya cambió de modo.
         const unidadIngreso = unidadFisicaDelIngreso({ vaPorPeso, base, destinoEsDeposito });
 
-        if (cantRecibida <= 0) {
+        if (!(contadas > 0)) {
           // UN CERO DECLARADO ES UN DATO: "se contó y no llegó". Se guarda,
           // porque es distinto de `null` —nunca se contó— y esa diferencia es
           // la que deja saber después si alguien miró la línea.
@@ -727,7 +756,6 @@ export async function POST(req, { params }) {
           //
           // Lo que se ve es lo que entra. Sin ese dato —una pantalla vieja, o
           // una línea que nadie abrió— se sigue deduciendo como antes.
-          const factorPack = Math.max(1, Number(base?.factor_pack || 1));
           const declaradasFisicas = fisicasMap[det.id];
           const hayFisicas =
             declaradasFisicas !== undefined &&
@@ -735,9 +763,7 @@ export async function POST(req, { params }) {
             declaradasFisicas !== "" &&
             Number.isFinite(Number(declaradasFisicas)) &&
             Number(declaradasFisicas) > 0;
-          incremento = hayFisicas
-            ? Number(declaradasFisicas)
-            : cantRecibida * (det.unidad === "UNIDAD" ? 1 : factorPack);
+          incremento = hayFisicas ? Number(declaradasFisicas) : contadas;
 
           // ── EL PRECIO DELATA LA ESCALA ─────────────────────────────────
           //
@@ -844,9 +870,18 @@ export async function POST(req, { params }) {
         const costoFinal = detData.precioCosto !== undefined
           ? Number(detData.precioCosto)
           : Number(det.precioCosto || 0);
+        // Con sueltas, lo que se valoriza son las físicas contadas llevadas a la
+        // escala del costo: una suelta vale el costo del bulto dividido por su
+        // factor. Sin sueltas, o por peso, es la cantidad de siempre.
+        const cantidadValorizada =
+          vaPorPeso || sueltasRecibidas === 0
+            ? cantRecibida
+            : det.unidad === "UNIDAD"
+            ? contadas
+            : contadas / factorPack;
         const { subtotal: subtotalEconomico } = subtotalLinea({
           base,
-          cantidad: cantRecibida,
+          cantidad: cantidadValorizada,
           costo: costoFinal,
           kg: kgReales,
         });

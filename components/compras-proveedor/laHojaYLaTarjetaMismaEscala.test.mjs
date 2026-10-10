@@ -177,7 +177,15 @@ test("Y EL CIERRE USA LO QUE LA HOJA DIJO, NO SU PROPIA CUENTA", () => {
   assert.match(cierre, /hayFisicas\s*\n?\s*\?\s*Number\(declaradasFisicas\)/);
   // La deducción vieja sigue como respaldo para una línea que nadie abrió, y
   // eso es a propósito: sacarla dejaría sin stock a las líneas no tocadas.
-  assert.match(cierre, /det\.unidad === "UNIDAD" \? 1 : factorPack/);
+  //
+  // Decía `cantRecibida * (det.unidad === "UNIDAD" ? 1 : factorPack)`, que
+  // perdía las sueltas: 2 bultos + 3 sueltas entraban como 24. Desde el arreglo
+  // de las sueltas el respaldo son las `contadas` de `unidadesFisicasDe`, con la
+  // misma elección de escala por `det.unidad`. El caso vive ejecutado en
+  // `scripts/pruebas-db/recepcionCompras.mjs`, sección 1d.
+  assert.match(cierre, /hayFisicas \? Number\(declaradasFisicas\) : contadas;/);
+  assert.match(cierre, /const contadas = unidadesFisicasDe\(/);
+  assert.match(cierre, /det\.unidad !== "UNIDAD" \? "BULTO" : "UNIDAD"/);
   // Y no se acusa a quien declaró una diferencia a propósito.
   assert.match(cierre, /motivoDeclarado/);
 });

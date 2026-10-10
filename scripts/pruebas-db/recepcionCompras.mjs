@@ -266,6 +266,16 @@ async function congelado(detId) {
   };
 }
 
+async function sueltasGuardadas(detId) {
+  const d = await prisma.pedidoProveedorDetalle.findUnique({ where: { id: detId }, select: { unidadesSueltas: true } });
+  return d?.unidadesSueltas ?? null;
+}
+
+async function totalFacturaDe(pedidoId) {
+  const p = await prisma.pedidoProveedor.findUnique({ where: { id: pedidoId }, select: { totalFactura: true } });
+  return p?.totalFactura == null ? null : Number(p.totalFactura);
+}
+
 /**
  * Un caso de una línea: recibe y compara el delta del stock contra lo congelado
  * y contra lo esperado. Devuelve el pedido y lo congelado para lo que sigue.
@@ -318,6 +328,39 @@ async function correr(f) {
     esperado: 77,
     unidad: "UNIDAD",
   });
+
+  // ── LAS SUELTAS TAMBIÉN EN LA PLATA, Y SIN BULTOS ────────────────────────
+  //
+  // Mismo defecto que la transferencia #373: la ruta preguntaba "¿llegó algo?"
+  // con el campo de bultos y valorizaba solo los bultos. Un bulto cuesta $1.200,
+  // así que una suelta del PACK x12 vale $100.
+  seccion("1c. PACK solo sueltas: 0 bultos y 3 sueltas entran como 3, y valen $300");
+  const soloSueltas = await casoDeUnaLinea(f, {
+    titulo: "PACK solo sueltas",
+    prod: f.pack,
+    owner: D,
+    sesion: f.sesionDeposito,
+    linea: { cantidad: 1, unidad: "BULTO", precioCosto: 1200 },
+    // Lo que manda la hoja de Corregir: 0 bultos, 3 sueltas, y las 3 en `fisicas`.
+    cuerpo: (id) => ({ recibidos: { [id]: 0 }, sueltas: { [id]: 3 }, fisicas: { [id]: 3 } }),
+    esperado: 3,
+    unidad: "UNIDAD",
+  });
+  igual("PACK solo sueltas: las sueltas quedan guardadas", await sueltasGuardadas(soloSueltas.detId), 3);
+  igual("PACK solo sueltas: totalFactura es 3 × $100", await totalFacturaDe(soloSueltas.pedido.id), 300);
+  seccion("1d. PACK bultos + sueltas SIN `fisicas`: 2 y 3 entran como 27, y valen $2.700");
+  // Una pantalla vieja, o una línea que nadie abrió en la hoja: la ruta deduce.
+  const sinFisicas = await casoDeUnaLinea(f, {
+    titulo: "PACK con sueltas sin fisicas",
+    prod: f.pack,
+    owner: D,
+    sesion: f.sesionDeposito,
+    linea: { cantidad: 3, unidad: "BULTO", precioCosto: 1200 },
+    cuerpo: (id) => ({ recibidos: { [id]: 2 }, sueltas: { [id]: 3 } }),
+    esperado: 27,
+    unidad: "UNIDAD",
+  });
+  igual("PACK con sueltas sin fisicas: totalFactura es 2 × $1.200 + 3 × $100", await totalFacturaDe(sinFisicas.pedido.id), 2700);
 
   seccion("3. UNIDAD simple: 15 entran como 15");
   await casoDeUnaLinea(f, {

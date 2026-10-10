@@ -116,6 +116,9 @@ export async function GET(req) {
           select: {
             cantidad: true,
             recibido: true,
+            // Las sueltas son parte de lo recibido: sin ellas el "rec" del
+            // reporte las cuenta como 0.
+            recibidoUnidadesSueltas: true,
             precioCosto: true,
             unidadEnviada: true,
             // El snapshot de presentación, para que el agrupado por destino

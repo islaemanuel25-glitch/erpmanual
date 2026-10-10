@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-09 23:48
+**Última actualización:** 2026-10-10 00:25
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-10: fix: la lista y el reporte por destino suman las sueltas recibidas, sin faltantes falsos
 - 2026-10-09: fix: una línea no declarada con solo sueltas no traba Confirmar y cuenta como diferencia
 - 2026-10-07: refactor(transferencias): el conteo de líneas con diferencia sale del tablero a lib
 - 2026-10-05: feat: corregir el turno operativo de la caja abierta desde el POS
