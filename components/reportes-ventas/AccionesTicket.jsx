@@ -4,7 +4,8 @@
 //   · Reimprimir (térmica)  · PDF  · Compartir (con fallback a descarga)
 //   · Corrección simple (cliente / observaciones / referencia interna)
 //   · Corregir venta completa → DESHABILITADO hasta Fase B.
-//   · Anular venta (solo venta común, sin remito, con su turno abierto).
+//   · Anular venta (solo venta común, sin remito; con el turno cerrado pide además
+//     el permiso de corregir con turno cerrado).
 //
 // Reimpresión/PDF/Compartir usan datos HISTÓRICOS de la venta, marcan
 // "REIMPRESIÓN — COPIA" y conservan el número original (opts.copia).

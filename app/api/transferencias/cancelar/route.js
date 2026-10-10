@@ -121,8 +121,9 @@ function localDeLaSesion(req, session) {
 // abierta significaba que el depósito tuviera que abrir la suya para que el
 // local destino pudiera deshacer un remito que le llegó por error.
 //
-// `turnoIdCorreccion` queda en null en este flujo. Poner ahí un turno diría que
-// la diferencia impactó en esa caja, y no impactó nada.
+// `turnoIdCorreccion` queda en null en este flujo: lo decide el motor, porque la
+// venta tiene remito. Poner ahí un turno diría que la diferencia impactó en esa
+// caja, y no impactó nada.
 
 // ── GET: el PREVIEW ─────────────────────────────────────────────────────────
 //
@@ -283,8 +284,9 @@ export async function POST(req) {
       // común y el registro diría que el esperado de alguna caja bajó por el
       // total cobrado, que es falso.
       //
-      // `turnoDestinoId: null` porque no hay diferencia que imputar. Ver el
-      // bloque de arriba sobre por qué este flujo no necesita una caja abierta.
+      // Ese mismo dato hace que el motor deje `turnoIdCorreccion` en null y no
+      // pida ajuste de cierre: no hay diferencia que imputar. Ver el bloque de
+      // arriba sobre por qué este flujo no necesita una caja abierta.
       let reversion = null;
       if (t.venta) {
         reversion = await revertirVenta(tx, {
@@ -292,8 +294,6 @@ export async function POST(req) {
           grupoId,
           usuarioId: auth.session.id ?? null,
           motivo,
-          turnoDestinoId: null,
-          turnoOriginalCerrado: t.venta.turno ? t.venta.turno.cierre != null : false,
           versionEsperada: t.venta.version,
           origen: `cancelacion de la transferencia #${t.id}`,
         });

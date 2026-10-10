@@ -2,7 +2,8 @@
 //
 // ANULAR UNA VENTA COMÚN DEL MOSTRADOR. Marca la venta como anulada, devuelve al
 // stock del local lo que la venta descontó, revierte la cuenta corriente y los
-// puntos, y deja el rastro. Todo en una transacción.
+// puntos, refleja la anulación en el cierre de su turno si ya estaba cerrado, y
+// deja el rastro. Todo en una transacción.
 //
 // ── DE DÓNDE VIENE ──────────────────────────────────────────────────────────
 //
@@ -23,27 +24,40 @@
 // ── QUÉ PASA CON EL ARQUEO ──────────────────────────────────────────────────
 //
 // La venta deja de contar porque el filtro comercial la excluye por `anuladaEn`,
-// así que el esperado de su turno BAJA por lo cobrado. Solo se permite con el
-// turno de la venta abierto —la regla de la corrección completa—, así que esa
-// baja nunca le cae a un arqueo ya contado. El GET devuelve el número para que la
-// pantalla lo diga ANTES de confirmar.
+// así que el esperado de su turno BAJA por lo cobrado en efectivo. Con el turno
+// abierto eso es todo: el cierre todavía no existe.
+//
+// Con el turno CERRADO (decisión de Emanuel del 2026-10-10, que reemplaza la del
+// 20/8): el cierre ya quedó grabado, y el ajuste va a ESE cierre —el del turno de
+// la venta, nunca otro—. Su esperado baja y su diferencia se recalcula contra lo
+// que el operador contó, que no se toca. Lo arma `ajusteDelCierrePorAnulacion`
+// con el turno bloqueado, lo escribe el motor, y el registro de la anulación
+// guarda el antes y el después. Hace falta `ventas.corregir_turno_cerrado`, y lo
+// pregunta esta ruta, no solo la pantalla.
+//
+// El GET devuelve todos esos números para que la pantalla los diga ANTES de
+// confirmar.
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { bloquearTurno } from "@/lib/caja/cierreRelevoServer";
+import { ESTADO_CIERRE } from "@/lib/caja/cierreRelevo";
 import {
   revertirVenta,
   impactoEnArqueo,
   veredictoAnulacionVentaComun,
   validarMotivoAnulacion,
+  ajusteDelCierrePorAnulacion,
   CODIGOS_ANULAR,
 } from "@/lib/pos-ventas/reversionVenta";
 
 const j = (body, status = 200) => NextResponse.json(body, { status });
 
 const PERMISO = "ventas.corregir_completa";
+const PERMISO_TURNO_CERRADO = "ventas.corregir_turno_cerrado";
 
 /** El select completo. Se usa igual para el preview (GET) y para anular (POST). */
 const SELECT_VENTA = {
@@ -57,8 +71,21 @@ const SELECT_VENTA = {
   turnoId: true,
   version: true,
   anuladaEn: true,
-  // Los mismos campos que lee `estadoTurnoCorreccion` en el detalle.
-  turno: { select: { id: true, cierre: true, cierreEnPreparacionEn: true, anuladoEn: true } },
+  // Los campos que lee `estadoDelTurno`, más el cierre grabado del turno.
+  turno: {
+    select: {
+      id: true,
+      cierre: true,
+      cierreEnPreparacionEn: true,
+      anuladoEn: true,
+      montoEsperadoEfectivo: true,
+      montoRealEfectivo: true,
+      diferenciaEfectivo: true,
+      totalVentasEfectivo: true,
+      totalVentasDigital: true,
+      cantidadVentas: true,
+    },
+  },
   transferencia: { select: { id: true } },
   pagos: { select: { medio: true, monto: true } },
   detalles: {
@@ -92,27 +119,63 @@ async function cargar(db, req, params) {
   if (!venta || (!session.esAdmin && venta.localId !== Number(session.localId))) {
     return { error: j({ ok: false, error: "No se encontró la venta.", code: CODIGOS_ANULAR.VENTA_AUSENTE }, 404) };
   }
-  return { session, ventaId, venta };
+  const puedeTurnoCerrado = checkPerm(session, PERMISO_TURNO_CERRADO).ok;
+  return { session, ventaId, venta, puedeTurnoCerrado };
+}
+
+/**
+ * El ajuste del cierre del turno ORIGINAL de la venta, leído de la base. Las
+ * filas son siempre las del `venta.turnoId`: no hay otro turno que buscar.
+ */
+async function ajusteDelCierre(db, venta) {
+  const [corte, arqueoFinal] = await Promise.all([
+    db.cierrePreparacion.findFirst({
+      where: { turnoId: venta.turnoId, estado: ESTADO_CIERRE.CONFIRMADO },
+      orderBy: { id: "desc" },
+      select: {
+        id: true, turnoId: true, estado: true, efectivoEsperadoCorte: true, totalCambio: true,
+        efectivoRetiradoEsperado: true, totalRetiroContado: true, totalContado: true,
+        diferencia: true, cantidadVentasCorte: true,
+      },
+    }),
+    db.arqueoCaja.findFirst({
+      where: { turnoId: venta.turnoId, tipo: "FINAL" },
+      orderBy: { fechaHora: "desc" },
+      select: { id: true, turnoId: true, tipo: true, efectivoEsperado: true, efectivoContado: true, diferencia: true },
+    }),
+  ]);
+  return ajusteDelCierrePorAnulacion({ venta, turno: venta.turno, corte, arqueoFinal });
 }
 
 // ── GET: el PREVIEW ─────────────────────────────────────────────────────────
 //
 // El panel pregunta al abrirse si se puede y qué va a pasar con el arqueo. Sin
-// esto el cajero se entera del salto al cerrar la caja.
+// esto el cajero se entera del salto al cerrar la caja — o, con el turno
+// cerrado, nadie se entera de cómo quedó su diferencia.
 export async function GET(req, { params }) {
   try {
     const r = await cargar(prisma, req, params);
     if (r.error) return r.error;
-    const { venta } = r;
+    const { venta, puedeTurnoCerrado } = r;
 
-    const veredicto = veredictoAnulacionVentaComun(venta);
+    const veredicto = veredictoAnulacionVentaComun(venta, { puedeTurnoCerrado });
+    let cierreDelTurnoOriginal = null;
+    if (veredicto.puede && veredicto.turnoCerrado) {
+      const ajuste = await ajusteDelCierre(prisma, venta);
+      if (!ajuste.ok) {
+        return j({ ok: true, anulable: false, codigo: CODIGOS_ANULAR.CIERRE_NO_COINCIDE, motivoBloqueo: ajuste.error });
+      }
+      cierreDelTurnoOriginal = { turnoId: ajuste.turnoId, efectivoAnulado: ajuste.efectivoAnulado, ...ajuste.cierre };
+    }
     return j({
       ok: true,
       anulable: veredicto.puede,
       codigo: veredicto.codigo,
       motivoBloqueo: veredicto.puede ? null : veredicto.error,
       numero: venta.numero,
+      turnoOriginalCerrado: veredicto.puede ? veredicto.turnoCerrado : null,
       arqueo: impactoEnArqueo(venta),
+      cierreDelTurnoOriginal,
     });
   } catch (err) {
     console.error("ERROR en preview de anulación:", err);
@@ -125,13 +188,14 @@ export async function GET(req, { params }) {
 const STATUS_POR_CODIGO = {
   [CODIGOS_ANULAR.VENTA_AUSENTE]: 404,
   [CODIGOS_ANULAR.MOTIVO_AUSENTE]: 400,
+  [CODIGOS_ANULAR.SIN_PERMISO_TURNO_CERRADO]: 403,
 };
 
 export async function POST(req, { params }) {
   try {
     const r = await cargar(prisma, req, params);
     if (r.error) return r.error;
-    const { session, ventaId } = r;
+    const { session, ventaId, puedeTurnoCerrado } = r;
 
     const body = await req.json().catch(() => ({}));
     const vm = validarMotivoAnulacion(body?.motivo);
@@ -144,16 +208,28 @@ export async function POST(req, { params }) {
       // El mismo candado por venta que la corrección completa: una corrección y
       // una anulación de la misma venta no pueden cruzarse.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(${ventaId})`;
+      // Y el turno, con el mismo candado que usan el cierre y los movimientos de
+      // caja: dos anulaciones del mismo turno cerrado leerían el mismo esperado y
+      // la segunda pisaría a la primera.
+      if (r.venta.turnoId) await bloquearTurno(tx, r.venta.turnoId);
 
       // Se relee y se vuelve a decidir ADENTRO: entre el preview y el toque el
-      // turno pudo pasar a cierre, o alguien pudo anularla.
+      // turno pudo cerrarse, o alguien pudo anularla.
       const venta = await tx.venta.findUnique({ where: { id: ventaId }, select: SELECT_VENTA });
-      const veredicto = veredictoAnulacionVentaComun(venta);
-      if (!veredicto.puede) {
-        const e = new Error(veredicto.error);
-        e.code = veredicto.codigo;
-        e.status = STATUS_POR_CODIGO[veredicto.codigo] ?? 409;
-        throw e;
+      const veredicto = veredictoAnulacionVentaComun(venta, { puedeTurnoCerrado });
+      const falla = (codigo, error) => {
+        const e = new Error(error);
+        e.code = codigo;
+        e.status = STATUS_POR_CODIGO[codigo] ?? 409;
+        return e;
+      };
+      if (!veredicto.puede) throw falla(veredicto.codigo, veredicto.error);
+
+      let ajusteCierre = null;
+      if (veredicto.turnoCerrado) {
+        const ajuste = await ajusteDelCierre(tx, venta);
+        if (!ajuste.ok) throw falla(CODIGOS_ANULAR.CIERRE_NO_COINCIDE, ajuste.error);
+        ajusteCierre = ajuste;
       }
 
       const reversion = await revertirVenta(tx, {
@@ -161,9 +237,7 @@ export async function POST(req, { params }) {
         grupoId,
         usuarioId: session.id ?? null,
         motivo: vm.motivo,
-        // Con turno abierto, la diferencia cae en el mismo turno de la venta.
-        turnoDestinoId: veredicto.turnoId,
-        turnoOriginalCerrado: false,
+        ajusteCierre,
         versionEsperada: Number.isFinite(versionEsperada) ? versionEsperada : venta.version,
         origen: "anulacion desde el detalle de la venta",
       });

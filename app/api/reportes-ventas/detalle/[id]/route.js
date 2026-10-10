@@ -268,7 +268,9 @@ export async function GET(req, { params }) {
     // que no tenía ningún camino: lo destapó un POS tildado que duplicó dos
     // tickets en Mini unidas. Lo decide `veredictoAnulacionVentaComun`, la MISMA
     // función que usa la ruta de anular, así el botón no ofrece algo que la ruta
-    // después rechaza. El permiso es el de la corrección completa.
+    // después rechaza. El permiso es el de la corrección completa, y con el turno
+    // de la venta ya cerrado además el de corregir con turno cerrado: también se
+    // lo pasa al predicado, igual que la ruta.
     let anuladaPorNombre = null;
     if (venta.anuladaPorId) {
       const u = await prisma.usuario.findUnique({
@@ -285,7 +287,9 @@ export async function GET(req, { params }) {
       // El remito, para que desde la venta se llegue al documento donde se
       // resuelve. Es un dato, no una acción.
       transferenciaId: venta.transferencia?.id ?? null,
-      puedeAnular: permiteCompleta && veredictoAnulacionVentaComun(venta).puede,
+      puedeAnular:
+        permiteCompleta &&
+        veredictoAnulacionVentaComun(venta, { puedeTurnoCerrado: permiteTurnoCerrado }).puede,
     };
 
     // --- Datos de medios de pago (desglose para UI + reimpresión) ---

@@ -2055,9 +2055,11 @@ model VentaCorreccion {
   // "SIMPLE" | "COMPLETA" | "ANULACION"
   // ANULACION: la venta se declara inexistente. Devuelve el stock, revierte
   // cuenta corriente y puntos, y cancela el remito vinculado si lo hay.
-  // `totalNuevo` va en 0 y `diferencia` en menos el total. Puede cruzar turnos:
-  // `turnoIdOriginal` es el de la venta y `turnoIdCorreccion` el turno abierto
-  // donde cae la diferencia, que pueden ser distintos.
+  // `totalNuevo` va en 0 y `diferencia` en menos el total. NO cruza turnos
+  // (decisión del 2026-10-10): el ajuste va al turno de la venta aunque esté
+  // cerrado, así que `turnoIdCorreccion` es igual a `turnoIdOriginal`, o null si
+  // la venta no contaba para el arqueo. Con el turno cerrado, `impactoCaja`
+  // guarda el antes y el después de su cierre.
   // Es un String y no un enum, así que este comentario es lo único que enumera
   // los valores — mantenerlo.
   tipo              String
@@ -2070,7 +2072,7 @@ model VentaCorreccion {
   localId           Int?
   grupoId           Int?
   turnoIdOriginal   Int? // turno de la venta al momento de corregir
-  turnoIdCorreccion Int? // turno actual abierto donde impacta la diferencia (si hay)
+  turnoIdCorreccion Int? // turno donde impacta la diferencia (si hay); en la anulación, el mismo que el original
   turnoCerrado      Boolean  @default(false)
   versionAntes      Int
   versionDespues    Int

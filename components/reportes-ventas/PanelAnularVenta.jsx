@@ -3,10 +3,11 @@
 // EL PANEL DE ANULAR UNA VENTA COMÚN, con su confirmación.
 //
 // Es el panel del 2026-08-20 (e7d9ff40), restaurado el 2026-10-10 para las ventas
-// del mostrador sin remito. Se le sacaron las dos líneas que solo existían para
-// la venta interna —el remito que se cancela y el turno cerrado—, porque la ruta
-// ya no acepta ninguno de los dos casos. La cinta de anulada que vivía acá se
-// mudó a `CintaVentaAnulada.jsx` y sigue allá.
+// del mostrador sin remito. Se le sacó la línea del remito que se cancela, porque
+// la ruta no acepta ventas con remito. La del turno cerrado volvió el mismo día,
+// con el criterio nuevo: la anulación se refleja en el cierre del turno ORIGINAL,
+// y el panel dice cuánto baja su esperado y cómo queda la diferencia. La cinta de
+// anulada que vivía acá se mudó a `CintaVentaAnulada.jsx` y sigue allá.
 //
 // ── POR QUÉ PREGUNTA ANTES DE MOSTRARSE ─────────────────────────────────────
 //
@@ -33,6 +34,45 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 // Espacio irrompible: a 360 px el "$" quedaba solo al final del renglón.
 const money = (n) =>
   `$ ${Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/** "faltante $ 11.400,00", "sobrante $ 200,00" o "sin diferencia". */
+function diferenciaEnPalabras(d) {
+  const n = Number(d || 0);
+  if (Math.round(n * 100) === 0) return "sin diferencia";
+  return `${n < 0 ? "faltante" : "sobrante"} ${money(Math.abs(n))}`;
+}
+
+/**
+ * Lo que pasa con el cierre del turno ORIGINAL cuando ya está cerrado. Todos los
+ * números vienen del servidor (`cierreDelTurnoOriginal` del preview); acá solo
+ * se escriben en palabras.
+ */
+function CierreDelTurnoOriginal({ c }) {
+  return (
+    <>
+      <div className="sunmi-text-accent font-medium">
+        · El turno de esta venta ya está CERRADO. La anulación se refleja en ese cierre, no en la caja de hoy.
+      </div>
+      {Number(c.efectivoAnulado) > 0 ? (
+        <div className="sunmi-text-accent font-medium">
+          · Su efectivo esperado BAJA {money(c.efectivoAnulado)}: de {money(c.esperadoAntes)} a {money(c.esperadoDespues)}.
+        </div>
+      ) : (
+        <div className="sunmi-text-muted">
+          · Su efectivo esperado no se mueve: la venta no se cobró en efectivo.
+        </div>
+      )}
+      {c.contado == null ? (
+        <div className="sunmi-text-muted">· Ese turno se cerró sin conteo: no hay diferencia que recalcular.</div>
+      ) : (
+        <div className="sunmi-text-accent font-medium">
+          · La diferencia de su cierre pasa de {diferenciaEnPalabras(c.diferenciaAntes)} a{" "}
+          {diferenciaEnPalabras(c.diferenciaDespues)}. Lo que se contó al cerrar no cambia.
+        </div>
+      )}
+    </>
+  );
+}
 
 export default function PanelAnularVenta({ venta, onAnulada, onCerrar }) {
   const [preview, setPreview] = useState(null);
@@ -96,14 +136,19 @@ export default function PanelAnularVenta({ venta, onAnulada, onCerrar }) {
             <div className="font-medium sunmi-text-strong">Al anular:</div>
             <div>· El stock vuelve al local. La venta deja de contar para reportes y estadísticas.</div>
             <div>· El ticket conserva su número y queda marcado como anulado.</div>
-            {preview.arqueo?.contabaEnArqueo ? (
+            {preview.cierreDelTurnoOriginal ? (
+              <CierreDelTurnoOriginal c={preview.cierreDelTurnoOriginal} />
+            ) : !preview.arqueo?.contabaEnArqueo ? (
+              <div className="sunmi-text-muted">
+                · El arqueo no se mueve: esta venta no contaba para el esperado.
+              </div>
+            ) : preview.arqueo.deltaEfectivo ? (
               <div className="sunmi-text-accent font-medium">
-                · El efectivo esperado de la caja BAJA {money(Math.abs(preview.arqueo.deltaEsperado))}
-                {preview.arqueo.medios?.length > 1 && " (repartido entre varios medios)"}.
+                · El efectivo esperado de la caja BAJA {money(Math.abs(preview.arqueo.deltaEfectivo))}.
               </div>
             ) : (
               <div className="sunmi-text-muted">
-                · El arqueo no se mueve: esta venta no contaba para el esperado.
+                · El efectivo esperado no se mueve: la venta no se cobró en efectivo.
               </div>
             )}
           </div>
