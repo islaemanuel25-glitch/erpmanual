@@ -248,7 +248,12 @@ test("EL CIERRE ESCRIBE AL STOCK LOS KILOS QUE MOSTRÓ LA HOJA", () => {
   // La rama de peso del cierre ya prefería `kgRecibidos` sobre el peso de
   // referencia; lo que faltaba era que alguien se lo mandara.
   const cierre = codigoDe(CIERRE);
-  assert.match(cierre, /kgRecibidosMap\[det\.id\] !== undefined/);
+  // Desde el 2026-10-10 los kilos pasan por `fiambreAlCerrar`, que suma el
+  // caso del fiambre que el papel factura en kilos (Das #255). Los de la hoja
+  // siguen mandando: son su primera opción, y de ahí sale `kgReales`.
+  assert.match(cierre, /const kilosDeLaHoja = kgRecibidosMap\[det\.id\];/);
+  assert.match(cierre, /kilosDeLaHoja: hayKilosDeLaHoja \? kilosDeLaHoja : null/);
+  assert.match(cierre, /kgReales = kilosQueEntran;/);
   assert.match(cierre, /incremento = esFiambreFijoEnUbicacion\(base, destinoEsDeposito\)/);
   // El respaldo por peso de referencia queda para cuando nadie pesó, y se ve
   // que es un respaldo.

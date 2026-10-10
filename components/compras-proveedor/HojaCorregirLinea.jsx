@@ -87,9 +87,12 @@ import {
   cantidadEnEscalaDelPedido,
   cantidadFueConvertida,
   costoPropioParaDecidir,
+  difiereDeLoPedido,
   estadoDeLinea,
   hayDiferenciaDePrecio,
   motivoSinComparacion,
+  piezasContadasDeLaFila,
+  piezasEstimadasDeLaFactura,
   porcentajeDelPrecio,
   unidadesFisicasEsperadas,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
@@ -429,6 +432,14 @@ export default function HojaCorregirLinea({
   // Se usa el MISMO número convertido que muestra la tarjeta —no se recalcula
   // acá—, que sale de la lectura que `deducirUnidad` ya eligió.
   const cantidadDeLaFactura = cantidadEnEscalaDelPedido(fila);
+  // Cómo se dice lo que trae el papel. En el fiambre de peso variable que se
+  // factura por kilo —Das #255, "10,94 × 9.375,87"— son KILOS, con su
+  // estimación de piezas al lado para cotejar contra lo pedido; nunca "10.94".
+  const piezasEstimadas = piezasEstimadasDeLaFactura(fila);
+  const loQueDiceLaFactura =
+    fila?.cantidadEnKilos === true
+      ? `${formatearKgExacto(fila.peso)}${piezasEstimadas !== null ? ` (≈ ${limpio(Math.round(piezasEstimadas * 10) / 10)} piezas)` : ""}`
+      : limpio(cantidadDeLaFactura);
   const convertida = cantidadFueConvertida(fila);
   // ── CUANDO EL PROVEEDOR FACTURA UN PACK DEL BULTO ─────────────────────
   //
@@ -442,10 +453,20 @@ export default function HojaCorregirLinea({
 
   useEffect(() => {
     if (!abierta || !fila) return;
+    // El fiambre de peso variable que viene en kilos: el papel no dice cuántas
+    // piezas llegaron, así que el campo arranca VACÍO —no contado— y no con los
+    // kilos puestos como si fueran piezas. Lo que sí se ofrece son los kilos,
+    // abajo, que es lo que entra al stock.
+    const contadasDelFiambre =
+      fila.cantidadEnKilos === true ? piezasContadasDeLaFila(fila) : null;
     setBultos(
-      fila.cantidadRecibida != null
-        ? String(fila.cantidadRecibida)
-        : String(cantidadEnEscalaDelPedido(fila) ?? "")
+      fila.cantidadEnKilos === true
+        ? contadasDelFiambre != null
+          ? String(contadasDelFiambre)
+          : ""
+        : fila.cantidadRecibida != null
+          ? String(fila.cantidadRecibida)
+          : String(cantidadEnEscalaDelPedido(fila) ?? "")
     );
     setSueltas(fila.unidadesSueltas != null ? String(fila.unidadesSueltas) : "");
     // Lo pesado antes si lo hubo; si no, LO QUE DICE EL PAPEL. Nunca el peso de
@@ -581,6 +602,13 @@ export default function HojaCorregirLinea({
     // UNIDADES con que se sembró el Gancia contra las 48 que entran: pedía el
     // motivo de una diferencia que no existe. `unidadesFisicasEsperadas` pasa
     // por la misma conversión de pack que lo que entra.
+    // El fiambre que viene en kilos se compara con la MISMA función que la
+    // tarjeta: con piezas contadas, exacto; sin contar, la estimación de piezas
+    // con la tolerancia del proveedor. Una diferencia chica no pide motivo.
+    if (fila?.cantidadEnKilos === true) {
+      const contadas = bultos === "" || !Number.isFinite(Number(bultos)) ? null : unidadesContadas;
+      return difiereDeLoPedido(fila, { piezasContadas: contadas }).difiere;
+    }
     const esperadas = unidadesFisicasEsperadas(fila);
     if (esperadas === null) return false;
     if (bultos === "" || !Number.isFinite(Number(bultos))) return false;
@@ -858,8 +886,8 @@ export default function HojaCorregirLinea({
               {sinPapel
                 ? `Pediste ${limpio(fila.cantidadPedida)}`
                 : sinPedidoPrevio
-                  ? `La factura dice ${limpio(cantidadDeLaFactura)}`
-                  : `Pediste ${limpio(fila.cantidadPedida)} · la factura dice ${limpio(cantidadDeLaFactura)}`}
+                  ? `La factura dice ${loQueDiceLaFactura}`
+                  : `Pediste ${limpio(fila.cantidadPedida)} · la factura dice ${loQueDiceLaFactura}`}
               {fraseDeLaUnidad
                 ? ` · ${fraseDeLaUnidad}${explicacionDeLaUnidad?.avisoDivision ? `. ${explicacionDeLaUnidad.avisoDivision}` : ""}`
                 : convertida

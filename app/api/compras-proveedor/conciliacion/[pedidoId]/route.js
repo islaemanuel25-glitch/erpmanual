@@ -228,6 +228,10 @@ export async function GET(req, { params }) {
       filas: (g.filas ?? []).map((f) => ({
         ...f,
         catalogoMovido: elCatalogoSeMovio(f, { variacionPct: variacionNormalPct }),
+        // Con la fila, para que la tarjeta y la hoja midan con la misma regla
+        // cuánto puede alejarse una estimación de piezas —la del fiambre que
+        // viene en kilos— sin pedir motivo.
+        variacionNormalPct,
       })),
     }));
 
