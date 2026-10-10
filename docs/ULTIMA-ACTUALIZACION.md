@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-10 04:15
+**Fecha:** 2026-10-10 12:14
 
 ## Módulos modificados recientemente
 
 ### compras-proveedor
-- fix: el fiambre de peso variable que se factura por kilo entra en kilos (Das #255, Salame Milan Fela 10,94 kg): precio por kilo con IVA y percepción, tarjeta y hoja en "kg", piezas estimadas contra lo pedido con la variación del proveedor, y el cierre entra el peso sin inventar piezas ni recalcular el promedio
-- Archivos: 11 modificados (1 candado nuevo: `lib/compras-proveedor/comprobante/fiambreEnKilos.test.mjs`)
+- fix: la boleta de Secco cierra con IVA incluido (el Total del renglón es su importe), los envases a precio simbólico van aparte sin producto, stock ni costo, el descuento global del pie se reparte en el costo, y la tolerancia por renglón multiplica el precio impreso entero; el lector grande recibe dónde va cada columna en un papel sin IVA (SIN VERIFICAR con Gemini real)
+- Archivos: 12 modificados, 3 nuevos (`envase.js`, `boletaSecco.fixture.json`, `boletaSecco.test.mjs`)
 
 
 
