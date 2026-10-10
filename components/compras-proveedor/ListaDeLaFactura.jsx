@@ -31,8 +31,10 @@ import { formatearMoneda } from "@/lib/moneda";
 // El catálogo que dice el estado del papel en castellano. Sin esto, el último
 // `||` devolvía el nombre crudo del enum —"MAL_LEIDO"— al celular.
 import { comoSeDice } from "@/lib/compras-proveedor/comprobante/pantalla";
+import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import {
   FILTRO,
+  esFilaDeEnvase,
   opcionesDeFiltro,
   pasaFiltro,
 } from "@/lib/compras-proveedor/estadoDeLineaFacturada";
@@ -81,7 +83,7 @@ export default function ListaDeLaFactura({
   // Viaja hasta la tarjeta, que es la que dibuja "Pediste".
   sinPedidoPrevio = false,
   comprobante,
-  filas = [],
+  filas: filasDelPapel = [],
   /** El total IMPRESO del papel. Es lo que muestra el rótulo "Factura". */
   totalDelPapel = null,
   onCorregir,
@@ -120,6 +122,18 @@ export default function ListaDeLaFactura({
   // como una capacidad de la pieza, y la próxima persona la va a mantener.
 }) {
   const [filtro, setFiltro] = useState(FILTRO.TODOS);
+
+  // ── LOS ENVASES VAN APARTE ─────────────────────────────────────────────
+  //
+  // Las botellas de cambio de Secco a $0,025 suman al papel y no son
+  // mercadería: no se revisan, no se filtran y no cuentan en la ganancia. Se
+  // listan debajo, con su importe, para que el papel se pueda cotejar entero.
+  // Ver `comprobante/envase.js`.
+  const envases = useMemo(() => (filasDelPapel || []).filter(esFilaDeEnvase), [filasDelPapel]);
+  const filas = useMemo(
+    () => (filasDelPapel || []).filter((f) => !esFilaDeEnvase(f)),
+    [filasDelPapel]
+  );
 
   const opciones = useMemo(() => opcionesDeFiltro(filas), [filas]);
   const visibles = useMemo(
@@ -337,6 +351,18 @@ export default function ListaDeLaFactura({
               onCoincide={onCoincide}
             />
           ))}
+          {envases.length > 0 && (
+            <>
+              <SunmiSeparator label="Envases" />
+              {envases.map((f) => (
+                <RenglonDeImporte
+                  key={claveDeFila(f)}
+                  rotulo={`${f.textoCrudo ?? "Envase"} · ${f.cantidad ?? "—"}`}
+                  valor={f.subtotal}
+                />
+              ))}
+            </>
+          )}
         </>
       }
       // ── EN EL PIE QUEDA LA ACCIÓN, SOLA ─────────────────────────────────
