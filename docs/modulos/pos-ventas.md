@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-10-05 17:10
+**Última actualización:** 2026-10-10 18:26
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-10-10: fix(ventas): volver a poder anular una venta común del mostrador
 - 2026-10-05: feat: corregir el turno operativo de la caja abierta desde el POS
 - 2026-10-05: feat: transición por local al turno operativo y turnos sin ventana válidos
 - 2026-10-05: feat: el turno operativo se reconoce por la ventana del local y la fecha es la de su jornada

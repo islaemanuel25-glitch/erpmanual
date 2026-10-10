@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-09-28 16:09
+**Última actualización:** 2026-10-10 18:26
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-10-10: feat: una explicación por tipo de papel, el CAE contra el duplicado, el cargo repartido en el costo, y se va el código de formato
 - 2026-09-28: feat: declarar el origen de las escrituras de costo para el Libro de Costos
 - 2026-09-19: fix: el cartel dice en cuánto difiere en vez de afirmar que el precio cambió
 - 2026-09-19: feat: el resultado dice cuáles no se van a actualizar y por qué

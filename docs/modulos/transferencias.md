@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-10 00:25
+**Última actualización:** 2026-10-10 18:26
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,12 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-10: feat: una explicación por tipo de papel, el CAE contra el duplicado, el cargo repartido en el costo, y se va el código de formato
+- 2026-10-10: feat: el modelo interpreta el papel y el código controla la cuenta
+- 2026-10-10: feat(compras): con un papel que no cierra se recibe igual, y el renglón se corrige a mano
+- 2026-10-10: fix: Flash razona con techo, y si igual no contesta lee el modelo grande (SIN VERIFICAR con Gemini real)
+- 2026-10-10: fix: la lectura en curso vive en la base, y Flash ya no se corta a los 45 s (SIN VERIFICAR con Gemini real)
+- 2026-10-10: fix: las sueltas cuentan en recibir una compra, en su valorización y en las listas de transferencias
 - 2026-10-10: fix: la lista y el reporte por destino suman las sueltas recibidas, sin faltantes falsos
 - 2026-10-09: fix: una línea no declarada con solo sueltas no traba Confirmar y cuenta como diferencia
 - 2026-10-07: refactor(transferencias): el conteo de líneas con diferencia sale del tablero a lib
