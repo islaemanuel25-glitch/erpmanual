@@ -719,6 +719,30 @@ export default function DetallePedidoProveedorPage({ params }) {
     }
   }, [id]);
 
+  // ── LO QUE DICE EL PAPEL, CORREGIDO A MANO ──────────────────────────────
+  //
+  // Secco #256: con un papel que no cierra, la hoja deja poner a mano lo que
+  // dice un renglón. Va por la MISMA ruta que el bloque "Este papel no
+  // cierra" —que guarda, registra y vuelve a hacer la cuenta— y después se
+  // recarga todo: si cerró, el papel vuelve a proponer costos.
+  const corregirPapel = useCallback(async ({ comprobanteId, orden, ...puesto }) => {
+    try {
+      const r = await fetch(`/api/compras-proveedor/comprobantes/corregir/${comprobanteId}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ renglones: { [orden]: puesto } }),
+      });
+      const d = await r.json().catch(() => null);
+      if (!d?.ok) return { ok: false, error: d?.queHacer || d?.error || "No se pudo guardar lo que dice el papel." };
+      setRecargarConciliacion((n) => n + 1);
+      cargar();
+      return { ok: true, cierra: d.cierra === true };
+    } catch (e) {
+      return { ok: false, error: e?.message || "No se pudo guardar lo que dice el papel." };
+    }
+  }, [cargar]);
+
   const guardarCorreccion = useCallback((datos) => {
     const id = datos?.pedidoDetalleId;
     if (!id) return;
@@ -1539,6 +1563,7 @@ export default function DetallePedidoProveedorPage({ params }) {
               onAceptarPrecio={aceptarPrecioDeLinea}
               onDejarMiPrecio={dejarMiPrecioDeLinea}
               onGuardar={guardarCorreccion}
+              onCorregirPapel={corregirPapel}
               onVincular={vincularLinea}
               onDesmarcar={desmarcarLinea}
               onEditarProducto={sinPapel && puedeEditarProductoP ? irAEditarProducto : null}

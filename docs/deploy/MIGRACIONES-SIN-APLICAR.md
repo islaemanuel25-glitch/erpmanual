@@ -16,12 +16,16 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Una. Producción está en **55 migraciones**; el árbol tiene 56.
+Dos. Producción está en **55 migraciones**; el árbol tiene 57.
 
 - `20261010025546_tokens_de_cada_llamada` — tres columnas nullable en
   `LlamadaLector`: `tokensSalida`, `tokensRazonamiento` y `tokensTotal` (lo que
   informa Google en `usageMetadata` de cada llamada). Sin datos que mover:
   ninguna fila se reescribe.
+- `20261010123108_recibir_sin_cerrar` — aditiva: `recibidoSinCerrar` (boolean,
+  default false) y `motivoSinCerrar` (nullable) en `PedidoProveedor`,
+  `respuestaCruda` (nullable) en `LlamadaLector`, y la tabla nueva
+  `CorreccionManualRenglon`. Sin DROP y sin datos que mover.
 
 **De dónde sale el 55.** `20261010004408_lectura_en_segundo_plano` sale de esta
 lista porque la sesión del VPS midió el 2026-10-10 a las 02:48 UTC una llamada

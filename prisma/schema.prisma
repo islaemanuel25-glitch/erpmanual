@@ -3367,6 +3367,12 @@ model PedidoProveedor {
   /// no existe el bloque de "productos que el papel no trajo" porque todo sale
   /// del papel, y la hoja de cierre no pregunta por ellos.
   nacidoDeFactura Boolean                @default(false)
+  /// SE RECIBIÓ CON UN PAPEL QUE NO CERRABA (Emanuel, 2026-10-10: "siempre se
+  /// tiene que poder recibir"). Entró el stock de lo vinculado y NINGÚN costo
+  /// se tocó: queda para la segunda revisión. `motivoSinCerrar` dice por qué,
+  /// en castellano —qué comprobante y por cuánto no cerraba—.
+  recibidoSinCerrar Boolean              @default(false)
+  motivoSinCerrar   String?
   notas           String?
   fechaConfirmado DateTime?
   fechaEnviado    DateTime?
@@ -5223,6 +5229,35 @@ model ComprobanteArchivo {
   @@index([hash])
 }
 
+/// UNA CORRECCIÓN A MANO DE LO QUE DICE EL PAPEL EN UN RENGLÓN.
+///
+/// Un comprobante que no cierra se puede arreglar poniendo a mano lo que se lee
+/// en la foto —cantidad, precio, importe—. Queda registrado quién, cuándo, qué
+/// había leído el lector y qué se puso, para la segunda revisión: lo que la
+/// persona escribió reemplaza a lo leído, y eso se tiene que poder ver.
+///
+/// Sin relación de Prisma con el renglón a propósito: el id de un renglón muere
+/// cuando el papel se vuelve a leer, y la corrección no se puede ir con él. Por
+/// eso guarda también el orden y el texto impreso.
+model CorreccionManualRenglon {
+  id                 Int      @id @default(autoincrement())
+  grupoId            Int
+  comprobanteId      Int
+  comprobanteLineaId Int?
+  orden              Int
+  textoCrudo         String?
+  /// `{ cantidad, netoUnitario, subtotal }` tal como estaban antes de corregir.
+  leido              Json
+  /// Lo mismo, con lo que la persona puso.
+  puesto             Json
+  /// Si con esta corrección el papel cerró.
+  cerroDespues       Boolean  @default(false)
+  usuarioId          Int?
+  creadaEn           DateTime @default(now())
+
+  @@index([comprobanteId])
+}
+
 model ComprobanteLinea {
   id            Int @id @default(autoincrement())
   comprobanteId Int
@@ -5440,6 +5475,12 @@ model LlamadaLector {
   tokensSalida       Int?
   tokensRazonamiento Int?
   tokensTotal        Int?
+
+  /// LO QUE CONTESTÓ EL MODELO, TAL CUAL: el texto del JSON que devolvió, antes
+  /// de normalizarlo. Sin esto Secco #256 quedó sin diagnóstico: el modelo
+  /// grande no cerró y no había forma de ver qué había puesto en cada campo sin
+  /// gastar otra lectura. Vacío cuando no hubo respuesta que guardar.
+  respuestaCruda String?
 
   creadoEn DateTime @default(now())
 

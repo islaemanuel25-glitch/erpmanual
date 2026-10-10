@@ -174,6 +174,17 @@ export async function POST(req) {
       );
     }
 
+    // ── UN PAPEL QUE NO CIERRA NO PROPONE NINGÚN COSTO ──────────────────
+    //
+    // Se recibe igual —regla de Emanuel, Secco #256— pero sus precios salen de
+    // una lectura que no se pudo verificar: ninguno se acepta. Corregido a mano
+    // hasta que cierre, vuelve a proponer costos como siempre.
+    if (linea.comprobante.estado === "MAL_LEIDO") {
+      const noCierra =
+        "Este papel no cierra: no se acepta ningún precio de él. Podés recibir igual y los costos quedan como estaban.";
+      return NextResponse.json({ ok: false, error: noCierra, queHacer: noCierra }, { status: 409 });
+    }
+
     const receta = linea.comprobante.recetaUsada ?? { ...RECETA_POR_DEFECTO };
 
     // ── LA RESOLUCIÓN ES LA DE LA PANTALLA, NO UNA PARECIDA ──────────────

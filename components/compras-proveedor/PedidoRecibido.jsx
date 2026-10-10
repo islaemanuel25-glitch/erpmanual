@@ -50,6 +50,7 @@ import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import { diaMesAR, horaAR } from "@/lib/fechas/formatearFechaHora";
 import { formatearMoneda } from "@/lib/moneda";
+import { textoDeLaCorreccionManual } from "@/lib/compras-proveedor/comprobante/correccionManual";
 import { gananciaDelDeposito } from "@/lib/compras-proveedor/gananciaDelDeposito";
 import {
   cuantosProductos,
@@ -119,6 +120,10 @@ export default function PedidoRecibido({
   onVerEnFinanzas = null,
 }) {
   const proveedor = pedido?.proveedor?.nombre || "el proveedor";
+  // Las correcciones a mano del papel vienen con la conciliación.
+  const correccionesManuales = Array.isArray(conciliacion?.correccionesManuales)
+    ? conciliacion.correccionesManuales
+    : [];
 
   // ── SI HAY PAPEL NO LO DECIDE ESTA PANTALLA ───────────────────────────
   //
@@ -156,6 +161,24 @@ export default function PedidoRecibido({
           {horaAR(pedido?.fechaRecibido)}
         </p>
       </SunmiCard>
+
+      {/* ── RECIBIDA SIN CERRAR, Y LO QUE SE CORRIGIÓ A MANO ──────────────
+          Para la segunda revisión (Secco #256): se recibió con un papel que
+          no cerraba —entró el stock y ningún costo se tocó— o alguien puso a
+          mano lo que dice un renglón. Las dos cosas las tiene que ver quien
+          revisa, dichas como el resto de los textos de esta pantalla. */}
+      {(pedido?.recibidoSinCerrar || correccionesManuales.length > 0) && (
+        <SunmiCard className="p-3 space-y-1">
+          {pedido?.recibidoSinCerrar && (
+            <p className="text-sm2 sunmi-text-muted break-words">{pedido.motivoSinCerrar}</p>
+          )}
+          {correccionesManuales.map((c) => (
+            <p key={c.id} className="text-sm2 sunmi-text-muted break-words">
+              {`Corregido a mano: ${textoDeLaCorreccionManual(c)}`}
+            </p>
+          ))}
+        </SunmiCard>
+      )}
 
       {/* ── EL PAGO AL PROVEEDOR ──────────────────────────────────────────
           Cuatro datos y un acceso: cuánto facturó, cuánto se pagó, cuánto

@@ -5,6 +5,10 @@
 //   POST { correcciones: { "<orden>": 1234.56 } }
 //        guarda esos subtotales en las líneas, vuelve a verificar y deja el
 //        estado que corresponda
+//   POST { renglones: { "<orden>": { cantidad, netoUnitario, subtotal } } }
+//        lo mismo con el renglón entero, desde la hoja de Corregir. Cada
+//        corrección queda en `CorreccionManualRenglon`: quién, cuándo, qué
+//        había leído el lector y qué se puso.
 //
 // ── POR QUÉ SE PUEDE CORREGIR, SI EL PAPEL MANDA ──────────────────────────
 //
@@ -36,7 +40,7 @@ import { checkPerm } from "@/lib/authorize";
 import { pasarPorLaPuerta, ESTADO } from "@/lib/compras-proveedor/comprobante/lector/puerta";
 import {
   lecturaDesdeLoGuardado,
-  conLosSubtotalesCorregidos,
+  conLosRenglonesCorregidos,
   ordenesQueNoExisten,
 } from "@/lib/compras-proveedor/comprobante/lecturaGuardada";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
@@ -186,11 +190,32 @@ export async function POST(req, { params }) {
     }
 
     const crudas = body?.correcciones && typeof body.correcciones === "object" ? body.correcciones : {};
+    // ── O EL RENGLÓN ENTERO: CANTIDAD, PRECIO E IMPORTE ──────────────────
+    //
+    // Secco #256: "Corregir" en la hoja deja poner a mano lo que dice el papel
+    // en ese renglón. `correcciones` sigue siendo el importe solo, que es lo
+    // que manda el bloque de arriba; los dos llegan a la misma forma.
+    const renglonesCrudos = body?.renglones && typeof body.renglones === "object" ? body.renglones : {};
     const correcciones = auto
-      ? [{ orden: auto.orden, valor: auto.valor }]
-      : Object.entries(crudas)
-          .map(([orden, valor]) => ({ orden: Number(orden), valor: aNumero(valor) }))
-          .filter((x) => Number.isFinite(x.orden) && x.valor !== null);
+      ? [{ orden: auto.orden, puesto: { subtotal: auto.valor }, automatica: true }]
+      : [
+          ...Object.entries(crudas).map(([orden, valor]) => ({
+            orden: Number(orden),
+            puesto: { subtotal: aNumero(valor) },
+          })),
+          ...Object.entries(renglonesCrudos).map(([orden, r]) => ({
+            orden: Number(orden),
+            puesto: {
+              cantidad: aNumero(r?.cantidad),
+              netoUnitario: aNumero(r?.netoUnitario),
+              subtotal: aNumero(r?.subtotal),
+            },
+          })),
+        ].filter((x) => Number.isFinite(x.orden) && Object.values(x.puesto).some((v) => v !== null));
+    if (correcciones.some((x) => Object.values(x.puesto).some((v) => v !== null && v < 0) || x.puesto.cantidad === 0)) {
+      const negativo = "La cantidad tiene que ser mayor que cero, y el precio y el importe no pueden ser negativos.";
+      return NextResponse.json({ ok: false, error: negativo, queHacer: negativo }, { status: 400 });
+    }
     if (!correcciones.length) {
       return NextResponse.json(
         { ok: false, error: "No llegó ninguna corrección." },
@@ -212,7 +237,7 @@ export async function POST(req, { params }) {
       );
     }
 
-    const porOrden = Object.fromEntries(correcciones.map((x) => [x.orden, x.valor]));
+    const porOrden = Object.fromEntries(correcciones.map((x) => [x.orden, x.puesto]));
     const original = lecturaDesdeLoGuardado(c);
     if (ordenesQueNoExisten(original, porOrden).length) {
       return NextResponse.json(
@@ -225,19 +250,47 @@ export async function POST(req, { params }) {
     //
     // No hay un segundo criterio para "cierra": es `pasarPorLaPuerta`, igual
     // que al leer. Lo único distinto es de dónde viene la lectura.
-    const lectura = conLosSubtotalesCorregidos(original, porOrden);
+    const lectura = conLosRenglonesCorregidos(original, porOrden);
     const puerta = pasarPorLaPuerta({ lectura, receta: c.recetaUsada ?? null });
 
     const guardado = await prisma.$transaction(async (tx) => {
-      for (const { orden, valor } of correcciones) {
-        // ── EN SU PROPIA COLUMNA, NO PISANDO LO LEÍDO ─────────────────
+      for (const { orden, puesto, automatica } of correcciones) {
+        // ── EL IMPORTE, EN SU PROPIA COLUMNA, NO PISANDO LO LEÍDO ─────
         //
         // `subtotalImpreso` es lo que el lector creyó leer y es un hecho de la
         // lectura. Pisarlo perdía la explicación —"leyó X, corregido a Y"— y
         // hacía que la relectura siguiente borrara la corrección sin rastro.
-        await tx.comprobanteLinea.updateMany({
-          where: { comprobanteId: c.id, orden },
-          data: { subtotalCorregido: valor },
+        //
+        // La cantidad y el precio no tienen columna aparte: se escriben en el
+        // renglón, y lo que había leído el lector queda en la bitácora de abajo.
+        const data = {};
+        if (puesto.subtotal !== null && puesto.subtotal !== undefined) data.subtotalCorregido = puesto.subtotal;
+        if (puesto.cantidad !== null && puesto.cantidad !== undefined) data.cantidad = puesto.cantidad;
+        if (puesto.netoUnitario !== null && puesto.netoUnitario !== undefined) data.netoUnitario = puesto.netoUnitario;
+        await tx.comprobanteLinea.updateMany({ where: { comprobanteId: c.id, orden }, data });
+
+        // ── Y QUEDA REGISTRADA: QUIÉN, CUÁNDO, QUÉ HABÍA Y QUÉ SE PUSO ──
+        //
+        // Para la segunda revisión: lo que una persona escribió reemplaza a lo
+        // leído, y eso se tiene que poder ver después.
+        const leida = original.lineas.find((l) => Number(l.orden) === Number(orden)) ?? {};
+        const renglon = (c.lineas || []).find((l) => Number(l.orden) === Number(orden)) ?? {};
+        await tx.correccionManualRenglon.create({
+          data: {
+            grupoId,
+            comprobanteId: c.id,
+            comprobanteLineaId: renglon.id ?? null,
+            orden,
+            textoCrudo: renglon.textoCrudo ?? null,
+            leido: {
+              cantidad: leida.cantidad ?? null,
+              netoUnitario: leida.netoUnitario ?? null,
+              subtotal: leida.subtotalImpreso ?? null,
+            },
+            puesto: { ...puesto, ...(automatica ? { automatica: true } : {}) },
+            cerroDespues: puerta.cierra === true,
+            usuarioId: Number.isFinite(Number(session?.id)) ? Number(session.id) : null,
+          },
         });
       }
       // SOLO EL VEREDICTO, NO TODO `aGuardar`. Los campos de la lectura —modelo,
