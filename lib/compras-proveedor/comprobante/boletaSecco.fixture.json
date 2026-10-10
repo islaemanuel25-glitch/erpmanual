@@ -1,0 +1,29 @@
+{
+  "_origen": [
+    "SECCO #256, 'Duplicado' del 2026-10-09, una hoja, diez renglones. Transcripto de la",
+    "foto que mando Emanuel el 2026-10-10 (produccion, recepcion 'Llego sin pedido').",
+    "No discrimina IVA: el precio ya lo trae. Columnas: Cod. | Cant. | Descripcion |",
+    "Precio | Bonif. | Total. Pie: 'DESCUENTO GLOBAL: $0.00' y TOTAL 922533.84, sin neto,",
+    "sin IVA y sin percepciones. Los diez Total suman 922533.84 exacto. La respuesta",
+    "cruda que devolvio el modelo grande en produccion NO se guarda en ningun lado:",
+    "lo que esta aca es el papel, no esa respuesta."
+  ],
+  "lineasEnElPapel": 10,
+  "hayTotalImpreso": true,
+  "lineas": [
+    { "codigoProveedor": "42", "cantidad": 10, "descripcion": "SECCO LIMA LIMON 3 LTS X 6", "precio": 10800.218, "bonificacion": 13, "total": 93961.90 },
+    { "codigoProveedor": "113", "cantidad": 10, "descripcion": "SECCO COLA 3 LTS X 6 U.", "precio": 10800.218, "bonificacion": 13, "total": 93961.90 },
+    { "codigoProveedor": "45", "cantidad": 10, "descripcion": "SECCO NARANJA 3 LTS X 6 U", "precio": 10800.218, "bonificacion": 13, "total": 93961.90 },
+    { "codigoProveedor": "44", "cantidad": 6, "descripcion": "SECCO POMELO 3 LTS X 6 U", "precio": 10800.218, "bonificacion": 13, "total": 56377.14 },
+    { "codigoProveedor": "795", "cantidad": 6, "descripcion": "BOTELLA SECCO 3000 CAMBIO", "precio": 0.025, "bonificacion": null, "total": 0.15 },
+    { "codigoProveedor": "114", "cantidad": 18, "descripcion": "BOTELLA SECCO COLA S/CARGO 3 LT", "precio": 0.024, "bonificacion": null, "total": 0.44 },
+    { "codigoProveedor": "1096", "cantidad": 120, "descripcion": "JUG.BAGGIO PRONTO MULTI 1 LT (8)", "precio": 1462.382, "bonificacion": null, "total": 175485.82 },
+    { "codigoProveedor": "1365", "cantidad": 80, "descripcion": "CHOCOLATADA BAGGIO LATTE 1 LT (8)", "precio": 2453.299, "bonificacion": null, "total": 196263.94 },
+    { "codigoProveedor": "858", "cantidad": 20, "descripcion": "PURE TOMATE LA HUERTA 530grs X12", "precio": 8796.023, "bonificacion": null, "total": 175920.45 },
+    { "codigoProveedor": "1587", "cantidad": 10, "descripcion": "AGUA MINERAL BIO 1.5 LTS X 6U", "precio": 3660.020, "bonificacion": null, "total": 36600.20 }
+  ],
+  "pie": {
+    "total": 922533.84,
+    "conceptos": [{ "nombre": "DESCUENTO GLOBAL", "importe": 0, "resta": true }]
+  }
+}

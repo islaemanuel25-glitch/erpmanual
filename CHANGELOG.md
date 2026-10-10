@@ -1,5 +1,22 @@
 # Changelog
 
+## [2026-10-10] - Actualización: compras-proveedor (boleta de Secco)
+
+### Modificado
+- fix: con la propuesta "IVA ya incluido", un renglón que el lector grande trae
+  con el importe en `totalImpreso` y sin precio ni subtotal usa ese Total como
+  su importe (`elTotalEsElImporteConIvaIncluido`). Secco #256 cierra a
+  922.533,84 y su receta queda para confirmar.
+- fix: renglones de envase (precio unitario menor a $1, `envase.js`): cuentan
+  para el total, no piden producto, no se siembran, no entran al stock ni
+  tocan costo; la lista los muestra aparte.
+- fix: el descuento global del pie se reparte por importe en el costo de cada
+  renglón; en cero no cambia nada.
+- fix: el control por renglón multiplica el precio impreso entero, sin
+  redondearlo antes a centavos.
+- El prompt del lector grande dice dónde va cada columna en un papel sin IVA
+  (**SIN VERIFICAR** con Gemini real). Sin migración.
+
 ## [2026-10-10] - Actualización: compras-proveedor (fiambre de peso variable en kilos)
 
 ### Modificado
