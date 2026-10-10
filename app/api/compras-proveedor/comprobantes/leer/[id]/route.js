@@ -299,33 +299,57 @@ export async function POST(req, { params }) {
           proveedorNombre: comprobante.proveedor?.nombre ?? null,
         });
 
-      let resultado = await pedirle();
+      // ── QUIÉN LEE ────────────────────────────────────────────────────────
+      //
+      // Con la explicación confirmada del proveedor, Flash, guiado por ella.
+      // Sin explicación no hay con qué guiarlo: lee directamente el modelo
+      // grande, que interpreta el papel y explica cómo viene —esa explicación
+      // queda como receta para confirmar—. Si el grande no está configurado,
+      // lee Flash igual, sin guía. Ver `escalada.js`.
+      const sinExplicacion = !String(receta?.explicacion ?? "").trim();
+      const interpretes = armarInterpretes();
+      const hayGrande = [interpretes.titular, interpretes.respaldo].some((i) => i?.disponible?.().ok === true);
+      let resultado =
+        sinExplicacion && hayGrande
+          ? { ok: false, motivo: null, lector: null, intentos: [], usoRespaldo: false, porQuePaso: null }
+          : await pedirle();
 
       // ── SI FLASH NO ALCANZA, ENTRA EL MODELO GRANDE. UNA SOLA VEZ ────────
       //
-      // Faltan renglones, no cierra, o el proveedor no tiene receta: ahí y en
-      // ningún otro caso, y nunca con un papel sin total. Lo que devuelve lo
-      // verifica el código con la misma puerta; si cierra, su lectura y su
-      // receta reemplazan a las de Flash, y si no, queda lo de Flash como
-      // estaba. Ver `escalada.js`.
-      let recetaDeLaLectura = receta;
+      // Sin explicación, faltan renglones, no cierra, o Flash no contestó: ahí
+      // y en ningún otro caso, y nunca con un papel sin total. Lo que devuelve
+      // lo verifica el código con la misma puerta: la suma de los costos
+      // finales contra el total impreso.
+      //
+      // La receta que queda con la lectura es su explicación: el costo no sale
+      // de ella, lo trae cada renglón.
+      let recetaDeLaLectura = { interpretada: true, explicacion: receta?.explicacion ?? null };
       let versionDeLaLectura = recetaVersion;
       const escalada = await escalarAlModeloGrande({
         resultado,
         receta,
         recetaVersion,
-        esGenerica,
-        interpretes: armarInterpretes(),
+        sinExplicacion: sinExplicacion && hayGrande,
+        interpretes,
         archivos: paraLeer,
         proveedorNombre: comprobante.proveedor?.nombre ?? null,
       });
-      if (escalada.cerro) {
-        // `ok: true` porque puede venir de un Flash que no contestó —el caso
-        // FLASH_SIN_RESPUESTA—: ahí la lectura del grande es la ÚNICA, y es
-        // buena porque la cuenta la verificó el código.
+      if (escalada.cerro || (escalada.lectura && resultado.ok !== true)) {
+        // `ok: true` porque puede venir sin lectura de Flash —sin explicación,
+        // o Flash que no contestó—: ahí la del grande es la ÚNICA. Si cerró es
+        // buena porque la cuenta la verificó el código; si no cerró, se guarda
+        // igual como "no cierra", que se puede recibir y corregir a mano.
         resultado = { ...resultado, ok: true, motivo: null, lectura: escalada.lectura };
         recetaDeLaLectura = escalada.receta;
         versionDeLaLectura = escalada.recetaVersion;
+      } else if (resultado.ok !== true && resultado.motivo == null) {
+        // Sin explicación leyó solo el grande, y no pudo contestar: el motivo
+        // de la falla es el suyo, para que la pantalla diga qué pasó.
+        resultado = {
+          ...resultado,
+          motivo: escalada.llamadas.at(-1)?.motivo ?? MOTIVO_LECTURA.SERVICIO_CAIDO,
+          lector: escalada.llamadas.at(-1)?.lector ?? null,
+        };
       }
 
       // ── SI EL MODELO DICE HABER TRANSCRIPTO DE MENOS, SE LE PIDE OTRA VEZ ─
@@ -635,6 +659,14 @@ export async function POST(req, { params }) {
               // columna existía y nadie la escribía; sin ella la harina se
               // costeaba al 21.
               ivaPct: l.alicuotaIva ?? null,
+              // ── LO QUE INTERPRETÓ EL MODELO ─────────────────────────────
+              //
+              // El costo del renglón entero, con todo adentro según ESTE papel:
+              // de acá sale el costo del producto, no de reglas de formato.
+              // En qué viene la cantidad, y si es mercadería o envase.
+              costoFinalRenglon: l.costoFinal ?? null,
+              enQueViene: l.enQueViene ?? null,
+              tipoRenglon: l.tipo ?? null,
             })),
           });
         }

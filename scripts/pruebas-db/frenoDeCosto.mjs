@@ -247,6 +247,18 @@ async function cierraYEscribe(f, p, titulo, costoEsperado, extra) {
  * producto y línea del pedido resueltos. Sin total impreso, así la deuda del
  * cierre sigue siendo la que se confirma a mano.
  */
+/**
+ * El neto que da EXACTAMENTE $1.000 final por unidad en un renglón de 2.
+ *
+ * Era 826,45, elegido cuando el IVA se calculaba por unidad. Desde #153
+ * (`7aa2eb82`) el costo se arma por renglón y recién después se divide —es lo
+ * que da los nueve costos de DYSSA—: 2 × 826,45 = 1.652,90 + IVA 347,11 =
+ * 2.000,01, o sea 1.000,005 por unidad y $1.000,01 escrito. Los casos que
+ * afirman "papel = línea = 1.000" estaban probando un papel que ya no costaba
+ * 1.000. Con 826,445: 1.652,89 + 347,11 = 2.000,00.
+ */
+const NETO_DE_MIL = 826.445;
+
 async function papelCon(f, p, { cantidad, netoUnitario }) {
   const c = await prisma.comprobanteProveedor.create({
     data: {
@@ -503,7 +515,7 @@ async function correr(f) {
   seccion("M-A. Papel = línea, catálogo movido: la hoja pregunta");
   const ma = await pedidoCon(f, { nombre: "MA", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
   await moverCatalogo(ma, 1300);
-  await papelCon(f, ma, { cantidad: 2, netoUnitario: 826.45 }); // 1.000 final
+  await papelCon(f, ma, { cantidad: 2, netoUnitario: NETO_DE_MIL }); // 1.000 final
   const [filaMA] = await filasDeLaPantalla(f, ma);
   igual("M-A: el papel y la línea coinciden", [filaMA?.costoFactura, filaMA?.costoCatalogo], [1000, 1000]);
   ok("M-A: la fila viene marcada con el catálogo movido", filaMA?.catalogoMovido === true, JSON.stringify(filaMA?.catalogoMovido));
@@ -517,7 +529,7 @@ async function correr(f) {
   seccion("M-B. Dejar el que tenía: cierra sin escribir 1.000");
   const mb = await pedidoCon(f, { nombre: "MB", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
   await moverCatalogo(mb, 1300);
-  const renglonMB = await papelCon(f, mb, { cantidad: 2, netoUnitario: 826.45 });
+  const renglonMB = await papelCon(f, mb, { cantidad: 2, netoUnitario: NETO_DE_MIL });
   const aceptaMB = await aceptarPrecio(f, mb, renglonMB, DECISION_DE_PRECIO.ACEPTA_FACTURA);
   ok("M-B: aceptar una baja de 23 % lo frena la regla de siempre", aceptaMB.status === 409, `${aceptaMB.status} ${aceptaMB.error || ""}`);
   const dejaMB = await aceptarPrecio(f, mb, renglonMB, DECISION_DE_PRECIO.DEJA_EL_MIO);
@@ -536,7 +548,7 @@ async function correr(f) {
   // aceptar de un clic. Hacia arriba (M-B) la regla de siempre no deja.
   const mc = await pedidoCon(f, { nombre: "MC", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
   await moverCatalogo(mc, 800);
-  const renglonMC = await papelCon(f, mc, { cantidad: 2, netoUnitario: 826.45 });
+  const renglonMC = await papelCon(f, mc, { cantidad: 2, netoUnitario: NETO_DE_MIL });
   const [filaMC0] = await filasDeLaPantalla(f, mc);
   ok("M-C: antes de decidir, hay que decidir", hayQueDecidirElPrecio(filaMC0) === true);
   const aceptaMC = await aceptarPrecio(f, mc, renglonMC, DECISION_DE_PRECIO.ACEPTA_FACTURA);
@@ -560,7 +572,7 @@ async function correr(f) {
   seccion("M-D. Catálogo movido dentro de la variación: no se pregunta");
   const md = await pedidoCon(f, { nombre: "MD", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
   await moverCatalogo(md, 1050);
-  await papelCon(f, md, { cantidad: 2, netoUnitario: 826.45 });
+  await papelCon(f, md, { cantidad: 2, netoUnitario: NETO_DE_MIL });
   const [filaMD] = await filasDeLaPantalla(f, md);
   ok("M-D: la fila no viene marcada", filaMD?.catalogoMovido === false, JSON.stringify(filaMD?.catalogoMovido));
   ok("M-D: no hay que decidir", hayQueDecidirElPrecio(filaMD) === false);
@@ -590,7 +602,7 @@ async function correr(f) {
   });
   creado.pedidoIds.push(pME.id);
   const me = { ...mea, pedidoId: pME.id, detId: pME.detalles[0].id };
-  await papelCon(f, me, { cantidad: 2, netoUnitario: 826.45 }); // 1.000 final
+  await papelCon(f, me, { cantidad: 2, netoUnitario: NETO_DE_MIL }); // 1.000 final
   const decisionME = await prisma.decisionDePrecioProveedor.findFirst({
     where: { productoBaseId: me.baseId },
     select: { decision: true, precioFacturado: true },
@@ -619,7 +631,7 @@ async function correr(f) {
   seccion("N1. Aceptar sin carrera: la decisión guarda el catálogo y vale");
   const n1 = await pedidoCon(f, { nombre: "N1", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
   await moverCatalogo(n1, 800);
-  const renglonN1 = await papelCon(f, n1, { cantidad: 2, netoUnitario: 826.45 }); // 1.000 final
+  const renglonN1 = await papelCon(f, n1, { cantidad: 2, netoUnitario: NETO_DE_MIL }); // 1.000 final
   const aceptaN1 = await aceptarPrecio(f, n1, renglonN1);
   ok("N1: aceptar contesta 200", aceptaN1.status === 200 && aceptaN1.ok, `${aceptaN1.status} ${aceptaN1.error || ""}`);
   igual("N1: la decisión guarda el catálogo observado, 800", (await decisionDe(n1))?.observado, 800);
@@ -630,7 +642,7 @@ async function correr(f) {
   seccion("N2. Aceptar con carrera: el catálogo pasa a 1.500 antes de cerrar");
   const n2 = await pedidoCon(f, { nombre: "N2", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
   await moverCatalogo(n2, 800);
-  const renglonN2 = await papelCon(f, n2, { cantidad: 2, netoUnitario: 826.45 });
+  const renglonN2 = await papelCon(f, n2, { cantidad: 2, netoUnitario: NETO_DE_MIL });
   const aceptaN2 = await aceptarPrecio(f, n2, renglonN2);
   ok("N2: aceptar contra 800 contesta 200", aceptaN2.status === 200 && aceptaN2.ok, `${aceptaN2.status} ${aceptaN2.error || ""}`);
   await moverCatalogo(n2, 1500);
@@ -662,7 +674,7 @@ async function correr(f) {
   // escribe lo aceptado con la decisión nueva.
   const n3b = await pedidoCon(f, { nombre: "N3b", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
   await moverCatalogo(n3b, 800);
-  const renglonN3b = await papelCon(f, n3b, { cantidad: 2, netoUnitario: 826.45 });
+  const renglonN3b = await papelCon(f, n3b, { cantidad: 2, netoUnitario: NETO_DE_MIL });
   await aceptarPrecio(f, n3b, renglonN3b);
   await moverCatalogo(n3b, 850);
   await frenaSinDejarNada(f, n3b, "N3b aceptada contra 800, catálogo en 850");
@@ -676,7 +688,7 @@ async function correr(f) {
   seccion("N4. Dejar sin carrera: igual que siempre");
   const n4 = await pedidoCon(f, { nombre: "N4", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
   await moverCatalogo(n4, 1300);
-  const renglonN4 = await papelCon(f, n4, { cantidad: 2, netoUnitario: 826.45 });
+  const renglonN4 = await papelCon(f, n4, { cantidad: 2, netoUnitario: NETO_DE_MIL });
   await aceptarPrecio(f, n4, renglonN4, DECISION_DE_PRECIO.DEJA_EL_MIO);
   igual("N4: la decisión guarda 1.300", (await decisionDe(n4))?.observado, 1300);
   const excluidosN4 = await excluidosDeLaPantalla(f, n4);
@@ -686,7 +698,7 @@ async function correr(f) {
   seccion("N5. Dejar con carrera: 1.300 → 1.500 vuelve a preguntar");
   const n5 = await pedidoCon(f, { nombre: "N5", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
   await moverCatalogo(n5, 1300);
-  const renglonN5 = await papelCon(f, n5, { cantidad: 2, netoUnitario: 826.45 });
+  const renglonN5 = await papelCon(f, n5, { cantidad: 2, netoUnitario: NETO_DE_MIL });
   await aceptarPrecio(f, n5, renglonN5, DECISION_DE_PRECIO.DEJA_EL_MIO);
   const excluidosViejosN5 = await excluidosDeLaPantalla(f, n5); // pantalla abierta antes del cambio
   await moverCatalogo(n5, 1500);
@@ -710,8 +722,8 @@ async function correr(f) {
   const n6bEnA = { ...n6b, pedidoId: n6a.pedidoId };
   await moverCatalogo(n6a, 1300);
   await moverCatalogo(n6b, 800);
-  const renglonN6a = await papelCon(f, n6a, { cantidad: 2, netoUnitario: 826.45 });
-  const renglonN6b = await papelCon(f, n6bEnA, { cantidad: 3, netoUnitario: 826.45 });
+  const renglonN6a = await papelCon(f, n6a, { cantidad: 2, netoUnitario: NETO_DE_MIL });
+  const renglonN6b = await papelCon(f, n6bEnA, { cantidad: 3, netoUnitario: NETO_DE_MIL });
   await aceptarPrecio(f, n6a, renglonN6a, DECISION_DE_PRECIO.DEJA_EL_MIO);
   const aceptaN6b = await aceptarPrecio(f, n6bEnA, renglonN6b);
   ok("N6: B aceptada contra 800", aceptaN6b.status === 200 && aceptaN6b.ok, `${aceptaN6b.status} ${aceptaN6b.error || ""}`);
@@ -735,7 +747,7 @@ async function correr(f) {
   // decisión previa a la migración.
   const n7 = await pedidoCon(f, { nombre: "N7", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
   await moverCatalogo(n7, 800);
-  const renglonN7 = await papelCon(f, n7, { cantidad: 2, netoUnitario: 826.45 });
+  const renglonN7 = await papelCon(f, n7, { cantidad: 2, netoUnitario: NETO_DE_MIL });
   await aceptarPrecio(f, n7, renglonN7);
   await prisma.decisionDePrecioProveedor.updateMany({ where: { productoBaseId: n7.baseId }, data: { costoMaestroObservado: null } });
   const [filaN7] = await filasDeLaPantalla(f, n7);
@@ -750,7 +762,7 @@ async function correr(f) {
 
   const n7d = await pedidoCon(f, { nombre: "N7d", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
   await moverCatalogo(n7d, 1300);
-  const renglonN7d = await papelCon(f, n7d, { cantidad: 2, netoUnitario: 826.45 });
+  const renglonN7d = await papelCon(f, n7d, { cantidad: 2, netoUnitario: NETO_DE_MIL });
   await aceptarPrecio(f, n7d, renglonN7d, DECISION_DE_PRECIO.DEJA_EL_MIO);
   await prisma.decisionDePrecioProveedor.updateMany({ where: { productoBaseId: n7d.baseId }, data: { costoMaestroObservado: null } });
   const excluidosN7d = await excluidosDeLaPantalla(f, n7d);
@@ -766,7 +778,7 @@ async function correr(f) {
   igual("N8: sin cambios", await foto(f, n1), antesN8);
   const n8 = await pedidoCon(f, { nombre: "N8", base: UNIDAD, catalogo: 1000, linea: { cantidad: 2, unidad: "UNIDAD", precioCosto: 1000 } });
   await moverCatalogo(n8, 800);
-  const renglonN8 = await papelCon(f, n8, { cantidad: 2, netoUnitario: 826.45 });
+  const renglonN8 = await papelCon(f, n8, { cantidad: 2, netoUnitario: NETO_DE_MIL });
   await aceptarPrecio(f, n8, renglonN8);
   const antesN8b = await foto(f, n8);
   const dos = await Promise.all([cerrar(f, n8), cerrar(f, n8)]);

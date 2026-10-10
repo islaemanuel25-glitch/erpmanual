@@ -60,7 +60,15 @@ async function sembrarPagoPrevio(url) {
     // llegaron después (el turno operativo) y la siembra se cae.
     const turno = await p.turno.create({ data: { localId: local.id, vendedorId: u.id, montoInicial: 0, apertura: new Date() }, select: { id: true } });
     const proveedor = await p.proveedor.create({ data: { nombre: "Proveedor previo" } });
-    const pedido = await p.pedidoProveedor.create({ data: { grupoId: grupo.id, depositoId: deposito.id, proveedorId: proveedor.id, estado: "RECIBIDO" } });
+    // A mano y no con `create`: el cliente de hoy manda en el INSERT toda
+    // columna con `@default` —`recibidoSinCerrar` llegó después de Gastos— y
+    // esta base todavía no la tiene. `select` no alcanza: es el INSERT, no el
+    // RETURNING, el que la nombra.
+    const [pedido] = await p.$queryRawUnsafe(
+      `INSERT INTO "PedidoProveedor" ("grupoId", "depositoId", "proveedorId", "estado", "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, 'RECIBIDO', NOW(), NOW()) RETURNING id`,
+      grupo.id, deposito.id, proveedor.id
+    );
     const cuenta = await p.cuentaPorPagarProveedor.create({
       data: { grupoId: grupo.id, pedidoProveedorId: pedido.id, proveedorId: proveedor.id, localGastoId: local.id, total: 1000, creadoPorId: u.id },
     });

@@ -145,6 +145,8 @@ export async function GET(req, { params }) {
             // Los kilos y el descuento del papel: el costo real de un renglón
             // con peso sale de dividir por ellos, no por las piezas.
             pesoKg: true, bonificacionPct: true,
+            // Lo que interpretó el modelo: de acá sale el costo del renglón.
+            costoFinalRenglon: true, enQueViene: true, tipoRenglon: true,
             // La alícuota de IVA de cada renglón, y con ella su costo: la
             // harina de DYSSA va al 10,5 y el resto al 21.
             ivaPct: true,

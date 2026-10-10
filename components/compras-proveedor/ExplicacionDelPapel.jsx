@@ -144,9 +144,13 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
         // Ya se leyó y ya cerró: el servidor la manda con su lectura, y acá se
         // dibuja con el MISMO bloque que deja «Probar», sin gastar otra
         // consulta. Lo que la persona decide es lo mismo: si está bien.
-        if (d.propuesta?.lectura && d.propuesta?.receta) {
+        //
+        // Desde la lectura interpretada la propuesta ES una explicación en
+        // castellano: arranca escrita en el campo, y guardarla es confirmarla.
+        if (d.propuesta?.lectura && (d.propuesta?.receta || d.propuesta?.explicacion)) {
           setLectura(d.propuesta.lectura);
-          setReceta(d.propuesta.receta);
+          setReceta(d.propuesta.receta ?? { interpretada: true, explicacion: d.propuesta.explicacion });
+          if (d.propuesta.explicacion) setExplicacion(d.propuesta.explicacion);
           setPropuesta({ comprobanteId: d.propuesta.comprobanteId ?? null });
         }
       } catch {
@@ -171,7 +175,12 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
     const conCorrecciones = {
       ...lectura,
       lineas: lectura.lineas.map((l, i) =>
-        correcciones[i] !== undefined ? { ...l, subtotalImpreso: correcciones[i] } : l
+        correcciones[i] === undefined
+          ? l
+          : // En la interpretada lo que se muestra y se suma es el costo final.
+            lectura.interpretada
+            ? { ...l, costoFinal: correcciones[i] }
+            : { ...l, subtotalImpreso: correcciones[i] }
       ),
     };
     return comoLoEntendio({ lectura: conCorrecciones, receta, productos });

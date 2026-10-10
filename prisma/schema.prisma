@@ -5033,6 +5033,10 @@ model ComprobanteProveedor {
   /// solo como respaldo. Un papel sin el pie desglosado queda en NULL y sigue
   /// verificándose como antes.
   conceptosDelPieLeidos Json?
+  /// CÓMO LEYÓ EL MODELO ESTE PAPEL, en criollo: qué columna es qué, si el
+  /// precio trae IVA, cómo repartió el pie. Es la receta que se propone cuando
+  /// la lectura cierra. Null en las lecturas anteriores a la interpretada.
+  explicacionLeida String?
   totalLeido        Decimal? @db.Decimal(12, 2)
 
   /// Diferencia en CENTAVOS ENTEROS entre lo calculado y lo leído. Enteros
@@ -5382,6 +5386,19 @@ model ComprobanteLinea {
   /// Se hereda a la lectura siguiente igual que el vínculo y la marca de
   /// revisado: es una decisión sobre el renglón, no un número del papel.
   subtotalCorregido Decimal? @db.Decimal(12, 2)
+
+  /// LO QUE INTERPRETÓ EL MODELO (2026-10-10, "seguimos de parche en parche").
+  ///
+  /// El costo del renglón ENTERO con todo adentro según ese papel —IVA,
+  /// percepciones, internos, bonificaciones y descuentos que le correspondan—.
+  /// De acá sale el costo del producto; la suma de todos contra el total
+  /// impreso es el control. Null en las lecturas anteriores a la interpretada,
+  /// que se siguen costeando como se costeaban.
+  costoFinalRenglon Decimal? @db.Decimal(14, 2)
+  /// En qué viene la cantidad, como lo dice el papel: "unidad", "pack de 6", "kg".
+  enQueViene        String?
+  /// MERCADERIA o ENVASE (`TIPO_RENGLON` en `lector/lecturaInterpretada.js`).
+  tipoRenglon       String?
 
   unidadElegida String?
 

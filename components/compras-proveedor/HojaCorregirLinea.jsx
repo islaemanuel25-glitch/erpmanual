@@ -496,7 +496,10 @@ export default function HojaCorregirLinea({
     const delPapel = fila.correccionDelPapel;
     setPapelCantidad(delPapel?.cantidad != null ? String(delPapel.cantidad) : "");
     setPapelPrecio(delPapel?.netoUnitario != null ? String(delPapel.netoUnitario) : "");
-    setPapelTotal(delPapel?.subtotal != null ? String(delPapel.subtotal) : "");
+    // En la lectura interpretada el campo es el costo final del renglón, que es
+    // con lo que se costea y lo que suma contra el total.
+    const totalDelPapel = delPapel?.interpretado ? delPapel?.costoFinal : delPapel?.subtotal;
+    setPapelTotal(totalDelPapel != null ? String(totalDelPapel) : "");
     // La opción marcada arranca en lo que se decidió la vez pasada, si sigue
     // valiendo. Sin esto, "Cambiar" mostraría "Aceptar el precio nuevo"
     // seleccionado sobre una línea donde se había dicho lo contrario, y un
@@ -684,7 +687,7 @@ export default function HojaCorregirLinea({
       for (const [campo, valor] of [
         ["cantidad", papelCantidad],
         ["netoUnitario", papelPrecio],
-        ["subtotal", papelTotal],
+        [delPapel.interpretado ? "costoFinal" : "subtotal", papelTotal],
       ]) {
         const puesto = aNumero(valor);
         if (puesto !== null && Number.isFinite(puesto) && puesto !== aNumero(delPapel[campo])) cambiado[campo] = puesto;
@@ -919,7 +922,7 @@ export default function HojaCorregirLinea({
               {[
                 ["Cantidad", papelCantidad, setPapelCantidad, 3],
                 ["Precio", papelPrecio, setPapelPrecio, 3],
-                ["Total", papelTotal, setPapelTotal, 2],
+                [fila.correccionDelPapel.interpretado ? "Costo final" : "Total", papelTotal, setPapelTotal, 2],
               ].map(([rotulo, valor, onCambiar, decimales]) => (
                 <div key={rotulo} className="w-full">
                   <div className="text-sm2 sunmi-text-muted truncate">{rotulo}</div>

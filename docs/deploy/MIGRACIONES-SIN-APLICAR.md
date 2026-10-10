@@ -16,18 +16,24 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Dos. Producción está en **55 migraciones**; el árbol tiene 57.
+Una. Producción está en **57 migraciones**; el árbol tiene 58.
 
-- `20261010025546_tokens_de_cada_llamada` — tres columnas nullable en
-  `LlamadaLector`: `tokensSalida`, `tokensRazonamiento` y `tokensTotal` (lo que
-  informa Google en `usageMetadata` de cada llamada). Sin datos que mover:
-  ninguna fila se reescribe.
-- `20261010123108_recibir_sin_cerrar` — aditiva: `recibidoSinCerrar` (boolean,
-  default false) y `motivoSinCerrar` (nullable) en `PedidoProveedor`,
-  `respuestaCruda` (nullable) en `LlamadaLector`, y la tabla nueva
-  `CorreccionManualRenglon`. Sin DROP y sin datos que mover.
+- `20261010130441_lectura_interpretada` — aditiva: `costoFinalRenglon`
+  (decimal), `enQueViene` y `tipoRenglon` (texto) en `ComprobanteLinea`, y
+  `explicacionLeida` en `ComprobanteProveedor`, todas nullable. **Sí mueve
+  datos, en una sola tabla:** un `UPDATE` de `RecetaProveedor` que traduce a
+  castellano lo que dicen los campos estructurados (dónde va el IVA, interno,
+  percepciones, bulto) y lo AGREGA al final de la explicación que haya, sin
+  pisarla y sin cambiar la versión. No toca las filas que tienen explicación y
+  los campos de fábrica, y es idempotente: no agrega el texto dos veces.
+  Ejercido contra la base de desarrollo dentro de una transacción revertida.
 
-**De dónde sale el 55.** `20261010004408_lectura_en_segundo_plano` sale de esta
+**De dónde sale el 57.** `20261010025546_tokens_de_cada_llamada` se aplicó el
+2026-10-10 a las 03:09 UTC con el despliegue de `f8ee067c`, y
+`20261010123108_recibir_sin_cerrar` a las 12:55 UTC con el de `0499e89b`, los
+dos informados por la sesión del VPS y anotados en la orden de esta tanda.
+
+**Lo que decía antes, sobre el 55.** `20261010004408_lectura_en_segundo_plano` sale de esta
 lista porque la sesión del VPS midió el 2026-10-10 a las 02:48 UTC una llamada
 con `duracionMs` 90.012 en `LlamadaLector`: esa columna y esa espera son de esa
 migración y de #160, así que producción ya la tiene. Es una inferencia de un
