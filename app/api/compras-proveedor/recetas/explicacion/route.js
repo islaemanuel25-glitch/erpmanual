@@ -51,7 +51,6 @@ import {
   olvidarTurno,
   ESTADO_TURNO,
 } from "@/lib/compras-proveedor/comprobante/lector/lecturasEnCurso";
-import { randomUUID } from "node:crypto";
 import { usadasHoy } from "@/lib/ia/contadorDeIa";
 import { hayCuota, limiteDiario, MOTIVO_LIMITE, TEXTO_LIMITE } from "@/lib/ia/limiteDiario";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
@@ -236,6 +235,20 @@ export async function POST(req) {
         );
       }
 
+      // ── UNA PRUEBA POR PAPEL A LA VEZ ──────────────────────────────────
+      //
+      // El turno se nombra por el papel: tocar «Probar» otra vez mientras
+      // lee se engancha a la prueba en curso en vez de lanzar otra, que
+      // gastaría otra consulta. Va antes de la cuota: engancharse no gasta.
+      //
+      // Probar NO escribe nada, así que esto vive en la memoria del proceso
+      // y no en la base. Un reinicio la pierde y el GET lo dice con
+      // `TEXTO_TURNO.NO_ESTA`: "Tocá «Probar» de nuevo: no se guardó nada".
+      const turno = `probar-${grupoId}-${papel.id}`;
+      if (mirarTurno(turno).estado === ESTADO_TURNO.LEYENDO) {
+        return NextResponse.json({ ok: true, leyendo: true, yaEstabaLeyendo: true, turno, comprobanteId: papel.id });
+      }
+
       const cuota = hayCuota({ usadasHoy: await usadasHoy(), limite: limiteDiario() });
       if (!cuota.puede) {
         return NextResponse.json(
@@ -261,7 +274,6 @@ export async function POST(req) {
       //
       // El porqué largo, con los 60 segundos de nginx medidos, está en
       // `lecturasEnCurso.js`.
-      const turno = randomUUID();
       arrancarTurno({
         id: turno,
         dueño: session.id,
@@ -521,6 +533,7 @@ async function leerElPapel({ papel, receta, proveedorId, grupoId, localId }) {
           // hace con el lector. Es el origen que explica las seis llamadas del
           // comprobante 13 que no reescribieron ningún renglón.
           origen: ORIGEN_DE_LECTURA.PRUEBA_DE_RECETA,
+          duracionMs: Number.isFinite(i.duracionMs) ? Math.round(i.duracionMs) : null,
         })),
       });
     }

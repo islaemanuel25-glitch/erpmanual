@@ -21,6 +21,7 @@ import { cuotaDelDia, horaLocalDeReposicion } from "@/lib/compras-proveedor/comp
 // hay ninguno y el contador no sabría contra qué modelos contar.
 import "@/lib/compras-proveedor/comprobante/lector/index.js";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
+import { comoVaLaLectura } from "@/lib/compras-proveedor/comprobante/lecturaEnSegundoPlano";
 
 export async function GET(req) {
   try {
@@ -76,6 +77,9 @@ export async function GET(req) {
         cerroEnIntento: true,
         usoRespaldo: true,
         motivoPaseRespaldo: true,
+        // Si se está leyendo ahora: la pantalla se engancha a esa lectura en
+        // vez de lanzar otra. Viaja como booleano, no la fecha.
+        lecturaEnCursoDesde: true,
         proveedor: { select: { id: true, nombre: true } },
         _count: { select: { lineas: true } },
         archivos: {
@@ -102,8 +106,11 @@ export async function GET(req) {
       : [];
     const vinculadasDe = new Map(vinculadasPorComprobante.map((v) => [v.comprobanteId, v._count._all]));
 
-    const conFotos = items.map((c) => ({
+    const conFotos = items.map(({ lecturaEnCursoDesde, ...c }) => ({
       ...c,
+      // Una vencida NO cuenta como leyendo: el GET de la lectura la da por
+      // cortada al mirarla, y engancharse a ella es justamente lo que lo hace.
+      leyendo: comoVaLaLectura({ lecturaEnCursoDesde }).estado === "LEYENDO",
       fotos: c.imagenBorradaEn ? 0 : c.archivos.length,
       archivos: c.imagenBorradaEn ? [] : c.archivos,
       lineasVinculadas: vinculadasDe.get(c.id) ?? 0,

@@ -426,7 +426,7 @@ test("PROBAR NO ESPERA LA LECTURA: PIDE TURNO Y PREGUNTA", () => {
   assert.match(c, /\?turno=\$\{encodeURIComponent\(turno\)\}/);
   assert.match(c, /CADA_CUANTO_SE_PREGUNTA_MS/);
   // Y mientras espera, dice cuánto puede tardar.
-  assert.match(TEXTO_LEYENDO, /puede tardar hasta un minuto/);
+  assert.match(TEXTO_LEYENDO, /puede tardar unos minutos/);
 
   // Del lado del servidor: arrancar y contestar, sin `await` de la lectura.
   const ruta = codigoDe(RUTA);

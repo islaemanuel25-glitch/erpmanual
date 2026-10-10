@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-10-10] - Actualización: compras-proveedor (lectura de comprobantes)
+
+### Modificado
+- fix: la lectura en curso vive en la base (`lecturaEnCursoDesde`,
+  `ultimaLectura`). Dos «Leer» seguidos lanzan una sola lectura; cerrar la
+  pantalla no la corta y al volver se engancha; un reinicio la deja cortada y
+  lo dice. «Probar» en Recetas: una prueba por papel a la vez.
+- fix: Flash espera 90 s (eran 45, por un techo de nginx que ya no aplica) y el
+  modelo grande 180 s. Si el grande no termina, queda la lectura de Flash.
+- fix: la pantalla muestra el motivo que manda el servidor y no el texto por
+  estado HTTP.
+- `LlamadaLector.duracionMs`: cuánto tarda cada llamada al lector.
+- Migración `20261010004408_lectura_en_segundo_plano` (pendiente de deploy).
+- **SIN VERIFICAR** con Gemini real: las esperas.
+
 ## [2026-10-10] - Actualización: compras-proveedor, transferencias
 
 ### Modificado
