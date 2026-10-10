@@ -1,25 +1,23 @@
 "use client";
 
-// RECETAS DE PROVEEDOR — cómo viene armada la factura de cada uno.
+// RECETAS DE PROVEEDOR — cómo viene el papel de cada uno.
 //
-// La receta es lo que el lector usa para saber qué buscar y lo que la
-// verificación usa para saber si la cuenta cierra. Sin ella se lee con la
-// genérica —21 % al pie— y todo proveedor que no sea así queda mal leído.
+// Desde la lectura interpretada (#165) lo que el lector usa es la EXPLICACIÓN
+// del papel, escrita en castellano y probada contra una foto real. Y desde el
+// caso CCU (factura A y factura B del mismo proveedor) hay una POR TIPO de
+// comprobante: esta lista dice, por proveedor, qué tipos tiene explicados y
+// cuáles esperan que alguien confirme lo que propuso el lector grande.
 //
-// ── ESTA PANTALLA SE USA DESDE EL CELULAR, CON LA FACTURA EN LA OTRA MANO ──
-//
-// Por eso ninguna opción se llama como el campo de la base. "El IVA viene en
-// cada renglón" es algo que se puede mirar y contestar; "IVA por línea" obliga
-// a traducir primero. Y donde ayuda va el ejemplo real —DYSSA lo trae por
-// renglón, DAS al pie, Mauro ya adentro del precio—, porque la respuesta más
-// rápida es "como el de DYSSA" y no un razonamiento sobre alícuotas.
-//
-// Los textos viven en lib/.../recetaEnCriollo.js con sus candados, uno de los
-// cuales comprueba justamente que ninguna opción se llame como el campo.
+// El formulario de impuestos que vivía acá se borró con el resto del código de
+// formato: ya no decide ningún costo. De la receta vieja quedan dos cosas, las
+// dos porque una regla de negocio las necesita: la variación normal de precio
+// —se edita en la pantalla de la explicación— y cómo cobra la cantidad, por
+// unidad o por bulto, que la usa el importador de pedidos desde archivo y se
+// contesta acá.
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Check, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Check } from "lucide-react";
 
 import { useUser } from "@/app/context/UserContext";
 import useContextoActivo from "@/hooks/useContextoActivo";
@@ -27,12 +25,20 @@ import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
-import { preguntasVisibles } from "@/lib/compras-proveedor/comprobante/recetaEnCriollo";
-import { ORIGEN_DE_LECTURA } from "@/lib/compras-proveedor/comprobante/origenDeLectura";
-import { pedirLaLectura } from "@/lib/compras-proveedor/comprobante/leerConTurno";
+/** La única pregunta que queda de la receta estructurada. */
+const PREGUNTA_FACTURA_POR = Object.freeze({
+  titulo: "¿Cómo cobra la cantidad?",
+  ayuda:
+    "Si el pedido dice «12» y son 12 paquetes sueltos, es por unidad. Si dice «12» y son 12 " +
+    "cajones, es por bulto. Ante la duda dejalo en unidad: el importador igual lo deduce " +
+    "comparando el precio contra el costo que ya tenés.",
+  opciones: [
+    { valor: "UNIDAD", texto: "Por unidad suelta" },
+    { valor: "BULTO", texto: "Por bulto o cajón" },
+  ],
+});
 
 export default function RecetasPage() {
   const router = useRouter();
@@ -44,13 +50,9 @@ export default function RecetasPage() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [items, setItems] = useState([]);
-  const [abierto, setAbierto] = useState(null); // proveedorId en edición
-  const [respuestas, setRespuestas] = useState(null);
-  const [proveedor, setProveedor] = useState(null);
+  const [abierto, setAbierto] = useState(null); // proveedorId con "cómo cobra" abierto
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
-  const [relectura, setRelectura] = useState(null);
-  const [releyendo, setReleyendo] = useState(null); // { hechas, total }
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
   const esAdmin = permisos.includes("*");
@@ -82,38 +84,15 @@ export default function RecetasPage() {
     cargar();
   }, [cargar, cargandoUser, cargandoCtx, needsContexto]);
 
-  async function abrir(proveedorId) {
-    setMensaje(null);
-    setRelectura(null);
-    setAbierto(proveedorId);
-    setRespuestas(null);
-    try {
-      const r = await fetch(`/api/compras-proveedor/recetas/obtener?proveedorId=${proveedorId}`, {
-        credentials: "include",
-        cache: "no-store",
-      });
-      const json = await r.json();
-      if (!json?.ok) {
-        setMensaje({ tipo: "error", texto: json?.error || "No se pudo abrir la receta." });
-        return;
-      }
-      setProveedor(json.proveedor);
-      setRespuestas(json.respuestas);
-    } catch {
-      setMensaje({ tipo: "error", texto: "Error de conexión." });
-    }
-  }
-
-  async function guardar() {
+  async function guardarFacturaPor(proveedorId, facturaPor) {
     setGuardando(true);
     setMensaje(null);
-    setRelectura(null);
     try {
       const r = await fetch("/api/compras-proveedor/recetas/guardar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ proveedorId: abierto, respuestas }),
+        body: JSON.stringify({ proveedorId, respuestas: { facturaPor } }),
       });
       const json = await r.json();
       if (!json?.ok) {
@@ -121,62 +100,12 @@ export default function RecetasPage() {
         return;
       }
       setMensaje({ tipo: "ok", texto: json.queHacer });
-      // El costo en lecturas llega con la respuesta del guardado, así que el
-      // aviso está a la vista ANTES de que apriete releer.
-      if (json.relectura?.hayQueOfrecer) setRelectura(json.relectura);
       await cargar();
     } catch {
       setMensaje({ tipo: "error", texto: "Error de conexión." });
     } finally {
       setGuardando(false);
     }
-  }
-
-  // Releer usa la MISMA ruta de lectura que el botón de un comprobante suelto,
-  // de a uno. Una ruta nueva que leyera en tanda sería un segundo camino de
-  // lectura, y el día que uno cambie el otro queda viejo.
-  async function releer() {
-    const ids = (relectura?.ids ?? []).slice(0, relectura.entran);
-    setReleyendo({ hechas: 0, total: ids.length });
-    let bien = 0;
-    let cortado = null;
-    for (const [i, id] of ids.entries()) {
-      try {
-        // ── SE ESPERA EL TURNO, Y ESO ACÁ NO ES UN DETALLE ────────────
-        //
-        // El POST contesta enseguida con un número de turno. Sin esperarlo,
-        // este `for` dispararía las cinco relecturas en paralelo contra una
-        // cuota de veinte por día, y las contaría todas como buenas antes de
-        // que ninguna hubiera terminado.
-        //
-        // La espera es la MISMA función que usa la tarjeta de comprobantes: dos
-        // copias del «pedí, esperá, volvé a preguntar» se separan el día que
-        // una cambia.
-        const { cuerpo: json } = await pedirLaLectura({
-          comprobanteId: id,
-          // Quién la pidió: la relectura que se ofrece después de escribir la
-          // receta. Queda guardado con la llamada.
-          origen: ORIGEN_DE_LECTURA.RECETA,
-          fetchImpl: fetch,
-        });
-        if (json?.ok) bien++;
-        // Si se acabó la cuota en el medio, se frena: seguir gasta llamadas que
-        // van a fallar todas y demora el aviso.
-        else if (json?.motivo === "CUOTA_AGOTADA") { cortado = json?.error; break; }
-      } catch {
-        cortado = "Se cortó la conexión.";
-        break;
-      }
-      setReleyendo({ hechas: i + 1, total: ids.length });
-    }
-    setReleyendo(null);
-    setRelectura(null);
-    setMensaje({
-      tipo: cortado ? "aviso" : "ok",
-      texto: cortado
-        ? `Se releyeron ${bien} de ${ids.length}. ${cortado}`
-        : `Se releyeron ${bien} de ${ids.length}. Miralos en la recepción de cada pedido.`,
-    });
   }
 
   if (cargandoUser || cargandoCtx) return null;
@@ -196,46 +125,18 @@ export default function RecetasPage() {
       </button>
 
       <SunmiCard>
-        <h1 className="text-sm font-bold sunmi-text-strong">Cómo viene la factura de cada proveedor</h1>
+        <h1 className="text-sm font-bold sunmi-text-strong">Cómo viene el papel de cada proveedor</h1>
         <p className="text-sm2 sunmi-text-muted mt-1 leading-snug">
-          Esto es lo que el sistema usa para leer una factura y comprobar que la cuenta cierre. Al
-          que no tiene nada cargado se le lee con lo más común —IVA 21 % al final— y si su factura
-          no es así, va a decir que no se pudo leer bien.
+          Cada tipo de papel —factura A, factura B, sin factura— tiene su propia explicación. El
+          primer papel de un tipo sin explicación lo lee el lector grande y deja una propuesta para
+          confirmar; la de los otros tipos no se toca.
         </p>
       </SunmiCard>
 
       {mensaje && (
-        <p
-          className={`text-xs ${
-            mensaje.tipo === "error"
-              ? "sunmi-text-danger"
-              : mensaje.tipo === "aviso"
-                ? "sunmi-text-warning"
-                : "sunmi-text-success"
-          }`}
-        >
+        <p className={`text-xs ${mensaje.tipo === "error" ? "sunmi-text-danger" : "sunmi-text-success"}`}>
           {mensaje.texto}
         </p>
-      )}
-
-      {/* EL COSTO EN LECTURAS, ANTES DEL BOTÓN Y NO DESPUÉS. */}
-      {relectura && (
-        <SunmiCard>
-          <p className="text-xs font-bold sunmi-text-warning">{relectura.texto}</p>
-          <p className="text-sm2 sunmi-text-muted mt-1 leading-snug">{relectura.aviso}</p>
-          {relectura.sePuedeAhora && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              <SunmiButton color="cyan" type="button" disabled={!!releyendo} onClick={releer}>
-                {releyendo
-                  ? `Releyendo ${releyendo.hechas} de ${releyendo.total}…`
-                  : `Releer ${relectura.entran}`}
-              </SunmiButton>
-              <SunmiButton color="slate" type="button" disabled={!!releyendo} onClick={() => setRelectura(null)}>
-                Ahora no
-              </SunmiButton>
-            </div>
-          )}
-        </SunmiCard>
       )}
 
       {cargando ? (
@@ -251,7 +152,7 @@ export default function RecetasPage() {
                   <p className="text-xs font-bold sunmi-text-strong">{p.nombre}</p>
                   <p
                     className={`text-sm2 leading-snug ${
-                      p.tieneReceta ? "sunmi-text-muted" : "sunmi-text-warning"
+                      p.pendientes?.length > 0 ? "sunmi-text-warning" : "sunmi-text-muted"
                     }`}
                   >
                     {p.resumen}
@@ -265,188 +166,60 @@ export default function RecetasPage() {
                   )}
                 </div>
                 <div className="flex flex-col gap-dato shrink-0">
-                  {/* ── LO QUE CAMBIA DE PAPEL A PAPEL SE EXPLICA, NO SE CARGA ──
-                      Los campos de abajo son los impuestos, que son cuatro y
-                      casi nunca cambian. Lo que cambia entre proveedores —qué
-                      columna es la cantidad, si hay descuento, si el precio es
-                      por kilo— se explica en castellano, una sola vez, y se
-                      prueba contra una foto de verdad antes de guardarla. */}
                   <SunmiButton
-                    color="cyan"
+                    color={p.pendientes?.length > 0 ? "cyan" : "slate"}
                     type="button"
                     onClick={() => router.push(`/modulos/proveedores/recetas/${p.proveedorId}`)}
                   >
                     Explicar el papel
                   </SunmiButton>
                   <SunmiButton
-                    color={p.tieneReceta ? "slate" : "cyan"}
+                    color="slate"
                     type="button"
-                    onClick={() => (abierto === p.proveedorId ? setAbierto(null) : abrir(p.proveedorId))}
+                    onClick={() => setAbierto(abierto === p.proveedorId ? null : p.proveedorId)}
                   >
-                    {abierto === p.proveedorId ? "Cerrar" : p.tieneReceta ? "Impuestos" : "Impuestos"}
+                    {abierto === p.proveedorId ? "Cerrar" : "Cómo cobra"}
                   </SunmiButton>
                 </div>
               </div>
 
               {abierto === p.proveedorId && (
                 <div className="mt-3 border-t sunmi-border pt-3">
-                  {!respuestas ? (
-                    <SunmiLoader />
-                  ) : (
-                    <Formulario
-                      respuestas={respuestas}
-                      onCambio={setRespuestas}
-                      onGuardar={guardar}
-                      guardando={guardando}
-                      nombre={proveedor?.nombre ?? p.nombre}
-                    />
-                  )}
+                  <p className="text-xs font-bold sunmi-text-strong">{PREGUNTA_FACTURA_POR.titulo}</p>
+                  <p className="text-sm2 sunmi-text-muted leading-snug mt-0.5">{PREGUNTA_FACTURA_POR.ayuda}</p>
+                  <div className="mt-2 flex flex-col gap-1">
+                    {PREGUNTA_FACTURA_POR.opciones.map((o) => {
+                      const elegida = p.facturaPor === o.valor;
+                      return (
+                        <SunmiButton
+                          key={o.valor}
+                          color={elegida ? "cyan" : "slate"}
+                          type="button"
+                          disabled={guardando}
+                          className="justify-start text-left"
+                          onClick={() => guardarFacturaPor(p.proveedorId, o.valor)}
+                        >
+                          <span className="flex items-start gap-2">
+                            {/* La elegida se marca con un signo además del color: dos
+                                botones que solo se distinguen por tono se confunden
+                                con el sol de frente. */}
+                            <span className="shrink-0 pt-0.5">
+                              {elegida ? <Check size={14} aria-hidden="true" /> : <span className="inline-block w-[14px]" />}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block">{o.texto}</span>
+                            </span>
+                          </span>
+                        </SunmiButton>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </SunmiCard>
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-/**
- * El formulario, armado desde las preguntas.
- *
- * Se dibuja recorriendo `preguntasVisibles`, no escribiendo cada campo a mano:
- * agregar una pregunta es agregarla al módulo, y las condiciones de cuándo
- * mostrar cada una viven ahí con sus candados.
- */
-function Formulario({ respuestas, onCambio, onGuardar, guardando, nombre }) {
-  const set = (campo, valor) => onCambio({ ...respuestas, [campo]: valor });
-  const visibles = preguntasVisibles(respuestas);
-
-  return (
-    <div className="flex flex-col gap-4">
-      {visibles.map((p) => (
-        <div key={p.campo}>
-          <p className="text-xs font-bold sunmi-text-strong">{p.titulo}</p>
-          <p className="text-sm2 sunmi-text-muted leading-snug mt-0.5">{p.ayuda}</p>
-
-          {p.opciones && (
-            <div className="mt-2 flex flex-col gap-1">
-              {p.opciones.map((o) => {
-                const elegida = respuestas[p.campo] === o.valor;
-                return (
-                  <SunmiButton
-                    key={String(o.valor)}
-                    color={elegida ? "cyan" : "slate"}
-                    type="button"
-                    className="justify-start text-left"
-                    onClick={() => set(p.campo, o.valor)}
-                  >
-                    <span className="flex items-start gap-2">
-                      {/* La elegida se marca con un signo además del color: dos
-                          botones que solo se distinguen por tono se confunden
-                          con el sol de frente. */}
-                      <span className="shrink-0 pt-0.5">
-                        {elegida ? <Check size={14} aria-hidden="true" /> : <span className="inline-block w-[14px]" />}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block">{o.texto}</span>
-                        {(o.detalle || o.ejemplo) && (
-                          <span className="block text-sm2 opacity-80 leading-snug">
-                            {o.detalle} {o.ejemplo}
-                          </span>
-                        )}
-                      </span>
-                    </span>
-                  </SunmiButton>
-                );
-              })}
-            </div>
-          )}
-
-          {p.tipo === "numero" && (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <SunmiInput
-                type="number"
-                inputMode="decimal"
-                value={respuestas[p.campo] ?? ""}
-                onChange={(e) => set(p.campo, e.target.value === "" ? "" : Number(e.target.value))}
-                className="w-28"
-              />
-              {(p.sugerencias ?? []).map((s) => (
-                <SunmiButton key={s} color="slate" type="button" onClick={() => set(p.campo, s)}>
-                  {s} %
-                </SunmiButton>
-              ))}
-            </div>
-          )}
-
-          {p.tipo === "lista" && (
-            <ListaPercepciones
-              valor={respuestas[p.campo] ?? []}
-              onCambio={(v) => set(p.campo, v)}
-            />
-          )}
-        </div>
-      ))}
-
-      <div>
-        <SunmiButton color="cyan" type="button" disabled={guardando} onClick={onGuardar}>
-          {guardando ? "Guardando…" : `Guardar la receta de ${nombre}`}
-        </SunmiButton>
-        <p className="text-sm2 sunmi-text-muted mt-1 leading-snug">
-          Los comprobantes que ya se leyeron no cambian: cada uno guardó la receta con la que se
-          leyó. Después de guardar se ofrece releer los que todavía no confirmaste.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-/** Las percepciones: nombre y porcentaje, tantas como diga el papel. */
-function ListaPercepciones({ valor, onCambio }) {
-  const lista = Array.isArray(valor) ? valor : [];
-  const cambiar = (i, campo, v) =>
-    onCambio(lista.map((p, j) => (j === i ? { ...p, [campo]: v } : p)));
-
-  return (
-    <div className="mt-2 flex flex-col gap-1">
-      {lista.map((p, i) => (
-        <div key={i} className="flex flex-wrap items-center gap-2">
-          <SunmiInput
-            value={p.nombre ?? ""}
-            placeholder="IIBB, IVA…"
-            onChange={(e) => cambiar(i, "nombre", e.target.value)}
-            className="flex-1 min-w-[8rem]"
-          />
-          <SunmiInput
-            type="number"
-            inputMode="decimal"
-            value={p.pct ?? ""}
-            placeholder="%"
-            onChange={(e) => cambiar(i, "pct", e.target.value === "" ? "" : Number(e.target.value))}
-            className="w-20"
-          />
-          <SunmiButton
-            color="slate"
-            type="button"
-            onClick={() => onCambio(lista.filter((_, j) => j !== i))}
-          >
-            <Trash2 size={14} aria-hidden="true" />
-          </SunmiButton>
-        </div>
-      ))}
-      <div>
-        <SunmiButton
-          color="slate"
-          type="button"
-          onClick={() => onCambio([...lista, { nombre: "", pct: "" }])}
-        >
-          <span className="inline-flex items-center gap-1">
-            <Plus size={14} aria-hidden="true" />
-            Agregar una percepción
-          </span>
-        </SunmiButton>
-      </div>
     </div>
   );
 }

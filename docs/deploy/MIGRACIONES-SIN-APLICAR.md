@@ -16,58 +16,39 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Una. Producción está en **57 migraciones**; el árbol tiene 58.
+Una. Producción está en **58 migraciones**; el árbol tiene 59.
 
-- `20261010130441_lectura_interpretada` — aditiva: `costoFinalRenglon`
-  (decimal), `enQueViene` y `tipoRenglon` (texto) en `ComprobanteLinea`, y
-  `explicacionLeida` en `ComprobanteProveedor`, todas nullable. **Sí mueve
-  datos, en una sola tabla:** un `UPDATE` de `RecetaProveedor` que traduce a
-  castellano lo que dicen los campos estructurados (dónde va el IVA, interno,
-  percepciones, bulto) y lo AGREGA al final de la explicación que haya, sin
-  pisarla y sin cambiar la versión. No toca las filas que tienen explicación y
-  los campos de fábrica, y es idempotente: no agrega el texto dos veces.
-  Ejercido contra la base de desarrollo dentro de una transacción revertida.
+- `20261010180000_explicacion_por_tipo` — **NO es aditiva: mueve datos y
+  TIENE DROP.** En orden: (1) `cae` en `ComprobanteProveedor`, nullable, con
+  un índice único parcial por grupo que excluye los anulados; (2) la tabla
+  `ExplicacionPorTipo`; (3) copia la explicación que cada proveedor tenía en
+  `RecetaProveedor` al tipo de papel que más le llegó (sin ninguno con letra,
+  SIN_FACTURA), con su versión, su fecha y su autor; (4) borra las propuestas
+  pendientes de la receta estructurada vieja —las que no traen explicación—,
+  le agrega `tipoComprobante` a las que quedan y cambia su índice único a
+  grupo + proveedor + tipo; (5) **borra de `RecetaProveedor` las columnas de
+  formato** (`alicuotaIvaPct`, `ivaPorLinea`, `tieneImpuestoInterno`,
+  `ivaIncluyeInternoEnLaBase`, `percepciones`, `percepcionesEnCosto`) y la
+  explicación única (`explicacion`, `explicacionActualizadaEn`,
+  `explicacionActualizadaPor`, `version`). Quedan `variacionNormalPct` y
+  `facturaPor`. El contenido de las columnas borradas ya está en la
+  explicación: lo tradujo `20261010130441_lectura_interpretada` y el paso 3 lo
+  copia. Si dos comprobantes no anulados del mismo grupo tuvieran el mismo
+  CAE el índice no se podría crear, y no puede pasar: la columna nace vacía.
+  Ejercida contra la base de desarrollo, con datos y dentro de una
+  transacción revertida, y desde cero.
 
-**De dónde sale el 57.** `20261010025546_tokens_de_cada_llamada` se aplicó el
-2026-10-10 a las 03:09 UTC con el despliegue de `f8ee067c`, y
-`20261010123108_recibir_sin_cerrar` a las 12:55 UTC con el de `0499e89b`, los
-dos informados por la sesión del VPS y anotados en la orden de esta tanda.
+**De dónde sale el 58.** `20261010130441_lectura_interpretada` se aplicó el
+2026-10-10 a las 14:04 UTC con el despliegue de `ffe489c8`, informado en la
+orden de esta tanda.
 
-**Lo que decía antes, sobre el 55.** `20261010004408_lectura_en_segundo_plano` sale de esta
-lista porque la sesión del VPS midió el 2026-10-10 a las 02:48 UTC una llamada
-con `duracionMs` 90.012 en `LlamadaLector`: esa columna y esa espera son de esa
-migración y de #160, así que producción ya la tiene. Es una inferencia de un
-dato medido, no un `migrate status`; si el próximo `/deploy` informa otra cosa,
-se corrige acá.
-
-**Lo que decía antes, sobre el 54.** `20261009222956_escalada_a_pro` sale de esta lista
-porque Emanuel informó el 2026-10-09 que producción corre `a1331d9a` (PRs #158 y
-#159), desplegado con `/deploy`, que aplica las pendientes. No se verificó
-desde la sesión que escribe esto; si el próximo `/deploy` informa otra cosa en
-`migrate status`, se corrige acá.
-
-**Lo que decía antes, sobre el 53.** `20261008120000_receta_dyssa_iva_por_renglon` está
-aplicada en producción desde el 2026-10-08 12:38, con el despliegue de
-`ca524482` (informado por la sesión del VPS). `20261006150000_delegacion_integracion`
-sale de esta lista por **inferencia, no verificada en el VPS**: está en la
-historia de `25172fe0` —comprobado con `git merge-base --is-ancestor`—, el
-commit que producción corría antes de `ca524482`, y el `migrate deploy` de ese
-despliegue aplica todas las pendientes. Si el próximo `/deploy` informa otra
-cosa en `migrate status`, se corrige acá.
-
-**Lo que decía antes, sobre el 51.** Lo informó Emanuel el
-2026-10-06: producción corre `06cc9510a1dceb277c77ac0dac41b4bc95e040f0` (merge
-de la PR #147) con 51/51 migraciones, ninguna pendiente. No se verificó desde
-la sesión que escribe esto —en el VPS no se investiga—. Con ese despliegue
-quedaron aplicadas las dos que esta lista tenía pendientes,
-`20261005100000_correccion_turno_operativo_de_caja` y
-`20261006120000_vinculo_integracion`, y por eso salen de acá. **Falta su
-sección en la bitácora de abajo**, con lo que informó el despliegue: la
-escribe la sesión que lo corrió, no ésta, que no lo vio.
-
-La última aplicada según ese informe es `20261006120000_vinculo_integracion`.
-La bitácora de abajo llega hasta `b6052783`. Un commit posterior que solo
-cambie documentación **no se despliega por eso**.
+Las que estaban en esta lista antes y ya se aplicaron —hasta
+`20261010130441_lectura_interpretada`— salieron de acá: la historia de cuándo
+y cómo se aplicó cada una está en `git log` de este archivo y, para las que la
+tienen, en la bitácora de abajo. La bitácora llega hasta `b6052783` y no se
+borra: la citan como evidencia `lib/stock/libro/stockDiario.test.mjs` y los
+documentos de tesorería y caja. Un commit posterior que solo cambie
+documentación **no se despliega por eso**.
 
 ---
 

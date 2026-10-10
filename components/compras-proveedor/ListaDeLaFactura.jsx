@@ -149,7 +149,7 @@ export default function ListaDeLaFactura({
   // la factura, y saber cuánto se gana en la compra pedía hacer la cuenta a
   // mano renglón por renglón.
   //
-  // ESTA SUMA NO ES LA QUE VERIFICA LA LECTURA. Aquélla —`verificarComprobante`—
+  // ESTA SUMA NO ES LA QUE VERIFICA LA LECTURA. Aquélla —`verificarLecturaInterpretada`—
   // suma las líneas para compararlas contra el total impreso del papel, y por
   // eso no puede usarse cuando el papel no trae total: compararía la cuenta
   // contra sí misma. Ésta suma para saber cuánto se paga y cuánto se gana, no
@@ -351,10 +351,24 @@ export default function ListaDeLaFactura({
               onCoincide={onCoincide}
             />
           ))}
-          {envases.length > 0 && (
+          {envases.some((f) => f.cargo) && (
+            <>
+              {/* El flete o el servicio logístico: no es producto, y su costo
+                  ya está repartido en el de cada producto (`cargos.js`). */}
+              <SunmiSeparator label="Cargos repartidos en el costo" />
+              {envases.filter((f) => f.cargo).map((f) => (
+                <RenglonDeImporte
+                  key={claveDeFila(f)}
+                  rotulo={`${f.textoCrudo ?? "Cargo"} · ${f.cantidad ?? "—"}`}
+                  valor={f.subtotal}
+                />
+              ))}
+            </>
+          )}
+          {envases.some((f) => !f.cargo) && (
             <>
               <SunmiSeparator label="Envases" />
-              {envases.map((f) => (
+              {envases.filter((f) => !f.cargo).map((f) => (
                 <RenglonDeImporte
                   key={claveDeFila(f)}
                   rotulo={`${f.textoCrudo ?? "Envase"} · ${f.cantidad ?? "—"}`}

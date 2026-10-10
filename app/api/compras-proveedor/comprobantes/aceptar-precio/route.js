@@ -41,8 +41,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { puedeAceptarse } from "@/lib/compras-proveedor/comprobante/aceptarPrecio";
 import { analizarPrecioDeLinea } from "@/lib/compras-proveedor/comprobante/precioDeLinea";
-import { repartoDelPie } from "@/lib/compras-proveedor/comprobante/repartoDelPie";
-import { RECETA_POR_DEFECTO } from "@/lib/compras-proveedor/comprobante/impuestos";
+import { cargosDelPapel } from "@/lib/compras-proveedor/comprobante/cargos";
 import { productosDeLasFilas } from "@/lib/compras-proveedor/comprobante/productoDeLaFila";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import {
@@ -140,29 +139,19 @@ export async function POST(req) {
           select: {
             // `pedidoId` para poder resolver a qué línea del pedido pertenece
             // esta línea, con el mismo criterio que usa la pantalla.
-            id: true, pedidoId: true, estado: true, confirmadoEn: true, recetaUsada: true,
-            // ── EL PIE DE LA FACTURA, PARA PODER REPARTIRLO ────────────
+            id: true, pedidoId: true, estado: true, confirmadoEn: true,
+            // ── TODAS SUS LÍNEAS, AUNQUE SE ANALICE UNA ────────────────
             //
-            // El costo que esta ruta ESCRIBE lleva adentro los conceptos del
-            // pie. Sin ellos, aceptar un precio guardaría neto + IVA mientras
-            // la pantalla muestra el final: dos números para la misma cosa, y
-            // el que queda en la base es el malo.
-            netoLeido: true, ivaLeido: true, internoLeido: true,
-            totalLeido: true, conceptosDelPieLeidos: true,
-            // ── Y TODAS SUS LÍNEAS, AUNQUE SE ANALICE UNA ──────────────
-            //
-            // El reparto es proporcional al neto de cada renglón sobre el neto
-            // de la factura: con una sola línea, el pie entero le caería a ella.
-            // Se piden los campos que el reparto necesita y nada más.
+            // El costo que esta ruta ESCRIBE lleva adentro su parte de los
+            // cargos del proveedor, que se reparten en proporción al costo
+            // final de cada renglón sobre el de la factura (`cargos.js`): con
+            // una sola línea, el flete entero le caería a ella. Se piden los
+            // campos que el reparto necesita y nada más.
             lineas: {
               orderBy: { orden: "asc" },
               select: {
-                orden: true, cantidad: true, netoUnitario: true,
-                subtotalImpreso: true, subtotalCorregido: true, internoUnitario: true,
-                textoCrudo: true, codigoProveedor: true, pesoKg: true, bonificacionPct: true,
-                costoFinalRenglon: true,
-                // La alícuota de cada renglón: el IVA del pie se reparte con ella.
-                ivaPct: true,
+                orden: true, cantidad: true, textoCrudo: true, codigoProveedor: true,
+                costoFinalRenglon: true, tipoRenglon: true,
               },
             },
             proveedor: { select: { id: true, umbralRevisarPct: true, umbralSospechaBajaPct: true } },
@@ -187,8 +176,6 @@ export async function POST(req) {
         "Este papel no cierra: no se acepta ningún precio de él. Podés recibir igual y los costos quedan como estaban.";
       return NextResponse.json({ ok: false, error: noCierra, queHacer: noCierra }, { status: 409 });
     }
-
-    const receta = linea.comprobante.recetaUsada ?? { ...RECETA_POR_DEFECTO };
 
     // ── LA RESOLUCIÓN ES LA DE LA PANTALLA, NO UNA PARECIDA ──────────────
     //
@@ -233,8 +220,8 @@ export async function POST(req) {
       contexto,
       detallesPlanos: detallesDelPedido,
       porProductoLocal,
-      // Se analiza UNA línea pero el pie se reparte entre TODAS: es proporcional
-      // al neto de cada renglón sobre el neto de la factura.
+      // Se analiza UNA línea pero los cargos se reparten entre TODAS: es
+      // proporcional al costo de cada renglón sobre el de la factura.
       todasLasLineas: linea.comprobante.lineas,
     });
 
@@ -245,7 +232,7 @@ export async function POST(req) {
 
     // El precio se recalcula acá y no se acepta lo que llegó en el pedido: el
     // número que se escribe no puede venir del cliente. Con el mismo producto y
-    // la misma receta da lo mismo que muestra la hoja; lo único que agrega es
+    // el mismo papel da lo mismo que muestra la hoja; lo único que agrega es
     // la unidad que una persona haya elegido mirando la factura, que la
     // pantalla no puede saber de antemano.
     // ── LA ELECCIÓN DE UNIDAD SE GUARDA, NO SE USA Y SE TIRA ────────────
@@ -264,14 +251,11 @@ export async function POST(req) {
     const analisis = analizarPrecioDeLinea({
       linea,
       producto: base,
-      receta,
-      // ── LO QUE LE TOCA DEL PIE, IGUAL QUE EN LA HOJA ──────────────────
+      // ── LO QUE LE TOCA DE LOS CARGOS, IGUAL QUE EN LA HOJA ────────────
       //
-      // Faltaba: la hoja proponía el costo con las percepciones adentro y esta
-      // ruta, que es la que lo ESCRIBE, lo recalculaba sin ellas. El reparto
-      // es de la factura entera, por eso se le pasan todas sus líneas.
-      percepcionDeLaLinea:
-        repartoDelPie({ ...linea.comprobante, lineas: linea.comprobante.lineas }).get(linea.orden) ?? null,
+      // El reparto es de la factura entera, por eso se le pasan todas sus
+      // líneas: es el MISMO `cargosDelPapel` que usa `analizarLineas`.
+      cargoDeLaLinea: cargosDelPapel(linea.comprobante.lineas).get(linea.orden) ?? 0,
       // El pack ya confirmado en el vínculo, igual que la hoja: sin esto esta
       // ruta escribiría el precio de un pack de 6 como si fuera el de la plancha.
       unidadesGuardadas: unidadesGuardadasDeLaLinea({ linea, productoBaseId: base?.id, contexto }),

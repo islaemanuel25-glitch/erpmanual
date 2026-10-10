@@ -529,9 +529,11 @@ model Proveedor {
   /// se ven varias aunque cada grupo tenga una sola. La unicidad real la
   /// garantiza @@unique([grupoId, proveedorId]) en RecetaProveedor.
   recetas      RecetaProveedor[]
-  /// La receta que armó el sistema y nadie confirmó todavía. Va aparte de
-  /// `recetas` a propósito: ver RecetaPropuestaProveedor.
+  /// La explicación que armó el sistema y nadie confirmó todavía. Va aparte a
+  /// propósito: ver RecetaPropuestaProveedor.
   recetasPropuestas RecetaPropuestaProveedor[]
+  /// Cómo viene cada tipo de papel de este proveedor, confirmado.
+  explicacionesPorTipo ExplicacionPorTipo[]
   /// Las recetas de LECTURA, que son varias por proveedor: un mismo proveedor
   /// factura con formatos distintos —Consumidor Final, Responsable Inscripto— y
   /// eso no cambia sus impuestos. Por eso son otra tabla y no un campo más de
@@ -4717,32 +4719,19 @@ enum FacturaPor {
   BULTO
 }
 
-/// La receta de un proveedor: cómo viene armada su factura.
+/// LO QUE SE SABE DE UN PROVEEDOR PARA COMPRARLE, QUE NO ES CÓMO SE LEE SU PAPEL.
 ///
-/// Se aprende una vez y se edita a mano. Los defaults de cada campo son los
-/// mismos de RECETA_POR_DEFECTO en lib/compras-proveedor/comprobante/impuestos.js.
-/// Si divergen, gana el código: ahí están los candados.
+/// Hasta la lectura interpretada (#165) esta fila era la receta de impuestos
+/// del papel —IVA por renglón o al pie, interno, percepciones— y con ella el
+/// código armaba el costo. Ya no: el papel lo interpreta el modelo y cómo
+/// viene cada tipo de papel está en `ExplicacionPorTipo`. Quedan las dos
+/// reglas de negocio que no son de formato: cuánto se le mueve el precio sin
+/// que sea raro, y si su lista de precios es por bulto (la usa la importación
+/// de pedidos desde archivo).
 model RecetaProveedor {
   id          Int @id @default(autoincrement())
   grupoId     Int
   proveedorId Int
-
-  /// true = cada línea trae su IVA. false = el IVA viene solo al pie.
-  ivaPorLinea    Boolean @default(false)
-  alicuotaIvaPct Decimal @default(21) @db.Decimal(5, 2)
-
-  tieneImpuestoInterno Boolean @default(false)
-
-  /// MEDIDO sobre la factura de DYSSA: el IVA se calcula sobre el neto SOLO.
-  ivaIncluyeInternoEnLaBase Boolean @default(false)
-
-  /// [{ nombre, pct }] sobre el neto. Json y no una tabla porque son dos o tres
-  /// por proveedor, se editan juntas y nunca se consultan solas.
-  percepciones Json @default("[]")
-
-  /// Las percepciones van ADENTRO del costo. Decisión de negocio del
-  /// 2026-08-11, con lo que gana y lo que resigna escrito en impuestos.js.
-  percepcionesEnCosto Boolean @default(true)
 
   /// CUÁNTO SE LE MUEVE EL PRECIO A ESTE PROVEEDOR SIN QUE SEA RARO, EN %.
   ///
@@ -4755,67 +4744,79 @@ model RecetaProveedor {
   /// el costo cae afuera sin que nadie lo haya elegido en esa recepción.
   variacionNormalPct Decimal @default(10) @db.Decimal(5, 2)
 
+  /// Si la lista de precios del proveedor es por bulto. Lo lee la importación
+  /// de pedidos desde archivo; el papel de compra no la usa.
   facturaPor FacturaPor @default(UNIDAD)
-
-  /// ── LA RECETA, EXPLICADA EN PALABRAS ──────────────────────────────────
-  ///
-  /// Hay unos treinta proveedores y cada papel es distinto. Los campos de
-  /// arriba cubren impuestos y nada más, y lo que cambia de papel a papel es
-  /// CÓMO SE LEE: qué columna es la cantidad, si hay descuento, si el precio es
-  /// por kilo. Acá va eso, dicho como se lo explicarías a una persona.
-  ///
-  /// MEDIDO antes de construirlo, con el papel real de Paty (la sonda
-  /// `sonda-explicacion-papel.mjs`, cd05b779): con una explicación de cuatro
-  /// frases, 11 de 11 renglones quedaron bien interpretados y las tres corridas
-  /// dieron los mismos números. Sin ella ese papel salía MAL_LEIDO.
-  ///
-  /// NO reemplaza a los campos de arriba: el IVA y las percepciones siguen
-  /// armando su parte del pedido al modelo y toda la verificación.
-  explicacion               String?
-  explicacionActualizadaEn  DateTime?
-  /// Quién la escribió. Sin autor, dentro de seis meses nadie sabe a quién
-  /// preguntarle por qué el papel se lee así.
-  explicacionActualizadaPor Int?
-
-  /// Sube cada vez que alguien la edita. Se copia en el comprobante para poder
-  /// explicar un resultado viejo, igual que parserVersion en las listas.
-  version Int @default(1)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   proveedor Proveedor @relation(fields: [proveedorId], references: [id])
 
-  /// Una receta por proveedor y grupo: es lo que hace que "la receta del
-  /// proveedor" sea una cosa y no un historial.
   @@unique([grupoId, proveedorId])
   @@index([proveedorId])
 }
 
-/// LA RECETA QUE ARMÓ EL SISTEMA, ESPERANDO QUE ALGUIEN LA CONFIRME.
+/// CÓMO VIENE UN TIPO DE PAPEL DE ESTE PROVEEDOR, EXPLICADO Y CONFIRMADO.
 ///
-/// Cuando la lectura de todos los días no alcanza, el modelo grande interpreta
-/// la boleta y propone cómo viene armada. Si con esa propuesta la cuenta del
-/// papel CIERRA —la hace el código, no el modelo—, queda acá hasta que una
-/// persona dice "está bien" en Recetas de facturas, y recién ahí pasa a
-/// `RecetaProveedor` con su versión.
+/// Una por tipo de comprobante —A, B, C, M, E o SIN_FACTURA para remitos y
+/// planillas— (`lib/compras-proveedor/comprobante/explicacionPorTipo.js`). CCU
+/// factura A a un responsable inscripto y B a un sujeto no categorizado, con
+/// papeles armados distinto: la de un tipo no pisa la del otro (regla de
+/// Emanuel, agosto 2026). Con ellas lee Flash; un tipo sin la suya lo lee el
+/// modelo grande y deja pendiente la de ese tipo.
 ///
-/// ── POR QUÉ NO ES UNA FILA DE RecetaProveedor ──────────────────────────
+/// MEDIDO antes de construir la explicación, con el papel real de Paty (la
+/// sonda `sonda-explicacion-papel.mjs`, cd05b779): con cuatro frases, 11 de 11
+/// renglones bien interpretados y las tres corridas con los mismos números.
+model ExplicacionPorTipo {
+  id              Int    @id @default(autoincrement())
+  grupoId         Int
+  proveedorId     Int
+  tipoComprobante String
+  explicacion     String
+
+  /// Sube cada vez que alguien la confirma o la edita. Se copia en el
+  /// comprobante para poder explicar un resultado viejo.
+  version Int @default(1)
+
+  actualizadaEn  DateTime @default(now())
+  /// Quién la confirmó. Sin autor, dentro de seis meses nadie sabe a quién
+  /// preguntarle por qué el papel se lee así.
+  actualizadaPor Int?
+
+  createdAt DateTime @default(now())
+
+  proveedor Proveedor @relation(fields: [proveedorId], references: [id])
+
+  @@unique([grupoId, proveedorId, tipoComprobante])
+  @@index([proveedorId])
+}
+
+/// LA EXPLICACIÓN QUE ARMÓ EL MODELO GRANDE, ESPERANDO QUE ALGUIEN LA CONFIRME.
 ///
-/// Porque la existencia de esa fila ES el hecho "el proveedor tiene receta
-/// confirmada": `recetaDelProveedor` la lee así y deja de usar la genérica.
-/// Escribir ahí lo que nadie confirmó convertiría una propuesta en una receta
-/// sin que nadie lo decidiera. Un hecho, una tabla.
+/// Cuando no hay una explicación confirmada para el tipo de papel que llegó, o
+/// la lectura de todos los días no alcanza, el modelo grande interpreta la
+/// boleta y explica cómo viene armada. Si con su lectura la cuenta del papel
+/// CIERRA —la hace el código, no el modelo—, la explicación queda acá hasta que
+/// una persona dice "está bien" en Recetas de facturas, y recién ahí pasa a
+/// `ExplicacionPorTipo` con su versión.
 ///
-/// Una por proveedor y grupo: la última propuesta que cerró reemplaza a la
-/// anterior, y confirmar la borra.
+/// No es una fila de `ExplicacionPorTipo` porque la existencia de esa fila ES
+/// el hecho "este tipo de papel tiene explicación confirmada". Un hecho, una
+/// tabla.
+///
+/// Una por proveedor, grupo y TIPO DE PAPEL: la última que cerró reemplaza a la
+/// anterior del mismo tipo, y confirmar la borra.
 model RecetaPropuestaProveedor {
   id          Int @id @default(autoincrement())
   grupoId     Int
   proveedorId Int
 
-  /// Las respuestas, con la forma de `aPreguntas`/`aReceta` de
-  /// `recetaEnCriollo.js`: la misma que guarda la pantalla de recetas.
+  /// De qué tipo de papel es (`explicacionPorTipo.js`).
+  tipoComprobante String @default("SIN_FACTURA")
+
+  /// `{ explicacion }`: lo que explicó el modelo grande.
   respuestas Json
   /// La lectura con la que cerró, para que la pantalla muestre "Así lo
   /// entendió" sin volver a gastar una consulta.
@@ -4829,7 +4830,7 @@ model RecetaPropuestaProveedor {
 
   proveedor Proveedor @relation(fields: [proveedorId], references: [id])
 
-  @@unique([grupoId, proveedorId])
+  @@unique([grupoId, proveedorId, tipoComprobante])
   @@index([proveedorId])
 }
 
@@ -5014,6 +5015,12 @@ model ComprobanteProveedor {
   /// difiere: NUNCA lo completa solo. Un CUIT mal leído que se autocompletara
   /// dejaría al proveedor con un dato falso que nadie volvería a mirar.
   cuitLeido String?
+
+  /// El CAE impreso, si lo trae: 14 dígitos, único por comprobante en la AFIP.
+  /// Defiende contra el mismo papel subido dos veces aunque el número de
+  /// comprobante no esté a la vista (CCU #257). Índice único parcial en la
+  /// migración `20261010180000_explicacion_por_tipo`: por grupo, sin los ANULADO.
+  cae String?
 
   /// ── TOTALES LEÍDOS DEL PAPEL ─────────────────────────────────────────
   /// Son lo que dice el comprobante, no lo que calculamos. La comparación entre

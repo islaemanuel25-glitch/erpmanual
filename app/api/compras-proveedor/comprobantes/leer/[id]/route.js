@@ -34,10 +34,8 @@ import { armarCadena, leerConCadena } from "@/lib/compras-proveedor/comprobante/
 import { escalarAlModeloGrande } from "@/lib/compras-proveedor/comprobante/lector/escalada";
 import { medicionDeLaLlamada } from "@/lib/compras-proveedor/comprobante/lector/medicionDeLaLlamada";
 import { armarInterpretes } from "@/lib/compras-proveedor/comprobante/lector/gemini";
-import {
-  recetaDelProveedor,
-  fechaLeidaONull,
-} from "@/lib/compras-proveedor/comprobante/lector/recetaDelProveedor";
+import { fechaLeidaONull } from "@/lib/compras-proveedor/comprobante/lector/recetaDelProveedor";
+import { explicacionesConfirmadas } from "@/lib/compras-proveedor/comprobante/explicacionPorTipo";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 import {
   achicarTodas,
@@ -245,10 +243,15 @@ export async function POST(req, { params }) {
     // acá: no hay un segundo formato que pueda quedar desfasado del primero.
     const hacerLaLectura = async () => {
       // ── La receta del proveedor: es lo que guía qué buscar ───────────────
-      const recetaFila = await prisma.recetaProveedor.findUnique({
-        where: { grupoId_proveedorId: { grupoId, proveedorId: comprobante.proveedorId } },
-      });
-      const { receta, version: recetaVersion, esGenerica } = recetaDelProveedor(recetaFila);
+      // Una por tipo de comprobante (`explicacionPorTipo.js`): Flash lee con
+      // todas y la letra que lea dice cuál correspondía.
+      const explicaciones = explicacionesConfirmadas(
+        await prisma.explicacionPorTipo.findMany({
+          where: { grupoId, proveedorId: comprobante.proveedorId },
+          select: { tipoComprobante: true, explicacion: true, version: true },
+        })
+      );
+      const receta = { interpretada: true, explicaciones };
 
       // Se leen TODAS antes de mandar: si falta una, no se manda media factura.
       // Media factura leída daría una cuenta que no cierra por el motivo
@@ -301,12 +304,12 @@ export async function POST(req, { params }) {
 
       // ── QUIÉN LEE ────────────────────────────────────────────────────────
       //
-      // Con la explicación confirmada del proveedor, Flash, guiado por ella.
-      // Sin explicación no hay con qué guiarlo: lee directamente el modelo
-      // grande, que interpreta el papel y explica cómo viene —esa explicación
-      // queda como receta para confirmar—. Si el grande no está configurado,
+      // Si el proveedor tiene alguna explicación confirmada, Flash, con todas
+      // —una por tipo de papel—; si la letra que lee no tiene la suya, entra el
+      // grande y deja pendiente la de ese tipo. Sin ninguna no hay con qué
+      // guiarlo: lee directamente el grande. Si el grande no está configurado,
       // lee Flash igual, sin guía. Ver `escalada.js`.
-      const sinExplicacion = !String(receta?.explicacion ?? "").trim();
+      const sinExplicacion = explicaciones.length === 0;
       const interpretes = armarInterpretes();
       const hayGrande = [interpretes.titular, interpretes.respaldo].some((i) => i?.disponible?.().ok === true);
       let resultado =
@@ -321,19 +324,18 @@ export async function POST(req, { params }) {
       // lo verifica el código con la misma puerta: la suma de los costos
       // finales contra el total impreso.
       //
-      // La receta que queda con la lectura es su explicación: el costo no sale
-      // de ella, lo trae cada renglón.
-      let recetaDeLaLectura = { interpretada: true, explicacion: receta?.explicacion ?? null };
-      let versionDeLaLectura = recetaVersion;
+      // La receta que queda con la lectura es la explicación de su tipo de
+      // papel: el costo no sale de ella, lo trae cada renglón.
       const escalada = await escalarAlModeloGrande({
         resultado,
-        receta,
-        recetaVersion,
+        explicaciones,
         sinExplicacion: sinExplicacion && hayGrande,
         interpretes,
         archivos: paraLeer,
         proveedorNombre: comprobante.proveedor?.nombre ?? null,
       });
+      let recetaDeLaLectura = escalada.recetaDeFlash;
+      let versionDeLaLectura = escalada.versionDeFlash;
       if (escalada.cerro || (escalada.lectura && resultado.ok !== true)) {
         // `ok: true` porque puede venir sin lectura de Flash —sin explicación,
         // o Flash que no contestó—: ahí la del grande es la ÚNICA. Si cerró es
@@ -711,15 +713,22 @@ export async function POST(req, { params }) {
       if (escalada.cerro && escalada.propuesta) {
         try {
           const propuesta = {
-            respuestas: escalada.propuesta,
+            respuestas: { explicacion: escalada.propuesta.explicacion },
             lectura: escalada.lectura,
             comprobanteId: comprobante.id,
             modelo: escalada.modelo ?? "",
             creadaEn: new Date(),
           };
+          // ── LA DE ESE TIPO DE PAPEL, Y NINGUNA OTRA ───────────────────
+          //
+          // Una B sin explicación deja pendiente la de la B: la de la A, si
+          // existe, no se toca (`explicacionPorTipo.js`).
+          const tipoComprobante = escalada.propuesta.tipoComprobante;
           await prisma.recetaPropuestaProveedor.upsert({
-            where: { grupoId_proveedorId: { grupoId, proveedorId: comprobante.proveedorId } },
-            create: { grupoId, proveedorId: comprobante.proveedorId, ...propuesta },
+            where: {
+              grupoId_proveedorId_tipoComprobante: { grupoId, proveedorId: comprobante.proveedorId, tipoComprobante },
+            },
+            create: { grupoId, proveedorId: comprobante.proveedorId, tipoComprobante, ...propuesta },
             update: propuesta,
           });
         } catch (e) {
@@ -779,7 +788,6 @@ export async function POST(req, { params }) {
         lineas: guardado.cuantasLineas,
         fotos: fotos.length,
         modelo: resultado.lectura.modelo,
-        recetaGenerica: esGenerica,
         // Cuál leyó y si hubo que ir al respaldo. El nombre del modelo ya los
         // distingue, pero contar cuántas veces el titular se quedó sin cuota no
         // tiene que depender de deducirlo.

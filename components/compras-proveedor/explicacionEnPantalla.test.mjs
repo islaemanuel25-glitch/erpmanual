@@ -63,7 +63,7 @@ const VISOR = "components/compras-proveedor/VisorDeFoto.jsx";
 
 const aLaVista = (html) => html.replace(/<[^>]*>/g, " ");
 
-const ROTULO_GUARDAR = "GUARDAR: SOLO LA EXPLICACIÓN";
+const ROTULO_GUARDAR = "GUARDAR: SOLO LA EXPLICACIÓN DE ESTE TIPO";
 
 /**
  * Los TRES trozos de la ruta, cortados por su rótulo y ya sin prosa.
@@ -111,7 +111,7 @@ test("Y PROBAR NO ESCRIBE: LA RUTA LO GARANTIZA DEL LADO DEL SERVIDOR", () => {
   // justo lo que pasa cuando un candado sobrevive a una mudanza sin releerse.
   for (const [donde, codigo] of [["la rama de probar", probar], ["la lectura aparte", worker]]) {
     assert.ok(
-      !/comprobanteProveedor\.(update|upsert|create)|comprobanteLinea\.(update|create|createMany|deleteMany)|recetaProveedor\.(update|upsert)/.test(codigo),
+      !/comprobanteProveedor\.(update|upsert|create)|comprobanteLinea\.(update|create|createMany|deleteMany)|recetaProveedor\.(update|upsert)|explicacionPorTipo\.(update|upsert|create)/.test(codigo),
       `probar volvió a escribir algo en ${donde}`
     );
   }
@@ -122,7 +122,10 @@ test("Y PROBAR NO ESCRIBE: LA RUTA LO GARANTIZA DEL LADO DEL SERVIDOR", () => {
 
 test("GUARDAR GUARDA SOLO LA EXPLICACIÓN", () => {
   const ramaGuardar = trozosDeLaRuta().guardar;
-  assert.match(ramaGuardar, /recetaProveedor\.upsert/);
+  // La de ESTE tipo de papel (`explicacionPorTipo.js`), y la variación normal
+  // en la receta del proveedor.
+  assert.match(ramaGuardar, /tx\.explicacionPorTipo\.upsert/);
+  assert.match(ramaGuardar, /tx\.recetaProveedor\.upsert/);
 
   // ── EL CONTRATO CAMBIÓ EL 2026-09-23, Y SE ESCRIBE LA DIFERENCIA ─────
   //
@@ -177,20 +180,15 @@ test("NO SE PUEDE GUARDAR SI EL PAPEL NO CIERRA", () => {
   assert.match(c, /hayTotal === false \? Boolean\(explicacion\.trim\(\)\)/);
 });
 
-test("UN PRODUCTO QUE NO DA LA CUENTA SE PREGUNTA, NO SE CORRIGE SOLO", () => {
+test("EL BLOQUE NO CORRIGE NADA: SOLO DIBUJA LO QUE LEYÓ", () => {
+  // Hasta la segunda parte de #165 el bloque señalaba el renglón que "no da la
+  // cuenta" y ofrecía el número que la daría. Eso lo decidían reglas de formato
+  // que ya no existen: si la suma no da el total, no se sabe cuál está mal
+  // hasta mirar la foto, y se corrige desde la hoja de cada renglón. Lo que
+  // este candado defiende es que el bloque no volvió a decidir un número.
   const c = codigoDe(BLOQUE);
-  assert.match(c, /Mirá la foto y tocá el que dice el papel/);
-  assert.match(c, /Da la cuenta/);
-  assert.match(c, /Leyó/);
-  assert.match(c, /Si ninguno es, escribilo como está en el papel/);
-  // La corrección es una ELECCIÓN de la persona: entra por `onElegir`, no por
-  // un `daLaCuenta` puesto de oficio en ningún lado.
-  assert.match(c, /onElegir\(p\.daLaCuenta\)/);
-  assert.match(c, /onElegir\(p\.subtotal\)/);
-  assert.ok(
-    !/subtotalImpreso: p\.daLaCuenta/.test(c),
-    "el bloque volvió a corregir el número por su cuenta"
-  );
+  assert.ok(!/daLaCuenta|onElegir|sospechosos/.test(c), "el bloque volvió a proponer números");
+  assert.match(c, /export default function AsiLoEntendio\(\{ resultado \}\)/);
 });
 
 test("EL BLOQUE ES UNO SOLO, USADO POR LAS DOS PANTALLAS", () => {
@@ -222,24 +220,18 @@ test("LA CUENTA SE REHACE CON LA MISMA FUNCIÓN QUE EL SERVIDOR", () => {
   // es la que resolvió qué producto es cada renglón para poder decir "el kilo"
   // o "cada una". Lo que este candado afirma es que la CUENTA la hace la misma
   // función, no que las tres llamadas sean idénticas letra por letra.
-  assert.match(
-    codigoDe(EXPLICACION),
-    /comoLoEntendio\(\{ lectura: conCorrecciones, receta(, productos)? \}\)/
-  );
-  assert.match(
-    codigoDe(CORRECCION),
-    /comoLoEntendio\(\{ lectura: conCorrecciones, receta(, productos)? \}\)/
-  );
+  assert.match(codigoDe(EXPLICACION), /comoLoEntendio\(\{ lectura, productos \}\)/);
+  assert.match(codigoDe(CORRECCION), /comoLoEntendio\(\{ lectura \}\)/);
   assert.match(codigoDe(RUTA), /comoLoEntendio\(\{\s*lectura: resultado\.lectura/);
 });
 
-test("Y LA UNIDAD QUE RESOLVIÓ EL SERVIDOR NO SE PIERDE AL CORREGIR", () => {
-  // La receta rehace la cuenta en pantalla cada vez que alguien elige un
-  // número. Si los productos no viajaran, esa segunda pasada los perdería y el
-  // rótulo "el kilo" desaparecería solo, sin que nadie tocara nada.
+test("Y LA UNIDAD QUE RESOLVIÓ EL SERVIDOR NO SE PIERDE AL REDIBUJAR", () => {
+  // La receta rehace la cuenta en pantalla cada vez que cambia la lectura. Si
+  // los productos no viajaran, esa pasada los perdería y el rótulo "el kilo"
+  // desaparecería solo, sin que nadie tocara nada.
   const c = codigoDe(EXPLICACION);
   assert.match(c, /setProductos\(d2\.productos \?\? null\)/);
-  assert.match(c, /\[lectura, receta, correcciones, productos\]/);
+  assert.match(c, /\[lectura, productos\]/);
   // Y el servidor manda SOLO la unidad: el costo del producto no tiene nada
   // que hacer en la pantalla donde se prueba cómo se lee un papel.
   assert.match(codigoDe(RUTA), /\{ unidad_medida: p\.unidad_medida \}/);
@@ -323,7 +315,11 @@ test("UN PAPEL DE UN PROVEEDOR SIN EXPLICACIÓN VA A LA RECETA ANTES DE LEER", (
   // ANTES de mirar la explicación, o el desvío seguiría ocurriendo.
   const corte = c.indexOf("if (d.interpretaSinExplicacion === true) return false;");
   assert.ok(corte > 0, "la recepción manda a escribir la explicación aunque el grande pueda leer sin ella");
-  assert.ok(corte < c.indexOf("return !String(d.explicacion"), "se pregunta después de decidir");
+  // Desde la explicación por tipo de papel, "falta" es no tener NINGUNA: con la
+  // de otro tipo confirmada, el papel nuevo lo explica el grande para su tipo.
+  const pregunta = c.indexOf("return !(Array.isArray(d.explicaciones) && d.explicaciones.length > 0)");
+  assert.ok(pregunta > 0, "se perdió la pregunta de si el proveedor tiene alguna explicación");
+  assert.ok(corte < pregunta, "se pregunta después de decidir");
 });
 
 test("«LEER DE NUEVO» EXISTE, Y SOLO MIENTRAS EL PEDIDO SE ESTÁ RECIBIENDO", () => {
@@ -358,7 +354,10 @@ test("LA FOTO SE SIRVE POR LA RUTA NUEVA, CON EL MISMO PERMISO", () => {
   // del archivo, gira y se agranda con dos dedos. Antes cada una abría la
   // imagen cruda con `window.open` o con un enlace, y el navegador la mostraba
   // como quería: el papel de Paty se veía dado vuelta y en una franja.
-  for (const pantalla of [BLOQUE, EXPLICACION]) {
+  // El bloque de "así lo entendió" ya no la monta: la mostraba para elegir el
+  // número de un renglón sospechoso, y eso se fue con las reglas de formato.
+  // Se mira la foto desde la hoja de cada renglón.
+  for (const pantalla of [EXPLICACION]) {
     assert.match(codigoDe(pantalla), /<VisorDeFoto/, `${pantalla} no monta el visor`);
     assert.ok(
       !/window\.open\(/.test(codigoDe(pantalla)),
@@ -457,14 +456,15 @@ test("NINGUNA PANTALLA MUESTRA EL MOTIVO LARGO DEL VERIFICADOR", () => {
 });
 
 test("Y CUANDO LA LECTURA ES VIEJA, LO DICE EN CASTELLANO", () => {
-  // Una lectura anterior a la explicación no trae el descuento de cada renglón,
-  // así que el control no juzga nada y el bloque quedaría mudo. Decirlo es
-  // mejor: la acción que lo resuelve es «Leer de nuevo», que está arriba.
+  // Una lectura anterior a la interpretada no guardó el costo final de cada
+  // producto, y ese costo ya no se arma con reglas de formato (segunda parte de
+  // #165). Decirlo es mejor que un bloque mudo: la acción que lo resuelve es
+  // volver a leer, y el botón está ahí mismo.
   const c = codigoDe(CORRECCION);
-  assert.match(c, /lecturaSinDescuentos/);
-  assert.match(c, /l\?\.bonificacion === null \|\| l\?\.bonificacion === undefined/);
-  assert.match(LECTURA_VIEJA, /anterior a la explicación/);
-  assert.match(LECTURA_VIEJA, /Leer de nuevo/);
+  assert.match(c, /const lecturaVieja = lectura\?\.interpretada !== true;/);
+  assert.match(c, /\{lecturaVieja && \(/);
+  assert.match(LECTURA_VIEJA, /lector anterior/);
+  assert.match(LECTURA_VIEJA, /Volvé a leerlo/);
   // No acusa a ningún producto: solo dice qué falta y qué tocar.
   assert.ok(!/Da la cuenta/.test(LECTURA_VIEJA));
 });

@@ -1,17 +1,18 @@
 // GET /api/compras-proveedor/recetas/obtener?proveedorId=
 //
-// La receta de un proveedor, ya traducida a las respuestas de la pantalla.
+// Lo que queda de la receta del proveedor que no es la explicación del papel:
+// cómo cobra la cantidad —por unidad o por bulto—. Lo lee el importador de
+// pedidos desde archivo para poner el precio en la escala correcta.
 //
-// La traducción se hace ACÁ y no en el navegador por la misma razón de siempre:
-// si la hiciera la pantalla, el alta y la edición terminarían con dos criterios
-// para lo mismo el día que alguien toque una sola.
+// Desde la lectura interpretada (#165) las respuestas de impuestos —alícuota,
+// interno, percepciones— no deciden ningún costo y se borraron. `facturaPor`
+// se conserva porque una regla de negocio lo necesita: el pedido por bulto.
 
 import { NextResponse } from "next/server";
 
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
-import { aPreguntas } from "@/lib/compras-proveedor/comprobante/recetaEnCriollo";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 
 export async function GET(req) {
@@ -44,16 +45,15 @@ export async function GET(req) {
 
     const fila = await prisma.recetaProveedor.findUnique({
       where: { grupoId_proveedorId: { grupoId, proveedorId } },
+      select: { facturaPor: true },
     });
 
     return NextResponse.json({
       ok: true,
       proveedor,
       tieneReceta: !!fila,
-      version: fila?.version ?? null,
-      // Sin receta se devuelven los valores de arranque, que son los de la
-      // genérica. Así la pantalla no tiene que saber cuáles son.
-      respuestas: aPreguntas(fila),
+      // Sin fila, por unidad: es el valor de arranque de la columna.
+      respuestas: { facturaPor: fila?.facturaPor === "BULTO" ? "BULTO" : "UNIDAD" },
     });
   } catch (err) {
     console.error("Error recetas/obtener:", err);

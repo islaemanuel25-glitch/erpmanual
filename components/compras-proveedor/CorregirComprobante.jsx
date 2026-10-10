@@ -1,24 +1,25 @@
 "use client";
 
-// EL PAPEL NO CERRÓ: ARREGLALO ACÁ, ARRIBA DE LA CONCILIACIÓN.
+// EL PAPEL NO CERRÓ: SE DICE ACÁ, ARRIBA DE LA CONCILIACIÓN.
 //
 // ── POR QUÉ ESTÁ ARRIBA Y NO EN OTRA PANTALLA ─────────────────────────────
 //
 // Un comprobante que no cierra no propone ningún costo, así que la conciliación
-// de abajo está trabada mientras esto siga rojo. Ponerlo en otro lado sería
-// pedirle a alguien con el camión en la puerta que adivine por qué la pantalla
-// no lo deja avanzar.
+// de abajo no propone precios mientras esto siga rojo. Ponerlo en otro lado
+// sería pedirle a alguien con el camión en la puerta que adivine por qué.
 //
 // ── ES EL MISMO BLOQUE QUE LA RECETA ──────────────────────────────────────
 //
-// `AsiLoEntendio`, literalmente el mismo componente. La diferencia es qué pasa
-// con lo que la persona elige: en la receta solo recalcula en pantalla, y acá
-// se GUARDA en la línea del comprobante y el papel se vuelve a verificar.
+// `AsiLoEntendio`, literalmente el mismo componente: el cartel con la cuenta y
+// la lista de lo leído.
 //
-// ── Y NO SE GUARDA NADA HASTA QUE SE TOCA GUARDAR ─────────────────────────
+// ── Y CÓMO SE ARREGLA ─────────────────────────────────────────────────────
 //
-// Mientras se van eligiendo números, la cuenta se rehace acá con la misma
-// función que el servidor. Recién "Guardar la corrección" escribe.
+// Mirando la foto: cada renglón tiene su hoja de «Corregir», que deja poner
+// el costo final que dice el papel (#164). Desde la lectura interpretada no hay
+// reglas de formato que señalen un renglón sospechoso: si la cuenta no cierra,
+// no se sabe cuál está mal hasta mirar el papel. Si lo que falta es la lista
+// entera, o el papel se leyó con el lector anterior, se vuelve a leer.
 
 import { useEffect, useMemo, useState } from "react";
 
@@ -29,29 +30,22 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import AsiLoEntendio from "@/components/compras-proveedor/AsiLoEntendio";
 import { textoDeFallo } from "@/components/compras-proveedor/ExplicacionDelPapel";
-import { formatearMoneda } from "@/lib/moneda";
-import { textoDeLaCorreccion } from "@/lib/compras-proveedor/comprobante/correccionAutomatica";
 import { comoLoEntendio } from "@/lib/compras-proveedor/comprobante/pruebaDeExplicacion";
 
 export const TITULO = "Este papel no cierra";
 /**
  * ── CUANDO LA LECTURA ES VIEJA, SE DICE — NO SE ACUSA A NADIE ──────────────
  *
- * Una lectura anterior a la explicación del proveedor no trae el descuento de
- * cada renglón. El control por renglón no juzga sin ese dato —para no acusar a
- * un renglón bueno, que es lo que le pasó al Butler del #242— así que el bloque
- * no tiene nada que señalar y quedaría mudo.
- *
- * Decirlo es mejor que quedarse callado: la acción que resuelve esto es volver
- * a leer, y el botón está a dos centímetros, arriba, en la lista de
- * comprobantes.
+ * Una lectura anterior a la interpretada (2026-10-10) no guardó el costo final
+ * de cada renglón, y ese costo ya no se arma con reglas de formato. La acción
+ * que resuelve esto es volver a leer: el botón está acá abajo.
  */
 export const LECTURA_VIEJA =
-  "Esta lectura es anterior a la explicación del proveedor: no trae el descuento de cada " +
-  "producto, así que no se puede comprobar renglón por renglón. Tocá «Leer de nuevo» en el " +
-  "comprobante de arriba.";
+  "Este papel se leyó con el lector anterior, que no guardaba el costo de cada producto. " +
+  "Volvé a leerlo para que se pueda comprobar y proponga los costos.";
 export const BAJADA =
-  "Hasta que cierre no se propone ningún costo. Mirá la foto y decí qué dice el papel.";
+  "Hasta que cierre no se propone ningún costo. Mirá la foto y corregí el costo del producto " +
+  "que no coincide desde su «Corregir».";
 /**
  * La salida que no depende de arreglar el sistema (Emanuel, Secco #256):
  * siempre se puede recibir. Va debajo de la bajada, con su mismo estilo.
@@ -62,20 +56,7 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [lectura, setLectura] = useState(null);
-  const [receta, setReceta] = useState(null);
-  const [correcciones, setCorrecciones] = useState({});
-  const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
-  // ── LO QUE SE DEDUCE NO SE PREGUNTA ────────────────────────────────────
-  //
-  // Si el papel señala un solo producto y las dos cuentas —la resta contra el
-  // total y la del propio renglón— dan lo mismo, el número correcto está
-  // determinado. El servidor lo dice en `automatica`; acá se aplica y se avisa
-  // en una línea. `yaCorregidas` es lo mismo después de un refresco: lo que ya
-  // quedó guardado en el renglón.
-  const [automatica, setAutomatica] = useState(null);
-  const [yaCorregidas, setYaCorregidas] = useState([]);
-  const [aplicando, setAplicando] = useState(false);
   const [releyendo, setReleyendo] = useState(false);
 
   useEffect(() => {
@@ -90,13 +71,10 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
         const d = await r.json();
         if (!vigente) return;
         if (!d?.ok) {
-          setError(d?.error || "No se pudo abrir el papel.");
+          setError(textoDeFallo(d, r.status));
           return;
         }
         setLectura(d.lectura);
-        setReceta(d.receta);
-        setAutomatica(d.automatica ?? null);
-        setYaCorregidas(d.yaCorregidas ?? []);
       } catch {
         if (vigente) setError("No se pudo abrir el papel: se cortó la conexión.");
       } finally {
@@ -108,55 +86,11 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
     };
   }, [comprobanteId]);
 
-  // ── SE APLICA SOLA, UNA VEZ, Y SIN BOTÓN ───────────────────────────────
-  //
-  // El número no viaja desde acá: la pantalla pide "aplicá la que corresponda"
-  // y el servidor lo vuelve a calcular sobre el papel guardado antes de
-  // escribirlo. Si viniera del navegador, cualquiera podría mandar el subtotal
-  // que quisiera diciendo que lo dedujo la cuenta.
-  //
-  // Escribe al abrir la recepción, que es un gesto de una persona; no cuesta
-  // una lectura de IA ni borra nada: deja el renglón con el único número que
-  // hace cerrar el papel, y con lo leído al lado para poder cotejarlo.
-  useEffect(() => {
-    if (!automatica?.aplica || aplicando) return;
-    let vigente = true;
-    (async () => {
-      setAplicando(true);
-      try {
-        const r = await fetch(`/api/compras-proveedor/comprobantes/corregir/${comprobanteId}`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ automatica: true }),
-        });
-        const d = await r.json().catch(() => null);
-        if (!vigente) return;
-        if (d?.ok) {
-          setAutomatica(null);
-          setYaCorregidas((prev) => [...prev, d.automatica].filter(Boolean));
-          onCorregido?.(d);
-        }
-        // Si no se pudo, no se insiste ni se grita: vuelve el bloque de
-        // siempre, que es lo que hay que hacer cuando el número no se deduce.
-      } catch {
-      } finally {
-        if (vigente) setAplicando(false);
-      }
-    })();
-    return () => {
-      vigente = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [automatica?.aplica, comprobanteId]);
-
   /**
-   * VOLVER A LEER EL PAPEL con la receta que haya ahora.
+   * VOLVER A LEER EL PAPEL con las explicaciones que haya ahora.
    *
-   * Es la salida del callejón: cuando no hay ningún número para elegir, lo que
-   * falta no es una corrección sino la lectura de los renglones. Llama a la
-   * MISMA ruta que usa la recepción al subir el papel —no hay un segundo camino
-   * de lectura— y cuando vuelve, la pantalla se recarga sola.
+   * Llama a la MISMA ruta que usa la recepción al subir el papel —no hay un
+   * segundo camino de lectura— y cuando vuelve, la pantalla se recarga sola.
    */
   const releer = async () => {
     if (releyendo) return;
@@ -168,7 +102,7 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
       // creer que ya leyó cuando recién arrancó. Es la misma puerta que usan
       // las otras dos pantallas, y el censo de
       // `laRecepcionSobreviveAlRefresco` se pone rojo si alguien agrega un
-      // camino que la saltee — se puso rojo con la primera versión de esto.
+      // camino que la saltee.
       const { cuerpo: d } = await pedirLaLectura({
         comprobanteId,
         origen: ORIGEN_DE_LECTURA.BOTON,
@@ -176,14 +110,10 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
       });
       // ── EL BOTÓN NUNCA TERMINA EN SILENCIO ─────────────────────────
       //
-      // El 2026-09-23 Emanuel lo tocó tres veces en dos minutos: el botón
-      // pasaba a "Leyendo el papel…", volvía, y la pantalla quedaba EXACTAMENTE
-      // igual. La lectura había corrido —quedó en la bitácora— pero había
-      // vuelto a traer un renglón de doce, y nada lo decía. Sin una frase, un
-      // botón que funciona y un botón que no hace nada se ven iguales.
-      //
-      // Los tres desenlaces se nombran: la que no arrancó, la que volvió corta,
-      // y la que salió bien.
+      // El 2026-09-23 Emanuel lo tocó tres veces en dos minutos y la pantalla
+      // quedaba EXACTAMENTE igual: la lectura había corrido y vuelto a traer un
+      // renglón de doce, y nada lo decía. Los tres desenlaces se nombran: la
+      // que no arrancó, la que volvió corta, y la que salió bien.
       if (!d?.ok) {
         setMensaje({ tipo: "error", texto: d?.error || "No se pudo volver a leer el papel." });
         return;
@@ -217,94 +147,26 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
   // La misma función que usa el servidor al verificar. Si acá se rehiciera la
   // cuenta por otro lado, la pantalla podría decir "cierra" sobre algo que el
   // servidor después rechaza.
-  const resultado = useMemo(() => {
-    if (!lectura) return null;
-    const conCorrecciones = {
-      ...lectura,
-      lineas: lectura.lineas.map((l, i) =>
-        correcciones[i] === undefined
-          ? l
-          : // En la interpretada lo que se muestra y se suma es el costo final.
-            lectura.interpretada
-            ? { ...l, costoFinal: correcciones[i] }
-            : { ...l, subtotalImpreso: correcciones[i] }
-      ),
-    };
-    return comoLoEntendio({ lectura: conCorrecciones, receta });
-  }, [lectura, receta, correcciones]);
-
-  const hayCambios = Object.keys(correcciones).length > 0;
-
-  // ── ¿ESTA LECTURA TRAE LO QUE EL CONTROL NECESITA? ─────────────────────
-  //
-  // Si NINGÚN renglón tiene descuento leído, la lectura es de antes de que se
-  // pidiera esa columna. No es que el papel no tenga descuentos —eso vendría
-  // como cero— es que no se preguntó.
-  //
-  // La interpretada no lo necesita: el descuento ya está adentro del costo
-  // final de cada renglón.
-  const lecturaSinDescuentos =
-    lectura?.interpretada !== true &&
-    Boolean(lectura?.lineas?.length) &&
-    lectura.lineas.every((l) => l?.bonificacion === null || l?.bonificacion === undefined);
-
-  async function guardar() {
-    setGuardando(true);
-    setMensaje(null);
-    try {
-      // Del índice de la lista al ORDEN de la línea, que es lo que el servidor
-      // conoce. Los índices son de este render; el orden vive en la base.
-      const porOrden = {};
-      for (const [indice, valor] of Object.entries(correcciones)) {
-        const linea = lectura.lineas[Number(indice)];
-        if (linea?.orden != null) porOrden[linea.orden] = valor;
-      }
-      const r = await fetch(`/api/compras-proveedor/comprobantes/corregir/${comprobanteId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        // La interpretada corrige el costo final de cada renglón; las de antes,
-        // el importe.
-        body: JSON.stringify(
-          lectura.interpretada
-            ? { renglones: Object.fromEntries(Object.entries(porOrden).map(([o, v]) => [o, { costoFinal: v }])) }
-            : { correcciones: porOrden }
-        ),
-      });
-      const d = await r.json().catch(() => null);
-      if (!d?.ok) {
-        setMensaje({ tipo: "error", texto: textoDeFallo(d, r.status) });
-        return;
-      }
-      setMensaje({ tipo: d.cierra ? "ok" : "aviso", texto: d.queHacer });
-      onCorregido?.(d);
-    } catch {
-      setMensaje({ tipo: "error", texto: "Se cortó la conexión: no se guardó la corrección." });
-    } finally {
-      setGuardando(false);
-    }
-  }
+  const resultado = useMemo(() => (lectura ? comoLoEntendio({ lectura }) : null), [lectura]);
 
   if (cargando) return <SunmiLoader />;
   if (error) return <p className="text-sm3 sunmi-text-danger break-words">{error}</p>;
-  // ── HAY ALGO QUE ELEGIR? ──────────────────────────────────────────────
-  //
-  // Los candidatos son los renglones que el control marcó como sospechosos: los
-  // únicos que ofrecen dos números para que una persona decida. Sin renglones
-  // —o con renglones que dan su cuenta— no hay nada que elegir, y pedirlo es
-  // mandar a alguien a un callejón sin salida.
-  const hayCandidatos = (resultado?.sospechosos?.length ?? 0) > 0;
-
   if (!resultado) return null;
+
+  // ── ¿VOLVER A LEER ES LO QUE CORRESPONDE? ─────────────────────────────
+  //
+  // Cuando lo que falta no es un número sino la lectura: la lista vacía o
+  // corta (#247), o un papel leído con el lector anterior.
+  const lecturaVieja = lectura?.interpretada !== true;
+  const hayQueReleer = lecturaVieja || resultado.productos.length === 0 || resultado.faltanRenglones;
 
   return (
     <section className="space-y-3 mb-4">
       {/* ── "NO CIERRA" SOLO CUANDO HAY CONTRA QUÉ CERRAR ───────────────
           Sin total leído, el cartel de abajo dice otra cosa —que no trae total,
           o que no se leyeron los productos— y "no cierra" al lado afirmaría una
-          cuenta que no se hizo. Salían los dos juntos sobre la relectura de
-          DYSSA que volvió vacía. */}
-      {resultado.hayTotal && (
+          cuenta que no se hizo. */}
+      {resultado.hayTotal && !lecturaVieja && (
         <SunmiCard className="p-3 space-y-1">
           <span className="block font-semibold sunmi-text-strong break-words">{TITULO}</span>
           <p className="text-sm2 sunmi-text-muted break-words">{BAJADA}</p>
@@ -312,28 +174,14 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
         </SunmiCard>
       )}
 
-      {lecturaSinDescuentos && (
+      {lecturaVieja && (
         <SunmiCard className="p-3 sunmi-state-warning">
           <p className="text-sm3 sunmi-text-strong break-words">{LECTURA_VIEJA}</p>
+          <p className="text-sm2 sunmi-text-muted break-words">{RECIBIR_IGUAL}</p>
         </SunmiCard>
       )}
 
-      {/* ── LO QUE SE CORRIGIÓ SOLO, EN UNA LÍNEA Y SIN BOTONES ────────
-          Sobrevive al refresco porque sale de la columna del renglón, no del
-          estado de la pantalla: al volver a abrir dice lo mismo. */}
-      {yaCorregidas.map((c) => (
-        <p key={c.orden} className="text-sm3 sunmi-text-success break-words">
-          {textoDeLaCorreccion(c, { moneda: formatearMoneda })}
-        </p>
-      ))}
-
-      <AsiLoEntendio
-        resultado={resultado}
-        comprobanteId={comprobanteId}
-        onElegir={(indice, valor) =>
-          setCorrecciones((prev) => ({ ...prev, [indice]: Number(valor) }))
-        }
-      />
+      {!lecturaVieja && <AsiLoEntendio resultado={resultado} comprobanteId={comprobanteId} />}
 
       {mensaje && (
         <p
@@ -349,48 +197,18 @@ export default function CorregirComprobante({ comprobanteId, onCorregido = null 
         </p>
       )}
 
-      {/* ── SIN NÚMEROS PARA ELEGIR NO SE PIDE ELEGIR UNO ────────────────
-          Es el callejón sin salida que se vio en el #247: la pantalla decía
-          "Elegí el número que dice el papel para poder guardar" sobre una lista
-          VACÍA, con el botón deshabilitado y sin nada que tocar. Cuando no hay
-          candidatos el problema no es una corrección que falta: es que no se
-          leyeron los productos, y lo que corresponde ofrecer es volver a leer
-          el papel con la receta que haya ahora. */}
-      {!automatica?.aplica && !aplicando && (
-        hayCandidatos ? (
-          <div className="flex flex-col gap-dato">
-            <SunmiButton
-              color="primary"
-              type="button"
-              disabled={guardando || !hayCambios}
-              onClick={guardar}
-              className="w-full min-h-botonFoto justify-center text-sm3 font-bold"
-            >
-              {guardando ? "Guardando…" : "Guardar la corrección"}
-            </SunmiButton>
-            {!hayCambios && (
-              <span className="text-sm3 sunmi-text-muted text-center">
-                Elegí el número que dice el papel para poder guardar.
-              </span>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-dato">
-            <SunmiButton
-              color="primary"
-              type="button"
-              disabled={releyendo}
-              onClick={releer}
-              className="w-full min-h-botonFoto justify-center text-sm3 font-bold"
-            >
-              {releyendo ? "Leyendo el papel…" : "Volver a leer el papel"}
-            </SunmiButton>
-            <span className="text-sm3 sunmi-text-muted text-center">
-              No hay ningún número para elegir. Si corregiste la explicación del
-              proveedor, volvé a leer el papel con la receta nueva.
-            </span>
-          </div>
-        )
+      {hayQueReleer && (
+        <div className="flex flex-col gap-dato">
+          <SunmiButton
+            color="primary"
+            type="button"
+            disabled={releyendo}
+            onClick={releer}
+            className="w-full min-h-botonFoto justify-center text-sm3 font-bold"
+          >
+            {releyendo ? "Leyendo el papel…" : "Volver a leer el papel"}
+          </SunmiButton>
+        </div>
       )}
     </section>
   );

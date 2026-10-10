@@ -36,9 +36,15 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiTextarea from "@/components/sunmi/SunmiTextarea";
+import SunmiSolapas from "@/components/sunmi/SunmiSolapas";
 import AsiLoEntendio from "@/components/compras-proveedor/AsiLoEntendio";
 import VisorDeFoto from "@/components/compras-proveedor/VisorDeFoto";
 import { comoLoEntendio } from "@/lib/compras-proveedor/comprobante/pruebaDeExplicacion";
+import {
+  TIPO_DE_PAPEL,
+  rotuloDelTipo,
+  tipoDePapel,
+} from "@/lib/compras-proveedor/comprobante/explicacionPorTipo";
 import {
   OPERACION,
   queHacerHttp,
@@ -81,7 +87,26 @@ export function textoDeFallo(cuerpo, status) {
 export const TEXTO_PROPUESTA =
   "Esto lo armó el sistema leyendo una factura de este proveedor, y la cuenta cierra. Revisalo: si está bien, se guarda como su receta.";
 export const BAJADA =
-  "Explicale cómo se lee, como se lo explicarías a una persona. Se hace una sola vez.";
+  "Explicale cómo se lee, como se lo explicarías a una persona. Se hace una sola vez por cada tipo de papel.";
+
+/**
+ * QUÉ TIPOS DE PAPEL SE OFRECEN, EN SOLAPAS.
+ *
+ * Los que ya tienen explicación o propuesta, el del papel con el que se
+ * prueba, y siempre la factura A, la B y "sin factura", que son los que llegan
+ * todos los días. En el orden de `TIPO_DE_PAPEL`.
+ */
+export function tiposAOfrecer({ explicaciones = {}, propuestas = {}, tipoDelPapel = null } = {}) {
+  const presentes = new Set([
+    ...Object.keys(explicaciones),
+    ...Object.keys(propuestas),
+    ...(tipoDelPapel ? [tipoDePapel(tipoDelPapel)] : []),
+    TIPO_DE_PAPEL.A,
+    TIPO_DE_PAPEL.B,
+    TIPO_DE_PAPEL.SIN_FACTURA,
+  ]);
+  return Object.values(TIPO_DE_PAPEL).filter((t) => presentes.has(t));
+}
 
 /**
  * @param proveedorId
@@ -105,18 +130,45 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
   const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
   const [lectura, setLectura] = useState(null);
-  const [receta, setReceta] = useState(null);
+  // ── UNA EXPLICACIÓN POR TIPO DE PAPEL (`explicacionPorTipo.js`) ────────
+  //
+  // `tipo` es la solapa abierta; las confirmadas y las propuestas viajan por
+  // tipo, y lo que está en pantalla es siempre la de la solapa abierta.
+  const [tipo, setTipo] = useState(TIPO_DE_PAPEL.SIN_FACTURA);
+  const [explicaciones, setExplicaciones] = useState({});
+  const [propuestas, setPropuestas] = useState({});
   /** `{hechas, total}` mientras se releen las facturas sin recibir. `null` = ninguna. */
   const [releyendo, setReleyendo] = useState(null);
   // Qué producto resultó ser cada renglón, cuando se pudo saber por su alias.
   // Lo resuelve el servidor y viaja para que la cuenta se rehaga acá con los
   // MISMOS datos: si no, corregir un número haría cambiar la unidad sola.
   const [productos, setProductos] = useState(null);
-  const [correcciones, setCorrecciones] = useState({});
   const [mirandoLaFoto, setMirandoLaFoto] = useState(false);
-  // La receta que armó el sistema, si hay una esperando: de qué comprobante
-  // salió. Mientras esté, «Está bien, guardar» la confirma.
+  // La explicación que armó el sistema para la solapa abierta, si hay una
+  // esperando: de qué comprobante salió. Mientras esté, «Está bien, guardar» la
+  // confirma.
   const [propuesta, setPropuesta] = useState(null);
+
+  /**
+   * Abrir una solapa: el campo muestra la propuesta de ese tipo si hay, o la
+   * confirmada, o nada; y "Así lo entendió" la lectura con la que cerró la
+   * propuesta. Lo de las otras solapas no se toca.
+   */
+  function abrirTipo(t, { explicaciones: conf = explicaciones, propuestas: prop = propuestas } = {}) {
+    setTipo(t);
+    setMensaje(null);
+    setProductos(null);
+    const p = prop[t] ?? null;
+    if (p?.lectura && p?.explicacion) {
+      setLectura(p.lectura);
+      setExplicacion(p.explicacion);
+      setPropuesta({ comprobanteId: p.comprobanteId ?? null });
+    } else {
+      setLectura(null);
+      setExplicacion(conf[t]?.explicacion ?? "");
+      setPropuesta(null);
+    }
+  }
 
   useEffect(() => {
     let vigente = true;
@@ -135,24 +187,27 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
         }
         setProveedor(d.proveedor);
         setPapel(d.papel);
-        setExplicacion(d.explicacion || "");
         // Lo que ya está guardado. Sin esto el campo arranca vacío y guardar
         // la explicación borraría una variación cargada antes.
         if (d.variacionNormalPct != null) setVariacion(String(d.variacionNormalPct));
-        // ── LA RECETA QUE ARMÓ EL SISTEMA SE MUESTRA COMO UNA PRUEBA ────
+        // ── LAS PROPUESTAS SE MUESTRAN COMO UNA PRUEBA ───────────────────
         //
-        // Ya se leyó y ya cerró: el servidor la manda con su lectura, y acá se
-        // dibuja con el MISMO bloque que deja «Probar», sin gastar otra
+        // Ya se leyeron y ya cerraron: el servidor las manda con su lectura, y
+        // acá se dibujan con el MISMO bloque que deja «Probar», sin gastar otra
         // consulta. Lo que la persona decide es lo mismo: si está bien.
-        //
-        // Desde la lectura interpretada la propuesta ES una explicación en
-        // castellano: arranca escrita en el campo, y guardarla es confirmarla.
-        if (d.propuesta?.lectura && (d.propuesta?.receta || d.propuesta?.explicacion)) {
-          setLectura(d.propuesta.lectura);
-          setReceta(d.propuesta.receta ?? { interpretada: true, explicacion: d.propuesta.explicacion });
-          if (d.propuesta.explicacion) setExplicacion(d.propuesta.explicacion);
-          setPropuesta({ comprobanteId: d.propuesta.comprobanteId ?? null });
-        }
+        const conf = Object.fromEntries((d.explicaciones ?? []).map((e) => [e.tipoComprobante, e]));
+        const prop = Object.fromEntries((d.propuestas ?? []).map((p) => [p.tipoComprobante, p]));
+        setExplicaciones(conf);
+        setPropuestas(prop);
+        // Se abre la solapa del papel con el que se prueba —el que trajo a la
+        // persona hasta acá—; si no hay, la primera propuesta, la primera
+        // confirmada, o "sin factura".
+        const inicial =
+          d.papel?.tipoComprobante ??
+          d.propuestas?.[0]?.tipoComprobante ??
+          d.explicaciones?.[0]?.tipoComprobante ??
+          TIPO_DE_PAPEL.SIN_FACTURA;
+        abrirTipo(inicial, { explicaciones: conf, propuestas: prop });
       } catch {
         if (vigente) setError("No se pudo abrir la explicación: se cortó la conexión.");
       } finally {
@@ -166,25 +221,13 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
 
   // ── LO QUE SE MUESTRA SALE DE LA MISMA FUNCIÓN QUE EL SERVIDOR ─────────
   //
-  // Cuando la persona corrige un número, el resultado se recalcula ACÁ con
-  // `comoLoEntendio`, que es la misma que usó el servidor al probar. Si la
-  // pantalla rehiciera la cuenta por su lado, el "cierra" de acá y el de allá
-  // podrían decir cosas distintas sobre el mismo papel.
-  const resultado = useMemo(() => {
-    if (!lectura) return null;
-    const conCorrecciones = {
-      ...lectura,
-      lineas: lectura.lineas.map((l, i) =>
-        correcciones[i] === undefined
-          ? l
-          : // En la interpretada lo que se muestra y se suma es el costo final.
-            lectura.interpretada
-            ? { ...l, costoFinal: correcciones[i] }
-            : { ...l, subtotalImpreso: correcciones[i] }
-      ),
-    };
-    return comoLoEntendio({ lectura: conCorrecciones, receta, productos });
-  }, [lectura, receta, correcciones, productos]);
+  // `comoLoEntendio`, la misma que usó el servidor al probar: si la pantalla
+  // rehiciera la cuenta por su lado, el "cierra" de acá y el de allá podrían
+  // decir cosas distintas sobre el mismo papel.
+  const resultado = useMemo(
+    () => (lectura ? comoLoEntendio({ lectura, productos }) : null),
+    [lectura, productos]
+  );
 
   const sePuedeGuardar =
     !resultado || resultado.hayTotal === false ? Boolean(explicacion.trim()) : resultado.cierra;
@@ -192,7 +235,6 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
   async function probar() {
     setProbando(true);
     setMensaje(null);
-    setCorrecciones({});
     try {
       // ── ARRANCAR: ESTO CONTESTA ENSEGUIDA ────────────────────────────
       //
@@ -203,7 +245,7 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ proveedorId, comprobanteId, explicacion, probar: true }),
+        body: JSON.stringify({ proveedorId, comprobanteId, tipoComprobante: tipo, explicacion, probar: true }),
       });
       const d = await r.json().catch(() => null);
       if (!d?.ok || !d?.turno) {
@@ -259,7 +301,6 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
         // ── LISTO ────────────────────────────────────────────────────
         const d2 = t.resultado;
         setLectura(d2.lectura);
-        setReceta(d2.receta);
         setProductos(d2.productos ?? null);
         return;
       }
@@ -278,10 +319,10 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
    *
    * ── ESTO NO ES UN CAMINO NUEVO ───────────────────────────────────────
    *
-   * Es el MISMO que ya tiene `app/modulos/proveedores/recetas/page.jsx` para
-   * la otra pantalla de receta, y se copia su forma entera a propósito: de a
-   * uno, esperando el turno con `pedirLaLectura`, y cortando si se acaba la
-   * cuota. Lo que faltaba era conectarlo a este camino, no inventarle otro.
+   * Es el que tenía la lista de recetas para el formulario de impuestos —que
+   * se borró con el código de formato (segunda parte de #165)—, con su forma
+   * entera: de a uno, esperando el turno con `pedirLaLectura`, y cortando si se
+   * acaba la cuota. Hoy es el único camino de relectura después de guardar.
    *
    * ── LA ESPERA DEL TURNO NO ES UN DETALLE ─────────────────────────────
    *
@@ -337,8 +378,10 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
         credentials: "include",
         body: JSON.stringify({
           proveedorId,
+          // La de ESTE tipo de papel: las de las otras solapas no se tocan.
+          tipoComprobante: tipo,
           explicacion,
-          // Con una receta propuesta en pantalla, guardar es confirmarla.
+          // Con una explicación propuesta en pantalla, guardar es confirmarla.
           ...(propuesta ? { confirmarPropuesta: true } : {}),
           // Vacío significa "no la toques": el default lo pone la base.
           variacionNormalPct: variacion.trim() === "" ? undefined : Number(variacion.replace(",", ".")),
@@ -352,6 +395,14 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
       );
       if (d?.ok) {
         setPropuesta(null);
+        // Lo guardado pasa a ser la confirmada de esta solapa, y la propuesta
+        // de este tipo deja de estar pendiente.
+        setExplicaciones((prev) => ({ ...prev, [tipo]: { tipoComprobante: tipo, explicacion, version: d.version } }));
+        setPropuestas((prev) => {
+          const resto = { ...prev };
+          delete resto[tipo];
+          return resto;
+        });
         onGuardado?.();
         if (d.relectura?.hayQueOfrecer) await releerLosPendientes(d.relectura);
       }
@@ -381,9 +432,36 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
         <p className="text-sm2 sunmi-text-muted break-words">{BAJADA}</p>
       </SunmiCard>
 
+      {/* ── UNA SOLAPA POR TIPO DE PAPEL ─────────────────────────────────
+          La factura A y la B del mismo proveedor pueden venir armadas
+          distinto: cada una tiene su explicación y la de una no pisa la de la
+          otra. Las solapas son las del kit (`SunmiSolapas`). */}
+      <SunmiSolapas
+        etiqueta="Tipo de papel"
+        valor={tipo}
+        onCambiar={(t) => abrirTipo(t)}
+        opciones={tiposAOfrecer({
+          explicaciones,
+          propuestas,
+          tipoDelPapel: papel?.tipoComprobante ?? null,
+        }).map((t) => ({
+          valor: t,
+          texto: t === TIPO_DE_PAPEL.SIN_FACTURA ? "Sin factura" : `Factura ${t}`,
+        }))}
+      />
+
       {/* ── TU EXPLICACIÓN ───────────────────────────────────────────── */}
       <SunmiCard className="p-3 space-y-dato">
-        <span className="block text-sm3 font-medium sunmi-text-strong">Tu explicación</span>
+        <span className="block text-sm3 font-medium sunmi-text-strong">
+          Cómo viene la {rotuloDelTipo(tipo).toLowerCase()}
+        </span>
+        <span className="block text-sm2 sunmi-text-muted">
+          {propuestas[tipo]
+            ? "Está para confirmar: la armó el sistema."
+            : explicaciones[tipo]
+              ? `Confirmada, versión ${explicaciones[tipo].version}.`
+              : "Todavía no tiene explicación: la primera que llegue la explica el lector grande."}
+        </span>
         <SunmiTextarea
           rows={7}
           value={explicacion}
@@ -483,13 +561,7 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
             <p className="text-sm2 sunmi-text-muted break-words">{TEXTO_PROPUESTA}</p>
           )}
 
-          <AsiLoEntendio
-            resultado={resultado}
-            comprobanteId={propuesta?.comprobanteId ?? papel?.comprobanteId}
-            onElegir={(indice, valor) =>
-              setCorrecciones((prev) => ({ ...prev, [indice]: Number(valor) }))
-            }
-          />
+          <AsiLoEntendio resultado={resultado} />
 
           <div className="flex flex-col gap-dato">
             <SunmiButton
@@ -516,7 +588,6 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
               onClick={() => {
                 setLectura(null);
                 setProductos(null);
-                setCorrecciones({});
                 // Descartada en pantalla: guardar ya no la confirma. Queda en
                 // la base hasta que otra boleta arme una nueva o se guarde.
                 setPropuesta(null);

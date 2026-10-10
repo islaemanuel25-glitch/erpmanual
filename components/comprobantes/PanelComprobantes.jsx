@@ -401,7 +401,8 @@ export default function PanelComprobantes({
       // receta no puede convertirse en "no se puede leer la factura".
       if (!d?.ok) return false;
       if (d.interpretaSinExplicacion === true) return false;
-      return !String(d.explicacion || "").trim();
+      // Sin ninguna explicación de ningún tipo de papel (`explicacionPorTipo.js`).
+      return !(Array.isArray(d.explicaciones) && d.explicaciones.length > 0);
     } catch {
       return false;
     }

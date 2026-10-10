@@ -2,11 +2,9 @@
 //
 //   GET  /api/compras-proveedor/comprobantes/corregir/[id]
 //        devuelve la lectura guardada rearmada, para dibujar "así lo entendió"
-//   POST { correcciones: { "<orden>": 1234.56 } }
-//        guarda esos subtotales en las líneas, vuelve a verificar y deja el
-//        estado que corresponda
-//   POST { renglones: { "<orden>": { cantidad, netoUnitario, subtotal } } }
-//        lo mismo con el renglón entero, desde la hoja de Corregir. Cada
+//   POST { renglones: { "<orden>": { cantidad, netoUnitario, subtotal, costoFinal } } }
+//        guarda lo que puso la persona en el renglón, desde la hoja de
+//        Corregir, vuelve a verificar y deja el estado que corresponda. Cada
 //        corrección queda en `CorreccionManualRenglon`: quién, cuándo, qué
 //        había leído el lector y qué se puso.
 //
@@ -44,7 +42,6 @@ import {
   ordenesQueNoExisten,
 } from "@/lib/compras-proveedor/comprobante/lecturaGuardada";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
-import { correccionAutomatica } from "@/lib/compras-proveedor/comprobante/correccionAutomatica";
 
 const aNumero = (v) => {
   if (v === null || v === undefined) return null;
@@ -120,28 +117,10 @@ export async function GET(req, { params }) {
     const c = await traerComprobante({ grupoId, id: comprobanteId });
     if (!c) return NextResponse.json({ ok: false, error: "No existe ese comprobante." }, { status: 404 });
 
-    const lecturaGuardada = lecturaDesdeLoGuardado(c);
     return NextResponse.json({
       ok: true,
       comprobante: { id: c.id, estado: c.estado, pedidoId: c.pedidoId, proveedorId: c.proveedorId },
-      lectura: lecturaGuardada,
-      receta: c.recetaUsada ?? null,
-      // ── SI EL NÚMERO SE DEDUCE, NO HAY QUE PREGUNTAR NADA ─────────────
-      //
-      // Se calcula acá y no del otro lado de la pantalla: el número que se va a
-      // escribir no puede venir del navegador. La pantalla lo aplica pidiendo
-      // `automatica: true`, y el servidor lo vuelve a calcular antes de guardar.
-      automatica: correccionAutomatica(lecturaGuardada),
-      // Lo que YA quedó corregido, para poder decirlo en una línea aunque la
-      // pantalla se haya refrescado.
-      yaCorregidas: (c.lineas || [])
-        .filter((l) => l.subtotalCorregido !== null && l.subtotalCorregido !== undefined)
-        .map((l) => ({
-          orden: l.orden,
-          nombre: l.textoCrudo,
-          leido: Number(l.subtotalImpreso),
-          valor: Number(l.subtotalCorregido),
-        })),
+      lectura: lecturaDesdeLoGuardado(c),
     });
   } catch (err) {
     console.error("Error comprobantes/corregir GET:", err);
@@ -174,53 +153,28 @@ export async function POST(req, { params }) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const pideLaAutomatica = body?.automatica === true;
 
     const c = await traerComprobante({ grupoId, id: comprobanteId });
     if (!c) return NextResponse.json({ ok: false, error: "No existe ese comprobante." }, { status: 404 });
 
-    // ── LA AUTOMÁTICA SE RECALCULA ACÁ, NO LLEGA HECHA ──────────────────
-    //
-    // La pantalla pide "aplicá la que corresponda"; el número sale del papel
-    // guardado. Si viniera en el cuerpo, cualquiera podría escribir el subtotal
-    // que quisiera diciendo que lo dedujo la cuenta.
-    let auto = null;
-    if (pideLaAutomatica) {
-      auto = correccionAutomatica(lecturaDesdeLoGuardado(c));
-      if (!auto.aplica) {
-        return NextResponse.json(
-          { ok: false, error: auto.porque, queHacer: auto.porque },
-          { status: 409 }
-        );
-      }
-    }
-
-    const crudas = body?.correcciones && typeof body.correcciones === "object" ? body.correcciones : {};
-    // ── O EL RENGLÓN ENTERO: CANTIDAD, PRECIO E IMPORTE ──────────────────
+    // ── EL RENGLÓN: CANTIDAD, PRECIO, IMPORTE Y COSTO FINAL ──────────────
     //
     // Secco #256: "Corregir" en la hoja deja poner a mano lo que dice el papel
-    // en ese renglón. `correcciones` sigue siendo el importe solo, que es lo
-    // que manda el bloque de arriba; los dos llegan a la misma forma.
+    // en ese renglón. Desde la lectura interpretada (#165) la cuenta se hace
+    // con el costo final; la cantidad decide el costo por unidad. La
+    // corrección automática por reglas de formato se borró con ellas.
     const renglonesCrudos = body?.renglones && typeof body.renglones === "object" ? body.renglones : {};
-    const correcciones = auto
-      ? [{ orden: auto.orden, puesto: { subtotal: auto.valor }, automatica: true }]
-      : [
-          ...Object.entries(crudas).map(([orden, valor]) => ({
-            orden: Number(orden),
-            puesto: { subtotal: aNumero(valor) },
-          })),
-          ...Object.entries(renglonesCrudos).map(([orden, r]) => ({
-            orden: Number(orden),
-            puesto: {
-              cantidad: aNumero(r?.cantidad),
-              netoUnitario: aNumero(r?.netoUnitario),
-              subtotal: aNumero(r?.subtotal),
-              // En la lectura interpretada se corrige el costo final del
-              // renglón, que es con lo que se costea.
-              costoFinal: aNumero(r?.costoFinal),
-            },
-          })),
-        ].filter((x) => Number.isFinite(x.orden) && Object.values(x.puesto).some((v) => v !== null));
+    const correcciones = Object.entries(renglonesCrudos)
+      .map(([orden, r]) => ({
+        orden: Number(orden),
+        puesto: {
+          cantidad: aNumero(r?.cantidad),
+          netoUnitario: aNumero(r?.netoUnitario),
+          subtotal: aNumero(r?.subtotal),
+          costoFinal: aNumero(r?.costoFinal),
+        },
+      }))
+      .filter((x) => Number.isFinite(x.orden) && Object.values(x.puesto).some((v) => v !== null));
     if (correcciones.some((x) => Object.values(x.puesto).some((v) => v !== null && v < 0) || x.puesto.cantidad === 0)) {
       const negativo = "La cantidad tiene que ser mayor que cero, y el precio y el importe no pueden ser negativos.";
       return NextResponse.json({ ok: false, error: negativo, queHacer: negativo }, { status: 400 });
@@ -263,7 +217,7 @@ export async function POST(req, { params }) {
     const puerta = pasarPorLaPuerta({ lectura, receta: c.recetaUsada ?? null });
 
     const guardado = await prisma.$transaction(async (tx) => {
-      for (const { orden, puesto, automatica } of correcciones) {
+      for (const { orden, puesto } of correcciones) {
         // ── EL IMPORTE, EN SU PROPIA COLUMNA, NO PISANDO LO LEÍDO ─────
         //
         // `subtotalImpreso` es lo que el lector creyó leer y es un hecho de la
@@ -300,7 +254,7 @@ export async function POST(req, { params }) {
               subtotal: leida.subtotalImpreso ?? null,
               ...(leida.costoFinal != null ? { costoFinal: leida.costoFinal } : {}),
             },
-            puesto: { ...puesto, ...(automatica ? { automatica: true } : {}) },
+            puesto,
             cerroDespues: puerta.cierra === true,
             usuarioId: Number.isFinite(Number(session?.id)) ? Number(session.id) : null,
           },
@@ -328,7 +282,6 @@ export async function POST(req, { params }) {
       porque: puerta.porque,
       diferenciaCentavos: puerta.diferenciaCentavos,
       corregidas: correcciones.length,
-      automatica: auto ? { orden: auto.orden, nombre: auto.nombre, leido: auto.leido, valor: auto.valor } : null,
       queHacer: puerta.cierra
         ? "El papel cierra. Ya se puede conciliar contra el pedido."
         : "Sigue sin cerrar: mirá la foto contra la lista.",
