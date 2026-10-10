@@ -122,7 +122,9 @@ test("LA TARJETA ES DE FACTURAS, Y DICE EL PEDIDO CONTRA TODAS", () => {
   assert.match(panel, /\+ Agregar factura/);
   assert.match(panel, /Pedido contra facturas/);
   assert.match(panel, /de \$\{cobertura\.totalPedido\} llegaron/);
-  assert.match(panel, /chipDeFactura\(c\.estado, \{ leyendo: leyendo === c\.id \}\)/);
+  // "Leyendo" también cuando la lectura la lanzó otra pantalla o la misma antes
+  // de cerrarse: el estado vive en la base desde el 2026-10-10.
+  assert.match(panel, /chipDeFactura\(c\.estado, \{ leyendo: leyendo === c\.id \|\| c\.leyendo === true \}\)/);
 });
 
 test("Y NO SE PREGUNTA MÁS SI ES UNA FACTURA NUEVA O UNA HOJA", () => {

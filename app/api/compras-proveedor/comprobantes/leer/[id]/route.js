@@ -58,9 +58,15 @@ import { hayCuota, limiteDiario, MOTIVO_LIMITE, TEXTO_LIMITE } from "@/lib/ia/li
 import { herenciaDeLosRenglones } from "@/lib/compras-proveedor/comprobante/herenciaDelRenglon";
 import { origenDeLectura } from "@/lib/compras-proveedor/comprobante/origenDeLectura";
 import {
+  tomarLaLectura,
+  terminarLaLectura,
+  respuestaParaGuardar,
+  comoVaLaLectura,
+  respuestaDeLaCortada,
+  TEXTO_LEYENDO_EN_SEGUNDO_PLANO,
+} from "@/lib/compras-proveedor/comprobante/lecturaEnSegundoPlano";
+import {
   arrancarTurno,
-  mirarTurno,
-  olvidarTurno,
   ESTADO_TURNO,
   TEXTO_TURNO,
 } from "@/lib/compras-proveedor/comprobante/lector/lecturasEnCurso";
@@ -117,6 +123,8 @@ export async function POST(req, { params }) {
           select: { orden: true, ubicacion: true, mime: true, nombre: true },
         },
         intentosLectura: true,
+        lecturaEnCursoDesde: true,
+        ultimaLectura: true,
         proveedor: { select: { nombre: true } },
       },
     });
@@ -179,6 +187,22 @@ export async function POST(req, { params }) {
     // lo usaba el importador. Esta ruta no lo miraba: dos consumidores de la
     // misma cuota y uno solo llevando la cuenta. Acá se pregunta con la MISMA
     // función, que es lo que hace que los dos números digan lo mismo.
+    // ── SI YA SE ESTÁ LEYENDO, NO SE LANZA OTRA ──────────────────────────
+    //
+    // Cada lectura gasta Flash y quizás el modelo grande. Un segundo «Leer»
+    // —o volver a la pantalla mientras lee— se engancha a la que está en
+    // curso. Va ANTES de la cuota: engancharse no gasta nada.
+    const leyendoYa = () =>
+      NextResponse.json({
+        ok: true,
+        leyendo: true,
+        yaEstabaLeyendo: true,
+        turno: String(comprobante.id),
+        comprobanteId: comprobante.id,
+        texto: TEXTO_LEYENDO_EN_SEGUNDO_PLANO,
+      });
+    if (comoVaLaLectura(comprobante).estado === "LEYENDO") return leyendoYa();
+
     const cuota = hayCuota({ usadasHoy: await usadasHoy(), limite: limiteDiario() });
     if (!cuota.puede) {
       return NextResponse.json(
@@ -399,6 +423,8 @@ export async function POST(req, { params }) {
               origen: origenPedido,
               comprobanteId: comprobante.id,
               escalada: i.escalada ?? null,
+              // Cuánto tardó: con esto se eligen las esperas con datos.
+              duracionMs: Number.isFinite(i.duracionMs) ? Math.round(i.duracionMs) : null,
             })),
           });
         }
@@ -727,15 +753,50 @@ export async function POST(req, { params }) {
       });
     };
 
+    // ── LA LECTURA SE TOMA EN LA BASE, Y RECIÉN AHÍ ARRANCA ──────────────
+    //
+    // Dos pedidos que pasaron juntos la pregunta de arriba no pueden tomarla
+    // los dos: es un UPDATE con la condición adentro. El que pierde se
+    // engancha a la del otro.
+    if (!(await tomarLaLectura(prisma, { comprobanteId: comprobante.id, grupoId }))) return leyendoYa();
+
+    // El trabajo corre con `arrancarTurno`, como desde el 2026-09-21; lo que
+    // contesta queda en la base, que es de donde lo lee el GET. Pase lo que
+    // pase —también si revienta— la lectura se suelta: una que queda tomada
+    // sin nadie leyendo es un "leyendo" para siempre.
     const turno = randomUUID();
-    arrancarTurno({ id: turno, dueño: session?.id ?? null, trabajo: hacerLaLectura });
+    arrancarTurno({
+      id: turno,
+      dueño: session?.id ?? null,
+      trabajo: async () => {
+        let respuesta;
+        try {
+          respuesta = await respuestaParaGuardar(await hacerLaLectura());
+        } catch (e) {
+          console.error("Falló la lectura del comprobante en segundo plano:", e?.message ?? e);
+          respuesta = {
+            status: 500,
+            cuerpo: {
+              ok: false,
+              error: errorInesperado({
+                operacion: "leer el comprobante",
+                quedo: "El comprobante y su foto quedaron guardados, así que no hay que volver a subirlo.",
+              }),
+            },
+          };
+        }
+        await terminarLaLectura(prisma, { comprobanteId: comprobante.id, respuesta });
+      },
+    });
 
     return NextResponse.json({
       ok: true,
       leyendo: true,
-      turno,
+      // El GET pregunta por el comprobante, no por el turno: el estado está en
+      // la base. Se manda igual para no cambiarle el contrato a la pantalla.
+      turno: String(comprobante.id),
       comprobanteId: comprobante.id,
-      texto: TEXTO_TURNO[ESTADO_TURNO.LEYENDO],
+      texto: TEXTO_LEYENDO_EN_SEGUNDO_PLANO,
     });
   } catch (err) {
     console.error("Error compras-proveedor/comprobantes/leer:", err);
@@ -748,17 +809,17 @@ export async function POST(req, { params }) {
 
 
 /**
- * GET /api/compras-proveedor/comprobantes/leer/[id]?turno=…
+ * GET /api/compras-proveedor/comprobantes/leer/[id]
  *
- * CÓMO VA LA LECTURA QUE ARRANCÓ EL POST.
+ * CÓMO VA LA LECTURA DE ESTE COMPROBANTE. Se lee de la base, no de la memoria.
  *
- * ── POR QUÉ DEVUELVE LA MISMA RESPUESTA Y NO UNA TRADUCIDA ────────────────
+ * Mientras se lee: `{ ok, leyendo: true }`. Cuando terminó: EXACTAMENTE la
+ * respuesta que daba el POST antes de pasar a segundo plano, con su estado
+ * HTTP — así no hay un segundo formato que pueda desfasarse del primero.
  *
- * Lo que el trabajo guardó como resultado es la `Response` que el POST devolvía
- * antes, tal cual. Acá se la clona y se la devuelve: así no hay un segundo
- * formato de respuesta que pueda quedar desfasado del primero el día que uno de
- * los dos cambie. Se clona porque el cuerpo de una `Response` se puede leer una
- * sola vez, y el turno puede consultarse dos veces seguidas.
+ * El `?turno=` que manda la pantalla se ignora: el comprobante ES el turno.
+ * Por eso se puede preguntar desde otro pedido, otro proceso o después de un
+ * reinicio, y por eso cerrar la pantalla no pierde nada.
  */
 export async function GET(req, { params }) {
   try {
@@ -766,52 +827,48 @@ export async function GET(req, { params }) {
     if (ctx.error) {
       return NextResponse.json({ ok: false, error: ctx.error }, { status: ctx.status });
     }
-    const { session } = ctx;
+    const { session, grupoId } = ctx;
 
     const perm = checkPerm(session, "compras.recibir");
     if (!perm.ok) {
       return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
 
-    const turno = new URL(req.url).searchParams.get("turno");
-    if (!turno) {
-      return NextResponse.json(
-        { ok: false, error: "Falta el número de turno de la lectura." },
-        { status: 400 }
-      );
+    const { id } = await params;
+    const comprobanteId = Number(id);
+    if (!Number.isFinite(comprobanteId) || comprobanteId <= 0) {
+      return NextResponse.json({ ok: false, error: "id requerido" }, { status: 400 });
+    }
+    // El alcance va en el WHERE: uno de otro grupo no existe.
+    const fila = await prisma.comprobanteProveedor.findFirst({
+      where: { id: comprobanteId, grupoId },
+      select: { lecturaEnCursoDesde: true, ultimaLectura: true },
+    });
+    if (!fila) {
+      return NextResponse.json({ ok: false, error: "No existe ese comprobante." }, { status: 404 });
     }
 
-    // El dueño va en la consulta: preguntar por un turno ajeno es como
-    // preguntar por uno que no existe.
-    const t = mirarTurno(turno, { dueño: session?.id ?? null });
-
-    if (t.estado === ESTADO_TURNO.LEYENDO) {
-      return NextResponse.json({ ok: true, leyendo: true, texto: t.texto, esperandoMs: t.esperandoMs });
+    const como = comoVaLaLectura(fila);
+    if (como.estado === "LEYENDO") {
+      return NextResponse.json({
+        ok: true,
+        leyendo: true,
+        texto: TEXTO_LEYENDO_EN_SEGUNDO_PLANO,
+        esperandoMs: como.esperandoMs,
+      });
+    }
+    if (como.estado === "VENCIDA") {
+      // Lleva más de lo que puede durar una lectura: el proceso que la corría
+      // no está. Se da por cortada acá mismo, para que nunca quede colgada.
+      const respuesta = respuestaDeLaCortada();
+      await terminarLaLectura(prisma, { comprobanteId, respuesta });
+      return NextResponse.json(respuesta.cuerpo, { status: respuesta.status });
+    }
+    if (como.estado === "TERMINADA") {
+      return NextResponse.json(como.respuesta.cuerpo, { status: como.respuesta.status });
     }
 
-    if (t.estado === ESTADO_TURNO.LISTO && t.resultado) {
-      const copia = t.resultado.clone();
-      olvidarTurno(turno);
-      return copia;
-    }
-
-    if (t.estado === ESTADO_TURNO.FALLO) {
-      olvidarTurno(turno);
-      console.error("Falló la lectura del comprobante en su turno:", t.error);
-      return NextResponse.json(
-        {
-          ok: false,
-          error: errorInesperado({
-            operacion: "leer el comprobante",
-            quedo: "El comprobante y su foto quedaron guardados, así que no hay que volver a subirlo.",
-          }),
-        },
-        { status: 500 }
-      );
-    }
-
-    // NO_ESTA: se venció, es de otra persona, o el contenedor se recreó en el
-    // medio. Lo dice en castellano en vez de dejar a la pantalla girando.
+    // Nunca se leyó con este mecanismo: no hay nada que esperar.
     return NextResponse.json(
       { ok: false, error: TEXTO_TURNO[ESTADO_TURNO.NO_ESTA], turnoPerdido: true },
       { status: 410 }

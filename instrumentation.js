@@ -27,6 +27,26 @@ export async function register() {
     console.error("[comprobantes] el chequeo de arranque falló inesperadamente:", e?.message ?? e);
   }
 
+  // ── LAS LECTURAS QUE QUEDARON "LEYENDO" SE MARCAN CORTADAS ──────────────
+  //
+  // El proceso que las corría ya no existe —esto es un arranque—, así que
+  // nunca van a terminar. Sin esto, la pantalla diría "leyendo" hasta que la
+  // lectura venza. Con esto, dice que se cortó y que se puede volver a leer.
+  // Hoy hay UN solo contenedor; con más, esto cortaría las de los otros: ver
+  // `lecturaEnSegundoPlano.js`.
+  try {
+    const { default: prisma } = await import("./lib/prisma.js");
+    const { cortarLasQueQuedaronLeyendo } = await import(
+      "./lib/compras-proveedor/comprobante/lecturaEnSegundoPlano.js"
+    );
+    const cortadas = await cortarLasQueQuedaronLeyendo(prisma);
+    if (cortadas) {
+      console.log(`[comprobantes] ${cortadas} lectura(s) quedaron a medias por el reinicio: se marcaron cortadas.`);
+    }
+  } catch (e) {
+    console.error("[comprobantes] no se pudieron marcar las lecturas cortadas:", e?.message ?? e);
+  }
+
   // ── ¿EL MODELO CONFIGURADO SIGUE EXISTIENDO? ─────────────────────────────
   //
   // Google da modelos de baja SIN AVISAR. El 2026-08-11 `gemini-2.5-flash`

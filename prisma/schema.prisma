@@ -5076,6 +5076,20 @@ model ComprobanteProveedor {
   /// suma, para que se vea que hubo que insistir.
   intentosLectura Int       @default(0)
 
+  /// ── LA LECTURA EN CURSO, EN LA BASE Y NO EN LA MEMORIA DEL PROCESO ────
+  ///
+  /// Desde cuándo se está leyendo este papel. Null = no se está leyendo. Es lo
+  /// que deja una sola lectura por comprobante a la vez —tomarla es un UPDATE
+  /// que solo pasa si está en null— y lo que deja ver "leyendo" al volver a la
+  /// pantalla. Un proceso que se reinicia con una en curso la marca cortada al
+  /// arrancar; una que quedó vieja sin terminar se da por cortada al mirarla.
+  /// Ver `lib/compras-proveedor/comprobante/lecturaEnSegundoPlano.js`.
+  lecturaEnCursoDesde DateTime?
+  /// Lo que contestó la última lectura terminada —`{ status, cuerpo }`, la
+  /// misma respuesta que daba la ruta—, para que la pantalla la reciba aunque
+  /// haya preguntado desde otro pedido, otro proceso o después de un reinicio.
+  ultimaLectura Json?
+
   /// ── PARA QUE EL NÚMERO DE ACIERTO SALGA SOLO ─────────────────────────
   ///
   /// La medición del acierto se hace con las facturas REALES que entren por la
@@ -5412,6 +5426,11 @@ model LlamadaLector {
   /// en `ESCALADA` de `lector/escalada.js`—, para poder contar cuántas hubo de
   /// cada una sin deducirlo. Texto y no enum por lo mismo que `motivo`.
   escalada String?
+
+  /// CUÁNTO TARDÓ, en milisegundos, desde que se mandó el pedido hasta que
+  /// contestó —o hasta que se cortó—. Es lo que va a decir con datos de
+  /// producción qué espera hace falta para cada modelo, en vez de suponerla.
+  duracionMs Int?
 
   creadoEn DateTime @default(now())
 

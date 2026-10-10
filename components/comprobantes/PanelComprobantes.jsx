@@ -43,7 +43,7 @@ import {
   resumenDeLista,
 } from "@/lib/compras-proveedor/comprobante/pantalla";
 import { sePuedeBorrar, textoDeBorrado } from "@/lib/compras-proveedor/comprobante/borrado";
-import { pedirLaLectura } from "@/lib/compras-proveedor/comprobante/leerConTurno";
+import { pedirLaLectura, esperarLaLectura } from "@/lib/compras-proveedor/comprobante/leerConTurno";
 import { ORIGEN_DE_LECTURA } from "@/lib/compras-proveedor/comprobante/origenDeLectura";
 import {
   LIMITES_COMPROBANTE,
@@ -131,7 +131,7 @@ function Aviso({ estado }) {
  * página HTML, así que `r.json()` revienta y todo el mensaje del servidor se
  * pierde en un `catch` genérico. Eso fue justamente lo que pasó.
  */
-async function mensajeDeRespuesta(r, operacion = OPERACION.SUBIDA) {
+async function mensajeDeRespuesta(r, operacion = OPERACION.SUBIDA, cuerpoYaLeido = undefined) {
   if (!r.ok) {
     // ── QUÉ SE ESTABA HACIENDO, NO SOLO QUÉ CONTESTÓ EL SERVIDOR ────────
     //
@@ -144,7 +144,7 @@ async function mensajeDeRespuesta(r, operacion = OPERACION.SUBIDA) {
     // tabla por estado. Si no se puede leer —página de error del proxy—, queda
     // el texto del estado, que igual dice qué pasó.
     try {
-      const d = await r.json();
+      const d = cuerpoYaLeido !== undefined ? cuerpoYaLeido : await r.json();
       if (d?.queHacer || d?.error) return { tipo: "error", texto: d.queHacer || d.error };
     } catch {}
     return { tipo: "error", texto };
@@ -249,6 +249,19 @@ export default function PanelComprobantes({
     recargar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pedidoId, proveedorId]);
+
+  // ── SI UNA FACTURA SE ESTÁ LEYENDO, LA PANTALLA SE ENGANCHA ────────────
+  //
+  // La lectura vive en el servidor con su estado en la base: cerrar la
+  // pantalla o perder el dato móvil no la corta. Al volver, la lista dice que
+  // está leyendo y esto vuelve a esperar su resultado. Engancharse NO lanza
+  // otra lectura: `seguirLeyendo` solo pregunta, nunca hace el POST.
+  useEffect(() => {
+    if (leyendo !== null) return;
+    const enCurso = items.find((c) => c.leyendo === true);
+    if (enCurso) seguirLeyendo(enCurso.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, leyendo]);
 
   // ── Elegir archivos: acá se decide si hace falta preguntar ─────────────
   // ── LA CÁMARA ES OTRO CAMPO, NO OTRO CIRCUITO ──────────────────────────
@@ -399,33 +412,49 @@ export default function PanelComprobantes({
   // esto hubo que deducirlo cruzando dos números para contestar por qué el
   // comprobante del pedido 242 tenía diez lecturas.
   async function leer(id, origen = ORIGEN_DE_LECTURA.BOTON) {
+    if (await faltaLaExplicacion()) {
+      const volverA = typeof window !== "undefined" ? window.location.pathname : "";
+      router.push(
+        `/modulos/proveedores/recetas/${proveedorId}?comprobante=${id}` +
+          `&volverA=${encodeURIComponent(volverA)}`
+      );
+      return false;
+    }
+    // ── LA LECTURA YA NO SE ESPERA ADENTRO DEL PEDIDO ───────────────
+    //
+    // El POST contesta enseguida y `pedirLaLectura` pregunta hasta que
+    // termina. La espera vive en el lib y no acá porque hay DOS pantallas que
+    // piden lecturas —ésta y la relectura de la receta—, y dos copias se
+    // separan.
+    return esperarYMostrar(id, (alAvisar) =>
+      pedirLaLectura({ comprobanteId: id, origen, fetchImpl: fetch, alAvisar })
+    );
+  }
+
+  /**
+   * ENGANCHARSE A UNA LECTURA QUE YA ESTÁ CORRIENDO. SOLO PREGUNTA: NO LEE.
+   *
+   * Es lo que hace la pantalla al volver cuando la lista dice que una factura
+   * se está leyendo. No hace el POST —una lectura reescribe renglones y solo
+   * la lanza una persona—: pregunta por la que ya existe hasta que termina.
+   */
+  function seguirLeyendo(id) {
+    return esperarYMostrar(id, (alAvisar) =>
+      esperarLaLectura({ comprobanteId: id, fetchImpl: fetch, alAvisar })
+    );
+  }
+
+  /** Esperar una lectura —lanzada o en curso— y decir cómo terminó. */
+  async function esperarYMostrar(id, esperar) {
     setLeyendo(id);
     setMensaje(null);
     try {
-      if (await faltaLaExplicacion()) {
-        const volverA = typeof window !== "undefined" ? window.location.pathname : "";
-        router.push(
-          `/modulos/proveedores/recetas/${proveedorId}?comprobante=${id}` +
-            `&volverA=${encodeURIComponent(volverA)}`
-        );
-        return false;
-      }
-      // ── LA LECTURA YA NO SE ESPERA ADENTRO DEL PEDIDO ───────────────
-      //
-      // El POST contesta un número de turno enseguida y `pedirLaLectura`
-      // pregunta por él hasta que termina. Antes la respuesta tardaba hasta 45
-      // segundos y nginx corta a los 60: con una lectura por hoja y cuatro
-      // facturas, alguna se iba a pasar.
-      //
-      // La espera vive en el lib y no acá porque hay DOS pantallas que piden
-      // lecturas —ésta y la relectura de la receta—, y dos copias se separan.
-      const { respuesta: r, cuerpo: d } = await pedirLaLectura({
-        comprobanteId: id,
-        origen,
-        fetchImpl: fetch,
-        alAvisar: (texto) => setMensaje({ tipo: "ok", texto }),
-      });
-      const fallo = await mensajeDeRespuesta(r, OPERACION.LECTURA);
+      const { respuesta: r, cuerpo: d } = await esperar((texto) => setMensaje({ tipo: "ok", texto }));
+      // El cuerpo ya lo leyó `pedirLaLectura`: se pasa, porque una `Response`
+      // se lee una sola vez. Sin esto el segundo `r.json()` revienta y queda
+      // el texto por estado HTTP, sin el motivo que mandó el servidor — que
+      // es lo que Emanuel vio el 2026-10-09 con el pedido 255.
+      const fallo = await mensajeDeRespuesta(r, OPERACION.LECTURA, d);
       if (fallo) {
         setMensaje(fallo);
         await recargar();
@@ -791,7 +820,7 @@ export default function PanelComprobantes({
               </p>
             )}
             {items.map((c, i) => {
-              const chip = chipDeFactura(c.estado, { leyendo: leyendo === c.id });
+              const chip = chipDeFactura(c.estado, { leyendo: leyendo === c.id || c.leyendo === true });
               return (
                 // La tarjeta entera es la acción, y para eso está la pieza del
                 // kit: un `<button>` de ancho completo con la superficie del

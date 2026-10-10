@@ -16,15 +16,21 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Una. Producción está en **53 migraciones**; el árbol tiene 54.
+Una. Producción está en **54 migraciones**; el árbol tiene 55.
 
-- `20261009222956_escalada_a_pro` — una columna nullable `escalada` en
-  `LlamadaLector` (por qué se llamó al modelo grande) y la tabla nueva
-  `RecetaPropuestaProveedor` (la receta que armó el sistema, esperando que
-  alguien la confirme), con FK a `Proveedor`. Sin datos que mover: columna
-  vacía y tabla vacía. Ninguna fila existente se reescribe.
+- `20261010004408_lectura_en_segundo_plano` — dos columnas nullable en
+  `ComprobanteProveedor` (`lecturaEnCursoDesde`, `ultimaLectura`: la lectura
+  en curso y su resultado, en la base y no en la memoria del proceso) y una en
+  `LlamadaLector` (`duracionMs`). Sin datos que mover: ninguna fila se
+  reescribe.
 
-**De dónde sale el 53.** `20261008120000_receta_dyssa_iva_por_renglon` está
+**De dónde sale el 54.** `20261009222956_escalada_a_pro` sale de esta lista
+porque Emanuel informó el 2026-10-09 que producción corre `a1331d9a` (PRs #158 y
+#159), desplegado con `/deploy`, que aplica las pendientes. No se verificó
+desde la sesión que escribe esto; si el próximo `/deploy` informa otra cosa en
+`migrate status`, se corrige acá.
+
+**Lo que decía antes, sobre el 53.** `20261008120000_receta_dyssa_iva_por_renglon` está
 aplicada en producción desde el 2026-10-08 12:38, con el despliegue de
 `ca524482` (informado por la sesión del VPS). `20261006150000_delegacion_integracion`
 sale de esta lista por **inferencia, no verificada en el VPS**: está en la
