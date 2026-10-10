@@ -16,7 +16,9 @@
 // anuló, cuándo y por qué. Sin esta cinta, una venta revertida se leería igual
 // que una vigente.
 //
-// No tiene ninguna acción: es informativa. Anular se hace en Transferencias.
+// No tiene ninguna acción: es informativa. Una venta interna se anula en
+// Transferencias; una común, con el botón de `AccionesTicket`, que volvió el
+// 2026-10-10 y abre `PanelAnularVenta.jsx`.
 
 import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 

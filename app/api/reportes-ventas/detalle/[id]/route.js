@@ -6,6 +6,7 @@ import { lineasPagoTicket, esPagoDividido } from "@/lib/pos-ventas/pagos";
 import { esVentaFiada, estadoVentanaCorreccion } from "@/lib/pos-ventas/correccion";
 import { enBetaCorreccionCompleta } from "@/lib/pos-ventas/correccionBeta";
 import { estadoTurnoCorreccion } from "@/lib/pos-ventas/correccionCompletaServer";
+import { veredictoAnulacionVentaComun } from "@/lib/pos-ventas/reversionVenta";
 import { descriptorDeposito } from "@/lib/reportes-ventas/modoLineaDeposito";
 
 const num = (v) => (v == null ? 0 : Number(v));
@@ -99,6 +100,10 @@ export async function GET(req, { params }) {
             // producto permite inferir si se vendió por Pack o por Unidad suelta.
             // NULL en líneas legacy, combos y servicios → presentación neutra.
             cantidadStock: true,
+            // Lo que el motor de reversión devolvería al anular. Sin esto el
+            // veredicto de anulación vería toda línea como no congelada.
+            productoLocalId: true,
+            componentes: { select: { productoLocalId: true, cantidad: true } },
             productoBase: {
               select: {
                 unidad_medida: true,
@@ -251,17 +256,19 @@ export async function GET(req, { params }) {
       puedeCorregirTurnoCerrado: permiteTurnoCerrado,
     };
 
-    // ── ANULACIÓN: SOLO PARA MOSTRARLA ───────────────────────────────────────
+    // ── ANULACIÓN ────────────────────────────────────────────────────────────
     //
-    // Es informativa. NO trae `puedeAnular` y eso es a propósito: una venta
-    // interna se anula cancelando su REMITO, desde el módulo Transferencias, que
-    // es el documento que el local destino recibe y revisa. Acá solo se muestra
-    // que pasó, con quién, cuándo y por qué — ERP Azul no borra la historia de
-    // una operación, así que una venta anulada tiene que decirlo en su pantalla.
+    // Muestra si la venta está anulada, con quién, cuándo y por qué — ERP Azul no
+    // borra la historia de una operación, así que una venta anulada tiene que
+    // decirlo en su pantalla.
     //
-    // Durante unas horas del 2026-08-20 esto tuvo un `puedeAnular` que encendía
-    // un botón en Ventas. Se retiró: tener dos caminos operativos para el mismo
-    // hecho es peor que tener uno incómodo.
+    // Y `puedeAnular` enciende el botón rojo. Estuvo retirado del 2026-08-20 al
+    // 2026-10-10 porque la venta interna se anula cancelando su REMITO desde
+    // Transferencias, y eso sigue igual. Volvió para la venta COMÚN del mostrador,
+    // que no tenía ningún camino: lo destapó un POS tildado que duplicó dos
+    // tickets en Mini unidas. Lo decide `veredictoAnulacionVentaComun`, la MISMA
+    // función que usa la ruta de anular, así el botón no ofrece algo que la ruta
+    // después rechaza. El permiso es el de la corrección completa.
     let anuladaPorNombre = null;
     if (venta.anuladaPorId) {
       const u = await prisma.usuario.findUnique({
@@ -278,6 +285,7 @@ export async function GET(req, { params }) {
       // El remito, para que desde la venta se llegue al documento donde se
       // resuelve. Es un dato, no una acción.
       transferenciaId: venta.transferencia?.id ?? null,
+      puedeAnular: permiteCompleta && veredictoAnulacionVentaComun(venta).puede,
     };
 
     // --- Datos de medios de pago (desglose para UI + reimpresión) ---

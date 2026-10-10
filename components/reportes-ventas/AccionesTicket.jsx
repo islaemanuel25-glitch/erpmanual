@@ -4,6 +4,7 @@
 //   · Reimprimir (térmica)  · PDF  · Compartir (con fallback a descarga)
 //   · Corrección simple (cliente / observaciones / referencia interna)
 //   · Corregir venta completa → DESHABILITADO hasta Fase B.
+//   · Anular venta (solo venta común, sin remito, con su turno abierto).
 //
 // Reimpresión/PDF/Compartir usan datos HISTÓRICOS de la venta, marcan
 // "REIMPRESIÓN — COPIA" y conservan el número original (opts.copia).
@@ -13,6 +14,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import CintaVentaAnulada from "@/components/reportes-ventas/CintaVentaAnulada";
+import PanelAnularVenta from "@/components/reportes-ventas/PanelAnularVenta";
 import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 
 function num(v) {
@@ -248,16 +250,20 @@ export default function AccionesTicket({ venta, onCorregido, onCorregirCompleta 
           🕑 Historial
         </SunmiButton>
 
-        {/* ── ACÁ HUBO UN BOTÓN "ANULAR VENTA". SE SACÓ EL 2026-08-20 ────────
-            Existió unas horas y se retiró por decisión de producto: una venta
-            interna se corrige desde el REMITO, en el módulo Transferencias, que
-            es el documento que el local destino recibe y revisa. Tener el botón
-            acá creaba un segundo camino operativo para el mismo hecho.
-
-            El motor de reversión NO se borró: vive en lib/pos-ventas/anularVenta.js
-            y lo usa la cancelación de transferencias. Si algún día hace falta
-            anular una venta COMÚN —sin remito— el lugar es éste, y el motor ya
-            está. Lo que no vuelve es usarlo como atajo para arreglar un remito. */}
+        {/* ANULAR. Va último y en rojo: es la única acción de esta tarjeta que
+            no se puede deshacer desde la pantalla. Estuvo retirado del
+            2026-08-20 al 2026-10-10 y volvió SOLO para la venta común del
+            mostrador: una venta interna se sigue anulando desde su remito, en
+            Transferencias, y para ella `puedeAnular` viene en false. */}
+        {venta?.anulacion?.puedeAnular && (
+          <SunmiButton
+            color="red"
+            onClick={() => { setPanel(panel === "anular" ? null : "anular"); setMsg(null); }}
+            className="text-sm"
+          >
+            ⛔ Anular venta
+          </SunmiButton>
+        )}
       </div>
 
       {/* Aviso de ventana vencida (solo si tiene permiso pero está fuera de plazo) */}
@@ -293,6 +299,20 @@ export default function AccionesTicket({ venta, onCorregido, onCorregirCompleta 
             onCorregido && onCorregido(info);
           }}
           onError={(texto) => flash("error", texto)}
+        />
+      )}
+
+      {panel === "anular" && (
+        <PanelAnularVenta
+          venta={venta}
+          onCerrar={() => setPanel(null)}
+          onAnulada={(info) => {
+            setPanel(null);
+            flash("ok", "Venta anulada.");
+            // Se recarga por el mismo camino que una corrección: la pantalla
+            // vuelve a pedir el detalle y aparece la cinta.
+            onCorregido && onCorregido(info);
+          }}
         />
       )}
 
