@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-10-10] - Actualización: compras-proveedor, transferencias
+
+### Modificado
+- **compras-proveedor**: fix: recibir un pedido ya no saltea el renglón con 0 bultos + sueltas; el stock, `totalFactura` y `cuantoSeValoriza` suman las sueltas
+- **transferencias**: fix: la lista y el reporte por destino suman las sueltas recibidas, sin faltantes falsos
+- **transferencias**: fix: una línea no declarada con solo sueltas no traba Confirmar y cuenta como diferencia (#373)
+
+
 ## [2026-10-09] - Actualización: compras-proveedor (lector)
 
 ### Modificado
