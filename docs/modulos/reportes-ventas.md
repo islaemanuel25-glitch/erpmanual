@@ -1,6 +1,6 @@
 # Módulo: Reportes de Ventas
 
-**Última actualización:** 2026-10-10 18:26
+**Última actualización:** 2026-10-10 20:03
 **Archivos principales:** `app/modulos/reportes-ventas/*`, `components/reportes-ventas/*`, `app/api/reportes-ventas/*`, `lib/reportes-ventas/*`
 
 ## Descripción
@@ -110,6 +110,7 @@ Flujo migrado a páginas reales y desplegado en producción. El detalle muestra 
 - El descriptor `deposito` devuelve `modo: null` para líneas legacy sin `cantidadStock`; evaluar si vale reconstruirlo o dejarlo neutro de forma definitiva
 
 ## Cambios recientes
+- 2026-10-10: fix(ventas): anular una venta con su turno cerrado, con el ajuste en ese turno
 - 2026-10-10: fix(ventas): volver a poder anular una venta común del mostrador
 - 2026-10-06: refactor: el resumen de ventas del reporte general pasa a una pieza compartida
 - 2026-09-26: fix(ventas): la corrección completa exige el turno ABIERTO, no solo sin cierre

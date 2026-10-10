@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-10 18:26
+**Última actualización:** 2026-10-10 20:03
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-10: fix(ventas): anular una venta con su turno cerrado, con el ajuste en ese turno
 - 2026-10-10: feat: una explicación por tipo de papel, el CAE contra el duplicado, el cargo repartido en el costo, y se va el código de formato
 - 2026-10-10: feat: el modelo interpreta el papel y el código controla la cuenta
 - 2026-10-10: feat(compras): con un papel que no cierra se recibe igual, y el renglón se corrige a mano
