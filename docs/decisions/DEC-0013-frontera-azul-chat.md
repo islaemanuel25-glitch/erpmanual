@@ -41,9 +41,11 @@ Seis pasos separados, cada uno en su pieza de `lib/integraciones/azul-chat/`:
    poner un endpoint, SQL, una consulta ni un `usuarioId`.
 3. **La capacidad** está en un catálogo congelado (`capacidades.js`). Hoy:
    `ventas_resumen`, que pide `reportes.ver`, el mismo permiso que el reporte
-   del ERP del que sale; `mi_alcance` (tanda 4), sin permiso propio; y
+   del ERP del que sale; `mi_alcance` (tanda 4), sin permiso propio;
    `transferencias_eventos`, que pide `transferencias.ver` (ver "Eventos de
-   transferencias", abajo).
+   transferencias", abajo); y, desde la Tanda 4A, `pedidos_eventos`
+   (`pedidos.ver`), `envios_eventos` y `cancelaciones_eventos`
+   (`transferencias.ver`) (ver "Eventos de pedidos, envíos y cancelaciones").
 4. **La delegación** (desde la tanda 4): la persona en cuyo nombre se pregunta
    SALE del token de delegación —es el dueño del vínculo que se canjeó—. Hasta
    la tanda 3 viajaba un `usuarioId` que Azul Chat afirmaba y la puerta
@@ -293,6 +295,89 @@ reinicia la secuencia, y un id vuelve a existir con otra recepción.
 `lib/transferencias/lineasConDiferencia.js` sin cambios y el tablero lo
 consume. Son dos datos y no se fuerzan a coincidir en filas históricas.
 
+## Eventos de pedidos, envíos y cancelaciones (Tanda 4A)
+
+**Estado:** en código, SIN desplegar. Sin migración y sin columnas nuevas: las
+tres leen columnas que ya existen.
+
+**Tres capacidades, no una.** Cada una ordena por OTRA columna de fecha, y un
+cursor sobre dos columnas en una sola consulta complicaría justamente lo que
+el cursor resuelve. Cada una tiene el mismo pedido, la misma respuesta y el
+mismo cursor que `transferencias_eventos`, cambiando solo los nombres:
+
+| Capacidad | Evento | Tabla y columna del hecho | `desde` | Permiso |
+|---|---|---|---|---|
+| `pedidos_eventos` | `PEDIDO_SOLICITADO` | `PosTransferencia.solicitadoAt` | `{ fechaSolicitud, pedidoId }` | `pedidos.ver` |
+| `envios_eventos` | `TRANSFERENCIA_ENVIADA` | `Transferencia.fechaEnvio` | `{ fechaEnvio, transferenciaId }` | `transferencias.ver` |
+| `cancelaciones_eventos` | `TRANSFERENCIA_CANCELADA` | `Transferencia.canceladaEn` | `{ fechaCancelacion, transferenciaId }` | `transferencias.ver` |
+
+Las tres: solo lectura, `pideLocal`, el local sale de la autorización y nunca
+del cuerpo, el evento es del local DESTINO (el que pidió, o el que recibe) y
+nunca del origen, `limite` de 1 a 100 (50 por defecto), `hayMas`, `hasta`,
+versión 1 y clave `TIPO:<id>:<fecha ISO>` porque `admin/reset-operativo`
+reinicia las secuencias. `mi_alcance` las anuncia solas, por estar en el
+catálogo con `pideLocal`.
+
+**El cursor, escrito una vez.** Validar `desde` y `limite`, la condición
+"estrictamente después" con desempate por id, `siguiente` y `hayMas` salieron
+de `transferenciasEventos.js` a `cursorDeEventos.js`, junto con la lectura del
+local de la autorización. `transferencias_eventos` contesta byte a byte lo
+mismo que antes: lo fija una huella sha256 de toda su salida para una batería
+de casos, tomada sobre `origin/main` 3f439c06 antes de extraer
+(`cursorDeEventos.test.mjs`).
+
+**`PEDIDO_SOLICITADO`.** `pos-transferencias/solicitar` pasa el pedido a
+"Solicitado" y escribe `solicitadoAt` en el mismo `update`; es el único
+escritor y nada la vuelve a tocar (un pedido solicitado pasa a Enviado o se
+borra, no vuelve a Borrador). El hecho es `solicitadoAt` no nulo, en cualquier
+estado. Permiso `pedidos.ver`: el de `pedidos/historial` y `pedidos/carrito`,
+las pantallas donde el local ve sus pedidos (`pos_transferencias.ver` es la
+vista del depósito, y `pedidos.solicitar` es para pedir). Datos: `pedidoId`,
+`fechaSolicitud`, `origen: { id, nombre }` y `lineas`. Dos avisos para Azul
+Chat: cancelar un pedido lo BORRA (`pos-transferencias/cancelar`), así que el
+evento deja de existir en el ERP y no hay una fecha de cancelación de pedidos
+que publicar; y `lineas` es la cantidad AL LEER, porque el depósito puede
+ajustar las líneas mientras el pedido está Solicitado.
+
+**`TRANSFERENCIA_ENVIADA`.** `crearTransferencia` crea el remito con `estado =
+"Enviada"` y `fechaEnvio = new Date()`; es el único escritor. Se eligió
+`fechaEnvio` y no `createdAt` —las dos se escriben en el mismo `create`—
+porque es la que nombra el hecho y la que usan las pantallas de
+Transferencias. Un remito histórico con `fechaEnvio` nula no se publica. El
+hecho es `fechaEnvio` no nula, en cualquier estado: un remito recibido o
+cancelado igual se envió. Datos: `transferenciaId`, `fechaEnvio`, `origen`,
+`lineas` y `pedidoId` (el `posTransferenciaId`, o `null` si vino de una venta;
+la venta no sale).
+
+**`TRANSFERENCIA_CANCELADA`.** Entró porque el ERP guarda cuándo se canceló un
+remito de forma confiable: `transferencias/cancelar` escribe `estado =
+"Cancelada"` y `canceladaEn = new Date()` en el MISMO `update`, al final de su
+única transacción, y es terminal. Una cancelación anterior al 2026-08-20 —sin
+la columna— queda nula y no se publica. Datos: `transferenciaId`,
+`fechaCancelacion`, `origen` y `pedidoId`. Ni el motivo (texto libre) ni quién
+canceló.
+
+**Los márgenes.** Las tres usan 60 s, justificados por quién escribe cada fecha:
+
+- `solicitadoAt`: un `update` suelto, sin transacción interactiva; visible en
+  milisegundos.
+- `fechaEnvio`: la escriben dos transacciones, `pos-transferencias/enviar`
+  (timeout por defecto de Prisma, 5 s) y la venta interna de
+  `pos-ventas/crear` (`LIMITES_TRANSACCION_DEL_LOCAL`, 30 s). 60 s es el doble
+  del timeout más largo.
+- `canceladaEn`: la transacción de `transferencias/cancelar`, 5 s.
+
+`frontera.test.mjs` fija cada supuesto: un solo escritor por columna, los dos
+llamadores de `crearTransferencia`, una transacción sin timeout propio en
+`enviar` y en `cancelar`, ninguna en `solicitar`, y `2 ×
+LIMITES_TRANSACCION_DEL_LOCAL.timeout <= margen`. Con su contraprueba.
+
+**Fixture para Azul Chat.** `docs/integraciones/azul-chat/erp-eventos-tanda-4a.json`:
+pedidos y respuestas reales de la puerta para las tres capacidades (páginas,
+vacía, sin permiso, límite fuera de rango, recorrido completo) y `mi_alcance`,
+generados por `scripts/pruebas-db/azulChatEventosTanda4a.mjs` con
+`AZUL_CHAT_FIXTURE_SALIDA`. No se edita a mano: se regenera.
+
 ## Las capacidades de cada local en `mi_alcance` (Tanda 1B)
 
 **Estado:** en código, SIN desplegar. Sin migración. Conviene desplegarla
@@ -308,8 +393,9 @@ cupo de 30 por minuto por delegación.
 `{ id, nombre, grupoId, esDeposito, activo, capacidades: [...] }`. Los campos
 de antes no cambian de nombre, tipo, orden ni significado, y la versión del
 contrato sigue siendo 1. `capacidades` es la lista de nombres de capacidades
-del catálogo, en el orden del catálogo; hoy puede traer `ventas_resumen` y
-`transferencias_eventos`, o ninguna.
+del catálogo, en el orden del catálogo; hoy puede traer `ventas_resumen`,
+`transferencias_eventos` y, desde la Tanda 4A, `pedidos_eventos`,
+`envios_eventos` y `cancelaciones_eventos`, o ninguna.
 
 **Cómo se calcula.** En la autorización, no en `mi_alcance`:
 
@@ -373,3 +459,11 @@ de Figma "Podés leer historial" contradice esta política y no se usa.
 - `lib/integraciones/azul-chat/autorizacion.test.mjs`, sección "Las
   capacidades que anuncia mi_alcance": anunciada si y solo si la puerta la deja
   pasar, para cada rol real del sistema.
+- Tanda 4A: `lib/integraciones/azul-chat/eventosTanda4a.test.mjs` (las tres
+  capacidades, sobre una base en memoria y por la puerta),
+  `cursorDeEventos.test.mjs` (la huella de `transferencias_eventos`) y
+  `scripts/pruebas-db/azulChatEventosTanda4a.mjs`: las tres contra PostgreSQL,
+  con la solicitud por `pos-transferencias/solicitar`, el envío por
+  `crearTransferencia`, la cancelación del remito por `transferencias/cancelar`
+  y la del pedido por `pos-transferencias/cancelar`; el cursor con fechas
+  iguales y su contraprueba, el margen, los permisos en vivo y la base intacta.

@@ -896,7 +896,8 @@ try {
     const enc = await alcanceDe(U.encargadoA.id);
     igual("20. el encargado de A: su local, con su grupo real y su nombre", [enc.status, enc.datos?.alcance, enc.datos?.usuario, enc.datos?.locales],
       // `capacidades` (Tanda 1B): lo que el ENCARGADO real puede consultar en su local.
-      [200, { modo: "LOCAL" }, { id: U.encargadoA.id, nombre: "encargado-a" }, [{ id: localA.id, nombre: "Local A", grupoId: grupo.id, esDeposito: false, activo: true, capacidades: ["ventas_resumen", "transferencias_eventos"] }]]);
+      // Tanda 4A: suma pedidos_eventos, envios_eventos y cancelaciones_eventos, que el rol tiene.
+      [200, { modo: "LOCAL" }, { id: U.encargadoA.id, nombre: "encargado-a" }, [{ id: localA.id, nombre: "Local A", grupoId: grupo.id, esDeposito: false, activo: true, capacidades: ["ventas_resumen", "transferencias_eventos", "pedidos_eventos", "envios_eventos", "cancelaciones_eventos"] }]]);
     const glob = await alcanceDe(U.adminGlobal.id);
     igual("21. el admin global: todo local y depósito con grupo, como grupo-activo/set", [glob.datos?.alcance, glob.ids], [{ modo: "GLOBAL" }, ordenar([deposito.id, localA.id, localB.id, localX.id])]);
     const deposito1 = glob.datos?.locales.find((l) => l.id === deposito.id);
