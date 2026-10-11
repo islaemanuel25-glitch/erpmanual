@@ -289,6 +289,12 @@ jobs:
           # contraprueba, el margen y los permisos en vivo. Base propia descartable.
           echo ""
           node --import ./scripts/alias-loader.mjs scripts/pruebas-db/azulChatEventosTanda4a.mjs
+          # Azul Chat · cajas_resumen (Tanda 7A): cajas, retiros y cierres por
+          # las rutas reales del POS, dos turnos operativos y una caja sin
+          # turno; los números contra Tesorería, el esperado del arqueo y
+          # ventas_resumen; la puerta y el anuncio. Base propia descartable.
+          echo ""
+          node --import ./scripts/alias-loader.mjs scripts/pruebas-db/azulChatCajasResumen.mjs
 
       # ── EL LIBRO DE STOCK ─────────────────────────────────────────────────
       #

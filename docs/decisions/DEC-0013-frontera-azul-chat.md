@@ -45,7 +45,9 @@ Seis pasos separados, cada uno en su pieza de `lib/integraciones/azul-chat/`:
    `transferencias_eventos`, que pide `transferencias.ver` (ver "Eventos de
    transferencias", abajo); y, desde la Tanda 4A, `pedidos_eventos`
    (`pedidos.ver`), `envios_eventos` y `cancelaciones_eventos`
-   (`transferencias.ver`) (ver "Eventos de pedidos, envíos y cancelaciones").
+   (`transferencias.ver`) (ver "Eventos de pedidos, envíos y cancelaciones");
+   y, desde la Tanda 7A, `cajas_resumen` (`tesoreria.ver`) (ver "Las cajas de
+   un día", abajo).
 4. **La delegación** (desde la tanda 4): la persona en cuyo nombre se pregunta
    SALE del token de delegación —es el dueño del vínculo que se canjeó—. Hasta
    la tanda 3 viajaba un `usuarioId` que Azul Chat afirmaba y la puerta
@@ -382,6 +384,106 @@ vacía, sin permiso, límite fuera de rango, recorrido completo) y `mi_alcance`,
 generados por `scripts/pruebas-db/azulChatEventosTanda4a.mjs` con
 `AZUL_CHAT_FIXTURE_SALIDA`. No se edita a mano: se regenera.
 
+## Las cajas de un día (`cajas_resumen`, Tanda 7A)
+
+**Estado:** en código, SIN desplegar. Sin migración: lee columnas que ya
+existen.
+
+**Qué contesta.** El pedido del dueño: lo que se vendió en efectivo y en
+débito, los retiros con su motivo y a quién, si cada caja está correcta o no
+y con cuánto, y las ventas por turno ("turno tarde", "turno mañana"). Por
+local y por UN día argentino, agrupado por turno operativo y, dentro de cada
+uno, sus cajas. Las cajas anteriores a los turnos operativos van a "Sin turno
+asignado", al final.
+
+**Pedido.** `pideLocal`, solo lectura, el local sale de la autorización.
+`parametros`: `periodo` —`{tipo:"hoy"}`, `{tipo:"ayer"}` o
+`{tipo:"fecha", fecha:"AAAA-MM-DD"}`, no futura— y `turnoOperativo` opcional,
+por nombre (sin mayúsculas ni acentos) o por id, entre los del local. Uno que
+el local no tiene contesta 400 `TURNO_OPERATIVO_INVALIDO` nombrando los que
+tiene: es el único código público nuevo, y el texto sale tal cual porque la
+persona ya fue autorizada para ese local. Con turno pedido, el turno aparece
+aunque no haya tenido cajas.
+
+**Permiso: `tesoreria.ver`.** Las pantallas que muestran cajas piden
+permisos distintos: Tesorería `tesoreria.ver`
+(`app/api/finanzas/tesoreria/route.js`, `checkPerm(session,
+PERMISO_VER_TESORERIA)`), Auditoría POS `reportes.ver`
+(`lib/auditoria-pos-ventas/scope.js`) y la ficha del turno en Finanzas
+`finanzas.ver`. Se tomó el más restrictivo, que además es la pantalla de la
+que salen estas cajas. Hoy ningún rol del sistema lo trae: lo usa Admin, o un
+rol al que se le asigne. `frontera.test.mjs` lo fija.
+
+**Respuesta (versión 1).** `{ capacidad, version, local, grupoId, periodo:
+{tipo, fecha, zonaHoraria}, turnoOperativoPedido, turnosOperativos: [...],
+advertencias }`. Cada turno: `turnoOperativo: {id|null, nombre}`,
+`sinTurnoAsignado`, `totales: {cantidadVentas, totalVendido, ventasEfectivo,
+ventasPorMedio, ventasNoCobradas}` y `cajas`. Cada caja: `id`, `etiqueta`,
+`operador`, `apertura`, `cierre`, `estado`, `montoInicial`, `cantidadVentas`,
+`totalVendido`, `ventasEfectivo`, `ventasPorMedio` (cobrados, con las
+etiquetas del ERP), `ventasNoCobradas` (FIADO, `cobrado: false`), `retiros`
+(`{tipo, monto, motivo, aQuien, recibidoPor, hora, registradoPor}`),
+`ingresos`, `efectivoEsperado`, `efectivoContado`, `diferencia: {monto, tipo:
+FALTA|SOBRA|NINGUNA}`, `efectivoRetiradoCierre`, `fondoDejadoCierre` y
+`verificacionTesoreria: VERIFICADA|FALTA_VERIFICAR|NO_APLICA`. Montos como
+texto decimal. Nada de costos, ganancias, comisiones, productos ni clientes.
+
+**Sin fórmula propia.** De dónde sale cada número:
+
+- Qué cajas entran al día, su turno operativo, las entregas y su verificación,
+  los pagos desde la caja y los Caja +/−: `leerTesoreria` con `rangoDeTesoreria`
+  (`lib/tesoreria/lecturaTesoreriaServer.js`), la lectura de la pantalla de
+  Tesorería. Una caja con turno entra entera por su fecha operativa; una sin
+  turno, por el instante de sus hechos.
+- El grupo y el orden: `grupoDeTesoreria` y `compararGrupos`
+  (`lib/tesoreria/turnoComercial.js`).
+- Lo vendido, por caja y por turno: `resumirVentas` y `desglosarPorMedio`
+  (`lib/reportes-ventas/resumenVentas.js`, por `mediosDePagoDe` de
+  `ventasResumen.js`) sobre las MISMAS ventas que toma Tesorería:
+  `whereVentasDeTesoreria`, que salió de `leerTesoreria` sin cambiar su
+  `where` (comercial: sin anuladas ni internas). Los totales del turno son las
+  ventas de sus cajas, contadas con la misma pieza.
+- El estado: `estadoDelTurno` (`lib/caja/cierreRelevo.js`). Correcta, sobra o
+  falta: `resultadoCierre` (`lib/caja/vistaTurno.js`) con el esperado guardado
+  al cerrar o, en una caja abierta, el de `calcularEsperadoDeTurno`
+  (`lib/caja/arqueoServer.js`): la misma elección que la ficha del turno en
+  Finanzas.
+- Inicial, esperado, contado, retiro y fondo del cierre: las columnas del
+  `Turno`. El "a quién": `Turno.destinoRetiroCierre`/`recibidoPorCierre` y
+  `ArqueoCaja.destino`/`recibidoPor`; el proveedor de un pago y el
+  beneficiario (o, si no se cargó, el concepto) de un gasto, como los presenta
+  Tesorería. Motivo, hora y autor: el `CajaMovimiento` y su `usuario`.
+
+**Lo que queda en null, y por qué.** El ERP no lo registra: el "a quién" de
+un retiro de recaudación y del cierre por el circuito de corte (las rutas
+`retiros/*` y `cierres/*` no lo piden; solo el cierre directo `turnos/cerrar`
+guarda destino y quien recibe) y de un Caja −; el esperado, contado y
+diferencia de una caja abierta (el esperado sí, el de ahora); lo contado y la
+diferencia de una caja cerrada sin conteo. `registradoPor` es el usuario de
+la sesión del POS —la cuenta del mostrador—, no el operario del PIN.
+
+**Dos estados más de los tres pedidos.** `SIN_CONTEO` (cerrada sin contar: no
+se sabe si estaba correcta) y `ANULADA` (turno anulado con hechos en el día).
+Ninguna de las dos se puede decir como CORRECTA ni CON_DIFERENCIA sin inventar.
+
+**Diferencias.** Son de cada caja: el turno no lleva una, porque sumar un
+faltante con un sobrante de otra caja escondería los dos. La verificación de
+Tesorería va en su propio campo. Si la diferencia guardada al cerrar no es
+contado − esperado, se avisa (`DIFERENCIA_NO_CUADRA`) sin elegir; también
+`DESGLOSE_NO_CUADRA`, `VERIFICACION_DESACTUALIZADA`, `DIA_EN_CURSO` y
+`LOCAL_INACTIVO`.
+
+**Una caja abierta sin ventas, movimientos ni pagos en el día no aparece**,
+igual que en Tesorería: el universo es el de su lectura.
+
+**Fixture para Azul Chat.** `docs/integraciones/azul-chat/erp-cajas-resumen.json`:
+pedidos y respuestas reales de la puerta —un día con Mañana (tres cajas:
+correcta y verificada, falta, sobra), Tarde (una cerrada con destino y una
+abierta) y una caja sin turno; el filtro por turno; ayer sin cajas; los
+rechazos y `mi_alcance`—, generados por
+`scripts/pruebas-db/azulChatCajasResumen.mjs` con `AZUL_CHAT_FIXTURE_SALIDA`.
+No se edita a mano: se regenera.
+
 ## Las capacidades de cada local en `mi_alcance` (Tanda 1B)
 
 **Estado:** en código, SIN desplegar. Sin migración. Conviene desplegarla
@@ -399,7 +501,8 @@ de antes no cambian de nombre, tipo, orden ni significado, y la versión del
 contrato sigue siendo 1. `capacidades` es la lista de nombres de capacidades
 del catálogo, en el orden del catálogo; hoy puede traer `ventas_resumen`,
 `transferencias_eventos` y, desde la Tanda 4A, `pedidos_eventos`,
-`envios_eventos` y `cancelaciones_eventos`, o ninguna.
+`envios_eventos` y `cancelaciones_eventos`, y desde la Tanda 7A
+`cajas_resumen`, o ninguna.
 
 **Cómo se calcula.** En la autorización, no en `mi_alcance`:
 
@@ -471,3 +574,12 @@ de Figma "Podés leer historial" contradice esta política y no se usa.
   `crearTransferencia`, la cancelación del remito por `transferencias/cancelar`
   y la del pedido por `pos-transferencias/cancelar`; el cursor con fechas
   iguales y su contraprueba, el margen, los permisos en vivo y la base intacta.
+- Tanda 7A: `lib/integraciones/azul-chat/cajasResumen.test.mjs` (el pedido,
+  la agrupación, las diferencias por caja, los retiros, y que cada número salga
+  de su pieza, con contraprueba) y `scripts/pruebas-db/azulChatCajasResumen.mjs`:
+  cajas abiertas, vendidas, retiradas y cerradas por las rutas del POS, la
+  caja sin turno abierta por la ruta en el modo legado, pagos por
+  `registrarPagoProveedor` y `crearGasto`, la anulación por `revertirVenta`,
+  la verificación por su ruta; los números contra la lectura de Tesorería,
+  la diferencia guardada, `calcularEsperadoDeTurno` y `ventas_resumen`; la
+  puerta, el anuncio y la base intacta.
