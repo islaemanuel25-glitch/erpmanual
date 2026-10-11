@@ -284,6 +284,11 @@ jobs:
           # el margen de 60 s y la autorización en vivo. Base propia descartable.
           echo ""
           node --import ./scripts/alias-loader.mjs scripts/pruebas-db/azulChatTransferenciasEventos.mjs
+          # Azul Chat · pedidos_eventos, envios_eventos y cancelaciones_eventos
+          # (Tanda 4A): hechos por las rutas reales, el cursor con su
+          # contraprueba, el margen y los permisos en vivo. Base propia descartable.
+          echo ""
+          node --import ./scripts/alias-loader.mjs scripts/pruebas-db/azulChatEventosTanda4a.mjs
 
       # ── EL LIBRO DE STOCK ─────────────────────────────────────────────────
       #
