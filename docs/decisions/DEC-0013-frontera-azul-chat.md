@@ -131,8 +131,12 @@ POST; el resto lo contesta Next con 405.
   secreto, corto o igual a `AUTH_SECRET`, sin decir cuál). El código interno
   detallado queda en el log, nunca en la respuesta.
 - **Cupo V1** (`limitador.js`): en memoria del proceso, ventana fija de un
-  minuto, 30 por aplicación y delegación (desde la tanda 4; antes, por
-  `usuarioId`) y 120 por aplicación. Cuenta después de
+  minuto, 120 por aplicación y delegación (desde la tanda 4; antes, por
+  `usuarioId`) y 240 por aplicación. Eran 30 y 120 hasta el 2026-10-11: Azul
+  Chat sincroniza en segundo plano cada 2 minutos (hasta 18 consultas por
+  persona y corrida) y cada pantalla de la app gasta 1 (Ventas, 2); con 30, a
+  la app le quedaban 12 por minuto y una navegación rápida real (24 pedidos en
+  51 s) dio 429. El motivo y la cuenta están en `limitador.js`. Cuenta después de
   la firma y antes de la base. No es el limitador del login, que decide otra
   cosa (perdona aciertos) y vive adentro de su ruta.
 - **Solo lectura:** la prueba de base saca una huella de TODAS las tablas antes
@@ -387,7 +391,7 @@ junto con `transferencias_eventos`, que tampoco está en producción.
 en ellos: un CAJERO ve su local y no tiene `transferencias.ver`. Para saberlo,
 Azul Chat tenía que adivinar el permiso —copiar una regla del ERP— o probar
 cada capacidad en cada local, que cuesta 1 + N llamadas por pantalla contra un
-cupo de 30 por minuto por delegación.
+cupo de 30 por minuto por delegación (el de entonces; 120 desde el 2026-10-11).
 
 **Forma.** Aditiva. Cada local de `locales` agrega un campo al final:
 `{ id, nombre, grupoId, esDeposito, activo, capacidades: [...] }`. Los campos
