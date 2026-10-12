@@ -252,8 +252,11 @@ test("[5b] «Aplicar» del calendario llega: la pantalla pasa todo lo que el kit
   const cuerpo = kit.slice(inicio, kit.indexOf("};", inicio));
   const obligatorios = [...cuerpo.matchAll(/\b(on[A-Z]\w*)\(/g)].map((m) => m[1]);
   assert.ok(obligatorios.length >= 2, `el kit cambió lo que llama al aplicar: ${obligatorios}`);
-  const uso = fuente("components/tesoreria/PantallaTesoreria.jsx").match(/<SunmiDateRangePicker[\s\S]*?\/>/)?.[0];
-  assert.ok(uso, "la pantalla dejó de usar el calendario del kit");
+  // El calendario vive en el selector de período compartido desde que "Turnos y
+  // cierres" lo usa también: se mira ahí, y que Tesorería use ESE selector.
+  assert.match(fuente("components/tesoreria/PantallaTesoreria.jsx"), /<SelectorDePeriodo\b/, "Tesorería dejó de usar el selector compartido");
+  const uso = fuente("components/periodo/SelectorDePeriodo.jsx").match(/<SunmiDateRangePicker[\s\S]*?\/>/)?.[0];
+  assert.ok(uso, "el selector dejó de usar el calendario del kit");
   for (const p of [...obligatorios, "onApply"]) assert.match(uso, new RegExp(`\\b${p}=\\{`), `falta ${p}: «Aplicar» no llegaría`);
 });
 
@@ -924,8 +927,8 @@ test("[H] Día, Semana, Mes y Otro siguen, con el local del servidor", () => {
 });
 
 test("[I] el rediseño no trae colores fijos: todo sale de los tokens del tema", () => {
-  for (const f of ["PantallaTesoreria.jsx", "PiezasTesoreria.jsx", "DetallesTesoreria.jsx"]) {
-    const src = fuente(`components/tesoreria/${f}`);
+  for (const f of ["tesoreria/PantallaTesoreria.jsx", "tesoreria/PiezasTesoreria.jsx", "tesoreria/DetallesTesoreria.jsx", "periodo/SelectorDePeriodo.jsx"]) {
+    const src = fuente(`components/${f}`);
     assert.doesNotMatch(src, /\b(text|bg|border|from|to|ring)-(amber|red|green|emerald|slate|cyan|sky|rose|yellow|gray|zinc|white|black)(-\d|\b)/, f);
     assert.doesNotMatch(src, /#[0-9a-fA-F]{3,8}\b|rgb\(/, f);
   }

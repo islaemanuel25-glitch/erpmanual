@@ -23,15 +23,14 @@
 
 import { useState } from "react";
 
-import ChipsDePeriodo from "@/components/transferencias/ChipsDePeriodo";
-import NavegadorDePeriodo from "@/components/transferencias/NavegadorDePeriodo";
-import SunmiDateRangePicker from "@/components/sunmi/SunmiDateRangePicker";
+// El selector de período se sacó a una pieza compartida cuando "Turnos y
+// cierres" necesitó el mismo; el marcado es el que estaba acá.
+import SelectorDePeriodo from "@/components/periodo/SelectorDePeriodo";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import { formatearMoneda } from "@/lib/moneda";
-import { CLAVE_OTRO_FINANZAS } from "@/lib/finanzas/periodoFinanciero";
 import { VISTA_TESORERIA } from "@/lib/tesoreria/contextoTesoreria";
 import {
   actosQueCruzan,
@@ -63,7 +62,6 @@ import {
 } from "./PiezasTesoreria";
 import { DetalleDeCaja, DetalleDeTurno, DetalleDeVerificacion } from "./DetallesTesoreria";
 
-const sinCambio = () => {};
 
 /**
  * @param {object} props
@@ -106,7 +104,7 @@ export default function PantallaTesoreria({
     <div className="space-y-3.5">
       <FilaDelLocal local={local} onCambiarLocal={onCambiarLocal} />
 
-      <EncabezadoDePeriodo
+      <SelectorDePeriodo
         datos={datos}
         ctx={ctx}
         hoy={hoy}
@@ -157,48 +155,6 @@ function FilaDelLocal({ local, onCambiarLocal }) {
         </SunmiLinkButton>
       ) : (
         <span className="text-sm2 font-medium sunmi-text-muted">{local}</span>
-      )}
-    </div>
-  );
-}
-
-/**
- * EL ENCABEZADO TEMPORAL CANÓNICO DE FINANZAS (Figma 21:1523): los cuatro chips
- * y el navegador, con los textos de `descripcionFinanciera` que manda el
- * servidor. Acá «Otro» NO va apagado: Tesorería sabe consultarlo. Con «Otro»
- * aparece el calendario de rango del kit, y el navegador dice «Período elegido»
- * con las flechas apagadas —el servidor contesta `puedeAvanzar` y
- * `puedeRetroceder` en false—.
- */
-function EncabezadoDePeriodo({ datos, ctx, hoy, onCambiarUnidad, onElegirRango, onAtras, onAdelante }) {
-  const descripcion = datos?.periodo?.descripcion || null;
-  const esOtro = ctx.unidad === CLAVE_OTRO_FINANZAS;
-  return (
-    <div className="space-y-3">
-      <ChipsDePeriodo valor={ctx.unidad} onCambiar={onCambiarUnidad} />
-      {esOtro && (
-        <SunmiDateRangePicker
-          valueDesde={ctx.desde || ""}
-          valueHasta={ctx.hasta || ""}
-          // El kit los llama al aplicar, ANTES de `onApply`: sin ellos «Aplicar»
-          // se cae y el rango no llega. El período vive en la URL y solo cambia
-          // al aplicar, así que no hay nada que guardar mientras se elige.
-          onChangeDesde={sinCambio}
-          onChangeHasta={sinCambio}
-          onApply={(desde, hasta) => onElegirRango(desde, hasta)}
-          placeholder="Elegí desde y hasta"
-          maxDate={hoy}
-        />
-      )}
-      {descripcion && (
-        <NavegadorDePeriodo
-          titulo={descripcion.titulo}
-          subtitulo={descripcion.subtitulo}
-          puedeAvanzar={Boolean(datos?.puedeAvanzar)}
-          puedeRetroceder={Boolean(datos?.puedeRetroceder)}
-          onAtras={onAtras}
-          onAdelante={onAdelante}
-        />
       )}
     </div>
   );
