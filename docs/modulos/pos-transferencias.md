@@ -16,7 +16,14 @@ Pedidos rapidos de mercaderia desde un local hacia un deposito. El sistema sugie
 - Busqueda manual de productos del deposito
 - Ajuste de cantidades preparadas
 - Envio: convierte POS → Transferencia formal
-- Cancelacion de borradores
+- Cancelación de pedidos **solicitados** (no de borradores, que esa ruta
+  rechaza con 409). Desde la Tanda 9A (2026-10-12) cancelar **marca** el
+  pedido —estado `Cancelado`, `canceladoAt`, `canceladoPorUserId`— y deja sus
+  líneas; antes lo borraba. Toda lectura de pedidos lo deja afuera con
+  `sinCancelados` (`lib/pedidos/estados.js`), así que para las pantallas sigue
+  sin existir, y el local puede volver a pedir igual que antes. Ver DEC-0013,
+  "Los pedidos pendientes de un local". *(verificado en código y contra
+  PostgreSQL: `scripts/pruebas-db/azulChatPedidosPendientes.mjs`)*
 
 ## Dependencias
 
@@ -45,7 +52,8 @@ Pedidos rapidos de mercaderia desde un local hacia un deposito. El sistema sugie
 - `GET /api/pos-transferencias/sugeridos?destinoId=&posId=`
 - `POST /api/pos-transferencias/agregarItem`
 - `POST /api/pos-transferencias/enviar` — convierte a Transferencia
-- `POST /api/pos-transferencias/cancelar`
+- `POST /api/pos-transferencias/cancelar` — marca un pedido Solicitado como
+  Cancelado (no borra)
 
 ## Componentes principales
 - `Encabezado`: Info de origen/destino

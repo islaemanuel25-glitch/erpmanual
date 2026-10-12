@@ -48,7 +48,8 @@ Seis pasos separados, cada uno en su pieza de `lib/integraciones/azul-chat/`:
    (`transferencias.ver`) (ver "Eventos de pedidos, envíos y cancelaciones");
    y, desde la Tanda 7A, `cajas_resumen` (`tesoreria.ver`) (ver "Las cajas de
    un día", abajo); y, desde la Tanda 8A, `stock_consulta` (`stock.ver`) (ver
-   "El stock de un local", abajo).
+   "El stock de un local", abajo); y, desde la Tanda 9A, `pedidos_pendientes`
+   (`pedidos.ver`) (ver "Los pedidos pendientes de un local", abajo).
 4. **La delegación** (desde la tanda 4): la persona en cuyo nombre se pregunta
    SALE del token de delegación —es el dueño del vínculo que se canjeó—. Hasta
    la tanda 3 viajaba un `usuarioId` que Azul Chat afirmaba y la puerta
@@ -335,16 +336,19 @@ de casos, tomada sobre `origin/main` 3f439c06 antes de extraer
 
 **`PEDIDO_SOLICITADO`.** `pos-transferencias/solicitar` pasa el pedido a
 "Solicitado" y escribe `solicitadoAt` en el mismo `update`; es el único
-escritor y nada la vuelve a tocar (un pedido solicitado pasa a Enviado o se
-borra, no vuelve a Borrador). El hecho es `solicitadoAt` no nulo, en cualquier
-estado. Permiso `pedidos.ver`: el de `pedidos/historial` y `pedidos/carrito`,
+escritor y nada la vuelve a tocar (un pedido solicitado pasa a Enviado o a
+Cancelado, no vuelve a Borrador). El hecho es `solicitadoAt` no nulo, en
+cualquier estado. Permiso `pedidos.ver`: el de `pedidos/historial` y `pedidos/carrito`,
 las pantallas donde el local ve sus pedidos (`pos_transferencias.ver` es la
 vista del depósito, y `pedidos.solicitar` es para pedir). Datos: `pedidoId`,
 `fechaSolicitud`, `origen: { id, nombre }` y `lineas`. Dos avisos para Azul
-Chat: cancelar un pedido lo BORRA (`pos-transferencias/cancelar`), así que el
-evento deja de existir en el ERP y no hay una fecha de cancelación de pedidos
-que publicar; y `lineas` es la cantidad AL LEER, porque el depósito puede
-ajustar las líneas mientras el pedido está Solicitado.
+Chat: hasta la Tanda 9A cancelar un pedido lo BORRABA y el evento dejaba de
+existir en el ERP; desde la 9A cancelar lo MARCA (ver "Los pedidos pendientes
+de un local") y el PEDIDO_SOLICITADO de un pedido cancelado **sigue saliendo**,
+porque se solicitó. Es un cambio esperado: la cancelación no se publica como
+evento, y lo que sigue pendiente lo dice `pedidos_pendientes`. Y `lineas` es la
+cantidad AL LEER, porque el depósito puede ajustar las líneas mientras el
+pedido está Solicitado.
 
 **`TRANSFERENCIA_ENVIADA`.** `crearTransferencia` crea el remito con `estado =
 "Enviada"` y `fechaEnvio = new Date()`; es el único escritor. Se eligió
@@ -574,6 +578,62 @@ bajo mínimo con faltantes y `STOCK_MINIMO_NO_DISPONIBLE`, los rechazos y
 `mi_alcance`—, generados por `scripts/pruebas-db/azulChatStockConsulta.mjs` con
 `AZUL_CHAT_FIXTURE_SALIDA`. No se edita a mano: se regenera.
 
+## Los pedidos pendientes de un local (`pedidos_pendientes`, Tanda 9A)
+
+**Estado:** en código, SIN desplegar. **Con migración**
+(`20261012120000_pedido_cancelado`: dos columnas nulas en `PosTransferencia`,
+sin tocar filas).
+
+**Antes, en el ERP: cancelar un pedido lo marca en vez de borrarlo.** Decidido
+por el dueño el 2026-10-11, para que quede rastro y se pueda saber qué está
+pendiente. `pos-transferencias/cancelar` hacía `deleteMany` de las líneas y
+`delete` del pedido; ahora, en una transacción, pone `estado = "Cancelado"`,
+`canceladoAt` y `canceladoPorUserId`, con la condición `estado = "Solicitado"`
+en el mismo update (si el depósito empezó a enviarlo, no marca y contesta 409).
+Las validaciones son las de siempre: solo un pedido Solicitado, `pedidos.editar`
+o admin, el local destino y su grupo. Un Borrador nunca se pudo cancelar por
+esta ruta (contesta 409) y sigue igual: no hay otra ruta que borre un pedido
+entero; un borrador nunca se pidió.
+
+Para el resto del ERP un pedido cancelado sigue sin existir, como cuando se
+borraba. Toda lectura de `PosTransferencia` —y toda lectura de sus líneas que
+parte de un pedido— pasa su `where` por `sinCancelados`
+(`lib/pedidos/estados.js`), el filtro único, al lado de las constantes de
+estado (`ESTADO_PEDIDO`), que no existían: el estado era un String escrito a
+mano en cada ruta. Por eso un id de un pedido cancelado da 404 donde antes daba
+404, y ningún listado ni conteo lo ve. Excepciones, con su motivo en
+`lib/pedidos/sinCancelados.test.mjs`: `pedidos_eventos` (arriba), el conteo de
+`admin/reset-operativo` (cuenta lo que va a borrar), el freno de
+`productos/eliminar` (una línea de un pedido cancelado es historial; antes de
+la 9A ese producto se podía borrar, ahora no) y `pos-transferencias/eliminarItem`
+(huérfana, no se tocó). Ese candado recorre `app/` y `lib/` y se pone rojo con
+una lectura nueva sin el filtro ni motivo.
+
+Rehacer funciona como antes: el carrito busca Borrador o Preparando, así que
+arma uno nuevo; y `solicitar` solo frena otro Solicitado del mismo par, que
+pasa por `sinCancelados`.
+
+**La capacidad.** Los pedidos del local (`destinoId`, el que pidió) en estado
+Solicitado: ya pedidos y sin despachar. Ni Borrador ni Preparando (no se
+pidieron), ni Enviando ni Enviado (despachados), ni Cancelado. Es la pregunta
+del aviso "pedido pendiente" de `pedidos/carrito`, para todos los orígenes del
+local. Solo lectura, `pideLocal: true`, sin parámetros, versión 1. Permiso
+`pedidos.ver`, el de `pedidos_eventos`: las mismas pantallas.
+
+Cada pedido trae `id`, `solicitadoAt`, `origen: { id, nombre }`, `lineas` (al
+leer) y `antiguedadHoras`: horas COMPLETAS desde `solicitadoAt` hasta la
+consulta, nunca negativa. Del más viejo al más nuevo, con el id de desempate.
+Sin productos, cantidades ni quién pidió o canceló. Sin tope: `solicitar` no
+deja dos Solicitado del mismo origen al mismo local, así que son a lo sumo uno
+por origen. Ningún código público nuevo.
+
+**Fixture para Azul Chat.** `docs/integraciones/azul-chat/erp-pedidos-pendientes.json`:
+pedidos y respuestas reales de la puerta —varios pendientes de dos orígenes,
+ninguno, un cancelado que no aparece, sin permiso y con un parámetro—,
+generados por `scripts/pruebas-db/azulChatPedidosPendientes.mjs` con
+`AZUL_CHAT_FIXTURE_SALIDA`, con un reloj de consulta 26 h 30 min después para
+que la antigüedad no salga en cero. No se edita a mano: se regenera.
+
 ## Las capacidades de cada local en `mi_alcance` (Tanda 1B)
 
 **Estado:** en código, SIN desplegar. Sin migración. Conviene desplegarla
@@ -592,7 +652,8 @@ contrato sigue siendo 1. `capacidades` es la lista de nombres de capacidades
 del catálogo, en el orden del catálogo; hoy puede traer `ventas_resumen`,
 `transferencias_eventos` y, desde la Tanda 4A, `pedidos_eventos`,
 `envios_eventos` y `cancelaciones_eventos`, desde la Tanda 7A
-`cajas_resumen` y desde la Tanda 8A `stock_consulta`, o ninguna.
+`cajas_resumen`, desde la Tanda 8A `stock_consulta` y desde la Tanda 9A
+`pedidos_pendientes`, o ninguna.
 
 **Cómo se calcula.** En la autorización, no en `mi_alcance`:
 
@@ -673,3 +734,12 @@ de Figma "Podés leer historial" contradice esta política y no se usa.
   la verificación por su ruta; los números contra la lectura de Tesorería,
   la diferencia guardada, `calcularEsperadoDeTurno` y `ventas_resumen`; la
   puerta, el anuncio y la base intacta.
+- Tanda 9A: `lib/pedidos/sinCancelados.test.mjs` (cada lectura de pedidos con
+  el filtro único, y su contraprueba), `lib/integraciones/azul-chat/pedidosPendientes.test.mjs`
+  y `scripts/pruebas-db/azulChatPedidosPendientes.mjs`: el carrito por
+  `pedidos/set-cantidad`, la solicitud, la cancelación y el envío por sus
+  rutas; cancelar marca y deja las líneas, las validaciones de siempre, cada
+  ruta que lee pedidos sin el cancelado (con el filtro anulado, siete de esas
+  comprobaciones dan rojo: editar y quitar llegaban a tocar las líneas del
+  cancelado), rehacer, `pedidos_eventos` con el solicitado del cancelado, la
+  capacidad, la puerta, el anuncio y la base intacta.
