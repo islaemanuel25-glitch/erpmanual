@@ -47,7 +47,8 @@ Seis pasos separados, cada uno en su pieza de `lib/integraciones/azul-chat/`:
    (`pedidos.ver`), `envios_eventos` y `cancelaciones_eventos`
    (`transferencias.ver`) (ver "Eventos de pedidos, envíos y cancelaciones");
    y, desde la Tanda 7A, `cajas_resumen` (`tesoreria.ver`) (ver "Las cajas de
-   un día", abajo).
+   un día", abajo); y, desde la Tanda 8A, `stock_consulta` (`stock.ver`) (ver
+   "El stock de un local", abajo).
 4. **La delegación** (desde la tanda 4): la persona en cuyo nombre se pregunta
    SALE del token de delegación —es el dueño del vínculo que se canjeó—. Hasta
    la tanda 3 viajaba un `usuarioId` que Azul Chat afirmaba y la puerta
@@ -484,6 +485,95 @@ rechazos y `mi_alcance`—, generados por
 `scripts/pruebas-db/azulChatCajasResumen.mjs` con `AZUL_CHAT_FIXTURE_SALIDA`.
 No se edita a mano: se regenera.
 
+## El stock de un local (`stock_consulta`, Tanda 8A)
+
+**Estado:** en código, SIN desplegar. Sin migración: lee columnas que ya
+existen.
+
+**Qué contesta.** El pedido del dueño: "¿cuánto hay de tal producto en tal
+local?" y "¿qué productos están por debajo del mínimo?".
+
+**Pedido.** `pideLocal`, solo lectura, el local sale de la autorización.
+`parametros`: `modo` —`producto` o `bajo_minimo`— y `texto` (solo con
+`producto`, de 2 a 60 caracteres). Otra forma es `SOLICITUD_INVALIDA`.
+
+**Permiso: `stock.ver`.** El de la pantalla Stock Locales: su listado
+(`app/api/stock_locales/listar/route.js`, `checkPerm(session, "stock.ver")`),
+de donde salen la existencia y el mínimo de cada fila, y su resumen
+(`app/api/stock_locales/resumen/route.js`), de donde sale la card "Bajo
+mínimo". Lo traen ENCARGADO y DUEÑO_LOCAL; CAJERO no. `stock.editar` es para
+ajustar y no habilita la capacidad. `frontera.test.mjs` lo fija, con
+contraprueba.
+
+**Respuesta (versión 1).** `{ capacidad, version, local: {id, nombre,
+esDeposito}, grupoId, modo, texto, productos, hayMas }` y, en `bajo_minimo`,
+`total`. Cada producto: `productoId` (el `ProductoLocal`), `nombre`, `codigo`
+(el código de barras de la ficha, o null), `cantidad` (la existencia, texto
+decimal con tres decimales), `unidad` (la etiqueta de la columna Unidad de la
+pantalla: "Unidad", "Kg", "Pack x12", "Cajón x8", "Pieza"), `equivalencia` (el
+texto de la celda Stock de la pantalla: "30 uds", "2.350 kg", "2 bultos + 6
+uds"), `stockMinimo` (texto con dos decimales, o null) y `bajoMinimo` (o null).
+Nada de costos, precios, márgenes ni valorizaciones: no se leen.
+
+**Sin número nuevo.** De dónde sale cada dato:
+
+- Qué productos coinciden y en qué orden: `buscarCatalogoLocal`
+  (`lib/productos/buscarCatalogoLocal.js`), el buscador de productos del ERP
+  —lo usan el buscador de pos-transferencias y el de recepción—: código de
+  barras exacto (los dos de la ficha y el propio del local), después nombre
+  igual, que empieza, palabra que empieza y que contiene (`rankearLiteral`),
+  los 10 primeros. Se le sumaron dos cosas sin cambiar lo que ya hacía: la
+  opción `soloActivos` (el universo de Stock Locales: producto del local y
+  ficha activos) y `coincidencias`, cuántas rankeó antes del corte, que es lo
+  que da `hayMas`.
+- La fila: `mapStockItemLocal` / `mapStockItemDeposito` (`lib/stock/mapItem.js`),
+  con el mismo `select` que el listado menos los precios.
+- La cantidad y la unidad: `presentacionCantidadStock`, `getUnidadLocal` y
+  `getUnidadDeposito` (`lib/stock/presentacion.js`), los de la tabla y la
+  tarjeta móvil. En un local la existencia va en unidades (o kg), que es como
+  vende el POS del local (`modoSalidaDeVenta` da UNIDAD fuera del depósito); en
+  el depósito, un pack o cajón con factor se lee en bultos + unidades.
+- El mínimo y "bajo mínimo": solo con límites AJUSTADOS
+  (`limitesConfiguradosAt`); `bajoMinimo` es el `faltante` de `mapItem`, la
+  misma condición que la card (`estadosDeStock.js`, comparadas en
+  `estadosDeStock.test.mjs`).
+
+**Bajo mínimo.** Los productos del local con el mínimo ajustado, y de ésos los
+faltantes —el camino "Faltantes" del listado—, por mayor faltante relativo
+(`(mínimo − cantidad) / mínimo`; un negativo con mínimo cero, primero), hasta
+50, con `total` y `hayMas`. El orden es lo único propio y no se devuelve como
+número. Si el local no tiene NINGÚN producto con el mínimo ajustado, contesta
+409 `STOCK_MINIMO_NO_DISPONIBLE` —"Ningún producto de este local tiene el stock
+mínimo ajustado."—: el local no usa stock mínimo y "no hay productos bajo
+mínimo" sería inventar. Es el único código público nuevo.
+
+**Stock mínimo: existe y se usa.** `StockLocal.stockMin` (Decimal(12,2)), con
+`stockMax` y `limitesConfiguradosAt`, por producto y local; lo edita el modal
+de límites de Stock Locales (`/api/stock_locales/ajustar`, modo `limites`, el
+único que sella la marca) y lo leen la card "Bajo mínimo · reponer", el filtro
+Faltantes, compras a proveedor y los sugeridos de pos-transferencias. Cuántos
+productos lo tienen cargado en producción NO se midió (desde desarrollo no se
+consulta producción); la última medición escrita es la de `erpazul_dev` en
+`lib/stock/estadosDeStock.js`: 63 de 4.008 con límites ajustados.
+
+**Lo que no hace.** No busca por SKU ni por el código interno de proveedor: el
+buscador del ERP tampoco (el listado de Stock Locales busca el código de
+proveedor solo con un proveedor elegido). No crea filas: la rama depósito del
+listado materializa al abrirse los productos del grupo que le faltan, y esto
+es solo lectura, así que un producto que el depósito todavía no materializó no
+aparece hasta que alguien abra la pantalla. Y hereda una diferencia que ya
+tiene la pantalla: en el depósito el desglose en bultos mira `unidad_medida`
+pack/cajón y no `modo_envio`, así que un producto "unidad" con factor, o uno
+que el depósito vende SOLO_UNIDAD, se muestra distinto de como se vende. Se
+dejó igual que la pantalla a propósito: corregirlo es cambiar la pantalla.
+
+**Fixture para Azul Chat.** `docs/integraciones/azul-chat/erp-stock-consulta.json`:
+pedidos y respuestas reales de la puerta —varias coincidencias, una por
+código, ninguna, `hayMas`, kg, unidades en el local y bultos en el depósito,
+bajo mínimo con faltantes y `STOCK_MINIMO_NO_DISPONIBLE`, los rechazos y
+`mi_alcance`—, generados por `scripts/pruebas-db/azulChatStockConsulta.mjs` con
+`AZUL_CHAT_FIXTURE_SALIDA`. No se edita a mano: se regenera.
+
 ## Las capacidades de cada local en `mi_alcance` (Tanda 1B)
 
 **Estado:** en código, SIN desplegar. Sin migración. Conviene desplegarla
@@ -501,8 +591,8 @@ de antes no cambian de nombre, tipo, orden ni significado, y la versión del
 contrato sigue siendo 1. `capacidades` es la lista de nombres de capacidades
 del catálogo, en el orden del catálogo; hoy puede traer `ventas_resumen`,
 `transferencias_eventos` y, desde la Tanda 4A, `pedidos_eventos`,
-`envios_eventos` y `cancelaciones_eventos`, y desde la Tanda 7A
-`cajas_resumen`, o ninguna.
+`envios_eventos` y `cancelaciones_eventos`, desde la Tanda 7A
+`cajas_resumen` y desde la Tanda 8A `stock_consulta`, o ninguna.
 
 **Cómo se calcula.** En la autorización, no en `mi_alcance`:
 
