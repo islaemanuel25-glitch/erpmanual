@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-10-12] - Actualización: categorias, pos-transferencias
+
+### Modificado
+- **categorias**: feat: cancelar un pedido lo marca en vez de borrarlo
+- **pos-transferencias**: feat: cancelar un pedido lo marca en vez de borrarlo
+
+
 ## [2026-10-10] - Actualización: compras-proveedor (lectura interpretada, segunda parte)
 
 ### Modificado
