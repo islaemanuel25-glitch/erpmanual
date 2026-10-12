@@ -457,10 +457,11 @@ try {
       return Object.fromEntries(r.cuerpo.datos.locales.map((l) => [l.id, l.capacidades]));
     };
     // Tanda 8A: el ENCARGADO trae stock.ver, así que también stock_consulta.
-    const TODAS = ["ventas_resumen", "transferencias_eventos", "pedidos_eventos", "envios_eventos", "cancelaciones_eventos", "stock_consulta"];
+    // Tanda 9A: y pedidos_pendientes, por pedidos.ver.
+    const TODAS = ["ventas_resumen", "transferencias_eventos", "pedidos_eventos", "envios_eventos", "cancelaciones_eventos", "stock_consulta", "pedidos_pendientes"];
     igual("el ENCARGADO las ve anunciadas todas", await anuncio(U.encA), { [localA.id]: TODAS });
     igual("con solo transferencias.ver: recibidas, envíos y cancelaciones", await anuncio(U.soloTransfA), { [localA.id]: ["transferencias_eventos", "envios_eventos", "cancelaciones_eventos"] });
-    igual("con solo pedidos.ver: pedidos", await anuncio(U.soloPedidosA), { [localA.id]: ["pedidos_eventos"] });
+    igual("con solo pedidos.ver: pedidos", await anuncio(U.soloPedidosA), { [localA.id]: ["pedidos_eventos", "pedidos_pendientes"] });
     // La puerta dice lo mismo que el anuncio.
     for (const [u, capacidad, status] of [
       [U.soloTransfA, "pedidos_eventos", 403],
