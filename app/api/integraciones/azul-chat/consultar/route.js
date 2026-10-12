@@ -54,8 +54,11 @@ export async function POST(req) {
     }
     return responder(publica);
   } catch (e) {
+    // Como el canje: solo el tipo y el código del error, nunca su mensaje. Un
+    // error de validación de Prisma imprime los argumentos de la llamada, y
+    // acá esos argumentos pueden llevar el hash del token o datos del local.
     const referencia = crypto.randomUUID();
-    console.error(`[azul-chat] consultar falló ref=${referencia}:`, e?.message || e);
+    console.error(`[azul-chat] consultar falló ref=${referencia}: ${e?.name ?? "Error"} ${e?.code ?? ""}`.trim());
     return responder(rechazoPublico("ERROR_AL_CALCULAR", { referencia }));
   }
 }
