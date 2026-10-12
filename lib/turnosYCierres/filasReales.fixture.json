@@ -1,0 +1,622 @@
+{
+ "localId": 2,
+ "rango": {
+  "desde": "2026-10-12",
+  "hasta": "2026-10-12"
+ },
+ "cajas": [
+  {
+   "id": 1,
+   "localId": 2,
+   "vendedorId": 3,
+   "operadorId": null,
+   "apertura": "2026-10-12T03:06:00.000Z",
+   "cierre": "2026-10-12T11:02:00.000Z",
+   "cierreEnPreparacionEn": "2026-10-12T11:02:00.000Z",
+   "anuladoEn": null,
+   "montoInicial": "20000",
+   "montoEsperadoEfectivo": "122000",
+   "montoRealEfectivo": "122000.01",
+   "diferenciaEfectivo": "0.01",
+   "retiroCierreMovimientoId": 2,
+   "turnoOperativoId": 1,
+   "fechaOperativa": "2026-10-12T00:00:00.000Z",
+   "turnoOperativo": {
+    "nombre": "Noche",
+    "orden": 0
+   },
+   "operador": null,
+   "vendedor": {
+    "nombre": "Mariangel"
+   },
+   "turnoOperativoNombre": "Noche",
+   "turnoOperativoOrden": 0,
+   "operadorNombre": null,
+   "vendedorNombre": "Mariangel"
+  },
+  {
+   "id": 2,
+   "localId": 2,
+   "vendedorId": 2,
+   "operadorId": null,
+   "apertura": "2026-10-12T11:02:00.000Z",
+   "cierre": "2026-10-12T19:00:00.000Z",
+   "cierreEnPreparacionEn": "2026-10-12T19:00:00.000Z",
+   "anuladoEn": null,
+   "montoInicial": "20000",
+   "montoEsperadoEfectivo": "82500",
+   "montoRealEfectivo": "81000",
+   "diferenciaEfectivo": "-1500",
+   "retiroCierreMovimientoId": 6,
+   "turnoOperativoId": 2,
+   "fechaOperativa": "2026-10-12T00:00:00.000Z",
+   "turnoOperativo": {
+    "nombre": "Mañana",
+    "orden": 1
+   },
+   "operador": null,
+   "vendedor": {
+    "nombre": "Damaris"
+   },
+   "turnoOperativoNombre": "Mañana",
+   "turnoOperativoOrden": 1,
+   "operadorNombre": null,
+   "vendedorNombre": "Damaris"
+  },
+  {
+   "id": 3,
+   "localId": 2,
+   "vendedorId": 3,
+   "operadorId": null,
+   "apertura": "2026-10-12T19:00:00.000Z",
+   "cierre": "2026-10-12T23:00:00.000Z",
+   "cierreEnPreparacionEn": "2026-10-12T23:00:00.000Z",
+   "anuladoEn": null,
+   "montoInicial": "20000",
+   "montoEsperadoEfectivo": "72000",
+   "montoRealEfectivo": "72000",
+   "diferenciaEfectivo": "0",
+   "retiroCierreMovimientoId": 7,
+   "turnoOperativoId": 3,
+   "fechaOperativa": "2026-10-12T00:00:00.000Z",
+   "turnoOperativo": {
+    "nombre": "Tarde",
+    "orden": 2
+   },
+   "operador": null,
+   "vendedor": {
+    "nombre": "Mariangel"
+   },
+   "turnoOperativoNombre": "Tarde",
+   "turnoOperativoOrden": 2,
+   "operadorNombre": null,
+   "vendedorNombre": "Mariangel"
+  },
+  {
+   "id": 6,
+   "localId": 2,
+   "vendedorId": 2,
+   "operadorId": null,
+   "apertura": "2026-10-12T19:05:00.000Z",
+   "cierre": null,
+   "cierreEnPreparacionEn": null,
+   "anuladoEn": null,
+   "montoInicial": "20000",
+   "montoEsperadoEfectivo": null,
+   "montoRealEfectivo": null,
+   "diferenciaEfectivo": null,
+   "retiroCierreMovimientoId": null,
+   "turnoOperativoId": 3,
+   "fechaOperativa": "2026-10-12T00:00:00.000Z",
+   "turnoOperativo": {
+    "nombre": "Tarde",
+    "orden": 2
+   },
+   "operador": null,
+   "vendedor": {
+    "nombre": "Damaris"
+   },
+   "turnoOperativoNombre": "Tarde",
+   "turnoOperativoOrden": 2,
+   "operadorNombre": null,
+   "vendedorNombre": "Damaris"
+  },
+  {
+   "id": 7,
+   "localId": 2,
+   "vendedorId": 3,
+   "operadorId": null,
+   "apertura": "2026-10-12T09:30:00.000Z",
+   "cierre": "2026-10-12T10:30:00.000Z",
+   "cierreEnPreparacionEn": "2026-10-12T10:30:00.000Z",
+   "anuladoEn": null,
+   "montoInicial": "10000",
+   "montoEsperadoEfectivo": "17000",
+   "montoRealEfectivo": "17000",
+   "diferenciaEfectivo": "0",
+   "retiroCierreMovimientoId": 12,
+   "turnoOperativoId": null,
+   "fechaOperativa": null,
+   "turnoOperativo": null,
+   "operador": null,
+   "vendedor": {
+    "nombre": "Mariangel"
+   },
+   "turnoOperativoNombre": null,
+   "turnoOperativoOrden": null,
+   "operadorNombre": null,
+   "vendedorNombre": "Mariangel"
+  }
+ ],
+ "ventas": [
+  {
+   "id": 1,
+   "total": "150000",
+   "subtotal": "150000",
+   "descuento": "0",
+   "comisionBancaria": "0",
+   "netoRecibido": "150000",
+   "comisionPendiente": false,
+   "costoTotal": "120000",
+   "gananciaBruta": "30000",
+   "gananciaNeta": "30000",
+   "formaPago": "efectivo",
+   "esFiado": false,
+   "pagos": [
+    {
+     "medio": "EFECTIVO",
+     "monto": "150000",
+     "comision": "0",
+     "neto": "150000"
+    }
+   ],
+   "turnoId": 1
+  },
+  {
+   "id": 2,
+   "total": "80000",
+   "subtotal": "80000",
+   "descuento": "0",
+   "comisionBancaria": "3200",
+   "netoRecibido": "76800",
+   "comisionPendiente": false,
+   "costoTotal": "64000",
+   "gananciaBruta": "16000",
+   "gananciaNeta": "12800",
+   "formaPago": "mercadopago",
+   "esFiado": false,
+   "pagos": [
+    {
+     "medio": "MERCADOPAGO",
+     "monto": "80000",
+     "comision": "3200",
+     "neto": "76800"
+    }
+   ],
+   "turnoId": 1
+  },
+  {
+   "id": 3,
+   "total": "20000",
+   "subtotal": "20000",
+   "descuento": "0",
+   "comisionBancaria": "320",
+   "netoRecibido": "19680",
+   "comisionPendiente": false,
+   "costoTotal": "16000",
+   "gananciaBruta": "4000",
+   "gananciaNeta": "3680",
+   "formaPago": "efectivo",
+   "esFiado": false,
+   "pagos": [
+    {
+     "medio": "EFECTIVO",
+     "monto": "12000",
+     "comision": "0",
+     "neto": "12000"
+    },
+    {
+     "medio": "MERCADOPAGO",
+     "monto": "8000",
+     "comision": "320",
+     "neto": "7680"
+    }
+   ],
+   "turnoId": 1
+  },
+  {
+   "id": 4,
+   "total": "25000",
+   "subtotal": "25000",
+   "descuento": "0",
+   "comisionBancaria": "1000",
+   "netoRecibido": "24000",
+   "comisionPendiente": false,
+   "costoTotal": "20000",
+   "gananciaBruta": "5000",
+   "gananciaNeta": "4000",
+   "formaPago": "debito",
+   "esFiado": false,
+   "pagos": [
+    {
+     "medio": "DEBITO",
+     "monto": "25000",
+     "comision": "1000",
+     "neto": "24000"
+    }
+   ],
+   "turnoId": 1
+  },
+  {
+   "id": 5,
+   "total": "6000",
+   "subtotal": "6000",
+   "descuento": "0",
+   "comisionBancaria": "0",
+   "netoRecibido": "6000",
+   "comisionPendiente": false,
+   "costoTotal": "4800",
+   "gananciaBruta": "1200",
+   "gananciaNeta": "1200",
+   "formaPago": "fiado",
+   "esFiado": true,
+   "pagos": [
+    {
+     "medio": "FIADO",
+     "monto": "6000",
+     "comision": "0",
+     "neto": "6000"
+    }
+   ],
+   "turnoId": 1
+  },
+  {
+   "id": 7,
+   "total": "40000",
+   "subtotal": "40000",
+   "descuento": "0",
+   "comisionBancaria": "0",
+   "netoRecibido": "40000",
+   "comisionPendiente": false,
+   "costoTotal": "32000",
+   "gananciaBruta": "8000",
+   "gananciaNeta": "8000",
+   "formaPago": "efectivo",
+   "esFiado": false,
+   "pagos": [
+    {
+     "medio": "EFECTIVO",
+     "monto": "40000",
+     "comision": "0",
+     "neto": "40000"
+    }
+   ],
+   "turnoId": 1
+  },
+  {
+   "id": 8,
+   "total": "180500",
+   "subtotal": "180500",
+   "descuento": "0",
+   "comisionBancaria": "0",
+   "netoRecibido": "180500",
+   "comisionPendiente": false,
+   "costoTotal": "144500",
+   "gananciaBruta": "36000",
+   "gananciaNeta": "36000",
+   "formaPago": "efectivo",
+   "esFiado": false,
+   "pagos": [
+    {
+     "medio": "EFECTIVO",
+     "monto": "180500",
+     "comision": "0",
+     "neto": "180500"
+    }
+   ],
+   "turnoId": 2
+  },
+  {
+   "id": 9,
+   "total": "42300",
+   "subtotal": "42300",
+   "descuento": "0",
+   "comisionBancaria": "1692",
+   "netoRecibido": "40608",
+   "comisionPendiente": false,
+   "costoTotal": "34300",
+   "gananciaBruta": "8000",
+   "gananciaNeta": "6308",
+   "formaPago": "credito",
+   "esFiado": false,
+   "pagos": [
+    {
+     "medio": "CREDITO",
+     "monto": "42300",
+     "comision": "1692",
+     "neto": "40608"
+    }
+   ],
+   "turnoId": 2
+  },
+  {
+   "id": 10,
+   "total": "61200",
+   "subtotal": "61200",
+   "descuento": "0",
+   "comisionBancaria": "2448",
+   "netoRecibido": "58752",
+   "comisionPendiente": false,
+   "costoTotal": "49200",
+   "gananciaBruta": "12000",
+   "gananciaNeta": "9552",
+   "formaPago": "mercadopago",
+   "esFiado": false,
+   "pagos": [
+    {
+     "medio": "MERCADOPAGO",
+     "monto": "61200",
+     "comision": "2448",
+     "neto": "58752"
+    }
+   ],
+   "turnoId": 2
+  },
+  {
+   "id": 11,
+   "total": "4500",
+   "subtotal": "4500",
+   "descuento": "0",
+   "comisionBancaria": "0",
+   "netoRecibido": "4500",
+   "comisionPendiente": false,
+   "costoTotal": "3600",
+   "gananciaBruta": "900",
+   "gananciaNeta": "900",
+   "formaPago": "fiado",
+   "esFiado": true,
+   "pagos": [
+    {
+     "medio": "FIADO",
+     "monto": "4500",
+     "comision": "0",
+     "neto": "4500"
+    }
+   ],
+   "turnoId": 2
+  },
+  {
+   "id": 12,
+   "total": "52000",
+   "subtotal": "52000",
+   "descuento": "0",
+   "comisionBancaria": "0",
+   "netoRecibido": "52000",
+   "comisionPendiente": false,
+   "costoTotal": "41600",
+   "gananciaBruta": "10400",
+   "gananciaNeta": "10400",
+   "formaPago": "efectivo",
+   "esFiado": false,
+   "pagos": [
+    {
+     "medio": "EFECTIVO",
+     "monto": "52000",
+     "comision": "0",
+     "neto": "52000"
+    }
+   ],
+   "turnoId": 3
+  },
+  {
+   "id": 15,
+   "total": "76400",
+   "subtotal": "76400",
+   "descuento": "0",
+   "comisionBancaria": "0",
+   "netoRecibido": "76400",
+   "comisionPendiente": false,
+   "costoTotal": "61400",
+   "gananciaBruta": "15000",
+   "gananciaNeta": "15000",
+   "formaPago": "efectivo",
+   "esFiado": false,
+   "pagos": [
+    {
+     "medio": "EFECTIVO",
+     "monto": "76400",
+     "comision": "0",
+     "neto": "76400"
+    }
+   ],
+   "turnoId": 6
+  },
+  {
+   "id": 16,
+   "total": "9300",
+   "subtotal": "9300",
+   "descuento": "0",
+   "comisionBancaria": "372",
+   "netoRecibido": "8928",
+   "comisionPendiente": false,
+   "costoTotal": "7500",
+   "gananciaBruta": "1800",
+   "gananciaNeta": "1428",
+   "formaPago": "debito",
+   "esFiado": false,
+   "pagos": [
+    {
+     "medio": "DEBITO",
+     "monto": "9300",
+     "comision": "372",
+     "neto": "8928"
+    }
+   ],
+   "turnoId": 6
+  },
+  {
+   "id": 20,
+   "total": "7000",
+   "subtotal": "7000",
+   "descuento": "0",
+   "comisionBancaria": "0",
+   "netoRecibido": "7000",
+   "comisionPendiente": false,
+   "costoTotal": "5600",
+   "gananciaBruta": "1400",
+   "gananciaNeta": "1400",
+   "formaPago": "efectivo",
+   "esFiado": false,
+   "pagos": [
+    {
+     "medio": "EFECTIVO",
+     "monto": "7000",
+     "comision": "0",
+     "neto": "7000"
+    }
+   ],
+   "turnoId": 7
+  }
+ ],
+ "movimientos": [
+  {
+   "id": 1,
+   "turnoId": 1,
+   "tipo": "RETIRO",
+   "monto": "100000",
+   "motivo": "Retiro de recaudación",
+   "createdAt": "2026-10-12T06:11:00.000Z",
+   "proveedorNombre": null,
+   "gastoConcepto": null,
+   "gastoCategoria": null,
+   "clase": "RECAUDACION"
+  },
+  {
+   "id": 2,
+   "turnoId": 1,
+   "tipo": "RETIRO",
+   "monto": "102000.01",
+   "motivo": "Retiro de cierre",
+   "createdAt": "2026-10-12T11:02:00.000Z",
+   "proveedorNombre": null,
+   "gastoConcepto": null,
+   "gastoCategoria": null,
+   "clase": "CIERRE"
+  },
+  {
+   "id": 3,
+   "turnoId": 2,
+   "tipo": "RETIRO",
+   "monto": "3000",
+   "motivo": "Pago de gasto: Pan",
+   "createdAt": "2026-10-12T15:10:00.000Z",
+   "proveedorNombre": null,
+   "gastoConcepto": "Pan",
+   "gastoCategoria": "Insumos",
+   "clase": "PAGO_GASTO"
+  },
+  {
+   "id": 4,
+   "turnoId": 2,
+   "tipo": "RETIRO",
+   "monto": "60000",
+   "motivo": "Retiro de recaudación",
+   "createdAt": "2026-10-12T16:00:00.000Z",
+   "proveedorNombre": null,
+   "gastoConcepto": null,
+   "gastoCategoria": null,
+   "clase": "RECAUDACION"
+  },
+  {
+   "id": 5,
+   "turnoId": 2,
+   "tipo": "RETIRO",
+   "monto": "55000",
+   "motivo": "Retiro de recaudación",
+   "createdAt": "2026-10-12T18:00:00.000Z",
+   "proveedorNombre": null,
+   "gastoConcepto": null,
+   "gastoCategoria": null,
+   "clase": "RECAUDACION"
+  },
+  {
+   "id": 6,
+   "turnoId": 2,
+   "tipo": "RETIRO",
+   "monto": "61000",
+   "motivo": "Retiro de cierre",
+   "createdAt": "2026-10-12T19:00:00.000Z",
+   "proveedorNombre": null,
+   "gastoConcepto": null,
+   "gastoCategoria": null,
+   "clase": "CIERRE"
+  },
+  {
+   "id": 7,
+   "turnoId": 3,
+   "tipo": "RETIRO",
+   "monto": "52000",
+   "motivo": "Retiro de cierre",
+   "createdAt": "2026-10-12T23:00:00.000Z",
+   "proveedorNombre": null,
+   "gastoConcepto": null,
+   "gastoCategoria": null,
+   "clase": "CIERRE"
+  },
+  {
+   "id": 12,
+   "turnoId": 7,
+   "tipo": "RETIRO",
+   "monto": "7000",
+   "motivo": "Retiro de cierre",
+   "createdAt": "2026-10-12T10:30:00.000Z",
+   "proveedorNombre": null,
+   "gastoConcepto": null,
+   "gastoCategoria": null,
+   "clase": "CIERRE"
+  }
+ ],
+ "turnosDelLocal": [
+  {
+   "id": 1,
+   "localId": 2,
+   "nombre": "Noche",
+   "orden": 0,
+   "activo": true,
+   "horaInicioReconocimiento": "00:00",
+   "horaFinReconocimiento": "08:00"
+  },
+  {
+   "id": 2,
+   "localId": 2,
+   "nombre": "Mañana",
+   "orden": 1,
+   "activo": true,
+   "horaInicioReconocimiento": "08:00",
+   "horaFinReconocimiento": "16:00"
+  },
+  {
+   "id": 3,
+   "localId": 2,
+   "nombre": "Tarde",
+   "orden": 2,
+   "activo": true,
+   "horaInicioReconocimiento": "16:00",
+   "horaFinReconocimiento": "23:59"
+  }
+ ],
+ "ventasSinCaja": [
+  {
+   "id": 18,
+   "numero": 1018,
+   "fecha": "2026-10-12T16:20:00.000Z",
+   "total": "5000"
+  },
+  {
+   "id": 17,
+   "numero": 1017,
+   "fecha": "2026-10-12T15:40:00.000Z",
+   "total": "9300"
+  }
+ ]
+}
