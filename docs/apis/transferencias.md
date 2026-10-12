@@ -402,7 +402,12 @@ Convierte POS en Transferencia formal.
 
 ### POST /api/pos-transferencias/cancelar
 
-Elimina borrador POS que no fue enviado.
+Cancela un pedido en estado **Solicitado**. Desde la Tanda 9A (2026-10-12) no
+lo borra: lo marca con `estado = "Cancelado"`, `canceladoAt` y
+`canceladoPorUserId`, y deja sus líneas. Un pedido en otro estado contesta 409
+(un Borrador nunca se pudo cancelar por acá); uno ya cancelado, 404, como
+cuando se borraba; si el depósito empezó a enviarlo mientras tanto, 409. Pide
+`pedidos.editar` (o admin sin local) y ser del local destino y su grupo.
 
 **Body:**
 ```json

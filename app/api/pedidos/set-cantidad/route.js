@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { esBultoMode } from "@/lib/conversiones/stock";
 import { esComboBase } from "@/lib/combos/guards";
+import { sinCancelados } from "@/lib/pedidos/estados";
 
 export async function POST(req) {
   try {
@@ -120,11 +121,11 @@ export async function POST(req) {
     // Obtener/crear POS borrador para este par (depósito->local)
     const pos = await prisma.$transaction(async (tx) => {
       let found = await tx.posTransferencia.findFirst({
-        where: {
+        where: sinCancelados({
           origenId: depositoId,
           destinoId: localId,
           estado: { in: ["Borrador", "Preparando"] },
-        },
+        }),
         orderBy: { createdAt: "desc" },
       });
 
@@ -162,6 +163,7 @@ export async function POST(req) {
       where: {
         posTransferenciaId: pos.id,
         productoId: productoLocalId,
+        pos: sinCancelados(),
       },
     });
 
@@ -203,7 +205,7 @@ export async function POST(req) {
 
     // Contar items en el carrito
     const itemCount = await prisma.posTransferenciaDetalle.count({
-      where: { posTransferenciaId: pos.id },
+      where: { posTransferenciaId: pos.id, pos: sinCancelados() },
     });
 
     return NextResponse.json({

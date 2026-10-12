@@ -4,6 +4,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { productoVisibleWhere } from "@/lib/visibilidad";
 import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
+import { sinCancelados } from "@/lib/pedidos/estados";
 
 export async function GET(req) {
   try {
@@ -49,7 +50,7 @@ export async function GET(req) {
     // 1) Obtener baseIds ya preparados
     // ============================================================
     const detalles = await prisma.posTransferenciaDetalle.findMany({
-      where: { posTransferenciaId: posId },
+      where: { posTransferenciaId: posId, pos: sinCancelados() },
       include: {
         producto: { select: { baseId: true } },
       },

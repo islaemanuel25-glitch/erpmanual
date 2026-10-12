@@ -898,7 +898,8 @@ try {
       // `capacidades` (Tanda 1B): lo que el ENCARGADO real puede consultar en su local.
       // Tanda 4A: suma pedidos_eventos, envios_eventos y cancelaciones_eventos, que el rol tiene.
       // Tanda 8A: y stock_consulta, por stock.ver.
-      [200, { modo: "LOCAL" }, { id: U.encargadoA.id, nombre: "encargado-a" }, [{ id: localA.id, nombre: "Local A", grupoId: grupo.id, esDeposito: false, activo: true, capacidades: ["ventas_resumen", "transferencias_eventos", "pedidos_eventos", "envios_eventos", "cancelaciones_eventos", "stock_consulta"] }]]);
+      // Tanda 9A: y pedidos_pendientes, por pedidos.ver.
+      [200, { modo: "LOCAL" }, { id: U.encargadoA.id, nombre: "encargado-a" }, [{ id: localA.id, nombre: "Local A", grupoId: grupo.id, esDeposito: false, activo: true, capacidades: ["ventas_resumen", "transferencias_eventos", "pedidos_eventos", "envios_eventos", "cancelaciones_eventos", "stock_consulta", "pedidos_pendientes"] }]]);
     const glob = await alcanceDe(U.adminGlobal.id);
     igual("21. el admin global: todo local y depósito con grupo, como grupo-activo/set", [glob.datos?.alcance, glob.ids], [{ modo: "GLOBAL" }, ordenar([deposito.id, localA.id, localB.id, localX.id])]);
     const deposito1 = glob.datos?.locales.find((l) => l.id === deposito.id);

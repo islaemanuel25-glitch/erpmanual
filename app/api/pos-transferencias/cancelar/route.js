@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { requireOperadorSegunConfig } from "@/lib/operador";
+import { ESTADO_PEDIDO, sinCancelados } from "@/lib/pedidos/estados";
 
 export async function POST(req) {
   try {
@@ -55,8 +56,9 @@ export async function POST(req) {
     // ============================
     // Validar POS
     // ============================
+    // Un pedido ya cancelado da 404, como cuando cancelar lo borraba.
     const pos = await prisma.posTransferencia.findUnique({
-      where: { id: posId },
+      where: sinCancelados({ id: posId }),
       select: { id: true, estado: true, origenId: true, destinoId: true },
     });
 
@@ -101,7 +103,7 @@ export async function POST(req) {
     // ============================
     // Estado: solo se puede cancelar "Solicitado"
     // ============================
-    if (pos.estado !== "Solicitado") {
+    if (pos.estado !== ESTADO_PEDIDO.SOLICITADO) {
       return NextResponse.json(
         {
           ok: false,
@@ -112,15 +114,36 @@ export async function POST(req) {
     }
 
     // ============================
-    // Eliminar detalles + POS
+    // Marcar como cancelado (Tanda 9A)
     // ============================
-    await prisma.posTransferenciaDetalle.deleteMany({
-      where: { posTransferenciaId: posId },
+    // Antes se borraban el pedido y sus líneas. Ahora se MARCA y las líneas
+    // quedan: el rastro es lo que el dueño pidió. Las lecturas lo dejan afuera
+    // con `sinCancelados`, así que para el resto del ERP sigue sin existir.
+    //
+    // La condición `estado: Solicitado` va en el mismo update: si el depósito
+    // empezó a enviarlo entre la lectura de arriba y acá, el estado ya es
+    // "Enviando" y no se marca nada.
+    const marcados = await prisma.$transaction(async (tx) => {
+      const r = await tx.posTransferencia.updateMany({
+        where: { id: posId, estado: ESTADO_PEDIDO.SOLICITADO },
+        data: {
+          estado: ESTADO_PEDIDO.CANCELADO,
+          canceladoAt: new Date(),
+          canceladoPorUserId: session.id,
+        },
+      });
+      return r.count;
     });
 
-    await prisma.posTransferencia.delete({
-      where: { id: posId },
-    });
+    if (marcados === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "El pedido cambió de estado mientras se cancelaba. Actualizá y volvé a intentar.",
+        },
+        { status: 409 }
+      );
+    }
 
     return NextResponse.json({
       ok: true,

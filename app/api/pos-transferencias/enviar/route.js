@@ -8,6 +8,7 @@ import { toUnidades, validarEnvio, esFiambreFijo, piezasToKg } from "@/lib/conve
 import { esComboBase } from "@/lib/combos/guards";
 import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
 import { DESCONTAR_Y_TRANSITO } from "@/lib/transferencias/politicasStock";
+import { sinCancelados } from "@/lib/pedidos/estados";
 import {
   PRESENTACION,
   agrupa,
@@ -79,7 +80,7 @@ export async function POST(req) {
     }
 
     const pos = await prisma.posTransferencia.findUnique({
-      where: { id: posId },
+      where: sinCancelados({ id: posId }),
       include: {
         detalles: {
           include: {

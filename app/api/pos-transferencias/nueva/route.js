@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
+import { sinCancelados } from "@/lib/pedidos/estados";
 
 export async function GET(req) {
   try {
@@ -29,7 +30,7 @@ export async function GET(req) {
     const posIdParam = Number(searchParams.get("posId") || 0);
     if (posIdParam) {
       const posExistente = await prisma.posTransferencia.findUnique({
-        where: { id: posIdParam },
+        where: sinCancelados({ id: posIdParam }),
       });
 
       if (!posExistente) {
@@ -190,12 +191,12 @@ export async function GET(req) {
     // OBTENER POS BORRADOR
     // =====================================================
     let pos = await prisma.posTransferencia.findFirst({
-      where: {
+      where: sinCancelados({
         origenId,
         destinoId,
         usuarioId: session.id,
         estado: { in: ["Borrador", "Preparando"] },
-      },
+      }),
       orderBy: { createdAt: "desc" },
     });
 

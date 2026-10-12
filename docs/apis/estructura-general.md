@@ -230,7 +230,7 @@ PageSize por defecto: 25 en la mayoria de endpoints.
 | `/api/pos-transferencias/sugeridos` | GET | Productos sugeridos |
 | `/api/pos-transferencias/agregarItem` | POST | Agregar item |
 | `/api/pos-transferencias/enviar` | POST | Convertir a transferencia |
-| `/api/pos-transferencias/cancelar` | POST | Cancelar borrador |
+| `/api/pos-transferencias/cancelar` | POST | Cancelar un pedido solicitado (lo marca, no lo borra) |
 
 ### Catalogos
 | Endpoint | Metodo | Descripcion |

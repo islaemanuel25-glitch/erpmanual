@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { sinCancelados } from "@/lib/pedidos/estados";
 
 export async function GET(req) {
   try {
@@ -87,7 +88,7 @@ export async function GET(req) {
     // Consultas en paralelo: datos + total
     const [rows, total] = await Promise.all([
       prisma.posTransferencia.findMany({
-        where,
+        where: sinCancelados(where),
         include: {
           detalles: {
             include: {
@@ -122,7 +123,7 @@ export async function GET(req) {
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
-      prisma.posTransferencia.count({ where }),
+      prisma.posTransferencia.count({ where: sinCancelados(where) }),
     ]);
 
     const items = rows.map((pos) => {
