@@ -16,47 +16,28 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Dos. Producción está en **58 migraciones**; el árbol tiene 60.
+Ninguna. Producción está en **60 migraciones**, las 60 del árbol, con el ERP en
+`ccf2894fe452802a5c2195327d95b7598830ae58`.
 
-- `20261012120000_pedido_cancelado` (Tanda 9A) — **aditiva**: dos columnas
-  nullable en `PosTransferencia`, `canceladoAt` y `canceladoPorUserId` (con su
-  clave foránea a `Usuario`, `ON DELETE SET NULL`). No toca ninguna fila. Desde
-  este código, cancelar un pedido lo marca en vez de borrarlo, así que la
-  migración tiene que estar aplicada ANTES de que arranque la imagen: sin las
-  columnas, cancelar falla. Validada desde una base vacía y sin deriva contra
-  `schema.prisma`.
+**De dónde sale el 60.** Lo informó el dueño en la orden de la auditoría de
+Azul Chat del 2026-10-12: producción corre `ccf2894` con 60 migraciones
+aplicadas. El árbol de `ccf2894` tiene 60 carpetas en `prisma/migrations`
+(contadas con `ls -d prisma/migrations/*/`), la última
+`20261012120000_pedido_cancelado`. *Sin verificar desde esa sesión*, que es de
+nube y no ve el VPS. Lo comprueba, de solo lectura, el paso 0 del próximo
+`/deploy` (mismo usuario y base que el backup del skill):
+`ssh vps-erp 'docker exec erpazul_db psql -At -U erpazul -d erpazul -c "SELECT count(*), max(migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL"'`,
+que tiene que decir `60|20261012120000_pedido_cancelado`. Si dice otra cosa,
+esta lista está mal y se vuelve a escribir antes de seguir.
 
-  *Sin verificar desde esta sesión:* la orden de la Tanda 9A dice que
-  producción corre `41f702b`, que ya trae `20261010180000_explicacion_por_tipo`;
-  si es así, producción está en 59 y esa entrada de abajo ya se aplicó. Lo
-  confirma y lo limpia la sesión que despliega, no ésta.
-
-- `20261010180000_explicacion_por_tipo` — **NO es aditiva: mueve datos y
-  TIENE DROP.** En orden: (1) `cae` en `ComprobanteProveedor`, nullable, con
-  un índice único parcial por grupo que excluye los anulados; (2) la tabla
-  `ExplicacionPorTipo`; (3) copia la explicación que cada proveedor tenía en
-  `RecetaProveedor` al tipo de papel que más le llegó (sin ninguno con letra,
-  SIN_FACTURA), con su versión, su fecha y su autor; (4) borra las propuestas
-  pendientes de la receta estructurada vieja —las que no traen explicación—,
-  le agrega `tipoComprobante` a las que quedan y cambia su índice único a
-  grupo + proveedor + tipo; (5) **borra de `RecetaProveedor` las columnas de
-  formato** (`alicuotaIvaPct`, `ivaPorLinea`, `tieneImpuestoInterno`,
-  `ivaIncluyeInternoEnLaBase`, `percepciones`, `percepcionesEnCosto`) y la
-  explicación única (`explicacion`, `explicacionActualizadaEn`,
-  `explicacionActualizadaPor`, `version`). Quedan `variacionNormalPct` y
-  `facturaPor`. El contenido de las columnas borradas ya está en la
-  explicación: lo tradujo `20261010130441_lectura_interpretada` y el paso 3 lo
-  copia. Si dos comprobantes no anulados del mismo grupo tuvieran el mismo
-  CAE el índice no se podría crear, y no puede pasar: la columna nace vacía.
-  Ejercida contra la base de desarrollo, con datos y dentro de una
-  transacción revertida, y desde cero.
-
-**De dónde sale el 58.** `20261010130441_lectura_interpretada` se aplicó el
-2026-10-10 a las 14:04 UTC con el despliegue de `ffe489c8`, informado en la
-orden de esta tanda.
+Salieron de esta lista con eso las dos que quedaban:
+`20261010180000_explicacion_por_tipo` (no aditiva: movía datos y borraba
+columnas de `RecetaProveedor`) y `20261012120000_pedido_cancelado` (aditiva:
+`canceladoAt` y `canceladoPorUserId` en `PosTransferencia`). Su descripción
+completa está en el `git log` de este archivo, en `e127395`.
 
 Las que estaban en esta lista antes y ya se aplicaron —hasta
-`20261010130441_lectura_interpretada`— salieron de acá: la historia de cuándo
+`20261012120000_pedido_cancelado`— salieron de acá: la historia de cuándo
 y cómo se aplicó cada una está en `git log` de este archivo y, para las que la
 tienen, en la bitácora de abajo. La bitácora llega hasta `b6052783` y no se
 borra: la citan como evidencia `lib/stock/libro/stockDiario.test.mjs` y los
