@@ -324,15 +324,21 @@ try {
   igual("B no ve la cancelación de A", ids("cancelaciones_eventos", (await recorrer("cancelaciones_eventos", { usuario: U.encB, local: localB })).vistos), []);
 
   // ═════════════════════════════════════════════════════════════════════════
-  seccion("Un pedido cancelado se BORRA: deja de estar");
+  seccion("Un pedido cancelado se MARCA (Tanda 9A): su solicitud sigue saliendo");
   // ═════════════════════════════════════════════════════════════════════════
   {
+    // Hasta la 9A cancelar BORRABA el pedido y su PEDIDO_SOLICITADO dejaba de
+    // salir. Desde la 9A lo marca: el pedido se solicitó igual, así que el
+    // evento sigue. Es el cambio esperado (DEC-0013).
+    const lineasAntes = await c.posTransferenciaDetalle.count({ where: { posTransferenciaId: p2.id } });
     // El permiso que pide la ruta para cancelar un pedido es `pedidos.editar`.
     const cookie = `erpazul_sesion=${sesion({ id: U.encA.id, localId: localA.id, permisos: ["pedidos.editar", "pedidos.ver"] })}`;
     const r = await leer(pedir(rutaCancelarPedido, "http://ci/api/pos-transferencias/cancelar", { cookie, cuerpo: { posId: p2.id } }));
     igual("la ruta real cancela el pedido", r.status, 200);
-    igual("y lo BORRA", await c.posTransferencia.findUnique({ where: { id: p2.id } }), null);
-    igual("cancelado, el pedido ya no sale", ids("pedidos_eventos", (await recorrer("pedidos_eventos")).vistos), [p1.id]);
+    const marcado = await c.posTransferencia.findUnique({ where: { id: p2.id }, select: { estado: true, canceladoAt: true, canceladoPorUserId: true, solicitadoAt: true } });
+    igual("y lo MARCA, no lo borra", [marcado?.estado, marcado?.canceladoAt != null, marcado?.canceladoPorUserId], ["Cancelado", true, U.encA.id]);
+    igual("con sus líneas intactas", await c.posTransferenciaDetalle.count({ where: { posTransferenciaId: p2.id } }), lineasAntes);
+    igual("cancelado, su solicitud SIGUE saliendo", ids("pedidos_eventos", (await recorrer("pedidos_eventos")).vistos), [p1.id, p2.id]);
   }
 
   // ═════════════════════════════════════════════════════════════════════════

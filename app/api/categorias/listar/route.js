@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { sinCancelados } from "@/lib/pedidos/estados";
 
 export async function GET(req) {
   try {
@@ -61,7 +62,7 @@ export async function GET(req) {
 
     if (posId) {
       const detallesPOS = await prisma.posTransferenciaDetalle.findMany({
-        where: { posTransferenciaId: posId },
+        where: { posTransferenciaId: posId, pos: sinCancelados() },
         select: {
           producto: {
             select: {

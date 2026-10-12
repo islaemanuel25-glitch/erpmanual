@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { esProductoFiambre } from "@/lib/conversiones/stock";
+import { sinCancelados } from "@/lib/pedidos/estados";
 
 export async function GET(req) {
   try {
@@ -31,7 +32,7 @@ export async function GET(req) {
     }
 
     const pos = await prisma.posTransferencia.findUnique({
-      where: { id: posId },
+      where: sinCancelados({ id: posId }),
       include: {
         origen: true,
         destino: true,
@@ -59,7 +60,7 @@ export async function GET(req) {
     // 1) Obtener DETALLES + PRODUCTOS
     // ============================================
     const detallesDb = await prisma.posTransferenciaDetalle.findMany({
-      where: { posTransferenciaId: posId },
+      where: { posTransferenciaId: posId, pos: sinCancelados() },
       include: {
         producto: {
           include: {

@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
+import { sinCancelados } from "@/lib/pedidos/estados";
 
 export async function POST(req) {
   try {
@@ -40,8 +41,9 @@ export async function POST(req) {
       );
     }
 
+    // La línea de un pedido cancelado da 404, como cuando cancelar la borraba.
     const detalle = await prisma.posTransferenciaDetalle.findUnique({
-      where: { id: detalleId },
+      where: { id: detalleId, pos: sinCancelados() },
       include: {
         pos: {
           select: { id: true, estado: true, origenId: true, destinoId: true },

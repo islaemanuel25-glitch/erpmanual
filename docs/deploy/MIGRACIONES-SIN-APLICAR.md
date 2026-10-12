@@ -16,7 +16,20 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Una. Producción está en **58 migraciones**; el árbol tiene 59.
+Dos. Producción está en **58 migraciones**; el árbol tiene 60.
+
+- `20261012120000_pedido_cancelado` (Tanda 9A) — **aditiva**: dos columnas
+  nullable en `PosTransferencia`, `canceladoAt` y `canceladoPorUserId` (con su
+  clave foránea a `Usuario`, `ON DELETE SET NULL`). No toca ninguna fila. Desde
+  este código, cancelar un pedido lo marca en vez de borrarlo, así que la
+  migración tiene que estar aplicada ANTES de que arranque la imagen: sin las
+  columnas, cancelar falla. Validada desde una base vacía y sin deriva contra
+  `schema.prisma`.
+
+  *Sin verificar desde esta sesión:* la orden de la Tanda 9A dice que
+  producción corre `41f702b`, que ya trae `20261010180000_explicacion_por_tipo`;
+  si es así, producción está en 59 y esa entrada de abajo ya se aplicó. Lo
+  confirma y lo limpia la sesión que despliega, no ésta.
 
 - `20261010180000_explicacion_por_tipo` — **NO es aditiva: mueve datos y
   TIENE DROP.** En orden: (1) `cae` en `ComprobanteProveedor`, nullable, con

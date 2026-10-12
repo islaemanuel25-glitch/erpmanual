@@ -578,7 +578,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // Sube a 59 el 2026-10-10: entró `20261010180000_explicacion_por_tipo`, la
   // tabla `ExplicacionPorTipo`, el CAE del comprobante y las columnas de
   // formato que salen de `RecetaProveedor`. No toca transferencias.
-  assert.equal(migraciones.length, 59, "aparecio una migracion que nadie declaro aca");
+  // Sube a 60 el 2026-10-12: entró `20261012120000_pedido_cancelado`, dos
+  // columnas nullable en `PosTransferencia` (el pedido, no el remito) para
+  // marcarlo cancelado en vez de borrarlo. No toca transferencias.
+  assert.equal(migraciones.length, 60, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

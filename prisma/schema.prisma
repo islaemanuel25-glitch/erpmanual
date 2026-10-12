@@ -404,6 +404,7 @@ model Usuario {
 
   posTransferencias            PosTransferencia[] @relation("pos_usuario")
   posTransferenciasSolicitadas PosTransferencia[] @relation("pos_solicitado_por")
+  posTransferenciasCanceladas  PosTransferencia[] @relation("pos_cancelado_por")
 
   ventas            Venta[]
   turnos            Turno[]
@@ -1683,6 +1684,12 @@ model PosTransferencia {
   solicitadoAt        DateTime?
   solicitadoPorUserId Int?
 
+  /// Cancelar un pedido Solicitado lo MARCA (estado "Cancelado") en vez de
+  /// borrarlo (Tanda 9A). Las lecturas los dejan afuera con `sinCancelados`
+  /// (lib/pedidos/estados.js).
+  canceladoAt        DateTime?
+  canceladoPorUserId Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1690,6 +1697,7 @@ model PosTransferencia {
   destino       Local    @relation("pos_destino", fields: [destinoId], references: [id])
   usuario       Usuario  @relation("pos_usuario", fields: [usuarioId], references: [id])
   solicitadoPor Usuario? @relation("pos_solicitado_por", fields: [solicitadoPorUserId], references: [id])
+  canceladoPor  Usuario? @relation("pos_cancelado_por", fields: [canceladoPorUserId], references: [id])
 
   detalles       PosTransferenciaDetalle[]
   transferencias Transferencia[]

@@ -5,6 +5,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
 import { esComboBase } from "@/lib/combos/guards";
+import { sinCancelados } from "@/lib/pedidos/estados";
 
 export async function POST(req) {
   try {
@@ -44,7 +45,7 @@ export async function POST(req) {
     // 1) OBTENER POS (origen + destino)
     // ================================
     const pos = await prisma.posTransferencia.findUnique({
-      where: { id: posId },
+      where: sinCancelados({ id: posId }),
       select: { id: true, estado: true, origenId: true, destinoId: true },
     });
 
@@ -140,6 +141,7 @@ export async function POST(req) {
       where: {
         posTransferenciaId: posId,
         productoId: productoLocalId,
+        pos: sinCancelados(),
       },
     });
 

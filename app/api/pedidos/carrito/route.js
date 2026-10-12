@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { defaultModoEnvio } from "@/lib/conversiones/stock";
+import { sinCancelados } from "@/lib/pedidos/estados";
 
 export async function GET(req) {
   try {
@@ -56,11 +57,11 @@ export async function GET(req) {
     // Buscar POS borrador activa para este par (depósito->local)
     // Sin filtrar por usuarioId: todos los usuarios del local comparten el mismo borrador.
     const pos = await prisma.posTransferencia.findFirst({
-      where: {
+      where: sinCancelados({
         origenId: depositoId,
         destinoId: localId,
         estado: { in: ["Borrador", "Preparando"] },
-      },
+      }),
       orderBy: { createdAt: "desc" },
       include: {
         detalles: {
@@ -75,11 +76,11 @@ export async function GET(req) {
 
     // Verificar si hay un pedido "Solicitado" pendiente para este par
     const posPendiente = await prisma.posTransferencia.findFirst({
-      where: {
+      where: sinCancelados({
         origenId: depositoId,
         destinoId: localId,
         estado: "Solicitado",
-      },
+      }),
       orderBy: { solicitadoAt: "desc" },
       include: {
         detalles: {

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
+import { sinCancelados } from "@/lib/pedidos/estados";
 
 export async function GET(req) {
   try {
@@ -52,7 +53,7 @@ export async function GET(req) {
     }
 
     const rows = await prisma.posTransferencia.findMany({
-      where,
+      where: sinCancelados(where),
       include: {
         origen: { select: { id: true, nombre: true } },
         destino: { select: { id: true, nombre: true } },

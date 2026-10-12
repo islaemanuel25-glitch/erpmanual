@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { requireOperadorSegunConfig } from "@/lib/operador";
+import { sinCancelados } from "@/lib/pedidos/estados";
 
 export async function POST(req) {
   try {
@@ -54,7 +55,7 @@ export async function POST(req) {
     }
 
     const pos = await prisma.posTransferencia.findUnique({
-      where: { id: posId },
+      where: sinCancelados({ id: posId }),
       include: { _count: { select: { detalles: true } } },
     });
 
@@ -93,13 +94,14 @@ export async function POST(req) {
     }
 
     // Concurrencia: verificar que no haya otro pedido Solicitado para el mismo par
+    // Un pedido cancelado no cuenta: el local puede volver a pedir (Tanda 9A).
     const existente = await prisma.posTransferencia.findFirst({
-      where: {
+      where: sinCancelados({
         estado: "Solicitado",
         origenId: pos.origenId,
         destinoId: pos.destinoId,
         id: { not: posId },
-      },
+      }),
     });
 
     if (existente) {
