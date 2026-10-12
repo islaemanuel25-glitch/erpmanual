@@ -1,6 +1,6 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-12 04:39
+**Fecha:** 2026-10-12 21:22
 
 ## Módulos modificados recientemente
 
@@ -11,6 +11,10 @@
 ### pos-transferencias
 - feat: cancelar un pedido lo marca en vez de borrarlo
 - Archivos: 11 modificados (11 total)
+
+### transferencias
+- feat: cancelar un pedido lo marca en vez de borrarlo
+- Archivos: 1 modificados (1 total)
 
 
 
