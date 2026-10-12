@@ -450,7 +450,8 @@ try {
       if (r.status !== 200) throw new Error(`mi_alcance: ${r.status} ${json(r.cuerpo)}`);
       return Object.fromEntries(r.cuerpo.datos.locales.map((l) => [l.id, l.capacidades]));
     };
-    const TODAS = ["ventas_resumen", "transferencias_eventos", "pedidos_eventos", "envios_eventos", "cancelaciones_eventos"];
+    // Tanda 8A: el ENCARGADO trae stock.ver, así que también stock_consulta.
+    const TODAS = ["ventas_resumen", "transferencias_eventos", "pedidos_eventos", "envios_eventos", "cancelaciones_eventos", "stock_consulta"];
     igual("el ENCARGADO las ve anunciadas todas", await anuncio(U.encA), { [localA.id]: TODAS });
     igual("con solo transferencias.ver: recibidas, envíos y cancelaciones", await anuncio(U.soloTransfA), { [localA.id]: ["transferencias_eventos", "envios_eventos", "cancelaciones_eventos"] });
     igual("con solo pedidos.ver: pedidos", await anuncio(U.soloPedidosA), { [localA.id]: ["pedidos_eventos"] });

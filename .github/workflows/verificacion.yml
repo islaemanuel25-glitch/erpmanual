@@ -295,6 +295,12 @@ jobs:
           # ventas_resumen; la puerta y el anuncio. Base propia descartable.
           echo ""
           node --import ./scripts/alias-loader.mjs scripts/pruebas-db/azulChatCajasResumen.mjs
+          # Azul Chat · stock_consulta (Tanda 8A): la búsqueda con el buscador
+          # del ERP, la cantidad y la unidad contra el listado de Stock Locales,
+          # bajo mínimo contra el filtro Faltantes y la card, y la puerta. La
+          # existencia y los límites, por la ruta de ajuste. Base descartable.
+          echo ""
+          node --import ./scripts/alias-loader.mjs scripts/pruebas-db/azulChatStockConsulta.mjs
 
       # ── EL LIBRO DE STOCK ─────────────────────────────────────────────────
       #

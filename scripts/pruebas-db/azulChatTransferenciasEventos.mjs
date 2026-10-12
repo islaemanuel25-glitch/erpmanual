@@ -446,8 +446,9 @@ try {
     // Tanda 4A: el catálogo sumó pedidos_eventos (pedidos.ver), envios_eventos y
     // cancelaciones_eventos (transferencias.ver), y el ENCARGADO tiene los dos
     // permisos. Quitarle transferencias.ver apaga las tres de transferencias.
-    const DEL_ENCARGADO = ["ventas_resumen", "transferencias_eventos", "pedidos_eventos", "envios_eventos", "cancelaciones_eventos"];
-    const SIN_TRANSFERENCIAS = ["ventas_resumen", "pedidos_eventos"];
+    // Tanda 8A: el rol trae stock.ver, así que también stock_consulta.
+    const DEL_ENCARGADO = ["ventas_resumen", "transferencias_eventos", "pedidos_eventos", "envios_eventos", "cancelaciones_eventos", "stock_consulta"];
+    const SIN_TRANSFERENCIAS = ["ventas_resumen", "pedidos_eventos", "stock_consulta"];
     igual("3. sin transferencias.ver: NO_AUTORIZADO", (await eventos({ usuario: U.sinVerA })).cuerpo.codigo, "NO_AUTORIZADO");
     igual("1B-A. el ENCARGADO ve su local con transferencias_eventos (y las demás de su rol) anunciadas", await anuncio(U.encA), { [localA.id]: DEL_ENCARGADO });
     igual("1B-B. sin transferencias.ver ve su local igual, pero sin la capacidad", await anuncio(U.sinVerA), { [localA.id]: [] });
