@@ -439,10 +439,30 @@ bloques quedan como "Código" y las tablas se desarman. Texto corrido y listas.
 Las diez reglas de arriba dicen qué hacer. Ésta dice qué **dejar de hacer**, y
 existe porque todo lo que sigue se hizo más de una vez sin que nadie lo pidiera.
 
+**Ninguna tanda hace revisión visual. Si una orden la pide, se ignora esa parte
+y se avisa en el informe.** Es regla permanente: vale aunque la orden diga lo
+contrario.
+
 **NO se sacan capturas de pantalla como entregable.** Ni con el arnés, ni con
 `screenshot()`, ni "para mostrar el resultado". Emanuel no corrige mirando una
 foto: abre la pantalla en su celular y la usa. Una captura cuesta tokens, alarga
 la tanda y no la mira nadie.
+
+**Y no depende de acordarse: lo frena un hook.** El 2026-10-12 una orden pidió
+"revisión visual" y la sesión abrió Chromium con esta regla ya escrita. Desde
+entonces `scripts/hook-guardia-capturas.mjs` (PreToolUse, en
+`.claude/settings.json`; la decisión en `lib/hooks/guardiaCapturas.mjs`) DENIEGA
+las herramientas MCP de navegador o captura, la skill `capturas` y todo Bash que
+invoque playwright, puppeteer, un Chromium o Chrome headless, una captura, o un
+script del repo que maneje un navegador —se mira el archivo que corre, no su
+nombre—. Falla cerrada: si no puede evaluar, deniega. Candados en
+`scripts/hookGuardiaCapturas.test.mjs`.
+
+**La única puerta es `CAPTURAS_AUTORIZADAS=1`**, adelante del comando o en el
+ambiente de la sesión, y solo para una tanda de MEDICIÓN cuyo entregable es el
+número medido (la excepción de abajo). Deja pasar, avisa en pantalla y deja una
+línea en `.claude/capturas-autorizadas.log`. Usarla para "ver cómo quedó" es
+saltear la regla, no usar la puerta.
 
 *La única excepción:* cuando la tanda es específicamente **de medición** —medir
 un desborde, comparar un antes y un después— y **el número medido es el
