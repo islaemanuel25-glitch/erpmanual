@@ -907,6 +907,13 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     "components/productos/HojaMasAcciones.jsx": false,
     "components/productos/HojaPersonalizarTarjeta.jsx": false,
     "app/modulos/productos/page.jsx": false,
+    // ── EL AVISO DE "PRODUCTO NO ENCONTRADO" DEL ESCÁNER: `true` ──────────
+    //
+    // No tiene nada escrito, y sin embargo contesta que sí por el mismo
+    // criterio: lo que se pierde al cerrarlo sin querer es EL AVISO, y con él un
+    // producto que no se cobró. Existe porque un código sin producto pasaba
+    // desapercibido; un toque al costado que lo cierre es el mismo defecto.
+    "components/pos-ventas/AvisoProductoNoEncontrado.jsx": true,
   };
 
   // Que la lista sea TODOS los que usan la pieza, no los que alguien recordó.

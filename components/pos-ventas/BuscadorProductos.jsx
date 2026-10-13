@@ -6,6 +6,15 @@ import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import { showError } from "@/components/sunmi/SunmiToast";
 import { fromUnidades } from "@/lib/conversiones/stock";
 import { rankearProductos } from "@/lib/pos-ventas/rankearProductos";
+import {
+  ENTER,
+  LECTURA,
+  clasificarEnter,
+  decidirLectura,
+  sumarCodigoNoEncontrado,
+  avisarErrorDeLectura,
+} from "@/lib/pos-ventas/lecturaEscaner";
+import AvisoProductoNoEncontrado from "@/components/pos-ventas/AvisoProductoNoEncontrado";
 const DEFAULT_SEARCH_API = "/api/pos-ventas/buscar-producto";
 const NO_DISPONIBLE_MSG = "Producto no disponible para la venta";
 
@@ -25,6 +34,10 @@ function BuscadorProductos({
   esDeposito = false,
   wrapCard = true,
   mostrarStock = true,
+  // El aviso bloqueante de "producto no encontrado" al escanear. Lo pide solo
+  // el POS de venta, donde un código perdido es un producto sin cobrar; ofertas
+  // y combos usan este mismo buscador y siguen como estaban.
+  avisarNoEncontrado = false,
 }) {
   const searchApi = apiPath || DEFAULT_SEARCH_API;
   const inputRef = useRef(null);
@@ -36,6 +49,27 @@ function BuscadorProductos({
   const debounceRef = useRef(null);
   const lastKeyTime = useRef(0);
   const scanBuffer = useRef("");
+  // Los códigos leídos que no encontraron producto; vacío es aviso cerrado. El
+  // ref espeja el estado para `handleKeyDown`, que decide al leer.
+  const [codigosNoEncontrados, setCodigosNoEncontrados] = useState([]);
+  const avisoAbiertoRef = useRef(false);
+
+  const abrirAvisoNoEncontrado = (codigo) => {
+    avisoAbiertoRef.current = true;
+    scanBuffer.current = "";
+    setQuery("");
+    setResultados([]);
+    setQueryInterpretada(null);
+    setCodigosNoEncontrados((previos) => sumarCodigoNoEncontrado(previos, codigo));
+    avisarErrorDeLectura();
+  };
+
+  const alEntenderAviso = () => {
+    avisoAbiertoRef.current = false;
+    scanBuffer.current = "";
+    setCodigosNoEncontrados([]);
+    inputRef.current?.focus();
+  };
 
   // Autofocus al montar
   useEffect(() => {
@@ -68,43 +102,26 @@ function BuscadorProductos({
             fromVoice && data.queryInterpretada ? data.queryInterpretada : null
           );
 
-          // Auto-agregar si match exacto por código de barras: código PROPIO de esta
-          // ubicación, principal o secundario global. Los tres habilitan el auto-scan.
-          const queryLower = texto.trim().toLowerCase();
-          const matchCodigoExacto =
-            items.length >= 1 &&
-            ((items[0].codigoBarra &&
-              items[0].codigoBarra.toLowerCase() === queryLower) ||
-              (items[0].codigoBarraSecundario &&
-                items[0].codigoBarraSecundario.toLowerCase() === queryLower) ||
-              (items[0].codigoBarraPropio &&
-                items[0].codigoBarraPropio.toLowerCase() === queryLower));
-          if (matchCodigoExacto) {
-            if (items[0].disponibleParaVenta === false) {
-              showError(NO_DISPONIBLE_MSG);
-              setResultados(items);
-              return;
-            }
-            onAgregar(items[0]);
+          // Código exacto (propio de esta ubicación, principal o secundario)
+          // agrega; una lectura del escáner con resultado único también; una
+          // lectura del escáner sin nada de eso abre el aviso. La decisión es
+          // de `lib/pos-ventas/lecturaEscaner.js`.
+          const decision = decidirLectura({ items, texto, autoAdd });
+          if (decision.tipo === LECTURA.NO_DISPONIBLE) {
+            showError(NO_DISPONIBLE_MSG);
+            setResultados(items);
+            return;
+          }
+          if (decision.tipo === LECTURA.AGREGAR) {
+            onAgregar(decision.producto);
             setQuery("");
             setResultados([]);
             setQueryInterpretada(null);
             inputRef.current?.focus();
             return;
           }
-
-          // Auto-agregar si se pidió (scanner Enter) y hay resultado único
-          if (autoAdd && items.length === 1) {
-            if (items[0].disponibleParaVenta === false) {
-              showError(NO_DISPONIBLE_MSG);
-              setResultados(items);
-              return;
-            }
-            onAgregar(items[0]);
-            setQuery("");
-            setResultados([]);
-            setQueryInterpretada(null);
-            inputRef.current?.focus();
+          if (decision.tipo === LECTURA.NO_ENCONTRADO && avisarNoEncontrado) {
+            abrirAvisoNoEncontrado(decision.codigo);
             return;
           }
 
@@ -116,7 +133,7 @@ function BuscadorProductos({
         setLoading(false);
       }
     },
-    [localId, clienteId, onAgregar, searchApi]
+    [localId, clienteId, onAgregar, searchApi, avisarNoEncontrado]
   );
 
   // ── LA VOZ Y EL CAMPO SE FUERON AL KIT ────────────────────────────────────
@@ -148,6 +165,14 @@ function BuscadorProductos({
       return;
     }
 
+    // Con el aviso de "no encontrado" abierto no se lee nada. El aviso ya se
+    // traga el teclado; esto es la segunda llave por si una tecla se cuela.
+    if (avisoAbiertoRef.current) {
+      e.preventDefault();
+      scanBuffer.current = "";
+      return;
+    }
+
     if (e.key === "Enter") {
       e.preventDefault();
 
@@ -157,8 +182,15 @@ function BuscadorProductos({
         debounceRef.current = null;
       }
 
+      const tipoEnter = clasificarEnter({
+        avisoAbierto: avisoAbiertoRef.current,
+        msDesdeUltimaTecla: diff,
+        buffer: scanBuffer.current,
+      });
+      if (tipoEnter === ENTER.IGNORAR) return;
+
       // Scanner: caracteres rapidos + Enter
-      if (diff < 200 && scanBuffer.current.length > 3) {
+      if (tipoEnter === ENTER.ESCANER) {
         setQuery(scanBuffer.current);
         buscar(scanBuffer.current, true);
         scanBuffer.current = "";
@@ -306,6 +338,8 @@ function BuscadorProductos({
           No se encontraron productos.
         </div>
       )}
+
+      <AvisoProductoNoEncontrado codigos={codigosNoEncontrados} onEntendido={alEntenderAviso} />
     </>
   );
 

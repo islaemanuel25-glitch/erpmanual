@@ -2314,6 +2314,7 @@ export default function PosVentasPage() {
               onAgregar={handleAgregar}
               esDeposito={contexto?.esDeposito === true}
               mostrarStock={mostrarStockPos}
+              avisarNoEncontrado
             />
             <div className="flex-1 min-h-0 lg:overflow-auto">
               <CarritoVenta
