@@ -119,7 +119,7 @@ test("deja pasar sin preguntar lo de todos los días, aunque nombre la palabra",
     "node --import ./scripts/alias-loader.mjs --test lib/turnosYCierres/turnosYCierres.test.mjs",
     // Un candado que prueba cómo se ARMA la llamada al navegador, sin abrirlo.
     "node --import ./scripts/alias-loader.mjs --test scripts/lib/sondaNavegador.test.mjs",
-    "git grep -n playwright -- scripts",
+    "git grep --untracked -n playwright -- scripts",
     "grep -rn chromium .github/workflows",
     "git log --oneline -3 -- scripts/generar-huellas.mjs",
     "npx eslint components",
