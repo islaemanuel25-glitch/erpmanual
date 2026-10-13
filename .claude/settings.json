@@ -80,6 +80,16 @@
             "timeout": 150
           }
         ]
+      },
+      {
+        "matcher": "Bash|Skill|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hook-guardia-capturas.mjs\" || { echo 'Prohibido: navegador y capturas. Lo visual lo prueba Emanuel desplegado en su celular. Seguí con candados y suite. (La guardia de capturas no pudo correr: falla cerrada.)' >&2; exit 2; }",
+            "timeout": 20
+          }
+        ]
       }
     ],
     "PostToolUse": [
