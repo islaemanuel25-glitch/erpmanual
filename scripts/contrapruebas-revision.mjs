@@ -1316,7 +1316,9 @@ const CASOS = [
   {
     n: "TES-calendario",
     defecto: "el calendario de «Otro» vuelve a quedarse sin los cambios que el kit llama al aplicar",
-    archivo: "components/tesoreria/PantallaTesoreria.jsx",
+    // El calendario se mudó de PantallaTesoreria al selector compartido el
+    // 2026-10-12 ("Turnos y cierres" usa el mismo); el candado mira ahí.
+    archivo: "components/periodo/SelectorDePeriodo.jsx",
     de: "          onChangeHasta={sinCambio}\n",
     a: "",
     candado: "[5b] «Aplicar» del calendario llega: la pantalla pasa todo lo que el kit llama al aplicar",
