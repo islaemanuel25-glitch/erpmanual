@@ -2098,24 +2098,26 @@ export default function PosVentasPage() {
                 fotografiaba y el descuento dependía de que el cajero se acordara
                 de crear el movimiento aparte. Acá es una sola operación y el
                 movimiento lo crea el backend en la misma transacción.
-                `arqueo.visible` exige que el backend haya respondido, así que el
-                botón no parpadea mientras carga. El punto rojo sigue marcando la
-                alerta vencida. */}
-            {turnoActual && arqueo.visible && (
+                Está SIEMPRE que haya caja abierta: retirar no depende de la
+                configuración. Con el aviso de Configuración → Arqueo de caja
+                apagado el botón no aparecía y nadie podía retirar (Mini unidas y
+                el depósito). La configuración prende o apaga solo el aviso y el
+                punto rojo, que siguen gateados por `arqueo.visible`. */}
+            {turnoActual && (
               <button
                 onClick={() => abrirRetiro(turnoActual.id)}
                 className={`text-[11px] px-2 py-1 rounded transition-colors inline-flex items-center gap-1 ${
-                  arqueo.estado.vencido
+                  arqueo.visible && arqueo.estado.vencido
                     ? "sunmi-pos-btn-danger font-bold"
                     : "sunmi-pos-btn-secondary sunmi-pos-text-accent"
                 }`}
                 title={
-                  arqueo.estado.vencido
+                  arqueo.visible && arqueo.estado.vencido
                     ? `Retiro pendiente hace ${arqueo.estado.minutosDemora} min`
                     : "Contar la caja y retirar la recaudación"
                 }
               >
-                {arqueo.estado.vencido && (
+                {arqueo.visible && arqueo.estado.vencido && (
                   <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                 )}
                 {/* Etiqueta corta en pantallas chicas: medido en navegador, con
