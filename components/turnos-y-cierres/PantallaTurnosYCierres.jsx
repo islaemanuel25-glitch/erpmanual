@@ -29,13 +29,14 @@ import {
   diferenciasDelGrupo,
   esCerrada,
   estadoDeCaja,
+  menos,
   plata,
+  renglonDelTurno,
   rotuloDeDia,
-  subtituloDelGrupo,
   tonoDeGanancia,
 } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
 
-import { Cifra, FilaDeSalida, Insignia, Renglon, Rotulo } from "./PiezasTurnosYCierres";
+import { BarraDeMedios, Cifra, FilaDeSalida, Insignia, Recuadro, Renglon, Rotulo } from "./PiezasTurnosYCierres";
 
 /**
  * @param {object} props
@@ -194,13 +195,7 @@ export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVe
         <span className="flex w-full items-start gap-2">
           <span className="min-w-0 flex-1">
             <span className="block text-lg2 font-bold sunmi-text-strong">{g.titulo}</span>
-            <span className="block text-sm2 sunmi-text-muted">{subtituloDelGrupo(g, { conDia })}</span>
-          </span>
-          <span className="shrink-0 text-right">
-            <span className="block text-xs2 font-medium sunmi-text-muted">Ganancia</span>
-            <span className={`block text-lg2 font-bold tabular-nums ${CLASE_TONO[tonoDeGanancia(g.ganancia)]}`}>
-              {plata(g.ganancia)}
-            </span>
+            <span className="block text-sm2 sunmi-text-muted">{renglonDelTurno(g, { conDia })}</span>
           </span>
           <span aria-hidden="true" className="shrink-0 pt-1 text-base sunmi-text-accent">
             {abierto ? "˄" : "˅"}
@@ -208,21 +203,35 @@ export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVe
         </span>
       </SunmiButton>
 
-      <div className="grid grid-cols-2 gap-2">
-        <Cifra rotulo="Tickets" valor={g.tickets} />
-        <Cifra rotulo="Vendido" valor={plata(g.vendido)} />
+      <Recuadro rotulo="RESULTADO DEL TURNO" valor={plata(g.resultado)} tono={Number(g.resultado) < 0 ? "danger" : "success"} />
+
+      <div data-cuenta-del-turno className="space-y-1.5">
+        <Renglon rotulo="Total vendido" valor={plata(g.vendido)} />
+        <Renglon rotulo="Comisiones" valor={menos(g.comisiones)} />
+        <Renglon rotulo="Costo de la mercadería" valor={menos(g.costo)} />
+        <div className="border-t sunmi-divider pt-1.5">
+          <Renglon rotulo="Ganancia de las ventas" valor={plata(g.ganancia)} fuerte />
+        </div>
+        <Renglon rotulo="Pagos desde la caja" valor={menos(g.pagosDesdeCaja)} />
       </div>
 
-      {abierto ? (
-        <div data-cajas-del-turno className="divide-y sunmi-divide">
-          {g.cajas.map((c) => (
-            <CajaDelTurno key={c.id} c={c} onVerCaja={onVerCaja} />
-          ))}
-        </div>
-      ) : dif ? (
+      <div className="space-y-2">
+        <Rotulo>CÓMO SE COBRÓ</Rotulo>
+        <BarraDeMedios medios={g.medios} />
+      </div>
+
+      {dif ? (
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm3 sunmi-text-muted">Diferencias de caja</span>
           <Insignia texto={dif.texto} tono={dif.tono} />
+        </div>
+      ) : null}
+
+      {abierto ? (
+        <div data-cajas-del-turno className="divide-y sunmi-divide border-t sunmi-divider">
+          {g.cajas.map((c) => (
+            <CajaDelTurno key={c.id} c={c} onVerCaja={onVerCaja} />
+          ))}
         </div>
       ) : null}
     </section>

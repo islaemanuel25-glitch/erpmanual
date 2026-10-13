@@ -13,7 +13,7 @@
 
 import { Bloque, Renglon } from "@/components/finanzas/PiezasDelResumen";
 import { horaAR } from "@/lib/fechas/formatearFechaHora";
-import { CLASE_TONO, plata } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
+import { CLASE_TONO, FONDO_DE_TONO, conPorcentajes, plata, tonoDeMedio } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
 
 export { Bloque, Renglon };
 
@@ -58,6 +58,50 @@ export function FilaDeSalida({ s }) {
         <div className="text-xs2 sunmi-text-muted">{horaAR(s.instante)}</div>
       </div>
       <div className="shrink-0 text-sm3 font-semibold tabular-nums sunmi-text-strong">{plata(s.monto)}</div>
+    </div>
+  );
+}
+
+/**
+ * EL RECUADRO GRANDE: el resultado del turno o la diferencia de la caja, con un
+ * fondo suave del tono (verde, rojo, naranja) y la cifra protagonista.
+ */
+export function Recuadro({ rotulo, valor, tono = "success", children = null }) {
+  return (
+    <div data-recuadro={tono} className={`rounded-xl px-4 py-3 ${FONDO_DE_TONO[tono] || FONDO_DE_TONO.muted}`}>
+      <div className={`text-xs2 font-semibold tracking-wider ${CLASE_TONO[tono] || CLASE_TONO.muted}`}>{rotulo}</div>
+      <div className={`text-xl3 font-bold tabular-nums ${CLASE_TONO[tono] || CLASE_TONO.strong}`}>{valor}</div>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * LA BARRA DE "CÓMO SE COBRÓ": un tramo por medio, del ancho de su parte, y
+ * debajo la leyenda con su punto de color, nombre y monto. El color es un token
+ * del tema por medio (`tonoDeMedio`), pintado con `bg-current`.
+ */
+export function BarraDeMedios({ medios = [], conPorcentaje = false }) {
+  const tramos = conPorcentajes(medios);
+  if (!tramos.length) return <p className="text-sm2 sunmi-text-muted">Sin ventas.</p>;
+  return (
+    <div className="space-y-2">
+      <div data-barra-medios className="flex h-2.5 w-full overflow-hidden rounded-full sunmi-bg">
+        {tramos.map((m) => (
+          <span key={m.medio} className={`h-full bg-current ${tonoDeMedio(m.medio)}`} style={{ width: `${m.ancho}%` }} />
+        ))}
+      </div>
+      {!conPorcentaje ? (
+        <div className="space-y-1">
+          {tramos.map((m) => (
+            <div key={m.medio} className="flex items-center gap-2 text-sm3">
+              <span aria-hidden="true" className={`size-2 shrink-0 rounded-full bg-current ${tonoDeMedio(m.medio)}`} />
+              <span className="min-w-0 flex-1 sunmi-text-strong">{m.etiqueta}</span>
+              <span className="tabular-nums font-medium sunmi-text-strong">{plata(m.monto)}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

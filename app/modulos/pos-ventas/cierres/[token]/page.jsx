@@ -59,6 +59,7 @@ import {
 import {
   totalDesglose,
   desgloseVacio,
+  retiroListoParaConfirmar,
   validarCambioQueQueda,
   limitarCambioAlConteo,
   calcularRetiroDesdeCambio,
@@ -112,6 +113,8 @@ export default function CierrePorTokenPage() {
 
   // Orden nuevo: se cuenta sólo el retiro.
   const [desgloseRetiro, setDesgloseRetiro] = useState({});
+  // "No queda nada para retirar": el retiro del cierre es $0 a propósito.
+  const [sinRetiro, setSinRetiro] = useState(false);
   // Orden anterior (compatibilidad): se cuenta el cajón y se elige el cambio.
   const [desgloseContado, setDesgloseContado] = useState({});
   const [desgloseCambio, setDesgloseCambio] = useState({});
@@ -218,7 +221,9 @@ export default function CierrePorTokenPage() {
   const retiroEsperado = cierre?.efectivoRetiradoEsperado ?? null;
 
   const retiroContado = totalDesglose(desgloseRetiro);
-  const hayRetiroContado = !desgloseVacio(desgloseRetiro);
+  // Con "No queda nada para retirar" el retiro es $0 EXPLÍCITO y habilita
+  // confirmar; un desglose vacío sin esa declaración, no.
+  const hayRetiroContado = retiroListoParaConfirmar(desgloseRetiro, { sinRetiroExplicito: sinRetiro });
   const diferenciaRetiro = useMemo(
     () => calcularDiferencia(retiroContado, retiroEsperado ?? 0),
     [retiroContado, retiroEsperado]
@@ -275,6 +280,14 @@ export default function CierrePorTokenPage() {
 
   const actualizarRetiro = (nuevo) => {
     setDesgloseRetiro(nuevo);
+    // Cargar algo deshace el "no queda nada": vale lo contado.
+    setSinRetiro(false);
+    marcarInicioConteo();
+  };
+
+  const declararSinRetiro = () => {
+    setDesgloseRetiro({});
+    setSinRetiro(true);
     marcarInicioConteo();
   };
 
@@ -499,13 +512,25 @@ export default function CierrePorTokenPage() {
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 items-start">
-            <PanelConteoRetiro
-              desglose={desgloseRetiro}
-              onDesglose={actualizarRetiro}
-              horaConteo={conteoIniciadoEn ? hora(conteoIniciadoEn) : null}
-              aviso={AVISO_CONTAR_SOLO_RETIRO_CIERRE}
-              controlTotal={controlTotal}
-            />
+            <div className="space-y-2">
+              <PanelConteoRetiro
+                desglose={desgloseRetiro}
+                onDesglose={actualizarRetiro}
+                horaConteo={conteoIniciadoEn ? hora(conteoIniciadoEn) : null}
+                aviso={AVISO_CONTAR_SOLO_RETIRO_CIERRE}
+                controlTotal={controlTotal}
+              />
+              <SunmiButton
+                type="button"
+                color={sinRetiro ? "primary" : "slate"}
+                aria-pressed={sinRetiro}
+                onClick={declararSinRetiro}
+                disabled={guardando}
+                className="w-full min-h-toque"
+              >
+                No queda nada para retirar
+              </SunmiButton>
+            </div>
 
             <PanelCambioSeparado
               desglose={cierre?.desgloseCambio ?? {}}

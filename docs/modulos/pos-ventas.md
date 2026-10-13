@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-10-10 20:03
+**Última actualización:** 2026-10-13 03:08
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,8 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-10-13: fix: "Retirar" aparece siempre que haya caja abierta
+- 2026-10-13: fix: el cierre se confirma con retiro $0 declarado ("No queda nada para retirar")
 - 2026-10-10: fix(ventas): anular una venta con su turno cerrado, con el ajuste en ese turno
 - 2026-10-10: fix(ventas): volver a poder anular una venta común del mostrador
 - 2026-10-05: feat: corregir el turno operativo de la caja abierta desde el POS

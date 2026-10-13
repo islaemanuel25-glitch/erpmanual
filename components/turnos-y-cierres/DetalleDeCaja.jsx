@@ -2,12 +2,12 @@
 
 // components/turnos-y-cierres/DetalleDeCaja.jsx
 //
-// EL DETALLE DE UNA CAJA (Figma 359:523) Y SU COMPROBANTE Z (359:605),
-// PRESENTACIONALES. Reciben lo que contestó `GET /api/turnos-y-cierres/cajas/:id`
-// y lo dibujan; no recalculan plata.
+// EL DETALLE DE UNA CAJA (Figma "V2 · B", 367:650), SUS ARQUEOS Y PAGOS, Y SU
+// COMPROBANTE Z (359:605), PRESENTACIONALES. Reciben lo que contestó
+// `GET /api/turnos-y-cierres/cajas/:id` y lo dibujan; no recalculan plata.
 //
-// La diferencia grande es la de la caja: lo contado contra lo que tenía que
-// haber, con `calcularEfectivoEsperado`. La de cada arqueo es la ACUMULADA
+// La diferencia del recuadro es la de la caja: lo contado contra lo que tenía
+// que haber, con `calcularEfectivoEsperado`. La de cada arqueo es la ACUMULADA
 // hasta ese corte, tal como se guardó: se muestra sola y nunca se suma.
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
@@ -18,20 +18,22 @@ import { franjaHoraria, textoFaltaSobra } from "@/lib/tesoreria/pantallaTesoreri
 import { CLASE_MOVIMIENTO } from "@/lib/finanzas/movimientosDeCaja";
 import {
   CLASE_TONO,
+  TEXTO_COMISION_SIN_CALCULAR,
+  conPorcentajes,
   diferenciaGrande,
   esCerrada,
   estadoDeCaja,
+  mas,
+  menos,
   plata,
   rotuloDeDia,
+  tonoDelRecuadro,
 } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
 
-import { Bloque, Insignia, Renglon, RenglonConTono } from "./PiezasTurnosYCierres";
+import { BarraDeMedios, Bloque, Insignia, Recuadro, Renglon, RenglonConTono } from "./PiezasTurnosYCierres";
 
-const menos = (n) => `−${plata(n)}`;
-const mas = (n) => `+${plata(n)}`;
-
-/** Las salidas que no son arqueo ni cierre: pagos y retiros de Caja −. */
-const salidasDeEfectivo = (c) =>
+/** Los pagos desde la caja: las salidas que no son arqueo ni cierre. */
+const pagosDeLaCaja = (c) =>
   (c.salidas || []).filter((s) => s.clase !== CLASE_MOVIMIENTO.RECAUDACION && s.clase !== CLASE_MOVIMIENTO.CIERRE);
 
 /** El día de la caja: el de su turno operativo, o el de su apertura. */
@@ -42,7 +44,7 @@ function Separador() {
 }
 
 /** El encabezado: "Caja #632 · Damaris" y de qué turno y día es. */
-function Encabezado({ c, local }) {
+export function Encabezado({ c, local }) {
   const est = estadoDeCaja(c);
   const horario = esCerrada(c) ? franjaHoraria(c.apertura, c.cierre) : `desde ${franjaHoraria(c.apertura, null)}`;
   return (
@@ -58,26 +60,23 @@ function Encabezado({ c, local }) {
   );
 }
 
-export default function DetalleDeCaja({ datos, onVerZ }) {
+export default function DetalleDeCaja({ datos, onVerMovimientos }) {
   const c = datos.caja;
   const e = c.efectivo;
   const grande = diferenciaGrande(c);
-  const salidas = salidasDeEfectivo(c);
+  const cobrados = c.cobrado.medios.filter((m) => !m.esFiado);
 
   return (
     <div className="space-y-3.5">
       <Encabezado c={c} local={datos.local?.nombre} />
 
-      <Bloque titulo="DIFERENCIA DE CAJA">
-        <div data-diferencia-grande className={`text-xl3 font-bold tabular-nums ${CLASE_TONO[grande.tono]}`}>
-          {grande.texto}
-        </div>
-        <Separador />
-        <div className="space-y-1.5">
-          <Renglon rotulo="Fondo inicial" valor={plata(e.fondoInicial)} />
+      <Bloque titulo="EFECTIVO DE LA CAJA">
+        <Recuadro rotulo="DIFERENCIA DE CAJA" valor={grande.texto} tono={tonoDelRecuadro(c)} />
+        <div data-cuenta-del-efectivo className="space-y-1.5">
+          <Renglon rotulo="Cambio inicial" valor={plata(e.cambioInicial)} />
           <Renglon rotulo="Ventas en efectivo" valor={mas(e.ventasEfectivo)} />
           {e.ingresos ? <Renglon rotulo="Ingresos" valor={mas(e.ingresos)} /> : null}
-          <Renglon rotulo="Salidas de efectivo" valor={menos(e.salidasEfectivo)} />
+          <Renglon rotulo="Pagos desde la caja" valor={menos(e.pagosDesdeCaja)} />
           <Renglon rotulo="Retirado en arqueos" valor={menos(e.retiradoArqueos)} />
         </div>
         <Separador />
@@ -88,18 +87,53 @@ export default function DetalleDeCaja({ datos, onVerZ }) {
       </Bloque>
 
       <Bloque titulo="COBRADO EN LA CAJA">
-        <div className="space-y-1.5">
-          <Renglon rotulo="Efectivo" valor={plata(c.cobrado.efectivo)} />
-          {c.cobrado.porMedio.map((m) => (
-            <Renglon key={m.medio} rotulo={m.etiqueta} valor={plata(m.monto)} />
+        <BarraDeMedios medios={cobrados} conPorcentaje />
+        <div data-cobrado-por-medio className="space-y-2">
+          {conPorcentajes(cobrados).map((m) => (
+            <div key={m.medio} data-medio={m.medio}>
+              <Renglon rotulo={`${m.etiqueta} · ${m.porcentaje}%`} valor={plata(m.monto)} />
+              {m.medio === "EFECTIVO" ? null : m.comisionConocida ? (
+                <div className={`text-right text-xs2 tabular-nums ${CLASE_TONO.danger}`}>{menos(m.comision)}</div>
+              ) : (
+                <div className={`text-right text-xs2 ${CLASE_TONO.muted}`}>{TEXTO_COMISION_SIN_CALCULAR}</div>
+              )}
+            </div>
           ))}
         </div>
         <Separador />
         <div className="space-y-1.5">
           <Renglon rotulo="Total cobrado" valor={plata(c.cobrado.total)} fuerte />
+          <Renglon
+            rotulo="Neto después de comisiones"
+            nota={c.cobrado.comisionesConocidas ? null : TEXTO_COMISION_SIN_CALCULAR}
+            valor={plata(c.cobrado.netoDespuesDeComisiones)}
+            colorValor={CLASE_TONO.success}
+            fuerte
+          />
           <Renglon rotulo="Fiado" valor={plata(c.cobrado.fiado)} atenuado />
         </div>
       </Bloque>
+
+      <SunmiButton
+        type="button"
+        color="primary"
+        onClick={onVerMovimientos}
+        className="w-full min-h-toque justify-center rounded-xl text-base font-semibold"
+      >
+        Arqueos, pagos y Z ›
+      </SunmiButton>
+    </div>
+  );
+}
+
+// ── LOS ARQUEOS, LOS PAGOS Y EL BOTÓN AL Z ───────────────────────────────
+
+export function MovimientosDeCaja({ datos, onVerZ }) {
+  const c = datos.caja;
+  const pagos = pagosDeLaCaja(c);
+  return (
+    <div className="space-y-3.5">
+      <Encabezado c={c} local={datos.local?.nombre} />
 
       <Bloque titulo="ARQUEOS Y CIERRE">
         {datos.arqueos?.length ? (
@@ -123,15 +157,15 @@ export default function DetalleDeCaja({ datos, onVerZ }) {
         )}
       </Bloque>
 
-      <Bloque titulo="SALIDAS DE EFECTIVO">
-        {salidas.length ? (
+      <Bloque titulo="PAGOS DESDE LA CAJA">
+        {pagos.length ? (
           <div className="space-y-1.5">
-            {salidas.map((s) => (
+            {pagos.map((s) => (
               <Renglon key={s.id} rotulo={s.larga} nota={horaAR(s.instante)} valor={plata(s.monto)} />
             ))}
           </div>
         ) : (
-          <p className="text-sm2 sunmi-text-muted">Sin salidas.</p>
+          <p className="text-sm2 sunmi-text-muted">Sin pagos.</p>
         )}
       </Bloque>
 
@@ -151,8 +185,8 @@ export default function DetalleDeCaja({ datos, onVerZ }) {
 
 /** La diferencia de un arqueo: la acumulada hasta ese corte, tal cual. */
 function DiferenciaAcumulada({ valor }) {
-  const t = textoFaltaSobra(valor);
   if (valor == null) return null;
+  const t = textoFaltaSobra(valor);
   if (!t) return <span className={`shrink-0 text-sm2 font-semibold ${CLASE_TONO.success}`}>Sin diferencia</span>;
   return (
     <span className={`shrink-0 text-sm2 font-semibold tabular-nums ${Number(valor) < 0 ? CLASE_TONO.danger : CLASE_TONO.warning}`}>
@@ -194,9 +228,9 @@ export function ComprobanteZ({ datos, onReimprimir }) {
         </div>
         <Separador />
         <div className="space-y-1">
-          <Renglon rotulo="Fondo inicial" valor={plata(e.fondoInicial)} />
+          <Renglon rotulo="Cambio inicial" valor={plata(e.cambioInicial)} />
           {e.ingresos ? <Renglon rotulo="Ingresos" valor={mas(e.ingresos)} /> : null}
-          <Renglon rotulo="Salidas" valor={menos(e.salidasEfectivo)} />
+          <Renglon rotulo="Pagos desde la caja" valor={menos(e.pagosDesdeCaja)} />
           <Renglon rotulo={`Arqueos (${cantidadArqueos})`} valor={menos(e.retiradoArqueos)} />
           <Renglon rotulo="Tenía que haber" valor={plata(e.teniaQueHaber)} fuerte />
           <Renglon rotulo="Contado" valor={plata(e.contado)} fuerte />

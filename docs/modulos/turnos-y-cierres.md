@@ -36,13 +36,26 @@ móvil" (A2 364:577, A3 364:674, B 359:523, C 359:605, D 359:2367).
 - La diferencia de un turno no es un importe: se cuentan cajas que faltan y que
   sobran. La de cada arqueo es la acumulada guardada y no se suma.
   *(verificado en código)*
+- Resultado del turno (desde 2026-10-13, Figma "V2 · A" 367:607): neto después
+  de comisiones − costo de la mercadería − pagos desde la caja
+  (`resultadoDelTurno`). Neto y costo de `resumirVentas`. Pagos desde la caja:
+  todo RETIRO que no es recaudación (arqueo) ni cierre, por la clasificación
+  canónica (`pagosDesdeCaja`); incluye los Caja − manuales. *(verificado en
+  código y ejercido)*
+- Comisión por medio: la de los tenders; si alguna venta del medio no tiene la
+  comisión exacta (`comisionEsExacta`), se muestra "Comisión sin calcular" y no
+  $0. *(verificado en código y ejercido)*
 
 ## Quién ve qué
 
-`reportes.ver`, `tesoreria.ver`, Admin o el dueño (`puedeOperarSinOperador`)
-ven el local entero. Solo `pos.usar` ve únicamente sus cajas (`whereCajaPropia`),
-hoy y las últimas 30, sin período; la de otro operador da 403. `turnos.ver_todos`
-no abre el local en este módulo. *(verificado en código y ejercido)*
+`reportes.ver`, `tesoreria.ver`, `turnos.ver_todos` (desde 2026-10-13), Admin o
+el dueño (`puedeOperarSinOperador`) ven el local entero. Solo `pos.usar` ve
+únicamente sus cajas (`whereCajaPropia`), hoy y las últimas 30, sin período; la
+de otro operador da 403. *(verificado en código y ejercido)*
+
+El detalle de una caja (Figma "V2 · B" 367:650) muestra el efectivo y lo
+cobrado; "Arqueos, pagos y Z ›" lleva a `cajas/[id]/movimientos`, con los
+arqueos, los pagos desde la caja y el botón al Z. *(verificado en código)*
 
 ## Pendiente conocido
 
