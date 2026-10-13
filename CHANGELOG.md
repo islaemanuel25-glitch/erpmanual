@@ -1,5 +1,16 @@
 # Changelog
 
+## [2026-10-13] - Actualización: pos-ventas, turnos-y-cierres
+
+### Modificado
+- **pos-ventas**: fix: "Retirar" aparece siempre que haya caja abierta
+- **pos-ventas**: fix: el cierre se confirma con retiro $0 declarado ("No queda nada para retirar")
+- **turnos-y-cierres**: feat: V2 — resultado del turno, cómo se cobró, detalle de
+  caja con comisiones por medio y pantalla "Arqueos, pagos y Z"; "Cambio
+  inicial"; turnos.ver_todos ve el local; la entrada vieja del menú pasa a
+  "Turnos y cierres (anterior)".
+
+
 ## [2026-10-12] - Módulo nuevo: turnos-y-cierres
 
 ### Agregado
