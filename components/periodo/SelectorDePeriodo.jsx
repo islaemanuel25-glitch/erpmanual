@@ -43,14 +43,32 @@ const sinCambio = () => {};
  * con las flechas apagadas —el servidor contesta `puedeAvanzar` y
  * `puedeRetroceder` en false—.
  */
-export default function SelectorDePeriodo({ datos, ctx, hoy, onCambiarUnidad, onElegirRango, onAtras, onAdelante }) {
+/**
+ * `enFilaDeEscritorio`: para la ranura `periodo` de `LayoutFinanzasEscritorio`.
+ * Desde `md` la caja del selector desaparece (`contents`) y los chips y el
+ * navegador quedan como celdas de la grilla del molde, uno al lado del otro; el
+ * calendario de «Otro» baja a su propio renglón, a todo el ancho. Debajo de
+ * `md` no cambia nada. Sin la prop —"Turnos y cierres"— el marcado es el de
+ * siempre.
+ */
+export default function SelectorDePeriodo({
+  datos,
+  ctx,
+  hoy,
+  onCambiarUnidad,
+  onElegirRango,
+  onAtras,
+  onAdelante,
+  enFilaDeEscritorio = false,
+}) {
   const descripcion = datos?.periodo?.descripcion || null;
   const esOtro = ctx.unidad === CLAVE_OTRO_FINANZAS;
   return (
-    <div className="space-y-3">
+    <div className={enFilaDeEscritorio ? "space-y-3 md:contents md:space-y-0" : "space-y-3"}>
       <ChipsDePeriodo valor={ctx.unidad} onCambiar={onCambiarUnidad} />
       {esOtro && (
         <SunmiDateRangePicker
+          className={enFilaDeEscritorio ? "md:order-last md:col-span-full" : ""}
           valueDesde={ctx.desde || ""}
           valueHasta={ctx.hasta || ""}
           // El kit los llama al aplicar, ANTES de `onApply`: sin ellos «Aplicar»

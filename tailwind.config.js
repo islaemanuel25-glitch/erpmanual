@@ -326,6 +326,27 @@ module.exports = {
         // `botonCorregir`: un token que nadie usa es una medida esperando a que
         // alguien la vuelva a inventar distinta.
       },
+
+      // ── LAS COLUMNAS DE FINANZAS EN ESCRITORIO ────────────────────────
+      //
+      // Las usa un solo molde, `components/finanzas/LayoutFinanzasEscritorio`,
+      // y las pantallas que se arman con él. Van en px y con nombre por el
+      // mismo motivo que `toque`: con `1rem = 14px` ninguna cae en la escala
+      // —`w-96` da 336— y escritas como `grid-cols-[...]` el trinquete las
+      // cuenta, con razón.
+      //
+      //   · `finanzasPeriodo`: los chips Día/Semana/Mes/Otro (400) y al lado
+      //     el navegador del período (420).
+      //   · `finanzasEscritorio`: el resumen (380) y el contenido, que se
+      //     queda con el resto. `minmax(0, 1fr)` y no `1fr`: con `1fr` una
+      //     fila larga de la lista estiraría la columna más allá de la ventana.
+      //   · `finanzasFiltros`: el selector Pendientes/Pagados/Todos, del
+      //     mismo ancho que los chips del período, y el buscador con el resto.
+      gridTemplateColumns: {
+        finanzasPeriodo: "400px 420px",
+        finanzasEscritorio: "380px minmax(0, 1fr)",
+        finanzasFiltros: "400px minmax(0, 1fr)",
+      },
     },
   },
   plugins: [],

@@ -15,6 +15,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import EntradaDeLocales from "@/components/transferencias/EntradaDeLocales";
+import { AnchoDeLectura } from "@/components/finanzas/LayoutFinanzasEscritorio";
 import { insigniaDelLocal } from "@/components/finanzas/TableroFinanzas";
 import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { VISTA_TESORERIA, urlDeLocalTesoreria, urlDeTesoreria } from "@/lib/tesoreria/contextoTesoreria";
@@ -35,13 +36,15 @@ export default function TableroTesoreria({ destino = null }) {
 
   if (esEntrada) {
     return (
-      <EntradaDeLocales
-        locales={t.datos.locales || []}
-        rotulo="LOCALES"
-        textoVacio="Este grupo todavía no tiene locales."
-        insigniaDe={insigniaDelLocal}
-        onEntrar={(l) => router.push(urlDeLocalTesoreria(l.localId, t.ctx))}
-      />
+      <AnchoDeLectura>
+        <EntradaDeLocales
+          locales={t.datos.locales || []}
+          rotulo="LOCALES"
+          textoVacio="Este grupo todavía no tiene locales."
+          insigniaDe={insigniaDelLocal}
+          onEntrar={(l) => router.push(urlDeLocalTesoreria(l.localId, t.ctx))}
+        />
+      </AnchoDeLectura>
     );
   }
 

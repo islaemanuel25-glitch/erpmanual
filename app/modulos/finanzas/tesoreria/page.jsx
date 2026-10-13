@@ -48,7 +48,10 @@ function Tesoreria() {
   if (!esAdmin && !permisos.includes(PERMISO_VER_TESORERIA)) return <SinPermisos />;
 
   return (
-    <div className="w-full min-h-full mx-auto max-w-4xl px-4 pt-4 pb-4 space-y-3.5">
+    // Desde `md` el molde de Finanzas va de costado a costado: sin tope, y
+    // 24,5 px de margen con los 14 del shell (`md:px-3`). Los detalles se
+    // topean solos (`AnchoDeLectura`).
+    <div className="w-full min-h-full mx-auto max-w-4xl px-4 pt-4 pb-4 space-y-3.5 md:max-w-none md:px-3">
       <AccionDePantalla>{volver}</AccionDePantalla>
       <TableroTesoreria />
     </div>

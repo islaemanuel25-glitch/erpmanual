@@ -47,8 +47,10 @@ function Gastos() {
   if (!esAdmin && !permisos.includes(PERMISO_VER_FINANZAS)) return <SinPermisos />;
 
   return (
-    // Mismo tope y mismos espacios que Pagos a proveedores.
-    <div className="w-full min-h-full mx-auto max-w-4xl px-4 pt-4 pb-4 space-y-3.5">
+    // En el celular, mismos espacios que Pagos a proveedores. Desde `md` el
+    // molde de Finanzas va de costado a costado: sin tope, y 24,5 px de margen
+    // con los 14 del shell (`md:px-3`).
+    <div className="w-full min-h-full mx-auto max-w-4xl px-4 pt-4 pb-4 space-y-3.5 md:max-w-none md:px-3">
       <AccionDePantalla>{volver}</AccionDePantalla>
       <ListaGastos />
     </div>
