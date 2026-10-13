@@ -44,8 +44,11 @@ const producto = (extra) => ({
   productoBaseId: 1,
   nombre: "Gaseosa cola 1,5 L",
   codigoBarra: "7790895000997",
-  codigoBarraSecundario: null,
-  codigoBarraPropio: null,
+  // Vacíos como texto y no `null`: así los manda `construirItems` del endpoint
+  // (`pl.base?.codigo_barra_secundario || ""`).
+  codigoBarraSecundario: "",
+  codigoBarraPropio: "",
+  unidadMedida: "unidad",
   disponibleParaVenta: true,
   ...extra,
 });
@@ -174,10 +177,17 @@ test("CNE7. código existente —principal, secundario o propio— se agrega com
   const p = producto({ codigoBarraSecundario: "SEC-01", codigoBarraPropio: "LOC77" });
   for (const texto of ["7790895000997", "sec-01", "LOC77"]) {
     for (const autoAdd of [true, false]) {
-      assert.deepEqual(decidirLectura({ items: [p], texto, autoAdd }), { tipo: LECTURA.AGREGAR, producto: p }, texto);
+      for (const estricto of [true, false]) {
+        assert.deepEqual(
+          decidirLectura({ items: [p], texto, autoAdd, estricto }),
+          { tipo: LECTURA.AGREGAR, producto: p },
+          `${texto} autoAdd=${autoAdd} estricto=${estricto}`
+        );
+      }
     }
   }
-  // Y una lectura del escáner con resultado único lo agrega, como antes.
+  // FUERA del POS —ofertas y combos, sin `estricto`— una lectura del escáner
+  // con resultado único lo sigue agregando, como antes. En el POS ya no: CNE12.
   const unico = producto({ codigoBarra: "999" });
   assert.equal(decidirLectura({ items: [unico], texto: "12345", autoAdd: true }).tipo, LECTURA.AGREGAR);
   // No disponible sigue avisando con el mensaje de siempre, sin agregar.
@@ -212,4 +222,91 @@ test("CNE10. el aviso lo pide el POS de venta; ofertas y combos siguen como esta
   for (const ruta of ["app/modulos/ofertas/nueva/page.jsx", "components/productos/EditorComponentesCombo.jsx"]) {
     assert.doesNotMatch(leer(ruta), /avisarNoEncontrado/, `${ruta} pidió el aviso`);
   }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+// EN EL POS, EL ESCÁNER AGREGA SOLO POR CÓDIGO EXACTO
+//
+// Antes una lectura con un único resultado se agregaba aunque el código no
+// coincidiera: entraba al carrito un producto que el escáner no leyó.
+// ══════════════════════════════════════════════════════════════════════════
+
+const lecturaPos = (items, texto) => decidirLectura({ items, texto, autoAdd: true, estricto: true });
+
+test("CNE11. exacto con el principal, el secundario o el propio de la ubicación → agrega", () => {
+  const principal = producto({ codigoBarra: "7790895000997" });
+  const secundario = producto({ codigoBarra: "111", codigoBarraSecundario: "7790895000980" });
+  const propio = producto({ codigoBarra: "111", codigoBarraPropio: "LOC-0042" });
+  assert.deepEqual(lecturaPos([principal], "7790895000997"), { tipo: LECTURA.AGREGAR, producto: principal });
+  assert.deepEqual(lecturaPos([secundario], "7790895000980"), { tipo: LECTURA.AGREGAR, producto: secundario });
+  assert.deepEqual(lecturaPos([propio], "loc-0042"), { tipo: LECTURA.AGREGAR, producto: propio });
+});
+
+test("CNE11b. ceros a la izquierda: EAN-13 leído contra UPC-A cargado, y al revés → agrega", () => {
+  const upc = producto({ codigoBarra: "012345678905" });
+  assert.deepEqual(lecturaPos([upc], "0012345678905"), { tipo: LECTURA.AGREGAR, producto: upc });
+  const ean = producto({ codigoBarra: "0012345678905" });
+  assert.deepEqual(lecturaPos([ean], "012345678905"), { tipo: LECTURA.AGREGAR, producto: ean });
+  // También contra el secundario y el propio.
+  const sec = producto({ codigoBarra: "111", codigoBarraSecundario: "012345678905" });
+  assert.equal(lecturaPos([sec], "0012345678905").tipo, LECTURA.AGREGAR);
+  // Pero un código interno corto NO: ahí el cero distingue.
+  const corto = producto({ codigoBarra: "111", codigoBarraPropio: "123" });
+  assert.equal(lecturaPos([corto], "0123").tipo, LECTURA.NO_ENCONTRADO);
+  // Ni un GTIN distinto que solo comparte dígitos.
+  assert.equal(lecturaPos([upc], "1012345678905").tipo, LECTURA.NO_ENCONTRADO);
+});
+
+test("CNE12. un único resultado que NO es exacto → aviso, no se agrega", () => {
+  const unico = producto({ nombre: "Alfajor 12345", codigoBarra: "7790000000001" });
+  assert.deepEqual(lecturaPos([unico], "12345"), { tipo: LECTURA.NO_ENCONTRADO, codigo: "12345" });
+});
+
+test("CNE13. varios resultados sin ninguno exacto → aviso", () => {
+  const varios = [
+    producto({ codigoBarra: "7790000000001" }),
+    producto({ productoBaseId: 2, codigoBarra: "7790000000002" }),
+  ];
+  assert.equal(lecturaPos(varios, "77900000").tipo, LECTURA.NO_ENCONTRADO);
+  // Y cero resultados, igual que desde c772a5b.
+  assert.equal(lecturaPos([], "7790000000009").tipo, LECTURA.NO_ENCONTRADO);
+});
+
+test("CNE14. etiqueta de balanza: no hay manejo propio, así que queda igual que antes", () => {
+  // Relevado: ni el endpoint ni el buscador interpretan peso o precio embebido
+  // (prefijo 2). Una etiqueta así solo agrega si su texto ES el código cargado
+  // de un producto, y entonces un producto por kg sigue yendo a `ModalPesoKg`.
+  const porKg = producto({ nombre: "Queso cremoso", codigoBarra: "2000123000000", unidadMedida: "kg" });
+  assert.deepEqual(lecturaPos([porKg], "2000123000000"), { tipo: LECTURA.AGREGAR, producto: porKg });
+  // Una etiqueta con el peso adentro no es ningún código cargado: el endpoint
+  // no devuelve nada y abre el aviso, como desde c772a5b.
+  assert.equal(lecturaPos([], "2000123012508").tipo, LECTURA.NO_ENCONTRADO);
+  // Que siga sin existir: si alguien agrega el manejo, este candado tiene que
+  // reescribirse sabiendo que la regla de exacto la toca.
+  for (const ruta of ["lib/pos-ventas/lecturaEscaner.js", "components/pos-ventas/BuscadorProductos.jsx", "app/api/pos-ventas/buscar-producto/route.js"]) {
+    assert.doesNotMatch(leer(ruta), /balanza|pesoEmbebido|precioEmbebido/i, `${ruta} empezó a manejar balanza`);
+  }
+});
+
+test("CNE15. el POS pide la regla estricta; el tipeo a mano sigue sin aviso", () => {
+  assert.match(BUSCADOR, /decidirLectura\(\{ items, texto, autoAdd, estricto: avisarNoEncontrado \}\)/);
+  // Tipeado a mano en el POS: nada exacto → lista, como siempre.
+  const varios = [producto({ nombre: "Yerba A" }), producto({ productoBaseId: 2, nombre: "Yerba B" })];
+  assert.deepEqual(decidirLectura({ items: varios, texto: "yerba", autoAdd: false, estricto: true }), { tipo: LECTURA.MOSTRAR });
+  assert.deepEqual(decidirLectura({ items: [], texto: "yerba", autoAdd: false, estricto: true }), { tipo: LECTURA.MOSTRAR });
+});
+
+test("CNE16. el endpoint del POS busca el mismo GTIN con otros ceros, DESPUÉS del exacto", () => {
+  const ruta = leer("app/api/pos-ventas/buscar-producto/route.js");
+  const iExacto = ruta.indexOf("let exacto = await buscarExacto(q);");
+  const iVariantes = ruta.indexOf("exacto = await buscarExacto({ in: otrasFormas });");
+  assert.ok(iExacto > -1, "no busca el código tal cual primero");
+  assert.ok(iVariantes > iExacto, "no prueba las otras formas del GTIN, o las prueba antes");
+  assert.match(ruta, /const otrasFormas = variantesGtin\(q\)\.filter\(\(v\) => v !== q\);/);
+  // Y que se prueben justo cuando el tal cual no encontró y hay otras formas.
+  assert.match(
+    ruta,
+    /if \(exacto\.length === 0 && otrasFormas\.length > 0\) \{\s*exacto = await buscarExacto\(\{ in: otrasFormas \}\);/,
+    "las otras formas del GTIN no se buscan cuando el código tal cual no está"
+  );
 });

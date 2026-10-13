@@ -103,10 +103,11 @@ function BuscadorProductos({
           );
 
           // Código exacto (propio de esta ubicación, principal o secundario)
-          // agrega; una lectura del escáner con resultado único también; una
-          // lectura del escáner sin nada de eso abre el aviso. La decisión es
+          // agrega. En el POS (`estricto`) una lectura del escáner que no es
+          // exacta abre el aviso, sea un resultado, varios o ninguno; en
+          // ofertas y combos el resultado único sigue agregando. La decisión es
           // de `lib/pos-ventas/lecturaEscaner.js`.
-          const decision = decidirLectura({ items, texto, autoAdd });
+          const decision = decidirLectura({ items, texto, autoAdd, estricto: avisarNoEncontrado });
           if (decision.tipo === LECTURA.NO_DISPONIBLE) {
             showError(NO_DISPONIBLE_MSG);
             setResultados(items);

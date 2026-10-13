@@ -15,7 +15,7 @@ import {
 } from "@/lib/productos/busquedaFuzzyProducto";
 import { getCombo } from "@/lib/combos/service";
 import { esModalidadServicio, resolverRecargoServicioPct } from "@/lib/pos-ventas/servicios";
-import { orCodigoBarraProductoLocal, codigosDeProductoLocal } from "@/lib/productos/busquedaCodigoBarra";
+import { orCodigoBarraProductoLocal, codigosDeProductoLocal, variantesGtin } from "@/lib/productos/busquedaCodigoBarra";
 import { ofertasVigentesPorProductoLocal } from "@/lib/ofertas/servidor";
 import { descuentoPctDesdePrecios } from "@/lib/ofertas/precio";
 import { CONDICION_PAGO_LABEL } from "@/lib/ofertas/vigencia";
@@ -108,19 +108,29 @@ export async function GET(req) {
     // Reconoce los TRES códigos por ubicación (helper centralizado): código propio del
     // ProductoLocal (por local) + los dos globales de la base. El propio es local por
     // construcción: la query ya filtra localId, así que un propio ajeno nunca matchea.
-    const exacto = await prisma.productoLocal.findMany({
-      where: {
-        localId,
-        activo: true,
-        base: { activo: true },
-        OR: orCodigoBarraProductoLocal(q),
-      },
-      include: {
-        base: true,
-        stock: { where: { localId }, select: { cantidad: true } },
-      },
-      take: 1,
-    });
+    //
+    // Si el código tal cual no está, se prueba el MISMO GTIN con otros ceros a la
+    // izquierda (UPC-A de 12 contra EAN-13). Va en segundo lugar a propósito: si
+    // hubiera cargadas las dos formas, gana la que coincide letra por letra.
+    const buscarExacto = (codigo) =>
+      prisma.productoLocal.findMany({
+        where: {
+          localId,
+          activo: true,
+          base: { activo: true },
+          OR: orCodigoBarraProductoLocal(codigo),
+        },
+        include: {
+          base: true,
+          stock: { where: { localId }, select: { cantidad: true } },
+        },
+        take: 1,
+      });
+    let exacto = await buscarExacto(q);
+    const otrasFormas = variantesGtin(q).filter((v) => v !== q);
+    if (exacto.length === 0 && otrasFormas.length > 0) {
+      exacto = await buscarExacto({ in: otrasFormas });
+    }
 
     if (exacto.length > 0) {
       const items = await construirItems(exacto, { esDeposito, allowNegativeStock, listaAplicable, grupoId, localId });
