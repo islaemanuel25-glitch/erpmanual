@@ -96,7 +96,7 @@ export const TEXTO_CARGA_NO_DECLARADO = "Cargá la cantidad que llegó";
  * `styles/sunmi.css` las define DESPUÉS del bloque de colores. Eso no es un
  * accidente que haya que recordar: `variantesDeAccion.test.mjs` lo exige.
  */
-const CLASE_COINCIDE = "sunmi-btn-accent-outline";
+export const CLASE_COINCIDE = "sunmi-btn-accent-outline";
 const CLASE_CORREGIR = "sunmi-btn-accent-suave";
 
 /** Cantidades: enteras sin decimales, fraccionarias con hasta 3 útiles. */
@@ -106,17 +106,16 @@ const fmtCant = (n) => {
   return Number.isInteger(v) ? v.toLocaleString("es-AR") : v.toLocaleString("es-AR", { maximumFractionDigits: 3 });
 };
 
-export default function TarjetaRecepcionMovil({
-  d,
-  puedeRecibir = false,
-  guardando = false,
-  onRevisar,
-  onAbrirFicha,
-}) {
-  const [error, setError] = useState("");
-
-  if (!d) return null;
-
+/**
+ * LO QUE UNA LÍNEA DICE, LEÍDO UNA VEZ.
+ *
+ * Vivía adentro de la tarjeta, renglón por renglón igual que acá. Se sacó a
+ * una función cuando la computadora tuvo su tabla (`RecepcionEscritorio`): las
+ * dos dibujan la misma línea —enviado, contado, diferencia, importe— y con la
+ * lectura escrita en cada una, el día que cambie una regla dirían cosas
+ * distintas sobre el mismo producto.
+ */
+export function lecturaDeLaLinea(d) {
   const envio = descriptorDeEnvio(d);
   // ── CÓMO SE MUESTRA, QUE NO ES LO MISMO QUE CÓMO SE GUARDA ──────────────
   //
@@ -194,6 +193,74 @@ export default function TarjetaRecepcionMovil({
   const importeRecibido = d.subtotalRecibido == null ? d.subtotal : d.subtotalRecibido;
   const hayCorreccionDeImporte =
     importeRemito != null && Number(importeRemito) !== Number(importeRecibido);
+
+  return {
+    envio,
+    mostrado,
+    porUnidad,
+    esAgregada,
+    revisado,
+    sueltasGuardadas,
+    fisicasContadas,
+    fisicasEnviadas,
+    chips,
+    hayDiferencia,
+    delta,
+    enviadasMostradas,
+    recibidasMostradas,
+    sueltasMostradas,
+    costoMostrado,
+    importeRemito,
+    importeRecibido,
+    hayCorreccionDeImporte,
+  };
+}
+
+/**
+ * Lo que manda "✓ Coincide": lo que el remito dice, tal cual, en la
+ * presentación en la que la línea está persistida. Lo usan la tarjeta y la
+ * fila de escritorio; una sola forma de decir "llegó todo".
+ */
+export function cuerpoDeCoincide(d) {
+  const envio = descriptorDeEnvio(d);
+  return {
+    detalleId: d.id,
+    // En la escala de la PRESENTACIÓN, que es la que el rótulo muestra.
+    // Mandar las físicas acá guardaría 144 packs sobre un envío de 6 PACK x24.
+    recibido: envio.cantidad,
+    recibidoUnidadesSueltas: envio.sueltas || 0,
+    motivoPrincipal: null,
+    motivoDetalle: null,
+  };
+}
+
+export default function TarjetaRecepcionMovil({
+  d,
+  puedeRecibir = false,
+  guardando = false,
+  onRevisar,
+  onAbrirFicha,
+}) {
+  const [error, setError] = useState("");
+
+  if (!d) return null;
+
+  const {
+    envio,
+    mostrado,
+    esAgregada,
+    revisado,
+    fisicasContadas,
+    hayDiferencia,
+    delta,
+    enviadasMostradas,
+    recibidasMostradas,
+    sueltasMostradas,
+    costoMostrado,
+    importeRemito,
+    importeRecibido,
+    hayCorreccionDeImporte,
+  } = lecturaDeLaLinea(d);
 
   // ── 3 · REVISADO: UNA SOLA LÍNEA, Y LA CORREGIDA SE DISTINGUE ────────────
   //
@@ -319,15 +386,7 @@ export default function TarjetaRecepcionMovil({
   /** El caso feliz: lo que el remito dice, tal cual, sin abrir el panel. */
   const coincidir = async () => {
     setError("");
-    const r = await onRevisar?.({
-      detalleId: d.id,
-      // En la escala de la PRESENTACIÓN, que es la que el rótulo muestra.
-      // Mandar las físicas acá guardaría 144 packs sobre un envío de 6 PACK x24.
-      recibido: envio.cantidad,
-      recibidoUnidadesSueltas: envio.sueltas || 0,
-      motivoPrincipal: null,
-      motivoDetalle: null,
-    });
+    const r = await onRevisar?.(cuerpoDeCoincide(d));
     if (r && r.ok === false) setError(r.error || "No se pudo guardar la revisión.");
   };
 

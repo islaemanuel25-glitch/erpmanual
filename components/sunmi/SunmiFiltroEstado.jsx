@@ -66,6 +66,14 @@ export default function SunmiFiltroEstado({
   /** Para el `role="group"` cuando no hay rótulo visible. */
   ariaLabel = undefined,
   className = "",
+  /**
+   * "compacto": los mismos botones, con el mismo comportamiento, EN FILA y en
+   * un segmentado de ~33 px —el de escritorio, como `SunmiSelectorDeOpciones`
+   * compacto—. Lo pidió la recepción de transferencias en la computadora
+   * (Figma EVJ2KvVCrY0oVSowfboymQ, 384:514): los cuatro de siempre, en fila en
+   * vez de 2×2. Sin la prop, la grilla de siempre, sin tocar una clase.
+   */
+  tamano = "normal",
 }) {
   if (!Array.isArray(opciones) || opciones.length === 0) return null;
 
@@ -73,6 +81,14 @@ export default function SunmiFiltroEstado({
   // lanza un error: una pantalla no se rompe por un filtro.
   const columnas = COLUMNAS[opciones.length] || "grid-cols-2";
   const elegida = valor == null ? null : String(valor);
+  const compacto = tamano === "compacto";
+  const claseGrupo = compacto
+    ? "inline-flex shrink-0 gap-0.5 rounded-control sunmi-surface-soft p-1"
+    : `grid ${columnas} gap-1.5`;
+  const claseBoton = compacto
+    ? "justify-center gap-1 min-h-0 py-1.5 px-3 rounded-md text-sm3 whitespace-nowrap"
+    : "w-full justify-center gap-1";
+  const colorInactivo = compacto ? "ghost" : "slate";
 
   return (
     <div className={className}>
@@ -80,7 +96,7 @@ export default function SunmiFiltroEstado({
       <div
         role="group"
         aria-label={ariaLabel || rotulo || undefined}
-        className={`grid ${columnas} gap-1.5`}
+        className={claseGrupo}
       >
         {opciones.map((o) => {
           const clave = String(o.clave);
@@ -89,7 +105,7 @@ export default function SunmiFiltroEstado({
             <SunmiButton
               key={clave}
               type="button"
-              color={activa ? "primary" : "slate"}
+              color={activa ? "primary" : colorInactivo}
               aria-pressed={activa}
               onClick={() => onCambiar?.(o.clave)}
               // `w-full` para que ocupe su celda entera y los cuatro midan igual;
@@ -101,7 +117,7 @@ export default function SunmiFiltroEstado({
               // nodo de texto que solo tiene un espacio no genera caja en un
               // contenedor flex — se descarta. Se vio en la captura de 390 px,
               // que decía "Pendientes45" pegado; leyendo el JSX parecía bien.
-              className="w-full justify-center gap-1"
+              className={claseBoton}
             >
               {o.texto}
               {/* El conteo adentro: saber cuántos hay antes de tocarlo es la

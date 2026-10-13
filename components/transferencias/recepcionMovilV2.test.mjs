@@ -55,8 +55,13 @@ test("1. el teléfono NO dibuja un segundo «Volver a transferencias»", () => {
   // En la página sigue existiendo, pero SOLO para escritorio: la franja entera
   // está detrás de `hidden md:flex`, que es el mismo corte que usa el shell para
   // su fila de título. O manda uno o manda el otro, nunca los dos.
+  //
+  // Recibiendo, desde `lg` la franja la pone la composición de la computadora
+  // y ésta queda entre `md` y `lg`: `hidden md:flex lg:hidden`. Las dos ramas
+  // empiezan en `hidden`, que es lo que este candado defiende —que en el
+  // teléfono no se dibuje—.
   const pagina = codigoDe(PAGINA);
-  const franja = pagina.indexOf('className="hidden md:flex items-start justify-between');
+  const franja = pagina.indexOf('puedeRecibir ? "hidden md:flex lg:hidden" : "hidden md:flex"} items-start justify-between');
   assert.ok(franja > 0, "la franja del encabezado dejó de estar acotada a escritorio");
   const posVolver = pagina.indexOf("Volver a transferencias");
   assert.ok(posVolver > franja, "el botón viejo quedó fuera de la franja de escritorio");
@@ -71,13 +76,13 @@ test("2. el teléfono NO dibuja «Volver al listado»", () => {
       assert.ok(!/Volver al listado/.test(src), "volvió el segundo Volver en el teléfono");
     }
   }
-  // En escritorio ese botón nunca existió en la rama de dos columnas; el que
-  // había era del apilado `lg:hidden`, que sigue siendo de escritorio.
-  const ws = codigoDe(WORKSPACE);
-  const apilado = ws.indexOf('className="lg:hidden space-y-2"');
-  const escritorio = ws.indexOf('className="hidden md:block space-y-3"');
-  assert.ok(escritorio > 0, "se perdió el envoltorio de escritorio");
-  assert.ok(apilado > escritorio, "el apilado con «Volver al listado» salió de escritorio");
+  // El que había era del apilado `lg:hidden` de la pantalla vieja de
+  // escritorio, que la composición de la computadora reemplazó: el producto
+  // va en un panel AL LADO de la lista y no hay nada a qué volver. No tiene
+  // que quedar en ninguna de las tres piezas.
+  for (const rel of [WORKSPACE, "components/transferencias/RecepcionEscritorio.jsx"]) {
+    assert.ok(!/Volver al listado/.test(codigoDe(rel)), `${rel}: volvió «Volver al listado»`);
+  }
 });
 
 test("3. el «Volver» del teléfono usa el slot del shell y SunmiBackButton", () => {
@@ -142,15 +147,17 @@ test("5. NO existe el botón «Escanear» pegado al buscador", () => {
 
   // La cámara sigue accesible, pero desde "Más acciones", que es la superficie
   // aprobada menos invasiva mientras no haya una composición para ella.
-  const posBuscador = movil.indexOf("<SunmiCampoBusquedaVoz");
-  const posEscaner = movil.indexOf("onAbrirEscaner()");
-  const posMasAcciones = movil.indexOf("TITULO_MAS_ACCIONES}");
+  //
+  // La hoja de "Más acciones" vive en `MasAccionesRecepcion` desde la versión
+  // de escritorio. El móvil le pasa el disparador y no lo llama en ningún otro
+  // lado; la pieza lo llama adentro de su hoja.
+  const acciones = codigoDe("components/transferencias/MasAccionesRecepcion.jsx");
+  const posEscaner = acciones.indexOf("onAbrirEscaner()");
+  const posHoja = acciones.indexOf("title={TITULO_MAS_ACCIONES}");
   assert.ok(posEscaner > 0, "se perdió el acceso a la cámara");
-  assert.ok(
-    posEscaner > posMasAcciones,
-    "el acceso a la cámara volvió al flujo principal en vez de vivir en Más acciones"
-  );
-  assert.ok(posEscaner > posBuscador + 500, "quedó un disparador de cámara pegado al buscador");
+  assert.ok(posEscaner > posHoja && posHoja > 0, "el acceso a la cámara salió de la hoja de Más acciones");
+  assert.ok(!movil.includes("onAbrirEscaner()"), "quedó un disparador de cámara en el flujo del móvil");
+  assert.match(movil, /<MasAccionesRecepcion[\s\S]{0,400}onAbrirEscaner=\{onAbrirEscaner\}/);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -163,8 +170,18 @@ test("6. el producto se presenta en una hoja del kit, no en un overlay a mano", 
 
   // Tres hojas: producto, más acciones e información general. Las tres con la
   // forma del kit, ninguna con una capa escrita a mano.
+  //
+  // Las dos últimas viven desde la versión de escritorio en
+  // `MasAccionesRecepcion` —la misma lista de acciones para las dos
+  // pantallas—, y el móvil la monta con `forma="hoja"`. Se cuentan las dos
+  // partes: la del producto acá, y la pieza montada como hoja.
   const hojas = [...movil.matchAll(/forma="hoja"/g)];
-  assert.equal(hojas.length, 3, "cambió la cantidad de hojas de la composición móvil");
+  assert.equal(hojas.length, 2, "cambió la cantidad de hojas de la composición móvil");
+  assert.match(movil, /<MasAccionesRecepcion[\s\S]{0,600}?forma="hoja"\s*\/>/, "más acciones dejó de abrirse como hoja");
+  assert.ok(
+    !/fixed inset-0/.test(codigoDe("components/transferencias/MasAccionesRecepcion.jsx")),
+    "hay una capa de modal escrita a mano en las hojas de acciones"
+  );
   assert.ok(
     !/fixed inset-0/.test(movil),
     "hay una capa de modal escrita a mano: eso ya lo resuelve SunmiModalLayout"
@@ -199,50 +216,79 @@ test("7. PDF, ticket y cancelación no están expandidos en el flujo principal",
 
   // Los cuatro existen, y los cuatro están DESPUÉS de que se abre la hoja de
   // "Más acciones". Si alguno subiera al flujo, su posición caería antes.
-  const inicioHoja = movil.indexOf("open={masAcciones}");
+  //
+  // La hoja vive en `MasAccionesRecepcion` desde la versión de escritorio, que
+  // abre la misma desde su "⋯". Los cuatro se buscan adentro de la hoja, y en
+  // el móvil no tiene que quedar ninguno suelto.
+  assert.match(movil, /<MasAccionesRecepcion\s+abierto=\{masAcciones\}/, "se perdió la hoja de Más acciones");
+  const acciones = codigoDe("components/transferencias/MasAccionesRecepcion.jsx");
+  const inicioHoja = acciones.indexOf("open={abierto}");
   assert.ok(inicioHoja > 0, "se perdió la hoja de Más acciones");
 
   for (const texto of ["PDF de envío", "PDF de recepción", "Imprimir ticket POS", "Cancelar transferencia"]) {
-    const pos = movil.indexOf(texto);
+    const pos = acciones.indexOf(texto);
     assert.ok(pos > 0, `desapareció «${texto}»`);
-    assert.ok(pos > inicioHoja, `«${texto}» volvió al flujo físico`);
+    assert.ok(pos > inicioHoja, `«${texto}» quedó fuera de la hoja`);
+    assert.ok(!movil.includes(texto), `«${texto}» volvió al flujo físico`);
   }
 
   // Y en la página, la card de acciones quedó acotada a escritorio.
   const pagina = codigoDe(PAGINA);
-  const posDiv = pagina.indexOf('<div className="hidden md:block">');
+  // Recibiendo, ya no se dibuja en ningún ancho —las dos composiciones tienen
+  // sus acciones—; en los demás casos, solo desde `md`. Las dos ramas empiezan
+  // en `hidden`.
+  const posDiv = pagina.indexOf('<div className={puedeRecibir ? "hidden" : "hidden md:block"}>');
   const posAcciones = pagina.indexOf("<AccionesRecepcion");
   assert.ok(posDiv > 0 && posAcciones > posDiv, "la card de acciones sigue expandida en el teléfono");
 
-  // La información general tampoco: se llega por la hoja, con el MISMO componente.
-  assert.match(movil, /<TransferenciaHeader item=\{item\} \/>/);
+  // La información general tampoco: se llega por la hoja, con el MISMO
+  // componente. La hoja vive en `MasAccionesRecepcion` desde la versión de
+  // escritorio, y el móvil no la dibuja en su flujo.
+  assert.match(acciones, /<TransferenciaHeader item=\{item\} \/>/);
+  assert.ok(!movil.includes("<TransferenciaHeader"), "la información general volvió al flujo físico");
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 8. EL ESCRITORIO NO SE REHIZO
 // ═══════════════════════════════════════════════════════════════════════════
 
-test("8. escritorio conserva su composición y sus contratos", () => {
+// ── EL 8 DEFENDÍA LA PANTALLA VIEJA DE ESCRITORIO, Y ÉSA SE REEMPLAZÓ ─────
+//
+// Decía "escritorio conserva su composición" y exigía las piezas de la
+// pantalla de antes —el resumen en tarjetas, el selector de tabs, los chips de
+// categoría, las dos columnas— detrás del corte `md`. Esa pantalla se cambió
+// a propósito por el diseño aprobado (Figma EVJ2KvVCrY0oVSowfboymQ, 384:483),
+// y el corte pasó a `lg`: entre 768 y 1023 se ve la composición del teléfono.
+//
+// Lo que el candado sigue defendiendo es lo que importaba de él: que las dos
+// composiciones estén cada una detrás de SU corte, que no haya un hueco entre
+// los dos ni un ancho donde se vean las dos, y que la de la computadora sea
+// presentación y no decida nada por su cuenta.
+test("8. el corte es `lg`: hasta 1023 el teléfono, desde 1024 la computadora", () => {
   const ws = codigoDe(WORKSPACE);
-
-  // Las piezas del escritorio siguen ahí, con el mismo contrato.
-  assert.match(ws, /<ResumenControlFisico resumen=\{resumen\} filtro=\{filtro\} onFiltrar=\{setFiltro\} \/>/);
-  assert.match(ws, /<SunmiSelectorUnidad/, "el escritorio perdió su selector de tabs");
-  assert.match(ws, /<SunmiChipsFiltro/, "el escritorio perdió sus chips de categoría");
-  assert.match(ws, /className="hidden lg:grid lg:grid-cols-2 gap-3 items-start"/);
-  assert.match(ws, /<SectionHead\s*\n\s*title="Control de recepción"/);
-
-  // Y todo eso vive detrás del corte `md`, así que de 768 px para arriba se
-  // dibuja exactamente lo que se dibujaba antes.
-  const escritorio = ws.indexOf('<div className="hidden md:block space-y-3">');
-  assert.ok(escritorio > 0, "se perdió el envoltorio de escritorio");
-  for (const marca of ["<ResumenControlFisico", "<SunmiSelectorUnidad", "<SunmiChipsFiltro", "hidden lg:grid"]) {
-    assert.ok(ws.indexOf(marca) > escritorio, `${marca} quedó fuera del envoltorio de escritorio`);
+  const movil = ws.indexOf('<div className="lg:hidden">');
+  const compu = ws.indexOf('<div className="hidden lg:block">');
+  assert.ok(movil > 0, "la composición del teléfono dejó de cortar en lg");
+  assert.ok(compu > movil, "la composición de la computadora dejó de cortar en lg");
+  assert.ok(ws.indexOf("<RecepcionMovil") > movil && ws.indexOf("<RecepcionMovil") < compu);
+  assert.ok(ws.indexOf("<RecepcionEscritorio") > compu, "la computadora quedó fuera de su corte");
+  assert.ok(!ws.includes("md:hidden") && !ws.includes("hidden md:block"), "quedó un corte en md");
+  for (const viejo of ["<ResumenControlFisico", "<SunmiSelectorUnidad", "<SunmiChipsFiltro", "<SectionHead"]) {
+    assert.ok(!ws.includes(viejo), `volvió una pieza de la pantalla vieja: ${viejo}`);
   }
 
-  // La ficha de escritorio NO va en hoja: su default es la tarjeta de siempre.
+  // La computadora es presentación: no busca, no filtra, no resuelve códigos
+  // y no llama a ningún endpoint. Todo eso sigue en el cerebro.
+  const compuSrc = codigoDe("components/transferencias/RecepcionEscritorio.jsx");
+  for (const prohibido of ["productosVisibles(", "resumenDeRecepcion(", "resolverEntrada(", "fetch(", "useMemo("]) {
+    assert.ok(!compuSrc.includes(prohibido), `la computadora está decidiendo por su cuenta: «${prohibido}»`);
+  }
+  // Y el panel es la MISMA hoja del teléfono: la ficha con `enHoja`.
+  assert.match(compuSrc, /<FichaProductoRecepcion[\s\S]{0,400}enHoja\n/);
+
+  // La ficha sin la prop sigue siendo la tarjeta de siempre.
   const ficha = codigoDe(FICHA);
-  assert.match(ficha, /enHoja = false/, "la ficha cambió su default y eso movería el escritorio");
+  assert.match(ficha, /enHoja = false/, "la ficha cambió su default");
 });
 
 test("8b. UNA sola lógica: la composición móvil no decide nada", () => {
@@ -269,11 +315,20 @@ test("8b. UNA sola lógica: la composición móvil no decide nada", () => {
   // Enumerados por nombre, el candado dice QUÉ puede guardar el móvil. Los tres
   // son presentación: dos hojas abiertas y un aviso efímero. El día que aparezca
   // un cuarto hay que nombrarlo acá y decir por qué no es negocio.
+  //
+  // `infoGeneral` se mudó con su hoja a `MasAccionesRecepcion`, que comparten
+  // el teléfono y la computadora. Sigue siendo presentación, y se enumera allá.
   const estados = [...movil.matchAll(/const \[(\w+), set\w+\] = useState\(/g)].map((m) => m[1]);
   assert.deepEqual(
     estados.sort(),
-    ["guardado", "infoGeneral", "masAcciones"],
+    ["guardado", "masAcciones"],
     "la composición móvil se guardó estado que no es de presentación"
+  );
+  assert.deepEqual(
+    [...codigoDe("components/transferencias/MasAccionesRecepcion.jsx").matchAll(/const \[(\w+), set\w+\] = useState\(/g)].map(
+      (m) => m[1]
+    ),
+    ["infoGeneral"]
   );
 
   // Y el cerebro le pasa lo que ya calculó.
@@ -307,9 +362,20 @@ test("8b. UNA sola lógica: la composición móvil no decide nada", () => {
 test("9. confirmar sigue bloqueado mientras queden productos sin revisar", () => {
   const movil = codigoDe(MOVIL);
 
+  // ── LA REGLA SE MUDÓ A `cierreDeRecepcion`, Y LAS DOS PANTALLAS LA LEEN ──
+  //
+  // Estos renglones vivían en el móvil. Cuando la computadora tuvo su propia
+  // composición, se mudaron tal cual a `lib/transferencias/recepcionUI.js`:
+  // con la regla escrita en cada pantalla, una podría dejar confirmar algo que
+  // la otra no. Se afirman donde viven, y se exige que las DOS pantallas los
+  // lean de ahí y de ningún otro lado.
+  const regla = codigoDe("lib/transferencias/recepcionUI.js");
+  assert.match(movil, /cierreDeRecepcion\(\{ items: item\?\.items, resumen \}\)/);
+  assert.match(movil, /const \{ trabado \} = cierre;/);
+
   // El deshabilitado se DERIVA del resumen, no de una segunda cuenta.
-  assert.match(movil, /const pendientes = resumen\?\.pendientes \?\? 0/);
-  assert.match(movil, /const todoRevisado = pendientes === 0 && \(resumen\?\.totalRemito \?\? 0\) > 0/);
+  assert.match(regla, /const pendientes = resumen\?\.pendientes \?\? 0/);
+  assert.match(regla, /const todoRevisado = pendientes === 0 && \(resumen\?\.totalRemito \?\? 0\) > 0/);
 
   // ── AHORA SON DOS IMPEDIMENTOS, NO UNO ──────────────────────────────────
   //
@@ -324,8 +390,8 @@ test("9. confirmar sigue bloqueado mientras queden productos sin revisar", () =>
   // El V16 sumó la tercera causa: un no declarado agregado en cero es un
   // borrador, y confirmarlo sería cerrar el remito con una línea que no
   // informa nada. Las tres van en la MISMA condición.
-  assert.match(movil, /const trabado = !todoRevisado \|\| sinMotivo > 0 \|\| sinCargar > 0/);
-  assert.match(movil, /const sinCargar = \(item\?\.items \|\| \[\]\)\.filter\(/);
+  assert.match(regla, /const trabado = !todoRevisado \|\| sinMotivo > 0 \|\| sinCargar > 0/);
+  assert.match(regla, /const sinCargar = \(items \|\| \[\]\)\.filter\(faltaCargarCantidad\)/);
   assert.match(movil, /disabled=\{trabado \|\| confirmando\}/);
 
   // ── EL AVISO SE FUE EN EL V16; LA REGLA NO ──────────────────────────────
@@ -340,12 +406,17 @@ test("9. confirmar sigue bloqueado mientras queden productos sin revisar", () =>
   // de las líneas. Sin esto, alguien podría dejar `trabado` intacto y aun así
   // habilitar el botón desde otro lado.
   assert.ok(!movil.includes("avisoDeCierre"), "volvió el aviso que el V16 sacó de la barra");
-  assert.match(movil, /const sinMotivo = \(item\?\.items \|\| \[\]\)\.filter\(/);
-  assert.equal(
-    (movil.match(/disabled=\{trabado/g) || []).length,
-    1,
-    "hay más de un lugar decidiendo si se puede confirmar"
-  );
+  assert.match(regla, /const sinMotivo = \(items \|\| \[\]\)\.filter\(/);
+  // Y en ninguna de las dos pantallas la regla se volvió a escribir a mano.
+  for (const [rel, src] of [
+    [MOVIL, movil],
+    ["components/transferencias/RecepcionEscritorio.jsx", codigoDe("components/transferencias/RecepcionEscritorio.jsx")],
+  ]) {
+    assert.equal((src.match(/disabled=\{trabado/g) || []).length, 1, `${rel}: más de un lugar decide si se puede confirmar`);
+    assert.ok(!/const trabado = !/.test(src), `${rel} volvió a escribir la regla de confirmar`);
+    assert.ok(!/const sinMotivo = /.test(src), `${rel} volvió a contar las diferencias sin motivo`);
+    assert.match(src, /cierreDeRecepcion\(/, `${rel} no lee la regla compartida`);
+  }
 
   // Y el servidor sigue siendo la autoridad: la guarda no se tocó.
   const confirmar = codigoDe("app/api/transferencias/confirmar-recepcion/route.js");

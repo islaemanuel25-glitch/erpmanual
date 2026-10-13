@@ -613,7 +613,13 @@ export default function TransferenciaDetallePage() {
             `useAccionDePagina` arriba—, y repetirla acá era el segundo
             encabezado que la V2 viene a sacar. El corte es `md`, el mismo
             que usa `LayoutBase` para su fila: o manda uno o manda el otro. */}
-        <div className="hidden md:flex items-start justify-between gap-3 flex-wrap">
+        {/* Recibiendo, desde `lg` la franja la dibuja la composición de la
+            computadora —título, estado, Volver y Confirmar en una tarjeta—, así
+            que ésta queda solo entre `md` y `lg`, sobre la del teléfono, que es
+            la que se ve ahí y no trae Volver propio. */}
+        <div
+          className={`${puedeRecibir ? "hidden md:flex lg:hidden" : "hidden md:flex"} items-start justify-between gap-3 flex-wrap`}
+        >
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
             <SunmiButton color="slate" onClick={volver} className="text-sm shrink-0">
               ← Volver a transferencias
@@ -672,7 +678,11 @@ export default function TransferenciaDetallePage() {
                 ticket y cancelación se llegan por "⋯", y confirmar es el CTA
                 del pie. Las funciones son LAS MISMAS —se le pasan también a
                 `WorkspaceRecepcion`—, no hay una segunda versión. */}
-            <div className="hidden md:block">
+            {/* Recibiendo, no se dibuja en ningún ancho: hasta `lg` se ve la
+                composición del teléfono, con su "⋯" y su pie, y desde `lg` la de
+                la computadora, con su franja. Las dos llaman a las MISMAS
+                funciones de abajo. */}
+            <div className={puedeRecibir ? "hidden" : "hidden md:block"}>
             <AccionesRecepcion
               id={id}
               item={item}
@@ -716,7 +726,7 @@ export default function TransferenciaDetallePage() {
                 No se borra: en el teléfono se llega por "⋯" → "Información
                 general", y lo que se abre es ESTE MISMO componente. Lo que
                 deja de pasar es que ocupe media pantalla durante el conteo. */}
-            <div className="hidden md:block">
+            <div className={puedeRecibir ? "hidden" : "hidden md:block"}>
               <TransferenciaHeader item={item} />
             </div>
 
@@ -762,6 +772,13 @@ export default function TransferenciaDetallePage() {
                   ) : null
                 }
                 imprimirTicket={imprimirTicket}
+                // El MISMO Volver de la franja de arriba, para la de la
+                // computadora: misma función, mismo destino.
+                volver={
+                  <SunmiButton color="slate" onClick={volver} className="shrink-0">
+                    ← Volver
+                  </SunmiButton>
+                }
               />
             ) : (
               <TablaDetalleTransferencia
@@ -777,7 +794,9 @@ export default function TransferenciaDetallePage() {
                 teléfono el avance vive en el bloque compacto —"0 / 15
                 revisados"— y las cinco cifras aparecen recién al llegar a
                 15/15, que es cuando dejan de ser ruido. */}
-            <section className="hidden md:block space-y-2">
+            {/* Recibiendo, los totales viven en las dos composiciones: el pie
+                del teléfono y la franja de la computadora. */}
+            <section className={`${puedeRecibir ? "hidden" : "hidden md:block"} space-y-2`}>
               <SectionHead title="Totales" />
               <SunmiCard>
                 <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-3">

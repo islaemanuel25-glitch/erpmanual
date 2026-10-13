@@ -18,6 +18,7 @@
 import SunmiActionCard from "@/components/sunmi/SunmiActionCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
+import SunmiBarraDeAvance from "@/components/sunmi/SunmiBarraDeAvance";
 import { Bloque, Renglon } from "@/components/finanzas/PiezasDelResumen";
 import { formatearMoneda } from "@/lib/moneda";
 import {
@@ -195,16 +196,12 @@ export function EncabezadoDeDetalle({ titulo, local, contexto, onVolver }) {
  * truncado: no dice 100 si falta contar. El color sale del token de texto del
  * tema con `bg-current`: no hay una clase de fondo de éxito o advertencia y no
  * se escribe uno fijo.
+ *
+ * Desde que la recepción de transferencias necesitó la misma barra, la pieza
+ * vive en el kit (`SunmiBarraDeAvance`), sacada de acá tal cual. Este nombre se
+ * conserva para no tocar a quien la importa.
  */
-export function BarraDeAvance({ pct }) {
-  if (pct == null) return null;
-  return (
-    <div className="flex h-1.5 gap-0.5 overflow-hidden" aria-hidden="true" data-avance={pct}>
-      {pct > 0 && <div className="h-full rounded-full bg-current sunmi-text-success" style={{ width: `${pct}%` }} />}
-      {pct < 100 && <div className="h-full flex-1 rounded-full bg-current sunmi-text-warning" />}
-    </div>
-  );
-}
+export const BarraDeAvance = SunmiBarraDeAvance;
 
 /** "Verificado $X · Falta $Y" en una fila: los dos importes del servidor. */
 export function VerificadoYFalta({ verificado, falta }) {
