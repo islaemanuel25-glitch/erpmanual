@@ -76,9 +76,16 @@ export const OPCIONES_DE_PERIODO_CON_ANIO = Object.freeze([
  *
  * Apagado dice la verdad: existe, y todavía no.
  */
-export default function ChipsDePeriodo({ valor = UNIDADES.SEMANA, onCambiar, deshabilitadas = [], conAnio = false }) {
+export default function ChipsDePeriodo({
+  valor = UNIDADES.SEMANA,
+  onCambiar,
+  deshabilitadas = [],
+  conAnio = false,
+  tamano = "normal",
+}) {
   // El `className` que aceptaba antes no lo pasaba ninguna de las tres pantallas
   // que lo usan, y concatenado no negociaba: se fue con el marcado al kit.
+  // `tamano` va derecho al kit: el compacto es el segmentado de escritorio.
   return (
     <SunmiSelectorDeOpciones
       opciones={conAnio ? OPCIONES_DE_PERIODO_CON_ANIO : OPCIONES_DE_PERIODO}
@@ -86,6 +93,7 @@ export default function ChipsDePeriodo({ valor = UNIDADES.SEMANA, onCambiar, des
       onCambiar={onCambiar}
       etiqueta="Período"
       deshabilitadas={deshabilitadas}
+      tamano={tamano}
     />
   );
 }

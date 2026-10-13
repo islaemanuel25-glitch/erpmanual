@@ -39,6 +39,8 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
  * @param {(clave:string) => void} props.onCambiar
  * @param {string} props.etiqueta  el `aria-label` del grupo
  * @param {string[]} [props.deshabilitadas]  claves que se dibujan apagadas
+ * @param {"normal"|"compacto"} [props.tamano]  "compacto" es el segmentado de
+ *   escritorio (`SelectorCompacto`, abajo); sin la prop, el de siempre
  */
 export default function SunmiSelectorDeOpciones({
   opciones = [],
@@ -46,8 +48,20 @@ export default function SunmiSelectorDeOpciones({
   onCambiar,
   etiqueta,
   deshabilitadas = [],
+  tamano = "normal",
 }) {
   const apagadas = new Set(deshabilitadas || []);
+  if (tamano === TAMANO_COMPACTO) {
+    return (
+      <SelectorCompacto
+        opciones={opciones}
+        valor={valor}
+        onCambiar={onCambiar}
+        etiqueta={etiqueta}
+        apagadas={apagadas}
+      />
+    );
+  }
   return (
     // `gap-1.5` son 5,25 px: el 6 de la especificación ajustado a la escala del
     // proyecto, donde 1rem = 14 px. Por qué se ajusta en vez de entrar al
@@ -110,3 +124,46 @@ export default function SunmiSelectorDeOpciones({
     </div>
   );
 }
+
+/**
+ * EL TAMAÑO COMPACTO, para el escritorio de Finanzas (Figma
+ * EVJ2KvVCrY0oVSowfboymQ, 378:1585): un segmentado de ~33 px de alto —el
+ * diseño pide 32— con las opciones juntas sobre una superficie suave, cada una
+ * del ancho de su texto, letra 13. La elegida sigue siendo `primary`; las otras
+ * pasan a `ghost`, la ausencia de relleno, porque en un segmentado la
+ * superficie la pone el grupo. Paddings de la escala de 3,5: `px-3` da 10,5
+ * donde el diseño pide 12 y `p-1` da 3,5 donde pide 3.
+ *
+ * Va aparte y no como otra rama de clases del normal porque no comparte nada
+ * de lo que el normal explica: ni el toque de 44 ni el reparto del ancho. El
+ * normal queda escrito como estaba, carácter por carácter.
+ */
+function SelectorCompacto({ opciones, valor, onCambiar, etiqueta, apagadas }) {
+  return (
+    <div role="group" aria-label={etiqueta} className="inline-flex shrink-0 gap-0.5 rounded-control sunmi-surface-soft p-1">
+      {opciones.map((o) => {
+        const activo = o.clave === valor;
+        const apagado = apagadas.has(o.clave);
+        return (
+          <SunmiButton
+            key={o.clave}
+            type="button"
+            color={activo ? "primary" : "ghost"}
+            aria-pressed={activo}
+            disabled={apagado || undefined}
+            title={apagado ? "Todavía no disponible" : undefined}
+            onClick={apagado ? undefined : () => onCambiar?.(o.clave)}
+            className={`justify-center min-h-0 py-1.5 px-3 rounded-md text-sm3 whitespace-nowrap ${
+              activo ? "font-semibold" : "font-medium"
+            }`}
+          >
+            {o.texto}
+          </SunmiButton>
+        );
+      })}
+    </div>
+  );
+}
+
+/** El valor de `tamano` que pide el segmentado de escritorio. */
+export const TAMANO_COMPACTO = "compacto";

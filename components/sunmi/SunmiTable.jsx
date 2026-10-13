@@ -155,6 +155,14 @@ export default function SunmiTable({
   ordenDir,
   /** (fila) => "ok" | "alerta" | "atencion" | "apagado" | null */
   tonoFila,
+  /**
+   * (fila) => string. La clase de UNA fila, que `SunmiTableRow` negocia por eje
+   * como cualquier `className`. Lo pidió la tabla de Gastos en escritorio, que
+   * intercala la fila de cada día —fondo suave, letra fuerte— entre las de sus
+   * gastos, como el celular intercala sus bandas. Sin la prop, ninguna fila
+   * recibe nada y la tabla es la de siempre.
+   */
+  claseFila,
   /** (fila) => ReactNode | null. Devolver null es "esta fila no está abierta". */
   filaExpandible,
   onClickFila,
@@ -226,6 +234,7 @@ export default function SunmiTable({
         <Fragment key={clave}>
           <SunmiTableRow
             tono={tonoFila ? tonoFila(fila) : null}
+            className={claseFila ? claseFila(fila) || "" : ""}
             selected={filaSeleccionada ? filaSeleccionada(fila) : false}
             onClick={onClickFila ? () => onClickFila(fila) : undefined}
           >

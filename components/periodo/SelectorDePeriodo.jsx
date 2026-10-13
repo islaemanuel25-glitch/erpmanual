@@ -44,12 +44,10 @@ const sinCambio = () => {};
  * `puedeRetroceder` en false—.
  */
 /**
- * `enFilaDeEscritorio`: para la ranura `periodo` de `LayoutFinanzasEscritorio`.
- * Desde `md` la caja del selector desaparece (`contents`) y los chips y el
- * navegador quedan como celdas de la grilla del molde, uno al lado del otro; el
- * calendario de «Otro» baja a su propio renglón, a todo el ancho. Debajo de
- * `md` no cambia nada. Sin la prop —"Turnos y cierres"— el marcado es el de
- * siempre.
+ * `tamano="compacto"`: para la barra de escritorio de Finanzas
+ * (`LayoutFinanzasEscritorio`). Los chips y el navegador en su tamaño compacto
+ * y en fila, con el calendario de «Otro» entre los dos. Sin la prop —el
+ * celular, "Turnos y cierres"— el marcado es el de siempre.
  */
 export default function SelectorDePeriodo({
   datos,
@@ -59,16 +57,16 @@ export default function SelectorDePeriodo({
   onElegirRango,
   onAtras,
   onAdelante,
-  enFilaDeEscritorio = false,
+  tamano = "normal",
 }) {
   const descripcion = datos?.periodo?.descripcion || null;
   const esOtro = ctx.unidad === CLAVE_OTRO_FINANZAS;
+  const compacto = tamano === "compacto";
   return (
-    <div className={enFilaDeEscritorio ? "space-y-3 md:contents md:space-y-0" : "space-y-3"}>
-      <ChipsDePeriodo valor={ctx.unidad} onCambiar={onCambiarUnidad} />
+    <div className={compacto ? "flex flex-wrap items-center gap-3" : "space-y-3"}>
+      <ChipsDePeriodo valor={ctx.unidad} onCambiar={onCambiarUnidad} tamano={tamano} />
       {esOtro && (
         <SunmiDateRangePicker
-          className={enFilaDeEscritorio ? "md:order-last md:col-span-full" : ""}
           valueDesde={ctx.desde || ""}
           valueHasta={ctx.hasta || ""}
           // El kit los llama al aplicar, ANTES de `onApply`: sin ellos «Aplicar»
@@ -89,6 +87,7 @@ export default function SelectorDePeriodo({
           puedeRetroceder={Boolean(datos?.puedeRetroceder)}
           onAtras={onAtras}
           onAdelante={onAdelante}
+          tamano={tamano}
         />
       )}
     </div>

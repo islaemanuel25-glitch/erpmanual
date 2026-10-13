@@ -63,7 +63,20 @@ export default function NavegadorDePeriodo({
   puedeRetroceder = true,
   onAtras,
   onAdelante,
+  tamano = "normal",
 }) {
+  if (tamano === "compacto") {
+    return (
+      <NavegadorCompacto
+        titulo={titulo}
+        subtitulo={subtitulo}
+        puedeAvanzar={puedeAvanzar}
+        puedeRetroceder={puedeRetroceder}
+        onAtras={onAtras}
+        onAdelante={onAdelante}
+      />
+    );
+  }
   return (
     <div className="flex items-center gap-3 rounded-xl border sunmi-border sunmi-bg-card p-2">
       <Flecha
@@ -89,5 +102,42 @@ export default function NavegadorDePeriodo({
         onClick={onAdelante}
       />
     </div>
+  );
+}
+
+/**
+ * EL TAMAÑO COMPACTO, para la barra de escritorio de Finanzas (Figma
+ * EVJ2KvVCrY0oVSowfboymQ, 378:1594): ~40 px de alto, del ancho de su texto,
+ * las flechas sin superficie propia y el período alineado a la izquierda —la
+ * fecha en una línea, el rango debajo en chico—. Es la misma pieza con el mismo
+ * contrato: las flechas, sus etiquetas y cuándo están apagadas no cambian.
+ */
+function NavegadorCompacto({ titulo, subtitulo, puedeAvanzar, puedeRetroceder, onAtras, onAdelante }) {
+  return (
+    <div className="inline-flex min-w-0 items-center gap-1 rounded-lg border sunmi-border sunmi-bg-card p-0.5">
+      <FlechaCompacta simbolo="‹" etiqueta="Período anterior" habilitada={puedeRetroceder} onClick={onAtras} />
+      <div className="min-w-0 px-1">
+        <div className="text-sm3 font-semibold sunmi-text-strong truncate">{titulo}</div>
+        {subtitulo ? <div className="text-xs2 sunmi-text-muted truncate">{subtitulo}</div> : null}
+      </div>
+      <FlechaCompacta simbolo="›" etiqueta="Período siguiente" habilitada={puedeAvanzar} onClick={onAdelante} />
+    </div>
+  );
+}
+
+function FlechaCompacta({ simbolo, etiqueta, habilitada, onClick }) {
+  return (
+    <SunmiButton
+      type="button"
+      color="ghost"
+      onClick={habilitada ? onClick : undefined}
+      disabled={!habilitada}
+      aria-label={etiqueta}
+      className={`shrink-0 min-h-0 rounded-md px-2 py-1.5 text-base2 font-semibold sunmi-text-strong ${
+        habilitada ? "" : "opacity-35"
+      }`}
+    >
+      {simbolo}
+    </SunmiButton>
   );
 }

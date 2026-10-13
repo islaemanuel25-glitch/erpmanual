@@ -183,6 +183,21 @@ function pantalla(d, ctx = {}, extra = {}) {
   );
 }
 const botonDe = (html, txt) => html.match(new RegExp(`<button[^>]*>[^<]*${txt}[^<]*</button>`))?.[0] ?? null;
+
+// ── DOS DIBUJOS EN EL MISMO HTML ─────────────────────────────────────────
+//
+// Desde el molde de escritorio de Finanzas (`LayoutFinanzasEscritorio`) el
+// resumen se dibuja dos veces: el del celular (`data-finanzas-celular`,
+// `md:hidden`) y el de escritorio (`data-finanzas-escritorio`). Lo que
+// cuenta —cuántas tarjetas, en qué orden— se pregunta en CADA dibujo por
+// separado: contado sobre el HTML entero, el doble de tarjetas se leía como
+// "una tarjeta de más por turno" y no como dos pantallas correctas.
+function dibujos(html) {
+  const i = html.indexOf("data-finanzas-celular");
+  const j = html.indexOf("data-finanzas-escritorio");
+  assert.ok(i >= 0 && j > i, "el resumen dejó de dibujarse en el molde: releer este candado");
+  return { celular: html.slice(i, j), escritorio: html.slice(j) };
+}
 const grupoDe = (d) => d.tesoreria.grupos[0].clave;
 
 // ── F0 · LOS ESCENARIOS TIENEN LA FORMA DEL ENDPOINT REAL ────────────────
@@ -756,10 +771,19 @@ test("[47] la navegación de Finanzas sigue: la página registra título y Volve
     const t = fuente(p);
     assert.match(t, /useTituloDePagina\("Tesorería"\)/, p);
     assert.match(t, /useAccionDePagina\(\(\) => <SunmiBackButton href=\{RUTA_(FINANZAS|TESORERIA)\} \/>, \[\]\)/, p);
-    assert.match(t, /<AccionDePantalla>\{volver\}<\/AccionDePantalla>/, p);
+    // El Volver lo ubica el tablero: la página se lo pasa y no dibuja su fila.
+    assert.match(t, /<TableroTesoreria[^>]*\bvolver=\{volver\}/, p);
     assert.match(t, /!permisos\.includes\(PERMISO_VER_TESORERIA\)/, p);
     assert.match(t, /<Suspense/, p);
   }
+  // Y el tablero lo pone en un solo lugar a la vez: en su fila (lista de locales
+  // y detalles) o en la barra del molde (resumen). La fila se dibuja siempre,
+  // vacía cuando el Volver está en la barra, porque en el celular es la hermana
+  // que le da el margen a lo que sigue.
+  const tablero = fuente("components/tesoreria/TableroTesoreria.jsx");
+  assert.match(tablero, /<AccionDePantalla>\{volverEnLaBarra \? null : volver\}<\/AccionDePantalla>/);
+  assert.match(tablero, /volver=\{volverEnLaBarra \? volver : null\}/);
+  assert.match(tablero, /const volverEnLaBarra = !esEntrada && !enDetalle;/);
   // Entrar a un detalle es navegar (el "atrás" vuelve); mover el período, reemplazar.
   const hook = fuente("components/tesoreria/useTesoreria.js");
   assert.match(hook, /if \(navegar\) router\.push\(url\);\s*else router\.replace\(url, \{ scroll: false \}\);/);
@@ -831,7 +855,9 @@ test("[C] una tarjeta por turno, con el nombre del catálogo, sus cajas, el efec
   });
   const d = datos(esc);
   const html = pantalla(d);
-  assert.equal((html.match(/data-tarjeta-turno=/g) || []).length, 2, "una tarjeta por turno operativo");
+  for (const [cual, dibujo] of Object.entries(dibujos(html))) {
+    assert.equal((dibujo.match(/data-tarjeta-turno=/g) || []).length, 2, `una tarjeta por turno operativo (${cual})`);
+  }
   const t = texto(html);
   assert.match(t, /Mañana 2 cajas Sin verificar \$110\.000,00 Efectivo entregado/);
   assert.match(t, /Siesta larga 1 caja Sin verificar \$8\.000,00 Efectivo entregado/);
@@ -879,8 +905,12 @@ test("[E] «Ver cajas (N)» abre las cajas dentro de la misma tarjeta y pasa a �
 test("[F] «Sin turno asignado» va al final, secundario, y se puede verificar mientras falte", () => {
   const d = datos(conSinTurno());
   const html = pantalla(d);
-  assert.ok(html.indexOf("data-sin-turno") > html.lastIndexOf("data-tarjeta-turno"), "sin turno no quedó al final");
-  assert.equal((html.match(/data-tarjeta-turno=/g) || []).length, 1, "sin turno se dibujó como un turno más");
+  for (const [cual, dibujo] of Object.entries(dibujos(html))) {
+    assert.ok(dibujo.indexOf("data-sin-turno") > dibujo.lastIndexOf("data-tarjeta-turno"), `sin turno no quedó al final (${cual})`);
+    assert.equal((dibujo.match(/data-tarjeta-turno=/g) || []).length, 1, `sin turno se dibujó como un turno más (${cual})`);
+  }
+  // En escritorio, además, a todo el ancho de la grilla de turnos.
+  assert.match(dibujos(html).escritorio, /<div class="col-span-full"><[^>]*data-sin-turno/, "sin turno no ocupa todo el ancho");
   const seco = sinTurnoDe(d, claveSinTurno(d));
   const t = texto(seco);
   assert.match(t, /^Sin turno asignado 1 caja · falta \$8\.000,00 \$8\.000,00 Verificar ›$/);

@@ -22,9 +22,18 @@ import { ESTADO_CUENTA, diaLegible } from "@/lib/finanzas/pagosProveedores";
 import { importeDeLaCuenta } from "@/lib/finanzas/calendarioDePagos";
 import { ROTULO_ESTADO_GASTO } from "@/lib/finanzas/calendarioDeGastos";
 
-export default function FilaGasto({ gasto, filtro, hoy, variasUbicaciones = false, onAbrir }) {
+/**
+ * Si el gasto está pagado y si está vencido. Lo leen la fila del celular y la
+ * tabla de escritorio (`TablaGastos`): una sola regla para las dos.
+ */
+export function situacionDelGasto(gasto, hoy) {
   const pagado = gasto?.estado === ESTADO_CUENTA.PAGADA;
   const vencido = !pagado && Boolean(gasto?.vencimiento) && gasto.vencimiento < hoy;
+  return { pagado, vencido };
+}
+
+export default function FilaGasto({ gasto, filtro, hoy, variasUbicaciones = false, onAbrir }) {
+  const { pagado, vencido } = situacionDelGasto(gasto, hoy);
   const vence = !gasto?.vencimiento
     ? "Sin vencimiento"
     : `${vencido ? "Venció" : "Vence"} ${diaLegible(gasto.vencimiento)}`;

@@ -48,11 +48,18 @@ function Gastos() {
 
   return (
     // En el celular, mismos espacios que Pagos a proveedores. Desde `md` el
-    // molde de Finanzas va de costado a costado: sin tope, y 24,5 px de margen
-    // con los 14 del shell (`md:px-3`).
-    <div className="w-full min-h-full mx-auto max-w-4xl px-4 pt-4 pb-4 space-y-3.5 md:max-w-none md:px-3">
-      <AccionDePantalla>{volver}</AccionDePantalla>
-      <ListaGastos />
+    // molde de Finanzas va de costado a costado: sin tope, 32 px de margen con
+    // los 14 del shell (`md:px-4.5`), y sin el `pt-4`: la barra del molde ya
+    // arranca con el espacio de abajo.
+    //
+    // `AccionDePantalla` queda VACÍA a propósito. En escritorio el Volver va en
+    // la barra del molde (`volver` a `ListaGastos`) y no en su propia fila; el
+    // elemento se conserva porque en el celular no se ve pero cuenta —es la
+    // hermana anterior que le da a lo que sigue el margen de `space-y-3.5`—, y
+    // sacarlo subiría la pantalla 12 px.
+    <div className="w-full min-h-full mx-auto max-w-4xl px-4 pt-4 pb-4 space-y-3.5 md:max-w-none md:px-4.5 md:pt-0">
+      <AccionDePantalla />
+      <ListaGastos volver={volver} />
     </div>
   );
 }

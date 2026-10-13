@@ -17,7 +17,6 @@ import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePagi
 import SinPermisos from "@/components/auth/SinPermisos";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
-import AccionDePantalla from "@/components/transferencias/AccionDePantalla";
 import TableroTesoreria from "@/components/tesoreria/TableroTesoreria";
 import { RUTA_TESORERIA } from "@/lib/finanzas/contextoFinanzas";
 import { PERMISO_VER_TESORERIA } from "@/lib/tesoreria/permisos";
@@ -49,12 +48,12 @@ function TesoreriaDelLocal() {
   if (!esAdmin && !permisos.includes(PERMISO_VER_TESORERIA)) return <SinPermisos />;
 
   return (
-    // Desde `md` el molde de Finanzas va de costado a costado: sin tope, y
-    // 24,5 px de margen con los 14 del shell (`md:px-3`). Los detalles se
-    // topean solos (`AnchoDeLectura`).
-    <div className="w-full min-h-full mx-auto max-w-4xl px-4 pt-4 pb-4 space-y-3.5 md:max-w-none md:px-3">
-      <AccionDePantalla>{volver}</AccionDePantalla>
-      <TableroTesoreria destino={localId} />
+    // Desde `md` el molde de Finanzas va de costado a costado: sin tope, 32 px
+    // de margen con los 14 del shell (`md:px-4.5`) y sin el `pt-4`. Los
+    // detalles se topean solos (`AnchoDeLectura`). El Volver lo ubica el
+    // tablero: en la barra del molde o en su fila (`AccionDePantalla`).
+    <div className="w-full min-h-full mx-auto max-w-4xl px-4 pt-4 pb-4 space-y-3.5 md:max-w-none md:px-4.5 md:pt-0">
+      <TableroTesoreria destino={localId} volver={volver} />
     </div>
   );
 }

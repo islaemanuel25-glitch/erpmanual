@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 
 import EntradaDeLocales from "@/components/transferencias/EntradaDeLocales";
 import { AnchoDeLectura } from "@/components/finanzas/LayoutFinanzasEscritorio";
+import AccionDePantalla from "@/components/transferencias/AccionDePantalla";
 import { insigniaDelLocal } from "@/components/finanzas/TableroFinanzas";
 import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { VISTA_TESORERIA, urlDeLocalTesoreria, urlDeTesoreria } from "@/lib/tesoreria/contextoTesoreria";
@@ -25,7 +26,22 @@ import HojaVerificarEfectivo from "./HojaVerificarEfectivo";
 import HojaAnularVerificacion from "./HojaAnularVerificacion";
 import { useTesoreria } from "./useTesoreria";
 
-export default function TableroTesoreria({ destino = null }) {
+/**
+ * @param {object} props
+ * @param {React.ReactNode} [props.volver]  el Volver de la página
+ *
+ * ── DÓNDE VA EL VOLVER EN ESCRITORIO ─────────────────────────────────────
+ *
+ * En el resumen del período, en la barra del molde de Finanzas, al lado del
+ * período: no ocupa su propia fila. En la lista de locales y en los detalles,
+ * que no usan el molde, en su fila de siempre (`AccionDePantalla`).
+ *
+ * `AccionDePantalla` se dibuja SIEMPRE, vacía cuando el Volver se fue a la
+ * barra: en el celular no se ve pero cuenta —es la hermana anterior que le da
+ * a lo que sigue el margen de `space-y-3.5` de la página—, y sacarla subiría
+ * la pantalla 12 px.
+ */
+export default function TableroTesoreria({ destino = null, volver = null }) {
   const router = useRouter();
   const t = useTesoreria({ destino });
   const [verificando, setVerificando] = useState(null);
@@ -33,23 +49,30 @@ export default function TableroTesoreria({ destino = null }) {
 
   const esEntrada = t.datos?.vista === "ENTRADA";
   const lectura = t.datos?.tesoreria || null;
+  // La misma condición con que `PantallaTesoreria` elige un detalle.
+  const enDetalle = t.ctx.vista !== VISTA_TESORERIA.RESUMEN && Boolean(lectura);
+  const volverEnLaBarra = !esEntrada && !enDetalle;
 
   if (esEntrada) {
     return (
-      <AnchoDeLectura>
-        <EntradaDeLocales
-          locales={t.datos.locales || []}
-          rotulo="LOCALES"
-          textoVacio="Este grupo todavía no tiene locales."
-          insigniaDe={insigniaDelLocal}
-          onEntrar={(l) => router.push(urlDeLocalTesoreria(l.localId, t.ctx))}
-        />
-      </AnchoDeLectura>
+      <>
+        <AccionDePantalla>{volver}</AccionDePantalla>
+        <AnchoDeLectura>
+          <EntradaDeLocales
+            locales={t.datos.locales || []}
+            rotulo="LOCALES"
+            textoVacio="Este grupo todavía no tiene locales."
+            insigniaDe={insigniaDelLocal}
+            onEntrar={(l) => router.push(urlDeLocalTesoreria(l.localId, t.ctx))}
+          />
+        </AnchoDeLectura>
+      </>
     );
   }
 
   return (
     <>
+      <AccionDePantalla>{volverEnLaBarra ? null : volver}</AccionDePantalla>
       <PantallaTesoreria
         datos={t.datos?.vista === "UN_LOCAL" ? t.datos : null}
         cargando={t.cargando}
@@ -68,6 +91,7 @@ export default function TableroTesoreria({ destino = null }) {
         onAnular={(acto) => setAnulando(acto)}
         // Solo quien entró desde la lista puede volver a ella a elegir otro local.
         onCambiarLocal={destino ? () => router.push(urlDeTesoreria(t.ctx)) : null}
+        volver={volverEnLaBarra ? volver : null}
       />
 
       <HojaVerificarEfectivo

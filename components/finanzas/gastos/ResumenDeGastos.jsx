@@ -65,3 +65,27 @@ export default function ResumenDeGastos({ filtro, descripcion, calendario }) {
     />
   );
 }
+
+/**
+ * LOS TOTALES DE ESCRITORIO (Figma EVJ2KvVCrY0oVSowfboymQ, 378:1605): lo mismo
+ * que dice la tarjeta de arriba, con los mismos números y los mismos rótulos,
+ * repartido en las partes de la franja del molde. El aviso de períodos
+ * anteriores, que en el celular es una frase adentro de la tarjeta, acá es un
+ * número propio en el color de advertencia; sin saldo anterior dice $ 0,00 y
+ * no se esconde, para que la franja no cambie de forma de un período a otro.
+ */
+export function totalesDeGastos({ filtro, calendario }) {
+  const textos = TEXTOS_DEL_RESUMEN_DE_GASTOS[filtroDeCuentas(filtro)];
+  const { cantidad, importe } = totalDelPeriodo(calendario);
+  const anteriores = calendario?.anteriores;
+  return [
+    { clave: "periodo", rotulo: textos.rotulo, valor: formatearMoneda(importe), nota: rotuloDeGastos(cantidad) },
+    {
+      clave: "anteriores",
+      rotulo: "Saldo de períodos anteriores",
+      valor: formatearMoneda(anteriores ? anteriores.importe : 0),
+      nota: rotuloDeGastos(anteriores ? anteriores.cantidad : 0),
+      tono: anteriores ? "advertencia" : undefined,
+    },
+  ];
+}

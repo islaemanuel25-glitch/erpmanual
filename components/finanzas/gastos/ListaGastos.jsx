@@ -85,8 +85,10 @@ import { parseContextoGastos, urlDeGasto, urlDeGastos } from "@/lib/finanzas/con
 
 import FilaGasto from "./FilaGasto";
 import ModalNuevoGasto from "./ModalNuevoGasto";
-import ResumenDeGastos from "./ResumenDeGastos";
+import ResumenDeGastos, { totalesDeGastos } from "./ResumenDeGastos";
+import TablaGastos from "./TablaGastos";
 import LayoutFinanzasEscritorio from "@/components/finanzas/LayoutFinanzasEscritorio";
+import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 
 async function pedirGastos(consulta) {
   const res = await fetch(`/api/finanzas/gastos?${consulta}`, { cache: "no-store", credentials: "include" });
@@ -97,7 +99,12 @@ async function pedirGastos(consulta) {
   return j;
 }
 
-export default function ListaGastos() {
+/**
+ * @param {object} props
+ * @param {React.ReactNode} [props.volver]  el Volver de la página: en escritorio
+ *   va en la barra del molde en vez de ocupar su propia fila
+ */
+export default function ListaGastos({ volver = null }) {
   const router = useRouter();
   const params = useSearchParams();
   const ctx = parseContextoGastos(params);
@@ -204,38 +211,23 @@ export default function ListaGastos() {
   const errorDeBusqueda = lista.enElServidor && resultado?.clave === clave ? resultado.error : "";
   const vacio = vacioDeLaLista({ busqueda, hayFilas, grupos, esperando: lista.esperando, error: errorDeBusqueda });
 
-  // El estado y la categoría van dos veces en el árbol, la MISMA pieza: en el
-  // celular están arriba del resumen, y en escritorio arriba de la lista, en la
-  // otra columna del molde. Se ve una sola según el ancho; las dos leen y
-  // escriben la URL, así que no pueden decir cosas distintas.
-  const selectorDeEstado = (
-    <SunmiSelectorDeOpciones
-      opciones={OPCIONES_FILTRO_CUENTAS}
-      valor={filtro}
-      onCambiar={(v) => ir({ estado: v })}
-      etiqueta="Estado de los gastos"
-    />
-  );
-  const chipsDeCategoria = (
-    <SunmiChipsFiltro
-      opciones={categorias.map((c) => ({ clave: String(c.id), texto: c.nombre }))}
-      valor={cat}
-      onCambiar={(c) => ir({ cat: c ? Number(c) : null })}
-    />
-  );
   const listo = !cargando && !error && datos;
 
-  // Escritorio: el saldo y Nuevo gasto a la izquierda; a la derecha el estado
-  // con el buscador al lado, las categorías y la lista. En el celular, el orden
-  // de siempre: período, estado, categoría, resumen, Nuevo gasto, buscador,
-  // lista.
+  // Debajo de `md`, `celular` es la pantalla de siempre, pieza por pieza. Desde
+  // `md`, el molde de Finanzas: barra, totales, filtros y la tabla. Las dos
+  // leen y escriben la misma URL y el mismo estado, así que no pueden decir
+  // cosas distintas; el ancho elige cuál se ve.
   return (
     <>
       <LayoutFinanzasEscritorio
         periodo={
           <>
-            <ChipsDePeriodo valor={unidad} onCambiar={(u) => ir({ unidad: u, desp: 0 })} deshabilitadas={CHIPS_APAGADOS} />
-
+            <ChipsDePeriodo
+              valor={unidad}
+              onCambiar={(u) => ir({ unidad: u, desp: 0 })}
+              deshabilitadas={CHIPS_APAGADOS}
+              tamano="compacto"
+            />
             <NavegadorDePeriodo
               titulo={descripcion.titulo}
               subtitulo={descripcion.subtitulo}
@@ -243,106 +235,187 @@ export default function ListaGastos() {
               puedeRetroceder={puedeRetrocederPagos(desp, filtro)}
               onAtras={() => ir({ desp: desp - 1 })}
               onAdelante={() => ir({ desp: desp + 1 })}
+              tamano="compacto"
             />
           </>
         }
-        resumen={
+        acciones={
           <>
-            <div className="space-y-3.5 md:hidden">
-              {selectorDeEstado}
-              {chipsDeCategoria}
-            </div>
-
-            {cargando && (
-              <div className="py-12">
-                <SunmiLoader />
-              </div>
-            )}
-
-            {error && !cargando && (
-              <SunmiAviso tono="danger" titulo="No se pudo cargar">
-                {error}
-              </SunmiAviso>
-            )}
-
-            {!cargando && !error && datos && (
-              <>
-                <ResumenDeGastos filtro={filtro} descripcion={descripcion} calendario={calendario} />
-
-                {lista.incompleta && (
-                  <SunmiAviso tono="warning" titulo="Lista incompleta">
-                    Hay más gastos de los que se pueden mostrar juntos. Elegí un período más corto o una categoría
-                    para ver todos.
-                  </SunmiAviso>
-                )}
-
-                {datos.puedeCrear && (
-                  <SunmiButton color="primary" className="w-full" onClick={() => setNuevoAbierto(true)}>
-                    Nuevo gasto
-                  </SunmiButton>
-                )}
-              </>
+            {volver}
+            {datos?.puedeCrear && (
+              <SunmiButton color="primary" onClick={() => setNuevoAbierto(true)}>
+                + Nuevo gasto
+              </SunmiButton>
             )}
           </>
         }
-        contenido={
+        totales={listo ? totalesDeGastos({ filtro, calendario }) : null}
+        filtros={
           <>
-            {/* La fila del estado y el buscador. En el celular no es una caja
-                (`contents`): el estado no se ve y el buscador queda en el flujo
-                del molde, debajo de Nuevo gasto, como siempre. */}
-            <div className="contents space-y-3.5 md:grid md:grid-cols-finanzasFiltros md:items-center md:gap-x-3.5 md:space-y-0">
-              <div className="hidden md:block">{selectorDeEstado}</div>
-
-              {listo && hayFilas && (
+            <SunmiSelectorDeOpciones
+              opciones={OPCIONES_FILTRO_CUENTAS}
+              valor={filtro}
+              onCambiar={(v) => ir({ estado: v })}
+              etiqueta="Estado de los gastos"
+              tamano="compacto"
+            />
+            <SunmiSelectAdv
+              value={cat == null ? "" : String(cat)}
+              onChange={(c) => ir({ cat: c ? Number(c) : null })}
+              aria-label="Categoría"
+              className="w-48 shrink-0"
+            >
+              <SunmiSelectOption value="">Categoría: Todas</SunmiSelectOption>
+              {categorias.map((c) => (
+                <SunmiSelectOption key={c.id} value={String(c.id)}>
+                  {c.nombre}
+                </SunmiSelectOption>
+              ))}
+            </SunmiSelectAdv>
+            {listo && hayFilas && (
+              <div className="min-w-0 flex-1">
                 <SunmiInput
                   value={busqueda}
                   onChange={(e) => setBusqueda(e.target.value)}
                   placeholder="Buscar concepto, beneficiario o comprobante"
                   aria-label="Buscar concepto, beneficiario o comprobante"
-                  className="w-full rounded-xl text-sm3"
+                  className="w-full rounded-lg text-sm3"
                 />
-              )}
-            </div>
-
-            <div className="hidden md:block">{chipsDeCategoria}</div>
-
-            {listo && (
-              <>
-                {lista.esperando && (
-                  <div className="py-12">
-                    <SunmiLoader />
-                  </div>
-                )}
-
-                {errorDeBusqueda && (
-                  <SunmiAviso tono="danger" titulo="No se pudo buscar">
-                    {errorDeBusqueda}
-                  </SunmiAviso>
-                )}
-
-                {vacio === VACIO_DE_LA_LISTA.BUSQUEDA && (
-                  <div className="text-center py-12 sunmi-text-muted text-xs">Ningún gasto coincide con la búsqueda.</div>
-                )}
-
-                {!lista.esperando &&
-                  !errorDeBusqueda &&
-                  grupos.map((g) => (
-                    <DiaConBanda key={g.clave} titulo={g.titulo} dato={rotuloDeGastos(g.cantidad)} importe={formatearMoneda(g.importe)}>
-                      {g.gastos.map((gasto) => (
-                        <FilaGasto
-                          key={gasto.id}
-                          gasto={gasto}
-                          filtro={filtro}
-                          hoy={hoy}
-                          variasUbicaciones={Boolean(datos.variasUbicaciones)}
-                          onAbrir={() => router.push(urlDeGasto(gasto.id, ctx))}
-                        />
-                      ))}
-                    </DiaConBanda>
-                  ))}
-              </>
+              </div>
             )}
           </>
+        }
+        contenido={
+          <>
+            {error && !cargando && (
+              <SunmiAviso tono="danger" titulo="No se pudo cargar">
+                {error}
+              </SunmiAviso>
+            )}
+            {listo && lista.incompleta && (
+              <SunmiAviso tono="warning" titulo="Lista incompleta">
+                Hay más gastos de los que se pueden mostrar juntos. Elegí un período más corto o una categoría
+                para ver todos.
+              </SunmiAviso>
+            )}
+            {listo && errorDeBusqueda && (
+              <SunmiAviso tono="danger" titulo="No se pudo buscar">
+                {errorDeBusqueda}
+              </SunmiAviso>
+            )}
+            {!error && !errorDeBusqueda && (
+              <TablaGastos
+                grupos={listo ? grupos : []}
+                filtro={filtro}
+                hoy={hoy}
+                cargando={cargando || Boolean(listo && lista.esperando)}
+                vacio={vacio}
+                variasUbicaciones={Boolean(datos?.variasUbicaciones)}
+                onAbrir={(gasto) => router.push(urlDeGasto(gasto.id, ctx))}
+              />
+            )}
+          </>
+        }
+        celular={
+    <>
+      <ChipsDePeriodo valor={unidad} onCambiar={(u) => ir({ unidad: u, desp: 0 })} deshabilitadas={CHIPS_APAGADOS} />
+
+      <NavegadorDePeriodo
+        titulo={descripcion.titulo}
+        subtitulo={descripcion.subtitulo}
+        puedeAvanzar={puedeAvanzarPagos(desp, filtro)}
+        puedeRetroceder={puedeRetrocederPagos(desp, filtro)}
+        onAtras={() => ir({ desp: desp - 1 })}
+        onAdelante={() => ir({ desp: desp + 1 })}
+      />
+
+      <SunmiSelectorDeOpciones
+        opciones={OPCIONES_FILTRO_CUENTAS}
+        valor={filtro}
+        onCambiar={(v) => ir({ estado: v })}
+        etiqueta="Estado de los gastos"
+      />
+
+      <SunmiChipsFiltro
+        opciones={categorias.map((c) => ({ clave: String(c.id), texto: c.nombre }))}
+        valor={cat}
+        onCambiar={(c) => ir({ cat: c ? Number(c) : null })}
+      />
+
+      {cargando && (
+        <div className="py-12">
+          <SunmiLoader />
+        </div>
+      )}
+
+      {error && !cargando && (
+        <SunmiAviso tono="danger" titulo="No se pudo cargar">
+          {error}
+        </SunmiAviso>
+      )}
+
+      {!cargando && !error && datos && (
+        <>
+          <ResumenDeGastos filtro={filtro} descripcion={descripcion} calendario={calendario} />
+
+          {lista.incompleta && (
+            <SunmiAviso tono="warning" titulo="Lista incompleta">
+              Hay más gastos de los que se pueden mostrar juntos. Elegí un período más corto o una categoría
+              para ver todos.
+            </SunmiAviso>
+          )}
+
+          {datos.puedeCrear && (
+            <SunmiButton color="primary" className="w-full" onClick={() => setNuevoAbierto(true)}>
+              Nuevo gasto
+            </SunmiButton>
+          )}
+
+          {hayFilas && (
+            <SunmiInput
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar concepto, beneficiario o comprobante"
+              aria-label="Buscar concepto, beneficiario o comprobante"
+              className="w-full rounded-xl text-sm3"
+            />
+          )}
+
+          {lista.esperando && (
+            <div className="py-12">
+              <SunmiLoader />
+            </div>
+          )}
+
+          {errorDeBusqueda && (
+            <SunmiAviso tono="danger" titulo="No se pudo buscar">
+              {errorDeBusqueda}
+            </SunmiAviso>
+          )}
+
+          {vacio === VACIO_DE_LA_LISTA.BUSQUEDA && (
+            <div className="text-center py-12 sunmi-text-muted text-xs">Ningún gasto coincide con la búsqueda.</div>
+          )}
+
+          {!lista.esperando &&
+            !errorDeBusqueda &&
+            grupos.map((g) => (
+              <DiaConBanda key={g.clave} titulo={g.titulo} dato={rotuloDeGastos(g.cantidad)} importe={formatearMoneda(g.importe)}>
+                {g.gastos.map((gasto) => (
+                  <FilaGasto
+                    key={gasto.id}
+                    gasto={gasto}
+                    filtro={filtro}
+                    hoy={hoy}
+                    variasUbicaciones={Boolean(datos.variasUbicaciones)}
+                    onAbrir={() => router.push(urlDeGasto(gasto.id, ctx))}
+                  />
+                ))}
+              </DiaConBanda>
+            ))}
+        </>
+      )}
+    </>
         }
       />
 

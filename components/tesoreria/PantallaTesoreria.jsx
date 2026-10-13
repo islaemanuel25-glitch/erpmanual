@@ -71,6 +71,7 @@ import LayoutFinanzasEscritorio, { AnchoDeLectura } from "@/components/finanzas/
  * @param {boolean} props.faltaRango  «Otro» sin las dos fechas: no se pidió nada
  * @param {string} props.hoy          AAAA-MM-DD argentino, tope del calendario
  * @param {function|null} props.onCambiarLocal  solo el depósito: volver a la lista
+ * @param {React.ReactNode} [props.volver]  el Volver de la página, para la barra de escritorio
  */
 export default function PantallaTesoreria({
   datos,
@@ -89,6 +90,7 @@ export default function PantallaTesoreria({
   onVerificar,
   onAnular,
   onCambiarLocal = null,
+  volver = null,
 }) {
   const lectura = datos?.tesoreria || null;
   const local = datos?.local?.nombre || "";
@@ -103,58 +105,76 @@ export default function PantallaTesoreria({
     }
   }
 
-  // Escritorio: el resumen del período a la izquierda y los turnos a la
-  // derecha (`LayoutFinanzasEscritorio`). En el celular el orden es el de
-  // siempre: período, avisos, Cobrado por POS, Efectivo entregado, turnos.
+  const selector = (tamano) => (
+    <SelectorDePeriodo
+      datos={datos}
+      ctx={ctx}
+      hoy={hoy}
+      onCambiarUnidad={onCambiarUnidad}
+      onElegirRango={onElegirRango}
+      onAtras={onAtras}
+      onAdelante={onAdelante}
+      tamano={tamano}
+    />
+  );
+  const estado = (
+    <>
+      {faltaRango && (
+        <SunmiAviso tono="neutral" titulo="Elegí el período">
+          Con «Otro» elegí desde y hasta para ver la Tesorería de esas fechas.
+        </SunmiAviso>
+      )}
+
+      {cargando && !lectura && (
+        <div className="py-12">
+          <SunmiLoader />
+        </div>
+      )}
+
+      {error && !cargando && (
+        <div role="alert" className="rounded-xl border sunmi-border-danger px-4 py-3 space-y-2">
+          <p className="text-sm2 sunmi-text-danger">{error}</p>
+          {onReintentar ? (
+            <SunmiButton color="slate" type="button" onClick={onReintentar} className="min-h-toque">
+              Reintentar
+            </SunmiButton>
+          ) : null}
+        </div>
+      )}
+    </>
+  );
+  const hayLectura = Boolean(lectura && !error);
+
+  // Debajo de `md`, `celular` es la pantalla de siempre, en su orden. Desde
+  // `md`, el molde de Finanzas: barra, totales y los turnos a todo el ancho.
   return (
     <div className="space-y-3.5">
-      <FilaDelLocal local={local} onCambiarLocal={onCambiarLocal} />
-
       <LayoutFinanzasEscritorio
-        periodo={
-          <SelectorDePeriodo
-            datos={datos}
-            ctx={ctx}
-            hoy={hoy}
-            onCambiarUnidad={onCambiarUnidad}
-            onElegirRango={onElegirRango}
-            onAtras={onAtras}
-            onAdelante={onAdelante}
-            enFilaDeEscritorio
-          />
-        }
-        resumen={
+        celular={
           <>
-            {faltaRango && (
-              <SunmiAviso tono="neutral" titulo="Elegí el período">
-                Con «Otro» elegí desde y hasta para ver la Tesorería de esas fechas.
-              </SunmiAviso>
+            <FilaDelLocal local={local} onCambiarLocal={onCambiarLocal} />
+            {selector("normal")}
+            {estado}
+            {hayLectura && (
+              <ResumenTesoreria datos={datos} lectura={lectura} ctx={ctx} onIr={onIr} onVerificar={onVerificar} />
             )}
-
-            {cargando && !lectura && (
-              <div className="py-12">
-                <SunmiLoader />
-              </div>
-            )}
-
-            {error && !cargando && (
-              <div role="alert" className="rounded-xl border sunmi-border-danger px-4 py-3 space-y-2">
-                <p className="text-sm2 sunmi-text-danger">{error}</p>
-                {onReintentar ? (
-                  <SunmiButton color="slate" type="button" onClick={onReintentar} className="min-h-toque">
-                    Reintentar
-                  </SunmiButton>
-                ) : null}
-              </div>
-            )}
-
-            {lectura && !error && <ResumenTesoreria datos={datos} lectura={lectura} onIr={onIr} />}
           </>
         }
+        periodo={selector("compacto")}
+        acciones={
+          <>
+            <FilaDelLocal local={local} onCambiarLocal={onCambiarLocal} />
+            {volver}
+          </>
+        }
+        totales={hayLectura && !periodoSinMovimientos(lectura) ? totalesDeTesoreria(lectura) : null}
         contenido={
-          lectura && !error && (
-            <TurnosTesoreria datos={datos} lectura={lectura} ctx={ctx} onIr={onIr} onVerificar={onVerificar} />
-          )
+          <>
+            {estado}
+            {hayLectura && (
+              <PeriodoEnEscritorio datos={datos} lectura={lectura} ctx={ctx} onIr={onIr} onVerificar={onVerificar} />
+            )}
+          </>
         }
       />
     </div>
@@ -178,80 +198,148 @@ function FilaDelLocal({ local, onCambiarLocal }) {
 }
 
 // ── A · EL RESUMEN DEL PERÍODO ───────────────────────────────────────────
-//
-// En dos mitades, una por ranura del molde: lo que resume el período
-// (`ResumenTesoreria`) y lo que lo detalla (`TurnosTesoreria`). En el celular
-// van una debajo de la otra, en el mismo orden que cuando eran una sola.
 
-function ResumenTesoreria({ datos, lectura, onIr }) {
+function ResumenTesoreria({ datos, lectura, ctx, onIr, onVerificar }) {
   const r = lectura.resumen || {};
 
-  if (periodoSinMovimientos(lectura)) return null;
+  if (periodoSinMovimientos(lectura)) return <SinMovimientos />;
 
-  const avisos = avisosDeRevision(lectura);
+  const { avisos, grupos, cruzan, comunDeTurno } = leerElPeriodo({ datos, lectura, ctx, onIr, onVerificar });
 
   return (
     <>
-      {avisos.map((a) => (
-        <AvisoDeEstado
-          key={a.verificacionId}
-          tono="danger"
-          accion={
-            <EnlaceTesoreria onClick={() => onIr({ vista: VISTA_TESORERIA.VERIFICACION, verificacion: a.verificacionId })}>
-              Ver verificación #{a.verificacionId}
-            </EnlaceTesoreria>
-          }
-        >
-          Una verificación requiere revisión: {a.cajas.length ? `la entrega de ${a.cajas.join(", ")}` : "una entrega"}{" "}
-          cambió después de verificarla. Lo verificado no se recalculó.
-        </AvisoDeEstado>
-      ))}
+      <AvisosDeRevision avisos={avisos} onIr={onIr} />
 
       <CobradoPorPos resumen={r} />
 
       {Number(r.efectivoDeclaradoEntregado || 0) > 0 && <EfectivoEntregado lectura={lectura} resumen={r} />}
+
+      {grupos.length > 0 && (
+        <>
+          <RotuloDeSeccion>EFECTIVO ENTREGADO POR TURNO</RotuloDeSeccion>
+          {grupos.map((g) =>
+            g.grupo.sinTurno ? (
+              <SinTurnoConCajas key={g.grupo.clave} g={g} {...comunDeTurno} />
+            ) : (
+              <TurnoConCajas key={g.grupo.clave} g={g} {...comunDeTurno} />
+            )
+          )}
+        </>
+      )}
+
+      <SalioPorFuera lectura={lectura} resumen={r} />
+
+      {cruzan.length > 0 && <VerificacionesQueCruzan actos={cruzan} onIr={onIr} />}
     </>
   );
 }
 
 /**
- * Los turnos del período, lo que salió por fuera y lo que cruza. En escritorio
- * las tarjetas de turno van en grilla —tres columnas desde `xl`, dos en `lg`,
- * una en `md`: con el resumen al lado, la columna de 768 a 1279 px no tiene
- * lugar para tres tarjetas legibles— y "Sin turno asignado", que
- * `gruposEnOrden` ya pone al final, ocupa todo el ancho.
+ * Lo que el período dice, leído una vez para los dos dibujos —el del celular
+ * (`ResumenTesoreria`) y el de escritorio (`PeriodoEnEscritorio`)—: los avisos
+ * de revisión, los turnos en orden, los actos que cruzan y lo que cada
+ * tarjeta de turno necesita.
  */
-function TurnosTesoreria({ datos, lectura, ctx, onIr, onVerificar }) {
-  const r = lectura.resumen || {};
-
-  if (periodoSinMovimientos(lectura)) {
-    return (
-      <div className="text-center py-12 sunmi-text-muted text-xs">
-        No hubo movimientos de Tesorería en este período: ninguna caja entregó efectivo, no hubo cobros por POS ni
-        egresos.
-      </div>
-    );
-  }
-
-  const grupos = gruposEnOrden((lectura.grupos || []).map((g) => lecturaDelGrupo(lectura, g.clave)).filter(Boolean));
-  const cruzan = actosQueCruzan(lectura);
-  const comunDeTurno = {
-    verificaciones: lectura.verificaciones,
-    puedeVerificar: Boolean(datos.puedeVerificarEfectivo),
-    onVerificar,
-    onIr,
-    unidad: ctx.unidad,
+function leerElPeriodo({ datos, lectura, ctx, onIr, onVerificar }) {
+  return {
+    avisos: avisosDeRevision(lectura),
+    grupos: gruposEnOrden((lectura.grupos || []).map((g) => lecturaDelGrupo(lectura, g.clave)).filter(Boolean)),
+    cruzan: actosQueCruzan(lectura),
+    comunDeTurno: {
+      verificaciones: lectura.verificaciones,
+      puedeVerificar: Boolean(datos.puedeVerificarEfectivo),
+      onVerificar,
+      onIr,
+      unidad: ctx.unidad,
+    },
   };
+}
+
+function SinMovimientos() {
+  return (
+    <div className="text-center py-12 sunmi-text-muted text-xs">
+      No hubo movimientos de Tesorería en este período: ninguna caja entregó efectivo, no hubo cobros por POS ni
+      egresos.
+    </div>
+  );
+}
+
+function AvisosDeRevision({ avisos, onIr }) {
+  return avisos.map((a) => (
+    <AvisoDeEstado
+      key={a.verificacionId}
+      tono="danger"
+      accion={
+        <EnlaceTesoreria onClick={() => onIr({ vista: VISTA_TESORERIA.VERIFICACION, verificacion: a.verificacionId })}>
+          Ver verificación #{a.verificacionId}
+        </EnlaceTesoreria>
+      }
+    >
+      Una verificación requiere revisión: {a.cajas.length ? `la entrega de ${a.cajas.join(", ")}` : "una entrega"}{" "}
+      cambió después de verificarla. Lo verificado no se recalculó.
+    </AvisoDeEstado>
+  ));
+}
+
+// ── EL PERÍODO EN ESCRITORIO ─────────────────────────────────────────────
+//
+// El molde de Finanzas (`LayoutFinanzasEscritorio`, Figma
+// EVJ2KvVCrY0oVSowfboymQ, 378:1583). Los totales van en la franja del molde;
+// acá queda el contenido: los avisos, los turnos en grilla —tres por fila desde
+// 1280 px, dos por debajo— con "Sin turno asignado" al final a todo el ancho,
+// y después lo que salió por fuera y lo que cruza, las mismas piezas que el
+// celular.
+
+/** Las partes de la franja de totales. Los importes son los del servidor. */
+export function totalesDeTesoreria(lectura) {
+  const r = lectura?.resumen || {};
+  const v = r.verificacion || {};
+  const pct = proporcionVerificada(v);
+  const diferencia = textoFaltaSobra(diferenciaDelPeriodo(lectura));
+  return [
+    {
+      clave: "cobrado",
+      rotulo: "Cobrado por POS",
+      valor: formatearMoneda(r.cobradoPorPosDeclarado),
+      nota: `En efectivo ${formatearMoneda(r.efectivoCobradoDeclarado)} · Digital ${formatearMoneda(r.digitalCobradoDeclarado)}`,
+    },
+    {
+      clave: "entregado",
+      rotulo: "Efectivo entregado",
+      valor: formatearMoneda(r.efectivoDeclaradoEntregado),
+      nota: r.baseIncompleta ? "Hay cajas sin cerrar o que cerraron sin conteo" : pct != null ? `${pct} % verificado` : null,
+    },
+    {
+      clave: "verificado",
+      rotulo: "Verificado",
+      valor: formatearMoneda(v.efectivoVerificado),
+      nota: diferencia ? `Diferencia ${diferencia}` : null,
+    },
+    {
+      clave: "falta",
+      rotulo: "Falta verificar",
+      valor: formatearMoneda(v.entregadoPendienteDeVerificar),
+      tono: Number(v.entregadoPendienteDeVerificar || 0) > 0 ? "advertencia" : undefined,
+    },
+  ];
+}
+
+function PeriodoEnEscritorio({ datos, lectura, ctx, onIr, onVerificar }) {
+  if (periodoSinMovimientos(lectura)) return <SinMovimientos />;
+
+  const { avisos, grupos, cruzan, comunDeTurno } = leerElPeriodo({ datos, lectura, ctx, onIr, onVerificar });
 
   return (
     <>
+      <AvisosDeRevision avisos={avisos} onIr={onIr} />
+
       {grupos.length > 0 && (
-        <>
+        <section className="space-y-3">
           <RotuloDeSeccion>EFECTIVO ENTREGADO POR TURNO</RotuloDeSeccion>
-          <div className="space-y-3.5 md:grid md:items-start md:gap-3.5 md:space-y-0 lg:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-2 items-start gap-3.5 xl:grid-cols-3" data-turnos-escritorio>
             {grupos.map((g) =>
               g.grupo.sinTurno ? (
-                <div key={g.grupo.clave} className="md:col-span-full">
+                <div key={g.grupo.clave} className="col-span-full">
                   <SinTurnoConCajas g={g} {...comunDeTurno} />
                 </div>
               ) : (
@@ -259,10 +347,10 @@ function TurnosTesoreria({ datos, lectura, ctx, onIr, onVerificar }) {
               )
             )}
           </div>
-        </>
+        </section>
       )}
 
-      <SalioPorFuera lectura={lectura} resumen={r} />
+      <SalioPorFuera lectura={lectura} resumen={lectura.resumen || {}} />
 
       {cruzan.length > 0 && <VerificacionesQueCruzan actos={cruzan} onIr={onIr} />}
     </>
