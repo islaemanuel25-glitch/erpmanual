@@ -1,6 +1,6 @@
 // app/modulos/turnos-y-cierres/cajas/[id]/page.jsx
 //
-// EL DETALLE DE UNA CAJA (Figma 359:523). Se entra desde la lista y se vuelve
+// EL DETALLE DE UNA CAJA (Figma "V2 · B", 367:650). Se entra desde la lista y se vuelve
 // a ella con el período y la pestaña que tenía: viajan en la dirección. El
 // Volver va en el slot del shell, que no scrollea con el contenido.
 "use client";
@@ -18,7 +18,7 @@ import AccionDePantalla from "@/components/transferencias/AccionDePantalla";
 import DetalleDeCaja from "@/components/turnos-y-cierres/DetalleDeCaja";
 import { useCajaDeTurnosYCierres } from "@/components/turnos-y-cierres/useCajaDeTurnosYCierres";
 import { PERMISO_CAJERO, PERMISOS_VER_TODO } from "@/lib/turnosYCierres/alcance";
-import { urlDeLaLista, urlDelZ } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
+import { urlDeLaLista, urlDeMovimientos } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
 
 export default function CajaPage() {
   return (
@@ -64,7 +64,7 @@ function Caja() {
           </SunmiButton>
         </div>
       ) : null}
-      {t.datos ? <DetalleDeCaja datos={t.datos} onVerZ={() => router.push(urlDelZ(params.id, qs))} /> : null}
+      {t.datos ? <DetalleDeCaja datos={t.datos} onVerMovimientos={() => router.push(urlDeMovimientos(params.id, qs))} /> : null}
     </div>
   );
 }

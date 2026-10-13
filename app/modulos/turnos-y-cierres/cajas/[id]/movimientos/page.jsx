@@ -1,0 +1,73 @@
+// app/modulos/turnos-y-cierres/cajas/[id]/movimientos/page.jsx
+//
+// LOS ARQUEOS, LOS PAGOS DESDE LA CAJA Y EL BOTÓN AL Z de una caja. Es lo que
+// estaba al pie del detalle hasta el rediseño "V2 · B": el detalle quedó con el
+// efectivo y lo cobrado, y "Arqueos, pagos y Z ›" trae acá. Vuelve al detalle.
+"use client";
+
+import { Suspense } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+
+import { useUser } from "@/app/context/UserContext";
+import { useAccionDePagina } from "@/app/context/AccionDePaginaContext";
+import SinPermisos from "@/components/auth/SinPermisos";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
+import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import AccionDePantalla from "@/components/transferencias/AccionDePantalla";
+import { MovimientosDeCaja } from "@/components/turnos-y-cierres/DetalleDeCaja";
+import { useCajaDeTurnosYCierres } from "@/components/turnos-y-cierres/useCajaDeTurnosYCierres";
+import { PERMISO_CAJERO, PERMISOS_VER_TODO } from "@/lib/turnosYCierres/alcance";
+import { urlDeCaja, urlDelZ } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
+
+export default function MovimientosDeCajaPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="py-12">
+          <SunmiLoader />
+        </div>
+      }
+    >
+      <Movimientos />
+    </Suspense>
+  );
+}
+
+function Movimientos() {
+  const { perfil, cargando } = useUser();
+  const permisos = perfil?.permisos || [];
+  const puede = permisos.includes("*") || [PERMISO_CAJERO, ...PERMISOS_VER_TODO].some((p) => permisos.includes(p));
+
+  const params = useParams();
+  const qs = useSearchParams().toString();
+  const router = useRouter();
+  const volver = useAccionDePagina(
+    () => <SunmiBackButton href={urlDeCaja(params?.id, qs)} texto={`Caja #${params?.id}`} />,
+    [params?.id, qs]
+  );
+  const t = useCajaDeTurnosYCierres(params?.id);
+
+  if (cargando) return null;
+  if (!puede) return <SinPermisos />;
+
+  return (
+    <div className="w-full min-h-full mx-auto max-w-4xl px-4 pt-4 pb-4 space-y-3.5">
+      <AccionDePantalla>{volver}</AccionDePantalla>
+      {t.cargando && !t.datos ? (
+        <div className="py-12">
+          <SunmiLoader />
+        </div>
+      ) : null}
+      {t.error && !t.cargando ? (
+        <div role="alert" className="rounded-xl border sunmi-border-danger px-4 py-3 space-y-2">
+          <p className="text-sm2 sunmi-text-danger">{t.error}</p>
+          <SunmiButton color="slate" type="button" onClick={t.recargar} className="min-h-toque">
+            Reintentar
+          </SunmiButton>
+        </div>
+      ) : null}
+      {t.datos ? <MovimientosDeCaja datos={t.datos} onVerZ={() => router.push(urlDelZ(params.id, qs))} /> : null}
+    </div>
+  );
+}

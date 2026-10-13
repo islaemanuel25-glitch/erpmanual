@@ -19,7 +19,7 @@ import { imprimirZReport } from "@/components/turnos/imprimirZReport";
 import { ComprobanteZ } from "@/components/turnos-y-cierres/DetalleDeCaja";
 import { useCajaDeTurnosYCierres } from "@/components/turnos-y-cierres/useCajaDeTurnosYCierres";
 import { PERMISO_CAJERO, PERMISOS_VER_TODO } from "@/lib/turnosYCierres/alcance";
-import { esCerrada, urlDeCaja } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
+import { esCerrada, urlDeMovimientos } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
 
 export default function ComprobanteZPage() {
   return (
@@ -43,7 +43,8 @@ function Comprobante() {
   const params = useParams();
   const qs = useSearchParams().toString();
   const volver = useAccionDePagina(
-    () => <SunmiBackButton href={urlDeCaja(params?.id, qs)} texto={`Caja #${params?.id}`} />,
+    // Se entra desde "Arqueos, pagos y Z" y se vuelve ahí.
+    () => <SunmiBackButton href={urlDeMovimientos(params?.id, qs)} texto={`Caja #${params?.id}`} />,
     [params?.id, qs]
   );
   const t = useCajaDeTurnosYCierres(params?.id);
