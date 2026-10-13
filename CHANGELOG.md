@@ -1,5 +1,20 @@
 # Changelog
 
+## [2026-10-12] - Módulo nuevo: turnos-y-cierres
+
+### Agregado
+- **turnos-y-cierres**: feat: módulo nuevo en `/modulos/turnos-y-cierres`, con
+  entrada propia en el menú al lado del POS. Turnos del período agrupados como
+  en Tesorería, cada caja con sus cifras, lo cobrado y lo que salió del cajón;
+  detalle de caja y Z en pantalla. El cajero ve solo sus cajas. Convive con las
+  pantallas viejas, que no cambian.
+
+### Modificado
+- refactor: el comprobante Z sale de `components/turnos/imprimirZReport.js`,
+  compartido por la ficha del turno y el módulo nuevo.
+- refactor: el selector de período de Tesorería es la pieza compartida
+  `components/periodo/SelectorDePeriodo.jsx`; Tesorería renderiza idéntico.
+
 ## [2026-10-12] - Actualización: categorias, pos-transferencias
 
 ### Modificado
