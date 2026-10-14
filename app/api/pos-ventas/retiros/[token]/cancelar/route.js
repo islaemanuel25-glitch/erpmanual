@@ -44,6 +44,7 @@ export async function POST(req, context) {
       turno: retiro.turno,
       tipo: "retiro",
       token,
+      forzado: retiro.intervenidoPorUsuarioId != null,
       accion: "cancelar",
     });
     if (!autorizado.ok) {

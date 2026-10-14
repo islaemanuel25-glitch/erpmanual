@@ -67,7 +67,7 @@ export async function GET(req) {
       include: {
         turno: {
           select: {
-            id: true, apertura: true, vendedorId: true, operadorId: true,
+            id: true, apertura: true, vendedorId: true, operadorId: true, operaLaCuenta: true,
             vendedor: { select: { nombre: true } },
           },
         },
@@ -92,14 +92,20 @@ export async function GET(req) {
     // ABIERTAS de otros operadores, que es lo único que un forzado cierra. Una
     // caja con el corte ya tomado no va acá: está arriba, en los pendientes, y
     // se fuerza desde su fila.
-    const forzar = { operadorDelPin: identidad.operadorId, puedeForzar: identidad.puedeIntervenir === true };
+    // Con `usuarioId`, la caja de la propia cuenta del dueño o Admin no se ofrece
+    // para forzar: es la suya y se cierra normal.
+    const forzar = {
+      operadorDelPin: identidad.operadorId,
+      usuarioId: session.id,
+      puedeForzar: identidad.puedeIntervenir === true,
+    };
     const abiertas = forzar.puedeForzar
       ? await prisma.turno.findMany({
           where: { localId, anuladoEn: null, ...WHERE_TURNO_OPERATIVO },
           orderBy: { apertura: "asc" },
           take: 50,
           select: {
-            id: true, apertura: true, vendedorId: true, operadorId: true, montoInicial: true,
+            id: true, apertura: true, vendedorId: true, operadorId: true, operaLaCuenta: true, montoInicial: true,
             vendedor: { select: { nombre: true } },
             operador: { select: { nombre: true } },
           },

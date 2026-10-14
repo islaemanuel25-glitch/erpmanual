@@ -22,6 +22,13 @@ Si la lista está vacía, el despliegue es solo de código.
   todos hasta hoy. Es del arreglo "ninguna caja sin operador" (enmienda
   2026-10-14 de DEC-0012). La versión vieja del código no lee esas columnas,
   así que no se rompe si la migración entra antes que el código.
+- `20261014191303_caja_de_cuenta_y_retiro_intervenido` — **aditiva**:
+  `operaLaCuenta` (BOOLEAN nulo) en `Turno` e `intervenidoPorUsuarioId`
+  (INTEGER nulo) en `RetiroPreparacion`. No toca ninguna fila: NULL es "caja
+  de operador o caja de cuenta vieja" y "retiro del dueño de la caja". Es de la
+  segunda regla del mismo día: la caja sin PIN del dueño o Admin y el retiro
+  que hacen en caja ajena. Va después de `cierre_forzado` y, como ésa, la
+  versión vieja del código no lee las columnas.
 
 Producción está en **60 migraciones**, con el ERP en
 `ccf2894fe452802a5c2195327d95b7598830ae58`.

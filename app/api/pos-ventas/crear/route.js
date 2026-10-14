@@ -111,12 +111,15 @@ class ErrorTurnoNoOperativo extends Error {
  * le dice nada a quien acaba de iniciar un cierre. Solo sobre la caja PROPIA:
  * el estado de la caja de otro no se informa, ni en el mensaje ni en el código.
  */
-async function responderTurnoNoOperativo({ turnoId, localId, usuarioId, operadorId }) {
+async function responderTurnoNoOperativo({ turnoId, localId, usuarioId, operadorId, cuentaOpera = false }) {
   const turnoPedido = await prisma.turno.findUnique({
     where: { id: turnoId },
-    select: { localId: true, operadorId: true, vendedorId: true, cierre: true, cierreEnPreparacionEn: true, anuladoEn: true },
+    select: {
+      localId: true, operadorId: true, vendedorId: true, operaLaCuenta: true,
+      cierre: true, cierreEnPreparacionEn: true, anuladoEn: true,
+    },
   });
-  const codigoTurno = codigoDeTurnoRechazado(turnoPedido, { localId, usuarioId, operadorId });
+  const codigoTurno = codigoDeTurnoRechazado(turnoPedido, { localId, usuarioId, operadorId, cuentaOpera });
   const enPreparacion = codigoTurno === CODIGO_RECHAZO_VENTA.TURNO_EN_CORTE;
   return NextResponse.json(
     {
@@ -265,7 +268,10 @@ async function procesarCrear(req, intento) {
     // Antes el voucher era la identidad del replay y la bandera salteaba la
     // vigencia del turno: con la cuenta compartida, B podía fabricar ventas en la
     // caja de A con el voucher de A, y cualquiera vender en su caja vencida.
-    const gateOp = await requireOperadorDeCaja(req, { localId });
+    //
+    // Sin PIN vende solo el dueño o el Admin, en la caja de SU cuenta
+    // (`cuentaOpera`); cualquier otra cuenta sin PIN no vende.
+    const gateOp = await requireOperadorDeCaja(req, session, { localId });
     if (!gateOp.ok) {
       return NextResponse.json(
         { ok: false, error: gateOp.error, needsOperador: true },
@@ -273,6 +279,7 @@ async function procesarCrear(req, intento) {
       );
     }
     const operadorId = gateOp.operadorId;
+    const cuentaOpera = gateOp.cuentaOpera;
 
     const operadorDelVoucher =
       origenOffline === true ? verificarVoucherOperador(operadorVoucher, localId) : null;
@@ -332,13 +339,13 @@ async function procesarCrear(req, intento) {
       where: {
         id: turnoId,
         localId,
-        ...whereCajaPropia({ usuarioId: session.id, operadorId }),
+        ...whereCajaPropia({ usuarioId: session.id, operadorId, cuentaOpera }),
         ...WHERE_TURNO_OPERATIVO,
       },
       select: { id: true, apertura: true },
     });
 
-    intentoTurno = { turnoId, localId, usuarioId: session.id, operadorId };
+    intentoTurno = { turnoId, localId, usuarioId: session.id, operadorId, cuentaOpera };
     if (!turnoValido) {
       return responderTurnoNoOperativo(intentoTurno);
     }
@@ -1243,7 +1250,7 @@ async function procesarCrear(req, intento) {
         where: {
           id: turnoId,
           localId,
-          ...whereCajaPropia({ usuarioId: session.id, operadorId }),
+          ...whereCajaPropia({ usuarioId: session.id, operadorId, cuentaOpera }),
           ...WHERE_TURNO_OPERATIVO,
         },
         select: { id: true },

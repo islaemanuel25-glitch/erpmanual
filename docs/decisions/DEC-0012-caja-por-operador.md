@@ -315,4 +315,31 @@ retiros y se cerró la caja 881 de Belén con un retiro de $46.900.
   históricos no se modifican.
 
 **Evidencia:** `lib/caja/cajaConOperador.test.mjs` (con contraprueba) y
-`scripts/pruebas-db/cajaPorOperador.mjs`, secciones 5, 7 y 11.
+`scripts/pruebas-db/cajaPorOperador.mjs`, secciones 5, 7, 11 y 12.
+
+### Segunda regla del mismo día — corrige dos puntos de arriba
+
+Emanuel cambió dos reglas sobre `1cac914` antes del despliegue. **Donde lo de
+arriba dice lo contrario, manda esto** [verificado en código y ejercido contra
+PostgreSQL]:
+
+- **El dueño del local y el Admin venden sin PIN.** Sin PIN, su cuenta hace de
+  operador (`requireOperadorDeCaja` devuelve `cuentaOpera`), y la caja que
+  abren queda con `vendedorId` = esa cuenta y `Turno.operaLaCuenta = true`. Es
+  solo suya: `whereCajaPropia` / `esCajaPropia` con `cuentaOpera` exigen la
+  marca, así que ni otra cuenta, ni alguien que haga PIN en la cuenta del
+  dueño (abre SU caja), ni una caja de cuenta vieja la alcanzan. Su corte lo
+  termina esa cuenta, sin un PIN de otro activo, o con la llave del corte.
+  Cualquier otra cuenta —cajero, y también en un local con
+  `exigirOperador = false`— sigue necesitando PIN. Si una caja de cuenta vieja
+  de esa misma cuenta sigue abierta, abrir se rechaza diciendo cuál es: se
+  cierra forzando.
+- **El dueño y el Admin pueden retirar de la caja de otro operador.**
+  `contextoArqueo` lo permite solo para el inicio del retiro
+  (`permitirIntervencion`); arquear y postergar siguen siendo de la caja
+  propia. El retiro queda con `RetiroPreparacion.intervenidoPorUsuarioId` y
+  `iniciadoPorOperadorId` en NULL, así el arqueo cae al operador del turno: el
+  retiro y su diferencia son de esa caja. Lo termina quien puede intervenir. Un
+  cajero sigue sin poder retirar de una caja ajena.
+- Migración `20261014191303_caja_de_cuenta_y_retiro_intervenido`, aditiva: dos
+  columnas nulas, sin tocar filas.

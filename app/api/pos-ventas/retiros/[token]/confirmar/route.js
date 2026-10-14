@@ -56,15 +56,18 @@ export async function POST(req, context) {
     const { session, localId, retiro } = res;
 
     // ── QUIÉN RETIRA ─────────────────────────────────────────────────────────
-    // Solo el operador de la caja, por su PIN o por la llave que recibió al
-    // tomar el corte. Un retiro no tiene camino forzado: un Admin o el dueño
-    // no retiran plata de la caja de otro operador.
+    // El dueño de la caja, por su PIN o por la llave que recibió al tomar el
+    // corte; o, si el retiro lo inició un Admin o el dueño sobre la caja de
+    // otro (intervenido), quien puede intervenir. Un cajero nunca termina el
+    // retiro de una caja ajena.
     const autorizado = await autorizarResolucionDeCorte(req, {
       session,
       localId,
       turno: retiro.turno,
       tipo: "retiro",
       token,
+      // Un retiro intervenido lo termina un Admin o el dueño.
+      forzado: retiro.intervenidoPorUsuarioId != null,
       accion: "confirmar",
     });
     if (!autorizado.ok) {

@@ -9,7 +9,7 @@ import { bloquearTurno } from "@/lib/caja/cierreRelevoServer";
 import { LIMITES_TRANSACCION_DEL_LOCAL } from "@/lib/pos-ventas/candadoDelLocal";
 
 const SELECT_TURNO = {
-  id: true, localId: true, vendedorId: true, operadorId: true,
+  id: true, localId: true, vendedorId: true, operadorId: true, operaLaCuenta: true,
   cierre: true, cierreEnPreparacionEn: true, anuladoEn: true,
 };
 

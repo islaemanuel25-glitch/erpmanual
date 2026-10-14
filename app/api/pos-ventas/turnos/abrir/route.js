@@ -7,7 +7,11 @@ import { resolveScope } from "@/lib/grupos";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { validarFondoManual } from "@/lib/caja/cierreCaja";
 import { WHERE_TURNO_OPERATIVO, esCajaPropia, whereCajaPropia } from "@/lib/caja/cierreRelevo";
-import { identidadParaOperar } from "@/lib/caja/identidadCajaServer";
+import {
+  identidadParaOperar,
+  cajaDeCuentaViejaAbierta,
+  ERROR_CAJA_DE_CUENTA_VIEJA,
+} from "@/lib/caja/identidadCajaServer";
 import { aCargoDelTurno } from "@/lib/finanzas/actividadFinanciera";
 import { turnoOperativoDeApertura } from "@/lib/caja/turnoOperativoServer";
 
@@ -15,6 +19,8 @@ import { turnoOperativoDeApertura } from "@/lib/caja/turnoOperativoServer";
 // la cuenta si no. La MISMA función que rotula los turnos en Finanzas.
 const SELECT_AVISO = {
   id: true, apertura: true, vendedorId: true, operadorId: true,
+  // Sin esto `esCajaPropia` no reconoce la caja de la cuenta del dueño o Admin.
+  operaLaCuenta: true,
   vendedor: { select: { nombre: true } },
   operador: { select: { nombre: true } },
 };
@@ -147,9 +153,10 @@ export async function POST(req) {
     // suyas al mismo tiempo — ni con la misma cuenta ni con otra.
     //
     // La identidad sale de la sesión y de la cookie del PIN validada en este
-    // local; nunca del cuerpo. Sin operador no hay caja, con ninguna cuenta:
-    // una caja sin operador la compartía cualquiera que usara la cuenta (las
-    // 836 a 872 de Mini unidas). Los índices únicos
+    // local; nunca del cuerpo. Sin PIN, solo el dueño o el Admin tienen caja,
+    // y es de su cuenta; cualquier otra cuenta sin PIN no abre: una caja sin
+    // operador la compartía cualquiera que usara la cuenta (las 836 a 872 de
+    // Mini unidas). Los índices únicos
     // parciales de `Turno` son la garantía ante dos aperturas simultáneas.
     //
     // Los turnos ajenos no bloquean: se informan y listo.
@@ -213,6 +220,11 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: to.error, codigo: to.codigo }, { status: to.status });
     }
 
+    const vieja = identidad.cuentaOpera ? await cajaDeCuentaViejaAbierta(prisma, { localId, usuarioId: session.id }) : null;
+    if (vieja) {
+      return NextResponse.json({ ok: false, error: ERROR_CAJA_DE_CUENTA_VIEJA(vieja.id) }, { status: 409 });
+    }
+
     const turno = await prisma.turno.create({
       data: {
         localId,
@@ -221,6 +233,10 @@ export async function POST(req) {
         vendedorId: session.id,
         // El responsable del cajón. Se escribe acá y no se reescribe nunca.
         operadorId: identidad.operadorId,
+        // Sin PIN, la cuenta del dueño o Admin es la responsable: la caja es
+        // solo de ella. Va marcada para no confundirla con una caja de cuenta
+        // vieja, que no es de nadie.
+        ...(identidad.cuentaOpera ? { operaLaCuenta: true } : {}),
         // Lo que el cajero declara haber recibido. Sin monto sugerido no hay
         // diferencia de recepcion que calcular, asi que fondoSugeridoApertura y
         // diferenciaFondoApertura quedan en NULL: significa "no aplica", no cero.

@@ -20,6 +20,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireOperadorDeCaja } from "@/lib/operador";
+import { cajaDeCuentaViejaAbierta, ERROR_CAJA_DE_CUENTA_VIEJA } from "@/lib/caja/identidadCajaServer";
 import {
   validarDesgloseServidor,
   evaluarDesproporcionDesglose,
@@ -48,9 +49,9 @@ export async function POST(req) {
 
     const body = await req.json().catch(() => ({}));
 
-    // Toda caja tiene un operador con PIN, también la que abre un Admin o el
-    // dueño: una caja sin operador la comparte cualquiera que use la cuenta.
-    const gateOp = await requireOperadorDeCaja(req, { localId });
+    // Toda caja tiene operador: el del PIN, o —solo para el dueño o el Admin
+    // sin PIN— su cuenta. Cualquier otra cuenta sin PIN no abre.
+    const gateOp = await requireOperadorDeCaja(req, session, { localId });
     if (!gateOp.ok) {
       return NextResponse.json(
         { ok: false, error: gateOp.error, needsOperador: true },
@@ -105,7 +106,7 @@ export async function POST(req) {
       const propio = await tx.turno.findFirst({
         where: {
           localId,
-          ...whereCajaPropia({ usuarioId: session.id, operadorId: gateOp.operadorId ?? null }),
+          ...whereCajaPropia({ usuarioId: session.id, operadorId: gateOp.operadorId, cuentaOpera: gateOp.cuentaOpera }),
           ...WHERE_TURNO_OPERATIVO,
           anuladoEn: null,
         },
@@ -116,6 +117,12 @@ export async function POST(req) {
         e.codigo = "conflicto";
         throw e;
       }
+      const vieja = gateOp.cuentaOpera ? await cajaDeCuentaViejaAbierta(tx, { localId, usuarioId: session.id }) : null;
+      if (vieja) {
+        const e = new Error(ERROR_CAJA_DE_CUENTA_VIEJA(vieja.id));
+        e.codigo = "conflicto";
+        throw e;
+      }
 
       return tx.turno.create({
         data: {
@@ -123,6 +130,7 @@ export async function POST(req) {
           ...to.datos,
           vendedorId: session.id,
           operadorId: gateOp.operadorId,
+          ...(gateOp.cuentaOpera ? { operaLaCuenta: true } : {}),
           // El total realmente contado. Ningún sobre se consume.
           montoInicial: apertura.montoInicial,
           observacionFondoApertura: apertura.motivo,

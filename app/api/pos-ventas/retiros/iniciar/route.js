@@ -66,7 +66,10 @@ export async function POST(req) {
     // 409 si el turno ya tomó su corte de CIERRE. Un retiro sobre una caja
     // cortada caería después de la frontera congelada y el cierre en curso no lo
     // vería nunca.
-    const ctx = await contextoArqueo(req, { turnoId, exigirAbierto: true });
+    //
+    // `permitirIntervencion`: el Admin o el dueño en su local pueden retirar de
+    // la caja de otro operador; un cajero no. `ctx.intervenido` lo dice.
+    const ctx = await contextoArqueo(req, { turnoId, exigirAbierto: true, permitirIntervencion: true });
     if (ctx.error) {
       // Si lo que bloquea es un CIERRE ya tomado sobre este mismo turno, el
       // rechazo viaja con ese proceso. Antes solo llevaba un texto, y la pantalla
@@ -85,7 +88,7 @@ export async function POST(req) {
         { status: ctx.status }
       );
     }
-    const { session, localId, turno } = ctx;
+    const { session, localId, turno, intervenido } = ctx;
     turnoDelPedido = turno?.id ?? null;
 
     if (!turno) {
@@ -113,10 +116,10 @@ export async function POST(req) {
     // este instante la pantalla de conteo no vuelve a mirar el operador activo,
     // que es una cookie compartida por todo el navegador.
     //
-    // Retira solo el operador de la caja, con su PIN. `contextoArqueo` ya
-    // rechazó la caja ajena; esto deja escrito que sin PIN no hay retiro, ni
-    // para un Admin ni para el dueño.
-    const gateOp = await requireOperadorDeCaja(req, { localId });
+    // Retira el dueño de la caja —su operador con PIN, o la cuenta del dueño o
+    // Admin sobre la suya— o, INTERVINIENDO, un Admin o el dueño sobre la de
+    // otro. `contextoArqueo` ya rechazó la caja ajena para todos los demás.
+    const gateOp = await requireOperadorDeCaja(req, session, { localId });
     if (!gateOp.ok) {
       return NextResponse.json(
         { ok: false, error: gateOp.error, needsOperador: true },
@@ -188,7 +191,11 @@ export async function POST(req) {
           turnoId: vigente.id,
           localId,
           iniciadoPorUsuarioId: session.id,
-          iniciadoPorOperadorId: gateOp.operadorId ?? vigente.operadorId ?? null,
+          // Intervenido: quien retira NO es el operador de la caja. Queda en
+          // NULL, el arqueo cae al operador del turno —la diferencia es de esa
+          // caja— y quién lo hizo va en su propia columna.
+          iniciadoPorOperadorId: intervenido ? null : gateOp.operadorId ?? vigente.operadorId ?? null,
+          intervenidoPorUsuarioId: intervenido ? session.id : null,
           corteEn: ahora,
           efectivoEsperadoCorte: corte.efectivoEsperadoCorte,
           ultimaVentaId: corte.ultimaVentaId,
@@ -240,7 +247,15 @@ export async function POST(req) {
     });
     // La llave del conteo, para el operador de la caja: termina el retiro en
     // otra pestaña aunque otro operador haga PIN en este navegador.
-    entregarLlaveDeCorte(respuesta, { tipo: "retiro", token: resultado.retiro.token, operadorId: gateOp.operadorId });
+    // Un retiro intervenido no la lleva: lo termina quien puede intervenir.
+    if (!intervenido) {
+      entregarLlaveDeCorte(respuesta, {
+        tipo: "retiro",
+        token: resultado.retiro.token,
+        operadorId: gateOp.operadorId,
+        cuentaId: gateOp.cuentaOpera ? session.id : null,
+      });
+    }
     return respuesta;
   } catch (error) {
     if (error?.codigo === "desproporcionado") {

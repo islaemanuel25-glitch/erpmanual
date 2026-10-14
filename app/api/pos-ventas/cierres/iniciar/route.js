@@ -121,8 +121,8 @@ export async function POST(req) {
     //
     // DOS CAMINOS, Y SOLO DOS:
     //
-    //   · normal  → el operador de la caja, con su PIN. Sin PIN no hay cierre,
-    //               ni para un Admin ni para el dueño.
+    //   · normal  → el operador de la caja, con su PIN; o el dueño o el Admin
+    //               sin PIN, sobre la caja de SU cuenta. Nadie más.
     //   · forzado → un Admin o el dueño en su local, sobre la caja de OTRO
     //               operador, pedido explícito con `forzado: true`. No necesita
     //               PIN porque no opera como ese operador: queda grabado como
@@ -134,9 +134,9 @@ export async function POST(req) {
         return NextResponse.json({ ok: false, error: ERROR_FORZAR_SIN_PERMISO }, { status: 403 });
       }
       const pin = await getOperadorActivoDelLocal(req, localId);
-      gateOp = { ok: true, operadorId: pin?.operadorId ?? null };
+      gateOp = { ok: true, operadorId: pin?.operadorId ?? null, cuentaOpera: false };
     } else {
-      gateOp = await requireOperadorDeCaja(req, { localId });
+      gateOp = await requireOperadorDeCaja(req, session, { localId });
       if (!gateOp.ok) {
         return NextResponse.json(
           { ok: false, error: gateOp.error, needsOperador: true },
@@ -154,7 +154,7 @@ export async function POST(req) {
       const turno = await tx.turno.findFirst({
         where: { id: turnoId, localId },
         select: {
-          id: true, localId: true, vendedorId: true, operadorId: true,
+          id: true, localId: true, vendedorId: true, operadorId: true, operaLaCuenta: true,
           apertura: true, cierre: true, cierreEnPreparacionEn: true,
           anuladoEn: true, montoInicial: true,
         },
@@ -166,10 +166,11 @@ export async function POST(req) {
       }
 
       // EL CORTE ES DE LA CAJA DE QUIEN LO TOMA. El cierre normal lo toma solo
-      // el operador de la caja con su PIN: nadie más, tampoco un Admin ni el
-      // dueño. Ellos tienen el forzado, que es explícito y queda marcado.
+      // quien es dueño de la caja: el operador con su PIN, o la cuenta del
+      // dueño o Admin sobre la suya. Sobre la de otro, Admin y dueño tienen el
+      // forzado, que es explícito y queda marcado.
       if (forzado) {
-        if (!puedeForzarCierre(turno, { operadorDelPin: gateOp.operadorId, puedeForzar: true })) {
+        if (!puedeForzarCierre(turno, { operadorDelPin: gateOp.operadorId, usuarioId: session.id, puedeForzar: true })) {
           const e = new Error(ERROR_FORZAR_CAJA_PROPIA);
           e.codigo = "forzar_propia";
           throw e;
@@ -178,6 +179,7 @@ export async function POST(req) {
         !puedeActuarSobreCaja(turno, {
           usuarioId: session.id,
           operadorId: gateOp.operadorId,
+          cuentaOpera: gateOp.cuentaOpera,
           puedeIntervenir: false,
         })
       ) {
@@ -390,7 +392,13 @@ export async function POST(req) {
     // conteo en otra pestaña aunque el relevo cambie el PIN de este navegador.
     // Un forzado no la lleva: quien fuerza no es el operador.
     if (!forzado) {
-      entregarLlaveDeCorte(respuesta, { tipo: "cierre", token: resultado.cierre.token, operadorId: gateOp.operadorId });
+      entregarLlaveDeCorte(respuesta, {
+        tipo: "cierre",
+        token: resultado.cierre.token,
+        operadorId: gateOp.operadorId,
+        // La caja de la cuenta: la llave nombra a la cuenta, no a un operador.
+        cuentaId: gateOp.cuentaOpera ? session.id : null,
+      });
     }
     return respuesta;
   } catch (error) {

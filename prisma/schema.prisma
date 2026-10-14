@@ -2410,6 +2410,16 @@ model Turno {
   // Se copia de `CierrePreparacion.forzadoPorUsuarioId` al confirmar.
   cierreForzadoPorId Int?
 
+  // ── LA CAJA DE LA CUENTA ───────────────────────────────────────────────────
+  //
+  // El dueño del local y el Admin venden SIN PIN (segunda regla del
+  // 2026-10-14): su cuenta hace de operador, y la caja es solo de esa cuenta.
+  // `true` marca esa caja; NULL es cualquier otra. La marca es lo que la separa
+  // de una caja de cuenta VIEJA —sin operador, abierta antes de que toda caja
+  // tuviera dueño—, que no es de nadie que opere hoy y solo se cierra forzando.
+  // La regla que la lee es `whereCajaPropia` / `esCajaPropia` con `cuentaOpera`.
+  operaLaCuenta Boolean?
+
   // ── TURNO OPERATIVO ────────────────────────────────────────────────────────
   //
   // ESTE MODELO SIGUE SIENDO UNA CAJA. El turno operativo es del catálogo del
@@ -2995,6 +3005,13 @@ model RetiroPreparacion {
   canceladoEn           DateTime?
   canceladoPorUsuarioId Int?
   motivoCancelacion     String?
+
+  /// RETIRO INTERVENIDO: la cuenta de Admin o del dueño que hizo este retiro
+  /// sobre la caja de OTRO operador (segunda regla del 2026-10-14). NULL =
+  /// retiro del dueño de la caja. El retiro y su diferencia siguen siendo de la
+  /// caja: `iniciadoPorOperadorId` queda en NULL y el arqueo cae al operador
+  /// del turno. Un cajero no puede intervenir.
+  intervenidoPorUsuarioId Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

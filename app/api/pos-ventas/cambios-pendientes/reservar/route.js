@@ -44,8 +44,8 @@ export async function POST(req) {
     }
 
     // Reservar el cambio es el primer paso de abrir una caja: pide el mismo
-    // operador con PIN que la apertura.
-    const gateOp = await requireOperadorDeCaja(req, { localId });
+    // operador que la apertura (PIN, o la cuenta del dueño o Admin).
+    const gateOp = await requireOperadorDeCaja(req, session, { localId });
     if (!gateOp.ok) {
       return NextResponse.json(
         { ok: false, error: gateOp.error, needsOperador: true },
