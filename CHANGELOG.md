@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-10-14] - Actualización: pos-ventas, transferencias
+
+### Modificado
+- **pos-ventas**: fix(caja): ninguna caja sin operador ni compartida; cierre forzado — SIN VERIFICAR en pantalla
+- **transferencias**: fix(transferencias): el celular vuelve a e60edeb; la computadora con copias propias — SIN VERIFICAR en pantalla
+
+
 ## [2026-10-13] - Actualización: pos-ventas, turnos-y-cierres
 
 ### Modificado

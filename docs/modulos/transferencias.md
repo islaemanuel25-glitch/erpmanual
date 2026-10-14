@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-12 21:22
+**Última actualización:** 2026-10-14 17:18
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-14: fix(transferencias): el celular vuelve a e60edeb; la computadora con copias propias — SIN VERIFICAR en pantalla
 - 2026-10-12: feat: cancelar un pedido lo marca en vez de borrarlo
 - 2026-10-10: fix(ventas): anular una venta con su turno cerrado, con el ajuste en ese turno
 - 2026-10-10: feat: una explicación por tipo de papel, el CAE contra el duplicado, el cargo repartido en el costo, y se va el código de formato

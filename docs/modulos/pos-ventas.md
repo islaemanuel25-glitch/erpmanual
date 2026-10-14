@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-10-13 15:11
+**Última actualización:** 2026-10-14 17:18
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-10-14: fix(caja): ninguna caja sin operador ni compartida; cierre forzado — SIN VERIFICAR en pantalla
 - 2026-10-13: fix: POS — el escáner agrega solo por código exacto
 - 2026-10-13: fix: POS — aviso bloqueante al escanear un código sin producto
 - 2026-10-13: fix: "Retirar" aparece siempre que haya caja abierta
