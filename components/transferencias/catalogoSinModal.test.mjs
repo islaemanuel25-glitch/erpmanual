@@ -109,21 +109,10 @@ test("C4. EL MÓVIL DIBUJA LAS FILAS Y NO ABRE NINGÚN MODAL PARA ESTO", () => {
   );
   // Las tres hojas del móvil son las de siempre —producto, más acciones e
   // información general—. El catálogo no agregó una cuarta.
-  //
-  // Las dos últimas se mudaron a `MasAccionesRecepcion` cuando la computadora
-  // necesitó el mismo "⋯": el móvil la monta como hoja. Se cuentan donde viven,
-  // y la suma sigue siendo tres.
   assert.equal(
     (movil.match(/forma="hoja"/g) || []).length,
-    2,
+    3,
     "apareció una hoja nueva en el camino del teléfono"
-  );
-  assert.match(movil, /<MasAccionesRecepcion[\s\S]{0,600}?forma="hoja"\s*\/>/, "las hojas de más acciones dejaron de ser hojas");
-  const acciones = codigoDe("components/transferencias/MasAccionesRecepcion.jsx");
-  assert.equal(
-    (acciones.match(/<SunmiModalLayout/g) || []).length,
-    2,
-    "Más acciones e Información general son dos hojas, ni una más"
   );
 });
 
@@ -155,15 +144,11 @@ test("C7. LA BÚSQUEDA VIVE EN EL WORKSPACE, no en la composición móvil", () =
   }
   // Enumerado por nombre y no contado: un número no dice QUÉ se guardó. Ver el
   // mismo cambio, con su motivo, en `recepcionMovilV2.test.mjs` — 8b.
-  // `infoGeneral` se mudó con su hoja a `MasAccionesRecepcion`: sigue siendo
-  // qué hoja está abierta, y se enumera allá.
   const estados = [...movil.matchAll(/const \[(\w+), set\w+\] = useState\(/g)].map((m) => m[1]);
-  assert.deepEqual(estados.sort(), ["guardado", "masAcciones"], "el móvil se guardó estado de negocio");
-  const acciones = codigoDe("components/transferencias/MasAccionesRecepcion.jsx");
   assert.deepEqual(
-    [...acciones.matchAll(/const \[(\w+), set\w+\] = useState\(/g)].map((m) => m[1]),
-    ["infoGeneral"],
-    "las hojas de acciones se guardaron estado de negocio"
+    estados.sort(),
+    ["guardado", "infoGeneral", "masAcciones"],
+    "el móvil se guardó estado de negocio"
   );
 
   const ws = codigoDe(WORKSPACE);

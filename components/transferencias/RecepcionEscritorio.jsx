@@ -4,26 +4,42 @@
 //
 // LA COMPOSICIÓN DE COMPUTADORA DE "RECIBIR UNA TRANSFERENCIA", desde `lg`
 // (Figma EVJ2KvVCrY0oVSowfboymQ, 384:483, "Escritorio · Recibir transferencia
-// · 1366"). Entre 768 y 1023 px se ve la del teléfono.
+// · 1366"). Por debajo de 1024 px se ve lo de siempre, sin tocar.
 //
-// ── QUÉ ES ESTO Y QUÉ NO ES ──────────────────────────────────────────────
+// ── LA REGLA DE ESTA PANTALLA: NO TOCA NADA DEL TELÉFONO ─────────────────
 //
-// Es PRESENTACIÓN, igual que `RecepcionMovil`. Recibe de `WorkspaceRecepcion`
-// el mismo estado y los mismos handlers —filtro, categoría, búsqueda, catálogo,
-// revisar, confirmar— y los acomoda para un mouse y una pantalla ancha. No
-// llama a ningún endpoint y no decide ninguna regla:
+// Los archivos que usa el teléfono —`RecepcionMovil`, `TarjetaRecepcionMovil`,
+// `recepcionUI.js`, las piezas del kit— NO se modifican para servir a esta
+// pantalla: ni por dentro, ni para "compartir" lógica, ni con una prop nueva
+// con valor por defecto. Lo decidió Emanuel el 2026-10-14, después de que
+// b064e6b los tocara para compartir reglas y él tuviera que pedir que se
+// restauraran. Esta pantalla solo IMPORTA de ellos lo que ya exportan, tal
+// como está; lo que vive adentro de uno y no está exportado se COPIA acá,
+// marcado como copia y con el archivo de donde salió. Esa duplicación se
+// acepta a sabiendas: si la regla cambia en el teléfono, hay que cambiarla
+// también acá.
 //
-//   · si se puede confirmar ......... `cierreDeRecepcion`, la misma del teléfono;
-//   · qué dice cada línea ........... `lecturaDeLaLinea`, la misma de la tarjeta;
-//   · qué manda "✓ Coincide" ........ `cuerpoDeCoincide`, el mismo de la tarjeta;
-//   · el producto elegido ........... `FichaProductoRecepcion` con `enHoja`, la
-//                                     MISMA hoja que el teléfono abre desde abajo:
-//                                     la presentación la dicta la ficha del
-//                                     depósito, el motivo es obligatorio si se
-//                                     toca la cantidad, la diferencia en plata;
-//   · el "⋯" ........................ `MasAccionesRecepcion`, la misma lista.
+// ── QUÉ ES ESTO ───────────────────────────────────────────────────────────
 //
-// Lo único suyo es qué se ve: dónde va cada cosa.
+// Es PRESENTACIÓN. Recibe de `WorkspaceRecepcion` el estado compartido
+// —filtro, categoría, búsqueda, catálogo— y los handlers que van al servidor
+// —revisar, agregar, confirmar—, y los acomoda para un mouse y una pantalla
+// ancha. Lo que es suyo: qué producto muestra el panel, el Enter del
+// buscador y la cámara, para que lo encontrado vaya a su panel y no a la hoja
+// del teléfono (que es un modal por portal y se abriría encima de esta).
+//
+//   · si se puede confirmar ......... `cierreDeRecepcion`, COPIA de la regla
+//                                     de `RecepcionMovil`;
+//   · qué dice cada línea ........... `lecturaDeLaLinea`, COPIA de la de
+//                                     `TarjetaRecepcionMovil`;
+//   · qué manda "✓ Coincide" ........ `cuerpoDeCoincide`, COPIA del de la tarjeta;
+//   · el producto elegido ........... `FichaProductoRecepcion` con `enHoja`,
+//                                     importada tal cual: la MISMA hoja que el
+//                                     teléfono abre desde abajo;
+//   · el "⋯" ........................ `MasAccionesRecepcion`, copia de las hojas
+//                                     de `RecepcionMovil`;
+//   · los cuatro filtros en fila .... `FiltroEstadoCompacto`, variante propia de
+//                                     `SunmiFiltroEstado`.
 //
 // ── TRES FRANJAS ──────────────────────────────────────────────────────────
 //
@@ -44,34 +60,141 @@ import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
-import SunmiFiltroEstado from "@/components/sunmi/SunmiFiltroEstado";
 import SunmiBarraDeAvance from "@/components/sunmi/SunmiBarraDeAvance";
-import { hayEscanerDisponible } from "@/components/sunmi/SunmiEscanerCodigoBarra";
+import SunmiEscanerCodigoBarra, {
+  MENSAJES_SIN_CAMARA,
+  hayEscanerDisponible,
+} from "@/components/sunmi/SunmiEscanerCodigoBarra";
 
 import EstadoTransferenciaBadge from "./EstadoTransferenciaBadge";
 import FichaProductoRecepcion from "./FichaProductoRecepcion";
 import FilaCatalogoRecepcion, { ROTULO_CATALOGO } from "./FilaCatalogoRecepcion";
+import FiltroEstadoCompacto from "./FiltroEstadoCompacto";
 import MasAccionesRecepcion, { TITULO_MAS_ACCIONES } from "./MasAccionesRecepcion";
 import { AVISO_FALTA_CANTIDAD, MENSAJE_NO_FIGURA_CORTO, PLACEHOLDER_BUSCADOR } from "./RecepcionMovil";
-import {
-  CLASE_COINCIDE,
-  TEXTO_COINCIDE,
-  TEXTO_CORREGIR,
-  cuerpoDeCoincide,
-  lecturaDeLaLinea,
-} from "./TarjetaRecepcionMovil";
+import { TEXTO_COINCIDE, TEXTO_CORREGIR } from "./TarjetaRecepcionMovil";
 import { fmtCantidad, fmtFechaHoraAR } from "./detallePresentacion";
 
 import { formatearMoneda } from "@/lib/moneda";
-import { FILTRO, pasaFiltro } from "@/lib/transferencias/controlFisico";
-import { MOTIVOS_FALTANTE, MOTIVOS_SOBRANTE, cierreDeRecepcion } from "@/lib/transferencias/recepcionUI";
+import { FILTRO, RESOLUCION, pasaFiltro, resolverEntrada } from "@/lib/transferencias/controlFisico";
+import {
+  MOTIVOS_FALTANTE,
+  MOTIVOS_SOBRANTE,
+  chipsDeMotivo,
+  costoMostradoDe,
+  fisicasEnviadasDe,
+  fisicasRecibidasDe,
+} from "@/lib/transferencias/recepcionUI";
 import {
   agrupa,
+  descriptorDeEnvio,
+  envioComoSeCuenta,
   firmaDeEdicion,
   nombreDePresentacion,
   rotuloConSueltasCorto,
   unidadDeDiferencia,
 } from "@/lib/transferencias/presentacionEnvio";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LAS COPIAS. Ver el encabezado: el teléfono no se toca, así que lo que esta
+// pantalla necesita de adentro de sus archivos se copia acá, tal cual.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * COPIA de `CLASE_COINCIDE` de `TarjetaRecepcionMovil.jsx`, que no la exporta:
+ * el botón "✓ Coincide" se pinta igual en la fila que en la tarjeta.
+ */
+const CLASE_COINCIDE = "sunmi-btn-accent-outline";
+
+/**
+ * SI SE PUEDE CONFIRMAR, Y POR QUÉ NO. COPIA de las cuentas de
+ * `RecepcionMovil.jsx` (`pendientes`, `todoRevisado`, `sinMotivo`,
+ * `sinCargar`, `trabado`), renglón por renglón. El porqué de cada causa está
+ * escrito allá; el servidor las vuelve a exigir de todas formas.
+ */
+export function cierreDeRecepcion({ items = [], resumen = null } = {}) {
+  const pendientes = resumen?.pendientes ?? 0;
+  const todoRevisado = pendientes === 0 && (resumen?.totalRemito ?? 0) > 0;
+  const sinMotivo = (items || []).filter((d) => {
+    if (d.agregadoEnRecepcion || d.motivoPrincipal) return false;
+    if (d.cantidadRecibida == null) return false;
+    const env = fisicasEnviadasDe(d);
+    const rec = fisicasRecibidasDe(d);
+    return env != null && rec != null && rec !== env;
+  }).length;
+  const faltaCargar = (d) => d.agregadoEnRecepcion === true && !(fisicasRecibidasDe(d) > 0);
+  const sinCargar = (items || []).filter(faltaCargar).length;
+  const trabado = !todoRevisado || sinMotivo > 0 || sinCargar > 0;
+  return { pendientes, todoRevisado, sinMotivo, sinCargar, trabado };
+}
+
+/**
+ * LO QUE UNA LÍNEA DICE. COPIA de las derivaciones del principio de
+ * `TarjetaRecepcionMovil` —la escala mostrada, las físicas, la diferencia, los
+ * dos importes—, con sus mismos nombres. El porqué de cada una está allá.
+ */
+export function lecturaDeLaLinea(d) {
+  const envio = descriptorDeEnvio(d);
+  const mostrado = envioComoSeCuenta(envio);
+  const porUnidad = mostrado !== envio;
+  const esAgregada = d.agregadoEnRecepcion === true;
+  const revisado = d.revisadoEnRecepcion === true;
+  const sueltasGuardadas = Number(d.recibidoUnidadesSueltas || 0);
+  const fisicasContadas = fisicasRecibidasDe(d);
+  const fisicasEnviadas = fisicasEnviadasDe(d);
+  const chips = chipsDeMotivo({
+    enviada: fisicasEnviadas,
+    recibida: fisicasContadas,
+    agregadoEnRecepcion: esAgregada,
+  });
+  const hayDiferencia = chips.length > 0;
+  const delta =
+    fisicasContadas == null || fisicasEnviadas == null ? null : fisicasContadas - fisicasEnviadas;
+  const enviadasMostradas = porUnidad ? fisicasEnviadas : envio.cantidad;
+  const recibidasMostradas = porUnidad ? fisicasContadas : d.cantidadRecibida;
+  const sueltasMostradas = porUnidad ? 0 : sueltasGuardadas;
+  const costoMostrado = costoMostradoDe(d, envio);
+  const importeRemito = esAgregada ? null : d.subtotal;
+  const importeRecibido = d.subtotalRecibido == null ? d.subtotal : d.subtotalRecibido;
+  const hayCorreccionDeImporte =
+    importeRemito != null && Number(importeRemito) !== Number(importeRecibido);
+  return {
+    envio,
+    mostrado,
+    porUnidad,
+    esAgregada,
+    revisado,
+    sueltasGuardadas,
+    fisicasContadas,
+    fisicasEnviadas,
+    chips,
+    hayDiferencia,
+    delta,
+    enviadasMostradas,
+    recibidasMostradas,
+    sueltasMostradas,
+    costoMostrado,
+    importeRemito,
+    importeRecibido,
+    hayCorreccionDeImporte,
+  };
+}
+
+/**
+ * LO QUE MANDA "✓ COINCIDE". COPIA del cuerpo de `coincidir` en
+ * `TarjetaRecepcionMovil`: lo que el remito dice, en la escala de la
+ * PRESENTACIÓN —mandar las físicas guardaría 144 packs sobre 6 PACK x24—.
+ */
+export function cuerpoDeCoincide(d) {
+  const envio = descriptorDeEnvio(d);
+  return {
+    detalleId: d.id,
+    recibido: envio.cantidad,
+    recibidoUnidadesSueltas: envio.sueltas || 0,
+    motivoPrincipal: null,
+    motivoDetalle: null,
+  };
+}
 
 /** Los cuatro estados del trabajo, los mismos del teléfono y en el mismo orden. */
 const TABS = [
@@ -332,8 +455,6 @@ export default function RecepcionEscritorio({
   resumen,
   categorias,
   visibles,
-  /** El producto del panel: el elegido, o el primer pendiente. Lo decide el cerebro. */
-  producto,
   filtro,
   categoriaId,
   texto,
@@ -350,13 +471,9 @@ export default function RecepcionEscritorio({
   onFiltrar,
   onCategoria,
   onTexto,
-  onTeclear,
   onVoz,
-  onElegir,
-  onSiguientePendiente,
   onRevisar,
   onQuitarLinea,
-  onAbrirEscaner,
   confirmarRecepcion,
   confirmando = false,
   puedeCancelar = false,
@@ -367,6 +484,59 @@ export default function RecepcionEscritorio({
 }) {
   const [masAcciones, setMasAcciones] = useState(false);
   const [errorDeFila, setErrorDeFila] = useState("");
+  const [avisoPropio, setAvisoPropio] = useState("");
+  const [escaneando, setEscaneando] = useState(false);
+
+  // ── EL PRODUCTO DEL PANEL ES DE ESTA PANTALLA ───────────────────────────
+  //
+  // No es el `seleccionado` del workspace: ése abre la hoja del teléfono, que
+  // es un modal por portal y se abriría encima de esta pantalla aunque la del
+  // teléfono esté oculta. Sin nada elegido, el panel muestra el primer
+  // pendiente en el orden del remito; con todo revisado, ninguno.
+  const items = item?.items || [];
+  const [elegidoId, setElegidoId] = useState(null);
+  const elegir = (d) => {
+    setElegidoId(d?.id ?? null);
+    setAvisoPropio("");
+  };
+  const producto =
+    items.find((d) => d.id === elegidoId) || items.find((d) => pasaFiltro(d, FILTRO.PENDIENTES)) || null;
+
+  // ── EL ENTER Y LA CÁMARA, A ESTE PANEL ──────────────────────────────────
+  //
+  // La cascada es la MISMA del workspace —`resolverEntrada`, importada tal
+  // cual—: lo encontrado se abre en el panel; si no figura, el texto queda en
+  // el buscador para que el catálogo del origen lo tome. La cámara pide solo
+  // código, como en el teléfono.
+  const resolver = (entrada, opciones) => {
+    const r = resolverEntrada(items, entrada, opciones);
+    if (r.tipo === RESOLUCION.ABRIR) {
+      elegir(r.producto);
+      if (r.porCodigo) onTexto("");
+      return r;
+    }
+    if (r.tipo === RESOLUCION.NO_FIGURA) {
+      onTexto(String(entrada || "").trim());
+      return r;
+    }
+    return r;
+  };
+  const alTeclear = (e) => {
+    if (e.key === "Enter" && texto.trim()) {
+      e.preventDefault();
+      resolver(texto.trim());
+    }
+  };
+
+  // Lo agregado desde el catálogo va derecho al panel, para cargarle la cantidad.
+  const agregarDesdeCatalogo = async (p) => {
+    const r = await onAgregarDesdeCatalogo?.(p);
+    if (r?.ok && !r.yaExistia && r.detalleId != null) setElegidoId(r.detalleId);
+    return r;
+  };
+
+  // "Guardar y seguir": el pendiente que sigue en la lista.
+  const alGuardar = () => elegir(siguientePendiente(visibles, producto));
 
   // Si se puede confirmar, y por qué no: la MISMA función que el teléfono.
   const cierre = cierreDeRecepcion({ items: item?.items, resumen });
@@ -414,7 +584,7 @@ export default function RecepcionEscritorio({
           puedeRecibir={puedeRecibir}
           guardando={guardando}
           onCoincide={coincidir}
-          onCorregir={onElegir}
+          onCorregir={elegir}
         />
       ),
     },
@@ -501,25 +671,24 @@ export default function RecepcionEscritorio({
               value={texto}
               onChange={onTexto}
               onVoz={onVoz}
-              onKeyDown={onTeclear}
+              onKeyDown={alTeclear}
               placeholder={PLACEHOLDER_BUSCADOR}
               ariaLabel="Buscar producto de esta transferencia"
             />
           </div>
           {puedeRecibir && hayEscanerDisponible() && (
-            <SunmiButton color="slate" onClick={onAbrirEscaner} className="shrink-0">
+            <SunmiButton color="slate" onClick={() => setEscaneando(true)} className="shrink-0">
               Escanear
             </SunmiButton>
           )}
         </div>
-        {/* Los cuatro filtros de siempre, con su número y su comportamiento:
-            la misma pieza que el teléfono, en fila en vez de 2×2. */}
-        <SunmiFiltroEstado
+        {/* Los cuatro filtros de siempre, con su número y su comportamiento,
+            en fila en vez de 2×2: la variante propia de esta pantalla. */}
+        <FiltroEstadoCompacto
           opciones={opcionesEstado}
           valor={filtro}
           onCambiar={onFiltrar}
           ariaLabel="Filtrar productos por estado"
-          tamano="compacto"
         />
         <SunmiSelectAdv
           value={categoriaId == null ? "" : String(categoriaId)}
@@ -541,7 +710,9 @@ export default function RecepcionEscritorio({
           Como en el teléfono: el aviso en una línea y, debajo, el catálogo del
           origen para tocarlo y agregarlo. Y el alta a mano, para lo que tampoco
           está en el catálogo. */}
-      {(noFigura || aviso) && <SunmiAviso tono="warning">{noFigura ? MENSAJE_NO_FIGURA_CORTO : aviso}</SunmiAviso>}
+      {(noFigura || aviso || avisoPropio) && (
+        <SunmiAviso tono="warning">{noFigura ? MENSAJE_NO_FIGURA_CORTO : avisoPropio || aviso}</SunmiAviso>
+      )}
       {noFigura && puedeRecibir && (
         <div className="space-y-1.5">
           <p className="text-sm2 font-semibold sunmi-text-muted">{ROTULO_CATALOGO}</p>
@@ -553,7 +724,7 @@ export default function RecepcionEscritorio({
           )}
           <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
             {catalogo.map((p) => (
-              <FilaCatalogoRecepcion key={p.productoLocalId} p={p} onElegir={onAgregarDesdeCatalogo} agregando={guardando} />
+              <FilaCatalogoRecepcion key={p.productoLocalId} p={p} onElegir={agregarDesdeCatalogo} agregando={guardando} />
             ))}
           </div>
           <SunmiButton color="slate" onClick={onAbrirAgregar}>
@@ -565,15 +736,18 @@ export default function RecepcionEscritorio({
       {errorDeFila && <SunmiAviso tono="danger">{errorDeFila}</SunmiAviso>}
 
       {/* ── 3 · LA LISTA Y EL PRODUCTO ───────────────────────────────────── */}
-      <div className="grid grid-cols-recepcionEscritorio items-start gap-4">
-        <div className="min-w-0 overflow-hidden rounded-xl2 border sunmi-border sunmi-bg-card">
+      {/* Dos tercios la lista, un tercio el panel: ~436 px a 1366, donde el
+          diseño pide 400. Con un ancho fijo haría falta un token nuevo en
+          `tailwind.config.js`, y esta pantalla no toca archivos compartidos. */}
+      <div className="grid grid-cols-3 items-start gap-4">
+        <div className="col-span-2 min-w-0 overflow-hidden rounded-xl2 border sunmi-border sunmi-bg-card">
           <SunmiTable
             columnas={columnas}
             filas={visibles}
             claveFila={(d) => firmaDeEdicion(d)}
             densidad="comoda"
             vacio={noFigura ? "" : "No hay productos que coincidan con este filtro."}
-            onClickFila={(d) => onElegir(d)}
+            onClickFila={(d) => elegir(d)}
             filaSeleccionada={(d) => d.id === producto?.id}
             // La elegida: fondo suave (el `selected` de la fila del kit) y el
             // borde izquierdo en el color de acción. Las demás llevan el mismo
@@ -585,7 +759,7 @@ export default function RecepcionEscritorio({
             className="text-sm3"
           />
         </div>
-        <div className="sticky top-3">
+        <div className="sticky top-3 min-w-0">
           <PanelDelProducto
             producto={producto}
             puedeRecibir={puedeRecibir}
@@ -593,10 +767,10 @@ export default function RecepcionEscritorio({
             quitandoId={quitandoId}
             onRevisar={onRevisar}
             onQuitarLinea={onQuitarLinea}
-            onGuardado={() => onSiguientePendiente?.(producto)}
+            onGuardado={alGuardar}
             anterior={anterior}
             siguiente={siguiente}
-            onElegir={onElegir}
+            onElegir={elegir}
             todoRevisado={todoRevisado}
           />
         </div>
@@ -610,8 +784,23 @@ export default function RecepcionEscritorio({
         puedeCancelar={puedeCancelar}
         abrirPanelCancelar={abrirPanelCancelar}
         imprimirTicket={imprimirTicket}
-        onAbrirEscaner={onAbrirEscaner}
+        onAbrirEscaner={() => setEscaneando(true)}
         forma="centrado"
+      />
+
+      {/* La cámara de ESTA pantalla: lo que lee va a su panel. */}
+      <SunmiEscanerCodigoBarra
+        abierto={escaneando}
+        onCerrar={() => setEscaneando(false)}
+        onCodigo={(codigo) => {
+          setEscaneando(false);
+          resolver(codigo, { soloCodigo: true });
+        }}
+        onSinCamara={(motivo) => {
+          setEscaneando(false);
+          setAvisoPropio(MENSAJES_SIN_CAMARA[motivo]);
+        }}
+        ayuda="Apuntá al código de barras del producto que tenés en la mano."
       />
     </div>
   );
@@ -619,7 +808,7 @@ export default function RecepcionEscritorio({
 
 /**
  * El siguiente pendiente DESPUÉS de `actual` en la lista que se ve, o el
- * primero si no hay ninguno después. Lo usa el cerebro al guardar.
+ * primero si no hay ninguno después. Lo usa el panel al guardar.
  */
 export function siguientePendiente(visibles = [], actual = null) {
   const pendientes = visibles.filter((d) => pasaFiltro(d, FILTRO.PENDIENTES) && d.id !== actual?.id);

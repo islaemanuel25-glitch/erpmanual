@@ -3,9 +3,11 @@
 //   node --import ./scripts/alias-loader.mjs --test components/transferencias/recepcionEscritorio.test.mjs
 //
 // Lo que dibuja la composición aprobada (Figma EVJ2KvVCrY0oVSowfboymQ,
-// 384:483) y, sobre todo, que lo que dice salga de las MISMAS funciones que el
-// teléfono. El corte —`lg`— y que no decida nada está en
-// `recepcionMovilV2.test.mjs` (8 y 9).
+// 384:483), y que sus COPIAS de las reglas del teléfono sigan diciendo lo
+// mismo que el original. El teléfono no se toca (regla del 2026-10-14), así
+// que la regla de confirmar, lo que dice cada línea y lo que manda "✓
+// Coincide" están escritos dos veces: el último candado compara los renglones
+// de las dos copias y se pone rojo si una cambia y la otra no.
 //
 // ── DE DÓNDE SALEN LOS DATOS ─────────────────────────────────────────────
 //
@@ -18,10 +20,21 @@ import assert from "node:assert/strict";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import RecepcionEscritorio, { TEXTO_TODO_REVISADO, siguientePendiente } from "./RecepcionEscritorio.jsx";
-import { cuerpoDeCoincide } from "./TarjetaRecepcionMovil.jsx";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+import RecepcionEscritorio, {
+  TEXTO_TODO_REVISADO,
+  cierreDeRecepcion,
+  cuerpoDeCoincide,
+  siguientePendiente,
+} from "./RecepcionEscritorio.jsx";
 import { resumenDeRecepcion, categoriasDelRemito } from "@/lib/transferencias/controlFisico";
-import { MOTIVOS_FALTANTE, cierreDeRecepcion } from "@/lib/transferencias/recepcionUI";
+import { MOTIVOS_FALTANTE } from "@/lib/transferencias/recepcionUI";
+
+const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const fuente = (rel) => fs.readFileSync(path.join(RAIZ, rel), "utf8");
 
 const texto = (html) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
@@ -69,7 +82,6 @@ function pantalla(items, extra = {}) {
       resumen,
       categorias: categoriasDelRemito(items),
       visibles: items,
-      producto: null,
       filtro: "TODOS",
       categoriaId: null,
       texto: "",
@@ -79,9 +91,7 @@ function pantalla(items, extra = {}) {
       onFiltrar() {},
       onCategoria() {},
       onTexto() {},
-      onTeclear() {},
       onVoz() {},
-      onElegir() {},
       onRevisar: () => ({ ok: true }),
       ...extra,
     })
@@ -119,14 +129,15 @@ test("Confirmar se traba con la MISMA regla que el teléfono, y dice por qué", 
   assert.ok(!/Falta revisar/.test(texto(listo)));
 });
 
-test("el panel es la hoja del teléfono; sin producto, avisa que está todo revisado", () => {
-  const html = pantalla([PENDIENTE, COINCIDE], { producto: PENDIENTE });
+test("el panel abre en el primer pendiente con la hoja del teléfono; sin pendientes, avisa", () => {
+  // Sin nada elegido, el panel muestra el primer pendiente del remito.
+  const html = pantalla([COINCIDE, PENDIENTE]);
   const panel = html.slice(html.indexOf("data-panel-producto"));
   assert.match(texto(panel), /^.*Pancho 24 Als Fiambres · se cuenta por PACK x24/);
   // La ficha con `enHoja`: su botón dice "y seguir", como en la hoja.
   assert.match(texto(panel), /✓ (Revisado|Guardar) y seguir/);
-  // Siguiente: el que sigue en la lista.
-  assert.match(texto(panel), /Siguiente: Salchicha ›/);
+  // Anterior: el que está antes en la lista.
+  assert.match(texto(panel), /‹ Anterior/);
 
   const nada = pantalla([COINCIDE, FALTANTE]);
   assert.ok(texto(nada).includes(TEXTO_TODO_REVISADO));
@@ -144,4 +155,38 @@ test("✓ Coincide en la fila manda lo mismo que la tarjeta, y el siguiente pend
   assert.equal(siguientePendiente([PENDIENTE, COINCIDE, otro], PENDIENTE).id, 7000);
   assert.equal(siguientePendiente([PENDIENTE, COINCIDE, otro], otro).id, 6698, "al final vuelve al primero que falta");
   assert.equal(siguientePendiente([COINCIDE], COINCIDE), null);
+});
+
+// ── LAS COPIAS NO SE DESPEGAN DEL ORIGINAL ────────────────────────────────
+//
+// El teléfono no se toca, así que estas reglas viven dos veces. Una copia
+// que se queda vieja no avisa sola: el teléfono dejaría confirmar algo que la
+// computadora no, o mandaría otra cantidad en "✓ Coincide". Cada renglón de
+// abajo es una regla; tiene que estar, igual, en los dos archivos. Si alguien
+// cambia la del teléfono, esto se pone rojo y dice cuál falta copiar.
+test("las copias de la computadora dicen lo mismo que el teléfono, renglón por renglón", () => {
+  const compu = fuente("components/transferencias/RecepcionEscritorio.jsx");
+  const pares = [
+    // La regla de confirmar, de `RecepcionMovil`.
+    ["components/transferencias/RecepcionMovil.jsx", "const todoRevisado = pendientes === 0 && (resumen?.totalRemito ?? 0) > 0;"],
+    ["components/transferencias/RecepcionMovil.jsx", "if (d.agregadoEnRecepcion || d.motivoPrincipal) return false;"],
+    ["components/transferencias/RecepcionMovil.jsx", "if (d.cantidadRecibida == null) return false;"],
+    ["components/transferencias/RecepcionMovil.jsx", "return env != null && rec != null && rec !== env;"],
+    ["components/transferencias/RecepcionMovil.jsx", "const faltaCargar = (d) => d.agregadoEnRecepcion === true && !(fisicasRecibidasDe(d) > 0);"],
+    ["components/transferencias/RecepcionMovil.jsx", "const trabado = !todoRevisado || sinMotivo > 0 || sinCargar > 0;"],
+    // Lo que dice cada línea, de `TarjetaRecepcionMovil`.
+    ["components/transferencias/TarjetaRecepcionMovil.jsx", "const mostrado = envioComoSeCuenta(envio);"],
+    ["components/transferencias/TarjetaRecepcionMovil.jsx", "fisicasContadas == null || fisicasEnviadas == null ? null : fisicasContadas - fisicasEnviadas;"],
+    ["components/transferencias/TarjetaRecepcionMovil.jsx", "const recibidasMostradas = porUnidad ? fisicasContadas : d.cantidadRecibida;"],
+    ["components/transferencias/TarjetaRecepcionMovil.jsx", "const importeRemito = esAgregada ? null : d.subtotal;"],
+    ["components/transferencias/TarjetaRecepcionMovil.jsx", "const importeRecibido = d.subtotalRecibido == null ? d.subtotal : d.subtotalRecibido;"],
+    // Lo que manda "✓ Coincide", y cómo se pinta.
+    ["components/transferencias/TarjetaRecepcionMovil.jsx", "recibido: envio.cantidad,"],
+    ["components/transferencias/TarjetaRecepcionMovil.jsx", "recibidoUnidadesSueltas: envio.sueltas || 0,"],
+    ["components/transferencias/TarjetaRecepcionMovil.jsx", 'const CLASE_COINCIDE = "sunmi-btn-accent-outline";'],
+  ];
+  for (const [rel, renglon] of pares) {
+    assert.ok(fuente(rel).includes(renglon), `${rel} ya no dice «${renglon}»: la regla cambió, hay que copiarla a la computadora`);
+    assert.ok(compu.includes(renglon), `la computadora no dice «${renglon}»: su copia se despegó del teléfono`);
+  }
 });

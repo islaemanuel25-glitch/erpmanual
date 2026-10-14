@@ -234,15 +234,7 @@ test("el importe del móvil va en el bloque de cierre, antes del CTA", () => {
   //
   // Lo que el candado tiene que seguir defendiendo es el BLOQUEO, que no
   // cambió. Se mide donde vive: en la condición del botón, no en un texto.
-  //
-  // La regla se mudó tal cual a `cierreDeRecepcion` cuando la computadora tuvo
-  // su propia composición: las dos pantallas la leen de ahí. Se afirma donde
-  // vive, y que el móvil la lea.
-  assert.match(
-    codigoDe("lib/transferencias/recepcionUI.js"),
-    /const trabado = !todoRevisado \|\| sinMotivo > 0 \|\| sinCargar > 0/
-  );
-  assert.match(src, /const \{ trabado \} = cierre;/);
+  assert.match(src, /const trabado = !todoRevisado \|\| sinMotivo > 0 \|\| sinCargar > 0/);
   assert.match(src, /disabled=\{trabado \|\| confirmando\}/);
   // Y la barra muestra el total, que es lo único que quedó a su izquierda.
   //

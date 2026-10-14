@@ -4,15 +4,15 @@
 //
 // LAS HOJAS DE "MÁS ACCIONES" E "INFORMACIÓN GENERAL" DE LA RECEPCIÓN.
 //
-// Vivían adentro de `RecepcionMovil`, tal cual están acá. Se mudaron cuando la
-// computadora tuvo su propia composición (`RecepcionEscritorio`), que pide en
-// su botón "⋯" las MISMAS acciones que el teléfono: PDF de envío, PDF de
-// recepción, ticket, cámara y cancelar. Con una lista en cada pantalla, el día
-// que se agregue una acción una de las dos la perdería sin que nada avise.
+// Es una COPIA de las dos hojas que viven adentro de `RecepcionMovil`, para el
+// botón "⋯" de la computadora (`RecepcionEscritorio`): PDF de envío, PDF de
+// recepción, ticket, cámara y cancelar. El teléfono sigue con las suyas y no
+// se toca —regla del 2026-10-14, ver el encabezado de `RecepcionEscritorio`—,
+// así que esta lista está escrita dos veces a sabiendas: si se agrega una
+// acción al teléfono, hay que agregarla también acá.
 //
-// Lo único que cambia entre las dos es la `forma` del modal del kit: en el
-// teléfono es una hoja pegada abajo; en la computadora, una tarjeta centrada.
-// Todo lo administrativo, fuera del flujo físico pero a un toque.
+// Lo único distinto es la `forma` del modal del kit: la computadora la abre
+// centrada. Todo lo administrativo, fuera del flujo físico pero a un toque.
 
 import { useState } from "react";
 

@@ -679,10 +679,9 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // puede pasar inadvertido porque son tres y están a la vista en el mismo
     // componente.
     "components/transferencias/RecepcionMovil.jsx": true,
-    // "Más acciones" e "Información general" se mudaron de `RecepcionMovil` a
-    // su propia pieza cuando la computadora necesitó el mismo "⋯". Contestan
-    // lo mismo que arriba: un menú y una hoja de solo lectura, nada que perder.
-    // Con eso `RecepcionMovil` queda con la ficha, que sí lo declara.
+    // La COPIA de "Más acciones" e "Información general" para el "⋯" de la
+    // computadora (`RecepcionEscritorio`). Contesta lo mismo que arriba: un
+    // menú y una hoja de solo lectura, nada que perder al cerrar.
     "components/transferencias/MasAccionesRecepcion.jsx": false,
     // El ESCÁNER contesta que NO, y por el mismo criterio: cerrarlo no pierde
     // nada. No hay nada escrito adentro —es un visor de cámara— y volver a

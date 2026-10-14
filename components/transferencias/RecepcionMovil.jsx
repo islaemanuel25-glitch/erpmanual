@@ -39,13 +39,15 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiPantallaDeTrabajo from "@/components/sunmi/SunmiPantallaDeTrabajo";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
+import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import SunmiFiltroEstado from "@/components/sunmi/SunmiFiltroEstado";
+import { hayEscanerDisponible } from "@/components/sunmi/SunmiEscanerCodigoBarra";
 
 import EstadoTransferenciaBadge from "./EstadoTransferenciaBadge";
-import MasAccionesRecepcion, { TITULO_INFO_GENERAL, TITULO_MAS_ACCIONES } from "./MasAccionesRecepcion";
+import TransferenciaHeader from "./TransferenciaHeader";
 import FichaProductoRecepcion from "./FichaProductoRecepcion";
 import TarjetaRecepcionMovil from "./TarjetaRecepcionMovil";
 import FilaCatalogoRecepcion, { ROTULO_CATALOGO } from "./FilaCatalogoRecepcion";
@@ -63,9 +65,7 @@ import { FILTRO, pasaFiltro } from "@/lib/transferencias/controlFisico";
 // de `escalaFisicaDeLinea`: leer `unidadEnviada` crudo devuelve null en las
 // líneas con snapshot, y null se lee como "no hay diferencia".
 import {
-  cierreDeRecepcion,
   contarCorregidas,
-  faltaCargarCantidad,
   fisicasEnviadasDe,
   fisicasRecibidasDe,
 } from "@/lib/transferencias/recepcionUI";
@@ -74,8 +74,8 @@ import { firmaDeEdicion } from "@/lib/transferencias/presentacionEnvio";
 /** El texto del buscador, el mismo patrón que Productos y el POS. */
 export const PLACEHOLDER_BUSCADOR = "Buscar producto, código o categoría...";
 
-// Los títulos de las dos hojas viven con ellas, en `MasAccionesRecepcion`.
-export { TITULO_MAS_ACCIONES, TITULO_INFO_GENERAL };
+export const TITULO_MAS_ACCIONES = "Más acciones";
+export const TITULO_INFO_GENERAL = "Información general";
 
 /**
  * El aviso de "no figura", en UNA línea.
@@ -152,6 +152,7 @@ export default function RecepcionMovil({
   imprimirTicket,
 }) {
   const [masAcciones, setMasAcciones] = useState(false);
+  const [infoGeneral, setInfoGeneral] = useState(false);
 
   // ── EL AVISO DE LO QUE SE ACABA DE GUARDAR ──────────────────────────────
   //
@@ -171,10 +172,8 @@ export default function RecepcionMovil({
     return () => clearTimeout(id);
   }, [guardado]);
 
-  // Si se puede confirmar, y por qué no: `cierreDeRecepcion`, la MISMA función
-  // que lee la composición de escritorio. Ver abajo, en `trabado`.
-  const cierre = cierreDeRecepcion({ items: item?.items, resumen });
-  const { pendientes, todoRevisado } = cierre;
+  const pendientes = resumen?.pendientes ?? 0;
+  const todoRevisado = pendientes === 0 && (resumen?.totalRemito ?? 0) > 0;
 
   // ── LOS TRES IMPORTES ─────────────────────────────────────────────────────
   //
@@ -238,13 +237,13 @@ export default function RecepcionMovil({
   // persistida, no está revisada y no tiene motivo. Se deriva de la línea, con
   // la misma función que el renglón de abajo, y en FÍSICO — que es donde la
   // diferencia cuenta.
-  //
-  // ── LA CUENTA SE MUDÓ A `cierreDeRecepcion` ─────────────────────────────
-  //
-  // Renglón por renglón, a `lib/transferencias/recepcionUI.js`, cuando la
-  // computadora tuvo su propia composición: las dos pantallas leen `trabado` de
-  // la misma función y no pueden decidir distinto. Este comentario y los de
-  // abajo explican la regla; la regla vive allá.
+  const sinMotivo = (item?.items || []).filter((d) => {
+    if (d.agregadoEnRecepcion || d.motivoPrincipal) return false;
+    if (d.cantidadRecibida == null) return false;
+    const env = fisicasEnviadasDe(d);
+    const rec = fisicasRecibidasDe(d);
+    return env != null && rec != null && rec !== env;
+  }).length;
   // ── Y LA TERCERA, QUE EL V16 TRAJO CON EL ALTA EN LÍNEA ─────────────────
   //
   // Tocar un producto del catálogo crea la línea EN CERO, para cargarla en la
@@ -263,13 +262,14 @@ export default function RecepcionMovil({
   // leía "sin cargar" y Confirmar quedaba gris, mientras el renglón, el estado y
   // el importe de la misma línea ya sumaban la suelta. Ahora sale de
   // `fisicasRecibidasDe`, la misma cuenta que usa el resto de la pantalla.
-  const faltaCargar = faltaCargarCantidad;
+  const faltaCargar = (d) => d.agregadoEnRecepcion === true && !(fisicasRecibidasDe(d) > 0);
+  const sinCargar = (item?.items || []).filter(faltaCargar).length;
 
   // Las tres causas juntas en UNA condición, para que el botón tenga una sola y
   // no puedan decir cosas distintas. El V16 sacó el renglón que las anunciaba
   // —el avance ya está arriba y los tabs ya traen su número— pero las reglas son
   // las mismas, y el servidor las vuelve a exigir de todas formas.
-  const { trabado } = cierre;
+  const trabado = !todoRevisado || sinMotivo > 0 || sinCargar > 0;
 
   /** Cuántas quedaron corregidas. Lo dice la barra y lo marca la lista. */
   const corregidas = contarCorregidas(item?.items);
@@ -826,21 +826,99 @@ export default function RecepcionMovil({
         )}
       </SunmiModalLayout>
 
-      {/* ── LAS HOJAS DE "MÁS ACCIONES" E "INFORMACIÓN GENERAL" ───────────
-          Todo lo administrativo, fuera del flujo físico pero a un toque. Viven
-          en `MasAccionesRecepcion`, que es la MISMA pieza que abre el "⋯" de la
-          computadora: una sola lista de acciones para las dos pantallas. */}
-      <MasAccionesRecepcion
-        abierto={masAcciones}
-        onCerrar={() => setMasAcciones(false)}
-        item={item}
-        puedeRecibir={puedeRecibir}
-        puedeCancelar={puedeCancelar}
-        abrirPanelCancelar={abrirPanelCancelar}
-        imprimirTicket={imprimirTicket}
-        onAbrirEscaner={onAbrirEscaner}
+      {/* ── LA HOJA DE "MÁS ACCIONES" ─────────────────────────────────────
+          Todo lo administrativo, fuera del flujo físico pero a un toque. */}
+      <SunmiModalLayout
+        open={masAcciones}
+        title={TITULO_MAS_ACCIONES}
+        subtitle={`Transferencia #${item?.id} · ${item?.origen?.nombre} a ${item?.destino?.nombre}`}
+        onClose={() => setMasAcciones(false)}
+        z={NIVEL_MODAL_GLOBAL}
         forma="hoja"
-      />
+        espacioCuerpo="gap-2"
+      >
+        <SunmiButton
+          color="slate"
+          className="w-full justify-center"
+          onClick={() => {
+            setMasAcciones(false);
+            setInfoGeneral(true);
+          }}
+        >
+          {TITULO_INFO_GENERAL}
+        </SunmiButton>
+
+        <a href={`/api/transferencias/pdf?id=${item?.id}`} target="_blank" rel="noreferrer">
+          <SunmiButton color="slate" className="w-full justify-center">
+            📄 PDF de envío
+          </SunmiButton>
+        </a>
+        <a href={`/api/transferencias/pdf-recepcion?id=${item?.id}`} target="_blank" rel="noreferrer">
+          <SunmiButton color="slate" className="w-full justify-center">
+            📄 PDF de recepción
+          </SunmiButton>
+        </a>
+        <SunmiButton color="slate" className="w-full justify-center" onClick={imprimirTicket}>
+          🖨 Imprimir ticket POS
+        </SunmiButton>
+
+        {/* ── LA CÁMARA, MIENTRAS NO HAYA UNA COMPOSICIÓN APROBADA ────────
+            El V2 no dibuja un botón de escanear al lado del buscador: eso se
+            descartó. Pero la cámara sigue existiendo y sacarla sería perder una
+            función. Queda acá, que es la superficie aprobada menos invasiva, y
+            no se inventa un lugar nuevo en el flujo principal. Solo aparece si
+            el navegador sabe leer códigos. */}
+        {puedeRecibir && hayEscanerDisponible() && (
+          <SunmiButton
+            color="slate"
+            className="w-full justify-center"
+            onClick={() => {
+              setMasAcciones(false);
+              onAbrirEscaner();
+            }}
+          >
+            📷 Escanear con la cámara
+          </SunmiButton>
+        )}
+
+        {puedeCancelar && (
+          <>
+            {/* Separado, porque no es una acción más de la lista.
+
+                Con `sunmi-border border-t` se dibujaba una CAJA VACÍA: esa
+                clase del kit pone los cuatro bordes, así que `border-t` solo le
+                agregaba grosor arriba y el resto ya estaba puesto. En la captura
+                de 390 px se veía un rectángulo blanco entre los botones.
+                `SunmiSeparator` es la pieza del kit para esto y no hay que
+                adivinarle el color. */}
+            <SunmiSeparator />
+            <SunmiButton
+              color="red"
+              className="w-full justify-center"
+              onClick={() => {
+                setMasAcciones(false);
+                abrirPanelCancelar?.();
+              }}
+            >
+              ⛔ Cancelar transferencia
+            </SunmiButton>
+          </>
+        )}
+      </SunmiModalLayout>
+
+      {/* ── LA HOJA DE INFORMACIÓN GENERAL ────────────────────────────────
+          El MISMO bloque del escritorio, sin una segunda versión. Deja de estar
+          desplegado durante el conteo; no deja de existir. */}
+      <SunmiModalLayout
+        open={infoGeneral}
+        title={TITULO_INFO_GENERAL}
+        onClose={() => setInfoGeneral(false)}
+        z={NIVEL_MODAL_GLOBAL}
+        forma="hoja"
+        espacioCuerpo="gap-2"
+      >
+        <TransferenciaHeader item={item} />
+      </SunmiModalLayout>
 
       {/* El panel de cancelación lo dibuja la página, con su preview y su
           motivo. Acá solo se lo deja aparecer cuando está abierto. */}

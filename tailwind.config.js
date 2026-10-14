@@ -331,17 +331,6 @@ module.exports = {
       // escritorio (`finanzasPeriodo`, `finanzasEscritorio`, `finanzasFiltros`).
       // Se fueron con él: el molde de ahora apila franjas a todo el ancho y no
       // necesita ninguna medida que no esté en la escala.
-      //
-      // ── LA RECEPCIÓN DE UNA TRANSFERENCIA EN LA COMPUTADORA ─────────────
-      //
-      // La lista con el resto y el panel del producto elegido fijo en 400 px
-      // (Figma EVJ2KvVCrY0oVSowfboymQ, 384:531). 400 no cae en la escala de
-      // `1rem = 14px` —`w-96` da 336— y escrita como `grid-cols-[...]` el
-      // trinquete la cuenta, con razón. `minmax(0, 1fr)` y no `1fr`: con `1fr`
-      // un nombre largo estiraría la lista más allá de la ventana.
-      gridTemplateColumns: {
-        recepcionEscritorio: "minmax(0, 1fr) 400px",
-      },
     },
   },
   plugins: [],

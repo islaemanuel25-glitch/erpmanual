@@ -33,18 +33,35 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check } from "lucide-react";
 
+import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiActionCard from "@/components/sunmi/SunmiActionCard";
-import SunmiEscanerCodigoBarra, { MENSAJES_SIN_CAMARA } from "@/components/sunmi/SunmiEscanerCodigoBarra";
+import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
+import SunmiChipsFiltro from "@/components/sunmi/SunmiChipsFiltro";
+import SunmiSelectorUnidad from "@/components/sunmi/SunmiSelectorUnidad";
+import SunmiAviso from "@/components/sunmi/SunmiAviso";
+import SunmiEscanerCodigoBarra, {
+  MENSAJES_SIN_CAMARA,
+  hayEscanerDisponible,
+} from "@/components/sunmi/SunmiEscanerCodigoBarra";
 
+import ResumenControlFisico from "./ResumenControlFisico";
 import RecepcionMovil from "./RecepcionMovil";
-import RecepcionEscritorio, { siguientePendiente } from "./RecepcionEscritorio";
-import { TEXTO_ESTADO } from "./FichaProductoRecepcion";
-import { descriptorDeEnvio, rotuloConSueltas, rotuloDeEnvio } from "@/lib/transferencias/presentacionEnvio";
+import RecepcionEscritorio from "./RecepcionEscritorio";
+import FichaProductoRecepcion, { TEXTO_ESTADO } from "./FichaProductoRecepcion";
+import {
+  descriptorDeEnvio,
+  firmaDeEdicion,
+  nombreDePresentacion,
+  rotuloConSueltas,
+  rotuloDeEnvio,
+} from "@/lib/transferencias/presentacionEnvio";
 import AgregarProductoRecibido, { ACCION_AGREGAR } from "./AgregarProductoRecibido";
 // Las MISMAS funciones que usa el modal para decidir la unidad y armar el
 // cuerpo. Con dos armadores, el día que el contrato cambie uno de los dos manda
 // un pedido que el servidor rechaza.
 import { unidadDeProductoNuevo, validarLineaNueva } from "@/lib/transferencias/recepcionUI";
+import { SectionHead, fmtMoneda } from "./detallePresentacion";
 import {
   ESTADO_PRODUCTO,
   FILTRO,
@@ -57,12 +74,13 @@ import {
   resumenDeRecepcion,
 } from "@/lib/transferencias/controlFisico";
 
-/**
- * Quién abrió la cámara. El escáner es un modal compartido: lo que lee va a la
- * composición que lo pidió —la hoja del teléfono o el panel de la computadora—.
- * El teléfono lo abre con `true`, como siempre.
- */
-const ESCANER_ESCRITORIO = "escritorio";
+/** Los tabs del remito. "No declarados" se llega por su card, no por acá. */
+const TABS = [
+  { clave: FILTRO.PENDIENTES, texto: "Pendientes" },
+  { clave: FILTRO.DIFERENCIAS, texto: "Diferencias" },
+  { clave: FILTRO.REVISADOS, texto: "Revisados" },
+  { clave: FILTRO.TODOS, texto: "Todos" },
+];
 
 export const MENSAJE_NO_FIGURA = "Este producto no figura en esta transferencia.";
 
@@ -205,7 +223,7 @@ export default function WorkspaceRecepcion({
   abrirPanelCancelar = null,
   panelCancelar = null,
   imprimirTicket = null,
-  /** El Volver de la página: en la computadora va en la franja de arriba. */
+  /** El Volver de la página, para la franja de la computadora. */
   volver = null,
 }) {
   const items = item?.items || [];
@@ -390,9 +408,6 @@ export default function WorkspaceRecepcion({
       setTexto("");
       setAviso("");
       setPorMostrarId(json.detalleId);
-      // En la computadora el agregado va derecho al panel, para cargarle la
-      // cantidad: ahí la lista y el panel conviven y no se tapa nada.
-      setElegidoEscritorioId(json.detalleId);
     }
     return json;
   };
@@ -422,15 +437,11 @@ export default function WorkspaceRecepcion({
    *                existiendo para la CÁMARA, que necesita dejar el código leído
    *                en el campo para que la derivación tenga qué mirar.
    */
-  //
-  // `alElegir` dice QUÉ composición abre el producto: el teléfono lo abre en
-  // su hoja (`elegir`) y la computadora en su panel (`elegirEnEscritorio`). La
-  // cascada es una sola; lo que cambia es dónde se muestra lo encontrado.
-  const resolver = (entrada, opciones, alElegir = elegir) => {
+  const resolver = (entrada, opciones) => {
     const r = resolverEntrada(items, entrada, opciones);
 
     if (r.tipo === RESOLUCION.ABRIR) {
-      alElegir(r.producto);
+      elegir(r.producto);
       // El campo se limpia solo cuando lo que entró era un CÓDIGO: el operador
       // va a escanear muchos seguidos y el siguiente tiene que caer en un campo
       // vacío. Si escribió "Fanta", el texto queda: es el contexto de lo que
@@ -453,12 +464,11 @@ export default function WorkspaceRecepcion({
   };
 
   const alEscanear = (codigo) => {
-    const desdeEscritorio = escaneando === ESCANER_ESCRITORIO;
     setEscaneando(false);
     // La cámara devuelve un CÓDIGO. Sin fallback por nombre: un código que no
     // está en el remito es "no figura", y buscarlo como texto abriría cualquier
     // producto cuyo nombre contenga esos dígitos.
-    resolver(codigo, { soloCodigo: true }, desdeEscritorio ? elegirEnEscritorio : elegir);
+    resolver(codigo, { soloCodigo: true });
   };
 
   const alTeclear = (e) => {
@@ -471,44 +481,60 @@ export default function WorkspaceRecepcion({
     }
   };
 
-  // ── LA COMPUTADORA ELIGE APARTE ───────────────────────────────────────────
-  //
-  // El producto que muestra el panel de escritorio NO es `seleccionadoId`.
-  // Ese abre la hoja del teléfono, y la hoja es un modal del kit que se monta
-  // por portal: aunque la composición del teléfono esté oculta con `lg:hidden`,
-  // su hoja se abriría encima de la computadora. Por eso cada composición
-  // tiene su elegido, y lo encontrado por la cascada va a la que buscó.
-  //
-  // Sin nada elegido, el panel muestra el primer pendiente: es lo que el
-  // operador va a contar después. Con todo revisado, ninguno.
-  const [elegidoEscritorioId, setElegidoEscritorioId] = useState(null);
-  const elegirEnEscritorio = (d) => {
-    setElegidoEscritorioId(d?.id ?? null);
-    setAviso("");
-  };
-  const productoEscritorio =
-    items.find((d) => d.id === elegidoEscritorioId) ||
-    productosVisibles(items, { filtro: FILTRO.PENDIENTES })[0] ||
-    null;
+  const listado = (
+    <div className="space-y-1.5">
+      {/* ── DOS VACÍOS QUE SIGNIFICAN COSAS DISTINTAS ─────────────────
+          Una lista vacía porque el FILTRO tapó lo que hay no es lo mismo que
+          una lista vacía porque el producto NO ESTÁ. Cuando `noFigura` ya lo
+          dijo arriba —y ofreció el camino de salida— repetir "no coincide con
+          este filtro" manda a mirar el filtro, que es justo la confusión que
+          esta tanda vino a sacar. */}
+      {visibles.length === 0 && !noFigura && (
+        <p className="text-center py-6 sunmi-text-muted text-sm2">
+          No hay productos que coincidan con este filtro.
+        </p>
+      )}
+      {visibles.map((d) => (
+        <FilaProducto key={d.id} d={d} activa={d.id === seleccionadoId} onElegir={elegir} />
+      ))}
+    </div>
+  );
 
-  const alTeclearEnEscritorio = (e) => {
-    if (e.key === "Enter" && texto.trim()) {
-      e.preventDefault();
-      resolver(texto.trim(), undefined, elegirEnEscritorio);
-    }
-  };
+  const ficha = seleccionado ? (
+    <FichaProductoRecepcion
+      // `key` con el id: cambiar de producto REMONTA la ficha, y su estado nace
+      // del producto nuevo. Sin esto haría falta un efecto que sincronice, y ese
+      // efecto deja el primer pintado con los campos vacíos.
+      // ── LA IDENTIDAD INCLUYE LA ESCALA, NO SOLO EL ID ──────────────
+      // Adoptar la presentación actual cambia en qué se cuenta esta línea
+      // SIN cambiarle el id. Con `key={seleccionado.id}` React conservaba el
+      // estado: el rótulo pasaba a "5 CAJÓN x8" y el campo seguía diciendo
+      // 40. Ver `firmaDeEdicion`.
+      key={firmaDeEdicion(seleccionado)}
+      producto={seleccionado}
+      puedeRecibir={puedeRecibir}
+      guardando={guardando}
+      onRevisar={onRevisar}
+      onQuitar={onQuitarLinea}
+      quitando={quitandoId === seleccionado.id}
+    />
+  ) : (
+    <SunmiCard className="p-3">
+      <p className="text-sm2 sunmi-text-muted">
+        Escaneá o buscá el producto que tenés en la mano, o elegí uno de la lista.
+      </p>
+    </SunmiCard>
+  );
 
   return (
     <section className="space-y-3">
       {/* ══ TELÉFONO ═══════════════════════════════════════════════════════
           La composición V2. Recibe el estado y los handlers de acá: no tiene
-          filtro propio, ni búsqueda propia, ni "revisar" propio.
-
-          Se ve hasta `lg` (1024 px): entre 768 y 1023 también, porque la
-          composición de la computadora necesita el ancho de la tabla y el
-          panel juntos. Debajo de `md` el encabezado lo pone el shell; entre
-          `md` y `lg`, la franja de la página —ver `page.jsx`—. */}
-      <div className="lg:hidden">
+          filtro propio, ni búsqueda propia, ni "revisar" propio. El corte es
+          `md`, el MISMO que usa el shell para su fila de título con acción —ver
+          `LayoutBase`—, así que o manda el encabezado del shell o manda el de la
+          página, nunca los dos ni ninguno. */}
+      <div className="md:hidden">
         <RecepcionMovil
           item={item}
           resumen={resumen}
@@ -559,23 +585,144 @@ export default function WorkspaceRecepcion({
         />
       </div>
 
-      {/* ══ COMPUTADORA, DESDE `lg` ═════════════════════════════════════════
-          La composición aprobada (Figma EVJ2KvVCrY0oVSowfboymQ, 384:483). Igual
-          que la del teléfono, recibe el estado y los handlers de acá: no tiene
-          filtro propio, ni búsqueda propia, ni "revisar" propio. Lo único que
-          tiene aparte es QUÉ producto muestra su panel —ver
-          `elegidoEscritorioId`— porque el elegido del teléfono abre su hoja.
+      {/* ══ ESCRITORIO ═════════════════════════════════════════════════════
+          Lo que había, sin tocar. El corte `md` deja todo lo de 768 px para
+          arriba exactamente como estaba, incluido su propio corte interno en
+          `lg` entre la lista apilada y las dos columnas.
 
-          Reemplazó a la pantalla de antes —el resumen en tarjetas, el buscador
-          en su caja, el selector de tabs, los chips de categoría y la lista con
-          la ficha al lado—, que se veía de 768 px para arriba. */}
+          Desde 1024 px lo reemplaza `RecepcionEscritorio`, más abajo: por eso
+          el `lg:hidden`, que es lo ÚNICO que se le agregó. Entre 768 y 1023
+          sigue siendo exactamente esta pantalla. */}
+      <div className="hidden md:block lg:hidden space-y-3">
+      <SectionHead
+        title="Control de recepción"
+        subtitle={`${resumen.revisados} de ${resumen.totalRemito} productos revisados`}
+      />
+
+      <ResumenControlFisico resumen={resumen} filtro={filtro} onFiltrar={setFiltro} />
+
+      {/* ── EL BUSCADOR, UNO SOLO ────────────────────────────────────────── */}
+      <SunmiCard className="p-3 space-y-2">
+        <SunmiCampoBusquedaVoz
+          value={texto}
+          onChange={(v) => {
+            setTexto(v);
+            setAviso("");
+          }}
+          onVoz={(t) => {
+            dictado.current = true;
+            setTexto(t);
+          }}
+          onKeyDown={alTeclear}
+          placeholder="Escaneá, o buscá por nombre o código…"
+          ariaLabel="Buscar producto de esta transferencia"
+        />
+
+        <div className="flex flex-wrap gap-2">
+          {hayEscanerDisponible() && (
+            <SunmiButton color="amber" onClick={() => setEscaneando(true)}>
+              Escanear código
+            </SunmiButton>
+          )}
+        </div>
+
+      </SunmiCard>
+
+      {/* ── FILTROS ──────────────────────────────────────────────────────── */}
+      <div className="space-y-2">
+        <SunmiSelectorUnidad
+          rotulo="Ver"
+          valor={TABS.some((t) => t.clave === filtro) ? filtro : null}
+          opciones={TABS}
+          onCambiar={setFiltro}
+          nota={null}
+        />
+        <SunmiChipsFiltro
+          rotulo="Categoría"
+          opciones={categorias.map((c) => ({ clave: c.id, texto: c.nombre, cantidad: c.cantidad }))}
+          valor={categoriaId}
+          onCambiar={setCategoriaId}
+        />
+      </div>
+
+      {/* ── EL CATÁLOGO DEL ORIGEN ES UN CAMINO DE EXCEPCIÓN ─────────────
+          Antes este botón estaba SIEMPRE, y eso contradice el flujo: lo normal
+          es que el producto esté en el remito, y ofrecer permanentemente el
+          atajo para "informar algo que no figura" invita a usarlo antes de
+          haber buscado — con el resultado de una línea agregada al lado de la
+          del remito, para el mismo producto.
+
+          Aparece solo cuando la búsqueda YA falló, que es cuando significa
+          algo. Y aparece pegado al mensaje que explica por qué.
+
+          ── Y DESPUÉS DE LOS FILTROS, NO PEGADO AL BUSCADOR ─────────────
+          Estaba adentro de la card de búsqueda, así que empujaba los filtros
+          hacia abajo cada vez que una búsqueda no encontraba algo. El orden
+          aprobado pone primero las herramientas de siempre y el camino de
+          excepción al final: es lo que pasa poco. */}
+      {(noFigura || aviso) && (
+        <SunmiAviso tono="warning">
+          {noFigura ? MENSAJE_NO_FIGURA : aviso}
+          {noFigura && puedeRecibir && (
+            <>
+              {" "}
+              Si igual llegó, informalo como producto no declarado.
+            </>
+          )}
+        </SunmiAviso>
+      )}
+
+      {noFigura && puedeRecibir && (
+        <SunmiButton color="slate" onClick={() => setAgregarAbierto(true)}>
+          {ACCION_AGREGAR}
+        </SunmiButton>
+      )}
+
+      {/* ── LISTADO Y FICHA ──────────────────────────────────────────────────
+          Teléfono: la ficha REEMPLAZA al listado mientras hay un producto
+          elegido. No hay lugar para los dos, y partir la pantalla dejaría los
+          dos inutilizables.
+          Escritorio: lado a lado, que es lo que el ancho permite. */}
+      <div className="lg:hidden space-y-2">
+        {seleccionado ? (
+          <>
+            <SunmiButton color="slate" onClick={() => setSeleccionadoId(null)}>
+              ← Volver al listado
+            </SunmiButton>
+            {ficha}
+          </>
+        ) : (
+          listado
+        )}
+      </div>
+
+      {/* `lg:grid-cols-2`, no un valor arbitrario. Decía
+          `lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]` para que las dos columnas
+          pudieran ENCOGERSE —sin el `minmax(0,…)` una columna con contenido
+          largo desborda la grilla—, sin saber que la primitiva de Tailwind ya
+          hace exactamente eso: `grid-cols-2` genera
+          `repeat(2, minmax(0, 1fr))`, comprobado contra la escala del proyecto,
+          que no la redefine. Misma CSS, cero píxeles de diferencia, y un valor
+          arbitrario menos. */}
+      <div className="hidden lg:grid lg:grid-cols-2 gap-3 items-start">
+        <div>{listado}</div>
+        <div className="lg:sticky lg:top-3">{ficha}</div>
+      </div>
+      </div>
+      {/* ══ FIN DEL ESCRITORIO ═════════════════════════════════════════════ */}
+
+      {/* ══ COMPUTADORA, DESDE 1024 px ══════════════════════════════════════
+          La composición aprobada (Figma EVJ2KvVCrY0oVSowfboymQ, 384:483), en
+          su propio archivo. Recibe el estado compartido de acá —filtro,
+          categoría, búsqueda, catálogo— y los handlers que van al servidor.
+          Qué producto muestra, el Enter y la cámara son suyos: el elegido de
+          acá abre la hoja del teléfono. Por debajo de `lg` no se dibuja. */}
       <div className="hidden lg:block">
         <RecepcionEscritorio
           item={item}
           resumen={resumen}
           categorias={categorias}
           visibles={visibles}
-          producto={productoEscritorio}
           filtro={filtro}
           categoriaId={categoriaId}
           texto={texto}
@@ -595,17 +742,12 @@ export default function WorkspaceRecepcion({
             setTexto(v);
             setAviso("");
           }}
-          onTeclear={alTeclearEnEscritorio}
           onVoz={(t) => {
             dictado.current = true;
             setTexto(t);
           }}
-          onElegir={elegirEnEscritorio}
-          // "Guardar y seguir" pasa al pendiente que sigue en la lista.
-          onSiguientePendiente={(actual) => elegirEnEscritorio(siguientePendiente(visibles, actual))}
           onRevisar={onRevisar}
           onQuitarLinea={onQuitarLinea}
-          onAbrirEscaner={() => setEscaneando(ESCANER_ESCRITORIO)}
           confirmarRecepcion={confirmarRecepcion}
           confirmando={confirmando}
           puedeCancelar={puedeCancelar}
@@ -615,14 +757,13 @@ export default function WorkspaceRecepcion({
           volver={volver}
         />
       </div>
-      {/* ══ FIN DE LA COMPUTADORA ══════════════════════════════════════════ */}
 
       {/* Los dos modales son COMPARTIDOS: el escáner y el alta de un producto no
           declarado se abren desde cualquiera de las dos composiciones y no hay
           motivo para tener dos. Se montan por portal, así que dónde estén
           escritos no cambia dónde se dibujan. */}
       <SunmiEscanerCodigoBarra
-        abierto={Boolean(escaneando)}
+        abierto={escaneando}
         onCerrar={() => setEscaneando(false)}
         onCodigo={alEscanear}
         onSinCamara={(motivo) => {

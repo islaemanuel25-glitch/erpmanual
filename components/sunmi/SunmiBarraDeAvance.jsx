@@ -4,12 +4,13 @@
 //
 // ── DE DÓNDE SALIÓ ────────────────────────────────────────────────────────
 //
-// De `components/tesoreria/PiezasTesoreria.jsx` (`BarraDeAvance`, Figma
-// EVJ2KvVCrY0oVSowfboymQ, "Avance · verificado / entregado"), tal cual estaba:
-// el mismo marcado y las mismas clases. Se mudó al kit cuando apareció la
-// segunda pantalla que la necesitaba —la recepción de transferencias en la
-// computadora, "4 / 15 revisados"—; Tesorería la sigue usando con el mismo
-// nombre y su HTML no cambia.
+// Es una COPIA de `BarraDeAvance` de `components/tesoreria/PiezasTesoreria.jsx`
+// (Figma EVJ2KvVCrY0oVSowfboymQ, "Avance · verificado / entregado"), con el
+// mismo marcado y las mismas clases. La usa hoy una sola pantalla: la
+// recepción de transferencias en la computadora, "4 / 15 revisados".
+// Tesorería sigue con la suya y no se toca: la regla del 2026-10-14 es que lo
+// nuevo de computadora solo agrega archivos e importa los existentes tal cual
+// (ver el encabezado de `RecepcionEscritorio`). Son dos copias a sabiendas.
 //
 // `pct` va de 0 a 100 y lo calcula quien la usa, truncado: la barra no dice
 // 100 si falta algo. Lo hecho va en el token de éxito y lo que falta en el de
