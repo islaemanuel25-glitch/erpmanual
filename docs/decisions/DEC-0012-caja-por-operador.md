@@ -343,3 +343,21 @@ PostgreSQL]:
   cajero sigue sin poder retirar de una caja ajena.
 - Migración `20261014191303_caja_de_cuenta_y_retiro_intervenido`, aditiva: dos
   columnas nulas, sin tocar filas.
+
+### La adopción de las cajas viejas (arreglo sobre `d7bf84c`)
+
+`d7bf84c` se desplegó y se volvió atrás a `ddec5a26`: las cajas abiertas sin
+operador antes del despliegue quedaron de nadie, ni su propia cuenta podía
+usarlas, y esa cuenta no podía abrir otra. Se trabó la venta en Minimarket
+ayala (caja 902 de la cuenta del dueño, 94 ventas) y en depo (caja 903 del
+Admin, 9 ventas). Esas cajas siguen abiertas.
+
+Ahora [verificado en código y ejercido contra PostgreSQL]: cuando una cuenta de
+dueño o Admin usa el POS sin PIN, `requireOperadorDeCaja` adopta la caja vieja
+que ESA cuenta abrió sin operador —le pone `operaLaCuenta = true`— y sigue
+vendiendo, retirando y cerrando en ella, con sus ventas. La regla es
+`cajaDeCuentaAAdoptar` (pura): solo la propia cuenta, ninguna si ya tiene su
+caja de cuenta, y si hay varias la más reciente; las demás, y las de cuentas
+que no son de dueño ni Admin, siguen cerrándose forzando. Lo mismo al terminar
+por token el corte de una caja vieja propia. No hay script ni migración: la
+marca la escribe la aplicación cuando la cuenta entra.

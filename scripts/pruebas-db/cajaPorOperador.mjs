@@ -797,6 +797,66 @@ async function correr() {
   igual("cerrada normal, sin marca de forzado, y sigue siendo de su cuenta",
     [cerradaDueno.cierre != null, cerradaDueno.cierreForzadoPorId, cerradaDueno.vendedorId, cerradaDueno.operaLaCuenta],
     [true, null, f.dueno.id, true]);
+
+  // ═════════════════════════════════════════════════════════════════════════
+  seccion("13. Las cajas viejas sin operador: el Dueño adopta la suya, la de otro no");
+
+  // El caso de Minimarket ayala y depo: cajas abiertas sin operador ANTES del
+  // despliegue, sin la marca. Se arman como las dejó el código viejo. Del Dueño
+  // hay dos: la más vieja con el corte ya tomado —el índice no deja dos
+  // operativas de la misma cuenta— y la más reciente, operativa. Y una de la
+  // cuenta del mostrador, que no es de dueño.
+  const hace = (min) => new Date(Date.now() - min * 60000);
+  const viejaVieja = await prisma.turno.create({
+    data: { localId: f.local.id, vendedorId: f.dueno.id, montoInicial: 0, apertura: hace(300), cierreEnPreparacionEn: hace(200) },
+  });
+  const viejaReciente = await prisma.turno.create({
+    data: { localId: f.local.id, vendedorId: f.dueno.id, montoInicial: 0, apertura: hace(100) },
+  });
+  const viejaMostrador = await prisma.turno.create({
+    data: { localId: f.local.id, vendedorId: f.cuenta.id, montoInicial: 0, apertura: hace(90) },
+  });
+  const marcas = async () =>
+    (await prisma.turno.findMany({
+      where: { id: { in: [viejaVieja.id, viejaReciente.id, viejaMostrador.id] } },
+      orderBy: { id: "asc" },
+      select: { operaLaCuenta: true },
+    })).map((t) => t.operaLaCuenta ?? null);
+
+  // La cuenta del mostrador sin PIN no es de dueño: no adopta nada.
+  const sinPinMostrador = { sesion: f.A.sesion };
+  const actualMostrador = await p.actual(sinPinMostrador, f.local.id);
+  ok("la cuenta del mostrador sin PIN no tiene caja", actualMostrador.needsOperador === true && !actualMostrador.turno, JSON.stringify(actualMostrador).slice(0, 120));
+  const vMostrador = await p.vender(sinPinMostrador, viejaMostrador.id, { cantidad: 1 });
+  ok("ni vende en su caja vieja: 428", vMostrador.status === 428, `${vMostrador.status} ${vMostrador.error ?? ""}`);
+
+  // El Dueño entra sin PIN: el POS le devuelve SU caja vieja más reciente.
+  const actualDueno = await p.actual(f.dueno_, f.local.id);
+  igual("el Dueño sigue en su caja vieja más reciente", actualDueno.turno?.id ?? null, viejaReciente.id);
+  igual("adoptó solo esa: ni la más vieja ni la de la cuenta del mostrador", await marcas(), [null, true, null]);
+  const vDuenoVieja = await p.vender(f.dueno_, viejaReciente.id, { cantidad: 1 });
+  ok("el Dueño sigue vendiendo en ella", vDuenoVieja.ok === true, `${vDuenoVieja.status} ${vDuenoVieja.error ?? ""}`);
+  const otraApertura = await p.abrir(f.dueno_);
+  ok("no le pide cerrar nada: su caja ya está abierta (409, no forzado)",
+    otraApertura.status === 409 && !/forzando/.test(otraApertura.error ?? ""), `${otraApertura.status} ${otraApertura.error ?? ""}`);
+  const retiroVieja = await p.iniciarRetiro(f.dueno_, viejaReciente.id, { 1000: 0 });
+  ok("retira de ella como dueño de la caja, no interviniendo", retiroVieja.ok === true, `${retiroVieja.status} ${retiroVieja.error ?? ""}`);
+  if (retiroVieja.ok) {
+    const fila = await prisma.retiroPreparacion.findUnique({ where: { token: retiroVieja.retiro.token } });
+    igual("el retiro no queda como intervenido", fila.intervenidoPorUsuarioId, null);
+    await prisma.retiroPreparacion.update({ where: { id: fila.id }, data: { estado: "CANCELADO", canceladoEn: new Date() } });
+  }
+
+  // Ni A con su PIN, ni la cuenta del mostrador, alcanzan la caja adoptada.
+  const vAenVieja = await p.vender(f.A, viejaReciente.id, { cantidad: 1 });
+  ok("A no vende en la caja adoptada del Dueño", vAenVieja.ok !== true, `${vAenVieja.status} ${vAenVieja.error ?? ""}`);
+  // Otra cuenta de dueño (la del auditor es la misma cuenta; se arma una sesión
+  // de Admin de otra cuenta) no adopta la caja vieja de la cuenta del mostrador.
+  const otraCuentaDueno = { sesion: sesionDe(f.otraCuenta, f.local.id, { esDuenoLocal: true }) };
+  await p.actual(otraCuentaDueno, f.local.id);
+  igual("otra cuenta de dueño no adopta la caja vieja de una cuenta ajena", await marcas(), [null, true, null]);
+  const vOtraEnMostrador = await p.vender(otraCuentaDueno, viejaMostrador.id, { cantidad: 1 });
+  ok("ni vende en ella", vOtraEnMostrador.ok !== true, `${vOtraEnMostrador.status} ${vOtraEnMostrador.error ?? ""}`);
 }
 
 let fallo = null;
