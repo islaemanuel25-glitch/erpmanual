@@ -18,7 +18,7 @@
 //   C. lo que la base rechaza al crear (4, 15, y la foto falsa);
 //   D. una entrega en una sola verificación vigente (7);
 //   E. dos verificaciones simultáneas de la misma entrega (8);
-//   F. idempotencia por local, y la foto sin operador (5, 6, 18);
+//   F. idempotencia por local, y la foto con el operador de la caja (5, 6, 18);
 //   G. anular sin perder historia, y verificar de nuevo (9, 10);
 //   H. el movimiento corregido después de verificar (11, 12);
 //   I. sin mezclar locales (17);
@@ -126,14 +126,12 @@ async function montarLocal(nombre, exigirOperador) {
   return { local, cuenta, producto, sesion, exigirOperador };
 }
 
+// Desde el 2026-10-14 toda caja es de un operador con PIN, también en un local
+// con `exigirOperador: false`: sin él no se abre, ni se vende, ni se cierra.
 async function quienAbre(l) {
-  let op = null;
-  let operador = null;
-  if (l.exigirOperador) {
-    op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-op${(n += 1)}`, pinHash: "x" } });
-    await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: l.local.id } });
-    operador = firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: l.local.id });
-  }
+  const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-op${(n += 1)}`, pinHash: "x" } });
+  await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: l.local.id } });
+  const operador = firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: l.local.id });
   return { op, quien: { sesion: l.sesion, operador } };
 }
 /**
@@ -247,7 +245,7 @@ async function correr() {
   await mover(c5, "INGRESO", 5000); // ni entregas ni de recaudación
   await mover(c5, "RETIRO", 3000);
   await vender(cb, 8000);
-  await cerrar(cb, 1000, 8000); //    CIERRE 8.000, local sin operador
+  await cerrar(cb, 1000, 8000); //    CIERRE 8.000, local sin operario obligatorio
   // Anterior al turno operativo a propósito: en una caja con turno, mezclar
   // locales lo frena ANTES el trigger de turno (el catálogo es por local), y la
   // sección I —con su contraprueba TV-5— tiene que seguir probando las dos
@@ -398,7 +396,10 @@ async function correr() {
   aceptado("la misma clave en otro local: aceptada", rVB);
   if (rVB.ok) {
     const fotoB = await prisma.verificacionEfectivoEntrega.findFirst({ where: { verificacionEfectivoId: rVB.valor.id } });
-    igual("la foto de un local sin operador lleva operador null", [fotoB?.operadorIdSnapshot, fotoB?.localIdSnapshot, Number(fotoB?.montoDeclaradoSnapshot)], [null, B.local.id, 8000]);
+    // Hasta el 2026-10-14 esta caja era de la cuenta y la foto llevaba operador
+    // null. Desde entonces toda caja es de un operador con PIN, también en un
+    // local con `exigirOperador: false`, y la foto lleva el suyo.
+    igual("la foto de un local sin operario obligatorio lleva el operador de la caja", [fotoB?.operadorIdSnapshot, fotoB?.localIdSnapshot, Number(fotoB?.montoDeclaradoSnapshot)], [cb.op.id, B.local.id, 8000]);
   }
 
   // ── G. ANULAR SIN PERDER HISTORIA ────────────────────────────────────────

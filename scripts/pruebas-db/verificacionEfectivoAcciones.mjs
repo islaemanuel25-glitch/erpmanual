@@ -156,14 +156,12 @@ async function montar() {
   return { grupo, A, B, D, proveedor };
 }
 
+// Desde el 2026-10-14 toda caja es de un operador con PIN, también en un local
+// con `exigirOperador: false`: sin él no se abre, ni se vende, ni se cierra.
 async function quienAbre(u) {
-  let operador = null;
-  let op = null;
-  if (u.exigirOperador) {
-    op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-op${(n += 1)}`, pinHash: "x" } });
-    await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: u.local.id } });
-    operador = firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: u.local.id });
-  }
+  const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-op${(n += 1)}`, pinHash: "x" } });
+  await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: u.local.id } });
+  const operador = firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: u.local.id });
   return { op, quien: { sesion: u.pos, operador } };
 }
 /**
@@ -292,7 +290,7 @@ async function correr() {
   const k6 = await cajaConCierre(A, 7000); //  carrera D
   const k7 = await cajaConCierre(A, 4000); //  una sola entrega, idempotencia
   const k9 = await cajaConCierre(A, 3000); //  fuente que cambia sola
-  const kB = await cajaConCierre(B, 8000); //  sin operador; la verifica el depósito
+  const kB = await cajaConCierre(B, 8000); //  local sin operario obligatorio; la verifica el depósito
   const kB2 = await cajaConCierre(B, 6000); // la verifica B
   // Un Caja − manual: no es entrega.
   const c7m = await nuevaCaja(A);
@@ -372,7 +370,10 @@ async function correr() {
   const rD = await verificar(D.todo, { cajaMovimientoIds: [kB.id], importeVerificado: 8000, idempotencyKey: `${marca}-compartida` });
   igual("[4] el depósito verifica una entrega de B de su grupo: 201", rD.status, 201);
   igual("[4] la verificación es de B, y la autoría del usuario del depósito", [rD.verificacion?.localId, rD.verificacion?.verificadaPorUsuarioId], [B.local.id, D.usuario.id]);
-  igual("la foto de un local sin operador lleva operador null, y nadie inventa uno", [rD.verificacion?.entregas?.[0]?.operadorId, rD.verificacion?.verificadaPorOperadorId], [null, null]);
+  // Hasta el 2026-10-14 la caja de B era de la cuenta y la foto llevaba operador
+  // null. Ahora toda caja tiene operador: la foto lleva el de la caja, y quien
+  // verifica desde el depósito sigue sin operador —nadie le inventa uno—.
+  igual("la foto lleva el operador de la caja, y nadie le inventa uno a quien verifica", [rD.verificacion?.entregas?.[0]?.operadorId, rD.verificacion?.verificadaPorOperadorId], [kB.caja.op.id, null]);
   rechazo("[6] A no anula una verificación de B: 403", await anular(A.todo, rD.verificacion.id, { motivo: "no es mía" }), 403, CODIGO_VERIFICACION.FUERA_DE_ALCANCE);
   igual("[6] y la de B sigue vigente", (await prisma.verificacionEfectivo.findUnique({ where: { id: rD.verificacion.id } })).estado, "VIGENTE");
   const rB = await verificar(B.todo, { cajaMovimientoIds: [kB2.id], importeVerificado: 6000, idempotencyKey: clave() });
@@ -678,7 +679,10 @@ async function correr() {
     ok("ningún rótulo inventa \"Caja 1\"", !/"Caja \d/.test(JSON.stringify(l)));
     const lB = await lectura(B.todo);
     const eB = lB.tesoreria.entregas.find((e) => e.cajaMovimientoId === kB2.id);
-    igual("sin operador: rótulo neutro del turno, operador null", [eB?.etiquetaCaja, eB?.operadorId, eB?.operadorNombre], [`Caja del turno #${kB2.caja.turnoId}`, null, null]);
+    // El rótulo neutro de una caja SIN operador (las históricas) lo afirma
+    // `lib/tesoreria/lecturaTesoreria.test.mjs`: por las rutas ya no se abre
+    // ninguna así desde el 2026-10-14.
+    igual("local sin operario obligatorio: el rótulo sale igual del operador de la caja", [eB?.etiquetaCaja, eB?.operadorId, eB?.operadorNombre], [`Caja de ${kB2.caja.op.nombre}`, kB2.caja.op.id, kB2.caja.op.nombre]);
   }
 
   seccion("20. Lo parcial se deriva, no se guarda [#138: 18]");

@@ -29,7 +29,9 @@ import {
   ESTADO_CIERRE,
   cierreAtrasado,
   puedeActuarSobreCaja,
+  puedeForzarCierre,
   PERMISO_CERRAR_SIN_CONTEO,
+  WHERE_TURNO_OPERATIVO,
 } from "@/lib/caja/cierreRelevo";
 import { contextoRelevo, marcarCortesVencidos } from "@/lib/caja/cierreRelevoServer";
 import { identidadParaMirar } from "@/lib/caja/identidadCajaServer";
@@ -84,8 +86,39 @@ export async function GET(req) {
       : [];
     const nombreOperador = new Map(operadores.map((o) => [o.id, o.nombre]));
 
+    // ── LAS CAJAS QUE SE PUEDEN FORZAR ─────────────────────────────────────
+    //
+    // Solo para quien puede forzar (Admin, o el dueño en su local): las cajas
+    // ABIERTAS de otros operadores, que es lo único que un forzado cierra. Una
+    // caja con el corte ya tomado no va acá: está arriba, en los pendientes, y
+    // se fuerza desde su fila.
+    const forzar = { operadorDelPin: identidad.operadorId, puedeForzar: identidad.puedeIntervenir === true };
+    const abiertas = forzar.puedeForzar
+      ? await prisma.turno.findMany({
+          where: { localId, anuladoEn: null, ...WHERE_TURNO_OPERATIVO },
+          orderBy: { apertura: "asc" },
+          take: 50,
+          select: {
+            id: true, apertura: true, vendedorId: true, operadorId: true, montoInicial: true,
+            vendedor: { select: { nombre: true } },
+            operador: { select: { nombre: true } },
+          },
+        })
+      : [];
+
     return NextResponse.json({
       ok: true,
+      cajasAbiertas: abiertas
+        .filter((t) => puedeForzarCierre(t, forzar))
+        .map((t) => ({
+          turnoId: t.id,
+          apertura: t.apertura,
+          montoInicial: Number(t.montoInicial),
+          // Una caja sin operador es de las abiertas antes de esta regla: se
+          // dice así, para que no parezca de nadie.
+          operadorNombre: t.operador?.nombre ?? null,
+          cajeroNombre: t.vendedor?.nombre ?? null,
+        })),
       items: filas.map((f) => ({
         id: f.id,
         token: f.token,
@@ -102,6 +135,10 @@ export async function GET(req) {
         operadorNombre: f.iniciadoPorOperadorId
           ? nombreOperador.get(f.iniciadoPorOperadorId) ?? null
           : null,
+        forzado: f.forzadoPorUsuarioId != null,
+        // Un corte de otro operador, todavía no forzado: quien puede forzar lo
+        // ve, pero el conteo no lo termina hasta forzarlo.
+        sePuedeForzar: f.forzadoPorUsuarioId == null && puedeForzarCierre(f.turno, forzar),
       })),
     });
   } catch (error) {

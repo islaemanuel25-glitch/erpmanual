@@ -21,6 +21,7 @@ import {
   serializarRetiroPreparacion,
 } from "@/lib/caja/retiroRelevoServer";
 import { bloquearTurno, OPCIONES_TX } from "@/lib/caja/cierreRelevoServer";
+import { autorizarResolucionDeCorte } from "@/lib/caja/llaveDeCorte";
 
 export async function POST(req, context) {
   try {
@@ -32,7 +33,22 @@ export async function POST(req, context) {
         { status: res.status }
       );
     }
-    const { session, retiro } = res;
+    const { session, localId, retiro } = res;
+
+    // Cancela el operador de la caja —PIN o llave del corte— o un Admin o el
+    // dueño: cancelar no mueve plata, y un retiro colgado en una caja vieja
+    // sin operador impediría forzar su cierre.
+    const autorizado = await autorizarResolucionDeCorte(req, {
+      session,
+      localId,
+      turno: retiro.turno,
+      tipo: "retiro",
+      token,
+      accion: "cancelar",
+    });
+    if (!autorizado.ok) {
+      return NextResponse.json({ ok: false, error: autorizado.error, cajaAjena: true }, { status: autorizado.status });
+    }
 
     const body = await req.json().catch(() => ({}));
     const motivo = String(body?.motivo ?? "").trim().slice(0, 500);

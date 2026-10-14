@@ -60,8 +60,8 @@ export async function POST(req) {
 
     const { localId, session } = scope;
 
-    // Quién mueve: el operador del PIN validado en este local, o la cuenta sin
-    // operador. El movimiento no guarda operador —se deriva de su turno—, así
+    // Quién mueve: el operador del PIN validado en este local, siempre. El
+    // movimiento no guarda operador —se deriva de su turno—, así
     // que lo único que hay que garantizar es que el turno sea el de quien mueve.
     const id = await identidadParaOperar(req, session, { localId });
     if (!id.ok) {

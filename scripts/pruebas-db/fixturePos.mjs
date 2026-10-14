@@ -67,14 +67,46 @@ export async function crearProductoVendible(db, {
  * Es idempotente: si el local ya tiene uno abierto lo devuelve, porque abrir dos
  * turnos a la vez es un estado que la aplicación no produce.
  */
-export async function abrirTurnoDePrueba(db, { localId, vendedorId, montoInicial = 0 }) {
+//
+// Con `operadorId`, el turno es la caja de ese operador. Desde el 2026-10-14
+// toda caja exige operador con PIN para vender (`requireOperadorDeCaja`): un
+// turno sin operador sigue sirviendo para leer, pero el POS no cobra en él.
+export async function abrirTurnoDePrueba(db, { localId, vendedorId, montoInicial = 0, operadorId = null }) {
   const abierto = await db.turno.findFirst({
-    where: { localId: Number(localId), cierre: null },
+    where: { localId: Number(localId), cierre: null, operadorId: operadorId == null ? null : Number(operadorId) },
     orderBy: { id: "desc" },
   });
   if (abierto) return abierto;
 
   return db.turno.create({
-    data: { localId: Number(localId), vendedorId: Number(vendedorId), montoInicial },
+    data: {
+      localId: Number(localId),
+      vendedorId: Number(vendedorId),
+      montoInicial,
+      ...(operadorId == null ? {} : { operadorId: Number(operadorId) }),
+    },
   });
+}
+
+/**
+ * UN OPERADOR CON PIN EN EL LOCAL, que es de quien es una caja.
+ *
+ * Toda caja exige un operador identificado con PIN —también la que abre un
+ * Admin o el dueño—, así que una prueba que abre caja o vende por las rutas
+ * del POS necesita uno. Se crea con su asignación al local y activo, que es lo
+ * que valida `getOperadorActivoDelLocal`. La cookie la firma la prueba con
+ * `firmarTokenOperador` (lib/operador.js): este archivo no importa la app.
+ *
+ * El PIN no se usa —la prueba firma la cookie directamente—, pero el modelo lo
+ * exige, y va un hash que no corresponde a ningún PIN.
+ *
+ * @returns {Promise<{id:number, nombre:string}>}
+ */
+export async function crearOperadorDeCaja(db, { localId, nombre }) {
+  const operador = await db.operadorLocal.create({
+    data: { nombre, pinHash: "sin-pin-de-prueba", activo: true },
+    select: { id: true, nombre: true },
+  });
+  await db.operadorEnLocal.create({ data: { operadorId: operador.id, localId: Number(localId) } });
+  return operador;
 }

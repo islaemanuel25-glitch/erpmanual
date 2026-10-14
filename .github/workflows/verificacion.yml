@@ -605,8 +605,9 @@ jobs:
       # La caja es del OPERADOR: mismo local, misma cuenta ERP, dos operadores y
       # dos cajas simultáneas. A −$5.000 y B +$5.000 tienen que llegar así hasta
       # la auditoría, sin compensarse. Y las contrapruebas: nadie vende, mueve,
-      # arquea, retira, corta ni cierra la caja de otro; el Dueño interviene con
-      # su autoría; un local sin operario sigue con la caja de la cuenta.
+      # arquea, retira, corta ni cierra la caja de otro; el Dueño solo FUERZA el
+      # cierre, marcado y sin quitarle la diferencia al operador; y ningún local
+      # abre una caja sin operador con PIN.
       - name: Caja por operador contra PostgreSQL
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/cajaPorOperador.mjs
 

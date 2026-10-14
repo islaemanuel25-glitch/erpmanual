@@ -30,7 +30,7 @@ const principal = await crearClientePrisma({ nivel: ESCRITURA });
 
 const jwt = (await import("jsonwebtoken")).default;
 const { aplicarMigraciones } = await import("./lib/libroEnElTiempo.mjs");
-const { crearProductoVendible, abrirTurnoDePrueba } = await import("./fixturePos.mjs");
+const { crearProductoVendible, abrirTurnoDePrueba, crearOperadorDeCaja } = await import("./fixturePos.mjs");
 
 let pasadas = 0;
 const fallas = [];
@@ -321,10 +321,15 @@ try {
   // ══════════════════════════════════════════════════════════════════════════
   seccion("D. Venta del POS: el consumo a nombre de su Venta.id");
   // ══════════════════════════════════════════════════════════════════════════
-  const turno = await abrirTurnoDePrueba(c, { localId: local.id, vendedorId: usuario.id });
+  // Toda caja es de un operador con PIN (2026-10-14): la venta lleva el suyo.
+  const { firmarTokenOperador, OperadorCookie } = await import("../../lib/operador.js");
+  const operador = await crearOperadorDeCaja(c, { localId: local.id, nombre: "Operador trazable" });
+  const turno = await abrirTurnoDePrueba(c, { localId: local.id, vendedorId: usuario.id, operadorId: operador.id });
+  const pin = `${OperadorCookie.nombre}=${firmarTokenOperador({ operadorId: operador.id, nombre: operador.nombre, localId: local.id })}`;
+  const conPin = { ...cookie(local.id), cookie: `${cookie(local.id).cookie}; ${pin}` };
   const pVenta = await producto(20);
   const resVenta = await rutaVenta.POST(new Request("http://ci/api/pos-ventas/crear", {
-    method: "POST", headers: cookie(local.id),
+    method: "POST", headers: conPin,
     body: JSON.stringify({
       clientTxnId: "trazable-1", localId: local.id, turnoId: turno.id, formaPago: "efectivo", totalPantalla: 2000,
       pagos: [{ medio: "EFECTIVO", monto: 2000 }],

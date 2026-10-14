@@ -30,7 +30,8 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import prisma from "@/lib/prisma";
-import { requireOperadorSegunConfig, puedeOperarSinOperador } from "@/lib/operador";
+import { requireOperadorDeCaja, getOperadorActivoDelLocal, puedeOperarSinOperador } from "@/lib/operador";
+import { entregarLlaveDeCorte } from "@/lib/caja/llaveDeCorte";
 import {
   validarDesgloseServidor,
   evaluarDesproporcionDesglose,
@@ -47,7 +48,10 @@ import {
   calcularRetiroEsperado,
   ERROR_RETIRO_EN_PREPARACION_PARA_CIERRE,
   ERROR_CAJA_AJENA,
+  ERROR_FORZAR_SIN_PERMISO,
+  ERROR_FORZAR_CAJA_PROPIA,
   puedeActuarSobreCaja,
+  puedeForzarCierre,
 } from "@/lib/caja/cierreRelevo";
 import { ESTADO_RETIRO } from "@/lib/caja/retiroRelevo";
 import { contarCobrosOfflinePendientesDelTurno } from "@/lib/pos-ventas/cobroOfflineServidor";
@@ -114,12 +118,31 @@ export async function POST(req) {
     // no vuelve a mirar el operador activo —que es una cookie compartida y va a
     // cambiar cuando el relevo haga login—, así que el conteo no puede terminar
     // firmado por quien no contó.
-    const gateOp = await requireOperadorSegunConfig(req, session, { localId });
-    if (!gateOp.ok) {
-      return NextResponse.json(
-        { ok: false, error: gateOp.error, needsOperador: true },
-        { status: gateOp.status }
-      );
+    //
+    // DOS CAMINOS, Y SOLO DOS:
+    //
+    //   · normal  → el operador de la caja, con su PIN. Sin PIN no hay cierre,
+    //               ni para un Admin ni para el dueño.
+    //   · forzado → un Admin o el dueño en su local, sobre la caja de OTRO
+    //               operador, pedido explícito con `forzado: true`. No necesita
+    //               PIN porque no opera como ese operador: queda grabado como
+    //               quien forzó, y la caja sigue siendo del original.
+    const forzado = body?.forzado === true;
+    let gateOp;
+    if (forzado) {
+      if (!puedeOperarSinOperador(session, { localId })) {
+        return NextResponse.json({ ok: false, error: ERROR_FORZAR_SIN_PERMISO }, { status: 403 });
+      }
+      const pin = await getOperadorActivoDelLocal(req, localId);
+      gateOp = { ok: true, operadorId: pin?.operadorId ?? null };
+    } else {
+      gateOp = await requireOperadorDeCaja(req, { localId });
+      if (!gateOp.ok) {
+        return NextResponse.json(
+          { ok: false, error: gateOp.error, needsOperador: true },
+          { status: gateOp.status }
+        );
+      }
     }
 
     const resultado = await prisma.$transaction(async (tx) => {
@@ -142,16 +165,20 @@ export async function POST(req) {
         throw e;
       }
 
-      // EL CORTE ES DE LA CAJA DE QUIEN LO TOMA. Antes alcanzaba con que el
-      // turno fuera del local: cualquier sesión con `pos.usar` podía cortar la
-      // caja de otro operador y dejarla congelada. Un cajero común corta solo
-      // la suya; Admin y el Dueño en su local, la de cualquiera, y quedan
-      // grabados como quien lo inició.
-      if (
+      // EL CORTE ES DE LA CAJA DE QUIEN LO TOMA. El cierre normal lo toma solo
+      // el operador de la caja con su PIN: nadie más, tampoco un Admin ni el
+      // dueño. Ellos tienen el forzado, que es explícito y queda marcado.
+      if (forzado) {
+        if (!puedeForzarCierre(turno, { operadorDelPin: gateOp.operadorId, puedeForzar: true })) {
+          const e = new Error(ERROR_FORZAR_CAJA_PROPIA);
+          e.codigo = "forzar_propia";
+          throw e;
+        }
+      } else if (
         !puedeActuarSobreCaja(turno, {
           usuarioId: session.id,
-          operadorId: gateOp.operadorId ?? null,
-          puedeIntervenir: puedeOperarSinOperador(session, { localId }),
+          operadorId: gateOp.operadorId,
+          puedeIntervenir: false,
         })
       ) {
         const e = new Error(ERROR_CAJA_AJENA);
@@ -182,6 +209,19 @@ export async function POST(req) {
         // No es un error del usuario: probablemente ya lo inició en otra pestaña.
         // Se devuelve el corte que existe en vez de romper — y con él su sobre,
         // porque el cambio ya quedó decidido y no se vuelve a preguntar.
+        //
+        // FORZAR UN CORTE QUE YA EXISTE. El caso real: el operador cortó y se
+        // fue sin contar. Forzar no toma otro corte —el cambio ya se separó y
+        // el sobre ya está publicado—: marca el que existe como forzado, y
+        // desde ahí quien forzó puede terminar el conteo.
+        if (vigente && forzado && vigente.forzadoPorUsuarioId == null) {
+          const marcado = await tx.cierrePreparacion.update({
+            where: { id: vigente.id },
+            data: { forzadoPorUsuarioId: session.id },
+            include: { cambioPendiente: true },
+          });
+          return { cierre: marcado, sobre: marcado.cambioPendiente, repetido: true };
+        }
         if (vigente) return { cierre: vigente, sobre: vigente.cambioPendiente, repetido: true };
         const e = new Error("El turno quedó marcado en preparación sin un corte vigente.");
         e.codigo = "conflicto";
@@ -263,7 +303,11 @@ export async function POST(req) {
           localId,
           grupoId,
           iniciadoPorUsuarioId: session.id,
-          iniciadoPorOperadorId: gateOp.operadorId ?? turno.operadorId ?? null,
+          // Forzado: quien fuerza NO es el operador de la caja. Queda en NULL y
+          // el arqueo cae al operador del turno, que es de quien es la caja y
+          // la diferencia. Quién forzó va en su propia columna.
+          iniciadoPorOperadorId: forzado ? null : gateOp.operadorId,
+          forzadoPorUsuarioId: forzado ? session.id : null,
           corteEn: ahora,
           efectivoEsperadoCorte: corte.efectivoEsperadoCorte,
           ultimaVentaId: corte.ultimaVentaId,
@@ -300,7 +344,7 @@ export async function POST(req) {
           grupoId,
           cierrePreparacionId: cierre.id,
           turnoOrigenId: turno.id,
-          operadorOrigenId: gateOp.operadorId ?? turno.operadorId ?? null,
+          operadorOrigenId: forzado ? turno.operadorId ?? null : gateOp.operadorId,
           dejadoEn: ahora,
           total: cambio.total,
           desglose: cambio.desglose,
@@ -320,9 +364,10 @@ export async function POST(req) {
       return { cierre, sobre, repetido: false, desglose: corte.calculo };
     }, OPCIONES_TX);
 
-    return NextResponse.json({
+    const respuesta = NextResponse.json({
       ok: true,
       repetido: resultado.repetido,
+      forzado: resultado.cierre.forzadoPorUsuarioId != null,
       // Un corte que YA EXISTÍA no es un alta: es un proceso pendiente. Viaja con
       // la misma forma que los rechazos para que la pantalla muestre el mismo
       // cartel en los dos casos, en vez de navegar en silencio a una pantalla que
@@ -341,7 +386,17 @@ export async function POST(req) {
           }
         : null,
     });
+    // La llave del conteo, para el operador de la caja: con ella termina el
+    // conteo en otra pestaña aunque el relevo cambie el PIN de este navegador.
+    // Un forzado no la lleva: quien fuerza no es el operador.
+    if (!forzado) {
+      entregarLlaveDeCorte(respuesta, { tipo: "cierre", token: resultado.cierre.token, operadorId: gateOp.operadorId });
+    }
+    return respuesta;
   } catch (error) {
+    if (error?.codigo === "forzar_propia") {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    }
     if (error?.codigo === "desproporcionado") {
       return NextResponse.json(respuestaDesproporcion(error.proporcion), { status: 400 });
     }

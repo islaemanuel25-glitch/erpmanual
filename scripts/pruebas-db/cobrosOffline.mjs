@@ -143,14 +143,19 @@ async function montar() {
   const cuenta = await usuario("cuenta", local.id);
   const otraCuenta = await usuario("otra-cuenta", local.id);
   const cuentaOtroLocal = await usuario("cuenta-otro", otroLocal.id);
-  const operador = async (sufijo) => {
+  const operador = async (sufijo, localId = local.id) => {
     const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-${sufijo}`, pinHash: "x" } });
     creado.operadorIds.push(op.id);
-    await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: local.id } });
+    await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId } });
     return op;
   };
   const opA = await operador("a");
   const opB = await operador("b");
+  // El otro local no exige operario por configuración, pero desde el
+  // 2026-10-14 ninguna caja se abre ni vende sin operador con PIN: también
+  // tiene el suyo.
+  const opOtro = await operador("otro", otroLocal.id);
+  const pinOtro = firmarTokenOperador({ operadorId: opOtro.id, nombre: opOtro.nombre, localId: otroLocal.id });
   const producto = await crearProductoVendible(prisma, {
     grupoId: grupo.id, localId: local.id, nombre: `${marca}-producto`, precioVenta: 1000, precioCosto: 600, stock: 1000,
   });
@@ -164,7 +169,7 @@ async function montar() {
     B: { sesion: sesionDe(cuenta, local.id), operador: pin(opB) },
     AconOtraCuenta: { sesion: sesionDe(otraCuenta, local.id), operador: pin(opA) },
     sinPin: { sesion: sesionDe(cuenta, local.id) },
-    otro: { sesion: sesionDe(cuentaOtroLocal, otroLocal.id) },
+    otro: { sesion: sesionDe(cuentaOtroLocal, otroLocal.id), operador: pinOtro },
     // Quien puede resolver cobros offline: la misma cuenta, con el permiso.
     resolutor: { sesion: sesionDe(cuenta, local.id, ["pos.usar", PERMISO_RESOLVER_COBROS_OFFLINE]), operador: pin(opA) },
     resolutorOtroLocal: { sesion: sesionDe(cuentaOtroLocal, otroLocal.id, ["pos.usar", PERMISO_RESOLVER_COBROS_OFFLINE]) },

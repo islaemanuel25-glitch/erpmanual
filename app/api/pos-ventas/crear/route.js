@@ -14,7 +14,7 @@ import {
 import { mapearVentaATransferencia } from "@/lib/ventas-internas/mapearVentaATransferencia";
 import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
 import { SOLO_TRANSITO } from "@/lib/transferencias/politicasStock";
-import { requireOperadorSegunConfig, verificarVoucherOperador } from "@/lib/operador";
+import { requireOperadorDeCaja, verificarVoucherOperador } from "@/lib/operador";
 import { WHERE_TURNO_OPERATIVO, ERROR_TURNO_EN_PREPARACION, whereCajaPropia } from "@/lib/caja/cierreRelevo";
 import { compartirTurno } from "@/lib/caja/cierreRelevoServer";
 import { ERROR_VENTA_DE_OTRO_OPERADOR } from "@/lib/pos-ventas/replayOffline";
@@ -249,7 +249,8 @@ async function procesarCrear(req, intento) {
     // QUIÉN COBRA: la identidad de caja de esta venta.
     //
     // Es SIEMPRE el PIN activo, validado en el local, como cualquier venta. Sin
-    // PIN donde el local lo exige, 428: no hay a nombre de quién cobrar.
+    // PIN, 428: no hay a nombre de quién cobrar. En cualquier local y con
+    // cualquier cuenta, Admin y dueño incluidos: la caja es de un operador.
     //
     // `origenOffline` lo manda el cliente y no prueba nada: no concede ninguna
     // excepción de propiedad ni de vigencia. Offline solo significa que la venta
@@ -264,7 +265,7 @@ async function procesarCrear(req, intento) {
     // Antes el voucher era la identidad del replay y la bandera salteaba la
     // vigencia del turno: con la cuenta compartida, B podía fabricar ventas en la
     // caja de A con el voucher de A, y cualquiera vender en su caja vencida.
-    const gateOp = await requireOperadorSegunConfig(req, session, { localId });
+    const gateOp = await requireOperadorDeCaja(req, { localId });
     if (!gateOp.ok) {
       return NextResponse.json(
         { ok: false, error: gateOp.error, needsOperador: true },

@@ -43,10 +43,10 @@ export async function GET(req) {
     // con su cajón. Preguntar por la cuenta devolvía el turno de cualquiera de
     // ellos; se pregunta por el operador que hizo PIN en este navegador,
     // validado en este local por el servidor —el cliente no declara a nadie—.
-    // Sin operador (local sin operario, Admin/Dueño sin PIN) la caja es la de la
-    // cuenta, como siempre.
     //
-    // Sin un PIN válido donde el local lo exige no hay caja que devolver: se
+    // Sin un PIN válido no hay caja que devolver, en ningún local y con ninguna
+    // cuenta —Admin y dueño incluidos: una caja sin operador la comparte
+    // cualquiera que use la cuenta—. Se
     // contesta "sin turno" con `needsOperador`, y no un 428, porque las
     // pantallas que preguntan esto ya saben dibujar "no hay caja" y el
     // OperadorProvider pide el PIN por su lado.

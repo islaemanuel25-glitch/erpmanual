@@ -59,7 +59,7 @@ const principal = await crearClientePrisma({ nivel: ESCRITURA });
 
 const jwt = (await import("jsonwebtoken")).default;
 const { aplicarMigraciones } = await import("./lib/libroEnElTiempo.mjs");
-const { crearProductoVendible, abrirTurnoDePrueba } = await import("./fixturePos.mjs");
+const { crearProductoVendible, abrirTurnoDePrueba, crearOperadorDeCaja } = await import("./fixturePos.mjs");
 
 let pasadas = 0;
 const fallas = [];
@@ -168,14 +168,25 @@ try {
       process.env.AUTH_SECRET,
       { expiresIn: "1h" }
     );
+  // TODA CAJA ES DE UN OPERADOR CON PIN (2026-10-14): cobrar exige uno, también
+  // con una cuenta Admin. Cada vendedor cobra con el operador de su local.
+  const { firmarTokenOperador, OperadorCookie } = await import("../../lib/operador.js");
+  const opA = await crearOperadorDeCaja(c, { localId: localA.id, nombre: "Operador A" });
+  const opD = await crearOperadorDeCaja(c, { localId: deposito.id, nombre: "Operador D" });
+  const pinDe = (u) => {
+    const op = u.localId === localA.id ? opA : u.localId === deposito.id ? opD : null;
+    return op ? `${OperadorCookie.nombre}=${firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: u.localId })}` : null;
+  };
   const cookieVendedor = (u, esDeposito = false) => ({
-    cookie: `erpazul_sesion=${sesion({ id: u.id, localId: u.localId, permisos: ["*"], esDeposito })}`,
+    cookie: [`erpazul_sesion=${sesion({ id: u.id, localId: u.localId, permisos: ["*"], esDeposito })}`, pinDe(u)]
+      .filter(Boolean)
+      .join("; "),
     "content-type": "application/json",
   });
 
   // ── Ventas por la ruta real ─────────────────────────────────────────────
-  const turnoA = await abrirTurnoDePrueba(c, { localId: localA.id, vendedorId: U.vendedorA.id });
-  const turnoD = await abrirTurnoDePrueba(c, { localId: deposito.id, vendedorId: U.vendedorD.id });
+  const turnoA = await abrirTurnoDePrueba(c, { localId: localA.id, vendedorId: U.vendedorA.id, operadorId: opA.id });
+  const turnoD = await abrirTurnoDePrueba(c, { localId: deposito.id, vendedorId: U.vendedorD.id, operadorId: opD.id });
   const pA = await crearProductoVendible(c, { grupoId: grupo.id, localId: localA.id, nombre: "Producto A", precioVenta: 10, precioCosto: 6, stock: 100000 });
   const pD = await crearProductoVendible(c, { grupoId: grupo.id, localId: deposito.id, nombre: "Producto D", precioVenta: 10, precioCosto: 6, stock: 100000 });
   const clienteFiado = await c.cliente.create({ data: { grupoId: grupo.id, localId: localA.id, nombre: "Cliente fiado" } });

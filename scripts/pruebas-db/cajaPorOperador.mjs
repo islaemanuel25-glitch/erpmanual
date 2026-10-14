@@ -21,12 +21,14 @@
 //
 // Las contrapruebas de autorización van entre los pasos: A no vende, no mueve,
 // no arquea, no retira, no corta ni cierra la caja de B. Un segundo turno de A
-// —ni por la ruta ni directo a la base con otra cuenta— no puede existir. Y la
-// intervención que ya existía —el Dueño de su local— sigue pudiendo arquear la
-// caja de un operador, con su autoría.
+// —ni por la ruta ni directo a la base con otra cuenta— no puede existir. El
+// Dueño de su local tampoco opera la caja de otro (2026-10-14): sin PIN no
+// arquea, no retira ni cierra normal. Lo único que puede es FORZAR el cierre,
+// y la caja de B se cierra así: queda marcada con quién la forzó y su
+// diferencia sigue siendo de B.
 //
-// Al final, un local SIN operario: la caja es de la cuenta, como siempre, y un
-// PIN de esa cuenta no la alcanza.
+// Al final, un local SIN operario obligatorio: igual nadie abre sin PIN, y una
+// caja de cuenta vieja no la alcanza ni la cuenta sin PIN ni un PIN.
 //
 // Siembra sus propios datos con una marca única y los borra al terminar.
 
@@ -265,8 +267,8 @@ function pasos(f) {
       leer(await rutaRetiroIniciar.POST(pedido(`${BASE}/retiros/iniciar`, quien, { turnoId, desgloseCambio }))),
     confirmarRetiro: async (quien, token, desgloseRetiroContado) =>
       leer(await rutaRetiroConfirmar.POST(pedido(`${BASE}/retiros/${token}/confirmar`, quien, { desgloseRetiroContado }), conToken(token))),
-    iniciarCierre: async (quien, turnoId, desgloseCambio) =>
-      leer(await rutaCierreIniciar.POST(pedido(`${BASE}/cierres/iniciar`, quien, { turnoId, desgloseCambio }))),
+    iniciarCierre: async (quien, turnoId, desgloseCambio, extra = {}) =>
+      leer(await rutaCierreIniciar.POST(pedido(`${BASE}/cierres/iniciar`, quien, { turnoId, desgloseCambio, ...extra }))),
     confirmarCierre: async (quien, token, desgloseRetiroContado) =>
       leer(await rutaCierreConfirmar.POST(pedido(`${BASE}/cierres/${token}/confirmar`, quien, { desgloseRetiroContado }), conToken(token))),
     cerrarClasico: async (quien, turnoId, montoRealEfectivo) =>
@@ -386,7 +388,7 @@ async function correr() {
   igual("la caja de B no se tocó", await fotoDe(turnoB.id), antesB2);
 
   // ═════════════════════════════════════════════════════════════════════════
-  seccion("5. Arqueos parciales: cada uno el suyo; el Dueño interviene con su autoría");
+  seccion("5. Arqueos parciales: cada uno el suyo; el Dueño tampoco opera la caja de otro");
 
   const arqA = await p.arquear(f.A, turnoA.id, 21000);
   requerir("A arquea su caja", arqA.ok === true, `${arqA.status} ${arqA.error ?? ""}`);
@@ -397,10 +399,14 @@ async function correr() {
   ok("A arqueando la caja de B: rechazo", arqCruzado.ok !== true && [403, 404].includes(arqCruzado.status), `${arqCruzado.status} ${arqCruzado.error ?? ""}`);
   igual("y no apareció ningún arqueo en la caja de B", await fotoDe(turnoB.id), antesB3);
 
+  // Hasta el 2026-10-14 el Dueño intervenía cualquier caja sin PIN. Ya no: toda
+  // caja la opera su operador con su PIN, y lo único que el Dueño puede hacer
+  // sobre la de otro es FORZAR el cierre (sección 7).
   const arqDueno = await p.arquear(f.dueno_, turnoB.id, 21000);
-  ok("el Dueño de Casiano arquea la caja de B", arqDueno.ok === true, `${arqDueno.status} ${arqDueno.error ?? ""}`);
-  const ultimoArqueoB = await prisma.arqueoCaja.findFirst({ where: { turnoId: turnoB.id }, orderBy: { id: "desc" } });
-  igual("con su autoría real en realizadoPorId", ultimoArqueoB?.realizadoPorId, f.dueno.id);
+  ok("el Dueño sin PIN no arquea la caja de B: 428", arqDueno.status === 428, `${arqDueno.status} ${arqDueno.error ?? ""}`);
+  const retiroDueno = await p.iniciarRetiro(f.dueno_, turnoB.id, { 1000: 1 });
+  ok("ni retira de ella: 428", retiroDueno.status === 428, `${retiroDueno.status} ${retiroDueno.error ?? ""}`);
+  igual("y en la caja de B no apareció nada", await fotoDe(turnoB.id), antesB3);
 
   // En la caja de A hay dos arqueos: el del retiro de recaudación —que deja su
   // propio ArqueoCaja, con el esperado de ese momento— y el parcial de recién.
@@ -451,13 +457,36 @@ async function correr() {
   ok("B no recibe el token del corte de A", !(await tokensPendientes(f.B)).includes(corteA.cierre.token));
   ok("A sí lo recibe, para recuperar su conteo", (await tokensPendientes(f.A)).includes(corteA.cierre.token));
   ok("el Dueño también, para resolverlo", (await tokensPendientes(f.dueno_)).includes(corteA.cierre.token));
+  // El token no alcanza: el corte de A lo confirma A. El Dueño, solo forzándolo.
+  const duenoConfirmaA = await p.confirmarCierre(f.dueno_, corteA.cierre.token, { 10000: 1, 1000: 5 });
+  ok("el Dueño no confirma el corte normal de A: 403", duenoConfirmaA.status === 403, `${duenoConfirmaA.status} ${duenoConfirmaA.error ?? ""}`);
+  const bConfirmaA = await p.confirmarCierre(f.B, corteA.cierre.token, { 10000: 1, 1000: 5 });
+  ok("B, con el token de A, tampoco: 403", bConfirmaA.status === 403, `${bConfirmaA.status} ${bConfirmaA.error ?? ""}`);
   const finA = await p.confirmarCierre(f.A, corteA.cierre.token, { 10000: 1, 1000: 5 });
   requerir("A confirma: contó $16.000", finA.ok === true, `${finA.status} ${finA.error ?? ""}`);
-  // B deja $1.000 de cambio y cuenta $25.000: el cajón tenía $26.000.
-  const corteB = await p.iniciarCierre(f.B, turnoB.id, { 1000: 1 });
-  requerir("B toma el corte de su caja", corteB.ok === true, `${corteB.status} ${corteB.error ?? ""}`);
-  const finB = await p.confirmarCierre(f.B, corteB.cierre.token, { 20000: 1, 1000: 5 });
-  requerir("B confirma: contó $26.000", finB.ok === true, `${finB.status} ${finB.error ?? ""}`);
+
+  // ── EL CIERRE FORZADO: la caja de B la cierra el Dueño ───────────────────
+  //
+  // B se fue sin cerrar. El Dueño fuerza el cierre: queda registrado como
+  // forzado y a su nombre, y la caja y su diferencia siguen siendo de B —la
+  // sección 8 lo comprueba en la auditoría—. B había dejado $1.000 de cambio y
+  // el cajón tiene $26.000: se cuentan $25.000 de retiro.
+  const forzadoPorA = await p.iniciarCierre(f.A, turnoB.id, { 1000: 1 }, { forzado: true });
+  ok("A no puede forzar la caja de B: 403", forzadoPorA.status === 403, `${forzadoPorA.status} ${forzadoPorA.error ?? ""}`);
+  const normalDelDueno = await p.iniciarCierre(f.dueno_, turnoB.id, { 1000: 1 });
+  ok("el Dueño sin PIN no toma el corte NORMAL de B: 428", normalDelDueno.status === 428, `${normalDelDueno.status} ${normalDelDueno.error ?? ""}`);
+  const corteB = await p.iniciarCierre(f.dueno_, turnoB.id, { 1000: 1 }, { forzado: true });
+  requerir("el Dueño fuerza el cierre de la caja de B", corteB.ok === true && corteB.forzado === true, `${corteB.status} ${corteB.error ?? ""}`);
+  const aConfirmaForzado = await p.confirmarCierre(f.A, corteB.cierre.token, { 20000: 1, 1000: 5 });
+  ok("A no confirma el cierre forzado de B: 403", aConfirmaForzado.status === 403, `${aConfirmaForzado.status} ${aConfirmaForzado.error ?? ""}`);
+  const finB = await p.confirmarCierre(f.dueno_, corteB.cierre.token, { 20000: 1, 1000: 5 });
+  requerir("el Dueño confirma: contó $26.000", finB.ok === true, `${finB.status} ${finB.error ?? ""}`);
+  const cerradaB = await prisma.turno.findUnique({ where: { id: turnoB.id } });
+  igual("la caja sigue siendo de B, cerrada por el Dueño y marcada forzada por él",
+    [cerradaB.operadorId, cerradaB.cerradoPorId, cerradaB.cierreForzadoPorId], [f.opB.id, f.dueno.id, f.dueno.id]);
+  const corteBFila = await prisma.cierrePreparacion.findUnique({ where: { id: corteB.cierre.id } });
+  igual("el corte forzado no se atribuye a ningún operador que no sea el de la caja",
+    [corteBFila.forzadoPorUsuarioId, corteBFila.iniciadoPorOperadorId], [f.dueno.id, null]);
 
   // ═════════════════════════════════════════════════════════════════════════
   seccion("8. Las diferencias quedan donde ocurrieron: A −$5.000, B +$5.000");
@@ -650,14 +679,30 @@ async function correr() {
   await prisma.operadorLocal.update({ where: { id: f.opA.id }, data: { activo: true } });
 
   // ═════════════════════════════════════════════════════════════════════════
-  seccion("11. Local SIN operario: la caja es de la cuenta, como siempre");
+  seccion("11. Local SIN operario obligatorio: igual, ninguna caja sin operador");
 
-  const abreCuenta = await p.abrir(f.sinOperario);
-  requerir("la cuenta abre sin PIN", abreCuenta.ok === true, `${abreCuenta.status} ${abreCuenta.error ?? ""}`);
-  const turnoCuenta = await prisma.turno.findUnique({ where: { id: abreCuenta.turno.id } });
-  igual("el turno queda sin operador", turnoCuenta.operadorId, null);
-  const otraVezCuenta = await p.abrir(f.sinOperario);
-  ok("la misma cuenta no abre otra: 409", otraVezCuenta.status === 409, `${otraVezCuenta.status}`);
+  // Hasta el 2026-10-14 la cuenta de este local abría sin PIN una caja de la
+  // cuenta, y todos los que la usaban la compartían (las 836 a 872 de Mini
+  // unidas). Ahora `exigirOperador: false` no libera la caja.
+  const cajasAntes = await prisma.turno.count({ where: { localId: f.localSinOperario.id } });
+  const abreSinPin = await p.abrir(f.sinOperario);
+  ok("la cuenta sin PIN no abre caja: 428", abreSinPin.status === 428, `${abreSinPin.status} ${abreSinPin.error ?? ""}`);
+  igual("y no se creó ningún turno", await prisma.turno.count({ where: { localId: f.localSinOperario.id } }), cajasAntes);
+  const abreC = await p.abrir(f.sinOperarioConPinC);
+  requerir("con el PIN de C, abre la caja de C", abreC.ok === true, `${abreC.status} ${abreC.error ?? ""}`);
+  igual("el turno es de C", (await prisma.turno.findUnique({ where: { id: abreC.turno.id } })).operadorId, f.opC.id);
+  const vC = await p.vender(f.sinOperarioConPinC, abreC.turno.id, { localId: f.localSinOperario.id, producto: f.productoSinOperario, cantidad: 1 });
+  ok("C vende en su caja", vC.ok === true, `${vC.status} ${vC.error ?? ""}`);
+
+  // LAS CAJAS DE CUENTA QUE QUEDARON ABIERTAS. Las abiertas antes de esta
+  // regla siguen en la base; se arma una así, como la dejó el código viejo, para
+  // ver qué se puede hacer con ella hoy: nada sin PIN, y con PIN tampoco, porque
+  // no es de ningún operador. Se cierra forzando.
+  const turnoCuenta = await prisma.turno.create({
+    data: { localId: f.localSinOperario.id, vendedorId: f.cuentaSinOperario.id, montoInicial: 0 },
+  });
+  const vCuenta = await p.vender(f.sinOperario, turnoCuenta.id, { localId: f.localSinOperario.id, producto: f.productoSinOperario, cantidad: 1 });
+  ok("la cuenta sin PIN ya no vende en la caja de cuenta vieja: 428", vCuenta.status === 428, `${vCuenta.status} ${vCuenta.error ?? ""}`);
   let errorIndiceCuenta = null;
   try {
     const intruso = await prisma.turno.create({
@@ -669,16 +714,16 @@ async function correr() {
   }
   ok("la base sigue impidiendo dos cajas abiertas de la cuenta sin operador",
     errorIndiceCuenta?.code === "P2002", errorIndiceCuenta ? errorIndiceCuenta.code : "se creó");
-  const vCuenta = await p.vender(f.sinOperario, turnoCuenta.id, { localId: f.localSinOperario.id, producto: f.productoSinOperario, cantidad: 1 });
-  ok("la cuenta vende en su caja", vCuenta.ok === true, `${vCuenta.status} ${vCuenta.error ?? ""}`);
-  igual("el turno actual de la cuenta es ése", (await p.actual(f.sinOperario, f.localSinOperario.id)).turno?.id, turnoCuenta.id);
+  igual("sin PIN, el POS no le devuelve caja a la cuenta", (await p.actual(f.sinOperario, f.localSinOperario.id)).turno?.id ?? null, null);
 
   // Un PIN de esa cuenta no alcanza la caja de la cuenta: si la alcanzara, sería
   // otra vez un cajón compartido.
   const actualC = await p.actual(f.sinOperarioConPinC, f.localSinOperario.id);
-  igual("con el PIN de C, la caja de la cuenta no es la suya", actualC.turno?.id ?? null, null);
+  igual("con el PIN de C, el POS le devuelve SU caja, no la de la cuenta", actualC.turno?.id ?? null, abreC.turno.id);
   const movC = await p.movimiento(f.sinOperarioConPinC, turnoCuenta.id, "INGRESO", 100);
   ok("C no mueve la caja de la cuenta", movC.ok !== true && [403, 404].includes(movC.status), `${movC.status} ${movC.error ?? ""}`);
+  const corteC = await p.iniciarCierre(f.sinOperarioConPinC, turnoCuenta.id, { 1000: 0 });
+  ok("ni la cierra: 403", corteC.status === 403, `${corteC.status} ${corteC.error ?? ""}`);
 
   // Una cookie de operador firmada para OTRO local no vale en éste.
   const pinAjeno = { sesion: f.A.sesion, operador: firmarTokenOperador({ operadorId: f.opA.id, nombre: f.opA.nombre, localId: f.localSinOperario.id }) };

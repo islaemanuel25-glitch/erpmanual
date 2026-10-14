@@ -214,8 +214,12 @@ export function FilasResumenCierre({ corteEn, operadorNombre }) {
 // `onCerrarSinConteo` lo pasa la pantalla SOLO si el usuario tiene el permiso, y
 // el botón aparece SOLO si el corte ya venció: `atrasado` lo calcula el servidor
 // con `venceEn`, el mismo criterio que la ruta aplica al resolver.
-export function FilaCierrePendiente({ item, onContinuar, onCerrarSinConteo }) {
+// `onForzar` lo pasa la pantalla para quien puede forzar, y el botón reemplaza a
+// "Continuar" SOLO en un corte de otro operador todavía no forzado
+// (`sePuedeForzar`, del servidor): ese conteo lo termina su operador, o se fuerza.
+export function FilaCierrePendiente({ item, onContinuar, onCerrarSinConteo, onForzar }) {
   const ofreceSinConteo = Boolean(onCerrarSinConteo) && item.atrasado === true;
+  const ofreceForzar = Boolean(onForzar) && item.sePuedeForzar === true;
   return (
     <div className="sunmi-surface sunmi-border rounded-lg p-3 flex items-start justify-between gap-3">
       <div className="min-w-0 space-y-0.5">
@@ -231,21 +235,55 @@ export function FilaCierrePendiente({ item, onContinuar, onCerrarSinConteo }) {
           ) : (
             <span className="sunmi-text-muted">Esperando conteo</span>
           )}
+          {item.forzado && <span className="sunmi-text-warning font-semibold"> · Cierre forzado</span>}
         </div>
       </div>
       <div className="shrink-0 flex flex-col items-stretch gap-2">
-        <SunmiButton
-          color="amber"
-          onClick={() => onContinuar?.(item)}
-          className="py-2 px-3 text-xs font-bold"
-        >
-          Continuar cierre
-        </SunmiButton>
+        {ofreceForzar ? (
+          <SunmiButton color="red" onClick={() => onForzar(item)} className="py-2 px-3 text-xs font-bold">
+            Forzar cierre
+          </SunmiButton>
+        ) : (
+          <SunmiButton
+            color="amber"
+            onClick={() => onContinuar?.(item)}
+            className="py-2 px-3 text-xs font-bold"
+          >
+            Continuar cierre
+          </SunmiButton>
+        )}
         {ofreceSinConteo && (
           <SunmiButton color="slate" onClick={() => onCerrarSinConteo(item)} className="py-2 px-3 text-xs">
             Cerrar sin conteo
           </SunmiButton>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Una caja ABIERTA de otro operador, en la bandeja, para quien puede forzar su
+ * cierre. Misma forma que la fila de arriba: es la misma bandeja.
+ *
+ * Una caja sin operador es de las abiertas antes de que toda caja exigiera PIN:
+ * se dice así, para que no parezca de nadie.
+ */
+export function FilaCajaAbiertaForzable({ item, onForzar }) {
+  return (
+    <div className="sunmi-surface sunmi-border rounded-lg p-3 flex items-start justify-between gap-3">
+      <div className="min-w-0 space-y-0.5">
+        <div className="text-sm3 font-bold sunmi-text-strong leading-tight">
+          Turno #{item.turnoId} · {item.operadorNombre || `Sin operador (cuenta ${item.cajeroNombre || "—"})`}
+        </div>
+        <div className="text-sm2 sunmi-text-muted leading-tight">
+          Abierta a las {hora(item.apertura)} · fondo {money(item.montoInicial)}
+        </div>
+      </div>
+      <div className="shrink-0 flex flex-col items-stretch gap-2">
+        <SunmiButton color="red" onClick={() => onForzar(item)} className="py-2 px-3 text-xs font-bold">
+          Forzar cierre
+        </SunmiButton>
       </div>
     </div>
   );

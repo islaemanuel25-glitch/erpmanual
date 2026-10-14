@@ -92,11 +92,10 @@ export async function POST(req) {
 
     // EL CIERRE ES DE LA CAJA DE QUIEN CIERRA, y se decide ANTES de mirar su
     // estado: el de una caja ajena no se informa. Antes era "de la cuenta", y con
-    // una cuenta compartida un operador cerraba la caja de otro. Un cajero común
-    // cierra solo la suya; Admin y el Dueño en su local, la de cualquiera, y
-    // quedan como `cerradoPorId` y `realizadoPorId`. El local autorizado es el
-    // del turno, ya validado arriba. Para DUEÑO_LOCAL el bypass de operario solo
-    // aplica si ese local es el suyo (puedeOperarSinOperador).
+    // una cuenta compartida un operador cerraba la caja de otro. Cada operador
+    // cierra solo la suya, con su PIN: también un Admin o el dueño. La caja de
+    // otro se cierra únicamente forzando, por `cierres/iniciar`. El local
+    // autorizado es el del turno, ya validado arriba.
     const id = await identidadParaOperar(req, session, { localId: turno.localId });
     if (!id.ok) {
       return NextResponse.json(

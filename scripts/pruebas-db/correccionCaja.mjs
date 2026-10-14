@@ -30,6 +30,8 @@ const rutaSinConteo = await import("../../app/api/pos-ventas/cierres/[token]/cer
 const rutaReservar = await import("../../app/api/pos-ventas/cambios-pendientes/reservar/route.js");
 const rutaAbrirConCambio = await import("../../app/api/pos-ventas/turnos/abrir-con-cambio/route.js");
 const { turnoOperativoDeSesion } = await import("./fixtureTurnoOperativo.mjs");
+const { crearOperadorDeCaja } = await import("./fixturePos.mjs");
+const { firmarTokenOperador, OperadorCookie } = await import("../../lib/operador.js");
 const rutaRetiroIniciar = await import("../../app/api/pos-ventas/retiros/iniciar/route.js");
 const rutaRetiroConfirmar = await import("../../app/api/pos-ventas/retiros/[token]/confirmar/route.js");
 const rutaListar = await import("../../app/api/caja/correcciones/route.js");
@@ -61,14 +63,18 @@ const token = (usuario, localId, grupoId, permisos = PERMISOS) =>
   jwt.sign({ id: usuario.id, nombre: usuario.nombre, email: usuario.email, localId, grupoId, permisos }, SECRETO, {
     expiresIn: "1h",
   });
+// TODA CAJA ES DE UN OPERADOR CON PIN (2026-10-14). Una sola persona en esta
+// prueba: cada pedido lleva el PIN de su operador, fijado en `montar`.
+let cookieOperador = "";
+const cookies = (sesion) => [`erpazul_sesion=${sesion}`, cookieOperador].filter(Boolean).join("; ");
 const pedido = (url, sesion, cuerpo) =>
   new Request(url, {
     method: "POST",
-    headers: { cookie: `erpazul_sesion=${sesion}`, "content-type": "application/json" },
+    headers: { cookie: cookies(sesion), "content-type": "application/json" },
     body: JSON.stringify(cuerpo ?? {}),
   });
 const pedidoGet = (url, sesion) => {
-  const req = new Request(url, { headers: { cookie: `erpazul_sesion=${sesion}` } });
+  const req = new Request(url, { headers: { cookie: cookies(sesion) } });
   Object.defineProperty(req, "nextUrl", { value: new URL(url), configurable: true });
   return req;
 };
@@ -81,7 +87,7 @@ const BASE = "http://ci/api/pos-ventas";
 // ═══════════════════════════════════════════════════════════════════════════
 
 const marca = `ci-correccion-caja-${Date.now()}`;
-const creado = { grupoId: null, localId: null, usuarioId: null, rolId: null };
+const creado = { grupoId: null, localId: null, usuarioId: null, rolId: null, operadorId: null };
 const codigosDePrueba = [];
 
 async function montar() {
@@ -97,9 +103,13 @@ async function montar() {
     data: { nombre: `${marca}-cajero`, email: `${marca}@ci.local`, passwordHash: "x", rolId: rol.id, localId: local.id },
   });
   creado.usuarioId = usuario.id;
+  const operador = await crearOperadorDeCaja(prisma, { localId: local.id, nombre: `${marca}-operador` });
+  creado.operadorId = operador.id;
+  cookieOperador = `${OperadorCookie.nombre}=${firmarTokenOperador({ operadorId: operador.id, nombre: operador.nombre, localId: local.id })}`;
   return {
     local,
     usuario,
+    operador,
     sesion: token(usuario, local.id, grupo.id),
     sesionCorrector: token(usuario, local.id, grupo.id, [...PERMISOS, PERMISO_CORREGIR_HISTORICO]),
     sesionSinConteo: token(usuario, local.id, grupo.id, [...PERMISOS, PERMISO_CERRAR_SIN_CONTEO]),
@@ -120,6 +130,10 @@ async function desmontar() {
   await prisma.turno.deleteMany({ where: { localId } });
   await prisma.configuracionLocal.deleteMany({ where: { localId } });
   await prisma.usuario.deleteMany({ where: { id: creado.usuarioId } });
+  if (creado.operadorId) {
+    await prisma.operadorEnLocal.deleteMany({ where: { operadorId: creado.operadorId } });
+    await prisma.operadorLocal.deleteMany({ where: { id: creado.operadorId } });
+  }
   await prisma.grupoLocal.deleteMany({ where: { grupoId: creado.grupoId } });
   await prisma.local.deleteMany({ where: { id: localId } });
   await prisma.grupo.deleteMany({ where: { id: creado.grupoId } });
@@ -135,7 +149,9 @@ const cerrarAbiertos = (f) =>
 
 async function turnoNuevo(f, montoInicial) {
   await cerrarAbiertos(f);
-  return prisma.turno.create({ data: { localId: f.local.id, vendedorId: f.usuario.id, montoInicial } });
+  return prisma.turno.create({
+    data: { localId: f.local.id, vendedorId: f.usuario.id, operadorId: f.operador.id, montoInicial },
+  });
 }
 
 /** Toma el corte y lo confirma por las rutas reales. El ×1000 entra confirmado en pesos. */

@@ -41,6 +41,7 @@ import {
   serializarRetiroPreparacion,
 } from "@/lib/caja/retiroRelevoServer";
 import { bloquearTurno, OPCIONES_TX } from "@/lib/caja/cierreRelevoServer";
+import { autorizarResolucionDeCorte } from "@/lib/caja/llaveDeCorte";
 
 export async function POST(req, context) {
   try {
@@ -53,6 +54,22 @@ export async function POST(req, context) {
       );
     }
     const { session, localId, retiro } = res;
+
+    // ── QUIÉN RETIRA ─────────────────────────────────────────────────────────
+    // Solo el operador de la caja, por su PIN o por la llave que recibió al
+    // tomar el corte. Un retiro no tiene camino forzado: un Admin o el dueño
+    // no retiran plata de la caja de otro operador.
+    const autorizado = await autorizarResolucionDeCorte(req, {
+      session,
+      localId,
+      turno: retiro.turno,
+      tipo: "retiro",
+      token,
+      accion: "confirmar",
+    });
+    if (!autorizado.ok) {
+      return NextResponse.json({ ok: false, error: autorizado.error, cajaAjena: true }, { status: autorizado.status });
+    }
 
     // ── Idempotencia: una preparación ya confirmada devuelve lo que quedó ───
     // No es un error. Doble clic, reintento de la cola, dos pestañas: el cajero

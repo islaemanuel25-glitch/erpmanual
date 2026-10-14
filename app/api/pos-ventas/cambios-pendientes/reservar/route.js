@@ -15,7 +15,7 @@
 // La reserva vence sola y vuelve a DISPONIBLE: ver MINUTOS_RESERVA_CAMBIO.
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireOperadorSegunConfig } from "@/lib/operador";
+import { requireOperadorDeCaja } from "@/lib/operador";
 import { ESTADO_CAMBIO, vencimientoReserva, whereReservaPropia } from "@/lib/caja/cierreRelevo";
 import {
   contextoRelevo,
@@ -43,7 +43,9 @@ export async function POST(req) {
       );
     }
 
-    const gateOp = await requireOperadorSegunConfig(req, session, { localId });
+    // Reservar el cambio es el primer paso de abrir una caja: pide el mismo
+    // operador con PIN que la apertura.
+    const gateOp = await requireOperadorDeCaja(req, { localId });
     if (!gateOp.ok) {
       return NextResponse.json(
         { ok: false, error: gateOp.error, needsOperador: true },

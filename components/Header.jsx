@@ -198,7 +198,9 @@ export default function Header({ onOpenMobileMenu }) {
 
         {/* OPERADOR — siempre visible */}
         <div className="relative" ref={operadorRef}>
-          {esCuentaPropia ? (
+          {/* Una cuenta exenta que hizo PIN para usar una caja se muestra como
+              cualquier operador: con su nombre y la opción de cambiar. */}
+          {esCuentaPropia && !operador ? (
             /* Cuenta propia: pill verde fijo con nombre del usuario, sin selector */
             <div
               className={`
@@ -247,7 +249,7 @@ export default function Header({ onOpenMobileMenu }) {
           )}
 
           {/* Dropdown selector — solo para cuentas compartidas */}
-          {showOperadorSelector && !esCuentaPropia && (
+          {showOperadorSelector && (!esCuentaPropia || operador) && (
             <div className="absolute right-0 mt-2 z-50">
               <OperadorSelector
                 operador={operador}

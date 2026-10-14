@@ -2400,6 +2400,16 @@ model Turno {
   anuladoPorId    Int?
   motivoAnulacion String?
 
+  // ── CIERRE FORZADO ─────────────────────────────────────────────────────────
+  //
+  // Cada caja es de UN operador y la cierra él, con su PIN. La única excepción:
+  // un Admin o el dueño en su local fuerza el cierre de la caja de otro. Esta
+  // columna dice quién lo forzó; NULL = cierre normal. `cerradoPorId` dice qué
+  // cuenta confirmó, y `operadorId` NO cambia: la caja y su diferencia siguen
+  // siendo del operador original, que es lo que no se puede perder.
+  // Se copia de `CierrePreparacion.forzadoPorUsuarioId` al confirmar.
+  cierreForzadoPorId Int?
+
   // ── TURNO OPERATIVO ────────────────────────────────────────────────────────
   //
   // ESTE MODELO SIGUE SIENDO UNA CAJA. El turno operativo es del catálogo del
@@ -2869,6 +2879,14 @@ model CierrePreparacion {
   cerradoSinConteoEn           DateTime?
   cerradoSinConteoPorUsuarioId Int?
   motivoCierreSinConteo        String?
+
+  /// CIERRE FORZADO: la cuenta de Admin o del dueño que tomó el corte de la
+  /// caja de OTRO operador. NULL = cierre normal, del propio operador con su
+  /// PIN. Un solo campo y no un booleano al lado: un forzado sin autor no
+  /// existe. La caja sigue siendo del operador original (`Turno.operadorId`) y
+  /// la diferencia, suya; por eso `iniciadoPorOperadorId` queda en NULL y el
+  /// arqueo cae al operador del turno.
+  forzadoPorUsuarioId Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

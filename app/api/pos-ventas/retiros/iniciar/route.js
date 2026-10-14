@@ -24,7 +24,8 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import prisma from "@/lib/prisma";
-import { requireOperadorSegunConfig } from "@/lib/operador";
+import { requireOperadorDeCaja } from "@/lib/operador";
+import { entregarLlaveDeCorte } from "@/lib/caja/llaveDeCorte";
 import { contextoArqueo } from "@/lib/caja/arqueoServer";
 import {
   validarDesgloseServidor,
@@ -111,7 +112,11 @@ export async function POST(req) {
     // El operario queda GRABADO en la fila: es la autoría real del retiro. Desde
     // este instante la pantalla de conteo no vuelve a mirar el operador activo,
     // que es una cookie compartida por todo el navegador.
-    const gateOp = await requireOperadorSegunConfig(req, session, { localId });
+    //
+    // Retira solo el operador de la caja, con su PIN. `contextoArqueo` ya
+    // rechazó la caja ajena; esto deja escrito que sin PIN no hay retiro, ni
+    // para un Admin ni para el dueño.
+    const gateOp = await requireOperadorDeCaja(req, { localId });
     if (!gateOp.ok) {
       return NextResponse.json(
         { ok: false, error: gateOp.error, needsOperador: true },
@@ -212,7 +217,7 @@ export async function POST(req) {
       return { retiro, repetido: false, desglose: corte.calculo };
     }, OPCIONES_TX);
 
-    return NextResponse.json({
+    const respuesta = NextResponse.json({
       ok: true,
       repetido: resultado.repetido,
       // Un corte que YA EXISTÍA no es un alta: es un proceso pendiente. Se
@@ -233,6 +238,10 @@ export async function POST(req) {
           }
         : null,
     });
+    // La llave del conteo, para el operador de la caja: termina el retiro en
+    // otra pestaña aunque otro operador haga PIN en este navegador.
+    entregarLlaveDeCorte(respuesta, { tipo: "retiro", token: resultado.retiro.token, operadorId: gateOp.operadorId });
+    return respuesta;
   } catch (error) {
     if (error?.codigo === "desproporcionado") {
       return NextResponse.json(respuestaDesproporcion(error.proporcion), { status: 400 });

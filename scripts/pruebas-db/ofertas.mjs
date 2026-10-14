@@ -56,6 +56,8 @@ const rutaBarrido = await import("../../app/api/ofertas/barrido/route.js");
 const rutaRecargos = await import("../../app/api/recargos-pago/route.js");
 const rutaBuscarProducto = await import("../../app/api/pos-ventas/buscar-producto/route.js");
 const rutaCrearVenta = await import("../../app/api/pos-ventas/crear/route.js");
+const { crearOperadorDeCaja } = await import("./fixturePos.mjs");
+const { firmarTokenOperador, OperadorCookie } = await import("../../lib/operador.js");
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ARNÉS
@@ -106,11 +108,15 @@ function token(usuarioId, localId, grupoId) {
   );
 }
 
+// TODA CAJA ES DE UN OPERADOR CON PIN (2026-10-14): cobrar exige uno, con la
+// cuenta que sea. Se fija en el montaje, para el local A, que es donde se cobra.
+let cookieOperador = "";
+
 function pedido(url, { metodo = "GET", cuerpo, sesion } = {}) {
   return new Request(url, {
     method: metodo,
     headers: {
-      cookie: `erpazul_sesion=${sesion}`,
+      cookie: [`erpazul_sesion=${sesion}`, cookieOperador].filter(Boolean).join("; "),
       "content-type": "application/json",
     },
     body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
@@ -129,7 +135,7 @@ const params = (id) => ({ params: Promise.resolve({ id: String(id) }) });
 // ═══════════════════════════════════════════════════════════════════════════
 
 const marca = `ci-ofertas-${Date.now()}`;
-const creado = { grupoId: null, localAId: null, localBId: null, usuarioId: null, rolId: null };
+const creado = { grupoId: null, localAId: null, localBId: null, usuarioId: null, rolId: null, operadorId: null };
 
 function enHoras(h) {
   return new Date(Date.now() + h * 60 * 60 * 1000);
@@ -221,8 +227,11 @@ async function montarFixtures() {
     productos[clave] = { baseId: base.id, productoLocalId: pl.id, ...datos };
   }
 
+  const operador = await crearOperadorDeCaja(prisma, { localId: localA.id, nombre: `${marca}-operador` });
+  creado.operadorId = operador.id;
+  cookieOperador = `${OperadorCookie.nombre}=${firmarTokenOperador({ operadorId: operador.id, nombre: operador.nombre, localId: localA.id })}`;
   const turno = await prisma.turno.create({
-    data: { localId: localA.id, vendedorId: usuario.id, montoInicial: 0 },
+    data: { localId: localA.id, vendedorId: usuario.id, operadorId: operador.id, montoInicial: 0 },
   });
 
   return {
@@ -259,6 +268,10 @@ async function desmontarFixtures() {
   await prisma.posVentaCounter.deleteMany({ where: { grupoId: creado.grupoId } });
   await prisma.configuracionLocal.deleteMany({ where: { localId: { in: locales } } });
   await prisma.usuario.deleteMany({ where: { id: creado.usuarioId } });
+  if (creado.operadorId) {
+    await prisma.operadorEnLocal.deleteMany({ where: { operadorId: creado.operadorId } });
+    await prisma.operadorLocal.deleteMany({ where: { id: creado.operadorId } });
+  }
   await prisma.grupoLocal.deleteMany({ where: { grupoId: creado.grupoId } });
   await prisma.configuracionGrupo.deleteMany({ where: { grupoId: creado.grupoId } });
   await prisma.local.deleteMany({ where: { id: { in: locales } } });

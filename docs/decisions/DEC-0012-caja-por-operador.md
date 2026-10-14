@@ -7,6 +7,10 @@
 está en `docs/deploy/MIGRACIONES-SIN-APLICAR.md`.
 **Alcance:** de quién es un turno de caja, quién lo puede operar y cómo se
 reportan sus diferencias.
+**Enmendada el 2026-10-14:** ninguna caja se abre sin operador con PIN y
+Admin y el Dueño ya no intervienen cajas ajenas, salvo el cierre forzado. Ver
+"Enmienda 2026-10-14" al final: donde este documento dice lo contrario, manda
+la enmienda.
 
 ## Contexto
 
@@ -265,3 +269,50 @@ migración.
 - Reportes: `app/api/auditoria-pos-ventas/operadores/route.js`,
   `app/modulos/auditoria-pos-ventas/cajas/page.jsx` y
   `lib/auditoria-pos-ventas/diferenciasSinNetear.test.mjs`.
+
+## Enmienda 2026-10-14 — ninguna caja sin operador, y el cierre forzado
+
+**Regla de negocio (Emanuel, 2026-10-14), no se discute:** cada caja pertenece
+a un operador. Las diferencias de efectivo son individuales y no se compensan
+entre operadores. Tesorería no se toca.
+
+**Contexto** [verificado en código, sobre `ddec5a2`]: la exención de arriba
+—"un turno sin operador es la caja de la cuenta"— dejaba que una cuenta que no
+pide PIN (el dueño del local, un Admin, o un local con `exigirOperador = false`)
+abriera una caja sin operador, y todos los que usaban esa cuenta la
+compartían. Caso real informado por Emanuel: en Mini unidas, las cajas 836 a
+872 se abrieron con la cuenta de Estefi; con esa misma cuenta se hicieron
+retiros y se cerró la caja 881 de Belén con un retiro de $46.900.
+
+**Decisión** [verificado en código y ejercido contra PostgreSQL]:
+
+- Abrir, vender, reservar el cambio de apertura, mover, arquear, retirar y
+  cerrar una caja exige SIEMPRE un operador con PIN validado en el local, con
+  cualquier cuenta y en cualquier local. Es `requireOperadorDeCaja`
+  (`lib/operador.js`), sin exenciones; `identidadParaOperar` la usa y ya no
+  interviene (`puedeIntervenir: false`). La exención de
+  `requireOperadorSegunConfig` sigue para lo que no es caja (pedidos entre
+  locales).
+- Confirmar o cancelar un cierre o un retiro (van por token) lo hace el
+  operador de la caja: por su PIN, o por la LLAVE del corte, una cookie firmada
+  que recibe al tomar el corte, atada a ese corte y a ese operador, que
+  sobrevive a que el relevo haga PIN en el mismo navegador
+  (`lib/caja/llaveDeCorte.js`, regla pura `puedeResolverCorte`).
+- **Cierre forzado**, la única excepción: Admin, o el Dueño en su local, pide
+  `forzado: true` en `cierres/iniciar` sobre la caja de OTRO operador (o una
+  caja de cuenta vieja). Queda en `CierrePreparacion.forzadoPorUsuarioId` y,
+  al confirmar, en `Turno.cierreForzadoPorId` (migración
+  `20261014165350_cierre_forzado`, dos columnas nulas, sin tocar filas).
+  `Turno.operadorId` no cambia y el arqueo cae al operador del turno: la caja
+  y su diferencia siguen siendo del operador original. Se entra desde la
+  bandeja de cierres pendientes. **Los retiros no tienen camino forzado.**
+- Cancelar un corte también lo puede Admin o el Dueño: no mueve plata, y sin
+  eso un retiro colgado en una caja de cuenta vieja impediría forzar su cierre.
+- `cerrar-sin-conteo` no cambia: es la resolución administrativa de un corte
+  vencido, con su permiso, motivo y bitácora propios.
+- Las cajas de cuenta que quedaron abiertas no se tocan: ninguna cuenta las
+  opera ya sin PIN y ningún PIN las alcanza; se cierran forzando. Los datos
+  históricos no se modifican.
+
+**Evidencia:** `lib/caja/cajaConOperador.test.mjs` (con contraprueba) y
+`scripts/pruebas-db/cajaPorOperador.mjs`, secciones 5, 7 y 11.

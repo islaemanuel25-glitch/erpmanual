@@ -718,10 +718,15 @@ export default function PosVentasPage() {
         // caja" y redirigía a la apertura: el POS se desmontaba con la
         // sincronización offline que esperaba ese PIN, y al cajero se le ofrecía
         // abrir otra caja teniendo una abierta.
+        //
+        // A una cuenta que entra sin PIN (Admin, dueño, local sin operario
+        // obligatorio) nadie se lo está pidiendo todavía: se le pide acá, porque
+        // la caja exige operador a todos.
         if (data.ok && !data.turno && data.needsOperador) {
           setTurnoActual(undefined);
           setTurnoVencido(false);
           setMensajeTurnoVencido("");
+          requerirOperador();
           return;
         }
         setTurnoActual(data.ok && data.turno ? data.turno : null);
@@ -736,8 +741,8 @@ export default function PosVentasPage() {
     verificarTurno();
     // El operador va en las dependencias: la caja es suya, y cambiar de PIN es
     // cambiar de caja. Sin esto la pantalla seguía mostrando —y cobrando en— el
-    // turno del operador anterior.
-  }, [localActual, me, operadorActivoId]);
+    // turno del operador anterior. `requerirOperador` es estable.
+  }, [localActual, me, operadorActivoId, requerirOperador]);
 
   // ---------------------------------------------------------------------------
   // Cargar info crédito cuando hay cliente + fiado

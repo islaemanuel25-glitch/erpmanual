@@ -58,6 +58,11 @@ export default function IniciarCierrePage() {
   const router = useRouter();
   const params = useSearchParams();
   const enPestanaNueva = params?.get("pestana") === "nueva";
+  // CIERRE FORZADO: un Admin o el dueño cierra la caja ABIERTA de otro
+  // operador. Llega desde la bandeja de cierres con el turno en la dirección.
+  // El servidor decide si se puede; la pantalla solo dice de quién es la caja.
+  const turnoForzado = Number(params?.get("turnoId")) || null;
+  const forzado = params?.get("forzado") === "1" && turnoForzado != null;
 
   const sesion = useUser() || {};
   const perfil = sesion.perfil;
@@ -67,6 +72,8 @@ export default function IniciarCierrePage() {
 
   const [cargando, setCargando] = useState(true);
   const [turno, setTurno] = useState(null);
+  // Forzado: de quién es la caja que se cierra. En el cierre normal es el PIN.
+  const [operadorDeLaCaja, setOperadorDeLaCaja] = useState(null);
   const [esperado, setEsperado] = useState(null);
   const [errorFatal, setErrorFatal] = useState("");
   const [error, setError] = useState("");
@@ -114,6 +121,26 @@ export default function IniciarCierrePage() {
   // que se muestra es el de este instante. Después del corte, la otra pantalla
   // lee exclusivamente de CierrePreparacion.
   const cargar = useCallback(async () => {
+    // Forzado: la caja no es la del PIN, es la que vino en la dirección. Su
+    // operador se lee de la misma bandeja que ofreció forzarla.
+    if (forzado) {
+      const b = await fetch("/api/pos-ventas/cierres/pendientes", {
+        credentials: "include",
+        cache: "no-store",
+      }).then((x) => x.json());
+      const caja = (b?.cajasAbiertas || []).find((c) => c.turnoId === turnoForzado);
+      if (!caja) return { turno: null };
+      const res = await fetch(`/api/pos-ventas/turnos/resumen?turnoId=${caja.turnoId}`, {
+        credentials: "include",
+        cache: "no-store",
+      }).then((x) => x.json());
+      return {
+        turno: { id: caja.turnoId },
+        operadorDeLaCaja: caja.operadorNombre || `Sin operador (cuenta ${caja.cajeroNombre || "—"})`,
+        esperado: res?.ok ? Number(res.efectivoEsperado) : null,
+      };
+    }
+
     const r = await fetch("/api/pos-ventas/turnos/actual", {
       credentials: "include",
       cache: "no-store",
@@ -139,7 +166,7 @@ export default function IniciarCierrePage() {
     }).then((x) => x.json());
 
     return { turno: t, esperado: res?.ok ? Number(res.efectivoEsperado) : null };
-  }, []);
+  }, [forzado, turnoForzado]);
 
   // El hook va primero y la relectura después, unidas por una ref: la
   // cancelación tiene que releer, y la relectura tiene que poder mostrar un
@@ -161,17 +188,22 @@ export default function IniciarCierrePage() {
         return;
       }
       if (!d.turno) {
-        setErrorFatal("No hay una caja abierta a tu nombre en este local.");
+        setErrorFatal(
+          forzado
+            ? "Esa caja ya no está abierta, o no podés forzar su cierre."
+            : "No hay una caja abierta a tu nombre en este local."
+        );
         return;
       }
       setTurno(d.turno);
       setEsperado(d.esperado);
+      setOperadorDeLaCaja(d.operadorDeLaCaja ?? null);
     } catch {
       setErrorFatal("No se pudo leer el estado de la caja.");
     } finally {
       setCargando(false);
     }
-  }, [cargar, setProceso]);
+  }, [cargar, setProceso, forzado]);
 
   releerRef.current = releer;
 
@@ -254,6 +286,7 @@ export default function IniciarCierrePage() {
           turnoId: turno.id,
           desgloseCambio,
           totalConfirmado: totalConfirmado === "" ? null : totalConfirmado,
+          ...(forzado ? { forzado: true } : {}),
         }),
       });
       const json = await res.json();
@@ -358,11 +391,17 @@ export default function IniciarCierrePage() {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <h1 className="text-base sm:text-lg font-bold sunmi-text-strong leading-tight">
-              {TITULO_CIERRE}
+              {forzado ? `${TITULO_CIERRE} · forzado` : TITULO_CIERRE}
             </h1>
             <p className="text-[11px] sm:text-xs sunmi-text-muted leading-tight">
               Todavía no se cortó nada. La caja sigue operativa.
             </p>
+            {forzado && (
+              <p className="text-sm2 sm:text-xs sunmi-text-warning leading-tight">
+                Es la caja de otro operador. El cierre queda registrado como forzado y a
+                tu nombre; la caja y su diferencia siguen siendo de {operadorDeLaCaja || "su operador"}.
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -381,7 +420,7 @@ export default function IniciarCierrePage() {
 
       <PanelAntesDelCorte
         turno={turno}
-        operadorNombre={operador?.nombre}
+        operadorNombre={forzado ? operadorDeLaCaja : operador?.nombre}
         localNombre={contexto?.nombre}
         esperado={esperado}
         iniciando={iniciando}

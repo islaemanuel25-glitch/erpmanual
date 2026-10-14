@@ -1,6 +1,7 @@
 "use client";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
+import SunmiButton from "@/components/sunmi/SunmiButton";
 import OperadorSelector from "./OperadorSelector";
 
 /**
@@ -26,16 +27,27 @@ import OperadorSelector from "./OperadorSelector";
  * un modal sube más que esto, el candado de `ModalPedirOperador.test.mjs` lo
  * frena — es lo único que separa a este cartel de volver a quedar tapado.
  */
-export default function ModalPedirOperador({ onLogin }) {
+//
+// `paraCaja`: lo pidió una caja a una cuenta que entra sin PIN (Admin, dueño,
+// local sin operario obligatorio). Toda caja es de un operador con PIN, y eso
+// es lo que se le explica. `onSalir` deja cerrar el cartel sin identificarse:
+// fuera de la caja esa cuenta no lo necesita, y sin la salida quedaría trabada.
+export default function ModalPedirOperador({ onLogin, paraCaja = false, onSalir }) {
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sunmi-overlay-strong">
       <SunmiCard className="w-full max-w-sm p-5 space-y-3 text-center">
         <p className="text-base font-bold">Identificate para seguir</p>
         <p className="text-xs sunmi-text-muted">
-          Se cerró o venció la sesión del operario. Ingresá tu PIN para continuar
-          — lo que tenías armado queda intacto.
+          {paraCaja
+            ? "Cada caja es de un operador. Para abrirla, vender, retirar o cerrarla, ingresá tu PIN."
+            : "Se cerró o venció la sesión del operario. Ingresá tu PIN para continuar — lo que tenías armado queda intacto."}
         </p>
         <OperadorSelector operador={null} onLogin={onLogin} forzado />
+        {onSalir && (
+          <SunmiButton color="ghost" onClick={onSalir} className="w-full">
+            Ahora no
+          </SunmiButton>
+        )}
       </SunmiCard>
     </div>
   );

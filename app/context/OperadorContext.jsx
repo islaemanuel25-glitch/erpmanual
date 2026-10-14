@@ -28,6 +28,15 @@ export function OperadorProvider({ children }) {
 
   const exento = perfilExentoDeOperador(perfil);
 
+  // LA CAJA PIDE PIN A TODOS. Un exento (Admin, dueño, local sin operario
+  // obligatorio) entra al sistema sin PIN, pero para usar una caja —abrir,
+  // vender, retirar, cerrar— el servidor contesta 428 igual que a cualquiera:
+  // una caja sin operador la comparte quien use la cuenta. Cuando eso pasa, el
+  // handler llama `requerirOperador()` y acá se levanta el mismo modal del PIN.
+  // Al exento se le deja salir sin identificarse: fuera de la caja no lo
+  // necesita.
+  const [pinPedido, setPinPedido] = useState(false);
+
   // ¿Hubo operario alguna vez en esta sesión? Distingue "ingreso inicial" (nunca
   // hubo → redirect) de "se cayó a mitad de sesión" (había → modal). Es estado
   // (no ref) para poder leerlo en render sin romper la regla de hooks.
@@ -54,17 +63,30 @@ export function OperadorProvider({ children }) {
   // aparece solo.
   const requerirOperador = useCallback(() => {
     refrescar();
+    setPinPedido(true);
   }, [refrescar]);
 
+  // Identificarse cierra el pedido de PIN: si después hace "cambiar operador",
+  // el modal no vuelve solo para el exento hasta que una caja lo pida de nuevo.
+  const loginYCerrar = useCallback(
+    async (...args) => {
+      const r = await login(...args);
+      if (r?.ok) setPinPedido(false);
+      return r;
+    },
+    [login]
+  );
+
   const value = useMemo(
-    () => ({ operador, voucher, loading, login, logout, refrescar, requerirOperador }),
-    [operador, voucher, loading, login, logout, refrescar, requerirOperador]
+    () => ({ operador, voucher, loading, login: loginYCerrar, logout, refrescar, requerirOperador }),
+    [operador, voucher, loading, loginYCerrar, logout, refrescar, requerirOperador]
   );
 
   // Modal derivado: se muestra cuando no hay operario PERO ya hubo uno en la
-  // sesión (caída a mitad de sesión). Se oculta solo apenas vuelve a haber
-  // operario. El ingreso inicial (sin operario previo) va por redirect, no acá.
-  const mostrarModal = !exento && !operador && huboOperador;
+  // sesión (caída a mitad de sesión), o cuando una caja lo pidió. Se oculta solo
+  // apenas vuelve a haber operario. El ingreso inicial (sin operario previo) va
+  // por redirect, no acá.
+  const mostrarModal = !operador && ((!exento && huboOperador) || pinPedido);
 
   // Puerta de ingreso inicial: mientras carga por primera vez y todavía no hubo
   // operario, no mostramos el chrome (igual que hacía layout.jsx antes).
@@ -73,7 +95,13 @@ export function OperadorProvider({ children }) {
   return (
     <OperadorContext.Provider value={value}>
       {children}
-      {mostrarModal && <ModalPedirOperador onLogin={login} />}
+      {mostrarModal && (
+        <ModalPedirOperador
+          onLogin={loginYCerrar}
+          paraCaja={exento}
+          onSalir={exento ? () => setPinPedido(false) : undefined}
+        />
+      )}
     </OperadorContext.Provider>
   );
 }

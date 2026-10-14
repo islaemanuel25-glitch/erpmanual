@@ -14,7 +14,7 @@
 // o el turno abierto sin haber tomado el sobre.
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { requireOperadorSegunConfig } from "@/lib/operador";
+import { requireOperadorDeCaja } from "@/lib/operador";
 import {
   validarDesgloseServidor,
   evaluarDesproporcionDesglose,
@@ -51,7 +51,9 @@ export async function POST(req) {
       );
     }
 
-    const gateOp = await requireOperadorSegunConfig(req, session, { localId });
+    // Toda caja tiene un operador con PIN, también la que abre un Admin o el
+    // dueño: una caja sin operador la comparte cualquiera que use la cuenta.
+    const gateOp = await requireOperadorDeCaja(req, { localId });
     if (!gateOp.ok) {
       return NextResponse.json(
         { ok: false, error: gateOp.error, needsOperador: true },

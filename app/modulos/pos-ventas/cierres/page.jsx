@@ -23,7 +23,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 
-import { FilaCierrePendiente } from "@/components/caja/PanelesCierre";
+import { FilaCierrePendiente, FilaCajaAbiertaForzable } from "@/components/caja/PanelesCierre";
 import ModalCerrarSinConteo from "@/components/caja/ModalCerrarSinConteo";
 import { PERMISO_CERRAR_SIN_CONTEO } from "@/lib/caja/cierreRelevo";
 
@@ -36,6 +36,11 @@ export default function CierresPendientesPage() {
 
   const [cargando, setCargando] = useState(true);
   const [items, setItems] = useState([]);
+  // Las cajas abiertas de otros operadores. El servidor las manda SOLO a quien
+  // puede forzar (Admin, o el dueño en su local); para el resto viene vacía.
+  const [cajasAbiertas, setCajasAbiertas] = useState([]);
+  const [forzando, setForzando] = useState(false);
+  const [errorForzar, setErrorForzar] = useState("");
   const [error, setError] = useState("");
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
@@ -58,9 +63,11 @@ export default function CierresPendientesPage() {
       if (!r?.ok) {
         setError(r?.error || "No se pudieron leer los cierres pendientes.");
         setItems([]);
+        setCajasAbiertas([]);
         return;
       }
       setItems(Array.isArray(r.items) ? r.items : []);
+      setCajasAbiertas(Array.isArray(r.cajasAbiertas) ? r.cajasAbiertas : []);
     } catch {
       setError("Error de conexión.");
     } finally {
@@ -72,6 +79,39 @@ export default function CierresPendientesPage() {
     if (cargandoUser || cargandoCtx || !puedeUsar || needsContexto) return;
     cargar();
   }, [cargar, cargandoUser, cargandoCtx, puedeUsar, needsContexto]);
+
+  // ── CIERRE FORZADO ───────────────────────────────────────────────────────
+  //
+  // Una caja ABIERTA de otro operador: se separa el cambio en la pantalla de
+  // iniciar cierre, en modo forzado. Una caja con el corte YA tomado no
+  // necesita eso —el cambio ya se separó—: se marca forzado el corte que existe
+  // y se pasa directo a su conteo.
+  const forzarAbierta = (item) => {
+    router.push(`/modulos/pos-ventas/cierres/iniciar?turnoId=${item.turnoId}&forzado=1`);
+  };
+
+  const forzarCortado = async (item) => {
+    setForzando(true);
+    setErrorForzar("");
+    try {
+      const r = await fetch("/api/pos-ventas/cierres/iniciar", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ turnoId: item.turnoId, forzado: true, desgloseCambio: {} }),
+      }).then((x) => x.json().catch(() => ({ ok: false, error: "Respuesta inválida del servidor." })));
+      const token = r?.cierre?.token;
+      if (!r?.ok || !token) {
+        setErrorForzar(r?.error || "No se pudo forzar el cierre.");
+        return;
+      }
+      router.push(`/modulos/pos-ventas/cierres/${encodeURIComponent(token)}`);
+    } catch {
+      setErrorForzar("Error de conexión.");
+    } finally {
+      setForzando(false);
+    }
+  };
 
   const abrirSinConteo = (item) => {
     setErrorSinConteo("");
@@ -159,25 +199,52 @@ export default function CierresPendientesPage() {
             Reintentar
           </SunmiButton>
         </SunmiCard>
-      ) : items.length === 0 ? (
-        <SunmiCard>
-          <p className="text-sm text-center py-6 sunmi-text-muted">
-            No hay cierres pendientes en este local.
-          </p>
-        </SunmiCard>
       ) : (
-        <div className="space-y-2">
-          {items.map((item) => (
-            <FilaCierrePendiente
-              key={item.id}
-              item={item}
-              onContinuar={(i) =>
-                router.push(`/modulos/pos-ventas/cierres/${encodeURIComponent(i.token)}`)
-              }
-              onCerrarSinConteo={puedeCerrarSinConteo ? abrirSinConteo : undefined}
-            />
-          ))}
-        </div>
+        <>
+          {items.length === 0 ? (
+            <SunmiCard>
+              <p className="text-sm text-center py-6 sunmi-text-muted">
+                No hay cierres pendientes en este local.
+              </p>
+            </SunmiCard>
+          ) : (
+            <div className="space-y-2">
+              {items.map((item) => (
+                <FilaCierrePendiente
+                  key={item.id}
+                  item={item}
+                  onContinuar={(i) =>
+                    router.push(`/modulos/pos-ventas/cierres/${encodeURIComponent(i.token)}`)
+                  }
+                  onCerrarSinConteo={puedeCerrarSinConteo ? abrirSinConteo : undefined}
+                  onForzar={forzando ? undefined : forzarCortado}
+                />
+              ))}
+            </div>
+          )}
+
+          {cajasAbiertas.length > 0 && (
+            <SunmiCard className="p-3 space-y-2">
+              <div>
+                <h2 className="text-sm3 font-bold sunmi-text-strong leading-tight">
+                  Cajas abiertas de otros operadores
+                </h2>
+                <p className="text-sm2 sunmi-text-muted leading-tight">
+                  Cada caja la cierra su operador con su PIN. Forzar el cierre queda
+                  registrado a tu nombre, y la caja y su diferencia siguen siendo del
+                  operador.
+                </p>
+              </div>
+              {cajasAbiertas.map((item) => (
+                <FilaCajaAbiertaForzable key={item.turnoId} item={item} onForzar={forzarAbierta} />
+              ))}
+            </SunmiCard>
+          )}
+
+          {/* El rechazo se muestra: un error que no dice nada se ve igual que un
+              botón que no hace nada. */}
+          {errorForzar && <p className="text-sm text-center sunmi-text-danger">{errorForzar}</p>}
+        </>
       )}
 
       <ModalCerrarSinConteo

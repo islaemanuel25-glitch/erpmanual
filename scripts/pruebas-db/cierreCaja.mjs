@@ -25,8 +25,9 @@ import { crearClientePrisma, ESCRITURA } from "../lib/clientePrisma.mjs";
 const prisma = await crearClientePrisma({ nivel: ESCRITURA });
 const jwt = (await import("jsonwebtoken")).default;
 
-const { crearProductoVendible } = await import("./fixturePos.mjs");
+const { crearProductoVendible, crearOperadorDeCaja } = await import("./fixturePos.mjs");
 const { turnoOperativoDeSesion } = await import("./fixtureTurnoOperativo.mjs");
+const { firmarTokenOperador, OperadorCookie } = await import("../../lib/operador.js");
 
 const rutaCerrar = await import("../../app/api/pos-ventas/turnos/cerrar/route.js");
 const rutaIniciar = await import("../../app/api/pos-ventas/cierres/iniciar/route.js");
@@ -75,8 +76,14 @@ const token = (usuario, localId, grupoId, permisos = PERMISOS) =>
     SECRETO,
     { expiresIn: "1h" }
   );
+// TODA CAJA ES DE UN OPERADOR CON PIN (2026-10-14): ningún local ni ninguna
+// cuenta abre, vende, retira o cierra sin uno. Esta prueba es de una sola
+// persona, así que cada pedido lleva el PIN de su operador; se fija en `montar`.
+let cookieOperador = "";
+const cookies = (sesion) => [`erpazul_sesion=${sesion}`, cookieOperador].filter(Boolean).join("; ");
+
 const pedidoGet = (url, sesion) => {
-  const req = new Request(url, { headers: { cookie: `erpazul_sesion=${sesion}` } });
+  const req = new Request(url, { headers: { cookie: cookies(sesion) } });
   // Los handlers leen `req.nextUrl.searchParams`, que el Request nativo no tiene.
   Object.defineProperty(req, "nextUrl", { value: new URL(url), configurable: true });
   return req;
@@ -85,7 +92,7 @@ const pedidoGet = (url, sesion) => {
 const pedido = (url, sesion, cuerpo) =>
   new Request(url, {
     method: "POST",
-    headers: { cookie: `erpazul_sesion=${sesion}`, "content-type": "application/json" },
+    headers: { cookie: cookies(sesion), "content-type": "application/json" },
     body: JSON.stringify(cuerpo ?? {}),
   });
 const leer = async (r) => ({ status: r.status, ...(await r.json().catch(() => ({}))) });
@@ -99,7 +106,7 @@ const BASE = "http://ci/api/pos-ventas";
 // ═══════════════════════════════════════════════════════════════════════════
 
 const marca = `ci-cierre-caja-${Date.now()}`;
-const creado = { grupoId: null, localId: null, usuarioId: null, rolId: null };
+const creado = { grupoId: null, localId: null, usuarioId: null, rolId: null, operadorId: null };
 
 async function montar() {
   const rol = await prisma.rol.create({ data: { nombre: `${marca}-rol`, permisos: PERMISOS } });
@@ -109,7 +116,9 @@ async function montar() {
   const local = await prisma.local.create({ data: { nombre: `${marca}-local`, tipo: "local" } });
   creado.localId = local.id;
   await prisma.grupoLocal.create({ data: { grupoId: grupo.id, localId: local.id } });
-  // El gate de operario es de otro circuito: se apaga explícitamente.
+  // `exigirOperador: false` ya no libera la caja: desde el 2026-10-14 toda
+  // caja exige operador con PIN. Se deja apagado a propósito, para que esta
+  // prueba ejerza también que la configuración del local no es una exención.
   await prisma.configuracionLocal.create({
     data: { localId: local.id, exigirOperador: false, allowNegativeStock: true },
   });
@@ -117,6 +126,9 @@ async function montar() {
     data: { nombre: `${marca}-cajero`, email: `${marca}@ci.local`, passwordHash: "x", rolId: rol.id, localId: local.id },
   });
   creado.usuarioId = usuario.id;
+  const operador = await crearOperadorDeCaja(prisma, { localId: local.id, nombre: `${marca}-operador` });
+  creado.operadorId = operador.id;
+  cookieOperador = `${OperadorCookie.nombre}=${firmarTokenOperador({ operadorId: operador.id, nombre: operador.nombre, localId: local.id })}`;
 
   const producto = await crearProductoVendible(prisma, {
     grupoId: grupo.id,
@@ -135,6 +147,7 @@ async function montar() {
     grupo,
     local,
     usuario,
+    operador,
     producto,
     sesion: token(usuario, local.id, grupo.id),
     // La misma persona CON el permiso excepcional. La sesión de arriba no lo tiene,
@@ -166,6 +179,10 @@ async function desmontar() {
   await prisma.posVentaCounter.deleteMany({ where: { grupoId: creado.grupoId } });
   await prisma.configuracionLocal.deleteMany({ where: { localId } });
   await prisma.usuario.deleteMany({ where: { id: creado.usuarioId } });
+  if (creado.operadorId) {
+    await prisma.operadorEnLocal.deleteMany({ where: { operadorId: creado.operadorId } });
+    await prisma.operadorLocal.deleteMany({ where: { id: creado.operadorId } });
+  }
   await prisma.grupoLocal.deleteMany({ where: { grupoId: creado.grupoId } });
   await prisma.local.deleteMany({ where: { id: localId } });
   await prisma.grupo.deleteMany({ where: { id: creado.grupoId } });
@@ -182,7 +199,9 @@ async function turnoNuevo(f, montoInicial = 10000) {
     where: { localId: f.local.id, vendedorId: f.usuario.id, cierre: null, cierreEnPreparacionEn: null },
     data: { cierre: new Date() },
   });
-  return prisma.turno.create({ data: { localId: f.local.id, vendedorId: f.usuario.id, montoInicial } });
+  return prisma.turno.create({
+    data: { localId: f.local.id, vendedorId: f.usuario.id, operadorId: f.operador.id, montoInicial },
+  });
 }
 
 const estadoDe = async (turnoId) =>

@@ -147,8 +147,9 @@ export async function POST(req) {
     // suyas al mismo tiempo — ni con la misma cuenta ni con otra.
     //
     // La identidad sale de la sesión y de la cookie del PIN validada en este
-    // local; nunca del cuerpo. Sin operador (local sin operario, o Admin/Dueño
-    // sin PIN) la caja es de la cuenta, como siempre. Los índices únicos
+    // local; nunca del cuerpo. Sin operador no hay caja, con ninguna cuenta:
+    // una caja sin operador la compartía cualquiera que usara la cuenta (las
+    // 836 a 872 de Mini unidas). Los índices únicos
     // parciales de `Turno` son la garantía ante dos aperturas simultáneas.
     //
     // Los turnos ajenos no bloquean: se informan y listo.

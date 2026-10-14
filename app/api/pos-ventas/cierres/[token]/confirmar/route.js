@@ -53,6 +53,7 @@ import {
   serializarCambio,
   OPCIONES_TX,
 } from "@/lib/caja/cierreRelevoServer";
+import { autorizarResolucionDeCorte } from "@/lib/caja/llaveDeCorte";
 
 export async function POST(req, context) {
   try {
@@ -65,6 +66,23 @@ export async function POST(req, context) {
       );
     }
     const { session, localId, grupoId, cierre } = res;
+
+    // ── QUIÉN CIERRA ─────────────────────────────────────────────────────────
+    // El token abre la pantalla; no dice quién pide. Cierra el operador de la
+    // caja —por su PIN o por la llave que recibió al tomar el corte— o, si el
+    // corte es FORZADO, un Admin o el dueño. Nadie más.
+    const autorizado = await autorizarResolucionDeCorte(req, {
+      session,
+      localId,
+      turno: cierre.turno,
+      tipo: "cierre",
+      token,
+      forzado: cierre.forzadoPorUsuarioId != null,
+      accion: "confirmar",
+    });
+    if (!autorizado.ok) {
+      return NextResponse.json({ ok: false, error: autorizado.error, cajaAjena: true }, { status: autorizado.status });
+    }
 
     // ── Idempotencia: un corte ya confirmado devuelve lo que quedó ──────────
     // No es un error. Doble clic, reintento de la cola, dos pestañas: el cajero
@@ -244,6 +262,9 @@ export async function POST(req, context) {
         data: {
           cierre: ahora,
           cerradoPorId: session.id,
+          // Quién lo forzó, si fue forzado. `operadorId` no se toca: la caja y
+          // su diferencia siguen siendo del operador original.
+          cierreForzadoPorId: filaCierre.forzadoPorUsuarioId ?? null,
           // EL ESPERADO CONGELADO, tal cual quedó en el corte.
           montoEsperadoEfectivo: cierre.efectivoEsperadoCorte,
           // EL TOTAL EQUIVALENTE DEL CAJÓN. Mismo significado de siempre: todo el
