@@ -16,7 +16,14 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-Ninguna. Producción está en **60 migraciones**, las 60 del árbol, con el ERP en
+- `20261014165350_cierre_forzado` — **aditiva**: `forzadoPorUsuarioId` (INTEGER
+  nulo) en `CierrePreparacion` y `cierreForzadoPorId` (INTEGER nulo) en
+  `Turno`. No toca ninguna fila: NULL es "cierre normal", que es lo que fueron
+  todos hasta hoy. Es del arreglo "ninguna caja sin operador" (enmienda
+  2026-10-14 de DEC-0012). La versión vieja del código no lee esas columnas,
+  así que no se rompe si la migración entra antes que el código.
+
+Producción está en **60 migraciones**, con el ERP en
 `ccf2894fe452802a5c2195327d95b7598830ae58`.
 
 **De dónde sale el 60.** Lo informó el dueño en la orden de la auditoría de
