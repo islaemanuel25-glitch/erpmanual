@@ -46,6 +46,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import { COLOR_ESTADO_CUENTA } from "@/components/finanzas/pagos/TarjetaCuentaPorPagar";
 import SunmiPill from "@/components/sunmi/SunmiPill";
+import { PagoParcial } from "@/components/compras-proveedor/ListadoPedidosProveedor";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import { diaMesAR, horaAR } from "@/lib/fechas/formatearFechaHora";
@@ -115,6 +116,9 @@ export default function PedidoRecibido({
   // estado ya resueltos por `serializarCuenta`. Null en las compras cerradas
   // antes de que el cierre la creara: ahí el bloque no se dibuja.
   cuentaPorPagar = null,
+  // Se recibió confirmando deuda y la cuenta todavía tiene saldo
+  // (`esPagoParcial`, resuelto por el servidor).
+  pagoParcial = false,
   // Navegar lo decide la página, que tiene el router: esta pantalla se dibuja
   // también en los candados, donde no hay ninguno montado.
   onVerEnFinanzas = null,
@@ -155,6 +159,7 @@ export default function PedidoRecibido({
         <div className="flex items-center gap-2 min-w-0">
           <span className="font-semibold sunmi-text-strong truncate">Pedido #{pedido?.id}</span>
           <SunmiPill color="green">Recibido</SunmiPill>
+          {pagoParcial && <PagoParcial />}
         </div>
         <p className="text-sm2 sunmi-text-muted truncate">
           {proveedor} · llegó el {diaMesAR(pedido?.fechaRecibido)} a las{" "}

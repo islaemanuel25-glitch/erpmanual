@@ -1498,6 +1498,43 @@ const CASOS = [
     inyecciones: [{ de: "actosQueCruzanIds: actosDe.filter((a) => !a.completo).map((a) => a.id),", a: "actosQueCruzanIds: []," }],
     esperadas: ["y se nombra entre los que cruzan", "en el día anterior también cruza"],
   },
+  // ── AVISO DE PAGO PARCIAL AL PROVEEDOR (2026-10-15) ─────────────────────
+  {
+    n: "PP-1",
+    defecto: "se recibe con deuda sin confirmarla",
+    archivo: "app/api/compras-proveedor/recibir/[id]/route.js",
+    suite: "scripts/pruebas-db/compraConSaldo.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "if (saldo.pideConfirmacion && !confirmaElSaldo(", a: "if (false && !confirmaElSaldo(" }],
+    esperadas: ["409 con el código del aviso", "nada escrito: el pedido sigue por cargar", "ni la fila, ni la campanita"],
+  },
+  {
+    n: "PP-2",
+    defecto: "la deuda confirmada no deja registro de quién ni campanita",
+    archivo: "app/api/compras-proveedor/recibir/[id]/route.js",
+    suite: "scripts/pruebas-db/compraConSaldo.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "if (saldo.pideConfirmacion) {\n        compraConSaldo = await", a: "if (false) {\n        compraConSaldo = await" }],
+    esperadas: ["UNA fila de la deuda confirmada", "UNA campanita", "'Pago parcial' en el detalle y en la lista"],
+  },
+  {
+    n: "PP-3",
+    defecto: "'Pago parcial' no se apaga con el saldo en cero",
+    archivo: "lib/compras-proveedor/saldoAlRecibir.js",
+    suite: "scripts/pruebas-db/compraConSaldo.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "return aCentavos(cuenta.saldo) > 0;", a: "return true;" }],
+    esperadas: ["ya no es 'Pago parcial'"],
+  },
+  {
+    n: "PP-4",
+    defecto: "Azul Chat ve las compras con saldo de otro local",
+    archivo: "lib/integraciones/azul-chat/comprasSaldoEventos.js",
+    suite: "scripts/pruebas-db/compraConSaldo.mjs",
+    minimo: 20,
+    inyecciones: [{ de: "const where = { localId, confirmadoEn: { lte: hasta } };", a: "const where = { confirmadoEn: { lte: hasta } };" }],
+    esperadas: ["otro local no lo ve"],
+  },
 ];
 
 // Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número

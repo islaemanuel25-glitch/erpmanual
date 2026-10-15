@@ -8,6 +8,8 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { getRangoArgentina } from "@/lib/fechas/rangoArgentina";
+import { esPagoParcial } from "@/lib/compras-proveedor/saldoAlRecibir";
+import { estadoDeCuenta } from "@/lib/finanzas/pagosProveedores";
 
 export async function GET(req) {
   try {
@@ -63,6 +65,10 @@ export async function GET(req) {
           proveedor: { select: { id: true, nombre: true } },
           deposito: { select: { id: true, nombre: true } },
           _count: { select: { detalles: true } },
+          // "Pago parcial": se recibió confirmando deuda y la cuenta todavía
+          // tiene saldo (`esPagoParcial`).
+          compraConSaldo: { select: { id: true } },
+          cuentaPorPagar: { select: { total: true, pagos: { select: { monto: true } } } },
           // ── LAS LÍNEAS, SOLO PARA SUMAR EL ESTIMADO ──────────────────────
           //
           // El listado de "Recibir mercadería" muestra cuánta plata está por
@@ -171,6 +177,10 @@ export async function GET(req) {
       // papel sin total impreso —un remito— también queda en null: no hay
       // número que mostrar y el estimado sigue siendo lo mejor que se tiene.
       totalFacturado: totalesPorPedido.get(p.id) ?? null,
+      pagoParcial: esPagoParcial({
+        compraConSaldo: p.compraConSaldo,
+        cuenta: p.cuentaPorPagar ? estadoDeCuenta({ total: p.cuentaPorPagar.total, pagos: p.cuentaPorPagar.pagos }) : null,
+      }),
       fechaConfirmado: p.fechaConfirmado,
       fechaEnviado: p.fechaEnviado,
       fechaRecibido: p.fechaRecibido,

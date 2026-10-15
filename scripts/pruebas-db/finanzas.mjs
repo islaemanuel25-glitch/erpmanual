@@ -1141,10 +1141,13 @@ async function correrCierre(f) {
 
   console.log("\n── Cierre: 2 · PARCIAL $300.000 por transferencia");
   const p2 = await pedidoParaCerrar(f, { owner: f.deposito.id, totales: [485300] });
-  const r2 = await cerrar(deposito, p2, {
-    estado: "PARCIAL",
-    pago: { monto: "300000", medio: "TRANSFERENCIA", localOrigenId: f.deposito.id },
-  });
+  // Pagar una parte y dejar saldo se confirma a sabiendas (2026-10-15): sin
+  // la confirmación, el cierre frena sin escribir; con el saldo visto, entra.
+  const parcial = { estado: "PARCIAL", pago: { monto: "300000", medio: "TRANSFERENCIA", localOrigenId: f.deposito.id } };
+  const r2sin = await cerrar(deposito, p2, parcial);
+  ok("sin confirmar el saldo, 409 y nada escrito",
+    r2sin.status === 409 && r2sin.codigo === "SALDO_SIN_CONFIRMAR" && (await estadoDelCierre(p2.pedidoId)).cuenta === null, `${r2sin.status} ${r2sin.error}`);
+  const r2 = await cerrar(deposito, p2, { ...parcial, saldoConfirmado: 185300 });
   ok("el cierre parcial responde 200", r2.status === 200 && r2.ok, r2.error);
   ok("cuenta $485.300, saldo $185.300, PARCIAL",
     r2.cuentaPorPagar?.total === 485300 && r2.cuentaPorPagar?.saldo === 185300 && r2.cuentaPorPagar?.estado === "PARCIAL");

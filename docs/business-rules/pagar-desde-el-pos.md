@@ -63,9 +63,43 @@ Desde 2026-10-15. Regla de Emanuel, no se discute.
   paga ahora es lo que falta, y "Pagada" ya cubierta no saca plata [CÓDIGO]
   [VERIFICADO: sección 9, la caja no se descuenta otra vez].
 - Si lo pagado desde la caja supera el total de la compra, no se recibe (409)
-  [CÓDIGO]. Ver la pregunta abierta en el informe de la tanda.
+  [CÓDIGO] [VERIFICADO: `compraConSaldo.mjs` sección F].
 - La foto del remito se sube con `pos.usar` solo a una compra por cargar de la
   ubicación [CÓDIGO] [VERIFICADO: sección 3].
+
+## Recibir con deuda se confirma (2026-10-15)
+
+Regla de Emanuel: no puede entrar mercadería con deuda sin avisar. Vale para
+toda recepción de Compras, no solo para las compras por cargar.
+
+- Si algo ya se pagó —desde la caja del POS o ahora en el cierre— y aun así
+  queda saldo, el primer "Confirmar cierre de compra" muestra el aviso
+  "Pedido $X · Pagado $Y · Quedan $Z a deber a {proveedor}" y dos botones:
+  "Recibir y dejar $Z a deber" y "Volver a corregir" [CÓDIGO]
+  (`HojaCerrarRecepcion.jsx`, `lib/compras-proveedor/saldoAlRecibir.js`).
+- La ruta lo exige: sin `saldoConfirmado` igual al saldo, 409
+  `SALDO_SIN_CONFIRMAR` y no se escribe nada. Es la última pregunta antes de
+  escribir: lo que hay que corregir se dice primero [CÓDIGO]
+  [VERIFICADO: `compraConSaldo.mjs` A y E; contrapruebas `PP-`].
+- Sin nada pagado no hay aviso: "queda pendiente" ya es una decisión explícita
+  de la hoja. Pagado de más sigue frenado como antes [CÓDIGO] [VERIFICADO: F, G].
+- Quién lo confirmó y cuándo queda en `CompraConSaldo`, una fila por pedido,
+  con el total, lo pagado y el saldo que vio [CÓDIGO] [VERIFICADO: B].
+- La compra muestra "Pago parcial" en rojo en la lista y en el detalle
+  mientras tenga esa fila y su cuenta tenga saldo (`esPagoParcial`): dos
+  hechos, la confirmación y el saldo de hoy [CÓDIGO] [VERIFICADO: B y D].
+- Una campanita por recepción, después de la transacción y nunca en el
+  reintento: "{proveedor}: quedan $Z a deber", con link a la cuenta en
+  Finanzas → Pagos a proveedores, para `finanzas.ver` de la ubicación dueña
+  [CÓDIGO] [VERIFICADO: B]. El dueño, con el comodín, la ve con esa ubicación
+  activa: las notificaciones de un local no se ven desde otro [CÓDIGO]
+  (`lib/notificaciones/whereNotif.js`).
+- Azul Chat: la capacidad `compras_saldo_eventos` (pide `finanzas.ver`) le da
+  a Chat un evento por fila, con el texto "{proveedor}: pedido $X · pagado $Y ·
+  quedan $Z a deber". El ERP no le habla a Chat: Chat pregunta con su cursor,
+  así que un Chat caído no frena la recepción y el evento espera [CÓDIGO]
+  [VERIFICADO: C]. Que Chat lo pregunte, lo muestre en la conversación del
+  local y mande push es trabajo del repo de Azul Chat [DOCUMENTADO].
 
 ## Al depósito en Finanzas
 

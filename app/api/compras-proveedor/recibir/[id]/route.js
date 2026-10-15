@@ -40,7 +40,18 @@ import {
   estadoSacaPlata,
 } from "@/lib/compras-proveedor/pagoDelCierre";
 import { errorPagadoDeMas, loYaPagadoAlRecibir } from "@/lib/compras-proveedor/compraPorCargar";
-import { PERMISO_REGISTRAR_PAGOS, leerFechaOpcional } from "@/lib/finanzas/pagosProveedores";
+import { PERMISO_REGISTRAR_PAGOS, PERMISO_VER_FINANZAS, leerFechaOpcional } from "@/lib/finanzas/pagosProveedores";
+import { urlDeCuentaPorPagar } from "@/lib/finanzas/contextoFinanzas";
+import { crearNotificacion } from "@/lib/notificaciones/crearNotificacion";
+import {
+  CODIGO_SALDO_SIN_CONFIRMAR,
+  TIPO_NOTIFICACION_SALDO,
+  confirmaElSaldo,
+  esPagoParcial,
+  saldoAlRecibir,
+  textoDeLaNotificacion,
+  textoDelAviso,
+} from "@/lib/compras-proveedor/saldoAlRecibir";
 import {
   ERROR_OPERAR_EN_LA_UBICACION_DE_LA_DEUDA,
   ERROR_ORIGEN_DE_OTRA_UBICACION,
@@ -68,6 +79,7 @@ async function respuestaDelCierre(pedidoId, { repetido = false, decisionesDeCost
       proveedor: { select: { id: true, nombre: true } },
       deposito: { select: { id: true, nombre: true } },
       cuentaPorPagar: { select: SELECT_CUENTA },
+      compraConSaldo: { select: { id: true } },
       detalles: {
         include: {
           producto: {
@@ -85,12 +97,14 @@ async function respuestaDelCierre(pedidoId, { repetido = false, decisionesDeCost
       { status: 409 }
     );
   }
-  const { cuentaPorPagar, ...item } = updated;
+  const { cuentaPorPagar, compraConSaldo, ...item } = updated;
+  const cuenta = cuentaPorPagar ? serializarCuenta(cuentaPorPagar) : null;
   return NextResponse.json({
     ok: true,
     repetido,
     item,
-    cuentaPorPagar: cuentaPorPagar ? serializarCuenta(cuentaPorPagar) : null,
+    cuentaPorPagar: cuenta,
+    pagoParcial: esPagoParcial({ compraConSaldo, cuenta }),
     decisionesDeCosto,
   });
 }
@@ -627,7 +641,43 @@ export async function POST(req, { params }) {
     }
     for (const d of repetidos) lineaDelPapelPorDetalle.delete(d);
 
+    // ── CON PLATA PAGADA Y DEUDA, NO SE RECIBE SIN CONFIRMARLO ──────────────
+    //
+    // Lo pagado —desde la caja antes, o ahora en el cierre— no cubre lo que se
+    // carga: queda saldo con el proveedor. Eso no entra en silencio. La hoja
+    // muestra el aviso y manda `saldoConfirmado` con el saldo que vio; si no
+    // viene, o es otro, se frena sin escribir nada y se devuelve el aviso.
+    //
+    // Es la ÚLTIMA pregunta antes de escribir, a propósito: lo que hay que
+    // corregir —un origen ajeno, un vencimiento mal escrito— se dice primero.
+    // Confirmar una deuda que después no se puede registrar no sirve de nada.
+    const saldo = saldoAlRecibir({
+      totalCentavos: deuda.centavos,
+      yaPagadoCentavos,
+      pagoAhoraCentavos: plan.pagoInicial ? Math.round(Number(plan.pagoInicial.monto) * 100) : 0,
+    });
+    if (saldo.pideConfirmacion && !confirmaElSaldo(pagoAlProveedor.saldoConfirmado, saldo.saldoCentavos)) {
+      const proveedor = pedido.proveedor?.nombre || "el proveedor";
+      const texto = textoDelAviso({ proveedor, ...saldo });
+      return NextResponse.json(
+        {
+          ok: false,
+          codigo: CODIGO_SALDO_SIN_CONFIRMAR,
+          error: texto,
+          queHacer: texto,
+          aviso: {
+            proveedor,
+            total: saldo.totalCentavos / 100,
+            pagado: saldo.pagadoCentavos / 100,
+            saldo: saldo.saldoCentavos / 100,
+          },
+        },
+        { status: 409 }
+      );
+    }
+
     // Transacción: incrementar stock + marcar recibido
+    let compraConSaldo = null;
     await prisma.$transaction(async (tx) => {
       // Metadata para el Libro de Costos: no cambia qué costo se escribe.
       await declararOrigenDeCosto(tx, { origen: ORIGEN_COSTO.COMPRA_PROVEEDOR, referencia: pedidoId });
@@ -1119,7 +1169,7 @@ export async function POST(req, { params }) {
       // pago inicial —si hay— pasa por `registrarPagoProveedor`, con su clave
       // `compra-<pedido>-pago-inicial`, su turno operativo y su RETIRO si es
       // efectivo. Si algo de eso falla, vuelve atrás también el stock.
-      await crearCuentaPorPagarDesdeCompra(tx, {
+      const { cuenta } = await crearCuentaPorPagarDesdeCompra(tx, {
         pedidoProveedorId: pedidoId,
         localGastoId: ownerLocalId,
         total: totalDeLaDeuda,
@@ -1135,7 +1185,46 @@ export async function POST(req, { params }) {
         // completa —total real— y no se vuelve a pagar lo pagado.
         completarCuentaPrevia: Boolean(cuentaPrevia),
       });
+
+      // La deuda confirmada, en la misma transacción que la cuenta: quién la
+      // confirmó, cuándo, y los tres números que vio. Una por pedido (UNIQUE).
+      if (saldo.pideConfirmacion) {
+        compraConSaldo = await tx.compraConSaldo.create({
+          data: {
+            grupoId,
+            localId: ownerLocalId,
+            pedidoProveedorId: pedidoId,
+            proveedorId: pedido.proveedorId,
+            cuentaId: cuenta.id,
+            total: saldo.totalCentavos / 100,
+            pagado: saldo.pagadoCentavos / 100,
+            saldo: saldo.saldoCentavos / 100,
+            confirmadoPorId: session.id,
+          },
+          select: { id: true, cuentaId: true },
+        });
+      }
     });
+
+    // ── LA CAMPANITA, UNA POR RECEPCIÓN ──────────────────────────────────
+    //
+    // Después de confirmar, y solo en el cierre que escribió: un reintento
+    // vuelve por `respuestaDelCierre` y no llega acá. Para Finanzas de la
+    // ubicación dueña de la compra. `crearNotificacion` no tira: si falla, la
+    // recepción ya está hecha y la deuda sigue a la vista en Finanzas.
+    if (compraConSaldo) {
+      await crearNotificacion({
+        grupoId,
+        alcance: ownerLocalId === pedido.depositoId ? "DEPOSITO" : "LOCAL",
+        localId: ownerLocalId,
+        permisoRequerido: PERMISO_VER_FINANZAS,
+        tipo: TIPO_NOTIFICACION_SALDO,
+        titulo: textoDeLaNotificacion({ proveedor: pedido.proveedor?.nombre || "Proveedor", saldoCentavos: saldo.saldoCentavos }),
+        href: urlDeCuentaPorPagar(compraConSaldo.cuentaId),
+        entidadTipo: "COMPRA_PROVEEDOR",
+        entidadId: pedidoId,
+      });
+    }
 
     // `decisionesDeCosto` viaja siempre, esté la frontera encendida o no: quien
     // recibe tiene derecho a saber qué costos se escribieron y cuáles no, y con
