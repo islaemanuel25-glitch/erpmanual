@@ -570,6 +570,17 @@ jobs:
       - name: Contrapruebas de Empleados y la carga a mano
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs EM-
 
+      # Recibir con deuda después de haber pagado algo: sin confirmar el saldo
+      # no entra nada; confirmándolo queda quién y cuándo, una campanita, el
+      # "Pago parcial" hasta saldo cero y un evento para Azul Chat.
+      - name: Ejercer el aviso de pago parcial contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/compraConSaldo.mjs
+
+      # Y que esa prueba MIRA: sin la confirmación obligatoria, sin el
+      # registro, con el saldo ignorado y con el evento de otro local.
+      - name: Contrapruebas del aviso de pago parcial
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs PP-
+
       # Y que esa prueba MIRA: se rompe el cierre sobre una copia, tres veces, y
       # cada vez tienen que gritar las afirmaciones que nombra el caso. Solo los
       # casos `SI-`: los de transferencias tardan minutos y se corren a mano.

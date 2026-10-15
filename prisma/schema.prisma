@@ -428,6 +428,7 @@ model Usuario {
   gastosCreados          Gasto[]                   @relation("gasto_creado_por")
   pagosGastoRegistrados  PagoGasto[]               @relation("pago_gasto_registrado_por")
   consumosPersonalRegistrados ConsumoPersonal[]    @relation("consumo_personal_registrado_por")
+  comprasConSaldoConfirmadas  CompraConSaldo[]     @relation("compra_con_saldo_confirmada_por")
   verificacionesEfectivoHechas   VerificacionEfectivo[] @relation("verificacion_efectivo_hecha_por")
   verificacionesEfectivoAnuladas VerificacionEfectivo[] @relation("verificacion_efectivo_anulada_por")
   /// Las aplicaciones externas que este usuario autorizó a consultar en su nombre.
@@ -3464,6 +3465,8 @@ model PedidoProveedor {
   /// La obligación con el proveedor que nació de esta compra. A lo sumo UNA:
   /// el UNIQUE está en `CuentaPorPagarProveedor.pedidoProveedorId`.
   cuentaPorPagar CuentaPorPagarProveedor?
+  /// Si se recibió con plata pagada y deuda: quién lo confirmó y cuánto quedó.
+  compraConSaldo CompraConSaldo?
 
   @@index([grupoId])
   @@index([depositoId])
@@ -3471,6 +3474,33 @@ model PedidoProveedor {
   @@index([proveedorId])
   @@index([estado])
   @@index([createdAt])
+}
+
+/// UNA COMPRA QUE SE RECIBIÓ CON DEUDA, CONFIRMADA A SABIENDAS. Regla de
+/// Emanuel (2026-10-15): no puede entrar mercadería con deuda sin avisar. Si al
+/// recibir lo cargado supera lo pagado —y algo se pagó—, quien recibe lo tiene
+/// que confirmar; esta fila guarda quién, cuándo y los tres números de ese
+/// momento. Una por pedido. De acá salen la notificación, la marca "Pago
+/// parcial" (mientras la cuenta tenga saldo) y el evento de Azul Chat
+/// (`compras_saldo_eventos`).
+model CompraConSaldo {
+  id                Int      @id @default(autoincrement())
+  grupoId           Int
+  /// La ubicación dueña de la compra, la que debe.
+  localId           Int
+  pedidoProveedorId Int      @unique
+  proveedorId       Int
+  cuentaId          Int
+  total             Decimal  @db.Decimal(12, 2)
+  pagado            Decimal  @db.Decimal(12, 2)
+  saldo             Decimal  @db.Decimal(12, 2)
+  confirmadoPorId   Int
+  confirmadoEn      DateTime @default(now())
+
+  pedido        PedidoProveedor @relation(fields: [pedidoProveedorId], references: [id], onDelete: Cascade)
+  confirmadoPor Usuario         @relation("compra_con_saldo_confirmada_por", fields: [confirmadoPorId], references: [id])
+
+  @@index([localId, confirmadoEn, id])
 }
 
 // ---------------------------------------------------------------------------

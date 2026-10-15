@@ -333,15 +333,20 @@ async function casos(f) {
     data: { pedidoId: prov2.pedidoProveedorId, productoLocalId: f.pl.id, cantidad: 1, unidad: "UNIDAD", precioCosto: 1500 },
   });
   const movs2 = (await movimientosDelTurno(f)).length;
-  const pend = await leer(
-    await rutaRecibir.POST(
-      pedido(`${BASE}/compras-proveedor/recibir/${prov2.pedidoProveedorId}`, quienCompras, {
-        cuerpo: { costosExcluidos: [det2.id], recibidos: { [det2.id]: 1 }, pagoAlProveedor: { estado: "PENDIENTE", totalAPagar: "1500", totalConfirmado: true } },
-      }),
-      { params: Promise.resolve({ id: String(prov2.pedidoProveedorId) }) }
-    )
-  );
-  igual("se recibe pendiente", [pend.status, pend.ok], [200, true]);
+  const recibirPendiente = async (extra = {}) =>
+    leer(
+      await rutaRecibir.POST(
+        pedido(`${BASE}/compras-proveedor/recibir/${prov2.pedidoProveedorId}`, quienCompras, {
+          cuerpo: { costosExcluidos: [det2.id], recibidos: { [det2.id]: 1 }, pagoAlProveedor: { estado: "PENDIENTE", totalAPagar: "1500", totalConfirmado: true, ...extra } },
+        }),
+        { params: Promise.resolve({ id: String(prov2.pedidoProveedorId) }) }
+      )
+    );
+  // Quedan $500 a deber: desde 2026-10-15 eso se confirma a sabiendas.
+  const sinConfirmar = await recibirPendiente();
+  igual("sin confirmar el saldo no se recibe", [sinConfirmar.status, sinConfirmar.codigo], [409, "SALDO_SIN_CONFIRMAR"]);
+  const pend = await recibirPendiente({ saldoConfirmado: 500 });
+  igual("se recibe pendiente, confirmando el saldo", [pend.status, pend.ok], [200, true]);
   igual("queda con saldo de lo que falta", [pend.cuentaPorPagar?.pagado, pend.cuentaPorPagar?.saldo], [1000, 500]);
   igual("sin otro retiro", (await movimientosDelTurno(f)).length, movs2);
 }

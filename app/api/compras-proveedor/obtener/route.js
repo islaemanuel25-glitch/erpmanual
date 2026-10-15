@@ -5,6 +5,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { ownerLocalIdDePedido, pedidoEnAlcance } from "@/lib/compras/scope";
 import { SELECT_CUENTA, serializarCuenta } from "@/lib/finanzas/pagosProveedoresServer";
+import { esPagoParcial } from "@/lib/compras-proveedor/saldoAlRecibir";
 
 export async function GET(req) {
   try {
@@ -40,6 +41,8 @@ export async function GET(req) {
         // Viaja ya resuelta por `serializarCuenta` —la misma de Finanzas—, así
         // que la pantalla no suma pagos.
         cuentaPorPagar: { select: SELECT_CUENTA },
+        // "Pago parcial": se recibió confirmando deuda (`esPagoParcial`).
+        compraConSaldo: { select: { id: true } },
         detalles: {
           include: {
             producto: {
@@ -78,7 +81,8 @@ export async function GET(req) {
       );
     }
 
-    const { cuentaPorPagar, ...item } = pedido;
+    const { cuentaPorPagar, compraConSaldo, ...item } = pedido;
+    const cuenta = cuentaPorPagar ? serializarCuenta(cuentaPorPagar) : null;
     // La ubicación DUEÑA, con nombre: es la que debe la compra y la única de
     // la que puede salir el pago inicial. La hoja de cierre la muestra fija
     // ("Sale de: …") en vez de ofrecer un selector.
@@ -90,7 +94,8 @@ export async function GET(req) {
       ok: true,
       item,
       ubicacionDuena,
-      cuentaPorPagar: cuentaPorPagar ? serializarCuenta(cuentaPorPagar) : null,
+      cuentaPorPagar: cuenta,
+      pagoParcial: esPagoParcial({ compraConSaldo, cuenta }),
     });
   } catch (err) {
     console.error("Error compras-proveedor/obtener:", err);

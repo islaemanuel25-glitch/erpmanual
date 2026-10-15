@@ -51,7 +51,8 @@ import {
 } from "@/lib/finanzas/pagosProveedores";
 
 import BloquePagoAlProveedor from "./BloquePagoAlProveedor";
-import { aCentavos } from "@/lib/caja/efectivoEsperado";
+import { aCentavos, desdeCentavos } from "@/lib/caja/efectivoEsperado";
+import { saldoAlRecibir, textoDelAviso, textoDelBoton } from "@/lib/compras-proveedor/saldoAlRecibir";
 
 /** Los medios con que se le paga a un proveedor, como los ofrece Finanzas. */
 const MEDIOS = MEDIOS_PAGO_PROVEEDOR.map((m) => ({ valor: m, texto: ROTULO_MEDIO_PAGO[m] }));
@@ -142,6 +143,22 @@ export default function HojaCerrarRecepcion({
     yaPagadoCentavos: aCentavos(yaPagado || 0),
   });
 
+  // ── RECIBIR CON DEUDA SE CONFIRMA A SABIENDAS ──────────────────────────
+  //
+  // Si algo ya se pagó y aun así queda saldo, el primer toque del botón no
+  // cierra: muestra el aviso, y recibir es otro botón que nombra el saldo. Lo
+  // pagado es lo que el total deja de deber, con la misma regla del servidor
+  // (`saldoAlRecibir`). El aviso vale para ESE saldo: si el pago cambia, vuelve
+  // a preguntar.
+  const saldo = enPantalla.listo
+    ? saldoAlRecibir({
+        totalCentavos: enPantalla.totalCentavos,
+        yaPagadoCentavos: enPantalla.totalCentavos - aCentavos(enPantalla.saldo || 0),
+      })
+    : null;
+  const [avisoDelSaldo, setAvisoDelSaldo] = useState(null);
+  const avisando = Boolean(saldo?.pideConfirmacion) && avisoDelSaldo === saldo.saldoCentavos;
+
   // ── LA RESPUESTA POR OMISIÓN ES "NO LLEGÓ" ─────────────────────────────
   //
   // No es pesimismo: es la única que no escribe nada. Si alguien cierra sin
@@ -167,8 +184,12 @@ export default function HojaCerrarRecepcion({
 
   if (!abierta) return null;
 
-  const confirmar = () => {
+  const confirmar = ({ dejandoSaldo = false } = {}) => {
     if (!enPantalla.listo) return;
+    if (saldo?.pideConfirmacion && !dejandoSaldo) {
+      setAvisoDelSaldo(saldo.saldoCentavos);
+      return;
+    }
     const sacaPlata = estadoSacaPlata(pago.estado);
     // Lo que viaja es lo que la persona decidió, sin convertir: el total y el
     // monto tal cual se escribieron los interpreta el servidor con la misma
@@ -186,6 +207,8 @@ export default function HojaCerrarRecepcion({
             turnoId: pago.turnoId ? Number(pago.turnoId) : null,
           }
         : null,
+      // El saldo que se vio en el aviso: el servidor recibe solo si coincide.
+      saldoConfirmado: dejandoSaldo ? desdeCentavos(saldo.saldoCentavos) : undefined,
     };
     onConfirmar?.(recibidosDelCierre({ filas, sinComprobante, llegadas, contados }), pagoAlProveedor);
   };
@@ -211,15 +234,41 @@ export default function HojaCerrarRecepcion({
           {!enPantalla.listo && enPantalla.error && (
             <p className="text-sm3 sunmi-text-muted break-words">{enPantalla.error}</p>
           )}
-          <SunmiButton
-            color="primary"
-            type="button"
-            disabled={guardando || !enPantalla.listo}
-            onClick={confirmar}
-            className="w-full min-h-botonFoto justify-center text-sm3 font-bold"
-          >
-            {guardando ? "Cerrando…" : "Confirmar cierre de compra"}
-          </SunmiButton>
+          {avisando ? (
+            <>
+              <p className="text-sm3 font-semibold sunmi-text-danger break-words" role="alert">
+                {textoDelAviso({ proveedor, ...saldo })}
+              </p>
+              <SunmiButton
+                color="red"
+                type="button"
+                disabled={guardando}
+                onClick={() => confirmar({ dejandoSaldo: true })}
+                className="w-full min-h-botonFoto justify-center text-sm3 font-bold"
+              >
+                {guardando ? "Cerrando…" : textoDelBoton(saldo.saldoCentavos)}
+              </SunmiButton>
+              <SunmiButton
+                color="slate"
+                type="button"
+                disabled={guardando}
+                onClick={() => setAvisoDelSaldo(null)}
+                className="w-full min-h-toque justify-center text-sm3"
+              >
+                Volver a corregir
+              </SunmiButton>
+            </>
+          ) : (
+            <SunmiButton
+              color="primary"
+              type="button"
+              disabled={guardando || !enPantalla.listo}
+              onClick={() => confirmar()}
+              className="w-full min-h-botonFoto justify-center text-sm3 font-bold"
+            >
+              {guardando ? "Cerrando…" : "Confirmar cierre de compra"}
+            </SunmiButton>
+          )}
         </div>
       }
     >

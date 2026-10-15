@@ -36,6 +36,14 @@ function estadoBadgeClass(estado) {
   ].join(" ");
 }
 
+/**
+ * Recibida con deuda confirmada y todavía con saldo: en rojo, hasta que el
+ * saldo llegue a cero. La usan la lista y el detalle de la compra.
+ */
+export function PagoParcial() {
+  return <span className="px-2 py-0.5 rounded text-xs font-medium sunmi-badge-danger">Pago parcial</span>;
+}
+
 function estadoLabel(estado) {
   return estado === "BORRADOR" ? "EN CURSO" : estado;
 }
@@ -106,6 +114,7 @@ export default function ListadoPedidosProveedor({
             <span className={`px-2 py-0.5 rounded text-xs font-medium ${estadoBadgeClass(item.estado)}`}>
               {estadoLabel(item.estado)}
             </span>
+            {item.pagoParcial && <PagoParcial />}
             {atraso && (
               <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${atraso.cls}`}>
                 {atraso.texto}
@@ -140,6 +149,7 @@ export default function ListadoPedidosProveedor({
                 {atraso.texto}
               </span>
             )}
+            {item.pagoParcial && <PagoParcial />}
             <span className={`px-2 py-0.5 rounded text-[11px] font-medium ${estadoBadgeClass(item.estado)}`}>
               {estadoLabel(item.estado)}
             </span>

@@ -601,7 +601,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // tres tablas nuevas y una categoría de gasto. No toca transferencias.
   // Sube a 65 el mismo día: `20261015154425_empleados`, dos tablas, dos
   // columnas nullable y el relleno de empleados. No toca transferencias.
-  assert.equal(migraciones.length, 65, "aparecio una migracion que nadie declaro aca");
+  // Sube a 66 el mismo día: `20261015164915_compra_con_saldo`, una tabla
+  // nueva con quién confirmó recibir dejando deuda. No toca transferencias.
+  assert.equal(migraciones.length, 66, "aparecio una migracion que nadie declaro aca");
+  assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015154425_empleados"));
   assert.ok(migraciones.includes("20261015120000_tipo_egreso_caja"));
   assert.ok(migraciones.includes("20261015140949_consumo_personal_y_archivo_de_gasto"));

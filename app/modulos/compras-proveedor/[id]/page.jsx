@@ -298,6 +298,7 @@ export default function DetallePedidoProveedorPage({ params }) {
   const [nroFactura, setNroFactura] = useState("");
   // La cuenta por pagar que nació al cerrar, ya resuelta por el servidor.
   const [cuentaPorPagar, setCuentaPorPagar] = useState(null);
+  const [pagoParcial, setPagoParcial] = useState(false);
   // La ubicación dueña del pedido: la que debe la compra y de la que sale el
   // pago inicial. La resuelve el servidor con `ownerLocalIdDePedido`.
   const [ubicacionDuena, setUbicacionDuena] = useState(null);
@@ -313,6 +314,7 @@ export default function DetallePedidoProveedorPage({ params }) {
       if (data.ok) {
         setPedido(data.item);
         setCuentaPorPagar(data.cuentaPorPagar || null);
+        setPagoParcial(Boolean(data.pagoParcial));
         setUbicacionDuena(data.ubicacionDuena || null);
         // Inicializar recibidos con la cantidad pedida
         const rec = {};
@@ -1267,6 +1269,7 @@ export default function DetallePedidoProveedorPage({ params }) {
           // por el servidor. Null en las compras cerradas antes de que el
           // cierre la creara.
           cuentaPorPagar={cuentaPorPagar}
+          pagoParcial={pagoParcial}
           onVerEnFinanzas={(cuentaId) => router.push(urlDeCuentaPorPagar(cuentaId))}
         />
       </div>
