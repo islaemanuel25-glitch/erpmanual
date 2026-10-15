@@ -34,7 +34,8 @@ está claro cuál de las dos es, va como **[ACCIDENTE POSIBLE]** y no como regla
   es de Transferencias y la caja no lo vuelve a pagar.
 - [pagar-desde-el-pos.md](pagar-desde-el-pos.md) — "Pagar" del POS, el tipo de
   cada salida de caja, y por qué la plata resta todo y la ganancia solo sueldos y
-  gastos; las compras por cargar.
+  gastos; las compras por cargar; recibir con deuda se confirma, con su
+  campanita, su "Pago parcial" y su evento para Azul Chat.
 - [consumo-del-personal.md](consumo-del-personal.md) — lo que se lleva el
   personal: sale del stock como una venta sin serlo, es un gasto al costo que no
   se paga, y resta en el resultado del turno; la foto del ticket de un gasto.

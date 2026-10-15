@@ -16,37 +16,31 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-- `20261015154425_empleados` — **MIGRACIÓN DE DATOS: autorizarla a
-  sabiendas.** Estructura aditiva: crea `Empleado` y `EmpleadoEnLocal`, agrega
-  `empleadoId` (nulo) en `ConsumoPersonal` y en `Gasto`, y relaja
-  `ConsumoPersonal.operadorId` a nulo (no la borra). Y en la misma migración
-  RELLENA: un empleado por cada operador con sus locales, y el `empleadoId`
-  de los consumos, de sus gastos y de los sueldos (por el beneficiario, que es
-  el nombre del operador). Idempotente. Compatible con el código anterior
-  durante la ventana: ese código no lee las tablas nuevas y ninguna fila pierde
-  su `operadorId`. Un operador creado DURANTE la ventana con el código viejo
-  queda sin empleado: se le crea desde Administración → Empleados. La
-  reposición, escrita antes de commitear, está en
-  `scripts/deploy/reposicion-empleados.sql`.
+- `20261015164915_compra_con_saldo` — **Aditiva.** Crea la tabla
+  `CompraConSaldo` vacía (quién confirmó recibir una compra dejando saldo con
+  el proveedor, cuándo, y el total, lo pagado y el saldo de ese momento), con
+  UNIQUE por pedido y un índice por local y fecha. No toca ninguna columna ni
+  ninguna fila existente, y el código anterior no la lee. Sin relleno: las
+  recepciones de antes no se confirmaron y no se inventa quién lo hizo.
 
-Producción está en **64 migraciones**, la última
-`20261015140949_consumo_personal_y_archivo_de_gasto`.
+Producción está en **65 migraciones**, la última
+`20261015154425_empleados`.
 
-**De dónde sale el 64.** Lo informó Emanuel en la orden del 2026-10-15: las
-cuatro que quedaban en esta lista —`20261014165350_cierre_forzado`,
-`20261014191303_caja_de_cuenta_y_retiro_intervenido`,
-`20261015120000_tipo_egreso_caja` y
-`20261015140949_consumo_personal_y_archivo_de_gasto`— se aplicaron el 15/10.
-Con las 60 de antes son 64. *Sin verificar desde esta sesión*, que es de nube
-y no ve el VPS. Lo comprueba, de solo lectura, el paso 0 del próximo
-`/deploy` (mismo usuario y base que el backup del skill):
+**De dónde sale el 65.** Lo informó Emanuel en la orden del 2026-10-15:
+`20261015154425_empleados` se aplicó el 15/10 y producción quedó en 65. Antes
+eran 64, hasta `20261015140949_consumo_personal_y_archivo_de_gasto`. *Sin
+verificar desde esta sesión*, que es de nube y no ve el VPS. Lo comprueba, de
+solo lectura, el paso 0 del próximo `/deploy` (mismo usuario y base que el
+backup del skill):
 `ssh vps-erp 'docker exec erpazul_db psql -At -U erpazul -d erpazul -c "SELECT count(*), max(migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL"'`,
-que tiene que decir `64|20261015140949_consumo_personal_y_archivo_de_gasto`.
-Si dice otra cosa, esta lista está mal y se vuelve a escribir antes de seguir.
-La descripción de las cuatro está en el `git log` de este archivo.
+que tiene que decir `65|20261015154425_empleados`. Si dice otra cosa, esta
+lista está mal y se vuelve a escribir antes de seguir. La descripción de la de
+empleados —migración de datos, con su relleno y su reposición en
+`scripts/deploy/reposicion-empleados.sql`— está en el `git log` de este
+archivo.
 
 Las que estaban en esta lista antes y ya se aplicaron —hasta
-`20261015140949_consumo_personal_y_archivo_de_gasto`— salieron de acá: la historia de cuándo
+`20261015154425_empleados`— salieron de acá: la historia de cuándo
 y cómo se aplicó cada una está en `git log` de este archivo y, para las que la
 tienen, en la bitácora de abajo. La bitácora llega hasta `b6052783` y no se
 borra: la citan como evidencia `lib/stock/libro/stockDiario.test.mjs` y los
