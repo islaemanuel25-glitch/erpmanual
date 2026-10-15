@@ -13,7 +13,6 @@ export default function ModalOperador({
   onClose,
   onSubmit,
   initialData = null,
-  locales = [],
 }) {
   const editMode = Boolean(initialData);
 
@@ -21,14 +20,13 @@ export default function ModalOperador({
     nombre: "",
     pin: "",
     activo: true,
-    localIds: [],
   });
 
   useEffect(() => {
     if (!open) return;
 
     if (!initialData) {
-      setForm({ nombre: "", pin: "", activo: true, localIds: [] });
+      setForm({ nombre: "", pin: "", activo: true });
       return;
     }
 
@@ -36,24 +34,11 @@ export default function ModalOperador({
       nombre: initialData.nombre || "",
       pin: "",
       activo: Boolean(initialData.activo),
-      localIds: (initialData.locales || []).map((l) => l.id),
     });
   }, [open, initialData]);
 
   const setField = (key, value) =>
     setForm((prev) => ({ ...prev, [key]: value }));
-
-  const toggleLocal = (localId) => {
-    setForm((prev) => {
-      const has = prev.localIds.includes(localId);
-      return {
-        ...prev,
-        localIds: has
-          ? prev.localIds.filter((id) => id !== localId)
-          : [...prev.localIds, localId],
-      };
-    });
-  };
 
   const validar = () => {
     if (!form.nombre.trim()) return "Completá el nombre.";
@@ -61,10 +46,10 @@ export default function ModalOperador({
       return "El PIN debe tener al menos 4 dígitos.";
     if (editMode && form.pin && form.pin.length < 4)
       return "El PIN debe tener al menos 4 dígitos.";
-    if (form.localIds.length === 0) return "Seleccioná al menos un local.";
     return null;
   };
 
+  // El local no viaja: el operador es del local activo.
   const handleSubmit = () => {
     const err = validar();
     if (err) return alert(err);
@@ -73,7 +58,6 @@ export default function ModalOperador({
       nombre: form.nombre.trim(),
       pin: form.pin || undefined,
       activo: Boolean(form.activo),
-      localIds: form.localIds.map(Number),
     });
   };
 
@@ -132,40 +116,6 @@ export default function ModalOperador({
                 inputMode="numeric"
                 autoComplete="new-password"
               />
-            </Field>
-
-            <Field label="Locales asignados *">
-              <div className="flex flex-wrap gap-2">
-                {locales.map((l) => {
-                  const checked = form.localIds.includes(l.id);
-                  return (
-                    <label
-                      key={l.id}
-                      className={`
-                        flex items-center gap-1.5 px-3 py-1.5 rounded-md cursor-pointer
-                        text-[13px] transition-all select-none border
-                        ${checked
-                          ? "sunmi-badge-success border-emerald-500/50"
-                          : "sunmi-surface border-transparent hover:border-slate-500/30"
-                        }
-                      `}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleLocal(l.id)}
-                        className="accent-emerald-500 w-3.5 h-3.5"
-                      />
-                      {l.nombre}
-                    </label>
-                  );
-                })}
-              </div>
-              {form.localIds.length === 0 && (
-                <p className="text-[10px] sunmi-text-muted mt-1">
-                  Seleccioná al menos un local.
-                </p>
-              )}
             </Field>
 
             <Field label="Estado">

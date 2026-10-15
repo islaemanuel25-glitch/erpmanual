@@ -104,9 +104,8 @@ export async function abrirTurnoDePrueba(db, { localId, vendedorId, montoInicial
  */
 export async function crearOperadorDeCaja(db, { localId, nombre }) {
   const operador = await db.operadorLocal.create({
-    data: { nombre, pinHash: "sin-pin-de-prueba", activo: true },
+    data: { nombre, pinHash: "sin-pin-de-prueba", activo: true, localId: Number(localId) },
     select: { id: true, nombre: true },
   });
-  await db.operadorEnLocal.create({ data: { operadorId: operador.id, localId: Number(localId) } });
   return operador;
 }

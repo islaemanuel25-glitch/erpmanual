@@ -28,15 +28,12 @@ export async function GET(req) {
       );
     }
 
-    const asignaciones = await prisma.operadorEnLocal.findMany({
-      where: { localId: scope.localId, operador: { activo: true } },
-      select: {
-        operador: { select: { id: true, nombre: true } },
-      },
-      orderBy: { operador: { nombre: "asc" } },
+    // Los operadores DEL local: cada uno es de uno solo (`localId`).
+    const items = await prisma.operadorLocal.findMany({
+      where: { localId: scope.localId, activo: true },
+      select: { id: true, nombre: true },
+      orderBy: { nombre: "asc" },
     });
-
-    const items = asignaciones.map((a) => a.operador);
 
     return NextResponse.json({ ok: true, items });
   } catch (e) {

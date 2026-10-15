@@ -129,8 +129,7 @@ async function montarLocal(nombre, exigirOperador) {
 // Desde el 2026-10-14 toda caja es de un operador con PIN, también en un local
 // con `exigirOperador: false`: sin él no se abre, ni se vende, ni se cierra.
 async function quienAbre(l) {
-  const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-op${(n += 1)}`, pinHash: "x" } });
-  await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: l.local.id } });
+  const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-op${(n += 1)}`, pinHash: "x", localId: l.local.id } });
   const operador = firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: l.local.id });
   return { op, quien: { sesion: l.sesion, operador } };
 }

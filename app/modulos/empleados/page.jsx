@@ -5,7 +5,8 @@
 // ADMINISTRACIÓN → EMPLEADOS. Quien trabaja en el local, maneje o no la caja.
 // Regla de Emanuel (2026-10-15): todo operador es empleado, no todo empleado es
 // operador (cocina, reparto). Sueldo y consumo del personal eligen de acá. Mismo
-// permiso y las mismas piezas que la pantalla de Operadores.
+// permiso y las mismas piezas que la pantalla de Operadores. Y los dos son de UN
+// local: la lista, el alta y la edición son las del local activo.
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -21,7 +22,6 @@ import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiBadgeEstado from "@/components/sunmi/SunmiBadgeEstado";
 import SunmiTable from "@/components/sunmi/SunmiTable";
 import SunmiButtonIcon from "@/components/sunmi/SunmiButtonIcon";
-import SunmiPill from "@/components/sunmi/SunmiPill";
 import ModalEmpleado from "@/components/empleados/ModalEmpleado";
 
 const RUTA = "/modulos/empleados";
@@ -40,17 +40,9 @@ export default function EmpleadosPage() {
 
   const [empleados, setEmpleados] = useState([]);
   const [operadoresLibres, setOperadoresLibres] = useState([]);
-  const [locales, setLocales] = useState([]);
   const [search, setSearch] = useState("");
   const [errorCarga, setErrorCarga] = useState("");
   const [errorModal, setErrorModal] = useState("");
-
-  useEffect(() => {
-    fetch("/api/operador/locales", { credentials: "include" })
-      .then((r) => r.json())
-      .then((d) => setLocales(d.locales || []))
-      .catch(() => setLocales([]));
-  }, []);
 
   // Cada guardado suma uno y la lista se vuelve a pedir.
   const [recarga, setRecarga] = useState(0);
@@ -122,19 +114,6 @@ export default function EmpleadosPage() {
       render: (e) => (e.operador ? e.operador.nombre : <span className="sunmi-text-muted">—</span>),
     },
     {
-      clave: "locales",
-      titulo: "Locales",
-      render: (e) => (
-        <div className="flex flex-wrap gap-1">
-          {(e.locales || []).map((l) => (
-            <SunmiPill key={l.id} color="green">
-              {l.nombre}
-            </SunmiPill>
-          ))}
-        </div>
-      ),
-    },
-    {
       clave: "estado",
       titulo: "Estado",
       align: "centro",
@@ -203,7 +182,6 @@ export default function EmpleadosPage() {
         open={modalOpen}
         onClose={cerrar}
         onSubmit={guardar}
-        locales={locales}
         operadoresLibres={operadoresLibres}
         initialData={initialData}
         error={errorModal}

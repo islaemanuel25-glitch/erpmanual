@@ -2,14 +2,14 @@
   "_lea_esto": "Línea de base del hardcodeo. La sella scripts/hardcodeo.mjs --linea-base --sellar; sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
   "_commit": "`commit` es el árbol que se ESCANEÓ, no la fecha en que se selló: pueden diferir. Cuando se corrige un falso positivo del contador, la base se REEXPRESA desde el árbol histórico —no desde main— para no perdonar la deuda que entró después.",
   "_inventario": "El trinquete compara el INVENTARIO, no los totales: una ocurrencia es archivo + categoría + texto, con cantidad. Sin número de línea, para que mover código no invente violaciones. Un alta en cualquier clave pone rojo aunque el total baje.",
-  "generada": "2026-10-15 11:08",
-  "commit": "76d37eb95425890fa4d261cb55b25eca4bb0293f",
+  "generada": "2026-10-15 23:43",
+  "commit": "e63e2bd749e62ed14bb00b2db6e545bba4f00130",
   "total": {
-    "color": 277,
-    "medida": 1601,
+    "color": 275,
+    "medida": 1597,
     "modal": 34,
-    "crudo": 281,
-    "celda": 430,
+    "crudo": 280,
+    "celda": 429,
     "kit-pisado": 0,
     "tema-paralelo": 87
   },
@@ -140,6 +140,15 @@
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
+    "empleados": {
+      "color": 0,
+      "medida": 0,
+      "modal": 0,
+      "crudo": 0,
+      "celda": 0,
+      "kit-pisado": 0,
+      "tema-paralelo": 0
+    },
     "fidelidad": {
       "color": 0,
       "medida": 14,
@@ -240,11 +249,11 @@
       "tema-paralelo": 0
     },
     "operadores": {
-      "color": 2,
-      "medida": 4,
+      "color": 0,
+      "medida": 0,
       "modal": 0,
-      "crudo": 1,
-      "celda": 4,
+      "crudo": 0,
+      "celda": 3,
       "kit-pisado": 0,
       "tema-paralelo": 0
     },
@@ -792,10 +801,7 @@
     },
     "app/modulos/operadores/page.jsx": {
       "celda": {
-        "<td>": 4
-      },
-      "medida": {
-        "text-[10px]": 2
+        "<td>": 3
       }
     },
     "app/modulos/pedidos/historial/page.jsx": {
@@ -1650,19 +1656,6 @@
     "components/operador/RequiereOperador.jsx": {
       "medida": {
         "text-[11px]": 1
-      }
-    },
-    "components/operadores/ModalOperador.jsx": {
-      "medida": {
-        "text-[13px]": 1,
-        "text-[10px]": 1
-      },
-      "color": {
-        "border-emerald-": 1,
-        "border-slate-": 1
-      },
-      "crudo": {
-        "<input>": 1
       }
     },
     "components/pos-transferencias/nueva/BuscadorManual.jsx": {

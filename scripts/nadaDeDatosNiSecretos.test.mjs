@@ -103,6 +103,9 @@ const PROHIBIDO = [
       // deshacer la migración de datos, que la corre una persona. Sentencias
       // sobre tablas y columnas, ni una fila de datos adentro.
       (p) => p === "scripts/deploy/reposicion-empleados.sql",
+      // La de `20261015232632_operadores_y_empleados_por_local`: lo mismo,
+      // sentencias sobre tablas y columnas, ni una fila de datos adentro.
+      (p) => p === "scripts/deploy/reposicion-operadores-por-local.sql",
     ],
   },
   {

@@ -144,7 +144,9 @@ async function sembrar(db, { conflicto = false, cajaSinOperador = false } = {}) 
     await c.configuracionLocal.create({ data: { localId: local.id, exigirOperador: true } });
     const cuenta1 = await c.usuario.create({ data: { nombre: "c1", email: "cpo1@x", passwordHash: "x", rolId: rol.id, localId: local.id } });
     const cuenta2 = await c.usuario.create({ data: { nombre: "c2", email: "cpo2@x", passwordHash: "x", rolId: rol.id, localId: local.id } });
-    const op = await c.operadorLocal.create({ data: { nombre: "cpo-op", pinHash: "x" } });
+    // `select`: la base puede ser de antes de `OperadorLocal.localId`, y el
+    // RETURNING por defecto la pediría.
+    const op = await c.operadorLocal.create({ data: { nombre: "cpo-op", pinHash: "x" }, select: { id: true } });
     await c.turno.create({ data: { localId: local.id, vendedorId: cuenta1.id, operadorId: op.id, montoInicial: 1000 } });
     // Un turno ya cerrado del mismo operador: no cuenta como operativo.
     await c.turno.create({ data: { localId: local.id, vendedorId: cuenta2.id, operadorId: op.id, montoInicial: 0, cierre: new Date() } });

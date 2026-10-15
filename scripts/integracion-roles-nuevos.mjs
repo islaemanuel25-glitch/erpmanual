@@ -186,8 +186,9 @@ async function main() {
   await check("DUEÑO ve detalle venta CON costos (verCostos=true)", req("GET", `/api/reportes-ventas/detalle/${S.ventaA}`, { cookie: DUE }), 200, (r) => r.json?.permisos?.verCostos === true);
   await check("DUEÑO crea usuario en SU local → 201", req("POST", `/api/usuarios/crear`, { cookie: DUE, body: { nombre: "Nuevo", email: "nuevo@rn.test", password: "123456", rolId: S.rolCajero, localId: S.localA } }), 201);
   await check("DUEÑO NO puede asignar rol Admin → 403", req("POST", `/api/usuarios/crear`, { cookie: DUE, body: { nombre: "Y", email: "y@rn.test", password: "123456", rolId: S.rolAdmin, localId: S.localA } }), 403);
-  await check("DUEÑO crea operador en SU local → 200", req("POST", `/api/operador/crear`, { cookie: DUE, body: { nombre: "OpUno", pin: "1234", localIds: [S.localA] } }), 200);
-  await check("DUEÑO crea operador en OTRO local → 403", req("POST", `/api/operador/crear`, { cookie: DUE, body: { nombre: "OpDos", pin: "1234", localIds: [S.localB] } }), 403);
+  await check("DUEÑO crea operador en SU local → 200", req("POST", `/api/operador/crear`, { cookie: DUE, body: { nombre: "OpUno", pin: "1234" } }), 200);
+  await check("DUEÑO crea operador en OTRO local → 403", req("POST", `/api/operador/crear?localId=${S.localB}`, { cookie: DUE, body: { nombre: "OpDos", pin: "1234" } }), 403);
+  await check("DUEÑO elige locales para el operador → 400", req("POST", `/api/operador/crear`, { cookie: DUE, body: { nombre: "OpTres", pin: "1234", localIds: [S.localA] } }), 400);
 
   console.log("\n=== SCOPE CROSS-LOCAL ===");
   await check("DUEÑO A configura stock con localId AJENO (B) → 403", req("POST", `/api/config/stock-negativo?localId=${S.localB}`, { cookie: DUE, body: { allowNegativeStock: true } }), 403);

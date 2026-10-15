@@ -35,16 +35,10 @@ export default function OperadoresPage() {
 
   const [modalOpen, setModalOpen] = useState(Boolean(nuevo || editar));
   const [operadores, setOperadores] = useState([]);
-  const [locales, setLocales] = useState([]);
   const [initialData, setInitialData] = useState(null);
   const [search, setSearch] = useState("");
-
-  useEffect(() => {
-    fetch("/api/operador/locales", { credentials: "include" })
-      .then((r) => r.json())
-      .then((d) => setLocales(d.locales || []))
-      .catch(() => setLocales([]));
-  }, []);
+  // Sin local activo, o sin permiso, la lista no viene: se dice, no se vacía.
+  const [errorCarga, setErrorCarga] = useState("");
 
   useEffect(() => {
     if (!editar) {
@@ -58,10 +52,12 @@ export default function OperadoresPage() {
   const fetchOperadores = useCallback(async () => {
     try {
       const res = await fetch("/api/operador/listar-todos", { credentials: "include", cache: "no-store" });
-      const json = await res.json();
-      setOperadores(json.ok ? json.items : []);
+      const json = await res.json().catch(() => null);
+      setOperadores(json?.ok ? json.items : []);
+      setErrorCarga(json?.ok ? "" : json?.error || "No se pudo cargar la lista de operadores.");
     } catch {
       setOperadores([]);
+      setErrorCarga("No se pudo cargar la lista de operadores.");
     }
   }, []);
 
@@ -145,23 +141,18 @@ export default function OperadoresPage() {
         </div>
 
         <SunmiSeparator label="Listado" />
-        <SunmiTable headers={["Nombre", "Locales", "Estado", "Acciones"]}>
+        {errorCarga && (
+          <p role="alert" className="text-sm2 sunmi-text-danger break-words">
+            {errorCarga}
+          </p>
+        )}
+        <SunmiTable headers={["Nombre", "Estado", "Acciones"]}>
           {lista.length === 0 ? (
             <SunmiTableEmpty message="No hay operadores para mostrar" />
           ) : (
             lista.map((op) => (
               <SunmiTableRow key={op.id}>
                 <td className="font-medium">{op.nombre}</td>
-                <td>
-                  <div className="flex flex-wrap gap-1">
-                    {(op.locales || []).map((l) => (
-                      <span key={l.id} className="text-[10px] px-1.5 py-0.5 rounded sunmi-badge-success">{l.nombre}</span>
-                    ))}
-                    {(!op.locales || op.locales.length === 0) && (
-                      <span className="text-[10px] sunmi-text-muted">Sin local</span>
-                    )}
-                  </div>
-                </td>
                 <td><div className="flex justify-center"><SunmiBadgeEstado value={op.activo} /></div></td>
                 <td>
                   <div className="flex justify-end gap-1">
@@ -179,7 +170,6 @@ export default function OperadoresPage() {
         open={modalOpen}
         onClose={closeModal}
         onSubmit={handleSubmit}
-        locales={locales}
         initialData={initialData}
       />
     </div>

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import prisma from "@/lib/prisma";
 import { requirePerm } from "@/lib/authorize";
+import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { ERROR_LOCAL_AJENO, ERROR_NO_SE_MUDA, ERROR_OPERADOR_REPETIDO, esDelLocal, pideOtroLocal } from "@/lib/empleados/empleados";
 
 export async function POST(req) {
   try {
@@ -9,10 +11,18 @@ export async function POST(req) {
     if (!perm.ok) {
       return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
-    const session = perm.session;
 
-    const body = await req.json();
-    const { id, nombre, pin, activo, localIds } = body;
+    // Se edita desde SU local, el activo; y no se muda a otro.
+    const scope = await resolveLocalAndGrupo(req);
+    if (scope.error) {
+      return NextResponse.json({ ok: false, error: scope.error, needsContexto: scope.needsContexto === true }, { status: scope.status });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    if (pideOtroLocal(body)) {
+      return NextResponse.json({ ok: false, error: ERROR_NO_SE_MUDA }, { status: 400 });
+    }
+    const { id, nombre, pin, activo } = body;
 
     if (!id) {
       return NextResponse.json({ ok: false, error: "ID requerido." }, { status: 400 });
@@ -20,23 +30,13 @@ export async function POST(req) {
 
     const operador = await prisma.operadorLocal.findUnique({
       where: { id: Number(id) },
-      include: { locales: { select: { localId: true } } },
+      select: { id: true, localId: true },
     });
     if (!operador) {
       return NextResponse.json({ ok: false, error: "Operador no encontrado." }, { status: 404 });
     }
-
-    // Scope: un no-admin solo gestiona operadores que pertenecen a SU local, y no
-    // puede reasignar locales (evita clobbear la membresía en otros locales).
-    if (!session.esAdmin) {
-      const propio = Number(session.localId) || 0;
-      const localesOp = operador.locales.map((l) => l.localId);
-      if (!propio || !localesOp.includes(propio)) {
-        return NextResponse.json({ ok: false, error: "No autorizado para este operador." }, { status: 403 });
-      }
-      if (Array.isArray(localIds) && localIds.map(Number).some((lid) => lid !== propio)) {
-        return NextResponse.json({ ok: false, error: "Local fuera de tu alcance." }, { status: 403 });
-      }
+    if (!esDelLocal(operador, scope.localId)) {
+      return NextResponse.json({ ok: false, error: ERROR_LOCAL_AJENO }, { status: 403 });
     }
 
     const data = {};
@@ -47,10 +47,11 @@ export async function POST(req) {
         return NextResponse.json({ ok: false, error: "El nombre debe tener al menos 2 caracteres." }, { status: 400 });
       }
       const dup = await prisma.operadorLocal.findFirst({
-        where: { nombre: nombreNorm, id: { not: operador.id } },
+        where: { localId: operador.localId, nombre: nombreNorm, id: { not: operador.id } },
+        select: { id: true },
       });
       if (dup) {
-        return NextResponse.json({ ok: false, error: "Ya existe otro operador con ese nombre." }, { status: 409 });
+        return NextResponse.json({ ok: false, error: ERROR_OPERADOR_REPETIDO }, { status: 409 });
       }
       data.nombre = nombreNorm;
     }
@@ -66,41 +67,18 @@ export async function POST(req) {
       data.activo = Boolean(activo);
     }
 
-    await prisma.operadorLocal.update({
+    const updated = await prisma.operadorLocal.update({
       where: { id: operador.id },
       data,
+      select: { id: true, nombre: true, activo: true, localId: true },
     });
 
-    // La reasignación completa de locales es solo para admin. Un no-admin ya quedó
-    // acotado a su local (validado arriba) y no reescribe la membresía multi-local.
-    if (session.esAdmin && Array.isArray(localIds)) {
-      await prisma.operadorEnLocal.deleteMany({ where: { operadorId: operador.id } });
-      if (localIds.length > 0) {
-        await prisma.operadorEnLocal.createMany({
-          data: localIds.map((lid) => ({ operadorId: operador.id, localId: Number(lid) })),
-        });
-      }
-    }
-
-    const updated = await prisma.operadorLocal.findUnique({
-      where: { id: operador.id },
-      select: {
-        id: true,
-        nombre: true,
-        activo: true,
-        locales: { select: { local: { select: { id: true, nombre: true } } } },
-      },
-    });
-
-    return NextResponse.json({
-      ok: true,
-      operador: {
-        ...updated,
-        locales: updated.locales.map((l) => l.local),
-      },
-    });
+    return NextResponse.json({ ok: true, operador: updated });
   } catch (e) {
+    if (e?.code === "P2002") {
+      return NextResponse.json({ ok: false, error: ERROR_OPERADOR_REPETIDO }, { status: 409 });
+    }
     console.error("operador/editar:", e);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: `No se pudo guardar el operador: ${e.message}` }, { status: 500 });
   }
 }

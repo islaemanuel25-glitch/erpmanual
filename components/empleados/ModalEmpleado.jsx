@@ -2,9 +2,9 @@
 
 // components/empleados/ModalEmpleado.jsx
 //
-// ALTA Y EDICIÓN DE UN EMPLEADO: nombre, locales donde trabaja, su operador si
-// maneja la caja, y si está activo. La forma es la de `ModalOperador`, sin PIN:
-// el PIN es del operador, no del empleado.
+// ALTA Y EDICIÓN DE UN EMPLEADO: nombre, su operador si maneja la caja, y si
+// está activo. El local no se elige: es el activo. La forma es la de
+// `ModalOperador`, sin PIN: el PIN es del operador, no del empleado.
 
 import { useState } from "react";
 
@@ -20,18 +20,17 @@ export const SIN_OPERADOR = "";
 
 /** El formulario con lo que ya tiene el empleado, o vacío para uno nuevo. */
 function formInicial(initialData) {
-  if (!initialData) return { nombre: "", activo: true, localIds: [], operadorId: SIN_OPERADOR };
+  if (!initialData) return { nombre: "", activo: true, operadorId: SIN_OPERADOR };
   return {
     nombre: initialData.nombre || "",
     activo: Boolean(initialData.activo),
-    localIds: (initialData.locales || []).map((l) => String(l.id)),
     operadorId: initialData.operador ? String(initialData.operador.id) : SIN_OPERADOR,
   };
 }
 
 // La pantalla lo monta de nuevo —con otra `key`— cada vez que se abre para otro
 // empleado: el formulario arranca de sus datos sin un efecto que lo copie.
-export default function ModalEmpleado({ open, onClose, onSubmit, initialData = null, locales = [], operadoresLibres = [], error = "" }) {
+export default function ModalEmpleado({ open, onClose, onSubmit, initialData = null, operadoresLibres = [], error = "" }) {
   const editMode = Boolean(initialData);
   const [form, setForm] = useState(() => formInicial(initialData));
 
@@ -43,7 +42,7 @@ export default function ModalEmpleado({ open, onClose, onSubmit, initialData = n
     ...operadoresLibres.filter((o) => o.id !== initialData?.operador?.id),
   ];
 
-  const falta = !form.nombre.trim() || form.localIds.length === 0;
+  const falta = !form.nombre.trim();
 
   if (!open) return null;
 
@@ -68,7 +67,6 @@ export default function ModalEmpleado({ open, onClose, onSubmit, initialData = n
               onSubmit({
                 nombre: form.nombre.trim(),
                 activo: Boolean(form.activo),
-                localIds: form.localIds.map(Number),
                 operadorId: form.operadorId === SIN_OPERADOR ? null : Number(form.operadorId),
               })
             }
@@ -88,22 +86,6 @@ export default function ModalEmpleado({ open, onClose, onSubmit, initialData = n
             placeholder="Nombre del empleado…"
             autoComplete="off"
           />
-        </Field>
-
-        <Field label="Locales donde trabaja *">
-          <SunmiSelectAdv
-            multiple
-            value={form.localIds}
-            onChange={(v) => setField("localIds", v)}
-            placeholder="Elegí los locales"
-            aria-label="Locales donde trabaja"
-          >
-            {locales.map((l) => (
-              <SunmiSelectOption key={l.id} value={String(l.id)}>
-                {l.nombre}
-              </SunmiSelectOption>
-            ))}
-          </SunmiSelectAdv>
         </Field>
 
         <Field label="Operador de caja">

@@ -103,12 +103,11 @@ async function montar() {
   const compras = await usuario("compras", rolCompras, PERMISOS_COMPRAS);
   const finanzas = await usuario("finanzas", rolFinanzas, ["finanzas.ver"]);
 
-  const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-Brenda`, pinHash: "x" } });
+  const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-Brenda`, pinHash: "x", localId: local.id } });
   creado.operadorIds.push(op.id);
-  await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: local.id } });
   // Sueldo elige de Empleados: el de la cajera, asociado a su operador.
   const empleado = await prisma.empleado.create({
-    data: { nombre: op.nombre, operadorId: op.id, locales: { create: [{ localId: local.id }] } },
+    data: { nombre: op.nombre, operadorId: op.id, localId: local.id },
   });
   creado.empleadoIds = [empleado.id];
 

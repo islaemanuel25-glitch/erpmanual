@@ -114,9 +114,8 @@ async function main() {
     data: { nombre: `Cajero B ${SUFIJO}`, email: `b-${SUFIJO}@test.local`, passwordHash: "x", rolId: rol.id, localId: local.id },
   });
   const operario = await prisma.operadorLocal.create({
-    data: { nombre: `Operario ${SUFIJO}`, pinHash: "x" },
+    data: { nombre: `Operario ${SUFIJO}`, pinHash: "x", localId: local.id },
   });
-  await prisma.operadorEnLocal.create({ data: { operadorId: operario.id, localId: local.id } });
 
   const A = cookieDe(cajeroA, local.id);
   const B = cookieDe(cajeroB, local.id);
@@ -526,8 +525,7 @@ async function main() {
 
   // Ahora el operario ACTIVO cambia (otro relevo hizo login en la pestaña
   // principal). El arqueo tiene que quedar firmado por el que CONTÓ, no por él.
-  const otroOperario = await prisma.operadorLocal.create({ data: { nombre: `Otro ${SUFIJO}`, pinHash: "x" } });
-  await prisma.operadorEnLocal.create({ data: { operadorId: otroOperario.id, localId: local.id } });
+  const otroOperario = await prisma.operadorLocal.create({ data: { nombre: `Otro ${SUFIJO}`, pinHash: "x", localId: local.id } });
   const cookieRelevo = `${B}; ${cookieOperador(otroOperario.id, otroOperario.nombre, local.id)}`;
   await confirmarCierre(
     pedido(`${BASE}/pos-ventas/cierres/${rG.cierre.token}/confirmar`, cookieRelevo, {

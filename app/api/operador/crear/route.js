@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import prisma from "@/lib/prisma";
 import { requirePerm } from "@/lib/authorize";
+import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { crearEmpleadoDeOperador } from "@/lib/empleados/empleadosServer";
+import { ERROR_EMPLEADO_REPETIDO, ERROR_NO_SE_MUDA, ERROR_OPERADOR_REPETIDO, pideOtroLocal } from "@/lib/empleados/empleados";
+
+/** El empleado del mismo nombre ya tiene otro operador: no se crea ninguno. */
+class EmpleadoConOtroOperador extends Error {}
 
 export async function POST(req) {
   try {
@@ -10,10 +15,19 @@ export async function POST(req) {
     if (!perm.ok) {
       return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
-    const session = perm.session;
 
-    const body = await req.json();
-    const { nombre, pin, localIds } = body;
+    // UN OPERADOR ES DE UN LOCAL: el activo. No se elige en el pedido.
+    const scope = await resolveLocalAndGrupo(req);
+    if (scope.error) {
+      return NextResponse.json({ ok: false, error: scope.error, needsContexto: scope.needsContexto === true }, { status: scope.status });
+    }
+    const localId = scope.localId;
+
+    const body = await req.json().catch(() => ({}));
+    if (pideOtroLocal(body)) {
+      return NextResponse.json({ ok: false, error: ERROR_NO_SE_MUDA }, { status: 400 });
+    }
+    const { nombre, pin } = body;
 
     if (!nombre || typeof nombre !== "string" || nombre.trim().length < 2) {
       return NextResponse.json({ ok: false, error: "El nombre debe tener al menos 2 caracteres." }, { status: 400 });
@@ -21,51 +35,42 @@ export async function POST(req) {
     if (!pin || String(pin).length < 4) {
       return NextResponse.json({ ok: false, error: "El PIN debe tener al menos 4 dígitos." }, { status: 400 });
     }
-    if (!Array.isArray(localIds) || localIds.length === 0) {
-      return NextResponse.json({ ok: false, error: "Seleccioná al menos un local." }, { status: 400 });
-    }
-
-    // Scope: un no-admin solo puede asignar operadores a SU local. Un localId
-    // ajeno → 403 (no se ignora). Admin puede asignar a cualquier local.
-    let asignLocalIds = localIds.map(Number);
-    if (!session.esAdmin) {
-      const propio = Number(session.localId) || 0;
-      if (!propio) {
-        return NextResponse.json({ ok: false, error: "Sin alcance autorizado." }, { status: 403 });
-      }
-      if (asignLocalIds.some((id) => id !== propio)) {
-        return NextResponse.json({ ok: false, error: "Local fuera de tu alcance." }, { status: 403 });
-      }
-      asignLocalIds = [propio];
-    }
 
     const nombreNorm = nombre.trim();
 
+    // El nombre es único DENTRO del local: dos locales pueden tener un "Juan".
     const existente = await prisma.operadorLocal.findUnique({
-      where: { nombre: nombreNorm },
+      where: { localId_nombre: { localId, nombre: nombreNorm } },
+      select: { id: true },
     });
     if (existente) {
-      return NextResponse.json({ ok: false, error: "Ya existe un operador con ese nombre." }, { status: 409 });
+      return NextResponse.json({ ok: false, error: ERROR_OPERADOR_REPETIDO }, { status: 409 });
     }
 
     const pinHash = await bcrypt.hash(String(pin), 10);
 
-    // Todo operador es empleado: nace con el suyo, en la misma transacción.
+    // Todo operador es empleado: nace con el suyo, en el mismo local y en la
+    // misma transacción.
     const operador = await prisma.$transaction(async (tx) => {
       const creado = await tx.operadorLocal.create({
-        data: { nombre: nombreNorm, pinHash },
-        select: { id: true, nombre: true, activo: true, createdAt: true },
+        data: { nombre: nombreNorm, pinHash, localId },
+        select: { id: true, nombre: true, activo: true, localId: true, createdAt: true },
       });
-      await tx.operadorEnLocal.createMany({
-        data: asignLocalIds.map((lid) => ({ operadorId: creado.id, localId: Number(lid) })),
-      });
-      await crearEmpleadoDeOperador(tx, { operadorId: creado.id, nombre: creado.nombre, localIds: asignLocalIds });
+      const empleado = await crearEmpleadoDeOperador(tx, { operadorId: creado.id, nombre: creado.nombre, localId });
+      if (!empleado) throw new EmpleadoConOtroOperador();
       return creado;
     });
 
     return NextResponse.json({ ok: true, operador });
   } catch (e) {
+    if (e instanceof EmpleadoConOtroOperador) {
+      return NextResponse.json({ ok: false, error: ERROR_EMPLEADO_REPETIDO }, { status: 409 });
+    }
+    // Otro alta con el mismo nombre en el mismo local, al mismo tiempo.
+    if (e?.code === "P2002") {
+      return NextResponse.json({ ok: false, error: ERROR_OPERADOR_REPETIDO }, { status: 409 });
+    }
     console.error("operador/crear:", e);
-    return NextResponse.json({ ok: false, error: "Error interno" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: `No se pudo crear el operador: ${e.message}` }, { status: 500 });
   }
 }
