@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-10-15] - Actualización: pos-ventas, transferencias
+
+### Modificado
+- **pos-ventas**: feat(caja): Pagar desde el POS con pagos clasificados y compras por cargar — SIN VERIFICAR en pantalla
+- **transferencias**: feat(caja): Pagar desde el POS con pagos clasificados y compras por cargar — SIN VERIFICAR en pantalla
+
+
 ## [2026-10-14] - Actualización: pos-ventas, transferencias
 
 ### Modificado
