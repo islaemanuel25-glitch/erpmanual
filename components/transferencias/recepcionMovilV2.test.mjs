@@ -599,7 +599,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // columna nullable en `CajaMovimiento`. No toca transferencias.
   // Sube a 64 el mismo día: `20261015140949_consumo_personal_y_archivo_de_gasto`,
   // tres tablas nuevas y una categoría de gasto. No toca transferencias.
-  assert.equal(migraciones.length, 64, "aparecio una migracion que nadie declaro aca");
+  // Sube a 65 el mismo día: `20261015154425_empleados`, dos tablas, dos
+  // columnas nullable y el relleno de empleados. No toca transferencias.
+  assert.equal(migraciones.length, 65, "aparecio una migracion que nadie declaro aca");
+  assert.ok(migraciones.includes("20261015154425_empleados"));
   assert.ok(migraciones.includes("20261015120000_tipo_egreso_caja"));
   assert.ok(migraciones.includes("20261015140949_consumo_personal_y_archivo_de_gasto"));
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));

@@ -99,6 +99,10 @@ const PROHIBIDO = [
       // operativos por operador y por cuenta y lee `_prisma_migrations`. Imprime
       // ids, ningún importe ni nombre.
       (p) => p === "scripts/deploy/precheck-caja-por-operador.sql",
+      // La reposición de `20261015154425_empleados`: SQL escrito a mano para
+      // deshacer la migración de datos, que la corre una persona. Sentencias
+      // sobre tablas y columnas, ni una fila de datos adentro.
+      (p) => p === "scripts/deploy/reposicion-empleados.sql",
     ],
   },
   {

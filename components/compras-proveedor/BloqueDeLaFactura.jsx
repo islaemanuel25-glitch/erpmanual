@@ -40,10 +40,16 @@ export const TEXTO_SUBIR = "Subir desde el teléfono";
 export const TEXTO_SIN_FACTURA = "Llegó sin factura";
 export const BAJADA_SIN_FACTURA = "Vas a tener que contar los bultos a mano";
 
+export const TEXTO_CARGAR_A_MANO = "Cargar a mano, sin papel";
+
 export default function BloqueDeLaFactura({
   onSacarFoto,
   onSubir,
   onSinFactura,
+  // Una compra que nació de "Pagar → Proveedor": no hubo pedido, y el papel
+  // puede no estar. Abre la MISMA recepción sin papel que "Llegó sin factura",
+  // con "Agregar producto" para cargar lo que vino.
+  onCargarAMano = null,
   subiendo = false,
 }) {
   return (
@@ -75,6 +81,16 @@ export default function BloqueDeLaFactura({
           {TEXTO_SUBIR}
         </SunmiLinkButton>
       </div>
+
+      {onCargarAMano && (
+        <SunmiLinkButton
+          onClick={onCargarAMano}
+          disabled={subiendo}
+          className="self-center text-sm3 font-medium sunmi-text-accent"
+        >
+          {TEXTO_CARGAR_A_MANO}
+        </SunmiLinkButton>
+      )}
 
       {/* ── LA SALIDA SECUNDARIA ────────────────────────────────────────────
           Existe porque el caso pasa: el camión llega y la factura viene después,

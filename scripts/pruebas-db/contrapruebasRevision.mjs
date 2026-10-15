@@ -850,6 +850,50 @@ const CASOS = [
     inyecciones: [{ de: "        total: totalCosto,", a: "        total: totalPrecio," }],
     esperadas: ["gasto por el COSTO, no por el precio"],
   },
+  // ── EMPLEADOS Y LA CARGA A MANO ────────────────────────────────────────
+  //
+  // El relleno de la migración se corre otra vez sobre su base aislada: sin
+  // la condición que lo hace idempotente, la segunda vuelta duplica. Y una
+  // compra pagada desde la caja que no cuenta lo pagado al recibirla, descuenta
+  // la caja dos veces.
+  {
+    n: "EM-1",
+    defecto: "el relleno de Empleados deja de ser idempotente",
+    archivo: "prisma/migrations/20261015154425_empleados/migration.sql",
+    suite: "scripts/pruebas-db/empleados.mjs",
+    minimo: 15,
+    inyecciones: [
+      {
+        de: '\nWHERE NOT EXISTS (SELECT 1 FROM "Empleado" e WHERE e."operadorId" = o."id");',
+        a: ";",
+      },
+    ],
+    esperadas: ["el relleno corrido dos veces más no duplica nada"],
+  },
+  {
+    n: "EM-2",
+    defecto: "cargar una compra pagada desde la caja vuelve a descontar la caja",
+    // Está frenado en tres capas: la ruta cuenta lo pagado, la cuenta previa
+    // se niega a quedar pagada de más, y el pago no supera el saldo. Se rompen
+    // la primera y la última —la del medio no frena un total igual a lo
+    // pagado—, que es cuando la caja sale dos veces.
+    archivo: "app/api/compras-proveedor/recibir/[id]/route.js",
+    inyecciones: [{ de: "    const yaPagadoCentavos = cuentaPrevia\n", a: "    const yaPagadoCentavos = false\n" }],
+    masArchivos: [
+      {
+        archivo: "lib/finanzas/pagosProveedoresServer.js",
+        inyecciones: [
+          {
+            de: "  const importe = validarMontoDePago({ monto: args.monto, saldo });\n  if (importe.error) throw new ErrorPagoProveedor(importe.error);",
+            a: "  const importe = validarMontoDePago({ monto: args.monto, saldo: Number(cuenta.total) });\n  if (importe.error) throw new ErrorPagoProveedor(importe.error);",
+          },
+        ],
+      },
+    ],
+    suite: "scripts/pruebas-db/empleados.mjs",
+    minimo: 15,
+    esperadas: ["la caja NO se descuenta otra vez"],
+  },
   // ── LA LECTURA DE TESORERÍA ──────────────────────────────────────────────
   //
   // Cada una saca UNA defensa de la lectura y la prueba de base, que arma las
@@ -1501,27 +1545,38 @@ let fallas = 0;
 for (const c of ELEGIDOS) {
   const raiz = copiar();
   const archivo = path.join(raiz, c.archivo);
-  let texto = fs.readFileSync(archivo, "utf8");
 
   // Cada inyección tiene que aplicar, y una sola vez. Un ancla que no engancha
   // deja el archivo sano y la suite verde, y eso se lee como "el candado no
   // sirve" cuando lo que no sirvió fue el destrozo.
+  //
+  // `masArchivos` es para el defecto que está defendido en más de una capa:
+  // romper una sola no lo produce, y la contraprueba diría "verde" sobre una
+  // afirmación que sí mira. Se rompen todas las que lo frenan, y recién ahí
+  // se exige el rojo.
   let ancladas = true;
-  for (const iny of c.inyecciones) {
-    const apariciones = texto.split(iny.de).length - 1;
-    if (apariciones !== 1) {
-      console.log(`✗ ${c.n}  una inyección no aplica (${apariciones} coincidencias de «${iny.de.trim()}»)`);
-      ancladas = false;
-      break;
+  const rotos = [];
+  for (const parte of [{ archivo: c.archivo, inyecciones: c.inyecciones }, ...(c.masArchivos || [])]) {
+    const ruta = path.join(raiz, parte.archivo);
+    let texto = fs.readFileSync(ruta, "utf8");
+    for (const iny of parte.inyecciones) {
+      const apariciones = texto.split(iny.de).length - 1;
+      if (apariciones !== 1) {
+        console.log(`✗ ${c.n}  una inyección no aplica en ${parte.archivo} (${apariciones} coincidencias de «${iny.de.trim()}»)`);
+        ancladas = false;
+        break;
+      }
+      texto = texto.replace(iny.de, iny.a);
     }
-    texto = texto.replace(iny.de, iny.a);
+    if (!ancladas) break;
+    rotos.push({ ruta, texto });
   }
   if (!ancladas) {
     fallas++;
     fs.rmSync(raiz, { recursive: true, force: true });
     continue;
   }
-  fs.writeFileSync(archivo, texto);
+  for (const r of rotos) fs.writeFileSync(r.ruta, r.texto);
 
   let aislada = null;
   if (c.migracion) {

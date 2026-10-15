@@ -16,53 +16,37 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-- `20261014165350_cierre_forzado` — **aditiva**: `forzadoPorUsuarioId` (INTEGER
-  nulo) en `CierrePreparacion` y `cierreForzadoPorId` (INTEGER nulo) en
-  `Turno`. No toca ninguna fila: NULL es "cierre normal", que es lo que fueron
-  todos hasta hoy. Es del arreglo "ninguna caja sin operador" (enmienda
-  2026-10-14 de DEC-0012). La versión vieja del código no lee esas columnas,
-  así que no se rompe si la migración entra antes que el código.
-- `20261014191303_caja_de_cuenta_y_retiro_intervenido` — **aditiva**:
-  `operaLaCuenta` (BOOLEAN nulo) en `Turno` e `intervenidoPorUsuarioId`
-  (INTEGER nulo) en `RetiroPreparacion`. No toca ninguna fila: NULL es "caja
-  de operador o caja de cuenta vieja" y "retiro del dueño de la caja". Es de la
-  segunda regla del mismo día: la caja sin PIN del dueño o Admin y el retiro
-  que hacen en caja ajena. Va después de `cierre_forzado` y, como ésa, la
-  versión vieja del código no lee las columnas.
-- `20261015120000_tipo_egreso_caja` — **aditiva**: crea el enum
-  `TipoEgresoCaja` y agrega `tipoEgreso` (nulo) en `CajaMovimiento`. No toca
-  ninguna fila: NULL es "Sin clasificar", que es lo que son todos los
-  movimientos hasta hoy. Es de "Pagar" desde el POS (2026-10-15). El efectivo
-  esperado no la lee, y la versión vieja del código tampoco, así que no se
-  rompe si la migración entra antes que el código.
-- `20261015140949_consumo_personal_y_archivo_de_gasto` — **aditiva**: crea
-  `ConsumoPersonal`, `ConsumoPersonalLinea` y `GastoArchivo`, e inserta la
-  categoría de gasto "Consumo del personal" (`ON CONFLICT DO NOTHING`). No toca
-  ninguna columna ni fila existente. Va después de `tipo_egreso_caja`; la
-  versión vieja del código no lee las tablas nuevas.
+- `20261015154425_empleados` — **MIGRACIÓN DE DATOS: autorizarla a
+  sabiendas.** Estructura aditiva: crea `Empleado` y `EmpleadoEnLocal`, agrega
+  `empleadoId` (nulo) en `ConsumoPersonal` y en `Gasto`, y relaja
+  `ConsumoPersonal.operadorId` a nulo (no la borra). Y en la misma migración
+  RELLENA: un empleado por cada operador con sus locales, y el `empleadoId`
+  de los consumos, de sus gastos y de los sueldos (por el beneficiario, que es
+  el nombre del operador). Idempotente. Compatible con el código anterior
+  durante la ventana: ese código no lee las tablas nuevas y ninguna fila pierde
+  su `operadorId`. Un operador creado DURANTE la ventana con el código viejo
+  queda sin empleado: se le crea desde Administración → Empleados. La
+  reposición, escrita antes de commitear, está en
+  `scripts/deploy/reposicion-empleados.sql`.
 
-Producción está en **60 migraciones**, con el ERP en
-`ccf2894fe452802a5c2195327d95b7598830ae58`.
+Producción está en **64 migraciones**, la última
+`20261015140949_consumo_personal_y_archivo_de_gasto`.
 
-**De dónde sale el 60.** Lo informó el dueño en la orden de la auditoría de
-Azul Chat del 2026-10-12: producción corre `ccf2894` con 60 migraciones
-aplicadas. El árbol de `ccf2894` tiene 60 carpetas en `prisma/migrations`
-(contadas con `ls -d prisma/migrations/*/`), la última
-`20261012120000_pedido_cancelado`. *Sin verificar desde esa sesión*, que es de
-nube y no ve el VPS. Lo comprueba, de solo lectura, el paso 0 del próximo
+**De dónde sale el 64.** Lo informó Emanuel en la orden del 2026-10-15: las
+cuatro que quedaban en esta lista —`20261014165350_cierre_forzado`,
+`20261014191303_caja_de_cuenta_y_retiro_intervenido`,
+`20261015120000_tipo_egreso_caja` y
+`20261015140949_consumo_personal_y_archivo_de_gasto`— se aplicaron el 15/10.
+Con las 60 de antes son 64. *Sin verificar desde esta sesión*, que es de nube
+y no ve el VPS. Lo comprueba, de solo lectura, el paso 0 del próximo
 `/deploy` (mismo usuario y base que el backup del skill):
 `ssh vps-erp 'docker exec erpazul_db psql -At -U erpazul -d erpazul -c "SELECT count(*), max(migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL"'`,
-que tiene que decir `60|20261012120000_pedido_cancelado`. Si dice otra cosa,
-esta lista está mal y se vuelve a escribir antes de seguir.
-
-Salieron de esta lista con eso las dos que quedaban:
-`20261010180000_explicacion_por_tipo` (no aditiva: movía datos y borraba
-columnas de `RecetaProveedor`) y `20261012120000_pedido_cancelado` (aditiva:
-`canceladoAt` y `canceladoPorUserId` en `PosTransferencia`). Su descripción
-completa está en el `git log` de este archivo, en `e127395`.
+que tiene que decir `64|20261015140949_consumo_personal_y_archivo_de_gasto`.
+Si dice otra cosa, esta lista está mal y se vuelve a escribir antes de seguir.
+La descripción de las cuatro está en el `git log` de este archivo.
 
 Las que estaban en esta lista antes y ya se aplicaron —hasta
-`20261012120000_pedido_cancelado`— salieron de acá: la historia de cuándo
+`20261015140949_consumo_personal_y_archivo_de_gasto`— salieron de acá: la historia de cuándo
 y cómo se aplicó cada una está en `git log` de este archivo y, para las que la
 tienen, en la bitácora de abajo. La bitácora llega hasta `b6052783` y no se
 borra: la citan como evidencia `lib/stock/libro/stockDiario.test.mjs` y los

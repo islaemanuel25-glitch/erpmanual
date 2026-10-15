@@ -99,10 +99,18 @@ async function montar() {
   const otroCajero = await usuario("otro");
 
   const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-Brenda`, pinHash: "x" } });
-  const consume = await prisma.operadorLocal.create({ data: { nombre: `${marca}-Mariangel`, pinHash: "x" } });
-  creado.operadorIds.push(op.id, consume.id);
+  creado.operadorIds.push(op.id);
   await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: local.id } });
-  await prisma.operadorEnLocal.create({ data: { operadorId: consume.id, localId: local.id } });
+  // Quien consume es una EMPLEADA SIN OPERADOR: trabaja en la cocina y no
+  // maneja la caja. Es el caso que Empleados existe para cubrir.
+  const consume = await prisma.empleado.create({
+    data: { nombre: `${marca}-Mariangel`, locales: { create: [{ localId: local.id }] } },
+  });
+  // Y el empleado de la cajera, que cobra el sueldo de la sección 5.
+  const empleadoOp = await prisma.empleado.create({
+    data: { nombre: op.nombre, operadorId: op.id, locales: { create: [{ localId: local.id }] } },
+  });
+  creado.empleadoIds = [consume.id, empleadoOp.id];
 
   const turno = await prisma.turno.create({
     data: { localId: local.id, vendedorId: cajero.u.id, operadorId: op.id, montoInicial: 50000, apertura: new Date() },
@@ -126,7 +134,7 @@ async function montar() {
   process.env[VARIABLE_RUTA] = creado.almacen;
 
   const quien = (c) => ({ sesion: c.sesion, operador: firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: local.id }) });
-  return { grupo, local, cajero, otroCajero, op, consume, turno, gaseosa, fiambre, plG, plF, quienCaja: quien(cajero), quienOtro: { sesion: otroCajero.sesion } };
+  return { grupo, local, cajero, otroCajero, op, consume, empleadoOp, turno, gaseosa, fiambre, plG, plF, quienCaja: quien(cajero), quienOtro: { sesion: otroCajero.sesion } };
 }
 
 async function desmontar() {
@@ -144,6 +152,7 @@ async function desmontar() {
     await prisma.configuracionLocal.deleteMany({ where: { localId } });
   }
   // El libro de stock no deja borrar sus movimientos: los productos quedan.
+  if (creado.empleadoIds) await prisma.empleado.deleteMany({ where: { id: { in: creado.empleadoIds } } });
   await prisma.operadorEnLocal.deleteMany({ where: { operadorId: { in: creado.operadorIds } } });
   await prisma.operadorLocal.deleteMany({ where: { id: { in: creado.operadorIds } } }).catch(() => {});
   if (creado.almacen) await rm(creado.almacen, { recursive: true, force: true });
@@ -177,8 +186,10 @@ async function casos(f) {
 
   seccion("1 · El consumo sale del stock, con su origen en el Libro");
   const claveC = clave();
-  const r = await consumir(f, { operadorId: f.consume.id, items, idempotencyKey: claveC });
-  igual("contesta ok", [r.status, r.ok], [200, true]);
+  const r = await consumir(f, { empleadoId: f.consume.id, items, idempotencyKey: claveC });
+  igual("una empleada SIN operador registra su consumo", [r.status, r.ok], [200, true]);
+  const fila = await prisma.consumoPersonal.findUnique({ where: { id: r.consumoId }, select: { empleadoId: true, operadorId: true } });
+  igual("el consumo es de la empleada, sin operador", [fila.empleadoId, fila.operadorId], [f.consume.id, null]);
   igual("gaseosa: 10 − 2", await stockDe(f, f.plG), 8);
   igual("fiambre: 5 − 0,25 kg", await stockDe(f, f.plF), 4.75);
   const libro = await prisma.movimientoStock.findMany({
@@ -199,9 +210,10 @@ async function casos(f) {
   igual("el consumo al costo", r.totalCosto, 2200);
   const gasto = await prisma.gasto.findUnique({
     where: { id: r.gastoId },
-    select: { total: true, beneficiario: true, concepto: true, localId: true, categoria: { select: { nombre: true } }, pagos: { select: { id: true } } },
+    select: { total: true, beneficiario: true, concepto: true, localId: true, empleadoId: true, categoria: { select: { nombre: true } }, pagos: { select: { id: true } } },
   });
   igual("gasto por el COSTO, no por el precio", Number(gasto.total), 2200);
+  igual("el gasto es de la empleada", gasto.empleadoId, f.consume.id);
   igual("en su categoría, a nombre de quien consumió", [gasto.categoria.nombre, gasto.beneficiario], ["Consumo del personal", f.consume.nombre]);
   ok("el concepto dice quién y qué", gasto.concepto.includes(f.consume.nombre) && gasto.concepto.includes("Gaseosa"));
   igual("sin pagos", gasto.pagos.length, 0);
@@ -220,27 +232,36 @@ async function casos(f) {
   igual("y no se puede pagar", rechazoPago, "El consumo del personal no se paga: sale del stock.");
 
   seccion("4 · El mismo intento no descuenta otra vez");
-  const otra = await consumir(f, { operadorId: f.consume.id, items, idempotencyKey: claveC });
+  const otra = await consumir(f, { empleadoId: f.consume.id, items, idempotencyKey: claveC });
   igual("devuelve el mismo consumo", [otra.ok, otra.repetido, otra.consumoId], [true, true, r.consumoId]);
   igual("el stock sigue igual", [await stockDe(f, f.plG), await stockDe(f, f.plF)], [8, 4.75]);
   igual("un solo gasto", await prisma.gasto.count({ where: { grupoId: f.grupo.id } }), 1);
 
   seccion("5 · El resultado del turno lo resta una vez");
   const sueldo = await leer(await rutaPagar.POST(pedido(`${BASE}/pos-ventas/pagar`, f.quienCaja, {
-    cuerpo: { turnoId: f.turno.id, tipo: "SUELDO", monto: "1000", operadorId: f.op.id, idempotencyKey: clave() },
+    cuerpo: { turnoId: f.turno.id, tipo: "SUELDO", monto: "1000", empleadoId: f.empleadoOp.id, idempotencyKey: clave() },
   })));
   igual("un sueldo desde la caja", sueldo.ok, true);
+  // Un adelanto a la empleada SIN operador: Sueldo elige de Empleados.
+  const adelanto = await leer(await rutaPagar.POST(pedido(`${BASE}/pos-ventas/pagar`, f.quienCaja, {
+    cuerpo: { turnoId: f.turno.id, tipo: "SUELDO", modalidad: "ADELANTO", monto: "500", empleadoId: f.consume.id, idempotencyKey: clave() },
+  })));
+  igual("una empleada sin operador cobra un adelanto", adelanto.ok, true);
+  const gastoAdelanto = await prisma.gasto.findUnique({ where: { id: adelanto.gastoId }, select: { empleadoId: true, beneficiario: true } });
+  igual("el sueldo queda a nombre de la empleada", [gastoAdelanto.empleadoId, gastoAdelanto.beneficiario], [f.consume.id, f.consume.nombre]);
+  const deEmpleados = await leer(await rutaPagar.GET(pedido(`${BASE}/pos-ventas/pagar?turnoId=${f.turno.id}`, f.quienCaja, { metodo: "GET" })));
+  ok("Pagar ofrece la empleada sin operador", (deEmpleados.empleados || []).some((e) => e.id === f.consume.id));
   const det = await detalle(f);
-  igual("sueldos y gastos NO cuenta el consumo", det.metricas.sueldosYGastos, 1000);
+  igual("sueldos y gastos NO cuenta el consumo", det.metricas.sueldosYGastos, 1500);
   igual("consumo del personal en su fila", det.metricas.consumoPersonal, 2200);
-  igual("resultado = 0 − 0 − 1000 − 2200", det.metricas.resultado, -3200);
+  igual("resultado = 0 − 0 − 1500 − 2200", det.metricas.resultado, -3700);
   igual("el detalle dice quién y cuánto", det.consumos.map((c) => [c.quien, c.productos, c.costo]), [[f.consume.nombre, 2, 2200]]);
 
   seccion("6 · Rechazos que no escriben nada");
-  const sinStock = await consumir(f, { operadorId: f.consume.id, items: [{ ...items[0], cantidad: 99 }], idempotencyKey: clave() });
+  const sinStock = await consumir(f, { empleadoId: f.consume.id, items: [{ ...items[0], cantidad: 99 }], idempotencyKey: clave() });
   igual("sin stock suficiente se frena", sinStock.status, 409);
   igual("y no descontó", await stockDe(f, f.plG), 8);
-  const ajeno = await consumir(f, { operadorId: 999999, items, idempotencyKey: clave() });
+  const ajeno = await consumir(f, { empleadoId: 999999, items, idempotencyKey: clave() });
   igual("quien consume tiene que ser del local", [ajeno.status, ajeno.error], [400, "Elegí quién lo consume."]);
   igual("ningún consumo de más", await prisma.consumoPersonal.count({ where: { localId: f.local.id } }), 1);
 

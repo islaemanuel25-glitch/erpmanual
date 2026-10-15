@@ -445,7 +445,9 @@ export default function DetallePedidoProveedorPage({ params }) {
   // exactamente el caso que fallaba.
   // Sin factura también se pide: las filas de la recepción sin papel son las
   // líneas del pedido, y las trae este mismo endpoint en `sinComprobante`.
-  const pidioSinFactura = sinFactura && pedido?.nacidoDeFactura !== true;
+  // Una compra nacida de "Pagar → Proveedor" también puede cargarse a mano:
+  // sus filas sin papel son lo que se agregue con "Agregar producto".
+  const pidioSinFactura = sinFactura;
   useEffect(() => {
     if (
       !pedido?.id ||
@@ -1081,7 +1083,10 @@ export default function DetallePedidoProveedorPage({ params }) {
   // después aparece uno, esto se apaga solo y la pantalla vuelve a la recepción
   // con papel: no hay dos pantallas para el mismo pedido según el orden en que
   // se tocaron los botones.
-  const sinPapel = esRecepcion && sinFactura && !sinPedidoPrevio && hayComprobantes === 0;
+  //
+  // Vale también para una compra nacida de "Pagar → Proveedor" que se carga a
+  // mano: es el mismo camino, y sus filas salen de "Agregar producto".
+  const sinPapel = esRecepcion && sinFactura && hayComprobantes === 0;
   // Las filas son las líneas del pedido, con la forma de una fila de la
   // conciliación, y con lo que se lleva contado: la tarjeta compara eso contra
   // lo pedido para decir si falta o sobra.
@@ -1426,6 +1431,9 @@ export default function DetallePedidoProveedorPage({ params }) {
                       // recibir —cero líneas—. Ofrecerlo mandaba a la rama
                       // vieja, que es donde terminó el 240.
                       onSinFactura={sinPedidoPrevio ? null : () => setSinFactura(true)}
+                      // Sí se ofrece cargarla a mano: la compra ya está pagada
+                      // y la mercadería llegó, aunque el papel no.
+                      onCargarAMano={sinPedidoPrevio ? () => setSinFactura(true) : null}
                       subiendo={subiendo}
                     />
                   )

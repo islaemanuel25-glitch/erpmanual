@@ -5,11 +5,17 @@ cosas para comer. No se cobra, sale del stock y es un gasto del negocio.
 
 ## Qué es y qué no
 
-- Se registra desde el panel de cobro del POS, botón "Consumo del personal" al
-  lado de "Fiado", en el teléfono y en escritorio (F7). Se elige quién lo
-  consume entre los operarios del local y se confirma [CÓDIGO]
+- Se registra desde "Pagar" del POS, sexta opción, después de "Retiro del
+  dueño" (hoja en el teléfono, diálogo en escritorio). Tiene su propia lista de
+  productos —buscar o escanear con `BuscadorProductos`, cantidad, quitar—,
+  separada del carrito de la venta, que no se toca. Quien consume se elige
+  entre los EMPLEADOS activos del local ([empleados.md](empleados.md)) [CÓDIGO]
   (`components/pos-ventas/PanelConsumoPersonal.jsx`,
   `app/api/pos-ventas/consumo-personal/route.js`, permiso `pos.usar`).
+- Hasta la tarde del 2026-10-15 estuvo en el panel de cobro, al lado de
+  "Fiado", con F7. Se sacó a pedido de Emanuel: ahí se podía tocar por error
+  en cada venta [CÓDIGO: `lib/pos-ventas/consumoPersonal.test.mjs` exige que
+  no vuelva].
 - Sale del stock con LAS MISMAS funciones que la venta:
   `cargarMapasDeProductos` → `construirLineasComerciales` →
   `aplicarConsumoStock`, así que la escala, el bulto, el kilo y los combos

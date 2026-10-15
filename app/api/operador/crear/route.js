@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcrypt";
 import prisma from "@/lib/prisma";
 import { requirePerm } from "@/lib/authorize";
+import { crearEmpleadoDeOperador } from "@/lib/empleados/empleadosServer";
 
 export async function POST(req) {
   try {
@@ -49,13 +50,17 @@ export async function POST(req) {
 
     const pinHash = await bcrypt.hash(String(pin), 10);
 
-    const operador = await prisma.operadorLocal.create({
-      data: { nombre: nombreNorm, pinHash },
-      select: { id: true, nombre: true, activo: true, createdAt: true },
-    });
-
-    await prisma.operadorEnLocal.createMany({
-      data: asignLocalIds.map((lid) => ({ operadorId: operador.id, localId: Number(lid) })),
+    // Todo operador es empleado: nace con el suyo, en la misma transacción.
+    const operador = await prisma.$transaction(async (tx) => {
+      const creado = await tx.operadorLocal.create({
+        data: { nombre: nombreNorm, pinHash },
+        select: { id: true, nombre: true, activo: true, createdAt: true },
+      });
+      await tx.operadorEnLocal.createMany({
+        data: asignLocalIds.map((lid) => ({ operadorId: creado.id, localId: Number(lid) })),
+      });
+      await crearEmpleadoDeOperador(tx, { operadorId: creado.id, nombre: creado.nombre, localIds: asignLocalIds });
+      return creado;
     });
 
     return NextResponse.json({ ok: true, operador });

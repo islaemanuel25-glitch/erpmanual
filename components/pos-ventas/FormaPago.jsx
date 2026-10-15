@@ -1,7 +1,6 @@
 "use client";
 
 import { memo, useState } from "react";
-import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
@@ -96,12 +95,6 @@ function FormaPago({
   // modalidades. Sin esto se usan los defaults, que son la MISMA constante que
   // usa el servidor.
   mediosCobro = null,
-  // CONSUMO DEL PERSONAL: el botón al lado de Fiado y, abierto, el panel que
-  // le pasa la pantalla. El estado vive en la pantalla para que el atajo de
-  // teclado del escritorio lo pueda abrir.
-  consumoAbierto = false,
-  onAlternarConsumo = null,
-  panelConsumo = null,
 }) {
   // Los botones del cobro simple y del pago dividido salen de la configuración.
   // Fiado no está: es tender único y se dibuja aparte, con sus propias
@@ -646,31 +639,10 @@ function FormaPago({
                       Seleccioná un cliente para vender fiado
                     </div>
                   )}
-                  {/* CONSUMO DEL PERSONAL, al lado de Fiado (Figma 392:576): no
-                      cobra, abre su panel abajo. Sin `onAlternarConsumo` el
-                      botón no existe y Fiado queda como estaba. */}
-                  <div className={onAlternarConsumo ? "grid grid-cols-2 gap-2" : ""}>
-                    <button type="button" onClick={cobrarFiado} disabled={!puedeVender}
-                      className="sunmi-btn sunmi-pos-btn-secondary w-full min-h-11 text-sm rounded-md">
-                      Fiado
-                    </button>
-                    {onAlternarConsumo ? (
-                      <SunmiButton
-                        type="button"
-                        color="ghost"
-                        data-consumo-del-personal
-                        aria-pressed={consumoAbierto}
-                        onClick={onAlternarConsumo}
-                        disabled={!puedeVender}
-                        className={`sunmi-pos-btn-secondary w-full min-h-11 text-sm rounded-md justify-center ${
-                          consumoAbierto ? "border-2 sunmi-border-accent sunmi-text-accent font-semibold" : ""
-                        }`}
-                      >
-                        Consumo del personal
-                      </SunmiButton>
-                    ) : null}
-                  </div>
-                  {onAlternarConsumo && consumoAbierto ? panelConsumo : null}
+                  <button type="button" onClick={cobrarFiado} disabled={!puedeVender}
+                    className="sunmi-btn sunmi-pos-btn-secondary w-full min-h-11 text-sm rounded-md">
+                    Fiado
+                  </button>
                 </>
               )}
 

@@ -48,7 +48,6 @@ import ModalCanjePuntos from "@/components/pos-ventas/ModalCanjePuntos";
 import ClientePickerFullscreen from "@/components/pos-ventas/ClientePickerFullscreen";
 import ModalCajaMovimiento from "@/components/pos-ventas/ModalCajaMovimiento";
 import ModalPagar from "@/components/pos-ventas/ModalPagar";
-import PanelConsumoPersonal from "@/components/pos-ventas/PanelConsumoPersonal";
 import AvisoArqueo from "@/components/pos-ventas/AvisoArqueo";
 import useArqueoEstado from "@/hooks/useArqueoEstado";
 import useEsEscritorio, { nombreVentanaRetiro, nombreVentanaCierre } from "@/hooks/useEsEscritorio";
@@ -168,10 +167,6 @@ export default function PosVentasPage() {
   );
   const [mostrarCajaMovimiento, setMostrarCajaMovimiento] = useState(false);
   const [mostrarPagar, setMostrarPagar] = useState(false);
-  // Consumo del personal: el panel abierto adentro del cobro. Vive acá y no en
-  // FormaPago para que F7 lo pueda abrir. Sin carrito no hay nada que consumir.
-  const [consumoAbierto, setConsumoAbierto] = useState(false);
-  if (consumoAbierto && state.carrito.length === 0) setConsumoAbierto(false);
   const [productoKgPendiente, setProductoKgPendiente] = useState(null);
   // Servicio de importe variable pendiente de ingresar importe en el modal.
   const [servicioPendiente, setServicioPendiente] = useState(null);
@@ -1478,11 +1473,6 @@ export default function PosVentasPage() {
           dispatch({ type: ActionTypes.SET_FORMA_PAGO, payload: siguiente });
           break;
         }
-        case "F7":
-          // Consumo del personal: la única tecla libre de la fila.
-          e.preventDefault();
-          if (turnoActual && !offlineMode && state.carrito.length > 0) setConsumoAbierto((v) => !v);
-          break;
         case "F8":
           e.preventDefault();
           handleLimpiar();
@@ -1498,7 +1488,7 @@ export default function PosVentasPage() {
 
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
-  }, [state.carrito, state.cobrando, state.formaPago, state.modalEfectivo, state.modalTicket, state.modalDescuento, mostrarPickerCliente, mostrarHistorial, handleLimpiar, handleAbrirPickerCliente, turnoActual, offlineMode]);
+  }, [state.carrito, state.cobrando, state.formaPago, state.modalEfectivo, state.modalTicket, state.modalDescuento, mostrarPickerCliente, mostrarHistorial, handleLimpiar, handleAbrirPickerCliente]);
 
   // ---------------------------------------------------------------------------
   // Cobrar desde FormaPago (redirige a iniciarCobro)
@@ -2405,21 +2395,6 @@ export default function PosVentasPage() {
               recargosPorMedio={recargosPorMedio}
               hayOfertaSoloEfectivo={hayOfertaSoloEfectivo}
               mediosCobro={mediosCobro}
-              consumoAbierto={consumoAbierto}
-              onAlternarConsumo={turnoActual && !offlineMode ? () => setConsumoAbierto((v) => !v) : null}
-              panelConsumo={
-                turnoActual ? (
-                  <PanelConsumoPersonal
-                    carrito={state.carrito}
-                    turnoId={turnoActual.id}
-                    onRegistrado={(r) => {
-                      showSuccess(`Consumo registrado: ${r.productos} ${r.productos === 1 ? "producto" : "productos"} a ${r.operador?.nombre ?? ""}`);
-                      setConsumoAbierto(false);
-                      handleLimpiar();
-                    }}
-                  />
-                ) : null
-              }
             />
             {/* Mensaje offline */}
             {offlineMode && (
@@ -2432,7 +2407,7 @@ export default function PosVentasPage() {
 
         {/* Shortcuts ayuda - solo desktop */}
         <div className="hidden lg:block text-[10px] sunmi-pos-muted text-center shrink-0">
-          F1: Buscar | F2: Efectivo | F3: MP | F4: Debito | F5: Credito | F6: Fiado | F7: Consumo | F10: Cobrar
+          F1: Buscar | F2: Efectivo | F3: MP | F4: Debito | F5: Credito | F6: Fiado | F10: Cobrar
         </div>
       </div>
 
@@ -2590,9 +2565,13 @@ export default function PosVentasPage() {
       {mostrarPagar && turnoActual && (
         <ModalPagar
           turnoId={turnoActual.id}
+          // El consumo del personal busca productos con el buscador del POS.
+          localId={localActual}
+          esDeposito={contexto?.esDeposito === true}
           onClose={() => setMostrarPagar(false)}
-          onPagado={({ errorFoto }) => {
-            if (errorFoto) showError(`Pago registrado. La foto no se subió: ${errorFoto}`);
+          onPagado={({ errorFoto, consumo }) => {
+            if (consumo) showSuccess("Consumo registrado");
+            else if (errorFoto) showError(`Pago registrado. La foto no se subió: ${errorFoto}`);
             else showSuccess("Pago registrado");
             // Un pago cambia el esperado: se refresca el estado.
             arqueo.refrescar();

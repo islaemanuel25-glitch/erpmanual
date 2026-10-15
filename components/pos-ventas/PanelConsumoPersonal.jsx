@@ -2,55 +2,57 @@
 
 // components/pos-ventas/PanelConsumoPersonal.jsx
 //
-// CONSUMO DEL PERSONAL, adentro del panel de cobro (Figma EVJ2KvVCrY0oVSowfboymQ,
-// nodo 392:576). El carrito no se cobra: sale del stock y queda como gasto al
-// costo, a nombre de quien lo consume (lib/pos-ventas/consumoPersonalServer.js).
+// CONSUMO DEL PERSONAL, adentro de "Pagar" del POS. Se mudó del panel de
+// cobro a pedido de Emanuel: ahí estaba al lado de cada venta y un toque de
+// más registraba un consumo.
 //
-// Lo de arriba —"No se cobra", "Sale del stock", "Gasto a costo"— es el
-// resumen que se ve ANTES de confirmar, con el costo del carrito. El
-// definitivo lo calcula el servidor con las líneas de la venta.
+// Tiene SU PROPIA lista de productos, separada del carrito de la venta: el
+// carrito no se toca. Para armarla se reusa lo del POS —`BuscadorProductos`
+// para buscar o escanear y el reductor del carrito (`posVentaReducer`) para
+// agregar, cambiar la cantidad y quitar—, así cada línea tiene la misma forma
+// que una de venta y viaja con `itemsCrearPayload`. Quién consume se elige de
+// los EMPLEADOS activos del local. El servidor descuenta el stock con las
+// funciones de la venta y deja el gasto al costo
+// (lib/pos-ventas/consumoPersonalServer.js).
 
-import { useEffect, useRef, useState } from "react";
+import { useReducer, useRef, useState } from "react";
 
 import { useOperadorContext } from "@/app/context/OperadorContext";
+import { ActionTypes, initialState, posVentaReducer } from "@/app/modulos/pos-ventas/reducer/posVentaReducer";
+import BuscadorProductos from "@/components/pos-ventas/BuscadorProductos";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
+import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
+import { showError } from "@/components/sunmi/SunmiToast";
 import { nuevaClaveDePago } from "@/lib/finanzas/pagosProveedores";
 import { formatearMoneda } from "@/lib/moneda";
 import { itemsCrearPayload } from "@/lib/pos-ventas/payloadVenta";
+import { esModalidadServicio } from "@/lib/pos-ventas/servicios";
 import { resumenDelConsumo } from "@/lib/pos-ventas/consumoPersonal";
 
-export default function PanelConsumoPersonal({ carrito, turnoId, onRegistrado }) {
+export default function PanelConsumoPersonal({ turnoId, localId, esDeposito = false, empleados = [], onRegistrado }) {
   const { requerirOperador } = useOperadorContext();
-  const [operarios, setOperarios] = useState(null);
-  const [errorCarga, setErrorCarga] = useState("");
-  const [operadorId, setOperadorId] = useState("");
+  // La lista del consumo: el mismo reductor que el carrito, en un estado propio.
+  const [lista, despachar] = useReducer(posVentaReducer, initialState);
+  const [empleadoId, setEmpleadoId] = useState("");
   const [registrando, setRegistrando] = useState(false);
   const [error, setError] = useState("");
-  // Un intento por carrito: el mismo envío repetido cae en el mismo consumo.
+  // Un intento por lista: el mismo envío repetido cae en el mismo consumo.
   const clave = useRef(nuevaClaveDePago(`consumo-${turnoId}`));
 
-  useEffect(() => {
-    let vigente = true;
-    (async () => {
-      try {
-        const r = await fetch("/api/operador/listar", { credentials: "include", cache: "no-store" });
-        const d = await r.json().catch(() => null);
-        if (!vigente) return;
-        if (!d?.ok) setErrorCarga(d?.error || "No se pudo cargar quién consume.");
-        else setOperarios(d.items || []);
-      } catch {
-        if (vigente) setErrorCarga("No se pudo cargar quién consume.");
-      }
-    })();
-    return () => {
-      vigente = false;
-    };
-  }, []);
+  const productos = lista.carrito;
+  const resumen = resumenDelConsumo(productos);
+  const puedeConfirmar = Boolean(turnoId) && Boolean(empleadoId) && resumen.productos > 0 && !resumen.hayServicios && !registrando;
 
-  const resumen = resumenDelConsumo(carrito);
-  const puedeConfirmar = Boolean(turnoId) && Boolean(operadorId) && resumen.productos > 0 && !resumen.hayServicios && !registrando;
+  const agregar = (producto) => {
+    // Un servicio no sale del stock: no hay nada que consumir.
+    if (producto?.esServicioImporteVariable || esModalidadServicio(producto?.modalidad)) {
+      showError(`"${producto.nombre}" es un servicio: no sale del stock.`);
+      return;
+    }
+    despachar({ type: ActionTypes.ADD_ITEM, payload: { producto } });
+  };
 
   async function confirmar() {
     if (!puedeConfirmar) return;
@@ -63,8 +65,8 @@ export default function PanelConsumoPersonal({ carrito, turnoId, onRegistrado })
         credentials: "include",
         body: JSON.stringify({
           turnoId,
-          operadorId: Number(operadorId),
-          items: itemsCrearPayload(carrito),
+          empleadoId: Number(empleadoId),
+          items: itemsCrearPayload(productos),
           idempotencyKey: clave.current,
         }),
       });
@@ -78,7 +80,8 @@ export default function PanelConsumoPersonal({ carrito, turnoId, onRegistrado })
         return;
       }
       clave.current = nuevaClaveDePago(`consumo-${turnoId}`);
-      setOperadorId("");
+      despachar({ type: ActionTypes.CLEAR_CART });
+      setEmpleadoId("");
       onRegistrado?.(d);
     } catch {
       setError("Sin conexión: no se sabe si el consumo entró. Mirá el stock antes de repetirlo.");
@@ -88,29 +91,59 @@ export default function PanelConsumoPersonal({ carrito, turnoId, onRegistrado })
   }
 
   return (
-    <div data-consumo-personal className="grid gap-3">
+    <div data-consumo-personal className="grid content-start gap-3">
+      <BuscadorProductos
+        localId={localId}
+        onAgregar={agregar}
+        esDeposito={esDeposito}
+        wrapCard={false}
+        mostrarStock={false}
+      />
+
+      {productos.length > 0 ? (
+        <div data-lista-consumo className="rounded-xl2 border sunmi-border sunmi-bg-card px-4 divide-y sunmi-divide">
+          {productos.map((p, idx) => {
+            const porPeso = p.unidadMedida === "kg";
+            return (
+              <div key={p.productoBaseId} className="flex items-center gap-3 py-2.5">
+                <span className="min-w-0 flex-1 text-sm3 sunmi-text-strong break-words">{p.nombre}</span>
+                <SunmiCampoCantidad
+                  valor={p.cantidad}
+                  onCambiar={(v) => despachar({ type: ActionTypes.UPDATE_CANTIDAD, payload: { idx, nuevaCantidad: v } })}
+                  etiqueta={`Cantidad de ${p.nombre}`}
+                  minimo={porPeso ? 0.001 : 1}
+                  paso={porPeso ? 0.1 : 1}
+                  decimales={porPeso ? 3 : 0}
+                  tamano="compacto"
+                />
+                <SunmiLinkButton
+                  type="button"
+                  onClick={() => despachar({ type: ActionTypes.REMOVE_ITEM, payload: { idx } })}
+                  disabled={registrando}
+                  className="shrink-0 text-sm3"
+                >
+                  Quitar
+                </SunmiLinkButton>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
       <div className="grid gap-1.5">
         <span className="text-sm2 font-medium sunmi-text-muted">¿Quién lo consume?</span>
-        {errorCarga ? (
-          <p role="alert" className="text-sm2 sunmi-text-danger">
-            {errorCarga}
-          </p>
-        ) : !operarios ? (
-          <SunmiLoader />
-        ) : (
-          <SunmiSelectAdv
-            value={operadorId}
-            onChange={(v) => setOperadorId(v)}
-            placeholder="Elegí quién"
-            aria-label="Quién lo consume"
-          >
-            {operarios.map((o) => (
-              <SunmiSelectOption key={o.id} value={String(o.id)}>
-                {o.nombre}
-              </SunmiSelectOption>
-            ))}
-          </SunmiSelectAdv>
-        )}
+        <SunmiSelectAdv
+          value={empleadoId}
+          onChange={(v) => setEmpleadoId(v)}
+          placeholder="Elegí quién"
+          aria-label="Quién lo consume"
+        >
+          {empleados.map((e) => (
+            <SunmiSelectOption key={e.id} value={String(e.id)}>
+              {e.nombre}
+            </SunmiSelectOption>
+          ))}
+        </SunmiSelectAdv>
       </div>
 
       <div data-resumen-consumo className="rounded-xl2 border sunmi-border sunmi-bg-card px-4 py-3.5 space-y-2.5 text-sm3">
@@ -130,11 +163,6 @@ export default function PanelConsumoPersonal({ carrito, turnoId, onRegistrado })
         </div>
       </div>
 
-      {resumen.hayServicios ? (
-        <p role="alert" className="text-sm2 sunmi-text-danger">
-          Un servicio no sale del stock: sacalo del carrito.
-        </p>
-      ) : null}
       {error ? (
         <p role="alert" className="text-sm2 sunmi-text-danger break-words">
           {error}
