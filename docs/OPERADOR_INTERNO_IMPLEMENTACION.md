@@ -98,6 +98,11 @@ model Local {
 | `/api/operador/editar` | POST | `usuarios.gestionar` | Edita nombre/PIN/activo/locales |
 | `/api/operador/eliminar` | POST | `usuarios.gestionar` | Elimina operador permanentemente |
 
+**Desde 2026-10-15 [CÓDIGO]:** un operador es de UN local (`OperadorLocal.localId`).
+`/api/operador/locales` se borró; `listar-todos`, `crear`, `editar` y
+`eliminar` trabajan sobre el local activo y no reciben locales; el permiso es
+`config_local.operadores`. Ver `docs/business-rules/empleados.md`.
+
 ### Paginas (2 archivos)
 
 | Archivo | Funcion |

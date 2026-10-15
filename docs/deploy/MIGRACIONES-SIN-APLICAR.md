@@ -22,6 +22,19 @@ Si la lista está vacía, el despliegue es solo de código.
   UNIQUE por pedido y un índice por local y fecha. No toca ninguna columna ni
   ninguna fila existente, y el código anterior no la lee. Sin relleno: las
   recepciones de antes no se confirmaron y no se inventa quién lo hizo.
+- `20261015232632_operadores_y_empleados_por_local` — **MIGRACIÓN DE DATOS:
+  autorizarla a sabiendas.** Agrega `localId` (nulo, con FK) a
+  `OperadorLocal` y a `Empleado`, y lo RELLENA desde su única fila de
+  `OperadorEnLocal` / `EmpleadoEnLocal`. Si alguno tiene más de una, la
+  migración se frena ANTES de tocar el esquema, nombrándolo: no se elige. Con
+  los datos medidos por Emanuel —6 operadores y 6 empleados, uno a uno— no
+  frena. Cambia la unicidad del nombre: deja de ser global en `OperadorLocal`
+  (se borra el índice `OperadorLocal_nombre_key`) y pasa a ser
+  `(localId, nombre)` en los dos. No borra columnas ni tablas. Compatible con
+  el código anterior durante la ventana; lo que ese código cree en la ventana
+  nace sin local y lo asigna la PARTE 0 de la reposición, corrida después.
+  La reposición, escrita antes de commitear, está en
+  `scripts/deploy/reposicion-operadores-por-local.sql`.
 
 Producción está en **65 migraciones**, la última
 `20261015154425_empleados`.
