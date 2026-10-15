@@ -136,8 +136,7 @@ async function montarLocal(nombre) {
   };
 }
 async function operador(L) {
-  const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-op${(n += 1)}`, pinHash: "x" } });
-  await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: L.local.id } });
+  const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-op${(n += 1)}`, pinHash: "x", localId: L.local.id } });
   return { op, quien: { sesion: L.sesion, operador: firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: L.local.id }) } };
 }
 /** Abre por la ruta clásica con el cuerpo dado. Devuelve la respuesta. */

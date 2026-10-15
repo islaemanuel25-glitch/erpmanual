@@ -144,9 +144,8 @@ async function montar() {
   const otraCuenta = await usuario("otra-cuenta", local.id);
   const cuentaOtroLocal = await usuario("cuenta-otro", otroLocal.id);
   const operador = async (sufijo, localId = local.id) => {
-    const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-${sufijo}`, pinHash: "x" } });
+    const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-${sufijo}`, pinHash: "x", localId } });
     creado.operadorIds.push(op.id);
-    await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId } });
     return op;
   };
   const opA = await operador("a");
@@ -959,9 +958,8 @@ async function correr() {
     igual("sin escrituras económicas", await huella(), antes);
 
     // Otro día: un operador nuevo abre su caja, y la apertura se lleva a ayer.
-    const opC = await prisma.operadorLocal.create({ data: { nombre: `${marca}-c`, pinHash: "x" } });
+    const opC = await prisma.operadorLocal.create({ data: { nombre: `${marca}-c`, pinHash: "x", localId: f.local.id } });
     creado.operadorIds.push(opC.id);
-    await prisma.operadorEnLocal.create({ data: { operadorId: opC.id, localId: f.local.id } });
     const C = { sesion: f.A.sesion, operador: firmarTokenOperador({ operadorId: opC.id, nombre: opC.nombre, localId: f.local.id }) };
     const abreC = await abrir(C);
     requerir("C abre su caja", abreC.ok === true, `${abreC.status} ${abreC.error ?? ""}`);
@@ -1259,9 +1257,8 @@ async function correr() {
   seccion("25. PR B: 428 y varios operadores: nadie sincroniza la caja de otro");
 
   // D abre su caja: la de B quedó cerrada en la sección 18.
-  const opD = await prisma.operadorLocal.create({ data: { nombre: `${marca}-d`, pinHash: "x" } });
+  const opD = await prisma.operadorLocal.create({ data: { nombre: `${marca}-d`, pinHash: "x", localId: f.local.id } });
   creado.operadorIds.push(opD.id);
-  await prisma.operadorEnLocal.create({ data: { operadorId: opD.id, localId: f.local.id } });
   const D = { sesion: f.A.sesion, operador: firmarTokenOperador({ operadorId: opD.id, nombre: opD.nombre, localId: f.local.id }) };
   const voucherD = firmarVoucherOperador({ operadorId: opD.id, localId: f.local.id });
   const abreD = await abrir(D);

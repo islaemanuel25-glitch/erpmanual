@@ -248,6 +248,8 @@ model Local {
   configuracionLocal ConfiguracionLocal?
   operadorAsignaciones OperadorEnLocal[]
   empleadoAsignaciones EmpleadoEnLocal[]
+  operadores           OperadorLocal[]
+  empleados            Empleado[]
   arqueos              ArqueoCaja[]
   arqueoPostergaciones ArqueoPostergacion[]
   cierresPreparacion   CierrePreparacion[]
@@ -4205,14 +4207,21 @@ model AuditoriaBitacora {
 // OPERADORES INTERNOS
 // ---------------------------------------------------------------------------
 
+/// QUIEN MANEJA LA CAJA DE UN LOCAL. Regla de Emanuel (2026-10-15): es de UN
+/// local, el que lo contrata; si trabaja en dos, son dos registros. El nombre
+/// es único dentro del local, no en todo el sistema. `localId` es nullable solo
+/// por la ventana del despliegue: la migración lo rellena desde
+/// `OperadorEnLocal`, que el código ya no lee ni escribe.
 model OperadorLocal {
   id        Int      @id @default(autoincrement())
-  nombre    String   @unique
+  nombre    String
   pinHash   String
   activo    Boolean  @default(true)
+  localId   Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  local   Local?            @relation(fields: [localId], references: [id])
   locales OperadorEnLocal[]
   ventas  Venta[]
   turnos  Turno[]
@@ -4222,6 +4231,8 @@ model OperadorLocal {
   consumosPersonal ConsumoPersonal[]
   /// El empleado que es este operador. Todo operador es empleado.
   empleado Empleado?
+
+  @@unique([localId, nombre])
 }
 
 /// QUIEN TRABAJA EN EL LOCAL. Regla de Emanuel (2026-10-15): el OPERADOR es
@@ -4232,18 +4243,25 @@ model Empleado {
   id         Int      @id @default(autoincrement())
   nombre     String
   activo     Boolean  @default(true)
-  /// Su operador, si maneja la caja. Uno a uno.
+  /// Su operador, si maneja la caja. Uno a uno, del mismo local.
   operadorId Int?     @unique
+  /// El local que lo contrata (2026-10-15): uno solo. Nullable solo por la
+  /// ventana del despliegue; la migración lo rellena desde `EmpleadoEnLocal`.
+  localId    Int?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   operador         OperadorLocal?    @relation(fields: [operadorId], references: [id], onDelete: SetNull)
+  local            Local?            @relation(fields: [localId], references: [id])
   locales          EmpleadoEnLocal[]
   consumosPersonal ConsumoPersonal[]
   gastos           Gasto[]
+
+  @@unique([localId, nombre])
 }
 
-/// Los locales donde trabaja un empleado: el patrón de `OperadorEnLocal`.
+/// Los locales donde trabajaba un empleado. Desde 2026-10-15 el código no la
+/// lee ni la escribe (`Empleado.localId`); se conserva hasta otra tanda.
 model EmpleadoEnLocal {
   empleadoId Int
   localId    Int
@@ -4338,6 +4356,9 @@ model GastoArchivo {
   @@unique([gastoId, orden])
 }
 
+/// Los locales de un operador, de cuando uno podía tener varios. Desde
+/// 2026-10-15 el código no la lee ni la escribe (`OperadorLocal.localId`); se
+/// conserva hasta otra tanda.
 model OperadorEnLocal {
   operadorId Int
   localId    Int

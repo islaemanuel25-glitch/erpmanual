@@ -97,7 +97,7 @@ async function montar() {
   const pl = await prisma.productoLocal.create({ data: { localId: local.id, baseId: base.id, precio_costo: 100, precio_venta: 150 } });
 
   const op = await leer(await rutaCrearOperador.POST(pedido(`${BASE}/operador/crear`, { sesion: encargado.sesion }, {
-    cuerpo: { nombre: `${marca}-Caro`, pin: "1234", localIds: [local.id] },
+    cuerpo: { nombre: `${marca}-Caro`, pin: "1234" },
   })));
   if (!op.ok) throw new Error(`operador: ${op.error}`);
   creado.operadorIds.push(op.operador.id);
@@ -126,7 +126,7 @@ async function desmontar() {
     const pls = (await prisma.productoLocal.findMany({ where: { baseId: { in: creado.bases } }, select: { id: true } })).map((p) => p.id);
     await prisma.stockLocal.deleteMany({ where: { productoId: { in: pls } } });
     await prisma.configuracionLocal.deleteMany({ where: { localId } });
-    const empleados = (await prisma.empleado.findMany({ where: { locales: { some: { localId } } }, select: { id: true } })).map((e) => e.id);
+    const empleados = (await prisma.empleado.findMany({ where: { localId }, select: { id: true } })).map((e) => e.id);
     await prisma.empleado.deleteMany({ where: { id: { in: empleados } } });
   }
   if (creado.proveedorId) await prisma.proveedor.updateMany({ where: { id: creado.proveedorId }, data: { activo: false } }).catch(() => {});

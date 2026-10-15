@@ -27,38 +27,37 @@ export async function POST(req) {
       return NextResponse.json({ ok: false, error: "Seleccioná un operador e ingresá el PIN." }, { status: 400 });
     }
 
-    const asignacion = await prisma.operadorEnLocal.findUnique({
-      where: {
-        operadorId_localId: { operadorId: Number(operadorId), localId: scope.localId },
-      },
-      include: { operador: true },
+    // Solo un operador DE este local (`localId`) entra a su caja.
+    const operador = await prisma.operadorLocal.findFirst({
+      where: { id: Number(operadorId) || 0, localId: scope.localId },
+      select: { id: true, nombre: true, activo: true, pinHash: true },
     });
 
-    if (!asignacion || !asignacion.operador.activo) {
+    if (!operador || !operador.activo) {
       return NextResponse.json({ ok: false, error: "Operador no disponible en este local." }, { status: 404 });
     }
 
-    const pinValido = await bcrypt.compare(String(pin), asignacion.operador.pinHash);
+    const pinValido = await bcrypt.compare(String(pin), operador.pinHash);
     if (!pinValido) {
       return NextResponse.json({ ok: false, error: "PIN incorrecto." }, { status: 401 });
     }
 
     const token = firmarTokenOperador({
-      operadorId: asignacion.operador.id,
-      nombre: asignacion.operador.nombre,
+      operadorId: operador.id,
+      nombre: operador.nombre,
       localId: scope.localId,
     });
 
     // Voucher offline: acompaña a la venta encolada para conservar la atribución
     // al sincronizar aunque el token de operador ya haya vencido.
     const voucher = firmarVoucherOperador({
-      operadorId: asignacion.operador.id,
+      operadorId: operador.id,
       localId: scope.localId,
     });
 
     const res = NextResponse.json({
       ok: true,
-      operador: { id: asignacion.operador.id, nombre: asignacion.operador.nombre },
+      operador: { id: operador.id, nombre: operador.nombre },
       voucher,
     });
 

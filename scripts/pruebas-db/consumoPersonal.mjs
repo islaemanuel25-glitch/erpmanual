@@ -98,17 +98,16 @@ async function montar() {
   const cajero = await usuario("cajero");
   const otroCajero = await usuario("otro");
 
-  const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-Brenda`, pinHash: "x" } });
+  const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-Brenda`, pinHash: "x", localId: local.id } });
   creado.operadorIds.push(op.id);
-  await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: local.id } });
   // Quien consume es una EMPLEADA SIN OPERADOR: trabaja en la cocina y no
   // maneja la caja. Es el caso que Empleados existe para cubrir.
   const consume = await prisma.empleado.create({
-    data: { nombre: `${marca}-Mariangel`, locales: { create: [{ localId: local.id }] } },
+    data: { nombre: `${marca}-Mariangel`, localId: local.id },
   });
   // Y el empleado de la cajera, que cobra el sueldo de la sección 5.
   const empleadoOp = await prisma.empleado.create({
-    data: { nombre: op.nombre, operadorId: op.id, locales: { create: [{ localId: local.id }] } },
+    data: { nombre: op.nombre, operadorId: op.id, localId: local.id },
   });
   creado.empleadoIds = [consume.id, empleadoOp.id];
 

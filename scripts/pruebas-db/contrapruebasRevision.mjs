@@ -1535,6 +1535,52 @@ const CASOS = [
     inyecciones: [{ de: "const where = { localId, confirmadoEn: { lte: hasta } };", a: "const where = { confirmadoEn: { lte: hasta } };" }],
     esperadas: ["otro local no lo ve"],
   },
+  // ── OPERADORES Y EMPLEADOS POR LOCAL (2026-10-15) ───────────────────────
+  {
+    n: "OL-1",
+    defecto: "el backend acepta un empleado de otro local en Sueldo y en Consumo",
+    archivo: "lib/empleados/empleadosServer.js",
+    suite: "scripts/pruebas-db/operadoresPorLocal.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "if (!esDelLocal(e, localId)) return { empleado: null, deOtroLocal: true };", a: "" }],
+    esperadas: ["Sueldo de un empleado de otro local: 403", "ni como adelanto", "Consumo de un empleado de otro local: 403"],
+  },
+  {
+    n: "OL-2",
+    defecto: "el relleno no frena a quien tiene dos locales",
+    archivo: "prisma/migrations/20261015232632_operadores_y_empleados_por_local/migration.sql",
+    suite: "scripts/pruebas-db/operadoresPorLocal.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "IF operadores IS NOT NULL OR empleados IS NOT NULL THEN", a: "IF false THEN" }],
+    esperadas: ["con un operador en dos locales, la migración se frena", "con un empleado en dos locales, la migración se frena", "y no aplicó nada (un operador)"],
+  },
+  {
+    n: "OL-3",
+    defecto: "la lista de operadores no se filtra por el local activo",
+    archivo: "app/api/operador/listar-todos/route.js",
+    suite: "scripts/pruebas-db/operadoresPorLocal.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "where: { localId: scope.localId },", a: "where: {}," }],
+    esperadas: ["la lista de operadores es la del local activo", "un admin ve la del local que eligió arriba, no todas"],
+  },
+  {
+    n: "OL-4",
+    defecto: "crear operador vuelve a aceptar locales",
+    archivo: "app/api/operador/crear/route.js",
+    suite: "scripts/pruebas-db/operadoresPorLocal.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "if (pideOtroLocal(body)) {", a: "if (false) {" }],
+    esperadas: ["crear operador ya no acepta locales", "ni uno solo"],
+  },
+  {
+    n: "OL-5",
+    defecto: "el login del POS deja entrar a un operador de otro local",
+    archivo: "app/api/operador/login/route.js",
+    suite: "scripts/pruebas-db/operadoresPorLocal.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "where: { id: Number(operadorId) || 0, localId: scope.localId },", a: "where: { id: Number(operadorId) || 0 }," }],
+    esperadas: ["y uno de otro local no entra"],
+  },
 ];
 
 // Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número

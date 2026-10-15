@@ -132,7 +132,10 @@ async function casoMigracion() {
   try {
     aplicarMigraciones(url, { hasta: MIGRACION });
     const s = await sembrarAntes(urlDe(DB));
-    aplicarMigraciones(url, { solo: MIGRACIONES.filter((m) => m >= MIGRACION) });
+    // Hasta antes de `operadores_y_empleados_por_local`: esta siembra tiene a
+    // Ana en DOS locales, que es justo lo que esa migración frena. Su caso
+    // vive en `operadoresPorLocal.mjs`.
+    aplicarMigraciones(url, { solo: MIGRACIONES.filter((m) => m >= MIGRACION && m < "20261015232632_operadores_y_empleados_por_local") });
 
     const c = await crearClientePrisma({ nivel: ESCRITURA, url: urlDe(DB) });
     try {
@@ -274,13 +277,12 @@ async function desmontar() {
     const pls = (await prisma.productoLocal.findMany({ where: { baseId: { in: creado.bases } }, select: { id: true } })).map((p) => p.id);
     await prisma.stockLocal.deleteMany({ where: { productoId: { in: pls } } });
     await prisma.configuracionLocal.deleteMany({ where: { localId } });
-    const empleados = (await prisma.empleado.findMany({ where: { locales: { some: { localId } } }, select: { id: true } })).map((e) => e.id);
+    const empleados = (await prisma.empleado.findMany({ where: { localId }, select: { id: true } })).map((e) => e.id);
     await prisma.empleado.deleteMany({ where: { id: { in: [...empleados, ...creado.empleadoIds] } } });
-    const ops = (await prisma.operadorEnLocal.findMany({ where: { localId }, select: { operadorId: true } })).map((o) => o.operadorId);
+    const ops = (await prisma.operadorLocal.findMany({ where: { localId }, select: { id: true } })).map((o) => o.id);
     creado.operadorIds.push(...ops);
   }
   if (creado.proveedorId) await prisma.proveedor.updateMany({ where: { id: creado.proveedorId }, data: { activo: false } }).catch(() => {});
-  await prisma.operadorEnLocal.deleteMany({ where: { operadorId: { in: creado.operadorIds } } });
   await prisma.operadorLocal.deleteMany({ where: { id: { in: creado.operadorIds } } }).catch(() => {});
 }
 
@@ -288,26 +290,26 @@ async function casosEmpleados(f) {
   seccion("B · Operador nuevo → su empleado; empleados sin operador");
   const quienEnc = { sesion: f.encargado.sesion };
   const op = await leer(await rutaCrearOperador.POST(pedido(`${BASE}/operador/crear`, quienEnc, {
-    cuerpo: { nombre: `${marca}-Caro`, pin: "1234", localIds: [f.local.id] },
+    cuerpo: { nombre: `${marca}-Caro`, pin: "1234" },
   })));
   igual("el operador se crea", [op.status, op.ok], [200, true]);
   creado.operadorIds.push(op.operador.id);
   const suyo = await prisma.empleado.findUnique({
     where: { operadorId: op.operador.id },
-    select: { nombre: true, activo: true, locales: { select: { localId: true } } },
+    select: { nombre: true, activo: true, localId: true },
   });
-  igual("y nace su empleado, con su nombre y su local", [suyo?.nombre, suyo?.activo, suyo?.locales.map((l) => l.localId)], [`${marca}-Caro`, true, [f.local.id]]);
+  igual("y nace su empleado, con su nombre y su local", [suyo?.nombre, suyo?.activo, suyo?.localId], [`${marca}-Caro`, true, f.local.id]);
 
   const cocina = await leer(await rutaCrearEmpleado.POST(pedido(`${BASE}/empleados/crear`, quienEnc, {
-    cuerpo: { nombre: `${marca}-Cocinero`, localIds: [f.local.id] },
+    cuerpo: { nombre: `${marca}-Cocinero` },
   })));
   igual("un empleado SIN operador se da de alta", [cocina.status, cocina.ok, cocina.empleado?.operador], [200, true, null]);
-  const ajeno = await leer(await rutaCrearEmpleado.POST(pedido(`${BASE}/empleados/crear`, quienEnc, {
-    cuerpo: { nombre: `${marca}-Ajeno`, localIds: [f.local.id + 999999] },
+  const ajeno = await leer(await rutaCrearEmpleado.POST(pedido(`${BASE}/empleados/crear?localId=${f.local.id + 999999}`, quienEnc, {
+    cuerpo: { nombre: `${marca}-Ajeno` },
   })));
   igual("un no-admin no da de alta en otro local", ajeno.status, 403);
   const ocupado = await leer(await rutaCrearEmpleado.POST(pedido(`${BASE}/empleados/crear`, quienEnc, {
-    cuerpo: { nombre: `${marca}-Otro`, localIds: [f.local.id], operadorId: op.operador.id },
+    cuerpo: { nombre: `${marca}-Otro`, operadorId: op.operador.id },
   })));
   igual("un operador que ya es de un empleado no se asocia a otro", ocupado.status, 409);
   const lista = await leer(await rutaListarEmpleados.GET(pedido(`${BASE}/empleados/listar-todos`, quienEnc, { metodo: "GET" })));

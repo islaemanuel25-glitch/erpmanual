@@ -581,6 +581,17 @@ jobs:
       - name: Contrapruebas del aviso de pago parcial
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs PP-
 
+      # Operadores y empleados son de UN local: la migración con los de hoy y
+      # su freno, Administración por el local activo, el login del POS por
+      # local, y Pagar/Consumo que rechazan con 403 un empleado de otro local.
+      - name: Ejercer operadores y empleados por local contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/operadoresPorLocal.mjs
+
+      # Y que esa prueba MIRA: sin la validación del backend, sin el freno del
+      # relleno, sin el filtro de la lista, con locales en el alta y en el login.
+      - name: Contrapruebas de operadores y empleados por local
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs OL-
+
       # Y que esa prueba MIRA: se rompe el cierre sobre una copia, tres veces, y
       # cada vez tienen que gritar las afirmaciones que nombra el caso. Solo los
       # casos `SI-`: los de transferencias tardan minutos y se corren a mano.

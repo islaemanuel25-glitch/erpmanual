@@ -157,15 +157,14 @@ async function montar() {
   const dueno = await nuevoUsuario("dueno", local.id);
   const cuentaSinOperario = await nuevoUsuario("cuenta-sin-operario", localSinOperario.id);
 
-  const nuevoOperador = async (sufijo, localIds) => {
-    const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-${sufijo}`, pinHash: "x" } });
+  const nuevoOperador = async (sufijo, localId) => {
+    const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-${sufijo}`, pinHash: "x", localId } });
     creado.operadorIds.push(op.id);
-    for (const localId of localIds) await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId } });
     return op;
   };
-  const opA = await nuevoOperador("operador-a", [local.id]);
-  const opB = await nuevoOperador("operador-b", [local.id]);
-  const opC = await nuevoOperador("operador-c", [localSinOperario.id]);
+  const opA = await nuevoOperador("operador-a", local.id);
+  const opB = await nuevoOperador("operador-b", local.id);
+  const opC = await nuevoOperador("operador-c", localSinOperario.id);
 
   const producto = await crearProductoVendible(prisma, {
     grupoId: grupo.id, localId: local.id, nombre: `${marca}-producto`, precioVenta: 1000, precioCosto: 600, stock: 1000,

@@ -162,9 +162,8 @@ async function correr() {
   const clave = () => `${marca}-${(n += 1)}`;
 
   async function nuevaCaja(fondo = 1000) {
-    const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-op${(n += 1)}`, pinHash: "x" } });
+    const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-op${(n += 1)}`, pinHash: "x", localId: f.local.id } });
     creado.operadorIds.push(op.id);
-    await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: f.local.id } });
     const quien = { sesion: f.sesion, operador: firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: f.local.id }) };
     const r = await leer(await rutaAbrir.POST(pedido(`${BASE}/turnos/abrir`, quien, { montoInicial: fondo, turnoOperativoId: await turnoOperativoDeSesion(prisma, quien) })));
     requerir("abre la caja", r.ok === true, `${r.status} ${r.error ?? ""}`);

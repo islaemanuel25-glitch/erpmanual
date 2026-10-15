@@ -194,8 +194,7 @@ try {
 
   // ── Las cajas, por las rutas del POS ────────────────────────────────────
   async function nuevaCaja(nombreOperador, { fondo = 1000, turnoOperativoId } = {}) {
-    const op = await c.operadorLocal.create({ data: { nombre: nombreOperador, pinHash: "x" } });
-    await c.operadorEnLocal.create({ data: { operadorId: op.id, localId: local.id } });
+    const op = await c.operadorLocal.create({ data: { nombre: nombreOperador, pinHash: "x", localId: local.id } });
     const quien = { sesion: sesionCaja, operador: firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: local.id }) };
     const cuerpo = { montoInicial: fondo, ...(turnoOperativoId ? { turnoOperativoId } : {}) };
     const r = await leer(rutaAbrir.POST(pedidoPos(`${BASE}/turnos/abrir`, quien, cuerpo)));

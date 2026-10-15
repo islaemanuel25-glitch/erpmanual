@@ -214,9 +214,8 @@ async function correr() {
   const sesionPosDe = (L) => sesionDe(L.usuario, L.local.id, PERMISOS_POS);
 
   async function nuevaCaja(L) {
-    const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-op${(n += 1)}`, pinHash: "x" } });
+    const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-op${(n += 1)}`, pinHash: "x", localId: L.local.id } });
     creado.operadorIds.push(op.id);
-    await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: L.local.id } });
     const quien = { sesion: sesionPosDe(L), operador: firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: L.local.id }) };
     const r = await leer(await rutaAbrir.POST(pedidoPos(`${BASE}/turnos/abrir`, quien, { montoInicial: 1000, turnoOperativoId: await turnoOperativoDeSesion(prisma, quien) })));
     requerir("abre la caja", r.ok === true, `${r.status} ${r.error ?? ""}`);

@@ -76,9 +76,8 @@ async function montar() {
   });
   creado.usuarioIds.push(cuenta.id);
   const operador = async (sufijo) => {
-    const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-${sufijo}`, pinHash: "x" } });
+    const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-${sufijo}`, pinHash: "x", localId: local.id } });
     creado.operadorIds.push(op.id);
-    await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: local.id } });
     return op;
   };
   const opA = await operador("a");
