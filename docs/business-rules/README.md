@@ -35,6 +35,9 @@ está claro cuál de las dos es, va como **[ACCIDENTE POSIBLE]** y no como regla
 - [pagar-desde-el-pos.md](pagar-desde-el-pos.md) — "Pagar" del POS, el tipo de
   cada salida de caja, y por qué la plata resta todo y la ganancia solo sueldos y
   gastos; las compras por cargar.
+- [consumo-del-personal.md](consumo-del-personal.md) — lo que se lleva el
+  personal: sale del stock como una venta sin serlo, es un gasto al costo que no
+  se paga, y resta en el resultado del turno; la foto del ticket de un gasto.
 - [tesoreria.md](tesoreria.md) — la plata real: el efectivo declarado sale de
   las entregas de cada caja, lo digital es cobrado declarado por el POS, y un
   pago hecho desde la caja no se resta dos veces.

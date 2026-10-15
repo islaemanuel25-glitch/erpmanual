@@ -56,6 +56,7 @@ import {
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { construirLineasComerciales, aplicarConsumoStock } from "@/lib/combos/ventaConsumo";
+import { cargarMapasDeProductos } from "@/lib/pos-ventas/mapasDeProductos";
 import { getConfigLocalEfectiva } from "@/lib/config/local";
 import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
 
@@ -1114,50 +1115,11 @@ async function procesarCrear(req, intento) {
 
     // Obtener precios de costo y datos para conversión piezas→kg (depósito PIEZA)
     const productoBaseIds = items.map((i) => i.productoBaseId);
-    const productosBase = await prisma.productoBase.findMany({
-      where: { id: { in: productoBaseIds } },
-      select: {
-        id: true, precio_costo: true, factor_pack: true, categoria_id: true,
-        modoVentaDeposito: true, pesoReferenciaKg: true, modo_envio: true,
-        unidad_medida: true, es_combo: true,
-        // ── SIN ESTOS DOS, NINGUNA PIEZA SE CONGELA COMO PIEZA ───────────
-        //
-        // `baseStockMap` los lee más abajo para armar la entrada que decide la
-        // presentación, pero el select no los pedía: llegaban `undefined`, así
-        // que `modoCompraProveedor` quedaba en null y `esProductoFiambre` —la
-        // puerta de `esFiambreFijo`— daba false SIEMPRE. Un fiambre de pieza
-        // fija tiene `unidad_medida = "kg"`, o sea que caía en la rama del kilo
-        // y el snapshot lo congelaba como KG: "2 PIEZA" se guardaba como "2 KG",
-        // y de ahí sale cuántos kilos acredita `confirmar-recepcion`.
-        //
-        // El candado del helper pasaba igual porque lo llamaba con un objeto
-        // escrito a mano, donde los dos campos estaban. El camino real del POS
-        // no los tenía.
-        modoCompraProveedor: true, pesoEsFijo: true,
-      },
-    });
-    const costosMap = {};
-    const pbMap = {};
-    const baseStockMap = {};
-    const productosBaseMap = {}; // { es_combo } por productoBaseId (server-authoritative)
-    productosBase.forEach((p) => {
-      const costoBulto = Number(p.precio_costo) || 0;
-      const factorPack = Math.max(1, Number(p.factor_pack) || 1);
-      costosMap[p.id] = { costoBulto, factorPack };
-      pbMap[p.id] = { categoria_id: p.categoria_id };
-      productosBaseMap[p.id] = { es_combo: p.es_combo === true };
-      baseStockMap[p.id] = {
-        modoVentaDeposito: p.modoVentaDeposito || "PESO",
-        pesoReferenciaKg: Number(p.pesoReferenciaKg || 0),
-        // Lo exige `esProductoFiambre`, la puerta de `esFiambreFijo`: sin él una
-        // pieza fija se lee como producto a granel al congelar la presentación.
-        modoCompraProveedor: p.modoCompraProveedor || null,
-        pesoEsFijo: p.pesoEsFijo ?? null,
-        factorPack,
-        modo_envio: p.modo_envio || null,
-        unidad_medida: p.unidad_medida || "unidad",
-      };
-    });
+    // Compartido con el consumo del personal: los dos descuentan stock igual.
+    const { costosMap, pbMap, baseStockMap, productosBaseMap } = await cargarMapasDeProductos(
+      prisma,
+      productoBaseIds
+    );
 
     // === VENTA INTERNA: ¿esta venta despacha mercadería a un local propio? ===
     //

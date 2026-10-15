@@ -200,7 +200,10 @@ try {
   // ══════════════════════════════════════════════════════════════════════
   seccion("Las categorías iniciales");
   // ══════════════════════════════════════════════════════════════════════
-  ok("las siete, activas, en el orden de la migración", JSON.stringify(categorias.map((x) => x.nombre)) === JSON.stringify(CATEGORIAS_INICIALES),
+  // Las siete con las que nació el catálogo, más "Consumo del personal", que
+  // agrega la migración del consumo (2026-10-15) antes de "Otros".
+  const CATALOGO_HOY = [...CATEGORIAS_INICIALES.slice(0, -1), "Consumo del personal", CATEGORIAS_INICIALES.at(-1)];
+  ok("las ocho, activas, en el orden de las migraciones", JSON.stringify(categorias.map((x) => x.nombre)) === JSON.stringify(CATALOGO_HOY),
     JSON.stringify(categorias));
   ok("el nombre es único en la base",
     (await error(() => c.categoriaGasto.create({ data: { nombre: "Alquiler" } })))?.code === "P2002");

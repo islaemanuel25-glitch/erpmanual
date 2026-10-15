@@ -163,7 +163,10 @@ try {
   r = await categorias(casianoSinNada);
   ok("sin finanzas.ver: 403", r.status === 403 && r.ok === false, JSON.stringify(r));
   r = await categorias(casianoVe);
-  ok("con finanzas.ver: las siete activas, por su orden", r.status === 200 && JSON.stringify(r.categorias.map((x) => x.nombre)) === JSON.stringify(CATEGORIAS_INICIALES),
+  // Las siete iniciales más "Consumo del personal" (migración del 2026-10-15),
+  // antes de "Otros".
+  const CATALOGO_HOY = [...CATEGORIAS_INICIALES.slice(0, -1), "Consumo del personal", CATEGORIAS_INICIALES.at(-1)];
+  ok("con finanzas.ver: las ocho activas, por su orden", r.status === 200 && JSON.stringify(r.categorias.map((x) => x.nombre)) === JSON.stringify(CATALOGO_HOY),
     JSON.stringify(r.categorias));
 
   // Un gasto con "Sueldos" ANTES de darla de baja, para ver después su detalle.
@@ -175,7 +178,7 @@ try {
   await c.categoriaGasto.create({ data: { nombre: "Seguros", orden: 35 } });
   r = await categorias(casianoVe);
   ok("una categoría dada de baja no se ofrece y una nueva sí, en su orden: la lista sale de la base",
-    JSON.stringify(r.categorias.map((x) => x.nombre)) === JSON.stringify(["Servicios", "Alquiler", "Seguros", "Mantenimiento", "Insumos y limpieza", "Impuestos", "Otros"]),
+    JSON.stringify(r.categorias.map((x) => x.nombre)) === JSON.stringify(["Servicios", "Alquiler", "Seguros", "Mantenimiento", "Insumos y limpieza", "Impuestos", "Consumo del personal", "Otros"]),
     JSON.stringify(r.categorias.map((x) => x.nombre)));
 
   // ══════════════════════════════════════════════════════════════════════

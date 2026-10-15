@@ -24,6 +24,7 @@ import { LIMITES_TRANSACCION_DEL_LOCAL } from "@/lib/pos-ventas/candadoDelLocal"
 import { SELECT_TURNO, rechazoDelTurno } from "@/lib/caja/turnoParaMover";
 import { esRechazoDePagar, leerPedidoDePago, pagarDesdeElPos } from "@/lib/caja/pagarDesdeElPosServer";
 import { CATEGORIA_SUELDOS } from "@/lib/caja/tipoEgreso";
+import { CATEGORIA_CONSUMO_PERSONAL } from "@/lib/pos-ventas/consumoPersonal";
 import { categoriasDeGasto } from "@/lib/finanzas/gastosServer";
 import { leerDetalleDeCaja } from "@/lib/turnosYCierres/lecturaTurnosYCierresServer";
 import { proveedorVisibleWhere } from "@/lib/visibilidad";
@@ -78,8 +79,11 @@ export async function GET(req) {
       ok: true,
       caja: { id: turnoId, efectivoAhora: detalle?.detalle?.efectivo?.teniaQueHaber ?? null },
       proveedores,
-      // Sueldos tiene su propio botón: como "Gasto" no se ofrece.
-      categorias: categorias.filter((x) => x.nombre !== CATEGORIA_SUELDOS).map((x) => ({ id: x.id, nombre: x.nombre })),
+      // Sueldos tiene su propio botón: como "Gasto" no se ofrece. El consumo
+      // del personal tampoco: no se paga, sale del stock desde el cobro.
+      categorias: categorias
+        .filter((x) => x.nombre !== CATEGORIA_SUELDOS && x.nombre !== CATEGORIA_CONSUMO_PERSONAL)
+        .map((x) => ({ id: x.id, nombre: x.nombre })),
       empleados: empleados.map((e) => e.operador),
     });
   } catch (e) {

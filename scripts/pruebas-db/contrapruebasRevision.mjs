@@ -820,6 +820,36 @@ const CASOS = [
     inyecciones: [{ de: "  if (turno.cierre !== null) {", a: "  if (false) {" }],
     esperadas: ["Caja +/− se rechaza: turno cerrado", "no existe ningún CajaMovimiento manual"],
   },
+  // ── EL CONSUMO DEL PERSONAL ─────────────────────────────────────────────
+  //
+  // Las dos mitades de la regla que no se ven en la pantalla del POS: que no
+  // es una venta, y que el gasto vale lo que costó y no lo que se vende.
+  {
+    n: "CP-1",
+    defecto: "el consumo del personal vuelve a crear una Venta",
+    archivo: "lib/pos-ventas/consumoPersonalServer.js",
+    suite: "scripts/pruebas-db/consumoPersonal.mjs",
+    // La suite tiene 32 afirmaciones; con el defecto, las de la sección 2 caen.
+    minimo: 25,
+    inyecciones: [
+      {
+        de: "    await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.CONSUMO_PERSONAL",
+        a:
+          "    await tx.venta.create({ data: { localId, vendedorId: session.id, turnoId, numero: 900000 + consumo.id, subtotal: 0, total: 0, formaPago: \"CONSUMO\" } });\n" +
+          "    await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.CONSUMO_PERSONAL",
+      },
+    ],
+    esperadas: ["no hay Venta nueva"],
+  },
+  {
+    n: "CP-2",
+    defecto: "el gasto del consumo sale al precio de venta y no al costo",
+    archivo: "lib/pos-ventas/consumoPersonalServer.js",
+    suite: "scripts/pruebas-db/consumoPersonal.mjs",
+    minimo: 25,
+    inyecciones: [{ de: "        total: totalCosto,", a: "        total: totalPrecio," }],
+    esperadas: ["gasto por el COSTO, no por el precio"],
+  },
   // ── LA LECTURA DE TESORERÍA ──────────────────────────────────────────────
   //
   // Cada una saca UNA defensa de la lectura y la prueba de base, que arma las

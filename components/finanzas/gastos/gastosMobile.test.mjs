@@ -194,12 +194,15 @@ test("solo usa las rutas de Gastos que existen —y la de turnos a través de Ca
   assert.ok(fs.existsSync("app/api/finanzas/gastos/route.js") && fs.existsSync("app/api/finanzas/gastos/categorias/route.js"));
 });
 
-test("no se agregó ningún endpoint: las rutas de Gastos son las cuatro de la API", () => {
+// CAMBIÓ EL 2026-10-15: la quinta es la foto o el archivo del ticket de un
+// gasto, que se sube desde Finanzas y desde "Pagar" del POS.
+test("no se agregó ningún endpoint: las rutas de Gastos son las cinco de la API", () => {
   const rutas = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "app/api/finanzas/gastos"], { encoding: "utf8" })
     .split("\n")
     .filter(Boolean)
     .sort();
   assert.deepEqual(rutas, [
+    "app/api/finanzas/gastos/[gastoId]/archivo/route.js",
     "app/api/finanzas/gastos/[gastoId]/pagos/route.js",
     "app/api/finanzas/gastos/[gastoId]/route.js",
     "app/api/finanzas/gastos/categorias/route.js",
