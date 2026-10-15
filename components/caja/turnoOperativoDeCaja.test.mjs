@@ -50,8 +50,15 @@ test("[TO-CC] va debajo del título, en la bajada del shell, y no en la barra de
   assert.equal((pos.match(/<TurnoOperativoDeCaja\b/g) || []).length, 1);
   const bajada = pos.slice(pos.indexOf("useBajadaDePagina("), pos.indexOf("useBajadaDePagina(") + 900);
   assert.match(bajada, /<TurnoOperativoDeCaja\b/, "el turno no se registra como bajada de la página");
-  // La barra de la caja: del botón Caja +/- al de Cerrar Turno.
-  const barra = pos.slice(pos.lastIndexOf("<", pos.indexOf("Caja +/-") - 400), pos.indexOf("Cerrar Turno") + 20);
+  // La barra de la caja: del botón Pagar —el primero de la caja desde el
+  // 2026-10-15, cuando "Caja +/-" pasó a "Cambio +/-"— al de Cerrar Turno. El
+  // ancla se comprueba: sin ella, la porción es cualquier cosa y el
+  // `doesNotMatch` de abajo da verde sin mirar la barra.
+  const inicio = pos.indexOf("onClick={() => setMostrarPagar(true)}");
+  const fin = pos.indexOf("Cerrar Turno");
+  assert.ok(inicio > 0 && fin > inicio, "no se encontró la barra de la caja");
+  const barra = pos.slice(inicio, fin + 20);
+  assert.match(barra, /Cambio \+\/-/);
   assert.doesNotMatch(barra, /TurnoOperativoDeCaja/);
 
   const shell = leer("components/LayoutBase.jsx");

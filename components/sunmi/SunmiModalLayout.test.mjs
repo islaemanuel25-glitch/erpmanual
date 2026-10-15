@@ -918,6 +918,21 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // producto que no se cobró. Existe porque un código sin producto pasaba
     // desapercibido; un toque al costado que lo cierre es el mismo defecto.
     "components/pos-ventas/AvisoProductoNoEncontrado.jsx": true,
+    // ── "PAGAR" DEL POS: `true` (2026-10-15) ──────────────────────────────
+    //
+    // Carga, y con plata: el proveedor elegido, el monto tipeado y la FOTO del
+    // remito ya sacada. Un toque al costado con el pulgar —es una hoja pegada
+    // abajo en el teléfono— tira las tres, y la foto no se recupera mirando la
+    // pantalla. En el primer paso (elegir el tipo) no hay nada que perder, pero
+    // el archivo protege entero: la política por paso de abajo pide un
+    // `setEstado(...)` que este modal no tiene, y declararla con otro nombre
+    // sería escribirla para el candado.
+    "components/pos-ventas/ModalPagar.jsx": true,
+    // ── CLASIFICAR UN PAGO EN TURNOS Y CIERRES: `false` ───────────────────
+    //
+    // Cinco botones, nada escrito: se toca el tipo y listo. Cerrarlo sin querer
+    // deja el pago como estaba, sin clasificar.
+    "components/turnos-y-cierres/PantallaTurnosYCierres.jsx": false,
   };
 
   // Que la lista sea TODOS los que usan la pieza, no los que alguien recordó.

@@ -51,6 +51,7 @@ import {
 } from "@/lib/finanzas/pagosProveedores";
 
 import BloquePagoAlProveedor from "./BloquePagoAlProveedor";
+import { aCentavos } from "@/lib/caja/efectivoEsperado";
 
 /** Los medios con que se le paga a un proveedor, como los ofrece Finanzas. */
 const MEDIOS = MEDIOS_PAGO_PROVEEDOR.map((m) => ({ valor: m, texto: ROTULO_MEDIO_PAGO[m] }));
@@ -109,6 +110,9 @@ export default function HojaCerrarRecepcion({
   // La ubicación dueña del pedido, `{ id, nombre }`: la que debe y la única de
   // la que puede salir el pago inicial. Se muestra fija.
   ubicacionDuena = null,
+  // Lo que ya se pagó desde la caja del POS (una compra por cargar). Cuenta
+  // como pagado: lo de ahora es lo que falta.
+  yaPagado = 0,
 }) {
   // El pago NO se reinicia al reabrir la hoja: la pantalla la cierra al
   // confirmar y la vuelve a abrir si el servidor frena, y ahí lo cargado —el
@@ -135,6 +139,7 @@ export default function HojaCerrarRecepcion({
       localOrigenId: ubicacionDuena?.id ?? null,
       turnoId: pago.turnoId,
     },
+    yaPagadoCentavos: aCentavos(yaPagado || 0),
   });
 
   // ── LA RESPUESTA POR OMISIÓN ES "NO LLEGÓ" ─────────────────────────────
@@ -312,6 +317,7 @@ export default function HojaCerrarRecepcion({
           medios={MEDIOS}
           ubicacionDuena={ubicacionDuena}
           deshabilitado={guardando}
+          yaPagado={yaPagado}
         />
       </Bloque>
 

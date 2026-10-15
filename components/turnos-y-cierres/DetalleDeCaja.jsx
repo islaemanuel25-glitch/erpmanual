@@ -19,7 +19,6 @@ import { CLASE_MOVIMIENTO } from "@/lib/finanzas/movimientosDeCaja";
 import {
   CLASE_TONO,
   TEXTO_COMISION_SIN_CALCULAR,
-  conPorcentajes,
   diferenciaGrande,
   esCerrada,
   estadoDeCaja,
@@ -60,59 +59,85 @@ export function Encabezado({ c, local }) {
   );
 }
 
-export default function DetalleDeCaja({ datos, onVerMovimientos }) {
-  const c = datos.caja;
+/**
+ * EL EFECTIVO DE LA CAJA (V2 · B): la diferencia en su recuadro y la cuenta de
+ * lo que tenía que haber. Lo usan el detalle y la caja desplegada del turno.
+ */
+export function EfectivoDeLaCaja({ c }) {
   const e = c.efectivo;
   const grande = diferenciaGrande(c);
+  return (
+    <Bloque titulo="EFECTIVO DE LA CAJA">
+      <Recuadro rotulo="DIFERENCIA DE CAJA" valor={grande.texto} tono={tonoDelRecuadro(c)} />
+      <div data-cuenta-del-efectivo className="space-y-1.5">
+        <Renglon rotulo="Cambio inicial" valor={plata(e.cambioInicial)} />
+        <Renglon rotulo="Ventas en efectivo" valor={mas(e.ventasEfectivo)} />
+        {e.ingresos ? <Renglon rotulo="Ingresos" valor={mas(e.ingresos)} /> : null}
+        <Renglon rotulo="Pagos desde la caja" valor={menos(e.pagosDesdeCaja)} />
+        <Renglon rotulo="Retirado en arqueos" valor={menos(e.retiradoArqueos)} />
+      </div>
+      <Separador />
+      <div className="space-y-1.5">
+        <Renglon rotulo={esCerrada(c) ? "Tenía que haber" : "Tiene que haber"} valor={plata(e.teniaQueHaber)} fuerte />
+        {esCerrada(c) ? <Renglon rotulo="Contado al cerrar" valor={plata(e.contado)} fuerte /> : null}
+      </div>
+    </Bloque>
+  );
+}
+
+/**
+ * LO COBRADO EN LA CAJA (V2 · B): la barra con el porcentaje de cada medio, el
+ * monto de cada uno y, debajo de cada medio digital, su comisión restada; el
+ * total, el neto y el fiado aparte.
+ */
+export function CobradoEnLaCaja({ c }) {
   const cobrados = c.cobrado.medios.filter((m) => !m.esFiado);
+  return (
+    <Bloque titulo="COBRADO EN LA CAJA">
+      <BarraDeMedios medios={cobrados} conPorcentaje />
+      <div data-cobrado-por-medio className="space-y-1.5">
+        {cobrados.map((m) => (
+          <div key={m.medio} data-medio={m.medio} className="space-y-1.5">
+            <Renglon rotulo={m.etiqueta} valor={plata(m.monto)} />
+            {m.medio === "EFECTIVO" ? null : (
+              <div className="pl-3">
+                {m.comisionConocida ? (
+                  <Renglon rotulo={`Comisión ${m.etiqueta}`} valor={menos(m.comision)} colorValor={CLASE_TONO.danger} atenuado />
+                ) : (
+                  <Renglon rotulo={`Comisión ${m.etiqueta}`} valor={TEXTO_COMISION_SIN_CALCULAR} atenuado />
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <Separador />
+      <Renglon rotulo="Total cobrado" valor={plata(c.cobrado.total)} fuerte />
+      <Separador />
+      <div className="space-y-1.5">
+        <Renglon
+          rotulo="Neto después de comisiones"
+          nota={c.cobrado.comisionesConocidas ? null : TEXTO_COMISION_SIN_CALCULAR}
+          valor={plata(c.cobrado.netoDespuesDeComisiones)}
+          colorValor={CLASE_TONO.success}
+          fuerte
+        />
+        <Renglon rotulo="Fiado" valor={plata(c.cobrado.fiado)} atenuado />
+      </div>
+    </Bloque>
+  );
+}
+
+export default function DetalleDeCaja({ datos, onVerMovimientos }) {
+  const c = datos.caja;
 
   return (
     <div className="space-y-3.5">
       <Encabezado c={c} local={datos.local?.nombre} />
 
-      <Bloque titulo="EFECTIVO DE LA CAJA">
-        <Recuadro rotulo="DIFERENCIA DE CAJA" valor={grande.texto} tono={tonoDelRecuadro(c)} />
-        <div data-cuenta-del-efectivo className="space-y-1.5">
-          <Renglon rotulo="Cambio inicial" valor={plata(e.cambioInicial)} />
-          <Renglon rotulo="Ventas en efectivo" valor={mas(e.ventasEfectivo)} />
-          {e.ingresos ? <Renglon rotulo="Ingresos" valor={mas(e.ingresos)} /> : null}
-          <Renglon rotulo="Pagos desde la caja" valor={menos(e.pagosDesdeCaja)} />
-          <Renglon rotulo="Retirado en arqueos" valor={menos(e.retiradoArqueos)} />
-        </div>
-        <Separador />
-        <div className="space-y-1.5">
-          <Renglon rotulo={esCerrada(c) ? "Tenía que haber" : "Tiene que haber"} valor={plata(e.teniaQueHaber)} fuerte />
-          {esCerrada(c) ? <Renglon rotulo="Contado al cerrar" valor={plata(e.contado)} fuerte /> : null}
-        </div>
-      </Bloque>
+      <EfectivoDeLaCaja c={c} />
 
-      <Bloque titulo="COBRADO EN LA CAJA">
-        <BarraDeMedios medios={cobrados} conPorcentaje />
-        <div data-cobrado-por-medio className="space-y-2">
-          {conPorcentajes(cobrados).map((m) => (
-            <div key={m.medio} data-medio={m.medio}>
-              <Renglon rotulo={`${m.etiqueta} · ${m.porcentaje}%`} valor={plata(m.monto)} />
-              {m.medio === "EFECTIVO" ? null : m.comisionConocida ? (
-                <div className={`text-right text-xs2 tabular-nums ${CLASE_TONO.danger}`}>{menos(m.comision)}</div>
-              ) : (
-                <div className={`text-right text-xs2 ${CLASE_TONO.muted}`}>{TEXTO_COMISION_SIN_CALCULAR}</div>
-              )}
-            </div>
-          ))}
-        </div>
-        <Separador />
-        <div className="space-y-1.5">
-          <Renglon rotulo="Total cobrado" valor={plata(c.cobrado.total)} fuerte />
-          <Renglon
-            rotulo="Neto después de comisiones"
-            nota={c.cobrado.comisionesConocidas ? null : TEXTO_COMISION_SIN_CALCULAR}
-            valor={plata(c.cobrado.netoDespuesDeComisiones)}
-            colorValor={CLASE_TONO.success}
-            fuerte
-          />
-          <Renglon rotulo="Fiado" valor={plata(c.cobrado.fiado)} atenuado />
-        </div>
-      </Bloque>
+      <CobradoEnLaCaja c={c} />
 
       <SunmiButton
         type="button"
@@ -229,6 +254,7 @@ export function ComprobanteZ({ datos, onReimprimir }) {
         <Separador />
         <div className="space-y-1">
           <Renglon rotulo="Cambio inicial" valor={plata(e.cambioInicial)} />
+          <Renglon rotulo="Ventas en efectivo" valor={mas(e.ventasEfectivo)} />
           {e.ingresos ? <Renglon rotulo="Ingresos" valor={mas(e.ingresos)} /> : null}
           <Renglon rotulo="Pagos desde la caja" valor={menos(e.pagosDesdeCaja)} />
           <Renglon rotulo={`Arqueos (${cantidadArqueos})`} valor={menos(e.retiradoArqueos)} />

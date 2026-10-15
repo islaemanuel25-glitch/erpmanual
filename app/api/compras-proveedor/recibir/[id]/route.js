@@ -39,6 +39,7 @@ import {
   resolverTotalDelCierre,
   estadoSacaPlata,
 } from "@/lib/compras-proveedor/pagoDelCierre";
+import { errorPagadoDeMas, loYaPagadoAlRecibir } from "@/lib/compras-proveedor/compraPorCargar";
 import { PERMISO_REGISTRAR_PAGOS, leerFechaOpcional } from "@/lib/finanzas/pagosProveedores";
 import {
   ERROR_OPERAR_EN_LA_UBICACION_DE_LA_DEUDA,
@@ -391,11 +392,25 @@ export async function POST(req, { params }) {
     const pagoAlProveedor = body.pagoAlProveedor || {};
     const estadoDelPago = pagoAlProveedor.estado;
 
+    // ── UNA COMPRA POR CARGAR YA VIENE PAGADA DESDE LA CAJA ────────────────
+    //
+    // "Pagar" del POS dejó la cuenta con su pago en efectivo antes de que la
+    // mercadería se recibiera. Lo pagado cuenta: lo que se paga ahora es lo que
+    // falta, y si ya está todo, "Pagada" no saca plata otra vez.
+    const cuentaPrevia = await prisma.cuentaPorPagarProveedor.findUnique({
+      where: { pedidoProveedorId: pedidoId },
+      select: { id: true, pagos: { select: { monto: true } } },
+    });
+    const yaPagadoCentavos = cuentaPrevia
+      ? loYaPagadoAlRecibir({ totalCentavos: 0, pagos: cuentaPrevia.pagos }).yaPagadoCentavos
+      : 0;
+
     // Sacar plata es escritura financiera y pide su permiso; dejarla PENDIENTE
     // no saca nada —solo nace la obligación que la compra ya generó— y alcanza
     // con el de Compras. Se chequea antes que todo lo demás del pago: sin
-    // permiso no hace falta ni leer las facturas.
-    if (estadoSacaPlata(estadoDelPago)) {
+    // permiso no hace falta ni leer las facturas. Una compra ya pagada desde la
+    // caja que se deja "Pagada" tampoco saca nada: eso lo decide el plan, abajo.
+    if (estadoSacaPlata(estadoDelPago) && !cuentaPrevia) {
       const permPago = checkPerm(session, PERMISO_REGISTRAR_PAGOS);
       if (!permPago.ok) {
         return NextResponse.json({ ok: false, error: permPago.error }, { status: permPago.status });
@@ -437,13 +452,26 @@ export async function POST(req, { params }) {
     }
     const totalDeLaDeuda = deuda.centavos / 100;
 
+    if (yaPagadoCentavos > deuda.centavos) {
+      const texto = errorPagadoDeMas({ yaPagadoCentavos, totalCentavos: deuda.centavos });
+      return NextResponse.json({ ok: false, error: texto, queHacer: texto }, { status: 409 });
+    }
     const plan = planDelPagoInicial({
       estado: estadoDelPago,
       totalCentavos: deuda.centavos,
       pago: pagoAlProveedor.pago,
+      yaPagadoCentavos,
     });
     if (plan.error) {
       return NextResponse.json({ ok: false, error: plan.error, queHacer: plan.error }, { status: 400 });
+    }
+    // Con lo pagado desde la caja contado, el permiso financiero se pide solo si
+    // AHORA sale plata.
+    if (cuentaPrevia && plan.pagoInicial) {
+      const permPago = checkPerm(session, PERMISO_REGISTRAR_PAGOS);
+      if (!permPago.ok) {
+        return NextResponse.json({ ok: false, error: permPago.error }, { status: permPago.status });
+      }
     }
 
     const vencimiento = leerFechaOpcional(pagoAlProveedor.vencimientoProveedor);
@@ -1103,6 +1131,9 @@ export async function POST(req, { params }) {
         // La ubicación que opera quien cierra. Con pago inicial, Finanzas
         // exige que sea la del gasto.
         localOperativoId: localId,
+        // La compra por cargar: su cuenta ya existe con el pago del POS. Se
+        // completa —total real— y no se vuelve a pagar lo pagado.
+        completarCuentaPrevia: Boolean(cuentaPrevia),
       });
     });
 

@@ -23,6 +23,7 @@ import {
 } from "@/lib/tesoreria/contextoTesoreria";
 import { PESTANA_TODOS } from "@/lib/turnosYCierres/lecturaTurnosYCierres";
 import { URL_API_TURNOS_Y_CIERRES, urlDeCaja } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
+import { showError } from "@/components/sunmi/SunmiToast";
 
 /** El período y la pestaña como cadena de la URL. Los defaults no se escriben. */
 export function serializarContexto(ctx, pestana) {
@@ -98,12 +99,36 @@ export function useTurnosYCierres() {
     [router, ctx, pestana]
   );
 
+  // Le asigna el tipo a un egreso sin clasificar y vuelve a leer: el resultado
+  // del turno cambia. Devuelve false si el servidor no lo aceptó.
+  const onClasificar = useCallback(
+    async (movimientoId, tipo) => {
+      try {
+        const res = await fetch(`/api/turnos-y-cierres/movimientos/${movimientoId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ tipo }),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok || !j.ok) throw new Error(j?.error || `No se pudo clasificar el pago (${res.status}).`);
+        await cargar();
+        return true;
+      } catch (e) {
+        showError(e.message);
+        return false;
+      }
+    },
+    [cargar]
+  );
+
   return {
     datos,
     cargando,
     error,
     ctx,
     pestana,
+    onClasificar,
     onCambiarUnidad,
     onElegirRango,
     onAtras,

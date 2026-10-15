@@ -45,6 +45,7 @@ import { vigenciasDeUbicaciones } from "@/lib/semanaOperativa/semanaOperativaSer
 // EL PAGO A DEPÓSITO ES DE TRANSFERENCIAS. La cuenta y su listado salen de la
 // función de ese módulo; Finanzas no vuelve a valorizar ni a consultar.
 import { detalleDePagoADeposito, primeraRecepcion } from "@/lib/transferencias/cuentaDelPeriodoServer";
+import { pagadoAlDepositoDesdeCaja } from "@/lib/finanzas/pagoADepositoDesdeCajaServer";
 import {
   PERMISO_VER_TRANSFERENCIAS,
   armarPagoADeposito,
@@ -144,9 +145,12 @@ export async function GET(req) {
       });
     }
 
-    const [cuenta, primerMovimiento] = await Promise.all([
+    const [cuenta, primerMovimiento, pagadoDesdeCaja] = await Promise.all([
       detalleDePagoADeposito(prisma, { destinoId: localId, rango }),
       primeraRecepcion(prisma, { destinoId: localId }),
+      // "Pagar → Al depósito" del POS: la plata que salió de una caja del local.
+      // Va aparte: no suma ni resta del pago reconocido.
+      pagadoAlDepositoDesdeCaja(prisma, { localId, rango }),
     ]);
 
     const puedeVerTransferencias = checkPerm(session, PERMISO_VER_TRANSFERENCIAS).ok;
@@ -182,6 +186,7 @@ export async function GET(req) {
       pagoADeposito,
       // Solo lo financiero de cada reconocida; las líneas quedan en Transferencias.
       recibidas: cuenta.recibidas,
+      pagadoDesdeCaja,
       // La señal para dibujar el "Ver" por transferencia: el mismo permiso que
       // el enlace agregado. El id para armar esos enlaces —del depósito, el
       // local mirado; del local, el suyo (null)—.

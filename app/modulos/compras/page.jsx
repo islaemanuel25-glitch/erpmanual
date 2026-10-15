@@ -82,6 +82,13 @@ export default function PanelComprasPage() {
       boton: "Recibir",
     },
     {
+      key: "por-cargar",
+      titulo: "Compras por cargar",
+      desc: "Pagadas desde la caja",
+      href: `${COMPRAS}/por-cargar`,
+      boton: "Ver",
+    },
+    {
       key: "historial",
       titulo: "Historial",
       desc: "Compras recibidas o anuladas",

@@ -32,6 +32,9 @@ está claro cuál de las dos es, va como **[ACCIDENTE POSIBLE]** y no como regla
 - [pago-a-deposito.md](pago-a-deposito.md) — la mercadería recibida del depósito
   se reconoce como pagada el día que el local confirma la recepción; el número
   es de Transferencias y la caja no lo vuelve a pagar.
+- [pagar-desde-el-pos.md](pagar-desde-el-pos.md) — "Pagar" del POS, el tipo de
+  cada salida de caja, y por qué la plata resta todo y la ganancia solo sueldos y
+  gastos; las compras por cargar.
 - [tesoreria.md](tesoreria.md) — la plata real: el efectivo declarado sale de
   las entregas de cada caja, lo digital es cobrado declarado por el POS, y un
   pago hecho desde la caja no se resta dos veces.

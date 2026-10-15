@@ -54,6 +54,9 @@ Cómo Finanzas lee la mercadería que un local recibe del depósito. Desde
 
 - Una entrega posterior de efectivo al depósito **no** es un pago a depósito.
   Ningún `CajaMovimiento` alimenta el número [CÓDIGO].
+- Desde 2026-10-15, lo que se pagó con "Pagar → Al depósito" del POS se
+  muestra aparte como "Pagado desde la caja", sin sumarse ni restarse del
+  número reconocido [CÓDIGO] (ver `pagar-desde-el-pos.md`).
 - Un retiro de recaudación es efectivo cambiando de lugar; un retiro manual no
   dice qué es, y su motivo es texto libre que no decide nada. Los dos siguen en
   "Movimientos de caja" y ningún total del resumen los resta [CÓDIGO]

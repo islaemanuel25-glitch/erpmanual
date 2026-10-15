@@ -47,6 +47,7 @@ import ModalDescuento from "@/components/pos-ventas/ModalDescuento";
 import ModalCanjePuntos from "@/components/pos-ventas/ModalCanjePuntos";
 import ClientePickerFullscreen from "@/components/pos-ventas/ClientePickerFullscreen";
 import ModalCajaMovimiento from "@/components/pos-ventas/ModalCajaMovimiento";
+import ModalPagar from "@/components/pos-ventas/ModalPagar";
 import AvisoArqueo from "@/components/pos-ventas/AvisoArqueo";
 import useArqueoEstado from "@/hooks/useArqueoEstado";
 import useEsEscritorio, { nombreVentanaRetiro, nombreVentanaCierre } from "@/hooks/useEsEscritorio";
@@ -165,6 +166,7 @@ export default function PosVentasPage() {
     [turnoActual, requerirOperador]
   );
   const [mostrarCajaMovimiento, setMostrarCajaMovimiento] = useState(false);
+  const [mostrarPagar, setMostrarPagar] = useState(false);
   const [productoKgPendiente, setProductoKgPendiente] = useState(null);
   // Servicio de importe variable pendiente de ingresar importe en el modal.
   const [servicioPendiente, setServicioPendiente] = useState(null);
@@ -2090,13 +2092,26 @@ export default function PosVentasPage() {
                 recaudación", que además crea el movimiento solo — y los pagos
                 a proveedores y de gastos tienen su propia puerta en Finanzas,
                 que deja el retiro vinculado a su pago. */}
+            {/* PAGAR: proveedor, sueldo, gasto, al depósito o retiro del dueño,
+                con el efectivo de esta caja. Cada pago queda en su módulo. */}
+            {turnoActual && (
+              <SunmiButton
+                type="button"
+                color="ghost"
+                onClick={() => setMostrarPagar(true)}
+                className="text-sm2 font-normal min-h-0 sunmi-pos-btn-secondary px-2 py-1 rounded sunmi-pos-text-accent"
+                title="Pagar con el efectivo de la caja"
+              >
+                Pagar
+              </SunmiButton>
+            )}
             {turnoActual && (
               <button
                 onClick={() => setMostrarCajaMovimiento(true)}
                 className="text-[11px] sunmi-pos-btn-secondary px-2 py-1 rounded transition-colors sunmi-pos-text-accent"
-                title="Ingreso o egreso puntual de efectivo (cambio, adelantos)"
+                title="Cambio: entra o sale efectivo que no es un pago"
               >
-                Caja +/-
+                Cambio +/-
               </button>
             )}
             {/* RETIRAR RECAUDACIÓN. Reemplaza al botón "Arqueo": el arqueo solo
@@ -2544,6 +2559,19 @@ export default function PosVentasPage() {
           producto={servicioPendiente}
           onConfirmar={handleConfirmarServicio}
           onCancelar={() => setServicioPendiente(null)}
+        />
+      )}
+
+      {mostrarPagar && turnoActual && (
+        <ModalPagar
+          turnoId={turnoActual.id}
+          onClose={() => setMostrarPagar(false)}
+          onPagado={({ errorFoto }) => {
+            if (errorFoto) showError(`Pago registrado. La foto no se subió: ${errorFoto}`);
+            else showSuccess("Pago registrado");
+            // Un pago cambia el esperado: se refresca el estado.
+            arqueo.refrescar();
+          }}
         />
       )}
 

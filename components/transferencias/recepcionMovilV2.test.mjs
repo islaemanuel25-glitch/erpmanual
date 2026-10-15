@@ -595,7 +595,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // Sube a 62 el mismo día: `20261014191303_caja_de_cuenta_y_retiro_intervenido`,
   // una columna nullable en `Turno` y otra en `RetiroPreparacion`. No toca
   // transferencias.
-  assert.equal(migraciones.length, 62, "aparecio una migracion que nadie declaro aca");
+  // Sube a 63 el 2026-10-15: `20261015120000_tipo_egreso_caja`, un enum y una
+  // columna nullable en `CajaMovimiento`. No toca transferencias.
+  assert.equal(migraciones.length, 63, "aparecio una migracion que nadie declaro aca");
+  assert.ok(migraciones.includes("20261015120000_tipo_egreso_caja"));
   assert.ok(migraciones.includes("20260908213000_recepcion_control_fisico"));
   assert.ok(migraciones.includes("20260909170000_presentacion_envio_snapshot"));
   assert.ok(migraciones.includes("20260910120000_presentacion_adoptada_en_recepcion"));

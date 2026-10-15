@@ -33,10 +33,12 @@ import {
   plata,
   renglonDelTurno,
   rotuloDeDia,
-  tonoDeGanancia,
 } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
+import { ETIQUETA_TIPO_EGRESO, TIPOS_EGRESO } from "@/lib/caja/tipoEgreso";
+import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 
-import { BarraDeMedios, Cifra, FilaDeSalida, Insignia, Recuadro, Renglon, Rotulo } from "./PiezasTurnosYCierres";
+import { BarraDeMedios, FilaDePago, Insignia, Recuadro, Renglon, Rotulo } from "./PiezasTurnosYCierres";
+import { CobradoEnLaCaja, EfectivoDeLaCaja } from "./DetalleDeCaja";
 
 /**
  * @param {object} props
@@ -59,6 +61,8 @@ export default function PantallaTurnosYCierres({
   onAdelante,
   onReintentar,
   onVerCaja,
+  puedeClasificar = false,
+  onClasificar = null,
 }) {
   if (datos?.vista === "MIS_CAJAS") return <MisCajas datos={datos} onVerCaja={onVerCaja} />;
   // Hasta la primera respuesta no se sabe si quien mira es un cajero —que no
@@ -94,6 +98,8 @@ export default function PantallaTurnosYCierres({
           abiertosIniciales={abiertosIniciales}
           onCambiarPestana={onCambiarPestana}
           onVerCaja={onVerCaja}
+          puedeClasificar={puedeClasificar}
+          onClasificar={onClasificar}
         />
       )}
     </div>
@@ -115,7 +121,15 @@ function Error({ error, onReintentar }) {
 
 // ── A2 · LOS TURNOS DEL PERÍODO ──────────────────────────────────────────
 
-export function ListaDeTurnos({ datos, pestana, abiertosIniciales = [], onCambiarPestana, onVerCaja }) {
+export function ListaDeTurnos({
+  datos,
+  pestana,
+  abiertosIniciales = [],
+  onCambiarPestana,
+  onVerCaja,
+  puedeClasificar = false,
+  onClasificar = null,
+}) {
   const grupos = (datos.grupos || []).filter((g) => grupoEnPestana(g, pestana));
   // Con más de un día en el período, cada tarjeta dice de qué día es.
   const conDia = new Set((datos.grupos || []).map((g) => g.dia)).size > 1;
@@ -136,6 +150,8 @@ export function ListaDeTurnos({ datos, pestana, abiertosIniciales = [], onCambia
             conDia={conDia}
             abiertoInicial={abiertosIniciales.includes(g.clave)}
             onVerCaja={onVerCaja}
+            puedeClasificar={puedeClasificar}
+            onClasificar={onClasificar}
           />
         ))
       )}
@@ -179,7 +195,85 @@ export function AvisoVentasSinCaja({ sinCaja }) {
 
 // ── A3 · UN TURNO, PLEGADO Y DESPLEGADO ─────────────────────────────────
 
-export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVerCaja }) {
+/**
+ * "PLATA QUE SALIÓ DE LA CAJA" (P5): cada pago con su tipo y su marca. Arriba,
+ * si hay, cuántos no tienen tipo; quien puede, toca uno y le asigna el tipo.
+ */
+export function PlataQueSalio({ g, puedeClasificar = false, onClasificar = null }) {
+  const [eligiendo, setEligiendo] = useState(null);
+  const pagos = g.pagos || [];
+  if (!pagos.length) return null;
+  const clasificar = puedeClasificar && onClasificar ? (p) => setEligiendo(p) : null;
+  const primeroSinClasificar = pagos.find((p) => p.clasificable && !p.tipoEgreso);
+  return (
+    <div data-plata-que-salio className="space-y-2">
+      {g.sinClasificar ? (
+        <div className="flex items-center justify-between gap-2 rounded-lg sunmi-btn-warning-soft px-3 py-2">
+          <span className="text-sm2 font-semibold sunmi-text-warning">
+            {g.sinClasificar} {g.sinClasificar === 1 ? "pago sin clasificar" : "pagos sin clasificar"}
+          </span>
+          {clasificar && primeroSinClasificar ? (
+            <SunmiLinkButton onClick={() => clasificar(primeroSinClasificar)} className="shrink-0 text-sm2 font-semibold">
+              Clasificar ›
+            </SunmiLinkButton>
+          ) : null}
+        </div>
+      ) : null}
+      <Rotulo>PLATA QUE SALIÓ DE LA CAJA</Rotulo>
+      {pagos.map((p) => (
+        <FilaDePago key={p.id} p={p} onClasificar={clasificar && p.clasificable ? clasificar : null} />
+      ))}
+      <ElegirTipoDePago
+        pago={eligiendo}
+        onCerrar={() => setEligiendo(null)}
+        onElegir={async (tipo) => {
+          const ok = await onClasificar?.(eligiendo.id, tipo);
+          if (ok !== false) setEligiendo(null);
+        }}
+      />
+    </div>
+  );
+}
+
+/** El tipo de un pago sin clasificar: solo el tipo, ni el monto ni la caja. */
+function ElegirTipoDePago({ pago, onCerrar, onElegir }) {
+  const [guardando, setGuardando] = useState(false);
+  return (
+    <SunmiModalLayout
+      open={Boolean(pago)}
+      title="Clasificar pago"
+      subtitle={pago ? `${pago.corta} · ${plata(pago.monto)}` : ""}
+      onClose={onCerrar}
+      forma="hoja-o-centrado"
+      espacioCuerpo="mt-2"
+      z={NIVEL_MODAL_GLOBAL}
+    >
+      <div className="grid gap-2">
+        {TIPOS_EGRESO.map((tipo) => (
+          <SunmiButton
+            key={tipo}
+            type="button"
+            color={pago?.tipoEgreso === tipo ? "primary" : "slate"}
+            disabled={guardando}
+            onClick={async () => {
+              setGuardando(true);
+              try {
+                await onElegir(tipo);
+              } finally {
+                setGuardando(false);
+              }
+            }}
+            className="w-full min-h-toque justify-center"
+          >
+            {ETIQUETA_TIPO_EGRESO[tipo]}
+          </SunmiButton>
+        ))}
+      </div>
+    </SunmiModalLayout>
+  );
+}
+
+export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVerCaja, puedeClasificar = false, onClasificar = null }) {
   const [abierto, setAbierto] = useState(abiertoInicial);
   const dif = diferenciasDelGrupo(g);
 
@@ -212,8 +306,10 @@ export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVe
         <div className="border-t sunmi-divider pt-1.5">
           <Renglon rotulo="Ganancia de las ventas" valor={plata(g.ganancia)} fuerte />
         </div>
-        <Renglon rotulo="Pagos desde la caja" valor={menos(g.pagosDesdeCaja)} />
+        <Renglon rotulo="Sueldos y gastos" valor={menos(g.sueldosYGastos)} />
       </div>
+
+      <PlataQueSalio g={g} puedeClasificar={puedeClasificar} onClasificar={onClasificar} />
 
       <div className="space-y-2">
         <Rotulo>CÓMO SE COBRÓ</Rotulo>
@@ -242,7 +338,6 @@ export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVe
 export function CajaDelTurno({ c, onVerCaja }) {
   const est = estadoDeCaja(c);
   const dif = diferenciaDeCaja(c);
-  const salidas = c.salidas || [];
   return (
     <div data-caja={c.id} className="space-y-3 py-3 first:pt-3">
       <div className="space-y-1">
@@ -262,31 +357,10 @@ export function CajaDelTurno({ c, onVerCaja }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <Cifra rotulo="Bruto" valor={plata(c.metricas.bruto)} />
-        <Cifra rotulo="Neto" valor={plata(c.metricas.neto)} />
-        <Cifra rotulo="Ganancia" valor={plata(c.metricas.ganancia)} tono={tonoDeGanancia(c.metricas.ganancia)} />
-        <Cifra rotulo="Tickets" valor={c.metricas.tickets} />
-      </div>
-
-      <div className="space-y-1.5">
-        <Rotulo>COBRADO</Rotulo>
-        <Renglon rotulo="Efectivo" valor={plata(c.cobrado.efectivo)} />
-        <Renglon rotulo="Digital" valor={plata(c.cobrado.digital)} />
-        {c.cobrado.porMedio.map((m) => (
-          <Renglon key={m.medio} rotulo={m.etiqueta} valor={plata(m.monto)} atenuado />
-        ))}
-        <Renglon rotulo="Fiado" valor={plata(c.cobrado.fiado)} atenuado />
-      </div>
-
-      <div className="space-y-2">
-        <Rotulo>LO QUE SALIÓ DE LA CAJA</Rotulo>
-        {salidas.length ? (
-          salidas.map((s) => <FilaDeSalida key={s.id} s={s} />)
-        ) : (
-          <p className="text-sm2 sunmi-text-muted">Sin salidas.</p>
-        )}
-      </div>
+      {/* La caja como en su detalle (V2 · B): la diferencia en su recuadro, y
+          lo cobrado con la barra, la comisión de cada medio restada y el neto. */}
+      <EfectivoDeLaCaja c={c} />
+      <CobradoEnLaCaja c={c} />
 
       <SunmiButton
         type="button"

@@ -543,6 +543,12 @@ jobs:
       - name: Ejercer la recepción de compras contra PostgreSQL
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/recepcionCompras.mjs
 
+      # "Pagar" del POS: cada tipo en su módulo con UN retiro de la caja, la
+      # compra por cargar que al recibirse NO vuelve a descontar, el esperado
+      # igual con tipo y sin tipo, y el resultado que resta solo sueldos y gastos.
+      - name: Ejercer Pagar desde el POS contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/pagarDesdeElPos.mjs
+
       # Y que esa prueba MIRA: se rompe el cierre sobre una copia, tres veces, y
       # cada vez tienen que gritar las afirmaciones que nombra el caso. Solo los
       # casos `SI-`: los de transferencias tardan minutos y se corren a mano.
