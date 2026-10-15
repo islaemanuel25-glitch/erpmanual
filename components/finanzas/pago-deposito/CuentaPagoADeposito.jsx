@@ -76,6 +76,30 @@ function Pendiente({ pendientes }) {
   );
 }
 
+/**
+ * LO PAGADO AL DEPÓSITO CON EFECTIVO DE UNA CAJA ("Pagar → Al depósito" del
+ * POS). Aparte del pago reconocido: no lo suma ni lo resta. Solo si hubo.
+ */
+function PagadoDesdeCaja({ pagado }) {
+  if (!pagado?.items?.length) return null;
+  return (
+    <section data-pagado-desde-caja className="sunmi-bg-card rounded-xl2 border sunmi-border p-4 space-y-2">
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="text-sm3 font-semibold sunmi-text-strong">Pagado desde la caja</div>
+        <div className="shrink-0 text-sm3 font-semibold tabular-nums sunmi-text-strong">{formatearMoneda(pagado.total)}</div>
+      </div>
+      {pagado.items.map((m) => (
+        <div key={m.id} className="flex items-baseline justify-between gap-3">
+          <div className="text-sm2 sunmi-text-muted">
+            {diaLegible(fechaArgentinaISO(new Date(m.fecha)))} · Caja #{m.cajaId}
+          </div>
+          <div className="shrink-0 text-sm2 tabular-nums sunmi-text-strong">{formatearMoneda(m.monto)}</div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
 export default function CuentaPagoADeposito({
   datos,
   cargando = false,
@@ -154,6 +178,8 @@ export default function CuentaPagoADeposito({
           />
 
           <Pendiente pendientes={pago.pendientes} />
+
+          <PagadoDesdeCaja pagado={datos?.pagadoDesdeCaja} />
 
           {sinReconocidas ? (
             // El período existe y no se reconoció nada: es una respuesta, no un

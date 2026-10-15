@@ -13,7 +13,9 @@
 
 import { Bloque, Renglon } from "@/components/finanzas/PiezasDelResumen";
 import { horaAR } from "@/lib/fechas/formatearFechaHora";
+import SunmiButton from "@/components/sunmi/SunmiButton";
 import { CLASE_TONO, FONDO_DE_TONO, conPorcentajes, plata, tonoDeMedio } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
+import { ETIQUETA_SIN_CLASIFICAR, ETIQUETA_TIPO_EGRESO, MARCA_EGRESO, TEXTO_MARCA } from "@/lib/caja/tipoEgreso";
 
 export { Bloque, Renglon };
 
@@ -91,7 +93,16 @@ export function BarraDeMedios({ medios = [], conPorcentaje = false }) {
           <span key={m.medio} className={`h-full bg-current ${tonoDeMedio(m.medio)}`} style={{ width: `${m.ancho}%` }} />
         ))}
       </div>
-      {!conPorcentaje ? (
+      {conPorcentaje ? (
+        <div data-leyenda-medios className="flex flex-wrap gap-x-3 gap-y-1">
+          {tramos.map((m) => (
+            <span key={m.medio} className="inline-flex items-center gap-1.5 text-sm2 font-medium sunmi-text-muted">
+              <span aria-hidden="true" className={`size-2 shrink-0 rounded-full bg-current ${tonoDeMedio(m.medio)}`} />
+              {`${m.etiqueta} ${m.porcentaje} %`}
+            </span>
+          ))}
+        </div>
+      ) : (
         <div className="space-y-1">
           {tramos.map((m) => (
             <div key={m.medio} className="flex items-center gap-2 text-sm3">
@@ -101,8 +112,48 @@ export function BarraDeMedios({ medios = [], conPorcentaje = false }) {
             </div>
           ))}
         </div>
-      ) : null}
+      )}
     </div>
+  );
+}
+
+/** El tono de cada marca de un pago en la ganancia. */
+const TONO_DE_MARCA = Object.freeze({
+  [MARCA_EGRESO.RESTA]: "danger",
+  [MARCA_EGRESO.MERCADERIA]: "success",
+  [MARCA_EGRESO.DEL_DUENO]: "muted",
+  [MARCA_EGRESO.SIN_CLASIFICAR]: "warning",
+});
+
+/**
+ * UN PAGO DESDE LA CAJA, CLASIFICADO (P5): el tipo en su chip, a quién o qué,
+ * su marca en la ganancia —"Resta", "Mercadería", "Del dueño" o "Sin
+ * clasificar"— y el monto SIN signo. Con `onClasificar` es un botón.
+ */
+export function FilaDePago({ p, onClasificar = null }) {
+  const etiqueta = p.tipoEgreso ? ETIQUETA_TIPO_EGRESO[p.tipoEgreso] : ETIQUETA_SIN_CLASIFICAR;
+  const tono = TONO_DE_MARCA[p.marca] || "muted";
+  const contenido = (
+    <span className="flex w-full items-center gap-2">
+      <span className="shrink-0 rounded-md sunmi-bg px-1.5 py-0.5 text-xs2 font-semibold sunmi-text-muted">{etiqueta}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm2 font-medium sunmi-text-strong">{p.corta}</span>
+        <span className={`block text-xs2 ${CLASE_TONO[tono]}`}>{TEXTO_MARCA[p.marca]}</span>
+      </span>
+      <span className="shrink-0 text-sm3 font-semibold tabular-nums sunmi-text-strong">{plata(p.monto)}</span>
+    </span>
+  );
+  if (!onClasificar) return <div data-pago={p.id}>{contenido}</div>;
+  return (
+    <SunmiButton
+      type="button"
+      color="ghost"
+      data-pago={p.id}
+      onClick={() => onClasificar(p)}
+      className="w-full min-h-0 p-0 rounded-none justify-start text-left font-normal"
+    >
+      {contenido}
+    </SunmiButton>
   );
 }
 

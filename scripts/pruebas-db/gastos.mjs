@@ -72,7 +72,12 @@ async function sembrarPagoPrevio(url) {
     const cuenta = await p.cuentaPorPagarProveedor.create({
       data: { grupoId: grupo.id, pedidoProveedorId: pedido.id, proveedorId: proveedor.id, localGastoId: local.id, total: 1000, creadoPorId: u.id },
     });
-    const mov = await p.cajaMovimiento.create({ data: { turnoId: turno.id, usuarioId: u.id, tipo: "RETIRO", monto: 1000, motivo: "Pago previo" } });
+    // `select` por lo mismo que el turno: `tipoEgreso` llegó después de Gastos
+    // y el RETURNING del cliente de hoy la pediría.
+    const mov = await p.cajaMovimiento.create({
+      data: { turnoId: turno.id, usuarioId: u.id, tipo: "RETIRO", monto: 1000, motivo: "Pago previo" },
+      select: { id: true },
+    });
     return await p.pagoProveedor.create({
       data: { cuentaId: cuenta.id, monto: 1000, medio: "EFECTIVO", localOrigenId: local.id, usuarioId: u.id, turnoId: turno.id, cajaMovimientoId: mov.id, idempotencyKey: "previo" },
       select: { id: true, cajaMovimientoId: true },

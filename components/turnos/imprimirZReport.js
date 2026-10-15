@@ -13,21 +13,19 @@
 
 import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import { TEXTO_SIN_CONTAR, TEXTO_DIFERENCIA_NO_DISPONIBLE } from "@/lib/caja/cierreRelevo";
+import { formatearMoneda } from "@/lib/moneda";
+import { mas, menos } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
 
-const fmt = (n) =>
-  n != null
-    ? Number(n).toLocaleString("es-AR", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })
-    : "-";
+// El formateador compartido: el signo va adelante —"−$1.500,00"— y un cero no
+// lleva signo. El que había acá escribía "$-1.500,00" y "$-" sin valor.
+const plata = (n) => formatearMoneda(n ?? 0);
 
 // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
 const fmtFecha = (iso) => fechaHoraAR(iso, { vacio: "-" });
 
 // Un importe, o la palabra que dice por qué no hay. En el papel, "$-" se lee como
 // un cero; un turno cerrado sin conteo tiene que decir "Sin contar".
-const plataOTexto = (n, texto) => (n != null ? `$${fmt(n)}` : texto);
+const plataOTexto = (n, texto) => (n != null ? plata(n) : texto);
 
 export function imprimirZReport(turno, resumen, movimientos) {
   const totalVentas =
@@ -54,8 +52,8 @@ export function imprimirZReport(turno, resumen, movimientos) {
     movHtml = `
 <div class="line"></div>
 <div class="center bold">MOVIMIENTOS CAJA</div>
-<div class="row"><span>Ingresos:</span><span>+$${fmt(totalIngresos)}</span></div>
-<div class="row"><span>Retiros:</span><span>-$${fmt(totalRetiros)}</span></div>`;
+<div class="row"><span>Ingresos:</span><span>${mas(totalIngresos)}</span></div>
+<div class="row"><span>Retiros:</span><span>${menos(totalRetiros)}</span></div>`;
   }
 
   // Entrega del efectivo. Solo se imprime en turnos que pasaron por el circuito
@@ -66,7 +64,7 @@ export function imprimirZReport(turno, resumen, movimientos) {
 <div class="line"></div>
 <div class="center bold">ENTREGA DEL EFECTIVO</div>
 <div class="row"><span>Se retira:</span><span>${plataOTexto(turno.efectivoRetiradoCierre, TEXTO_SIN_CONTAR)}</span></div>
-<div class="row bold"><span>Queda de cambio:</span><span>${fmt(turno.fondoDejadoCierre)}</span></div>
+<div class="row bold"><span>Queda de cambio:</span><span>${plataOTexto(turno.fondoDejadoCierre, "-")}</span></div>
 ${turno.destinoRetiroCierre ? `<div class="row"><span>Destino:</span><span>${turno.destinoRetiroCierre}</span></div>` : ""}
 ${turno.recibidoPorCierre ? `<div class="row"><span>Recibe:</span><span>${turno.recibidoPorCierre}</span></div>` : ""}
 <div class="center" style="font-size:10px;margin-top:4px;">El cambio que queda abre el proximo turno</div>`
@@ -103,21 +101,21 @@ ${turno.recibidoPorCierre ? `<div class="row"><span>Recibe:</span><span>${turno.
 <div class="center bold">VENTAS</div>
 <div class="row"><span>Cantidad:</span><span>${resumen.cantidadVentas || 0}</span></div>
 <div class="line"></div>
-<div class="row"><span>Efectivo:</span><span>$${fmt(resumen.totalEfectivo)}</span></div>
-<div class="row"><span>MercadoPago:</span><span>$${fmt(resumen.desglose?.mercadopago)}</span></div>
-<div class="row"><span>Debito:</span><span>$${fmt(resumen.desglose?.debito)}</span></div>
-<div class="row"><span>Credito:</span><span>$${fmt(resumen.desglose?.credito)}</span></div>
-<div class="row"><span>Fiado:</span><span>$${fmt(resumen.desglose?.fiado)}</span></div>
+<div class="row"><span>Efectivo:</span><span>${plata(resumen.totalEfectivo)}</span></div>
+<div class="row"><span>MercadoPago:</span><span>${plata(resumen.desglose?.mercadopago)}</span></div>
+<div class="row"><span>Debito:</span><span>${plata(resumen.desglose?.debito)}</span></div>
+<div class="row"><span>Credito:</span><span>${plata(resumen.desglose?.credito)}</span></div>
+<div class="row"><span>Fiado:</span><span>${plata(resumen.desglose?.fiado)}</span></div>
 <div class="line"></div>
-<div class="row bold"><span>Total ventas:</span><span>$${fmt(totalVentas)}</span></div>
+<div class="row bold"><span>Total ventas:</span><span>${plata(totalVentas)}</span></div>
 ${movHtml}
 <div class="line"></div>
 <div class="center bold">ARQUEO EFECTIVO</div>
-<div class="row"><span>Cambio inicial:</span><span>${fmt(turno.montoInicial)}</span></div>
-<div class="row"><span>+ Ventas efectivo:</span><span>$${fmt(resumen.totalEfectivo)}</span></div>
-${totalIngresos > 0 ? `<div class="row"><span>+ Ingresos:</span><span>$${fmt(totalIngresos)}</span></div>` : ""}
-${totalRetiros > 0 ? `<div class="row"><span>- Retiros:</span><span>$${fmt(totalRetiros)}</span></div>` : ""}
-<div class="row bold"><span>Efectivo esperado:</span><span>$${fmt(esperado)}</span></div>
+<div class="row"><span>Cambio inicial:</span><span>${plata(turno.montoInicial)}</span></div>
+<div class="row"><span>Ventas en efectivo:</span><span>${mas(resumen.totalEfectivo)}</span></div>
+${totalIngresos > 0 ? `<div class="row"><span>Ingresos:</span><span>${mas(totalIngresos)}</span></div>` : ""}
+${totalRetiros > 0 ? `<div class="row"><span>Pagos y retiros:</span><span>${menos(totalRetiros)}</span></div>` : ""}
+<div class="row bold"><span>Efectivo esperado:</span><span>${plata(esperado)}</span></div>
 <div class="row"><span>Efectivo contado:</span><span>${plataOTexto(turno.montoRealEfectivo, TEXTO_SIN_CONTAR)}</span></div>
 <div class="row bold"><span>Diferencia:</span><span>${plataOTexto(turno.diferenciaEfectivo, TEXTO_DIFERENCIA_NO_DISPONIBLE)}</span></div>
 ${entregaHtml}

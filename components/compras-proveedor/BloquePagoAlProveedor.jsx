@@ -60,13 +60,17 @@ export default function BloquePagoAlProveedor({
   /** La ubicación dueña del pedido, `{ id, nombre }`: de ahí sale la plata. */
   ubicacionDuena = null,
   deshabilitado = false,
+  /** Lo pagado desde la caja del POS antes de recibir: una compra por cargar. */
+  yaPagado = 0,
 }) {
   const { estado, totalEscrito, totalConfirmado, montoAhora, medio, turnoId, vencimiento } = valor;
   // Por función y no sobre `valor`: la búsqueda de turnos contesta tarde, y
   // mezclar su respuesta con un `valor` viejo pisaría lo que se cargó mientras.
   const cambiar = (parcial) => onCambiar?.((previo) => ({ ...previo, ...parcial }));
-  const sacaPlata = estadoSacaPlata(estado);
   const { pideTotal, total, saldo } = estadoEnPantalla;
+  // Ya pagada entera desde la caja: "Pagada" no saca plata otra vez.
+  const cubiertaPorLaCaja = Number(yaPagado) > 0 && total != null && Number(yaPagado) >= Number(total);
+  const sacaPlata = estadoSacaPlata(estado) && !(estado === ESTADO_PAGO_CIERRE.PAGADA && cubiertaPorLaCaja);
 
   return (
     <div className="flex flex-col gap-renglon">
@@ -119,6 +123,8 @@ export default function BloquePagoAlProveedor({
         <Importe rotulo="Total a pagar al proveedor" valor={total} fuerte />
       )}
 
+      {Number(yaPagado) > 0 && <Importe rotulo="Pagado desde la caja" valor={yaPagado} />}
+
       {/* ── CÓMO QUEDA EL PAGO ──────────────────────────────────────────
           Tres botones, el mismo patrón que "Llegó / No llegó" de esta hoja. No
           viene ninguno elegido: es una decisión, no un valor por omisión. */}
@@ -126,7 +132,8 @@ export default function BloquePagoAlProveedor({
         <div className="flex gap-dentroFiltro">
           {ESTADOS_PAGO_CIERRE.map((e) => {
             const elegido = estado === e;
-            const necesitaPermiso = estadoSacaPlata(e) && !puedeRegistrarPago;
+            const necesitaPermiso =
+              estadoSacaPlata(e) && !puedeRegistrarPago && !(e === ESTADO_PAGO_CIERRE.PAGADA && cubiertaPorLaCaja);
             return (
               <SunmiButton
                 key={e}

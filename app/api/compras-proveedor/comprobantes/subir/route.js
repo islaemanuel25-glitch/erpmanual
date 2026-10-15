@@ -50,6 +50,7 @@ import {
   queHacer,
 } from "@/lib/compras-proveedor/comprobante/subida";
 import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
+import { whereComprasPorCargar } from "@/lib/compras-proveedor/compraPorCargar";
 
 export async function POST(req) {
   try {
@@ -66,7 +67,12 @@ export async function POST(req) {
     const { grupoId, localId, session } = ctx;
 
     const perm = checkPerm(session, "compras.recibir");
-    if (!perm.ok) {
+    // LA FOTO DEL REMITO DESDE "PAGAR" DEL POS. El cajero no tiene Compras,
+    // pero el papel lo tiene él: con `pos.usar` puede subir la foto de una
+    // compra POR CARGAR de su ubicación, y nada más —ni otro pedido, ni páginas
+    // de un comprobante existente—. Se comprueba abajo, con el pedido leído.
+    const soloCompraPorCargar = !perm.ok && checkPerm(session, "pos.usar").ok;
+    if (!perm.ok && !soloCompraPorCargar) {
       return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
 
@@ -119,6 +125,18 @@ export async function POST(req) {
       ? Number(form.get("comprobanteId"))
       : null;
     const agruparEnUno = form.get("agruparEnUno") === "true";
+
+    if (soloCompraPorCargar) {
+      const porCargar = pedidoId && !comprobanteExistenteId
+        ? await prisma.pedidoProveedor.findFirst({
+            where: { id: pedidoId, proveedorId, ...whereComprasPorCargar({ grupoId, localId }) },
+            select: { id: true },
+          })
+        : null;
+      if (!porCargar) {
+        return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+      }
+    }
 
     const archivos = form.getAll("archivos").filter((f) => f && typeof f.arrayBuffer === "function");
 

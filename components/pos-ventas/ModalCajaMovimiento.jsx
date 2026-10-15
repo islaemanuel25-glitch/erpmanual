@@ -60,10 +60,10 @@ export default function ModalCajaMovimiento({ turnoId, onClose, onSuccess }) {
       <div className="sunmi-pos-panel rounded-xl shadow-2xl w-full max-w-md mx-4 p-5 space-y-4">
         <div className="text-center">
           <h2 className="text-lg font-bold sunmi-pos-text-accent">
-            Otro movimiento de caja
+            Cambio de caja
           </h2>
           <p className="text-[12px] sunmi-pos-muted mt-0.5">
-            Entradas y salidas puntuales de efectivo: cambio, adelantos. Los pagos a proveedores se registran en Finanzas.
+            Los pagos van por “Pagar”.
           </p>
         </div>
 
@@ -73,9 +73,8 @@ export default function ModalCajaMovimiento({ turnoId, onClose, onSuccess }) {
             otro. El backend además rechaza el motivo reservado. */}
         {tipo === "RETIRO" && (
           <div className="sunmi-state-warning sunmi-border rounded-lg p-2 text-[11px] sunmi-text-warning">
-            ¿Vas a sacar la recaudación? Usá <strong>“Retirar recaudación”</strong>: cuenta la
-            caja, deja el fondo y descuenta solo. Este retiro es para gastos o salidas
-            extraordinarias.
+            ¿Vas a sacar la recaudación? Usá <strong>“Retirar recaudación”</strong>. ¿Es un
+            pago? Usá <strong>“Pagar”</strong>.
           </div>
         )}
 
@@ -126,7 +125,7 @@ export default function ModalCajaMovimiento({ turnoId, onClose, onSuccess }) {
           <SunmiInput
             value={motivo}
             onChange={(e) => setMotivo(e.target.value)}
-            placeholder="Ej: cambio, adelanto..."
+            placeholder="Ej: cambio"
           />
         </div>
 

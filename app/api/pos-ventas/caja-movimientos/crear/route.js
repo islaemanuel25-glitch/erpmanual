@@ -3,43 +3,11 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { requirePerm } from "@/lib/authorize";
 import { esMotivoReservado } from "@/lib/caja/retiroDinero";
-import { ERROR_TURNO_EN_PREPARACION, ERROR_CAJA_AJENA, puedeActuarSobreCaja } from "@/lib/caja/cierreRelevo";
 import { identidadParaOperar } from "@/lib/caja/identidadCajaServer";
 import { bloquearTurno } from "@/lib/caja/cierreRelevoServer";
 import { LIMITES_TRANSACCION_DEL_LOCAL } from "@/lib/pos-ventas/candadoDelLocal";
-
-const SELECT_TURNO = {
-  id: true, localId: true, vendedorId: true, operadorId: true, operaLaCuenta: true,
-  cierre: true, cierreEnPreparacionEn: true, anuladoEn: true,
-};
-
-/**
- * Por qué este turno no admite un Caja +/−, o null si lo admite. La misma regla
- * se aplica dos veces —afuera como respuesta rápida, adentro con el turno
- * tomado— y por eso vive en un solo lugar.
- */
-function rechazoDelTurno(turno, localId, identidad) {
-  if (!turno || turno.localId !== localId) {
-    return { status: 404, cuerpo: { ok: false, error: "Turno no encontrado en este local" } };
-  }
-  if (!puedeActuarSobreCaja(turno, identidad)) {
-    return { status: 403, cuerpo: { ok: false, error: ERROR_CAJA_AJENA, cajaAjena: true } };
-  }
-  if (turno.cierre !== null) {
-    return { status: 400, cuerpo: { ok: false, error: "El turno ya esta cerrado" } };
-  }
-  // Un turno que tomó el corte de cierre tampoco admite movimientos, aunque
-  // `cierre` siga en null. Su universo quedó congelado: un ingreso o un egreso
-  // cargado ahora caería después de la frontera del corte y no lo vería el
-  // cierre que se está confirmando. Es la misma regla que aplica a las ventas.
-  if (turno.cierreEnPreparacionEn !== null) {
-    return {
-      status: 409,
-      cuerpo: { ok: false, error: ERROR_TURNO_EN_PREPARACION, turnoEnPreparacionDeCierre: true },
-    };
-  }
-  return null;
-}
+// Por qué un turno no admite un movimiento: la misma regla que "Pagar".
+import { SELECT_TURNO, rechazoDelTurno } from "@/lib/caja/turnoParaMover";
 
 export async function POST(req) {
   try {

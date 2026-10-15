@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-14 17:18
+**Última actualización:** 2026-10-15 11:08
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-15: feat(caja): Pagar desde el POS con pagos clasificados y compras por cargar — SIN VERIFICAR en pantalla
 - 2026-10-14: fix(transferencias): el celular vuelve a e60edeb; la computadora con copias propias — SIN VERIFICAR en pantalla
 - 2026-10-12: feat: cancelar un pedido lo marca en vez de borrarlo
 - 2026-10-10: fix(ventas): anular una venta con su turno cerrado, con el ajuste en ese turno

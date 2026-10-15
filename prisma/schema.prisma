@@ -3110,6 +3110,17 @@ model CambioPendiente {
   @@index([turnoOrigenId])
 }
 
+/// Qué se pagó con una salida de caja. Sueldo y Gasto restan en la ganancia;
+/// Proveedor y Al depósito son mercadería (su costo ya entra como costo de lo
+/// vendido) y el retiro del dueño no es gasto. En la caja restan todos igual.
+enum TipoEgresoCaja {
+  PROVEEDOR
+  SUELDO
+  GASTO
+  AL_DEPOSITO
+  RETIRO_DUENO
+}
+
 model CajaMovimiento {
   id        Int      @id @default(autoincrement())
   turnoId   Int
@@ -3125,6 +3136,13 @@ model CajaMovimiento {
   /// pierde datos.
   monto     Decimal  @db.Decimal(12, 2)
   motivo    String?
+  /// QUÉ SE PAGÓ con esta salida, para la mirada de la GANANCIA. La PLATA no lo
+  /// mira: el efectivo esperado resta todo RETIRO igual, tenga tipo o no.
+  /// Nullable: los movimientos anteriores a la columna quedan sin tipo y se
+  /// muestran "Sin clasificar" — no se adivina qué fueron. Lo escriben "Pagar"
+  /// del POS y los pagos en efectivo de Finanzas; a uno manual sin tipo se lo
+  /// clasifica a mano, y solo cambia esto (lib/caja/tipoEgreso.js).
+  tipoEgreso TipoEgresoCaja?
   createdAt DateTime @default(now())
 
   turno   Turno   @relation(fields: [turnoId], references: [id])

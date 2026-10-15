@@ -16,7 +16,7 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import PantallaTurnosYCierres from "@/components/turnos-y-cierres/PantallaTurnosYCierres";
 import { useTurnosYCierres } from "@/components/turnos-y-cierres/useTurnosYCierres";
 import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
-import { PERMISO_CAJERO, PERMISOS_VER_TODO } from "@/lib/turnosYCierres/alcance";
+import { PERMISO_CAJERO, PERMISO_CLASIFICAR_PAGOS, PERMISOS_VER_TODO } from "@/lib/turnosYCierres/alcance";
 
 export default function TurnosYCierresPage() {
   return (
@@ -44,6 +44,9 @@ function TurnosYCierres() {
 
 function Contenido() {
   const t = useTurnosYCierres();
+  const { perfil } = useUser();
+  const permisos = perfil?.permisos || [];
+  const puedeClasificar = permisos.includes("*") || permisos.includes(PERMISO_CLASIFICAR_PAGOS);
   return (
     <div className="w-full min-h-full mx-auto max-w-4xl px-4 pt-4 pb-4">
       <PantallaTurnosYCierres
@@ -60,6 +63,8 @@ function Contenido() {
         onAdelante={t.onAdelante}
         onReintentar={t.recargar}
         onVerCaja={t.onVerCaja}
+        puedeClasificar={puedeClasificar}
+        onClasificar={t.onClasificar}
       />
     </div>
   );

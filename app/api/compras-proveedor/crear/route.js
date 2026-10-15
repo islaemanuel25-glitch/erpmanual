@@ -6,6 +6,7 @@ import { checkPerm } from "@/lib/authorize";
 import { esComboBase } from "@/lib/combos/guards";
 import { aliasesDeImportacion } from "@/lib/compras-proveedor/importacion/aliases";
 import { persistirIdentidad } from "@/lib/proveedores/identidad/persistirIdentidad";
+import { datosDePedidoNacidoDeFactura } from "@/lib/compras-proveedor/compraPorCargar";
 import {
   itemQueNoCierra,
   textoItemQueNoCierra,
@@ -213,9 +214,7 @@ export async function POST(req) {
           // `fechaEnviado` se llena con la misma marca de tiempo: es la única
           // fecha del flujo que ocurrió de verdad, y dejarla vacía haría que el
           // historial mostrara un pedido enviado sin cuándo.
-          ...(nacidoDeFactura
-            ? { estado: "ENVIADO", fechaEnviado: new Date(), nacidoDeFactura: true }
-            : {}),
+          ...(nacidoDeFactura ? datosDePedidoNacidoDeFactura() : {}),
           detalles: {
             create: listaItems.map((it) => ({
               productoLocalId: Number(it.productoLocalId),

@@ -1607,6 +1607,9 @@ export default function DetallePedidoProveedorPage({ params }) {
               )}
               puedeRegistrarPago={puedeRegistrarPago}
               ubicacionDuena={ubicacionDuena}
+              // Una compra por cargar llega con su cuenta ya pagada desde la
+              // caja del POS: lo pagado cuenta y no se vuelve a pagar.
+              yaPagado={cuentaPorPagar?.pagado || 0}
               onConfirmar={(recibidosDelCierre, pagoAlProveedor) => {
                 setCerrandoRecepcion(false);
                 ejecutarAccion("recibir", {
