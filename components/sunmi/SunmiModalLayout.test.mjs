@@ -616,6 +616,7 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     "components/proveedores/ModalProveedor.jsx": true,
     "components/usuarios/ModalUsuario.jsx": true,
     "components/operadores/ModalOperador.jsx": true,
+    "components/empleados/ModalEmpleado.jsx": true,
     "components/roles/ModalRol.jsx": true,
     "components/categorias/ModalCategoria.jsx": true,
     "components/compras-proveedor/ModalVincularCodigo.jsx": true,

@@ -106,6 +106,11 @@ async function montar() {
   const op = await prisma.operadorLocal.create({ data: { nombre: `${marca}-Brenda`, pinHash: "x" } });
   creado.operadorIds.push(op.id);
   await prisma.operadorEnLocal.create({ data: { operadorId: op.id, localId: local.id } });
+  // Sueldo elige de Empleados: el de la cajera, asociado a su operador.
+  const empleado = await prisma.empleado.create({
+    data: { nombre: op.nombre, operadorId: op.id, locales: { create: [{ localId: local.id }] } },
+  });
+  creado.empleadoIds = [empleado.id];
 
   const turno = await prisma.turno.create({
     data: { localId: local.id, vendedorId: cajero.u.id, operadorId: op.id, montoInicial: 100000, apertura: new Date() },
@@ -128,7 +133,7 @@ async function montar() {
   process.env[VARIABLE_RUTA] = creado.almacen;
 
   const quienCaja = { sesion: cajero.sesion, operador: firmarTokenOperador({ operadorId: op.id, nombre: op.nombre, localId: local.id }) };
-  return { grupo, deposito, local, cajero, compras, finanzas, op, turno, proveedor, pl, categoriaGasto, quienCaja };
+  return { grupo, deposito, local, cajero, compras, finanzas, op, empleado, turno, proveedor, pl, categoriaGasto, quienCaja };
 }
 
 async function desmontar() {
@@ -152,6 +157,7 @@ async function desmontar() {
   }
   // El libro de stock no deja borrar sus movimientos: los productos quedan.
   if (creado.proveedorId) await prisma.proveedor.updateMany({ where: { id: creado.proveedorId }, data: { activo: false } }).catch(() => {});
+  if (creado.empleadoIds) await prisma.empleado.deleteMany({ where: { id: { in: creado.empleadoIds } } });
   await prisma.operadorEnLocal.deleteMany({ where: { operadorId: { in: creado.operadorIds } } });
   await prisma.operadorLocal.deleteMany({ where: { id: { in: creado.operadorIds } } });
   if (creado.almacen) await rm(creado.almacen, { recursive: true, force: true });
@@ -181,7 +187,7 @@ async function casos(f) {
   igual("el efectivo de la caja ahora", op.caja?.efectivoAhora, 100000);
   ok("el proveedor del local está", (op.proveedores || []).some((p) => p.id === f.proveedor.id));
   ok("el proveedor viaja sin teléfono ni CUIT", (op.proveedores || []).every((p) => Object.keys(p).join() === "id,nombre"));
-  ok("el empleado del local está", (op.empleados || []).some((e) => e.id === f.op.id));
+  ok("el empleado del local está", (op.empleados || []).some((e) => e.id === f.empleado.id));
   ok("Sueldos no se ofrece como Gasto", !(op.categorias || []).some((c) => c.nombre === "Sueldos"));
 
   seccion("2 · Proveedor: compra por cargar + pago en Finanzas + un retiro");
@@ -217,7 +223,7 @@ async function casos(f) {
   igual("sin compra por cargar, el cajero no sube nada", ajena.status, 403);
 
   seccion("4 · Sueldo, gasto, al depósito y retiro del dueño");
-  const sueldo = await pagar(f, { tipo: "SUELDO", monto: "35000", operadorId: f.op.id, modalidad: "ADELANTO", idempotencyKey: clave() });
+  const sueldo = await pagar(f, { tipo: "SUELDO", monto: "35000", empleadoId: f.empleado.id, modalidad: "ADELANTO", idempotencyKey: clave() });
   igual("sueldo ok", sueldo.ok, true);
   const gastoS = await prisma.gasto.findUnique({ where: { id: sueldo.gastoId }, select: { concepto: true, categoria: { select: { nombre: true } }, beneficiario: true, pagos: { select: { medio: true, cajaMovimientoId: true } } } });
   igual("queda en Gastos → Sueldos, pagado con efectivo de la caja", [gastoS.categoria.nombre, gastoS.concepto, gastoS.pagos[0].medio], ["Sueldos", `Adelanto · ${f.op.nombre}`, "EFECTIVO"]);

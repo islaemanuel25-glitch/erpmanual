@@ -1,13 +1,12 @@
 // app/api/pos-ventas/consumo-personal/route.js
 //
-// CONSUMO DEL PERSONAL desde el panel de cobro del POS. Lo puede registrar
-// todo cajero con `pos.usar`. No es una venta: sale del stock con las
-// funciones de la venta y queda como Gasto al costo
-// (lib/pos-ventas/consumoPersonalServer.js).
+// CONSUMO DEL PERSONAL desde "Pagar" del POS. Lo puede registrar todo cajero
+// con `pos.usar`. No es una venta: sale del stock con las funciones de la
+// venta y queda como Gasto al costo (lib/pos-ventas/consumoPersonalServer.js).
 //
-//   POST { turnoId, operadorId, items, idempotencyKey } → el consumo.
+//   POST { turnoId, empleadoId, items, idempotencyKey } → el consumo.
 //
-// Quién consume se elige entre los operarios del local; la lista la da
+// Quién consume se elige entre los EMPLEADOS activos del local; la lista la da
 // `/api/pos-ventas/pagar` (GET), la misma que usa "Sueldo" en Pagar.
 
 import { NextResponse } from "next/server";

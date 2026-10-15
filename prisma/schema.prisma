@@ -247,6 +247,7 @@ model Local {
   ticketConfig       TicketConfig?
   configuracionLocal ConfiguracionLocal?
   operadorAsignaciones OperadorEnLocal[]
+  empleadoAsignaciones EmpleadoEnLocal[]
   arqueos              ArqueoCaja[]
   arqueoPostergaciones ArqueoPostergacion[]
   cierresPreparacion   CierrePreparacion[]
@@ -3667,6 +3668,9 @@ model Gasto {
   vencimiento       DateTime? @db.Date
   fechaPrevistaPago DateTime? @db.Date
   creadoPorId       Int
+  /// El empleado al que corresponde: el de un sueldo o un adelanto, o el que
+  /// hizo el consumo del personal. Null en el resto de los gastos.
+  empleadoId        Int?
   /// Clave de idempotencia del INTENTO de alta, que genera el cliente al abrir
   /// el formulario. Obligatoria, por la misma razón que la del pago: un alta
   /// repetida —doble clic, respuesta perdida— con un pago inicial en efectivo
@@ -3678,6 +3682,7 @@ model Gasto {
   local     Local          @relation("gasto_del_local", fields: [localId], references: [id])
   categoria CategoriaGasto @relation(fields: [categoriaId], references: [id])
   creadoPor Usuario        @relation("gasto_creado_por", fields: [creadoPorId], references: [id])
+  empleado  Empleado?      @relation(fields: [empleadoId], references: [id])
   pagos     PagoGasto[]
   /// La foto o el archivo del ticket, si se adjuntó. Opcional.
   archivos  GastoArchivo[]
@@ -3689,6 +3694,7 @@ model Gasto {
   @@index([grupoId])
   @@index([categoriaId])
   @@index([localId, fecha])
+  @@index([empleadoId])
 }
 
 /// UN PAGO DE UN GASTO: el hecho financiero. La forma de `PagoProveedor`.
@@ -4181,8 +4187,42 @@ model OperadorLocal {
   ventas  Venta[]
   turnos  Turno[]
   arqueos ArqueoCaja[]
-  /// Lo que este operario consumió del stock de un local.
+  /// Lo que este operario consumió del stock de un local (consumos de antes de
+  /// Empleados; desde entonces la persona es `ConsumoPersonal.empleadoId`).
   consumosPersonal ConsumoPersonal[]
+  /// El empleado que es este operador. Todo operador es empleado.
+  empleado Empleado?
+}
+
+/// QUIEN TRABAJA EN EL LOCAL. Regla de Emanuel (2026-10-15): el OPERADOR es
+/// quien maneja la caja y entra al POS con PIN; el EMPLEADO es quien trabaja.
+/// Todo operador es empleado —`operadorId` lo asocia—, pero no todo empleado
+/// es operador: cocina, reparto. Sueldo y consumo del personal eligen de acá.
+model Empleado {
+  id         Int      @id @default(autoincrement())
+  nombre     String
+  activo     Boolean  @default(true)
+  /// Su operador, si maneja la caja. Uno a uno.
+  operadorId Int?     @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  operador         OperadorLocal?    @relation(fields: [operadorId], references: [id], onDelete: SetNull)
+  locales          EmpleadoEnLocal[]
+  consumosPersonal ConsumoPersonal[]
+  gastos           Gasto[]
+}
+
+/// Los locales donde trabaja un empleado: el patrón de `OperadorEnLocal`.
+model EmpleadoEnLocal {
+  empleadoId Int
+  localId    Int
+
+  empleado Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  local    Local    @relation(fields: [localId], references: [id])
+
+  @@id([empleadoId, localId])
+  @@index([localId])
 }
 
 /// LO QUE EL PERSONAL SE LLEVA PARA CONSUMIR: bebida, pan, fiambre.
@@ -4198,8 +4238,11 @@ model ConsumoPersonal {
   id             Int      @id @default(autoincrement())
   localId        Int
   turnoId        Int
+  /// Quién lo consumió, en los consumos de antes de Empleados. Se conserva:
+  /// el código de esa versión lo sigue escribiendo durante el despliegue.
+  operadorId     Int?
   /// Quién lo consumió.
-  operadorId     Int
+  empleadoId     Int?
   /// Quién lo registró (la cuenta de la sesión).
   usuarioId      Int
   gastoId        Int?     @unique
@@ -4212,13 +4255,15 @@ model ConsumoPersonal {
 
   local    Local                  @relation("consumo_personal_del_local", fields: [localId], references: [id])
   turno    Turno                  @relation(fields: [turnoId], references: [id])
-  operador OperadorLocal          @relation(fields: [operadorId], references: [id])
+  operador OperadorLocal?         @relation(fields: [operadorId], references: [id], onDelete: Restrict)
+  empleado Empleado?              @relation(fields: [empleadoId], references: [id])
   usuario  Usuario                @relation("consumo_personal_registrado_por", fields: [usuarioId], references: [id])
   gasto    Gasto?                 @relation(fields: [gastoId], references: [id])
   lineas   ConsumoPersonalLinea[]
 
   @@unique([localId, idempotencyKey])
   @@index([turnoId])
+  @@index([empleadoId])
 }
 
 /// Un renglón del consumo: el producto, cuánto, cuánto salió del stock y a qué

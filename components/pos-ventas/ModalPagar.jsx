@@ -28,12 +28,25 @@ import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiMo
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSolapas from "@/components/sunmi/SunmiSolapas";
 import CampoFotoOArchivo from "@/components/pos-ventas/CampoFotoOArchivo";
+import PanelConsumoPersonal from "@/components/pos-ventas/PanelConsumoPersonal";
 import useEsEscritorio from "@/hooks/useEsEscritorio";
 import { ETIQUETA_TIPO_EGRESO, TIPO_EGRESO, TIPOS_EGRESO } from "@/lib/caja/tipoEgreso";
 import { desdeCentavos } from "@/lib/caja/efectivoEsperado";
 import { leerImporte, nuevaClaveDePago } from "@/lib/finanzas/pagosProveedores";
 import { formatearMoneda } from "@/lib/moneda";
 import { subirArchivoDeGasto } from "@/lib/finanzas/subirArchivoDeGasto";
+
+// ── LA SEXTA OPCIÓN NO ES UN EGRESO DE CAJA ───────────────────────────────
+//
+// "Consumo del personal" va después de "Retiro del dueño", pero no sale plata:
+// sale mercadería. Por eso no es un `TIPO_EGRESO` —ese enum es la columna de
+// `CajaMovimiento`— sino una opción más de esta pantalla, que no pasa por
+// `/api/pos-ventas/pagar` sino por `/api/pos-ventas/consumo-personal`.
+export const OPCION_CONSUMO = "CONSUMO_PERSONAL";
+export const OPCIONES_PAGAR = Object.freeze([...TIPOS_EGRESO, OPCION_CONSUMO]);
+
+/** Cómo se llama cada opción. */
+const ETIQUETA = Object.freeze({ ...ETIQUETA_TIPO_EGRESO, [OPCION_CONSUMO]: "Consumo del personal" });
 
 /** Lo que dice cada opción de P1. */
 const DESCRIPCION = Object.freeze({
@@ -42,6 +55,7 @@ const DESCRIPCION = Object.freeze({
   [TIPO_EGRESO.GASTO]: "Insumos, limpieza, servicios",
   [TIPO_EGRESO.AL_DEPOSITO]: "Mercadería del depósito",
   [TIPO_EGRESO.RETIRO_DUENO]: "Plata que se lleva el dueño",
+  [OPCION_CONSUMO]: "Lo que se lleva el personal",
 });
 
 /** El título de cada formulario. */
@@ -51,6 +65,7 @@ const TITULO = Object.freeze({
   [TIPO_EGRESO.GASTO]: "Gasto",
   [TIPO_EGRESO.AL_DEPOSITO]: "Al depósito",
   [TIPO_EGRESO.RETIRO_DUENO]: "Retiro del dueño",
+  [OPCION_CONSUMO]: "Consumo del personal",
 });
 
 const MODALIDADES = [
@@ -58,9 +73,9 @@ const MODALIDADES = [
   { valor: "ADELANTO", texto: "Adelanto" },
 ];
 
-const VACIO = { proveedorId: "", operadorId: "", modalidad: "SUELDO", categoriaId: "", monto: "", foto: null };
+const VACIO = { proveedorId: "", empleadoId: "", modalidad: "SUELDO", categoriaId: "", monto: "", foto: null };
 
-export default function ModalPagar({ turnoId, onClose, onPagado }) {
+export default function ModalPagar({ turnoId, localId, esDeposito = false, onClose, onPagado }) {
   const { requerirOperador } = useOperadorContext();
   // En escritorio, el diálogo de dos columnas; en el teléfono, la hoja de siempre.
   const esEscritorio = useEsEscritorio() === true;
@@ -109,7 +124,7 @@ export default function ModalPagar({ turnoId, onClose, onPagado }) {
   const falta =
     monto == null ||
     (tipo === TIPO_EGRESO.PROVEEDOR && !form.proveedorId) ||
-    (tipo === TIPO_EGRESO.SUELDO && !form.operadorId) ||
+    (tipo === TIPO_EGRESO.SUELDO && !form.empleadoId) ||
     (tipo === TIPO_EGRESO.GASTO && !form.categoriaId);
 
   async function pagar() {
@@ -127,7 +142,7 @@ export default function ModalPagar({ turnoId, onClose, onPagado }) {
           monto: form.monto,
           idempotencyKey: clave.current,
           proveedorId: form.proveedorId || null,
-          operadorId: form.operadorId || null,
+          empleadoId: form.empleadoId || null,
           modalidad: form.modalidad,
           categoriaId: form.categoriaId || null,
         }),
@@ -165,7 +180,7 @@ export default function ModalPagar({ turnoId, onClose, onPagado }) {
   // la derecha (Figma 398:664): elegir otro tipo no obliga a volver.
   const listaDeTipos = (
     <div className="grid content-start gap-3">
-      {TIPOS_EGRESO.map((t) => (
+      {OPCIONES_PAGAR.map((t) => (
         <SunmiActionCard
           key={t}
           data-pagar-tipo={t}
@@ -177,7 +192,7 @@ export default function ModalPagar({ turnoId, onClose, onPagado }) {
           <span className="flex w-full items-center gap-3">
             <span className="min-w-0 flex-1">
               <span className={`block text-base2 font-semibold ${esEscritorio && tipo === t ? "sunmi-text-accent" : "sunmi-text-strong"}`}>
-                {ETIQUETA_TIPO_EGRESO[t]}
+                {ETIQUETA[t]}
               </span>
               <span className="block text-sm2 sunmi-text-muted">{DESCRIPCION[t]}</span>
             </span>
@@ -230,6 +245,28 @@ export default function ModalPagar({ turnoId, onClose, onPagado }) {
   );
 
   function formulario() {
+    // El consumo tiene su propio formulario: una lista de productos, no un monto.
+    if (tipo === OPCION_CONSUMO) {
+      return (
+        <div className="grid content-start gap-3">
+          {!esEscritorio ? (
+            <SunmiLinkButton onClick={() => setTipo(null)} className="justify-self-start text-sm3">
+              ‹ Pagar
+            </SunmiLinkButton>
+          ) : null}
+          <PanelConsumoPersonal
+            turnoId={turnoId}
+            localId={localId}
+            esDeposito={esDeposito}
+            empleados={opciones.empleados}
+            onRegistrado={(r) => {
+              onPagado?.({ tipo: OPCION_CONSUMO, consumo: r });
+              onClose();
+            }}
+          />
+        </div>
+      );
+    }
     const campoPrincipal =
       tipo === TIPO_EGRESO.PROVEEDOR ? (
         <Campo rotulo="Proveedor">
@@ -249,8 +286,8 @@ export default function ModalPagar({ turnoId, onClose, onPagado }) {
       ) : tipo === TIPO_EGRESO.SUELDO ? (
         <Campo rotulo="Empleado">
           <SunmiSelectAdv
-            value={form.operadorId}
-            onChange={(v) => cambiar({ operadorId: v })}
+            value={form.empleadoId}
+            onChange={(v) => cambiar({ empleadoId: v })}
             placeholder="Elegí el empleado"
           >
             {opciones.empleados.map((e) => (

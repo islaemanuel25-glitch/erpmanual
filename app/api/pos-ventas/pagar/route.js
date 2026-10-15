@@ -7,7 +7,7 @@
 //
 //   GET  ?turnoId=N → lo que la pantalla ofrece: la caja, su efectivo de
 //        ahora, proveedores, categorías de gasto y empleados del local.
-//   POST { turnoId, tipo, monto, idempotencyKey, proveedorId?, operadorId?,
+//   POST { turnoId, tipo, monto, idempotencyKey, proveedorId?, empleadoId?,
 //          modalidad?, categoriaId? } → el pago.
 //
 // La forma es la de "Caja +/−": identidad canónica, una respuesta rápida
@@ -28,6 +28,7 @@ import { CATEGORIA_CONSUMO_PERSONAL } from "@/lib/pos-ventas/consumoPersonal";
 import { categoriasDeGasto } from "@/lib/finanzas/gastosServer";
 import { leerDetalleDeCaja } from "@/lib/turnosYCierres/lecturaTurnosYCierresServer";
 import { proveedorVisibleWhere } from "@/lib/visibilidad";
+import { empleadosDelLocal } from "@/lib/empleados/empleadosServer";
 
 const PERMISO = "pos.usar";
 
@@ -68,11 +69,9 @@ export async function GET(req) {
         orderBy: { nombre: "asc" },
       }),
       categoriasDeGasto(prisma),
-      prisma.operadorEnLocal.findMany({
-        where: { localId, operador: { activo: true } },
-        select: { operador: { select: { id: true, nombre: true } } },
-        orderBy: { operador: { nombre: "asc" } },
-      }),
+      // Sueldo y consumo eligen de Empleados, no de Operadores: quien cobra un
+      // sueldo puede no manejar la caja.
+      empleadosDelLocal(prisma, localId),
     ]);
 
     return NextResponse.json({
@@ -84,7 +83,7 @@ export async function GET(req) {
       categorias: categorias
         .filter((x) => x.nombre !== CATEGORIA_SUELDOS && x.nombre !== CATEGORIA_CONSUMO_PERSONAL)
         .map((x) => ({ id: x.id, nombre: x.nombre })),
-      empleados: empleados.map((e) => e.operador),
+      empleados,
     });
   } catch (e) {
     console.error("[pos-ventas/pagar GET]", e);

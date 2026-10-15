@@ -38,6 +38,9 @@ está claro cuál de las dos es, va como **[ACCIDENTE POSIBLE]** y no como regla
 - [consumo-del-personal.md](consumo-del-personal.md) — lo que se lleva el
   personal: sale del stock como una venta sin serlo, es un gasto al costo que no
   se paga, y resta en el resultado del turno; la foto del ticket de un gasto.
+- [empleados.md](empleados.md) — operador (caja, PIN) y empleado (trabaja en el
+  local): de dónde eligen Sueldo y Consumo del personal, y el relleno de la
+  migración que los creó.
 - [tesoreria.md](tesoreria.md) — la plata real: el efectivo declarado sale de
   las entregas de cada caja, lo digital es cobrado declarado por el POS, y un
   pago hecho desde la caja no se resta dos veces.
