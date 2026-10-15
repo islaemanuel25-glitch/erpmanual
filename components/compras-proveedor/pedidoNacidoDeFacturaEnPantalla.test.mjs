@@ -34,7 +34,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import TarjetaContextoDelPedido from "./TarjetaContextoDelPedido.jsx";
-import BloqueDeLaFactura, { TEXTO_SIN_FACTURA } from "./BloqueDeLaFactura.jsx";
+import BloqueDeLaFactura, { TEXTO_CARGAR_A_MANO, TEXTO_SIN_FACTURA } from "./BloqueDeLaFactura.jsx";
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const codigoDe = (rel) =>
@@ -114,6 +114,14 @@ test("SIN PEDIDO PREVIO NO SE OFRECE 'LLEGÓ SIN FACTURA'", () => {
   assert.ok(html.includes("Sacale una foto a la factura"), "se llevó puesto el bloque entero");
 });
 
+test("una compra por cargar ofrece 'Cargar a mano, sin papel', y sin manejador no se dibuja", () => {
+  const con = aLaVista(renderToStaticMarkup(React.createElement(BloqueDeLaFactura, { onCargarAMano: () => {} })));
+  assert.ok(con.includes(TEXTO_CARGAR_A_MANO));
+  assert.ok(!con.includes(TEXTO_SIN_FACTURA), "no es la salida de un pedido normal");
+  const sin = aLaVista(renderToStaticMarkup(React.createElement(BloqueDeLaFactura, {})));
+  assert.ok(!sin.includes(TEXTO_CARGAR_A_MANO));
+});
+
 test("CONTRAPRUEBA: en un pedido normal la salida secundaria sigue estando", () => {
   const html = aLaVista(
     renderToStaticMarkup(React.createElement(BloqueDeLaFactura, { onSinFactura: () => {} }))
@@ -144,10 +152,23 @@ test("LA RAMA VIEJA DE ENVIADO NO SE DIBUJA PARA UN PEDIDO NACIDO DE FACTURA", (
     /!esRecepcion \|\| sinFactura/,
     "volvió la rama vieja de 'Llegó sin factura'"
   );
+  // ── CAMBIÓ EL 2026-10-15: "CARGAR A MANO" EN UNA COMPRA POR CARGAR ──────
+  //
+  // Afirmaba `!sinPedidoPrevio` adentro de `sinPapel`: el camino sin papel no
+  // se abría nunca para un pedido nacido de factura. Una compra nacida de
+  // "Pagar → Proveedor" quedaba así sin forma de cargarse sin foto. Ahora se
+  // abre para él, pero SOLO por "Cargar a mano, sin papel", y sigue cerrado
+  // con papel subido. Lo que no cambia: la salida "Llegó sin factura" —la de
+  // un pedido normal— sigue sin ofrecerse para él (abajo).
   assert.match(
     pagina,
-    /const sinPapel = esRecepcion && sinFactura && !sinPedidoPrevio && hayComprobantes === 0;/,
-    "el camino sin papel se abre para un pedido nacido de factura, o con papel subido"
+    /const sinPapel = esRecepcion && sinFactura && hayComprobantes === 0;/,
+    "el camino sin papel se abre con papel subido"
+  );
+  assert.match(
+    pagina,
+    /onCargarAMano=\{sinPedidoPrevio \? \(\) => setSinFactura\(true\) : null\}/,
+    "la compra nacida de factura no tiene cómo cargarse a mano, o un pedido normal ganó una segunda salida"
   );
   assert.match(
     pagina,
