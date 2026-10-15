@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-15 16:17
+**Última actualización:** 2026-10-15 17:20
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-15: feat: recibir con deuda se confirma, con campanita, "Pago parcial" y evento para Azul Chat (SIN VERIFICAR en pantalla)
 - 2026-10-15: feat(empleados): empleados del local, y el consumo del personal pasa a Pagar — SIN VERIFICAR en pantalla
 - 2026-10-15: feat(pos): consumo del personal y foto del ticket de un gasto — servidor
 - 2026-10-15: feat(caja): Pagar desde el POS con pagos clasificados y compras por cargar — SIN VERIFICAR en pantalla

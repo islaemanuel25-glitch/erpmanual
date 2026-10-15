@@ -1,16 +1,16 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-15 16:17
+**Fecha:** 2026-10-15 17:20
 
 ## Módulos modificados recientemente
+
+### transferencias
+- feat: recibir con deuda se confirma, con campanita, "Pago parcial" y evento para Azul Chat (SIN VERIFICAR en pantalla), feat(empleados): empleados del local, y el consumo del personal pasa a Pagar — SIN VERIFICAR en pantalla, feat(pos): consumo del personal y foto del ticket de un gasto — servidor
+- Archivos: 1 modificados (1 total)
 
 ### pos-ventas
 - feat(empleados): empleados del local, y el consumo del personal pasa a Pagar — SIN VERIFICAR en pantalla, feat(pos): consumo del personal en el cobro, Pagar en escritorio y foto del gasto — SIN VERIFICAR en pantalla, feat(pos): consumo del personal y foto del ticket de un gasto — servidor
 - Archivos: 9 nuevos, 5 modificados (14 total)
-
-### transferencias
-- feat(empleados): empleados del local, y el consumo del personal pasa a Pagar — SIN VERIFICAR en pantalla, feat(pos): consumo del personal y foto del ticket de un gasto — servidor, feat(caja): Pagar desde el POS con pagos clasificados y compras por cargar — SIN VERIFICAR en pantalla
-- Archivos: 1 modificados (1 total)
 
 
 ## Archivos nuevos desde última sincronización
