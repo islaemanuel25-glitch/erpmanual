@@ -16,7 +16,9 @@ Desde 2026-10-15. Regla de Emanuel, no se discute.
   `sueldosYGastos` y `resultadoDelTurno` en
   `lib/turnosYCierres/lecturaTurnosYCierres.js`).
 - Resultado del turno = neto después de comisiones − costo de la mercadería −
-  (sueldos + gastos) [CÓDIGO].
+  (sueldos + gastos) − consumo del personal [CÓDIGO]. El consumo va en su fila
+  y no tiene movimiento de caja: ver
+  [consumo-del-personal.md](consumo-del-personal.md).
 
 ## El tipo
 

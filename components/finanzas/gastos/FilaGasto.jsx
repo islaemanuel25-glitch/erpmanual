@@ -20,7 +20,7 @@ import FilaConImporte from "@/components/periodo/FilaConImporte";
 import { formatearMoneda } from "@/lib/moneda";
 import { ESTADO_CUENTA, diaLegible } from "@/lib/finanzas/pagosProveedores";
 import { importeDeLaCuenta } from "@/lib/finanzas/calendarioDePagos";
-import { ROTULO_ESTADO_GASTO } from "@/lib/finanzas/calendarioDeGastos";
+import { rotuloEstadoDelGasto } from "@/lib/finanzas/calendarioDeGastos";
 
 /**
  * Si el gasto está pagado y si está vencido. Lo leen la fila del celular y la
@@ -54,7 +54,7 @@ export default function FilaGasto({ gasto, filtro, hoy, variasUbicaciones = fals
       <div className={`text-sm2 ${vencido ? "sunmi-text-warning" : "sunmi-text-muted"}`}>
         {gasto?.categoria?.nombre || "Sin categoría"}
         {" · "}
-        {ROTULO_ESTADO_GASTO[gasto?.estado] || gasto?.estado}
+        {rotuloEstadoDelGasto(gasto)}
         {pagado ? null : " · "}
         {pagado ? null : vence}
       </div>

@@ -28,12 +28,13 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import ModalRegistrarPago from "@/components/finanzas/pagos/ModalRegistrarPago";
 import { Renglon, RenglonDePago } from "@/components/finanzas/pagos/DetalleCuentaPorPagar";
 import { COLOR_ESTADO_CUENTA, ImporteConRotulo } from "@/components/finanzas/pagos/TarjetaCuentaPorPagar";
 import { formatearMoneda } from "@/lib/moneda";
 import { ESTADO_CUENTA, diaLegible } from "@/lib/finanzas/pagosProveedores";
-import { ROTULO_ESTADO_GASTO } from "@/lib/finanzas/calendarioDeGastos";
+import { rotuloEstadoDelGasto } from "@/lib/finanzas/calendarioDeGastos";
 
 export default function DetalleGasto({ datos, onCambio }) {
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -53,7 +54,8 @@ export default function DetalleGasto({ datos, onCambio }) {
             </div>
           </div>
           <SunmiPill color={COLOR_ESTADO_CUENTA[gasto.estado] || "slate"}>
-            {ROTULO_ESTADO_GASTO[gasto.estado] || gasto.estado}
+            {/* El consumo del personal no se paga: dice eso y no "Pagado". */}
+            {rotuloEstadoDelGasto(gasto)}
           </SunmiPill>
         </div>
 
@@ -70,6 +72,17 @@ export default function DetalleGasto({ datos, onCambio }) {
         {gasto.comprobanteNumero && <Renglon rotulo="Comprobante">{gasto.comprobanteNumero}</Renglon>}
         {gasto.vencimiento && <Renglon rotulo="Vencimiento">{diaLegible(gasto.vencimiento)}</Renglon>}
         {gasto.fechaPrevistaPago && <Renglon rotulo="Fecha prevista de pago">{diaLegible(gasto.fechaPrevistaPago)}</Renglon>}
+        {(gasto.archivos || []).map((a) => (
+          <Renglon key={a.orden} rotulo={gasto.archivos.length > 1 ? `Ticket ${a.orden}` : "Ticket"}>
+            <SunmiLinkButton
+              type="button"
+              onClick={() => window.open(`/api/finanzas/gastos/${gasto.id}/archivo?orden=${a.orden}`, "_blank", "noopener")}
+              className="break-all"
+            >
+              {a.nombre || "Ver"}
+            </SunmiLinkButton>
+          </Renglon>
+        ))}
 
         {puedePagar && !pagado && (
           <SunmiButton color="primary" className="w-full" onClick={() => setModalAbierto(true)}>
@@ -83,9 +96,11 @@ export default function DetalleGasto({ datos, onCambio }) {
         )}
       </SunmiCard>
 
-      <h2 className="text-xs2 font-semibold sunmi-text-muted tracking-wider">PAGOS</h2>
+      {gasto.sinPago ? null : (
+        <h2 className="text-xs2 font-semibold sunmi-text-muted tracking-wider">PAGOS</h2>
+      )}
 
-      {pagos.length === 0 ? (
+      {gasto.sinPago ? null : pagos.length === 0 ? (
         <SunmiAviso tono="neutral" titulo="Sin pagos">
           Todavía no se registró ningún pago de este gasto.
         </SunmiAviso>

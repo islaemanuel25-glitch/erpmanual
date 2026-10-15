@@ -35,6 +35,11 @@ Si la lista está vacía, el despliegue es solo de código.
   movimientos hasta hoy. Es de "Pagar" desde el POS (2026-10-15). El efectivo
   esperado no la lee, y la versión vieja del código tampoco, así que no se
   rompe si la migración entra antes que el código.
+- `20261015140949_consumo_personal_y_archivo_de_gasto` — **aditiva**: crea
+  `ConsumoPersonal`, `ConsumoPersonalLinea` y `GastoArchivo`, e inserta la
+  categoría de gasto "Consumo del personal" (`ON CONFLICT DO NOTHING`). No toca
+  ninguna columna ni fila existente. Va después de `tipo_egreso_caja`; la
+  versión vieja del código no lee las tablas nuevas.
 
 Producción está en **60 migraciones**, con el ERP en
 `ccf2894fe452802a5c2195327d95b7598830ae58`.

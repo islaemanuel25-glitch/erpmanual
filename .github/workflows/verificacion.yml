@@ -549,6 +549,16 @@ jobs:
       - name: Ejercer Pagar desde el POS contra PostgreSQL
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/pagarDesdeElPos.mjs
 
+      # El consumo del personal: sale del stock con las funciones de la venta,
+      # no crea Venta ni toca la caja, el gasto va al costo y el resultado del
+      # turno lo resta una vez. Y la foto de un gasto se guarda y se lee.
+      - name: Ejercer el consumo del personal contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/consumoPersonal.mjs
+
+      # Y que esa prueba MIRA: vuelve a crear una Venta, y el gasto al precio.
+      - name: Contrapruebas del consumo del personal
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs CP-
+
       # Y que esa prueba MIRA: se rompe el cierre sobre una copia, tres veces, y
       # cada vez tienen que gritar las afirmaciones que nombra el caso. Solo los
       # casos `SI-`: los de transferencias tardan minutos y se corren a mano.

@@ -264,6 +264,8 @@ model Local {
   gastos                  Gasto[]                   @relation("gasto_del_local")
   /// Los pagos de gastos cuyo dinero salió de esta ubicación.
   pagosGastoOrigen        PagoGasto[]               @relation("pago_gasto_origen")
+  /// Lo que el personal de esta ubicación consumió de su stock.
+  consumosPersonal        ConsumoPersonal[]         @relation("consumo_personal_del_local")
   /// Las verificaciones de efectivo de Tesorería de esta ubicación.
   verificacionesEfectivo  VerificacionEfectivo[]    @relation("verificacion_efectivo_del_local")
   /// El catálogo de turnos operativos de esta ubicación.
@@ -424,6 +426,7 @@ model Usuario {
   pagosProveedorRegistrados PagoProveedor[]        @relation("pago_registrado_por")
   gastosCreados          Gasto[]                   @relation("gasto_creado_por")
   pagosGastoRegistrados  PagoGasto[]               @relation("pago_gasto_registrado_por")
+  consumosPersonalRegistrados ConsumoPersonal[]    @relation("consumo_personal_registrado_por")
   verificacionesEfectivoHechas   VerificacionEfectivo[] @relation("verificacion_efectivo_hecha_por")
   verificacionesEfectivoAnuladas VerificacionEfectivo[] @relation("verificacion_efectivo_anulada_por")
   /// Las aplicaciones externas que este usuario autorizó a consultar en su nombre.
@@ -2507,6 +2510,9 @@ model Turno {
   pagosProveedor    PagoProveedor[]
   /// Pagos de gastos en EFECTIVO que salieron del cajón de ESTE turno.
   pagosGasto        PagoGasto[]
+  /// Lo que el personal consumió mientras esta caja estaba abierta. No es plata
+  /// del cajón: ni el esperado ni el cierre lo leen.
+  consumosPersonal  ConsumoPersonal[]
 
   @@index([localId])
   @@index([vendedorId])
@@ -3673,6 +3679,10 @@ model Gasto {
   categoria CategoriaGasto @relation(fields: [categoriaId], references: [id])
   creadoPor Usuario        @relation("gasto_creado_por", fields: [creadoPorId], references: [id])
   pagos     PagoGasto[]
+  /// La foto o el archivo del ticket, si se adjuntó. Opcional.
+  archivos  GastoArchivo[]
+  /// El consumo del personal que originó este gasto, si vino de ahí.
+  consumoPersonal ConsumoPersonal?
 
   /// El mismo intento no crea dos gastos en la misma ubicación.
   @@unique([localId, idempotencyKey])
@@ -4171,6 +4181,86 @@ model OperadorLocal {
   ventas  Venta[]
   turnos  Turno[]
   arqueos ArqueoCaja[]
+  /// Lo que este operario consumió del stock de un local.
+  consumosPersonal ConsumoPersonal[]
+}
+
+/// LO QUE EL PERSONAL SE LLEVA PARA CONSUMIR: bebida, pan, fiambre.
+///
+/// No se cobra y NO es una venta: no suma a lo vendido, a los tickets, a la
+/// ganancia de las ventas ni al efectivo esperado, y no mueve la caja. Sale del
+/// stock con la misma función que la venta (`aplicarConsumoStock`), declarando
+/// el origen CONSUMO_PERSONAL en el libro de stock, y es un GASTO del negocio
+/// por el COSTO de los productos: `gastoId`, categoría "Consumo del personal".
+/// Queda atado a la caja abierta donde se hizo (`turnoId`) para leerlo en el
+/// resultado de ese turno.
+model ConsumoPersonal {
+  id             Int      @id @default(autoincrement())
+  localId        Int
+  turnoId        Int
+  /// Quién lo consumió.
+  operadorId     Int
+  /// Quién lo registró (la cuenta de la sesión).
+  usuarioId      Int
+  gastoId        Int?     @unique
+  totalCosto     Decimal  @db.Decimal(12, 2)
+  /// Lo que habría valido vendido. Solo para leer: no se cobra.
+  totalPrecio    Decimal  @db.Decimal(12, 2)
+  /// Clave del intento: el mismo envío repetido no descuenta dos veces.
+  idempotencyKey String
+  createdAt      DateTime @default(now())
+
+  local    Local                  @relation("consumo_personal_del_local", fields: [localId], references: [id])
+  turno    Turno                  @relation(fields: [turnoId], references: [id])
+  operador OperadorLocal          @relation(fields: [operadorId], references: [id])
+  usuario  Usuario                @relation("consumo_personal_registrado_por", fields: [usuarioId], references: [id])
+  gasto    Gasto?                 @relation(fields: [gastoId], references: [id])
+  lineas   ConsumoPersonalLinea[]
+
+  @@unique([localId, idempotencyKey])
+  @@index([turnoId])
+}
+
+/// Un renglón del consumo: el producto, cuánto, cuánto salió del stock y a qué
+/// costo. La forma es la de la línea comercial de la venta (`planConsumoVenta`).
+model ConsumoPersonalLinea {
+  id              Int      @id @default(autoincrement())
+  consumoId       Int
+  /// NORMAL o COMBO, como la línea de la venta.
+  tipo            String
+  productoBaseId  Int
+  productoLocalId Int?
+  nombre          String
+  cantidad        Decimal  @db.Decimal(12, 3)
+  /// Lo que salió de `StockLocal` por esta línea; null en un combo, que
+  /// consume por sus componentes.
+  cantidadStock   Decimal? @db.Decimal(12, 3)
+  costoLinea      Decimal  @db.Decimal(12, 2)
+  precioLinea     Decimal  @db.Decimal(12, 2)
+
+  consumo ConsumoPersonal @relation(fields: [consumoId], references: [id], onDelete: Cascade)
+
+  @@index([consumoId])
+}
+
+/// LA FOTO O EL ARCHIVO DEL TICKET DE UN GASTO. Se guarda en el mismo almacén
+/// que los comprobantes de proveedor, con la misma inspección (`exigirAlmacen`).
+/// La fila nace sin `ubicacion` y se completa cuando el archivo ya está escrito:
+/// una fila sin ubicación admite no tener archivo, nunca promete uno que falta.
+model GastoArchivo {
+  id        Int      @id @default(autoincrement())
+  gastoId   Int
+  orden     Int
+  nombre    String
+  mime      String?
+  tamano    Int
+  hash      String
+  ubicacion String?
+  createdAt DateTime @default(now())
+
+  gasto Gasto @relation(fields: [gastoId], references: [id], onDelete: Cascade)
+
+  @@unique([gastoId, orden])
 }
 
 model OperadorEnLocal {

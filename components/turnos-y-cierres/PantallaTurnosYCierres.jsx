@@ -273,6 +273,23 @@ function ElegirTipoDePago({ pago, onCerrar, onElegir }) {
   );
 }
 
+/** Quién consumió y cuánto, al costo. Sin consumos, nada. */
+export function ConsumoDelPersonal({ consumos = [] }) {
+  if (!consumos?.length) return null;
+  return (
+    <div data-consumo-del-personal className="space-y-1.5">
+      <Rotulo>CONSUMO DEL PERSONAL</Rotulo>
+      {consumos.map((c) => (
+        <Renglon
+          key={c.id}
+          rotulo={`${c.quien} · ${c.productos} ${c.productos === 1 ? "producto" : "productos"}`}
+          valor={plata(c.costo)}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVerCaja, puedeClasificar = false, onClasificar = null }) {
   const [abierto, setAbierto] = useState(abiertoInicial);
   const dif = diferenciasDelGrupo(g);
@@ -307,7 +324,10 @@ export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVe
           <Renglon rotulo="Ganancia de las ventas" valor={plata(g.ganancia)} fuerte />
         </div>
         <Renglon rotulo="Sueldos y gastos" valor={menos(g.sueldosYGastos)} />
+        <Renglon rotulo="Consumo del personal" valor={menos(g.consumoPersonal)} />
       </div>
+
+      <ConsumoDelPersonal consumos={g.consumos} />
 
       <PlataQueSalio g={g} puedeClasificar={puedeClasificar} onClasificar={onClasificar} />
 
