@@ -17,6 +17,14 @@
 // el celular no cambie, sin querer, el escritorio. Si escritorio cambia A
 // PROPÓSITO —el día que tenga diseño—, se regenera dibujando la versión nueva y
 // se dice por qué en el commit; no se ajusta a mano para que pase.
+//
+// ── EL ÚNICO CAMBIO DESDE 3feaf1c, Y ES A PROPÓSITO (2026-10-15) ───────────
+//
+// El formateador compartido (`lib/moneda.js`) dejó de escribir "$-3.500,00" y
+// escribe "−$3.500,00": el signo adelante del peso, que es el arreglo pedido.
+// El golden cambió en ese único importe —el del caso "conAvisos", el único
+// negativo de los casos— y en nada más: D1 lo compara carácter por carácter
+// con el render de hoy, que para los otros casos sigue siendo idéntico.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
