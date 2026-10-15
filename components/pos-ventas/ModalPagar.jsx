@@ -9,7 +9,12 @@
 //
 // La foto del remito de un pago a proveedor se sube DESPUÉS del pago, a la
 // compra por cargar que el pago dejó, por la subida de comprobantes de siempre:
-// si la foto falla, el pago ya está hecho y se dice así.
+// si la foto falla, el pago ya está hecho y se dice así. El ticket de un Gasto,
+// igual, al gasto que el pago dejó (`/api/finanzas/gastos/[id]/archivo`).
+//
+// En escritorio es un diálogo de dos columnas —los tipos a la izquierda, el
+// formulario a la derecha (Figma 398:664)— y el papel se arrastra o se elige
+// como archivo. En el teléfono queda la hoja de siempre, con cámara o archivo.
 
 import { useEffect, useRef, useState } from "react";
 
@@ -22,10 +27,13 @@ import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiSolapas from "@/components/sunmi/SunmiSolapas";
+import CampoFotoOArchivo from "@/components/pos-ventas/CampoFotoOArchivo";
+import useEsEscritorio from "@/hooks/useEsEscritorio";
 import { ETIQUETA_TIPO_EGRESO, TIPO_EGRESO, TIPOS_EGRESO } from "@/lib/caja/tipoEgreso";
 import { desdeCentavos } from "@/lib/caja/efectivoEsperado";
 import { leerImporte, nuevaClaveDePago } from "@/lib/finanzas/pagosProveedores";
 import { formatearMoneda } from "@/lib/moneda";
+import { subirArchivoDeGasto } from "@/lib/finanzas/subirArchivoDeGasto";
 
 /** Lo que dice cada opción de P1. */
 const DESCRIPCION = Object.freeze({
@@ -54,6 +62,8 @@ const VACIO = { proveedorId: "", operadorId: "", modalidad: "SUELDO", categoriaI
 
 export default function ModalPagar({ turnoId, onClose, onPagado }) {
   const { requerirOperador } = useOperadorContext();
+  // En escritorio, el diálogo de dos columnas; en el teléfono, la hoja de siempre.
+  const esEscritorio = useEsEscritorio() === true;
   const [opciones, setOpciones] = useState(null);
   const [errorCarga, setErrorCarga] = useState("");
   const [tipo, setTipo] = useState(null);
@@ -61,7 +71,6 @@ export default function ModalPagar({ turnoId, onClose, onPagado }) {
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
   const clave = useRef(null);
-  const inputFoto = useRef(null);
 
   useEffect(() => {
     let vigente = true;
@@ -136,6 +145,10 @@ export default function ModalPagar({ turnoId, onClose, onPagado }) {
       if (tipo === TIPO_EGRESO.PROVEEDOR && form.foto && d.pedidoProveedorId) {
         errorFoto = await subirFoto({ proveedorId: form.proveedorId, pedidoId: d.pedidoProveedorId, foto: form.foto });
       }
+      // El ticket del gasto, al gasto que el pago dejó. Si falla, el pago ya está.
+      if (tipo === TIPO_EGRESO.GASTO && form.foto && d.gastoId) {
+        errorFoto = await subirArchivoDeGasto({ gastoId: d.gastoId, archivo: form.foto });
+      }
       onPagado?.({ tipo, monto, errorFoto });
       onClose();
     } catch {
@@ -144,6 +157,40 @@ export default function ModalPagar({ turnoId, onClose, onPagado }) {
       setEnviando(false);
     }
   }
+
+  // ── LA LISTA DE TIPOS ─────────────────────────────────────────────────
+  //
+  // En el teléfono es la primera pantalla y se pasa al formulario. En
+  // escritorio queda a la izquierda, con el elegido marcado, y el formulario a
+  // la derecha (Figma 398:664): elegir otro tipo no obliga a volver.
+  const listaDeTipos = (
+    <div className="grid content-start gap-3">
+      {TIPOS_EGRESO.map((t) => (
+        <SunmiActionCard
+          key={t}
+          data-pagar-tipo={t}
+          aria-pressed={esEscritorio ? tipo === t : undefined}
+          disabled={enviando}
+          onClick={() => elegir(t)}
+          className={`min-h-toque ${esEscritorio && tipo === t ? "border-2 sunmi-border-accent" : ""}`}
+        >
+          <span className="flex w-full items-center gap-3">
+            <span className="min-w-0 flex-1">
+              <span className={`block text-base2 font-semibold ${esEscritorio && tipo === t ? "sunmi-text-accent" : "sunmi-text-strong"}`}>
+                {ETIQUETA_TIPO_EGRESO[t]}
+              </span>
+              <span className="block text-sm2 sunmi-text-muted">{DESCRIPCION[t]}</span>
+            </span>
+            {!esEscritorio ? (
+              <span aria-hidden="true" className="shrink-0 text-lg2 sunmi-text-muted">
+                ›
+              </span>
+            ) : null}
+          </span>
+        </SunmiActionCard>
+      ))}
+    </div>
+  );
 
   return (
     <SunmiModalLayout
@@ -154,6 +201,7 @@ export default function ModalPagar({ turnoId, onClose, onPagado }) {
       forma="hoja-o-centrado"
       espacioCuerpo="mt-2"
       z={NIVEL_MODAL_GLOBAL}
+      maxWidth={esEscritorio ? "max-w-4xl" : undefined}
       destructivo
     >
       {errorCarga ? (
@@ -164,116 +212,131 @@ export default function ModalPagar({ turnoId, onClose, onPagado }) {
         <div className="py-8">
           <SunmiLoader />
         </div>
-      ) : !tipo ? (
-        <div className="grid gap-3">
-          {TIPOS_EGRESO.map((t) => (
-            <SunmiActionCard key={t} data-pagar-tipo={t} onClick={() => elegir(t)} className="min-h-toque">
-              <span className="flex w-full items-center gap-3">
-                <span className="min-w-0 flex-1">
-                  <span className="block text-base2 font-semibold sunmi-text-strong">{ETIQUETA_TIPO_EGRESO[t]}</span>
-                  <span className="block text-sm2 sunmi-text-muted">{DESCRIPCION[t]}</span>
-                </span>
-                <span aria-hidden="true" className="shrink-0 text-lg2 sunmi-text-muted">
-                  ›
-                </span>
-              </span>
-            </SunmiActionCard>
-          ))}
+      ) : esEscritorio ? (
+        <div data-pagar-escritorio className="grid grid-cols-[320px_minmax(0,1fr)] gap-6">
+          {listaDeTipos}
+          {tipo ? (
+            formulario()
+          ) : (
+            <p className="self-center text-center text-sm3 sunmi-text-muted">Elegí qué vas a pagar.</p>
+          )}
         </div>
+      ) : !tipo ? (
+        listaDeTipos
       ) : (
-        <div className="grid gap-3">
+        formulario()
+      )}
+    </SunmiModalLayout>
+  );
+
+  function formulario() {
+    const campoPrincipal =
+      tipo === TIPO_EGRESO.PROVEEDOR ? (
+        <Campo rotulo="Proveedor">
+          <SunmiSelectAdv
+            value={form.proveedorId}
+            onChange={(v) => cambiar({ proveedorId: v })}
+            placeholder="Elegí el proveedor"
+            searchable
+          >
+            {opciones.proveedores.map((p) => (
+              <SunmiSelectOption key={p.id} value={String(p.id)}>
+                {p.nombre}
+              </SunmiSelectOption>
+            ))}
+          </SunmiSelectAdv>
+        </Campo>
+      ) : tipo === TIPO_EGRESO.SUELDO ? (
+        <Campo rotulo="Empleado">
+          <SunmiSelectAdv
+            value={form.operadorId}
+            onChange={(v) => cambiar({ operadorId: v })}
+            placeholder="Elegí el empleado"
+          >
+            {opciones.empleados.map((e) => (
+              <SunmiSelectOption key={e.id} value={String(e.id)}>
+                {e.nombre}
+              </SunmiSelectOption>
+            ))}
+          </SunmiSelectAdv>
+        </Campo>
+      ) : tipo === TIPO_EGRESO.GASTO ? (
+        <Campo rotulo="Categoría">
+          <SunmiSelectAdv
+            value={form.categoriaId}
+            onChange={(v) => cambiar({ categoriaId: v })}
+            placeholder="Elegí la categoría"
+          >
+            {opciones.categorias.map((c) => (
+              <SunmiSelectOption key={c.id} value={String(c.id)}>
+                {c.nombre}
+              </SunmiSelectOption>
+            ))}
+          </SunmiSelectAdv>
+        </Campo>
+      ) : null;
+
+    const campoMonto = (
+      <Campo rotulo="Monto">
+        <SunmiInput
+          inputMode="decimal"
+          value={form.monto}
+          onChange={(e) => cambiar({ monto: e.target.value })}
+          placeholder="$ 0,00"
+          aria-label="Monto"
+          className="text-base2 font-semibold"
+        />
+      </Campo>
+    );
+
+    // En escritorio el campo principal y el monto van lado a lado (Figma 398:759).
+    const lado = esEscritorio && campoPrincipal;
+    // El papel: el remito del proveedor, o el ticket del gasto (opcional).
+    const rotuloPapel =
+      tipo === TIPO_EGRESO.PROVEEDOR
+        ? esEscritorio ? "Foto o archivo del remito" : "Foto del remito"
+        : tipo === TIPO_EGRESO.GASTO
+          ? esEscritorio ? "Foto o archivo del ticket" : "Foto del ticket"
+          : null;
+
+    return (
+      <div className="grid content-start gap-3">
+        {!esEscritorio ? (
           <SunmiLinkButton onClick={() => setTipo(null)} disabled={enviando} className="justify-self-start text-sm3">
             ‹ Pagar
           </SunmiLinkButton>
+        ) : null}
 
-          {tipo === TIPO_EGRESO.PROVEEDOR && (
-            <Campo rotulo="Proveedor">
-              <SunmiSelectAdv
-                value={form.proveedorId}
-                onChange={(v) => cambiar({ proveedorId: v })}
-                placeholder="Elegí el proveedor"
-                searchable
-              >
-                {opciones.proveedores.map((p) => (
-                  <SunmiSelectOption key={p.id} value={String(p.id)}>
-                    {p.nombre}
-                  </SunmiSelectOption>
-                ))}
-              </SunmiSelectAdv>
-            </Campo>
-          )}
+        {lado ? (
+          <div className="grid grid-cols-2 gap-3.5">
+            {campoPrincipal}
+            {campoMonto}
+          </div>
+        ) : (
+          campoPrincipal
+        )}
 
-          {tipo === TIPO_EGRESO.SUELDO && (
-            <>
-              <Campo rotulo="Empleado">
-                <SunmiSelectAdv
-                  value={form.operadorId}
-                  onChange={(v) => cambiar({ operadorId: v })}
-                  placeholder="Elegí el empleado"
-                >
-                  {opciones.empleados.map((e) => (
-                    <SunmiSelectOption key={e.id} value={String(e.id)}>
-                      {e.nombre}
-                    </SunmiSelectOption>
-                  ))}
-                </SunmiSelectAdv>
-              </Campo>
-              <SunmiSolapas
-                opciones={MODALIDADES}
-                valor={form.modalidad}
-                onCambiar={(v) => cambiar({ modalidad: v })}
-                etiqueta="Sueldo o adelanto"
-              />
-            </>
-          )}
+        {tipo === TIPO_EGRESO.SUELDO && (
+          <SunmiSolapas
+            opciones={MODALIDADES}
+            valor={form.modalidad}
+            onCambiar={(v) => cambiar({ modalidad: v })}
+            etiqueta="Sueldo o adelanto"
+          />
+        )}
 
-          {tipo === TIPO_EGRESO.GASTO && (
-            <Campo rotulo="Categoría">
-              <SunmiSelectAdv
-                value={form.categoriaId}
-                onChange={(v) => cambiar({ categoriaId: v })}
-                placeholder="Elegí la categoría"
-              >
-                {opciones.categorias.map((c) => (
-                  <SunmiSelectOption key={c.id} value={String(c.id)}>
-                    {c.nombre}
-                  </SunmiSelectOption>
-                ))}
-              </SunmiSelectAdv>
-            </Campo>
-          )}
+        {!lado ? campoMonto : null}
 
-          <Campo rotulo="Monto">
-            <SunmiInput
-              inputMode="decimal"
-              value={form.monto}
-              onChange={(e) => cambiar({ monto: e.target.value })}
-              placeholder="$ 0,00"
-              aria-label="Monto"
-              className="text-base2 font-semibold"
+        {rotuloPapel ? (
+          <Campo rotulo={rotuloPapel}>
+            <CampoFotoOArchivo
+              archivo={form.foto}
+              onCambiar={(foto) => cambiar({ foto })}
+              esEscritorio={esEscritorio}
+              deshabilitado={enviando}
             />
           </Campo>
-
-          {tipo === TIPO_EGRESO.PROVEEDOR && (
-            <Campo rotulo="Foto del remito">
-              <SunmiButton
-                type="button"
-                color="ghost"
-                onClick={() => inputFoto.current?.click()}
-                className="w-full min-h-toque justify-center rounded-xl border border-dashed sunmi-border sunmi-bg py-6 text-base2 font-semibold sunmi-text-accent"
-              >
-                {form.foto ? `📷  ${form.foto.name}` : "📷  Sacar foto"}
-              </SunmiButton>
-              <SunmiInput
-                ref={inputFoto}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={(e) => cambiar({ foto: e.target.files?.[0] || null })}
-              />
-            </Campo>
-          )}
+        ) : null}
 
           <div data-sale-de className="rounded-xl2 border sunmi-border sunmi-bg-card px-4 py-3.5 space-y-2.5 text-sm3">
             <div className="flex items-center justify-between gap-3 font-semibold sunmi-text-strong">
@@ -301,10 +364,9 @@ export default function ModalPagar({ turnoId, onClose, onPagado }) {
           >
             {enviando ? "Pagando…" : monto != null ? `Pagar ${formatearMoneda(monto)}` : "Pagar"}
           </SunmiButton>
-        </div>
-      )}
-    </SunmiModalLayout>
-  );
+      </div>
+    );
+  }
 }
 
 function Campo({ rotulo, children }) {

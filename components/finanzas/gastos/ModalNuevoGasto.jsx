@@ -47,6 +47,11 @@ import CamposDeOrigenDelPago, { Campo } from "@/components/finanzas/pagos/Campos
 import { hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { MEDIO_PAGO_GASTO, MEDIOS_PAGO_GASTO, ROTULO_MEDIO_GASTO, nuevaClaveDeGasto } from "@/lib/finanzas/gastos";
 import { medioTocaLaCaja } from "@/lib/finanzas/pagosProveedores";
+import CampoFotoOArchivo from "@/components/pos-ventas/CampoFotoOArchivo";
+import { subirArchivoDeGasto } from "@/lib/finanzas/subirArchivoDeGasto";
+import { showError } from "@/components/sunmi/SunmiToast";
+import useEsEscritorio from "@/hooks/useEsEscritorio";
+import { CATEGORIA_CONSUMO_PERSONAL } from "@/lib/pos-ventas/consumoPersonal";
 
 export const PAGO_AL_CREAR = Object.freeze({ PENDIENTE: "PENDIENTE", AHORA: "AHORA" });
 const OPCIONES_PAGO = Object.freeze([
@@ -102,9 +107,13 @@ const vacio = () => ({
   medio: MEDIO_PAGO_GASTO.TRANSFERENCIA,
   turnoId: "",
   fechaPago: hoyArgentinaISO(),
+  // La foto o el archivo del ticket. No viaja en el cuerpo: se sube después,
+  // al gasto creado, por la misma subida que usa "Pagar" del POS.
+  foto: null,
 });
 
 export default function ModalNuevoGasto({ abierto, categorias = [], ubicacion = null, onCerrar, onCreado }) {
+  const esEscritorio = useEsEscritorio() === true;
   const [form, setForm] = useState(vacio);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
@@ -139,6 +148,9 @@ export default function ModalNuevoGasto({ abierto, categorias = [], ubicacion = 
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok || !j.ok) throw new Error(j?.error || "No se pudo registrar el gasto.");
+      // El gasto ya está. Si el archivo no sube, se dice y el gasto queda.
+      const errorFoto = form.foto && j.gasto?.id ? await subirArchivoDeGasto({ gastoId: j.gasto.id, archivo: form.foto }) : null;
+      if (errorFoto) showError(`Gasto registrado. El archivo no se subió: ${errorFoto}`);
       onCreado?.(j);
     } catch (e) {
       setError(e.message);
@@ -174,7 +186,8 @@ export default function ModalNuevoGasto({ abierto, categorias = [], ubicacion = 
 
       <Campo rotulo="Categoría">
         <SunmiSelectAdv value={form.categoriaId} onChange={(v) => cambiar({ categoriaId: v })} placeholder="Elegí la categoría">
-          {categorias.map((c) => (
+          {/* "Consumo del personal" no se carga a mano: nace del cobro del POS. */}
+          {categorias.filter((c) => c.nombre !== CATEGORIA_CONSUMO_PERSONAL).map((c) => (
             <SunmiSelectOption key={c.id} value={String(c.id)}>
               {c.nombre}
             </SunmiSelectOption>
@@ -200,6 +213,15 @@ export default function ModalNuevoGasto({ abierto, categorias = [], ubicacion = 
 
       <Campo rotulo="Comprobante (opcional)">
         <SunmiInput value={form.comprobante} onChange={(e) => cambiar({ comprobante: e.target.value })} placeholder="N° de factura o recibo" aria-label="Comprobante" />
+      </Campo>
+
+      <Campo rotulo="Foto o archivo del ticket (opcional)">
+        <CampoFotoOArchivo
+          archivo={form.foto}
+          onCambiar={(foto) => cambiar({ foto })}
+          esEscritorio={esEscritorio}
+          deshabilitado={enviando}
+        />
       </Campo>
 
       <Campo rotulo="Vencimiento (opcional)">

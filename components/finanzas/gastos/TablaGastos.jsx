@@ -21,7 +21,7 @@ import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import { formatearMoneda } from "@/lib/moneda";
 import { ESTADO_CUENTA, diaLegible, filtroDeCuentas } from "@/lib/finanzas/pagosProveedores";
 import { importeDeLaCuenta } from "@/lib/finanzas/calendarioDePagos";
-import { ROTULO_ESTADO_GASTO, VACIO_DE_LA_LISTA, rotuloDeGastos } from "@/lib/finanzas/calendarioDeGastos";
+import { VACIO_DE_LA_LISTA, rotuloDeGastos, rotuloEstadoDelGasto } from "@/lib/finanzas/calendarioDeGastos";
 
 import { situacionDelGasto } from "./FilaGasto";
 import { TEXTOS_DEL_RESUMEN_DE_GASTOS } from "./ResumenDeGastos";
@@ -81,7 +81,7 @@ function columnas({ filtro, hoy, variasUbicaciones, onAbrir }) {
       thClassName: encabezado,
       render: deGasto((g) => (
         <span className={g.estado === ESTADO_CUENTA.PARCIAL ? "sunmi-text-warning" : ""}>
-          {ROTULO_ESTADO_GASTO[g.estado] || g.estado}
+          {rotuloEstadoDelGasto(g)}
         </span>
       )),
     },
