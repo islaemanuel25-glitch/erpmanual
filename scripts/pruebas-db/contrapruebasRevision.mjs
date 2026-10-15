@@ -803,7 +803,9 @@ const CASOS = [
   {
     n: "CM-3",
     defecto: "Caja +/− vuelve a admitir un movimiento después del corte",
-    archivo: "app/api/pos-ventas/caja-movimientos/crear/route.js",
+    // La regla se mudó de la ruta a `lib/caja/turnoParaMover.js` el
+    // 2026-10-15, cuando "Pagar" del POS la necesitó también.
+    archivo: "lib/caja/turnoParaMover.js",
     suite: "scripts/pruebas-db/cajaMovimientoAtomico.mjs",
     minimo: 60,
     inyecciones: [{ de: "  if (turno.cierreEnPreparacionEn !== null) {", a: "  if (false) {" }],
@@ -812,7 +814,7 @@ const CASOS = [
   {
     n: "CM-4",
     defecto: "Caja +/− vuelve a admitir un movimiento después del cierre",
-    archivo: "app/api/pos-ventas/caja-movimientos/crear/route.js",
+    archivo: "lib/caja/turnoParaMover.js",
     suite: "scripts/pruebas-db/cajaMovimientoAtomico.mjs",
     minimo: 60,
     inyecciones: [{ de: "  if (turno.cierre !== null) {", a: "  if (false) {" }],
