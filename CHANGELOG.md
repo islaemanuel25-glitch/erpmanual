@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-10-16] - Actualización: pos-ventas
+
+### Modificado
+- **pos-ventas**: feat: rediseño de Pagar en el POS (SIN VERIFICAR en pantalla)
+- **pos-ventas**: feat: Pagar no saca más efectivo del que hay en la caja
+
+
 ## [2026-10-15] - Actualización: pos-ventas, transferencias
 
 ### Modificado

@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-10-15 23:58
+**Última actualización:** 2026-10-16 03:02
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,8 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-10-16: feat: rediseño de Pagar en el POS (SIN VERIFICAR en pantalla)
+- 2026-10-16: feat: Pagar no saca más efectivo del que hay en la caja
 - 2026-10-15: feat: operadores y empleados son de un local (SIN VERIFICAR en pantalla)
 - 2026-10-15: feat(empleados): empleados del local, y el consumo del personal pasa a Pagar — SIN VERIFICAR en pantalla
 - 2026-10-15: feat(pos): consumo del personal en el cobro, Pagar en escritorio y foto del gasto — SIN VERIFICAR en pantalla
