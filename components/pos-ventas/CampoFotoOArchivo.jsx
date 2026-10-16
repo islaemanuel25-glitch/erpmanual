@@ -12,8 +12,14 @@
 //
 // Lo usan "Pagar" del POS y Finanzas → Gastos: la misma pieza en los dos, así
 // que un papel se adjunta igual desde los dos lados.
+//
+// `botones` (2026-10-16, "Pagar"): dos botones iguales lado a lado, "Sacar
+// foto" y "Elegir archivo", en el teléfono y en escritorio; en escritorio
+// "Elegir archivo" también recibe el archivo arrastrado. Sin `botones`, la
+// forma de siempre, que es la de Gastos.
 
 import { useRef, useState } from "react";
+import { Camera, FileText } from "lucide-react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
@@ -22,7 +28,7 @@ import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 /** Lo que acepta la subida de comprobantes: fotos y PDF. */
 export const ACEPTA_FOTO_O_ARCHIVO = "image/*,application/pdf";
 
-export default function CampoFotoOArchivo({ archivo, onCambiar, esEscritorio, deshabilitado = false }) {
+export default function CampoFotoOArchivo({ archivo, onCambiar, esEscritorio, deshabilitado = false, botones = false }) {
   const inputCamara = useRef(null);
   const inputArchivo = useRef(null);
   const [encima, setEncima] = useState(false);
@@ -43,7 +49,7 @@ export default function CampoFotoOArchivo({ archivo, onCambiar, esEscritorio, de
         onChange={elegido}
         data-entrada-archivo
       />
-      {!esEscritorio ? (
+      {!esEscritorio || botones ? (
         <SunmiInput
           ref={inputCamara}
           type="file"
@@ -62,6 +68,62 @@ export default function CampoFotoOArchivo({ archivo, onCambiar, esEscritorio, de
       Quitar
     </SunmiLinkButton>
   ) : null;
+
+  if (botones) {
+    const claseBoton = "flex-1 min-h-toque justify-center gap-2 rounded-xl border sunmi-border text-sm3 font-semibold";
+    // Arrastrar solo tiene sentido con un mouse: en escritorio.
+    const soltar = esEscritorio
+      ? {
+          "data-soltar-archivo": true,
+          onDragOver: (e) => {
+            e.preventDefault();
+            if (!deshabilitado) setEncima(true);
+          },
+          onDragLeave: () => setEncima(false),
+          onDrop: (e) => {
+            e.preventDefault();
+            setEncima(false);
+            if (deshabilitado) return;
+            const f = e.dataTransfer?.files?.[0];
+            if (f) onCambiar(f);
+          },
+        }
+      : {};
+    return (
+      <div className="grid gap-1.5">
+        <div className="flex gap-2">
+          <SunmiButton
+            type="button"
+            color="ghost"
+            disabled={deshabilitado}
+            onClick={() => inputCamara.current?.click()}
+            className={claseBoton}
+          >
+            <Camera size={18} aria-hidden="true" />
+            Sacar foto
+          </SunmiButton>
+          <SunmiButton
+            type="button"
+            color="ghost"
+            disabled={deshabilitado}
+            onClick={() => inputArchivo.current?.click()}
+            className={`${claseBoton} ${encima ? "sunmi-border-accent" : ""}`}
+            {...soltar}
+          >
+            <FileText size={18} aria-hidden="true" />
+            Elegir archivo
+          </SunmiButton>
+        </div>
+        {archivo ? (
+          <div className="flex items-center justify-between gap-3">
+            <span className="min-w-0 text-sm3 font-medium sunmi-text-strong break-all">{archivo.name}</span>
+            {quitar}
+          </div>
+        ) : null}
+        {entradas}
+      </div>
+    );
+  }
 
   if (esEscritorio) {
     return (

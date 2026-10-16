@@ -422,6 +422,11 @@ export default function SunmiModalLayout({
    * Sexta cosa de la misma familia —el alto, el apilado, el padding de la
    * tarjeta, el espaciado, la referencia y esto— y se resuelve igual: parámetro,
    * con el del kit por defecto, y anotado en el registro quién declara qué.
+   *
+   * `"ninguno"` (2026-10-16): la pieza no dibuja ni título ni botón de cerrar,
+   * y la pantalla pone el suyo en el cuerpo. Lo pide "Pagar" del POS, cuyo
+   * encabezado cambia con el paso —"‹" para volver a la lista de tipos, el
+   * título del tipo, "✕"—. El título igual se pasa: es como se anuncia.
    */
   encabezado = "tarjeta",
   /**
@@ -597,7 +602,7 @@ export default function SunmiModalLayout({
           {/* `shrink-0` en el encabezado y en el pie: cuando la forma hace de la
               tarjeta una columna, lo único que tiene que ceder alto es el
               cuerpo. En las formas que no son columna no hace nada. */}
-          <div className="shrink-0 flex items-start justify-between gap-2">
+          {encabezado !== "ninguno" && <div className="shrink-0 flex items-start justify-between gap-2">
             {/* EL SUBTÍTULO NO SE REENVÍA, Y ES A PROPÓSITO.
 
                 `SunmiCardHeader` acaba de aprender a dibujarlo. Si esta línea lo
@@ -643,7 +648,7 @@ export default function SunmiModalLayout({
                 Cerrar
               </SunmiButton>
             )}
-          </div>
+          </div>}
 
           <div
             ref={refCuerpo}
