@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-15 23:58
+**Última actualización:** 2026-10-16 11:32
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-16: fix: el ticket POS de Transferencias sale con la pieza de Posventa
 - 2026-10-15: feat: operadores y empleados son de un local (SIN VERIFICAR en pantalla)
 - 2026-10-15: feat: recibir con deuda se confirma, con campanita, "Pago parcial" y evento para Azul Chat (SIN VERIFICAR en pantalla)
 - 2026-10-15: feat(empleados): empleados del local, y el consumo del personal pasa a Pagar — SIN VERIFICAR en pantalla
