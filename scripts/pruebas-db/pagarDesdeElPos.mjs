@@ -112,7 +112,9 @@ async function montar() {
   creado.empleadoIds = [empleado.id];
 
   const turno = await prisma.turno.create({
-    data: { localId: local.id, vendedorId: cajero.u.id, operadorId: op.id, montoInicial: 100000, apertura: new Date() },
+    // 150.000 y no 100.000: los pagos de la sección 4 suman 100.300, y desde
+    // 2026-10-16 no se paga más de lo que hay en la caja (sección 11).
+    data: { localId: local.id, vendedorId: cajero.u.id, operadorId: op.id, montoInicial: FONDO, apertura: new Date() },
   });
 
   const proveedor = await prisma.proveedor.create({ data: { nombre: `${marca}-Panaderia`, creadoEnLocalId: local.id } });
@@ -167,6 +169,7 @@ async function desmontar() {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const BASE = "http://ci/api";
+const FONDO = 150000;
 let n = 0;
 const clave = () => `ci-pagar-${Date.now()}-${(n += 1)}`;
 const pagar = async (f, cuerpo) =>
@@ -183,7 +186,7 @@ async function casos(f) {
   seccion("1 · Lo que ofrece Pagar al cajero");
   const op = await leer(await rutaPagar.GET(pedido(`${BASE}/pos-ventas/pagar?turnoId=${f.turno.id}`, f.quienCaja, { metodo: "GET" })));
   igual("contesta ok", op.status, 200);
-  igual("el efectivo de la caja ahora", op.caja?.efectivoAhora, 100000);
+  igual("el efectivo de la caja ahora", op.caja?.efectivoAhora, FONDO);
   ok("el proveedor del local está", (op.proveedores || []).some((p) => p.id === f.proveedor.id));
   ok("el proveedor viaja sin teléfono ni CUIT", (op.proveedores || []).every((p) => Object.keys(p).join() === "id,nombre"));
   ok("el empleado del local está", (op.empleados || []).some((e) => e.id === f.empleado.id));
@@ -248,7 +251,7 @@ async function casos(f) {
 
   seccion("5 · La plata: el esperado resta todo, con tipo o sin tipo");
   const conTipo = await esperado(f);
-  igual("esperado = 100.000 − todo lo que salió", conTipo, 100000 - 38800 - 35000 - 1500 - 20000 - 5000);
+  igual("esperado = el fondo − todo lo que salió", conTipo, FONDO - 38800 - 35000 - 1500 - 20000 - 5000);
   const tipos = movs.map((m) => [m.id, m.tipoEgreso]);
   await prisma.cajaMovimiento.updateMany({ where: { turnoId: f.turno.id }, data: { tipoEgreso: null } });
   igual("sin tipo, el esperado es EXACTAMENTE el mismo", await esperado(f), conTipo);
@@ -348,6 +351,36 @@ async function casos(f) {
   igual("se recibe pendiente, confirmando el saldo", [pend.status, pend.ok], [200, true]);
   igual("queda con saldo de lo que falta", [pend.cuentaPorPagar?.pagado, pend.cuentaPorPagar?.saldo], [1000, 500]);
   igual("sin otro retiro", (await movimientosDelTurno(f)).length, movs2);
+
+  seccion("11 · No se paga más de lo que hay en la caja");
+  const hay = async () => (await leer(await rutaPagar.GET(pedido(`${BASE}/pos-ventas/pagar?turnoId=${f.turno.id}`, f.quienCaja, { metodo: "GET" })))).caja?.efectivoAhora;
+  const disponible = await hay();
+  igual("Pagar dice lo mismo que el cierre", disponible, await esperado(f));
+  ok("y queda algo en la caja para probar", disponible > 0, String(disponible));
+  const unCentavoMas = (disponible + 0.01).toFixed(2);
+  const movsAntesTope = (await movimientosDelTurno(f)).length;
+  const pedidosAntes = await prisma.pedidoProveedor.count({ where: { creadoEnLocalId: f.local.id } });
+  const gastosAntes = await prisma.gasto.count({ where: { localId: f.local.id } });
+  for (const [t, extra] of [
+    ["PROVEEDOR", { proveedorId: f.proveedor.id }],
+    ["SUELDO", { empleadoId: f.empleado.id, modalidad: "SUELDO" }],
+    ["GASTO", { categoriaId: f.categoriaGasto.id }],
+    ["AL_DEPOSITO", {}],
+    ["RETIRO_DUENO", {}],
+  ]) {
+    const r = await pagar(f, { tipo: t, monto: unCentavoMas, idempotencyKey: clave(), ...extra });
+    igual(`${t}: un centavo más de lo que hay → 409`, [r.status, /No alcanza el efectivo de la caja/.test(r.error ?? "")], [409, true]);
+  }
+  igual("y no salió nada de la caja", (await movimientosDelTurno(f)).length, movsAntesTope);
+  igual("ni quedó una compra ni un gasto a medias", [
+    await prisma.pedidoProveedor.count({ where: { creadoEnLocalId: f.local.id } }),
+    await prisma.gasto.count({ where: { localId: f.local.id } }),
+  ], [pedidosAntes, gastosAntes]);
+  const justo = await pagar(f, { tipo: "AL_DEPOSITO", monto: String(disponible), idempotencyKey: clave() });
+  igual("lo que hay, justo, sí se paga", [justo.status, justo.ok], [200, true]);
+  igual("y la caja queda en cero", await hay(), 0);
+  const nada = await pagar(f, { tipo: "RETIRO_DUENO", monto: "0,01", idempotencyKey: clave() });
+  igual("con la caja en cero, ni un centavo", nada.status, 409);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -364,7 +397,9 @@ try {
   await prisma.$disconnect();
 }
 
-console.log(`\n${pasadas} pasadas, ${fallas.length} fallas`);
+// La primera línea es la que lee contrapruebasRevision.mjs para saber que corrió.
+console.log(`\nAfirmaciones que pasaron: ${pasadas}`);
+console.log(`${pasadas} pasadas, ${fallas.length} fallas`);
 if (fallas.length) {
   for (const x of fallas) console.log(`  ✗ ${x}`);
   process.exit(1);

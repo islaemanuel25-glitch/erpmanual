@@ -1581,6 +1581,23 @@ const CASOS = [
     inyecciones: [{ de: "where: { id: Number(operadorId) || 0, localId: scope.localId },", a: "where: { id: Number(operadorId) || 0 }," }],
     esperadas: ["y uno de otro local no entra"],
   },
+  // ── NO SE PAGA MÁS DE LO QUE HAY EN LA CAJA (2026-10-16) ────────────────
+  {
+    n: "TP-1",
+    defecto: "Pagar deja sacar más efectivo del que hay en la caja",
+    archivo: "lib/finanzas/salidaDelPago.js",
+    suite: "scripts/pruebas-db/pagarDesdeElPos.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "if (args.hastaElEfectivoDelTurno === true) {", a: "if (false) {" }],
+    esperadas: [
+      "PROVEEDOR: un centavo más de lo que hay → 409",
+      "SUELDO: un centavo más de lo que hay → 409",
+      "GASTO: un centavo más de lo que hay → 409",
+      "AL_DEPOSITO: un centavo más de lo que hay → 409",
+      "RETIRO_DUENO: un centavo más de lo que hay → 409",
+      "y no salió nada de la caja",
+    ],
+  },
 ];
 
 // Sin argumento corren todos. Con un prefijo —`SI-`— solo los casos cuyo número

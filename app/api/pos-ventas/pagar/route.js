@@ -26,7 +26,7 @@ import { esRechazoDePagar, leerPedidoDePago, pagarDesdeElPos } from "@/lib/caja/
 import { CATEGORIA_SUELDOS } from "@/lib/caja/tipoEgreso";
 import { CATEGORIA_CONSUMO_PERSONAL } from "@/lib/pos-ventas/consumoPersonal";
 import { categoriasDeGasto } from "@/lib/finanzas/gastosServer";
-import { leerDetalleDeCaja } from "@/lib/turnosYCierres/lecturaTurnosYCierresServer";
+import { calcularEsperadoDeTurno } from "@/lib/caja/arqueoServer";
 import { proveedorVisibleWhere } from "@/lib/visibilidad";
 import { empleadosDelLocal } from "@/lib/empleados/empleadosServer";
 
@@ -61,8 +61,13 @@ export async function GET(req) {
     const rechazo = rechazoDelTurno(turno, localId, c.identidad);
     if (rechazo) return NextResponse.json(rechazo.cuerpo, { status: rechazo.status });
 
-    const [detalle, proveedores, categorias, empleados] = await Promise.all([
-      leerDetalleDeCaja(prisma, turnoId),
+    const [efectivo, proveedores, categorias, empleados] = await Promise.all([
+      // Lo que hay: el efectivo del cierre, con la MISMA función que usa el
+      // tope del servidor (`resolverSalidaDelPago`). Lo que la pantalla deja
+      // pagar es lo que el servidor acepta.
+      prisma.turno
+        .findUnique({ where: { id: turnoId }, select: { id: true, montoInicial: true } })
+        .then((t) => calcularEsperadoDeTurno(t, prisma)),
       prisma.proveedor.findMany({
         where: { AND: [{ activo: true }, proveedorVisibleWhere(localId, grupoId)] },
         select: { id: true, nombre: true },
@@ -76,7 +81,7 @@ export async function GET(req) {
 
     return NextResponse.json({
       ok: true,
-      caja: { id: turnoId, efectivoAhora: detalle?.detalle?.efectivo?.teniaQueHaber ?? null },
+      caja: { id: turnoId, efectivoAhora: efectivo.efectivoEsperado },
       proveedores,
       // Sueldos tiene su propio botón: como "Gasto" no se ofrece. El consumo
       // del personal tampoco: no se paga, sale del stock desde el cobro.
