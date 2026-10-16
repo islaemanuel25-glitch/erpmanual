@@ -549,6 +549,10 @@ jobs:
       - name: Ejercer Pagar desde el POS contra PostgreSQL
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/pagarDesdeElPos.mjs
 
+      # Y que esa prueba MIRA: sin el tope, Pagar saca más de lo que hay.
+      - name: Contrapruebas del tope de efectivo de Pagar
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs TP-
+
       # El consumo del personal: sale del stock con las funciones de la venta,
       # no crea Venta ni toca la caja, el gasto va al costo y el resultado del
       # turno lo resta una vez. Y la foto de un gasto se guarda y se lee.

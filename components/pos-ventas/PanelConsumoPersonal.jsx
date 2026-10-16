@@ -137,6 +137,7 @@ export default function PanelConsumoPersonal({ turnoId, localId, esDeposito = fa
           onChange={(v) => setEmpleadoId(v)}
           placeholder="Elegí quién"
           aria-label="Quién lo consume"
+          searchable
         >
           {empleados.map((e) => (
             <SunmiSelectOption key={e.id} value={String(e.id)}>

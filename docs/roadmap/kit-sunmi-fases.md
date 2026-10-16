@@ -587,6 +587,7 @@ anotar.
 | `compras-proveedor/ModalVincularCodigo` | `encabezado` | `"cinta"` | mismo caso |
 | `compras-proveedor/ModalVincularCodigo` | `espacioCuerpo` / `espacioPie` | `""` | el cuerpo trae sus propios márgenes |
 | `proveedores/ModalCodigosProveedor` | `encabezado` | `"cinta"` | mismo caso |
+| `pos-ventas/ModalPagar` | `encabezado` | `"ninguno"` | (2026-10-16) su encabezado cambia con el paso —"‹" vuelve a la lista de tipos, el título del tipo, "✕"— y lo dibuja la pantalla; el kit no tenía cómo |
 | `proveedores/ModalCodigosProveedor` | `espacioCuerpo` / `espacioPie` | `""` | es de solo lectura y no tiene pie: el único botón es el de cerrar, que lo pone la pieza |
 | `categorias/ModalCategoria` | `maxWidth` | `"max-w-md"` | su tarjeta es `max-w-md`; con el `max-w-xl` del kit pasaría de 392 a 504 px a 1366 |
 | `categorias/ModalCategoria` | `espacioCuerpo` | `"p-4 space-y-4"` | el cuerpo trae su propio padding y su propia separación de campos |
