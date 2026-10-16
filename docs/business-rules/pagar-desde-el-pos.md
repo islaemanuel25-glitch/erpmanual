@@ -51,6 +51,19 @@ Desde 2026-10-15. Regla de Emanuel, no se discute.
 - `desdeElPos` abre `crearGasto` con `pos.usar` en vez de los permisos de
   Finanzas, y solo para un gasto pagado entero en efectivo en el alta [CÓDIGO].
 - "Cambio +/−" sigue para mover cambio; no se borró nada [CÓDIGO].
+- **No se paga más de lo que hay en la caja** (2026-10-16). Los cinco tipos
+  piden `hastaElEfectivoDelTurno`, y `resolverSalidaDelPago` lee el efectivo
+  del cierre (`calcularEsperadoDeTurno`) con el turno tomado, justo antes de
+  crear el retiro y después de la relectura por clave: más de lo que hay es
+  409, igual a lo que hay se paga [CÓDIGO] [VERIFICADO: `pagarDesdeElPos.mjs`
+  sección 11; contraprueba TP-1]. Finanzas no lo pide. La pantalla muestra
+  "Hay $X" con la misma función y apaga el botón con la misma regla
+  (`lib/caja/topeDeEfectivo.js`) [CÓDIGO].
+- La pantalla (2026-10-16): encabezado con "‹", título y "✕"; el IMPORTE arriba
+  y centrado; "Sale de tu caja #N · Hay $X" (en rojo si no alcanza); los campos
+  del tipo con `SunmiSelectAdv` y su buscador; "Pagar $X". Consumo del
+  personal, sin importe ni caja [CÓDIGO: `components/pos-ventas/ModalPagar.jsx`]
+  [SIN VERIFICAR en pantalla].
 
 ## Compras por cargar
 
