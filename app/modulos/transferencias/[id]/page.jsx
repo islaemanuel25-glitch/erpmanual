@@ -209,7 +209,7 @@ export default function TransferenciaDetallePage() {
    */
   const imprimirTicket = async () => {
     const { default: imprimir } = await import(
-      "@/lib/transferencias/imprimirTicketTransferencia"
+      "@/lib/transferencias/ticketTransferencia"
     );
     imprimir(item, me);
   };

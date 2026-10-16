@@ -56,10 +56,10 @@ export default function AccionesRecepcion({
   panelCancelar = null,
 }) {
   const handleImprimirTicket = async () => {
-    const { default: imprimirTicketTransferencia } = await import(
-      "@/lib/transferencias/imprimirTicketTransferencia"
+    const { default: imprimirTicketDeTransferencia } = await import(
+      "@/lib/transferencias/ticketTransferencia"
     );
-    imprimirTicketTransferencia(item, me);
+    imprimirTicketDeTransferencia(item, me);
   };
 
   return (
