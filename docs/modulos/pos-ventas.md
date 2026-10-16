@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-10-16 11:32
+**Última actualización:** 2026-10-16 11:48
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-10-16: fix: el ticket de transferencia ya no desborda el papel y usa solo lo de Posventa
 - 2026-10-16: fix: el ticket POS de Transferencias sale con la pieza de Posventa
 - 2026-10-16: feat: rediseño de Pagar en el POS (SIN VERIFICAR en pantalla)
 - 2026-10-16: feat: Pagar no saca más efectivo del que hay en la caja
