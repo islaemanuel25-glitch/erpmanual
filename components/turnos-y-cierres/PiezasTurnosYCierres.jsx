@@ -133,12 +133,14 @@ const TONO_DE_MARCA = Object.freeze({
 export function FilaDePago({ p, onClasificar = null }) {
   const etiqueta = p.tipoEgreso ? ETIQUETA_TIPO_EGRESO[p.tipoEgreso] : ETIQUETA_SIN_CLASIFICAR;
   const tono = TONO_DE_MARCA[p.marca] || "muted";
+  // Sin tipo, el chip ya dice "Sin clasificar": la marca debajo lo repetía.
+  const marca = p.marca === MARCA_EGRESO.SIN_CLASIFICAR ? null : TEXTO_MARCA[p.marca];
   const contenido = (
     <span className="flex w-full items-center gap-2">
       <span className="shrink-0 rounded-md sunmi-bg px-1.5 py-0.5 text-xs2 font-semibold sunmi-text-muted">{etiqueta}</span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm2 font-medium sunmi-text-strong">{p.corta}</span>
-        <span className={`block text-xs2 ${CLASE_TONO[tono]}`}>{TEXTO_MARCA[p.marca]}</span>
+        {marca ? <span className={`block text-xs2 ${CLASE_TONO[tono]}`}>{marca}</span> : null}
       </span>
       <span className="shrink-0 text-sm3 font-semibold tabular-nums sunmi-text-strong">{plata(p.monto)}</span>
     </span>

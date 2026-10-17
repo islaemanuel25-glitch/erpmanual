@@ -25,6 +25,7 @@ import { franjaHoraria } from "@/lib/tesoreria/pantallaTesoreria";
 import { PESTANA_TODOS, grupoEnPestana } from "@/lib/turnosYCierres/lecturaTurnosYCierres";
 import {
   CLASE_TONO,
+  comoCerroLaCaja,
   diferenciaDeCaja,
   diferenciasDelGrupo,
   esCerrada,
@@ -291,7 +292,19 @@ export function ConsumoDelPersonal({ consumos = [] }) {
 }
 
 export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVerCaja, puedeClasificar = false, onClasificar = null }) {
-  const [abierto, setAbierto] = useState(abiertoInicial);
+  const ids = g.cajas.map((c) => c.id);
+  // Qué cajas de "Quién trabajó" están desplegadas. Varias a la vez; el turno
+  // desplegado es el turno con todas sus cajas abiertas, que es lo que antes
+  // mostraba al desplegarse (y lo que pide `abiertosIniciales` desde la URL).
+  const [abiertas, setAbiertas] = useState(() => new Set(abiertoInicial ? ids : []));
+  const abierto = ids.length > 0 && ids.every((id) => abiertas.has(id));
+  const alternarCaja = (id) =>
+    setAbiertas((prev) => {
+      const s = new Set(prev);
+      if (s.has(id)) s.delete(id);
+      else s.add(id);
+      return s;
+    });
   const dif = diferenciasDelGrupo(g);
 
   return (
@@ -300,7 +313,7 @@ export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVe
         type="button"
         color="ghost"
         aria-expanded={abierto}
-        onClick={() => setAbierto((v) => !v)}
+        onClick={() => setAbiertas(new Set(abierto ? [] : ids))}
         className="w-full min-h-0 p-0 rounded-none justify-start text-left font-normal"
       >
         <span className="flex w-full items-start gap-2">
@@ -313,6 +326,8 @@ export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVe
           </span>
         </span>
       </SunmiButton>
+
+      <QuienTrabajo cajas={g.cajas} abiertas={abiertas} onAlternar={alternarCaja} onVerCaja={onVerCaja} />
 
       <Recuadro rotulo="RESULTADO DEL TURNO" valor={plata(g.resultado)} tono={Number(g.resultado) < 0 ? "danger" : "success"} />
 
@@ -342,54 +357,81 @@ export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVe
           <Insignia texto={dif.texto} tono={dif.tono} />
         </div>
       ) : null}
-
-      {abierto ? (
-        <div data-cajas-del-turno className="divide-y sunmi-divide border-t sunmi-divider">
-          {g.cajas.map((c) => (
-            <CajaDelTurno key={c.id} c={c} onVerCaja={onVerCaja} />
-          ))}
-        </div>
-      ) : null}
     </section>
   );
 }
 
-/** Una caja dentro del turno desplegado. */
-export function CajaDelTurno({ c, onVerCaja }) {
-  const est = estadoDeCaja(c);
-  const dif = diferenciaDeCaja(c);
+/**
+ * "QUIÉN TRABAJÓ" (Figma "OPCIÓN B", 415:483): una tarjetita por caja, arriba
+ * de todo y también con el turno plegado, para no tener que bajar hasta el
+ * final. Antes las cajas iban al pie de la tarjeta y solo desplegadas.
+ */
+export function QuienTrabajo({ cajas = [], abiertas, onAlternar, onVerCaja }) {
+  if (!cajas.length) return null;
   return (
-    <div data-caja={c.id} className="space-y-3 py-3 first:pt-3">
-      <div className="space-y-1">
-        <div className="flex items-center justify-between gap-2">
-          <span className="min-w-0 truncate text-base2 font-bold sunmi-text-strong">
-            {c.nombre} · Caja #{c.id}
-          </span>
-          <Insignia texto={est.texto} tono={est.tono} />
-        </div>
-        <div className="flex items-center justify-between gap-2 text-sm2">
-          <span className="sunmi-text-muted">{franjaHoraria(c.apertura, c.cierre) || "—"}</span>
-          {dif ? (
-            <span data-diferencia-de-caja className={`font-semibold tabular-nums ${CLASE_TONO[dif.tono]}`}>
-              {dif.texto}
-            </span>
-          ) : null}
-        </div>
-      </div>
+    <div data-quien-trabajo className="space-y-2">
+      <Rotulo>QUIÉN TRABAJÓ</Rotulo>
+      {cajas.map((c) => (
+        <PersonaDelTurno key={c.id} c={c} abierta={abiertas.has(c.id)} onAlternar={() => onAlternar(c.id)} onVerCaja={onVerCaja} />
+      ))}
+    </div>
+  );
+}
 
-      {/* La caja como en su detalle (V2 · B): la diferencia en su recuadro, y
-          lo cobrado con la barra, la comisión de cada medio restada y el neto. */}
-      <EfectivoDeLaCaja c={c} />
-      <CobradoEnLaCaja c={c} />
+/** "Caja #938 · 00:07–08:08", o "desde 00:07" mientras siga abierta. */
+const horarioDeLaCaja = (c) =>
+  esCerrada(c) ? `${horaAR(c.apertura)}–${horaAR(c.cierre)}` : `desde ${horaAR(c.apertura)}`;
 
+/**
+ * Una persona del turno: su caja y cómo cerró. Toda la cabecera se toca y
+ * despliega, adentro de la misma tarjetita, la caja como en su detalle (V2 · B)
+ * —las MISMAS piezas `EfectivoDeLaCaja` y `CobradoEnLaCaja`, sin recalcular—.
+ */
+export function PersonaDelTurno({ c, abierta = false, onAlternar, onVerCaja }) {
+  const cierre = comoCerroLaCaja(c);
+  return (
+    <div
+      data-caja={c.id}
+      data-abierta={abierta ? "" : undefined}
+      className={`rounded-xl ${abierta ? "border-2 sunmi-border-accent sunmi-bg" : "border sunmi-border sunmi-bg-card"}`}
+    >
       <SunmiButton
         type="button"
-        color="primary"
-        onClick={() => onVerCaja?.(c.id)}
-        className="w-full min-h-toque justify-center rounded-xl text-base font-semibold"
+        color="ghost"
+        aria-expanded={abierta}
+        onClick={onAlternar}
+        className="w-full min-h-toque px-4 py-3 rounded-xl justify-start text-left font-normal"
       >
-        {esCerrada(c) ? "Ver detalle y Z ›" : "Ver detalle ›"}
+        <span className="flex w-full items-start justify-between gap-3">
+          <span className="min-w-0">
+            <span className="block truncate text-base2 font-bold sunmi-text-strong">{c.nombre}</span>
+            <span className="block text-sm2 sunmi-text-muted">
+              Caja #{c.id} · {horarioDeLaCaja(c)}
+            </span>
+          </span>
+          <span className="shrink-0 text-right">
+            <span data-como-cerro className={`block text-sm3 font-semibold tabular-nums ${CLASE_TONO[cierre.tono]}`}>
+              {cierre.texto}
+            </span>
+            <span className="block text-sm2 font-semibold sunmi-text-accent">{abierta ? "Ocultar caja" : "Ver caja ›"}</span>
+          </span>
+        </span>
       </SunmiButton>
+
+      {abierta ? (
+        <div data-detalle-de-la-caja className="space-y-3 px-3 pb-3">
+          <EfectivoDeLaCaja c={c} />
+          <CobradoEnLaCaja c={c} />
+          <SunmiButton
+            type="button"
+            color="primary"
+            onClick={() => onVerCaja?.(c.id)}
+            className="w-full min-h-toque justify-center rounded-xl text-base font-semibold"
+          >
+            {esCerrada(c) ? "Ver detalle y Z ›" : "Ver detalle ›"}
+          </SunmiButton>
+        </div>
+      ) : null}
     </div>
   );
 }
