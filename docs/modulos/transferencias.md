@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-17 13:43
+**Última actualización:** 2026-10-17 20:32
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-17: fix: el ticket de una transferencia nacida de una venta imprime las líneas de la venta
 - 2026-10-17: test: declarar la migración 68 (permiso ventas.ver_dia) en los contadores y en las pendientes de deploy
 - 2026-10-16: fix: el ticket POS de Transferencias sale con la pieza de Posventa
 - 2026-10-15: feat: operadores y empleados son de un local (SIN VERIFICAR en pantalla)
