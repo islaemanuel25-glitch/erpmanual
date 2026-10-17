@@ -33,9 +33,22 @@ móvil" (A2 364:577, A3 364:674, B 359:523, C 359:605, D 359:2367).
   anuladas no entran. *(verificado en código)*
 - Ventas sin caja: la consulta de `auditoria-pos-ventas/turnos/sin-turno` con el
   filtro de venta comercial. *(verificado en código y ejercido)*
-- La diferencia de un turno no es un importe: se cuentan cajas que faltan y que
-  sobran. La de cada arqueo es la acumulada guardada y no se suma.
-  *(verificado en código)*
+- La diferencia de un turno no se netea: cada caja con diferencia va en su
+  renglón del desglose —"Faltante de caja · Alexis", "Sobrante de caja ·
+  Roxana"—, y el resultado resta los faltantes y suma los sobrantes (regla de
+  Emanuel, 2026-10-17). La de cada arqueo es la acumulada guardada y no se
+  suma. *(verificado en código)*
+- Resultado del turno, desde 2026-10-17: ganancia de las ventas − sueldos y
+  gastos − consumo del personal − faltantes de caja + sobrantes de caja. Lo
+  de abajo es la historia. *(verificado en código y ejercido)*
+- "Quién trabajó": una tarjetita por caja con cómo cerró y "Este mes: N faltas
+  · N sobras" de esa persona —sus cajas cerradas del mes en curso, con la
+  diferencia calculada (`historialDelMes`)—. Si hubo dos o más cajas abiertas a
+  la vez, una pastilla con la franja (`cajasSuperpuestas`). *(verificado en
+  código; consulta ejercida contra Postgres)*
+- Mercado Pago QR y crédito: el tender guarda el tipo contable —QR es
+  `MERCADOPAGO`, el crédito por Mercado Pago es `CREDITO`, ambos con procesador
+  MERCADOPAGO—, así que van en renglones distintos. *(verificado en código)*
 - Resultado del turno (desde 2026-10-13, Figma "V2 · A" 367:607): neto después
   de comisiones − costo de la mercadería − pagos desde la caja
   (`resultadoDelTurno`). Neto y costo de `resumirVentas`. Pagos desde la caja:

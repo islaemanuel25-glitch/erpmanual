@@ -49,7 +49,8 @@ cosas para comer. No se cobra, sale del stock y es un gasto del negocio.
 ## Turnos y cierres
 
 - Resultado del turno = neto después de comisiones − costo de la mercadería −
-  sueldos y gastos − consumo del personal [CÓDIGO] (`resultadoDelTurno`).
+  sueldos y gastos − consumo del personal − faltantes de caja + sobrantes de
+  caja [CÓDIGO] (`resultadoDelTurno`; las diferencias, desde 2026-10-17).
 - "Sueldos y gastos" suma movimientos de caja; el consumo no tiene, así que no
   cuenta dos veces [VERIFICADO: sección 5].
 - La tarjeta del turno muestra la fila "Consumo del personal" y, debajo, quién

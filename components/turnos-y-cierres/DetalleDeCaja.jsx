@@ -38,7 +38,7 @@ const pagosDeLaCaja = (c) =>
 /** El día de la caja: el de su turno operativo, o el de su apertura. */
 const diaDe = (c) => fechaOperativaISO(c.fechaOperativa) || fechaArgentinaISO(c.apertura);
 
-function Separador() {
+export function Separador() {
   return <div className="border-t sunmi-divider" />;
 }
 
@@ -61,14 +61,15 @@ export function Encabezado({ c, local }) {
 
 /**
  * EL EFECTIVO DE LA CAJA (V2 · B): la diferencia en su recuadro y la cuenta de
- * lo que tenía que haber. Lo usan el detalle y la caja desplegada del turno.
+ * lo que tenía que haber. Lo usan el detalle y la caja desplegada del turno;
+ * ésta, con `conDiferencia={false}`, porque su tarjetita ya dice cómo cerró.
  */
-export function EfectivoDeLaCaja({ c }) {
+export function EfectivoDeLaCaja({ c, conDiferencia = true }) {
   const e = c.efectivo;
   const grande = diferenciaGrande(c);
   return (
     <Bloque titulo="EFECTIVO DE LA CAJA">
-      <Recuadro rotulo="DIFERENCIA DE CAJA" valor={grande.texto} tono={tonoDelRecuadro(c)} />
+      {conDiferencia ? <Recuadro rotulo="DIFERENCIA DE CAJA" valor={grande.texto} tono={tonoDelRecuadro(c)} /> : null}
       <div data-cuenta-del-efectivo className="space-y-1.5">
         <Renglon rotulo="Cambio inicial" valor={plata(e.cambioInicial)} />
         <Renglon rotulo="Ventas en efectivo" valor={mas(e.ventasEfectivo)} />
@@ -126,6 +127,29 @@ export function CobradoEnLaCaja({ c }) {
       </div>
     </Bloque>
   );
+}
+
+/**
+ * LO COBRADO POR CADA MEDIO ELECTRÓNICO, en corto: un bloque por medio —"MERCADO
+ * PAGO", "CRÉDITO"…— con lo cobrado y su comisión. Es la caja desplegada en
+ * "Quién trabajó"; el efectivo ya está en su bloque y el total, en el turno.
+ * Los medios son los de `cobrado.medios`, tal como vinieron: QR es MERCADOPAGO y
+ * el crédito por Mercado Pago es CREDITO, cada uno en su bloque.
+ */
+export function CobradoPorMedioElectronico({ c }) {
+  const medios = (c.cobrado?.medios || []).filter((m) => !m.esFiado && m.medio !== "EFECTIVO");
+  return medios.map((m) => (
+    <Bloque key={m.medio} titulo={m.etiqueta.toUpperCase()}>
+      <div data-medio={m.medio} className="space-y-1.5">
+        <Renglon rotulo="Cobrado" valor={plata(m.monto)} />
+        {m.comisionConocida ? (
+          <Renglon rotulo="Comisión" valor={menos(m.comision)} colorValor={CLASE_TONO.danger} />
+        ) : (
+          <Renglon rotulo="Comisión" valor={TEXTO_COMISION_SIN_CALCULAR} atenuado />
+        )}
+      </div>
+    </Bloque>
+  ));
 }
 
 export default function DetalleDeCaja({ datos, onVerMovimientos }) {

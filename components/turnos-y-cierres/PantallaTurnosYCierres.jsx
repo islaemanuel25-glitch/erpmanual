@@ -25,21 +25,23 @@ import { franjaHoraria } from "@/lib/tesoreria/pantallaTesoreria";
 import { PESTANA_TODOS, grupoEnPestana } from "@/lib/turnosYCierres/lecturaTurnosYCierres";
 import {
   CLASE_TONO,
+  cajasSuperpuestas,
   comoCerroLaCaja,
   diferenciaDeCaja,
-  diferenciasDelGrupo,
   esCerrada,
   estadoDeCaja,
+  mas,
   menos,
   plata,
   renglonDelTurno,
   rotuloDeDia,
+  textoDelHistorial,
 } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
 import { ETIQUETA_TIPO_EGRESO, TIPOS_EGRESO } from "@/lib/caja/tipoEgreso";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 
-import { BarraDeMedios, FilaDePago, Insignia, Recuadro, Renglon, Rotulo } from "./PiezasTurnosYCierres";
-import { CobradoEnLaCaja, EfectivoDeLaCaja } from "./DetalleDeCaja";
+import { FilaDePago, Insignia, Recuadro, Renglon, RenglonConTono, Rotulo } from "./PiezasTurnosYCierres";
+import { CobradoPorMedioElectronico, EfectivoDeLaCaja, Separador } from "./DetalleDeCaja";
 
 /**
  * @param {object} props
@@ -292,12 +294,10 @@ export function ConsumoDelPersonal({ consumos = [] }) {
 }
 
 export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVerCaja, puedeClasificar = false, onClasificar = null }) {
-  const ids = g.cajas.map((c) => c.id);
-  // Qué cajas de "Quién trabajó" están desplegadas. Varias a la vez; el turno
-  // desplegado es el turno con todas sus cajas abiertas, que es lo que antes
-  // mostraba al desplegarse (y lo que pide `abiertosIniciales` desde la URL).
-  const [abiertas, setAbiertas] = useState(() => new Set(abiertoInicial ? ids : []));
-  const abierto = ids.length > 0 && ids.every((id) => abiertas.has(id));
+  // La flecha pliega el TURNO: su desglose. "Quién trabajó" y el resultado se
+  // ven siempre; cada caja se despliega sola, varias a la vez.
+  const [abierto, setAbierto] = useState(abiertoInicial);
+  const [abiertas, setAbiertas] = useState(() => new Set());
   const alternarCaja = (id) =>
     setAbiertas((prev) => {
       const s = new Set(prev);
@@ -305,7 +305,7 @@ export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVe
       else s.add(id);
       return s;
     });
-  const dif = diferenciasDelGrupo(g);
+  const superpuestas = cajasSuperpuestas(g.cajas);
 
   return (
     <section data-tarjeta-turno={g.clave} className="rounded-xl2 border sunmi-border sunmi-bg-card p-4 space-y-3">
@@ -313,7 +313,7 @@ export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVe
         type="button"
         color="ghost"
         aria-expanded={abierto}
-        onClick={() => setAbiertas(new Set(abierto ? [] : ids))}
+        onClick={() => setAbierto((v) => !v)}
         className="w-full min-h-0 p-0 rounded-none justify-start text-left font-normal"
       >
         <span className="flex w-full items-start gap-2">
@@ -327,37 +327,62 @@ export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVe
         </span>
       </SunmiButton>
 
+      {superpuestas ? (
+        <div data-cajas-superpuestas>
+          <span className="inline-flex items-center rounded-full sunmi-btn-warning-soft px-2.5 py-0.5 text-sm2 font-semibold">
+            {superpuestas.texto}
+          </span>
+        </div>
+      ) : null}
+
       <QuienTrabajo cajas={g.cajas} abiertas={abiertas} onAlternar={alternarCaja} onVerCaja={onVerCaja} />
 
       <Recuadro rotulo="RESULTADO DEL TURNO" valor={plata(g.resultado)} tono={Number(g.resultado) < 0 ? "danger" : "success"} />
 
-      <div data-cuenta-del-turno className="space-y-1.5">
-        <Renglon rotulo="Total vendido" valor={plata(g.vendido)} />
-        <Renglon rotulo="Comisiones" valor={menos(g.comisiones)} />
-        <Renglon rotulo="Costo de la mercadería" valor={menos(g.costo)} />
-        <div className="border-t sunmi-divider pt-1.5">
-          <Renglon rotulo="Ganancia de las ventas" valor={plata(g.ganancia)} fuerte />
-        </div>
-        <Renglon rotulo="Sueldos y gastos" valor={menos(g.sueldosYGastos)} />
-        <Renglon rotulo="Consumo del personal" valor={menos(g.consumoPersonal)} />
-      </div>
-
-      <ConsumoDelPersonal consumos={g.consumos} />
-
-      <PlataQueSalio g={g} puedeClasificar={puedeClasificar} onClasificar={onClasificar} />
-
-      <div className="space-y-2">
-        <Rotulo>CÓMO SE COBRÓ</Rotulo>
-        <BarraDeMedios medios={g.medios} />
-      </div>
-
-      {dif ? (
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-sm3 sunmi-text-muted">Diferencias de caja</span>
-          <Insignia texto={dif.texto} tono={dif.tono} />
-        </div>
+      {abierto ? (
+        <>
+          <DesgloseDelTurno g={g} />
+          <ConsumoDelPersonal consumos={g.consumos} />
+          <PlataQueSalio g={g} puedeClasificar={puedeClasificar} onClasificar={onClasificar} />
+        </>
       ) : null}
     </section>
+  );
+}
+
+/**
+ * EL DESGLOSE DEL TURNO, de lo cobrado al resultado. Cada número viene del
+ * servidor; acá solo se ordena. "Total cobrado" es lo vendido por todos los
+ * medios —el fiado también, para que la cuenta cierre con la ganancia— menos
+ * sus comisiones. Las diferencias de caja van una por caja y con nombre: un
+ * faltante y un sobrante nunca se netean entre sí.
+ */
+export function DesgloseDelTurno({ g }) {
+  const conDiferencia = g.cajas.filter((c) => c.metricas?.faltantes || c.metricas?.sobrantes);
+  return (
+    <div data-cuenta-del-turno className="space-y-1.5">
+      <Rotulo>LO QUE SE COBRÓ</Rotulo>
+      {(g.medios || []).map((m) => (
+        <Renglon key={m.medio} rotulo={m.etiqueta} valor={plata(m.monto)} />
+      ))}
+      <Renglon rotulo="Comisiones" valor={menos(g.comisiones)} />
+      <Separador />
+      <Renglon rotulo="Total cobrado" valor={plata(g.neto)} fuerte />
+      <Renglon rotulo="Costo de la mercadería" valor={menos(g.costo)} />
+      <Separador />
+      <Renglon rotulo="Ganancia de las ventas" valor={plata(g.ganancia)} fuerte />
+      <Renglon rotulo="Sueldos y gastos" valor={menos(g.sueldosYGastos)} />
+      <Renglon rotulo="Consumo del personal" valor={menos(g.consumoPersonal)} />
+      {conDiferencia.map((c) =>
+        c.metricas.faltantes ? (
+          <RenglonConTono key={c.id} rotulo={`Faltante de caja · ${c.nombre}`} valor={menos(c.metricas.faltantes)} tono="danger" />
+        ) : (
+          <RenglonConTono key={c.id} rotulo={`Sobrante de caja · ${c.nombre}`} valor={mas(c.metricas.sobrantes)} tono="warning" />
+        )
+      )}
+      <Separador />
+      <Renglon rotulo="Resultado del turno" valor={plata(g.resultado)} fuerte />
+    </div>
   );
 }
 
@@ -389,6 +414,7 @@ const horarioDeLaCaja = (c) =>
  */
 export function PersonaDelTurno({ c, abierta = false, onAlternar, onVerCaja }) {
   const cierre = comoCerroLaCaja(c);
+  const historial = textoDelHistorial(c.historialDelMes);
   return (
     <div
       data-caja={c.id}
@@ -408,6 +434,11 @@ export function PersonaDelTurno({ c, abierta = false, onAlternar, onVerCaja }) {
             <span className="block text-sm2 sunmi-text-muted">
               Caja #{c.id} · {horarioDeLaCaja(c)}
             </span>
+            {historial ? (
+              <span data-historial-del-mes className={`block text-sm2 font-medium ${CLASE_TONO[historial.tono]}`}>
+                {historial.texto}
+              </span>
+            ) : null}
           </span>
           <span className="shrink-0 text-right">
             <span data-como-cerro className={`block text-sm3 font-semibold tabular-nums ${CLASE_TONO[cierre.tono]}`}>
@@ -420,8 +451,8 @@ export function PersonaDelTurno({ c, abierta = false, onAlternar, onVerCaja }) {
 
       {abierta ? (
         <div data-detalle-de-la-caja className="space-y-3 px-3 pb-3">
-          <EfectivoDeLaCaja c={c} />
-          <CobradoEnLaCaja c={c} />
+          <EfectivoDeLaCaja c={c} conDiferencia={false} />
+          <CobradoPorMedioElectronico c={c} />
           <SunmiButton
             type="button"
             color="primary"
