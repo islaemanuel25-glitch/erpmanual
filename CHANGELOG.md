@@ -1,5 +1,13 @@
 # Changelog
 
+## [2026-10-17] - Actualización: transferencias, dashboard, stock
+
+### Modificado
+- **transferencias**: test: declarar la migración 68 (permiso ventas.ver_dia) en los contadores y en las pendientes de deploy
+- **dashboard**: fix: con un operador activo por PIN, el Panel deja de mostrar el total del día y Finanzas
+- **stock**: fix: con un operador activo por PIN, el Panel deja de mostrar el total del día y Finanzas
+
+
 ## [2026-10-16] - Actualización: pos-ventas
 
 ### Modificado

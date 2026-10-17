@@ -1,20 +1,22 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-16 11:48
+**Fecha:** 2026-10-17 13:43
 
 ## Módulos modificados recientemente
 
-### pos-ventas
-- fix: el ticket de transferencia ya no desborda el papel y usa solo lo de Posventa, fix: el ticket POS de Transferencias sale con la pieza de Posventa, feat: rediseño de Pagar en el POS (SIN VERIFICAR en pantalla)
-- Archivos: 1 nuevos, 5 modificados (6 total)
-
 ### transferencias
-- fix: el ticket POS de Transferencias sale con la pieza de Posventa
+- test: declarar la migración 68 (permiso ventas.ver_dia) en los contadores y en las pendientes de deploy
+- Archivos: 1 modificados (1 total)
+
+### dashboard
+- fix: con un operador activo por PIN, el Panel deja de mostrar el total del día y Finanzas
 - Archivos: 2 modificados (2 total)
 
+### stock
+- fix: con un operador activo por PIN, el Panel deja de mostrar el total del día y Finanzas
+- Archivos: 5 modificados (5 total)
 
-## Archivos nuevos desde última sincronización
-- lib/pos-ventas/imprimirTicketTermico.test.mjs
+
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai
