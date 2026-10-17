@@ -35,6 +35,14 @@ Si la lista está vacía, el despliegue es solo de código.
   nace sin local y lo asigna la PARTE 0 de la reposición, corrida después.
   La reposición, escrita antes de commitear, está en
   `scripts/deploy/reposicion-operadores-por-local.sql`.
+- `20261017120000_permiso_ventas_ver_dia` — **De datos, chica y aditiva.**
+  Agrega `ventas.ver_dia` (el total del día en el Panel) al array de permisos
+  de ENCARGADO, DUEÑO_LOCAL y los roles propios que ya tienen `reportes.ver` o
+  `finanzas.ver`. Concatena, no reemplaza; idempotente; no toca Admin ni
+  CAJERO ni ninguna otra tabla. Sin ella, esos roles dejarían de ver el total
+  del día al desplegar el código, porque `/api/dashboard/resumen` ahora lo
+  pide. Las sesiones abiertas lo reciben al volver a iniciar sesión: el JWT
+  lleva los permisos del login.
 
 Producción está en **65 migraciones**, la última
 `20261015154425_empleados`.

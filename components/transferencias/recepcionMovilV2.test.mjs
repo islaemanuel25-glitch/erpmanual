@@ -605,7 +605,9 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // nueva con quién confirmó recibir dejando deuda. No toca transferencias.
   // Sube a 67 el mismo día: `20261015232632_operadores_y_empleados_por_local`,
   // el local de cada operador y empleado. No toca transferencias.
-  assert.equal(migraciones.length, 67, "aparecio una migracion que nadie declaro aca");
+  // Sube a 68 el 2026-10-17: `20261017120000_permiso_ventas_ver_dia`, solo
+  // agrega un permiso a roles existentes. No toca transferencias.
+  assert.equal(migraciones.length, 68, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));
