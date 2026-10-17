@@ -36,6 +36,9 @@ export function UserProvider({ children }) {
           esDeposito: p.esDeposito ?? false,
           // Operario obligatorio efectivo del local (null/ausente = true).
           exigirOperador: p.exigirOperador !== false,
+          // Hay operador activo por PIN: los `permisos` ya vienen sin lo que no
+          // es del operador, y el menú lo mira para lo que el comodín no resta.
+          operadorActivo: p.operadorActivo === true,
 
           // ── LA PREFERENCIA DE LA TARJETA, YA RESUELTA ───────────────────
           //

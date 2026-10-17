@@ -34,6 +34,7 @@ export default function DashboardDesktop({
   cargandoVentas,
   cargandoActividad,
   sinPermisoActividad,
+  sinPermisoResumen = false,
   errorCarga,
 }) {
   const { theme } = useSunmiTheme();
@@ -119,6 +120,8 @@ export default function DashboardDesktop({
         </div>
       )}
 
+      {/* Sin `ventas.ver_dia` no se dibujan los números del día: ni con guion. */}
+      {!sinPermisoResumen && (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {cargandoResumen
           ? Array.from({ length: 4 }).map((_, i) => (
@@ -134,6 +137,7 @@ export default function DashboardDesktop({
               />
             ))}
       </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:h-[300px]">
         <div className={`lg:col-span-2 flex flex-col min-h-0 ${cardSoft} p-3.5`}>

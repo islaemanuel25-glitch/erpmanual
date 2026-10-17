@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 import { getUsuarioSession } from "@/lib/auth";
+import { checkPerm } from "@/lib/authorize";
+import { PERMISO_VER_VENTAS_DEL_DIA } from "@/lib/rbac/permisosDelOperador";
 import { getContextoActivo } from "@/lib/contexto";
 import { estadoFinanciero } from "@/lib/pos-ventas/comisionPendiente";
 
@@ -13,6 +15,14 @@ export async function GET(req) {
         { ok: false, error: "No autenticado" },
         { status: 401 }
       );
+    }
+
+    // El total y los tickets del día no son de cualquiera: CAJERO no los tiene,
+    // y con un operador activo por PIN tampoco la cuenta que sí
+    // (lib/rbac/permisosDelOperador.js). Antes esta ruta no pedía permiso.
+    const perm = checkPerm(session, PERMISO_VER_VENTAS_DEL_DIA);
+    if (!perm.ok) {
+      return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
 
     const contexto = getContextoActivo(req, session);

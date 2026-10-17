@@ -52,6 +52,9 @@ function StockDiario() {
 
   if (cargando) return null;
   if (!esAdmin && !permisos.includes(PERMISO_STOCK_DIARIO)) return <SinPermisos />;
+  // Es Finanzas: con operador activo no se entra aunque haya `stock.ver`. Sus
+  // rutas lo niegan por su lado (checkFueraDelOperador).
+  if (perfil?.operadorActivo === true) return <SinPermisos />;
 
   return (
     // Mismo tope y mismos espacios que Gastos y Pagos a proveedores.

@@ -7,7 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { getUsuarioSession } from "@/lib/auth";
-import { checkPerm } from "@/lib/authorize";
+import { checkPerm, checkFueraDelOperador } from "@/lib/authorize";
 import { responderResumen } from "@/lib/stock/libro/stockDiarioRutas";
 
 export const dynamic = "force-dynamic";
@@ -19,5 +19,8 @@ export async function GET(req) {
   // stock por local: el mismo permiso.
   const perm = checkPerm(session, "stock.ver");
   if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
+  // Es Finanzas (Valor del Stock): el operador conserva `stock.ver` pero no entra.
+  const fuera = checkFueraDelOperador(session);
+  if (!fuera.ok) return NextResponse.json({ ok: false, error: fuera.error }, { status: fuera.status });
   return responderResumen(req);
 }

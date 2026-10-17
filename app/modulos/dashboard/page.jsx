@@ -24,6 +24,7 @@ export default function DashboardPage() {
   // pudo cargar" son dos hechos distintos y comparten pantalla. Es la misma
   // razón por la que `proveedores/page.jsx` terminó con dos estados de error.
   const [sinPermisoActividad, setSinPermisoActividad] = useState(false);
+  const [sinPermisoResumen, setSinPermisoResumen] = useState(false);
 
   useEffect(() => {
     if (menuMode === "launcher") {
@@ -50,6 +51,12 @@ export default function DashboardPage() {
     if (resRes.status === "fulfilled" && resRes.value.ok) {
       const data = await resRes.value.json();
       if (data.ok) setResumen(data.resumen);
+      setSinPermisoResumen(false);
+    } else if (resRes.status === "fulfilled" && resRes.value.status === 403) {
+      // NO ES UNA FALLA: `ventas.ver_dia`. Un cajero, o la cuenta con un
+      // operador activo por PIN, no ve el total del día; el resto carga igual.
+      setSinPermisoResumen(true);
+      setResumen(null);
     } else {
       hayError = true;
       if (resRes.status === "fulfilled" && resRes.value.status === 409) esContexto = true;
@@ -120,6 +127,7 @@ export default function DashboardPage() {
         cargandoVentas={cargandoVentas}
         cargandoActividad={cargandoActividad}
         sinPermisoActividad={sinPermisoActividad}
+        sinPermisoResumen={sinPermisoResumen}
         errorCarga={errorCarga}
       />
       <DashboardDesktop
@@ -131,6 +139,7 @@ export default function DashboardPage() {
         cargandoVentas={cargandoVentas}
         cargandoActividad={cargandoActividad}
         sinPermisoActividad={sinPermisoActividad}
+        sinPermisoResumen={sinPermisoResumen}
         errorCarga={errorCarga}
       />
     </div>

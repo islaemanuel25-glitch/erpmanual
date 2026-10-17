@@ -1,6 +1,7 @@
 // app/api/me/route.js
 import { NextResponse } from "next/server";
-import { getTokenFromRequest, verificarToken } from "@/lib/auth";
+import { getTokenFromRequest, verificarToken, leerOperadorDeCookie } from "@/lib/auth";
+import { permisosEfectivos } from "@/lib/rbac/permisosDelOperador";
 import prisma from "@/lib/prisma";
 import { operarioObligatorio } from "@/lib/config/acceso";
 import { getContextoActivo } from "@/lib/contexto";
@@ -26,7 +27,12 @@ export async function GET(req) {
     // ["*"] ante un payload con permisos corruptos: el backend rechazaba igual
     // cada operación, pero el frontend arma menú y botones con esta respuesta y
     // le mostraba la aplicación entera a quien no debía verla.
-    const permisos = normalizarPermisos(payload.permisos);
+    //
+    // Y con operador activo por PIN, los mismos que ve el servidor: los de la
+    // cuenta menos lo que no es del operador (lib/rbac/permisosDelOperador.js).
+    // Sin esto el menú y el Panel seguían mostrando lo de la cuenta.
+    const operadorActivo = leerOperadorDeCookie(req) !== null;
+    const permisos = permisosEfectivos(normalizarPermisos(payload.permisos), operadorActivo);
     const esAdmin = esAdminPorPermisos(permisos);
 
     // -------------------------------------------
@@ -132,6 +138,9 @@ export async function GET(req) {
       esAdmin,
       // Flag para el frontend (perfilExentoDeOperador). JWT viejos → false.
       esDuenoLocal: payload.esDuenoLocal === true,
+      // Hay operador activo por PIN: el menú lo mira para lo que el comodín del
+      // Admin no deja restar como lista (lib/menu/canAccess.js).
+      operadorActivo,
 
       // 🔵 localId ahora es CORRECTO SIEMPRE
       localId,

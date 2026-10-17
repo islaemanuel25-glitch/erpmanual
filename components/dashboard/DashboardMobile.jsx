@@ -19,6 +19,7 @@ export default function DashboardMobile({
   cargandoVentas,
   cargandoActividad,
   sinPermisoActividad,
+  sinPermisoResumen = false,
   errorCarga,
 }) {
   const { theme } = useSunmiTheme();
@@ -41,14 +42,20 @@ export default function DashboardMobile({
         <p className="text-lg font-semibold">
           {nombre ? `Hola, ${nombre}` : "Dashboard"}
         </p>
-        <p className="text-2xl font-bold mt-2">
-          {cargandoResumen ? "Cargando..." : totalHoy}
-        </p>
-        <p className="text-xs sunmi-text-muted mt-0.5">
-          {cargandoResumen
-            ? "Obteniendo datos del día..."
-            : `Ventas del día · ${ticketsHoy} tickets`}
-        </p>
+        {/* Sin `ventas.ver_dia` —cajero, u operador activo por PIN— no se
+            dibuja ni el importe ni los tickets: la ruta ya contestó 403. */}
+        {!sinPermisoResumen && (
+          <>
+            <p className="text-2xl font-bold mt-2">
+              {cargandoResumen ? "Cargando..." : totalHoy}
+            </p>
+            <p className="text-xs sunmi-text-muted mt-0.5">
+              {cargandoResumen
+                ? "Obteniendo datos del día..."
+                : `Ventas del día · ${ticketsHoy} tickets`}
+            </p>
+          </>
+        )}
         {isHrefVisible(menu, "/modulos/pos-ventas") && (
           <Link
             href="/modulos/pos-ventas"

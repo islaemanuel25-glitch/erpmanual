@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
+import { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/app/context/UserContext";
 import { useOperadorActivo } from "@/hooks/useOperadorActivo";
@@ -23,10 +23,30 @@ const OperadorContext = createContext(null);
  */
 export function OperadorProvider({ children }) {
   const router = useRouter();
-  const { perfil } = useUser();
+  const { perfil, refrescar: refrescarPerfil } = useUser();
   const { operador, voucher, loading, login, logout, refrescar } = useOperadorActivo();
 
   const exento = perfilExentoDeOperador(perfil);
+
+  // LOS PERMISOS DEPENDEN DEL OPERADOR. Con operador activo `/api/me` devuelve
+  // los de la cuenta menos lo que no es del operador (Finanzas, el total del
+  // día: lib/rbac/permisosDelOperador.js). Cuando entra, sale o cambia el
+  // operador, el perfil se vuelve a pedir para que el menú y el Panel muestren
+  // lo que corresponde. Se dispara por CAMBIO de operador y no comparando con
+  // `perfil.operadorActivo`: las dos fuentes miran la cookie con criterios
+  // distintos (ésta valida contra el local) y compararlas podría no cerrar nunca.
+  const operadorId = operador?.operadorId ?? null;
+  const operadorVisto = useRef(undefined);
+  useEffect(() => {
+    if (loading) return;
+    if (operadorVisto.current === undefined) {
+      operadorVisto.current = operadorId;
+      return;
+    }
+    if (operadorVisto.current === operadorId) return;
+    operadorVisto.current = operadorId;
+    refrescarPerfil?.();
+  }, [loading, operadorId, refrescarPerfil]);
 
   // LA CAJA PIDE PIN A TODOS. Un exento (Admin, dueño, local sin operario
   // obligatorio) entra al sistema sin PIN, pero para usar una caja —abrir,
