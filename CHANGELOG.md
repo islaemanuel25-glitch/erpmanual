@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-10-18] - Actualización: proveedores, productos, transferencias, pos-ventas, dashboard, stock
+
+### Modificado
+- **proveedores**: fix: el dueño de un local crea y edita sus propios proveedores
+- **productos**: fix: el dueño de un local crea y edita sus propios proveedores
+- **transferencias**: fix: el ticket de una transferencia nacida de una venta imprime las líneas de la venta
+- **transferencias**: test: declarar la migración 68 (permiso ventas.ver_dia) en los contadores y en las pendientes de deploy
+- **pos-ventas**: fix: el ticket de una transferencia nacida de una venta imprime las líneas de la venta
+- **dashboard**: fix: con un operador activo por PIN, el Panel deja de mostrar el total del día y Finanzas
+- **stock**: fix: con un operador activo por PIN, el Panel deja de mostrar el total del día y Finanzas
+
+
 ## [2026-10-17] - Actualización: transferencias, dashboard, stock
 
 ### Modificado
