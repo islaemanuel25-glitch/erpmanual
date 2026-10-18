@@ -1,32 +1,20 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-18 00:06
+**Fecha:** 2026-10-18 00:47
 
 ## Módulos modificados recientemente
 
 ### proveedores
-- fix: el dueño de un local crea y edita sus propios proveedores
-- Archivos: 1 nuevos, 2 modificados (3 total)
+- fix: el dueño de un local elimina sus proveedores y lleva sus listas de precios, fix: el dueño de un local crea y edita sus propios proveedores
+- Archivos: 1 nuevos, 39 modificados (40 total)
+
+### transferencias
+- fix: el dueño de un local elimina sus proveedores y lleva sus listas de precios, test: declarar la migración 69 (permisos de proveedores del dueño) en los contadores y en las pendientes de deploy
+- Archivos: 1 modificados (1 total)
 
 ### productos
 - fix: el dueño de un local crea y edita sus propios proveedores
 - Archivos: 1 modificados (1 total)
-
-### transferencias
-- fix: el ticket de una transferencia nacida de una venta imprime las líneas de la venta, test: declarar la migración 68 (permiso ventas.ver_dia) en los contadores y en las pendientes de deploy
-- Archivos: 2 modificados (2 total)
-
-### pos-ventas
-- fix: el ticket de una transferencia nacida de una venta imprime las líneas de la venta
-- Archivos: 1 modificados (1 total)
-
-### dashboard
-- fix: con un operador activo por PIN, el Panel deja de mostrar el total del día y Finanzas
-- Archivos: 2 modificados (2 total)
-
-### stock
-- fix: con un operador activo por PIN, el Panel deja de mostrar el total del día y Finanzas
-- Archivos: 5 modificados (5 total)
 
 
 ## Archivos nuevos desde última sincronización
