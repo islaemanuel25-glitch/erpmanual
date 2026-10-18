@@ -43,6 +43,15 @@ Si la lista está vacía, el despliegue es solo de código.
   del día al desplegar el código, porque `/api/dashboard/resumen` ahora lo
   pide. Las sesiones abiertas lo reciben al volver a iniciar sesión: el JWT
   lleva los permisos del login.
+- `20261018120000_permisos_proveedores_dueno_local` — **De datos, chica y
+  aditiva.** Agrega `proveedores.ver`, `proveedores.crear` y
+  `proveedores.editar` al array de permisos del rol DUEÑO_LOCAL. Concatena, no
+  reemplaza; idempotente por permiso (el rol puede tener `proveedores.ver`
+  tildado a mano); no toca Admin, ENCARGADO, CAJERO ni ninguna otra tabla. Sin
+  ella, al desplegar el código el dueño seguiría sin poder crear proveedores,
+  porque `/api/proveedores/crear` y `/editar` ahora piden esos permisos en vez
+  de administrador. Los tres dueños la reciben al volver a iniciar sesión: el
+  JWT lleva los permisos del login.
 
 Producción está en **65 migraciones**, la última
 `20261015154425_empleados`.
