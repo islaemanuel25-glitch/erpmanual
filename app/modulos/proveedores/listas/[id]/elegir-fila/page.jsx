@@ -94,7 +94,9 @@ export default function ElegirFilaDeLaListaPage() {
   const [aviso, setAviso] = useState(null);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
-  const esAdmin = permisos.includes("*");
+  // El permiso, como las rutas que esta pantalla llama; era solo admin escrito
+  // a mano. Una lista de otro local la frena el servidor.
+  const puedeListas = permisos.includes("*") || permisos.includes("proveedores.listas");
 
   useTituloDePagina(datos?.producto?.nombre ? `¿Cuál es ${datos.producto.nombre}?` : "Elegir de la lista");
   // En una sola expresión y sin paréntesis alrededor del JSX, que es como lo
@@ -139,10 +141,10 @@ export default function ElegirFilaDeLaListaPage() {
   );
 
   useEffect(() => {
-    if (cargandoUser || cargandoCtx || !esAdmin || needsContexto) return;
+    if (cargandoUser || cargandoCtx || !puedeListas || needsContexto) return;
     if (!endpoint) return;
     cargar("");
-  }, [cargandoUser, cargandoCtx, esAdmin, needsContexto, endpoint, cargar]);
+  }, [cargandoUser, cargandoCtx, puedeListas, needsContexto, endpoint, cargar]);
 
   // La búsqueda va al SERVIDOR, con una espera. Filtrar en el navegador buscaría
   // dentro de las treinta que se trajeron, así que escribir el nombre de un
@@ -188,7 +190,7 @@ export default function ElegirFilaDeLaListaPage() {
   };
 
   if (cargandoUser || cargandoCtx) return <Marco><SunmiLoader /></Marco>;
-  if (!esAdmin) return <SinPermisos />;
+  if (!puedeListas) return <SinPermisos />;
   if (!entrada) {
     return (
       <Marco>

@@ -46,8 +46,8 @@ function unidadesDeLaFila(fila) {
 
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { requireAdmin } from "@/lib/authorize";
-import { productoVisibleWhere, getDepositoIdDeGrupo } from "@/lib/visibilidad";
+import { requirePerm } from "@/lib/authorize";
+import { productoVisibleWhere, getDepositoIdDeGrupo, importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { resolverParserDeProveedor } from "@/lib/proveedores/listas/registro";
 import { conciliarFila, indexarCodigosProveedor, indexarCodigosBarra } from "@/lib/proveedores/listas/conciliarLista";
 import { filaAPersistir, OPCIONES_TX } from "@/lib/proveedores/listas/persistencia";
@@ -63,9 +63,9 @@ import { recalcularContadores } from "@/lib/proveedores/listas/contadores";
 
 export async function POST(req, context) {
   try {
-    const admin = requireAdmin(req);
-    if (!admin.ok) {
-      return NextResponse.json({ ok: false, error: admin.error }, { status: admin.status });
+    const acceso = requirePerm(req, "proveedores.listas");
+    if (!acceso.ok) {
+      return NextResponse.json({ ok: false, error: acceso.error }, { status: acceso.status });
     }
 
     const scope = await resolveScope(req);
@@ -92,7 +92,7 @@ export async function POST(req, context) {
 
     // ── 1. La importación, anclada al grupo ──────────────────────────────
     const importacion = await prisma.importacionListaProveedor.findFirst({
-      where: { id: importacionId, grupoId },
+      where: { id: importacionId, grupoId, ...importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin) },
       select: {
         id: true, estado: true, proveedorId: true, recargoPct: true, umbralVariacionPct: true,
         // El rango esperado va al motor: sin él no se puede decidir si alguna

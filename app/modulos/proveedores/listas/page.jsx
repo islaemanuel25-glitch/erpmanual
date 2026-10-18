@@ -120,7 +120,10 @@ export default function HistorialListasPage() {
   const [errorAlCancelar, setErrorAlCancelar] = useState(null);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
-  const esAdmin = permisos.includes("*");
+  // El permiso, como las rutas que esta pantalla llama; era solo admin escrito
+  // a mano. Lo que se ve lo acota el servidor: sin el comodín, las listas de
+  // los proveedores del local.
+  const puedeListas = permisos.includes("*") || permisos.includes("proveedores.listas");
 
   // ── ACÁ SÍ MANDA EL TÍTULO DEL MENÚ ─────────────────────────────────────
   //
@@ -190,9 +193,9 @@ export default function HistorialListasPage() {
   };
 
   useEffect(() => {
-    if (cargandoUser || cargandoCtx || !esAdmin || needsContexto) return;
+    if (cargandoUser || cargandoCtx || !puedeListas || needsContexto) return;
     cargar();
-  }, [cargar, cargandoUser, cargandoCtx, esAdmin, needsContexto]);
+  }, [cargar, cargandoUser, cargandoCtx, puedeListas, needsContexto]);
 
   // EL BUSCADOR ESPERA A QUE DEJEN DE ESCRIBIR. Sin esto, escribir "arcor" son
   // cinco consultas y las cinco corren contra la base del negocio.
@@ -205,7 +208,7 @@ export default function HistorialListasPage() {
   }, [buscar]);
 
   if (cargandoUser || cargandoCtx) return null;
-  if (!esAdmin) return <SinPermisos />;
+  if (!puedeListas) return <SinPermisos />;
 
   if (needsContexto) {
     return (

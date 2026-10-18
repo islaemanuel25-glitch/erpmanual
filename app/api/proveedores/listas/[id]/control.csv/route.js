@@ -25,7 +25,8 @@
 
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { requireAdmin } from "@/lib/authorize";
+import { requirePerm } from "@/lib/authorize";
+import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import {
   CONTROL,
   TEXTO_CONTROL,
@@ -54,9 +55,9 @@ const importe = (v) => (v === null || v === undefined ? "" : String(v).replace("
 
 export async function GET(req, context) {
   try {
-    const admin = requireAdmin(req);
-    if (!admin.ok) {
-      return Response.json({ ok: false, error: admin.error }, { status: admin.status });
+    const acceso = requirePerm(req, "proveedores.listas");
+    if (!acceso.ok) {
+      return Response.json({ ok: false, error: acceso.error }, { status: acceso.status });
     }
 
     const scope = await resolveScope(req);
@@ -77,7 +78,7 @@ export async function GET(req, context) {
     // El grupo va en el WHERE junto al id: una importación de otro grupo no
     // existe para esta consulta, así que da 404 y no revela que existe.
     const cab = await prisma.importacionListaProveedor.findFirst({
-      where: { id, grupoId },
+      where: { id, grupoId, ...importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin) },
       select: {
         id: true,
         archivoNombre: true,

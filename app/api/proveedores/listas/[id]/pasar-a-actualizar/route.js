@@ -34,8 +34,8 @@ import { NextResponse } from "next/server";
 
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { requireAdmin } from "@/lib/authorize";
-import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
+import { requirePerm } from "@/lib/authorize";
+import { getDepositoIdDeGrupo, importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { resolverParserPorId } from "@/lib/proveedores/listas/registro";
 import { esImportacionAbierta } from "@/lib/proveedores/listas/persistencia";
 // La relectura entera de una importación ya leída. La comparten esta ruta y la
@@ -55,9 +55,9 @@ const numeroONull = (v) => {
 
 export async function POST(req, context) {
   try {
-    const admin = requireAdmin(req);
-    if (!admin.ok) {
-      return NextResponse.json({ ok: false, error: admin.error }, { status: admin.status });
+    const acceso = requirePerm(req, "proveedores.listas");
+    if (!acceso.ok) {
+      return NextResponse.json({ ok: false, error: acceso.error }, { status: acceso.status });
     }
 
     const scope = await resolveScope(req);
@@ -116,7 +116,7 @@ export async function POST(req, context) {
     }
 
     const cab = await prisma.importacionListaProveedor.findFirst({
-      where: { id: importacionId, grupoId },
+      where: { id: importacionId, grupoId, ...importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin) },
       select: {
         id: true,
         estado: true,

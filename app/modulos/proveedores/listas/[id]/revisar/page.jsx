@@ -152,7 +152,9 @@ export default function RevisarDeAUnoPage() {
   const [vuelta, setVuelta] = useState(0);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
-  const esAdmin = permisos.includes("*");
+  // El permiso, como las rutas que esta pantalla llama; era solo admin escrito
+  // a mano. Una lista de otro local la frena el servidor.
+  const puedeListas = permisos.includes("*") || permisos.includes("proveedores.listas");
 
   // La barra dice en qué cola estás, que son dos distintas: la de decidir
   // precios y la de vincular lo que no tenés.
@@ -200,9 +202,9 @@ export default function RevisarDeAUnoPage() {
   }, [id, solo]);
 
   useEffect(() => {
-    if (cargandoUser || cargandoCtx || !esAdmin || needsContexto || !Number.isInteger(id)) return;
+    if (cargandoUser || cargandoCtx || !puedeListas || needsContexto || !Number.isInteger(id)) return;
     cargar({ pedir: filaId, saltados: salteados });
-  }, [cargar, cargandoUser, cargandoCtx, esAdmin, needsContexto, id, filaId, salteados, vuelta]);
+  }, [cargar, cargandoUser, cargandoCtx, puedeListas, needsContexto, id, filaId, salteados, vuelta]);
 
   const fila = datos?.fila ?? null;
   const proveedor = datos?.cabecera?.proveedor?.nombre ?? "";
@@ -322,7 +324,7 @@ export default function RevisarDeAUnoPage() {
   };
 
   if (cargandoUser || cargandoCtx) return null;
-  if (!esAdmin) return <SinPermisos />;
+  if (!puedeListas) return <SinPermisos />;
 
   if (needsContexto) {
     return (

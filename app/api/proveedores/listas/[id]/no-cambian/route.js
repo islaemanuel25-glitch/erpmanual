@@ -27,7 +27,8 @@ import { NextResponse } from "next/server";
 
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { requireAdmin } from "@/lib/authorize";
+import { requirePerm } from "@/lib/authorize";
+import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { productoActivoWhere } from "@/lib/proveedores/listas/productoDeBaja";
 import {
@@ -61,9 +62,9 @@ const CAMPOS_FILA = {
 
 export async function GET(req, context) {
   try {
-    const admin = requireAdmin(req);
-    if (!admin.ok) {
-      return NextResponse.json({ ok: false, error: admin.error }, { status: admin.status });
+    const acceso = requirePerm(req, "proveedores.listas");
+    if (!acceso.ok) {
+      return NextResponse.json({ ok: false, error: acceso.error }, { status: acceso.status });
     }
     const scope = await resolveScope(req);
     if (scope.error) {
@@ -81,7 +82,7 @@ export async function GET(req, context) {
     }
 
     const cab = await prisma.importacionListaProveedor.findFirst({
-      where: { id, grupoId },
+      where: { id, grupoId, ...importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin) },
       select: {
         id: true,
         estado: true,

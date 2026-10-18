@@ -18,7 +18,8 @@ import { NextResponse } from "next/server";
 
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { requireAdmin } from "@/lib/authorize";
+import { requirePerm } from "@/lib/authorize";
+import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { OPCIONES_TX } from "@/lib/proveedores/listas/persistencia";
 import {
   validarSeleccion,
@@ -32,9 +33,9 @@ const ACCIONES = new Set(["MARCAR", "DESMARCAR", "TODOS", "NINGUNO", "EXCLUIR", 
 
 export async function POST(req, context) {
   try {
-    const admin = requireAdmin(req);
-    if (!admin.ok) {
-      return NextResponse.json({ ok: false, error: admin.error }, { status: admin.status });
+    const acceso = requirePerm(req, "proveedores.listas");
+    if (!acceso.ok) {
+      return NextResponse.json({ ok: false, error: acceso.error }, { status: acceso.status });
     }
 
     const scope = await resolveScope(req);
@@ -59,7 +60,7 @@ export async function POST(req, context) {
     }
 
     const importacion = await prisma.importacionListaProveedor.findFirst({
-      where: { id: importacionId, grupoId },
+      where: { id: importacionId, grupoId, ...importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin) },
       // `proveedorId` desde esta tanda: "no lo cambio" se recuerda POR PRODUCTO
       // Y PROVEEDOR, así que sin este campo la memoria no sabría de quién es.
       // Sin pedirlo llegaría `undefined` y el `createMany` fallaría contra
@@ -150,10 +151,10 @@ export async function POST(req, context) {
                 proveedorId: importacion.proveedorId,
                 productoBaseId,
                 // QUIÉN LO DECIDIÓ. Sale de la sesión que ya resolvió
-                // `requireAdmin`, no de una segunda lectura del token: es un
+                // `requirePerm`, no de una segunda lectura del token: es un
                 // dato de autoría y tiene que ser el mismo con el que se
                 // autorizó el pedido.
-                decididoPorUsuarioId: admin.session?.id ?? null,
+                decididoPorUsuarioId: acceso.session?.id ?? null,
               })),
               skipDuplicates: true,
             });

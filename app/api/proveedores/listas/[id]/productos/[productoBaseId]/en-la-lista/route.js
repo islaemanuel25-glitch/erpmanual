@@ -35,8 +35,8 @@ import { NextResponse } from "next/server";
 
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { requireAdmin } from "@/lib/authorize";
-import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
+import { requirePerm } from "@/lib/authorize";
+import { getDepositoIdDeGrupo, importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { resolverParserPorId } from "@/lib/proveedores/listas/registro";
 import {
   conciliarFila,
@@ -63,8 +63,8 @@ async function ids(context) {
 }
 
 async function contexto(req) {
-  const admin = requireAdmin(req);
-  if (!admin.ok) return { error: { ok: false, error: admin.error }, status: admin.status };
+  const acceso = requirePerm(req, "proveedores.listas");
+  if (!acceso.ok) return { error: { ok: false, error: acceso.error }, status: acceso.status };
 
   const scope = await resolveScope(req);
   if (scope.error) {
@@ -73,7 +73,8 @@ async function contexto(req) {
       status: scope.status,
     };
   }
-  return scope;
+  // Sin el comodín, solo las listas de un proveedor del local de la sesión.
+  return { ...scope, propia: importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin) };
 }
 
 /** Los campos de fila que la pantalla muestra y el puntaje necesita. */
@@ -100,7 +101,7 @@ export async function GET(req, context) {
     }
 
     const cab = await prisma.importacionListaProveedor.findFirst({
-      where: { id: importacionId, grupoId },
+      where: { id: importacionId, grupoId, ...ctx.propia },
       select: { id: true, estado: true, proveedor: { select: { id: true, nombre: true } } },
     });
     if (!cab) {
@@ -180,7 +181,7 @@ export async function POST(req, context) {
     }
 
     const cab = await prisma.importacionListaProveedor.findFirst({
-      where: { id: importacionId, grupoId },
+      where: { id: importacionId, grupoId, ...ctx.propia },
       select: CAMPOS_CABECERA_PARA_EL_MOTOR,
     });
     if (!cab) {

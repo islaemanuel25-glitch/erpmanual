@@ -76,7 +76,9 @@ export default function LosQueSeActualizanPage() {
   const grupoDeControl = Object.values(CONTROL).includes(controlCrudo) ? controlCrudo : null;
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
-  const esAdmin = permisos.includes("*");
+  // El permiso, como las rutas que esta pantalla llama; era solo admin escrito
+  // a mano. Una lista de otro local la frena el servidor.
+  const puedeListas = permisos.includes("*") || permisos.includes("proveedores.listas");
 
   // ── EL TÍTULO DICE QUÉ LISTA SE ESTÁ MIRANDO ──────────────────────────
   //
@@ -155,13 +157,13 @@ export default function LosQueSeActualizanPage() {
   // MIENTRAS SE ESCRIBE, pero no en cada tecla: 300 ms es lo que tarda en
   // notarse y evita una consulta por letra sobre 954 filas.
   useEffect(() => {
-    if (cargandoUser || cargandoCtx || !esAdmin || needsContexto || !Number.isInteger(id)) return;
+    if (cargandoUser || cargandoCtx || !puedeListas || needsContexto || !Number.isInteger(id)) return;
     const t = setTimeout(() => cargar({ texto: buscar.trim(), tope: hasta }), 300);
     return () => clearTimeout(t);
-  }, [cargar, cargandoUser, cargandoCtx, esAdmin, needsContexto, id, buscar, hasta]);
+  }, [cargar, cargandoUser, cargandoCtx, puedeListas, needsContexto, id, buscar, hasta]);
 
   if (cargandoUser || cargandoCtx) return null;
-  if (!esAdmin) return <SinPermisos />;
+  if (!puedeListas) return <SinPermisos />;
 
   if (needsContexto) {
     return (

@@ -16,61 +16,39 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-- `20261015164915_compra_con_saldo` — **Aditiva.** Crea la tabla
-  `CompraConSaldo` vacía (quién confirmó recibir una compra dejando saldo con
-  el proveedor, cuándo, y el total, lo pagado y el saldo de ese momento), con
-  UNIQUE por pedido y un índice por local y fecha. No toca ninguna columna ni
-  ninguna fila existente, y el código anterior no la lee. Sin relleno: las
-  recepciones de antes no se confirmaron y no se inventa quién lo hizo.
-- `20261015232632_operadores_y_empleados_por_local` — **MIGRACIÓN DE DATOS:
-  autorizarla a sabiendas.** Agrega `localId` (nulo, con FK) a
-  `OperadorLocal` y a `Empleado`, y lo RELLENA desde su única fila de
-  `OperadorEnLocal` / `EmpleadoEnLocal`. Si alguno tiene más de una, la
-  migración se frena ANTES de tocar el esquema, nombrándolo: no se elige. Con
-  los datos medidos por Emanuel —6 operadores y 6 empleados, uno a uno— no
-  frena. Cambia la unicidad del nombre: deja de ser global en `OperadorLocal`
-  (se borra el índice `OperadorLocal_nombre_key`) y pasa a ser
-  `(localId, nombre)` en los dos. No borra columnas ni tablas. Compatible con
-  el código anterior durante la ventana; lo que ese código cree en la ventana
-  nace sin local y lo asigna la PARTE 0 de la reposición, corrida después.
-  La reposición, escrita antes de commitear, está en
-  `scripts/deploy/reposicion-operadores-por-local.sql`.
-- `20261017120000_permiso_ventas_ver_dia` — **De datos, chica y aditiva.**
-  Agrega `ventas.ver_dia` (el total del día en el Panel) al array de permisos
-  de ENCARGADO, DUEÑO_LOCAL y los roles propios que ya tienen `reportes.ver` o
-  `finanzas.ver`. Concatena, no reemplaza; idempotente; no toca Admin ni
-  CAJERO ni ninguna otra tabla. Sin ella, esos roles dejarían de ver el total
-  del día al desplegar el código, porque `/api/dashboard/resumen` ahora lo
-  pide. Las sesiones abiertas lo reciben al volver a iniciar sesión: el JWT
-  lleva los permisos del login.
-- `20261018120000_permisos_proveedores_dueno_local` — **De datos, chica y
-  aditiva.** Agrega `proveedores.ver`, `proveedores.crear` y
-  `proveedores.editar` al array de permisos del rol DUEÑO_LOCAL. Concatena, no
-  reemplaza; idempotente por permiso (el rol puede tener `proveedores.ver`
-  tildado a mano); no toca Admin, ENCARGADO, CAJERO ni ninguna otra tabla. Sin
-  ella, al desplegar el código el dueño seguiría sin poder crear proveedores,
-  porque `/api/proveedores/crear` y `/editar` ahora piden esos permisos en vez
-  de administrador. Los tres dueños la reciben al volver a iniciar sesión: el
-  JWT lleva los permisos del login.
+- `20261018180000_permisos_proveedores_eliminar_y_listas` — **De datos, chica
+  y aditiva.** Agrega `proveedores.eliminar` y `proveedores.listas` al array de
+  permisos del rol DUEÑO_LOCAL. Concatena, no reemplaza; un UPDATE por permiso
+  con su `NOT (@> ...)`, así que correrla dos veces no cambia nada; no toca
+  Admin, ENCARGADO, CAJERO ni ninguna otra tabla. Sin ella, al desplegar el
+  código el dueño seguiría sin poder eliminar sus proveedores ni llevar sus
+  listas de precios, porque `/api/proveedores/eliminar` y las 29 rutas de
+  `/api/proveedores/listas/**` ahora piden esos permisos en vez de
+  administrador. Los dueños la reciben al volver a iniciar sesión: el JWT lleva
+  los permisos del login.
 
-Producción está en **65 migraciones**, la última
-`20261015154425_empleados`.
+Producción está en **69 migraciones**, la última
+`20261018120000_permisos_proveedores_dueno_local`.
 
-**De dónde sale el 65.** Lo informó Emanuel en la orden del 2026-10-15:
-`20261015154425_empleados` se aplicó el 15/10 y producción quedó en 65. Antes
-eran 64, hasta `20261015140949_consumo_personal_y_archivo_de_gasto`. *Sin
-verificar desde esta sesión*, que es de nube y no ve el VPS. Lo comprueba, de
-solo lectura, el paso 0 del próximo `/deploy` (mismo usuario y base que el
-backup del skill):
+**De dónde sale el 69.** Lo informó Emanuel en la orden del 2026-10-18:
+producción tiene 69. Son las 65 que había hasta `20261015154425_empleados`
+más las cuatro que esta lista tenía pendientes —`20261015164915_compra_con_saldo`,
+`20261015232632_operadores_y_empleados_por_local`,
+`20261017120000_permiso_ventas_ver_dia` y
+`20261018120000_permisos_proveedores_dueno_local`—, que es lo único que cierra
+con 69 contando el árbol. *Sin verificar desde esta sesión*, que es de nube y
+no ve el VPS. Lo comprueba, de solo lectura, el paso 0 del próximo `/deploy`
+(mismo usuario y base que el backup del skill):
 `ssh vps-erp 'docker exec erpazul_db psql -At -U erpazul -d erpazul -c "SELECT count(*), max(migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL"'`,
-que tiene que decir `65|20261015154425_empleados`. Si dice otra cosa, esta
-lista está mal y se vuelve a escribir antes de seguir. La descripción de la de
-empleados —migración de datos, con su relleno y su reposición en
-`scripts/deploy/reposicion-empleados.sql`— está en el `git log` de este
-archivo.
+que tiene que decir `69|20261018120000_permisos_proveedores_dueno_local`. Si
+dice otra cosa, esta lista está mal y se vuelve a escribir antes de seguir. La
+descripción de esas cuatro —entre ellas la de operadores y empleados por local,
+migración de datos con su reposición en
+`scripts/deploy/reposicion-operadores-por-local.sql`— está en el `git log` de
+este archivo.
 
 Las que estaban en esta lista antes y ya se aplicaron —hasta
-`20261015154425_empleados`— salieron de acá: la historia de cuándo
+`20261018120000_permisos_proveedores_dueno_local`— salieron de acá: la historia de cuándo
 y cómo se aplicó cada una está en `git log` de este archivo y, para las que la
 tienen, en la bitácora de abajo. La bitácora llega hasta `b6052783` y no se
 borra: la citan como evidencia `lib/stock/libro/stockDiario.test.mjs` y los

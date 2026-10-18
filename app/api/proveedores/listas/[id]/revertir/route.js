@@ -19,7 +19,7 @@
 //
 // ── EL CONTEXTO DE REQUEST SE ABRE SÍ O SÍ ──────────────────────────────────
 //
-// `requireAdmin` llama a `getUsuarioSession`, que siembra el contexto y registra
+// `requirePerm` llama a `getUsuarioSession`, que siembra el contexto y registra
 // el volcado de la bitácora. Sin eso, los costos y las ventas volverían sin
 // autor: exactamente el agujero que dejó 451 escrituras sin rastro. Va primero,
 // antes de cualquier otra cosa.
@@ -33,7 +33,8 @@ import { NextResponse } from "next/server";
 
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { requireAdmin } from "@/lib/authorize";
+import { requirePerm } from "@/lib/authorize";
+import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { OPCIONES_TX, esImportacionRevertible } from "@/lib/proveedores/listas/persistencia";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { planDeReversion, TEXTO_OMISION } from "@/lib/proveedores/listas/reversion";
@@ -115,10 +116,10 @@ async function cargarProductos(db, { importacionId, grupoId, proveedorId }) {
   }));
 }
 
-/** La cabecera, con la guarda de grupo. */
-async function cargarImportacion(db, { importacionId, grupoId }) {
+/** La cabecera, con la guarda de grupo y la de proveedor propio. */
+async function cargarImportacion(db, { importacionId, grupoId, propia }) {
   return db.importacionListaProveedor.findFirst({
-    where: { id: importacionId, grupoId },
+    where: { id: importacionId, grupoId, ...propia },
     // `archivoHash` hace falta para saber si otra importación ABIERTA del mismo
     // archivo está ocupando el índice único antes de intentar reabrir ésta.
     // Sin él la única forma de enterarse era el P2002, que se lleva puesta la
@@ -159,8 +160,8 @@ function respuestaDePrevia(plan) {
 async function contexto(req, context) {
   // PRIMERO de todo: abre el contexto de request y registra el volcado de la
   // bitácora. Ver el comentario de arriba.
-  const admin = requireAdmin(req);
-  if (!admin.ok) return { error: NextResponse.json({ ok: false, error: admin.error }, { status: admin.status }) };
+  const acceso = requirePerm(req, "proveedores.listas");
+  if (!acceso.ok) return { error: NextResponse.json({ ok: false, error: acceso.error }, { status: acceso.status }) };
 
   const scope = await resolveScope(req);
   if (scope.error) {
@@ -178,7 +179,11 @@ async function contexto(req, context) {
     return { error: NextResponse.json({ ok: false, error: "Id inválido." }, { status: 400 }) };
   }
 
-  const importacion = await cargarImportacion(prisma, { importacionId, grupoId: scope.grupoId });
+  const importacion = await cargarImportacion(prisma, {
+    importacionId,
+    grupoId: scope.grupoId,
+    propia: importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin),
+  });
   if (!importacion) {
     return { error: NextResponse.json({ ok: false, error: "Importación no encontrada." }, { status: 404 }) };
   }

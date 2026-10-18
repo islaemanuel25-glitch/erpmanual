@@ -34,8 +34,8 @@ import { NextResponse } from "next/server";
 
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { requireAdmin } from "@/lib/authorize";
-import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
+import { requirePerm } from "@/lib/authorize";
+import { getDepositoIdDeGrupo, importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { ESTADO_IMPORTACION, esImportacionAbierta } from "@/lib/proveedores/listas/persistencia";
 // LA CONFIGURACIÓN SALE DEL PARSER CON EL QUE SE LEYÓ ESTA LISTA, NO DE ARCOR.
 //
@@ -123,9 +123,9 @@ async function resultadoPrevio(importacionId) {
  */
 export async function GET(req, context) {
   try {
-    const admin = requireAdmin(req);
-    if (!admin.ok) {
-      return NextResponse.json({ ok: false, error: admin.error }, { status: admin.status });
+    const acceso = requirePerm(req, "proveedores.listas");
+    if (!acceso.ok) {
+      return NextResponse.json({ ok: false, error: acceso.error }, { status: acceso.status });
     }
     const scope = await resolveScope(req);
     if (scope.error) {
@@ -143,7 +143,7 @@ export async function GET(req, context) {
     }
 
     const importacion = await prisma.importacionListaProveedor.findFirst({
-      where: { id: importacionId, grupoId },
+      where: { id: importacionId, grupoId, ...importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin) },
       select: {
         id: true, estado: true, recargoPct: true, localOperativoId: true,
         // CON QUÉ LECTOR SE LEYÓ. Sin este campo la previa calcularía con las
@@ -263,9 +263,9 @@ export async function GET(req, context) {
 
 export async function POST(req, context) {
   try {
-    const admin = requireAdmin(req);
-    if (!admin.ok) {
-      return NextResponse.json({ ok: false, error: admin.error }, { status: admin.status });
+    const acceso = requirePerm(req, "proveedores.listas");
+    if (!acceso.ok) {
+      return NextResponse.json({ ok: false, error: acceso.error }, { status: acceso.status });
     }
 
     const scope = await resolveScope(req);
@@ -294,7 +294,7 @@ export async function POST(req, context) {
     const modoPrecioVenta = resolverModoPrecioVenta(modoPedido);
 
     const importacion = await prisma.importacionListaProveedor.findFirst({
-      where: { id: importacionId, grupoId },
+      where: { id: importacionId, grupoId, ...importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin) },
       select: {
         id: true, estado: true, proveedorId: true, localOperativoId: true,
         // CON QUÉ LECTOR SE LEYÓ ESTA LISTA. Es lo que decide la configuración

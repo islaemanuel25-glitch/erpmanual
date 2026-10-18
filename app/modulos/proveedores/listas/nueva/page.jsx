@@ -101,7 +101,9 @@ export default function SubirListaPage() {
   const controlando = modo === MODO_LISTA.CONTROLAR;
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
-  const esAdmin = permisos.includes("*");
+  // El permiso, como las rutas que esta pantalla llama; era solo admin escrito
+  // a mano. Sin el comodín, el servidor ofrece solo los proveedores del local.
+  const puedeListas = permisos.includes("*") || permisos.includes("proveedores.listas");
 
   // El título y la salida van a la fila del shell, igual que en las otras cinco
   // pantallas del módulo. Acá el título cambia con el paso: el de columnas es
@@ -145,9 +147,9 @@ export default function SubirListaPage() {
   }, []);
 
   useEffect(() => {
-    if (cargandoUser || cargandoCtx || !esAdmin || needsContexto) return;
+    if (cargandoUser || cargandoCtx || !puedeListas || needsContexto) return;
     cargarProveedores();
-  }, [cargarProveedores, cargandoUser, cargandoCtx, esAdmin, needsContexto]);
+  }, [cargarProveedores, cargandoUser, cargandoCtx, puedeListas, needsContexto]);
 
   const proveedor = useMemo(
     () => proveedores.find((p) => String(p.id) === String(proveedorId)) ?? null,
@@ -416,7 +418,7 @@ export default function SubirListaPage() {
   };
 
   if (cargandoUser || cargandoCtx) return null;
-  if (!esAdmin) return <SinPermisos />;
+  if (!puedeListas) return <SinPermisos />;
 
   if (needsContexto) {
     return (

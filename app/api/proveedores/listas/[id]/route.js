@@ -46,7 +46,8 @@ import {
   filaConProductoDeBajaWhere,
 } from "@/lib/proveedores/listas/productoDeBaja";
 import { resolveScope } from "@/lib/grupos";
-import { requireAdmin } from "@/lib/authorize";
+import { requirePerm } from "@/lib/authorize";
+import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { paginacion, LIMITES } from "@/lib/proveedores/listas/persistencia";
 import { ESTADO_LINEA } from "@/lib/proveedores/listas/estados";
 
@@ -92,9 +93,9 @@ const VISTAS = {
 
 export async function GET(req, context) {
   try {
-    const admin = requireAdmin(req);
-    if (!admin.ok) {
-      return NextResponse.json({ ok: false, error: admin.error }, { status: admin.status });
+    const acceso = requirePerm(req, "proveedores.listas");
+    if (!acceso.ok) {
+      return NextResponse.json({ ok: false, error: acceso.error }, { status: acceso.status });
     }
 
     const scope = await resolveScope(req);
@@ -114,7 +115,7 @@ export async function GET(req, context) {
 
     // grupoId en el WHERE, no en una validación posterior.
     const cabecera = await prisma.importacionListaProveedor.findFirst({
-      where: { id: importacionId, grupoId },
+      where: { id: importacionId, grupoId, ...importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin) },
       select: {
         id: true, estado: true, archivoNombre: true, archivoTamano: true,
         archivoHash: true, archivoUbicacion: true, parser: true, parserVersion: true,

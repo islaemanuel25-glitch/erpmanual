@@ -105,7 +105,9 @@ export default function ResultadoDeListaPage() {
   const [releyendo, setReleyendo] = useState(false);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
-  const esAdmin = permisos.includes("*");
+  // El permiso, como las rutas que esta pantalla llama; era solo admin escrito
+  // a mano. Una lista de otro local la frena el servidor.
+  const puedeListas = permisos.includes("*") || permisos.includes("proveedores.listas");
 
   // ── LA BARRA DE LA APP DICE DÓNDE ESTÁS ─────────────────────────────────
   //
@@ -154,9 +156,9 @@ export default function ResultadoDeListaPage() {
   }, [id]);
 
   useEffect(() => {
-    if (cargandoUser || cargandoCtx || !esAdmin || needsContexto || !Number.isInteger(id)) return;
+    if (cargandoUser || cargandoCtx || !puedeListas || needsContexto || !Number.isInteger(id)) return;
     cargar();
-  }, [cargar, cargandoUser, cargandoCtx, esAdmin, needsContexto, id]);
+  }, [cargar, cargandoUser, cargandoCtx, puedeListas, needsContexto, id]);
 
   /**
    * Pasa este control a actualizar precios, con el rango que se acaba de pedir.
@@ -472,7 +474,7 @@ export default function ResultadoDeListaPage() {
   };
 
   if (cargandoUser || cargandoCtx) return null;
-  if (!esAdmin) return <SinPermisos />;
+  if (!puedeListas) return <SinPermisos />;
 
   if (needsContexto) {
     return (

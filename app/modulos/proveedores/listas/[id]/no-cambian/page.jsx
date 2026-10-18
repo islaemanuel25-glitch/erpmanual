@@ -108,7 +108,9 @@ export default function LosQueNoCambianPage() {
   const [trabajando, setTrabajando] = useState(false);
 
   const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
-  const esAdmin = permisos.includes("*");
+  // El permiso, como las rutas que esta pantalla llama; era solo admin escrito
+  // a mano. Una lista de otro local la frena el servidor.
+  const puedeListas = permisos.includes("*") || permisos.includes("proveedores.listas");
 
   useTituloDePagina("No cambian");
   useAccionDePagina(
@@ -150,10 +152,10 @@ export default function LosQueNoCambianPage() {
   // pantalla de los que se actualizan: es lo que tarda en notarse y evita una
   // consulta por letra.
   useEffect(() => {
-    if (cargandoUser || cargandoCtx || !esAdmin || needsContexto || !Number.isInteger(id)) return;
+    if (cargandoUser || cargandoCtx || !puedeListas || needsContexto || !Number.isInteger(id)) return;
     const t = setTimeout(() => cargar({ texto: buscar.trim(), grupo: filtro }), 300);
     return () => clearTimeout(t);
-  }, [cargar, cargandoUser, cargandoCtx, esAdmin, needsContexto, id, buscar, filtro]);
+  }, [cargar, cargandoUser, cargandoCtx, puedeListas, needsContexto, id, buscar, filtro]);
 
   /**
    * VOLVER A INCLUIR un producto que se había dejado igual.
@@ -249,7 +251,7 @@ export default function LosQueNoCambianPage() {
   };
 
   if (cargandoUser || cargandoCtx) return null;
-  if (!esAdmin) return <SinPermisos />;
+  if (!puedeListas) return <SinPermisos />;
 
   if (needsContexto) {
     return (

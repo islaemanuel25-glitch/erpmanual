@@ -19,8 +19,8 @@ import { NextResponse } from "next/server";
 
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { requireAdmin } from "@/lib/authorize";
-import { proveedorVisibleWhere } from "@/lib/visibilidad";
+import { requirePerm } from "@/lib/authorize";
+import { proveedorVisibleWhere, proveedorEditableWhere } from "@/lib/visibilidad";
 import { listarParsers, resolverParserDeProveedor } from "@/lib/proveedores/listas/registro";
 import {
   configuracionDeProveedor,
@@ -29,9 +29,9 @@ import {
 
 export async function GET(req) {
   try {
-    const admin = requireAdmin(req);
-    if (!admin.ok) {
-      return NextResponse.json({ ok: false, error: admin.error }, { status: admin.status });
+    const acceso = requirePerm(req, "proveedores.listas");
+    if (!acceso.ok) {
+      return NextResponse.json({ ok: false, error: acceso.error }, { status: acceso.status });
     }
 
     const scope = await resolveScope(req);
@@ -56,7 +56,13 @@ export async function GET(req) {
       : null;
 
     const items = await prisma.proveedor.findMany({
-      where: { activo: true, ...proveedorVisibleWhere(localId, grupoId) },
+      // Sin el comodín, solo los proveedores del local: son a los que se les
+      // puede subir una lista.
+      where: {
+        activo: true,
+        ...proveedorVisibleWhere(localId, grupoId),
+        AND: [proveedorEditableWhere(localId, acceso.session.esAdmin)],
+      },
       orderBy: { nombre: "asc" },
       select: {
         id: true, nombre: true, parserListaId: true,

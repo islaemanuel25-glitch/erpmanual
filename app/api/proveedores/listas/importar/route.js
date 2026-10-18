@@ -28,8 +28,8 @@ import * as XLSX from "xlsx";
 
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { requireAdmin } from "@/lib/authorize";
-import { proveedorVisibleWhere, getDepositoIdDeGrupo } from "@/lib/visibilidad";
+import { requirePerm } from "@/lib/authorize";
+import { proveedorVisibleWhere, proveedorEditableWhere, getDepositoIdDeGrupo } from "@/lib/visibilidad";
 import { resolverParserDeProveedor } from "@/lib/proveedores/listas/registro";
 import { conciliarLista } from "@/lib/proveedores/listas/conciliarLista";
 import { cargarDatosDeConciliacion } from "@/lib/proveedores/listas/cargaErp";
@@ -331,12 +331,14 @@ export async function POST(req) {
   try {
     // ── 1. Sesión, permiso y contexto ────────────────────────────────────
     //
-    // Importar listas mueve el costo de todo el catálogo de un proveedor: por
-    // ahora es exclusivo de administradores. `esAdmin` es cómo el ERP reconoce
-    // al administrador (permisos incluye "*"); no se inventa ningún rol nuevo.
-    const admin = requireAdmin(req);
-    if (!admin.ok) {
-      return NextResponse.json({ ok: false, error: admin.error }, { status: admin.status });
+    // Importar listas mueve el costo de todo el catálogo de un proveedor. Era
+    // exclusivo de administradores; desde 2026-10-18 lo hace quien tenga
+    // `proveedores.listas`, y sin el comodín solo sobre un proveedor de su local
+    // (más abajo, `proveedorEditableWhere`): cada local tiene sus propios
+    // proveedores y sobre lo propio los mismos poderes que el depósito.
+    const acceso = requirePerm(req, "proveedores.listas");
+    if (!acceso.ok) {
+      return NextResponse.json({ ok: false, error: acceso.error }, { status: acceso.status });
     }
 
     const scope = await resolveScope(req);
@@ -378,7 +380,11 @@ export async function POST(req) {
     // formulario pero NO se confía: se busca con el filtro de visibilidad, así
     // que un proveedor de otro alcance simplemente no existe para esta consulta.
     const proveedor = await prisma.proveedor.findFirst({
-      where: { id: proveedorId, ...proveedorVisibleWhere(localId, grupoId) },
+      where: {
+        id: proveedorId,
+        ...proveedorVisibleWhere(localId, grupoId),
+        AND: [proveedorEditableWhere(localId, acceso.session.esAdmin)],
+      },
       select: {
         id: true, nombre: true, parserListaId: true, activo: true,
         listaAumentoEsperadoMinPct: true, listaAumentoEsperadoMaxPct: true,

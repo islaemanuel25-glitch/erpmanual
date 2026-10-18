@@ -609,7 +609,9 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // agrega un permiso a roles existentes. No toca transferencias.
   // Sube a 69 el 2026-10-18: `20261018120000_permisos_proveedores_dueno_local`,
   // solo agrega permisos de proveedores a DUEÑO_LOCAL. No toca transferencias.
-  assert.equal(migraciones.length, 69, "aparecio una migracion que nadie declaro aca");
+  // Sube a 70 el 2026-10-18: `20261018180000_permisos_proveedores_eliminar_y_listas`,
+  // dos permisos más de proveedores para DUEÑO_LOCAL. No toca transferencias.
+  assert.equal(migraciones.length, 70, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));

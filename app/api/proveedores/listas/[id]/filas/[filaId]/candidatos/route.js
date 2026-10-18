@@ -36,8 +36,8 @@ import { NextResponse } from "next/server";
 
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { requireAdmin, checkPerm } from "@/lib/authorize";
-import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
+import { requirePerm, checkPerm } from "@/lib/authorize";
+import { getDepositoIdDeGrupo, importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { puedeEditarCosto } from "@/lib/productos/propiedadCosto";
 import { cargarDatosDeConciliacion } from "@/lib/proveedores/listas/cargaErp";
 import { sugerirPorNombre, parecidoNombre } from "@/lib/proveedores/listas/conciliarLista";
@@ -48,9 +48,9 @@ const MAX_CANDIDATOS = 3;
 
 export async function GET(req, context) {
   try {
-    const admin = requireAdmin(req);
-    if (!admin.ok) {
-      return NextResponse.json({ ok: false, error: admin.error }, { status: admin.status });
+    const acceso = requirePerm(req, "proveedores.listas");
+    if (!acceso.ok) {
+      return NextResponse.json({ ok: false, error: acceso.error }, { status: acceso.status });
     }
 
     const scope = await resolveScope(req);
@@ -71,7 +71,7 @@ export async function GET(req, context) {
 
     // La importación ancla el alcance: de otro grupo, no existe.
     const importacion = await prisma.importacionListaProveedor.findFirst({
-      where: { id: importacionId, grupoId },
+      where: { id: importacionId, grupoId, ...importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin) },
       select: { id: true, proveedorId: true },
     });
     if (!importacion) {
@@ -114,7 +114,7 @@ export async function GET(req, context) {
       .slice(0, MAX_CANDIDATOS);
 
     const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
-    const puedeVerCosto = checkPerm(admin.session, "costos.ver").ok;
+    const puedeVerCosto = checkPerm(acceso.session, "costos.ver").ok;
 
     const candidatos = ordenados.map(({ p, parecido }) =>
       Object.assign(

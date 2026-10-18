@@ -24,8 +24,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 
-import { proveedorEditableWhere } from "@/lib/visibilidad";
+import { proveedorEditableWhere, importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { DEFAULT_PERMISOS_SISTEMA, DUENO_LOCAL, ENCARGADO, CAJERO } from "@/lib/rbac/systemRoles";
 import { PERMISSION_REGISTRY as PERMISSIONS } from "@/lib/rbac/registry";
 import { checkPerm } from "@/lib/authorize";
@@ -154,4 +155,142 @@ test("3. admin crea igual que antes: sin contexto el proveedor queda en null, co
   assert.match(src, /creadoEnLocalId = scope\.error \? null : scope\.localId \?\? null/);
   // El corte por falta de local es solo para quien no es admin.
   assert.ok(!/if \(scope\.error\)/.test(src), "admin sin contexto dejaría de poder crear");
+});
+
+// ══ SEGUNDA TANDA: ELIMINAR Y LISTAS DE PRECIOS ══════════════════════════════
+//
+// Quedaba a medias: eliminar un proveedor propio seguía diciendo "Requiere
+// administrador", y el circuito de listas de precios —29 rutas y 7 pantallas—
+// también era solo de admin escrito a mano. La regla: sobre sus proveedores el
+// dueño hace TODO lo que hace el admin, y nada sobre los de otro local ni del
+// depósito. Eliminar pide `proveedores.eliminar` y las listas
+// `proveedores.listas`; las dos acotan con la regla de "proveedor propio".
+
+const ELIMINAR = "app/api/proveedores/eliminar/route.js";
+const MIGRACION_2 = "prisma/migrations/20261018180000_permisos_proveedores_eliminar_y_listas/migration.sql";
+
+/** Todas las rutas del circuito de listas, recorridas en profundidad y viendo
+ *  también lo recién escrito sin commitear (regla 10 de CLAUDE.md). */
+function rutasDeListas() {
+  const salida = execFileSync(
+    "git",
+    ["ls-files", "--cached", "--others", "--exclude-standard", "app/api/proveedores/listas"],
+    { cwd: RAIZ, encoding: "utf8" }
+  );
+  return salida.split("\n").filter((f) => f.endsWith("/route.js")).sort();
+}
+
+const PANTALLAS_DE_LISTAS = () =>
+  execFileSync(
+    "git",
+    ["ls-files", "--cached", "--others", "--exclude-standard", "app/modulos/proveedores/listas"],
+    { cwd: RAIZ, encoding: "utf8" }
+  ).split("\n").filter((f) => f.endsWith("page.jsx")).sort();
+
+/** ¿La importación pasa el `where` de listas propias? Forma afirmada antes. */
+function listaPropia(importacion, localId, esAdmin) {
+  const w = importacionDeProveedorPropioWhere(localId, esAdmin);
+  if (esAdmin) {
+    assert.deepEqual(w, {}, "cambió la forma para admin");
+    return true;
+  }
+  assert.deepEqual(Object.keys(w), ["proveedor"], "cambió la forma de importacionDeProveedorPropioWhere");
+  assert.deepEqual(w.proveedor, proveedorEditableWhere(localId, false), "no reusa la regla de proveedor propio");
+  return editable(importacion.proveedor, localId, false);
+}
+
+const LISTA_DEPO = { id: 100, proveedor: DEL_DEPOSITO };
+const LISTA_A = { id: 101, proveedor: DEL_LOCAL_A };
+const LISTA_B = { id: 102, proveedor: DEL_LOCAL_B };
+const LISTA_VIEJA = { id: 103, proveedor: VIEJO };
+const LISTAS = [LISTA_DEPO, LISTA_A, LISTA_B, LISTA_VIEJA];
+
+test("4. DUEÑO_LOCAL tiene eliminar y listas; encargado y cajero no", () => {
+  for (const p of ["proveedores.eliminar", "proveedores.listas"]) {
+    assert.ok(DEFAULT_PERMISOS_SISTEMA[DUENO_LOCAL].includes(p), `DUEÑO_LOCAL sin ${p}`);
+    assert.ok(PERMISSIONS.some((x) => x.code === p && !x.deprecated), `${p} no está en el registro`);
+    for (const rol of [ENCARGADO, CAJERO]) {
+      assert.ok(!DEFAULT_PERMISOS_SISTEMA[rol].includes(p), `${rol} recibió ${p}`);
+    }
+  }
+});
+
+test("4. la segunda migración habilita eliminar y listas a los DUEÑO_LOCAL que ya existen, idempotente", () => {
+  const sql = leer(MIGRACION_2).replace(/--[^\n]*/g, "");
+  const updates = sql.split(/;\s*/).filter((s) => /UPDATE "Rol"/.test(s));
+  assert.equal(updates.length, 2);
+  for (const [u, p] of updates.map((u, i) => [u, ["proveedores.eliminar", "proveedores.listas"][i]])) {
+    assert.ok(u.includes(`"permisos" || '["${p}"]'::jsonb`), `no agrega ${p}`);
+    assert.ok(u.includes(`AND NOT ("permisos" @> '["${p}"]'::jsonb)`), `${p} no es idempotente`);
+    assert.match(u, /"nombre" = 'DUEÑO_LOCAL'/);
+    assert.match(u, /AND NOT \("permisos" @> '\["\*"\]'::jsonb\)/);
+  }
+});
+
+test("5. eliminar pide proveedores.eliminar y filtra con el predicado de escritura antes de borrar", () => {
+  const src = sinComentarios(leer(ELIMINAR));
+  assert.ok(!src.includes("requireAdmin"), "eliminar sigue pidiendo administrador");
+  assert.match(src, /requirePerm\(req, "proveedores\.eliminar"\)/);
+  assert.match(src, /where: \{ id: numId, \.\.\.proveedorEditableWhere\(scope\.localId, auth\.session\.esAdmin\) \}/);
+  assert.match(src, /if \(!propio && !auth\.session\.esAdmin\)/);
+  assert.match(src, /status: 403/);
+  // El filtro va ANTES de todo lo que lee o borra: un ajeno no llega ni a contar.
+  const filtro = src.indexOf("proveedorEditableWhere(");
+  assert.ok(filtro > 0 && filtro < src.indexOf("productoBase.count("));
+  assert.ok(filtro < src.indexOf("proveedor.delete("));
+  // Qué pasa al eliminar no cambió: la misma restricción por productos.
+  assert.match(src, /No se puede eliminar: tiene productos asociados/);
+});
+
+test("5. DUEÑO_LOCAL elimina solo lo propio; admin cualquiera (misma regla que editar)", () => {
+  assert.deepEqual(TODOS.filter((p) => editable(p, LOCAL_A, false)), [DEL_LOCAL_A]);
+  for (const ajeno of [DEL_DEPOSITO, DEL_LOCAL_B, VIEJO]) assert.equal(editable(ajeno, LOCAL_A, false), false);
+  assert.deepEqual(TODOS.filter((p) => editable(p, LOCAL_A, true)), TODOS);
+});
+
+test("6. DUEÑO_LOCAL toca solo las listas de un proveedor de su local; admin todas", () => {
+  assert.deepEqual(LISTAS.filter((l) => listaPropia(l, LOCAL_A, false)), [LISTA_A]);
+  assert.deepEqual(LISTAS.filter((l) => listaPropia(l, LOCAL_B, false)), [LISTA_B]);
+  for (const ajena of [LISTA_DEPO, LISTA_VIEJA]) assert.equal(listaPropia(ajena, LOCAL_A, false), false);
+  assert.deepEqual(LISTAS.filter((l) => listaPropia(l, null, false)), []);
+  assert.deepEqual(LISTAS.filter((l) => listaPropia(l, LOCAL_A, true)), LISTAS);
+});
+
+test("6. CENSO: cada ruta de listas pide proveedores.listas y acota a lo propio", () => {
+  const rutas = rutasDeListas();
+  // Contra la enumeración vacía o corta: hoy son 29.
+  assert.ok(rutas.length >= 29, `la enumeración devolvió ${rutas.length} rutas`);
+  const sinPermiso = [];
+  const sinAlcance = [];
+  for (const f of rutas) {
+    const src = sinComentarios(leer(f));
+    if (src.includes("requireAdmin") || !src.includes('requirePerm(req, "proveedores.listas")')) sinPermiso.push(f);
+    // Cada carga de cabecera por id lleva la guarda; cada proveedor pedido por
+    // id o listado, la regla de proveedor propio.
+    const cargas = [...src.matchAll(/importacionListaProveedor\.findFirst\(\{\s*where: \{ id[^}]*\}/g)].map((m) => m[0]);
+    const cargasSinGuarda = cargas.filter((c) => !/importacionDeProveedorPropioWhere\(|\.\.\.ctx\.propia|\.\.\.propia/.test(c));
+    const porProveedor = /prisma\.proveedor\.find(First|Many)\(\{\s*where: \{[^}]*proveedorVisibleWhere/.test(src);
+    const guardaDeProveedor = /AND: \[proveedorEditableWhere\(localId, acceso\.session\.esAdmin\)\]/.test(src);
+    const historial = /AND: \[importacionDeProveedorPropioWhere\(scope\.localId, acceso\.session\.esAdmin\)\]/.test(src);
+    const tieneAlgo = cargas.length > 0 || porProveedor || historial;
+    if (!tieneAlgo || cargasSinGuarda.length > 0 || (porProveedor && !guardaDeProveedor)) sinAlcance.push(f);
+  }
+  assert.deepEqual(sinPermiso, [], "rutas de listas sin el permiso");
+  assert.deepEqual(sinAlcance, [], "rutas de listas que no acotan al proveedor propio");
+});
+
+test("7. las pantallas de listas y el menú siguen al permiso, no al comodín solo", () => {
+  const pantallas = PANTALLAS_DE_LISTAS();
+  assert.ok(pantallas.length >= 7, `la enumeración devolvió ${pantallas.length} pantallas`);
+  for (const f of pantallas) {
+    const src = sinComentarios(leer(f));
+    assert.ok(!/const esAdmin = permisos\.includes\("\*"\);/.test(src), `${f} sigue cortando con admin a mano`);
+    if (src.includes("SinPermisos")) {
+      assert.match(src, /permisos\.includes\("proveedores\.listas"\)/, `${f} no mira proveedores.listas`);
+    }
+  }
+  const menu = sinComentarios(leer("lib/menu/registry.js"));
+  const item = menu.slice(menu.indexOf('href: "/modulos/proveedores/listas"') - 200, menu.indexOf('href: "/modulos/proveedores/listas"') + 300);
+  assert.match(item, /permiso: "proveedores\.listas"/);
+  assert.ok(!/adminOnly: true/.test(item.slice(0, item.indexOf("enabledByDefault"))), "el menú de listas sigue siendo solo admin");
 });

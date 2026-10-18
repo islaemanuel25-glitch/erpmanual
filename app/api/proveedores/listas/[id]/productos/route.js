@@ -14,8 +14,8 @@ import { NextResponse } from "next/server";
 
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { requireAdmin, checkPerm } from "@/lib/authorize";
-import { productoVisibleWhere, getDepositoIdDeGrupo } from "@/lib/visibilidad";
+import { requirePerm, checkPerm } from "@/lib/authorize";
+import { productoVisibleWhere, getDepositoIdDeGrupo, importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { puedeEditarCosto } from "@/lib/productos/propiedadCosto";
 import {
   MIN_BUSQUEDA,
@@ -27,9 +27,9 @@ import {
 
 export async function GET(req, context) {
   try {
-    const admin = requireAdmin(req);
-    if (!admin.ok) {
-      return NextResponse.json({ ok: false, error: admin.error }, { status: admin.status });
+    const acceso = requirePerm(req, "proveedores.listas");
+    if (!acceso.ok) {
+      return NextResponse.json({ ok: false, error: acceso.error }, { status: acceso.status });
     }
 
     const scope = await resolveScope(req);
@@ -49,7 +49,7 @@ export async function GET(req, context) {
 
     // La importación ancla el alcance: si es de otro grupo, no existe.
     const importacion = await prisma.importacionListaProveedor.findFirst({
-      where: { id: importacionId, grupoId },
+      where: { id: importacionId, grupoId, ...importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin) },
       select: { id: true, proveedorId: true },
     });
     if (!importacion) {
@@ -113,10 +113,10 @@ export async function GET(req, context) {
 
     const depositoLocalId = await getDepositoIdDeGrupo(grupoId);
 
-    // Hoy la guarda de arriba ya exige administrador, así que esto siempre da
-    // true. Se consulta igual para que el costo dependa del permiso y no de esa
-    // guarda: si mañana se afloja, el costo no viaja de arriba sin decidirlo.
-    const puedeVerCosto = checkPerm(admin.session, "costos.ver").ok;
+    // La guarda de arriba ya no exige administrador: pide `proveedores.listas`.
+    // Por eso esto se consulta aparte, como estaba previsto: el costo depende de
+    // `costos.ver` y no de esa guarda.
+    const puedeVerCosto = checkPerm(acceso.session, "costos.ver").ok;
 
     const items = bases.map((b) =>
       presentarCandidato(

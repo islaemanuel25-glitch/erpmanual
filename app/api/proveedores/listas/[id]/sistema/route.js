@@ -19,7 +19,8 @@ import { NextResponse } from "next/server";
 
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { requireAdmin } from "@/lib/authorize";
+import { requirePerm } from "@/lib/authorize";
+import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { productoActivoWhere } from "@/lib/proveedores/listas/productoDeBaja";
 import { SITUACION_DETALLE } from "@/lib/proveedores/listas/detalleSistema";
@@ -69,9 +70,9 @@ const numero = (v) => (v === null || v === undefined ? null : Number(v));
 
 export async function GET(req, context) {
   try {
-    const admin = requireAdmin(req);
-    if (!admin.ok) {
-      return NextResponse.json({ ok: false, error: admin.error }, { status: admin.status });
+    const acceso = requirePerm(req, "proveedores.listas");
+    if (!acceso.ok) {
+      return NextResponse.json({ ok: false, error: acceso.error }, { status: acceso.status });
     }
 
     const scope = await resolveScope(req);
@@ -104,7 +105,7 @@ export async function GET(req, context) {
     const todo = url.searchParams.get("todo") === "1";
 
     const importacion = await prisma.importacionListaProveedor.findFirst({
-      where: { id: importacionId, grupoId },
+      where: { id: importacionId, grupoId, ...importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin) },
       select: { id: true, proveedorId: true, recargoPct: true, aumentoEsperadoMinPct: true, aumentoEsperadoMaxPct: true },
     });
     if (!importacion) {

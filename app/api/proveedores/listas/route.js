@@ -7,7 +7,8 @@ import { NextResponse } from "next/server";
 
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { requireAdmin } from "@/lib/authorize";
+import { requirePerm } from "@/lib/authorize";
+import { importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { paginacion } from "@/lib/proveedores/listas/persistencia";
 import { productoDelProveedorWhere } from "@/lib/proveedores/listas/cargaErp";
 import { productoActivoWhere } from "@/lib/proveedores/listas/productoDeBaja";
@@ -17,9 +18,9 @@ import { ESTADOS_A_MEDIAS } from "@/lib/proveedores/listas/persistencia";
 
 export async function GET(req) {
   try {
-    const admin = requireAdmin(req);
-    if (!admin.ok) {
-      return NextResponse.json({ ok: false, error: admin.error }, { status: admin.status });
+    const acceso = requirePerm(req, "proveedores.listas");
+    if (!acceso.ok) {
+      return NextResponse.json({ ok: false, error: acceso.error }, { status: acceso.status });
     }
 
     const scope = await resolveScope(req);
@@ -39,7 +40,11 @@ export async function GET(req) {
 
     // El grupo NO sale de un parámetro: sale del alcance resuelto. Un id de
     // grupo por query no cambiaría nada.
-    const where = { grupoId };
+    //
+    // Y sin el comodín, solo las listas de los proveedores del local. Va en un
+    // `AND` y no suelto: el buscador de abajo escribe `where.proveedor` y lo
+    // pisaría.
+    const where = { grupoId, AND: [importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin)] };
     const proveedorId = Number(url.searchParams.get("proveedorId"));
     if (Number.isInteger(proveedorId) && proveedorId > 0) where.proveedorId = proveedorId;
 

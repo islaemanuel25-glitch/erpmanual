@@ -28,7 +28,7 @@ import { NextResponse } from "next/server";
 
 import prisma from "@/lib/prisma";
 import { resolveScope } from "@/lib/grupos";
-import { requireAdmin } from "@/lib/authorize";
+import { requirePerm } from "@/lib/authorize";
 import { paginacion } from "@/lib/proveedores/listas/persistencia";
 import {
   contarResultado,
@@ -56,7 +56,7 @@ import {
   MOTIVO_OMISION,
   textoOmision,
 } from "@/lib/proveedores/listas/aplicacion";
-import { getDepositoIdDeGrupo } from "@/lib/visibilidad";
+import { getDepositoIdDeGrupo, importacionDeProveedorPropioWhere } from "@/lib/visibilidad";
 import { analizarFila } from "@/lib/proveedores/listas/confirmarPresentacion";
 import { baseParaHelpers } from "@/lib/proveedores/listas/conciliarLista";
 import { resolverParserDeProveedor, resolverParserPorId } from "@/lib/proveedores/listas/registro";
@@ -122,9 +122,9 @@ const CAMPOS_CONTEO = {
 
 export async function GET(req, context) {
   try {
-    const admin = requireAdmin(req);
-    if (!admin.ok) {
-      return NextResponse.json({ ok: false, error: admin.error }, { status: admin.status });
+    const acceso = requirePerm(req, "proveedores.listas");
+    if (!acceso.ok) {
+      return NextResponse.json({ ok: false, error: acceso.error }, { status: acceso.status });
     }
 
     const scope = await resolveScope(req);
@@ -148,7 +148,7 @@ export async function GET(req, context) {
     // El grupo va en el WHERE junto al id: una importación de otro grupo no
     // existe para esta consulta, así que da 404 y no revela que existe.
     const cab = await prisma.importacionListaProveedor.findFirst({
-      where: { id, grupoId },
+      where: { id, grupoId, ...importacionDeProveedorPropioWhere(scope.localId, acceso.session.esAdmin) },
       select: {
         id: true,
         estado: true,
