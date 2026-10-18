@@ -451,7 +451,7 @@ export function PersonaDelTurno({ c, abierta = false, onAlternar, onVerCaja }) {
 
       {abierta ? (
         <div data-detalle-de-la-caja className="space-y-3 px-3 pb-3">
-          <EfectivoDeLaCaja c={c} conDiferencia={false} />
+          <EfectivoDeLaCaja c={c} />
           <CobradoPorMedioElectronico c={c} />
           <SunmiButton
             type="button"

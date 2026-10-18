@@ -7,18 +7,19 @@
 // `GET /api/turnos-y-cierres/cajas/:id` y lo dibujan; no recalculan plata.
 //
 // La diferencia del recuadro es la de la caja: lo contado contra lo que tenía
-// que haber, con `calcularEfectivoEsperado`. La de cada arqueo es la ACUMULADA
-// hasta ese corte, tal como se guardó: se muestra sola y nunca se suma.
+// que haber, con `calcularEfectivoEsperado`. La de cada retiro del cajón es la
+// de SU tramo (`arqueosDeCaja`): la acumulada de ese corte menos la anterior.
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import { fechaHoraAR, horaAR } from "@/lib/fechas/formatearFechaHora";
 import { fechaOperativaISO } from "@/lib/caja/turnoOperativo";
 import { fechaArgentinaISO } from "@/lib/fechas/rangoArgentina";
-import { franjaHoraria, textoFaltaSobra } from "@/lib/tesoreria/pantallaTesoreria";
+import { franjaHoraria } from "@/lib/tesoreria/pantallaTesoreria";
 import { CLASE_MOVIMIENTO } from "@/lib/finanzas/movimientosDeCaja";
 import {
   CLASE_TONO,
   TEXTO_COMISION_SIN_CALCULAR,
+  diferenciaDelCajon,
   diferenciaGrande,
   esCerrada,
   estadoDeCaja,
@@ -26,10 +27,10 @@ import {
   menos,
   plata,
   rotuloDeDia,
-  tonoDelRecuadro,
+  textoDeDiferencia,
 } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
 
-import { BarraDeMedios, Bloque, Insignia, Recuadro, Renglon, RenglonConTono } from "./PiezasTurnosYCierres";
+import { BarraDeMedios, Bloque, Insignia, Recuadro, Renglon, RenglonConTono, Rotulo } from "./PiezasTurnosYCierres";
 
 /** Los pagos desde la caja: las salidas que no son arqueo ni cierre. */
 const pagosDeLaCaja = (c) =>
@@ -60,28 +61,60 @@ export function Encabezado({ c, local }) {
 }
 
 /**
- * EL EFECTIVO DE LA CAJA (V2 · B): la diferencia en su recuadro y la cuenta de
- * lo que tenía que haber. Lo usan el detalle y la caja desplegada del turno;
- * ésta, con `conDiferencia={false}`, porque su tarjetita ya dice cómo cerró.
+ * EL EFECTIVO DE LA CAJA: LA ÚNICA LECTURA DEL CAJÓN. Lo que entró, lo que
+ * salió —pagos y TODOS los retiros en orden de hora, con el cierre como último:
+ * el cierre es un arqueo más— y la diferencia. Cada retiro dice la diferencia
+ * de SU tramo, no la acumulada, que hacía parecer que faltó en todos.
+ *
+ * Dibuja `c.cajon` tal como vino (`efectivoDelCajon` en
+ * `lib/turnosYCierres/lecturaTurnosYCierres.js`); no suma ni resta nada. Los
+ * montos van sin signo: lo que sale ya lo dice "SALIÓ DEL CAJÓN". Lo usan la
+ * caja desplegada del trabajador y el detalle de la caja: la misma pieza.
  */
-export function EfectivoDeLaCaja({ c, conDiferencia = true }) {
-  const e = c.efectivo;
-  const grande = diferenciaGrande(c);
+export function EfectivoDeLaCaja({ c }) {
+  const k = c.cajon;
+  const dif = diferenciaDelCajon(c);
   return (
     <Bloque titulo="EFECTIVO DE LA CAJA">
-      {conDiferencia ? <Recuadro rotulo="DIFERENCIA DE CAJA" valor={grande.texto} tono={tonoDelRecuadro(c)} /> : null}
-      <div data-cuenta-del-efectivo className="space-y-1.5">
-        <Renglon rotulo="Cambio inicial" valor={plata(e.cambioInicial)} />
-        <Renglon rotulo="Ventas en efectivo" valor={mas(e.ventasEfectivo)} />
-        {e.ingresos ? <Renglon rotulo="Ingresos" valor={mas(e.ingresos)} /> : null}
-        <Renglon rotulo="Pagos desde la caja" valor={menos(e.pagosDesdeCaja)} />
-        <Renglon rotulo="Retirado en arqueos" valor={menos(e.retiradoArqueos)} />
+      <Rotulo>ENTRÓ AL CAJÓN</Rotulo>
+      <div data-entro-al-cajon className="space-y-1.5">
+        <Renglon rotulo="Cambio inicial" valor={plata(k.entro.cambioInicial)} />
+        <Renglon rotulo="Ventas en efectivo" valor={plata(k.entro.ventasEfectivo)} />
+        {k.entro.ingresos ? <Renglon rotulo="Ingresos" valor={plata(k.entro.ingresos)} /> : null}
       </div>
       <Separador />
-      <div className="space-y-1.5">
-        <Renglon rotulo={esCerrada(c) ? "Tenía que haber" : "Tiene que haber"} valor={plata(e.teniaQueHaber)} fuerte />
-        {esCerrada(c) ? <Renglon rotulo="Contado al cerrar" valor={plata(e.contado)} fuerte /> : null}
+      <Renglon rotulo="Entró" valor={plata(k.entro.total)} fuerte />
+
+      <Rotulo>SALIÓ DEL CAJÓN</Rotulo>
+      <div data-salio-del-cajon className="space-y-1.5">
+        {k.salio.pagosDesdeCaja ? <Renglon rotulo="Pagos desde la caja" valor={plata(k.salio.pagosDesdeCaja)} /> : null}
+        {k.salio.retiros.map((r) => {
+          const tramo = textoDeDiferencia(r.tramo);
+          return (
+            <div key={r.id} data-retiro={r.id}>
+              <Renglon
+                rotulo={r.instante ? `${horaAR(r.instante)} · ${r.rotulo}` : r.rotulo}
+                valor={r.esConteo ? `Contó ${plata(r.monto)}` : plata(r.monto)}
+                atenuado={r.esConteo}
+                nota={tramo?.texto ?? null}
+                notaColor={tramo ? CLASE_TONO[tramo.tono] : undefined}
+              />
+            </div>
+          );
+        })}
       </div>
+      <Separador />
+      <Renglon rotulo="Salió" valor={plata(k.salio.total)} fuerte />
+
+      {esCerrada(c) ? (
+        <Recuadro rotulo="DIFERENCIA DE LA CAJA" valor={dif.texto} tono={dif.tono}>
+          <div className="text-xs2 sunmi-text-muted">
+            Entró {plata(k.entro.total)} − salió {plata(k.salio.total)}
+          </div>
+        </Recuadro>
+      ) : (
+        <p data-caja-abierta className="text-sm2 sunmi-text-muted">{dif.texto}</p>
+      )}
     </Bloque>
   );
 }
@@ -169,7 +202,7 @@ export default function DetalleDeCaja({ datos, onVerMovimientos }) {
         onClick={onVerMovimientos}
         className="w-full min-h-toque justify-center rounded-xl text-base font-semibold"
       >
-        Arqueos, pagos y Z ›
+        Pagos y Z ›
       </SunmiButton>
     </div>
   );
@@ -184,28 +217,9 @@ export function MovimientosDeCaja({ datos, onVerZ }) {
     <div className="space-y-3.5">
       <Encabezado c={c} local={datos.local?.nombre} />
 
-      <Bloque titulo="ARQUEOS Y CIERRE">
-        {datos.arqueos?.length ? (
-          <div className="divide-y sunmi-divide">
-            {datos.arqueos.map((a) => (
-              <div key={a.id} data-arqueo={a.id} className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0">
-                <div className="min-w-0">
-                  <div className="text-sm3 font-semibold sunmi-text-strong">
-                    {horaAR(a.instante)} · {a.tipo}
-                  </div>
-                  <div className="text-xs2 sunmi-text-muted">
-                    {a.accion} {plata(a.monto)}
-                  </div>
-                </div>
-                <DiferenciaAcumulada valor={a.diferencia} />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm2 sunmi-text-muted">Sin arqueos.</p>
-        )}
-      </Bloque>
-
+      {/* La lista "Arqueos y cierre" se fue de acá: los arqueos y el cierre son
+          los retiros de "SALIÓ DEL CAJÓN" en `EfectivoDeLaCaja`, con la
+          diferencia de cada tramo. Una sola lectura de la caja, en un lugar. */}
       <Bloque titulo="PAGOS DESDE LA CAJA">
         {pagos.length ? (
           <div className="space-y-1.5">
@@ -229,18 +243,6 @@ export function MovimientosDeCaja({ datos, onVerZ }) {
         </SunmiButton>
       ) : null}
     </div>
-  );
-}
-
-/** La diferencia de un arqueo: la acumulada hasta ese corte, tal cual. */
-function DiferenciaAcumulada({ valor }) {
-  if (valor == null) return null;
-  const t = textoFaltaSobra(valor);
-  if (!t) return <span className={`shrink-0 text-sm2 font-semibold ${CLASE_TONO.success}`}>Sin diferencia</span>;
-  return (
-    <span className={`shrink-0 text-sm2 font-semibold tabular-nums ${Number(valor) < 0 ? CLASE_TONO.danger : CLASE_TONO.warning}`}>
-      {t}
-    </span>
   );
 }
 
