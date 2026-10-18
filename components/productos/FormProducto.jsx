@@ -130,6 +130,9 @@ export default function FormProducto({
   // reutilizar el chequeo oportunista de visibilidad.
   const { versionNueva, verificando: verificandoVersion, puedeGuardar } = useVersionGuard();
   const esAdmin = Array.isArray(perfil?.permisos) && perfil.permisos.includes("*");
+  // El alta rápida de proveedor sigue al permiso, igual que la ruta que la
+  // atiende (`proveedores.crear`); categoría y área física siguen con admin.
+  const puedeCrearProveedor = esAdmin || (Array.isArray(perfil?.permisos) && perfil.permisos.includes("proveedores.crear"));
 
   const toNum = (v) => {
     if (v === "" || v === null || v === undefined) return "";
@@ -1042,7 +1045,7 @@ export default function FormProducto({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Field label="Proveedor 1" fieldKey="proveedor_id">
               <SunmiSelectConCrearRapido
-                puedeCrear={esAdmin}
+                puedeCrear={puedeCrearProveedor}
                 value={form.proveedor_id === "" ? "" : String(form.proveedor_id)}
                 onChange={(v) =>
                   setField("proveedor_id", v === "" ? "" : Number(v))
@@ -1064,7 +1067,7 @@ export default function FormProducto({
 
             <Field label="Proveedor 2" fieldKey="proveedor2_id">
               <SunmiSelectConCrearRapido
-                puedeCrear={esAdmin}
+                puedeCrear={puedeCrearProveedor}
                 value={form.proveedor2_id === "" ? "" : String(form.proveedor2_id)}
                 onChange={(v) =>
                   setField("proveedor2_id", v === "" ? "" : Number(v))
@@ -1086,7 +1089,7 @@ export default function FormProducto({
 
             <Field label="Proveedor 3" fieldKey="proveedor3_id">
               <SunmiSelectConCrearRapido
-                puedeCrear={esAdmin}
+                puedeCrear={puedeCrearProveedor}
                 value={form.proveedor3_id === "" ? "" : String(form.proveedor3_id)}
                 onChange={(v) =>
                   setField("proveedor3_id", v === "" ? "" : Number(v))

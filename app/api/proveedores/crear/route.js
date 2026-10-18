@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
-import { requireAdmin } from "@/lib/authorize";
+import { requirePerm } from "@/lib/authorize";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 
 export async function POST(req) {
   try {
-    const auth = requireAdmin(req);
+    // El permiso, como el resto del sistema. Acá decía `requireAdmin`, escrito a
+    // mano, y el dueño de un local recibía "Requiere administrador" al dar de
+    // alta un proveedor propio. El admin pasa igual: tiene el comodín.
+    const auth = requirePerm(req, "proveedores.crear");
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
     const session = getUsuarioSession(req);
@@ -19,7 +22,15 @@ export async function POST(req) {
 
     // Regla B: marcar el local que da de alta el proveedor (fallback de
     // visibilidad hasta que tenga productos). Admin sin contexto activo → null.
+    //
+    // Sin el comodín, el local NO se elige: es el de la sesión, que es lo único
+    // que `resolveLocalAndGrupo` le acepta a un no-admin (un localId ajeno en la
+    // query da 403). Y si no hay local no se crea: un proveedor con
+    // `creadoEnLocalId` en null no sería de nadie y el que lo creó no lo vería.
     const scope = await resolveLocalAndGrupo(req);
+    if (!session.esAdmin && scope.error) {
+      return NextResponse.json({ ok: false, error: scope.error }, { status: scope.status });
+    }
     const creadoEnLocalId = scope.error ? null : scope.localId ?? null;
 
     const body = await req.json();

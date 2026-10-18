@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
-import { requireAdmin } from "@/lib/authorize";
+import { requirePerm } from "@/lib/authorize";
+import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { proveedorEditableWhere } from "@/lib/visibilidad";
 
 export async function PUT(req) {
   try {
-    const auth = requireAdmin(req);
+    // El permiso, como el resto del sistema; acá decía `requireAdmin` escrito a
+    // mano. El admin pasa igual: tiene el comodín.
+    const auth = requirePerm(req, "proveedores.editar");
     if (!auth.ok) return NextResponse.json({ ok: false, error: auth.error }, { status: auth.status });
 
     const session = getUsuarioSession(req);
@@ -52,8 +56,34 @@ export async function PUT(req) {
       .map((d) => ACENTOS_LEGACY[d] || d)
       .filter((d) => DIAS_VALIDOS.includes(d));
 
+    // ── SOLO LO PROPIO ─────────────────────────────────────────────────────
+    //
+    // Cada local tiene sus propios proveedores. Sin el comodín se edita solo uno
+    // creado en el local de la sesión, aunque el id venga escrito a mano: el
+    // `where` lo pone el predicado de escritura, no el request. Uno de otro
+    // local o del depósito contesta 403 y no se toca.
+    const scope = await resolveLocalAndGrupo(req);
+    if (!session.esAdmin && scope.error) {
+      return NextResponse.json({ ok: false, error: scope.error }, { status: scope.status });
+    }
+    const propio = await prisma.proveedor.findFirst({
+      where: { id: numId, ...proveedorEditableWhere(scope.localId, session.esAdmin) },
+      select: { id: true },
+    });
+    if (!propio) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: session.esAdmin
+            ? "Proveedor no encontrado"
+            : "Ese proveedor no es de este local. Cada local tiene sus propios proveedores.",
+        },
+        { status: session.esAdmin ? 404 : 403 }
+      );
+    }
+
     const item = await prisma.proveedor.update({
-      where: { id: numId },
+      where: { id: propio.id },
       data: {
         nombre: nombre.trim(),
         cuit: cuit || null,
