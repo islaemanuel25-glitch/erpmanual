@@ -17,8 +17,6 @@ import { SOLO_TRANSITO } from "@/lib/transferencias/politicasStock";
 import { requireOperadorDeCaja, verificarVoucherOperador } from "@/lib/operador";
 import { WHERE_TURNO_OPERATIVO, ERROR_TURNO_EN_PREPARACION, whereCajaPropia } from "@/lib/caja/cierreRelevo";
 import { compartirTurno } from "@/lib/caja/cierreRelevoServer";
-import { SELECT_FIN_DE_TURNO, estadoDeFinDeTurno } from "@/lib/caja/turnoOperativoServer";
-import { MENSAJE_TURNO_TERMINADO } from "@/lib/caja/turnoOperativo";
 import { ERROR_VENTA_DE_OTRO_OPERADOR } from "@/lib/pos-ventas/replayOffline";
 import { esMismoDestino, esChoqueDeClientTxnId } from "@/lib/pos-ventas/idempotenciaVenta";
 import { tomarCandadoDelLocal, LIMITES_TRANSACCION_DEL_LOCAL } from "@/lib/pos-ventas/candadoDelLocal";
@@ -345,7 +343,7 @@ async function procesarCrear(req, intento) {
         ...whereCajaPropia({ usuarioId: session.id, operadorId, cuentaOpera }),
         ...WHERE_TURNO_OPERATIVO,
       },
-      select: { ...SELECT_FIN_DE_TURNO, apertura: true },
+      select: { id: true, apertura: true },
     });
 
     intentoTurno = { turnoId, localId, usuarioId: session.id, operadorId, cuentaOpera };
@@ -369,24 +367,6 @@ async function procesarCrear(req, intento) {
           code: CODIGO_RECHAZO_VENTA.TURNO_DE_OTRO_DIA,
         },
         { status: 403 }
-      );
-    }
-
-    // TERMINÓ EL TURNO OPERATIVO DE LA CAJA: hay que cerrarla. La venta que
-    // estaba en curso cuando terminó entra —es la primera después del fin—; la
-    // siguiente, no. Retiros y cierre no pasan por acá y siguen andando. Una caja
-    // sin turno operativo no termina nunca. Igual que la caja de otro día, vale
-    // también para un replay offline: queda en la cola para una persona.
-    const finDeTurno = await estadoDeFinDeTurno(prisma, turnoValido);
-    if (finDeTurno.bloqueaVenta) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: MENSAJE_TURNO_TERMINADO,
-          code: CODIGO_RECHAZO_VENTA.TURNO_TERMINADO,
-          turnoTerminado: true,
-        },
-        { status: 409 }
       );
     }
 

@@ -26,6 +26,16 @@ Si la lista está vacía, el despliegue es solo de código.
   leer al usuario y deja pasar los pedidos como venían (falla abierta, a
   propósito), pero `/api/login` sí se cae: lee el usuario con todas sus
   columnas y Postgres no tiene la nueva.
+- `20261019190000_cobros_offline_turno_terminado_a_pendiente` — **De datos,
+  chica.** Se sacó el corte de la caja por el horario del turno (409
+  `TURNO_TERMINADO`, entró en `7b4f742`). Los cobros offline que ese rechazo
+  mandó a `REQUIERE_REVISION` con `revisionMotivo = 'TURNO_TERMINADO'`: con la
+  caja todavía operativa vuelven a `PENDIENTE` y la cola del POS los manda en la
+  próxima sincronización; con la caja cerrada, anulada o en corte quedan en
+  revisión con el motivo de la regla normal (`TURNO_CERRADO`, `TURNO_ANULADO`,
+  `TURNO_EN_CORTE`). No toca `ultimoRechazo*` ni ningún otro cobro. Correrla
+  dos veces no cambia nada. Puede ir antes o después de levantar la imagen; si
+  va después, un cobro de esos solo espera hasta que corra.
 
 Producción está en **71 migraciones**, la última
 `20261019120000_operador_sesion_invalidada_en`.

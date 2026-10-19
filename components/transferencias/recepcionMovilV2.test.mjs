@@ -615,7 +615,9 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // columna nula en OperadorLocal para cerrar la sesión de PIN al cerrar la caja.
   // Sube a 72 el 2026-10-19: `20261019180000_usuario_sesion_invalidada_en`, una
   // columna nula en Usuario: la sesión de la cuenta no vence por reloj.
-  assert.equal(migraciones.length, 72, "aparecio una migracion que nadie declaro aca");
+  // Sube a 73 el 2026-10-19: `20261019190000_cobros_offline_turno_terminado_a_pendiente`,
+  // un UPDATE de CobroOffline al sacar el corte por horario. No toca transferencias.
+  assert.equal(migraciones.length, 73, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));
