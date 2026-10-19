@@ -390,6 +390,11 @@ model Usuario {
   rolId        Int
   localId      Int?
   activo       Boolean  @default(true)
+  /// Desde este instante no vale ninguna sesión de la cuenta emitida antes. La
+  /// sesión no vence por reloj: la cortan cerrar sesión, desactivar el usuario
+  /// o cambiarle la contraseña, que escribe esta columna. La lee `proxy.js`
+  /// (lib/sesionCuentaServer.js). Null: nunca se le cambió la contraseña con esto.
+  sesionInvalidadaEn DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

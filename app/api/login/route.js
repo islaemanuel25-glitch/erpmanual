@@ -3,9 +3,8 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import bcrypt from "bcrypt";
-import { firmarToken, SesionCookie } from "@/lib/auth";
-import { DUENO_LOCAL } from "@/lib/rbac/systemRoles";
-import { normalizarPermisos } from "@/lib/rbac/permisosSesion";
+import { firmarTokenDeSesion, SesionCookie } from "@/lib/auth";
+import { payloadDeSesion } from "@/lib/sesionCuenta";
 
 // Rate limit en memoria por IP: máx 10 intentos por 15 min
 const LOGIN_RATE_WINDOW_MS = 15 * 60 * 1000;
@@ -130,43 +129,16 @@ export async function POST(req) {
     }
 
     // ============================
-    // 4) Permisos del rol
+    // 4) Payload del JWT
     // ============================
-    // Seguridad: si permisos no es un array válido (null/objeto/string/JSON inválido),
-    // NO otorgar admin. Fail-closed → sin permisos. El rol Admin real guarda ["*"]
-    // (array) y se conserva tal cual.
-    //
-    // La regla vive en lib/rbac/permisosSesion.js y la comparten los tres lugares
-    // que la necesitan. Estaba escrita a mano en cada uno, y /api/me la tenía al
-    // revés.
-    const permisos = normalizarPermisos(user.rol?.permisos);
+    // Permisos (fail-closed: un `permisos` que no es array no otorga nada), la
+    // identidad de DUEÑO_LOCAL y el local. Lo arma `payloadDeSesion`, la misma
+    // pieza con que `proxy.js` renueva la foto cuando cambia en la base.
+    const payload = payloadDeSesion(user);
 
-    // Identidad de rol para el bypass de operario de DUEÑO_LOCAL. Se calcula acá
-    // (donde tenemos el rol completo desde la DB) y se snapshotea en el JWT.
-    // Robusto: exige rol de sistema (esSistema) + el nombre canónico; no depende
-    // de un ID fijo de base ni SOLO del texto del nombre. Ver lib/operador.js
-    // (puedeOperarSinOperador). JWT viejos sin este flag → se tratan como false.
-    const esDuenoLocal =
-      user.rol?.esSistema === true && user.rol?.nombre === DUENO_LOCAL;
-
-    // ============================
-    // 5) Payload del JWT
-    // ============================
-    const payload = {
-      id: user.id,
-      nombre: user.nombre,
-      email: user.email,
-
-      rolId: user.rolId,
-      rolNombre: user.rol?.nombre ?? null,
-      permisos,
-      esDuenoLocal,
-
-      localId: user.localId ?? null,
-      esDeposito: user.local?.es_deposito ?? false,
-    };
-
-    const token = firmarToken(payload);
+    // Sin vencimiento por reloj: la sesión dura hasta que el usuario sale. La
+    // valida el servidor en cada pedido (`proxy.js`).
+    const token = firmarTokenDeSesion(payload);
 
     // ============================
     // 6) Respuesta + cookie

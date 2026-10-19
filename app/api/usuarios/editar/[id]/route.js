@@ -54,6 +54,10 @@ export async function PUT(req, context) {
 
     if (body?.password !== undefined && String(body.password).trim() !== "") {
       data.passwordHash = await bcrypt.hash(String(body.password), 10);
+      // La sesión de la cuenta no vence por reloj: con la contraseña cambiada,
+      // las sesiones abiertas con la vieja quedan afuera en todos los
+      // dispositivos (`proxy.js`).
+      data.sesionInvalidadaEn = new Date();
     }
 
     // ROL: validar que sea asignable por el actor (no-admin no asigna Admin/"*").
@@ -92,6 +96,8 @@ export async function PUT(req, context) {
 
     if (body?.activo !== undefined) {
       data.activo = Boolean(body.activo);
+      // Desactivar corta sus sesiones, y reactivarlo no las revive: entra de nuevo.
+      if (data.activo === false) data.sesionInvalidadaEn = new Date();
     }
 
     const editado = await prisma.usuario.update({

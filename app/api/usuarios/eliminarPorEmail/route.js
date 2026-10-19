@@ -79,7 +79,8 @@ export async function DELETE(req) {
     // 7) Soft delete (marcar como inactivo)
     const eliminado = await prisma.usuario.update({
       where: { id: usuario.id },
-      data: { activo: false },
+      // `sesionInvalidadaEn`: si se lo reactiva, sus sesiones de antes no reviven.
+      data: { activo: false, sesionInvalidadaEn: new Date() },
       include: { rol: true, local: true },
     });
 

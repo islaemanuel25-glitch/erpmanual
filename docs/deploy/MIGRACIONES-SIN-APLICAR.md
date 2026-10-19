@@ -16,47 +16,35 @@ Si la lista está vacía, el despliegue es solo de código.
 
 ## Pendientes
 
-- `20261018180000_permisos_proveedores_eliminar_y_listas` — **De datos, chica
-  y aditiva.** Agrega `proveedores.eliminar` y `proveedores.listas` al array de
-  permisos del rol DUEÑO_LOCAL. Concatena, no reemplaza; un UPDATE por permiso
-  con su `NOT (@> ...)`, así que correrla dos veces no cambia nada; no toca
-  Admin, ENCARGADO, CAJERO ni ninguna otra tabla. Sin ella, al desplegar el
-  código el dueño seguiría sin poder eliminar sus proveedores ni llevar sus
-  listas de precios, porque `/api/proveedores/eliminar` y las 29 rutas de
-  `/api/proveedores/listas/**` ahora piden esos permisos en vez de
-  administrador. Los dueños la reciben al volver a iniciar sesión: el JWT lleva
-  los permisos del login.
-- `20261019120000_operador_sesion_invalidada_en` — **Aditiva, sin datos.**
-  Agrega `OperadorLocal.sesionInvalidadaEn` (TIMESTAMP nulo), sin relleno. El
-  cierre de caja la escribe y desde ese instante no vale ninguna sesión de PIN
-  de ese operador emitida antes, en ningún dispositivo. No toca ninguna fila:
-  las cajas cerradas quedan como están y las sesiones vigentes al desplegar
-  siguen valiendo hasta el próximo cierre de su caja. El código anterior no la
-  lee. Ojo con el orden: el código nuevo la lee en cada operación con PIN, así
-  que la migración va ANTES de levantar la imagen nueva.
+- `20261019180000_usuario_sesion_invalidada_en` — **Aditiva, sin datos.**
+  Agrega `Usuario.sesionInvalidadaEn` (TIMESTAMP nulo), sin relleno. Cambiar la
+  contraseña o desactivar el usuario la escriben, y desde ese instante no vale
+  ninguna sesión de la cuenta emitida antes, en ningún dispositivo. No toca
+  ninguna fila: las sesiones vigentes al desplegar siguen valiendo. Ojo con el
+  orden: el código nuevo la lee en `proxy.js` en CADA pedido con sesión, así que
+  la migración va ANTES de levantar la imagen nueva. Sin ella, el proxy no puede
+  leer al usuario y deja pasar los pedidos como venían (falla abierta, a
+  propósito), pero `/api/login` sí se cae: lee el usuario con todas sus
+  columnas y Postgres no tiene la nueva.
 
-Producción está en **69 migraciones**, la última
-`20261018120000_permisos_proveedores_dueno_local`.
+Producción está en **71 migraciones**, la última
+`20261019120000_operador_sesion_invalidada_en`.
 
-**De dónde sale el 69.** Lo informó Emanuel en la orden del 2026-10-18:
-producción tiene 69. Son las 65 que había hasta `20261015154425_empleados`
-más las cuatro que esta lista tenía pendientes —`20261015164915_compra_con_saldo`,
-`20261015232632_operadores_y_empleados_por_local`,
-`20261017120000_permiso_ventas_ver_dia` y
-`20261018120000_permisos_proveedores_dueno_local`—, que es lo único que cierra
-con 69 contando el árbol. *Sin verificar desde esta sesión*, que es de nube y
-no ve el VPS. Lo comprueba, de solo lectura, el paso 0 del próximo `/deploy`
-(mismo usuario y base que el backup del skill):
+**De dónde sale el 71.** Lo informó Emanuel en el cierre del despliegue de
+`7b4f742d` (2026-10-19): la base de producción está en 71, al día, sin
+migraciones en ese despliegue. Son las 69 de antes más
+`20261018180000_permisos_proveedores_eliminar_y_listas` y
+`20261019120000_operador_sesion_invalidada_en`, que esta lista tenía
+pendientes. *Sin verificar desde esta sesión*, que es de nube y no ve el VPS.
+Lo comprueba, de solo lectura, el paso 0 del próximo `/deploy` (mismo usuario y
+base que el backup del skill):
 `ssh vps-erp 'docker exec erpazul_db psql -At -U erpazul -d erpazul -c "SELECT count(*), max(migration_name) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL"'`,
-que tiene que decir `69|20261018120000_permisos_proveedores_dueno_local`. Si
-dice otra cosa, esta lista está mal y se vuelve a escribir antes de seguir. La
-descripción de esas cuatro —entre ellas la de operadores y empleados por local,
-migración de datos con su reposición en
-`scripts/deploy/reposicion-operadores-por-local.sql`— está en el `git log` de
-este archivo.
+que tiene que decir `71|20261019120000_operador_sesion_invalidada_en`. Si dice
+otra cosa, esta lista está mal y se vuelve a escribir antes de seguir. La
+descripción de las que salieron está en el `git log` de este archivo.
 
 Las que estaban en esta lista antes y ya se aplicaron —hasta
-`20261018120000_permisos_proveedores_dueno_local`— salieron de acá: la historia de cuándo
+`20261019120000_operador_sesion_invalidada_en`— salieron de acá: la historia de cuándo
 y cómo se aplicó cada una está en `git log` de este archivo y, para las que la
 tienen, en la bitácora de abajo. La bitácora llega hasta `b6052783` y no se
 borra: la citan como evidencia `lib/stock/libro/stockDiario.test.mjs` y los

@@ -34,7 +34,8 @@ export async function DELETE(req, { params }) {
 
     await prisma.usuario.update({
       where: { id: userId },
-      data: { activo: false },
+      // `sesionInvalidadaEn`: si se lo reactiva, sus sesiones de antes no reviven.
+      data: { activo: false, sesionInvalidadaEn: new Date() },
     });
 
     return NextResponse.json({ ok: true }, { status: 200 });

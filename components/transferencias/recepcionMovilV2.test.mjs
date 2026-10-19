@@ -613,7 +613,9 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // dos permisos más de proveedores para DUEÑO_LOCAL. No toca transferencias.
   // Sube a 71 el 2026-10-19: `20261019120000_operador_sesion_invalidada_en`, una
   // columna nula en OperadorLocal para cerrar la sesión de PIN al cerrar la caja.
-  assert.equal(migraciones.length, 71, "aparecio una migracion que nadie declaro aca");
+  // Sube a 72 el 2026-10-19: `20261019180000_usuario_sesion_invalidada_en`, una
+  // columna nula en Usuario: la sesión de la cuenta no vence por reloj.
+  assert.equal(migraciones.length, 72, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));

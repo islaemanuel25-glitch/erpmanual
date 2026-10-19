@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { SesionCookie } from "@/lib/auth";
+import { SesionCookie, GrupoActivoCookie } from "@/lib/auth";
+import { ContextoActivoCookie } from "@/lib/contexto";
 import { OperadorCookie } from "@/lib/operador";
 
 export async function POST() {
@@ -11,5 +12,9 @@ export async function POST() {
   // acá identificaría al operador anterior sin PIN. La caja no se cierra: con
   // el PIN, el operador vuelve a la suya.
   res.cookies.set(OperadorCookie.nombre, "", { ...OperadorCookie.opciones, maxAge: 0 });
+  // El grupo y la ubicación que eligió el Admin acompañan a la sesión, que
+  // tampoco vence por reloj: salir los borra, y quien entre después elige los suyos.
+  res.cookies.set(GrupoActivoCookie.nombre, "", { ...GrupoActivoCookie.opciones, maxAge: 0 });
+  res.cookies.set(ContextoActivoCookie.nombre, "", { ...ContextoActivoCookie.opciones, maxAge: 0 });
   return res;
 }
