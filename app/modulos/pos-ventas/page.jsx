@@ -64,6 +64,7 @@ import HistorialDia from "@/components/pos-ventas/HistorialDia";
 import AvisoVentaInterna from "@/components/pos-ventas/AvisoVentaInterna";
 import { ClipboardList, Printer, Undo2 } from "lucide-react";
 import TurnoOperativoDeCaja from "@/components/caja/TurnoOperativoDeCaja";
+import { MENSAJE_TURNO_TERMINADO } from "@/lib/caja/turnoOperativo";
 import { useBajadaDePagina } from "@/app/context/AccionDePaginaContext";
 import { descuentoPorPuntos } from "@/lib/pos-ventas/puntos";
 
@@ -139,6 +140,12 @@ export default function PosVentasPage() {
   const [turnoActual, setTurnoActual] = useState(undefined); // undefined=cargando, null=sin turno, object=turno
   const [turnoVencido, setTurnoVencido] = useState(false);
   const [mensajeTurnoVencido, setMensajeTurnoVencido] = useState("");
+  // FIN DEL TURNO OPERATIVO DE LA CAJA. El instante lo dice el servidor
+  // (`finDelTurno`); llegado ese momento la pantalla deja terminar la venta que
+  // está en curso y, con el carrito vacío, pide cerrar la caja. La regla vive en
+  // `lib/caja/turnoOperativoServer.js` y `crear` la repite con un 409.
+  const [finDelTurno, setFinDelTurno] = useState(null);
+  const [turnoTerminado, setTurnoTerminado] = useState(false);
   // Espejo del turno para el listener del corte. Sin la ref, el listener tendría
   // que resuscribirse en cada cambio de turno y podría perder un aviso que llega
   // justo entre la baja y el alta.
@@ -319,6 +326,8 @@ export default function PosVentasPage() {
       setTurnoActual(null);
       setTurnoVencido(false);
       setMensajeTurnoVencido("");
+      setFinDelTurno(null);
+      setTurnoTerminado(false);
       // Cierra la sesión de operario: el OperadorProvider muestra solo el PIN.
       logoutOperador?.();
     },
@@ -728,16 +737,22 @@ export default function PosVentasPage() {
           setTurnoActual(undefined);
           setTurnoVencido(false);
           setMensajeTurnoVencido("");
+          setFinDelTurno(null);
+          setTurnoTerminado(false);
           requerirOperador();
           return;
         }
         setTurnoActual(data.ok && data.turno ? data.turno : null);
         setTurnoVencido(!!(data.ok && data.requiereCierre));
         setMensajeTurnoVencido(data.ok && data.mensaje ? data.mensaje : "");
+        setFinDelTurno(data.ok && data.finDelTurno ? data.finDelTurno : null);
+        setTurnoTerminado(!!(data.ok && data.turnoTerminado));
       } catch {
         setTurnoActual(null);
         setTurnoVencido(false);
         setMensajeTurnoVencido("");
+        setFinDelTurno(null);
+        setTurnoTerminado(false);
       }
     };
     verificarTurno();
@@ -745,6 +760,26 @@ export default function PosVentasPage() {
     // cambiar de caja. Sin esto la pantalla seguía mostrando —y cobrando en— el
     // turno del operador anterior. `requerirOperador` es estable.
   }, [localActual, me, operadorActivoId, requerirOperador]);
+
+  // Llegado el fin del turno, se marca solo: el POS queda abierto horas y no
+  // vuelve a preguntar. Los temporizadores largos se recortan a un día —el
+  // límite de `setTimeout`— y al vencer se vuelve a programar.
+  useEffect(() => {
+    if (!finDelTurno || turnoTerminado) return;
+    const fin = new Date(finDelTurno).getTime();
+    if (!Number.isFinite(fin)) return;
+    let reloj;
+    const esperar = () => {
+      const falta = fin - Date.now();
+      if (falta <= 0) {
+        setTurnoTerminado(true);
+        return;
+      }
+      reloj = setTimeout(esperar, Math.min(falta, 24 * 60 * 60 * 1000));
+    };
+    esperar();
+    return () => clearTimeout(reloj);
+  }, [finDelTurno, turnoTerminado]);
 
   // ---------------------------------------------------------------------------
   // Cargar info crédito cuando hay cliente + fiado
@@ -1864,7 +1899,13 @@ export default function PosVentasPage() {
         showError(msg);
       } else {
         // Manejar errores específicos
-        if (res.status === 409) {
+        if (data.code === "TURNO_TERMINADO") {
+          // La venta en curso ya entró: la caja se cierra. El carrito queda
+          // guardado en su caja, como en cualquier rechazo.
+          setTurnoTerminado(true);
+          setTurnoVencido(true);
+          setMensajeTurnoVencido(data.error || MENSAJE_TURNO_TERMINADO);
+        } else if (res.status === 409) {
           const msg = mensajeErrorVenta(data, "Error de concurrencia. Intenta nuevamente.", mostrarStockPos);
           setErrorMsg(msg);
           showError(msg);
@@ -1945,18 +1986,23 @@ export default function PosVentasPage() {
   }
 
   // ---------------------------------------------------------------------------
-  // Caja vencida (turno abierto de un día anterior): pantalla bloqueante
+  // Caja vencida (turno abierto de un día anterior) o turno operativo
+  // terminado: pantalla bloqueante. La del turno espera a que la venta en curso
+  // termine —carrito vacío— y no oculta retirar: retiros y cierre andan siempre.
   // ---------------------------------------------------------------------------
-  if (localActual && me && turnoActual && turnoVencido) {
+  const porFinDeTurno = turnoTerminado && (turnoVencido ? mensajeTurnoVencido === MENSAJE_TURNO_TERMINADO : state.carrito.length === 0);
+  if (localActual && me && turnoActual && (turnoVencido || porFinDeTurno)) {
     // Ya declaraba la zona; le faltaba `hour12: false`. Del helper único.
     const fechaAperturaTxt = fechaHoraAR(turnoActual.apertura);
     return (
       <div className="sunmi-bg w-full min-h-full flex items-center justify-center p-4">
         <div className="max-w-md w-full sunmi-surface rounded-xl p-5 space-y-4">
-          <h1 className="text-lg font-bold text-center">Caja vencida</h1>
+          <h1 className="text-lg font-bold text-center">{porFinDeTurno ? "Terminó tu turno" : "Caja vencida"}</h1>
           <div className="sunmi-state-warning sunmi-text-accent rounded-lg p-3 text-sm text-center">
-            {mensajeTurnoVencido ||
-              "Tenés una caja abierta de un día anterior. Cerrala antes de seguir vendiendo."}
+            {porFinDeTurno
+              ? MENSAJE_TURNO_TERMINADO
+              : mensajeTurnoVencido ||
+                "Tenés una caja abierta de un día anterior. Cerrala antes de seguir vendiendo."}
           </div>
           <div className="text-xs sunmi-text-muted text-center">
             Caja abierta el {fechaAperturaTxt}
@@ -1971,6 +2017,15 @@ export default function PosVentasPage() {
           >
             Cerrar caja
           </SunmiButton>
+          {porFinDeTurno && (
+            <SunmiButton
+              color="slate"
+              onClick={() => abrirRetiro(turnoActual.id)}
+              className="w-full"
+            >
+              Retirar recaudación
+            </SunmiButton>
+          )}
         </div>
       </div>
     );

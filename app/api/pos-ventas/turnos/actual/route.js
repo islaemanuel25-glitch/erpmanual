@@ -7,6 +7,8 @@ import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina"
 import { WHERE_TURNO_OPERATIVO, ESTADO_CIERRE, whereCajaPropia } from "@/lib/caja/cierreRelevo";
 import { identidadParaOperar } from "@/lib/caja/identidadCajaServer";
 import { ESTADO_RETIRO } from "@/lib/caja/retiroRelevo";
+import { estadoDeFinDeTurno } from "@/lib/caja/turnoOperativoServer";
+import { MENSAJE_TURNO_TERMINADO } from "@/lib/caja/turnoOperativo";
 import {
   retiroPendienteDeTurno,
   cierrePendienteDeTurno,
@@ -131,11 +133,23 @@ export async function GET(req) {
       }
     }
 
+    // El fin del turno operativo de la caja, con la misma regla que `crear`. El
+    // instante viaja para que el POS lo espere solo: terminado el turno, deja
+    // terminar la venta que tiene en curso y después pide cerrar. Si esa venta ya
+    // entró, la caja se cierra desde acá mismo.
+    const finDeTurno = turno ? await estadoDeFinDeTurno(prisma, turno) : null;
+    if (finDeTurno?.bloqueaVenta && !requiereCierre) {
+      requiereCierre = true;
+      mensaje = MENSAJE_TURNO_TERMINADO;
+    }
+
     return NextResponse.json({
       ok: true,
       turno,
       requiereCierre,
       mensaje,
+      finDelTurno: finDeTurno?.fin ?? null,
+      turnoTerminado: finDeTurno?.terminado ?? false,
       // El token viaja acá para que la pestaña principal pueda ofrecer "volver al
       // cierre" sin que el cajero tenga que guardarse la URL. No reemplaza a la
       // autenticación: el endpoint del cierre exige sesión, permiso y alcance.
