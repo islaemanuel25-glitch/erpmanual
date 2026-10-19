@@ -3668,6 +3668,15 @@ enum MedioPagoGasto {
   OTRO
 }
 
+/// QUÉ FUE UN SUELDO (Finanzas → Sueldos y "Pagar" del POS). Ver
+/// `lib/finanzas/sueldos.js`.
+enum ModalidadSueldo {
+  SUELDO
+  ADELANTO
+  AGUINALDO
+  VACACIONES
+}
+
 /// UN GASTO DE UNA UBICACIÓN: el hecho económico.
 ///
 /// ── A QUIÉN PERTENECE ────────────────────────────────────────────────────
@@ -3708,6 +3717,10 @@ model Gasto {
   /// El empleado al que corresponde: el de un sueldo o un adelanto, o el que
   /// hizo el consumo del personal. Null en el resto de los gastos.
   empleadoId        Int?
+  /// Qué fue un sueldo: sueldo, adelanto, aguinaldo o vacaciones. Solo en los
+  /// gastos de la categoría Sueldos, donde es obligatoria para uno nuevo
+  /// (`crearGasto`); null en el resto y en los sueldos viejos sin asignar.
+  modalidadSueldo   ModalidadSueldo?
   /// Clave de idempotencia del INTENTO de alta, que genera el cliente al abrir
   /// el formulario. Obligatoria, por la misma razón que la del pago: un alta
   /// repetida —doble clic, respuesta perdida— con un pago inicial en efectivo

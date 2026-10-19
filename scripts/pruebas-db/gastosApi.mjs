@@ -164,27 +164,29 @@ try {
   ok("sin finanzas.ver: 403", r.status === 403 && r.ok === false, JSON.stringify(r));
   r = await categorias(casianoVe);
   // Las siete iniciales más "Consumo del personal" (migración del 2026-10-15),
-  // antes de "Otros".
-  const CATALOGO_HOY = [...CATEGORIAS_INICIALES.slice(0, -1), "Consumo del personal", CATEGORIAS_INICIALES.at(-1)];
-  ok("con finanzas.ver: las ocho activas, por su orden", r.status === 200 && JSON.stringify(r.categorias.map((x) => x.nombre)) === JSON.stringify(CATALOGO_HOY),
+  // antes de "Otros", MENOS Sueldos: desde el 2026-10-19 un sueldo se paga en
+  // Finanzas → Sueldos eligiendo el empleado, y Gastos no lo ofrece.
+  const CATALOGO_HOY = [...CATEGORIAS_INICIALES.slice(0, -1), "Consumo del personal", CATEGORIAS_INICIALES.at(-1)].filter((n) => n !== "Sueldos");
+  ok("con finanzas.ver: las siete activas que carga Gastos, por su orden, sin Sueldos", r.status === 200 && JSON.stringify(r.categorias.map((x) => x.nombre)) === JSON.stringify(CATALOGO_HOY),
     JSON.stringify(r.categorias));
 
-  // Un gasto con "Sueldos" ANTES de darla de baja, para ver después su detalle.
-  const conSueldos = await crear(casianoEscribe, base({ categoriaId: cat("Sueldos"), concepto: "Adelanto de sueldo", total: 30000 }));
+  // Un gasto con "Impuestos" ANTES de darla de baja, para ver después su detalle.
+  // (Era Sueldos: un sueldo ya no se crea desde Gastos sin empleado.)
+  const conBaja = await crear(casianoEscribe, base({ categoriaId: cat("Impuestos"), concepto: "Ingresos brutos", total: 30000 }));
   // La lista sale de la tabla: una categoría dada de baja deja de ofrecerse y una
   // nueva aparece en su lugar del orden. Con una lista escrita en la ruta, esto
   // no cambiaría.
-  await c.categoriaGasto.update({ where: { id: cat("Sueldos") }, data: { activo: false } });
+  await c.categoriaGasto.update({ where: { id: cat("Impuestos") }, data: { activo: false } });
   await c.categoriaGasto.create({ data: { nombre: "Seguros", orden: 35 } });
   r = await categorias(casianoVe);
   ok("una categoría dada de baja no se ofrece y una nueva sí, en su orden: la lista sale de la base",
-    JSON.stringify(r.categorias.map((x) => x.nombre)) === JSON.stringify(["Servicios", "Alquiler", "Seguros", "Mantenimiento", "Insumos y limpieza", "Impuestos", "Consumo del personal", "Otros"]),
+    JSON.stringify(r.categorias.map((x) => x.nombre)) === JSON.stringify(["Servicios", "Alquiler", "Seguros", "Mantenimiento", "Insumos y limpieza", "Consumo del personal", "Otros"]),
     JSON.stringify(r.categorias.map((x) => x.nombre)));
 
   // ══════════════════════════════════════════════════════════════════════
   seccion("Crear un gasto: permisos y ubicación");
   // ══════════════════════════════════════════════════════════════════════
-  ok("el gasto con Sueldos se creó antes de la baja", conSueldos.status === 200 && conSueldos.gasto?.categoria?.nombre === "Sueldos", JSON.stringify(conSueldos));
+  ok("el gasto con Impuestos se creó antes de la baja", conBaja.status === 200 && conBaja.gasto?.categoria?.nombre === "Impuestos", JSON.stringify(conBaja));
   let antes = await totales();
   r = await crear(null, base());
   ok("sin sesión: 401", r.status === 401);
@@ -200,8 +202,12 @@ try {
   ok("un admin en vista global no opera ninguna ubicación: no crea (403)", r.status === 403 && r.error === ERROR_OPERAR_EN_LA_UBICACION_DEL_GASTO, r.error);
   r = await crear(casianoEscribe, base({ categoriaId: 999999 }));
   ok("una categoría que no existe: 400", r.status === 400 && r.error === ERROR_CATEGORIA_INVALIDA, r.error);
-  r = await crear(casianoEscribe, base({ categoriaId: cat("Sueldos") }));
+  r = await crear(casianoEscribe, base({ categoriaId: cat("Impuestos") }));
   ok("una categoría dada de baja: 400", r.status === 400 && r.error === ERROR_CATEGORIA_INVALIDA, r.error);
+  // Sueldos sigue activa, pero desde Gastos no hay empleado: la regla de
+  // `crearGasto` lo rechaza. El camino es Finanzas → Sueldos.
+  r = await crear(casianoEscribe, base({ categoriaId: cat("Sueldos"), beneficiario: "Ana", pagoInicial: { monto: 100000, medio: "TRANSFERENCIA" } }));
+  ok("un sueldo desde Gastos, sin empleado: 400", r.status === 400 && r.error === "Elegí el empleado.", r.error);
   r = await crear(casianoEscribe, base({ concepto: "   " }));
   ok("sin concepto: 400", r.status === 400, r.error);
   r = await crear(casianoEscribe, base({ total: 0 }));
@@ -372,8 +378,8 @@ try {
   ok("con finanzas.ver solo, lo ve pero la pantalla sabe que no puede pagarlo", r.status === 200 && r.puedePagar === false && r.puedeEscribir === false);
   r = await abrir(depositoEscribe, g4.id);
   ok("el depósito lo ve y no puede pagarlo", r.status === 200 && r.puedePagar === false && r.puedeEscribir === true);
-  r = await abrir(casianoVe, conSueldos.gasto.id);
-  ok("un gasto viejo sigue mostrando su categoría dada de baja", r.status === 200 && r.gasto.categoria?.nombre === "Sueldos" && r.gasto.categoria.activa === false,
+  r = await abrir(casianoVe, conBaja.gasto.id);
+  ok("un gasto viejo sigue mostrando su categoría dada de baja", r.status === 200 && r.gasto.categoria?.nombre === "Impuestos" && r.gasto.categoria.activa === false,
     JSON.stringify(r.gasto?.categoria));
 
   // ══════════════════════════════════════════════════════════════════════

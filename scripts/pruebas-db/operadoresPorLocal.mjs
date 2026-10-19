@@ -358,12 +358,15 @@ async function casosPos(f, { juan1, juan2, pedro1 }) {
 
   const pagar = async (cuerpo) => leer(await ruta.pagar.POST(pedido(`${BASE}/pos-ventas/pagar`, quienCaja, { cuerpo: { turnoId: turno.id, idempotencyKey: clave(), ...cuerpo } })));
   const movsAntes = await prisma.cajaMovimiento.count({ where: { turnoId: turno.id } });
-  const ajeno = await pagar({ tipo: "SUELDO", monto: "1000", empleadoId: empleadoL2.id });
-  igual("Sueldo de un empleado de otro local: 403", ajeno.status, 403);
+  // 400 y no 403 desde el 2026-10-19: la regla única de sueldos de `crearGasto`
+  // trata al empleado de otro local como uno que no se ofrece, igual desde el
+  // POS que desde Finanzas.
+  const ajeno = await pagar({ tipo: "SUELDO", modalidad: "SUELDO", monto: "1000", empleadoId: empleadoL2.id });
+  igual("Sueldo de un empleado de otro local: 400", [ajeno.status, ajeno.error], [400, "Ese empleado es de otro local."]);
   const adelanto = await pagar({ tipo: "SUELDO", modalidad: "ADELANTO", monto: "500", empleadoId: empleadoL2.id });
-  igual("ni como adelanto", adelanto.status, 403);
+  igual("ni como adelanto", adelanto.status, 400);
   igual("y la caja no se movió", await prisma.cajaMovimiento.count({ where: { turnoId: turno.id } }), movsAntes);
-  const propio = await pagar({ tipo: "SUELDO", monto: "1000", empleadoId: pedro1.empleado.id });
+  const propio = await pagar({ tipo: "SUELDO", modalidad: "SUELDO", monto: "1000", empleadoId: pedro1.empleado.id });
   igual("el del local, sí", [propio.status, propio.ok], [200, true]);
   const gasto = await prisma.gasto.findFirst({ where: { empleadoId: pedro1.empleado.id }, select: { localId: true } });
   igual("y el gasto del sueldo es del local del empleado", gasto?.localId, f.L1.id);

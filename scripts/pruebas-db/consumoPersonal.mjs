@@ -238,7 +238,7 @@ async function casos(f) {
 
   seccion("5 · El resultado del turno lo resta una vez");
   const sueldo = await leer(await rutaPagar.POST(pedido(`${BASE}/pos-ventas/pagar`, f.quienCaja, {
-    cuerpo: { turnoId: f.turno.id, tipo: "SUELDO", monto: "1000", empleadoId: f.empleadoOp.id, idempotencyKey: clave() },
+    cuerpo: { turnoId: f.turno.id, tipo: "SUELDO", modalidad: "SUELDO", monto: "1000", empleadoId: f.empleadoOp.id, idempotencyKey: clave() },
   })));
   igual("un sueldo desde la caja", sueldo.ok, true);
   // Un adelanto a la empleada SIN operador: Sueldo elige de Empleados.

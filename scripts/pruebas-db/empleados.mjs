@@ -323,7 +323,9 @@ async function casosEmpleados(f) {
   const pagar = async (cuerpo) =>
     leer(await rutaPagar.POST(pedido(`${BASE}/pos-ventas/pagar`, quienCaja, { cuerpo: { turnoId: turno.id, idempotencyKey: clave(), ...cuerpo } })));
 
-  const sueldo = await pagar({ tipo: "SUELDO", monto: "2000", empleadoId: cocina.empleado.id });
+  // `modalidad` la manda siempre el formulario del POS (arranca en SUELDO) y
+  // desde el 2026-10-19 `crearGasto` la exige.
+  const sueldo = await pagar({ tipo: "SUELDO", modalidad: "SUELDO", monto: "2000", empleadoId: cocina.empleado.id });
   igual("el empleado sin operador cobra su sueldo", sueldo.ok, true);
 
   const baja = await leer(await rutaEditarEmpleado.POST(pedido(`${BASE}/empleados/editar`, quienEnc, {
@@ -332,7 +334,7 @@ async function casosEmpleados(f) {
   igual("se desactiva", [baja.ok, baja.empleado?.activo], [true, false]);
   const opciones = await leer(await rutaPagar.GET(pedido(`${BASE}/pos-ventas/pagar?turnoId=${turno.id}`, quienCaja, { metodo: "GET" })));
   ok("desactivado, Pagar ya no lo ofrece", !(opciones.empleados || []).some((e) => e.id === cocina.empleado.id));
-  const rechazado = await pagar({ tipo: "SUELDO", monto: "2000", empleadoId: cocina.empleado.id });
+  const rechazado = await pagar({ tipo: "SUELDO", modalidad: "SUELDO", monto: "2000", empleadoId: cocina.empleado.id });
   igual("ni lo acepta", [rechazado.status, rechazado.error], [400, "Elegí el empleado."]);
 
   return { turno, quienCaja, pagar };

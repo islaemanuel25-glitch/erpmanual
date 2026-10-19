@@ -32,8 +32,10 @@ Desde 2026-10-15. Regla de Emanuel.
   local de la caja, con una sola condición para la lista y para lo que se
   acepta (`empleadosDelLocal`, `empleadoActivoDelLocal` en
   `lib/empleados/empleadosServer.js`) [CÓDIGO]. Uno de otro local se rechaza
-  con 403 en el servidor, no solo en la pantalla [VERIFICADO:
-  `operadoresPorLocal.mjs` D; contraprueba OL-1].
+  en el servidor, no solo en la pantalla: en Consumo con 403, en Sueldo con
+  400 desde el 2026-10-19 —lo rechaza `crearGasto`, la regla única de
+  sueldos, ver [sueldos.md](sueldos.md)— [VERIFICADO: `operadoresPorLocal.mjs`
+  D; contraprueba OL-1].
 - El gasto de un sueldo o de un consumo es del local de la caja, que es el del
   empleado, y guarda su `empleadoId` [VERIFICADO: `operadoresPorLocal.mjs` D].
 - El login del POS, la lista de operadores de la caja y la validación del

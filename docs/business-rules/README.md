@@ -39,6 +39,9 @@ está claro cuál de las dos es, va como **[ACCIDENTE POSIBLE]** y no como regla
 - [consumo-del-personal.md](consumo-del-personal.md) — lo que se lleva el
   personal: sale del stock como una venta sin serlo, es un gasto al costo que no
   se paga, y resta en el resultado del turno; la foto del ticket de un gasto.
+- [sueldos.md](sueldos.md) — un sueldo es un gasto de Sueldos de un empleado
+  del local, con su modalidad; la regla única de `crearGasto` para el POS y
+  Finanzas, la sección propia, y por qué Gastos ya no los lista.
 - [empleados.md](empleados.md) — operador (caja, PIN) y empleado (trabaja en el
   local): de dónde eligen Sueldo y Consumo del personal, y el relleno de la
   migración que los creó.

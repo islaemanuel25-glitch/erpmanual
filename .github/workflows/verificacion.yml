@@ -574,6 +574,13 @@ jobs:
       - name: Contrapruebas de Empleados y la carga a mano
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs EM-
 
+      # Finanzas → Sueldos: un sueldo sin empleado, sin tipo o de otro local es
+      # 400 desde Finanzas, el POS y Gastos; los pagos de la caja y de Finanzas
+      # en un solo historial; Gastos sin sueldos; el Resumen igual; el relleno
+      # de la modalidad y asignar empleado sin tocar plata.
+      - name: Ejercer Sueldos contra PostgreSQL
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/sueldos.mjs
+
       # Recibir con deuda después de haber pagado algo: sin confirmar el saldo
       # no entra nada; confirmándolo queda quién y cuándo, una campanita, el
       # "Pago parcial" hasta saldo cero y un evento para Azul Chat.
@@ -587,7 +594,8 @@ jobs:
 
       # Operadores y empleados son de UN local: la migración con los de hoy y
       # su freno, Administración por el local activo, el login del POS por
-      # local, y Pagar/Consumo que rechazan con 403 un empleado de otro local.
+      # local, y Pagar/Consumo que rechazan un empleado de otro local (sueldo
+      # 400 desde el 2026-10-19, consumo 403).
       - name: Ejercer operadores y empleados por local contra PostgreSQL
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/operadoresPorLocal.mjs
 

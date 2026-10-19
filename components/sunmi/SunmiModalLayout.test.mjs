@@ -814,6 +814,12 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // medio y el turno. Un toque al costado lo tira todo, y en el teléfono es la
     // misma hoja con el pulgar en el borde que el registrar pago de al lado.
     "components/finanzas/gastos/ModalNuevoGasto.jsx": true,
+    // ── ASIGNAR EMPLEADO A UN SUELDO VIEJO: `false` ──────────────────────
+    //
+    // Elegir un empleado de la lista y uno de cuatro tipos, tocando: no hay
+    // nada tipeado. Si el velo la cierra sin querer, se pierden dos toques, y
+    // no escribe plata —completa dos datos de un sueldo que ya existe—.
+    "components/finanzas/sueldos/HojaAsignarEmpleado.jsx": false,
     // ── LA PREGUNTA DE "ESTE AUMENTO NO SE PARECE A LOS DE ESTE PROVEEDOR" ──
     //
     // Vive adentro de la pantalla de revisar de a uno. Mismo caso que la hoja de

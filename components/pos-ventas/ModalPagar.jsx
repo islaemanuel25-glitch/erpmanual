@@ -46,6 +46,7 @@ import { TEXTO_NO_ALCANZA, superaElEfectivo } from "@/lib/caja/topeDeEfectivo";
 import { leerImporte, nuevaClaveDePago } from "@/lib/finanzas/pagosProveedores";
 import { formatearMoneda } from "@/lib/moneda";
 import { subirArchivoDeGasto } from "@/lib/finanzas/subirArchivoDeGasto";
+import { MODALIDAD_SUELDO, OPCIONES_MODALIDAD_SUELDO } from "@/lib/finanzas/sueldos";
 
 // ── LA SEXTA OPCIÓN NO ES UN EGRESO DE CAJA ───────────────────────────────
 //
@@ -72,7 +73,7 @@ const DESCRIPCION = Object.freeze({
 /** El título de cada formulario. */
 const TITULO = Object.freeze({
   [TIPO_EGRESO.PROVEEDOR]: "Pago a proveedor",
-  [TIPO_EGRESO.SUELDO]: "Sueldo o adelanto",
+  [TIPO_EGRESO.SUELDO]: "Sueldo",
   [TIPO_EGRESO.GASTO]: "Gasto",
   [TIPO_EGRESO.AL_DEPOSITO]: "Al depósito",
   [TIPO_EGRESO.RETIRO_DUENO]: "Retiro del dueño",
@@ -81,12 +82,7 @@ const TITULO = Object.freeze({
 
 const TITULO_LISTA = "¿Qué vas a pagar?";
 
-const MODALIDADES = [
-  { valor: "SUELDO", texto: "Sueldo" },
-  { valor: "ADELANTO", texto: "Adelanto" },
-];
-
-const VACIO = { proveedorId: "", empleadoId: "", modalidad: "SUELDO", categoriaId: "", importe: "", foto: null };
+const VACIO = { proveedorId: "", empleadoId: "", modalidad: MODALIDAD_SUELDO.SUELDO, categoriaId: "", importe: "", foto: null };
 
 export default function ModalPagar({ turnoId, localId, esDeposito = false, onClose, onPagado }) {
   const { requerirOperador } = useOperadorContext();
@@ -360,10 +356,10 @@ export default function ModalPagar({ turnoId, localId, esDeposito = false, onClo
               </SunmiSelectAdv>
             </Campo>
             <SunmiSolapas
-              opciones={MODALIDADES}
+              opciones={OPCIONES_MODALIDAD_SUELDO}
               valor={form.modalidad}
               onCambiar={(v) => cambiar({ modalidad: v })}
-              etiqueta="Sueldo o adelanto"
+              etiqueta="Qué se paga"
             />
           </>
         ) : null}

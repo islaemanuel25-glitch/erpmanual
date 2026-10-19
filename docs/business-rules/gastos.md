@@ -10,6 +10,10 @@ pantalla móvil de Finanzas → Gastos que las usa.
   alquiler, sueldos, una reparación, insumos de limpieza, impuestos. Modelo
   `Gasto`, categoría en el catálogo `CategoriaGasto` [CÓDIGO]
   (`prisma/schema.prisma`, migración `20260929230000_gastos`).
+- **Los sueldos son gastos con sección propia** (2026-10-19): siguen siendo
+  `Gasto` de la categoría Sueldos y suman en el Resumen, pero se pagan en
+  Finanzas → Sueldos eligiendo el empleado, y Gastos no los ofrece ni los
+  lista. Ver [sueldos.md](sueldos.md) [CÓDIGO].
 - **Gasto ≠ retiro de caja.** Un RETIRO es plata saliendo de un cajón. Puede ser
   el pago de un gasto, o la recaudación, o el cambio. Un retiro manual con motivo
   "luz" NO es un gasto: nadie registró el gasto. La migración no convirtió ningún

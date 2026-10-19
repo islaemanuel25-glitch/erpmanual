@@ -46,8 +46,11 @@ Desde 2026-10-15. Regla de Emanuel, no se discute.
   - Proveedor: una compra "nacida de factura" en ENVIADO y su cuenta por pagar
     con el pago inicial en efectivo (`crearCuentaPorPagarDesdeCompra` →
     `registrarPagoProveedor`). Queda "por cargar".
-  - Sueldo o adelanto: un Gasto de categoría Sueldos, concepto "Sueldo · X" o
-    "Adelanto · X", pagado entero en efectivo (`crearGasto` con `desdeElPos`).
+  - Sueldo: un Gasto de categoría Sueldos —sueldo, adelanto, aguinaldo o
+    vacaciones, en `Gasto.modalidadSueldo`—, de un empleado activo del local,
+    pagado entero en efectivo (`crearGasto` con `desdeElPos`). La regla del
+    empleado y la modalidad es la de `crearGasto`, la misma de Finanzas →
+    Sueldos: ver [sueldos.md](sueldos.md) (2026-10-19).
   - Gasto: un Gasto de la categoría elegida, pagado entero en efectivo.
   - Al depósito y Retiro del dueño: solo el retiro con su tipo.
 - `desdeElPos` abre `crearGasto` con `pos.usar` en vez de los permisos de

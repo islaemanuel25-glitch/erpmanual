@@ -36,6 +36,17 @@ Si la lista está vacía, el despliegue es solo de código.
   `TURNO_EN_CORTE`). No toca `ultimoRechazo*` ni ningún otro cobro. Correrla
   dos veces no cambia nada. Puede ir antes o después de levantar la imagen; si
   va después, un cobro de esos solo espera hasta que corra.
+- `20261019200000_gasto_modalidad_sueldo` — **Aditiva, CON relleno de datos.**
+  Crea el enum `ModalidadSueldo` y la columna nula `Gasto.modalidadSueldo`
+  (Finanzas → Sueldos). El relleno es un UPDATE que marca SUELDO o ADELANTO
+  solo en los gastos de la categoría Sueldos cuyo concepto empieza
+  exactamente con "Sueldo · " o "Adelanto · " —el formato que escribía el
+  POS— y donde la columna está vacía; los sueldos con concepto libre quedan
+  en null. No toca montos, pagos ni caja. Correrla dos veces no cambia nada.
+  Ojo con el orden: va ANTES de levantar la imagen nueva, porque `crearGasto`
+  escribe la columna en todo gasto nuevo y sin ella el alta de cualquier gasto
+  —y "Pagar" del POS— se cae. La imagen vieja con la columna puesta sigue
+  andando: no la conoce y la deja nula.
 
 Producción está en **71 migraciones**, la última
 `20261019120000_operador_sesion_invalidada_en`.

@@ -1,6 +1,7 @@
 // app/api/finanzas/gastos/categorias/route.js
 //
-// LAS CATEGORÍAS QUE SE OFRECEN AL CREAR UN GASTO: las activas, por su orden.
+// LAS CATEGORÍAS QUE SE OFRECEN AL CREAR UN GASTO: las activas, por su orden,
+// menos Sueldos, que tiene su sección.
 //
 // Salen de la tabla, no de una lista escrita acá: la migración sembró las
 // iniciales y el catálogo puede crecer o dar de baja una sin tocar código. Una
@@ -28,7 +29,9 @@ export async function GET(req) {
     if (!perm.ok) {
       return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
     }
-    return NextResponse.json({ ok: true, categorias: await categoriasDeGasto(prisma) });
+    // Sin Sueldos: un sueldo se paga desde Finanzas → Sueldos, eligiendo el
+    // empleado. Si igual llega uno por acá, `crearGasto` lo rechaza sin empleado.
+    return NextResponse.json({ ok: true, categorias: await categoriasDeGasto(prisma, { sinSueldos: true }) });
   } catch (e) {
     console.error("[finanzas/gastos/categorias]", e);
     return NextResponse.json(

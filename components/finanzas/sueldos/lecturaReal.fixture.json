@@ -1,0 +1,142 @@
+{
+  "status": 200,
+  "ok": true,
+  "unidad": "MES",
+  "desplazamiento": 0,
+  "local": {
+    "id": 49,
+    "nombre": "ci-sueldos-1792450922406-A"
+  },
+  "periodo": {
+    "rango": {
+      "desde": "2026-10-01",
+      "hasta": "2026-10-31"
+    },
+    "descripcion": {
+      "unidad": "MES",
+      "desplazamiento": 0,
+      "rango": {
+        "desde": "2026-10-01",
+        "hasta": "2026-10-31"
+      },
+      "titulo": "Octubre · en curso",
+      "subtitulo": "1 al 31 de octubre · van 19 días",
+      "rotuloDelImporte": "Va acumulado",
+      "enCurso": true
+    }
+  },
+  "puedeAvanzar": false,
+  "puedeRetroceder": true,
+  "puedePagar": true,
+  "total": 291000,
+  "desdeLaCaja": 40000,
+  "desdeFinanzas": 251000,
+  "empleados": [
+    {
+      "id": 45,
+      "nombre": "ci-sueldos-1792450922406-Brenda",
+      "activo": true,
+      "cantidadPagos": 1,
+      "ultimo": "2026-10-19",
+      "total": 10000,
+      "pagos": [
+        {
+          "pagoId": 50,
+          "gastoId": 89,
+          "fecha": "2026-10-19",
+          "modalidad": "AGUINALDO",
+          "titulo": "19/10 · Aguinaldo",
+          "origen": "Caja #22 · efectivo",
+          "desdeLaCaja": true,
+          "nota": null,
+          "monto": 10000
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "nombre": "ci-sueldos-1792450922406-Carlos",
+      "activo": true,
+      "cantidadPagos": 2,
+      "ultimo": "2026-10-19",
+      "total": 280000,
+      "pagos": [
+        {
+          "pagoId": 51,
+          "gastoId": 90,
+          "fecha": "2026-10-19",
+          "modalidad": "SUELDO",
+          "titulo": "19/10 · Sueldo",
+          "origen": "Finanzas · transferencia",
+          "desdeLaCaja": false,
+          "nota": "Octubre",
+          "monto": 250000
+        },
+        {
+          "pagoId": 49,
+          "gastoId": 88,
+          "fecha": "2026-10-19",
+          "modalidad": "ADELANTO",
+          "titulo": "19/10 · Adelanto",
+          "origen": "Caja #22 · efectivo",
+          "desdeLaCaja": true,
+          "nota": null,
+          "monto": 30000
+        }
+      ]
+    },
+    {
+      "id": 48,
+      "nombre": "ci-sueldos-1792450922406-Eva",
+      "activo": true,
+      "cantidadPagos": 0,
+      "ultimo": null,
+      "total": 0,
+      "pagos": []
+    }
+  ],
+  "sinEmpleado": {
+    "total": 1000,
+    "sueldos": [
+      {
+        "id": 94,
+        "fecha": "2026-10-19",
+        "concepto": "Pago a Ana por la semana",
+        "beneficiario": null,
+        "total": 1000,
+        "pagado": 1000,
+        "pagos": [
+          {
+            "pagoId": 52,
+            "gastoId": 94,
+            "fecha": "2026-10-19",
+            "modalidad": null,
+            "titulo": "19/10 · Sueldo",
+            "origen": "Finanzas · mercado pago",
+            "desdeLaCaja": false,
+            "nota": null,
+            "monto": 1000
+          }
+        ]
+      },
+      {
+        "id": 93,
+        "fecha": "2026-10-19",
+        "concepto": "Adelanto · ci-sueldos-1792450922406-Brenda",
+        "beneficiario": null,
+        "total": 1000,
+        "pagado": 0,
+        "pagos": []
+      },
+      {
+        "id": 92,
+        "fecha": "2026-10-19",
+        "concepto": "Sueldo · ci-sueldos-1792450922406-Brenda",
+        "beneficiario": null,
+        "total": 1000,
+        "pagado": 0,
+        "pagos": []
+      }
+    ]
+  }
+}

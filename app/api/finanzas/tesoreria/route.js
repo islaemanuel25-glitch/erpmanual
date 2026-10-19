@@ -35,16 +35,7 @@ import { checkPerm } from "@/lib/authorize";
 import { resolveVistaOperativa } from "@/lib/grupos";
 import { esVistaDeDeposito, resolverLocalPedido } from "@/lib/finanzas/alcanceFinanciero";
 import { localesDeFinanzas } from "@/lib/finanzas/localesDelGrupo";
-import {
-  CLAVE_OTRO_FINANZAS,
-  DESPLAZAMIENTO_POR_DEFECTO,
-  ERROR_RANGO_SIN_OTRO,
-  descripcionFinanciera,
-  desplazamientoFinanciero,
-  leerRangoElegido,
-  puedeAvanzar,
-  unidadFinanciera,
-} from "@/lib/finanzas/periodoFinanciero";
+import { descripcionFinanciera, leerPeriodoDelPedido, puedeAvanzar } from "@/lib/finanzas/periodoFinanciero";
 import { corteDeUbicacion } from "@/lib/semanaOperativa/semanaOperativa";
 import { primerDiaComercialDelLocal } from "@/lib/finanzas/primerDiaComercialServer";
 import { leerTesoreria, rangoDeTesoreria } from "@/lib/tesoreria/lecturaTesoreriaServer";
@@ -53,8 +44,6 @@ import {
   PERMISO_VER_TESORERIA,
   PERMISO_VERIFICAR_EFECTIVO,
 } from "@/lib/tesoreria/permisos";
-
-const ERROR_OTRO_SIN_DESPLAZAMIENTO = "Un período elegido con «Otro» no se desplaza: no mandes desplazamiento.";
 
 export async function GET(req) {
   try {
@@ -78,24 +67,9 @@ export async function GET(req) {
     }
 
     const { searchParams } = new URL(req.url);
-    const esOtro = String(searchParams.get("unidad") || "").toUpperCase() === CLAVE_OTRO_FINANZAS;
-    const conFechas = searchParams.has("desde") || searchParams.has("hasta");
-    let rangoFijo = null;
-    if (esOtro) {
-      // Un rango elegido no se desplaza: pedir las dos cosas es ambiguo.
-      if (searchParams.has("desplazamiento")) {
-        return NextResponse.json({ ok: false, error: ERROR_OTRO_SIN_DESPLAZAMIENTO }, { status: 400 });
-      }
-      const leido = leerRangoElegido({ desde: searchParams.get("desde"), hasta: searchParams.get("hasta") });
-      if (leido.error) return NextResponse.json({ ok: false, error: leido.error }, { status: 400 });
-      rangoFijo = leido.rango;
-    } else if (conFechas) {
-      return NextResponse.json({ ok: false, error: ERROR_RANGO_SIN_OTRO }, { status: 400 });
-    }
-    const unidad = esOtro ? CLAVE_OTRO_FINANZAS : unidadFinanciera(searchParams.get("unidad"));
-    const desplazamiento = esOtro
-      ? DESPLAZAMIENTO_POR_DEFECTO
-      : desplazamientoFinanciero(searchParams.get("desplazamiento") ?? DESPLAZAMIENTO_POR_DEFECTO);
+    const periodo = leerPeriodoDelPedido(searchParams);
+    if (periodo.error) return NextResponse.json({ ok: false, error: periodo.error }, { status: 400 });
+    const { esOtro, unidad, desplazamiento, rangoFijo } = periodo;
 
     const localPropio = vista.localId
       ? await prisma.local.findUnique({
