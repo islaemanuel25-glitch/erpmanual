@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-19 17:10
+**Última actualización:** 2026-10-19 23:51
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-19: feat: Finanzas → Sueldos, sección propia con pagos atados a empleados del local (pantalla SIN VERIFICAR en navegador)
 - 2026-10-19: fix: el horario del turno operativo no corta la venta; se saca el bloqueo por fin de turno
 - 2026-10-19: feat: la sesión de la cuenta no vence por reloj; la valida el servidor en cada pedido
 - 2026-10-19: fix: cerrar la caja cierra la sesión de PIN del operador en todos los dispositivos

@@ -1,6 +1,6 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-19 23:07
+**Fecha:** 2026-10-19 23:51
 
 ## Módulos modificados recientemente
 
@@ -9,7 +9,7 @@
 - Archivos: 10 modificados (10 total)
 
 ### transferencias
-- fix: el horario del turno operativo no corta la venta; se saca el bloqueo por fin de turno, feat: la sesión de la cuenta no vence por reloj; la valida el servidor en cada pedido, fix: cerrar la caja cierra la sesión de PIN del operador en todos los dispositivos
+- feat: Finanzas → Sueldos, sección propia con pagos atados a empleados del local (pantalla SIN VERIFICAR en navegador), fix: el horario del turno operativo no corta la venta; se saca el bloqueo por fin de turno, feat: la sesión de la cuenta no vence por reloj; la valida el servidor en cada pedido
 - Archivos: 1 modificados (1 total)
 
 ### usuarios
