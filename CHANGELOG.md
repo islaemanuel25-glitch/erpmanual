@@ -1,5 +1,15 @@
 # Changelog
 
+## [2026-10-19] - Actualización: proveedores, transferencias, productos
+
+### Modificado
+- **proveedores**: fix: el dueño de un local elimina sus proveedores y lleva sus listas de precios
+- **proveedores**: fix: el dueño de un local crea y edita sus propios proveedores
+- **transferencias**: fix: el dueño de un local elimina sus proveedores y lleva sus listas de precios
+- **transferencias**: test: declarar la migración 69 (permisos de proveedores del dueño) en los contadores y en las pendientes de deploy
+- **productos**: fix: el dueño de un local crea y edita sus propios proveedores
+
+
 ## [2026-10-18] - Actualización: proveedores, productos, transferencias, pos-ventas, dashboard, stock
 
 ### Modificado
