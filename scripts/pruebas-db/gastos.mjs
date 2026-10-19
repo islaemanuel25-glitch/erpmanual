@@ -54,7 +54,9 @@ async function sembrarPagoPrevio(url) {
     await p.grupoDeposito.create({ data: { grupoId: grupo.id, localId: deposito.id } });
     await p.grupoLocal.create({ data: { grupoId: grupo.id, localId: local.id } });
     const rol = await p.rol.create({ data: { nombre: "CI previo", permisos: [] } });
-    const u = await p.usuario.create({ data: { nombre: "Previo", email: "previo@ci.local", passwordHash: "x", rolId: rol.id, localId: local.id } });
+    // `select` por lo mismo que el turno de abajo: `Usuario` también sumó
+    // columnas después de Gastos (`sesionInvalidadaEn`).
+    const u = await p.usuario.create({ data: { nombre: "Previo", email: "previo@ci.local", passwordHash: "x", rolId: rol.id, localId: local.id }, select: { id: true } });
     // `select` a propósito: esta base está en el esquema de ANTES de Gastos y el
     // cliente es el de hoy; sin él, el RETURNING pide columnas de `Turno` que
     // llegaron después (el turno operativo) y la siembra se cae.
