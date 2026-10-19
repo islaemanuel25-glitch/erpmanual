@@ -78,6 +78,9 @@ export function UserProvider({ children }) {
       headers: { "Content-Type": "application/json" },
     });
     setPerfil(null);
+    // Navegación completa, a propósito: descarta también el estado del
+    // operador (`useOperadorActivo` lo tiene solo en memoria). Con la cookie del
+    // PIN borrada por `/api/logout`, al volver a entrar se pide el PIN.
     if (typeof window !== "undefined") window.location.href = "/login";
   };
 
