@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { identidadParaOperar } from "@/lib/caja/identidadCajaServer";
+import { invalidarSesionDeOperador, limpiarCookieDeOperadorCerrado } from "@/lib/operador";
 import { resolveScope } from "@/lib/grupos";
 import { whereVentaComercial } from "@/lib/ventas/filtroVentaComercial";
 // Fórmula única del efectivo esperado. Antes vivía duplicada acá, en
@@ -287,6 +288,11 @@ export async function POST(req) {
         throw e;
       }
 
+      // Cerrar la caja cierra la sesión de PIN de su operador en TODOS los
+      // dispositivos, en esta misma transacción: para abrir otra caja hay que
+      // volver a poner el PIN. Ver `lib/operador-sesion.js` (la #951).
+      await invalidarSesionDeOperador(tx, turno.operadorId, ahora);
+
       // El período del corte final arranca donde terminó el último parcial, o en
       // la apertura si no hubo ninguno.
       const ultimo = await tx.arqueoCaja.findFirst({
@@ -350,7 +356,11 @@ export async function POST(req) {
       // tiene el turno tomado, y una venta larga dura más que el default de Prisma.
     }, LIMITES_TRANSACCION_DEL_LOCAL);
 
-    return NextResponse.json({ ok: true, turno: turnoCerrado });
+    // Y el navegador que cerró queda sin operador aunque la señal entre
+    // pestañas no le llegue al POS.
+    const respuesta = NextResponse.json({ ok: true, turno: turnoCerrado });
+    limpiarCookieDeOperadorCerrado(req, respuesta, turno.operadorId);
+    return respuesta;
   } catch (error) {
     if (error?.codigo === "turno_ya_cerrado") {
       return NextResponse.json({ ok: false, error: error.message }, { status: 409 });

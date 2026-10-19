@@ -54,6 +54,7 @@ import {
   OPCIONES_TX,
 } from "@/lib/caja/cierreRelevoServer";
 import { autorizarResolucionDeCorte } from "@/lib/caja/llaveDeCorte";
+import { invalidarSesionDeOperador, limpiarCookieDeOperadorCerrado } from "@/lib/operador";
 
 export async function POST(req, context) {
   try {
@@ -286,6 +287,11 @@ export async function POST(req, context) {
         throw e;
       }
 
+      // Cerrar la caja cierra la sesión de PIN de su operador en TODOS los
+      // dispositivos, en esta misma transacción: para abrir otra caja hay que
+      // volver a poner el PIN. Ver `lib/operador-sesion.js` (la #951).
+      await invalidarSesionDeOperador(tx, turno.operadorId, ahora);
+
       // ── 2) Arqueo FINAL ──────────────────────────────────────────────────
       // El período va desde el último corte parcial —o la apertura— hasta el
       // instante del CORTE, no hasta ahora: la ventana que este cierre controla
@@ -409,7 +415,7 @@ export async function POST(req, context) {
         },
       });
 
-      return { confirmado, sobre, arqueo, repetido: false };
+      return { confirmado, sobre, arqueo, repetido: false, operadorDeLaCaja: turno.operadorId ?? null };
     }, OPCIONES_TX);
 
     if (resultado.repetido) {
@@ -420,7 +426,7 @@ export async function POST(req, context) {
       });
     }
 
-    return NextResponse.json({
+    const respuesta = NextResponse.json({
       ok: true,
       repetido: false,
       cierre: serializarCierre(resultado.confirmado),
@@ -438,6 +444,11 @@ export async function POST(req, context) {
         diferencia: cuentas.diferencia,
       },
     });
+    // El navegador que cerró queda sin el operador de esa caja aunque la señal
+    // entre pestañas no le llegue al POS. Si ahí está identificado otro —un
+    // relevo—, su sesión sigue.
+    limpiarCookieDeOperadorCerrado(req, respuesta, resultado.operadorDeLaCaja);
+    return respuesta;
   } catch (error) {
     if (error?.codigo === "conflicto") {
       return NextResponse.json({ ok: false, error: error.message }, { status: 409 });

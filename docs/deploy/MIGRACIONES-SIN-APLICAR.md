@@ -26,6 +26,14 @@ Si la lista está vacía, el despliegue es solo de código.
   `/api/proveedores/listas/**` ahora piden esos permisos en vez de
   administrador. Los dueños la reciben al volver a iniciar sesión: el JWT lleva
   los permisos del login.
+- `20261019120000_operador_sesion_invalidada_en` — **Aditiva, sin datos.**
+  Agrega `OperadorLocal.sesionInvalidadaEn` (TIMESTAMP nulo), sin relleno. El
+  cierre de caja la escribe y desde ese instante no vale ninguna sesión de PIN
+  de ese operador emitida antes, en ningún dispositivo. No toca ninguna fila:
+  las cajas cerradas quedan como están y las sesiones vigentes al desplegar
+  siguen valiendo hasta el próximo cierre de su caja. El código anterior no la
+  lee. Ojo con el orden: el código nuevo la lee en cada operación con PIN, así
+  que la migración va ANTES de levantar la imagen nueva.
 
 Producción está en **69 migraciones**, la última
 `20261018120000_permisos_proveedores_dueno_local`.

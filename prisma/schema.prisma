@@ -4220,6 +4220,12 @@ model OperadorLocal {
   localId   Int?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  /// Desde este instante no vale ninguna sesión de PIN emitida antes. Lo
+  /// escribe el CIERRE de su caja, en la misma transacción: cerrar la caja
+  /// cierra la sesión del operador en todos los dispositivos, y para abrir otra
+  /// tiene que volver a poner el PIN. Null: nunca cerró una caja con esto.
+  /// Lo lee `getOperadorActivoDelLocal` (lib/operador.js). Ver la #951.
+  sesionInvalidadaEn DateTime?
 
   local   Local?            @relation(fields: [localId], references: [id])
   locales OperadorEnLocal[]

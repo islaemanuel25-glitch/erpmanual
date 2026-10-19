@@ -1,0 +1,22 @@
+-- `OperadorLocal.sesionInvalidadaEn`: desde este instante no vale ninguna
+-- sesión de PIN de ese operador emitida antes.
+--
+-- ── POR QUÉ ───────────────────────────────────────────────────────────────
+--
+-- La sesión de PIN es una cookie firmada que vive 8 horas y no se invalidaba
+-- en el servidor al cerrar la caja: solo la borraba la pestaña del POS si le
+-- llegaba la señal del cierre. Con la cookie viva, `requireOperadorDeCaja`
+-- abría una caja NUEVA a nombre del operador sin que nadie pusiera el PIN.
+-- Caso real: la #951 de Mini unidas, abierta a las 00:06 a nombre de Belen, con
+-- ventas de 00:06 a 00:12 y nada hasta las 08:32.
+--
+-- Desde ahora el cierre de la caja escribe esta columna en la misma
+-- transacción, y `getOperadorActivoDelLocal` rechaza todo token emitido antes.
+--
+-- ── QUÉ HACE ──────────────────────────────────────────────────────────────
+--
+-- Una columna nula, sin relleno: ninguna caja cerrada se toca, y las sesiones
+-- vigentes al desplegar siguen valiendo hasta el próximo cierre de su caja.
+-- No borra ni modifica ninguna fila.
+
+ALTER TABLE "OperadorLocal" ADD COLUMN "sesionInvalidadaEn" TIMESTAMP(3);

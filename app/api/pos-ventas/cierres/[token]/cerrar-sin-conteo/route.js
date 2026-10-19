@@ -34,6 +34,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { checkPerm } from "@/lib/authorize";
+import { invalidarSesionDeOperador, limpiarCookieDeOperadorCerrado } from "@/lib/operador";
 import {
   ESTADO_CIERRE,
   ACCION_CERRAR_SIN_CONTEO,
@@ -97,7 +98,7 @@ export async function POST(req, context) {
 
       const turno = await tx.turno.findFirst({
         where: { id: cierre.turnoId, localId },
-        select: { id: true, localId: true, cierre: true, cierreEnPreparacionEn: true, anuladoEn: true },
+        select: { id: true, localId: true, operadorId: true, cierre: true, cierreEnPreparacionEn: true, anuladoEn: true },
       });
       const problema = validarTurnoDelCierre(turno);
       if (problema) {
@@ -135,6 +136,11 @@ export async function POST(req, context) {
         e.codigo = "conflicto";
         throw e;
       }
+
+      // Cerrar la caja —también sin conteo— cierra la sesión de PIN de su
+      // operador en todos los dispositivos, en esta misma transacción. Ver
+      // `lib/operador-sesion.js` (la #951).
+      await invalidarSesionDeOperador(tx, turno.operadorId, ahora);
 
       // ── 2) El corte queda resuelto, con su autoría ───────────────────────
       //
@@ -206,14 +212,18 @@ export async function POST(req, context) {
         },
       });
 
-      return { resuelto, repetido: false };
+      return { resuelto, repetido: false, operadorDeLaCaja: turno.operadorId ?? null };
     }, OPCIONES_TX);
 
-    return NextResponse.json({
+    const respuesta = NextResponse.json({
       ok: true,
       repetido: resultado.repetido,
       cierre: serializarCierre(resultado.repetido ? resultado.yaEstaba : resultado.resuelto),
     });
+    // El navegador que cerró queda sin el operador de esa caja; otro operador
+    // identificado ahí no se toca.
+    if (!resultado.repetido) limpiarCookieDeOperadorCerrado(req, respuesta, resultado.operadorDeLaCaja);
+    return respuesta;
   } catch (error) {
     if (error?.codigo === "conflicto") {
       return NextResponse.json({ ok: false, error: error.message }, { status: 409 });
