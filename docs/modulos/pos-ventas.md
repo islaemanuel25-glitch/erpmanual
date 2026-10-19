@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-10-17 20:32
+**Última actualización:** 2026-10-19 00:42
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-10-19: fix: cerrar la caja cierra la sesión de PIN del operador en todos los dispositivos
 - 2026-10-17: fix: el ticket de una transferencia nacida de una venta imprime las líneas de la venta
 - 2026-10-16: fix: el ticket de transferencia ya no desborda el papel y usa solo lo de Posventa
 - 2026-10-16: fix: el ticket POS de Transferencias sale con la pieza de Posventa

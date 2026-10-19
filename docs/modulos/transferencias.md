@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-18 00:47
+**Última actualización:** 2026-10-19 00:42
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-19: fix: cerrar la caja cierra la sesión de PIN del operador en todos los dispositivos
 - 2026-10-18: fix: el dueño de un local elimina sus proveedores y lleva sus listas de precios
 - 2026-10-18: test: declarar la migración 69 (permisos de proveedores del dueño) en los contadores y en las pendientes de deploy
 - 2026-10-17: fix: el ticket de una transferencia nacida de una venta imprime las líneas de la venta
