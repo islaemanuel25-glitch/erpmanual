@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-19 00:42
+**Fecha:** 2026-10-19 01:13
 
 ## Módulos modificados recientemente
 
 ### pos-ventas
-- fix: cerrar la caja cierra la sesión de PIN del operador en todos los dispositivos
-- Archivos: 3 modificados (3 total)
+- feat: sesión de PIN sin vencimiento por reloj y cierre de caja al terminar el turno, fix: cerrar la caja cierra la sesión de PIN del operador en todos los dispositivos
+- Archivos: 8 modificados (8 total)
 
 ### transferencias
 - fix: cerrar la caja cierra la sesión de PIN del operador en todos los dispositivos
