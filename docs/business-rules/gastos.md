@@ -92,7 +92,11 @@ el mismo alcance —`alcanceDePagos`, con el permiso de gastos para
 
 - `GET /api/finanzas/gastos` — el listado de lo que se ve. Filtros `estado`
   (Pendientes —con saldo, incluye parciales—, Pagadas, Todas; por defecto
-  Pendientes), `categoriaId`, `fechaDesde`/`fechaHasta` (días, sobre la fecha
+  **Todas** desde el 2026-10-19, en la ruta y en la pantalla: un gasto pagado
+  desde el POS nace saldado y con Pendientes no se veía. Pagos a proveedores
+  sigue en Pendientes [CÓDIGO] (`filtroDeGastos`, `lib/finanzas/gastos.js`)
+  [VERIFICADO: `pagarDesdeElPos.mjs` 10.bis; contraprueba GT-1]. Cada gasto
+  pagado desde una caja dice "Caja #N · efectivo" [VERIFICADO: GT-2]), `categoriaId`, `fechaDesde`/`fechaHasta` (días, sobre la fecha
   del gasto), `q` (concepto, beneficiario y número de comprobante) y `destino`
   (una ubicación, por `resolverLocalPedido`). Filtra y pagina **en la base**:
   `page`/`pageSize` con `normalizarPaginacion` [VERIFICADO:

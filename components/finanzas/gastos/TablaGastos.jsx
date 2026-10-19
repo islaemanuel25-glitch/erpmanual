@@ -80,9 +80,13 @@ function columnas({ filtro, hoy, variasUbicaciones, onAbrir }) {
       titulo: "Estado",
       thClassName: encabezado,
       render: deGasto((g) => (
-        <span className={g.estado === ESTADO_CUENTA.PARCIAL ? "sunmi-text-warning" : ""}>
-          {rotuloEstadoDelGasto(g)}
-        </span>
+        <>
+          <span className={g.estado === ESTADO_CUENTA.PARCIAL ? "sunmi-text-warning" : ""}>
+            {rotuloEstadoDelGasto(g)}
+          </span>
+          {/* Lo pagado desde el POS dice de qué caja salió. */}
+          {g.salioDeLaCaja ? <span className="sunmi-text-muted"> · {g.salioDeLaCaja}</span> : null}
+        </>
       )),
     },
     { clave: "vence", titulo: "Vence", thClassName: encabezado, render: deGasto((g) => <Vence gasto={g} hoy={hoy} />) },

@@ -553,6 +553,11 @@ jobs:
       - name: Contrapruebas del tope de efectivo de Pagar
         run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs TP-
 
+      # Y que lo pagado desde el POS se ve en Gastos sin elegir filtro: con la
+      # lista abriendo en Pendientes, o sin el turno del pago, se pone rojo.
+      - name: Contrapruebas de Gastos abriendo en Todas
+        run: node --import ./scripts/alias-loader.mjs scripts/pruebas-db/contrapruebasRevision.mjs GT-
+
       # El consumo del personal: sale del stock con las funciones de la venta,
       # no crea Venta ni toca la caja, el gasto va al costo y el resultado del
       # turno lo resta una vez. Y la foto de un gasto se guarda y se lee.

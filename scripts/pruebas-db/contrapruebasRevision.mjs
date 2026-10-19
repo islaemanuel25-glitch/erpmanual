@@ -1582,6 +1582,25 @@ const CASOS = [
     inyecciones: [{ de: "where: { id: Number(operadorId) || 0, localId: scope.localId },", a: "where: { id: Number(operadorId) || 0 }," }],
     esperadas: ["y uno de otro local no entra"],
   },
+  // ── GASTOS ABRE EN TODAS (2026-10-19) ───────────────────────────────────
+  {
+    n: "GT-1",
+    defecto: "la lista de Gastos vuelve a abrir en Pendientes y esconde lo pagado desde el POS",
+    archivo: "lib/finanzas/gastos.js",
+    suite: "scripts/pruebas-db/pagarDesdeElPos.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "export const FILTRO_GASTOS_POR_DEFECTO = FILTRO_CUENTAS.TODAS;", a: "export const FILTRO_GASTOS_POR_DEFECTO = FILTRO_CUENTAS.PENDIENTES;" }],
+    esperadas: ["sin filtro, la lista abre en Todas", "y trae el gasto pagado desde el POS"],
+  },
+  {
+    n: "GT-2",
+    defecto: "la lista de Gastos no dice de qué caja salió el pago",
+    archivo: "lib/finanzas/gastosServer.js",
+    suite: "scripts/pruebas-db/pagarDesdeElPos.mjs",
+    minimo: 40,
+    inyecciones: [{ de: "fecha: true, medio: true, turnoId: true }, orderBy", a: "fecha: true, medio: true }, orderBy" }],
+    esperadas: ["diciendo de qué caja salió"],
+  },
   // ── FINANZAS → SUELDOS (2026-10-19) ─────────────────────────────────────
   {
     n: "SU-1",

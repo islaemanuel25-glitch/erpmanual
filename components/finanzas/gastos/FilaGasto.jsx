@@ -11,7 +11,8 @@
 //   arriba   → el concepto fuerte y el beneficiario apagado —y la ubicación,
 //              solo cuando se miran varias (`variasUbicaciones`)—;
 //   abajo    → la categoría, el estado y el vencimiento, en aviso si ya venció.
-//              Un gasto pagado dice solo su categoría y "Pagado";
+//              Un gasto pagado dice solo su categoría y "Pagado"; y si se pagó
+//              desde el POS, debajo, de qué caja salió ("Caja #12 · efectivo");
 //   derecha  → UNA sola cifra, la de la pestaña (`importeDeLaCuenta`): el saldo
 //              en Pendientes, el total en Pagados y en Todos. Sin rótulo: el
 //              resumen de arriba ya dice qué es.
@@ -58,6 +59,8 @@ export default function FilaGasto({ gasto, filtro, hoy, variasUbicaciones = fals
         {pagado ? null : " · "}
         {pagado ? null : vence}
       </div>
+      {/* Lo pagado desde el POS dice de qué caja salió: "Caja #12 · efectivo". */}
+      {gasto?.salioDeLaCaja ? <div className="text-sm2 sunmi-text-muted">{gasto.salioDeLaCaja}</div> : null}
     </FilaConImporte>
   );
 }

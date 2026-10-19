@@ -35,6 +35,10 @@ const rutaRecibir = await import("../../app/api/compras-proveedor/recibir/[id]/r
 const rutaPorCargar = await import("../../app/api/compras-proveedor/por-cargar/route.js");
 const rutaSubir = await import("../../app/api/compras-proveedor/comprobantes/subir/route.js");
 const rutaClasificar = await import("../../app/api/turnos-y-cierres/movimientos/[id]/route.js");
+const rutaGastos = await import("../../app/api/finanzas/gastos/route.js");
+const rutaCuentas = await import("../../app/api/finanzas/pagos-proveedores/route.js");
+const rutaTablero = await import("../../app/api/finanzas/tablero/route.js");
+const { hoyArgentinaISO } = await import("../../lib/fechas/rangoArgentina.js");
 const { leerDetalleDeCaja } = await import("../../lib/turnosYCierres/lecturaTurnosYCierresServer.js");
 const { pagadoAlDepositoDesdeCaja } = await import("../../lib/finanzas/pagoADepositoDesdeCajaServer.js");
 const { NOMBRE_CENTINELA } = await import("../../lib/compras-proveedor/comprobante/almacenImagenes.js");
@@ -351,6 +355,30 @@ async function casos(f) {
   igual("se recibe pendiente, confirmando el saldo", [pend.status, pend.ok], [200, true]);
   igual("queda con saldo de lo que falta", [pend.cuentaPorPagar?.pagado, pend.cuentaPorPagar?.saldo], [1000, 500]);
   igual("sin otro retiro", (await movimientosDelTurno(f)).length, movs2);
+
+  seccion("10.bis · Lo pagado desde el POS se ve en Finanzas → Gastos sin elegir filtro");
+  // Producción, 2026-10-19: un insumo pagado en la caja nacía saldado y la
+  // lista de Gastos abría en Pendientes, así que no aparecía. Desde ahí abre en
+  // Todas; Pagos a proveedores y el Resumen siguen como estaban.
+  const listaGastos = (qs) => rutaGastos.GET(pedido(`${BASE}/finanzas/gastos?pageSize=100${qs}`, f.finanzas, { metodo: "GET" })).then(leer);
+  const sinFiltro = await listaGastos("");
+  const delPos = (sinFiltro.gastos || []).find((g) => g.id === gasto.gastoId);
+  igual("sin filtro, la lista abre en Todas", sinFiltro.filtros?.estado, "TODAS");
+  ok("y trae el gasto pagado desde el POS", Boolean(delPos), JSON.stringify((sinFiltro.gastos || []).map((g) => g.id)));
+  igual("diciendo de qué caja salió", [delPos?.estado, delPos?.salioDeLaCaja], ["PAGADA", `Caja #${f.turno.id} · efectivo`]);
+  ok("Pendientes lo oculta", !((await listaGastos("&estado=PENDIENTES")).gastos || []).some((g) => g.id === gasto.gastoId));
+  ok("Pagadas lo muestra", ((await listaGastos("&estado=PAGADAS")).gastos || []).some((g) => g.id === gasto.gastoId));
+
+  const cuentas = (qs) => rutaCuentas.GET(pedido(`${BASE}/finanzas/pagos-proveedores${qs}`, f.finanzas, { metodo: "GET" })).then(leer);
+  const cuentasSin = await cuentas("");
+  const cuentasPend = await cuentas("?estado=PENDIENTES");
+  igual("Pagos a proveedores sigue abriendo en Pendientes", cuentasSin.estado, "PENDIENTES");
+  igual("con las mismas cuentas que pidiendo Pendientes", (cuentasSin.cuentas || []).map((c) => c.id), (cuentasPend.cuentas || []).map((c) => c.id));
+  ok("y la cuenta ya pagada desde el POS sigue sin aparecer ahí", !(cuentasSin.cuentas || []).some((c) => c.pedidoProveedorId === prov.pedidoProveedorId && c.estado === "PAGADA"));
+
+  const tablero = await leer(await rutaTablero.GET(pedido(`${BASE}/finanzas/tablero?unidad=DIA&desplazamiento=0`, f.finanzas, { metodo: "GET" })));
+  const sumaDelDia = await prisma.$queryRaw`SELECT COALESCE(SUM(g."total"), 0)::float AS t FROM "Gasto" g WHERE g."localId" = ${f.local.id} AND g."fecha" = ${hoyArgentinaISO()}::date`;
+  igual("el Resumen suma todos los gastos del día, pagados incluidos, como antes", tablero.resumen?.gastos, Number(sumaDelDia[0].t));
 
   seccion("11 · No se paga más de lo que hay en la caja");
   const hay = async () => (await leer(await rutaPagar.GET(pedido(`${BASE}/pos-ventas/pagar?turnoId=${f.turno.id}`, f.quienCaja, { metodo: "GET" })))).caja?.efectivoAhora;

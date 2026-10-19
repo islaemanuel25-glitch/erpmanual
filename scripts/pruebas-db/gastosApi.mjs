@@ -443,8 +443,13 @@ try {
   const pendientesEsperados = conEstado.filter((g) => g.estado !== "PAGADA").length;
   const pagadasEsperadas = conEstado.filter((g) => g.estado === "PAGADA").length;
   ok("hay de los tres estados para mirar", ["PENDIENTE", "PARCIAL", "PAGADA"].every((e) => conEstado.some((g) => g.estado === e)));
+  // Sin estado, TODAS desde el 2026-10-19: lo pagado desde el POS nace saldado
+  // y con Pendientes no se veía. Pendientes se sigue pidiendo explícito.
   r = await listar(casianoVe);
-  ok("sin estado, Pendientes: lo que tiene saldo, parciales incluidos", r.filtros.estado === "PENDIENTES" && r.paginacion.total === pendientesEsperados &&
+  ok("sin estado, Todas: los tres estados", r.filtros.estado === "TODAS" && r.paginacion.total === conEstado.length,
+    JSON.stringify(r.paginacion));
+  r = await listar(casianoVe, "estado=PENDIENTES&pageSize=200");
+  ok("Pendientes: lo que tiene saldo, parciales incluidos", r.filtros.estado === "PENDIENTES" && r.paginacion.total === pendientesEsperados &&
     r.gastos.every((g) => g.estado !== "PAGADA") && r.gastos.some((g) => g.estado === "PARCIAL"), JSON.stringify(r.paginacion));
   r = await listar(casianoVe, "estado=PAGADAS&pageSize=200");
   ok("Pagadas: solo las saldadas", r.paginacion.total === pagadasEsperadas && r.gastos.every((g) => g.estado === "PAGADA"), JSON.stringify(r.paginacion));

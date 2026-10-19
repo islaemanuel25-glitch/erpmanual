@@ -259,6 +259,39 @@ test("la pantalla no escribe colores ni medidas mágicas nuevas", () => {
   }
 });
 
+// ── LO PAGADO DESDE EL POS (2026-10-19) ─────────────────────────────────
+//
+// La fila sale de `serializarGasto`, el serializador real, sobre una fila con
+// la forma de `SELECT_GASTO`: un gasto pagado entero en efectivo desde la caja
+// 12, como lo deja "Pagar" del POS. Contra la base lo ejerce
+// scripts/pruebas-db/pagarDesdeElPos.mjs, sección 10.bis.
+
+test("un gasto pagado desde el POS dice de qué caja salió; uno pagado en Finanzas, no", async () => {
+  const { serializarGasto } = await import("@/lib/finanzas/gastosServer");
+  const fila = (pagos) => serializarGasto({
+    id: 7, grupoId: 1, localId: 3, categoriaId: 5, concepto: "Lavandina", total: "1500.00", fecha: new Date("2026-10-19T00:00:00Z"),
+    beneficiario: null, comprobanteNumero: null, comprobanteFecha: null, vencimiento: null, fechaPrevistaPago: null,
+    creadoPorId: 1, createdAt: new Date(), categoria: { id: 5, nombre: "Insumos y limpieza", activo: true },
+    local: { id: 3, nombre: "Mini unidas" }, creadoPor: null, pagos, consumoPersonal: null, archivos: [],
+  });
+  const delPos = fila([{ id: 1, monto: "1500.00", fecha: new Date(), medio: "EFECTIVO", turnoId: 12 }]);
+  assert.deepEqual([delPos.estado, delPos.salioDeLaCaja], ["PAGADA", "Caja #12 · efectivo"]);
+  const t = html(React.createElement(FilaGasto, { gasto: delPos, filtro: FILTRO_CUENTAS.TODAS, hoy: HOY })).replace(/<[^>]+>/g, " ");
+  assert.match(t, /Insumos y limpieza · Pagado\s+Caja #12 · efectivo/);
+  const deFinanzas = fila([{ id: 2, monto: "1500.00", fecha: new Date(), medio: "TRANSFERENCIA", turnoId: null }]);
+  assert.equal(deFinanzas.salioDeLaCaja, null);
+  assert.doesNotMatch(html(React.createElement(FilaGasto, { gasto: deFinanzas, filtro: FILTRO_CUENTAS.TODAS, hoy: HOY })), /Caja #/);
+});
+
+test("la lista de Gastos arranca en Todas, con Todas elegido en el filtro", async () => {
+  const { parseContextoGastos } = await import("@/lib/finanzas/contextoFinanzas");
+  assert.equal(parseContextoGastos(new URLSearchParams("")).estado, FILTRO_CUENTAS.TODAS);
+  // El filtro de la pantalla muestra lo que dice el contexto: no tiene un default propio.
+  const lista = codigo("components/finanzas/gastos/ListaGastos.jsx");
+  assert.match(lista, /const \{ estado: filtro, unidad, desp, cat, destino \} = ctx;/);
+  assert.equal((lista.match(/valor=\{filtro\}/g) || []).length, 2, "los dos filtros de estado (celular y escritorio) leen el contexto");
+});
+
 test("Pagos a proveedores sigue mandando a su ruta y con su subtítulo cuando no se le pasa nada", () => {
   const modal = codigo("components/finanzas/pagos/ModalRegistrarPago.jsx");
   assert.match(modal, /fetch\(urlPago \|\| `\/api\/finanzas\/pagos-proveedores\/\$\{cuenta\.id\}\/pagos`/);
