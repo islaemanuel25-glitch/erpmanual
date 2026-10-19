@@ -22,7 +22,7 @@ import {
   serializarContextoTesoreria,
 } from "@/lib/tesoreria/contextoTesoreria";
 import { PESTANA_TODOS } from "@/lib/turnosYCierres/lecturaTurnosYCierres";
-import { URL_API_TURNOS_Y_CIERRES, urlDeCaja } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
+import { URL_API_TURNOS_Y_CIERRES, urlDeCaja, urlDeVentas } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
 import { showError } from "@/components/sunmi/SunmiToast";
 
 /** El período y la pestaña como cadena de la URL. Los defaults no se escriben. */
@@ -98,6 +98,11 @@ export function useTurnosYCierres() {
     (id) => router.push(urlDeCaja(id, serializarContexto(ctx, pestana))),
     [router, ctx, pestana]
   );
+  // "Ventas de la Caja #N", con el mismo período para volver.
+  const onVerVentas = useCallback(
+    (id) => router.push(urlDeVentas(id, serializarContexto(ctx, pestana))),
+    [router, ctx, pestana]
+  );
 
   // Le asigna el tipo a un egreso sin clasificar y vuelve a leer: el resultado
   // del turno cambia. Devuelve false si el servidor no lo aceptó.
@@ -135,6 +140,7 @@ export function useTurnosYCierres() {
     onAdelante,
     onCambiarPestana,
     onVerCaja,
+    onVerVentas,
     recargar: cargar,
   };
 }

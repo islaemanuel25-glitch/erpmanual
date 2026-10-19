@@ -43,15 +43,18 @@ export function Separador() {
   return <div className="border-t sunmi-divider" />;
 }
 
-/** El encabezado: "Caja #632 · Damaris" y de qué turno y día es. */
-export function Encabezado({ c, local }) {
+/**
+ * El encabezado: "Caja #632 · Damaris" y de qué turno y día es. `titulo`
+ * reemplaza la primera línea ("Ventas de la Caja #632 · Damaris").
+ */
+export function Encabezado({ c, local, titulo = null }) {
   const est = estadoDeCaja(c);
   const horario = esCerrada(c) ? franjaHoraria(c.apertura, c.cierre) : `desde ${franjaHoraria(c.apertura, null)}`;
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between gap-2">
         <h1 className="min-w-0 truncate text-xl2 font-bold sunmi-text-strong">
-          Caja #{c.id} · {c.nombre}
+          {titulo ?? `Caja #${c.id} · ${c.nombre}`}
         </h1>
         <Insignia texto={est.texto} tono={est.tono} />
       </div>
@@ -243,6 +246,76 @@ export function MovimientosDeCaja({ datos, onVerZ }) {
         </SunmiButton>
       ) : null}
     </div>
+  );
+}
+
+// ── LAS VENTAS DE LA CAJA ────────────────────────────────────────────────
+
+/**
+ * "VENTAS DE LA CAJA #N": todas sus ventas en orden de hora —hora, ticket,
+ * medio y total—, con las anuladas tachadas y las internas marcadas. Tocar una
+ * abre su detalle en Reportes de ventas. Al pie, los tickets y lo cobrado por
+ * medio, que vienen del resumen de la MISMA caja que dibuja la tarjeta.
+ * Recibe lo que contestó `GET /api/turnos-y-cierres/cajas/:id/ventas`.
+ */
+export function VentasDeCaja({ datos, onVerVenta }) {
+  const c = datos.caja;
+  const ventas = datos.ventas || [];
+  const pie = datos.pie || { tickets: 0, medios: [] };
+  return (
+    <div className="space-y-3.5">
+      <Encabezado c={c} local={datos.local?.nombre} titulo={`Ventas de la Caja #${c.id} · ${c.nombre}`} />
+
+      <Bloque titulo="VENTAS">
+        {ventas.length ? (
+          <div className="divide-y sunmi-divide">
+            {ventas.map((v) => (
+              <FilaDeVenta key={v.id} v={v} onVerVenta={onVerVenta} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm2 sunmi-text-muted">Sin ventas.</p>
+        )}
+      </Bloque>
+
+      <Bloque titulo="TOTAL DE LA CAJA">
+        <div data-pie-de-ventas className="space-y-1.5">
+          <Renglon rotulo="Tickets" valor={String(pie.tickets)} fuerte />
+          {pie.medios.map((m) => (
+            <Renglon key={m.medio} rotulo={m.etiqueta} valor={plata(m.monto)} />
+          ))}
+        </div>
+        <p className="text-xs2 sunmi-text-muted">Sin anuladas ni internas, igual que la tarjeta de la caja.</p>
+      </Bloque>
+    </div>
+  );
+}
+
+/** Una venta: hora y ticket, el medio debajo, el total; marcas si las tiene. */
+function FilaDeVenta({ v, onVerVenta }) {
+  const tachada = v.anulada ? "line-through" : "";
+  return (
+    <SunmiButton
+      type="button"
+      color="ghost"
+      data-venta={v.id}
+      data-anulada={v.anulada ? "" : undefined}
+      data-interna={v.interna ? "" : undefined}
+      onClick={() => onVerVenta?.(v.id)}
+      className="w-full min-h-toque px-0 py-2 rounded-none justify-start text-left font-normal"
+    >
+      <span className="flex w-full items-center gap-2">
+        <span className="min-w-0 flex-1">
+          <span className={`block text-sm3 font-semibold sunmi-text-strong ${tachada}`}>
+            {horaAR(v.instante)} · Ticket #{v.numero}
+          </span>
+          <span className="block text-xs2 sunmi-text-muted">{v.medio}</span>
+        </span>
+        {v.anulada ? <Insignia texto="Anulada" tono="danger" /> : null}
+        {v.interna ? <Insignia texto="Interna" tono="muted" /> : null}
+        <span className={`shrink-0 text-sm3 font-semibold tabular-nums sunmi-text-strong ${tachada}`}>{plata(v.total)}</span>
+      </span>
+    </SunmiButton>
   );
 }
 

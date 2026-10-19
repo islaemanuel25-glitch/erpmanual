@@ -35,7 +35,9 @@ import {
   plata,
   renglonDelTurno,
   rotuloDeDia,
+  textoDeHorarioDeVentas,
   textoDelHistorial,
+  horarioDeLaCaja,
 } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
 import { ETIQUETA_TIPO_EGRESO, TIPOS_EGRESO } from "@/lib/caja/tipoEgreso";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
@@ -64,6 +66,7 @@ export default function PantallaTurnosYCierres({
   onAdelante,
   onReintentar,
   onVerCaja,
+  onVerVentas = null,
   puedeClasificar = false,
   onClasificar = null,
 }) {
@@ -101,6 +104,7 @@ export default function PantallaTurnosYCierres({
           abiertosIniciales={abiertosIniciales}
           onCambiarPestana={onCambiarPestana}
           onVerCaja={onVerCaja}
+          onVerVentas={onVerVentas}
           puedeClasificar={puedeClasificar}
           onClasificar={onClasificar}
         />
@@ -130,6 +134,7 @@ export function ListaDeTurnos({
   abiertosIniciales = [],
   onCambiarPestana,
   onVerCaja,
+  onVerVentas = null,
   puedeClasificar = false,
   onClasificar = null,
 }) {
@@ -153,6 +158,7 @@ export function ListaDeTurnos({
             conDia={conDia}
             abiertoInicial={abiertosIniciales.includes(g.clave)}
             onVerCaja={onVerCaja}
+            onVerVentas={onVerVentas}
             puedeClasificar={puedeClasificar}
             onClasificar={onClasificar}
           />
@@ -293,7 +299,7 @@ export function ConsumoDelPersonal({ consumos = [] }) {
   );
 }
 
-export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVerCaja, puedeClasificar = false, onClasificar = null }) {
+export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVerCaja, onVerVentas = null, puedeClasificar = false, onClasificar = null }) {
   // La flecha pliega el TURNO: su desglose. "Quién trabajó" y el resultado se
   // ven siempre; cada caja se despliega sola, varias a la vez.
   const [abierto, setAbierto] = useState(abiertoInicial);
@@ -335,7 +341,7 @@ export function TarjetaDeTurno({ g, conDia = false, abiertoInicial = false, onVe
         </div>
       ) : null}
 
-      <QuienTrabajo cajas={g.cajas} abiertas={abiertas} onAlternar={alternarCaja} onVerCaja={onVerCaja} />
+      <QuienTrabajo cajas={g.cajas} abiertas={abiertas} onAlternar={alternarCaja} onVerCaja={onVerCaja} onVerVentas={onVerVentas} />
 
       <Recuadro rotulo="RESULTADO DEL TURNO" valor={plata(g.resultado)} tono={Number(g.resultado) < 0 ? "danger" : "success"} />
 
@@ -391,28 +397,48 @@ export function DesgloseDelTurno({ g }) {
  * de todo y también con el turno plegado, para no tener que bajar hasta el
  * final. Antes las cajas iban al pie de la tarjeta y solo desplegadas.
  */
-export function QuienTrabajo({ cajas = [], abiertas, onAlternar, onVerCaja }) {
+export function QuienTrabajo({ cajas = [], abiertas, onAlternar, onVerCaja, onVerVentas = null }) {
   if (!cajas.length) return null;
   return (
     <div data-quien-trabajo className="space-y-2">
       <Rotulo>QUIÉN TRABAJÓ</Rotulo>
       {cajas.map((c) => (
-        <PersonaDelTurno key={c.id} c={c} abierta={abiertas.has(c.id)} onAlternar={() => onAlternar(c.id)} onVerCaja={onVerCaja} />
+        <PersonaDelTurno key={c.id} c={c} abierta={abiertas.has(c.id)} onAlternar={() => onAlternar(c.id)} onVerCaja={onVerCaja} onVerVentas={onVerVentas} />
       ))}
     </div>
   );
 }
 
-/** "Caja #938 · 00:07–08:08", o "desde 00:07" mientras siga abierta. */
-const horarioDeLaCaja = (c) =>
-  esCerrada(c) ? `${horaAR(c.apertura)}–${horaAR(c.cierre)}` : `desde ${horaAR(c.apertura)}`;
+/**
+ * CUÁNDO VENDIÓ LA CAJA, arriba de su efectivo: la primera y la última venta, y
+ * cuántos tickets con el enlace a "Ventas de la Caja #N". Sin ventas, lo dice y
+ * no ofrece el enlace. Es el recuadro chico ámbar del kit (`sunmi-btn-warning-soft`).
+ */
+export function HorarioDeVentasDeLaCaja({ c, onVerVentas }) {
+  const t = textoDeHorarioDeVentas(c.horarioDeVentas);
+  return (
+    <div data-horario-de-ventas className="rounded-xl sunmi-btn-warning-soft px-3 py-2">
+      <p className="text-sm3 font-semibold sunmi-text-strong">{t.horario}</p>
+      {t.sinVentas ? null : (
+        <SunmiButton
+          type="button"
+          color="ghost"
+          onClick={() => onVerVentas?.(c.id)}
+          className="w-full min-h-toque p-0 rounded-none justify-start text-left text-sm2 font-semibold sunmi-text-accent"
+        >
+          {`${t.tickets} · Ver ventas de esta caja ›`}
+        </SunmiButton>
+      )}
+    </div>
+  );
+}
 
 /**
  * Una persona del turno: su caja y cómo cerró. Toda la cabecera se toca y
  * despliega, adentro de la misma tarjetita, la caja como en su detalle (V2 · B)
  * —las MISMAS piezas `EfectivoDeLaCaja` y `CobradoEnLaCaja`, sin recalcular—.
  */
-export function PersonaDelTurno({ c, abierta = false, onAlternar, onVerCaja }) {
+export function PersonaDelTurno({ c, abierta = false, onAlternar, onVerCaja, onVerVentas = null }) {
   const cierre = comoCerroLaCaja(c);
   const historial = textoDelHistorial(c.historialDelMes);
   return (
@@ -451,6 +477,7 @@ export function PersonaDelTurno({ c, abierta = false, onAlternar, onVerCaja }) {
 
       {abierta ? (
         <div data-detalle-de-la-caja className="space-y-3 px-3 pb-3">
+          <HorarioDeVentasDeLaCaja c={c} onVerVentas={onVerVentas} />
           <EfectivoDeLaCaja c={c} />
           <CobradoPorMedioElectronico c={c} />
           <SunmiButton

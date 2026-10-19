@@ -3,13 +3,14 @@
 // components/turnos-y-cierres/useCajaDeTurnosYCierres.js
 //
 // La lectura de UNA caja: su detalle y los datos de su Z. La comparten la
-// pantalla del detalle y la del comprobante, que piden lo mismo.
+// pantalla del detalle y la del comprobante, que piden lo mismo. Con
+// `recurso = "/ventas"` lee sus ventas: la misma caja, el mismo alcance.
 
 import { useCallback, useEffect, useState } from "react";
 
 import { URL_API_TURNOS_Y_CIERRES } from "@/lib/turnosYCierres/pantallaTurnosYCierres";
 
-export function useCajaDeTurnosYCierres(id) {
+export function useCajaDeTurnosYCierres(id, recurso = "") {
   const [datos, setDatos] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -19,7 +20,7 @@ export function useCajaDeTurnosYCierres(id) {
     setCargando(true);
     setError("");
     try {
-      const res = await fetch(`${URL_API_TURNOS_Y_CIERRES}/cajas/${encodeURIComponent(id)}`, {
+      const res = await fetch(`${URL_API_TURNOS_Y_CIERRES}/cajas/${encodeURIComponent(id)}${recurso}`, {
         cache: "no-store",
         credentials: "include",
       });
@@ -32,7 +33,7 @@ export function useCajaDeTurnosYCierres(id) {
     } finally {
       setCargando(false);
     }
-  }, [id]);
+  }, [id, recurso]);
 
   useEffect(() => {
     cargar();

@@ -63,6 +63,7 @@ function Contenido() {
         onAdelante={t.onAdelante}
         onReintentar={t.recargar}
         onVerCaja={t.onVerCaja}
+        onVerVentas={t.onVerVentas}
         puedeClasificar={puedeClasificar}
         onClasificar={t.onClasificar}
       />

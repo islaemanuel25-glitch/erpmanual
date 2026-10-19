@@ -9,51 +9,23 @@
 //
 // El alcance es el de la lista (`alcanceDeCajas`): una caja de otro local no
 // existe para esta sesión (404) y la de otro operador, para un cajero, tampoco
-// se muestra (403). Solo lee.
+// se muestra (403). Lo decide `cajaDelModulo`, el mismo que usa la ruta de sus
+// ventas. Solo lee.
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getUsuarioSession } from "@/lib/auth";
-import { checkPerm } from "@/lib/authorize";
-import { resolveVistaOperativa } from "@/lib/grupos";
-import { puedeOperarSinOperador } from "@/lib/operador";
-import { identidadParaMirar } from "@/lib/caja/identidadCajaServer";
-import { PERMISO_CAJERO, PERMISOS_VER_TODO, alcanceDeCajas, puedeVerCajaDelModulo } from "@/lib/turnosYCierres/alcance";
-import { leerDetalleDeCaja } from "@/lib/turnosYCierres/lecturaTurnosYCierresServer";
+import { cajaDelModulo } from "@/lib/turnosYCierres/cajaDelModuloServer";
 
 export async function GET(req, { params }) {
   try {
-    const session = getUsuarioSession(req);
-    if (!session) return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
-
-    const perm = checkPerm(session, [PERMISO_CAJERO, ...PERMISOS_VER_TODO]);
-    if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
-
-    const cajaId = Number((await params)?.id);
-    if (!Number.isInteger(cajaId) || cajaId <= 0) {
-      return NextResponse.json({ ok: false, error: "Número de caja inválido." }, { status: 400 });
+    const acceso = await cajaDelModulo(req, prisma, (await params)?.id);
+    if (!acceso.ok) {
+      return NextResponse.json(
+        { ok: false, error: acceso.error, ...(acceso.needsContexto ? { needsContexto: true } : {}) },
+        { status: acceso.status }
+      );
     }
-
-    const vista = await resolveVistaOperativa(req);
-    if (vista.error) {
-      return NextResponse.json({ ok: false, error: vista.error, needsContexto: vista.needsContexto }, { status: vista.status });
-    }
-    if (!vista.localId) {
-      return NextResponse.json({ ok: false, error: "Elegí un local para ver sus cajas.", needsContexto: true }, { status: 409 });
-    }
-    const localId = vista.localId;
-
-    const alcance = alcanceDeCajas(session, { esDueno: puedeOperarSinOperador(session, { localId }) });
-    if (!alcance) return NextResponse.json({ ok: false, error: "Sin permiso para ver cajas." }, { status: 403 });
-
-    const leida = await leerDetalleDeCaja(prisma, cajaId);
-    if (!leida || leida.caja.localId !== localId) {
-      return NextResponse.json({ ok: false, error: `No existe la caja #${cajaId} en este local.` }, { status: 404 });
-    }
-    const identidad = await identidadParaMirar(req, session, { localId });
-    if (!puedeVerCajaDelModulo(leida.caja, { localId, alcance, identidad })) {
-      return NextResponse.json({ ok: false, error: "Esa caja es de otro operador." }, { status: 403 });
-    }
+    const { leida, localId } = acceso;
 
     return NextResponse.json({
       ok: true,
