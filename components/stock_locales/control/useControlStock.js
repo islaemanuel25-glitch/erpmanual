@@ -24,14 +24,14 @@
 // Un 428 es "falta el PIN": se levanta el mismo modal que en la caja.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useOperadorContext } from "@/app/context/OperadorContext";
 import { useStockData } from "@/hooks/useStockData";
 import { FILTRO_CONTROL, VISTA_CONTROL } from "@/lib/stock/control/controlStock";
 
 const API = "/api/stock_locales/control";
 
-export function useControlStock({ puedeGestionar = false } = {}) {
-  const { requerirOperador } = useOperadorContext();
+// `requerirOperador` lo pasa la página desde `useOperadorContext`: así el hook
+// se puede montar entero en el arnés de la tarjeta, que no tiene el shell.
+export function useControlStock({ puedeGestionar = false, requerirOperador } = {}) {
   const [vista, setVista] = useState(VISTA_CONTROL.INICIO);
   const [estado, setEstado] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -71,7 +71,7 @@ export function useControlStock({ puedeGestionar = false } = {}) {
         return { ok: false, error: "Sin conexión." };
       }
       const datos = await r.json().catch(() => ({}));
-      if (r.status === 428) requerirOperador();
+      if (r.status === 428) requerirOperador?.();
       if (!r.ok || datos.ok === false) {
         return { ok: false, status: r.status, error: datos.error || `El servidor contestó ${r.status}.`, ...datos };
       }
@@ -207,8 +207,9 @@ export function useControlStock({ puedeGestionar = false } = {}) {
 
   /**
    * GUARDAR UN PRODUCTO: `{ total }` (`null` lo borra) o `{ estaBien: true }`,
-   * que es el stock del sistema. Devuelve si se guardó: la tarjeta decide con
-   * eso si muestra "No se guardó".
+   * que es el stock del sistema. Devuelve la tarjeta como quedó —o false si no
+   * se guardó—: con "Está bien" el total lo decide el servidor, y la tarjeta lo
+   * pone en el campo con lo que vuelve.
    */
   const guardarTotal = useCallback(
     async (productoLocalId, cuerpo) => {
@@ -226,7 +227,7 @@ export function useControlStock({ puedeGestionar = false } = {}) {
         setFijado((f) => (f && f.id === r.item.id ? r.item : f));
       }
       if (r.resumen) setResumen(r.resumen);
-      return true;
+      return r.item ?? true;
     },
     [pedir]
   );

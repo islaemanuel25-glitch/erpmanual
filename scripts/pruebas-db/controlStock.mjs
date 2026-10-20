@@ -289,7 +289,11 @@ try {
     const deNuevo = await fijar(S.dueno, P.coca, 2);
     ok("contarlo de nuevo vuelve a fijar: 4 → 2", deNuevo.status === 200 && (await stockDe(P.coca)) === 2, json(deNuevo));
 
+    // Lo que ve la pantalla antes de escribir "1,25" en el queso, y lo que
+    // contesta el guardado: el arnés de la tarjeta lo usa tal cual.
+    guardar("listaAntesDelQueso", await lista(S.dueno, "sin_contar", "q=Queso"));
     const kg = await fijar(S.dueno, P.queso, 1.25);
+    guardar("guardadoDelQueso", kg);
     ok("el queso se cuenta en kg, con decimales", kg.status === 200 && (await stockDe(P.queso)) === 1.25, json(kg));
     const sinFila = await fijar(S.ana, P.nuevo, 2);
     ok("un producto sin fila de stock: la crea y queda en el total", sinFila.status === 200 && (await stockDe(P.nuevo)) === 2, json(sinFila));
@@ -300,7 +304,9 @@ try {
     const borrarSinContar = await fijar(S.dueno, P.fideos, null);
     ok("borrar uno que nadie contó no hace nada", borrarSinContar.status === 200 && (await stockDe(P.fideos)) === 4 && (await auditoriasDe(P.fideos)) === 0, json(borrarSinContar));
 
+    guardar("listaAntesDeEstaBien", await lista(S.ana, "sin_contar", "q=Aceite"));
     const bien = await estaBien(S.ana, P.aceite);
+    guardar("estaBienDelAceite", bien);
     ok(
       "'Está bien' guarda el stock del sistema: el aceite queda en 3, contado 3, sin diferencia",
       bien.status === 200 && (await stockDe(P.aceite)) === 3 && bien.item?.conteo?.total === 3 && bien.item?.conteo?.diferencia === 0,

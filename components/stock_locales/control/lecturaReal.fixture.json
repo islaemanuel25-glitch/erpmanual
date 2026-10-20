@@ -29,10 +29,178 @@
       "conteo": {
         "total": 3,
         "contadoPor": "Emanuel",
-        "en": "2026-10-20T13:38:02.941Z",
+        "en": "2026-10-20T13:57:44.329Z",
         "sistema": 5,
         "diferencia": -2
       }
+    }
+  },
+  "listaAntesDelQueso": {
+    "ok": true,
+    "items": [
+      {
+        "id": 2,
+        "localId": 1,
+        "baseId": 2,
+        "nombre": "Queso por kg",
+        "codigoBarra": "7790000000002",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "kg",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 2.5,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "conteo": null
+      }
+    ],
+    "total": 1,
+    "totalPages": 1,
+    "resumenControl": {
+      "controlId": 1,
+      "total": 8,
+      "contados": 1,
+      "sinContar": 7,
+      "conDiferencia": 1
+    }
+  },
+  "guardadoDelQueso": {
+    "ok": true,
+    "item": {
+      "id": 2,
+      "localId": 1,
+      "baseId": 2,
+      "nombre": "Queso por kg",
+      "codigoBarra": "7790000000002",
+      "categoriaId": null,
+      "proveedorId": null,
+      "areaFisicaId": null,
+      "unidadMedida": "kg",
+      "factorPack": 1,
+      "precioUnitario": 600,
+      "precioCosto": 600,
+      "precioVentaUnitario": 1000,
+      "precioVenta": 1000,
+      "margen": null,
+      "stock": 1.25,
+      "stockMin": null,
+      "stockMax": null,
+      "limitesConfigurados": false,
+      "faltante": false,
+      "modoCompraProveedor": "BULTO",
+      "pesoReferenciaKg": null,
+      "pesoEsFijo": false,
+      "modoVentaDeposito": "PESO",
+      "conteo": {
+        "total": 1.25,
+        "contadoPor": "Emanuel",
+        "en": "2026-10-20T13:57:44.629Z",
+        "sistema": 2.5,
+        "diferencia": -1.25
+      }
+    },
+    "resumen": {
+      "controlId": 1,
+      "total": 8,
+      "contados": 2,
+      "sinContar": 6,
+      "conDiferencia": 2
+    }
+  },
+  "listaAntesDeEstaBien": {
+    "ok": true,
+    "items": [
+      {
+        "id": 10,
+        "localId": 1,
+        "baseId": 10,
+        "nombre": "Aceite 900",
+        "codigoBarra": "7790000000011",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 3,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "conteo": null
+      }
+    ],
+    "total": 1,
+    "totalPages": 1,
+    "resumenControl": {
+      "controlId": 1,
+      "total": 8,
+      "contados": 3,
+      "sinContar": 5,
+      "conDiferencia": 3
+    }
+  },
+  "estaBienDelAceite": {
+    "ok": true,
+    "item": {
+      "id": 10,
+      "localId": 1,
+      "baseId": 10,
+      "nombre": "Aceite 900",
+      "codigoBarra": "7790000000011",
+      "categoriaId": null,
+      "proveedorId": null,
+      "areaFisicaId": null,
+      "unidadMedida": "unidad",
+      "factorPack": 1,
+      "precioUnitario": 600,
+      "precioCosto": 600,
+      "precioVentaUnitario": 1000,
+      "precioVenta": 1000,
+      "margen": null,
+      "stock": 3,
+      "stockMin": null,
+      "stockMax": null,
+      "limitesConfigurados": false,
+      "faltante": false,
+      "modoCompraProveedor": "BULTO",
+      "pesoReferenciaKg": null,
+      "pesoEsFijo": false,
+      "modoVentaDeposito": "PESO",
+      "conteo": {
+        "total": 3,
+        "contadoPor": "Ana",
+        "en": "2026-10-20T13:57:44.774Z",
+        "sistema": 3,
+        "diferencia": 0
+      }
+    },
+    "resumen": {
+      "controlId": 1,
+      "total": 8,
+      "contados": 4,
+      "sinContar": 4,
+      "conDiferencia": 3
     }
   },
   "listaSinContar": {
@@ -188,7 +356,7 @@
         "conteo": {
           "total": 3,
           "contadoPor": "Ana",
-          "en": "2026-10-20T13:38:03.386Z",
+          "en": "2026-10-20T13:57:44.774Z",
           "sistema": 3,
           "diferencia": 0
         }
@@ -221,7 +389,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T13:38:03.226Z",
+          "en": "2026-10-20T13:57:44.568Z",
           "sistema": 4,
           "diferencia": -2
         }
@@ -254,7 +422,7 @@
         "conteo": {
           "total": 1.25,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T13:38:03.262Z",
+          "en": "2026-10-20T13:57:44.629Z",
           "sistema": 2.5,
           "diferencia": -1.25
         }
@@ -287,7 +455,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Ana",
-          "en": "2026-10-20T13:38:03.302Z",
+          "en": "2026-10-20T13:57:44.670Z",
           "sistema": 0,
           "diferencia": 2
         }
@@ -334,7 +502,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T13:38:03.226Z",
+          "en": "2026-10-20T13:57:44.568Z",
           "sistema": 4,
           "diferencia": -2
         }
@@ -367,7 +535,7 @@
         "conteo": {
           "total": 1.25,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T13:38:03.262Z",
+          "en": "2026-10-20T13:57:44.629Z",
           "sistema": 2.5,
           "diferencia": -1.25
         }
@@ -400,7 +568,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Ana",
-          "en": "2026-10-20T13:38:03.302Z",
+          "en": "2026-10-20T13:57:44.670Z",
           "sistema": 0,
           "diferencia": 2
         }
@@ -465,7 +633,7 @@
     "control": {
       "id": 2,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-20T13:38:03.570Z",
+      "abiertoEn": "2026-10-20T13:57:44.945Z",
       "terminadoEn": null,
       "terminadoPorNombre": null
     },
@@ -500,7 +668,7 @@
     },
     "control": {
       "id": 1,
-      "abiertoEn": "2026-10-20T13:38:02.874Z"
+      "abiertoEn": "2026-10-20T13:57:44.266Z"
     },
     "vendidos": [
       {
@@ -545,7 +713,7 @@
     "control": {
       "id": 1,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-20T13:38:02.874Z",
+      "abiertoEn": "2026-10-20T13:57:44.266Z",
       "terminadoEn": null,
       "terminadoPorNombre": null
     },
@@ -603,7 +771,7 @@
     "control": {
       "id": 1,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-20T13:38:02.874Z",
+      "abiertoEn": "2026-10-20T13:57:44.266Z",
       "terminadoEn": null,
       "terminadoPorNombre": null
     },
@@ -661,16 +829,16 @@
     "control": null,
     "ultimo": {
       "id": 1,
-      "abiertoEn": "2026-10-20T13:38:02.874Z",
-      "terminadoEn": "2026-10-20T13:38:03.820Z",
+      "abiertoEn": "2026-10-20T13:57:44.266Z",
+      "terminadoEn": "2026-10-20T13:57:45.189Z",
       "terminadoPorNombre": "Emanuel",
       "puestosEnCero": 2
     },
     "historial": [
       {
         "id": 1,
-        "abiertoEn": "2026-10-20T13:38:02.874Z",
-        "terminadoEn": "2026-10-20T13:38:03.820Z",
+        "abiertoEn": "2026-10-20T13:57:44.266Z",
+        "terminadoEn": "2026-10-20T13:57:45.189Z",
         "terminadoPorNombre": "Emanuel",
         "puestosEnCero": 2
       }
@@ -689,8 +857,8 @@
     "control": {
       "id": 1,
       "estado": "TERMINADO",
-      "abiertoEn": "2026-10-20T13:38:02.874Z",
-      "terminadoEn": "2026-10-20T13:38:03.820Z",
+      "abiertoEn": "2026-10-20T13:57:44.266Z",
+      "terminadoEn": "2026-10-20T13:57:45.189Z",
       "terminadoPorNombre": "Emanuel"
     },
     "congelado": true,
@@ -768,7 +936,7 @@
     },
     "control": {
       "id": 3,
-      "abiertoEn": "2026-10-20T13:38:03.950Z",
+      "abiertoEn": "2026-10-20T13:57:45.274Z",
       "abiertoPorNombre": "Cuenta Mini",
       "controlId": 3,
       "total": 8,
@@ -784,7 +952,7 @@
     "ok": true,
     "control": {
       "id": 2,
-      "abiertoEn": "2026-10-20T13:38:03.570Z"
+      "abiertoEn": "2026-10-20T13:57:44.945Z"
     },
     "productos": [
       {
@@ -814,7 +982,7 @@
             "id": 52,
             "origen": "VENTA",
             "origenRef": "9002",
-            "instante": "2026-10-20T13:38:05.002Z",
+            "instante": "2026-10-20T13:57:46.225Z",
             "cambio": -1
           }
         ],

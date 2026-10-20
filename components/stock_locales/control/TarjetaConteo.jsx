@@ -110,6 +110,14 @@ export default function TarjetaConteo({ item, esDeposito, proveedorNombre = null
 
   useEffect(() => () => clearTimeout(espera.current), []);
 
+  // Lo último que se mandó, para no mandarlo dos veces: Enter guarda y lleva el
+  // foco al buscador, y el campo, al perderlo, volvía a guardar lo mismo con el
+  // `total` viejo de antes de que contestara el servidor.
+  const enviado = useRef(total);
+  useEffect(() => {
+    enviado.current = total;
+  }, [total, conteo?.en]);
+
   async function guardar(v = valores) {
     clearTimeout(espera.current);
     const r = totalDeCasilleros(v, casilleros);
@@ -118,16 +126,37 @@ export default function TarjetaConteo({ item, esDeposito, proveedorNombre = null
       return;
     }
     const nuevo = r.vacio ? null : r.total;
-    if (nuevo === total && !fallo) return;
+    if (nuevo === enviado.current && !fallo) return;
+    const antes = enviado.current;
+    enviado.current = nuevo;
     const ok = await onGuardar?.(item.id, { total: nuevo });
+    if (!ok) enviado.current = antes;
     setFallo(!ok);
     // Guardado, el campo dice el total como lo guarda el servidor ("3,0" → "3").
     if (ok) setValores(casillerosDesdeTotal(nuevo, casilleros));
   }
 
+  // ── "ESTÁ BIEN" Y "ACEPTAR" SON BOTONES DE LA FILA, Y ESO ERA EL ERROR ─────
+  //
+  // Con el foco en el campo, tocar un botón de la fila le saca el foco al campo
+  // pero `alSalir` lo ignora —el foco se quedó en la fila, como al pasar de
+  // bultos a sueltas—, así que `enFoco` seguía en true. Y mientras se escribe, lo
+  // que contesta el servidor no pisa el campo: el "Está bien" se guardaba, la
+  // tarjeta nueva llegaba, y el campo seguía vacío y la fila "escribiendo". El
+  // próximo salir del campo mandaba ese vacío, que BORRA el conteo.
+  //
+  // Tocar uno de los dos es terminar de escribir: el foco ya no cuenta, y el
+  // campo dice lo que quedó guardado.
   async function estaBien() {
-    const ok = await onGuardar?.(item.id, { estaBien: true });
-    setFallo(!ok);
+    setEnFoco(false);
+    const guardado = await onGuardar?.(item.id, { estaBien: true });
+    setFallo(!guardado);
+    if (guardado?.conteo) setValores(casillerosDesdeTotal(guardado.conteo.total, casilleros));
+  }
+
+  function aceptar() {
+    setEnFoco(false);
+    guardar();
   }
 
   // Un cambio que vino del − o del +: se guarda a los 1,5 s sin tocar más.
@@ -192,15 +221,20 @@ export default function TarjetaConteo({ item, esDeposito, proveedorNombre = null
 
   const escrito = totalDeCasilleros(valores, casilleros);
   const sinGuardar = !igualesValores(valores, guardados);
+  // "Contado" en el color de acción es ESCRIBIENDO: un valor distinto de lo
+  // guardado, sin aceptar. Tener el foco en un campo vacío no es escribir.
   const estado = fallo
     ? ESTADO_FILA.ERROR
-    : enFoco || sinGuardar
+    : sinGuardar
       ? ESTADO_FILA.ESCRIBIENDO
       : total != null
         ? ESTADO_FILA.CONTADO
         : ESTADO_FILA.SIN_CONTAR;
   const stockDelSistema = Number(item?.stock ?? 0);
-  const conEstaBien = total == null && !sinGuardar && !fallo && stockDelSistema >= 0;
+  // En el renglón del botón va uno de los dos: "Aceptar" si hay algo escrito que
+  // no está guardado, y si no "Está bien" mientras está sin contar.
+  const conAceptar = sinGuardar && !escrito.vacio;
+  const conEstaBien = !conAceptar && total == null && !sinGuardar && !fallo && stockDelSistema >= 0;
 
   const campo = (clave, etiqueta, ref) => (
     <SunmiCampoCantidad
@@ -249,7 +283,11 @@ export default function TarjetaConteo({ item, esDeposito, proveedorNombre = null
       <EncabezadoDeLaFila estado={estado} conteo={conteo} />
       {/* "Está bien" va en su renglón, del alto de los campos (44 px): al lado
           no entran los dos grupos del depósito en 360 px. */}
-      {conEstaBien ? (
+      {conAceptar ? (
+        <SunmiButton color="primary" type="button" onClick={aceptar} className="min-h-toque w-full">
+          Aceptar
+        </SunmiButton>
+      ) : conEstaBien ? (
         <SunmiButton color="primary" type="button" onClick={estaBien} className="min-h-toque">
           Está bien
         </SunmiButton>

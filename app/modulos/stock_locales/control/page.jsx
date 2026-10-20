@@ -8,6 +8,7 @@
 // dibujar un botón que el servidor va a rechazar.
 "use client";
 
+import { useOperadorContext } from "@/app/context/OperadorContext";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
 import PantallaControlStock from "@/components/stock_locales/control/PantallaControlStock";
@@ -27,7 +28,8 @@ export default function ControlStockPage() {
 }
 
 function ControlStock({ puedeGestionar }) {
-  const c = useControlStock({ puedeGestionar });
+  const { requerirOperador } = useOperadorContext();
+  const c = useControlStock({ puedeGestionar, requerirOperador });
   return (
     <div className="w-full min-h-full mx-auto max-w-xl px-4 pt-4 pb-4">
       <PantallaControlStock c={c} puedeGestionar={puedeGestionar} />
