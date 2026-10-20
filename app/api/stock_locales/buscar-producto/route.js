@@ -12,7 +12,7 @@ import {
   rankearLiteral,
   resolverContraCatalogo,
 } from "@/lib/productos/busquedaFuzzyProducto";
-import { orCodigoBarraProductoLocal, codigosDeProductoLocal } from "@/lib/productos/busquedaCodigoBarra";
+import { buscarProductoLocalPorCodigo, codigosDeProductoLocal } from "@/lib/productos/busquedaCodigoBarra";
 
 const FUZZY_CANDIDATE_LIMIT = 10000;
 const FUZZY_TOP_RESULTS = 10;
@@ -66,24 +66,20 @@ export async function GET(req) {
     });
     const esDeposito = local?.es_deposito === true;
 
-    // Match exacto por código de barras: código propio del local + los dos globales
-    // de la base (helper centralizado, mismos códigos que el POS).
-    const exacto = await prisma.productoLocal.findMany({
-      where: {
-        localId,
-        activo: true,
-        base: { activo: true },
-        OR: orCodigoBarraProductoLocal(q),
+    // Match exacto por código de barras: el mismo buscador que el POS.
+    const exacto = await buscarProductoLocalPorCodigo(prisma, {
+      localId,
+      codigo: q,
+      consulta: {
+        include: {
+          base: true,
+          stock: { where: { localId }, select: { cantidad: true } },
+        },
       },
-      include: {
-        base: true,
-        stock: { where: { localId }, select: { cantidad: true } },
-      },
-      take: 1,
     });
 
-    if (exacto.length > 0) {
-      const items = mapProductos(exacto, esDeposito);
+    if (exacto) {
+      const items = mapProductos([exacto], esDeposito);
       return NextResponse.json({ ok: true, items });
     }
 

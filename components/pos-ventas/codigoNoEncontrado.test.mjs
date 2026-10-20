@@ -28,6 +28,7 @@ import {
   avisarErrorDeLectura,
 } from "@/lib/pos-ventas/lecturaEscaner";
 import AvisoProductoNoEncontrado, { TITULO_NO_ENCONTRADO } from "@/components/pos-ventas/AvisoProductoNoEncontrado";
+import { buscarProductoLocalPorCodigo } from "@/lib/productos/busquedaCodigoBarra";
 
 const RAIZ = path.resolve(import.meta.dirname, "../..");
 const leer = (ruta) =>
@@ -296,17 +297,32 @@ test("CNE15. el POS pide la regla estricta; el tipeo a mano sigue sin aviso", ()
   assert.deepEqual(decidirLectura({ items: [], texto: "yerba", autoAdd: false, estricto: true }), { tipo: LECTURA.MOSTRAR });
 });
 
-test("CNE16. el endpoint del POS busca el mismo GTIN con otros ceros, DESPUÉS del exacto", () => {
+// El exacto del POS se mudó a `buscarProductoLocalPorCodigo`, compartido con
+// Stock. Este candado afirma las dos mitades: que el endpoint lo usa con lo que
+// se escaneó, y que la función prueba el código tal cual ANTES que las otras
+// formas del GTIN —ejerciéndola, no leyéndola—.
+test("CNE16. el endpoint del POS busca el mismo GTIN con otros ceros, DESPUÉS del exacto", async () => {
   const ruta = leer("app/api/pos-ventas/buscar-producto/route.js");
-  const iExacto = ruta.indexOf("let exacto = await buscarExacto(q);");
-  const iVariantes = ruta.indexOf("exacto = await buscarExacto({ in: otrasFormas });");
-  assert.ok(iExacto > -1, "no busca el código tal cual primero");
-  assert.ok(iVariantes > iExacto, "no prueba las otras formas del GTIN, o las prueba antes");
-  assert.match(ruta, /const otrasFormas = variantesGtin\(q\)\.filter\(\(v\) => v !== q\);/);
-  // Y que se prueben justo cuando el tal cual no encontró y hay otras formas.
   assert.match(
     ruta,
-    /if \(exacto\.length === 0 && otrasFormas\.length > 0\) \{\s*exacto = await buscarExacto\(\{ in: otrasFormas \}\);/,
-    "las otras formas del GTIN no se buscan cuando el código tal cual no está"
+    /const exacto = await buscarProductoLocalPorCodigo\(prisma, \{\s*localId,\s*codigo: q,/,
+    "el endpoint del POS no busca el código con el buscador compartido"
   );
+  assert.doesNotMatch(ruta, /orCodigoBarraProductoLocal|variantesGtin/, "el endpoint volvió a buscar por código por su cuenta");
+
+  const consultas = [];
+  const db = { productoLocal: { findFirst: async ({ where }) => (consultas.push(where), null) } };
+  await buscarProductoLocalPorCodigo(db, { localId: 1, codigo: "0012345678905" });
+  const codigosPedidos = consultas.map((w) => w.codigo_barra_propio ?? w.OR?.[0]?.codigo_barra_propio);
+  assert.deepEqual(codigosPedidos.slice(0, 2), ["0012345678905", "0012345678905"], "no busca el código tal cual primero");
+  assert.deepEqual(
+    codigosPedidos.slice(2).map((c) => [...c.in].sort()),
+    [["00012345678905", "012345678905"], ["00012345678905", "012345678905"]],
+    "no prueba las otras formas del GTIN, o las prueba antes"
+  );
+  // Y que no se prueben cuando el tal cual encontró.
+  consultas.length = 0;
+  const encontrado = { productoLocal: { findFirst: async ({ where }) => (consultas.push(where), { id: 9 }) } };
+  assert.equal((await buscarProductoLocalPorCodigo(encontrado, { localId: 1, codigo: "0012345678905" }))?.id, 9);
+  assert.equal(consultas.length, 1, "las otras formas se buscan aunque el código tal cual esté");
 });

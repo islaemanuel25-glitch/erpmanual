@@ -6,6 +6,7 @@ import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
 import { productoVisibleWhere } from "@/lib/visibilidad";
 import { mapStockItemLocal, mapStockItemDeposito } from "@/lib/stock/mapItem";
+import { buscarProductoLocalPorCodigo } from "@/lib/productos/busquedaCodigoBarra";
 import {
   condicionesPrisma,
   condicionesSql,
@@ -25,6 +26,20 @@ function buildTextOR(q) {
         ],
       }
     : {};
+}
+
+// ── UN CÓDIGO ESCANEADO O TIPEADO SE RESUELVE COMO EN LA CAJA ───────────────
+//
+// `buildTextOR` mira los dos códigos globales de la base y no ve el código PROPIO
+// que el local le agrega a un producto del depósito (vive en ProductoLocal): la
+// caja lo leía y Stock no lo encontraba. Si `q` es un código que el buscador del
+// POS reconoce en este local, el listado es ese producto y nada más —con los
+// filtros de la pantalla encima—; si no, sigue la búsqueda de texto de siempre.
+// El propio de otro local no cuenta, y un propio gana sobre un global igual.
+async function getProductoLocalIdPorCodigo(localId, q) {
+  if (!q) return null;
+  const pl = await buscarProductoLocalPorCodigo(prisma, { localId, codigo: q, consulta: { select: { id: true } } });
+  return pl?.id ?? null;
 }
 
 // Código interno por proveedor (Opción C): SOLO con proveedor + q. Match EXACTO.
@@ -125,8 +140,11 @@ export async function GET(req) {
       const grupoIdLocal = await getGrupoIdDeLocal(localId);
       const baseIdsCodigo = await getBaseIdsCodigo(grupoIdLocal, provNum, q);
       const proveedorBaseFilter = provNum ? { proveedor_id: provNum } : {};
+      const plIdPorCodigo = await getProductoLocalIdPorCodigo(localId, q);
       let baseClause;
-      if (q) {
+      if (plIdPorCodigo) {
+        baseClause = proveedorBaseFilter;
+      } else if (q) {
         const proveedorYTexto = { AND: [proveedorBaseFilter, buildTextOR(q)] };
         baseClause = baseIdsCodigo.length
           ? { OR: [proveedorYTexto, { id: { in: baseIdsCodigo } }] }
@@ -178,6 +196,7 @@ export async function GET(req) {
       // WHERE único, compartido por count(), findMany paginado y camino hybrid.
       const whereLocal = {
         localId,
+        ...(plIdPorCodigo ? { id: plIdPorCodigo } : {}),
         activo: true,
         ...(estadoStockClauses.length ? { AND: estadoStockClauses } : {}),
         base: {
@@ -335,8 +354,11 @@ export async function GET(req) {
       const provNumDep = proveedor ? Number(proveedor) : null;
       const baseIdsCodigoDepo = await getBaseIdsCodigo({ in: grupoIds }, provNumDep, q);
       const proveedorBaseFilterDepo = provNumDep ? { proveedor_id: provNumDep } : {};
+      const plIdPorCodigoDepo = await getProductoLocalIdPorCodigo(localId, q);
       let baseClauseDepo;
-      if (q) {
+      if (plIdPorCodigoDepo) {
+        baseClauseDepo = proveedorBaseFilterDepo;
+      } else if (q) {
         const proveedorYTextoDepo = { AND: [proveedorBaseFilterDepo, buildTextOR(q)] };
         baseClauseDepo = baseIdsCodigoDepo.length
           ? { OR: [proveedorYTextoDepo, { id: { in: baseIdsCodigoDepo } }] }
@@ -374,6 +396,7 @@ export async function GET(req) {
 
       const whereDepo = {
         localId,
+        ...(plIdPorCodigoDepo ? { id: plIdPorCodigoDepo } : {}),
         activo: true,
         ...(estadoStockClausesDepo.length ? { AND: estadoStockClausesDepo } : {}),
         base: {

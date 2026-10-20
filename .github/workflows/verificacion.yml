@@ -301,6 +301,11 @@ jobs:
           # existencia y los límites, por la ruta de ajuste. Base descartable.
           echo ""
           node --import ./scripts/alias-loader.mjs scripts/pruebas-db/azulChatStockConsulta.mjs
+          # Stock encuentra por el código propio del local como la caja, y no
+          # en otro local: listado de Stock y buscador del POS, handlers reales.
+          # Base descartable.
+          echo ""
+          node --import ./scripts/alias-loader.mjs scripts/pruebas-db/stockCodigoPropio.mjs
           # Pedidos y Azul Chat · pedidos_pendientes (Tanda 9A): cancelar marca y
           # no borra, cada lectura de pedidos deja afuera al cancelado como
           # cuando se borraba, rehacer por el carrito, y la capacidad. Todo por
