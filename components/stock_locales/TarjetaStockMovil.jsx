@@ -118,22 +118,38 @@ export default function TarjetaStockMovil({
         </span>
       }
       valor={
-        <BloqueValorTarjeta className="flex-col justify-center">
+        // `min-w-0`: el recuadro mide su ancho del tema, pero dentro de la fila
+        // nunca puede empujar más allá del borde de la tarjeta.
+        <BloqueValorTarjeta className="flex-col justify-center min-w-0">
           <RotuloBloqueValor className="sunmi-text-muted">
             STOCK · {unidad}
           </RotuloBloqueValor>
           {/* El número grande es lo que la persona vino a ver. La presentación
               es la MISMA pieza que usa la tabla de escritorio: en depósito un
-              Pack x10 con 45 unidades se lee "4 bultos + 5 uds". */}
-          {/* ── EL DESGLOSE BAJA DE RENGLÓN, NO SE SALE ────────────────────
-              "-2 bultos + -8 uds" no entra en el recuadro y se salía. Cada
-              parte va entera y el corte solo puede caer entre las dos, así que
-              donde hoy entra en un renglón sigue en uno. */}
+              Pack x10 con 45 unidades es 4 bultos y 5 uds. */}
+          {/* ── EL DESGLOSE VA EN DOS RENGLONES, SIEMPRE ────────────────────
+              "-3 bultos + -8 uds" en un renglón se cortaba contra el borde: la
+              versión anterior dejaba que el navegador decidiera dónde cortar, y
+              no alcanzó. Ahora no depende del ancho: los bultos en un renglón,
+              las sueltas en el siguiente, sin el "+", cada uno su elemento. Con
+              un lado en 0 queda el otro solo.
+
+              Y si un caso futuro no entrara igual, `break-words` lo parte
+              adentro del recuadro en vez de dejarlo salir. Nunca puntos
+              suspensivos: un stock cortado es un stock que no se puede leer.
+
+              LA CUENTA, a 360 px: la pantalla deja 328 (px-4 a cada lado), la
+              tarjeta 302 (13 px de cada lado) y el recuadro mide 202
+              (`--sunmi-product-value-width`), con 8,75 de cada lado de padding
+              (px-2.5, 1rem = 14 px): 184,5 px para el renglón. "−9999 bultos"
+              a 25 px son 12 caracteres; aun tomando 0,6 em para cada uno —los
+              dígitos tabulares miden eso y las letras de "bultos" menos— da
+              12 × 15 = 180 px, adentro. Está escrito en el candado. */}
           {presentacion.esDesglose ? (
-            <NumeroBloqueValor className={`whitespace-normal ${negativo ? "sunmi-text-danger" : ""}`}>
-              {presentacion.texto.split(" + ").map((parte, i, partes) => (
-                <span key={i} className="whitespace-nowrap">
-                  {i < partes.length - 1 ? `${parte} + ` : parte}
+            <NumeroBloqueValor className={`whitespace-normal break-words ${negativo ? "sunmi-text-danger" : ""}`}>
+              {presentacion.partes.map((parte) => (
+                <span key={parte} data-renglon-stock="" className="block">
+                  {parte}
                 </span>
               ))}
             </NumeroBloqueValor>

@@ -381,12 +381,13 @@ test("el kilo: campo de texto con coma y tres decimales", () => {
   assert.match(texto(h), /Faltan 1,25 kg$/);
 });
 
-test("en el depósito, un pack: el stock entero en sus partes, '= 40 un' debajo y dos casilleros", () => {
+test("en el depósito, un pack: el stock en dos renglones, '= 40 un' debajo y dos casilleros", () => {
   const agua = de(real.listaDeposito, "Agua x6");
   const h = tarjeta(agua, true);
   const t = texto(h);
-  assert.match(t, /STOCK · Pack x6 6 bultos \+ 4 uds = 40 un/);
-  assert.match(h, /<span class="whitespace-nowrap">6 bultos \+ <\/span><span class="whitespace-nowrap">4 uds<\/span>/, "cada parte entera");
+  assert.match(t, /STOCK · Pack x6 6 bultos 4 uds = 40 un/);
+  // Los casos largos y el ancho están en components/stock_locales/tarjetaStockDesglose.dom.test.mjs.
+  assert.match(h, /<span data-renglon-stock="" class="block">6 bultos<\/span><span data-renglon-stock="" class="block">4 uds<\/span>/, "un renglón por parte, sin +");
   assert.match(t, /bultos .*sueltas/);
   assert.equal((h.match(/<input/g) || []).length, 2);
   assert.match(h, /aria-label="Bultos contados"/);
