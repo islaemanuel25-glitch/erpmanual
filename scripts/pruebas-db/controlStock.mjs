@@ -280,7 +280,9 @@ try {
     await vender(P.coca, 6);
     const r3 = await fijar(S.ana, P.coca, 5);
     ok("se vendió 1 (7 → 6) y el total pasa a 5: el stock baja 2 sobre lo que hay (6 → 4)", r3.status === 200 && (await stockDe(P.coca)) === 4, json(r3));
+    guardar("listaContadosAntesDeBorrar", await lista(S.dueno, "contados"));
     const borrar = await fijar(S.dueno, P.coca, null);
+    guardar("borradoDeLaCoca", borrar);
     ok(
       "borrar el campo deshace el ajuste del control: 5 menos la venta → 4, y vuelve a sin contar",
       borrar.status === 200 && (await stockDe(P.coca)) === 4 && borrar.item?.conteo === null && borrar.resumen?.contados === 0,
@@ -305,6 +307,7 @@ try {
     ok("borrar uno que nadie contó no hace nada", borrarSinContar.status === 200 && (await stockDe(P.fideos)) === 4 && (await auditoriasDe(P.fideos)) === 0, json(borrarSinContar));
 
     guardar("listaAntesDeEstaBien", await lista(S.ana, "sin_contar", "q=Aceite"));
+    guardar("listaSinContarAntesDeEstaBien", await lista(S.ana, "sin_contar"));
     const bien = await estaBien(S.ana, P.aceite);
     guardar("estaBienDelAceite", bien);
     ok(
@@ -370,6 +373,24 @@ try {
     ok("el lector con un combo no trae nada: la pantalla filtra por el texto", combo.status === 200 && combo.item === null, json(combo));
     const nada = await escanear(S.ana, "");
     ok("sin código ni producto: 400", nada.status === 400, json(nada));
+
+    // ── EL BUSCADOR DEL CONTROL ES EL DE LA CAJA ──────────────────────────
+    const porCodigo = await lista(S.ana, "sin_contar", "q=7790000000001");
+    guardar("listaPorCodigo", porCodigo);
+    ok(
+      "un código del local muestra SOLO ese producto, aunque el chip no lo incluya (la coca está contada)",
+      json(ids(porCodigo.items)) === json([P.coca.pl]) && porCodigo.lecturaControl?.porCodigo === P.coca.pl && porCodigo.items[0].conteo?.total === 2,
+      json({ items: porCodigo.items?.map((i) => i.nombre), lectura: porCodigo.lecturaControl })
+    );
+    const leidoSinProducto = await lista(S.ana, "todos", "q=9999999999999&lectura=1");
+    guardar("listaCodigoSinProducto", leidoSinProducto);
+    ok(
+      "un código LEÍDO que no es de ningún producto del local: lista vacía y lo dice",
+      leidoSinProducto.status === 200 && leidoSinProducto.items?.length === 0 && leidoSinProducto.lecturaControl?.codigoSinProducto === "9999999999999",
+      json(leidoSinProducto)
+    );
+    const tecleado = await lista(S.ana, "todos", "q=9999999999999");
+    ok("tecleado sin lector, se busca como texto: vacío y sin aviso", tecleado.items?.length === 0 && !tecleado.lecturaControl?.codigoSinProducto, json(tecleado.lecturaControl));
   }
 
   seccion("5. El depósito: un pack se cuenta en bultos y se guarda en unidades");
@@ -546,6 +567,26 @@ try {
       );
       return r;
     };
+
+    // ── EL TEXTO SE BUSCA COMO EN LA CAJA, Y SALE EN SU ORDEN ──────────────
+    //
+    // "coco": por nombre, Bizcochos va antes que Coco; la caja pone primero lo
+    // que EMPIEZA con lo buscado. El control sale como la caja; Stock Locales,
+    // como siempre.
+    await ficha(mini.id, "Bizcochos de coco", "8000000000201", "unidad", 1, 2);
+    await ficha(mini.id, "Coco rallado", "8000000000202", "unidad", 1, 3);
+    const porTexto = await lista(S.dueno, "todos", "q=coco");
+    guardar("listaPorTexto", porTexto);
+    const { rankearComoLaCaja, nombreDeBusqueda, SELECT_CANDIDATO_DE_BUSQUEDA } = await import("../../lib/productos/busquedaComoLaCaja.js");
+    const { whereUniversoStock } = await import("../../lib/stock/universoStock.js");
+    const comoLaCaja = rankearComoLaCaja(await c.productoLocal.findMany({ where: whereUniversoStock(mini.id, false), select: SELECT_CANDIDATO_DE_BUSQUEDA }), "coco").map((r) => nombreDeBusqueda(r.item));
+    ok(
+      "el control busca \"coco\" como la caja y en su orden: Coco rallado, después Bizcochos de coco",
+      json(porTexto.items?.map((i) => i.nombre)) === json(comoLaCaja) && json(comoLaCaja) === json(["Coco rallado", "Bizcochos de coco"]),
+      json({ control: porTexto.items?.map((i) => i.nombre), caja: comoLaCaja })
+    );
+    const enStock = await pedir(R.listar, "GET", "http://ci/api/stock_locales/listar?q=coco", S.dueno);
+    ok("Stock Locales sigue como siempre: por nombre", json(enStock.items?.map((i) => i.nombre)) === json(["Bizcochos de coco", "Coco rallado"]), json(enStock.items?.map((i) => i.nombre)));
 
     // En un local, por unidad.
     const fanta = await ficha(mini.id, "Fanta 2L", "8000000000101", "unidad", 1, 5);

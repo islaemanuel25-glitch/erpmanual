@@ -29,10 +29,95 @@
       "conteo": {
         "total": 3,
         "contadoPor": "Emanuel",
-        "en": "2026-10-20T13:57:44.329Z",
+        "en": "2026-10-20T14:30:42.012Z",
         "sistema": 5,
         "diferencia": -2
       }
+    }
+  },
+  "listaContadosAntesDeBorrar": {
+    "ok": true,
+    "items": [
+      {
+        "id": 1,
+        "localId": 1,
+        "baseId": 1,
+        "nombre": "Coca 2L",
+        "codigoBarra": "7790000000001",
+        "categoriaId": null,
+        "proveedorId": 1,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 4,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "conteo": {
+          "total": 5,
+          "contadoPor": "Ana",
+          "en": "2026-10-20T14:30:42.185Z",
+          "sistema": 5,
+          "diferencia": 0
+        }
+      }
+    ],
+    "total": 1,
+    "totalPages": 1,
+    "resumenControl": {
+      "controlId": 1,
+      "total": 8,
+      "contados": 1,
+      "sinContar": 7,
+      "conDiferencia": 0
+    },
+    "lecturaControl": null
+  },
+  "borradoDeLaCoca": {
+    "ok": true,
+    "item": {
+      "id": 1,
+      "localId": 1,
+      "baseId": 1,
+      "nombre": "Coca 2L",
+      "codigoBarra": "7790000000001",
+      "categoriaId": null,
+      "proveedorId": 1,
+      "areaFisicaId": null,
+      "unidadMedida": "unidad",
+      "factorPack": 1,
+      "precioUnitario": 600,
+      "precioCosto": 600,
+      "precioVentaUnitario": 1000,
+      "precioVenta": 1000,
+      "margen": null,
+      "stock": 4,
+      "stockMin": null,
+      "stockMax": null,
+      "limitesConfigurados": false,
+      "faltante": false,
+      "modoCompraProveedor": "BULTO",
+      "pesoReferenciaKg": null,
+      "pesoEsFijo": false,
+      "modoVentaDeposito": "PESO",
+      "conteo": null
+    },
+    "resumen": {
+      "controlId": 1,
+      "total": 8,
+      "contados": 0,
+      "sinContar": 8,
+      "conDiferencia": 0
     }
   },
   "listaAntesDelQueso": {
@@ -74,7 +159,8 @@
       "contados": 1,
       "sinContar": 7,
       "conDiferencia": 1
-    }
+    },
+    "lecturaControl": null
   },
   "guardadoDelQueso": {
     "ok": true,
@@ -106,7 +192,7 @@
       "conteo": {
         "total": 1.25,
         "contadoPor": "Emanuel",
-        "en": "2026-10-20T13:57:44.629Z",
+        "en": "2026-10-20T14:30:42.330Z",
         "sistema": 2.5,
         "diferencia": -1.25
       }
@@ -158,7 +244,158 @@
       "contados": 3,
       "sinContar": 5,
       "conDiferencia": 3
-    }
+    },
+    "lecturaControl": null
+  },
+  "listaSinContarAntesDeEstaBien": {
+    "ok": true,
+    "items": [
+      {
+        "id": 10,
+        "localId": 1,
+        "baseId": 10,
+        "nombre": "Aceite 900",
+        "codigoBarra": "7790000000011",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 3,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "conteo": null
+      },
+      {
+        "id": 5,
+        "localId": 1,
+        "baseId": 5,
+        "nombre": "Fideos",
+        "codigoBarra": "7790000000005",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 4,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "conteo": null
+      },
+      {
+        "id": 4,
+        "localId": 1,
+        "baseId": 4,
+        "nombre": "Galletas",
+        "codigoBarra": "7790000000004",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": -15,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "conteo": null
+      },
+      {
+        "id": 6,
+        "localId": 1,
+        "baseId": 6,
+        "nombre": "Sin stock",
+        "codigoBarra": "7790000000006",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 0,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "conteo": null
+      },
+      {
+        "id": 3,
+        "localId": 1,
+        "baseId": 3,
+        "nombre": "Yerba 1kg",
+        "codigoBarra": "7790000000003",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 12,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "conteo": null
+      }
+    ],
+    "total": 5,
+    "totalPages": 1,
+    "resumenControl": {
+      "controlId": 1,
+      "total": 8,
+      "contados": 3,
+      "sinContar": 5,
+      "conDiferencia": 3
+    },
+    "lecturaControl": null
   },
   "estaBienDelAceite": {
     "ok": true,
@@ -190,7 +427,7 @@
       "conteo": {
         "total": 3,
         "contadoPor": "Ana",
-        "en": "2026-10-20T13:57:44.774Z",
+        "en": "2026-10-20T14:30:42.493Z",
         "sistema": 3,
         "diferencia": 0
       }
@@ -323,7 +560,8 @@
       "contados": 4,
       "sinContar": 4,
       "conDiferencia": 3
-    }
+    },
+    "lecturaControl": null
   },
   "listaContados": {
     "ok": true,
@@ -356,7 +594,7 @@
         "conteo": {
           "total": 3,
           "contadoPor": "Ana",
-          "en": "2026-10-20T13:57:44.774Z",
+          "en": "2026-10-20T14:30:42.493Z",
           "sistema": 3,
           "diferencia": 0
         }
@@ -389,7 +627,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T13:57:44.568Z",
+          "en": "2026-10-20T14:30:42.276Z",
           "sistema": 4,
           "diferencia": -2
         }
@@ -422,7 +660,7 @@
         "conteo": {
           "total": 1.25,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T13:57:44.629Z",
+          "en": "2026-10-20T14:30:42.330Z",
           "sistema": 2.5,
           "diferencia": -1.25
         }
@@ -455,7 +693,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Ana",
-          "en": "2026-10-20T13:57:44.670Z",
+          "en": "2026-10-20T14:30:42.369Z",
           "sistema": 0,
           "diferencia": 2
         }
@@ -469,7 +707,8 @@
       "contados": 4,
       "sinContar": 4,
       "conDiferencia": 3
-    }
+    },
+    "lecturaControl": null
   },
   "listaConDiferencia": {
     "ok": true,
@@ -502,7 +741,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T13:57:44.568Z",
+          "en": "2026-10-20T14:30:42.276Z",
           "sistema": 4,
           "diferencia": -2
         }
@@ -535,7 +774,7 @@
         "conteo": {
           "total": 1.25,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T13:57:44.629Z",
+          "en": "2026-10-20T14:30:42.330Z",
           "sistema": 2.5,
           "diferencia": -1.25
         }
@@ -568,7 +807,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Ana",
-          "en": "2026-10-20T13:57:44.670Z",
+          "en": "2026-10-20T14:30:42.369Z",
           "sistema": 0,
           "diferencia": 2
         }
@@ -582,6 +821,73 @@
       "contados": 4,
       "sinContar": 4,
       "conDiferencia": 3
+    },
+    "lecturaControl": null
+  },
+  "listaPorCodigo": {
+    "ok": true,
+    "items": [
+      {
+        "id": 1,
+        "localId": 1,
+        "baseId": 1,
+        "nombre": "Coca 2L",
+        "codigoBarra": "7790000000001",
+        "categoriaId": null,
+        "proveedorId": 1,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 2,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "conteo": {
+          "total": 2,
+          "contadoPor": "Emanuel",
+          "en": "2026-10-20T14:30:42.276Z",
+          "sistema": 4,
+          "diferencia": -2
+        }
+      }
+    ],
+    "total": 1,
+    "totalPages": 1,
+    "resumenControl": {
+      "controlId": 1,
+      "total": 8,
+      "contados": 4,
+      "sinContar": 4,
+      "conDiferencia": 3
+    },
+    "lecturaControl": {
+      "porCodigo": 1
+    }
+  },
+  "listaCodigoSinProducto": {
+    "ok": true,
+    "items": [],
+    "total": 0,
+    "totalPages": 1,
+    "resumenControl": {
+      "controlId": 1,
+      "total": 8,
+      "contados": 4,
+      "sinContar": 4,
+      "conDiferencia": 3
+    },
+    "lecturaControl": {
+      "codigoSinProducto": "9999999999999"
     }
   },
   "listaDeposito": {
@@ -621,7 +927,8 @@
       "contados": 0,
       "sinContar": 1,
       "conDiferencia": 0
-    }
+    },
+    "lecturaControl": null
   },
   "diferenciasDeposito": {
     "ok": true,
@@ -633,7 +940,7 @@
     "control": {
       "id": 2,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-20T13:57:44.945Z",
+      "abiertoEn": "2026-10-20T14:30:42.750Z",
       "terminadoEn": null,
       "terminadoPorNombre": null
     },
@@ -668,7 +975,7 @@
     },
     "control": {
       "id": 1,
-      "abiertoEn": "2026-10-20T13:57:44.266Z"
+      "abiertoEn": "2026-10-20T14:30:41.936Z"
     },
     "vendidos": [
       {
@@ -713,7 +1020,7 @@
     "control": {
       "id": 1,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-20T13:57:44.266Z",
+      "abiertoEn": "2026-10-20T14:30:41.936Z",
       "terminadoEn": null,
       "terminadoPorNombre": null
     },
@@ -771,7 +1078,7 @@
     "control": {
       "id": 1,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-20T13:57:44.266Z",
+      "abiertoEn": "2026-10-20T14:30:41.936Z",
       "terminadoEn": null,
       "terminadoPorNombre": null
     },
@@ -829,16 +1136,16 @@
     "control": null,
     "ultimo": {
       "id": 1,
-      "abiertoEn": "2026-10-20T13:57:44.266Z",
-      "terminadoEn": "2026-10-20T13:57:45.189Z",
+      "abiertoEn": "2026-10-20T14:30:41.936Z",
+      "terminadoEn": "2026-10-20T14:30:42.971Z",
       "terminadoPorNombre": "Emanuel",
       "puestosEnCero": 2
     },
     "historial": [
       {
         "id": 1,
-        "abiertoEn": "2026-10-20T13:57:44.266Z",
-        "terminadoEn": "2026-10-20T13:57:45.189Z",
+        "abiertoEn": "2026-10-20T14:30:41.936Z",
+        "terminadoEn": "2026-10-20T14:30:42.971Z",
         "terminadoPorNombre": "Emanuel",
         "puestosEnCero": 2
       }
@@ -857,8 +1164,8 @@
     "control": {
       "id": 1,
       "estado": "TERMINADO",
-      "abiertoEn": "2026-10-20T13:57:44.266Z",
-      "terminadoEn": "2026-10-20T13:57:45.189Z",
+      "abiertoEn": "2026-10-20T14:30:41.936Z",
+      "terminadoEn": "2026-10-20T14:30:42.971Z",
       "terminadoPorNombre": "Emanuel"
     },
     "congelado": true,
@@ -936,7 +1243,7 @@
     },
     "control": {
       "id": 3,
-      "abiertoEn": "2026-10-20T13:57:45.274Z",
+      "abiertoEn": "2026-10-20T14:30:43.052Z",
       "abiertoPorNombre": "Cuenta Mini",
       "controlId": 3,
       "total": 8,
@@ -948,20 +1255,89 @@
       "nombre": "Ana"
     }
   },
+  "listaPorTexto": {
+    "ok": true,
+    "items": [
+      {
+        "id": 13,
+        "localId": 1,
+        "baseId": 13,
+        "nombre": "Coco rallado",
+        "codigoBarra": "8000000000202",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 2400,
+        "precioCosto": 2400,
+        "precioVentaUnitario": 3000,
+        "precioVenta": 3000,
+        "margen": null,
+        "stock": 3,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "conteo": null
+      },
+      {
+        "id": 12,
+        "localId": 1,
+        "baseId": 12,
+        "nombre": "Bizcochos de coco",
+        "codigoBarra": "8000000000201",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 2400,
+        "precioCosto": 2400,
+        "precioVentaUnitario": 3000,
+        "precioVenta": 3000,
+        "margen": null,
+        "stock": 2,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "conteo": null
+      }
+    ],
+    "total": 2,
+    "totalPages": 1,
+    "resumenControl": {
+      "controlId": 3,
+      "total": 10,
+      "contados": 0,
+      "sinContar": 10,
+      "conDiferencia": 0
+    },
+    "lecturaControl": null
+  },
   "revisionConUnoRoto": {
     "ok": true,
     "control": {
       "id": 2,
-      "abiertoEn": "2026-10-20T13:57:44.945Z"
+      "abiertoEn": "2026-10-20T14:30:42.750Z"
     },
     "productos": [
       {
-        "productoLocalId": 20,
+        "productoLocalId": 24,
         "nombre": "Lata al revés x24",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Administrador",
         "contado": 24,
-        "anclaMovimientoId": 54,
+        "anclaMovimientoId": 58,
         "movimientosPosteriores": [],
         "posteriores": 0,
         "deberia": 24,
@@ -971,18 +1347,18 @@
         "filasDeOtroLocal": []
       },
       {
-        "productoLocalId": 13,
+        "productoLocalId": 15,
         "nombre": "361 LATA X24",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Admin Depo",
         "contado": 24,
-        "anclaMovimientoId": 30,
+        "anclaMovimientoId": 32,
         "movimientosPosteriores": [
           {
-            "id": 52,
+            "id": 56,
             "origen": "VENTA",
             "origenRef": "9002",
-            "instante": "2026-10-20T13:57:46.225Z",
+            "instante": "2026-10-20T14:30:44.113Z",
             "cambio": -1
           }
         ],
@@ -1009,12 +1385,12 @@
         "filasDeOtroLocal": []
       },
       {
-        "productoLocalId": 19,
+        "productoLocalId": 23,
         "nombre": "Lata con fila ajena x24",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Admin Depo",
         "contado": 24,
-        "anclaMovimientoId": 51,
+        "anclaMovimientoId": 55,
         "movimientosPosteriores": [],
         "posteriores": 0,
         "deberia": 24,
@@ -1029,12 +1405,12 @@
         ]
       },
       {
-        "productoLocalId": 16,
+        "productoLocalId": 20,
         "nombre": "Lata doble x24",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Admin Depo",
         "contado": 24,
-        "anclaMovimientoId": 40,
+        "anclaMovimientoId": 44,
         "movimientosPosteriores": [],
         "posteriores": 0,
         "deberia": 24,

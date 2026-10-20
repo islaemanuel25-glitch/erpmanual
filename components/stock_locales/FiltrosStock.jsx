@@ -20,8 +20,17 @@ export default function FiltrosStock({
   // Lo usa el Control de stock: recibe el código que leyó el lector y contesta
   // si lo encontró. Sin esto, la lectura filtra el listado como siempre.
   onEscanear = null,
+  // También del Control de stock: el lector escribió con el foco en una
+  // cantidad, y el código va al buscador. `{ texto, vez }`: `vez` cambia en
+  // cada lectura, así el mismo código leído dos veces se vuelve a buscar.
+  textoDesdeAfuera = null,
 }) {
   const [q, setQ] = useState("");
+
+  useEffect(() => {
+    if (textoDesdeAfuera) setQ(textoDesdeAfuera.texto);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [textoDesdeAfuera?.vez]);
   const [categoria, setCategoria] = useState("");
   const [proveedor, setProveedor] = useState("");
   const [area, setArea] = useState("");

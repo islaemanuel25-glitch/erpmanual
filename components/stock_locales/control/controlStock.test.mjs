@@ -300,7 +300,7 @@ test("el chip activo por defecto es Todos", () => {
 test("la lista es la de Stock Locales: FiltrosStock y useStockData con el chip en `control`", () => {
   const hook = fuente("components/stock_locales/control/useControlStock.js");
   assert.match(hook, /useStockData\(\{/);
-  assert.match(hook, /\{ \.\.\.filtros, control: chip \}/);
+  assert.match(hook, /\{ \.\.\.filtros, control: chip, \.\.\.\(filtros\.q && filtros\.q === ultimaLectura \? \{ lectura: true \} : \{\}\) \}/);
   assert.doesNotMatch(hook, /\/control\/productos\?\$\{qs\}/, "ya no hay una lista propia del control");
   assert.match(fuente("hooks/useStockData.js"), /if \(filtro\.control\) params\.set\("control", filtro\.control\)/);
   const pantalla = fuente("components/stock_locales/control/PantallaControlStock.jsx");
@@ -310,11 +310,15 @@ test("la lista es la de Stock Locales: FiltrosStock y useStockData con el chip e
   assert.match(fuente("lib/stock/control/controlStockServer.js"), /whereUniversoStock\(localId, esDeposito\)/);
 });
 
-test("el lector en FiltrosStock: un código del local va a su tarjeta, si no filtra por el texto", () => {
+test("el lector en FiltrosStock: el código queda en el buscador y el listado lo resuelve como la caja", () => {
+  // Lo que se ve al tocar está en tarjetaConteo.toque.test.mjs; acá, el cableado.
   const src = fuente("components/stock_locales/FiltrosStock.jsx");
   assert.match(src, /Promise\.resolve\(onEscanear\(codigo\)\)\.then\(\(encontrado\) => \{\s*if \(!encontrado\) setQ\(codigo\);/);
   const hook = fuente("components/stock_locales/control/useControlStock.js");
-  assert.match(hook, /if \(!r\.item\) return false;/);
+  assert.match(hook, /const escanear = useCallback\(\(codigo\) => \{\s*setUltimaLectura\(String\(codigo\)\.trim\(\)\);\s*return false;/);
+  const listar = fuente("app/api/stock_locales/listar/route.js");
+  assert.equal((listar.match(/rankearComoLaCaja\(/g) || []).length, 1, "el texto, con la búsqueda de la caja");
+  assert.match(fuente("app/api/pos-ventas/buscar-producto/route.js"), /rankings = rankearComoLaCaja\(candidatos, q\);/, "la caja usa la misma");
 });
 
 test("una tarjeta contada: '✓ Contado · quién · hora', Sistema · Contado · Faltan, y el campo sigue editable", () => {

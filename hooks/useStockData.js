@@ -13,6 +13,8 @@ export function useStockData({ localSeleccionado, filtro, page, refrescar, setRe
   const [error, setError] = useState("");
   // Solo con `filtro.control`: los contadores del Control de stock.
   const [resumenControl, setResumenControl] = useState(null);
+  // Y qué pasó con un código: el producto que mostró, o que no hay ninguno.
+  const [lecturaControl, setLecturaControl] = useState(null);
 
   const buildQuery = () => {
     const params = new URLSearchParams();
@@ -34,6 +36,9 @@ export function useStockData({ localSeleccionado, filtro, page, refrescar, setRe
     if (filtro.estado) params.set("estado", filtro.estado);
     // El chip del Control de stock: el mismo listado, con su conteo por ítem.
     if (filtro.control) params.set("control", filtro.control);
+    // Y si el texto lo escribió el lector: un código que no es de ningún
+    // producto del local se dice, en vez de buscarse como nombre.
+    if (filtro.control && filtro.lectura) params.set("lectura", "1");
 
     return params.toString();
   };
@@ -95,6 +100,7 @@ export function useStockData({ localSeleccionado, filtro, page, refrescar, setRe
           setTotal(json.total || 0);
           setTotalPages(json.totalPages || 1);
           setResumenControl(json.resumenControl ?? null);
+          setLecturaControl(json.lecturaControl ?? null);
         }
       } catch (err) {
         console.error("Error cargando stock:", err);
@@ -112,5 +118,5 @@ export function useStockData({ localSeleccionado, filtro, page, refrescar, setRe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localSeleccionado, JSON.stringify(filtro), page, refrescar]);
 
-  return { items, total, totalPages, loading, error, resumenControl };
+  return { items, total, totalPages, loading, error, resumenControl, lecturaControl };
 }

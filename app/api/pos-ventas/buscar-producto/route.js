@@ -9,13 +9,16 @@ import { modoSalidaDeVenta } from "@/lib/precios/escalaDeVenta";
 import { redondear100 } from "@/lib/precios/redondeo";
 import { resolverListaCliente } from "@/lib/precios/resolverListaCliente";
 import { calcularPrecioConLista } from "@/lib/precios/calcularPrecioConLista";
+import { resolverContraCatalogo } from "@/lib/productos/busquedaFuzzyProducto";
 import {
-  rankearLiteral,
-  resolverContraCatalogo,
-} from "@/lib/productos/busquedaFuzzyProducto";
+  SELECT_CANDIDATO_DE_BUSQUEDA,
+  codigosDeBusqueda,
+  nombreDeBusqueda,
+  rankearComoLaCaja,
+} from "@/lib/productos/busquedaComoLaCaja";
 import { getCombo } from "@/lib/combos/service";
 import { esModalidadServicio, resolverRecargoServicioPct } from "@/lib/pos-ventas/servicios";
-import { buscarProductoLocalPorCodigo, codigosDeProductoLocal } from "@/lib/productos/busquedaCodigoBarra";
+import { buscarProductoLocalPorCodigo } from "@/lib/productos/busquedaCodigoBarra";
 import { ofertasVigentesPorProductoLocal } from "@/lib/ofertas/servidor";
 import { descuentoPctDesdePrecios } from "@/lib/ofertas/precio";
 import { CONDICION_PAGO_LABEL } from "@/lib/ofertas/vigencia";
@@ -134,17 +137,14 @@ export async function GET(req) {
         activo: true,
         base: { activo: true },
       },
-      select: {
-        id: true,
-        nombre: true,
-        codigo_barra_propio: true,
-        base: { select: { nombre: true, codigo_barra: true, codigo_barra_secundario: true } },
-      },
+      // Qué se trae, qué nombre se compara y qué códigos cuentan viven en
+      // `lib/productos/busquedaComoLaCaja.js`: el Control de stock busca igual.
+      select: SELECT_CANDIDATO_DE_BUSQUEDA,
       take: FUZZY_CANDIDATE_LIMIT,
     });
 
-    const getNombre = (p) => p.nombre || p.base?.nombre || "";
-    const getCodigo = (p) => codigosDeProductoLocal(p);
+    const getNombre = nombreDeBusqueda;
+    const getCodigo = codigosDeBusqueda;
 
     let rankings;
     let queryInterpretada = null;
@@ -159,7 +159,7 @@ export async function GET(req) {
       queryInterpretada = resuelto.queryInterpretada;
     } else {
       // Manual: solo substring / inicio de palabra. Sin variantes ni Levenshtein.
-      rankings = rankearLiteral(candidatos, q, { getNombre, getCodigo });
+      rankings = rankearComoLaCaja(candidatos, q);
     }
 
     const topIds = rankings.slice(0, FUZZY_TOP_RESULTS).map((r) => r.item.id);

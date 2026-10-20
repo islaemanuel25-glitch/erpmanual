@@ -151,7 +151,8 @@ function ControlAbierto({ c, puedeGestionar }) {
     setProveedoresPorId(mapa);
   }, []);
 
-  const tarjeta = (item, foco = 0) => (
+  // El foco va a la tarjeta que lo pidió: la del código leído o la del "Contar".
+  const tarjeta = (item, foco = item.id === c.focoId ? c.foco : 0) => (
     <TarjetaConteo
       key={item.id}
       item={item}
@@ -181,6 +182,7 @@ function ControlAbierto({ c, puedeGestionar }) {
           onReset={c.alLimpiar}
           onCatalogos={alCargarCatalogos}
           onEscanear={c.escanear}
+          textoDesdeAfuera={c.textoParaBuscador}
         />
       </div>
 
@@ -198,7 +200,7 @@ function ControlAbierto({ c, puedeGestionar }) {
 
       {c.errorLista ? <Aviso texto={c.errorLista} /> : null}
 
-      {c.fijado ? <SunmiListaProductoCards>{tarjeta(c.fijado, c.foco)}</SunmiListaProductoCards> : null}
+      {c.fijado ? <SunmiListaProductoCards>{tarjeta(c.fijado)}</SunmiListaProductoCards> : null}
 
       {c.cargandoLista && items.length === 0 ? (
         <div className="py-6">

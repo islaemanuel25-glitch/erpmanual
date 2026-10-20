@@ -10,6 +10,8 @@ import { buscarProductoLocalPorCodigo } from "@/lib/productos/busquedaCodigoBarr
 // Búsqueda de texto de stock (nombre / código de barras / secundario). La
 // comparte el Control de stock.
 import { buildTextOR } from "@/lib/stock/busquedaStock";
+// La búsqueda por texto de la caja: la usa el Control de stock.
+import { SELECT_CANDIDATO_DE_BUSQUEDA, rankearComoLaCaja } from "@/lib/productos/busquedaComoLaCaja";
 // Qué productos lista Stock: lo comparte el Control de stock.
 import { whereUniversoStock } from "@/lib/stock/universoStock";
 import { listadoDelControl } from "@/lib/stock/control/controlStockServer";
@@ -129,14 +131,36 @@ export async function GET(req) {
     const ctrl = searchParams.has("control")
       ? await listadoDelControl({ localId, esDeposito, filtro: searchParams.get("control") })
       : null;
-    const responder = async (items, total, totalPages) =>
+    const responder = async (items, total, totalPages, lecturaControl = null) =>
       NextResponse.json({
         ok: true,
         items: ctrl ? await ctrl.enriquecer(items) : items,
         total,
         totalPages,
-        ...(ctrl ? { resumenControl: ctrl.resumen } : {}),
+        ...(ctrl ? { resumenControl: ctrl.resumen, lecturaControl } : {}),
       });
+
+    // ── EN EL CONTROL, EL BUSCADOR ES EL DE LA CAJA ──────────────────────────
+    //
+    // Un código del local —propio, principal o secundario, con la misma
+    // resolución que la caja (`buscarProductoLocalPorCodigo`)— muestra SOLO ese
+    // producto, sin el chip encima. Una lectura del lector (`lectura=1`) que no
+    // es de ningún producto del local deja la lista vacía y lo dice. El texto se
+    // busca con `rankearComoLaCaja` y sale en su orden. Sin `control`, Stock
+    // Locales busca como siempre.
+    const lectura = searchParams.get("lectura") === "1";
+    const conBuscadorDeCaja = Boolean(ctrl && q);
+    const listarComoLaCaja = async ({ where, include, mapear }) => {
+      const candidatos = await prisma.productoLocal.findMany({ where, select: SELECT_CANDIDATO_DE_BUSQUEDA });
+      const ids = rankearComoLaCaja(candidatos, q).map((r) => r.item.id);
+      const filas = ids.length ? await prisma.productoLocal.findMany({ where: { id: { in: ids } }, include }) : [];
+      const orden = new Map(ids.map((id, i) => [id, i]));
+      filas.sort((a, b) => orden.get(a.id) - orden.get(b.id));
+      let mapeados = filas.map(mapear);
+      if (faltantes) mapeados = mapeados.filter((p) => p.faltante);
+      const total = mapeados.length;
+      return responder(mapeados.slice(offset, offset + PAGE_SIZE), total, Math.max(1, Math.ceil(total / PAGE_SIZE)));
+    };
 
     // ======================================================
     // 🟦 VISTA LOCAL → PRECIO UNITARIO + REDONDEO A 100
@@ -151,8 +175,9 @@ export async function GET(req) {
       const baseIdsCodigo = await getBaseIdsCodigo(grupoIdLocal, provNum, q);
       const proveedorBaseFilter = provNum ? { proveedor_id: provNum } : {};
       const plIdPorCodigo = await getProductoLocalIdPorCodigo(localId, q);
+      if (conBuscadorDeCaja && !plIdPorCodigo && lectura) return responder([], 0, 1, { codigoSinProducto: q });
       let baseClause;
-      if (plIdPorCodigo) {
+      if (plIdPorCodigo || conBuscadorDeCaja) {
         baseClause = proveedorBaseFilter;
       } else if (q) {
         const proveedorYTexto = { AND: [proveedorBaseFilter, buildTextOR(q)] };
@@ -204,7 +229,8 @@ export async function GET(req) {
       }
 
       // WHERE único, compartido por count(), findMany paginado y camino hybrid.
-      if (ctrl?.clausula) estadoStockClauses.push(ctrl.clausula);
+      // Un código en el control muestra ese producto aunque el chip no lo incluya.
+      if (ctrl?.clausula && !plIdPorCodigo) estadoStockClauses.push(ctrl.clausula);
 
       const universoLocal = whereUniversoStock(localId, false);
       const whereLocal = {
@@ -254,6 +280,15 @@ export async function GET(req) {
       // Orden movido a DB. Acepta variación menor de collation respecto al
       // localeCompare("es") JS anterior (aceptado explícitamente).
       const orderByLocal = { base: { nombre: "asc" } };
+
+      if (plIdPorCodigo && ctrl) {
+        const rows = await prisma.productoLocal.findMany({ where: whereLocal, include: includeLocal });
+        const items = rows.map((p) => mapStockItemLocal(p, p.base, p.stock?.[0]));
+        return responder(items, items.length, 1, { porCodigo: plIdPorCodigo });
+      }
+      if (conBuscadorDeCaja) {
+        return listarComoLaCaja({ where: whereLocal, include: includeLocal, mapear: (p) => mapStockItemLocal(p, p.base, p.stock?.[0]) });
+      }
 
       // Faltantes (cantidad < stockMin = comparación entre 2 columnas) no se
       // puede expresar limpio en Prisma sin $queryRaw → camino HYBRID: la DB ya
@@ -370,8 +405,9 @@ export async function GET(req) {
       const baseIdsCodigoDepo = await getBaseIdsCodigo({ in: grupoIds }, provNumDep, q);
       const proveedorBaseFilterDepo = provNumDep ? { proveedor_id: provNumDep } : {};
       const plIdPorCodigoDepo = await getProductoLocalIdPorCodigo(localId, q);
+      if (conBuscadorDeCaja && !plIdPorCodigoDepo && lectura) return responder([], 0, 1, { codigoSinProducto: q });
       let baseClauseDepo;
-      if (plIdPorCodigoDepo) {
+      if (plIdPorCodigoDepo || conBuscadorDeCaja) {
         baseClauseDepo = proveedorBaseFilterDepo;
       } else if (q) {
         const proveedorYTextoDepo = { AND: [proveedorBaseFilterDepo, buildTextOR(q)] };
@@ -409,7 +445,7 @@ export async function GET(req) {
         }
       }
 
-      if (ctrl?.clausula) estadoStockClausesDepo.push(ctrl.clausula);
+      if (ctrl?.clausula && !plIdPorCodigoDepo) estadoStockClausesDepo.push(ctrl.clausula);
 
       // Regla A, adentro del universo: defensa por si quedara alguna PL cáscara
       // de un producto de local en el depósito — no se lista.
@@ -465,6 +501,15 @@ export async function GET(req) {
       };
 
       const orderByDepo = { base: { nombre: "asc" } };
+
+      if (plIdPorCodigoDepo && ctrl) {
+        const rows = await prisma.productoLocal.findMany({ where: whereDepo, include: includeDepo });
+        const items = rows.map((p) => mapStockItemDeposito(p, p.base, p.stock?.[0], localId));
+        return responder(items, items.length, 1, { porCodigo: plIdPorCodigoDepo });
+      }
+      if (conBuscadorDeCaja) {
+        return listarComoLaCaja({ where: whereDepo, include: includeDepo, mapear: (p) => mapStockItemDeposito(p, p.base, p.stock?.[0], localId) });
+      }
 
       // Faltantes (cantidad < stockMin = 2 columnas) → hybrid JS, igual que LOCAL.
       if (faltantes) {
