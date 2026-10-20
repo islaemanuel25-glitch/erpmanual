@@ -171,6 +171,8 @@ function ControlAbierto({ c, puedeGestionar }) {
         <BarraDeAvance pct={porcentajeDeAvance(n.contados, n.total - n.contados)} />
       </TarjetaHero>
 
+      {puedeGestionar ? <StockQueNoCoincide c={c} /> : null}
+
       <div ref={c.buscadorRef} data-buscador-control="">
         <FiltrosStock
           compact
@@ -227,6 +229,37 @@ function ControlAbierto({ c, puedeGestionar }) {
         </BotonTesoreria>
       )}
     </>
+  );
+}
+
+/**
+ * LOS CONTADOS CUYO STOCK NO ES LO CONTADO MÁS LO QUE PASÓ DESPUÉS. Lo arma el
+ * servidor leyendo el Libro (`revisarControl`); "Corregir" lo deja en lo que
+ * debería con un Ajuste por control. Sin ninguno, no se dibuja nada.
+ */
+export function StockQueNoCoincide({ c }) {
+  const productos = (c.revision?.productos ?? []).filter((p) => p.corregir);
+  if (productos.length === 0) return null;
+  return (
+    <section className="rounded-xl2 border sunmi-border-warning sunmi-state-warning-soft p-4 space-y-3">
+      <h2 className="text-xs2 font-semibold tracking-wider sunmi-text-warning">EL STOCK NO COINCIDE CON LO CONTADO</h2>
+      {productos.map((p) => (
+        <div key={p.productoLocalId} className="flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="text-sm3 font-medium sunmi-text-strong break-words">{p.nombre}</div>
+            <div className="text-xs2 sunmi-text-muted tabular-nums">
+              {`contado ${textoNumero(p.contado)} · después ${textoNumero(p.posteriores)} · debería ${textoCantidad(p.deberia, p.unidadFisica)} · hay ${textoCantidad(p.actual, p.unidadFisica)}`}
+            </div>
+            {p.filasDeOtroLocal?.length ? (
+              <div className="text-xs2 sunmi-text-warning">{`Tiene ${p.filasDeOtroLocal.length === 1 ? "una fila" : `${p.filasDeOtroLocal.length} filas`} de stock de otro local`}</div>
+            ) : null}
+          </div>
+          <SunmiButton color="secondary" type="button" onClick={() => c.corregirProducto(p.productoLocalId)} disabled={c.ocupado} className="shrink-0">
+            Corregir
+          </SunmiButton>
+        </div>
+      ))}
+    </section>
   );
 }
 

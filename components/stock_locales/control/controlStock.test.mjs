@@ -25,7 +25,7 @@ import { readFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import PantallaControlStock, { ConfirmarTerminar, InformeDeDiferencias } from "@/components/stock_locales/control/PantallaControlStock.jsx";
+import PantallaControlStock, { ConfirmarTerminar, InformeDeDiferencias, StockQueNoCoincide } from "@/components/stock_locales/control/PantallaControlStock.jsx";
 import TarjetaConteo, { ESPERA_TRAS_BOTON_MS, ESTADO_FILA, EncabezadoDeLaFila } from "@/components/stock_locales/control/TarjetaConteo.jsx";
 import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad.jsx";
 import { NumeroBloqueValor } from "@/components/sunmi/SunmiProductoCard.jsx";
@@ -43,6 +43,7 @@ import {
   ordenarDiferencias,
   partirNoContados,
   porcentajeDeAvance,
+  revisionDelProducto,
   stockTrasDeshacer,
   stockTrasFijarTotal,
   textoCantidad,
@@ -339,7 +340,28 @@ test("una tarjeta sin contar: 'Está bien', y la caja vacía teñida para verse 
   assert.match(h, /data-fila-conteo="sin_contar"/);
   assert.match(texto(h), /Sin contar Está bien − \+ un$/);
   assert.match(h, /<input[^>]*class="[^"]*sunmi-state-warning[^"]*"[^>]*value=""/);
-  assert.match(h, /<span class="min-w-0 rounded-lg w-16 border sunmi-divider">/, "con el marco de recibir transferencias");
+  assert.match(h, /<span class="min-w-0 rounded-lg flex-1 [^"]*border sunmi-divider">/, "con el marco de recibir transferencias, a lo ancho");
+});
+
+test("los campos grandes: − y + de 44 × 44, el número grande y del mismo alto, a lo ancho de la fila", () => {
+  const h = tarjeta(de(real.listaSinContar, "Fideos"));
+  const botones = h.match(/<button type="button" class="[^"]*pos-control[^"]*"/g) || [];
+  assert.equal(botones.length, 2);
+  for (const b of botones) assert.match(b, / min-w-toque min-h-toque /, "el token de toque, 44 px escritos en px");
+  assert.match(h, /<input[^>]*class="[^"]*min-h-toque text-xl2 font-semibold/, "el campo del alto de los botones, con el número grande");
+  assert.match(h, /<div class="flex w-full items-center gap-1">/, "la pieza toma el ancho de la fila");
+  assert.match(h, /<button[^>]*class="[^"]*min-h-toque[^"]*"[^>]*>Está bien<\/button>/, "'Está bien' del alto de los campos");
+  assert.doesNotMatch(fuente("components/stock_locales/control/TarjetaConteo.jsx"), /tamano=\{desglose|claseMarco=/, "el tamaño lo pone el kit, no la pantalla");
+});
+
+test("el tamaño grande es una opción del kit: los otros dos quedan letra por letra", () => {
+  const boton = (tamano) => renderToStaticMarkup(React.createElement(SunmiCampoCantidad, { valor: "1", onCambiar: nada, etiqueta: "X", tamano })).match(/<button[^>]*>/)[0];
+  assert.match(boton("normal"), /class="flex items-center justify-center w-9 h-9 rounded pos-control text-sm font-bold transition-colors select-none shrink-0"/);
+  assert.match(boton("compacto"), /class="flex items-center justify-center w-7 h-7 rounded pos-control text-sm font-bold transition-colors select-none shrink-0"/);
+  assert.match(boton("grande"), /class="flex items-center justify-center min-w-toque min-h-toque rounded pos-control text-lg font-bold transition-colors select-none shrink-0"/);
+  const sinAncho = renderToStaticMarkup(React.createElement(SunmiCampoCantidad, { valor: "1", onCambiar: nada, etiqueta: "X" }));
+  assert.match(sinAncho, /^<div class="flex items-center gap-1">/);
+  assert.doesNotMatch(sinAncho, /flex-1|min-h-toque|text-xl2/);
 });
 
 test("con el sistema en negativo no hay 'Está bien': hay que poner lo que hay", () => {
@@ -365,7 +387,12 @@ test("en el depósito, un pack: el stock entero en sus partes, '= 40 un' debajo 
   assert.equal((h.match(/<input/g) || []).length, 2);
   assert.match(h, /aria-label="Bultos contados"/);
   assert.match(h, /aria-label="Sueltas contadas"/);
-  assert.equal((h.match(/rounded-lg w-12 border/g) || []).length, 2, "los dos chicos, para entrar en 360 px");
+  // En 360 px la fila tiene ~304 px: la mitad cada grupo, 44 + 44 de botones y
+  // la caja del número con lo que sobra. La caja tiene `min-w-0` y crece con
+  // `flex-1`; los botones son `shrink-0`: si no entra, se achica la caja.
+  assert.match(h, /<div class="grid grid-cols-2 gap-2">/, "uno al lado del otro, la mitad cada uno");
+  assert.equal((h.match(/rounded-lg flex-1 /g) || []).length, 2);
+  assert.equal((h.match(/ min-w-toque min-h-toque [^"]* shrink-0"/g) || []).length, 4, "los cuatro botones de 44, sin achicarse");
 });
 
 test("los rótulos de la fila", () => {
@@ -454,6 +481,97 @@ test("'Ver diferencias' en el abierto lleva al informe del abierto, que dice que
   const t = dibujar({ estado: real.abierto, vista: VISTA_CONTROL.DIFERENCIAS, diferencias: real.diferenciasAbierto });
   assert.match(t, /Mini el 7 · abierto desde [a-záéíóú]+ \d\d\/\d\d, sin terminar/);
   assert.match(t, /FALTANTE \$ \$1\.950,00 SOBRANTE \$ \$1\.200,00 3 productos con diferencia/);
+});
+
+// ── LA REVISIÓN: EL STOCK CONTRA LO CONTADO MÁS LO QUE PASÓ DESPUÉS ───────
+
+// Con la forma de los `select` de `datosDeRevision`: bitácora y Libro.
+const auditoria = (accion, cantidadAnterior, cantidadNueva, creadoEn) => ({ accion, cantidadAnterior, cantidadNueva, creadoEn });
+const movimiento = (id, origen, origenRef, cantidadAnterior, cantidadPosterior, instante) => ({ id, origen, origenRef, cantidadAnterior, cantidadPosterior, instante });
+const T = (s) => `2026-10-20T12:${s}.000Z`;
+
+test("la revisión: debería = lo contado + lo que no es del control después del conteo", () => {
+  // La lata: 1 bulto contado sobre 0 y después una venta de 1.
+  const sana = revisionDelProducto({
+    controlId: 7,
+    contado: 24,
+    auditorias: [auditoria("CONTROL_CONTEO", 0, 24, T("33:00"))],
+    movimientos: [
+      movimiento(10, "AJUSTE_POR_CONTROL", "7", 0, 24, T("33:00")),
+      movimiento(11, "VENTA", "55", 24, 23, T("40:00")),
+    ],
+    actual: 23,
+  });
+  assert.deepEqual([sana.anclaMovimientoId, sana.posteriores, sana.deberia, sana.ajuste, sana.corregir], [10, -1, 23, 0, false]);
+  // Una transferencia de 2 bultos después de contar: el −24 es lo que pasó, no un error.
+  const transferida = revisionDelProducto({
+    controlId: 7,
+    contado: 24,
+    auditorias: [auditoria("CONTROL_CONTEO", 0, 24, T("33:00"))],
+    movimientos: [movimiento(10, "AJUSTE_POR_CONTROL", "7", 0, 24, T("33:00")), movimiento(12, "TRANSFERENCIA_ENVIO", "900", 24, -24, T("50:00"))],
+    actual: -24,
+  });
+  assert.deepEqual([transferida.deberia, transferida.corregir, transferida.movimientosPosteriores[0].origen], [-24, false, "TRANSFERENCIA_ENVIO"]);
+  // El control movió al revés: la bitácora y el Libro dicen 0 → −24.
+  const alReves = revisionDelProducto({
+    controlId: 7,
+    contado: 24,
+    auditorias: [auditoria("CONTROL_CONTEO", 0, -24, T("33:00"))],
+    movimientos: [movimiento(10, "AJUSTE_POR_CONTROL", "7", 0, -24, T("33:00"))],
+    actual: -24,
+  });
+  assert.deepEqual([alReves.deberia, alReves.ajuste, alReves.corregir], [24, 48, true]);
+  // Una corrección después no es "lo que pasó después": es el mismo conteo.
+  const corregida = revisionDelProducto({
+    controlId: 7,
+    contado: 5,
+    auditorias: [auditoria("CONTROL_CONTEO", 5, 3, T("10:00")), auditoria("CONTROL_CORRECCION", 2, 4, T("20:00"))],
+    movimientos: [
+      movimiento(1, "AJUSTE_POR_CONTROL", "7", 5, 3, T("10:00")),
+      movimiento(2, "VENTA", "1", 3, 2, T("15:00")),
+      movimiento(3, "AJUSTE_POR_CONTROL", "7", 2, 4, T("20:00")),
+    ],
+    actual: 4,
+  });
+  assert.deepEqual([corregida.deberia, corregida.corregir], [4, false]);
+  // Lo vendido ANTES de contar ya está adentro de lo contado: no se suma.
+  const vendidaAntes = revisionDelProducto({
+    controlId: 7,
+    contado: 24,
+    auditorias: [auditoria("CONTROL_CONTEO", 20, 24, T("33:00"))],
+    movimientos: [movimiento(9, "VENTA", "54", 24, 20, T("20:00")), movimiento(10, "AJUSTE_POR_CONTROL", "7", 20, 24, T("33:00"))],
+    actual: 24,
+  });
+  assert.deepEqual([vendidaAntes.posteriores, vendidaAntes.deberia, vendidaAntes.corregir], [0, 24, false]);
+  // Lo de OTRO control no es de éste.
+  const otro = revisionDelProducto({
+    controlId: 7,
+    contado: 24,
+    auditorias: [auditoria("CONTROL_CONTEO", 0, 24, T("33:00"))],
+    movimientos: [movimiento(10, "AJUSTE_POR_CONTROL", "7", 0, 24, T("33:00")), movimiento(11, "AJUSTE_POR_CONTROL", "3", 24, 20, T("34:00"))],
+    actual: 20,
+  });
+  assert.equal(otro.deberia, 20);
+  // Sin contar, o borrado, no hay nada que revisar.
+  assert.equal(revisionDelProducto({ controlId: 7, contado: null, auditorias: [], movimientos: [], actual: 0 }), null);
+});
+
+test("'El stock no coincide': lo que trae la revisión real, con Corregir, solo los que no dan", () => {
+  const r = real.revisionConUnoRoto;
+  const t = texto(renderToStaticMarkup(React.createElement(StockQueNoCoincide, { c: { revision: r, ocupado: false, corregirProducto: nada } })));
+  assert.equal(r.aCorregir, 1);
+  assert.match(t, /^EL STOCK NO COINCIDE CON LO CONTADO Lata al revés x24 contado 24 · después 0 · debería 24 un · hay −24 un Corregir$/);
+  const sinNada = { ...r, productos: r.productos.filter((p) => !p.corregir), aCorregir: 0 };
+  assert.equal(renderToStaticMarkup(React.createElement(StockQueNoCoincide, { c: { revision: sinNada, ocupado: false, corregirProducto: nada } })), "");
+  const pantalla = fuente("components/stock_locales/control/PantallaControlStock.jsx");
+  assert.match(pantalla, /\{puedeGestionar \? <StockQueNoCoincide c=\{c\} \/> : null\}/, "solo quien gestiona");
+  const ruta = fuente("app/api/stock_locales/control/revision/route.js");
+  assert.equal((ruta.match(/autorizarControl\(req, PERMISO_GESTIONAR_CONTROL, \{[^}]*persona: "cuenta" \}\)/g) || []).length, 2, "GET y POST, de la cuenta sin PIN");
+});
+
+test("la tarjeta y el listado leen la fila de stock DEL local, la que el control escribe", () => {
+  assert.match(fuente("lib/stock/control/controlStockServer.js"), /stock: \{\s*where: \{ localId \},\s*take: 1,/);
+  assert.equal((fuente("app/api/stock_locales/listar/route.js").match(/stock: \{\s*where: \{ localId \},\s*take: 1,/g) || []).length, 2, "las dos ramas");
 });
 
 // ── DÓNDE SE ENGANCHA ──────────────────────────────────────────────────────

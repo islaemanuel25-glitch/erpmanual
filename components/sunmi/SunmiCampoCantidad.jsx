@@ -81,6 +81,10 @@
 //                     cual escrito (con su coma) y el − / + lo entienden. Sin
 //                     esto, como siempre: la coma se normaliza al tipear.
 //
+//   tamano="grande"   el − y el + de 44 × 44 y el número grande: ver TAMANOS.
+//   ocupaElAncho      la pieza toma el ancho de su fila y el marco crece.
+//           = false
+//
 // Sin ellos —la caja y recepción— el marcado es el de siempre.
 
 import SunmiInput from "@/components/sunmi/SunmiInput";
@@ -102,15 +106,29 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 //
 // `w-9` son 2,25rem = 31,5 px, que es el escalón que pasa los 30. `w-7` son los
 // del carrito y no se tocan.
+//
+// ── `grande`, EL DEL CONTROL DE STOCK ───────────────────────────────────
+//
+// El Control de stock se cuenta de parado, con el celular en una mano: el − y
+// el + van al mínimo que se toca, 44 × 44 —`min-w-toque` y `min-h-toque`, en px
+// a propósito—, con el signo más grande, y el campo del mismo alto con el
+// número del orden del número de STOCK de la tarjeta (`text-xl2`, 22 px). Los
+// otros dos tamaños quedan como estaban, letra por letra.
 const TAMANOS = Object.freeze({
   normal: "w-9 h-9",
   compacto: "w-7 h-7",
+  grande: "min-w-toque min-h-toque",
 });
+
+const LETRA_DEL_BOTON = Object.freeze({ grande: "text-lg" });
+
+/** Lo que el tamaño le agrega al campo del número. */
+const CAMPO_DEL_TAMANO = Object.freeze({ grande: "min-h-toque text-xl2" });
 
 const claseBoton = (tamano) =>
   `flex items-center justify-center ${
     TAMANOS[tamano] || TAMANOS.normal
-  } rounded pos-control text-sm font-bold transition-colors select-none shrink-0`;
+  } rounded pos-control ${LETRA_DEL_BOTON[tamano] || "text-sm"} font-bold transition-colors select-none shrink-0`;
 
 export default function SunmiCampoCantidad({
   valor,
@@ -132,7 +150,12 @@ export default function SunmiCampoCantidad({
   onFocus = undefined,
   onBlur = undefined,
   conservaLoEscrito = false,
+  // El control lo pide para que el campo ocupe el ancho de su fila: la pieza
+  // toma todo el ancho y el marco crece entre los dos botones, que no se
+  // achican nunca. Sin esto, como siempre: lo que mide el contenido.
+  ocupaElAncho = false,
 }) {
+  const delTamano = CAMPO_DEL_TAMANO[tamano] ? `${CAMPO_DEL_TAMANO[tamano]} ` : "";
   // Con decimales o con un paso fraccionario, el campo acepta comas y decide con
   // `parseFloat`. Sin ellos, `parseInt` — que es lo que impide que en el carrito
   // se escriba "2,5" sobre un producto que se vende por unidad.
@@ -247,14 +270,14 @@ export default function SunmiCampoCantidad({
             // es del consumidor. Recepción pide 18 px —`text-lg`— y sin eso el
             // número queda en el tamaño heredado: medido, el ancho de un dígito
             // bajaba de 9,7 a 8 px.
-            `w-full border-0 px-0 text-center ${claseInput} ${difiere ? "sunmi-text-danger" : ""}`
-          : claseInput
+            `w-full border-0 px-0 text-center ${delTamano}${claseInput} ${difiere ? "sunmi-text-danger" : ""}`
+          : `${delTamano}${claseInput}`
       }
     />
   );
 
   return (
-    <div className="flex items-center gap-1">
+    <div className={ocupaElAncho ? "flex w-full items-center gap-1" : "flex items-center gap-1"}>
       <button
         type="button"
         className={claseBoton(tamano)}
@@ -266,7 +289,7 @@ export default function SunmiCampoCantidad({
 
       {conMarco ? (
         <span
-          className={`min-w-0 rounded-lg ${claseMarco} ${
+          className={`min-w-0 rounded-lg ${ocupaElAncho ? "flex-1 " : ""}${claseMarco} ${
             difiere ? "border-2 sunmi-border-danger" : "border sunmi-divider"
           }`}
         >

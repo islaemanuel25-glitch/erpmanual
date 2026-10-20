@@ -29,7 +29,7 @@
       "conteo": {
         "total": 3,
         "contadoPor": "Emanuel",
-        "en": "2026-10-20T13:00:00.151Z",
+        "en": "2026-10-20T13:38:02.941Z",
         "sistema": 5,
         "diferencia": -2
       }
@@ -188,7 +188,7 @@
         "conteo": {
           "total": 3,
           "contadoPor": "Ana",
-          "en": "2026-10-20T13:00:00.517Z",
+          "en": "2026-10-20T13:38:03.386Z",
           "sistema": 3,
           "diferencia": 0
         }
@@ -221,7 +221,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T13:00:00.382Z",
+          "en": "2026-10-20T13:38:03.226Z",
           "sistema": 4,
           "diferencia": -2
         }
@@ -254,7 +254,7 @@
         "conteo": {
           "total": 1.25,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T13:00:00.410Z",
+          "en": "2026-10-20T13:38:03.262Z",
           "sistema": 2.5,
           "diferencia": -1.25
         }
@@ -287,7 +287,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Ana",
-          "en": "2026-10-20T13:00:00.443Z",
+          "en": "2026-10-20T13:38:03.302Z",
           "sistema": 0,
           "diferencia": 2
         }
@@ -334,7 +334,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T13:00:00.382Z",
+          "en": "2026-10-20T13:38:03.226Z",
           "sistema": 4,
           "diferencia": -2
         }
@@ -367,7 +367,7 @@
         "conteo": {
           "total": 1.25,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T13:00:00.410Z",
+          "en": "2026-10-20T13:38:03.262Z",
           "sistema": 2.5,
           "diferencia": -1.25
         }
@@ -400,7 +400,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Ana",
-          "en": "2026-10-20T13:00:00.443Z",
+          "en": "2026-10-20T13:38:03.302Z",
           "sistema": 0,
           "diferencia": 2
         }
@@ -465,7 +465,7 @@
     "control": {
       "id": 2,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-20T13:00:00.690Z",
+      "abiertoEn": "2026-10-20T13:38:03.570Z",
       "terminadoEn": null,
       "terminadoPorNombre": null
     },
@@ -500,7 +500,7 @@
     },
     "control": {
       "id": 1,
-      "abiertoEn": "2026-10-20T13:00:00.090Z"
+      "abiertoEn": "2026-10-20T13:38:02.874Z"
     },
     "vendidos": [
       {
@@ -545,7 +545,7 @@
     "control": {
       "id": 1,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-20T13:00:00.090Z",
+      "abiertoEn": "2026-10-20T13:38:02.874Z",
       "terminadoEn": null,
       "terminadoPorNombre": null
     },
@@ -603,7 +603,7 @@
     "control": {
       "id": 1,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-20T13:00:00.090Z",
+      "abiertoEn": "2026-10-20T13:38:02.874Z",
       "terminadoEn": null,
       "terminadoPorNombre": null
     },
@@ -661,16 +661,16 @@
     "control": null,
     "ultimo": {
       "id": 1,
-      "abiertoEn": "2026-10-20T13:00:00.090Z",
-      "terminadoEn": "2026-10-20T13:00:00.905Z",
+      "abiertoEn": "2026-10-20T13:38:02.874Z",
+      "terminadoEn": "2026-10-20T13:38:03.820Z",
       "terminadoPorNombre": "Emanuel",
       "puestosEnCero": 2
     },
     "historial": [
       {
         "id": 1,
-        "abiertoEn": "2026-10-20T13:00:00.090Z",
-        "terminadoEn": "2026-10-20T13:00:00.905Z",
+        "abiertoEn": "2026-10-20T13:38:02.874Z",
+        "terminadoEn": "2026-10-20T13:38:03.820Z",
         "terminadoPorNombre": "Emanuel",
         "puestosEnCero": 2
       }
@@ -689,8 +689,8 @@
     "control": {
       "id": 1,
       "estado": "TERMINADO",
-      "abiertoEn": "2026-10-20T13:00:00.090Z",
-      "terminadoEn": "2026-10-20T13:00:00.905Z",
+      "abiertoEn": "2026-10-20T13:38:02.874Z",
+      "terminadoEn": "2026-10-20T13:38:03.820Z",
       "terminadoPorNombre": "Emanuel"
     },
     "congelado": true,
@@ -768,7 +768,7 @@
     },
     "control": {
       "id": 3,
-      "abiertoEn": "2026-10-20T13:00:00.985Z",
+      "abiertoEn": "2026-10-20T13:38:03.950Z",
       "abiertoPorNombre": "Cuenta Mini",
       "controlId": 3,
       "total": 8,
@@ -779,5 +779,103 @@
     "quien": {
       "nombre": "Ana"
     }
+  },
+  "revisionConUnoRoto": {
+    "ok": true,
+    "control": {
+      "id": 2,
+      "abiertoEn": "2026-10-20T13:38:03.570Z"
+    },
+    "productos": [
+      {
+        "productoLocalId": 20,
+        "nombre": "Lata al revés x24",
+        "unidadFisica": "UNIDAD",
+        "contadoPor": "Administrador",
+        "contado": 24,
+        "anclaMovimientoId": 54,
+        "movimientosPosteriores": [],
+        "posteriores": 0,
+        "deberia": 24,
+        "actual": -24,
+        "ajuste": 48,
+        "corregir": true,
+        "filasDeOtroLocal": []
+      },
+      {
+        "productoLocalId": 13,
+        "nombre": "361 LATA X24",
+        "unidadFisica": "UNIDAD",
+        "contadoPor": "Admin Depo",
+        "contado": 24,
+        "anclaMovimientoId": 30,
+        "movimientosPosteriores": [
+          {
+            "id": 52,
+            "origen": "VENTA",
+            "origenRef": "9002",
+            "instante": "2026-10-20T13:38:05.002Z",
+            "cambio": -1
+          }
+        ],
+        "posteriores": -1,
+        "deberia": 23,
+        "actual": 23,
+        "ajuste": 0,
+        "corregir": false,
+        "filasDeOtroLocal": []
+      },
+      {
+        "productoLocalId": 11,
+        "nombre": "Agua x6",
+        "unidadFisica": "UNIDAD",
+        "contadoPor": "Admin Depo",
+        "contado": 27,
+        "anclaMovimientoId": 18,
+        "movimientosPosteriores": [],
+        "posteriores": 0,
+        "deberia": 27,
+        "actual": 27,
+        "ajuste": 0,
+        "corregir": false,
+        "filasDeOtroLocal": []
+      },
+      {
+        "productoLocalId": 19,
+        "nombre": "Lata con fila ajena x24",
+        "unidadFisica": "UNIDAD",
+        "contadoPor": "Admin Depo",
+        "contado": 24,
+        "anclaMovimientoId": 51,
+        "movimientosPosteriores": [],
+        "posteriores": 0,
+        "deberia": 24,
+        "actual": 24,
+        "ajuste": 0,
+        "corregir": false,
+        "filasDeOtroLocal": [
+          {
+            "localId": 1,
+            "cantidad": -24
+          }
+        ]
+      },
+      {
+        "productoLocalId": 16,
+        "nombre": "Lata doble x24",
+        "unidadFisica": "UNIDAD",
+        "contadoPor": "Admin Depo",
+        "contado": 24,
+        "anclaMovimientoId": 40,
+        "movimientosPosteriores": [],
+        "posteriores": 0,
+        "deberia": 24,
+        "actual": 24,
+        "ajuste": 0,
+        "corregir": false,
+        "filasDeOtroLocal": []
+      }
+    ],
+    "aCorregir": 1
   }
 }

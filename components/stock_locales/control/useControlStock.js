@@ -30,7 +30,7 @@ import { FILTRO_CONTROL, VISTA_CONTROL } from "@/lib/stock/control/controlStock"
 
 const API = "/api/stock_locales/control";
 
-export function useControlStock() {
+export function useControlStock({ puedeGestionar = false } = {}) {
   const { requerirOperador } = useOperadorContext();
   const [vista, setVista] = useState(VISTA_CONTROL.INICIO);
   const [estado, setEstado] = useState(null);
@@ -233,6 +233,43 @@ export function useControlStock() {
 
   const alBuscador = useCallback(() => buscadorRef.current?.querySelector("input")?.focus(), []);
 
+  // ── LA REVISIÓN: EL STOCK CONTRA LO CONTADO MÁS LO QUE PASÓ DESPUÉS ──────
+  //
+  // Solo quien gestiona: corregir mueve stock sin un conteo nuevo. Se pide al
+  // entrar a la lista y después de cada corrección.
+  const [revision, setRevision] = useState(null);
+  const cargarRevision = useCallback(async () => {
+    const r = await pedir(`${API}/revision`);
+    setRevision(r.ok ? r : null);
+  }, [pedir]);
+
+  useEffect(() => {
+    if (puedeGestionar && listando) cargarRevision();
+  }, [puedeGestionar, listando, cargarRevision]);
+
+  const corrigiendo = useRef(false);
+  const corregirProducto = useCallback(
+    async (productoLocalId) => {
+      if (corrigiendo.current) return;
+      corrigiendo.current = true;
+      setOcupado(true);
+      const r = await pedir(`${API}/revision`, { method: "POST", body: JSON.stringify({ productoLocalId }) });
+      corrigiendo.current = false;
+      setOcupado(false);
+      if (!r.ok) {
+        setAviso(r.error);
+        return;
+      }
+      setAviso(null);
+      if (r.item) {
+        setGuardados((g) => ({ ...g, [r.item.id]: r.item }));
+        setFijado((f) => (f && f.id === r.item.id ? r.item : f));
+      }
+      cargarRevision();
+    },
+    [pedir, cargarRevision]
+  );
+
   const cargarTerminar = useCallback(async () => {
     setTerminar(null);
     const r = await pedir(`${API}/terminar`);
@@ -313,6 +350,8 @@ export function useControlStock() {
     buscadorRef,
     terminar,
     diferencias,
+    revision,
+    corregirProducto,
     recargar,
     abrir,
     alCambiarFiltros,

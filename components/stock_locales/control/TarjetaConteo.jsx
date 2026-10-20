@@ -211,9 +211,11 @@ export default function TarjetaConteo({ item, esDeposito, proveedorNombre = null
       decimales={!desglose && casilleros.decimales ? 3 : 0}
       conservaLoEscrito={!desglose && casilleros.decimales}
       tipo="text"
-      tamano={desglose ? "compacto" : "normal"}
-      claseMarco={desglose ? "w-12" : "w-16"}
-      claseInput={`text-base2 font-semibold tabular-nums ${CLASE_CAJA[estado]}`}
+      // Grande y a lo ancho: el − y el + de 44 × 44, y la caja del número es la
+      // que se achica si no entra —en el depósito, la mitad de la fila cada uno—.
+      tamano="grande"
+      ocupaElAncho
+      claseInput={`font-semibold tabular-nums ${CLASE_CAJA[estado]}`}
       difiere={estado === ESTADO_FILA.ERROR}
       inputRef={ref}
       onFocus={alEntrar}
@@ -222,13 +224,15 @@ export default function TarjetaConteo({ item, esDeposito, proveedorNombre = null
     />
   );
 
+  // Depósito: bultos y sueltas uno al lado del otro, la mitad cada uno, con su
+  // rótulo debajo. Local: un solo campo a lo ancho de la fila, con su unidad.
   const campos = desglose ? (
-    <div className="flex items-start gap-2">
-      <div className="flex flex-col items-center gap-0.5">
+    <div className="grid grid-cols-2 gap-2">
+      <div className="flex min-w-0 flex-col items-center gap-0.5">
         {campo("bultos", "Bultos contados", primero)}
         <span className="text-xs2 sunmi-text-muted">bultos</span>
       </div>
-      <div className="flex flex-col items-center gap-0.5">
+      <div className="flex min-w-0 flex-col items-center gap-0.5">
         {campo("sueltas", "Sueltas contadas")}
         <span className="text-xs2 sunmi-text-muted">sueltas</span>
       </div>
@@ -236,23 +240,21 @@ export default function TarjetaConteo({ item, esDeposito, proveedorNombre = null
   ) : (
     <div className="flex items-center gap-1.5">
       {campo("valor", "Contado", primero)}
-      <span className="text-sm2 sunmi-text-muted">{casilleros.unidad}</span>
+      <span className="shrink-0 text-sm2 sunmi-text-muted">{casilleros.unidad}</span>
     </div>
   );
 
   const fila = (
     <div ref={contenedor} onClickCapture={alTocar} data-fila-conteo={estado} className="px-3 py-2.5 space-y-1.5">
       <EncabezadoDeLaFila estado={estado} conteo={conteo} />
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        {conEstaBien ? (
-          <SunmiButton color="primary" type="button" onClick={estaBien} className="min-h-toque">
-            Está bien
-          </SunmiButton>
-        ) : (
-          <span />
-        )}
-        {campos}
-      </div>
+      {/* "Está bien" va en su renglón, del alto de los campos (44 px): al lado
+          no entran los dos grupos del depósito en 360 px. */}
+      {conEstaBien ? (
+        <SunmiButton color="primary" type="button" onClick={estaBien} className="min-h-toque">
+          Está bien
+        </SunmiButton>
+      ) : null}
+      {campos}
       {desglose && estado === ESTADO_FILA.ESCRIBIENDO && escrito.total != null ? (
         <p className="text-xs2 sunmi-text-muted tabular-nums text-right">{`= ${textoCantidad(escrito.total, casilleros.unidadFisica)}`}</p>
       ) : null}

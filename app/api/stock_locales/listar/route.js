@@ -239,7 +239,11 @@ export async function GET(req) {
             modoVentaDeposito: true,
           },
         },
+        // La fila de ESTE local: `StockLocal` es único por (local, producto), no
+        // por producto, y con `take: 1` solo se podía mostrar otra fila que la
+        // que ajustan el control y Ajustar.
         stock: {
+          where: { localId },
           take: 1,
           // `limitesConfiguradosAt` viaja porque `mapItem` lo necesita para poder
           // decir `limitesConfigurados` sin adivinarlo desde los valores.
@@ -452,7 +456,9 @@ export async function GET(req) {
         //
         // No fallaba en ningún lado: un `undefined` en un `!= null` es
         // exactamente igual de válido que un null.
+        // La fila del depósito, no una cualquiera: ver la rama LOCAL.
         stock: {
+          where: { localId },
           take: 1,
           select: { cantidad: true, stockMin: true, stockMax: true, limitesConfiguradosAt: true },
         },

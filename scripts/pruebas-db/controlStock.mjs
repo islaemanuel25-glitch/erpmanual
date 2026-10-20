@@ -179,6 +179,7 @@ try {
     conteos: await import("../../app/api/stock_locales/control/conteos/route.js"),
     terminar: await import("../../app/api/stock_locales/control/terminar/route.js"),
     diferencias: await import("../../app/api/stock_locales/control/diferencias/route.js"),
+    revision: await import("../../app/api/stock_locales/control/revision/route.js"),
     listar: await import("../../app/api/stock_locales/listar/route.js"),
   };
 
@@ -501,6 +502,178 @@ try {
     );
     const e = await estado(S.ana);
     guardar("abierto", e);
+  }
+
+  seccion("9. El ajuste va en el sentido del conteo (el caso de la LATA X24)");
+  {
+    // Lo que vio Emanuel en el depósito: un Pack x24 contado en 1 bulto, la
+    // tarjeta "Sistema 0 · Contado 24 · Sobran 24" y el STOCK en −24. Acá se
+    // recorre cada paso que mueve stock —primer conteo, subir, bajar, borrar,
+    // volver a contar—, en un local y en el depósito con desglose, y en cada
+    // uno se mira lo mismo por los tres lados: la fila de StockLocal, el
+    // movimiento del Libro y la bitácora, y lo que dice la tarjeta.
+    const ficha = async (localId, nombre, codigo, unidad, factor, stock) => {
+      const b = await c.productoBase.create({
+        data: { grupoId: grupo.id, nombre, codigo_barra: codigo, unidad_medida: unidad, factor_pack: factor, precio_costo: 2400, precio_venta: 3000, redondeo_100: false, activo: true },
+      });
+      const pl = await c.productoLocal.create({ data: { localId, baseId: b.id, activo: true, precio_costo: 2400, precio_venta: 3000 } });
+      if (stock !== null) await c.stockLocal.create({ data: { localId, productoId: pl.id, cantidad: stock } });
+      return { pl: pl.id, localId };
+    };
+    const sesionDe = (p) => (p.localId === depo.id ? S.adminDepo : S.dueno);
+    const paso = async (titulo, p, total, esperado) => {
+      // Sin fila de stock el sistema dice 0, como la tarjeta.
+      const antes = (await stockDe(p, p.localId)) || 0;
+      const ultimoMov = (await c.movimientoStock.findFirst({ where: { productoLocalId: p.pl }, orderBy: { id: "desc" } }))?.id ?? 0;
+      const ultimaAud = (await c.auditoriaStock.findFirst({ where: { productoLocalId: p.pl }, orderBy: { id: "desc" } }))?.id ?? 0;
+      const r = await pedir(R.conteos, "PUT", `${B}/conteos`, sesionDe(p), { productoLocalId: p.pl, total });
+      const despues = await stockDe(p, p.localId);
+      const movs = await c.movimientoStock.findMany({ where: { productoLocalId: p.pl, id: { gt: ultimoMov } } });
+      const auds = await c.auditoriaStock.findMany({ where: { productoLocalId: p.pl, id: { gt: ultimaAud } } });
+      const enElLibro = movs.reduce((s, m) => s + Number(m.cantidadPosterior ?? 0) - Number(m.cantidadAnterior ?? 0), 0);
+      const enLaBitacora = auds.reduce((s, a) => s + Number(a.cantidadNueva) - Number(a.cantidadAnterior), 0);
+      ok(
+        `${titulo}: ${antes} → ${esperado}, igual en el Libro, la bitácora y la tarjeta`,
+        r.status === 200 && despues === esperado && enElLibro === esperado - antes && enLaBitacora === esperado - antes && r.item?.stock === esperado &&
+          movs.every((m) => m.origen === ORIGEN_STOCK.AJUSTE_POR_CONTROL),
+        json({ status: r.status, despues, enElLibro, enLaBitacora, tarjeta: r.item?.stock, conteo: r.item?.conteo })
+      );
+      return r;
+    };
+
+    // En un local, por unidad.
+    const fanta = await ficha(mini.id, "Fanta 2L", "8000000000101", "unidad", 1, 5);
+    await paso("local, primer conteo", fanta, 3, 3);
+    await paso("local, sube el total", fanta, 8, 8);
+    await paso("local, baja el total", fanta, 6, 6);
+    await paso("local, borrar deshace", fanta, null, 5);
+    await paso("local, contar de nuevo", fanta, 3, 3);
+
+    // En el depósito, un Pack x24 SIN fila de stock: sistema 0, como la lata.
+    const lata = await ficha(depo.id, "361 LATA X24", "8000000000102", "pack", 24, null);
+    const primero = await paso("depósito, 1 bulto + 0 sueltas sobre 0", lata, 24, 24);
+    ok(
+      "la tarjeta dice Sistema 0 · Contado 24 · Sobran 24, y el stock 24 —no −24—",
+      primero.item?.conteo?.sistema === 0 && primero.item?.conteo?.total === 24 && primero.item?.conteo?.diferencia === 24 && primero.item?.stock === 24,
+      json(primero.item)
+    );
+    await paso("depósito, sube a 2 bultos", lata, 48, 48);
+    await paso("depósito, baja a 1 bulto + 6", lata, 30, 30);
+    await paso("depósito, borrar deshace", lata, null, 0);
+    await paso("depósito, contar de nuevo 1 bulto", lata, 24, 24);
+    const enLista = (await lista(S.adminDepo, "contados")).items?.find((i) => i.id === lata.pl);
+    ok("y el listado de Stock dice lo mismo: 24", enLista?.stock === 24 && enLista?.conteo?.total === 24, json(enLista));
+
+    // Con el sistema en negativo antes de contar.
+    const neg = await ficha(depo.id, "Lata negativa x24", "8000000000103", "pack", 24, -24);
+    await paso("depósito, 1 bulto sobre −24", neg, 24, 24);
+    // Este depósito no admite negativo (la configuración de siempre): deshacer
+    // no puede volver a −24 y se queda en 0, igual que un Restar de Ajustar.
+    await paso("depósito, borrar sobre un negativo que no se admite queda en 0", neg, null, 0);
+
+    // Dos guardados del mismo total a la vez: la tarjeta de fa23d01 los mandaba
+    // (Enter guarda, el foco va al buscador y el campo, al perderlo, guarda otra vez).
+    const doble = await ficha(depo.id, "Lata doble x24", "8000000000104", "pack", 24, null);
+    await Promise.all([1, 2].map(() => pedir(R.conteos, "PUT", `${B}/conteos`, S.adminDepo, { productoLocalId: doble.pl, total: 24 })));
+    ok("dos guardados de 24 a la vez dejan 24, con un solo conteo", (await stockDe(doble, depo.id)) === 24 && (await auditoriasDe(doble)) === 1);
+    const mezcla = await ficha(depo.id, "Lata mezcla x24", "8000000000105", "pack", 24, 0);
+    await Promise.all([24, null].map((t) => pedir(R.conteos, "PUT", `${B}/conteos`, S.adminDepo, { productoLocalId: mezcla.pl, total: t })));
+    const quedo = await stockDe(mezcla, depo.id);
+    const vigente = await c.conteoControlStock.findFirst({ where: { productoLocalId: mezcla.pl, borradoEn: null } });
+    ok("guardar y borrar a la vez: el stock queda como dice el conteo vigente", (vigente ? quedo === 24 : quedo === 0), json({ quedo, vigente }));
+
+    // Un control de la versión anterior: sus conteos no tienen `sistemaAntes`.
+    const vieja = await ficha(depo.id, "Lata vieja x24", "8000000000106", "pack", 24, 0);
+    await paso("versión anterior, primer conteo", vieja, 24, 24);
+    await c.conteoControlStock.updateMany({ where: { productoLocalId: vieja.pl }, data: { sistemaAntes: null } });
+    const sube = await paso("versión anterior, sube a 2 bultos", vieja, 48, 48);
+    ok("y la tarjeta saca el sistema de la bitácora: 0", sube.item?.conteo?.sistema === 0 && sube.item?.conteo?.diferencia === 48, json(sube.item?.conteo));
+    await paso("versión anterior, baja a 1 bulto", vieja, 24, 24);
+    await paso("versión anterior, borrar deshace", vieja, null, 0);
+
+    // ── LA FILA QUE SE LEE ES LA QUE SE ESCRIBE ────────────────────────────
+    //
+    // `StockLocal` es único por (local, producto), así que un producto del
+    // depósito puede tener además una fila con OTRO local. El listado y la
+    // tarjeta leían "una fila cualquiera" (`take: 1`) y el control escribe la
+    // del depósito: con una de esas filas, la tarjeta podía mostrar un stock que
+    // el control nunca tocó.
+    const ajena = await ficha(depo.id, "Lata con fila ajena x24", "8000000000107", "pack", 24, null);
+    await c.stockLocal.create({ data: { localId: mini.id, productoId: ajena.pl, cantidad: -24 } });
+    const r = await pedir(R.conteos, "PUT", `${B}/conteos`, S.adminDepo, { productoLocalId: ajena.pl, total: 24 });
+    const enListaAjena = (await lista(S.adminDepo, "contados")).items?.find((i) => i.id === ajena.pl);
+    ok(
+      "con otra fila del mismo producto en otro local, la tarjeta y el listado muestran la del depósito: 24",
+      r.item?.stock === 24 && enListaAjena?.stock === 24 && (await stockDe(ajena, depo.id)) === 24,
+      json({ tarjeta: r.item?.stock, listado: enListaAjena?.stock })
+    );
+
+    // ── LA REVISIÓN DEL CONTROL QUE CORRE LA SESIÓN DEL VPS ────────────────
+    const revision = (s) => pedir(R.revision, "GET", `${B}/revision`, s);
+    const reparar = (s, p) => pedir(R.revision, "POST", `${B}/revision`, s, { productoLocalId: p.pl });
+    const depoControl = await c.controlStock.findFirst({ where: { localId: depo.id, estado: "ABIERTO" } });
+    // Se vende 1 después de contar la lata: el stock bueno es 24 − 1.
+    await c.$transaction(async (tx) => {
+      await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.VENTA, referencia: "9002" });
+      await tx.stockLocal.update({ where: { localId_productoId: { localId: depo.id, productoId: lata.pl } }, data: { cantidad: 23 } });
+    });
+    const sano = await revision(S.adminDepo);
+    const deLaLata = sano.productos?.find((p) => p.productoLocalId === lata.pl);
+    ok(
+      "la revisión: contado 24, una venta posterior de −1, debería 23 y hay 23: nada que corregir",
+      sano.status === 200 && deLaLata?.contado === 24 && deLaLata?.posteriores === -1 && deLaLata?.deberia === 23 && deLaLata?.actual === 23 && deLaLata?.corregir === false &&
+        deLaLata?.movimientosPosteriores?.length === 1 && deLaLata.movimientosPosteriores[0].origen === ORIGEN_STOCK.VENTA,
+      json(deLaLata)
+    );
+    ok("todo lo que el control movió hasta acá está bien: nada a corregir", sano.aCorregir === 0, json(sano.productos?.filter((p) => p.corregir)));
+    const conPin = await revision(S.ana);
+    ok("la revisión es de quien gestiona: con PIN, 403", conPin.status === 403, json(conPin));
+
+    // El estado que vio Emanuel, armado en ESTA base descartable: el conteo de
+    // 1 bulto (24) con un movimiento del control que dejó el stock al revés
+    // (0 → −24), y su bitácora diciendo lo mismo. Ninguna ruta de hoy lo produce:
+    // es el estado a corregir, no un caso de uso.
+    const malo = await ficha(depo.id, "Lata al revés x24", "8000000000108", "pack", 24, 0);
+    await c.$transaction(async (tx) => {
+      await tx.conteoControlStock.create({
+        data: { controlId: depoControl.id, localId: depo.id, productoLocalId: malo.pl, cantidad: 24, usuarioId: admin.id, operadorId: null, contadoPor: "Administrador", fijo: true, sistemaAntes: null },
+      });
+      await tx.auditoriaStock.create({
+        data: { grupoId: grupo.id, localId: depo.id, productoLocalId: malo.pl, userId: admin.id, accion: "CONTROL_CONTEO", cantidadAnterior: 0, cantidadNueva: -24, motivo: `Ajuste por control #${depoControl.id}`, controlStockId: depoControl.id },
+      });
+      await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.AJUSTE_POR_CONTROL, referencia: String(depoControl.id) });
+      await tx.stockLocal.update({ where: { localId_productoId: { localId: depo.id, productoId: malo.pl } }, data: { cantidad: -24 } });
+    });
+    const conElRoto = await revision(S.adminDepo);
+    guardar("revisionConUnoRoto", conElRoto);
+    const roto = conElRoto.productos?.find((p) => p.productoLocalId === malo.pl);
+    ok(
+      "la revisión lo encuentra primero: debería 24, hay −24, corregir +48",
+      conElRoto.productos?.[0]?.productoLocalId === malo.pl && conElRoto.aCorregir === 1 && roto?.deberia === 24 && roto?.actual === -24 && roto?.corregir === true && roto?.ajuste === 48,
+      json(roto)
+    );
+    const auditAntes = await c.auditoriaStock.count({ where: { productoLocalId: malo.pl } });
+    const conteoAntes = json(await c.conteoControlStock.findMany({ where: { productoLocalId: malo.pl } }));
+    const rep = await reparar(S.adminDepo, malo);
+    const movRep = await c.movimientoStock.findFirst({ where: { productoLocalId: malo.pl }, orderBy: { id: "desc" } });
+    const audRep = await c.auditoriaStock.findFirst({ where: { productoLocalId: malo.pl }, orderBy: { id: "desc" } });
+    ok(
+      "y lo corrige: 24, con un Ajuste por control en el Libro y en la bitácora, sin tocar el conteo",
+      rep.status === 200 && rep.reparado === true && rep.item?.stock === 24 && (await stockDe(malo, depo.id)) === 24 &&
+        movRep.origen === ORIGEN_STOCK.AJUSTE_POR_CONTROL && movRep.origenRef === String(depoControl.id) && Number(movRep.cantidadAnterior) === -24 && Number(movRep.cantidadPosterior) === 24 &&
+        (await c.auditoriaStock.count({ where: { productoLocalId: malo.pl } })) === auditAntes + 1 &&
+        audRep.accion === "CONTROL_CORRECCION" && audRep.motivo === `Ajuste por control #${depoControl.id}` && audRep.controlStockId === depoControl.id &&
+        json(await c.conteoControlStock.findMany({ where: { productoLocalId: malo.pl } })) === conteoAntes,
+      json({ rep, movRep, audRep })
+    );
+    const otraVez = await reparar(S.adminDepo, malo);
+    ok("corregirlo otra vez no mueve nada", otraVez.status === 200 && otraVez.reparado === false && (await stockDe(malo, depo.id)) === 24, json(otraVez));
+    ok("y la revisión ya no marca nada", (await revision(S.adminDepo)).aCorregir === 0);
+    const conPinPost = await reparar(S.ana, malo);
+    ok("corregir con PIN: 403", conPinPost.status === 403, json(conPinPost));
+    // Borrar después de corregir sigue deshaciendo el conteo: la corrección
+    // entra en la bitácora como CONTROL_CORRECCION y el deshacer la suma.
+    await paso("borrar después de corregir", malo, null, 0);
   }
 
   if (process.env.ESCRIBIR_FIXTURE_CONTROL) {

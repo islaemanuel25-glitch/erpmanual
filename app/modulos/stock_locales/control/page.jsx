@@ -27,7 +27,7 @@ export default function ControlStockPage() {
 }
 
 function ControlStock({ puedeGestionar }) {
-  const c = useControlStock();
+  const c = useControlStock({ puedeGestionar });
   return (
     <div className="w-full min-h-full mx-auto max-w-xl px-4 pt-4 pb-4">
       <PantallaControlStock c={c} puedeGestionar={puedeGestionar} />
