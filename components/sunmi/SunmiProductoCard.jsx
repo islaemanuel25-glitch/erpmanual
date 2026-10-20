@@ -400,6 +400,15 @@ export default function SunmiProductoCard({
   // tarjeta mide exactamente lo mismo con y sin marca. Hay un candado que lo
   // compara.
   destacado = null,
+  // ── RESALTADA: EL BORDE DEL COLOR DE ACCIÓN, Y SOLO EL BORDE ─────────────
+  //
+  // La pidió el Control de stock: mientras se escribe el conteo de una tarjeta,
+  // la tarjeta lo dice. Va como prop y no por `className` porque ése también lo
+  // reciben los renglones de texto (`componerClaseTexto`), y un borde pedido ahí
+  // le pondría borde a cada renglón. Esto llega SOLO al panel, que cede su borde
+  // del tema (`tarjetaQueSobrevive`) y pinta el de acción. Sin la prop, la
+  // tarjeta es la de siempre.
+  resaltada = false,
   className = "",
 }) {
   const padding = paddingQueSobrevive(PADDING, className);
@@ -433,7 +442,7 @@ export default function SunmiProductoCard({
       elevado
       // `h-full` para que el panel llene su fila cuando la lista iguala alturas.
       // Va primero para que, si la pantalla declara su propio alto, el suyo mande.
-      className={["h-full", className].filter(Boolean).join(" ")}
+      className={["h-full", resaltada ? "border sunmi-border-accent" : "", className].filter(Boolean).join(" ")}
     >
       <div
         className={contenedor}

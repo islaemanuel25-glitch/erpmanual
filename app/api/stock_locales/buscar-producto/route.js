@@ -1,10 +1,7 @@
-// Stock Locales no la consume (la pantalla usa `listar` y `ajustar`). La usa el
-// Control de stock (2026-10-20): el buscador del POS, `BuscadorProductos`, con
-// esta ruta en `apiPath`, para escanear o buscar por nombre lo que se cuenta.
-// Por eso alcanza también con `stock.control.contar`: quien cuenta tiene que
-// poder encontrar el producto aunque no vea Stock Locales.
+// ⚠️ REVISIÓN (refactor Stock — Etapa 1): hoy NO se consume desde el módulo
+//    Stock Locales (la pantalla usa solo `listar` y `ajustar`). Candidato a
+//    documentar / eliminar / cablear en Etapa 3. NO se borra todavía.
 import { NextResponse } from "next/server";
-import { PERMISO_CONTAR_CONTROL } from "@/lib/stock/control/controlStock";
 import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
@@ -23,7 +20,7 @@ const FUZZY_TOP_RESULTS = 10;
 /**
  * Búsqueda de productos para el módulo Stock.
  * Misma lógica que pos-ventas/buscar-producto: código exacto primero, luego contains;
- * ranking por relevancia. Permiso stock.ver, o el de contar un control.
+ * ranking por relevancia. Permiso stock.ver.
  * No filtra por stock > 0 (en Stock se muestran todos para poder ajustar).
  */
 export async function GET(req) {
@@ -36,7 +33,7 @@ export async function GET(req) {
       );
     }
 
-    const perm = checkPerm(session, ["stock.ver", PERMISO_CONTAR_CONTROL]);
+    const perm = checkPerm(session, "stock.ver");
     if (!perm.ok) return NextResponse.json({ ok: false, error: perm.error }, { status: perm.status });
 
     const { searchParams } = new URL(req.url);

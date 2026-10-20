@@ -1,29 +1,31 @@
 // app/api/stock_locales/control/conteos/route.js
 //
-// POST { productoLocalId, cantidad }: guardar un conteo. El primero del producto
-// en el control fija el stock en lo contado; los siguientes suman. Se aplica en
-// el momento.
+// PUT { productoLocalId, total }: fijar el TOTAL contado de un producto en el
+// control. El primero fija el stock en ese total; cambiarlo lo mueve por la
+// diferencia; `total: null` lo borra, deshace su ajuste y el producto vuelve a
+// "Sin contar". Se aplica en el momento. Contesta la tarjeta como queda y los
+// contadores.
 
 import { NextResponse } from "next/server";
 import { PERMISO_CONTAR_CONTROL } from "@/lib/stock/control/controlStock";
 import {
   autorizarControl,
-  registrarConteo,
+  fijarTotal,
   respuestaDeError,
   respuestaDeRechazo,
 } from "@/lib/stock/control/controlStockServer";
 
-export async function POST(req) {
+export async function PUT(req) {
   try {
     const a = await autorizarControl(req, PERMISO_CONTAR_CONTROL);
     if (!a.ok) return respuestaDeRechazo(a);
     const body = await req.json().catch(() => ({}));
-    const r = await registrarConteo({
+    const r = await fijarTotal({
       localId: a.localId,
       grupoId: a.grupoId,
       quien: a.quien,
       productoLocalId: Number(body.productoLocalId || 0),
-      cantidad: body.cantidad,
+      total: body.total === null || body.total === undefined || body.total === "" ? null : body.total,
     });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {

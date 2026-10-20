@@ -1,68 +1,276 @@
 {
-  "productoConAviso": {
+  "cocaContadaPorOtro": {
     "ok": true,
-    "producto": {
-      "productoLocalId": 1,
+    "item": {
+      "id": 1,
+      "localId": 1,
+      "baseId": 1,
       "nombre": "Coca 2L",
       "codigoBarra": "7790000000001",
-      "unidadFisica": "UNIDAD",
-      "unidad": "un",
-      "admiteDecimales": false
-    },
-    "aviso": "Ya contado por Emanuel: 3 un · Lo tuyo se suma"
+      "categoriaId": null,
+      "proveedorId": 1,
+      "areaFisicaId": null,
+      "unidadMedida": "unidad",
+      "factorPack": 1,
+      "precioUnitario": 600,
+      "precioCosto": 600,
+      "precioVentaUnitario": 1000,
+      "precioVenta": 1000,
+      "margen": null,
+      "stock": 3,
+      "stockMin": null,
+      "stockMax": null,
+      "limitesConfigurados": false,
+      "faltante": false,
+      "modoCompraProveedor": "BULTO",
+      "pesoReferenciaKg": null,
+      "pesoEsFijo": false,
+      "modoVentaDeposito": "PESO",
+      "proveedorNombre": "Coca-Cola FEMSA",
+      "conteo": {
+        "total": 3,
+        "contadoPor": "Emanuel",
+        "en": "2026-10-20T12:11:01.237Z"
+      }
+    }
   },
-  "abierto": {
+  "listaSinContar": {
     "ok": true,
-    "local": {
-      "id": 1,
-      "nombre": "Mini el 7",
-      "es_deposito": false
-    },
-    "control": {
-      "id": 1,
-      "abiertoEn": "2026-10-20T10:47:15.176Z",
-      "abiertoPorNombre": "Emanuel",
-      "contados": 3,
-      "sinContar": 3,
-      "personas": [
-        {
-          "clave": "op:1",
-          "nombre": "Ana",
-          "ultimo": "2026-10-20T10:47:15.377Z",
-          "productos": 2
-        },
-        {
-          "clave": "us:1",
-          "nombre": "Emanuel",
-          "ultimo": "2026-10-20T10:47:15.340Z",
-          "productos": 2
-        }
-      ]
-    },
-    "misConteos": [
+    "items": [
+      {
+        "id": 5,
+        "localId": 1,
+        "baseId": 5,
+        "nombre": "Fideos",
+        "codigoBarra": "7790000000005",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 4,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "proveedorNombre": null,
+        "conteo": null
+      },
       {
         "id": 4,
-        "productoLocalId": 7,
-        "nombre": "Sin fila",
-        "cantidad": 2,
-        "unidadFisica": "UNIDAD",
-        "unidad": "un",
-        "admiteDecimales": false,
-        "creadoEn": "2026-10-20T10:47:15.377Z"
+        "localId": 1,
+        "baseId": 4,
+        "nombre": "Galletas",
+        "codigoBarra": "7790000000004",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": -15,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "proveedorNombre": null,
+        "conteo": null
+      },
+      {
+        "id": 3,
+        "localId": 1,
+        "baseId": 3,
+        "nombre": "Yerba 1kg",
+        "codigoBarra": "7790000000003",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 12,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "proveedorNombre": null,
+        "conteo": null
+      }
+    ],
+    "total": 3,
+    "totalPages": 1,
+    "resumen": {
+      "contados": 3,
+      "sinContar": 3
+    }
+  },
+  "listaContados": {
+    "ok": true,
+    "items": [
+      {
+        "id": 1,
+        "localId": 1,
+        "baseId": 1,
+        "nombre": "Coca 2L",
+        "codigoBarra": "7790000000001",
+        "categoriaId": null,
+        "proveedorId": 1,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 2,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "proveedorNombre": "Coca-Cola FEMSA",
+        "conteo": {
+          "total": 2,
+          "contadoPor": "Emanuel",
+          "en": "2026-10-20T12:11:01.479Z"
+        }
       },
       {
         "id": 2,
-        "productoLocalId": 1,
-        "nombre": "Coca 2L",
-        "cantidad": 4,
-        "unidadFisica": "UNIDAD",
-        "unidad": "un",
-        "admiteDecimales": false,
-        "creadoEn": "2026-10-20T10:47:15.318Z"
+        "localId": 1,
+        "baseId": 2,
+        "nombre": "Queso por kg",
+        "codigoBarra": "7790000000002",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "kg",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 1.25,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "proveedorNombre": null,
+        "conteo": {
+          "total": 1.25,
+          "contadoPor": "Emanuel",
+          "en": "2026-10-20T12:11:01.512Z"
+        }
+      },
+      {
+        "id": 7,
+        "localId": 1,
+        "baseId": 7,
+        "nombre": "Sin fila",
+        "codigoBarra": "7790000000007",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 2,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "proveedorNombre": null,
+        "conteo": {
+          "total": 2,
+          "contadoPor": "Ana",
+          "en": "2026-10-20T12:11:01.559Z"
+        }
       }
     ],
-    "quien": {
-      "nombre": "Ana"
+    "total": 3,
+    "totalPages": 1,
+    "resumen": {
+      "contados": 3,
+      "sinContar": 3
+    }
+  },
+  "listaDeposito": {
+    "ok": true,
+    "items": [
+      {
+        "id": 10,
+        "localId": 2,
+        "baseId": 10,
+        "nombre": "Agua x6",
+        "codigoBarra": "7790000000010",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "pack",
+        "factorPack": 6,
+        "precioCosto": 600,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 40,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "proveedorNombre": null,
+        "conteo": null
+      }
+    ],
+    "total": 1,
+    "totalPages": 1,
+    "resumen": {
+      "contados": 0,
+      "sinContar": 1
     }
   },
   "terminar": {
@@ -74,7 +282,7 @@
     },
     "control": {
       "id": 1,
-      "abiertoEn": "2026-10-20T10:47:15.176Z"
+      "abiertoEn": "2026-10-20T12:11:01.175Z"
     },
     "vendidos": [
       {
@@ -119,12 +327,30 @@
     "control": null,
     "ultimo": {
       "id": 1,
-      "terminadoEn": "2026-10-20T10:47:15.547Z",
+      "terminadoEn": "2026-10-20T12:11:01.935Z",
       "terminadoPorNombre": "Emanuel",
       "puestosEnCero": 2
     },
     "quien": {
       "nombre": "Emanuel"
+    }
+  },
+  "abierto": {
+    "ok": true,
+    "local": {
+      "id": 1,
+      "nombre": "Mini el 7",
+      "es_deposito": false
+    },
+    "control": {
+      "id": 3,
+      "abiertoEn": "2026-10-20T12:11:01.980Z",
+      "abiertoPorNombre": "Cuenta Mini",
+      "contados": 0,
+      "sinContar": 4
+    },
+    "quien": {
+      "nombre": "Ana"
     }
   }
 }

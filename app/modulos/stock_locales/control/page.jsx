@@ -23,14 +23,14 @@ export default function ControlStockPage() {
   const { puedeGestionar, puedeContar } = permisosDelControl(perfil);
   if (!puedeGestionar && !puedeContar) return <SinPermisos />;
 
-  return <ControlStock puedeGestionar={puedeGestionar} puedeContar={puedeContar} />;
+  return <ControlStock puedeGestionar={puedeGestionar} />;
 }
 
-function ControlStock({ puedeGestionar, puedeContar }) {
+function ControlStock({ puedeGestionar }) {
   const c = useControlStock();
   return (
     <div className="w-full min-h-full mx-auto max-w-xl px-4 pt-4 pb-4">
-      <PantallaControlStock c={c} puedeGestionar={puedeGestionar} puedeContar={puedeContar} />
+      <PantallaControlStock c={c} puedeGestionar={puedeGestionar} />
     </div>
   );
 }

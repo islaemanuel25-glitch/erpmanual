@@ -3,30 +3,33 @@
 // components/stock_locales/control/PantallaControlStock.jsx
 //
 // LA PANTALLA DEL CONTROL DE STOCK, PRESENTACIONAL. Recibe lo que armó
-// `useControlStock` y dibuja una de tres vistas:
+// `useControlStock` y dibuja una de dos vistas:
 //
-//   C0/C1 · inicio: sin control, "Empezar control" y el último terminado; con
-//           control, el avance, quién está contando, "Contar" y "Terminar".
-//   C2    · contar: el buscador del POS (lector y nombre), el escaneado con su
-//           cantidad, y lo que contó esta persona, para corregir o borrar.
-//   C3    · terminar: lo que nadie contó, partido en vendidos durante el control
-//           —que no se tocan— y los que quedan en cero.
+//   · inicio. Sin control, "Empezar control" y el último terminado. Con control,
+//     la pantalla de Stock Locales con un campo "Contado" en cada tarjeta: el
+//     avance, el buscador (lector y nombre), los chips Todos / Sin contar /
+//     Contados, la lista y, abajo, "Terminar control".
+//   · terminar. Lo que nadie contó, partido en vendidos durante el control —que
+//     no se tocan— y los que quedan en cero, con su confirmación.
 //
-// Se arma con el kit y con las piezas que ya usan Finanzas y Tesorería en el
-// celular —el encabezado, la tarjeta del número grande, el renglón, el bloque y
-// el botón—, no con unas parecidas al lado. Los colores son clases del tema.
+// Se arma con el kit, con la tarjeta de Stock (`TarjetaStockMovil`, vía
+// `TarjetaConteo`) y con las piezas de Finanzas y Tesorería en el celular —el
+// encabezado, la tarjeta del número grande, el renglón y el botón—, no con unas
+// parecidas al lado. Los colores son clases del tema.
 //
 // Los resúmenes cuentan PRODUCTOS, nunca suman unidades de productos distintos.
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
-import BuscadorProductos from "@/components/pos-ventas/BuscadorProductos";
-import SunmiActionCard from "@/components/sunmi/SunmiActionCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
-import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
-import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
+import SunmiChipsFiltro from "@/components/sunmi/SunmiChipsFiltro";
 import SunmiHojaDeConfirmacion from "@/components/sunmi/SunmiHojaDeConfirmacion";
+import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
+import SunmiListaProductoCards from "@/components/sunmi/SunmiListaProductoCards";
+import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
+import TarjetaConteo from "@/components/stock_locales/control/TarjetaConteo";
 import {
   AvisoDeEstado,
   BarraDeAvance,
@@ -37,23 +40,23 @@ import {
   Renglon,
   TarjetaHero,
 } from "@/components/tesoreria/PiezasTesoreria";
+import { MS_MAX_ENTRE_TECLAS_ESCANER, esLecturaDeEscaner } from "@/lib/pos-ventas/lecturaEscaner";
 import {
+  FILTRO_CONTROL,
   VISTA_CONTROL,
-  haceCuanto,
+  diaDelControl,
   momentoDelControl,
   porcentajeDeAvance,
   textoCantidad,
   textoNumero,
 } from "@/lib/stock/control/controlStock";
 
-const RUTA_BUSCADOR = "/api/stock_locales/buscar-producto";
-
 /** Cuántos de "Quedan en 0" se ven antes de "Ver los n". */
 const PRIMEROS_EN_CERO = 8;
 
 const productos = (n) => `${n} ${n === 1 ? "producto" : "productos"}`;
 
-export default function PantallaControlStock({ c, puedeGestionar, puedeContar }) {
+export default function PantallaControlStock({ c, puedeGestionar }) {
   if (c.cargando) {
     return (
       <div className="py-12">
@@ -72,25 +75,25 @@ export default function PantallaControlStock({ c, puedeGestionar, puedeContar })
   }
   const local = c.estado?.local?.nombre || "";
 
-  if (c.vista === VISTA_CONTROL.CONTAR) return <VistaContar c={c} local={local} />;
   if (c.vista === VISTA_CONTROL.TERMINAR) return <VistaTerminar c={c} local={local} />;
-  return <VistaInicio c={c} local={local} puedeGestionar={puedeGestionar} puedeContar={puedeContar} />;
+  return <VistaInicio c={c} local={local} puedeGestionar={puedeGestionar} />;
 }
 
 function Aviso({ texto }) {
   return texto ? <AvisoDeEstado tono="danger">{texto}</AvisoDeEstado> : null;
 }
 
-// ── C0 / C1 · INICIO ───────────────────────────────────────────────────────
+// ── INICIO ─────────────────────────────────────────────────────────────────
 
-function VistaInicio({ c, local, puedeGestionar, puedeContar }) {
+function VistaInicio({ c, local, puedeGestionar }) {
   const control = c.estado?.control;
+  const contexto = control ? `${local} · abierto desde ${diaDelControl(control.abiertoEn)}` : local;
   return (
     <div className="space-y-3.5">
-      <EncabezadoDeDetalle etiqueta="STOCK · CONTROL" titulo="Control de stock" contexto={local} />
+      <EncabezadoDeDetalle etiqueta="STOCK · CONTROL" titulo="Control de stock" contexto={contexto} />
       <Aviso texto={c.aviso} />
       {control ? (
-        <ControlAbierto c={c} control={control} puedeGestionar={puedeGestionar} puedeContar={puedeContar} />
+        <ControlAbierto c={c} control={control} puedeGestionar={puedeGestionar} />
       ) : (
         <SinControl c={c} puedeGestionar={puedeGestionar} />
       )}
@@ -121,33 +124,64 @@ function SinControl({ c, puedeGestionar }) {
   );
 }
 
-function ControlAbierto({ c, control, puedeGestionar, puedeContar }) {
-  const pct = porcentajeDeAvance(control.contados, control.sinContar);
+function ControlAbierto({ c, control, puedeGestionar }) {
+  const universo = control.contados + control.sinContar;
+  const esDeposito = c.estado?.local?.es_deposito === true;
+  const idFijado = c.fijado?.id ?? null;
+  const items = c.lista.items.filter((i) => i.id !== idFijado);
+  const tarjeta = (item, foco = 0) => (
+    <TarjetaConteo
+      key={item.id}
+      item={item}
+      esDeposito={esDeposito}
+      onGuardar={c.guardarTotal}
+      onEscanear={c.escanear}
+      onListo={c.alBuscador}
+      autoFoco={foco}
+    />
+  );
   return (
     <>
       <TarjetaHero franja={false}>
-        <CifraHero
-          rotulo={`CONTROL ABIERTO · DESDE ${momentoDelControl(control.abiertoEn).toUpperCase()}`}
-          valor={control.contados}
-        />
-        <p className="text-sm2 sunmi-text-muted">productos contados</p>
-        <BarraDeAvance pct={pct} />
-        <Renglon rotulo="Sin contar" valor={control.sinContar} />
+        <CifraHero rotulo={null} valor={control.contados} />
+        <p className="text-sm2 sunmi-text-muted">{`contados de ${universo}`}</p>
+        <BarraDeAvance pct={porcentajeDeAvance(control.contados, control.sinContar)} />
       </TarjetaHero>
 
-      {control.personas.length > 0 && (
-        <Bloque titulo="QUIÉN ESTÁ CONTANDO">
-          {control.personas.map((p) => (
-            <Renglon key={p.clave} rotulo={p.nombre} nota={`último escaneo ${haceCuanto(p.ultimo)}`} valor={productos(p.productos)} />
-          ))}
-        </Bloque>
-      )}
+      <Buscador c={c} />
 
-      {puedeContar && (
-        <BotonTesoreria onClick={() => c.irAContar()} disabled={c.ocupado}>
-          Contar
-        </BotonTesoreria>
+      <SunmiChipsFiltro
+        textoTodas="Todos"
+        valor={c.filtro}
+        onCambiar={c.setFiltro}
+        opciones={[
+          { clave: FILTRO_CONTROL.SIN_CONTAR, texto: `Sin contar · ${control.sinContar}` },
+          { clave: FILTRO_CONTROL.CONTADOS, texto: `Contados · ${control.contados}` },
+        ]}
+      />
+
+      {c.fijado ? <SunmiListaProductoCards>{tarjeta(c.fijado, c.foco)}</SunmiListaProductoCards> : null}
+
+      {c.cargandoLista && items.length === 0 ? (
+        <div className="py-6">
+          <SunmiLoader />
+        </div>
+      ) : (
+        <SunmiListaProductoCards>{items.map((i) => tarjeta(i))}</SunmiListaProductoCards>
       )}
+      {!c.cargandoLista && c.lista.items.length === 0 && !c.fijado ? (
+        <p className="text-sm2 sunmi-text-muted py-2">No hay productos con este filtro.</p>
+      ) : null}
+
+      <SunmiPaginador
+        page={c.page}
+        totalPages={c.lista.totalPages}
+        totalItems={c.lista.total}
+        onPrev={() => c.setPage((p) => Math.max(1, p - 1))}
+        onNext={() => c.setPage((p) => Math.min(c.lista.totalPages, p + 1))}
+        onGoToPage={(n) => c.setPage(Math.min(Math.max(1, Number(n) || 1), c.lista.totalPages))}
+      />
+
       {puedeGestionar && (
         <BotonTesoreria tipo="secundario" onClick={c.irATerminar} disabled={c.ocupado}>
           Terminar control
@@ -157,130 +191,57 @@ function ControlAbierto({ c, control, puedeGestionar, puedeContar }) {
   );
 }
 
-// ── C2 · CONTAR ────────────────────────────────────────────────────────────
+/**
+ * EL BUSCADOR: el lector lleva a la tarjeta del producto, el texto filtra la
+ * lista. El lector se reconoce con la regla de la caja: teclas muy seguidas y
+ * un Enter (`esLecturaDeEscaner`).
+ */
+function Buscador({ c }) {
+  const [texto, setTexto] = useState(c.q);
+  const ultima = useRef(0);
+  const rafaga = useRef("");
 
-function VistaContar({ c, local }) {
-  const quien = c.estado?.quien?.nombre;
-  const control = c.estado?.control;
+  const cambiar = (t) => {
+    setTexto(t);
+    c.buscar(t);
+  };
+
+  const alTeclear = (e) => {
+    const ahora = Date.now();
+    const ms = ahora - ultima.current;
+    ultima.current = ahora;
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (esLecturaDeEscaner(ms, rafaga.current)) {
+        const codigo = rafaga.current;
+        cambiar("");
+        c.escanear(codigo);
+      }
+      rafaga.current = "";
+      return;
+    }
+    if (e.key.length === 1) {
+      if (ms > MS_MAX_ENTRE_TECLAS_ESCANER) rafaga.current = "";
+      rafaga.current += e.key;
+    }
+  };
+
   return (
-    <div className="space-y-3.5">
-      <EncabezadoDeDetalle
-        etiqueta="CONTROL DE STOCK · CONTAR"
-        titulo="Contar"
-        contexto={[local, quien ? `contando: ${quien}` : null].filter(Boolean).join(" · ")}
-        onVolver={c.volverAlInicio}
-      />
-      <Aviso texto={c.aviso} />
-      {!control ? null : (
-        <>
-          <BuscadorProductos
-            key={c.vueltas}
-            localId={c.estado?.local?.id}
-            apiPath={RUTA_BUSCADOR}
-            onAgregar={(p) => c.elegirProducto(p.productoLocalId)}
-            wrapCard={false}
-            mostrarStock={false}
-            placeholder="Escaneá o buscá un producto"
-          />
-          {c.escaneado && <Escaneado c={c} />}
-          <LoQueContaste c={c} />
-        </>
-      )}
-    </div>
+    <SunmiCampoBusquedaVoz
+      inputRef={c.buscadorRef}
+      id="buscar-control"
+      placeholder="Escaneá o buscá un producto"
+      ariaLabel="Escaneá o buscá un producto"
+      value={texto}
+      onChange={cambiar}
+      onVoz={cambiar}
+      onKeyDown={alTeclear}
+      autoFocus
+    />
   );
 }
 
-function Escaneado({ c }) {
-  const p = c.escaneado;
-  const listo = c.cantidad !== "" && Number.isFinite(Number(c.cantidad));
-  return (
-    <Bloque titulo="ESCANEADO">
-      <div className="space-y-0.5">
-        <div className="text-base2 font-semibold sunmi-text-strong break-words">{p.nombre}</div>
-        {p.codigoBarra ? <div className="text-sm2 sunmi-text-muted tabular-nums">{p.codigoBarra}</div> : null}
-      </div>
-      {p.aviso ? <AvisoDeEstado tono="warning">{p.aviso}</AvisoDeEstado> : null}
-      <FilaCantidad
-        valor={c.cantidad}
-        onCambiar={c.setCantidad}
-        admiteDecimales={p.admiteDecimales}
-        unidad={p.unidad}
-      />
-      <BotonTesoreria onClick={c.guardar} disabled={!listo || c.ocupado}>
-        {listo ? `Guardar ${textoCantidad(c.cantidad, p.unidadFisica)}` : "Guardar"}
-      </BotonTesoreria>
-    </Bloque>
-  );
-}
-
-function FilaCantidad({ valor, onCambiar, admiteDecimales, unidad }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-sm3 sunmi-text-strong">Cantidad</span>
-      <div className="flex items-center gap-2">
-        <SunmiCampoCantidad
-          valor={valor}
-          onCambiar={onCambiar}
-          etiqueta="Cantidad"
-          minimo={0}
-          paso={1}
-          decimales={admiteDecimales ? 3 : 0}
-          claseMarco="w-24"
-          claseInput="text-lg2 font-semibold tabular-nums"
-        />
-        <span className="text-sm2 sunmi-text-muted">{unidad}</span>
-      </div>
-    </div>
-  );
-}
-
-function LoQueContaste({ c }) {
-  const mios = c.estado?.misConteos || [];
-  if (mios.length === 0) return null;
-  return (
-    <Bloque titulo="LO QUE CONTASTE">
-      <div className="space-y-1.5">
-        {mios.map((m) =>
-          c.editando?.id === m.id ? (
-            <Edicion key={m.id} c={c} m={m} />
-          ) : (
-            <SunmiActionCard key={m.id} onClick={() => c.empezarAEditar(m)} aria-label={`Corregir ${m.nombre}`}>
-              <div className="flex w-full items-baseline gap-2">
-                <span className="flex-1 min-w-0 text-sm3 font-medium sunmi-text-strong break-words">{m.nombre}</span>
-                <span className="shrink-0 text-sm3 font-semibold tabular-nums sunmi-text-strong">
-                  {textoCantidad(m.cantidad, m.unidadFisica)}
-                </span>
-              </div>
-              <div className="text-xs2 sunmi-text-muted">{haceCuanto(m.creadoEn)}</div>
-            </SunmiActionCard>
-          )
-        )}
-      </div>
-    </Bloque>
-  );
-}
-
-function Edicion({ c, m }) {
-  const e = c.editando;
-  const listo = e.cantidad !== "" && Number.isFinite(Number(e.cantidad));
-  return (
-    <div className="rounded-xl border sunmi-divider p-3 space-y-2.5">
-      <div className="text-sm3 font-semibold sunmi-text-strong break-words">{m.nombre}</div>
-      <FilaCantidad valor={e.cantidad} onCambiar={c.cambiarEdicion} admiteDecimales={e.admiteDecimales} unidad={e.unidad} />
-      <BotonTesoreria onClick={() => c.corregir()} disabled={!listo || c.ocupado}>
-        {listo ? `Corregir a ${textoCantidad(e.cantidad, m.unidadFisica)}` : "Corregir"}
-      </BotonTesoreria>
-      <BotonTesoreria tipo="peligro" onClick={() => c.corregir({ borrar: true })} disabled={c.ocupado}>
-        Borrar conteo
-      </BotonTesoreria>
-      <BotonTesoreria tipo="fantasma" onClick={c.cancelarEdicion} disabled={c.ocupado}>
-        Cancelar
-      </BotonTesoreria>
-    </div>
-  );
-}
-
-// ── C3 · TERMINAR ──────────────────────────────────────────────────────────
+// ── TERMINAR ───────────────────────────────────────────────────────────────
 
 function VistaTerminar({ c, local }) {
   const t = c.terminar;

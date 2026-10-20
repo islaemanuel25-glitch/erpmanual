@@ -38,9 +38,6 @@ function BuscadorProductos({
   // el POS de venta, donde un código perdido es un producto sin cobrar; ofertas
   // y combos usan este mismo buscador y siguen como estaban.
   avisarNoEncontrado = false,
-  // El texto del campo vacío. El Control de stock pide el suyo; el resto queda
-  // con el de siempre.
-  placeholder = "Codigo o nombre del producto...",
 }) {
   const searchApi = apiPath || DEFAULT_SEARCH_API;
   const inputRef = useRef(null);
@@ -268,7 +265,7 @@ function BuscadorProductos({
       <SunmiCampoBusquedaVoz
         inputRef={inputRef}
         id="buscar-producto"
-        placeholder={placeholder}
+        placeholder="Codigo o nombre del producto..."
         value={query}
         onChange={(texto) => handleChange({ target: { value: texto } })}
         onVoz={alDictar}

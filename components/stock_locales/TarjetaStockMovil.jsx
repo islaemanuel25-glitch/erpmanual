@@ -78,6 +78,16 @@ export default function TarjetaStockMovil({
   onLimites,
   puedeAjustar = true,
   localEsDeposito = false,
+  // ── EL CONTROL DE STOCK USA ESTA MISMA TARJETA ───────────────────────────
+  //
+  // Con `filaDeAbajo`, la fila de abajo es la que trae la pantalla —el campo "Contado"—
+  // en lugar de Ajustar y Límites. Lo de arriba no cambia: nombre, proveedor,
+  // código y el STOCK con su presentación, que es lo que tiene que leerse igual
+  // en las dos pantallas. `resaltada` pinta el borde de acción mientras se
+  // escribe, y `ancla` deja encontrar la tarjeta después de escanear.
+  filaDeAbajo = null,
+  resaltada = false,
+  ancla = null,
 }) {
   const stock = Number(item?.stock ?? 0);
   const presentacion = presentacionCantidadStock(item, localEsDeposito);
@@ -124,8 +134,12 @@ export default function TarjetaStockMovil({
           <span className="sunmi-text-warning">Bajo mínimo</span>
         ) : null
       }
+      resaltada={resaltada}
+      ancla={ancla}
       acciones={
-        puedeAjustar ? (
+        filaDeAbajo ? (
+          filaDeAbajo
+        ) : puedeAjustar ? (
           <>
             {/* Las dos acciones quedan SEPARADAS, que es la regla de negocio:
                 Ajustar mueve cantidad, Límites mueve mínimo y máximo. */}

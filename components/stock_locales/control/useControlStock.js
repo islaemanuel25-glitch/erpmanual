@@ -6,20 +6,22 @@
 // contestó el servidor y las acciones. La pantalla (`PantallaControlStock`) no
 // pide nada: dibuja lo que esto le da.
 //
-// Las tres vistas son de una misma página —inicio, contar, terminar—, como
-// Sueldos con sus detalles: el "Contar" de un vendido en Terminar lleva a
-// contar con ese producto ya cargado, sin perder dónde se estaba.
+// Dos vistas de una misma página: la lista de tarjetas (o, sin control, el
+// "Empezar control") y terminar. El "Contar" de un vendido en terminar vuelve a
+// la lista con ese producto arriba y el foco en su campo, igual que escanearlo.
+//
+// Guardar un total actualiza la tarjeta y los contadores con lo que contesta
+// el servidor, sin volver a pedir la lista: la tarjeta no salta de lugar ni
+// desaparece del filtro mientras se está contando al lado.
 //
 // Un 428 es "falta el PIN": se levanta el mismo modal que en la caja.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useOperadorContext } from "@/app/context/OperadorContext";
-import { VISTA_CONTROL } from "@/lib/stock/control/controlStock";
+import { FILTRO_CONTROL, VISTA_CONTROL } from "@/lib/stock/control/controlStock";
 
 const API = "/api/stock_locales/control";
-
-/** La cantidad con la que arranca un producto recién escaneado. */
-const cantidadInicial = (producto) => (producto?.admiteDecimales ? "" : "1");
+const ESPERA_BUSQUEDA_MS = 300;
 
 export function useControlStock() {
   const { requerirOperador } = useOperadorContext();
@@ -30,11 +32,17 @@ export function useControlStock() {
   const [ocupado, setOcupado] = useState(false);
   const [aviso, setAviso] = useState(null);
 
-  // Contar
-  const [escaneado, setEscaneado] = useState(null);
-  const [cantidad, setCantidad] = useState("");
-  const [vueltas, setVueltas] = useState(0);
-  const [editando, setEditando] = useState(null);
+  // La lista
+  const [filtro, setFiltroCrudo] = useState(FILTRO_CONTROL.SIN_CONTAR);
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const [lista, setLista] = useState({ items: [], total: 0, totalPages: 1 });
+  const [cargandoLista, setCargandoLista] = useState(false);
+  // El producto que trajo el lector o el "Contar" de terminar: va arriba, aunque
+  // el filtro lo oculte, y su campo recibe el foco (`foco` cambia en cada uno).
+  const [fijado, setFijado] = useState(null);
+  const [foco, setFoco] = useState(0);
+  const buscadorRef = useRef(null);
 
   // Terminar
   const [terminar, setTerminar] = useState(null);
@@ -49,7 +57,7 @@ export function useControlStock() {
           headers: { "content-type": "application/json", ...(opciones.headers || {}) },
         });
       } catch {
-        return { ok: false, error: "Sin conexión: no se sabe si se guardó. Mirá la lista antes de repetirlo." };
+        return { ok: false, error: "Sin conexión." };
       }
       const datos = await r.json().catch(() => ({}));
       if (r.status === 428) requerirOperador();
@@ -77,10 +85,52 @@ export function useControlStock() {
     recargar();
   }, [recargar]);
 
+  const hayControl = Boolean(estado?.control);
+
+  /** Los contadores que llegan con cada lista y con cada guardado. */
+  const ponerResumen = useCallback((resumen) => {
+    if (!resumen) return;
+    setEstado((e) => (e?.control ? { ...e, control: { ...e.control, ...resumen } } : e));
+  }, []);
+
+  // La lista se pide de nuevo cuando cambia el filtro, el texto o la página.
+  useEffect(() => {
+    if (!hayControl || vista !== VISTA_CONTROL.INICIO) return undefined;
+    let vigente = true;
+    const t = setTimeout(async () => {
+      setCargandoLista(true);
+      const qs = new URLSearchParams({ page: String(page) });
+      if (filtro) qs.set("filtro", filtro);
+      if (q.trim()) qs.set("q", q.trim());
+      const r = await pedir(`${API}/productos?${qs}`);
+      if (!vigente) return;
+      setCargandoLista(false);
+      if (!r.ok) {
+        setAviso(r.error);
+        return;
+      }
+      setLista({ items: r.items, total: r.total, totalPages: r.totalPages });
+      ponerResumen(r.resumen);
+    }, q ? ESPERA_BUSQUEDA_MS : 0);
+    return () => {
+      vigente = false;
+      clearTimeout(t);
+    };
+  }, [hayControl, vista, filtro, q, page, pedir, ponerResumen]);
+
+  const setFiltro = useCallback((f) => {
+    setFiltroCrudo(f);
+    setPage(1);
+    setFijado(null);
+  }, []);
+
+  const buscar = useCallback((texto) => {
+    setQ(texto);
+    setPage(1);
+  }, []);
+
   const volverAlInicio = useCallback(() => {
     setVista(VISTA_CONTROL.INICIO);
-    setEscaneado(null);
-    setEditando(null);
     setAviso(null);
     recargar();
   }, [recargar]);
@@ -93,79 +143,58 @@ export function useControlStock() {
     await recargar();
   }, [pedir, recargar]);
 
-  /** Carga el producto para contar: su unidad y el aviso de "ya contado". */
-  const elegirProducto = useCallback(
-    async (productoLocalId) => {
-      setAviso(null);
-      setEditando(null);
-      const r = await pedir(`${API}/producto?productoLocalId=${Number(productoLocalId)}`);
-      if (!r.ok) {
-        setEscaneado(null);
-        setAviso(r.error);
+  /** Trae UNA tarjeta —por código leído o por id— y le da el foco. */
+  const fijar = useCallback(
+    async (consulta) => {
+      const r = await pedir(`${API}/productos?${new URLSearchParams(consulta)}`);
+      if (!r.ok || !r.item) {
+        setAviso(r.error || "No se encontró el producto.");
         return;
       }
-      setEscaneado({ ...r.producto, aviso: r.aviso });
-      setCantidad(cantidadInicial(r.producto));
+      setAviso(null);
+      setFijado(r.item);
+      setFoco((n) => n + 1);
     },
     [pedir]
   );
 
+  const escanear = useCallback((codigo) => fijar({ codigo: String(codigo).trim() }), [fijar]);
+
   const irAContar = useCallback(
-    (productoLocalId = null) => {
-      setVista(VISTA_CONTROL.CONTAR);
-      setEscaneado(null);
+    (productoLocalId) => {
+      setVista(VISTA_CONTROL.INICIO);
       setAviso(null);
-      if (productoLocalId) elegirProducto(productoLocalId);
+      fijar({ productoLocalId: String(productoLocalId) });
     },
-    [elegirProducto]
+    [fijar]
   );
 
-  const guardar = useCallback(async () => {
-    if (!escaneado || cantidad === "") return;
-    setOcupado(true);
-    const r = await pedir(`${API}/conteos`, {
-      method: "POST",
-      body: JSON.stringify({ productoLocalId: escaneado.productoLocalId, cantidad: Number(cantidad) }),
-    });
-    setOcupado(false);
-    if (!r.ok) {
-      setAviso(r.error);
-      return;
-    }
-    setAviso(null);
-    setEscaneado(null);
-    setCantidad("");
-    // El buscador se vuelve a montar: arranca vacío y con el foco puesto, listo
-    // para el próximo escaneo.
-    setVueltas((n) => n + 1);
-    recargar();
-  }, [escaneado, cantidad, pedir, recargar]);
-
-  const empezarAEditar = useCallback((c) => {
-    setEditando({ id: c.id, cantidad: String(c.cantidad), admiteDecimales: c.admiteDecimales, unidad: c.unidad });
-  }, []);
-
-  const corregir = useCallback(
-    async ({ borrar = false } = {}) => {
-      if (!editando) return;
-      if (!borrar && editando.cantidad === "") return;
-      setOcupado(true);
-      const r = await pedir(`${API}/conteos/${editando.id}`, {
-        method: borrar ? "DELETE" : "PATCH",
-        ...(borrar ? {} : { body: JSON.stringify({ cantidad: Number(editando.cantidad) }) }),
+  /**
+   * GUARDAR EL TOTAL de un producto (`null` lo borra). Devuelve si se guardó:
+   * la tarjeta decide con eso si muestra "No se guardó".
+   */
+  const guardarTotal = useCallback(
+    async (productoLocalId, total) => {
+      const r = await pedir(`${API}/conteos`, {
+        method: "PUT",
+        body: JSON.stringify({ productoLocalId, total }),
       });
-      setOcupado(false);
       if (!r.ok) {
         setAviso(r.error);
-        return;
+        return false;
       }
       setAviso(null);
-      setEditando(null);
-      setVueltas((n) => n + 1);
-      recargar();
+      if (r.item) {
+        setLista((l) => ({ ...l, items: l.items.map((i) => (i.id === r.item.id ? r.item : i)) }));
+        setFijado((f) => (f && f.id === r.item.id ? r.item : f));
+      }
+      ponerResumen(r.resumen);
+      return true;
     },
-    [editando, pedir, recargar]
+    [pedir, ponerResumen]
   );
+
+  const alBuscador = useCallback(() => buscadorRef.current?.focus(), []);
 
   const cargarTerminar = useCallback(async () => {
     setTerminar(null);
@@ -212,23 +241,26 @@ export function useControlStock() {
     error,
     ocupado,
     aviso,
-    escaneado,
-    cantidad,
-    vueltas,
-    editando,
+    filtro,
+    q,
+    page,
+    lista,
+    cargandoLista,
+    fijado,
+    foco,
+    buscadorRef,
     terminar,
     recargar,
     abrir,
+    setFiltro,
+    buscar,
+    setPage,
+    escanear,
     irAContar,
+    guardarTotal,
+    alBuscador,
     irATerminar,
     volverAlInicio,
-    elegirProducto,
-    setCantidad,
-    guardar,
-    empezarAEditar,
-    cambiarEdicion: (valor) => setEditando((e) => (e ? { ...e, cantidad: valor } : e)),
-    cancelarEdicion: () => setEditando(null),
-    corregir,
     confirmarTerminar,
   };
 }

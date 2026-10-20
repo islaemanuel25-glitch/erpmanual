@@ -7,6 +7,9 @@ import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStoc
 import { productoVisibleWhere } from "@/lib/visibilidad";
 import { mapStockItemLocal, mapStockItemDeposito } from "@/lib/stock/mapItem";
 import { buscarProductoLocalPorCodigo } from "@/lib/productos/busquedaCodigoBarra";
+// Búsqueda de texto de stock (nombre / código de barras / secundario). La
+// comparte el Control de stock.
+import { buildTextOR } from "@/lib/stock/busquedaStock";
 import {
   condicionesPrisma,
   condicionesSql,
@@ -14,19 +17,6 @@ import {
 } from "@/lib/stock/estadosDeStock";
 
 const PAGE_SIZE = 25;
-
-// Búsqueda de texto actual de stock (nombre / código de barras / secundario).
-function buildTextOR(q) {
-  return q
-    ? {
-        OR: [
-          { nombre: { contains: q, mode: "insensitive" } },
-          { codigo_barra: { contains: q, mode: "insensitive" } },
-          { codigo_barra_secundario: { contains: q, mode: "insensitive" } },
-        ],
-      }
-    : {};
-}
 
 // ── UN CÓDIGO ESCANEADO O TIPEADO SE RESUELVE COMO EN LA CAJA ───────────────
 //
