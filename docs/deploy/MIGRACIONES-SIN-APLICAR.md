@@ -61,6 +61,11 @@ Si la lista está vacía, el despliegue es solo de código.
   `20261017120000_permiso_ventas_ver_dia`; confirmarla es de Emanuel. Correrla
   dos veces no cambia nada. Puede ir antes o después de la imagen; sin ella el
   dueño no ve el módulo hasta tildarlos en Roles (el Admin sí, por "*").
+- `20261020180000_permisos_control_stock_encargado` — **De datos, chica.** Lo
+  mismo que la anterior, para el rol ENCARGADO: concatena los dos permisos del
+  Control de stock, no saca ninguno ni toca otro rol. **El clasificador la
+  frena** por el UPDATE de `Rol`; confirmarla es de Emanuel. Idempotente, y
+  puede ir antes o después de la imagen.
 
 Producción está en **71 migraciones**, la última
 `20261019120000_operador_sesion_invalidada_en`.

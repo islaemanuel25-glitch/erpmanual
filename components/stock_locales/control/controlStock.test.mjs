@@ -22,7 +22,9 @@ import { readFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import PantallaControlStock from "@/components/stock_locales/control/PantallaControlStock.jsx";
+import PantallaControlStock, { ConfirmarTerminar } from "@/components/stock_locales/control/PantallaControlStock.jsx";
+import { PERMISOS_FUERA_DEL_OPERADOR, permisosEfectivos } from "@/lib/rbac/permisosDelOperador.js";
+import { checkPerm } from "@/lib/authorize.js";
 import {
   VISTA_CONTROL,
   avisoYaContado,
@@ -35,7 +37,12 @@ import {
   textoCantidad,
   validarCantidadContada,
 } from "@/lib/stock/control/controlStock.js";
-import { PERMISO_CONTAR_CONTROL, PERMISO_GESTIONAR_CONTROL, RUTA_CONTROL_STOCK } from "@/lib/stock/control/rutasControlStock.js";
+import {
+  PERMISO_CONTAR_CONTROL,
+  PERMISO_GESTIONAR_CONTROL,
+  RUTA_CONTROL_STOCK,
+  permisosDelControl,
+} from "@/lib/stock/control/rutasControlStock.js";
 import { construirMenuVisible } from "@/lib/menu/menuVisible";
 import { getGrupoConfig } from "@/lib/empresa-config";
 import { PERMISSION_REGISTRY } from "@/lib/rbac/registry.js";
@@ -171,17 +178,72 @@ test("C3: los que nadie contó, los vendidos aparte, y el botón dice cuántos q
   assert.match(html, /SE VENDIERON DURANTE EL CONTROL Yerba 1kg vendidas 2 · sistema 10 un Contar/);
   assert.match(html, /QUEDAN EN 0 Fideos 4 un → 0 Galletas −15 un → 0/);
   assert.match(html, /Poner 2 en 0 y terminar$/);
+  assert.doesNotMatch(html, /Vas a poner/, "la confirmación arranca cerrada");
+});
+
+test("C3: el botón abre la confirmación y solo 'Poner en 0' llama al servidor", () => {
+  const sinComentarios = (t) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1");
+  const src = sinComentarios(readFileSync("components/stock_locales/control/PantallaControlStock.jsx", "utf8"));
+  const boton = src.slice(src.lastIndexOf("<BotonTesoreria", src.indexOf("en 0 y terminar")), src.indexOf("en 0 y terminar"));
+  assert.match(boton, /onClick=\{\(\) => setConfirmando\(true\)\}/, "el botón de abajo tiene que abrir, no terminar");
+  assert.equal((src.match(/c\.confirmarTerminar\(/g) || []).length, 1, "un solo lugar llama al servidor");
+  assert.match(src, /const alConfirmar = async \(\) => \{\s*await c\.confirmarTerminar\(\);/);
+  assert.match(src, /onConfirmar=\{alConfirmar\}/);
+  // Y el hook no deja mandar dos.
+  const hook = sinComentarios(readFileSync("components/stock_locales/control/useControlStock.js", "utf8"));
+  assert.match(hook, /if \(!terminar \|\| terminando\.current\) return;\s*terminando\.current = true;/);
+});
+
+test("la confirmación: el texto, Cancelar y Poner en 0, y deshabilitado mientras procesa", () => {
+  const abierta = (ocupado) =>
+    renderToStaticMarkup(React.createElement(ConfirmarTerminar, { abierto: true, cantidad: 2, ocupado, onCancelar: nada, onConfirmar: nada }));
+  // La hoja de confirmación del kit: el texto, y los dos botones grandes.
+  assert.match(texto(abierta(false)), /Terminar control .*Vas a poner 2 productos en 0 y terminar el control Poner en 0 Cancelar/);
+  assert.match(readFileSync("components/stock_locales/control/PantallaControlStock.jsx", "utf8"), /<SunmiHojaDeConfirmacion\b/);
+  const boton = (html, rotulo) => html.match(new RegExp(`<button[^>]*>${rotulo}</button>`))?.[0] || "";
+  assert.doesNotMatch(boton(abierta(false), "Poner en 0"), /disabled/);
+  assert.match(boton(abierta(true), "Poner en 0"), /disabled/, "procesando, no se puede mandar dos veces");
+  assert.equal(renderToStaticMarkup(React.createElement(ConfirmarTerminar, { abierto: false, cantidad: 2, ocupado: false, onCancelar: nada, onConfirmar: nada })), "");
 });
 
 // ── DÓNDE SE ENGANCHA ──────────────────────────────────────────────────────
 
-test("los dos permisos existen, los tiene el dueño y no el encargado ni el cajero", () => {
+test("los dos permisos existen, los tienen el dueño y el encargado, y no el cajero", () => {
   for (const p of [PERMISO_CONTAR_CONTROL, PERMISO_GESTIONAR_CONTROL]) {
     assert.ok(PERMISSION_REGISTRY.some((r) => r.code === p && r.group === "stock"), p);
     assert.ok(DEFAULT_PERMISOS_SISTEMA[DUENO_LOCAL].includes(p), `DUEÑO_LOCAL sin ${p}`);
-    assert.ok(!DEFAULT_PERMISOS_SISTEMA[ENCARGADO].includes(p), `ENCARGADO con ${p}`);
+    assert.ok(DEFAULT_PERMISOS_SISTEMA[ENCARGADO].includes(p), `ENCARGADO sin ${p}`);
     assert.ok(!DEFAULT_PERMISOS_SISTEMA[CAJERO].includes(p), `CAJERO con ${p}`);
   }
+});
+
+test("con PIN activo se cuenta pero no se empieza ni se termina: también el Admin", () => {
+  // La resta es la de Finanzas: la misma función en la sesión y en `/api/me`.
+  assert.ok(PERMISOS_FUERA_DEL_OPERADOR.includes(PERMISO_GESTIONAR_CONTROL));
+  assert.ok(!PERMISOS_FUERA_DEL_OPERADOR.includes(PERMISO_CONTAR_CONTROL));
+  const cuenta = DEFAULT_PERMISOS_SISTEMA[ENCARGADO];
+  assert.deepEqual(permisosDelControl({ permisos: permisosEfectivos(cuenta, false), operadorActivo: false }), { puedeGestionar: true, puedeContar: true });
+  assert.deepEqual(permisosDelControl({ permisos: permisosEfectivos(cuenta, true), operadorActivo: true }), { puedeGestionar: false, puedeContar: true });
+  assert.deepEqual(permisosDelControl({ permisos: ["*"], operadorActivo: true }), { puedeGestionar: false, puedeContar: true });
+  assert.deepEqual(permisosDelControl({ permisos: ["*"], operadorActivo: false }), { puedeGestionar: true, puedeContar: true });
+  // En el servidor: checkPerm con la sesión del operador, Admin incluido.
+  const sesion = (permisos, operadorActivo) => ({ permisos: permisosEfectivos(permisos, operadorActivo), esAdmin: permisos.includes("*"), operadorActivo });
+  assert.equal(checkPerm(sesion(["*"], true), PERMISO_GESTIONAR_CONTROL).ok, false);
+  assert.equal(checkPerm(sesion(["*"], true), PERMISO_CONTAR_CONTROL).ok, true);
+  assert.equal(checkPerm(sesion(cuenta, true), PERMISO_GESTIONAR_CONTROL).ok, false);
+  assert.equal(checkPerm(sesion(cuenta, false), PERMISO_GESTIONAR_CONTROL).ok, true);
+});
+
+test("abrir y terminar pasan por la puerta que niega al operador; la página usa la misma regla", () => {
+  const sinComentarios = (t) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1");
+  const leer = (r) => sinComentarios(readFileSync(r, "utf8"));
+  // Y la persona es la cuenta: un encargado sin PIN gestiona (con PIN ya se rechazó).
+  assert.match(leer("app/api/stock_locales/control/abrir/route.js"), /autorizarControl\(req, PERMISO_GESTIONAR_CONTROL, \{ persona: "cuenta" \}\)/);
+  const terminar = leer("app/api/stock_locales/control/terminar/route.js");
+  assert.equal((terminar.match(/autorizarControl\(req, PERMISO_GESTIONAR_CONTROL, \{[^}]*persona: "cuenta" \}\)/g) || []).length, 2, "GET y POST");
+  const servidor = leer("lib/stock/control/controlStockServer.js");
+  assert.match(servidor, /scope\.session\.operadorActivo && pedidos\.every\(\(p\) => p === PERMISO_GESTIONAR_CONTROL\)/);
+  assert.match(leer("app/modulos/stock_locales/control/page.jsx"), /permisosDelControl\(perfil\)/);
 });
 
 test("el menú: Stock → Control de stock, después de Stock Locales, con cualquiera de los dos", () => {
@@ -191,5 +253,6 @@ test("el menú: Stock → Control de stock, después de Stock Locales, con cualq
   const dueno = hrefs(stock(DEFAULT_PERMISOS_SISTEMA[DUENO_LOCAL]));
   assert.equal(dueno[dueno.indexOf("/modulos/stock_locales") + 1], RUTA_CONTROL_STOCK);
   assert.ok(hrefs(stock(["stock.ver", PERMISO_CONTAR_CONTROL])).includes(RUTA_CONTROL_STOCK));
-  assert.ok(!hrefs(stock(DEFAULT_PERMISOS_SISTEMA[ENCARGADO])).includes(RUTA_CONTROL_STOCK));
+  assert.ok(hrefs(stock(DEFAULT_PERMISOS_SISTEMA[ENCARGADO])).includes(RUTA_CONTROL_STOCK));
+  assert.ok(!hrefs(stock(DEFAULT_PERMISOS_SISTEMA[CAJERO].concat("stock.ver"))).includes(RUTA_CONTROL_STOCK));
 });

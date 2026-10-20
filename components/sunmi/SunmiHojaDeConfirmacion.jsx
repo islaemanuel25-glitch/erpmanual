@@ -37,6 +37,8 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
  * @param {string}   props.textoTrabajando  lo que dice el botón mientras escribe
  * @param {string}   [props.colorConfirmar] un color de `SunmiButton` ("cyan")
  * @param {boolean}  [props.trabajando]     apaga los dos botones y el velo
+ * @param {string}   [props.textoVolver]    el botón de salir; el Control de
+ *                                          stock pide "Cancelar"
  * @param {() => void} props.onConfirmar
  * @param {() => void} props.onVolver
  */
@@ -47,6 +49,7 @@ export default function SunmiHojaDeConfirmacion({
   textoTrabajando,
   colorConfirmar = "cyan",
   trabajando = false,
+  textoVolver = "Volver",
   onConfirmar,
   onVolver,
 }) {
@@ -77,7 +80,7 @@ export default function SunmiHojaDeConfirmacion({
             disabled={trabajando}
             className="w-full min-h-toque text-sm3"
           >
-            Volver
+            {textoVolver}
           </SunmiButton>
         </div>
       }

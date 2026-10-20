@@ -17,7 +17,7 @@ import {
 
 export async function GET(req) {
   try {
-    const a = await autorizarControl(req, PERMISO_GESTIONAR_CONTROL, { lectura: true, persona: "opcional" });
+    const a = await autorizarControl(req, PERMISO_GESTIONAR_CONTROL, { lectura: true, persona: "cuenta" });
     if (!a.ok) return respuestaDeRechazo(a);
     const r = await leerTerminar({ localId: a.localId });
     return NextResponse.json({ ok: true, ...r });
@@ -28,7 +28,7 @@ export async function GET(req) {
 
 export async function POST(req) {
   try {
-    const a = await autorizarControl(req, PERMISO_GESTIONAR_CONTROL);
+    const a = await autorizarControl(req, PERMISO_GESTIONAR_CONTROL, { persona: "cuenta" });
     if (!a.ok) return respuestaDeRechazo(a);
     const body = await req.json().catch(() => ({}));
     const r = await terminarControl({ localId: a.localId, grupoId: a.grupoId, quien: a.quien, vistos: body.productos });

@@ -12,7 +12,7 @@ import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
 import PantallaControlStock from "@/components/stock_locales/control/PantallaControlStock";
 import { useControlStock } from "@/components/stock_locales/control/useControlStock";
-import { PERMISO_CONTAR_CONTROL, PERMISO_GESTIONAR_CONTROL } from "@/lib/stock/control/rutasControlStock";
+import { permisosDelControl } from "@/lib/stock/control/rutasControlStock";
 
 export default function ControlStockPage() {
   // El título del shell sale del ítem del menú, que se llama igual que la
@@ -20,10 +20,7 @@ export default function ControlStockPage() {
   const { perfil, cargando } = useUser();
 
   if (cargando) return null;
-  const permisos = Array.isArray(perfil?.permisos) ? perfil.permisos : [];
-  const esAdmin = permisos.includes("*");
-  const puedeGestionar = esAdmin || permisos.includes(PERMISO_GESTIONAR_CONTROL);
-  const puedeContar = esAdmin || permisos.includes(PERMISO_CONTAR_CONTROL);
+  const { puedeGestionar, puedeContar } = permisosDelControl(perfil);
   if (!puedeGestionar && !puedeContar) return <SinPermisos />;
 
   return <ControlStock puedeGestionar={puedeGestionar} puedeContar={puedeContar} />;

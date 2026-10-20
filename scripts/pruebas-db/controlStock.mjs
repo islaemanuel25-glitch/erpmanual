@@ -77,15 +77,28 @@ try {
   // Hasta ANTES de la de permisos: los roles se crean como los tiene una
   // instalación que ya corre —sin los dos permisos nuevos— y después se aplica
   // esa migración, que es la que tiene que dárselos al dueño.
-  const MIGRACION_PERMISOS = "20261020120100_permisos_control_stock_dueno_local";
-  aplicarMigraciones(urlPrueba, { hasta: MIGRACION_PERMISOS });
+  const MIGRACIONES_PERMISOS = [
+    "20261020120100_permisos_control_stock_dueno_local",
+    "20261020180000_permisos_control_stock_encargado",
+  ];
+  aplicarMigraciones(urlPrueba, { hasta: MIGRACIONES_PERMISOS[0] });
   c = await crearClientePrisma({ nivel: ESCRITURA, url: urlPrueba });
   const sinLosNuevos = (l) => l.filter((p) => !p.startsWith("stock.control."));
   await c.rol.create({ data: { nombre: "DUEÑO_LOCAL", esSistema: true, permisos: sinLosNuevos(DEFAULT_PERMISOS_SISTEMA[DUENO_LOCAL]) } });
   await c.rol.create({ data: { nombre: "ENCARGADO", esSistema: true, permisos: sinLosNuevos(DEFAULT_PERMISOS_SISTEMA[ENCARGADO]) } });
-  aplicarMigraciones(urlPrueba, { solo: [MIGRACION_PERMISOS] });
+  await c.rol.create({ data: { nombre: "CAJERO", esSistema: true, permisos: DEFAULT_PERMISOS_SISTEMA.CAJERO } });
+  aplicarMigraciones(urlPrueba, { solo: MIGRACIONES_PERMISOS });
   const rolEncargado = await c.rol.findUnique({ where: { nombre: "ENCARGADO" } });
-  ok("al ENCARGADO no le agregó nada", !rolEncargado.permisos.some((p) => p.startsWith("stock.control.")), json(rolEncargado.permisos));
+  ok(
+    "la migración le dio los dos permisos al ENCARGADO que ya existía",
+    rolEncargado.permisos.includes("stock.control.gestionar") && rolEncargado.permisos.includes("stock.control.contar"),
+    json(rolEncargado.permisos)
+  );
+  const rolCajero = await c.rol.findUnique({ where: { nombre: "CAJERO" } });
+  ok("al CAJERO no le agregó nada", !rolCajero.permisos.some((p) => p.startsWith("stock.control.")), json(rolCajero.permisos));
+  aplicarMigraciones(urlPrueba, { solo: MIGRACIONES_PERMISOS });
+  const otraVez = await c.rol.findUnique({ where: { nombre: "ENCARGADO" } });
+  ok("correrlas dos veces no duplica", otraVez.permisos.filter((p) => p.startsWith("stock.control.")).length === 2, json(otraVez.permisos));
 
   // ── Siembra: un grupo con un local ──────────────────────────────────────
   const grupo = await c.grupo.create({ data: { nombre: "Grupo control" } });
@@ -151,9 +164,13 @@ try {
   const permisosEnc = DEFAULT_PERMISOS_SISTEMA[ENCARGADO];
   const S = {
     dueno: sesion(dueno, DEFAULT_PERMISOS_SISTEMA[DUENO_LOCAL], true),
-    encargadoSinPermiso: sesion(cuenta, permisosEnc, false),
-    cuentaSinPin: sesion(cuenta, [...permisosEnc, "stock.control.contar"], false),
-    ana: `${sesion(cuenta, [...permisosEnc, "stock.control.contar"], false)}; ${pin(ana)}`,
+    // Con su PIN puesto en la cuenta del dueño: cuenta, pero no gestiona.
+    duenoConPin: `${sesion(dueno, DEFAULT_PERMISOS_SISTEMA[DUENO_LOCAL], true)}; ${pin(ana)}`,
+    adminConPin: `${sesion(dueno, ["*"], false)}; ${pin(ana)}`,
+    encargadoSinPermiso: sesion(cuenta, sinLosNuevos(permisosEnc), false),
+    // La cuenta del encargado, sin PIN: gestiona, pero para contar pide el PIN.
+    cuentaSinPin: sesion(cuenta, permisosEnc, false),
+    ana: `${sesion(cuenta, permisosEnc, false)}; ${pin(ana)}`,
   };
 
   const pedir = async (ruta, metodo, url, cookie, body = undefined, params = undefined) => {
@@ -174,8 +191,11 @@ try {
   {
     const r = await estado(S.encargadoSinPermiso);
     ok("sin ningún permiso del control: 403", r.status === 403, json(r));
-    const a = await pedir(R.abrir, "POST", `${B}/abrir`, S.ana);
-    ok("contar no alcanza para abrir: 403", a.status === 403, json(a));
+    for (const [quien, s] of [["Ana con PIN", S.ana], ["el dueño con PIN", S.duenoConPin], ["el Admin con PIN", S.adminConPin]]) {
+      const a = await pedir(R.abrir, "POST", `${B}/abrir`, s);
+      ok(`${quien} no puede empezar: 403 y dice por qué`, a.status === 403 && /empezar o terminar el control lo hace la cuenta sin PIN/.test(a.error || ""), json(a));
+    }
+    ok("y no se abrió nada", (await c.controlStock.count()) === 0);
     const e = await estado(S.cuentaSinPin);
     ok("la cuenta compartida sin PIN igual ve el estado", e.status === 200 && e.control === null, json(e));
   }
@@ -260,8 +280,15 @@ try {
     ok("la yerba va a 'se vendieron', con 2 vendidas y 10 en el sistema", t.status === 200 && json(ids(t.vendidos)) === json([P.yerba.pl]) && t.vendidos[0].vendidas === 2 && t.vendidos[0].stock === 10, json(t.vendidos));
     // El queso: su único conteo se borró y quedó en cero, así que no está en ninguna lista.
     ok("quedan en 0: galletas (−15) y fideos (4)", json(ids(t.aCero)) === json([P.galletas.pl, P.fideos.pl].sort((a, b) => a - b)), json(t.aCero));
-    const sinTerminar = await pedir(R.terminar, "POST", `${B}/terminar`, S.ana, { productos: ids(t.aCero) });
-    ok("Ana cuenta pero no termina: 403", sinTerminar.status === 403, json(sinTerminar));
+    for (const [quien, s] of [["Ana con PIN", S.ana], ["el dueño con PIN", S.duenoConPin], ["el Admin con PIN", S.adminConPin]]) {
+      const post = await pedir(R.terminar, "POST", `${B}/terminar`, s, { productos: ids(t.aCero) });
+      const get = await pedir(R.terminar, "GET", `${B}/terminar`, s);
+      ok(`${quien} cuenta pero no termina: 403 en el POST y en la lista`, post.status === 403 && get.status === 403, json({ post, get }));
+    }
+    const conPin = await contar(S.duenoConPin, P.vacio, 0);
+    ok("con PIN en la cuenta del dueño sí cuenta, a nombre de la operadora", conPin.status === 200 && (await c.conteoControlStock.findUnique({ where: { id: conPin.conteo.id } })).contadoPor === "Ana", json(conPin));
+    const sinPinCuenta = await pedir(R.terminar, "GET", `${B}/terminar`, S.cuentaSinPin);
+    ok("la cuenta del encargado, sin PIN, sí ve la lista de terminar", sinPinCuenta.status === 200, json(sinPinCuenta));
     const vieja = await pedir(R.terminar, "POST", `${B}/terminar`, S.dueno, { productos: [P.galletas.pl] });
     ok("con una lista que no tiene a todos: 409 y no toca nada", vieja.status === 409 && vieja.cambioLaLista === true && (await stockDe(P.fideos)) === 4, json(vieja));
     const fin = await pedir(R.terminar, "POST", `${B}/terminar`, S.dueno, { productos: ids(t.aCero) });
@@ -286,8 +313,8 @@ try {
     const aud = await c.auditoriaStock.findMany({ where: { controlStockId: controlId }, orderBy: { id: "asc" } });
     const acciones = aud.map((a) => a.accion);
     ok(
-      "la bitácora de stock: 4 conteos, 1 corrección, 1 borrado, 2 en cero",
-      acciones.filter((a) => a === "CONTROL_CONTEO").length === 4 &&
+      "la bitácora de stock: 5 conteos, 1 corrección, 1 borrado, 2 en cero",
+      acciones.filter((a) => a === "CONTROL_CONTEO").length === 5 &&
         acciones.filter((a) => a === "CONTROL_CORRECCION").length === 1 &&
         acciones.filter((a) => a === "CONTROL_BORRADO").length === 1 &&
         acciones.filter((a) => a === "CONTROL_PUESTO_EN_CERO").length === 2,
@@ -304,8 +331,14 @@ try {
     ok("contar con el control terminado: 409, y no mueve el stock", r.status === 409 && (await stockDe(P.fideos)) === 0, json(r));
     const cor = await pedir(R.conteo, "PATCH", `${B}/conteos/${conteoDueno}`, S.dueno, { cantidad: 1 }, { id: String(conteoDueno) });
     ok("corregir con el control terminado: 409", cor.status === 409 && (await stockDe(P.coca)) === 9, json(cor));
-    const nuevo = await pedir(R.abrir, "POST", `${B}/abrir`, S.dueno);
-    ok("se puede abrir uno nuevo", nuevo.status === 200);
+    // Y lo abre la cuenta del encargado, sin PIN: gestionar es de la cuenta.
+    const nuevo = await pedir(R.abrir, "POST", `${B}/abrir`, S.cuentaSinPin);
+    const abierto = nuevo.control ? await c.controlStock.findUnique({ where: { id: nuevo.control.id } }) : null;
+    ok(
+      "la cuenta del encargado, sin PIN, abre uno nuevo a su nombre",
+      nuevo.status === 200 && abierto?.abiertoPorNombre === "Cuenta Mini" && abierto?.abiertoPorOperadorId === null,
+      json({ nuevo, abierto })
+    );
   }
 
   seccion("8. El buscador de Stock, con el permiso de contar");

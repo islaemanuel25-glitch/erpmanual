@@ -12,7 +12,7 @@
 //
 // Un 428 es "falta el PIN": se levanta el mismo modal que en la caja.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useOperadorContext } from "@/app/context/OperadorContext";
 import { VISTA_CONTROL } from "@/lib/stock/control/controlStock";
 
@@ -183,13 +183,18 @@ export function useControlStock() {
     cargarTerminar();
   }, [cargarTerminar]);
 
+  // `ocupado` deshabilita el botón, pero llega un render tarde: dos toques
+  // seguidos alcanzarían a mandar dos pedidos. La llave es síncrona.
+  const terminando = useRef(false);
   const confirmarTerminar = useCallback(async () => {
-    if (!terminar) return;
+    if (!terminar || terminando.current) return;
+    terminando.current = true;
     setOcupado(true);
     const r = await pedir(`${API}/terminar`, {
       method: "POST",
       body: JSON.stringify({ productos: terminar.aCero.map((p) => p.productoLocalId) }),
     });
+    terminando.current = false;
     setOcupado(false);
     if (!r.ok) {
       setAviso(r.error);

@@ -26,6 +26,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import SunmiHojaDeConfirmacion from "@/components/sunmi/SunmiHojaDeConfirmacion";
 import {
   AvisoDeEstado,
   BarraDeAvance,
@@ -300,6 +301,13 @@ function VistaTerminar({ c, local }) {
 
 function ListasDeTerminar({ c, t }) {
   const [todos, setTodos] = useState(false);
+  // "Poner n en 0 y terminar" no ejecuta: abre la confirmación, y recién su
+  // "Poner en 0" llama al servidor.
+  const [confirmando, setConfirmando] = useState(false);
+  const alConfirmar = async () => {
+    await c.confirmarTerminar();
+    setConfirmando(false);
+  };
   const visibles = todos ? t.aCero : t.aCero.slice(0, PRIMEROS_EN_CERO);
   return (
     <>
@@ -342,9 +350,41 @@ function ListasDeTerminar({ c, t }) {
         </Bloque>
       )}
 
-      <BotonTesoreria onClick={c.confirmarTerminar} disabled={c.ocupado}>
+      <BotonTesoreria onClick={() => setConfirmando(true)} disabled={c.ocupado}>
         {`Poner ${t.aCero.length} en 0 y terminar`}
       </BotonTesoreria>
+
+      <ConfirmarTerminar
+        abierto={confirmando}
+        cantidad={t.aCero.length}
+        ocupado={c.ocupado}
+        onCancelar={() => setConfirmando(false)}
+        onConfirmar={alConfirmar}
+      />
     </>
+  );
+}
+
+/**
+ * LA CONFIRMACIÓN DE TERMINAR: la hoja de confirmación del kit, que es
+ * `SunmiModalLayout` con dos botones grandes. Cerrarla sin querer no pierde
+ * nada —se vuelve a tocar el botón—, así que el velo cierra; mientras el
+ * servidor procesa, la pieza apaga el velo y los dos botones, y "Poner en 0" no
+ * se puede mandar dos veces. El texto del botón no cambia mientras procesa.
+ */
+export function ConfirmarTerminar({ abierto, cantidad, ocupado, onCancelar, onConfirmar }) {
+  if (!abierto) return null;
+  return (
+    <SunmiHojaDeConfirmacion
+      titulo="Terminar control"
+      puntos={[`Vas a poner ${productos(cantidad)} en 0 y terminar el control`]}
+      textoConfirmar="Poner en 0"
+      textoTrabajando="Poner en 0"
+      colorConfirmar="red"
+      textoVolver="Cancelar"
+      trabajando={ocupado}
+      onConfirmar={onConfirmar}
+      onVolver={onCancelar}
+    />
   );
 }
