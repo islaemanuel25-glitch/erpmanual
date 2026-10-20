@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-20 13:42
+**Fecha:** 2026-10-20 14:10
 
 ## Módulos modificados recientemente
 
 ### stock
-- fix: control de stock — la tarjeta lee la fila del local, revisión que corrige el stock y campos grandes (pantalla SIN VERIFICAR en navegador), feat: control de stock con el listado de Stock y el informe de diferencias (pantalla SIN VERIFICAR en navegador), feat: Control de stock es la pantalla de Stock con un campo "Contado" por tarjeta (pantalla SIN VERIFICAR en navegador)
-- Archivos: 15 nuevos, 6 modificados (21 total)
+- fix: control de stock — "Está bien" queda guardado, botón Aceptar y el rótulo de sin contar (pantalla SIN VERIFICAR en navegador), fix: control de stock — la tarjeta lee la fila del local, revisión que corrige el stock y campos grandes (pantalla SIN VERIFICAR en navegador), feat: control de stock con el listado de Stock y el informe de diferencias (pantalla SIN VERIFICAR en navegador)
+- Archivos: 16 nuevos, 6 modificados (22 total)
 
 ### transferencias
 - feat: control de stock con el listado de Stock y el informe de diferencias (pantalla SIN VERIFICAR en navegador), fix: Control de stock — con PIN se cuenta pero no se empieza ni termina, el encargado gestiona, y terminar pide confirmación (pantalla SIN VERIFICAR en navegador), feat: Control de stock, conteo físico por local (pantalla SIN VERIFICAR en navegador)
@@ -18,13 +18,14 @@
 
 
 ## Archivos nuevos desde última sincronización
-- app/api/stock_locales/control/revision/route.js
 - app/modulos/stock_locales/control/page.jsx
-- components/stock_locales/control/PantallaControlStock.jsx
 - components/stock_locales/control/TarjetaConteo.jsx
-- components/stock_locales/control/controlStock.test.mjs
 - components/stock_locales/control/lecturaReal.fixture.json
+- components/stock_locales/control/tarjetaConteo.toque.test.mjs
 - components/stock_locales/control/useControlStock.js
+- app/api/stock_locales/control/revision/route.js
+- components/stock_locales/control/PantallaControlStock.jsx
+- components/stock_locales/control/controlStock.test.mjs
 - app/api/stock_locales/control/conteos/route.js
 - app/api/stock_locales/control/diferencias/route.js
 - app/api/stock_locales/control/productos/route.js
