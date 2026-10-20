@@ -401,13 +401,14 @@ export function useControlStock({ puedeGestionar = false, requerirOperador } = {
   // `ocupado` deshabilita el botón, pero llega un render tarde: dos toques
   // seguidos alcanzarían a mandar dos pedidos. La llave es síncrona.
   const terminando = useRef(false);
-  const confirmarTerminar = useCallback(async () => {
+  /** `decision`: `DECISION_NO_CONTADOS.EN_CERO` o `.COMO_ESTABAN`, la que tocó la persona. */
+  const confirmarTerminar = useCallback(async (decision) => {
     if (!terminar || terminando.current) return;
     terminando.current = true;
     setOcupado(true);
     const r = await pedir(`${API}/terminar`, {
       method: "POST",
-      body: JSON.stringify({ productos: terminar.aCero.map((p) => p.productoLocalId) }),
+      body: JSON.stringify({ productos: terminar.aCero.map((p) => p.productoLocalId), decision }),
     });
     terminando.current = false;
     setOcupado(false);

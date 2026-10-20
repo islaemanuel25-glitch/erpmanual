@@ -52,6 +52,15 @@ export default function SunmiHojaDeConfirmacion({
   textoVolver = "Volver",
   onConfirmar,
   onVolver,
+  // ── UNA SEGUNDA FORMA DE CONFIRMAR, OPCIONAL ───────────────────────────
+  //
+  // La pidió terminar el Control de stock: "Poner n en 0 y terminar" o
+  // "Dejarlos como están y terminar", y Cancelar. Va entre las dos de siempre,
+  // del mismo alto y ancho, y se apaga igual mientras se procesa. Sin
+  // `textoAlternativa`, la hoja es la de siempre, letra por letra.
+  textoAlternativa = null,
+  colorAlternativa = "secondary",
+  onAlternativa = null,
 }) {
   return (
     <SunmiModalLayout
@@ -74,6 +83,16 @@ export default function SunmiHojaDeConfirmacion({
           >
             {trabajando ? textoTrabajando : textoConfirmar}
           </SunmiButton>
+          {textoAlternativa ? (
+            <SunmiButton
+              color={colorAlternativa}
+              onClick={onAlternativa}
+              disabled={trabajando}
+              className="w-full min-h-toque text-base font-bold"
+            >
+              {textoAlternativa}
+            </SunmiButton>
+          ) : null}
           <SunmiButton
             color="slate"
             onClick={onVolver}

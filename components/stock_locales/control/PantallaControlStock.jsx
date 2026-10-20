@@ -7,10 +7,9 @@
 //
 //   · inicio. Sin control, "Empezar control" y el historial de terminados, cada
 //     uno con sus diferencias. Con control, armada como recibir una
-//     transferencia: la cabecera con "Abierto", el buscador, los filtros Sin
-//     contar / Con diferencia / Contados / Todos, la categoría, el listado de
-//     Stock con un campo "Contado" en cada tarjeta y, en la barra de abajo,
-//     "Terminar control".
+//     transferencia: la cabecera con "Abierto" y, adentro, "Terminar control";
+//     el buscador, los filtros Sin contar / Con diferencia / Contados / Todos,
+//     la categoría y el listado de Stock con un campo "Contado" en cada tarjeta.
 //   · terminar. Lo que nadie contó, partido en vendidos durante el control —que
 //     no se tocan— y los que quedan en cero, con su confirmación.
 //   · diferencias. Qué productos estaban mal, por cuánto y cuánta plata es.
@@ -54,9 +53,11 @@ import { useAvisoAlSalir } from "@/hooks/useAvisoAlSalir";
 import { formatearMoneda } from "@/lib/moneda";
 import { MS_MAX_ENTRE_TECLAS_ESCANER, esLecturaDeEscaner } from "@/lib/pos-ventas/lecturaEscaner";
 import {
+  DECISION_NO_CONTADOS,
   FILTRO_CONTROL,
   VISTA_CONTROL,
   diaDelControl,
+  textoQuedaronComoEstaban,
   momentoDelControl,
   textoCantidad,
   textoDeLaDiferencia,
@@ -149,7 +150,8 @@ export const textoSinAceptar = (n) => `Tenés ${n} ${n === 1 ? "cantidad" : "can
  * EL CONTROL ABIERTO, ARMADO COMO RECIBIR UNA TRANSFERENCIA: la misma
  * `SunmiPantallaDeTrabajo` con las mismas piezas y en el mismo orden —la
  * tarjeta de cabecera con su chip y su "⋯", el buscador, los cuatro filtros en
- * dos filas, la categoría y la barra de abajo—. Las tarjetas de producto y su
+ * dos filas y la categoría—. Sin la barra pegada abajo de recibir transferencia:
+ * "Terminar control" va adentro de la cabecera. Las tarjetas de producto y su
  * fila de conteo son las de siempre.
  */
 function ControlAbierto({ c, local, puedeGestionar }) {
@@ -229,6 +231,13 @@ function ControlAbierto({ c, local, puedeGestionar }) {
               {n.sinContar > 0 ? `${n.sinContar} sin contar` : "Nada sin contar"}
             </span>
           </div>
+          {/* "Terminar control" dentro de la tarjeta, a todo su ancho: va con
+              ella al scrollear, sin `fixed` ni `sticky`. */}
+          {puedeGestionar ? (
+            <SunmiButton color="amber" onClick={c.irATerminar} disabled={c.ocupado} className="w-full justify-center">
+              Terminar control
+            </SunmiButton>
+          ) : null}
         </>
       }
       buscador={
@@ -291,15 +300,9 @@ function ControlAbierto({ c, local, puedeGestionar }) {
         </>
       }
       // "Terminar control" en el lugar de "Confirmar": es lo que cierra el trabajo.
-      pieDePantalla={
-        puedeGestionar ? (
-          <div className="flex items-center justify-end gap-3">
-            <SunmiButton color="amber" onClick={c.irATerminar} disabled={c.ocupado} className="shrink-0 justify-center">
-              Terminar control
-            </SunmiButton>
-          </div>
-        ) : null
-      }
+      // Sin `pieDePantalla`: la barra pegada abajo quedaba flotando a mitad de
+      // pantalla y se movía con la barra del navegador. "Terminar control" va
+      // en la tarjeta de cabecera.
       despuesDelPie={
         <>
           <SunmiModalLayout
@@ -432,11 +435,11 @@ function VistaTerminar({ c, local }) {
 
 function ListasDeTerminar({ c, t }) {
   const [todos, setTodos] = useState(false);
-  // "Poner n en 0 y terminar" no ejecuta: abre la confirmación, y recién su
-  // "Poner en 0" llama al servidor.
+  // "Terminar control" no ejecuta: abre la confirmación, y recién ahí se elige
+  // qué hacer con lo que nadie contó. Esa elección es la que viaja al servidor.
   const [confirmando, setConfirmando] = useState(false);
-  const alConfirmar = async () => {
-    await c.confirmarTerminar();
+  const alConfirmar = async (decision) => {
+    await c.confirmarTerminar(decision);
     setConfirmando(false);
   };
   const visibles = todos ? t.aCero : t.aCero.slice(0, PRIMEROS_EN_CERO);
@@ -482,15 +485,16 @@ function ListasDeTerminar({ c, t }) {
       )}
 
       <BotonTesoreria onClick={() => setConfirmando(true)} disabled={c.ocupado}>
-        {`Poner ${t.aCero.length} en 0 y terminar`}
+        Terminar control
       </BotonTesoreria>
 
       <ConfirmarTerminar
         abierto={confirmando}
-        cantidad={t.aCero.length}
+        aCero={t.aCero.length}
+        sinContar={t.aCero.length + t.vendidos.length}
         ocupado={c.ocupado}
         onCancelar={() => setConfirmando(false)}
-        onConfirmar={alConfirmar}
+        onDecidir={alConfirmar}
       />
     </>
   );
@@ -498,23 +502,70 @@ function ListasDeTerminar({ c, t }) {
 
 /**
  * LA CONFIRMACIÓN DE TERMINAR: la hoja de confirmación del kit, que es
- * `SunmiModalLayout` con dos botones grandes. Cerrarla sin querer no pierde
+ * `SunmiModalLayout` con sus botones grandes. Cerrarla sin querer no pierde
  * nada —se vuelve a tocar el botón—, así que el velo cierra; mientras el
- * servidor procesa, la pieza apaga el velo y los dos botones, y "Poner en 0" no
- * se puede mandar dos veces. El texto del botón no cambia mientras procesa.
+ * servidor procesa, la pieza apaga el velo y los botones, y nada se puede
+ * mandar dos veces. El texto de los botones no cambia mientras procesa.
+ *
+ * ── QUÉ HACER CON LO QUE NADIE CONTÓ SE ELIGE ACÁ, CADA VEZ ──────────────
+ *
+ * Antes terminar ponía en 0 todo lo no contado con stock, sin preguntar. Ahora,
+ * si quedó algo así, la hoja lo dice y ofrece las dos salidas: "Poner n en 0 y
+ * terminar" —lo de siempre; lo vendido durante el control no se toca— o
+ * "Dejarlos como están y terminar", que no mueve ningún stock. Sin nada no
+ * contado con stock, es la hoja de siempre: "Terminar" y "Cancelar".
  */
-export function ConfirmarTerminar({ abierto, cantidad, ocupado, onCancelar, onConfirmar }) {
+export function ConfirmarTerminar({ abierto, aCero, sinContar, ocupado, onCancelar, onDecidir }) {
   if (!abierto) return null;
-  return (
+  const enCero = () => onDecidir(DECISION_NO_CONTADOS.EN_CERO);
+  const comoEstaban = () => onDecidir(DECISION_NO_CONTADOS.COMO_ESTABAN);
+  if (sinContar === 0) {
+    return (
+      <SunmiHojaDeConfirmacion
+        titulo="Terminar control"
+        puntos={["Vas a terminar el control"]}
+        textoConfirmar="Terminar"
+        textoTrabajando="Terminar"
+        colorConfirmar="amber"
+        textoVolver="Cancelar"
+        trabajando={ocupado}
+        onConfirmar={enCero}
+        onVolver={onCancelar}
+      />
+    );
+  }
+  const puntos = [
+    `${sinContar === 1 ? "Quedó 1 producto" : `Quedaron ${sinContar} productos`} sin contar con stock distinto de 0`,
+    ...(aCero < sinContar ? ["Los vendidos durante el control no se tocan"] : []),
+  ];
+  const textoEnCero = `Poner ${aCero} en 0 y terminar`;
+  const textoComoEstaban = "Dejarlos como están y terminar";
+  // Si todo lo no contado se vendió durante el control, no hay nada para poner
+  // en 0: queda una sola salida.
+  return aCero > 0 ? (
     <SunmiHojaDeConfirmacion
       titulo="Terminar control"
-      puntos={[`Vas a poner ${productos(cantidad)} en 0 y terminar el control`]}
-      textoConfirmar="Poner en 0"
-      textoTrabajando="Poner en 0"
+      puntos={puntos}
+      textoConfirmar={textoEnCero}
+      textoTrabajando={textoEnCero}
       colorConfirmar="red"
+      textoAlternativa={textoComoEstaban}
+      onAlternativa={comoEstaban}
       textoVolver="Cancelar"
       trabajando={ocupado}
-      onConfirmar={onConfirmar}
+      onConfirmar={enCero}
+      onVolver={onCancelar}
+    />
+  ) : (
+    <SunmiHojaDeConfirmacion
+      titulo="Terminar control"
+      puntos={puntos}
+      textoConfirmar={textoComoEstaban}
+      textoTrabajando={textoComoEstaban}
+      colorConfirmar="amber"
+      textoVolver="Cancelar"
+      trabajando={ocupado}
+      onConfirmar={comoEstaban}
       onVolver={onCancelar}
     />
   );
@@ -561,8 +612,14 @@ function VistaDiferencias({ c, local }) {
 export function InformeDeDiferencias({ d }) {
   const filas = d.filas.filter((f) => Number(f.diferencia) !== 0);
   const t = d.totales;
+  // Lo que se eligió al terminar queda en el control: si se dejaron como
+  // estaban, no entran al informe y se dice arriba, siempre igual.
+  const comoEstaban = d.control?.noContadosDecision === DECISION_NO_CONTADOS.COMO_ESTABAN;
   return (
     <>
+      {comoEstaban ? (
+        <AvisoDeEstado tono="warning">{textoQuedaronComoEstaban(d.control.noContadosComoEstaban ?? 0)}</AvisoDeEstado>
+      ) : null}
       <TarjetaHero franja={false}>
         {d.conPlata ? (
           <div className="grid grid-cols-2 gap-3">

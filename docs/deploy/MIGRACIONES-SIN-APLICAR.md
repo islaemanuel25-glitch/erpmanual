@@ -73,6 +73,13 @@ Si la lista está vacía, el despliegue es solo de código.
   vacía. No toca ninguna fila. Va ANTES de levantar la imagen nueva: guardar un
   conteo escribe `sistemaAntes` y terminar escribe la tabla. La imagen vieja
   con esto puesto sigue andando: no las conoce.
+- `20261020210000_control_stock_decision_no_contados` — **Aditiva, sin
+  datos.** Dos columnas nulas en `ControlStock`: `noContadosDecision` (qué se
+  eligió al terminar con lo que nadie contó: ponerlo en 0 o dejarlo como
+  estaba) y `noContadosComoEstaban` (cuántos quedaron como estaban). No toca
+  ninguna fila; los terminados quedan en null, que se lee "se pusieron en 0".
+  Va ANTES de levantar la imagen nueva: terminar las escribe. La imagen vieja
+  con esto puesto sigue andando.
 
 Producción está en **71 migraciones**, la última
 `20261019120000_operador_sesion_invalidada_en`.

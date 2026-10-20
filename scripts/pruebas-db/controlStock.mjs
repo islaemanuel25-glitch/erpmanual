@@ -98,7 +98,7 @@ try {
   const rolAdmin = await c.rol.create({ data: { nombre: "Admin", esSistema: true, permisos: ["*"] } });
   aplicarMigraciones(urlPrueba, { solo: MIGRACIONES_PERMISOS });
   // Y las que vienen después: el informe de diferencias.
-  aplicarMigraciones(urlPrueba, { solo: ["20261020200000_control_stock_diferencias"] });
+  aplicarMigraciones(urlPrueba, { solo: ["20261020200000_control_stock_diferencias", "20261020210000_control_stock_decision_no_contados"] });
   const rolEncargado = await c.rol.findUnique({ where: { nombre: "ENCARGADO" } });
   ok(
     "la migración le dio los dos permisos al ENCARGADO que ya existía",
@@ -425,7 +425,7 @@ try {
     ok("la yerba va a 'se vendieron', con 2 vendidas y 10 en el sistema", t.status === 200 && json(ids(t.vendidos)) === json([P.yerba.pl]) && t.vendidos[0].vendidas === 2 && t.vendidos[0].stock === 10, json(t.vendidos));
     ok("quedan en 0: galletas (−15) y fideos (4)", json(ids(t.aCero)) === json([P.galletas.pl, P.fideos.pl].sort((a, b) => a - b)), json(t.aCero));
     for (const [quien, s] of [["Ana con PIN", S.ana], ["el dueño con PIN", S.duenoConPin], ["el Admin con PIN", S.adminConPin]]) {
-      const post = await pedir(R.terminar, "POST", `${B}/terminar`, s, { productos: ids(t.aCero) });
+      const post = await pedir(R.terminar, "POST", `${B}/terminar`, s, { productos: ids(t.aCero), decision: "EN_CERO" });
       const get = await pedir(R.terminar, "GET", `${B}/terminar`, s);
       ok(`${quien} cuenta pero no termina: 403 en el POST y en la lista`, post.status === 403 && get.status === 403, json({ post, get }));
     }
@@ -453,10 +453,22 @@ try {
     );
     const sinPinCuenta = await pedir(R.terminar, "GET", `${B}/terminar`, S.cuentaSinPin);
     ok("la cuenta del encargado, sin PIN, sí ve la lista de terminar", sinPinCuenta.status === 200, json(sinPinCuenta));
-    const vieja = await pedir(R.terminar, "POST", `${B}/terminar`, S.dueno, { productos: [P.galletas.pl] });
+    // La elección es explícita: sin ella, o con cualquier otra cosa, no se toca nada.
+    for (const decision of [undefined, "", "TODO_EN_CERO"]) {
+      const sinElegir = await pedir(R.terminar, "POST", `${B}/terminar`, S.dueno, { productos: ids(t.aCero), ...(decision === undefined ? {} : { decision }) });
+      const sigue = await c.controlStock.findUnique({ where: { id: controlId } });
+      ok(
+        `terminar sin elegir qué hacer con lo no contado (${json(decision)}): 400, y ni el control ni el stock se mueven`,
+        sinElegir.status === 400 && /Falta elegir qué hacer/.test(sinElegir.error || "") && sigue.estado === "ABIERTO" && (await stockDe(P.fideos)) === 4 && (await stockDe(P.galletas)) === -15,
+        json(sinElegir)
+      );
+    }
+    const vieja = await pedir(R.terminar, "POST", `${B}/terminar`, S.dueno, { productos: [P.galletas.pl], decision: "EN_CERO" });
     ok("con una lista que no tiene a todos: 409 y no toca nada", vieja.status === 409 && vieja.cambioLaLista === true && (await stockDe(P.fideos)) === 4, json(vieja));
-    const fin = await pedir(R.terminar, "POST", `${B}/terminar`, S.dueno, { productos: ids(t.aCero) });
-    ok("terminar pone 2 en cero", fin.status === 200 && fin.puestosEnCero === 2, json(fin));
+    const fin = await pedir(R.terminar, "POST", `${B}/terminar`, S.dueno, { productos: ids(t.aCero), decision: "EN_CERO" });
+    ok("terminar con 'Poner en 0' pone 2 en cero", fin.status === 200 && fin.puestosEnCero === 2 && fin.decision === "EN_CERO", json(fin));
+    const registrado = await c.controlStock.findUnique({ where: { id: controlId } });
+    ok("y queda registrado qué se eligió", registrado.noContadosDecision === "EN_CERO" && registrado.noContadosComoEstaban === null, json(registrado));
     ok("galletas y fideos en 0; la yerba sigue en 10; la coca en 2", (await stockDe(P.galletas)) === 0 && (await stockDe(P.fideos)) === 0 && (await stockDe(P.yerba)) === 10 && (await stockDe(P.coca)) === 2);
     ok("el inactivo no se tocó", (await stockDe(P.inactivo)) === 7);
     ok("terminar contesta el id del control, para abrir su informe", fin.controlId === controlId, json(fin));
@@ -722,6 +734,49 @@ try {
     // Borrar después de corregir sigue deshaciendo el conteo: la corrección
     // entra en la bitácora como CONTROL_CORRECCION y el deshacer la suma.
     await paso("borrar después de corregir", malo, null, 0);
+  }
+
+  seccion("10. Terminar dejando lo no contado como estaba");
+  {
+    // El control abierto del local (el de la sección 8): la Fanta se contó en 3
+    // y se borró y se volvió a contar; el resto, nadie lo contó. Se vende una
+    // yerba durante el control, para que haya un vendido.
+    const abierto = await c.controlStock.findFirst({ where: { localId: mini.id, estado: "ABIERTO" } });
+    await vender(P.yerba, 9);
+    const t = await pedir(R.terminar, "GET", `${B}/terminar`, S.dueno);
+    guardar("terminarAntesDeComoEstaban", t);
+    const sinContar = [...t.aCero, ...t.vendidos];
+    ok("hay no contados con stock para elegir: algunos a 0 y la yerba vendida", t.aCero.length > 0 && ids(t.vendidos).includes(P.yerba.pl), json({ aCero: ids(t.aCero), vendidos: ids(t.vendidos) }));
+    const stockAntes = new Map();
+    for (const p of sinContar) stockAntes.set(p.productoLocalId, await stockDe({ pl: p.productoLocalId }, mini.id));
+    const movAntes = await c.movimientoStock.count({ where: { localId: mini.id, origen: ORIGEN_STOCK.AJUSTE_POR_CONTROL, origenRef: String(abierto.id) } });
+
+    const fin = await pedir(R.terminar, "POST", `${B}/terminar`, S.dueno, { productos: ids(t.aCero), decision: "COMO_ESTABAN" });
+    ok("terminar con 'Dejarlos como están': cierra sin poner nada en 0", fin.status === 200 && fin.puestosEnCero === 0 && fin.decision === "COMO_ESTABAN", json(fin));
+    let iguales = true;
+    for (const p of sinContar) if ((await stockDe({ pl: p.productoLocalId }, mini.id)) !== stockAntes.get(p.productoLocalId)) iguales = false;
+    ok("ningún stock de lo no contado se movió", iguales, json([...stockAntes]));
+    ok(
+      "ni la bitácora ni el Libro tienen un puesto en cero de este control",
+      (await c.auditoriaStock.count({ where: { controlStockId: abierto.id, accion: "CONTROL_PUESTO_EN_CERO" } })) === 0 &&
+        (await c.movimientoStock.count({ where: { localId: mini.id, origen: ORIGEN_STOCK.AJUSTE_POR_CONTROL, origenRef: String(abierto.id) } })) === movAntes
+    );
+    const cerrado = await c.controlStock.findUnique({ where: { id: abierto.id } });
+    ok(
+      "queda registrado qué se eligió y cuántos quedaron como estaban",
+      cerrado.estado === "TERMINADO" && cerrado.noContadosDecision === "COMO_ESTABAN" && cerrado.noContadosComoEstaban === sinContar.length && cerrado.puestosEnCero === 0,
+      json(cerrado)
+    );
+    const informe = await diferencias(S.dueno, abierto.id);
+    guardar("diferenciasComoEstaban", informe);
+    ok(
+      "el informe no tiene puestos en 0, y lo dice desde lo guardado",
+      informe.status === 200 && informe.congelado === true && informe.filas.every((f) => !f.puestoEnCero) &&
+        informe.control?.noContadosDecision === "COMO_ESTABAN" && informe.control?.noContadosComoEstaban === sinContar.length,
+      json({ control: informe.control, filas: resumenDif(informe) })
+    );
+    const elDeAntes = await diferencias(S.dueno, controlId);
+    ok("el informe del que se puso en 0 lo dice como antes", elDeAntes.control?.noContadosDecision === "EN_CERO" && elDeAntes.filas.some((f) => f.puestoEnCero), json(elDeAntes.control));
   }
 
   if (process.env.ESCRIBIR_FIXTURE_CONTROL) {

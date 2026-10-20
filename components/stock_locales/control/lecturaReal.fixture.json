@@ -29,7 +29,7 @@
       "conteo": {
         "total": 3,
         "contadoPor": "Emanuel",
-        "en": "2026-10-20T17:38:33.299Z",
+        "en": "2026-10-20T22:08:29.227Z",
         "sistema": 5,
         "diferencia": -2
       }
@@ -66,7 +66,7 @@
         "conteo": {
           "total": 5,
           "contadoPor": "Ana",
-          "en": "2026-10-20T17:38:33.521Z",
+          "en": "2026-10-20T22:08:29.568Z",
           "sistema": 5,
           "diferencia": 0
         }
@@ -213,7 +213,7 @@
       "conteo": {
         "total": 1.25,
         "contadoPor": "Emanuel",
-        "en": "2026-10-20T17:38:33.691Z",
+        "en": "2026-10-20T22:08:29.812Z",
         "sistema": 2.5,
         "diferencia": -1.25
       }
@@ -469,7 +469,7 @@
       "conteo": {
         "total": 3,
         "contadoPor": "Ana",
-        "en": "2026-10-20T17:38:33.840Z",
+        "en": "2026-10-20T22:08:29.998Z",
         "sistema": 3,
         "diferencia": 0
       }
@@ -650,7 +650,7 @@
         "conteo": {
           "total": 3,
           "contadoPor": "Ana",
-          "en": "2026-10-20T17:38:33.840Z",
+          "en": "2026-10-20T22:08:29.998Z",
           "sistema": 3,
           "diferencia": 0
         }
@@ -683,7 +683,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T17:38:33.625Z",
+          "en": "2026-10-20T22:08:29.729Z",
           "sistema": 4,
           "diferencia": -2
         }
@@ -716,7 +716,7 @@
         "conteo": {
           "total": 1.25,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T17:38:33.691Z",
+          "en": "2026-10-20T22:08:29.812Z",
           "sistema": 2.5,
           "diferencia": -1.25
         }
@@ -749,7 +749,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Ana",
-          "en": "2026-10-20T17:38:33.730Z",
+          "en": "2026-10-20T22:08:29.854Z",
           "sistema": 0,
           "diferencia": 2
         }
@@ -804,7 +804,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T17:38:33.625Z",
+          "en": "2026-10-20T22:08:29.729Z",
           "sistema": 4,
           "diferencia": -2
         }
@@ -837,7 +837,7 @@
         "conteo": {
           "total": 1.25,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T17:38:33.691Z",
+          "en": "2026-10-20T22:08:29.812Z",
           "sistema": 2.5,
           "diferencia": -1.25
         }
@@ -870,7 +870,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Ana",
-          "en": "2026-10-20T17:38:33.730Z",
+          "en": "2026-10-20T22:08:29.854Z",
           "sistema": 0,
           "diferencia": 2
         }
@@ -925,7 +925,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T17:38:33.625Z",
+          "en": "2026-10-20T22:08:29.729Z",
           "sistema": 4,
           "diferencia": -2
         }
@@ -1025,9 +1025,11 @@
     "control": {
       "id": 2,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-20T17:38:34.085Z",
+      "abiertoEn": "2026-10-20T22:08:30.313Z",
       "terminadoEn": null,
-      "terminadoPorNombre": null
+      "terminadoPorNombre": null,
+      "noContadosDecision": null,
+      "noContadosComoEstaban": null
     },
     "congelado": false,
     "conPlata": true,
@@ -1060,7 +1062,7 @@
     },
     "control": {
       "id": 1,
-      "abiertoEn": "2026-10-20T17:38:33.236Z"
+      "abiertoEn": "2026-10-20T22:08:29.095Z"
     },
     "vendidos": [
       {
@@ -1105,9 +1107,11 @@
     "control": {
       "id": 1,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-20T17:38:33.236Z",
+      "abiertoEn": "2026-10-20T22:08:29.095Z",
       "terminadoEn": null,
-      "terminadoPorNombre": null
+      "terminadoPorNombre": null,
+      "noContadosDecision": null,
+      "noContadosComoEstaban": null
     },
     "congelado": false,
     "conPlata": true,
@@ -1163,9 +1167,11 @@
     "control": {
       "id": 1,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-20T17:38:33.236Z",
+      "abiertoEn": "2026-10-20T22:08:29.095Z",
       "terminadoEn": null,
-      "terminadoPorNombre": null
+      "terminadoPorNombre": null,
+      "noContadosDecision": null,
+      "noContadosComoEstaban": null
     },
     "congelado": false,
     "conPlata": false,
@@ -1221,16 +1227,16 @@
     "control": null,
     "ultimo": {
       "id": 1,
-      "abiertoEn": "2026-10-20T17:38:33.236Z",
-      "terminadoEn": "2026-10-20T17:38:34.286Z",
+      "abiertoEn": "2026-10-20T22:08:29.095Z",
+      "terminadoEn": "2026-10-20T22:08:30.652Z",
       "terminadoPorNombre": "Emanuel",
       "puestosEnCero": 2
     },
     "historial": [
       {
         "id": 1,
-        "abiertoEn": "2026-10-20T17:38:33.236Z",
-        "terminadoEn": "2026-10-20T17:38:34.286Z",
+        "abiertoEn": "2026-10-20T22:08:29.095Z",
+        "terminadoEn": "2026-10-20T22:08:30.652Z",
         "terminadoPorNombre": "Emanuel",
         "puestosEnCero": 2
       }
@@ -1249,9 +1255,11 @@
     "control": {
       "id": 1,
       "estado": "TERMINADO",
-      "abiertoEn": "2026-10-20T17:38:33.236Z",
-      "terminadoEn": "2026-10-20T17:38:34.286Z",
-      "terminadoPorNombre": "Emanuel"
+      "abiertoEn": "2026-10-20T22:08:29.095Z",
+      "terminadoEn": "2026-10-20T22:08:30.652Z",
+      "terminadoPorNombre": "Emanuel",
+      "noContadosDecision": "EN_CERO",
+      "noContadosComoEstaban": null
     },
     "congelado": true,
     "conPlata": true,
@@ -1328,7 +1336,7 @@
     },
     "control": {
       "id": 3,
-      "abiertoEn": "2026-10-20T17:38:34.371Z",
+      "abiertoEn": "2026-10-20T22:08:30.759Z",
       "abiertoPorNombre": "Cuenta Mini",
       "controlId": 3,
       "total": 8,
@@ -1427,7 +1435,7 @@
     "ok": true,
     "control": {
       "id": 2,
-      "abiertoEn": "2026-10-20T17:38:34.085Z"
+      "abiertoEn": "2026-10-20T22:08:30.313Z"
     },
     "productos": [
       {
@@ -1436,7 +1444,7 @@
         "unidadFisica": "UNIDAD",
         "contadoPor": "Administrador",
         "contado": 24,
-        "anclaMovimientoId": 58,
+        "anclaMovimientoId": 57,
         "movimientosPosteriores": [],
         "posteriores": 0,
         "deberia": 24,
@@ -1454,10 +1462,10 @@
         "anclaMovimientoId": 32,
         "movimientosPosteriores": [
           {
-            "id": 56,
+            "id": 55,
             "origen": "VENTA",
             "origenRef": "9002",
-            "instante": "2026-10-20T17:38:35.415Z",
+            "instante": "2026-10-20T22:08:32.376Z",
             "cambio": -1
           }
         ],
@@ -1489,7 +1497,7 @@
         "unidadFisica": "UNIDAD",
         "contadoPor": "Admin Depo",
         "contado": 24,
-        "anclaMovimientoId": 55,
+        "anclaMovimientoId": 54,
         "movimientosPosteriores": [],
         "posteriores": 0,
         "deberia": 24,
@@ -1517,8 +1525,141 @@
         "ajuste": 0,
         "corregir": false,
         "filasDeOtroLocal": []
+      },
+      {
+        "productoLocalId": 21,
+        "nombre": "Lata mezcla x24",
+        "unidadFisica": "UNIDAD",
+        "contadoPor": "Admin Depo",
+        "contado": 24,
+        "anclaMovimientoId": 46,
+        "movimientosPosteriores": [],
+        "posteriores": 0,
+        "deberia": 24,
+        "actual": 24,
+        "ajuste": 0,
+        "corregir": false,
+        "filasDeOtroLocal": []
       }
     ],
     "aCorregir": 1
+  },
+  "terminarAntesDeComoEstaban": {
+    "ok": true,
+    "local": {
+      "id": 1,
+      "nombre": "Mini el 7",
+      "es_deposito": false
+    },
+    "control": {
+      "id": 3,
+      "abiertoEn": "2026-10-20T22:08:30.759Z"
+    },
+    "vendidos": [
+      {
+        "stockLocalId": 3,
+        "productoLocalId": 3,
+        "nombre": "Yerba 1kg",
+        "codigoBarra": "7790000000003",
+        "stock": 9,
+        "unidadFisica": "UNIDAD",
+        "unidad": "un",
+        "vendidas": 1
+      }
+    ],
+    "aCero": [
+      {
+        "stockLocalId": 8,
+        "productoLocalId": 10,
+        "nombre": "Aceite 900",
+        "codigoBarra": "7790000000011",
+        "stock": 3,
+        "unidadFisica": "UNIDAD",
+        "unidad": "un"
+      },
+      {
+        "stockLocalId": 11,
+        "productoLocalId": 12,
+        "nombre": "Bizcochos de coco",
+        "codigoBarra": "8000000000201",
+        "stock": 2,
+        "unidadFisica": "UNIDAD",
+        "unidad": "un"
+      },
+      {
+        "stockLocalId": 1,
+        "productoLocalId": 1,
+        "nombre": "Coca 2L",
+        "codigoBarra": "7790000000001",
+        "stock": 1,
+        "unidadFisica": "UNIDAD",
+        "unidad": "un"
+      },
+      {
+        "stockLocalId": 12,
+        "productoLocalId": 13,
+        "nombre": "Coco rallado",
+        "codigoBarra": "8000000000202",
+        "stock": 3,
+        "unidadFisica": "UNIDAD",
+        "unidad": "un"
+      },
+      {
+        "stockLocalId": 2,
+        "productoLocalId": 2,
+        "nombre": "Queso por kg",
+        "codigoBarra": "7790000000002",
+        "stock": 1.25,
+        "unidadFisica": "KG",
+        "unidad": "kg"
+      },
+      {
+        "stockLocalId": 10,
+        "productoLocalId": 7,
+        "nombre": "Sin fila",
+        "codigoBarra": "7790000000007",
+        "stock": 2,
+        "unidadFisica": "UNIDAD",
+        "unidad": "un"
+      }
+    ]
+  },
+  "diferenciasComoEstaban": {
+    "ok": true,
+    "local": {
+      "id": 1,
+      "nombre": "Mini el 7",
+      "es_deposito": false
+    },
+    "control": {
+      "id": 3,
+      "estado": "TERMINADO",
+      "abiertoEn": "2026-10-20T22:08:30.759Z",
+      "terminadoEn": "2026-10-20T22:08:32.723Z",
+      "terminadoPorNombre": "Emanuel",
+      "noContadosDecision": "COMO_ESTABAN",
+      "noContadosComoEstaban": 7
+    },
+    "congelado": true,
+    "conPlata": true,
+    "filas": [
+      {
+        "productoLocalId": 14,
+        "nombre": "Fanta 2L",
+        "unidadFisica": "UNIDAD",
+        "sistema": 5,
+        "contado": 3,
+        "diferencia": -2,
+        "costoUnitario": 2400,
+        "importe": -4800,
+        "puestoEnCero": false
+      }
+    ],
+    "totales": {
+      "faltante": 4800,
+      "sobrante": 0,
+      "productos": 1,
+      "sinCosto": 0
+    }
   }
 }

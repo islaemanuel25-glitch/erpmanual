@@ -40,7 +40,7 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
  * El servidor: cada pedido de la pantalla contesta con una respuesta real.
  * `lista` es una respuesta, o una función de los parámetros del listado.
  */
-function servidor({ lista, guardado }) {
+function servidor({ lista, guardado, terminar = real.terminar, terminado = null, informe = real.diferenciasAbierto }) {
   const pedidos = [];
   globalThis.fetch = async (url, opciones = {}) => {
     const u = new URL(url, "http://localhost");
@@ -50,7 +50,9 @@ function servidor({ lista, guardado }) {
     if (u.pathname === "/api/stock_locales/control") datos = real.abierto;
     else if (u.pathname === "/api/stock_locales/listar") datos = typeof lista === "function" ? lista(u.searchParams) : lista;
     else if (u.pathname === "/api/stock_locales/control/conteos" && metodo === "PUT") datos = guardado;
-    else if (u.pathname === "/api/stock_locales/control/diferencias") datos = real.diferenciasAbierto;
+    else if (u.pathname === "/api/stock_locales/control/diferencias") datos = informe;
+    else if (u.pathname === "/api/stock_locales/control/terminar" && metodo === "GET") datos = terminar;
+    else if (u.pathname === "/api/stock_locales/control/terminar" && metodo === "POST") datos = terminado ?? { ok: true, controlId: informe.control.id };
     else if (u.pathname === "/api/stock_locales/control/revision") datos = { ok: true, productos: [], aCorregir: 0 };
     return { ok: true, status: 200, json: async () => datos };
   };
@@ -475,11 +477,15 @@ test("el buscador y los filtros de transferencias: 2 filas de 2, Sin contar de e
   assert.doesNotMatch(texto(raiz), /Más filtros|Limpiar/, "sin los filtros de Stock Locales");
 });
 
-test("quien gestiona sin PIN: '⋯' abre 'Ver diferencias', y 'Terminar control' va en la barra de abajo", async () => {
+test("quien gestiona sin PIN: '⋯' abre 'Ver diferencias', y 'Terminar control' va adentro de la cabecera, sin barra fija", async () => {
   const { raiz, pedidos } = await montar({ lista: sinContarReal(), guardado: real.estaBienDelAceite }, { puedeGestionar: true });
-  const barra = raiz.querySelector(".sticky.bottom-0");
-  assert.ok(barra, "la barra fija de abajo");
-  assert.equal([...barra.querySelectorAll("button")].map((b) => b.textContent.trim()).join(), "Terminar control");
+  assert.equal(raiz.querySelector(".sticky, .fixed, [class*='sticky'], [class*='fixed']") === null, true, "nada pegado ni fijo en la pantalla");
+  const cabecera = raiz.querySelector("section > div");
+  const terminar = [...cabecera.querySelectorAll("button")].find((b) => b.textContent.trim() === "Terminar control");
+  assert.ok(terminar, "en la tarjeta de cabecera");
+  assert.ok(terminar.className.split(/\s+/).includes("w-full"), "a todo el ancho de la tarjeta");
+  assert.equal(cabecera.lastElementChild === terminar, true, "debajo de la fila de contados");
+  assert.equal([...raiz.querySelectorAll("button")].filter((b) => b.textContent.trim() === "Terminar control").length, 1, "uno solo");
   await tocarBoton(raiz.querySelector("button[aria-label='Más acciones']"));
   const ver = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Ver diferencias");
   assert.ok(ver, "la hoja de ⋯ con Ver diferencias");
@@ -491,10 +497,82 @@ test("quien gestiona sin PIN: '⋯' abre 'Ver diferencias', y 'Terminar control'
   assert.match(texto(raiz), /Diferencias del control/);
 });
 
-test("sin gestionar no hay barra con Terminar", async () => {
+test("sin gestionar no hay Terminar ni barra", async () => {
   const { raiz } = await montar({ lista: sinContarReal(), guardado: real.estaBienDelAceite });
   assert.equal(raiz.querySelector(".sticky.bottom-0") === null, true);
   assert.doesNotMatch(texto(raiz), /Terminar control/);
+});
+
+// ── TERMINAR PREGUNTA QUÉ HACER CON LO NO CONTADO ─────────────────────────
+
+const botonDe = (txt) => [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === txt) ?? null;
+
+/** Tocar "Terminar control" en la cabecera y después en la vista de terminar. */
+async function abrirConfirmacion(raiz) {
+  await tocarBoton([...raiz.querySelector("section > div").querySelectorAll("button")].find((b) => b.textContent.trim() === "Terminar control"));
+  await act(async () => {
+    await esperar(0);
+  });
+  await tocarBoton(botonDe("Terminar control"));
+}
+
+test("con no contados con stock, la confirmación dice cuántos y ofrece los tres botones", async () => {
+  const t = real.terminarAntesDeComoEstaban;
+  const { raiz } = await montar({ lista: sinContarReal(), guardado: real.estaBienDelAceite, terminar: t }, { puedeGestionar: true });
+  await abrirConfirmacion(raiz);
+  const sinContar = t.aCero.length + t.vendidos.length;
+  assert.match(texto(document.body), new RegExp(`Quedaron ${sinContar} productos sin contar con stock distinto de 0`));
+  assert.match(texto(document.body), /Los vendidos durante el control no se tocan/);
+  assert.ok(botonDe(`Poner ${t.aCero.length} en 0 y terminar`));
+  assert.ok(botonDe("Dejarlos como están y terminar"));
+  assert.ok(botonDe("Cancelar"));
+  await tocarBoton(botonDe("Cancelar"));
+  assert.equal(botonDe("Dejarlos como están y terminar") === null, true, "Cancelar cierra sin terminar");
+});
+
+test("'Dejarlos como están y terminar' manda la elección, y el informe dice cuántos quedaron como estaban", async () => {
+  const t = real.terminarAntesDeComoEstaban;
+  const informe = real.diferenciasComoEstaban;
+  const { raiz, pedidos } = await montar(
+    { lista: sinContarReal(), guardado: real.estaBienDelAceite, terminar: t, informe, terminado: { ok: true, controlId: informe.control.id, puestosEnCero: 0, decision: "COMO_ESTABAN" } },
+    { puedeGestionar: true }
+  );
+  await abrirConfirmacion(raiz);
+  await tocarBoton(botonDe("Dejarlos como están y terminar"));
+  await act(async () => {
+    await esperar(0);
+  });
+  const post = pedidos.find((p) => p.ruta === "/api/stock_locales/control/terminar" && p.metodo === "POST");
+  assert.equal(post?.cuerpo?.decision, "COMO_ESTABAN");
+  assert.match(texto(raiz), /Diferencias del control/);
+  assert.match(texto(raiz), new RegExp(`${informe.control.noContadosComoEstaban} productos no se contaron y quedaron como estaban`));
+});
+
+test("'Poner n en 0 y terminar' manda EN_CERO, y el informe no trae el aviso", async () => {
+  const t = real.terminarAntesDeComoEstaban;
+  const informe = real.diferenciasCongeladas;
+  const { raiz, pedidos } = await montar({ lista: sinContarReal(), guardado: real.estaBienDelAceite, terminar: t, informe }, { puedeGestionar: true });
+  await abrirConfirmacion(raiz);
+  await tocarBoton(botonDe(`Poner ${t.aCero.length} en 0 y terminar`));
+  await act(async () => {
+    await esperar(0);
+  });
+  assert.equal(pedidos.find((p) => p.metodo === "POST" && p.ruta.endsWith("/terminar"))?.cuerpo?.decision, "EN_CERO");
+  assert.doesNotMatch(texto(raiz), /quedaron como estaban/);
+});
+
+test("sin no contados con stock, la confirmación es la de siempre: Terminar y Cancelar", async () => {
+  const nada = { ...real.terminar, vendidos: [], aCero: [] };
+  const { raiz, pedidos } = await montar({ lista: sinContarReal(), guardado: real.estaBienDelAceite, terminar: nada }, { puedeGestionar: true });
+  await abrirConfirmacion(raiz);
+  assert.ok(botonDe("Terminar"));
+  assert.ok(botonDe("Cancelar"));
+  assert.equal(botonDe("Dejarlos como están y terminar") === null, true);
+  await tocarBoton(botonDe("Terminar"));
+  await act(async () => {
+    await esperar(0);
+  });
+  assert.equal(pedidos.find((p) => p.metodo === "POST" && p.ruta.endsWith("/terminar"))?.cuerpo?.decision, "EN_CERO");
 });
 
 // ── NADA SE GUARDA SOLO ────────────────────────────────────────────────────

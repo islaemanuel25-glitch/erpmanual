@@ -4207,6 +4207,14 @@ model ControlStock {
   // vuelva a contar o cambie el costo. Null en los terminados antes de que
   // existiera el informe: ésos se calculan con lo que quedó escrito.
   diferenciasCongeladasEn DateTime?
+  // Qué se eligió al terminar con lo que nadie contó y tenía stock: "EN_CERO"
+  // (se pusieron en 0, como antes) o "COMO_ESTABAN" (no se tocaron). Se elige
+  // cada vez; queda acá para que el informe guardado lo diga siempre igual. Null
+  // en los terminados antes de que se pudiera elegir: ésos se pusieron en 0.
+  noContadosDecision      String?
+  // Con "COMO_ESTABAN", cuántos productos no se contaron y quedaron como
+  // estaban. Un CONTEO de productos.
+  noContadosComoEstaban   Int?
 
   actualizadoEn DateTime @updatedAt
 

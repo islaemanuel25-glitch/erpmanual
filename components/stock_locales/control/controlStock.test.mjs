@@ -35,6 +35,9 @@ import {
   FILTRO_CONTROL,
   MODO_CASILLEROS,
   VISTA_CONTROL,
+  DECISION_NO_CONTADOS,
+  esDecisionNoContados,
+  textoQuedaronComoEstaban,
   ajusteNetoDelConteo,
   casillerosDe,
   casillerosDesdeTotal,
@@ -435,34 +438,53 @@ test("C0: sin control, Empezar solo con gestionar, y el historial con sus difere
   assert.match(fuente("components/stock_locales/control/PantallaControlStock.jsx"), /onClick=\{\(\) => c\.verDiferencias\(h\.id\)\}/);
 });
 
-test("C3: los que nadie contó, los vendidos aparte, y el botón dice cuántos quedan en 0", () => {
+test("C3: los que nadie contó, los vendidos aparte, y el botón es 'Terminar control'", () => {
   const t = dibujar({ estado: real.abierto, vista: VISTA_CONTROL.TERMINAR, terminar: real.terminar });
   assert.match(t, /NADIE LOS CONTÓ Y EL SISTEMA DICE QUE HAY 3 productos Quedan en 0 2 Se vendieron durante el control 1/);
   assert.match(t, /SE VENDIERON DURANTE EL CONTROL Yerba 1kg vendidas 2 · sistema 10 un Contar/);
   assert.match(t, /QUEDAN EN 0 Fideos 4 un → 0 Galletas −15 un → 0/);
-  assert.match(t, /Poner 2 en 0 y terminar$/);
-  assert.doesNotMatch(t, /Vas a poner/, "la confirmación arranca cerrada");
+  assert.match(t, /Terminar control$/);
+  assert.doesNotMatch(t, /Dejarlos como están/, "la confirmación arranca cerrada");
 });
 
-test("C3: el botón abre la confirmación, solo 'Poner en 0' llama al servidor, y después se abre el informe", () => {
+test("C3: el botón abre la confirmación, la elección viaja al servidor, y después se abre el informe", () => {
+  // Lo que se toca está en tarjetaConteo.toque.test.mjs; acá, el cableado.
   const src = fuente("components/stock_locales/control/PantallaControlStock.jsx");
-  const boton = src.slice(src.lastIndexOf("<BotonTesoreria", src.indexOf("en 0 y terminar")), src.indexOf("en 0 y terminar"));
-  assert.match(boton, /onClick=\{\(\) => setConfirmando\(true\)\}/, "el botón de abajo tiene que abrir, no terminar");
   assert.equal((src.match(/c\.confirmarTerminar\(/g) || []).length, 1, "un solo lugar llama al servidor");
-  assert.match(src, /const alConfirmar = async \(\) => \{\s*await c\.confirmarTerminar\(\);/);
+  assert.match(src, /const alConfirmar = async \(decision\) => \{\s*await c\.confirmarTerminar\(decision\);/);
   const hook = fuente("components/stock_locales/control/useControlStock.js");
   assert.match(hook, /if \(!terminar \|\| terminando\.current\) return;\s*terminando\.current = true;/);
+  assert.match(hook, /JSON\.stringify\(\{ productos: terminar\.aCero\.map\(\(p\) => p\.productoLocalId\), decision \}\)/);
   assert.match(hook, /verDiferencias\(r\.controlId\);\s*\}, \[/, "terminado, se abre su informe");
+  assert.match(fuente("app/api/stock_locales/control/terminar/route.js"), /decision: body\.decision/);
 });
 
-test("la confirmación: el texto, Cancelar y Poner en 0, y deshabilitado mientras procesa", () => {
-  const abierta = (ocupado) =>
-    renderToStaticMarkup(React.createElement(ConfirmarTerminar, { abierto: true, cantidad: 2, ocupado, onCancelar: nada, onConfirmar: nada }));
-  assert.match(texto(abierta(false)), /Terminar control .*Vas a poner 2 productos en 0 y terminar el control Poner en 0 Cancelar/);
+test("la confirmación: los tres botones, deshabilitados mientras procesa, y la de siempre sin no contados", () => {
+  const hoja = (props) =>
+    renderToStaticMarkup(React.createElement(ConfirmarTerminar, { abierto: true, aCero: 2, sinContar: 3, ocupado: false, onCancelar: nada, onDecidir: nada, ...props }));
+  assert.match(
+    texto(hoja()),
+    /Terminar control .*Quedaron 3 productos sin contar con stock distinto de 0 .*Los vendidos durante el control no se tocan Poner 2 en 0 y terminar Dejarlos como están y terminar Cancelar/
+  );
   const boton = (h, rotulo) => h.match(new RegExp(`<button[^>]*>${rotulo}</button>`))?.[0] || "";
-  assert.doesNotMatch(boton(abierta(false), "Poner en 0"), /disabled/);
-  assert.match(boton(abierta(true), "Poner en 0"), /disabled/, "procesando, no se puede mandar dos veces");
-  assert.equal(renderToStaticMarkup(React.createElement(ConfirmarTerminar, { abierto: false, cantidad: 2, ocupado: false, onCancelar: nada, onConfirmar: nada })), "");
+  for (const r of ["Poner 2 en 0 y terminar", "Dejarlos como están y terminar", "Cancelar"]) {
+    assert.doesNotMatch(boton(hoja(), r), /disabled/, r);
+    assert.match(boton(hoja({ ocupado: true }), r), /disabled/, `procesando, ${r} no se puede tocar`);
+  }
+  assert.match(texto(hoja({ aCero: 0, sinContar: 0 })), /Terminar control .*Vas a terminar el control Terminar Cancelar$/);
+  assert.doesNotMatch(texto(hoja({ aCero: 0, sinContar: 0 })), /Dejarlos|en 0/);
+  assert.equal(renderToStaticMarkup(React.createElement(ConfirmarTerminar, { abierto: false, aCero: 2, sinContar: 3, ocupado: false, onCancelar: nada, onDecidir: nada })), "");
+});
+
+test("terminar exige la elección, y queda escrita en el control", () => {
+  assert.deepEqual(Object.values(DECISION_NO_CONTADOS), ["EN_CERO", "COMO_ESTABAN"]);
+  assert.equal(esDecisionNoContados(undefined), false);
+  assert.equal(esDecisionNoContados("EN_CERO"), true);
+  const server = fuente("lib/stock/control/controlStockServer.js");
+  assert.match(server, /if \(!esDecisionNoContados\(decision\)\) throw new RechazoDelControl\(400, TEXTO_FALTA_DECISION\);/);
+  assert.match(server, /noContadosDecision: decision,/);
+  assert.equal(textoQuedaronComoEstaban(7), "7 productos no se contaron y quedaron como estaban");
+  assert.equal(textoQuedaronComoEstaban(1), "1 producto no se contó y quedó como estaba");
 });
 
 // ── LAS DIFERENCIAS ────────────────────────────────────────────────────────

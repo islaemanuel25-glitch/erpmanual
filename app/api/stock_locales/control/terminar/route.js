@@ -2,8 +2,9 @@
 //
 // GET: lo que nadie contó y el sistema dice que hay, partido en vendidos durante
 // el control (no se tocan) y los que quedan en cero.
-// POST { productos: [productoLocalId…] }: poner en cero los que la pantalla
-// mostró y cerrar el control.
+// POST { productos: [productoLocalId…], decision }: cerrar el control. Con
+// `decision: "EN_CERO"` pone en cero los que la pantalla mostró; con
+// "COMO_ESTABAN" no los toca. Sin `decision`, 400 y no hace nada.
 
 import { NextResponse } from "next/server";
 import { PERMISO_GESTIONAR_CONTROL } from "@/lib/stock/control/controlStock";
@@ -31,7 +32,9 @@ export async function POST(req) {
     const a = await autorizarControl(req, PERMISO_GESTIONAR_CONTROL, { persona: "cuenta" });
     if (!a.ok) return respuestaDeRechazo(a);
     const body = await req.json().catch(() => ({}));
-    const r = await terminarControl({ localId: a.localId, grupoId: a.grupoId, quien: a.quien, vistos: body.productos });
+    // `decision`: qué hacer con lo que nadie contó —ponerlo en 0 o dejarlo como
+    // estaba—. Sin ella, `terminarControl` rechaza y no toca nada.
+    const r = await terminarControl({ localId: a.localId, grupoId: a.grupoId, quien: a.quien, vistos: body.productos, decision: body.decision });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {
     return respuestaDeError(e, "terminar el control");
