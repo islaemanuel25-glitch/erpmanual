@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-10-20 12:16
+**Última actualización:** 2026-10-20 14:46
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-10-20: feat: control de stock — lo contado sale del chip, un código muestra solo ese producto y el texto se busca como en la caja (pantalla SIN VERIFICAR en navegador)
 - 2026-10-20: feat: Control de stock es la pantalla de Stock con un campo "Contado" por tarjeta (pantalla SIN VERIFICAR en navegador)
 - 2026-10-20: feat: Control de stock, conteo físico por local (pantalla SIN VERIFICAR en navegador)
 - 2026-10-20: fix: Stock encuentra por el código propio del local con el buscador de la caja
