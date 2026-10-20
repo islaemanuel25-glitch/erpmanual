@@ -1,6 +1,6 @@
 # Módulo: POS Ventas
 
-**Última actualización:** 2026-10-20 10:13
+**Última actualización:** 2026-10-20 10:55
 **Archivos principales:** `app/modulos/pos-ventas/page.jsx`, `components/pos-ventas/*`, `app/api/pos-ventas/*`
 
 ## Descripción
@@ -55,6 +55,7 @@ POS:
 - Ventas (registro de venta con items, forma de pago, comisiones)
 
 ## Cambios recientes
+- 2026-10-20: feat: Control de stock, conteo físico por local (pantalla SIN VERIFICAR en navegador)
 - 2026-10-20: fix: Stock encuentra por el código propio del local con el buscador de la caja
 - 2026-10-19: feat: Finanzas → Sueldos, sección propia con pagos atados a empleados del local (pantalla SIN VERIFICAR en navegador)
 - 2026-10-19: fix: el horario del turno operativo no corta la venta; se saca el bloqueo por fin de turno
