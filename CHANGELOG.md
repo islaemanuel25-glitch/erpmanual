@@ -1,5 +1,21 @@
 # Changelog
 
+## [2026-10-20] - Actualización: pos-ventas, stock, transferencias, usuarios
+
+### Modificado
+- **pos-ventas**: fix: Stock encuentra por el código propio del local con el buscador de la caja
+- **pos-ventas**: feat: Finanzas → Sueldos, sección propia con pagos atados a empleados del local (pantalla SIN VERIFICAR en navegador)
+- **pos-ventas**: fix: el horario del turno operativo no corta la venta; se saca el bloqueo por fin de turno
+- **pos-ventas**: feat: sesión de PIN sin vencimiento por reloj y cierre de caja al terminar el turno
+- **pos-ventas**: fix: cerrar la caja cierra la sesión de PIN del operador en todos los dispositivos
+- **stock**: fix: Stock encuentra por el código propio del local con el buscador de la caja
+- **transferencias**: feat: Finanzas → Sueldos, sección propia con pagos atados a empleados del local (pantalla SIN VERIFICAR en navegador)
+- **transferencias**: fix: el horario del turno operativo no corta la venta; se saca el bloqueo por fin de turno
+- **transferencias**: feat: la sesión de la cuenta no vence por reloj; la valida el servidor en cada pedido
+- **transferencias**: fix: cerrar la caja cierra la sesión de PIN del operador en todos los dispositivos
+- **usuarios**: feat: la sesión de la cuenta no vence por reloj; la valida el servidor en cada pedido
+
+
 ## [2026-10-19] - Actualización: proveedores, transferencias, productos
 
 ### Modificado
