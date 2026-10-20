@@ -33,6 +33,15 @@ export default function EstadoTransferenciaBadge({ estado }) {
 }
 
 /**
+ * EL MISMO CHIP, PARA OTRO TRABAJO EN CURSO. El Control de stock copia la
+ * cabecera de recibir una transferencia y en el lugar de "Recibiendo" dice
+ * "Abierto": con las mismas clases, no con unas parecidas al lado.
+ */
+export function InsigniaEnCurso({ children }) {
+  return <span className={`${BASE} ${MAPA.Recibiendo.clase}`}>{children}</span>;
+}
+
+/**
  * Badge secundario de diferencias. Equivalente al "✎ Corregida" de Ventas.
  * Solo se muestra con la recepción ya confirmada: antes de eso el faltante
  * todavía no es un hecho.

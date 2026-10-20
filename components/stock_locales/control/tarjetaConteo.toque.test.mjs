@@ -50,6 +50,8 @@ function servidor({ lista, guardado }) {
     if (u.pathname === "/api/stock_locales/control") datos = real.abierto;
     else if (u.pathname === "/api/stock_locales/listar") datos = typeof lista === "function" ? lista(u.searchParams) : lista;
     else if (u.pathname === "/api/stock_locales/control/conteos" && metodo === "PUT") datos = guardado;
+    else if (u.pathname === "/api/stock_locales/control/diferencias") datos = real.diferenciasAbierto;
+    else if (u.pathname === "/api/stock_locales/control/revision") datos = { ok: true, productos: [], aCorregir: 0 };
     return { ok: true, status: 200, json: async () => datos };
   };
   return pedidos;
@@ -61,9 +63,9 @@ const listados = (pedidos) => pedidos.filter((p) => p.ruta === "/api/stock_local
 // render rehace `pedir` y el estado se vuelve a pedir sin fin.
 const requerirOperador = () => {};
 
-function Pantalla() {
-  const c = useControlStock({ puedeGestionar: false, requerirOperador });
-  return React.createElement(PantallaControlStock, { c, puedeGestionar: false });
+function Pantalla({ puedeGestionar = false }) {
+  const c = useControlStock({ puedeGestionar, requerirOperador });
+  return React.createElement(PantallaControlStock, { c, puedeGestionar });
 }
 
 // Lo montado se desmonta SIEMPRE, también cuando un caso falla: una pantalla
@@ -75,7 +77,7 @@ afterEach(async () => {
 });
 
 /** Monta la pantalla y espera la lista (el buscador filtra a los 300 ms). */
-async function montar(respuestas) {
+async function montar(respuestas, { puedeGestionar = false } = {}) {
   const pedidos = servidor(respuestas);
   const raiz = document.createElement("div");
   document.body.replaceChildren(raiz);
@@ -88,7 +90,7 @@ async function montar(respuestas) {
   };
   montadas.push(root);
   await act(async () => {
-    root.render(React.createElement(Pantalla));
+    root.render(React.createElement(Pantalla, { puedeGestionar }));
   });
   await act(async () => {
     await esperar(400);
@@ -162,7 +164,7 @@ test("1 · 'Está bien' con el campo tocado guarda el stock del sistema y la tar
   assert.equal(campo(raiz).value, "3", "el campo dice lo que se guardó");
   assert.match(texto(fila(raiz)), /Sistema 3 · Contado 3 · Sin diferencia/);
   assert.equal(fila(raiz).dataset.filaConteo, "contado");
-  assert.match(texto(raiz), new RegExp(`Contados · ${real.estaBienDelAceite.resumen.contados}`), "y sube Contados");
+  assert.equal(texto(chip(raiz, "Contados")), `Contados${real.estaBienDelAceite.resumen.contados}`, "y sube Contados");
   // Y salir del campo después no borra lo guardado.
   await act(async () => {
     document.body.focus();
@@ -206,7 +208,7 @@ test("2 · con un valor escrito aparece 'Aceptar' en lugar de 'Está bien', a to
   await act(async () => root.unmount());
 });
 
-test("2 · Enter y salir del campo siguen guardando", async () => {
+test("2 · Enter es Aceptar; salir del campo NO guarda", async () => {
   const { raiz, root, pedidos } = await montar({ lista: real.listaAntesDelQueso, guardado: real.guardadoDelQueso });
   await tocarCampo(campo(raiz));
   await escribir(campo(raiz), "1,25");
@@ -217,8 +219,9 @@ test("2 · Enter y salir del campo siguen guardando", async () => {
   await act(async () => {
     await esperar(0);
   });
-  assert.deepEqual(pedidos.filter((p) => p.metodo === "PUT").map((p) => p.cuerpo.total), [1.25], "al salir");
-  assert.match(texto(rotulo(raiz)), /^✓ Contado/);
+  assert.equal(pedidos.filter((p) => p.metodo === "PUT").length, 0, "salir del campo no guarda");
+  assert.equal(texto(rotulo(raiz)), "Contado", "queda escrito, sin aceptar");
+  assert.ok(boton(raiz, "Aceptar"), "con Aceptar a la vista");
   await act(async () => root.unmount());
 
   const otra = await montar({ lista: real.listaAntesDelQueso, guardado: real.guardadoDelQueso });
@@ -305,9 +308,9 @@ test("1 · con 'Sin contar', lo contado queda en ✓ Contado, los números suben
   await tocarBoton(tarjetaDe(raiz, aceite.id).querySelector("button.sunmi-btn-primary"));
   assert.match(texto(tarjetaDe(raiz, aceite.id).querySelector("[data-fila-conteo] p")), /^✓ Contado/, "se ve que quedó contado");
   const { contados, sinContar: quedan } = real.estaBienDelAceite.resumen;
-  assert.equal(texto(chip(raiz, "Sin contar")), `Sin contar · ${quedan}`, "los chips ya cambiaron");
-  assert.equal(texto(chip(raiz, "Contados")), `Contados · ${contados}`);
-  assert.match(texto(raiz), new RegExp(`${contados}\\s*contados de ${real.estaBienDelAceite.resumen.total}`), "y el avance");
+  assert.equal(texto(chip(raiz, "Sin contar")), `Sin contar${quedan}`, "los chips ya cambiaron");
+  assert.equal(texto(chip(raiz, "Contados")), `Contados${contados}`);
+  assert.match(texto(raiz), new RegExp(`${contados} / ${real.estaBienDelAceite.resumen.total} contados\\s*${quedan} sin contar`), "y la cabecera");
 
   await act(async () => {
     await esperar(1600);
@@ -329,13 +332,8 @@ test("1 · con 'Contados', un producto que se borra sale de la lista", async () 
   const coca = contados.items[0];
   await tocarCampo(campo(raiz));
   await escribir(campo(raiz), "");
-  await act(async () => {
-    campo(raiz).blur();
-    await esperar(0);
-  });
-  await act(async () => {
-    await esperar(0);
-  });
+  // Vaciar lo contado se acepta como todo lo demás: con Aceptar.
+  await tocarBoton(boton(raiz, "Aceptar"));
   assert.match(texto(tarjetaDe(raiz, coca.id).querySelector("[data-fila-conteo] p")), /^Sin contar/);
   await act(async () => {
     await esperar(1600);
@@ -347,6 +345,7 @@ test("1 · con 'Contados', un producto que se borra sale de la lista", async () 
 test("1 · con 'Todos' no sale nadie", async () => {
   const sinContar = real.listaSinContarAntesDeEstaBien;
   const { raiz, root } = await montar({ lista: sinContar, guardado: real.estaBienDelAceite });
+  await tocarChip(raiz, "Todos");
   await tocarBoton(boton(raiz, "Está bien"));
   await act(async () => {
     await esperar(1600);
@@ -441,4 +440,145 @@ test("3 · escribir un nombre en el buscador pide la búsqueda de la caja y la m
   assert.equal(ultimo.lectura, undefined, "tecleado no es lectura");
   assert.deepEqual(nombres(raiz), ["Coco rallado", "Bizcochos de coco"], "el orden de la caja: primero lo que empieza con lo buscado");
   await act(async () => root.unmount());
+});
+
+// ── LA PANTALLA LIMPIA, COMO RECIBIR UNA TRANSFERENCIA ────────────────────
+
+const sinContarReal = () => listadoReal({ todos: real.listaSinContarAntesDeEstaBien, sin_contar: real.listaSinContarAntesDeEstaBien });
+
+test("arriba: sin título repetido; la cabecera de recibir transferencia con 'Abierto', el local, contados y sin contar", async () => {
+  const { raiz } = await montar({ lista: sinContarReal(), guardado: real.estaBienDelAceite });
+  const t = texto(raiz);
+  assert.doesNotMatch(t, /STOCK · CONTROL/, "sin la etiqueta propia");
+  assert.equal((t.match(/Control de stock/g) || []).length, 1, "el título lo pone el shell; la tarjeta lo dice una vez");
+  const cabecera = raiz.querySelector("section > div");
+  const n = real.listaSinContarAntesDeEstaBien.resumenControl;
+  // `textContent` pega los bloques sin espacio: cada parte se mira por separado.
+  assert.match(texto(cabecera), new RegExp(`^Control de stock\\s*Abierto\\s*${real.abierto.local.nombre} · desde [a-záéíóú]+ \\d\\d/\\d\\d\\s*${n.contados} / ${n.total} contados\\s*${n.sinContar} sin contar$`));
+  const sinContar = [...cabecera.querySelectorAll("span")].find((s) => s.textContent === `${n.sinContar} sin contar`);
+  assert.ok(sinContar.className.includes("sunmi-text-accent"), "en el color de '4 pendientes'");
+  assert.equal([...cabecera.querySelectorAll("span")].some((s) => s.textContent === "Abierto" && s.className.includes("sunmi-state-warning-soft")), true, "el chip de 'Recibiendo'");
+  assert.doesNotMatch(raiz.innerHTML, /role="progressbar"|contados de/, "sin la tarjeta del número grande y la barra");
+  assert.equal(raiz.querySelector("button[aria-label='Más acciones']") === null, true, "sin gestionar no hay ⋯");
+});
+
+test("el buscador y los filtros de transferencias: 2 filas de 2, Sin contar de entrada, y Categoría · Todas", async () => {
+  const { raiz, pedidos } = await montar({ lista: sinContarReal(), guardado: real.estaBienDelAceite });
+  assert.equal(buscador(raiz).getAttribute("placeholder"), "Buscar producto, código o categoría...");
+  const filtros = [...raiz.querySelectorAll("[role='group'] button")];
+  const n = real.listaSinContarAntesDeEstaBien.resumenControl;
+  assert.deepEqual(filtros.map(texto), [`Sin contar${n.sinContar}`, `Con diferencia${n.conDiferencia}`, `Contados${n.contados}`, `Todos${n.total}`]);
+  assert.match(raiz.querySelector("[role='group']").className, /grid-cols-2/, "dos filas de dos");
+  assert.equal(filtros[0].getAttribute("aria-pressed"), "true", "de entrada, Sin contar");
+  assert.equal(listados(pedidos)[0].params.control, "sin_contar");
+  assert.match(texto(raiz), new RegExp(`Categoría\\s*Todas · ${n.total}`));
+  assert.doesNotMatch(texto(raiz), /Más filtros|Limpiar/, "sin los filtros de Stock Locales");
+});
+
+test("quien gestiona sin PIN: '⋯' abre 'Ver diferencias', y 'Terminar control' va en la barra de abajo", async () => {
+  const { raiz, pedidos } = await montar({ lista: sinContarReal(), guardado: real.estaBienDelAceite }, { puedeGestionar: true });
+  const barra = raiz.querySelector(".sticky.bottom-0");
+  assert.ok(barra, "la barra fija de abajo");
+  assert.equal([...barra.querySelectorAll("button")].map((b) => b.textContent.trim()).join(), "Terminar control");
+  await tocarBoton(raiz.querySelector("button[aria-label='Más acciones']"));
+  const ver = [...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Ver diferencias");
+  assert.ok(ver, "la hoja de ⋯ con Ver diferencias");
+  await tocarBoton(ver);
+  await act(async () => {
+    await esperar(0);
+  });
+  assert.ok(pedidos.some((p) => p.ruta === "/api/stock_locales/control/diferencias"), "abre el informe");
+  assert.match(texto(raiz), /Diferencias del control/);
+});
+
+test("sin gestionar no hay barra con Terminar", async () => {
+  const { raiz } = await montar({ lista: sinContarReal(), guardado: real.estaBienDelAceite });
+  assert.equal(raiz.querySelector(".sticky.bottom-0") === null, true);
+  assert.doesNotMatch(texto(raiz), /Terminar control/);
+});
+
+// ── NADA SE GUARDA SOLO ────────────────────────────────────────────────────
+
+const puts = (pedidos) => pedidos.filter((p) => p.metodo === "PUT");
+
+test("tocar − o + y esperar no guarda: queda con Aceptar", async () => {
+  const { raiz, pedidos } = await montar({ lista: real.listaAntesDelQueso, guardado: real.guardadoDelQueso });
+  await tocarBoton(fila(raiz).querySelector("button[aria-label^='Sumar']"));
+  await act(async () => {
+    await esperar(2000);
+  });
+  assert.equal(puts(pedidos).length, 0, "ni a los 2 s");
+  assert.ok(boton(raiz, "Aceptar"));
+});
+
+test("escanear el próximo no guarda lo escrito: la tarjeta queda arriba con su Aceptar y no sale de Sin contar", async () => {
+  const porCodigo = real.listaPorCodigo;
+  const codigo = porCodigo.items[0].codigoBarra;
+  const { raiz, pedidos } = await montar({ lista: listadoReal({ todos: real.listaSinContarAntesDeEstaBien }, { [codigo]: porCodigo }), guardado: real.estaBienDelAceite });
+  const aceite = real.listaSinContarAntesDeEstaBien.items[0];
+  await tocarCampo(campo(raiz));
+  await escribir(campo(raiz), "7");
+  // El lector, con el foco en esa cantidad: el código va al buscador.
+  await leerConElLector(campo(raiz), codigo);
+  assert.equal(puts(pedidos).length, 0, "nada guardado");
+  assert.deepEqual(nombres(raiz), [aceite.nombre, porCodigo.items[0].nombre], "la escrita sigue a la vista, arriba");
+  const escrita = tarjetaDe(raiz, aceite.id);
+  assert.equal(escrita.querySelector("input").value, "7", "con lo escrito");
+  assert.ok([...escrita.querySelectorAll("button")].some((b) => b.textContent.trim() === "Aceptar"));
+  // Y Aceptar la guarda.
+  await tocarBoton([...escrita.querySelectorAll("button")].find((b) => b.textContent.trim() === "Aceptar"));
+  assert.deepEqual(puts(pedidos).map((p) => p.cuerpo), [{ productoLocalId: aceite.id, total: 7 }]);
+});
+
+test("buscar otro producto tampoco pierde lo escrito", async () => {
+  const { raiz, pedidos } = await montar({ lista: listadoReal({ todos: real.listaSinContarAntesDeEstaBien }, { coco: real.listaPorTexto }), guardado: real.estaBienDelAceite });
+  const aceite = real.listaSinContarAntesDeEstaBien.items[0];
+  await escribir(campo(raiz), "7");
+  await escribir(buscador(raiz), "coco");
+  await act(async () => {
+    await esperar(400);
+  });
+  assert.deepEqual(nombres(raiz), [aceite.nombre, "Coco rallado", "Bizcochos de coco"]);
+  assert.equal(tarjetaDe(raiz, aceite.id).querySelector("input").value, "7");
+  assert.equal(puts(pedidos).length, 0);
+});
+
+// ── SALIR CON CANTIDADES SIN ACEPTAR ──────────────────────────────────────
+
+test("con cantidades sin aceptar, ir a otro módulo avisa: Quedarme se queda, Salir igual deja pasar", async () => {
+  const { raiz } = await montar({ lista: sinContarReal(), guardado: real.estaBienDelAceite });
+  await escribir(campo(raiz), "7");
+  const enlace = document.createElement("a");
+  enlace.href = "/modulos/stock_locales";
+  enlace.textContent = "Stock";
+  document.body.appendChild(enlace);
+  const tocarEnlace = async () => {
+    const ev = new window.MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+    await act(async () => {
+      enlace.dispatchEvent(ev);
+    });
+    return ev.defaultPrevented;
+  };
+  assert.equal(await tocarEnlace(), true, "el enlace no navega");
+  assert.match(texto(document.body), /Tenés 1 cantidad sin aceptar/);
+  await tocarBoton([...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Quedarme"));
+  assert.doesNotMatch(texto(document.body), /Tenés 1 cantidad sin aceptar/, "Quedarme cierra el aviso");
+  assert.equal(tarjetaDe(raiz, real.listaSinContarAntesDeEstaBien.items[0].id).querySelector("input").value, "7", "y lo escrito sigue");
+  assert.equal(await tocarEnlace(), true, "vuelve a avisar");
+  await tocarBoton([...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Salir igual"));
+  assert.equal(await tocarEnlace(), false, "Salir igual deja pasar");
+});
+
+test("con cantidades sin aceptar, recargar pide el aviso del navegador; sin nada, no", async () => {
+  const { raiz } = await montar({ lista: sinContarReal(), guardado: real.estaBienDelAceite });
+  const recargar = () => {
+    const ev = new window.Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(ev);
+    return ev.defaultPrevented;
+  };
+  assert.equal(recargar(), false, "sin nada escrito, no avisa");
+  await escribir(campo(raiz), "7");
+  assert.equal(recargar(), true, "con algo sin aceptar, avisa");
+  await escribir(campo(raiz), "");
+  assert.equal(recargar(), false, "borrado lo escrito, deja de avisar");
 });

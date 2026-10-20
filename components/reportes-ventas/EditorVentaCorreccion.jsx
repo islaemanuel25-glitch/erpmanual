@@ -41,6 +41,7 @@ import {
 } from "@/lib/pos-ventas/lineaModoDeposito";
 import { firmaCorreccion } from "@/lib/reportes-ventas/correccionDirty";
 import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
+import { useAvisoAlSalir } from "@/hooks/useAvisoAlSalir";
 
 const money = (n) => `$ ${Number(n || 0).toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtCant = (n) => { const x = Number(n); return Number.isInteger(x) ? String(x) : x.toLocaleString("es-AR", { maximumFractionDigits: 3 }); };
@@ -98,8 +99,6 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
   // panel inline de confirmación al intentar salir con cambios.
   const [firmaInicial, setFirmaInicial] = useState(null);
   const [confirmSalida, setConfirmSalida] = useState(false);
-  const bypassSalidaRef = useRef(false); // salida ya autorizada (no re-preguntar)
-  const sentinelRef = useRef(false); // centinela de history ya insertado (botón atrás)
 
   // Buscar producto (bloque "Agregar producto" inline)
   const [extraSearch, setExtraSearch] = useState("");
@@ -434,38 +433,25 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
     if (data && !cargando && firmaInicial === null) setFirmaInicial(firmaActual);
   }, [data, cargando, firmaActual, firmaInicial]);
 
-  // beforeunload: advertencia nativa SOLO mientras hay cambios (recarga/cerrar pestaña
-  // o navegador). El mensaje no se personaliza (los navegadores modernos lo ignoran).
-  useEffect(() => {
-    if (!dirty) return;
-    const onBeforeUnload = (e) => { e.preventDefault(); e.returnValue = ""; return ""; };
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [dirty]);
-
-  // Botón atrás (App Router no ofrece bloqueador): centinela de history + popstate.
-  // Al entrar en dirty insertamos UNA entrada centinela; el primer "atrás" la consume
-  // y, en vez de salir, mostramos la confirmación inline y reponemos el centinela.
-  useEffect(() => {
-    if (!dirty || typeof window === "undefined") return;
-    if (!sentinelRef.current) { window.history.pushState({ correccionSalida: true }, ""); sentinelRef.current = true; }
-    const onPop = () => {
-      if (bypassSalidaRef.current) return; // salida ya autorizada → no interferir
-      window.history.pushState({ correccionSalida: true }, ""); // reponer centinela
+  // beforeunload (recarga/cerrar) y botón atrás (centinela de history + popstate),
+  // SOLO mientras hay cambios. Vivían acá y se sacaron tal cual a
+  // `hooks/useAvisoAlSalir.js`, que también usa el Control de stock. Al primer
+  // "atrás" se muestra la confirmación inline y se repone el centinela.
+  const { permitirSalida } = useAvisoAlSalir({
+    activo: dirty,
+    onIntento: () => {
       setConfirmSalida(true);
       const el = getEditorScrollEl();
       if (el) el.scrollTop = 0; else window.scrollTo(0, 0);
-    };
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, [dirty]);
+    },
+  });
 
   // Handlers de salida controlada (botón "Volver a la venta" + confirmación inline).
   const salirAhora = useCallback(() => {
-    bypassSalidaRef.current = true;
+    permitirSalida();
     setConfirmSalida(false);
     onVolver && onVolver();
-  }, [onVolver]);
+  }, [onVolver, permitirSalida]);
   const solicitarSalida = useCallback(() => {
     if (!dirty) { onVolver && onVolver(); return; }
     setConfirmSalida(true);
@@ -505,7 +491,7 @@ export default function EditorVentaCorreccion({ ventaId, onVolver, onCorregido }
       // limpiar el formulario. El code habilita "Recargar venta" ante conflicto.
       if (!d.ok) { setError(d.error || "No se pudo aplicar la corrección."); setErrorCode(d.code || null); setConfirmando(false); return; }
       // Éxito: autorizar la salida (sin advertencia espuria) y navegar al detalle.
-      bypassSalidaRef.current = true;
+      permitirSalida();
       onCorregido && onCorregido(d); onVolver && onVolver();
     } catch { setError("Error de conexión."); }
     finally { setConfirmando(false); confirmandoRef.current = false; }

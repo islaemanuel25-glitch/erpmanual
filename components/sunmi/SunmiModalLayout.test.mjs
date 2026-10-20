@@ -684,6 +684,10 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // computadora (`RecepcionEscritorio`). Contesta lo mismo que arriba: un
     // menú y una hoja de solo lectura, nada que perder al cerrar.
     "components/transferencias/MasAccionesRecepcion.jsx": false,
+    // El "⋯" del Control de stock: la misma hoja de "Más acciones" de recibir
+    // una transferencia, con un solo botón —"Ver diferencias"—. Un menú: nada
+    // que perder al cerrar.
+    "components/stock_locales/control/PantallaControlStock.jsx": false,
     // El ESCÁNER contesta que NO, y por el mismo criterio: cerrarlo no pierde
     // nada. No hay nada escrito adentro —es un visor de cámara— y volver a
     // abrirlo cuesta un toque. Lo que sí tiene que pasar al cerrar es que la

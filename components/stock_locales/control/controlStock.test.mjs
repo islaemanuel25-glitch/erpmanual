@@ -26,7 +26,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 import PantallaControlStock, { ConfirmarTerminar, InformeDeDiferencias, StockQueNoCoincide } from "@/components/stock_locales/control/PantallaControlStock.jsx";
-import TarjetaConteo, { ESPERA_TRAS_BOTON_MS, ESTADO_FILA, EncabezadoDeLaFila } from "@/components/stock_locales/control/TarjetaConteo.jsx";
+import TarjetaConteo, { ESTADO_FILA, EncabezadoDeLaFila } from "@/components/stock_locales/control/TarjetaConteo.jsx";
 import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad.jsx";
 import { NumeroBloqueValor } from "@/components/sunmi/SunmiProductoCard.jsx";
 import { PERMISOS_FUERA_DEL_OPERADOR, permisosEfectivos } from "@/lib/rbac/permisosDelOperador.js";
@@ -274,51 +274,58 @@ test("la cantidad del kit: el kilo con coma se queda como se escribió, y sin la
 
 // ── LA PANTALLA, CON LA FORMA REAL ─────────────────────────────────────────
 
-test("control abierto: encabezado, avance contra el total del listado, FiltrosStock, chips y la lista", () => {
-  const c = conLista(real.listaSinContar);
-  const t = dibujar(c);
-  assert.match(t, /^STOCK · CONTROL Control de stock Mini el 7 · abierto desde [a-záéíóú]+ \d\d\/\d\d /);
-  const { contados, total, sinContar, conDiferencia } = real.listaSinContar.resumenControl;
-  assert.match(t, new RegExp(` ${contados} contados de ${total} `));
-  assert.match(html(c), /placeholder="Buscar por nombre o código\.\.\."/, "el buscador es el de Stock Locales");
-  assert.match(t, new RegExp(`Todos Sin contar · ${sinContar} Contados · ${contados} Con diferencia · ${conDiferencia}`));
-  assert.match(t, /Fideos .*STOCK · Unidad 4 .*Sin contar .*Está bien/);
-  assert.match(t, /Ver diferencias Terminar control$/);
-  assert.doesNotMatch(t, /QUIÉN ESTÁ CONTANDO|Guardar|Ajustar|Límites/);
-  assert.doesNotMatch(dibujar(c, { gestionar: false }), /Terminar control/);
-  assert.match(dibujar(c, { gestionar: false }), /Ver diferencias$/, "quien cuenta también ve las diferencias");
+// Lo que se ve y se toca de la parte de arriba —la cabecera, el buscador, los
+// filtros, la categoría, el "⋯" y la barra de abajo— está en
+// tarjetaConteo.toque.test.mjs, montado en un DOM. Acá, el cableado.
+
+test("control abierto: armado con las piezas de recibir transferencia, y sin lo de Stock Locales", () => {
+  const pantalla = fuente("components/stock_locales/control/PantallaControlStock.jsx");
+  assert.match(pantalla, /<SunmiPantallaDeTrabajo\b/);
+  assert.match(pantalla, /<SunmiFiltroEstado\b/);
+  assert.match(pantalla, /<SunmiCampoBusquedaVoz\b[\s\S]*placeholder=\{PLACEHOLDER_BUSCADOR\}/);
+  assert.match(pantalla, /import \{ PLACEHOLDER_BUSCADOR, TITULO_MAS_ACCIONES \} from "@\/components\/transferencias\/RecepcionMovil"/, "los textos de transferencias, no copias");
+  assert.doesNotMatch(pantalla, /<FiltrosStock\b|<SunmiChipsFiltro\b|BarraDeAvance|etiqueta="STOCK · CONTROL"/);
+  const t = dibujar(conLista(real.listaSinContar));
+  assert.doesNotMatch(t, /QUIÉN ESTÁ CONTANDO|Guardar|Ajustar|Límites|Más filtros|Limpiar/);
 });
 
-test("el chip activo por defecto es Todos", () => {
+test("el chip de entrada es Sin contar", () => {
   const src = fuente("components/stock_locales/control/useControlStock.js");
-  assert.match(src, /useState\(FILTRO_CONTROL\.TODOS\)/);
-  const h = html(conLista(real.listaSinContar));
-  const chip = h.match(/<button[^>]*aria-pressed="true"[^>]*>([\s\S]*?)<\/button>/)?.[1] || "";
-  assert.equal(texto(chip), "Todos");
+  assert.match(src, /const \[chip, setChipCrudo\] = useState\(FILTRO_CONTROL\.SIN_CONTAR\)/);
 });
 
-test("la lista es la de Stock Locales: FiltrosStock y useStockData con el chip en `control`", () => {
+test("la lista es la de Stock Locales: useStockData con el chip en `control`, y el universo de la misma función", () => {
   const hook = fuente("components/stock_locales/control/useControlStock.js");
   assert.match(hook, /useStockData\(\{/);
   assert.match(hook, /\{ \.\.\.filtros, control: chip, \.\.\.\(filtros\.q && filtros\.q === ultimaLectura \? \{ lectura: true \} : \{\}\) \}/);
   assert.doesNotMatch(hook, /\/control\/productos\?\$\{qs\}/, "ya no hay una lista propia del control");
   assert.match(fuente("hooks/useStockData.js"), /if \(filtro\.control\) params\.set\("control", filtro\.control\)/);
-  const pantalla = fuente("components/stock_locales/control/PantallaControlStock.jsx");
-  assert.match(pantalla, /<FiltrosStock\b[\s\S]*onEscanear=\{c\.escanear\}/);
   // El listado y el control piden el universo a la MISMA función.
   assert.equal((fuente("app/api/stock_locales/listar/route.js").match(/whereUniversoStock\(localId, (false|true)\)/g) || []).length, 2);
   assert.match(fuente("lib/stock/control/controlStockServer.js"), /whereUniversoStock\(localId, esDeposito\)/);
+  // FiltrosStock vuelve a ser solo de Stock Locales: sin lo que le había agregado el control.
+  assert.doesNotMatch(fuente("components/stock_locales/FiltrosStock.jsx"), /onEscanear|textoDesdeAfuera/);
 });
 
-test("el lector en FiltrosStock: el código queda en el buscador y el listado lo resuelve como la caja", () => {
-  // Lo que se ve al tocar está en tarjetaConteo.toque.test.mjs; acá, el cableado.
-  const src = fuente("components/stock_locales/FiltrosStock.jsx");
-  assert.match(src, /Promise\.resolve\(onEscanear\(codigo\)\)\.then\(\(encontrado\) => \{\s*if \(!encontrado\) setQ\(codigo\);/);
+test("el lector: el código queda en el buscador y el listado lo resuelve como la caja", () => {
   const hook = fuente("components/stock_locales/control/useControlStock.js");
-  assert.match(hook, /const escanear = useCallback\(\(codigo\) => \{\s*setUltimaLectura\(String\(codigo\)\.trim\(\)\);\s*return false;/);
+  assert.match(hook, /const escanear = useCallback\(\(codigo\) => \{\s*const t = String\(codigo\)\.trim\(\);\s*setUltimaLectura\(t\);\s*setTexto\(t\);/);
   const listar = fuente("app/api/stock_locales/listar/route.js");
   assert.equal((listar.match(/rankearComoLaCaja\(/g) || []).length, 1, "el texto, con la búsqueda de la caja");
   assert.match(fuente("app/api/pos-ventas/buscar-producto/route.js"), /rankings = rankearComoLaCaja\(candidatos, q\);/, "la caja usa la misma");
+});
+
+test("la categoría cuenta sobre el universo del control", () => {
+  const n = real.listaSinContar.resumenControl;
+  assert.ok(Array.isArray(n.categorias), "el resumen trae las categorías");
+  assert.deepEqual(n.categorias.map((c) => [c.nombre, c.cantidad]), [["Bebidas", 1]]);
+});
+
+test("salir con cantidades sin aceptar usa el aviso que salió del editor de correcciones", () => {
+  const editor = fuente("components/reportes-ventas/EditorVentaCorreccion.jsx");
+  assert.match(editor, /useAvisoAlSalir\(\{/);
+  assert.doesNotMatch(editor, /addEventListener\("(beforeunload|popstate)"/, "sin la copia de antes");
+  assert.match(fuente("components/stock_locales/control/PantallaControlStock.jsx"), /useAvisoAlSalir\(\{\s*activo: c\.sinAceptar > 0,\s*interceptarEnlaces: true,/);
 });
 
 test("una tarjeta contada: '✓ Contado · quién · hora', Sistema · Contado · Faltan, y el campo sigue editable", () => {
@@ -408,14 +415,13 @@ test("los rótulos de la fila", () => {
   assert.match(r(ESTADO_FILA.CONTADO, de(real.listaContados, "Coca 2L").conteo), /^✓ Contado · Emanuel · \d\d:\d\d$/);
 });
 
-test("la tarjeta es la de Stock, la cantidad es la del kit, y se guarda sola", () => {
+test("la tarjeta es la de Stock, la cantidad es la del kit, y NADA se guarda solo", () => {
   const src = fuente("components/stock_locales/control/TarjetaConteo.jsx");
   assert.match(src, /<TarjetaStockMovil\b[\s\S]*filaDeAbajo=\{fila\}/);
   assert.match(src, /<SunmiCampoCantidad\b[\s\S]*minimo=\{0\}/);
   assert.match(src, /esLecturaDeEscaner\(ms, r\.texto\)/, "el lector se reconoce como en la caja");
-  assert.match(src, /onBlur=\{alSalir\}/, "se guarda al salir del campo");
-  assert.equal(ESPERA_TRAS_BOTON_MS, 1500);
-  assert.match(src, /espera\.current = setTimeout\(\(\) => guardar\(v\), ESPERA_TRAS_BOTON_MS\)/, "después de − o +, a los 1,5 s");
+  assert.doesNotMatch(src, /onBlur=|setTimeout\(|onClickCapture/, "ni al salir del campo, ni a los 1,5 s de − o +");
+  assert.equal((src.match(/guardar\(/g) || []).length, 3, "la definición, Enter y Aceptar: nada más guarda");
   assert.match(src, /onGuardar\?\.\(item\.id, \{ estaBien: true \}\)/);
   assert.doesNotMatch(src, /<button/, "los botones son del kit");
   const tarjetaStock = fuente("components/stock_locales/TarjetaStockMovil.jsx");

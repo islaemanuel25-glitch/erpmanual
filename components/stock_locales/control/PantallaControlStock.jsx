@@ -6,10 +6,11 @@
 // `useControlStock` y dibuja una de tres vistas:
 //
 //   · inicio. Sin control, "Empezar control" y el historial de terminados, cada
-//     uno con sus diferencias. Con control, la pantalla de Stock Locales con un
-//     campo "Contado" en cada tarjeta: el avance, el MISMO `FiltrosStock`, los
-//     chips Todos / Sin contar / Contados / Con diferencia, la lista y, abajo,
-//     "Ver diferencias" y "Terminar control".
+//     uno con sus diferencias. Con control, armada como recibir una
+//     transferencia: la cabecera con "Abierto", el buscador, los filtros Sin
+//     contar / Con diferencia / Contados / Todos, la categoría, el listado de
+//     Stock con un campo "Contado" en cada tarjeta y, en la barra de abajo,
+//     "Terminar control".
 //   · terminar. Lo que nadie contó, partido en vendidos durante el control —que
 //     no se tocan— y los que quedan en cero, con su confirmación.
 //   · diferencias. Qué productos estaban mal, por cuánto y cuánta plata es.
@@ -22,20 +23,26 @@
 // Los resúmenes cuentan PRODUCTOS, nunca suman unidades de productos distintos.
 // La plata sí se suma: es lo único que tiene la misma unidad en todos.
 
-import { useCallback, useState } from "react";
+import { useRef, useState } from "react";
+import { MoreHorizontal } from "lucide-react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiChipsFiltro from "@/components/sunmi/SunmiChipsFiltro";
+import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
+import SunmiFiltroEstado from "@/components/sunmi/SunmiFiltroEstado";
 import SunmiHojaDeConfirmacion from "@/components/sunmi/SunmiHojaDeConfirmacion";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import SunmiListaProductoCards from "@/components/sunmi/SunmiListaProductoCards";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
+import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
-import FiltrosStock from "@/components/stock_locales/FiltrosStock";
+import SunmiPantallaDeTrabajo from "@/components/sunmi/SunmiPantallaDeTrabajo";
+import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import TarjetaConteo, { CLASE_TONO } from "@/components/stock_locales/control/TarjetaConteo";
+import { InsigniaEnCurso } from "@/components/transferencias/EstadoTransferenciaBadge";
+// El texto del buscador y el del "⋯" son los de recibir una transferencia.
+import { PLACEHOLDER_BUSCADOR, TITULO_MAS_ACCIONES } from "@/components/transferencias/RecepcionMovil";
 import {
   AvisoDeEstado,
-  BarraDeAvance,
   Bloque,
   BotonTesoreria,
   CifraHero,
@@ -43,13 +50,14 @@ import {
   Renglon,
   TarjetaHero,
 } from "@/components/tesoreria/PiezasTesoreria";
+import { useAvisoAlSalir } from "@/hooks/useAvisoAlSalir";
 import { formatearMoneda } from "@/lib/moneda";
+import { MS_MAX_ENTRE_TECLAS_ESCANER, esLecturaDeEscaner } from "@/lib/pos-ventas/lecturaEscaner";
 import {
   FILTRO_CONTROL,
   VISTA_CONTROL,
   diaDelControl,
   momentoDelControl,
-  porcentajeDeAvance,
   textoCantidad,
   textoDeLaDiferencia,
   textoNumero,
@@ -90,18 +98,16 @@ function Aviso({ texto }) {
 
 // ── INICIO ─────────────────────────────────────────────────────────────────
 
+// El título "Control de stock" lo pone el shell (sale del ítem del menú): la
+// pantalla no lo repite. Lo que decía su encabezado —el local y desde cuándo—
+// está en la tarjeta de cabecera del control abierto.
 function VistaInicio({ c, local, puedeGestionar }) {
   const control = c.estado?.control;
-  const contexto = control ? `${local} · abierto desde ${diaDelControl(control.abiertoEn)}` : local;
+  if (control) return <ControlAbierto c={c} local={local} puedeGestionar={puedeGestionar} />;
   return (
     <div className="space-y-3.5">
-      <EncabezadoDeDetalle etiqueta="STOCK · CONTROL" titulo="Control de stock" contexto={contexto} />
       <Aviso texto={c.aviso} />
-      {control ? (
-        <ControlAbierto c={c} puedeGestionar={puedeGestionar} />
-      ) : (
-        <SinControl c={c} puedeGestionar={puedeGestionar} />
-      )}
+      <SinControl c={c} puedeGestionar={puedeGestionar} />
     </div>
   );
 }
@@ -136,20 +142,35 @@ function SinControl({ c, puedeGestionar }) {
   );
 }
 
-function ControlAbierto({ c, puedeGestionar }) {
-  const n = c.contadores ?? { total: 0, contados: 0, sinContar: 0, conDiferencia: 0 };
+/** El aviso al querer salir con algo escrito sin aceptar. */
+export const textoSinAceptar = (n) => `Tenés ${n} ${n === 1 ? "cantidad" : "cantidades"} sin aceptar`;
+
+/**
+ * EL CONTROL ABIERTO, ARMADO COMO RECIBIR UNA TRANSFERENCIA: la misma
+ * `SunmiPantallaDeTrabajo` con las mismas piezas y en el mismo orden —la
+ * tarjeta de cabecera con su chip y su "⋯", el buscador, los cuatro filtros en
+ * dos filas, la categoría y la barra de abajo—. Las tarjetas de producto y su
+ * fila de conteo son las de siempre.
+ */
+function ControlAbierto({ c, local, puedeGestionar }) {
+  const n = c.contadores ?? { total: 0, contados: 0, sinContar: 0, conDiferencia: 0, categorias: [] };
+  const control = c.estado?.control;
   const esDeposito = c.estado?.local?.es_deposito === true;
   const idFijado = c.fijado?.id ?? null;
   const items = c.items.filter((i) => i.id !== idFijado);
+  const [masAcciones, setMasAcciones] = useState(false);
 
-  // El nombre del proveedor sale del catálogo que ya trae `FiltrosStock`, como
-  // en Stock Locales: el listado solo manda `proveedorId`.
-  const [proveedoresPorId, setProveedoresPorId] = useState({});
-  const alCargarCatalogos = useCallback(({ proveedores }) => {
-    const mapa = {};
-    for (const p of proveedores || []) mapa[p.id] = p.nombre;
-    setProveedoresPorId(mapa);
-  }, []);
+  // ── SALIR CON CANTIDADES SIN ACEPTAR ───────────────────────────────────
+  //
+  // Recargar o cerrar: el aviso del navegador. Volver o ir a otro módulo: la
+  // hoja de confirmación. La lógica es la del editor de correcciones de venta,
+  // que salió a `useAvisoAlSalir`.
+  const [avisoSalida, setAvisoSalida] = useState(false);
+  const { salir } = useAvisoAlSalir({
+    activo: c.sinAceptar > 0,
+    interceptarEnlaces: true,
+    onIntento: () => setAvisoSalida(true),
+  });
 
   // El foco va a la tarjeta que lo pidió: la del código leído o la del "Contar".
   const tarjeta = (item, foco = item.id === c.focoId ? c.foco : 0) => (
@@ -157,80 +178,205 @@ function ControlAbierto({ c, puedeGestionar }) {
       key={item.id}
       item={item}
       esDeposito={esDeposito}
-      proveedorNombre={proveedoresPorId[item.proveedorId] ?? null}
+      proveedorNombre={c.proveedoresPorId?.[item.proveedorId] ?? null}
       onGuardar={c.guardarTotal}
       onEscanear={c.escanearDesdeLaCantidad}
       onListo={c.alBuscador}
       autoFoco={foco}
+      borrador={c.borradores?.[item.id]?.valores ?? null}
+      onBorrador={c.anotarBorrador}
     />
   );
+
+  const opcionesEstado = [
+    { clave: FILTRO_CONTROL.SIN_CONTAR, texto: "Sin contar", cantidad: n.sinContar },
+    { clave: FILTRO_CONTROL.CON_DIFERENCIA, texto: "Con diferencia", cantidad: n.conDiferencia },
+    { clave: FILTRO_CONTROL.CONTADOS, texto: "Contados", cantidad: n.contados },
+    { clave: FILTRO_CONTROL.TODOS, texto: "Todos", cantidad: n.total },
+  ];
+
   return (
-    <>
-      <TarjetaHero franja={false}>
-        <CifraHero rotulo={null} valor={n.contados} />
-        <p className="text-sm2 sunmi-text-muted">{`contados de ${n.total}`}</p>
-        <BarraDeAvance pct={porcentajeDeAvance(n.contados, n.total - n.contados)} />
-      </TarjetaHero>
-
-      {puedeGestionar ? <StockQueNoCoincide c={c} /> : null}
-
-      <div ref={c.buscadorRef} data-buscador-control="">
-        <FiltrosStock
-          compact
-          localSeleccionado={c.estado?.local?.id ?? null}
-          onFiltroChange={c.alCambiarFiltros}
-          onReset={c.alLimpiar}
-          onCatalogos={alCargarCatalogos}
-          onEscanear={c.escanear}
-          textoDesdeAfuera={c.textoParaBuscador}
-        />
-      </div>
-
-      <SunmiChipsFiltro
-        textoTodas={null}
-        valor={c.chip}
-        onCambiar={c.setChip}
-        opciones={[
-          { clave: FILTRO_CONTROL.TODOS, texto: "Todos" },
-          { clave: FILTRO_CONTROL.SIN_CONTAR, texto: `Sin contar · ${n.sinContar}` },
-          { clave: FILTRO_CONTROL.CONTADOS, texto: `Contados · ${n.contados}` },
-          { clave: FILTRO_CONTROL.CON_DIFERENCIA, texto: `Con diferencia · ${n.conDiferencia}` },
-        ]}
-      />
-
-      {c.errorLista ? <Aviso texto={c.errorLista} /> : null}
-
-      {c.fijado ? <SunmiListaProductoCards>{tarjeta(c.fijado)}</SunmiListaProductoCards> : null}
-
-      {c.cargandoLista && items.length === 0 ? (
-        <div className="py-6">
-          <SunmiLoader />
+    <SunmiPantallaDeTrabajo
+      idCategoria="categoria-control"
+      contexto={
+        <>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-semibold sunmi-text-strong truncate">Control de stock</span>
+              <InsigniaEnCurso>Abierto</InsigniaEnCurso>
+            </div>
+            {puedeGestionar ? (
+              <SunmiButton
+                color="slate"
+                onClick={() => setMasAcciones(true)}
+                aria-label={TITULO_MAS_ACCIONES}
+                aria-haspopup="dialog"
+                className="shrink-0"
+              >
+                <MoreHorizontal size={18} aria-hidden="true" />
+              </SunmiButton>
+            ) : null}
+          </div>
+          <p className="text-sm2 sunmi-text-muted truncate">{`${local} · desde ${diaDelControl(control.abiertoEn)}`}</p>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-sm2 sunmi-text-muted">
+              <span className="tabular-nums sunmi-text-strong font-semibold">
+                {n.contados} / {n.total}
+              </span>{" "}
+              contados
+            </span>
+            <span className={`text-sm2 ${n.sinContar > 0 ? "sunmi-text-accent" : "sunmi-text-success"}`}>
+              {n.sinContar > 0 ? `${n.sinContar} sin contar` : "Nada sin contar"}
+            </span>
+          </div>
+        </>
+      }
+      buscador={
+        <div ref={c.buscadorRef} data-buscador-control="">
+          <BuscadorDelControl c={c} />
         </div>
-      ) : (
-        <SunmiListaProductoCards>{items.map((i) => tarjeta(i))}</SunmiListaProductoCards>
-      )}
-      {!c.cargandoLista && c.items.length === 0 && !c.fijado ? (
-        <p className="text-sm2 sunmi-text-muted py-2">No hay productos con este filtro.</p>
-      ) : null}
+      }
+      filtros={
+        <SunmiFiltroEstado opciones={opcionesEstado} valor={c.chip} onCambiar={c.setChip} ariaLabel="Filtrar productos por estado" />
+      }
+      categoria={
+        <SunmiSelectAdv
+          id="categoria-control"
+          value={c.categoria == null ? "" : String(c.categoria)}
+          onChange={(v) => c.setCategoria(v === "" ? null : v)}
+        >
+          <option value="">Todas · {n.total}</option>
+          {(n.categorias ?? []).map((cat) => (
+            <option key={cat.id} value={cat.id}>
+              {cat.nombre} · {cat.cantidad}
+            </option>
+          ))}
+        </SunmiSelectAdv>
+      }
+      antesDeLista={
+        <>
+          <Aviso texto={c.aviso} />
+          {puedeGestionar ? <StockQueNoCoincide c={c} /> : null}
+          {c.errorLista ? <Aviso texto={c.errorLista} /> : null}
+          {/* Lo escrito sin aceptar que la lista de ahora no muestra: sigue a la
+              vista, con su "Aceptar", hasta que se acepte o se borre. */}
+          {c.pendientesFuera?.length ? (
+            <SunmiListaProductoCards>{c.pendientesFuera.map((i) => tarjeta(i))}</SunmiListaProductoCards>
+          ) : null}
+          {c.fijado ? <SunmiListaProductoCards>{tarjeta(c.fijado)}</SunmiListaProductoCards> : null}
+        </>
+      }
+      lista={
+        c.cargandoLista && items.length === 0 ? (
+          <div className="py-6">
+            <SunmiLoader />
+          </div>
+        ) : (
+          <SunmiListaProductoCards>{items.map((i) => tarjeta(i))}</SunmiListaProductoCards>
+        )
+      }
+      despuesDeLista={
+        <>
+          {!c.cargandoLista && c.items.length === 0 && !c.fijado ? (
+            <p className="text-sm2 sunmi-text-muted py-2">No hay productos con este filtro.</p>
+          ) : null}
+          <SunmiPaginador
+            page={c.page}
+            totalPages={c.totalPages}
+            totalItems={c.totalItems}
+            onPrev={() => c.setPage((p) => Math.max(1, p - 1))}
+            onNext={() => c.setPage((p) => Math.min(c.totalPages, p + 1))}
+            onGoToPage={(p) => c.setPage(Math.min(Math.max(1, Number(p) || 1), c.totalPages))}
+          />
+        </>
+      }
+      // "Terminar control" en el lugar de "Confirmar": es lo que cierra el trabajo.
+      pieDePantalla={
+        puedeGestionar ? (
+          <div className="flex items-center justify-end gap-3">
+            <SunmiButton color="amber" onClick={c.irATerminar} disabled={c.ocupado} className="shrink-0 justify-center">
+              Terminar control
+            </SunmiButton>
+          </div>
+        ) : null
+      }
+      despuesDelPie={
+        <>
+          <SunmiModalLayout
+            open={masAcciones}
+            title={TITULO_MAS_ACCIONES}
+            subtitle={`Control de stock · ${local}`}
+            onClose={() => setMasAcciones(false)}
+            z={NIVEL_MODAL_GLOBAL}
+            forma="hoja"
+            espacioCuerpo="gap-2"
+          >
+            <SunmiButton
+              color="slate"
+              className="w-full justify-center"
+              onClick={() => {
+                setMasAcciones(false);
+                c.verDiferencias();
+              }}
+            >
+              Ver diferencias
+            </SunmiButton>
+          </SunmiModalLayout>
+          {avisoSalida ? (
+            <SunmiHojaDeConfirmacion
+              titulo="Cantidades sin aceptar"
+              puntos={[textoSinAceptar(c.sinAceptar)]}
+              textoConfirmar="Salir igual"
+              textoTrabajando="Salir igual"
+              colorConfirmar="red"
+              textoVolver="Quedarme"
+              trabajando={false}
+              onConfirmar={() => {
+                setAvisoSalida(false);
+                salir();
+              }}
+              onVolver={() => setAvisoSalida(false)}
+            />
+          ) : null}
+        </>
+      }
+    />
+  );
+}
 
-      <SunmiPaginador
-        page={c.page}
-        totalPages={c.totalPages}
-        totalItems={c.totalItems}
-        onPrev={() => c.setPage((p) => Math.max(1, p - 1))}
-        onNext={() => c.setPage((p) => Math.min(c.totalPages, p + 1))}
-        onGoToPage={(p) => c.setPage(Math.min(Math.max(1, Number(p) || 1), c.totalPages))}
-      />
-
-      <BotonTesoreria tipo="secundario" onClick={() => c.verDiferencias()} disabled={c.ocupado}>
-        Ver diferencias
-      </BotonTesoreria>
-      {puedeGestionar && (
-        <BotonTesoreria tipo="secundario" onClick={c.irATerminar} disabled={c.ocupado}>
-          Terminar control
-        </BotonTesoreria>
-      )}
-    </>
+/**
+ * EL BUSCADOR, CON EL ASPECTO DEL DE TRANSFERENCIAS: `SunmiCampoBusquedaVoz`,
+ * lupa, campo y micrófono. El lector se reconoce con la regla de la caja
+ * (teclas muy seguidas y un Enter: `esLecturaDeEscaner`) y va como lectura; lo
+ * tecleado se busca a los 300 ms.
+ */
+function BuscadorDelControl({ c }) {
+  const ultima = useRef(0);
+  const rafaga = useRef("");
+  const alTeclear = (e) => {
+    const ahora = Date.now();
+    const ms = ahora - ultima.current;
+    ultima.current = ahora;
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (esLecturaDeEscaner(ms, rafaga.current)) c.escanear(rafaga.current);
+      rafaga.current = "";
+      return;
+    }
+    if (e.key.length === 1) {
+      if (ms > MS_MAX_ENTRE_TECLAS_ESCANER) rafaga.current = "";
+      rafaga.current += e.key;
+    }
+  };
+  return (
+    <SunmiCampoBusquedaVoz
+      value={c.texto}
+      onChange={c.setTexto}
+      onVoz={c.setTexto}
+      onKeyDown={alTeclear}
+      placeholder={PLACEHOLDER_BUSCADOR}
+      ariaLabel="Buscar producto del control"
+    />
   );
 }
 

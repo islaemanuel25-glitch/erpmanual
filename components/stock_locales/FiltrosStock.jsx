@@ -17,20 +17,8 @@ export default function FiltrosStock({
   // tendría entre sus dependencias si fuera inline.
   onCatalogos = null,
   compact = false,
-  // Lo usa el Control de stock: recibe el código que leyó el lector y contesta
-  // si lo encontró. Sin esto, la lectura filtra el listado como siempre.
-  onEscanear = null,
-  // También del Control de stock: el lector escribió con el foco en una
-  // cantidad, y el código va al buscador. `{ texto, vez }`: `vez` cambia en
-  // cada lectura, así el mismo código leído dos veces se vuelve a buscar.
-  textoDesdeAfuera = null,
 }) {
   const [q, setQ] = useState("");
-
-  useEffect(() => {
-    if (textoDesdeAfuera) setQ(textoDesdeAfuera.texto);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [textoDesdeAfuera?.vez]);
   const [categoria, setCategoria] = useState("");
   const [proveedor, setProveedor] = useState("");
   const [area, setArea] = useState("");
@@ -176,18 +164,8 @@ export default function FiltrosStock({
       e.preventDefault();
       // Scanner: caracteres rápidos + Enter
       if (diff < 200 && scanBuffer.current.length > 3) {
-        const codigo = scanBuffer.current;
+        setQ(scanBuffer.current);
         scanBuffer.current = "";
-        // El Control de stock pide la lectura: si el código es de un producto
-        // del local, lleva a su tarjeta; si no, se filtra como siempre.
-        if (onEscanear) {
-          setQ("");
-          Promise.resolve(onEscanear(codigo)).then((encontrado) => {
-            if (!encontrado) setQ(codigo);
-          });
-          return;
-        }
-        setQ(codigo);
         return;
       }
       scanBuffer.current = "";

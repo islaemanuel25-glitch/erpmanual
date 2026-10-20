@@ -7,7 +7,7 @@
       "baseId": 1,
       "nombre": "Coca 2L",
       "codigoBarra": "7790000000001",
-      "categoriaId": null,
+      "categoriaId": 1,
       "proveedorId": 1,
       "areaFisicaId": null,
       "unidadMedida": "unidad",
@@ -29,7 +29,7 @@
       "conteo": {
         "total": 3,
         "contadoPor": "Emanuel",
-        "en": "2026-10-20T14:30:42.012Z",
+        "en": "2026-10-20T17:38:33.299Z",
         "sistema": 5,
         "diferencia": -2
       }
@@ -44,7 +44,7 @@
         "baseId": 1,
         "nombre": "Coca 2L",
         "codigoBarra": "7790000000001",
-        "categoriaId": null,
+        "categoriaId": 1,
         "proveedorId": 1,
         "areaFisicaId": null,
         "unidadMedida": "unidad",
@@ -66,7 +66,7 @@
         "conteo": {
           "total": 5,
           "contadoPor": "Ana",
-          "en": "2026-10-20T14:30:42.185Z",
+          "en": "2026-10-20T17:38:33.521Z",
           "sistema": 5,
           "diferencia": 0
         }
@@ -79,7 +79,14 @@
       "total": 8,
       "contados": 1,
       "sinContar": 7,
-      "conDiferencia": 0
+      "conDiferencia": 0,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        }
+      ]
     },
     "lecturaControl": null
   },
@@ -91,7 +98,7 @@
       "baseId": 1,
       "nombre": "Coca 2L",
       "codigoBarra": "7790000000001",
-      "categoriaId": null,
+      "categoriaId": 1,
       "proveedorId": 1,
       "areaFisicaId": null,
       "unidadMedida": "unidad",
@@ -117,7 +124,14 @@
       "total": 8,
       "contados": 0,
       "sinContar": 8,
-      "conDiferencia": 0
+      "conDiferencia": 0,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        }
+      ]
     }
   },
   "listaAntesDelQueso": {
@@ -158,7 +172,14 @@
       "total": 8,
       "contados": 1,
       "sinContar": 7,
-      "conDiferencia": 1
+      "conDiferencia": 1,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        }
+      ]
     },
     "lecturaControl": null
   },
@@ -192,7 +213,7 @@
       "conteo": {
         "total": 1.25,
         "contadoPor": "Emanuel",
-        "en": "2026-10-20T14:30:42.330Z",
+        "en": "2026-10-20T17:38:33.691Z",
         "sistema": 2.5,
         "diferencia": -1.25
       }
@@ -202,7 +223,14 @@
       "total": 8,
       "contados": 2,
       "sinContar": 6,
-      "conDiferencia": 2
+      "conDiferencia": 2,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        }
+      ]
     }
   },
   "listaAntesDeEstaBien": {
@@ -243,7 +271,14 @@
       "total": 8,
       "contados": 3,
       "sinContar": 5,
-      "conDiferencia": 3
+      "conDiferencia": 3,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        }
+      ]
     },
     "lecturaControl": null
   },
@@ -393,7 +428,14 @@
       "total": 8,
       "contados": 3,
       "sinContar": 5,
-      "conDiferencia": 3
+      "conDiferencia": 3,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        }
+      ]
     },
     "lecturaControl": null
   },
@@ -427,7 +469,7 @@
       "conteo": {
         "total": 3,
         "contadoPor": "Ana",
-        "en": "2026-10-20T14:30:42.493Z",
+        "en": "2026-10-20T17:38:33.840Z",
         "sistema": 3,
         "diferencia": 0
       }
@@ -437,7 +479,14 @@
       "total": 8,
       "contados": 4,
       "sinContar": 4,
-      "conDiferencia": 3
+      "conDiferencia": 3,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        }
+      ]
     }
   },
   "listaSinContar": {
@@ -559,7 +608,14 @@
       "total": 8,
       "contados": 4,
       "sinContar": 4,
-      "conDiferencia": 3
+      "conDiferencia": 3,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        }
+      ]
     },
     "lecturaControl": null
   },
@@ -594,7 +650,7 @@
         "conteo": {
           "total": 3,
           "contadoPor": "Ana",
-          "en": "2026-10-20T14:30:42.493Z",
+          "en": "2026-10-20T17:38:33.840Z",
           "sistema": 3,
           "diferencia": 0
         }
@@ -605,7 +661,7 @@
         "baseId": 1,
         "nombre": "Coca 2L",
         "codigoBarra": "7790000000001",
-        "categoriaId": null,
+        "categoriaId": 1,
         "proveedorId": 1,
         "areaFisicaId": null,
         "unidadMedida": "unidad",
@@ -627,7 +683,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T14:30:42.276Z",
+          "en": "2026-10-20T17:38:33.625Z",
           "sistema": 4,
           "diferencia": -2
         }
@@ -660,7 +716,7 @@
         "conteo": {
           "total": 1.25,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T14:30:42.330Z",
+          "en": "2026-10-20T17:38:33.691Z",
           "sistema": 2.5,
           "diferencia": -1.25
         }
@@ -693,7 +749,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Ana",
-          "en": "2026-10-20T14:30:42.369Z",
+          "en": "2026-10-20T17:38:33.730Z",
           "sistema": 0,
           "diferencia": 2
         }
@@ -706,7 +762,14 @@
       "total": 8,
       "contados": 4,
       "sinContar": 4,
-      "conDiferencia": 3
+      "conDiferencia": 3,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        }
+      ]
     },
     "lecturaControl": null
   },
@@ -719,7 +782,7 @@
         "baseId": 1,
         "nombre": "Coca 2L",
         "codigoBarra": "7790000000001",
-        "categoriaId": null,
+        "categoriaId": 1,
         "proveedorId": 1,
         "areaFisicaId": null,
         "unidadMedida": "unidad",
@@ -741,7 +804,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T14:30:42.276Z",
+          "en": "2026-10-20T17:38:33.625Z",
           "sistema": 4,
           "diferencia": -2
         }
@@ -774,7 +837,7 @@
         "conteo": {
           "total": 1.25,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T14:30:42.330Z",
+          "en": "2026-10-20T17:38:33.691Z",
           "sistema": 2.5,
           "diferencia": -1.25
         }
@@ -807,7 +870,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Ana",
-          "en": "2026-10-20T14:30:42.369Z",
+          "en": "2026-10-20T17:38:33.730Z",
           "sistema": 0,
           "diferencia": 2
         }
@@ -820,7 +883,14 @@
       "total": 8,
       "contados": 4,
       "sinContar": 4,
-      "conDiferencia": 3
+      "conDiferencia": 3,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        }
+      ]
     },
     "lecturaControl": null
   },
@@ -833,7 +903,7 @@
         "baseId": 1,
         "nombre": "Coca 2L",
         "codigoBarra": "7790000000001",
-        "categoriaId": null,
+        "categoriaId": 1,
         "proveedorId": 1,
         "areaFisicaId": null,
         "unidadMedida": "unidad",
@@ -855,7 +925,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T14:30:42.276Z",
+          "en": "2026-10-20T17:38:33.625Z",
           "sistema": 4,
           "diferencia": -2
         }
@@ -868,7 +938,14 @@
       "total": 8,
       "contados": 4,
       "sinContar": 4,
-      "conDiferencia": 3
+      "conDiferencia": 3,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        }
+      ]
     },
     "lecturaControl": {
       "porCodigo": 1
@@ -884,7 +961,14 @@
       "total": 8,
       "contados": 4,
       "sinContar": 4,
-      "conDiferencia": 3
+      "conDiferencia": 3,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        }
+      ]
     },
     "lecturaControl": {
       "codigoSinProducto": "9999999999999"
@@ -926,7 +1010,8 @@
       "total": 1,
       "contados": 0,
       "sinContar": 1,
-      "conDiferencia": 0
+      "conDiferencia": 0,
+      "categorias": []
     },
     "lecturaControl": null
   },
@@ -940,7 +1025,7 @@
     "control": {
       "id": 2,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-20T14:30:42.750Z",
+      "abiertoEn": "2026-10-20T17:38:34.085Z",
       "terminadoEn": null,
       "terminadoPorNombre": null
     },
@@ -975,7 +1060,7 @@
     },
     "control": {
       "id": 1,
-      "abiertoEn": "2026-10-20T14:30:41.936Z"
+      "abiertoEn": "2026-10-20T17:38:33.236Z"
     },
     "vendidos": [
       {
@@ -1020,7 +1105,7 @@
     "control": {
       "id": 1,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-20T14:30:41.936Z",
+      "abiertoEn": "2026-10-20T17:38:33.236Z",
       "terminadoEn": null,
       "terminadoPorNombre": null
     },
@@ -1078,7 +1163,7 @@
     "control": {
       "id": 1,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-20T14:30:41.936Z",
+      "abiertoEn": "2026-10-20T17:38:33.236Z",
       "terminadoEn": null,
       "terminadoPorNombre": null
     },
@@ -1136,16 +1221,16 @@
     "control": null,
     "ultimo": {
       "id": 1,
-      "abiertoEn": "2026-10-20T14:30:41.936Z",
-      "terminadoEn": "2026-10-20T14:30:42.971Z",
+      "abiertoEn": "2026-10-20T17:38:33.236Z",
+      "terminadoEn": "2026-10-20T17:38:34.286Z",
       "terminadoPorNombre": "Emanuel",
       "puestosEnCero": 2
     },
     "historial": [
       {
         "id": 1,
-        "abiertoEn": "2026-10-20T14:30:41.936Z",
-        "terminadoEn": "2026-10-20T14:30:42.971Z",
+        "abiertoEn": "2026-10-20T17:38:33.236Z",
+        "terminadoEn": "2026-10-20T17:38:34.286Z",
         "terminadoPorNombre": "Emanuel",
         "puestosEnCero": 2
       }
@@ -1164,8 +1249,8 @@
     "control": {
       "id": 1,
       "estado": "TERMINADO",
-      "abiertoEn": "2026-10-20T14:30:41.936Z",
-      "terminadoEn": "2026-10-20T14:30:42.971Z",
+      "abiertoEn": "2026-10-20T17:38:33.236Z",
+      "terminadoEn": "2026-10-20T17:38:34.286Z",
       "terminadoPorNombre": "Emanuel"
     },
     "congelado": true,
@@ -1243,13 +1328,20 @@
     },
     "control": {
       "id": 3,
-      "abiertoEn": "2026-10-20T14:30:43.052Z",
+      "abiertoEn": "2026-10-20T17:38:34.371Z",
       "abiertoPorNombre": "Cuenta Mini",
       "controlId": 3,
       "total": 8,
       "contados": 0,
       "sinContar": 8,
-      "conDiferencia": 0
+      "conDiferencia": 0,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        }
+      ]
     },
     "quien": {
       "nombre": "Ana"
@@ -1320,7 +1412,14 @@
       "total": 10,
       "contados": 0,
       "sinContar": 10,
-      "conDiferencia": 0
+      "conDiferencia": 0,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        }
+      ]
     },
     "lecturaControl": null
   },
@@ -1328,7 +1427,7 @@
     "ok": true,
     "control": {
       "id": 2,
-      "abiertoEn": "2026-10-20T14:30:42.750Z"
+      "abiertoEn": "2026-10-20T17:38:34.085Z"
     },
     "productos": [
       {
@@ -1358,7 +1457,7 @@
             "id": 56,
             "origen": "VENTA",
             "origenRef": "9002",
-            "instante": "2026-10-20T14:30:44.113Z",
+            "instante": "2026-10-20T17:38:35.415Z",
             "cambio": -1
           }
         ],

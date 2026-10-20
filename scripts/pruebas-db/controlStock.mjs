@@ -144,7 +144,8 @@ try {
     return { base: b.id, pl: pl.id, sl: sl?.id ?? null };
   };
   const P = {
-    coca: await producto("Coca 2L", "7790000000001", 5, "unidad", { proveedor_id: proveedor.id }),
+    // Con categoría: el selector "Categoría" de la pantalla cuenta por ella.
+    coca: await producto("Coca 2L", "7790000000001", 5, "unidad", { proveedor_id: proveedor.id, categoria_id: (await c.categoria.create({ data: { nombre: "Bebidas" } })).id }),
     queso: await producto("Queso por kg", "7790000000002", 2.5, "kg"),
     yerba: await producto("Yerba 1kg", "7790000000003", 12), //        nadie la cuenta, se vende: no se toca
     galletas: await producto("Galletas", "7790000000004", -15), //     nadie, negativa: queda en 0

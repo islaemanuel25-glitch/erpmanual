@@ -45,9 +45,11 @@ export function useControlStock({ puedeGestionar = false, requerirOperador } = {
   const [ocupado, setOcupado] = useState(false);
   const [aviso, setAviso] = useState(null);
 
-  // La lista
+  // La lista: el texto del buscador (con su espera) y la categoría.
   const [filtros, setFiltros] = useState({});
-  const [chip, setChipCrudo] = useState(FILTRO_CONTROL.TODOS);
+  const [texto, setTexto] = useState("");
+  // De entrada, "Sin contar": es lo que hay que hacer.
+  const [chip, setChipCrudo] = useState(FILTRO_CONTROL.SIN_CONTAR);
   const [page, setPage] = useState(1);
   const [refrescar, setRefrescar] = useState(false);
   // Lo que contestó cada guardado, por producto, hasta que llegue otra lista.
@@ -61,17 +63,41 @@ export function useControlStock({ puedeGestionar = false, requerirOperador } = {
   const [focoId, setFocoId] = useState(null);
   // ── EL LECTOR ESCRIBE EN EL BUSCADOR ─────────────────────────────────────
   //
-  // Lo leído va al buscador de `FiltrosStock` como texto, y el listado lo
-  // resuelve como la caja: un código del local muestra solo ese producto. La
-  // pantalla recuerda qué texto vino del lector (`ultimaLectura`) para pedir
-  // `lectura`: un código leído que no es de nadie se dice, no se busca por nombre.
+  // Lo leído va al buscador como texto, y el listado lo resuelve como la caja:
+  // un código del local muestra solo ese producto. La pantalla recuerda qué
+  // texto vino del lector (`ultimaLectura`) para pedir `lectura`: un código
+  // leído que no es de nadie se dice, no se busca por nombre.
   const [ultimaLectura, setUltimaLectura] = useState(null);
-  const [textoParaBuscador, setTextoParaBuscador] = useState(null);
   // Los que dejaron de ser del chip al guardarse: salen de la lista a los 1,5 s.
   const [salidos, setSalidos] = useState(() => new Set());
   const esperas = useRef([]);
-  // El contenedor de `FiltrosStock`: Enter en una cantidad vuelve a su buscador.
+  // El contenedor del buscador: Enter en una cantidad vuelve a él.
   const buscadorRef = useRef(null);
+  // ── LO ESCRITO SIN ACEPTAR ───────────────────────────────────────────────
+  //
+  // Por producto, lo que tiene escrito su tarjeta y no se aceptó. Vive acá y no
+  // en la tarjeta porque la tarjeta se desmonta al buscar otro producto: así
+  // vuelve con lo escrito, la pantalla la muestra arriba mientras no esté en la
+  // lista, y al salir se sabe cuántas quedan.
+  const [borradores, setBorradores] = useState({});
+  // El nombre del proveedor de cada tarjeta: el listado solo manda `proveedorId`,
+  // y el catálogo es el que también cargaba `FiltrosStock` en Stock Locales.
+  const [proveedoresPorId, setProveedoresPorId] = useState({});
+  useEffect(() => {
+    let vigente = true;
+    fetch("/api/catalogos/proveedores", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((d) => {
+        if (!vigente) return;
+        const mapa = {};
+        for (const p of d?.items ?? []) mapa[p.id] = p.nombre;
+        setProveedoresPorId(mapa);
+      })
+      .catch(() => {});
+    return () => {
+      vigente = false;
+    };
+  }, []);
 
   // Terminar y diferencias
   const [terminar, setTerminar] = useState(null);
@@ -156,6 +182,43 @@ export function useControlStock({ puedeGestionar = false, requerirOperador } = {
     [listado.items, guardados, salidos]
   );
 
+  /** Lo que avisa cada tarjeta: `valores` pendientes, o null si no queda nada. */
+  const anotarBorrador = useCallback((id, valores, item) => {
+    setBorradores((b) => {
+      if (!valores) {
+        if (!(id in b)) return b;
+        const { [id]: _fuera, ...resto } = b;
+        return resto;
+      }
+      return { ...b, [id]: { valores, item: b[id]?.item ?? item } };
+    });
+  }, []);
+
+  // Las tarjetas con algo sin aceptar que la lista de ahora no muestra: se
+  // siguen viendo arriba, con su "Aceptar".
+  const pendientesFuera = useMemo(() => {
+    const visibles = new Set(items.map((i) => i.id));
+    if (fijado) visibles.add(fijado.id);
+    return Object.entries(borradores)
+      .filter(([id]) => !visibles.has(Number(id)))
+      .map(([, b]) => guardados[b.item.id] ?? b.item);
+  }, [borradores, items, fijado, guardados]);
+
+  // El buscador: el texto se pide a los 300 ms, como en Stock y en la caja.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const q = texto.trim() || undefined;
+      setFiltros((f) => (f.q === q ? f : { ...f, q }));
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [texto]);
+
+  const setCategoria = useCallback((categoria) => {
+    setFiltros((f) => ({ ...f, categoria: categoria || undefined }));
+    setPage(1);
+  }, []);
+
   // Lo que necesita el guardado sin quedar viejo en su closure.
   const chipVigente = useRef(chip);
   chipVigente.current = chip;
@@ -165,18 +228,8 @@ export function useControlStock({ puedeGestionar = false, requerirOperador } = {
   /** Los contadores: los de la última lista o el último guardado, si no los del inicio. */
   const contadores = resumen ?? estado?.control ?? null;
 
-  const alCambiarFiltros = useCallback((nuevos) => {
-    setPage(1);
-    setFiltros(nuevos);
-  }, []);
-
-  const alLimpiar = useCallback(() => {
-    setPage(1);
-    setFiltros({});
-  }, []);
-
   const setChip = useCallback((clave) => {
-    setChipCrudo(clave ?? FILTRO_CONTROL.TODOS);
+    setChipCrudo(clave ?? FILTRO_CONTROL.SIN_CONTAR);
     setPage(1);
     setFijado(null);
   }, []);
@@ -217,24 +270,19 @@ export function useControlStock({ puedeGestionar = false, requerirOperador } = {
   );
 
   /**
-   * EL LECTOR, desde el buscador de `FiltrosStock`: se recuerda que el texto lo
-   * leyó el lector y se contesta "no lo resolví acá", así `FiltrosStock` lo
-   * pone en el buscador como siempre y el listado hace el resto.
+   * EL LECTOR, desde el buscador o desde adentro de una cantidad: el código
+   * queda escrito en el buscador y se pide en el momento —un escaneo no espera
+   * los 300 ms del teclado—, recordando que lo leyó el lector. El listado hace
+   * el resto. En la cantidad, la tarjeta ya sacó lo tecleado por la ráfaga.
    */
   const escanear = useCallback((codigo) => {
-    setUltimaLectura(String(codigo).trim());
-    return false;
-  }, []);
-
-  /**
-   * EL LECTOR, desde adentro de una cantidad: lo leído no queda en la cantidad
-   * —lo saca la tarjeta— y va al buscador, igual que si se hubiera leído ahí.
-   */
-  const escanearDesdeLaCantidad = useCallback((codigo) => {
     const t = String(codigo).trim();
     setUltimaLectura(t);
-    setTextoParaBuscador((p) => ({ texto: t, vez: (p?.vez ?? 0) + 1 }));
+    setTexto(t);
+    setFiltros((f) => ({ ...f, q: t || undefined }));
+    setPage(1);
   }, []);
+  const escanearDesdeLaCantidad = escanear;
 
   const irAContar = useCallback(
     (productoLocalId) => {
@@ -396,7 +444,12 @@ export function useControlStock({ puedeGestionar = false, requerirOperador } = {
     fijado,
     foco,
     focoId,
-    textoParaBuscador,
+    texto,
+    categoria: filtros.categoria ?? null,
+    borradores,
+    pendientesFuera,
+    proveedoresPorId,
+    sinAceptar: Object.keys(borradores).length,
     buscadorRef,
     terminar,
     diferencias,
@@ -404,8 +457,9 @@ export function useControlStock({ puedeGestionar = false, requerirOperador } = {
     corregirProducto,
     recargar,
     abrir,
-    alCambiarFiltros,
-    alLimpiar,
+    setTexto,
+    setCategoria,
+    anotarBorrador,
     setChip,
     setPage,
     escanear,

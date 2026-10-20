@@ -16,20 +16,31 @@
 //   · contado: "✓ Contado · quién · hh:mm" y "Sistema x · Contado y · Faltan n",
 //     con la cantidad todavía editable.
 //
-// ── EL CAMPO ES EL TOTAL, Y SE GUARDA SOLO ──────────────────────────────────
+// ── EL CAMPO ES EL TOTAL, Y NADA SE GUARDA SOLO ─────────────────────────────
 //
 // Lo que se escribe es el TOTAL contado de ese producto en el control. Se guarda
-// al salir del campo, con Enter, al escanear el próximo producto y, después de
-// tocar − o +, a los 1,5 s sin tocar más. No hay botón. Si el guardado falla,
-// el campo queda en peligro con "No se guardó" y lo escrito se queda: vuelve a
-// intentar apenas se lo toca.
+// SOLO con "Aceptar", con "Está bien" o con Enter en el campo (Enter es lo mismo
+// que Aceptar). Antes se guardaba también al salir del campo, al escanear el
+// próximo y a los 1,5 s de tocar − o +, y eso aceptaba cantidades que nadie
+// había aceptado. Si el guardado falla, el campo queda en peligro con "No se
+// guardó" y lo escrito se queda.
+//
+// Borrar lo contado es lo mismo: vaciar el campo y Aceptar.
+//
+// ── LO ESCRITO SIN ACEPTAR NO SE PIERDE ─────────────────────────────────────
+//
+// Si la lista cambia —se busca o se escanea otro producto— esta tarjeta se
+// desmonta. Por eso lo escrito vive también en la pantalla (`borrador`,
+// `onBorrador`): vuelve a la tarjeta cuando se la dibuja de nuevo, y la pantalla
+// la sigue mostrando arriba mientras no se acepte.
 //
 // ── EL LECTOR PUEDE ESCRIBIR ACÁ ADENTRO ────────────────────────────────────
 //
 // El foco queda en la cantidad después de escanear, así que el próximo escaneo
 // lo teclea el lector EN este campo. Se reconoce con la misma regla que la caja
 // (`esLecturaDeEscaner`: teclas muy seguidas y un Enter): lo tecleado en esa
-// ráfaga se saca, se guarda lo que había antes, y el código va al buscador.
+// ráfaga se saca, el campo vuelve a lo que tenía —sin guardarlo— y el código va
+// al buscador.
 
 import { useEffect, useRef, useState } from "react";
 
@@ -56,9 +67,6 @@ export const ESTADO_FILA = Object.freeze({
   ERROR: "error",
 });
 
-/** Lo que espera la cantidad después del último − o + antes de guardarse. */
-export const ESPERA_TRAS_BOTON_MS = 1500;
-
 // La caja del número tiene que verse contra el fondo de la tarjeta aun vacía:
 // el input del tema y la tarjeta son casi el mismo color en varios temas. Los
 // estados del tema la tiñen; `border-0` del kit sigue mandando adentro del marco.
@@ -78,28 +86,47 @@ export const CLASE_TONO = Object.freeze({
 
 const igualesValores = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-export default function TarjetaConteo({ item, esDeposito, proveedorNombre = null, onGuardar, onEscanear, onListo, autoFoco = 0 }) {
+export default function TarjetaConteo({
+  item,
+  esDeposito,
+  proveedorNombre = null,
+  onGuardar,
+  onEscanear,
+  onListo,
+  autoFoco = 0,
+  // Lo escrito sin aceptar, que guarda la pantalla: `borrador` lo trae de vuelta
+  // y `onBorrador(id, valores | null, item)` avisa cada cambio (null = nada
+  // pendiente).
+  borrador = null,
+  onBorrador = null,
+}) {
   const casilleros = casillerosDe(item, esDeposito);
   const desglose = casilleros.modo === MODO_CASILLEROS.DESGLOSE;
   const conteo = item?.conteo ?? null;
   const total = conteo?.total ?? null;
   const guardados = casillerosDesdeTotal(total, casilleros);
 
-  const [valores, setValores] = useState(guardados);
-  const [enFoco, setEnFoco] = useState(false);
+  const [valores, setValores] = useState(borrador ?? guardados);
   const [fallo, setFallo] = useState(false);
-  const contenedor = useRef(null);
   const primero = useRef(null);
   const rafaga = useRef({ ultima: 0, texto: "", antes: guardados });
-  const tocoBoton = useRef(false);
-  const espera = useRef(null);
 
-  // Lo que dice el servidor manda mientras no se está escribiendo: otro celular
-  // pudo haber fijado otro total.
+  // Lo que dice el servidor manda mientras no hay nada escrito sin aceptar: otro
+  // celular pudo haber fijado otro total. Lo escrito sin aceptar no se pisa.
+  const guardadosPrevios = useRef(guardados);
   useEffect(() => {
-    if (!enFoco && !fallo) setValores(casillerosDesdeTotal(total, casilleros));
+    if (!fallo && igualesValores(valores, guardadosPrevios.current)) setValores(guardados);
+    guardadosPrevios.current = guardados;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [total, conteo?.en]);
+
+  // Cada cambio de lo escrito se le cuenta a la pantalla: así no se pierde si la
+  // tarjeta se desmonta, y la pantalla sabe cuántas hay sin aceptar al salir.
+  const pendiente = !igualesValores(valores, guardados);
+  useEffect(() => {
+    onBorrador?.(item.id, pendiente ? valores : null, item);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(valores), pendiente]);
 
   // Escanear o "Contar" desde terminar: la tarjeta aparece y el foco va al campo.
   useEffect(() => {
@@ -108,25 +135,26 @@ export default function TarjetaConteo({ item, esDeposito, proveedorNombre = null
     primero.current.focus();
   }, [autoFoco]);
 
-  useEffect(() => () => clearTimeout(espera.current), []);
-
-  // Lo último que se mandó, para no mandarlo dos veces: Enter guarda y lleva el
-  // foco al buscador, y el campo, al perderlo, volvía a guardar lo mismo con el
-  // `total` viejo de antes de que contestara el servidor.
+  // Lo último que se mandó, para no mandarlo dos veces: Enter y "Aceptar"
+  // seguidos no guardan lo mismo dos veces.
   const enviado = useRef(total);
   useEffect(() => {
     enviado.current = total;
   }, [total, conteo?.en]);
 
   async function guardar(v = valores) {
-    clearTimeout(espera.current);
     const r = totalDeCasilleros(v, casilleros);
     if (r.invalido) {
       setFallo(true);
       return;
     }
     const nuevo = r.vacio ? null : r.total;
-    if (nuevo === enviado.current && !fallo) return;
+    // Lo mismo que ya está guardado ("3,0" sobre un 3): no se manda, y el campo
+    // vuelve a decirlo como está guardado, sin quedar pendiente.
+    if (nuevo === enviado.current && !fallo) {
+      setValores(casillerosDesdeTotal(nuevo, casilleros));
+      return;
+    }
     const antes = enviado.current;
     enviado.current = nuevo;
     const ok = await onGuardar?.(item.id, { total: nuevo });
@@ -136,57 +164,15 @@ export default function TarjetaConteo({ item, esDeposito, proveedorNombre = null
     if (ok) setValores(casillerosDesdeTotal(nuevo, casilleros));
   }
 
-  // ── "ESTÁ BIEN" Y "ACEPTAR" SON BOTONES DE LA FILA, Y ESO ERA EL ERROR ─────
-  //
-  // Con el foco en el campo, tocar un botón de la fila le saca el foco al campo
-  // pero `alSalir` lo ignora —el foco se quedó en la fila, como al pasar de
-  // bultos a sueltas—, así que `enFoco` seguía en true. Y mientras se escribe, lo
-  // que contesta el servidor no pisa el campo: el "Está bien" se guardaba, la
-  // tarjeta nueva llegaba, y el campo seguía vacío y la fila "escribiendo". El
-  // próximo salir del campo mandaba ese vacío, que BORRA el conteo.
-  //
-  // Tocar uno de los dos es terminar de escribir: el foco ya no cuenta, y el
-  // campo dice lo que quedó guardado.
+  // "Está bien" guarda el stock del sistema; el total lo decide el servidor y el
+  // campo dice lo que volvió.
   async function estaBien() {
-    setEnFoco(false);
     const guardado = await onGuardar?.(item.id, { estaBien: true });
     setFallo(!guardado);
     if (guardado?.conteo) setValores(casillerosDesdeTotal(guardado.conteo.total, casilleros));
   }
 
-  function aceptar() {
-    setEnFoco(false);
-    guardar();
-  }
-
-  // Un cambio que vino del − o del +: se guarda a los 1,5 s sin tocar más.
-  const cambiar = (clave) => (texto) => {
-    const v = { ...valores, [clave]: texto };
-    setValores(v);
-    if (tocoBoton.current) {
-      tocoBoton.current = false;
-      clearTimeout(espera.current);
-      espera.current = setTimeout(() => guardar(v), ESPERA_TRAS_BOTON_MS);
-    }
-  };
-
-  // El − y el + son botones del kit: se reconocen al tocarlos, antes de que la
-  // pieza avise el cambio.
-  const alTocar = (e) => {
-    if (e.target?.closest?.("button[aria-label^='Restar'], button[aria-label^='Sumar']")) tocoBoton.current = true;
-  };
-
-  const alSalir = (e) => {
-    // Pasar de "bultos" a "sueltas", o tocar el − o el +, no es salir de la fila.
-    if (contenedor.current?.contains(e.relatedTarget)) return;
-    setEnFoco(false);
-    guardar();
-  };
-
-  const alEntrar = () => {
-    setEnFoco(true);
-    if (fallo) guardar();
-  };
+  const cambiar = (clave) => (texto) => setValores((v) => ({ ...v, [clave]: texto }));
 
   const alTeclear = (e) => {
     const ahora = Date.now();
@@ -196,15 +182,16 @@ export default function TarjetaConteo({ item, esDeposito, proveedorNombre = null
     if (e.key === "Enter") {
       e.preventDefault();
       if (esLecturaDeEscaner(ms, r.texto)) {
-        // Fue el lector: lo tecleado en la ráfaga no es una cantidad.
+        // Fue el lector: lo tecleado en la ráfaga no es una cantidad. El campo
+        // vuelve a lo que tenía, sin guardar nada, y el código va al buscador.
         const codigo = r.texto;
         const antes = r.antes;
         r.texto = "";
         setValores(antes);
-        guardar(antes);
         onEscanear?.(codigo);
         return;
       }
+      // Enter es "Aceptar".
       r.texto = "";
       guardar();
       onListo?.();
@@ -220,7 +207,7 @@ export default function TarjetaConteo({ item, esDeposito, proveedorNombre = null
   };
 
   const escrito = totalDeCasilleros(valores, casilleros);
-  const sinGuardar = !igualesValores(valores, guardados);
+  const sinGuardar = pendiente;
   // "Contado" en el color de acción es ESCRIBIENDO: un valor distinto de lo
   // guardado, sin aceptar. Tener el foco en un campo vacío no es escribir.
   const estado = fallo
@@ -232,8 +219,10 @@ export default function TarjetaConteo({ item, esDeposito, proveedorNombre = null
         : ESTADO_FILA.SIN_CONTAR;
   const stockDelSistema = Number(item?.stock ?? 0);
   // En el renglón del botón va uno de los dos: "Aceptar" si hay algo escrito que
-  // no está guardado, y si no "Está bien" mientras está sin contar.
-  const conAceptar = sinGuardar && !escrito.vacio;
+  // no está guardado —también un contado vaciado, que al aceptarlo se borra: sin
+  // guardado al salir del campo no habría otra forma—, y si no "Está bien"
+  // mientras está sin contar.
+  const conAceptar = sinGuardar;
   const conEstaBien = !conAceptar && total == null && !sinGuardar && !fallo && stockDelSistema >= 0;
 
   const campo = (clave, etiqueta, ref) => (
@@ -252,8 +241,6 @@ export default function TarjetaConteo({ item, esDeposito, proveedorNombre = null
       claseInput={`font-semibold tabular-nums ${CLASE_CAJA[estado]}`}
       difiere={estado === ESTADO_FILA.ERROR}
       inputRef={ref}
-      onFocus={alEntrar}
-      onBlur={alSalir}
       onKeyDown={alTeclear}
     />
   );
@@ -279,12 +266,12 @@ export default function TarjetaConteo({ item, esDeposito, proveedorNombre = null
   );
 
   const fila = (
-    <div ref={contenedor} onClickCapture={alTocar} data-fila-conteo={estado} className="px-3 py-2.5 space-y-1.5">
+    <div data-fila-conteo={estado} className="px-3 py-2.5 space-y-1.5">
       <EncabezadoDeLaFila estado={estado} conteo={conteo} />
       {/* "Está bien" va en su renglón, del alto de los campos (44 px): al lado
           no entran los dos grupos del depósito en 360 px. */}
       {conAceptar ? (
-        <SunmiButton color="primary" type="button" onClick={aceptar} className="min-h-toque w-full">
+        <SunmiButton color="primary" type="button" onClick={() => guardar()} className="min-h-toque w-full">
           Aceptar
         </SunmiButton>
       ) : conEstaBien ? (
