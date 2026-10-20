@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-10-20 12:16
+**Última actualización:** 2026-10-20 13:09
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -498,6 +498,7 @@ la API del Stock Diario y no se tocó; hay que confirmarlo ejerciéndolo antes d
 corregirlo.
 
 ## Cambios recientes
+- 2026-10-20: feat: control de stock con el listado de Stock y el informe de diferencias (pantalla SIN VERIFICAR en navegador)
 - 2026-10-20: feat: Control de stock es la pantalla de Stock con un campo "Contado" por tarjeta (pantalla SIN VERIFICAR en navegador)
 - 2026-10-20: fix: Control de stock — con PIN se cuenta pero no se empieza ni termina, el encargado gestiona, y terminar pide confirmación (pantalla SIN VERIFICAR en navegador)
 - 2026-10-20: feat: Control de stock, conteo físico por local (pantalla SIN VERIFICAR en navegador)
