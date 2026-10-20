@@ -3,14 +3,16 @@
 // components/stock_locales/control/PantallaControlStock.jsx
 //
 // LA PANTALLA DEL CONTROL DE STOCK, PRESENTACIONAL. Recibe lo que armó
-// `useControlStock` y dibuja una de dos vistas:
+// `useControlStock` y dibuja una de tres vistas:
 //
-//   · inicio. Sin control, "Empezar control" y el último terminado. Con control,
-//     la pantalla de Stock Locales con un campo "Contado" en cada tarjeta: el
-//     avance, el buscador (lector y nombre), los chips Todos / Sin contar /
-//     Contados, la lista y, abajo, "Terminar control".
+//   · inicio. Sin control, "Empezar control" y el historial de terminados, cada
+//     uno con sus diferencias. Con control, la pantalla de Stock Locales con un
+//     campo "Contado" en cada tarjeta: el avance, el MISMO `FiltrosStock`, los
+//     chips Todos / Sin contar / Contados / Con diferencia, la lista y, abajo,
+//     "Ver diferencias" y "Terminar control".
 //   · terminar. Lo que nadie contó, partido en vendidos durante el control —que
 //     no se tocan— y los que quedan en cero, con su confirmación.
+//   · diferencias. Qué productos estaban mal, por cuánto y cuánta plata es.
 //
 // Se arma con el kit, con la tarjeta de Stock (`TarjetaStockMovil`, vía
 // `TarjetaConteo`) y con las piezas de Finanzas y Tesorería en el celular —el
@@ -18,18 +20,19 @@
 // parecidas al lado. Los colores son clases del tema.
 //
 // Los resúmenes cuentan PRODUCTOS, nunca suman unidades de productos distintos.
+// La plata sí se suma: es lo único que tiene la misma unidad en todos.
 
-import { useRef, useState } from "react";
+import { useCallback, useState } from "react";
 
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import SunmiChipsFiltro from "@/components/sunmi/SunmiChipsFiltro";
 import SunmiHojaDeConfirmacion from "@/components/sunmi/SunmiHojaDeConfirmacion";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import SunmiListaProductoCards from "@/components/sunmi/SunmiListaProductoCards";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
-import TarjetaConteo from "@/components/stock_locales/control/TarjetaConteo";
+import FiltrosStock from "@/components/stock_locales/FiltrosStock";
+import TarjetaConteo, { CLASE_TONO } from "@/components/stock_locales/control/TarjetaConteo";
 import {
   AvisoDeEstado,
   BarraDeAvance,
@@ -40,7 +43,7 @@ import {
   Renglon,
   TarjetaHero,
 } from "@/components/tesoreria/PiezasTesoreria";
-import { MS_MAX_ENTRE_TECLAS_ESCANER, esLecturaDeEscaner } from "@/lib/pos-ventas/lecturaEscaner";
+import { formatearMoneda } from "@/lib/moneda";
 import {
   FILTRO_CONTROL,
   VISTA_CONTROL,
@@ -48,6 +51,7 @@ import {
   momentoDelControl,
   porcentajeDeAvance,
   textoCantidad,
+  textoDeLaDiferencia,
   textoNumero,
 } from "@/lib/stock/control/controlStock";
 
@@ -76,6 +80,7 @@ export default function PantallaControlStock({ c, puedeGestionar }) {
   const local = c.estado?.local?.nombre || "";
 
   if (c.vista === VISTA_CONTROL.TERMINAR) return <VistaTerminar c={c} local={local} />;
+  if (c.vista === VISTA_CONTROL.DIFERENCIAS) return <VistaDiferencias c={c} local={local} />;
   return <VistaInicio c={c} local={local} puedeGestionar={puedeGestionar} />;
 }
 
@@ -93,7 +98,7 @@ function VistaInicio({ c, local, puedeGestionar }) {
       <EncabezadoDeDetalle etiqueta="STOCK · CONTROL" titulo="Control de stock" contexto={contexto} />
       <Aviso texto={c.aviso} />
       {control ? (
-        <ControlAbierto c={c} control={control} puedeGestionar={puedeGestionar} />
+        <ControlAbierto c={c} puedeGestionar={puedeGestionar} />
       ) : (
         <SinControl c={c} puedeGestionar={puedeGestionar} />
       )}
@@ -102,7 +107,7 @@ function VistaInicio({ c, local, puedeGestionar }) {
 }
 
 function SinControl({ c, puedeGestionar }) {
-  const ultimo = c.estado?.ultimo;
+  const historial = c.estado?.historial ?? [];
   return (
     <>
       {puedeGestionar && (
@@ -110,32 +115,50 @@ function SinControl({ c, puedeGestionar }) {
           Empezar control
         </BotonTesoreria>
       )}
-      {ultimo && (
-        <Bloque titulo="ÚLTIMO CONTROL">
-          <Renglon
-            rotulo={momentoDelControl(ultimo.terminadoEn)}
-            nota={ultimo.terminadoPorNombre ? `Lo cerró ${ultimo.terminadoPorNombre}` : null}
-            valor={`${ultimo.puestosEnCero ?? 0} en 0`}
-            valorLargo
-          />
+      {historial.length > 0 && (
+        <Bloque titulo="CONTROLES TERMINADOS">
+          {historial.map((h) => (
+            <div key={h.id} className="space-y-1">
+              <Renglon
+                rotulo={momentoDelControl(h.terminadoEn)}
+                nota={h.terminadoPorNombre ? `Lo cerró ${h.terminadoPorNombre}` : null}
+                valor={`${h.puestosEnCero ?? 0} en 0`}
+                valorLargo
+              />
+              <SunmiLinkButton onClick={() => c.verDiferencias(h.id)} className="text-sm2 font-medium">
+                Ver diferencias ›
+              </SunmiLinkButton>
+            </div>
+          ))}
         </Bloque>
       )}
     </>
   );
 }
 
-function ControlAbierto({ c, control, puedeGestionar }) {
-  const universo = control.contados + control.sinContar;
+function ControlAbierto({ c, puedeGestionar }) {
+  const n = c.contadores ?? { total: 0, contados: 0, sinContar: 0, conDiferencia: 0 };
   const esDeposito = c.estado?.local?.es_deposito === true;
   const idFijado = c.fijado?.id ?? null;
-  const items = c.lista.items.filter((i) => i.id !== idFijado);
+  const items = c.items.filter((i) => i.id !== idFijado);
+
+  // El nombre del proveedor sale del catálogo que ya trae `FiltrosStock`, como
+  // en Stock Locales: el listado solo manda `proveedorId`.
+  const [proveedoresPorId, setProveedoresPorId] = useState({});
+  const alCargarCatalogos = useCallback(({ proveedores }) => {
+    const mapa = {};
+    for (const p of proveedores || []) mapa[p.id] = p.nombre;
+    setProveedoresPorId(mapa);
+  }, []);
+
   const tarjeta = (item, foco = 0) => (
     <TarjetaConteo
       key={item.id}
       item={item}
       esDeposito={esDeposito}
+      proveedorNombre={proveedoresPorId[item.proveedorId] ?? null}
       onGuardar={c.guardarTotal}
-      onEscanear={c.escanear}
+      onEscanear={c.escanearDesdeLaCantidad}
       onListo={c.alBuscador}
       autoFoco={foco}
     />
@@ -143,22 +166,35 @@ function ControlAbierto({ c, control, puedeGestionar }) {
   return (
     <>
       <TarjetaHero franja={false}>
-        <CifraHero rotulo={null} valor={control.contados} />
-        <p className="text-sm2 sunmi-text-muted">{`contados de ${universo}`}</p>
-        <BarraDeAvance pct={porcentajeDeAvance(control.contados, control.sinContar)} />
+        <CifraHero rotulo={null} valor={n.contados} />
+        <p className="text-sm2 sunmi-text-muted">{`contados de ${n.total}`}</p>
+        <BarraDeAvance pct={porcentajeDeAvance(n.contados, n.total - n.contados)} />
       </TarjetaHero>
 
-      <Buscador c={c} />
+      <div ref={c.buscadorRef} data-buscador-control="">
+        <FiltrosStock
+          compact
+          localSeleccionado={c.estado?.local?.id ?? null}
+          onFiltroChange={c.alCambiarFiltros}
+          onReset={c.alLimpiar}
+          onCatalogos={alCargarCatalogos}
+          onEscanear={c.escanear}
+        />
+      </div>
 
       <SunmiChipsFiltro
-        textoTodas="Todos"
-        valor={c.filtro}
-        onCambiar={c.setFiltro}
+        textoTodas={null}
+        valor={c.chip}
+        onCambiar={c.setChip}
         opciones={[
-          { clave: FILTRO_CONTROL.SIN_CONTAR, texto: `Sin contar · ${control.sinContar}` },
-          { clave: FILTRO_CONTROL.CONTADOS, texto: `Contados · ${control.contados}` },
+          { clave: FILTRO_CONTROL.TODOS, texto: "Todos" },
+          { clave: FILTRO_CONTROL.SIN_CONTAR, texto: `Sin contar · ${n.sinContar}` },
+          { clave: FILTRO_CONTROL.CONTADOS, texto: `Contados · ${n.contados}` },
+          { clave: FILTRO_CONTROL.CON_DIFERENCIA, texto: `Con diferencia · ${n.conDiferencia}` },
         ]}
       />
+
+      {c.errorLista ? <Aviso texto={c.errorLista} /> : null}
 
       {c.fijado ? <SunmiListaProductoCards>{tarjeta(c.fijado, c.foco)}</SunmiListaProductoCards> : null}
 
@@ -169,75 +205,28 @@ function ControlAbierto({ c, control, puedeGestionar }) {
       ) : (
         <SunmiListaProductoCards>{items.map((i) => tarjeta(i))}</SunmiListaProductoCards>
       )}
-      {!c.cargandoLista && c.lista.items.length === 0 && !c.fijado ? (
+      {!c.cargandoLista && c.items.length === 0 && !c.fijado ? (
         <p className="text-sm2 sunmi-text-muted py-2">No hay productos con este filtro.</p>
       ) : null}
 
       <SunmiPaginador
         page={c.page}
-        totalPages={c.lista.totalPages}
-        totalItems={c.lista.total}
+        totalPages={c.totalPages}
+        totalItems={c.totalItems}
         onPrev={() => c.setPage((p) => Math.max(1, p - 1))}
-        onNext={() => c.setPage((p) => Math.min(c.lista.totalPages, p + 1))}
-        onGoToPage={(n) => c.setPage(Math.min(Math.max(1, Number(n) || 1), c.lista.totalPages))}
+        onNext={() => c.setPage((p) => Math.min(c.totalPages, p + 1))}
+        onGoToPage={(p) => c.setPage(Math.min(Math.max(1, Number(p) || 1), c.totalPages))}
       />
 
+      <BotonTesoreria tipo="secundario" onClick={() => c.verDiferencias()} disabled={c.ocupado}>
+        Ver diferencias
+      </BotonTesoreria>
       {puedeGestionar && (
         <BotonTesoreria tipo="secundario" onClick={c.irATerminar} disabled={c.ocupado}>
           Terminar control
         </BotonTesoreria>
       )}
     </>
-  );
-}
-
-/**
- * EL BUSCADOR: el lector lleva a la tarjeta del producto, el texto filtra la
- * lista. El lector se reconoce con la regla de la caja: teclas muy seguidas y
- * un Enter (`esLecturaDeEscaner`).
- */
-function Buscador({ c }) {
-  const [texto, setTexto] = useState(c.q);
-  const ultima = useRef(0);
-  const rafaga = useRef("");
-
-  const cambiar = (t) => {
-    setTexto(t);
-    c.buscar(t);
-  };
-
-  const alTeclear = (e) => {
-    const ahora = Date.now();
-    const ms = ahora - ultima.current;
-    ultima.current = ahora;
-    if (e.key === "Enter") {
-      e.preventDefault();
-      if (esLecturaDeEscaner(ms, rafaga.current)) {
-        const codigo = rafaga.current;
-        cambiar("");
-        c.escanear(codigo);
-      }
-      rafaga.current = "";
-      return;
-    }
-    if (e.key.length === 1) {
-      if (ms > MS_MAX_ENTRE_TECLAS_ESCANER) rafaga.current = "";
-      rafaga.current += e.key;
-    }
-  };
-
-  return (
-    <SunmiCampoBusquedaVoz
-      inputRef={c.buscadorRef}
-      id="buscar-control"
-      placeholder="Escaneá o buscá un producto"
-      ariaLabel="Escaneá o buscá un producto"
-      value={texto}
-      onChange={cambiar}
-      onVoz={cambiar}
-      onKeyDown={alTeclear}
-      autoFocus
-    />
   );
 }
 
@@ -347,5 +336,85 @@ export function ConfirmarTerminar({ abierto, cantidad, ocupado, onCancelar, onCo
       onConfirmar={onConfirmar}
       onVolver={onCancelar}
     />
+  );
+}
+
+// ── DIFERENCIAS ────────────────────────────────────────────────────────────
+
+function VistaDiferencias({ c, local }) {
+  const d = c.diferencias;
+  const control = d?.control;
+  const contexto = !control
+    ? local
+    : d.congelado
+      ? `${local} · terminado ${momentoDelControl(control.terminadoEn)}`
+      : `${local} · abierto desde ${diaDelControl(control.abiertoEn)}, sin terminar`;
+  return (
+    <div className="space-y-3.5">
+      <EncabezadoDeDetalle
+        etiqueta="CONTROL DE STOCK · DIFERENCIAS"
+        titulo="Diferencias del control"
+        contexto={contexto}
+        onVolver={c.volverAlInicio}
+      />
+      <Aviso texto={c.aviso} />
+      {!d ? (
+        c.aviso ? null : (
+          <div className="py-12">
+            <SunmiLoader />
+          </div>
+        )
+      ) : (
+        <InformeDeDiferencias d={d} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * EL INFORME: la plata que falta y la que sobra, a costo, en grande; cuántos
+ * productos dieron distinto; y la lista, primero los faltantes de más plata a
+ * menos y después los sobrantes. Sin `costos.ver` el servidor no manda los
+ * importes, y el informe queda con las cantidades.
+ */
+export function InformeDeDiferencias({ d }) {
+  const filas = d.filas.filter((f) => Number(f.diferencia) !== 0);
+  const t = d.totales;
+  return (
+    <>
+      <TarjetaHero franja={false}>
+        {d.conPlata ? (
+          <div className="grid grid-cols-2 gap-3">
+            <CifraHero rotulo="FALTANTE $" valor={formatearMoneda(t.faltante)} color="sunmi-text-danger" />
+            <CifraHero rotulo="SOBRANTE $" valor={formatearMoneda(t.sobrante)} color="sunmi-text-warning" />
+          </div>
+        ) : null}
+        <p className="text-sm2 sunmi-text-muted">{`${productos(t.productos)} con diferencia`}</p>
+        {d.conPlata && t.sinCosto > 0 ? (
+          <p className="text-xs2 sunmi-text-muted">{`${productos(t.sinCosto)} sin costo cargado: no suman plata.`}</p>
+        ) : null}
+        {!d.conPlata ? <p className="text-xs2 sunmi-text-muted">La plata la ve quien puede ver costos.</p> : null}
+      </TarjetaHero>
+
+      {filas.length === 0 ? (
+        <p className="text-sm2 sunmi-text-muted py-2">No hubo diferencias.</p>
+      ) : (
+        <Bloque titulo="PRODUCTOS CON DIFERENCIA">
+          {filas.map((f) => {
+            const dif = textoDeLaDiferencia(f.diferencia, f.unidadFisica);
+            return (
+              <Renglon
+                key={f.productoLocalId}
+                rotulo={f.nombre}
+                nota={`Sistema ${textoNumero(f.sistema)} · Contado ${textoNumero(f.contado)}${f.puestoEnCero ? " · puesto en 0" : ""}`}
+                valor={dif.texto}
+                colorValor={CLASE_TONO[dif.tono]}
+                notaValor={d.conPlata ? formatearMoneda(f.importe) : null}
+              />
+            );
+          })}
+        </Bloque>
+      )}
+    </>
   );
 }

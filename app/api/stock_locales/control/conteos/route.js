@@ -3,8 +3,9 @@
 // PUT { productoLocalId, total }: fijar el TOTAL contado de un producto en el
 // control. El primero fija el stock en ese total; cambiarlo lo mueve por la
 // diferencia; `total: null` lo borra, deshace su ajuste y el producto vuelve a
-// "Sin contar". Se aplica en el momento. Contesta la tarjeta como queda y los
-// contadores.
+// "Sin contar". `estaBien: true` en lugar de `total`: el total es el stock del
+// sistema en ese momento. Se aplica en el momento. Contesta la tarjeta como
+// queda y los contadores.
 
 import { NextResponse } from "next/server";
 import { PERMISO_CONTAR_CONTROL } from "@/lib/stock/control/controlStock";
@@ -26,6 +27,7 @@ export async function PUT(req) {
       quien: a.quien,
       productoLocalId: Number(body.productoLocalId || 0),
       total: body.total === null || body.total === undefined || body.total === "" ? null : body.total,
+      estaBien: body.estaBien === true,
     });
     return NextResponse.json({ ok: true, ...r });
   } catch (e) {

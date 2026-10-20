@@ -66,6 +66,13 @@ Si la lista está vacía, el despliegue es solo de código.
   Control de stock, no saca ninguno ni toca otro rol. **El clasificador la
   frena** por el UPDATE de `Rol`; confirmarla es de Emanuel. Idempotente, y
   puede ir antes o después de la imagen.
+- `20261020200000_control_stock_diferencias` — **Aditiva, sin datos.** El
+  informe de diferencias del Control de stock: la columna nula
+  `ConteoControlStock.sistemaAntes`, la columna nula
+  `ControlStock.diferenciasCongeladasEn` y la tabla `DiferenciaControlStock`,
+  vacía. No toca ninguna fila. Va ANTES de levantar la imagen nueva: guardar un
+  conteo escribe `sistemaAntes` y terminar escribe la tabla. La imagen vieja
+  con esto puesto sigue andando: no las conoce.
 
 Producción está en **71 migraciones**, la última
 `20261019120000_operador_sesion_invalidada_en`.

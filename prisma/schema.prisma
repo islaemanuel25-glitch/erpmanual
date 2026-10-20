@@ -4202,11 +4202,17 @@ model ControlStock {
   // Cuántos productos puso en cero el terminar. Un CONTEO de productos: nunca se
   // suman cantidades de productos distintos.
   puestosEnCero          Int?
+  // Cuándo se congelaron las diferencias al terminar: desde ahí el informe se
+  // lee de `DiferenciaControlStock` y no cambia aunque después se venda, se
+  // vuelva a contar o cambie el costo. Null en los terminados antes de que
+  // existiera el informe: ésos se calculan con lo que quedó escrito.
+  diferenciasCongeladasEn DateTime?
 
   actualizadoEn DateTime @updatedAt
 
-  local   Local                @relation(fields: [localId], references: [id])
-  conteos ConteoControlStock[]
+  local       Local                     @relation(fields: [localId], references: [id])
+  conteos     ConteoControlStock[]
+  diferencias DiferenciaControlStock[]
 
   @@index([localId, estado])
 }
@@ -4232,6 +4238,12 @@ model ConteoControlStock {
   // stock— o uno de los que suman. Un hecho de cuando se guardó.
   fijo Boolean
 
+  // LO QUE DECÍA EL SISTEMA antes del primer conteo de este producto en el
+  // control: contra esto se mide la diferencia. La fila que fija el total la
+  // escribe con el stock que leyó bloqueado; las que lo cambian la copian. Null
+  // en las filas anteriores a la columna: se lee de su AuditoriaStock.
+  sistemaAntes Decimal? @db.Decimal(12, 3)
+
   creadoEn      DateTime  @default(now())
   actualizadoEn DateTime  @updatedAt
   // Borrar un conteo no borra la fila: queda la historia, y el stock se ajusta
@@ -4242,6 +4254,39 @@ model ConteoControlStock {
 
   @@index([controlId, productoLocalId])
   @@index([controlId, usuarioId, operadorId])
+}
+
+// EL INFORME DE DIFERENCIAS DE UN CONTROL TERMINADO, CONGELADO.
+//
+// Una fila por producto con diferencia —los contados que no coinciden y los
+// que el terminar puso en cero—, escrita en la MISMA transacción que cierra el
+// control. Lleva la plata ya calculada al costo de ese momento, con
+// `costoPorUnidadFisica` y `valorEnCentavos`, las del Valor del Stock: el
+// informe no cambia aunque después cambie el costo o se vuelva a contar.
+//
+// Las cantidades van en la unidad del stock de la fila. Nunca se suman
+// cantidades de productos distintos: el total del informe es de PESOS.
+model DiferenciaControlStock {
+  id              Int     @id @default(autoincrement())
+  controlId       Int
+  productoLocalId Int
+  // El producto como se leía al terminar.
+  nombre          String
+  unidadFisica    String
+  sistema         Decimal @db.Decimal(12, 3)
+  contado         Decimal @db.Decimal(12, 3)
+  diferencia      Decimal @db.Decimal(12, 3)
+  // Por unidad física y el importe de la diferencia. Null: no hay costo con qué
+  // valorizarla —se dice, no vale cero—.
+  costoUnitario   Decimal? @db.Decimal(14, 4)
+  importe         Decimal? @db.Decimal(14, 2)
+  // Lo puso en cero el terminar: nadie lo contó.
+  puestoEnCero    Boolean @default(false)
+  creadoEn        DateTime @default(now())
+
+  control ControlStock @relation(fields: [controlId], references: [id])
+
+  @@index([controlId])
 }
 
 // CORRECCIÓN HISTÓRICA DE CAJA

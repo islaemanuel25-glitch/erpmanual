@@ -93,9 +93,12 @@ test("SEG5. EL UNIVERSO ES EXACTAMENTE EL DEL LISTADO", () => {
   assert.match(RESUMEN, /pb\."activo" = true/, "el resumen cuenta productos de bases inactivas");
   assert.match(RESUMEN, /pb\."es_combo" = false/, "el resumen cuenta combos, que no tienen stock físico");
 
-  // El listado excluye lo mismo, por su lado de Prisma.
-  assert.match(LISTAR, /activo: true/);
-  assert.match(LISTAR, /es_combo: false/);
+  // El listado excluye lo mismo, por su lado de Prisma. Desde el 2026-10-21 lo
+  // hace con el universo compartido con el Control de stock: se afirma que las
+  // dos ramas lo usan y que el universo excluye eso.
+  assert.equal((LISTAR.match(/whereUniversoStock\(localId, (false|true)\)/g) || []).length, 2, "las dos ramas del listado usan el universo");
+  const UNIVERSO = fs.readFileSync(path.join(RAIZ, "lib/stock/universoStock.js"), "utf8").replace(/\/\/[^\n]*/g, "");
+  assert.match(UNIVERSO, /activo: true,\s*base: \{\s*activo: true,\s*es_combo: false,/);
 });
 
 test("SEG6. EL JOIN NO CRUZA UBICACIONES", () => {

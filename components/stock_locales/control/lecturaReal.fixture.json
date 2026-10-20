@@ -26,11 +26,12 @@
       "pesoReferenciaKg": null,
       "pesoEsFijo": false,
       "modoVentaDeposito": "PESO",
-      "proveedorNombre": "Coca-Cola FEMSA",
       "conteo": {
         "total": 3,
         "contadoPor": "Emanuel",
-        "en": "2026-10-20T12:11:01.237Z"
+        "en": "2026-10-20T13:00:00.151Z",
+        "sistema": 5,
+        "diferencia": -2
       }
     }
   },
@@ -62,7 +63,6 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "proveedorNombre": null,
         "conteo": null
       },
       {
@@ -90,7 +90,33 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "proveedorNombre": null,
+        "conteo": null
+      },
+      {
+        "id": 6,
+        "localId": 1,
+        "baseId": 6,
+        "nombre": "Sin stock",
+        "codigoBarra": "7790000000006",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 0,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
         "conteo": null
       },
       {
@@ -118,20 +144,55 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "proveedorNombre": null,
         "conteo": null
       }
     ],
-    "total": 3,
+    "total": 4,
     "totalPages": 1,
-    "resumen": {
-      "contados": 3,
-      "sinContar": 3
+    "resumenControl": {
+      "controlId": 1,
+      "total": 8,
+      "contados": 4,
+      "sinContar": 4,
+      "conDiferencia": 3
     }
   },
   "listaContados": {
     "ok": true,
     "items": [
+      {
+        "id": 10,
+        "localId": 1,
+        "baseId": 10,
+        "nombre": "Aceite 900",
+        "codigoBarra": "7790000000011",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 3,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "conteo": {
+          "total": 3,
+          "contadoPor": "Ana",
+          "en": "2026-10-20T13:00:00.517Z",
+          "sistema": 3,
+          "diferencia": 0
+        }
+      },
       {
         "id": 1,
         "localId": 1,
@@ -157,11 +218,12 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "proveedorNombre": "Coca-Cola FEMSA",
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T12:11:01.479Z"
+          "en": "2026-10-20T13:00:00.382Z",
+          "sistema": 4,
+          "diferencia": -2
         }
       },
       {
@@ -189,11 +251,12 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "proveedorNombre": null,
         "conteo": {
           "total": 1.25,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T12:11:01.512Z"
+          "en": "2026-10-20T13:00:00.410Z",
+          "sistema": 2.5,
+          "diferencia": -1.25
         }
       },
       {
@@ -221,28 +284,145 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "proveedorNombre": null,
         "conteo": {
           "total": 2,
           "contadoPor": "Ana",
-          "en": "2026-10-20T12:11:01.559Z"
+          "en": "2026-10-20T13:00:00.443Z",
+          "sistema": 0,
+          "diferencia": 2
+        }
+      }
+    ],
+    "total": 4,
+    "totalPages": 1,
+    "resumenControl": {
+      "controlId": 1,
+      "total": 8,
+      "contados": 4,
+      "sinContar": 4,
+      "conDiferencia": 3
+    }
+  },
+  "listaConDiferencia": {
+    "ok": true,
+    "items": [
+      {
+        "id": 1,
+        "localId": 1,
+        "baseId": 1,
+        "nombre": "Coca 2L",
+        "codigoBarra": "7790000000001",
+        "categoriaId": null,
+        "proveedorId": 1,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 2,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "conteo": {
+          "total": 2,
+          "contadoPor": "Emanuel",
+          "en": "2026-10-20T13:00:00.382Z",
+          "sistema": 4,
+          "diferencia": -2
+        }
+      },
+      {
+        "id": 2,
+        "localId": 1,
+        "baseId": 2,
+        "nombre": "Queso por kg",
+        "codigoBarra": "7790000000002",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "kg",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 1.25,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "conteo": {
+          "total": 1.25,
+          "contadoPor": "Emanuel",
+          "en": "2026-10-20T13:00:00.410Z",
+          "sistema": 2.5,
+          "diferencia": -1.25
+        }
+      },
+      {
+        "id": 7,
+        "localId": 1,
+        "baseId": 7,
+        "nombre": "Sin fila",
+        "codigoBarra": "7790000000007",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 2,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "conteo": {
+          "total": 2,
+          "contadoPor": "Ana",
+          "en": "2026-10-20T13:00:00.443Z",
+          "sistema": 0,
+          "diferencia": 2
         }
       }
     ],
     "total": 3,
     "totalPages": 1,
-    "resumen": {
-      "contados": 3,
-      "sinContar": 3
+    "resumenControl": {
+      "controlId": 1,
+      "total": 8,
+      "contados": 4,
+      "sinContar": 4,
+      "conDiferencia": 3
     }
   },
   "listaDeposito": {
     "ok": true,
     "items": [
       {
-        "id": 10,
+        "id": 11,
         "localId": 2,
-        "baseId": 10,
+        "baseId": 11,
         "nombre": "Agua x6",
         "codigoBarra": "7790000000010",
         "categoriaId": null,
@@ -262,15 +442,53 @@
         "pesoReferenciaKg": null,
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
-        "proveedorNombre": null,
         "conteo": null
       }
     ],
     "total": 1,
     "totalPages": 1,
-    "resumen": {
+    "resumenControl": {
+      "controlId": 2,
+      "total": 1,
       "contados": 0,
-      "sinContar": 1
+      "sinContar": 1,
+      "conDiferencia": 0
+    }
+  },
+  "diferenciasDeposito": {
+    "ok": true,
+    "local": {
+      "id": 2,
+      "nombre": "Depósito",
+      "es_deposito": true
+    },
+    "control": {
+      "id": 2,
+      "estado": "ABIERTO",
+      "abiertoEn": "2026-10-20T13:00:00.690Z",
+      "terminadoEn": null,
+      "terminadoPorNombre": null
+    },
+    "congelado": false,
+    "conPlata": true,
+    "filas": [
+      {
+        "productoLocalId": 11,
+        "nombre": "Agua x6",
+        "unidadFisica": "UNIDAD",
+        "sistema": 40,
+        "contado": 27,
+        "diferencia": -13,
+        "costoUnitario": 100,
+        "importe": -1300,
+        "puestoEnCero": false
+      }
+    ],
+    "totales": {
+      "faltante": 1300,
+      "sobrante": 0,
+      "productos": 1,
+      "sinCosto": 0
     }
   },
   "terminar": {
@@ -282,7 +500,7 @@
     },
     "control": {
       "id": 1,
-      "abiertoEn": "2026-10-20T12:11:01.175Z"
+      "abiertoEn": "2026-10-20T13:00:00.090Z"
     },
     "vendidos": [
       {
@@ -317,6 +535,122 @@
       }
     ]
   },
+  "diferenciasAbierto": {
+    "ok": true,
+    "local": {
+      "id": 1,
+      "nombre": "Mini el 7",
+      "es_deposito": false
+    },
+    "control": {
+      "id": 1,
+      "estado": "ABIERTO",
+      "abiertoEn": "2026-10-20T13:00:00.090Z",
+      "terminadoEn": null,
+      "terminadoPorNombre": null
+    },
+    "congelado": false,
+    "conPlata": true,
+    "filas": [
+      {
+        "productoLocalId": 1,
+        "nombre": "Coca 2L",
+        "unidadFisica": "UNIDAD",
+        "sistema": 4,
+        "contado": 2,
+        "diferencia": -2,
+        "costoUnitario": 600,
+        "importe": -1200,
+        "puestoEnCero": false
+      },
+      {
+        "productoLocalId": 2,
+        "nombre": "Queso por kg",
+        "unidadFisica": "KG",
+        "sistema": 2.5,
+        "contado": 1.25,
+        "diferencia": -1.25,
+        "costoUnitario": 600,
+        "importe": -750,
+        "puestoEnCero": false
+      },
+      {
+        "productoLocalId": 7,
+        "nombre": "Sin fila",
+        "unidadFisica": "UNIDAD",
+        "sistema": 0,
+        "contado": 2,
+        "diferencia": 2,
+        "costoUnitario": 600,
+        "importe": 1200,
+        "puestoEnCero": false
+      }
+    ],
+    "totales": {
+      "faltante": 1950,
+      "sobrante": 1200,
+      "productos": 3,
+      "sinCosto": 0
+    }
+  },
+  "diferenciasSinPlata": {
+    "ok": true,
+    "local": {
+      "id": 1,
+      "nombre": "Mini el 7",
+      "es_deposito": false
+    },
+    "control": {
+      "id": 1,
+      "estado": "ABIERTO",
+      "abiertoEn": "2026-10-20T13:00:00.090Z",
+      "terminadoEn": null,
+      "terminadoPorNombre": null
+    },
+    "congelado": false,
+    "conPlata": false,
+    "filas": [
+      {
+        "productoLocalId": 1,
+        "nombre": "Coca 2L",
+        "unidadFisica": "UNIDAD",
+        "sistema": 4,
+        "contado": 2,
+        "diferencia": -2,
+        "costoUnitario": null,
+        "importe": null,
+        "puestoEnCero": false
+      },
+      {
+        "productoLocalId": 2,
+        "nombre": "Queso por kg",
+        "unidadFisica": "KG",
+        "sistema": 2.5,
+        "contado": 1.25,
+        "diferencia": -1.25,
+        "costoUnitario": null,
+        "importe": null,
+        "puestoEnCero": false
+      },
+      {
+        "productoLocalId": 7,
+        "nombre": "Sin fila",
+        "unidadFisica": "UNIDAD",
+        "sistema": 0,
+        "contado": 2,
+        "diferencia": 2,
+        "costoUnitario": null,
+        "importe": null,
+        "puestoEnCero": false
+      }
+    ],
+    "totales": {
+      "faltante": null,
+      "sobrante": null,
+      "productos": 3,
+      "sinCosto": 0
+    }
+  },
   "terminado": {
     "ok": true,
     "local": {
@@ -327,12 +661,102 @@
     "control": null,
     "ultimo": {
       "id": 1,
-      "terminadoEn": "2026-10-20T12:11:01.935Z",
+      "abiertoEn": "2026-10-20T13:00:00.090Z",
+      "terminadoEn": "2026-10-20T13:00:00.905Z",
       "terminadoPorNombre": "Emanuel",
       "puestosEnCero": 2
     },
+    "historial": [
+      {
+        "id": 1,
+        "abiertoEn": "2026-10-20T13:00:00.090Z",
+        "terminadoEn": "2026-10-20T13:00:00.905Z",
+        "terminadoPorNombre": "Emanuel",
+        "puestosEnCero": 2
+      }
+    ],
     "quien": {
       "nombre": "Emanuel"
+    }
+  },
+  "diferenciasCongeladas": {
+    "ok": true,
+    "local": {
+      "id": 1,
+      "nombre": "Mini el 7",
+      "es_deposito": false
+    },
+    "control": {
+      "id": 1,
+      "estado": "TERMINADO",
+      "abiertoEn": "2026-10-20T13:00:00.090Z",
+      "terminadoEn": "2026-10-20T13:00:00.905Z",
+      "terminadoPorNombre": "Emanuel"
+    },
+    "congelado": true,
+    "conPlata": true,
+    "filas": [
+      {
+        "productoLocalId": 5,
+        "nombre": "Fideos",
+        "unidadFisica": "UNIDAD",
+        "sistema": 4,
+        "contado": 0,
+        "diferencia": -4,
+        "costoUnitario": 600,
+        "importe": -2400,
+        "puestoEnCero": true
+      },
+      {
+        "productoLocalId": 1,
+        "nombre": "Coca 2L",
+        "unidadFisica": "UNIDAD",
+        "sistema": 4,
+        "contado": 2,
+        "diferencia": -2,
+        "costoUnitario": 600,
+        "importe": -1200,
+        "puestoEnCero": false
+      },
+      {
+        "productoLocalId": 2,
+        "nombre": "Queso por kg",
+        "unidadFisica": "KG",
+        "sistema": 2.5,
+        "contado": 1.25,
+        "diferencia": -1.25,
+        "costoUnitario": 600,
+        "importe": -750,
+        "puestoEnCero": false
+      },
+      {
+        "productoLocalId": 4,
+        "nombre": "Galletas",
+        "unidadFisica": "UNIDAD",
+        "sistema": -15,
+        "contado": 0,
+        "diferencia": 15,
+        "costoUnitario": 600,
+        "importe": 9000,
+        "puestoEnCero": true
+      },
+      {
+        "productoLocalId": 7,
+        "nombre": "Sin fila",
+        "unidadFisica": "UNIDAD",
+        "sistema": 0,
+        "contado": 2,
+        "diferencia": 2,
+        "costoUnitario": 600,
+        "importe": 1200,
+        "puestoEnCero": false
+      }
+    ],
+    "totales": {
+      "faltante": 4350,
+      "sobrante": 10200,
+      "productos": 5,
+      "sinCosto": 0
     }
   },
   "abierto": {
@@ -344,10 +768,13 @@
     },
     "control": {
       "id": 3,
-      "abiertoEn": "2026-10-20T12:11:01.980Z",
+      "abiertoEn": "2026-10-20T13:00:00.985Z",
       "abiertoPorNombre": "Cuenta Mini",
+      "controlId": 3,
+      "total": 8,
       "contados": 0,
-      "sinContar": 4
+      "sinContar": 8,
+      "conDiferencia": 0
     },
     "quien": {
       "nombre": "Ana"

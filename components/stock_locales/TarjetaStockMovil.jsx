@@ -88,6 +88,9 @@ export default function TarjetaStockMovil({
   filaDeAbajo = null,
   resaltada = false,
   ancla = null,
+  // Un renglón chico debajo del número: el control pone ahí el total en
+  // unidades de un desglose ("= −48 un").
+  notaDelStock = null,
 }) {
   const stock = Number(item?.stock ?? 0);
   const presentacion = presentacionCantidadStock(item, localEsDeposito);
@@ -122,9 +125,24 @@ export default function TarjetaStockMovil({
           {/* El número grande es lo que la persona vino a ver. La presentación
               es la MISMA pieza que usa la tabla de escritorio: en depósito un
               Pack x10 con 45 unidades se lee "4 bultos + 5 uds". */}
-          <NumeroBloqueValor className={negativo ? "sunmi-text-danger" : ""}>
-            {presentacion.texto}
-          </NumeroBloqueValor>
+          {/* ── EL DESGLOSE BAJA DE RENGLÓN, NO SE SALE ────────────────────
+              "-2 bultos + -8 uds" no entra en el recuadro y se salía. Cada
+              parte va entera y el corte solo puede caer entre las dos, así que
+              donde hoy entra en un renglón sigue en uno. */}
+          {presentacion.esDesglose ? (
+            <NumeroBloqueValor className={`whitespace-normal ${negativo ? "sunmi-text-danger" : ""}`}>
+              {presentacion.texto.split(" + ").map((parte, i, partes) => (
+                <span key={i} className="whitespace-nowrap">
+                  {i < partes.length - 1 ? `${parte} + ` : parte}
+                </span>
+              ))}
+            </NumeroBloqueValor>
+          ) : (
+            <NumeroBloqueValor className={negativo ? "sunmi-text-danger" : ""}>
+              {presentacion.texto}
+            </NumeroBloqueValor>
+          )}
+          {notaDelStock}
         </BloqueValorTarjeta>
       }
       aviso={

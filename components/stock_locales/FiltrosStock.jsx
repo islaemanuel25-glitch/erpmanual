@@ -17,6 +17,9 @@ export default function FiltrosStock({
   // tendría entre sus dependencias si fuera inline.
   onCatalogos = null,
   compact = false,
+  // Lo usa el Control de stock: recibe el código que leyó el lector y contesta
+  // si lo encontró. Sin esto, la lectura filtra el listado como siempre.
+  onEscanear = null,
 }) {
   const [q, setQ] = useState("");
   const [categoria, setCategoria] = useState("");
@@ -164,8 +167,18 @@ export default function FiltrosStock({
       e.preventDefault();
       // Scanner: caracteres rápidos + Enter
       if (diff < 200 && scanBuffer.current.length > 3) {
-        setQ(scanBuffer.current);
+        const codigo = scanBuffer.current;
         scanBuffer.current = "";
+        // El Control de stock pide la lectura: si el código es de un producto
+        // del local, lleva a su tarjeta; si no, se filtra como siempre.
+        if (onEscanear) {
+          setQ("");
+          Promise.resolve(onEscanear(codigo)).then((encontrado) => {
+            if (!encontrado) setQ(codigo);
+          });
+          return;
+        }
+        setQ(codigo);
         return;
       }
       scanBuffer.current = "";

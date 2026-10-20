@@ -10,6 +10,9 @@ import { buscarProductoLocalPorCodigo } from "@/lib/productos/busquedaCodigoBarr
 // Búsqueda de texto de stock (nombre / código de barras / secundario). La
 // comparte el Control de stock.
 import { buildTextOR } from "@/lib/stock/busquedaStock";
+// Qué productos lista Stock: lo comparte el Control de stock.
+import { whereUniversoStock } from "@/lib/stock/universoStock";
+import { listadoDelControl } from "@/lib/stock/control/controlStockServer";
 import {
   condicionesPrisma,
   condicionesSql,
@@ -118,6 +121,23 @@ export async function GET(req) {
 
     const esDeposito = local.es_deposito === true;
 
+    // ── EL CONTROL DE STOCK USA ESTE MISMO LISTADO ──────────────────────────
+    //
+    // Con `?control=`, el chip del control filtra encima de los filtros de
+    // siempre —sin contar, contados, con diferencia; `todos` no filtra— y cada
+    // ítem trae su conteo. Sin el parámetro, el listado es el de siempre.
+    const ctrl = searchParams.has("control")
+      ? await listadoDelControl({ localId, esDeposito, filtro: searchParams.get("control") })
+      : null;
+    const responder = async (items, total, totalPages) =>
+      NextResponse.json({
+        ok: true,
+        items: ctrl ? await ctrl.enriquecer(items) : items,
+        total,
+        totalPages,
+        ...(ctrl ? { resumenControl: ctrl.resumen } : {}),
+      });
+
     // ======================================================
     // 🟦 VISTA LOCAL → PRECIO UNITARIO + REDONDEO A 100
     // ======================================================
@@ -184,14 +204,15 @@ export async function GET(req) {
       }
 
       // WHERE único, compartido por count(), findMany paginado y camino hybrid.
+      if (ctrl?.clausula) estadoStockClauses.push(ctrl.clausula);
+
+      const universoLocal = whereUniversoStock(localId, false);
       const whereLocal = {
-        localId,
+        ...universoLocal,
         ...(plIdPorCodigo ? { id: plIdPorCodigo } : {}),
-        activo: true,
         ...(estadoStockClauses.length ? { AND: estadoStockClauses } : {}),
         base: {
-          activo: true,
-          es_combo: false,
+          ...universoLocal.base,
           categoria_id: categoria ? Number(categoria) : undefined,
           area_fisica_id: area ? Number(area) : undefined,
           AND: [baseClause],
@@ -247,7 +268,7 @@ export async function GET(req) {
         const total = mapped.length;
         const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
         const items = mapped.slice(offset, offset + PAGE_SIZE);
-        return NextResponse.json({ ok: true, items, total, totalPages });
+        return responder(items, total, totalPages);
       }
 
       // Resto de casos: filtros + orden + paginación + count 100% en DB.
@@ -261,7 +282,7 @@ export async function GET(req) {
         include: includeLocal,
       });
       const items = rows.map((p) => mapStockItemLocal(p, p.base, p.stock?.[0]));
-      return NextResponse.json({ ok: true, items, total, totalPages });
+      return responder(items, total, totalPages);
     }
 
     // ======================================================
@@ -384,20 +405,20 @@ export async function GET(req) {
         }
       }
 
+      if (ctrl?.clausula) estadoStockClausesDepo.push(ctrl.clausula);
+
+      // Regla A, adentro del universo: defensa por si quedara alguna PL cáscara
+      // de un producto de local en el depósito — no se lista.
+      const universoDepo = whereUniversoStock(localId, true);
       const whereDepo = {
-        localId,
+        ...universoDepo,
         ...(plIdPorCodigoDepo ? { id: plIdPorCodigoDepo } : {}),
-        activo: true,
         ...(estadoStockClausesDepo.length ? { AND: estadoStockClausesDepo } : {}),
         base: {
-          activo: true,
-          es_combo: false,
+          ...universoDepo.base,
           categoria_id: categoria ? Number(categoria) : undefined,
           area_fisica_id: area ? Number(area) : undefined,
           AND: [baseClauseDepo],
-          // Regla A: defensa por si quedara alguna PL cáscara de un producto de
-          // local en el depósito — no se lista.
-          ...productoVisibleWhere(localId),
         },
       };
 
@@ -452,7 +473,7 @@ export async function GET(req) {
         const total = mapped.length;
         const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
         const items = mapped.slice(offset, offset + PAGE_SIZE);
-        return NextResponse.json({ ok: true, items, total, totalPages });
+        return responder(items, total, totalPages);
       }
 
       // Resto: filtros + orden + paginación + count 100% en DB.
@@ -466,7 +487,7 @@ export async function GET(req) {
         include: includeDepo,
       });
       const items = rows.map((p) => mapStockItemDeposito(p, p.base, p.stock?.[0], localId));
-      return NextResponse.json({ ok: true, items, total, totalPages });
+      return responder(items, total, totalPages);
     }
   } catch (err) {
     console.error("❌ ERROR STOCK LISTAR:", err);

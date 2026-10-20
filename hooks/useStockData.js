@@ -11,6 +11,8 @@ export function useStockData({ localSeleccionado, filtro, page, refrescar, setRe
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Solo con `filtro.control`: los contadores del Control de stock.
+  const [resumenControl, setResumenControl] = useState(null);
 
   const buildQuery = () => {
     const params = new URLSearchParams();
@@ -30,6 +32,8 @@ export function useStockData({ localSeleccionado, filtro, page, refrescar, setRe
     // lo valida contra la lista del dominio: si llega cualquier otra cosa, lo
     // ignora en vez de devolver una lista vacía sin explicación.
     if (filtro.estado) params.set("estado", filtro.estado);
+    // El chip del Control de stock: el mismo listado, con su conteo por ítem.
+    if (filtro.control) params.set("control", filtro.control);
 
     return params.toString();
   };
@@ -90,6 +94,7 @@ export function useStockData({ localSeleccionado, filtro, page, refrescar, setRe
           setItems(json.items || []);
           setTotal(json.total || 0);
           setTotalPages(json.totalPages || 1);
+          setResumenControl(json.resumenControl ?? null);
         }
       } catch (err) {
         console.error("Error cargando stock:", err);
@@ -107,5 +112,5 @@ export function useStockData({ localSeleccionado, filtro, page, refrescar, setRe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [localSeleccionado, JSON.stringify(filtro), page, refrescar]);
 
-  return { items, total, totalPages, loading, error };
+  return { items, total, totalPages, loading, error, resumenControl };
 }

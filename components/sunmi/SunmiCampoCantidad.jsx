@@ -67,6 +67,21 @@
 //                     UX del POS ya dice que es "aceptable pero justo"; subirlo ahí
 //                     es una decisión de esa pantalla, no un efecto de esta
 //                     mudanza.
+//
+// ── Y LOS CINCO DEL CONTROL DE STOCK, TERCER CONSUMIDOR ──────────────────
+//
+// El Control de stock guarda solo, sin botón: al salir del campo, con Enter y
+// cuando el lector escanea el próximo producto adentro del campo. Para eso
+// necesita los eventos del input y poder ponerle el foco:
+//
+//   inputRef / onKeyDown / onFocus / onBlur   pasan al input tal cual. `onBlur`
+//                     corre DESPUÉS de `normalizaAlSalir`, que sigue igual.
+//   conservaLoEscrito el kilo se tipea con coma: "1," es un número a medio
+//           = false   escribir, no un 1. Con esto, un decimal a medias pasa tal
+//                     cual escrito (con su coma) y el − / + lo entienden. Sin
+//                     esto, como siempre: la coma se normaliza al tipear.
+//
+// Sin ellos —la caja y recepción— el marcado es el de siempre.
 
 import SunmiInput from "@/components/sunmi/SunmiInput";
 
@@ -112,6 +127,11 @@ export default function SunmiCampoCantidad({
   claseMarco = "",
   claseInput = "",
   tamano = "normal",
+  inputRef = undefined,
+  onKeyDown = undefined,
+  onFocus = undefined,
+  onBlur = undefined,
+  conservaLoEscrito = false,
 }) {
   // Con decimales o con un paso fraccionario, el campo acepta comas y decide con
   // `parseFloat`. Sin ellos, `parseInt` — que es lo que impide que en el carrito
@@ -119,7 +139,14 @@ export default function SunmiCampoCantidad({
   const esDecimal = decimales > 0 || paso < 1;
 
   /** Deja el número en la forma en que se escribe: con los ceros del peso. */
-  const comoTexto = (n) => (decimales > 0 ? n.toFixed(decimales) : String(n));
+  const comoTexto = (n) => {
+    const t = decimales > 0 ? n.toFixed(decimales) : String(n);
+    return conservaLoEscrito ? t.replace(".", ",") : t;
+  };
+
+  // Un decimal a medio escribir —"1,", "1,2"—, con no más decimales que los
+  // pedidos. Solo cuenta con `conservaLoEscrito`.
+  const aMedias = new RegExp(`^\\d*[.,]?\\d{0,${Math.max(decimales, 0)}}$`);
 
   const limitar = (n) => {
     let v = Math.max(minimo, n);
@@ -133,6 +160,12 @@ export default function SunmiCampoCantidad({
       onCambiar("");
       return;
     }
+    if (conservaLoEscrito && esDecimal) {
+      // Se queda como se escribió, coma incluida. Lo que no es un número a medio
+      // escribir no entra: el campo no cambia.
+      if (aMedias.test(String(bruto))) onCambiar(String(bruto));
+      return;
+    }
     // La coma a punto: el POS ya lo tenía resuelto para vender por kilo, y es la
     // diferencia entre que un cajero pueda tipear 1,5 y que no.
     const n = esDecimal ? parseFloat(String(bruto).replace(",", ".")) : parseInt(bruto, 10);
@@ -143,7 +176,7 @@ export default function SunmiCampoCantidad({
     onCambiar(String(Math.max(minimo, n)));
   };
 
-  const alSalir = () => {
+  const normalizar = () => {
     if (!normalizaAlSalir) return;
     const n = Number(valor);
     if (valor === "" || valor == null || Number.isNaN(n)) {
@@ -153,9 +186,14 @@ export default function SunmiCampoCantidad({
     if (n < minimo) onCambiar(comoTexto(minimo));
     else if (!esDecimal) onCambiar(comoTexto(Math.round(n)));
   };
+  const alSalir = (e) => {
+    normalizar();
+    onBlur?.(e);
+  };
 
   const pasoDe = (dir) => {
-    const n = Number(valor === "" ? 0 : valor);
+    // La coma vale como punto: con `conservaLoEscrito` el valor puede traerla.
+    const n = Number(valor === "" ? 0 : String(valor).replace(",", "."));
     const base = Number.isFinite(n) ? n : 0;
     let siguiente = base + dir * paso;
     // Tres decimales de redondeo: sin esto, sumar 0,001 doce veces deja
@@ -192,9 +230,12 @@ export default function SunmiCampoCantidad({
       // una decisión de esa pantalla; lo segundo, la señal de que no era gratis.
       type={tipo}
       inputMode={esDecimal ? "decimal" : "numeric"}
+      ref={inputRef}
       value={valor}
       onChange={alEscribir}
       onBlur={alSalir}
+      onFocus={onFocus}
+      onKeyDown={onKeyDown}
       aria-label={etiqueta}
       className={
         conMarco

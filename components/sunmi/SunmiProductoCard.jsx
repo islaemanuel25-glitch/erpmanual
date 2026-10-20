@@ -145,10 +145,15 @@ export function RotuloBloqueValor({ children, className = "", style = undefined,
 }
 
 export function NumeroBloqueValor({ children, atenuado = false, className = "", ...resto }) {
+  // El número no se corta: un precio partido en dos renglones no se lee. Pero
+  // CEDE el eje si la pantalla lo declara —el stock en bultos y sueltas del
+  // depósito, "-2 bultos + -8 uds", no entra en un renglón y se salía del
+  // recuadro—. Concatenar las dos dejaría ganar a la hoja de estilos.
+  const corte = /(^|\s)whitespace-/.test(className) ? "" : "whitespace-nowrap";
   return (
     <span
       data-cara-importe
-      className={`sunmi-product-value-number font-semibold whitespace-nowrap [font-variant-numeric:tabular-nums] tracking-[-.01em] ${
+      className={`sunmi-product-value-number font-semibold ${corte} [font-variant-numeric:tabular-nums] tracking-[-.01em] ${
         atenuado ? "sunmi-text-muted" : "sunmi-text-strong"
       } ${className}`}
       {...resto}

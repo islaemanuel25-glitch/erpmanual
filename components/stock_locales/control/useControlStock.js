@@ -6,9 +6,16 @@
 // contestó el servidor y las acciones. La pantalla (`PantallaControlStock`) no
 // pide nada: dibuja lo que esto le da.
 //
-// Dos vistas de una misma página: la lista de tarjetas (o, sin control, el
-// "Empezar control") y terminar. El "Contar" de un vendido en terminar vuelve a
-// la lista con ese producto arriba y el foco en su campo, igual que escanearlo.
+// Tres vistas de una misma página: la lista de tarjetas (o, sin control, el
+// "Empezar control" y el historial), terminar, y las diferencias de un control.
+//
+// ── LA LISTA ES LA DE STOCK LOCALES ─────────────────────────────────────────
+//
+// Mismo `FiltrosStock`, mismo `useStockData`, mismo `/api/stock_locales/listar`
+// —universo, orden y página—. Lo único que agrega el control es el chip
+// (`filtro.control`), con el que el listado trae el conteo de cada producto y
+// los contadores. Los filtros de `FiltrosStock` se FUSIONAN con el chip, igual
+// que Stock Locales fusiona la card de estado: buscar no apaga el chip.
 //
 // Guardar un total actualiza la tarjeta y los contadores con lo que contesta
 // el servidor, sin volver a pedir la lista: la tarjeta no salta de lugar ni
@@ -16,12 +23,12 @@
 //
 // Un 428 es "falta el PIN": se levanta el mismo modal que en la caja.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOperadorContext } from "@/app/context/OperadorContext";
+import { useStockData } from "@/hooks/useStockData";
 import { FILTRO_CONTROL, VISTA_CONTROL } from "@/lib/stock/control/controlStock";
 
 const API = "/api/stock_locales/control";
-const ESPERA_BUSQUEDA_MS = 300;
 
 export function useControlStock() {
   const { requerirOperador } = useOperadorContext();
@@ -33,19 +40,23 @@ export function useControlStock() {
   const [aviso, setAviso] = useState(null);
 
   // La lista
-  const [filtro, setFiltroCrudo] = useState(FILTRO_CONTROL.SIN_CONTAR);
-  const [q, setQ] = useState("");
+  const [filtros, setFiltros] = useState({});
+  const [chip, setChipCrudo] = useState(FILTRO_CONTROL.TODOS);
   const [page, setPage] = useState(1);
-  const [lista, setLista] = useState({ items: [], total: 0, totalPages: 1 });
-  const [cargandoLista, setCargandoLista] = useState(false);
+  const [refrescar, setRefrescar] = useState(false);
+  // Lo que contestó cada guardado, por producto, hasta que llegue otra lista.
+  const [guardados, setGuardados] = useState({});
+  const [resumen, setResumen] = useState(null);
   // El producto que trajo el lector o el "Contar" de terminar: va arriba, aunque
   // el filtro lo oculte, y su campo recibe el foco (`foco` cambia en cada uno).
   const [fijado, setFijado] = useState(null);
   const [foco, setFoco] = useState(0);
+  // El contenedor de `FiltrosStock`: Enter en una cantidad vuelve a su buscador.
   const buscadorRef = useRef(null);
 
-  // Terminar
+  // Terminar y diferencias
   const [terminar, setTerminar] = useState(null);
+  const [diferencias, setDiferencias] = useState(null);
 
   const pedir = useCallback(
     async (url, opciones = {}) => {
@@ -86,52 +97,52 @@ export function useControlStock() {
   }, [recargar]);
 
   const hayControl = Boolean(estado?.control);
+  const listando = hayControl && vista === VISTA_CONTROL.INICIO;
 
-  /** Los contadores que llegan con cada lista y con cada guardado. */
-  const ponerResumen = useCallback((resumen) => {
-    if (!resumen) return;
-    setEstado((e) => (e?.control ? { ...e, control: { ...e.control, ...resumen } } : e));
+  const filtroDelListado = useMemo(() => ({ ...filtros, control: chip }), [filtros, chip]);
+  const listado = useStockData({
+    localSeleccionado: listando ? estado?.local?.id ?? null : null,
+    filtro: filtroDelListado,
+    page,
+    refrescar,
+    setRefrescar,
+  });
+
+  // Una lista nueva trae los conteos al día: lo guardado a mano ya está adentro.
+  useEffect(() => {
+    setGuardados({});
+  }, [listado.items]);
+
+  useEffect(() => {
+    if (listado.resumenControl) setResumen(listado.resumenControl);
+  }, [listado.resumenControl]);
+
+  const items = useMemo(() => listado.items.map((i) => guardados[i.id] ?? i), [listado.items, guardados]);
+
+  /** Los contadores: los de la última lista o el último guardado, si no los del inicio. */
+  const contadores = resumen ?? estado?.control ?? null;
+
+  const alCambiarFiltros = useCallback((nuevos) => {
+    setPage(1);
+    setFiltros(nuevos);
   }, []);
 
-  // La lista se pide de nuevo cuando cambia el filtro, el texto o la página.
-  useEffect(() => {
-    if (!hayControl || vista !== VISTA_CONTROL.INICIO) return undefined;
-    let vigente = true;
-    const t = setTimeout(async () => {
-      setCargandoLista(true);
-      const qs = new URLSearchParams({ page: String(page) });
-      if (filtro) qs.set("filtro", filtro);
-      if (q.trim()) qs.set("q", q.trim());
-      const r = await pedir(`${API}/productos?${qs}`);
-      if (!vigente) return;
-      setCargandoLista(false);
-      if (!r.ok) {
-        setAviso(r.error);
-        return;
-      }
-      setLista({ items: r.items, total: r.total, totalPages: r.totalPages });
-      ponerResumen(r.resumen);
-    }, q ? ESPERA_BUSQUEDA_MS : 0);
-    return () => {
-      vigente = false;
-      clearTimeout(t);
-    };
-  }, [hayControl, vista, filtro, q, page, pedir, ponerResumen]);
+  const alLimpiar = useCallback(() => {
+    setPage(1);
+    setFiltros({});
+  }, []);
 
-  const setFiltro = useCallback((f) => {
-    setFiltroCrudo(f);
+  const setChip = useCallback((clave) => {
+    setChipCrudo(clave ?? FILTRO_CONTROL.TODOS);
     setPage(1);
     setFijado(null);
-  }, []);
-
-  const buscar = useCallback((texto) => {
-    setQ(texto);
-    setPage(1);
   }, []);
 
   const volverAlInicio = useCallback(() => {
     setVista(VISTA_CONTROL.INICIO);
     setAviso(null);
+    setDiferencias(null);
+    setRefrescar(true);
     recargar();
   }, [recargar]);
 
@@ -140,25 +151,50 @@ export function useControlStock() {
     const r = await pedir(`${API}/abrir`, { method: "POST" });
     setOcupado(false);
     setAviso(r.ok ? null : r.error);
+    setResumen(null);
     await recargar();
   }, [pedir, recargar]);
 
-  /** Trae UNA tarjeta —por código leído o por id— y le da el foco. */
+  /** Trae UNA tarjeta —por código leído o por id— y le da el foco. Contesta si la encontró. */
   const fijar = useCallback(
     async (consulta) => {
       const r = await pedir(`${API}/productos?${new URLSearchParams(consulta)}`);
-      if (!r.ok || !r.item) {
-        setAviso(r.error || "No se encontró el producto.");
-        return;
+      if (!r.ok) {
+        setAviso(r.error);
+        return false;
       }
+      if (!r.item) return false;
       setAviso(null);
       setFijado(r.item);
       setFoco((n) => n + 1);
+      return true;
     },
     [pedir]
   );
 
+  /**
+   * EL LECTOR, desde el buscador de `FiltrosStock`: un código de un producto del
+   * local lleva a su tarjeta. Si no lo encuentra, `FiltrosStock` filtra por el
+   * texto, como siempre.
+   */
   const escanear = useCallback((codigo) => fijar({ codigo: String(codigo).trim() }), [fijar]);
+
+  /**
+   * EL LECTOR, desde adentro de una cantidad: el texto no se puede poner en el
+   * buscador de `FiltrosStock`, que es suyo. Sin producto, se avisa y el foco
+   * vuelve al buscador para leer de nuevo.
+   */
+  const escanearDesdeLaCantidad = useCallback(
+    async (codigo) => {
+      const t = String(codigo).trim();
+      const encontrado = await fijar({ codigo: t });
+      if (!encontrado) {
+        setAviso(`Ningún producto de este local tiene el código ${t}.`);
+        buscadorRef.current?.querySelector("input")?.focus();
+      }
+    },
+    [fijar]
+  );
 
   const irAContar = useCallback(
     (productoLocalId) => {
@@ -170,14 +206,15 @@ export function useControlStock() {
   );
 
   /**
-   * GUARDAR EL TOTAL de un producto (`null` lo borra). Devuelve si se guardó:
-   * la tarjeta decide con eso si muestra "No se guardó".
+   * GUARDAR UN PRODUCTO: `{ total }` (`null` lo borra) o `{ estaBien: true }`,
+   * que es el stock del sistema. Devuelve si se guardó: la tarjeta decide con
+   * eso si muestra "No se guardó".
    */
   const guardarTotal = useCallback(
-    async (productoLocalId, total) => {
+    async (productoLocalId, cuerpo) => {
       const r = await pedir(`${API}/conteos`, {
         method: "PUT",
-        body: JSON.stringify({ productoLocalId, total }),
+        body: JSON.stringify({ productoLocalId, ...cuerpo }),
       });
       if (!r.ok) {
         setAviso(r.error);
@@ -185,16 +222,16 @@ export function useControlStock() {
       }
       setAviso(null);
       if (r.item) {
-        setLista((l) => ({ ...l, items: l.items.map((i) => (i.id === r.item.id ? r.item : i)) }));
+        setGuardados((g) => ({ ...g, [r.item.id]: r.item }));
         setFijado((f) => (f && f.id === r.item.id ? r.item : f));
       }
-      ponerResumen(r.resumen);
+      if (r.resumen) setResumen(r.resumen);
       return true;
     },
-    [pedir, ponerResumen]
+    [pedir]
   );
 
-  const alBuscador = useCallback(() => buscadorRef.current?.focus(), []);
+  const alBuscador = useCallback(() => buscadorRef.current?.querySelector("input")?.focus(), []);
 
   const cargarTerminar = useCallback(async () => {
     setTerminar(null);
@@ -211,6 +248,23 @@ export function useControlStock() {
     setAviso(null);
     cargarTerminar();
   }, [cargarTerminar]);
+
+  /** El informe de un control: sin `controlId`, el abierto. */
+  const verDiferencias = useCallback(
+    async (controlId = null) => {
+      setVista(VISTA_CONTROL.DIFERENCIAS);
+      setAviso(null);
+      setDiferencias(null);
+      const qs = controlId ? `?${new URLSearchParams({ controlId: String(controlId) })}` : "";
+      const r = await pedir(`${API}/diferencias${qs}`);
+      if (!r.ok) {
+        setAviso(r.error);
+        return;
+      }
+      setDiferencias(r);
+    },
+    [pedir]
+  );
 
   // `ocupado` deshabilita el botón, pero llega un render tarde: dos toques
   // seguidos alcanzarían a mandar dos pedidos. La llave es síncrona.
@@ -231,8 +285,13 @@ export function useControlStock() {
       if (r.cambioLaLista) cargarTerminar();
       return;
     }
-    volverAlInicio();
-  }, [terminar, pedir, cargarTerminar, volverAlInicio]);
+    // Terminado, se abre su informe. El inicio se pone al día por detrás: al
+    // volver ya está sin control y con este en el historial.
+    setResumen(null);
+    setFijado(null);
+    recargar();
+    verDiferencias(r.controlId);
+  }, [terminar, pedir, cargarTerminar, recargar, verDiferencias]);
 
   return {
     vista,
@@ -241,25 +300,32 @@ export function useControlStock() {
     error,
     ocupado,
     aviso,
-    filtro,
-    q,
+    chip,
     page,
-    lista,
-    cargandoLista,
+    items,
+    totalPages: listado.totalPages,
+    totalItems: listado.total,
+    cargandoLista: listado.loading,
+    errorLista: listado.error,
+    contadores,
     fijado,
     foco,
     buscadorRef,
     terminar,
+    diferencias,
     recargar,
     abrir,
-    setFiltro,
-    buscar,
+    alCambiarFiltros,
+    alLimpiar,
+    setChip,
     setPage,
     escanear,
+    escanearDesdeLaCantidad,
     irAContar,
     guardarTotal,
     alBuscador,
     irATerminar,
+    verDiferencias,
     volverAlInicio,
     confirmarTerminar,
   };

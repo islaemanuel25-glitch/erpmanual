@@ -624,7 +624,9 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // (dos permisos para DUEÑO_LOCAL). No tocan transferencias.
   // Sube a 77 el mismo día: `20261020180000_permisos_control_stock_encargado`,
   // los mismos dos permisos para ENCARGADO. No toca transferencias.
-  assert.equal(migraciones.length, 77, "aparecio una migracion que nadie declaro aca");
+  // Sube a 78 el 2026-10-20: `20261020200000_control_stock_diferencias`, dos
+  // columnas nulas y una tabla nueva del Control de stock. No toca transferencias.
+  assert.equal(migraciones.length, 78, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));

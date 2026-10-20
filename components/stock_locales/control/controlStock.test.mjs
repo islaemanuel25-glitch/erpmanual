@@ -3,19 +3,21 @@
 //   node --import ./scripts/alias-loader.mjs --test components/stock_locales/control/controlStock.test.mjs
 //
 // El comportamiento contra la base —el campo fija el total, cambiarlo mueve por
-// la diferencia y borrarlo deshace el ajuste; la lista con sus chips y el
-// lector; el depósito en unidades; terminar con los vendidos aparte; el Libro y
-// la bitácora; los permisos y el PIN— lo ejerce scripts/pruebas-db/controlStock.mjs
-// con los handlers reales. Acá van las reglas puras, la pantalla dibujada y
-// dónde se engancha el módulo (menú y roles).
+// la diferencia y borrarlo deshace el ajuste; "Está bien"; la lista de Stock
+// Locales con sus chips y el lector; el depósito en unidades y su plata por
+// bulto; terminar con los vendidos aparte; las diferencias vivas y congeladas;
+// el Libro y la bitácora; los permisos y el PIN— lo ejerce
+// scripts/pruebas-db/controlStock.mjs con los handlers reales. Acá van las reglas
+// puras, la pantalla dibujada y dónde se engancha el módulo (menú y roles).
 //
 // ── DE DÓNDE SALEN LOS DATOS ───────────────────────────────────────────────
 //
-// `lecturaReal.fixture.json` son las respuestas REALES de las rutas del control
-// que escribe aquel guion (`ESCRIBIR_FIXTURE_CONTROL=1`): la lista de sin contar
-// y la de contados de un local, la del depósito con un pack, la coca vista por
-// otra persona después de que la contaron, la vista de terminar, el estado
-// después de terminar y el de un control recién abierto. No se escribió a mano.
+// `lecturaReal.fixture.json` son las respuestas REALES de las rutas que escribe
+// aquel guion (`ESCRIBIR_FIXTURE_CONTROL=1`): el listado de Stock con el chip
+// —sin contar, contados, con diferencia, el del depósito—, la coca vista por
+// otra persona, la vista de terminar, el estado después de terminar y el de uno
+// recién abierto, y los informes de diferencias —abierto, sin plata, congelado y
+// del depósito—. No se escribió a mano.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -23,8 +25,10 @@ import { readFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import PantallaControlStock, { ConfirmarTerminar } from "@/components/stock_locales/control/PantallaControlStock.jsx";
-import TarjetaConteo, { ESTADO_FILA, ResumenDeLaFila } from "@/components/stock_locales/control/TarjetaConteo.jsx";
+import PantallaControlStock, { ConfirmarTerminar, InformeDeDiferencias } from "@/components/stock_locales/control/PantallaControlStock.jsx";
+import TarjetaConteo, { ESPERA_TRAS_BOTON_MS, ESTADO_FILA, EncabezadoDeLaFila } from "@/components/stock_locales/control/TarjetaConteo.jsx";
+import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad.jsx";
+import { NumeroBloqueValor } from "@/components/sunmi/SunmiProductoCard.jsx";
 import { PERMISOS_FUERA_DEL_OPERADOR, permisosEfectivos } from "@/lib/rbac/permisosDelOperador.js";
 import { checkPerm } from "@/lib/authorize.js";
 import {
@@ -34,15 +38,20 @@ import {
   ajusteNetoDelConteo,
   casillerosDe,
   casillerosDesdeTotal,
+  diferenciaDe,
   leerNumero,
+  ordenarDiferencias,
   partirNoContados,
   porcentajeDeAvance,
   stockTrasDeshacer,
   stockTrasFijarTotal,
   textoCantidad,
+  textoDeLaDiferencia,
   totalDeCasilleros,
+  totalesDeDiferencias,
   validarCantidadContada,
 } from "@/lib/stock/control/controlStock.js";
+import { valorDeLaDiferencia } from "@/lib/stock/control/valorDeLaDiferencia.js";
 import {
   PERMISO_CONTAR_CONTROL,
   PERMISO_GESTIONAR_CONTROL,
@@ -57,46 +66,59 @@ import { DEFAULT_PERMISOS_SISTEMA, CAJERO, ENCARGADO, DUENO_LOCAL } from "@/lib/
 const real = JSON.parse(readFileSync("components/stock_locales/control/lecturaReal.fixture.json", "utf8"));
 const sinComentarios = (t) => t.replace(/\{\/\*[\s\S]*?\*\/\}/g, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/[^\n]*/g, "$1");
 const fuente = (r) => sinComentarios(readFileSync(r, "utf8"));
-const texto = (html) => html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
+const texto = (html) =>
+  html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
 const nada = () => {};
 
-// El estado de la pantalla con un control abierto: el del fixture, con la lista
-// de contados del local.
+// El estado de la pantalla con un control abierto: el del fixture, con un
+// listado de Stock pedido con el chip.
 const conLista = (lista, estado = real.abierto) => ({
   vista: VISTA_CONTROL.INICIO,
-  estado: { ...estado, control: { ...estado.control, ...lista.resumen } },
-  lista: { items: lista.items, total: lista.total, totalPages: lista.totalPages },
+  estado,
+  items: lista.items,
+  totalPages: lista.totalPages,
+  totalItems: lista.total,
+  contadores: lista.resumenControl,
 });
 const base = {
   cargando: false,
   error: null,
   ocupado: false,
   aviso: null,
-  filtro: FILTRO_CONTROL.SIN_CONTAR,
-  q: "",
+  chip: FILTRO_CONTROL.TODOS,
   page: 1,
-  lista: { items: [], total: 0, totalPages: 1 },
+  items: [],
+  totalPages: 1,
+  totalItems: 0,
   cargandoLista: false,
+  errorLista: "",
+  contadores: null,
   fijado: null,
   foco: 0,
   buscadorRef: { current: null },
   terminar: null,
+  diferencias: null,
   recargar: nada,
   abrir: nada,
-  setFiltro: nada,
-  buscar: nada,
+  alCambiarFiltros: nada,
+  alLimpiar: nada,
+  setChip: nada,
   setPage: nada,
   escanear: nada,
+  escanearDesdeLaCantidad: nada,
   irAContar: nada,
   guardarTotal: async () => true,
   alBuscador: nada,
   irATerminar: nada,
+  verDiferencias: nada,
   volverAlInicio: nada,
   confirmarTerminar: nada,
 };
 const html = (c, { gestionar = true } = {}) =>
   renderToStaticMarkup(React.createElement(PantallaControlStock, { c: { ...base, ...c }, puedeGestionar: gestionar }));
 const dibujar = (c, opciones) => texto(html(c, opciones));
+const tarjeta = (item, esDeposito = false) => renderToStaticMarkup(React.createElement(TarjetaConteo, { item, esDeposito, onGuardar: nada }));
+const de = (lista, nombre) => lista.items.find((i) => i.nombre === nombre);
 
 // ── LAS REGLAS ─────────────────────────────────────────────────────────────
 
@@ -120,9 +142,7 @@ test("borrar el campo deshace lo que el control ajustó, y lo vendido sigue desc
     { accion: "CONTROL_PUESTO_EN_CERO", cantidadAnterior: 9, cantidadNueva: 0 },
   ];
   assert.equal(ajusteNetoDelConteo(auditorias), 0);
-  // Había 5, se vendió 1, y el control no le dejó nada: queda en 4.
   assert.deepEqual(stockTrasDeshacer({ actual: 4, ajusteNeto: 0 }), { nuevo: 4, ajuste: 0 });
-  // Había 5, se contaron 3 (−2) y se vendió 1 (2): borrar devuelve los 2 → 4.
   assert.deepEqual(stockTrasDeshacer({ actual: 2, ajusteNeto: -2 }), { nuevo: 4, ajuste: 2 });
 });
 
@@ -134,16 +154,14 @@ test("la cantidad: cero vale, negativa no, y las piezas son enteras", () => {
 });
 
 test("los casilleros: uno en la unidad del local, bultos y sueltas en el depósito, como lo lee Stock", () => {
-  const local = real.listaContados.items;
-  const coca = local.find((i) => i.nombre === "Coca 2L");
-  const queso = local.find((i) => i.nombre === "Queso por kg");
+  const coca = de(real.listaContados, "Coca 2L");
+  const queso = de(real.listaContados, "Queso por kg");
   assert.deepEqual(casillerosDe(coca, false), { modo: MODO_CASILLEROS.SIMPLE, unidadFisica: "UNIDAD", unidad: "un", decimales: false });
   assert.deepEqual(casillerosDe(queso, false), { modo: MODO_CASILLEROS.SIMPLE, unidadFisica: "KG", unidad: "kg", decimales: true });
-  const agua = real.listaDeposito.items.find((i) => i.nombre === "Agua x6");
+  const agua = de(real.listaDeposito, "Agua x6");
   assert.deepEqual(casillerosDe(agua, true), { modo: MODO_CASILLEROS.DESGLOSE, factorPack: 6, unidadFisica: "UNIDAD" });
   // El mismo pack en un LOCAL no se desglosa: Stock lo lee en unidades.
   assert.equal(casillerosDe(agua, false).modo, MODO_CASILLEROS.SIMPLE);
-  // El fiambre de peso fijo en el depósito, en piezas.
   const fiambre = { unidadMedida: "kg", modoVentaDeposito: "PIEZA", pesoEsFijo: true, pesoReferenciaKg: 0.4, modoCompraProveedor: "UNIDAD", factorPack: 1 };
   assert.equal(casillerosDe(fiambre, true).unidad, "pzs");
 });
@@ -157,6 +175,7 @@ test("el total de los casilleros: bultos × factor + sueltas, la coma decimal, y
   assert.deepEqual(casillerosDesdeTotal(27, pack), { bultos: "4", sueltas: "3" });
   const kg = { modo: MODO_CASILLEROS.SIMPLE, decimales: true };
   assert.deepEqual(totalDeCasilleros({ valor: "1,25" }, kg), { total: 1.25 });
+  assert.deepEqual(totalDeCasilleros({ valor: "1," }, kg), { total: 1 }, "la coma a medio escribir vale el entero");
   assert.deepEqual(casillerosDesdeTotal(1.25, kg), { valor: "1,25" });
   const un = { modo: MODO_CASILLEROS.SIMPLE, decimales: false };
   assert.deepEqual(totalDeCasilleros({ valor: "2,5" }, un), { invalido: true });
@@ -176,77 +195,206 @@ test("terminar parte en vendidos y los que quedan en cero, y el avance sale del 
   assert.equal(textoCantidad(-15, "UNIDAD"), "−15 un");
 });
 
+test("la diferencia es contado − sistema, y se dice Faltan, Sobran o Sin diferencia", () => {
+  assert.equal(diferenciaDe({ sistema: 4, contado: 2 }), -2);
+  assert.equal(diferenciaDe({ sistema: -15, contado: 0 }), 15, "un negativo puesto en 0 es sobrante");
+  assert.deepEqual(textoDeLaDiferencia(-2, "UNIDAD"), { texto: "Faltan 2 un", tono: "danger" });
+  assert.deepEqual(textoDeLaDiferencia(1.25, "KG"), { texto: "Sobran 1,25 kg", tono: "warning" });
+  assert.deepEqual(textoDeLaDiferencia(0, "UNIDAD"), { texto: "Sin diferencia", tono: "success" });
+  // La forma real: cada conteo que llega con el listado ya trae su diferencia.
+  for (const i of real.listaContados.items) assert.equal(i.conteo.diferencia, diferenciaDe({ sistema: i.conteo.sistema, contado: i.conteo.total }), i.nombre);
+});
+
+test("el informe: primero los faltantes por la plata que falta, después los sobrantes; los totales solo suman pesos", () => {
+  const congelado = real.diferenciasCongeladas;
+  const revueltas = [...congelado.filas].reverse();
+  assert.deepEqual(ordenarDiferencias(revueltas).map((f) => f.nombre), congelado.filas.map((f) => f.nombre));
+  assert.deepEqual(congelado.filas.map((f) => f.nombre), ["Fideos", "Coca 2L", "Queso por kg", "Galletas", "Sin fila"]);
+  assert.deepEqual(totalesDeDiferencias(congelado.filas), congelado.totales);
+  // Sin costo no vale cero: no suma y se cuenta aparte.
+  assert.deepEqual(totalesDeDiferencias([{ diferencia: -2, importe: null }, { diferencia: 3, importe: 300 }, { diferencia: 0, importe: 0 }]), {
+    faltante: 0,
+    sobrante: 300,
+    productos: 2,
+    sinCosto: 1,
+  });
+  const sinImporte = ordenarDiferencias([{ nombre: "B", diferencia: -1, importe: null }, { nombre: "A", diferencia: -1, importe: -10 }]);
+  assert.deepEqual(sinImporte.map((f) => f.nombre), ["A", "B"], "los sin costo van al final de su grupo");
+});
+
+test("la plata de una diferencia: las mismas funciones y la misma escala que Valor del stock", () => {
+  // Un pack de 6 con el costo por bulto: $6.000 el pack, $1.000 la unidad física.
+  const pack = { unidad_medida: "pack", factor_pack: 6, precio_costo: 6000 };
+  assert.deepEqual(valorDeLaDiferencia({ diferencia: -2, base: pack, costoLocal: 6000, esDeposito: true }), { costoUnitario: 1000, importe: -2000 });
+  const kg = { unidad_medida: "kg", factor_pack: 1, precio_costo: 8000 };
+  assert.deepEqual(valorDeLaDiferencia({ diferencia: 0.25, base: kg, costoLocal: null, esDeposito: false }), { costoUnitario: 8000, importe: 2000 });
+  assert.deepEqual(valorDeLaDiferencia({ diferencia: -1, base: { ...kg, precio_costo: 0 }, costoLocal: 0, esDeposito: false }), { costoUnitario: null, importe: null });
+  const src = fuente("lib/stock/control/valorDeLaDiferencia.js");
+  assert.match(src, /from "\.\.\/\.\.\/conversiones\/costoPorUnidadFisica\.js"/);
+  assert.match(src, /from "\.\.\/libro\/valorDelStock\.js"/);
+  assert.match(fuente("lib/stock/libro/valorDelStock.js"), /costoPorUnidadFisica/, "Valor del stock usa la misma conversión");
+  // El depósito real: 600 el pack de 6 son 100 la unidad.
+  assert.equal(real.diferenciasDeposito.filas[0].costoUnitario, 100);
+});
+
+// ── LAS PIEZAS DEL KIT QUE SE TOCARON ──────────────────────────────────────
+
+test("el número del stock: entero en una línea, salvo que la pantalla pida que baje de renglón", () => {
+  const n = (className) => renderToStaticMarkup(React.createElement(NumeroBloqueValor, { className }, "4 bultos"));
+  assert.match(n(""), /class="[^"]*whitespace-nowrap/);
+  assert.match(n("sunmi-text-danger"), /class="[^"]*whitespace-nowrap/);
+  assert.doesNotMatch(n("whitespace-normal"), /whitespace-nowrap/, "la pantalla declaró el eje y la pieza cede");
+});
+
+/** El input de un `SunmiCampoCantidad`: la pieza no tiene estado, se recorre su árbol. */
+function inputDe(props) {
+  const buscar = (el) => {
+    if (!el || typeof el !== "object") return null;
+    if (el.props?.onChange) return el;
+    for (const h of [].concat(el.props?.children ?? [])) {
+      const r = buscar(h);
+      if (r) return r;
+    }
+    return null;
+  };
+  return buscar(SunmiCampoCantidad(props));
+}
+
+test("la cantidad del kit: el kilo con coma se queda como se escribió, y sin la prop sigue como en la caja", () => {
+  const escrito = [];
+  const kg = { valor: "", onCambiar: (v) => escrito.push(v), etiqueta: "Contado", minimo: 0, decimales: 3, tipo: "text", conservaLoEscrito: true };
+  const input = inputDe(kg);
+  for (const v of ["1,", "1,2", "1,250", "1,2505", "abc"]) input.props.onChange({ target: { value: v } });
+  assert.deepEqual(escrito, ["1,", "1,2", "1,250"], "lo que no es un número a medio escribir no entra");
+  const caja = [];
+  inputDe({ ...kg, conservaLoEscrito: false, onCambiar: (v) => caja.push(v) }).props.onChange({ target: { value: "1,5" } });
+  assert.deepEqual(caja, ["1.5"], "la caja sigue pasando la coma a punto");
+});
+
 // ── LA PANTALLA, CON LA FORMA REAL ─────────────────────────────────────────
 
-test("control abierto: encabezado, avance, buscador, chips y la lista; sin 'Quién está contando' ni 'Guardar'", () => {
-  const t = dibujar({ ...conLista(real.listaSinContar) });
+test("control abierto: encabezado, avance contra el total del listado, FiltrosStock, chips y la lista", () => {
+  const c = conLista(real.listaSinContar);
+  const t = dibujar(c);
   assert.match(t, /^STOCK · CONTROL Control de stock Mini el 7 · abierto desde [a-záéíóú]+ \d\d\/\d\d /);
-  const { contados, sinContar } = real.listaSinContar.resumen;
-  assert.match(t, new RegExp(`${contados} contados de ${contados + sinContar}`));
-  assert.match(html({ ...conLista(real.listaSinContar) }), /placeholder="Escaneá o buscá un producto"/);
-  assert.match(t, new RegExp(`Todos Sin contar · ${sinContar} Contados · ${contados}`));
-  assert.match(t, /Fideos .*STOCK · Unidad 4 .*Sin contar/);
-  assert.match(t, /Terminar control$/);
-  assert.doesNotMatch(t, /QUIÉN ESTÁ CONTANDO|ESCANEADO|Guardar|Ajustar|Límites/);
-  assert.doesNotMatch(dibujar({ ...conLista(real.listaSinContar) }, { gestionar: false }), /Terminar control/);
+  const { contados, total, sinContar, conDiferencia } = real.listaSinContar.resumenControl;
+  assert.match(t, new RegExp(` ${contados} contados de ${total} `));
+  assert.match(html(c), /placeholder="Buscar por nombre o código\.\.\."/, "el buscador es el de Stock Locales");
+  assert.match(t, new RegExp(`Todos Sin contar · ${sinContar} Contados · ${contados} Con diferencia · ${conDiferencia}`));
+  assert.match(t, /Fideos .*STOCK · Unidad 4 .*Sin contar .*Está bien/);
+  assert.match(t, /Ver diferencias Terminar control$/);
+  assert.doesNotMatch(t, /QUIÉN ESTÁ CONTANDO|Guardar|Ajustar|Límites/);
+  assert.doesNotMatch(dibujar(c, { gestionar: false }), /Terminar control/);
+  assert.match(dibujar(c, { gestionar: false }), /Ver diferencias$/, "quien cuenta también ve las diferencias");
 });
 
-test("el chip activo por defecto es Sin contar", () => {
-  const h = html({ ...conLista(real.listaSinContar) });
+test("el chip activo por defecto es Todos", () => {
+  const src = fuente("components/stock_locales/control/useControlStock.js");
+  assert.match(src, /useState\(FILTRO_CONTROL\.TODOS\)/);
+  const h = html(conLista(real.listaSinContar));
   const chip = h.match(/<button[^>]*aria-pressed="true"[^>]*>([\s\S]*?)<\/button>/)?.[1] || "";
-  assert.match(texto(chip), /^Sin contar ·/);
+  assert.equal(texto(chip), "Todos");
 });
 
-test("una tarjeta contada: la de Stock arriba, '✓ Contado' con quién y la hora, y el campo en positivo con el total", () => {
-  const coca = real.cocaContadaPorOtro.item;
-  const h = renderToStaticMarkup(React.createElement(TarjetaConteo, { item: coca, esDeposito: false, onGuardar: nada }));
+test("la lista es la de Stock Locales: FiltrosStock y useStockData con el chip en `control`", () => {
+  const hook = fuente("components/stock_locales/control/useControlStock.js");
+  assert.match(hook, /useStockData\(\{/);
+  assert.match(hook, /\{ \.\.\.filtros, control: chip \}/);
+  assert.doesNotMatch(hook, /\/control\/productos\?\$\{qs\}/, "ya no hay una lista propia del control");
+  assert.match(fuente("hooks/useStockData.js"), /if \(filtro\.control\) params\.set\("control", filtro\.control\)/);
+  const pantalla = fuente("components/stock_locales/control/PantallaControlStock.jsx");
+  assert.match(pantalla, /<FiltrosStock\b[\s\S]*onEscanear=\{c\.escanear\}/);
+  // El listado y el control piden el universo a la MISMA función.
+  assert.equal((fuente("app/api/stock_locales/listar/route.js").match(/whereUniversoStock\(localId, (false|true)\)/g) || []).length, 2);
+  assert.match(fuente("lib/stock/control/controlStockServer.js"), /whereUniversoStock\(localId, esDeposito\)/);
+});
+
+test("el lector en FiltrosStock: un código del local va a su tarjeta, si no filtra por el texto", () => {
+  const src = fuente("components/stock_locales/FiltrosStock.jsx");
+  assert.match(src, /Promise\.resolve\(onEscanear\(codigo\)\)\.then\(\(encontrado\) => \{\s*if \(!encontrado\) setQ\(codigo\);/);
+  const hook = fuente("components/stock_locales/control/useControlStock.js");
+  assert.match(hook, /if \(!r\.item\) return false;/);
+});
+
+test("una tarjeta contada: '✓ Contado · quién · hora', Sistema · Contado · Faltan, y el campo sigue editable", () => {
+  const coca = de(real.listaContados, "Coca 2L");
+  const h = renderToStaticMarkup(React.createElement(TarjetaConteo, { item: coca, esDeposito: false, proveedorNombre: "Coca-Cola FEMSA", onGuardar: nada }));
   const t = texto(h);
-  // Lo de arriba es exactamente lo de Stock, mín y máx incluidos.
-  assert.match(t, /^Coca 2L Coca-Cola FEMSA mín Sin ajustar · máx Sin ajustar STOCK · Unidad 3 uds 7790000000001 ✓ Contado Emanuel · \d\d:\d\d un$/);
+  assert.match(t, /^Coca 2L Coca-Cola FEMSA mín Sin ajustar · máx Sin ajustar STOCK · Unidad 2 uds 7790000000001 ✓ Contado · Emanuel · \d\d:\d\d /);
+  assert.match(t, /Sistema 4 · Contado 2 · Faltan 2 un$/);
   assert.match(h, /data-fila-conteo="contado"/);
-  assert.match(h, /<input[^>]*class="[^"]*sunmi-state-success[^"]*"[^>]*value="3"/);
+  assert.match(h, /<input[^>]*class="[^"]*sunmi-state-success[^"]*"[^>]*value="2"/);
+  assert.doesNotMatch(h, /<input[^>]* disabled=""/);
+  assert.doesNotMatch(t, /Está bien/);
+  assert.match(h, /<span class="font-semibold sunmi-text-danger">Faltan 2 un<\/span>/);
 });
 
-test("una tarjeta sin contar: 'Sin contar' y el campo vacío", () => {
-  const fideos = real.listaSinContar.items.find((i) => i.nombre === "Fideos");
-  const h = renderToStaticMarkup(React.createElement(TarjetaConteo, { item: fideos, esDeposito: false, onGuardar: nada }));
+test("Sobran en advertencia y Sin diferencia en positivo", () => {
+  assert.match(tarjeta(de(real.listaContados, "Sin fila")), /<span class="font-semibold sunmi-text-warning">Sobran 2 un<\/span>/);
+  assert.match(tarjeta(de(real.listaContados, "Aceite 900")), /<span class="font-semibold sunmi-text-success">Sin diferencia<\/span>/);
+});
+
+test("una tarjeta sin contar: 'Está bien', y la caja vacía teñida para verse contra la tarjeta", () => {
+  const h = tarjeta(de(real.listaSinContar, "Fideos"));
   assert.match(h, /data-fila-conteo="sin_contar"/);
-  assert.match(texto(h), /Sin contar un$/);
-  assert.match(h, /<input[^>]*value=""/);
+  assert.match(texto(h), /Sin contar Está bien − \+ un$/);
+  assert.match(h, /<input[^>]*class="[^"]*sunmi-state-warning[^"]*"[^>]*value=""/);
+  assert.match(h, /<span class="min-w-0 rounded-lg w-16 border sunmi-divider">/, "con el marco de recibir transferencias");
 });
 
-test("en el depósito, un pack: el stock como Stock ('6 bultos + 4 uds') y dos casilleros", () => {
-  const agua = real.listaDeposito.items.find((i) => i.nombre === "Agua x6");
-  const h = renderToStaticMarkup(React.createElement(TarjetaConteo, { item: agua, esDeposito: true, onGuardar: nada }));
+test("con el sistema en negativo no hay 'Está bien': hay que poner lo que hay", () => {
+  const galletas = de(real.listaSinContar, "Galletas");
+  assert.equal(galletas.stock, -15);
+  assert.doesNotMatch(texto(tarjeta(galletas)), /Está bien/);
+  assert.match(fuente("lib/stock/control/controlStockServer.js"), /TEXTO_ESTA_BIEN_NEGATIVO/);
+});
+
+test("el kilo: campo de texto con coma y tres decimales", () => {
+  const h = tarjeta(de(real.listaContados, "Queso por kg"));
+  assert.match(h, /<input[^>]*type="text"[^>]*inputMode="decimal"[^>]*value="1,25"/);
+  assert.match(texto(h), /Faltan 1,25 kg$/);
+});
+
+test("en el depósito, un pack: el stock entero en sus partes, '= 40 un' debajo y dos casilleros", () => {
+  const agua = de(real.listaDeposito, "Agua x6");
+  const h = tarjeta(agua, true);
   const t = texto(h);
-  assert.match(t, /STOCK · Pack x6 6 bultos \+ 4 uds/);
+  assert.match(t, /STOCK · Pack x6 6 bultos \+ 4 uds = 40 un/);
+  assert.match(h, /<span class="whitespace-nowrap">6 bultos \+ <\/span><span class="whitespace-nowrap">4 uds<\/span>/, "cada parte entera");
   assert.match(t, /bultos .*sueltas/);
   assert.equal((h.match(/<input/g) || []).length, 2);
   assert.match(h, /aria-label="Bultos contados"/);
   assert.match(h, /aria-label="Sueltas contadas"/);
+  assert.equal((h.match(/rounded-lg w-12 border/g) || []).length, 2, "los dos chicos, para entrar en 360 px");
 });
 
-test("los rótulos de la fila: escribiendo dice el total en unidades, y si falla 'No se guardó'", () => {
-  const r = (estado, extra = {}) => texto(renderToStaticMarkup(React.createElement(ResumenDeLaFila, { estado, ...extra })));
-  assert.equal(r(ESTADO_FILA.ESCRIBIENDO, { igualA: "27 un" }), "Contado = 27 un");
+test("los rótulos de la fila", () => {
+  const r = (estado, conteo = null) => texto(renderToStaticMarkup(React.createElement(EncabezadoDeLaFila, { estado, conteo })));
   assert.equal(r(ESTADO_FILA.ERROR), "No se guardó");
   assert.equal(r(ESTADO_FILA.SIN_CONTAR), "Sin contar");
+  assert.equal(r(ESTADO_FILA.ESCRIBIENDO), "Contado");
+  assert.match(r(ESTADO_FILA.CONTADO, de(real.listaContados, "Coca 2L").conteo), /^✓ Contado · Emanuel · \d\d:\d\d$/);
 });
 
-test("la tarjeta es la de Stock: sin Ajustar ni Límites, el lector con la regla de la caja, y se guarda sin botón", () => {
+test("la tarjeta es la de Stock, la cantidad es la del kit, y se guarda sola", () => {
   const src = fuente("components/stock_locales/control/TarjetaConteo.jsx");
   assert.match(src, /<TarjetaStockMovil\b[\s\S]*filaDeAbajo=\{fila\}/);
+  assert.match(src, /<SunmiCampoCantidad\b[\s\S]*minimo=\{0\}/);
   assert.match(src, /esLecturaDeEscaner\(ms, r\.texto\)/, "el lector se reconoce como en la caja");
   assert.match(src, /onBlur=\{alSalir\}/, "se guarda al salir del campo");
-  assert.doesNotMatch(src, /<SunmiButton|<button/, "no hay botón Guardar");
-  const tarjeta = fuente("components/stock_locales/TarjetaStockMovil.jsx");
-  assert.match(tarjeta, /filaDeAbajo \? \(\s*filaDeAbajo\s*\) : puedeAjustar/, "con la fila del conteo no van Ajustar ni Límites");
+  assert.equal(ESPERA_TRAS_BOTON_MS, 1500);
+  assert.match(src, /espera\.current = setTimeout\(\(\) => guardar\(v\), ESPERA_TRAS_BOTON_MS\)/, "después de − o +, a los 1,5 s");
+  assert.match(src, /onGuardar\?\.\(item\.id, \{ estaBien: true \}\)/);
+  assert.doesNotMatch(src, /<button/, "los botones son del kit");
+  const tarjetaStock = fuente("components/stock_locales/TarjetaStockMovil.jsx");
+  assert.match(tarjetaStock, /filaDeAbajo \? \(\s*filaDeAbajo\s*\) : puedeAjustar/, "con la fila del conteo no van Ajustar ni Límites");
 });
 
-test("C0: sin control, Empezar solo con gestionar, y el último terminado", () => {
+test("C0: sin control, Empezar solo con gestionar, y el historial con sus diferencias", () => {
   const t = dibujar({ estado: real.terminado, vista: VISTA_CONTROL.INICIO });
-  assert.match(t, /Empezar control ÚLTIMO CONTROL .* Lo cerró Emanuel 2 en 0/);
+  assert.match(t, /Empezar control CONTROLES TERMINADOS .* Lo cerró Emanuel 2 en 0 Ver diferencias ›/);
   assert.doesNotMatch(dibujar({ estado: real.terminado, vista: VISTA_CONTROL.INICIO }, { gestionar: false }), /Empezar control/);
+  assert.match(fuente("components/stock_locales/control/PantallaControlStock.jsx"), /onClick=\{\(\) => c\.verDiferencias\(h\.id\)\}/);
 });
 
 test("C3: los que nadie contó, los vendidos aparte, y el botón dice cuántos quedan en 0", () => {
@@ -258,26 +406,54 @@ test("C3: los que nadie contó, los vendidos aparte, y el botón dice cuántos q
   assert.doesNotMatch(t, /Vas a poner/, "la confirmación arranca cerrada");
 });
 
-test("C3: el botón abre la confirmación y solo 'Poner en 0' llama al servidor", () => {
+test("C3: el botón abre la confirmación, solo 'Poner en 0' llama al servidor, y después se abre el informe", () => {
   const src = fuente("components/stock_locales/control/PantallaControlStock.jsx");
   const boton = src.slice(src.lastIndexOf("<BotonTesoreria", src.indexOf("en 0 y terminar")), src.indexOf("en 0 y terminar"));
   assert.match(boton, /onClick=\{\(\) => setConfirmando\(true\)\}/, "el botón de abajo tiene que abrir, no terminar");
   assert.equal((src.match(/c\.confirmarTerminar\(/g) || []).length, 1, "un solo lugar llama al servidor");
   assert.match(src, /const alConfirmar = async \(\) => \{\s*await c\.confirmarTerminar\(\);/);
-  assert.match(src, /onConfirmar=\{alConfirmar\}/);
   const hook = fuente("components/stock_locales/control/useControlStock.js");
   assert.match(hook, /if \(!terminar \|\| terminando\.current\) return;\s*terminando\.current = true;/);
+  assert.match(hook, /verDiferencias\(r\.controlId\);\s*\}, \[/, "terminado, se abre su informe");
 });
 
 test("la confirmación: el texto, Cancelar y Poner en 0, y deshabilitado mientras procesa", () => {
   const abierta = (ocupado) =>
     renderToStaticMarkup(React.createElement(ConfirmarTerminar, { abierto: true, cantidad: 2, ocupado, onCancelar: nada, onConfirmar: nada }));
   assert.match(texto(abierta(false)), /Terminar control .*Vas a poner 2 productos en 0 y terminar el control Poner en 0 Cancelar/);
-  assert.match(readFileSync("components/stock_locales/control/PantallaControlStock.jsx", "utf8"), /<SunmiHojaDeConfirmacion\b/);
   const boton = (h, rotulo) => h.match(new RegExp(`<button[^>]*>${rotulo}</button>`))?.[0] || "";
   assert.doesNotMatch(boton(abierta(false), "Poner en 0"), /disabled/);
   assert.match(boton(abierta(true), "Poner en 0"), /disabled/, "procesando, no se puede mandar dos veces");
   assert.equal(renderToStaticMarkup(React.createElement(ConfirmarTerminar, { abierto: false, cantidad: 2, ocupado: false, onCancelar: nada, onConfirmar: nada })), "");
+});
+
+// ── LAS DIFERENCIAS ────────────────────────────────────────────────────────
+
+test("diferencias de un terminado: Faltante y Sobrante en grande, cuántos, y la lista en su orden", () => {
+  const h = html({ estado: real.terminado, vista: VISTA_CONTROL.DIFERENCIAS, diferencias: real.diferenciasCongeladas });
+  const t = texto(h);
+  assert.match(t, /^CONTROL DE STOCK · DIFERENCIAS ‹ Diferencias del control Mini el 7 · terminado [a-záéíóú]+ \d\d\/\d\d \d\d:\d\d /);
+  assert.match(t, /FALTANTE \$ \$4\.350,00 SOBRANTE \$ \$10\.200,00 5 productos con diferencia/);
+  assert.match(h, /class="text-xl3 font-semibold tabular-nums sunmi-text-danger">\$4\.350,00/);
+  assert.match(h, /class="text-xl3 font-semibold tabular-nums sunmi-text-warning">\$10\.200,00/);
+  assert.match(
+    t,
+    /PRODUCTOS CON DIFERENCIA Fideos Sistema 4 · Contado 0 · puesto en 0 Faltan 4 un −\$2\.400,00 Coca 2L .*Faltan 2 un −\$1\.200,00 Queso por kg .*Faltan 1,25 kg −\$750,00 Galletas Sistema −15 · Contado 0 · puesto en 0 Sobran 15 un \$9\.000,00 Sin fila .*Sobran 2 un \$1\.200,00$/
+  );
+});
+
+test("diferencias sin costos.ver: las cantidades, sin un solo peso", () => {
+  const t = texto(renderToStaticMarkup(React.createElement(InformeDeDiferencias, { d: real.diferenciasSinPlata })));
+  assert.doesNotMatch(t, /FALTANTE|SOBRANTE|\$/);
+  assert.match(t, /3 productos con diferencia La plata la ve quien puede ver costos\./);
+  assert.match(t, /Coca 2L Sistema 4 · Contado 2 Faltan 2 un/);
+  assert.match(fuente("app/api/stock_locales/control/diferencias/route.js"), /checkPerm\(a\.session, PERMISO_PLATA_DE_LAS_DIFERENCIAS\)\.ok/);
+});
+
+test("'Ver diferencias' en el abierto lleva al informe del abierto, que dice que no terminó", () => {
+  const t = dibujar({ estado: real.abierto, vista: VISTA_CONTROL.DIFERENCIAS, diferencias: real.diferenciasAbierto });
+  assert.match(t, /Mini el 7 · abierto desde [a-záéíóú]+ \d\d\/\d\d, sin terminar/);
+  assert.match(t, /FALTANTE \$ \$1\.950,00 SOBRANTE \$ \$1\.200,00 3 productos con diferencia/);
 });
 
 // ── DÓNDE SE ENGANCHA ──────────────────────────────────────────────────────

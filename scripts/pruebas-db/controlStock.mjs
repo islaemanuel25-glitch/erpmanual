@@ -10,13 +10,18 @@
 //   2. abrir: uno solo por local;
 //   3. el campo es el TOTAL: el primero fija el stock, cambiarlo lo mueve por la
 //      diferencia —sobre lo vendido mientras tanto—, y borrarlo deshace el
-//      ajuste del control; la tarjeta dice el total y quién lo tocó último;
-//   4. la lista: Sin contar / Contados / Todos, el texto, y el lector que trae
-//      un producto aunque el filtro lo oculte; los contadores;
-//   5. el depósito: la tarjeta de un pack es la de Stock y el total se guarda en
-//      unidades;
+//      ajuste del control; la tarjeta dice el total, quién lo tocó último y el
+//      sistema de ANTES del primer conteo; "Está bien" guarda el stock del
+//      sistema y con el sistema en negativo se rechaza;
+//   4. la lista es la de Stock Locales (`/api/stock_locales/listar?control=`):
+//      Todos / Sin contar / Contados / Con diferencia, el texto, y el lector que
+//      trae un producto aunque el filtro lo oculte; los contadores;
+//   5. el depósito: la tarjeta de un pack es la de Stock, el total se guarda en
+//      unidades y la plata sale del costo por bulto;
 //   6. terminar: los que nadie contó se parten en vendidos durante el control
-//      (no se tocan) y los que quedan en cero; una lista vieja se rechaza;
+//      (no se tocan) y los que quedan en cero; una lista vieja se rechaza; las
+//      diferencias, vivas antes y congeladas después: una venta o un costo
+//      nuevo no las cambian; sin `costos.ver`, sin plata;
 //   7. cada cambio quedó en el Libro como AJUSTE_POR_CONTROL con el id del
 //      control, y en AuditoriaStock con su controlStockId;
 //   8. con el control terminado no se cuenta más.
@@ -92,6 +97,8 @@ try {
   await c.rol.create({ data: { nombre: "CAJERO", esSistema: true, permisos: DEFAULT_PERMISOS_SISTEMA.CAJERO } });
   const rolAdmin = await c.rol.create({ data: { nombre: "Admin", esSistema: true, permisos: ["*"] } });
   aplicarMigraciones(urlPrueba, { solo: MIGRACIONES_PERMISOS });
+  // Y las que vienen después: el informe de diferencias.
+  aplicarMigraciones(urlPrueba, { solo: ["20261020200000_control_stock_diferencias"] });
   const rolEncargado = await c.rol.findUnique({ where: { nombre: "ENCARGADO" } });
   ok(
     "la migración le dio los dos permisos al ENCARGADO que ya existía",
@@ -146,6 +153,7 @@ try {
     nuevo: await producto("Sin fila", "7790000000007", null), //        sin StockLocal: el conteo crea la fila
     combo: await producto("Combo desayuno", "7790000000008", null, "unidad", { es_combo: true }),
     inactivo: await producto("Discontinuado", "7790000000009", 7, "unidad", { activo: false }),
+    aceite: await producto("Aceite 900", "7790000000011", 3), //        "Está bien": queda en 3
   };
   const stockDe = async (p, localId = mini.id) => Number((await c.stockLocal.findFirst({ where: { localId, productoId: p.pl } }))?.cantidad ?? NaN);
   const vender = (p, queda) =>
@@ -170,6 +178,8 @@ try {
     productos: await import("../../app/api/stock_locales/control/productos/route.js"),
     conteos: await import("../../app/api/stock_locales/control/conteos/route.js"),
     terminar: await import("../../app/api/stock_locales/control/terminar/route.js"),
+    diferencias: await import("../../app/api/stock_locales/control/diferencias/route.js"),
+    listar: await import("../../app/api/stock_locales/listar/route.js"),
   };
 
   const sesion = (u, permisos, esDuenoLocal, localId = mini.id, esDeposito = false) =>
@@ -206,7 +216,12 @@ try {
   const B = "http://ci/api/stock_locales/control";
   const estado = (s) => pedir(R.estado, "GET", B, s);
   const fijar = (s, p, total) => pedir(R.conteos, "PUT", `${B}/conteos`, s, { productoLocalId: p.pl, total });
-  const lista = (s, qs = "") => pedir(R.productos, "GET", `${B}/productos?${qs}`, s);
+  const estaBien = (s, p) => pedir(R.conteos, "PUT", `${B}/conteos`, s, { productoLocalId: p.pl, estaBien: true });
+  // La lista del control ES la de Stock Locales, con el chip en `control`.
+  const lista = (s, chip = "todos", qs = "") => pedir(R.listar, "GET", `http://ci/api/stock_locales/listar?control=${chip}${qs ? `&${qs}` : ""}`, s);
+  const escanear = (s, qs) => pedir(R.productos, "GET", `${B}/productos?${qs}`, s);
+  const diferencias = (s, id = null) => pedir(R.diferencias, "GET", `${B}/diferencias${id ? `?controlId=${id}` : ""}`, s);
+  const resumenDif = (d) => (d.filas || []).filter((f) => f.diferencia !== 0).map((f) => [f.nombre, f.diferencia, f.importe]);
   const ids = (l) => (l || []).map((p) => p.id ?? p.productoLocalId).sort((a, b) => a - b);
   const auditoriasDe = (p) => c.auditoriaStock.count({ where: { productoLocalId: p.pl, controlStockId: { not: null } } });
 
@@ -232,9 +247,9 @@ try {
     const otra = await pedir(R.abrir, "POST", `${B}/abrir`, S.dueno);
     ok("un segundo abierto en el mismo local: 409", otra.status === 409, json(otra));
     const e = await estado(S.dueno);
-    // Universo: coca, queso, yerba, galletas, fideos. No: el de cero, el sin fila,
-    // el combo ni el inactivo.
-    ok("arranca con 0 contados y 5 sin contar", e.control?.contados === 0 && e.control?.sinContar === 5, json(e.control));
+    // El universo es el de Stock Locales: coca, queso, yerba, galletas, fideos,
+    // el de cero, el sin fila y el aceite. No: el combo ni el inactivo.
+    ok("arranca con 0 contados de 8, los del listado de Stock", e.control?.contados === 0 && e.control?.total === 8 && e.control?.sinContar === 8, json(e.control));
   }
   const controlId = (await c.controlStock.findFirst({ where: { localId: mini.id, estado: "ABIERTO" } })).id;
 
@@ -245,13 +260,17 @@ try {
     const r = await fijar(S.dueno, P.coca, 3);
     ok("el primer total fija: había 5, contó 3 → 3", r.status === 200 && (await stockDe(P.coca)) === 3, json(r));
     ok("y la tarjeta que vuelve dice el stock nuevo, el total y quién", r.item?.stock === 3 && r.item?.conteo?.total === 3 && r.item?.conteo?.contadoPor === "Emanuel", json(r.item));
-    ok("y los contadores: 1 contado y 4 sin contar", r.resumen?.contados === 1 && r.resumen?.sinContar === 4, json(r.resumen));
-    const visto = await lista(S.ana, "codigo=7790000000001");
+    ok("y los contadores: 1 contado y 7 sin contar", r.resumen?.contados === 1 && r.resumen?.sinContar === 7, json(r.resumen));
+    ok("el sistema de antes es el de antes del conteo: 5, y faltan 2", r.item?.conteo?.sistema === 5 && r.item?.conteo?.diferencia === -2, json(r.item?.conteo));
+    const visto = await escanear(S.ana, "codigo=7790000000001");
     guardar("cocaContadaPorOtro", visto);
     ok("Ana escanea la coca: la ve ya contada por Emanuel, con el total", visto.item?.conteo?.total === 3 && visto.item?.conteo?.contadoPor === "Emanuel", json(visto));
     const r2 = await fijar(S.ana, P.coca, 7);
     ok("Ana escribe el nuevo total 7: el stock se mueve por la diferencia (3 → 7)", r2.status === 200 && (await stockDe(P.coca)) === 7, json(r2));
     ok("y la tarjeta queda a nombre de Ana", r2.item?.conteo?.contadoPor === "Ana" && r2.item?.conteo?.total === 7, json(r2.item?.conteo));
+    ok("el sistema de antes no se mueve al corregir: sigue 5, y sobran 2", r2.item?.conteo?.sistema === 5 && r2.item?.conteo?.diferencia === 2, json(r2.item?.conteo));
+    const fila = await c.conteoControlStock.findFirst({ where: { controlId, productoLocalId: P.coca.pl, borradoEn: null } });
+    ok("y queda en su columna, en la fila vigente", Number(fila?.sistemaAntes) === 5, json(fila));
     const filas = await c.conteoControlStock.findMany({ where: { controlId, productoLocalId: P.coca.pl }, orderBy: { id: "asc" } });
     ok("la historia queda: el total de Emanuel borrado, el de Ana vigente", filas.length === 2 && filas[0].borradoEn !== null && filas[1].borradoEn === null && filas[1].operadorId === ana.id, json(filas));
     const antes = await auditoriasDe(P.coca);
@@ -279,40 +298,93 @@ try {
     ok("un total negativo: 400, y no movió nada", neg.status === 400 && (await stockDe(P.fideos)) === 4, json(neg));
     const borrarSinContar = await fijar(S.dueno, P.fideos, null);
     ok("borrar uno que nadie contó no hace nada", borrarSinContar.status === 200 && (await stockDe(P.fideos)) === 4 && (await auditoriasDe(P.fideos)) === 0, json(borrarSinContar));
+
+    const bien = await estaBien(S.ana, P.aceite);
+    ok(
+      "'Está bien' guarda el stock del sistema: el aceite queda en 3, contado 3, sin diferencia",
+      bien.status === 200 && (await stockDe(P.aceite)) === 3 && bien.item?.conteo?.total === 3 && bien.item?.conteo?.diferencia === 0,
+      json(bien)
+    );
+    const negativo = await estaBien(S.ana, P.galletas);
+    ok(
+      "'Está bien' con el sistema en negativo: 400, y las galletas siguen sin contar en −15",
+      negativo.status === 400 && (await stockDe(P.galletas)) === -15 && (await auditoriasDe(P.galletas)) === 0,
+      json(negativo)
+    );
   }
 
-  seccion("4. La lista, los chips y el lector");
+  seccion("4. La lista es la de Stock Locales, con los chips y el lector");
   {
-    const sin = await lista(S.ana);
-    ok("sin filtro pedido son todos los que se pueden contar: 7", sin.status === 200 && sin.total === 7, json({ total: sin.total, items: sin.items?.map((i) => i.nombre) }));
-    const sinContar = await lista(S.ana, "filtro=sin_contar");
+    const sinControl = await pedir(R.listar, "GET", "http://ci/api/stock_locales/listar", S.ana);
+    const todos = await lista(S.ana);
+    ok(
+      "Todos es el MISMO listado de Stock: mismos productos y mismo orden, stock 0 incluido",
+      todos.status === 200 && todos.total === 8 && json(todos.items?.map((i) => i.id)) === json(sinControl.items?.map((i) => i.id)),
+      json({ control: todos.items?.map((i) => i.nombre), stock: sinControl.items?.map((i) => i.nombre) })
+    );
+    ok("y sin `control` el listado de Stock no trae conteos ni contadores", sinControl.resumenControl === undefined && sinControl.items?.every((i) => i.conteo === undefined), json(sinControl.items?.[0]));
+    const sinContar = await lista(S.ana, "sin_contar");
     guardar("listaSinContar", sinContar);
-    ok("Sin contar: yerba, galletas y fideos —con stock y sin contar—", json(ids(sinContar.items)) === json([P.yerba.pl, P.galletas.pl, P.fideos.pl].sort((a, b) => a - b)), json(sinContar.items?.map((i) => i.nombre)));
-    ok("y los contadores: 3 contados, 3 sin contar", sinContar.resumen?.contados === 3 && sinContar.resumen?.sinContar === 3, json(sinContar.resumen));
-    const contados = await lista(S.ana, "filtro=contados");
+    ok(
+      "Sin contar: yerba, galletas, fideos y el de cero",
+      json(ids(sinContar.items)) === json([P.yerba.pl, P.galletas.pl, P.fideos.pl, P.vacio.pl].sort((a, b) => a - b)),
+      json(sinContar.items?.map((i) => i.nombre))
+    );
+    ok(
+      "y los contadores: 4 contados de 8, 3 con diferencia",
+      sinContar.resumenControl?.contados === 4 && sinContar.resumenControl?.sinContar === 4 && sinContar.resumenControl?.total === 8 && sinContar.resumenControl?.conDiferencia === 3,
+      json(sinContar.resumenControl)
+    );
+    const contados = await lista(S.ana, "contados");
     guardar("listaContados", contados);
-    ok("Contados: coca, queso y el sin fila", json(ids(contados.items)) === json([P.coca.pl, P.queso.pl, P.nuevo.pl].sort((a, b) => a - b)), json(contados.items?.map((i) => i.nombre)));
+    ok(
+      "Contados: coca, queso, el sin fila y el aceite",
+      json(ids(contados.items)) === json([P.coca.pl, P.queso.pl, P.nuevo.pl, P.aceite.pl].sort((a, b) => a - b)),
+      json(contados.items?.map((i) => i.nombre))
+    );
+    const conDif = await lista(S.ana, "con_diferencia");
+    guardar("listaConDiferencia", conDif);
+    ok(
+      "Con diferencia: coca, queso y el sin fila —el aceite dio igual—",
+      json(ids(conDif.items)) === json([P.coca.pl, P.queso.pl, P.nuevo.pl].sort((a, b) => a - b)),
+      json(conDif.items?.map((i) => i.nombre))
+    );
     const coca = contados.items.find((i) => i.id === P.coca.pl);
-    ok("la tarjeta trae lo de Stock: proveedor, código, unidad y stock", coca?.proveedorNombre === "Coca-Cola FEMSA" && coca?.codigoBarra === "7790000000001" && coca?.unidadMedida === "unidad" && coca?.stock === 2, json(coca));
-    const texto = await lista(S.ana, "filtro=sin_contar&q=gall");
-    ok("el texto filtra por nombre", json(ids(texto.items)) === json([P.galletas.pl]), json(texto.items?.map((i) => i.nombre)));
-    const escaneada = await lista(S.ana, "codigo=7790000000006");
-    ok("el lector trae 'Sin stock' aunque Sin contar no lo muestre", escaneada.item?.id === P.vacio.pl, json(escaneada));
-    const combo = await lista(S.ana, "codigo=7790000000008");
-    ok("el lector con un combo dice que no se puede contar", combo.status === 200 && combo.item === null && /No hay ningún producto para contar/.test(combo.error || ""), json(combo));
+    ok(
+      "la tarjeta trae lo de Stock: proveedor, código, unidad y stock, y su conteo",
+      coca?.proveedorId === proveedor.id && coca?.codigoBarra === "7790000000001" && coca?.unidadMedida === "unidad" && coca?.stock === 2 && coca?.conteo?.total === 2,
+      json(coca)
+    );
+    const texto = await lista(S.ana, "sin_contar", "q=gall");
+    ok("el texto filtra por nombre, con el chip encima", json(ids(texto.items)) === json([P.galletas.pl]), json(texto.items?.map((i) => i.nombre)));
+    const escaneada = await escanear(S.ana, "codigo=7790000000006");
+    ok("el lector trae 'Sin stock' aunque el filtro no lo muestre", escaneada.item?.id === P.vacio.pl, json(escaneada));
+    const combo = await escanear(S.ana, "codigo=7790000000008");
+    ok("el lector con un combo no trae nada: la pantalla filtra por el texto", combo.status === 200 && combo.item === null, json(combo));
+    const nada = await escanear(S.ana, "");
+    ok("sin código ni producto: 400", nada.status === 400, json(nada));
   }
 
   seccion("5. El depósito: un pack se cuenta en bultos y se guarda en unidades");
   {
     const a = await pedir(R.abrir, "POST", `${B}/abrir`, S.adminDepo);
     ok("el Admin abre un control en el depósito", a.status === 200, json(a));
-    const l = await lista(S.adminDepo, "filtro=sin_contar");
+    const l = await lista(S.adminDepo, "sin_contar");
     guardar("listaDeposito", l);
     const agua = l.items?.find((i) => i.id === PACK.pl);
     ok("la tarjeta es la del depósito: pack de 6 y 40 unidades", agua?.unidadMedida === "pack" && agua?.factorPack === 6 && agua?.stock === 40, json(agua));
     // 4 bultos + 3 sueltas = 27: lo calcula la pantalla con `toUnidades`.
     const r = await pedir(R.conteos, "PUT", `${B}/conteos`, S.adminDepo, { productoLocalId: PACK.pl, total: 27 });
     ok("el total en unidades fija el stock del depósito: 27", r.status === 200 && (await stockDe(PACK, depo.id)) === 27, json(r));
+    // El costo del pack es POR BULTO (600 el de 6): la unidad vale 100, como en
+    // Valor del stock. Faltan 13 unidades: $1.300.
+    const d = await diferencias(S.adminDepo);
+    guardar("diferenciasDeposito", d);
+    ok(
+      "la plata del depósito sale del costo por bulto: faltan 13 un, $1.300",
+      d.status === 200 && json(resumenDif(d)) === json([["Agua x6", -13, -1300]]) && d.totales?.faltante === 1300 && d.totales?.sobrante === 0,
+      json(d)
+    );
   }
 
   seccion("6. Terminar");
@@ -330,6 +402,26 @@ try {
     }
     const conPin = await fijar(S.duenoConPin, P.vacio, 0);
     ok("con PIN en la cuenta del dueño sí cuenta, a nombre de la operadora", conPin.status === 200 && conPin.item?.conteo?.contadoPor === "Ana", json(conPin));
+
+    // Las diferencias con el control abierto: se calculan ahora, a costo (600).
+    // La coca se volvió a contar después de borrarla: su sistema de antes es el
+    // 4 que había al contarla de nuevo.
+    const vivo = await diferencias(S.dueno);
+    guardar("diferenciasAbierto", vivo);
+    ok(
+      "las diferencias del abierto: faltan la coca (−2) y el queso (−1,25 kg); sobra el sin fila (+2)",
+      vivo.status === 200 && vivo.congelado === false && vivo.conPlata === true &&
+        json(resumenDif(vivo)) === json([["Coca 2L", -2, -1200], ["Queso por kg", -1.25, -750], ["Sin fila", 2, 1200]]),
+      json(resumenDif(vivo))
+    );
+    ok("y los totales: faltante $1.950, sobrante $1.200, 3 productos", vivo.totales?.faltante === 1950 && vivo.totales?.sobrante === 1200 && vivo.totales?.productos === 3, json(vivo.totales));
+    const sinPlata = await diferencias(S.ana);
+    guardar("diferenciasSinPlata", sinPlata);
+    ok(
+      "el encargado, sin costos.ver, ve las cantidades y no la plata",
+      sinPlata.status === 200 && sinPlata.conPlata === false && sinPlata.filas.every((f) => f.importe === null && f.costoUnitario === null) && sinPlata.totales?.faltante === null && sinPlata.totales?.productos === 3,
+      json(sinPlata)
+    );
     const sinPinCuenta = await pedir(R.terminar, "GET", `${B}/terminar`, S.cuentaSinPin);
     ok("la cuenta del encargado, sin PIN, sí ve la lista de terminar", sinPinCuenta.status === 200, json(sinPinCuenta));
     const vieja = await pedir(R.terminar, "POST", `${B}/terminar`, S.dueno, { productos: [P.galletas.pl] });
@@ -338,9 +430,34 @@ try {
     ok("terminar pone 2 en cero", fin.status === 200 && fin.puestosEnCero === 2, json(fin));
     ok("galletas y fideos en 0; la yerba sigue en 10; la coca en 2", (await stockDe(P.galletas)) === 0 && (await stockDe(P.fideos)) === 0 && (await stockDe(P.yerba)) === 10 && (await stockDe(P.coca)) === 2);
     ok("el inactivo no se tocó", (await stockDe(P.inactivo)) === 7);
+    ok("terminar contesta el id del control, para abrir su informe", fin.controlId === controlId, json(fin));
     const e = await estado(S.dueno);
     guardar("terminado", e);
     ok("sin control abierto, el último terminado dice quién y cuántos", e.control === null && e.ultimo?.terminadoPorNombre === "Emanuel" && e.ultimo?.puestosEnCero === 2, json(e.ultimo));
+    ok("y el historial lo tiene", json(e.historial?.map((h) => h.id)) === json([controlId]), json(e.historial));
+
+    // El informe congelado: entran los puestos en cero —las galletas en −15
+    // puestas en 0 SOBRAN 15—, en el orden de la plata que falta.
+    const congelado = await diferencias(S.dueno, controlId);
+    guardar("diferenciasCongeladas", congelado);
+    const esperado = [
+      ["Fideos", -4, -2400],
+      ["Coca 2L", -2, -1200],
+      ["Queso por kg", -1.25, -750],
+      ["Galletas", 15, 9000],
+      ["Sin fila", 2, 1200],
+    ];
+    ok("terminado, el informe se lee congelado, con los puestos en cero", congelado.status === 200 && congelado.congelado === true && json(resumenDif(congelado)) === json(esperado), json(resumenDif(congelado)));
+    ok("los puestos en cero van marcados", congelado.filas.filter((f) => f.puestoEnCero).map((f) => f.nombre).sort().join() === "Fideos,Galletas", json(congelado.filas));
+    ok("y los totales: faltante $4.350, sobrante $10.200, 5 productos", congelado.totales?.faltante === 4350 && congelado.totales?.sobrante === 10200 && congelado.totales?.productos === 5, json(congelado.totales));
+    ok("se guardó en su tabla, una fila por producto revisado", (await c.diferenciaControlStock.count({ where: { controlId } })) >= 5);
+    // Después de terminar se vende y cambia el costo: el informe no se mueve.
+    await vender(P.coca, 1);
+    await c.productoLocal.update({ where: { id: P.coca.pl }, data: { precio_costo: 9999 } });
+    const otraVez = await diferencias(S.dueno, controlId);
+    ok("una venta y un costo nuevo después de terminar no cambian el informe", json(otraVez.filas) === json(congelado.filas) && json(otraVez.totales) === json(congelado.totales), json(resumenDif(otraVez)));
+    const ajeno = await diferencias(S.dueno, 999999);
+    ok("el informe de un control que no es del local: 404", ajeno.status === 404, json(ajeno));
   }
 
   seccion("7. El Libro y la bitácora de stock");
@@ -371,7 +488,9 @@ try {
     const r = await fijar(S.dueno, P.fideos, 3);
     ok("fijar con el control terminado: 409, y no mueve el stock", r.status === 409 && (await stockDe(P.fideos)) === 0, json(r));
     const l = await lista(S.dueno);
-    ok("la lista sin control: 409", l.status === 409, json(l));
+    ok("la lista sin control es la de Stock, sin conteos ni contadores", l.status === 200 && l.resumenControl === null && l.items?.every((i) => i.conteo === undefined), json(l.resumenControl));
+    const sinControl = await escanear(S.dueno, "codigo=7790000000001");
+    ok("el lector sin control: 409", sinControl.status === 409, json(sinControl));
     // Y lo abre la cuenta del encargado, sin PIN: gestionar es de la cuenta.
     const nuevo = await pedir(R.abrir, "POST", `${B}/abrir`, S.cuentaSinPin);
     const abierto = nuevo.control ? await c.controlStock.findUnique({ where: { id: nuevo.control.id } }) : null;
