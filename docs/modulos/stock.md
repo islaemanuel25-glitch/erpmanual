@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-10-20 10:55
+**Última actualización:** 2026-10-20 11:12
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -498,6 +498,7 @@ la API del Stock Diario y no se tocó; hay que confirmarlo ejerciéndolo antes d
 corregirlo.
 
 ## Cambios recientes
+- 2026-10-20: fix: Control de stock — con PIN se cuenta pero no se empieza ni termina, el encargado gestiona, y terminar pide confirmación (pantalla SIN VERIFICAR en navegador)
 - 2026-10-20: feat: Control de stock, conteo físico por local (pantalla SIN VERIFICAR en navegador)
 - 2026-10-20: fix: Stock encuentra por el código propio del local con el buscador de la caja
 - 2026-10-17: fix: con un operador activo por PIN, el Panel deja de mostrar el total del día y Finanzas

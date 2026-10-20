@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-20 10:55
+**Última actualización:** 2026-10-20 11:12
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-20: fix: Control de stock — con PIN se cuenta pero no se empieza ni termina, el encargado gestiona, y terminar pide confirmación (pantalla SIN VERIFICAR en navegador)
 - 2026-10-20: feat: Control de stock, conteo físico por local (pantalla SIN VERIFICAR en navegador)
 - 2026-10-19: feat: Finanzas → Sueldos, sección propia con pagos atados a empleados del local (pantalla SIN VERIFICAR en navegador)
 - 2026-10-19: fix: el horario del turno operativo no corta la venta; se saca el bloqueo por fin de turno
