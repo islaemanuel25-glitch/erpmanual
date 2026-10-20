@@ -47,6 +47,20 @@ Si la lista está vacía, el despliegue es solo de código.
   escribe la columna en todo gasto nuevo y sin ella el alta de cualquier gasto
   —y "Pagar" del POS— se cae. La imagen vieja con la columna puesta sigue
   andando: no la conoce y la deja nula.
+- `20261020120000_control_de_stock` — **Aditiva, sin datos.** Stock → Control
+  de stock. Crea el enum `EstadoControlStock`, las tablas `ControlStock` y
+  `ConteoControlStock` (vacías), la columna nula
+  `AuditoriaStock.controlStockId` con su índice y un índice único parcial —un
+  solo control ABIERTO por local—. No toca ninguna fila. Va ANTES de levantar
+  la imagen nueva: la pantalla del control lee las tablas. La imagen vieja con
+  esto puesto sigue andando: no las conoce.
+- `20261020120100_permisos_control_stock_dueno_local` — **De datos, chica.**
+  Agrega `stock.control.gestionar` y `stock.control.contar` a los permisos del
+  rol DUEÑO_LOCAL, concatenando: no saca ninguno ni toca otro rol. **El
+  clasificador la frena** por el UPDATE de `Rol`, igual que
+  `20261017120000_permiso_ventas_ver_dia`; confirmarla es de Emanuel. Correrla
+  dos veces no cambia nada. Puede ir antes o después de la imagen; sin ella el
+  dueño no ve el módulo hasta tildarlos en Roles (el Admin sí, por "*").
 
 Producción está en **71 migraciones**, la última
 `20261019120000_operador_sesion_invalidada_en`.

@@ -167,20 +167,27 @@ export function CifraHero({ rotulo, valor, color = "sunmi-text-strong", accesori
 /**
  * EL ENCABEZADO DE UN DETALLE (B, C, I): ‹, el título, el local y una línea de
  * contexto. "‹" vuelve a la vista anterior.
+ *
+ * `etiqueta` es el rótulo chico en el color de acción ARRIBA del título
+ * ("STOCK · CONTROL"), y sin `onVolver` no hay "‹": los dos los pidió el
+ * Control de stock. Sin ellos, el encabezado es el de siempre.
  */
-export function EncabezadoDeDetalle({ titulo, local, contexto, onVolver }) {
+export function EncabezadoDeDetalle({ titulo, local, contexto, onVolver, etiqueta = null }) {
   return (
     <header className="space-y-1">
+      {etiqueta ? <div className="text-xs2 font-semibold tracking-wider sunmi-text-accent">{etiqueta}</div> : null}
       <div className="flex items-center gap-2.5">
-        <SunmiButton
-          color="ghost"
-          type="button"
-          onClick={onVolver}
-          aria-label="Volver"
-          className="min-h-toque min-w-toque justify-center px-0 text-xl2 sunmi-text-muted"
-        >
-          ‹
-        </SunmiButton>
+        {onVolver ? (
+          <SunmiButton
+            color="ghost"
+            type="button"
+            onClick={onVolver}
+            aria-label="Volver"
+            className="min-h-toque min-w-toque justify-center px-0 text-xl2 sunmi-text-muted"
+          >
+            ‹
+          </SunmiButton>
+        ) : null}
         <h1 className="flex-1 min-w-0 text-lg2 font-semibold sunmi-text-strong">{titulo}</h1>
         {local ? <span className="shrink-0 text-sm2 font-medium sunmi-text-muted">{local}</span> : null}
       </div>

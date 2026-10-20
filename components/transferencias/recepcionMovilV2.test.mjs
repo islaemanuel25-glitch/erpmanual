@@ -619,7 +619,10 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // un UPDATE de CobroOffline al sacar el corte por horario. No toca transferencias.
   // Sube a 74 el 2026-10-19: `20261019200000_gasto_modalidad_sueldo`, una columna
   // nula en Gasto con su relleno para los sueldos del POS. No toca transferencias.
-  assert.equal(migraciones.length, 74, "aparecio una migracion que nadie declaro aca");
+  // Sube a 76 el 2026-10-20: `20261020120000_control_de_stock` (dos tablas y una
+  // columna nula en AuditoriaStock) y `20261020120100_permisos_control_stock_dueno_local`
+  // (dos permisos para DUEÑO_LOCAL). No tocan transferencias.
+  assert.equal(migraciones.length, 76, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));

@@ -244,6 +244,7 @@ model Local {
   contadorVenta      PosVentaCounter?
   pedidosProveedor   PedidoProveedor[]
   auditoriaStock     AuditoriaStock[]
+  controlesStock     ControlStock[]
   ticketConfig       TicketConfig?
   configuracionLocal ConfiguracionLocal?
   operadorAsignaciones OperadorEnLocal[]
@@ -4139,6 +4140,14 @@ model AuditoriaStock {
   transferenciaId        Int?
   transferenciaDetalleId Int?
 
+  // ── DE QUÉ CONTROL DE STOCK SALIÓ ─────────────────────────────────────────
+  //
+  // Lo mismo que las dos de arriba, para el conteo físico: cada conteo, cada
+  // corrección y cada producto puesto en cero al terminar deja su fila acá, y
+  // esta columna dice de qué control. Sin FK, como `productoLocalId`: la
+  // auditoría es historia y no depende de que el control siga existiendo.
+  controlStockId         Int?
+
   createdAt        DateTime @default(now())
 
   local   Local   @relation(fields: [localId], references: [id])
@@ -4150,6 +4159,89 @@ model AuditoriaStock {
   @@index([createdAt])
   @@index([transferenciaId])
   @@index([transferenciaDetalleId])
+  @@index([controlStockId])
+}
+
+// ---------------------------------------------------------------------------
+// CONTROL DE STOCK: EL CONTEO FÍSICO DE UN LOCAL
+// ---------------------------------------------------------------------------
+//
+// Se cuenta por sector pasando el lector, durante días y con varios celulares.
+// Lo que no está nunca se escanea, así que el stock falso de eso no lo corrige
+// ningún conteo: lo corrige TERMINAR, que pone en cero lo que nadie contó.
+//
+// Cada conteo mueve el stock EN EL MOMENTO en que se guarda —el primero de un
+// producto fija, los siguientes suman—, así que lo que se vende o se recibe
+// después sigue moviendo el stock normal y no se pisa al final. Las reglas
+// están en `lib/stock/control/controlStock.js`; las escrituras, en
+// `lib/stock/control/controlStockServer.js`.
+//
+// Un solo control ABIERTO por local: lo asegura un índice único parcial de la
+// migración `20261020120000_control_de_stock`, que Prisma no sabe expresar.
+enum EstadoControlStock {
+  ABIERTO
+  TERMINADO
+}
+
+model ControlStock {
+  id      Int                @id @default(autoincrement())
+  localId Int
+  estado  EstadoControlStock @default(ABIERTO)
+
+  abiertoEn          DateTime @default(now())
+  abiertoPorUsuarioId Int
+  // Quién lo abrió y quién lo cerró, con su nombre del momento: el operador
+  // activo por PIN, o la cuenta si no había. Un hecho del momento, no se deriva.
+  abiertoPorOperadorId Int?
+  abiertoPorNombre     String
+
+  terminadoEn            DateTime?
+  terminadoPorUsuarioId  Int?
+  terminadoPorOperadorId Int?
+  terminadoPorNombre     String?
+  // Cuántos productos puso en cero el terminar. Un CONTEO de productos: nunca se
+  // suman cantidades de productos distintos.
+  puestosEnCero          Int?
+
+  actualizadoEn DateTime @updatedAt
+
+  local   Local                @relation(fields: [localId], references: [id])
+  conteos ConteoControlStock[]
+
+  @@index([localId, estado])
+}
+
+model ConteoControlStock {
+  id              Int @id @default(autoincrement())
+  controlId       Int
+  localId         Int
+  productoLocalId Int
+
+  // En la unidad en que `StockLocal` guarda ese producto en este local
+  // (`unidadFisicaDeStock`). Misma escala que StockLocal.
+  cantidad Decimal @db.Decimal(12, 3)
+
+  // QUIÉN CONTÓ: el operador activo por PIN y la cuenta. Sin operador, la
+  // cuenta es la persona (dueño o admin). El nombre se guarda: es el que se
+  // mostró cuando se contó.
+  usuarioId   Int
+  operadorId  Int?
+  contadoPor  String
+
+  // Si este conteo fue el PRIMERO del producto en el control —el que fijó el
+  // stock— o uno de los que suman. Un hecho de cuando se guardó.
+  fijo Boolean
+
+  creadoEn      DateTime  @default(now())
+  actualizadoEn DateTime  @updatedAt
+  // Borrar un conteo no borra la fila: queda la historia, y el stock se ajusta
+  // por la diferencia. Lo borrado no cuenta como contado.
+  borradoEn     DateTime?
+
+  control ControlStock @relation(fields: [controlId], references: [id])
+
+  @@index([controlId, productoLocalId])
+  @@index([controlId, usuarioId, operadorId])
 }
 
 // CORRECCIÓN HISTÓRICA DE CAJA

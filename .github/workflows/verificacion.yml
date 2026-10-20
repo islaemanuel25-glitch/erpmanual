@@ -306,6 +306,12 @@ jobs:
           # Base descartable.
           echo ""
           node --import ./scripts/alias-loader.mjs scripts/pruebas-db/stockCodigoPropio.mjs
+          # Control de stock: el primero fija y el siguiente suma, corregir y
+          # borrar lo propio, terminar con vendidos aparte, el Libro y la
+          # bitácora, y la migración de permisos sobre roles existentes. Todo por
+          # las rutas reales. Base descartable.
+          echo ""
+          node --import ./scripts/alias-loader.mjs scripts/pruebas-db/controlStock.mjs
           # Pedidos y Azul Chat · pedidos_pendientes (Tanda 9A): cancelar marca y
           # no borra, cada lectura de pedidos deja afuera al cancelado como
           # cuando se borraba, rehacer por el carrito, y la capacidad. Todo por

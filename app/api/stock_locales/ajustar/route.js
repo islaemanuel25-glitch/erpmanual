@@ -63,6 +63,8 @@ import {
   validarPedidoDeAjuste,
 } from "@/lib/stock/ajusteManual";
 import { declararOrigenDeStock, ORIGEN_STOCK } from "@/lib/stock/libro/libroStock";
+// La fila bloqueada y la creación en cero: las comparte con el Control de stock.
+import { bloquearFila, crearFilaEnCero } from "@/lib/stock/filaDeStock";
 
 const TEXTO_SIN_AUDITORIA =
   "No se puede registrar el ajuste porque no se pudo determinar el grupo de la " +
@@ -123,39 +125,6 @@ async function reglasDelAjuste(localId) {
     requireMotivoAjuste: configGrupo?.requireMotivoAjusteStock === true,
     requireMotivoLimites: configGrupo?.requireMotivoLimitesStock === true,
   };
-}
-
-/** La fila bloqueada hasta el fin de la transacción, o null si no existe. */
-async function bloquearFila(tx, localId, productoLocalId) {
-  const filas = await tx.$queryRaw`
-    SELECT "id", "cantidad", "stockMin", "stockMax"
-    FROM "StockLocal"
-    WHERE "localId" = ${localId} AND "productoId" = ${productoLocalId}
-    FOR UPDATE`;
-  return filas[0] ?? null;
-}
-
-/**
- * Crea la fila en cero si falta, con el origen ya declarado, y la devuelve
- * bloqueada. `skipDuplicates` es el `ON CONFLICT DO NOTHING`: si otro pedido la
- * creó en el medio, no se duplica ni explota, y la lectura que sigue la ve.
- */
-async function crearFilaEnCero(tx, localId, productoLocalId) {
-  await tx.stockLocal.createMany({
-    data: [
-      {
-        localId,
-        productoId: productoLocalId,
-        cantidad: 0,
-        // NULL, no 0: crear la fila para poder ajustar cantidad no configura
-        // límites. Los sella el modo "limites", más abajo.
-        stockMin: null,
-        stockMax: null,
-      },
-    ],
-    skipDuplicates: true,
-  });
-  return bloquearFila(tx, localId, productoLocalId);
 }
 
 /**

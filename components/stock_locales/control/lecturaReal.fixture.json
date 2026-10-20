@@ -1,0 +1,130 @@
+{
+  "productoConAviso": {
+    "ok": true,
+    "producto": {
+      "productoLocalId": 1,
+      "nombre": "Coca 2L",
+      "codigoBarra": "7790000000001",
+      "unidadFisica": "UNIDAD",
+      "unidad": "un",
+      "admiteDecimales": false
+    },
+    "aviso": "Ya contado por Emanuel: 3 un · Lo tuyo se suma"
+  },
+  "abierto": {
+    "ok": true,
+    "local": {
+      "id": 1,
+      "nombre": "Mini el 7",
+      "es_deposito": false
+    },
+    "control": {
+      "id": 1,
+      "abiertoEn": "2026-10-20T10:47:15.176Z",
+      "abiertoPorNombre": "Emanuel",
+      "contados": 3,
+      "sinContar": 3,
+      "personas": [
+        {
+          "clave": "op:1",
+          "nombre": "Ana",
+          "ultimo": "2026-10-20T10:47:15.377Z",
+          "productos": 2
+        },
+        {
+          "clave": "us:1",
+          "nombre": "Emanuel",
+          "ultimo": "2026-10-20T10:47:15.340Z",
+          "productos": 2
+        }
+      ]
+    },
+    "misConteos": [
+      {
+        "id": 4,
+        "productoLocalId": 7,
+        "nombre": "Sin fila",
+        "cantidad": 2,
+        "unidadFisica": "UNIDAD",
+        "unidad": "un",
+        "admiteDecimales": false,
+        "creadoEn": "2026-10-20T10:47:15.377Z"
+      },
+      {
+        "id": 2,
+        "productoLocalId": 1,
+        "nombre": "Coca 2L",
+        "cantidad": 4,
+        "unidadFisica": "UNIDAD",
+        "unidad": "un",
+        "admiteDecimales": false,
+        "creadoEn": "2026-10-20T10:47:15.318Z"
+      }
+    ],
+    "quien": {
+      "nombre": "Ana"
+    }
+  },
+  "terminar": {
+    "ok": true,
+    "local": {
+      "id": 1,
+      "nombre": "Mini el 7",
+      "es_deposito": false
+    },
+    "control": {
+      "id": 1,
+      "abiertoEn": "2026-10-20T10:47:15.176Z"
+    },
+    "vendidos": [
+      {
+        "stockLocalId": 3,
+        "productoLocalId": 3,
+        "nombre": "Yerba 1kg",
+        "codigoBarra": "7790000000003",
+        "stock": 10,
+        "unidadFisica": "UNIDAD",
+        "unidad": "un",
+        "vendidas": 2
+      }
+    ],
+    "aCero": [
+      {
+        "stockLocalId": 5,
+        "productoLocalId": 5,
+        "nombre": "Fideos",
+        "codigoBarra": "7790000000005",
+        "stock": 4,
+        "unidadFisica": "UNIDAD",
+        "unidad": "un"
+      },
+      {
+        "stockLocalId": 4,
+        "productoLocalId": 4,
+        "nombre": "Galletas",
+        "codigoBarra": "7790000000004",
+        "stock": -15,
+        "unidadFisica": "UNIDAD",
+        "unidad": "un"
+      }
+    ]
+  },
+  "terminado": {
+    "ok": true,
+    "local": {
+      "id": 1,
+      "nombre": "Mini el 7",
+      "es_deposito": false
+    },
+    "control": null,
+    "ultimo": {
+      "id": 1,
+      "terminadoEn": "2026-10-20T10:47:15.547Z",
+      "terminadoPorNombre": "Emanuel",
+      "puestosEnCero": 2
+    },
+    "quien": {
+      "nombre": "Emanuel"
+    }
+  }
+}
