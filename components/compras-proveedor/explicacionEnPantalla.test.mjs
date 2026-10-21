@@ -60,6 +60,8 @@ const RECEPCION = "app/modulos/compras-proveedor/[id]/page.jsx";
 const RUTA = "app/api/compras-proveedor/recetas/explicacion/route.js";
 const RUTA_CORREGIR = "app/api/compras-proveedor/comprobantes/corregir/[id]/route.js";
 const VISOR = "components/compras-proveedor/VisorDeFoto.jsx";
+const PROPUESTA = "components/compras-proveedor/PropuestaDeReceta.jsx";
+const EN_LA_RECEPCION = "components/compras-proveedor/PropuestaEnLaRecepcion.jsx";
 
 const aLaVista = (html) => html.replace(/<[^>]*>/g, " ");
 
@@ -160,24 +162,34 @@ test("GUARDAR GUARDA SOLO LA EXPLICACIÓN", () => {
 });
 
 test("NO SE PUEDE GUARDAR SI EL PAPEL NO CIERRA", () => {
-  const c = codigoDe(EXPLICACION);
-  assert.match(c, /sePuedeGuardar/, "se perdió la condición de guardado");
+  // ── EL BOTÓN SE MUDÓ EL 2026-10-21, Y EL CANDADO CON ÉL ───────────────
+  //
+  // «Está bien, guardar» y su condición viven en `PropuestaDeReceta`, que
+  // dibujan Recetas de facturas y la recepción. Lo que se afirma es lo mismo;
+  // cambia dónde se mira, y que las DOS pantallas le pasen la condición.
+  const bloque = codigoDe(PROPUESTA);
   // El botón mira DOS cosas: que el papel cierre, y que no haya una relectura
   // de los pendientes en curso —apretar en el medio dispararía dos tandas de
   // llamadas pagas—. La condición de cierre es la que este candado defiende.
   assert.match(
-    c,
+    bloque,
     /disabled=\{guardando \|\| Boolean\(releyendo\) \|\| !sePuedeGuardar\}/,
     "el botón de guardar dejó de mirar si el papel cierra"
   );
   assert.match(
-    c,
+    bloque,
     /Se puede guardar cuando los productos sumen el total del papel/,
     "se perdió el motivo por el que el botón está apagado"
   );
   // Y la excepción que SÍ corresponde: un papel sin total no tiene contra qué
   // cerrar, así que se guarda igual.
-  assert.match(c, /hayTotal === false \? Boolean\(explicacion\.trim\(\)\)/);
+  assert.match(bloque, /hayTotal === false \? Boolean\(explicacion\.trim\(\)\)/);
+  // Las dos pantallas calculan la condición con la MISMA función y la pasan.
+  for (const pantalla of [EXPLICACION, EN_LA_RECEPCION]) {
+    const c = codigoDe(pantalla);
+    assert.match(c, /sePuedeGuardarLaExplicacion\(\{ resultado, explicacion \}\)/, pantalla);
+    assert.match(c, /sePuedeGuardar=\{sePuedeGuardar\}/, `${pantalla} no le pasa la condición al botón`);
+  }
 });
 
 test("EL BLOQUE NO CORRIGE NADA: SOLO DIBUJA LO QUE LEYÓ", () => {
@@ -195,7 +207,11 @@ test("EL BLOQUE ES UNO SOLO, USADO POR LAS DOS PANTALLAS", () => {
   // Era una sola pantalla y ahora son dos: la receta y la corrección de la
   // recepción. Si se copiara, se separarían el día que una cambie — es
   // literalmente la regla 1.
-  for (const pantalla of [EXPLICACION, CORRECCION]) {
+  //
+  // Desde el 2026-10-21 la receta no lo importa directo: lo dibuja a través de
+  // `PropuestaDeReceta`, que es lo que comparte con la recepción.
+  assert.match(codigoDe(EXPLICACION), /<PropuestaDeReceta/);
+  for (const pantalla of [PROPUESTA, CORRECCION]) {
     assert.match(
       codigoDe(pantalla),
       /import AsiLoEntendio.*from "@\/components\/compras-proveedor\/AsiLoEntendio"/,
@@ -204,7 +220,7 @@ test("EL BLOQUE ES UNO SOLO, USADO POR LAS DOS PANTALLAS", () => {
     assert.match(codigoDe(pantalla), /<AsiLoEntendio/);
   }
   // Y ninguna se quedó con una copia de las piezas de adentro.
-  for (const pantalla of [EXPLICACION, CORRECCION]) {
+  for (const pantalla of [EXPLICACION, PROPUESTA, EN_LA_RECEPCION, CORRECCION]) {
     assert.ok(
       !/function ProductoSospechoso|function ProductoLeido/.test(codigoDe(pantalla)),
       `${pantalla} volvió a tener su propia copia del producto sospechoso`
@@ -337,7 +353,7 @@ test("«LEER DE NUEVO» EXISTE, Y SOLO MIENTRAS EL PEDIDO SE ESTÁ RECIBIENDO", 
 
 test("EN PANTALLA SE DICE PRODUCTOS, NUNCA RENGLONES NI LÍNEAS", () => {
   // Solo el texto que se ve: los nombres de variables no cuentan.
-  const juntos = [BLOQUE, EXPLICACION, CORRECCION]
+  const juntos = [BLOQUE, EXPLICACION, PROPUESTA, EN_LA_RECEPCION, CORRECCION]
     .flatMap((f) => [...codigoDe(f).matchAll(/>\s*([^<>{}\n]{6,120})\s*</g)].map((m) => m[1]))
     .join(" ")
     .toLowerCase() + " " + [AVISO_PROBAR, TITULO_PROBAR].join(" ").toLowerCase();
@@ -382,6 +398,8 @@ test("NADIE ESCRIBE UN NÚMERO DE HTTP EN PANTALLA", () => {
     EXPLICACION,
     CORRECCION,
     BLOQUE,
+    PROPUESTA,
+    EN_LA_RECEPCION,
     // `ListaConciliacion.jsx` estaba acá y se borró el 2026-09-24 con la
     // pantalla vieja de "Llegó sin factura".
     "components/comprobantes/PiezasConciliacion.jsx",

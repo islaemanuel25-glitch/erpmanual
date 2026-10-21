@@ -15,6 +15,7 @@ import SunmiTableRow from "@/components/sunmi/SunmiTableRow";
 import PanelComprobantes from "@/components/comprobantes/PanelComprobantes";
 import ListaDeLaFactura from "@/components/compras-proveedor/ListaDeLaFactura";
 import CorregirComprobante from "@/components/compras-proveedor/CorregirComprobante";
+import PropuestaEnLaRecepcion from "@/components/compras-proveedor/PropuestaEnLaRecepcion";
 import HojaCorregirLinea from "@/components/compras-proveedor/HojaCorregirLinea";
 import HojaCerrarRecepcion from "@/components/compras-proveedor/HojaCerrarRecepcion";
 import PedidoRecibido from "@/components/compras-proveedor/PedidoRecibido";
@@ -1494,6 +1495,19 @@ export default function DetallePedidoProveedorPage({ params }) {
           malLeidos.map((id) => (
             <CorregirComprobante key={id} comprobanteId={id} onCorregido={cargar} />
           ))}
+
+        {/* ── LA RECETA QUE ARMÓ EL SISTEMA, PARA CONFIRMAR ACÁ MISMO ────
+            El mismo bloque de Recetas de facturas, arriba de los productos del
+            papel. Si el proveedor no tiene ninguna propuesta para el tipo de
+            papel que llegó, no dibuja nada. */}
+        {esRecepcion && !sinPapel && (
+          <PropuestaEnLaRecepcion
+            proveedorId={pedido.proveedor?.id ?? pedido.proveedorId ?? null}
+            comprobantes={(conciliacion?.grupos || [])
+              .map((g) => g?.comprobante)
+              .filter(Boolean)}
+          />
+        )}
 
         {/* ── SIN PAPEL, MIENTRAS LLEGAN LAS LÍNEAS DEL PEDIDO ───────────
             Las trae el endpoint de conciliación. Si no se pudo, se dice: una

@@ -35,14 +35,16 @@ import { pedirLaLectura } from "@/lib/compras-proveedor/comprobante/leerConTurno
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
-import SunmiTextarea from "@/components/sunmi/SunmiTextarea";
 import SunmiSolapas from "@/components/sunmi/SunmiSolapas";
-import AsiLoEntendio from "@/components/compras-proveedor/AsiLoEntendio";
+import PropuestaDeReceta, {
+  MensajeDeLaReceta,
+  TarjetaDeLaExplicacion,
+  sePuedeGuardarLaExplicacion,
+} from "@/components/compras-proveedor/PropuestaDeReceta";
 import VisorDeFoto from "@/components/compras-proveedor/VisorDeFoto";
 import { comoLoEntendio } from "@/lib/compras-proveedor/comprobante/pruebaDeExplicacion";
 import {
   TIPO_DE_PAPEL,
-  rotuloDelTipo,
   tipoDePapel,
 } from "@/lib/compras-proveedor/comprobante/explicacionPorTipo";
 import {
@@ -83,9 +85,6 @@ export function textoDeFallo(cuerpo, status) {
   if (cuerpo?.error) return cuerpo.error;
   return queHacerHttp(status, { operacion: OPERACION.LECTURA }).texto;
 }
-/** La línea que dice que esto lo armó el sistema y no una persona. */
-export const TEXTO_PROPUESTA =
-  "Esto lo armó el sistema leyendo una factura de este proveedor, y la cuenta cierra. Revisalo: si está bien, se guarda como su receta.";
 export const BAJADA =
   "Explicale cómo se lee, como se lo explicarías a una persona. Se hace una sola vez por cada tipo de papel.";
 
@@ -109,6 +108,128 @@ export function tiposAOfrecer({ explicaciones = {}, propuestas = {}, tipoDelPape
 }
 
 /**
+ * GUARDAR UNA EXPLICACIÓN —O CONFIRMAR LA QUE ARMÓ EL SISTEMA— Y RELEER LO
+ * QUE QUEDÓ LEÍDO CON LA VIEJA.
+ *
+ * Era el `guardar` de esta pantalla y se sacó a un hook el 2026-10-21 para que
+ * la recepción confirme la propuesta por el MISMO camino: la misma ruta, el
+ * mismo cuerpo y la misma relectura. La recepción no tiene una copia.
+ *
+ * @param setMensaje  dónde decir cómo salió: cada pantalla lo dibuja donde va
+ * @returns `{ guardando, releyendo, guardar }`
+ */
+export function useGuardarLaExplicacion({ setMensaje }) {
+  const [guardando, setGuardando] = useState(false);
+  /** `{hechas, total}` mientras se releen las facturas sin recibir. `null` = ninguna. */
+  const [releyendo, setReleyendo] = useState(null);
+
+  /**
+   * LOS PAPELES SIN RECIBIR SE VUELVEN A LEER CON LA RECETA NUEVA.
+   *
+   * Cambiar la explicación cambia cómo se entiende el papel, así que un
+   * comprobante subido antes quedó leído con la vieja. Le pasó al #247: la
+   * receta se guardó a las 15:10 y el comprobante seguía con la lectura de
+   * antes, con cero renglones y sin salida en la pantalla.
+   *
+   * ── ESTO NO ES UN CAMINO NUEVO ───────────────────────────────────────
+   *
+   * Es el que tenía la lista de recetas para el formulario de impuestos —que
+   * se borró con el código de formato (segunda parte de #165)—, con su forma
+   * entera: de a uno, esperando el turno con `pedirLaLectura`, y cortando si se
+   * acaba la cuota. Hoy es el único camino de relectura después de guardar.
+   *
+   * ── LA ESPERA DEL TURNO NO ES UN DETALLE ─────────────────────────────
+   *
+   * El POST contesta enseguida con un número de turno. Sin esperarlo, este
+   * `for` dispararía todas las relecturas en paralelo contra una cuota de
+   * veinte por día, y las contaría como buenas antes de que ninguna hubiera
+   * terminado. El censo de `laRecepcionSobreviveAlRefresco` existe para que
+   * nadie agregue un camino que llame a la ruta por afuera — y se puso rojo
+   * con la primera versión de esto, que hacía exactamente eso.
+   *
+   * ── LOS DEL PEDIDO QUE SE ESTÁ RECIBIENDO NO SE RELEEN ──────────────
+   *
+   * `exceptuar` lo pasa la recepción con los comprobantes de su pedido. El que
+   * armó la propuesta ya está leído con ella —es la lectura que cerró—, y
+   * releer cualquiera de ellos cambiaría los renglones debajo de una recepción
+   * a medio controlar. Los que falten se releen con «Leer de nuevo».
+   */
+  async function releerLosPendientes(relectura, exceptuar = []) {
+    const ids = (relectura?.ids ?? [])
+      .filter((id) => !exceptuar.includes(id))
+      .slice(0, relectura?.entran ?? 0);
+    if (!ids.length) return;
+    setReleyendo({ hechas: 0, total: ids.length });
+    let bien = 0;
+    let cortado = null;
+    for (const [i, id] of ids.entries()) {
+      try {
+        const { cuerpo: json } = await pedirLaLectura({
+          comprobanteId: id,
+          origen: ORIGEN_DE_LECTURA.RECETA,
+          fetchImpl: fetch,
+        });
+        if (json?.ok) bien++;
+        // Si se acabó la cuota en el medio se frena: seguir gasta llamadas que
+        // van a fallar todas y demora el aviso.
+        else if (json?.motivo === "CUOTA_AGOTADA") {
+          cortado = json?.error;
+          break;
+        }
+      } catch {
+        cortado = "Se cortó la conexión.";
+        break;
+      }
+      setReleyendo({ hechas: i + 1, total: ids.length });
+    }
+    setReleyendo(null);
+    setMensaje({
+      tipo: cortado ? "aviso" : "ok",
+      texto: cortado
+        ? `Se releyeron ${bien} de ${ids.length}. ${cortado}`
+        : `Guardada. Se volvieron a leer ${bien} ${bien === 1 ? "factura" : "facturas"} de este proveedor que todavía no se recibieron.`,
+    });
+  }
+
+  /**
+   * @param cuerpo      lo que va a la ruta, armado por cada pantalla
+   * @param alGuardar   qué hacer apenas se guardó, antes de releer
+   * @param exceptuar   ids de comprobantes que no se releen
+   * @returns true si se guardó
+   */
+  async function guardar({ cuerpo, alGuardar = null, exceptuar = [] }) {
+    setGuardando(true);
+    setMensaje(null);
+    try {
+      const r = await fetch("/api/compras-proveedor/recetas/explicacion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(cuerpo),
+      });
+      const d = await r.json().catch(() => null);
+      setMensaje(
+        d?.ok
+          ? { tipo: "ok", texto: d.queHacer }
+          : { tipo: "error", texto: textoDeFallo(d, r.status) }
+      );
+      if (d?.ok) {
+        alGuardar?.(d);
+        if (d.relectura?.hayQueOfrecer) await releerLosPendientes(d.relectura, exceptuar);
+      }
+      return Boolean(d?.ok);
+    } catch {
+      setMensaje({ tipo: "error", texto: "Se cortó la conexión: no se guardó." });
+      return false;
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return { guardando, releyendo, guardar };
+}
+
+/**
  * @param proveedorId
  * @param comprobanteId  con cuál papel probar. Lo manda la recepción cuando
  *                       llegó una factura de un proveedor sin explicación: se
@@ -127,8 +248,8 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
   const [probando, setProbando] = useState(false);
   // Qué decirle a quien espera mientras la lectura corre aparte.
   const [leyendo, setLeyendo] = useState(null);
-  const [guardando, setGuardando] = useState(false);
   const [mensaje, setMensaje] = useState(null);
+  const { guardando, releyendo, guardar: guardarLaExplicacion } = useGuardarLaExplicacion({ setMensaje });
   const [lectura, setLectura] = useState(null);
   // ── UNA EXPLICACIÓN POR TIPO DE PAPEL (`explicacionPorTipo.js`) ────────
   //
@@ -137,8 +258,6 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
   const [tipo, setTipo] = useState(TIPO_DE_PAPEL.SIN_FACTURA);
   const [explicaciones, setExplicaciones] = useState({});
   const [propuestas, setPropuestas] = useState({});
-  /** `{hechas, total}` mientras se releen las facturas sin recibir. `null` = ninguna. */
-  const [releyendo, setReleyendo] = useState(null);
   // Qué producto resultó ser cada renglón, cuando se pudo saber por su alias.
   // Lo resuelve el servidor y viaja para que la cuenta se rehaga acá con los
   // MISMOS datos: si no, corregir un número haría cambiar la unidad sola.
@@ -229,8 +348,7 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
     [lectura, productos]
   );
 
-  const sePuedeGuardar =
-    !resultado || resultado.hayTotal === false ? Boolean(explicacion.trim()) : resultado.cierra;
+  const sePuedeGuardar = sePuedeGuardarLaExplicacion({ resultado, explicacion });
 
   async function probar() {
     setProbando(true);
@@ -309,91 +427,19 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
     }
   }
 
-  /**
-   * LOS PAPELES SIN RECIBIR SE VUELVEN A LEER CON LA RECETA NUEVA.
-   *
-   * Cambiar la explicación cambia cómo se entiende el papel, así que un
-   * comprobante subido antes quedó leído con la vieja. Le pasó al #247: la
-   * receta se guardó a las 15:10 y el comprobante seguía con la lectura de
-   * antes, con cero renglones y sin salida en la pantalla.
-   *
-   * ── ESTO NO ES UN CAMINO NUEVO ───────────────────────────────────────
-   *
-   * Es el que tenía la lista de recetas para el formulario de impuestos —que
-   * se borró con el código de formato (segunda parte de #165)—, con su forma
-   * entera: de a uno, esperando el turno con `pedirLaLectura`, y cortando si se
-   * acaba la cuota. Hoy es el único camino de relectura después de guardar.
-   *
-   * ── LA ESPERA DEL TURNO NO ES UN DETALLE ─────────────────────────────
-   *
-   * El POST contesta enseguida con un número de turno. Sin esperarlo, este
-   * `for` dispararía todas las relecturas en paralelo contra una cuota de
-   * veinte por día, y las contaría como buenas antes de que ninguna hubiera
-   * terminado. El censo de `laRecepcionSobreviveAlRefresco` existe para que
-   * nadie agregue un camino que llame a la ruta por afuera — y se puso rojo
-   * con la primera versión de esto, que hacía exactamente eso.
-   */
-  async function releerLosPendientes(relectura) {
-    const ids = (relectura?.ids ?? []).slice(0, relectura?.entran ?? 0);
-    if (!ids.length) return;
-    setReleyendo({ hechas: 0, total: ids.length });
-    let bien = 0;
-    let cortado = null;
-    for (const [i, id] of ids.entries()) {
-      try {
-        const { cuerpo: json } = await pedirLaLectura({
-          comprobanteId: id,
-          origen: ORIGEN_DE_LECTURA.RECETA,
-          fetchImpl: fetch,
-        });
-        if (json?.ok) bien++;
-        // Si se acabó la cuota en el medio se frena: seguir gasta llamadas que
-        // van a fallar todas y demora el aviso.
-        else if (json?.motivo === "CUOTA_AGOTADA") {
-          cortado = json?.error;
-          break;
-        }
-      } catch {
-        cortado = "Se cortó la conexión.";
-        break;
-      }
-      setReleyendo({ hechas: i + 1, total: ids.length });
-    }
-    setReleyendo(null);
-    setMensaje({
-      tipo: cortado ? "aviso" : "ok",
-      texto: cortado
-        ? `Se releyeron ${bien} de ${ids.length}. ${cortado}`
-        : `Guardada. Se volvieron a leer ${bien} ${bien === 1 ? "factura" : "facturas"} de este proveedor que todavía no se recibieron.`,
-    });
-  }
-
   async function guardar() {
-    setGuardando(true);
-    setMensaje(null);
-    try {
-      const r = await fetch("/api/compras-proveedor/recetas/explicacion", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          proveedorId,
-          // La de ESTE tipo de papel: las de las otras solapas no se tocan.
-          tipoComprobante: tipo,
-          explicacion,
-          // Con una explicación propuesta en pantalla, guardar es confirmarla.
-          ...(propuesta ? { confirmarPropuesta: true } : {}),
-          // Vacío significa "no la toques": el default lo pone la base.
-          variacionNormalPct: variacion.trim() === "" ? undefined : Number(variacion.replace(",", ".")),
-        }),
-      });
-      const d = await r.json().catch(() => null);
-      setMensaje(
-        d?.ok
-          ? { tipo: "ok", texto: d.queHacer }
-          : { tipo: "error", texto: textoDeFallo(d, r.status) }
-      );
-      if (d?.ok) {
+    await guardarLaExplicacion({
+      cuerpo: {
+        proveedorId,
+        // La de ESTE tipo de papel: las de las otras solapas no se tocan.
+        tipoComprobante: tipo,
+        explicacion,
+        // Con una explicación propuesta en pantalla, guardar es confirmarla.
+        ...(propuesta ? { confirmarPropuesta: true } : {}),
+        // Vacío significa "no la toques": el default lo pone la base.
+        variacionNormalPct: variacion.trim() === "" ? undefined : Number(variacion.replace(",", ".")),
+      },
+      alGuardar: (d) => {
         setPropuesta(null);
         // Lo guardado pasa a ser la confirmada de esta solapa, y la propuesta
         // de este tipo deja de estar pendiente.
@@ -404,13 +450,8 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
           return resto;
         });
         onGuardado?.();
-        if (d.relectura?.hayQueOfrecer) await releerLosPendientes(d.relectura);
-      }
-    } catch {
-      setMensaje({ tipo: "error", texto: "Se cortó la conexión: no se guardó." });
-    } finally {
-      setGuardando(false);
-    }
+      },
+    });
   }
 
   if (cargando) return <SunmiLoader />;
@@ -451,25 +492,13 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
       />
 
       {/* ── TU EXPLICACIÓN ───────────────────────────────────────────── */}
-      <SunmiCard className="p-3 space-y-dato">
-        <span className="block text-sm3 font-medium sunmi-text-strong">
-          Cómo viene la {rotuloDelTipo(tipo).toLowerCase()}
-        </span>
-        <span className="block text-sm2 sunmi-text-muted">
-          {propuestas[tipo]
-            ? "Está para confirmar: la armó el sistema."
-            : explicaciones[tipo]
-              ? `Confirmada, versión ${explicaciones[tipo].version}.`
-              : "Todavía no tiene explicación: la primera que llegue la explica el lector grande."}
-        </span>
-        <SunmiTextarea
-          rows={7}
-          value={explicacion}
-          onChange={(e) => setExplicacion(e.target.value)}
-          placeholder="Por ejemplo: CANTIDAD son las unidades que manda. BONIF. es el descuento en porcentaje. Cuando la columna PESO trae un número, el PRECIO es por kilo y la cantidad son piezas."
-          className="w-full text-sm3"
-        />
-      </SunmiCard>
+      <TarjetaDeLaExplicacion
+        tipo={tipo}
+        propuesta={Boolean(propuestas[tipo])}
+        confirmada={explicaciones[tipo] ?? null}
+        explicacion={explicacion}
+        onCambiar={setExplicacion}
+      />
 
       {/* ── EL PAPEL CON EL QUE SE PRUEBA ────────────────────────────── */}
       {papel ? (
@@ -528,15 +557,7 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
         </div>
       </SunmiCard>
 
-      {mensaje && (
-        <p
-          className={`text-sm3 break-words ${
-            mensaje.tipo === "error" ? "sunmi-text-danger" : "sunmi-text-success"
-          }`}
-        >
-          {mensaje.texto}
-        </p>
-      )}
+      <MensajeDeLaReceta mensaje={mensaje} />
 
       {!resultado && (
         <div className="flex flex-col gap-dato">
@@ -555,49 +576,21 @@ export default function ExplicacionDelPapel({ proveedorId, comprobanteId = null,
 
       {/* ── ASÍ LO ENTENDIÓ ──────────────────────────────────────────── */}
       {resultado && (
-        <>
-          <span className="block text-sm3 font-medium sunmi-text-strong">Así lo entendió</span>
-          {propuesta && (
-            <p className="text-sm2 sunmi-text-muted break-words">{TEXTO_PROPUESTA}</p>
-          )}
-
-          <AsiLoEntendio resultado={resultado} />
-
-          <div className="flex flex-col gap-dato">
-            <SunmiButton
-              color="primary"
-              type="button"
-              disabled={guardando || Boolean(releyendo) || !sePuedeGuardar}
-              onClick={guardar}
-              className="w-full min-h-botonFoto justify-center text-sm3 font-bold"
-            >
-              {releyendo
-              ? `Releyendo ${releyendo.hechas} de ${releyendo.total}…`
-              : guardando
-                ? "Guardando…"
-                : "Está bien, guardar"}
-            </SunmiButton>
-            {!sePuedeGuardar && (
-              <span className="text-sm3 sunmi-text-muted text-center">
-                Se puede guardar cuando los productos sumen el total del papel.
-              </span>
-            )}
-            <SunmiButton
-              color="slate"
-              type="button"
-              onClick={() => {
-                setLectura(null);
-                setProductos(null);
-                // Descartada en pantalla: guardar ya no la confirma. Queda en
-                // la base hasta que otra boleta arme una nueva o se guarde.
-                setPropuesta(null);
-              }}
-              className="w-full min-h-toque justify-center text-sm3"
-            >
-              Algo está mal: corregir la explicación
-            </SunmiButton>
-          </div>
-        </>
+        <PropuestaDeReceta
+          resultado={resultado}
+          propuesta={Boolean(propuesta)}
+          guardando={guardando}
+          releyendo={releyendo}
+          sePuedeGuardar={sePuedeGuardar}
+          onGuardar={guardar}
+          onCorregir={() => {
+            setLectura(null);
+            setProductos(null);
+            // Descartada en pantalla: guardar ya no la confirma. Queda en
+            // la base hasta que otra boleta arme una nueva o se guarde.
+            setPropuesta(null);
+          }}
+        />
       )}
     </section>
   );
