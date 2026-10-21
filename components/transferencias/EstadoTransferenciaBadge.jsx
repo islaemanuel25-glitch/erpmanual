@@ -42,6 +42,14 @@ export function InsigniaEnCurso({ children }) {
 }
 
 /**
+ * Y SU PAR CERRADO: el control "Terminado" lleva el chip de "Recibida", con las
+ * mismas clases, por el mismo motivo.
+ */
+export function InsigniaTerminada({ children }) {
+  return <span className={`${BASE} ${MAPA.Recibida.clase}`}>{children}</span>;
+}
+
+/**
  * Badge secundario de diferencias. Equivalente al "✎ Corregida" de Ventas.
  * Solo se muestra con la recepción ya confirmada: antes de eso el faltante
  * todavía no es un hecho.

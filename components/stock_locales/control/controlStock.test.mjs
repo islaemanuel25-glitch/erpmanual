@@ -24,6 +24,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime.js";
 
 import PantallaControlStock, { ConfirmarTerminar, InformeDeDiferencias, StockQueNoCoincide } from "@/components/stock_locales/control/PantallaControlStock.jsx";
 import TarjetaConteo, { ESTADO_FILA, EncabezadoDeLaFila } from "@/components/stock_locales/control/TarjetaConteo.jsx";
@@ -118,8 +119,16 @@ const base = {
   volverAlInicio: nada,
   confirmarTerminar: nada,
 };
+// El router de Next montado, como en la app: el Volver de las diferencias es un
+// `SunmiBackButton`, que lo pide aunque vuelva con `onVolver`.
 const html = (c, { gestionar = true } = {}) =>
-  renderToStaticMarkup(React.createElement(PantallaControlStock, { c: { ...base, ...c }, puedeGestionar: gestionar }));
+  renderToStaticMarkup(
+    React.createElement(
+      AppRouterContext.Provider,
+      { value: {} },
+      React.createElement(PantallaControlStock, { c: { ...base, ...c }, puedeGestionar: gestionar })
+    )
+  );
 const dibujar = (c, opciones) => texto(html(c, opciones));
 const tarjeta = (item, esDeposito = false) => renderToStaticMarkup(React.createElement(TarjetaConteo, { item, esDeposito, onGuardar: nada }));
 const de = (lista, nombre) => lista.items.find((i) => i.nombre === nombre);
@@ -489,13 +498,15 @@ test("terminar exige la elección, y queda escrita en el control", () => {
 
 // ── LAS DIFERENCIAS ────────────────────────────────────────────────────────
 
-test("diferencias de un terminado: Faltante y Sobrante en grande, cuántos, y la lista en su orden", () => {
+test("diferencias de un terminado: la cabecera del control, Faltante y Sobrante en su renglón, cuántos, y la lista en su orden", () => {
   const h = html({ estado: real.terminado, vista: VISTA_CONTROL.DIFERENCIAS, diferencias: real.diferenciasCongeladas });
   const t = texto(h);
-  assert.match(t, /^CONTROL DE STOCK · DIFERENCIAS ‹ Diferencias del control Mini el 7 · terminado [a-záéíóú]+ \d\d\/\d\d \d\d:\d\d /);
-  assert.match(t, /FALTANTE \$ \$4\.350,00 SOBRANTE \$ \$10\.200,00 5 productos con diferencia/);
-  assert.match(h, /class="text-xl3 font-semibold tabular-nums sunmi-text-danger">\$4\.350,00/);
-  assert.match(h, /class="text-xl3 font-semibold tabular-nums sunmi-text-warning">\$10\.200,00/);
+  // El shell ya dice "Control de stock": ni la etiqueta ni el título grande.
+  assert.doesNotMatch(t, /CONTROL DE STOCK · DIFERENCIAS|Diferencias del control|‹/);
+  assert.match(t, /^Diferencias Terminado Volver Mini el 7 · desde [a-záéíóú]+ \d\d\/\d\d /);
+  assert.match(t, /Faltante \$4\.350,00 Sobrante \$10\.200,00 5 productos con diferencia/);
+  assert.match(h, /tabular-nums sunmi-text-danger">\$4\.350,00/);
+  assert.match(h, /tabular-nums sunmi-text-warning">\$10\.200,00/);
   assert.match(
     t,
     /PRODUCTOS CON DIFERENCIA Fideos Sistema 4 · Contado 0 · puesto en 0 Faltan 4 un −\$2\.400,00 Coca 2L .*Faltan 2 un −\$1\.200,00 Queso por kg .*Faltan 1,25 kg −\$750,00 Galletas Sistema −15 · Contado 0 · puesto en 0 Sobran 15 un \$9\.000,00 Sin fila .*Sobran 2 un \$1\.200,00$/
@@ -504,16 +515,16 @@ test("diferencias de un terminado: Faltante y Sobrante en grande, cuántos, y la
 
 test("diferencias sin costos.ver: las cantidades, sin un solo peso", () => {
   const t = texto(renderToStaticMarkup(React.createElement(InformeDeDiferencias, { d: real.diferenciasSinPlata })));
-  assert.doesNotMatch(t, /FALTANTE|SOBRANTE|\$/);
+  assert.doesNotMatch(t, /Faltante|Sobrante|FALTANTE|SOBRANTE|\$/);
   assert.match(t, /3 productos con diferencia La plata la ve quien puede ver costos\./);
   assert.match(t, /Coca 2L Sistema 4 · Contado 2 Faltan 2 un/);
   assert.match(fuente("app/api/stock_locales/control/diferencias/route.js"), /checkPerm\(a\.session, PERMISO_PLATA_DE_LAS_DIFERENCIAS\)\.ok/);
 });
 
-test("'Ver diferencias' en el abierto lleva al informe del abierto, que dice que no terminó", () => {
+test("'Ver diferencias' en el abierto lleva al informe del abierto, con el chip 'Abierto'", () => {
   const t = dibujar({ estado: real.abierto, vista: VISTA_CONTROL.DIFERENCIAS, diferencias: real.diferenciasAbierto });
-  assert.match(t, /Mini el 7 · abierto desde [a-záéíóú]+ \d\d\/\d\d, sin terminar/);
-  assert.match(t, /FALTANTE \$ \$1\.950,00 SOBRANTE \$ \$1\.200,00 3 productos con diferencia/);
+  assert.match(t, /^Diferencias Abierto Volver Mini el 7 · desde [a-záéíóú]+ \d\d\/\d\d /);
+  assert.match(t, /Faltante \$1\.950,00 Sobrante \$1\.200,00 3 productos con diferencia/);
 });
 
 // ── LA REVISIÓN: EL STOCK CONTRA LO CONTADO MÁS LO QUE PASÓ DESPUÉS ───────

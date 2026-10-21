@@ -25,7 +25,10 @@
 import { useRef, useState } from "react";
 import { MoreHorizontal } from "lucide-react";
 
+import { useAccionDePagina } from "@/app/context/AccionDePaginaContext";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiButton from "@/components/sunmi/SunmiButton";
+import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import SunmiFiltroEstado from "@/components/sunmi/SunmiFiltroEstado";
 import SunmiHojaDeConfirmacion from "@/components/sunmi/SunmiHojaDeConfirmacion";
@@ -37,7 +40,7 @@ import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 import SunmiPantallaDeTrabajo from "@/components/sunmi/SunmiPantallaDeTrabajo";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import TarjetaConteo, { CLASE_TONO } from "@/components/stock_locales/control/TarjetaConteo";
-import { InsigniaEnCurso } from "@/components/transferencias/EstadoTransferenciaBadge";
+import { InsigniaEnCurso, InsigniaTerminada } from "@/components/transferencias/EstadoTransferenciaBadge";
 // El texto del buscador y el del "⋯" son los de recibir una transferencia.
 import { PLACEHOLDER_BUSCADOR, TITULO_MAS_ACCIONES } from "@/components/transferencias/RecepcionMovil";
 import {
@@ -573,22 +576,35 @@ export function ConfirmarTerminar({ abierto, aCero, sinContar, ocupado, onCancel
 
 // ── DIFERENCIAS ────────────────────────────────────────────────────────────
 
+/**
+ * El shell ya dice "Control de stock": acá no va otro título. Va la MISMA
+ * tarjeta de cabecera que el control abierto —la de recibir una transferencia—
+ * con "Diferencias" y su chip, y el Volver en la fila del shell, como allá.
+ * En escritorio el shell no tiene esa fila, y el mismo nodo se dibuja en la
+ * tarjeta (`hidden md:block`, el corte de `LayoutBase`).
+ */
 function VistaDiferencias({ c, local }) {
   const d = c.diferencias;
   const control = d?.control;
-  const contexto = !control
-    ? local
-    : d.congelado
-      ? `${local} · terminado ${momentoDelControl(control.terminadoEn)}`
-      : `${local} · abierto desde ${diaDelControl(control.abiertoEn)}, sin terminar`;
+  const volver = useAccionDePagina(() => <SunmiBackButton onVolver={c.volverAlInicio} />, [c.volverAlInicio]);
   return (
     <div className="space-y-3.5">
-      <EncabezadoDeDetalle
-        etiqueta="CONTROL DE STOCK · DIFERENCIAS"
-        titulo="Diferencias del control"
-        contexto={contexto}
-        onVolver={c.volverAlInicio}
-      />
+      <SunmiCard className="p-3 space-y-1">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-semibold sunmi-text-strong truncate">Diferencias</span>
+            {!control ? null : d.congelado ? (
+              <InsigniaTerminada>Terminado</InsigniaTerminada>
+            ) : (
+              <InsigniaEnCurso>Abierto</InsigniaEnCurso>
+            )}
+          </div>
+          <div className="hidden md:block shrink-0">{volver}</div>
+        </div>
+        <p className="text-sm2 sunmi-text-muted truncate">
+          {control ? `${local} · desde ${diaDelControl(control.abiertoEn)}` : local}
+        </p>
+      </SunmiCard>
       <Aviso texto={c.aviso} />
       {!d ? (
         c.aviso ? null : (
@@ -621,10 +637,12 @@ export function InformeDeDiferencias({ d }) {
         <AvisoDeEstado tono="warning">{textoQuedaronComoEstaban(d.control.noContadosComoEstaban ?? 0)}</AvisoDeEstado>
       ) : null}
       <TarjetaHero franja={false}>
+        {/* Uno debajo del otro, cada uno en su renglón: lado a lado, con siete
+            cifras, se pisaban y el segundo se salía de la tarjeta. */}
         {d.conPlata ? (
-          <div className="grid grid-cols-2 gap-3">
-            <CifraHero rotulo="FALTANTE $" valor={formatearMoneda(t.faltante)} color="sunmi-text-danger" />
-            <CifraHero rotulo="SOBRANTE $" valor={formatearMoneda(t.sobrante)} color="sunmi-text-warning" />
+          <div className="space-y-1">
+            <Renglon rotulo="Faltante" valor={formatearMoneda(t.faltante)} colorValor="sunmi-text-danger" valorGrande />
+            <Renglon rotulo="Sobrante" valor={formatearMoneda(t.sobrante)} colorValor="sunmi-text-warning" valorGrande />
           </div>
         ) : null}
         <p className="text-sm2 sunmi-text-muted">{`${productos(t.productos)} con diferencia`}</p>

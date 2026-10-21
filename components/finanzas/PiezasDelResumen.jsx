@@ -68,9 +68,24 @@ export function Renglon({
   // empujar por encima del rótulo y salirse de la tarjeta. Sin la prop, igual
   // que siempre: los importes no se cortan.
   valorLargo = false,
+  // Un importe protagonista (las cifras del informe del Control de stock): en
+  // tamaño grande y, si no entra al lado del rótulo, BAJA DE RENGLÓN entero
+  // —alineado a la derecha— en vez de pisar al rótulo o salirse de la tarjeta.
+  // Nunca se corta con puntos suspensivos. Sin la prop, igual que siempre.
+  valorGrande = false,
 }) {
   const tono = atenuado ? "sunmi-text-muted" : "sunmi-text-strong";
   const claseRotulo = fuerte ? `text-sm3 font-semibold ${tono}` : `text-sm3 ${tono}`;
+  if (valorGrande) {
+    return (
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <div className={`min-w-0 ${claseRotulo}`}>{rotulo}</div>
+        <div className={`min-w-0 ml-auto break-words text-right text-xl2 font-semibold tabular-nums ${colorValor || tono}`}>
+          {valor}
+        </div>
+      </div>
+    );
+  }
   const claseValor = `text-sm3 ${fuerte ? "font-semibold" : "font-medium"} tabular-nums ${colorValor || tono}`;
   return (
     <div className="flex items-baseline justify-between gap-3">

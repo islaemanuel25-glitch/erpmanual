@@ -32,6 +32,8 @@ const { act } = await import("react");
 const { createRoot } = await import("react-dom/client");
 const { default: PantallaControlStock } = await import("@/components/stock_locales/control/PantallaControlStock.jsx");
 const { useControlStock } = await import("@/components/stock_locales/control/useControlStock.js");
+const { AccionDePaginaProvider, useAccionDelShell } = await import("@/app/context/AccionDePaginaContext.jsx");
+const { AppRouterContext } = await import("next/dist/shared/lib/app-router-context.shared-runtime.js");
 
 const real = JSON.parse(readFileSync("components/stock_locales/control/lecturaReal.fixture.json", "utf8"));
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -70,6 +72,23 @@ function Pantalla({ puedeGestionar = false }) {
   return React.createElement(PantallaControlStock, { c, puedeGestionar });
 }
 
+// La fila del shell, como la dibuja `LayoutBase`: lo que la pantalla registró
+// con `useAccionDePagina`, en un lugar aparte del contenido.
+function FilaDelShell() {
+  return React.createElement("div", { "data-fila-shell": "" }, useAccionDelShell());
+}
+
+// El router de Next montado, como en la app: `SunmiBackButton` lo pide aunque
+// vuelva con `onVolver`.
+const router = { push: () => {}, back: () => {}, replace: () => {}, refresh: () => {}, prefetch: () => {} };
+function ConShell(props) {
+  return React.createElement(
+    AppRouterContext.Provider,
+    { value: router },
+    React.createElement(AccionDePaginaProvider, null, React.createElement(FilaDelShell), React.createElement(Pantalla, props))
+  );
+}
+
 // Lo montado se desmonta SIEMPRE, también cuando un caso falla: una pantalla
 // que queda viva con sus esperas deja el proceso colgado y el rojo no se ve.
 let montadas = [];
@@ -92,7 +111,7 @@ async function montar(respuestas, { puedeGestionar = false } = {}) {
   };
   montadas.push(root);
   await act(async () => {
-    root.render(React.createElement(Pantalla, { puedeGestionar }));
+    root.render(React.createElement(ConShell, { puedeGestionar }));
   });
   await act(async () => {
     await esperar(400);
@@ -494,7 +513,80 @@ test("quien gestiona sin PIN: '⋯' abre 'Ver diferencias', y 'Terminar control'
     await esperar(0);
   });
   assert.ok(pedidos.some((p) => p.ruta === "/api/stock_locales/control/diferencias"), "abre el informe");
-  assert.match(texto(raiz), /Diferencias del control/);
+  assert.match(texto(cabeceraDeDiferencias(raiz)), /^Diferencias\s*Abierto/);
+});
+
+// ── LAS DIFERENCIAS: LA CABECERA DEL CONTROL Y LOS MONTOS EN SU RENGLÓN ────
+
+/** La tarjeta de cabecera de las diferencias: la que abre con "Diferencias". */
+const cabeceraDeDiferencias = (raiz) =>
+  [...raiz.querySelectorAll("div")].find((d) => d.firstElementChild?.firstElementChild?.firstElementChild?.textContent === "Diferencias") ?? null;
+
+/** Del control a las diferencias, por el '⋯', como lo hace quien gestiona. */
+async function abrirDiferencias(respuestas) {
+  const montada = await montar({ lista: sinContarReal(), guardado: real.estaBienDelAceite, ...respuestas }, { puedeGestionar: true });
+  await tocarBoton(montada.raiz.querySelector("button[aria-label='Más acciones']"));
+  await tocarBoton([...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Ver diferencias"));
+  await act(async () => {
+    await esperar(0);
+  });
+  return montada;
+}
+
+test("diferencias: sin segundo título, la tarjeta de cabecera del control con 'Abierto', y Volver en la fila del shell", async () => {
+  const { raiz } = await abrirDiferencias({});
+  assert.doesNotMatch(texto(raiz), /CONTROL DE STOCK · DIFERENCIAS|Diferencias del control|‹/, "el shell ya dice Control de stock");
+  const cabecera = cabeceraDeDiferencias(raiz);
+  assert.ok(cabecera, "la tarjeta de cabecera");
+  assert.match(cabecera.className, /p-3 space-y-1/, "la misma tarjeta que la del control");
+  assert.match(texto(cabecera), /^Diferencias\s*Abierto\s*Volver\s*Mini el 7 · desde [a-záéíóú]+ \d\d\/\d\d$/);
+  const chip = cabecera.querySelector("span.rounded-full");
+  assert.equal(chip?.textContent, "Abierto");
+  assert.match(chip.className, /sunmi-state-warning-soft sunmi-text-accent/, "el chip de Recibiendo");
+  const volver = [...raiz.querySelectorAll("[data-fila-shell] button")].find((b) => b.textContent.trim() === "Volver");
+  assert.ok(volver, "Volver registrado en la fila del shell, como en recibir una transferencia");
+  await tocarBoton(volver);
+  await act(async () => {
+    await esperar(0);
+  });
+  assert.equal(cabeceraDeDiferencias(raiz) === null, true, "vuelve al control");
+  assert.match(texto(raiz), /Control de stock\s*Abierto/);
+  assert.equal(raiz.querySelector("[data-fila-shell] button") === null, true, "y la fila del shell queda sin Volver");
+});
+
+test("diferencias de un terminado: el chip dice 'Terminado', con el de Recibida", async () => {
+  const { raiz } = await abrirDiferencias({ informe: real.diferenciasCongeladas });
+  const chip = cabeceraDeDiferencias(raiz).querySelector("span.rounded-full");
+  assert.equal(chip?.textContent, "Terminado");
+  assert.match(chip.className, /sunmi-state-success sunmi-text-success/);
+});
+
+test("$424.391,68 y $1.118.415,05: cada uno en su renglón, rótulo a la izquierda, sin cortarse, y debajo cuántos", async () => {
+  const informe = { ...real.diferenciasAbierto, totales: { ...real.diferenciasAbierto.totales, faltante: 424391.68, sobrante: 1118415.05 } };
+  const { raiz } = await abrirDiferencias({ informe });
+  const monto = (m) => [...raiz.querySelectorAll("div")].find((d) => d.textContent === m && d.children.length === 0) ?? null;
+  const faltante = monto("$424.391,68");
+  const sobrante = monto("$1.118.415,05");
+  assert.ok(faltante && sobrante, "los dos montos");
+  const renglonF = faltante.parentElement;
+  const renglonS = sobrante.parentElement;
+  assert.equal(renglonF !== renglonS && !renglonF.contains(renglonS) && !renglonS.contains(renglonF), true, "cada uno en su renglón");
+  assert.equal(renglonF.parentElement === renglonS.parentElement, true, "uno debajo del otro, hermanos");
+  assert.equal(renglonF.nextElementSibling === renglonS, true, "Faltante arriba, Sobrante abajo");
+  assert.match(renglonF.parentElement.className, /space-y-1/, "apilados, no en columnas");
+  assert.doesNotMatch(renglonF.parentElement.className, /grid|cols/, "nada de dos columnas");
+  assert.equal(renglonF.firstElementChild.textContent, "Faltante");
+  assert.equal(renglonS.firstElementChild.textContent, "Sobrante");
+  assert.equal(renglonF.lastElementChild === faltante && renglonS.lastElementChild === sobrante, true, "el monto a la derecha");
+  for (const [m, color] of [[faltante, "sunmi-text-danger"], [sobrante, "sunmi-text-warning"]]) {
+    const clases = m.className.split(/\s+/);
+    assert.ok(clases.includes(color), color);
+    assert.ok(clases.includes("min-w-0") && clases.includes("break-words"), "puede encogerse y bajar, nunca salirse");
+    assert.equal(clases.some((c) => /truncate|ellipsis|whitespace-nowrap|overflow-hidden/.test(c)), false, "nunca con puntos suspensivos");
+    assert.ok(m.parentElement.className.split(/\s+/).includes("flex-wrap"), "si no entra al lado del rótulo, baja de renglón");
+  }
+  const cuantos = renglonF.parentElement.nextElementSibling;
+  assert.equal(cuantos?.textContent, `${informe.totales.productos} productos con diferencia`, "debajo de los dos");
 });
 
 test("sin gestionar no hay Terminar ni barra", async () => {
@@ -544,7 +636,7 @@ test("'Dejarlos como están y terminar' manda la elección, y el informe dice cu
   });
   const post = pedidos.find((p) => p.ruta === "/api/stock_locales/control/terminar" && p.metodo === "POST");
   assert.equal(post?.cuerpo?.decision, "COMO_ESTABAN");
-  assert.match(texto(raiz), /Diferencias del control/);
+  assert.match(texto(cabeceraDeDiferencias(raiz)), /^Diferencias\s*Terminado/);
   assert.match(texto(raiz), new RegExp(`${informe.control.noContadosComoEstaban} productos no se contaron y quedaron como estaban`));
 });
 
