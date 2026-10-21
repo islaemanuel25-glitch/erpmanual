@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-10-20 22:16
+**Última actualización:** 2026-10-21 01:34
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -498,6 +498,7 @@ la API del Stock Diario y no se tocó; hay que confirmarlo ejerciéndolo antes d
 corregirlo.
 
 ## Cambios recientes
+- 2026-10-21: fix: diferencias del control — Faltante y Sobrante en su renglón, y la cabecera del control en vez del segundo título (pantalla SIN VERIFICAR en navegador)
 - 2026-10-20: feat: control de stock — terminar pregunta qué hacer con lo no contado, y "Terminar control" va en la cabecera (pantalla SIN VERIFICAR en navegador)
 - 2026-10-20: feat: control de stock — la parte de arriba de recibir transferencia, y nada se guarda solo (pantalla SIN VERIFICAR en navegador)
 - 2026-10-20: fix: tarjeta de stock — el desglose en dos renglones y el recuadro que no desborda (pantalla SIN VERIFICAR en navegador)

@@ -1,15 +1,15 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-20 22:16
+**Fecha:** 2026-10-21 01:34
 
 ## Módulos modificados recientemente
 
 ### stock
-- feat: control de stock — terminar pregunta qué hacer con lo no contado, y "Terminar control" va en la cabecera (pantalla SIN VERIFICAR en navegador), feat: control de stock — la parte de arriba de recibir transferencia, y nada se guarda solo (pantalla SIN VERIFICAR en navegador), fix: tarjeta de stock — el desglose en dos renglones y el recuadro que no desborda (pantalla SIN VERIFICAR en navegador)
+- fix: diferencias del control — Faltante y Sobrante en su renglón, y la cabecera del control en vez del segundo título (pantalla SIN VERIFICAR en navegador), feat: control de stock — terminar pregunta qué hacer con lo no contado, y "Terminar control" va en la cabecera (pantalla SIN VERIFICAR en navegador), feat: control de stock — la parte de arriba de recibir transferencia, y nada se guarda solo (pantalla SIN VERIFICAR en navegador)
 - Archivos: 17 nuevos, 6 modificados (23 total)
 
 ### transferencias
-- feat: control de stock — terminar pregunta qué hacer con lo no contado, y "Terminar control" va en la cabecera (pantalla SIN VERIFICAR en navegador), feat: control de stock — la parte de arriba de recibir transferencia, y nada se guarda solo (pantalla SIN VERIFICAR en navegador), feat: control de stock con el listado de Stock y el informe de diferencias (pantalla SIN VERIFICAR en navegador)
+- fix: diferencias del control — Faltante y Sobrante en su renglón, y la cabecera del control en vez del segundo título (pantalla SIN VERIFICAR en navegador), feat: control de stock — terminar pregunta qué hacer con lo no contado, y "Terminar control" va en la cabecera (pantalla SIN VERIFICAR en navegador), feat: control de stock — la parte de arriba de recibir transferencia, y nada se guarda solo (pantalla SIN VERIFICAR en navegador)
 - Archivos: 2 modificados (2 total)
 
 ### reportes-ventas
@@ -22,11 +22,11 @@
 
 
 ## Archivos nuevos desde última sincronización
-- app/api/stock_locales/control/terminar/route.js
 - components/stock_locales/control/PantallaControlStock.jsx
 - components/stock_locales/control/controlStock.test.mjs
-- components/stock_locales/control/lecturaReal.fixture.json
 - components/stock_locales/control/tarjetaConteo.toque.test.mjs
+- app/api/stock_locales/control/terminar/route.js
+- components/stock_locales/control/lecturaReal.fixture.json
 - components/stock_locales/control/useControlStock.js
 - components/stock_locales/control/TarjetaConteo.jsx
 - components/stock_locales/tarjetaStockDesglose.dom.test.mjs
