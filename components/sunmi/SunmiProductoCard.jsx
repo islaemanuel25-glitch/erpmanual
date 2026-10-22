@@ -172,14 +172,35 @@ export function NumeroBloqueValor({ children, atenuado = false, className = "", 
 // porque hoy ancho y alto coincidan.
 const LADO_MINIATURA = "sunmi-product-thumbnail";
 
-export function MiniaturaProductoTarjeta({ url }) {
+// ── `conservaLugar`: EL CUADRADO SIEMPRE, CON LA INICIAL SI NO HAY FOTO ────
+//
+// Lo pidió Pedidos al depósito (2026-10-22): ahí la columna de la foto marca
+// dónde empieza cada tarjeta, y un producto sin foto que se corriera a la
+// izquierda rompería esa línea. Sin foto, o con la imagen rota, el mismo
+// cuadrado lleva la inicial del nombre, centrada y en texto suave sobre el
+// fondo de control del tema —como la pantalla vieja de Pedidos—.
+//
+// Apagado por defecto: sin la opción no hay foto, no hay nada, como siempre.
+// `TarjetaProductoMovil` y el resto se dibujan igual que antes.
+export function MiniaturaProductoTarjeta({ url, conservaLugar = false, nombre = "" }) {
   const [fallo, setFallo] = useState(false);
 
   const alMontarLaImagen = (img) => {
     if (img && img.complete && img.naturalWidth === 0) setFallo(true);
   };
 
-  if (fallo || !url) return null;
+  if (fallo || !url) {
+    if (!conservaLugar) return null;
+    return (
+      <span
+        data-tarjeta-inicial
+        aria-hidden="true"
+        className={`${LADO_MINIATURA} shrink-0 rounded-lg sunmi-control flex items-center justify-center text-lg2 sunmi-text-muted`}
+      >
+        {nombre?.trim()?.[0]?.toUpperCase() || "?"}
+      </span>
+    );
+  }
 
   return (
     <img

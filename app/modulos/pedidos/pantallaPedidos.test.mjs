@@ -140,6 +140,65 @@ test("3. el − apagado en 0, y no muestra stock, ni código, ni categoría", as
   assert.ok(!tarjeta("Yerba 1kg").tarjeta.querySelector("img"), "sin foto");
 });
 
+// ── LA FOTO, Y LA INICIAL EN SU LUGAR ─────────────────────────────────────
+//
+// El agua tiene foto en la base; la coca y la yerba no. El cuadrado va a la
+// izquierda, primero en la fila, siempre: con foto o con la inicial.
+
+/** Lo que hay en el lugar de la foto: el primer hijo de la fila de la tarjeta. */
+const lugarDeLaFoto = (t) => t.tarjeta.firstElementChild?.firstElementChild ?? null;
+
+test("FOTO: con imagenUrl, la foto; sin imagenUrl, la inicial en el mismo lugar", async () => {
+  await montar({ inicio: real.carritoBorrador });
+  const agua = real.catalogo.cuerpo.items.find((i) => i.nombre === "Agua x6");
+  assert.ok(agua.imagenUrl, "el fixture tiene que traer la foto del agua");
+
+  const t = tarjeta("Agua x6");
+  assert.ok(t.foto, "el agua tiene foto y no se dibujó");
+  assert.equal(t.foto.getAttribute("src"), agua.imagenUrl);
+  assert.ok(!t.inicial, "con foto no va la inicial");
+  assert.ok(lugarDeLaFoto(t) === t.foto, "la foto no está a la izquierda, primera en la fila");
+
+  for (const [nombre, letra] of [["Coca 2L", "C"], ["Yerba 1kg", "Y"]]) {
+    const s = tarjeta(nombre);
+    assert.ok(!s.foto, `${nombre} no tiene foto`);
+    assert.ok(s.inicial, `${nombre}: sin foto tiene que ir la inicial`);
+    assert.equal(s.inicial.textContent, letra);
+    assert.ok(lugarDeLaFoto(s) === s.inicial, `${nombre}: la inicial no ocupa el lugar de la foto`);
+    // El mismo cuadrado que la foto: el token de lado del kit.
+    assert.match(s.inicial.className, /sunmi-product-thumbnail/);
+  }
+});
+
+test("FOTO: si la imagen falla, en el mismo lugar va la inicial", async () => {
+  await montar({ inicio: real.carritoBorrador });
+  await act(async () => {
+    tarjeta("Agua x6").foto.dispatchEvent(new window.Event("error"));
+  });
+  const t = tarjeta("Agua x6");
+  assert.ok(!t.foto, "la foto rota sigue dibujada");
+  assert.ok(t.inicial, "la foto rota no dejó la inicial");
+  assert.equal(t.inicial.textContent, "A");
+  assert.ok(lugarDeLaFoto(t) === t.inicial);
+});
+
+test("FOTO: en Ver mi pedido y en el pedido enviado, el mismo cuadrado", async () => {
+  await montar({ inicio: real.carritoBorrador });
+  await tocar(boton("Ver mi pedido ›"));
+  assert.ok(tarjeta("Agua x6").foto, "Ver mi pedido: el carrito trae la foto del agua");
+  assert.ok(tarjeta("Coca 2L").inicial, "Ver mi pedido: la coca, con su inicial");
+  await desmontarTodo();
+
+  // Lo enviado no trae la foto: `pendiente.items` no tiene `imagenUrl`. Va la
+  // inicial en las dos, y el lugar se conserva igual.
+  assert.ok(real.carritoPendiente.cuerpo.pendiente.items.every((i) => !("imagenUrl" in i)));
+  await montar({ inicio: pendienteDel(new Date()) });
+  for (const t of tarjetas()) {
+    assert.ok(t.inicial, `${t.nombre}: el pedido enviado tiene que conservar el cuadrado`);
+    assert.ok(lugarDeLaFoto(t) === t.inicial);
+  }
+});
+
 test("3. lo tipeado se manda al salir del campo, no tecla por tecla", async () => {
   const { pedidos } = await montar({ inicio: real.carritoBorrador });
   const { campo } = tarjeta("Yerba 1kg");

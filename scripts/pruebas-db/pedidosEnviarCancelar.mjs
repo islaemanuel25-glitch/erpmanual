@@ -91,7 +91,13 @@ try {
   const coca = await delDeposito("Coca 2L", `77${marca}1`.slice(0, 13), bebidas.id);
   const yerba = await delDeposito("Yerba 1kg", `77${marca}2`.slice(0, 13), almacen.id);
   // Un pack de 6: la ficha lo hace salir por bulto (`defaultModoEnvio`).
-  const agua = await delDeposito("Agua x6", `77${marca}3`.slice(0, 13), bebidas.id, { unidad_medida: "pack", factor_pack: 6 });
+  // Y con foto, como la deja Productos: la tarjeta la dibuja; las otras dos
+  // no tienen y llevan la inicial.
+  const agua = await delDeposito("Agua x6", `77${marca}3`.slice(0, 13), bebidas.id, {
+    unidad_medida: "pack",
+    factor_pack: 6,
+    imagen_url: "/uploads/productos/agua-x6.jpg",
+  });
 
   // ── La aplicación ───────────────────────────────────────────────────────
   const R = {
@@ -155,6 +161,9 @@ try {
     ok("el catálogo trae los tres del depósito", cat.status === 200 && cat.cuerpo.items?.length === 3, json(cat));
     const aguaEnCat = cat.cuerpo.items?.find((i) => i.productoLocalId === agua);
     ok("el pack sale por bulto de 6", aguaEnCat?.modoEnvio === "SOLO_BULTO" && aguaEnCat?.factorPack === 6, json(aguaEnCat));
+    ok("el catálogo trae la foto del agua y ninguna de las otras dos",
+      aguaEnCat?.imagenUrl === "/uploads/productos/agua-x6.jpg" && cat.cuerpo.items.filter((i) => i.imagenUrl).length === 1,
+      json(cat.cuerpo.items.map((i) => [i.nombre, i.imagenUrl])));
     ok("las dos categorías están en las opciones", [bebidas.id, almacen.id].every((id) => op.cuerpo.categorias?.some((k) => k.id === id)), json(op.cuerpo.categorias));
     // Lo que contesta el catálogo filtrado por categoría, como lo pide la
     // pantalla: página, tamaño y la categoría, nada más.
@@ -178,6 +187,7 @@ try {
     ok("el carrito tiene las dos líneas y ningún pendiente", k.cuerpo.itemCount === 2 && k.cuerpo.pendiente === null && k.cuerpo.posId === posId, json(k));
     const aguaEnCarrito = k.cuerpo.items?.find((i) => i.productoLocalId === agua);
     ok("el agua se guardó en bultos", aguaEnCarrito?.unidadSugerida === "BULTO" && aguaEnCarrito?.sugerido === 2, json(aguaEnCarrito));
+    ok("el carrito también trae la foto", aguaEnCarrito?.imagenUrl === "/uploads/productos/agua-x6.jpg", json(aguaEnCarrito));
   }
 
   seccion("2. Solicitar sin operario");

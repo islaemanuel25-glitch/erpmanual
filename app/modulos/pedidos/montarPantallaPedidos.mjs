@@ -165,6 +165,8 @@ export const tarjetas = () =>
     menos: tarjeta.querySelector('button[aria-label^="Restar uno"]'),
     mas: tarjeta.querySelector('button[aria-label^="Sumar uno"]'),
     unidad: tarjeta.querySelector("[data-unidad-pedido]")?.textContent ?? null,
+    foto: tarjeta.querySelector("[data-tarjeta-foto]"),
+    inicial: tarjeta.querySelector("[data-tarjeta-inicial]"),
   }));
 export const tarjeta = (nombre) => tarjetas().find((t) => t.nombre === nombre) ?? null;
 

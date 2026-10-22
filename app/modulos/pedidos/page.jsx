@@ -21,6 +21,7 @@ import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiListaProductoCards from "@/components/sunmi/SunmiListaProductoCards";
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
+import { MiniaturaProductoTarjeta } from "@/components/sunmi/SunmiProductoCard";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import { showSuccess } from "@/components/sunmi/SunmiToast";
 
@@ -594,7 +595,13 @@ function TarjetaPedido({ producto, cantidad, enPedido = false, apagada = false, 
 
   return (
     // Las dos marcas son el asidero de los candados (`pantallaPedidos.test.mjs`).
-    <SunmiCard data-tarjeta-pedido={nombre} className="p-3 space-y-2">
+    <SunmiCard data-tarjeta-pedido={nombre} className="p-3">
+      <div className="flex gap-3">
+      {/* La foto a la izquierda, ocupando su lugar siempre: sin foto, la
+          inicial en el mismo cuadrado. El pedido enviado no trae la foto
+          (`pendiente.items` no tiene `imagenUrl`), así que ahí va la inicial. */}
+      <MiniaturaProductoTarjeta url={producto.imagenUrl} conservaLugar nombre={nombre} />
+      <div className="flex-1 min-w-0 space-y-2">
       <div className="flex items-start gap-2">
         <p className="flex-1 min-w-0 text-sm3 font-semibold sunmi-text-strong break-words">{nombre}</p>
         {enPedido && !apagada ? (
@@ -608,23 +615,30 @@ function TarjetaPedido({ producto, cantidad, enPedido = false, apagada = false, 
           </SunmiButton>
         ) : null}
       </div>
+      {/* Con la foto al lado, "Por BULTO de 6 u" y el − valor + no siempre
+          entran en un renglón a 360 px: la unidad se parte en dos (`min-w-0`)
+          y el campo no se achica (`shrink-0`), que es el que se toca. */}
       <div className="flex items-center justify-between gap-2">
-        <span data-unidad-pedido="" className="text-sm2 sunmi-text-muted">{porBulto ? `Por BULTO de ${factorPack} u` : "UNIDAD"}</span>
-        <SunmiCampoCantidad
-          valor={escrito ?? String(cantidad ?? 0)}
-          onCambiar={cambiar}
-          etiqueta={`Cantidad de ${nombre}`}
-          minimo={0}
-          tamano="grande"
-          claseMarco="w-16"
-          apagaMenosEnMinimo
-          deshabilitado={apagada}
-          inputRef={campoRef}
-          onBlur={confirmar}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") e.currentTarget.blur();
-          }}
-        />
+        <span data-unidad-pedido="" className="min-w-0 text-sm2 sunmi-text-muted">{porBulto ? `Por BULTO de ${factorPack} u` : "UNIDAD"}</span>
+        <div className="shrink-0">
+          <SunmiCampoCantidad
+            valor={escrito ?? String(cantidad ?? 0)}
+            onCambiar={cambiar}
+            etiqueta={`Cantidad de ${nombre}`}
+            minimo={0}
+            tamano="grande"
+            claseMarco="w-16"
+            apagaMenosEnMinimo
+            deshabilitado={apagada}
+            inputRef={campoRef}
+            onBlur={confirmar}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
+          />
+        </div>
+      </div>
+      </div>
       </div>
     </SunmiCard>
   );

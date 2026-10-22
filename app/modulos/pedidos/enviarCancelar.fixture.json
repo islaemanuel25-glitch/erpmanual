@@ -4,9 +4,9 @@
     "cuerpo": {
       "ok": true,
       "user": {
-        "id": 5,
+        "id": 6,
         "nombre": "Cuenta Mini",
-        "email": "pedidos-1792637787659@ci.local",
+        "email": "pedidos-1792662645979@ci.local",
         "rolId": 3,
         "rolNombre": "ENCARGADO",
         "permisos": [
@@ -46,7 +46,7 @@
         "esAdmin": false,
         "esDuenoLocal": false,
         "operadorActivo": true,
-        "localId": 10,
+        "localId": 12,
         "esDeposito": false,
         "exigirOperador": true,
         "tarjetaPrecioUnitario": null,
@@ -59,12 +59,12 @@
     "cuerpo": {
       "ok": true,
       "operador": {
-        "operadorId": 4,
+        "operadorId": 5,
         "nombre": "Ana",
-        "localId": 10,
-        "emitidoEn": 1792637790132
+        "localId": 12,
+        "emitidoEn": 1792662647747
       },
-      "voucher": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVyYWRvcklkIjo0LCJsb2NhbElkIjoxMCwiX3RpcG8iOiJvcGVyYWRvcl92b3VjaGVyIiwiaWF0IjoxNzkyNjM3NzkwLCJleHAiOjE3OTI2NjY1OTB9.gFfPcTbqNyKQavoU05Qhb6I3BSLLNYOBzBsR-18WmRw"
+      "voucher": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVyYWRvcklkIjo1LCJsb2NhbElkIjoxMiwiX3RpcG8iOiJvcGVyYWRvcl92b3VjaGVyIiwiaWF0IjoxNzkyNjYyNjQ3LCJleHAiOjE3OTI2OTE0NDd9.pi3T3F8WowMi4nK_6BCecun-7P4pj9gJYGCkKiHf1bI"
     }
   },
   "operadorMeSinPin": {
@@ -80,7 +80,7 @@
       "ok": true,
       "items": [
         {
-          "id": 4,
+          "id": 5,
           "nombre": "Ana"
         }
       ]
@@ -91,22 +91,22 @@
     "cuerpo": {
       "ok": true,
       "local": {
-        "id": 10,
-        "nombre": "Mini pedidos 1792637787659"
+        "id": 12,
+        "nombre": "Mini pedidos 1792662645979"
       },
       "deposito": {
-        "id": 11,
-        "nombre": "Depósito pedidos 1792637787659"
+        "id": 13,
+        "nombre": "Depósito pedidos 1792662645979"
       },
-      "grupoId": 5,
+      "grupoId": 6,
       "categorias": [
         {
-          "id": 2,
-          "nombre": "Almacén 1792637787659"
+          "id": 4,
+          "nombre": "Almacén 1792662645979"
         },
         {
-          "id": 1,
-          "nombre": "Bebidas 1792637787659"
+          "id": 3,
+          "nombre": "Bebidas 1792662645979"
         }
       ],
       "proveedores": [],
@@ -119,28 +119,28 @@
       "ok": true,
       "items": [
         {
-          "productoLocalId": 9,
-          "baseId": 9,
+          "productoLocalId": 12,
+          "baseId": 12,
           "nombre": "Agua x6",
-          "codigoBarra": "7717926377876",
+          "codigoBarra": "7717926626459",
           "codigoBarraSecundario": null,
           "sku": null,
-          "imagenUrl": null,
+          "imagenUrl": "/uploads/productos/agua-x6.jpg",
           "precioCosto": 600,
           "unidadMedida": "pack",
           "factorPack": 6,
           "modoPedido": "BULTO",
           "modoEnvio": "SOLO_BULTO",
           "stockDeposito": 50,
-          "categoriaNombre": "Bebidas 1792637787659",
+          "categoriaNombre": "Bebidas 1792662645979",
           "proveedorNombre": null,
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 7,
-          "baseId": 7,
+          "productoLocalId": 10,
+          "baseId": 10,
           "nombre": "Coca 2L",
-          "codigoBarra": "7717926377876",
+          "codigoBarra": "7717926626459",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -150,15 +150,15 @@
           "modoPedido": "BULTO",
           "modoEnvio": "SOLO_UNIDAD",
           "stockDeposito": 50,
-          "categoriaNombre": "Bebidas 1792637787659",
+          "categoriaNombre": "Bebidas 1792662645979",
           "proveedorNombre": null,
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 8,
-          "baseId": 8,
+          "productoLocalId": 11,
+          "baseId": 11,
           "nombre": "Yerba 1kg",
-          "codigoBarra": "7717926377876",
+          "codigoBarra": "7717926626459",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -168,7 +168,7 @@
           "modoPedido": "BULTO",
           "modoEnvio": "SOLO_UNIDAD",
           "stockDeposito": 50,
-          "categoriaNombre": "Almacén 1792637787659",
+          "categoriaNombre": "Almacén 1792662645979",
           "proveedorNombre": null,
           "areaFisicaNombre": null
         }
@@ -185,28 +185,28 @@
       "ok": true,
       "items": [
         {
-          "productoLocalId": 9,
-          "baseId": 9,
+          "productoLocalId": 12,
+          "baseId": 12,
           "nombre": "Agua x6",
-          "codigoBarra": "7717926377876",
+          "codigoBarra": "7717926626459",
           "codigoBarraSecundario": null,
           "sku": null,
-          "imagenUrl": null,
+          "imagenUrl": "/uploads/productos/agua-x6.jpg",
           "precioCosto": 600,
           "unidadMedida": "pack",
           "factorPack": 6,
           "modoPedido": "BULTO",
           "modoEnvio": "SOLO_BULTO",
           "stockDeposito": 50,
-          "categoriaNombre": "Bebidas 1792637787659",
+          "categoriaNombre": "Bebidas 1792662645979",
           "proveedorNombre": null,
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 7,
-          "baseId": 7,
+          "productoLocalId": 10,
+          "baseId": 10,
           "nombre": "Coca 2L",
-          "codigoBarra": "7717926377876",
+          "codigoBarra": "7717926626459",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -216,7 +216,7 @@
           "modoPedido": "BULTO",
           "modoEnvio": "SOLO_UNIDAD",
           "stockDeposito": 50,
-          "categoriaNombre": "Bebidas 1792637787659",
+          "categoriaNombre": "Bebidas 1792662645979",
           "proveedorNombre": null,
           "areaFisicaNombre": null
         }
@@ -231,10 +231,10 @@
     "status": 200,
     "cuerpo": {
       "ok": true,
-      "posId": 4,
+      "posId": 5,
       "item": {
-        "detalleId": 7,
-        "productoLocalId": 7,
+        "detalleId": 9,
+        "productoLocalId": 10,
         "sugerido": 3,
         "preparado": 0,
         "unidadSugerida": "UNIDAD"
@@ -247,10 +247,10 @@
     "status": 200,
     "cuerpo": {
       "ok": true,
-      "posId": 4,
+      "posId": 5,
       "item": {
-        "detalleId": 8,
-        "productoLocalId": 9,
+        "detalleId": 10,
+        "productoLocalId": 12,
         "sugerido": 2,
         "preparado": 0,
         "unidadSugerida": "BULTO"
@@ -263,15 +263,15 @@
     "status": 200,
     "cuerpo": {
       "ok": true,
-      "posId": 4,
+      "posId": 5,
       "estado": "Borrador",
       "items": [
         {
-          "detalleId": 7,
-          "productoLocalId": 7,
-          "baseId": 7,
+          "detalleId": 9,
+          "productoLocalId": 10,
+          "baseId": 10,
           "nombre": "Coca 2L",
-          "codigoBarra": "7717926377876",
+          "codigoBarra": "7717926626459",
           "sugerido": 3,
           "preparado": 0,
           "unidadSugerida": "UNIDAD",
@@ -281,18 +281,18 @@
           "imagenUrl": null
         },
         {
-          "detalleId": 8,
-          "productoLocalId": 9,
-          "baseId": 9,
+          "detalleId": 10,
+          "productoLocalId": 12,
+          "baseId": 12,
           "nombre": "Agua x6",
-          "codigoBarra": "7717926377876",
+          "codigoBarra": "7717926626459",
           "sugerido": 2,
           "preparado": 0,
           "unidadSugerida": "BULTO",
           "factorPack": 6,
           "modoEnvio": "SOLO_BULTO",
           "unidadMedida": "pack",
-          "imagenUrl": null
+          "imagenUrl": "/uploads/productos/agua-x6.jpg"
         }
       ],
       "itemCount": 2,
@@ -312,12 +312,12 @@
     "cuerpo": {
       "ok": true,
       "item": {
-        "id": 4,
+        "id": 5,
         "estado": "Solicitado",
-        "origenId": 11,
-        "destinoId": 10,
+        "origenId": 13,
+        "destinoId": 12,
         "origenManual": true,
-        "solicitadoAt": "2026-10-22T02:56:30.572Z"
+        "solicitadoAt": "2026-10-22T09:50:48.155Z"
       }
     }
   },
@@ -329,10 +329,10 @@
       "items": [],
       "itemCount": 0,
       "pendiente": {
-        "posId": 4,
+        "posId": 5,
         "estado": "Solicitado",
-        "solicitadoAt": "2026-10-22T02:56:30.572Z",
-        "createdAt": "2026-10-22T02:56:30.491Z",
+        "solicitadoAt": "2026-10-22T09:50:48.155Z",
+        "createdAt": "2026-10-22T09:50:48.055Z",
         "items": [
           {
             "nombre": "Coca 2L",
