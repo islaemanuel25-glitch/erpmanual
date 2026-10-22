@@ -389,14 +389,30 @@ function BuscadorDelControl({ c }) {
 /**
  * LOS CONTADOS CUYO STOCK NO ES LO CONTADO MÁS LO QUE PASÓ DESPUÉS. Lo arma el
  * servidor leyendo el Libro (`revisarControl`); "Corregir" lo deja en lo que
- * debería con un Ajuste por control. Sin ninguno, no se dibuja nada.
+ * debería con un Ajuste por control, y "Corregir todos" hace lo mismo con todos
+ * (es la reconstrucción de los conteos anteriores al stock al contar). Los que
+ * el Libro no alcanza a explicar se nombran con su motivo y no se tocan. Sin
+ * ninguno, no se dibuja nada.
  */
 export function StockQueNoCoincide({ c }) {
-  const productos = (c.revision?.productos ?? []).filter((p) => p.corregir);
-  if (productos.length === 0) return null;
+  const revisados = c.revision?.productos ?? [];
+  const productos = revisados.filter((p) => p.corregir && p.reconstruible !== false);
+  const sinLibro = revisados.filter((p) => p.reconstruible === false);
+  if (productos.length === 0 && sinLibro.length === 0) return null;
   return (
     <section className="rounded-xl2 border sunmi-border-warning sunmi-state-warning-soft p-4 space-y-3">
       <h2 className="text-xs2 font-semibold tracking-wider sunmi-text-warning">EL STOCK NO COINCIDE CON LO CONTADO</h2>
+      {productos.length > 1 ? (
+        <SunmiButton color="primary" type="button" onClick={c.corregirTodos} disabled={c.ocupado} className="w-full">
+          {`Corregir todos (${productos.length})`}
+        </SunmiButton>
+      ) : null}
+      {sinLibro.map((p) => (
+        <div key={p.productoLocalId} className="text-xs2">
+          <span className="text-sm3 font-medium sunmi-text-strong break-words">{p.nombre}</span>
+          <span className="sunmi-text-muted">{` · no se corrige: ${p.motivoNoReconstruible}`}</span>
+        </div>
+      ))}
       {productos.map((p) => (
         <div key={p.productoLocalId} className="flex items-center gap-3">
           <div className="flex-1 min-w-0">

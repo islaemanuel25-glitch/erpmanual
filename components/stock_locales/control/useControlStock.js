@@ -365,6 +365,20 @@ export function useControlStock({ puedeGestionar = false, requerirOperador } = {
     [pedir, cargarRevision]
   );
 
+  // Todos los de la revisión de una vez (`reconstruirConteos`): cambia el stock
+  // de muchas tarjetas, así que se vuelve a pedir la lista entera.
+  const corregirTodos = useCallback(async () => {
+    if (corrigiendo.current) return;
+    corrigiendo.current = true;
+    setOcupado(true);
+    const r = await pedir(`${API}/revision`, { method: "POST", body: JSON.stringify({ todos: true }) });
+    corrigiendo.current = false;
+    setOcupado(false);
+    setAviso(r.ok ? null : r.error);
+    setRefrescar(true);
+    cargarRevision();
+  }, [pedir, cargarRevision]);
+
   const cargarTerminar = useCallback(async () => {
     setTerminar(null);
     const r = await pedir(`${API}/terminar`);
@@ -456,6 +470,7 @@ export function useControlStock({ puedeGestionar = false, requerirOperador } = {
     diferencias,
     revision,
     corregirProducto,
+    corregirTodos,
     recargar,
     abrir,
     setTexto,

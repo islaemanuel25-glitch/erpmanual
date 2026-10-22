@@ -14,7 +14,8 @@
 //     transferencias. Con el sistema en negativo no hay "Está bien": hay que
 //     poner lo que hay;
 //   · contado: "✓ Contado · quién · hh:mm" y "Sistema x · Contado y · Faltan n",
-//     con la cantidad todavía editable.
+//     con la cantidad todavía editable. Sistema es el stock al contar —contado
+//     menos la diferencia—, no el de cuando se abrió el control.
 //
 // ── EL CAMPO ES EL TOTAL, Y NADA SE GUARDA SOLO ─────────────────────────────
 //
@@ -24,6 +25,11 @@
 // próximo y a los 1,5 s de tocar − o +, y eso aceptaba cantidades que nadie
 // había aceptado. Si el guardado falla, el campo queda en peligro con "No se
 // guardó" y lo escrito se queda.
+//
+// Aceptar sobre un contado es VOLVER A CONTARLO, aunque sea el mismo número: el
+// servidor lo mide contra el stock vivo de ese momento, y lo vendido desde el
+// conteo anterior deja de verse como faltante. Por eso tocar el campo de un
+// contado muestra "Aceptar" aunque el número termine igual.
 //
 // Borrar lo contado es lo mismo: vaciar el campo y Aceptar.
 //
@@ -108,6 +114,9 @@ export default function TarjetaConteo({
 
   const [valores, setValores] = useState(borrador ?? guardados);
   const [fallo, setFallo] = useState(false);
+  // Se tocó el campo desde lo último guardado: en un contado, eso ya es un
+  // recuento para aceptar, aunque el número quede igual.
+  const [tocado, setTocado] = useState(false);
   const primero = useRef(null);
   const rafaga = useRef({ ultima: 0, texto: "", antes: guardados });
 
@@ -115,7 +124,10 @@ export default function TarjetaConteo({
   // celular pudo haber fijado otro total. Lo escrito sin aceptar no se pisa.
   const guardadosPrevios = useRef(guardados);
   useEffect(() => {
-    if (!fallo && igualesValores(valores, guardadosPrevios.current)) setValores(guardados);
+    if (!fallo && igualesValores(valores, guardadosPrevios.current)) {
+      setValores(guardados);
+      setTocado(false);
+    }
     guardadosPrevios.current = guardados;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [total, conteo?.en]);
@@ -149,10 +161,11 @@ export default function TarjetaConteo({
       return;
     }
     const nuevo = r.vacio ? null : r.total;
-    // Lo mismo que ya está guardado ("3,0" sobre un 3): no se manda, y el campo
-    // vuelve a decirlo como está guardado, sin quedar pendiente.
-    if (nuevo === enviado.current && !fallo) {
+    // Vacío sobre un sin contar no borra nada: no se manda. El mismo número
+    // sobre un contado SÍ: es volver a contarlo contra el stock de ahora.
+    if (nuevo === null && enviado.current === null && !fallo) {
       setValores(casillerosDesdeTotal(nuevo, casilleros));
+      setTocado(false);
       return;
     }
     const antes = enviado.current;
@@ -161,7 +174,10 @@ export default function TarjetaConteo({
     if (!ok) enviado.current = antes;
     setFallo(!ok);
     // Guardado, el campo dice el total como lo guarda el servidor ("3,0" → "3").
-    if (ok) setValores(casillerosDesdeTotal(nuevo, casilleros));
+    if (ok) {
+      setValores(casillerosDesdeTotal(nuevo, casilleros));
+      setTocado(false);
+    }
   }
 
   // "Está bien" guarda el stock del sistema; el total lo decide el servidor y el
@@ -172,7 +188,10 @@ export default function TarjetaConteo({
     if (guardado?.conteo) setValores(casillerosDesdeTotal(guardado.conteo.total, casilleros));
   }
 
-  const cambiar = (clave) => (texto) => setValores((v) => ({ ...v, [clave]: texto }));
+  const cambiar = (clave) => (texto) => {
+    setTocado(true);
+    setValores((v) => ({ ...v, [clave]: texto }));
+  };
 
   const alTeclear = (e) => {
     const ahora = Date.now();
@@ -188,6 +207,7 @@ export default function TarjetaConteo({
         const antes = r.antes;
         r.texto = "";
         setValores(antes);
+        setTocado(!igualesValores(antes, guardados));
         onEscanear?.(codigo);
         return;
       }
@@ -220,9 +240,11 @@ export default function TarjetaConteo({
   const stockDelSistema = Number(item?.stock ?? 0);
   // En el renglón del botón va uno de los dos: "Aceptar" si hay algo escrito que
   // no está guardado —también un contado vaciado, que al aceptarlo se borra: sin
-  // guardado al salir del campo no habría otra forma—, y si no "Está bien"
+  // guardado al salir del campo no habría otra forma—, o si se tocó el campo de
+  // un contado y quedó el mismo número —volver a contarlo—; y si no "Está bien"
   // mientras está sin contar.
-  const conAceptar = sinGuardar;
+  const recuentoIgual = tocado && total != null && escrito.total != null;
+  const conAceptar = sinGuardar || recuentoIgual;
   const conEstaBien = !conAceptar && total == null && !sinGuardar && !fallo && stockDelSistema >= 0;
 
   const campo = (clave, etiqueta, ref) => (

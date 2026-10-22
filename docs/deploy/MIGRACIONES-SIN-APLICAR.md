@@ -91,6 +91,20 @@ Si la lista está vacía, el despliegue es solo de código.
   Coca-Cola y la de Secco: borró solo la primera, y la segunda corrida no
   encontró nada. Puede ir antes o después de la imagen nueva; con la vieja la
   propuesta podría volver a armarse si se relee ese papel, la nueva ya no.
+- `20261022180000_control_stock_sistema_al_contar` — **Aditiva, sin datos.**
+  La columna nula `ConteoControlStock.sistemaAlContar`: el stock vivo con que
+  se midió cada conteo. No toca ninguna fila. Va ANTES de levantar la imagen
+  nueva: aceptar un conteo la escribe y el listado del control la lee. La
+  imagen vieja con esto puesto sigue andando: no la conoce. **Después de
+  levantar la imagen, y aparte del despliegue**, los conteos del control
+  abierto escritos antes de la columna se reconstruyen desde la aplicación: en
+  Control de stock, como dueño o admin sin PIN, el panel "El stock no coincide
+  con lo contado" es el modo prueba (dice cuáles corregiría y cuáles no puede,
+  con su motivo) y "Corregir todos" la aplica
+  (`POST /api/stock_locales/control/revision` con `{ "todos": true }`).
+  Idempotente: una segunda vez no ajusta nada. El script
+  `scripts/control-stock-reconstruir.mjs` hace lo mismo contra una copia de
+  desarrollo; en producción no corre, a propósito.
 
 Producción está en **71 migraciones**, la última
 `20261019120000_operador_sesion_invalidada_en`.

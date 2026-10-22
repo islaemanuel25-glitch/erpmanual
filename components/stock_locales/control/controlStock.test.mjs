@@ -2,11 +2,13 @@
 //
 //   node --import ./scripts/alias-loader.mjs --test components/stock_locales/control/controlStock.test.mjs
 //
-// El comportamiento contra la base —el campo fija el total, cambiarlo mueve por
-// la diferencia y borrarlo deshace el ajuste; "Está bien"; la lista de Stock
-// Locales con sus chips y el lector; el depósito en unidades y su plata por
-// bulto; terminar con los vendidos aparte; las diferencias vivas y congeladas;
-// el Libro y la bitácora; los permisos y el PIN— lo ejerce
+// El comportamiento contra la base —cada conteo se mide contra el stock vivo y
+// deja el stock en lo contado, también al volver a contarlo, y borrarlo deshace
+// los ajustes; "Está bien"; la lista de Stock Locales con sus chips y el
+// lector; el depósito en unidades y su plata por bulto; terminar con los
+// vendidos aparte y sin volver a aplicar lo contado; las diferencias vivas y
+// congeladas; el Libro y la bitácora; la reconstrucción de los conteos
+// anteriores, con su script; los permisos y el PIN— lo ejerce
 // scripts/pruebas-db/controlStock.mjs con los handlers reales. Acá van las reglas
 // puras, la pantalla dibujada y dónde se engancha el módulo (menú y roles).
 //
@@ -43,6 +45,8 @@ import {
   casillerosDe,
   casillerosDesdeTotal,
   diferenciaDe,
+  diferenciaDelConteo,
+  MOTIVO_NO_RECONSTRUIBLE,
   leerNumero,
   ordenarDiferencias,
   partirNoContados,
@@ -135,26 +139,33 @@ const de = (lista, nombre) => lista.items.find((i) => i.nombre === nombre);
 
 // ── LAS REGLAS ─────────────────────────────────────────────────────────────
 
-test("el campo es el total: el primero fija, cambiarlo mueve por la diferencia sobre lo que hay", () => {
-  assert.deepEqual(stockTrasFijarTotal({ actual: 5, totalAnterior: null, total: 3 }), { nuevo: 3, ajuste: -2 });
-  assert.deepEqual(stockTrasFijarTotal({ actual: -15, totalAnterior: null, total: 0 }), { nuevo: 0, ajuste: 15 });
-  // Otra persona cambia el total de 3 a 7: el stock sube 4, no se suma lo suyo.
-  assert.deepEqual(stockTrasFijarTotal({ actual: 3, totalAnterior: 3, total: 7 }), { nuevo: 7, ajuste: 4 });
-  // Se vendió 1 en el medio (7 → 6) y el total baja a 5: se baja 2 sobre los 6.
-  assert.deepEqual(stockTrasFijarTotal({ actual: 6, totalAnterior: 7, total: 5 }), { nuevo: 4, ajuste: -2 });
-  assert.deepEqual(stockTrasFijarTotal({ actual: 1, totalAnterior: 4, total: 0, allowNegativeStock: false }), { nuevo: 0, ajuste: -1 });
-  assert.deepEqual(stockTrasFijarTotal({ actual: 1, totalAnterior: 4, total: 0, allowNegativeStock: true }), { nuevo: -3, ajuste: -4 });
+test("aceptar un conteo deja el stock en lo contado, contra el stock VIVO: el primero y los recuentos", () => {
+  // El SWIFT: al abrir 23, se vendieron 4 y hay 19 vivos; se cuentan 21.
+  assert.deepEqual(stockTrasFijarTotal({ actual: 19, total: 21 }), { nuevo: 21, ajuste: 2 });
+  assert.deepEqual(stockTrasFijarTotal({ actual: -15, total: 0 }), { nuevo: 0, ajuste: 15 });
+  // Un recuento: se vendió 1 después del conteo (21 → 20) y se cuentan 20. No
+  // hay "total anterior" que restar: coincide con lo vivo y no mueve nada.
+  assert.deepEqual(stockTrasFijarTotal({ actual: 20, total: 20 }), { nuevo: 20, ajuste: 0 });
+  // El mismo número que el conteo anterior, con una venta en el medio: el
+  // recuento lo vuelve a dejar en lo contado.
+  assert.deepEqual(stockTrasFijarTotal({ actual: 6, total: 7 }), { nuevo: 7, ajuste: 1 });
+  assert.equal(stockTrasFijarTotal.length, 1, "un solo argumento, sin totalAnterior");
+  assert.doesNotMatch(fuente("lib/stock/control/controlStock.js"), /totalAnterior/, "nada mide contra el total anterior");
 });
 
-test("borrar el campo deshace lo que el control ajustó, y lo vendido sigue descontado", () => {
+test("la diferencia de un producto es la suma de sus ajustes, y borrar los deshace", () => {
   const auditorias = [
     { accion: "CONTROL_CONTEO", cantidadAnterior: 5, cantidadNueva: 3 },
-    { accion: "CONTROL_CORRECCION", cantidadAnterior: 3, cantidadNueva: 7 },
+    { accion: "CONTROL_RECUENTO", cantidadAnterior: 3, cantidadNueva: 7 },
     { accion: "CONTROL_CORRECCION", cantidadAnterior: 6, cantidadNueva: 4 },
-    // El terminar no es un ajuste de conteo: no se deshace.
+    { accion: "CONTROL_CORRECCION_REVISION", cantidadAnterior: 4, cantidadNueva: 5 },
+    // El terminar no es un ajuste de conteo: no se deshace ni suma.
     { accion: "CONTROL_PUESTO_EN_CERO", cantidadAnterior: 9, cantidadNueva: 0 },
   ];
-  assert.equal(ajusteNetoDelConteo(auditorias), 0);
+  assert.equal(ajusteNetoDelConteo(auditorias), 1);
+  assert.deepEqual(diferenciaDelConteo({ contado: 5, auditorias }), { diferencia: 1, sistema: 4 }, "el sistema es contado − diferencia");
+  // Un solo conteo: el sistema es exactamente el stock vivo al contar.
+  assert.deepEqual(diferenciaDelConteo({ contado: 21, auditorias: [{ accion: "CONTROL_CONTEO", cantidadAnterior: 19, cantidadNueva: 21 }] }), { diferencia: 2, sistema: 19 });
   assert.deepEqual(stockTrasDeshacer({ actual: 4, ajusteNeto: 0 }), { nuevo: 4, ajuste: 0 });
   assert.deepEqual(stockTrasDeshacer({ actual: 2, ajusteNeto: -2 }), { nuevo: 4, ajuste: 2 });
 });
@@ -208,12 +219,12 @@ test("terminar parte en vendidos y los que quedan en cero, y el avance sale del 
   assert.equal(textoCantidad(-15, "UNIDAD"), "−15 un");
 });
 
-test("la diferencia es contado − sistema, y se dice Faltan, Sobran o Sin diferencia", () => {
+test("la diferencia es contado − sistema, y se dice Faltan en rojo, Sobran en verde o Coincide", () => {
   assert.equal(diferenciaDe({ sistema: 4, contado: 2 }), -2);
   assert.equal(diferenciaDe({ sistema: -15, contado: 0 }), 15, "un negativo puesto en 0 es sobrante");
   assert.deepEqual(textoDeLaDiferencia(-2, "UNIDAD"), { texto: "Faltan 2 un", tono: "danger" });
-  assert.deepEqual(textoDeLaDiferencia(1.25, "KG"), { texto: "Sobran 1,25 kg", tono: "warning" });
-  assert.deepEqual(textoDeLaDiferencia(0, "UNIDAD"), { texto: "Sin diferencia", tono: "success" });
+  assert.deepEqual(textoDeLaDiferencia(1.25, "KG"), { texto: "Sobran 1,25 kg", tono: "success" });
+  assert.deepEqual(textoDeLaDiferencia(0, "UNIDAD"), { texto: "Coincide", tono: "success" });
   // La forma real: cada conteo que llega con el listado ya trae su diferencia.
   for (const i of real.listaContados.items) assert.equal(i.conteo.diferencia, diferenciaDe({ sistema: i.conteo.sistema, contado: i.conteo.total }), i.nombre);
 });
@@ -353,9 +364,17 @@ test("una tarjeta contada: '✓ Contado · quién · hora', Sistema · Contado �
   assert.match(h, /<span class="font-semibold sunmi-text-danger">Faltan 2 un<\/span>/);
 });
 
-test("Sobran en advertencia y Sin diferencia en positivo", () => {
-  assert.match(tarjeta(de(real.listaContados, "Sin fila")), /<span class="font-semibold sunmi-text-warning">Sobran 2 un<\/span>/);
-  assert.match(tarjeta(de(real.listaContados, "Aceite 900")), /<span class="font-semibold sunmi-text-success">Sin diferencia<\/span>/);
+test("Sobran en verde y Coincide", () => {
+  assert.match(tarjeta(de(real.listaContados, "Sin fila")), /<span class="font-semibold sunmi-text-success">Sobran 2 un<\/span>/);
+  assert.match(tarjeta(de(real.listaContados, "Aceite 900")), /<span class="font-semibold sunmi-text-success">Coincide<\/span>/);
+});
+
+test("el SWIFT: la tarjeta dice el stock vivo arriba y Sistema = stock al contar, no el de apertura", () => {
+  // La respuesta real: al abrir 23, vendidos 4, contados 21.
+  const t = texto(tarjeta(real.conteoDelSwift.item));
+  assert.match(t, /STOCK · Unidad 21 uds/, "arriba, el stock vivo: ya es lo contado");
+  assert.match(t, /Sistema 19 · Contado 21 · Sobran 2 un$/);
+  assert.doesNotMatch(t, /Sistema 23/);
 });
 
 test("una tarjeta sin contar: 'Está bien', y la caja vacía teñida para verse contra la tarjeta", () => {
@@ -565,10 +584,13 @@ test("la revisión: debería = lo contado + lo que no es del control después de
     actual: -24,
   });
   assert.deepEqual([alReves.deberia, alReves.ajuste, alReves.corregir], [24, 48, true]);
-  // Una corrección después no es "lo que pasó después": es el mismo conteo.
+  // Un cambio de total de la versión anterior (CONTROL_CORRECCION, que movía
+  // por la diferencia de totales: 3 → 5 subió 2 sobre los 2 vivos) es un
+  // RECUENTO: el 5 se contó con 2 en el sistema y ahí tenía que quedar.
   const corregida = revisionDelProducto({
     controlId: 7,
     contado: 5,
+    desde: T("20:00"),
     auditorias: [auditoria("CONTROL_CONTEO", 5, 3, T("10:00")), auditoria("CONTROL_CORRECCION", 2, 4, T("20:00"))],
     movimientos: [
       movimiento(1, "AJUSTE_POR_CONTROL", "7", 5, 3, T("10:00")),
@@ -577,7 +599,31 @@ test("la revisión: debería = lo contado + lo que no es del control después de
     ],
     actual: 4,
   });
-  assert.deepEqual([corregida.deberia, corregida.corregir], [4, false]);
+  assert.deepEqual([corregida.anclaMovimientoId, corregida.deberia, corregida.ajuste, corregida.corregir], [3, 5, 1, true]);
+  // La reconstrucción: al abrir 5, la venta de 1 antes del recuento → el
+  // sistema al contar es 4, y la diferencia que tiene que quedar es +1.
+  assert.deepEqual([corregida.sistemaAlContar, corregida.diferencia, corregida.reconstruible], [4, 1, true]);
+  // Corregida, la próxima revisión sigue anclada en el conteo y no la toma por
+  // uno: CONTROL_CORRECCION_REVISION, aunque sea en el mismo segundo.
+  const yaCorregida = revisionDelProducto({
+    controlId: 7,
+    contado: 5,
+    desde: T("20:00"),
+    auditorias: [
+      auditoria("CONTROL_CONTEO", 5, 3, T("10:00")),
+      auditoria("CONTROL_CORRECCION", 2, 4, T("20:00")),
+      auditoria("CONTROL_CORRECCION_REVISION", 4, 5, T("20:01")),
+    ],
+    movimientos: [
+      movimiento(1, "AJUSTE_POR_CONTROL", "7", 5, 3, T("10:00")),
+      movimiento(2, "VENTA", "1", 3, 2, T("15:00")),
+      movimiento(3, "AJUSTE_POR_CONTROL", "7", 2, 4, T("20:00")),
+      movimiento(4, "AJUSTE_POR_CONTROL", "7", 4, 5, T("20:01")),
+      movimiento(5, "VENTA", "2", 5, 3, T("30:00")),
+    ],
+    actual: 3,
+  });
+  assert.deepEqual([yaCorregida.anclaMovimientoId, yaCorregida.deberia, yaCorregida.corregir, yaCorregida.sistemaAlContar, yaCorregida.reconstruible], [3, 3, false, 4, true]);
   // Lo vendido ANTES de contar ya está adentro de lo contado: no se suma.
   const vendidaAntes = revisionDelProducto({
     controlId: 7,
@@ -600,6 +646,42 @@ test("la revisión: debería = lo contado + lo que no es del control después de
   assert.equal(revisionDelProducto({ controlId: 7, contado: null, auditorias: [], movimientos: [], actual: 0 }), null);
 });
 
+test("la reconstrucción no inventa: si el Libro no alcanza, dice por qué y no es reconstruible", () => {
+  const base = { controlId: 7, contado: 8, desde: T("10:00") };
+  // La bitácora dice 6 → 4 y el Libro 6 → 3: el conteo no está en el Libro.
+  const sinMovimiento = revisionDelProducto({
+    ...base,
+    auditorias: [auditoria("CONTROL_CONTEO", 6, 4, T("10:00"))],
+    movimientos: [movimiento(1, "AJUSTE_POR_CONTROL", "7", 6, 3, T("10:00"))],
+    actual: 3,
+  });
+  assert.deepEqual([sinMovimiento.reconstruible, sinMovimiento.motivoNoReconstruible], [false, MOTIVO_NO_RECONSTRUIBLE.SIN_MOVIMIENTO_DEL_CONTEO]);
+  // El Libro salta de 8 a 9 sin un movimiento que lo explique.
+  const noEncadena = revisionDelProducto({
+    ...base,
+    auditorias: [auditoria("CONTROL_CONTEO", 10, 8, T("10:00"))],
+    movimientos: [movimiento(1, "AJUSTE_POR_CONTROL", "7", 10, 8, T("10:00")), movimiento(2, "VENTA", "1", 9, 7, T("11:00"))],
+    actual: 7,
+  });
+  assert.deepEqual([noEncadena.reconstruible, noEncadena.motivoNoReconstruible], [false, MOTIVO_NO_RECONSTRUIBLE.LIBRO_NO_CIERRA]);
+  // El stock de hoy no es el último del Libro.
+  const noLlegaAHoy = revisionDelProducto({
+    ...base,
+    auditorias: [auditoria("CONTROL_CONTEO", 10, 8, T("10:00"))],
+    movimientos: [movimiento(1, "AJUSTE_POR_CONTROL", "7", 10, 8, T("10:00"))],
+    actual: 5,
+  });
+  assert.equal(noLlegaAHoy.motivoNoReconstruible, MOTIVO_NO_RECONSTRUIBLE.LIBRO_NO_CIERRA);
+  // El control movió en el Libro algo que su bitácora no tiene.
+  const difieren = revisionDelProducto({
+    ...base,
+    auditorias: [auditoria("CONTROL_CONTEO", 10, 8, T("10:00"))],
+    movimientos: [movimiento(1, "AJUSTE_POR_CONTROL", "7", 10, 8, T("10:00")), movimiento(2, "AJUSTE_POR_CONTROL", "7", 8, 6, T("12:00"))],
+    actual: 6,
+  });
+  assert.equal(difieren.motivoNoReconstruible, MOTIVO_NO_RECONSTRUIBLE.BITACORA_Y_LIBRO_DIFIEREN);
+});
+
 test("'El stock no coincide': lo que trae la revisión real, con Corregir, solo los que no dan", () => {
   const r = real.revisionConUnoRoto;
   const t = texto(renderToStaticMarkup(React.createElement(StockQueNoCoincide, { c: { revision: r, ocupado: false, corregirProducto: nada } })));
@@ -611,6 +693,37 @@ test("'El stock no coincide': lo que trae la revisión real, con Corregir, solo 
   assert.match(pantalla, /\{puedeGestionar \? <StockQueNoCoincide c=\{c\} \/> : null\}/, "solo quien gestiona");
   const ruta = fuente("app/api/stock_locales/control/revision/route.js");
   assert.equal((ruta.match(/autorizarControl\(req, PERMISO_GESTIONAR_CONTROL, \{[^}]*persona: "cuenta" \}\)/g) || []).length, 2, "GET y POST, de la cuenta sin PIN");
+});
+
+test("la revisión antes de reconstruir: 'Corregir todos', los que se corrigen y los que no, con su motivo", () => {
+  // La respuesta real del modo prueba en la pantalla (sección 12 del guion).
+  const r = real.revisionAntesDeReconstruir;
+  const pedidos = [];
+  const c = { revision: r, ocupado: false, corregirProducto: (id) => pedidos.push(id), corregirTodos: () => pedidos.push("todos") };
+  const h = renderToStaticMarkup(React.createElement(StockQueNoCoincide, { c }));
+  const t = texto(h);
+  assert.match(t, /^EL STOCK NO COINCIDE CON LO CONTADO Corregir todos \(2\) /);
+  assert.match(t, /Té x25 · no se corrige: Tiene varios conteos vigentes que se sumaban/);
+  assert.match(t, /Mate cocido · no se corrige: El Libro no tiene el movimiento que dejó el conteo/);
+  assert.match(t, /Arroz 1kg contado 8 · después −1 · debería 7 un · hay 4 un Corregir/);
+  assert.match(t, /Harina 000 contado 5 · después 0 · debería 5 un · hay 3 un Corregir/);
+  assert.equal((t.match(/Corregir(?! todos)/g) || []).length, 2, "Corregir solo en los que el Libro explica");
+  const ruta = fuente("app/api/stock_locales/control/revision/route.js");
+  assert.match(ruta, /body\.todos === true\s*\?\s*await corregirTodos\(/, "'Corregir todos' va por la misma ruta, a la reconstrucción");
+  assert.match(fuente("lib/stock/control/controlStockServer.js"), /reconstruirConteos\(prisma, \{ controlId: control\.id, aplicar: true,/);
+});
+
+test("el script de reconstrucción: modo prueba por defecto en LECTURA, y escribe solo con --aplicar en ESCRITURA", () => {
+  const s = fuente("scripts/control-stock-reconstruir.mjs");
+  assert.match(s, /^import \{ crearClientePrisma, ESCRITURA, LECTURA \} from "\.\/lib\/clientePrisma\.mjs";/m, "la fábrica, primero");
+  assert.match(s, /crearClientePrisma\(\{ nivel: aplicar \? ESCRITURA : LECTURA \}\)/);
+  assert.match(s, /const aplicar = args\.includes\("--aplicar"\);/);
+  assert.match(s, /reconstruirConteos\(prisma, \{/, "la misma función que la ruta");
+  assert.doesNotMatch(s, /new PrismaClient/);
+  // Y la función no construye cliente ni importa con alias: corre igual desde el script.
+  const lib = fuente("lib/stock/control/reconstruccionDeConteos.js");
+  assert.doesNotMatch(lib, /from "@\//);
+  assert.doesNotMatch(lib, /PrismaClient|lib\/prisma/);
 });
 
 test("la tarjeta y el listado leen la fila de stock DEL local, la que el control escribe", () => {

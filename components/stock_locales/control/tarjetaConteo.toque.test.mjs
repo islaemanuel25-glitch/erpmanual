@@ -183,7 +183,7 @@ test("1 · 'Está bien' con el campo tocado guarda el stock del sistema y la tar
   assert.deepEqual(puts.map((p) => p.cuerpo), [{ productoLocalId: aceite.id, estaBien: true }], "un solo guardado, el de Está bien");
   assert.match(texto(rotulo(raiz)), /^✓ Contado · Ana · \d\d:\d\d$/);
   assert.equal(campo(raiz).value, "3", "el campo dice lo que se guardó");
-  assert.match(texto(fila(raiz)), /Sistema 3 · Contado 3 · Sin diferencia/);
+  assert.match(texto(fila(raiz)), /Sistema 3 · Contado 3 · Coincide/);
   assert.equal(fila(raiz).dataset.filaConteo, "contado");
   assert.equal(texto(chip(raiz, "Contados")), `Contados${real.estaBienDelAceite.resumen.contados}`, "y sube Contados");
   // Y salir del campo después no borra lo guardado.
@@ -227,6 +227,36 @@ test("2 · con un valor escrito aparece 'Aceptar' en lugar de 'Está bien', a to
   assert.equal(boton(raiz, "Aceptar") === null, true, "guardado igual a lo escrito: no hay Aceptar");
   assert.match(texto(fila(raiz)), /Sistema 2,5 · Contado 1,25 · Faltan 1,25 kg/);
   await act(async () => root.unmount());
+});
+
+test("volver a contar con el MISMO número: tocar el campo muestra Aceptar, y aceptarlo se manda (es un recuento)", async () => {
+  const { raiz, root, pedidos } = await montar({ lista: real.listaAntesDelRecuento, guardado: real.recuentoIgualDeLaCoca });
+  const coca = real.listaAntesDelRecuento.items[0];
+  assert.equal(coca.conteo?.total, 7, "arranca contada en 7");
+  assert.equal(boton(raiz, "Aceptar") === null, true, "contada y sin tocar: no hay Aceptar");
+  await tocarCampo(campo(raiz));
+  await escribir(campo(raiz), "");
+  await escribir(campo(raiz), "7");
+  const aceptar = boton(raiz, "Aceptar");
+  assert.ok(aceptar, "tocado y con el mismo número: Aceptar, porque es volver a contarlo");
+  await tocarBoton(aceptar);
+  assert.deepEqual(pedidos.filter((p) => p.metodo === "PUT").map((p) => p.cuerpo), [{ productoLocalId: coca.id, total: 7 }], "se manda aunque sea igual");
+  assert.equal(boton(raiz, "Aceptar") === null, true, "aceptado, el botón se va");
+  assert.match(texto(fila(raiz)), /Sistema 5 · Contado 7 · Sobran 2 un/);
+  await act(async () => root.unmount());
+
+  // Y con Enter, lo mismo.
+  const otra = await montar({ lista: real.listaAntesDelRecuento, guardado: real.recuentoIgualDeLaCoca });
+  await tocarCampo(campo(otra.raiz));
+  await act(async () => {
+    campo(otra.raiz).dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await esperar(0);
+  });
+  await act(async () => {
+    await esperar(0);
+  });
+  assert.deepEqual(otra.pedidos.filter((p) => p.metodo === "PUT").map((p) => p.cuerpo.total), [7], "Enter sobre un contado lo vuelve a contar");
+  await act(async () => otra.root.unmount());
 });
 
 test("2 · Enter es Aceptar; salir del campo NO guarda", async () => {

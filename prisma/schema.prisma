@@ -4170,9 +4170,10 @@ model AuditoriaStock {
 // Lo que no está nunca se escanea, así que el stock falso de eso no lo corrige
 // ningún conteo: lo corrige TERMINAR, que pone en cero lo que nadie contó.
 //
-// Cada conteo mueve el stock EN EL MOMENTO en que se guarda —el primero de un
-// producto fija, los siguientes suman—, así que lo que se vende o se recibe
-// después sigue moviendo el stock normal y no se pisa al final. Las reglas
+// Cada conteo mueve el stock EN EL MOMENTO en que se acepta: se mide contra el
+// stock vivo de ese instante y el stock pasa a ser lo contado —el primero y los
+// que lo vuelven a contar—, así que lo que se vende o se recibe después sigue
+// moviendo el stock normal y no se pisa al final. Las reglas
 // están en `lib/stock/control/controlStock.js`; las escrituras, en
 // `lib/stock/control/controlStockServer.js`.
 //
@@ -4247,10 +4248,19 @@ model ConteoControlStock {
   fijo Boolean
 
   // LO QUE DECÍA EL SISTEMA antes del primer conteo de este producto en el
-  // control: contra esto se mide la diferencia. La fila que fija el total la
-  // escribe con el stock que leyó bloqueado; las que lo cambian la copian. Null
-  // en las filas anteriores a la columna: se lee de su AuditoriaStock.
+  // control. La fila que fija el total la escribe con el stock que leyó
+  // bloqueado; las que lo cambian la copian. Es historia: desde el 2026-10-22
+  // la diferencia NO se mide contra esto —daba por faltante lo vendido entre el
+  // primer conteo y los siguientes—, sino contra `sistemaAlContar`.
   sistemaAntes Decimal? @db.Decimal(12, 3)
+
+  // EL STOCK DEL SISTEMA AL CONTAR: el stock vivo de la fila, leído bloqueado en
+  // el instante en que se aceptó ESTE conteo, antes de dejarlo en lo contado.
+  // El ajuste de este conteo es `cantidad` − esto, y la diferencia del producto
+  // es la suma de sus ajustes (la bitácora). Null en las filas escritas antes de
+  // la columna: `reconstruirConteos` lo saca del Libro y lo escribe al
+  // corregirlas, y su presencia dice que esa fila ya se miró.
+  sistemaAlContar Decimal? @db.Decimal(12, 3)
 
   creadoEn      DateTime  @default(now())
   actualizadoEn DateTime  @updatedAt

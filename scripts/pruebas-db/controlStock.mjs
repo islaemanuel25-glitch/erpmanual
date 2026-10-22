@@ -8,11 +8,12 @@
 //
 //   1. permisos y PIN: sin el permiso, 403; con PIN no se empieza ni termina;
 //   2. abrir: uno solo por local;
-//   3. el campo es el TOTAL: el primero fija el stock, cambiarlo lo mueve por la
-//      diferencia —sobre lo vendido mientras tanto—, y borrarlo deshace el
-//      ajuste del control; la tarjeta dice el total, quién lo tocó último y el
-//      sistema de ANTES del primer conteo; "Está bien" guarda el stock del
-//      sistema y con el sistema en negativo se rechaza;
+//   3. el campo es el TOTAL: aceptarlo lo mide contra el stock VIVO y deja el
+//      stock en lo contado, sea el primero o un recuento —aunque sea el mismo
+//      número, y con lo vendido en el medio—; la diferencia es la suma de los
+//      ajustes, y borrarlo los deshace; la tarjeta dice el total, quién lo tocó
+//      último y el sistema; "Está bien" guarda el stock del sistema y con el
+//      sistema en negativo se rechaza;
 //   4. la lista es la de Stock Locales (`/api/stock_locales/listar?control=`):
 //      Todos / Sin contar / Contados / Con diferencia, el texto, y el lector que
 //      trae un producto aunque el filtro lo oculte; los contadores;
@@ -97,8 +98,14 @@ try {
   await c.rol.create({ data: { nombre: "CAJERO", esSistema: true, permisos: DEFAULT_PERMISOS_SISTEMA.CAJERO } });
   const rolAdmin = await c.rol.create({ data: { nombre: "Admin", esSistema: true, permisos: ["*"] } });
   aplicarMigraciones(urlPrueba, { solo: MIGRACIONES_PERMISOS });
-  // Y las que vienen después: el informe de diferencias.
-  aplicarMigraciones(urlPrueba, { solo: ["20261020200000_control_stock_diferencias", "20261020210000_control_stock_decision_no_contados"] });
+  // Y las que vienen después: el informe de diferencias, y el stock al contar.
+  aplicarMigraciones(urlPrueba, {
+    solo: [
+      "20261020200000_control_stock_diferencias",
+      "20261020210000_control_stock_decision_no_contados",
+      "20261022180000_control_stock_sistema_al_contar",
+    ],
+  });
   const rolEncargado = await c.rol.findUnique({ where: { nombre: "ENCARGADO" } });
   ok(
     "la migración le dio los dos permisos al ENCARGADO que ya existía",
@@ -263,29 +270,47 @@ try {
     ok("el primer total fija: había 5, contó 3 → 3", r.status === 200 && (await stockDe(P.coca)) === 3, json(r));
     ok("y la tarjeta que vuelve dice el stock nuevo, el total y quién", r.item?.stock === 3 && r.item?.conteo?.total === 3 && r.item?.conteo?.contadoPor === "Emanuel", json(r.item));
     ok("y los contadores: 1 contado y 7 sin contar", r.resumen?.contados === 1 && r.resumen?.sinContar === 7, json(r.resumen));
-    ok("el sistema de antes es el de antes del conteo: 5, y faltan 2", r.item?.conteo?.sistema === 5 && r.item?.conteo?.diferencia === -2, json(r.item?.conteo));
+    ok("el sistema es el stock vivo al contar: 5, y faltan 2", r.item?.conteo?.sistema === 5 && r.item?.conteo?.diferencia === -2, json(r.item?.conteo));
+    const primera = await c.conteoControlStock.findFirst({ where: { controlId, productoLocalId: P.coca.pl, borradoEn: null } });
+    ok("y el conteo guarda en su fila el stock del sistema al contar: 5", Number(primera?.sistemaAlContar) === 5, json(primera));
     const visto = await escanear(S.ana, "codigo=7790000000001");
     guardar("cocaContadaPorOtro", visto);
     ok("Ana escanea la coca: la ve ya contada por Emanuel, con el total", visto.item?.conteo?.total === 3 && visto.item?.conteo?.contadoPor === "Emanuel", json(visto));
     const r2 = await fijar(S.ana, P.coca, 7);
-    ok("Ana escribe el nuevo total 7: el stock se mueve por la diferencia (3 → 7)", r2.status === 200 && (await stockDe(P.coca)) === 7, json(r2));
+    ok("Ana la vuelve a contar en 7: el stock pasa a 7 (3 → 7)", r2.status === 200 && (await stockDe(P.coca)) === 7, json(r2));
     ok("y la tarjeta queda a nombre de Ana", r2.item?.conteo?.contadoPor === "Ana" && r2.item?.conteo?.total === 7, json(r2.item?.conteo));
-    ok("el sistema de antes no se mueve al corregir: sigue 5, y sobran 2", r2.item?.conteo?.sistema === 5 && r2.item?.conteo?.diferencia === 2, json(r2.item?.conteo));
+    ok(
+      "la diferencia es la suma de los dos ajustes (−2 + 4): sobran 2, y el sistema sin el control sigue 5",
+      r2.item?.conteo?.sistema === 5 && r2.item?.conteo?.diferencia === 2,
+      json(r2.item?.conteo)
+    );
     const fila = await c.conteoControlStock.findFirst({ where: { controlId, productoLocalId: P.coca.pl, borradoEn: null } });
-    ok("y queda en su columna, en la fila vigente", Number(fila?.sistemaAntes) === 5, json(fila));
+    ok("la fila del recuento guarda el stock vivo con que se midió: 3", Number(fila?.sistemaAlContar) === 3 && Number(fila?.sistemaAntes) === 5, json(fila));
     const filas = await c.conteoControlStock.findMany({ where: { controlId, productoLocalId: P.coca.pl }, orderBy: { id: "asc" } });
     ok("la historia queda: el total de Emanuel borrado, el de Ana vigente", filas.length === 2 && filas[0].borradoEn !== null && filas[1].borradoEn === null && filas[1].operadorId === ana.id, json(filas));
     const antes = await auditoriasDe(P.coca);
+    guardar("listaAntesDelRecuento", await lista(S.ana, "contados", "q=Coca"));
     const igual = await fijar(S.ana, P.coca, 7);
-    ok("el mismo total otra vez no mueve nada ni deja otra fila", igual.status === 200 && (await stockDe(P.coca)) === 7 && (await auditoriasDe(P.coca)) === antes, json(igual));
+    guardar("recuentoIgualDeLaCoca", igual);
+    ok(
+      "volver a contar el mismo número sin ventas en el medio: el stock queda en 7, la diferencia no cambia y el recuento queda en la bitácora",
+      igual.status === 200 && (await stockDe(P.coca)) === 7 && igual.item?.conteo?.diferencia === 2 && (await auditoriasDe(P.coca)) === antes + 1,
+      json(igual)
+    );
     await vender(P.coca, 6);
     const r3 = await fijar(S.ana, P.coca, 5);
-    ok("se vendió 1 (7 → 6) y el total pasa a 5: el stock baja 2 sobre lo que hay (6 → 4)", r3.status === 200 && (await stockDe(P.coca)) === 4, json(r3));
+    ok(
+      "se vendió 1 (7 → 6) y se vuelve a contar 5: se mide contra los 6 de ahora, el stock queda en 5 —no en 4— y sobra 1",
+      r3.status === 200 && (await stockDe(P.coca)) === 5 && r3.item?.conteo?.diferencia === 1 && r3.item?.conteo?.sistema === 4,
+      json(r3)
+    );
+    const recuentos = await c.auditoriaStock.findMany({ where: { controlStockId: controlId, productoLocalId: P.coca.pl, accion: "CONTROL_RECUENTO" } });
+    ok("los recuentos van a la bitácora como CONTROL_RECUENTO, a nombre de quien contó", recuentos.length === 3, json(recuentos.map((a) => a.accion)));
     guardar("listaContadosAntesDeBorrar", await lista(S.dueno, "contados"));
     const borrar = await fijar(S.dueno, P.coca, null);
     guardar("borradoDeLaCoca", borrar);
     ok(
-      "borrar el campo deshace el ajuste del control: 5 menos la venta → 4, y vuelve a sin contar",
+      "borrar el campo deshace los ajustes del control: 5 menos la venta → 4, y vuelve a sin contar",
       borrar.status === 200 && (await stockDe(P.coca)) === 4 && borrar.item?.conteo === null && borrar.resumen?.contados === 0,
       json({ stock: await stockDe(P.coca), borrar })
     );
@@ -506,16 +531,18 @@ try {
     const movs = await c.movimientoStock.findMany({ where: { localId: mini.id, origen: ORIGEN_STOCK.AJUSTE_POR_CONTROL }, orderBy: { id: "asc" } });
     ok("cada movimiento del control nombra al control", movs.length > 0 && movs.every((m) => m.origenRef === String(controlId)), json(movs.map((m) => m.origenRef)));
     const deCoca = movs.filter((m) => m.productoLocalId === P.coca.pl).map((m) => [Number(m.cantidadAnterior), Number(m.cantidadPosterior)]);
-    // La venta (7 → 6) no es del control. Borrar no movió nada: el ajuste neto era cero.
-    ok("la coca: 5 → 3, 3 → 7, 6 → 4, y al contarla de nuevo 4 → 2", json(deCoca) === json([[5, 3], [3, 7], [6, 4], [4, 2]]), json(deCoca));
+    // La venta (7 → 6) no es del control, y el recuento de 7 sobre 7 no movió
+    // nada. Borrar deshace el +1 neto.
+    ok("la coca: 5 → 3, 3 → 7, 6 → 5, el borrado 5 → 4 y al contarla de nuevo 4 → 2", json(deCoca) === json([[5, 3], [3, 7], [6, 5], [5, 4], [4, 2]]), json(deCoca));
     const altaSinFila = movs.find((m) => m.productoLocalId === P.nuevo.pl && m.tipo === "ALTA");
     ok("la fila creada por el conteo también es del control", Boolean(altaSinFila), json(movs.filter((m) => m.productoLocalId === P.nuevo.pl)));
     const ceros = movs.filter((m) => [P.galletas.pl, P.fideos.pl].includes(m.productoLocalId)).map((m) => Number(m.cantidadPosterior));
     ok("los dos puestos en cero, en el Libro", json(ceros) === json([0, 0]), json(ceros));
     const aud = await c.auditoriaStock.findMany({ where: { controlStockId: controlId, productoLocalId: P.coca.pl }, orderBy: { id: "asc" } });
     ok(
-      "la bitácora de la coca: conteo, dos correcciones, el borrado y el conteo de nuevo",
-      json(aud.map((a) => a.accion)) === json(["CONTROL_CONTEO", "CONTROL_CORRECCION", "CONTROL_CORRECCION", "CONTROL_BORRADO", "CONTROL_CONTEO"]),
+      "la bitácora de la coca: conteo, tres recuentos, el borrado y el conteo de nuevo",
+      json(aud.map((a) => a.accion)) ===
+        json(["CONTROL_CONTEO", "CONTROL_RECUENTO", "CONTROL_RECUENTO", "CONTROL_RECUENTO", "CONTROL_BORRADO", "CONTROL_CONTEO"]),
       json(aud.map((a) => a.accion))
     );
     const todas = await c.auditoriaStock.findMany({ where: { controlStockId: controlId } });
@@ -635,7 +662,12 @@ try {
     // (Enter guarda, el foco va al buscador y el campo, al perderlo, guarda otra vez).
     const doble = await ficha(depo.id, "Lata doble x24", "8000000000104", "pack", 24, null);
     await Promise.all([1, 2].map(() => pedir(R.conteos, "PUT", `${B}/conteos`, S.adminDepo, { productoLocalId: doble.pl, total: 24 })));
-    ok("dos guardados de 24 a la vez dejan 24, con un solo conteo", (await stockDe(doble, depo.id)) === 24 && (await auditoriasDe(doble)) === 1);
+    const dobleEnLista = (await lista(S.adminDepo, "contados")).items?.find((i) => i.id === doble.pl);
+    ok(
+      "dos guardados de 24 a la vez dejan 24: el segundo es un recuento que no mueve nada, y sobran 24 una sola vez",
+      (await stockDe(doble, depo.id)) === 24 && (await auditoriasDe(doble)) === 2 && dobleEnLista?.conteo?.diferencia === 24,
+      json(dobleEnLista?.conteo)
+    );
     const mezcla = await ficha(depo.id, "Lata mezcla x24", "8000000000105", "pack", 24, 0);
     await Promise.all([24, null].map((t) => pedir(R.conteos, "PUT", `${B}/conteos`, S.adminDepo, { productoLocalId: mezcla.pl, total: t })));
     const quedo = await stockDe(mezcla, depo.id);
@@ -713,18 +745,27 @@ try {
       json(roto)
     );
     const auditAntes = await c.auditoriaStock.count({ where: { productoLocalId: malo.pl } });
-    const conteoAntes = json(await c.conteoControlStock.findMany({ where: { productoLocalId: malo.pl } }));
+    // El conteo no se toca, salvo guardar el stock al contar, que no tenía.
+    const sinSistemaAlContar = (filas) => json(filas.map(({ sistemaAlContar, actualizadoEn, ...resto }) => resto));
+    const conteoAntes = sinSistemaAlContar(await c.conteoControlStock.findMany({ where: { productoLocalId: malo.pl } }));
     const rep = await reparar(S.adminDepo, malo);
     const movRep = await c.movimientoStock.findFirst({ where: { productoLocalId: malo.pl }, orderBy: { id: "desc" } });
     const audRep = await c.auditoriaStock.findFirst({ where: { productoLocalId: malo.pl }, orderBy: { id: "desc" } });
     ok(
-      "y lo corrige: 24, con un Ajuste por control en el Libro y en la bitácora, sin tocar el conteo",
+      "y lo corrige: 24, con un Ajuste por control en el Libro y en la bitácora, sin tocar lo contado",
       rep.status === 200 && rep.reparado === true && rep.item?.stock === 24 && (await stockDe(malo, depo.id)) === 24 &&
         movRep.origen === ORIGEN_STOCK.AJUSTE_POR_CONTROL && movRep.origenRef === String(depoControl.id) && Number(movRep.cantidadAnterior) === -24 && Number(movRep.cantidadPosterior) === 24 &&
         (await c.auditoriaStock.count({ where: { productoLocalId: malo.pl } })) === auditAntes + 1 &&
-        audRep.accion === "CONTROL_CORRECCION" && audRep.motivo === `Ajuste por control #${depoControl.id}` && audRep.controlStockId === depoControl.id &&
-        json(await c.conteoControlStock.findMany({ where: { productoLocalId: malo.pl } })) === conteoAntes,
+        audRep.accion === "CONTROL_CORRECCION_REVISION" && audRep.motivo === `Ajuste por control #${depoControl.id}` && audRep.controlStockId === depoControl.id &&
+        sinSistemaAlContar(await c.conteoControlStock.findMany({ where: { productoLocalId: malo.pl } })) === conteoAntes,
       json({ rep, movRep, audRep })
+    );
+    const marcado = await c.conteoControlStock.findFirst({ where: { productoLocalId: malo.pl, borradoEn: null } });
+    const maloEnLista = (await lista(S.adminDepo, "contados")).items?.find((i) => i.id === malo.pl);
+    ok(
+      "la fila guarda el stock al contar que sale del Libro (0), y la diferencia queda en contado − eso: sobran 24",
+      Number(marcado?.sistemaAlContar) === 0 && maloEnLista?.conteo?.diferencia === 24 && maloEnLista?.conteo?.sistema === 0,
+      json({ marcado, conteo: maloEnLista?.conteo })
     );
     const otraVez = await reparar(S.adminDepo, malo);
     ok("corregirlo otra vez no mueve nada", otraVez.status === 200 && otraVez.reparado === false && (await stockDe(malo, depo.id)) === 24, json(otraVez));
@@ -732,7 +773,7 @@ try {
     const conPinPost = await reparar(S.ana, malo);
     ok("corregir con PIN: 403", conPinPost.status === 403, json(conPinPost));
     // Borrar después de corregir sigue deshaciendo el conteo: la corrección
-    // entra en la bitácora como CONTROL_CORRECCION y el deshacer la suma.
+    // entra en la bitácora como CONTROL_CORRECCION_REVISION y el deshacer la suma.
     await paso("borrar después de corregir", malo, null, 0);
   }
 
@@ -777,6 +818,205 @@ try {
     );
     const elDeAntes = await diferencias(S.dueno, controlId);
     ok("el informe del que se puso en 0 lo dice como antes", elDeAntes.control?.noContadosDecision === "EN_CERO" && elDeAntes.filas.some((f) => f.puestoEnCero), json(elDeAntes.control));
+  }
+
+  seccion("11. El caso del SWIFT: cada conteo contra el stock vivo de su instante");
+  {
+    // Lo que vio Emanuel el 2026-10-22: al abrir había 23, se vendieron 4 (19),
+    // se contaron 21. La tarjeta decía stock 19 y "Sistema 23 · Contado 21 ·
+    // Faltan 2"; sobraban 2.
+    const swift = await producto("SWIFT PICADILLO 90G", "7790360720115", 23);
+    const a = await pedir(R.abrir, "POST", `${B}/abrir`, S.dueno);
+    const ctl = a.control.id;
+    await vender(swift, 19);
+    const r = await fijar(S.ana, swift, 21);
+    guardar("conteoDelSwift", r);
+    ok("se cuentan 21 con 19 en el sistema: el stock pasa YA a 21", r.status === 200 && (await stockDe(swift)) === 21 && r.item?.stock === 21, json(r));
+    ok(
+      "y la tarjeta dice Sistema 19 · Contado 21 · Sobran 2, no Sistema 23 · Faltan 2",
+      r.item?.conteo?.sistema === 19 && r.item?.conteo?.total === 21 && r.item?.conteo?.diferencia === 2,
+      json(r.item?.conteo)
+    );
+    const fila = await c.conteoControlStock.findFirst({ where: { controlId: ctl, productoLocalId: swift.pl, borradoEn: null } });
+    ok("el conteo guarda el stock del sistema al contar: 19", Number(fila?.sistemaAlContar) === 19, json(fila));
+    const mov = await c.movimientoStock.findFirst({ where: { productoLocalId: swift.pl }, orderBy: { id: "desc" } });
+    const aud = await c.auditoriaStock.findFirst({ where: { productoLocalId: swift.pl }, orderBy: { id: "desc" } });
+    ok(
+      "el ajuste es un Ajuste por control de ESTE control, 19 → 21, a nombre de quien contó",
+      mov?.origen === ORIGEN_STOCK.AJUSTE_POR_CONTROL && mov?.origenRef === String(ctl) && Number(mov.cantidadAnterior) === 19 && Number(mov.cantidadPosterior) === 21 &&
+        aud?.accion === "CONTROL_CONTEO" && aud?.controlStockId === ctl && aud?.userId === cuenta.id,
+      json({ mov, aud })
+    );
+    await vender(swift, 20);
+    ok("la venta siguiente descuenta desde lo contado: 20", (await stockDe(swift)) === 20);
+    const re = await fijar(S.dueno, swift, 20);
+    ok(
+      "se vuelve a contar y hay 20: es lo que dice el sistema, no mueve nada, y el producto sigue con sobran 2 (sistema 18)",
+      re.status === 200 && (await stockDe(swift)) === 20 && re.item?.conteo?.diferencia === 2 && re.item?.conteo?.sistema === 18,
+      json(re.item?.conteo)
+    );
+    await vender(swift, 18);
+    const ajustesAntes = await c.movimientoStock.count({ where: { productoLocalId: swift.pl, origen: ORIGEN_STOCK.AJUSTE_POR_CONTROL } });
+    const t = await pedir(R.terminar, "GET", `${B}/terminar`, S.dueno);
+    const fin = await pedir(R.terminar, "POST", `${B}/terminar`, S.dueno, { productos: ids(t.aCero), decision: "COMO_ESTABAN" });
+    ok(
+      "terminar NO vuelve a aplicar el conteo: queda 18, lo contado menos lo vendido después, sin otro ajuste",
+      fin.status === 200 && (await stockDe(swift)) === 18 &&
+        (await c.movimientoStock.count({ where: { productoLocalId: swift.pl, origen: ORIGEN_STOCK.AJUSTE_POR_CONTROL } })) === ajustesAntes,
+      json(fin)
+    );
+    const informe = await diferencias(S.dueno, ctl);
+    const deSwift = informe.filas?.find((f) => f.productoLocalId === swift.pl);
+    ok(
+      "el informe congelado usa la diferencia de los conteos: sistema 18, contado 20, sobran 2",
+      deSwift?.sistema === 18 && deSwift?.contado === 20 && deSwift?.diferencia === 2,
+      json(deSwift)
+    );
+  }
+
+  seccion("12. La reconstrucción de los conteos escritos antes del stock al contar");
+  {
+    const { ESTADO_RECONSTRUCCION, reconstruirConteos } = await import("../../lib/stock/control/reconstruccionDeConteos.js");
+    const a = await pedir(R.abrir, "POST", `${B}/abrir`, S.dueno);
+    const ctl = a.control.id;
+    // Las filas COMO LAS ESCRIBÍA la versión anterior, en esta base descartable:
+    // sin `sistemaAlContar`, el primer total como CONTROL_CONTEO y un cambio de
+    // total como CONTROL_CORRECCION, que movía por la diferencia de totales.
+    // Ninguna ruta de hoy las produce: es el estado a reconstruir.
+    const conteoViejo = (p, { accion, total, queda, sumar = false }) =>
+      c.$transaction(async (tx) => {
+        const antes = Number((await tx.stockLocal.findUnique({ where: { id: p.sl } })).cantidad);
+        if (!sumar) {
+          await tx.conteoControlStock.updateMany({ where: { controlId: ctl, productoLocalId: p.pl, borradoEn: null }, data: { borradoEn: new Date() } });
+        }
+        await tx.conteoControlStock.create({
+          data: { controlId: ctl, localId: mini.id, productoLocalId: p.pl, cantidad: total, usuarioId: dueno.id, operadorId: null, contadoPor: "Emanuel", fijo: accion === "CONTROL_CONTEO", sistemaAntes: null },
+        });
+        await tx.auditoriaStock.create({
+          data: { grupoId: grupo.id, localId: mini.id, productoLocalId: p.pl, userId: dueno.id, accion, cantidadAnterior: antes, cantidadNueva: queda, motivo: `Ajuste por control #${ctl}`, controlStockId: ctl },
+        });
+        await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.AJUSTE_POR_CONTROL, referencia: String(ctl) });
+        await tx.stockLocal.update({ where: { id: p.sl }, data: { cantidad: queda } });
+      });
+
+    // Arroz: al abrir 12. Se cuentan 10 (12 → 10), se venden 3 (7), y se
+    // corrige el total a 8: la versión anterior movía −2 sobre lo que había
+    // (7 → 5). Después se vende 1 (4). Contra el stock vivo, el 8 se contó
+    // con 7 en el sistema: debería haber 8 − 1 = 7, y la diferencia es
+    // 8 − (12 − 3) = −1.
+    const arroz = await producto("Arroz 1kg", "7790000000301", 12);
+    await conteoViejo(arroz, { accion: "CONTROL_CONTEO", total: 10, queda: 10 });
+    await vender(arroz, 7);
+    await conteoViejo(arroz, { accion: "CONTROL_CORRECCION", total: 8, queda: 5 });
+    await vender(arroz, 4);
+    // Harina: al abrir 10, se cuentan 6, se venden 2 (4) y el total pasa a 5:
+    // la versión anterior la dejó en 3. Debería haber 5; la diferencia es
+    // 5 − (10 − 2) = −3.
+    const harina = await producto("Harina 000", "7790000000306", 10);
+    await conteoViejo(harina, { accion: "CONTROL_CONTEO", total: 6, queda: 6 });
+    await vender(harina, 4);
+    await conteoViejo(harina, { accion: "CONTROL_CORRECCION", total: 5, queda: 3 });
+    // Sal: se contaron 21 con 23 en el sistema y después se vendieron 2. Nada
+    // que corregir: el stock ya es lo contado menos lo vendido.
+    const sal = await producto("Sal fina", "7790000000302", 23);
+    await conteoViejo(sal, { accion: "CONTROL_CONTEO", total: 21, queda: 21 });
+    await vender(sal, 19);
+    // Té: dos conteos que se SUMABAN (la primera versión): no hay un único
+    // instante del conteo.
+    const te = await producto("Té x25", "7790000000303", 5);
+    await conteoViejo(te, { accion: "CONTROL_CONTEO", total: 2, queda: 2 });
+    await conteoViejo(te, { accion: "CONTROL_CORRECCION", total: 3, queda: 5, sumar: true });
+    // Mate: la bitácora dice 6 → 4 y el Libro 6 → 3: el conteo no está en el Libro.
+    const mate = await producto("Mate cocido", "7790000000304", 6);
+    await c.$transaction(async (tx) => {
+      await tx.conteoControlStock.create({
+        data: { controlId: ctl, localId: mini.id, productoLocalId: mate.pl, cantidad: 4, usuarioId: dueno.id, operadorId: null, contadoPor: "Emanuel", fijo: true, sistemaAntes: null },
+      });
+      await tx.auditoriaStock.create({
+        data: { grupoId: grupo.id, localId: mini.id, productoLocalId: mate.pl, userId: dueno.id, accion: "CONTROL_CONTEO", cantidadAnterior: 6, cantidadNueva: 4, motivo: `Ajuste por control #${ctl}`, controlStockId: ctl },
+      });
+      await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.AJUSTE_POR_CONTROL, referencia: String(ctl) });
+      await tx.stockLocal.update({ where: { id: mate.sl }, data: { cantidad: 3 } });
+    });
+    // Y uno contado con la versión de hoy, por su ruta: ya está al día.
+    const lenteja = await producto("Lentejas", "7790000000305", 9);
+    await vender(lenteja, 8);
+    await fijar(S.dueno, lenteja, 6);
+
+    const stockAntes = json(await Promise.all([arroz, harina, sal, te, mate, lenteja].map((p) => stockDe(p))));
+    const auditAntes = await c.auditoriaStock.count({ where: { controlStockId: ctl } });
+    const antesDeArroz = (await lista(S.dueno, "contados", "q=Arroz")).items?.[0]?.conteo;
+    ok("antes de reconstruir, el arroz suma lo que el control movió: −2 − 2 = faltan 4", antesDeArroz?.diferencia === -4, json(antesDeArroz));
+    const revisionAntes = await pedir(R.revision, "GET", `${B}/revision`, S.dueno);
+    guardar("revisionAntesDeReconstruir", revisionAntes);
+    ok(
+      "la revisión es el modo prueba en la pantalla: 2 a corregir y 2 que no se pueden",
+      revisionAntes.aCorregir === 2 && revisionAntes.noReconstruibles === 2,
+      json({ aCorregir: revisionAntes.aCorregir, noReconstruibles: revisionAntes.noReconstruibles })
+    );
+
+    // ── El script, como lo corre una persona: primero en modo prueba ────────
+    const { spawnSync } = await import("node:child_process");
+    // Sin la marca del alias-loader de ESTE proceso: si el hijo la hereda, cree
+    // que ya registró sus hooks y no resuelve `@/`.
+    const { __ERPAZUL_ALIAS_LOADER__, ...ambiente } = process.env;
+    const correrScript = (...extra) =>
+      spawnSync(process.execPath, ["--import", "./scripts/alias-loader.mjs", "scripts/control-stock-reconstruir.mjs", "--control", String(ctl), ...extra], {
+        encoding: "utf8",
+        env: { ...ambiente, DATABASE_URL: urlPrueba },
+      });
+    const prueba = correrScript();
+    ok(
+      "el modo prueba dice cuántos toca y cuántos no puede, con el motivo de cada uno",
+      prueba.status === 0 && /MODO PRUEBA/.test(prueba.stdout) && /Productos contados: 6/.test(prueba.stdout) && /Stock corregido \(los tocaría\): 2/.test(prueba.stdout) &&
+        /el stock ya daba \(los tocaría\): 1/.test(prueba.stdout) && /Ya estaban al día: 1/.test(prueba.stdout) && /NO se pudieron reconstruir \(no se tocan\): 2/.test(prueba.stdout) &&
+        /Té x25: Tiene varios conteos vigentes/.test(prueba.stdout) && /Mate cocido: El Libro no tiene el movimiento/.test(prueba.stdout),
+      prueba.stdout + prueba.stderr
+    );
+    ok(
+      "y no escribió nada: ni stock, ni bitácora, ni el stock al contar",
+      json(await Promise.all([arroz, harina, sal, te, mate, lenteja].map((p) => stockDe(p)))) === stockAntes &&
+        (await c.auditoriaStock.count({ where: { controlStockId: ctl } })) === auditAntes &&
+        (await c.conteoControlStock.count({ where: { controlId: ctl, borradoEn: null, sistemaAlContar: { not: null } } })) === 1
+    );
+
+    const aplicado = correrScript("--aplicar");
+    ok("aplicado: corrige el arroz y la harina, y marca la sal", aplicado.status === 0 && /Stock corregido: 2/.test(aplicado.stdout) && /el stock ya daba: 1/.test(aplicado.stdout), aplicado.stdout + aplicado.stderr);
+    ok("el arroz queda en 7: lo contado (8) menos lo vendido después (1)", (await stockDe(arroz)) === 7);
+    const harinaDespues = (await lista(S.dueno, "contados", "q=Harina")).items?.[0];
+    ok("la harina queda en 5, con faltan 3", (await stockDe(harina)) === 5 && harinaDespues?.conteo?.diferencia === -3 && harinaDespues?.conteo?.sistema === 8, json(harinaDespues?.conteo));
+    const arrozDespues = (await lista(S.dueno, "contados", "q=Arroz")).items?.[0]?.conteo;
+    ok("y su diferencia es contado − stock al contar: 8 − 9 = falta 1, con sistema 9", arrozDespues?.diferencia === -1 && arrozDespues?.sistema === 9, json(arrozDespues));
+    const filaArroz = await c.conteoControlStock.findFirst({ where: { controlId: ctl, productoLocalId: arroz.pl, borradoEn: null } });
+    const audArroz = await c.auditoriaStock.findFirst({ where: { productoLocalId: arroz.pl }, orderBy: { id: "desc" } });
+    ok(
+      "la fila vigente guarda el stock al contar sacado del Libro (9), y la corrección queda como CONTROL_CORRECCION_REVISION de este control",
+      Number(filaArroz?.sistemaAlContar) === 9 && audArroz?.accion === "CONTROL_CORRECCION_REVISION" && audArroz?.controlStockId === ctl && Number(audArroz.cantidadAnterior) === 4 && Number(audArroz.cantidadNueva) === 7,
+      json({ filaArroz, audArroz })
+    );
+    ok("la sal no se movió (19) y quedó con su stock al contar (23)", (await stockDe(sal)) === 19 && Number((await c.conteoControlStock.findFirst({ where: { controlId: ctl, productoLocalId: sal.pl, borradoEn: null } }))?.sistemaAlContar) === 23);
+    ok("el té y el mate no se tocaron", (await stockDe(te)) === 5 && (await stockDe(mate)) === 3);
+
+    const auditDespues = await c.auditoriaStock.count({ where: { controlStockId: ctl } });
+    await vender(arroz, 6);
+    const otraVez = correrScript("--aplicar");
+    ok(
+      "correrlo otra vez, aun con una venta en el medio, no ajusta nada: es idempotente",
+      otraVez.status === 0 && /Stock corregido: 0/.test(otraVez.stdout) && /el stock ya daba: 0/.test(otraVez.stdout) && (await c.auditoriaStock.count({ where: { controlStockId: ctl } })) === auditDespues && (await stockDe(arroz)) === 6,
+      otraVez.stdout + otraVez.stderr
+    );
+    // El camino de producción: la misma función, por la ruta de la revisión.
+    const todos = await pedir(R.revision, "POST", `${B}/revision`, S.dueno, { todos: true });
+    ok(
+      "'Corregir todos' de la revisión es la misma reconstrucción: tampoco ajusta nada ya",
+      todos.status === 200 && todos.resumen?.ajustados === 0 && todos.resumen?.noReconstruibles === 2 && (await c.auditoriaStock.count({ where: { controlStockId: ctl } })) === auditDespues,
+      json(todos)
+    );
+    const rev = await pedir(R.revision, "GET", `${B}/revision`, S.dueno);
+    guardar("revisionConNoReconstruibles", rev);
+    ok("y la revisión dice cuáles no se pueden corregir", rev.noReconstruibles === 2 && rev.aCorregir === 0, json({ aCorregir: rev.aCorregir, noReconstruibles: rev.noReconstruibles }));
+    const directo = await reconstruirConteos(c, { controlId: ctl, aplicar: false, userId: dueno.id, grupoId: grupo.id });
+    ok("sin aplicar, la función da lo mismo que la ruta", directo.ok && directo.productos.filter((p) => p.estado === ESTADO_RECONSTRUCCION.AL_DIA).length === 4, json(directo.resumen));
   }
 
   if (process.env.ESCRIBIR_FIXTURE_CONTROL) {

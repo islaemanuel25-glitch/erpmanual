@@ -29,10 +29,115 @@
       "conteo": {
         "total": 3,
         "contadoPor": "Emanuel",
-        "en": "2026-10-20T22:08:29.227Z",
+        "en": "2026-10-22T20:19:10.740Z",
         "sistema": 5,
         "diferencia": -2
       }
+    }
+  },
+  "listaAntesDelRecuento": {
+    "ok": true,
+    "items": [
+      {
+        "id": 1,
+        "localId": 1,
+        "baseId": 1,
+        "nombre": "Coca 2L",
+        "codigoBarra": "7790000000001",
+        "categoriaId": 1,
+        "proveedorId": 1,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioUnitario": 600,
+        "precioCosto": 600,
+        "precioVentaUnitario": 1000,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 7,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "conteo": {
+          "total": 7,
+          "contadoPor": "Ana",
+          "en": "2026-10-22T20:19:10.853Z",
+          "sistema": 5,
+          "diferencia": 2
+        }
+      }
+    ],
+    "total": 1,
+    "totalPages": 1,
+    "resumenControl": {
+      "controlId": 1,
+      "total": 8,
+      "contados": 1,
+      "sinContar": 7,
+      "conDiferencia": 1,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        }
+      ]
+    },
+    "lecturaControl": null
+  },
+  "recuentoIgualDeLaCoca": {
+    "ok": true,
+    "item": {
+      "id": 1,
+      "localId": 1,
+      "baseId": 1,
+      "nombre": "Coca 2L",
+      "codigoBarra": "7790000000001",
+      "categoriaId": 1,
+      "proveedorId": 1,
+      "areaFisicaId": null,
+      "unidadMedida": "unidad",
+      "factorPack": 1,
+      "precioUnitario": 600,
+      "precioCosto": 600,
+      "precioVentaUnitario": 1000,
+      "precioVenta": 1000,
+      "margen": null,
+      "stock": 7,
+      "stockMin": null,
+      "stockMax": null,
+      "limitesConfigurados": false,
+      "faltante": false,
+      "modoCompraProveedor": "BULTO",
+      "pesoReferenciaKg": null,
+      "pesoEsFijo": false,
+      "modoVentaDeposito": "PESO",
+      "conteo": {
+        "total": 7,
+        "contadoPor": "Ana",
+        "en": "2026-10-22T20:19:10.943Z",
+        "sistema": 5,
+        "diferencia": 2
+      }
+    },
+    "resumen": {
+      "controlId": 1,
+      "total": 8,
+      "contados": 1,
+      "sinContar": 7,
+      "conDiferencia": 1,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        }
+      ]
     }
   },
   "listaContadosAntesDeBorrar": {
@@ -54,7 +159,7 @@
         "precioVentaUnitario": 1000,
         "precioVenta": 1000,
         "margen": null,
-        "stock": 4,
+        "stock": 5,
         "stockMin": null,
         "stockMax": null,
         "limitesConfigurados": false,
@@ -66,9 +171,9 @@
         "conteo": {
           "total": 5,
           "contadoPor": "Ana",
-          "en": "2026-10-20T22:08:29.568Z",
-          "sistema": 5,
-          "diferencia": 0
+          "en": "2026-10-22T20:19:10.999Z",
+          "sistema": 4,
+          "diferencia": 1
         }
       }
     ],
@@ -79,7 +184,7 @@
       "total": 8,
       "contados": 1,
       "sinContar": 7,
-      "conDiferencia": 0,
+      "conDiferencia": 1,
       "categorias": [
         {
           "id": 1,
@@ -213,7 +318,7 @@
       "conteo": {
         "total": 1.25,
         "contadoPor": "Emanuel",
-        "en": "2026-10-20T22:08:29.812Z",
+        "en": "2026-10-22T20:19:11.160Z",
         "sistema": 2.5,
         "diferencia": -1.25
       }
@@ -469,7 +574,7 @@
       "conteo": {
         "total": 3,
         "contadoPor": "Ana",
-        "en": "2026-10-20T22:08:29.998Z",
+        "en": "2026-10-22T20:19:11.345Z",
         "sistema": 3,
         "diferencia": 0
       }
@@ -650,7 +755,7 @@
         "conteo": {
           "total": 3,
           "contadoPor": "Ana",
-          "en": "2026-10-20T22:08:29.998Z",
+          "en": "2026-10-22T20:19:11.345Z",
           "sistema": 3,
           "diferencia": 0
         }
@@ -683,7 +788,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T22:08:29.729Z",
+          "en": "2026-10-22T20:19:11.100Z",
           "sistema": 4,
           "diferencia": -2
         }
@@ -716,7 +821,7 @@
         "conteo": {
           "total": 1.25,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T22:08:29.812Z",
+          "en": "2026-10-22T20:19:11.160Z",
           "sistema": 2.5,
           "diferencia": -1.25
         }
@@ -749,7 +854,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Ana",
-          "en": "2026-10-20T22:08:29.854Z",
+          "en": "2026-10-22T20:19:11.205Z",
           "sistema": 0,
           "diferencia": 2
         }
@@ -804,7 +909,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T22:08:29.729Z",
+          "en": "2026-10-22T20:19:11.100Z",
           "sistema": 4,
           "diferencia": -2
         }
@@ -837,7 +942,7 @@
         "conteo": {
           "total": 1.25,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T22:08:29.812Z",
+          "en": "2026-10-22T20:19:11.160Z",
           "sistema": 2.5,
           "diferencia": -1.25
         }
@@ -870,7 +975,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Ana",
-          "en": "2026-10-20T22:08:29.854Z",
+          "en": "2026-10-22T20:19:11.205Z",
           "sistema": 0,
           "diferencia": 2
         }
@@ -925,7 +1030,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-20T22:08:29.729Z",
+          "en": "2026-10-22T20:19:11.100Z",
           "sistema": 4,
           "diferencia": -2
         }
@@ -1025,7 +1130,7 @@
     "control": {
       "id": 2,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-20T22:08:30.313Z",
+      "abiertoEn": "2026-10-22T20:19:11.633Z",
       "terminadoEn": null,
       "terminadoPorNombre": null,
       "noContadosDecision": null,
@@ -1062,7 +1167,7 @@
     },
     "control": {
       "id": 1,
-      "abiertoEn": "2026-10-20T22:08:29.095Z"
+      "abiertoEn": "2026-10-22T20:19:10.668Z"
     },
     "vendidos": [
       {
@@ -1107,7 +1212,7 @@
     "control": {
       "id": 1,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-20T22:08:29.095Z",
+      "abiertoEn": "2026-10-22T20:19:10.668Z",
       "terminadoEn": null,
       "terminadoPorNombre": null,
       "noContadosDecision": null,
@@ -1167,7 +1272,7 @@
     "control": {
       "id": 1,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-20T22:08:29.095Z",
+      "abiertoEn": "2026-10-22T20:19:10.668Z",
       "terminadoEn": null,
       "terminadoPorNombre": null,
       "noContadosDecision": null,
@@ -1227,16 +1332,16 @@
     "control": null,
     "ultimo": {
       "id": 1,
-      "abiertoEn": "2026-10-20T22:08:29.095Z",
-      "terminadoEn": "2026-10-20T22:08:30.652Z",
+      "abiertoEn": "2026-10-22T20:19:10.668Z",
+      "terminadoEn": "2026-10-22T20:19:11.892Z",
       "terminadoPorNombre": "Emanuel",
       "puestosEnCero": 2
     },
     "historial": [
       {
         "id": 1,
-        "abiertoEn": "2026-10-20T22:08:29.095Z",
-        "terminadoEn": "2026-10-20T22:08:30.652Z",
+        "abiertoEn": "2026-10-22T20:19:10.668Z",
+        "terminadoEn": "2026-10-22T20:19:11.892Z",
         "terminadoPorNombre": "Emanuel",
         "puestosEnCero": 2
       }
@@ -1255,8 +1360,8 @@
     "control": {
       "id": 1,
       "estado": "TERMINADO",
-      "abiertoEn": "2026-10-20T22:08:29.095Z",
-      "terminadoEn": "2026-10-20T22:08:30.652Z",
+      "abiertoEn": "2026-10-22T20:19:10.668Z",
+      "terminadoEn": "2026-10-22T20:19:11.892Z",
       "terminadoPorNombre": "Emanuel",
       "noContadosDecision": "EN_CERO",
       "noContadosComoEstaban": null
@@ -1336,7 +1441,7 @@
     },
     "control": {
       "id": 3,
-      "abiertoEn": "2026-10-20T22:08:30.759Z",
+      "abiertoEn": "2026-10-22T20:19:11.987Z",
       "abiertoPorNombre": "Cuenta Mini",
       "controlId": 3,
       "total": 8,
@@ -1435,7 +1540,7 @@
     "ok": true,
     "control": {
       "id": 2,
-      "abiertoEn": "2026-10-20T22:08:30.313Z"
+      "abiertoEn": "2026-10-22T20:19:11.633Z"
     },
     "productos": [
       {
@@ -1444,13 +1549,17 @@
         "unidadFisica": "UNIDAD",
         "contadoPor": "Administrador",
         "contado": 24,
-        "anclaMovimientoId": 57,
+        "anclaMovimientoId": 59,
         "movimientosPosteriores": [],
         "posteriores": 0,
         "deberia": 24,
         "actual": -24,
         "ajuste": 48,
         "corregir": true,
+        "sistemaAlContar": 0,
+        "diferencia": 24,
+        "reconstruible": true,
+        "motivoNoReconstruible": null,
         "filasDeOtroLocal": []
       },
       {
@@ -1459,13 +1568,13 @@
         "unidadFisica": "UNIDAD",
         "contadoPor": "Admin Depo",
         "contado": 24,
-        "anclaMovimientoId": 32,
+        "anclaMovimientoId": 33,
         "movimientosPosteriores": [
           {
-            "id": 55,
+            "id": 57,
             "origen": "VENTA",
             "origenRef": "9002",
-            "instante": "2026-10-20T22:08:32.376Z",
+            "instante": "2026-10-22T20:19:13.206Z",
             "cambio": -1
           }
         ],
@@ -1474,6 +1583,10 @@
         "actual": 23,
         "ajuste": 0,
         "corregir": false,
+        "sistemaAlContar": 0,
+        "diferencia": 24,
+        "reconstruible": true,
+        "motivoNoReconstruible": null,
         "filasDeOtroLocal": []
       },
       {
@@ -1482,13 +1595,17 @@
         "unidadFisica": "UNIDAD",
         "contadoPor": "Admin Depo",
         "contado": 27,
-        "anclaMovimientoId": 18,
+        "anclaMovimientoId": 19,
         "movimientosPosteriores": [],
         "posteriores": 0,
         "deberia": 27,
         "actual": 27,
         "ajuste": 0,
         "corregir": false,
+        "sistemaAlContar": 40,
+        "diferencia": -13,
+        "reconstruible": true,
+        "motivoNoReconstruible": null,
         "filasDeOtroLocal": []
       },
       {
@@ -1497,13 +1614,17 @@
         "unidadFisica": "UNIDAD",
         "contadoPor": "Admin Depo",
         "contado": 24,
-        "anclaMovimientoId": 54,
+        "anclaMovimientoId": 56,
         "movimientosPosteriores": [],
         "posteriores": 0,
         "deberia": 24,
         "actual": 24,
         "ajuste": 0,
         "corregir": false,
+        "sistemaAlContar": 0,
+        "diferencia": 24,
+        "reconstruible": true,
+        "motivoNoReconstruible": null,
         "filasDeOtroLocal": [
           {
             "localId": 1,
@@ -1517,32 +1638,22 @@
         "unidadFisica": "UNIDAD",
         "contadoPor": "Admin Depo",
         "contado": 24,
-        "anclaMovimientoId": 44,
+        "anclaMovimientoId": null,
         "movimientosPosteriores": [],
         "posteriores": 0,
         "deberia": 24,
         "actual": 24,
         "ajuste": 0,
         "corregir": false,
-        "filasDeOtroLocal": []
-      },
-      {
-        "productoLocalId": 21,
-        "nombre": "Lata mezcla x24",
-        "unidadFisica": "UNIDAD",
-        "contadoPor": "Admin Depo",
-        "contado": 24,
-        "anclaMovimientoId": 46,
-        "movimientosPosteriores": [],
-        "posteriores": 0,
-        "deberia": 24,
-        "actual": 24,
-        "ajuste": 0,
-        "corregir": false,
+        "sistemaAlContar": 0,
+        "diferencia": 24,
+        "reconstruible": true,
+        "motivoNoReconstruible": null,
         "filasDeOtroLocal": []
       }
     ],
-    "aCorregir": 1
+    "aCorregir": 1,
+    "noReconstruibles": 0
   },
   "terminarAntesDeComoEstaban": {
     "ok": true,
@@ -1553,7 +1664,7 @@
     },
     "control": {
       "id": 3,
-      "abiertoEn": "2026-10-20T22:08:30.759Z"
+      "abiertoEn": "2026-10-22T20:19:11.987Z"
     },
     "vendidos": [
       {
@@ -1634,8 +1745,8 @@
     "control": {
       "id": 3,
       "estado": "TERMINADO",
-      "abiertoEn": "2026-10-20T22:08:30.759Z",
-      "terminadoEn": "2026-10-20T22:08:32.723Z",
+      "abiertoEn": "2026-10-22T20:19:11.987Z",
+      "terminadoEn": "2026-10-22T20:19:13.470Z",
       "terminadoPorNombre": "Emanuel",
       "noContadosDecision": "COMO_ESTABAN",
       "noContadosComoEstaban": 7
@@ -1661,5 +1772,344 @@
       "productos": 1,
       "sinCosto": 0
     }
+  },
+  "conteoDelSwift": {
+    "ok": true,
+    "item": {
+      "id": 25,
+      "localId": 1,
+      "baseId": 22,
+      "nombre": "SWIFT PICADILLO 90G",
+      "codigoBarra": "7790360720115",
+      "categoriaId": null,
+      "proveedorId": null,
+      "areaFisicaId": null,
+      "unidadMedida": "unidad",
+      "factorPack": 1,
+      "precioUnitario": 600,
+      "precioCosto": 600,
+      "precioVentaUnitario": 1000,
+      "precioVenta": 1000,
+      "margen": null,
+      "stock": 21,
+      "stockMin": null,
+      "stockMax": null,
+      "limitesConfigurados": false,
+      "faltante": false,
+      "modoCompraProveedor": "BULTO",
+      "pesoReferenciaKg": null,
+      "pesoEsFijo": false,
+      "modoVentaDeposito": "PESO",
+      "conteo": {
+        "total": 21,
+        "contadoPor": "Ana",
+        "en": "2026-10-22T20:19:13.525Z",
+        "sistema": 19,
+        "diferencia": 2
+      }
+    },
+    "resumen": {
+      "controlId": 4,
+      "total": 12,
+      "contados": 1,
+      "sinContar": 11,
+      "conDiferencia": 1,
+      "categorias": [
+        {
+          "id": 1,
+          "nombre": "Bebidas",
+          "cantidad": 1
+        }
+      ]
+    }
+  },
+  "revisionAntesDeReconstruir": {
+    "ok": true,
+    "control": {
+      "id": 5,
+      "abiertoEn": "2026-10-22T20:19:13.659Z"
+    },
+    "productos": [
+      {
+        "productoLocalId": 26,
+        "nombre": "Arroz 1kg",
+        "unidadFisica": "UNIDAD",
+        "contadoPor": "Emanuel",
+        "contado": 8,
+        "anclaMovimientoId": 71,
+        "movimientosPosteriores": [
+          {
+            "id": 72,
+            "origen": "VENTA",
+            "origenRef": "9001",
+            "instante": "2026-10-22T20:19:13.693Z",
+            "cambio": -1
+          }
+        ],
+        "posteriores": -1,
+        "deberia": 7,
+        "actual": 4,
+        "ajuste": 3,
+        "corregir": true,
+        "sistemaAlContar": 9,
+        "diferencia": -1,
+        "reconstruible": true,
+        "motivoNoReconstruible": null,
+        "filasDeOtroLocal": []
+      },
+      {
+        "productoLocalId": 27,
+        "nombre": "Harina 000",
+        "unidadFisica": "UNIDAD",
+        "contadoPor": "Emanuel",
+        "contado": 5,
+        "anclaMovimientoId": 76,
+        "movimientosPosteriores": [],
+        "posteriores": 0,
+        "deberia": 5,
+        "actual": 3,
+        "ajuste": 2,
+        "corregir": true,
+        "sistemaAlContar": 8,
+        "diferencia": -3,
+        "reconstruible": true,
+        "motivoNoReconstruible": null,
+        "filasDeOtroLocal": []
+      },
+      {
+        "productoLocalId": 30,
+        "nombre": "Mate cocido",
+        "unidadFisica": "UNIDAD",
+        "contadoPor": "Emanuel",
+        "contado": 4,
+        "anclaMovimientoId": null,
+        "movimientosPosteriores": [],
+        "posteriores": 0,
+        "deberia": 4,
+        "actual": 3,
+        "ajuste": 1,
+        "corregir": true,
+        "sistemaAlContar": 6,
+        "diferencia": -2,
+        "reconstruible": false,
+        "motivoNoReconstruible": "El Libro no tiene el movimiento que dejó el conteo.",
+        "filasDeOtroLocal": []
+      },
+      {
+        "productoLocalId": 31,
+        "nombre": "Lentejas",
+        "unidadFisica": "UNIDAD",
+        "contadoPor": "Emanuel",
+        "contado": 6,
+        "anclaMovimientoId": 87,
+        "movimientosPosteriores": [],
+        "posteriores": 0,
+        "deberia": 6,
+        "actual": 6,
+        "ajuste": 0,
+        "corregir": false,
+        "sistemaAlContar": 8,
+        "diferencia": -2,
+        "reconstruible": true,
+        "motivoNoReconstruible": null,
+        "filasDeOtroLocal": []
+      },
+      {
+        "productoLocalId": 28,
+        "nombre": "Sal fina",
+        "unidadFisica": "UNIDAD",
+        "contadoPor": "Emanuel",
+        "contado": 21,
+        "anclaMovimientoId": 78,
+        "movimientosPosteriores": [
+          {
+            "id": 79,
+            "origen": "VENTA",
+            "origenRef": "9001",
+            "instante": "2026-10-22T20:19:13.745Z",
+            "cambio": -2
+          }
+        ],
+        "posteriores": -2,
+        "deberia": 19,
+        "actual": 19,
+        "ajuste": 0,
+        "corregir": false,
+        "sistemaAlContar": 23,
+        "diferencia": -2,
+        "reconstruible": true,
+        "motivoNoReconstruible": null,
+        "filasDeOtroLocal": []
+      },
+      {
+        "productoLocalId": 29,
+        "nombre": "Té x25",
+        "unidadFisica": "UNIDAD",
+        "contadoPor": "Emanuel",
+        "contado": 5,
+        "anclaMovimientoId": 82,
+        "movimientosPosteriores": [],
+        "posteriores": 0,
+        "deberia": 5,
+        "actual": 5,
+        "ajuste": 0,
+        "corregir": false,
+        "sistemaAlContar": 5,
+        "diferencia": 0,
+        "reconstruible": false,
+        "motivoNoReconstruible": "Tiene varios conteos vigentes que se sumaban: no hay un único instante del conteo.",
+        "filasDeOtroLocal": []
+      }
+    ],
+    "aCorregir": 2,
+    "noReconstruibles": 2
+  },
+  "revisionConNoReconstruibles": {
+    "ok": true,
+    "control": {
+      "id": 5,
+      "abiertoEn": "2026-10-22T20:19:13.659Z"
+    },
+    "productos": [
+      {
+        "productoLocalId": 30,
+        "nombre": "Mate cocido",
+        "unidadFisica": "UNIDAD",
+        "contadoPor": "Emanuel",
+        "contado": 4,
+        "anclaMovimientoId": null,
+        "movimientosPosteriores": [],
+        "posteriores": 0,
+        "deberia": 4,
+        "actual": 3,
+        "ajuste": 1,
+        "corregir": true,
+        "sistemaAlContar": 6,
+        "diferencia": -2,
+        "reconstruible": false,
+        "motivoNoReconstruible": "El Libro no tiene el movimiento que dejó el conteo.",
+        "filasDeOtroLocal": []
+      },
+      {
+        "productoLocalId": 26,
+        "nombre": "Arroz 1kg",
+        "unidadFisica": "UNIDAD",
+        "contadoPor": "Emanuel",
+        "contado": 8,
+        "anclaMovimientoId": 71,
+        "movimientosPosteriores": [
+          {
+            "id": 72,
+            "origen": "VENTA",
+            "origenRef": "9001",
+            "instante": "2026-10-22T20:19:13.693Z",
+            "cambio": -1
+          },
+          {
+            "id": 90,
+            "origen": "VENTA",
+            "origenRef": "9001",
+            "instante": "2026-10-22T20:19:14.615Z",
+            "cambio": -1
+          }
+        ],
+        "posteriores": -2,
+        "deberia": 6,
+        "actual": 6,
+        "ajuste": 0,
+        "corregir": false,
+        "sistemaAlContar": 9,
+        "diferencia": -1,
+        "reconstruible": true,
+        "motivoNoReconstruible": null,
+        "filasDeOtroLocal": []
+      },
+      {
+        "productoLocalId": 27,
+        "nombre": "Harina 000",
+        "unidadFisica": "UNIDAD",
+        "contadoPor": "Emanuel",
+        "contado": 5,
+        "anclaMovimientoId": 76,
+        "movimientosPosteriores": [],
+        "posteriores": 0,
+        "deberia": 5,
+        "actual": 5,
+        "ajuste": 0,
+        "corregir": false,
+        "sistemaAlContar": 8,
+        "diferencia": -3,
+        "reconstruible": true,
+        "motivoNoReconstruible": null,
+        "filasDeOtroLocal": []
+      },
+      {
+        "productoLocalId": 31,
+        "nombre": "Lentejas",
+        "unidadFisica": "UNIDAD",
+        "contadoPor": "Emanuel",
+        "contado": 6,
+        "anclaMovimientoId": 87,
+        "movimientosPosteriores": [],
+        "posteriores": 0,
+        "deberia": 6,
+        "actual": 6,
+        "ajuste": 0,
+        "corregir": false,
+        "sistemaAlContar": 8,
+        "diferencia": -2,
+        "reconstruible": true,
+        "motivoNoReconstruible": null,
+        "filasDeOtroLocal": []
+      },
+      {
+        "productoLocalId": 28,
+        "nombre": "Sal fina",
+        "unidadFisica": "UNIDAD",
+        "contadoPor": "Emanuel",
+        "contado": 21,
+        "anclaMovimientoId": 78,
+        "movimientosPosteriores": [
+          {
+            "id": 79,
+            "origen": "VENTA",
+            "origenRef": "9001",
+            "instante": "2026-10-22T20:19:13.745Z",
+            "cambio": -2
+          }
+        ],
+        "posteriores": -2,
+        "deberia": 19,
+        "actual": 19,
+        "ajuste": 0,
+        "corregir": false,
+        "sistemaAlContar": 23,
+        "diferencia": -2,
+        "reconstruible": true,
+        "motivoNoReconstruible": null,
+        "filasDeOtroLocal": []
+      },
+      {
+        "productoLocalId": 29,
+        "nombre": "Té x25",
+        "unidadFisica": "UNIDAD",
+        "contadoPor": "Emanuel",
+        "contado": 5,
+        "anclaMovimientoId": 82,
+        "movimientosPosteriores": [],
+        "posteriores": 0,
+        "deberia": 5,
+        "actual": 5,
+        "ajuste": 0,
+        "corregir": false,
+        "sistemaAlContar": 5,
+        "diferencia": 0,
+        "reconstruible": false,
+        "motivoNoReconstruible": "Tiene varios conteos vigentes que se sumaban: no hay un único instante del conteo.",
+        "filasDeOtroLocal": []
+      }
+    ],
+    "aCorregir": 0,
+    "noReconstruibles": 2
   }
 }
