@@ -14,7 +14,7 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 
-const { real, montar, desmontarTodo, asentar, llamadas, tocar } = await import("./montarPantallaPedidos.mjs");
+const { real, montar, desmontarTodo, asentar, llamadas, tocar, contenido } = await import("./montarPantallaPedidos.mjs");
 
 afterEach(desmontarTodo);
 
@@ -38,8 +38,12 @@ const montar120 = () => montar({ inicio: real.paginadoCarrito, local: localDe120
 
 const delCatalogo = (pedidos) => llamadas(pedidos, "/api/pedidos/catalogo").map((p) => p.params);
 const ultimo = (pedidos) => delCatalogo(pedidos).at(-1);
-/** El paginador del teléfono: ahí están "Página N de M", "viendo…" y el elegidor. */
-const paginador = () => document.querySelector('[data-paginador="celular"]');
+/**
+ * El paginador del teléfono: ahí están "Página N de M", "viendo…" y el
+ * elegidor. Adentro del teléfono: desde el 2026-10-22 el escritorio, montado
+ * al lado, tiene el suyo.
+ */
+const paginador = () => contenido().querySelector('[data-paginador="celular"]');
 const opcion = (n) => [...(paginador()?.querySelectorAll("button") ?? [])].find((b) => b.textContent.trim() === String(n)) ?? null;
 const guardado = () => window.localStorage.getItem(CLAVE);
 

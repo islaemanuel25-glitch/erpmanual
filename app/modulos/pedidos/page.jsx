@@ -28,6 +28,7 @@ import SunmiToggle from "@/components/sunmi/SunmiToggle";
 import { showSuccess } from "@/components/sunmi/SunmiToast";
 import { tamanoDePaginaCatalogo } from "@/lib/pedidos/tamanoDePagina";
 import { salePorBulto, juntarPorProducto, claveDeLoEnviado } from "@/lib/pedidos/lineasDelPedido";
+import PedidosEscritorio from "@/components/pedidos/PedidosEscritorio";
 
 // Cuántos productos por página: lo elige la persona al pie de la lista y queda
 // recordado en el celular con la clave de siempre de esta pantalla. Las
@@ -76,7 +77,31 @@ function cuandoSeEnvio(solicitadoAt) {
   return `${dia} ${horaAR(solicitadoAt)}`;
 }
 
-export default function PedidosCatalogoPage() {
+// ── EL REPARTO: TELÉFONO Y COMPUTADORA ────────────────────────────────────
+//
+// Por debajo de 1024 px, la pantalla del teléfono, TAL CUAL: es
+// `PedidosCatalogoPage`, más abajo, que no cambió en nada. Desde 1024 px, la
+// de computadora, en su propio archivo (`components/pedidos/PedidosEscritorio`),
+// con su propio estado: el del teléfono vive adentro de esta pantalla y
+// sacarlo sería tocarla. Mismo reparto por CSS que `WorkspaceRecepcion`.
+//
+// El envoltorio del teléfono es `contents` además de `lg:hidden`: así no es
+// una caja más entre la página y su contenido, y el `min-h-full` de adentro
+// sigue midiendo contra lo mismo que antes. Desde `lg`, `hidden` lo apaga.
+export default function PaginaPedidos() {
+  return (
+    <>
+      <div data-pedidos-celular="" className="contents lg:hidden">
+        <PedidosCatalogoPage />
+      </div>
+      <div data-pedidos-escritorio="" className="hidden lg:block">
+        <PedidosEscritorio />
+      </div>
+    </>
+  );
+}
+
+function PedidosCatalogoPage() {
   const router = useRouter();
   const { perfil: perfilPed, cargando: cargandoPed } = useUser();
   // Solicitar y cancelar contestan `needsOperador` cuando falta o venció el PIN.

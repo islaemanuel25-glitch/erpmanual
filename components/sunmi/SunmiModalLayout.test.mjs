@@ -743,6 +743,11 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // botones. Adentro no hay nada escrito, y cerrar sin querer deja el pedido
     // como estaba, que es la salida segura. `false`.
     "app/modulos/pedidos/page.jsx": false,
+    // La computadora de Pedidos: las MISMAS dos confirmaciones que el teléfono
+    // —cancelar el pedido y descartar los cambios sin confirmar—, copiadas.
+    // Cerrar sin querer la de descartar es "Seguir cargando", que no pierde
+    // nada. `false`.
+    "components/pedidos/PedidosEscritorio.jsx": false,
     // Las dos hojas de Tesorería son CARGA, por el criterio de qué se pierde: en
     // una, el importe contado y la observación —lo contado es lo único que no se
     // puede rehacer mirando la pantalla—; en la otra, el motivo de anular, que

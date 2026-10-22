@@ -198,10 +198,27 @@ export async function abrirDesdeLaEntrada() {
   await asentar(450);
 }
 
-export const texto = () => document.body.textContent;
-export const contenido = () => document.querySelector("[data-contenido]");
+// ── EL CELULAR, SIN EL ESCRITORIO ─────────────────────────────────────────
+//
+// Desde el 2026-10-22 la página monta las dos composiciones —la del teléfono y
+// la de computadora— y las reparte por CSS, que jsdom no aplica: las dos
+// están en el DOM. Los candados del teléfono miran SOLO el teléfono: el
+// contenido es su envoltorio, y el texto y los botones de la página no
+// cuentan los del escritorio. Los del escritorio usan `escritorio()`.
+export const escritorio = () => document.querySelector("[data-pedidos-escritorio]");
+const fueraDelEscritorio = (el) => !escritorio()?.contains(el);
+export const texto = () => {
+  if (!escritorio()) return document.body.textContent;
+  const copia = document.body.cloneNode(true);
+  copia.querySelector("[data-pedidos-escritorio]")?.remove();
+  return copia.textContent;
+};
+export const contenido = () => document.querySelector("[data-pedidos-celular]") ?? document.querySelector("[data-contenido]");
 export const filaShell = () => document.querySelector("[data-fila-shell]");
-export const botones = (dentro = document.body) => [...dentro.querySelectorAll("button")];
+export const botones = (dentro = document.body) => {
+  const todos = [...dentro.querySelectorAll("button")];
+  return dentro === document.body ? todos.filter(fueraDelEscritorio) : todos;
+};
 export const boton = (etiqueta, dentro = document.body) =>
   botones(dentro).find((b) => b.textContent.trim().startsWith(etiqueta)) ?? null;
 export const modal = () => document.querySelector("[data-sunmi-modal]");

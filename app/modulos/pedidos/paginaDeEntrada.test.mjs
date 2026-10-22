@@ -133,7 +133,7 @@ test("enviado: Ver pedido es solo para mirar —apagado, con la cantidad, sin bu
   assert.equal(tarjeta("ACEITE").campo.value, "2", "no muestra la cantidad");
   assert.ok(!contenido().querySelector('input[placeholder="Buscar producto o código"]'), "con buscador");
   assert.ok(!contenido().querySelector("#categoria-pedido"), "con filtro");
-  assert.ok(!document.querySelector("[data-paginador]"), "con paginador");
+  assert.ok(!contenido().querySelector("[data-paginador]"), "con paginador");
   for (const b of ["Enviar pedido al depósito", "Agregar al pedido", "Cancelar pedido", "Ver mi pedido ›"]) {
     assert.ok(!boton(b), `en Ver pedido apareció ${b}`);
   }

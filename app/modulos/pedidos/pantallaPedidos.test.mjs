@@ -596,7 +596,7 @@ test("5. enviado sin empezar: se sigue armando, con el catálogo vivo y lo carga
   assert.ok(buscador(), "sin buscador");
   assert.ok(categoria(), "sin filtro");
   assert.ok(interruptor(), "sin Ver fotos");
-  assert.ok(document.querySelector("[data-paginador]"), "sin paginador");
+  assert.ok(contenido().querySelector("[data-paginador]"), "sin paginador");
   assert.deepEqual(nombres(), ["Agua x6", "Coca 2L", "Yerba 1kg"], "el catálogo entero, no solo lo enviado");
   assert.equal(tarjeta("Agua x6").campo.value, "2", "lo enviado trae su cantidad");
   for (const t of tarjetas()) assert.equal(t.mas.disabled, false, `${t.nombre}: el + apagado`);
@@ -706,7 +706,7 @@ test("6. empezado: El depósito lo está preparando, solo lo pedido, todo apagad
   assert.ok(!buscador(), "con buscador");
   assert.ok(!categoria(), "con filtro");
   assert.ok(!interruptor(), "con Ver fotos");
-  assert.ok(!document.querySelector("[data-paginador]"), "con paginador");
+  assert.ok(!contenido().querySelector("[data-paginador]"), "con paginador");
 
   assert.deepEqual(nombres(), p.items.map((i) => i.nombre).sort(), "solo lo pedido, no el catálogo");
   for (const t of tarjetas()) {
