@@ -941,6 +941,75 @@ try {
       ok("12f: el carrito los trae, sin empezar", mt.cuerpo.pendiente?.depositoEmpezo === false && mt.cuerpo.pendiente.items.length === 3, json(mt.cuerpo.pendiente));
       await limpiar(m);
     }
+
+    seccion("13. El historial de un local con pedidos en todos los estados");
+    {
+      // Un local propio: en camino, recibido, cancelado, y uno enviado que
+      // después el depósito empieza. Todo por las rutas: el envío del local,
+      // el despacho del depósito, la recepción del local (revisar cada línea y
+      // confirmar) y la cancelación.
+      const H = await armarLocal("Grupo historial", ["ACEITE", "ARROZ", "FIDEOS"]);
+      for (const id of Object.values(H.ids)) await c.stockLocal.create({ data: { localId: H.deposito.id, productoId: id, cantidad: 1000 } });
+      const cuentaDepoH = await c.usuario.create({
+        data: { nombre: "Depósito historial", email: `deposito-historial-${marca}@ci.local`, passwordHash: "x", rolId: rolEnc.id, localId: H.deposito.id },
+      });
+      const sDepoH = sesionDe(cuentaDepoH, H.deposito.id);
+      const solicitarH = (posId) => pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, H.sPin, { posId });
+      const despacharH = (posId) => pedir(enviar, "POST", `${B}/pos-transferencias/enviar`, sDepoH, { posId });
+      const historialH = (qs = "page=1&pageSize=50") => pedir(R.historial, "GET", `${B}/pedidos/historial?${qs}`, H.sPin);
+      const enviarH = async (cargas) => {
+        let posId = null;
+        for (const [nombre, cantidad] of cargas) posId = (await H.fijar(H.ids[nombre], cantidad)).cuerpo.posId;
+        const s = await solicitarH(posId);
+        if (!s.cuerpo.ok) throw new Error(`no se pudo enviar: ${json(s)}`);
+        return posId;
+      };
+
+      // En camino: enviado y despachado.
+      const pCamino = await enviarH([["ACEITE", 2]]);
+      const dCamino = await despacharH(pCamino);
+      ok("13: el depósito despacha el primero", dCamino.cuerpo.ok === true, json(dCamino));
+
+      // Recibido: enviado, despachado y recibido por el local.
+      const pRecibido = await enviarH([["ARROZ", 3], ["FIDEOS", 1]]);
+      const dRecibido = await despacharH(pRecibido);
+      const tRecibido = dRecibido.cuerpo.item?.id;
+      const revisarRuta = await import("../../app/api/transferencias/revisar-producto/route.js");
+      const confirmarRuta = await import("../../app/api/transferencias/confirmar-recepcion/route.js");
+      for (const d of await c.transferenciaDetalle.findMany({ where: { transferenciaId: tRecibido }, select: { id: true, cantidad: true } })) {
+        const r = await pedir(revisarRuta, "POST", `${B}/transferencias/revisar-producto`, H.sPin, { transferenciaId: tRecibido, detalleId: d.id, recibido: Number(d.cantidad), motivoPrincipal: null });
+        ok(`13: el local revisa la línea ${d.id}`, r.cuerpo.ok === true, json(r));
+      }
+      const conf = await pedir(confirmarRuta, "POST", `${B}/transferencias/confirmar-recepcion`, H.sPin, { transferenciaId: tRecibido });
+      ok("13: el local confirma la recepción", conf.cuerpo.ok === true, json(conf).slice(0, 300));
+
+      // Cancelado: enviado y cancelado por el local.
+      const pCancelado = await enviarH([["FIDEOS", 4]]);
+      ok("13: el local cancela uno", (await pedir(R.cancelar, "POST", `${B}/pos-transferencias/cancelar`, H.sPin, { posId: pCancelado })).cuerpo.ok === true);
+
+      // Enviado sin empezar, y después empezado.
+      const pEnCurso = await enviarH([["ACEITE", 1], ["ARROZ", 2]]);
+      guardar("historialConEnviado", await historialH());
+      guardar("historialCarritoEnviado", await carrito(H.sPin));
+      const lEnCurso = await c.posTransferenciaDetalle.findFirst({ where: { posTransferenciaId: pEnCurso, productoId: H.ids.ACEITE } });
+      const prepH = await pedir(editar, "POST", `${B}/pos-transferencias/detalle/editar`, sDepoH, { detalleId: lEnCurso.id, preparado: 1 });
+      ok("13: el depósito empieza el último", prepH.cuerpo.ok === true, json(prepH));
+
+      const h = await historialH();
+      guardar("historialTodos", h);
+      guardar("historialCarrito", await carrito(H.sPin));
+      const porId = Object.fromEntries((h.cuerpo.items || []).map((i) => [i.posId, i]));
+      console.log(`  · 13: historial → ${json(h.cuerpo.items?.map((i) => [i.posId, i.estado, i.transferenciaEstado, i.itemCount]))}`);
+      ok("13: trae los cuatro, el más nuevo arriba", json(h.cuerpo.items?.map((i) => i.posId)) === json([pEnCurso, pCancelado, pRecibido, pCamino]), json(h.cuerpo.items?.map((i) => i.posId)));
+      ok("13: el cancelado está, como Cancelado", porId[pCancelado]?.estado === "Cancelado", json(porId[pCancelado]));
+      ok("13: el recibido trae su transferencia Recibida", porId[pRecibido]?.estado === "Enviado" && porId[pRecibido]?.transferenciaEstado === "Recibida", json(porId[pRecibido]));
+      ok("13: el en camino trae su transferencia Enviada", porId[pCamino]?.estado === "Enviado" && porId[pCamino]?.transferenciaEstado === "Enviada", json(porId[pCamino]));
+      ok("13: el en curso sigue Solicitado", porId[pEnCurso]?.estado === "Solicitado");
+      // Los que se piden por estado siguen andando, y "Cancelado" también.
+      const soloCancelados = await historialH("page=1&pageSize=50&estado=Cancelado");
+      ok("13: ?estado=Cancelado trae solo el cancelado", json(soloCancelados.cuerpo.items?.map((i) => i.posId)) === json([pCancelado]), json(soloCancelados.cuerpo));
+      guardar("historialIds", { pEnCurso, pCancelado, pRecibido, pCamino, tRecibido, localId: H.local.id });
+    }
   }
 
   if (process.env.ESCRIBIR_FIXTURE_PEDIDOS) {

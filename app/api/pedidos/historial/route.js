@@ -2,7 +2,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
-import { sinCancelados } from "@/lib/pedidos/estados";
 
 export async function GET(req) {
   try {
@@ -60,8 +59,12 @@ export async function GET(req) {
     const estado = searchParams.get("estado") || "";
     const q = (searchParams.get("q") || "").trim();
 
-    // Filtro base
-    const estadosValidos = ["Solicitado", "Preparando", "Enviado"];
+    // Filtro base. Los cancelados entran desde el 2026-10-22: el historial del
+    // celular tiene el filtro "Cancelados", y un pedido cancelado es historial
+    // del local. Por eso esta lectura no pasa por `sinCancelados` (está en las
+    // excepciones de `lib/pedidos/sinCancelados.test.mjs`, con este motivo).
+    // Lo demás que devuelve no cambió.
+    const estadosValidos = ["Solicitado", "Preparando", "Enviado", "Cancelado"];
     const where = {
       destinoId: localId,
       origenId: depositoId,
@@ -88,7 +91,7 @@ export async function GET(req) {
     // Consultas en paralelo: datos + total
     const [rows, total] = await Promise.all([
       prisma.posTransferencia.findMany({
-        where: sinCancelados(where),
+        where,
         include: {
           detalles: {
             include: {
@@ -123,7 +126,7 @@ export async function GET(req) {
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
-      prisma.posTransferencia.count({ where: sinCancelados(where) }),
+      prisma.posTransferencia.count({ where }),
     ]);
 
     const items = rows.map((pos) => {

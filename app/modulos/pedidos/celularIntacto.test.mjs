@@ -33,7 +33,7 @@ import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
-const { real, montar, desmontarTodo, boton, tocar, asentar, filaShell } = await import("./montarPantallaPedidos.mjs");
+const { montar, desmontarTodo, boton, tocar, asentar, filaShell } = await import("./montarPantallaPedidos.mjs");
 
 afterEach(desmontarTodo);
 
@@ -55,32 +55,50 @@ const normalizar = (html) => html.replace(/«r[0-9a-z]+»|:r[0-9a-z]+:/g, "«id�
 
 const delTelefono = (texto) => boton(texto);
 
+// ── LAS RESPUESTAS, CONGELADAS ────────────────────────────────────────────
+//
+// Las fotos se sacaron con las respuestas que el fixture tenía entonces. El
+// fixture se regenera (`pedidosEnviarCancelar.mjs`) y cada corrida trae otras
+// marcas de tiempo en los nombres de categoría: con el fixture vivo, la foto
+// del catálogo dio rojo el 2026-10-22 sin que la pantalla hubiera cambiado.
+// `celularIntacto.respuestas.json` son ESAS respuestas —del fixture de aff3a9c,
+// idéntico al de db2db4d—, reales y congeladas: lo que se compara es la
+// pantalla, no el fixture del día.
+const R = JSON.parse(readFileSync("app/modulos/pedidos/celularIntacto.respuestas.json", "utf8"));
+const montarCongelado = (inicio) =>
+  montar({
+    inicio,
+    enLaEntrada: true,
+    historial: R.historialVacio,
+    local: { me: R.me, operadorMe: R.operadorMeConPin, opciones: R.opciones, catalogo: () => R.catalogo },
+  });
+
 const MOMENTOS = {
   "entrada sin pedido": async () => {
-    await montar({ inicio: real.carritoVacio, enLaEntrada: true });
+    await montarCongelado(R.carritoVacio);
   },
   "entrada con borrador": async () => {
-    await montar({ inicio: real.carritoBorrador, enLaEntrada: true });
+    await montarCongelado(R.carritoBorrador);
   },
   "catálogo armando": async () => {
-    await montar({ inicio: real.carritoBorrador, enLaEntrada: true });
+    await montarCongelado(R.carritoBorrador);
     await tocar(delTelefono("Seguir armando"));
     await asentar(450);
   },
   "entrada enviado": async () => {
-    await montar({ inicio: conFecha(real.carritoPendiente), enLaEntrada: true });
+    await montarCongelado(conFecha(R.carritoPendiente));
   },
   "modo sumar": async () => {
-    await montar({ inicio: conFecha(real.carritoPendiente), enLaEntrada: true });
+    await montarCongelado(conFecha(R.carritoPendiente));
     await tocar(delTelefono("Sumar productos"));
     await asentar(450);
   },
   "ver pedido enviado": async () => {
-    await montar({ inicio: conFecha(real.carritoPendiente), enLaEntrada: true });
+    await montarCongelado(conFecha(R.carritoPendiente));
     await tocar(delTelefono("Ver pedido"));
   },
   "entrada preparando": async () => {
-    await montar({ inicio: conFecha(real.empezadoCarrito), enLaEntrada: true });
+    await montarCongelado(conFecha(R.empezadoCarrito));
   },
 };
 

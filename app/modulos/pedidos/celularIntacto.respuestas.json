@@ -1,0 +1,332 @@
+{
+  "me": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "user": {
+        "id": 332,
+        "nombre": "Cuenta Mini",
+        "email": "pedidos-1792680221978@ci.local",
+        "rolId": 3,
+        "rolNombre": "ENCARGADO",
+        "permisos": [
+          "pos.usar",
+          "clientes.crear",
+          "clientes.puntos.ver",
+          "clientes.puntos.canjear",
+          "clientes.cc.ver",
+          "clientes.cc.pagar",
+          "compras.revisar",
+          "comprobantes.ver",
+          "pos.anular",
+          "turnos.ver_todos",
+          "clientes.ver",
+          "clientes.editar",
+          "productos.ver",
+          "productos.crear",
+          "productos.editar",
+          "stock.ver",
+          "stock.editar",
+          "transferencias.ver",
+          "transferencias.crear",
+          "transferencias.recibir",
+          "transferencias.cancelar",
+          "pos_transferencias.ver",
+          "pos_transferencias.enviar",
+          "pedidos.ver",
+          "pedidos.editar",
+          "pedidos.solicitar",
+          "compras.ver",
+          "compras.recibir",
+          "reportes.ver",
+          "config_local.operadores",
+          "config_local.alertas",
+          "stock.control.contar"
+        ],
+        "esAdmin": false,
+        "esDuenoLocal": false,
+        "operadorActivo": true,
+        "localId": 588,
+        "esDeposito": false,
+        "exigirOperador": true,
+        "tarjetaPrecioUnitario": null,
+        "tarjetaOcultarEquivalencia": null
+      }
+    }
+  },
+  "operadorMeConPin": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "operador": {
+        "operadorId": 304,
+        "nombre": "Ana",
+        "localId": 588,
+        "emitidoEn": 1792680222415
+      },
+      "voucher": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVyYWRvcklkIjozMDQsImxvY2FsSWQiOjU4OCwiX3RpcG8iOiJvcGVyYWRvcl92b3VjaGVyIiwiaWF0IjoxNzkyNjgwMjIyLCJleHAiOjE3OTI3MDkwMjJ9.bgFjkZ4vDbIcB_y7K30d-nj3seWXttCPl5hW_Qk7S_M"
+    }
+  },
+  "opciones": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "local": {
+        "id": 588,
+        "nombre": "Mini pedidos 1792680221978"
+      },
+      "deposito": {
+        "id": 589,
+        "nombre": "Depósito pedidos 1792680221978"
+      },
+      "grupoId": 294,
+      "categorias": [
+        {
+          "id": 114,
+          "nombre": "Almacén 1792680221978"
+        },
+        {
+          "id": 113,
+          "nombre": "Bebidas 1792680221978"
+        }
+      ],
+      "proveedores": [],
+      "areas": []
+    }
+  },
+  "catalogo": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "items": [
+        {
+          "productoLocalId": 8046,
+          "baseId": 7996,
+          "nombre": "Agua x6",
+          "codigoBarra": "7717926802219",
+          "codigoBarraSecundario": null,
+          "sku": null,
+          "imagenUrl": "/uploads/productos/agua-x6.jpg",
+          "precioCosto": 600,
+          "unidadMedida": "pack",
+          "factorPack": 6,
+          "modoPedido": "BULTO",
+          "modoEnvio": "SOLO_BULTO",
+          "stockDeposito": 50,
+          "categoriaNombre": "Bebidas 1792680221978",
+          "proveedorNombre": null,
+          "areaFisicaNombre": null
+        },
+        {
+          "productoLocalId": 8044,
+          "baseId": 7994,
+          "nombre": "Coca 2L",
+          "codigoBarra": "7717926802219",
+          "codigoBarraSecundario": null,
+          "sku": null,
+          "imagenUrl": null,
+          "precioCosto": 600,
+          "unidadMedida": "unidad",
+          "factorPack": 1,
+          "modoPedido": "BULTO",
+          "modoEnvio": "SOLO_UNIDAD",
+          "stockDeposito": 50,
+          "categoriaNombre": "Bebidas 1792680221978",
+          "proveedorNombre": null,
+          "areaFisicaNombre": null
+        },
+        {
+          "productoLocalId": 8045,
+          "baseId": 7995,
+          "nombre": "Yerba 1kg",
+          "codigoBarra": "7717926802219",
+          "codigoBarraSecundario": null,
+          "sku": null,
+          "imagenUrl": null,
+          "precioCosto": 600,
+          "unidadMedida": "unidad",
+          "factorPack": 1,
+          "modoPedido": "BULTO",
+          "modoEnvio": "SOLO_UNIDAD",
+          "stockDeposito": 50,
+          "categoriaNombre": "Almacén 1792680221978",
+          "proveedorNombre": null,
+          "areaFisicaNombre": null
+        }
+      ],
+      "total": 3,
+      "page": 1,
+      "pageSize": 50,
+      "totalPages": 1
+    }
+  },
+  "historialVacio": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "items": [],
+      "total": 0,
+      "page": 1,
+      "pageSize": 4,
+      "totalPages": 1
+    }
+  },
+  "carritoVacio": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "posId": null,
+      "items": [],
+      "itemCount": 0,
+      "pendiente": null
+    }
+  },
+  "carritoBorrador": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "posId": 3323,
+      "estado": "Borrador",
+      "items": [
+        {
+          "detalleId": 6800,
+          "productoLocalId": 8044,
+          "baseId": 7994,
+          "nombre": "Coca 2L",
+          "codigoBarra": "7717926802219",
+          "sugerido": 3,
+          "preparado": 0,
+          "unidadSugerida": "UNIDAD",
+          "factorPack": 1,
+          "modoEnvio": "SOLO_UNIDAD",
+          "unidadMedida": "unidad",
+          "imagenUrl": null
+        },
+        {
+          "detalleId": 6801,
+          "productoLocalId": 8046,
+          "baseId": 7996,
+          "nombre": "Agua x6",
+          "codigoBarra": "7717926802219",
+          "sugerido": 2,
+          "preparado": 0,
+          "unidadSugerida": "BULTO",
+          "factorPack": 6,
+          "modoEnvio": "SOLO_BULTO",
+          "unidadMedida": "pack",
+          "imagenUrl": "/uploads/productos/agua-x6.jpg"
+        }
+      ],
+      "itemCount": 2,
+      "pendiente": null
+    }
+  },
+  "carritoPendiente": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "posId": null,
+      "items": [],
+      "itemCount": 0,
+      "pendiente": {
+        "posId": 3323,
+        "estado": "Solicitado",
+        "solicitadoAt": "2026-10-22T14:43:42.836Z",
+        "createdAt": "2026-10-22T14:43:42.717Z",
+        "depositoEmpezo": false,
+        "items": [
+          {
+            "nombre": "Coca 2L",
+            "sugerido": 3,
+            "unidadSugerida": "UNIDAD",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "detalleId": 6800,
+            "productoLocalId": 8044,
+            "baseId": 7994,
+            "codigoBarra": "7717926802219",
+            "preparado": 0,
+            "unidadMedida": "unidad",
+            "imagenUrl": null
+          },
+          {
+            "nombre": "Agua x6",
+            "sugerido": 2,
+            "unidadSugerida": "BULTO",
+            "factorPack": 6,
+            "modoEnvio": "SOLO_BULTO",
+            "detalleId": 6801,
+            "productoLocalId": 8046,
+            "baseId": 7996,
+            "codigoBarra": "7717926802219",
+            "preparado": 0,
+            "unidadMedida": "pack",
+            "imagenUrl": "/uploads/productos/agua-x6.jpg"
+          }
+        ],
+        "itemCount": 2
+      }
+    }
+  },
+  "empezadoCarrito": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "posId": null,
+      "items": [],
+      "itemCount": 0,
+      "pendiente": {
+        "posId": 3346,
+        "estado": "Solicitado",
+        "solicitadoAt": "2026-10-22T14:43:49.296Z",
+        "createdAt": "2026-10-22T14:43:49.226Z",
+        "depositoEmpezo": true,
+        "items": [
+          {
+            "nombre": "ACEITE",
+            "sugerido": 2,
+            "unidadSugerida": "UNIDAD",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "detalleId": 6881,
+            "productoLocalId": 8199,
+            "baseId": 8149,
+            "codigoBarra": "7917926802000",
+            "preparado": 2,
+            "unidadMedida": "unidad",
+            "imagenUrl": null
+          },
+          {
+            "nombre": "ARROZ",
+            "sugerido": 5,
+            "unidadSugerida": "UNIDAD",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "detalleId": 6882,
+            "productoLocalId": 8200,
+            "baseId": 8150,
+            "codigoBarra": "7917926802001",
+            "preparado": 0,
+            "unidadMedida": "unidad",
+            "imagenUrl": null
+          },
+          {
+            "nombre": "GALLETITAS",
+            "sugerido": 4,
+            "unidadSugerida": "UNIDAD",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "detalleId": 6884,
+            "productoLocalId": 8202,
+            "baseId": 8152,
+            "codigoBarra": "7917926802003",
+            "preparado": 0,
+            "unidadMedida": "unidad",
+            "imagenUrl": null
+          }
+        ],
+        "itemCount": 3
+      }
+    }
+  }
+}
