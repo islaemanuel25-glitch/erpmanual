@@ -2,10 +2,9 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
-import { esBultoMode } from "@/lib/conversiones/stock";
-import { esComboBase } from "@/lib/combos/guards";
 import { sinCancelados } from "@/lib/pedidos/estados";
 import { bloquearParDelPedido, bloquearFilaDelPedido, depositoEmpezo } from "@/lib/pedidos/bloqueoDelPedido";
+import { validarCambio, fijarCantidadEnPedido } from "@/lib/pedidos/cantidadEnPedido";
 
 export async function POST(req) {
   try {
@@ -43,22 +42,6 @@ export async function POST(req) {
     }
 
     const body = await req.json();
-    const productoLocalId = Number(body.productoLocalId || 0);
-    const cantidad = Number(body.cantidad || 0);
-
-    if (!productoLocalId) {
-      return NextResponse.json(
-        { ok: false, error: "productoLocalId requerido" },
-        { status: 400 }
-      );
-    }
-
-    if (cantidad < 0) {
-      return NextResponse.json(
-        { ok: false, error: "La cantidad no puede ser negativa" },
-        { status: 400 }
-      );
-    }
 
     // Resolver depósito del grupo
     const grupoDeposito = await prisma.grupoDeposito.findFirst({
@@ -75,49 +58,13 @@ export async function POST(req) {
 
     const depositoId = grupoDeposito.localId;
 
-    // Verificar que el productoLocal pertenece al depósito
-    const productoOrigen = await prisma.productoLocal.findUnique({
-      where: { id: productoLocalId },
-      include: { base: true },
-    });
-
-    if (!productoOrigen || productoOrigen.localId !== depositoId) {
-      return NextResponse.json(
-        { ok: false, error: "Producto no encontrado en el depósito" },
-        { status: 404 }
-      );
+    // El producto, el combo y el bulto: `lib/pedidos/cantidadEnPedido.js`,
+    // compartido con `sumar-al-enviado`.
+    const validado = await validarCambio(prisma, depositoId, body);
+    if (!validado.ok) {
+      return NextResponse.json({ ok: false, error: validado.error }, { status: validado.status });
     }
-
-    // Los combos no se transfieren: se transfieren sus componentes.
-    if (esComboBase(productoOrigen.base)) {
-      return NextResponse.json(
-        { ok: false, error: "Los combos no se transfieren; se transfieren sus componentes." },
-        { status: 400 }
-      );
-    }
-
-    // Validar modo_envio: si llega cantidad en UNIDAD y el producto sale por bulto,
-    // la cantidad debe ser múltiplo de factorPack. Si llega en BULTO, no aplica.
-    const base = productoOrigen.base;
-    const factorPack = Number(base?.factor_pack || 1);
-    const unidadIn = body.unidad === "BULTO" ? "BULTO" : "UNIDAD";
-
-    if (
-      unidadIn === "UNIDAD" &&
-      cantidad > 0 &&
-      base?.modo_envio === "SOLO_BULTO" &&
-      factorPack > 1
-    ) {
-      if (cantidad % factorPack !== 0) {
-        return NextResponse.json(
-          { ok: false, error: `Este producto se pide por bulto completo (x${factorPack}).` },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Se respeta la unidad recibida ("BULTO" o "UNIDAD"). Fallback a "UNIDAD".
-    const unidad = unidadIn;
+    const { productoLocalId, cantidad, unidad } = validado.cambio;
 
     // ── TODO LO QUE ESCRIBE, EN UNA TRANSACCIÓN Y DE A UNO POR PAR ──────────
     //
@@ -205,56 +152,8 @@ export async function POST(req) {
         });
       }
 
-      // Todas las líneas del producto: con el bloqueo puesto hay una o
-      // ninguna, pero los borradores de antes pueden tener dos.
-      const lineas = await tx.posTransferenciaDetalle.findMany({
-        where: {
-          posTransferenciaId: pos.id,
-          productoId: productoLocalId,
-          pos: sinCancelados(),
-        },
-        orderBy: { id: "asc" },
-      });
-      const [existente, ...sobrantes] = lineas;
-
-      let item = null;
-
-      if (cantidad === 0) {
-        // Quitar el producto: todas sus líneas, también las repetidas.
-        if (lineas.length) {
-          await tx.posTransferenciaDetalle.deleteMany({ where: { id: { in: lineas.map((l) => l.id) } } });
-        }
-      } else {
-        // Upsert: sugerido = cantidad, preparado = 0
-        if (existente) {
-          item = await tx.posTransferenciaDetalle.update({
-            where: { id: existente.id },
-            data: {
-              sugerido: cantidad,
-              preparado: 0,
-              unidadSugerida: unidad,
-              tipo: "manual",
-            },
-          });
-          // Un pedido viejo —borrador o enviado sin empezar— con el producto
-          // dos veces queda con UNA línea, la de la cantidad nueva.
-          if (sobrantes.length) {
-            await tx.posTransferenciaDetalle.deleteMany({ where: { id: { in: sobrantes.map((l) => l.id) } } });
-          }
-        } else {
-          item = await tx.posTransferenciaDetalle.create({
-            data: {
-              posTransferenciaId: pos.id,
-              productoId: productoLocalId,
-              sugerido: cantidad,
-              preparado: 0,
-              tipo: "manual",
-              unidadSugerida: unidad,
-              unidadPreparada: unidad,
-            },
-          });
-        }
-      }
+      // Una línea por producto; 0 lo saca. `lib/pedidos/cantidadEnPedido.js`.
+      const item = await fijarCantidadEnPedido(tx, pos.id, { productoLocalId, cantidad, unidad });
 
       // Contar items en el carrito
       const itemCount = await tx.posTransferenciaDetalle.count({

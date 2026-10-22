@@ -91,8 +91,10 @@ test("3: enviar sin operario pide el PIN, deja el carrito y no reintenta solo; e
   assert.deepEqual(dialogosNativos, []);
 });
 
+// Cancelar está en la tarjeta de la entrada: desde el 2026-10-22 el catálogo
+// del pedido enviado es el modo sumar, y su barra no lleva cancelar.
 test("2: cancelar se confirma en un modal del kit; Volver no cancela", async () => {
-  const { pedidos } = await montar({ inicio: real.carritoPendiente, cancelar: [real.cancelado] });
+  const { pedidos } = await montar({ inicio: real.carritoPendiente, cancelar: [real.cancelado], enLaEntrada: true });
   assert.ok(esperandoAlDeposito());
   assert.ok(!modal(), "el modal tiene que estar cerrado");
 
@@ -116,7 +118,7 @@ test("2: cancelar se confirma en un modal del kit; Volver no cancela", async () 
 });
 
 test("3: cancelar sin operario pide el PIN, el pendiente queda y no reintenta solo", async () => {
-  const { pedidos, estado } = await montar({ inicio: real.carritoPendiente, cancelar: [real.cancelarSinOperador, real.cancelado] });
+  const { pedidos, estado } = await montar({ inicio: real.carritoPendiente, cancelar: [real.cancelarSinOperador, real.cancelado], enLaEntrada: true });
   estado.conPin = false;
   await tocar(boton("Cancelar pedido"));
   await tocar(boton("Cancelar pedido", modal()));

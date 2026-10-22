@@ -32,6 +32,9 @@ const conFecha = (r, fecha) => ({
   cuerpo: { ...r.cuerpo, pendiente: { ...r.cuerpo.pendiente, solicitadoAt: fecha.toISOString() } },
 });
 
+/** El pedido enviado del local de los tres productos —el del catálogo del arnés—. */
+const pendienteDelPrincipal = (fecha) => conFecha(real.carritoPendiente, fecha);
+
 test("el fixture: un carrito por estado, y el historial trae el pedido en curso primero", () => {
   assert.equal(real.carritoVacio.cuerpo.pendiente, null);
   assert.equal(real.carritoVacio.cuerpo.items.length, 0);
@@ -200,18 +203,24 @@ test("el Volver del shell: desde la entrada a donde va hoy; desde el catálogo, 
   assert.deepEqual(navegacion, [["back"]], "desde la entrada no volvió a donde se venía");
 });
 
-test("409 al sumar (el depósito lo empezó): el aviso, y vuelve a la entrada en Preparando", async () => {
-  const { estado } = await montar({
-    inicio: conFecha(real.entradaEnviadoCarrito, new Date()),
-    setCantidad: real.empezadoSetCantidad,
+test("409 al confirmar (el depósito lo empezó): el aviso, se descartan los cambios y vuelve a la entrada en Preparando", async () => {
+  // Decía "409 al sumar": con 00d300f cada toque escribía y el 409 llegaba en
+  // el toque. Desde el modo sumar, llega al confirmar, y no entró ninguno.
+  const { pedidos, estado } = await montar({
+    inicio: pendienteDelPrincipal(new Date()),
+    sumar: [real.sumarEmpezado],
     enLaEntrada: true,
   });
   await tocar(boton("Sumar productos", entrada()));
-  estado.carrito = real.empezadoCarrito;
   await tocar(tarjeta("Yerba 1kg").mas);
+  estado.carrito = real.empezadoCarrito;
+  await tocar(boton("Agregar al pedido (1)"));
+  assert.equal(llamadas(pedidos, "/api/pedidos/sumar-al-enviado").length, 1);
+  assert.equal(llamadas(pedidos, "/api/pedidos/set-cantidad").length, 0);
   assert.match(texto(), /El depósito ya está preparando tu pedido\. Ya no se puede cambiar\./);
   assert.ok(entrada(), "no volvió a la entrada");
   assert.equal(pill(), "Preparando");
+  assert.ok(!boton("Sumar productos") && !boton("Cancelar pedido"), "empezado se ofrece sumar o cancelar");
 });
 
 test("RECORRIDO: entrar, hacer un pedido, enviar, sumar, volver y cancelar", async () => {
@@ -219,6 +228,7 @@ test("RECORRIDO: entrar, hacer un pedido, enviar, sumar, volver y cancelar", asy
     inicio: real.carritoVacio,
     solicitar: [real.solicitado],
     cancelar: [real.cancelado],
+    sumar: [real.mainSumado],
     enLaEntrada: true,
   });
   // Entrar: sin pedido.
@@ -239,17 +249,32 @@ test("RECORRIDO: entrar, hacer un pedido, enviar, sumar, volver y cancelar", asy
   assert.equal(pill(), "Enviado");
   assert.match(texto(), /Pedido enviado al depósito correctamente/);
 
-  // Sumar productos: el catálogo, y lo que se carga va al pedido.
+  // Sumar productos: el catálogo en modo sumar. Lo que se carga queda en la
+  // pantalla; "Agregar al pedido (1)" lo confirma y vuelve a la entrada.
+  const setAntes = llamadas(pedidos, "/api/pedidos/set-cantidad").length;
   await tocar(boton("Sumar productos", entrada()));
   assert.ok(enCatalogo());
   await tocar(tarjeta("Yerba 1kg").mas);
-  assert.equal(llamadas(pedidos, "/api/pedidos/set-cantidad").at(-1).cuerpo.cantidad, 1);
+  assert.equal(llamadas(pedidos, "/api/pedidos/set-cantidad").length, setAntes, "en modo sumar se llamó a set-cantidad");
+  assert.equal(llamadas(pedidos, "/api/pedidos/sumar-al-enviado").length, 0, "se escribió sin confirmar");
+  await tocar(boton("Agregar al pedido (1)"));
+  assert.deepEqual(llamadas(pedidos, "/api/pedidos/sumar-al-enviado")[0].cuerpo, {
+    posId: real.carritoPendiente.cuerpo.pendiente.posId,
+    cambios: [{ productoLocalId: real.catalogo.cuerpo.items.find((i) => i.nombre === "Yerba 1kg").productoLocalId, cantidad: 1, unidad: "UNIDAD" }],
+  });
   assert.equal(llamadas(pedidos, "/api/pos-transferencias/solicitar").length, 1, "sumar mandó otro envío");
+  assert.ok(entrada(), "confirmar no volvió a la entrada");
+  assert.match(texto(), /Se agregó 1 cambio al pedido/);
+  assert.match(entrada().textContent, /3 productos en el pedido/);
 
-  // Volver: la entrada.
+  // Sumar otra vez, cargar, y Volver: la hoja de descartar; Descartar, la entrada.
+  await tocar(boton("Sumar productos", entrada()));
+  await tocar(tarjeta("Agua x6").mas);
   await tocar(boton("Volver", filaShell()));
+  await tocar(boton("Descartar", modal()));
   assert.ok(entrada());
   assert.equal(pill(), "Enviado");
+  assert.equal(llamadas(pedidos, "/api/pedidos/sumar-al-enviado").length, 1, "descartar escribió algo");
 
   // Cancelar, confirmado en la hoja: la entrada sin pedido.
   await tocar(boton("Cancelar pedido", entrada()));

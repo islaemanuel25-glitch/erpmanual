@@ -49,7 +49,11 @@ test("9b: cada cambio deja su fila en la bitácora, bajo el pedido", () => {
 test("9b: las líneas del pedido están en la lista blanca de la bitácora, agrupadas bajo su pedido", () => {
   const f = sinComentarios("lib/auditoria/interceptor.js");
   assert.match(f, /PosTransferenciaDetalle: \["create", "update", "delete", "deleteMany"\]/);
-  assert.match(f, /grupoKey: \(e\) => `TransferenciaPOS:\$\{\(e\.despues \|\| e\.antes\)\?\.posTransferenciaId\}`/);
+  // Bajo su pedido (`refId`), y cada línea su propio cambio dentro de la fila:
+  // desde `sumar-al-enviado` llegan varias en un request, y con una sola clave
+  // por pedido `mergeCampos` se quedaba con la primera (sección 12b).
+  assert.match(f, /grupoKey: \(e\) => `TransferenciaPOS:\$\{\(e\.despues \|\| e\.antes\)\?\.posTransferenciaId\}:linea:\$\{e\.id\}`/);
+  assert.match(f, /refId: \(e\) => Number\(\(e\.despues \|\| e\.antes\)\?\.posTransferenciaId\)/);
 });
 
 test("9c: si se saca todo, el pedido sigue enviado y vacío", () => {

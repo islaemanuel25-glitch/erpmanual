@@ -87,13 +87,20 @@ test("enviado: el catálogo vuelve con lo enviado, cada producto una vez y el de
     assert.deepEqual(repetidos(), [], "un producto aparece dos veces");
     assert.equal(tarjetas().find((t) => t.nombre === ORO).campo.value, "3", "lo enviado del 9 DE ORO es 1 + 2");
     assert.ok(tarjetas().every((t) => t.quitar), "lo enviado son los cinco del catálogo: todos con ✕");
-    assert.match(document.body.textContent, /Pedido enviado · 5 productos/);
+    // Decía "Pedido enviado · 5 productos" en la barra: desde el modo sumar
+    // (2026-10-22) la barra cuenta los cambios sin confirmar.
+    assert.match(document.body.textContent, /5 productos en el pedido/);
+    assert.match(document.body.textContent, /0 cambios sin confirmar/);
     assert.deepEqual(consola.avisos, [], "React vio dos tarjetas con la misma clave");
 
-    // Y en Ver mi pedido, los cinco, una vez cada uno.
-    await tocar(boton("Ver mi pedido ›"));
+    // Y en Ver pedido —desde la entrada, solo para mirar—, los cinco, una vez
+    // cada uno. Decía "Ver mi pedido ›" de la barra, que se fue con el modo
+    // sumar.
+    await tocar(boton("Volver"));
+    await tocar(boton("Ver pedido", entrada()));
     assert.equal(tarjetas().length, 5);
     assert.deepEqual(repetidos(), []);
+    assert.equal(tarjetas().find((t) => t.nombre === ORO).campo.value, "3");
     assert.deepEqual(consola.avisos, []);
   } finally {
     consola.soltar();

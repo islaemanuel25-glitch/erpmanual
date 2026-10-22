@@ -65,11 +65,14 @@ export const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
  *   - `historial`: lo que contesta `/api/pedidos/historial` (los pedidos
  *     anteriores de la página de entrada). Sin esto, el del local de los tres
  *     productos al entrar: ninguno.
+ *   - `sumar`: lista de respuestas de `/api/pedidos/sumar-al-enviado`, una
+ *     por confirmación. Con un ok, el carrito pasa a `trasSumar` (por defecto
+ *     el real del local de los tres productos después de sumar).
  */
-function servidor({ inicio, solicitar = [], cancelar = [], local = null, setCantidad = null, historial = null }) {
+function servidor({ inicio, solicitar = [], cancelar = [], local = null, setCantidad = null, historial = null, sumar = [], trasSumar = null }) {
   const pedidos = [];
   const estado = { conPin: true, carrito: inicio };
-  const colas = { solicitar: [...solicitar], cancelar: [...cancelar] };
+  const colas = { solicitar: [...solicitar], cancelar: [...cancelar], sumar: [...sumar] };
   globalThis.fetch = async (url, opciones = {}) => {
     const u = new URL(url, "http://localhost");
     const metodo = opciones.method || "GET";
@@ -85,6 +88,10 @@ function servidor({ inicio, solicitar = [], cancelar = [], local = null, setCant
     }
     else if (u.pathname === "/api/pedidos/carrito") r = estado.carrito;
     else if (u.pathname === "/api/pedidos/historial") r = historial ?? real.historialVacio;
+    else if (u.pathname === "/api/pedidos/sumar-al-enviado") {
+      r = colas.sumar.shift();
+      if (r?.cuerpo?.ok) estado.carrito = trasSumar ?? real.mainTrasSumar;
+    }
     else if (u.pathname === "/api/pedidos/set-cantidad") r = setCantidad ?? (cuerpo?.unidad === "BULTO" ? real.setCantidad_BULTO : real.setCantidad_UNIDAD);
     else if (u.pathname === "/api/pos-transferencias/solicitar") {
       r = colas.solicitar.shift();

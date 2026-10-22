@@ -112,7 +112,14 @@ test("el borrador viejo de verdad —líneas repetidas que hizo la ruta de antes
 });
 
 test("la forma: un pedido con el producto dos veces queda con una línea", () => {
-  assert.match(fuente, /const \[existente, \.\.\.sobrantes\] = lineas;/);
-  assert.match(fuente, /deleteMany\(\{ where: \{ id: \{ in: sobrantes\.map\(\(l\) => l\.id\) \} \} \}\)/, "las líneas sobrantes no se borran");
-  assert.match(fuente, /deleteMany\(\{ where: \{ id: \{ in: lineas\.map\(\(l\) => l\.id\) \} \} \}\)/, "con 0 no se borran todas las líneas del producto");
+  // La escritura se mudó el 2026-10-22 a `lib/pedidos/cantidadEnPedido.js`,
+  // compartida con `sumar-al-enviado`. Se mira ahí, y que la ruta la llame
+  // adentro de su transacción, con el pedido que bloqueó.
+  const escritura = sinComentarios("lib/pedidos/cantidadEnPedido.js");
+  assert.match(escritura, /const \[existente, \.\.\.sobrantes\] = lineas;/);
+  assert.match(escritura, /deleteMany\(\{ where: \{ id: \{ in: sobrantes\.map\(\(l\) => l\.id\) \} \} \}\)/, "las líneas sobrantes no se borran");
+  assert.match(escritura, /deleteMany\(\{ where: \{ id: \{ in: lineas\.map\(\(l\) => l\.id\) \} \} \}\)/, "con 0 no se borran todas las líneas del producto");
+  const tx = fuente.indexOf("prisma.$transaction(async (tx) =>");
+  const llama = fuente.indexOf("fijarCantidadEnPedido(tx, pos.id, { productoLocalId, cantidad, unidad })");
+  assert.ok(llama > tx && tx > -1, "set-cantidad no escribe con la función compartida adentro de la transacción");
 });

@@ -828,6 +828,119 @@ try {
       ok("11: con estado, fecha y cantidad de líneas", h.cuerpo.items.every((i) => i.estado && (i.solicitadoAt || i.createdAt) && Number.isInteger(i.itemCount)));
       await limpiar(pid);
     }
+
+    seccion("12. Sumar al pedido enviado con confirmación: todos los cambios juntos, o ninguno");
+    {
+      const sumarRuta = await import("../../app/api/pedidos/sumar-al-enviado/route.js");
+      const sumar = (posId, cambios) => pedir(sumarRuta, "POST", `${B}/pedidos/sumar-al-enviado`, P.sPin, { posId, cambios });
+      const TRES = [
+        { productoLocalId: ARROZ, cantidad: 3, unidad: "UNIDAD" },
+        { productoLocalId: GALLETITAS, cantidad: 4, unidad: "UNIDAD" },
+        { productoLocalId: ACEITE, cantidad: 5, unidad: "UNIDAD" },
+      ];
+
+      // 12a. Enviado. Los tres cambios de la pantalla quedan en la pantalla:
+      // mientras no se confirma no viaja nada (eso lo afirman los candados de
+      // la pantalla, que cuentan los pedidos a la red). Acá: el pedido
+      // guardado sigue igual hasta la confirmación.
+      const pid = await enviarUno(ACEITE, 2);
+      const antes = await lineasDelPedido(pid);
+      guardar("sumarModoCarrito", await carrito(P.sPin));
+      ok("12a: sin confirmar, el pedido guardado no cambió", json(await lineasDelPedido(pid)) === json(antes) && json(antes) === json({ [ACEITE]: 2 }), json(antes));
+
+      // 12b. Confirmar: los tres entran juntos, con su rastro en la bitácora.
+      const desde = new Date();
+      const store = {};
+      const r = await globalThis.__auditoriaALS.run(store, () => sumar(pid, TRES));
+      await flushAuditoria(globalThis.__auditoriaRefs.base, store);
+      guardar("sumarConfirmado", r);
+      ok("12b: confirmar contesta ok con los tres", r.status === 200 && r.cuerpo.ok && r.cuerpo.aplicados === 3, json(r));
+      const despues = await lineasDelPedido(pid);
+      console.log(`  · 12b: pedido #${pid} → ${json(despues)}`);
+      ok("12b: entraron los tres juntos", json(despues) === json({ [ACEITE]: 5, [ARROZ]: 3, [GALLETITAS]: 4 }), json(despues));
+      ok("12b: sigue Solicitado y sin borrador al lado", (await estadoDe(pid)) === "Solicitado" && (await borradoresDelPar()) === 0);
+      guardar("sumarConfirmadoCarrito", await carrito(P.sPin));
+      const rastro = await prismaApp.auditoriaBitacora.findMany({
+        where: { entidadId: String(pid), entidad: "Transferencia POS", createdAt: { gte: desde } },
+        select: { accion: true, entidadNombre: true, cambios: true },
+      });
+      const lineasDelRastro = (rastro[0]?.cambios || []).map((c) => c.campos.map((x) => `${x.label}:${x.antes}→${x.despues}`));
+      console.log(`  · 12b: bitácora: ${rastro.length} fila(s), ${json(rastro.map((f) => f.entidadNombre))}, ${json(lineasDelRastro)}`);
+      ok("12b: una fila para la confirmación, con un cambio por cada línea",
+        rastro.length === 1 && rastro[0].accion === "pos_transferencia.editar" && rastro[0].cambios.length === 3 && rastro[0].entidadNombre === `Transferencia POS #${pid}`,
+        json(rastro));
+      guardar("sumarConfirmadoBitacora", lineasDelRastro);
+      await limpiar(pid);
+
+      // 12c. El depósito lo empieza entre medio: 409 y no entra ninguno.
+      const p2 = await enviarUno(ACEITE, 2);
+      const l2 = await c.posTransferenciaDetalle.findFirst({ where: { posTransferenciaId: p2, productoId: ACEITE } });
+      ok("12c: el depósito lo empieza", (await preparar(l2.id, 2)).cuerpo.ok === true);
+      const r2 = await sumar(p2, TRES);
+      guardar("sumarEmpezado", r2);
+      ok("12c: 409 con el mensaje", r2.status === 409 && r2.cuerpo.error === "El depósito ya está preparando tu pedido. Ya no se puede cambiar.", json(r2));
+      ok("12c: y no entró ninguno", json(await lineasDelPedido(p2)) === json({ [ACEITE]: 2 }), json(await lineasDelPedido(p2)));
+      guardar("sumarEmpezadoCarrito", await carrito(P.sPin));
+      await limpiar(p2);
+
+      // 12d. Un producto inválido en la lista: no entra ninguno.
+      const p3 = await enviarUno(ACEITE, 2);
+      const r3 = await sumar(p3, [TRES[0], { productoLocalId: 999999999, cantidad: 1, unidad: "UNIDAD" }]);
+      ok("12d: uno inválido rechaza todos", r3.status === 404 && json(await lineasDelPedido(p3)) === json({ [ACEITE]: 2 }), json(r3));
+      await limpiar(p3);
+
+      // 12e. CARRERA: confirmar los cambios en el mismo instante en que el
+      // depósito prepara. Los cambios tocan la línea que se prepara —el aceite
+      // pasa a 5, y escribir una cantidad pone lo preparado en 0—, así que una
+      // confirmación que entra DESPUÉS de empezado borra lo preparado: esa es
+      // la línea tarde. Y todo o nada: los otros dos entran con ella o no entra
+      // ninguno.
+      let antesDep = 0, rechazos = 0, tardes = 0, parciales = 0, otras = 0;
+      for (let i = 0; i < VUELTAS; i++) {
+        const pv = await enviarUno(ACEITE, 2);
+        const lv = await c.posTransferenciaDetalle.findFirst({ where: { posTransferenciaId: pv, productoId: ACEITE } });
+        // La confirmación valida los tres productos antes de bloquear, y el
+        // depósito llegaba siempre primero. Se lo demora un poco más en cada
+        // vuelta para que caiga de los dos lados.
+        const [dep, loc] = await Promise.all([
+          new Promise((ok) => setTimeout(ok, (i % 13) * 3)).then(() => preparar(lv.id, 2)),
+          sumar(pv, TRES),
+        ]);
+        const fin = await c.posTransferenciaDetalle.findFirst({ where: { id: lv.id } });
+        const otros = await c.posTransferenciaDetalle.count({ where: { posTransferenciaId: pv, productoId: { in: [ARROZ, GALLETITAS] } } });
+        const preparado = Number(fin.preparado);
+        if (otros !== 0 && otros !== 2) parciales += 1;
+        else if (dep.cuerpo.ok && loc.cuerpo.ok && preparado === 0) tardes += 1;
+        else if (dep.cuerpo.ok && loc.status === 409 && preparado === 2 && otros === 0) rechazos += 1;
+        else if (dep.cuerpo.ok && loc.cuerpo.ok && preparado === 2 && Number(fin.sugerido) === 5 && otros === 2) antesDep += 1;
+        else {
+          otras += 1;
+          console.log(`  · 12e vuelta ${i + 1} sin clasificar: ${json({ dep: dep.status, loc, preparado, otros })}`);
+        }
+        await limpiar(pv);
+      }
+      console.log(`  · 12e: ${VUELTAS} vueltas — ${antesDep} los cambios entraron antes, ${rechazos} 409 sin escribir nada, ${tardes} TARDE (preparado borrado), ${parciales} a medias, ${otras} otras`);
+      guardar(CONTRA === "sumar" ? "carreraSumarSinBloqueo" : "carreraSumar", { vueltas: VUELTAS, antes: antesDep, rechazos, tardes, parciales, otras });
+      if (CONTRA === "sumar") ok("12e CONTRAPRUEBA: sin el bloqueo en sumar-al-enviado, hay líneas tarde", tardes > 0, `${tardes}`);
+      else ok("12e: cero líneas tarde, cero a medias", tardes === 0 && parciales === 0 && otras === 0, json({ tardes, parciales, otras }));
+
+      // 12f. En el local de los tres productos —el que monta la pantalla—: el
+      // pedido enviado, la confirmación de dos cambios y el carrito después.
+      const m = (await pedir(R.setCantidad, "POST", `${B}/pedidos/set-cantidad`, S.conPin, { productoLocalId: coca, cantidad: 3, unidad: "UNIDAD" })).cuerpo.posId;
+      await pedir(R.setCantidad, "POST", `${B}/pedidos/set-cantidad`, S.conPin, { productoLocalId: agua, cantidad: 2, unidad: "BULTO" });
+      ok("12f: el local principal envía", (await pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, S.conPin, { posId: m })).cuerpo.ok === true);
+      const mc = [
+        { productoLocalId: yerba, cantidad: 1, unidad: "UNIDAD" },
+        { productoLocalId: coca, cantidad: 5, unidad: "UNIDAD" },
+      ];
+      const ms = await pedir(sumarRuta, "POST", `${B}/pedidos/sumar-al-enviado`, S.conPin, { posId: m, cambios: mc });
+      guardar("mainSumado", ms);
+      ok("12f: los dos cambios entran", ms.cuerpo.ok && ms.cuerpo.aplicados === 2, json(ms));
+      const mt = await carrito(S.conPin);
+      guardar("mainTrasSumar", mt);
+      ok("12f: el carrito los trae, sin empezar", mt.cuerpo.pendiente?.depositoEmpezo === false && mt.cuerpo.pendiente.items.length === 3, json(mt.cuerpo.pendiente));
+      await limpiar(m);
+    }
   }
 
   if (process.env.ESCRIBIR_FIXTURE_PEDIDOS) {

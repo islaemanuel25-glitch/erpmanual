@@ -176,15 +176,19 @@ test("✕: en el pedido empezado no va, pero el lugar se reserva igual", async (
   }
 });
 
-test("✕: en el pedido enviado sin empezar va en lo pedido, y saca el producto", async () => {
+test("✕: en el modo sumar va en lo pedido, y sacarlo es un cambio sin confirmar", async () => {
+  // Decía que la ✕ escribía en el acto (set-cantidad en 0). Desde el modo
+  // sumar, sacar queda en la pantalla hasta "Agregar al pedido".
   const { pedidos } = await montar({ inicio: pendienteDel(new Date()) });
   assert.ok(tarjeta("Coca 2L").quitar, "la coca está en el pedido enviado: lleva ✕");
   assert.ok(tarjeta("Agua x6").quitar);
   assert.ok(!tarjeta("Yerba 1kg").quitar, "la yerba no está en el pedido: sin ✕");
   await tocar(tarjeta("Coca 2L").quitar);
-  assert.equal(setCantidades(pedidos).at(-1).cantidad, 0);
-  assert.ok(!tarjeta("Coca 2L").quitar);
-  assert.match(contenido().textContent, /Pedido enviado · 1 producto(?!s)/);
+  assert.equal(setCantidades(pedidos).length, 0, "la ✕ escribió en el pedido enviado");
+  assert.ok(!tarjeta("Coca 2L").quitar, "en 0 la ✕ sigue");
+  assert.equal(tarjeta("Coca 2L").campo.value, "");
+  assert.match(contenido().textContent, /1 cambio sin confirmar/);
+  assert.ok(boton("Agregar al pedido (1)"));
 });
 
 test("cada tarjeta mide lo que necesita: la lista de Pedidos no iguala altos", async () => {
@@ -597,39 +601,98 @@ test("5. enviado sin empezar: se sigue armando, con el catálogo vivo y lo carga
   assert.equal(tarjeta("Agua x6").campo.value, "2", "lo enviado trae su cantidad");
   for (const t of tarjetas()) assert.equal(t.mas.disabled, false, `${t.nombre}: el + apagado`);
 
-  // La barra: el conteo, "Ver mi pedido ›" a la derecha y cancelar; sin enviar.
-  assert.ok(barra(), "falta el renglón Pedido enviado · N productos");
-  assert.match(barra().textContent, /Pedido enviado · 2 productos/);
-  const ver = boton("Ver mi pedido ›", barra());
-  assert.ok(ver, "falta Ver mi pedido › al lado del conteo");
-  assert.ok(barra().lastElementChild === ver, "Ver mi pedido › no está a la derecha");
-  assert.ok(boton("Cancelar pedido"));
-  assert.match(boton("Cancelar pedido").className, /w-full/);
-  assert.ok(!boton("Enviar pedido al depósito") && !boton("Revisar y enviar") && !boton("Confirmar y enviar"), "no hay nada que enviar");
+  // ── EL MODO SUMAR (2026-10-22) ─────────────────────────────────────────
+  // Decía que lo cargado iba directo al pedido con set-cantidad, y que la
+  // barra traía "Ver mi pedido ›" y cancelar. Emanuel: "Sumar productos
+  // debería dejar sumar pero con una confirmación". La barra dice cuántos
+  // cambios hay y "Agregar al pedido (N)" los confirma; cancelar está en la
+  // entrada.
+  const pie = document.querySelector("[data-cambios-sin-confirmar]")?.parentElement;
+  assert.ok(pie, "falta la barra del modo sumar");
+  assert.match(pie.textContent, /0 cambios sin confirmar/);
+  const agregar = boton("Agregar al pedido (0)", pie);
+  assert.ok(agregar && agregar.disabled, "sin cambios, Agregar tiene que estar apagado");
+  assert.match(agregar.className, /sunmi-btn-primary/);
+  assert.match(agregar.className, /w-full/);
+  for (const b of ["Cancelar pedido", "Ver mi pedido ›", "Enviar pedido al depósito", "Revisar y enviar", "Confirmar y enviar"]) {
+    assert.ok(!boton(b), `en el modo sumar apareció ${b}`);
+  }
 
-  // Lo que se carga va directo al pedido: set-cantidad, sin enviar nada.
+  // Lo que se carga queda en la pantalla: la tarjeta muestra lo que va a
+  // quedar, y no viaja nada.
   await tocar(tarjeta("Yerba 1kg").mas);
-  assert.equal(setCantidades(pedidos).at(-1).cantidad, 1);
-  assert.equal(llamadas(pedidos, "/api/pos-transferencias/solicitar").length, 0);
-  assert.match(barra().textContent, /Pedido enviado · 3 productos/);
+  await tocar(tarjeta("Agua x6").mas);
+  assert.equal(setCantidades(pedidos).length, 0, "el modo sumar llamó a set-cantidad");
+  assert.equal(llamadas(pedidos, "/api/pedidos/sumar-al-enviado").length, 0, "se escribió sin confirmar");
+  assert.equal(tarjeta("Yerba 1kg").campo.value, "1");
+  assert.equal(tarjeta("Agua x6").campo.value, "3", "no muestra la del pedido más el cambio");
+  assert.match(pie.textContent, /2 cambios sin confirmar/);
+  assert.equal(boton("Agregar al pedido (2)", pie).disabled, false);
 });
 
-test("5. enviado sin empezar: Ver mi pedido trae solo lo pedido, vivo y con ✕", async () => {
-  const { pedidos } = await montar({ inicio: pendienteDel(new Date()) });
-  await tocar(boton("Ver mi pedido ›"));
-  assert.deepEqual(nombres(), ["Agua x6", "Coca 2L"]);
-  assert.ok(!buscador() && !categoria(), "en Ver mi pedido no van el buscador ni el filtro");
-  for (const t of tarjetas()) {
-    assert.ok(t.quitar, `${t.nombre}: sin ✕`);
-    assert.equal(t.campo.disabled, false, `${t.nombre}: el campo apagado`);
-  }
-  assert.ok(!boton("Ver mi pedido ›"), "adentro no se ofrece de nuevo");
-  assert.ok(!boton("Confirmar y enviar"), "no hay nada que enviar");
-  assert.ok(boton("Cancelar pedido"));
+test("5. modo sumar: volver a la cantidad del pedido deja de ser un cambio", async () => {
+  await montar({ inicio: pendienteDel(new Date()) });
   await tocar(tarjeta("Agua x6").mas);
-  assert.equal(setCantidades(pedidos).at(-1).cantidad, 3);
-  await tocar(boton("Volver al catálogo", filaShell()));
-  assert.ok(buscador());
+  assert.match(contenido().textContent, /1 cambio sin confirmar/);
+  await tocar(tarjeta("Agua x6").menos);
+  assert.equal(tarjeta("Agua x6").campo.value, "2");
+  assert.match(contenido().textContent, /0 cambios sin confirmar/);
+  assert.equal(boton("Agregar al pedido (0)").disabled, true);
+});
+
+test("5. modo sumar: Agregar al pedido manda TODOS los cambios juntos, avisa y vuelve a la entrada", async () => {
+  const { pedidos } = await montar({ inicio: pendienteDel(new Date()), sumar: [real.mainSumado] });
+  const id = (n) => real.catalogo.cuerpo.items.find((i) => i.nombre === n).productoLocalId;
+  await tocar(tarjeta("Yerba 1kg").mas);
+  await tocar(tarjeta("Coca 2L").quitar);
+  await tocar(boton("Agregar al pedido (2)"));
+  const envios = llamadas(pedidos, "/api/pedidos/sumar-al-enviado");
+  assert.equal(envios.length, 1, "no fue una sola confirmación");
+  assert.equal(envios[0].cuerpo.posId, real.carritoPendiente.cuerpo.pendiente.posId);
+  assert.deepEqual(
+    [...envios[0].cuerpo.cambios].sort((a, b) => a.productoLocalId - b.productoLocalId),
+    [
+      { productoLocalId: id("Yerba 1kg"), cantidad: 1, unidad: "UNIDAD" },
+      { productoLocalId: id("Coca 2L"), cantidad: 0, unidad: "UNIDAD" },
+    ].sort((a, b) => a.productoLocalId - b.productoLocalId)
+  );
+  assert.equal(setCantidades(pedidos).length, 0);
+  assert.match(texto(), /Se agregaron 2 cambios al pedido/);
+  assert.ok(document.querySelector("[data-entrada-pedido]"), "no volvió a la entrada");
+});
+
+test("5. modo sumar: Volver con cambios pregunta; Seguir cargando los deja, Descartar los tira", async () => {
+  const { pedidos } = await montar({ inicio: pendienteDel(new Date()) });
+  await tocar(tarjeta("Yerba 1kg").mas);
+  await tocar(tarjeta("Agua x6").mas);
+  await tocar(boton("Volver", filaShell()));
+  assert.ok(modal(), "con cambios, Volver no preguntó");
+  assert.match(modal().textContent, /Tenés 2 cambios sin confirmar\. ¿Descartarlos\?/);
+  const delModal = botones(modal()).map((b) => b.textContent.trim()).filter((t) => t === "Seguir cargando" || t === "Descartar");
+  assert.deepEqual(delModal, ["Seguir cargando", "Descartar"]);
+  assert.match(boton("Seguir cargando", modal()).className, /sunmi-btn-slate/);
+  assert.match(boton("Descartar", modal()).className, /sunmi-btn-red/);
+
+  await tocar(boton("Seguir cargando", modal()));
+  assert.ok(!modal(), "Seguir cargando no cerró la hoja");
+  assert.equal(tarjeta("Yerba 1kg").campo.value, "1", "Seguir cargando perdió los cambios");
+  assert.match(contenido().textContent, /2 cambios sin confirmar/);
+
+  await tocar(boton("Volver", filaShell()));
+  await tocar(boton("Descartar", modal()));
+  assert.ok(document.querySelector("[data-entrada-pedido]"), "Descartar no volvió a la entrada");
+  assert.equal(llamadas(pedidos, "/api/pedidos/sumar-al-enviado").length, 0, "descartar escribió");
+  // Y al volver a entrar, lo descartado no está.
+  await tocar(boton("Sumar productos"));
+  assert.equal(tarjeta("Yerba 1kg").campo.value, "");
+  assert.equal(tarjeta("Agua x6").campo.value, "2");
+});
+
+test("5. modo sumar: Volver sin cambios sale directo, sin hoja", async () => {
+  await montar({ inicio: pendienteDel(new Date()) });
+  await tocar(boton("Volver", filaShell()));
+  assert.ok(!modal(), "sin cambios se abrió la hoja");
+  assert.ok(document.querySelector("[data-entrada-pedido]"), "no volvió a la entrada");
 });
 
 test("6. empezado: El depósito lo está preparando, solo lo pedido, todo apagado", async () => {
@@ -666,7 +729,8 @@ test("6. cancelar sin empezar sigue en la barra, y el 409 de uno que el depósit
   // cancelar contesta el 409 real y el carrito, releído, viene empezado.
   const r409 = real.cancelarEmpezadoLocal;
   assert.equal(r409.status, 409);
-  const { pedidos, estado } = await montar({ inicio: pendienteDel(new Date()), cancelar: [r409] });
+  // Desde el modo sumar, cancelar está en la tarjeta de la entrada.
+  const { pedidos, estado } = await montar({ inicio: pendienteDel(new Date()), cancelar: [r409], enLaEntrada: true });
   assert.ok(boton("Cancelar pedido"), "sin empezar, cancelar está");
   estado.carrito = empezadoDel(new Date());
   await tocar(boton("Cancelar pedido"));
@@ -679,11 +743,15 @@ test("6. cancelar sin empezar sigue en la barra, y el 409 de uno que el depósit
 });
 
 test("6. el 409 de un pedido que el depósito empezó lleva la pantalla a empezado", async () => {
-  // Lo enviado sin empezar en pantalla; el depósito lo empezó por detrás:
-  // set-cantidad contesta el 409 real y el carrito, releído, viene empezado.
-  const { estado } = await montar({ inicio: pendienteDel(new Date()), setCantidad: real.empezadoSetCantidad });
+  // Lo enviado sin empezar en pantalla; el depósito lo empezó por detrás.
+  // Decía que el 409 llegaba en el toque, de set-cantidad. Desde el modo
+  // sumar el toque no viaja: el 409 real llega al confirmar, de
+  // sumar-al-enviado, y el carrito releído viene empezado.
+  const { pedidos, estado } = await montar({ inicio: pendienteDel(new Date()), sumar: [real.sumarEmpezado] });
   estado.carrito = empezadoDel(new Date());
   await tocar(tarjeta("Yerba 1kg").mas);
+  assert.equal(setCantidades(pedidos).length, 0);
+  await tocar(boton("Agregar al pedido (1)"));
   assert.match(texto(), /El depósito ya está preparando tu pedido\. Ya no se puede cambiar\./);
   assert.match(contenido().textContent, /El depósito lo está preparando/);
   assert.ok(!buscador());

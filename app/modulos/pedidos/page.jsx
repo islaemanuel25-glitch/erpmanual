@@ -137,6 +137,14 @@ export default function PedidosCatalogoPage() {
   const [carritoCargado, setCarritoCargado] = useState(false);
   // Los últimos pedidos al depósito, de `/api/pedidos/historial`.
   const [anteriores, setAnteriores] = useState([]);
+  // MODO SUMAR: lo que se carga sobre el pedido enviado queda acá, en la
+  // pantalla, hasta que se confirma con "Agregar al pedido (N)" (Emanuel,
+  // 2026-10-22: "Sumar productos debería dejar sumar pero con una
+  // confirmación"). productoLocalId → { cantidad, unidad }: la cantidad que va
+  // a quedar, no la diferencia.
+  const [cambios, setCambios] = useState({});
+  const [agregando, setAgregando] = useState(false);
+  const [confirmandoDescartar, setConfirmandoDescartar] = useState(false);
   const [carritoItems, setCarritoItems] = useState([]);
   const [loadingCarrito, setLoadingCarrito] = useState(false);
 
@@ -160,16 +168,27 @@ export default function PedidosCatalogoPage() {
   const enEntrada = vista === "entrada";
   const viendoPedido = vista === "carrito" && !empezado;
   const alCatalogo = viendoPedido && volverA === "catalogo";
+  // El catálogo sobre el pedido enviado sin empezar es el modo sumar: nada se
+  // escribe hasta confirmar, y `set-cantidad` no se llama.
+  const sumando = !!pendiente && !empezado && vista === "catalogo";
+  const cambiosSinConfirmar = Object.keys(cambios).length;
+  // Salir del modo sumar con cambios pregunta antes de tirarlos.
+  const salirDeSumar = () => {
+    if (cambiosSinConfirmar > 0) setConfirmandoDescartar(true);
+    else setVista("entrada");
+  };
   useAccionDePagina(
     () =>
       enEntrada ? (
         <SunmiBackButton onVolver={() => router.back()} />
       ) : alCatalogo ? (
         <SunmiBackButton texto="Volver al catálogo" onVolver={() => setVista("catalogo")} />
+      ) : sumando ? (
+        <SunmiBackButton onVolver={salirDeSumar} />
       ) : (
         <SunmiBackButton onVolver={() => setVista("entrada")} />
       ),
-    [enEntrada, alCatalogo, router]
+    [enEntrada, alCatalogo, sumando, cambiosSinConfirmar, router]
   );
 
   // ====================================================
@@ -318,6 +337,18 @@ export default function PedidosCatalogoPage() {
     // eso la pantalla vuelve sola a la entrada, en "Preparando".
     if (empezado) return;
 
+    // En el modo sumar se anota en la pantalla y nada viaja. Volver a la
+    // cantidad del pedido deja de ser un cambio.
+    if (sumando) {
+      setCambios((prev) => {
+        const next = { ...prev };
+        if (cantidad === (carrito[productoLocalId] ?? 0)) delete next[productoLocalId];
+        else next[productoLocalId] = { cantidad, unidad };
+        return next;
+      });
+      return;
+    }
+
     // Optimistic update (siempre en total unidades)
     setCarrito((prev) => {
       const next = { ...prev };
@@ -396,6 +427,52 @@ export default function PedidosCatalogoPage() {
       setError("Error de conexión al solicitar");
     }
     setEnviando(false);
+  };
+
+  // ====================================================
+  // MODO SUMAR: CONFIRMAR O DESCARTAR LOS CAMBIOS
+  // ====================================================
+  // "Agregar al pedido (N)" ES la confirmación: un toque y viajan todos juntos
+  // a `/api/pedidos/sumar-al-enviado`, que los aplica todos o ninguno.
+  const confirmarCambios = async () => {
+    if (!pendiente || cambiosSinConfirmar === 0) return;
+    const lista = Object.entries(cambios).map(([id, c]) => ({ productoLocalId: Number(id), cantidad: c.cantidad, unidad: c.unidad }));
+    setError("");
+    setAgregando(true);
+    try {
+      const res = await fetch("/api/pedidos/sumar-al-enviado", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ posId: pendiente.posId, cambios: lista }),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setCambios({});
+        setVista("entrada");
+        await cargarCarrito();
+        showSuccess(lista.length === 1 ? "Se agregó 1 cambio al pedido" : `Se agregaron ${lista.length} cambios al pedido`);
+      } else if (res.status === 409) {
+        // El depósito lo empezó (o el pedido ya no espera): no entró ninguno.
+        // Se avisa, se tiran los cambios y la entrada, releída, lo muestra
+        // como está ahora —"Preparando" si lo empezó—.
+        setError(json.error || "No se pudieron agregar los cambios al pedido");
+        setCambios({});
+        setVista("entrada");
+        await cargarCarrito();
+      } else {
+        setError(json.error || "No se pudieron agregar los cambios al pedido");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Error de conexión al agregar los cambios");
+    }
+    setAgregando(false);
+  };
+
+  const descartarCambios = () => {
+    setConfirmandoDescartar(false);
+    setCambios({});
+    setVista("entrada");
   };
 
   // ====================================================
@@ -510,6 +587,34 @@ export default function PedidosCatalogoPage() {
     </SunmiModalLayout>
   );
 
+  // Salir del modo sumar con cambios sin confirmar. La misma hoja que la de
+  // cancelar; sin `destructivo` por lo mismo: cerrarla sin querer es "Seguir
+  // cargando", que no pierde nada.
+  const modalDescartar = (
+    <SunmiModalLayout
+      open={confirmandoDescartar}
+      title="Cambios sin confirmar"
+      onClose={() => setConfirmandoDescartar(false)}
+      forma="hoja-o-centrado"
+      espacioCuerpo="mt-2 gap-3"
+      z={9999}
+      footer={
+        <>
+          <SunmiButton color="slate" onClick={() => setConfirmandoDescartar(false)}>
+            Seguir cargando
+          </SunmiButton>
+          <SunmiButton color="red" onClick={descartarCambios}>
+            Descartar
+          </SunmiButton>
+        </>
+      }
+    >
+      <p className="text-sm2 sunmi-text-muted leading-snug">
+        {`Tenés ${cambiosSinConfirmar} ${cambiosSinConfirmar === 1 ? "cambio" : "cambios"} sin confirmar. ¿Descartarlos?`}
+      </p>
+    </SunmiModalLayout>
+  );
+
   // ====================================================
   // LOS ESTADOS: armando el borrador (en el catálogo o en "Ver mi pedido"),
   // enviado y todavía sin empezar (igual, pero lo que se carga va directo al
@@ -528,12 +633,15 @@ export default function PedidosCatalogoPage() {
   const productosEnElCarrito = Object.keys(carrito).length;
   const enPedido = soloMirar ? enviados.length : productosEnElCarrito;
 
+  // En el modo sumar, la tarjeta muestra la cantidad que va a quedar: la del
+  // pedido con el cambio sin confirmar encima.
+  const cantidadEnPantalla = (id) => (sumando && cambios[id] ? cambios[id].cantidad : carrito[id] ?? 0);
   const tarjetaDelCatalogo = (prod) => (
     <TarjetaPedido
       key={prod.productoLocalId}
       producto={prod}
-      cantidad={carrito[prod.productoLocalId] ?? 0}
-      enPedido={carrito[prod.productoLocalId] != null}
+      cantidad={cantidadEnPantalla(prod.productoLocalId)}
+      enPedido={sumando ? cantidadEnPantalla(prod.productoLocalId) > 0 : carrito[prod.productoLocalId] != null}
       conFoto={verFotos}
       onCantidad={(cant, uni) => setCantidad(prod.productoLocalId, cant, uni)}
     />
@@ -651,7 +759,10 @@ export default function PedidosCatalogoPage() {
                   se toque" (Emanuel, 2026-10-22). */}
               <div className="space-y-4">
                 <div className="space-y-2">
-                  {accion("Sumar productos", "primary", () => setVista("catalogo"))}
+                  {accion("Sumar productos", "primary", () => {
+                    setCambios({});
+                    setVista("catalogo");
+                  })}
                   {accion("Ver pedido", "slate", () => setVista("lectura"))}
                 </div>
                 {accion(cancelandoPendiente ? "Cancelando..." : "Cancelar pedido", "red", pedirCancelarPendiente)}
@@ -768,7 +879,23 @@ export default function PedidosCatalogoPage() {
           ) : null
         }
         pieDePantalla={
-          esperando ? (
+          sumando ? (
+            // El modo sumar: cuántos cambios hay, y el botón que los confirma
+            // todos juntos. Sin hoja ni segundo paso: tocarlo es confirmar.
+            <div className="space-y-2">
+              <span data-cambios-sin-confirmar="" className="block text-sm2 sunmi-text-muted">
+                {`${cambiosSinConfirmar} ${cambiosSinConfirmar === 1 ? "cambio" : "cambios"} sin confirmar`}
+              </span>
+              <SunmiButton
+                color="primary"
+                className="w-full min-h-toque"
+                disabled={agregando || cambiosSinConfirmar === 0}
+                onClick={confirmarCambios}
+              >
+                {agregando ? "Agregando..." : `Agregar al pedido (${cambiosSinConfirmar})`}
+              </SunmiButton>
+            </div>
+          ) : esperando ? (
             // Enviado: sin botón de enviar —ya está enviado—. Sin empezar,
             // "Ver mi pedido ›" lleva a lo pedido, con las tarjetas vivas, y se
             // puede cancelar. Solo para mirar —empezado, o "Ver pedido" desde
@@ -812,7 +939,12 @@ export default function PedidosCatalogoPage() {
             </div>
           )
         }
-        despuesDelPie={modalCancelar}
+        despuesDelPie={
+          <>
+            {modalCancelar}
+            {modalDescartar}
+          </>
+        }
       />
     </div>
   );
