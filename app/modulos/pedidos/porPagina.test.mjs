@@ -102,19 +102,25 @@ test("al entrar usa lo guardado; lo que no es 25, 50 o 100 vale 50", async () =>
 });
 
 test("si el celular no deja leer lo guardado, 50 y la pantalla anda", async () => {
-  const original = window.localStorage.getItem;
-  Object.defineProperty(window.localStorage, "getItem", {
-    value: () => {
-      throw new Error("SecurityError");
-    },
-    configurable: true,
-  });
+  // Guardado 100: si la lectura no tirara, pediría de a 100. Así el caso
+  // distingue "tiró y cayó en 50" de "no había nada", que era lo único que
+  // afirmaba la primera versión.
+  window.localStorage.setItem(CLAVE, "100");
+  // En jsdom `localStorage` es un proxy: un `defineProperty` sobre la instancia
+  // guarda un dato llamado "getItem" y no reemplaza nada —la primera versión
+  // de este caso hacía eso y daba verde sin tirar nunca—. Se tapa en el
+  // prototipo, que es por donde pasa la llamada de la pantalla.
+  const proto = window.Storage.prototype;
+  const original = proto.getItem;
+  proto.getItem = () => {
+    throw new Error("SecurityError");
+  };
   try {
     const { pedidos } = await montar120();
     assert.equal(delCatalogo(pedidos)[0].pageSize, "50");
     assert.ok(paginador(), "la pantalla no se dibujó");
   } finally {
-    Object.defineProperty(window.localStorage, "getItem", { value: original, configurable: true });
+    proto.getItem = original;
   }
 });
 
