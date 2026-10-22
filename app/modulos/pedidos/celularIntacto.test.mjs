@@ -11,12 +11,15 @@
 // pantalla del teléfono en aff3a9c —la producción de antes del escritorio—,
 // en siete momentos, con las respuestas reales de las rutas sobre erpazul_al.
 // Se sacó con ESCRIBIR_FOTO_CELULAR=1 corriendo este mismo archivo CONTRA
-// aff3a9c, antes de tocar `page.jsx`. Hoy se vuelve a montar y se compara lo
-// que queda adentro del envoltorio del teléfono, carácter por carácter.
+// aff3a9c, antes de tocar `page.jsx`. Hoy se vuelve a montar, con la ventana
+// de teléfono, y se compara todo el contenido de la página, carácter por
+// carácter. Desde que se monta una sola versión no hay envoltorio: si
+// volviera a haber uno, o algo del escritorio al lado, el HTML ya no sería el
+// mismo y esto da rojo.
 //
 // Lo único que se normaliza son los identificadores que React inventa
-// (`useId`): dependen de dónde está el componente en el árbol, y el envoltorio
-// del reparto lo baja un nivel. No es algo que se dibuje.
+// (`useId`): dependen de dónde está el componente en el árbol. No es algo que
+// se dibuje.
 
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
@@ -33,19 +36,13 @@ const ESCRIBIR = process.env.ESCRIBIR_FOTO_CELULAR === "1";
 const FECHA = "2026-01-15T15:00:00.000Z";
 const conFecha = (r) => ({ ...r, cuerpo: { ...r.cuerpo, pendiente: { ...r.cuerpo.pendiente, solicitadoAt: FECHA } } });
 
-/** Lo que dibuja el teléfono: adentro de su envoltorio, o —en aff3a9c, que no lo tenía— todo el contenido. */
+/** Lo que dibuja la página —el contenido entero— y la fila del shell. */
 function delCelular() {
-  const envoltorio = document.querySelector("[data-pedidos-celular]");
-  const raiz = envoltorio ?? document.querySelector("[data-contenido]");
-  return normalizar(raiz.innerHTML) + "\n--shell--\n" + normalizar(filaShell().innerHTML);
+  return normalizar(document.querySelector("[data-contenido]").innerHTML) + "\n--shell--\n" + normalizar(filaShell().innerHTML);
 }
 const normalizar = (html) => html.replace(/«r[0-9a-z]+»|:r[0-9a-z]+:/g, "«id»");
 
-/** El botón del teléfono, y no el homónimo del escritorio. */
-const delTelefono = (texto) => {
-  const raiz = document.querySelector("[data-pedidos-celular]") ?? document.querySelector("[data-contenido]");
-  return boton(texto, raiz);
-};
+const delTelefono = (texto) => boton(texto);
 
 const MOMENTOS = {
   "entrada sin pedido": async () => {

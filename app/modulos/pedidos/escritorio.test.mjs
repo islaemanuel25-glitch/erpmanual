@@ -4,9 +4,8 @@
 //
 // `components/pedidos/PedidosEscritorio.jsx`, montada por la página entera con
 // el arnés (`montarPantallaPedidos.mjs`) y las respuestas REALES de las rutas
-// sobre erpazul_al. jsdom no aplica el CSS del reparto: el teléfono y la
-// computadora están los dos en el DOM, y estos candados miran solo la de
-// computadora (`escritorio()`). Que el teléfono no cambió lo dice
+// sobre erpazul_al, con la ventana de computadora: la página monta solo esta
+// composición (`montaje.test.mjs`). Que el teléfono no cambió lo dice
 // `celularIntacto.test.mjs`.
 
 import { afterEach, test } from "node:test";
@@ -53,8 +52,9 @@ const id = (n) => real.catalogo.cuerpo.items.find((i) => i.nombre === n).product
 const conFecha = (r, fecha) => ({ ...r, cuerpo: { ...r.cuerpo, pendiente: { ...r.cuerpo.pendiente, solicitadoAt: fecha.toISOString() } } });
 const enviadoHoy = () => conFecha(real.carritoPendiente, new Date());
 
-// El escritorio no tiene página de entrada: se monta sin pasar por la del teléfono.
-const montarE = (r) => montar({ ...r, enLaEntrada: true });
+// Con la ventana de computadora, que es la única que lo monta. No tiene
+// página de entrada.
+const montarE = (r) => montar({ ...r, ancho: "escritorio" });
 
 // ── ARMANDO ───────────────────────────────────────────────────────────────
 

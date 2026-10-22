@@ -77,28 +77,45 @@ function cuandoSeEnvio(solicitadoAt) {
   return `${dia} ${horaAR(solicitadoAt)}`;
 }
 
-// ── EL REPARTO: TELÉFONO Y COMPUTADORA ────────────────────────────────────
+// ── EL REPARTO: TELÉFONO O COMPUTADORA, UNA SOLA ──────────────────────────
 //
 // Por debajo de 1024 px, la pantalla del teléfono, TAL CUAL: es
 // `PedidosCatalogoPage`, más abajo, que no cambió en nada. Desde 1024 px, la
 // de computadora, en su propio archivo (`components/pedidos/PedidosEscritorio`),
 // con su propio estado: el del teléfono vive adentro de esta pantalla y
-// sacarlo sería tocarla. Mismo reparto por CSS que `WorkspaceRecepcion`.
+// sacarlo sería tocarla.
 //
-// El envoltorio del teléfono es `contents` además de `lg:hidden`: así no es
-// una caja más entre la página y su contenido, y el `min-h-full` de adentro
-// sigue midiendo contra lo mismo que antes. Desde `lg`, `hidden` lo apaga.
+// Se monta UNA, la del ancho real de la ventana. En 99d7410 el reparto era
+// por CSS, como en `WorkspaceRecepcion`, y las dos estaban montadas a la vez:
+// cada una pedía opciones, carrito y catálogo al entrar —todo dos veces— y
+// llevaba su propio estado. Ahora la otra no existe en el árbol. Si la ventana
+// cruza el corte, se desmonta una y se monta la otra, y lo que hubiera sin
+// confirmar en el modo sumar se pierde, igual que al salir de la pantalla.
+//
+// Mientras no se sabe el ancho —en el servidor y en el primer render— no se
+// monta ninguna: va el mismo "Cargando..." de la pantalla. Así nunca aparece
+// la equivocada para después cambiarla.
+const CORTE_ESCRITORIO = "(min-width: 1024px)"; // `lg` de Tailwind
+
 export default function PaginaPedidos() {
-  return (
-    <>
-      <div data-pedidos-celular="" className="contents lg:hidden">
-        <PedidosCatalogoPage />
+  const [esEscritorio, setEsEscritorio] = useState(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia(CORTE_ESCRITORIO);
+    const alCambiar = () => setEsEscritorio(mq.matches);
+    alCambiar();
+    mq.addEventListener("change", alCambiar);
+    return () => mq.removeEventListener("change", alCambiar);
+  }, []);
+
+  if (esEscritorio === null) {
+    return (
+      <div className="min-h-screen sunmi-bg flex items-center justify-center">
+        <span className="text-sm sunmi-text-muted">Cargando...</span>
       </div>
-      <div data-pedidos-escritorio="" className="hidden lg:block">
-        <PedidosEscritorio />
-      </div>
-    </>
-  );
+    );
+  }
+  return esEscritorio ? <PedidosEscritorio /> : <PedidosCatalogoPage />;
 }
 
 function PedidosCatalogoPage() {

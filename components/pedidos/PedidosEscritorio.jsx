@@ -26,9 +26,9 @@
 // `page.jsx`, y sacarlo de ahí sería tocar el teléfono. Así que esta pantalla
 // lleva el suyo: los MISMOS fetch a las MISMAS rutas —opciones, carrito,
 // catálogo, set-cantidad, sumar-al-enviado, solicitar y cancelar—, copiados de
-// `page.jsx`. Las dos composiciones están montadas a la vez (el reparto es por
-// CSS, como en la recepción), así que al entrar las lecturas de opciones,
-// carrito y catálogo se hacen dos veces: una por composición.
+// `page.jsx`. La página monta UNA de las dos según el ancho de la ventana
+// (ver el reparto en `page.jsx`), así que cada lectura sale una vez; si la
+// ventana cruza los 1024 px, esta se desmonta y su estado se pierde.
 //
 //   · las claves guardadas en el celular .... COPIA de `CLAVE_TAMANO_DE_PAGINA`,
 //                                             `CLAVE_VER_FOTOS`, `tamanoGuardado`

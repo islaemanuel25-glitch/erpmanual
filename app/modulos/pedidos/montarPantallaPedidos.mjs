@@ -24,8 +24,35 @@ for (const clave of ["window", "document", "HTMLElement", "HTMLInputElement", "N
 }
 Object.defineProperty(globalThis, "navigator", { value: dom.window.navigator, configurable: true, writable: true });
 // El toaster pregunta por el movimiento reducido.
-dom.window.matchMedia = () => ({ matches: true, addEventListener() {}, removeEventListener() {} });
+//
+// Y el ancho de la ventana: la página monta el teléfono o la computadora según
+// `(min-width: 1024px)`. Cada candado elige con `montar({ ancho })` —"telefono"
+// por defecto— y `cambiarAncho` simula cruzar el corte. Cualquier otra
+// pregunta —la del movimiento reducido— contesta que sí, como siempre.
+let anchoDeVentana = "telefono";
+const oyentesDelAncho = new Set();
+dom.window.matchMedia = (consulta) =>
+  /min-width/.test(String(consulta))
+    ? {
+        // Vivo, como el de verdad: lo lee el manejador del cambio.
+        get matches() {
+          return anchoDeVentana === "escritorio";
+        },
+        media: consulta,
+        addEventListener: (_, f) => oyentesDelAncho.add(f),
+        removeEventListener: (_, f) => oyentesDelAncho.delete(f),
+      }
+    : { matches: true, addEventListener() {}, removeEventListener() {} };
 globalThis.matchMedia = dom.window.matchMedia;
+
+/** Cruzar el corte de 1024 px con la pantalla montada. */
+export async function cambiarAncho(ancho) {
+  anchoDeVentana = ancho;
+  await act(async () => {
+    for (const f of [...oyentesDelAncho]) f();
+  });
+  await asentar(450);
+}
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 // Un `alert` o un `confirm` del navegador frenan la pantalla en el celular. Si la
@@ -153,6 +180,8 @@ export async function desmontarTodo() {
   montadas = [];
   dialogosNativos.length = 0;
   navegacion.length = 0;
+  anchoDeVentana = "telefono";
+  oyentesDelAncho.clear();
   // El tamaño de página queda guardado en el celular: un caso no le deja el
   // suyo al siguiente.
   dom.window.localStorage.clear();
@@ -165,6 +194,7 @@ export async function asentar(ms = 50) {
 }
 
 export async function montar(respuestas) {
+  anchoDeVentana = respuestas.ancho ?? "telefono";
   const srv = servidor(respuestas);
   const raiz = document.createElement("div");
   document.body.replaceChildren(raiz);
@@ -179,7 +209,8 @@ export async function montar(respuestas) {
   // candado sea de la entrada (`enLaEntrada`), se pasa por ella como la
   // persona: el botón que abre el catálogo, o "Ver pedido" si el depósito ya lo
   // empezó (ahí no hay catálogo).
-  if (!respuestas.enLaEntrada) await abrirDesdeLaEntrada();
+  // En la computadora no hay entrada.
+  if (!respuestas.enLaEntrada && anchoDeVentana === "telefono") await abrirDesdeLaEntrada();
   return { raiz, ...srv };
 }
 
@@ -198,27 +229,20 @@ export async function abrirDesdeLaEntrada() {
   await asentar(450);
 }
 
-// ── EL CELULAR, SIN EL ESCRITORIO ─────────────────────────────────────────
+// ── LA PÁGINA ENTERA ──────────────────────────────────────────────────────
 //
-// Desde el 2026-10-22 la página monta las dos composiciones —la del teléfono y
-// la de computadora— y las reparte por CSS, que jsdom no aplica: las dos
-// están en el DOM. Los candados del teléfono miran SOLO el teléfono: el
-// contenido es su envoltorio, y el texto y los botones de la página no
-// cuentan los del escritorio. Los del escritorio usan `escritorio()`.
-export const escritorio = () => document.querySelector("[data-pedidos-escritorio]");
-const fueraDelEscritorio = (el) => !escritorio()?.contains(el);
-export const texto = () => {
-  if (!escritorio()) return document.body.textContent;
-  const copia = document.body.cloneNode(true);
-  copia.querySelector("[data-pedidos-escritorio]")?.remove();
-  return copia.textContent;
-};
-export const contenido = () => document.querySelector("[data-pedidos-celular]") ?? document.querySelector("[data-contenido]");
+// En 99d7410 la página montaba las dos composiciones a la vez y estas
+// funciones miraban solo la del teléfono, para no encontrar los botones de la
+// otra. Desde que se monta UNA (`page.jsx`, el reparto), miran la página
+// entera otra vez: si algún día volvieran a estar las dos, los candados del
+// teléfono encontrarían botones y textos de más y darían rojo, que es lo que
+// tiene que pasar. Acotarlos lo taparía. `escritorio()` queda para los
+// candados de la computadora.
+export const escritorio = () => document.querySelector("[data-pedidos-escritorio-pantalla]");
+export const texto = () => document.body.textContent;
+export const contenido = () => document.querySelector("[data-contenido]");
 export const filaShell = () => document.querySelector("[data-fila-shell]");
-export const botones = (dentro = document.body) => {
-  const todos = [...dentro.querySelectorAll("button")];
-  return dentro === document.body ? todos.filter(fueraDelEscritorio) : todos;
-};
+export const botones = (dentro = document.body) => [...dentro.querySelectorAll("button")];
 export const boton = (etiqueta, dentro = document.body) =>
   botones(dentro).find((b) => b.textContent.trim().startsWith(etiqueta)) ?? null;
 export const modal = () => document.querySelector("[data-sunmi-modal]");
