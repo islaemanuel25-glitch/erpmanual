@@ -645,6 +645,11 @@ function PedidosCatalogoPage() {
   // (solo lo pedido, apagado). Las tarjetas son las mismas en todos.
   // ====================================================
   const esperando = !!pendiente;
+  // El estado de la barra, con la MISMA traducción que la entrada: un pedido
+  // que el depósito empezó dice "Preparando" acá también, no "Enviado".
+  const estadoDeLaBarra = esperando
+    ? estadoParaElLocal({ estado: pendiente.estado, depositoEmpezo: empezado })
+    : ESTADO_LOCAL.BORRADOR;
   // Solo para mirar: el pedido empezado, y el enviado abierto con "Ver pedido"
   // desde la entrada (Emanuel, 2026-10-22: "Ver pedido no debería dejar
   // agregar productos"). Lo pedido, apagado, sin buscador ni filtro.
@@ -837,7 +842,7 @@ function PedidosCatalogoPage() {
           <>
             <div className="flex items-center gap-2">
               <span className="font-semibold sunmi-text-strong">Pedido al depósito</span>
-              <SunmiPill color={esperando ? "cyan" : "slate"}>{esperando ? "Enviado" : "Borrador"}</SunmiPill>
+              <SunmiPill color={COLOR_DEL_ESTADO[estadoDeLaBarra]}>{estadoDeLaBarra}</SunmiPill>
             </div>
             <p className="text-sm2 sunmi-text-muted">
               {empezado

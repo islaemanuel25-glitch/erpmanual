@@ -711,7 +711,10 @@ test("6. empezado: El depósito lo está preparando, solo lo pedido, todo apagad
   const p = real.empezadoCarrito.cuerpo.pendiente;
   assert.equal(p.depositoEmpezo, true, "el fixture no es de un pedido empezado");
   await montar({ inicio: empezadoDel(new Date()) });
-  assert.equal(pill(), "Enviado");
+  // Decía "Enviado": la barra tenía su propia traducción y no miraba si el
+  // depósito lo empezó. Desde el 2026-10-22 es la de la entrada
+  // (`lib/pedidos/estadoParaElLocal.js`), y empezado es "Preparando".
+  assert.equal(pill(), "Preparando");
   assert.match(contenido().textContent, /El depósito lo está preparando/);
   assert.doesNotMatch(contenido().textContent, /Podés sumar/);
   assert.match(contenido().textContent, /3 productos · ya no se puede cambiar/);
