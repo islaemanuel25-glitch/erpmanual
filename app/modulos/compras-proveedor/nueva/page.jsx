@@ -2143,8 +2143,9 @@ export default function NuevaCompraProveedorPage() {
   //
   // La variante móvil se fue: era un `fixed bottom-0 h-28` contra la ventana
   // que tapaba la última tarjeta y obligaba a compensar con un relleno al
-  // final. Ahora el pie del teléfono lo pone `SunmiPantallaDeTrabajo`, en
-  // `sticky` y dentro del flujo, igual que la recepción de transferencias.
+  // final. Ahora el pie del teléfono lo pone `SunmiPantallaDeTrabajo`, clavado
+  // abajo y con su lugar reservado medido, igual que la recepción de
+  // transferencias (ver el punto 4 de la pieza).
   // Acá queda solo el de escritorio, que ya era sticky al pie del contenido
   // para no taparle el sidebar.
   const barraResumen = () => (

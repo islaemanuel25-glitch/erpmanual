@@ -1289,7 +1289,10 @@ test("V22-E · escritorio conserva TODO lo suyo, tanda tras tanda del teléfono"
   // afirmaciones de ausencia legítimas, porque las cadenas EXISTEN en el
   // teléfono: si aparecieran acá, escritorio se movió.
   assert.ok(!html.includes("CAJÓN x8 completos"), "se filtró el rótulo del teléfono");
-  assert.ok(!html.includes("sticky bottom-0"), "se filtró el pie anclado del teléfono");
+  // Decía `sticky bottom-0`. Desde 2026-10-22 el pie del teléfono es `fixed`
+  // con su lugar reservado, y esa cadena ya no existe en ningún lado: buscarla
+  // daba verde sin mirar nada. Se busca la marca del pie de hoy.
+  assert.ok(!html.includes("data-pie-de-pantalla"), "se filtró el pie anclado del teléfono");
   assert.ok(!html.includes("line-through"), "se filtró el importe tachado del teléfono");
 });
 

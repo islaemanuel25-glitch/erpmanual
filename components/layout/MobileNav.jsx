@@ -43,8 +43,10 @@ export default function MobileNav({ menu, drawerOpen, setDrawerOpen }) {
 
   return (
     <>
-      {/* BottomNav: solo mobile */}
+      {/* BottomNav: solo mobile. `data-nav-inferior` es para que el pie de
+          `SunmiPantallaDeTrabajo` mida su alto y se apoye encima de ella. */}
       <nav
+        data-nav-inferior=""
         className={`
           md:hidden fixed bottom-0 left-0 right-0 z-40
           flex items-stretch justify-around
