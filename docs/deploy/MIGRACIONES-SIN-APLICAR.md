@@ -80,6 +80,17 @@ Si la lista está vacía, el despliegue es solo de código.
   ninguna fila; los terminados quedan en null, que se lee "se pusieron en 0".
   Va ANTES de levantar la imagen nueva: terminar las escribe. La imagen vieja
   con esto puesto sigue andando.
+- `20261022120000_descartar_propuesta_coca_cola_sin_factura` — **De datos,
+  chica, con `DELETE`.** Borra la receta PROPUESTA de Coca-Cola que quedó como
+  "sin factura" en el pedido #259: era una factura cuya letra no se leyó, con
+  IVA, internos y percepciones al pie. Emanuel pidió descartarla, no
+  confirmarla. Solo toca `RecetaPropuestaProveedor`, solo esa fila —proveedor
+  cuyo nombre dice Coca, tipo `SIN_FACTURA`, explicación que nombra
+  percepciones—; ninguna receta confirmada ni la "sin factura" de otro
+  proveedor. Ejercida contra `erpazul_al` con la de Coca-Cola, la A de
+  Coca-Cola y la de Secco: borró solo la primera, y la segunda corrida no
+  encontró nada. Puede ir antes o después de la imagen nueva; con la vieja la
+  propuesta podría volver a armarse si se relee ese papel, la nueva ya no.
 
 Producción está en **71 migraciones**, la última
 `20261019120000_operador_sesion_invalidada_en`.

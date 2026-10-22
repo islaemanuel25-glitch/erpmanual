@@ -34,11 +34,16 @@
     "el resto al renglón mayor: suman el total exacto. NO se usó la columna Pr.Un.Fin, que puede",
     "traer un dígito mal leído. «Servicio Logístico» es un CARGO: lleva su costo final como cualquier",
     "renglón y el sistema lo reparte entre la mercadería. La identidad es la de un papel cuyo número",
-    "de comprobante no está a la vista: letra B, CUIT y CAE, sin punto de venta ni número."
+    "de comprobante no está a la vista: letra B, CUIT y CAE, sin punto de venta ni número.",
+    "",
+    "`discriminaImpuestos` (2026-10-22, Coca-Cola #259) es la respuesta a la pregunta aparte de si el",
+    "papel muestra IVA o percepciones como importes aparte, mirando cada papel: DYSSA, DAS y CCU sí",
+    "—IVA, percepciones e internos al pie—; Secco no —el Total de cada renglón ya es lo que se paga—."
   ],
   "dyssa": {
     "lineasEnElPapel": 9,
     "hayTotalImpreso": true,
+    "discriminaImpuestos": true,
     "identidad": { "tipo": "A" },
     "pie": { "total": 633686.40 },
     "lineas": [
@@ -58,6 +63,7 @@
   "das": {
     "lineasEnElPapel": 3,
     "hayTotalImpreso": true,
+    "discriminaImpuestos": true,
     "identidad": { "tipo": "A" },
     "pie": { "total": 898726.85 },
     "lineas": [
@@ -75,6 +81,7 @@
   "secco": {
     "lineasEnElPapel": 10,
     "hayTotalImpreso": true,
+    "discriminaImpuestos": false,
     "identidad": { "tipo": "X" },
     "pie": { "total": 922533.84 },
     "lineas": [
@@ -95,6 +102,7 @@
   "ccu": {
     "lineasEnElPapel": 11,
     "hayTotalImpreso": true,
+    "discriminaImpuestos": true,
     "identidad": { "tipo": "B", "fecha": "2026-09-29", "cuit": "30-50577985-8", "cae": "86395263000660" },
     "pie": { "total": 1450756.63 },
     "lineas": [

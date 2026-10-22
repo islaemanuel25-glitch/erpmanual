@@ -628,7 +628,9 @@ test("10. ninguna modificación de schema, migraciones ni endpoints", () => {
   // columnas nulas y una tabla nueva del Control de stock. No toca transferencias.
   // Sube a 79 el mismo día: `20261020210000_control_stock_decision_no_contados`,
   // dos columnas nulas en `ControlStock`. No toca transferencias.
-  assert.equal(migraciones.length, 79, "aparecio una migracion que nadie declaro aca");
+  // Sube a 80 el 2026-10-22: `20261022120000_descartar_propuesta_coca_cola_sin_factura`,
+  // borra una receta PROPUESTA de Coca-Cola. No toca transferencias.
+  assert.equal(migraciones.length, 80, "aparecio una migracion que nadie declaro aca");
   assert.ok(migraciones.includes("20261015164915_compra_con_saldo"));
   assert.ok(migraciones.includes("20261015232632_operadores_y_empleados_por_local"));
   assert.ok(migraciones.includes("20261015154425_empleados"));
