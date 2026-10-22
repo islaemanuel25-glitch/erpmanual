@@ -57,8 +57,9 @@ export const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
  *   - `inicio`: la respuesta del carrito al entrar.
  *   - `solicitar` / `cancelar`: lista de respuestas, una por pedido, en orden.
  *   - `local`: para montar la pantalla de OTRO local del fixture —el de los
- *     120 productos—: `{ me, operadorMe, opciones, catalogo(params) }`, todas
- *     respuestas reales de ese local. Sin esto, el local de los tres productos.
+ *     120 productos, el del recorrido—: `{ me, operadorMe, opciones,
+ *     catalogo(params), trasEnviar }`, todas respuestas reales de ese local.
+ *     Sin esto, el local de los tres productos.
  */
 function servidor({ inicio, solicitar = [], cancelar = [], local = null }) {
   const pedidos = [];
@@ -82,6 +83,8 @@ function servidor({ inicio, solicitar = [], cancelar = [], local = null }) {
     else if (u.pathname === "/api/pos-transferencias/solicitar") {
       r = colas.solicitar.shift();
       if (r === real.solicitado) estado.carrito = real.carritoPendiente;
+      // En otro local, lo que contestó el carrito de ese local después de enviar.
+      else if (local?.trasEnviar && r?.cuerpo?.ok) estado.carrito = local.trasEnviar;
     } else if (u.pathname === "/api/pos-transferencias/cancelar") {
       r = colas.cancelar.shift();
       if (r === real.cancelado) estado.carrito = real.carritoTrasCancelar;

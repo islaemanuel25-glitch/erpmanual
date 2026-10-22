@@ -26,6 +26,7 @@ import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiToggle from "@/components/sunmi/SunmiToggle";
 import { showSuccess } from "@/components/sunmi/SunmiToast";
 import { tamanoDePaginaCatalogo } from "@/lib/pedidos/tamanoDePagina";
+import { salePorBulto, juntarPorProducto, claveDeLoEnviado } from "@/lib/pedidos/lineasDelPedido";
 
 // Cuántos productos por página: lo elige la persona al pie de la lista y queda
 // recordado en el celular con la clave de siempre de esta pantalla. Las
@@ -52,23 +53,6 @@ function fotosGuardadas() {
   }
 }
 
-/** Si el producto se pide por bulto. Es el criterio de siempre de la pantalla. */
-const salePorBulto = (p) => p.modoEnvio === "SOLO_BULTO" && p.factorPack > 1;
-
-/**
- * La cantidad que se muestra de una línea guardada, según su unidad.
- * - Si unidadSugerida === "BULTO" → it.sugerido ya esta en bultos, leer tal cual.
- * - Si unidadSugerida === "UNIDAD" y el producto sale por bulto (legacy):
- *   convertir a bultos para que el frontend en bultoMode funcione coherente.
- * - Si producto sale por unidad: it.sugerido en unidades, tal cual.
- * La usan el carrito y el pedido enviado: es el mismo dato.
- */
-function cantidadEnPantalla(it) {
-  if (salePorBulto(it)) {
-    return it.unidadSugerida === "BULTO" ? it.sugerido : Math.floor(it.sugerido / it.factorPack);
-  }
-  return it.sugerido;
-}
 
 const productos = (n) => (n === 1 ? "producto" : "productos");
 
@@ -126,7 +110,6 @@ export default function PedidosCatalogoPage() {
 
   // Carrito (cantidades locales)
   const [carrito, setCarrito] = useState({});
-  const [carritoCount, setCarritoCount] = useState(0);
   const [posId, setPosId] = useState(null);
   const [enviando, setEnviando] = useState(false);
   const [vista, setVista] = useState("catalogo"); // "catalogo" | "carrito"
@@ -241,14 +224,16 @@ export default function PedidosCatalogoPage() {
       const json = await res.json();
       if (json.ok) {
         setPosId(json.posId || null);
-        setCarritoCount(json.itemCount || 0);
-        setCarritoItems(json.items || []);
+        // Una línea por producto, con la cantidad sumada: el pedido puede
+        // tener dos líneas del mismo producto (ver `juntarPorProducto`).
+        const lineas = juntarPorProducto(json.items, (it) => it.productoLocalId);
+        setCarritoItems(lineas);
         setPendiente(json.pendiente || null);
 
         // Reconstruir mapa de cantidades segun la unidad guardada del item.
         const mapa = {};
-        (json.items || []).forEach((it) => {
-          mapa[it.productoLocalId] = cantidadEnPantalla(it);
+        lineas.forEach((it) => {
+          mapa[it.productoLocalId] = it.cantidad;
         });
         setCarrito(mapa);
       }
@@ -290,7 +275,6 @@ export default function PedidosCatalogoPage() {
       const json = await res.json();
       if (json.ok) {
         setPosId(json.posId);
-        setCarritoCount(json.itemCount);
       } else {
         setError(json.error || "Error al actualizar cantidad");
         // Revert
@@ -325,7 +309,6 @@ export default function PedidosCatalogoPage() {
 
       if (json.ok) {
         setCarrito({});
-        setCarritoCount(0);
         setCarritoItems([]);
         setPosId(null);
         setVista("catalogo");
@@ -451,7 +434,13 @@ export default function PedidosCatalogoPage() {
   // esperando al depósito. Las tarjetas son las mismas en los tres.
   // ====================================================
   const esperando = !!pendiente;
-  const enPedido = esperando ? pendiente.itemCount ?? pendiente.items?.length ?? 0 : carritoCount;
+  // Lo enviado, una tarjeta por producto con la cantidad sumada. La ruta no
+  // manda el id del producto en el pendiente: la clave es nombre y forma.
+  const enviados = esperando ? juntarPorProducto(pendiente.items, claveDeLoEnviado) : [];
+  // Cuántos PRODUCTOS hay, no cuántas líneas: `itemCount` de las rutas cuenta
+  // líneas, y un producto con dos líneas contaba doble.
+  const productosEnElCarrito = Object.keys(carrito).length;
+  const enPedido = esperando ? enviados.length : productosEnElCarrito;
 
   const tarjetaDelCatalogo = (prod) => (
     <TarjetaPedido
@@ -470,13 +459,19 @@ export default function PedidosCatalogoPage() {
   // igualando altos, un nombre de dos renglones estiraba todas las de la página
   // y dejaba un hueco debajo del − valor +. Miden igual entre sí por el lugar
   // de la ✕, que está siempre.
+  //
+  // CADA LISTA LLEVA SU PROPIA CLAVE ("catalogo", "revision", "enviado"): al
+  // pasar de una a otra React tira la vieja entera y arma la nueva, sin
+  // reusar ninguna tarjeta. Antes las tres eran el mismo elemento y React
+  // emparejaba tarjetas por clave entre listas distintas; con dos tarjetas de
+  // la misma clave en "Ver mi pedido" (un producto con dos líneas) una quedaba
+  // viva, con su ✕ y su − valor +, arriba del pedido ya enviado.
   let lista;
   if (esperando) {
-    // Lo enviado no trae el id del producto: se identifica por su lugar.
     lista = (
-      <SunmiListaProductoCards mismoAlto={false}>
-        {(pendiente.items || []).map((item, i) => (
-          <TarjetaPedido key={i} producto={item} cantidad={cantidadEnPantalla(item)} conFoto={verFotos} apagada />
+      <SunmiListaProductoCards key="enviado" mismoAlto={false}>
+        {enviados.map((item) => (
+          <TarjetaPedido key={claveDeLoEnviado(item)} producto={item} cantidad={item.cantidad} conFoto={verFotos} apagada />
         ))}
       </SunmiListaProductoCards>
     );
@@ -485,13 +480,13 @@ export default function PedidosCatalogoPage() {
       ? vacio("Cargando carrito...")
       : carritoItems.length === 0
         ? vacio("El carrito está vacío. Volvé al catálogo para agregar productos.")
-        : <SunmiListaProductoCards mismoAlto={false}>{carritoItems.map(tarjetaDelCatalogo)}</SunmiListaProductoCards>;
+        : <SunmiListaProductoCards key="revision" mismoAlto={false}>{carritoItems.map(tarjetaDelCatalogo)}</SunmiListaProductoCards>;
   } else {
     lista = loadingCat
       ? vacio("Cargando productos...")
       : catalogo.length === 0
         ? vacio("No se encontraron productos.")
-        : <SunmiListaProductoCards mismoAlto={false}>{catalogo.map(tarjetaDelCatalogo)}</SunmiListaProductoCards>;
+        : <SunmiListaProductoCards key="catalogo" mismoAlto={false}>{catalogo.map(tarjetaDelCatalogo)}</SunmiListaProductoCards>;
   }
 
   const enviadoCuando = esperando ? cuandoSeEnvio(pendiente.solicitadoAt) : null;
@@ -599,13 +594,13 @@ export default function PedidosCatalogoPage() {
           ) : (
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-sm2 sunmi-text-muted">{`${carritoCount} ${productos(carritoCount)} en el pedido`}</span>
+                <span className="text-sm2 sunmi-text-muted">{`${productosEnElCarrito} ${productos(productosEnElCarrito)} en el pedido`}</span>
                 {viendoPedido ? null : <SunmiLinkButton onClick={abrirCarrito}>Ver mi pedido ›</SunmiLinkButton>}
               </div>
               <SunmiButton
                 color="primary"
                 className="w-full min-h-toque"
-                disabled={enviando || carritoCount === 0}
+                disabled={enviando || productosEnElCarrito === 0}
                 onClick={enviarPedido}
               >
                 {enviando ? "Enviando..." : "Enviar pedido al depósito"}

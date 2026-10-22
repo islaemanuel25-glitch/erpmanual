@@ -301,6 +301,81 @@ try {
     }
   }
 
+  seccion("7. El recorrido del celular: cargar, tocar el último dos veces, revisar y enviar");
+  {
+    // Un local aparte, como un pedido de verdad: varios productos cargados uno
+    // por uno y el ÚLTIMO tocado dos veces seguidas con el + —dos pedidos a
+    // `set-cantidad` que viajan juntos, como dos toques rápidos en el celular—.
+    const g = await c.grupo.create({ data: { nombre: `Grupo recorrido ${marca}` } });
+    await c.configuracionGrupo.create({ data: { grupoId: g.id } });
+    const local = await c.local.create({ data: { nombre: `Mini recorrido ${marca}` } });
+    const deposito = await c.local.create({ data: { nombre: `Depósito recorrido ${marca}`, es_deposito: true } });
+    await c.grupoLocal.create({ data: { grupoId: g.id, localId: local.id } });
+    await c.grupoDeposito.create({ data: { grupoId: g.id, localId: deposito.id } });
+    for (const l of [local, deposito]) await c.configuracionLocal.create({ data: { localId: l.id } });
+    const otra = await c.usuario.create({
+      data: { nombre: "Cuenta recorrido", email: `recorrido-${marca}@ci.local`, passwordHash: "x", rolId: rolEnc.id, localId: local.id },
+    });
+    const caro = await c.operadorLocal.create({ data: { nombre: "Caro", pinHash: "x", localId: local.id } });
+    const ids = {};
+    for (const [i, nombre] of ["9 DE ORO AGRIDULCE", "ARROZ 1KG", "FIDEOS MOÑO", "GALLETITAS AGUA", "LECHE 1L"].entries()) {
+      const b = await c.productoBase.create({
+        data: { grupoId: g.id, nombre, codigo_barra: `79${marca}${i}`.slice(0, 13) + i, unidad_medida: "unidad", precio_costo: 600, precio_venta: 1000, redondeo_100: false, activo: true },
+      });
+      ids[nombre] = (await c.productoLocal.create({ data: { localId: deposito.id, baseId: b.id, activo: true, precio_costo: 600, precio_venta: 1000 } })).id;
+    }
+    const s = `erpazul_sesion=${jwt.sign(
+      { id: otra.id, nombre: otra.nombre, email: otra.email, rolId: otra.rolId, rolNombre: "ENCARGADO", permisos, esDuenoLocal: false, localId: local.id, esDeposito: false },
+      process.env.AUTH_SECRET,
+      { expiresIn: "1h" }
+    )}`;
+    const sPin = `${s}; erpazul_operador_activo=${jwt.sign({ operadorId: caro.id, nombre: caro.nombre, localId: local.id, _tipo: "operador", emitidoEn: Date.now() }, process.env.AUTH_SECRET)}`;
+    const fijar = (id, cantidad) => pedir(R.setCantidad, "POST", `${B}/pedidos/set-cantidad`, sPin, { productoLocalId: id, cantidad, unidad: "UNIDAD" });
+
+    guardar("recorridoMe", await pedir(R.me, "GET", `${B}/me`, sPin));
+    guardar("recorridoOperadorMe", await pedir(R.operadorMe, "GET", `${B}/operador/me`, sPin));
+    guardar("recorridoOpciones", await pedir(R.opciones, "GET", `${B}/pedidos/opciones`, sPin));
+    guardar("recorridoCarritoVacio", await carrito(sPin));
+    guardar("recorridoCatalogo", await pedir(R.catalogo, "GET", `${B}/pedidos/catalogo?page=1&pageSize=50`, sPin));
+
+    // Cargar varios, uno por uno.
+    for (const nombre of ["ARROZ 1KG", "FIDEOS MOÑO", "GALLETITAS AGUA", "LECHE 1L"]) await fijar(ids[nombre], 2);
+    // Y el último: dos toques al + seguidos, sin esperar la respuesta del primero.
+    // Es una carrera y no sale siempre: se repite —volviendo a 0 entre
+    // intentos, como lo haría la ✕— hasta que quedan dos líneas, y se cuenta.
+    const ORO = ids["9 DE ORO AGRIDULCE"];
+    let posId = null;
+    let filas = [];
+    let intentos = 0;
+    while (intentos < 10) {
+      intentos += 1;
+      const [uno, dos] = await Promise.all([fijar(ORO, 1), fijar(ORO, 2)]);
+      ok(`intento ${intentos}: los dos toques contestan ok`, uno.cuerpo.ok && dos.cuerpo.ok, json([uno, dos]));
+      posId = dos.cuerpo.posId;
+      filas = await c.posTransferenciaDetalle.findMany({ where: { posTransferenciaId: posId, productoId: ORO }, select: { id: true, sugerido: true } });
+      if (filas.length === 2) break;
+      // `set-cantidad` con 0 borra UNA línea; con una sola, el producto sale.
+      await fijar(ORO, 0);
+    }
+    console.log(`  · filas de "9 DE ORO AGRIDULCE" en el pedido #${posId}: ${filas.length} → ${json(filas.map((f) => Number(f.sugerido)))} (intento ${intentos})`);
+    ok("dos toques rápidos dejan dos líneas del mismo producto", filas.length === 2, `${filas.length} línea(s) en ${intentos} intentos`);
+    guardar("recorridoFilasDuplicadas", { posId, filas: filas.length, intentos });
+
+    // Revisar: lo que trae "Ver mi pedido".
+    const revision = await carrito(sPin);
+    guardar("recorridoRevision", revision);
+    console.log(`  · Ver mi pedido trae ${revision.cuerpo.items.length} líneas para ${new Set(revision.cuerpo.items.map((i) => i.productoLocalId)).size} productos`);
+
+    // Confirmar y enviar.
+    const enviado = await pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, sPin, { posId });
+    guardar("recorridoSolicitado", enviado);
+    ok("se envía", enviado.status === 200 && enviado.cuerpo.ok === true, json(enviado));
+    const despues = await carrito(sPin);
+    guardar("recorridoTrasEnviar", despues);
+    const nombres = despues.cuerpo.pendiente?.items.map((i) => i.nombre) ?? [];
+    console.log(`  · el pedido enviado trae ${nombres.length} líneas: ${json(nombres)}`);
+  }
+
   if (process.env.ESCRIBIR_FIXTURE_PEDIDOS) {
     writeFileSync("app/modulos/pedidos/enviarCancelar.fixture.json", `${JSON.stringify(lectura, null, 2)}\n`);
     console.log("  · fixture escrito");
