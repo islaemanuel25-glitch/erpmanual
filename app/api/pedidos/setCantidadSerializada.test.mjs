@@ -7,6 +7,11 @@
 // encontraba la línea y los dos la creaban. Y una cantidad que llegaba junto con
 // el envío no encontraba borrador y abría uno nuevo al lado del pedido enviado.
 //
+// Desde el 2026-10-22 esa cantidad ya no contesta 409: entra al pedido enviado
+// mientras el depósito no lo empezó (los candados de eso están en
+// `sumarAlEnviado.test.mjs`). Lo que sigue valiendo es que no se abre nada al
+// lado.
+//
 // Dos miradas, porque los candados no tocan la base:
 //
 // 1. LAS MEDICIONES DE VERDAD. `scripts/pruebas-db/pedidosEnviarCancelar.mjs`,
@@ -16,22 +21,24 @@
 //    fixture con la ruta sin bloqueo, este candado se pone rojo.
 //
 // 2. LA FORMA DE LA RUTA. Lo que hace que las mediciones den cero: los dos
-//    bloqueos, y el ORDEN de las consultas, que también se midió —preguntar por
-//    el pedido enviado antes de buscar el borrador dejó 7 de 20 borradores
-//    nuevos, con los dos bloqueos puestos—.
+//    bloqueos, y el ORDEN de las consultas, que también se midió dos veces —con
+//    una sola pregunta por el pedido enviado, antes del borrador, se abrieron 7
+//    de 20 borradores nuevos el 2026-10-21 y 13 de 20 el 2026-10-22—.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const real = JSON.parse(readFileSync("app/modulos/pedidos/enviarCancelar.fixture.json", "utf8"));
-const MENSAJE = "Hay un pedido enviado esperando al depósito. Cancelalo para pedir otra cosa.";
 
 // Sin comentarios: un candado que mira código no puede encontrar su patrón en
 // la prosa (CLAUDE.md, regla 5).
-const fuente = readFileSync("app/api/pedidos/set-cantidad/route.js", "utf8")
-  .replace(/\/\*[\s\S]*?\*\//g, "")
-  .replace(/\/\/[^\n]*/g, "");
+const sinComentarios = (ruta) =>
+  readFileSync(ruta, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/[^\n]*/g, "");
+const fuente = sinComentarios("app/api/pedidos/set-cantidad/route.js");
+const bloqueo = sinComentarios("lib/pedidos/bloqueoDelPedido.js");
 
 test("la carrera de los dos toques: con la ruta de antes daba duplicados; con la de hoy, cero", () => {
   const antes = real.carreraAntesDelBloqueo;
@@ -43,46 +50,56 @@ test("la carrera de los dos toques: con la ruta de antes daba duplicados; con la
   assert.equal(hoy.borradores, 1, "la primera carrera abrió dos borradores para el par");
 });
 
-test("la carrera con el envío: con la ruta de antes abría borradores; con la de hoy, ninguno", () => {
+test("la carrera con el envío: con la ruta de antes abría borradores; con la de hoy, ninguno, y la cantidad entra", () => {
   const antes = real.envioAntesDelBloqueo;
   const hoy = real.envioConBloqueo;
   assert.ok(antes && hoy, "faltan las mediciones de la sección 8 en el fixture");
   assert.ok(antes.nuevos > 0, "la medición de antes no muestra la carrera");
   assert.ok(hoy.vueltas >= 20);
   assert.equal(hoy.nuevos, 0, `con el bloqueo se abrieron ${hoy.nuevos} borradores al lado del enviado`);
-  // Cada vuelta terminó en una de las dos formas buenas: la cantidad entró al
-  // pedido antes de enviarse, o contestó 409.
-  assert.equal(hoy.conflictos + hoy.entraronAntes, hoy.vueltas);
-  assert.ok(hoy.conflictos > 0, "ninguna vuelta llegó tarde: no se ejerció el 409");
+  // Antes o después del envío, la cantidad entró al MISMO pedido.
+  assert.equal(hoy.entraronAntes, hoy.vueltas, "alguna cantidad fue a parar a otro pedido");
+  assert.equal(hoy.conflictos, 0, "un pedido recién enviado, sin empezar, contestó 409");
 });
 
-test("con el pedido enviado, la ruta contesta 409 con el mensaje", () => {
-  const r = real.setCantidadConPedidoEnviado;
-  assert.equal(r.status, 409);
-  assert.deepEqual(r.cuerpo, { ok: false, error: MENSAJE });
+test("las respuestas de la regla vieja no quedan en el fixture", () => {
+  // Un candado montado sobre una respuesta que la ruta ya no da quedaría verde
+  // probando lo que no pasa.
+  for (const vieja of ["setCantidadConPedidoEnviado", "setCantidadConPedidoEnviadoCarrera", "carritoConPedidoEnviadoEnvio"]) {
+    assert.ok(!(vieja in real), `el fixture todavía trae ${vieja}`);
+  }
 });
 
-test("la forma: una transacción, el bloqueo del par primero y la fila del borrador bloqueada", () => {
+test("los dos bloqueos: el consultivo del par y la fila del pedido FOR UPDATE", () => {
+  assert.ok(bloqueo.includes("SELECT pg_advisory_xact_lock(${Number(origenId)}::int, ${Number(destinoId)}::int)"), "falta el bloqueo del par");
+  assert.ok(bloqueo.includes('SELECT id, estado FROM "PosTransferencia" WHERE id = ${Number(posId)} FOR UPDATE'), "falta el FOR UPDATE de la fila");
+});
+
+test("la forma: una transacción, el bloqueo del par primero y las filas bloqueadas", () => {
   const tx = fuente.indexOf("prisma.$transaction(async (tx) =>");
-  const par = fuente.indexOf("SELECT pg_advisory_xact_lock(${depositoId}::int, ${localId}::int)");
+  const par = fuente.indexOf("bloquearParDelPedido(tx, depositoId, localId)");
   const borrador = fuente.indexOf('estado: { in: ["Borrador", "Preparando"] }', tx);
-  const fila = fuente.indexOf('FROM "PosTransferencia" WHERE id = ${pos.id} FOR UPDATE');
+  const filaBorrador = fuente.indexOf("bloquearFilaDelPedido(tx, pos.id)");
+  const filaEnviado = fuente.indexOf("bloquearFilaDelPedido(tx, enviado.id)");
   assert.ok(tx > -1, "no hay transacción");
   assert.ok(par > tx, "falta el bloqueo del par depósito→local adentro de la transacción");
   assert.ok(borrador > par, "el borrador se busca antes del bloqueo del par");
-  assert.ok(fila > borrador, "la fila del borrador no se bloquea con FOR UPDATE");
+  assert.ok(filaBorrador > borrador, "la fila del borrador no se bloquea");
+  assert.ok(filaEnviado > par, "la fila del pedido enviado no se bloquea");
   // Y lo que escribe va por `tx`, no por el cliente de afuera.
   assert.doesNotMatch(fuente, /prisma\.posTransferenciaDetalle\./, "una escritura de líneas quedó afuera de la transacción");
 });
 
-test("la forma: el pedido enviado se pregunta DESPUÉS de bloquear el borrador, con sinCancelados", () => {
-  const fila = fuente.indexOf("FOR UPDATE");
-  const enviado = fuente.indexOf('sinCancelados({ estado: "Solicitado", origenId: depositoId, destinoId: localId })');
+test("la forma: el pedido enviado se pregunta antes Y después del borrador, y recién después se crea uno", () => {
+  const def = fuente.indexOf("const tomarEnviado = async () =>");
+  const criterio = fuente.indexOf('sinCancelados({ estado: "Solicitado", origenId: depositoId, destinoId: localId })');
+  const borrador = fuente.indexOf('estado: { in: ["Borrador", "Preparando"] }');
+  const llamadas = [...fuente.matchAll(/await tomarEnviado\(\)/g)].map((m) => m.index);
   const crear = fuente.indexOf("tx.posTransferencia.create(");
-  assert.ok(enviado > -1, "no se pregunta por el pedido enviado con el criterio de solicitar");
-  assert.ok(enviado > fila, "se pregunta por el enviado antes de bloquear el borrador: así se abrían 7 de 20");
-  assert.ok(crear > enviado, "el borrador se crea antes de preguntar por el enviado");
-  assert.ok(fuente.includes(MENSAJE), "falta el mensaje del 409");
+  assert.ok(def > -1 && criterio > def, "no se pregunta por el enviado con el criterio de solicitar");
+  assert.equal(llamadas.length, 2, "el enviado se pregunta una sola vez: así se abrían 13 de 20");
+  assert.ok(llamadas[0] < borrador && llamadas[1] > borrador, "las dos preguntas no rodean la búsqueda del borrador");
+  assert.ok(crear > llamadas[1], "el borrador se crea antes de la segunda pregunta");
 });
 
 test("el borrador viejo de verdad —líneas repetidas que hizo la ruta de antes— queda con una", () => {
@@ -94,7 +111,7 @@ test("el borrador viejo de verdad —líneas repetidas que hizo la ruta de antes
   assert.equal(v.sacar.despues, 0, "la ✕ dejó una de las dos líneas");
 });
 
-test("la forma: un borrador con el producto dos veces queda con una línea", () => {
+test("la forma: un pedido con el producto dos veces queda con una línea", () => {
   assert.match(fuente, /const \[existente, \.\.\.sobrantes\] = lineas;/);
   assert.match(fuente, /deleteMany\(\{ where: \{ id: \{ in: sobrantes\.map\(\(l\) => l\.id\) \} \} \}\)/, "las líneas sobrantes no se borran");
   assert.match(fuente, /deleteMany\(\{ where: \{ id: \{ in: lineas\.map\(\(l\) => l\.id\) \} \} \}\)/, "con 0 no se borran todas las líneas del producto");

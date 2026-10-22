@@ -9,6 +9,7 @@ import { esComboBase } from "@/lib/combos/guards";
 import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
 import { DESCONTAR_Y_TRANSITO } from "@/lib/transferencias/politicasStock";
 import { sinCancelados } from "@/lib/pedidos/estados";
+import { bloquearParDelPedido, bloquearFilaDelPedido } from "@/lib/pedidos/bloqueoDelPedido";
 import {
   PRESENTACION,
   agrupa,
@@ -51,6 +52,14 @@ function snapshotDeEnvioManual(item) {
     factorPresentacion: agrupa(d.presentacion) ? d.factor : null,
     pesoPiezaKg: d.presentacion === PRESENTACION.PIEZA ? d.pesoPiezaKg : null,
   };
+}
+
+/** Las líneas de un pedido como texto comparable: qué producto, cuánto y en qué unidad. */
+function firmaDeLineas(lineas) {
+  return (lineas || [])
+    .map((d) => [d.id, d.productoId, Number(d.sugerido || 0), Number(d.preparado || 0), d.unidadSugerida, d.unidadPreparada].join(":"))
+    .sort()
+    .join("|");
 }
 
 export async function POST(req) {
@@ -272,6 +281,24 @@ export async function POST(req) {
     // TRANSACCIÓN REAL
     // --------------------------------------------------
     const transferencia = await prisma.$transaction(async (tx) => {
+      // ── EL MISMO BLOQUEO QUE EL LOCAL, Y LAS LÍNEAS DE AHORA ──────────────
+      // Despachar EMPIEZA el pedido (`depositoEmpezo`), y mientras el pedido
+      // enviado espera, el local le puede sumar productos con `set-cantidad`.
+      // Con el mismo bloqueo del par y la fila, los dos no se pisan. Y las
+      // líneas se leyeron AFUERA de esta transacción —para validar stock—: si
+      // el local cambió algo entre esa lectura y acá, se despacharía una lista
+      // vieja y lo que sumó quedaría en el pedido sin viajar. Entonces no se
+      // despacha y se dice. Ver `lib/pedidos/bloqueoDelPedido.js`.
+      await bloquearParDelPedido(tx, pos.origenId, pos.destinoId);
+      await bloquearFilaDelPedido(tx, pos.id);
+      const ahora = await tx.posTransferenciaDetalle.findMany({
+        where: { posTransferenciaId: pos.id, pos: sinCancelados() },
+        select: { id: true, productoId: true, sugerido: true, preparado: true, unidadSugerida: true, unidadPreparada: true },
+      });
+      if (firmaDeLineas(ahora) !== firmaDeLineas(pos.detalles)) {
+        throw new Error("PEDIDO_CAMBIO");
+      }
+
       // Barrera atómica: evitar doble envío concurrente
       const lock = await tx.posTransferencia.updateMany({
         where: {
@@ -329,6 +356,12 @@ export async function POST(req) {
       error: null,
     });
   } catch (err) {
+    if (err.message === "PEDIDO_CAMBIO") {
+      return NextResponse.json(
+        { ok: false, error: "El local cambió el pedido mientras lo enviabas. Volvé a abrirlo y enviá de nuevo." },
+        { status: 409 }
+      );
+    }
     if (err.message === "ALREADY_SENT") {
       return NextResponse.json(
         { ok: false, error: "Esta transferencia ya fue enviada." },

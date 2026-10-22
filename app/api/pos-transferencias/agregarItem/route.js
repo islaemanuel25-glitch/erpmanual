@@ -6,6 +6,7 @@ import { checkPerm } from "@/lib/authorize";
 import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
 import { esComboBase } from "@/lib/combos/guards";
 import { sinCancelados } from "@/lib/pedidos/estados";
+import { bloquearParDelPedido, bloquearFilaDelPedido } from "@/lib/pedidos/bloqueoDelPedido";
 
 export async function POST(req) {
   try {
@@ -137,16 +138,6 @@ export async function POST(req) {
     // ================================
     // 5) DETALLE
     // ================================
-    const existente = await prisma.posTransferenciaDetalle.findFirst({
-      where: {
-        posTransferenciaId: posId,
-        productoId: productoLocalId,
-        pos: sinCancelados(),
-      },
-    });
-
-    let detalle;
-
     // Inferir unidades desde modo_envio + factorPack
     const factorPack = Number(productoLocal.base.factor_pack || 1);
     const efectivo = productoLocal.base.modo_envio || defaultModoEnvio(productoLocal.base.unidad_medida || "unidad");
@@ -158,16 +149,34 @@ export async function POST(req) {
       ? body.unidadPreparada
       : unidadSugerida;
 
-    if (existente) {
-      detalle = await prisma.posTransferenciaDetalle.update({
-        where: { id: existente.id },
-        data: {
-          preparado: Number(existente.preparado || 0) + cantidad,
-          ...(tipo === "sugerido" ? { sugerido: cantidad, unidadSugerida, unidadPreparada } : { unidadPreparada }),
+    // ── EL MISMO BLOQUEO QUE EL LOCAL ───────────────────────────────────────
+    // Lo preparado EMPIEZA un pedido enviado (`depositoEmpezo`). Con el mismo
+    // bloqueo del par y la fila que toma `set-cantidad`, el local y esto no se
+    // pisan; y la búsqueda de la línea va adentro, junto con la escritura.
+    // Ver `lib/pedidos/bloqueoDelPedido.js`.
+    const detalle = await prisma.$transaction(async (tx) => {
+      await bloquearParDelPedido(tx, pos.origenId, pos.destinoId);
+      const fila = await bloquearFilaDelPedido(tx, posId);
+      if (!fila || fila.estado === "Enviado" || fila.estado === "Enviando") return null;
+
+      const existente = await tx.posTransferenciaDetalle.findFirst({
+        where: {
+          posTransferenciaId: posId,
+          productoId: productoLocalId,
+          pos: sinCancelados(),
         },
       });
-    } else {
-      detalle = await prisma.posTransferenciaDetalle.create({
+
+      if (existente) {
+        return tx.posTransferenciaDetalle.update({
+          where: { id: existente.id },
+          data: {
+            preparado: Number(existente.preparado || 0) + cantidad,
+            ...(tipo === "sugerido" ? { sugerido: cantidad, unidadSugerida, unidadPreparada } : { unidadPreparada }),
+          },
+        });
+      }
+      return tx.posTransferenciaDetalle.create({
         data: {
           posTransferenciaId: posId,
           productoId: productoLocalId,
@@ -178,6 +187,13 @@ export async function POST(req) {
           unidadPreparada,
         },
       });
+    });
+
+    if (!detalle) {
+      return NextResponse.json(
+        { ok: false, error: "La POS ya fue enviada" },
+        { status: 400 }
+      );
     }
 
     // ================================

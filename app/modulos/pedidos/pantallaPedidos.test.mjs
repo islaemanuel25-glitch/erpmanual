@@ -172,11 +172,12 @@ test("cada tarjeta mide lo que necesita: la lista de Pedidos no iguala altos", a
   assert.doesNotMatch(grilla.className, /auto-rows-fr/, "la grilla sigue estirando todas al alto de la más alta");
 });
 
-test("409 de set-cantidad (hay un pedido enviado): el mensaje sale en el aviso de arriba, y la pantalla sigue entera", async () => {
-  // El caso: otro celular del mismo local envió el pedido y éste todavía no se
-  // enteró. Tocar el + manda una cantidad, y la ruta contesta 409. La respuesta
-  // es la REAL (`scripts/pruebas-db/pedidosEnviarCancelar.mjs`, sección 8b).
-  const r409 = real.setCantidadConPedidoEnviado;
+test("409 de set-cantidad (el depósito ya lo empezó): el mensaje sale en el aviso de arriba, y la pantalla sigue entera", async () => {
+  // El caso: otro celular del mismo local envió el pedido, el depósito lo
+  // empezó y éste todavía no se enteró. Tocar el + manda una cantidad, y la
+  // ruta contesta 409. La respuesta es la REAL
+  // (`scripts/pruebas-db/pedidosEnviarCancelar.mjs`, sección 9d).
+  const r409 = real.empezadoSetCantidad;
   assert.equal(r409.status, 409);
   await montar({ inicio: real.carritoBorrador, setCantidad: r409 });
   await tocar(tarjeta("Yerba 1kg").mas);
@@ -190,7 +191,7 @@ test("409 de set-cantidad (hay un pedido enviado): el mensaje sale en el aviso d
   assert.deepEqual(nombres(), ["Agua x6", "Coca 2L", "Yerba 1kg"]);
   assert.ok(boton("Revisar y enviar"));
   await tocar(boton("cerrar", aviso));
-  assert.doesNotMatch(document.body.textContent, /Hay un pedido enviado esperando/, "cerrar no cerró el aviso");
+  assert.ok(!document.body.textContent.includes(r409.cuerpo.error), "cerrar no cerró el aviso");
 });
 
 test("3. la ✕ solo en lo pedido, y pone la cantidad en 0", async () => {
@@ -297,15 +298,15 @@ test("FOTO: en Ver mi pedido y en el pedido enviado, el mismo cuadrado", async (
   assert.ok(tarjeta("Coca 2L").inicial, "Ver mi pedido: la coca, con su inicial");
   await desmontarTodo();
 
-  // Lo enviado no trae la foto: `pendiente.items` no tiene `imagenUrl`. Va la
-  // inicial en las dos, y el lugar se conserva igual.
-  assert.ok(real.carritoPendiente.cuerpo.pendiente.items.every((i) => !("imagenUrl" in i)));
+  // Lo enviado trae la foto desde el 2026-10-22 (`pendiente.items` con
+  // `imagenUrl`, para que sea la misma tarjeta viva): el agua con la suya, la
+  // coca con su inicial, en el mismo lugar.
+  assert.ok(real.carritoPendiente.cuerpo.pendiente.items.find((i) => i.nombre === "Agua x6").imagenUrl);
   conFotos();
   await montar({ inicio: pendienteDel(new Date()) });
-  for (const t of tarjetas()) {
-    assert.ok(t.inicial, `${t.nombre}: el pedido enviado tiene que conservar el cuadrado`);
-    assert.ok(lugarDeLaFoto(t) === t.inicial);
-  }
+  assert.ok(tarjeta("Agua x6").foto, "el pedido enviado: el agua trae su foto");
+  assert.ok(tarjeta("Coca 2L").inicial, "el pedido enviado: la coca, con su inicial");
+  for (const t of tarjetas()) assert.ok(lugarDeLaFoto(t) === (t.foto || t.inicial), `${t.nombre}: el cuadrado no está en su lugar`);
 });
 
 // ── VER FOTOS ─────────────────────────────────────────────────────────────

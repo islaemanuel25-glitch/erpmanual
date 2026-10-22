@@ -5,6 +5,7 @@ import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { esBultoMode } from "@/lib/conversiones/stock";
 import { esComboBase } from "@/lib/combos/guards";
 import { sinCancelados } from "@/lib/pedidos/estados";
+import { bloquearParDelPedido, bloquearFilaDelPedido, depositoEmpezo } from "@/lib/pedidos/bloqueoDelPedido";
 
 export async function POST(req) {
   try {
@@ -127,56 +128,71 @@ export async function POST(req) {
     // llegaba justo detrás del envío no encontraba borrador y abría uno nuevo
     // al lado del pedido enviado.
     //
-    // Dos bloqueos, y cada uno cubre un choque distinto:
-    //
-    // · `pg_advisory_xact_lock(depósito, local)`: hace esperar a otro
-    //   `set-cantidad` del mismo par hasta que éste termine. Va sobre el PAR y
-    //   no sobre la fila del borrador porque, sin borrador todavía, no hay fila
-    //   que bloquear y dos pedidos crearían dos. Es la forma de dos claves de
-    //   32 bits, que en PostgreSQL no se pisa con la de una clave que usan
-    //   Ofertas y la anulación de ventas.
-    //
-    // · `SELECT … FOR UPDATE` sobre la fila del borrador: hace esperar al envío
-    //   (`/api/pos-transferencias/solicitar` actualiza esa fila) o espera a que
-    //   el envío termine. Si el envío ganó, la fila se relee ya en
-    //   "Solicitado" y no se escribe nada en ella.
+    // Los dos bloqueos —el del par depósito→local y la fila del pedido FOR
+    // UPDATE— y por qué son dos están en `lib/pedidos/bloqueoDelPedido.js`. Los
+    // toman también las rutas del depósito que empiezan el pedido, así que o la
+    // cantidad entra antes de que el depósito lo tome, o se contesta 409.
     //
     // Sin migración a propósito: un índice único fallaría al aplicarse sobre
     // los pedidos que ya tienen líneas repetidas. Esos se arreglan solos acá
     // cuando se toca el producto (ver más abajo).
     const resultado = await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${depositoId}::int, ${localId}::int)`;
+      await bloquearParDelPedido(tx, depositoId, localId);
 
-      let pos = await tx.posTransferencia.findFirst({
-        where: sinCancelados({
-          origenId: depositoId,
-          destinoId: localId,
-          estado: { in: ["Borrador", "Preparando"] },
-        }),
-        orderBy: { createdAt: "desc" },
-      });
+      // ── EL PEDIDO ENVIADO, SI LO HAY, SE SIGUE ARMANDO ──────────────────
+      // Regla de Emanuel (reemplaza la de 9e2f438, que lo trababa): mientras
+      // el pedido enviado espera al depósito, el local le suma productos y le
+      // cambia cantidades, sin cancelarlo y sin abrir otro. Hasta que el
+      // depósito lo EMPIEZA (`depositoEmpezo`): desde ahí, 409.
+      //
+      // El criterio de "Solicitado sin cancelar" es el mismo de `solicitar`:
+      // `sinCancelados` sobre el par.
+      //
+      // Se pregunta DOS veces, antes y después de buscar el borrador: `solicitar`
+      // no toma el bloqueo del par, y si confirma entre las dos lecturas el
+      // borrador ya no aparece como borrador y el enviado no apareció todavía
+      // —cada consulta ve lo confirmado hasta ese momento—. Con una sola
+      // pregunta se abría un borrador nuevo al lado del enviado (13 de 20
+      // vueltas de la carrera 8b contra erpazul_al).
+      const tomarEnviado = async () => {
+        const enviado = await tx.posTransferencia.findFirst({
+          where: sinCancelados({ estado: "Solicitado", origenId: depositoId, destinoId: localId }),
+          orderBy: { solicitadoAt: "desc" },
+          select: { id: true },
+        });
+        if (!enviado) return null;
+        const fila = await bloquearFilaDelPedido(tx, enviado.id);
+        if (await depositoEmpezo(tx, fila)) return { conflicto: true };
+        return { id: fila.id, estado: fila.estado };
+      };
+      let pos = await tomarEnviado();
+      if (pos?.conflicto) return pos;
 
-      if (pos) {
-        // La fila, bloqueada y releída: si el envío la pasó a "Solicitado"
-        // mientras tanto, ya no es un borrador.
-        const [bloqueada] = await tx.$queryRaw`SELECT id, estado FROM "PosTransferencia" WHERE id = ${pos.id} FOR UPDATE`;
-        if (!bloqueada || !["Borrador", "Preparando"].includes(bloqueada.estado)) pos = null;
+      if (!pos) {
+        pos = await tx.posTransferencia.findFirst({
+          where: sinCancelados({
+            origenId: depositoId,
+            destinoId: localId,
+            estado: { in: ["Borrador", "Preparando"] },
+          }),
+          orderBy: { createdAt: "desc" },
+        });
+        if (pos) {
+          // La fila, bloqueada y releída: si el local la acaba de enviar
+          // (`solicitar` actualiza esa fila sin tomar el bloqueo del par), ya
+          // es el pedido enviado, que todavía nadie empezó: se escribe ahí.
+          const fila = await bloquearFilaDelPedido(tx, pos.id);
+          if (!fila) pos = null;
+          else if (fila.estado === "Solicitado") {
+            if (await depositoEmpezo(tx, fila)) return { conflicto: true };
+          } else if (!["Borrador", "Preparando"].includes(fila.estado)) pos = null;
+        }
       }
 
-      // ── MIENTRAS HAY UN PEDIDO ENVIADO, NO SE ARMA OTRO ─────────────────
-      // Regla de Emanuel. El criterio de "Solicitado sin cancelar" es el
-      // mismo de `solicitar`: `sinCancelados` sobre el par.
-      //
-      // Se pregunta DESPUÉS de buscar y bloquear el borrador, y el orden es el
-      // arreglo: preguntado antes, un envío que se confirmaba entre las dos
-      // consultas no se veía en la primera y ya se había llevado el borrador
-      // en la segunda, y se abría uno nuevo (medido: 7 de 20). Ahora, si el
-      // envío se llevó el borrador, ya está confirmado cuando se pregunta.
-      const enviado = await tx.posTransferencia.findFirst({
-        where: sinCancelados({ estado: "Solicitado", origenId: depositoId, destinoId: localId }),
-        select: { id: true },
-      });
-      if (enviado) return { conflicto: true };
+      if (!pos) {
+        pos = await tomarEnviado();
+        if (pos?.conflicto) return pos;
+      }
 
       if (!pos) {
         pos = await tx.posTransferencia.create({
@@ -220,8 +236,8 @@ export async function POST(req) {
               tipo: "manual",
             },
           });
-          // Un borrador viejo con el producto dos veces queda con UNA línea,
-          // la de la cantidad nueva.
+          // Un pedido viejo —borrador o enviado sin empezar— con el producto
+          // dos veces queda con UNA línea, la de la cantidad nueva.
           if (sobrantes.length) {
             await tx.posTransferenciaDetalle.deleteMany({ where: { id: { in: sobrantes.map((l) => l.id) } } });
           }
@@ -250,7 +266,7 @@ export async function POST(req) {
 
     if (resultado.conflicto) {
       return NextResponse.json(
-        { ok: false, error: "Hay un pedido enviado esperando al depósito. Cancelalo para pedir otra cosa." },
+        { ok: false, error: "El depósito ya está preparando tu pedido. Ya no se puede cambiar." },
         { status: 409 }
       );
     }

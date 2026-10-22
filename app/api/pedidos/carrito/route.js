@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { defaultModoEnvio } from "@/lib/conversiones/stock";
 import { sinCancelados } from "@/lib/pedidos/estados";
+import { depositoEmpezo } from "@/lib/pedidos/bloqueoDelPedido";
 
 export async function GET(req) {
   try {
@@ -99,6 +100,11 @@ export async function GET(req) {
           estado: posPendiente.estado,
           solicitadoAt: posPendiente.solicitadoAt,
           createdAt: posPendiente.createdAt,
+          // Mientras el depósito no lo empezó, el local le sigue sumando
+          // productos (`set-cantidad` escribe en este pedido). Desde que lo
+          // empezó, la pantalla lo muestra apagado. El criterio es UNO y vive
+          // en `lib/pedidos/bloqueoDelPedido.js`.
+          depositoEmpezo: await depositoEmpezo(prisma, posPendiente),
           items: posPendiente.detalles.map((d) => {
             const pl = d.producto;
             const base = pl?.base;
@@ -108,6 +114,15 @@ export async function GET(req) {
               unidadSugerida: d.unidadSugerida,
               factorPack: Number(base?.factor_pack || 1),
               modoEnvio: base?.modo_envio || defaultModoEnvio(base?.unidad_medida),
+              // Para que la tarjeta del pedido enviado sea la misma tarjeta
+              // viva del borrador: con qué producto se carga y cómo se dibuja.
+              detalleId: d.id,
+              productoLocalId: d.productoId,
+              baseId: pl?.baseId,
+              codigoBarra: base?.codigo_barra || null,
+              preparado: Number(d.preparado || 0),
+              unidadMedida: base?.unidad_medida || "unidad",
+              imagenUrl: base?.imagen_url || null,
             };
           }),
           itemCount: posPendiente.detalles.length,

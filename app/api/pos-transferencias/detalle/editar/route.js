@@ -4,6 +4,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
 import { sinCancelados } from "@/lib/pedidos/estados";
+import { bloquearParDelPedido, bloquearFilaDelPedido } from "@/lib/pedidos/bloqueoDelPedido";
 
 export async function POST(req) {
   try {
@@ -186,14 +187,32 @@ export async function POST(req) {
       );
     }
 
-    const updated = await prisma.posTransferenciaDetalle.update({
-      where: { id: detalleId },
-      data,
-      include: {
-        producto: { include: { base: true } },
-        pos: { select: { origenId: true } },
-      },
+    // ── EL MISMO BLOQUEO QUE EL LOCAL ───────────────────────────────────────
+    // Escribir lo preparado es lo que EMPIEZA un pedido enviado
+    // (`depositoEmpezo`), y desde ahí el local ya no lo puede tocar. Con el
+    // mismo bloqueo del par y la fila, un `set-cantidad` del local y esto no se
+    // pisan: o la cantidad del local entra antes, o el local recibe el 409.
+    // Ver `lib/pedidos/bloqueoDelPedido.js`.
+    const updated = await prisma.$transaction(async (tx) => {
+      await bloquearParDelPedido(tx, detalle.pos.origenId, detalle.pos.destinoId);
+      const fila = await bloquearFilaDelPedido(tx, detalle.pos.id);
+      if (!fila || fila.estado === "Enviado" || fila.estado === "Enviando") return null;
+      return tx.posTransferenciaDetalle.update({
+        where: { id: detalleId },
+        data,
+        include: {
+          producto: { include: { base: true } },
+          pos: { select: { origenId: true } },
+        },
+      });
     });
+
+    if (!updated) {
+      return NextResponse.json(
+        { ok: false, error: "No se puede editar un detalle de una POS enviada" },
+        { status: 400 }
+      );
+    }
 
     const stockOrigen = await prisma.stockLocal.findUnique({
       where: {

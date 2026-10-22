@@ -5,6 +5,7 @@ import { checkPerm } from "@/lib/authorize";
 import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
 import { esComboBase } from "@/lib/combos/guards";
 import { sinCancelados } from "@/lib/pedidos/estados";
+import { bloquearParDelPedido, bloquearFilaDelPedido } from "@/lib/pedidos/bloqueoDelPedido";
 
 export async function POST(req) {
   try {
@@ -169,30 +170,48 @@ export async function POST(req) {
       unidadPreparada = "UNIDAD";
     }
 
-    // Verificar que no exista
-    const existente = await prisma.posTransferenciaDetalle.findFirst({
-      where: {
-        posTransferenciaId: posId,
-        productoId: productoOrigen.id,
-        pos: sinCancelados(),
-      }
+    // ── EL MISMO BLOQUEO QUE EL LOCAL ───────────────────────────────────────
+    // Una línea con algo preparado EMPIEZA un pedido enviado
+    // (`depositoEmpezo`). Con el mismo bloqueo del par y la fila que toma
+    // `set-cantidad`, el local y esto no se pisan; y la pregunta "¿ya está?"
+    // va adentro, junto con la creación, para que entre las dos nadie más la
+    // cree. Ver `lib/pedidos/bloqueoDelPedido.js`.
+    const resultado = await prisma.$transaction(async (tx) => {
+      await bloquearParDelPedido(tx, pos.origenId, pos.destinoId);
+      const fila = await bloquearFilaDelPedido(tx, posId);
+      if (!fila || fila.estado === "Enviado" || fila.estado === "Enviando") return { yaEnviada: true };
+
+      // Verificar que no exista
+      const existente = await tx.posTransferenciaDetalle.findFirst({
+        where: {
+          posTransferenciaId: posId,
+          productoId: productoOrigen.id,
+          pos: sinCancelados(),
+        }
+      });
+      if (existente) return { yaEsta: true };
+
+      // Crear
+      const creado = await tx.posTransferenciaDetalle.create({
+        data: {
+          posTransferenciaId: posId,
+          productoId: productoOrigen.id,
+          sugerido,
+          preparado,
+          tipo,
+          unidadSugerida,
+          unidadPreparada
+        }
+      });
+      return { detalle: creado };
     });
 
-    if (existente)
+    if (resultado.yaEnviada)
+      return NextResponse.json({ ok: false, error: "POS ya enviada" }, { status: 400 });
+    if (resultado.yaEsta)
       return NextResponse.json({ ok: false, error: "El producto ya está en la POS" }, { status: 400 });
 
-    // Crear
-    const detalle = await prisma.posTransferenciaDetalle.create({
-      data: {
-        posTransferenciaId: posId,
-        productoId: productoOrigen.id,
-        sugerido,
-        preparado,
-        tipo,
-        unidadSugerida,
-        unidadPreparada
-      }
-    });
+    const { detalle } = resultado;
 
     return NextResponse.json({
       ok: true,

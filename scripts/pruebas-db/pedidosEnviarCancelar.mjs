@@ -472,7 +472,7 @@ try {
       if (borradoresAhora > 0) nuevos += 1;
       if (cantidad.status === 409) conflictos += 1;
       else if (cantidad.cuerpo.ok && cantidad.cuerpo.posId === posId) entraronAntes += 1;
-      if (i === 0) guardar(ANTES ? "envioCarreraAntes" : "setCantidadConPedidoEnviadoCarrera", cantidad);
+      if (i === 0 && ANTES) guardar("envioCarreraAntes", cantidad);
       // Limpiar para la vuelta siguiente: cancelar lo enviado y, si la ruta de
       // antes abrió un borrador, vaciarlo.
       await pedir(R.cancelar, "POST", `${B}/pos-transferencias/cancelar`, E.sPin, { posId });
@@ -481,22 +481,13 @@ try {
         await E.fijar(E.ids.ACEITE, 0);
       }
     }
-    console.log(`  · 8b: ${nuevos} de ${VUELTAS} vueltas abrieron un borrador nuevo; ${conflictos} contestaron 409; ${entraronAntes} entraron al pedido antes de enviarse`);
+    // Con la regla de hoy, una cantidad que llega detrás del envío entra al
+    // pedido enviado: "entró" cuenta las dos, antes y después de enviarse.
+    console.log(`  · 8b: ${nuevos} de ${VUELTAS} vueltas abrieron un borrador nuevo; ${conflictos} contestaron 409; ${entraronAntes} entraron al pedido`);
     guardar(ANTES ? "envioAntesDelBloqueo" : "envioConBloqueo", { vueltas: VUELTAS, nuevos, conflictos, entraronAntes });
     if (!ANTES) {
       ok("8b: ningún borrador nuevo al lado del pedido enviado", nuevos === 0, `${nuevos} de ${VUELTAS}`);
-      ok("8b: cada vuelta, o entró antes del envío o contestó 409", conflictos + entraronAntes === VUELTAS, json({ conflictos, entraronAntes }));
-
-      // Y sin carrera: con el pedido ya enviado, una cantidad contesta 409 con
-      // el mensaje, y no abre nada. Es la respuesta que ve la pantalla.
-      const base = await E.fijar(E.ids.ACEITE, 1);
-      await pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, E.sPin, { posId: base.cuerpo.posId });
-      const tarde = await E.fijar(E.ids.AZUCAR, 3);
-      guardar("setCantidadConPedidoEnviado", tarde);
-      ok("con el pedido enviado: 409 y el mensaje", tarde.status === 409 && tarde.cuerpo.error === "Hay un pedido enviado esperando al depósito. Cancelalo para pedir otra cosa.", json(tarde));
-      const abiertos = await c.posTransferencia.count({ where: { origenId: E.deposito.id, destinoId: E.local.id, estado: { in: ["Borrador", "Preparando"] } } });
-      ok("y no abrió ningún borrador", abiertos === 0, `${abiertos}`);
-      guardar("carritoConPedidoEnviadoEnvio", await carrito(E.sPin));
+      ok("8b: en cada vuelta la cantidad entró al mismo pedido, enviado o no", entraronAntes === VUELTAS && conflictos === 0, json({ conflictos, entraronAntes }));
     }
 
     // ── 8c. EL BORRADOR VIEJO CON LÍNEAS REPETIDAS ───────────────────────
@@ -543,9 +534,205 @@ try {
     }
   }
 
+  if (!ANTES) {
+    seccion("9. Sumar al pedido enviado, hasta que el depósito lo empieza");
+    // ── CONTRAPRUEBA_DEPOSITO=editar | enviar ─────────────────────────────
+    // Para correr con esa ruta del depósito SIN el bloqueo (sacado a mano del
+    // árbol): la carrera correspondiente tiene que poder dejar líneas tarde.
+    const CONTRA = process.env.CONTRAPRUEBA_DEPOSITO || "";
+    const VUELTAS = Number(process.env.VUELTAS_CARRERA || 25);
+    const editar = await import("../../app/api/pos-transferencias/detalle/editar/route.js");
+    const enviar = await import("../../app/api/pos-transferencias/enviar/route.js");
+    const { flushAuditoria } = await import("../../lib/auditoria/interceptor.js");
+    const { default: prismaApp } = await import("../../lib/prisma.js");
+
+    const P = await armarLocal("Grupo sumar", ["ACEITE", "ARROZ", "FIDEOS", "GALLETITAS", "LECHE"]);
+    // Siembra: stock en el depósito, para que el despacho pase, y la cuenta
+    // de un encargado del depósito, que es quien lo prepara.
+    for (const id of Object.values(P.ids)) await c.stockLocal.create({ data: { localId: P.deposito.id, productoId: id, cantidad: 1000 } });
+    const cuentaDepo = await c.usuario.create({
+      data: { nombre: "Cuenta Depósito", email: `deposito-sumar-${marca}@ci.local`, passwordHash: "x", rolId: rolEnc.id, localId: P.deposito.id },
+    });
+    const sDepo = sesionDe(cuentaDepo, P.deposito.id);
+    const preparar = (detalleId, preparado) =>
+      pedir(editar, "POST", `${B}/pos-transferencias/detalle/editar`, sDepo, { detalleId, preparado });
+    const despachar = (posId) => pedir(enviar, "POST", `${B}/pos-transferencias/enviar`, sDepo, { posId });
+    const solicitar = (posId) => pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, P.sPin, { posId });
+    const cancelar = (posId) => pedir(R.cancelar, "POST", `${B}/pos-transferencias/cancelar`, P.sPin, { posId });
+    const lineasDelPedido = async (posId) =>
+      Object.fromEntries(
+        (await c.posTransferenciaDetalle.findMany({ where: { posTransferenciaId: posId }, select: { productoId: true, sugerido: true } })).map((l) => [l.productoId, Number(l.sugerido)])
+      );
+    const borradoresDelPar = () =>
+      c.posTransferencia.count({ where: { origenId: P.deposito.id, destinoId: P.local.id, estado: { in: ["Borrador", "Preparando"] } } });
+    // Un pedido enviado con un producto: el punto de partida de cada vuelta.
+    const enviarUno = async (id, cantidad) => {
+      const r = await P.fijar(id, cantidad);
+      const s = await solicitar(r.cuerpo.posId);
+      if (!s.cuerpo.ok) throw new Error(`no se pudo enviar: ${json(s)}`);
+      return r.cuerpo.posId;
+    };
+
+    // ── 9a. ENVIAR, SUMAR, CAMBIAR Y SACAR ─────────────────────────────────
+    const { ACEITE, ARROZ, FIDEOS, GALLETITAS, LECHE } = P.ids;
+    await P.fijar(ACEITE, 2);
+    await P.fijar(ARROZ, 3);
+    const r0 = await P.fijar(FIDEOS, 1);
+    const posId = r0.cuerpo.posId;
+    ok("9a: se envía", (await solicitar(posId)).cuerpo.ok === true);
+    const enviado = await carrito(P.sPin);
+    guardar("sumarCarritoEnviado", enviado);
+    ok("9a: el carrito trae el pendiente sin empezar", enviado.cuerpo.pendiente?.posId === posId && enviado.cuerpo.pendiente?.depositoEmpezo === false, json(enviado.cuerpo.pendiente));
+    const sumar = await P.fijar(GALLETITAS, 4);
+    guardar("sumarSetCantidad", sumar);
+    const cambiar = await P.fijar(ARROZ, 5);
+    const sacar = await P.fijar(FIDEOS, 0);
+    ok("9a: sumar, cambiar y sacar contestan ok, sobre el pedido enviado",
+      [sumar, cambiar, sacar].every((r) => r.status === 200 && r.cuerpo.ok && r.cuerpo.posId === posId), json([sumar, cambiar, sacar]));
+    const lineas = await lineasDelPedido(posId);
+    console.log(`  · 9a: pedido #${posId} queda con ${json(lineas)}`);
+    ok("9a: las líneas del Solicitado son ACEITE 2, ARROZ 5 y GALLETITAS 4, sin FIDEOS",
+      json(lineas) === json({ [ACEITE]: 2, [ARROZ]: 5, [GALLETITAS]: 4 }), json(lineas));
+    ok("9a: sigue Solicitado", (await estadoDe(posId)) === "Solicitado");
+    ok("9a: no se creó ningún borrador", (await borradoresDelPar()) === 0);
+    guardar("sumarCarritoTrasSumar", await carrito(P.sPin));
+
+    // ── 9b. EL RASTRO EN LA BITÁCORA ───────────────────────────────────────
+    // La ruta corre adentro del contexto de un request —el mismo
+    // AsyncLocalStorage que siembra `getUsuarioSession`— y el flush se llama a
+    // mano: en un script no hay `after()` que lo dispare.
+    const auditado = async (fn) => {
+      const store = {};
+      const r = await globalThis.__auditoriaALS.run(store, fn);
+      await flushAuditoria(globalThis.__auditoriaRefs.base, store);
+      return r;
+    };
+    const desde = new Date();
+    await auditado(() => P.fijar(LECHE, 1));
+    await auditado(() => P.fijar(LECHE, 3));
+    await auditado(() => P.fijar(LECHE, 0));
+    const rastro = await prismaApp.auditoriaBitacora.findMany({
+      where: { entidadId: String(posId), entidad: "Transferencia POS", createdAt: { gte: desde } },
+      orderBy: { id: "asc" },
+      select: { accion: true, usuarioId: true, operadorId: true, cambios: true },
+    });
+    const resumen = rastro.map((f) => ({ accion: f.accion, campos: (f.cambios?.[0]?.campos || []).map((x) => `${x.label}:${x.antes}→${x.despues}`) }));
+    console.log(`  · 9b: ${rastro.length} filas: ${json(resumen)}`);
+    ok("9b: tres filas, una por agregar, cambiar y sacar, como pos_transferencia.editar",
+      rastro.length === 3 && rastro.every((f) => f.accion === "pos_transferencia.editar"), json(resumen));
+    ok("9b: con la cuenta que lo hizo", rastro.every((f) => f.usuarioId != null), json(rastro.map((f) => [f.usuarioId, f.operadorId])));
+    console.log(`  · 9b: operadora en el rastro: ${json(rastro.map((f) => f.operadorId))}`);
+    guardar("sumarBitacora", resumen);
+
+    // ── 9c. EL QUE QUEDA VACÍO SIGUE ENVIADO ───────────────────────────────
+    // Otro local, para no tocar el pedido de arriba.
+    const V = await armarLocal("Grupo vacio", ["YERBA"]);
+    const rv = await V.fijar(V.ids.YERBA, 2);
+    await pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, V.sPin, { posId: rv.cuerpo.posId });
+    const vacio = await V.fijar(V.ids.YERBA, 0);
+    ok("9c: sacar el único producto contesta ok con 0 productos", vacio.cuerpo.ok && vacio.cuerpo.itemCount === 0, json(vacio));
+    ok("9c: y el pedido sigue Solicitado, vacío", (await estadoDe(rv.cuerpo.posId)) === "Solicitado" && (await lineasDe(rv.cuerpo.posId)) === 0);
+    guardar("sumarEnviadoVacio", await carrito(V.sPin));
+
+    // ── 9d. EL DEPÓSITO LO EMPIEZA, Y DESDE AHÍ 409 ────────────────────────
+    const lineaAceite = await c.posTransferenciaDetalle.findFirst({ where: { posTransferenciaId: posId, productoId: ACEITE } });
+    const prep = await preparar(lineaAceite.id, 2);
+    ok("9d: el depósito prepara una línea", prep.cuerpo.ok === true, json(prep));
+    const empezado = await carrito(P.sPin);
+    guardar("empezadoCarrito", empezado);
+    ok("9d: el carrito lo da por empezado", empezado.cuerpo.pendiente?.depositoEmpezo === true, json(empezado.cuerpo.pendiente));
+    const tarde = await P.fijar(GALLETITAS, 7);
+    guardar("empezadoSetCantidad", tarde);
+    ok("9d: set-cantidad da 409 con el mensaje", tarde.status === 409 && tarde.cuerpo.error === "El depósito ya está preparando tu pedido. Ya no se puede cambiar.", json(tarde));
+    ok("9d: y no tocó nada", json(await lineasDelPedido(posId)) === json(lineas));
+    ok("9d: ni abrió un borrador", (await borradoresDelPar()) === 0);
+    const canc = await cancelar(posId);
+    guardar("empezadoCancelar", canc);
+    ok("9d: cancelar todavía lo permite (la ruta solo mira que sea Solicitado)", canc.cuerpo.ok === true, json(canc));
+
+    // Y despachar sin nadie al lado: sale entero, y después el local ya no
+    // tiene pedido enviado —lo que cargue va a uno nuevo—.
+    {
+      const pid = await enviarUno(ACEITE, 2);
+      await P.fijar(ARROZ, 3);
+      const dep = await despachar(pid);
+      ok("9d: despachar sin carrera sale con las dos líneas", dep.cuerpo.ok === true && dep.cuerpo.totalItems === 2 && (await estadoDe(pid)) === "Enviado", json(dep));
+      const nuevo = await P.fijar(LECHE, 1);
+      ok("9d: lo que el local carga después va a un pedido nuevo", nuevo.cuerpo.ok && nuevo.cuerpo.posId !== pid, json(nuevo));
+      await P.fijar(LECHE, 0);
+    }
+
+    // ── 9e. CARRERA: EL DEPÓSITO PREPARA MIENTRAS EL LOCAL CAMBIA ─────────
+    // Los dos sobre la MISMA línea. `set-cantidad` pone preparado en 0 al
+    // escribir, así que si escribe DESPUÉS de que el depósito empezó, borra lo
+    // preparado: esa es la línea tarde, y se ve en la base.
+    {
+      let antes = 0, conflictos = 0, tardes = 0, otras = 0;
+      for (let i = 0; i < VUELTAS; i++) {
+        const pid = await enviarUno(ACEITE, 2);
+        const linea = await c.posTransferenciaDetalle.findFirst({ where: { posTransferenciaId: pid, productoId: ACEITE } });
+        const [dep, loc] = await Promise.all([preparar(linea.id, 2), P.fijar(ACEITE, 5)]);
+        const fin = await c.posTransferenciaDetalle.findFirst({ where: { posTransferenciaId: pid, productoId: ACEITE } });
+        const preparado = Number(fin.preparado);
+        if (dep.cuerpo.ok && loc.cuerpo.ok && preparado === 0) tardes += 1;
+        else if (dep.cuerpo.ok && loc.status === 409 && preparado === 2) conflictos += 1;
+        else if (dep.cuerpo.ok && loc.cuerpo.ok && preparado === 2 && Number(fin.sugerido) === 5) antes += 1;
+        else otras += 1;
+        await cancelar(pid);
+      }
+      console.log(`  · 9e: ${VUELTAS} vueltas — ${antes} el local entró antes, ${conflictos} 409, ${tardes} TARDE (preparado borrado), ${otras} otras`);
+      guardar(CONTRA === "editar" ? "carreraPrepararSinBloqueo" : "carreraPreparar", { vueltas: VUELTAS, antes, conflictos, tardes, otras });
+      if (CONTRA === "editar") ok("9e CONTRAPRUEBA: sin el bloqueo en preparar, hay líneas tarde", tardes > 0, `${tardes}`);
+      else ok("9e: cero líneas tarde", tardes === 0 && otras === 0, json({ tardes, otras }));
+    }
+
+    // ── 9f. CARRERA: EL DEPÓSITO DESPACHA MIENTRAS EL LOCAL SUMA ──────────
+    // Tarde es una línea que quedó en el pedido despachado sin viajar: más
+    // líneas en el pedido que ítems en lo que salió.
+    {
+      let antes = 0, despues = 0, cambio = 0, rechazos = 0, tardes = 0, otras = 0;
+      for (let i = 0; i < VUELTAS; i++) {
+        const pid = await enviarUno(ACEITE, 2);
+        // El despacho hace varias lecturas antes de su transacción, y una
+        // cantidad que sale junto con él llega siempre en ese hueco. Se la
+        // demora un poco más en cada vuelta para que caiga también adentro de
+        // la transacción y después.
+        const [dep, loc] = await Promise.all([
+          despachar(pid),
+          new Promise((r) => setTimeout(r, (i % 13) * 4)).then(() => P.fijar(ARROZ, 3)),
+        ]);
+        const enPedido = (await c.posTransferenciaDetalle.count({ where: { posTransferenciaId: pid, sugerido: { gt: 0 } } }));
+        const estado = await estadoDe(pid);
+        if (dep.cuerpo.ok && enPedido > dep.cuerpo.totalItems) tardes += 1;
+        else if (dep.cuerpo.ok && loc.cuerpo.ok && loc.cuerpo.posId === pid && dep.cuerpo.totalItems === 2) antes += 1;
+        else if (dep.cuerpo.ok && loc.cuerpo.ok && loc.cuerpo.posId !== pid) despues += 1;
+        else if (dep.status === 409 && estado === "Solicitado") cambio += 1;
+        // El local esperó el bloqueo de la fila mientras se despachaba: al
+        // entrar el pedido ya no está sin empezar, y contesta 409.
+        else if (dep.cuerpo.ok && loc.status === 409 && enPedido === dep.cuerpo.totalItems) rechazos += 1;
+        else {
+          otras += 1;
+          console.log(`  · 9f vuelta ${i + 1} sin clasificar: ${json({ dep, loc: loc.cuerpo, pid, enPedido, estado })}`);
+        }
+        if (dep.status === 409 && !lectura.despacharPedidoCambio) guardar("despacharPedidoCambio", dep);
+        // Dejar el par limpio: lo que quedó enviado se cancela, y lo que abrió
+        // un borrador nuevo se saca.
+        if (estado === "Solicitado") await cancelar(pid);
+        if (loc.cuerpo.posId !== pid) await P.fijar(ARROZ, 0);
+      }
+      console.log(`  · 9f: ${VUELTAS} vueltas — ${antes} el local sumó antes y viajó, ${despues} fue a un pedido nuevo, ${cambio} el despacho pidió volver a abrir, ${rechazos} 409 al local, ${tardes} TARDE (quedó sin viajar), ${otras} otras`);
+      guardar(CONTRA === "enviar" ? "carreraDespacharSinBloqueo" : "carreraDespachar", { vueltas: VUELTAS, antes, despues, cambio, rechazos, tardes, otras });
+      if (CONTRA === "enviar") ok("9f CONTRAPRUEBA: sin el bloqueo en despachar, hay líneas tarde", tardes > 0, `${tardes}`);
+      else ok("9f: cero líneas tarde", tardes === 0 && otras === 0, json({ tardes, otras }));
+    }
+  }
+
   if (process.env.ESCRIBIR_FIXTURE_PEDIDOS) {
     const RUTA_FIXTURE = "app/modulos/pedidos/enviarCancelar.fixture.json";
     const previo = existsSync(RUTA_FIXTURE) ? JSON.parse(readFileSync(RUTA_FIXTURE, "utf8")) : {};
+    // De la regla de 9e2f438 —el pedido enviado no se tocaba—: ya no las
+    // produce la ruta, y un candado montado sobre ellas probaría lo que no pasa.
+    for (const vieja of ["setCantidadConPedidoEnviado", "setCantidadConPedidoEnviadoCarrera", "carritoConPedidoEnviadoEnvio"]) delete previo[vieja];
     writeFileSync(RUTA_FIXTURE, `${JSON.stringify({ ...previo, ...lectura }, null, 2)}\n`);
     console.log("  · fixture escrito");
   }
