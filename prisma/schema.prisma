@@ -1732,6 +1732,15 @@ model PosTransferenciaDetalle {
   unidadSugerida  ModoPedido  @default(BULTO)
   unidadPreparada ModoPedido? // BULTO o UNIDAD según cómo se preparó
 
+  /// Cuándo el depósito DECIDIÓ esta línea: "va completo", una corrección
+  /// —incluida una a 0— o un producto que agregó él (2026-10-22). Sin esto,
+  /// "va 0, decidido" y "todavía no la miré" eran la misma fila: preparado 0.
+  /// Null = nadie la decidió. Lo escriben `detalle/editar` (lo preparado) y
+  /// `agregarItem`; `detalle/quitar` lo vuelve a null cuando devuelve la línea
+  /// a sugeridos. Lo leen `revisionDeLinea.js` (qué está revisado y cuánto
+  /// viaja) y `depositoEmpezo`. Las líneas anteriores quedan en null.
+  revisadoEn DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

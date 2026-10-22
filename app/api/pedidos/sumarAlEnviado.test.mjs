@@ -132,5 +132,10 @@ test("el carrito dice si el depósito empezó, con el mismo criterio que set-can
   assert.ok(f.includes("depositoEmpezo: await depositoEmpezo(prisma, posPendiente)"));
   const b = sinComentarios("lib/pedidos/bloqueoDelPedido.js");
   assert.match(b, /if \(pos\.estado !== ESTADO_PEDIDO\.SOLICITADO\) return true;/);
-  assert.match(b, /preparado: \{ gt: 0 \}/);
+  // Decía `preparado: { gt: 0 }`. Desde el 2026-10-22 una línea que el depósito
+  // decidió en 0 también lo empieza: el criterio es el de una línea revisada,
+  // escrito una vez en `lib/pedidos/revisionDeLinea.js`.
+  assert.match(b, /\.\.\.WHERE_LINEA_REVISADA/);
+  const r = sinComentarios("lib/pedidos/revisionDeLinea.js");
+  assert.match(r, /OR: \[\{ preparado: \{ gt: 0 \} \}, \{ revisadoEn: \{ not: null \} \}\]/);
 });

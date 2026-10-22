@@ -4,6 +4,8 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { sinCancelados } from "@/lib/pedidos/estados";
+import { depositoEmpezo } from "@/lib/pedidos/bloqueoDelPedido";
+import { WHERE_LINEA_REVISADA } from "@/lib/pedidos/revisionDeLinea";
 
 export async function GET(req) {
   try {
@@ -63,7 +65,23 @@ export async function GET(req) {
       orderBy: { solicitadoAt: "desc" },
     });
 
-    const items = rows.map((r) => ({
+    // ── EL AVANCE DE CADA PEDIDO (2026-10-22) ─────────────────────────────
+    // Para la entrada del depósito en el celular: "Nuevo" o "Preparando · N
+    // de M". Se AGREGAN dos campos y no cambia ninguno de los que había.
+    // `revisados` cuenta con el mismo criterio que la pantalla de preparar
+    // (`WHERE_LINEA_REVISADA`) y `depositoEmpezo` es el de los bloqueos, el
+    // mismo que lee el local.
+    const ids = rows.map((r) => r.id);
+    const revisadasPorPedido = ids.length
+      ? await prisma.posTransferenciaDetalle.groupBy({
+          by: ["posTransferenciaId"],
+          where: { posTransferenciaId: { in: ids }, ...WHERE_LINEA_REVISADA, pos: sinCancelados() },
+          _count: { _all: true },
+        })
+      : [];
+    const revisadas = new Map(revisadasPorPedido.map((g) => [g.posTransferenciaId, g._count._all]));
+
+    const items = await Promise.all(rows.map(async (r) => ({
       id: r.id,
       origenId: r.origenId,
       origenNombre: r.origen?.nombre || "-",
@@ -72,7 +90,9 @@ export async function GET(req) {
       solicitadoAt: r.solicitadoAt?.toISOString() || null,
       itemCount: r._count.detalles,
       solicitadoPorNombre: r.solicitadoPor?.nombre || "-",
-    }));
+      revisados: revisadas.get(r.id) || 0,
+      depositoEmpezo: await depositoEmpezo(prisma, r),
+    })));
 
     return NextResponse.json({ ok: true, items });
   } catch (err) {

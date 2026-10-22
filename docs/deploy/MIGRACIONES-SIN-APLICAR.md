@@ -105,6 +105,13 @@ Si la lista está vacía, el despliegue es solo de código.
   Idempotente: una segunda vez no ajusta nada. El script
   `scripts/control-stock-reconstruir.mjs` hace lo mismo contra una copia de
   desarrollo; en producción no corre, a propósito.
+- `20261022215306_deposito_revision_de_linea` — **Aditiva, sin datos.** La
+  columna nula `PosTransferenciaDetalle.revisadoEn`: cuándo el depósito decidió
+  cada línea de un pedido de local (Pedidos de locales en el celular). No toca
+  ninguna fila; las líneas de antes quedan en null y se leen como hasta hoy. Va
+  ANTES de levantar la imagen nueva: `detalle/editar` la escribe y `enviar`,
+  `solicitados` y el criterio de "empezado" la leen. La imagen vieja con esto
+  puesto sigue andando: no la conoce. El clasificador sale en 0.
 
 Producción está en **71 migraciones**, la última
 `20261019120000_operador_sesion_invalidada_en`.

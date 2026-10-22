@@ -185,6 +185,10 @@ export async function POST(req) {
       }
     }
 
+    // Escribir lo preparado es DECIDIR la línea, también en 0: "va 0" deja de
+    // ser lo mismo que "todavía no la miré". Ver `lib/pedidos/revisionDeLinea.js`.
+    if (data.preparado !== undefined) data.revisadoEn = new Date();
+
     if (Object.keys(data).length === 0) {
       return NextResponse.json(
         { ok: false, error: "No hay cambios para aplicar" },
@@ -248,6 +252,7 @@ export async function POST(req) {
       preparado: Number(updated.preparado || 0),
       unidadSugerida: updated.unidadSugerida,
       unidadPreparada: updated.unidadPreparada,
+      revisadoEn: updated.revisadoEn,
       productoNombre: productoLocal?.nombre || baseItem?.nombre || "",
       codigoBarra: baseItem?.codigo_barra || "",
       stockActual,

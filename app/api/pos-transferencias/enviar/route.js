@@ -10,6 +10,7 @@ import { crearTransferencia } from "@/lib/transferencias/crearTransferencia";
 import { DESCONTAR_Y_TRANSITO } from "@/lib/transferencias/politicasStock";
 import { sinCancelados } from "@/lib/pedidos/estados";
 import { bloquearParDelPedido, bloquearFilaDelPedido } from "@/lib/pedidos/bloqueoDelPedido";
+import { cantidadQueViaja } from "@/lib/pedidos/revisionDeLinea";
 import {
   PRESENTACION,
   agrupa,
@@ -57,7 +58,7 @@ function snapshotDeEnvioManual(item) {
 /** Las líneas de un pedido como texto comparable: qué producto, cuánto y en qué unidad. */
 function firmaDeLineas(lineas) {
   return (lineas || [])
-    .map((d) => [d.id, d.productoId, Number(d.sugerido || 0), Number(d.preparado || 0), d.unidadSugerida, d.unidadPreparada].join(":"))
+    .map((d) => [d.id, d.productoId, Number(d.sugerido || 0), Number(d.preparado || 0), d.unidadSugerida, d.unidadPreparada, d.revisadoEn ? new Date(d.revisadoEn).getTime() : ""].join(":"))
     .sort()
     .join("|");
 }
@@ -161,10 +162,10 @@ export async function POST(req) {
     // --------------------------------------------------
     const items = pos.detalles
       .map((detalle) => {
-        const cantidadPreparada = Number(detalle.preparado || 0);
-        const cantidadSugerida = Number(detalle.sugerido || 0);
-        const cantidadRaw =
-          cantidadPreparada > 0 ? cantidadPreparada : cantidadSugerida;
+        // Lo preparado; sin nada preparado, lo pedido —como siempre— salvo que
+        // el depósito la haya decidido en 0: esa no viaja. Ver
+        // `lib/pedidos/revisionDeLinea.js`.
+        const cantidadRaw = cantidadQueViaja(detalle);
 
         if (!cantidadRaw || cantidadRaw <= 0) return null;
 
@@ -293,7 +294,7 @@ export async function POST(req) {
       await bloquearFilaDelPedido(tx, pos.id);
       const ahora = await tx.posTransferenciaDetalle.findMany({
         where: { posTransferenciaId: pos.id, pos: sinCancelados() },
-        select: { id: true, productoId: true, sugerido: true, preparado: true, unidadSugerida: true, unidadPreparada: true },
+        select: { id: true, productoId: true, sugerido: true, preparado: true, unidadSugerida: true, unidadPreparada: true, revisadoEn: true },
       });
       if (firmaDeLineas(ahora) !== firmaDeLineas(pos.detalles)) {
         throw new Error("PEDIDO_CAMBIO");

@@ -120,7 +120,10 @@ export async function POST(req) {
     if (sugeridoActual > 0) {
       await prisma.posTransferenciaDetalle.update({
         where: { id: detalleId },
-        data: { preparado: 0 },
+        // Devuelta a sugeridos es "todavía no la decidí": sin esto, la línea
+        // quedaría como un "va 0" decidido y no viajaría
+        // (`lib/pedidos/revisionDeLinea.js`).
+        data: { preparado: 0, revisadoEn: null },
       });
       accion = "devuelto_a_sugerido";
     } else {

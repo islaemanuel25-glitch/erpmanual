@@ -345,15 +345,18 @@ try {
     });
     const operadora = await c.operadorLocal.create({ data: { nombre: "Caro", pinHash: "x", localId: local.id } });
     const ids = {};
-    for (const [i, nombre] of productos.entries()) {
+    // Un producto es su nombre, o `{ nombre, extra }` con campos de la ficha
+    // (un pack que sale por bulto, por ejemplo).
+    for (const [i, producto] of productos.entries()) {
+      const { nombre, extra = {} } = typeof producto === "string" ? { nombre: producto } : producto;
       const b = await c.productoBase.create({
-        data: { grupoId: g.id, nombre, codigo_barra: `79${marca}`.slice(0, 10) + String(i).padStart(3, "0"), unidad_medida: "unidad", precio_costo: 600, precio_venta: 1000, redondeo_100: false, activo: true },
+        data: { grupoId: g.id, nombre, codigo_barra: `79${marca}`.slice(0, 10) + String(i).padStart(3, "0"), unidad_medida: "unidad", precio_costo: 600, precio_venta: 1000, redondeo_100: false, activo: true, ...extra },
       });
       ids[nombre] = (await c.productoLocal.create({ data: { localId: deposito.id, baseId: b.id, activo: true, precio_costo: 600, precio_venta: 1000 } })).id;
     }
     const s = sesionDe(cuentaLocal, local.id);
     const sPin = `${s}; erpazul_operador_activo=${jwt.sign({ operadorId: operadora.id, nombre: operadora.nombre, localId: local.id, _tipo: "operador", emitidoEn: Date.now() }, process.env.AUTH_SECRET)}`;
-    const fijar = (id, cantidad) => pedir(R.setCantidad, "POST", `${B}/pedidos/set-cantidad`, sPin, { productoLocalId: id, cantidad, unidad: "UNIDAD" });
+    const fijar = (id, cantidad, unidad = "UNIDAD") => pedir(R.setCantidad, "POST", `${B}/pedidos/set-cantidad`, sPin, { productoLocalId: id, cantidad, unidad });
     return { local, deposito, s, sPin, ids, fijar };
   }
   function sesionDe(usuario, localId) {
@@ -1060,6 +1063,158 @@ try {
       ok("13: el historial largo pasa de 50", largo[0].cuerpo.total > 50 && largo.length >= 2, json({ total: largo[0].cuerpo.total }));
       guardar("historialLargo", largo);
     }
+
+    seccion("14. El depósito prepara un pedido: revisar, corregir, agregar y enviar");
+    {
+      // El lado del depósito, por sus rutas de siempre (`/api/pos-transferencias`).
+      // Un local propio pide cinco renglones —uno por bulto— y el depósito los
+      // decide como la pantalla del celular: "va completo" en dos, uno a menos,
+      // uno a 0 y un producto que el local no pidió. Después lo envía y el local
+      // empieza a recibirlo, para tener tarjetas REALES de la recepción.
+      const { vaCompleto } = await import("../../lib/pedidos/revisionDeLinea.js");
+      const RD = {
+        solicitados: await import("../../app/api/pos-transferencias/solicitados/route.js"),
+        detalle: await import("../../app/api/pos-transferencias/detalle/route.js"),
+        agregarItem: await import("../../app/api/pos-transferencias/agregarItem/route.js"),
+        recepcion: await import("../../app/api/transferencias/detalle/route.js"),
+        revisar: await import("../../app/api/transferencias/revisar-producto/route.js"),
+      };
+      const D = await armarLocal("Grupo depósito", [
+        "ACEITE", "ARROZ", "FIDEOS", "YERBA",
+        { nombre: "AGUA X6", extra: { unidad_medida: "pack", factor_pack: 6 } },
+        "AZUCAR", "SAL",
+      ]);
+      for (const id of Object.values(D.ids)) await c.stockLocal.create({ data: { localId: D.deposito.id, productoId: id, cantidad: 1000 } });
+      const cuentaDepoD = await c.usuario.create({
+        data: { nombre: "Depósito Marta", email: `deposito-prepara-${marca}@ci.local`, passwordHash: "x", rolId: rolEnc.id, localId: D.deposito.id },
+      });
+      const sDepo = sesionDe(cuentaDepoD, D.deposito.id);
+      const solicitadosD = () => pedir(RD.solicitados, "GET", `${B}/pos-transferencias/solicitados`, sDepo);
+      const detalleD = (posId) => pedir(RD.detalle, "GET", `${B}/pos-transferencias/detalle?posId=${posId}`, sDepo);
+      const editarD = (body) => pedir(editar, "POST", `${B}/pos-transferencias/detalle/editar`, sDepo, body);
+      const lineaDe = (det, nombre) => det.cuerpo.item.detalles.find((d) => d.productoNombre === nombre);
+      const deEste = (sol, posId) => (sol.cuerpo.items || []).find((i) => i.id === posId);
+      const solicitarD = async () => {
+        const carritoD = await carrito(D.sPin);
+        const r = await pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, D.sPin, { posId: carritoD.cuerpo.posId });
+        if (!r.cuerpo.ok) throw new Error(`no se pudo enviar: ${json(r)}`);
+        return carritoD.cuerpo.posId;
+      };
+
+      // ── El local pide cinco renglones, uno por bulto ──────────────────────
+      for (const [nombre, cantidad, unidad] of [["ACEITE", 2], ["ARROZ", 3], ["FIDEOS", 1], ["YERBA", 4], ["AGUA X6", 2, "BULTO"]]) {
+        const r = await D.fijar(D.ids[nombre], cantidad, unidad);
+        ok(`14: el local pide ${cantidad} ${nombre}`, r.cuerpo.ok === true, json(r));
+      }
+      const p1 = await solicitarD();
+
+      const solNuevo = await solicitadosD();
+      guardar("depositoSolicitadosNuevo", solNuevo);
+      const nuevo = deEste(solNuevo, p1);
+      console.log(`  · 14: en la entrada → ${json(nuevo)}`);
+      ok("14: el depósito lo ve en la entrada, Nuevo, con sus 5 renglones", nuevo?.depositoEmpezo === false && nuevo.revisados === 0 && nuevo.itemCount === 5 && nuevo.destinoNombre === D.local.nombre, json(nuevo));
+      const detNuevo = await detalleD(p1);
+      guardar("depositoDetalleNuevo", detNuevo);
+      ok("14: el detalle trae los 5, ninguno revisado", detNuevo.cuerpo.item?.detalles?.length === 5 && detNuevo.cuerpo.item.detalles.every((d) => d.revisadoEn === null && d.preparado === 0), json(detNuevo.cuerpo.item?.detalles));
+      const agua = lineaDe(detNuevo, "AGUA X6");
+      // El local la pidió por bulto; el detalle del depósito le deduce "MIXTO"
+      // (no usa `defaultModoEnvio` como el carrito). Por eso la pantalla lee la
+      // unidad pedida y no el modo: ver `lib/pedidos/revisionDeLinea.js`.
+      ok("14: el agua se pidió por bulto", agua?.unidadSugerida === "BULTO" && agua.factorPack === 6, json(agua));
+      ok("14: el detalle le deduce MIXTO al pack", agua?.modoEnvio === "MIXTO", json(agua));
+
+      // ── Primero una línea a 0: eso solo ya lo empieza ─────────────────────
+      const yerba0 = await editarD({ detalleId: lineaDe(detNuevo, "YERBA").detalleId, preparado: 0, unidadPreparada: "UNIDAD" });
+      ok("14: la yerba va 0, decidido", yerba0.cuerpo.ok === true && yerba0.cuerpo.item.preparado === 0 && yerba0.cuerpo.item.revisadoEn != null, json(yerba0));
+      const solTrasCero = deEste(await solicitadosD(), p1);
+      ok("14: con una línea en 0 ya está empezado, 1 de 5", solTrasCero?.depositoEmpezo === true && solTrasCero.revisados === 1, json(solTrasCero));
+      const localTarde = await D.fijar(D.ids.ACEITE, 5);
+      ok("14: el local ya no puede cambiarlo (409)", localTarde.status === 409, json(localTarde));
+
+      // ── Va completo en dos, uno a menos, y uno que no pidió ───────────────
+      for (const nombre of ["ACEITE", "AGUA X6"]) {
+        const l = lineaDe(detNuevo, nombre);
+        const r = await editarD({ detalleId: l.detalleId, ...vaCompleto(l) });
+        ok(`14: ${nombre} va completo`, r.cuerpo.ok === true && r.cuerpo.item.preparado === l.sugerido && r.cuerpo.item.unidadPreparada === l.unidadSugerida, json(r));
+      }
+      const arroz = await editarD({ detalleId: lineaDe(detNuevo, "ARROZ").detalleId, preparado: 1, unidadPreparada: "UNIDAD" });
+      ok("14: el arroz va 1 de 3", arroz.cuerpo.ok === true && arroz.cuerpo.item.preparado === 1, json(arroz));
+      const azucar = await pedir(RD.agregarItem, "POST", `${B}/pos-transferencias/agregarItem`, sDepo, { posId: p1, productoLocalId: D.ids.AZUCAR, cantidad: 1, tipo: "manual" });
+      ok("14: el depósito agrega azúcar, que el local no pidió", azucar.cuerpo.ok === true && azucar.cuerpo.item.sugerido === 0 && azucar.cuerpo.item.preparado === 1, json(azucar));
+
+      const detTrabajando = await detalleD(p1);
+      guardar("depositoDetalleTrabajando", detTrabajando);
+      const solTrabajando = await solicitadosD();
+      guardar("depositoSolicitadosTrabajando", solTrabajando);
+      const trabajando = deEste(solTrabajando, p1);
+      ok("14: en la entrada, Preparando · 5 de 6", trabajando?.depositoEmpezo === true && trabajando.revisados === 5 && trabajando.itemCount === 6, json(trabajando));
+      ok("14: el fideo es el único sin revisar", json(detTrabajando.cuerpo.item.detalles.filter((d) => d.revisadoEn == null && d.preparado === 0).map((d) => d.productoNombre)) === json(["FIDEOS"]), json(detTrabajando.cuerpo.item.detalles));
+
+      const fideos = lineaDe(detTrabajando, "FIDEOS");
+      ok("14: el fideo va completo", (await editarD({ detalleId: fideos.detalleId, ...vaCompleto(fideos) })).cuerpo.ok === true);
+      const detListo = await detalleD(p1);
+      guardar("depositoDetalleListo", detListo);
+
+      // ── Enviar: la transferencia lleva lo decidido, y la yerba no viaja ────
+      const envio = await pedir(enviar, "POST", `${B}/pos-transferencias/enviar`, sDepo, { posId: p1 });
+      guardar("depositoEnviar", envio);
+      ok("14: se envía", envio.cuerpo.ok === true, json(envio).slice(0, 400));
+      const tId = envio.cuerpo.item?.id;
+      // `cantidad`, `cantidadPresentada` y la unidad en que salió. Este camino
+      // guarda la cantidad en la unidad preparada: 2 BULTO es 2, no 12.
+      const lineasT = await c.transferenciaDetalle.findMany({
+        where: { transferenciaId: tId },
+        include: { producto: { include: { base: { select: { nombre: true } } } } },
+        orderBy: { id: "asc" },
+      });
+      const viajo = Object.fromEntries(
+        lineasT.map((l) => [l.producto?.base?.nombre ?? l.producto?.nombre, [Number(l.cantidad), Number(l.cantidadPresentada ?? l.cantidad), l.unidadEnviada]])
+      );
+      console.log(`  · 14: la transferencia #${tId} lleva → ${json(viajo)}`);
+      ok("14: la transferencia lleva aceite 2, arroz 1, fideos 1, agua 2 bultos y azúcar 1; sin yerba",
+        json(viajo) === json({ ACEITE: [2, 2, "UNIDAD"], ARROZ: [1, 1, "UNIDAD"], FIDEOS: [1, 1, "UNIDAD"], "AGUA X6": [2, 2, "BULTO"], AZUCAR: [1, 1, "UNIDAD"] }),
+        json(viajo));
+      const solTrasEnviar = await solicitadosD();
+      guardar("depositoSolicitadosTrasEnviar", solTrasEnviar);
+      ok("14: la entrada ya no lo muestra", !deEste(solTrasEnviar, p1), json(solTrasEnviar.cuerpo.items?.map((i) => i.id)));
+
+      // ── La recepción del local, para las tarjetas reales de la recepción ──
+      const recAntes = await pedir(RD.recepcion, "GET", `${B}/transferencias/detalle?id=${tId}`, D.sPin);
+      guardar("recepcionAntes", recAntes);
+      ok("14: el local ve la transferencia para recibir", recAntes.cuerpo.ok === true && (recAntes.cuerpo.item?.items?.length ?? 0) === 5, json(recAntes).slice(0, 300));
+      const lineaRec = (nombre) => recAntes.cuerpo.item.items.find((d) => d.nombre === nombre);
+      const coincide = lineaRec("ACEITE");
+      const rCoincide = await pedir(RD.revisar, "POST", `${B}/transferencias/revisar-producto`, D.sPin, { transferenciaId: tId, detalleId: coincide.id, recibido: Number(coincide.cantidad), motivoPrincipal: null });
+      ok("14: el local da el aceite por coincidente", rCoincide.cuerpo.ok === true, json(rCoincide).slice(0, 300));
+      const falta = lineaRec("ARROZ");
+      const rFalta = await pedir(RD.revisar, "POST", `${B}/transferencias/revisar-producto`, D.sPin, { transferenciaId: tId, detalleId: falta.id, recibido: 0, motivoPrincipal: "Faltante" });
+      ok("14: el local corrige el arroz a 0, Faltante", rFalta.cuerpo.ok === true, json(rFalta).slice(0, 300));
+      const recDespues = await pedir(RD.recepcion, "GET", `${B}/transferencias/detalle?id=${tId}`, D.sPin);
+      guardar("recepcionRevisada", recDespues);
+
+      // ── El otro caso: el local suma antes de que el depósito empiece ──────
+      ok("14b: el local pide aceite", (await D.fijar(D.ids.ACEITE, 1)).cuerpo.ok === true);
+      const p2 = await solicitarD();
+      const antesDeSumar = await detalleD(p2);
+      guardar("depositoDetalleAntesDeSumar", antesDeSumar);
+      const suma = await D.fijar(D.ids.SAL, 2);
+      ok("14b: sin empezar, el local suma sal", suma.cuerpo.ok === true, json(suma));
+      const trasSumar = await detalleD(p2);
+      guardar("depositoDetalleTrasSumar", trasSumar);
+      ok("14b: al volver a leer, la sal aparece sin revisar", antesDeSumar.cuerpo.item.detalles.length === 1 && trasSumar.cuerpo.item.detalles.length === 2 && lineaDe(trasSumar, "SAL")?.revisadoEn === null, json(trasSumar.cuerpo.item?.detalles));
+      const solSumado = await solicitadosD();
+      guardar("depositoSolicitadosSumado", solSumado);
+      ok("14b: en la entrada sigue Nuevo, ahora con 2", deEste(solSumado, p2)?.depositoEmpezo === false && deEste(solSumado, p2)?.itemCount === 2, json(deEste(solSumado, p2)));
+      // Quitar (la computadora) devuelve la línea a "sin decidir": no queda como
+      // un "va 0" que no viajaría.
+      const quitarRuta = await import("../../app/api/pos-transferencias/detalle/quitar/route.js");
+      const sal = lineaDe(trasSumar, "SAL");
+      ok("14b: el depósito prepara la sal", (await editarD({ detalleId: sal.detalleId, ...vaCompleto(sal) })).cuerpo.ok === true);
+      const quitada = await pedir(quitarRuta, "POST", `${B}/pos-transferencias/detalle/quitar`, sDepo, { detalleId: sal.detalleId });
+      const salQuitada = lineaDe(await detalleD(p2), "SAL");
+      ok("14b: quitada, la sal vuelve a sin decidir", quitada.cuerpo.accion === "devuelto_a_sugerido" && salQuitada?.preparado === 0 && salQuitada.revisadoEn === null, json({ quitada, salQuitada }));
+      guardar("depositoIds", { p1, p2, transferenciaId: tId, local: D.local.nombre, deposito: D.deposito.nombre, pidio: "Cuenta Grupo depósito" });
+    }
   }
 
   if (process.env.ESCRIBIR_FIXTURE_PEDIDOS) {
@@ -1068,8 +1223,13 @@ try {
     // De la regla de 9e2f438 —el pedido enviado no se tocaba—: ya no las
     // produce la ruta, y un candado montado sobre ellas probaría lo que no pasa.
     for (const vieja of ["setCantidadConPedidoEnviado", "setCantidadConPedidoEnviadoCarrera", "carritoConPedidoEnviadoEnvio"]) delete previo[vieja];
-    writeFileSync(RUTA_FIXTURE, `${JSON.stringify({ ...previo, ...lectura }, null, 2)}\n`);
-    console.log("  · fixture escrito");
+    // Lo del depósito (sección 14) va a su propio archivo, al lado de sus
+    // pantallas: `app/modulos/pos-transferencias/deposito.fixture.json`.
+    const delDeposito = (k) => k.startsWith("deposito") || k.startsWith("recepcion");
+    const deLaSeccion = (soloDeposito) => Object.fromEntries(Object.entries(lectura).filter(([k]) => delDeposito(k) === soloDeposito));
+    writeFileSync(RUTA_FIXTURE, `${JSON.stringify({ ...previo, ...deLaSeccion(false) }, null, 2)}\n`);
+    writeFileSync("app/modulos/pos-transferencias/deposito.fixture.json", `${JSON.stringify(deLaSeccion(true), null, 2)}\n`);
+    console.log("  · fixtures escritos");
   }
 } catch (e) {
   fallas.push(`la prueba se cayó: ${e?.stack || e}`);

@@ -144,6 +144,8 @@ export async function GET(req) {
         preparado,
         unidadSugerida: detalle.unidadSugerida || "BULTO",
         unidadPreparada: detalle.unidadPreparada || detalle.unidadSugerida || "BULTO",
+        // Cuándo la decidió el depósito; null si nadie. Ver `lib/pedidos/revisionDeLinea.js`.
+        revisadoEn: detalle.revisadoEn,
 
         productoNombre: productoLocal?.nombre || base?.nombre || "",
         codigoBarra: base?.codigo_barra || "",
