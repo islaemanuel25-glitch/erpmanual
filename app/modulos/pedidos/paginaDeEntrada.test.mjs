@@ -184,7 +184,15 @@ test("pedidos anteriores: los tres últimos sin el en curso, con número, estado
     assert.equal(fila.tagName, "BUTTON", "la fila no es tocable");
     const negrita = fila.querySelector(".font-semibold");
     assert.equal(negrita?.textContent, `Pedido #${a.posId}`);
-    assert.match(fila.textContent, new RegExp(`${a.estado} · \\d\\d/\\d\\d · ${a.itemCount} producto`));
+    // Decía el estado guardado ("Enviado") y siempre la fecha corta. Desde el
+    // 2026-10-22 va el estado en palabras del local —despachado con la
+    // transferencia Enviada es "En camino"— y, si es de hoy, "hoy HH:MM".
+    // Y desde cd22aa3 la ruta trae los cancelados: también están entre los
+    // anteriores. La traducción va escrita acá, no tomada de la función que
+    // se prueba.
+    const enPalabras = a.estado === "Cancelado" ? "Cancelado" : a.estado === "Enviado" && a.transferenciaEstado === "Enviada" ? "En camino" : null;
+    assert.ok(enPalabras, `el fixture trae un caso que este candado no espera: ${a.estado}/${a.transferenciaEstado}`);
+    assert.match(fila.textContent, new RegExp(`${enPalabras} · (hoy \\d\\d:\\d\\d|\\d\\d/\\d\\d) · ${a.itemCount} producto`));
     assert.match(fila.textContent, /›/);
   }
   await tocar(anteriores()[0]);

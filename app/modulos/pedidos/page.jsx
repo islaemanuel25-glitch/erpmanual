@@ -15,7 +15,6 @@ import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
-import SunmiActionCard from "@/components/sunmi/SunmiActionCard";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiListaProductoCards from "@/components/sunmi/SunmiListaProductoCards";
@@ -27,6 +26,9 @@ import { tamanoDePaginaCatalogo } from "@/lib/pedidos/tamanoDePagina";
 import { juntarPorProducto, claveDeLoEnviado } from "@/lib/pedidos/lineasDelPedido";
 import PedidosEscritorio from "@/components/pedidos/PedidosEscritorio";
 import TarjetaPedido from "@/components/pedidos/TarjetaPedido";
+import FilaDePedidoAnterior from "@/components/pedidos/FilaDePedidoAnterior";
+import { useEsEscritorio } from "@/lib/layout/useEsEscritorio";
+import { ESTADO_LOCAL, COLOR_DEL_ESTADO, estadoParaElLocal } from "@/lib/pedidos/estadoParaElLocal";
 
 // Cuántos productos por página: lo elige la persona al pie de la lista y queda
 // recordado en el celular con la clave de siempre de esta pantalla. Las
@@ -56,18 +58,6 @@ function fotosGuardadas() {
 
 const productos = (n) => (n === 1 ? "producto" : "productos");
 
-/**
- * El renglón de abajo de un pedido anterior: estado, fecha corta y, si el dato
- * está, cuántos. `itemCount` de `/api/pedidos/historial` cuenta LÍNEAS: un
- * pedido viejo con un producto repetido cuenta uno de más.
- */
-function lineaDelAnterior(a) {
-  const cuando = a.solicitadoAt ?? a.createdAt;
-  const partes = [a.estado, cuando ? diaMesAR(cuando) : null];
-  if (Number.isInteger(a.itemCount)) partes.push(`${a.itemCount} ${productos(a.itemCount)}`);
-  return partes.filter(Boolean).join(" · ");
-}
-
 /** "hoy 14:05", o la fecha corta si no es de hoy: "21/10 14:05". */
 function cuandoSeEnvio(solicitadoAt) {
   if (!solicitadoAt) return null;
@@ -93,18 +83,11 @@ function cuandoSeEnvio(solicitadoAt) {
 // Mientras no se sabe el ancho —en el servidor y en el primer render— no se
 // monta ninguna: va el mismo "Cargando..." de la pantalla. Así nunca aparece
 // la equivocada para después cambiarla.
-const CORTE_ESCRITORIO = "(min-width: 1024px)"; // `lg` de Tailwind
-
+//
+// El ancho lo dice `useEsEscritorio` (`lib/layout/useEsEscritorio.js`), que
+// salió de acá cuando el historial necesitó el mismo reparto.
 export default function PaginaPedidos() {
-  const [esEscritorio, setEsEscritorio] = useState(null);
-
-  useEffect(() => {
-    const mq = window.matchMedia(CORTE_ESCRITORIO);
-    const alCambiar = () => setEsEscritorio(mq.matches);
-    alCambiar();
-    mq.addEventListener("change", alCambiar);
-    return () => mq.removeEventListener("change", alCambiar);
-  }, []);
+  const esEscritorio = useEsEscritorio();
 
   if (esEscritorio === null) {
     return (
@@ -746,20 +729,27 @@ function PedidosCatalogoPage() {
   // puede hacer con él, y debajo los últimos pedidos. El catálogo se abre
   // desde acá.
   if (enEntrada) {
+    // El estado, en palabras del local, con la MISMA traducción que el
+    // historial y el detalle (`lib/pedidos/estadoParaElLocal.js`). Sin pedido
+    // enviado, un borrador con productos es "Borrador"; sin nada, no hay pedido.
+    const estadoEnCurso = !carritoCargado
+      ? null
+      : pendiente
+        ? estadoParaElLocal({ estado: pendiente.estado, depositoEmpezo: empezado })
+        : productosEnElCarrito > 0
+          ? ESTADO_LOCAL.BORRADOR
+          : null;
     const enCurso = !carritoCargado
       ? null
-      : empezado
-        ? "preparando"
-        : esperando
-          ? "enviado"
-          : productosEnElCarrito > 0
-            ? "borrador"
-            : "nada";
+      : {
+          [ESTADO_LOCAL.PREPARANDO]: "preparando",
+          [ESTADO_LOCAL.ENVIADO]: "enviado",
+          [ESTADO_LOCAL.BORRADOR]: "borrador",
+        }[estadoEnCurso] ?? "nada";
     // El historial trae también el pedido en curso (está Solicitado): ése va
     // en la tarjeta, no entre los anteriores.
     const delHistorial = anteriores.filter((a) => a.posId !== pendiente?.posId).slice(0, 3);
     const irAlHistorial = () => router.push("/modulos/pedidos/historial");
-    const PILL = { borrador: ["slate", "Borrador"], enviado: ["cyan", "Enviado"], preparando: ["amber", "Preparando"] };
     const accion = (texto, color, onClick, className = "") => (
       <SunmiButton color={color} className={`w-full min-h-toque ${className}`} onClick={onClick}>
         {texto}
@@ -772,7 +762,7 @@ function PedidosCatalogoPage() {
         <SunmiCard data-entrada-pedido="" className="p-4 space-y-3">
           <div className="flex items-center gap-2">
             <span className="font-semibold sunmi-text-strong">Pedido al depósito</span>
-            {PILL[enCurso] ? <SunmiPill color={PILL[enCurso][0]}>{PILL[enCurso][1]}</SunmiPill> : null}
+            {estadoEnCurso ? <SunmiPill color={COLOR_DEL_ESTADO[estadoEnCurso]}>{estadoEnCurso}</SunmiPill> : null}
           </div>
           {enCurso === null ? <p className="text-sm2 sunmi-text-muted">Cargando...</p> : null}
           {enCurso === "nada" ? (
@@ -821,18 +811,15 @@ function PedidosCatalogoPage() {
         {delHistorial.length ? (
           <section data-pedidos-anteriores="" className="space-y-2">
             <p className="text-sm2 sunmi-text-muted">Pedidos anteriores</p>
-            {/* El historial no tiene una vista por pedido —despliega cada uno
-                en su lugar—, así que cada fila lleva al historial. */}
+            {/* La misma fila que el historial (`FilaDePedidoAnterior`), con el
+                estado en palabras del local. */}
             {delHistorial.map((a) => (
-              <SunmiActionCard key={a.posId} data-pedido-anterior={a.posId} onClick={irAlHistorial}>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm3 font-semibold sunmi-text-strong">{`Pedido #${a.posId}`}</p>
-                    <p className="text-sm2 sunmi-text-muted">{lineaDelAnterior(a)}</p>
-                  </div>
-                  <span aria-hidden="true" className="sunmi-text-muted">›</span>
-                </div>
-              </SunmiActionCard>
+              <FilaDePedidoAnterior
+                key={a.posId}
+                pedido={a}
+                estado={estadoParaElLocal({ estado: a.estado, transferenciaEstado: a.transferenciaEstado })}
+                onAbrir={irAlHistorial}
+              />
             ))}
             <SunmiLinkButton onClick={irAlHistorial}>Ver todo el historial ›</SunmiLinkButton>
           </section>

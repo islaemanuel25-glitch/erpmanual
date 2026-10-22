@@ -1009,6 +1009,17 @@ try {
       const soloCancelados = await historialH("page=1&pageSize=50&estado=Cancelado");
       ok("13: ?estado=Cancelado trae solo el cancelado", json(soloCancelados.cuerpo.items?.map((i) => i.posId)) === json([pCancelado]), json(soloCancelados.cuerpo));
       guardar("historialIds", { pEnCurso, pCancelado, pRecibido, pCamino, tRecibido, localId: H.local.id });
+
+      // Un historial largo, de verdad: el local de la sección 9 hizo decenas de
+      // pedidos en las carreras. Todas sus páginas de a 50, como las pide la
+      // pantalla.
+      const largo = [await pedir(R.historial, "GET", `${B}/pedidos/historial?page=1&pageSize=50`, P.sPin)];
+      for (let p = 2; p <= largo[0].cuerpo.totalPages; p++) {
+        largo.push(await pedir(R.historial, "GET", `${B}/pedidos/historial?page=${p}&pageSize=50`, P.sPin));
+      }
+      console.log(`  · 13: historial largo → ${largo[0].cuerpo.total} pedidos en ${largo.length} páginas de 50`);
+      ok("13: el historial largo pasa de 50", largo[0].cuerpo.total > 50 && largo.length >= 2, json({ total: largo[0].cuerpo.total }));
+      guardar("historialLargo", largo);
     }
   }
 

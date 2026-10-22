@@ -72,7 +72,8 @@ const { createRoot } = await import("react-dom/client");
 const { default: PaginaPedidos } = await import("@/app/modulos/pedidos/page.jsx");
 const { UserProvider } = await import("@/app/context/UserContext.jsx");
 const { OperadorProvider } = await import("@/app/context/OperadorContext.jsx");
-const { AccionDePaginaProvider, useAccionDelShell } = await import("@/app/context/AccionDePaginaContext.jsx");
+const { AccionDePaginaProvider, useAccionDelShell, useTituloDelShell } = await import("@/app/context/AccionDePaginaContext.jsx");
+const { PathParamsContext } = await import("next/dist/shared/lib/hooks-client-context.shared-runtime.js");
 const { SunmiToaster } = await import("@/components/sunmi/SunmiToast.jsx");
 const { AppRouterContext } = await import("next/dist/shared/lib/app-router-context.shared-runtime.js");
 
@@ -91,12 +92,12 @@ export const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
  *     (por ejemplo el 409 de "hay un pedido enviado").
  *   - `historial`: lo que contesta `/api/pedidos/historial` (los pedidos
  *     anteriores de la página de entrada). Sin esto, el del local de los tres
- *     productos al entrar: ninguno.
+ *     productos al entrar: ninguno. Una lista: una respuesta por página.
  *   - `sumar`: lista de respuestas de `/api/pedidos/sumar-al-enviado`, una
  *     por confirmación. Con un ok, el carrito pasa a `trasSumar` (por defecto
  *     el real del local de los tres productos después de sumar).
  */
-function servidor({ inicio, solicitar = [], cancelar = [], local = null, setCantidad = null, historial = null, sumar = [], trasSumar = null }) {
+function servidor({ inicio, solicitar = [], cancelar = [], local = null, setCantidad = null, historial = null, sumar = [], trasSumar = null, detalles = null }) {
   const pedidos = [];
   const estado = { conPin: true, carrito: inicio };
   const colas = { solicitar: [...solicitar], cancelar: [...cancelar], sumar: [...sumar] };
@@ -114,7 +115,15 @@ function servidor({ inicio, solicitar = [], cancelar = [], local = null, setCant
       r = local ? local.catalogo(Object.fromEntries(u.searchParams)) : u.searchParams.get("categoriaId") ? real.catalogoBebidas : real.catalogo;
     }
     else if (u.pathname === "/api/pedidos/carrito") r = estado.carrito;
-    else if (u.pathname === "/api/pedidos/historial") r = historial ?? real.historialVacio;
+    else if (u.pathname === "/api/pedidos/historial") {
+      // Una lista de respuestas es una por página (`?page=`, desde 1).
+      r = Array.isArray(historial) ? historial[Number(u.searchParams.get("page") || 1) - 1] : historial ?? real.historialVacio;
+    }
+    else if (u.pathname.startsWith("/api/pedidos/historial/")) {
+      // El detalle de un pedido: el de `detalles[id]`, o el 404 de la ruta.
+      const id = u.pathname.split("/").pop();
+      r = detalles?.[id] ?? { status: 404, cuerpo: { ok: false, error: "Pedido no encontrado" } };
+    }
     else if (u.pathname === "/api/pedidos/sumar-al-enviado") {
       r = colas.sumar.shift();
       if (r?.cuerpo?.ok) estado.carrito = trasSumar ?? real.mainTrasSumar;
@@ -151,22 +160,38 @@ function FilaDelShell() {
   return React.createElement("div", { "data-fila-shell": "" }, useAccionDelShell());
 }
 
+/** El título que la pantalla le pone al shell, aparte de la fila (que las fotos comparan). */
+function TituloDelShell() {
+  const t = useTituloDelShell();
+  return React.createElement("div", { "data-titulo-shell": "" }, t ?? "");
+}
+
+// Qué página se monta y con qué parámetros de ruta: Pedidos por defecto; el
+// historial y el detalle de un pedido con `montar({ pagina, params })`.
+let paginaMontada = PaginaPedidos;
+let paramsMontados = {};
+
 function App() {
   return React.createElement(
     AppRouterContext.Provider,
     { value: router },
     React.createElement(
-      UserProvider,
-      null,
+      PathParamsContext.Provider,
+      { value: paramsMontados },
       React.createElement(
-        OperadorProvider,
+        UserProvider,
         null,
         React.createElement(
-          AccionDePaginaProvider,
+          OperadorProvider,
           null,
-          React.createElement(FilaDelShell),
-          React.createElement("main", { "data-contenido": "" }, React.createElement(PaginaPedidos)),
-          React.createElement(SunmiToaster)
+          React.createElement(
+            AccionDePaginaProvider,
+            null,
+            React.createElement(FilaDelShell),
+            React.createElement(TituloDelShell),
+            React.createElement("main", { "data-contenido": "" }, React.createElement(paginaMontada)),
+            React.createElement(SunmiToaster)
+          )
         )
       )
     )
@@ -195,6 +220,8 @@ export async function asentar(ms = 50) {
 
 export async function montar(respuestas) {
   anchoDeVentana = respuestas.ancho ?? "telefono";
+  paginaMontada = respuestas.pagina ?? PaginaPedidos;
+  paramsMontados = respuestas.params ?? {};
   const srv = servidor(respuestas);
   const raiz = document.createElement("div");
   document.body.replaceChildren(raiz);
@@ -210,7 +237,7 @@ export async function montar(respuestas) {
   // persona: el botón que abre el catálogo, o "Ver pedido" si el depósito ya lo
   // empezó (ahí no hay catálogo).
   // En la computadora no hay entrada.
-  if (!respuestas.enLaEntrada && anchoDeVentana === "telefono") await abrirDesdeLaEntrada();
+  if (!respuestas.enLaEntrada && !respuestas.pagina && anchoDeVentana === "telefono") await abrirDesdeLaEntrada();
   return { raiz, ...srv };
 }
 
@@ -242,6 +269,7 @@ export const escritorio = () => document.querySelector("[data-pedidos-escritorio
 export const texto = () => document.body.textContent;
 export const contenido = () => document.querySelector("[data-contenido]");
 export const filaShell = () => document.querySelector("[data-fila-shell]");
+export const tituloShell = () => document.querySelector("[data-titulo-shell]")?.textContent ?? "";
 export const botones = (dentro = document.body) => [...dentro.querySelectorAll("button")];
 export const boton = (etiqueta, dentro = document.body) =>
   botones(dentro).find((b) => b.textContent.trim().startsWith(etiqueta)) ?? null;

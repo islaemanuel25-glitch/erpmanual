@@ -6,6 +6,8 @@ import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import Link from "next/link";
 import { useUser } from "@/app/context/UserContext";
 import SinPermisos from "@/components/auth/SinPermisos";
+import HistorialCelular from "@/components/pedidos/HistorialCelular";
+import { useEsEscritorio } from "@/lib/layout/useEsEscritorio";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
@@ -34,7 +36,26 @@ const TRANS_BADGE_COLORS = {
   Recibida: "sunmi-state-success sunmi-text-success",
 };
 
-export default function HistorialPedidosPage() {
+// ── EL REPARTO: CELULAR O COMPUTADORA, UNA SOLA ──────────────────────────
+//
+// Por debajo de 1024 px, el historial nuevo del celular
+// (`components/pedidos/HistorialCelular.jsx`, 2026-10-22). Desde 1024 px, la
+// pantalla de siempre, más abajo, sin tocar, hasta que se diseñe la de
+// computadora. Se monta UNA, la del ancho real, como en Pedidos
+// (`useEsEscritorio`); mientras no se sabe, el mismo "Cargando...".
+export default function PaginaHistorialPedidos() {
+  const esEscritorio = useEsEscritorio();
+  if (esEscritorio === null) {
+    return (
+      <div className="min-h-screen sunmi-bg flex items-center justify-center">
+        <span className="text-sm sunmi-text-muted">Cargando...</span>
+      </div>
+    );
+  }
+  return esEscritorio ? <HistorialPedidosPage /> : <HistorialCelular />;
+}
+
+function HistorialPedidosPage() {
   const router = useRouter();
   const { perfil, cargando: cargandoUser } = useUser();
 
