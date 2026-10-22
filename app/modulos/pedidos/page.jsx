@@ -23,6 +23,7 @@ import SunmiListaProductoCards from "@/components/sunmi/SunmiListaProductoCards"
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 import { MiniaturaProductoTarjeta } from "@/components/sunmi/SunmiProductoCard";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
+import SunmiToggle from "@/components/sunmi/SunmiToggle";
 import { showSuccess } from "@/components/sunmi/SunmiToast";
 import { tamanoDePaginaCatalogo } from "@/lib/pedidos/tamanoDePagina";
 
@@ -36,6 +37,18 @@ function tamanoGuardado() {
     return tamanoDePaginaCatalogo(localStorage.getItem(CLAVE_TAMANO_DE_PAGINA));
   } catch {
     return tamanoDePaginaCatalogo(null);
+  }
+}
+
+// "Ver fotos": arranca apagado y el celular recuerda lo elegido. Sin nada
+// guardado, o si no se puede leer, apagado.
+const CLAVE_VER_FOTOS = "pedidos_ver_fotos";
+
+function fotosGuardadas() {
+  try {
+    return localStorage.getItem(CLAVE_VER_FOTOS) === "1";
+  } catch {
+    return false;
   }
 }
 
@@ -97,6 +110,14 @@ export default function PedidosCatalogoPage() {
     setPageSizeRaw(size);
     setPage(1);
     try { localStorage.setItem(CLAVE_TAMANO_DE_PAGINA, String(size)); } catch {}
+  };
+  // Se lee lo guardado ACÁ, al crear el estado, y no en un efecto: `SunmiToggle`
+  // toma su `value` una sola vez al montarse y después lleva el suyo, así que
+  // tiene que nacer con el valor bueno. Se monta recién cuando terminó la carga.
+  const [verFotos, setVerFotosRaw] = useState(fotosGuardadas);
+  const setVerFotos = (v) => {
+    setVerFotosRaw(v);
+    try { localStorage.setItem(CLAVE_VER_FOTOS, v ? "1" : "0"); } catch {}
   };
   // El "Todas · N" del filtro: el total sin buscar ni filtrar. Sale de la misma
   // respuesta del catálogo, la vez que se pide sin filtros.
@@ -438,6 +459,7 @@ export default function PedidosCatalogoPage() {
       producto={prod}
       cantidad={carrito[prod.productoLocalId] ?? 0}
       enPedido={carrito[prod.productoLocalId] != null}
+      conFoto={verFotos}
       onCantidad={(cant, uni) => setCantidad(prod.productoLocalId, cant, uni)}
     />
   );
@@ -454,7 +476,7 @@ export default function PedidosCatalogoPage() {
     lista = (
       <SunmiListaProductoCards mismoAlto={false}>
         {(pendiente.items || []).map((item, i) => (
-          <TarjetaPedido key={i} producto={item} cantidad={cantidadEnPantalla(item)} apagada />
+          <TarjetaPedido key={i} producto={item} cantidad={cantidadEnPantalla(item)} conFoto={verFotos} apagada />
         ))}
       </SunmiListaProductoCards>
     );
@@ -520,18 +542,27 @@ export default function PedidosCatalogoPage() {
           )
         }
         antesDeLista={
-          error ? (
-            <div className="mb-3 text-[11px] sunmi-text-danger sunmi-state-danger rounded-lg px-3 py-2">
-              {error}
-              <button
-                type="button"
-                className="ml-2 underline"
-                onClick={() => setError("")}
-              >
-                cerrar
-              </button>
-            </div>
-          ) : null
+          <>
+            {/* Debajo del filtro, y solo donde está el filtro: en Ver mi pedido
+                y en el pedido enviado no se ve, pero lo elegido se respeta. */}
+            {esperando || viendoPedido ? null : (
+              <div data-ver-fotos="">
+                <SunmiToggle value={verFotos} onChange={setVerFotos} label="Ver fotos" />
+              </div>
+            )}
+            {error ? (
+              <div className="mb-3 text-[11px] sunmi-text-danger sunmi-state-danger rounded-lg px-3 py-2">
+                {error}
+                <button
+                  type="button"
+                  className="ml-2 underline"
+                  onClick={() => setError("")}
+                >
+                  cerrar
+                </button>
+              </div>
+            ) : null}
+          </>
         }
         lista={lista}
         despuesDeLista={
@@ -598,7 +629,7 @@ export default function PedidosCatalogoPage() {
 // El número se puede tipear: lo escrito se manda al salir del campo (o con
 // Enter), no tecla por tecla, para que "12" no viaje como un 1 y después un 12.
 // El − y el + mandan en el acto.
-function TarjetaPedido({ producto, cantidad, enPedido = false, apagada = false, onCantidad }) {
+function TarjetaPedido({ producto, cantidad, enPedido = false, apagada = false, conFoto = false, onCantidad }) {
   const { nombre, factorPack } = producto;
   const porBulto = salePorBulto(producto);
   const unidad = porBulto ? "BULTO" : "UNIDAD";
@@ -625,10 +656,11 @@ function TarjetaPedido({ producto, cantidad, enPedido = false, apagada = false, 
     // Las dos marcas son el asidero de los candados (`pantallaPedidos.test.mjs`).
     <SunmiCard data-tarjeta-pedido={nombre} className="p-3">
       <div className="flex gap-3">
-      {/* La foto a la izquierda, ocupando su lugar siempre: sin foto, la
-          inicial en el mismo cuadrado. El pedido enviado no trae la foto
-          (`pendiente.items` no tiene `imagenUrl`), así que ahí va la inicial. */}
-      <MiniaturaProductoTarjeta url={producto.imagenUrl} conservaLugar nombre={nombre} />
+      {/* Con "Ver fotos" prendido, la foto a la izquierda ocupando su lugar
+          siempre: sin foto, la inicial en el mismo cuadrado. El pedido enviado
+          no trae la foto (`pendiente.items` no tiene `imagenUrl`), así que ahí
+          va la inicial. Apagado, no hay cuadrado y el resto usa todo el ancho. */}
+      {conFoto ? <MiniaturaProductoTarjeta url={producto.imagenUrl} conservaLugar nombre={nombre} /> : null}
       <div className="flex-1 min-w-0 space-y-2">
       <div className="flex items-start gap-2">
         <p className="flex-1 min-w-0 text-sm3 font-semibold sunmi-text-strong break-words">{nombre}</p>

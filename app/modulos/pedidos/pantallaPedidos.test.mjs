@@ -213,13 +213,23 @@ test("3. el − apagado en 0, y no muestra stock, ni código, ni categoría", as
 
 // ── LA FOTO, Y LA INICIAL EN SU LUGAR ─────────────────────────────────────
 //
-// El agua tiene foto en la base; la coca y la yerba no. El cuadrado va a la
-// izquierda, primero en la fila, siempre: con foto o con la inicial.
+// El agua tiene foto en la base; la coca y la yerba no. Con "Ver fotos"
+// prendido, el cuadrado va a la izquierda, primero en la fila, siempre: con foto
+// o con la inicial.
+//
+// Desde 2026-10-22 la foto es optativa y arranca APAGADA: estos tres candados
+// la prenden antes de montar —como la deja guardada quien tocó el
+// interruptor— y siguen afirmando lo mismo que en 538f894. Lo de apagada está
+// más abajo, en "VER FOTOS".
+
+const CLAVE_FOTOS = "pedidos_ver_fotos";
+const conFotos = () => window.localStorage.setItem(CLAVE_FOTOS, "1");
 
 /** Lo que hay en el lugar de la foto: el primer hijo de la fila de la tarjeta. */
 const lugarDeLaFoto = (t) => t.tarjeta.firstElementChild?.firstElementChild ?? null;
 
 test("FOTO: con imagenUrl, la foto; sin imagenUrl, la inicial en el mismo lugar", async () => {
+  conFotos();
   await montar({ inicio: real.carritoBorrador });
   const agua = real.catalogo.cuerpo.items.find((i) => i.nombre === "Agua x6");
   assert.ok(agua.imagenUrl, "el fixture tiene que traer la foto del agua");
@@ -242,6 +252,7 @@ test("FOTO: con imagenUrl, la foto; sin imagenUrl, la inicial en el mismo lugar"
 });
 
 test("FOTO: si la imagen falla, en el mismo lugar va la inicial", async () => {
+  conFotos();
   await montar({ inicio: real.carritoBorrador });
   await act(async () => {
     tarjeta("Agua x6").foto.dispatchEvent(new window.Event("error"));
@@ -254,6 +265,7 @@ test("FOTO: si la imagen falla, en el mismo lugar va la inicial", async () => {
 });
 
 test("FOTO: en Ver mi pedido y en el pedido enviado, el mismo cuadrado", async () => {
+  conFotos();
   await montar({ inicio: real.carritoBorrador });
   await tocar(boton("Ver mi pedido ›"));
   assert.ok(tarjeta("Agua x6").foto, "Ver mi pedido: el carrito trae la foto del agua");
@@ -263,11 +275,94 @@ test("FOTO: en Ver mi pedido y en el pedido enviado, el mismo cuadrado", async (
   // Lo enviado no trae la foto: `pendiente.items` no tiene `imagenUrl`. Va la
   // inicial en las dos, y el lugar se conserva igual.
   assert.ok(real.carritoPendiente.cuerpo.pendiente.items.every((i) => !("imagenUrl" in i)));
+  conFotos();
   await montar({ inicio: pendienteDel(new Date()) });
   for (const t of tarjetas()) {
     assert.ok(t.inicial, `${t.nombre}: el pedido enviado tiene que conservar el cuadrado`);
     assert.ok(lugarDeLaFoto(t) === t.inicial);
   }
+});
+
+// ── VER FOTOS ─────────────────────────────────────────────────────────────
+//
+// El interruptor arranca APAGADO y el celular recuerda lo elegido con la clave
+// `pedidos_ver_fotos`. `SunmiToggle` toma su valor una sola vez al montarse,
+// así que lo guardado se lee antes: si naciera apagado y se prendiera después,
+// el interruptor seguiría mostrando "apagado" con las fotos a la vista.
+
+const interruptor = () => document.querySelector("[data-ver-fotos]");
+/** El riel del interruptor: ámbar prendido, gris apagado (los de `SunmiToggle`). */
+const prendido = () => interruptor()?.querySelector(".rounded-full")?.className.includes("bg-amber-400");
+const sinCuadrado = () => tarjetas().every((t) => !t.foto && !t.inicial);
+
+test("VER FOTOS: arranca apagado, y apagado no hay cuadrado y el nombre usa todo el ancho", async () => {
+  await montar({ inicio: real.carritoBorrador });
+  assert.ok(interruptor(), "falta el interruptor");
+  assert.match(interruptor().textContent, /Ver fotos/);
+  assert.equal(prendido(), false, "tiene que arrancar apagado");
+  assert.ok(sinCuadrado(), "apagado se dibujó una foto o una inicial");
+  // Lo primero de la fila es la columna del nombre: el cuadrado no se reserva.
+  const agua = tarjeta("Agua x6");
+  assert.match(lugarDeLaFoto(agua).className, /flex-1 min-w-0/, "apagado, el lugar de la foto sigue ocupado");
+  // Va debajo del filtro de Categoría, antes de la lista.
+  const orden = document.body.innerHTML;
+  assert.ok(orden.indexOf('id="categoria-pedido"') < orden.indexOf("data-ver-fotos"), "el interruptor no está debajo del filtro");
+  assert.ok(orden.indexOf("data-ver-fotos") < orden.indexOf("data-tarjeta-pedido"), "el interruptor quedó después de la lista");
+});
+
+test("VER FOTOS: prenderlo dibuja foto o inicial, y queda guardado; apagarlo lo saca", async () => {
+  await montar({ inicio: real.carritoBorrador });
+  await tocar(interruptor().firstElementChild);
+  assert.equal(prendido(), true);
+  assert.equal(window.localStorage.getItem(CLAVE_FOTOS), "1", "no quedó guardado prendido");
+  assert.ok(tarjeta("Agua x6").foto, "prendido, el agua tiene que mostrar su foto");
+  assert.equal(tarjeta("Coca 2L").inicial?.textContent, "C", "prendido, la coca tiene que mostrar su inicial");
+
+  await tocar(interruptor().firstElementChild);
+  assert.equal(prendido(), false);
+  assert.equal(window.localStorage.getItem(CLAVE_FOTOS), "0", "no quedó guardado apagado");
+  assert.ok(sinCuadrado());
+});
+
+test("VER FOTOS: lo guardado se lee antes de montar el interruptor", async () => {
+  conFotos();
+  await montar({ inicio: real.carritoBorrador });
+  assert.equal(prendido(), true, "el interruptor arrancó apagado con las fotos guardadas prendidas");
+  assert.ok(tarjeta("Agua x6").foto);
+});
+
+test("VER FOTOS: si el celular no deja leer, apagado", async () => {
+  // Guardado PRENDIDO: si la lectura no tirara, arrancaría prendido y el
+  // candado lo vería. Así el caso distingue "tiró y quedó apagado" de "no
+  // había nada".
+  window.localStorage.setItem(CLAVE_FOTOS, "1");
+  // En jsdom `localStorage` es un proxy: un `defineProperty` sobre la instancia
+  // guarda un dato llamado "getItem" y no reemplaza nada. Se tapa en el
+  // prototipo, que es por donde pasa la llamada de la pantalla.
+  const proto = window.Storage.prototype;
+  const original = proto.getItem;
+  proto.getItem = () => {
+    throw new Error("SecurityError");
+  };
+  try {
+    await montar({ inicio: real.carritoBorrador });
+    assert.equal(prendido(), false);
+    assert.ok(sinCuadrado());
+  } finally {
+    proto.getItem = original;
+  }
+});
+
+test("VER FOTOS: en Ver mi pedido y en el pedido enviado no se ve, pero se respeta", async () => {
+  await montar({ inicio: real.carritoBorrador });
+  await tocar(boton("Ver mi pedido ›"));
+  assert.ok(!interruptor(), "en Ver mi pedido no va el interruptor");
+  assert.ok(sinCuadrado(), "apagado, Ver mi pedido mostró fotos");
+  await desmontarTodo();
+
+  await montar({ inicio: pendienteDel(new Date()) });
+  assert.ok(!interruptor(), "en el pedido enviado no va el interruptor");
+  assert.ok(sinCuadrado(), "apagado, el pedido enviado mostró iniciales");
 });
 
 test("3. lo tipeado se manda al salir del campo, no tecla por tecla", async () => {
