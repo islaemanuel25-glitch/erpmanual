@@ -1,6 +1,6 @@
 # Modulo: POS Transferencias
 
-**Última actualización:** 2026-10-12 04:39
+**Última actualización:** 2026-10-22 18:19
 
 ## Ubicacion
 - UI: `app/modulos/pos-transferencias/page.jsx`, `app/modulos/pos-transferencias/nueva/page.jsx`
@@ -105,6 +105,8 @@ model PosTransferenciaDetalle {
 ```
 
 ## Cambios recientes
+- 2026-10-22: feat(pedidos): el local no cancela un pedido que el depósito ya empezó (pantalla SIN VERIFICAR en el celular)
+- 2026-10-22: feat(pedidos): sumar al pedido enviado hasta que el depósito lo empieza
 - 2026-10-12: feat: cancelar un pedido lo marca en vez de borrarlo
 - 2026-09-13: fix(transferencias): el criterio es el CLIENTE VINCULADO, y vale en las tres pantallas
 - 2026-09-13: fix(transferencias): el local dado de baja, y una sola puerta para los destinos

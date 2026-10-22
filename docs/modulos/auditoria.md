@@ -1,6 +1,6 @@
 # Modulo: Bitácora de auditoría
 
-**Última actualización:** 2026-08-09 17:07
+**Última actualización:** 2026-10-22 18:19
 
 ## Ubicacion
 - UI: `app/modulos/auditoria/page.jsx`
@@ -38,6 +38,8 @@ paralelo a las islas existentes (AuditoriaStock, PrecioUpdate), que no reemplaza
 - `lib/authorize.js` (`requirePerm`)
 
 ## Cambios recientes
+- 2026-10-22: feat(pedidos): sumar al pedido enviado con confirmación, todos los cambios juntos (pantalla SIN VERIFICAR en el celular)
+- 2026-10-22: feat(pedidos): sumar al pedido enviado hasta que el depósito lo empieza
 - 2026-08-09: fix(auditoria): la referencia al cliente base va anclada en globalThis
 - 2026-08-09: fix(auditoria): la referencia al cliente base va anclada en globalThis
 - 2026-08-09: fix(auditoria): la referencia al cliente base va anclada en globalThis

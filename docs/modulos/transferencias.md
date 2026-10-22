@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-21 01:34
+**Última actualización:** 2026-10-22 18:19
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,8 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-22: fix(kit): el pie de SunmiPantallaDeTrabajo queda clavado abajo de la pantalla, con su lugar reservado medido (SIN VERIFICAR en navegador)
+- 2026-10-22: fix(comprobantes): una factura cuya letra no se leyó no se propone como receta "sin factura" (SIN VERIFICAR contra el modelo real)
 - 2026-10-21: fix: diferencias del control — Faltante y Sobrante en su renglón, y la cabecera del control en vez del segundo título (pantalla SIN VERIFICAR en navegador)
 - 2026-10-20: feat: control de stock — terminar pregunta qué hacer con lo no contado, y "Terminar control" va en la cabecera (pantalla SIN VERIFICAR en navegador)
 - 2026-10-20: feat: control de stock — la parte de arriba de recibir transferencia, y nada se guarda solo (pantalla SIN VERIFICAR en navegador)

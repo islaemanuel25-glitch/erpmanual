@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-10-22] - Actualización: auditoria, pos-transferencias, productos, transferencias
+
+### Modificado
+- **auditoria**: feat(pedidos): sumar al pedido enviado con confirmación, todos los cambios juntos (pantalla SIN VERIFICAR en el celular)
+- **auditoria**: feat(pedidos): sumar al pedido enviado hasta que el depósito lo empieza
+- **pos-transferencias**: feat(pedidos): el local no cancela un pedido que el depósito ya empezó (pantalla SIN VERIFICAR en el celular)
+- **pos-transferencias**: feat(pedidos): sumar al pedido enviado hasta que el depósito lo empieza
+- **productos**: feat(pedidos): la foto del producto a la izquierda de cada tarjeta, con la inicial si no hay (pantalla SIN VERIFICAR en navegador)
+- **transferencias**: fix(kit): el pie de SunmiPantallaDeTrabajo queda clavado abajo de la pantalla, con su lugar reservado medido (SIN VERIFICAR en navegador)
+- **transferencias**: fix(comprobantes): una factura cuya letra no se leyó no se propone como receta "sin factura" (SIN VERIFICAR contra el modelo real)
+
+
 ## [2026-10-21] - Actualización: stock, transferencias, reportes-ventas, pos-ventas
 
 ### Modificado

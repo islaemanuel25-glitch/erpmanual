@@ -1,6 +1,6 @@
 # Modulo: Productos
 
-**Última actualización:** 2026-10-18 00:06
+**Última actualización:** 2026-10-22 18:19
 
 ## Ubicacion
 - UI: `app/modulos/productos/page.jsx`
@@ -102,6 +102,7 @@ model ProductoLocal {
 ```
 
 ## Cambios recientes
+- 2026-10-22: feat(pedidos): la foto del producto a la izquierda de cada tarjeta, con la inicial si no hay (pantalla SIN VERIFICAR en navegador)
 - 2026-10-18: fix: el dueño de un local crea y edita sus propios proveedores
 - 2026-09-30: feat(stock): cada movimiento del Libro de Stock nombra su documento
 - 2026-09-28: fix: separar compra por bulto de la divergencia con los escritores

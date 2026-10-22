@@ -1,44 +1,26 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-21 01:34
+**Fecha:** 2026-10-22 18:19
 
 ## Módulos modificados recientemente
 
-### stock
-- fix: diferencias del control — Faltante y Sobrante en su renglón, y la cabecera del control en vez del segundo título (pantalla SIN VERIFICAR en navegador), feat: control de stock — terminar pregunta qué hacer con lo no contado, y "Terminar control" va en la cabecera (pantalla SIN VERIFICAR en navegador), feat: control de stock — la parte de arriba de recibir transferencia, y nada se guarda solo (pantalla SIN VERIFICAR en navegador)
-- Archivos: 17 nuevos, 6 modificados (23 total)
-
-### transferencias
-- fix: diferencias del control — Faltante y Sobrante en su renglón, y la cabecera del control en vez del segundo título (pantalla SIN VERIFICAR en navegador), feat: control de stock — terminar pregunta qué hacer con lo no contado, y "Terminar control" va en la cabecera (pantalla SIN VERIFICAR en navegador), feat: control de stock — la parte de arriba de recibir transferencia, y nada se guarda solo (pantalla SIN VERIFICAR en navegador)
-- Archivos: 2 modificados (2 total)
-
-### reportes-ventas
-- feat: control de stock — la parte de arriba de recibir transferencia, y nada se guarda solo (pantalla SIN VERIFICAR en navegador)
+### auditoria
+- feat(pedidos): sumar al pedido enviado con confirmación, todos los cambios juntos (pantalla SIN VERIFICAR en el celular), feat(pedidos): sumar al pedido enviado hasta que el depósito lo empieza
 - Archivos: 1 modificados (1 total)
 
-### pos-ventas
-- feat: control de stock — lo contado sale del chip, un código muestra solo ese producto y el texto se busca como en la caja (pantalla SIN VERIFICAR en navegador), feat: Control de stock es la pantalla de Stock con un campo "Contado" por tarjeta (pantalla SIN VERIFICAR en navegador), feat: Control de stock, conteo físico por local (pantalla SIN VERIFICAR en navegador)
-- Archivos: 3 modificados (3 total)
+### pos-transferencias
+- feat(pedidos): el local no cancela un pedido que el depósito ya empezó (pantalla SIN VERIFICAR en el celular), feat(pedidos): sumar al pedido enviado hasta que el depósito lo empieza
+- Archivos: 5 modificados (5 total)
+
+### productos
+- feat(pedidos): la foto del producto a la izquierda de cada tarjeta, con la inicial si no hay (pantalla SIN VERIFICAR en navegador)
+- Archivos: 1 modificados (1 total)
+
+### transferencias
+- fix(kit): el pie de SunmiPantallaDeTrabajo queda clavado abajo de la pantalla, con su lugar reservado medido (SIN VERIFICAR en navegador), fix(comprobantes): una factura cuya letra no se leyó no se propone como receta "sin factura" (SIN VERIFICAR contra el modelo real)
+- Archivos: 2 modificados (2 total)
 
 
-## Archivos nuevos desde última sincronización
-- components/stock_locales/control/PantallaControlStock.jsx
-- components/stock_locales/control/controlStock.test.mjs
-- components/stock_locales/control/tarjetaConteo.toque.test.mjs
-- app/api/stock_locales/control/terminar/route.js
-- components/stock_locales/control/lecturaReal.fixture.json
-- components/stock_locales/control/useControlStock.js
-- components/stock_locales/control/TarjetaConteo.jsx
-- components/stock_locales/tarjetaStockDesglose.dom.test.mjs
-- app/modulos/stock_locales/control/page.jsx
-- app/api/stock_locales/control/revision/route.js
-- app/api/stock_locales/control/conteos/route.js
-- app/api/stock_locales/control/diferencias/route.js
-- app/api/stock_locales/control/productos/route.js
-- app/api/stock_locales/control/conteos/[id]/route.js
-- app/api/stock_locales/control/producto/route.js
-- app/api/stock_locales/control/route.js
-- app/api/stock_locales/control/abrir/route.js
 
 ## Acción recomendada
 ✅ Subir archivos nuevos al Proyecto Claude en claude.ai
