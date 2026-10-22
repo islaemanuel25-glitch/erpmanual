@@ -233,6 +233,74 @@ try {
     ok("el carrito ya no tiene pendiente", k.cuerpo.ok === true && k.cuerpo.pendiente === null && k.cuerpo.itemCount === 0, json(k));
   }
 
+  seccion("6. Cuántos por página: 25, 50, 100, inválido y sin valor");
+  {
+    // Un grupo aparte con 120 productos del depósito: con los tres de arriba
+    // cualquier tamaño trae los tres en una página y no se distingue nada.
+    const g = await c.grupo.create({ data: { nombre: `Grupo paginado ${marca}` } });
+    await c.configuracionGrupo.create({ data: { grupoId: g.id } });
+    const local = await c.local.create({ data: { nombre: `Mini paginado ${marca}` } });
+    const deposito = await c.local.create({ data: { nombre: `Depósito paginado ${marca}`, es_deposito: true } });
+    await c.grupoLocal.create({ data: { grupoId: g.id, localId: local.id } });
+    await c.grupoDeposito.create({ data: { grupoId: g.id, localId: deposito.id } });
+    for (const l of [local, deposito]) await c.configuracionLocal.create({ data: { localId: l.id } });
+    const otra = await c.usuario.create({
+      data: { nombre: "Cuenta paginado", email: `paginado-${marca}@ci.local`, passwordHash: "x", rolId: rolEnc.id, localId: local.id },
+    });
+    const TOTAL = 120;
+    for (let i = 1; i <= TOTAL; i++) {
+      const n = String(i).padStart(3, "0");
+      const b = await c.productoBase.create({
+        data: { grupoId: g.id, nombre: `Producto ${n}`, codigo_barra: `78${marca}${n}`.slice(0, 13) + n, unidad_medida: "unidad", precio_costo: 600, precio_venta: 1000, redondeo_100: false, activo: true },
+      });
+      await c.productoLocal.create({ data: { localId: deposito.id, baseId: b.id, activo: true, precio_costo: 600, precio_venta: 1000 } });
+    }
+    const s = `erpazul_sesion=${jwt.sign(
+      { id: otra.id, nombre: otra.nombre, email: otra.email, rolId: otra.rolId, rolNombre: "ENCARGADO", permisos, esDuenoLocal: false, localId: local.id, esDeposito: false },
+      process.env.AUTH_SECRET,
+      { expiresIn: "1h" }
+    )}`;
+    const catalogo = (qs) => pedir(R.catalogo, "GET", `${B}/pedidos/catalogo?${qs}`, s);
+    const resumen = (r) => ({ status: r.status, items: r.cuerpo.items?.length, total: r.cuerpo.total, pageSize: r.cuerpo.pageSize, totalPages: r.cuerpo.totalPages, page: r.cuerpo.page });
+
+    // Lo que la pantalla de este local lee al entrar, para montarla entera: su
+    // perfil, su operadora con PIN, sus opciones y su carrito (vacío).
+    const bea = await c.operadorLocal.create({ data: { nombre: "Bea", pinHash: "x", localId: local.id } });
+    const pinBea = `erpazul_operador_activo=${jwt.sign({ operadorId: bea.id, nombre: bea.nombre, localId: local.id, _tipo: "operador", emitidoEn: Date.now() }, process.env.AUTH_SECRET)}`;
+    guardar("paginadoMe", await pedir(R.me, "GET", `${B}/me`, s));
+    guardar("paginadoOperadorMe", await pedir(R.operadorMe, "GET", `${B}/operador/me`, `${s}; ${pinBea}`));
+    guardar("paginadoOpciones", await pedir(R.opciones, "GET", `${B}/pedidos/opciones`, s));
+    guardar("paginadoCarrito", await carrito(s));
+
+    const casos = [
+      ["paginado25", "page=1&pageSize=25", 25, 25, 5],
+      ["paginado50", "page=1&pageSize=50", 50, 50, 3],
+      ["paginado100", "page=1&pageSize=100", 100, 100, 2],
+      ["paginadoInvalido", "page=1&pageSize=30", 50, 50, 3],
+      ["paginadoSinValor", "page=1", 50, 50, 3],
+    ];
+    for (const [clave, qs, tamano, items, paginas] of casos) {
+      const r = await catalogo(qs);
+      guardar(clave, r);
+      const v = resumen(r);
+      console.log(`  · ${qs.padEnd(22)} → ${v.items} productos, ${v.totalPages} páginas de ${v.pageSize}, total ${v.total}`);
+      ok(`${qs}: ${items} productos, ${paginas} páginas de ${tamano}`, v.status === 200 && v.items === items && v.pageSize === tamano && v.totalPages === paginas && v.total === TOTAL, json(v));
+    }
+    // La página 2 de 50, para que la pantalla pueda estar en otra página antes
+    // de cambiar el tamaño.
+    guardar("paginado50p2", await catalogo("page=2&pageSize=50"));
+    // La última de 100 trae los 20 que sobran, y los nombres siguen en orden.
+    const ultima = await catalogo("page=2&pageSize=100");
+    ok("la página 2 de 100 trae los 20 que quedan, del 101 al 120",
+      ultima.cuerpo.items?.length === 20 && ultima.cuerpo.items[0].nombre === "Producto 101" && ultima.cuerpo.items.at(-1).nombre === "Producto 120",
+      json(resumen(ultima)));
+    // Otros inválidos: todos dan 50, como hoy.
+    for (const malo of ["abc", "0", "-25", "50abc", "1000", "25.5", ""]) {
+      const r = await catalogo(`page=1&pageSize=${encodeURIComponent(malo)}`);
+      ok(`pageSize="${malo}" da 50`, r.cuerpo.pageSize === 50 && r.cuerpo.items?.length === 50, json(resumen(r)));
+    }
+  }
+
   if (process.env.ESCRIBIR_FIXTURE_PEDIDOS) {
     writeFileSync("app/modulos/pedidos/enviarCancelar.fixture.json", `${JSON.stringify(lectura, null, 2)}\n`);
     console.log("  · fixture escrito");

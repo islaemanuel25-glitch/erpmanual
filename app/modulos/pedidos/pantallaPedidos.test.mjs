@@ -78,7 +78,10 @@ test("2. un solo filtro, Categoría, con Todas y el total; no se manda proveedor
   assert.ok(buscador(), "el buscador con su placeholder");
   assert.ok(categoria(), "el desplegable de categoría");
   assert.match(contenido().textContent, /Categoría/);
-  assert.doesNotMatch(contenido().textContent, /Proveedor|Área|Mostrar/, "ni proveedor, ni área, ni tamaño de página");
+  // Decía también "ni tamaño de página": el rediseño lo había sacado. Volvió el
+  // 2026-10-22 a pedido de Emanuel, al pie de la lista junto al paginador, y lo
+  // afirma `porPagina.test.mjs`. Proveedor y área siguen afuera.
+  assert.doesNotMatch(contenido().textContent, /Proveedor|Área/, "ni proveedor ni área");
 
   // Abierto: "Todas · 3" y las dos por nombre, sin cantidad.
   await tocar(categoria().querySelector("button"));

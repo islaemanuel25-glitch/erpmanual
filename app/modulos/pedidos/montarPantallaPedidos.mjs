@@ -56,8 +56,11 @@ export const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
  * El servidor.
  *   - `inicio`: la respuesta del carrito al entrar.
  *   - `solicitar` / `cancelar`: lista de respuestas, una por pedido, en orden.
+ *   - `local`: para montar la pantalla de OTRO local del fixture —el de los
+ *     120 productos—: `{ me, operadorMe, opciones, catalogo(params) }`, todas
+ *     respuestas reales de ese local. Sin esto, el local de los tres productos.
  */
-function servidor({ inicio, solicitar = [], cancelar = [] }) {
+function servidor({ inicio, solicitar = [], cancelar = [], local = null }) {
   const pedidos = [];
   const estado = { conPin: true, carrito: inicio };
   const colas = { solicitar: [...solicitar], cancelar: [...cancelar] };
@@ -67,11 +70,13 @@ function servidor({ inicio, solicitar = [], cancelar = [] }) {
     const cuerpo = opciones.body ? JSON.parse(opciones.body) : null;
     pedidos.push({ ruta: u.pathname, metodo, params: Object.fromEntries(u.searchParams), cuerpo });
     let r = { status: 200, cuerpo: { ok: true } };
-    if (u.pathname === "/api/me") r = real.me;
-    else if (u.pathname === "/api/operador/me") r = estado.conPin ? real.operadorMeConPin : real.operadorMeSinPin;
+    if (u.pathname === "/api/me") r = local ? local.me : real.me;
+    else if (u.pathname === "/api/operador/me") r = local ? local.operadorMe : estado.conPin ? real.operadorMeConPin : real.operadorMeSinPin;
     else if (u.pathname === "/api/operador/listar") r = real.operadorListar;
-    else if (u.pathname === "/api/pedidos/opciones") r = real.opciones;
-    else if (u.pathname === "/api/pedidos/catalogo") r = u.searchParams.get("categoriaId") ? real.catalogoBebidas : real.catalogo;
+    else if (u.pathname === "/api/pedidos/opciones") r = local ? local.opciones : real.opciones;
+    else if (u.pathname === "/api/pedidos/catalogo") {
+      r = local ? local.catalogo(Object.fromEntries(u.searchParams)) : u.searchParams.get("categoriaId") ? real.catalogoBebidas : real.catalogo;
+    }
     else if (u.pathname === "/api/pedidos/carrito") r = estado.carrito;
     else if (u.pathname === "/api/pedidos/set-cantidad") r = cuerpo?.unidad === "BULTO" ? real.setCantidad_BULTO : real.setCantidad_UNIDAD;
     else if (u.pathname === "/api/pos-transferencias/solicitar") {
@@ -123,6 +128,9 @@ export async function desmontarTodo() {
   for (const r of montadas) await act(async () => r.unmount());
   montadas = [];
   dialogosNativos.length = 0;
+  // El tamaño de página queda guardado en el celular: un caso no le deja el
+  // suyo al siguiente.
+  dom.window.localStorage.clear();
 }
 
 export async function asentar(ms = 50) {

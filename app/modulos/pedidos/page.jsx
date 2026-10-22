@@ -24,10 +24,20 @@ import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 import { MiniaturaProductoTarjeta } from "@/components/sunmi/SunmiProductoCard";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import { showSuccess } from "@/components/sunmi/SunmiToast";
+import { tamanoDePaginaCatalogo } from "@/lib/pedidos/tamanoDePagina";
 
-// El selector de tamaño de página se fue de la pantalla: el catálogo se pide
-// siempre de a 50, que era el tamaño por defecto.
-const TAMANO_DE_PAGINA = 50;
+// Cuántos productos por página: lo elige la persona al pie de la lista y queda
+// recordado en el celular con la clave de siempre de esta pantalla. Las
+// opciones y el 50 por defecto son los de la ruta: `lib/pedidos/tamanoDePagina`.
+const CLAVE_TAMANO_DE_PAGINA = "pedidos_page_size";
+
+function tamanoGuardado() {
+  try {
+    return tamanoDePaginaCatalogo(localStorage.getItem(CLAVE_TAMANO_DE_PAGINA));
+  } catch {
+    return tamanoDePaginaCatalogo(null);
+  }
+}
 
 /** Si el producto se pide por bulto. Es el criterio de siempre de la pantalla. */
 const salePorBulto = (p) => p.modoEnvio === "SOLO_BULTO" && p.factorPack > 1;
@@ -80,6 +90,14 @@ export default function PedidosCatalogoPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [pageSize, setPageSizeRaw] = useState(tamanoGuardado);
+  // Cambiar el tamaño vuelve a la página 1: el efecto de los filtros mira
+  // `pageSize` y vuelve a pedir el catálogo desde el principio.
+  const setPageSize = (size) => {
+    setPageSizeRaw(size);
+    setPage(1);
+    try { localStorage.setItem(CLAVE_TAMANO_DE_PAGINA, String(size)); } catch {}
+  };
   // El "Todas · N" del filtro: el total sin buscar ni filtrar. Sale de la misma
   // respuesta del catálogo, la vez que se pide sin filtros.
   const [totalCatalogo, setTotalCatalogo] = useState(null);
@@ -157,7 +175,7 @@ export default function PedidosCatalogoPage() {
     async (p = 1) => {
       setLoadingCat(true);
       try {
-        const params = new URLSearchParams({ page: p, pageSize: TAMANO_DE_PAGINA });
+        const params = new URLSearchParams({ page: p, pageSize });
         if (busqueda.trim()) params.set("q", busqueda.trim());
         if (categoriaId) params.set("categoriaId", categoriaId);
 
@@ -178,10 +196,10 @@ export default function PedidosCatalogoPage() {
       }
       setLoadingCat(false);
     },
-    [busqueda, categoriaId]
+    [busqueda, categoriaId, pageSize]
   );
 
-  // Cargar al montar y cuando cambian los filtros
+  // Cargar al montar y cuando cambian los filtros o el tamaño de página
   useEffect(() => {
     if (!opciones) return;
 
@@ -513,15 +531,20 @@ export default function PedidosCatalogoPage() {
         }
         lista={lista}
         despuesDeLista={
-          !esperando && !viendoPedido && totalPages > 1 ? (
+          // Va aunque haya una sola página: adentro está el elegidor de 25, 50 o
+          // 100 (las opciones por defecto de `SunmiPageSizer`, las mismas de la
+          // ruta), y si se escondiera, quien eligió 100 y le entró todo en una
+          // no podría volver a 25. Sin productos no hay nada que paginar.
+          !esperando && !viendoPedido && total > 0 ? (
             <SunmiPaginador
               page={page}
-              pageSize={TAMANO_DE_PAGINA}
+              pageSize={pageSize}
               totalPages={totalPages}
               totalItems={total}
               onPrev={() => cargarCatalogo(Math.max(1, page - 1))}
               onNext={() => cargarCatalogo(Math.min(totalPages, page + 1))}
               onGoToPage={(p) => cargarCatalogo(p)}
+              onPageSizeChange={setPageSize}
             />
           ) : null
         }

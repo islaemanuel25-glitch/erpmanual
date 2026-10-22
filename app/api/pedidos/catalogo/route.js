@@ -4,8 +4,7 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { productoVisibleWhere } from "@/lib/visibilidad";
 import { defaultModoEnvio } from "@/lib/conversiones/stock";
-
-const PAGE_SIZE = 50;
+import { tamanoDePaginaCatalogo } from "@/lib/pedidos/tamanoDePagina";
 
 export async function GET(req) {
   try {
@@ -60,6 +59,8 @@ export async function GET(req) {
     // Filtros
     const { searchParams } = new URL(req.url);
     const page = Math.max(Number(searchParams.get("page") || 1), 1);
+    // 25, 50 o 100, lo que eligió la pantalla; cualquier otra cosa, 50.
+    const PAGE_SIZE = tamanoDePaginaCatalogo(searchParams.get("pageSize"));
     const q = (searchParams.get("q") || "").trim();
     const categoriaId = searchParams.get("categoriaId")
       ? Number(searchParams.get("categoriaId"))
