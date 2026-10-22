@@ -267,11 +267,14 @@ try {
   // ═════════════════════════════════════════════════════════════════════════
   {
     const ck = await cookieDe(U.encA);
+    // El historial es la EXCEPCIÓN desde el 2026-10-22 (cd22aa3): el del celular
+    // tiene el filtro "Cancelados", así que lo lista, como Cancelado. Ver las
+    // excepciones de `lib/pedidos/sinCancelados.test.mjs`.
     const hist = await get(R.historial, "http://ci/api/pedidos/historial", ck);
-    igual("historial: no lo lista y el total es 0", [hist.items?.length, hist.total ?? hist.pagination?.total], [0, 0]);
-    for (const estado of ["Solicitado", "Enviado", "Cancelado"]) {
+    igual("historial: lo lista, como Cancelado", [hist.items?.map((i) => [i.posId, i.estado]), hist.total], [[[p1, "Cancelado"]], 1]);
+    for (const [estado, cuantos] of [["Solicitado", 0], ["Enviado", 0], ["Cancelado", 1]]) {
       const h = await get(R.historial, `http://ci/api/pedidos/historial?estado=${estado}`, ck);
-      igual(`historial con estado=${estado}: nada`, h.items?.length, 0);
+      igual(`historial con estado=${estado}: ${cuantos}`, h.items?.length, cuantos);
     }
     const car = await get(R.carrito, "http://ci/api/pedidos/carrito", ck);
     igual("carrito: sin pedido pendiente y sin borrador revivido", [car.pendiente ?? null, car.posId ?? car.carrito?.posId ?? null], [null, null]);
@@ -296,7 +299,7 @@ try {
   const rs2 = await solicitar(U.encA, p2);
   igual("y se solicita: el cancelado no bloquea al mismo depósito", rs2.status, 200);
   igual("el carrito avisa el pedido nuevo como pendiente", (await get(R.carrito, "http://ci/api/pedidos/carrito", await cookieDe(U.encA))).pendiente?.posId, p2);
-  igual("el historial lista solo el nuevo", (await get(R.historial, "http://ci/api/pedidos/historial", await cookieDe(U.encA))).items?.map((i) => i.id ?? i.posId), [p2]);
+  igual("el historial lista el nuevo arriba y el cancelado abajo", (await get(R.historial, "http://ci/api/pedidos/historial", await cookieDe(U.encA))).items?.map((i) => i.id ?? i.posId), [p2, p1]);
   igual("el depósito ve solo el nuevo en solicitados", (await get(R.solicitados, "http://ci/api/pos-transferencias/solicitados", await cookieDe(U.dep))).items?.map((i) => i.id), [p2]);
 
   // ═════════════════════════════════════════════════════════════════════════
