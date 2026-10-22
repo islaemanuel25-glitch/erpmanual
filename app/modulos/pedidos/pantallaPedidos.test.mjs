@@ -181,7 +181,10 @@ test("3. la ✕ solo en lo pedido, y pone la cantidad en 0", async () => {
   await tocar(tarjeta("Coca 2L").quitar);
   assert.deepEqual(setCantidades(pedidos).at(-1), { productoLocalId: real.catalogo.cuerpo.items.find((i) => i.nombre === "Coca 2L").productoLocalId, cantidad: 0, unidad: "UNIDAD" });
   assert.ok(!tarjeta("Coca 2L").quitar, "sacada del pedido, la ✕ se va");
-  assert.equal(tarjeta("Coca 2L").campo.value, "0");
+  // Decía `value === "0"`. Desde 2026-10-22 el 0 es GUÍA, no un número
+  // cargado: el campo queda vacío y el 0 va de placeholder.
+  assert.equal(tarjeta("Coca 2L").campo.value, "");
+  assert.equal(tarjeta("Coca 2L").campo.getAttribute("placeholder"), "0");
 });
 
 test("3. Por BULTO de N u contra UNIDAD, y la cantidad viaja en esa unidad", async () => {
@@ -382,6 +385,124 @@ test("3. lo tipeado se manda al salir del campo, no tecla por tecla", async () =
   await asentar();
   assert.equal(setCantidades(pedidos).length, antes + 1, "al salir, una sola vez");
   assert.equal(setCantidades(pedidos).at(-1).cantidad, 12);
+});
+
+// ── EL 0 ES GUÍA, Y LO QUE SE ESCRIBE REEMPLAZA ───────────────────────────
+//
+// Con el teclado abierto sobre un producto en 0, el 0 quedaba escrito y se le
+// sumaba lo tipeado. Ahora Pedidos prende `minimoComoGuia` de la pieza: en 0 el
+// campo está vacío con "0" de placeholder, y al tocar un número lo que se
+// escribe lo reemplaza. Al salir, vacío vale 0 y sin cambio no se manda nada.
+
+/** Lo que dejó el teclado en el campo, y el `input` que escucha React. */
+async function teclear(campo, texto) {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set.call(campo, texto);
+    campo.dispatchEvent(new window.Event("input", { bubbles: true }));
+  });
+}
+async function entrar(campo) {
+  await act(async () => {
+    campo.focus();
+    await new Promise((r) => setTimeout(r, 5));
+  });
+}
+async function salir(campo) {
+  await act(async () => campo.blur());
+  await asentar();
+}
+
+test("GUÍA: en 0 el campo está vacío con 0 de placeholder; con cantidad, el número", async () => {
+  await montar({ inicio: real.carritoBorrador });
+  const yerba = tarjeta("Yerba 1kg").campo;
+  assert.equal(yerba.value, "", "el 0 quedó como número cargado");
+  assert.equal(yerba.getAttribute("placeholder"), "0");
+  assert.equal(tarjeta("Coca 2L").campo.value, "3");
+  assert.equal(tarjeta("Agua x6").campo.value, "2");
+});
+
+test("GUÍA: en 0, escribir 5 manda 5", async () => {
+  const { pedidos } = await montar({ inicio: real.carritoBorrador });
+  const { campo } = tarjeta("Yerba 1kg");
+  await entrar(campo);
+  assert.equal(campo.value, "", "al tocarlo quedó un 0 adentro");
+  await teclear(campo, "5");
+  await salir(campo);
+  assert.equal(setCantidades(pedidos).at(-1).cantidad, 5);
+  assert.equal(setCantidades(pedidos).at(-1).unidad, "UNIDAD");
+});
+
+test("GUÍA: con 3, tocar selecciona y escribir 1 manda 1 (no 31)", async () => {
+  const { pedidos } = await montar({ inicio: real.carritoBorrador });
+  const { campo } = tarjeta("Coca 2L");
+  await entrar(campo);
+  assert.deepEqual([campo.selectionStart, campo.selectionEnd], [0, 1], "el número no quedó seleccionado");
+  // Con la selección perdida, el teclado deja "31": igual tiene que quedar 1.
+  await teclear(campo, "31");
+  await salir(campo);
+  assert.deepEqual(
+    setCantidades(pedidos).at(-1),
+    { productoLocalId: real.catalogo.cuerpo.items.find((i) => i.nombre === "Coca 2L").productoLocalId, cantidad: 1, unidad: "UNIDAD" }
+  );
+});
+
+test("GUÍA: el agua por bulto manda en BULTO, como hoy", async () => {
+  const { pedidos } = await montar({ inicio: real.carritoBorrador });
+  const { campo } = tarjeta("Agua x6");
+  await entrar(campo);
+  await teclear(campo, "4");
+  await salir(campo);
+  assert.equal(setCantidades(pedidos).at(-1).cantidad, 4);
+  assert.equal(setCantidades(pedidos).at(-1).unidad, "BULTO");
+});
+
+test("GUÍA: vacío al salir manda 0, y el producto sale del pedido", async () => {
+  const { pedidos } = await montar({ inicio: real.carritoBorrador });
+  const { campo } = tarjeta("Coca 2L");
+  await entrar(campo);
+  await teclear(campo, "");
+  await salir(campo);
+  assert.equal(setCantidades(pedidos).at(-1).cantidad, 0);
+  assert.ok(!tarjeta("Coca 2L").quitar, "vaciado, la coca sigue en el pedido");
+  assert.equal(tarjeta("Coca 2L").campo.value, "", "vaciado, el campo tiene que quedar con la guía");
+});
+
+test("GUÍA: tocar y salir sin cambiar no manda nada, en 0 ni con cantidad", async () => {
+  const { pedidos } = await montar({ inicio: real.carritoBorrador });
+  const antes = setCantidades(pedidos).length;
+  for (const nombre of ["Yerba 1kg", "Coca 2L"]) {
+    const { campo } = tarjeta(nombre);
+    await entrar(campo);
+    await salir(campo);
+  }
+  // Y borrar y volver a escribir lo mismo que había tampoco. Tiene que ser
+  // borrar y escribir: poner "3" donde ya hay "3" no es un cambio para React,
+  // `confirmar` no recibe nada y la comparación no llega a correr —la primera
+  // versión de este caso hacía eso y daba verde con la comparación sacada—.
+  const { campo } = tarjeta("Coca 2L");
+  await entrar(campo);
+  await teclear(campo, "");
+  await teclear(campo, "3");
+  await salir(campo);
+  assert.equal(setCantidades(pedidos).length, antes, "salir sin cambiar mandó algo");
+});
+
+test("GUÍA: el + desde 0 lleva a 1, y el 1 se ve como número", async () => {
+  const { pedidos } = await montar({ inicio: real.carritoBorrador });
+  await tocar(tarjeta("Yerba 1kg").mas);
+  assert.equal(setCantidades(pedidos).at(-1).cantidad, 1);
+  assert.equal(tarjeta("Yerba 1kg").campo.value, "1");
+});
+
+test("GUÍA: se prende en el catálogo y en Ver mi pedido, no en el pedido enviado", async () => {
+  await montar({ inicio: real.carritoBorrador });
+  assert.equal(tarjeta("Yerba 1kg").campo.getAttribute("placeholder"), "0", "el catálogo no la prende");
+  await tocar(boton("Ver mi pedido ›"));
+  assert.equal(tarjeta("Coca 2L").campo.getAttribute("placeholder"), "0", "Ver mi pedido no la prende");
+  await desmontarTodo();
+
+  await montar({ inicio: pendienteDel(new Date()) });
+  for (const t of tarjetas()) assert.equal(t.campo.getAttribute("placeholder"), null, `${t.nombre}: el pedido enviado la prende`);
 });
 
 test("4. Ver mi pedido: solo lo pedido, sin buscador ni filtro, y vuelve desde el shell", async () => {

@@ -96,12 +96,62 @@
 //   deshabilitado       los dos botones y el campo apagados. Pedidos lo pide con
 //           = false     el pedido ya enviado: se ve lo pedido y no se cambia.
 //
+//   minimoComoGuia      el mínimo como GUÍA y no como valor, y lo que se escribe
+//           = false     REEMPLAZA lo que había. Pedidos lo pidió (2026-10-22):
+//                       con el producto en 0, el 0 quedaba escrito y lo que se
+//                       tipeaba se le sumaba —"05", "50"—. Emanuel: "el 0 como
+//                       formato inicial podría ser, pero no debe interferir en
+//                       el resultado". Con la opción:
+//                       · en el mínimo, el campo está VACÍO y el mínimo se ve
+//                         como placeholder, en el texto suave del kit;
+//                       · al enfocar, el número queda SELECCIONADO entero, así
+//                         lo primero que se escribe lo reemplaza: con 9, tocar
+//                         y escribir 1 da 1, no 91;
+//                       · y si el teclado igual deja el cursor al final —la
+//                         selección se pierde—, la primera tecla después de
+//                         enfocar reemplaza igual: si lo escrito es lo que
+//                         había más algo, queda solo ese algo.
+//                       El − y el + no cambian. Qué hacer con un campo vacío
+//                       al salir lo decide el consumidor: Pedidos lo toma como
+//                       0. `normalizaAlSalir` no se reusa para eso porque al
+//                       salir ESCRIBE el mínimo adentro del campo, que es justo
+//                       lo que esta opción evita.
+//
 // El apagado es `disabled:opacity-40`, el mismo de los botones de
 // `SunmiPaginador`. Va en la clase SOLO si alguno de los dos está pedido: sin
 // ellos el HTML es byte a byte el de antes, que es lo que congela el candado del
 // carrito.
 
 import SunmiInput from "@/components/sunmi/SunmiInput";
+
+/**
+ * Lo que tenía cada campo al enfocarlo, hasta la primera tecla (con
+ * `minimoComoGuia`). Va en un `WeakMap` por elemento y no en un `useRef`: la
+ * pieza NO TIENE ESTADO —hay candados que la llaman como función común, y es
+ * parte de su contrato—, y lo que se anota es del campo del DOM, no del render.
+ */
+const ANTES_DE_LA_PRIMERA_TECLA = new WeakMap();
+
+/**
+ * Selecciona todo el texto del campo. Dos veces, y es a propósito: en el acto,
+ * y otra vez en la tarea siguiente. En Chrome de Android el toque llega como
+ * touchend → mousedown (que enfoca) → mouseup → click, todo seguido, y el
+ * mouseup puede dejar el cursor donde cayó el dedo y deshacer un `select()`
+ * hecho al enfocar. El `setTimeout(…, 0)` corre después de esa ráfaga. Se usa
+ * `setSelectionRange` y no `select()` porque es el que respeta un `type="text"`
+ * con teclado numérico, que es como se dibuja este campo.
+ */
+function seleccionarTodo(el) {
+  const elegir = () => {
+    try {
+      if (el && el.ownerDocument?.activeElement === el) el.setSelectionRange(0, el.value.length);
+    } catch {
+      // Un `type="number"` no deja seleccionar: queda la red de la primera tecla.
+    }
+  };
+  elegir();
+  setTimeout(elegir, 0);
+}
 
 /**
  * El botón. `pos-control` es lo que le da el fondo relleno que hace que se lea
@@ -170,6 +220,7 @@ export default function SunmiCampoCantidad({
   ocupaElAncho = false,
   apagaMenosEnMinimo = false,
   deshabilitado = false,
+  minimoComoGuia = false,
 }) {
   const conApagado = apagaMenosEnMinimo || deshabilitado;
   const claseDelBoton = `${claseBoton(tamano)}${conApagado ? " disabled:opacity-40" : ""}`;
@@ -198,7 +249,16 @@ export default function SunmiCampoCantidad({
   };
 
   const alEscribir = (e) => {
-    const bruto = e.target.value;
+    let bruto = e.target.value;
+    // La primera tecla después de enfocar REEMPLAZA (con `minimoComoGuia`): si
+    // la selección se perdió y el teclado escribió atrás de lo que había, queda
+    // solo lo nuevo. Si la selección anduvo, lo escrito ya es solo lo nuevo y
+    // esto no toca nada.
+    const previo = e.target ? ANTES_DE_LA_PRIMERA_TECLA.get(e.target) : undefined;
+    if (e.target) ANTES_DE_LA_PRIMERA_TECLA.delete(e.target);
+    if (minimoComoGuia && previo && bruto.length > previo.length && bruto.startsWith(previo)) {
+      bruto = bruto.slice(previo.length);
+    }
     if (bruto === "") {
       onCambiar("");
       return;
@@ -230,8 +290,22 @@ export default function SunmiCampoCantidad({
     else if (!esDecimal) onCambiar(comoTexto(Math.round(n)));
   };
   const alSalir = (e) => {
+    if (e?.target) ANTES_DE_LA_PRIMERA_TECLA.delete(e.target);
     normalizar();
     onBlur?.(e);
+  };
+
+  // En el mínimo, con la opción, se muestra vacío: el mínimo va de guía.
+  const enElMinimoComoGuia =
+    minimoComoGuia && valor !== "" && valor != null && Number(String(valor).replace(",", ".")) === minimo;
+
+  // Al enfocar, con la opción: se anota lo que había —para la red de la
+  // primera tecla— y se selecciona todo, así lo que se escribe reemplaza.
+  const alEnfocar = (e) => {
+    const el = e.currentTarget;
+    ANTES_DE_LA_PRIMERA_TECLA.set(el, el.value);
+    seleccionarTodo(el);
+    onFocus?.(e);
   };
 
   const pasoDe = (dir) => {
@@ -274,10 +348,13 @@ export default function SunmiCampoCantidad({
       type={tipo}
       inputMode={esDecimal ? "decimal" : "numeric"}
       ref={inputRef}
-      value={valor}
+      // Con `minimoComoGuia`, en el mínimo el VALOR es vacío y el mínimo es
+      // solo el placeholder. Sin la opción, como siempre: ni placeholder.
+      value={enElMinimoComoGuia ? "" : valor}
+      placeholder={minimoComoGuia ? comoTexto(minimo) : undefined}
       onChange={alEscribir}
       onBlur={alSalir}
-      onFocus={onFocus}
+      onFocus={minimoComoGuia ? alEnfocar : onFocus}
       onKeyDown={onKeyDown}
       disabled={deshabilitado || undefined}
       aria-label={etiqueta}

@@ -645,6 +645,8 @@ function TarjetaPedido({ producto, cantidad, enPedido = false, apagada = false, 
     onCantidad?.(Number(s) || 0, unidad);
   };
 
+  // Al salir: vacío vale 0 —el producto sale del pedido, como con la ✕—, y si
+  // no cambió no se manda nada.
   const confirmar = () => {
     if (escrito === null) return;
     const n = Number(escrito) || 0;
@@ -701,6 +703,11 @@ function TarjetaPedido({ producto, cantidad, enPedido = false, apagada = false, 
             tamano="grande"
             claseMarco="w-16"
             apagaMenosEnMinimo
+            // El 0 es guía y no un número cargado, y lo que se escribe
+            // reemplaza lo que había. Vacío al salir vale 0: lo decide
+            // `confirmar`, que además no manda nada si no cambió. En el pedido
+            // enviado el campo está apagado y no hace falta.
+            minimoComoGuia={!apagada}
             deshabilitado={apagada}
             inputRef={campoRef}
             onBlur={confirmar}
