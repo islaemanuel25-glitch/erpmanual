@@ -127,7 +127,8 @@ export default function PedidosCatalogoPage() {
   const [enviando, setEnviando] = useState(false);
   // Se entra por la página de entrada, no por el catálogo: la tarjeta del
   // pedido en curso y los pedidos anteriores (pedido de Emanuel, 2026-10-22).
-  const [vista, setVista] = useState("entrada"); // "entrada" | "catalogo" | "carrito"
+  // "lectura" es "Ver pedido" del pedido enviado: lo pedido, solo para mirar.
+  const [vista, setVista] = useState("entrada"); // "entrada" | "catalogo" | "carrito" | "lectura"
   // "Ver mi pedido" se abre desde el catálogo o desde la entrada, y su Volver
   // vuelve a donde se estaba.
   const [volverA, setVolverA] = useState("entrada");
@@ -516,12 +517,16 @@ export default function PedidosCatalogoPage() {
   // (solo lo pedido, apagado). Las tarjetas son las mismas en todos.
   // ====================================================
   const esperando = !!pendiente;
+  // Solo para mirar: el pedido empezado, y el enviado abierto con "Ver pedido"
+  // desde la entrada (Emanuel, 2026-10-22: "Ver pedido no debería dejar
+  // agregar productos"). Lo pedido, apagado, sin buscador ni filtro.
+  const soloMirar = empezado || (esperando && vista === "lectura");
   // Lo enviado, una tarjeta por producto con la cantidad sumada.
-  const enviados = empezado ? juntarPorProducto(pendiente.items, claveDeLoEnviado) : [];
+  const enviados = soloMirar ? juntarPorProducto(pendiente.items, claveDeLoEnviado) : [];
   // Cuántos PRODUCTOS hay, no cuántas líneas: `itemCount` de las rutas cuenta
   // líneas, y un producto con dos líneas contaba doble.
   const productosEnElCarrito = Object.keys(carrito).length;
-  const enPedido = empezado ? enviados.length : productosEnElCarrito;
+  const enPedido = soloMirar ? enviados.length : productosEnElCarrito;
 
   const tarjetaDelCatalogo = (prod) => (
     <TarjetaPedido
@@ -548,7 +553,7 @@ export default function PedidosCatalogoPage() {
   // la misma clave en "Ver mi pedido" (un producto con dos líneas) una quedaba
   // viva, con su ✕ y su − valor +, arriba del pedido ya enviado.
   let lista;
-  if (empezado) {
+  if (soloMirar) {
     lista = (
       <SunmiListaProductoCards key="enviado" mismoAlto={false}>
         {enviados.map((item) => (
@@ -641,12 +646,15 @@ export default function PedidosCatalogoPage() {
             <>
               <p className="text-sm2 sunmi-text-muted">{`Enviado${enviadoCuando ? ` ${enviadoCuando}` : ""} · todavía podés sumar productos`}</p>
               <p className="text-sm2 sunmi-text-muted">{`${productosEnElCarrito} ${productos(productosEnElCarrito)} en el pedido`}</p>
-              <div className="space-y-2">
-                {accion("Sumar productos", "primary", () => setVista("catalogo"))}
-                {accion("Ver pedido", "slate", () => abrirCarrito("entrada"))}
-                {/* Sin relleno y con el rojo del tema: `ghost` no pinta el
-                    texto, lo hereda, así que el tono lo pone la clase. */}
-                {accion(cancelandoPendiente ? "Cancelando..." : "Cancelar pedido", "ghost", pedirCancelarPendiente, "sunmi-text-danger")}
+              {/* Cancelar es un botón rojo, el último y separado de los otros
+                  dos: escrito en rojo sin relleno "no parecía un lugar donde
+                  se toque" (Emanuel, 2026-10-22). */}
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  {accion("Sumar productos", "primary", () => setVista("catalogo"))}
+                  {accion("Ver pedido", "slate", () => setVista("lectura"))}
+                </div>
+                {accion(cancelandoPendiente ? "Cancelando..." : "Cancelar pedido", "red", pedirCancelarPendiente)}
               </div>
             </>
           ) : null}
@@ -654,7 +662,7 @@ export default function PedidosCatalogoPage() {
             <>
               <p className="text-sm2 sunmi-text-muted">El depósito lo está preparando</p>
               <p className="text-sm2 sunmi-text-muted">{`${enviados.length} ${productos(enviados.length)}`}</p>
-              {accion("Ver pedido", "slate", () => setVista("carrito"))}
+              {accion("Ver pedido", "slate", () => setVista("lectura"))}
             </>
           ) : null}
         </SunmiCard>
@@ -707,7 +715,7 @@ export default function PedidosCatalogoPage() {
           </>
         }
         buscador={
-          empezado || viendoPedido ? null : (
+          soloMirar || viendoPedido ? null : (
             <SunmiCampoBusquedaVoz
               value={busqueda}
               onChange={setBusqueda}
@@ -717,7 +725,7 @@ export default function PedidosCatalogoPage() {
           )
         }
         categoria={
-          empezado || viendoPedido ? null : (
+          soloMirar || viendoPedido ? null : (
             <SunmiSelectAdv id="categoria-pedido" value={categoriaId} onChange={(v) => setCategoriaId(v)}>
               <SunmiSelectOption value="">{`Todas · ${totalCatalogo ?? total}`}</SunmiSelectOption>
               {(opciones.categorias || []).map((c) => (
@@ -732,7 +740,7 @@ export default function PedidosCatalogoPage() {
           <>
             {/* Debajo del filtro, y solo donde está el filtro: en Ver mi pedido
                 y en el pedido enviado no se ve, pero lo elegido se respeta. */}
-            {empezado || viendoPedido ? null : (
+            {soloMirar || viendoPedido ? null : (
               <div data-ver-fotos="">
                 <SunmiToggle value={verFotos} onChange={setVerFotos} label="Ver fotos" />
               </div>
@@ -746,7 +754,7 @@ export default function PedidosCatalogoPage() {
           // 100 (las opciones por defecto de `SunmiPageSizer`, las mismas de la
           // ruta), y si se escondiera, quien eligió 100 y le entró todo en una
           // no podría volver a 25. Sin productos no hay nada que paginar.
-          !empezado && !viendoPedido && total > 0 ? (
+          !soloMirar && !viendoPedido && total > 0 ? (
             <SunmiPaginador
               page={page}
               pageSize={pageSize}
@@ -763,14 +771,14 @@ export default function PedidosCatalogoPage() {
           esperando ? (
             // Enviado: sin botón de enviar —ya está enviado—. Sin empezar,
             // "Ver mi pedido ›" lleva a lo pedido, con las tarjetas vivas, y se
-            // puede cancelar. Empezado, solo el conteo: desde que el depósito
-            // lo empieza el local ya no lo cancela (la ruta contesta 409).
+            // puede cancelar. Solo para mirar —empezado, o "Ver pedido" desde
+            // la entrada—, solo el conteo.
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm2 sunmi-text-muted">{`Pedido enviado · ${enPedido} ${productos(enPedido)}`}</span>
-                {empezado || viendoPedido ? null : <SunmiLinkButton onClick={() => abrirCarrito("catalogo")}>Ver mi pedido ›</SunmiLinkButton>}
+                {soloMirar || viendoPedido ? null : <SunmiLinkButton onClick={() => abrirCarrito("catalogo")}>Ver mi pedido ›</SunmiLinkButton>}
               </div>
-              {empezado ? null : (
+              {soloMirar ? null : (
                 <SunmiButton
                   color="red"
                   className="w-full min-h-toque"

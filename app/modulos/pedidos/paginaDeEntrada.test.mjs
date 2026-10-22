@@ -93,15 +93,57 @@ test("enviado sin empezar: la fecha, cuántos, y Sumar productos, Ver pedido y C
   assert.deepEqual(acciones(), ["Sumar productos", "Ver pedido", "Cancelar pedido"]);
   assert.match(boton("Sumar productos", entrada()).className, /sunmi-btn-primary/);
   assert.match(boton("Ver pedido", entrada()).className, /sunmi-btn-slate/);
+  // Cancelar: decía ghost con el texto rojo. Desde el 2026-10-22 es un botón
+  // rojo —escrito en rojo "no parecía un lugar donde se toque"—, el último, y
+  // separado de los otros dos por más espacio que el que hay entre ellos.
   const cancelar = boton("Cancelar pedido", entrada());
-  assert.match(cancelar.className, /sunmi-btn-ghost/);
-  assert.match(cancelar.className, /sunmi-text-danger/, "el texto no va en el rojo del tema");
+  assert.match(cancelar.className, /sunmi-btn-red/, "cancelar no es un botón rojo");
+  assert.doesNotMatch(cancelar.className, /sunmi-btn-ghost/);
+  assert.equal(botones(entrada()).at(-1), cancelar, "cancelar no es el último");
+  const dosPrimeros = boton("Sumar productos", entrada()).parentElement;
+  assert.equal(dosPrimeros, boton("Ver pedido", entrada()).parentElement, "Sumar y Ver no van juntos");
+  assert.match(dosPrimeros.className, /space-y-2/);
+  assert.equal(cancelar.parentElement, dosPrimeros.parentElement, "cancelar no está al lado del par");
+  assert.match(cancelar.parentElement.className, /space-y-4/, "el espacio antes de cancelar no es mayor");
   assert.ok(acciones().every((t) => /w-full/.test(boton(t, entrada()).className)));
 
   // Cancelar abre la hoja de confirmación que ya existía, y no cancela solo.
   await tocar(cancelar);
   assert.ok(modal(), "no abrió la hoja de confirmación");
   assert.match(modal().textContent, /¿Cancelar el pedido solicitado\?/);
+});
+
+test("enviado: Ver pedido es solo para mirar —apagado, con la cantidad, sin buscador ni barra de cambios—", async () => {
+  // Decía (00d300f) que "Ver pedido" abría Ver mi pedido editable. Emanuel:
+  // "Ver pedido no debería dejar agregar productos".
+  const { pedidos } = await montar({ inicio: conFecha(real.entradaEnviadoCarrito, new Date()), enLaEntrada: true });
+  await tocar(boton("Ver pedido", entrada()));
+  const p = real.entradaEnviadoCarrito.cuerpo.pendiente;
+  assert.deepEqual(tarjetas().map((t) => t.nombre).sort(), p.items.map((i) => i.nombre).sort(), "no son las líneas del pedido");
+  for (const t of tarjetas()) {
+    assert.ok(!t.quitar, `${t.nombre}: con ✕`);
+    assert.ok(t.lugarQuitar?.classList.contains("invisible"), `${t.nombre}: sin el lugar de la ✕`);
+    assert.equal(t.campo.disabled, true, `${t.nombre}: el campo se puede tocar`);
+    assert.equal(t.menos.disabled, true);
+    assert.equal(t.mas.disabled, true);
+  }
+  assert.equal(tarjeta("ACEITE").campo.value, "2", "no muestra la cantidad");
+  assert.ok(!contenido().querySelector('input[placeholder="Buscar producto o código"]'), "con buscador");
+  assert.ok(!contenido().querySelector("#categoria-pedido"), "con filtro");
+  assert.ok(!document.querySelector("[data-paginador]"), "con paginador");
+  for (const b of ["Enviar pedido al depósito", "Agregar al pedido", "Cancelar pedido", "Ver mi pedido ›"]) {
+    assert.ok(!boton(b), `en Ver pedido apareció ${b}`);
+  }
+  assert.equal(llamadas(pedidos, "/api/pedidos/set-cantidad").length, 0);
+  await tocar(boton("Volver", filaShell()));
+  assert.ok(entrada(), "el Volver no volvió a la entrada");
+});
+
+test("enviado: Ver pedido respeta Ver fotos", async () => {
+  try { localStorage.setItem("pedidos_ver_fotos", "1"); } catch {}
+  await montar({ inicio: conFecha(real.entradaEnviadoCarrito, new Date()), enLaEntrada: true });
+  await tocar(boton("Ver pedido", entrada()));
+  assert.ok(tarjetas().every((t) => t.foto || t.inicial), "con Ver fotos prendido, sin cuadrado");
 });
 
 test("enviado otro día: fecha corta y hora", async () => {
