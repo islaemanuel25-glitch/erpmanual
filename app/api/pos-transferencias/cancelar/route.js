@@ -5,6 +5,7 @@ import { getUsuarioSession } from "@/lib/auth";
 import { getGrupoIdDeLocal } from "@/lib/grupos";
 import { requireOperadorSegunConfig } from "@/lib/operador";
 import { ESTADO_PEDIDO, sinCancelados } from "@/lib/pedidos/estados";
+import { bloquearParDelPedido, bloquearFilaDelPedido, depositoEmpezo } from "@/lib/pedidos/bloqueoDelPedido";
 
 export async function POST(req) {
   try {
@@ -123,7 +124,23 @@ export async function POST(req) {
     // La condición `estado: Solicitado` va en el mismo update: si el depósito
     // empezó a enviarlo entre la lectura de arriba y acá, el estado ya es
     // "Enviando" y no se marca nada.
+    //
+    // ── EL LOCAL NO CANCELA LO QUE EL DEPÓSITO YA EMPEZÓ ──────────────────
+    // Regla de Emanuel (2026-10-22): desde que el depósito lo empieza
+    // (`depositoEmpezo`, el mismo criterio que traba `set-cantidad`), el
+    // local ya no lo cancela; se perdería lo preparado. La pregunta va
+    // adentro del MISMO bloqueo del par y la fila que toman `set-cantidad` y
+    // las rutas del depósito: si no, el local podía cancelar en el mismo
+    // instante en que el depósito empezaba. El admin sin local cancela como
+    // antes, también empezado: es el único que hoy cancela desde el lado del
+    // depósito —un usuario del depósito no pasa el control de propiedad de
+    // arriba—.
     const marcados = await prisma.$transaction(async (tx) => {
+      await bloquearParDelPedido(tx, pos.origenId, pos.destinoId);
+      const fila = await bloquearFilaDelPedido(tx, posId);
+      if (!esAdmin && fila?.estado === ESTADO_PEDIDO.SOLICITADO && (await depositoEmpezo(tx, fila))) {
+        return "EMPEZADO";
+      }
       const r = await tx.posTransferencia.updateMany({
         where: { id: posId, estado: ESTADO_PEDIDO.SOLICITADO },
         data: {
@@ -134,6 +151,13 @@ export async function POST(req) {
       });
       return r.count;
     });
+
+    if (marcados === "EMPEZADO") {
+      return NextResponse.json(
+        { ok: false, error: "El depósito ya está preparando tu pedido. Ya no se puede cancelar desde el local." },
+        { status: 409 }
+      );
+    }
 
     if (marcados === 0) {
       return NextResponse.json(

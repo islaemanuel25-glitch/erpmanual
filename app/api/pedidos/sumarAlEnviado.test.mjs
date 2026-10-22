@@ -64,8 +64,9 @@ test("9d: con el pedido empezado, set-cantidad contesta 409 con el mensaje", () 
   assert.equal(real.empezadoSetCantidad.status, 409);
   assert.deepEqual(real.empezadoSetCantidad.cuerpo, { ok: false, error: MENSAJE_409 });
   assert.ok(sinComentarios("app/api/pedidos/set-cantidad/route.js").includes(MENSAJE_409));
-  // Y cancelar todavía lo permite: la pantalla tiene que mostrar el botón.
-  assert.equal(real.empezadoCancelar.status, 200);
+  // Decía que cancelar todavía lo permitía. Desde el 2026-10-22 el local
+  // tampoco lo cancela: `cancelarEmpezado.test.mjs`.
+  assert.equal(real.empezadoCancelar.status, 409);
 });
 
 test("9e: el depósito prepara mientras el local cambia la misma línea: cero tarde", () => {

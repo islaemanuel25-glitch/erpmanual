@@ -559,6 +559,22 @@ try {
     const despachar = (posId) => pedir(enviar, "POST", `${B}/pos-transferencias/enviar`, sDepo, { posId });
     const solicitar = (posId) => pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, P.sPin, { posId });
     const cancelar = (posId) => pedir(R.cancelar, "POST", `${B}/pos-transferencias/cancelar`, P.sPin, { posId });
+    // Siembra: un admin sin local, como lo deja Usuarios. Es el único que
+    // cancela un pedido que el depósito ya empezó (sección 10).
+    const rolAdmin =
+      (await c.rol.findUnique({ where: { nombre: "Admin" } })) ??
+      (await c.rol.create({ data: { nombre: "Admin", esSistema: true, permisos: ["*"] } }));
+    const cuentaAdmin = await c.usuario.create({
+      data: { nombre: "Admin pedidos", email: `admin-pedidos-${marca}@ci.local`, passwordHash: "x", rolId: rolAdmin.id, localId: null },
+    });
+    const sAdmin = `erpazul_sesion=${jwt.sign(
+      { id: cuentaAdmin.id, nombre: cuentaAdmin.nombre, email: cuentaAdmin.email, rolId: rolAdmin.id, rolNombre: "Admin", permisos: ["*"], esDuenoLocal: false, localId: null, esDeposito: false },
+      process.env.AUTH_SECRET,
+      { expiresIn: "1h" }
+    )}`;
+    const cancelarComo = (sesion, posId) => pedir(R.cancelar, "POST", `${B}/pos-transferencias/cancelar`, sesion, { posId });
+    // Para dejar el par limpio entre vueltas, también con el pedido empezado.
+    const limpiar = (posId) => cancelarComo(sAdmin, posId);
     const lineasDelPedido = async (posId) =>
       Object.fromEntries(
         (await c.posTransferenciaDetalle.findMany({ where: { posTransferenciaId: posId }, select: { productoId: true, sugerido: true } })).map((l) => [l.productoId, Number(l.sugerido)])
@@ -648,7 +664,11 @@ try {
     ok("9d: ni abrió un borrador", (await borradoresDelPar()) === 0);
     const canc = await cancelar(posId);
     guardar("empezadoCancelar", canc);
-    ok("9d: cancelar todavía lo permite (la ruta solo mira que sea Solicitado)", canc.cuerpo.ok === true, json(canc));
+    ok("9d: el local ya no lo puede cancelar: 409 con el mensaje",
+      canc.status === 409 && canc.cuerpo.error === "El depósito ya está preparando tu pedido. Ya no se puede cancelar desde el local.", json(canc));
+    ok("9d: y sigue Solicitado", (await estadoDe(posId)) === "Solicitado");
+    guardar("empezadoCarritoTrasCancelar", await carrito(P.sPin));
+    ok("9d: el admin lo cancela", (await limpiar(posId)).cuerpo.ok === true);
 
     // Y despachar sin nadie al lado: sale entero, y después el local ya no
     // tiene pedido enviado —lo que cargue va a uno nuevo—.
@@ -678,7 +698,7 @@ try {
         else if (dep.cuerpo.ok && loc.status === 409 && preparado === 2) conflictos += 1;
         else if (dep.cuerpo.ok && loc.cuerpo.ok && preparado === 2 && Number(fin.sugerido) === 5) antes += 1;
         else otras += 1;
-        await cancelar(pid);
+        await limpiar(pid);
       }
       console.log(`  · 9e: ${VUELTAS} vueltas — ${antes} el local entró antes, ${conflictos} 409, ${tardes} TARDE (preparado borrado), ${otras} otras`);
       guardar(CONTRA === "editar" ? "carreraPrepararSinBloqueo" : "carreraPreparar", { vueltas: VUELTAS, antes, conflictos, tardes, otras });
@@ -717,13 +737,69 @@ try {
         if (dep.status === 409 && !lectura.despacharPedidoCambio) guardar("despacharPedidoCambio", dep);
         // Dejar el par limpio: lo que quedó enviado se cancela, y lo que abrió
         // un borrador nuevo se saca.
-        if (estado === "Solicitado") await cancelar(pid);
+        if (estado === "Solicitado") await limpiar(pid);
         if (loc.cuerpo.posId !== pid) await P.fijar(ARROZ, 0);
       }
       console.log(`  · 9f: ${VUELTAS} vueltas — ${antes} el local sumó antes y viajó, ${despues} fue a un pedido nuevo, ${cambio} el despacho pidió volver a abrir, ${rechazos} 409 al local, ${tardes} TARDE (quedó sin viajar), ${otras} otras`);
       guardar(CONTRA === "enviar" ? "carreraDespacharSinBloqueo" : "carreraDespachar", { vueltas: VUELTAS, antes, despues, cambio, rechazos, tardes, otras });
       if (CONTRA === "enviar") ok("9f CONTRAPRUEBA: sin el bloqueo en despachar, hay líneas tarde", tardes > 0, `${tardes}`);
       else ok("9f: cero líneas tarde", tardes === 0 && otras === 0, json({ tardes, otras }));
+    }
+
+    seccion("10. Cancelar: el local no cancela lo que el depósito empezó");
+    {
+      // 10a. Sin empezar, el local cancela como siempre.
+      const pa = await enviarUno(ACEITE, 2);
+      const ca = await cancelar(pa);
+      guardar("cancelarSinEmpezar", ca);
+      ok("10a: el local cancela un pedido sin empezar", ca.cuerpo.ok === true && (await estadoDe(pa)) === "Cancelado", json(ca));
+
+      // 10b. Empezado: 409 al local, y el pedido sigue.
+      const pb = await enviarUno(ACEITE, 2);
+      const lb = await c.posTransferenciaDetalle.findFirst({ where: { posTransferenciaId: pb, productoId: ACEITE } });
+      ok("10b: el depósito lo empieza", (await preparar(lb.id, 2)).cuerpo.ok === true);
+      const cb = await cancelar(pb);
+      guardar("cancelarEmpezadoLocal", cb);
+      ok("10b: el local recibe 409 con el mensaje",
+        cb.status === 409 && cb.cuerpo.error === "El depósito ya está preparando tu pedido. Ya no se puede cancelar desde el local.", json(cb));
+      ok("10b: y el pedido sigue Solicitado, con lo preparado", (await estadoDe(pb)) === "Solicitado");
+
+      // 10c. Desde el lado del depósito. Un usuario del depósito, con su PIN:
+      // la ruta solo deja cancelar al local destino o a un admin sin local.
+      const opDepo = await c.operadorLocal.create({ data: { nombre: "Dani", pinHash: "x", localId: P.deposito.id } });
+      const sDepoPin = `${sDepo}; erpazul_operador_activo=${jwt.sign({ operadorId: opDepo.id, nombre: opDepo.nombre, localId: P.deposito.id, _tipo: "operador", emitidoEn: Date.now() }, process.env.AUTH_SECRET)}`;
+      const cd = await cancelarComo(sDepoPin, pb);
+      guardar("cancelarEmpezadoDeposito", cd);
+      console.log(`  · 10c: un usuario del depósito intenta cancelar: ${cd.status} ${json(cd.cuerpo)}`);
+      ok("10c: un usuario del depósito no puede cancelar (hoy, por propiedad: no es el local destino)", cd.status === 403, json(cd));
+      const cadm = await cancelarComo(sAdmin, pb);
+      guardar("cancelarEmpezadoAdmin", cadm);
+      ok("10c: el admin sin local cancela el empezado", cadm.cuerpo.ok === true && (await estadoDe(pb)) === "Cancelado", json(cadm));
+
+      // 10d. CARRERA: el local cancela en el mismo instante en que el
+      // depósito empieza. Tarde = un pedido Cancelado con algo preparado: se
+      // canceló después de empezado (o se preparó uno ya cancelado).
+      let cancelo = 0, rechazo = 0, tardes = 0, otras = 0;
+      for (let i = 0; i < VUELTAS; i++) {
+        const pid = await enviarUno(ACEITE, 2);
+        const linea = await c.posTransferenciaDetalle.findFirst({ where: { posTransferenciaId: pid, productoId: ACEITE } });
+        const [dep, loc] = await Promise.all([preparar(linea.id, 2), cancelar(pid)]);
+        const estado = await estadoDe(pid);
+        const preparado = Number((await c.posTransferenciaDetalle.findFirst({ where: { id: linea.id } })).preparado);
+        if (estado === "Cancelado" && preparado > 0) tardes += 1;
+        else if (estado === "Cancelado" && loc.cuerpo.ok && !dep.cuerpo.ok) cancelo += 1;
+        else if (estado === "Solicitado" && dep.cuerpo.ok && loc.status === 409) rechazo += 1;
+        else {
+          otras += 1;
+          console.log(`  · 10d vuelta ${i + 1} sin clasificar: ${json({ dep, loc, estado, preparado })}`);
+        }
+        if (!dep.cuerpo.ok && dep.status === 409 && !lectura.prepararCanceladoEnElMedio) guardar("prepararCanceladoEnElMedio", dep);
+        if (estado === "Solicitado") await limpiar(pid);
+      }
+      console.log(`  · 10d: ${VUELTAS} vueltas — ${cancelo} el local canceló antes, ${rechazo} 409 al local, ${tardes} TARDE (cancelado ya empezado), ${otras} otras`);
+      guardar(CONTRA === "cancelar" ? "carreraCancelarSinBloqueo" : "carreraCancelar", { vueltas: VUELTAS, cancelo, rechazo, tardes, otras });
+      if (CONTRA === "cancelar") ok("10d CONTRAPRUEBA: sin el bloqueo en cancelar, hay pedidos cancelados ya empezados", tardes > 0, `${tardes}`);
+      else ok("10d: cero pedidos cancelados después de empezados", tardes === 0 && otras === 0, json({ tardes, otras }));
     }
   }
 

@@ -5,8 +5,13 @@ import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
 import { esComboBase } from "@/lib/combos/guards";
-import { sinCancelados } from "@/lib/pedidos/estados";
-import { bloquearParDelPedido, bloquearFilaDelPedido } from "@/lib/pedidos/bloqueoDelPedido";
+import { ESTADO_PEDIDO, sinCancelados } from "@/lib/pedidos/estados";
+import {
+  bloquearParDelPedido,
+  bloquearFilaDelPedido,
+  CANCELADO_EN_EL_MEDIO,
+  MENSAJE_CANCELADO_EN_EL_MEDIO,
+} from "@/lib/pedidos/bloqueoDelPedido";
 
 export async function POST(req) {
   try {
@@ -157,6 +162,7 @@ export async function POST(req) {
     const detalle = await prisma.$transaction(async (tx) => {
       await bloquearParDelPedido(tx, pos.origenId, pos.destinoId);
       const fila = await bloquearFilaDelPedido(tx, posId);
+      if (fila?.estado === ESTADO_PEDIDO.CANCELADO) return CANCELADO_EN_EL_MEDIO;
       if (!fila || fila.estado === "Enviado" || fila.estado === "Enviando") return null;
 
       const existente = await tx.posTransferenciaDetalle.findFirst({
@@ -188,6 +194,10 @@ export async function POST(req) {
         },
       });
     });
+
+    if (detalle === CANCELADO_EN_EL_MEDIO) {
+      return NextResponse.json({ ok: false, error: MENSAJE_CANCELADO_EN_EL_MEDIO }, { status: 409 });
+    }
 
     if (!detalle) {
       return NextResponse.json(

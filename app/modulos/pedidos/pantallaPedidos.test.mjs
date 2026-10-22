@@ -23,7 +23,7 @@ import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 
 const {
-  real, montar, desmontarTodo, asentar, act, texto, contenido, filaShell, boton, botones, llamadas, tocar, tarjetas, tarjeta,
+  real, montar, desmontarTodo, asentar, act, texto, contenido, filaShell, boton, botones, llamadas, tocar, tarjetas, tarjeta, modal,
 } = await import("./montarPantallaPedidos.mjs");
 
 afterEach(desmontarTodo);
@@ -644,12 +644,30 @@ test("6. empezado: El depósito lo está preparando, solo lo pedido, todo apagad
     assert.equal(t.menos.disabled, true, `${t.nombre}: el − vivo`);
     assert.equal(t.mas.disabled, true, `${t.nombre}: el + vivo`);
   }
-  // La barra: el conteo y cancelar, que la ruta todavía permite (sección 9d).
-  assert.equal(real.empezadoCancelar.status, 200);
+  // La barra: solo el conteo. Sin cancelar: desde el 2026-10-22 la ruta no
+  // deja al local cancelar un pedido empezado (sección 9d: 409).
+  assert.equal(real.empezadoCancelar.status, 409);
   assert.match(barra().textContent, /Pedido enviado · 3 productos/);
   assert.ok(!boton("Ver mi pedido ›"), "empezado no hay nada que ver aparte");
-  assert.ok(boton("Cancelar pedido"));
+  assert.ok(!boton("Cancelar pedido"), "empezado, el local no puede cancelar");
   assert.ok(!boton("Revisar y enviar") && !boton("Confirmar y enviar"));
+});
+
+test("6. cancelar sin empezar sigue en la barra, y el 409 de uno que el depósito empezó lleva a empezado", async () => {
+  // Lo enviado sin empezar en pantalla; el depósito lo empezó por detrás:
+  // cancelar contesta el 409 real y el carrito, releído, viene empezado.
+  const r409 = real.cancelarEmpezadoLocal;
+  assert.equal(r409.status, 409);
+  const { pedidos, estado } = await montar({ inicio: pendienteDel(new Date()), cancelar: [r409] });
+  assert.ok(boton("Cancelar pedido"), "sin empezar, cancelar está");
+  estado.carrito = empezadoDel(new Date());
+  await tocar(boton("Cancelar pedido"));
+  await tocar(boton("Cancelar pedido", modal()));
+  assert.equal(llamadas(pedidos, "/api/pos-transferencias/cancelar").length, 1);
+  const aviso = [...document.querySelectorAll(".sunmi-state-danger")].find((d) => d.textContent.includes(r409.cuerpo.error));
+  assert.ok(aviso, "el mensaje de la ruta no salió en el aviso de arriba");
+  assert.match(contenido().textContent, /El depósito lo está preparando/);
+  assert.ok(!boton("Cancelar pedido"), "después del 409 el botón tiene que irse");
 });
 
 test("6. el 409 de un pedido que el depósito empezó lleva la pantalla a empezado", async () => {

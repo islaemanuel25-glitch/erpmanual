@@ -3,8 +3,13 @@ import prisma from "@/lib/prisma";
 import { getUsuarioSession } from "@/lib/auth";
 import { checkPerm } from "@/lib/authorize";
 import { defaultModoEnvio, esProductoFiambre } from "@/lib/conversiones/stock";
-import { sinCancelados } from "@/lib/pedidos/estados";
-import { bloquearParDelPedido, bloquearFilaDelPedido } from "@/lib/pedidos/bloqueoDelPedido";
+import { ESTADO_PEDIDO, sinCancelados } from "@/lib/pedidos/estados";
+import {
+  bloquearParDelPedido,
+  bloquearFilaDelPedido,
+  CANCELADO_EN_EL_MEDIO,
+  MENSAJE_CANCELADO_EN_EL_MEDIO,
+} from "@/lib/pedidos/bloqueoDelPedido";
 
 export async function POST(req) {
   try {
@@ -196,6 +201,8 @@ export async function POST(req) {
     const updated = await prisma.$transaction(async (tx) => {
       await bloquearParDelPedido(tx, detalle.pos.origenId, detalle.pos.destinoId);
       const fila = await bloquearFilaDelPedido(tx, detalle.pos.id);
+      // Cancelado: el local lo canceló entre la lectura de arriba y el bloqueo.
+      if (fila?.estado === ESTADO_PEDIDO.CANCELADO) return CANCELADO_EN_EL_MEDIO;
       if (!fila || fila.estado === "Enviado" || fila.estado === "Enviando") return null;
       return tx.posTransferenciaDetalle.update({
         where: { id: detalleId },
@@ -206,6 +213,10 @@ export async function POST(req) {
         },
       });
     });
+
+    if (updated === CANCELADO_EN_EL_MEDIO) {
+      return NextResponse.json({ ok: false, error: MENSAJE_CANCELADO_EN_EL_MEDIO }, { status: 409 });
+    }
 
     if (!updated) {
       return NextResponse.json(

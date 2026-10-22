@@ -372,6 +372,10 @@ export default function PedidosCatalogoPage() {
         requerirOperador();
       } else {
         setError(json.error || "Error al cancelar pedido");
+        // El 409 de un pedido que el depósito empezó justo antes del toque: el
+        // carrito, releído, lo trae empezado y la pantalla pasa sola a "El
+        // depósito lo está preparando", sin el botón.
+        await cargarCarrito();
       }
     } catch (err) {
       console.error(err);
@@ -595,23 +599,25 @@ export default function PedidosCatalogoPage() {
         }
         pieDePantalla={
           esperando ? (
-            // Enviado, empezado o no: sin botón de enviar —ya está enviado— y
-            // con cancelar, que la ruta permite mientras siga Solicitado
-            // (también empezado: `cancelar` solo mira el estado). Sin empezar,
-            // "Ver mi pedido ›" lleva a lo pedido, con las tarjetas vivas.
+            // Enviado: sin botón de enviar —ya está enviado—. Sin empezar,
+            // "Ver mi pedido ›" lleva a lo pedido, con las tarjetas vivas, y se
+            // puede cancelar. Empezado, solo el conteo: desde que el depósito
+            // lo empieza el local ya no lo cancela (la ruta contesta 409).
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm2 sunmi-text-muted">{`Pedido enviado · ${enPedido} ${productos(enPedido)}`}</span>
                 {empezado || viendoPedido ? null : <SunmiLinkButton onClick={abrirCarrito}>Ver mi pedido ›</SunmiLinkButton>}
               </div>
-              <SunmiButton
-                color="red"
-                className="w-full min-h-toque"
-                disabled={cancelandoPendiente}
-                onClick={pedirCancelarPendiente}
-              >
-                {cancelandoPendiente ? "Cancelando..." : "Cancelar pedido"}
-              </SunmiButton>
+              {empezado ? null : (
+                <SunmiButton
+                  color="red"
+                  className="w-full min-h-toque"
+                  disabled={cancelandoPendiente}
+                  onClick={pedirCancelarPendiente}
+                >
+                  {cancelandoPendiente ? "Cancelando..." : "Cancelar pedido"}
+                </SunmiButton>
+              )}
             </div>
           ) : (
             // ── REVISAR ANTES DE MANDAR ───────────────────────────────────
