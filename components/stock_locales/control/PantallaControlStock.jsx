@@ -391,14 +391,21 @@ function BuscadorDelControl({ c }) {
  * servidor leyendo el Libro (`revisarControl`); "Corregir" lo deja en lo que
  * debería con un Ajuste por control, y "Corregir todos" hace lo mismo con todos
  * (es la reconstrucción de los conteos anteriores al stock al contar). Los que
- * el Libro no alcanza a explicar se nombran con su motivo y no se tocan. Sin
- * ninguno, no se dibuja nada.
+ * el Libro no alcanza a explicar se nombran con su motivo y no se tocan.
+ *
+ * Se dibuja SIEMPRE para quien gestiona: revisando, el error con su motivo, o
+ * "todo coincide" con cuántos revisó. Antes, sin nada para corregir —o con la
+ * revisión caída— no se dibujaba, y las dos cosas se veían igual.
  */
 export function StockQueNoCoincide({ c }) {
-  const revisados = c.revision?.productos ?? [];
+  if (!c.revision) return <RevisionEnUnRenglon texto="Revisando el stock de lo contado…" />;
+  if (c.revision.error) return <RevisionEnUnRenglon texto={`No se pudo revisar lo contado: ${c.revision.error}`} tono="danger" />;
+  const revisados = c.revision.productos ?? [];
   const productos = revisados.filter((p) => p.corregir && p.reconstruible !== false);
   const sinLibro = revisados.filter((p) => p.reconstruible === false);
-  if (productos.length === 0 && sinLibro.length === 0) return null;
+  if (productos.length === 0 && sinLibro.length === 0) {
+    return <RevisionEnUnRenglon texto={textoRevisionAlDia(revisados.length)} />;
+  }
   return (
     <section className="rounded-xl2 border sunmi-border-warning sunmi-state-warning-soft p-4 space-y-3">
       <h2 className="text-xs2 font-semibold tracking-wider sunmi-text-warning">EL STOCK NO COINCIDE CON LO CONTADO</h2>
@@ -429,6 +436,22 @@ export function StockQueNoCoincide({ c }) {
           </SunmiButton>
         </div>
       ))}
+    </section>
+  );
+}
+
+/** "Revisé 8 contados: el stock coincide con lo contado." */
+export const textoRevisionAlDia = (n) =>
+  n === 0
+    ? "Todavía no hay nada contado para revisar."
+    : `${n === 1 ? "Revisé 1 contado" : `Revisé ${n} contados`}: el stock coincide con lo contado, no hay nada para corregir.`;
+
+/** La revisión cuando no hay lista que mostrar: un renglón, con el rótulo de siempre. */
+function RevisionEnUnRenglon({ texto, tono = null }) {
+  return (
+    <section data-revision-control="" className="rounded-xl2 sunmi-border p-4 space-y-1">
+      <h2 className="text-xs2 font-semibold tracking-wider sunmi-text-muted">REVISIÓN DE LO CONTADO</h2>
+      <p className={`text-sm3 ${tono === "danger" ? "sunmi-text-danger" : "sunmi-text-muted"}`}>{texto}</p>
     </section>
   );
 }

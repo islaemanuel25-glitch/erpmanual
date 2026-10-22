@@ -332,10 +332,14 @@ export function useControlStock({ puedeGestionar = false, requerirOperador } = {
   //
   // Solo quien gestiona: corregir mueve stock sin un conteo nuevo. Se pide al
   // entrar a la lista y después de cada corrección.
+  //
+  // Un pedido que falla NO se descarta: queda `{ error }` y el recuadro lo dice.
+  // Antes quedaba en null, que se veía igual que "nada para corregir", y en
+  // producción el recuadro no apareció sin que nadie supiera por qué.
   const [revision, setRevision] = useState(null);
   const cargarRevision = useCallback(async () => {
     const r = await pedir(`${API}/revision`);
-    setRevision(r.ok ? r : null);
+    setRevision(r.ok ? r : { error: r.error || "No se pudo revisar lo contado." });
   }, [pedir]);
 
   useEffect(() => {

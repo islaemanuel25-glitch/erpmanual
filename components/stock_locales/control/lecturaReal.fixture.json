@@ -29,7 +29,7 @@
       "conteo": {
         "total": 3,
         "contadoPor": "Emanuel",
-        "en": "2026-10-22T20:19:10.740Z",
+        "en": "2026-10-22T20:49:56.997Z",
         "sistema": 5,
         "diferencia": -2
       }
@@ -66,7 +66,7 @@
         "conteo": {
           "total": 7,
           "contadoPor": "Ana",
-          "en": "2026-10-22T20:19:10.853Z",
+          "en": "2026-10-22T20:49:57.122Z",
           "sistema": 5,
           "diferencia": 2
         }
@@ -120,7 +120,7 @@
       "conteo": {
         "total": 7,
         "contadoPor": "Ana",
-        "en": "2026-10-22T20:19:10.943Z",
+        "en": "2026-10-22T20:49:57.229Z",
         "sistema": 5,
         "diferencia": 2
       }
@@ -171,7 +171,7 @@
         "conteo": {
           "total": 5,
           "contadoPor": "Ana",
-          "en": "2026-10-22T20:19:10.999Z",
+          "en": "2026-10-22T20:49:57.284Z",
           "sistema": 4,
           "diferencia": 1
         }
@@ -318,7 +318,7 @@
       "conteo": {
         "total": 1.25,
         "contadoPor": "Emanuel",
-        "en": "2026-10-22T20:19:11.160Z",
+        "en": "2026-10-22T20:49:57.463Z",
         "sistema": 2.5,
         "diferencia": -1.25
       }
@@ -574,7 +574,7 @@
       "conteo": {
         "total": 3,
         "contadoPor": "Ana",
-        "en": "2026-10-22T20:19:11.345Z",
+        "en": "2026-10-22T20:49:57.672Z",
         "sistema": 3,
         "diferencia": 0
       }
@@ -755,7 +755,7 @@
         "conteo": {
           "total": 3,
           "contadoPor": "Ana",
-          "en": "2026-10-22T20:19:11.345Z",
+          "en": "2026-10-22T20:49:57.672Z",
           "sistema": 3,
           "diferencia": 0
         }
@@ -788,7 +788,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-22T20:19:11.100Z",
+          "en": "2026-10-22T20:49:57.394Z",
           "sistema": 4,
           "diferencia": -2
         }
@@ -821,7 +821,7 @@
         "conteo": {
           "total": 1.25,
           "contadoPor": "Emanuel",
-          "en": "2026-10-22T20:19:11.160Z",
+          "en": "2026-10-22T20:49:57.463Z",
           "sistema": 2.5,
           "diferencia": -1.25
         }
@@ -854,7 +854,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Ana",
-          "en": "2026-10-22T20:19:11.205Z",
+          "en": "2026-10-22T20:49:57.522Z",
           "sistema": 0,
           "diferencia": 2
         }
@@ -909,7 +909,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-22T20:19:11.100Z",
+          "en": "2026-10-22T20:49:57.394Z",
           "sistema": 4,
           "diferencia": -2
         }
@@ -942,7 +942,7 @@
         "conteo": {
           "total": 1.25,
           "contadoPor": "Emanuel",
-          "en": "2026-10-22T20:19:11.160Z",
+          "en": "2026-10-22T20:49:57.463Z",
           "sistema": 2.5,
           "diferencia": -1.25
         }
@@ -975,7 +975,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Ana",
-          "en": "2026-10-22T20:19:11.205Z",
+          "en": "2026-10-22T20:49:57.522Z",
           "sistema": 0,
           "diferencia": 2
         }
@@ -1030,7 +1030,7 @@
         "conteo": {
           "total": 2,
           "contadoPor": "Emanuel",
-          "en": "2026-10-22T20:19:11.100Z",
+          "en": "2026-10-22T20:49:57.394Z",
           "sistema": 4,
           "diferencia": -2
         }
@@ -1106,15 +1106,40 @@
         "pesoEsFijo": false,
         "modoVentaDeposito": "PESO",
         "conteo": null
+      },
+      {
+        "id": 12,
+        "localId": 2,
+        "baseId": 12,
+        "nombre": "Quieto sin Libro",
+        "codigoBarra": "8000000000301",
+        "categoriaId": null,
+        "proveedorId": null,
+        "areaFisicaId": null,
+        "unidadMedida": "unidad",
+        "factorPack": 1,
+        "precioCosto": 600,
+        "precioVenta": 1000,
+        "margen": null,
+        "stock": 7,
+        "stockMin": null,
+        "stockMax": null,
+        "limitesConfigurados": false,
+        "faltante": false,
+        "modoCompraProveedor": "BULTO",
+        "pesoReferenciaKg": null,
+        "pesoEsFijo": false,
+        "modoVentaDeposito": "PESO",
+        "conteo": null
       }
     ],
-    "total": 1,
+    "total": 2,
     "totalPages": 1,
     "resumenControl": {
       "controlId": 2,
-      "total": 1,
+      "total": 2,
       "contados": 0,
-      "sinContar": 1,
+      "sinContar": 2,
       "conDiferencia": 0,
       "categorias": []
     },
@@ -1130,7 +1155,7 @@
     "control": {
       "id": 2,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-22T20:19:11.633Z",
+      "abiertoEn": "2026-10-22T20:49:57.957Z",
       "terminadoEn": null,
       "terminadoPorNombre": null,
       "noContadosDecision": null,
@@ -1167,7 +1192,7 @@
     },
     "control": {
       "id": 1,
-      "abiertoEn": "2026-10-22T20:19:10.668Z"
+      "abiertoEn": "2026-10-22T20:49:56.927Z"
     },
     "vendidos": [
       {
@@ -1212,7 +1237,7 @@
     "control": {
       "id": 1,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-22T20:19:10.668Z",
+      "abiertoEn": "2026-10-22T20:49:56.927Z",
       "terminadoEn": null,
       "terminadoPorNombre": null,
       "noContadosDecision": null,
@@ -1272,7 +1297,7 @@
     "control": {
       "id": 1,
       "estado": "ABIERTO",
-      "abiertoEn": "2026-10-22T20:19:10.668Z",
+      "abiertoEn": "2026-10-22T20:49:56.927Z",
       "terminadoEn": null,
       "terminadoPorNombre": null,
       "noContadosDecision": null,
@@ -1332,16 +1357,16 @@
     "control": null,
     "ultimo": {
       "id": 1,
-      "abiertoEn": "2026-10-22T20:19:10.668Z",
-      "terminadoEn": "2026-10-22T20:19:11.892Z",
+      "abiertoEn": "2026-10-22T20:49:56.927Z",
+      "terminadoEn": "2026-10-22T20:49:58.229Z",
       "terminadoPorNombre": "Emanuel",
       "puestosEnCero": 2
     },
     "historial": [
       {
         "id": 1,
-        "abiertoEn": "2026-10-22T20:19:10.668Z",
-        "terminadoEn": "2026-10-22T20:19:11.892Z",
+        "abiertoEn": "2026-10-22T20:49:56.927Z",
+        "terminadoEn": "2026-10-22T20:49:58.229Z",
         "terminadoPorNombre": "Emanuel",
         "puestosEnCero": 2
       }
@@ -1360,8 +1385,8 @@
     "control": {
       "id": 1,
       "estado": "TERMINADO",
-      "abiertoEn": "2026-10-22T20:19:10.668Z",
-      "terminadoEn": "2026-10-22T20:19:11.892Z",
+      "abiertoEn": "2026-10-22T20:49:56.927Z",
+      "terminadoEn": "2026-10-22T20:49:58.229Z",
       "terminadoPorNombre": "Emanuel",
       "noContadosDecision": "EN_CERO",
       "noContadosComoEstaban": null
@@ -1441,7 +1466,7 @@
     },
     "control": {
       "id": 3,
-      "abiertoEn": "2026-10-22T20:19:11.987Z",
+      "abiertoEn": "2026-10-22T20:49:58.331Z",
       "abiertoPorNombre": "Cuenta Mini",
       "controlId": 3,
       "total": 8,
@@ -1464,9 +1489,9 @@
     "ok": true,
     "items": [
       {
-        "id": 13,
+        "id": 14,
         "localId": 1,
-        "baseId": 13,
+        "baseId": 14,
         "nombre": "Coco rallado",
         "codigoBarra": "8000000000202",
         "categoriaId": null,
@@ -1491,9 +1516,9 @@
         "conteo": null
       },
       {
-        "id": 12,
+        "id": 13,
         "localId": 1,
-        "baseId": 12,
+        "baseId": 13,
         "nombre": "Bizcochos de coco",
         "codigoBarra": "8000000000201",
         "categoriaId": null,
@@ -1540,16 +1565,16 @@
     "ok": true,
     "control": {
       "id": 2,
-      "abiertoEn": "2026-10-22T20:19:11.633Z"
+      "abiertoEn": "2026-10-22T20:49:57.957Z"
     },
     "productos": [
       {
-        "productoLocalId": 24,
+        "productoLocalId": 25,
         "nombre": "Lata al revés x24",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Administrador",
         "contado": 24,
-        "anclaMovimientoId": 59,
+        "anclaMovimientoId": 60,
         "movimientosPosteriores": [],
         "posteriores": 0,
         "deberia": 24,
@@ -1563,18 +1588,18 @@
         "filasDeOtroLocal": []
       },
       {
-        "productoLocalId": 15,
+        "productoLocalId": 16,
         "nombre": "361 LATA X24",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Admin Depo",
         "contado": 24,
-        "anclaMovimientoId": 33,
+        "anclaMovimientoId": 34,
         "movimientosPosteriores": [
           {
-            "id": 57,
+            "id": 58,
             "origen": "VENTA",
             "origenRef": "9002",
-            "instante": "2026-10-22T20:19:13.206Z",
+            "instante": "2026-10-22T20:49:59.591Z",
             "cambio": -1
           }
         ],
@@ -1595,7 +1620,7 @@
         "unidadFisica": "UNIDAD",
         "contadoPor": "Admin Depo",
         "contado": 27,
-        "anclaMovimientoId": 19,
+        "anclaMovimientoId": 20,
         "movimientosPosteriores": [],
         "posteriores": 0,
         "deberia": 27,
@@ -1609,12 +1634,12 @@
         "filasDeOtroLocal": []
       },
       {
-        "productoLocalId": 23,
+        "productoLocalId": 24,
         "nombre": "Lata con fila ajena x24",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Admin Depo",
         "contado": 24,
-        "anclaMovimientoId": 56,
+        "anclaMovimientoId": 57,
         "movimientosPosteriores": [],
         "posteriores": 0,
         "deberia": 24,
@@ -1633,7 +1658,7 @@
         ]
       },
       {
-        "productoLocalId": 20,
+        "productoLocalId": 21,
         "nombre": "Lata doble x24",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Admin Depo",
@@ -1664,7 +1689,7 @@
     },
     "control": {
       "id": 3,
-      "abiertoEn": "2026-10-22T20:19:11.987Z"
+      "abiertoEn": "2026-10-22T20:49:58.331Z"
     },
     "vendidos": [
       {
@@ -1689,8 +1714,8 @@
         "unidad": "un"
       },
       {
-        "stockLocalId": 11,
-        "productoLocalId": 12,
+        "stockLocalId": 12,
+        "productoLocalId": 13,
         "nombre": "Bizcochos de coco",
         "codigoBarra": "8000000000201",
         "stock": 2,
@@ -1707,8 +1732,8 @@
         "unidad": "un"
       },
       {
-        "stockLocalId": 12,
-        "productoLocalId": 13,
+        "stockLocalId": 13,
+        "productoLocalId": 14,
         "nombre": "Coco rallado",
         "codigoBarra": "8000000000202",
         "stock": 3,
@@ -1725,7 +1750,7 @@
         "unidad": "kg"
       },
       {
-        "stockLocalId": 10,
+        "stockLocalId": 11,
         "productoLocalId": 7,
         "nombre": "Sin fila",
         "codigoBarra": "7790000000007",
@@ -1745,8 +1770,8 @@
     "control": {
       "id": 3,
       "estado": "TERMINADO",
-      "abiertoEn": "2026-10-22T20:19:11.987Z",
-      "terminadoEn": "2026-10-22T20:19:13.470Z",
+      "abiertoEn": "2026-10-22T20:49:58.331Z",
+      "terminadoEn": "2026-10-22T20:49:59.893Z",
       "terminadoPorNombre": "Emanuel",
       "noContadosDecision": "COMO_ESTABAN",
       "noContadosComoEstaban": 7
@@ -1755,7 +1780,7 @@
     "conPlata": true,
     "filas": [
       {
-        "productoLocalId": 14,
+        "productoLocalId": 15,
         "nombre": "Fanta 2L",
         "unidadFisica": "UNIDAD",
         "sistema": 5,
@@ -1776,9 +1801,9 @@
   "conteoDelSwift": {
     "ok": true,
     "item": {
-      "id": 25,
+      "id": 26,
       "localId": 1,
-      "baseId": 22,
+      "baseId": 23,
       "nombre": "SWIFT PICADILLO 90G",
       "codigoBarra": "7790360720115",
       "categoriaId": null,
@@ -1803,7 +1828,7 @@
       "conteo": {
         "total": 21,
         "contadoPor": "Ana",
-        "en": "2026-10-22T20:19:13.525Z",
+        "en": "2026-10-22T20:49:59.953Z",
         "sistema": 19,
         "diferencia": 2
       }
@@ -1827,22 +1852,22 @@
     "ok": true,
     "control": {
       "id": 5,
-      "abiertoEn": "2026-10-22T20:19:13.659Z"
+      "abiertoEn": "2026-10-22T20:50:00.088Z"
     },
     "productos": [
       {
-        "productoLocalId": 26,
+        "productoLocalId": 27,
         "nombre": "Arroz 1kg",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Emanuel",
         "contado": 8,
-        "anclaMovimientoId": 71,
+        "anclaMovimientoId": 72,
         "movimientosPosteriores": [
           {
-            "id": 72,
+            "id": 73,
             "origen": "VENTA",
             "origenRef": "9001",
-            "instante": "2026-10-22T20:19:13.693Z",
+            "instante": "2026-10-22T20:50:00.133Z",
             "cambio": -1
           }
         ],
@@ -1858,12 +1883,12 @@
         "filasDeOtroLocal": []
       },
       {
-        "productoLocalId": 27,
+        "productoLocalId": 28,
         "nombre": "Harina 000",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Emanuel",
         "contado": 5,
-        "anclaMovimientoId": 76,
+        "anclaMovimientoId": 77,
         "movimientosPosteriores": [],
         "posteriores": 0,
         "deberia": 5,
@@ -1877,7 +1902,7 @@
         "filasDeOtroLocal": []
       },
       {
-        "productoLocalId": 30,
+        "productoLocalId": 31,
         "nombre": "Mate cocido",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Emanuel",
@@ -1896,12 +1921,12 @@
         "filasDeOtroLocal": []
       },
       {
-        "productoLocalId": 31,
+        "productoLocalId": 32,
         "nombre": "Lentejas",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Emanuel",
         "contado": 6,
-        "anclaMovimientoId": 87,
+        "anclaMovimientoId": 88,
         "movimientosPosteriores": [],
         "posteriores": 0,
         "deberia": 6,
@@ -1915,18 +1940,18 @@
         "filasDeOtroLocal": []
       },
       {
-        "productoLocalId": 28,
+        "productoLocalId": 29,
         "nombre": "Sal fina",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Emanuel",
         "contado": 21,
-        "anclaMovimientoId": 78,
+        "anclaMovimientoId": 79,
         "movimientosPosteriores": [
           {
-            "id": 79,
+            "id": 80,
             "origen": "VENTA",
             "origenRef": "9001",
-            "instante": "2026-10-22T20:19:13.745Z",
+            "instante": "2026-10-22T20:50:00.190Z",
             "cambio": -2
           }
         ],
@@ -1942,12 +1967,12 @@
         "filasDeOtroLocal": []
       },
       {
-        "productoLocalId": 29,
+        "productoLocalId": 30,
         "nombre": "Té x25",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Emanuel",
         "contado": 5,
-        "anclaMovimientoId": 82,
+        "anclaMovimientoId": 83,
         "movimientosPosteriores": [],
         "posteriores": 0,
         "deberia": 5,
@@ -1968,11 +1993,11 @@
     "ok": true,
     "control": {
       "id": 5,
-      "abiertoEn": "2026-10-22T20:19:13.659Z"
+      "abiertoEn": "2026-10-22T20:50:00.088Z"
     },
     "productos": [
       {
-        "productoLocalId": 30,
+        "productoLocalId": 31,
         "nombre": "Mate cocido",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Emanuel",
@@ -1991,25 +2016,25 @@
         "filasDeOtroLocal": []
       },
       {
-        "productoLocalId": 26,
+        "productoLocalId": 27,
         "nombre": "Arroz 1kg",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Emanuel",
         "contado": 8,
-        "anclaMovimientoId": 71,
+        "anclaMovimientoId": 72,
         "movimientosPosteriores": [
           {
-            "id": 72,
+            "id": 73,
             "origen": "VENTA",
             "origenRef": "9001",
-            "instante": "2026-10-22T20:19:13.693Z",
+            "instante": "2026-10-22T20:50:00.133Z",
             "cambio": -1
           },
           {
-            "id": 90,
+            "id": 91,
             "origen": "VENTA",
             "origenRef": "9001",
-            "instante": "2026-10-22T20:19:14.615Z",
+            "instante": "2026-10-22T20:50:01.315Z",
             "cambio": -1
           }
         ],
@@ -2025,12 +2050,12 @@
         "filasDeOtroLocal": []
       },
       {
-        "productoLocalId": 27,
+        "productoLocalId": 28,
         "nombre": "Harina 000",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Emanuel",
         "contado": 5,
-        "anclaMovimientoId": 76,
+        "anclaMovimientoId": 77,
         "movimientosPosteriores": [],
         "posteriores": 0,
         "deberia": 5,
@@ -2044,12 +2069,12 @@
         "filasDeOtroLocal": []
       },
       {
-        "productoLocalId": 31,
+        "productoLocalId": 32,
         "nombre": "Lentejas",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Emanuel",
         "contado": 6,
-        "anclaMovimientoId": 87,
+        "anclaMovimientoId": 88,
         "movimientosPosteriores": [],
         "posteriores": 0,
         "deberia": 6,
@@ -2063,18 +2088,18 @@
         "filasDeOtroLocal": []
       },
       {
-        "productoLocalId": 28,
+        "productoLocalId": 29,
         "nombre": "Sal fina",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Emanuel",
         "contado": 21,
-        "anclaMovimientoId": 78,
+        "anclaMovimientoId": 79,
         "movimientosPosteriores": [
           {
-            "id": 79,
+            "id": 80,
             "origen": "VENTA",
             "origenRef": "9001",
-            "instante": "2026-10-22T20:19:13.745Z",
+            "instante": "2026-10-22T20:50:00.190Z",
             "cambio": -2
           }
         ],
@@ -2090,12 +2115,12 @@
         "filasDeOtroLocal": []
       },
       {
-        "productoLocalId": 29,
+        "productoLocalId": 30,
         "nombre": "Té x25",
         "unidadFisica": "UNIDAD",
         "contadoPor": "Emanuel",
         "contado": 5,
-        "anclaMovimientoId": 82,
+        "anclaMovimientoId": 83,
         "movimientosPosteriores": [],
         "posteriores": 0,
         "deberia": 5,

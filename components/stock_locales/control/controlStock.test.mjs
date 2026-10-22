@@ -687,12 +687,68 @@ test("'El stock no coincide': lo que trae la revisión real, con Corregir, solo 
   const t = texto(renderToStaticMarkup(React.createElement(StockQueNoCoincide, { c: { revision: r, ocupado: false, corregirProducto: nada } })));
   assert.equal(r.aCorregir, 1);
   assert.match(t, /^EL STOCK NO COINCIDE CON LO CONTADO Lata al revés x24 contado 24 · después 0 · debería 24 un · hay −24 un Corregir$/);
+  // Sin nada para corregir el recuadro NO desaparece: dice que revisó y que
+  // coincide. Desaparecer se veía igual que una revisión caída.
   const sinNada = { ...r, productos: r.productos.filter((p) => !p.corregir), aCorregir: 0 };
-  assert.equal(renderToStaticMarkup(React.createElement(StockQueNoCoincide, { c: { revision: sinNada, ocupado: false, corregirProducto: nada } })), "");
+  const alDia = texto(renderToStaticMarkup(React.createElement(StockQueNoCoincide, { c: { revision: sinNada, ocupado: false, corregirProducto: nada } })));
+  assert.equal(alDia, `REVISIÓN DE LO CONTADO Revisé ${sinNada.productos.length} contados: el stock coincide con lo contado, no hay nada para corregir.`);
   const pantalla = fuente("components/stock_locales/control/PantallaControlStock.jsx");
   assert.match(pantalla, /\{puedeGestionar \? <StockQueNoCoincide c=\{c\} \/> : null\}/, "solo quien gestiona");
   const ruta = fuente("app/api/stock_locales/control/revision/route.js");
   assert.equal((ruta.match(/autorizarControl\(req, PERMISO_GESTIONAR_CONTROL, \{[^}]*persona: "cuenta" \}\)/g) || []).length, 2, "GET y POST, de la cuenta sin PIN");
+});
+
+test("el recuadro de la revisión carga SIEMPRE: revisando, el error con su motivo, o al día", () => {
+  const dibujarRevision = (revision) => texto(renderToStaticMarkup(React.createElement(StockQueNoCoincide, { c: { revision, ocupado: false, corregirProducto: nada } })));
+  assert.equal(dibujarRevision(null), "REVISIÓN DE LO CONTADO Revisando el stock de lo contado…");
+  const caida = renderToStaticMarkup(React.createElement(StockQueNoCoincide, { c: { revision: { error: "El servidor contestó 500." }, ocupado: false } }));
+  assert.equal(texto(caida), "REVISIÓN DE LO CONTADO No se pudo revisar lo contado: El servidor contestó 500.");
+  assert.match(caida, /sunmi-text-danger/);
+  assert.equal(dibujarRevision({ ok: true, productos: [], aCorregir: 0 }), "REVISIÓN DE LO CONTADO Todavía no hay nada contado para revisar.");
+  // El hook no descarta un pedido que falla: lo guarda como error.
+  const hook = fuente("components/stock_locales/control/useControlStock.js");
+  assert.match(hook, /setRevision\(r\.ok \? r : \{ error: r\.error \|\| "No se pudo revisar lo contado\." \}\)/);
+  assert.doesNotMatch(hook, /setRevision\(r\.ok \? r : null\)/);
+});
+
+test("un producto que revienta al revisarse va a 'no se corrige' con el motivo; los demás se revisan igual", async () => {
+  // La defensa se ejerce: una base mínima en memoria, con la forma de los
+  // `select` de `reconstruccionDeConteos.js`, donde la fila de stock de UN
+  // producto no se puede leer como número. No es un caso de producción
+  // conocido: es la contraprueba de que uno solo no tira abajo el recuadro.
+  const { revisarProductosContados, ESTADO_RECONSTRUCCION } = await import("@/lib/stock/control/reconstruccionDeConteos.js");
+  const T0 = new Date("2026-10-20T12:00:00.000Z");
+  const conteo = (productoLocalId, cantidad) => ({ id: productoLocalId, productoLocalId, cantidad, contadoPor: "Ana", creadoEn: T0, sistemaAlContar: null });
+  const audit = (productoLocalId, a, n) => ({ productoLocalId, accion: "CONTROL_CONTEO", cantidadAnterior: a, cantidadNueva: n, createdAt: T0 });
+  const malo = { valueOf() { throw new Error("cantidad ilegible"); } };
+  const db = {
+    conteoControlStock: { findMany: async () => [conteo(1, 5), conteo(2, 3)] },
+    auditoriaStock: { findMany: async () => [audit(1, 5, 5), audit(2, 3, 3)] },
+    movimientoStock: { findMany: async () => [] },
+    stockLocal: { findMany: async () => [{ localId: 9, productoId: 1, cantidad: 5 }, { localId: 9, productoId: 2, cantidad: malo }] },
+  };
+  const errores = [];
+  const original = console.error;
+  console.error = (...a) => errores.push(a.join(" "));
+  let r;
+  try {
+    r = await revisarProductosContados(db, { id: 7, localId: 9, abiertoEn: T0 });
+  } finally {
+    console.error = original;
+  }
+  const de = (id) => r.find((p) => p.productoLocalId === id);
+  assert.equal(de(1).estado, ESTADO_RECONSTRUCCION.MARCADO, "el sano se revisa");
+  assert.equal(de(2).estado, ESTADO_RECONSTRUCCION.NO_RECONSTRUIBLE);
+  assert.equal(de(2).revision.motivoNoReconstruible, `${MOTIVO_NO_RECONSTRUIBLE.NO_SE_PUDO_REVISAR} cantidad ilegible`);
+  assert.equal(errores.length, 1);
+  assert.match(errores[0], /CONTROL DE STOCK · revisar el producto #2 del control #7:.*cantidad ilegible/, "y el motivo real va al log");
+});
+
+test("el listado devuelve con `return await`: una falla al armar la respuesta pasa por su catch y su log", () => {
+  const ruta = fuente("app/api/stock_locales/listar/route.js");
+  assert.equal((ruta.match(/return responder\(/g) || []).length, 0, "un `return responder(` sin await saca el rechazo del try");
+  assert.ok((ruta.match(/return await responder\(/g) || []).length >= 9);
+  assert.match(ruta, /console\.error\(`❌ ERROR STOCK LISTAR \$\{new URL\(req\.url\)\.search\}:`, err\);/);
 });
 
 test("la revisión antes de reconstruir: 'Corregir todos', los que se corrigen y los que no, con su motivo", () => {

@@ -131,6 +131,10 @@ export async function GET(req) {
     const ctrl = searchParams.has("control")
       ? await listadoDelControl({ localId, esDeposito, filtro: searchParams.get("control") })
       : null;
+    // Se devuelve SIEMPRE con `return await`: un `return responder(...)` a secas
+    // saca el rechazo afuera de este `try`, y una falla al enriquecer o al
+    // serializar llegaba al teléfono como un 500 sin JSON —"Error interno al
+    // cargar stock."— y al log sin el "ERROR STOCK LISTAR" que dice el motivo.
     const responder = async (items, total, totalPages, lecturaControl = null) =>
       NextResponse.json({
         ok: true,
@@ -159,7 +163,7 @@ export async function GET(req) {
       let mapeados = filas.map(mapear);
       if (faltantes) mapeados = mapeados.filter((p) => p.faltante);
       const total = mapeados.length;
-      return responder(mapeados.slice(offset, offset + PAGE_SIZE), total, Math.max(1, Math.ceil(total / PAGE_SIZE)));
+      return await responder(mapeados.slice(offset, offset + PAGE_SIZE), total, Math.max(1, Math.ceil(total / PAGE_SIZE)));
     };
 
     // ======================================================
@@ -175,7 +179,7 @@ export async function GET(req) {
       const baseIdsCodigo = await getBaseIdsCodigo(grupoIdLocal, provNum, q);
       const proveedorBaseFilter = provNum ? { proveedor_id: provNum } : {};
       const plIdPorCodigo = await getProductoLocalIdPorCodigo(localId, q);
-      if (conBuscadorDeCaja && !plIdPorCodigo && lectura) return responder([], 0, 1, { codigoSinProducto: q });
+      if (conBuscadorDeCaja && !plIdPorCodigo && lectura) return await responder([], 0, 1, { codigoSinProducto: q });
       let baseClause;
       if (plIdPorCodigo || conBuscadorDeCaja) {
         baseClause = proveedorBaseFilter;
@@ -284,7 +288,7 @@ export async function GET(req) {
       if (plIdPorCodigo && ctrl) {
         const rows = await prisma.productoLocal.findMany({ where: whereLocal, include: includeLocal });
         const items = rows.map((p) => mapStockItemLocal(p, p.base, p.stock?.[0]));
-        return responder(items, items.length, 1, { porCodigo: plIdPorCodigo });
+        return await responder(items, items.length, 1, { porCodigo: plIdPorCodigo });
       }
       if (conBuscadorDeCaja) {
         return listarComoLaCaja({ where: whereLocal, include: includeLocal, mapear: (p) => mapStockItemLocal(p, p.base, p.stock?.[0]) });
@@ -307,7 +311,7 @@ export async function GET(req) {
         const total = mapped.length;
         const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
         const items = mapped.slice(offset, offset + PAGE_SIZE);
-        return responder(items, total, totalPages);
+        return await responder(items, total, totalPages);
       }
 
       // Resto de casos: filtros + orden + paginación + count 100% en DB.
@@ -321,7 +325,7 @@ export async function GET(req) {
         include: includeLocal,
       });
       const items = rows.map((p) => mapStockItemLocal(p, p.base, p.stock?.[0]));
-      return responder(items, total, totalPages);
+      return await responder(items, total, totalPages);
     }
 
     // ======================================================
@@ -405,7 +409,7 @@ export async function GET(req) {
       const baseIdsCodigoDepo = await getBaseIdsCodigo({ in: grupoIds }, provNumDep, q);
       const proveedorBaseFilterDepo = provNumDep ? { proveedor_id: provNumDep } : {};
       const plIdPorCodigoDepo = await getProductoLocalIdPorCodigo(localId, q);
-      if (conBuscadorDeCaja && !plIdPorCodigoDepo && lectura) return responder([], 0, 1, { codigoSinProducto: q });
+      if (conBuscadorDeCaja && !plIdPorCodigoDepo && lectura) return await responder([], 0, 1, { codigoSinProducto: q });
       let baseClauseDepo;
       if (plIdPorCodigoDepo || conBuscadorDeCaja) {
         baseClauseDepo = proveedorBaseFilterDepo;
@@ -505,7 +509,7 @@ export async function GET(req) {
       if (plIdPorCodigoDepo && ctrl) {
         const rows = await prisma.productoLocal.findMany({ where: whereDepo, include: includeDepo });
         const items = rows.map((p) => mapStockItemDeposito(p, p.base, p.stock?.[0], localId));
-        return responder(items, items.length, 1, { porCodigo: plIdPorCodigoDepo });
+        return await responder(items, items.length, 1, { porCodigo: plIdPorCodigoDepo });
       }
       if (conBuscadorDeCaja) {
         return listarComoLaCaja({ where: whereDepo, include: includeDepo, mapear: (p) => mapStockItemDeposito(p, p.base, p.stock?.[0], localId) });
@@ -524,7 +528,7 @@ export async function GET(req) {
         const total = mapped.length;
         const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
         const items = mapped.slice(offset, offset + PAGE_SIZE);
-        return responder(items, total, totalPages);
+        return await responder(items, total, totalPages);
       }
 
       // Resto: filtros + orden + paginación + count 100% en DB.
@@ -538,12 +542,13 @@ export async function GET(req) {
         include: includeDepo,
       });
       const items = rows.map((p) => mapStockItemDeposito(p, p.base, p.stock?.[0], localId));
-      return responder(items, total, totalPages);
+      return await responder(items, total, totalPages);
     }
   } catch (err) {
-    console.error("❌ ERROR STOCK LISTAR:", err);
+    // Con el pedido entero: sin él no se sabe qué chip, local ni búsqueda falló.
+    console.error(`❌ ERROR STOCK LISTAR ${new URL(req.url).search}:`, err);
     return NextResponse.json(
-      { ok: false, error: err.message },
+      { ok: false, error: `No se pudo cargar el stock: ${err?.message || err}` },
       { status: 500 }
     );
   }

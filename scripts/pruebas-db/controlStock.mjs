@@ -177,6 +177,15 @@ try {
   const plPack = await c.productoLocal.create({ data: { localId: depo.id, baseId: bPack.id, activo: true, precio_costo: 600, precio_venta: 1000 } });
   await c.stockLocal.create({ data: { localId: depo.id, productoId: plPack.id, cantidad: 40 } });
   const PACK = { pl: plPack.id };
+  // Uno del depósito con su fila desde ANTES de abrir el control: en la sección
+  // 13 se cuenta con "Está bien" de la versión anterior y no tiene ningún
+  // movimiento en el Libro desde que se abrió.
+  const bQuieto = await c.productoBase.create({
+    data: { grupoId: grupo.id, nombre: "Quieto sin Libro", codigo_barra: "8000000000301", unidad_medida: "unidad", factor_pack: 1, precio_costo: 600, precio_venta: 1000, redondeo_100: false, activo: true },
+  });
+  const plQuieto = await c.productoLocal.create({ data: { localId: depo.id, baseId: bQuieto.id, activo: true, precio_costo: 600, precio_venta: 1000 } });
+  const slQuieto = await c.stockLocal.create({ data: { localId: depo.id, productoId: plQuieto.id, cantidad: 7 } });
+  const QUIETO = { pl: plQuieto.id, sl: slQuieto.id };
 
   // ── La aplicación, contra ESTA base ─────────────────────────────────────
   process.env.DATABASE_URL = urlPrueba;
@@ -1017,6 +1026,77 @@ try {
     ok("y la revisión dice cuáles no se pueden corregir", rev.noReconstruibles === 2 && rev.aCorregir === 0, json({ aCorregir: rev.aCorregir, noReconstruibles: rev.noReconstruibles }));
     const directo = await reconstruirConteos(c, { controlId: ctl, aplicar: false, userId: dueno.id, grupoId: grupo.id });
     ok("sin aplicar, la función da lo mismo que la ruta", directo.ok && directo.productos.filter((p) => p.estado === ESTADO_RECONSTRUCCION.AL_DIA).length === 4, json(directo.resumen));
+  }
+
+  seccion("13. Con la forma de producción, el listado y la revisión contestan siempre");
+  {
+    // Lo que vio Emanuel el 2026-10-22 con 7607b48: "Error interno al cargar
+    // stock." donde va el recuadro, y el recuadro nunca. Acá, el control del
+    // depósito sigue abierto desde la sección 5 —con sus conteos de hoy—, y se
+    // le suman los de la versión anterior con las formas que tiene producción:
+    // sin `sistemaAlContar`, sin movimientos en el Libro desde que se abrió, de
+    // un producto inactivo, de uno borrado, y un pack y un cajón.
+    const depoCtl = await c.controlStock.findFirst({ where: { localId: depo.id, estado: "ABIERTO" } });
+    const fichaDepo = async (nombre, codigo, unidad, factor, stock, extra = {}) => {
+      const b = await c.productoBase.create({
+        data: { grupoId: grupo.id, nombre, codigo_barra: codigo, unidad_medida: unidad, factor_pack: factor, precio_costo: 1200, precio_venta: 2000, redondeo_100: false, activo: true, ...extra },
+      });
+      const pl = await c.productoLocal.create({ data: { localId: depo.id, baseId: b.id, activo: extra.activo ?? true, precio_costo: 1200, precio_venta: 2000 } });
+      const sl = await c.stockLocal.create({ data: { localId: depo.id, productoId: pl.id, cantidad: stock } });
+      return { pl: pl.id, sl: sl.id, base: b.id };
+    };
+    // Como lo escribía la versión anterior: fila sin `sistemaAlContar`, su
+    // bitácora y, si movió, su Ajuste por control en el Libro.
+    const conteoViejo = (p, { total, antes, queda }) =>
+      c.$transaction(async (tx) => {
+        await tx.conteoControlStock.create({
+          data: { controlId: depoCtl.id, localId: depo.id, productoLocalId: p.pl, cantidad: total, usuarioId: admin.id, operadorId: null, contadoPor: "Administrador", fijo: true, sistemaAntes: antes },
+        });
+        await tx.auditoriaStock.create({
+          data: { grupoId: grupo.id, localId: depo.id, productoLocalId: p.pl, userId: admin.id, accion: "CONTROL_CONTEO", cantidadAnterior: antes, cantidadNueva: queda, motivo: `Ajuste por control #${depoCtl.id}`, controlStockId: depoCtl.id },
+        });
+        if (antes !== queda) {
+          await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.AJUSTE_POR_CONTROL, referencia: String(depoCtl.id) });
+          await tx.stockLocal.update({ where: { id: p.sl }, data: { cantidad: queda } });
+        }
+      });
+    // "Está bien" de antes: no movió nada, y el producto no tiene NINGÚN
+    // movimiento en el Libro desde que se abrió (la fila es de antes).
+    const quieto = QUIETO;
+    ok(
+      "el quieto no tiene movimientos en el Libro desde que se abrió el control",
+      (await c.movimientoStock.count({ where: { productoLocalId: quieto.pl, instante: { gte: depoCtl.abiertoEn } } })) === 0
+    );
+    await conteoViejo(quieto, { total: 7, antes: 7, queda: 7 });
+    const pack = await fichaDepo("Pack viejo x12", "8000000000302", "pack", 12, 30);
+    await conteoViejo(pack, { total: 24, antes: 30, queda: 24 });
+    const cajon = await fichaDepo("Cajón viejo x8", "8000000000303", "cajon", 8, 16, { modoVentaDeposito: "PESO" });
+    await conteoViejo(cajon, { total: 8, antes: 16, queda: 8 });
+    const inactivo = await fichaDepo("Inactivo viejo", "8000000000304", "unidad", 1, 5);
+    await conteoViejo(inactivo, { total: 3, antes: 5, queda: 3 });
+    await c.productoLocal.update({ where: { id: inactivo.pl }, data: { activo: false } });
+    // Uno contado y después BORRADO: la fila del conteo queda, el producto no.
+    const borrado = await fichaDepo("Borrado viejo", "8000000000305", "unidad", 1, 4);
+    await conteoViejo(borrado, { total: 2, antes: 4, queda: 2 });
+    await c.$transaction(async (tx) => {
+      await declararOrigenDeStock(tx, { origen: ORIGEN_STOCK.ELIMINACION_PRODUCTO, referencia: String(borrado.pl) });
+      await tx.stockLocal.delete({ where: { id: borrado.sl } });
+    });
+    await c.productoLocal.delete({ where: { id: borrado.pl } });
+
+    for (const chip of ["todos", "sin_contar", "contados", "con_diferencia"]) {
+      const l = await lista(S.adminDepo, chip);
+      ok(`el listado del control con '${chip}' contesta JSON con ok`, l.status === 200 && l.ok === true && Array.isArray(l.items), json({ status: l.status, error: l.error }));
+    }
+    const rev = await pedir(R.revision, "GET", `${B}/revision`, S.adminDepo);
+    ok("la revisión contesta JSON con ok", rev.status === 200 && rev.ok === true && Array.isArray(rev.productos), json({ status: rev.status, error: rev.error }));
+    const de = (id) => rev.productos?.find((p) => p.productoLocalId === id);
+    ok("el pack y el cajón viejos se revisan en unidades y están al día", de(pack.pl)?.reconstruible === true && de(pack.pl)?.corregir === false && de(cajon.pl)?.reconstruible === true, json([de(pack.pl), de(cajon.pl)]));
+    ok("el que no tiene movimientos en el Libro se revisa igual", de(quieto.pl)?.reconstruible === true && de(quieto.pl)?.corregir === false, json(de(quieto.pl)));
+    ok("el inactivo contado está en la revisión", Boolean(de(inactivo.pl)), json(rev.productos?.map((p) => p.nombre)));
+    ok("el borrado no está en la revisión ni la tira abajo", !de(borrado.pl));
+    const todos = await pedir(R.revision, "POST", `${B}/revision`, S.adminDepo, { todos: true });
+    ok("'Corregir todos' con todo eso también contesta, sin tocar el borrado", todos.status === 200 && todos.ok === true, json(todos));
   }
 
   if (process.env.ESCRIBIR_FIXTURE_CONTROL) {

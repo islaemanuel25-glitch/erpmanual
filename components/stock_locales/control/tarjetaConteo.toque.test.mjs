@@ -42,7 +42,15 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
  * El servidor: cada pedido de la pantalla contesta con una respuesta real.
  * `lista` es una respuesta, o una función de los parámetros del listado.
  */
-function servidor({ lista, guardado, terminar = real.terminar, terminado = null, informe = real.diferenciasAbierto }) {
+function servidor({
+  lista,
+  guardado,
+  terminar = real.terminar,
+  terminado = null,
+  informe = real.diferenciasAbierto,
+  revision = { ok: true, productos: [], aCorregir: 0 },
+  listarSinDatos = null,
+}) {
   const pedidos = [];
   globalThis.fetch = async (url, opciones = {}) => {
     const u = new URL(url, "http://localhost");
@@ -55,8 +63,14 @@ function servidor({ lista, guardado, terminar = real.terminar, terminado = null,
     else if (u.pathname === "/api/stock_locales/control/diferencias") datos = informe;
     else if (u.pathname === "/api/stock_locales/control/terminar" && metodo === "GET") datos = terminar;
     else if (u.pathname === "/api/stock_locales/control/terminar" && metodo === "POST") datos = terminado ?? { ok: true, controlId: informe.control.id };
-    else if (u.pathname === "/api/stock_locales/control/revision") datos = { ok: true, productos: [], aCorregir: 0 };
-    return { ok: true, status: 200, json: async () => datos };
+    else if (u.pathname === "/api/stock_locales/control/revision") datos = revision;
+    // Un listado que el servidor contesta sin JSON —un 500 de Next, un 502 del
+    // proxy—: `{ status, cuerpo }`.
+    if (u.pathname === "/api/stock_locales/listar" && listarSinDatos) {
+      return { ok: false, status: listarSinDatos.status, text: async () => listarSinDatos.cuerpo, json: async () => JSON.parse(listarSinDatos.cuerpo) };
+    }
+    // Como el `fetch` de verdad: el cuerpo se lee como JSON o como texto.
+    return { ok: datos.ok !== false, status: datos.ok === false ? 500 : 200, json: async () => datos, text: async () => JSON.stringify(datos) };
   };
   return pedidos;
 }
@@ -98,7 +112,7 @@ afterEach(async () => {
 });
 
 /** Monta la pantalla y espera la lista (el buscador filtra a los 300 ms). */
-async function montar(respuestas, { puedeGestionar = false } = {}) {
+async function montar(respuestas, { puedeGestionar = false, conTarjeta = true } = {}) {
   const pedidos = servidor(respuestas);
   const raiz = document.createElement("div");
   document.body.replaceChildren(raiz);
@@ -117,9 +131,35 @@ async function montar(respuestas, { puedeGestionar = false } = {}) {
     await esperar(400);
   });
   const fila = raiz.querySelector("[data-fila-conteo]");
-  assert.ok(fila, "la tarjeta tiene que estar dibujada");
+  if (conTarjeta) assert.ok(fila, "la tarjeta tiene que estar dibujada");
   return { raiz, root, pedidos };
 }
+
+test("quien gestiona: la revisión que falla se DICE en el recuadro, con su motivo, en vez de no aparecer", async () => {
+  const { raiz, root } = await montar(
+    { lista: real.listaContados, guardado: null, revision: { ok: false, error: "No se pudo revisar el control: columna inexistente" } },
+    { puedeGestionar: true }
+  );
+  const recuadro = raiz.querySelector("[data-revision-control]");
+  assert.ok(recuadro, "el recuadro está aunque la revisión haya fallado");
+  assert.equal(texto(recuadro.querySelector("h2")), "REVISIÓN DE LO CONTADO");
+  assert.equal(texto(recuadro.querySelector("p")), "No se pudo revisar lo contado: No se pudo revisar el control: columna inexistente");
+  await act(async () => root.unmount());
+
+  const otra = await montar({ lista: real.listaContados, guardado: null }, { puedeGestionar: true });
+  assert.equal(texto(otra.raiz.querySelector("[data-revision-control] p")), "Todavía no hay nada contado para revisar.");
+  await act(async () => otra.root.unmount());
+});
+
+test("un listado que el servidor contesta sin JSON dice el status, no 'Error interno al cargar stock.'", async () => {
+  const { raiz, root } = await montar(
+    { lista: real.listaContados, guardado: null, listarSinDatos: { status: 502, cuerpo: "<html>Bad Gateway</html>" } },
+    { conTarjeta: false }
+  );
+  assert.match(texto(raiz), /El servidor contestó 502 sin datos al cargar el stock\./);
+  assert.doesNotMatch(texto(raiz), /Error interno al cargar stock/);
+  await act(async () => root.unmount());
+});
 
 const fila = (raiz) => raiz.querySelector("[data-fila-conteo]");
 const rotulo = (raiz) => fila(raiz).querySelector("p");

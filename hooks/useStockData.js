@@ -2,6 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
+/** El pedido del listado no tuvo respuesta: sin conexión, o se cortó. */
+export const TEXTO_SIN_RESPUESTA = "No llegó respuesta del servidor al cargar el stock. Revisá la conexión y volvé a intentar.";
+
+/** El servidor contestó, pero sin datos: el motivo está en su log con ese status. */
+export const textoSinDatos = (status) => `El servidor contestó ${status} sin datos al cargar el stock.`;
+
 // Fetch + estado del listado de Stock Locales. Extraído de TablaStock.jsx SIN
 // cambiar comportamiento: mismos params, mismo endpoint, misma dependencia de
 // efecto (incluida la limpieza de `refrescar`). La presentación queda en la tabla.
@@ -84,7 +90,18 @@ export function useStockData({ localSeleccionado, filtro, page, refrescar, setRe
           cache: "no-store",
         });
 
-        const json = await res.json();
+        // Una respuesta que no es JSON —un 500 que no pasó por el `catch` de la
+        // ruta, un 502 o 504 del proxy— se dice con su status, no como "Error
+        // interno": ése fue todo lo que se vio en producción el 2026-10-22.
+        const cuerpo = await res.text();
+        let json;
+        try {
+          json = JSON.parse(cuerpo);
+        } catch {
+          console.error(`Error cargando stock: el servidor contestó ${res.status} sin datos`, cuerpo.slice(0, 300));
+          if (!cancelado) setError(textoSinDatos(res.status));
+          return;
+        }
         if (!json.ok) {
           if (!cancelado) {
             setError(json.error || "Error cargando stock.");
@@ -103,8 +120,10 @@ export function useStockData({ localSeleccionado, filtro, page, refrescar, setRe
           setLecturaControl(json.lecturaControl ?? null);
         }
       } catch (err) {
+        // `fetch` rechaza sin respuesta: el pedido no llegó o se cortó, y el
+        // servidor no tiene nada que loguear.
         console.error("Error cargando stock:", err);
-        if (!cancelado) setError("Error interno al cargar stock.");
+        if (!cancelado) setError(TEXTO_SIN_RESPUESTA);
       } finally {
         if (!cancelado) {
           setLoading(false);
