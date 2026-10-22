@@ -10,9 +10,38 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiHeader from "@/components/sunmi/SunmiHeader";
 import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
+import {
+  SelectoresAdmin,
+  SelectoresDeposito,
+  useTransferenciaSinPedido,
+} from "@/components/pos-transferencias/TransferenciaSinPedido";
+import EntradaDepositoCelular from "@/components/pos-transferencias/EntradaDepositoCelular";
+import { useEsEscritorio } from "@/lib/layout/useEsEscritorio";
 
-export default function PosTransferenciasHomePage() {
+// ── UNA PÁGINA, DOS PANTALLAS ─────────────────────────────────────────────
+//
+// Por debajo de 1024 px, el depósito y el admin ven "Pedidos de locales"
+// (`components/pos-transferencias/EntradaDepositoCelular.jsx`, 2026-10-22). Desde
+// 1024 px, y para un LOCAL en cualquier ancho, la pantalla de siempre, más
+// abajo. Se monta UNA, la del ancho real, como en Pedidos (`useEsEscritorio`);
+// mientras no se sabe, el mismo "Cargando opciones...".
+export default function PaginaPosTransferencias() {
+  const esEscritorio = useEsEscritorio();
+  if (esEscritorio === null) {
+    return (
+      <div className="min-h-screen sunmi-bg flex items-center justify-center">
+        <span className="text-sm sunmi-text-muted">Cargando opciones...</span>
+      </div>
+    );
+  }
+  return esEscritorio ? (
+    <PosTransferenciasHomePage />
+  ) : (
+    <EntradaDepositoCelular PantallaDeSiempre={PosTransferenciasHomePage} />
+  );
+}
+
+function PosTransferenciasHomePage() {
   const router = useRouter();
   const { perfil: perfilCtx, cargando: cargandoCtx } = useUser();
 
@@ -21,20 +50,9 @@ export default function PosTransferenciasHomePage() {
   const [me, setMe] = useState(null);
   const [modo, setModo] = useState(null);
 
-  // DEPÓSITO
-  const [origenDeposito, setOrigenDeposito] = useState(null);
-  const [destinosDeposito, setDestinosDeposito] = useState([]);
-  const [destinoIdDeposito, setDestinoIdDeposito] = useState("");
-
-  // ADMIN
-  const [grupos, setGrupos] = useState([]);
-  const [grupoIdSel, setGrupoIdSel] = useState("");
-
-  const [depositosGrupo, setDepositosGrupo] = useState([]);
-  const [localesGrupo, setLocalesGrupo] = useState([]);
-
-  const [origenIdAdmin, setOrigenIdAdmin] = useState("");
-  const [destinoIdAdmin, setDestinoIdAdmin] = useState("");
+  // DEPÓSITO y ADMIN: los selectores de una transferencia sin pedido, que
+  // comparte con la entrada del celular (`TransferenciaSinPedido`).
+  const sinPedido = useTransferenciaSinPedido();
 
   // LOCAL
   const [localInfo, setLocalInfo] = useState(null);
@@ -79,40 +97,8 @@ export default function PosTransferenciasHomePage() {
 
         setModo(jsonOpt.modo);
 
-        // -------------------------
-        // MODO DEPÓSITO
-        // -------------------------
-        if (jsonOpt.modo === "deposito") {
-          const origen = jsonOpt.origen || null;
-          const destinos = jsonOpt.destinos || [];
-
-          setOrigenDeposito(origen);
-          setDestinosDeposito(destinos);
-
-          setDestinoIdDeposito(destinos[0]?.id ? String(destinos[0].id) : "");
-        }
-
-        // -------------------------
-        // MODO ADMIN
-        // -------------------------
-        if (jsonOpt.modo === "admin") {
-          const gruposData = jsonOpt.grupos || [];
-          setGrupos(gruposData);
-
-          if (gruposData.length > 0) {
-            const g0 = gruposData[0];
-            setGrupoIdSel(String(g0.id));
-
-            const deps = g0.depositos || [];
-            const locs = g0.locales || [];
-
-            setDepositosGrupo(deps);
-            setLocalesGrupo(locs);
-
-            setOrigenIdAdmin(deps[0]?.id ? String(deps[0].id) : "");
-            setDestinoIdAdmin(locs[0]?.id ? String(locs[0].id) : "");
-          }
-        }
+        // MODO DEPÓSITO y MODO ADMIN
+        sinPedido.cargarOpciones(jsonOpt);
 
         // -------------------------
         // MODO LOCAL (G1)
@@ -156,66 +142,9 @@ export default function PosTransferenciasHomePage() {
   };
 
   // ========================================================
-  // CAMBIOS ADMIN
+  // INICIAR TRANSFERENCIA (la lógica vive en `TransferenciaSinPedido`)
   // ========================================================
-  const handleChangeGrupo = (grupoIdStr) => {
-    setGrupoIdSel(grupoIdStr);
-
-    const grupoId = Number(grupoIdStr);
-    const g = grupos.find((x) => x.id === grupoId);
-
-    if (!g) {
-      setDepositosGrupo([]);
-      setLocalesGrupo([]);
-      setOrigenIdAdmin("");
-      setDestinoIdAdmin("");
-      return;
-    }
-
-    const deps = g.depositos || [];
-    const locs = g.locales || [];
-
-    setDepositosGrupo(deps);
-    setLocalesGrupo(locs);
-
-    setOrigenIdAdmin(deps[0]?.id ? String(deps[0].id) : "");
-    setDestinoIdAdmin(locs[0]?.id ? String(locs[0].id) : "");
-  };
-
-  // ========================================================
-  // INICIAR TRANSFERENCIA
-  // ========================================================
-  const iniciarTransferencia = () => {
-    let origenId = null;
-    let destinoId = null;
-
-    if (modo === "deposito") {
-      if (!origenDeposito || !destinoIdDeposito) {
-        setError("Seleccioná un local destino");
-        return;
-      }
-      origenId = origenDeposito.id;
-      destinoId = Number(destinoIdDeposito);
-    }
-
-    if (modo === "admin") {
-      if (!grupoIdSel || !origenIdAdmin || !destinoIdAdmin) {
-        setError("Seleccioná grupo, depósito y local destino");
-        return;
-      }
-      origenId = Number(origenIdAdmin);
-      destinoId = Number(destinoIdAdmin);
-    }
-
-    if (!origenId || !destinoId || origenId === destinoId) {
-      setError("Origen y destino deben ser distintos");
-      return;
-    }
-
-    router.push(
-      `/modulos/pos-transferencias/nueva?origenId=${origenId}&destinoId=${destinoId}`
-    );
-  };
+  const iniciarTransferencia = () => sinPedido.iniciarTransferencia(modo, setError);
 
   // ========================================================
   // ESTADOS SIMPLES
@@ -357,67 +286,11 @@ export default function PosTransferenciasHomePage() {
           {/* =============================
               MODO DEPÓSITO
           ============================= */}
-          {modo === "deposito" && origenDeposito && (
+          {modo === "deposito" && sinPedido.origenDeposito && (
             <>
               <SunmiSeparator label="Preparar transferencia desde Depósito" />
 
-              <div className="space-y-4 text-[13px]">
-                {/* RESUMEN ORIGEN */}
-                <div
-                  className="
-                    sunmi-surface
-                    border sunmi-border
-                    rounded-2xl
-                    px-4 py-3
-                    flex flex-col sm:flex-row sm:items-center sm:justify-between
-                    gap-2
-                  "
-                >
-                  <div>
-                    <div className="text-[11px] uppercase tracking-wide sunmi-text-muted">
-                      Depósito origen
-                    </div>
-                    <div className="text-[14px] font-semibold">
-                      {origenDeposito.nombre}
-                    </div>
-                  </div>
-
-                  <div className="text-[11px] sunmi-text-muted">
-                    Seleccioná el local destino y comenzá la sesión POS.
-                  </div>
-                </div>
-
-                {/* SELECT DESTINO SUNMI */}
-                <div className="space-y-1">
-                  <div className="text-[11px] uppercase tracking-wide sunmi-text-muted">
-                    Local destino
-                  </div>
-
-                  <SunmiSelectAdv
-                    value={destinoIdDeposito}
-                    placeholder="Seleccionar local destino"
-                    onChange={(value) => setDestinoIdDeposito(value)}
-                    className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
-                  >
-                    {destinosDeposito.map((l) => (
-                      <div key={l.id} value={String(l.id)}>
-                        {l.nombre}
-                      </div>
-                    ))}
-                  </SunmiSelectAdv>
-                </div>
-
-                {/* BOTÓN INICIAR */}
-                <div className="pt-2">
-                  <SunmiButton
-                    color="amber"
-                    disabled={!destinoIdDeposito}
-                    onClick={iniciarTransferencia}
-                  >
-                    Iniciar transferencia desde depósito
-                  </SunmiButton>
-                </div>
-              </div>
+              <SelectoresDeposito s={sinPedido} onIniciar={iniciarTransferencia} />
             </>
           )}
 
@@ -428,81 +301,7 @@ export default function PosTransferenciasHomePage() {
             <>
               <SunmiSeparator label="Preparar transferencia como Admin" />
 
-              <div className="space-y-4 text-[13px]">
-                {/* GRUPO */}
-                <div className="space-y-1">
-                  <div className="text-[11px] uppercase tracking-wide sunmi-text-muted">
-                    Grupo
-                  </div>
-
-                  <SunmiSelectAdv
-                    value={grupoIdSel}
-                    placeholder="Seleccionar grupo"
-                    onChange={(value) => handleChangeGrupo(value)}
-                    className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
-                  >
-                    {grupos.map((g) => (
-                      <div key={g.id} value={String(g.id)}>
-                        {g.nombre}
-                      </div>
-                    ))}
-                  </SunmiSelectAdv>
-                </div>
-
-                {/* ORIGEN / DESTINO */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* DEPÓSITO ORIGEN */}
-                  <div className="space-y-1">
-                    <div className="text-[11px] uppercase tracking-wide sunmi-text-muted">
-                      Depósito origen
-                    </div>
-
-                    <SunmiSelectAdv
-                      value={origenIdAdmin}
-                      placeholder="Seleccionar depósito"
-                      onChange={(value) => setOrigenIdAdmin(value)}
-                      className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
-                    >
-                      {depositosGrupo.map((d) => (
-                        <div key={d.id} value={String(d.id)}>
-                          {d.nombre}
-                        </div>
-                      ))}
-                    </SunmiSelectAdv>
-                  </div>
-
-                  {/* LOCAL DESTINO */}
-                  <div className="space-y-1">
-                    <div className="text-[11px] uppercase tracking-wide sunmi-text-muted">
-                      Local destino
-                    </div>
-
-                    <SunmiSelectAdv
-                      value={destinoIdAdmin}
-                      placeholder="Seleccionar local"
-                      onChange={(value) => setDestinoIdAdmin(value)}
-                      className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
-                    >
-                      {localesGrupo.map((l) => (
-                        <div key={l.id} value={String(l.id)}>
-                          {l.nombre}
-                        </div>
-                      ))}
-                    </SunmiSelectAdv>
-                  </div>
-                </div>
-
-                {/* BOTÓN INICIAR */}
-                <div className="pt-2">
-                  <SunmiButton
-                    color="cyan"
-                    disabled={!origenIdAdmin || !destinoIdAdmin}
-                    onClick={iniciarTransferencia}
-                  >
-                    Iniciar transferencia admin
-                  </SunmiButton>
-                </div>
-              </div>
+              <SelectoresAdmin s={sinPedido} onIniciar={iniciarTransferencia} />
             </>
           )}
 

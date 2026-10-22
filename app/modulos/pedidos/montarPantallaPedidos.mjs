@@ -93,11 +93,14 @@ export const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
  *   - `historial`: lo que contesta `/api/pedidos/historial` (los pedidos
  *     anteriores de la página de entrada). Sin esto, el del local de los tres
  *     productos al entrar: ninguno. Una lista: una respuesta por página.
+ *   - `otras`: `{ "/api/ruta": respuesta | ({ params, metodo, cuerpo }) => respuesta }`
+ *     para montar pantallas que leen rutas que no son de Pedidos (el lado del
+ *     depósito). Se miran antes que las de Pedidos.
  *   - `sumar`: lista de respuestas de `/api/pedidos/sumar-al-enviado`, una
  *     por confirmación. Con un ok, el carrito pasa a `trasSumar` (por defecto
  *     el real del local de los tres productos después de sumar).
  */
-function servidor({ inicio, solicitar = [], cancelar = [], local = null, setCantidad = null, historial = null, sumar = [], trasSumar = null, detalles = null }) {
+function servidor({ inicio, solicitar = [], cancelar = [], local = null, setCantidad = null, historial = null, sumar = [], trasSumar = null, detalles = null, otras = null }) {
   const pedidos = [];
   const estado = { conPin: true, carrito: inicio };
   const colas = { solicitar: [...solicitar], cancelar: [...cancelar], sumar: [...sumar] };
@@ -107,7 +110,13 @@ function servidor({ inicio, solicitar = [], cancelar = [], local = null, setCant
     const cuerpo = opciones.body ? JSON.parse(opciones.body) : null;
     pedidos.push({ ruta: u.pathname, metodo, params: Object.fromEntries(u.searchParams), cuerpo });
     let r = { status: 200, cuerpo: { ok: true } };
-    if (u.pathname === "/api/me") r = local ? local.me : real.me;
+    if (otras && Object.hasOwn(otras, u.pathname)) {
+      // Una ruta de otra pantalla (las del depósito): su respuesta real, o una
+      // función que la elige según lo que se pidió.
+      const o = otras[u.pathname];
+      r = typeof o === "function" ? o({ params: Object.fromEntries(u.searchParams), metodo, cuerpo }) : o;
+    }
+    else if (u.pathname === "/api/me") r = local ? local.me : real.me;
     else if (u.pathname === "/api/operador/me") r = local ? local.operadorMe : estado.conPin ? real.operadorMeConPin : real.operadorMeSinPin;
     else if (u.pathname === "/api/operador/listar") r = real.operadorListar;
     else if (u.pathname === "/api/pedidos/opciones") r = local ? local.opciones : real.opciones;

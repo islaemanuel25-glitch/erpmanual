@@ -1085,10 +1085,18 @@ try {
         "AZUCAR", "SAL",
       ]);
       for (const id of Object.values(D.ids)) await c.stockLocal.create({ data: { localId: D.deposito.id, productoId: id, cantidad: 1000 } });
+      // El cliente del depósito vinculado al local, como lo deja Clientes: es lo
+      // que hace que el local sea destino de una transferencia
+      // (`lib/transferencias/destinosDeTransferencia.js`).
+      const grupoIdD = (await c.grupoLocal.findFirst({ where: { localId: D.local.id }, select: { grupoId: true } })).grupoId;
+      await c.cliente.create({ data: { grupoId: grupoIdD, localId: D.deposito.id, nombre: `${D.local.nombre} (interno)`, localVinculadoId: D.local.id } });
       const cuentaDepoD = await c.usuario.create({
         data: { nombre: "Depósito Marta", email: `deposito-prepara-${marca}@ci.local`, passwordHash: "x", rolId: rolEnc.id, localId: D.deposito.id },
       });
-      const sDepo = sesionDe(cuentaDepoD, D.deposito.id);
+      // Con su operaria y el PIN puesto, como trabaja un depósito de verdad: sin
+      // operario, la app lo manda a /bloqueo-operador.
+      const operariaDepo = await c.operadorLocal.create({ data: { nombre: "Marta", pinHash: "x", localId: D.deposito.id } });
+      const sDepo = `${sesionDe(cuentaDepoD, D.deposito.id)}; erpazul_operador_activo=${jwt.sign({ operadorId: operariaDepo.id, nombre: operariaDepo.nombre, localId: D.deposito.id, _tipo: "operador", emitidoEn: Date.now() }, process.env.AUTH_SECRET)}`;
       const solicitadosD = () => pedir(RD.solicitados, "GET", `${B}/pos-transferencias/solicitados`, sDepo);
       const detalleD = (posId) => pedir(RD.detalle, "GET", `${B}/pos-transferencias/detalle?posId=${posId}`, sDepo);
       const editarD = (body) => pedir(editar, "POST", `${B}/pos-transferencias/detalle/editar`, sDepo, body);
@@ -1213,6 +1221,36 @@ try {
       const quitada = await pedir(quitarRuta, "POST", `${B}/pos-transferencias/detalle/quitar`, sDepo, { detalleId: sal.detalleId });
       const salQuitada = lineaDe(await detalleD(p2), "SAL");
       ok("14b: quitada, la sal vuelve a sin decidir", quitada.cuerpo.accion === "devuelto_a_sugerido" && salQuitada?.preparado === 0 && salQuitada.revisadoEn === null, json({ quitada, salQuitada }));
+      // ── Lo que leen las pantallas del depósito al entrar ─────────────────
+      // El depósito y un admin (permiso "*", sin local), firmados como el login.
+      const opcionesRuta = await import("../../app/api/pos-transferencias/opciones/route.js");
+      const sAdmin = `erpazul_sesion=${jwt.sign(
+        { id: cuentaDepoD.id, nombre: "Admin pruebas", email: cuentaDepoD.email, rolId: cuentaDepoD.rolId, rolNombre: "ADMIN", permisos: ["*"], esDuenoLocal: false, localId: null, esDeposito: false },
+        process.env.AUTH_SECRET,
+        { expiresIn: "1h" }
+      )}`;
+      const meDepo = await pedir(R.me, "GET", `${B}/me`, sDepo);
+      const opcionesDepo = await pedir(opcionesRuta, "GET", `${B}/pos-transferencias/opciones`, sDepo);
+      guardar("depositoMe", meDepo);
+      guardar("depositoOpciones", opcionesDepo);
+      guardar("depositoOperadorMe", await pedir(R.operadorMe, "GET", `${B}/operador/me`, sDepo));
+      const opcionesLocal = await pedir(opcionesRuta, "GET", `${B}/pos-transferencias/opciones`, D.sPin);
+      guardar("depositoOpcionesDelLocal", opcionesLocal);
+      ok("14: un local entra en modo local", opcionesLocal.cuerpo.modo === "local", json(opcionesLocal.cuerpo).slice(0, 200));
+      ok("14: el depósito entra en modo depósito, con su local de destino", opcionesDepo.cuerpo.modo === "deposito" && opcionesDepo.cuerpo.destinos?.some((l) => l.id === D.local.id), json(opcionesDepo.cuerpo).slice(0, 300));
+      const meAdmin = await pedir(R.me, "GET", `${B}/me`, sAdmin);
+      const opcionesAdmin = await pedir(opcionesRuta, "GET", `${B}/pos-transferencias/opciones`, sAdmin);
+      const solAdmin = await pedir(RD.solicitados, "GET", `${B}/pos-transferencias/solicitados`, sAdmin);
+      ok("14: el admin entra en modo admin y ve el pedido de este local", opcionesAdmin.cuerpo.modo === "admin" && !!deEste(solAdmin, p2), json({ modo: opcionesAdmin.cuerpo.modo, pedidos: solAdmin.cuerpo.items?.length }));
+      console.log(`  · 14: el admin ve ${solAdmin.cuerpo.items?.length} pedidos y ${opcionesAdmin.cuerpo.grupos?.length} grupos`);
+      guardar("depositoAdminMe", meAdmin);
+      // El admin ve TODOS los grupos y TODOS los pedidos de la base: con las
+      // corridas acumuladas son cientos. Se guardan los diez más nuevos de cada
+      // uno, tal cual vinieron, más el de este grupo si no estaba entre ellos.
+      const grupoD = opcionesAdmin.cuerpo.grupos?.find((g) => g.locales?.some((l) => l.id === D.local.id));
+      const ultimosGrupos = (opcionesAdmin.cuerpo.grupos || []).slice(0, 10);
+      guardar("depositoAdminOpciones", { ...opcionesAdmin, cuerpo: { ...opcionesAdmin.cuerpo, grupos: ultimosGrupos.includes(grupoD) ? ultimosGrupos : [grupoD, ...ultimosGrupos].filter(Boolean) } });
+      guardar("depositoAdminSolicitados", { ...solAdmin, cuerpo: { ...solAdmin.cuerpo, items: (solAdmin.cuerpo.items || []).slice(0, 10) } });
       guardar("depositoIds", { p1, p2, transferenciaId: tId, local: D.local.nombre, deposito: D.deposito.nombre, pidio: "Cuenta Grupo depósito" });
     }
   }

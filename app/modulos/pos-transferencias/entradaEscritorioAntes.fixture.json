@@ -1,0 +1,406 @@
+{
+  "tomadaSobre": "4cd3ba7",
+  "respuestas": {
+    "deposito": {
+      "me": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "user": {
+            "id": 480,
+            "nombre": "Depósito Marta",
+            "email": "deposito-prepara-1792706944031@ci.local",
+            "rolId": 3,
+            "rolNombre": "ENCARGADO",
+            "permisos": [
+              "pos.usar",
+              "clientes.crear",
+              "clientes.puntos.ver",
+              "clientes.puntos.canjear",
+              "clientes.cc.ver",
+              "clientes.cc.pagar",
+              "compras.revisar",
+              "comprobantes.ver",
+              "pos.anular",
+              "turnos.ver_todos",
+              "clientes.ver",
+              "clientes.editar",
+              "productos.ver",
+              "productos.crear",
+              "productos.editar",
+              "stock.ver",
+              "stock.editar",
+              "transferencias.ver",
+              "transferencias.crear",
+              "transferencias.recibir",
+              "transferencias.cancelar",
+              "pos_transferencias.ver",
+              "pos_transferencias.enviar",
+              "pedidos.ver",
+              "pedidos.editar",
+              "pedidos.solicitar",
+              "compras.ver",
+              "compras.recibir",
+              "reportes.ver",
+              "ventas.ver_dia",
+              "config_local.operadores",
+              "config_local.alertas",
+              "stock.control.gestionar",
+              "stock.control.contar"
+            ],
+            "esAdmin": false,
+            "esDuenoLocal": false,
+            "operadorActivo": false,
+            "localId": 801,
+            "esDeposito": true,
+            "exigirOperador": true,
+            "tarjetaPrecioUnitario": null,
+            "tarjetaOcultarEquivalencia": null
+          }
+        }
+      },
+      "opciones": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "modo": "deposito",
+          "origen": {
+            "id": 801,
+            "nombre": "Depósito Grupo depósito 1792706944031",
+            "esDeposito": true,
+            "grupoId": 400
+          },
+          "destinos": [
+            {
+              "id": 800,
+              "nombre": "Mini Grupo depósito 1792706944031",
+              "esDeposito": false,
+              "grupoId": 400
+            }
+          ],
+          "error": null
+        }
+      },
+      "solicitados": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "items": [
+            {
+              "id": 5105,
+              "origenId": 801,
+              "origenNombre": "Depósito Grupo depósito 1792706944031",
+              "destinoId": 800,
+              "destinoNombre": "Mini Grupo depósito 1792706944031",
+              "solicitadoAt": "2026-10-22T22:09:22.596Z",
+              "itemCount": 2,
+              "solicitadoPorNombre": "Cuenta Grupo depósito",
+              "revisados": 0,
+              "depositoEmpezo": false
+            }
+          ]
+        }
+      }
+    },
+    "admin": {
+      "me": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "user": {
+            "id": 480,
+            "nombre": "Admin pruebas",
+            "email": "deposito-prepara-1792706944031@ci.local",
+            "rolId": 3,
+            "rolNombre": "ADMIN",
+            "permisos": [
+              "*"
+            ],
+            "esAdmin": true,
+            "esDuenoLocal": false,
+            "operadorActivo": false,
+            "localId": null,
+            "esDeposito": false,
+            "exigirOperador": true,
+            "tarjetaPrecioUnitario": null,
+            "tarjetaOcultarEquivalencia": null
+          }
+        }
+      },
+      "opciones": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "modo": "admin",
+          "grupos": [
+            {
+              "id": 400,
+              "nombre": "Grupo depósito 1792706944031",
+              "depositos": [
+                {
+                  "id": 801,
+                  "nombre": "Depósito Grupo depósito 1792706944031",
+                  "esDeposito": true
+                }
+              ],
+              "locales": [
+                {
+                  "id": 800,
+                  "nombre": "Mini Grupo depósito 1792706944031",
+                  "esDeposito": false
+                }
+              ]
+            },
+            {
+              "id": 1,
+              "nombre": "Grupo Base",
+              "depositos": [],
+              "locales": []
+            },
+            {
+              "id": 55,
+              "nombre": "Grupo carrera 1792671119651",
+              "depositos": [
+                {
+                  "id": 111,
+                  "nombre": "Depósito Grupo carrera 1792671119651",
+                  "esDeposito": true
+                }
+              ],
+              "locales": []
+            },
+            {
+              "id": 60,
+              "nombre": "Grupo carrera 1792671155057",
+              "depositos": [
+                {
+                  "id": 121,
+                  "nombre": "Depósito Grupo carrera 1792671155057",
+                  "esDeposito": true
+                }
+              ],
+              "locales": []
+            },
+            {
+              "id": 65,
+              "nombre": "Grupo carrera 1792671160873",
+              "depositos": [
+                {
+                  "id": 131,
+                  "nombre": "Depósito Grupo carrera 1792671160873",
+                  "esDeposito": true
+                }
+              ],
+              "locales": []
+            },
+            {
+              "id": 70,
+              "nombre": "Grupo carrera 1792671167318",
+              "depositos": [
+                {
+                  "id": 141,
+                  "nombre": "Depósito Grupo carrera 1792671167318",
+                  "esDeposito": true
+                }
+              ],
+              "locales": []
+            },
+            {
+              "id": 75,
+              "nombre": "Grupo carrera 1792671178839",
+              "depositos": [
+                {
+                  "id": 151,
+                  "nombre": "Depósito Grupo carrera 1792671178839",
+                  "esDeposito": true
+                }
+              ],
+              "locales": []
+            },
+            {
+              "id": 80,
+              "nombre": "Grupo carrera 1792671192164",
+              "depositos": [
+                {
+                  "id": 161,
+                  "nombre": "Depósito Grupo carrera 1792671192164",
+                  "esDeposito": true
+                }
+              ],
+              "locales": []
+            },
+            {
+              "id": 85,
+              "nombre": "Grupo carrera 1792671217531",
+              "depositos": [
+                {
+                  "id": 171,
+                  "nombre": "Depósito Grupo carrera 1792671217531",
+                  "esDeposito": true
+                }
+              ],
+              "locales": []
+            },
+            {
+              "id": 90,
+              "nombre": "Grupo carrera 1792671265958",
+              "depositos": [
+                {
+                  "id": 181,
+                  "nombre": "Depósito Grupo carrera 1792671265958",
+                  "esDeposito": true
+                }
+              ],
+              "locales": []
+            },
+            {
+              "id": 95,
+              "nombre": "Grupo carrera 1792671328562",
+              "depositos": [
+                {
+                  "id": 191,
+                  "nombre": "Depósito Grupo carrera 1792671328562",
+                  "esDeposito": true
+                }
+              ],
+              "locales": []
+            }
+          ],
+          "error": null
+        }
+      },
+      "solicitados": {
+        "status": 200,
+        "cuerpo": {
+          "ok": true,
+          "items": [
+            {
+              "id": 5105,
+              "origenId": 801,
+              "origenNombre": "Depósito Grupo depósito 1792706944031",
+              "destinoId": 800,
+              "destinoNombre": "Mini Grupo depósito 1792706944031",
+              "solicitadoAt": "2026-10-22T22:09:22.596Z",
+              "itemCount": 2,
+              "solicitadoPorNombre": "Cuenta Grupo depósito",
+              "revisados": 0,
+              "depositoEmpezo": false
+            },
+            {
+              "id": 5103,
+              "origenId": 799,
+              "origenNombre": "Depósito Grupo historial 1792706944031",
+              "destinoId": 798,
+              "destinoNombre": "Mini Grupo historial 1792706944031",
+              "solicitadoAt": "2026-10-22T22:09:21.632Z",
+              "itemCount": 2,
+              "solicitadoPorNombre": "Cuenta Grupo historial",
+              "revisados": 1,
+              "depositoEmpezo": true
+            },
+            {
+              "id": 4991,
+              "origenId": 797,
+              "origenNombre": "Depósito Grupo vacio 1792706944031",
+              "destinoId": 796,
+              "destinoNombre": "Mini Grupo vacio 1792706944031",
+              "solicitadoAt": "2026-10-22T22:09:09.993Z",
+              "itemCount": 0,
+              "solicitadoPorNombre": "Cuenta Grupo vacio",
+              "revisados": 0,
+              "depositoEmpezo": false
+            },
+            {
+              "id": 4968,
+              "origenId": 789,
+              "origenNombre": "Depósito Grupo recorrido 1792706944031",
+              "destinoId": 788,
+              "destinoNombre": "Mini Grupo recorrido 1792706944031",
+              "solicitadoAt": "2026-10-22T22:09:06.772Z",
+              "itemCount": 5,
+              "solicitadoPorNombre": "Cuenta Grupo recorrido",
+              "revisados": 0,
+              "depositoEmpezo": false
+            },
+            {
+              "id": 4966,
+              "origenId": 783,
+              "origenNombre": "Depósito Grupo depósito 1792706900829",
+              "destinoId": 782,
+              "destinoNombre": "Mini Grupo depósito 1792706900829",
+              "solicitadoAt": "2026-10-22T22:08:38.888Z",
+              "itemCount": 2,
+              "solicitadoPorNombre": "Cuenta Grupo depósito",
+              "revisados": 0,
+              "depositoEmpezo": false
+            },
+            {
+              "id": 4964,
+              "origenId": 781,
+              "origenNombre": "Depósito Grupo historial 1792706900829",
+              "destinoId": 780,
+              "destinoNombre": "Mini Grupo historial 1792706900829",
+              "solicitadoAt": "2026-10-22T22:08:37.916Z",
+              "itemCount": 2,
+              "solicitadoPorNombre": "Cuenta Grupo historial",
+              "revisados": 1,
+              "depositoEmpezo": true
+            },
+            {
+              "id": 4852,
+              "origenId": 779,
+              "origenNombre": "Depósito Grupo vacio 1792706900829",
+              "destinoId": 778,
+              "destinoNombre": "Mini Grupo vacio 1792706900829",
+              "solicitadoAt": "2026-10-22T22:08:27.094Z",
+              "itemCount": 0,
+              "solicitadoPorNombre": "Cuenta Grupo vacio",
+              "revisados": 0,
+              "depositoEmpezo": false
+            },
+            {
+              "id": 4829,
+              "origenId": 771,
+              "origenNombre": "Depósito Grupo recorrido 1792706900829",
+              "destinoId": 770,
+              "destinoNombre": "Mini Grupo recorrido 1792706900829",
+              "solicitadoAt": "2026-10-22T22:08:23.779Z",
+              "itemCount": 5,
+              "solicitadoPorNombre": "Cuenta Grupo recorrido",
+              "revisados": 0,
+              "depositoEmpezo": false
+            },
+            {
+              "id": 4827,
+              "origenId": 765,
+              "origenNombre": "Depósito Grupo depósito 1792706320123",
+              "destinoId": 764,
+              "destinoNombre": "Mini Grupo depósito 1792706320123",
+              "solicitadoAt": "2026-10-22T21:58:55.054Z",
+              "itemCount": 2,
+              "solicitadoPorNombre": "Cuenta Grupo depósito",
+              "revisados": 1,
+              "depositoEmpezo": true
+            },
+            {
+              "id": 4825,
+              "origenId": 763,
+              "origenNombre": "Depósito Grupo historial 1792706320123",
+              "destinoId": 762,
+              "destinoNombre": "Mini Grupo historial 1792706320123",
+              "solicitadoAt": "2026-10-22T21:58:54.219Z",
+              "itemCount": 2,
+              "solicitadoPorNombre": "Cuenta Grupo historial",
+              "revisados": 1,
+              "depositoEmpezo": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  "fotos": {
+    "deposito": "<div class=\"min-h-screen sunmi-bg\"><div class=\"max-w-4xl mx-auto p-3 sm:p-5 space-y-3\"><button type=\"button\" class=\" text-xs sunmi-link flex items-center gap-1 transition \">← Volver</button><div class=\"bg-slate-900 border border-slate-800 rounded-xl shadow-md p-6 backdrop-blur-sm\"><div class=\"\n        bg-gradient-to-r from-amber-400/10 via-amber-400/0 to-amber-500/5\n        border-amber-400/40\n        text-amber-200\n        rounded-xl\n        px-4 py-2\n        text-[13px]\n        font-bold\n        tracking-wide\n        uppercase\n        shadow-md\n        mb-2\n        border\n      \">POS · Transferencias<div class=\"flex flex-col sm:flex-row sm:items-center sm:justify-between text-[11px] mt-1\"><div class=\"text-slate-900/80\">Usuario: <span class=\"font-semibold\">Depósito Marta</span></div><div class=\"text-slate-900/70 mt-1 sm:mt-0\">Modo: <span class=\"font-semibold\">Depósito</span></div></div></div><div class=\"\n        flex items-center gap-2\n        text-[12px] text-slate-400\n        my-2\n        \n      \"><div class=\"flex-1 h-px bg-slate-800\"></div><span class=\"whitespace-nowrap\">Preparar transferencia desde Depósito</span><div class=\"flex-1 h-px bg-slate-800\"></div></div><div class=\"space-y-4 text-[13px]\"><div class=\" sunmi-surface border sunmi-border rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 \"><div><div class=\"text-[11px] uppercase tracking-wide sunmi-text-muted\">Depósito origen</div><div class=\"text-[14px] font-semibold\">Depósito Grupo depósito 1792706944031</div></div><div class=\"text-[11px] sunmi-text-muted\">Seleccioná el local destino y comenzá la sesión POS.</div></div><div class=\"space-y-1\"><div class=\"text-[11px] uppercase tracking-wide sunmi-text-muted\">Local destino</div><div class=\"w-full [&amp;_.sunmi-select-trigger]:!border-[var(--pos-link)]\"><button type=\"button\" class=\"w-full px-3 py-1.5 rounded-md sunmi-select-trigger text-[13px] flex items-center justify-between\"><span class=\"truncate min-w-0\">Mini Grupo depósito 1792706944031</span><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-chevron-down transition-transform sunmi-text-accent\" aria-hidden=\"true\"><path d=\"m6 9 6 6 6-6\"></path></svg></button></div></div><div class=\"pt-2\"><button class=\"sunmi-btn-parte-nucleo sunmi-btn-parte-alto sunmi-btn-parte-display sunmi-btn-parte-items sunmi-btn-parte-pad-y sunmi-btn-parte-pad-x sunmi-btn-parte-radio sunmi-btn-parte-letra sunmi-btn-parte-peso sunmi-btn-parte-cursor sunmi-btn-amber \">Iniciar transferencia desde depósito</button></div></div><div class=\"\n        flex items-center gap-2\n        text-[12px] text-slate-400\n        my-2\n        \n      \"><div class=\"flex-1 h-px bg-slate-800\"></div><span class=\"whitespace-nowrap\">Pedidos solicitados por locales</span><div class=\"flex-1 h-px bg-slate-800\"></div></div><div class=\"space-y-2\"><div class=\" sunmi-btn-accent-soft rounded-xl px-4 py-3 cursor-pointer transition \"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><span class=\" px-2 py-0.5 text-[9px] font-semibold rounded-full sunmi-btn-accent-soft \">Solicitado</span><span class=\"text-[13px] font-medium\">Mini Grupo depósito 1792706944031 →</span></div><div class=\"text-[11px] sunmi-text-muted\">2 productos</div></div><div class=\"flex items-center justify-between mt-1 text-[11px] sunmi-text-muted\"><span>Solicitado por Cuenta Grupo depósito</span><span>22/10/2026 19:09</span></div></div></div></div></div></div>",
+    "admin": "<div class=\"min-h-screen sunmi-bg\"><div class=\"max-w-4xl mx-auto p-3 sm:p-5 space-y-3\"><button type=\"button\" class=\" text-xs sunmi-link flex items-center gap-1 transition \">← Volver</button><div class=\"bg-slate-900 border border-slate-800 rounded-xl shadow-md p-6 backdrop-blur-sm\"><div class=\"\n        bg-gradient-to-r from-amber-400/10 via-amber-400/0 to-amber-500/5\n        border-amber-400/40\n        text-amber-200\n        rounded-xl\n        px-4 py-2\n        text-[13px]\n        font-bold\n        tracking-wide\n        uppercase\n        shadow-md\n        mb-2\n        border\n      \">POS · Transferencias<div class=\"flex flex-col sm:flex-row sm:items-center sm:justify-between text-[11px] mt-1\"><div class=\"text-slate-900/80\">Usuario: <span class=\"font-semibold\">Admin pruebas</span></div><div class=\"text-slate-900/70 mt-1 sm:mt-0\">Modo: <span class=\"font-semibold\">Admin</span></div></div></div><div class=\"\n        flex items-center gap-2\n        text-[12px] text-slate-400\n        my-2\n        \n      \"><div class=\"flex-1 h-px bg-slate-800\"></div><span class=\"whitespace-nowrap\">Preparar transferencia como Admin</span><div class=\"flex-1 h-px bg-slate-800\"></div></div><div class=\"space-y-4 text-[13px]\"><div class=\"space-y-1\"><div class=\"text-[11px] uppercase tracking-wide sunmi-text-muted\">Grupo</div><div class=\"w-full [&amp;_.sunmi-select-trigger]:!border-[var(--pos-link)]\"><button type=\"button\" class=\"w-full px-3 py-1.5 rounded-md sunmi-select-trigger text-[13px] flex items-center justify-between\"><span class=\"truncate min-w-0\">Grupo depósito 1792706944031</span><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-chevron-down transition-transform sunmi-text-accent\" aria-hidden=\"true\"><path d=\"m6 9 6 6 6-6\"></path></svg></button></div></div><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"space-y-1\"><div class=\"text-[11px] uppercase tracking-wide sunmi-text-muted\">Depósito origen</div><div class=\"w-full [&amp;_.sunmi-select-trigger]:!border-[var(--pos-link)]\"><button type=\"button\" class=\"w-full px-3 py-1.5 rounded-md sunmi-select-trigger text-[13px] flex items-center justify-between\"><span class=\"truncate min-w-0\">Depósito Grupo depósito 1792706944031</span><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-chevron-down transition-transform sunmi-text-accent\" aria-hidden=\"true\"><path d=\"m6 9 6 6 6-6\"></path></svg></button></div></div><div class=\"space-y-1\"><div class=\"text-[11px] uppercase tracking-wide sunmi-text-muted\">Local destino</div><div class=\"w-full [&amp;_.sunmi-select-trigger]:!border-[var(--pos-link)]\"><button type=\"button\" class=\"w-full px-3 py-1.5 rounded-md sunmi-select-trigger text-[13px] flex items-center justify-between\"><span class=\"truncate min-w-0\">Mini Grupo depósito 1792706944031</span><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-chevron-down transition-transform sunmi-text-accent\" aria-hidden=\"true\"><path d=\"m6 9 6 6 6-6\"></path></svg></button></div></div></div><div class=\"pt-2\"><button class=\"sunmi-btn-parte-nucleo sunmi-btn-parte-alto sunmi-btn-parte-display sunmi-btn-parte-items sunmi-btn-parte-pad-y sunmi-btn-parte-pad-x sunmi-btn-parte-radio sunmi-btn-parte-letra sunmi-btn-parte-peso sunmi-btn-parte-cursor sunmi-btn-cyan \">Iniciar transferencia admin</button></div></div><div class=\"\n        flex items-center gap-2\n        text-[12px] text-slate-400\n        my-2\n        \n      \"><div class=\"flex-1 h-px bg-slate-800\"></div><span class=\"whitespace-nowrap\">Pedidos solicitados por locales</span><div class=\"flex-1 h-px bg-slate-800\"></div></div><div class=\"space-y-2\"><div class=\" sunmi-btn-accent-soft rounded-xl px-4 py-3 cursor-pointer transition \"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><span class=\" px-2 py-0.5 text-[9px] font-semibold rounded-full sunmi-btn-accent-soft \">Solicitado</span><span class=\"text-[13px] font-medium\">Mini Grupo depósito 1792706944031 →</span></div><div class=\"text-[11px] sunmi-text-muted\">2 productos</div></div><div class=\"flex items-center justify-between mt-1 text-[11px] sunmi-text-muted\"><span>Solicitado por Cuenta Grupo depósito</span><span>22/10/2026 19:09</span></div></div><div class=\" sunmi-btn-accent-soft rounded-xl px-4 py-3 cursor-pointer transition \"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><span class=\" px-2 py-0.5 text-[9px] font-semibold rounded-full sunmi-btn-accent-soft \">Solicitado</span><span class=\"text-[13px] font-medium\">Mini Grupo historial 1792706944031 →</span></div><div class=\"text-[11px] sunmi-text-muted\">2 productos</div></div><div class=\"flex items-center justify-between mt-1 text-[11px] sunmi-text-muted\"><span>Solicitado por Cuenta Grupo historial</span><span>22/10/2026 19:09</span></div></div><div class=\" sunmi-btn-accent-soft rounded-xl px-4 py-3 cursor-pointer transition \"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><span class=\" px-2 py-0.5 text-[9px] font-semibold rounded-full sunmi-btn-accent-soft \">Solicitado</span><span class=\"text-[13px] font-medium\">Mini Grupo vacio 1792706944031 →</span></div><div class=\"text-[11px] sunmi-text-muted\">0 productos</div></div><div class=\"flex items-center justify-between mt-1 text-[11px] sunmi-text-muted\"><span>Solicitado por Cuenta Grupo vacio</span><span>22/10/2026 19:09</span></div></div><div class=\" sunmi-btn-accent-soft rounded-xl px-4 py-3 cursor-pointer transition \"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><span class=\" px-2 py-0.5 text-[9px] font-semibold rounded-full sunmi-btn-accent-soft \">Solicitado</span><span class=\"text-[13px] font-medium\">Mini Grupo recorrido 1792706944031 →</span></div><div class=\"text-[11px] sunmi-text-muted\">5 productos</div></div><div class=\"flex items-center justify-between mt-1 text-[11px] sunmi-text-muted\"><span>Solicitado por Cuenta Grupo recorrido</span><span>22/10/2026 19:09</span></div></div><div class=\" sunmi-btn-accent-soft rounded-xl px-4 py-3 cursor-pointer transition \"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><span class=\" px-2 py-0.5 text-[9px] font-semibold rounded-full sunmi-btn-accent-soft \">Solicitado</span><span class=\"text-[13px] font-medium\">Mini Grupo depósito 1792706900829 →</span></div><div class=\"text-[11px] sunmi-text-muted\">2 productos</div></div><div class=\"flex items-center justify-between mt-1 text-[11px] sunmi-text-muted\"><span>Solicitado por Cuenta Grupo depósito</span><span>22/10/2026 19:08</span></div></div><div class=\" sunmi-btn-accent-soft rounded-xl px-4 py-3 cursor-pointer transition \"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><span class=\" px-2 py-0.5 text-[9px] font-semibold rounded-full sunmi-btn-accent-soft \">Solicitado</span><span class=\"text-[13px] font-medium\">Mini Grupo historial 1792706900829 →</span></div><div class=\"text-[11px] sunmi-text-muted\">2 productos</div></div><div class=\"flex items-center justify-between mt-1 text-[11px] sunmi-text-muted\"><span>Solicitado por Cuenta Grupo historial</span><span>22/10/2026 19:08</span></div></div><div class=\" sunmi-btn-accent-soft rounded-xl px-4 py-3 cursor-pointer transition \"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><span class=\" px-2 py-0.5 text-[9px] font-semibold rounded-full sunmi-btn-accent-soft \">Solicitado</span><span class=\"text-[13px] font-medium\">Mini Grupo vacio 1792706900829 →</span></div><div class=\"text-[11px] sunmi-text-muted\">0 productos</div></div><div class=\"flex items-center justify-between mt-1 text-[11px] sunmi-text-muted\"><span>Solicitado por Cuenta Grupo vacio</span><span>22/10/2026 19:08</span></div></div><div class=\" sunmi-btn-accent-soft rounded-xl px-4 py-3 cursor-pointer transition \"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><span class=\" px-2 py-0.5 text-[9px] font-semibold rounded-full sunmi-btn-accent-soft \">Solicitado</span><span class=\"text-[13px] font-medium\">Mini Grupo recorrido 1792706900829 →</span></div><div class=\"text-[11px] sunmi-text-muted\">5 productos</div></div><div class=\"flex items-center justify-between mt-1 text-[11px] sunmi-text-muted\"><span>Solicitado por Cuenta Grupo recorrido</span><span>22/10/2026 19:08</span></div></div><div class=\" sunmi-btn-accent-soft rounded-xl px-4 py-3 cursor-pointer transition \"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><span class=\" px-2 py-0.5 text-[9px] font-semibold rounded-full sunmi-btn-accent-soft \">Solicitado</span><span class=\"text-[13px] font-medium\">Mini Grupo depósito 1792706320123 →</span></div><div class=\"text-[11px] sunmi-text-muted\">2 productos</div></div><div class=\"flex items-center justify-between mt-1 text-[11px] sunmi-text-muted\"><span>Solicitado por Cuenta Grupo depósito</span><span>22/10/2026 18:58</span></div></div><div class=\" sunmi-btn-accent-soft rounded-xl px-4 py-3 cursor-pointer transition \"><div class=\"flex items-center justify-between\"><div class=\"flex items-center gap-3\"><span class=\" px-2 py-0.5 text-[9px] font-semibold rounded-full sunmi-btn-accent-soft \">Solicitado</span><span class=\"text-[13px] font-medium\">Mini Grupo historial 1792706320123 →</span></div><div class=\"text-[11px] sunmi-text-muted\">2 productos</div></div><div class=\"flex items-center justify-between mt-1 text-[11px] sunmi-text-muted\"><span>Solicitado por Cuenta Grupo historial</span><span>22/10/2026 18:58</span></div></div></div></div></div></div>"
+  }
+}

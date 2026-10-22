@@ -684,6 +684,10 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // computadora (`RecepcionEscritorio`). Contesta lo mismo que arriba: un
     // menú y una hoja de solo lectura, nada que perder al cerrar.
     "components/transferencias/MasAccionesRecepcion.jsx": false,
+    // "Transferencia sin pedido" en la entrada del depósito del celular: los
+    // selectores de destino de siempre. Se elige un local de una lista y se
+    // toca iniciar; no hay nada escrito que perder al cerrar.
+    "components/pos-transferencias/EntradaDepositoCelular.jsx": false,
     // El "⋯" del Control de stock: la misma hoja de "Más acciones" de recibir
     // una transferencia, con un solo botón —"Ver diferencias"—. Un menú: nada
     // que perder al cerrar.
