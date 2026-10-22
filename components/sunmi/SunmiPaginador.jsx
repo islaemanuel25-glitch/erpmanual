@@ -41,6 +41,16 @@
 // Lo único que se le agregó al contenedor de escritorio es `hidden md:flex`. A
 // 768 px y más arriba eso resuelve a `flex`, que es lo que ya tenía: el nodo, sus
 // hijos y sus otras clases quedan iguales.
+//
+// ── `formaDelCelular`: LA DISPOSICIÓN COMPACTA EN TODOS LOS ANCHOS ────────
+//
+// Agregada el 2026-10-22 para la computadora de Pedidos, cuyo diseño pide
+// "‹ Página 1 de 44 ›" y al lado, suave, "viendo 1–50 de 2156": exactamente lo
+// que ya dibuja la disposición del celular. No se escribió otra: con la opción
+// prendida se usa ESA, en cualquier ancho, en una fila —los dos renglones del
+// celular, uno al lado del otro—, y la de escritorio no se dibuja. APAGADA POR
+// DEFECTO: sin ella, los dos bloques son nodo por nodo los de siempre y los
+// demás paginadores no cambian.
 
 import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -58,6 +68,7 @@ export default function SunmiPaginador({
   onPrev,
   onGoToPage,
   onPageSizeChange,
+  formaDelCelular = false,
 }) {
   // "Ir a página": valida 1..totalPages y delega en onGoToPage.
   const [goToValue, setGoToValue] = useState("");
@@ -97,7 +108,10 @@ export default function SunmiPaginador({
           repo ya usa la misma idea con `[data-sunmi-modal]`: sin un selector
           estable, una captura de "el pie" termina apuntando a un `div` que
           mañana cambia de clase y retrata otra región sin avisar. */}
-      <div data-paginador="celular" className="md:hidden px-1 py-2">
+      <div
+        data-paginador={formaDelCelular ? "compacto" : "celular"}
+        className={formaDelCelular ? "flex items-center gap-4 px-1 py-2" : "md:hidden px-1 py-2"}
+      >
         <div className="flex items-center justify-center gap-3">
           {/* 44 px ESCRITOS, no `h-11`: en esta aplicación 1 rem son 14 px, así
               que `h-11` daría 38,5. Es el mismo número y el mismo motivo que las
@@ -166,7 +180,7 @@ export default function SunmiPaginador({
           </SunmiButton>
         </div>
 
-        <div className="mt-1.5 flex items-center justify-between gap-2">
+        <div className={formaDelCelular ? "flex items-center justify-between gap-2" : "mt-1.5 flex items-center justify-between gap-2"}>
           <span className="text-sm2 sunmi-text-muted [font-variant-numeric:tabular-nums]">
             {totalItems === 0 ? "sin resultados" : `viendo ${desde}–${hasta} de ${totalItems}`}
           </span>
@@ -176,7 +190,9 @@ export default function SunmiPaginador({
         </div>
       </div>
 
-      {/* ══ ESCRITORIO — IDÉNTICO A LO QUE HABÍA ═══════════════════════════ */}
+      {/* ══ ESCRITORIO — IDÉNTICO A LO QUE HABÍA ═══════════════════════════
+          Con `formaDelCelular` no se dibuja: la de arriba ocupa su lugar. */}
+      {formaDelCelular ? null : (
       <div className="hidden md:flex items-center justify-between px-3 py-2 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <SunmiButton color="slate" disabled={page <= 1} onClick={onPrev}>
@@ -217,6 +233,7 @@ export default function SunmiPaginador({
           <SunmiPageSizer value={pageSize} onChange={onPageSizeChange} />
         )}
       </div>
+      )}
     </>
   );
 }

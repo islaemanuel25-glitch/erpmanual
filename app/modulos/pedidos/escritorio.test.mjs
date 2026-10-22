@@ -89,7 +89,14 @@ test("armando: las herramientas en una fila, y el catálogo como tabla con sus c
   // Con el 0 de guía, como en el teléfono.
   assert.equal(fila("Yerba 1kg").campo.value, "");
   assert.equal(fila("Yerba 1kg").campo.getAttribute("placeholder"), "0");
-  assert.ok(enEscritorio().querySelector("[data-paginador]"), "falta el paginador");
+  // El paginador: "‹ Página N de M ›" y al lado, suave, "viendo a–b de N" —la
+  // forma del celular del kit, `formaDelCelular`—, no la fila de escritorio.
+  const paginador = enEscritorio().querySelector('[data-paginador="compacto"]');
+  assert.ok(paginador, "falta el paginador, o no es el compacto");
+  assert.match(paginador.textContent, /Página 1 de 1/);
+  assert.match(paginador.textContent, /viendo 1–3 de 3/);
+  assert.ok(paginador.querySelector('button[aria-label="Página anterior"]') && paginador.querySelector('button[aria-label="Página siguiente"]'));
+  assert.doesNotMatch(textoE(), /« Anterior|items\)/, "quedó la fila de escritorio del paginador");
 });
 
 test("la ✕: solo en lo pedido, con el lugar reservado siempre", async () => {

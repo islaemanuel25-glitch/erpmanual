@@ -799,6 +799,10 @@ export default function PedidosEscritorio() {
                 onPrev={() => cargarCatalogo(Math.max(1, page - 1))}
                 onNext={() => cargarCatalogo(Math.min(totalPages, page + 1))}
                 onGoToPage={(p) => cargarCatalogo(p)}
+                // "‹ Página 1 de 44 ›" y al lado "viendo 1–50 de 2156", como
+                // pide el diseño: la disposición del celular del kit. El
+                // "Mostrar" va arriba, en las herramientas.
+                formaDelCelular
               />
             ) : null}
           </div>
