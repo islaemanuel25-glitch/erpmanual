@@ -39,7 +39,33 @@ test("MOV2. LA TARJETA NO MUESTRA UN CERO CUANDO NO HAY LÍMITE", () => {
   // Es la regla que motivó la tanda, del lado que la persona ve: "mín 0" sobre un
   // producto nunca configurado es una afirmación falsa con cara de dato.
   assert.match(TARJETA, /limitesConfigurados/, "la tarjeta no consulta si están configurados");
-  assert.match(TARJETA, /Sin ajustar/, "no dice 'Sin ajustar' cuando no hay límites");
+  assert.match(TARJETA, /TEXTO_SIN_LIMITES = "Sin mín\/máx"/, "no dice 'Sin mín/máx' cuando no hay límites");
+});
+
+test("MOV2b. EL RENGLÓN DE LÍMITES: ninguno, uno solo o los dos, sin quedar tapado por STOCK", async () => {
+  // "mín Sin ajustar · máx Sin ajustar" no entraba al lado del recuadro de
+  // STOCK (Control de stock, 2026-10-22). Se dibuja la tarjeta de verdad.
+  const React = (await import("react")).default;
+  const { renderToStaticMarkup } = await import("react-dom/server");
+  const { default: TarjetaStockMovil, textoMinMax } = await import("@/components/stock_locales/TarjetaStockMovil.jsx");
+  const item = (extra) => ({ id: 1, nombre: "AGUILA BARRITA TAZA", stock: 5, unidadMedida: "unidad", factorPack: 1, ...extra });
+  const renglon = (it) => {
+    const h = renderToStaticMarkup(React.createElement(TarjetaStockMovil, { item: it, onAjustar: () => {}, onLimites: () => {} }));
+    const span = h.match(/<span class="text-xs sunmi-text-muted whitespace-nowrap">([\s\S]*?)<\/span>/);
+    return span ? span[1].replace(/<!-- -->/g, "") : null;
+  };
+
+  // Ninguno: nunca configurados, o configurados sin valor.
+  assert.equal(renglon(item({ limitesConfigurados: false, stockMin: null, stockMax: null })), "Sin mín/máx");
+  assert.equal(renglon(item({ limitesConfigurados: true, stockMin: null, stockMax: null })), "Sin mín/máx");
+  // Uno solo: el que existe, nada del otro.
+  assert.equal(renglon(item({ limitesConfigurados: true, stockMin: 4, stockMax: null })), "mín 4");
+  assert.equal(renglon(item({ limitesConfigurados: true, stockMin: null, stockMax: 10 })), "máx 10");
+  // Los dos: como siempre. Un 0 configurado es un límite.
+  assert.equal(renglon(item({ limitesConfigurados: true, stockMin: 4, stockMax: 10 })), "mín 4 · máx 10");
+  assert.equal(renglon(item({ limitesConfigurados: true, stockMin: 0, stockMax: 6 })), "mín 0 · máx 6");
+  assert.deepEqual(textoMinMax(item({ limitesConfigurados: false, stockMin: 4, stockMax: 10 }), false), { ninguno: "Sin mín/máx" }, "sin configurar no se muestran valores viejos");
+  assert.doesNotMatch(TARJETA, /Sin ajustar/);
 });
 
 test("MOV3. LAS DOS ACCIONES SIGUEN SEPARADAS", () => {

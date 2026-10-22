@@ -56,16 +56,65 @@ import {
 // aparte y tiene una decisión de negocio antes que la técnica —un producto puede
 // tener más de uno y hay que elegir cuál—.
 
-/** El alfa de "no hay dato" se decide acá y no en cada renglón. */
-function textoLimite(valor, configurados, item, esDeposito) {
-  if (!configurados) return "Sin ajustar";
-  if (valor === null || valor === undefined) return "—";
+/** Un límite configurado, en su escala. */
+function textoLimite(valor, item, esDeposito) {
   // Solo el depósito pack necesita cambiar de escala. En locales y en los
   // productos sueltos se conserva el texto corto que ya tenía la card.
   if (esPackDeposito(item, esDeposito)) {
     return formatLimiteStock(valor, item, esDeposito);
   }
   return Number(valor).toLocaleString("es-AR");
+}
+
+export const TEXTO_SIN_LIMITES = "Sin mín/máx";
+
+/**
+ * QUÉ DICE EL RENGLÓN DE LOS LÍMITES, en el lugar que le deja el recuadro de
+ * STOCK a la derecha:
+ *
+ *   · sin ninguno (o nunca configurados): "Sin mín/máx";
+ *   · con uno solo: "mín 4" o "máx 10", el que existe;
+ *   · con los dos: "mín 4 · máx 10", como siempre.
+ *
+ * "mín Sin ajustar · máx Sin ajustar" no entraba: el recuadro tapaba el final
+ * ("máx Sin ajus", visto en Control de stock el 2026-10-22). Un 0 configurado
+ * es un límite, no la falta de uno.
+ *
+ * @returns {{ min: string|null, max: string|null }} | {{ ninguno: string }}
+ */
+export function textoMinMax(item, esDeposito) {
+  const hay = (v) => v !== null && v !== undefined;
+  const configurados = item?.limitesConfigurados === true;
+  const min = configurados && hay(item?.stockMin) ? textoLimite(item.stockMin, item, esDeposito) : null;
+  const max = configurados && hay(item?.stockMax) ? textoLimite(item.stockMax, item, esDeposito) : null;
+  if (min === null && max === null) return { ninguno: TEXTO_SIN_LIMITES };
+  return { min, max };
+}
+
+/**
+ * El renglón dibujado. Con los dos va en los MISMOS nodos de texto que antes
+ * —"mín ", el valor, " · ", "máx ", el valor—: juntarlos en una cadena mueve
+ * píxeles (regla 1 de CLAUDE.md).
+ */
+function RenglonDeLimites({ item, esDeposito }) {
+  const t = textoMinMax(item, esDeposito);
+  return (
+    <span className="text-xs sunmi-text-muted whitespace-nowrap">
+      {t.ninguno ? (
+        t.ninguno
+      ) : t.min !== null && t.max !== null ? (
+        <>
+          mín {t.min}
+          {" · "}
+          máx {t.max}
+        </>
+      ) : t.min !== null ? (
+        <>mín {t.min}</>
+      ) : (
+        <>máx {t.max}</>
+      )}
+    </span>
+  );
 }
 
 export default function TarjetaStockMovil({
@@ -97,7 +146,6 @@ export default function TarjetaStockMovil({
   const unidad = localEsDeposito
     ? getUnidadDeposito(item || {})
     : getUnidadLocal(item || {});
-  const configurados = item?.limitesConfigurados === true;
   const negativo = stock < 0;
   // `faltante` lo calcula el servidor con la MISMA regla que cuenta la card de
   // "Bajo mínimo". Recalcularlo acá sería el modo de que las dos se separaran.
@@ -110,13 +158,7 @@ export default function TarjetaStockMovil({
       codigoBarra={item?.codigoBarra ?? null}
       // `false`, no `null`: ver el comentario de arriba.
       codigoInterno={false}
-      marca={
-        <span className="text-xs sunmi-text-muted whitespace-nowrap">
-          mín {textoLimite(item?.stockMin, configurados, item, localEsDeposito)}
-          {" · "}
-          máx {textoLimite(item?.stockMax, configurados, item, localEsDeposito)}
-        </span>
-      }
+      marca={<RenglonDeLimites item={item} esDeposito={localEsDeposito} />}
       valor={
         // `min-w-0`: el recuadro mide su ancho del tema, pero dentro de la fila
         // nunca puede empujar más allá del borde de la tarjeta.

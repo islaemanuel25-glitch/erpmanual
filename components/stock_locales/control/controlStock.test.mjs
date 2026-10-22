@@ -355,7 +355,7 @@ test("una tarjeta contada: '✓ Contado · quién · hora', Sistema · Contado �
   const coca = de(real.listaContados, "Coca 2L");
   const h = renderToStaticMarkup(React.createElement(TarjetaConteo, { item: coca, esDeposito: false, proveedorNombre: "Coca-Cola FEMSA", onGuardar: nada }));
   const t = texto(h);
-  assert.match(t, /^Coca 2L Coca-Cola FEMSA mín Sin ajustar · máx Sin ajustar STOCK · Unidad 2 uds 7790000000001 ✓ Contado · Emanuel · \d\d:\d\d /);
+  assert.match(t, /^Coca 2L Coca-Cola FEMSA Sin mín\/máx STOCK · Unidad 2 uds 7790000000001 ✓ Contado · Emanuel · \d\d:\d\d /);
   assert.match(t, /Sistema 4 · Contado 2 · Faltan 2 un$/);
   assert.match(h, /data-fila-conteo="contado"/);
   assert.match(h, /<input[^>]*class="[^"]*sunmi-state-success[^"]*"[^>]*value="2"/);
