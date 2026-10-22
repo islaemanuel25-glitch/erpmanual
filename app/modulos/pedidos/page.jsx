@@ -444,11 +444,15 @@ export default function PedidosCatalogoPage() {
 
   const vacio = (texto) => <p className="text-sm2 sunmi-text-muted text-center py-4">{texto}</p>;
 
+  // `mismoAlto={false}`: cada tarjeta mide lo que necesita. Con la grilla
+  // igualando altos, un nombre de dos renglones estiraba todas las de la página
+  // y dejaba un hueco debajo del − valor +. Miden igual entre sí por el lugar
+  // de la ✕, que está siempre.
   let lista;
   if (esperando) {
     // Lo enviado no trae el id del producto: se identifica por su lugar.
     lista = (
-      <SunmiListaProductoCards>
+      <SunmiListaProductoCards mismoAlto={false}>
         {(pendiente.items || []).map((item, i) => (
           <TarjetaPedido key={i} producto={item} cantidad={cantidadEnPantalla(item)} apagada />
         ))}
@@ -459,13 +463,13 @@ export default function PedidosCatalogoPage() {
       ? vacio("Cargando carrito...")
       : carritoItems.length === 0
         ? vacio("El carrito está vacío. Volvé al catálogo para agregar productos.")
-        : <SunmiListaProductoCards>{carritoItems.map(tarjetaDelCatalogo)}</SunmiListaProductoCards>;
+        : <SunmiListaProductoCards mismoAlto={false}>{carritoItems.map(tarjetaDelCatalogo)}</SunmiListaProductoCards>;
   } else {
     lista = loadingCat
       ? vacio("Cargando productos...")
       : catalogo.length === 0
         ? vacio("No se encontraron productos.")
-        : <SunmiListaProductoCards>{catalogo.map(tarjetaDelCatalogo)}</SunmiListaProductoCards>;
+        : <SunmiListaProductoCards mismoAlto={false}>{catalogo.map(tarjetaDelCatalogo)}</SunmiListaProductoCards>;
   }
 
   const enviadoCuando = esperando ? cuandoSeEnvio(pendiente.solicitadoAt) : null;
@@ -598,6 +602,7 @@ function TarjetaPedido({ producto, cantidad, enPedido = false, apagada = false, 
   const { nombre, factorPack } = producto;
   const porBulto = salePorBulto(producto);
   const unidad = porBulto ? "BULTO" : "UNIDAD";
+  const puedeQuitar = enPedido && !apagada;
   const [escrito, setEscrito] = useState(null);
   const campoRef = useRef(null);
 
@@ -627,16 +632,28 @@ function TarjetaPedido({ producto, cantidad, enPedido = false, apagada = false, 
       <div className="flex-1 min-w-0 space-y-2">
       <div className="flex items-start gap-2">
         <p className="flex-1 min-w-0 text-sm3 font-semibold sunmi-text-strong break-words">{nombre}</p>
-        {enPedido && !apagada ? (
-          <SunmiButton
-            color="ghost"
-            aria-label={`Quitar ${nombre} del pedido`}
-            onClick={() => onCantidad?.(0, "UNIDAD")}
-            className="shrink-0 min-w-toque min-h-toque inline-flex items-center justify-center"
-          >
-            <X size={18} aria-hidden="true" />
-          </SunmiButton>
-        ) : null}
+        {/* ── EL LUGAR DE LA ✕ ESTÁ SIEMPRE ──────────────────────────────
+            Aparecía solo con el producto en el pedido, y como es un toque de
+            44 px al lado de una línea de texto, al pasar de 0 a 1 el renglón
+            del nombre crecía y el − valor + bajaba: el dedo quedaba sobre otra
+            cosa. Ahora el botón está siempre, del mismo alto y ancho. Sin el
+            producto en el pedido —y en el pedido enviado— va invisible, apagado,
+            fuera del orden de foco y oculto al lector de pantalla: ocupa su
+            lugar y nada más. */}
+        <SunmiButton
+          color="ghost"
+          data-lugar-quitar=""
+          aria-label={puedeQuitar ? `Quitar ${nombre} del pedido` : undefined}
+          aria-hidden={puedeQuitar ? undefined : "true"}
+          tabIndex={puedeQuitar ? undefined : -1}
+          disabled={!puedeQuitar}
+          onClick={() => {
+            if (puedeQuitar) onCantidad?.(0, "UNIDAD");
+          }}
+          className={`shrink-0 min-w-toque min-h-toque inline-flex items-center justify-center${puedeQuitar ? "" : " invisible"}`}
+        >
+          <X size={18} aria-hidden="true" />
+        </SunmiButton>
       </div>
       {/* Con la foto al lado, "Por BULTO de 6 u" y el − valor + no siempre
           entran en un renglón a 360 px: la unidad se parte en dos (`min-w-0`)

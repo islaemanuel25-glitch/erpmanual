@@ -103,6 +103,74 @@ test("2. un solo filtro, Categoría, con Todas y el total; no se manda proveedor
   assert.equal(delCatalogo.at(-1).params.categoriaId, String(bebidas.id));
 });
 
+// ── LA ✕ NO MUEVE NADA ────────────────────────────────────────────────────
+//
+// Aparecía solo con el producto en el pedido, y al pasar de 0 a 1 el renglón del
+// nombre crecía y el − valor + bajaba. Ahora el lugar está siempre. Sin layout
+// en jsdom, lo que se afirma es la ESTRUCTURA: los mismos elementos, con las
+// mismas clases, salvo `invisible` en el lugar vacío. Si el árbol es el mismo,
+// no hay nada que pueda correrse.
+
+/** El árbol de la tarjeta: etiquetas y clases, sin textos ni valores. */
+function forma(el) {
+  const clases = [...el.classList].filter((c) => c !== "invisible").sort().join(".");
+  return `${el.tagName.toLowerCase()}${clases ? `.${clases}` : ""}(${[...el.children].map(forma).join(",")})`;
+}
+
+test("✕: la tarjeta tiene la misma estructura con y sin el producto en el pedido", async () => {
+  await montar({ inicio: real.carritoBorrador });
+  // Coca está en el pedido y la yerba no: las dos por unidad y sin foto, así
+  // que lo único que puede diferir es la ✕.
+  assert.ok(tarjeta("Coca 2L").quitar && !tarjeta("Yerba 1kg").quitar);
+  assert.equal(forma(tarjeta("Yerba 1kg").tarjeta), forma(tarjeta("Coca 2L").tarjeta), "sin el producto la tarjeta tiene otra forma");
+
+  // Y la misma tarjeta, pasando de 0 a 1 y de 1 a 0.
+  const antes = forma(tarjeta("Yerba 1kg").tarjeta);
+  await tocar(tarjeta("Yerba 1kg").mas);
+  assert.ok(tarjeta("Yerba 1kg").quitar, "con 1 tiene que aparecer la ✕");
+  assert.equal(forma(tarjeta("Yerba 1kg").tarjeta), antes, "de 0 a 1 cambió la forma");
+  await tocar(tarjeta("Yerba 1kg").quitar);
+  assert.equal(forma(tarjeta("Yerba 1kg").tarjeta), antes, "de 1 a 0 cambió la forma");
+});
+
+test("✕: sin el producto, el lugar está pero invisible, apagado y fuera del foco", async () => {
+  const { pedidos } = await montar({ inicio: real.carritoBorrador });
+  const { lugarQuitar } = tarjeta("Yerba 1kg");
+  assert.ok(lugarQuitar, "no se reservó el lugar de la ✕");
+  assert.ok(lugarQuitar.classList.contains("invisible"), "el lugar vacío se ve");
+  assert.equal(lugarQuitar.disabled, true, "el lugar vacío se puede tocar");
+  assert.equal(lugarQuitar.getAttribute("tabindex"), "-1", "el lugar vacío entra en el orden de foco");
+  assert.equal(lugarQuitar.getAttribute("aria-hidden"), "true", "el lector de pantalla lo anuncia");
+  // Mismo alto y ancho que la ✕: el toque de 44.
+  assert.match(lugarQuitar.className, /min-w-toque min-h-toque/);
+
+  const antes = llamadas(pedidos, "/api/pedidos/set-cantidad").length;
+  await tocar(lugarQuitar);
+  assert.equal(llamadas(pedidos, "/api/pedidos/set-cantidad").length, antes, "tocar el lugar vacío mandó algo");
+
+  // Con el producto: el mismo lugar, visible y tocable.
+  const coca = tarjeta("Coca 2L").lugarQuitar;
+  assert.ok(!coca.classList.contains("invisible"));
+  assert.equal(coca.disabled, false);
+  assert.ok(coca === tarjeta("Coca 2L").quitar, "la ✕ no está en el lugar reservado");
+});
+
+test("✕: en el pedido enviado no va, pero el lugar se reserva igual", async () => {
+  await montar({ inicio: pendienteDel(new Date()) });
+  for (const t of tarjetas()) {
+    assert.ok(t.lugarQuitar, `${t.nombre}: el pedido enviado no reserva el lugar`);
+    assert.ok(t.lugarQuitar.classList.contains("invisible"), `${t.nombre}: se ve la ✕ en el pedido enviado`);
+    assert.equal(t.lugarQuitar.disabled, true);
+  }
+});
+
+test("cada tarjeta mide lo que necesita: la lista de Pedidos no iguala altos", async () => {
+  await montar({ inicio: real.carritoBorrador });
+  const grilla = tarjeta("Coca 2L").tarjeta.parentElement;
+  assert.match(grilla.className, /sunmi-product-list/);
+  assert.doesNotMatch(grilla.className, /auto-rows-fr/, "la grilla sigue estirando todas al alto de la más alta");
+});
+
 test("3. la ✕ solo en lo pedido, y pone la cantidad en 0", async () => {
   const { pedidos } = await montar({ inicio: real.carritoBorrador });
   assert.deepEqual(nombres(), ["Agua x6", "Coca 2L", "Yerba 1kg"]);

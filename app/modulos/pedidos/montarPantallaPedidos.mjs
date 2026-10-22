@@ -169,7 +169,10 @@ export const tarjetas = () =>
     tarjeta,
     nombre: tarjeta.getAttribute("data-tarjeta-pedido"),
     campo: tarjeta.querySelector('input[aria-label^="Cantidad de "]'),
+    // La ✕ que se puede tocar (con el producto en el pedido)…
     quitar: tarjeta.querySelector('button[aria-label^="Quitar "]'),
+    // …y su lugar, que está siempre: con ✕ o vacío.
+    lugarQuitar: tarjeta.querySelector("[data-lugar-quitar]"),
     menos: tarjeta.querySelector('button[aria-label^="Restar uno"]'),
     mas: tarjeta.querySelector('button[aria-label^="Sumar uno"]'),
     unidad: tarjeta.querySelector("[data-unidad-pedido]")?.textContent ?? null,
