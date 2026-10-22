@@ -16,6 +16,7 @@ import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
+import SunmiActionCard from "@/components/sunmi/SunmiActionCard";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
@@ -55,6 +56,18 @@ function fotosGuardadas() {
 
 
 const productos = (n) => (n === 1 ? "producto" : "productos");
+
+/**
+ * El renglón de abajo de un pedido anterior: estado, fecha corta y, si el dato
+ * está, cuántos. `itemCount` de `/api/pedidos/historial` cuenta LÍNEAS: un
+ * pedido viejo con un producto repetido cuenta uno de más.
+ */
+function lineaDelAnterior(a) {
+  const cuando = a.solicitadoAt ?? a.createdAt;
+  const partes = [a.estado, cuando ? diaMesAR(cuando) : null];
+  if (Number.isInteger(a.itemCount)) partes.push(`${a.itemCount} ${productos(a.itemCount)}`);
+  return partes.filter(Boolean).join(" · ");
+}
 
 /** "hoy 14:05", o la fecha corta si no es de hoy: "21/10 14:05". */
 function cuandoSeEnvio(solicitadoAt) {
@@ -112,7 +125,17 @@ export default function PedidosCatalogoPage() {
   const [carrito, setCarrito] = useState({});
   const [posId, setPosId] = useState(null);
   const [enviando, setEnviando] = useState(false);
-  const [vista, setVista] = useState("catalogo"); // "catalogo" | "carrito"
+  // Se entra por la página de entrada, no por el catálogo: la tarjeta del
+  // pedido en curso y los pedidos anteriores (pedido de Emanuel, 2026-10-22).
+  const [vista, setVista] = useState("entrada"); // "entrada" | "catalogo" | "carrito"
+  // "Ver mi pedido" se abre desde el catálogo o desde la entrada, y su Volver
+  // vuelve a donde se estaba.
+  const [volverA, setVolverA] = useState("entrada");
+  // Hasta que el carrito contesta, la entrada no sabe si hay pedido en curso:
+  // sin esto diría "No tenés un pedido en curso" un instante.
+  const [carritoCargado, setCarritoCargado] = useState(false);
+  // Los últimos pedidos al depósito, de `/api/pedidos/historial`.
+  const [anteriores, setAnteriores] = useState([]);
   const [carritoItems, setCarritoItems] = useState([]);
   const [loadingCarrito, setLoadingCarrito] = useState(false);
 
@@ -129,17 +152,23 @@ export default function PedidosCatalogoPage() {
   // `set-cantidad` conteste 409). Empezado, solo se mira.
   const empezado = !!pendiente?.depositoEmpezo;
 
-  // El Volver va en el slot del shell. En "Ver mi pedido" vuelve al catálogo;
-  // en el resto, a donde se venía.
+  // El Volver va en el slot del shell. Desde la entrada, a donde se venía. En
+  // "Ver mi pedido" abierto desde el catálogo, al catálogo. En el resto —el
+  // catálogo, "Ver mi pedido" abierto desde la entrada, el pedido empezado—,
+  // a la entrada.
+  const enEntrada = vista === "entrada";
   const viendoPedido = vista === "carrito" && !empezado;
+  const alCatalogo = viendoPedido && volverA === "catalogo";
   useAccionDePagina(
     () =>
-      viendoPedido ? (
+      enEntrada ? (
+        <SunmiBackButton onVolver={() => router.back()} />
+      ) : alCatalogo ? (
         <SunmiBackButton texto="Volver al catálogo" onVolver={() => setVista("catalogo")} />
       ) : (
-        <SunmiBackButton onVolver={() => router.back()} />
+        <SunmiBackButton onVolver={() => setVista("entrada")} />
       ),
-    [viendoPedido, router]
+    [enEntrada, alCatalogo, router]
   );
 
   // ====================================================
@@ -165,8 +194,9 @@ export default function PedidosCatalogoPage() {
         setOpciones(json);
         setLoading(false);
 
-        // Cargar carrito existente
+        // Cargar carrito existente y los pedidos anteriores
         cargarCarrito();
+        cargarAnteriores();
       } catch (err) {
         console.error(err);
         setError("Error de conexión");
@@ -243,10 +273,38 @@ export default function PedidosCatalogoPage() {
           mapa[it.productoLocalId] = it.cantidad;
         });
         setCarrito(mapa);
+        setCarritoCargado(true);
+        return json;
       }
     } catch (err) {
       console.error(err);
     }
+    return null;
+  };
+
+  // ====================================================
+  // PEDIDOS ANTERIORES (página de entrada)
+  // ====================================================
+  // Cuatro: los tres que se muestran más el que puede estar en curso, que el
+  // historial también trae y la entrada deja afuera porque está en la tarjeta.
+  // Si falla, la sección no se muestra: no es lo que la persona vino a hacer.
+  const cargarAnteriores = async () => {
+    try {
+      const res = await fetch("/api/pedidos/historial?page=1&pageSize=4", { cache: "no-store" });
+      const json = await res.json();
+      setAnteriores(json.ok ? json.items || [] : []);
+    } catch (err) {
+      console.error(err);
+      setAnteriores([]);
+    }
+  };
+
+  // Volver a leer el carrito después de un 409 —el depósito empezó el pedido
+  // justo antes del toque— y, si quedó empezado, ir a la entrada, que lo
+  // muestra en "Preparando".
+  const releerTrasRechazo = async () => {
+    const k = await cargarCarrito();
+    if (k?.pendiente?.depositoEmpezo) setVista("entrada");
   };
 
   // ====================================================
@@ -256,7 +314,7 @@ export default function PedidosCatalogoPage() {
     // Empezado no hay tarjetas vivas; esto es por si algo llegara a llamarlo.
     // Si el depósito lo empezó y la pantalla todavía no se enteró, la ruta
     // contesta 409, el mensaje sale arriba y el carrito se vuelve a leer: con
-    // eso la pantalla pasa sola a "El depósito lo está preparando".
+    // eso la pantalla vuelve sola a la entrada, en "Preparando".
     if (empezado) return;
 
     // Optimistic update (siempre en total unidades)
@@ -286,12 +344,12 @@ export default function PedidosCatalogoPage() {
       } else {
         setError(json.error || "Error al actualizar cantidad");
         // Revert
-        cargarCarrito();
+        await releerTrasRechazo();
       }
     } catch (err) {
       console.error(err);
       setError("Error de conexión");
-      cargarCarrito();
+      await releerTrasRechazo();
     }
   };
 
@@ -319,13 +377,15 @@ export default function PedidosCatalogoPage() {
         setCarrito({});
         setCarritoItems([]);
         setPosId(null);
-        setVista("catalogo");
-        // El pedido pasó a Solicitado: lo que ahora hay que mostrar es el
-        // pendiente, y eso lo trae el carrito del servidor.
+        // Enviado, la pantalla vuelve sola a la entrada, que lo muestra como
+        // "Enviado". El pedido pasó a Solicitado: eso lo trae el carrito del
+        // servidor.
+        setVista("entrada");
         await cargarCarrito();
+        cargarAnteriores();
         showSuccess("Pedido enviado al depósito correctamente");
       } else if (json.needsOperador) {
-        setError("Ingresá tu PIN y volvé a tocar «Confirmar y enviar».");
+        setError("Ingresá tu PIN y volvé a tocar «Enviar pedido al depósito».");
         requerirOperador();
       } else {
         setError(json.error || "Error al solicitar pedido");
@@ -365,17 +425,18 @@ export default function PedidosCatalogoPage() {
         setPendiente(null);
         setCarrito({});
         setCarritoItems([]);
-        setVista("catalogo");
+        setVista("entrada");
         await cargarCarrito();
+        cargarAnteriores();
       } else if (json.needsOperador) {
         setError("Ingresá tu PIN y volvé a tocar «Cancelar pedido».");
         requerirOperador();
       } else {
         setError(json.error || "Error al cancelar pedido");
         // El 409 de un pedido que el depósito empezó justo antes del toque: el
-        // carrito, releído, lo trae empezado y la pantalla pasa sola a "El
-        // depósito lo está preparando", sin el botón.
-        await cargarCarrito();
+        // carrito, releído, lo trae empezado y la pantalla vuelve sola a la
+        // entrada, en "Preparando", sin cancelar.
+        await releerTrasRechazo();
       }
     } catch (err) {
       console.error(err);
@@ -387,7 +448,8 @@ export default function PedidosCatalogoPage() {
   // ====================================================
   // VER CARRITO
   // ====================================================
-  const abrirCarrito = async () => {
+  const abrirCarrito = async (desde = "catalogo") => {
+    setVolverA(desde);
     setVista("carrito");
     setLoadingCarrito(true);
     await cargarCarrito();
@@ -510,6 +572,117 @@ export default function PedidosCatalogoPage() {
 
   const enviadoCuando = esperando ? cuandoSeEnvio(pendiente.solicitadoAt) : null;
 
+  // El aviso de arriba: en la entrada y en el catálogo, el mismo.
+  const avisoDeError = error ? (
+    <div className="mb-3 text-[11px] sunmi-text-danger sunmi-state-danger rounded-lg px-3 py-2">
+      {error}
+      <button
+        type="button"
+        className="ml-2 underline"
+        onClick={() => setError("")}
+      >
+        cerrar
+      </button>
+    </div>
+  ) : null;
+
+  // ====================================================
+  // LA PÁGINA DE ENTRADA
+  // ====================================================
+  // Lo primero que se ve al entrar: el pedido en curso, si hay, con lo que se
+  // puede hacer con él, y debajo los últimos pedidos. El catálogo se abre
+  // desde acá.
+  if (enEntrada) {
+    const enCurso = !carritoCargado
+      ? null
+      : empezado
+        ? "preparando"
+        : esperando
+          ? "enviado"
+          : productosEnElCarrito > 0
+            ? "borrador"
+            : "nada";
+    // El historial trae también el pedido en curso (está Solicitado): ése va
+    // en la tarjeta, no entre los anteriores.
+    const delHistorial = anteriores.filter((a) => a.posId !== pendiente?.posId).slice(0, 3);
+    const irAlHistorial = () => router.push("/modulos/pedidos/historial");
+    const PILL = { borrador: ["slate", "Borrador"], enviado: ["cyan", "Enviado"], preparando: ["amber", "Preparando"] };
+    const accion = (texto, color, onClick, className = "") => (
+      <SunmiButton color={color} className={`w-full min-h-toque ${className}`} onClick={onClick}>
+        {texto}
+      </SunmiButton>
+    );
+
+    return (
+      <div className="w-full min-h-full mx-auto max-w-xl px-4 pt-4 pb-4 space-y-4">
+        {avisoDeError}
+        <SunmiCard data-entrada-pedido="" className="p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold sunmi-text-strong">Pedido al depósito</span>
+            {PILL[enCurso] ? <SunmiPill color={PILL[enCurso][0]}>{PILL[enCurso][1]}</SunmiPill> : null}
+          </div>
+          {enCurso === null ? <p className="text-sm2 sunmi-text-muted">Cargando...</p> : null}
+          {enCurso === "nada" ? (
+            <>
+              <p className="text-sm2 sunmi-text-muted">No tenés un pedido en curso</p>
+              {accion("Hacer un pedido", "primary", () => setVista("catalogo"))}
+            </>
+          ) : null}
+          {enCurso === "borrador" ? (
+            <>
+              <p className="text-sm2 sunmi-text-muted">{`${productosEnElCarrito} ${productos(productosEnElCarrito)} sin enviar`}</p>
+              <div className="space-y-2">
+                {accion("Seguir armando", "primary", () => setVista("catalogo"))}
+                {accion("Ver pedido", "slate", () => abrirCarrito("entrada"))}
+              </div>
+            </>
+          ) : null}
+          {enCurso === "enviado" ? (
+            <>
+              <p className="text-sm2 sunmi-text-muted">{`Enviado${enviadoCuando ? ` ${enviadoCuando}` : ""} · todavía podés sumar productos`}</p>
+              <p className="text-sm2 sunmi-text-muted">{`${productosEnElCarrito} ${productos(productosEnElCarrito)} en el pedido`}</p>
+              <div className="space-y-2">
+                {accion("Sumar productos", "primary", () => setVista("catalogo"))}
+                {accion("Ver pedido", "slate", () => abrirCarrito("entrada"))}
+                {/* Sin relleno y con el rojo del tema: `ghost` no pinta el
+                    texto, lo hereda, así que el tono lo pone la clase. */}
+                {accion(cancelandoPendiente ? "Cancelando..." : "Cancelar pedido", "ghost", pedirCancelarPendiente, "sunmi-text-danger")}
+              </div>
+            </>
+          ) : null}
+          {enCurso === "preparando" ? (
+            <>
+              <p className="text-sm2 sunmi-text-muted">El depósito lo está preparando</p>
+              <p className="text-sm2 sunmi-text-muted">{`${enviados.length} ${productos(enviados.length)}`}</p>
+              {accion("Ver pedido", "slate", () => setVista("carrito"))}
+            </>
+          ) : null}
+        </SunmiCard>
+
+        {delHistorial.length ? (
+          <section data-pedidos-anteriores="" className="space-y-2">
+            <p className="text-sm2 sunmi-text-muted">Pedidos anteriores</p>
+            {/* El historial no tiene una vista por pedido —despliega cada uno
+                en su lugar—, así que cada fila lleva al historial. */}
+            {delHistorial.map((a) => (
+              <SunmiActionCard key={a.posId} data-pedido-anterior={a.posId} onClick={irAlHistorial}>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm3 font-semibold sunmi-text-strong">{`Pedido #${a.posId}`}</p>
+                    <p className="text-sm2 sunmi-text-muted">{lineaDelAnterior(a)}</p>
+                  </div>
+                  <span aria-hidden="true" className="sunmi-text-muted">›</span>
+                </div>
+              </SunmiActionCard>
+            ))}
+            <SunmiLinkButton onClick={irAlHistorial}>Ver todo el historial ›</SunmiLinkButton>
+          </section>
+        ) : null}
+        {modalCancelar}
+      </div>
+    );
+  }
+
   return (
     <div className="w-full min-h-full mx-auto max-w-xl px-4 pt-4 pb-4">
       <SunmiPantallaDeTrabajo
@@ -564,18 +737,7 @@ export default function PedidosCatalogoPage() {
                 <SunmiToggle value={verFotos} onChange={setVerFotos} label="Ver fotos" />
               </div>
             )}
-            {error ? (
-              <div className="mb-3 text-[11px] sunmi-text-danger sunmi-state-danger rounded-lg px-3 py-2">
-                {error}
-                <button
-                  type="button"
-                  className="ml-2 underline"
-                  onClick={() => setError("")}
-                >
-                  cerrar
-                </button>
-              </div>
-            ) : null}
+            {avisoDeError}
           </>
         }
         lista={lista}
@@ -606,7 +768,7 @@ export default function PedidosCatalogoPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm2 sunmi-text-muted">{`Pedido enviado · ${enPedido} ${productos(enPedido)}`}</span>
-                {empezado || viendoPedido ? null : <SunmiLinkButton onClick={abrirCarrito}>Ver mi pedido ›</SunmiLinkButton>}
+                {empezado || viendoPedido ? null : <SunmiLinkButton onClick={() => abrirCarrito("catalogo")}>Ver mi pedido ›</SunmiLinkButton>}
               </div>
               {empezado ? null : (
                 <SunmiButton
@@ -620,35 +782,25 @@ export default function PedidosCatalogoPage() {
               )}
             </div>
           ) : (
-            // ── REVISAR ANTES DE MANDAR ───────────────────────────────────
-            // En el catálogo el botón grande NO envía: lleva a "Ver mi
-            // pedido", con solo lo pedido y editable. Recién ahí se manda. Es
-            // el paso que tenía la pantalla vieja ("Mi pedido") y que el
-            // rediseño se había saltado. El "Ver mi pedido ›" de esta barra se
-            // fue: el botón grande ya lleva ahí.
+            // ── UN SOLO BOTÓN, Y ENVÍA ────────────────────────────────────
+            // En el catálogo y en "Ver mi pedido", el mismo botón: tocarlo
+            // envía. El paso de revisión de 280ec05 ("Revisar y enviar" que
+            // llevaba a confirmar otra vez) se fue: Emanuel había pedido una
+            // página ANTES del catálogo —la de entrada—, no un paso antes de
+            // enviar. "Ver mi pedido ›" queda para mirar y editar lo cargado.
             <div className="space-y-2">
-              <span className="block text-sm2 sunmi-text-muted">{`${productosEnElCarrito} ${productos(productosEnElCarrito)} en el pedido`}</span>
-              {viendoPedido ? (
-                <SunmiButton
-                  color="primary"
-                  className="w-full min-h-toque"
-                  disabled={enviando || productosEnElCarrito === 0}
-                  onClick={enviarPedido}
-                >
-                  {enviando
-                    ? "Enviando..."
-                    : `Confirmar y enviar al depósito (${productosEnElCarrito} ${productos(productosEnElCarrito)})`}
-                </SunmiButton>
-              ) : (
-                <SunmiButton
-                  color="primary"
-                  className="w-full min-h-toque"
-                  disabled={productosEnElCarrito === 0}
-                  onClick={abrirCarrito}
-                >
-                  {`Revisar y enviar (${productosEnElCarrito})`}
-                </SunmiButton>
-              )}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm2 sunmi-text-muted">{`${productosEnElCarrito} ${productos(productosEnElCarrito)} en el pedido`}</span>
+                {viendoPedido ? null : <SunmiLinkButton onClick={() => abrirCarrito("catalogo")}>Ver mi pedido ›</SunmiLinkButton>}
+              </div>
+              <SunmiButton
+                color="primary"
+                className="w-full min-h-toque"
+                disabled={enviando || productosEnElCarrito === 0}
+                onClick={enviarPedido}
+              >
+                {enviando ? "Enviando..." : `Enviar pedido al depósito (${productosEnElCarrito})`}
+              </SunmiButton>
             </div>
           )
         }

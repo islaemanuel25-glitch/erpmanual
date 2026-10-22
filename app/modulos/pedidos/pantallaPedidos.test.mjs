@@ -73,11 +73,13 @@ test("1. armando: la tarjeta de contexto dice Borrador, de dónde a dónde y cu�
   assert.doesNotMatch(texto(), /CATÁLOGO DE PEDIDO|Catálogo de Pedido/);
   assert.ok(!botones(contenido()).some((b) => /Volver/.test(b.textContent)), "el Volver no se dibuja en el contenido");
   assert.ok(boton("Volver", filaShell()), "el Volver va en el slot del shell");
-  // La barra: cuántos y "Revisar y enviar". Decía "Ver mi pedido ›" y
-  // "Enviar pedido al depósito": desde 2026-10-22 el botón grande lleva a la
-  // revisión y el link se fue (lo afirma `revisarAntesDeEnviar.test.mjs`).
-  const revisar = boton("Revisar y enviar (2)");
-  assert.ok(revisar && !revisar.disabled);
+  // La barra: cuántos, "Ver mi pedido ›" y "Enviar pedido al depósito (N)",
+  // que envía directo. Volvió así el 2026-10-22: el paso "Revisar y enviar"
+  // de 280ec05 se fue (lo afirma `revisarAntesDeEnviar.test.mjs`).
+  const enviar = boton("Enviar pedido al depósito (2)");
+  assert.ok(enviar && !enviar.disabled);
+  assert.ok(boton("Ver mi pedido ›"));
+  assert.ok(!boton("Revisar y enviar"));
 });
 
 test("2. un solo filtro, Categoría, con Todas y el total; no se manda proveedor ni área", async () => {
@@ -209,7 +211,7 @@ test("409 de set-cantidad (el depósito ya lo empezó): el mensaje sale en el av
   assert.ok(orden.indexOf(r409.cuerpo.error) < orden.indexOf("data-tarjeta-pedido"), "el aviso no está arriba de la lista");
   // Y la pantalla sigue entera: las tarjetas y la barra.
   assert.deepEqual(nombres(), ["Agua x6", "Coca 2L", "Yerba 1kg"]);
-  assert.ok(boton("Revisar y enviar"));
+  assert.ok(boton("Enviar pedido al depósito"));
   await tocar(boton("cerrar", aviso));
   assert.ok(!document.body.textContent.includes(r409.cuerpo.error), "cerrar no cerró el aviso");
 });
@@ -313,7 +315,7 @@ test("FOTO: si la imagen falla, en el mismo lugar va la inicial", async () => {
 test("FOTO: en Ver mi pedido y en el pedido enviado, el mismo cuadrado", async () => {
   conFotos();
   await montar({ inicio: real.carritoBorrador });
-  await tocar(boton("Revisar y enviar"));
+  await tocar(boton("Ver mi pedido ›"));
   assert.ok(tarjeta("Agua x6").foto, "Ver mi pedido: el carrito trae la foto del agua");
   assert.ok(tarjeta("Coca 2L").inicial, "Ver mi pedido: la coca, con su inicial");
   await desmontarTodo();
@@ -401,7 +403,7 @@ test("VER FOTOS: si el celular no deja leer, apagado", async () => {
 
 test("VER FOTOS: en Ver mi pedido y en el pedido empezado no se ve, pero se respeta", async () => {
   await montar({ inicio: real.carritoBorrador });
-  await tocar(boton("Revisar y enviar"));
+  await tocar(boton("Ver mi pedido ›"));
   assert.ok(!interruptor(), "en Ver mi pedido no va el interruptor");
   assert.ok(sinCuadrado(), "apagado, Ver mi pedido mostró fotos");
   await desmontarTodo();
@@ -545,7 +547,7 @@ test("GUÍA: el + desde 0 lleva a 1, y el 1 se ve como número", async () => {
 test("GUÍA: se prende en el catálogo y en Ver mi pedido, no en el pedido empezado", async () => {
   await montar({ inicio: real.carritoBorrador });
   assert.equal(tarjeta("Yerba 1kg").campo.getAttribute("placeholder"), "0", "el catálogo no la prende");
-  await tocar(boton("Revisar y enviar"));
+  await tocar(boton("Ver mi pedido ›"));
   assert.equal(tarjeta("Coca 2L").campo.getAttribute("placeholder"), "0", "Ver mi pedido no la prende");
   await desmontarTodo();
 
@@ -557,19 +559,25 @@ test("GUÍA: se prende en el catálogo y en Ver mi pedido, no en el pedido empez
   for (const t of tarjetas()) assert.equal(t.campo.getAttribute("placeholder"), null, `${t.nombre}: el pedido empezado la prende`);
 });
 
-test("4. Ver mi pedido: solo lo pedido, sin buscador ni filtro, y vuelve desde el shell", async () => {
-  await montar({ inicio: real.carritoBorrador });
-  await tocar(boton("Revisar y enviar"));
+test("4. Ver mi pedido: solo lo pedido, sin buscador ni filtro, el MISMO botón de enviar, y vuelve desde el shell", async () => {
+  const { pedidos } = await montar({ inicio: real.carritoBorrador, solicitar: [real.solicitado] });
+  await tocar(boton("Ver mi pedido ›"));
   assert.deepEqual(nombres(), ["Agua x6", "Coca 2L"]);
   assert.ok(!buscador(), "sin buscador");
   assert.ok(!categoria(), "sin filtro");
-  assert.ok(!boton("Revisar y enviar"), "adentro no se ofrece de nuevo");
-  assert.ok(boton("Confirmar y enviar al depósito"), "desde acá se envía");
+  assert.ok(!boton("Ver mi pedido ›"), "adentro no se ofrece de nuevo");
+  assert.ok(!boton("Confirmar y enviar"), "el segundo paso de 280ec05 volvió");
+  assert.match(contenido().textContent, /2 productos en el pedido/);
   assert.equal(tarjeta("Agua x6").unidad, "Por BULTO de 6 u");
 
   await tocar(boton("Volver al catálogo", filaShell()));
   assert.deepEqual(nombres(), ["Agua x6", "Coca 2L", "Yerba 1kg"]);
   assert.ok(buscador());
+
+  // Y el botón de abajo envía en el acto, sin nada en el medio.
+  await tocar(boton("Ver mi pedido ›"));
+  await tocar(boton("Enviar pedido al depósito (2)"));
+  assert.equal(llamadas(pedidos, "/api/pos-transferencias/solicitar").length, 1, "tocar el botón no envió");
 });
 
 /** La barra de abajo: el renglón con el conteo y lo que tenga al lado. */
@@ -597,7 +605,7 @@ test("5. enviado sin empezar: se sigue armando, con el catálogo vivo y lo carga
   assert.ok(barra().lastElementChild === ver, "Ver mi pedido › no está a la derecha");
   assert.ok(boton("Cancelar pedido"));
   assert.match(boton("Cancelar pedido").className, /w-full/);
-  assert.ok(!boton("Revisar y enviar") && !boton("Confirmar y enviar"), "no hay nada que enviar");
+  assert.ok(!boton("Enviar pedido al depósito") && !boton("Revisar y enviar") && !boton("Confirmar y enviar"), "no hay nada que enviar");
 
   // Lo que se carga va directo al pedido: set-cantidad, sin enviar nada.
   await tocar(tarjeta("Yerba 1kg").mas);
@@ -650,7 +658,7 @@ test("6. empezado: El depósito lo está preparando, solo lo pedido, todo apagad
   assert.match(barra().textContent, /Pedido enviado · 3 productos/);
   assert.ok(!boton("Ver mi pedido ›"), "empezado no hay nada que ver aparte");
   assert.ok(!boton("Cancelar pedido"), "empezado, el local no puede cancelar");
-  assert.ok(!boton("Revisar y enviar") && !boton("Confirmar y enviar"));
+  assert.ok(!boton("Enviar pedido al depósito") && !boton("Revisar y enviar") && !boton("Confirmar y enviar"));
 });
 
 test("6. cancelar sin empezar sigue en la barra, y el 409 de uno que el depósito empezó lleva a empezado", async () => {

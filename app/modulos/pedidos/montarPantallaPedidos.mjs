@@ -62,8 +62,11 @@ export const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
  *     Sin esto, el local de los tres productos.
  *   - `setCantidad`: lo que contesta `set-cantidad` en vez del ok de siempre
  *     (por ejemplo el 409 de "hay un pedido enviado").
+ *   - `historial`: lo que contesta `/api/pedidos/historial` (los pedidos
+ *     anteriores de la página de entrada). Sin esto, el del local de los tres
+ *     productos al entrar: ninguno.
  */
-function servidor({ inicio, solicitar = [], cancelar = [], local = null, setCantidad = null }) {
+function servidor({ inicio, solicitar = [], cancelar = [], local = null, setCantidad = null, historial = null }) {
   const pedidos = [];
   const estado = { conPin: true, carrito: inicio };
   const colas = { solicitar: [...solicitar], cancelar: [...cancelar] };
@@ -81,6 +84,7 @@ function servidor({ inicio, solicitar = [], cancelar = [], local = null, setCant
       r = local ? local.catalogo(Object.fromEntries(u.searchParams)) : u.searchParams.get("categoriaId") ? real.catalogoBebidas : real.catalogo;
     }
     else if (u.pathname === "/api/pedidos/carrito") r = estado.carrito;
+    else if (u.pathname === "/api/pedidos/historial") r = historial ?? real.historialVacio;
     else if (u.pathname === "/api/pedidos/set-cantidad") r = setCantidad ?? (cuerpo?.unidad === "BULTO" ? real.setCantidad_BULTO : real.setCantidad_UNIDAD);
     else if (u.pathname === "/api/pos-transferencias/solicitar") {
       r = colas.solicitar.shift();
@@ -97,7 +101,15 @@ function servidor({ inicio, solicitar = [], cancelar = [], local = null, setCant
   return { pedidos, estado };
 }
 
-const router = { push: () => {}, back: () => {}, replace: () => {}, refresh: () => {}, prefetch: () => {} };
+/** Adónde mandó la pantalla al router: `["back"]`, `["push", "/ruta"]`. */
+export const navegacion = [];
+const router = {
+  push: (ruta) => navegacion.push(["push", ruta]),
+  back: () => navegacion.push(["back"]),
+  replace: () => {},
+  refresh: () => {},
+  prefetch: () => {},
+};
 
 // La fila del shell, como la dibuja `LayoutBase`: lo que la pantalla registró
 // con `useAccionDePagina`, en un lugar aparte del contenido.
@@ -133,6 +145,7 @@ export async function desmontarTodo() {
   for (const r of montadas) await act(async () => r.unmount());
   montadas = [];
   dialogosNativos.length = 0;
+  navegacion.length = 0;
   // El tamaño de página queda guardado en el celular: un caso no le deja el
   // suyo al siguiente.
   dom.window.localStorage.clear();
@@ -155,7 +168,27 @@ export async function montar(respuestas) {
   });
   // Perfil, operador, opciones, carrito y el catálogo (que espera 300 ms).
   await asentar(450);
+  // Desde el 2026-10-22 se entra por la página de entrada. Salvo que el
+  // candado sea de la entrada (`enLaEntrada`), se pasa por ella como la
+  // persona: el botón que abre el catálogo, o "Ver pedido" si el depósito ya lo
+  // empezó (ahí no hay catálogo).
+  if (!respuestas.enLaEntrada) await abrirDesdeLaEntrada();
   return { raiz, ...srv };
+}
+
+/** Lo que la página de entrada ofrece para seguir, en el orden en que se busca. */
+const PARA_SEGUIR = ["Hacer un pedido", "Seguir armando", "Sumar productos", "Ver pedido"];
+
+export const entrada = () => document.querySelector("[data-entrada-pedido]");
+
+export async function abrirDesdeLaEntrada() {
+  const tarjeta = entrada();
+  assert.ok(tarjeta, "la pantalla no arrancó en la página de entrada");
+  const botonesDeLaEntrada = [...tarjeta.querySelectorAll("button")];
+  const seguir = PARA_SEGUIR.map((t) => botonesDeLaEntrada.find((b) => b.textContent.trim() === t)).find(Boolean);
+  assert.ok(seguir, `la entrada no ofrece cómo seguir: ${tarjeta.textContent}`);
+  await act(async () => seguir.click());
+  await asentar(450);
 }
 
 export const texto = () => document.body.textContent;

@@ -24,7 +24,7 @@ import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 
 const {
-  real, montar, desmontarTodo, texto, boton, modal, llamadas, modalDelPin, tocar, dialogosNativos, volverElPin, tarjetas,
+  real, montar, desmontarTodo, texto, boton, modal, llamadas, modalDelPin, tocar, dialogosNativos, volverElPin, tarjetas, entrada,
 } = await import("./montarPantallaPedidos.mjs");
 
 afterEach(desmontarTodo);
@@ -33,7 +33,8 @@ afterEach(desmontarTodo);
 // el nodo de jsdom entero y el proceso se cuelga en vez de dar rojo. Con
 // `assert.ok(!nodo, …)` el rojo se ve.
 
-const esperandoAlDeposito = () => /Pedido enviado · \d+ producto/.test(texto());
+// En el catálogo se ve en la barra; en la página de entrada, en la tarjeta.
+const esperandoAlDeposito = () => /Pedido enviado · \d+ producto|todavía podés sumar productos/.test(texto());
 
 test("el fixture es el que contestan las rutas: los 428 traen needsOperador y el carrito armado no tiene pendiente", () => {
   assert.equal(real.solicitarSinOperador.status, 428);
@@ -48,14 +49,15 @@ test("el fixture es el que contestan las rutas: los 428 traen needsOperador y el
 test("1 y 2: enviar muestra el pendiente en el acto y avisa con un toast, sin alert", async () => {
   const { pedidos } = await montar({ inicio: real.carritoBorrador, solicitar: [real.solicitado] });
   assert.ok(!esperandoAlDeposito());
-  // Desde 2026-10-22 se envía desde la revisión: "Revisar y enviar" lleva ahí
-  // y "Confirmar y enviar al depósito" es el que manda.
-  await tocar(boton("Revisar y enviar"));
-  await tocar(boton("Confirmar y enviar al depósito"));
+  // Un toque y sale: "Enviar pedido al depósito (N)" envía directo. El paso de
+  // revisión de 280ec05 ("Revisar y enviar" → "Confirmar y enviar") se fue.
+  await tocar(boton("Enviar pedido al depósito"));
 
   assert.equal(llamadas(pedidos, "/api/pos-transferencias/solicitar").length, 1);
   assert.ok(esperandoAlDeposito(), "el pendiente tiene que aparecer sin recargar");
-  assert.ok(boton("Cancelar pedido"), "y con él, cancelar en la barra");
+  // Y se vuelve sola a la entrada, con cancelar en la tarjeta.
+  assert.ok(entrada(), "después de enviar no volvió a la entrada");
+  assert.ok(boton("Cancelar pedido", entrada()), "y con él, cancelar en la tarjeta");
   assert.match(texto(), /Pedido enviado al depósito correctamente/, "el aviso va en el toast");
   assert.deepEqual(dialogosNativos, []);
   // Y la carga es la del carrito, no otra: se pidió después del envío.
@@ -65,13 +67,15 @@ test("1 y 2: enviar muestra el pendiente en el acto y avisa con un toast, sin al
 
 test("3: enviar sin operario pide el PIN, deja el carrito y no reintenta solo; el segundo toque envía", async () => {
   const { pedidos, estado } = await montar({ inicio: real.carritoBorrador, solicitar: [real.solicitarSinOperador, real.solicitado] });
-  await tocar(boton("Revisar y enviar"));
   estado.conPin = false; // la sesión del operario venció del lado del servidor
-  await tocar(boton("Confirmar y enviar al depósito"));
+  await tocar(boton("Enviar pedido al depósito"));
 
   assert.ok(modalDelPin(), "tiene que aparecer el modal del PIN encima de la pantalla");
-  assert.deepEqual(tarjetas().map((t) => t.nombre).sort(), ["Agua x6", "Coca 2L"], "sigue en Ver mi pedido con sus dos productos");
+  // Decía "sigue en Ver mi pedido": desde que se envía desde el catálogo,
+  // sigue en el catálogo, con lo cargado.
+  assert.deepEqual(tarjetas().map((t) => t.nombre).sort(), ["Agua x6", "Coca 2L", "Yerba 1kg"], "sigue en el catálogo");
   assert.match(texto(), /2 productos en el pedido/);
+  assert.ok(!entrada(), "sin PIN no tiene que irse a la entrada");
   assert.match(texto(), /Ingresá tu PIN y volvé a tocar/);
   assert.doesNotMatch(texto(), /Se requiere un operador activo/, "no es un error genérico");
   assert.ok(!esperandoAlDeposito());
@@ -81,7 +85,7 @@ test("3: enviar sin operario pide el PIN, deja el carrito y no reintenta solo; e
   assert.ok(!modalDelPin(), "con el operario de vuelta el modal se va");
   assert.equal(llamadas(pedidos, "/api/pos-transferencias/solicitar").length, 1, "no se reintentó solo");
 
-  await tocar(boton("Confirmar y enviar al depósito"));
+  await tocar(boton("Enviar pedido al depósito"));
   assert.equal(llamadas(pedidos, "/api/pos-transferencias/solicitar").length, 2);
   assert.ok(esperandoAlDeposito());
   assert.deepEqual(dialogosNativos, []);

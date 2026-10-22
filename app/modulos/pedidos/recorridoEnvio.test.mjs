@@ -16,7 +16,7 @@
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 
-const { real, montar, desmontarTodo, tarjetas, boton, tocar, asentar, llamadas } = await import("./montarPantallaPedidos.mjs");
+const { real, montar, desmontarTodo, tarjetas, boton, tocar, asentar, llamadas, entrada } = await import("./montarPantallaPedidos.mjs");
 
 afterEach(desmontarTodo);
 
@@ -43,18 +43,20 @@ function escucharClavesRepetidas() {
 const nombres = () => tarjetas().map((t) => t.nombre);
 const repetidos = () => nombres().filter((n, i, todos) => todos.indexOf(n) !== i);
 
-/** Revisar el pedido y enviarlo: "Revisar y enviar", y desde ahí confirmar. */
-async function revisarYEnviar() {
-  await tocar(boton("Revisar y enviar"));
-  await tocar(boton("Confirmar y enviar al depósito"));
+/**
+ * Enviar el pedido. Decía "Revisar y enviar" y después confirmar: desde el
+ * 2026-10-22 es un toque, y la pantalla vuelve sola a la entrada.
+ */
+async function enviar() {
+  await tocar(boton("Enviar pedido al depósito"));
   await asentar(400);
 }
 
-test("revisar: cada producto una vez, y el de dos líneas con la suma", async () => {
+test("Ver mi pedido: cada producto una vez, y el de dos líneas con la suma", async () => {
   const consola = escucharClavesRepetidas();
   try {
     await montar({ inicio: real.recorridoRevision, local });
-    await tocar(boton("Revisar y enviar"));
+    await tocar(boton("Ver mi pedido ›"));
     assert.deepEqual(repetidos(), [], "un producto aparece dos veces en Ver mi pedido");
     assert.equal(tarjetas().length, 5);
     assert.equal(tarjetas().find((t) => t.nombre === ORO).campo.value, "3", "no muestra la suma de las dos líneas");
@@ -74,8 +76,12 @@ test("enviado: el catálogo vuelve con lo enviado, cada producto una vez y el de
   try {
     assert.equal(real.recorridoTrasEnviar.cuerpo.pendiente.depositoEmpezo, false);
     const { pedidos } = await montar({ inicio: real.recorridoRevision, solicitar: [real.recorridoSolicitado], local });
-    await revisarYEnviar();
+    await enviar();
     assert.equal(llamadas(pedidos, "/api/pos-transferencias/solicitar").length, 1);
+    // Vuelve a la entrada, en "Enviado"; "Sumar productos" abre el catálogo.
+    assert.match(entrada().textContent, /todavía podés sumar productos/);
+    assert.match(entrada().textContent, /5 productos en el pedido/);
+    await tocar(boton("Sumar productos", entrada()));
     assert.match(document.body.textContent, /Podés sumar productos hasta que el depósito lo empiece a preparar/);
 
     assert.deepEqual(repetidos(), [], "un producto aparece dos veces");

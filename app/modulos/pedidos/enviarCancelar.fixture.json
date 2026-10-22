@@ -4,9 +4,9 @@
     "cuerpo": {
       "ok": true,
       "user": {
-        "id": 246,
+        "id": 264,
         "nombre": "Cuenta Mini",
-        "email": "pedidos-1792674172989@ci.local",
+        "email": "pedidos-1792675840485@ci.local",
         "rolId": 3,
         "rolNombre": "ENCARGADO",
         "permisos": [
@@ -46,7 +46,7 @@
         "esAdmin": false,
         "esDuenoLocal": false,
         "operadorActivo": true,
-        "localId": 452,
+        "localId": 480,
         "esDeposito": false,
         "exigirOperador": true,
         "tarjetaPrecioUnitario": null,
@@ -59,12 +59,12 @@
     "cuerpo": {
       "ok": true,
       "operador": {
-        "operadorId": 227,
+        "operadorId": 243,
         "nombre": "Ana",
-        "localId": 452,
-        "emitidoEn": 1792674173464
+        "localId": 480,
+        "emitidoEn": 1792675842817
       },
-      "voucher": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVyYWRvcklkIjoyMjcsImxvY2FsSWQiOjQ1MiwiX3RpcG8iOiJvcGVyYWRvcl92b3VjaGVyIiwiaWF0IjoxNzkyNjc0MTczLCJleHAiOjE3OTI3MDI5NzN9.wuLjMQW6CMU-ftVv59BWIRoDpnluf-8KTf_RMhxzOMI"
+      "voucher": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVyYWRvcklkIjoyNDMsImxvY2FsSWQiOjQ4MCwiX3RpcG8iOiJvcGVyYWRvcl92b3VjaGVyIiwiaWF0IjoxNzkyNjc1ODQzLCJleHAiOjE3OTI3MDQ2NDN9.lJyS6M7jabWqrDq5yHflwKiI15onxHL9pz24iRp8MJA"
     }
   },
   "operadorMeSinPin": {
@@ -80,7 +80,7 @@
       "ok": true,
       "items": [
         {
-          "id": 227,
+          "id": 243,
           "nombre": "Ana"
         }
       ]
@@ -91,22 +91,22 @@
     "cuerpo": {
       "ok": true,
       "local": {
-        "id": 452,
-        "nombre": "Mini pedidos 1792674172989"
+        "id": 480,
+        "nombre": "Mini pedidos 1792675840485"
       },
       "deposito": {
-        "id": 453,
-        "nombre": "Depósito pedidos 1792674172989"
+        "id": 481,
+        "nombre": "Depósito pedidos 1792675840485"
       },
-      "grupoId": 226,
+      "grupoId": 240,
       "categorias": [
         {
-          "id": 94,
-          "nombre": "Almacén 1792674172989"
+          "id": 98,
+          "nombre": "Almacén 1792675840485"
         },
         {
-          "id": 93,
-          "nombre": "Bebidas 1792674172989"
+          "id": 97,
+          "nombre": "Bebidas 1792675840485"
         }
       ],
       "proveedores": [],
@@ -119,10 +119,10 @@
       "ok": true,
       "items": [
         {
-          "productoLocalId": 6424,
-          "baseId": 6392,
+          "productoLocalId": 6750,
+          "baseId": 6714,
           "nombre": "Agua x6",
-          "codigoBarra": "7717926741729",
+          "codigoBarra": "7717926758404",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": "/uploads/productos/agua-x6.jpg",
@@ -132,15 +132,15 @@
           "modoPedido": "BULTO",
           "modoEnvio": "SOLO_BULTO",
           "stockDeposito": 50,
-          "categoriaNombre": "Bebidas 1792674172989",
+          "categoriaNombre": "Bebidas 1792675840485",
           "proveedorNombre": null,
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6422,
-          "baseId": 6390,
+          "productoLocalId": 6748,
+          "baseId": 6712,
           "nombre": "Coca 2L",
-          "codigoBarra": "7717926741729",
+          "codigoBarra": "7717926758404",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -150,15 +150,15 @@
           "modoPedido": "BULTO",
           "modoEnvio": "SOLO_UNIDAD",
           "stockDeposito": 50,
-          "categoriaNombre": "Bebidas 1792674172989",
+          "categoriaNombre": "Bebidas 1792675840485",
           "proveedorNombre": null,
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6423,
-          "baseId": 6391,
+          "productoLocalId": 6749,
+          "baseId": 6713,
           "nombre": "Yerba 1kg",
-          "codigoBarra": "7717926741729",
+          "codigoBarra": "7717926758404",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -168,7 +168,7 @@
           "modoPedido": "BULTO",
           "modoEnvio": "SOLO_UNIDAD",
           "stockDeposito": 50,
-          "categoriaNombre": "Almacén 1792674172989",
+          "categoriaNombre": "Almacén 1792675840485",
           "proveedorNombre": null,
           "areaFisicaNombre": null
         }
@@ -185,10 +185,10 @@
       "ok": true,
       "items": [
         {
-          "productoLocalId": 6424,
-          "baseId": 6392,
+          "productoLocalId": 6750,
+          "baseId": 6714,
           "nombre": "Agua x6",
-          "codigoBarra": "7717926741729",
+          "codigoBarra": "7717926758404",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": "/uploads/productos/agua-x6.jpg",
@@ -198,15 +198,15 @@
           "modoPedido": "BULTO",
           "modoEnvio": "SOLO_BULTO",
           "stockDeposito": 50,
-          "categoriaNombre": "Bebidas 1792674172989",
+          "categoriaNombre": "Bebidas 1792675840485",
           "proveedorNombre": null,
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6422,
-          "baseId": 6390,
+          "productoLocalId": 6748,
+          "baseId": 6712,
           "nombre": "Coca 2L",
-          "codigoBarra": "7717926741729",
+          "codigoBarra": "7717926758404",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -216,7 +216,7 @@
           "modoPedido": "BULTO",
           "modoEnvio": "SOLO_UNIDAD",
           "stockDeposito": 50,
-          "categoriaNombre": "Bebidas 1792674172989",
+          "categoriaNombre": "Bebidas 1792675840485",
           "proveedorNombre": null,
           "areaFisicaNombre": null
         }
@@ -231,10 +231,10 @@
     "status": 200,
     "cuerpo": {
       "ok": true,
-      "posId": 2032,
+      "posId": 2283,
       "item": {
-        "detalleId": 4296,
-        "productoLocalId": 6422,
+        "detalleId": 4740,
+        "productoLocalId": 6748,
         "sugerido": 3,
         "preparado": 0,
         "unidadSugerida": "UNIDAD"
@@ -247,10 +247,10 @@
     "status": 200,
     "cuerpo": {
       "ok": true,
-      "posId": 2032,
+      "posId": 2283,
       "item": {
-        "detalleId": 4297,
-        "productoLocalId": 6424,
+        "detalleId": 4741,
+        "productoLocalId": 6750,
         "sugerido": 2,
         "preparado": 0,
         "unidadSugerida": "BULTO"
@@ -263,15 +263,15 @@
     "status": 200,
     "cuerpo": {
       "ok": true,
-      "posId": 2032,
+      "posId": 2283,
       "estado": "Borrador",
       "items": [
         {
-          "detalleId": 4296,
-          "productoLocalId": 6422,
-          "baseId": 6390,
+          "detalleId": 4740,
+          "productoLocalId": 6748,
+          "baseId": 6712,
           "nombre": "Coca 2L",
-          "codigoBarra": "7717926741729",
+          "codigoBarra": "7717926758404",
           "sugerido": 3,
           "preparado": 0,
           "unidadSugerida": "UNIDAD",
@@ -281,11 +281,11 @@
           "imagenUrl": null
         },
         {
-          "detalleId": 4297,
-          "productoLocalId": 6424,
-          "baseId": 6392,
+          "detalleId": 4741,
+          "productoLocalId": 6750,
+          "baseId": 6714,
           "nombre": "Agua x6",
-          "codigoBarra": "7717926741729",
+          "codigoBarra": "7717926758404",
           "sugerido": 2,
           "preparado": 0,
           "unidadSugerida": "BULTO",
@@ -312,12 +312,12 @@
     "cuerpo": {
       "ok": true,
       "item": {
-        "id": 2032,
+        "id": 2283,
         "estado": "Solicitado",
-        "origenId": 453,
-        "destinoId": 452,
+        "origenId": 481,
+        "destinoId": 480,
         "origenManual": true,
-        "solicitadoAt": "2026-10-22T13:02:53.901Z"
+        "solicitadoAt": "2026-10-22T13:30:43.820Z"
       }
     }
   },
@@ -329,10 +329,10 @@
       "items": [],
       "itemCount": 0,
       "pendiente": {
-        "posId": 2032,
+        "posId": 2283,
         "estado": "Solicitado",
-        "solicitadoAt": "2026-10-22T13:02:53.901Z",
-        "createdAt": "2026-10-22T13:02:53.767Z",
+        "solicitadoAt": "2026-10-22T13:30:43.820Z",
+        "createdAt": "2026-10-22T13:30:43.440Z",
         "depositoEmpezo": false,
         "items": [
           {
@@ -341,10 +341,10 @@
             "unidadSugerida": "UNIDAD",
             "factorPack": 1,
             "modoEnvio": "SOLO_UNIDAD",
-            "detalleId": 4296,
-            "productoLocalId": 6422,
-            "baseId": 6390,
-            "codigoBarra": "7717926741729",
+            "detalleId": 4740,
+            "productoLocalId": 6748,
+            "baseId": 6712,
+            "codigoBarra": "7717926758404",
             "preparado": 0,
             "unidadMedida": "unidad",
             "imagenUrl": null
@@ -355,10 +355,10 @@
             "unidadSugerida": "BULTO",
             "factorPack": 6,
             "modoEnvio": "SOLO_BULTO",
-            "detalleId": 4297,
-            "productoLocalId": 6424,
-            "baseId": 6392,
-            "codigoBarra": "7717926741729",
+            "detalleId": 4741,
+            "productoLocalId": 6750,
+            "baseId": 6714,
+            "codigoBarra": "7717926758404",
             "preparado": 0,
             "unidadMedida": "pack",
             "imagenUrl": "/uploads/productos/agua-x6.jpg"
@@ -399,9 +399,9 @@
     "cuerpo": {
       "ok": true,
       "user": {
-        "id": 247,
+        "id": 265,
         "nombre": "Cuenta paginado",
-        "email": "paginado-1792674172989@ci.local",
+        "email": "paginado-1792675840485@ci.local",
         "rolId": 3,
         "rolNombre": "ENCARGADO",
         "permisos": [
@@ -443,7 +443,7 @@
         "esAdmin": false,
         "esDuenoLocal": false,
         "operadorActivo": false,
-        "localId": 454,
+        "localId": 482,
         "esDeposito": false,
         "exigirOperador": true,
         "tarjetaPrecioUnitario": null,
@@ -456,12 +456,12 @@
     "cuerpo": {
       "ok": true,
       "operador": {
-        "operadorId": 228,
+        "operadorId": 244,
         "nombre": "Bea",
-        "localId": 454,
-        "emitidoEn": 1792674175001
+        "localId": 482,
+        "emitidoEn": 1792675845505
       },
-      "voucher": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVyYWRvcklkIjoyMjgsImxvY2FsSWQiOjQ1NCwiX3RpcG8iOiJvcGVyYWRvcl92b3VjaGVyIiwiaWF0IjoxNzkyNjc0MTc1LCJleHAiOjE3OTI3MDI5NzV9.rra9aYV6w6OgXErgDihCSP0PbnJoOcXCiZ8u3JedhVM"
+      "voucher": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVyYWRvcklkIjoyNDQsImxvY2FsSWQiOjQ4MiwiX3RpcG8iOiJvcGVyYWRvcl92b3VjaGVyIiwiaWF0IjoxNzkyNjc1ODQ1LCJleHAiOjE3OTI3MDQ2NDV9.3zPJ8KQp2YGMmZVTYpGcwj_53HFo06JV4C832KKEcJ4"
     }
   },
   "paginadoOpciones": {
@@ -469,14 +469,14 @@
     "cuerpo": {
       "ok": true,
       "local": {
-        "id": 454,
-        "nombre": "Mini paginado 1792674172989"
+        "id": 482,
+        "nombre": "Mini paginado 1792675840485"
       },
       "deposito": {
-        "id": 455,
-        "nombre": "Depósito paginado 1792674172989"
+        "id": 483,
+        "nombre": "Depósito paginado 1792675840485"
       },
-      "grupoId": 227,
+      "grupoId": 241,
       "categorias": [],
       "proveedores": [],
       "areas": []
@@ -498,10 +498,10 @@
       "ok": true,
       "items": [
         {
-          "productoLocalId": 6425,
-          "baseId": 6393,
+          "productoLocalId": 6751,
+          "baseId": 6715,
           "nombre": "Producto 001",
-          "codigoBarra": "7817926741729001",
+          "codigoBarra": "7817926758404001",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -516,10 +516,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6426,
-          "baseId": 6394,
+          "productoLocalId": 6752,
+          "baseId": 6716,
           "nombre": "Producto 002",
-          "codigoBarra": "7817926741729002",
+          "codigoBarra": "7817926758404002",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -534,10 +534,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6427,
-          "baseId": 6395,
+          "productoLocalId": 6753,
+          "baseId": 6717,
           "nombre": "Producto 003",
-          "codigoBarra": "7817926741729003",
+          "codigoBarra": "7817926758404003",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -552,10 +552,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6428,
-          "baseId": 6396,
+          "productoLocalId": 6754,
+          "baseId": 6718,
           "nombre": "Producto 004",
-          "codigoBarra": "7817926741729004",
+          "codigoBarra": "7817926758404004",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -570,10 +570,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6429,
-          "baseId": 6397,
+          "productoLocalId": 6755,
+          "baseId": 6719,
           "nombre": "Producto 005",
-          "codigoBarra": "7817926741729005",
+          "codigoBarra": "7817926758404005",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -588,10 +588,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6430,
-          "baseId": 6398,
+          "productoLocalId": 6756,
+          "baseId": 6720,
           "nombre": "Producto 006",
-          "codigoBarra": "7817926741729006",
+          "codigoBarra": "7817926758404006",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -606,10 +606,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6431,
-          "baseId": 6399,
+          "productoLocalId": 6757,
+          "baseId": 6721,
           "nombre": "Producto 007",
-          "codigoBarra": "7817926741729007",
+          "codigoBarra": "7817926758404007",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -624,10 +624,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6432,
-          "baseId": 6400,
+          "productoLocalId": 6758,
+          "baseId": 6722,
           "nombre": "Producto 008",
-          "codigoBarra": "7817926741729008",
+          "codigoBarra": "7817926758404008",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -642,10 +642,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6433,
-          "baseId": 6401,
+          "productoLocalId": 6759,
+          "baseId": 6723,
           "nombre": "Producto 009",
-          "codigoBarra": "7817926741729009",
+          "codigoBarra": "7817926758404009",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -660,10 +660,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6434,
-          "baseId": 6402,
+          "productoLocalId": 6760,
+          "baseId": 6724,
           "nombre": "Producto 010",
-          "codigoBarra": "7817926741729010",
+          "codigoBarra": "7817926758404010",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -678,10 +678,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6435,
-          "baseId": 6403,
+          "productoLocalId": 6761,
+          "baseId": 6725,
           "nombre": "Producto 011",
-          "codigoBarra": "7817926741729011",
+          "codigoBarra": "7817926758404011",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -696,10 +696,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6436,
-          "baseId": 6404,
+          "productoLocalId": 6762,
+          "baseId": 6726,
           "nombre": "Producto 012",
-          "codigoBarra": "7817926741729012",
+          "codigoBarra": "7817926758404012",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -714,10 +714,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6437,
-          "baseId": 6405,
+          "productoLocalId": 6763,
+          "baseId": 6727,
           "nombre": "Producto 013",
-          "codigoBarra": "7817926741729013",
+          "codigoBarra": "7817926758404013",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -732,10 +732,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6438,
-          "baseId": 6406,
+          "productoLocalId": 6764,
+          "baseId": 6728,
           "nombre": "Producto 014",
-          "codigoBarra": "7817926741729014",
+          "codigoBarra": "7817926758404014",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -750,10 +750,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6439,
-          "baseId": 6407,
+          "productoLocalId": 6765,
+          "baseId": 6729,
           "nombre": "Producto 015",
-          "codigoBarra": "7817926741729015",
+          "codigoBarra": "7817926758404015",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -768,10 +768,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6440,
-          "baseId": 6408,
+          "productoLocalId": 6766,
+          "baseId": 6730,
           "nombre": "Producto 016",
-          "codigoBarra": "7817926741729016",
+          "codigoBarra": "7817926758404016",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -786,10 +786,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6441,
-          "baseId": 6409,
+          "productoLocalId": 6767,
+          "baseId": 6731,
           "nombre": "Producto 017",
-          "codigoBarra": "7817926741729017",
+          "codigoBarra": "7817926758404017",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -804,10 +804,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6442,
-          "baseId": 6410,
+          "productoLocalId": 6768,
+          "baseId": 6732,
           "nombre": "Producto 018",
-          "codigoBarra": "7817926741729018",
+          "codigoBarra": "7817926758404018",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -822,10 +822,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6443,
-          "baseId": 6411,
+          "productoLocalId": 6769,
+          "baseId": 6733,
           "nombre": "Producto 019",
-          "codigoBarra": "7817926741729019",
+          "codigoBarra": "7817926758404019",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -840,10 +840,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6444,
-          "baseId": 6412,
+          "productoLocalId": 6770,
+          "baseId": 6734,
           "nombre": "Producto 020",
-          "codigoBarra": "7817926741729020",
+          "codigoBarra": "7817926758404020",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -858,10 +858,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6445,
-          "baseId": 6413,
+          "productoLocalId": 6771,
+          "baseId": 6735,
           "nombre": "Producto 021",
-          "codigoBarra": "7817926741729021",
+          "codigoBarra": "7817926758404021",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -876,10 +876,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6446,
-          "baseId": 6414,
+          "productoLocalId": 6772,
+          "baseId": 6736,
           "nombre": "Producto 022",
-          "codigoBarra": "7817926741729022",
+          "codigoBarra": "7817926758404022",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -894,10 +894,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6447,
-          "baseId": 6415,
+          "productoLocalId": 6773,
+          "baseId": 6737,
           "nombre": "Producto 023",
-          "codigoBarra": "7817926741729023",
+          "codigoBarra": "7817926758404023",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -912,10 +912,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6448,
-          "baseId": 6416,
+          "productoLocalId": 6774,
+          "baseId": 6738,
           "nombre": "Producto 024",
-          "codigoBarra": "7817926741729024",
+          "codigoBarra": "7817926758404024",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -930,10 +930,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6449,
-          "baseId": 6417,
+          "productoLocalId": 6775,
+          "baseId": 6739,
           "nombre": "Producto 025",
-          "codigoBarra": "7817926741729025",
+          "codigoBarra": "7817926758404025",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -960,10 +960,10 @@
       "ok": true,
       "items": [
         {
-          "productoLocalId": 6425,
-          "baseId": 6393,
+          "productoLocalId": 6751,
+          "baseId": 6715,
           "nombre": "Producto 001",
-          "codigoBarra": "7817926741729001",
+          "codigoBarra": "7817926758404001",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -978,10 +978,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6426,
-          "baseId": 6394,
+          "productoLocalId": 6752,
+          "baseId": 6716,
           "nombre": "Producto 002",
-          "codigoBarra": "7817926741729002",
+          "codigoBarra": "7817926758404002",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -996,10 +996,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6427,
-          "baseId": 6395,
+          "productoLocalId": 6753,
+          "baseId": 6717,
           "nombre": "Producto 003",
-          "codigoBarra": "7817926741729003",
+          "codigoBarra": "7817926758404003",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1014,10 +1014,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6428,
-          "baseId": 6396,
+          "productoLocalId": 6754,
+          "baseId": 6718,
           "nombre": "Producto 004",
-          "codigoBarra": "7817926741729004",
+          "codigoBarra": "7817926758404004",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1032,10 +1032,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6429,
-          "baseId": 6397,
+          "productoLocalId": 6755,
+          "baseId": 6719,
           "nombre": "Producto 005",
-          "codigoBarra": "7817926741729005",
+          "codigoBarra": "7817926758404005",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1050,10 +1050,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6430,
-          "baseId": 6398,
+          "productoLocalId": 6756,
+          "baseId": 6720,
           "nombre": "Producto 006",
-          "codigoBarra": "7817926741729006",
+          "codigoBarra": "7817926758404006",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1068,10 +1068,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6431,
-          "baseId": 6399,
+          "productoLocalId": 6757,
+          "baseId": 6721,
           "nombre": "Producto 007",
-          "codigoBarra": "7817926741729007",
+          "codigoBarra": "7817926758404007",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1086,10 +1086,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6432,
-          "baseId": 6400,
+          "productoLocalId": 6758,
+          "baseId": 6722,
           "nombre": "Producto 008",
-          "codigoBarra": "7817926741729008",
+          "codigoBarra": "7817926758404008",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1104,10 +1104,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6433,
-          "baseId": 6401,
+          "productoLocalId": 6759,
+          "baseId": 6723,
           "nombre": "Producto 009",
-          "codigoBarra": "7817926741729009",
+          "codigoBarra": "7817926758404009",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1122,10 +1122,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6434,
-          "baseId": 6402,
+          "productoLocalId": 6760,
+          "baseId": 6724,
           "nombre": "Producto 010",
-          "codigoBarra": "7817926741729010",
+          "codigoBarra": "7817926758404010",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1140,10 +1140,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6435,
-          "baseId": 6403,
+          "productoLocalId": 6761,
+          "baseId": 6725,
           "nombre": "Producto 011",
-          "codigoBarra": "7817926741729011",
+          "codigoBarra": "7817926758404011",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1158,10 +1158,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6436,
-          "baseId": 6404,
+          "productoLocalId": 6762,
+          "baseId": 6726,
           "nombre": "Producto 012",
-          "codigoBarra": "7817926741729012",
+          "codigoBarra": "7817926758404012",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1176,10 +1176,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6437,
-          "baseId": 6405,
+          "productoLocalId": 6763,
+          "baseId": 6727,
           "nombre": "Producto 013",
-          "codigoBarra": "7817926741729013",
+          "codigoBarra": "7817926758404013",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1194,10 +1194,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6438,
-          "baseId": 6406,
+          "productoLocalId": 6764,
+          "baseId": 6728,
           "nombre": "Producto 014",
-          "codigoBarra": "7817926741729014",
+          "codigoBarra": "7817926758404014",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1212,10 +1212,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6439,
-          "baseId": 6407,
+          "productoLocalId": 6765,
+          "baseId": 6729,
           "nombre": "Producto 015",
-          "codigoBarra": "7817926741729015",
+          "codigoBarra": "7817926758404015",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1230,10 +1230,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6440,
-          "baseId": 6408,
+          "productoLocalId": 6766,
+          "baseId": 6730,
           "nombre": "Producto 016",
-          "codigoBarra": "7817926741729016",
+          "codigoBarra": "7817926758404016",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1248,10 +1248,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6441,
-          "baseId": 6409,
+          "productoLocalId": 6767,
+          "baseId": 6731,
           "nombre": "Producto 017",
-          "codigoBarra": "7817926741729017",
+          "codigoBarra": "7817926758404017",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1266,10 +1266,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6442,
-          "baseId": 6410,
+          "productoLocalId": 6768,
+          "baseId": 6732,
           "nombre": "Producto 018",
-          "codigoBarra": "7817926741729018",
+          "codigoBarra": "7817926758404018",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1284,10 +1284,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6443,
-          "baseId": 6411,
+          "productoLocalId": 6769,
+          "baseId": 6733,
           "nombre": "Producto 019",
-          "codigoBarra": "7817926741729019",
+          "codigoBarra": "7817926758404019",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1302,10 +1302,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6444,
-          "baseId": 6412,
+          "productoLocalId": 6770,
+          "baseId": 6734,
           "nombre": "Producto 020",
-          "codigoBarra": "7817926741729020",
+          "codigoBarra": "7817926758404020",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1320,10 +1320,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6445,
-          "baseId": 6413,
+          "productoLocalId": 6771,
+          "baseId": 6735,
           "nombre": "Producto 021",
-          "codigoBarra": "7817926741729021",
+          "codigoBarra": "7817926758404021",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1338,10 +1338,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6446,
-          "baseId": 6414,
+          "productoLocalId": 6772,
+          "baseId": 6736,
           "nombre": "Producto 022",
-          "codigoBarra": "7817926741729022",
+          "codigoBarra": "7817926758404022",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1356,10 +1356,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6447,
-          "baseId": 6415,
+          "productoLocalId": 6773,
+          "baseId": 6737,
           "nombre": "Producto 023",
-          "codigoBarra": "7817926741729023",
+          "codigoBarra": "7817926758404023",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1374,10 +1374,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6448,
-          "baseId": 6416,
+          "productoLocalId": 6774,
+          "baseId": 6738,
           "nombre": "Producto 024",
-          "codigoBarra": "7817926741729024",
+          "codigoBarra": "7817926758404024",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1392,10 +1392,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6449,
-          "baseId": 6417,
+          "productoLocalId": 6775,
+          "baseId": 6739,
           "nombre": "Producto 025",
-          "codigoBarra": "7817926741729025",
+          "codigoBarra": "7817926758404025",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1410,10 +1410,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6450,
-          "baseId": 6418,
+          "productoLocalId": 6776,
+          "baseId": 6740,
           "nombre": "Producto 026",
-          "codigoBarra": "7817926741729026",
+          "codigoBarra": "7817926758404026",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1428,10 +1428,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6451,
-          "baseId": 6419,
+          "productoLocalId": 6777,
+          "baseId": 6741,
           "nombre": "Producto 027",
-          "codigoBarra": "7817926741729027",
+          "codigoBarra": "7817926758404027",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1446,10 +1446,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6452,
-          "baseId": 6420,
+          "productoLocalId": 6778,
+          "baseId": 6742,
           "nombre": "Producto 028",
-          "codigoBarra": "7817926741729028",
+          "codigoBarra": "7817926758404028",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1464,10 +1464,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6453,
-          "baseId": 6421,
+          "productoLocalId": 6779,
+          "baseId": 6743,
           "nombre": "Producto 029",
-          "codigoBarra": "7817926741729029",
+          "codigoBarra": "7817926758404029",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1482,10 +1482,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6454,
-          "baseId": 6422,
+          "productoLocalId": 6780,
+          "baseId": 6744,
           "nombre": "Producto 030",
-          "codigoBarra": "7817926741729030",
+          "codigoBarra": "7817926758404030",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1500,10 +1500,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6455,
-          "baseId": 6423,
+          "productoLocalId": 6781,
+          "baseId": 6745,
           "nombre": "Producto 031",
-          "codigoBarra": "7817926741729031",
+          "codigoBarra": "7817926758404031",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1518,10 +1518,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6456,
-          "baseId": 6424,
+          "productoLocalId": 6782,
+          "baseId": 6746,
           "nombre": "Producto 032",
-          "codigoBarra": "7817926741729032",
+          "codigoBarra": "7817926758404032",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1536,10 +1536,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6457,
-          "baseId": 6425,
+          "productoLocalId": 6783,
+          "baseId": 6747,
           "nombre": "Producto 033",
-          "codigoBarra": "7817926741729033",
+          "codigoBarra": "7817926758404033",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1554,10 +1554,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6458,
-          "baseId": 6426,
+          "productoLocalId": 6784,
+          "baseId": 6748,
           "nombre": "Producto 034",
-          "codigoBarra": "7817926741729034",
+          "codigoBarra": "7817926758404034",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1572,10 +1572,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6459,
-          "baseId": 6427,
+          "productoLocalId": 6785,
+          "baseId": 6749,
           "nombre": "Producto 035",
-          "codigoBarra": "7817926741729035",
+          "codigoBarra": "7817926758404035",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1590,10 +1590,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6460,
-          "baseId": 6428,
+          "productoLocalId": 6786,
+          "baseId": 6750,
           "nombre": "Producto 036",
-          "codigoBarra": "7817926741729036",
+          "codigoBarra": "7817926758404036",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1608,10 +1608,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6461,
-          "baseId": 6429,
+          "productoLocalId": 6787,
+          "baseId": 6751,
           "nombre": "Producto 037",
-          "codigoBarra": "7817926741729037",
+          "codigoBarra": "7817926758404037",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1626,10 +1626,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6462,
-          "baseId": 6430,
+          "productoLocalId": 6788,
+          "baseId": 6752,
           "nombre": "Producto 038",
-          "codigoBarra": "7817926741729038",
+          "codigoBarra": "7817926758404038",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1644,10 +1644,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6463,
-          "baseId": 6431,
+          "productoLocalId": 6789,
+          "baseId": 6753,
           "nombre": "Producto 039",
-          "codigoBarra": "7817926741729039",
+          "codigoBarra": "7817926758404039",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1662,10 +1662,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6464,
-          "baseId": 6432,
+          "productoLocalId": 6790,
+          "baseId": 6754,
           "nombre": "Producto 040",
-          "codigoBarra": "7817926741729040",
+          "codigoBarra": "7817926758404040",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1680,10 +1680,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6465,
-          "baseId": 6433,
+          "productoLocalId": 6791,
+          "baseId": 6755,
           "nombre": "Producto 041",
-          "codigoBarra": "7817926741729041",
+          "codigoBarra": "7817926758404041",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1698,10 +1698,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6466,
-          "baseId": 6434,
+          "productoLocalId": 6792,
+          "baseId": 6756,
           "nombre": "Producto 042",
-          "codigoBarra": "7817926741729042",
+          "codigoBarra": "7817926758404042",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1716,10 +1716,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6467,
-          "baseId": 6435,
+          "productoLocalId": 6793,
+          "baseId": 6757,
           "nombre": "Producto 043",
-          "codigoBarra": "7817926741729043",
+          "codigoBarra": "7817926758404043",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1734,10 +1734,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6468,
-          "baseId": 6436,
+          "productoLocalId": 6794,
+          "baseId": 6758,
           "nombre": "Producto 044",
-          "codigoBarra": "7817926741729044",
+          "codigoBarra": "7817926758404044",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1752,10 +1752,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6469,
-          "baseId": 6437,
+          "productoLocalId": 6795,
+          "baseId": 6759,
           "nombre": "Producto 045",
-          "codigoBarra": "7817926741729045",
+          "codigoBarra": "7817926758404045",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1770,10 +1770,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6470,
-          "baseId": 6438,
+          "productoLocalId": 6796,
+          "baseId": 6760,
           "nombre": "Producto 046",
-          "codigoBarra": "7817926741729046",
+          "codigoBarra": "7817926758404046",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1788,10 +1788,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6471,
-          "baseId": 6439,
+          "productoLocalId": 6797,
+          "baseId": 6761,
           "nombre": "Producto 047",
-          "codigoBarra": "7817926741729047",
+          "codigoBarra": "7817926758404047",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1806,10 +1806,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6472,
-          "baseId": 6440,
+          "productoLocalId": 6798,
+          "baseId": 6762,
           "nombre": "Producto 048",
-          "codigoBarra": "7817926741729048",
+          "codigoBarra": "7817926758404048",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1824,10 +1824,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6473,
-          "baseId": 6441,
+          "productoLocalId": 6799,
+          "baseId": 6763,
           "nombre": "Producto 049",
-          "codigoBarra": "7817926741729049",
+          "codigoBarra": "7817926758404049",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1842,10 +1842,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6474,
-          "baseId": 6442,
+          "productoLocalId": 6800,
+          "baseId": 6764,
           "nombre": "Producto 050",
-          "codigoBarra": "7817926741729050",
+          "codigoBarra": "7817926758404050",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1872,10 +1872,10 @@
       "ok": true,
       "items": [
         {
-          "productoLocalId": 6425,
-          "baseId": 6393,
+          "productoLocalId": 6751,
+          "baseId": 6715,
           "nombre": "Producto 001",
-          "codigoBarra": "7817926741729001",
+          "codigoBarra": "7817926758404001",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1890,10 +1890,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6426,
-          "baseId": 6394,
+          "productoLocalId": 6752,
+          "baseId": 6716,
           "nombre": "Producto 002",
-          "codigoBarra": "7817926741729002",
+          "codigoBarra": "7817926758404002",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1908,10 +1908,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6427,
-          "baseId": 6395,
+          "productoLocalId": 6753,
+          "baseId": 6717,
           "nombre": "Producto 003",
-          "codigoBarra": "7817926741729003",
+          "codigoBarra": "7817926758404003",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1926,10 +1926,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6428,
-          "baseId": 6396,
+          "productoLocalId": 6754,
+          "baseId": 6718,
           "nombre": "Producto 004",
-          "codigoBarra": "7817926741729004",
+          "codigoBarra": "7817926758404004",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1944,10 +1944,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6429,
-          "baseId": 6397,
+          "productoLocalId": 6755,
+          "baseId": 6719,
           "nombre": "Producto 005",
-          "codigoBarra": "7817926741729005",
+          "codigoBarra": "7817926758404005",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1962,10 +1962,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6430,
-          "baseId": 6398,
+          "productoLocalId": 6756,
+          "baseId": 6720,
           "nombre": "Producto 006",
-          "codigoBarra": "7817926741729006",
+          "codigoBarra": "7817926758404006",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1980,10 +1980,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6431,
-          "baseId": 6399,
+          "productoLocalId": 6757,
+          "baseId": 6721,
           "nombre": "Producto 007",
-          "codigoBarra": "7817926741729007",
+          "codigoBarra": "7817926758404007",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -1998,10 +1998,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6432,
-          "baseId": 6400,
+          "productoLocalId": 6758,
+          "baseId": 6722,
           "nombre": "Producto 008",
-          "codigoBarra": "7817926741729008",
+          "codigoBarra": "7817926758404008",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2016,10 +2016,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6433,
-          "baseId": 6401,
+          "productoLocalId": 6759,
+          "baseId": 6723,
           "nombre": "Producto 009",
-          "codigoBarra": "7817926741729009",
+          "codigoBarra": "7817926758404009",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2034,10 +2034,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6434,
-          "baseId": 6402,
+          "productoLocalId": 6760,
+          "baseId": 6724,
           "nombre": "Producto 010",
-          "codigoBarra": "7817926741729010",
+          "codigoBarra": "7817926758404010",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2052,10 +2052,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6435,
-          "baseId": 6403,
+          "productoLocalId": 6761,
+          "baseId": 6725,
           "nombre": "Producto 011",
-          "codigoBarra": "7817926741729011",
+          "codigoBarra": "7817926758404011",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2070,10 +2070,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6436,
-          "baseId": 6404,
+          "productoLocalId": 6762,
+          "baseId": 6726,
           "nombre": "Producto 012",
-          "codigoBarra": "7817926741729012",
+          "codigoBarra": "7817926758404012",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2088,10 +2088,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6437,
-          "baseId": 6405,
+          "productoLocalId": 6763,
+          "baseId": 6727,
           "nombre": "Producto 013",
-          "codigoBarra": "7817926741729013",
+          "codigoBarra": "7817926758404013",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2106,10 +2106,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6438,
-          "baseId": 6406,
+          "productoLocalId": 6764,
+          "baseId": 6728,
           "nombre": "Producto 014",
-          "codigoBarra": "7817926741729014",
+          "codigoBarra": "7817926758404014",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2124,10 +2124,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6439,
-          "baseId": 6407,
+          "productoLocalId": 6765,
+          "baseId": 6729,
           "nombre": "Producto 015",
-          "codigoBarra": "7817926741729015",
+          "codigoBarra": "7817926758404015",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2142,10 +2142,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6440,
-          "baseId": 6408,
+          "productoLocalId": 6766,
+          "baseId": 6730,
           "nombre": "Producto 016",
-          "codigoBarra": "7817926741729016",
+          "codigoBarra": "7817926758404016",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2160,10 +2160,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6441,
-          "baseId": 6409,
+          "productoLocalId": 6767,
+          "baseId": 6731,
           "nombre": "Producto 017",
-          "codigoBarra": "7817926741729017",
+          "codigoBarra": "7817926758404017",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2178,10 +2178,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6442,
-          "baseId": 6410,
+          "productoLocalId": 6768,
+          "baseId": 6732,
           "nombre": "Producto 018",
-          "codigoBarra": "7817926741729018",
+          "codigoBarra": "7817926758404018",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2196,10 +2196,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6443,
-          "baseId": 6411,
+          "productoLocalId": 6769,
+          "baseId": 6733,
           "nombre": "Producto 019",
-          "codigoBarra": "7817926741729019",
+          "codigoBarra": "7817926758404019",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2214,10 +2214,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6444,
-          "baseId": 6412,
+          "productoLocalId": 6770,
+          "baseId": 6734,
           "nombre": "Producto 020",
-          "codigoBarra": "7817926741729020",
+          "codigoBarra": "7817926758404020",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2232,10 +2232,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6445,
-          "baseId": 6413,
+          "productoLocalId": 6771,
+          "baseId": 6735,
           "nombre": "Producto 021",
-          "codigoBarra": "7817926741729021",
+          "codigoBarra": "7817926758404021",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2250,10 +2250,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6446,
-          "baseId": 6414,
+          "productoLocalId": 6772,
+          "baseId": 6736,
           "nombre": "Producto 022",
-          "codigoBarra": "7817926741729022",
+          "codigoBarra": "7817926758404022",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2268,10 +2268,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6447,
-          "baseId": 6415,
+          "productoLocalId": 6773,
+          "baseId": 6737,
           "nombre": "Producto 023",
-          "codigoBarra": "7817926741729023",
+          "codigoBarra": "7817926758404023",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2286,10 +2286,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6448,
-          "baseId": 6416,
+          "productoLocalId": 6774,
+          "baseId": 6738,
           "nombre": "Producto 024",
-          "codigoBarra": "7817926741729024",
+          "codigoBarra": "7817926758404024",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2304,10 +2304,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6449,
-          "baseId": 6417,
+          "productoLocalId": 6775,
+          "baseId": 6739,
           "nombre": "Producto 025",
-          "codigoBarra": "7817926741729025",
+          "codigoBarra": "7817926758404025",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2322,10 +2322,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6450,
-          "baseId": 6418,
+          "productoLocalId": 6776,
+          "baseId": 6740,
           "nombre": "Producto 026",
-          "codigoBarra": "7817926741729026",
+          "codigoBarra": "7817926758404026",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2340,10 +2340,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6451,
-          "baseId": 6419,
+          "productoLocalId": 6777,
+          "baseId": 6741,
           "nombre": "Producto 027",
-          "codigoBarra": "7817926741729027",
+          "codigoBarra": "7817926758404027",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2358,10 +2358,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6452,
-          "baseId": 6420,
+          "productoLocalId": 6778,
+          "baseId": 6742,
           "nombre": "Producto 028",
-          "codigoBarra": "7817926741729028",
+          "codigoBarra": "7817926758404028",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2376,10 +2376,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6453,
-          "baseId": 6421,
+          "productoLocalId": 6779,
+          "baseId": 6743,
           "nombre": "Producto 029",
-          "codigoBarra": "7817926741729029",
+          "codigoBarra": "7817926758404029",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2394,10 +2394,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6454,
-          "baseId": 6422,
+          "productoLocalId": 6780,
+          "baseId": 6744,
           "nombre": "Producto 030",
-          "codigoBarra": "7817926741729030",
+          "codigoBarra": "7817926758404030",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2412,10 +2412,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6455,
-          "baseId": 6423,
+          "productoLocalId": 6781,
+          "baseId": 6745,
           "nombre": "Producto 031",
-          "codigoBarra": "7817926741729031",
+          "codigoBarra": "7817926758404031",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2430,10 +2430,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6456,
-          "baseId": 6424,
+          "productoLocalId": 6782,
+          "baseId": 6746,
           "nombre": "Producto 032",
-          "codigoBarra": "7817926741729032",
+          "codigoBarra": "7817926758404032",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2448,10 +2448,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6457,
-          "baseId": 6425,
+          "productoLocalId": 6783,
+          "baseId": 6747,
           "nombre": "Producto 033",
-          "codigoBarra": "7817926741729033",
+          "codigoBarra": "7817926758404033",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2466,10 +2466,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6458,
-          "baseId": 6426,
+          "productoLocalId": 6784,
+          "baseId": 6748,
           "nombre": "Producto 034",
-          "codigoBarra": "7817926741729034",
+          "codigoBarra": "7817926758404034",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2484,10 +2484,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6459,
-          "baseId": 6427,
+          "productoLocalId": 6785,
+          "baseId": 6749,
           "nombre": "Producto 035",
-          "codigoBarra": "7817926741729035",
+          "codigoBarra": "7817926758404035",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2502,10 +2502,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6460,
-          "baseId": 6428,
+          "productoLocalId": 6786,
+          "baseId": 6750,
           "nombre": "Producto 036",
-          "codigoBarra": "7817926741729036",
+          "codigoBarra": "7817926758404036",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2520,10 +2520,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6461,
-          "baseId": 6429,
+          "productoLocalId": 6787,
+          "baseId": 6751,
           "nombre": "Producto 037",
-          "codigoBarra": "7817926741729037",
+          "codigoBarra": "7817926758404037",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2538,10 +2538,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6462,
-          "baseId": 6430,
+          "productoLocalId": 6788,
+          "baseId": 6752,
           "nombre": "Producto 038",
-          "codigoBarra": "7817926741729038",
+          "codigoBarra": "7817926758404038",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2556,10 +2556,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6463,
-          "baseId": 6431,
+          "productoLocalId": 6789,
+          "baseId": 6753,
           "nombre": "Producto 039",
-          "codigoBarra": "7817926741729039",
+          "codigoBarra": "7817926758404039",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2574,10 +2574,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6464,
-          "baseId": 6432,
+          "productoLocalId": 6790,
+          "baseId": 6754,
           "nombre": "Producto 040",
-          "codigoBarra": "7817926741729040",
+          "codigoBarra": "7817926758404040",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2592,10 +2592,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6465,
-          "baseId": 6433,
+          "productoLocalId": 6791,
+          "baseId": 6755,
           "nombre": "Producto 041",
-          "codigoBarra": "7817926741729041",
+          "codigoBarra": "7817926758404041",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2610,10 +2610,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6466,
-          "baseId": 6434,
+          "productoLocalId": 6792,
+          "baseId": 6756,
           "nombre": "Producto 042",
-          "codigoBarra": "7817926741729042",
+          "codigoBarra": "7817926758404042",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2628,10 +2628,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6467,
-          "baseId": 6435,
+          "productoLocalId": 6793,
+          "baseId": 6757,
           "nombre": "Producto 043",
-          "codigoBarra": "7817926741729043",
+          "codigoBarra": "7817926758404043",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2646,10 +2646,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6468,
-          "baseId": 6436,
+          "productoLocalId": 6794,
+          "baseId": 6758,
           "nombre": "Producto 044",
-          "codigoBarra": "7817926741729044",
+          "codigoBarra": "7817926758404044",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2664,10 +2664,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6469,
-          "baseId": 6437,
+          "productoLocalId": 6795,
+          "baseId": 6759,
           "nombre": "Producto 045",
-          "codigoBarra": "7817926741729045",
+          "codigoBarra": "7817926758404045",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2682,10 +2682,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6470,
-          "baseId": 6438,
+          "productoLocalId": 6796,
+          "baseId": 6760,
           "nombre": "Producto 046",
-          "codigoBarra": "7817926741729046",
+          "codigoBarra": "7817926758404046",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2700,10 +2700,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6471,
-          "baseId": 6439,
+          "productoLocalId": 6797,
+          "baseId": 6761,
           "nombre": "Producto 047",
-          "codigoBarra": "7817926741729047",
+          "codigoBarra": "7817926758404047",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2718,10 +2718,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6472,
-          "baseId": 6440,
+          "productoLocalId": 6798,
+          "baseId": 6762,
           "nombre": "Producto 048",
-          "codigoBarra": "7817926741729048",
+          "codigoBarra": "7817926758404048",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2736,10 +2736,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6473,
-          "baseId": 6441,
+          "productoLocalId": 6799,
+          "baseId": 6763,
           "nombre": "Producto 049",
-          "codigoBarra": "7817926741729049",
+          "codigoBarra": "7817926758404049",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2754,10 +2754,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6474,
-          "baseId": 6442,
+          "productoLocalId": 6800,
+          "baseId": 6764,
           "nombre": "Producto 050",
-          "codigoBarra": "7817926741729050",
+          "codigoBarra": "7817926758404050",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2772,10 +2772,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6475,
-          "baseId": 6443,
+          "productoLocalId": 6801,
+          "baseId": 6765,
           "nombre": "Producto 051",
-          "codigoBarra": "7817926741729051",
+          "codigoBarra": "7817926758404051",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2790,10 +2790,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6476,
-          "baseId": 6444,
+          "productoLocalId": 6802,
+          "baseId": 6766,
           "nombre": "Producto 052",
-          "codigoBarra": "7817926741729052",
+          "codigoBarra": "7817926758404052",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2808,10 +2808,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6477,
-          "baseId": 6445,
+          "productoLocalId": 6803,
+          "baseId": 6767,
           "nombre": "Producto 053",
-          "codigoBarra": "7817926741729053",
+          "codigoBarra": "7817926758404053",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2826,10 +2826,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6478,
-          "baseId": 6446,
+          "productoLocalId": 6804,
+          "baseId": 6768,
           "nombre": "Producto 054",
-          "codigoBarra": "7817926741729054",
+          "codigoBarra": "7817926758404054",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2844,10 +2844,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6479,
-          "baseId": 6447,
+          "productoLocalId": 6805,
+          "baseId": 6769,
           "nombre": "Producto 055",
-          "codigoBarra": "7817926741729055",
+          "codigoBarra": "7817926758404055",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2862,10 +2862,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6480,
-          "baseId": 6448,
+          "productoLocalId": 6806,
+          "baseId": 6770,
           "nombre": "Producto 056",
-          "codigoBarra": "7817926741729056",
+          "codigoBarra": "7817926758404056",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2880,10 +2880,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6481,
-          "baseId": 6449,
+          "productoLocalId": 6807,
+          "baseId": 6771,
           "nombre": "Producto 057",
-          "codigoBarra": "7817926741729057",
+          "codigoBarra": "7817926758404057",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2898,10 +2898,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6482,
-          "baseId": 6450,
+          "productoLocalId": 6808,
+          "baseId": 6772,
           "nombre": "Producto 058",
-          "codigoBarra": "7817926741729058",
+          "codigoBarra": "7817926758404058",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2916,10 +2916,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6483,
-          "baseId": 6451,
+          "productoLocalId": 6809,
+          "baseId": 6773,
           "nombre": "Producto 059",
-          "codigoBarra": "7817926741729059",
+          "codigoBarra": "7817926758404059",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2934,10 +2934,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6484,
-          "baseId": 6452,
+          "productoLocalId": 6810,
+          "baseId": 6774,
           "nombre": "Producto 060",
-          "codigoBarra": "7817926741729060",
+          "codigoBarra": "7817926758404060",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2952,10 +2952,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6485,
-          "baseId": 6453,
+          "productoLocalId": 6811,
+          "baseId": 6775,
           "nombre": "Producto 061",
-          "codigoBarra": "7817926741729061",
+          "codigoBarra": "7817926758404061",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2970,10 +2970,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6486,
-          "baseId": 6454,
+          "productoLocalId": 6812,
+          "baseId": 6776,
           "nombre": "Producto 062",
-          "codigoBarra": "7817926741729062",
+          "codigoBarra": "7817926758404062",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -2988,10 +2988,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6487,
-          "baseId": 6455,
+          "productoLocalId": 6813,
+          "baseId": 6777,
           "nombre": "Producto 063",
-          "codigoBarra": "7817926741729063",
+          "codigoBarra": "7817926758404063",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3006,10 +3006,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6488,
-          "baseId": 6456,
+          "productoLocalId": 6814,
+          "baseId": 6778,
           "nombre": "Producto 064",
-          "codigoBarra": "7817926741729064",
+          "codigoBarra": "7817926758404064",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3024,10 +3024,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6489,
-          "baseId": 6457,
+          "productoLocalId": 6815,
+          "baseId": 6779,
           "nombre": "Producto 065",
-          "codigoBarra": "7817926741729065",
+          "codigoBarra": "7817926758404065",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3042,10 +3042,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6490,
-          "baseId": 6458,
+          "productoLocalId": 6816,
+          "baseId": 6780,
           "nombre": "Producto 066",
-          "codigoBarra": "7817926741729066",
+          "codigoBarra": "7817926758404066",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3060,10 +3060,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6491,
-          "baseId": 6459,
+          "productoLocalId": 6817,
+          "baseId": 6781,
           "nombre": "Producto 067",
-          "codigoBarra": "7817926741729067",
+          "codigoBarra": "7817926758404067",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3078,10 +3078,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6492,
-          "baseId": 6460,
+          "productoLocalId": 6818,
+          "baseId": 6782,
           "nombre": "Producto 068",
-          "codigoBarra": "7817926741729068",
+          "codigoBarra": "7817926758404068",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3096,10 +3096,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6493,
-          "baseId": 6461,
+          "productoLocalId": 6819,
+          "baseId": 6783,
           "nombre": "Producto 069",
-          "codigoBarra": "7817926741729069",
+          "codigoBarra": "7817926758404069",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3114,10 +3114,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6494,
-          "baseId": 6462,
+          "productoLocalId": 6820,
+          "baseId": 6784,
           "nombre": "Producto 070",
-          "codigoBarra": "7817926741729070",
+          "codigoBarra": "7817926758404070",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3132,10 +3132,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6495,
-          "baseId": 6463,
+          "productoLocalId": 6821,
+          "baseId": 6785,
           "nombre": "Producto 071",
-          "codigoBarra": "7817926741729071",
+          "codigoBarra": "7817926758404071",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3150,10 +3150,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6496,
-          "baseId": 6464,
+          "productoLocalId": 6822,
+          "baseId": 6786,
           "nombre": "Producto 072",
-          "codigoBarra": "7817926741729072",
+          "codigoBarra": "7817926758404072",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3168,10 +3168,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6497,
-          "baseId": 6465,
+          "productoLocalId": 6823,
+          "baseId": 6787,
           "nombre": "Producto 073",
-          "codigoBarra": "7817926741729073",
+          "codigoBarra": "7817926758404073",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3186,10 +3186,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6498,
-          "baseId": 6466,
+          "productoLocalId": 6824,
+          "baseId": 6788,
           "nombre": "Producto 074",
-          "codigoBarra": "7817926741729074",
+          "codigoBarra": "7817926758404074",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3204,10 +3204,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6499,
-          "baseId": 6467,
+          "productoLocalId": 6825,
+          "baseId": 6789,
           "nombre": "Producto 075",
-          "codigoBarra": "7817926741729075",
+          "codigoBarra": "7817926758404075",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3222,10 +3222,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6500,
-          "baseId": 6468,
+          "productoLocalId": 6826,
+          "baseId": 6790,
           "nombre": "Producto 076",
-          "codigoBarra": "7817926741729076",
+          "codigoBarra": "7817926758404076",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3240,10 +3240,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6501,
-          "baseId": 6469,
+          "productoLocalId": 6827,
+          "baseId": 6791,
           "nombre": "Producto 077",
-          "codigoBarra": "7817926741729077",
+          "codigoBarra": "7817926758404077",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3258,10 +3258,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6502,
-          "baseId": 6470,
+          "productoLocalId": 6828,
+          "baseId": 6792,
           "nombre": "Producto 078",
-          "codigoBarra": "7817926741729078",
+          "codigoBarra": "7817926758404078",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3276,10 +3276,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6503,
-          "baseId": 6471,
+          "productoLocalId": 6829,
+          "baseId": 6793,
           "nombre": "Producto 079",
-          "codigoBarra": "7817926741729079",
+          "codigoBarra": "7817926758404079",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3294,10 +3294,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6504,
-          "baseId": 6472,
+          "productoLocalId": 6830,
+          "baseId": 6794,
           "nombre": "Producto 080",
-          "codigoBarra": "7817926741729080",
+          "codigoBarra": "7817926758404080",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3312,10 +3312,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6505,
-          "baseId": 6473,
+          "productoLocalId": 6831,
+          "baseId": 6795,
           "nombre": "Producto 081",
-          "codigoBarra": "7817926741729081",
+          "codigoBarra": "7817926758404081",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3330,10 +3330,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6506,
-          "baseId": 6474,
+          "productoLocalId": 6832,
+          "baseId": 6796,
           "nombre": "Producto 082",
-          "codigoBarra": "7817926741729082",
+          "codigoBarra": "7817926758404082",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3348,10 +3348,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6507,
-          "baseId": 6475,
+          "productoLocalId": 6833,
+          "baseId": 6797,
           "nombre": "Producto 083",
-          "codigoBarra": "7817926741729083",
+          "codigoBarra": "7817926758404083",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3366,10 +3366,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6508,
-          "baseId": 6476,
+          "productoLocalId": 6834,
+          "baseId": 6798,
           "nombre": "Producto 084",
-          "codigoBarra": "7817926741729084",
+          "codigoBarra": "7817926758404084",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3384,10 +3384,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6509,
-          "baseId": 6477,
+          "productoLocalId": 6835,
+          "baseId": 6799,
           "nombre": "Producto 085",
-          "codigoBarra": "7817926741729085",
+          "codigoBarra": "7817926758404085",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3402,10 +3402,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6510,
-          "baseId": 6478,
+          "productoLocalId": 6836,
+          "baseId": 6800,
           "nombre": "Producto 086",
-          "codigoBarra": "7817926741729086",
+          "codigoBarra": "7817926758404086",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3420,10 +3420,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6511,
-          "baseId": 6479,
+          "productoLocalId": 6837,
+          "baseId": 6801,
           "nombre": "Producto 087",
-          "codigoBarra": "7817926741729087",
+          "codigoBarra": "7817926758404087",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3438,10 +3438,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6512,
-          "baseId": 6480,
+          "productoLocalId": 6838,
+          "baseId": 6802,
           "nombre": "Producto 088",
-          "codigoBarra": "7817926741729088",
+          "codigoBarra": "7817926758404088",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3456,10 +3456,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6513,
-          "baseId": 6481,
+          "productoLocalId": 6839,
+          "baseId": 6803,
           "nombre": "Producto 089",
-          "codigoBarra": "7817926741729089",
+          "codigoBarra": "7817926758404089",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3474,10 +3474,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6514,
-          "baseId": 6482,
+          "productoLocalId": 6840,
+          "baseId": 6804,
           "nombre": "Producto 090",
-          "codigoBarra": "7817926741729090",
+          "codigoBarra": "7817926758404090",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3492,10 +3492,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6515,
-          "baseId": 6483,
+          "productoLocalId": 6841,
+          "baseId": 6805,
           "nombre": "Producto 091",
-          "codigoBarra": "7817926741729091",
+          "codigoBarra": "7817926758404091",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3510,10 +3510,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6516,
-          "baseId": 6484,
+          "productoLocalId": 6842,
+          "baseId": 6806,
           "nombre": "Producto 092",
-          "codigoBarra": "7817926741729092",
+          "codigoBarra": "7817926758404092",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3528,10 +3528,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6517,
-          "baseId": 6485,
+          "productoLocalId": 6843,
+          "baseId": 6807,
           "nombre": "Producto 093",
-          "codigoBarra": "7817926741729093",
+          "codigoBarra": "7817926758404093",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3546,10 +3546,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6518,
-          "baseId": 6486,
+          "productoLocalId": 6844,
+          "baseId": 6808,
           "nombre": "Producto 094",
-          "codigoBarra": "7817926741729094",
+          "codigoBarra": "7817926758404094",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3564,10 +3564,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6519,
-          "baseId": 6487,
+          "productoLocalId": 6845,
+          "baseId": 6809,
           "nombre": "Producto 095",
-          "codigoBarra": "7817926741729095",
+          "codigoBarra": "7817926758404095",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3582,10 +3582,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6520,
-          "baseId": 6488,
+          "productoLocalId": 6846,
+          "baseId": 6810,
           "nombre": "Producto 096",
-          "codigoBarra": "7817926741729096",
+          "codigoBarra": "7817926758404096",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3600,10 +3600,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6521,
-          "baseId": 6489,
+          "productoLocalId": 6847,
+          "baseId": 6811,
           "nombre": "Producto 097",
-          "codigoBarra": "7817926741729097",
+          "codigoBarra": "7817926758404097",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3618,10 +3618,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6522,
-          "baseId": 6490,
+          "productoLocalId": 6848,
+          "baseId": 6812,
           "nombre": "Producto 098",
-          "codigoBarra": "7817926741729098",
+          "codigoBarra": "7817926758404098",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3636,10 +3636,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6523,
-          "baseId": 6491,
+          "productoLocalId": 6849,
+          "baseId": 6813,
           "nombre": "Producto 099",
-          "codigoBarra": "7817926741729099",
+          "codigoBarra": "7817926758404099",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3654,10 +3654,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6524,
-          "baseId": 6492,
+          "productoLocalId": 6850,
+          "baseId": 6814,
           "nombre": "Producto 100",
-          "codigoBarra": "7817926741729100",
+          "codigoBarra": "7817926758404100",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3684,10 +3684,10 @@
       "ok": true,
       "items": [
         {
-          "productoLocalId": 6425,
-          "baseId": 6393,
+          "productoLocalId": 6751,
+          "baseId": 6715,
           "nombre": "Producto 001",
-          "codigoBarra": "7817926741729001",
+          "codigoBarra": "7817926758404001",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3702,10 +3702,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6426,
-          "baseId": 6394,
+          "productoLocalId": 6752,
+          "baseId": 6716,
           "nombre": "Producto 002",
-          "codigoBarra": "7817926741729002",
+          "codigoBarra": "7817926758404002",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3720,10 +3720,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6427,
-          "baseId": 6395,
+          "productoLocalId": 6753,
+          "baseId": 6717,
           "nombre": "Producto 003",
-          "codigoBarra": "7817926741729003",
+          "codigoBarra": "7817926758404003",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3738,10 +3738,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6428,
-          "baseId": 6396,
+          "productoLocalId": 6754,
+          "baseId": 6718,
           "nombre": "Producto 004",
-          "codigoBarra": "7817926741729004",
+          "codigoBarra": "7817926758404004",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3756,10 +3756,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6429,
-          "baseId": 6397,
+          "productoLocalId": 6755,
+          "baseId": 6719,
           "nombre": "Producto 005",
-          "codigoBarra": "7817926741729005",
+          "codigoBarra": "7817926758404005",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3774,10 +3774,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6430,
-          "baseId": 6398,
+          "productoLocalId": 6756,
+          "baseId": 6720,
           "nombre": "Producto 006",
-          "codigoBarra": "7817926741729006",
+          "codigoBarra": "7817926758404006",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3792,10 +3792,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6431,
-          "baseId": 6399,
+          "productoLocalId": 6757,
+          "baseId": 6721,
           "nombre": "Producto 007",
-          "codigoBarra": "7817926741729007",
+          "codigoBarra": "7817926758404007",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3810,10 +3810,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6432,
-          "baseId": 6400,
+          "productoLocalId": 6758,
+          "baseId": 6722,
           "nombre": "Producto 008",
-          "codigoBarra": "7817926741729008",
+          "codigoBarra": "7817926758404008",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3828,10 +3828,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6433,
-          "baseId": 6401,
+          "productoLocalId": 6759,
+          "baseId": 6723,
           "nombre": "Producto 009",
-          "codigoBarra": "7817926741729009",
+          "codigoBarra": "7817926758404009",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3846,10 +3846,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6434,
-          "baseId": 6402,
+          "productoLocalId": 6760,
+          "baseId": 6724,
           "nombre": "Producto 010",
-          "codigoBarra": "7817926741729010",
+          "codigoBarra": "7817926758404010",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3864,10 +3864,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6435,
-          "baseId": 6403,
+          "productoLocalId": 6761,
+          "baseId": 6725,
           "nombre": "Producto 011",
-          "codigoBarra": "7817926741729011",
+          "codigoBarra": "7817926758404011",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3882,10 +3882,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6436,
-          "baseId": 6404,
+          "productoLocalId": 6762,
+          "baseId": 6726,
           "nombre": "Producto 012",
-          "codigoBarra": "7817926741729012",
+          "codigoBarra": "7817926758404012",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3900,10 +3900,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6437,
-          "baseId": 6405,
+          "productoLocalId": 6763,
+          "baseId": 6727,
           "nombre": "Producto 013",
-          "codigoBarra": "7817926741729013",
+          "codigoBarra": "7817926758404013",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3918,10 +3918,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6438,
-          "baseId": 6406,
+          "productoLocalId": 6764,
+          "baseId": 6728,
           "nombre": "Producto 014",
-          "codigoBarra": "7817926741729014",
+          "codigoBarra": "7817926758404014",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3936,10 +3936,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6439,
-          "baseId": 6407,
+          "productoLocalId": 6765,
+          "baseId": 6729,
           "nombre": "Producto 015",
-          "codigoBarra": "7817926741729015",
+          "codigoBarra": "7817926758404015",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3954,10 +3954,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6440,
-          "baseId": 6408,
+          "productoLocalId": 6766,
+          "baseId": 6730,
           "nombre": "Producto 016",
-          "codigoBarra": "7817926741729016",
+          "codigoBarra": "7817926758404016",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3972,10 +3972,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6441,
-          "baseId": 6409,
+          "productoLocalId": 6767,
+          "baseId": 6731,
           "nombre": "Producto 017",
-          "codigoBarra": "7817926741729017",
+          "codigoBarra": "7817926758404017",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -3990,10 +3990,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6442,
-          "baseId": 6410,
+          "productoLocalId": 6768,
+          "baseId": 6732,
           "nombre": "Producto 018",
-          "codigoBarra": "7817926741729018",
+          "codigoBarra": "7817926758404018",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4008,10 +4008,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6443,
-          "baseId": 6411,
+          "productoLocalId": 6769,
+          "baseId": 6733,
           "nombre": "Producto 019",
-          "codigoBarra": "7817926741729019",
+          "codigoBarra": "7817926758404019",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4026,10 +4026,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6444,
-          "baseId": 6412,
+          "productoLocalId": 6770,
+          "baseId": 6734,
           "nombre": "Producto 020",
-          "codigoBarra": "7817926741729020",
+          "codigoBarra": "7817926758404020",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4044,10 +4044,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6445,
-          "baseId": 6413,
+          "productoLocalId": 6771,
+          "baseId": 6735,
           "nombre": "Producto 021",
-          "codigoBarra": "7817926741729021",
+          "codigoBarra": "7817926758404021",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4062,10 +4062,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6446,
-          "baseId": 6414,
+          "productoLocalId": 6772,
+          "baseId": 6736,
           "nombre": "Producto 022",
-          "codigoBarra": "7817926741729022",
+          "codigoBarra": "7817926758404022",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4080,10 +4080,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6447,
-          "baseId": 6415,
+          "productoLocalId": 6773,
+          "baseId": 6737,
           "nombre": "Producto 023",
-          "codigoBarra": "7817926741729023",
+          "codigoBarra": "7817926758404023",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4098,10 +4098,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6448,
-          "baseId": 6416,
+          "productoLocalId": 6774,
+          "baseId": 6738,
           "nombre": "Producto 024",
-          "codigoBarra": "7817926741729024",
+          "codigoBarra": "7817926758404024",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4116,10 +4116,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6449,
-          "baseId": 6417,
+          "productoLocalId": 6775,
+          "baseId": 6739,
           "nombre": "Producto 025",
-          "codigoBarra": "7817926741729025",
+          "codigoBarra": "7817926758404025",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4134,10 +4134,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6450,
-          "baseId": 6418,
+          "productoLocalId": 6776,
+          "baseId": 6740,
           "nombre": "Producto 026",
-          "codigoBarra": "7817926741729026",
+          "codigoBarra": "7817926758404026",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4152,10 +4152,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6451,
-          "baseId": 6419,
+          "productoLocalId": 6777,
+          "baseId": 6741,
           "nombre": "Producto 027",
-          "codigoBarra": "7817926741729027",
+          "codigoBarra": "7817926758404027",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4170,10 +4170,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6452,
-          "baseId": 6420,
+          "productoLocalId": 6778,
+          "baseId": 6742,
           "nombre": "Producto 028",
-          "codigoBarra": "7817926741729028",
+          "codigoBarra": "7817926758404028",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4188,10 +4188,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6453,
-          "baseId": 6421,
+          "productoLocalId": 6779,
+          "baseId": 6743,
           "nombre": "Producto 029",
-          "codigoBarra": "7817926741729029",
+          "codigoBarra": "7817926758404029",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4206,10 +4206,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6454,
-          "baseId": 6422,
+          "productoLocalId": 6780,
+          "baseId": 6744,
           "nombre": "Producto 030",
-          "codigoBarra": "7817926741729030",
+          "codigoBarra": "7817926758404030",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4224,10 +4224,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6455,
-          "baseId": 6423,
+          "productoLocalId": 6781,
+          "baseId": 6745,
           "nombre": "Producto 031",
-          "codigoBarra": "7817926741729031",
+          "codigoBarra": "7817926758404031",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4242,10 +4242,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6456,
-          "baseId": 6424,
+          "productoLocalId": 6782,
+          "baseId": 6746,
           "nombre": "Producto 032",
-          "codigoBarra": "7817926741729032",
+          "codigoBarra": "7817926758404032",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4260,10 +4260,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6457,
-          "baseId": 6425,
+          "productoLocalId": 6783,
+          "baseId": 6747,
           "nombre": "Producto 033",
-          "codigoBarra": "7817926741729033",
+          "codigoBarra": "7817926758404033",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4278,10 +4278,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6458,
-          "baseId": 6426,
+          "productoLocalId": 6784,
+          "baseId": 6748,
           "nombre": "Producto 034",
-          "codigoBarra": "7817926741729034",
+          "codigoBarra": "7817926758404034",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4296,10 +4296,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6459,
-          "baseId": 6427,
+          "productoLocalId": 6785,
+          "baseId": 6749,
           "nombre": "Producto 035",
-          "codigoBarra": "7817926741729035",
+          "codigoBarra": "7817926758404035",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4314,10 +4314,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6460,
-          "baseId": 6428,
+          "productoLocalId": 6786,
+          "baseId": 6750,
           "nombre": "Producto 036",
-          "codigoBarra": "7817926741729036",
+          "codigoBarra": "7817926758404036",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4332,10 +4332,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6461,
-          "baseId": 6429,
+          "productoLocalId": 6787,
+          "baseId": 6751,
           "nombre": "Producto 037",
-          "codigoBarra": "7817926741729037",
+          "codigoBarra": "7817926758404037",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4350,10 +4350,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6462,
-          "baseId": 6430,
+          "productoLocalId": 6788,
+          "baseId": 6752,
           "nombre": "Producto 038",
-          "codigoBarra": "7817926741729038",
+          "codigoBarra": "7817926758404038",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4368,10 +4368,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6463,
-          "baseId": 6431,
+          "productoLocalId": 6789,
+          "baseId": 6753,
           "nombre": "Producto 039",
-          "codigoBarra": "7817926741729039",
+          "codigoBarra": "7817926758404039",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4386,10 +4386,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6464,
-          "baseId": 6432,
+          "productoLocalId": 6790,
+          "baseId": 6754,
           "nombre": "Producto 040",
-          "codigoBarra": "7817926741729040",
+          "codigoBarra": "7817926758404040",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4404,10 +4404,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6465,
-          "baseId": 6433,
+          "productoLocalId": 6791,
+          "baseId": 6755,
           "nombre": "Producto 041",
-          "codigoBarra": "7817926741729041",
+          "codigoBarra": "7817926758404041",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4422,10 +4422,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6466,
-          "baseId": 6434,
+          "productoLocalId": 6792,
+          "baseId": 6756,
           "nombre": "Producto 042",
-          "codigoBarra": "7817926741729042",
+          "codigoBarra": "7817926758404042",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4440,10 +4440,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6467,
-          "baseId": 6435,
+          "productoLocalId": 6793,
+          "baseId": 6757,
           "nombre": "Producto 043",
-          "codigoBarra": "7817926741729043",
+          "codigoBarra": "7817926758404043",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4458,10 +4458,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6468,
-          "baseId": 6436,
+          "productoLocalId": 6794,
+          "baseId": 6758,
           "nombre": "Producto 044",
-          "codigoBarra": "7817926741729044",
+          "codigoBarra": "7817926758404044",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4476,10 +4476,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6469,
-          "baseId": 6437,
+          "productoLocalId": 6795,
+          "baseId": 6759,
           "nombre": "Producto 045",
-          "codigoBarra": "7817926741729045",
+          "codigoBarra": "7817926758404045",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4494,10 +4494,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6470,
-          "baseId": 6438,
+          "productoLocalId": 6796,
+          "baseId": 6760,
           "nombre": "Producto 046",
-          "codigoBarra": "7817926741729046",
+          "codigoBarra": "7817926758404046",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4512,10 +4512,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6471,
-          "baseId": 6439,
+          "productoLocalId": 6797,
+          "baseId": 6761,
           "nombre": "Producto 047",
-          "codigoBarra": "7817926741729047",
+          "codigoBarra": "7817926758404047",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4530,10 +4530,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6472,
-          "baseId": 6440,
+          "productoLocalId": 6798,
+          "baseId": 6762,
           "nombre": "Producto 048",
-          "codigoBarra": "7817926741729048",
+          "codigoBarra": "7817926758404048",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4548,10 +4548,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6473,
-          "baseId": 6441,
+          "productoLocalId": 6799,
+          "baseId": 6763,
           "nombre": "Producto 049",
-          "codigoBarra": "7817926741729049",
+          "codigoBarra": "7817926758404049",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4566,10 +4566,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6474,
-          "baseId": 6442,
+          "productoLocalId": 6800,
+          "baseId": 6764,
           "nombre": "Producto 050",
-          "codigoBarra": "7817926741729050",
+          "codigoBarra": "7817926758404050",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4596,10 +4596,10 @@
       "ok": true,
       "items": [
         {
-          "productoLocalId": 6425,
-          "baseId": 6393,
+          "productoLocalId": 6751,
+          "baseId": 6715,
           "nombre": "Producto 001",
-          "codigoBarra": "7817926741729001",
+          "codigoBarra": "7817926758404001",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4614,10 +4614,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6426,
-          "baseId": 6394,
+          "productoLocalId": 6752,
+          "baseId": 6716,
           "nombre": "Producto 002",
-          "codigoBarra": "7817926741729002",
+          "codigoBarra": "7817926758404002",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4632,10 +4632,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6427,
-          "baseId": 6395,
+          "productoLocalId": 6753,
+          "baseId": 6717,
           "nombre": "Producto 003",
-          "codigoBarra": "7817926741729003",
+          "codigoBarra": "7817926758404003",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4650,10 +4650,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6428,
-          "baseId": 6396,
+          "productoLocalId": 6754,
+          "baseId": 6718,
           "nombre": "Producto 004",
-          "codigoBarra": "7817926741729004",
+          "codigoBarra": "7817926758404004",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4668,10 +4668,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6429,
-          "baseId": 6397,
+          "productoLocalId": 6755,
+          "baseId": 6719,
           "nombre": "Producto 005",
-          "codigoBarra": "7817926741729005",
+          "codigoBarra": "7817926758404005",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4686,10 +4686,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6430,
-          "baseId": 6398,
+          "productoLocalId": 6756,
+          "baseId": 6720,
           "nombre": "Producto 006",
-          "codigoBarra": "7817926741729006",
+          "codigoBarra": "7817926758404006",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4704,10 +4704,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6431,
-          "baseId": 6399,
+          "productoLocalId": 6757,
+          "baseId": 6721,
           "nombre": "Producto 007",
-          "codigoBarra": "7817926741729007",
+          "codigoBarra": "7817926758404007",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4722,10 +4722,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6432,
-          "baseId": 6400,
+          "productoLocalId": 6758,
+          "baseId": 6722,
           "nombre": "Producto 008",
-          "codigoBarra": "7817926741729008",
+          "codigoBarra": "7817926758404008",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4740,10 +4740,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6433,
-          "baseId": 6401,
+          "productoLocalId": 6759,
+          "baseId": 6723,
           "nombre": "Producto 009",
-          "codigoBarra": "7817926741729009",
+          "codigoBarra": "7817926758404009",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4758,10 +4758,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6434,
-          "baseId": 6402,
+          "productoLocalId": 6760,
+          "baseId": 6724,
           "nombre": "Producto 010",
-          "codigoBarra": "7817926741729010",
+          "codigoBarra": "7817926758404010",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4776,10 +4776,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6435,
-          "baseId": 6403,
+          "productoLocalId": 6761,
+          "baseId": 6725,
           "nombre": "Producto 011",
-          "codigoBarra": "7817926741729011",
+          "codigoBarra": "7817926758404011",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4794,10 +4794,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6436,
-          "baseId": 6404,
+          "productoLocalId": 6762,
+          "baseId": 6726,
           "nombre": "Producto 012",
-          "codigoBarra": "7817926741729012",
+          "codigoBarra": "7817926758404012",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4812,10 +4812,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6437,
-          "baseId": 6405,
+          "productoLocalId": 6763,
+          "baseId": 6727,
           "nombre": "Producto 013",
-          "codigoBarra": "7817926741729013",
+          "codigoBarra": "7817926758404013",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4830,10 +4830,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6438,
-          "baseId": 6406,
+          "productoLocalId": 6764,
+          "baseId": 6728,
           "nombre": "Producto 014",
-          "codigoBarra": "7817926741729014",
+          "codigoBarra": "7817926758404014",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4848,10 +4848,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6439,
-          "baseId": 6407,
+          "productoLocalId": 6765,
+          "baseId": 6729,
           "nombre": "Producto 015",
-          "codigoBarra": "7817926741729015",
+          "codigoBarra": "7817926758404015",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4866,10 +4866,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6440,
-          "baseId": 6408,
+          "productoLocalId": 6766,
+          "baseId": 6730,
           "nombre": "Producto 016",
-          "codigoBarra": "7817926741729016",
+          "codigoBarra": "7817926758404016",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4884,10 +4884,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6441,
-          "baseId": 6409,
+          "productoLocalId": 6767,
+          "baseId": 6731,
           "nombre": "Producto 017",
-          "codigoBarra": "7817926741729017",
+          "codigoBarra": "7817926758404017",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4902,10 +4902,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6442,
-          "baseId": 6410,
+          "productoLocalId": 6768,
+          "baseId": 6732,
           "nombre": "Producto 018",
-          "codigoBarra": "7817926741729018",
+          "codigoBarra": "7817926758404018",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4920,10 +4920,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6443,
-          "baseId": 6411,
+          "productoLocalId": 6769,
+          "baseId": 6733,
           "nombre": "Producto 019",
-          "codigoBarra": "7817926741729019",
+          "codigoBarra": "7817926758404019",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4938,10 +4938,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6444,
-          "baseId": 6412,
+          "productoLocalId": 6770,
+          "baseId": 6734,
           "nombre": "Producto 020",
-          "codigoBarra": "7817926741729020",
+          "codigoBarra": "7817926758404020",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4956,10 +4956,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6445,
-          "baseId": 6413,
+          "productoLocalId": 6771,
+          "baseId": 6735,
           "nombre": "Producto 021",
-          "codigoBarra": "7817926741729021",
+          "codigoBarra": "7817926758404021",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4974,10 +4974,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6446,
-          "baseId": 6414,
+          "productoLocalId": 6772,
+          "baseId": 6736,
           "nombre": "Producto 022",
-          "codigoBarra": "7817926741729022",
+          "codigoBarra": "7817926758404022",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -4992,10 +4992,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6447,
-          "baseId": 6415,
+          "productoLocalId": 6773,
+          "baseId": 6737,
           "nombre": "Producto 023",
-          "codigoBarra": "7817926741729023",
+          "codigoBarra": "7817926758404023",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5010,10 +5010,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6448,
-          "baseId": 6416,
+          "productoLocalId": 6774,
+          "baseId": 6738,
           "nombre": "Producto 024",
-          "codigoBarra": "7817926741729024",
+          "codigoBarra": "7817926758404024",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5028,10 +5028,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6449,
-          "baseId": 6417,
+          "productoLocalId": 6775,
+          "baseId": 6739,
           "nombre": "Producto 025",
-          "codigoBarra": "7817926741729025",
+          "codigoBarra": "7817926758404025",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5046,10 +5046,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6450,
-          "baseId": 6418,
+          "productoLocalId": 6776,
+          "baseId": 6740,
           "nombre": "Producto 026",
-          "codigoBarra": "7817926741729026",
+          "codigoBarra": "7817926758404026",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5064,10 +5064,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6451,
-          "baseId": 6419,
+          "productoLocalId": 6777,
+          "baseId": 6741,
           "nombre": "Producto 027",
-          "codigoBarra": "7817926741729027",
+          "codigoBarra": "7817926758404027",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5082,10 +5082,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6452,
-          "baseId": 6420,
+          "productoLocalId": 6778,
+          "baseId": 6742,
           "nombre": "Producto 028",
-          "codigoBarra": "7817926741729028",
+          "codigoBarra": "7817926758404028",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5100,10 +5100,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6453,
-          "baseId": 6421,
+          "productoLocalId": 6779,
+          "baseId": 6743,
           "nombre": "Producto 029",
-          "codigoBarra": "7817926741729029",
+          "codigoBarra": "7817926758404029",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5118,10 +5118,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6454,
-          "baseId": 6422,
+          "productoLocalId": 6780,
+          "baseId": 6744,
           "nombre": "Producto 030",
-          "codigoBarra": "7817926741729030",
+          "codigoBarra": "7817926758404030",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5136,10 +5136,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6455,
-          "baseId": 6423,
+          "productoLocalId": 6781,
+          "baseId": 6745,
           "nombre": "Producto 031",
-          "codigoBarra": "7817926741729031",
+          "codigoBarra": "7817926758404031",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5154,10 +5154,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6456,
-          "baseId": 6424,
+          "productoLocalId": 6782,
+          "baseId": 6746,
           "nombre": "Producto 032",
-          "codigoBarra": "7817926741729032",
+          "codigoBarra": "7817926758404032",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5172,10 +5172,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6457,
-          "baseId": 6425,
+          "productoLocalId": 6783,
+          "baseId": 6747,
           "nombre": "Producto 033",
-          "codigoBarra": "7817926741729033",
+          "codigoBarra": "7817926758404033",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5190,10 +5190,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6458,
-          "baseId": 6426,
+          "productoLocalId": 6784,
+          "baseId": 6748,
           "nombre": "Producto 034",
-          "codigoBarra": "7817926741729034",
+          "codigoBarra": "7817926758404034",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5208,10 +5208,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6459,
-          "baseId": 6427,
+          "productoLocalId": 6785,
+          "baseId": 6749,
           "nombre": "Producto 035",
-          "codigoBarra": "7817926741729035",
+          "codigoBarra": "7817926758404035",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5226,10 +5226,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6460,
-          "baseId": 6428,
+          "productoLocalId": 6786,
+          "baseId": 6750,
           "nombre": "Producto 036",
-          "codigoBarra": "7817926741729036",
+          "codigoBarra": "7817926758404036",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5244,10 +5244,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6461,
-          "baseId": 6429,
+          "productoLocalId": 6787,
+          "baseId": 6751,
           "nombre": "Producto 037",
-          "codigoBarra": "7817926741729037",
+          "codigoBarra": "7817926758404037",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5262,10 +5262,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6462,
-          "baseId": 6430,
+          "productoLocalId": 6788,
+          "baseId": 6752,
           "nombre": "Producto 038",
-          "codigoBarra": "7817926741729038",
+          "codigoBarra": "7817926758404038",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5280,10 +5280,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6463,
-          "baseId": 6431,
+          "productoLocalId": 6789,
+          "baseId": 6753,
           "nombre": "Producto 039",
-          "codigoBarra": "7817926741729039",
+          "codigoBarra": "7817926758404039",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5298,10 +5298,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6464,
-          "baseId": 6432,
+          "productoLocalId": 6790,
+          "baseId": 6754,
           "nombre": "Producto 040",
-          "codigoBarra": "7817926741729040",
+          "codigoBarra": "7817926758404040",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5316,10 +5316,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6465,
-          "baseId": 6433,
+          "productoLocalId": 6791,
+          "baseId": 6755,
           "nombre": "Producto 041",
-          "codigoBarra": "7817926741729041",
+          "codigoBarra": "7817926758404041",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5334,10 +5334,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6466,
-          "baseId": 6434,
+          "productoLocalId": 6792,
+          "baseId": 6756,
           "nombre": "Producto 042",
-          "codigoBarra": "7817926741729042",
+          "codigoBarra": "7817926758404042",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5352,10 +5352,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6467,
-          "baseId": 6435,
+          "productoLocalId": 6793,
+          "baseId": 6757,
           "nombre": "Producto 043",
-          "codigoBarra": "7817926741729043",
+          "codigoBarra": "7817926758404043",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5370,10 +5370,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6468,
-          "baseId": 6436,
+          "productoLocalId": 6794,
+          "baseId": 6758,
           "nombre": "Producto 044",
-          "codigoBarra": "7817926741729044",
+          "codigoBarra": "7817926758404044",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5388,10 +5388,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6469,
-          "baseId": 6437,
+          "productoLocalId": 6795,
+          "baseId": 6759,
           "nombre": "Producto 045",
-          "codigoBarra": "7817926741729045",
+          "codigoBarra": "7817926758404045",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5406,10 +5406,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6470,
-          "baseId": 6438,
+          "productoLocalId": 6796,
+          "baseId": 6760,
           "nombre": "Producto 046",
-          "codigoBarra": "7817926741729046",
+          "codigoBarra": "7817926758404046",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5424,10 +5424,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6471,
-          "baseId": 6439,
+          "productoLocalId": 6797,
+          "baseId": 6761,
           "nombre": "Producto 047",
-          "codigoBarra": "7817926741729047",
+          "codigoBarra": "7817926758404047",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5442,10 +5442,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6472,
-          "baseId": 6440,
+          "productoLocalId": 6798,
+          "baseId": 6762,
           "nombre": "Producto 048",
-          "codigoBarra": "7817926741729048",
+          "codigoBarra": "7817926758404048",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5460,10 +5460,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6473,
-          "baseId": 6441,
+          "productoLocalId": 6799,
+          "baseId": 6763,
           "nombre": "Producto 049",
-          "codigoBarra": "7817926741729049",
+          "codigoBarra": "7817926758404049",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5478,10 +5478,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6474,
-          "baseId": 6442,
+          "productoLocalId": 6800,
+          "baseId": 6764,
           "nombre": "Producto 050",
-          "codigoBarra": "7817926741729050",
+          "codigoBarra": "7817926758404050",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5508,10 +5508,10 @@
       "ok": true,
       "items": [
         {
-          "productoLocalId": 6475,
-          "baseId": 6443,
+          "productoLocalId": 6801,
+          "baseId": 6765,
           "nombre": "Producto 051",
-          "codigoBarra": "7817926741729051",
+          "codigoBarra": "7817926758404051",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5526,10 +5526,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6476,
-          "baseId": 6444,
+          "productoLocalId": 6802,
+          "baseId": 6766,
           "nombre": "Producto 052",
-          "codigoBarra": "7817926741729052",
+          "codigoBarra": "7817926758404052",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5544,10 +5544,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6477,
-          "baseId": 6445,
+          "productoLocalId": 6803,
+          "baseId": 6767,
           "nombre": "Producto 053",
-          "codigoBarra": "7817926741729053",
+          "codigoBarra": "7817926758404053",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5562,10 +5562,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6478,
-          "baseId": 6446,
+          "productoLocalId": 6804,
+          "baseId": 6768,
           "nombre": "Producto 054",
-          "codigoBarra": "7817926741729054",
+          "codigoBarra": "7817926758404054",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5580,10 +5580,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6479,
-          "baseId": 6447,
+          "productoLocalId": 6805,
+          "baseId": 6769,
           "nombre": "Producto 055",
-          "codigoBarra": "7817926741729055",
+          "codigoBarra": "7817926758404055",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5598,10 +5598,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6480,
-          "baseId": 6448,
+          "productoLocalId": 6806,
+          "baseId": 6770,
           "nombre": "Producto 056",
-          "codigoBarra": "7817926741729056",
+          "codigoBarra": "7817926758404056",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5616,10 +5616,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6481,
-          "baseId": 6449,
+          "productoLocalId": 6807,
+          "baseId": 6771,
           "nombre": "Producto 057",
-          "codigoBarra": "7817926741729057",
+          "codigoBarra": "7817926758404057",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5634,10 +5634,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6482,
-          "baseId": 6450,
+          "productoLocalId": 6808,
+          "baseId": 6772,
           "nombre": "Producto 058",
-          "codigoBarra": "7817926741729058",
+          "codigoBarra": "7817926758404058",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5652,10 +5652,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6483,
-          "baseId": 6451,
+          "productoLocalId": 6809,
+          "baseId": 6773,
           "nombre": "Producto 059",
-          "codigoBarra": "7817926741729059",
+          "codigoBarra": "7817926758404059",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5670,10 +5670,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6484,
-          "baseId": 6452,
+          "productoLocalId": 6810,
+          "baseId": 6774,
           "nombre": "Producto 060",
-          "codigoBarra": "7817926741729060",
+          "codigoBarra": "7817926758404060",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5688,10 +5688,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6485,
-          "baseId": 6453,
+          "productoLocalId": 6811,
+          "baseId": 6775,
           "nombre": "Producto 061",
-          "codigoBarra": "7817926741729061",
+          "codigoBarra": "7817926758404061",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5706,10 +5706,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6486,
-          "baseId": 6454,
+          "productoLocalId": 6812,
+          "baseId": 6776,
           "nombre": "Producto 062",
-          "codigoBarra": "7817926741729062",
+          "codigoBarra": "7817926758404062",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5724,10 +5724,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6487,
-          "baseId": 6455,
+          "productoLocalId": 6813,
+          "baseId": 6777,
           "nombre": "Producto 063",
-          "codigoBarra": "7817926741729063",
+          "codigoBarra": "7817926758404063",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5742,10 +5742,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6488,
-          "baseId": 6456,
+          "productoLocalId": 6814,
+          "baseId": 6778,
           "nombre": "Producto 064",
-          "codigoBarra": "7817926741729064",
+          "codigoBarra": "7817926758404064",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5760,10 +5760,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6489,
-          "baseId": 6457,
+          "productoLocalId": 6815,
+          "baseId": 6779,
           "nombre": "Producto 065",
-          "codigoBarra": "7817926741729065",
+          "codigoBarra": "7817926758404065",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5778,10 +5778,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6490,
-          "baseId": 6458,
+          "productoLocalId": 6816,
+          "baseId": 6780,
           "nombre": "Producto 066",
-          "codigoBarra": "7817926741729066",
+          "codigoBarra": "7817926758404066",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5796,10 +5796,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6491,
-          "baseId": 6459,
+          "productoLocalId": 6817,
+          "baseId": 6781,
           "nombre": "Producto 067",
-          "codigoBarra": "7817926741729067",
+          "codigoBarra": "7817926758404067",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5814,10 +5814,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6492,
-          "baseId": 6460,
+          "productoLocalId": 6818,
+          "baseId": 6782,
           "nombre": "Producto 068",
-          "codigoBarra": "7817926741729068",
+          "codigoBarra": "7817926758404068",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5832,10 +5832,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6493,
-          "baseId": 6461,
+          "productoLocalId": 6819,
+          "baseId": 6783,
           "nombre": "Producto 069",
-          "codigoBarra": "7817926741729069",
+          "codigoBarra": "7817926758404069",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5850,10 +5850,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6494,
-          "baseId": 6462,
+          "productoLocalId": 6820,
+          "baseId": 6784,
           "nombre": "Producto 070",
-          "codigoBarra": "7817926741729070",
+          "codigoBarra": "7817926758404070",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5868,10 +5868,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6495,
-          "baseId": 6463,
+          "productoLocalId": 6821,
+          "baseId": 6785,
           "nombre": "Producto 071",
-          "codigoBarra": "7817926741729071",
+          "codigoBarra": "7817926758404071",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5886,10 +5886,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6496,
-          "baseId": 6464,
+          "productoLocalId": 6822,
+          "baseId": 6786,
           "nombre": "Producto 072",
-          "codigoBarra": "7817926741729072",
+          "codigoBarra": "7817926758404072",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5904,10 +5904,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6497,
-          "baseId": 6465,
+          "productoLocalId": 6823,
+          "baseId": 6787,
           "nombre": "Producto 073",
-          "codigoBarra": "7817926741729073",
+          "codigoBarra": "7817926758404073",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5922,10 +5922,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6498,
-          "baseId": 6466,
+          "productoLocalId": 6824,
+          "baseId": 6788,
           "nombre": "Producto 074",
-          "codigoBarra": "7817926741729074",
+          "codigoBarra": "7817926758404074",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5940,10 +5940,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6499,
-          "baseId": 6467,
+          "productoLocalId": 6825,
+          "baseId": 6789,
           "nombre": "Producto 075",
-          "codigoBarra": "7817926741729075",
+          "codigoBarra": "7817926758404075",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5958,10 +5958,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6500,
-          "baseId": 6468,
+          "productoLocalId": 6826,
+          "baseId": 6790,
           "nombre": "Producto 076",
-          "codigoBarra": "7817926741729076",
+          "codigoBarra": "7817926758404076",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5976,10 +5976,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6501,
-          "baseId": 6469,
+          "productoLocalId": 6827,
+          "baseId": 6791,
           "nombre": "Producto 077",
-          "codigoBarra": "7817926741729077",
+          "codigoBarra": "7817926758404077",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -5994,10 +5994,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6502,
-          "baseId": 6470,
+          "productoLocalId": 6828,
+          "baseId": 6792,
           "nombre": "Producto 078",
-          "codigoBarra": "7817926741729078",
+          "codigoBarra": "7817926758404078",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6012,10 +6012,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6503,
-          "baseId": 6471,
+          "productoLocalId": 6829,
+          "baseId": 6793,
           "nombre": "Producto 079",
-          "codigoBarra": "7817926741729079",
+          "codigoBarra": "7817926758404079",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6030,10 +6030,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6504,
-          "baseId": 6472,
+          "productoLocalId": 6830,
+          "baseId": 6794,
           "nombre": "Producto 080",
-          "codigoBarra": "7817926741729080",
+          "codigoBarra": "7817926758404080",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6048,10 +6048,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6505,
-          "baseId": 6473,
+          "productoLocalId": 6831,
+          "baseId": 6795,
           "nombre": "Producto 081",
-          "codigoBarra": "7817926741729081",
+          "codigoBarra": "7817926758404081",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6066,10 +6066,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6506,
-          "baseId": 6474,
+          "productoLocalId": 6832,
+          "baseId": 6796,
           "nombre": "Producto 082",
-          "codigoBarra": "7817926741729082",
+          "codigoBarra": "7817926758404082",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6084,10 +6084,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6507,
-          "baseId": 6475,
+          "productoLocalId": 6833,
+          "baseId": 6797,
           "nombre": "Producto 083",
-          "codigoBarra": "7817926741729083",
+          "codigoBarra": "7817926758404083",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6102,10 +6102,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6508,
-          "baseId": 6476,
+          "productoLocalId": 6834,
+          "baseId": 6798,
           "nombre": "Producto 084",
-          "codigoBarra": "7817926741729084",
+          "codigoBarra": "7817926758404084",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6120,10 +6120,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6509,
-          "baseId": 6477,
+          "productoLocalId": 6835,
+          "baseId": 6799,
           "nombre": "Producto 085",
-          "codigoBarra": "7817926741729085",
+          "codigoBarra": "7817926758404085",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6138,10 +6138,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6510,
-          "baseId": 6478,
+          "productoLocalId": 6836,
+          "baseId": 6800,
           "nombre": "Producto 086",
-          "codigoBarra": "7817926741729086",
+          "codigoBarra": "7817926758404086",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6156,10 +6156,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6511,
-          "baseId": 6479,
+          "productoLocalId": 6837,
+          "baseId": 6801,
           "nombre": "Producto 087",
-          "codigoBarra": "7817926741729087",
+          "codigoBarra": "7817926758404087",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6174,10 +6174,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6512,
-          "baseId": 6480,
+          "productoLocalId": 6838,
+          "baseId": 6802,
           "nombre": "Producto 088",
-          "codigoBarra": "7817926741729088",
+          "codigoBarra": "7817926758404088",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6192,10 +6192,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6513,
-          "baseId": 6481,
+          "productoLocalId": 6839,
+          "baseId": 6803,
           "nombre": "Producto 089",
-          "codigoBarra": "7817926741729089",
+          "codigoBarra": "7817926758404089",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6210,10 +6210,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6514,
-          "baseId": 6482,
+          "productoLocalId": 6840,
+          "baseId": 6804,
           "nombre": "Producto 090",
-          "codigoBarra": "7817926741729090",
+          "codigoBarra": "7817926758404090",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6228,10 +6228,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6515,
-          "baseId": 6483,
+          "productoLocalId": 6841,
+          "baseId": 6805,
           "nombre": "Producto 091",
-          "codigoBarra": "7817926741729091",
+          "codigoBarra": "7817926758404091",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6246,10 +6246,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6516,
-          "baseId": 6484,
+          "productoLocalId": 6842,
+          "baseId": 6806,
           "nombre": "Producto 092",
-          "codigoBarra": "7817926741729092",
+          "codigoBarra": "7817926758404092",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6264,10 +6264,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6517,
-          "baseId": 6485,
+          "productoLocalId": 6843,
+          "baseId": 6807,
           "nombre": "Producto 093",
-          "codigoBarra": "7817926741729093",
+          "codigoBarra": "7817926758404093",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6282,10 +6282,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6518,
-          "baseId": 6486,
+          "productoLocalId": 6844,
+          "baseId": 6808,
           "nombre": "Producto 094",
-          "codigoBarra": "7817926741729094",
+          "codigoBarra": "7817926758404094",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6300,10 +6300,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6519,
-          "baseId": 6487,
+          "productoLocalId": 6845,
+          "baseId": 6809,
           "nombre": "Producto 095",
-          "codigoBarra": "7817926741729095",
+          "codigoBarra": "7817926758404095",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6318,10 +6318,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6520,
-          "baseId": 6488,
+          "productoLocalId": 6846,
+          "baseId": 6810,
           "nombre": "Producto 096",
-          "codigoBarra": "7817926741729096",
+          "codigoBarra": "7817926758404096",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6336,10 +6336,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6521,
-          "baseId": 6489,
+          "productoLocalId": 6847,
+          "baseId": 6811,
           "nombre": "Producto 097",
-          "codigoBarra": "7817926741729097",
+          "codigoBarra": "7817926758404097",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6354,10 +6354,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6522,
-          "baseId": 6490,
+          "productoLocalId": 6848,
+          "baseId": 6812,
           "nombre": "Producto 098",
-          "codigoBarra": "7817926741729098",
+          "codigoBarra": "7817926758404098",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6372,10 +6372,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6523,
-          "baseId": 6491,
+          "productoLocalId": 6849,
+          "baseId": 6813,
           "nombre": "Producto 099",
-          "codigoBarra": "7817926741729099",
+          "codigoBarra": "7817926758404099",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6390,10 +6390,10 @@
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6524,
-          "baseId": 6492,
+          "productoLocalId": 6850,
+          "baseId": 6814,
           "nombre": "Producto 100",
-          "codigoBarra": "7817926741729100",
+          "codigoBarra": "7817926758404100",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -6888,10 +6888,10 @@
       "items": [],
       "itemCount": 0,
       "pendiente": {
-        "posId": 2055,
+        "posId": 2306,
         "estado": "Solicitado",
-        "solicitadoAt": "2026-10-22T13:02:59.449Z",
-        "createdAt": "2026-10-22T13:02:59.384Z",
+        "solicitadoAt": "2026-10-22T13:30:51.708Z",
+        "createdAt": "2026-10-22T13:30:51.631Z",
         "depositoEmpezo": false,
         "items": [
           {
@@ -6900,10 +6900,10 @@
             "unidadSugerida": "UNIDAD",
             "factorPack": 1,
             "modoEnvio": "SOLO_UNIDAD",
-            "detalleId": 4377,
-            "productoLocalId": 6577,
-            "baseId": 6545,
-            "codigoBarra": "7917926741000",
+            "detalleId": 4821,
+            "productoLocalId": 6903,
+            "baseId": 6867,
+            "codigoBarra": "7917926758000",
             "preparado": 0,
             "unidadMedida": "unidad",
             "imagenUrl": null
@@ -6914,10 +6914,10 @@
             "unidadSugerida": "UNIDAD",
             "factorPack": 1,
             "modoEnvio": "SOLO_UNIDAD",
-            "detalleId": 4378,
-            "productoLocalId": 6578,
-            "baseId": 6546,
-            "codigoBarra": "7917926741001",
+            "detalleId": 4822,
+            "productoLocalId": 6904,
+            "baseId": 6868,
+            "codigoBarra": "7917926758001",
             "preparado": 0,
             "unidadMedida": "unidad",
             "imagenUrl": null
@@ -6928,10 +6928,10 @@
             "unidadSugerida": "UNIDAD",
             "factorPack": 1,
             "modoEnvio": "SOLO_UNIDAD",
-            "detalleId": 4379,
-            "productoLocalId": 6579,
-            "baseId": 6547,
-            "codigoBarra": "7917926741002",
+            "detalleId": 4823,
+            "productoLocalId": 6905,
+            "baseId": 6869,
+            "codigoBarra": "7917926758002",
             "preparado": 0,
             "unidadMedida": "unidad",
             "imagenUrl": null
@@ -6945,10 +6945,10 @@
     "status": 200,
     "cuerpo": {
       "ok": true,
-      "posId": 2055,
+      "posId": 2306,
       "item": {
-        "detalleId": 4380,
-        "productoLocalId": 6580,
+        "detalleId": 4824,
+        "productoLocalId": 6906,
         "sugerido": 4,
         "preparado": 0,
         "unidadSugerida": "UNIDAD"
@@ -6965,10 +6965,10 @@
       "items": [],
       "itemCount": 0,
       "pendiente": {
-        "posId": 2055,
+        "posId": 2306,
         "estado": "Solicitado",
-        "solicitadoAt": "2026-10-22T13:02:59.449Z",
-        "createdAt": "2026-10-22T13:02:59.384Z",
+        "solicitadoAt": "2026-10-22T13:30:51.708Z",
+        "createdAt": "2026-10-22T13:30:51.631Z",
         "depositoEmpezo": false,
         "items": [
           {
@@ -6977,10 +6977,10 @@
             "unidadSugerida": "UNIDAD",
             "factorPack": 1,
             "modoEnvio": "SOLO_UNIDAD",
-            "detalleId": 4377,
-            "productoLocalId": 6577,
-            "baseId": 6545,
-            "codigoBarra": "7917926741000",
+            "detalleId": 4821,
+            "productoLocalId": 6903,
+            "baseId": 6867,
+            "codigoBarra": "7917926758000",
             "preparado": 0,
             "unidadMedida": "unidad",
             "imagenUrl": null
@@ -6991,10 +6991,10 @@
             "unidadSugerida": "UNIDAD",
             "factorPack": 1,
             "modoEnvio": "SOLO_UNIDAD",
-            "detalleId": 4378,
-            "productoLocalId": 6578,
-            "baseId": 6546,
-            "codigoBarra": "7917926741001",
+            "detalleId": 4822,
+            "productoLocalId": 6904,
+            "baseId": 6868,
+            "codigoBarra": "7917926758001",
             "preparado": 0,
             "unidadMedida": "unidad",
             "imagenUrl": null
@@ -7005,10 +7005,10 @@
             "unidadSugerida": "UNIDAD",
             "factorPack": 1,
             "modoEnvio": "SOLO_UNIDAD",
-            "detalleId": 4380,
-            "productoLocalId": 6580,
-            "baseId": 6548,
-            "codigoBarra": "7917926741003",
+            "detalleId": 4824,
+            "productoLocalId": 6906,
+            "baseId": 6870,
+            "codigoBarra": "7917926758003",
             "preparado": 0,
             "unidadMedida": "unidad",
             "imagenUrl": null
@@ -7022,8 +7022,8 @@
     {
       "accion": "pos_transferencia.editar",
       "campos": [
-        "Pos Transferencia Id:null→2.055",
-        "Producto Id:null→6.581",
+        "Pos Transferencia Id:null→2.306",
+        "Producto Id:null→6.907",
         "Sugerido:null→1",
         "Preparado:null→0",
         "Tipo:null→manual",
@@ -7040,7 +7040,7 @@
     {
       "accion": "pos_transferencia.editar",
       "campos": [
-        "Producto Id:6.581→null",
+        "Producto Id:6.907→null",
         "Sugerido:3→null"
       ]
     }
@@ -7053,10 +7053,10 @@
       "items": [],
       "itemCount": 0,
       "pendiente": {
-        "posId": 2056,
+        "posId": 2307,
         "estado": "Solicitado",
-        "solicitadoAt": "2026-10-22T13:02:59.765Z",
-        "createdAt": "2026-10-22T13:02:59.745Z",
+        "solicitadoAt": "2026-10-22T13:30:52.143Z",
+        "createdAt": "2026-10-22T13:30:52.125Z",
         "depositoEmpezo": false,
         "items": [],
         "itemCount": 0
@@ -7071,10 +7071,10 @@
       "items": [],
       "itemCount": 0,
       "pendiente": {
-        "posId": 2055,
+        "posId": 2306,
         "estado": "Solicitado",
-        "solicitadoAt": "2026-10-22T13:02:59.449Z",
-        "createdAt": "2026-10-22T13:02:59.384Z",
+        "solicitadoAt": "2026-10-22T13:30:51.708Z",
+        "createdAt": "2026-10-22T13:30:51.631Z",
         "depositoEmpezo": true,
         "items": [
           {
@@ -7083,10 +7083,10 @@
             "unidadSugerida": "UNIDAD",
             "factorPack": 1,
             "modoEnvio": "SOLO_UNIDAD",
-            "detalleId": 4377,
-            "productoLocalId": 6577,
-            "baseId": 6545,
-            "codigoBarra": "7917926741000",
+            "detalleId": 4821,
+            "productoLocalId": 6903,
+            "baseId": 6867,
+            "codigoBarra": "7917926758000",
             "preparado": 2,
             "unidadMedida": "unidad",
             "imagenUrl": null
@@ -7097,10 +7097,10 @@
             "unidadSugerida": "UNIDAD",
             "factorPack": 1,
             "modoEnvio": "SOLO_UNIDAD",
-            "detalleId": 4378,
-            "productoLocalId": 6578,
-            "baseId": 6546,
-            "codigoBarra": "7917926741001",
+            "detalleId": 4822,
+            "productoLocalId": 6904,
+            "baseId": 6868,
+            "codigoBarra": "7917926758001",
             "preparado": 0,
             "unidadMedida": "unidad",
             "imagenUrl": null
@@ -7111,10 +7111,10 @@
             "unidadSugerida": "UNIDAD",
             "factorPack": 1,
             "modoEnvio": "SOLO_UNIDAD",
-            "detalleId": 4380,
-            "productoLocalId": 6580,
-            "baseId": 6548,
-            "codigoBarra": "7917926741003",
+            "detalleId": 4824,
+            "productoLocalId": 6906,
+            "baseId": 6870,
+            "codigoBarra": "7917926758003",
             "preparado": 0,
             "unidadMedida": "unidad",
             "imagenUrl": null
@@ -7140,8 +7140,8 @@
   },
   "carreraPreparar": {
     "vueltas": 25,
-    "antes": 20,
-    "conflictos": 5,
+    "antes": 21,
+    "conflictos": 4,
     "tardes": 0,
     "otras": 0
   },
@@ -7155,8 +7155,8 @@
   "carreraDespachar": {
     "vueltas": 25,
     "antes": 0,
-    "despues": 22,
-    "cambio": 3,
+    "despues": 20,
+    "cambio": 5,
     "rechazos": 0,
     "tardes": 0,
     "otras": 0
@@ -7169,10 +7169,10 @@
       "items": [],
       "itemCount": 0,
       "pendiente": {
-        "posId": 2055,
+        "posId": 2306,
         "estado": "Solicitado",
-        "solicitadoAt": "2026-10-22T13:02:59.449Z",
-        "createdAt": "2026-10-22T13:02:59.384Z",
+        "solicitadoAt": "2026-10-22T13:30:51.708Z",
+        "createdAt": "2026-10-22T13:30:51.631Z",
         "depositoEmpezo": true,
         "items": [
           {
@@ -7181,10 +7181,10 @@
             "unidadSugerida": "UNIDAD",
             "factorPack": 1,
             "modoEnvio": "SOLO_UNIDAD",
-            "detalleId": 4377,
-            "productoLocalId": 6577,
-            "baseId": 6545,
-            "codigoBarra": "7917926741000",
+            "detalleId": 4821,
+            "productoLocalId": 6903,
+            "baseId": 6867,
+            "codigoBarra": "7917926758000",
             "preparado": 2,
             "unidadMedida": "unidad",
             "imagenUrl": null
@@ -7195,10 +7195,10 @@
             "unidadSugerida": "UNIDAD",
             "factorPack": 1,
             "modoEnvio": "SOLO_UNIDAD",
-            "detalleId": 4378,
-            "productoLocalId": 6578,
-            "baseId": 6546,
-            "codigoBarra": "7917926741001",
+            "detalleId": 4822,
+            "productoLocalId": 6904,
+            "baseId": 6868,
+            "codigoBarra": "7917926758001",
             "preparado": 0,
             "unidadMedida": "unidad",
             "imagenUrl": null
@@ -7209,10 +7209,10 @@
             "unidadSugerida": "UNIDAD",
             "factorPack": 1,
             "modoEnvio": "SOLO_UNIDAD",
-            "detalleId": 4380,
-            "productoLocalId": 6580,
-            "baseId": 6548,
-            "codigoBarra": "7917926741003",
+            "detalleId": 4824,
+            "productoLocalId": 6906,
+            "baseId": 6870,
+            "codigoBarra": "7917926758003",
             "preparado": 0,
             "unidadMedida": "unidad",
             "imagenUrl": null
@@ -7261,9 +7261,179 @@
   },
   "carreraCancelar": {
     "vueltas": 25,
-    "cancelo": 7,
-    "rechazo": 18,
+    "cancelo": 9,
+    "rechazo": 16,
     "tardes": 0,
     "otras": 0
+  },
+  "carritoVacio": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "posId": null,
+      "items": [],
+      "itemCount": 0,
+      "pendiente": null
+    }
+  },
+  "historialVacio": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "items": [],
+      "total": 0,
+      "page": 1,
+      "pageSize": 4,
+      "totalPages": 1
+    }
+  },
+  "entradaEnviadoCarrito": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "posId": null,
+      "items": [],
+      "itemCount": 0,
+      "pendiente": {
+        "posId": 2386,
+        "estado": "Solicitado",
+        "solicitadoAt": "2026-10-22T13:31:01.333Z",
+        "createdAt": "2026-10-22T13:31:01.308Z",
+        "depositoEmpezo": false,
+        "items": [
+          {
+            "nombre": "ACEITE",
+            "sugerido": 2,
+            "unidadSugerida": "UNIDAD",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "detalleId": 4932,
+            "productoLocalId": 6903,
+            "baseId": 6867,
+            "codigoBarra": "7917926758000",
+            "preparado": 0,
+            "unidadMedida": "unidad",
+            "imagenUrl": null
+          },
+          {
+            "nombre": "ARROZ",
+            "sugerido": 3,
+            "unidadSugerida": "UNIDAD",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD",
+            "detalleId": 4933,
+            "productoLocalId": 6904,
+            "baseId": 6868,
+            "codigoBarra": "7917926758001",
+            "preparado": 0,
+            "unidadMedida": "unidad",
+            "imagenUrl": null
+          }
+        ],
+        "itemCount": 2
+      }
+    }
+  },
+  "entradaHistorial": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "items": [
+        {
+          "posId": 2386,
+          "estado": "Solicitado",
+          "solicitadoAt": "2026-10-22T13:31:01.333Z",
+          "createdAt": "2026-10-22T13:31:01.308Z",
+          "itemCount": 2,
+          "totalBultos": 0,
+          "totalUnidades": 5,
+          "resumen": [
+            {
+              "nombre": "ACEITE",
+              "sugerido": 2,
+              "unidadSugerida": "UNIDAD",
+              "factorPack": 1
+            },
+            {
+              "nombre": "ARROZ",
+              "sugerido": 3,
+              "unidadSugerida": "UNIDAD",
+              "factorPack": 1
+            }
+          ],
+          "transferenciaId": null,
+          "transferenciaEstado": null,
+          "transferenciaFechaEnvio": null,
+          "transferenciaFechaRecepcion": null
+        },
+        {
+          "posId": 2358,
+          "estado": "Enviado",
+          "solicitadoAt": "2026-10-22T13:30:59.100Z",
+          "createdAt": "2026-10-22T13:30:59.028Z",
+          "itemCount": 1,
+          "totalBultos": 0,
+          "totalUnidades": 2,
+          "resumen": [
+            {
+              "nombre": "ACEITE",
+              "sugerido": 2,
+              "unidadSugerida": "UNIDAD",
+              "factorPack": 1
+            }
+          ],
+          "transferenciaId": 580,
+          "transferenciaEstado": "Enviada",
+          "transferenciaFechaEnvio": "2026-10-22T13:30:59.122Z",
+          "transferenciaFechaRecepcion": null
+        },
+        {
+          "posId": 2357,
+          "estado": "Enviado",
+          "solicitadoAt": "2026-10-22T13:30:58.968Z",
+          "createdAt": "2026-10-22T13:30:58.908Z",
+          "itemCount": 1,
+          "totalBultos": 0,
+          "totalUnidades": 2,
+          "resumen": [
+            {
+              "nombre": "ACEITE",
+              "sugerido": 2,
+              "unidadSugerida": "UNIDAD",
+              "factorPack": 1
+            }
+          ],
+          "transferenciaId": 579,
+          "transferenciaEstado": "Enviada",
+          "transferenciaFechaEnvio": "2026-10-22T13:30:58.992Z",
+          "transferenciaFechaRecepcion": null
+        },
+        {
+          "posId": 2356,
+          "estado": "Enviado",
+          "solicitadoAt": "2026-10-22T13:30:58.853Z",
+          "createdAt": "2026-10-22T13:30:58.778Z",
+          "itemCount": 1,
+          "totalBultos": 0,
+          "totalUnidades": 2,
+          "resumen": [
+            {
+              "nombre": "ACEITE",
+              "sugerido": 2,
+              "unidadSugerida": "UNIDAD",
+              "factorPack": 1
+            }
+          ],
+          "transferenciaId": 578,
+          "transferenciaEstado": "Enviada",
+          "transferenciaFechaEnvio": "2026-10-22T13:30:58.873Z",
+          "transferenciaFechaRecepcion": null
+        }
+      ],
+      "total": 22,
+      "page": 1,
+      "pageSize": 4,
+      "totalPages": 6
+    }
   }
 }

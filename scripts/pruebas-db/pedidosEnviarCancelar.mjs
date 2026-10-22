@@ -124,6 +124,7 @@ try {
     setCantidad: await import("../../app/api/pedidos/set-cantidad/route.js"),
     solicitar: await import("../../app/api/pos-transferencias/solicitar/route.js"),
     cancelar: await import("../../app/api/pos-transferencias/cancelar/route.js"),
+    historial: await import("../../app/api/pedidos/historial/route.js"),
   };
 
   const permisos = rolEnc.permisos;
@@ -184,6 +185,15 @@ try {
     const catBebidas = await pedir(R.catalogo, "GET", `${B}/pedidos/catalogo?page=1&pageSize=50&categoriaId=${bebidas.id}`, S.conPin);
     guardar("catalogoBebidas", catBebidas);
     ok("filtrado por Bebidas: la coca y el agua", catBebidas.cuerpo.total === 2 && catBebidas.cuerpo.items?.every((i) => i.productoLocalId !== yerba), json(catBebidas));
+    // La página de entrada: el carrito de un local que todavía no pidió nada,
+    // y sus pedidos anteriores, como los pide la pantalla (los últimos cuatro:
+    // tres más el que pueda estar en curso).
+    const vacio = await carrito(S.conPin);
+    guardar("carritoVacio", vacio);
+    ok("al entrar, sin pedido en curso", vacio.cuerpo.ok && vacio.cuerpo.items.length === 0 && vacio.cuerpo.pendiente === null, json(vacio));
+    const hist = await pedir(R.historial, "GET", `${B}/pedidos/historial?page=1&pageSize=4`, S.conPin);
+    guardar("historialVacio", hist);
+    ok("al entrar, sin pedidos anteriores", hist.cuerpo.ok && hist.cuerpo.items.length === 0, json(hist));
   }
 
   seccion("1. El carrito, como lo arma la pantalla");
@@ -800,6 +810,23 @@ try {
       guardar(CONTRA === "cancelar" ? "carreraCancelarSinBloqueo" : "carreraCancelar", { vueltas: VUELTAS, cancelo, rechazo, tardes, otras });
       if (CONTRA === "cancelar") ok("10d CONTRAPRUEBA: sin el bloqueo en cancelar, hay pedidos cancelados ya empezados", tardes > 0, `${tardes}`);
       else ok("10d: cero pedidos cancelados después de empezados", tardes === 0 && otras === 0, json({ tardes, otras }));
+    }
+
+    seccion("11. La página de entrada de un local con pedidos anteriores");
+    {
+      // El local de la sección 9 ya despachó varios (9f). Uno enviado ahora,
+      // en curso: el historial lo trae primero, y la entrada lo deja afuera de
+      // "Pedidos anteriores" porque es el de la tarjeta.
+      const pid = await enviarUno(ACEITE, 2);
+      await P.fijar(ARROZ, 3);
+      const k = await carrito(P.sPin);
+      guardar("entradaEnviadoCarrito", k);
+      const h = await pedir(R.historial, "GET", `${B}/pedidos/historial?page=1&pageSize=4`, P.sPin);
+      guardar("entradaHistorial", h);
+      console.log(`  · 11: historial → ${json(h.cuerpo.items?.map((i) => [i.posId, i.estado, i.itemCount]))}`);
+      ok("11: el historial trae el en curso primero y tres más", h.cuerpo.items?.length === 4 && h.cuerpo.items[0].posId === pid && k.cuerpo.pendiente?.posId === pid, json(h.cuerpo.items?.map((i) => i.posId)));
+      ok("11: con estado, fecha y cantidad de líneas", h.cuerpo.items.every((i) => i.estado && (i.solicitadoAt || i.createdAt) && Number.isInteger(i.itemCount)));
+      await limpiar(pid);
     }
   }
 
