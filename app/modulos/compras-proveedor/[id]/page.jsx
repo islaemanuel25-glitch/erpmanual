@@ -16,6 +16,8 @@ import PanelComprobantes from "@/components/comprobantes/PanelComprobantes";
 import ListaDeLaFactura from "@/components/compras-proveedor/ListaDeLaFactura";
 import CorregirComprobante from "@/components/compras-proveedor/CorregirComprobante";
 import PropuestaEnLaRecepcion from "@/components/compras-proveedor/PropuestaEnLaRecepcion";
+import ConfirmarConNumeros from "@/components/compras-proveedor/ConfirmarConNumeros";
+import { sePuedeAnular, textoDeAnular } from "@/lib/compras-proveedor/anularPedido";
 import HojaCorregirLinea from "@/components/compras-proveedor/HojaCorregirLinea";
 import HojaCerrarRecepcion from "@/components/compras-proveedor/HojaCerrarRecepcion";
 import PedidoRecibido from "@/components/compras-proveedor/PedidoRecibido";
@@ -150,6 +152,10 @@ export default function DetallePedidoProveedorPage({ params }) {
   // Por qué no entró el cierre, en castellano y a la vista. Se limpia al volver
   // a intentar: un motivo viejo al lado de un botón que acaba de andar miente.
   const [motivoDelFallo, setMotivoDelFallo] = useState(null);
+  // La confirmación de «Anular pedido» desde la recepción, y lo que contestó el
+  // servidor si no se pudo: se dice adentro de la hoja, donde se tocó.
+  const [anulando, setAnulando] = useState(false);
+  const [errorAlAnular, setErrorAlAnular] = useState(null);
 
   // El primer comprobante con líneas leídas. Con varios, se muestra el primero:
   // el caso de dos facturas en un mismo pedido existe y se resuelve en la tanda
@@ -901,10 +907,33 @@ export default function DetallePedidoProveedorPage({ params }) {
         setMotivoDelFallo(data.queHacer || data.error || "No se pudo completar la acción.");
         if (accion === "recibir") setCerrandoRecepcion(true);
       }
+      // Lo que contestó el servidor, para quien tiene que saber si salió: la
+      // confirmación de anular lo dice adentro de su hoja.
+      return data;
     } finally {
       setActing(false);
     }
   };
+
+  /**
+   * ANULAR DESDE LA RECEPCIÓN: el mismo `ejecutarAccion("anular")` —la misma
+   * ruta, con sus reglas— y, si salió, de vuelta a Recibir mercadería, de
+   * donde el pedido ya no aparece.
+   */
+  async function anularDesdeLaRecepcion() {
+    setErrorAlAnular(null);
+    try {
+      const data = await ejecutarAccion("anular");
+      if (data?.ok) {
+        setAnulando(false);
+        router.push("/modulos/compras-proveedor/recepcion");
+        return;
+      }
+      setErrorAlAnular(data?.queHacer || data?.error || "No se pudo anular el pedido.");
+    } catch {
+      setErrorAlAnular("Se cortó la conexión: el pedido quedó como estaba.");
+    }
+  }
 
   // --- Buscar producto extra (debounced) ---
   const debounceRef = useRef(null);
@@ -1041,6 +1070,9 @@ export default function DetallePedidoProveedorPage({ params }) {
   // Solo con permiso de editar productos: son dos permisos distintos, y un
   // botón incondicional rebotaría en la cara de quien no lo tiene.
   const puedeEditarProductoP = esAdminP || permisosP.includes("productos.editar");
+  // Anular pide el permiso que exige la ruta: sin él el botón no se ofrece, y
+  // si igual llegara el pedido, el servidor lo rechaza.
+  const puedeAnularP = esAdminP || permisosP.includes("compras.crear");
   const irAEditarProducto = (fila) => {
     const url = linkEditarProducto({
       baseId: fila?.productoBaseId,
@@ -1649,6 +1681,54 @@ export default function DetallePedidoProveedorPage({ params }) {
             />
           </>
         )}
+
+        {/* ── UN PEDIDO QUE NO VA A LLEGAR SE ANULA DESDE ACÁ ───────────────
+            Golosimax #261 y Secco #256 esperaban con cero productos y sin
+            factura, y desde el celular no había cómo sacarlos: anular solo se
+            ofrecía antes de enviar (2026-10-22). Va al pie, afuera de la lista,
+            porque esos pedidos no tienen lista. La confirmación es la del
+            borrado de factura: con números, el rojo debajo del que cancela. */}
+        {esRecepcion && puedeAnularP && sePuedeAnular(pedido.estado) && (
+          <div className="mt-6 flex flex-col">
+            <SunmiButton
+              color="red"
+              type="button"
+              disabled={acting}
+              onClick={() => {
+                setErrorAlAnular(null);
+                setAnulando(true);
+              }}
+              className="w-full min-h-toque justify-center text-sm3"
+            >
+              Anular pedido
+            </SunmiButton>
+          </div>
+        )}
+        {anulando && (() => {
+          const d = textoDeAnular({
+            pedidoId: pedido.id,
+            proveedor: pedido.proveedor?.nombre ?? null,
+            productos: pedido.detalles?.length ?? 0,
+            // Las facturas vivas del pedido: las de la conciliación, que ya
+            // deja afuera las anuladas. Sin conciliación cargada, las del panel.
+            facturas: conciliacion?.grupos?.length ?? hayComprobantes ?? 0,
+          });
+          return (
+            <ConfirmarConNumeros
+              titulo="¿Anular este pedido?"
+              subtitulo={`Pedido #${pedido.id}`}
+              texto={d.texto}
+              aviso={d.aviso}
+              error={errorAlAnular}
+              textoNo="No, dejarlo"
+              textoSi="Sí, anularlo"
+              textoHaciendo="Anulando…"
+              trabajando={acting}
+              onNo={() => setAnulando(false)}
+              onSi={anularDesdeLaRecepcion}
+            />
+          );
+        })()}
 
         {/* ── LA RAMA VIEJA YA NO EXISTE RECIBIENDO ───────────────────────
             Acá caía "Llegó sin factura": "Detalle (N productos)" con las

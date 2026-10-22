@@ -13,7 +13,11 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { resumenDeLista } from "@/lib/compras-proveedor/comprobante/pantalla";
-import { coberturaDelPedido, textoDeCobertura } from "@/lib/compras-proveedor/comprobante/cobertura";
+import {
+  coberturaDelPedido,
+  productosDelPapel,
+  textoDeCobertura,
+} from "@/lib/compras-proveedor/comprobante/cobertura";
 import { productosDeLasFilas, baseIdDeLaFila } from "@/lib/compras-proveedor/comprobante/productoDeLaFila";
 import { armarCadena } from "@/lib/compras-proveedor/comprobante/lector/cadena";
 import { cuotaDelDia, horaLocalDeReposicion } from "@/lib/compras-proveedor/comprobante/lector/cuota";
@@ -106,6 +110,17 @@ export async function GET(req) {
       : [];
     const vinculadasDe = new Map(vinculadasPorComprobante.map((v) => [v.comprobanteId, v._count._all]));
 
+    // Cuántos PRODUCTOS trae cada papel —sin envases ni cargos— y cuántos ya
+    // tienen producto del catálogo (`productosDelPapel`). `_count.lineas` sigue
+    // contando todos los renglones: es lo que se lleva un borrado.
+    const lineasDeLosPapeles = items.length
+      ? await prisma.comprobanteLinea.findMany({
+          where: { comprobanteId: { in: items.map((c) => c.id) } },
+          select: { comprobanteId: true, tipoRenglon: true, productoLocalId: true },
+        })
+      : [];
+    const delPapel = productosDelPapel(lineasDeLosPapeles);
+
     const conFotos = items.map(({ lecturaEnCursoDesde, ...c }) => ({
       ...c,
       // Una vencida NO cuenta como leyendo: el GET de la lectura la da por
@@ -114,6 +129,8 @@ export async function GET(req) {
       fotos: c.imagenBorradaEn ? 0 : c.archivos.length,
       archivos: c.imagenBorradaEn ? [] : c.archivos,
       lineasVinculadas: vinculadasDe.get(c.id) ?? 0,
+      productosDelPapel: delPapel.get(c.id)?.productos ?? 0,
+      conProducto: delPapel.get(c.id)?.conProducto ?? 0,
     }));
 
     // ── LA COBERTURA DEL PEDIDO, CONTRA TODOS LOS COMPROBANTES ───────────
@@ -149,7 +166,23 @@ export async function GET(req) {
         })),
       });
       const sinLeer = items.filter((x) => !x.leidoEn && x.estado !== "ANULADO").length;
-      cobertura = { ...c, ...textoDeCobertura(c, { comprobantesSinLeer: sinLeer }) };
+      // ── EL PEDIDO NACIDO DE UNA FACTURA SE CUENTA CONTRA EL PAPEL ───────
+      //
+      // Sus líneas salen de los renglones que se pudieron atar, así que
+      // "N de N llegaron" es verdad siempre. Lo que se dice es cuántos
+      // productos del papel ya tienen producto (`productosDelPapel`).
+      const pedido = await prisma.pedidoProveedor.findFirst({
+        where: { id: pedidoId, grupoId },
+        select: { nacidoDeFactura: true },
+      });
+      const vivos = conFotos.filter((x) => x.estado !== "ANULADO");
+      cobertura = {
+        ...c,
+        ...textoDeCobertura(c, { comprobantesSinLeer: sinLeer }),
+        nacidoDeFactura: pedido?.nacidoDeFactura === true,
+        productosDelPapel: vivos.reduce((a, x) => a + x.productosDelPapel, 0),
+        conProducto: vivos.reduce((a, x) => a + x.conProducto, 0),
+      };
     }
 
     // ── CUÁNTAS LECTURAS QUEDAN HOY ──────────────────────────────────────

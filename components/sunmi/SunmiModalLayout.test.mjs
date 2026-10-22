@@ -729,6 +729,11 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // gesto que se espera de algo que se abrió para mirar.
     "components/compras-proveedor/VisorDeFoto.jsx": false,
     "components/comprobantes/PanelComprobantes.jsx": false,
+    // La confirmación de borrar un comprobante, sacada tal cual del panel
+    // (2026-10-22) porque anular un pedido desde la recepción necesitó la
+    // misma. Es una CONFIRMACIÓN: adentro no hay nada escrito, y cerrar sin
+    // querer deja todo como estaba. `false`, como estaba en el panel.
+    "components/compras-proveedor/ConfirmarConNumeros.jsx": false,
     // Aplicar una corrección histórica de caja: es una CONFIRMACIÓN, aunque la
     // acción sea la más delicada de la caja. Lo único escrito adentro es el
     // código repetido, y cerrar sin querer deja todo sin aplicar, que es la
@@ -1030,13 +1035,22 @@ test("los modales que ya existían NO pasan forma: el default es el de siempre",
 
   // El de borrar un comprobante es el que ya existía en el panel: sigue sin
   // declarar forma, o sea que se sigue dibujando centrado como siempre.
+  //
+  // Desde 2026-10-22 su modal vive en `ConfirmarConNumeros`, sacado tal cual
+  // del panel para que anular un pedido use el mismo. Se mira ahí —el archivo
+  // entero es ese modal— y que el panel lo use para borrar: buscarlo en el
+  // panel cortaba hasta el cierre de la HOJA de detalle, que sí declara forma.
   const panel = fs.readFileSync(
     path.join(RAIZ, "components/comprobantes/PanelComprobantes.jsx"),
     "utf8"
   );
-  const borrar = panel.slice(panel.indexOf("¿Borrar este comprobante?"));
-  const hastaElCierre = borrar.slice(0, borrar.indexOf("</SunmiModalLayout>"));
-  assert.doesNotMatch(hastaElCierre, /forma=/, "el modal de borrar cambió de forma");
+  const confirmar = fs.readFileSync(
+    path.join(RAIZ, "components/compras-proveedor/ConfirmarConNumeros.jsx"),
+    "utf8"
+  );
+  assert.match(confirmar, /<SunmiModalLayout/);
+  assert.doesNotMatch(confirmar, /forma=/, "el modal de borrar cambió de forma");
+  assert.match(panel, /<ConfirmarConNumeros\s+titulo="¿Borrar este comprobante\?"/);
 
   // Y la hoja nueva sí la declara: si dejara de hacerlo se dibujaría centrada
   // sin que nadie lo decidiera.

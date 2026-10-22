@@ -36,6 +36,7 @@ import SunmiTableEmpty from "@/components/sunmi/SunmiTableEmpty";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiLoader from "@/components/sunmi/SunmiLoader";
 import VisorDeFoto from "@/components/compras-proveedor/VisorDeFoto";
+import ConfirmarConNumeros from "@/components/compras-proveedor/ConfirmarConNumeros";
 
 import {
   chipDeFactura,
@@ -590,7 +591,14 @@ export default function PanelComprobantes({
             {resumen.total === 0
               ? "Sacá una foto de la factura. Si es larga, sacá una por hoja, en orden."
               : `${resumen.total} ${resumen.total === 1 ? "factura" : "facturas"}` +
-                (cobertura?.totalPedido
+                // Un pedido nacido de la factura no tiene "productos del
+                // pedido" propios: son los del papel que se pudieron atar. Ahí
+                // se dice cuántos trae el papel.
+                (cobertura?.nacidoDeFactura
+                  ? cobertura.productosDelPapel
+                    ? ` · ${cobertura.productosDelPapel} productos del papel`
+                    : ""
+                  : cobertura?.totalPedido
                   ? ` · ${cobertura.totalPedido} productos del pedido`
                   : "") +
                 (resumen.sinLeer ? ` · ${resumen.sinLeer} sin leer` : "")}
@@ -831,7 +839,19 @@ export default function PanelComprobantes({
                 // Apila en columna, así que el renglón va adentro: pedirle
                 // `flex-row` por `className` pondría dos clases de la misma
                 // familia y ganaría cualquiera — la pieza concatena.
-                <SunmiActionCard key={c.id} onClick={() => setAbierta(c.id)} className="min-h-toque">
+                //
+                // ── EL BORRADO, A LA VISTA Y NO UN TOQUE MÁS ADENTRO ──────
+                //
+                // Con el rediseño de la fila (18a4e401) «Borrar esta factura»
+                // se mudó a la hoja de detalle, y la tarjeta no dice en ningún
+                // lado que se puede tocar: Emanuel la vio en producción y no
+                // encontró cómo borrar (2026-10-22). En escritorio la tabla
+                // siempre tuvo su «Borrar» en la fila. Acá va al lado de la
+                // tarjeta —adentro sería un botón dentro de otro— y abre la
+                // MISMA confirmación, que es la que dice con números qué se
+                // lleva y pone el rojo debajo del que cancela.
+                <div key={c.id} className="flex items-stretch gap-2">
+                <SunmiActionCard onClick={() => setAbierta(c.id)} className="min-h-toque">
                   <span className="flex items-center justify-between gap-2 w-full">
                   <span className="min-w-0">
                     <span className="block text-xs font-bold sunmi-text-strong truncate">
@@ -842,12 +862,14 @@ export default function PanelComprobantes({
                         sirve a quien tiene la mercadería adelante, y ocupa el
                         lugar de lo que sí. Sigue guardado y se mira en la base
                         cuando hay que medir qué lector lee mejor. */}
+                    {/* PRODUCTOS, no renglones: envases y cargos no cuentan
+                        (`productosDelPapel`, Coca-Cola #259). */}
                     <span className="block text-sm2 sunmi-text-muted truncate">
                       {c.fotos === 0
                         ? "fotos vencidas"
                         : `${c.fotos} ${c.fotos === 1 ? "hoja" : "hojas"}`}
-                      {c._count?.lineas
-                        ? ` · ${c._count.lineas} ${c._count.lineas === 1 ? "producto" : "productos"}`
+                      {c.productosDelPapel
+                        ? ` · ${c.productosDelPapel} ${c.productosDelPapel === 1 ? "producto" : "productos"}`
                         : ""}
                     </span>
                   </span>
@@ -856,6 +878,18 @@ export default function PanelComprobantes({
                   </span>
                   </span>
                 </SunmiActionCard>
+                {puedeRecibir && sePuedeBorrar(c).ok && (
+                  <SunmiButton
+                    color="red"
+                    type="button"
+                    aria-label={`Borrar la factura ${i + 1}`}
+                    className="shrink-0 min-h-toque justify-center"
+                    onClick={() => setBorrando(c)}
+                  >
+                    Borrar
+                  </SunmiButton>
+                )}
+                </div>
               );
             })}
           </div>
@@ -866,7 +900,24 @@ export default function PanelComprobantes({
               cuatro, ¿alcanzan?»—. El número sale de `coberturaDelPedido`, que
               ya cruzaba el pedido contra TODOS los comprobantes; lo que
               faltaba era decirlo acá. */}
-          {cobertura?.totalPedido > 0 && (
+          {/* ── Y SI EL PEDIDO NACIÓ DE LA FACTURA, CONTRA EL PAPEL ──────
+              Sus líneas salen de los productos del papel que se pudieron
+              atar, así que "N de N llegaron" no podía decir otra cosa y
+              escondía los que todavía no tienen producto (Coca-Cola #259). */}
+          {cobertura?.nacidoDeFactura
+            ? cobertura.productosDelPapel > 0 && (
+                <div className="md:hidden mt-2 pt-2 border-t sunmi-border flex items-center justify-between gap-2">
+                  <span className="text-xs sunmi-text-strong">Productos del papel</span>
+                  <span
+                    className={`text-xs font-bold shrink-0 ${
+                      cobertura.conProducto === cobertura.productosDelPapel ? TONOS.ok : TONOS.neutro
+                    }`}
+                  >
+                    {`${cobertura.conProducto} de ${cobertura.productosDelPapel} con producto`}
+                  </span>
+                </div>
+              )
+            : cobertura?.totalPedido > 0 && (
             <div className="md:hidden mt-2 pt-2 border-t sunmi-border flex items-center justify-between gap-2">
               <span className="text-xs sunmi-text-strong">Pedido contra facturas</span>
               <span
@@ -887,58 +938,28 @@ export default function PanelComprobantes({
           "esta acción no se puede deshacer" genérico no lo lee nadie.
           El botón que borra va en rojo y NO es el primero: el que cancela está
           antes, porque el dedo cae en el de arriba. */}
-      {borrando && (
-        <SunmiModalLayout
-          open
-          title="¿Borrar este comprobante?"
-          subtitle={identidad(borrando)}
-          color="red"
-          onClose={() => (trabajandoBorrar ? null : setBorrando(null))}
-          // El valor que este modal ya tenía: era el default del kit y ahora se
-          // declara, porque el kit dejó de tener uno. No cambia un píxel.
-          espacioCuerpo="mt-2 gap-3"
-          // El valor efectivo que esta pantalla ya tenía. El kit dejó de tener
-          // default de `z`.
-          z={9999}
-        >
-          {(() => {
-            const d = textoDeBorrado({
-              lineas: borrando._count?.lineas ?? 0,
-              vinculadas: borrando.lineasVinculadas ?? 0,
-              fotos: borrando.fotos ?? 0,
-              identidad: borrando.numero ? identidad(borrando) : null,
-            });
-            return (
-              <>
-                <p className="text-xs sunmi-text-strong leading-snug">{d.texto}</p>
-                {d.aviso && (
-                  <p className="text-xs sunmi-text-warning leading-snug mt-2 font-bold">{d.aviso}</p>
-                )}
-                <div className="flex flex-col gap-2 mt-4">
-                  <SunmiButton
-                    color="slate"
-                    type="button"
-                    disabled={trabajandoBorrar}
-                    className="py-3 justify-center"
-                    onClick={() => setBorrando(null)}
-                  >
-                    No, dejarlo
-                  </SunmiButton>
-                  <SunmiButton
-                    color="red"
-                    type="button"
-                    disabled={trabajandoBorrar}
-                    className="py-3 justify-center"
-                    onClick={() => borrar(borrando)}
-                  >
-                    {trabajandoBorrar ? "Borrando…" : "Sí, borrarlo"}
-                  </SunmiButton>
-                </div>
-              </>
-            );
-          })()}
-        </SunmiModalLayout>
-      )}
+      {borrando && (() => {
+        const d = textoDeBorrado({
+          lineas: borrando._count?.lineas ?? 0,
+          vinculadas: borrando.lineasVinculadas ?? 0,
+          fotos: borrando.fotos ?? 0,
+          identidad: borrando.numero ? identidad(borrando) : null,
+        });
+        return (
+          <ConfirmarConNumeros
+            titulo="¿Borrar este comprobante?"
+            subtitulo={identidad(borrando)}
+            texto={d.texto}
+            aviso={d.aviso}
+            textoNo="No, dejarlo"
+            textoSi="Sí, borrarlo"
+            textoHaciendo="Borrando…"
+            trabajando={trabajandoBorrar}
+            onNo={() => setBorrando(null)}
+            onSi={() => borrar(borrando)}
+          />
+        );
+      })()}
 
       {/* ── LO QUE HOY MUESTRA UN COMPROBANTE, UN TOQUE MÁS ADENTRO ────
           Nada de esto es nuevo: es lo que la tarjeta de cada comprobante ya
@@ -969,8 +990,8 @@ export default function PanelComprobantes({
               {c.fotos === 0
                 ? "Las fotos ya vencieron."
                 : `${c.fotos} ${c.fotos === 1 ? "hoja" : "hojas"}`}
-              {c._count?.lineas
-                ? ` · ${c._count.lineas} ${c._count.lineas === 1 ? "producto" : "productos"}`
+              {c.productosDelPapel
+                ? ` · ${c.productosDelPapel} ${c.productosDelPapel === 1 ? "producto" : "productos"}`
                 : ""}
               {c.proveedor?.nombre ? ` · ${c.proveedor.nombre}` : ""}
             </p>

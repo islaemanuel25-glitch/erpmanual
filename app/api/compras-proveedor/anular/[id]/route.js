@@ -3,6 +3,8 @@ import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
 import { checkPerm } from "@/lib/authorize";
 import { pedidoEnAlcance } from "@/lib/compras/scope";
+import { sePuedeAnular } from "@/lib/compras-proveedor/anularPedido";
+import { errorInesperado } from "@/lib/compras-proveedor/comprobante/errorDeRuta";
 
 export async function POST(req, { params }) {
   try {
@@ -47,26 +49,47 @@ export async function POST(req, { params }) {
       );
     }
 
-    if (pedido.estado === "RECIBIDO" || pedido.estado === "ANULADO") {
+    if (!sePuedeAnular(pedido.estado)) {
       return NextResponse.json(
         { ok: false, error: `No se puede anular un pedido en estado ${pedido.estado}` },
         { status: 400 }
       );
     }
 
-    const updated = await prisma.pedidoProveedor.update({
-      where: { id: pedidoId },
-      data: {
-        estado: "ANULADO",
-        fechaAnulado: new Date(),
-      },
+    // ── LAS FACTURAS DEL PEDIDO SE ANULAN CON ÉL ─────────────────────────
+    //
+    // Desde 2026-10-22 se anula también desde la recepción, donde un pedido
+    // puede tener facturas subidas. Quedarían vivas colgando de un pedido
+    // anulado, y su archivo y su CAE chocarían como repetidos contra la misma
+    // factura subida en otro pedido (`subir`, `facturaRepetida`), que ya no
+    // miran las anuladas. En la misma transacción: un pedido anulado con sus
+    // facturas vivas sería un estado a medias.
+    const { pedido: updated, comprobantes } = await prisma.$transaction(async (tx) => {
+      const p = await tx.pedidoProveedor.update({
+        where: { id: pedidoId },
+        data: {
+          estado: "ANULADO",
+          fechaAnulado: new Date(),
+        },
+      });
+      const c = await tx.comprobanteProveedor.updateMany({
+        where: { pedidoId, grupoId, estado: { not: "ANULADO" } },
+        data: { estado: "ANULADO" },
+      });
+      return { pedido: p, comprobantes: c.count };
     });
 
-    return NextResponse.json({ ok: true, item: updated });
+    return NextResponse.json({ ok: true, item: updated, comprobantesAnulados: comprobantes });
   } catch (err) {
     console.error("Error compras-proveedor/anular:", err);
     return NextResponse.json(
-      { ok: false, error: "Error interno" },
+      {
+        ok: false,
+        error: errorInesperado({
+          operacion: "anular el pedido",
+          quedo: "El pedido quedó como estaba: no se anuló nada.",
+        }),
+      },
       { status: 500 }
     );
   }
