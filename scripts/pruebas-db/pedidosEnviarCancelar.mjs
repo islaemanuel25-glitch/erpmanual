@@ -125,6 +125,7 @@ try {
     solicitar: await import("../../app/api/pos-transferencias/solicitar/route.js"),
     cancelar: await import("../../app/api/pos-transferencias/cancelar/route.js"),
     historial: await import("../../app/api/pedidos/historial/route.js"),
+    detalle: await import("../../app/api/pedidos/historial/[id]/route.js"),
   };
 
   const permisos = rolEnc.permisos;
@@ -1009,6 +1010,44 @@ try {
       const soloCancelados = await historialH("page=1&pageSize=50&estado=Cancelado");
       ok("13: ?estado=Cancelado trae solo el cancelado", json(soloCancelados.cuerpo.items?.map((i) => i.posId)) === json([pCancelado]), json(soloCancelados.cuerpo));
       guardar("historialIds", { pEnCurso, pCancelado, pRecibido, pCamino, tRecibido, localId: H.local.id });
+
+      // El detalle de cada uno (`/api/pedidos/historial/[id]`), como lo pide
+      // la pantalla: Next le pasa el id en `params`, que es una promesa.
+      {
+      const detalle = async (id, cookie) => {
+        const url = `${B}/pedidos/historial/${id}`;
+        const req = new Request(url, { method: "GET", headers: { cookie } });
+        Object.defineProperty(req, "nextUrl", { value: new URL(url), configurable: true });
+        const r = await R.detalle.GET(req, { params: Promise.resolve({ id: String(id) }) });
+        return { status: r.status, cuerpo: await r.json().catch(() => ({})) };
+      };
+      const dRecibido = await detalle(pRecibido, H.sPin);
+      const dCancelado = await detalle(pCancelado, H.sPin);
+      const dCamino = await detalle(pCamino, H.sPin);
+      const dEnCurso = await detalle(pEnCurso, H.sPin);
+      console.log(`  · 13: detalle del recibido → ${json({ ...dRecibido.cuerpo.pedido, items: dRecibido.cuerpo.pedido?.items?.map((i) => [i.nombre, i.sugerido, i.unidadSugerida]) })}`);
+      ok("13: el detalle del recibido, con su transferencia Recibida y su fecha", dRecibido.status === 200 && dRecibido.cuerpo.pedido?.transferencia?.id === tRecibido && dRecibido.cuerpo.pedido.transferencia.estado === "Recibida" && !!dRecibido.cuerpo.pedido.transferencia.fechaRecepcion, json(dRecibido));
+      ok("13: el detalle del recibido trae sus dos productos con la forma del carrito", dRecibido.cuerpo.pedido?.items?.length === 2 && dRecibido.cuerpo.pedido.items.every((i) => i.productoLocalId && i.nombre && "imagenUrl" in i && "modoEnvio" in i), json(dRecibido.cuerpo.pedido?.items));
+      ok("13: el detalle del cancelado, con la fecha en que se canceló", dCancelado.status === 200 && dCancelado.cuerpo.pedido?.estado === "Cancelado" && !!dCancelado.cuerpo.pedido.canceladoAt && dCancelado.cuerpo.pedido.transferencia === null, json(dCancelado));
+      ok("13: el detalle del en camino", dCamino.status === 200 && dCamino.cuerpo.pedido?.transferencia?.estado === "Enviada", json(dCamino));
+      ok("13: el detalle del en curso dice que el depósito lo empezó", dEnCurso.status === 200 && dEnCurso.cuerpo.pedido?.estado === "Solicitado" && dEnCurso.cuerpo.pedido.depositoEmpezo === true, json(dEnCurso));
+      // Otro local no lo puede abrir: ni el de otro grupo, ni el principal, ni
+      // el depósito del grupo (que no es un local).
+      const deOtro = await detalle(pRecibido, P.sPin);
+      const delPrincipal = await detalle(pRecibido, S.conPin);
+      const delDepositoH = await detalle(pRecibido, sDepoH);
+      const inexistente = await detalle(999999999, H.sPin);
+      console.log(`  · 13: detalle ajeno → otro local ${deOtro.status}, principal ${delPrincipal.status}, depósito ${delDepositoH.status}, inexistente ${inexistente.status}`);
+      ok("13: otro local no abre el detalle (404)", deOtro.status === 404 && !deOtro.cuerpo.pedido, json(deOtro));
+      ok("13: el local principal tampoco (404)", delPrincipal.status === 404 && !delPrincipal.cuerpo.pedido, json(delPrincipal));
+      ok("13: el depósito no ve el historial de un local (403)", delDepositoH.status === 403, json(delDepositoH));
+      ok("13: uno que no existe, 404", inexistente.status === 404, json(inexistente));
+      guardar("detalleRecibido", dRecibido);
+      guardar("detalleCancelado", dCancelado);
+      guardar("detalleCamino", dCamino);
+      guardar("detalleEnCurso", dEnCurso);
+      guardar("detalleDeOtroLocal", deOtro);
+      }
 
       // Un historial largo, de verdad: el local de la sección 9 hizo decenas de
       // pedidos en las carreras. Todas sus páginas de a 50, como las pide la

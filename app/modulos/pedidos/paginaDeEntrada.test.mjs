@@ -173,7 +173,7 @@ test("empezado: Preparando, El depósito lo está preparando, y solo Ver pedido,
   assert.ok(entrada(), "el Volver no volvió a la entrada");
 });
 
-test("pedidos anteriores: los tres últimos sin el en curso, con número, estado, fecha y cuántos, y llevan al historial", async () => {
+test("pedidos anteriores: los tres últimos sin el en curso, con número, estado, fecha y cuántos, y cada uno abre su detalle", async () => {
   await montar({ inicio: conFecha(real.entradaEnviadoCarrito, new Date()), historial: real.entradaHistorial, enLaEntrada: true });
   assert.match(texto(), /Pedidos anteriores/);
   const enCurso = real.entradaEnviadoCarrito.cuerpo.pendiente.posId;
@@ -195,8 +195,14 @@ test("pedidos anteriores: los tres últimos sin el en curso, con número, estado
     assert.match(fila.textContent, new RegExp(`${enPalabras} · (hoy \\d\\d:\\d\\d|\\d\\d/\\d\\d) · ${a.itemCount} producto`));
     assert.match(fila.textContent, /›/);
   }
-  await tocar(anteriores()[0]);
-  assert.deepEqual(navegacion.at(-1), ["push", "/modulos/pedidos/historial"], "la fila no lleva al historial");
+  // Cada fila abre el detalle de ESE pedido (decía: todas llevaban al
+  // historial, 2026-10-22). Se tocan todas, no la primera: una fila que
+  // abriera siempre el mismo pedido pasaría con una sola.
+  for (const [i, fila] of anteriores().entries()) {
+    await tocar(fila);
+    assert.deepEqual(navegacion.at(-1), ["push", `/modulos/pedidos/historial/${esperados[i].posId}`], `la fila ${i + 1} no abre su pedido`);
+  }
+  // "Ver todo el historial ›" sigue yendo al historial.
   await tocar(boton("Ver todo el historial ›"));
   assert.deepEqual(navegacion.at(-1), ["push", "/modulos/pedidos/historial"]);
 });

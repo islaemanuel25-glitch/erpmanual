@@ -149,7 +149,7 @@ export const navegacion = [];
 const router = {
   push: (ruta) => navegacion.push(["push", ruta]),
   back: () => navegacion.push(["back"]),
-  replace: () => {},
+  replace: (ruta) => navegacion.push(["replace", ruta]),
   refresh: () => {},
   prefetch: () => {},
 };

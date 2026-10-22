@@ -1,56 +1,14 @@
 // app/api/pedidos/historial/route.js
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { resolveLocalAndGrupo } from "@/lib/grupos";
+import { alcanceDelHistorial, pedidosDelHistorial, ESTADOS_DEL_HISTORIAL } from "@/lib/pedidos/alcanceDelHistorial";
 
 export async function GET(req) {
   try {
-    // Auth + localId + grupoId (soporta admin con contexto activo)
-    const scope = await resolveLocalAndGrupo(req);
-    if (scope.error) {
-      return NextResponse.json(
-        { ok: false, error: scope.error, needsContexto: scope.needsContexto || false },
-        { status: scope.status }
-      );
-    }
-
-    const { localId, grupoId, session } = scope;
-
-    // Permisos
-    const permisos = Array.isArray(session.permisos) ? session.permisos : [];
-    if (!permisos.includes("*") && !permisos.includes("pedidos.ver")) {
-      return NextResponse.json(
-        { ok: false, error: "Sin permiso para ver pedidos" },
-        { status: 403 }
-      );
-    }
-
-    const localUser = await prisma.local.findUnique({
-      where: { id: localId },
-      select: { es_deposito: true },
-    });
-
-    if (localUser?.es_deposito) {
-      return NextResponse.json(
-        { ok: false, error: "Solo locales pueden ver historial de pedidos" },
-        { status: 403 }
-      );
-    }
-
-    // Resolver depósito del grupo
-    const grupoDeposito = await prisma.grupoDeposito.findFirst({
-      where: { grupoId },
-      select: { localId: true },
-    });
-
-    if (!grupoDeposito) {
-      return NextResponse.json(
-        { ok: false, error: "No se encontró un depósito para el grupo" },
-        { status: 400 }
-      );
-    }
-
-    const depositoId = grupoDeposito.localId;
+    // Sesión, `pedidos.ver`, local y no depósito, y el depósito del grupo. Lo
+    // comparte con el detalle de un pedido (`./[id]/route.js`).
+    const alcance = await alcanceDelHistorial(req);
+    if (alcance.respuesta) return alcance.respuesta;
 
     // Query params
     const { searchParams } = new URL(req.url);
@@ -59,16 +17,11 @@ export async function GET(req) {
     const estado = searchParams.get("estado") || "";
     const q = (searchParams.get("q") || "").trim();
 
-    // Filtro base. Los cancelados entran desde el 2026-10-22: el historial del
-    // celular tiene el filtro "Cancelados", y un pedido cancelado es historial
-    // del local. Por eso esta lectura no pasa por `sinCancelados` (está en las
-    // excepciones de `lib/pedidos/sinCancelados.test.mjs`, con este motivo).
-    // Lo demás que devuelve no cambió.
-    const estadosValidos = ["Solicitado", "Preparando", "Enviado", "Cancelado"];
+    // Filtro base. Los cancelados entran desde el 2026-10-22 (ver
+    // `ESTADOS_DEL_HISTORIAL`): esta lectura no pasa por `sinCancelados`.
+    const estadosValidos = ESTADOS_DEL_HISTORIAL;
     const where = {
-      destinoId: localId,
-      origenId: depositoId,
-      origenManual: true,
+      ...pedidosDelHistorial(alcance),
       estado: estado && estadosValidos.includes(estado)
         ? estado
         : { in: estadosValidos },

@@ -28,6 +28,7 @@ import PedidosEscritorio from "@/components/pedidos/PedidosEscritorio";
 import TarjetaPedido from "@/components/pedidos/TarjetaPedido";
 import FilaDePedidoAnterior from "@/components/pedidos/FilaDePedidoAnterior";
 import { useEsEscritorio } from "@/lib/layout/useEsEscritorio";
+import { CLAVE_VER_FOTOS, fotosGuardadas } from "@/lib/pedidos/verFotos";
 import { ESTADO_LOCAL, COLOR_DEL_ESTADO, estadoParaElLocal } from "@/lib/pedidos/estadoParaElLocal";
 
 // Cuántos productos por página: lo elige la persona al pie de la lista y queda
@@ -42,19 +43,6 @@ function tamanoGuardado() {
     return tamanoDePaginaCatalogo(null);
   }
 }
-
-// "Ver fotos": arranca apagado y el celular recuerda lo elegido. Sin nada
-// guardado, o si no se puede leer, apagado.
-const CLAVE_VER_FOTOS = "pedidos_ver_fotos";
-
-function fotosGuardadas() {
-  try {
-    return localStorage.getItem(CLAVE_VER_FOTOS) === "1";
-  } catch {
-    return false;
-  }
-}
-
 
 const productos = (n) => (n === 1 ? "producto" : "productos");
 
@@ -823,7 +811,7 @@ function PedidosCatalogoPage() {
                 key={a.posId}
                 pedido={a}
                 estado={estadoParaElLocal({ estado: a.estado, transferenciaEstado: a.transferenciaEstado })}
-                onAbrir={irAlHistorial}
+                onAbrir={() => router.push(`/modulos/pedidos/historial/${a.posId}`)}
               />
             ))}
             <SunmiLinkButton onClick={irAlHistorial}>Ver todo el historial ›</SunmiLinkButton>

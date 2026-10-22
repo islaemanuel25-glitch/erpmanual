@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { resolveLocalAndGrupo } from "@/lib/grupos";
-import { defaultModoEnvio } from "@/lib/conversiones/stock";
+import { itemDelPedido } from "@/lib/pedidos/itemDelPedido";
 import { sinCancelados } from "@/lib/pedidos/estados";
 import { depositoEmpezo } from "@/lib/pedidos/bloqueoDelPedido";
 
@@ -105,26 +105,9 @@ export async function GET(req) {
           // empezó, la pantalla lo muestra apagado. El criterio es UNO y vive
           // en `lib/pedidos/bloqueoDelPedido.js`.
           depositoEmpezo: await depositoEmpezo(prisma, posPendiente),
-          items: posPendiente.detalles.map((d) => {
-            const pl = d.producto;
-            const base = pl?.base;
-            return {
-              nombre: pl?.nombre || base?.nombre || "",
-              sugerido: Number(d.sugerido || 0),
-              unidadSugerida: d.unidadSugerida,
-              factorPack: Number(base?.factor_pack || 1),
-              modoEnvio: base?.modo_envio || defaultModoEnvio(base?.unidad_medida),
-              // Para que la tarjeta del pedido enviado sea la misma tarjeta
-              // viva del borrador: con qué producto se carga y cómo se dibuja.
-              detalleId: d.id,
-              productoLocalId: d.productoId,
-              baseId: pl?.baseId,
-              codigoBarra: base?.codigo_barra || null,
-              preparado: Number(d.preparado || 0),
-              unidadMedida: base?.unidad_medida || "unidad",
-              imagenUrl: base?.imagen_url || null,
-            };
-          }),
+          // El mismo renglón que el borrador: para que la tarjeta del pedido
+          // enviado sea la misma tarjeta viva del borrador.
+          items: posPendiente.detalles.map(itemDelPedido),
           itemCount: posPendiente.detalles.length,
         }
       : null;
@@ -139,24 +122,7 @@ export async function GET(req) {
       });
     }
 
-    const items = pos.detalles.map((d) => {
-      const pl = d.producto;
-      const base = pl?.base;
-      return {
-        detalleId: d.id,
-        productoLocalId: d.productoId,
-        baseId: pl?.baseId,
-        nombre: pl?.nombre || base?.nombre || "",
-        codigoBarra: base?.codigo_barra || null,
-        sugerido: Number(d.sugerido || 0),
-        preparado: Number(d.preparado || 0),
-        unidadSugerida: d.unidadSugerida,
-        factorPack: Number(base?.factor_pack || 1),
-        modoEnvio: base?.modo_envio || defaultModoEnvio(base?.unidad_medida),
-        unidadMedida: base?.unidad_medida || "unidad",
-        imagenUrl: base?.imagen_url || null,
-      };
-    });
+    const items = pos.detalles.map(itemDelPedido);
 
     return NextResponse.json({
       ok: true,
