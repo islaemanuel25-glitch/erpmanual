@@ -264,7 +264,28 @@ export const tarjetas = () =>
     unidad: tarjeta.querySelector("[data-unidad-pedido]")?.textContent ?? null,
     foto: tarjeta.querySelector("[data-tarjeta-foto]"),
     inicial: tarjeta.querySelector("[data-tarjeta-inicial]"),
+    // La variante de solo lectura: sin campo ni botones, la cantidad como número.
+    soloLectura: tarjeta.hasAttribute("data-solo-lectura"),
+    cantidad: tarjeta.querySelector("[data-cantidad-pedido]")?.textContent ?? null,
   }));
+
+/**
+ * Que una tarjeta sea de SOLO LECTURA de verdad: la marca, la cantidad como
+ * número, y nada que se toque ni el lugar de algo que se toque —ni − ni +, ni
+ * el recuadro del campo, ni la ✕ ni su lugar—.
+ */
+export function esDeSoloLectura(t) {
+  return (
+    t.soloLectura &&
+    t.cantidad != null &&
+    !t.campo &&
+    !t.menos &&
+    !t.mas &&
+    !t.quitar &&
+    !t.lugarQuitar &&
+    t.tarjeta.querySelectorAll("button, input").length === 0
+  );
+}
 export const tarjeta = (nombre) => tarjetas().find((t) => t.nombre === nombre) ?? null;
 
 export async function tocar(b) {

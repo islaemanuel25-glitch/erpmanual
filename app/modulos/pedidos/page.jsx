@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { X } from "lucide-react";
 import { diaMesAR, horaAR } from "@/lib/fechas/formatearFechaHora";
 import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { useUser } from "@/app/context/UserContext";
@@ -18,17 +17,16 @@ import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import SunmiActionCard from "@/components/sunmi/SunmiActionCard";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
-import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
 import SunmiListaProductoCards from "@/components/sunmi/SunmiListaProductoCards";
 import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
-import { MiniaturaProductoTarjeta } from "@/components/sunmi/SunmiProductoCard";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import SunmiToggle from "@/components/sunmi/SunmiToggle";
 import { showSuccess } from "@/components/sunmi/SunmiToast";
 import { tamanoDePaginaCatalogo } from "@/lib/pedidos/tamanoDePagina";
-import { salePorBulto, juntarPorProducto, claveDeLoEnviado } from "@/lib/pedidos/lineasDelPedido";
+import { juntarPorProducto, claveDeLoEnviado } from "@/lib/pedidos/lineasDelPedido";
 import PedidosEscritorio from "@/components/pedidos/PedidosEscritorio";
+import TarjetaPedido from "@/components/pedidos/TarjetaPedido";
 
 // Cuántos productos por página: lo elige la persona al pie de la lista y queda
 // recordado en el celular con la clave de siempre de esta pantalla. Las
@@ -707,7 +705,7 @@ function PedidosCatalogoPage() {
     lista = (
       <SunmiListaProductoCards key="enviado" mismoAlto={false}>
         {enviados.map((item) => (
-          <TarjetaPedido key={claveDeLoEnviado(item)} producto={item} cantidad={item.cantidad} conFoto={verFotos} apagada />
+          <TarjetaPedido key={claveDeLoEnviado(item)} producto={item} cantidad={item.cantidad} conFoto={verFotos} soloLectura />
         ))}
       </SunmiListaProductoCards>
     );
@@ -992,106 +990,6 @@ function PedidosCatalogoPage() {
   );
 }
 
-// ====================================================
-// COMPONENTE: Tarjeta de un producto del pedido
-// ====================================================
-// La misma en el catálogo, en "Ver mi pedido" y en el pedido enviado. No
-// muestra stock del depósito —está mayormente en negativo y confunde—, ni foto,
-// ni categoría, ni código.
-//
-// El número se puede tipear: lo escrito se manda al salir del campo (o con
-// Enter), no tecla por tecla, para que "12" no viaje como un 1 y después un 12.
-// El − y el + mandan en el acto.
-function TarjetaPedido({ producto, cantidad, enPedido = false, apagada = false, conFoto = false, onCantidad }) {
-  const { nombre, factorPack } = producto;
-  const porBulto = salePorBulto(producto);
-  const unidad = porBulto ? "BULTO" : "UNIDAD";
-  const puedeQuitar = enPedido && !apagada;
-  const [escrito, setEscrito] = useState(null);
-  const campoRef = useRef(null);
-
-  const cambiar = (s) => {
-    if (typeof document !== "undefined" && document.activeElement === campoRef.current) {
-      setEscrito(s);
-      return;
-    }
-    onCantidad?.(Number(s) || 0, unidad);
-  };
-
-  // Al salir: vacío vale 0 —el producto sale del pedido, como con la ✕—, y si
-  // no cambió no se manda nada.
-  const confirmar = () => {
-    if (escrito === null) return;
-    const n = Number(escrito) || 0;
-    setEscrito(null);
-    if (n !== cantidad) onCantidad?.(n, unidad);
-  };
-
-  return (
-    // Las dos marcas son el asidero de los candados (`pantallaPedidos.test.mjs`).
-    <SunmiCard data-tarjeta-pedido={nombre} className="p-3">
-      <div className="flex gap-3">
-      {/* Con "Ver fotos" prendido, la foto a la izquierda ocupando su lugar
-          siempre: sin foto, la inicial en el mismo cuadrado. El pedido enviado
-          trae la foto igual que el borrador (`pendiente.items` con `imagenUrl`).
-          Apagado, no hay cuadrado y el resto usa todo el ancho. */}
-      {conFoto ? <MiniaturaProductoTarjeta url={producto.imagenUrl} conservaLugar nombre={nombre} /> : null}
-      <div className="flex-1 min-w-0 space-y-2">
-      <div className="flex items-start gap-2">
-        <p className="flex-1 min-w-0 text-sm3 font-semibold sunmi-text-strong break-words">{nombre}</p>
-        {/* ── EL LUGAR DE LA ✕ ESTÁ SIEMPRE ──────────────────────────────
-            Aparecía solo con el producto en el pedido, y como es un toque de
-            44 px al lado de una línea de texto, al pasar de 0 a 1 el renglón
-            del nombre crecía y el − valor + bajaba: el dedo quedaba sobre otra
-            cosa. Ahora el botón está siempre, del mismo alto y ancho. Sin el
-            producto en el pedido —y en el pedido enviado— va invisible, apagado,
-            fuera del orden de foco y oculto al lector de pantalla: ocupa su
-            lugar y nada más. */}
-        <SunmiButton
-          color="ghost"
-          data-lugar-quitar=""
-          aria-label={puedeQuitar ? `Quitar ${nombre} del pedido` : undefined}
-          aria-hidden={puedeQuitar ? undefined : "true"}
-          tabIndex={puedeQuitar ? undefined : -1}
-          disabled={!puedeQuitar}
-          onClick={() => {
-            if (puedeQuitar) onCantidad?.(0, "UNIDAD");
-          }}
-          className={`shrink-0 min-w-toque min-h-toque inline-flex items-center justify-center${puedeQuitar ? "" : " invisible"}`}
-        >
-          <X size={18} aria-hidden="true" />
-        </SunmiButton>
-      </div>
-      {/* Con la foto al lado, "Por BULTO de 6 u" y el − valor + no siempre
-          entran en un renglón a 360 px: la unidad se parte en dos (`min-w-0`)
-          y el campo no se achica (`shrink-0`), que es el que se toca. */}
-      <div className="flex items-center justify-between gap-2">
-        <span data-unidad-pedido="" className="min-w-0 text-sm2 sunmi-text-muted">{porBulto ? `Por BULTO de ${factorPack} u` : "UNIDAD"}</span>
-        <div className="shrink-0">
-          <SunmiCampoCantidad
-            valor={escrito ?? String(cantidad ?? 0)}
-            onCambiar={cambiar}
-            etiqueta={`Cantidad de ${nombre}`}
-            minimo={0}
-            tamano="grande"
-            claseMarco="w-16"
-            apagaMenosEnMinimo
-            // El 0 es guía y no un número cargado, y lo que se escribe
-            // reemplaza lo que había. Vacío al salir vale 0: lo decide
-            // `confirmar`, que además no manda nada si no cambió. En el pedido
-            // enviado el campo está apagado y no hace falta.
-            minimoComoGuia={!apagada}
-            deshabilitado={apagada}
-            inputRef={campoRef}
-            onBlur={confirmar}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-            }}
-          />
-        </div>
-      </div>
-      </div>
-      </div>
-    </SunmiCard>
-  );
-}
+// La tarjeta de un producto del pedido —editable o de solo lectura— vive en
+// `components/pedidos/TarjetaPedido.jsx`: la usa también el detalle de un
+// pedido anterior.

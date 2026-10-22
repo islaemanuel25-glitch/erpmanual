@@ -16,7 +16,7 @@ import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 
 const {
-  real, montar, desmontarTodo, texto, boton, botones, tocar, tarjetas, tarjeta, llamadas, filaShell, modal, entrada, navegacion, contenido,
+  real, montar, desmontarTodo, texto, boton, botones, tocar, tarjetas, tarjeta, llamadas, filaShell, modal, entrada, navegacion, contenido, esDeSoloLectura,
 } = await import("./montarPantallaPedidos.mjs");
 
 afterEach(desmontarTodo);
@@ -123,14 +123,13 @@ test("enviado: Ver pedido es solo para mirar —apagado, con la cantidad, sin bu
   await tocar(boton("Ver pedido", entrada()));
   const p = real.entradaEnviadoCarrito.cuerpo.pendiente;
   assert.deepEqual(tarjetas().map((t) => t.nombre).sort(), p.items.map((i) => i.nombre).sort(), "no son las líneas del pedido");
-  for (const t of tarjetas()) {
-    assert.ok(!t.quitar, `${t.nombre}: con ✕`);
-    assert.ok(t.lugarQuitar?.classList.contains("invisible"), `${t.nombre}: sin el lugar de la ✕`);
-    assert.equal(t.campo.disabled, true, `${t.nombre}: el campo se puede tocar`);
-    assert.equal(t.menos.disabled, true);
-    assert.equal(t.mas.disabled, true);
-  }
-  assert.equal(tarjeta("ACEITE").campo.value, "2", "no muestra la cantidad");
+  // Decía que las tarjetas iban apagadas, con el − valor + deshabilitado y el
+  // lugar de la ✕ reservado. Desde el 2026-10-22 son de SOLO LECTURA: sin −
+  // ni + ni recuadro ni ✕ ni su lugar —"es como irrelevante que estén",
+  // Emanuel—, y la cantidad como número.
+  for (const t of tarjetas()) assert.ok(esDeSoloLectura(t), `${t.nombre}: no es de solo lectura`);
+  assert.equal(tarjeta("ACEITE").cantidad, "2", "no muestra la cantidad");
+  assert.equal(tarjeta("ACEITE").unidad, "UNIDAD");
   assert.ok(!contenido().querySelector('input[placeholder="Buscar producto o código"]'), "con buscador");
   assert.ok(!contenido().querySelector("#categoria-pedido"), "con filtro");
   assert.ok(!document.querySelector("[data-paginador]"), "con paginador");
@@ -167,7 +166,8 @@ test("empezado: Preparando, El depósito lo está preparando, y solo Ver pedido,
   await tocar(boton("Ver pedido", entrada()));
   const nombres = real.empezadoCarrito.cuerpo.pendiente.items.map((i) => i.nombre).sort();
   assert.deepEqual(tarjetas().map((t) => t.nombre).sort(), nombres, "no abrió lo pedido");
-  assert.ok(tarjetas().every((t) => t.campo.disabled && !t.quitar), "la lista no está apagada");
+  // Solo lectura (decía: apagada).
+  assert.ok(tarjetas().every(esDeSoloLectura), "la lista no es de solo lectura");
   assert.ok(!boton("Cancelar pedido"), "empezado apareció cancelar");
   await tocar(boton("Volver", filaShell()));
   assert.ok(entrada(), "el Volver no volvió a la entrada");

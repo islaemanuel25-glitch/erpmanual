@@ -20,6 +20,14 @@
 // Lo único que se normaliza son los identificadores que React inventa
 // (`useId`): dependen de dónde está el componente en el árbol. No es algo que
 // se dibuje.
+//
+// ── UN MOMENTO CAMBIÓ A PROPÓSITO ─────────────────────────────────────────
+//
+// "ver pedido enviado" se volvió a sacar el 2026-10-22, después de a770e5e,
+// con ESCRIBIR_FOTO_CELULAR="ver pedido enviado": las tarjetas de lo que solo
+// se mira pasaron a ser de SOLO LECTURA (`components/pedidos/TarjetaPedido`),
+// sin − ni + ni recuadro ni ✕, por pedido de Emanuel. Los otros seis siguen
+// siendo los de aff3a9c: las tarjetas editables no cambiaron un nodo.
 
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
@@ -30,7 +38,10 @@ const { real, montar, desmontarTodo, boton, tocar, asentar, filaShell } = await 
 afterEach(desmontarTodo);
 
 const RUTA_FOTO = "app/modulos/pedidos/celularIntacto.foto.json";
-const ESCRIBIR = process.env.ESCRIBIR_FOTO_CELULAR === "1";
+// "1" reescribe los siete; el nombre de un momento reescribe solo ése.
+const ESCRIBIR_TODOS = process.env.ESCRIBIR_FOTO_CELULAR === "1";
+const ESCRIBIR_UNO = !ESCRIBIR_TODOS ? process.env.ESCRIBIR_FOTO_CELULAR || null : null;
+const ESCRIBIR = ESCRIBIR_TODOS || !!ESCRIBIR_UNO;
 
 /** Una fecha fija y vieja: "Enviado 15/01 12:00" no cambia de un día al otro. */
 const FECHA = "2026-01-15T15:00:00.000Z";
@@ -79,7 +90,7 @@ for (const [nombre, llegar] of Object.entries(MOMENTOS)) {
   test(`el celular dibuja lo mismo que en aff3a9c: ${nombre}`, async () => {
     await llegar();
     const ahora = delCelular();
-    if (ESCRIBIR) {
+    if (ESCRIBIR_TODOS || ESCRIBIR_UNO === nombre) {
       foto[nombre] = ahora;
       writeFileSync(RUTA_FOTO, `${JSON.stringify(foto, null, 2)}\n`);
       return;
@@ -99,4 +110,6 @@ test("la foto es de aff3a9c y tiene los siete momentos", () => {
   assert.match(foto["modo sumar"], /0 cambios sin confirmar/);
   assert.match(foto["entrada preparando"], /El depósito lo está preparando/);
   assert.match(foto["ver pedido enviado"], /data-tarjeta-pedido/);
+  assert.match(foto["ver pedido enviado"], /data-solo-lectura/, "la foto de Ver pedido no es la de solo lectura");
+  assert.doesNotMatch(foto["catálogo armando"], /data-solo-lectura/, "el catálogo salió de solo lectura");
 });

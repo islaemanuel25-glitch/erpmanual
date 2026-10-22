@@ -100,7 +100,8 @@ test("enviado: el catálogo vuelve con lo enviado, cada producto una vez y el de
     await tocar(boton("Ver pedido", entrada()));
     assert.equal(tarjetas().length, 5);
     assert.deepEqual(repetidos(), []);
-    assert.equal(tarjetas().find((t) => t.nombre === ORO).campo.value, "3");
+    // Ver pedido es de solo lectura: la suma va como número, sin campo.
+    assert.equal(tarjetas().find((t) => t.nombre === ORO).cantidad, "3");
     assert.deepEqual(consola.avisos, []);
   } finally {
     consola.soltar();

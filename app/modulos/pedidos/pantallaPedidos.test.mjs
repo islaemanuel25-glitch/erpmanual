@@ -23,7 +23,7 @@ import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 
 const {
-  real, montar, desmontarTodo, asentar, act, texto, contenido, filaShell, boton, botones, llamadas, tocar, tarjetas, tarjeta, modal,
+  real, montar, desmontarTodo, asentar, act, texto, contenido, filaShell, boton, botones, llamadas, tocar, tarjetas, tarjeta, modal, esDeSoloLectura,
 } = await import("./montarPantallaPedidos.mjs");
 
 afterEach(desmontarTodo);
@@ -164,15 +164,25 @@ test("✕: sin el producto, el lugar está pero invisible, apagado y fuera del f
   assert.ok(coca === tarjeta("Coca 2L").quitar, "la ✕ no está en el lugar reservado");
 });
 
-test("✕: en el pedido empezado no va, pero el lugar se reserva igual", async () => {
+test("✕: en el pedido empezado no va, ni su lugar: la tarjeta es de solo lectura", async () => {
+  // Decía que el lugar de la ✕ se reservaba igual, invisible. Desde el
+  // 2026-10-22 la tarjeta de lo que solo se mira no lleva la ✕ ni su lugar:
+  // nada que se toque, ni su hueco.
   await montar({ inicio: empezadoDel(new Date()) });
   // Las tarjetas son las de lo pedido: sin esto, el catálogo —que no tiene
   // esos productos y por eso no lleva ✕— pasaba igual (contraprueba).
   assert.deepEqual(nombres(), real.empezadoCarrito.cuerpo.pendiente.items.map((i) => i.nombre).sort());
   for (const t of tarjetas()) {
-    assert.ok(t.lugarQuitar, `${t.nombre}: el pedido empezado no reserva el lugar`);
-    assert.ok(t.lugarQuitar.classList.contains("invisible"), `${t.nombre}: se ve la ✕ en el pedido empezado`);
-    assert.equal(t.lugarQuitar.disabled, true);
+    assert.ok(!t.lugarQuitar, `${t.nombre}: el pedido empezado reserva el lugar de la ✕`);
+    assert.ok(esDeSoloLectura(t), `${t.nombre}: no es de solo lectura`);
+  }
+});
+
+test("las tarjetas EDITABLES no cambian: ✕ con su lugar, − valor + y el recuadro", async () => {
+  await montar({ inicio: real.carritoBorrador });
+  for (const t of tarjetas()) {
+    assert.ok(!t.soloLectura && t.cantidad === null, `${t.nombre}: salió de solo lectura`);
+    assert.ok(t.campo && t.menos && t.mas && t.lugarQuitar, `${t.nombre}: le falta algo de la editable`);
   }
 });
 
@@ -559,8 +569,10 @@ test("GUÍA: se prende en el catálogo y en Ver mi pedido, no en el pedido empez
   assert.equal(tarjeta("Yerba 1kg").campo.getAttribute("placeholder"), "0", "el pedido enviado sin empezar no la prende");
   await desmontarTodo();
 
+  // En el pedido empezado no hay campo: la tarjeta es de solo lectura, con la
+  // cantidad como número (decía: el campo apagado, sin guía).
   await montar({ inicio: empezadoDel(new Date()) });
-  for (const t of tarjetas()) assert.equal(t.campo.getAttribute("placeholder"), null, `${t.nombre}: el pedido empezado la prende`);
+  for (const t of tarjetas()) assert.ok(esDeSoloLectura(t), `${t.nombre}: el pedido empezado tiene campo`);
 });
 
 test("4. Ver mi pedido: solo lo pedido, sin buscador ni filtro, el MISMO botón de enviar, y vuelve desde el shell", async () => {
@@ -709,12 +721,10 @@ test("6. empezado: El depósito lo está preparando, solo lo pedido, todo apagad
   assert.ok(!document.querySelector("[data-paginador]"), "con paginador");
 
   assert.deepEqual(nombres(), p.items.map((i) => i.nombre).sort(), "solo lo pedido, no el catálogo");
-  for (const t of tarjetas()) {
-    assert.ok(!t.quitar, `${t.nombre}: con ✕`);
-    assert.equal(t.campo.disabled, true, `${t.nombre}: el campo vivo`);
-    assert.equal(t.menos.disabled, true, `${t.nombre}: el − vivo`);
-    assert.equal(t.mas.disabled, true, `${t.nombre}: el + vivo`);
-  }
+  // De solo lectura (decía: con el campo, el − y el + apagados).
+  for (const t of tarjetas()) assert.ok(esDeSoloLectura(t), `${t.nombre}: no es de solo lectura`);
+  const enPedido = Object.fromEntries(p.items.map((i) => [i.nombre, String(i.sugerido)]));
+  for (const t of tarjetas()) assert.equal(t.cantidad, enPedido[t.nombre], `${t.nombre}: no muestra lo pedido`);
   // La barra: solo el conteo. Sin cancelar: desde el 2026-10-22 la ruta no
   // deja al local cancelar un pedido empezado (sección 9d: 409).
   assert.equal(real.empezadoCancelar.status, 409);
