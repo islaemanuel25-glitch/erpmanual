@@ -86,6 +86,20 @@
 //           = false
 //
 // Sin ellos —la caja y recepción— el marcado es el de siempre.
+//
+// ── Y LOS DOS DE PEDIDOS AL DEPÓSITO, CUARTO CONSUMIDOR ──────────────────
+//
+//   apagaMenosEnMinimo  el − apagado cuando el número está en el mínimo. Pedidos
+//           = false     lo pide en 0: es la señal de que el producto no está en
+//                       el pedido, y tocarlo no haría nada. Los demás siguen
+//                       como siempre: el − en el mínimo se toca y no resta.
+//   deshabilitado       los dos botones y el campo apagados. Pedidos lo pide con
+//           = false     el pedido ya enviado: se ve lo pedido y no se cambia.
+//
+// El apagado es `disabled:opacity-40`, el mismo de los botones de
+// `SunmiPaginador`. Va en la clase SOLO si alguno de los dos está pedido: sin
+// ellos el HTML es byte a byte el de antes, que es lo que congela el candado del
+// carrito.
 
 import SunmiInput from "@/components/sunmi/SunmiInput";
 
@@ -154,7 +168,13 @@ export default function SunmiCampoCantidad({
   // toma todo el ancho y el marco crece entre los dos botones, que no se
   // achican nunca. Sin esto, como siempre: lo que mide el contenido.
   ocupaElAncho = false,
+  apagaMenosEnMinimo = false,
+  deshabilitado = false,
 }) {
+  const conApagado = apagaMenosEnMinimo || deshabilitado;
+  const claseDelBoton = `${claseBoton(tamano)}${conApagado ? " disabled:opacity-40" : ""}`;
+  const enElMinimo = valor === "" || valor == null || Number(String(valor).replace(",", ".")) <= minimo;
+  const menosApagado = deshabilitado || (apagaMenosEnMinimo && enElMinimo);
   const delTamano = CAMPO_DEL_TAMANO[tamano] ? `${CAMPO_DEL_TAMANO[tamano]} ` : "";
   // Con decimales o con un paso fraccionario, el campo acepta comas y decide con
   // `parseFloat`. Sin ellos, `parseInt` — que es lo que impide que en el carrito
@@ -259,6 +279,7 @@ export default function SunmiCampoCantidad({
       onBlur={alSalir}
       onFocus={onFocus}
       onKeyDown={onKeyDown}
+      disabled={deshabilitado || undefined}
       aria-label={etiqueta}
       className={
         conMarco
@@ -280,8 +301,9 @@ export default function SunmiCampoCantidad({
     <div className={ocupaElAncho ? "flex w-full items-center gap-1" : "flex items-center gap-1"}>
       <button
         type="button"
-        className={claseBoton(tamano)}
+        className={claseDelBoton}
         aria-label={`Restar uno a ${etiqueta}`}
+        disabled={menosApagado || undefined}
         onClick={() => pasoDe(-1)}
       >
         −
@@ -301,8 +323,9 @@ export default function SunmiCampoCantidad({
 
       <button
         type="button"
-        className={claseBoton(tamano)}
+        className={claseDelBoton}
         aria-label={`Sumar uno a ${etiqueta}`}
+        disabled={deshabilitado || undefined}
         onClick={() => pasoDe(1)}
       >
         +

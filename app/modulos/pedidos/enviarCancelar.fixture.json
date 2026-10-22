@@ -4,9 +4,9 @@
     "cuerpo": {
       "ok": true,
       "user": {
-        "id": 4,
+        "id": 5,
         "nombre": "Cuenta Mini",
-        "email": "pedidos-1792634557619@ci.local",
+        "email": "pedidos-1792637787659@ci.local",
         "rolId": 3,
         "rolNombre": "ENCARGADO",
         "permisos": [
@@ -46,7 +46,7 @@
         "esAdmin": false,
         "esDuenoLocal": false,
         "operadorActivo": true,
-        "localId": 8,
+        "localId": 10,
         "esDeposito": false,
         "exigirOperador": true,
         "tarjetaPrecioUnitario": null,
@@ -59,12 +59,12 @@
     "cuerpo": {
       "ok": true,
       "operador": {
-        "operadorId": 3,
+        "operadorId": 4,
         "nombre": "Ana",
-        "localId": 8,
-        "emitidoEn": 1792634557948
+        "localId": 10,
+        "emitidoEn": 1792637790132
       },
-      "voucher": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVyYWRvcklkIjozLCJsb2NhbElkIjo4LCJfdGlwbyI6Im9wZXJhZG9yX3ZvdWNoZXIiLCJpYXQiOjE3OTI2MzQ1NTgsImV4cCI6MTc5MjY2MzM1OH0.HC_Hq8ye6cJK956lObUeO82cKn4oIuPbQtOFkgYam7Y"
+      "voucher": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVyYWRvcklkIjo0LCJsb2NhbElkIjoxMCwiX3RpcG8iOiJvcGVyYWRvcl92b3VjaGVyIiwiaWF0IjoxNzkyNjM3NzkwLCJleHAiOjE3OTI2NjY1OTB9.gFfPcTbqNyKQavoU05Qhb6I3BSLLNYOBzBsR-18WmRw"
     }
   },
   "operadorMeSinPin": {
@@ -80,7 +80,7 @@
       "ok": true,
       "items": [
         {
-          "id": 3,
+          "id": 4,
           "nombre": "Ana"
         }
       ]
@@ -91,15 +91,24 @@
     "cuerpo": {
       "ok": true,
       "local": {
-        "id": 8,
-        "nombre": "Mini pedidos 1792634557619"
+        "id": 10,
+        "nombre": "Mini pedidos 1792637787659"
       },
       "deposito": {
-        "id": 9,
-        "nombre": "Depósito pedidos 1792634557619"
+        "id": 11,
+        "nombre": "Depósito pedidos 1792637787659"
       },
-      "grupoId": 4,
-      "categorias": [],
+      "grupoId": 5,
+      "categorias": [
+        {
+          "id": 2,
+          "nombre": "Almacén 1792637787659"
+        },
+        {
+          "id": 1,
+          "nombre": "Bebidas 1792637787659"
+        }
+      ],
       "proveedores": [],
       "areas": []
     }
@@ -110,28 +119,28 @@
       "ok": true,
       "items": [
         {
-          "productoLocalId": 5,
-          "baseId": 5,
-          "nombre": "Coca 2L",
-          "codigoBarra": "7717926345576",
+          "productoLocalId": 9,
+          "baseId": 9,
+          "nombre": "Agua x6",
+          "codigoBarra": "7717926377876",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
           "precioCosto": 600,
-          "unidadMedida": "unidad",
-          "factorPack": 1,
+          "unidadMedida": "pack",
+          "factorPack": 6,
           "modoPedido": "BULTO",
-          "modoEnvio": "SOLO_UNIDAD",
+          "modoEnvio": "SOLO_BULTO",
           "stockDeposito": 50,
-          "categoriaNombre": null,
+          "categoriaNombre": "Bebidas 1792637787659",
           "proveedorNombre": null,
           "areaFisicaNombre": null
         },
         {
-          "productoLocalId": 6,
-          "baseId": 6,
-          "nombre": "Yerba 1kg",
-          "codigoBarra": "7717926345576",
+          "productoLocalId": 7,
+          "baseId": 7,
+          "nombre": "Coca 2L",
+          "codigoBarra": "7717926377876",
           "codigoBarraSecundario": null,
           "sku": null,
           "imagenUrl": null,
@@ -141,7 +150,73 @@
           "modoPedido": "BULTO",
           "modoEnvio": "SOLO_UNIDAD",
           "stockDeposito": 50,
-          "categoriaNombre": null,
+          "categoriaNombre": "Bebidas 1792637787659",
+          "proveedorNombre": null,
+          "areaFisicaNombre": null
+        },
+        {
+          "productoLocalId": 8,
+          "baseId": 8,
+          "nombre": "Yerba 1kg",
+          "codigoBarra": "7717926377876",
+          "codigoBarraSecundario": null,
+          "sku": null,
+          "imagenUrl": null,
+          "precioCosto": 600,
+          "unidadMedida": "unidad",
+          "factorPack": 1,
+          "modoPedido": "BULTO",
+          "modoEnvio": "SOLO_UNIDAD",
+          "stockDeposito": 50,
+          "categoriaNombre": "Almacén 1792637787659",
+          "proveedorNombre": null,
+          "areaFisicaNombre": null
+        }
+      ],
+      "total": 3,
+      "page": 1,
+      "pageSize": 50,
+      "totalPages": 1
+    }
+  },
+  "catalogoBebidas": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "items": [
+        {
+          "productoLocalId": 9,
+          "baseId": 9,
+          "nombre": "Agua x6",
+          "codigoBarra": "7717926377876",
+          "codigoBarraSecundario": null,
+          "sku": null,
+          "imagenUrl": null,
+          "precioCosto": 600,
+          "unidadMedida": "pack",
+          "factorPack": 6,
+          "modoPedido": "BULTO",
+          "modoEnvio": "SOLO_BULTO",
+          "stockDeposito": 50,
+          "categoriaNombre": "Bebidas 1792637787659",
+          "proveedorNombre": null,
+          "areaFisicaNombre": null
+        },
+        {
+          "productoLocalId": 7,
+          "baseId": 7,
+          "nombre": "Coca 2L",
+          "codigoBarra": "7717926377876",
+          "codigoBarraSecundario": null,
+          "sku": null,
+          "imagenUrl": null,
+          "precioCosto": 600,
+          "unidadMedida": "unidad",
+          "factorPack": 1,
+          "modoPedido": "BULTO",
+          "modoEnvio": "SOLO_UNIDAD",
+          "stockDeposito": 50,
+          "categoriaNombre": "Bebidas 1792637787659",
           "proveedorNombre": null,
           "areaFisicaNombre": null
         }
@@ -152,19 +227,51 @@
       "totalPages": 1
     }
   },
+  "setCantidad_UNIDAD": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "posId": 4,
+      "item": {
+        "detalleId": 7,
+        "productoLocalId": 7,
+        "sugerido": 3,
+        "preparado": 0,
+        "unidadSugerida": "UNIDAD"
+      },
+      "itemCount": 1,
+      "cantidad": 3
+    }
+  },
+  "setCantidad_BULTO": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "posId": 4,
+      "item": {
+        "detalleId": 8,
+        "productoLocalId": 9,
+        "sugerido": 2,
+        "preparado": 0,
+        "unidadSugerida": "BULTO"
+      },
+      "itemCount": 2,
+      "cantidad": 2
+    }
+  },
   "carritoBorrador": {
     "status": 200,
     "cuerpo": {
       "ok": true,
-      "posId": 3,
+      "posId": 4,
       "estado": "Borrador",
       "items": [
         {
-          "detalleId": 5,
-          "productoLocalId": 5,
-          "baseId": 5,
+          "detalleId": 7,
+          "productoLocalId": 7,
+          "baseId": 7,
           "nombre": "Coca 2L",
-          "codigoBarra": "7717926345576",
+          "codigoBarra": "7717926377876",
           "sugerido": 3,
           "preparado": 0,
           "unidadSugerida": "UNIDAD",
@@ -174,17 +281,17 @@
           "imagenUrl": null
         },
         {
-          "detalleId": 6,
-          "productoLocalId": 6,
-          "baseId": 6,
-          "nombre": "Yerba 1kg",
-          "codigoBarra": "7717926345576",
+          "detalleId": 8,
+          "productoLocalId": 9,
+          "baseId": 9,
+          "nombre": "Agua x6",
+          "codigoBarra": "7717926377876",
           "sugerido": 2,
           "preparado": 0,
-          "unidadSugerida": "UNIDAD",
-          "factorPack": 1,
-          "modoEnvio": "SOLO_UNIDAD",
-          "unidadMedida": "unidad",
+          "unidadSugerida": "BULTO",
+          "factorPack": 6,
+          "modoEnvio": "SOLO_BULTO",
+          "unidadMedida": "pack",
           "imagenUrl": null
         }
       ],
@@ -205,12 +312,12 @@
     "cuerpo": {
       "ok": true,
       "item": {
-        "id": 3,
+        "id": 4,
         "estado": "Solicitado",
-        "origenId": 9,
-        "destinoId": 8,
+        "origenId": 11,
+        "destinoId": 10,
         "origenManual": true,
-        "solicitadoAt": "2026-10-22T02:02:38.249Z"
+        "solicitadoAt": "2026-10-22T02:56:30.572Z"
       }
     }
   },
@@ -222,10 +329,10 @@
       "items": [],
       "itemCount": 0,
       "pendiente": {
-        "posId": 3,
+        "posId": 4,
         "estado": "Solicitado",
-        "solicitadoAt": "2026-10-22T02:02:38.249Z",
-        "createdAt": "2026-10-22T02:02:38.174Z",
+        "solicitadoAt": "2026-10-22T02:56:30.572Z",
+        "createdAt": "2026-10-22T02:56:30.491Z",
         "items": [
           {
             "nombre": "Coca 2L",
@@ -235,11 +342,11 @@
             "modoEnvio": "SOLO_UNIDAD"
           },
           {
-            "nombre": "Yerba 1kg",
+            "nombre": "Agua x6",
             "sugerido": 2,
-            "unidadSugerida": "UNIDAD",
-            "factorPack": 1,
-            "modoEnvio": "SOLO_UNIDAD"
+            "unidadSugerida": "BULTO",
+            "factorPack": 6,
+            "modoEnvio": "SOLO_BULTO"
           }
         ],
         "itemCount": 2

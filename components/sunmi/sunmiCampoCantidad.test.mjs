@@ -170,6 +170,35 @@ test("EL MARCO es opcional, y es lo que permitió no mover el carrito", () => {
   assert.ok(!/px-0/.test(sinMarco), "se le sacó al input del carrito su padding");
 });
 
+test("PEDIDOS: el − se apaga en el mínimo solo si se pide, y apagado es todo el campo", () => {
+  const props = { onCambiar: () => {}, etiqueta: "C" };
+  // El ATRIBUTO, no la palabra: `disabled:opacity-40` también dice "disabled".
+  const apagadoAttr = / disabled=""/;
+  const menos = (html) => html.match(/<button[^>]*aria-label="Restar uno a C"[^>]*>/)[0];
+  const mas = (html) => html.match(/<button[^>]*aria-label="Sumar uno a C"[^>]*>/)[0];
+
+  // Sin pedirlo, en el mínimo el − sigue tocable: es lo de siempre de los demás.
+  assert.doesNotMatch(menos(pintar({ ...props, valor: "0" })), apagadoAttr);
+  // Pedido: en 0 apagado, en 1 no; el + nunca.
+  const enCero = pintar({ ...props, valor: "0", apagaMenosEnMinimo: true });
+  assert.match(menos(enCero), apagadoAttr, "en el mínimo el − tiene que estar apagado");
+  assert.doesNotMatch(mas(enCero), apagadoAttr, "el + no se apaga por el mínimo");
+  assert.doesNotMatch(menos(pintar({ ...props, valor: "1", apagaMenosEnMinimo: true })), apagadoAttr);
+  assert.match(enCero, /disabled:opacity-40/, "apagado se tiene que ver apagado");
+
+  // Deshabilitado: los dos botones y el campo.
+  const apagado = pintar({ ...props, valor: "2", deshabilitado: true });
+  assert.match(menos(apagado), apagadoAttr);
+  assert.match(mas(apagado), apagadoAttr);
+  assert.match(apagado.match(/<input[^>]*>/)[0], apagadoAttr, "el campo también");
+
+  // Y sin ninguno de los dos, ni rastro del apagado: es lo que mantiene
+  // congelado el HTML del carrito.
+  const comoSiempre = pintar({ ...props, valor: "2" });
+  assert.doesNotMatch(comoSiempre, apagadoAttr, "sin pedirlo no se apaga nada");
+  assert.doesNotMatch(comoSiempre, /disabled:opacity-40/, "sin pedirlo, la clase del apagado no está");
+});
+
 test("el BOTÓN tiene dos tamaños, y los dos salen de la escala", () => {
   // `w-9` y `w-7`, los dos de la escala. Ninguno escrito a mano: el trinquete
   // atrapó un `w-[30px]` en la primera versión y tenía razón.

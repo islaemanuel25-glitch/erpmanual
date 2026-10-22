@@ -77,16 +77,21 @@ try {
   });
   const ana = await c.operadorLocal.create({ data: { nombre: "Ana", pinHash: "x", localId: mini.id } });
 
-  const delDeposito = async (nombre, codigo_barra) => {
+  // Dos categorías propias: el filtro de la pantalla las lista por nombre.
+  const bebidas = await c.categoria.create({ data: { nombre: `Bebidas ${marca}` } });
+  const almacen = await c.categoria.create({ data: { nombre: `Almacén ${marca}` } });
+  const delDeposito = async (nombre, codigo_barra, categoria_id, extra = {}) => {
     const b = await c.productoBase.create({
-      data: { grupoId: grupo.id, nombre, codigo_barra, unidad_medida: "unidad", precio_costo: 600, precio_venta: 1000, redondeo_100: false, activo: true },
+      data: { grupoId: grupo.id, nombre, codigo_barra, unidad_medida: "unidad", precio_costo: 600, precio_venta: 1000, redondeo_100: false, activo: true, categoria_id, ...extra },
     });
     const pl = await c.productoLocal.create({ data: { localId: depo.id, baseId: b.id, activo: true, precio_costo: 600, precio_venta: 1000 } });
     await c.stockLocal.create({ data: { localId: depo.id, productoId: pl.id, cantidad: 50 } });
     return pl.id;
   };
-  const coca = await delDeposito("Coca 2L", `77${marca}1`.slice(0, 13));
-  const yerba = await delDeposito("Yerba 1kg", `77${marca}2`.slice(0, 13));
+  const coca = await delDeposito("Coca 2L", `77${marca}1`.slice(0, 13), bebidas.id);
+  const yerba = await delDeposito("Yerba 1kg", `77${marca}2`.slice(0, 13), almacen.id);
+  // Un pack de 6: la ficha lo hace salir por bulto (`defaultModoEnvio`).
+  const agua = await delDeposito("Agua x6", `77${marca}3`.slice(0, 13), bebidas.id, { unidad_medida: "pack", factor_pack: 6 });
 
   // ── La aplicación ───────────────────────────────────────────────────────
   const R = {
@@ -147,20 +152,32 @@ try {
     ok("opciones del local", op.status === 200 && op.cuerpo.ok === true, json(op));
     const cat = await pedir(R.catalogo, "GET", `${B}/pedidos/catalogo?page=1&pageSize=50`, S.conPin);
     guardar("catalogo", cat);
-    ok("el catálogo trae los dos del depósito", cat.status === 200 && cat.cuerpo.items?.length === 2, json(cat));
+    ok("el catálogo trae los tres del depósito", cat.status === 200 && cat.cuerpo.items?.length === 3, json(cat));
+    const aguaEnCat = cat.cuerpo.items?.find((i) => i.productoLocalId === agua);
+    ok("el pack sale por bulto de 6", aguaEnCat?.modoEnvio === "SOLO_BULTO" && aguaEnCat?.factorPack === 6, json(aguaEnCat));
+    ok("las dos categorías están en las opciones", [bebidas.id, almacen.id].every((id) => op.cuerpo.categorias?.some((k) => k.id === id)), json(op.cuerpo.categorias));
+    // Lo que contesta el catálogo filtrado por categoría, como lo pide la
+    // pantalla: página, tamaño y la categoría, nada más.
+    const catBebidas = await pedir(R.catalogo, "GET", `${B}/pedidos/catalogo?page=1&pageSize=50&categoriaId=${bebidas.id}`, S.conPin);
+    guardar("catalogoBebidas", catBebidas);
+    ok("filtrado por Bebidas: la coca y el agua", catBebidas.cuerpo.total === 2 && catBebidas.cuerpo.items?.every((i) => i.productoLocalId !== yerba), json(catBebidas));
   }
 
   seccion("1. El carrito, como lo arma la pantalla");
   let posId = null;
   {
-    for (const [p, cant] of [[coca, 3], [yerba, 2]]) {
-      const r = await pedir(R.setCantidad, "POST", `${B}/pedidos/set-cantidad`, S.conPin, { productoLocalId: p, cantidad: cant, unidad: "UNIDAD" });
-      ok(`set-cantidad ${p} → ${cant}`, r.status === 200 && r.cuerpo.ok === true, json(r));
+    // La yerba queda AFUERA del pedido: en la lista no lleva ✕.
+    for (const [p, cant, unidad] of [[coca, 3, "UNIDAD"], [agua, 2, "BULTO"]]) {
+      const r = await pedir(R.setCantidad, "POST", `${B}/pedidos/set-cantidad`, S.conPin, { productoLocalId: p, cantidad: cant, unidad });
+      ok(`set-cantidad ${p} → ${cant} ${unidad}`, r.status === 200 && r.cuerpo.ok === true, json(r));
+      guardar(`setCantidad_${unidad}`, r);
       posId = r.cuerpo.posId;
     }
     const k = await carrito(S.conPin);
     guardar("carritoBorrador", k);
     ok("el carrito tiene las dos líneas y ningún pendiente", k.cuerpo.itemCount === 2 && k.cuerpo.pendiente === null && k.cuerpo.posId === posId, json(k));
+    const aguaEnCarrito = k.cuerpo.items?.find((i) => i.productoLocalId === agua);
+    ok("el agua se guardó en bultos", aguaEnCarrito?.unidadSugerida === "BULTO" && aguaEnCarrito?.sugerido === 2, json(aguaEnCarrito));
   }
 
   seccion("2. Solicitar sin operario");

@@ -2,21 +2,59 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
+import { X } from "lucide-react";
+import { diaMesAR, horaAR } from "@/lib/fechas/formatearFechaHora";
+import { fechaArgentinaISO, hoyArgentinaISO } from "@/lib/fechas/rangoArgentina";
 import { useUser } from "@/app/context/UserContext";
 import { useOperadorContext } from "@/app/context/OperadorContext";
+import { useAccionDePagina } from "@/app/context/AccionDePaginaContext";
 import SinPermisos from "@/components/auth/SinPermisos";
 
+import SunmiPantallaDeTrabajo from "@/components/sunmi/SunmiPantallaDeTrabajo";
 import SunmiCard from "@/components/sunmi/SunmiCard";
-import SunmiHeader from "@/components/sunmi/SunmiHeader";
-import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiInput from "@/components/sunmi/SunmiInput";
-import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
-import SunmiPageSizer from "@/components/sunmi/SunmiPageSizer";
+import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
+import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
+import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
+import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
+import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
+import SunmiListaProductoCards from "@/components/sunmi/SunmiListaProductoCards";
+import SunmiPaginador from "@/components/sunmi/SunmiPaginador";
 import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
 import { showSuccess } from "@/components/sunmi/SunmiToast";
-import { Search } from "lucide-react";
+
+// El selector de tamaño de página se fue de la pantalla: el catálogo se pide
+// siempre de a 50, que era el tamaño por defecto.
+const TAMANO_DE_PAGINA = 50;
+
+/** Si el producto se pide por bulto. Es el criterio de siempre de la pantalla. */
+const salePorBulto = (p) => p.modoEnvio === "SOLO_BULTO" && p.factorPack > 1;
+
+/**
+ * La cantidad que se muestra de una línea guardada, según su unidad.
+ * - Si unidadSugerida === "BULTO" → it.sugerido ya esta en bultos, leer tal cual.
+ * - Si unidadSugerida === "UNIDAD" y el producto sale por bulto (legacy):
+ *   convertir a bultos para que el frontend en bultoMode funcione coherente.
+ * - Si producto sale por unidad: it.sugerido en unidades, tal cual.
+ * La usan el carrito y el pedido enviado: es el mismo dato.
+ */
+function cantidadEnPantalla(it) {
+  if (salePorBulto(it)) {
+    return it.unidadSugerida === "BULTO" ? it.sugerido : Math.floor(it.sugerido / it.factorPack);
+  }
+  return it.sugerido;
+}
+
+const productos = (n) => (n === 1 ? "producto" : "productos");
+
+/** "hoy 14:05", o la fecha corta si no es de hoy: "21/10 14:05". */
+function cuandoSeEnvio(solicitadoAt) {
+  if (!solicitadoAt) return null;
+  const dia = fechaArgentinaISO(solicitadoAt) === hoyArgentinaISO() ? "hoy" : diaMesAR(solicitadoAt);
+  return `${dia} ${horaAR(solicitadoAt)}`;
+}
+
 export default function PedidosCatalogoPage() {
   const router = useRouter();
   const { perfil: perfilPed, cargando: cargandoPed } = useUser();
@@ -31,64 +69,19 @@ export default function PedidosCatalogoPage() {
   const [error, setError] = useState("");
   const [opciones, setOpciones] = useState(null);
 
-  // Filtros
+  // Filtros: uno solo, la categoría. Proveedor y área la ruta los sigue
+  // aceptando; la pantalla no los manda.
   const [busqueda, setBusqueda] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
-  const [proveedorId, setProveedorId] = useState("");
-  const [areaId, setAreaId] = useState("");
-
-  // Voz
-  const [escuchando, setEscuchando] = useState(false);
-  const recognitionRef = useRef(null);
-  const soportaVoz =
-    typeof window !== "undefined" &&
-    !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-
-  const iniciarVoz = () => {
-    const SR =
-      typeof window !== "undefined" &&
-      (window.SpeechRecognition || window.webkitSpeechRecognition);
-    if (!SR) return;
-
-    if (escuchando && recognitionRef.current) {
-      recognitionRef.current.stop();
-      setEscuchando(false);
-      return;
-    }
-
-    const recognition = new SR();
-    recognition.lang = "es-AR";
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    recognition.onstart = () => setEscuchando(true);
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setBusqueda(transcript);
-      setEscuchando(false);
-    };
-    recognition.onerror = () => setEscuchando(false);
-    recognition.onend = () => setEscuchando(false);
-
-    recognitionRef.current = recognition;
-    recognition.start();
-  };
 
   // Catálogo
-  const [productos, setProductos] = useState([]);
+  const [catalogo, setCatalogo] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const [pageSize, setPageSizeRaw] = useState(() => {
-    try {
-      const v = Number(localStorage.getItem("pedidos_page_size"));
-      return [25, 50, 100].includes(v) ? v : 50;
-    } catch { return 50; }
-  });
-  const setPageSize = (size) => {
-    setPageSizeRaw(size);
-    try { localStorage.setItem("pedidos_page_size", String(size)); } catch {}
-  };
+  // El "Todas · N" del filtro: el total sin buscar ni filtrar. Sale de la misma
+  // respuesta del catálogo, la vez que se pide sin filtros.
+  const [totalCatalogo, setTotalCatalogo] = useState(null);
   const [loadingCat, setLoadingCat] = useState(false);
 
   // Carrito (cantidades locales)
@@ -99,17 +92,27 @@ export default function PedidosCatalogoPage() {
   const [vista, setVista] = useState("catalogo"); // "catalogo" | "carrito"
   const [carritoItems, setCarritoItems] = useState([]);
   const [loadingCarrito, setLoadingCarrito] = useState(false);
-  const [carritoPage, setCarritoPage] = useState(1);
-  const [carritoPageSize, setCarritoPageSize] = useState(25);
 
   // Pedido pendiente (Solicitado)
   const [pendiente, setPendiente] = useState(null);
-  const [verDetallePendiente, setVerDetallePendiente] = useState(false);
   const [cancelandoPendiente, setCancelandoPendiente] = useState(false);
   const [confirmandoCancelar, setConfirmandoCancelar] = useState(false);
 
   // Debounce busqueda
   const debounceRef = useRef(null);
+
+  // El Volver va en el slot del shell. En "Ver mi pedido" vuelve al catálogo;
+  // en el resto, a donde se venía.
+  const viendoPedido = vista === "carrito" && !pendiente;
+  useAccionDePagina(
+    () =>
+      viendoPedido ? (
+        <SunmiBackButton texto="Volver al catálogo" onVolver={() => setVista("catalogo")} />
+      ) : (
+        <SunmiBackButton onVolver={() => router.back()} />
+      ),
+    [viendoPedido, router]
+  );
 
   // ====================================================
   // CARGAR OPCIONES
@@ -153,11 +156,9 @@ export default function PedidosCatalogoPage() {
     async (p = 1) => {
       setLoadingCat(true);
       try {
-        const params = new URLSearchParams({ page: p, pageSize });
+        const params = new URLSearchParams({ page: p, pageSize: TAMANO_DE_PAGINA });
         if (busqueda.trim()) params.set("q", busqueda.trim());
         if (categoriaId) params.set("categoriaId", categoriaId);
-        if (proveedorId) params.set("proveedorId", proveedorId);
-        if (areaId) params.set("areaId", areaId);
 
         const res = await fetch(`/api/pedidos/catalogo?${params}`, {
           cache: "no-store",
@@ -165,20 +166,21 @@ export default function PedidosCatalogoPage() {
         const json = await res.json();
 
         if (json.ok) {
-          setProductos(json.items || []);
+          setCatalogo(json.items || []);
           setPage(json.page || 1);
           setTotalPages(json.totalPages || 1);
           setTotal(json.total || 0);
+          if (!busqueda.trim() && !categoriaId) setTotalCatalogo(json.total || 0);
         }
       } catch (err) {
         console.error(err);
       }
       setLoadingCat(false);
     },
-    [busqueda, categoriaId, proveedorId, areaId, pageSize]
+    [busqueda, categoriaId]
   );
 
-  // Cargar al montar y cuando cambian filtros o pageSize
+  // Cargar al montar y cuando cambian los filtros
   useEffect(() => {
     if (!opciones) return;
 
@@ -204,21 +206,9 @@ export default function PedidosCatalogoPage() {
         setPendiente(json.pendiente || null);
 
         // Reconstruir mapa de cantidades segun la unidad guardada del item.
-        // - Si unidadSugerida === "BULTO" → it.sugerido ya esta en bultos, leer tal cual.
-        // - Si unidadSugerida === "UNIDAD" y el producto sale por bulto (legacy):
-        //   convertir a bultos para que el frontend en bultoMode funcione coherente.
-        // - Si producto sale por unidad: it.sugerido en unidades, tal cual.
         const mapa = {};
         (json.items || []).forEach((it) => {
-          const isBultoMode = it.modoEnvio === "SOLO_BULTO" && it.factorPack > 1;
-          if (isBultoMode) {
-            mapa[it.productoLocalId] =
-              it.unidadSugerida === "BULTO"
-                ? it.sugerido
-                : Math.floor(it.sugerido / it.factorPack);
-          } else {
-            mapa[it.productoLocalId] = it.sugerido;
-          }
+          mapa[it.productoLocalId] = cantidadEnPantalla(it);
         });
         setCarrito(mapa);
       }
@@ -319,7 +309,7 @@ export default function PedidosCatalogoPage() {
   // ====================================================
   // CANCELAR PEDIDO PENDIENTE
   // ====================================================
-  // El botón del banner solo pregunta; cancelar de verdad es el del modal.
+  // El botón de la barra solo pregunta; cancelar de verdad es el del modal.
   const pedirCancelarPendiente = () => {
     if (!pendiente) return;
     setConfirmandoCancelar(true);
@@ -340,7 +330,6 @@ export default function PedidosCatalogoPage() {
       const json = await res.json();
       if (json.ok) {
         setPendiente(null);
-        setVerDetallePendiente(false);
       } else if (json.needsOperador) {
         setError("Ingresá tu PIN y volvé a tocar «Cancelar pedido».");
         requerirOperador();
@@ -389,8 +378,7 @@ export default function PedidosCatalogoPage() {
     );
   }
 
-  // Confirmación de cancelar, la misma en las dos vistas: el banner del
-  // pendiente está en las dos.
+  // Confirmación de cancelar.
   // Sin `destructivo`: es una confirmación, y cerrar sin querer es justamente la
   // salida segura —no se pierde nada—.
   const modalCancelar = (
@@ -419,146 +407,97 @@ export default function PedidosCatalogoPage() {
   );
 
   // ====================================================
-  // VISTA CARRITO
+  // LOS TRES ESTADOS: armando en el catálogo, armando en "Ver mi pedido", y
+  // esperando al depósito. Las tarjetas son las mismas en los tres.
   // ====================================================
-  if (vista === "carrito") {
-    return (
-      <div className="min-h-screen sunmi-bg">
-        <div className="max-w-4xl mx-auto p-3 sm:p-5 space-y-3">
-          <button
-            type="button"
-            onClick={() => setVista("catalogo")}
-            className="text-xs sunmi-link flex items-center gap-1 transition"
-          >
-            ← Volver al catálogo
-          </button>
+  const esperando = !!pendiente;
+  const enPedido = esperando ? pendiente.itemCount ?? pendiente.items?.length ?? 0 : carritoCount;
 
-          <SunmiCard>
-            <SunmiHeader title="Mi Pedido" color="amber">
-              <div className="text-[11px] text-slate-900/80 mt-1">
-                {opciones.local.nombre} → {opciones.deposito.nombre}
-              </div>
-            </SunmiHeader>
+  const tarjetaDelCatalogo = (prod) => (
+    <TarjetaPedido
+      key={prod.productoLocalId}
+      producto={prod}
+      cantidad={carrito[prod.productoLocalId] ?? 0}
+      enPedido={carrito[prod.productoLocalId] != null}
+      onCantidad={(cant, uni) => setCantidad(prod.productoLocalId, cant, uni)}
+    />
+  );
 
-            {error && (
-              <div className="mb-3 text-[11px] sunmi-text-danger sunmi-state-danger rounded-lg px-3 py-2">
-                {error}
-              </div>
-            )}
+  const vacio = (texto) => <p className="text-sm2 sunmi-text-muted text-center py-4">{texto}</p>;
 
-            {pendiente && (
-              <BannerPendiente
-                pendiente={pendiente}
-                verDetalle={verDetallePendiente}
-                onToggleDetalle={() => setVerDetallePendiente((v) => !v)}
-                onCancelar={pedirCancelarPendiente}
-                cancelando={cancelandoPendiente}
-              />
-            )}
-
-            {loadingCarrito ? (
-              <div className="text-[12px] sunmi-text-muted py-4 text-center">
-                Cargando carrito...
-              </div>
-            ) : carritoItems.length === 0 ? (
-              <div className="text-[12px] sunmi-text-muted py-4 text-center">
-                El carrito está vacío. Volvé al catálogo para agregar productos.
-              </div>
-            ) : (() => {
-              const carritoTotalPages = Math.max(1, Math.ceil(carritoItems.length / carritoPageSize));
-              const carritoPagedItems = carritoItems.slice(
-                (carritoPage - 1) * carritoPageSize,
-                carritoPage * carritoPageSize
-              );
-              return (
-                <>
-                  <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
-                    <span className="text-[12px] sunmi-text-muted">
-                      {carritoItems.length} producto{carritoItems.length !== 1 ? "s" : ""} en el pedido
-                    </span>
-                    <SunmiPageSizer
-                      value={carritoPageSize}
-                      options={[25, 50, 100]}
-                      onChange={(size) => { setCarritoPageSize(size); setCarritoPage(1); }}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    {carritoPagedItems.map((item) => (
-                      <CarritoItemCard
-                        key={item.detalleId}
-                        item={item}
-                        totalActual={carrito[item.productoLocalId] || item.sugerido}
-                        onSetCantidad={(cant, uni) => setCantidad(item.productoLocalId, cant, uni)}
-                      />
-                    ))}
-                  </div>
-
-                  {carritoTotalPages > 1 && (
-                    <div className="flex items-center justify-center gap-3 pt-2">
-                      <SunmiButton
-                        color="slate"
-                        disabled={carritoPage <= 1}
-                        onClick={() => setCarritoPage((p) => p - 1)}
-                      >
-                        ← Anterior
-                      </SunmiButton>
-                      <span className="text-[12px] sunmi-text-muted">
-                        Página {carritoPage} de {carritoTotalPages}
-                      </span>
-                      <SunmiButton
-                        color="slate"
-                        disabled={carritoPage >= carritoTotalPages}
-                        onClick={() => setCarritoPage((p) => p + 1)}
-                      >
-                        Siguiente →
-                      </SunmiButton>
-                    </div>
-                  )}
-
-                  <div className="pt-4">
-                    <SunmiButton
-                      color="amber"
-                      disabled={enviando || carritoItems.length === 0}
-                      onClick={enviarPedido}
-                    >
-                      {enviando
-                        ? "Enviando..."
-                        : `Enviar pedido al depósito (${carritoItems.length} productos)`}
-                    </SunmiButton>
-                  </div>
-                </>
-              );
-            })()}
-          </SunmiCard>
-        </div>
-        {modalCancelar}
-      </div>
+  let lista;
+  if (esperando) {
+    // Lo enviado no trae el id del producto: se identifica por su lugar.
+    lista = (
+      <SunmiListaProductoCards>
+        {(pendiente.items || []).map((item, i) => (
+          <TarjetaPedido key={i} producto={item} cantidad={cantidadEnPantalla(item)} apagada />
+        ))}
+      </SunmiListaProductoCards>
     );
+  } else if (viendoPedido) {
+    lista = loadingCarrito
+      ? vacio("Cargando carrito...")
+      : carritoItems.length === 0
+        ? vacio("El carrito está vacío. Volvé al catálogo para agregar productos.")
+        : <SunmiListaProductoCards>{carritoItems.map(tarjetaDelCatalogo)}</SunmiListaProductoCards>;
+  } else {
+    lista = loadingCat
+      ? vacio("Cargando productos...")
+      : catalogo.length === 0
+        ? vacio("No se encontraron productos.")
+        : <SunmiListaProductoCards>{catalogo.map(tarjetaDelCatalogo)}</SunmiListaProductoCards>;
   }
 
-  // ====================================================
-  // VISTA CATÁLOGO
-  // ====================================================
+  const enviadoCuando = esperando ? cuandoSeEnvio(pendiente.solicitadoAt) : null;
+
   return (
-    <div className="min-h-screen sunmi-bg">
-      <div className="max-w-4xl mx-auto p-3 sm:p-5 space-y-3">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="text-xs sunmi-link flex items-center gap-1 transition"
-        >
-          ← Volver
-        </button>
-
-        <SunmiCard>
-          <SunmiHeader title="Catálogo de Pedido" color="cyan">
-            <div className="text-[11px] text-slate-900/80 mt-1">
-              {opciones.local.nombre} → {opciones.deposito.nombre}
+    <div className="w-full min-h-full mx-auto max-w-xl px-4 pt-4 pb-4">
+      <SunmiPantallaDeTrabajo
+        idCategoria="categoria-pedido"
+        contexto={
+          <>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold sunmi-text-strong">Pedido al depósito</span>
+              <SunmiPill color={esperando ? "cyan" : "slate"}>{esperando ? "Enviado" : "Borrador"}</SunmiPill>
             </div>
-          </SunmiHeader>
-
-          {error && (
+            <p className="text-sm2 sunmi-text-muted">
+              {esperando
+                ? `Enviado${enviadoCuando ? ` ${enviadoCuando}` : ""} · esperando al depósito`
+                : `${opciones.local.nombre} → ${opciones.deposito.nombre} · se guarda solo`}
+            </p>
+            <p className="text-sm2 sunmi-text-muted">
+              <span className="tabular-nums sunmi-text-strong font-semibold">{enPedido}</span>{" "}
+              {esperando
+                ? `${productos(enPedido)} · para pedir otra cosa, cancelalo`
+                : `${productos(enPedido)} en el pedido`}
+            </p>
+          </>
+        }
+        buscador={
+          esperando || viendoPedido ? null : (
+            <SunmiCampoBusquedaVoz
+              value={busqueda}
+              onChange={setBusqueda}
+              placeholder="Buscar producto o código"
+              ariaLabel="Buscar producto o código"
+            />
+          )
+        }
+        categoria={
+          esperando || viendoPedido ? null : (
+            <SunmiSelectAdv id="categoria-pedido" value={categoriaId} onChange={(v) => setCategoriaId(v)}>
+              <SunmiSelectOption value="">{`Todas · ${totalCatalogo ?? total}`}</SunmiSelectOption>
+              {(opciones.categorias || []).map((c) => (
+                <SunmiSelectOption key={c.id} value={String(c.id)}>
+                  {c.nombre}
+                </SunmiSelectOption>
+              ))}
+            </SunmiSelectAdv>
+          )
+        }
+        antesDeLista={
+          error ? (
             <div className="mb-3 text-[11px] sunmi-text-danger sunmi-state-danger rounded-lg px-3 py-2">
               {error}
               <button
@@ -569,515 +508,124 @@ export default function PedidosCatalogoPage() {
                 cerrar
               </button>
             </div>
-          )}
-
-          {/* BANNER PEDIDO PENDIENTE */}
-          {pendiente && (
-            <BannerPendiente
-              pendiente={pendiente}
-              verDetalle={verDetallePendiente}
-              onToggleDetalle={() => setVerDetallePendiente((v) => !v)}
-              onCancelar={pedirCancelarPendiente}
-              cancelando={cancelandoPendiente}
+          ) : null
+        }
+        lista={lista}
+        despuesDeLista={
+          !esperando && !viendoPedido && totalPages > 1 ? (
+            <SunmiPaginador
+              page={page}
+              pageSize={TAMANO_DE_PAGINA}
+              totalPages={totalPages}
+              totalItems={total}
+              onPrev={() => cargarCatalogo(Math.max(1, page - 1))}
+              onNext={() => cargarCatalogo(Math.min(totalPages, page + 1))}
+              onGoToPage={(p) => cargarCatalogo(p)}
             />
-          )}
-
-          {/* CARRITO FLOTANTE */}
-          {carritoCount > 0 && (
-            <div className="mb-3">
-              <button
-                type="button"
-                onClick={abrirCarrito}
-                className="
-                  w-full
-                  sunmi-btn-accent-soft
-                  rounded-xl px-4 py-2.5
-                  flex items-center justify-between
-                  transition
-                "
+          ) : null
+        }
+        pieDePantalla={
+          esperando ? (
+            <div className="space-y-2">
+              <p className="text-sm2 sunmi-text-muted">{`Pedido enviado · ${enPedido} ${productos(enPedido)}`}</p>
+              <SunmiButton
+                color="red"
+                className="w-full min-h-toque"
+                disabled={cancelandoPendiente}
+                onClick={pedirCancelarPendiente}
               >
-                <span className="text-[13px] font-medium sunmi-text-accent">
-                  Ver mi pedido
-                </span>
-                <span className="text-[12px] sunmi-badge-accent font-bold px-2.5 py-0.5 rounded-full">
-                  {carritoCount}
-                </span>
-              </button>
-            </div>
-          )}
-
-          {/* FILTROS */}
-          <SunmiSeparator label="Buscar productos" />
-
-          <div className="space-y-2">
-            <div className="relative">
-              <Search
-                size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10"
-                style={{ color: "var(--pos-link)" }}
-              />
-              <SunmiInput
-                placeholder="Buscar por nombre, código de barras, SKU..."
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="none"
-                spellCheck={false}
-                type="text"
-                value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
-                className={`!pl-9 !border-2 pulse-neon ${soportaVoz ? "!pr-12" : ""}`}
-                style={{ borderColor: "var(--pos-link)" }}
-              />
-              {soportaVoz && (
-                <button
-                  onClick={iniciarVoz}
-                  className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded transition-colors ${
-                    escuchando
-                      ? "bg-red-600 text-white animate-pulse"
-                      : "sunmi-text-muted hover:text-[var(--app-fg)] hover:bg-[var(--pos-control-bg)]"
-                  }`}
-                  title="Buscar por voz"
-                  type="button"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                    <line x1="12" x2="12" y1="19" y2="22" />
-                  </svg>
-                </button>
-              )}
-              {escuchando && (
-                <span className="absolute left-3 -bottom-5 text-xs text-red-400 animate-pulse">
-                  Escuchando...
-                </span>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <SunmiSelectAdv
-                value={categoriaId}
-                placeholder="Categoría"
-                onChange={(v) => setCategoriaId(v)}
-                className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
-              >
-                <div value="">Todas</div>
-                {(opciones.categorias || []).map((c) => (
-                  <div key={c.id} value={String(c.id)}>
-                    {c.nombre}
-                  </div>
-                ))}
-              </SunmiSelectAdv>
-
-              <SunmiSelectAdv
-                value={proveedorId}
-                placeholder="Proveedor"
-                onChange={(v) => setProveedorId(v)}
-                className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
-              >
-                <div value="">Todos</div>
-                {(opciones.proveedores || []).map((p) => (
-                  <div key={p.id} value={String(p.id)}>
-                    {p.nombre}
-                  </div>
-                ))}
-              </SunmiSelectAdv>
-
-              <SunmiSelectAdv
-                value={areaId}
-                placeholder="Área"
-                onChange={(v) => setAreaId(v)}
-                className="[&_.sunmi-select-trigger]:!border-[var(--pos-link)]"
-              >
-                <div value="">Todas</div>
-                {(opciones.areas || []).map((a) => (
-                  <div key={a.id} value={String(a.id)}>
-                    {a.nombre}
-                  </div>
-                ))}
-              </SunmiSelectAdv>
-            </div>
-          </div>
-
-          {/* RESULTADOS */}
-          <SunmiSeparator
-            label={`Productos (${total})`}
-          />
-
-          {loadingCat ? (
-            <div className="text-[12px] sunmi-text-muted py-4 text-center">
-              Cargando productos...
-            </div>
-          ) : productos.length === 0 ? (
-            <div className="text-[12px] sunmi-text-muted py-4 text-center">
-              No se encontraron productos.
+                {cancelandoPendiente ? "Cancelando..." : "Cancelar pedido"}
+              </SunmiButton>
             </div>
           ) : (
             <div className="space-y-2">
-              {productos.map((prod) => (
-                <ProductoCard
-                  key={prod.productoLocalId}
-                  producto={prod}
-                  cantidadActual={carrito[prod.productoLocalId] || 0}
-                  onSetCantidad={(cant, uni) =>
-                    setCantidad(prod.productoLocalId, cant, uni)
-                  }
-                />
-              ))}
-            </div>
-          )}
-
-          {/* PAGINACIÓN */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
-              <div className="flex items-center gap-3">
-                <SunmiButton
-                  color="slate"
-                  disabled={page <= 1 || loadingCat}
-                  onClick={() => cargarCatalogo(page - 1)}
-                >
-                  ← Anterior
-                </SunmiButton>
-                <span className="text-[12px] sunmi-text-muted">
-                  Página {page} de {totalPages}
-                </span>
-                <SunmiButton
-                  color="slate"
-                  disabled={page >= totalPages || loadingCat}
-                  onClick={() => cargarCatalogo(page + 1)}
-                >
-                  Siguiente →
-                </SunmiButton>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm2 sunmi-text-muted">{`${carritoCount} ${productos(carritoCount)} en el pedido`}</span>
+                {viendoPedido ? null : <SunmiLinkButton onClick={abrirCarrito}>Ver mi pedido ›</SunmiLinkButton>}
               </div>
-              <SunmiPageSizer
-                value={pageSize}
-                options={[25, 50, 100]}
-                onChange={(size) => { setPageSize(size); setPage(1); }}
-              />
-            </div>
-          )}
-        </SunmiCard>
-      </div>
-      {modalCancelar}
-    </div>
-  );
-}
-
-// ====================================================
-// COMPONENTE: Tarjeta de producto
-// ====================================================
-function ProductoCard({ producto, cantidadActual, onSetCantidad }) {
-  const {
-    nombre,
-    codigoBarra,
-    imagenUrl,
-    stockDeposito,
-    factorPack,
-    categoriaNombre,
-    unidadMedida,
-    modoEnvio,
-  } = producto;
-
-  const bultoMode = modoEnvio === "SOLO_BULTO" && factorPack > 1;
-
-  const labelBulto =
-    unidadMedida === "cajon" ? "Cajón" :
-    unidadMedida === "pack" ? "Pack" :
-    // "caja" y "carton" no están en el enum `UnidadMedida`: eran ramas muertas.
-    "Bulto";
-
-  return (
-    <div
-      className={`
-        sunmi-surface border rounded-xl px-4 py-3
-        ${cantidadActual > 0 ? "" : "sunmi-border"}
-        transition-colors
-      `}
-      style={cantidadActual > 0 ? {borderColor: 'var(--pos-accent)'} : undefined}
-    >
-      <div className="flex gap-3">
-        {/* Imagen */}
-        {imagenUrl ? (
-          <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 sunmi-control">
-            <img
-              src={imagenUrl}
-              alt={nombre}
-              className="w-full h-full object-cover"
-            />
-          </div>
-        ) : (
-          <div className="w-14 h-14 rounded-lg flex-shrink-0 sunmi-control flex items-center justify-center">
-            <span className="text-[18px] sunmi-text-muted">
-              {nombre?.[0]?.toUpperCase() || "?"}
-            </span>
-          </div>
-        )}
-
-        {/* Info */}
-        <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-medium truncate">{nombre}</div>
-
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
-            {codigoBarra && (
-              <span className="text-[10px] sunmi-text-muted">{codigoBarra}</span>
-            )}
-            {categoriaNombre && (
-              <span className="text-[10px] sunmi-link opacity-70">
-                {categoriaNombre}
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-3 mt-1">
-            <span className="text-[10px] sunmi-text-muted">
-              Stock dep.: {stockDeposito} u.
-            </span>
-            {bultoMode && (
-              <span className="text-[10px] sunmi-text-muted">
-                {labelBulto} x{factorPack}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Control +/- */}
-        <div className="flex-shrink-0 flex items-center">
-          <InputCantidad
-            totalActual={cantidadActual}
-            factorPack={factorPack}
-            unidadMedida={unidadMedida}
-            modoEnvio={modoEnvio}
-            onChange={onSetCantidad}
-          />
-        </div>
-      </div>
-
-      {/* Info de bultos debajo (cantidadActual ya esta en bultos cuando bultoMode) */}
-      {bultoMode && cantidadActual > 0 && (
-        <div className="mt-1 flex items-center justify-between">
-          <span className="text-[10px] sunmi-text-muted">
-            = {cantidadActual * factorPack} uds totales
-          </span>
-          <button
-            type="button"
-            onClick={() => onSetCantidad(0, "UNIDAD")}
-            className="text-[10px] sunmi-link-danger flex-shrink-0"
-          >
-            Quitar
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ====================================================
-// COMPONENTE: Input cantidad (mixto o simple)
-// ====================================================
-function InputCantidad({ totalActual, factorPack, onChange, mostrarAgregar = true, unidadMedida, modoEnvio }) {
-  const bultoMode = modoEnvio === "SOLO_BULTO" && factorPack > 1;
-
-  const labelBulto =
-    unidadMedida === "cajon" ? "caj." :
-    unidadMedida === "pack" ? "packs" :
-    // "caja" y "carton" no están en el enum `UnidadMedida`: eran ramas muertas.
-    "bultos";
-
-  // Botón agregar
-  if (totalActual === 0 && mostrarAgregar) {
-    return (
-      <button
-        type="button"
-        onClick={() => onChange(1, bultoMode ? "BULTO" : "UNIDAD")}
-        className="
-          h-[32px] px-3
-          rounded-lg
-          sunmi-btn-link-soft
-          text-[12px] font-medium
-          transition
-        "
-      >
-        + Agregar
-      </button>
-    );
-  }
-
-  // BULTO mode: +/- en bultos. totalActual ya representa bultos.
-  if (bultoMode) {
-    const bultos = totalActual;
-    return (
-      <div className="flex items-center gap-1.5">
-        <div className="flex items-center gap-0 sunmi-control rounded-lg border sunmi-border overflow-hidden">
-          <button
-            type="button"
-            onClick={() => onChange(Math.max(0, bultos - 1), "BULTO")}
-            className="h-[32px] w-[32px] flex items-center justify-center text-[16px] sunmi-control transition"
-          >
-            -
-          </button>
-          <div className="h-[32px] px-2 flex items-center justify-center min-w-[36px] text-[13px] font-bold sunmi-text-accent">
-            {bultos}
-          </div>
-          <button
-            type="button"
-            onClick={() => onChange(bultos + 1, "BULTO")}
-            className="h-[32px] w-[32px] flex items-center justify-center text-[16px] sunmi-control transition"
-          >
-            +
-          </button>
-        </div>
-        <span className="text-[11px] sunmi-text-muted">{labelBulto}</span>
-      </div>
-    );
-  }
-
-  // UNIDAD mode: +/- en unidades
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className="flex items-center gap-0 sunmi-control rounded-lg border sunmi-border overflow-hidden">
-        <button
-          type="button"
-          onClick={() => onChange(Math.max(0, totalActual - 1), "UNIDAD")}
-          className="h-[32px] w-[32px] flex items-center justify-center text-[16px] sunmi-control transition"
-        >
-          -
-        </button>
-        <div className="h-[32px] px-2 flex items-center justify-center min-w-[36px] text-[13px] font-bold sunmi-text-accent">
-          {totalActual}
-        </div>
-        <button
-          type="button"
-          onClick={() => onChange(totalActual + 1, "UNIDAD")}
-          className="h-[32px] w-[32px] flex items-center justify-center text-[16px] sunmi-control transition"
-        >
-          +
-        </button>
-      </div>
-      <span className="text-[11px] sunmi-text-muted">uds</span>
-    </div>
-  );
-}
-
-// ====================================================
-// COMPONENTE: Item del carrito (vista pedido)
-// ====================================================
-function CarritoItemCard({ item, totalActual, onSetCantidad }) {
-  const bultoMode = item.modoEnvio === "SOLO_BULTO" && item.factorPack > 1;
-  const labelBulto =
-    item.unidadMedida === "cajon" ? "caj." :
-    item.unidadMedida === "pack" ? "packs" :
-    // "caja" y "carton" no están en el enum `UnidadMedida`: eran ramas muertas.
-    "bultos";
-
-  return (
-    <div className="sunmi-surface border sunmi-border rounded-xl px-4 py-3">
-      <div className="flex items-center justify-between">
-        <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-medium truncate">
-            {item.nombre}
-          </div>
-          {item.codigoBarra && (
-            <div className="text-[10px] sunmi-text-muted">
-              {item.codigoBarra}
-            </div>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={() => onSetCantidad(0, "UNIDAD")}
-          className="text-[10px] sunmi-link-danger ml-3 flex-shrink-0"
-        >
-          Quitar
-        </button>
-      </div>
-
-      <div className="mt-2 flex items-center justify-between">
-        <InputCantidad
-          totalActual={totalActual}
-          factorPack={item.factorPack}
-          unidadMedida={item.unidadMedida}
-          modoEnvio={item.modoEnvio}
-          onChange={onSetCantidad}
-          mostrarAgregar={false}
-        />
-        {bultoMode && totalActual > 0 && (
-          <span className="text-[10px] sunmi-text-muted ml-2">
-            = {totalActual * item.factorPack} uds totales
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ====================================================
-// COMPONENTE: Banner pedido pendiente (Solicitado)
-// ====================================================
-function BannerPendiente({ pendiente, verDetalle, onToggleDetalle, onCancelar, cancelando }) {
-  // Zona de Argentina y 24 horas: ver `lib/fechas/formatearFechaHora.js`.
-  const fecha = pendiente.solicitadoAt ? fechaHoraAR(pendiente.solicitadoAt) : null;
-
-  return (
-    <div className="mb-3 sunmi-state-warning rounded-xl px-4 py-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-semibold sunmi-text-accent">
-            Pedido solicitado pendiente
-          </div>
-          <div className="text-[11px] sunmi-text-muted mt-0.5">
-            POS #{pendiente.posId}
-            {fecha && <> &middot; {fecha}</>}
-            {" "}&middot; {pendiente.itemCount} producto{pendiente.itemCount !== 1 ? "s" : ""}
-          </div>
-          <div className="text-[11px] sunmi-text-muted mt-1">
-            Esperá a que el depósito lo procese o cancelalo para hacer un pedido nuevo.
-          </div>
-        </div>
-      </div>
-
-      <div className="flex gap-2 mt-2">
-        <button
-          type="button"
-          onClick={onToggleDetalle}
-          className="text-[11px] sunmi-link underline transition"
-        >
-          {verDetalle ? "Ocultar detalle" : "Ver detalle"}
-        </button>
-        <button
-          type="button"
-          onClick={onCancelar}
-          disabled={cancelando}
-          className="text-[11px] sunmi-link-danger underline transition disabled:opacity-50"
-        >
-          {cancelando ? "Cancelando..." : "Cancelar pedido"}
-        </button>
-      </div>
-
-      {verDetalle && pendiente.items?.length > 0 && (
-        <div className="mt-3 space-y-1 border-t sunmi-divider pt-2">
-          {pendiente.items.map((item, i) => {
-            const isBultoMode = item.modoEnvio === "SOLO_BULTO" && item.factorPack > 1;
-            const enBulto = item.unidadSugerida === "BULTO";
-            // bultos y uds segun como esta guardado el sugerido (compat legacy)
-            const bultos = enBulto
-              ? item.sugerido
-              : (isBultoMode ? Math.floor(item.sugerido / item.factorPack) : 0);
-            const uds = enBulto ? item.sugerido * item.factorPack : item.sugerido;
-            return (
-              <div
-                key={i}
-                className="flex items-center justify-between text-[11px] sunmi-text-strong"
+              <SunmiButton
+                color="primary"
+                className="w-full min-h-toque"
+                disabled={enviando || carritoCount === 0}
+                onClick={enviarPedido}
               >
-                <span className="truncate flex-1 min-w-0">{item.nombre}</span>
-                <span className="ml-2 sunmi-text-accent font-medium whitespace-nowrap">
-                  {isBultoMode
-                    ? `${bultos} bulto${bultos !== 1 ? "s" : ""} (${uds} uds)`
-                    : `${item.sugerido} unidad${item.sugerido !== 1 ? "es" : ""}`}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
+                {enviando ? "Enviando..." : "Enviar pedido al depósito"}
+              </SunmiButton>
+            </div>
+          )
+        }
+        despuesDelPie={modalCancelar}
+      />
     </div>
+  );
+}
+
+// ====================================================
+// COMPONENTE: Tarjeta de un producto del pedido
+// ====================================================
+// La misma en el catálogo, en "Ver mi pedido" y en el pedido enviado. No
+// muestra stock del depósito —está mayormente en negativo y confunde—, ni foto,
+// ni categoría, ni código.
+//
+// El número se puede tipear: lo escrito se manda al salir del campo (o con
+// Enter), no tecla por tecla, para que "12" no viaje como un 1 y después un 12.
+// El − y el + mandan en el acto.
+function TarjetaPedido({ producto, cantidad, enPedido = false, apagada = false, onCantidad }) {
+  const { nombre, factorPack } = producto;
+  const porBulto = salePorBulto(producto);
+  const unidad = porBulto ? "BULTO" : "UNIDAD";
+  const [escrito, setEscrito] = useState(null);
+  const campoRef = useRef(null);
+
+  const cambiar = (s) => {
+    if (typeof document !== "undefined" && document.activeElement === campoRef.current) {
+      setEscrito(s);
+      return;
+    }
+    onCantidad?.(Number(s) || 0, unidad);
+  };
+
+  const confirmar = () => {
+    if (escrito === null) return;
+    const n = Number(escrito) || 0;
+    setEscrito(null);
+    if (n !== cantidad) onCantidad?.(n, unidad);
+  };
+
+  return (
+    // Las dos marcas son el asidero de los candados (`pantallaPedidos.test.mjs`).
+    <SunmiCard data-tarjeta-pedido={nombre} className="p-3 space-y-2">
+      <div className="flex items-start gap-2">
+        <p className="flex-1 min-w-0 text-sm3 font-semibold sunmi-text-strong break-words">{nombre}</p>
+        {enPedido && !apagada ? (
+          <SunmiButton
+            color="ghost"
+            aria-label={`Quitar ${nombre} del pedido`}
+            onClick={() => onCantidad?.(0, "UNIDAD")}
+            className="shrink-0 min-w-toque min-h-toque inline-flex items-center justify-center"
+          >
+            <X size={18} aria-hidden="true" />
+          </SunmiButton>
+        ) : null}
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <span data-unidad-pedido="" className="text-sm2 sunmi-text-muted">{porBulto ? `Por BULTO de ${factorPack} u` : "UNIDAD"}</span>
+        <SunmiCampoCantidad
+          valor={escrito ?? String(cantidad ?? 0)}
+          onCambiar={cambiar}
+          etiqueta={`Cantidad de ${nombre}`}
+          minimo={0}
+          tamano="grande"
+          claseMarco="w-16"
+          apagaMenosEnMinimo
+          deshabilitado={apagada}
+          inputRef={campoRef}
+          onBlur={confirmar}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+        />
+      </div>
+    </SunmiCard>
   );
 }
