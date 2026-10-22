@@ -1,0 +1,275 @@
+{
+  "me": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "user": {
+        "id": 4,
+        "nombre": "Cuenta Mini",
+        "email": "pedidos-1792634557619@ci.local",
+        "rolId": 3,
+        "rolNombre": "ENCARGADO",
+        "permisos": [
+          "pos.usar",
+          "clientes.crear",
+          "clientes.puntos.ver",
+          "clientes.puntos.canjear",
+          "clientes.cc.ver",
+          "clientes.cc.pagar",
+          "compras.revisar",
+          "comprobantes.ver",
+          "pos.anular",
+          "turnos.ver_todos",
+          "clientes.ver",
+          "clientes.editar",
+          "productos.ver",
+          "productos.crear",
+          "productos.editar",
+          "stock.ver",
+          "stock.editar",
+          "transferencias.ver",
+          "transferencias.crear",
+          "transferencias.recibir",
+          "transferencias.cancelar",
+          "pos_transferencias.ver",
+          "pos_transferencias.enviar",
+          "pedidos.ver",
+          "pedidos.editar",
+          "pedidos.solicitar",
+          "compras.ver",
+          "compras.recibir",
+          "reportes.ver",
+          "config_local.operadores",
+          "config_local.alertas",
+          "stock.control.contar"
+        ],
+        "esAdmin": false,
+        "esDuenoLocal": false,
+        "operadorActivo": true,
+        "localId": 8,
+        "esDeposito": false,
+        "exigirOperador": true,
+        "tarjetaPrecioUnitario": null,
+        "tarjetaOcultarEquivalencia": null
+      }
+    }
+  },
+  "operadorMeConPin": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "operador": {
+        "operadorId": 3,
+        "nombre": "Ana",
+        "localId": 8,
+        "emitidoEn": 1792634557948
+      },
+      "voucher": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJvcGVyYWRvcklkIjozLCJsb2NhbElkIjo4LCJfdGlwbyI6Im9wZXJhZG9yX3ZvdWNoZXIiLCJpYXQiOjE3OTI2MzQ1NTgsImV4cCI6MTc5MjY2MzM1OH0.HC_Hq8ye6cJK956lObUeO82cKn4oIuPbQtOFkgYam7Y"
+    }
+  },
+  "operadorMeSinPin": {
+    "status": 200,
+    "cuerpo": {
+      "ok": false,
+      "operador": null
+    }
+  },
+  "operadorListar": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "items": [
+        {
+          "id": 3,
+          "nombre": "Ana"
+        }
+      ]
+    }
+  },
+  "opciones": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "local": {
+        "id": 8,
+        "nombre": "Mini pedidos 1792634557619"
+      },
+      "deposito": {
+        "id": 9,
+        "nombre": "Depósito pedidos 1792634557619"
+      },
+      "grupoId": 4,
+      "categorias": [],
+      "proveedores": [],
+      "areas": []
+    }
+  },
+  "catalogo": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "items": [
+        {
+          "productoLocalId": 5,
+          "baseId": 5,
+          "nombre": "Coca 2L",
+          "codigoBarra": "7717926345576",
+          "codigoBarraSecundario": null,
+          "sku": null,
+          "imagenUrl": null,
+          "precioCosto": 600,
+          "unidadMedida": "unidad",
+          "factorPack": 1,
+          "modoPedido": "BULTO",
+          "modoEnvio": "SOLO_UNIDAD",
+          "stockDeposito": 50,
+          "categoriaNombre": null,
+          "proveedorNombre": null,
+          "areaFisicaNombre": null
+        },
+        {
+          "productoLocalId": 6,
+          "baseId": 6,
+          "nombre": "Yerba 1kg",
+          "codigoBarra": "7717926345576",
+          "codigoBarraSecundario": null,
+          "sku": null,
+          "imagenUrl": null,
+          "precioCosto": 600,
+          "unidadMedida": "unidad",
+          "factorPack": 1,
+          "modoPedido": "BULTO",
+          "modoEnvio": "SOLO_UNIDAD",
+          "stockDeposito": 50,
+          "categoriaNombre": null,
+          "proveedorNombre": null,
+          "areaFisicaNombre": null
+        }
+      ],
+      "total": 2,
+      "page": 1,
+      "pageSize": 50,
+      "totalPages": 1
+    }
+  },
+  "carritoBorrador": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "posId": 3,
+      "estado": "Borrador",
+      "items": [
+        {
+          "detalleId": 5,
+          "productoLocalId": 5,
+          "baseId": 5,
+          "nombre": "Coca 2L",
+          "codigoBarra": "7717926345576",
+          "sugerido": 3,
+          "preparado": 0,
+          "unidadSugerida": "UNIDAD",
+          "factorPack": 1,
+          "modoEnvio": "SOLO_UNIDAD",
+          "unidadMedida": "unidad",
+          "imagenUrl": null
+        },
+        {
+          "detalleId": 6,
+          "productoLocalId": 6,
+          "baseId": 6,
+          "nombre": "Yerba 1kg",
+          "codigoBarra": "7717926345576",
+          "sugerido": 2,
+          "preparado": 0,
+          "unidadSugerida": "UNIDAD",
+          "factorPack": 1,
+          "modoEnvio": "SOLO_UNIDAD",
+          "unidadMedida": "unidad",
+          "imagenUrl": null
+        }
+      ],
+      "itemCount": 2,
+      "pendiente": null
+    }
+  },
+  "solicitarSinOperador": {
+    "status": 428,
+    "cuerpo": {
+      "ok": false,
+      "error": "Se requiere un operador activo para esta acción.",
+      "needsOperador": true
+    }
+  },
+  "solicitado": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "item": {
+        "id": 3,
+        "estado": "Solicitado",
+        "origenId": 9,
+        "destinoId": 8,
+        "origenManual": true,
+        "solicitadoAt": "2026-10-22T02:02:38.249Z"
+      }
+    }
+  },
+  "carritoPendiente": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "posId": null,
+      "items": [],
+      "itemCount": 0,
+      "pendiente": {
+        "posId": 3,
+        "estado": "Solicitado",
+        "solicitadoAt": "2026-10-22T02:02:38.249Z",
+        "createdAt": "2026-10-22T02:02:38.174Z",
+        "items": [
+          {
+            "nombre": "Coca 2L",
+            "sugerido": 3,
+            "unidadSugerida": "UNIDAD",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD"
+          },
+          {
+            "nombre": "Yerba 1kg",
+            "sugerido": 2,
+            "unidadSugerida": "UNIDAD",
+            "factorPack": 1,
+            "modoEnvio": "SOLO_UNIDAD"
+          }
+        ],
+        "itemCount": 2
+      }
+    }
+  },
+  "cancelarSinOperador": {
+    "status": 428,
+    "cuerpo": {
+      "ok": false,
+      "error": "Se requiere un operador activo para esta acción.",
+      "needsOperador": true
+    }
+  },
+  "cancelado": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "item": null,
+      "error": null
+    }
+  },
+  "carritoTrasCancelar": {
+    "status": 200,
+    "cuerpo": {
+      "ok": true,
+      "posId": null,
+      "items": [],
+      "itemCount": 0,
+      "pendiente": null
+    }
+  }
+}

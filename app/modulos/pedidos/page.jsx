@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { fechaHoraAR } from "@/lib/fechas/formatearFechaHora";
 import { useUser } from "@/app/context/UserContext";
+import { useOperadorContext } from "@/app/context/OperadorContext";
 import SinPermisos from "@/components/auth/SinPermisos";
 
 import SunmiCard from "@/components/sunmi/SunmiCard";
@@ -13,10 +14,17 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiInput from "@/components/sunmi/SunmiInput";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiPageSizer from "@/components/sunmi/SunmiPageSizer";
+import SunmiModalLayout from "@/components/sunmi/SunmiModalLayout";
+import { showSuccess } from "@/components/sunmi/SunmiToast";
 import { Search } from "lucide-react";
 export default function PedidosCatalogoPage() {
   const router = useRouter();
   const { perfil: perfilPed, cargando: cargandoPed } = useUser();
+  // Solicitar y cancelar contestan `needsOperador` cuando falta o venció el PIN.
+  // Es el mismo mecanismo del POS: el modal del PIN se levanta encima de esta
+  // pantalla sin navegar, y el carrito queda como estaba. No se reintenta solo:
+  // con el PIN puesto, la persona vuelve a tocar el botón.
+  const { requerirOperador } = useOperadorContext();
 
   // Estado general
   const [loading, setLoading] = useState(true);
@@ -98,6 +106,7 @@ export default function PedidosCatalogoPage() {
   const [pendiente, setPendiente] = useState(null);
   const [verDetallePendiente, setVerDetallePendiente] = useState(false);
   const [cancelandoPendiente, setCancelandoPendiente] = useState(false);
+  const [confirmandoCancelar, setConfirmandoCancelar] = useState(false);
 
   // Debounce busqueda
   const debounceRef = useRef(null);
@@ -290,7 +299,13 @@ export default function PedidosCatalogoPage() {
         setCarritoItems([]);
         setPosId(null);
         setVista("catalogo");
-        alert("Pedido enviado al depósito correctamente");
+        // El pedido pasó a Solicitado: lo que ahora hay que mostrar es el
+        // pendiente, y eso lo trae el carrito del servidor.
+        await cargarCarrito();
+        showSuccess("Pedido enviado al depósito correctamente");
+      } else if (json.needsOperador) {
+        setError("Ingresá tu PIN y volvé a tocar «Enviar pedido».");
+        requerirOperador();
       } else {
         setError(json.error || "Error al solicitar pedido");
       }
@@ -304,10 +319,17 @@ export default function PedidosCatalogoPage() {
   // ====================================================
   // CANCELAR PEDIDO PENDIENTE
   // ====================================================
-  const cancelarPendiente = async () => {
+  // El botón del banner solo pregunta; cancelar de verdad es el del modal.
+  const pedirCancelarPendiente = () => {
     if (!pendiente) return;
-    if (!confirm("¿Cancelar el pedido solicitado? Se eliminarán todos los items.")) return;
+    setConfirmandoCancelar(true);
+  };
 
+  const cancelarPendiente = async () => {
+    setConfirmandoCancelar(false);
+    if (!pendiente) return;
+
+    setError("");
     setCancelandoPendiente(true);
     try {
       const res = await fetch("/api/pos-transferencias/cancelar", {
@@ -319,6 +341,9 @@ export default function PedidosCatalogoPage() {
       if (json.ok) {
         setPendiente(null);
         setVerDetallePendiente(false);
+      } else if (json.needsOperador) {
+        setError("Ingresá tu PIN y volvé a tocar «Cancelar pedido».");
+        requerirOperador();
       } else {
         setError(json.error || "Error al cancelar pedido");
       }
@@ -364,6 +389,35 @@ export default function PedidosCatalogoPage() {
     );
   }
 
+  // Confirmación de cancelar, la misma en las dos vistas: el banner del
+  // pendiente está en las dos.
+  // Sin `destructivo`: es una confirmación, y cerrar sin querer es justamente la
+  // salida segura —no se pierde nada—.
+  const modalCancelar = (
+    <SunmiModalLayout
+      open={confirmandoCancelar}
+      title="Cancelar pedido"
+      onClose={() => setConfirmandoCancelar(false)}
+      forma="hoja-o-centrado"
+      // Los dos que el kit no tiene por defecto, con los valores de su hoja de
+      // confirmación (`SunmiHojaDeConfirmacion`).
+      espacioCuerpo="mt-2 gap-3"
+      z={9999}
+      footer={
+        <>
+          <SunmiButton color="slate" onClick={() => setConfirmandoCancelar(false)}>
+            Volver
+          </SunmiButton>
+          <SunmiButton color="red" onClick={cancelarPendiente}>
+            Cancelar pedido
+          </SunmiButton>
+        </>
+      }
+    >
+      <p className="text-sm2 sunmi-text-muted leading-snug">¿Cancelar el pedido solicitado? Se eliminarán todos los items.</p>
+    </SunmiModalLayout>
+  );
+
   // ====================================================
   // VISTA CARRITO
   // ====================================================
@@ -397,7 +451,7 @@ export default function PedidosCatalogoPage() {
                 pendiente={pendiente}
                 verDetalle={verDetallePendiente}
                 onToggleDetalle={() => setVerDetallePendiente((v) => !v)}
-                onCancelar={cancelarPendiente}
+                onCancelar={pedirCancelarPendiente}
                 cancelando={cancelandoPendiente}
               />
             )}
@@ -478,6 +532,7 @@ export default function PedidosCatalogoPage() {
             })()}
           </SunmiCard>
         </div>
+        {modalCancelar}
       </div>
     );
   }
@@ -522,7 +577,7 @@ export default function PedidosCatalogoPage() {
               pendiente={pendiente}
               verDetalle={verDetallePendiente}
               onToggleDetalle={() => setVerDetallePendiente((v) => !v)}
-              onCancelar={cancelarPendiente}
+              onCancelar={pedirCancelarPendiente}
               cancelando={cancelandoPendiente}
             />
           )}
@@ -702,6 +757,7 @@ export default function PedidosCatalogoPage() {
           )}
         </SunmiCard>
       </div>
+      {modalCancelar}
     </div>
   );
 }

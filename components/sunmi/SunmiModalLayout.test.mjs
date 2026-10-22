@@ -739,6 +739,10 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // código repetido, y cerrar sin querer deja todo sin aplicar, que es la
     // salida segura. Por el criterio de qué se pierde, `false`.
     "app/modulos/auditoria-pos-ventas/correcciones/page.jsx": false,
+    // Cancelar el pedido solicitado: una CONFIRMACIÓN con el texto y dos
+    // botones. Adentro no hay nada escrito, y cerrar sin querer deja el pedido
+    // como estaba, que es la salida segura. `false`.
+    "app/modulos/pedidos/page.jsx": false,
     // Las dos hojas de Tesorería son CARGA, por el criterio de qué se pierde: en
     // una, el importe contado y la observación —lo contado es lo único que no se
     // puede rehacer mirando la pantalla—; en la otra, el motivo de anular, que
