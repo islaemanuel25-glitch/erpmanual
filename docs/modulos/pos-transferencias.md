@@ -1,6 +1,6 @@
 # Modulo: POS Transferencias
 
-**Última actualización:** 2026-10-22 18:19
+**Última actualización:** 2026-10-22 22:36
 
 ## Ubicacion
 - UI: `app/modulos/pos-transferencias/page.jsx`, `app/modulos/pos-transferencias/nueva/page.jsx`
@@ -105,6 +105,9 @@ model PosTransferenciaDetalle {
 ```
 
 ## Cambios recientes
+- 2026-10-22: feat(deposito): preparar un pedido de local en el celular, como se recibe
+- 2026-10-22: feat(deposito): Pedidos de locales, la entrada del depósito en el celular
+- 2026-10-22: feat(deposito): cada línea de un pedido guarda cuándo la decidió el depósito
 - 2026-10-22: feat(pedidos): el local no cancela un pedido que el depósito ya empezó (pantalla SIN VERIFICAR en el celular)
 - 2026-10-22: feat(pedidos): sumar al pedido enviado hasta que el depósito lo empieza
 - 2026-10-12: feat: cancelar un pedido lo marca en vez de borrarlo
