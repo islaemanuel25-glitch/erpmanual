@@ -15,6 +15,7 @@ import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiButton from "@/components/sunmi/SunmiButton";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
+import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
 import SunmiSelectAdv, { SunmiSelectOption } from "@/components/sunmi/SunmiSelectAdv";
@@ -123,9 +124,14 @@ export default function PedidosCatalogoPage() {
   // Debounce busqueda
   const debounceRef = useRef(null);
 
+  // El pedido enviado se sigue armando hasta que el depósito lo empieza
+  // (`depositoEmpezo` de la ruta del carrito, el mismo criterio que hace que
+  // `set-cantidad` conteste 409). Empezado, solo se mira.
+  const empezado = !!pendiente?.depositoEmpezo;
+
   // El Volver va en el slot del shell. En "Ver mi pedido" vuelve al catálogo;
   // en el resto, a donde se venía.
-  const viendoPedido = vista === "carrito" && !pendiente;
+  const viendoPedido = vista === "carrito" && !empezado;
   useAccionDePagina(
     () =>
       viendoPedido ? (
@@ -223,9 +229,11 @@ export default function PedidosCatalogoPage() {
       const json = await res.json();
       if (json.ok) {
         setPosId(json.posId || null);
+        // Con un pedido enviado, lo que se arma es ESE pedido: `set-cantidad`
+        // escribe ahí y no abre borrador. Sus líneas son las del carrito.
         // Una línea por producto, con la cantidad sumada: el pedido puede
         // tener dos líneas del mismo producto (ver `juntarPorProducto`).
-        const lineas = juntarPorProducto(json.items, (it) => it.productoLocalId);
+        const lineas = juntarPorProducto(json.pendiente ? json.pendiente.items : json.items, (it) => it.productoLocalId);
         setCarritoItems(lineas);
         setPendiente(json.pendiente || null);
 
@@ -245,10 +253,11 @@ export default function PedidosCatalogoPage() {
   // SET CANTIDAD
   // ====================================================
   const setCantidad = async (productoLocalId, cantidad, unidad = "UNIDAD") => {
-    if (pendiente) {
-      setError("Hay un pedido solicitado pendiente. Esperá a que el depósito lo procese o cancelalo.");
-      return;
-    }
+    // Empezado no hay tarjetas vivas; esto es por si algo llegara a llamarlo.
+    // Si el depósito lo empezó y la pantalla todavía no se enteró, la ruta
+    // contesta 409, el mensaje sale arriba y el carrito se vuelve a leer: con
+    // eso la pantalla pasa sola a "El depósito lo está preparando".
+    if (empezado) return;
 
     // Optimistic update (siempre en total unidades)
     setCarrito((prev) => {
@@ -351,7 +360,13 @@ export default function PedidosCatalogoPage() {
       });
       const json = await res.json();
       if (json.ok) {
+        // Las cantidades en pantalla eran las del pedido cancelado: se tiran,
+        // y lo que haya ahora lo dice el carrito del servidor.
         setPendiente(null);
+        setCarrito({});
+        setCarritoItems([]);
+        setVista("catalogo");
+        await cargarCarrito();
       } else if (json.needsOperador) {
         setError("Ingresá tu PIN y volvé a tocar «Cancelar pedido».");
         requerirOperador();
@@ -429,17 +444,18 @@ export default function PedidosCatalogoPage() {
   );
 
   // ====================================================
-  // LOS TRES ESTADOS: armando en el catálogo, armando en "Ver mi pedido", y
-  // esperando al depósito. Las tarjetas son las mismas en los tres.
+  // LOS ESTADOS: armando el borrador (en el catálogo o en "Ver mi pedido"),
+  // enviado y todavía sin empezar (igual, pero lo que se carga va directo al
+  // pedido enviado, y no hay botón de enviar), y empezado por el depósito
+  // (solo lo pedido, apagado). Las tarjetas son las mismas en todos.
   // ====================================================
   const esperando = !!pendiente;
-  // Lo enviado, una tarjeta por producto con la cantidad sumada. La ruta no
-  // manda el id del producto en el pendiente: la clave es nombre y forma.
-  const enviados = esperando ? juntarPorProducto(pendiente.items, claveDeLoEnviado) : [];
+  // Lo enviado, una tarjeta por producto con la cantidad sumada.
+  const enviados = empezado ? juntarPorProducto(pendiente.items, claveDeLoEnviado) : [];
   // Cuántos PRODUCTOS hay, no cuántas líneas: `itemCount` de las rutas cuenta
   // líneas, y un producto con dos líneas contaba doble.
   const productosEnElCarrito = Object.keys(carrito).length;
-  const enPedido = esperando ? enviados.length : productosEnElCarrito;
+  const enPedido = empezado ? enviados.length : productosEnElCarrito;
 
   const tarjetaDelCatalogo = (prod) => (
     <TarjetaPedido
@@ -466,7 +482,7 @@ export default function PedidosCatalogoPage() {
   // la misma clave en "Ver mi pedido" (un producto con dos líneas) una quedaba
   // viva, con su ✕ y su − valor +, arriba del pedido ya enviado.
   let lista;
-  if (esperando) {
+  if (empezado) {
     lista = (
       <SunmiListaProductoCards key="enviado" mismoAlto={false}>
         {enviados.map((item) => (
@@ -478,7 +494,7 @@ export default function PedidosCatalogoPage() {
     lista = loadingCarrito
       ? vacio("Cargando carrito...")
       : carritoItems.length === 0
-        ? vacio("El carrito está vacío. Volvé al catálogo para agregar productos.")
+        ? vacio(esperando ? "El pedido enviado está vacío. Volvé al catálogo para sumar productos." : "El carrito está vacío. Volvé al catálogo para agregar productos.")
         : <SunmiListaProductoCards key="revision" mismoAlto={false}>{carritoItems.map(tarjetaDelCatalogo)}</SunmiListaProductoCards>;
   } else {
     lista = loadingCat
@@ -501,20 +517,20 @@ export default function PedidosCatalogoPage() {
               <SunmiPill color={esperando ? "cyan" : "slate"}>{esperando ? "Enviado" : "Borrador"}</SunmiPill>
             </div>
             <p className="text-sm2 sunmi-text-muted">
-              {esperando
-                ? `Enviado${enviadoCuando ? ` ${enviadoCuando}` : ""} · esperando al depósito`
-                : `${opciones.local.nombre} → ${opciones.deposito.nombre} · se guarda solo`}
+              {empezado
+                ? "El depósito lo está preparando"
+                : esperando
+                  ? `Enviado${enviadoCuando ? ` ${enviadoCuando}` : ""} · Podés sumar productos hasta que el depósito lo empiece a preparar`
+                  : `${opciones.local.nombre} → ${opciones.deposito.nombre} · se guarda solo`}
             </p>
             <p className="text-sm2 sunmi-text-muted">
               <span className="tabular-nums sunmi-text-strong font-semibold">{enPedido}</span>{" "}
-              {esperando
-                ? `${productos(enPedido)} · para pedir otra cosa, cancelalo`
-                : `${productos(enPedido)} en el pedido`}
+              {empezado ? `${productos(enPedido)} · ya no se puede cambiar` : `${productos(enPedido)} en el pedido`}
             </p>
           </>
         }
         buscador={
-          esperando || viendoPedido ? null : (
+          empezado || viendoPedido ? null : (
             <SunmiCampoBusquedaVoz
               value={busqueda}
               onChange={setBusqueda}
@@ -524,7 +540,7 @@ export default function PedidosCatalogoPage() {
           )
         }
         categoria={
-          esperando || viendoPedido ? null : (
+          empezado || viendoPedido ? null : (
             <SunmiSelectAdv id="categoria-pedido" value={categoriaId} onChange={(v) => setCategoriaId(v)}>
               <SunmiSelectOption value="">{`Todas · ${totalCatalogo ?? total}`}</SunmiSelectOption>
               {(opciones.categorias || []).map((c) => (
@@ -539,7 +555,7 @@ export default function PedidosCatalogoPage() {
           <>
             {/* Debajo del filtro, y solo donde está el filtro: en Ver mi pedido
                 y en el pedido enviado no se ve, pero lo elegido se respeta. */}
-            {esperando || viendoPedido ? null : (
+            {empezado || viendoPedido ? null : (
               <div data-ver-fotos="">
                 <SunmiToggle value={verFotos} onChange={setVerFotos} label="Ver fotos" />
               </div>
@@ -564,7 +580,7 @@ export default function PedidosCatalogoPage() {
           // 100 (las opciones por defecto de `SunmiPageSizer`, las mismas de la
           // ruta), y si se escondiera, quien eligió 100 y le entró todo en una
           // no podría volver a 25. Sin productos no hay nada que paginar.
-          !esperando && !viendoPedido && total > 0 ? (
+          !empezado && !viendoPedido && total > 0 ? (
             <SunmiPaginador
               page={page}
               pageSize={pageSize}
@@ -579,8 +595,15 @@ export default function PedidosCatalogoPage() {
         }
         pieDePantalla={
           esperando ? (
+            // Enviado, empezado o no: sin botón de enviar —ya está enviado— y
+            // con cancelar, que la ruta permite mientras siga Solicitado
+            // (también empezado: `cancelar` solo mira el estado). Sin empezar,
+            // "Ver mi pedido ›" lleva a lo pedido, con las tarjetas vivas.
             <div className="space-y-2">
-              <p className="text-sm2 sunmi-text-muted">{`Pedido enviado · ${enPedido} ${productos(enPedido)}`}</p>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm2 sunmi-text-muted">{`Pedido enviado · ${enPedido} ${productos(enPedido)}`}</span>
+                {empezado || viendoPedido ? null : <SunmiLinkButton onClick={abrirCarrito}>Ver mi pedido ›</SunmiLinkButton>}
+              </div>
               <SunmiButton
                 color="red"
                 className="w-full min-h-toque"
@@ -670,8 +693,8 @@ function TarjetaPedido({ producto, cantidad, enPedido = false, apagada = false, 
       <div className="flex gap-3">
       {/* Con "Ver fotos" prendido, la foto a la izquierda ocupando su lugar
           siempre: sin foto, la inicial en el mismo cuadrado. El pedido enviado
-          no trae la foto (`pendiente.items` no tiene `imagenUrl`), así que ahí
-          va la inicial. Apagado, no hay cuadrado y el resto usa todo el ancho. */}
+          trae la foto igual que el borrador (`pendiente.items` con `imagenUrl`).
+          Apagado, no hay cuadrado y el resto usa todo el ancho. */}
       {conFoto ? <MiniaturaProductoTarjeta url={producto.imagenUrl} conservaLugar nombre={nombre} /> : null}
       <div className="flex-1 min-w-0 space-y-2">
       <div className="flex items-start gap-2">

@@ -64,23 +64,31 @@ test("revisar: cada producto una vez, y el de dos líneas con la suma", async ()
   }
 });
 
-test("enviado: TODAS las tarjetas apagadas, sin ✕, y ningún producto repetido", async () => {
+// Desde el 2026-10-22 el pedido recién enviado se sigue armando: después de
+// enviar vuelve el catálogo, vivo, con las cantidades de lo enviado. Decía
+// "TODAS las tarjetas apagadas"; apagado queda solo el pedido que el depósito
+// ya empezó (`pantallaPedidos.test.mjs`, "6. empezado"). Lo que sigue valiendo
+// es lo que vio Emanuel: ningún producto dos veces y ninguna clave repetida.
+test("enviado: el catálogo vuelve con lo enviado, cada producto una vez y el de dos líneas con la suma", async () => {
   const consola = escucharClavesRepetidas();
   try {
+    assert.equal(real.recorridoTrasEnviar.cuerpo.pendiente.depositoEmpezo, false);
     const { pedidos } = await montar({ inicio: real.recorridoRevision, solicitar: [real.recorridoSolicitado], local });
     await revisarYEnviar();
     assert.equal(llamadas(pedidos, "/api/pos-transferencias/solicitar").length, 1);
-    assert.match(document.body.textContent, /esperando al depósito/);
+    assert.match(document.body.textContent, /Podés sumar productos hasta que el depósito lo empiece a preparar/);
 
-    const vivas = tarjetas().filter((t) => t.quitar || !t.mas?.disabled || !t.menos?.disabled || !t.campo?.disabled);
-    assert.deepEqual(vivas.map((t) => t.nombre), [], "con el pedido enviado quedó una tarjeta viva");
-    assert.deepEqual(repetidos(), [], "un producto aparece dos veces en el pedido enviado");
-    assert.equal(tarjetas().length, 5, "el pedido enviado tiene cinco productos");
+    assert.deepEqual(repetidos(), [], "un producto aparece dos veces");
     assert.equal(tarjetas().find((t) => t.nombre === ORO).campo.value, "3", "lo enviado del 9 DE ORO es 1 + 2");
-    // Y cada tarjeta conserva el lugar de la ✕, invisible.
-    assert.ok(tarjetas().every((t) => t.lugarQuitar?.classList.contains("invisible")));
+    assert.ok(tarjetas().every((t) => t.quitar), "lo enviado son los cinco del catálogo: todos con ✕");
     assert.match(document.body.textContent, /Pedido enviado · 5 productos/);
     assert.deepEqual(consola.avisos, [], "React vio dos tarjetas con la misma clave");
+
+    // Y en Ver mi pedido, los cinco, una vez cada uno.
+    await tocar(boton("Ver mi pedido ›"));
+    assert.equal(tarjetas().length, 5);
+    assert.deepEqual(repetidos(), []);
+    assert.deepEqual(consola.avisos, []);
   } finally {
     consola.soltar();
   }

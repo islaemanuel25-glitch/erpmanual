@@ -53,7 +53,9 @@ test("en la revisión, Confirmar y enviar al depósito (N productos) es el que e
   assert.deepEqual(llamadas(pedidos, "/api/pos-transferencias/solicitar")[0].cuerpo, { posId: real.recorridoRevision.cuerpo.posId });
   // Lo de 8b25d40 se conserva: el aviso y el pendiente en el acto.
   assert.match(texto(), /Pedido enviado al depósito correctamente/);
-  assert.match(texto(), /esperando al depósito/);
+  // Decía "esperando al depósito", que dejó de salir el 2026-10-22: el
+  // pendiente se ve en la barra.
+  assert.match(texto(), /Pedido enviado · 5 productos/);
 });
 
 test("Volver al catálogo vuelve sin enviar", async () => {

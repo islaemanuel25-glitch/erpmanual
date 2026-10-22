@@ -14,9 +14,11 @@
 //   3. `needsOperador` pide el PIN encima de la pantalla, el carrito queda, y no
 //      se reintenta solo: el segundo envío lo hace la persona.
 //
-// Desde el rediseño de la pantalla, "pendiente" se ve en la tarjeta de contexto
-// —la píldora "Enviado" y "esperando al depósito"— y cancelar está en la barra
-// de abajo. Lo que estos candados afirman no cambió.
+// Desde el rediseño de la pantalla, "pendiente" se ve en la barra de abajo
+// —"Pedido enviado · N productos"—, con cancelar al lado. Decía "esperando al
+// depósito", que desde el 2026-10-22 no sale: el pedido enviado se sigue
+// armando ("Podés sumar productos…") hasta que el depósito lo empieza. Lo que
+// estos candados afirman no cambió.
 
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
@@ -31,7 +33,7 @@ afterEach(desmontarTodo);
 // el nodo de jsdom entero y el proceso se cuelga en vez de dar rojo. Con
 // `assert.ok(!nodo, …)` el rojo se ve.
 
-const esperandoAlDeposito = () => /esperando al depósito/.test(texto());
+const esperandoAlDeposito = () => /Pedido enviado · \d+ producto/.test(texto());
 
 test("el fixture es el que contestan las rutas: los 428 traen needsOperador y el carrito armado no tiene pendiente", () => {
   assert.equal(real.solicitarSinOperador.status, 428);

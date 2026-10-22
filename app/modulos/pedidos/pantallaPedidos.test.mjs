@@ -15,7 +15,9 @@
 //      "UNIDAD", y la unidad con la que se manda la cantidad;
 //   4. "Ver mi pedido": la misma lista, solo con lo pedido, y su Volver en el
 //      slot del shell;
-//   5. esperando al depósito: solo lo enviado, sin ✕ y sin poder tocar nada.
+//   5. enviado sin empezar: el catálogo vuelve, vivo, y lo cargado va directo
+//      al pedido enviado; en la barra "Ver mi pedido ›" y cancelar, sin enviar;
+//   6. empezado por el depósito: solo lo pedido, sin ✕ y sin poder tocar nada.
 
 import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
@@ -37,10 +39,14 @@ const buscador = () => contenido().querySelector('input[placeholder="Buscar prod
 const categoria = () => contenido().querySelector("#categoria-pedido");
 
 /** El pendiente real, con su fecha corrida: es lo único que cambia de un día al otro. */
-const pendienteDel = (fecha) => ({
-  ...real.carritoPendiente,
-  cuerpo: { ...real.carritoPendiente.cuerpo, pendiente: { ...real.carritoPendiente.cuerpo.pendiente, solicitadoAt: fecha.toISOString() } },
+const conFecha = (r, fecha) => ({
+  ...r,
+  cuerpo: { ...r.cuerpo, pendiente: { ...r.cuerpo.pendiente, solicitadoAt: fecha.toISOString() } },
 });
+/** Enviado y sin empezar: la coca y el agua (sección 3 del script de base). */
+const pendienteDel = (fecha) => conFecha(real.carritoPendiente, fecha);
+/** Enviado y empezado: el depósito preparó el aceite (sección 9d). */
+const empezadoDel = (fecha) => conFecha(real.empezadoCarrito, fecha);
 
 test("el fixture es el que contestan las rutas: tres en el catálogo, el agua por bulto de 6, dos en el pedido", () => {
   const cat = real.catalogo.cuerpo.items;
@@ -156,13 +162,27 @@ test("✕: sin el producto, el lugar está pero invisible, apagado y fuera del f
   assert.ok(coca === tarjeta("Coca 2L").quitar, "la ✕ no está en el lugar reservado");
 });
 
-test("✕: en el pedido enviado no va, pero el lugar se reserva igual", async () => {
-  await montar({ inicio: pendienteDel(new Date()) });
+test("✕: en el pedido empezado no va, pero el lugar se reserva igual", async () => {
+  await montar({ inicio: empezadoDel(new Date()) });
+  // Las tarjetas son las de lo pedido: sin esto, el catálogo —que no tiene
+  // esos productos y por eso no lleva ✕— pasaba igual (contraprueba).
+  assert.deepEqual(nombres(), real.empezadoCarrito.cuerpo.pendiente.items.map((i) => i.nombre).sort());
   for (const t of tarjetas()) {
-    assert.ok(t.lugarQuitar, `${t.nombre}: el pedido enviado no reserva el lugar`);
-    assert.ok(t.lugarQuitar.classList.contains("invisible"), `${t.nombre}: se ve la ✕ en el pedido enviado`);
+    assert.ok(t.lugarQuitar, `${t.nombre}: el pedido empezado no reserva el lugar`);
+    assert.ok(t.lugarQuitar.classList.contains("invisible"), `${t.nombre}: se ve la ✕ en el pedido empezado`);
     assert.equal(t.lugarQuitar.disabled, true);
   }
+});
+
+test("✕: en el pedido enviado sin empezar va en lo pedido, y saca el producto", async () => {
+  const { pedidos } = await montar({ inicio: pendienteDel(new Date()) });
+  assert.ok(tarjeta("Coca 2L").quitar, "la coca está en el pedido enviado: lleva ✕");
+  assert.ok(tarjeta("Agua x6").quitar);
+  assert.ok(!tarjeta("Yerba 1kg").quitar, "la yerba no está en el pedido: sin ✕");
+  await tocar(tarjeta("Coca 2L").quitar);
+  assert.equal(setCantidades(pedidos).at(-1).cantidad, 0);
+  assert.ok(!tarjeta("Coca 2L").quitar);
+  assert.match(contenido().textContent, /Pedido enviado · 1 producto(?!s)/);
 });
 
 test("cada tarjeta mide lo que necesita: la lista de Pedidos no iguala altos", async () => {
@@ -379,16 +399,21 @@ test("VER FOTOS: si el celular no deja leer, apagado", async () => {
   }
 });
 
-test("VER FOTOS: en Ver mi pedido y en el pedido enviado no se ve, pero se respeta", async () => {
+test("VER FOTOS: en Ver mi pedido y en el pedido empezado no se ve, pero se respeta", async () => {
   await montar({ inicio: real.carritoBorrador });
   await tocar(boton("Revisar y enviar"));
   assert.ok(!interruptor(), "en Ver mi pedido no va el interruptor");
   assert.ok(sinCuadrado(), "apagado, Ver mi pedido mostró fotos");
   await desmontarTodo();
 
+  await montar({ inicio: empezadoDel(new Date()) });
+  assert.ok(!interruptor(), "en el pedido empezado no va el interruptor");
+  assert.ok(sinCuadrado(), "apagado, el pedido empezado mostró iniciales");
+  await desmontarTodo();
+
+  // Enviado sin empezar vuelve el catálogo, y con él el interruptor.
   await montar({ inicio: pendienteDel(new Date()) });
-  assert.ok(!interruptor(), "en el pedido enviado no va el interruptor");
-  assert.ok(sinCuadrado(), "apagado, el pedido enviado mostró iniciales");
+  assert.ok(interruptor(), "en el pedido enviado sin empezar va el interruptor");
 });
 
 test("3. lo tipeado se manda al salir del campo, no tecla por tecla", async () => {
@@ -517,7 +542,7 @@ test("GUÍA: el + desde 0 lleva a 1, y el 1 se ve como número", async () => {
   assert.equal(tarjeta("Yerba 1kg").campo.value, "1");
 });
 
-test("GUÍA: se prende en el catálogo y en Ver mi pedido, no en el pedido enviado", async () => {
+test("GUÍA: se prende en el catálogo y en Ver mi pedido, no en el pedido empezado", async () => {
   await montar({ inicio: real.carritoBorrador });
   assert.equal(tarjeta("Yerba 1kg").campo.getAttribute("placeholder"), "0", "el catálogo no la prende");
   await tocar(boton("Revisar y enviar"));
@@ -525,7 +550,11 @@ test("GUÍA: se prende en el catálogo y en Ver mi pedido, no en el pedido envia
   await desmontarTodo();
 
   await montar({ inicio: pendienteDel(new Date()) });
-  for (const t of tarjetas()) assert.equal(t.campo.getAttribute("placeholder"), null, `${t.nombre}: el pedido enviado la prende`);
+  assert.equal(tarjeta("Yerba 1kg").campo.getAttribute("placeholder"), "0", "el pedido enviado sin empezar no la prende");
+  await desmontarTodo();
+
+  await montar({ inicio: empezadoDel(new Date()) });
+  for (const t of tarjetas()) assert.equal(t.campo.getAttribute("placeholder"), null, `${t.nombre}: el pedido empezado la prende`);
 });
 
 test("4. Ver mi pedido: solo lo pedido, sin buscador ni filtro, y vuelve desde el shell", async () => {
@@ -543,32 +572,100 @@ test("4. Ver mi pedido: solo lo pedido, sin buscador ni filtro, y vuelve desde e
   assert.ok(buscador());
 });
 
-test("5. esperando: Enviado, solo lo enviado, sin ✕ y sin poder tocar nada", async () => {
-  await montar({ inicio: pendienteDel(new Date()) });
-  assert.equal(pill(), "Enviado");
-  assert.match(contenido().textContent, /Enviado hoy \d\d:\d\d · esperando al depósito/);
-  assert.match(contenido().textContent, /2 productos · para pedir otra cosa, cancelalo/);
-  assert.match(contenido().textContent, /Pedido enviado · 2 productos/);
-  assert.ok(!buscador(), "sin buscador");
-  assert.ok(!categoria(), "sin filtro");
-  assert.ok(!document.querySelector("[data-paginador]"), "sin paginador");
-  assert.ok(!boton("Revisar y enviar") && !boton("Confirmar y enviar"), "sin enviar");
-  assert.ok(boton("Cancelar pedido"));
+/** La barra de abajo: el renglón con el conteo y lo que tenga al lado. */
+const barra = () => [...document.querySelectorAll("span")].find((s) => /^Pedido enviado · /.test(s.textContent.trim()))?.parentElement;
 
-  assert.deepEqual(nombres(), ["Agua x6", "Coca 2L"], "solo lo enviado, no el catálogo");
+test("5. enviado sin empezar: se sigue armando, con el catálogo vivo y lo cargado directo al pedido", async () => {
+  const { pedidos } = await montar({ inicio: pendienteDel(new Date()) });
+  assert.equal(pill(), "Enviado");
+  assert.match(contenido().textContent, /Enviado hoy \d\d:\d\d · Podés sumar productos hasta que el depósito lo empiece a preparar/);
+  assert.match(contenido().textContent, /2 productos en el pedido/);
+  // Vuelven el buscador, la categoría y el catálogo, con las tarjetas vivas.
+  assert.ok(buscador(), "sin buscador");
+  assert.ok(categoria(), "sin filtro");
+  assert.ok(interruptor(), "sin Ver fotos");
+  assert.ok(document.querySelector("[data-paginador]"), "sin paginador");
+  assert.deepEqual(nombres(), ["Agua x6", "Coca 2L", "Yerba 1kg"], "el catálogo entero, no solo lo enviado");
+  assert.equal(tarjeta("Agua x6").campo.value, "2", "lo enviado trae su cantidad");
+  for (const t of tarjetas()) assert.equal(t.mas.disabled, false, `${t.nombre}: el + apagado`);
+
+  // La barra: el conteo, "Ver mi pedido ›" a la derecha y cancelar; sin enviar.
+  assert.ok(barra(), "falta el renglón Pedido enviado · N productos");
+  assert.match(barra().textContent, /Pedido enviado · 2 productos/);
+  const ver = boton("Ver mi pedido ›", barra());
+  assert.ok(ver, "falta Ver mi pedido › al lado del conteo");
+  assert.ok(barra().lastElementChild === ver, "Ver mi pedido › no está a la derecha");
+  assert.ok(boton("Cancelar pedido"));
+  assert.match(boton("Cancelar pedido").className, /w-full/);
+  assert.ok(!boton("Revisar y enviar") && !boton("Confirmar y enviar"), "no hay nada que enviar");
+
+  // Lo que se carga va directo al pedido: set-cantidad, sin enviar nada.
+  await tocar(tarjeta("Yerba 1kg").mas);
+  assert.equal(setCantidades(pedidos).at(-1).cantidad, 1);
+  assert.equal(llamadas(pedidos, "/api/pos-transferencias/solicitar").length, 0);
+  assert.match(barra().textContent, /Pedido enviado · 3 productos/);
+});
+
+test("5. enviado sin empezar: Ver mi pedido trae solo lo pedido, vivo y con ✕", async () => {
+  const { pedidos } = await montar({ inicio: pendienteDel(new Date()) });
+  await tocar(boton("Ver mi pedido ›"));
+  assert.deepEqual(nombres(), ["Agua x6", "Coca 2L"]);
+  assert.ok(!buscador() && !categoria(), "en Ver mi pedido no van el buscador ni el filtro");
   for (const t of tarjetas()) {
-    assert.ok(!t.quitar, `${t.nombre}: sin ✕`);
-    assert.equal(t.campo.disabled, true, `${t.nombre}: el campo apagado`);
-    assert.equal(t.menos.disabled, true, `${t.nombre}: el − apagado`);
-    assert.equal(t.mas.disabled, true, `${t.nombre}: el + apagado`);
+    assert.ok(t.quitar, `${t.nombre}: sin ✕`);
+    assert.equal(t.campo.disabled, false, `${t.nombre}: el campo apagado`);
   }
-  assert.equal(tarjeta("Agua x6").unidad, "Por BULTO de 6 u");
-  assert.equal(tarjeta("Agua x6").campo.value, "2");
+  assert.ok(!boton("Ver mi pedido ›"), "adentro no se ofrece de nuevo");
+  assert.ok(!boton("Confirmar y enviar"), "no hay nada que enviar");
+  assert.ok(boton("Cancelar pedido"));
+  await tocar(tarjeta("Agua x6").mas);
+  assert.equal(setCantidades(pedidos).at(-1).cantidad, 3);
+  await tocar(boton("Volver al catálogo", filaShell()));
+  assert.ok(buscador());
+});
+
+test("6. empezado: El depósito lo está preparando, solo lo pedido, todo apagado", async () => {
+  const p = real.empezadoCarrito.cuerpo.pendiente;
+  assert.equal(p.depositoEmpezo, true, "el fixture no es de un pedido empezado");
+  await montar({ inicio: empezadoDel(new Date()) });
+  assert.equal(pill(), "Enviado");
+  assert.match(contenido().textContent, /El depósito lo está preparando/);
+  assert.doesNotMatch(contenido().textContent, /Podés sumar/);
+  assert.match(contenido().textContent, /3 productos · ya no se puede cambiar/);
+  assert.ok(!buscador(), "con buscador");
+  assert.ok(!categoria(), "con filtro");
+  assert.ok(!interruptor(), "con Ver fotos");
+  assert.ok(!document.querySelector("[data-paginador]"), "con paginador");
+
+  assert.deepEqual(nombres(), p.items.map((i) => i.nombre).sort(), "solo lo pedido, no el catálogo");
+  for (const t of tarjetas()) {
+    assert.ok(!t.quitar, `${t.nombre}: con ✕`);
+    assert.equal(t.campo.disabled, true, `${t.nombre}: el campo vivo`);
+    assert.equal(t.menos.disabled, true, `${t.nombre}: el − vivo`);
+    assert.equal(t.mas.disabled, true, `${t.nombre}: el + vivo`);
+  }
+  // La barra: el conteo y cancelar, que la ruta todavía permite (sección 9d).
+  assert.equal(real.empezadoCancelar.status, 200);
+  assert.match(barra().textContent, /Pedido enviado · 3 productos/);
+  assert.ok(!boton("Ver mi pedido ›"), "empezado no hay nada que ver aparte");
+  assert.ok(boton("Cancelar pedido"));
+  assert.ok(!boton("Revisar y enviar") && !boton("Confirmar y enviar"));
+});
+
+test("6. el 409 de un pedido que el depósito empezó lleva la pantalla a empezado", async () => {
+  // Lo enviado sin empezar en pantalla; el depósito lo empezó por detrás:
+  // set-cantidad contesta el 409 real y el carrito, releído, viene empezado.
+  const { estado } = await montar({ inicio: pendienteDel(new Date()), setCantidad: real.empezadoSetCantidad });
+  estado.carrito = empezadoDel(new Date());
+  await tocar(tarjeta("Yerba 1kg").mas);
+  assert.match(texto(), /El depósito ya está preparando tu pedido\. Ya no se puede cambiar\./);
+  assert.match(contenido().textContent, /El depósito lo está preparando/);
+  assert.ok(!buscador());
 });
 
 test("5. si no es de hoy, la fecha corta", async () => {
   const hace3 = new Date(Date.now() - 3 * 24 * 3600 * 1000);
   await montar({ inicio: pendienteDel(hace3) });
-  assert.match(contenido().textContent, /Enviado \d\d\/\d\d \d\d:\d\d · esperando al depósito/);
+  assert.match(contenido().textContent, /Enviado \d\d\/\d\d \d\d:\d\d · Podés sumar/);
   assert.doesNotMatch(contenido().textContent, /Enviado hoy/);
 });
