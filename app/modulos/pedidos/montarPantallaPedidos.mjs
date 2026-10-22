@@ -60,8 +60,10 @@ export const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
  *     120 productos, el del recorrido—: `{ me, operadorMe, opciones,
  *     catalogo(params), trasEnviar }`, todas respuestas reales de ese local.
  *     Sin esto, el local de los tres productos.
+ *   - `setCantidad`: lo que contesta `set-cantidad` en vez del ok de siempre
+ *     (por ejemplo el 409 de "hay un pedido enviado").
  */
-function servidor({ inicio, solicitar = [], cancelar = [], local = null }) {
+function servidor({ inicio, solicitar = [], cancelar = [], local = null, setCantidad = null }) {
   const pedidos = [];
   const estado = { conPin: true, carrito: inicio };
   const colas = { solicitar: [...solicitar], cancelar: [...cancelar] };
@@ -79,7 +81,7 @@ function servidor({ inicio, solicitar = [], cancelar = [], local = null }) {
       r = local ? local.catalogo(Object.fromEntries(u.searchParams)) : u.searchParams.get("categoriaId") ? real.catalogoBebidas : real.catalogo;
     }
     else if (u.pathname === "/api/pedidos/carrito") r = estado.carrito;
-    else if (u.pathname === "/api/pedidos/set-cantidad") r = cuerpo?.unidad === "BULTO" ? real.setCantidad_BULTO : real.setCantidad_UNIDAD;
+    else if (u.pathname === "/api/pedidos/set-cantidad") r = setCantidad ?? (cuerpo?.unidad === "BULTO" ? real.setCantidad_BULTO : real.setCantidad_UNIDAD);
     else if (u.pathname === "/api/pos-transferencias/solicitar") {
       r = colas.solicitar.shift();
       if (r === real.solicitado) estado.carrito = real.carritoPendiente;

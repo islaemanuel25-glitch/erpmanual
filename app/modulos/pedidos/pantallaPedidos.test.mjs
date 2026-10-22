@@ -172,6 +172,27 @@ test("cada tarjeta mide lo que necesita: la lista de Pedidos no iguala altos", a
   assert.doesNotMatch(grilla.className, /auto-rows-fr/, "la grilla sigue estirando todas al alto de la más alta");
 });
 
+test("409 de set-cantidad (hay un pedido enviado): el mensaje sale en el aviso de arriba, y la pantalla sigue entera", async () => {
+  // El caso: otro celular del mismo local envió el pedido y éste todavía no se
+  // enteró. Tocar el + manda una cantidad, y la ruta contesta 409. La respuesta
+  // es la REAL (`scripts/pruebas-db/pedidosEnviarCancelar.mjs`, sección 8b).
+  const r409 = real.setCantidadConPedidoEnviado;
+  assert.equal(r409.status, 409);
+  await montar({ inicio: real.carritoBorrador, setCantidad: r409 });
+  await tocar(tarjeta("Yerba 1kg").mas);
+  const aviso = [...document.querySelectorAll(".sunmi-state-danger")].find((d) => d.textContent.includes(r409.cuerpo.error));
+  assert.ok(aviso, "el mensaje de la ruta no salió en el aviso");
+  assert.ok(boton("cerrar", aviso), "el aviso perdió su cerrar");
+  // Arriba de la lista, como los demás errores.
+  const orden = document.body.innerHTML;
+  assert.ok(orden.indexOf(r409.cuerpo.error) < orden.indexOf("data-tarjeta-pedido"), "el aviso no está arriba de la lista");
+  // Y la pantalla sigue entera: las tarjetas y la barra.
+  assert.deepEqual(nombres(), ["Agua x6", "Coca 2L", "Yerba 1kg"]);
+  assert.ok(boton("Revisar y enviar"));
+  await tocar(boton("cerrar", aviso));
+  assert.doesNotMatch(document.body.textContent, /Hay un pedido enviado esperando/, "cerrar no cerró el aviso");
+});
+
 test("3. la ✕ solo en lo pedido, y pone la cantidad en 0", async () => {
   const { pedidos } = await montar({ inicio: real.carritoBorrador });
   assert.deepEqual(nombres(), ["Agua x6", "Coca 2L", "Yerba 1kg"]);

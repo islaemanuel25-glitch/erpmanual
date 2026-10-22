@@ -118,9 +118,36 @@ export async function POST(req) {
     // Se respeta la unidad recibida ("BULTO" o "UNIDAD"). Fallback a "UNIDAD".
     const unidad = unidadIn;
 
-    // Obtener/crear POS borrador para este par (depósito->local)
-    const pos = await prisma.$transaction(async (tx) => {
-      let found = await tx.posTransferencia.findFirst({
+    // ── TODO LO QUE ESCRIBE, EN UNA TRANSACCIÓN Y DE A UNO POR PAR ──────────
+    //
+    // Antes buscar el borrador, buscar la línea y crearla iban por separado.
+    // Dos toques rápidos al + sobre un producto en 0 viajaban juntos, ninguno
+    // encontraba la línea y los dos la creaban: dos líneas del mismo producto
+    // (reproducido 8 de 11 contra erpazul_al, pedido #31). Y una cantidad que
+    // llegaba justo detrás del envío no encontraba borrador y abría uno nuevo
+    // al lado del pedido enviado.
+    //
+    // Dos bloqueos, y cada uno cubre un choque distinto:
+    //
+    // · `pg_advisory_xact_lock(depósito, local)`: hace esperar a otro
+    //   `set-cantidad` del mismo par hasta que éste termine. Va sobre el PAR y
+    //   no sobre la fila del borrador porque, sin borrador todavía, no hay fila
+    //   que bloquear y dos pedidos crearían dos. Es la forma de dos claves de
+    //   32 bits, que en PostgreSQL no se pisa con la de una clave que usan
+    //   Ofertas y la anulación de ventas.
+    //
+    // · `SELECT … FOR UPDATE` sobre la fila del borrador: hace esperar al envío
+    //   (`/api/pos-transferencias/solicitar` actualiza esa fila) o espera a que
+    //   el envío termine. Si el envío ganó, la fila se relee ya en
+    //   "Solicitado" y no se escribe nada en ella.
+    //
+    // Sin migración a propósito: un índice único fallaría al aplicarse sobre
+    // los pedidos que ya tienen líneas repetidas. Esos se arreglan solos acá
+    // cuando se toca el producto (ver más abajo).
+    const resultado = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${depositoId}::int, ${localId}::int)`;
+
+      let pos = await tx.posTransferencia.findFirst({
         where: sinCancelados({
           origenId: depositoId,
           destinoId: localId,
@@ -129,8 +156,30 @@ export async function POST(req) {
         orderBy: { createdAt: "desc" },
       });
 
-      if (!found) {
-        found = await tx.posTransferencia.create({
+      if (pos) {
+        // La fila, bloqueada y releída: si el envío la pasó a "Solicitado"
+        // mientras tanto, ya no es un borrador.
+        const [bloqueada] = await tx.$queryRaw`SELECT id, estado FROM "PosTransferencia" WHERE id = ${pos.id} FOR UPDATE`;
+        if (!bloqueada || !["Borrador", "Preparando"].includes(bloqueada.estado)) pos = null;
+      }
+
+      // ── MIENTRAS HAY UN PEDIDO ENVIADO, NO SE ARMA OTRO ─────────────────
+      // Regla de Emanuel. El criterio de "Solicitado sin cancelar" es el
+      // mismo de `solicitar`: `sinCancelados` sobre el par.
+      //
+      // Se pregunta DESPUÉS de buscar y bloquear el borrador, y el orden es el
+      // arreglo: preguntado antes, un envío que se confirmaba entre las dos
+      // consultas no se veía en la primera y ya se había llevado el borrador
+      // en la segunda, y se abría uno nuevo (medido: 7 de 20). Ahora, si el
+      // envío se llevó el borrador, ya está confirmado cuando se pregunta.
+      const enviado = await tx.posTransferencia.findFirst({
+        where: sinCancelados({ estado: "Solicitado", origenId: depositoId, destinoId: localId }),
+        select: { id: true },
+      });
+      if (enviado) return { conflicto: true };
+
+      if (!pos) {
+        pos = await tx.posTransferencia.create({
           data: {
             origenId: depositoId,
             destinoId: localId,
@@ -140,73 +189,73 @@ export async function POST(req) {
         });
       }
 
-      return found;
+      // Todas las líneas del producto: con el bloqueo puesto hay una o
+      // ninguna, pero los borradores de antes pueden tener dos.
+      const lineas = await tx.posTransferenciaDetalle.findMany({
+        where: {
+          posTransferenciaId: pos.id,
+          productoId: productoLocalId,
+          pos: sinCancelados(),
+        },
+        orderBy: { id: "asc" },
+      });
+      const [existente, ...sobrantes] = lineas;
+
+      let item = null;
+
+      if (cantidad === 0) {
+        // Quitar el producto: todas sus líneas, también las repetidas.
+        if (lineas.length) {
+          await tx.posTransferenciaDetalle.deleteMany({ where: { id: { in: lineas.map((l) => l.id) } } });
+        }
+      } else {
+        // Upsert: sugerido = cantidad, preparado = 0
+        if (existente) {
+          item = await tx.posTransferenciaDetalle.update({
+            where: { id: existente.id },
+            data: {
+              sugerido: cantidad,
+              preparado: 0,
+              unidadSugerida: unidad,
+              tipo: "manual",
+            },
+          });
+          // Un borrador viejo con el producto dos veces queda con UNA línea,
+          // la de la cantidad nueva.
+          if (sobrantes.length) {
+            await tx.posTransferenciaDetalle.deleteMany({ where: { id: { in: sobrantes.map((l) => l.id) } } });
+          }
+        } else {
+          item = await tx.posTransferenciaDetalle.create({
+            data: {
+              posTransferenciaId: pos.id,
+              productoId: productoLocalId,
+              sugerido: cantidad,
+              preparado: 0,
+              tipo: "manual",
+              unidadSugerida: unidad,
+              unidadPreparada: unidad,
+            },
+          });
+        }
+      }
+
+      // Contar items en el carrito
+      const itemCount = await tx.posTransferenciaDetalle.count({
+        where: { posTransferenciaId: pos.id, pos: sinCancelados() },
+      });
+
+      return { pos, item, itemCount };
     });
 
-    // Verificar que la POS no esté Solicitado o Enviado
-    if (pos.estado === "Solicitado") {
+    if (resultado.conflicto) {
       return NextResponse.json(
-        { ok: false, error: "Tu pedido ya fue solicitado. Esperá a que el depósito lo procese, o cancelalo." },
+        { ok: false, error: "Hay un pedido enviado esperando al depósito. Cancelalo para pedir otra cosa." },
         { status: 409 }
       );
     }
 
-    if (pos.estado === "Enviado") {
-      return NextResponse.json(
-        { ok: false, error: "Esta POS ya fue enviada" },
-        { status: 400 }
-      );
-    }
-
-    // Buscar detalle existente
-    const existente = await prisma.posTransferenciaDetalle.findFirst({
-      where: {
-        posTransferenciaId: pos.id,
-        productoId: productoLocalId,
-        pos: sinCancelados(),
-      },
-    });
-
-    let item = null;
-
-    if (cantidad === 0) {
-      // Quitar item si existe
-      if (existente) {
-        await prisma.posTransferenciaDetalle.delete({
-          where: { id: existente.id },
-        });
-      }
-    } else {
-      // Upsert: sugerido = cantidad, preparado = 0
-      if (existente) {
-        item = await prisma.posTransferenciaDetalle.update({
-          where: { id: existente.id },
-          data: {
-            sugerido: cantidad,
-            preparado: 0,
-            unidadSugerida: unidad,
-            tipo: "manual",
-          },
-        });
-      } else {
-        item = await prisma.posTransferenciaDetalle.create({
-          data: {
-            posTransferenciaId: pos.id,
-            productoId: productoLocalId,
-            sugerido: cantidad,
-            preparado: 0,
-            tipo: "manual",
-            unidadSugerida: unidad,
-            unidadPreparada: unidad,
-          },
-        });
-      }
-    }
-
-    // Contar items en el carrito
-    const itemCount = await prisma.posTransferenciaDetalle.count({
-      where: { posTransferenciaId: pos.id, pos: sinCancelados() },
-    });
+    const { pos, item, itemCount } = resultado;
 
     return NextResponse.json({
       ok: true,

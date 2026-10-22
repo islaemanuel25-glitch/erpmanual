@@ -22,11 +22,25 @@
 // Con ESCRIBIR_FIXTURE_PEDIDOS=1 deja las respuestas tal cual en
 // `app/modulos/pedidos/enviarCancelar.fixture.json`, que es lo que leen los
 // candados de la pantalla (`app/modulos/pedidos/enviarCancelar.test.mjs`).
+// ACTUALIZA solo las claves que produjo esta corrida y deja las demás: las del
+// recorrido con líneas repetidas (sección 7) son de la ruta de ANTES del
+// bloqueo y con la de hoy ya no se pueden producir.
+//
+// ── RUTA_ANTES_DEL_BLOQUEO=1 ──────────────────────────────────────────────
+// Para correr con `app/api/pedidos/set-cantidad/route.js` de antes del bloqueo
+// (la de e4505d0, puesta a mano en el árbol) y medir las carreras como eran. Le
+// cambia a las secciones 7 y 8 lo que esperan: con la ruta de antes, las dos
+// carreras SÍ dan duplicados y borradores nuevos. Y deja en la base un borrador
+// con líneas repetidas DE VERDAD —hechas por la ruta, no escritas a mano— en un
+// grupo "Grupo duplicados viejos", que la sección 8 de la corrida normal usa
+// para probar que la ruta de hoy los deja en una línea.
 //
 // Nivel ESCRITURA: host local y NODE_ENV distinto de production.
 
 import { crearClientePrisma, ESCRITURA } from "../lib/clientePrisma.mjs";
-import { writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+
+const ANTES = process.env.RUTA_ANTES_DEL_BLOQUEO === "1";
 
 const c = await crearClientePrisma({ nivel: ESCRITURA });
 
@@ -301,42 +315,65 @@ try {
     }
   }
 
-  seccion("7. El recorrido del celular: cargar, tocar el último dos veces, revisar y enviar");
+  /**
+   * Un local aparte con su depósito, la cuenta de un encargado y su operadora,
+   * y los productos pedidos en el depósito. Devuelve las sesiones (sin y con
+   * PIN), los ids de los productos por nombre y `fijar`, que llama a
+   * `set-cantidad` como la pantalla.
+   */
+  async function armarLocal(nombreGrupo, productos) {
+    const g = await c.grupo.create({ data: { nombre: `${nombreGrupo} ${marca}` } });
+    await c.configuracionGrupo.create({ data: { grupoId: g.id } });
+    const local = await c.local.create({ data: { nombre: `Mini ${nombreGrupo} ${marca}` } });
+    const deposito = await c.local.create({ data: { nombre: `Depósito ${nombreGrupo} ${marca}`, es_deposito: true } });
+    await c.grupoLocal.create({ data: { grupoId: g.id, localId: local.id } });
+    await c.grupoDeposito.create({ data: { grupoId: g.id, localId: deposito.id } });
+    for (const l of [local, deposito]) await c.configuracionLocal.create({ data: { localId: l.id } });
+    const cuentaLocal = await c.usuario.create({
+      data: { nombre: `Cuenta ${nombreGrupo}`, email: `${nombreGrupo.replace(/\W+/g, "-").toLowerCase()}-${marca}@ci.local`, passwordHash: "x", rolId: rolEnc.id, localId: local.id },
+    });
+    const operadora = await c.operadorLocal.create({ data: { nombre: "Caro", pinHash: "x", localId: local.id } });
+    const ids = {};
+    for (const [i, nombre] of productos.entries()) {
+      const b = await c.productoBase.create({
+        data: { grupoId: g.id, nombre, codigo_barra: `79${marca}`.slice(0, 10) + String(i).padStart(3, "0"), unidad_medida: "unidad", precio_costo: 600, precio_venta: 1000, redondeo_100: false, activo: true },
+      });
+      ids[nombre] = (await c.productoLocal.create({ data: { localId: deposito.id, baseId: b.id, activo: true, precio_costo: 600, precio_venta: 1000 } })).id;
+    }
+    const s = sesionDe(cuentaLocal, local.id);
+    const sPin = `${s}; erpazul_operador_activo=${jwt.sign({ operadorId: operadora.id, nombre: operadora.nombre, localId: local.id, _tipo: "operador", emitidoEn: Date.now() }, process.env.AUTH_SECRET)}`;
+    const fijar = (id, cantidad) => pedir(R.setCantidad, "POST", `${B}/pedidos/set-cantidad`, sPin, { productoLocalId: id, cantidad, unidad: "UNIDAD" });
+    return { local, deposito, s, sPin, ids, fijar };
+  }
+  function sesionDe(usuario, localId) {
+    return `erpazul_sesion=${jwt.sign(
+      { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rolId: usuario.rolId, rolNombre: "ENCARGADO", permisos, esDuenoLocal: false, localId, esDeposito: false },
+      process.env.AUTH_SECRET,
+      { expiresIn: "1h" }
+    )}`;
+  }
+  const lineasDelProducto = (posId, productoId) =>
+    c.posTransferenciaDetalle.findMany({ where: { posTransferenciaId: posId, productoId }, select: { id: true, sugerido: true } });
+
+  seccion(`7. El recorrido del celular: cargar, tocar el último dos veces, revisar y enviar${ANTES ? " (RUTA DE ANTES)" : ""}`);
   {
     // Un local aparte, como un pedido de verdad: varios productos cargados uno
     // por uno y el ÚLTIMO tocado dos veces seguidas con el + —dos pedidos a
     // `set-cantidad` que viajan juntos, como dos toques rápidos en el celular—.
-    const g = await c.grupo.create({ data: { nombre: `Grupo recorrido ${marca}` } });
-    await c.configuracionGrupo.create({ data: { grupoId: g.id } });
-    const local = await c.local.create({ data: { nombre: `Mini recorrido ${marca}` } });
-    const deposito = await c.local.create({ data: { nombre: `Depósito recorrido ${marca}`, es_deposito: true } });
-    await c.grupoLocal.create({ data: { grupoId: g.id, localId: local.id } });
-    await c.grupoDeposito.create({ data: { grupoId: g.id, localId: deposito.id } });
-    for (const l of [local, deposito]) await c.configuracionLocal.create({ data: { localId: l.id } });
-    const otra = await c.usuario.create({
-      data: { nombre: "Cuenta recorrido", email: `recorrido-${marca}@ci.local`, passwordHash: "x", rolId: rolEnc.id, localId: local.id },
-    });
-    const caro = await c.operadorLocal.create({ data: { nombre: "Caro", pinHash: "x", localId: local.id } });
-    const ids = {};
-    for (const [i, nombre] of ["9 DE ORO AGRIDULCE", "ARROZ 1KG", "FIDEOS MOÑO", "GALLETITAS AGUA", "LECHE 1L"].entries()) {
-      const b = await c.productoBase.create({
-        data: { grupoId: g.id, nombre, codigo_barra: `79${marca}${i}`.slice(0, 13) + i, unidad_medida: "unidad", precio_costo: 600, precio_venta: 1000, redondeo_100: false, activo: true },
-      });
-      ids[nombre] = (await c.productoLocal.create({ data: { localId: deposito.id, baseId: b.id, activo: true, precio_costo: 600, precio_venta: 1000 } })).id;
-    }
-    const s = `erpazul_sesion=${jwt.sign(
-      { id: otra.id, nombre: otra.nombre, email: otra.email, rolId: otra.rolId, rolNombre: "ENCARGADO", permisos, esDuenoLocal: false, localId: local.id, esDeposito: false },
-      process.env.AUTH_SECRET,
-      { expiresIn: "1h" }
-    )}`;
-    const sPin = `${s}; erpazul_operador_activo=${jwt.sign({ operadorId: caro.id, nombre: caro.nombre, localId: local.id, _tipo: "operador", emitidoEn: Date.now() }, process.env.AUTH_SECRET)}`;
-    const fijar = (id, cantidad) => pedir(R.setCantidad, "POST", `${B}/pedidos/set-cantidad`, sPin, { productoLocalId: id, cantidad, unidad: "UNIDAD" });
+    //
+    // Con la ruta de ANTES del bloqueo eso dejaba dos líneas del mismo
+    // producto, y estas respuestas —las que guarda el fixture— son de esa
+    // ruta: los candados de la pantalla las usan para probar que un pedido viejo
+    // con líneas repetidas se ve bien. Con la ruta de hoy queda una sola, y no
+    // se guarda nada: el fixture conserva las de antes.
+    const guardar7 = ANTES ? guardar : () => {};
+    const { sPin, ids, fijar } = await armarLocal("Grupo recorrido", ["9 DE ORO AGRIDULCE", "ARROZ 1KG", "FIDEOS MOÑO", "GALLETITAS AGUA", "LECHE 1L"]);
 
-    guardar("recorridoMe", await pedir(R.me, "GET", `${B}/me`, sPin));
-    guardar("recorridoOperadorMe", await pedir(R.operadorMe, "GET", `${B}/operador/me`, sPin));
-    guardar("recorridoOpciones", await pedir(R.opciones, "GET", `${B}/pedidos/opciones`, sPin));
-    guardar("recorridoCarritoVacio", await carrito(sPin));
-    guardar("recorridoCatalogo", await pedir(R.catalogo, "GET", `${B}/pedidos/catalogo?page=1&pageSize=50`, sPin));
+    guardar7("recorridoMe", await pedir(R.me, "GET", `${B}/me`, sPin));
+    guardar7("recorridoOperadorMe", await pedir(R.operadorMe, "GET", `${B}/operador/me`, sPin));
+    guardar7("recorridoOpciones", await pedir(R.opciones, "GET", `${B}/pedidos/opciones`, sPin));
+    guardar7("recorridoCarritoVacio", await carrito(sPin));
+    guardar7("recorridoCatalogo", await pedir(R.catalogo, "GET", `${B}/pedidos/catalogo?page=1&pageSize=50`, sPin));
 
     // Cargar varios, uno por uno.
     for (const nombre of ["ARROZ 1KG", "FIDEOS MOÑO", "GALLETITAS AGUA", "LECHE 1L"]) await fijar(ids[nombre], 2);
@@ -347,37 +384,169 @@ try {
     let posId = null;
     let filas = [];
     let intentos = 0;
+    let maximo = 0;
     while (intentos < 10) {
       intentos += 1;
       const [uno, dos] = await Promise.all([fijar(ORO, 1), fijar(ORO, 2)]);
       ok(`intento ${intentos}: los dos toques contestan ok`, uno.cuerpo.ok && dos.cuerpo.ok, json([uno, dos]));
       posId = dos.cuerpo.posId;
-      filas = await c.posTransferenciaDetalle.findMany({ where: { posTransferenciaId: posId, productoId: ORO }, select: { id: true, sugerido: true } });
-      if (filas.length === 2) break;
-      // `set-cantidad` con 0 borra UNA línea; con una sola, el producto sale.
+      filas = await lineasDelProducto(posId, ORO);
+      maximo = Math.max(maximo, filas.length);
+      if (ANTES ? filas.length === 2 : intentos === 10) break;
+      // Con la ruta de antes, `set-cantidad` con 0 borraba UNA línea; con una
+      // sola, el producto sale.
       await fijar(ORO, 0);
     }
     console.log(`  · filas de "9 DE ORO AGRIDULCE" en el pedido #${posId}: ${filas.length} → ${json(filas.map((f) => Number(f.sugerido)))} (intento ${intentos})`);
-    ok("dos toques rápidos dejan dos líneas del mismo producto", filas.length === 2, `${filas.length} línea(s) en ${intentos} intentos`);
-    guardar("recorridoFilasDuplicadas", { posId, filas: filas.length, intentos });
+    if (ANTES) {
+      ok("con la ruta de antes, dos toques rápidos dejan dos líneas del mismo producto", filas.length === 2, `${filas.length} línea(s) en ${intentos} intentos`);
+    } else {
+      ok("con el bloqueo, dos toques rápidos dejan UNA línea, en los diez intentos", maximo === 1, `hubo ${maximo} línea(s)`);
+    }
+    guardar7("recorridoFilasDuplicadas", { posId, filas: filas.length, intentos });
 
     // Revisar: lo que trae "Ver mi pedido".
     const revision = await carrito(sPin);
-    guardar("recorridoRevision", revision);
+    guardar7("recorridoRevision", revision);
     console.log(`  · Ver mi pedido trae ${revision.cuerpo.items.length} líneas para ${new Set(revision.cuerpo.items.map((i) => i.productoLocalId)).size} productos`);
 
     // Confirmar y enviar.
     const enviado = await pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, sPin, { posId });
-    guardar("recorridoSolicitado", enviado);
+    guardar7("recorridoSolicitado", enviado);
     ok("se envía", enviado.status === 200 && enviado.cuerpo.ok === true, json(enviado));
     const despues = await carrito(sPin);
-    guardar("recorridoTrasEnviar", despues);
+    guardar7("recorridoTrasEnviar", despues);
     const nombres = despues.cuerpo.pendiente?.items.map((i) => i.nombre) ?? [];
     console.log(`  · el pedido enviado trae ${nombres.length} líneas: ${json(nombres)}`);
   }
 
+  seccion(`8. Las carreras con el bloqueo${ANTES ? " (RUTA DE ANTES: se miden como eran)" : ""}`);
+  {
+    // ── 8a. DOS TOQUES AL + SOBRE UN PRODUCTO EN 0, 25 VECES ──────────────
+    // Un producto nuevo por vez, así cada carrera arranca en 0 de verdad: sin
+    // línea, que es cuando los dos pedidos la creaban.
+    const VECES = 25;
+    const nombres = Array.from({ length: VECES }, (_, i) => `PRODUCTO ${String(i + 1).padStart(2, "0")}`);
+    const L = await armarLocal(ANTES ? "Grupo duplicados viejos" : "Grupo carrera", nombres);
+    let duplicados = 0;
+    let posCarrera = null;
+    const cantidades = [];
+    for (const nombre of nombres) {
+      const [uno, dos] = await Promise.all([L.fijar(L.ids[nombre], 1), L.fijar(L.ids[nombre], 2)]);
+      posCarrera = dos.cuerpo.posId ?? uno.cuerpo.posId;
+      const filas = await lineasDelProducto(posCarrera, L.ids[nombre]);
+      if (filas.length > 1) duplicados += 1;
+      if (filas.length === 1) cantidades.push(Number(filas[0].sugerido));
+    }
+    const borradores = await c.posTransferencia.count({ where: { origenId: L.deposito.id, destinoId: L.local.id, estado: "Borrador" } });
+    console.log(`  · 8a: ${duplicados} de ${VECES} carreras dejaron el producto dos veces; ${borradores} borrador(es) para el par`);
+    guardar(ANTES ? "carreraAntesDelBloqueo" : "carreraConBloqueo", { veces: VECES, duplicados, borradores });
+    if (ANTES) {
+      ok("8a con la ruta de antes: la carrera da duplicados", duplicados > 0, `${duplicados} de ${VECES}`);
+      // Se deja así a propósito: es el borrador viejo de la 8c.
+      console.log(`  · queda en la base el borrador #${posCarrera} con líneas repetidas, para la 8c de la corrida normal`);
+    } else {
+      ok(`8a: ${VECES} carreras, cero duplicados`, duplicados === 0, `${duplicados} de ${VECES}`);
+      ok("8a: un solo borrador para el par", borradores === 1, `${borradores}`);
+      ok("8a: cada línea quedó con la cantidad de uno de los dos toques", cantidades.length === VECES && cantidades.every((n) => n === 1 || n === 2), json(cantidades));
+    }
+
+    // ── 8b. UNA CANTIDAD QUE VIAJA JUNTO CON EL ENVÍO, 20 VECES ──────────
+    // El borrador con un producto, y en el mismo instante: enviar y mandar la
+    // cantidad de otro. Después se cancela lo enviado —por su ruta— para la
+    // vuelta siguiente.
+    const E = await armarLocal("Grupo envio", ["ACEITE", "AZUCAR"]);
+    const VUELTAS = 20;
+    let nuevos = 0;
+    let conflictos = 0;
+    let entraronAntes = 0;
+    for (let i = 0; i < VUELTAS; i++) {
+      const base = await E.fijar(E.ids.ACEITE, 1);
+      const posId = base.cuerpo.posId;
+      const [envio, cantidad] = await Promise.all([
+        pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, E.sPin, { posId }),
+        E.fijar(E.ids.AZUCAR, 3),
+      ]);
+      ok(`8b vuelta ${i + 1}: el envío sale`, envio.cuerpo.ok === true, json(envio));
+      const borradoresAhora = await c.posTransferencia.count({ where: { origenId: E.deposito.id, destinoId: E.local.id, estado: { in: ["Borrador", "Preparando"] } } });
+      if (borradoresAhora > 0) nuevos += 1;
+      if (cantidad.status === 409) conflictos += 1;
+      else if (cantidad.cuerpo.ok && cantidad.cuerpo.posId === posId) entraronAntes += 1;
+      if (i === 0) guardar(ANTES ? "envioCarreraAntes" : "setCantidadConPedidoEnviadoCarrera", cantidad);
+      // Limpiar para la vuelta siguiente: cancelar lo enviado y, si la ruta de
+      // antes abrió un borrador, vaciarlo.
+      await pedir(R.cancelar, "POST", `${B}/pos-transferencias/cancelar`, E.sPin, { posId });
+      if (borradoresAhora > 0) {
+        await E.fijar(E.ids.AZUCAR, 0);
+        await E.fijar(E.ids.ACEITE, 0);
+      }
+    }
+    console.log(`  · 8b: ${nuevos} de ${VUELTAS} vueltas abrieron un borrador nuevo; ${conflictos} contestaron 409; ${entraronAntes} entraron al pedido antes de enviarse`);
+    guardar(ANTES ? "envioAntesDelBloqueo" : "envioConBloqueo", { vueltas: VUELTAS, nuevos, conflictos, entraronAntes });
+    if (!ANTES) {
+      ok("8b: ningún borrador nuevo al lado del pedido enviado", nuevos === 0, `${nuevos} de ${VUELTAS}`);
+      ok("8b: cada vuelta, o entró antes del envío o contestó 409", conflictos + entraronAntes === VUELTAS, json({ conflictos, entraronAntes }));
+
+      // Y sin carrera: con el pedido ya enviado, una cantidad contesta 409 con
+      // el mensaje, y no abre nada. Es la respuesta que ve la pantalla.
+      const base = await E.fijar(E.ids.ACEITE, 1);
+      await pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, E.sPin, { posId: base.cuerpo.posId });
+      const tarde = await E.fijar(E.ids.AZUCAR, 3);
+      guardar("setCantidadConPedidoEnviado", tarde);
+      ok("con el pedido enviado: 409 y el mensaje", tarde.status === 409 && tarde.cuerpo.error === "Hay un pedido enviado esperando al depósito. Cancelalo para pedir otra cosa.", json(tarde));
+      const abiertos = await c.posTransferencia.count({ where: { origenId: E.deposito.id, destinoId: E.local.id, estado: { in: ["Borrador", "Preparando"] } } });
+      ok("y no abrió ningún borrador", abiertos === 0, `${abiertos}`);
+      guardar("carritoConPedidoEnviadoEnvio", await carrito(E.sPin));
+    }
+
+    // ── 8c. EL BORRADOR VIEJO CON LÍNEAS REPETIDAS ───────────────────────
+    // Lo dejó la ruta de antes, de verdad, en una corrida con
+    // RUTA_ANTES_DEL_BLOQUEO=1. Se busca el último, y con la ruta de hoy se le
+    // cambia la cantidad a un producto repetido y se le saca otro.
+    if (!ANTES) {
+      const [viejo] = await c.$queryRaw`
+        SELECT d."posTransferenciaId" AS "posId", p."destinoId" AS "localId"
+        FROM "PosTransferenciaDetalle" d
+        JOIN "PosTransferencia" p ON p.id = d."posTransferenciaId"
+        JOIN "Local" l ON l.id = p."destinoId"
+        WHERE p.estado = 'Borrador' AND l.nombre LIKE 'Mini Grupo duplicados viejos%'
+        GROUP BY d."posTransferenciaId", p."destinoId"
+        HAVING COUNT(*) > COUNT(DISTINCT d."productoId")
+        ORDER BY d."posTransferenciaId" DESC
+        LIMIT 1`;
+      ok("8c: hay un borrador viejo con líneas repetidas (si no, correr antes con RUTA_ANTES_DEL_BLOQUEO=1 y la ruta de antes)", !!viejo);
+      if (viejo) {
+        const posId = Number(viejo.posId);
+        const repetidos = await c.$queryRaw`
+          SELECT "productoId" FROM "PosTransferenciaDetalle" WHERE "posTransferenciaId" = ${posId}
+          GROUP BY "productoId" HAVING COUNT(*) > 1 ORDER BY "productoId"`;
+        ok("8c: con al menos dos productos repetidos", repetidos.length >= 2, `${repetidos.length}`);
+        const cuenta = await c.usuario.findFirst({ where: { localId: Number(viejo.localId) } });
+        const s = sesionDe(cuenta, Number(viejo.localId));
+        const [cambiar, sacar] = repetidos.map((r) => Number(r.productoId));
+        const antesCambiar = (await lineasDelProducto(posId, cambiar)).length;
+        const r1 = await pedir(R.setCantidad, "POST", `${B}/pedidos/set-cantidad`, s, { productoLocalId: cambiar, cantidad: 5, unidad: "UNIDAD" });
+        const despuesCambiar = await lineasDelProducto(posId, cambiar);
+        console.log(`  · 8c: borrador viejo #${posId}: el producto ${cambiar} tenía ${antesCambiar} líneas; con 5 quedan ${despuesCambiar.length} → ${json(despuesCambiar.map((f) => Number(f.sugerido)))}`);
+        ok("8c: cambiar la cantidad deja UNA línea, con la cantidad nueva", r1.cuerpo.ok && despuesCambiar.length === 1 && Number(despuesCambiar[0].sugerido) === 5, json(despuesCambiar));
+        const antesSacar = (await lineasDelProducto(posId, sacar)).length;
+        const r2 = await pedir(R.setCantidad, "POST", `${B}/pedidos/set-cantidad`, s, { productoLocalId: sacar, cantidad: 0, unidad: "UNIDAD" });
+        const despuesSacar = await lineasDelProducto(posId, sacar);
+        console.log(`  · 8c: el producto ${sacar} tenía ${antesSacar} líneas; con 0 quedan ${despuesSacar.length}`);
+        ok("8c: ponerlo en 0 (la ✕) saca TODAS sus líneas", r2.cuerpo.ok && despuesSacar.length === 0, json(despuesSacar));
+        guardar("borradorViejoConRepetidos", {
+          posId,
+          cambiar: { antes: antesCambiar, despues: despuesCambiar.length, cantidad: Number(despuesCambiar[0]?.sugerido ?? 0) },
+          sacar: { antes: antesSacar, despues: despuesSacar.length },
+        });
+      }
+    }
+  }
+
   if (process.env.ESCRIBIR_FIXTURE_PEDIDOS) {
-    writeFileSync("app/modulos/pedidos/enviarCancelar.fixture.json", `${JSON.stringify(lectura, null, 2)}\n`);
+    const RUTA_FIXTURE = "app/modulos/pedidos/enviarCancelar.fixture.json";
+    const previo = existsSync(RUTA_FIXTURE) ? JSON.parse(readFileSync(RUTA_FIXTURE, "utf8")) : {};
+    writeFileSync(RUTA_FIXTURE, `${JSON.stringify({ ...previo, ...lectura }, null, 2)}\n`);
     console.log("  · fixture escrito");
   }
 } catch (e) {
