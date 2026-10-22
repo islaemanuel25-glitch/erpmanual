@@ -73,7 +73,7 @@ const { default: PaginaPedidos } = await import("@/app/modulos/pedidos/page.jsx"
 const { UserProvider } = await import("@/app/context/UserContext.jsx");
 const { OperadorProvider } = await import("@/app/context/OperadorContext.jsx");
 const { AccionDePaginaProvider, useAccionDelShell, useTituloDelShell } = await import("@/app/context/AccionDePaginaContext.jsx");
-const { PathParamsContext } = await import("next/dist/shared/lib/hooks-client-context.shared-runtime.js");
+const { PathParamsContext, SearchParamsContext } = await import("next/dist/shared/lib/hooks-client-context.shared-runtime.js");
 const { SunmiToaster } = await import("@/components/sunmi/SunmiToast.jsx");
 const { AppRouterContext } = await import("next/dist/shared/lib/app-router-context.shared-runtime.js");
 
@@ -179,6 +179,8 @@ function TituloDelShell() {
 // historial y el detalle de un pedido con `montar({ pagina, params })`.
 let paginaMontada = PaginaPedidos;
 let paramsMontados = {};
+// Y lo de después del `?`, para `useSearchParams` (`montar({ busqueda: "posId=7" })`).
+let busquedaMontada = new URLSearchParams();
 
 function App() {
   return React.createElement(
@@ -188,18 +190,22 @@ function App() {
       PathParamsContext.Provider,
       { value: paramsMontados },
       React.createElement(
-        UserProvider,
-        null,
+        SearchParamsContext.Provider,
+        { value: busquedaMontada },
         React.createElement(
-          OperadorProvider,
+          UserProvider,
           null,
           React.createElement(
-            AccionDePaginaProvider,
+            OperadorProvider,
             null,
-            React.createElement(FilaDelShell),
-            React.createElement(TituloDelShell),
-            React.createElement("main", { "data-contenido": "" }, React.createElement(paginaMontada)),
-            React.createElement(SunmiToaster)
+            React.createElement(
+              AccionDePaginaProvider,
+              null,
+              React.createElement(FilaDelShell),
+              React.createElement(TituloDelShell),
+              React.createElement("main", { "data-contenido": "" }, React.createElement(paginaMontada)),
+              React.createElement(SunmiToaster)
+            )
           )
         )
       )
@@ -231,6 +237,7 @@ export async function montar(respuestas) {
   anchoDeVentana = respuestas.ancho ?? "telefono";
   paginaMontada = respuestas.pagina ?? PaginaPedidos;
   paramsMontados = respuestas.params ?? {};
+  busquedaMontada = new URLSearchParams(respuestas.busqueda ?? "");
   const srv = servidor(respuestas);
   const raiz = document.createElement("div");
   document.body.replaceChildren(raiz);
@@ -332,6 +339,14 @@ export async function tocar(b) {
     await esperar(0);
   });
   await asentar();
+}
+
+/** Lo que dejó el teclado en el campo, y el `input` que escucha React. */
+export async function teclear(campo, texto) {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set.call(campo, texto);
+    campo.dispatchEvent(new window.Event("input", { bubbles: true }));
+  });
 }
 
 /** Vuelve el operario y la pantalla se entera como en la app: al volver el foco. */

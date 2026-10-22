@@ -23,7 +23,7 @@ import { afterEach, test } from "node:test";
 import assert from "node:assert/strict";
 
 const {
-  real, montar, desmontarTodo, asentar, act, texto, contenido, filaShell, boton, botones, llamadas, tocar, tarjetas, tarjeta, modal, esDeSoloLectura,
+  real, montar, desmontarTodo, asentar, act, texto, contenido, filaShell, boton, botones, llamadas, tocar, tarjetas, tarjeta, modal, esDeSoloLectura, teclear,
 } = await import("./montarPantallaPedidos.mjs");
 
 afterEach(desmontarTodo);
@@ -458,13 +458,9 @@ test("3. lo tipeado se manda al salir del campo, no tecla por tecla", async () =
 // campo está vacío con "0" de placeholder, y al tocar un número lo que se
 // escribe lo reemplaza. Al salir, vacío vale 0 y sin cambio no se manda nada.
 
-/** Lo que dejó el teclado en el campo, y el `input` que escucha React. */
-async function teclear(campo, texto) {
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set.call(campo, texto);
-    campo.dispatchEvent(new window.Event("input", { bubbles: true }));
-  });
-}
+// `teclear` —lo que dejó el teclado en el campo, y el `input` que escucha
+// React— vive en el arnés desde el 2026-10-22: lo usa también la pantalla de
+// preparar del depósito.
 async function entrar(campo) {
   await act(async () => {
     campo.focus();

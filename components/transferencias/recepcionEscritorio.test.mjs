@@ -183,10 +183,20 @@ test("las copias de la computadora dicen lo mismo que el teléfono, renglón por
     // Lo que manda "✓ Coincide", y cómo se pinta.
     ["components/transferencias/TarjetaRecepcionMovil.jsx", "recibido: envio.cantidad,"],
     ["components/transferencias/TarjetaRecepcionMovil.jsx", "recibidoUnidadesSueltas: envio.sueltas || 0,"],
-    ["components/transferencias/TarjetaRecepcionMovil.jsx", 'const CLASE_COINCIDE = "sunmi-btn-accent-outline";'],
   ];
   for (const [rel, renglon] of pares) {
     assert.ok(fuente(rel).includes(renglon), `${rel} ya no dice «${renglon}»: la regla cambió, hay que copiarla a la computadora`);
     assert.ok(compu.includes(renglon), `la computadora no dice «${renglon}»: su copia se despegó del teléfono`);
   }
+  // Cómo se pinta "✓ Coincide". Desde el 2026-10-22 la clase del teléfono vive
+  // en la pieza compartida con el depósito (`PiezasDeRevision`) y la tarjeta la
+  // toma de ahí: el renglón ya no es el mismo texto en los dos archivos, pero
+  // el VALOR sí tiene que serlo.
+  const tarjeta = fuente("components/transferencias/TarjetaRecepcionMovil.jsx");
+  assert.ok(tarjeta.includes("const CLASE_COINCIDE = CLASE_ACCION_RAPIDA;"), "la tarjeta dejó de tomar la clase de la pieza compartida");
+  assert.ok(
+    fuente("components/revision/PiezasDeRevision.jsx").includes('export const CLASE_ACCION_RAPIDA = "sunmi-btn-accent-outline";'),
+    "la clase de la acción rápida cambió: hay que copiarla a la computadora"
+  );
+  assert.ok(compu.includes('const CLASE_COINCIDE = "sunmi-btn-accent-outline";'), "la computadora no pinta Coincide igual que el teléfono");
 });

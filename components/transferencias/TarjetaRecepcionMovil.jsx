@@ -48,12 +48,17 @@
 import { useState } from "react";
 import { Check, Pencil } from "lucide-react";
 
-import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-// La fila colapsada entera es el área tocable, y necesita un `<button>` de
-// verdad SIN caja: la tarjeta ya es la caja. Ver el comentario en el render.
-import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
-import SunmiSeparator from "@/components/sunmi/SunmiSeparator";
+// La FORMA de la tarjeta —abierta y colapsada— salió de acá el 2026-10-22 para
+// que el depósito prepare con la misma mecánica. Esta tarjeta dibuja lo mismo
+// que antes: `tarjetaRecepcionIgual.test.mjs` lo compara contra el HTML de
+// antes de sacarla.
+import {
+  CLASE_ACCION_CORREGIR,
+  CLASE_ACCION_RAPIDA,
+  FilaRevisada,
+  TarjetaDeRevision,
+} from "@/components/revision/PiezasDeRevision";
 
 import { formatearMoneda } from "@/lib/moneda";
 import {
@@ -80,24 +85,13 @@ export const TEXTO_CORREGIR = "Corregir";
 export const TEXTO_CARGA_NO_DECLARADO = "Cargá la cantidad que llegó";
 
 /**
- * Las dos clases de acción de la tarjeta, y por qué son distintas.
- *
- * `accent-soft` trae fondo tenue y `accent-outline` solo el contorno: las dos
- * salen de `--pos-accent` y ninguna escribe un color. La jerarquía es a
- * propósito — "Coincide" cierra la línea sin abrir nada y "Corregir" lleva al
- * panel, así que no pueden pesar igual en la misma tarjeta.
- *
- * ── POR QUÉ VAN EN `className` Y NO COMO `color` ────────────────────────
- *
- * `SunmiButton` enumera sus colores y estos dos no están en esa lista, a
- * propósito: el candado del kit lee `.sunmi-btn-<una-sola-palabra>` como color, y
- * las variantes con guión quedan afuera por la forma del nombre. Conviven con el
- * `sunmi-btn-<color>` que el componente agrega igual, y ganan porque
- * `styles/sunmi.css` las define DESPUÉS del bloque de colores. Eso no es un
- * accidente que haya que recordar: `variantesDeAccion.test.mjs` lo exige.
+ * Las dos clases de acción de la tarjeta: "Coincide" cierra la línea sin abrir
+ * nada y "Corregir" lleva al panel, así que no pueden pesar igual. El porqué de
+ * cada una, y de que vayan en `className`, está junto a ellas en
+ * `components/revision/PiezasDeRevision.jsx`.
  */
-const CLASE_COINCIDE = "sunmi-btn-accent-outline";
-const CLASE_CORREGIR = "sunmi-btn-accent-suave";
+const CLASE_COINCIDE = CLASE_ACCION_RAPIDA;
+const CLASE_CORREGIR = CLASE_ACCION_CORREGIR;
 
 /** Cantidades: enteras sin decimales, fraccionarias con hasta 3 útiles. */
 const fmtCant = (n) => {
@@ -229,19 +223,10 @@ export default function TarjetaRecepcionMovil({
     // la lista podría marcar tres y el pie decir dos.
     const corregida = !esAgregada && delta != null && delta !== 0;
 
-    const cuerpo = (
-      <div className="flex items-center gap-2">
-        {corregida ? (
-          <Pencil size={16} aria-hidden="true" className="shrink-0 sunmi-text-warning" />
-        ) : (
-          <Check size={16} aria-hidden="true" className="shrink-0 sunmi-text-success" />
-        )}
-
-        {/* El nombre no cede: sin el botón hay lugar para que entre entero. */}
-        <span className="min-w-0 flex-auto truncate text-sm2 sunmi-text-strong text-left">
-          {d.nombre}
-        </span>
-
+    // El icono, el nombre y el área tocable los pone `FilaRevisada`; acá va lo
+    // que dice esta línea a la derecha del nombre.
+    const derecha = (
+      <>
         <span
           className={`min-w-0 truncate text-sm2 text-right ${
             corregida ? "sunmi-text-warning" : "sunmi-text-muted"
@@ -284,35 +269,31 @@ export default function TarjetaRecepcionMovil({
             {formatearMoneda(importeRecibido)}
           </span>
         )}
-      </div>
+      </>
     );
 
     // El borde de la tarjeta es lo que se ve barriendo la lista sin leer nada.
     const tonoTarjeta = corregida ? "sunmi-state-warning border-1.5" : "";
 
+    // Tocable entera solo con permiso: mirar no es escribir. El porqué de que
+    // sea un `SunmiLinkButton` y no un `SunmiButton` está en `FilaRevisada`.
     return (
-      <SunmiCard className={`p-2 ${tonoTarjeta}`} data-tarjeta-recepcion={d.nombre}>
-        {puedeRecibir ? (
-          // ── POR QUÉ `SunmiLinkButton` Y NO `SunmiButton` ───────────────
-          //
-          // Hace falta un `<button>` de verdad —tocable con teclado, con foco—
-          // y SIN caja: la fila ya tiene la suya, que es la tarjeta. Los
-          // colores de `SunmiButton` traen fondo propio y dibujarían una caja
-          // adentro de otra. `SunmiLinkButton` no trae ninguno; lo que sí trae
-          // —subrayado, acento y `text-xs`— lo ceden las clases de acá, que son
-          // utilidades y le ganan por el orden de la hoja.
-          <SunmiLinkButton
-            onClick={() => onAbrirFicha?.(d)}
-            disabled={guardando}
-            aria-label={`Corregir ${d.nombre}`}
-            className="block w-full text-left no-underline text-sm2 sunmi-text-strong"
-          >
-            {cuerpo}
-          </SunmiLinkButton>
-        ) : (
-          cuerpo
-        )}
-      </SunmiCard>
+      <FilaRevisada
+        icono={
+          corregida ? (
+            <Pencil size={16} aria-hidden="true" className="shrink-0 sunmi-text-warning" />
+          ) : (
+            <Check size={16} aria-hidden="true" className="shrink-0 sunmi-text-success" />
+          )
+        }
+        nombre={d.nombre}
+        derecha={derecha}
+        tono={tonoTarjeta}
+        onTocar={puedeRecibir ? () => onAbrirFicha?.(d) : null}
+        disabled={guardando}
+        ariaLabel={`Corregir ${d.nombre}`}
+        data-tarjeta-recepcion={d.nombre}
+      />
     );
   }
 
@@ -397,26 +378,12 @@ export default function TarjetaRecepcionMovil({
     }`;
   }
 
-  return (
-    // ── EL ANCLA DEL ARNÉS, Y POR QUÉ ES UN ATRIBUTO Y NO UNA CLASE ────────
-    //
-    // El arnés necesita leer UNA tarjeta y no la pantalla entera. Lo hacía con
-    // una heurística —"el div más chico que contiene el nombre y algún botón"—
-    // y el V21 la rompió sin tocarla: al mudar "✓ Coincide" al encabezado, esa
-    // fila pasó a contener nombre Y botón, así que ganaba ella y el pie con
-    // "Corregir" quedaba afuera. El síntoma era que la tarjeta "no tenía"
-    // Corregir cuando sí lo tenía.
-    //
-    // Un atributo estable no depende de la forma del DOM, que es justamente lo
-    // que un rediseño cambia. `SunmiCard` reenvía props de más a propósito.
-    <SunmiCard className={`p-4 space-y-3 ${tono}`} data-tarjeta-recepcion={d.nombre}>
-      {/* ── FILA 1: NOMBRE, REFERENCIA Y EL CASO FELIZ ─────────────────────
-          "✓ Coincide" NO aparece cuando ya hay una diferencia declarada: no
-          tiene sentido ofrecer "coincide" en una línea donde alguien ya contó y
-          dijo que no coincide. Ahí el único camino es "Corregir". */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-md2 font-semibold sunmi-text-strong break-words">{d.nombre}</p>
+  // ── LO QUE DICE LA LÍNEA ABIERTA, PIEZA POR PIEZA ──────────────────────
+  // La forma —nombre, renglón de abajo, acción arriba a la derecha, avisos,
+  // separador y pie— la pone `TarjetaDeRevision`. Acá se decide qué va en cada
+  // lugar.
+  const debajo = (
+    <>
           {/* ── QUÉ MANDÓ EL DEPÓSITO, Y QUÉ CONTÉ SI YA CONTÉ ─────────────
               Una línea no declarada no tiene remito, así que dice otra cosa en
               vez de inventar un "Enviado 0".
@@ -487,23 +454,28 @@ export default function TarjetaRecepcionMovil({
               )}
             </p>
           )}
-        </div>
+    </>
+  );
 
-        {puedeRecibir && !esAgregada && !hayDiferencia && (
-          <SunmiButton
-            onClick={coincidir}
-            disabled={guardando}
-            className={`shrink-0 ${CLASE_COINCIDE}`}
-          >
-            {TEXTO_COINCIDE}
-          </SunmiButton>
-        )}
-      </div>
+  // ── EL CASO FELIZ, ARRIBA A LA DERECHA ──────────────────────────────────
+  // "✓ Coincide" NO aparece cuando ya hay una diferencia declarada: no tiene
+  // sentido ofrecer "coincide" en una línea donde alguien ya contó y dijo que
+  // no coincide. Ahí el único camino es "Corregir".
+  const accionArriba = puedeRecibir && !esAgregada && !hayDiferencia && (
+    <SunmiButton
+      onClick={coincidir}
+      disabled={guardando}
+      className={`shrink-0 ${CLASE_COINCIDE}`}
+    >
+      {TEXTO_COINCIDE}
+    </SunmiButton>
+  );
 
-      {/* La fila 2 se fue con el V26. Ver arriba, donde se armaba `queHay`.
-          La tarjeta queda en TRES filas: el nombre con el enviado y «Coincide»,
-          el separador, y el pie con «Corregir» y el importe. */}
-
+  // La fila 2 se fue con el V26. Ver arriba, donde se armaba `queHay`. La
+  // tarjeta queda en TRES filas: el nombre con el enviado y «Coincide», el
+  // separador, y el pie con «Corregir» y el importe.
+  const avisos = (
+    <>
       {aviso && (
         <p
           className={`text-sm2 ${esAgregada ? "sunmi-text-danger" : "sunmi-text-warning"}`}
@@ -514,40 +486,60 @@ export default function TarjetaRecepcionMovil({
       )}
 
       {error && <p className="text-sm2 sunmi-text-danger">{error}</p>}
+    </>
+  );
 
-      <SunmiSeparator />
+  // ── EL PIE: LA ACCIÓN A LA IZQUIERDA, EL IMPORTE A LA DERECHA ───────────
+  // Sin rótulo al lado del importe. "Total línea" no le decía nada a nadie: en
+  // una tarjeta de una línea, el número grande de abajo a la derecha ya es el
+  // total de esa línea. Sin permiso no hay acción y queda su lugar vacío.
+  const accionAbajo = puedeRecibir ? (
+    <SunmiButton
+      onClick={() => onAbrirFicha?.(d)}
+      disabled={guardando}
+      className={`shrink-0 ${CLASE_CORREGIR}`}
+    >
+      {TEXTO_CORREGIR}
+    </SunmiButton>
+  ) : null;
 
-      {/* ── FILA 3, EL PIE: LA ACCIÓN A LA IZQUIERDA, EL IMPORTE A LA DERECHA
-          Sin rótulo al lado del importe. "Total línea" no le decía nada a nadie:
-          en una tarjeta de una línea, el número grande de abajo a la derecha ya
-          es el total de esa línea. */}
-      <div className="flex items-center justify-between gap-3">
-        {puedeRecibir ? (
-          <SunmiButton
-            onClick={() => onAbrirFicha?.(d)}
-            disabled={guardando}
-            className={`shrink-0 ${CLASE_CORREGIR}`}
-          >
-            {TEXTO_CORREGIR}
-          </SunmiButton>
-        ) : (
-          <span />
-        )}
-
-        {/* ── EL IMPORTE, CON SU ANTES CUANDO LO HAY ─────────────────────
-            El del remito primero y en gris chico, la corrección después y en
-            grande: se lee "de cuánto era" → "cuánto es". El orden no es
-            decorativo — invertido diría que el documento cambió y no cambió.
-            Ver el bloque de arriba para por qué son dos campos. */}
-        <span className="shrink-0 whitespace-nowrap tabular-nums text-lg2 font-semibold sunmi-text-strong">
-          {hayCorreccionDeImporte && (
-            <span className="text-sm2 font-normal sunmi-text-muted">
-              {formatearMoneda(importeRemito)} →{" "}
-            </span>
-          )}
-          {formatearMoneda(importeRecibido)}
+  // ── EL IMPORTE, CON SU ANTES CUANDO LO HAY ──────────────────────────────
+  // El del remito primero y en gris chico, la corrección después y en grande:
+  // se lee "de cuánto era" → "cuánto es". El orden no es decorativo —
+  // invertido diría que el documento cambió y no cambió. Ver el bloque de
+  // arriba para por qué son dos campos.
+  const alPie = (
+    <span className="shrink-0 whitespace-nowrap tabular-nums text-lg2 font-semibold sunmi-text-strong">
+      {hayCorreccionDeImporte && (
+        <span className="text-sm2 font-normal sunmi-text-muted">
+          {formatearMoneda(importeRemito)} →{" "}
         </span>
-      </div>
-    </SunmiCard>
+      )}
+      {formatearMoneda(importeRecibido)}
+    </span>
+  );
+
+  return (
+    // ── EL ANCLA DEL ARNÉS, Y POR QUÉ ES UN ATRIBUTO Y NO UNA CLASE ────────
+    //
+    // El arnés necesita leer UNA tarjeta y no la pantalla entera. Lo hacía con
+    // una heurística —"el div más chico que contiene el nombre y algún botón"—
+    // y el V21 la rompió sin tocarla: al mudar "✓ Coincide" al encabezado, esa
+    // fila pasó a contener nombre Y botón, así que ganaba ella y el pie con
+    // "Corregir" quedaba afuera. El síntoma era que la tarjeta "no tenía"
+    // Corregir cuando sí lo tenía.
+    //
+    // Un atributo estable no depende de la forma del DOM, que es justamente lo
+    // que un rediseño cambia. `SunmiCard` reenvía props de más a propósito.
+    <TarjetaDeRevision
+      nombre={d.nombre}
+      tono={tono}
+      debajo={debajo}
+      accionArriba={accionArriba}
+      avisos={avisos}
+      accionAbajo={accionAbajo}
+      alPie={alPie}
+      data-tarjeta-recepcion={d.nombre}
+    />
   );
 }

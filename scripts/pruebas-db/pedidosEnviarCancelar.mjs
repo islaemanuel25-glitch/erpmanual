@@ -1099,7 +1099,15 @@ try {
       const sDepo = `${sesionDe(cuentaDepoD, D.deposito.id)}; erpazul_operador_activo=${jwt.sign({ operadorId: operariaDepo.id, nombre: operariaDepo.nombre, localId: D.deposito.id, _tipo: "operador", emitidoEn: Date.now() }, process.env.AUTH_SECRET)}`;
       const solicitadosD = () => pedir(RD.solicitados, "GET", `${B}/pos-transferencias/solicitados`, sDepo);
       const detalleD = (posId) => pedir(RD.detalle, "GET", `${B}/pos-transferencias/detalle?posId=${posId}`, sDepo);
-      const editarD = (body) => pedir(editar, "POST", `${B}/pos-transferencias/detalle/editar`, sDepo, body);
+      // Cada escritura del depósito queda anotada con lo que se mandó y lo que
+      // contestó la ruta: el arnés de la pantalla de preparar contesta con
+      // ESTAS respuestas, no con unas escritas a mano.
+      const escrituras = [];
+      const editarD = async (body) => {
+        const r = await pedir(editar, "POST", `${B}/pos-transferencias/detalle/editar`, sDepo, body);
+        escrituras.push({ ruta: "/api/pos-transferencias/detalle/editar", cuerpo: body, respuesta: r });
+        return r;
+      };
       const lineaDe = (det, nombre) => det.cuerpo.item.detalles.find((d) => d.productoNombre === nombre);
       const deEste = (sol, posId) => (sol.cuerpo.items || []).find((i) => i.id === posId);
       const solicitarD = async () => {
@@ -1139,6 +1147,13 @@ try {
       const localTarde = await D.fijar(D.ids.ACEITE, 5);
       ok("14: el local ya no puede cambiarlo (409)", localTarde.status === 409, json(localTarde));
 
+      // ── El agua, corregida a 1 bulto y 3 sueltas, como la guarda la hoja ──
+      // Un número y una unidad: 9 UNIDAD. Después va completo (la corrección
+      // queda en `escrituras`, para la hoja de la pantalla).
+      const aguaSueltas = await editarD({ detalleId: lineaDe(detNuevo, "AGUA X6").detalleId, preparado: 9, unidadPreparada: "UNIDAD" });
+      ok("14: el agua, 1 bulto y 3 sueltas: 9 UNIDAD", aguaSueltas.cuerpo.ok === true && aguaSueltas.cuerpo.item.preparado === 9 && aguaSueltas.cuerpo.item.unidadPreparada === "UNIDAD", json(aguaSueltas));
+      guardar("depositoDetalleAguaConSueltas", await detalleD(p1));
+
       // ── Va completo en dos, uno a menos, y uno que no pidió ───────────────
       for (const nombre of ["ACEITE", "AGUA X6"]) {
         const l = lineaDe(detNuevo, nombre);
@@ -1147,7 +1162,14 @@ try {
       }
       const arroz = await editarD({ detalleId: lineaDe(detNuevo, "ARROZ").detalleId, preparado: 1, unidadPreparada: "UNIDAD" });
       ok("14: el arroz va 1 de 3", arroz.cuerpo.ok === true && arroz.cuerpo.item.preparado === 1, json(arroz));
+      // Buscar en el catálogo del depósito lo que el local no pidió, como la
+      // pantalla (la lógica de `BuscadorManual`).
+      const buscarRuta = await import("../../app/api/pos-transferencias/buscarProductos/route.js");
+      const buscado = await pedir(buscarRuta, "GET", `${B}/pos-transferencias/buscarProductos?q=AZUC&origenId=${D.deposito.id}`, sDepo);
+      guardar("depositoBuscarAzucar", buscado);
+      ok("14: buscar 'AZUC' en el depósito encuentra el azúcar", (buscado.cuerpo.items || []).some((p) => p.productoLocalId === D.ids.AZUCAR), json(buscado.cuerpo).slice(0, 300));
       const azucar = await pedir(RD.agregarItem, "POST", `${B}/pos-transferencias/agregarItem`, sDepo, { posId: p1, productoLocalId: D.ids.AZUCAR, cantidad: 1, tipo: "manual" });
+      escrituras.push({ ruta: "/api/pos-transferencias/agregarItem", cuerpo: { posId: p1, productoLocalId: D.ids.AZUCAR, cantidad: 1, tipo: "manual" }, respuesta: azucar });
       ok("14: el depósito agrega azúcar, que el local no pidió", azucar.cuerpo.ok === true && azucar.cuerpo.item.sugerido === 0 && azucar.cuerpo.item.preparado === 1, json(azucar));
 
       const detTrabajando = await detalleD(p1);
@@ -1251,6 +1273,20 @@ try {
       const ultimosGrupos = (opcionesAdmin.cuerpo.grupos || []).slice(0, 10);
       guardar("depositoAdminOpciones", { ...opcionesAdmin, cuerpo: { ...opcionesAdmin.cuerpo, grupos: ultimosGrupos.includes(grupoD) ? ultimosGrupos : [grupoD, ...ultimosGrupos].filter(Boolean) } });
       guardar("depositoAdminSolicitados", { ...solAdmin, cuerpo: { ...solAdmin.cuerpo, items: (solAdmin.cuerpo.items || []).slice(0, 10) } });
+      guardar("depositoEscrituras", escrituras);
+
+      // ── El 409 de enviar, de verdad: el local suma mientras sale ──────────
+      // `enviar` lee las líneas para validar el stock AFUERA de su transacción
+      // y las vuelve a leer adentro, con el bloqueo. Si el local sumó en el
+      // medio, no despacha una lista vieja: 409. Se larga el envío y, sin
+      // esperarlo, el local suma —el pedido no está empezado, así que puede—.
+      const enviando = pedir(enviar, "POST", `${B}/pos-transferencias/enviar`, sDepo, { posId: p2 });
+      const sumaEnElMedio = D.fijar(D.ids.SAL, 3);
+      const [envio409, suma409] = await Promise.all([enviando, sumaEnElMedio]);
+      console.log(`  · 14b: enviar con el local sumando en el medio → ${envio409.status} ${json(envio409.cuerpo).slice(0, 140)}; la suma → ${suma409.status}`);
+      guardar("depositoEnviarMientrasElLocalSuma", envio409);
+      guardar("depositoDetalleTrasElCambio", await detalleD(p2));
+      ok("14b: enviar con el local sumando en el medio da 409, y no sale", envio409.status === 409 && (await c.posTransferencia.findUnique({ where: { id: p2 }, select: { estado: true } })).estado === "Solicitado", json(envio409));
       guardar("depositoIds", { p1, p2, transferenciaId: tId, local: D.local.nombre, deposito: D.deposito.nombre, pidio: "Cuenta Grupo depósito" });
     }
   }

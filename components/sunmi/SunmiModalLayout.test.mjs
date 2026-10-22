@@ -688,6 +688,12 @@ test("LOS FORMULARIOS NO SE CIERRAN AL TOCAR EL VELO, Y LOS DEMÁS SÍ", () => {
     // selectores de destino de siempre. Se elige un local de una lista y se
     // toca iniciar; no hay nada escrito que perder al cerrar.
     "components/pos-transferencias/EntradaDepositoCelular.jsx": false,
+    // Preparar un pedido de local en el celular: declara `true` por la HOJA DE
+    // CORREGIR, que tiene la cantidad escrita —bultos y sueltas—, el mismo
+    // argumento que la hoja del producto de la recepción, de donde sale. La
+    // otra hoja, la de agregar lo que el local no pidió, es una búsqueda: perder
+    // el término no es perder nada, pero este chequeo mira el ARCHIVO.
+    "components/pos-transferencias/PrepararPedidoCelular.jsx": true,
     // El "⋯" del Control de stock: la misma hoja de "Más acciones" de recibir
     // una transferencia, con un solo botón —"Ver diferencias"—. Un menú: nada
     // que perder al cerrar.

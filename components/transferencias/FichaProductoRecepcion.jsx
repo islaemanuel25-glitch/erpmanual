@@ -37,6 +37,7 @@ import SunmiInput from "@/components/sunmi/SunmiInput";
 // `Minus` y `Plus` y el `SunmiLinkButton` se fueron con `CampoConPasos`: los
 // dibuja el componente del kit.
 import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
+import { CajaDeCantidad, ParDeCantidades } from "@/components/revision/PiezasDeRevision";
 import SunmiSelectAdv from "@/components/sunmi/SunmiSelectAdv";
 import SunmiAviso from "@/components/sunmi/SunmiAviso";
 
@@ -719,19 +720,12 @@ export default function FichaProductoRecepcion({
           </div>
 
           {/* ── LOS DOS CAMPOS, AL 35 % Y CON UN HUECO EN EL MEDIO ───────
-              Ocupaban la mitad cada uno y llenaban el ancho. Bajan a 124 px
-              sobre 390 —el 35 % del contenedor— y el hueco del medio queda
-              VACÍO a propósito: es lo que separa dos cantidades que se leen de
-              un vistazo y no una columna que haya que llenar.
-
-              `justify-between` y no un grid de tres columnas: la del medio
-              tendría que existir para quedar vacía, y un grid con una celda
-              muerta es una invitación a meterle algo. */}
-          <div className="flex justify-between gap-2">
-            <div className="w-35p">
-              {/* 11 px y no 10: el rótulo dice en qué escala está el número de
-                  abajo, así que leerlo no es opcional. Ver `sm2` en el config. */}
-              <div className="text-sm2 sunmi-text-muted truncate">{rotuloDeCompletos}</div>
+              Bajan a 124 px sobre 390 —el 35 % del contenedor—. La forma del
+              par y de cada caja, con su porqué, está en `ParDeCantidades` y
+              `CajaDeCantidad` (`components/revision/PiezasDeRevision.jsx`),
+              que el depósito comparte para corregir lo que prepara. */}
+          <ParDeCantidades>
+            <CajaDeCantidad rotulo={rotuloDeCompletos}>
               {puedeRecibir ? (
                 <SunmiCampoCantidad
                   valor={recibido}
@@ -753,14 +747,13 @@ export default function FichaProductoRecepcion({
                   {d.cantidadRecibida == null ? "—" : fmtCantidad(d.cantidadRecibida)}
                 </div>
               )}
-            </div>
+            </CajaDeCantidad>
 
             {/* Las sueltas solo donde significan algo: en KG, PIEZA y UNIDAD la
                 cantidad YA está en unidades físicas y un desglose se sumaría
                 encima de sí mismo. */}
             {muestraSueltas && (
-              <div className="w-35p">
-                <div className="text-sm2 sunmi-text-muted truncate">{ROTULO_SUELTAS_CAMPO}</div>
+              <CajaDeCantidad rotulo={ROTULO_SUELTAS_CAMPO}>
                 {/* `difiere` va en los DOS campos, porque los dos suman al total
                     que difiere: marcar solo el de completos diría que las
                     sueltas están bien cuando puede ser al revés.
@@ -804,9 +797,9 @@ export default function FichaProductoRecepcion({
                     {formatearMoneda(d.costoUnitarioFisico)} / un
                   </div>
                 )}
-              </div>
+              </CajaDeCantidad>
             )}
-          </div>
+          </ParDeCantidades>
         </div>
       ) : (
       <div className="grid grid-cols-2 gap-2">
