@@ -190,6 +190,43 @@ test("LA LISTA SIN PAPEL NO HABLA DE FACTURA NI DE LÍNEAS", () => {
   assert.doesNotMatch(t, /líneas?\b|ítems?\b|renglón|renglones/i);
 });
 
+test("«RECIBIR MERCADERÍA» VA DESPUÉS DE LA ÚLTIMA TARJETA, EN EL FLUJO: NI FIJO NI PEGAJOSO", () => {
+  // Emanuel, en el celular (2026-10-22): pegado al pie de la pantalla, el
+  // botón tapaba la tarjeta que pasaba por debajo —el costo, el total, y el
+  // «Corregir» de la de abajo asomando—. Va al final, como un elemento más.
+  const filas = DEL_ENDPOINT.sinComprobante.map((d) => filaSinPapel(d));
+  const html = renderToStaticMarkup(
+    React.createElement(ListaDeLaFactura, {
+      sinPapel: true,
+      filas,
+      revisadas: {},
+      accionDelPie: React.createElement(
+        "button",
+        { type: "button", "data-accion": "recibir", className: "w-full min-h-botonFoto" },
+        "Recibir mercadería"
+      ),
+    })
+  );
+  const boton = html.indexOf('data-accion="recibir"');
+  assert.ok(boton > 0, "la lista no dibujó la acción");
+  // Después de la última tarjeta.
+  assert.ok(html.lastIndexOf("Yerba Mate 1 kg") < boton, "el botón quedó arriba de alguna tarjeta");
+  // En toda la lista no hay nada pegado ni fijo: la única capa que lo era es
+  // la del pie de la pieza, y esta pantalla ya no la usa.
+  assert.ok(!/\bsticky\b/.test(html), "el botón volvió a quedar pegajoso");
+  assert.ok(!/\bfixed\b/.test(html), "el botón quedó fijo");
+  // Y no hay espacio reservado para un pie que ya no flota: el botón es hijo
+  // directo de la sección, sin envoltorio con relleno.
+  const abre = html.lastIndexOf("<button", boton);
+  assert.match(html.slice(0, abre), /<\/div>$/, "el botón quedó adentro de un envoltorio");
+  assert.match(html.slice(html.indexOf("</button>", boton)), /^<\/button><\/section>/, "algo quedó debajo del botón");
+  // En el fuente: la lista no le pasa nada al pie pegajoso de la pieza.
+  assert.ok(
+    !/pieDePantalla=/.test(codigoDe("components/compras-proveedor/ListaDeLaFactura.jsx")),
+    "la lista volvió a mandar la acción al pie pegajoso"
+  );
+});
+
 test("LA HOJA SIN PAPEL NO OFRECE ACEPTAR UN AUMENTO, Y SÍ EL LÁPIZ", () => {
   const fila = filaSinPapel(YERBA);
   const conPermiso = aLaVista(

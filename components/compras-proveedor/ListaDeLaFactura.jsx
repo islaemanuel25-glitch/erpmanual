@@ -90,7 +90,9 @@ export default function ListaDeLaFactura({
   onCoincide,
   /** Qué líneas marcó la persona como controladas. `{ pedidoDetalleId: true }` */
   revisadas = {},
-  /** La acción del pie. Se llama así y no `pie` porque `pie={` ya es el pie de
+  /** La acción del final —«Recibir mercadería»—, después de la última tarjeta
+   *  y en el flujo de la página: NO pegada al pie (2026-10-22, ver abajo).
+   *  Se llama así y no `pie` porque `pie={` ya es el pie de
    *  `SunmiTabla`, con otro contrato y su propio candado: dos props con el
    *  mismo nombre y distinto significado es cómo un candado empieza a mirar el
    *  archivo equivocado. */
@@ -379,14 +381,23 @@ export default function ListaDeLaFactura({
           )}
         </>
       }
-      // ── EN EL PIE QUEDA LA ACCIÓN, SOLA ─────────────────────────────────
+      // ── LA ACCIÓN VA AL FINAL DE LA LISTA, NO PEGADA AL PIE ─────────────
       //
-      // Un pie pegajoso tapa lo que hay detrás mientras se scrollea, así que
-      // todo lo que se meta ahí es alto que la lista pierde. Con los tres
-      // importes adentro medía cuatro renglones y el botón se les montaba
-      // encima. Ahora lleva una sola cosa y el alto es el del botón.
-      despuesDeLista={despuesDeLista}
-      pieDePantalla={accionDelPie}
+      // Iba en `pieDePantalla`, que la pieza dibuja `sticky bottom-0`: aun con
+      // una sola cosa adentro, el botón tapaba la tarjeta que pasaba por
+      // debajo —cortaba el costo y el total, y el «Corregir» de la de abajo
+      // asomaba por detrás—. Emanuel lo vio en el celular y lo pidió afuera
+      // (2026-10-22): después de la última tarjeta, como un elemento más de la
+      // página. Va como hijo directo de la sección —el fragmento no agrega
+      // caja—, así que la separación es la `space-y-3` de siempre y no queda
+      // nada reservado abajo. La pieza no cambia: las otras pantallas que usan
+      // `pieDePantalla` lo siguen teniendo pegado.
+      despuesDeLista={
+        <>
+          {despuesDeLista}
+          {accionDelPie}
+        </>
+      }
     />
   );
 }
