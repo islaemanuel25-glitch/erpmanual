@@ -14,7 +14,6 @@ import SunmiPantallaDeTrabajo from "@/components/sunmi/SunmiPantallaDeTrabajo";
 import SunmiCard from "@/components/sunmi/SunmiCard";
 import SunmiPill from "@/components/sunmi/SunmiPill";
 import SunmiButton from "@/components/sunmi/SunmiButton";
-import SunmiLinkButton from "@/components/sunmi/SunmiLinkButton";
 import SunmiBackButton from "@/components/sunmi/SunmiBackButton";
 import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import SunmiCampoCantidad from "@/components/sunmi/SunmiCampoCantidad";
@@ -317,7 +316,7 @@ export default function PedidosCatalogoPage() {
         await cargarCarrito();
         showSuccess("Pedido enviado al depósito correctamente");
       } else if (json.needsOperador) {
-        setError("Ingresá tu PIN y volvé a tocar «Enviar pedido».");
+        setError("Ingresá tu PIN y volvé a tocar «Confirmar y enviar».");
         requerirOperador();
       } else {
         setError(json.error || "Error al solicitar pedido");
@@ -592,19 +591,35 @@ export default function PedidosCatalogoPage() {
               </SunmiButton>
             </div>
           ) : (
+            // ── REVISAR ANTES DE MANDAR ───────────────────────────────────
+            // En el catálogo el botón grande NO envía: lleva a "Ver mi
+            // pedido", con solo lo pedido y editable. Recién ahí se manda. Es
+            // el paso que tenía la pantalla vieja ("Mi pedido") y que el
+            // rediseño se había saltado. El "Ver mi pedido ›" de esta barra se
+            // fue: el botón grande ya lleva ahí.
             <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm2 sunmi-text-muted">{`${productosEnElCarrito} ${productos(productosEnElCarrito)} en el pedido`}</span>
-                {viendoPedido ? null : <SunmiLinkButton onClick={abrirCarrito}>Ver mi pedido ›</SunmiLinkButton>}
-              </div>
-              <SunmiButton
-                color="primary"
-                className="w-full min-h-toque"
-                disabled={enviando || productosEnElCarrito === 0}
-                onClick={enviarPedido}
-              >
-                {enviando ? "Enviando..." : "Enviar pedido al depósito"}
-              </SunmiButton>
+              <span className="block text-sm2 sunmi-text-muted">{`${productosEnElCarrito} ${productos(productosEnElCarrito)} en el pedido`}</span>
+              {viendoPedido ? (
+                <SunmiButton
+                  color="primary"
+                  className="w-full min-h-toque"
+                  disabled={enviando || productosEnElCarrito === 0}
+                  onClick={enviarPedido}
+                >
+                  {enviando
+                    ? "Enviando..."
+                    : `Confirmar y enviar al depósito (${productosEnElCarrito} ${productos(productosEnElCarrito)})`}
+                </SunmiButton>
+              ) : (
+                <SunmiButton
+                  color="primary"
+                  className="w-full min-h-toque"
+                  disabled={productosEnElCarrito === 0}
+                  onClick={abrirCarrito}
+                >
+                  {`Revisar y enviar (${productosEnElCarrito})`}
+                </SunmiButton>
+              )}
             </div>
           )
         }

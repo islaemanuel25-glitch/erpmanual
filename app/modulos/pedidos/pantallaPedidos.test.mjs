@@ -67,10 +67,11 @@ test("1. armando: la tarjeta de contexto dice Borrador, de dónde a dónde y cu�
   assert.doesNotMatch(texto(), /CATÁLOGO DE PEDIDO|Catálogo de Pedido/);
   assert.ok(!botones(contenido()).some((b) => /Volver/.test(b.textContent)), "el Volver no se dibuja en el contenido");
   assert.ok(boton("Volver", filaShell()), "el Volver va en el slot del shell");
-  // La barra: cuántos, "Ver mi pedido" y enviar.
-  assert.ok(boton("Ver mi pedido ›"));
-  const enviar = boton("Enviar pedido al depósito");
-  assert.ok(enviar && !enviar.disabled);
+  // La barra: cuántos y "Revisar y enviar". Decía "Ver mi pedido ›" y
+  // "Enviar pedido al depósito": desde 2026-10-22 el botón grande lleva a la
+  // revisión y el link se fue (lo afirma `revisarAntesDeEnviar.test.mjs`).
+  const revisar = boton("Revisar y enviar (2)");
+  assert.ok(revisar && !revisar.disabled);
 });
 
 test("2. un solo filtro, Categoría, con Todas y el total; no se manda proveedor ni área", async () => {
@@ -270,7 +271,7 @@ test("FOTO: si la imagen falla, en el mismo lugar va la inicial", async () => {
 test("FOTO: en Ver mi pedido y en el pedido enviado, el mismo cuadrado", async () => {
   conFotos();
   await montar({ inicio: real.carritoBorrador });
-  await tocar(boton("Ver mi pedido ›"));
+  await tocar(boton("Revisar y enviar"));
   assert.ok(tarjeta("Agua x6").foto, "Ver mi pedido: el carrito trae la foto del agua");
   assert.ok(tarjeta("Coca 2L").inicial, "Ver mi pedido: la coca, con su inicial");
   await desmontarTodo();
@@ -358,7 +359,7 @@ test("VER FOTOS: si el celular no deja leer, apagado", async () => {
 
 test("VER FOTOS: en Ver mi pedido y en el pedido enviado no se ve, pero se respeta", async () => {
   await montar({ inicio: real.carritoBorrador });
-  await tocar(boton("Ver mi pedido ›"));
+  await tocar(boton("Revisar y enviar"));
   assert.ok(!interruptor(), "en Ver mi pedido no va el interruptor");
   assert.ok(sinCuadrado(), "apagado, Ver mi pedido mostró fotos");
   await desmontarTodo();
@@ -497,7 +498,7 @@ test("GUÍA: el + desde 0 lleva a 1, y el 1 se ve como número", async () => {
 test("GUÍA: se prende en el catálogo y en Ver mi pedido, no en el pedido enviado", async () => {
   await montar({ inicio: real.carritoBorrador });
   assert.equal(tarjeta("Yerba 1kg").campo.getAttribute("placeholder"), "0", "el catálogo no la prende");
-  await tocar(boton("Ver mi pedido ›"));
+  await tocar(boton("Revisar y enviar"));
   assert.equal(tarjeta("Coca 2L").campo.getAttribute("placeholder"), "0", "Ver mi pedido no la prende");
   await desmontarTodo();
 
@@ -507,12 +508,12 @@ test("GUÍA: se prende en el catálogo y en Ver mi pedido, no en el pedido envia
 
 test("4. Ver mi pedido: solo lo pedido, sin buscador ni filtro, y vuelve desde el shell", async () => {
   await montar({ inicio: real.carritoBorrador });
-  await tocar(boton("Ver mi pedido ›"));
+  await tocar(boton("Revisar y enviar"));
   assert.deepEqual(nombres(), ["Agua x6", "Coca 2L"]);
   assert.ok(!buscador(), "sin buscador");
   assert.ok(!categoria(), "sin filtro");
-  assert.ok(!boton("Ver mi pedido ›"), "adentro no se ofrece de nuevo");
-  assert.ok(boton("Enviar pedido al depósito"), "se envía desde acá también");
+  assert.ok(!boton("Revisar y enviar"), "adentro no se ofrece de nuevo");
+  assert.ok(boton("Confirmar y enviar al depósito"), "desde acá se envía");
   assert.equal(tarjeta("Agua x6").unidad, "Por BULTO de 6 u");
 
   await tocar(boton("Volver al catálogo", filaShell()));
@@ -529,7 +530,7 @@ test("5. esperando: Enviado, solo lo enviado, sin ✕ y sin poder tocar nada", a
   assert.ok(!buscador(), "sin buscador");
   assert.ok(!categoria(), "sin filtro");
   assert.ok(!document.querySelector("[data-paginador]"), "sin paginador");
-  assert.ok(!boton("Enviar pedido al depósito"), "sin enviar");
+  assert.ok(!boton("Revisar y enviar") && !boton("Confirmar y enviar"), "sin enviar");
   assert.ok(boton("Cancelar pedido"));
 
   assert.deepEqual(nombres(), ["Agua x6", "Coca 2L"], "solo lo enviado, no el catálogo");

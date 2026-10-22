@@ -43,10 +43,10 @@ function escucharClavesRepetidas() {
 const nombres = () => tarjetas().map((t) => t.nombre);
 const repetidos = () => nombres().filter((n, i, todos) => todos.indexOf(n) !== i);
 
-/** Revisar el pedido y enviarlo, como se hace hoy en la pantalla. */
+/** Revisar el pedido y enviarlo: "Revisar y enviar", y desde ahí confirmar. */
 async function revisarYEnviar() {
-  await tocar(boton("Ver mi pedido ›"));
-  await tocar(boton("Enviar pedido al depósito"));
+  await tocar(boton("Revisar y enviar"));
+  await tocar(boton("Confirmar y enviar al depósito"));
   await asentar(400);
 }
 
@@ -54,7 +54,7 @@ test("revisar: cada producto una vez, y el de dos líneas con la suma", async ()
   const consola = escucharClavesRepetidas();
   try {
     await montar({ inicio: real.recorridoRevision, local });
-    await tocar(boton("Ver mi pedido ›"));
+    await tocar(boton("Revisar y enviar"));
     assert.deepEqual(repetidos(), [], "un producto aparece dos veces en Ver mi pedido");
     assert.equal(tarjetas().length, 5);
     assert.equal(tarjetas().find((t) => t.nombre === ORO).campo.value, "3", "no muestra la suma de las dos líneas");
