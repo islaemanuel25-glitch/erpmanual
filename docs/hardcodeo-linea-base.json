@@ -2,13 +2,13 @@
   "_lea_esto": "Línea de base del hardcodeo. La sella scripts/hardcodeo.mjs --linea-base --sellar; sin --sellar el mismo comando solo la muestra. NO se edita a mano: si un número sube, se arregla el código o se decide subir la base a propósito y se dice por qué en el commit.",
   "_commit": "`commit` es el árbol que se ESCANEÓ, no la fecha en que se selló: pueden diferir. Cuando se corrige un falso positivo del contador, la base se REEXPRESA desde el árbol histórico —no desde main— para no perdonar la deuda que entró después.",
   "_inventario": "El trinquete compara el INVENTARIO, no los totales: una ocurrencia es archivo + categoría + texto, con cantidad. Sin número de línea, para que mover código no invente violaciones. Un alta en cualquier clave pone rojo aunque el total baje.",
-  "generada": "2026-10-15 23:43",
-  "commit": "e63e2bd749e62ed14bb00b2db6e545bba4f00130",
+  "generada": "2026-10-22 03:11",
+  "commit": "538826b58a7787e6ad20cf49d60c8d4501e4ff4f",
   "total": {
-    "color": 275,
-    "medida": 1597,
+    "color": 273,
+    "medida": 1545,
     "modal": 34,
-    "crudo": 280,
+    "crudo": 267,
     "celda": 429,
     "kit-pisado": 0,
     "tema-paralelo": 87
@@ -258,10 +258,10 @@
       "tema-paralelo": 0
     },
     "pedidos": {
-      "color": 2,
-      "medida": 68,
+      "color": 0,
+      "medida": 16,
       "modal": 0,
-      "crudo": 16,
+      "crudo": 3,
       "celda": 0,
       "kit-pisado": 0,
       "tema-paralelo": 0
@@ -816,23 +816,11 @@
       }
     },
     "app/modulos/pedidos/page.jsx": {
-      "crudo": {
-        "<button>": 14
-      },
       "medida": {
-        "text-[11px]": 11,
-        "text-[12px]": 9,
-        "text-[13px]": 6,
-        "text-[18px]": 1,
-        "text-[10px]": 9,
-        "h-[32px]": 7,
-        "text-[16px]": 4,
-        "w-[32px]": 4,
-        "min-w-[36px]": 2
+        "text-[11px]": 1
       },
-      "color": {
-        "bg-red-": 1,
-        "text-red-": 1
+      "crudo": {
+        "<button>": 1
       }
     },
     "app/modulos/pos-transferencias/nueva/page.jsx": {
