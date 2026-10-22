@@ -1,6 +1,6 @@
 # Modulo: Stock Locales
 
-**Última actualización:** 2026-10-22 20:53
+**Última actualización:** 2026-10-22 21:21
 
 ## Ubicacion
 - UI: `app/modulos/stock_locales/page.jsx`
@@ -498,6 +498,7 @@ la API del Stock Diario y no se tocó; hay que confirmarlo ejerciéndolo antes d
 corregirlo.
 
 ## Cambios recientes
+- 2026-10-22: fix: tarjeta de stock — "Sin mín/máx", o solo el límite que existe, en vez de "mín Sin ajustar · máx Sin ajustar" (pantalla SIN VERIFICAR en navegador)
 - 2026-10-22: fix: control de stock — el recuadro de la revisión carga siempre y los errores del listado dicen su motivo (causa en producción SIN CONFIRMAR; pantalla SIN VERIFICAR en navegador)
 - 2026-10-22: fix: control de stock — cada conteo corrige el stock al aceptarlo, contra el stock vivo, y la reconstrucción de los conteos ya hechos (pantalla SIN VERIFICAR en navegador)
 - 2026-10-21: fix: diferencias del control — Faltante y Sobrante en su renglón, y la cabecera del control en vez del segundo título (pantalla SIN VERIFICAR en navegador)
