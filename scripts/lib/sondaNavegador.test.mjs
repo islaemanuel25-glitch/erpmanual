@@ -16,6 +16,8 @@ import {
   argumentosDelNavegador,
   opcionesDeLaSonda,
   resolverWebSocket,
+  webSocketDeLaSalida,
+  TOPE_ARRANQUE_MS,
 } from "./sondaNavegador.mjs";
 
 const argv = (...resto) => ["node", "scripts/sonda-cascada.mjs", ...resto];
@@ -125,6 +127,41 @@ test("la sonda lanza el navegador con estos argumentos y habla con este WebSocke
   assert.ok(src.includes("new conexion.WebSocket("), "la sonda volvió a depender del WebSocket global");
   assert.ok(!/new WebSocket\(/.test(src), "la sonda volvió a depender del WebSocket global");
   assert.ok(src.includes("ROJO · NO SE PUEDE MEDIR"), "sin WebSocket tiene que ser rojo");
+});
+
+// ── EL NAVEGADOR ESTÁ LISTO CUANDO LO DICE, NO A LOS 15 s ─────────────────
+//
+// Tres corridas (39800858242, 39837127411, 39973221585) murieron a los 15 s
+// justos con "no respondió al puerto de depuración 9226": la espera era un
+// número fijo de intentos, y un Chrome en frío en el runner tarda más.
+
+test("la línea que Chrome escribe en stderr da el WebSocket; sin ella, null", () => {
+  // Forma real de la línea de Chrome, con el ruido de stderr que la rodea.
+  const stderr =
+    "[1023/145140.123:ERROR:bus.cc(407)] Failed to connect to the bus\n" +
+    "\nDevTools listening on ws://127.0.0.1:9226/devtools/browser/3f1c2b7e-8a1d-4c55-9b0e-0d6f1a2b3c4d\n";
+  assert.equal(
+    webSocketDeLaSalida(stderr),
+    "ws://127.0.0.1:9226/devtools/browser/3f1c2b7e-8a1d-4c55-9b0e-0d6f1a2b3c4d"
+  );
+  // CONTRAPRUEBA: con el stderr de un Chrome que todavía arranca, no hay URL.
+  assert.equal(webSocketDeLaSalida("[1023/145140.123:ERROR:bus.cc(407)] Failed to connect to the bus\n"), null);
+  assert.equal(webSocketDeLaSalida("DevTools listening on "), null, "a medio escribir todavía no está");
+  assert.equal(webSocketDeLaSalida(undefined), null);
+});
+
+test("la sonda espera la línea del navegador, con tope largo, y ya no cuenta intentos", () => {
+  const src = fs
+    .readFileSync(new URL("../sonda-cascada.mjs", import.meta.url), "utf8")
+    .replace(/\/\/[^\n]*/g, "");
+  assert.ok(src.includes("webSocketDeLaSalida(salida)"), "la sonda no lee la línea de Chrome");
+  assert.ok(src.includes('stdio: ["ignore", "ignore", "pipe"]'), "sin stderr en caño no hay línea que leer");
+  assert.ok(!/for \(let i = 0; i < 60; i\+\+\)/.test(src), "volvió la espera de 60 intentos fijos");
+  assert.ok(!src.includes("/json/version"), "volvió el sondeo del puerto");
+  assert.ok(src.includes('proceso.on("exit"'), "si el navegador se muere hay que decirlo, no esperar el tope");
+  assert.ok(src.includes("ROJO · NO SE PUEDE MEDIR: el navegador del runner no arrancó"));
+  assert.ok(src.includes("NO RESPONDE: ${navegacion.errorText}"), "un destino caído tiene que ser ROJO con su motivo");
+  assert.ok(TOPE_ARRANQUE_MS >= 60_000, "el tope es para no colgar, no la espera");
 });
 
 function require_sep() {

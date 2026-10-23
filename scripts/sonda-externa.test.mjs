@@ -115,6 +115,52 @@ test("el script que GitHub repite en el log NO cuenta: solo el eco de lo que se 
   assert.equal(veredictoDelLog(soloElScript, { fase: REAL.fase, shaEsperado: SHA }).verde, false);
 });
 
+// ── CORTADA ANTES DE PREGUNTAR NO ES "PRODUCCIÓN NO SIRVE NADA" ────────────
+//
+// Las corridas 39800858242, 39837127411 y 39973221585 imprimieron SHA-ANTES con
+// el SHA correcto y se cortaron en la sonda: nunca llegaron a SHA-DESPUES. El
+// veredicto decía "después de medir, producción servía nada" con producción
+// sana. La forma del log sale del real, cortado donde se cortaron aquéllas.
+
+test("una corrida cortada antes de SHA-DESPUES dice que no se llegó a preguntar, no que producción no sirve", () => {
+  const corte = REAL.lineas.findIndex((l) => l.endsWith(" sonda de cascada — https://operix.cloud/login"));
+  assert.ok(corte > -1, "el log real ya no tiene la primera línea de la sonda");
+  const cortada = REAL.lineas.slice(0, corte).join("\n");
+  assert.ok(cortada.includes(`${MARCAS.shaAntes} ${SHA}`), "el recorte tiene que conservar SHA-ANTES, como las corridas reales");
+  const v = veredictoDelLog(cortada, { fase: REAL.fase, shaEsperado: SHA });
+  assert.equal(v.verde, false);
+  const texto = v.faltas.join(" | ");
+  assert.match(texto, /después de medir, no se llegó a preguntarle la versión/);
+  assert.doesNotMatch(texto, /servía nada/);
+  assert.doesNotMatch(texto, /antes de medir/, "antes de medir producción SÍ contestó el SHA correcto");
+});
+
+test("CONTRAPRUEBA: si producción contestó sin versión, eso SÍ se dice como que no respondió", () => {
+  // La corrida 39972823943 imprimió literalmente `SONDA-EXTERNA SHA-ANTES ninguno`.
+  const sinVersion = LOG_REAL.replace(`${MARCAS.shaAntes} ${SHA}`, `${MARCAS.shaAntes} ninguno`);
+  assert.notEqual(sinVersion, LOG_REAL);
+  const v = veredictoDelLog(sinVersion, { fase: REAL.fase, shaEsperado: SHA });
+  assert.equal(v.verde, false);
+  assert.match(v.faltas.join(" "), /antes de medir, producción no respondió con una versión/);
+});
+
+test("el pedido de versión se reintenta con tope, solo por red, y vacío sigue siendo ROJO", () => {
+  const yml = workflow();
+  const curls = yml.split("\n").filter((l) => /^\s+sha=\$\(curl /.test(l));
+  assert.equal(curls.length, 2, "antes y después de medir");
+  for (const l of curls) {
+    assert.match(l, /--retry 2 /, "el tope son 3 intentos");
+    assert.match(l, / -m 20 /);
+    assert.doesNotMatch(l, /--retry-all-errors/, "un 404 o un 401 no es de red y no se reintenta");
+  }
+  // Un reintento NO puede volver verde una producción caída: sin SHA es ROJO
+  // también en la autoprueba, que antes lo dejaba pasar.
+  assert.equal((yml.match(/if \[ -z "\$sha" \]; then\n\s+echo "ROJO · producción (no respondió|dejó de responder)/g) ?? []).length, 2);
+  // Y el único reintento del workflow es ése: ni la sonda ni el job se repiten.
+  assert.equal((yml.match(/retry/g) ?? []).length, 6, "--retry, --retry-delay y --retry-connrefused en los dos curl, nada más");
+  assert.doesNotMatch(yml, /continue-on-error|max-attempts|retry-on/);
+});
+
 test("un ROJO en cualquier línea gana, aunque el resto esté", () => {
   const conRojo = `${LOG_REAL}\n2026-09-24T15:41:24.0000000Z ROJO · producción cambió mientras se medía`;
   const v = veredictoDelLog(conRojo, { fase: REAL.fase, shaEsperado: SHA });

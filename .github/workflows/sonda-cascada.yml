@@ -121,12 +121,25 @@ jobs:
           echo "No hay ningún navegador Chromium en el runner."
           exit 1
 
+      # ── UN PEDIDO DE 15 s ERA TODA LA PRUEBA ─────────────────────────────
+      # La corrida 39972823943 dio ROJO con "curl: (28) Operation timed out
+      # after 15001 milliseconds with 0 bytes received" mientras producción
+      # servía la versión correcta: un solo pedido perdido en la red del runner
+      # bastaba. Se reintenta SOLO este pedido, y solo lo que curl considera
+      # transitorio (timeout, conexión rechazada, 408/429/5xx), con tope: 3
+      # intentos de 20 s con 5 s entre medio. Si producción está caída de verdad
+      # los tres fallan y sigue siendo ROJO, diciendo que NO RESPONDIÓ, que no
+      # es lo mismo que servir otra versión.
       - name: Qué versión sirve producción, ANTES de medir
         run: |
-          sha=$(curl -fsS -m 15 "$BASE/api/version" | grep -o '[0-9a-f]\{40\}' | head -1 || true)
+          sha=$(curl -fsS --connect-timeout 10 -m 20 --retry 2 --retry-delay 5 --retry-connrefused "$BASE/api/version" | grep -o '[0-9a-f]\{40\}' | head -1 || true)
           echo "SONDA-EXTERNA SHA-ANTES ${sha:-ninguno}"
+          if [ -z "$sha" ]; then
+            echo "ROJO · producción no respondió a $BASE/api/version en 3 intentos de 20 s."
+            exit 1
+          fi
           if [ "$EVENTO" = "workflow_dispatch" ] && [ "$sha" != "$SHA_ESPERADO" ]; then
-            echo "ROJO · producción sirve ${sha:-nada}, y se esperaba $SHA_ESPERADO."
+            echo "ROJO · producción sirve $sha, y se esperaba $SHA_ESPERADO."
             exit 1
           fi
 
@@ -137,10 +150,15 @@ jobs:
 
       - name: Qué versión sirve producción, DESPUÉS de medir
         run: |
-          sha=$(curl -fsS -m 15 "$BASE/api/version" | grep -o '[0-9a-f]\{40\}' | head -1 || true)
+          # El mismo reintento acotado que antes de medir, por el mismo motivo.
+          sha=$(curl -fsS --connect-timeout 10 -m 20 --retry 2 --retry-delay 5 --retry-connrefused "$BASE/api/version" | grep -o '[0-9a-f]\{40\}' | head -1 || true)
           echo "SONDA-EXTERNA SHA-DESPUES ${sha:-ninguno}"
+          if [ -z "$sha" ]; then
+            echo "ROJO · producción dejó de responder a $BASE/api/version mientras se medía (3 intentos de 20 s)."
+            exit 1
+          fi
           if [ "$EVENTO" = "workflow_dispatch" ] && [ "$sha" != "$SHA_ESPERADO" ]; then
-            echo "ROJO · producción cambió mientras se medía: sirve ${sha:-nada}, y se esperaba $SHA_ESPERADO."
+            echo "ROJO · producción cambió mientras se medía: sirve $sha, y se esperaba $SHA_ESPERADO."
             exit 1
           fi
 

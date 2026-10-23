@@ -186,8 +186,19 @@ export function veredictoDelLog(texto, { fase, shaEsperado }) {
   if (valorDe(MARCAS.fase) !== fase) faltas.push(`la corrida no es de la fase ${fase}`);
   const antes = valorDe(MARCAS.shaAntes);
   const despues = valorDe(MARCAS.shaDespues);
-  if (antes !== shaEsperado) faltas.push(`antes de medir, producción servía ${antes || "nada"}`);
-  if (despues !== shaEsperado) faltas.push(`después de medir, producción servía ${despues || "nada"}`);
+  // TRES CASOS, NO DOS. La línea ausente quiere decir que la corrida se cortó
+  // ANTES de preguntar; "ninguno" que se preguntó y producción no contestó; y
+  // otro SHA que contestó otra versión. Las corridas 39800858242, 39837127411 y
+  // 39973221585 se cortaron porque el navegador del runner no arrancó, y esto
+  // las informaba como "producción servía nada" con producción sana.
+  const describir = (cuando, valor) =>
+    valor === null
+      ? `${cuando}, no se llegó a preguntarle la versión a producción (la corrida se cortó antes)`
+      : valor === "ninguno"
+        ? `${cuando}, producción no respondió con una versión`
+        : `${cuando}, producción servía ${valor}`;
+  if (antes !== shaEsperado) faltas.push(describir("antes de medir", antes));
+  if (despues !== shaEsperado) faltas.push(describir("después de medir", despues));
   if (!lineas.includes(MARCAS.verdeDeLaSonda)) faltas.push("la sonda no dio VERDE");
   if (!lineas.includes(MARCAS.resultado)) faltas.push("el workflow no llegó al veredicto");
   if (rojas.length) faltas.push(...rojas.map((l) => l.replace(/^ROJO · /, "")));

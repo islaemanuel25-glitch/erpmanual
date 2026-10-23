@@ -75,7 +75,13 @@
 
 import { spawn } from "node:child_process";
 
-import { argumentosDelNavegador, opcionesDeLaSonda, resolverWebSocket } from "./lib/sondaNavegador.mjs";
+import {
+  TOPE_ARRANQUE_MS,
+  argumentosDelNavegador,
+  opcionesDeLaSonda,
+  resolverWebSocket,
+  webSocketDeLaSalida,
+} from "./lib/sondaNavegador.mjs";
 
 // ── EL RUNNER, NO LA MEDICIÓN ──────────────────────────────────────────────
 //
@@ -134,16 +140,43 @@ function send(method, params = {}, conSesion = true) {
   });
 }
 
-async function urlDepurador() {
-  for (let i = 0; i < 60; i++) {
-    try {
-      const r = await fetch(`http://127.0.0.1:${PUERTO}/json/version`);
-      const j = await r.json();
-      if (j.webSocketDebuggerUrl) return j.webSocketDebuggerUrl;
-    } catch {}
-    await sleep(250);
-  }
-  throw new Error(`El navegador (${EDGE}) no respondió al puerto de depuración ${PUERTO}`);
+// Se espera la línea `DevTools listening on ws://…` que el navegador escribe en
+// stderr cuando está listo, no un número fijo de intentos: 15 s fijos cortaron
+// tres corridas con un Chrome en frío que todavía estaba arrancando. Ver
+// `webSocketDeLaSalida` en `lib/sondaNavegador.mjs`. Si el navegador se muere
+// antes, se dice con su código y su stderr; el tope es solo para no colgar.
+function urlDepurador(proceso) {
+  return new Promise((resolve, reject) => {
+    let salida = "";
+    let listo = false;
+    const fallar = (motivo) => {
+      if (listo) return;
+      listo = true;
+      clearTimeout(tope);
+      const cola = salida.trim().split("\n").slice(-8).join("\n    ");
+      reject(new Error(`${motivo}${cola ? `\n  stderr del navegador:\n    ${cola}` : ""}`));
+    };
+    const tope = setTimeout(
+      () => fallar(`El navegador (${EDGE}) no dijo que estaba listo en ${TOPE_ARRANQUE_MS / 1000} s.`),
+      TOPE_ARRANQUE_MS
+    );
+    proceso.stderr.on("data", (trozo) => {
+      // Se sigue leyendo aunque ya se haya encontrado la línea: un stderr que
+      // nadie lee llena el caño y frena al navegador.
+      if (listo) return;
+      salida += trozo;
+      const url = webSocketDeLaSalida(salida);
+      if (url) {
+        listo = true;
+        clearTimeout(tope);
+        resolve(url);
+      }
+    });
+    proceso.on("error", (e) => fallar(`No se pudo lanzar el navegador (${EDGE}): ${e.message}`));
+    proceso.on("exit", (codigo, senal) =>
+      fallar(`El navegador (${EDGE}) se cerró antes de estar listo (código ${codigo ?? "—"}, señal ${senal ?? "—"}).`)
+    );
+  });
 }
 
 async function evaluar(expresion) {
@@ -166,12 +199,24 @@ if (conexion.error) {
 const edge = spawn(
   EDGE,
   argumentosDelNavegador({ puerto: PUERTO, perfil: PERFIL, sinSandbox: OPCIONES.sinSandbox }),
-  { stdio: "ignore" }
+  { stdio: ["ignore", "ignore", "pipe"] }
 );
 const cerrar = () => { try { edge.kill(); } catch {} };
 process.on("exit", cerrar);
 
-ws = new conexion.WebSocket(await urlDepurador());
+let urlDelNavegador;
+try {
+  urlDelNavegador = await urlDepurador(edge);
+} catch (e) {
+  // No poder levantar el navegador es ROJO, y se dice que es del RUNNER: no se
+  // llegó a preguntarle nada a producción.
+  console.log("");
+  console.log("ROJO · NO SE PUEDE MEDIR: el navegador del runner no arrancó. Producción no se llegó a consultar.");
+  console.log(`  ${e.message}`);
+  cerrar();
+  process.exit(1);
+}
+ws = new conexion.WebSocket(urlDelNavegador);
 await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
 ws.onmessage = (ev) => {
   const m = JSON.parse(ev.data);
@@ -190,7 +235,17 @@ await send("Runtime.enable");
 
 const destino = String(BASE) + String(RUTA);
 console.log(`sonda de cascada — ${destino}`);
-await send("Page.navigate", { url: destino });
+const navegacion = await send("Page.navigate", { url: destino });
+// Un destino que no responde vuelve acá con `errorText` (net::ERR_…). Sin esto,
+// la sonda esperaba 20 s la hoja y decía "la hoja no tiene .sunmi-btn-base", que
+// apunta al CSS cuando lo que pasa es que no hay nadie del otro lado.
+if (navegacion?.errorText) {
+  console.log("");
+  console.log(`ROJO · ${destino} NO RESPONDE: ${navegacion.errorText}`);
+  console.log("  El navegador no pudo cargar la página, así que no hay hoja que medir.");
+  cerrar();
+  process.exit(1);
+}
 
 // Se espera a que la hoja esté PUESTA, no a que pase un tiempo. Un `sleep` fijo
 // mide una página cuyo CSS todavía no llegó y devuelve los valores por defecto,

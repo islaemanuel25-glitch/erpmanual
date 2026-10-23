@@ -84,6 +84,30 @@ export function argumentosDelNavegador({ puerto, perfil, sinSandbox = false }) {
   ];
 }
 
+// ── CUÁNDO EL NAVEGADOR ESTÁ LISTO: POR CONDICIÓN, NO POR TIEMPO ──────────
+//
+// La sonda preguntaba 60 veces al puerto de depuración, cada 250 ms, y a los
+// 15 s se rendía. En el runner de GitHub un Chrome en frío a veces tarda más:
+// las corridas 39800858242, 39837127411 y 39973221585 murieron con "no
+// respondió al puerto de depuración 9226" a los 15 s justos —en la primera,
+// con el Chrome todavía vivo: Actions lo mató como huérfano al limpiar—.
+// Producción no llegó a medirse, y el cliente lo informó como "producción
+// servía nada".
+//
+// Chrome dice cuándo está listo: escribe en stderr
+// `DevTools listening on ws://127.0.0.1:<puerto>/devtools/browser/<id>`. La
+// sonda espera ESA línea, o que el proceso se muera —con su código y su
+// stderr—, o un tope largo que solo existe para no colgar el job.
+
+/** Tope para que el navegador arranque. No es la espera: la espera es la línea. */
+export const TOPE_ARRANQUE_MS = 90_000;
+
+/** El WebSocket del navegador si este texto de stderr ya trae la línea; si no, null. */
+export function webSocketDeLaSalida(texto) {
+  const m = /DevTools listening on (ws:\/\/\S+)/.exec(String(texto ?? ""));
+  return m ? m[1] : null;
+}
+
 /**
  * La clase `WebSocket` con que se habla con el navegador: la global si el Node
  * la trae, y si no, la del paquete `ws`.
