@@ -29,7 +29,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check } from "lucide-react";
+import { Check, MoreHorizontal } from "lucide-react";
 
 import { useUser } from "@/app/context/UserContext";
 import { useAccionDePagina, useTituloDePagina } from "@/app/context/AccionDePaginaContext";
@@ -45,7 +45,9 @@ import SunmiCampoBusquedaVoz from "@/components/sunmi/SunmiCampoBusquedaVoz";
 import SunmiBarraDeAvance from "@/components/sunmi/SunmiBarraDeAvance";
 import SunmiPantallaDeTrabajo from "@/components/sunmi/SunmiPantallaDeTrabajo";
 import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiModalLayout";
+import SunmiHojaDeConfirmacion from "@/components/sunmi/SunmiHojaDeConfirmacion";
 import { showSuccess } from "@/components/sunmi/SunmiToast";
+import { TITULO_MAS_ACCIONES } from "@/components/transferencias/RecepcionMovil";
 import {
   CajaDeCantidad,
   CantidadDestacada,
@@ -79,6 +81,8 @@ export const TEXTO_CORREGIR = "Corregir";
 export const TEXTO_AGREGAR = "+ Agregar producto que no pidió";
 export const TEXTO_ENVIAR = "Enviar al local";
 export const PLACEHOLDER_BUSCAR = "Buscar o escanear producto";
+export const TEXTO_CANCELAR_PEDIDO = "Cancelar pedido";
+export const TEXTO_LO_PREPARADO_NO_SE_ENVIA = "Lo preparado no se envía.";
 
 const ENTRADA = "/modulos/pos-transferencias";
 
@@ -218,6 +222,9 @@ export default function PrepararPedidoCelular({ posId, PantallaDeSiempre }) {
   const [agregando, setAgregando] = useState(false);
   const [textoCatalogo, setTextoCatalogo] = useState("");
   const [catalogo, setCatalogo] = useState(null);
+  const [masAcciones, setMasAcciones] = useState(false);
+  const [confirmandoCancelar, setConfirmandoCancelar] = useState(false);
+  const [cancelando, setCancelando] = useState(false);
 
   const delDeposito = modo === "deposito" || modo === "admin";
   const esPedido = pos?.estado === "Solicitado";
@@ -378,8 +385,38 @@ export default function PrepararPedidoCelular({ posId, PantallaDeSiempre }) {
     }
   };
 
+  // El depósito cancela el pedido, empezado o no: lo preparado no movió stock y
+  // no se envía. Un 409 —ya se envió, o lo cambió otro— deja el aviso arriba y
+  // el pedido como está ahora, igual que `enviar`.
+  const cancelar = async () => {
+    setCancelando(true);
+    setAviso(null);
+    try {
+      const res = await fetch("/api/pos-transferencias/cancelar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ posId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (json.ok) {
+        showSuccess(`Pedido #${posId} cancelado`);
+        router.push(ENTRADA);
+        return;
+      }
+      setConfirmandoCancelar(false);
+      setAviso({ tono: res.status === 409 ? "warning" : "danger", texto: json.error || "No se pudo cancelar el pedido." });
+      if (res.status === 409) await leer();
+    } catch (err) {
+      console.error(err);
+      setConfirmandoCancelar(false);
+      setAviso({ tono: "danger", texto: "Error de conexión al cancelar." });
+    } finally {
+      setCancelando(false);
+    }
+  };
+
   const permisos = perfil?.permisos || [];
-  const puede = (Array.isArray(permisos) && permisos.includes("*")) || permisos.includes("pos_transferencias.ver");
+  const puede =(Array.isArray(permisos) && permisos.includes("*")) || permisos.includes("pos_transferencias.ver");
 
   if (cargandoPerfil || modo === null || (delDeposito && pos === null)) {
     return (
@@ -408,7 +445,20 @@ export default function PrepararPedidoCelular({ posId, PantallaDeSiempre }) {
           <>
             <div className="flex items-center justify-between gap-2">
               <span className="min-w-0 break-words text-lg2 font-semibold sunmi-text-strong">{pos?.destino?.nombre}</span>
-              <SunmiPill color={empezado ? "amber" : "cyan"}>{empezado ? "Preparando" : "Nuevo"}</SunmiPill>
+              <span className="flex shrink-0 items-center gap-2">
+                <SunmiPill color={empezado ? "amber" : "cyan"}>{empezado ? "Preparando" : "Nuevo"}</SunmiPill>
+                {/* El mismo "⋯" que la recepción (`RecepcionMovil`): un icono y
+                    no el carácter, que la fuente puede no tener. */}
+                <SunmiButton
+                  color="slate"
+                  onClick={() => setMasAcciones(true)}
+                  aria-label={TITULO_MAS_ACCIONES}
+                  aria-haspopup="dialog"
+                  className="shrink-0"
+                >
+                  <MoreHorizontal size={18} aria-hidden="true" />
+                </SunmiButton>
+              </span>
             </div>
             <p className="text-sm2 sunmi-text-muted">
               {[
@@ -557,6 +607,43 @@ export default function PrepararPedidoCelular({ posId, PantallaDeSiempre }) {
                 <FilaCatalogoRecepcion key={p.productoLocalId} p={p} onElegir={agregarDelCatalogo} agregando={guardando} />
               ))}
             </SunmiModalLayout>
+
+            {/* ── MÁS ACCIONES: HOY, CANCELAR EL PEDIDO ──────────────────────
+                La misma hoja que la de la recepción. Cancelar no es una acción
+                del flujo de preparar: queda a un toque, pero afuera. */}
+            <SunmiModalLayout
+              open={masAcciones}
+              title={TITULO_MAS_ACCIONES}
+              subtitle={`Pedido #${posId} · ${pos?.destino?.nombre ?? ""}`}
+              onClose={() => setMasAcciones(false)}
+              z={NIVEL_MODAL_GLOBAL}
+              forma="hoja"
+              espacioCuerpo="gap-2"
+            >
+              <SunmiButton
+                color="red"
+                className="w-full justify-center"
+                onClick={() => {
+                  setMasAcciones(false);
+                  setConfirmandoCancelar(true);
+                }}
+              >
+                {TEXTO_CANCELAR_PEDIDO}
+              </SunmiButton>
+            </SunmiModalLayout>
+
+            {confirmandoCancelar ? (
+              <SunmiHojaDeConfirmacion
+                titulo={`¿Cancelar el pedido #${posId} de ${pos?.destino?.nombre ?? "el local"}?`}
+                puntos={[TEXTO_LO_PREPARADO_NO_SE_ENVIA]}
+                textoConfirmar={TEXTO_CANCELAR_PEDIDO}
+                textoTrabajando="Cancelando..."
+                colorConfirmar="red"
+                trabajando={cancelando}
+                onConfirmar={cancelar}
+                onVolver={() => setConfirmandoCancelar(false)}
+              />
+            ) : null}
           </>
         }
       />
