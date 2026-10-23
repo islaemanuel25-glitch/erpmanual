@@ -1,6 +1,6 @@
 # Modulo: Transferencias
 
-**Última actualización:** 2026-10-22 22:36
+**Última actualización:** 2026-10-23 02:05
 
 ## Ubicacion
 - UI: `app/modulos/transferencias/page.jsx`, `app/modulos/transferencias/[id]/page.jsx`
@@ -223,6 +223,7 @@ vuelto al origen. La resolución contable de esa diferencia es una etapa aparte,
 todavía no implementada.
 
 ## Cambios recientes
+- 2026-10-23: fix(deposito): lo que pidió el local se resalta igual que lo enviado en la recepción
 - 2026-10-22: feat(deposito): preparar un pedido de local en el celular, como se recibe
 - 2026-10-22: feat(deposito): cada línea de un pedido guarda cuándo la decidió el depósito
 - 2026-10-22: fix: control de stock — cada conteo corrige el stock al aceptarlo, contra el stock vivo, y la reconstrucción de los conteos ya hechos (pantalla SIN VERIFICAR en navegador)

@@ -1,15 +1,15 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-22 22:36
+**Fecha:** 2026-10-23 02:05
 
 ## Módulos modificados recientemente
 
 ### pos-transferencias
-- feat(deposito): preparar un pedido de local en el celular, como se recibe, feat(deposito): Pedidos de locales, la entrada del depósito en el celular, feat(deposito): cada línea de un pedido guarda cuándo la decidió el depósito
-- Archivos: 8 nuevos, 10 modificados (18 total)
+- fix(deposito): lo que pidió el local se resalta igual que lo enviado en la recepción, feat(deposito): preparar un pedido de local en el celular, como se recibe, feat(deposito): Pedidos de locales, la entrada del depósito en el celular
+- Archivos: 9 nuevos, 10 modificados (19 total)
 
 ### transferencias
-- feat(deposito): preparar un pedido de local en el celular, como se recibe, feat(deposito): cada línea de un pedido guarda cuándo la decidió el depósito, fix: control de stock — cada conteo corrige el stock al aceptarlo, contra el stock vivo, y la reconstrucción de los conteos ya hechos (pantalla SIN VERIFICAR en navegador)
+- fix(deposito): lo que pidió el local se resalta igual que lo enviado en la recepción, feat(deposito): preparar un pedido de local en el celular, como se recibe, feat(deposito): cada línea de un pedido guarda cuándo la decidió el depósito
 - Archivos: 4 nuevos, 6 modificados (10 total)
 
 ### stock
@@ -26,9 +26,10 @@
 
 
 ## Archivos nuevos desde última sincronización
-- app/modulos/pos-transferencias/deposito.fixture.json
+- app/modulos/pos-transferencias/cantidadPedidaDestacada.test.mjs
 - app/modulos/pos-transferencias/prepararPedido.test.mjs
 - components/pos-transferencias/PrepararPedidoCelular.jsx
+- app/modulos/pos-transferencias/deposito.fixture.json
 - app/modulos/pos-transferencias/entradaDeposito.test.mjs
 - app/modulos/pos-transferencias/entradaEscritorioAntes.fixture.json
 - app/modulos/pos-transferencias/entradaEscritorioIgual.test.mjs

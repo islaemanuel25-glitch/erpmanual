@@ -1,5 +1,28 @@
 # Changelog
 
+## [2026-10-23] - Actualización: pos-transferencias, transferencias, stock, auditoria, productos
+
+### Modificado
+- **pos-transferencias**: fix(deposito): lo que pidió el local se resalta igual que lo enviado en la recepción
+- **pos-transferencias**: feat(deposito): preparar un pedido de local en el celular, como se recibe
+- **pos-transferencias**: feat(deposito): Pedidos de locales, la entrada del depósito en el celular
+- **pos-transferencias**: feat(deposito): cada línea de un pedido guarda cuándo la decidió el depósito
+- **pos-transferencias**: feat(pedidos): el local no cancela un pedido que el depósito ya empezó (pantalla SIN VERIFICAR en el celular)
+- **pos-transferencias**: feat(pedidos): sumar al pedido enviado hasta que el depósito lo empieza
+- **transferencias**: fix(deposito): lo que pidió el local se resalta igual que lo enviado en la recepción
+- **transferencias**: feat(deposito): preparar un pedido de local en el celular, como se recibe
+- **transferencias**: feat(deposito): cada línea de un pedido guarda cuándo la decidió el depósito
+- **transferencias**: fix: control de stock — cada conteo corrige el stock al aceptarlo, contra el stock vivo, y la reconstrucción de los conteos ya hechos (pantalla SIN VERIFICAR en navegador)
+- **transferencias**: fix(kit): el pie de SunmiPantallaDeTrabajo queda clavado abajo de la pantalla, con su lugar reservado medido (SIN VERIFICAR en navegador)
+- **transferencias**: fix(comprobantes): una factura cuya letra no se leyó no se propone como receta "sin factura" (SIN VERIFICAR contra el modelo real)
+- **stock**: fix: tarjeta de stock — "Sin mín/máx", o solo el límite que existe, en vez de "mín Sin ajustar · máx Sin ajustar" (pantalla SIN VERIFICAR en navegador)
+- **stock**: fix: control de stock — el recuadro de la revisión carga siempre y los errores del listado dicen su motivo (causa en producción SIN CONFIRMAR; pantalla SIN VERIFICAR en navegador)
+- **stock**: fix: control de stock — cada conteo corrige el stock al aceptarlo, contra el stock vivo, y la reconstrucción de los conteos ya hechos (pantalla SIN VERIFICAR en navegador)
+- **auditoria**: feat(pedidos): sumar al pedido enviado con confirmación, todos los cambios juntos (pantalla SIN VERIFICAR en el celular)
+- **auditoria**: feat(pedidos): sumar al pedido enviado hasta que el depósito lo empieza
+- **productos**: feat(pedidos): la foto del producto a la izquierda de cada tarjeta, con la inicial si no hay (pantalla SIN VERIFICAR en navegador)
+
+
 ## [2026-10-22] - Actualización: auditoria, pos-transferencias, productos, transferencias
 
 ### Modificado
