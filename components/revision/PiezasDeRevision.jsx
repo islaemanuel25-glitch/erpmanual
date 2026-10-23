@@ -92,6 +92,36 @@ export function TarjetaDeRevision({
 }
 
 /**
+ * El renglón de la cantidad, resaltada: un rótulo chico en suave y, al lado, la
+ * cantidad en su presentación comercial —"2 PACK x10"— grande, en negrita y en
+ * el color de acento. Lo que va después (el precio de la presentación en la
+ * recepción) va como `children`.
+ *
+ * Salió de `TarjetaRecepcionMovil` ("Enviado 2 PACK x10") el 2026-10-23, tal
+ * cual, cuando la tarjeta del depósito tuvo que decir "Pidió 2 PACK x24" igual
+ * (lo comparan `tarjetaRecepcionIgual.test.mjs` y
+ * `app/modulos/pos-transferencias/cantidadPedidaDestacada.test.mjs`).
+ *
+ * El texto de la cantidad NO se arma acá: lo trae quien la usa, de
+ * `rotuloConSueltasCorto` (`lib/transferencias/presentacionEnvio.js`).
+ *
+ * No se trunca la cantidad: es el dato que hay que leer. Lo que cede es lo de
+ * después, que baja solo cuando no entra —`min-w-0` en la cantidad le da
+ * prioridad al reparto—. Cuando entran los dos, comparten renglón.
+ */
+export function CantidadDestacada({ rotulo, cantidad, children = null }) {
+  return (
+    <p className="flex items-baseline gap-x-2 flex-wrap break-words">
+      <span className="text-xs sunmi-text-muted shrink-0">{rotulo}</span>
+      <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-accent">
+        {cantidad}
+      </span>
+      {children}
+    </p>
+  );
+}
+
+/**
  * Las cantidades de la hoja de corrección: los completos y, cuando la
  * presentación agrupa, las sueltas, uno al lado del otro. Salió de
  * `FichaProductoRecepcion` el mismo día, tal cual (lo compara

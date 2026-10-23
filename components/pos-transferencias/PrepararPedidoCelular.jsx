@@ -48,6 +48,7 @@ import SunmiModalLayout, { NIVEL_MODAL_GLOBAL } from "@/components/sunmi/SunmiMo
 import { showSuccess } from "@/components/sunmi/SunmiToast";
 import {
   CajaDeCantidad,
+  CantidadDestacada,
   CLASE_ACCION_CORREGIR,
   CLASE_ACCION_RAPIDA,
   FilaRevisada,
@@ -69,6 +70,7 @@ import {
   lineasVisibles,
   textoDelCambio,
   textoPidio,
+  rotuloDeLoPedido,
   textoVa,
 } from "@/lib/pedidos/preparacionDelPedido";
 
@@ -173,7 +175,10 @@ function LineaParaPreparar({ l, guardando, onVaCompleto, onCorregir }) {
       tono={estado === ESTADO_PREPARACION.CON_CAMBIOS ? "border-1.5 sunmi-border-accent" : ""}
       debajo={
         <>
-          {esAgregada(l) ? null : <p className="text-sm2 sunmi-text-muted">{textoPidio(l)}</p>}
+          {/* Lo que pidió el local, resaltado IGUAL que lo enviado en la
+              recepción: la misma pieza (`CantidadDestacada`) y el mismo texto
+              (`rotuloDeLoPedido`, con la función de "2 PACK x10"). */}
+          {esAgregada(l) ? null : <CantidadDestacada rotulo="Pidió" cantidad={rotuloDeLoPedido(l)} />}
           {cambio ? <p className="text-sm2 font-semibold sunmi-text-accent">{cambio}</p> : null}
         </>
       }

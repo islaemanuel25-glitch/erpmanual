@@ -124,9 +124,17 @@ test("los cuatro filtros con sus cantidades, en Pendientes; la categoría en Tod
 test("cada renglón dice lo que pidió el local, con ✓ Va completo y Corregir", async () => {
   await montarPreparar();
   assert.deepEqual(visibles(), ["ACEITE", "ARROZ", "FIDEOS", "YERBA", "AGUA X6"]);
-  assert.match(linea("ACEITE").textContent, /Pidió 2 UNIDAD/);
-  assert.match(linea("YERBA").textContent, /Pidió 4 UNIDAD/);
-  assert.match(linea("AGUA X6").textContent, /Pidió 2 BULTO de 6 u/);
+  // Decía "Pidió 2 BULTO de 6 u" en una línea suave. Desde el 2026-10-23 es
+  // como lo enviado en la recepción: "Pidió" chico y la cantidad en su
+  // presentación, resaltada. Cómo se resalta lo afirma
+  // `cantidadPedidaDestacada.test.mjs`; acá, qué dice.
+  const pidio = (n) => {
+    const fila = [...linea(n).querySelectorAll("p")].find((p) => p.firstElementChild?.textContent === "Pidió");
+    return fila ? fila.children[1].textContent.trim() : null;
+  };
+  assert.equal(pidio("ACEITE"), "2 UNIDAD");
+  assert.equal(pidio("YERBA"), "4 UNIDAD");
+  assert.equal(pidio("AGUA X6"), "2 PACK x6");
   for (const n of visibles()) {
     assert.ok(A.boton("✓ Va completo", linea(n)), `${n} sin Va completo`);
     assert.ok(A.boton("Corregir", linea(n)), `${n} sin Corregir`);

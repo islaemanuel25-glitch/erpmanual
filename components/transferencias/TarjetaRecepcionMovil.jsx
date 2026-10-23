@@ -54,6 +54,7 @@ import SunmiButton from "@/components/sunmi/SunmiButton";
 // que antes: `tarjetaRecepcionIgual.test.mjs` lo compara contra el HTML de
 // antes de sacarla.
 import {
+  CantidadDestacada,
   CLASE_ACCION_CORREGIR,
   CLASE_ACCION_RAPIDA,
   FilaRevisada,
@@ -421,15 +422,16 @@ export default function TarjetaRecepcionMovil({
             //
             // Medido en producción: 24 líneas con envío mixto, las 24 abiertas, y
             // las 24 con cero packs.
-            <p className="flex items-baseline gap-x-2 flex-wrap break-words">
-              <span className="text-xs sunmi-text-muted shrink-0">Enviado</span>
-              <span className="min-w-0 whitespace-nowrap text-base2 font-semibold tabular-nums sunmi-text-accent">
-                {/* `mostrado` y no `envio`: si no salió ningún bulto entero esto
-                    dice "1 UNIDAD" y no "0 PACK x6 + 1". La forma corta sigue
-                    sirviendo para el mixto de verdad —"2 PACK x6 + 3"—, que es
-                    donde el renglón compite con el precio. */}
-                {rotuloConSueltasCorto(mostrado)}
-              </span>
+            //
+            // El renglón —"Enviado" chico y la cantidad grande en acento— es
+            // `CantidadDestacada` (`PiezasDeRevision`), compartido con la tarjeta
+            // del depósito ("Pidió 2 PACK x24").
+            //
+            // `mostrado` y no `envio`: si no salió ningún bulto entero esto dice
+            // "1 UNIDAD" y no "0 PACK x6 + 1". La forma corta sigue sirviendo
+            // para el mixto de verdad —"2 PACK x6 + 3"—, que es donde el renglón
+            // compite con el precio.
+            <CantidadDestacada rotulo="Enviado" cantidad={rotuloConSueltasCorto(mostrado)}>
               {/* ── EL PRECIO DE LA PRESENTACIÓN ───────────────────────────
                   El V26 le sacó a este renglón el importe SIN rótulo, que
                   competía con el total de abajo sin decir cuál era cuál. Vuelve
@@ -452,7 +454,7 @@ export default function TarjetaRecepcionMovil({
                   · {formatearMoneda(costoMostrado)} / {unidadCortaDePresentacion(mostrado).toLowerCase()}
                 </span>
               )}
-            </p>
+            </CantidadDestacada>
           )}
     </>
   );
