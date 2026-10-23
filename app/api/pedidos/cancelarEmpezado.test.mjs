@@ -33,8 +33,12 @@ test("10b: empezado, el local recibe 409 con el mensaje", () => {
   assert.equal(real.empezadoCarritoTrasCancelar.cuerpo.pendiente.depositoEmpezo, true);
 });
 
-test("10c: un usuario del depósito no cancela (propiedad); el admin sin local sí, empezado", () => {
-  assert.equal(real.cancelarEmpezadoDeposito.status, 403);
+test("10c: el depósito de este pedido cancela el empezado; el admin sin local también", () => {
+  // Decía: un usuario del depósito no cancela (403, por propiedad). Desde el
+  // 2026-10-23 el depósito ORIGEN sí, empezado o no: lo cubre entero
+  // `app/api/pos-transferencias/cancelarDesdeElDeposito.test.mjs`.
+  assert.equal(real.cancelarEmpezadoDeposito.status, 200);
+  assert.equal(real.cancelarEmpezadoDeposito.cuerpo.ok, true);
   assert.equal(real.cancelarEmpezadoAdmin.status, 200);
 });
 
@@ -55,7 +59,9 @@ test("la forma: el criterio de empezado es el de bloqueoDelPedido, adentro del b
   const tx = ruta.indexOf("prisma.$transaction(async (tx) =>");
   const par = ruta.indexOf("bloquearParDelPedido(tx, pos.origenId, pos.destinoId)");
   const fila = ruta.indexOf("bloquearFilaDelPedido(tx, posId)");
-  const pregunta = ruta.indexOf("!esAdmin && fila?.estado === ESTADO_PEDIDO.SOLICITADO && (await depositoEmpezo(tx, fila))");
+  // El depósito de este pedido queda afuera de la pregunta (2026-10-23): él sí
+  // cancela un empezado. El local, adentro, como siempre.
+  const pregunta = ruta.indexOf("!esAdmin && !esDelDeposito && fila?.estado === ESTADO_PEDIDO.SOLICITADO && (await depositoEmpezo(tx, fila))");
   const marca = ruta.indexOf("tx.posTransferencia.updateMany(");
   assert.ok(tx > -1 && par > tx && fila > par && pregunta > fila && marca > pregunta, "el orden no es transacción → par → fila → empezado → marcar");
   assert.match(ruta, /from "@\/lib\/pedidos\/bloqueoDelPedido"/);

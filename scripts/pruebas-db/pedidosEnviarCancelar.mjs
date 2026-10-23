@@ -778,17 +778,26 @@ try {
         cb.status === 409 && cb.cuerpo.error === "El depósito ya está preparando tu pedido. Ya no se puede cancelar desde el local.", json(cb));
       ok("10b: y el pedido sigue Solicitado, con lo preparado", (await estadoDe(pb)) === "Solicitado");
 
-      // 10c. Desde el lado del depósito. Un usuario del depósito, con su PIN:
-      // la ruta solo deja cancelar al local destino o a un admin sin local.
+      // 10c. Desde el lado del depósito. Decía: un usuario del depósito no
+      // puede (403, la ruta solo dejaba al local destino o a un admin sin
+      // local). Desde el 2026-10-23 el depósito ORIGEN de este pedido sí, con el
+      // permiso de enviar, empezado o no (sección 15). El admin sin local, como
+      // antes, sobre otro pedido empezado.
       const opDepo = await c.operadorLocal.create({ data: { nombre: "Dani", pinHash: "x", localId: P.deposito.id } });
       const sDepoPin = `${sDepo}; erpazul_operador_activo=${jwt.sign({ operadorId: opDepo.id, nombre: opDepo.nombre, localId: P.deposito.id, _tipo: "operador", emitidoEn: Date.now() }, process.env.AUTH_SECRET)}`;
       const cd = await cancelarComo(sDepoPin, pb);
       guardar("cancelarEmpezadoDeposito", cd);
-      console.log(`  · 10c: un usuario del depósito intenta cancelar: ${cd.status} ${json(cd.cuerpo)}`);
-      ok("10c: un usuario del depósito no puede cancelar (hoy, por propiedad: no es el local destino)", cd.status === 403, json(cd));
-      const cadm = await cancelarComo(sAdmin, pb);
+      console.log(`  · 10c: un usuario del depósito cancela el empezado: ${cd.status} ${json(cd.cuerpo)}`);
+      ok("10c: el depósito de este pedido cancela el empezado", cd.cuerpo.ok === true && (await estadoDe(pb)) === "Cancelado", json(cd));
+      // Si no pudo, el rojo ya quedó anotado: se saca con el admin para que lo
+      // que sigue (que necesita al local sin un pedido pendiente) se pueda medir.
+      if ((await estadoDe(pb)) === "Solicitado") await cancelarComo(sAdmin, pb);
+      const pc = await enviarUno(ACEITE, 2);
+      const lc = await c.posTransferenciaDetalle.findFirst({ where: { posTransferenciaId: pc, productoId: ACEITE } });
+      ok("10c: el depósito empieza otro", (await preparar(lc.id, 2)).cuerpo.ok === true);
+      const cadm = await cancelarComo(sAdmin, pc);
       guardar("cancelarEmpezadoAdmin", cadm);
-      ok("10c: el admin sin local cancela el empezado", cadm.cuerpo.ok === true && (await estadoDe(pb)) === "Cancelado", json(cadm));
+      ok("10c: el admin sin local cancela el empezado", cadm.cuerpo.ok === true && (await estadoDe(pc)) === "Cancelado", json(cadm));
 
       // 10d. CARRERA: el local cancela en el mismo instante en que el
       // depósito empieza. Tarde = un pedido Cancelado con algo preparado: se
@@ -1201,8 +1210,11 @@ try {
         lineasT.map((l) => [l.producto?.base?.nombre ?? l.producto?.nombre, [Number(l.cantidad), Number(l.cantidadPresentada ?? l.cantidad), l.unidadEnviada]])
       );
       console.log(`  · 14: la transferencia #${tId} lleva → ${json(viajo)}`);
+      // Por producto, sin depender del orden de las líneas: comparar el JSON de
+      // un objeto armado en el orden en que vinieron daba rojo según el orden.
+      const ordenado = (o) => json(Object.entries(o).sort(([a], [b]) => a.localeCompare(b)));
       ok("14: la transferencia lleva aceite 2, arroz 1, fideos 1, agua 2 bultos y azúcar 1; sin yerba",
-        json(viajo) === json({ ACEITE: [2, 2, "UNIDAD"], ARROZ: [1, 1, "UNIDAD"], FIDEOS: [1, 1, "UNIDAD"], "AGUA X6": [2, 2, "BULTO"], AZUCAR: [1, 1, "UNIDAD"] }),
+        ordenado(viajo) === ordenado({ ACEITE: [2, 2, "UNIDAD"], ARROZ: [1, 1, "UNIDAD"], FIDEOS: [1, 1, "UNIDAD"], "AGUA X6": [2, 2, "BULTO"], AZUCAR: [1, 1, "UNIDAD"] }),
         json(viajo));
       const solTrasEnviar = await solicitadosD();
       guardar("depositoSolicitadosTrasEnviar", solTrasEnviar);
@@ -1280,14 +1292,196 @@ try {
       // y las vuelve a leer adentro, con el bloqueo. Si el local sumó en el
       // medio, no despacha una lista vieja: 409. Se larga el envío y, sin
       // esperarlo, el local suma —el pedido no está empezado, así que puede—.
-      const enviando = pedir(enviar, "POST", `${B}/pos-transferencias/enviar`, sDepo, { posId: p2 });
-      const sumaEnElMedio = D.fijar(D.ids.SAL, 3);
-      const [envio409, suma409] = await Promise.all([enviando, sumaEnElMedio]);
-      console.log(`  · 14b: enviar con el local sumando en el medio → ${envio409.status} ${json(envio409.cuerpo).slice(0, 140)}; la suma → ${suma409.status}`);
+      //
+      // Es una carrera de verdad y a veces el envío gana (el 2026-10-23 pasó):
+      // entonces sale ese pedido, el local arma otro y se prueba de nuevo, hasta
+      // diez veces. Lo que se afirma es que, cuando el local suma en el medio,
+      // el envío NO despacha la lista vieja.
+      let envio409 = null;
+      let pCarrera = p2;
+      let intentos = 0;
+      for (; intentos < 10; intentos++) {
+        const enviando = pedir(enviar, "POST", `${B}/pos-transferencias/enviar`, sDepo, { posId: pCarrera });
+        const sumaEnElMedio = D.fijar(D.ids.SAL, 3 + intentos);
+        const [r] = await Promise.all([enviando, sumaEnElMedio]);
+        if (r.status === 409) {
+          envio409 = r;
+          break;
+        }
+        ok(`14b: el envío ganó la vuelta ${intentos + 1} y salió entero`, r.cuerpo.ok === true, json(r).slice(0, 200));
+        // Lo que el local sumó cuando ya había salido fue a un borrador nuevo:
+        // ése se envía para la vuelta siguiente.
+        ok("14b: el local arma otro", (await D.fijar(D.ids.ACEITE, 1)).cuerpo.ok === true);
+        pCarrera = (await carrito(D.sPin)).cuerpo.posId;
+        await pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, D.sPin, { posId: pCarrera });
+      }
+      console.log(`  · 14b: enviar con el local sumando en el medio → ${envio409?.status} en el intento ${intentos + 1}`);
       guardar("depositoEnviarMientrasElLocalSuma", envio409);
-      guardar("depositoDetalleTrasElCambio", await detalleD(p2));
-      ok("14b: enviar con el local sumando en el medio da 409, y no sale", envio409.status === 409 && (await c.posTransferencia.findUnique({ where: { id: p2 }, select: { estado: true } })).estado === "Solicitado", json(envio409));
+      guardar("depositoDetalleTrasElCambio", await detalleD(pCarrera));
+      ok("14b: enviar con el local sumando en el medio da 409, y no sale", envio409?.status === 409 && (await c.posTransferencia.findUnique({ where: { id: pCarrera }, select: { estado: true } })).estado === "Solicitado", json(envio409));
       guardar("depositoIds", { p1, p2, transferenciaId: tId, local: D.local.nombre, deposito: D.deposito.nombre, pidio: "Cuenta Grupo depósito" });
+    }
+
+    seccion("15. El depósito cancela un pedido de local, empezado o no");
+    {
+      // Regla de Emanuel (2026-10-23): el depósito ORIGEN cancela un pedido
+      // Solicitado, empezado o no; el local sigue sin poder cancelar uno
+      // empezado; nadie de otro depósito ni de otro local puede; uno ya enviado
+      // se maneja desde la transferencia. Y lo preparado no movió stock: se mide
+      // el stock antes y después de cada cancelación.
+      const RC = {
+        detalle: await import("../../app/api/pos-transferencias/detalle/route.js"),
+        solicitados: await import("../../app/api/pos-transferencias/solicitados/route.js"),
+        opciones: await import("../../app/api/pos-transferencias/opciones/route.js"),
+      };
+      const C = await armarLocal("Grupo cancela depósito", ["ACEITE", "ARROZ", { nombre: "AGUA X6", extra: { unidad_medida: "pack", factor_pack: 6 } }]);
+      for (const id of Object.values(C.ids)) await c.stockLocal.create({ data: { localId: C.deposito.id, productoId: id, cantidad: 1000 } });
+      const grupoC = (await c.grupoLocal.findFirst({ where: { localId: C.local.id }, select: { grupoId: true } })).grupoId;
+      await c.cliente.create({ data: { grupoId: grupoC, localId: C.deposito.id, nombre: `${C.local.nombre} (interno)`, localVinculadoId: C.local.id } });
+      // Dos personas del depósito, cada una con su PIN: una cancela y otra envía.
+      const deDeposito = async (nombre, deposito) => {
+        const u = await c.usuario.create({
+          data: { nombre, email: `${nombre.toLowerCase().replace(/\W+/g, "-")}-${marca}@ci.local`, passwordHash: "x", rolId: rolEnc.id, localId: deposito.id },
+        });
+        const op = await c.operadorLocal.create({ data: { nombre, pinHash: "x", localId: deposito.id } });
+        const s = `${sesionDe(u, deposito.id)}; erpazul_operador_activo=${jwt.sign({ operadorId: op.id, nombre: op.nombre, localId: deposito.id, _tipo: "operador", emitidoEn: Date.now() }, process.env.AUTH_SECRET)}`;
+        return { u, s };
+      };
+      const marta = await deDeposito("Marta cancela", C.deposito);
+      const lucas = await deDeposito("Lucas envía", C.deposito);
+      // Otro grupo: su depósito y su local no son de este pedido.
+      const O = await armarLocal("Grupo otro depósito", ["ACEITE"]);
+      const otroDepo = await deDeposito("Otro depósito", O.deposito);
+
+      const cancelarC = (s, posId) => pedir(R.cancelar, "POST", `${B}/pos-transferencias/cancelar`, s, { posId });
+      const enviarC = (s, posId) => pedir(enviar, "POST", `${B}/pos-transferencias/enviar`, s, { posId });
+      const editarC = (s, body) => pedir(editar, "POST", `${B}/pos-transferencias/detalle/editar`, s, body);
+      const detalleC = (posId) => pedir(RC.detalle, "GET", `${B}/pos-transferencias/detalle?posId=${posId}`, marta.s);
+      const solicitadosC = () => pedir(RC.solicitados, "GET", `${B}/pos-transferencias/solicitados`, marta.s);
+      const pedirC = async (cargas) => {
+        for (const [nombre, cantidad, unidad] of cargas) {
+          const r = await C.fijar(C.ids[nombre], cantidad, unidad);
+          if (!r.cuerpo.ok) throw new Error(`no se pudo cargar ${nombre}: ${json(r)}`);
+        }
+        const car = await carrito(C.sPin);
+        const r = await pedir(R.solicitar, "POST", `${B}/pos-transferencias/solicitar`, C.sPin, { posId: car.cuerpo.posId });
+        if (!r.cuerpo.ok) throw new Error(`no se pudo enviar: ${json(r)}`);
+        return car.cuerpo.posId;
+      };
+      const empezar = async (posId) => {
+        const l = (await detalleC(posId)).cuerpo.item.detalles[0];
+        const r = await editarC(marta.s, { detalleId: l.detalleId, preparado: l.sugerido, unidadPreparada: l.unidadSugerida });
+        if (!r.cuerpo.ok) throw new Error(`no se pudo empezar: ${json(r)}`);
+      };
+      /** El stock del depósito y del local, producto por producto. */
+      const stock = async () =>
+        json(
+          (await c.stockLocal.findMany({ where: { localId: { in: [C.deposito.id, C.local.id] } }, select: { localId: true, productoId: true, cantidad: true }, orderBy: [{ localId: "asc" }, { productoId: "asc" }] }))
+            .map((s) => [s.localId, s.productoId, Number(s.cantidad)])
+        );
+      const pedidoDe = (id) => c.posTransferencia.findUnique({ where: { id }, select: { estado: true, canceladoPorUserId: true, canceladoAt: true } });
+      const transferenciasDe = (id) => c.transferencia.count({ where: { posTransferenciaId: id } });
+
+      // ── Lo que lee la pantalla de preparar de este depósito ───────────────
+      guardar("depositoCancelarMe", await pedir(R.me, "GET", `${B}/me`, marta.s));
+      guardar("depositoCancelarOperadorMe", await pedir(R.operadorMe, "GET", `${B}/operador/me`, marta.s));
+      guardar("depositoCancelarOpciones", await pedir(RC.opciones, "GET", `${B}/pos-transferencias/opciones`, marta.s));
+
+      // ── a. Sin empezar: el depósito cancela ───────────────────────────────
+      const pa = await pedirC([["ACEITE", 2]]);
+      const stockA = await stock();
+      const ca = await cancelarC(marta.s, pa);
+      guardar("depositoCancelarSinEmpezar", ca);
+      const ea = await pedidoDe(pa);
+      ok("15a: el depósito cancela uno sin empezar", ca.status === 200 && ca.cuerpo.ok === true && ea.estado === "Cancelado", json({ ca, ea }));
+      ok("15a: queda quién lo canceló y cuándo", ea.canceladoPorUserId === marta.u.id && !!ea.canceladoAt, json(ea));
+      ok("15a: el stock no cambió", (await stock()) === stockA);
+
+      // ── b. Empezado: el local no, otro depósito no, otro local no; el depósito sí
+      const pb = await pedirC([["ACEITE", 2], ["AGUA X6", 1, "BULTO"]]);
+      await empezar(pb);
+      const stockB = await stock();
+      guardar("depositoCancelarDetalle", await detalleC(pb));
+      guardar("depositoCancelarSolicitados", await solicitadosC());
+      const cbLocal = await cancelarC(C.sPin, pb);
+      guardar("depositoCancelarElLocalEmpezado", cbLocal);
+      ok("15b: el local no cancela uno empezado (409, como hoy)", cbLocal.status === 409 && cbLocal.cuerpo.error === "El depósito ya está preparando tu pedido. Ya no se puede cancelar desde el local.", json(cbLocal));
+      const cbOtroDepo = await cancelarC(otroDepo.s, pb);
+      ok("15b: un usuario de OTRO depósito no puede (403)", cbOtroDepo.status === 403, json(cbOtroDepo));
+      const cbOtroLocal = await cancelarC(O.sPin, pb);
+      ok("15b: un usuario de otro local no puede (403)", cbOtroLocal.status === 403, json(cbOtroLocal));
+      ok("15b: y sigue Solicitado", (await pedidoDe(pb)).estado === "Solicitado");
+      const cb = await cancelarC(marta.s, pb);
+      guardar("depositoCancelarEmpezado", cb);
+      ok("15b: el depósito cancela el empezado", cb.status === 200 && cb.cuerpo.ok === true && (await pedidoDe(pb)).estado === "Cancelado", json(cb));
+      ok("15b: el stock no cambió (lo preparado no lo movió)", (await stock()) === stockB, json({ antes: stockB, despues: await stock() }));
+      ok("15b: no hay transferencia", (await transferenciasDe(pb)) === 0);
+      const solDespues = await solicitadosC();
+      guardar("depositoCancelarSolicitadosDespues", solDespues);
+      ok("15b: ya no está en Pedidos de locales", !(solDespues.cuerpo.items || []).some((s) => s.id === pb), json(solDespues.cuerpo.items?.map((s) => s.id)));
+      const otraVez = await cancelarC(marta.s, pb);
+      ok("15b: cancelarlo otra vez da 404, como siempre", otraVez.status === 404, json(otraVez));
+
+      // ── Lo que ve el local ────────────────────────────────────────────────
+      guardar("depositoCanceloMeDelLocal", await pedir(R.me, "GET", `${B}/me`, C.sPin));
+      guardar("depositoCanceloOperadorDelLocal", await pedir(R.operadorMe, "GET", `${B}/operador/me`, C.sPin));
+      guardar("depositoCanceloOpcionesDelLocal", await pedir(R.opciones, "GET", `${B}/pedidos/opciones`, C.sPin));
+      guardar("depositoCanceloCatalogoDelLocal", await pedir(R.catalogo, "GET", `${B}/pedidos/catalogo?page=1&pageSize=50`, C.sPin));
+      const carritoLocal = await carrito(C.sPin);
+      guardar("depositoCanceloCarritoDelLocal", carritoLocal);
+      ok("15: el local ya no tiene un pedido en curso", carritoLocal.cuerpo.pendiente === null && (carritoLocal.cuerpo.items || []).length === 0, json(carritoLocal.cuerpo));
+      const histLocal = await pedir(R.historial, "GET", `${B}/pedidos/historial?page=1&pageSize=50`, C.sPin);
+      guardar("depositoCanceloHistorialDelLocal", histLocal);
+      ok("15: en su historial, los dos cancelados", json(histLocal.cuerpo.items?.map((i) => [i.posId, i.estado])) === json([[pb, "Cancelado"], [pa, "Cancelado"]]), json(histLocal.cuerpo.items?.map((i) => [i.posId, i.estado])));
+      const nuevo = await C.fijar(C.ids.ARROZ, 1);
+      ok("15: y puede hacer un pedido nuevo", nuevo.cuerpo.ok === true && nuevo.cuerpo.posId !== pb && nuevo.cuerpo.posId !== pa, json(nuevo));
+      await C.fijar(C.ids.ARROZ, 0);
+
+      // ── c. Ya enviado: se maneja desde la transferencia ───────────────────
+      const pcc = await pedirC([["ARROZ", 1]]);
+      await empezar(pcc);
+      ok("15c: Lucas lo envía", (await enviarC(lucas.s, pcc)).cuerpo.ok === true);
+      const stockC = await stock();
+      const ccc = await cancelarC(marta.s, pcc);
+      guardar("depositoCancelarYaEnviado", ccc);
+      ok("15c: cancelar uno enviado da 409, con el mensaje", ccc.status === 409 && ccc.cuerpo.error === "El pedido ya se envió. Se maneja desde la transferencia.", json(ccc));
+      ok("15c: sigue Enviado, con su transferencia, y el stock no cambió", (await pedidoDe(pcc)).estado === "Enviado" && (await transferenciasDe(pcc)) === 1 && (await stock()) === stockC);
+
+      // ── d. CARRERA: Marta cancela mientras Lucas envía ────────────────────
+      // Las dos rutas toman el bloqueo del par y la fila: una pasa primero y la
+      // otra encuentra el pedido ya decidido. Nunca las dos: cancelado Y con
+      // transferencia. Y si ganó la cancelación, el stock no se movió.
+      const VUELTAS = 20;
+      const carrera = { vueltas: VUELTAS, cancelo: 0, envio: 0, ambas: 0, ninguna: 0, stockMovidoAlCancelar: 0, respuestas: {} };
+      for (let i = 0; i < VUELTAS; i++) {
+        const p = await pedirC([["ACEITE", 1]]);
+        await empezar(p);
+        const antes = await stock();
+        // El envío arranca primero y la cancelación sale con una demora que va
+        // de 0 a 38 ms: `enviar` valida el stock ANTES de tomar el bloqueo, y
+        // largadas juntas la cancelación ganaba las 20 (una carrera que cae
+        // siempre del mismo lado no ejerce nada).
+        const envia = enviarC(lucas.s, p);
+        await new Promise((r) => setTimeout(r, i * 2));
+        const [rc, re] = await Promise.all([cancelarC(marta.s, p), envia]);
+        const e = await pedidoDe(p);
+        const t = await transferenciasDe(p);
+        // Con el mensaje: lo que lee el que perdió.
+        const clave = `cancelar ${rc.status}${rc.cuerpo.error ? ` "${rc.cuerpo.error}"` : ""} / enviar ${re.status}${re.cuerpo.error ? ` "${re.cuerpo.error}"` : ""}`;
+        carrera.respuestas[clave] = (carrera.respuestas[clave] || 0) + 1;
+        if (e.estado === "Cancelado" && t > 0) carrera.ambas++;
+        else if (e.estado === "Cancelado") {
+          carrera.cancelo++;
+          if ((await stock()) !== antes) carrera.stockMovidoAlCancelar++;
+        } else if (e.estado === "Enviado" && t === 1) carrera.envio++;
+        else carrera.ninguna++;
+      }
+      console.log(`  · 15d: carrera cancelar contra enviar → ${json(carrera)}`);
+      guardar("depositoCarreraCancelarEnviar", carrera);
+      ok("15d: nunca quedan las dos cosas (cancelado y con transferencia)", carrera.ambas === 0, json(carrera));
+      ok("15d: cada vuelta terminó en una de las dos", carrera.cancelo + carrera.envio === VUELTAS && carrera.ninguna === 0, json(carrera));
+      ok("15d: ninguna cancelación movió stock", carrera.stockMovidoAlCancelar === 0, json(carrera));
+      guardar("depositoCancelarIds", { pa, pb, pcc, local: C.local.nombre, deposito: C.deposito.nombre });
     }
   }
 
