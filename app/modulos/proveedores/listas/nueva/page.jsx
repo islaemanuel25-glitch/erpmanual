@@ -55,6 +55,7 @@ import { LIMITES } from "@/lib/proveedores/listas/persistencia";
 // ofreciendo un botón que el servidor después no acepta.
 import {
   faltantesDeConfiguracion,
+  recargoODefault,
   TEXTO_FALTA_CONFIGURACION,
 } from "@/lib/proveedores/listas/configuracionProveedor";
 // Y CUÁLES DE LOS "NO PUDE ELEGIR LA COLUMNA" SON PREGUNTAS Y NO ERRORES. La
@@ -205,7 +206,9 @@ export default function SubirListaPage() {
     const txt = (v) => (v === null || v === undefined ? "" : String(v));
     setMinPct(txt(c?.minPct));
     setMaxPct(txt(c?.maxPct));
-    setRecargoPct(txt(c?.recargoPct));
+    // El recargo arranca con un VALOR REAL —el de la ficha, o 0—, no con una
+    // marca de agua: el "0" gris se leía como cargado y la lectura se frenaba.
+    setRecargoPct(String(recargoODefault(c?.recargoPct)));
     setTieneImpuestos(c?.impuestosDefinidos ? Number(c?.impuestoAdicionalPct) > 0 : null);
     setImpuestoPct(txt(c?.impuestoAdicionalPct));
     setAvisoGuardado("");
@@ -215,7 +218,7 @@ export default function SubirListaPage() {
   const configEditada = useMemo(() => ({
     minPct: minPct === "" ? null : Number(minPct),
     maxPct: maxPct === "" ? null : Number(maxPct),
-    recargoPct: recargoPct === "" ? null : Number(recargoPct),
+    recargoPct: recargoODefault(recargoPct),
     impuestoAdicionalPct: tieneImpuestos === false ? 0 : (impuestoPct === "" ? null : Number(impuestoPct)),
     impuestosDefinidos: tieneImpuestos !== null,
   }), [minPct, maxPct, recargoPct, tieneImpuestos, impuestoPct]);
@@ -615,12 +618,9 @@ export default function SubirListaPage() {
                   {proveedor.nombre}, guardalo con el botón de abajo.
                 </p>
               ) : (
-                // Y DICE QUÉ FALTA, no que falta algo. Con el rango y el
-                // impuesto contestados pero el recargo vacío, "Falta completar
-                // esto" dejaba un botón apagado y ninguna pista de cuál de los
-                // tres campos lo apagaba — y el recargo es justamente el que se
-                // deja en blanco, porque su ayuda dice "poné 0 si no le sumás
-                // nada" y el 0 que se ve es el de la marca de agua.
+                // Y DICE QUÉ FALTA, no que falta algo: "Falta completar esto"
+                // dejaba un botón apagado y ninguna pista de cuál campo lo
+                // apagaba.
                 <div className="text-sm2 sunmi-text-warning leading-snug space-y-1">
                   <p>Falta completar esto para poder leer la lista:</p>
                   <ul className="list-disc pl-5">
@@ -648,7 +648,6 @@ export default function SubirListaPage() {
                       inputMode="decimal"
                       value={minPct}
                       onChange={(e) => setMinPct(e.target.value)}
-                      placeholder="5"
                       aria-label="Aumento mínimo esperado, en por ciento"
                       className="min-h-toque text-base w-full"
                     />
@@ -660,7 +659,6 @@ export default function SubirListaPage() {
                       inputMode="decimal"
                       value={maxPct}
                       onChange={(e) => setMaxPct(e.target.value)}
-                      placeholder="8"
                       aria-label="Aumento máximo esperado, en por ciento"
                       className="min-h-toque text-base w-full"
                     />
@@ -671,8 +669,10 @@ export default function SubirListaPage() {
 
               <Campo
                 etiqueta="¿Le sumás algo al precio de la lista?"
-                ayuda="Por ejemplo, el flete. Poné 0 si no le sumás nada."
+                ayuda="Por ejemplo, el flete. Vacío cuenta como 0."
               >
+                {/* SIN MARCA DE AGUA NUMÉRICA en ningún campo de esta tarjeta:
+                    un número gris se lee como cargado. */}
                 <ConPorciento>
                   <SunmiInput
                     id="recargoPct"
@@ -680,7 +680,6 @@ export default function SubirListaPage() {
                     inputMode="decimal"
                     value={recargoPct}
                     onChange={(e) => setRecargoPct(e.target.value)}
-                    placeholder="0"
                     aria-label="Recargo, en por ciento"
                     className="min-h-toque text-base w-full"
                   />
@@ -719,7 +718,6 @@ export default function SubirListaPage() {
                         inputMode="decimal"
                         value={impuestoPct}
                         onChange={(e) => setImpuestoPct(e.target.value)}
-                        placeholder="0"
                         aria-label="Impuesto adicional, en por ciento"
                         className="min-h-toque text-base w-full"
                       />

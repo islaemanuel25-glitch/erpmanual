@@ -30,6 +30,7 @@ import { proveedorVisibleWhere, proveedorEditableWhere } from "@/lib/visibilidad
 import {
   configuracionDeProveedor,
   faltantesDeConfiguracion,
+  recargoODefault,
   TEXTO_FALTA_CONFIGURACION,
 } from "@/lib/proveedores/listas/configuracionProveedor";
 
@@ -82,7 +83,8 @@ export async function PUT(req, context) {
     const body = await req.json().catch(() => ({}));
     const minPct = num(body?.aumentoEsperadoMinPct);
     const maxPct = num(body?.aumentoEsperadoMaxPct);
-    const recargoPct = num(body?.recargoPct);
+    // Vacío se guarda como 0: es lo que la lectura usaría igual.
+    const recargoPct = recargoODefault(body?.recargoPct);
     const impuestosDefinidos = body?.impuestosDefinidos === true;
     const impuestoAdicionalPct = impuestosDefinidos ? num(body?.impuestoAdicionalPct) : null;
 
