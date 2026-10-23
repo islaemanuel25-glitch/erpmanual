@@ -1,6 +1,6 @@
 # Modulo: Proveedores
 
-**Última actualización:** 2026-10-18 00:47
+**Última actualización:** 2026-10-23 14:16
 
 ## Ubicacion
 - UI: `app/modulos/proveedores/page.jsx`
@@ -71,6 +71,7 @@ enum DiaPedido {
 ```
 
 ## Cambios recientes
+- 2026-10-23: fix(proveedores/listas): el recargo vacío vale 0 y no frena la lectura
 - 2026-10-18: fix: el dueño de un local elimina sus proveedores y lleva sus listas de precios
 - 2026-10-18: fix: el dueño de un local crea y edita sus propios proveedores
 - 2026-10-10: feat: una explicación por tipo de papel, el CAE contra el duplicado, el cargo repartido en el costo, y se va el código de formato

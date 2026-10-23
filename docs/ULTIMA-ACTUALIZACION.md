@@ -1,8 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-23 11:44
+**Fecha:** 2026-10-23 14:16
 
 ## Módulos modificados recientemente
+
+### proveedores
+- fix(proveedores/listas): el recargo vacío vale 0 y no frena la lectura
+- Archivos: 2 modificados (2 total)
 
 ### pos-transferencias
 - fix(deposito): enviar dice "Este pedido se canceló." y la hoja de corregir habla como la tarjeta, feat(deposito): cancelar el pedido desde la pantalla de preparar, en el celular, feat(deposito): el depósito origen cancela un pedido de local, empezado o no
