@@ -1,6 +1,6 @@
 # Modulo: POS Transferencias
 
-**Última actualización:** 2026-10-23 02:37
+**Última actualización:** 2026-10-23 11:44
 
 ## Ubicacion
 - UI: `app/modulos/pos-transferencias/page.jsx`, `app/modulos/pos-transferencias/nueva/page.jsx`
@@ -105,6 +105,7 @@ model PosTransferenciaDetalle {
 ```
 
 ## Cambios recientes
+- 2026-10-23: fix(deposito): enviar dice "Este pedido se canceló." y la hoja de corregir habla como la tarjeta
 - 2026-10-23: feat(deposito): cancelar el pedido desde la pantalla de preparar, en el celular
 - 2026-10-23: feat(deposito): el depósito origen cancela un pedido de local, empezado o no
 - 2026-10-23: fix(deposito): lo que pidió el local se resalta igual que lo enviado en la recepción

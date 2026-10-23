@@ -1,12 +1,12 @@
 ## Última actualización del Proyecto Claude
 
-**Fecha:** 2026-10-23 02:37
+**Fecha:** 2026-10-23 11:44
 
 ## Módulos modificados recientemente
 
 ### pos-transferencias
-- feat(deposito): cancelar el pedido desde la pantalla de preparar, en el celular, feat(deposito): el depósito origen cancela un pedido de local, empezado o no, fix(deposito): lo que pidió el local se resalta igual que lo enviado en la recepción
-- Archivos: 3 nuevos, 4 modificados (7 total)
+- fix(deposito): enviar dice "Este pedido se canceló." y la hoja de corregir habla como la tarjeta, feat(deposito): cancelar el pedido desde la pantalla de preparar, en el celular, feat(deposito): el depósito origen cancela un pedido de local, empezado o no
+- Archivos: 3 nuevos, 5 modificados (8 total)
 
 ### transferencias
 - fix(deposito): lo que pidió el local se resalta igual que lo enviado en la recepción
@@ -14,8 +14,8 @@
 
 
 ## Archivos nuevos desde última sincronización
-- app/modulos/pos-transferencias/cancelarDesdePreparar.test.mjs
 - app/api/pos-transferencias/cancelarDesdeElDeposito.test.mjs
+- app/modulos/pos-transferencias/cancelarDesdePreparar.test.mjs
 - app/modulos/pos-transferencias/cantidadPedidaDestacada.test.mjs
 
 ## Acción recomendada
